@@ -18,6 +18,7 @@ class OriginalStandardModelGeometry50LA;
 class OriginalStandardCollisionType0Resource50LA;
 class OriginalStandardArchiveProvider50LA;
 class OriginalUiArchive50KG;
+struct OriginalUiMemberIdentity50KG;
 class OriginalUiIpumTextureCache50KG;
 struct OriginalUiIpumProvenance50KG;
 class OriginalStandardGarageIpumLease50KG;
@@ -293,8 +294,25 @@ private:
     friend class OriginalStandardTextureResource50LA;
     bool bind(const std::shared_ptr<const OriginalStandardMaterialContext50LA>&,
         OriginalStandardTextureDiagnostic50LA&) noexcept;
+    // Captured only from the actual positive resolver lookup. This private
+    // move-only value is not an occurrence/material/population capability.
+    struct UiSelection {
+        UiSelection()noexcept=default;
+        UiSelection(const UiSelection&)=delete;
+        UiSelection& operator=(const UiSelection&)=delete;
+        UiSelection(UiSelection&&)noexcept=default;
+        UiSelection& operator=(UiSelection&&)noexcept=default;
+        const OriginalStandardTextureResolver50LA* resolver=nullptr;
+        const OriginalStandardArchiveProvider50LA* providerIdentity=nullptr;
+        std::shared_ptr<const OriginalUiArchive50KG> archive;
+        const OriginalUiMemberIdentity50KG* member=nullptr;
+        const std::uint8_t* data=nullptr;
+        std::size_t bytes=0,sourceIndex=static_cast<std::size_t>(-1);
+        std::size_t mount=static_cast<std::size_t>(-1),ordinal=static_cast<std::size_t>(-1);
+        std::uint64_t providerRevision=0,bankGeneration=0;
+    };
     bool resolve24DADC(const std::string&,std::size_t&,std::string& resolvedName,
-        OriginalStandardTextureDiagnostic50LA&) const noexcept;
+        OriginalStandardTextureDiagnostic50LA&,UiSelection* capture=nullptr) const noexcept;
     bool validateProviderCache(OriginalStandardTextureDiagnostic50LA&) const noexcept;
     bool cached132820(std::size_t,std::shared_ptr<OriginalStandardTextureResource50LA>&,
         OriginalStandardTextureDiagnostic50LA&) noexcept;
@@ -418,7 +436,8 @@ private:
         const std::string& resolvedName,
         std::shared_ptr<const OriginalStandardMaterialContext50LA>,
         OriginalStandardTextureDiagnostic50LA&,
-        std::size_t frame=static_cast<std::size_t>(-1)) noexcept;
+        std::size_t frame=static_cast<std::size_t>(-1),
+        OriginalStandardTextureResolver50LA::UiSelection* selection=nullptr) noexcept;
     bool retain104960(OriginalStandardTextureDiagnostic50LA&) noexcept;
     bool release104970() noexcept;
     // Direct original1F2530 floor, not projected-size conversion104A00.
@@ -449,6 +468,10 @@ private:
     bool demandSelection249580(bool& written,OriginalStandardTextureDiagnostic50LA&) noexcept;
     bool demand104A00(float,bool& written,OriginalStandardTextureDiagnostic50LA&) noexcept;
     void resetDemand14D1A8() noexcept;
+    // Historical first selection belongs to this resource, not its mutable
+    // resolver File.bank association. Cached aliases never replace it.
+    OriginalStandardTextureResolver50LA::UiSelection firstUiSource_;
+    bool firstUiSourceCurrent()const noexcept;
     std::shared_ptr<OriginalStandardTextureResolver50LA> resolver_;
     std::shared_ptr<const OriginalStandardMaterialContext50LA> construction_;
     OriginalStandardTextureLifetimeLink50LA lifetimeLink_;

@@ -10,6 +10,7 @@ namespace rr::platform {
 // This owner never resets, steals or retunes another provider's voices/groups.
 class OriginalSoundMode50KG final {
     friend class OriginalApplicationAural50KG;
+    friend class OriginalUiRiderProfileOwner50KG; //single private all-owner Load coordinator
 public:
     OriginalSoundMode50KG() noexcept=default;
     OriginalSoundMode50KG(const OriginalSoundMode50KG&)=delete;

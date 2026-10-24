@@ -2,11 +2,15 @@
 #include "original_ui_rider_profile50kg.h"
 #include "original_save_profile_owner50kg.h"
 #include "original_save_native_read_stage50kg.h"
+#include "original_ui_main_audio50kg.h"
+#include "original_sound_mode50kg.h"
+#include "../../../src/game/original_ui_controls_controller50kg.h"
 #include "../../../src/game/original_course_load_selection50kg.h"
 #include <cmath>
 #include <limits>
 #include <string>
 #include <utility>
+#include <type_traits>
 
 namespace rr::platform {
 namespace {
@@ -774,6 +778,74 @@ bool OriginalUiRiderProfileOwner50KG::playerName10F68(std::uint32_t player,
     OriginalPersistedProfileName50KG& out)const noexcept {
     return storage_&&storage_->common&&storage_->common->known&&
         storage_->saveProfile.persistedName(false,player,out);
+}
+bool OriginalUiRiderProfileOwner50KG::installNativeReadOwners(
+    const std::shared_ptr<const OriginalSaveNativeReadStage50KG>& read,
+    OriginalSaveProfileOwner50KG& prepared,OriginalUiMainProfile50KG& common,
+    OriginalUiRiderProfileStamp50KG expected,game::OriginalUiGameSettingsProfile50KG& settings,
+    game::ControlPresets49D& controls,OriginalUiMainAudio50KG& audio,OriginalSoundMode50KG& sound)noexcept {
+    if(!read||!storage_||storage_->common.get()!=&common||!common.known||common.mode34!=4||
+       expected.mode34!=4||expected.generation!=storage_->generation||
+       storage_->generation==std::numeric_limits<std::uint64_t>::max()||
+       !hallRecordsReady()||!storage_->saveProfile.namesReady()||storage_->tournamentResultArmed||
+       storage_->comparison100C0>=27||(storage_->packed1125F&15u)>=13)return false;
+    auto& s=*storage_;auto& live=s.saveProfile;const auto& stage=read->projection();
+    if(s.testRider||s.gasganoScTest||s.tzidikTcTest||s.scorchRcTest||
+       s.sebulbaTbTest||s.kraidGbTest||s.youngAnakinMcTest)return false;
+    for(const auto course:s.courseOrder100C4)if(course>=13)return false;
+    const auto& before=stage.settingsBefore();
+    if(settings.known!=before.known||settings.savedGroup6E8!=before.savedGroup6E8||
+       settings.soundMode1101C!=before.soundMode1101C||settings.volume11020!=before.volume11020||
+       settings.flags11050!=before.flags11050||common.flags11054!=stage.flags11054Before()||
+       !game::sameOriginalUiControlsPresets50KG(controls,stage.controlsBefore())||
+       prepared.importedRead_.get()!=read.get()||prepared.payloadRecords_.get()!=stage.retainedEnvelope().get()||
+       prepared.hallOrigin_!=OriginalSaveProfileOwner50KG::HallOrigin::originalPayload||
+       !prepared.namesReady()||!prepared.identity191C_||
+       (prepared.cardFlags_.value&0xfcu)!=(live.cardFlags_.value&0xfcu)||
+       (prepared.cardFlags_.knownMask&0xfcu)!=(live.cardFlags_.knownMask&0xfcu))return false;
+    // Positive nonfailure proof is ONLY for the actual retained producer and
+    // current mixer/sound attachment. No legacy unbound-transport fallback.
+    game::OriginalSoundModeFields50KG soundFields;
+    const auto mode=stage.settingsAfter().soundMode1101C;
+    if(!audio.retainedGarageStorageCurrent()||!audio.canApplySoundMode18874050KG(mode)||
+       !audio.mixer_||audio.mixer_->originalSoundMode50KG()!=&sound||
+       !game::projectOriginalSoundMode18874050KG(mode,soundFields))return false;
+    const auto& shared=stage.records().sharedFields();
+    static_assert(std::is_nothrow_copy_assignable_v<decltype(s.tournament.careers)>);
+    static_assert(std::is_nothrow_copy_assignable_v<decltype(live.careerNames_)>);
+    static_assert(std::is_nothrow_copy_assignable_v<decltype(s.hallRecords.courses)>);
+    static_assert(std::is_nothrow_copy_assignable_v<decltype(live.playerNames_)>);
+    static_assert(std::is_nothrow_copy_assignable_v<game::OriginalUiGameSettingsProfile50KG>);
+    static_assert(std::is_nothrow_copy_assignable_v<game::OriginalSoundModeFields50KG>);
+    // BEGIN single nonfailing store interval: fixed value stores, noexcept
+    // accessors/swaps only; no allocation, callbacks, branch-to-failure or
+    // destruction of last retained ownership below.
+    live.identity191C_=prepared.identity191C_;                         //186D58
+    s.tournament.careers=stage.careers();
+    live.careerNames_=prepared.careerNames_;
+    s.hallRecords.courses=stage.records().courses();
+    s.hallRecords.namesSource=nullptr;s.hallRecords.textSource=nullptr;
+    live.playerNames_=prepared.playerNames_;live.namesInitialized_=true;
+    s.unlock10FAC=shared.unlock10FAC;common.availability11018=shared.availability11018;
+    settings=stage.settingsAfter();
+    // Copy only persisted words. Existing action rows are NEVER assigned.
+    for(std::size_t i=0;i<game::controlPresetSlots49D;++i){
+        auto& dst=controls.slots[i];const auto& src=stage.controlsAfter().slots[i];
+        dst.configuration11040=src.configuration11040;dst.preset11048=src.preset11048;
+        dst.field10F94=src.field10F94;dst.field10F9C=src.field10F9C;dst.field10FA4=src.field10FA4;
+        dst.field11030=src.field11030;dst.field11038=src.field11038;
+    }
+    live.hallOrigin_=prepared.hallOrigin_;live.localizedNames_=nullptr;live.localizedText_=nullptr;
+    live.payloadRecords_.swap(prepared.payloadRecords_);live.importedRead_.swap(prepared.importedRead_);
+    live.cardFlags_=prepared.cardFlags_;                              //186D94..DE0
+    // EXACT successful188740 effects: projected fields + sound revision,
+    // then Main transport control revision. Existing implementation has no
+    // mixer/gain/device writes. All predicates were proved above and no
+    // preceding store touches them. No bool-returning re-entry/rollback.
+    sound.fields_=soundFields;++sound.revision_;++audio.controlRevision_;
+    common.flags11054=stage.flags11054After();                        //186DE4..E18
+    ++s.generation; //one native publication; no source-selection/reset writes.
+    return true;
 }
 bool OriginalUiRiderProfileOwner50KG::prepareNativeReadMetadata(
     const std::shared_ptr<const OriginalSaveNativeReadStage50KG>& read,

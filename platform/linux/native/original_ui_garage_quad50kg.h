@@ -7,11 +7,13 @@
 namespace original_main_entry50KG {struct Video;class NativeCollectorFifo50LA;}
 namespace rr::platform {
 class OriginalUiGaragePageOwner50KG;
+class OriginalUiMemoryCardConstructor50KG;
 // Canonical embedded2DEF40, real2461E0 material reference and aligned2DF0B0
 // packet backing. No counted Entity, native collector or draw-ready claim.
 class OriginalUiGarageQuad50KG final {
     friend class ::original_main_entry50KG::NativeCollectorFifo50LA;
     friend class OriginalUiSharedDialogs50KG;
+    friend class OriginalUiMemoryCardConstructor50KG;
     friend class OriginalUiGaragePageOwner50KG;
     friend class OriginalUiGarageDrawContribution50KG;
     using Root=::original_main_entry50KG::Application;
@@ -65,6 +67,11 @@ private:
     static bool retainPrimitive2465B0(const RootInputs&,Primitive&,const char*,Diagnostic&)noexcept;
     static bool loadAperturePrimitive2E20F0(const RootInputs&,std::unique_ptr<Primitive>&,Diagnostic&)noexcept;
     bool construct2DEF40(std::uint32_t)noexcept;
+    bool initializeColdPrefix2DEF40(std::uint32_t,bool memoryCardOnly)noexcept;
+    // Separate detached page438 prefix only. Never admits Garage load/name mapping.
+    bool constructMemoryCardPrefix2DEF40(std::uint32_t)noexcept;
+    bool retainMemoryCardFirstIcon2465B0(OriginalUiMemoryCardConstructor50KG&,Diagnostic&)noexcept;
+    bool memoryCardPrefixOnly_=false;
     bool load2DF0B0(const RootInputs&,Diagnostic&)noexcept;
     // Queued records borrow the actual Primitive and packet. Mutation and
     // source retirement wait for genuine105990 release of these same pins.

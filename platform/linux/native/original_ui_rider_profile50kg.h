@@ -12,9 +12,12 @@
 #include "../../../src/game/original_ui_hall_records50kg.h"
 
 namespace original_main_entry50KG { struct Application; }
+namespace rr::game { struct ControlPresets49D; struct OriginalUiGameSettingsProfile50KG; }
 
 namespace rr::platform {
 class OriginalUiFrontend50KG;
+class OriginalUiMainAudio50KG;
+class OriginalSoundMode50KG;
 class OriginalSaveNativeReadStage50KG;
 class OriginalSaveProfileOwner50KG;
 class OriginalUiTournamentSession50KG;
@@ -241,6 +244,13 @@ private:
     // mode. Actual Rider entry and every profile commit still read live mode.
     bool selectionSnapshotForMode(std::uint32_t prospectiveMode,
         game::OriginalUiRiderSelectionProfile50KG&) const noexcept;
+    // One all-owner nonfailing store interval, called only after the actual
+    // Frontend/Options exclusion. Prepared ownership receives displaced shared
+    // ancestry and must outlive that exclusion. No separately callable stores.
+    bool installNativeReadOwners(const std::shared_ptr<const OriginalSaveNativeReadStage50KG>&,
+        OriginalSaveProfileOwner50KG& prepared,OriginalUiMainProfile50KG&,
+        OriginalUiRiderProfileStamp50KG,game::OriginalUiGameSettingsProfile50KG&,
+        game::ControlPresets49D&,OriginalUiMainAudio50KG&,OriginalSoundMode50KG&)noexcept;
     // Existing-owner facet for the future private load coordinator. It uses
     // THIS sole Rider bank/common pointer and generation, not supplied careers.
     // No mutation, storage IO, live import or completed-load capability.

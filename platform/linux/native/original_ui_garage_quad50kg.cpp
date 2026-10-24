@@ -1,5 +1,6 @@
 #include "vehicle_window_gl50ds.h"
 #include "original_ui_garage_quad50kg.h"
+#include "original_ui_memory_card_constructor50kg.h"
 #include "original_ui_garage_draw_contribution50kg.h"
 #include "original_ui_shared_dialogs50kg.h"
 #include "../../../tests/native/original_ui_main_entry50kg.h"
@@ -27,12 +28,56 @@ const char* OriginalUiGarageQuad50KG::authoredName(std::uint32_t at)noexcept {
         case 0x33F0:return "arrwleftsm";case 0x3450:return "arrwrghtsm";default:break;}
     return at>=0x640&&at<0x640+120*0x60&&(at-0x640)%0x60==0?"notch":nullptr;
 }
-bool OriginalUiGarageQuad50KG::construct2DEF40(std::uint32_t at)noexcept {
-    if(stage_!=Stage::empty||!authoredName(at))return false;offset=at;
+bool OriginalUiGarageQuad50KG::initializeColdPrefix2DEF40(std::uint32_t at,bool memoryCardOnly)noexcept {
+    if(stage_!=Stage::empty)return false;offset=at;
     position10={0,0,0,1};size20={0,0,0,1};material54=nullptr;resource58=nullptr;
     scale4C=scale50=1;position10[0]=position10[1]=0;uv30={1,0,0,0};
     color44=0x00FFFFFF;alpha48=255;size20[0]=size20[1]=0;field40=1;
-    flags5CValue=0;flags5CKnownMask=3;constructed=true;stage_=Stage::constructed;return true;
+    flags5CValue=0;flags5CKnownMask=3;constructed=true;stage_=Stage::constructed;
+    memoryCardPrefixOnly_=memoryCardOnly;return true;
+}
+bool OriginalUiGarageQuad50KG::construct2DEF40(std::uint32_t at)noexcept {
+    if(!authoredName(at))return false;
+    return initializeColdPrefix2DEF40(at,false);
+}
+bool OriginalUiGarageQuad50KG::constructMemoryCardPrefix2DEF40(std::uint32_t at)noexcept {
+    if(at!=0x40&&at!=0xA0&&at!=0x100&&at!=0x160&&at!=0x1C0&&at!=0x220&&at!=0x280)return false;
+    // No authoredName()/Garage source capability; loader stays inaccessible.
+    return initializeColdPrefix2DEF40(at,true);
+}
+bool OriginalUiGarageQuad50KG::retainMemoryCardFirstIcon2465B0(OriginalUiMemoryCardConstructor50KG& owner,Diagnostic& d)noexcept {
+    d={};const auto& role=owner.loadRoles_[0];
+    if(!owner.resourcePrefixCurrent()||owner.phase_!=OriginalUiMemoryCardConstructor50KG::Phase::detachedConstructed||
+       owner.constructedQuads_!=7||owner.retiredQuads_||owner.firstIconRetained_||
+       &owner.quads_[role.constructionIndex]!=this||!memoryCardPrefixOnly_||offset!=role.offset||
+       stage_!=Stage::constructed||!constructed||material54||resource58)
+        {d.status=Status::phase;d.sourcePC=0x1FF058;return false;}
+    // Actual component2461E0 ownership, prepared before any published effect.
+    // No Garage RootInputs, archive, fallback proof or caller-supplied row/name.
+    try {
+        auto primitive=std::make_unique<Primitive>();
+        const auto table=owner.domain_->materials382B38();
+        std::int32_t row=-1;
+        if(!table||!table->find298C80(role.qualifiedName,row,d.material)||row<0||
+           !table->preflightRetain14D590(row,d.material))
+            return fail(d,Status::material,d.material.sourcePC?d.material.sourcePC:0x299CF8);
+        // Serial actual-owner preflight; no allocation/callback follows until
+        // the retain completes. This is not permission to populate the table.
+        domain_=owner.domain_;context_=owner.context_;video_=owner.video_;
+        primitive->domain=domain_;primitive->context=context_;
+        primitiveOwner_=std::move(primitive);material54=primitiveOwner_.get();stage_=Stage::primitivePublished;
+        material54->material00=row;material54->materialStored=true;
+        auto& guard=OriginalUiGarageScreenText50KG::guard8CD8();
+        auto& assertion=OriginalUiGarageScreenText50KG::assertion443640();
+        if(!guard.load(std::memory_order_acquire)){assertion.store(1,std::memory_order_relaxed);guard.store(1,std::memory_order_release);}
+        // Same source14D590 ref increment and unconditional ScreenMT store.
+        // The preflight above is identical to the mutator's own guard.
+        if(!table->retainScreen14D590(row,d.material))std::terminate();
+        material54->materialRetained=true;material54->type0C=15;material54->flags0F&=std::uint8_t(~1u);
+        stage_=Stage::materialRetained;pendingPC_=0x2DF144;
+        owner.firstIconRetained_=true;d.sourceEffectsCommitted=true;d.sourcePC=0x2DF144;
+        return true;
+    }catch(...){return fail(d,Status::allocation,0x2DF0E8);}
 }
 bool OriginalUiGarageQuad50KG::fail(Diagnostic& d,Status status,std::uint32_t pc)noexcept {
     d.status=status;d.sourcePC=pc;pendingPC_=pc;d.sourceEffectsCommitted=material54!=nullptr;
@@ -92,7 +137,7 @@ bool OriginalUiGarageQuad50KG::demand1FDD60(Diagnostic& d)noexcept {
     d.sourceEffectsCommitted=d.material.sourceEffectsCommitted;return true;
 }
 bool OriginalUiGarageQuad50KG::load2DF0B0(const RootInputs& in,Diagnostic& d)noexcept {
-    d={};if(stage_!=Stage::constructed||!constructed||material54||resource58)
+    d={};if(memoryCardPrefixOnly_||stage_!=Stage::constructed||!constructed||material54||resource58)
         return fail(d,Status::phase,0x2DF0B0);
     if(!inputsCurrent(in)||((offset<0x200)!=(in.garage_->identity()==
        assets::originalUiArchiveIdentity50KG(assets::OriginalUiArchiveId50KG::controllerPopup))))

@@ -296,6 +296,7 @@ def main():
         'src/game/original_save_identity_continuation50kg.cpp',
         'src/game/original_ui_memory_card50kg.cpp',
         'src/game/original_ui_memory_card_geometry50kg.cpp',
+        'platform/linux/native/original_ui_memory_card_constructor50kg.cpp',
         'platform/linux/native/original_ui_memory_card_resources50kg.cpp',
         'src/game/original_ui_hall_records50kg.cpp',
         'src/game/original_ui_hall_widgets50kg.cpp',

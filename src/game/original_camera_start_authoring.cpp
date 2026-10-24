@@ -1,4 +1,8 @@
 #include "original_camera_start_effects.h"
+// Compile the private immutable TA authoring foundation; no live caller or admission.
+#include "../assets/original_ta_cut_authoring_candidate.h"
+// Compile the private TA child foundation only; no live caller or admission.
+#include "original_ta_cut_child_candidate.h"
 #include <cstring>
 namespace rr::game { namespace {
 std::uint32_t rotateRight(std::uint32_t x, unsigned n) noexcept {

@@ -8,7 +8,7 @@ namespace original_cable_selection50LA { class Binding; }
 #include <memory>
 #include <thread>
 
-namespace rr::platform {class OriginalUiSharedDialogs50KG; class OriginalUiGaragePageOwner50KG;class OriginalUiGarageRendererLease50KG;class OriginalUiGarageFogColorLease50KG;}
+namespace rr::platform {class OriginalUiMemoryCardConstructor50KG; class OriginalUiSharedDialogs50KG; class OriginalUiGaragePageOwner50KG;class OriginalUiGarageRendererLease50KG;class OriginalUiGarageFogColorLease50KG;}
 namespace rr::game { class OriginalPositionStatsPrimitiveOwner50LA; class OriginalPositionStatsResources50LA; }
 namespace original_main_entry50KG {
 class NativeCollectorFifo50LA;
@@ -22,6 +22,7 @@ class RaceDisplayLifetime50LA final : public std::enable_shared_from_this<RaceDi
     friend struct Frontend;
     friend class rr::platform::OriginalUiGaragePageOwner50KG;
     friend class rr::platform::OriginalUiSharedDialogs50KG;
+    friend class rr::platform::OriginalUiMemoryCardConstructor50KG;
     friend class rr::platform::OriginalUiGarageRendererLease50KG;
     friend class rr::platform::OriginalUiGarageDrawContribution50KG;
     friend class rr::platform::OriginalUiGarageCameraFrame50KG;
@@ -216,6 +217,15 @@ class RaceDisplayLifetime50LA final : public std::enable_shared_from_this<RaceDi
             renderer_.sessionDisplayOwner50LA_==this&&
             renderer_.sessionDependentPins50LA_<std::numeric_limits<std::uint32_t>::max()&&
             video_->host.sessionDependentPins50LA_<std::numeric_limits<std::uint32_t>::max();
+    }
+    // An already-held detached constructor pin must drain during shutdown and
+    // at pin capacity. This is not permission to acquire another dependency.
+    bool memoryCardConstructorDrainCurrent50KG()const noexcept {
+        return frontendOwnerCurrent50KG()&&video_&&video_->originalMain&&created_&&renderer_.initialized()&&
+            video_->host.created()&&video_->host.current()&&
+            video_->host.sessionDisplayRenderer50LA_==&renderer_&&
+            renderer_.sessionDisplayOwner50LA_==this&&
+            renderer_.sessionDependentPins50LA_&&video_->host.sessionDependentPins50LA_;
     }
     // Exact constructed native backing only: no GL readiness or queue service.
     bool sourceFogFieldLifetimeCurrent()const noexcept {

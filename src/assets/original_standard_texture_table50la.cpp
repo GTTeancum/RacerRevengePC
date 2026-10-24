@@ -172,10 +172,13 @@ bool OriginalStandardTextureTable50LA::populate29E340(
             if(row.references08<=0||row.object04)continue;
             d.row=static_cast<std::int32_t>(i);
             std::size_t source=0;std::string resolvedName;
-            if(!s.resolver->resolve24DADC(row.name00,source,resolvedName,d))return terminal();
+            OriginalStandardTextureResolver50LA::UiSelection selected;
+            if(!s.resolver->resolve24DADC(row.name00,source,resolvedName,d,&selected))return terminal();
             std::shared_ptr<OriginalStandardTextureResource50LA> cached;
             if(!s.resolver->cached132820(source,cached,d))return terminal();
             if(cached){
+                // Preserve the resource's actual first-source receipt. This
+                // later lookup grants neither replacement nor backfilling.
                 if(!s.construction->live()){fail(d,E::video,0x24DCE4,d.row);return terminal();}
                 //29E388 supplies retainCached=1; this is a RESOURCE reference,
                 //independent of the row's one-reference-per-material-map count.
@@ -186,7 +189,7 @@ bool OriginalStandardTextureTable50LA::populate29E340(
                 //is cleaned without pretending to have registered/published.
                 s.partial=OriginalStandardTextureResource50LA::allocate();
                 d.sourceEffectsCommitted=true;
-                if(!s.partial->construct24DA30(s.resolver,source,resolvedName,s.construction,d))return terminal();
+                if(!s.partial->construct24DA30(s.resolver,source,resolvedName,s.construction,d,static_cast<std::size_t>(-1),&selected))return terminal();
                 if(!s.resolver->cache1326A0(source,s.partial)){
                     fail(d,E::phase,0x1326A0,d.row);return terminal();
                 }

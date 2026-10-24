@@ -538,6 +538,40 @@ const game::OriginalUiTransitionOwner50KG* OriginalUiOptionsSession50KG::externa
 bool OriginalUiOptionsSession50KG::ownsPreparedPage(std::uint8_t page) const noexcept {
     const auto* s=storage_.get();return s&&s->operational()&&!s->inOperation&&s->ownsPage(page);
 }
+bool OriginalUiOptionsSession50KG::beginNativeLoadInstall(
+    const OriginalUiOptionsSessionCold50KG& expected)noexcept {
+    auto* s=storage_.get();
+    if(!s||!s->operational()||s->sourceTornDown||s->inOperation||s->rendering||s->updatePrepared||
+       s->paused||s->state.backProposalPending||!s->idleInput()||s->activePage()!=5||
+       s->controlsExecution||s->controls2EntrySerial||s->controls2EntryPoll||
+       !s->cold.application||!s->cold.application->known||
+       s->cold.application->controllerPopupState.active3CC)return false;
+    const auto sameOwner=[](const auto& a,const auto& b)noexcept {
+        return a&&b&&a.get()==b.get()&&!a.owner_before(b)&&!b.owner_before(a);
+    };
+    const auto& c=s->cold;
+    if(!sameOwner(c.resources,expected.resources)||!sameOwner(c.gpu,expected.gpu)||
+       !sameOwner(c.optionsArchive,expected.optionsArchive)||!sameOwner(c.profile,expected.profile)||
+       !sameOwner(c.commonProfile,expected.commonProfile)||!sameOwner(c.application,expected.application)||
+       !sameOwner(c.gameSettingsProfile,expected.gameSettingsProfile)||!sameOwner(c.controlsProfile,expected.controlsProfile)||
+       !sameOwner(c.audio,expected.audio)||!sameOwner(c.soundMode,expected.soundMode)||
+       !sameOwner(c.externalTransition,expected.externalTransition)||
+       c.audioMode!=OriginalUiMainAudioMode50KG::enabled||c.audioMode!=expected.audioMode)return false;
+    const auto shared=c.application->sharedDialogs;
+    if(!shared||!sharedMenuLifetimeCurrent(*shared,s->collector)||!shared->menuTopologyCurrent()||
+       shared->menu470Owner()||shared->menuUpdateFailedOwner_||shared->menuUpdateAborted_||
+       shared->menu470Phase_!=OriginalUiSharedDialogs50KG::Menu470Phase::idle||
+       shared->demand470Pending_||shared->update470Pending_||
+       shared->menuDisplayPinned_||shared->menuUpdateFailedDisplayPinned_)return false;
+    // pendingControls2* may remain historical; only actual pending/lifetime
+    // authority above excludes. Never erase stale snapshots to fake quiescence.
+    s->inOperation=true;return true;
+}
+void OriginalUiOptionsSession50KG::endNativeLoadInstall(bool committed)noexcept {
+    // Only the paired private Frontend call can reach here after begin succeeds.
+    if(committed)storage_->state.framePublished=false;
+    storage_->inOperation=false;
+}
 Status OriginalUiOptionsSession50KG::input(const OriginalUiMainSessionInput50KG& in,OriginalUiOptionsSessionInputReceipt50KG& receipt,Diagnostic& d) noexcept {
     d={};receipt={};auto* s=storage_.get();if(!s)return result(d,Status::notBound);
     if(s->cold.application->sharedDialogs&&s->cold.application->sharedDialogs->menu470PendingFor(s->collector))

@@ -29,6 +29,9 @@ class OriginalUiGarageSession50KG;
 // retirement before race output, retaining PCM/cursors/clock until terminal
 // source retirement. Mixer/storage outlive this stable owner. Main-thread only.
 class OriginalUiMainAudio50KG final : public AudioStereoProducer50HD {
+    // Only the one private all-owner Load coordinator may apply the already
+    // prevalidated188740 fields/revisions inside its nonfailing store interval.
+    friend class OriginalUiRiderProfileOwner50KG;
     friend class OriginalAudioSampleCache50KG;
     friend class OriginalAudioPendingWaves50KG;
     friend bool AudioMixer50HD::canRetireStoppedNativeGarageClips(

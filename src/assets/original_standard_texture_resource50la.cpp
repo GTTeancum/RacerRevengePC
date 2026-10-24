@@ -1261,7 +1261,8 @@ bool OriginalStandardTextureResolver50LA::bind(
     return true;
 }
 bool OriginalStandardTextureResolver50LA::resolve24DADC(
-    const std::string& requested,std::size_t& index,std::string& resolvedName,D& d) const noexcept {
+    const std::string& requested,std::size_t& index,std::string& resolvedName,D& d,UiSelection* capture) const noexcept {
+    if(capture)*capture=UiSelection{};
     index=static_cast<std::size_t>(-1);
     if(!prepared())return fail(d,E::unprepared,0x132820);
     if(!nameDomain(requested))return fail(d,E::input,0x24DA90);
@@ -1281,6 +1282,27 @@ bool OriginalStandardTextureResolver50LA::resolve24DADC(
                    view->size!=entry.file->bytes.size()||view->revision!=revision||
                    !std::equal(entry.file->bytes.begin(),entry.file->bytes.end(),view->data)))
                     return fail(d,E::source,pc);
+                // Freeze only the four ordinary shared UI PST selections at
+                // their real resolver lookup. No retrospective provider query.
+                if(capture&&view&&provider&&entry.file->format==OriginalStandardTextureSourceFormat50LA::pstIndexed&&
+                   (Provider::sameName(name,"ui\\textures\\icon_x.pst")||Provider::sameName(name,"ui\\textures\\icon_tri.pst")||
+                    Provider::sameName(name,"ui\\textures\\icon_sqr.pst")||Provider::sameName(name,"ui\\textures\\icon_cir.pst"))&&
+                   view->mount<provider->mounts_.size()){
+                    const auto& bank=*provider->mounts_[view->mount];
+                    if(bank.active&&bank.ui&&bank.ui->loaded()&&bank.generation==view->bankGeneration&&
+                       view->ordinal<bank.rows.size()&&provider->sealed()&&provider->revision()==revision){
+                        const auto member=bank.ui->member(view->ordinal);
+                        const auto& row=bank.rows[view->ordinal];
+                        if(member.identity&&member.data==view->data&&member.size==view->size&&
+                           row.data==view->data&&row.size==view->size&&same(row.name,*view->member)){
+                            UiSelection selected;selected.resolver=this;selected.providerIdentity=provider.get();
+                            selected.archive=bank.ui;selected.member=member.identity;selected.data=member.data;
+                            selected.bytes=member.size;selected.sourceIndex=i;selected.mount=view->mount;
+                            selected.ordinal=view->ordinal;selected.providerRevision=revision;
+                            selected.bankGeneration=view->bankGeneration;*capture=std::move(selected);
+                        }
+                    }
+                }
                 resolvedName=name;index=i;d.source=i;return true;
             }
             return fail(d,E::unresolved,pc);
@@ -1530,8 +1552,9 @@ OriginalStandardTextureResource50LA::~OriginalStandardTextureResource50LA() {
 bool OriginalStandardTextureResource50LA::construct24DA30(
     std::shared_ptr<OriginalStandardTextureResolver50LA> resolver,std::size_t index,
     const std::string& resolvedName,
-    std::shared_ptr<const OriginalStandardMaterialContext50LA> context,D& d,std::size_t frame) noexcept {
-    if(resolver_||construction_||constructed_||registered_)return fail(d,E::phase,0x24DEF8);
+    std::shared_ptr<const OriginalStandardMaterialContext50LA> context,D& d,std::size_t frame,
+    OriginalStandardTextureResolver50LA::UiSelection* selection) noexcept {
+    if(resolver_||construction_||constructed_||registered_||firstUiSource_.archive)return fail(d,E::phase,0x24DEF8);
     if(!resolver||!resolver->storage_||index>=resolver->storage_->entries.size())
         return fail(d,E::source,0x24DAF8);
     if(!context||!context->live())return fail(d,E::video,0x29C768);
@@ -1542,6 +1565,23 @@ bool OriginalStandardTextureResource50LA::construct24DA30(
     if(child&&(root.file->format!=OriginalStandardTextureSourceFormat50LA::atmPstFrames||
         frame>=root.frames.size()))return fail(d,E::source,0x10237C);
     const auto& entry=child?root.frames[frame]:root;
+    if(selection&&selection->archive){
+        const auto member=selection->archive->member(selection->ordinal);
+        if(child||selection->resolver!=resolver.get()||selection->sourceIndex!=index||
+           selection->providerIdentity!=resolver->storage_->provider.get()||
+           !selection->archive->loaded()||member.identity!=selection->member||
+           member.data!=selection->data||member.size!=selection->bytes||
+           !member.identity||!member.data||!OriginalStandardArchiveProvider50LA::sameName(member.identity->name,root.file->member)||
+           member.size!=root.file->bytes.size()||
+           !std::equal(root.file->bytes.begin(),root.file->bytes.end(),member.data)||
+           root.file->format!=OriginalStandardTextureSourceFormat50LA::pstIndexed||
+           entry.pstOffset||entry.pstBytes!=member.size)
+            return fail(d,E::source,0x24DAF8);
+        // Retain before any actual resource/list effects. Construction failure
+        // keeps this owner with the existing partial resource until cleanup.
+        firstUiSource_=std::move(*selection);
+    }
+
     // Lock the entire actual six-frame bridge before any aggregate effects.
     // Bind/adoption are lifetime-once per stage; no reset under old leases.
     std::shared_ptr<const OriginalStandardIpumImageSet50LA> images;
@@ -1770,6 +1810,20 @@ const std::int32_t* OriginalStandardTextureResource50LA::sourceWidth14() const n
 const std::int32_t* OriginalStandardTextureResource50LA::sourceHeight18() const noexcept {return constructed_?&height18_:nullptr;}
 const std::int32_t* OriginalStandardTextureResource50LA::levelCountB0() const noexcept {return constructed_&&!aggregate_?&levelCountB0_:nullptr;}
 const std::string* OriginalStandardTextureResource50LA::name20() const noexcept {return constructed_&&!aggregate_&&!atmChild_?&name20_:nullptr;}
+bool OriginalStandardTextureResource50LA::firstUiSourceCurrent()const noexcept {
+    const auto& source=firstUiSource_;
+    if(!constructed_||aggregate_||atmChild_||references00_<=0||!construction_||!construction_->live()||
+       !resolver_||source.resolver!=resolver_.get()||source.sourceIndex!=sourceIndex_||
+       !source.archive||!source.archive->loaded()||!source.member||!source.data||!source.bytes||
+       !source.providerIdentity||!source.providerRevision||!source.bankGeneration||
+       sourceFormat_!=OriginalStandardTextureSourceFormat50LA::pstIndexed||pstOffset_||pstBytes_!=source.bytes)
+        return false;
+    const auto member=source.archive->member(source.ordinal);
+    const auto* bytes=originalBytes();const auto* name=sourceMember();
+    return member.identity==source.member&&member.data==source.data&&member.size==source.bytes&&
+        name&&OriginalStandardArchiveProvider50LA::sameName(*name,source.member->name)&&bytes&&bytes->size()==source.bytes&&
+        std::equal(bytes->begin(),bytes->end(),source.data);
+}
 const std::string* OriginalStandardTextureResource50LA::sourceMember() const noexcept {
     return constructed_?&resolver_->storage_->entries[sourceIndex_].file->member:nullptr;
 }

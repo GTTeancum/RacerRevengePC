@@ -299,6 +299,9 @@ private:
 
     // Private existing-owner preflight, uncalled. Output is private metadata,
     // NOT all-semantic readiness, a pending transaction or permission to load.
+    // Uncalled private native install. Does not read a provider or admit a menu
+    // action/card status. All failures precede the first live profile store.
+    bool installNativeReadProfile50KG(const std::shared_ptr<const OriginalSaveNativeReadStage50KG>&)noexcept;
     bool prepareNativeReadProfileMetadata50KG(
         const std::shared_ptr<const OriginalSaveNativeReadStage50KG>&,
         std::unique_ptr<OriginalSaveProfileOwner50KG>& out)const noexcept;

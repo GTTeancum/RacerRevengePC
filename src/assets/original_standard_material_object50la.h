@@ -102,8 +102,17 @@ private:
     friend class OriginalStandardMaterialTable50LA;
     friend class rr::platform::OriginalUiGarageDrawContribution50KG;
     friend class rr::platform::OriginalUiGarageCanonicalSubmission50KG;
+    // Private synchronous existing-object observation; not queue/population
+    // authority and not a stored capability detached from its occurrence.
+    bool preflightCapturedSharedIconBinding(std::int32_t,
+        const std::shared_ptr<const OriginalStandardMaterialContext50LA>&,
+        const std::shared_ptr<OriginalStandardTextureTable50LA>&,
+        const std::shared_ptr<const OriginalStandardProgramTable50LA>&,
+        const std::shared_ptr<const OriginalStandardArchiveProvider50LA>&,
+        const std::shared_ptr<OriginalStandardTextureResolver50LA>&,
+        OriginalStandardMaterialDiagnostic50LA&)const noexcept;
     // Only the actual queued representative may expose its constructed
-    // missing-PSM state. Neither method creates source() or an authored PSM.
+    // missing-PSM state. Neither projection creates source() or an authored PSM.
     bool borrowGarageScreenFallback2475C0(std::size_t,
         const OriginalStandardTextureResource50LA&,const OriginalUiArchive50KG&,
         const OriginalUiMemberView50KG&,OriginalUiMaterial50KG&,

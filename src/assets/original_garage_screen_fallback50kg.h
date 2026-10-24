@@ -19,6 +19,13 @@ class OriginalGarageScreenFallback50KG final {
     friend class OriginalStandardMaterialTable50LA;
     friend class OriginalStandardMaterialObject50LA;
     OriginalGarageScreenFallback50KG()=default;
+    struct ConstructionObservation {
+        OriginalUiEncodedArchiveView50KG selectedArchive;
+        const OriginalStandardArchiveProvider50LA* providerIdentity=nullptr;
+        const std::uint8_t* selectedBytes=nullptr;
+        std::size_t selectedSize=0,mount=static_cast<std::size_t>(-1),ordinal=static_cast<std::size_t>(-1);
+        std::uint64_t revision=0,bankGeneration=0;
+    };
     std::int32_t row_=-1;
     std::string name_,pstMember_;
     std::vector<std::uint8_t> pstBytes_;
@@ -29,7 +36,9 @@ class OriginalGarageScreenFallback50KG final {
     std::shared_ptr<OriginalStandardTextureTable50LA> textures_;
     bool current(const std::string& materialName,
         const std::shared_ptr<const OriginalStandardMaterialContext50LA>& context,
-        const std::shared_ptr<OriginalStandardTextureTable50LA>& textures)const noexcept {
+        const std::shared_ptr<OriginalStandardTextureTable50LA>& textures,
+        ConstructionObservation* observation=nullptr)const noexcept {
+        if(observation)*observation=ConstructionObservation{};
         if(row_<0||!context_||context!=context_||!context_->live()||textures!=textures_||!textures_||
            !garage_||!garage_->loaded()||garage_->identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::garage)||
            !garage_->find("UI/UIGarage/garage.dat").identity||!provider_||!provider_->sealed()||pstBytes_.empty())return false;
@@ -61,8 +70,22 @@ class OriginalGarageScreenFallback50KG final {
                std::memcmp(pst.data,pstBytes_.data(),pst.size))return false;
             OriginalStandardArchiveProvider50LA::MountView mount;
             const auto* expected=originalUiArchiveIdentity50KG(pstArchive_);
-            return expected&&provider_->mount(pst.mount,mount)&&mount.archiveSha256&&
+            const bool valid=expected&&provider_->mount(pst.mount,mount)&&mount.archiveSha256&&
                 *mount.archiveSha256==expected->sha256&&mount.archiveBytes==expected->bytes;
+            // Freeze evidence only while observing the actual constructor's
+            // absence/winner branch. Non-UI origins remain uncaptured, not relabeled.
+            if(valid&&observation&&(overlay||sharedGarageIcon)&&psm.revision==pst.revision&&
+               pst.revision==provider_->revision()&&provider_->sealed()){
+                OriginalUiEncodedArchiveView50KG retained;
+                if(provider_->encodedUiInput(pst.mount,retained)&&retained.providerIdentity()==provider_.get()&&
+                   retained.identity()==expected){
+                    observation->selectedArchive=std::move(retained);observation->providerIdentity=provider_.get();
+                    observation->selectedBytes=pst.data;observation->selectedSize=pst.size;
+                    observation->mount=pst.mount;observation->ordinal=pst.ordinal;
+                    observation->revision=pst.revision;observation->bankGeneration=pst.bankGeneration;
+                }
+            }
+            return valid;
         }catch(...){return false;}
     }
 public:

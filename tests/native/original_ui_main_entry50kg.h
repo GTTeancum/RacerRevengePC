@@ -9,7 +9,7 @@ namespace rr::game { class OriginalRacerModelRenderGlobals50LA; class OriginalRa
 struct OriginalPositionStatsNumbers50LA; struct OriginalPositionStatsResourceDiagnostic50LA; }
 namespace original_camera_session50KX { class Session; }
 namespace rr::assets {class OriginalUiGarageSceneAssets50KG; struct OriginalUiGaragePageData50KG;}
-namespace rr::platform {class OriginalUiSharedDialogs50KG; class OriginalUiGarageSharedPageDrawOwner50KG; class OriginalUiGarageSession50KG; struct OriginalUiGarageNativeInput50KG; struct OriginalUiGarageNativeState50KG; class OriginalUiGarageModelResources50KG; class OriginalUiGarageVisibility50KG; class OriginalUiGarageTextOverlay50KG; class OriginalUiGarageFogColorLease50KG; class OriginalUiGarageScreenText50KG; struct OriginalUiGarageScreenTextDiagnostic50KG; class OriginalUiGarageWidget1Owner50KG; struct OriginalUiGarageWidget1Diagnostic50KG; class OriginalUiGarageManagerFog50KG;}
+namespace rr::platform {class OriginalUiMemoryCardConstructor50KG; class OriginalUiSharedDialogs50KG; class OriginalUiGarageSharedPageDrawOwner50KG; class OriginalUiGarageSession50KG; struct OriginalUiGarageNativeInput50KG; struct OriginalUiGarageNativeState50KG; class OriginalUiGarageModelResources50KG; class OriginalUiGarageVisibility50KG; class OriginalUiGarageTextOverlay50KG; class OriginalUiGarageFogColorLease50KG; class OriginalUiGarageScreenText50KG; struct OriginalUiGarageScreenTextDiagnostic50KG; class OriginalUiGarageWidget1Owner50KG; struct OriginalUiGarageWidget1Diagnostic50KG; class OriginalUiGarageManagerFog50KG;}
 namespace rr::platform { class OriginalUiMainDrawResources50KG; }
 namespace native_ai50IV { struct Session; }
 #include "original_ui_main_output50kg.h"
@@ -177,6 +177,7 @@ struct Application {
     friend class rr::platform::OriginalUiGaragePageOwner50KG;
     friend class rr::platform::OriginalUiGarageSession50KG;
     friend class rr::platform::OriginalUiSharedDialogs50KG;
+    friend class rr::platform::OriginalUiMemoryCardConstructor50KG;
     friend class rr::platform::OriginalUiFrontend50KG;
     bool enabled=false;
     // Persistent native preview request only; never a profile unlock or race grant.
@@ -254,6 +255,7 @@ private:
     bool clearAuralRegistrations103DD0(rr::platform::OriginalApplicationAural50KG::Diagnostic&)const noexcept;
     bool releaseAuralCold102CD0(rr::platform::OriginalApplicationAural50KG::Diagnostic&)const noexcept;
     mutable std::shared_ptr<rr::game::OriginalUiEntityScope50KG> sharedUiScopeOwner_;
+    mutable std::shared_ptr<rr::platform::OriginalUiMemoryCardConstructor50KG> memoryCardConstructorOwner_;
     // Bounded last-completed dispatcher receipt. This keeps the old address
     // generation distinct while its genuine successor is constructed.
     mutable std::shared_ptr<rr::platform::OriginalUiSharedDialogs50KG> retiredSharedUiDialogs_;
@@ -893,7 +895,7 @@ public:
     Application(const Application&)=delete;
     Application& operator=(const Application&)=delete;
     ~Application() {
-        if((state&&state->sharedDialogs)||(sharedUiScopeOwner_&&!sharedUiScopeOwner_->closed_))std::terminate();
+        if(memoryCardConstructorOwner_||(state&&state->sharedDialogs)||(sharedUiScopeOwner_&&!sharedUiScopeOwner_->closed_))std::terminate();
         // A live source slot may still own renderer/context and counted state.
         // Application destruction cannot substitute for its checked retirement.
         if(sourceAural00Owner_||sourceRace28COwner_||sourceLightManager426F60Owner_||sourceLocalization32COwner_||localizationRendererCall14C5A0_)std::terminate();

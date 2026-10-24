@@ -20,6 +20,7 @@ class OriginalUiGarageSceneCollision50KG;
 class OriginalUiGarageStaticModels50KG;
 class OriginalUiGaragePageOwner50KG;
 class OriginalUiSharedDialogs50KG;
+class OriginalUiMemoryCardConstructor50KG;
 class OriginalUiGarageManagerSearch50KG;
 class OriginalUiGarageUiLights50KG;
 class OriginalUiGarageManagerFog50KG;
@@ -37,6 +38,7 @@ class OriginalFrontendCameraCold50LA;
 class OriginalUiEntityScope50KG final {
     friend struct ::original_main_entry50KG::Application;
     friend class rr::platform::OriginalUiSharedDialogs50KG;
+    friend class rr::platform::OriginalUiMemoryCardConstructor50KG;
     friend class rr::platform::OriginalUiFrontend50KG;
     friend class rr::platform::OriginalUiGarageSession50KG;
     friend class rr::platform::OriginalUiGarageSelectedModel50KG;
@@ -68,6 +70,14 @@ private:
     std::uint8_t transitionDisplayPhase_=0;
     bool transitionDisplayPinned_=false;
 
+    using MemoryCardConstructor=rr::platform::OriginalUiMemoryCardConstructor50KG;
+    const MemoryCardConstructor* detachedMemoryCardOwner_=nullptr;
+    C* detachedMemoryCard_=nullptr;
+    bool detachedMemoryCardRetiring_=false;
+    Result constructDetachedMemoryCard1FEC80(MemoryCardConstructor&,C&)noexcept;
+    bool detachedMemoryCardCurrent(const MemoryCardConstructor&,const C&,bool retiring)const noexcept;
+    Result beginDetachedMemoryCardRetirement142590(MemoryCardConstructor&,C&)noexcept;
+    Result finishDetachedMemoryCardRetirement1413E0(MemoryCardConstructor&,C&)noexcept;
     using SharedDialogs=rr::platform::OriginalUiSharedDialogs50KG;
     const SharedDialogs* sharedDialogsOwner_=nullptr;
     std::array<C*,2> sharedDialogs_{};
@@ -3251,6 +3261,7 @@ private:
             dispatcherCurrentManager30_=nullptr;dispatcherCurrentManagerGeneration30_=0;}return r;
     }
     Result close()noexcept {
+        if(detachedMemoryCardOwner_||detachedMemoryCard_)return {Status::phase,0x1FEE40};
         if(transitionDisplayPinned_)return {Status::phase,0x2A3550};
         if(sharedDialogs_[0]||sharedDialogs_[1])return {Status::phase,0x1425B8};
         if(closed_)return {Status::complete,0x1413E0};

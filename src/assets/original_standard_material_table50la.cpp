@@ -1,4 +1,5 @@
 #include "original_standard_material_table50la.h"
+#include "../../platform/linux/native/original_ui_memory_card_constructor50kg.h"
 #include "original_shader_pass_groups50la.h"
 #include "original_standard_texture_resource50la.h"
 #include "original_standard_material_animation50la.h"
@@ -1378,18 +1379,43 @@ bool OriginalStandardMaterialTable50LA::retainPauseBackdropFallback14D590(
     if(!row.pauseBackdropTextures)row.pauseBackdropTextures=std::move(textures);
     return true;
 }
-bool OriginalStandardMaterialTable50LA::retainScreen14D590(std::int32_t index,D& d) noexcept {
-    return retain14D590(index,OriginalUiTemplate50KG::screenMt,d);
+bool OriginalStandardMaterialTable50LA::preflightMemoryCardFirstIconBinding(
+    const rr::platform::OriginalUiMemoryCardConstructor50KG& occurrence,D& d)const noexcept {
+    d={};std::int32_t index=-1;
+    if(!storage_||storage_->uiSharedHistoryOwner||storage_->nativeFifoPins||storage_->nativeBindingPoisoned||
+       storage_->populationTerminal||storage_->populationActive||storage_->demandActive||storage_->collectorActive||demandTerminal()||
+       !occurrence.firstIconOccurrenceCurrent(*this,index))return fail(d,S::phase,0x2DF158);
+    if(index<0||static_cast<std::size_t>(index)>=storage_->rows.size())return fail(d,S::range,0x298E60);
+    const auto& row=storage_->rows[static_cast<std::size_t>(index)];d.row=index;
+    // Current actual occurrence is MemoryCard; the object's original Garage
+    // construction family remains unchanged and is validated separately.
+    if(row.references08<=0||!row.object04||!storage_->templates||!storage_->populationBound||
+       storage_->construction!=occurrence.context_||storage_->programs!=occurrence.domain_->programs382B70()||
+       storage_->textures!=occurrence.domain_->textures383400()||
+       row.associated30!=storage_->templates->get(OriginalUiTemplate50KG::screenMt)||
+       !OriginalStandardArchiveProvider50LA::sameName(row.name00,"ui\\textures\\icon_x"))
+        return fail(d,S::reference,0x2DF158);
+    return row.object04->preflightCapturedSharedIconBinding(index,occurrence.context_,
+        occurrence.domain_->textures383400(),storage_->programs,occurrence.domain_->archiveProvider3E1A70(),
+        occurrence.domain_->resolver3E1A70(),d);
 }
-bool OriginalStandardMaterialTable50LA::retain14D590(std::int32_t index,
-    OriginalUiTemplate50KG associated,D& d) noexcept {
+bool OriginalStandardMaterialTable50LA::preflightRetain14D590(std::int32_t index,D& d)const noexcept {
     d.row=index;if(!storage_)return fail(d,S::unprepared,0x14D590);
     if(storage_->uiSharedHistoryOwner||storage_->nativeFifoPins||storage_->populationTerminal||storage_->populationActive||storage_->demandActive||
        storage_->collectorActive||demandTerminal())
         return fail(d,S::phase,0x14D590);
     if(index<0||static_cast<std::size_t>(index)>=storage_->rows.size())return fail(d,S::range,0x298A30);
-    auto& r=storage_->rows[static_cast<std::size_t>(index)];
+    const auto& r=storage_->rows[static_cast<std::size_t>(index)];
     if(r.references08==std::numeric_limits<std::int32_t>::max())return fail(d,S::overflow,0x298AE8);
+    return true;
+}
+bool OriginalStandardMaterialTable50LA::retainScreen14D590(std::int32_t index,D& d) noexcept {
+    return retain14D590(index,OriginalUiTemplate50KG::screenMt,d);
+}
+bool OriginalStandardMaterialTable50LA::retain14D590(std::int32_t index,
+    OriginalUiTemplate50KG associated,D& d) noexcept {
+    if(!preflightRetain14D590(index,d))return false;
+    auto& r=storage_->rows[static_cast<std::size_t>(index)];
     ++r.references08; //298AE8/EC, before the unconditional associated30 store.
     r.associated30=storage_->templates->get(associated); //14D5C0, even if already loaded.
     return true;

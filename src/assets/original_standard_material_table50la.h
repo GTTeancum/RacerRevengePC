@@ -9,7 +9,7 @@ namespace original_position_stats_prestage50LA { class Owner; }
 namespace ra_static_world50LA {class Owner;}
 namespace rr::game {class OriginalPositionStatsResources50LA;class OriginalPauseMaterialAdmission50LA;}
 namespace rr::platform { class OriginalUiSharedDialogMaterialHistory50KG; class OriginalUiTournamentPodReferences50KG; class OriginalUiSharedDialogs50KG; }
-namespace rr::platform {class OriginalUiGarageModelResource50KG;class OriginalUiGarageScreenText50KG;class OriginalUiGarageQuad50KG;class OriginalUiGaragePageOwner50KG;}
+namespace rr::platform {class OriginalUiMemoryCardConstructor50KG;class OriginalUiGarageModelResource50KG;class OriginalUiGarageScreenText50KG;class OriginalUiGarageQuad50KG;class OriginalUiGaragePageOwner50KG;}
 namespace rr::platform { class OriginalUiGarageCanonicalSubmission50KG; class OriginalUiGarageDrawContribution50KG; }
 namespace rr::assets {
 // A partial CPU callback outcome, never a renderer capability. The first
@@ -137,6 +137,7 @@ struct OriginalStandardMaterialUiSharedHistorySlot50LA {
 // existing foreign owners are absent. Default construction is UNPREPARED.
 // Serial and nonreentrant; no table mutation during scene/renderer borrows.
 class OriginalStandardMaterialTable50LA final {
+    friend class rr::platform::OriginalUiMemoryCardConstructor50KG;
     friend class rr::platform::OriginalUiGarageModelResource50KG;
     friend class rr::platform::OriginalUiGarageScreenText50KG;
     friend class rr::platform::OriginalUiGarageQuad50KG;
@@ -362,6 +363,9 @@ private:
     bool retain14D590(std::int32_t,OriginalUiTemplate50KG,
         OriginalStandardMaterialDiagnostic50LA&) noexcept;
     bool retainDefault14D590(std::int32_t,OriginalStandardMaterialDiagnostic50LA&) noexcept;
+    bool preflightMemoryCardFirstIconBinding(const rr::platform::OriginalUiMemoryCardConstructor50KG&,
+        OriginalStandardMaterialDiagnostic50LA&)const noexcept;
+    bool preflightRetain14D590(std::int32_t,OriginalStandardMaterialDiagnostic50LA&)const noexcept;
     bool retainScreen14D590(std::int32_t,OriginalStandardMaterialDiagnostic50LA&) noexcept;
     bool bindGarageScreenFallbackAfterRetain(std::int32_t,
         std::shared_ptr<const OriginalGarageScreenFallback50KG>,OriginalStandardMaterialDiagnostic50LA&)noexcept;

@@ -143,6 +143,10 @@ private:
     bool sharedMenuUpdateCurrent(const OriginalUiSharedDialogs50KG&,const OriginalUiOptionsDrawContribution50KG&)const noexcept;
 
     friend class OriginalUiFrontend50KG;
+    // Synchronous actual-Session exclusion, not a profile-store phase or an
+    // escaping lease. Frontend pairs these around the ONE all-owner install.
+    bool beginNativeLoadInstall(const OriginalUiOptionsSessionCold50KG&)noexcept;
+    void endNativeLoadInstall(bool committed)noexcept;
     // Only the concrete coordinator's manager commit callback may call this,
     // after destination admission. A holder of a proposal cannot manually
     // promote its flags and invoke the transaction without that actual manager.

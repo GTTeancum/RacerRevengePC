@@ -2140,6 +2140,41 @@ const MaterialTextureGl50EB* OriginalUiFrontend50KG::gpu() const noexcept {retur
 const OriginalUiNativeDraw50KG* OriginalUiFrontend50KG::draw() const noexcept {
     const auto* s=storage_.get();return s&&!s->inOperation&&!s->garageTextureDraw&&!s->faulted&&!s->quit&&!s->closing&&s->frameRendered&&s->active?s->active->draw():nullptr;
 }
+bool OriginalUiFrontend50KG::installNativeReadProfile50KG(
+    const std::shared_ptr<const OriginalSaveNativeReadStage50KG>& read)noexcept {
+    auto* s=storage_.get();
+    if(!s||s->updates!=s->submittedUpdate||s->garageTextureDraw||
+       (s->frameRendered&&!s->frameSubmitted)||!s->cold.riderProfile)return false;
+    const auto retainedRead=read; //Own the argument independently of any displaced ancestry.
+    const auto expectedStamp=s->cold.riderProfile->stamp();
+    // All allocation/retention precedes Session exclusion and live stores.
+    // This object later retains displaced envelope/read ownership until AFTER
+    // both exclusions end, so final-reference destruction is outside commit.
+    std::unique_ptr<OriginalSaveProfileOwner50KG> prepared;
+    if(!prepareNativeReadProfileMetadata50KG(retainedRead,prepared))return false;
+    auto& c=s->cold;auto& manager=*s->active;
+    OriginalUiOptionsSessionCold50KG expected;
+    expected.resources=manager.optionsResources;expected.gpu=manager.gpu;expected.optionsArchive=c.options;
+    expected.profile=c.optionsProfile;expected.commonProfile=c.profile;expected.application=c.application;
+    expected.gameSettingsProfile=c.gameSettingsProfile;expected.controlsProfile=c.controlsProfile;
+    expected.soundMode=c.soundMode;expected.audio=c.audio;expected.audioMode=c.audioMode;
+    expected.externalTransition=manager.transition;
+    bool committed=false;
+    {
+        Operation operation(s->inOperation);
+        // Same actual source/bank/light/application eligibility as normal
+        // scheduling. Check while Options is not yet inOperation: its real
+        // ownsPreparedPage participates in sourceCurrent().
+        if(!s->sourceCurrent()||s->updates!=s->submittedUpdate||
+           (s->frameRendered&&!s->frameSubmitted)||
+           !manager.options->beginNativeLoadInstall(expected))return false;
+        committed=c.riderProfile->installNativeReadOwners(retainedRead,*prepared,*c.profile,expectedStamp,
+            *c.gameSettingsProfile,*c.controlsProfile,*c.audio,*c.soundMode);
+        if(committed){s->frameRendered=false;s->frameSubmitted=false;}
+        manager.options->endNativeLoadInstall(committed);
+    }
+    return committed;
+}
 bool OriginalUiFrontend50KG::prepareNativeReadProfileMetadata50KG(
     const std::shared_ptr<const OriginalSaveNativeReadStage50KG>& read,
     std::unique_ptr<OriginalSaveProfileOwner50KG>& out)const noexcept {
