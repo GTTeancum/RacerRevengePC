@@ -3,6 +3,10 @@
 #include "original_ui_options_draw_resources50kg.h"
 #include "../../../src/game/original_ui_aperture_owner50kg.h"
 namespace rr::platform {
+class OriginalUiSharedDialogs50KG;
+class OriginalUiMenuWarningPacket50KG;
+struct OriginalUiMenuWarningGeometry50KG;
+class OriginalUiOptionsSession50KG;
 enum class OriginalUiOptionsContributionError50KG : std::uint8_t {
     none,publication,input,resource,alreadyBound,notBound,sourceOrder,clock,geometry,projection,capacity,material,allocation,unfinished
 };
@@ -14,11 +18,12 @@ struct OriginalUiOptionsContributionDiagnostic50KG {
     game::OriginalUiMainParticleGeometryStatus50KG particle{};
     std::uint16_t widgetId=0;std::uint32_t sourcePC=0;
 };
-enum class OriginalUiOptionsSegment50KG : std::uint8_t {ordinaryWidgets,page,exitText,aperture,prompts,onTopWidgets,particles,controllerPopup,memoryCardDialog};
+enum class OriginalUiOptionsSegment50KG : std::uint8_t {ordinaryWidgets,page,exitText,aperture,prompts,onTopWidgets,particles,controllerPopup,memoryCardDialog,warning470};
 struct OriginalUiOptionsPacket50KG {
     std::uint32_t firstQuad=0,quadCount=0,materialIndex=0,imageIndex=0,frameIndex=0;
     std::uint32_t sourceOrdinal=0,sourcePC=0;
     std::uint16_t widgetId=0;OriginalUiOptionsSegment50KG segment=OriginalUiOptionsSegment50KG::ordinaryWidgets;
+    const OriginalUiMenuWarningPacket50KG* warning470=nullptr;
 };
 struct OriginalUiOptionsClock50KG {bool known=false,advanceAnimations=false;std::uint32_t milliseconds=0;
     game::OriginalApplicationAnimationClockView50KG applicationAnimation{};};
@@ -72,6 +77,25 @@ public:
     const std::vector<OriginalUiOptionsPacket50KG>* packets() const noexcept;
     const OriginalUiOptionsDrawResources50KG* resources() const noexcept;
 private:
+    friend class OriginalUiSharedDialogMaterialHistory50KG;
+    bool historyRendererRetired(const VehicleWindowGl50DS&)const noexcept;
+    friend class OriginalUiSharedDialogs50KG;
+    friend class OriginalUiOptionsSession50KG;
+    std::shared_ptr<OriginalUiSharedDialogs50KG> menuShared_;
+    OriginalUiOptionsSession50KG* menuSession_=nullptr;
+    std::uint64_t menuInvocationEpoch_=0;
+    mutable std::uint64_t menuAcceptedEpoch_=0;
+    const VehicleWindowGl50DS* menuRetiredRenderer_=nullptr;
+    bool bindSharedMenu470(OriginalUiOptionsSession50KG&,std::shared_ptr<OriginalUiSharedDialogs50KG>)noexcept;
+    bool sharedMenuBoundCurrent(const OriginalUiSharedDialogs50KG&,const OriginalUiOptionsSession50KG&)const noexcept;
+    bool sharedMenuInvocationCurrent(const OriginalUiSharedDialogs50KG&,std::uint64_t)const noexcept;
+    bool sharedMenuCollectorInitialized(const OriginalUiSharedDialogs50KG&,std::uint64_t)const noexcept;
+    bool controls2WarningCollectorCurrent(const OriginalUiSharedDialogs50KG&,std::uint64_t)const noexcept;
+    bool sharedMenuRasterResourcesCurrent(const OriginalUiSharedDialogs50KG&,const void*,const MaterialTextureGl50EB*,std::uint64_t)const noexcept;
+    bool appendMenuWarning470(const OriginalUiSharedDialogs50KG&,const OriginalUiMenuWarningPacket50KG&,const OriginalUiMenuWarningGeometry50KG&,OriginalUiOptionsContributionDiagnostic50KG&)noexcept;
+    bool sharedMenuFrameCurrent(const OriginalUiSharedDialogs50KG&,std::uint64_t,std::uint64_t)const noexcept;
+    bool sharedMenuRetiredCurrent(const OriginalUiSharedDialogs50KG&,const VehicleWindowGl50DS&)const noexcept;
+
     bool beginSourceSubmission(std::uint64_t,const VehicleWindowGl50DS&) const noexcept override;
     void finishSourceSubmission(std::uint64_t,bool sourceAccepted,bool sourceWorkStarted) const noexcept override;
     struct Storage;std::unique_ptr<Storage> storage_;

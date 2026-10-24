@@ -2,6 +2,8 @@
 #include "original_ui_main_session50kg.h"
 #include "original_ui_controller_popup_resources50kg.h"
 #include <cmath>
+#include <exception>
+#include <cstring>
 #include <new>
 #include <utility>
 
@@ -192,8 +194,12 @@ bool OriginalUiMainSession50KG::Storage::admit(void* p,const game::OriginalUiScr
 }
 OriginalUiMainSession50KG::OriginalUiMainSession50KG() noexcept=default;
 OriginalUiMainSession50KG::~OriginalUiMainSession50KG(){
-    // Preserve the real source owner and every borrowed backing if a caller
-    // omits successful explicit retirement, matching other sealed UI owners.
+    // Shared retains this Session facade as part of its exact invocation.
+    // Leaking only Storage cannot preserve the facade. Refuse destruction
+    // until actual explicit retirement instead of leaving a dangling authority.
+    if(storage_&&storage_->collector.menuShared_&&storage_->collector.sourceTeardownPending())std::terminate();
+    // Existing non-Shared sealed-source fallback retains its borrowed backing.
+    // It is not a retirement receipt and never preserves a Session facade.
     if(storage_&&storage_->collector.sourceTeardownPending())storage_.release();
 }
 Status OriginalUiMainSession50KG::bind(const OriginalUiMainSessionCold50KG& cold,
@@ -259,13 +265,21 @@ Status OriginalUiMainSession50KG::bind(const OriginalUiMainSessionCold50KG& cold
             // require fresh resources instead of implying atomic rollback.
             d=next->callbackFault;storage_=std::move(next);return d.status;
         }
-        next->state.bound=true;storage_=std::move(next);return result(d,Status::ok);
+        next->state.bound=true;storage_=std::move(next);
+        if(const auto shared=storage_->cold.application->sharedDialogs){
+            if(!storage_->collector.bindSharedMenu470(*this,shared)){
+                storage_->fault(Status::draw,0x204A00);d=storage_->callbackFault;return d.status;
+            }
+        }
+        return result(d,Status::ok);
     }catch(const std::bad_alloc&){return result(d,Status::allocation);}catch(...){return result(d,Status::resource);}
 }
 Status OriginalUiMainSession50KG::input(const OriginalUiMainSessionInput50KG& in,
     OriginalUiMainSessionInputReceipt50KG& receipt,OriginalUiMainSessionDiagnostic50KG& d) noexcept {
     d={};receipt={};auto* s=storage_.get();
     if(!s)return result(d,Status::notBound);
+    if(s->cold.application->sharedDialogs&&s->cold.application->sharedDialogs->menu470PendingFor(s->collector))
+        return result(d,Status::unsupportedState,0x204A00);
     if(s->state.faulted)return result(d,Status::faulted);
     if(s->state.quitRequested)return result(d,Status::quit);
     if(s->inOperation || s->updateAudioPrepared || in.controller>1 || in.originalInput>15)return result(d,Status::invalidInput);
@@ -359,6 +373,8 @@ Status OriginalUiMainSession50KG::input(const OriginalUiMainSessionInput50KG& in
 Status OriginalUiMainSession50KG::prepareUpdateAudio(const OriginalUiMainSessionUpdate50KG& in,
     OriginalUiMainSessionDiagnostic50KG& d) noexcept {
     d={};auto* s=storage_.get();if(!s)return result(d,Status::notBound);
+    if(s->cold.application->sharedDialogs&&s->cold.application->sharedDialogs->menu470PendingFor(s->collector))
+        return result(d,Status::unsupportedState,0x204A00);
     if(!s->cold.externalTransition || s->inOperation)return result(d,Status::invalidInput);
     if(s->state.faulted)return result(d,Status::faulted);
     if(s->state.quitRequested)return result(d,Status::quit);
@@ -383,6 +399,8 @@ Status OriginalUiMainSession50KG::prepareUpdateAudio(const OriginalUiMainSession
 Status OriginalUiMainSession50KG::update(const OriginalUiMainSessionUpdate50KG& in,
     OriginalUiMainSessionDiagnostic50KG& d) noexcept {
     d={};auto* s=storage_.get();if(!s)return result(d,Status::notBound);
+    if(s->cold.application->sharedDialogs&&s->cold.application->sharedDialogs->menu470PendingFor(s->collector))
+        return result(d,Status::unsupportedState,0x204A00);
     if(s->state.faulted)return result(d,Status::faulted);
     if(s->inOperation)return result(d,Status::invalidInput);
     s->state.framePublished=false;
@@ -408,14 +426,15 @@ Status OriginalUiMainSession50KG::update(const OriginalUiMainSessionUpdate50KG& 
     s->inOperation=true;s->paused=in.paused;
     if(const auto shared=s->cold.application->sharedDialogs){
         OriginalUiSharedDialogs50KG::Diagnostic sharedDiagnostic;
-        if(!shared->advance4702048F0(in.elapsedSeconds,sharedDiagnostic)){
+        if(!shared->advanceMenu470(*this,s->collector,in.elapsedSeconds,sharedDiagnostic)){
             s->fault(Status::unsupportedState,sharedDiagnostic.sourcePC);s->inOperation=false;d=s->callbackFault;return d.status;
         }
+    }else{
+        game::OriginalUiControllerPopupPlan50KG popupUpdate;
+        if(game::OriginalUiControllerPopup50KG::update(s->cold.application->controllerPopupState,in.elapsedSeconds,popupUpdate)!=
+           game::OriginalUiControllerPopupStatus50KG::ok)s->fault(Status::unsupportedState,0x206420);
+        else s->cold.application->controllerPopupState=popupUpdate.state;
     }
-    game::OriginalUiControllerPopupPlan50KG popupUpdate;
-    if(game::OriginalUiControllerPopup50KG::update(s->cold.application->controllerPopupState,in.elapsedSeconds,popupUpdate)!=
-       game::OriginalUiControllerPopupStatus50KG::ok)s->fault(Status::unsupportedState,0x206420);
-    else s->cold.application->controllerPopupState=popupUpdate.state;
     if(!s->cold.externalTransition && s->cold.audioMode==OriginalUiMainAudioMode50KG::enabled){
         s->cold.audio->pause(in.paused);
         if(!s->cold.audio->update(in.elapsedSeconds)){s->fault(Status::audio,0x234440);}
@@ -458,6 +477,78 @@ Status OriginalUiMainSession50KG::update(const OriginalUiMainSessionUpdate50KG& 
     if(s->state.faulted){d=s->callbackFault;return d.status;}
     ++s->state.updateCount;return result(d,Status::ok);
 }
+bool OriginalUiMainSession50KG::bindInitialSharedMenu470(OriginalUiSharedDialogs50KG& shared,
+    OriginalUiMainSessionDiagnostic50KG& d)noexcept {
+    d={};auto* s=storage_.get();
+    if(!s||!s->state.bound||!s->operational()||s->inOperation||s->rendering||s->sourceTornDown||
+       s->updateAudioPrepared||s->state.updateCount||s->state.renderCount||s->state.framePublished||
+       !s->cold.externalTransition||s->cold.externalTransition->snapshot().bound||
+       s->cold.application->sharedDialogs.get()!=&shared||!shared.menuTopologyCurrent()||
+       shared.update470Count_||shared.update470Pending_||shared.menu470Owner()||shared.menuUpdateFailedOwner_||
+       !s->cold.resources||s->cold.resources->controllerPopup()!=shared.controller47C_.resources||
+       !s->collector.bindSharedMenu470(*this,s->cold.application->sharedDialogs)){
+        result(d,Status::unsupportedState,0x1B7BD0);return false;
+    }
+    return true;
+}
+bool OriginalUiMainSession50KG::readSharedMenuRasterInputs(const OriginalUiSharedDialogs50KG& shared,
+    const OriginalUiMainDraw50KG& draw,OriginalUiMenuRasterInputs50KG& out)const noexcept {
+    const auto* s=storage_.get();
+    if(!sharedMenuLifetimeCurrent(shared,draw)||s->state.faulted||s->sourceClosing||
+       !s->cold.resources->loaded()||!s->cold.gpu||!s->cold.gpu->initialized()||
+       !draw.sharedMenuRasterResourcesCurrent(shared,s->cold.resources.get(),s->cold.gpu.get(),
+           s->cold.gpu->publicationToken()))return false;
+    const auto* video=s->cold.resources->video();
+    if(!video||!video->lifetime||video->width!=640||video->height!=448||
+       video->colorBits!=32||video->packetZMaximum!=0xFFFFFF||video->zBufferFormat!=0x31)return false;
+    OriginalUiMenuRasterInputs50KG next;
+    const auto* manager=s->cold.resources->manager();
+    const auto* ui=manager?manager->uiDat():nullptr;
+    if(!ui||!s->cold.mainArchive||!s->cold.mainArchive->loaded()||
+       s->cold.mainArchive->identity()!=assets::originalUiArchiveIdentity50KG(assets::OriginalUiArchiveId50KG::mainMenu)||
+       s->camera.configurationIdentity!=ui->identity()||
+       s->camera.originalWidth!=640||s->camera.originalHeight!=448)return false;
+    bool memberCurrent=false;
+    for(std::size_t i=0;i<s->cold.mainArchive->memberCount();++i){
+        const auto member=s->cold.mainArchive->member(i);
+        if(member.identity==ui->identity()&&member.identity&&
+           std::strcmp(member.identity->name,"UI\\UIMain\\ui.dat")==0){memberCurrent=true;break;}
+    }
+    if(!memberCurrent)return false;
+    next.camera=&s->camera;next.configurationIdentity=s->camera.configurationIdentity;
+    next.viewport={{0,0,s->camera.originalWidth,s->camera.originalHeight}};
+    next.session=this;next.resources=s->cold.resources.get();next.videoLifetime=video->lifetime;
+    next.cpu=s->cold.resources->textures();next.gpu=s->cold.gpu.get();
+    next.publication=s->cold.gpu->publicationToken();
+    if(!next.cpu||!next.publication)return false;
+    next.xyOffsetFixed4={{(2048u-next.viewport[2]/2u-next.viewport[0])*16u,
+        (2048u-next.viewport[3]/2u-next.viewport[1])*16u}};
+    out=std::move(next);return true;
+}
+bool OriginalUiMainSession50KG::sharedMenuLifetimeCurrent(const OriginalUiSharedDialogs50KG& shared,
+    const OriginalUiMainDraw50KG& draw)const noexcept {
+    const auto* s=storage_.get();
+    return s&&s->state.bound&&!s->sourceTornDown&& &s->collector==&draw&&s->cold.application&&
+        s->cold.application->sharedDialogs.get()==&shared&&s->cold.resources&&
+        s->cold.resources->controllerPopup()==shared.controller47C_.resources;
+}
+bool OriginalUiMainSession50KG::sharedMenuUnwindEntryCurrent(const OriginalUiSharedDialogs50KG& shared,
+    const OriginalUiMainDraw50KG& draw)const noexcept {
+    const auto* s=storage_.get();
+    return sharedMenuLifetimeCurrent(shared,draw)&&!s->inOperation&&!s->rendering;
+}
+bool OriginalUiMainSession50KG::sharedMenuRenderCurrent(const OriginalUiSharedDialogs50KG& shared,
+    const OriginalUiMainDraw50KG& draw)const noexcept {
+    const auto* s=storage_.get();
+    return sharedMenuLifetimeCurrent(shared,draw)&&s->inOperation&&s->rendering&&s->operational()&&
+        !s->updateAudioPrepared&&s->state.updateCount&&s->currentMainLifecycle();
+}
+bool OriginalUiMainSession50KG::sharedMenuUpdateCurrent(const OriginalUiSharedDialogs50KG& shared,
+    const OriginalUiMainDraw50KG& draw)const noexcept {
+    const auto* s=storage_.get();
+    return sharedMenuLifetimeCurrent(shared,draw)&&s->inOperation&&!s->rendering&&s->operational()&&
+        !s->updateAudioPrepared&&s->currentMainLifecycle();
+}
 Status OriginalUiMainSession50KG::render(const OriginalUiMainFrameClock50KG& clock,
     OriginalUiMainSessionDiagnostic50KG& d) noexcept {
     d={};auto* s=storage_.get();if(!s)return result(d,Status::notBound);
@@ -475,8 +566,16 @@ Status OriginalUiMainSession50KG::render(const OriginalUiMainFrameClock50KG& clo
     // it does not replace the manager's immutable authored pose or page camera.
     s->state.framePublished=false;s->inOperation=true;s->rendering=true;
     game::OriginalUiControllerPopupRender50KG popupRender;
-    bool okay=game::OriginalUiControllerPopup50KG::render(s->cold.application->controllerPopupState,popupRender)==
-        game::OriginalUiControllerPopupStatus50KG::ok&&s->collector.begin(clock,d.draw) &&
+    bool okay=s->collector.begin(clock,d.draw);
+    if(okay){
+        if(const auto shared=s->cold.application->sharedDialogs){
+            OriginalUiSharedDialogs50KG::Diagnostic sd;
+            okay=shared->renderMenuPopupSibling(popupRender,sd);
+            if(!okay)d.draw.sourcePC=sd.sourcePC;
+        }else okay=game::OriginalUiControllerPopup50KG::render(s->cold.application->controllerPopupState,popupRender)==
+            game::OriginalUiControllerPopupStatus50KG::ok;
+    }
+    okay=okay&&
         s->collector.projectControllerRequiredPopup(popupRender,d.draw)&&s->collector.projectOrdinaryWidgets(true,d.draw) &&
         s->collector.projectMainPage(s->state.mainPageShown,d.draw);
     if(okay)okay=apertureOkay(s->aperture.render48(s->lifecycle().snapshot().lifecycle));
@@ -486,7 +585,9 @@ Status OriginalUiMainSession50KG::render(const OriginalUiMainFrameClock50KG& clo
         s->collector.projectMainParticles(s->fire,s->scene,s->particleRenderState,d.draw) && s->collector.drain(d.draw);
     s->rendering=false;s->inOperation=false;
     if(!okay){if(s->state.faulted){d=s->callbackFault;return d.status;}return result(d,Status::draw);}
-    s->cold.application->controllerPopupState=popupRender.state;
+    // The retained shared owner has already committed the genuine47C body
+    // before its fallible projection. Never replay or roll back that prefix.
+    if(!s->cold.application->sharedDialogs)s->cold.application->controllerPopupState=popupRender.state;
     ++s->state.renderCount;s->state.framePublished=true;return result(d,Status::ok);
 }
 namespace {
@@ -510,6 +611,8 @@ bool selectedControlCurrent(const game::OriginalUiNavigation50KG* nav,std::uint1
 Status OriginalUiMainSession50KG::notifyTransition(const game::OriginalUiTransitionNotification50KG& event,
     OriginalUiMainSessionDiagnostic50KG& d) noexcept {
     d={};auto* s=storage_.get();if(!s)return result(d,Status::notBound);
+    if(s->cold.application->sharedDialogs&&s->cold.application->sharedDialogs->menu470PendingFor(s->collector))
+        return result(d,Status::unsupportedState,0x204A00);
     if(!s->cold.externalTransition || s->inOperation || !s->operational())return result(d,Status::unsupportedState);
     const auto t=s->lifecycle().snapshot();
     if(!t.bound || event.route.screen!=4 || event.route.page!=1 || event.lifecycle!=t.lifecycle || event.phase!=t.phase ||

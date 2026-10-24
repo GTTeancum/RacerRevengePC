@@ -16,7 +16,7 @@ namespace rr::platform {
 void OriginalUiGarageQuad50KG::PacketDelete::operator()(Qword* p)const noexcept {::operator delete[](p,std::align_val_t{64});}
 OriginalUiGarageQuad50KG::~OriginalUiGarageQuad50KG()noexcept {
     //2DEFE0 requires the actual renderer callbacks even when never loaded.
-    if(nativeGarageFifoPins_||constructed||primitiveOwner_||packetOwner_)std::terminate();
+    if(nativeGarageFifoPins_||nativeMenuWarningPins_||constructed||primitiveOwner_||packetOwner_)std::terminate();
 }
 const char* OriginalUiGarageQuad50KG::authoredName(std::uint32_t at)noexcept {
     switch(at){case 0x40:case 0xA0:case 0x100:return "overlay1popup";
@@ -275,7 +275,7 @@ void OriginalUiGarageQuad50KG::releasePrimitive246260(std::unique_ptr<Primitive>
 }
 bool OriginalUiGarageQuad50KG::preflightRetirement2DEFE0(Diagnostic& d)const noexcept {
     d={};if(stage_==Stage::retired)return true;
-    if(nativeGarageFifoPins_||!constructed||material54!=primitiveOwner_.get()||resource58!=packetOwner_.get()||
+    if(nativeGarageFifoPins_||nativeMenuWarningPins_||!constructed||material54!=primitiveOwner_.get()||resource58!=packetOwner_.get()||
        (material54&&material54->packet10&&material54->packet10!=resource58)){
         d.status=Status::phase;d.sourcePC=0x2DEFE0;return false;
     }
@@ -335,7 +335,7 @@ bool OriginalUiGarageQuad50KG::packetCurrent2DF550()const noexcept {
         resource58&&resource58==packetOwner_.get()&&material54->packet10==resource58&&dmaData4_==resource58+1;
 }
 bool OriginalUiGarageQuad50KG::canMutatePacket2DF550()const noexcept {
-    return packetCurrent2DF550()&&!nativeGarageFifoPins_&&packetRevision_!=std::numeric_limits<std::uint64_t>::max();
+    return packetCurrent2DF550()&&!nativeGarageFifoPins_&&!nativeMenuWarningPins_&&packetRevision_!=std::numeric_limits<std::uint64_t>::max();
 }
 void OriginalUiGarageQuad50KG::initializeDrawAssertion2DF550()noexcept {
     // One real process-local lazy assertion history, not one copy per Quad.
@@ -414,8 +414,13 @@ bool OriginalUiGarageQuad50KG::drawWarning4702DF550(OriginalUiGarageDrawContribu
 }
 bool OriginalUiGarageQuad50KG::lowerPacket327E90(std::uint64_t revision,
     const std::array<std::uint32_t,2>& xyOffset,LoweredPacket327E90& out,Diagnostic& d)const noexcept {
+    d={};if(!nativeGarageFifoPins_){d.status=Status::phase;d.sourcePC=0x3281e8u;return false;}
+    return lowerRetainedPacketBody327E90(revision,xyOffset,out,d);
+}
+bool OriginalUiGarageQuad50KG::lowerRetainedPacketBody327E90(std::uint64_t revision,
+    const std::array<std::uint32_t,2>& xyOffset,LoweredPacket327E90& out,Diagnostic& d)const noexcept {
     d={};const auto stop=[&](Status status,std::uint32_t pc){d.status=status;d.sourcePC=pc;return false;};
-    if(!packetCurrent2DF550()||!nativeGarageFifoPins_||!revision||packetRevision_!=revision||
+    if(!packetCurrent2DF550()||!revision||packetRevision_!=revision||
        (flags5CValue&1u)||std::fegetround()!=FE_TONEAREST||xyOffset[0]>65535u||xyOffset[1]>65535u)
         return stop(Status::phase,0x3281e8u);
     // Actual constructor packet/giftag, not a newly invented material quad.
@@ -467,5 +472,64 @@ bool OriginalUiGarageQuad50KG::lowerPacket327E90(std::uint64_t revision,
     for(std::size_t i=0;i<order.size();++i){next.vertices[i]=vertices[order[i]];
         next.stq[i]=stq[order[i]];next.rasterW[i]=1.f;next.fog[i]=0.f;}
     next.quadCount=2;out=next;d.sourcePC=0x328378u;return true;
+}
+}
+
+namespace rr::platform {
+bool OriginalUiGarageQuad50KG::drawMenuWarning4702DF550(
+    OriginalUiSharedDialogs50KG& shared,Diagnostic& d)noexcept {
+    d={};const auto stop=[&](Status status,std::uint32_t pc){d.status=status;d.sourcePC=pc;pendingPC_=pc;return false;};
+    initializeDrawAssertion2DF550();
+    if(!shared.menuWarning470QuadCurrent(*this))return stop(Status::phase,0x2df5b4u);
+    OriginalUiSharedDialogs50KG::MenuWarningQuadInputs input;std::uint32_t pc=0;
+    if(!shared.readMenuWarningQuadInputs2DF550(*this,input,pc))return stop(Status::phase,pc?pc:0x2df5e8u);
+    if(!input.sourceQuadEnabled383678){d.sourcePC=0x2df87cu;return true;}
+    if(!regeneratePacket2DF550(input.viewportWidth1E8,input.viewportHeight1EC,d))return false;
+    const bool effects=d.sourceEffectsCommitted;
+    if(!shared.collectMenuWarning470Quad(*this,d)){d.sourceEffectsCommitted|=effects;return false;}
+    d.sourceEffectsCommitted|=effects;pendingPC_=0;d.sourcePC=0x2df87cu;return true;
+}
+bool OriginalUiGarageQuad50KG::retainMenuWarningPacket(OriginalUiSharedDialogs50KG& shared,
+    OriginalUiMenuWarningPacket50KG& receipt,Diagnostic& d)noexcept {
+    d={};
+    if(!shared.menuWarning470PacketCaptureCurrent(receipt)||!shared.menuWarning470QuadCurrent(*this)||
+       receipt.owner_!=&shared||receipt.kind_!=OriginalUiMenuWarningPacket50KG::Kind::quad||receipt.active_||
+       nativeGarageFifoPins_||nativeMenuWarningPins_||!packetCurrent2DF550()||!packetRevision_||
+       domain_!=shared.inputs_.domain||context_!=shared.inputs_.context||video_!=shared.inputs_.video||
+       garage_!=shared.inputs_.popup||
+       (flags5CValue&1u)||!material54||material54!=primitiveOwner_.get()||
+       !material54->materialStored||!material54->materialRetained||material54->material00!=3229||
+       material54->optional04||material54->optional14||(material54->flags0F&1u)){
+        d.status=Status::phase;d.sourcePC=0x2DF8B0u;return false;
+    }
+    receipt.payload_=this;receipt.primitive_=material54;receipt.packet_=resource58;
+    receipt.primitiveIndex_=0;receipt.packetRevision_=packetRevision_;receipt.materialToken_=material54->material00;
+    ++nativeMenuWarningPins_;receipt.active_=true;return true;
+}
+bool OriginalUiGarageQuad50KG::menuWarningPacketMatches(const OriginalUiSharedDialogs50KG& shared,
+    const OriginalUiMenuWarningPacket50KG& receipt)const noexcept {
+    return receipt.active_&&receipt.owner_==&shared&&receipt.kind_==OriginalUiMenuWarningPacket50KG::Kind::quad&&
+       receipt.payload_==this&&nativeMenuWarningPins_&&receipt.packetRevision_&&receipt.packetRevision_==packetRevision_&&
+       receipt.primitiveIndex_==0&&receipt.primitive_==material54&&material54&&
+       receipt.packet_==resource58&&resource58==packetOwner_.get()&&material54->packet10==resource58&&
+       receipt.materialToken_==material54->material00;
+}
+bool OriginalUiGarageQuad50KG::releaseMenuWarningPacket(OriginalUiMenuWarningPacket50KG& receipt)noexcept {
+    if(!receipt.owner_||!menuWarningPacketMatches(*receipt.owner_,receipt))return false;
+    --nativeMenuWarningPins_;receipt.active_=false;return true;
+}
+bool OriginalUiGarageQuad50KG::lowerMenuWarningPacket(const OriginalUiSharedDialogs50KG& shared,
+    const OriginalUiMenuWarningPacket50KG& receipt,const std::array<std::uint32_t,2>& offset,
+    OriginalUiMenuWarningGeometry50KG& out,Diagnostic& d)const noexcept {
+    d={};if(!shared.menuWarning470PacketOffsetCurrent(receipt,offset)||!menuWarningPacketMatches(shared,receipt)){
+        d.status=Status::phase;d.sourcePC=0x3281E8u;return false;
+    }
+    LoweredPacket327E90 next;if(!lowerRetainedPacketBody327E90(receipt.packetRevision_,offset,next,d))return false;
+    try{
+        OriginalUiMenuWarningGeometry50KG geometry;
+        geometry.vertices.assign(next.vertices.begin(),next.vertices.end());geometry.stq.assign(next.stq.begin(),next.stq.end());
+        geometry.rasterW.assign(next.rasterW.begin(),next.rasterW.end());geometry.fog.assign(next.fog.begin(),next.fog.end());
+        geometry.quadCount=next.quadCount;out=std::move(geometry);return true;
+    }catch(...){d.status=Status::allocation;d.sourcePC=0x328378u;return false;}
 }
 }

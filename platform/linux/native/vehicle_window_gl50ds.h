@@ -42,6 +42,7 @@ inline constexpr std::size_t gbParticleRendererMetadataReservation50DS=256;
 inline constexpr std::size_t mcParticleRendererMetadataReservation50DS=256;
 class GameHost50ER;
 class OriginalUiGarageDrawContribution50KG;
+class OriginalUiSharedDialogs50KG;
 struct GameHostDiagnostic50ER;
 class OriginalVideoBlockingNativeBackend;
 using VehicleWindowGlProc50DS = void (*)();
@@ -1314,6 +1315,12 @@ public:
     // completion receipt. Same owner-thread/no-reentrancy contract as close.
     bool hasSessionDependents50LA() const noexcept { return sessionDependentPins50LA_!=0; }
 private:
+    friend class OriginalUiSharedDialogs50KG;
+    bool applyMenuRasterPrelude50KG(OriginalUiSharedDialogs50KG&,VehicleWindowDiagnostic50DS&)noexcept;
+    bool menuRasterPreludeCurrent50KG(const OriginalUiSharedDialogs50KG&)const noexcept;
+    bool sealMenuRasterSourceFrame50KG(const OriginalUiSharedDialogs50KG&,VehicleWindowDiagnostic50DS&)noexcept;
+    bool acceptMenuRasterSource50KG(const OriginalUiSharedDialogs50KG&)noexcept;
+    bool menuRasterRetired50KG(const OriginalUiSharedDialogs50KG&)const noexcept;
     friend class OriginalUiGarageRendererLease50KG;
     friend class OriginalUiGarageDrawContribution50KG;
     bool pollOriginalRenderer245030(bool& complete,VehicleWindowDiagnostic50DS&)noexcept;

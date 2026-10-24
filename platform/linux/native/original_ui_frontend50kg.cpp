@@ -5,6 +5,9 @@
 #include "../../../tests/native/original_race_display_lifetime50la.h"
 // Source-reviewed bounded Course/Tournament integration; runtime acceptance is pending.
 #include "original_ui_frontend50kg.h"
+#include "original_save_profile_owner50kg.h"
+#include "original_save_native_read_stage50kg.h"
+#include "../../../src/game/original_ui_controls_controller50kg.h"
 #include <thread>
 #include <array>
 #include <cstdio>
@@ -1367,16 +1370,23 @@ bool OriginalUiFrontend50KG::bindGarageDestinationRoot50KG(
 }
 bool OriginalUiFrontend50KG::prepareSharedDialogsInitial(const ::original_main_entry50KG::Application& root,
  VehicleWindowGl50DS& renderer,Diagnostic& d)noexcept {
- d={};auto* s=storage_.get();if(!s||!s->prepared||s->activated||s->renderer||s->closing||s->quit||
+ d={};auto* s=storage_.get();if(!s||!s->prepared||s->activated||s->renderer||s->inOperation||s->faulted||s->closing||s->quit||
     !s->active||!s->active->main||!s->active->mainResources||!s->active->prepared()||s->cold.application!=root.state){
   result(d,Status::notPrepared);return false;}
  if(s->cold.application->sharedDialogs){result(d,Status::busy);return false;}
  std::string error;
- const auto resultValue=root.prepareSharedDialogsInitial1B7BD0(s->active->mainResources->controllerPopup(),
+ const auto resultValue=root.prepareSharedDialogsInitial1B7BD0(*s->active->mainResources,
   s->cold.controllerPopup,renderer,error);
  if(resultValue==::original_main_entry50KG::Application::SharedUiBootResult::failed){
   std::fprintf(stderr,"original_shared_ui_initialization_failed detail=%s\n",error.c_str());
   s->fault(d,Status::cleanup,0x1B7BD0);return false;}
+ if(resultValue==::original_main_entry50KG::Application::SharedUiBootResult::complete){
+  const auto shared=s->cold.application->sharedDialogs;
+  if(!shared||shared->inputs_.root!=&root||
+     !s->active->main->bindInitialSharedMenu470(*shared,d.main)){
+   s->fault(d,Status::session,0x1B7BD0);return false;
+  }
+ }
  // Missing genuine Root services leave only the new Garage/global-dialog
  // join unopened. Existing Main/Options behavior is unchanged, not replaced
  // by fake32C,328,renderer or controller history.
@@ -1806,7 +1816,9 @@ Status OriginalUiFrontend50KG::render(const OriginalUiMainFrameClock50KG& clock,
         if(!s->cold.riderPresentation->materialClock(renderClock))return s->fault(d,Status::session);
     }
     if(const auto shared=s->cold.application->sharedDialogs){OriginalUiSharedDialogs50KG::Diagnostic sd;
-        if(!shared->invisible470204AC0(sd))return s->fault(d,Status::session,sd.sourcePC);
+        if(!shared->invisible470204AC0(sd)&&
+           (!m.options||!m.options->admitSharedMenu470(*shared)))
+            return s->fault(d,Status::session,sd.sourcePC);
         if(!m.main&&!m.options&&s->cold.application->controllerPopupState.active3CC)
             return s->fault(d,Status::session,0x206420);
     }
@@ -2012,8 +2024,33 @@ Status OriginalUiFrontend50KG::close(Diagnostic& d) noexcept {
         if(retired!=Status::ok&&retired!=Status::noChange)return retired;
     }
     if(s->inOperation||s->garageTextureDraw)return result(d,Status::busy);
-    // Reject before closing/frame flags, Rider end, or source-owner retirement.
-    // Keep every backing intact until actual primitive leases have retired.
+    // A failed/unsubmitted bounded Main/Options callback owns its own real
+    // Display pin. Retire only that authenticated Session before the general
+    // dependent gate, otherwise close would wait for the pin it must release.
+    // This does not retire any unrelated manager, primitive, Garage or FIFO.
+    if(s->renderer){if(const auto shared=s->cold.application->sharedDialogs){
+        Operation operation(s->inOperation);
+        decltype(s->active.get()) ownMenu=nullptr;bool ownMain=false;
+        for(auto* manager:{s->retiring.get(),s->pending.get(),s->active.get(),s->garageRestoration.get()}){
+            if(!manager)continue;
+            const bool mainMatch=manager->main&&!manager->mainRetired&&shared->menu470CloseOwnerCurrent(*manager->main,*s->renderer);
+            const bool optionsMatch=manager->options&&!manager->optionsRetired&&shared->menu470CloseOwnerCurrent(*manager->options,*s->renderer);
+            if((mainMatch&&optionsMatch)||((mainMatch||optionsMatch)&&ownMenu))return result(d,Status::cleanup,0x204A00);
+            if(mainMatch||optionsMatch){ownMenu=manager;ownMain=mainMatch;}
+        }
+        if(shared->menu470Owner()||shared->menuUpdateFailedOwner_){
+            if(!ownMenu)return result(d,Status::cleanup,0x204A00);
+            if(ownMain){
+                if(ownMenu->main->teardownSource(s->renderer,d.main)!=MainStatus::ok)return result(d,Status::cleanup);
+                ownMenu->mainRetired=true;
+            }else{
+                if(ownMenu->options->teardownSource(s->renderer,d.options)!=OptionsStatus::ok)return result(d,Status::cleanup);
+                ownMenu->optionsRetired=true;
+            }
+        }
+    }}
+    // Unrelated dependent pins still reject before closing/frame flags, Rider
+    // end, or any other source-owner retirement. Keep every backing intact.
     if(s->renderer&&s->renderer->hasSessionDependents50LA()) {
         d.renderer.error=VehicleWindowError50DS::request;
         d.renderer.operation="dependent primitive retirement must precede frontend close";
@@ -2103,6 +2140,33 @@ const MaterialTextureGl50EB* OriginalUiFrontend50KG::gpu() const noexcept {retur
 const OriginalUiNativeDraw50KG* OriginalUiFrontend50KG::draw() const noexcept {
     const auto* s=storage_.get();return s&&!s->inOperation&&!s->garageTextureDraw&&!s->faulted&&!s->quit&&!s->closing&&s->frameRendered&&s->active?s->active->draw():nullptr;
 }
+bool OriginalUiFrontend50KG::prepareNativeReadProfileMetadata50KG(
+    const std::shared_ptr<const OriginalSaveNativeReadStage50KG>& read,
+    std::unique_ptr<OriginalSaveProfileOwner50KG>& out)const noexcept {
+    const auto* s=storage_.get();
+    if(!read||!s||!s->prepared||!s->activated||s->faulted||s->quit||s->inOperation||
+       s->closing||s->pending||s->retiring||s->queued||s->courseLaunchReady||s->courseLaunchTaken||
+       !s->active||!s->active->transition||!s->active->transition->snapshot().bound||
+       !same(s->active->currentRoute(),{12,5})||!s->active->options||s->active->optionsRetired)return false;
+    const auto& c=s->cold;
+    if(!c.profile||!c.riderProfile||c.riderProfile->commonProfile()!=c.profile.get()||
+       !c.gameSettingsProfile||!c.controlsProfile||!c.audio||!c.soundMode||
+       c.audio->soundModeOwner50KG()!=c.soundMode.get())return false;
+    const auto& stage=read->projection();
+    const auto& before=stage.settingsBefore();const auto& actual=*c.gameSettingsProfile;
+    if(actual.known!=before.known||actual.savedGroup6E8!=before.savedGroup6E8||
+       actual.soundMode1101C!=before.soundMode1101C||actual.volume11020!=before.volume11020||
+       actual.flags11050!=before.flags11050||
+       !game::sameOriginalUiControlsPresets50KG(*c.controlsProfile,stage.controlsBefore())||
+       c.profile->flags11054!=stage.flags11054Before()||
+       !c.audio->canApplySoundMode18874050KG(stage.settingsAfter().soundMode1101C))return false;
+    // Actual retained frontend owners, not independently supplied snapshots.
+    // This checks audio NOW only. No lock/lease survives return; a future final
+    // single-producer commit must repeat these conditions immediately before
+    // its first mutation and must still establish complete semantic admission.
+    return c.riderProfile->prepareNativeReadMetadata(read,*c.profile,c.riderProfile->stamp(),out);
+}
+
 }
 
 namespace original_main_entry50KG {
@@ -2422,4 +2486,5 @@ bool Frontend::retireFailedGarageEntryTransfers(
     garageTransferAfter_=std::move(replacement);
     garageTransferPhase_=GarageTransferPhase::failedEntryRetired;d.sourcePC=0x254420;return true;
 }
+
 }

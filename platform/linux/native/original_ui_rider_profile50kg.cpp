@@ -1,6 +1,7 @@
 // New reconstruction after rollback; source-only, unverified.
 #include "original_ui_rider_profile50kg.h"
 #include "original_save_profile_owner50kg.h"
+#include "original_save_native_read_stage50kg.h"
 #include "../../../src/game/original_course_load_selection50kg.h"
 #include <cmath>
 #include <limits>
@@ -283,6 +284,7 @@ bool OriginalUiRiderProfileOwner50KG::initializeStartupProfile(
                 career.pods[pod].remainingPrizes1946=game::originalTournamentPrizes50KG;
             }
         }
+        next->saveProfile.recordFreshNames(); //180098..B0 /1864CC..F4
         //186EF0's exact source roster. This is an application reset, not an
         // unlock-all option nor an inference from which art happens to exist.
         next->unlock10FAC.fill(0);next->hidden0730.fill(0);
@@ -363,7 +365,8 @@ bool OriginalUiRiderProfileOwner50KG::initializeHallRecordsAtApplicationStartup(
     storage_->hallRecordsInitialized=true;++storage_->generation;return true;
 }
 bool OriginalUiRiderProfileOwner50KG::hallRecordsReady() const noexcept {
-    return storage_&&storage_->common&&storage_->common->known&&storage_->hallRecordsInitialized;
+    return storage_&&storage_->common&&storage_->common->known&&storage_->hallRecordsInitialized&&
+        storage_->saveProfile.hallRecordsCurrent(storage_->hallRecords);
 }
 bool OriginalUiRiderProfileOwner50KG::hallSnapshotForMode(std::uint32_t mode,
     game::OriginalUiHallProfile50KG& out) const noexcept {
@@ -760,6 +763,37 @@ bool OriginalUiRiderProfileOwner50KG::commitCourseBack(const game::OriginalUiRou
     for(std::size_t i=0;i<4;++i)if(!sameChange(exact.profileChanges.values[i],d.profileChanges.values[i]))return false;
     storage_->rememberedCourse[0]=c.courseSlot14E4;storage_->rememberedCourse[1]=c.laps14EC;
     storage_->rememberedCourse[2]=c.entrants14F0;storage_->rememberedCourse[3]=c.subtypeSlot14F4;++storage_->generation;return true;
+}
+
+bool OriginalUiRiderProfileOwner50KG::careerName219D(std::uint32_t career,
+    OriginalPersistedProfileName50KG& out)const noexcept {
+    return storage_&&storage_->common&&storage_->common->known&&
+        storage_->saveProfile.persistedName(true,career,out);
+}
+bool OriginalUiRiderProfileOwner50KG::playerName10F68(std::uint32_t player,
+    OriginalPersistedProfileName50KG& out)const noexcept {
+    return storage_&&storage_->common&&storage_->common->known&&
+        storage_->saveProfile.persistedName(false,player,out);
+}
+bool OriginalUiRiderProfileOwner50KG::prepareNativeReadMetadata(
+    const std::shared_ptr<const OriginalSaveNativeReadStage50KG>& read,
+    const OriginalUiMainProfile50KG& common,OriginalUiRiderProfileStamp50KG expected,
+    std::unique_ptr<OriginalSaveProfileOwner50KG>& out)const noexcept {
+    if(!read||!storage_||storage_->common.get()!=&common||!common.known||
+       common.mode34!=4||expected.mode34!=common.mode34||expected.generation!=storage_->generation||
+       storage_->generation==std::numeric_limits<std::uint64_t>::max()||
+       !hallRecordsReady()||!storage_->saveProfile.namesReady()||storage_->tournamentResultArmed||
+       storage_->comparison100C0>=27||(storage_->packed1125F&15u)>=13||
+       common.flags11054!=read->projection().flags11054Before())return false;
+    const auto& s=*storage_;
+    // Test-profile authority cannot be relabeled as an imported original save.
+    // Reject this unsupported coexistence; do not silently clear route guards.
+    if(s.testRider||s.gasganoScTest||s.tzidikTcTest||s.scorchRcTest||
+       s.sebulbaTbTest||s.kraidGbTest||s.youngAnakinMcTest)return false;
+    for(const auto course:s.courseOrder100C4)if(course>=13)return false;
+    // Metadata now retains the genuine full-read/stage join, not merely a
+    // structurally parsed arbitrary envelope. Output is still temporary only.
+    return s.saveProfile.preparePayloadMetadata(read,out);
 }
 
 }

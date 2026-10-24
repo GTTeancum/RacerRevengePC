@@ -39,6 +39,7 @@ public:
  const game::OriginalUiControllerPopupGeometry50KG* geometry() const noexcept;
  bool project(const game::OriginalUiControllerPopupRender50KG&,OriginalUiControllerPopupResourceDiagnostic50KG&) noexcept;
 private:
+    std::shared_ptr<OriginalUiSharedDialogMaterialHistory50KG> sharedHistory()const noexcept;
  friend class OriginalUiSharedDialogMaterialHistory50KG;
  bool transferInitialHistoryTo(const OriginalUiSharedDialogs50KG&,
    const std::shared_ptr<OriginalUiSharedDialogMaterialHistory50KG>&,

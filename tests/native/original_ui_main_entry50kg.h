@@ -10,6 +10,7 @@ struct OriginalPositionStatsNumbers50LA; struct OriginalPositionStatsResourceDia
 namespace original_camera_session50KX { class Session; }
 namespace rr::assets {class OriginalUiGarageSceneAssets50KG; struct OriginalUiGaragePageData50KG;}
 namespace rr::platform {class OriginalUiSharedDialogs50KG; class OriginalUiGarageSharedPageDrawOwner50KG; class OriginalUiGarageSession50KG; struct OriginalUiGarageNativeInput50KG; struct OriginalUiGarageNativeState50KG; class OriginalUiGarageModelResources50KG; class OriginalUiGarageVisibility50KG; class OriginalUiGarageTextOverlay50KG; class OriginalUiGarageFogColorLease50KG; class OriginalUiGarageScreenText50KG; struct OriginalUiGarageScreenTextDiagnostic50KG; class OriginalUiGarageWidget1Owner50KG; struct OriginalUiGarageWidget1Diagnostic50KG; class OriginalUiGarageManagerFog50KG;}
+namespace rr::platform { class OriginalUiMainDrawResources50KG; }
 namespace native_ai50IV { struct Session; }
 #include "original_ui_main_output50kg.h"
 #include "../../platform/linux/native/original_ui_garage_audio_backing50kg.h"
@@ -260,7 +261,7 @@ private:
     bool sharedUiRetirementReceiptCurrent17C1D8()const noexcept;
     enum class SharedUiBootResult { unavailable,complete,failed };
     SharedUiBootResult prepareSharedDialogsInitial1B7BD0(
-        std::shared_ptr<rr::platform::OriginalUiControllerPopupResources50KG>,
+        const rr::platform::OriginalUiMainDrawResources50KG&,
         std::shared_ptr<const rr::assets::OriginalUiArchive50KG>,
         rr::platform::VehicleWindowGl50DS&,std::string&)const noexcept;
     bool finishSharedUiDispatcherAfterBanks1B7140(std::string&)const noexcept;

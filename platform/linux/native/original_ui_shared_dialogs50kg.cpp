@@ -1,8 +1,10 @@
 #include "original_ui_shared_dialogs50kg.h"
+#include "original_ui_shared_dialog_material_history50kg.h"
 #include "original_ui_main_session50kg.h"
 #include "original_ui_garage_draw_contribution50kg.h"
 #include "../../../tests/native/original_ui_main_entry50kg.h"
 #include "../../../tests/native/original_race_display_lifetime50la.h"
+#include "../../../src/assets/original_standard_archive_provider50la.h"
 #include <exception>
 #include <cmath>
 #include <bit>
@@ -14,7 +16,7 @@ namespace rr::platform {
 OriginalUiSharedDialogs50KG::~OriginalUiSharedDialogs50KG()noexcept {
     // Global UI shutdown must perform its actual two child callbacks. Neither
     // Garage Back nor destruction of a resource projection releases these.
-    if(dialog470_.entity.reference00||controller47C_.entity.reference00||firstPass470Draw_||demand470Pending_||thirdPass470Draw_||nativeWarning470FifoPins_)std::terminate();
+    if(dialog470_.entity.reference00||controller47C_.entity.reference00||firstPass470Draw_||demand470Pending_||thirdPass470Draw_||nativeWarning470FifoPins_||nativeMenuWarning470Pins_||menuMainDraw_||menuOptionsDraw_||menuUpdateFailedOwner_)std::terminate();
 }
 bool OriginalUiSharedDialogs50KG::fail(Diagnostic& d,Status s,std::uint32_t pc)noexcept {
     d.status=s;d.sourcePC=pc;d.sourceEffectsCommitted=dialog470_.entity.reference00!=0||dialog470_.vtable!=0;return false;
@@ -180,7 +182,7 @@ bool OriginalUiSharedDialogs50KG::bindLoaded47C2055B0(
     controller47C_.loaded=true;phase_=Phase::loaded;d.sourceEffectsCommitted=true;d.sourcePC=0x2055B0;return true;
 }
 bool OriginalUiSharedDialogs50KG::reappendInitialMain1D7CF4(Diagnostic& d)noexcept {
- d={};if(firstPass470Draw_||demand470Pending_||thirdPass470Draw_||nativeWarning470FifoPins_)return fail(d,Status::phase,0x1D7CF4);
+ d={};if(firstPass470Draw_||demand470Pending_||thirdPass470Draw_||nativeWarning470FifoPins_||nativeMenuWarning470Pins_||menuMainDraw_||menuOptionsDraw_||menuUpdateFailedOwner_||menuUpdateAborted_)return fail(d,Status::phase,0x1D7CF4);
  if(initialMainAttached_)return loadedCurrent();
  if(!loadedCurrent()||scope_->managerEpoch_||scope_->managerLive_||completedReorders_||reorderingPage_)
   return fail(d,Status::phase,0x1D7CF4);
@@ -197,7 +199,7 @@ bool OriginalUiSharedDialogs50KG::reappendInitialMain1D7CF4(Diagnostic& d)noexce
  initialMainAttached_=true;initialMainResetPending_=true;++completedReorders_;reorderStep_=0;d.sourceEffectsCommitted=true;d.sourcePC=0x1E5044;return true;
 }
 bool OriginalUiSharedDialogs50KG::reappendNativeMenu1B86D0(Diagnostic& d)noexcept {
- d={};if(firstPass470Draw_||demand470Pending_||thirdPass470Draw_||nativeWarning470FifoPins_)return fail(d,Status::phase,0x1B86D0);
+ d={};if(firstPass470Draw_||demand470Pending_||thirdPass470Draw_||nativeWarning470FifoPins_||nativeMenuWarning470Pins_||menuMainDraw_||menuOptionsDraw_||menuUpdateFailedOwner_||menuUpdateAborted_)return fail(d,Status::phase,0x1B86D0);
  if(!loadedCurrent()||!initialMainAttached_||scope_->managerLive_||reorderingPage_||
     completedReorders_==std::numeric_limits<std::uint64_t>::max())return fail(d,Status::phase,0x1B86D0);
  const auto app=application_.lock();
@@ -211,7 +213,7 @@ bool OriginalUiSharedDialogs50KG::reappendNativeMenu1B86D0(Diagnostic& d)noexcep
  d.sourceEffectsCommitted=true;d.sourcePC=0x1B872C;return true;
 }
 bool OriginalUiSharedDialogs50KG::reappendMainEntry1D7CF4(Diagnostic& d)noexcept {
- if(firstPass470Draw_||demand470Pending_||thirdPass470Draw_||nativeWarning470FifoPins_)return fail(d,Status::phase,0x1D7CF4);
+ if(firstPass470Draw_||demand470Pending_||thirdPass470Draw_||nativeWarning470FifoPins_||nativeMenuWarning470Pins_||menuMainDraw_||menuOptionsDraw_||menuUpdateFailedOwner_||menuUpdateAborted_)return fail(d,Status::phase,0x1D7CF4);
  if(initialMainResetPending_){d={};if(!loadedCurrent()||!initialMainAttached_)return fail(d,Status::phase,0x1D7CF4);
   initialMainResetPending_=false;d.sourcePC=0x1D7CF4;return true;}
  if(!reappendNativeMenu1B86D0(d))return false;
@@ -227,7 +229,7 @@ bool OriginalUiSharedDialogs50KG::reorderCompleteFor1B872C(const OriginalUiGarag
         scope_->garagePage_==&page.entity_&&page.cameraHandoffPhase_==3;
 }
 bool OriginalUiSharedDialogs50KG::reappend1B86D0(const OriginalUiGaragePageOwner50KG& page,Diagnostic& d)noexcept {
-    d={};if(firstPass470Draw_||demand470Pending_||thirdPass470Draw_||nativeWarning470FifoPins_)return fail(d,Status::phase,0x1B86D0);
+    d={};if(firstPass470Draw_||demand470Pending_||thirdPass470Draw_||nativeWarning470FifoPins_||nativeMenuWarning470Pins_||menuMainDraw_||menuOptionsDraw_||menuUpdateFailedOwner_||menuUpdateAborted_)return fail(d,Status::phase,0x1B86D0);
     if(!loadedCurrent()||!page.currentConstructor()||page.issuer_!=inputs_.root||
         scope_->garagePageOwner_!=&page||scope_->garagePage_!=&page.entity_||page.cameraHandoffPhase_!=3)
         return fail(d,Status::owner,0x1B86D0);
@@ -248,7 +250,11 @@ bool OriginalUiSharedDialogs50KG::reappend1B86D0(const OriginalUiGaragePageOwner
     ++completedReorders_;reorderedPage_=&page;reorderedGrant_=page.grant_;reorderingPage_=nullptr;reorderStep_=0;d.sourceEffectsCommitted=true;d.sourcePC=0x1B872C;return true;
 }
 bool OriginalUiSharedDialogs50KG::advance4702048F0(float delta,Diagnostic& d)noexcept {
- d={};if(firstPass470Draw_||demand470Pending_||thirdPass470Draw_||nativeWarning470FifoPins_)return fail(d,Status::phase,0x2048F0);
+ d={};if(menuMainDraw_||menuOptionsDraw_||menuUpdateFailedOwner_||menuUpdateAborted_)return fail(d,Status::phase,0x2048F0);
+ return advance470Body2048F0(delta,d);
+}
+bool OriginalUiSharedDialogs50KG::advance470Body2048F0(float delta,Diagnostic& d)noexcept {
+ d={};if(firstPass470Draw_||demand470Pending_||thirdPass470Draw_||nativeWarning470FifoPins_||nativeMenuWarning470Pins_||menuMainDraw_||menuOptionsDraw_||menuUpdateFailedOwner_||menuUpdateAborted_)return fail(d,Status::phase,0x2048F0);
  if(!loadedCurrent()||!std::isfinite(delta)||delta<0||
     dialog470_.entity.parent1C!=&scope_->dispatcher_||controller47C_.entity.parent1C!=&scope_->dispatcher_)
   return fail(d,Status::owner,0x2048F0);
@@ -297,7 +303,7 @@ bool OriginalUiSharedDialogs50KG::begin470FirstPass(OriginalUiGarageDrawContribu
    return fail(d,Status::phase,0x204A00);
   d.sourcePC=0x204A00;return true;
  }
- if(firstPass470Phase_!=FirstPass470Phase::idle||demand470Pending_||thirdPass470Draw_||nativeWarning470FifoPins_||draw.shared470FirstPassOwner_||
+ if(firstPass470Phase_!=FirstPass470Phase::idle||demand470Pending_||thirdPass470Draw_||nativeWarning470FifoPins_||nativeMenuWarning470Pins_||menuMainDraw_||menuOptionsDraw_||menuUpdateFailedOwner_||menuUpdateAborted_||draw.shared470FirstPassOwner_||
     draw.shared470FirstPassEpoch_||draw.shared470InheritedReturned_||
     firstPass470Epoch_==std::numeric_limits<std::uint64_t>::max()||!inputs_.context||
     !inputs_.context->live()||!inputs_.context->textureLifetime_)return fail(d,Status::phase,0x204A00);
@@ -348,8 +354,14 @@ bool OriginalUiSharedDialogs50KG::demand470204A00(Diagnostic& d)noexcept {
  if(!firstPass470Draw_||firstPass470Phase_!=FirstPass470Phase::body||
     !firstPass470Matches(*firstPass470Draw_)||!firstPass470Draw_->shared470FirstPassReceiverCurrent(*this))
   return fail(d,Status::owner,0x204A00);
+ return demand470Body204A00(d);
+}
+bool OriginalUiSharedDialogs50KG::demand470Body204A00(Diagnostic& d)noexcept {
+ d={};if(!demand470Pending_)demand470Effects_=false;
  const auto stop=[&](Status status,std::uint32_t pc)noexcept {
   d.status=status;d.sourcePC=pc;d.sourceEffectsCommitted=demand470Effects_;return false;};
+ if(menu470Owner()&&(!menu470RenderCurrent()||menu470Phase_!=Menu470Phase::callbacks||
+    menu470Slot_!=0x40||menu470Callback_!=&dialog470_.entity))return stop(Status::owner,0x204A00);
  if(!loadedCurrent()||update470Pending_||!update470Count_||
     dialog470_.entity.parent1C!=&scope_->dispatcher_||dialog470_.manager30!=&scope_->dispatcher_)
   return stop(Status::owner,0x204A00);
@@ -373,15 +385,23 @@ bool OriginalUiSharedDialogs50KG::demand470204A00(Diagnostic& d)noexcept {
  if(!inputs_.popup||!inputs_.popup->loaded()||inputs_.popup->identity()!=
     assets::originalUiArchiveIdentity50KG(assets::OriginalUiArchiveId50KG::controllerPopup)||
     !inputs_.domain||!inputs_.context||!inputs_.context->live())return stop(Status::owner,0x204A54);
- const auto psm=inputs_.popup->find("ui/textures/overlay1popup.psm");
- const auto pst=inputs_.popup->find("ui/textures/overlay1.pst");
+ // Keep this noexcept positive-only demand path allocation-free. The loaded
+ // Popup archive owns these exact authenticated views; string_view matching
+ // uses canonical Popup member spelling without temporary std::strings.
+ assets::OriginalUiMemberView50KG psm,pst;
+ for(std::size_t i=0;i<inputs_.popup->memberCount();++i){
+  const auto member=inputs_.popup->member(i);
+  if(!member.identity||!member.identity->name)continue;
+  if(!psm.identity&&assets::OriginalStandardArchiveProvider50LA::sameName(member.identity->name,"ui\\textures\\overlay1popup.psm"))psm=member;
+  if(!pst.identity&&assets::OriginalStandardArchiveProvider50LA::sameName(member.identity->name,"ui\\textures\\overlay1.pst"))pst=member;
+ }
  if(!psm.identity||!psm.data||!pst.identity||!pst.data)return stop(Status::source,0x204A54);
  const auto table=inputs_.domain->materials382B38();const auto textures=inputs_.domain->textures383400();
  if(!table||!textures)return stop(Status::owner,0x204A54);
  while(demand470Next_<2){auto& q=dialog470_.strips[demand470Next_];
   if(q.offset!=0x40u+std::uint32_t(demand470Next_)*0x60u||!q.packetCurrent2DF550()||
      q.domain_!=inputs_.domain||q.context_!=inputs_.context||q.video_!=inputs_.video||q.garage_!=inputs_.popup||
-     q.nativeGarageFifoPins_||!q.material54||q.material54!=q.primitiveOwner_.get()||
+     q.nativeGarageFifoPins_||q.nativeMenuWarningPins_||!q.material54||q.material54!=q.primitiveOwner_.get()||
      q.material54->domain!=inputs_.domain||q.material54->context!=inputs_.context)
    return stop(Status::owner,0x204A54);
   if(!table->demandSharedWarning2DF8A0(q.material54->material00,*textures,psm,pst,d.quad.material)){
@@ -410,7 +430,7 @@ bool OriginalUiSharedDialogs50KG::invisible470204AC0(Diagnostic& d)const noexcep
  d.sourcePC=0x2054A4;return true;
 }
 bool OriginalUiSharedDialogs50KG::nativeMaterialRetirementCurrent()const noexcept {
- Quad::Diagnostic d;return !nativeWarning470FifoPins_&&!thirdPass470Draw_&&dialog470_.dim160&&!dialog470_.dim160->nativeGarageFifoPins_&&dialog470_.dim160->primitives30&&
+ Quad::Diagnostic d;return !menu470Owner()&&!nativeMenuWarning470Pins_&&!menuRasterAttempted_&&!nativeWarning470FifoPins_&&!thirdPass470Draw_&&dialog470_.dim160&&!dialog470_.dim160->nativeGarageFifoPins_&&!dialog470_.dim160->nativeMenuWarningPins_&&dialog470_.dim160->primitives30&&
   Quad::preflightPrimitive246260(dialog470_.dim160->primitives30[0],d);
 }
 bool OriginalUiSharedDialogs50KG::controllerRetirementCurrent()const noexcept {
@@ -440,7 +460,7 @@ bool OriginalUiSharedDialogs50KG::drain2DEFE0(Diagnostic& d,std::uint32_t firstP
 }
 bool OriginalUiSharedDialogs50KG::retireDim2E1980(Diagnostic& d)noexcept {
  if(!dialog470_.dim160)return fail(d,Status::phase,0x20E094);auto& p=*dialog470_.dim160;
- if(nativeWarning470FifoPins_||thirdPass470Draw_||p.nativeGarageFifoPins_||p.count34!=1||p.count48!=1||p.capacity4C!=1||p.count04!=4||p.count08!=4||p.owns38!=1||
+ if(nativeWarning470FifoPins_||nativeMenuWarning470Pins_||thirdPass470Draw_||p.nativeGarageFifoPins_||p.nativeMenuWarningPins_||p.count34!=1||p.count48!=1||p.capacity4C!=1||p.count04!=4||p.count08!=4||p.owns38!=1||
     !p.vertices00||!p.primitives30||!p.packets44||!Quad::preflightPrimitive246260(p.primitives30[0],d.quad))
   return fail(d,Status::retirementPending,d.quad.sourcePC?d.quad.sourcePC:0x2E19D4);
  if(!drain2DEFE0(d,0x2E19B4,0x2E19CC))return false;
@@ -448,9 +468,20 @@ bool OriginalUiSharedDialogs50KG::retireDim2E1980(Diagnostic& d)noexcept {
  Quad::releasePrimitive246260(p.primitives30[0]);p.primitives30.reset();
  p.packets44[0].allocation00.reset();p.packets44.reset();p.vertices00.reset();dialog470_.dim160.reset();return true;
 }
+bool OriginalUiSharedDialogs50KG::sharedScopeFinalRetirementComplete()const noexcept {
+ // These exact flags/null slots are written only after the two authentic
+ // Scope1413E0 completions. No Display check belongs in this replay barrier:
+ // final history cleanup may be pending while the same Display is not current.
+ return scope_&&scope_->issuer_==inputs_.root&&scope_->live().okay()&&
+  !scope_->sharedDialogsOwner_&&!scope_->sharedDialogs_[0]&&!scope_->sharedDialogs_[1]&&
+  !scope_->sharedDialogRetiring_[0]&&!scope_->sharedDialogRetiring_[1]&&
+  scope_->sharedDialogRetired_[0]&&scope_->sharedDialogRetired_[1]&&
+  !scope_->sharedDialogDetached_&&!scope_->sharedDialogReorderOrdinal_&&
+  !scope_->dispatcher_.firstChild18&&!controller47C_.entity.reference00&&!dialog470_.entity.reference00;
+}
 bool OriginalUiSharedDialogs50KG::retireAttached142590(Diagnostic& d)noexcept {
  d={};if(phase_==Phase::retired){d.sourcePC=0x1413E0;return true;}
- if(firstPass470Draw_||demand470Pending_||thirdPass470Draw_||nativeWarning470FifoPins_)return fail(d,Status::retirementPending,0x142590);
+ if(firstPass470Draw_||demand470Pending_||thirdPass470Draw_||nativeWarning470FifoPins_||nativeMenuWarning470Pins_||menuMainDraw_||menuOptionsDraw_||menuUpdateFailedOwner_)return fail(d,Status::retirementPending,0x142590);
  if(!current()||reorderStep_)return fail(d,Status::phase,0x142590);
  const auto app=application_.lock();
  if(phase_==Phase::loaded){
@@ -477,27 +508,38 @@ bool OriginalUiSharedDialogs50KG::retireAttached142590(Diagnostic& d)noexcept {
   app->controllerPopupResources.reset();controller47C_.resources.reset();controller47C_.loaded=false;
   retiringOrdinal_=0;retirementPayloadStep_=retirementDrainPhase_=0;
  }
- if(!scope_->sharedDialogRetirementCurrent(*this,0,dialog470_.entity)){
-  d.entity=scope_->beginSharedDialogRetirement142590(*this,0,dialog470_.entity);
+ if(!sharedScopeFinalRetirementComplete()){
+  if(!scope_->sharedDialogRetirementCurrent(*this,0,dialog470_.entity)){
+   d.entity=scope_->beginSharedDialogRetirement142590(*this,0,dialog470_.entity);
+   if(!d.entity.okay())return fail(d,Status::owner,d.entity.sourcePC);
+  }
+  //20E050 exact embedded order: Text220,Text1B0,Dim160,Quad100,A0,40.
+  while(retirementPayloadStep_<6){const auto step=retirementPayloadStep_;
+   if(step<2){auto& item=step==0?dialog470_.alternate220:dialog470_.message1B0;
+    if(!item||!item->retire2E1340(d.text))return fail(d,Status::retirementPending,d.text.sourcePC);
+    item.reset();--loaded470Texts_;
+   }else if(step==2){if(!retireDim2E1980(d))return false;}
+   else {auto& q=dialog470_.strips[5-step];
+    if(!q.preflightRetirement2DEFE0(d.quad))return fail(d,Status::retirementPending,d.quad.sourcePC);
+    if(!drain2DEFE0(d,0x2DF018,0x2DF030))return false;
+    q.retirementDrainPhase_=retirementDrainPhase_;
+    if(!q.retireResources2DF038(d.quad))return fail(d,Status::retirementPending,d.quad.sourcePC);
+    --loaded470Quads_;--constructed470Quads_;
+   }
+   ++retirementPayloadStep_;retirementDrainPhase_=0;
+  }
+  d.entity=scope_->finishSharedDialogRetirement1413E0(*this,0,dialog470_.entity);
   if(!d.entity.okay())return fail(d,Status::owner,d.entity.sourcePC);
  }
- //20E050 exact embedded order: Text220,Text1B0,Dim160,Quad100,A0,40.
- while(retirementPayloadStep_<6){const auto step=retirementPayloadStep_;
-  if(step<2){auto& item=step==0?dialog470_.alternate220:dialog470_.message1B0;
-   if(!item||!item->retire2E1340(d.text))return fail(d,Status::retirementPending,d.text.sourcePC);
-   item.reset();--loaded470Texts_;
-  }else if(step==2){if(!retireDim2E1980(d))return false;}
-  else {auto& q=dialog470_.strips[5-step];
-   if(!q.preflightRetirement2DEFE0(d.quad))return fail(d,Status::retirementPending,d.quad.sourcePC);
-   if(!drain2DEFE0(d,0x2DF018,0x2DF030))return false;
-   q.retirementDrainPhase_=retirementDrainPhase_;
-   if(!q.retireResources2DF038(d.quad))return fail(d,Status::retirementPending,d.quad.sourcePC);
-   --loaded470Quads_;--constructed470Quads_;
-  }
-  ++retirementPayloadStep_;retirementDrainPhase_=0;
+ //470 payload and its counted Entity have genuinely retired. Retain the exact
+ // same Display/context until the common owner independently authenticates
+ // final Scope completion and renderer/Root/Video ownership. Failure is sticky
+ // pending cleanup, never an early release or a fresh history initialization.
+ if(sharedMaterialHistory_){
+  if(!sharedMaterialHistory_->finishAfter470(*this,d.popup))
+   return fail(d,Status::retirementPending,d.popup.sourcePC);
+  sharedMaterialHistory_.reset();
  }
- d.entity=scope_->finishSharedDialogRetirement1413E0(*this,0,dialog470_.entity);
- if(!d.entity.okay())return fail(d,Status::owner,d.entity.sourcePC);
  dialog470_.loaded=false;phase_=Phase::retired;reorderedPage_=nullptr;reorderedGrant_.reset();
  if(retirementDisplayPinned_){retirementDisplay_->unpin();retirementDisplayPinned_=false;}retirementDisplay_.reset();
  inputs_.selected32C.reset();inputs_.fonts.reset();inputs_.popup.reset();inputs_.video.reset();inputs_.context.reset();inputs_.domain.reset();
@@ -641,6 +683,7 @@ bool Application::sharedUiRetirementReceiptCurrent17C1D8()const noexcept {
     rejected(old->dialog470_.loaded,"old->dialog470_.loaded")||
     rejected(old->controller47C_.loaded,"old->controller47C_.loaded")||
     rejected(old->controller47C_.resources,"old->controller47C_.resources")||
+    rejected(old->sharedMaterialHistory_,"old->sharedMaterialHistory_")||
     rejected(old->retirementDisplay_,"old->retirementDisplay_")||
     rejected(old->retirementDisplayPinned_,"old->retirementDisplayPinned_")||
     rejected(old->reorderingPage_,"old->reorderingPage_")||
@@ -683,10 +726,11 @@ bool Application::sharedUiRetirementReceiptCurrent17C1D8()const noexcept {
  return true;
 }
 Application::SharedUiBootResult Application::prepareSharedDialogsInitial1B7BD0(
- std::shared_ptr<rr::platform::OriginalUiControllerPopupResources50KG> resources,
+ const rr::platform::OriginalUiMainDrawResources50KG& mainBank,
  std::shared_ptr<const rr::assets::OriginalUiArchive50KG> popup,
  rr::platform::VehicleWindowGl50DS& renderer,std::string& error)const noexcept {
  using Owner=rr::platform::OriginalUiSharedDialogs50KG;
+ const auto resources=mainBank.controllerPopup();
  error.clear();
  if(!state||state->sharedDialogs){error="Persistent UI constructor already owned; no history adoption";return SharedUiBootResult::unavailable;}
  const bool successor=bool(sharedUiScopeOwner_);
@@ -802,8 +846,8 @@ Application::SharedUiBootResult Application::prepareSharedDialogsInitial1B7BD0(
   in.materialDirectory=&materialDirectory36B970_;in.fontDirectory=&fontDirectory36B420_;
   Owner::Diagnostic d;
   if(!owner->bindInitial1B7BD0(sharedUiScopeOwner_,state,std::move(in),d)||!owner->load470203D40(d)||
-     !owner->construct47C2054D0(d)||!owner->bindLoaded47C2055B0(std::move(resources),d)||
-     !owner->reappendInitialMain1D7CF4(d)){
+     !owner->construct47C2054D0(d)||!owner->bindLoaded47C2055B0(resources,d)||
+     !owner->bootstrapInitialHistoryFromMain(mainBank,d)||!owner->reappendInitialMain1D7CF4(d)){
    error="Actual shared UI prefix retained at source PC "+std::to_string(d.sourcePC);return SharedUiBootResult::failed;}
   return SharedUiBootResult::complete;
  }catch(...){error="Shared UI boot allocation failed; actual committed prefixes retained";return SharedUiBootResult::failed;}
@@ -811,7 +855,8 @@ Application::SharedUiBootResult Application::prepareSharedDialogsInitial1B7BD0(
 bool Application::finishSharedUiDispatcherAfterBanks1B7140(std::string& error)const noexcept {
  error.clear();const auto owner=state?state->sharedDialogs:nullptr;
  if(!owner)return !sharedUiScopeOwner_;
- if(owner->inputs_.root!=this||owner->scope_!=sharedUiScopeOwner_||owner->phase_!=rr::platform::OriginalUiSharedDialogs50KG::Phase::retired){
+ if(owner->inputs_.root!=this||owner->scope_!=sharedUiScopeOwner_||owner->phase_!=rr::platform::OriginalUiSharedDialogs50KG::Phase::retired||
+    owner->sharedMaterialHistory_){
   error="Global dialog payloads must retire before the native UI banks and dispatcher";return false;}
  const auto result=sharedUiScopeOwner_->close();if(!result.okay()){error="Actual UI dispatcher still owns live children";return false;}
  // Preserve only the last completed lifetime, including exact 47C state.

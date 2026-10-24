@@ -178,6 +178,7 @@ private:
         std::int32_t count48=0,capacity4C=0;
         // Native lifetime of the exact retained packet/Primitive borrow.
         std::uint32_t nativeGarageFifoPins_=0;
+        std::uint32_t nativeMenuWarningPins_=0; // Actual Shared menu packet lifetime.
         std::uint64_t packetRevision_=1;
     };
     std::array<std::unique_ptr<Aperture>,2> apertures_;

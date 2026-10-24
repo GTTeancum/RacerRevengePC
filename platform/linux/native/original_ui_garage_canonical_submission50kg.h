@@ -9,6 +9,7 @@
 namespace rr::platform {
 class OriginalUiGarageDrawContribution50KG;
 class OriginalUiGarageModelResource50KG;
+class OriginalUiSharedDialogMaterialHistory50KG;
 // One genuine canonical-table transaction, owned by a future COMPLETE Garage
 // composer. This is not a SourceOwner and cannot construct/seal a source frame.
 // The three model families are lowered distinctly; visibility,
@@ -22,6 +23,7 @@ public:
     OriginalUiGarageCanonicalSubmission50KG& operator=(const OriginalUiGarageCanonicalSubmission50KG&)=delete;
 private:
     friend class OriginalUiGarageDrawContribution50KG;
+    friend class OriginalUiSharedDialogMaterialHistory50KG;
     friend class VehicleWindowGl50DS;
     friend class OriginalUiSourceFrame50KM;
     using Table=assets::OriginalStandardMaterialTable50LA;
@@ -76,6 +78,8 @@ private:
         OriginalUiMaterialSpan50KG span{};
         const void* screenReceiver=nullptr;
     };
+    std::shared_ptr<OriginalUiSharedDialogMaterialHistory50KG> sharedHistory_;
+    std::uint64_t sharedRevision_=0;
     std::shared_ptr<Table> table_;
     std::shared_ptr<const assets::OriginalUiImageBank50KG> bank_;
     assets::OriginalStandardMaterialCollectorReceipt50LA receipt_{};

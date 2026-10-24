@@ -87,7 +87,7 @@ void OriginalUiGarageScreenText50KG::PacketDelete::operator()(Qword* p)const noe
 OriginalUiGarageScreenText50KG::~OriginalUiGarageScreenText50KG()noexcept {
  //The enclosing real29C9C0 owns this retirement boundary. No hidden source
  //release from a C++ reverse-member destructor or automatic framebuffer drain.
- if(phase_!=Phase::constructed&&phase_!=Phase::retired)std::terminate();
+ if(nativeMenuWarningPins_||nativeGarageFifoPins_||(phase_!=Phase::constructed&&phase_!=Phase::retired))std::terminate();
 }
 bool OriginalUiGarageScreenText50KG::stop(Diagnostic& d,Status status,std::uint32_t pc)noexcept {
  d.status=status;d.sourcePC=pc;d.sourceEffectsCommitted=phase_!=Phase::constructed;
@@ -400,7 +400,8 @@ bool OriginalUiGarageScreenText50KG::applyOverlay29D690(std::uint32_t color,
  std::int16_t alpha,float scale,float rotation,std::int32_t x,std::int32_t y,
  std::int32_t justification,Diagnostic& d)noexcept {
  d={};
- if(nativeGarageFifoPins_||phase_!=Phase::coldLoaded||!coldInputsCurrent()||!glyphsC_||
+ if(nativeGarageFifoPins_||nativeMenuWarningPins_||phase_!=Phase::coldLoaded||!coldInputsCurrent()||!glyphsC_||
+    packetRevision_==std::numeric_limits<std::uint64_t>::max()||
     !std::isfinite(scale)||!std::isfinite(rotation)||scale==0)
   return stop(d,Status::phase,0x29D690);
  // Every source vertex alias is validated before the first color write.
@@ -408,6 +409,7 @@ bool OriginalUiGarageScreenText50KG::applyOverlay29D690(std::uint32_t color,
   if(!v.aliases10||v.aliases10>2)return stop(d,Status::phase,0x133F20);
   for(std::size_t a=0;a<v.aliases10;++a)if(!v.rgba1C[a])return stop(d,Status::phase,0x133F20);
  }
+ ++packetRevision_; // Native revision precedes this mutation prefix.
  const bool rgb=color54_!=color,a=alpha58_!=alpha;
  const auto rgba=game::originalUiTextPacketColor50KG(color,alpha);
  if(rgb||a)for(std::size_t i=0;i<capacity5B_;++i)for(auto& v:glyphsC_[i].vertices)
@@ -428,7 +430,8 @@ bool OriginalUiGarageScreenText50KG::applyOverlay29D690(std::uint32_t color,
 bool OriginalUiGarageScreenText50KG::regenerate2E0F50(std::uint32_t viewportWidth,
  std::uint32_t viewportHeight,float videoMaximum,Diagnostic& d)noexcept {
  d={};
- if(nativeGarageFifoPins_||phase_!=Phase::coldLoaded||!coldInputsCurrent()||
+ if(nativeGarageFifoPins_||nativeMenuWarningPins_||phase_!=Phase::coldLoaded||!coldInputsCurrent()||
+    packetRevision_==std::numeric_limits<std::uint64_t>::max()||
     !string8_||!glyphsC_||!packets64_||!primitives4_||length5C_>capacity5B_||
     string8_[length5C_]!=0||angle44_!=0||!std::isfinite(scale40_)||scale40_==0||
     !std::isfinite(depth48_)||!viewportWidth||!viewportHeight||!std::isfinite(videoMaximum)||videoMaximum<0)
@@ -439,6 +442,7 @@ bool OriginalUiGarageScreenText50KG::regenerate2E0F50(std::uint32_t viewportWidt
   if(active5E_>packetCount5D_)return stop(d,Status::phase,0x2E103C);
   for(std::size_t p=0;p<active5E_;++p)if(!packets64_[p].gif08||!packets64_[p].giftag0C)
    return stop(d,Status::phase,0x2E103C);
+  ++packetRevision_; // Before the first clean-branch packet store.
   for(std::size_t p=0;p<active5E_;++p){
    auto& packet=packets64_[p];
    packet.gif08->words[1]=(packet.gif08->words[1]&~0x03ff8000u)|(0x5eu<<15);
@@ -501,6 +505,7 @@ bool OriginalUiGarageScreenText50KG::regenerate2E0F50(std::uint32_t viewportWidt
   for(std::size_t a=0;a<vertex.aliases10;++a)if(!vertex.stq14[a]||!vertex.xyz24[a])
    return stop(d,Status::phase,0x2E1284);
  }
+ ++packetRevision_; // Before the first dirty-branch retained state store.
  active5E_=static_cast<std::uint8_t>(active);vector20_[0]=x;vector20_[1]=y;
  for(std::size_t p=0;p<active;++p){
   auto& packet=packets64_[p];
@@ -549,7 +554,9 @@ bool OriginalUiGarageScreenText50KG::writeText29D990(std::string_view text,Diagn
  // The source equality branch above performs no store. Only an actual text
  // change needs exclusive access to the retained packet/string owner; do not
  // admit a truncated-prefix match or clear its live FIFO borrow.
- if(nativeGarageFifoPins_)return rejectSetter("screen_pinned_mutation");
+ if(nativeGarageFifoPins_||nativeMenuWarningPins_)return rejectSetter("screen_pinned_mutation");
+ if(packetRevision_==std::numeric_limits<std::uint64_t>::max())return rejectSetter("screen_revision_exhausted");
+ ++packetRevision_;
  const auto copied=std::min<std::size_t>(text.size(),capacity5B_);
  length5C_=static_cast<std::uint8_t>(copied); //29D99C before copy.
  if(copied)std::memcpy(string8_.get(),text.data(),copied); //29D9A8.
@@ -561,7 +568,7 @@ bool OriginalUiGarageScreenText50KG::writeText29D990(std::string_view text,Diagn
 bool OriginalUiGarageScreenText50KG::preflightRetirement2E1340(Diagnostic& d)const noexcept {
  d={};
  if(ownerThread_!=std::this_thread::get_id()){d.status=Status::authority;d.sourcePC=0x2DFC60;return false;}
- if(nativeGarageFifoPins_){d.status=Status::phase;d.sourcePC=0x2E1340;return false;}
+ if(nativeGarageFifoPins_||nativeMenuWarningPins_){d.status=Status::phase;d.sourcePC=0x2E1340;return false;}
  if(phase_==Phase::retired)return true;
  if(phase_==Phase::loading){d.status=Status::phase;d.sourcePC=0x2DFC60;return false;}
  //Preflight ALL real ref releases before the first source payload free. A live
@@ -630,18 +637,33 @@ bool Application::prepareGarageScreenText29CBD8(std::shared_ptr<rr::platform::Or
 
 namespace rr::platform {
 bool OriginalUiGarageScreenText50KG::borrowQueuedFontAtlas(FontAtlasBorrow& out,Diagnostic& d)const noexcept {
+ d={};if(!nativeGarageFifoPins_){d.status=Status::authority;d.sourcePC=0x281F90;return false;}
+ return borrowRetainedFontAtlasBody(out,d);
+}
+bool OriginalUiGarageScreenText50KG::borrowRetainedFontAtlasBody(FontAtlasBorrow& out,Diagnostic& d)const noexcept {
  d={};
- if(!nativeGarageFifoPins_||!coldInputsCurrent()||!font4C_||!font4C_->archive_||
+ if(!coldInputsCurrent()||!font4C_||!font4C_->archive_||
     !font4C_->archive_->loaded()||!font4C_->pst_.identity||!font4C_->pst_.data||
     font4C_->pst_.size!=font4C_->pst_.identity->bytes||font4C_->texture408_<0||
     !Fonts::currentResource281F90(*domain_,*font4C_)){
   d.status=Status::authority;d.sourcePC=0x281F90;return false;
  }
- const auto member=font4C_->archive_->find(font4C_->pst_.identity->name);
+ // These exact retained-member reads must not implicitly allocate a
+ // std::string from a const char* inside this noexcept lifetime check.
+ assets::OriginalUiMemberView50KG member;
+ for(std::size_t i=0;i<font4C_->archive_->memberCount();++i){
+  const auto candidate=font4C_->archive_->member(i);
+  if(candidate.identity==font4C_->pst_.identity){member=candidate;break;}
+ }
+ const auto* texture=font4C_->texture281F90();
+ const auto* sourceName=texture?texture->sourceMember():nullptr;
  assets::OriginalStandardArchiveProvider50LA::MemberView mounted;
  const auto provider=domain_->archiveProvider3E1A70();
- if(member.identity!=font4C_->pst_.identity||member.data!=font4C_->pst_.data||member.size!=font4C_->pst_.size||
-    !provider||!provider->sealed()||provider->lookup132820(member.identity->name,mounted)!=
+ if(member.identity!=font4C_->pst_.identity||!member.identity->name||
+    member.data!=font4C_->pst_.data||member.size!=font4C_->pst_.size||
+    !sourceName||!provider||!provider->sealed()||
+    !assets::OriginalStandardArchiveProvider50LA::sameName(*sourceName,member.identity->name)||
+    provider->lookup132820(*sourceName,mounted)!=
        assets::OriginalStandardArchiveProvider50LA::Lookup::present||
     !mounted.member||!mounted.data||mounted.size!=member.size){d.status=Status::source;d.sourcePC=0x132820;return false;}
  if(mounted.data!=member.data){
@@ -663,8 +685,13 @@ bool OriginalUiGarageScreenText50KG::borrowQueuedFontAtlas(FontAtlasBorrow& out,
 }
 bool OriginalUiGarageScreenText50KG::lowerQueuedPacket(std::size_t primitiveIndex,
  const std::array<std::uint32_t,2>& offset,LoweredPacket& out,Diagnostic& d)const {
+ d={};if(!nativeGarageFifoPins_){d.status=Status::source;d.sourcePC=0x327ED8;return false;}
+ return lowerRetainedPacketBody(primitiveIndex,offset,out,d);
+}
+bool OriginalUiGarageScreenText50KG::lowerRetainedPacketBody(std::size_t primitiveIndex,
+ const std::array<std::uint32_t,2>& offset,LoweredPacket& out,Diagnostic& d)const {
  d={};auto reject=[&](std::uint32_t pc){d.status=Status::source;d.sourcePC=pc;return false;};
- if(!nativeGarageFifoPins_||!coldInputsCurrent()||phase_!=Phase::coldLoaded||
+ if(!coldInputsCurrent()||phase_!=Phase::coldLoaded||
     (flags5A_&7u)||std::fegetround()!=FE_TONEAREST||offset[0]>65535u||offset[1]>65535u||
     primitiveIndex>=active5E_||primitiveIndex>=packetCount5D_||!packets64_||!primitives4_||!glyphsC_)
   return reject(0x327ED8);
@@ -725,5 +752,82 @@ bool OriginalUiGarageScreenText50KG::lowerQueuedPacket(std::size_t primitiveInde
   }
  }
  next.quadCount=static_cast<std::uint32_t>(count);out=std::move(next);d.sourcePC=0x328448;return true;
+}
+}
+
+namespace rr::platform {
+bool OriginalUiGarageScreenText50KG::drawMenuWarning4702E0170(
+ OriginalUiSharedDialogs50KG& shared,Diagnostic& d)noexcept {
+ d={};
+ if(!shared.menuWarning470TextCurrent(*this)||!coldInputsCurrent())return stop(d,Status::authority,0x2E01C0);
+ // The actual383688 disabled return precedes every raster/depth operand read.
+ if(!authority_->screenTextEnabled383688_)return true;
+ OriginalUiSharedDialogs50KG::MenuWarningTextInputs input;std::uint32_t pc=0;
+ if(!shared.readMenuWarningTextInputs2E0170(*this,input,pc))return stop(d,Status::authority,pc);
+ if(!regenerate2E0F50(input.viewportWidth1E8,input.viewportHeight1EC,input.videoDepthMaximum60,d))return false;
+ bool effects=d.sourceEffectsCommitted;
+ for(std::size_t p=0;p<active5E_;++p){
+  if(!shared.collectMenuWarning470Text(*this,p,d)){d.sourceEffectsCommitted|=effects;return false;}
+  effects|=d.sourceEffectsCommitted;
+ }
+ d.sourceEffectsCommitted=effects;return true;
+}
+bool OriginalUiGarageScreenText50KG::retainMenuWarningPacket(OriginalUiSharedDialogs50KG& shared,
+ std::size_t index,OriginalUiMenuWarningPacket50KG& receipt,Diagnostic& d)noexcept {
+ d={};
+ if(!shared.menuWarning470PacketCaptureCurrent(receipt)||!shared.menuWarning470TextCurrent(*this)||
+    receipt.owner_!=&shared||receipt.kind_!=OriginalUiMenuWarningPacket50KG::Kind::text||receipt.active_||
+    issuer_!=shared.inputs_.root||domain_!=shared.inputs_.domain||context_!=shared.inputs_.context||
+    garage_!=shared.inputs_.popup||fonts_!=shared.inputs_.fonts||fontName_!=Fonts::Name::frontendVenus16||
+    materialName_!="venus16popup"||capacity5B_!=40||
+    nativeGarageFifoPins_||nativeMenuWarningPins_==std::numeric_limits<std::uint32_t>::max()||
+    !packetRevision_||!coldInputsCurrent()||phase_!=Phase::coldLoaded||(flags5A_&7u)||
+    index>=active5E_||index>=publishedPrimitives_||index>=packetCount5D_||
+    !primitives4_||!packets64_||!primitives4_[index])return stop(d,Status::authority,0x2E01F0);
+ const auto& primitive=*primitives4_[index];const auto& packet=packets64_[index];
+ if(!primitive.materialStored||!primitive.materialRetained||primitive.material00!=3230||primitive.type0C!=15||
+    primitive.optional04||primitive.optional14||primitive.flags0F||!packet.buffer00||
+    primitive.packet10!=packet.buffer00.get()||!packet.dmaPointerPublished||packet.dmaData4!=packet.buffer00.get()+1)
+  return stop(d,Status::source,0x246760);
+ // No fallible work follows acquisition. Shared increments its issued prefix
+ // immediately on success, before any fallible lowering/material append.
+ receipt.payload_=this;receipt.primitive_=&primitive;receipt.packet_=packet.buffer00.get();
+ receipt.primitiveIndex_=index;receipt.packetRevision_=packetRevision_;receipt.materialToken_=primitive.material00;
+ ++nativeMenuWarningPins_;receipt.active_=true;return true;
+}
+bool OriginalUiGarageScreenText50KG::menuWarningPacketMatches(const OriginalUiSharedDialogs50KG& shared,
+ const OriginalUiMenuWarningPacket50KG& receipt)const noexcept {
+ if(!receipt.active_||receipt.owner_!=&shared||receipt.kind_!=OriginalUiMenuWarningPacket50KG::Kind::text||
+    receipt.payload_!=this||!nativeMenuWarningPins_||!receipt.packetRevision_||receipt.packetRevision_!=packetRevision_||
+    receipt.primitiveIndex_>=active5E_||receipt.primitiveIndex_>=packetCount5D_||!primitives4_||!packets64_)
+  return false;
+ const auto& primitive=primitives4_[receipt.primitiveIndex_];const auto& packet=packets64_[receipt.primitiveIndex_];
+ return primitive&&receipt.primitive_==primitive.get()&&receipt.packet_==packet.buffer00.get()&&
+    primitive->packet10==packet.buffer00.get()&&receipt.materialToken_==primitive->material00;
+}
+bool OriginalUiGarageScreenText50KG::releaseMenuWarningPacket(OriginalUiMenuWarningPacket50KG& receipt)noexcept {
+ // Caller Shared must first authenticate actual accepted/retired publication.
+ // This leaf neither accepts a renderer frame nor supplies retirement authority.
+ if(!receipt.owner_||!menuWarningPacketMatches(*receipt.owner_,receipt))return false;
+ --nativeMenuWarningPins_;receipt.active_=false;return true;
+}
+bool OriginalUiGarageScreenText50KG::lowerMenuWarningPacket(const OriginalUiSharedDialogs50KG& shared,
+ const OriginalUiMenuWarningPacket50KG& receipt,const std::array<std::uint32_t,2>& offset,
+ OriginalUiMenuWarningGeometry50KG& out,Diagnostic& d)const {
+ d={};if(!shared.menuWarning470PacketOffsetCurrent(receipt,offset)||!menuWarningPacketMatches(shared,receipt)){
+  d.status=Status::authority;d.sourcePC=0x327ED8;return false;
+ }
+ LoweredPacket next;if(!lowerRetainedPacketBody(receipt.primitiveIndex_,offset,next,d))return false;
+ OriginalUiMenuWarningGeometry50KG geometry;
+ geometry.vertices=std::move(next.vertices);geometry.stq=std::move(next.stq);
+ geometry.rasterW=std::move(next.rasterW);geometry.fog=std::move(next.fog);geometry.quadCount=next.quadCount;
+ out=std::move(geometry);return true;
+}
+bool OriginalUiGarageScreenText50KG::borrowMenuWarningFontAtlas(const OriginalUiSharedDialogs50KG& shared,
+ const OriginalUiMenuWarningPacket50KG& receipt,FontAtlasBorrow& out,Diagnostic& d)const noexcept {
+ d={};if(!shared.menuWarning470PacketCurrent(receipt)||!menuWarningPacketMatches(shared,receipt)){
+  d.status=Status::authority;d.sourcePC=0x281F90;return false;
+ }
+ return borrowRetainedFontAtlasBody(out,d);
 }
 }

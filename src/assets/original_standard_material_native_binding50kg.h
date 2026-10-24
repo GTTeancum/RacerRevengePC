@@ -1,6 +1,7 @@
 #pragma once
 #include "original_ui_archive50kg.h"
 namespace rr::platform {class OriginalUiGarageCanonicalSubmission50KG;}
+namespace rr::platform {class OriginalUiSharedDialogMaterialHistory50KG;}
 namespace rr::assets {
 class OriginalStandardMaterialTable50LA;
 // Actual canonical pass-lifetime HOST binding history. Cold/bound differ even
@@ -16,6 +17,7 @@ public:
             width_==b.width_&&height_==b.height_&&kind_==b.kind_;
     }
 private:
+    friend class rr::platform::OriginalUiSharedDialogMaterialHistory50KG;
     friend class OriginalStandardMaterialTable50LA;
     friend class rr::platform::OriginalUiGarageCanonicalSubmission50KG;
     const OriginalUiMemberIdentity50KG* member_=nullptr;

@@ -1,4 +1,5 @@
 #include "original_ui_garage_canonical_submission50kg.h"
+#include "original_ui_shared_dialog_material_history50kg.h"
 #include "original_ui_garage_model_resource50kg.h"
 #include "original_ui_garage_draw_contribution50kg.h"
 #include "original_ui_garage_prelit_adapter50kg.h"
@@ -24,6 +25,7 @@ bool sameSpan(const OriginalUiMaterialSpan50KG& expected,const OriginalUiSpan50K
 }
 }
 OriginalUiGarageCanonicalSubmission50KG::~OriginalUiGarageCanonicalSubmission50KG(){
+    if(sharedHistory_){const auto keep=sharedHistory_;keep->cancelGarage(*this,pending_||attempted_);}
     if(pending_&&table_)table_->poisonGarageNativeBindings();
     unpin();
 }
@@ -401,6 +403,8 @@ bool OriginalUiGarageCanonicalSubmission50KG::begin(const OriginalUiSourceFrame5
     const OriginalUiSourceOwner50KM* owner,std::uint64_t generation,const OriginalUiNativeDraw50KG* input,
     const VehicleWindowGl50DS& renderer)noexcept {
     if(!preflight(frame,owner,generation,input,renderer))return false;
+    for(const auto& map:maps_)if((map.origin.materialRow>=3228&&map.origin.materialRow<=3230)||
+       (map.representative.materialRow>=3228&&map.representative.materialRow<=3230))return false;
     renderer_=&renderer;attempted_=true;pending_=true;return true;
 }
 bool OriginalUiGarageCanonicalSubmission50KG::beginGarageBatch(
@@ -416,15 +420,26 @@ bool OriginalUiGarageCanonicalSubmission50KG::beginGarageBatch(
     for(std::size_t i=0;i<contributions_.size();++i)if(contributions_[i].screenReceiver&&
        !draw.warning470DrainBindingCurrent(contributions_[i].screenReceiver,
            maps_[i].origin.registration,maps_[i].representative.registration))return false;
+    OriginalUiControllerPopupResourceDiagnostic50KG sharedDetail;
+    if(!OriginalUiSharedDialogMaterialHistory50KG::stageGarage(*this,draw,sharedDetail))return false;
     renderer_=&renderer;attempted_=true;pending_=true;return true;
 }
 bool OriginalUiGarageCanonicalSubmission50KG::finish(std::uint64_t generation,bool accepted,bool started)noexcept {
-    if(!pending_||generation!=generation_){terminal_=true;if(table_)table_->poisonGarageNativeBindings();unpin();return false;}
+    const auto common=sharedHistory_;
+    if(!pending_||generation!=generation_){terminal_=true;if(common)common->cancelGarage(*this,true);
+        if(table_)table_->poisonGarageNativeBindings();unpin();return false;}
     pending_=false;
     if(accepted){
-        if(!table_->garageNativeBindingsCurrent(receipt_,maps_)){terminal_=true;table_->poisonGarageNativeBindings();unpin();return false;}
+        // Both prior-history/lease checks happen before EITHER accepted store.
+        // The two commits are nonallocating under the same real FIFO pin.
+        if(!table_->garageNativeBindingsCurrent(receipt_,maps_)||(common&&!common->garageCurrent(*this))){
+            terminal_=true;if(common)common->cancelGarage(*this,true);table_->poisonGarageNativeBindings();unpin();return false;}
         table_->commitGarageNativeBindings249610(receipt_,maps_,images_);
-    }else if(started){terminal_=true;table_->poisonGarageNativeBindings();}
+        if(common)common->commitGarage(*this);
+    }else {
+        if(common)common->cancelGarage(*this,started);
+        if(started){terminal_=true;table_->poisonGarageNativeBindings();}
+    }
     unpin();return !terminal_;
 }
 }

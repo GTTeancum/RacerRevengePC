@@ -1,4 +1,7 @@
 #include "original_ui_main_draw50kg.h"
+#include "original_ui_menu_warning_packet50kg.h"
+#include "original_ui_shared_dialogs50kg.h"
+#include "original_ui_shared_dialog_material_history50kg.h"
 #include "vehicle_window_gl50ds.h"
 #include "../../../src/game/original_ui_controller_popup_geometry50kg.h"
 #include <algorithm>
@@ -89,7 +92,7 @@ const ImageEntry imageEntries[]={
     {"popup_icon_x",Archive::controllerPopup,"ui/textures/icon_x.pst",nullptr,false},
     {"popup_icon_tri",Archive::controllerPopup,"ui/textures/icon_tri.pst",nullptr,false}
 };
-struct MaterialEntry { const char* registry;const char* texture; };
+struct MaterialEntry { const char* registry;const char* texture;const char* sourceTexture=nullptr; };
 // Resource table order is an internal immutable index, NOT source draw order.
 const MaterialEntry materialEntries[]={
     {"font/denmrk16top","denmrk16"},{"font/venus16","venus16"},
@@ -101,22 +104,34 @@ const MaterialEntry materialEntries[]={
     {"ui/textures/icon_x","icon_x"},{"ui/textures/icon_tri","icon_tri"},
     {"ui/textures/icon_sqr","icon_sqr"},{"ui/textures/icon_cir","icon_cir"},
     {"ui/textures/dimpopup",nullptr},{"ui/textures/overlay1popup","overlay1"},
-    {"font/venus14popup","venus14"},{"ui/textures/icon_x_popup","popup_icon_x"},
-    {"ui/textures/icon_tri_popup","popup_icon_tri"}
+    {"font/venus14popup","venus14"},{"ui/textures/icon_x_popup","popup_icon_x","icon_x"},
+    {"ui/textures/icon_tri_popup","popup_icon_tri","icon_tri"},
+    // Append the sixth shared material: legacy icon indices18/19 stay exact.
+    {"font/venus16popup","venus16"}
 };
+// Common six-token order is deliberately distinct from bank order and the
+// unchanged five-role controller47C geometry enum/popupIndices.
+struct SharedDialogMaterial {std::size_t index;std::uint32_t token;std::size_t offset;};
+constexpr SharedDialogMaterial sharedDialogMaterials[]={
+    {15,3228,70804},{16,3229,70826},{20,3230,70853},
+    {17,3231,70872},{18,3232,70891},{19,3233,70917}
+};
+const SharedDialogMaterial* sharedDialogMaterial(std::size_t index)noexcept {
+    for(const auto& entry:sharedDialogMaterials)if(entry.index==index)return &entry;
+    return nullptr;
+}
 bool popupRegistry(const assets::OriginalUiMemberView50KG& table) noexcept {
     if(!table.identity||!table.data||table.size!=70962)return false;
-    constexpr std::size_t offsets[]={70804,70826,70872,70891,70917};
     const auto delimiter=[](std::uint8_t c){return c==' '||c=='\r'||c=='\n';};
     std::size_t cursor=0,matched=0;std::uint32_t token=0;
     while(cursor<table.size){while(cursor<table.size&&delimiter(table.data[cursor]))++cursor;if(cursor==table.size)break;
         const auto start=cursor;while(cursor<table.size&&!delimiter(table.data[cursor]))++cursor;
-        for(std::size_t i=0;i<5;++i)if(token==OriginalUiControllerPopupResources50KG::registryTokens[i]){
-            const char* name=materialEntries[15+i].registry;std::size_t j=0;if(start!=offsets[i])return false;
+        for(const auto& entry:sharedDialogMaterials)if(token==entry.token){
+            const char* name=materialEntries[entry.index].registry;std::size_t j=0;if(start!=entry.offset)return false;
             for(;name[j];++j)if(start+j>=cursor||fold(char(table.data[start+j]))!=name[j])return false;
             if(start+j!=cursor)return false;++matched;
         }++token;
-    }return matched==5;
+    }return matched==sizeof(sharedDialogMaterials)/sizeof(sharedDialogMaterials[0]);
 }
 const assets::OriginalUiArchive50KG* selectArchive(const OriginalUiMainColdInput50KG& in,Archive id) noexcept {
     return id==Archive::fonts?in.fonts.get():id==Archive::controllerPopup?in.controllerPopup.get():
@@ -146,6 +161,20 @@ struct OriginalUiMainDrawResources50KG::Storage {
     game::OriginalUiMainBackground50KG background;
     game::OriginalUiExitText50KG exitText;
 };
+// The Root calls this only between actual47C binding and its first reappend.
+// The bank supplies its retained cold inputs, not caller-rebuilt credentials or
+// a copied/default history. The six-history owner checks the initial prefix
+// and transfers the exact unbound five47C records only after all six validate.
+bool OriginalUiSharedDialogs50KG::bootstrapInitialHistoryFromMain(
+    const OriginalUiMainDrawResources50KG& resources,Diagnostic& d)noexcept {
+    d={};const auto* bank=resources.storage_.get();
+    if(!bank||!controller47C_.resources||bank->popup!=controller47C_.resources)
+        return fail(d,Status::owner,0x2055B0);
+    if(!OriginalUiSharedDialogMaterialHistory50KG::bootstrapInitial(
+        *this,bank->owners,bank->images,bank->materials,d.popup))
+        return fail(d,Status::history,d.popup.sourcePC);
+    d.sourceEffectsCommitted=true;d.sourcePC=0x2055B0;return true;
+}
 OriginalUiMainDrawResources50KG::OriginalUiMainDrawResources50KG() noexcept=default;
 OriginalUiMainDrawResources50KG::~OriginalUiMainDrawResources50KG()=default;
 bool OriginalUiMainDrawResources50KG::load(const OriginalUiMainColdInput50KG& in,
@@ -210,11 +239,12 @@ bool OriginalUiMainDrawResources50KG::load(const OriginalUiMainColdInput50KG& in
         next->materials.reserve(sizeof(materialEntries)/sizeof(materialEntries[0]));
         for(std::size_t i=0;i<sizeof(materialEntries)/sizeof(materialEntries[0]);++i){
             d.materialIndex=static_cast<std::uint32_t>(i);
-            const auto& entry=materialEntries[i];OriginalUiMainMaterialBinding50KG binding;
+            const auto& entry=materialEntries[i];const auto* shared=sharedDialogMaterial(i);
+            OriginalUiMainMaterialBinding50KG binding;
             binding.registeredName=entry.registry;
             const bool logo=same(binding.registeredName,"ui/textures/mmlogo");
             bool read=false;
-            if(i>=15)read=assets::readOriginalUiMaterial50KG(*in.controllerPopup,binding.registeredName+".psm",
+            if(shared)read=assets::readOriginalUiMaterial50KG(*in.controllerPopup,binding.registeredName+".psm",
                 next->templates,assets::OriginalUiTemplate50KG::screenMt,in.runtime,binding.material,d.material);
             else if(i>=11)read=assets::readOriginalUiMainPromptFallbackMaterial50KG(*in.mainMenu,*in.overlays,
                 static_cast<assets::OriginalUiMainPrompt50KG>(i-11),next->templates,
@@ -226,14 +256,14 @@ bool OriginalUiMainDrawResources50KG::load(const OriginalUiMainColdInput50KG& in
             if(!read||binding.material.passes.size()!=1)return fail(d,Error::material);
             const auto& pass=binding.material.passes[0];
             binding.registryIdentity=table.identity;
-            if(i>=15){binding.registryToken=OriginalUiControllerPopupResources50KG::registryTokens[i-15];}
+            if(shared){binding.registryToken=shared->token;}
             else {const auto* scheduled=next->schedule.find(binding.registeredName);
                 if(!scheduled||scheduled->shaderPassCount!=1||scheduled->textureMapCount!=pass.textureCount||
                     scheduled->psmIdentity!=binding.material.identity)return fail(d,Error::registry);
                 binding.projectedLeafOrdinal=scheduled->projectedLeafOrdinal;binding.registryToken=scheduled->registryTokenOrdinal;}
 
             if(entry.texture){
-                const char* sourceTexture=i==18?"icon_x":i==19?"icon_tri":entry.texture;
+                const char* sourceTexture=entry.sourceTexture?entry.sourceTexture:entry.texture;
                 if(pass.textureCount!=1||!same(pass.textureName,sourceTexture))return fail(d,Error::material);
                 std::size_t map=0;for(;map<imageCount;++map)if(same(imageEntries[map].name,entry.texture))break;
                 if(map==imageCount)return fail(d,Error::resource);
@@ -354,6 +384,16 @@ std::uint32_t OriginalUiMainDrawResources50KG::particleImageIndex()const noexcep
 
 struct OriginalUiMainDraw50KG::Storage {
     std::shared_ptr<OriginalUiControllerPopupResources50KG> popup;
+    std::shared_ptr<OriginalUiSharedDialogMaterialHistory50KG> common;
+    std::array<std::uint32_t,6> historyIndices{};
+    std::array<assets::OriginalUiMaterialBindingState50KG,6> commonPending;
+    std::vector<OriginalUiSharedDialogMaterialHistory50KG::MenuUse> menuUses;
+    bool historyCurrent(const OriginalUiSourceOwner50KM* owner)const noexcept {
+        return common?common->current(owner,popupRevision):popup->current(owner,popupRevision);
+    }
+    void poisonHistory(const OriginalUiSourceOwner50KM* owner)noexcept {
+        historyPoisoned=true;if(common)common->poison(owner);else popup->poison(owner);
+    }
     std::array<std::uint32_t,5> popupIndices{};
     std::array<assets::OriginalUiMaterialBindingState50KG,5> popupPendingHistory;
     std::vector<assets::OriginalUiMaterialBindingState50KG> history,pendingHistory;
@@ -361,9 +401,9 @@ struct OriginalUiMainDraw50KG::Storage {
     std::uint64_t popupRevision=0,frameGeneration=0,attemptedGeneration=0,acknowledgedGeneration=0;
     const VehicleWindowGl50DS* submittedRenderer=nullptr;
     bool popupLeased=false,popupVisited=false,submissionPending=false,historyPoisoned=false;
-    bool prepareGroups(OriginalUiMainDrawDiagnostic50KG& d){
+    bool prepareGroups(const OriginalUiSourceOwner50KM* owner,OriginalUiMainDrawDiagnostic50KG& d){
         const auto& bindings=*resources->materials();const auto count=bindings.size();
-        popup=resources->controllerPopup();if(!popup)return fail(d,Error::resource);popupIndices.fill(unresolved);
+        popup=resources->controllerPopup();if(!popup)return fail(d,Error::resource);popupIndices.fill(unresolved);historyIndices.fill(unresolved);
         history.clear();pendingHistory.clear();leaf.clear();representatives.clear();
         std::vector<std::uint32_t> sequence;sequence.reserve(count);history.resize(count);leaf.resize(count);
         for(std::size_t i=0;i<count;++i){const auto& b=bindings[i];
@@ -371,16 +411,23 @@ struct OriginalUiMainDraw50KG::Storage {
             const auto& pass=b.material.passes[0];assets::OriginalUiMaterialEquivalenceKey50KG key;
             assets::OriginalUiMaterialEquivalenceDiagnostic50KG keyDetail;assets::OriginalUiMaterialBindingDiagnostic50KG detail;
             const auto* source=b.images.empty()?nullptr:resources->images()->sourceProvenance(b.images[0]);
-            if(!assets::prepareOriginalUiMaterialEquivalence50KG(pass,source,key,keyDetail)||!history[i].initialize(key,detail))
-                return fail(d,Error::material,keyDetail.sourcePC?keyDetail.sourcePC:detail.sourcePC);
+            if(!assets::prepareOriginalUiMaterialEquivalence50KG(pass,source,key,keyDetail))
+                return fail(d,Error::material,keyDetail.sourcePC);
+            if(common&&b.registryToken>=3228&&b.registryToken<=3233){
+                const auto role=b.registryToken-3228;
+                if(historyIndices[role]!=unresolved||!common->copyHistory(owner,popupRevision,b.registryToken,key,history[i],d.controllerPopup))
+                    return fail(d,Error::material,d.controllerPopup.sourcePC);
+                historyIndices[role]=static_cast<std::uint32_t>(i);
+            }else if(!history[i].initialize(key,detail))return fail(d,Error::material,detail.sourcePC);
             for(std::size_t role=0;role<popupIndices.size();++role)if(b.registryToken==OriginalUiControllerPopupResources50KG::registryTokens[role]){
-                if(popupIndices[role]!=unresolved||!popup->copyHistory(b.registryToken,key,history[i],d.controllerPopup))
+                if(popupIndices[role]!=unresolved||(!common&&!popup->copyHistory(b.registryToken,key,history[i],d.controllerPopup)))
                     return fail(d,Error::material,d.controllerPopup.sourcePC);
                 popupIndices[role]=static_cast<std::uint32_t>(i);
             }
             sequence.push_back(static_cast<std::uint32_t>(i));
         }
         for(auto index:popupIndices)if(index==unresolved)return fail(d,Error::material);
+        if(common)for(auto index:historyIndices)if(index==unresolved)return fail(d,Error::material);
         std::sort(sequence.begin(),sequence.end(),[&](std::uint32_t a,std::uint32_t b){
             return bindings[a].registryToken!=bindings[b].registryToken?bindings[a].registryToken<bindings[b].registryToken:
                 bindings[a].material.passes[0].pass<bindings[b].material.passes[0].pass;
@@ -424,9 +471,105 @@ struct OriginalUiMainDraw50KG::Storage {
     bool exitText=false;
     std::uint32_t nextOrdinal=0;
 };
+bool OriginalUiMainDraw50KG::historyRendererRetired(const VehicleWindowGl50DS& renderer)const noexcept {
+    return storage_&&menuRetiredRenderer_==&renderer&&!storage_->submittedRenderer&&!storage_->submissionPending;
+}
+bool OriginalUiMainDraw50KG::bindSharedMenu470(OriginalUiMainSession50KG& session,std::shared_ptr<OriginalUiSharedDialogs50KG> shared)noexcept {
+    if(menuShared_||menuSession_||!storage_||!shared||storage_->active||storage_->popupLeased||
+       storage_->resources->controllerPopup()!=shared->controller47C_.resources)return false;
+    menuSession_=&session;menuShared_=std::move(shared);return true;
+}
+bool OriginalUiMainDraw50KG::sharedMenuBoundCurrent(const OriginalUiSharedDialogs50KG& shared,const OriginalUiMainSession50KG& session)const noexcept {
+    return storage_&&menuShared_.get()==&shared&&menuSession_==&session&&
+        storage_->resources&&storage_->resources->controllerPopup()==shared.controller47C_.resources&&
+        storage_->gpu&&storage_->gpu->initialized()&&storage_->publication&&
+        storage_->gpu->publicationToken()==storage_->publication;
+}
+bool OriginalUiMainDraw50KG::sharedMenuInvocationCurrent(const OriginalUiSharedDialogs50KG& shared,std::uint64_t epoch)const noexcept {
+    return menuSession_&&sharedMenuBoundCurrent(shared,*menuSession_)&&epoch&&epoch==menuInvocationEpoch_;
+}
+bool OriginalUiMainDraw50KG::sharedMenuCollectorInitialized(const OriginalUiSharedDialogs50KG& shared,std::uint64_t epoch)const noexcept {
+    if(!sharedMenuInvocationCurrent(shared,epoch)||!storage_)return false;const auto& s=*storage_;
+    return s.active&&!s.failed&&!s.drained&&!s.submissionPending&&!s.historyPoisoned&&s.popupLeased&&s.historyCurrent(this)&&
+        !s.popupVisited&&!s.ordinary&&!s.prompts&&!s.top&&!s.scene&&!s.exitText&&!s.apertureCount&&
+        !frame_.owner_&&!frame_.native_&&!frame_.frameGeneration_&&s.packets.empty()&&s.order.empty()&&
+        s.drainedVertices.empty()&&s.drainedFog.empty()&&s.spans.empty()&&s.states.empty()&&!s.main&&!s.nextOrdinal&&s.submittedVertices.empty()&&s.submittedFog.empty();
+}
+bool OriginalUiMainDraw50KG::sharedMenuRasterResourcesCurrent(const OriginalUiSharedDialogs50KG& shared,const void* resources,
+ const MaterialTextureGl50EB* gpu,std::uint64_t publication)const noexcept {
+    return menuSession_&&sharedMenuBoundCurrent(shared,*menuSession_)&&storage_->resources.get()==resources&&
+        storage_->gpu.get()==gpu&&storage_->publication==publication;
+}
+bool OriginalUiMainDraw50KG::appendMenuWarning470(const OriginalUiSharedDialogs50KG& shared,
+ const OriginalUiMenuWarningPacket50KG& receipt,const OriginalUiMenuWarningGeometry50KG& geometry,OriginalUiMainDrawDiagnostic50KG& d)noexcept {
+    d={};if(!storage_)return fail(d,Error::sourceOrder);auto& s=*storage_;
+    if(menuShared_.get()!=&shared||!shared.menuWarning470PacketAppendCurrent(*this,receipt)||
+       !s.active||s.failed||s.drained||s.popupVisited||s.ordinary||s.top||s.scene||!s.common||
+       !s.popupLeased||!s.historyCurrent(this)||receipt.materialToken_<3228||receipt.materialToken_>3230)
+        return fail(d,Error::sourceOrder,receipt.sourcePC_);
+    const auto count=std::size_t(geometry.quadCount)*4;
+    if(!geometry.quadCount||geometry.vertices.size()!=count||geometry.stq.size()!=count||
+       geometry.rasterW.size()!=count||geometry.fog.size()!=count||s.submittedVertices.size()%4||
+       s.submittedVertices.size()/4>originalUiMaximumQuads50KG||geometry.quadCount>originalUiMaximumQuads50KG-s.submittedVertices.size()/4||s.packets.size()>=originalUiMaximumSpans50KG)
+        return fail(d,Error::capacity,receipt.sourcePC_);
+    const auto material=s.historyIndices[static_cast<std::size_t>(receipt.materialToken_-3228)];
+    const auto& materials=*s.resources->materials();
+    if(material>=materials.size()||materials[material].registryToken!=static_cast<std::uint32_t>(receipt.materialToken_))
+        return fail(d,Error::material,receipt.sourcePC_);
+    const auto& binding=materials[material];
+    if(binding.animated||binding.material.passes.size()!=1||!binding.material.passes[0].enabled||
+       (receipt.materialToken_==3228?!binding.images.empty():binding.images.size()!=1))
+        return fail(d,Error::material,receipt.sourcePC_);
+    try {
+    if(receipt.materialToken_!=3228){
+        const auto* bank=s.resources->sourceImageBank();
+        assets::OriginalStandardMaterialNativeBinding50KG verifiedImage;
+        OriginalUiControllerPopupResourceDiagnostic50KG imageDiagnostic;
+        if(!bank||material>=s.history.size()||
+           !shared.menuWarning470PacketImageCurrent(receipt,bank->sourceMember(binding.images[0])))
+            return fail(d,Error::material,receipt.sourcePC_);
+        auto candidate=s.history[material];
+        assets::OriginalUiMaterialBindingDiagnostic50KG bindingDiagnostic;
+        if(!candidate.recordDrainedBinding(*bank,binding.images[0],bindingDiagnostic))
+            return fail(d,Error::material,bindingDiagnostic.sourcePC);
+        if(!s.common->authenticateImage(
+            static_cast<std::size_t>(receipt.materialToken_-3228),*bank,binding.images[0],
+            candidate,verifiedImage,imageDiagnostic))
+            return fail(d,Error::material,imageDiagnostic.sourcePC?imageDiagnostic.sourcePC:receipt.sourcePC_);
+    }
+    // These actual ScreenObject packets have Q1 and W1. Preserve ordinary
+    // screen UV interpolation, never opt into the unrelated 3D raw-STQ mode.
+    for(std::size_t i=0;i<count;++i){const auto& v=geometry.vertices[i];const auto& stq=geometry.stq[i];
+        if(!std::isfinite(v.position[0])||!std::isfinite(v.position[1])||!std::isfinite(v.position[2])||
+           v.position[2]<0||v.position[2]>16777215.f||std::floor(v.position[2])!=v.position[2]||v.color[3]>128||
+           !std::isfinite(v.uv[0])||!std::isfinite(v.uv[1])||!std::isfinite(stq[0])||!std::isfinite(stq[1])||
+           stq[2]!=1.f||v.uv[0]!=stq[0]||v.uv[1]!=stq[1]||geometry.rasterW[i]!=1.f||geometry.fog[i]!=0.f)
+            return fail(d,Error::geometry,receipt.sourcePC_);
+    }
+        const auto first=static_cast<std::uint32_t>(s.submittedVertices.size()/4);
+        const auto image=binding.images.empty()?unresolved:binding.images[0];
+        s.submittedVertices.insert(s.submittedVertices.end(),geometry.vertices.begin(),geometry.vertices.end());
+        s.submittedFog.insert(s.submittedFog.end(),geometry.fog.begin(),geometry.fog.end());
+        
+        s.packets.push_back({first,geometry.quadCount,material,image,0,s.nextOrdinal++,receipt.sourcePC_,0,OriginalUiMainDrawSegment50KG::warning470,&receipt});
+        return true;
+    }catch(...){s.failed=true;return fail(d,Error::allocation,receipt.sourcePC_);}
+}
+bool OriginalUiMainDraw50KG::sharedMenuFrameCurrent(const OriginalUiSharedDialogs50KG& shared,std::uint64_t epoch,std::uint64_t generation)const noexcept {
+    return sharedMenuInvocationCurrent(shared,epoch)&&storage_->drained&&!storage_->failed&&
+        frame_.owner_==this&&frame_.native_==&storage_->draw&&generation&&
+        generation==frame_.frameGeneration_&&generation==storage_->frameGeneration;
+}
+bool OriginalUiMainDraw50KG::sharedMenuRetiredCurrent(const OriginalUiSharedDialogs50KG& shared,const VehicleWindowGl50DS& renderer)const noexcept {
+    return menuSession_&&sharedMenuBoundCurrent(shared,*menuSession_)&&menuRetiredRenderer_==&renderer&&
+        !storage_->submittedRenderer&&!storage_->submissionPending;
+}
 OriginalUiMainDraw50KG::OriginalUiMainDraw50KG()noexcept=default;
 OriginalUiMainDraw50KG::~OriginalUiMainDraw50KG(){
-    if(storage_&&storage_->popup)storage_->popup->release(this,!storage_->submissionPending&&!storage_->submittedRenderer);
+    if(storage_&&storage_->popup){auto& s=*storage_;
+        if(s.common){if(s.popupLeased)s.common->poison(this);}
+        else s.popup->release(this,!s.submissionPending&&!s.submittedRenderer);
+    }
 }
 bool OriginalUiMainDraw50KG::bind(std::shared_ptr<OriginalUiMainDrawResources50KG> resources,
     OriginalUiMainDrawDiagnostic50KG& d) noexcept {
@@ -469,9 +612,30 @@ bool OriginalUiMainDraw50KG::begin(const OriginalUiMainFrameClock50KG& clock,
     if(!clock.known)return fail(d,Error::animation);
     if(s.gpu&&(s.gpu->publicationToken()!=s.publication||!s.gpu->initialized()))return fail(d,Error::publication);
     if(s.submissionPending||s.historyPoisoned)return fail(d,Error::sourceOrder);
-    if(!s.popupLeased){try{if(!s.prepareGroups(d)||!s.popup->acquire(this,s.popupRevision))return fail(d,Error::sourceOrder);
-        s.popupLeased=true;}catch(...){return fail(d,Error::allocation);}}
-    if(!s.popup->current(this,s.popupRevision))return fail(d,Error::sourceOrder);
+    if(menuShared_&&menuShared_->menu470PendingFor(*this))return fail(d,Error::sourceOrder);
+    if(s.common&&s.common->menuStagePending(this))return fail(d,Error::sourceOrder);
+    // Reject positive warning demand before even acquiring a common lease or
+    // advancing this collector's invocation. Shared repeats the gate at issuance.
+    if(menuShared_){OriginalUiSharedDialogs50KG::Diagnostic sd;
+        if(!menuShared_->invisible470204AC0(sd))return fail(d,Error::sourceOrder,sd.sourcePC);}
+    if(menuInvocationEpoch_==std::numeric_limits<std::uint64_t>::max())return fail(d,Error::sourceOrder);
+    if(!s.popupLeased){try{
+        s.common=s.popup->sharedHistory();
+        if(s.common&&!menuShared_)return fail(d,Error::sourceOrder);
+        if(s.common){
+            if(!s.common->acquire(this,s.popupRevision,d.controllerPopup))return fail(d,Error::sourceOrder,d.controllerPopup.sourcePC);
+            s.popupLeased=true;
+            if(!s.prepareGroups(this,d)){s.poisonHistory(this);return false;}
+        }else{
+            if(!s.prepareGroups(this,d)||!s.popup->acquire(this,s.popupRevision))return fail(d,Error::sourceOrder);
+            s.popupLeased=true;
+        }
+        }catch(...){s.poisonHistory(this);return fail(d,Error::allocation);}}
+    if(!s.historyCurrent(this))return fail(d,Error::sourceOrder);
+    ++menuInvocationEpoch_;menuRetiredRenderer_=nullptr;
+    if(menuShared_){OriginalUiSharedDialogs50KG::Diagnostic sd;
+        if(!menuSession_||!menuShared_->beginMenu470(*menuSession_,*this,menuInvocationEpoch_,sd)){
+            s.failed=true;return fail(d,Error::sourceOrder,sd.sourcePC);}}
     frame_.native_=nullptr;frame_.owner_=nullptr;frame_.frameGeneration_=0;frame_.terminal_={};
     s.popupVisited=false;
     s.clock=clock;s.active=true;s.ordinary=s.main=s.prompts=s.top=s.scene=s.drained=s.failed=false;
@@ -483,6 +647,9 @@ bool OriginalUiMainDraw50KG::begin(const OriginalUiMainFrameClock50KG& clock,
             s.failed=true;return fail(d,Error::animation);
         }
     }
+    if(menuShared_){OriginalUiSharedDialogs50KG::Diagnostic sd;
+        if(!menuShared_->continueMenu470AfterCollectorBegin(*this,sd)){
+            s.failed=true;return fail(d,Error::sourceOrder,sd.sourcePC);}}
     return true;
 }
 bool OriginalUiMainDraw50KG::appendOverlay(const game::OriginalUiOverlayQuad50KG& quad,
@@ -520,7 +687,8 @@ bool OriginalUiMainDraw50KG::appendOverlay(const game::OriginalUiOverlayQuad50KG
 bool OriginalUiMainDraw50KG::projectControllerRequiredPopup(const game::OriginalUiControllerPopupRender50KG& render,OriginalUiMainDrawDiagnostic50KG& d) noexcept {
     d={};if(!storage_)return fail(d,Error::notLoaded);auto& s=*storage_;
     if(!s.active||s.popupVisited||s.ordinary||s.main||s.top||s.scene||s.drained||s.failed||
-       !s.popup->current(this,s.popupRevision))return fail(d,Error::sourceOrder,0x2064C0);
+       !s.historyCurrent(this))return fail(d,Error::sourceOrder,0x2064C0);
+    if(menuShared_&&!menuShared_->menuPopupProjectionCurrent(*this,render))return fail(d,Error::sourceOrder,0x2064C0);
     if(!s.popup->project(render,d.controllerPopup)){s.failed=true;return fail(d,Error::projection,d.controllerPopup.sourcePC);}
     const auto* geometry=s.popup->geometry();if(!geometry)return fail(d,Error::resource);
     for(std::size_t i=0;i<geometry->packetCount();++i){const auto& packet=geometry->packets()[i];
@@ -541,7 +709,10 @@ bool OriginalUiMainDraw50KG::projectControllerRequiredPopup(const game::Original
             for(unsigned c=0;c<4;++c)v.color[c]=packet.packetColor[c];s.submittedVertices.push_back(v);s.submittedFog.push_back(0);}
         s.packets.push_back({first,text.count,material,binding.images[0],0,ordinal,packet.sourcePC,0,OriginalUiMainDrawSegment50KG::controllerPopup});
     }
-    s.popupVisited=true;return true;
+    s.popupVisited=true;
+    if(menuShared_){OriginalUiSharedDialogs50KG::Diagnostic sd;
+        if(!menuShared_->completeMenuPopupProjection(*this,render,sd)){s.failed=true;return fail(d,Error::sourceOrder,sd.sourcePC);}}
+    return true;
 }
 bool OriginalUiMainDraw50KG::projectWidgets(bool onTop,bool ancestorsShown,
     OriginalUiMainDrawDiagnostic50KG& d) noexcept {
@@ -780,11 +951,11 @@ bool OriginalUiMainDraw50KG::projectMainParticles(game::OriginalUiMainFireOwner5
 }
 bool OriginalUiMainDraw50KG::drain(OriginalUiMainDrawDiagnostic50KG& d) noexcept {
     d={};if(!storage_)return fail(d,Error::notLoaded);auto& s=*storage_;
-    if(!s.active||!s.popupVisited||!s.ordinary||!s.main||!s.prompts||!s.top||!s.scene||s.failed||s.drained||s.apertureCount!=2||s.historyPoisoned||!s.popup->current(this,s.popupRevision)||s.frameGeneration==std::numeric_limits<std::uint64_t>::max())return fail(d,Error::unfinished);
+    if(!s.active||!s.popupVisited||!s.ordinary||!s.main||!s.prompts||!s.top||!s.scene||s.failed||s.drained||s.apertureCount!=2||s.historyPoisoned||!s.historyCurrent(this)||s.frameGeneration==std::numeric_limits<std::uint64_t>::max())return fail(d,Error::unfinished);
     try {
     const auto& materials=*s.resources->materials();
     if(!s.gpu||!s.gpu->initialized()||s.gpu->publicationToken()!=s.publication)return fail(d,Error::publication);
-    s.pendingHistory=s.history;
+    s.pendingHistory=s.history;s.menuUses.clear();
     s.order.clear();
     for(std::size_t i=0;i<s.packets.size();++i)
         if(s.packets[i].materialIndex==unresolved||materials[s.packets[i].materialIndex].material.passes[0].enabled!=0)s.order.push_back(static_cast<std::uint32_t>(i));
@@ -799,6 +970,10 @@ bool OriginalUiMainDraw50KG::drain(OriginalUiMainDrawDiagnostic50KG& d) noexcept
     std::uint32_t terminalMaterial=unresolved;
     for(const auto i:s.order){
         const auto& p=s.packets[i];
+        if(p.warning470&&(!menuShared_||!menuShared_->menuWarning470PacketCurrent(*p.warning470)||
+           p.warning470->sourceOwner_!=this||p.materialIndex>=materials.size()||
+           materials[p.materialIndex].registryToken!=static_cast<std::uint32_t>(p.warning470->materialToken_))){
+            s.failed=true;return fail(d,Error::sourceOrder,p.sourcePC);}
         const auto first=static_cast<std::uint32_t>(s.drainedVertices.size()/4);
         OriginalUiMaterialSpan50KG converted;bool okay=false;
         if(p.materialIndex==unresolved)okay=convertOriginalUiMainParticleSpan50KG(*s.resources->particleMaterial(),
@@ -815,6 +990,8 @@ bool OriginalUiMainDraw50KG::drain(OriginalUiMainDrawDiagnostic50KG& d) noexcept
             if(source.textureCount&&(!s.resources->sourceImageBank()||
                 !s.pendingHistory[representative].recordDrainedBinding(*s.resources->sourceImageBank(),p.imageIndex,detail)))
                 return fail(d,Error::material,detail.sourcePC);
+            if(s.common)s.menuUses.push_back({material.registryToken,materials[representative].registryToken,
+                static_cast<std::uint32_t>(s.spans.size()),p.imageIndex});
             terminalMaterial=representative;
         }
         if(!okay){s.failed=true;return fail(d,Error::material);}
@@ -853,37 +1030,67 @@ bool OriginalUiMainDraw50KG::drain(OriginalUiMainDrawDiagnostic50KG& d) noexcept
     terminal.magFilter=terminalPass.magFilter;terminal.minFilter=terminalPass.minFilter;terminal.lodL=terminalPass.lodL;terminal.lodK=terminalPass.lodK;
     for(std::size_t i=0;i<s.popupIndices.size();++i)s.popupPendingHistory[i]=s.pendingHistory[s.popupIndices[i]];
     s.drained=true;frame_.native_=&s.draw;frame_.owner_=this;frame_.frameGeneration_=++s.frameGeneration;frame_.terminal_=terminal;
+    if(s.common){
+        if(!s.resources->sourceImageBank()){s.failed=true;return fail(d,Error::resource);}
+        for(std::size_t i=0;i<s.historyIndices.size();++i)s.commonPending[i]=s.pendingHistory[s.historyIndices[i]];
+        if(!s.common->stageMenu(this,s.popupRevision,frame_,*s.resources->sourceImageBank(),s.menuUses,s.commonPending,d.controllerPopup)){
+            s.failed=true;frame_.native_=nullptr;frame_.owner_=nullptr;return fail(d,Error::material,d.controllerPopup.sourcePC);}}
+    if(menuShared_){OriginalUiSharedDialogs50KG::Diagnostic sd;
+        if(!menuShared_->sealMenu470Frame(*this,s.frameGeneration,sd)){
+            s.failed=true;return fail(d,Error::sourceOrder,sd.sourcePC);}}
     return true;
     }catch(...){s.failed=true;frame_.native_=nullptr;frame_.owner_=nullptr;return fail(d,Error::allocation);}
 }
 const OriginalUiNativeDraw50KG* OriginalUiMainDraw50KG::draw()const noexcept{return storage_&&storage_->drained&&!storage_->failed?&storage_->draw:nullptr;}
 const OriginalUiSourceFrame50KM* OriginalUiMainDraw50KG::sourceFrame() const noexcept {
-    return storage_&&storage_->drained&&!storage_->failed&&!storage_->historyPoisoned&&!storage_->submissionPending&&
-        storage_->popupLeased&&storage_->popup->current(this,storage_->popupRevision)&&frame_.native_?&frame_:nullptr;
+    if(!storage_)return nullptr;const auto& s=*storage_;
+    if(!s.drained||s.failed||s.historyPoisoned||s.submissionPending||!s.popupLeased||
+       !s.historyCurrent(this)||!frame_.native_)return nullptr;
+    if(menuShared_&&!menuShared_->menu470FrameCurrent(*this,frame_.frameGeneration_)&&
+       !(menuAcceptedEpoch_==menuInvocationEpoch_&&s.acknowledgedGeneration==frame_.frameGeneration_))return nullptr;
+    return &frame_;
 }
-bool OriginalUiMainDraw50KG::sourceTeardownPending() const noexcept {return storage_&&storage_->submittedRenderer;}
+bool OriginalUiMainDraw50KG::sourceTeardownPending() const noexcept {
+    return storage_&&(storage_->submittedRenderer||(storage_->common&&storage_->popupLeased)||
+        (menuShared_&&menuShared_->menu470PendingFor(*this)));
+}
 bool OriginalUiMainDraw50KG::retireSourceRenderer(VehicleWindowGl50DS& renderer,OriginalUiMainDrawDiagnostic50KG& d) noexcept {
     d={};if(!storage_)return true;auto& s=*storage_;
     if(s.submissionPending||(s.submittedRenderer&&s.submittedRenderer!=&renderer))return fail(d,Error::sourceOrder);
-    if(s.submittedRenderer){VehicleWindowDiagnostic50DS detail;
-        if(!renderer.retireOriginalUiSourceOwner(*this,detail))return fail(d,Error::publication);}
-    s.submittedRenderer=nullptr;s.popup->release(this,true);s.popupLeased=false;
-    frame_.native_=nullptr;frame_.owner_=nullptr;frame_.frameGeneration_=0;return true;
+    VehicleWindowDiagnostic50DS detail;
+    if(!renderer.retireOriginalUiSourceOwner(*this,detail))return fail(d,Error::publication);
+    s.submittedRenderer=nullptr;menuRetiredRenderer_=&renderer;
+    if(menuShared_){OriginalUiSharedDialogs50KG::Diagnostic sd;
+        if(!menuShared_->retireMenu470AfterRenderer(*this,renderer,sd))return fail(d,Error::sourceOrder,sd.sourcePC);}
+    if(s.common){if(!s.common->releaseMenu(this,&renderer))return fail(d,Error::sourceOrder);}
+    else s.popup->release(this,true);
+    s.popupLeased=false;frame_.native_=nullptr;frame_.owner_=nullptr;frame_.frameGeneration_=0;return true;
 }
 bool OriginalUiMainDraw50KG::beginSourceSubmission(std::uint64_t generation,const VehicleWindowGl50DS& renderer) const noexcept {
     if(!storage_||!sourceFrame()||generation!=frame_.frameGeneration_)return false;auto& s=*storage_;
     if(s.submissionPending||s.historyPoisoned||(s.submittedRenderer&&s.submittedRenderer!=&renderer)||
         generation<=s.attemptedGeneration||generation<=s.acknowledgedGeneration||s.pendingHistory.size()!=s.history.size())return false;
+    if(s.common&&!s.common->beginMenu(this,s.popupRevision,frame_,renderer))return false;
+    if(menuShared_&&!menuShared_->beginMenu470Submission(*this,generation,renderer)){
+        if(s.common&&!s.common->cancelMenuBegin(this,s.popupRevision,frame_,renderer))s.poisonHistory(this);
+        menuShared_->failMenu470Submission(*this);return false;}
     s.submittedRenderer=&renderer;s.attemptedGeneration=generation;s.submissionPending=true;return true;
 }
 void OriginalUiMainDraw50KG::finishSourceSubmission(std::uint64_t generation,bool accepted,bool started) const noexcept {
     if(!storage_)return;auto& s=*storage_;
-    if(!s.submissionPending||generation!=frame_.frameGeneration_){s.historyPoisoned=true;s.popup->poison(this);return;}
+    if(!s.submissionPending||generation!=frame_.frameGeneration_){
+        s.poisonHistory(this);if(menuShared_)menuShared_->failMenu470Submission(*this);return;}
     s.submissionPending=false;
-    if(accepted){if(s.pendingHistory.size()!=s.history.size()||!s.popup->commit(this,s.popupRevision,s.popupPendingHistory)){
-            s.historyPoisoned=true;s.popup->poison(this);return;}
-        s.history.swap(s.pendingHistory);s.acknowledgedGeneration=generation;}
-    else if(started){s.historyPoisoned=true;s.popup->poison(this);}
+    bool historyOkay=s.pendingHistory.size()==s.history.size();
+    if(!historyOkay)s.poisonHistory(this); // Preflight every local invariant before either accepted store.
+    if(s.common)historyOkay=s.common->finishMenu(this,s.popupRevision,frame_,accepted,started)&&historyOkay;
+    else if(accepted)historyOkay=historyOkay&&s.popup->commit(this,s.popupRevision,s.popupPendingHistory);
+    if(!historyOkay){s.poisonHistory(this);if(menuShared_)menuShared_->failMenu470Submission(*this);return;}
+    if(accepted){s.history.swap(s.pendingHistory);s.acknowledgedGeneration=generation;}
+    else if(started)s.poisonHistory(this);
+    if(menuShared_){if(!menuShared_->finishMenu470Submission(*this,generation,accepted,started)){
+            s.poisonHistory(this);menuShared_->failMenu470Submission(*this);return;}
+        if(accepted)menuAcceptedEpoch_=menuInvocationEpoch_;}
 }
 const std::vector<OriginalUiMainSubmittedPacket50KG>* OriginalUiMainDraw50KG::packets()const noexcept{return storage_?&storage_->packets:nullptr;}
 const std::vector<std::uint32_t>* OriginalUiMainDraw50KG::drainedPacketIndices()const noexcept{return storage_&&storage_->drained?&storage_->order:nullptr;}

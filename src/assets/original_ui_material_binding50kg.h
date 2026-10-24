@@ -2,6 +2,7 @@
 #include "original_ui_material_equivalence50kg.h"
 #include "original_ui_image_bank50kg.h"
 
+namespace rr::platform {class OriginalUiSharedDialogMaterialHistory50KG;}
 namespace rr::assets {
 enum class OriginalUiMaterialBindingError50KG : std::uint8_t {
     none,alreadyInitialized,key,uninitialized,untextured,disabled,bank,image,provenance,policy,allocation
@@ -51,6 +52,7 @@ public:
         out=effective_.state_;return true;
     }
 private:
+    friend class rr::platform::OriginalUiSharedDialogMaterialHistory50KG;
     OriginalUiMaterialEquivalenceKey50KG construction_,effective_;
     bool initialized_=false,bound_=false;
     const OriginalUiMemberIdentity50KG* member_=nullptr;

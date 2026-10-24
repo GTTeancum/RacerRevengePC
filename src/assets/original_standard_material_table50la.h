@@ -8,7 +8,7 @@ namespace original_position_stats_prestage50LA { class Owner; }
 
 namespace ra_static_world50LA {class Owner;}
 namespace rr::game {class OriginalPositionStatsResources50LA;class OriginalPauseMaterialAdmission50LA;}
-namespace rr::platform { class OriginalUiTournamentPodReferences50KG; class OriginalUiSharedDialogs50KG; }
+namespace rr::platform { class OriginalUiSharedDialogMaterialHistory50KG; class OriginalUiTournamentPodReferences50KG; class OriginalUiSharedDialogs50KG; }
 namespace rr::platform {class OriginalUiGarageModelResource50KG;class OriginalUiGarageScreenText50KG;class OriginalUiGarageQuad50KG;class OriginalUiGaragePageOwner50KG;}
 namespace rr::platform { class OriginalUiGarageCanonicalSubmission50KG; class OriginalUiGarageDrawContribution50KG; }
 namespace rr::assets {
@@ -114,6 +114,22 @@ struct OriginalStandardMaterialRowView50LA {
     const OriginalUiMaterialTemplateState50KG* associated30=nullptr;
     std::uint32_t tableByteOffset=0;
 };
+// Borrowed staging observations only. Constructing/copying these values gives
+// no mutation authority. Only the actual common history owner may hold the
+// table's private lease and publish an accepted UI transaction. Fixed order is
+// 3228/dim, 3229/overlay1, 3230/venus16; all are their own actual pass0.
+enum class OriginalStandardMaterialUiSharedHistoryWrite50LA : std::uint8_t {untextured,bound};
+struct OriginalStandardMaterialUiSharedHistorySlot50LA {
+    std::int32_t row=-1;
+    std::size_t pass=0;
+    const OriginalStandardMaterialObject50LA* object=nullptr;
+    const OriginalStandardMaterialState50LA* state30=nullptr;
+    const std::array<OriginalStandardMaterialNativeBinding50KG,2>* nativeBindings=nullptr;
+    OriginalStandardMaterialStateContext50LA beforeContext{},afterContext{};
+    std::array<OriginalStandardMaterialNativeBinding50KG,2> beforeNativeBindings{},afterNativeBindings{};
+    bool write=false;
+    OriginalStandardMaterialUiSharedHistoryWrite50LA writeKind=OriginalStandardMaterialUiSharedHistoryWrite50LA::untextured;
+};
 // Actual native reference/population portion of the source382B38 table, not the
 // UI lifetime projection. Its one shared application owner must be retained
 // across models/scenes. Only a fresh constructor -> first Mat_Stbl load is
@@ -210,6 +226,47 @@ public:
     bool firstPending14D370(std::int32_t& row,const std::string*& name,
         OriginalStandardMaterialDiagnostic50LA&) const noexcept;
 private:
+    friend class rr::platform::OriginalUiSharedDialogMaterialHistory50KG;
+    using UiSharedHistoryOwner=rr::platform::OriginalUiSharedDialogMaterialHistory50KG;
+    using UiSharedHistorySlots=std::array<OriginalStandardMaterialUiSharedHistorySlot50LA,3>;
+    // Not a collector seal or FIFO receipt. There is no public constructor,
+    // copy, move, setter, ready flag, registration or producer outside the
+    // actual common owner and this table. Storage pins the receipt address as
+    // well as its owner so a copied/reconstructed value cannot release a lease.
+    class UiSharedHistoryReceipt final {
+        friend class OriginalStandardMaterialTable50LA;
+        friend class rr::platform::OriginalUiSharedDialogMaterialHistory50KG;
+        UiSharedHistoryReceipt()noexcept=default;
+        ~UiSharedHistoryReceipt()noexcept;
+        UiSharedHistoryReceipt(const UiSharedHistoryReceipt&)=delete;
+        UiSharedHistoryReceipt& operator=(const UiSharedHistoryReceipt&)=delete;
+        const OriginalStandardMaterialTable50LA* table_=nullptr;
+        const UiSharedHistoryOwner* owner_=nullptr;
+        const OriginalStandardMaterialContext50LA* context_=nullptr;
+        std::uint64_t leaseRevision_=0,bindingRevision_=0;
+        UiSharedHistorySlots snapshots_{};
+        std::array<OriginalStandardMaterialPassView50LA,3> passViews_{};
+        std::array<std::int32_t,3> retainedReferences_{};
+    };
+    bool beginUiSharedHistory(const UiSharedHistoryOwner*,const OriginalStandardMaterialContext50LA*,
+        UiSharedHistoryReceipt&,UiSharedHistorySlots&)noexcept;
+    bool tableOwnerUiSharedHistory(const UiSharedHistoryOwner*,const OriginalStandardMaterialContext50LA*,
+        const UiSharedHistoryReceipt&)const noexcept;
+    bool bindingRevisionUiSharedHistory(const UiSharedHistoryOwner*,const UiSharedHistoryReceipt&,
+        std::uint64_t&)const noexcept;
+    bool uiSharedHistoryCurrent(const UiSharedHistoryOwner*,const UiSharedHistoryReceipt&)const noexcept;
+    bool commitUiSharedHistory(const UiSharedHistoryOwner*,UiSharedHistoryReceipt&,
+        const UiSharedHistorySlots&)noexcept;
+    bool cancelUiSharedHistory(const UiSharedHistoryOwner*,UiSharedHistoryReceipt&)noexcept;
+    bool releaseUiSharedHistory(const UiSharedHistoryOwner*,UiSharedHistoryReceipt&)noexcept;
+    bool poisonUiSharedHistory(const UiSharedHistoryOwner*,const UiSharedHistoryReceipt&)noexcept;
+    bool captureUiSharedHistorySlot(std::size_t,OriginalStandardMaterialUiSharedHistorySlot50LA&,
+        OriginalStandardMaterialPassView50LA&,std::int32_t&)const noexcept;
+    bool ownsUiSharedHistoryLease(const UiSharedHistoryOwner*,const UiSharedHistoryReceipt&)const noexcept;
+    bool uiSharedHistoryQuiescent()const noexcept;
+    // Read-only lifetime/poison observation, not a binding/renderer grant.
+    // Actual canonical FIFO pins are permitted; no collector seal is minted.
+    bool nativeBindingHistoryUsable()const noexcept;
     friend class rr::platform::OriginalUiGarageCanonicalSubmission50KG;
     friend class rr::platform::OriginalUiGarageDrawContribution50KG;
     bool prepareGarageUntexturedState249BA0(const OriginalStandardMaterialCollectorReceipt50LA&,

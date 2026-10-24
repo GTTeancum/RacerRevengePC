@@ -2,6 +2,7 @@
 #include "original_ui_options_particle_adapter50kg.h"
 #include "original_ui_main_session50kg.h"
 #include <cmath>
+#include <cstring>
 #include <utility>
 namespace rr::platform {
 namespace {
@@ -92,7 +93,10 @@ constexpr Material materialEntries[]={
     {"font/venus14popup","venus14",3231,70872,Archive::controllerPopup},
     {"ui/textures/icon_x_popup","icon_x",3232,70891,Archive::controllerPopup,"popup_icon_x"},
     {"ui/textures/icon_tri_popup","icon_tri",3233,70917,Archive::controllerPopup,"popup_icon_tri"},
-    {"ui/textures/overlay1top","overlay1",3176,69840}
+    {"ui/textures/overlay1top","overlay1",3176,69840},
+    // Six-role shared-dialog history adds Venus16 without changing the five
+    // controller47C geometry roles or the preceding Options menu indices.
+    {"font/venus16popup","venus16",3230,70853,Archive::controllerPopup}
 };
 const assets::OriginalUiArchive50KG& owner(const OriginalUiOptionsColdInput50KG& in,Archive id) noexcept {
     return *(id==Archive::fonts?in.fonts:id==Archive::controllerPopup?in.controllerPopup:
@@ -171,6 +175,21 @@ struct OriginalUiOptionsDrawResources50KG::Storage {
     assets::OriginalUiMainParticleMaterial50KG particle;
     std::uint32_t particleImage=unresolved;
 };
+bool OriginalUiOptionsDrawResources50KG::menuCameraConstructionCurrent(
+    const std::shared_ptr<const assets::OriginalUiArchive50KG>& archive,
+    const game::OriginalUiOptionsCamera50KG* camera)const noexcept {
+    const auto* s=storage_.get();
+    if(!s||!archive||s->owners.options!=archive||
+       s->owners.options.owner_before(archive)||archive.owner_before(s->owners.options)||
+       !archive->loaded()||archive->identity()!=assets::originalUiArchiveIdentity50KG(assets::OriginalUiArchiveId50KG::options)||
+       camera!=&s->camera||!camera->uiIdentity)return false;
+    for(std::size_t i=0;i<archive->memberCount();++i){
+        const auto member=archive->member(i);
+        if(member.identity==camera->uiIdentity&&member.identity&&
+           std::strcmp(member.identity->name,"UI\\UIOption\\ui.dat")==0)return true;
+    }
+    return false;
+}
 OriginalUiOptionsDrawResources50KG::OriginalUiOptionsDrawResources50KG() noexcept=default;
 OriginalUiOptionsDrawResources50KG::~OriginalUiOptionsDrawResources50KG()=default;
 bool OriginalUiOptionsDrawResources50KG::load(const OriginalUiOptionsColdInput50KG& in,Diagnostic& d) noexcept {

@@ -19,6 +19,10 @@
 #include <vector>
 
 namespace rr::platform {
+class OriginalUiSharedDialogs50KG;
+class OriginalUiMenuWarningPacket50KG;
+struct OriginalUiMenuWarningGeometry50KG;
+class OriginalUiMainSession50KG;
 // NEW native reconstruction. No source PCs are executable addresses.
 enum class OriginalUiMainDrawError50KG : std::uint8_t {
     none,alreadyLoaded,notLoaded,archive,videoOwner,manager,resource,material,
@@ -73,6 +77,7 @@ struct OriginalUiMainMaterialBinding50KG {
 // CEL metrics, actual PST/ATM images and native policies stay pinned. No path
 // search, substitute image, synthesized PSM, font fallback or menu labels.
 class OriginalUiMainDrawResources50KG final {
+    friend class OriginalUiSharedDialogs50KG;
 public:
     OriginalUiMainDrawResources50KG() noexcept;
     ~OriginalUiMainDrawResources50KG();
@@ -106,7 +111,7 @@ private:
 };
 
 enum class OriginalUiMainDrawSegment50KG : std::uint8_t {
-    ordinaryWidgets,mainPage,aperture,basePrompts,onTopWidgets,particles,exitText,controllerPopup
+    ordinaryWidgets,mainPage,aperture,basePrompts,onTopWidgets,particles,exitText,controllerPopup,warning470
 };
 struct OriginalUiMainSubmittedPacket50KG {
     // materialIndex==unresolvedMaterialTexture50EA denotes the separately
@@ -115,6 +120,7 @@ struct OriginalUiMainSubmittedPacket50KG {
     std::uint32_t submissionOrdinal=0,sourcePC=0;
     std::uint16_t widgetId=0;
     OriginalUiMainDrawSegment50KG segment=OriginalUiMainDrawSegment50KG::ordinaryWidgets;
+    const OriginalUiMenuWarningPacket50KG* warning470=nullptr;
 };
 struct OriginalUiMainFrameClock50KG {
     // Legacy filtered UI presentation time and update suppression. These
@@ -197,6 +203,24 @@ public:
     // Parallel to draw spans; identifies exact source packet after draining.
     const std::vector<std::uint32_t>* drainedPacketIndices() const noexcept;
 private:
+    friend class OriginalUiSharedDialogMaterialHistory50KG;
+    bool historyRendererRetired(const VehicleWindowGl50DS&)const noexcept;
+    friend class OriginalUiSharedDialogs50KG;
+    friend class OriginalUiMainSession50KG;
+    std::shared_ptr<OriginalUiSharedDialogs50KG> menuShared_;
+    OriginalUiMainSession50KG* menuSession_=nullptr;
+    std::uint64_t menuInvocationEpoch_=0;
+    mutable std::uint64_t menuAcceptedEpoch_=0;
+    const VehicleWindowGl50DS* menuRetiredRenderer_=nullptr;
+    bool bindSharedMenu470(OriginalUiMainSession50KG&,std::shared_ptr<OriginalUiSharedDialogs50KG>)noexcept;
+    bool sharedMenuBoundCurrent(const OriginalUiSharedDialogs50KG&,const OriginalUiMainSession50KG&)const noexcept;
+    bool sharedMenuInvocationCurrent(const OriginalUiSharedDialogs50KG&,std::uint64_t)const noexcept;
+    bool sharedMenuCollectorInitialized(const OriginalUiSharedDialogs50KG&,std::uint64_t)const noexcept;
+    bool sharedMenuRasterResourcesCurrent(const OriginalUiSharedDialogs50KG&,const void*,const MaterialTextureGl50EB*,std::uint64_t)const noexcept;
+    bool appendMenuWarning470(const OriginalUiSharedDialogs50KG&,const OriginalUiMenuWarningPacket50KG&,const OriginalUiMenuWarningGeometry50KG&,OriginalUiMainDrawDiagnostic50KG&)noexcept;
+    bool sharedMenuFrameCurrent(const OriginalUiSharedDialogs50KG&,std::uint64_t,std::uint64_t)const noexcept;
+    bool sharedMenuRetiredCurrent(const OriginalUiSharedDialogs50KG&,const VehicleWindowGl50DS&)const noexcept;
+
     struct Storage;
     std::unique_ptr<Storage> storage_;
     OriginalUiSourceFrame50KM frame_;

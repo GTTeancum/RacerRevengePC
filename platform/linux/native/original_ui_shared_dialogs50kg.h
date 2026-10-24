@@ -1,4 +1,6 @@
 #pragma once
+#include "original_ui_menu_warning_packet50kg.h"
+#include "original_ui_menu_raster_inputs50kg.h"
 #include "original_ui_garage_page_owner50kg.h"
 #include "original_ui_controller_popup_resources50kg.h"
 #include "original_ui_warning_geometry50kg.h"
@@ -6,7 +8,12 @@
 namespace rr::platform {
 struct OriginalUiMainApplication50KG;
 class OriginalUiSharedDialogMaterialHistory50KG;
+class OriginalUiMainDrawResources50KG;
 class OriginalUiGarageDrawContribution50KG;
+class OriginalUiMainDraw50KG;
+class OriginalUiOptionsDrawContribution50KG;
+class OriginalUiMainSession50KG;
+class OriginalUiOptionsSession50KG;
 // Native retained UI470/47C owners, not a second dispatcher or menu manager.
 // Initial construction is a Root boot operation. A preexisting UI without this
 // owner cannot be adopted by inventing prior470 activity or resetting47C.
@@ -18,8 +25,11 @@ class OriginalUiSharedDialogs50KG final {
     friend class OriginalUiControllerPopupResources50KG;
     friend class OriginalUiSharedDialogMaterialHistory50KG;
     friend class OriginalUiMainSession50KG;
+    friend class OriginalUiMainDraw50KG;
+    friend class OriginalUiOptionsDrawContribution50KG;
     friend class OriginalUiOptionsSession50KG;
     friend class OriginalUiFrontend50KG;
+    friend class VehicleWindowGl50DS;
     friend class OriginalUiGarageQuad50KG;
     friend class OriginalUiGarageScreenText50KG;
     friend class ::original_main_entry50KG::NativeCollectorFifo50LA;
@@ -74,10 +84,15 @@ private:
     } controller47C_;
     std::shared_ptr<Scope> scope_;
     std::weak_ptr<OriginalUiMainApplication50KG> application_;
-    // Dormant shared material-history foundation. No bootstrap call is added
-    // here: this must outlive47C payload and retire after actual470 payload.
+    // Root boot transfers the exact initial five47C histories into the six-role
+    // owner. It survives47C payload and retires after actual470 final1413E0.
     std::shared_ptr<OriginalUiSharedDialogMaterialHistory50KG> sharedMaterialHistory_;
     bool sharedHistoryFinalRetirementCurrent()const noexcept;
+    // Exact Scope completion only, independent of current Display authority.
+    // A retry of pending history cleanup must never replay completed1413E0.
+    bool sharedScopeFinalRetirementComplete()const noexcept;
+    bool bootstrapInitialHistoryFromMain(const OriginalUiMainDrawResources50KG&,Diagnostic&)noexcept;
+    bool sharedHistoryCanonicalOwnersCurrent(std::array<const assets::OriginalStandardMaterialObject50LA*,3>&)const noexcept;
     Phase phase_=Phase::empty;
     bool successorConstructor_=false; // Only Application issues after exact retired-predecessor proof.
     std::size_t constructed470Quads_=0,loaded470Texts_=0,loaded470Quads_=0;
@@ -111,6 +126,7 @@ private:
     // Native keyboard transport supplies the first logical menu route. The
     // SDL second route remains unknown when enumeration/open was ambiguous.
     bool advance4702048F0(float,Diagnostic&)noexcept;
+    bool advance470Body2048F0(float,Diagnostic&)noexcept;
     // A genuine dispatcher470 callback, not a Garage page receiver. The Draw
     // owns the invocation lease; update count is never callback authority.
     enum class FirstPass470Phase:std::uint8_t {idle,body,inheritedPending};
@@ -151,13 +167,151 @@ private:
         Quad::LoweredPacket327E90&,Diagnostic&)const noexcept;
     // Material body only. The inherited tail and positive draw are separate.
     bool demand470204A00(Diagnostic&)noexcept;
+    bool demand470Body204A00(Diagnostic&)noexcept;
     std::uint64_t demand470Update_=0;
     std::uint8_t demand470Next_=0;
     std::array<std::uint32_t,4> demand470Cache_{};
     bool demand470Pending_=false,demand470Effects_=false;
     bool invisible470204AC0(Diagnostic&)const noexcept;
+    // Private readiness only. These neither poll devices nor issue callbacks,
+    // raster/frame receipts, source completion or renderer retirement.
+    bool controls2ObservedPresent(std::uint64_t& pollRevision)const noexcept;
+    bool controls2MenuResourcesCurrent(const OriginalUiOptionsSession50KG&,
+        const OriginalUiOptionsDrawContribution50KG&)const noexcept;
+    bool admitControls2Menu470(const OriginalUiOptionsSession50KG&,
+        const OriginalUiOptionsDrawContribution50KG&,Diagnostic&)const noexcept;
     std::uint64_t update470Count_=0,update470PollRevision_=0;
     bool update470Pending_=false,update470SampledPrimary_=false;
+    // Bounded native menu callback receipt, NOT a shared first-pass or full
+    // Root traversal. It covers470+40/tail,470+48/tail and ONE existing47C
+    // semantic projection at its actual sibling point. Active47C+40 demand
+    // remains outside this receipt and is never called inherited-only.
+    // Native menu raster provenance, never a guest114A00/CameraFrame receipt.
+    OriginalUiMenuRasterInputs50KG menuRaster_;
+    bool menuRasterAttempted_=false,menuRasterFailed_=false;
+    std::uint64_t menuRasterFrame_=0;
+    const OriginalUiNativeDraw50KG* menuRasterNative_=nullptr;
+    bool readMenu470RasterInputs(OriginalUiMenuRasterInputs50KG&)const noexcept;
+    bool applyMenu470RasterPrelude(Diagnostic&)noexcept;
+    bool menu470RasterCurrent()const noexcept;
+    bool sealMenu470RasterFrame(std::uint64_t,Diagnostic&)noexcept;
+    bool releaseMenu470RasterAfterAcceptance()noexcept;
+    bool releaseMenu470RasterAfterRetirement(const VehicleWindowGl50DS&,Diagnostic&)noexcept;
+
+// Add #include "original_ui_menu_warning_packet50kg.h" to Shared's header.
+// Private Main/Options operation custody. No Garage callback/FIFO authority.
+enum class MenuWarningPhase:std::uint8_t {idle,body,inheritedPending,complete,failed};
+MenuWarningPhase menuWarningPhase_=MenuWarningPhase::idle;
+OriginalUiWarningGeometryPlan50KG menuWarningPlan_;
+std::size_t menuWarningNext_=0,menuWarningIssued_=0,menuWarningAppended_=0;
+std::uint64_t menuWarningEpoch_=0,menuWarningInvocation_=0,menuWarningUpdate_=0;
+std::array<std::uint32_t,4> menuWarningCache_{};
+std::uint32_t menuWarningSourcePC_=0,nativeMenuWarning470Pins_=0;
+bool menuWarningEffects_=false;
+std::array<OriginalUiMenuWarningPacket50KG,8> menuWarningPackets_;
+bool menuWarningIdentityCurrent()const noexcept;
+bool menuWarningBodyCurrent()const noexcept;
+bool menuWarningCompletedCurrent()const noexcept;
+bool menuWarningOperationCurrent()const noexcept;
+bool executeMenu470WarningBody(Diagnostic&)noexcept;
+bool completeMenu470WarningTail(Diagnostic&)noexcept;
+bool menuWarningPacketsCurrent()const noexcept;
+bool menuWarningPacketsReleasable()const noexcept;
+void releaseMenuWarningPackets()noexcept;
+void resetMenuWarningBody()noexcept;
+bool menuWarningPacketIdentity(const OriginalUiMenuWarningPacket50KG&,std::size_t)const noexcept;
+bool menuWarningPacketPayloadMatches(const OriginalUiMenuWarningPacket50KG&)const noexcept;
+bool prepareMenuWarningPacket(OriginalUiMenuWarningPacket50KG&,OriginalUiMenuWarningPacket50KG::Kind)noexcept;
+bool appendMenuWarningPacket(OriginalUiMenuWarningPacket50KG&,const OriginalUiMenuWarningGeometry50KG&,Diagnostic&)noexcept;
+bool menuWarning470PacketAppendCurrent(const OriginalUiMainDraw50KG&,const OriginalUiMenuWarningPacket50KG&)const noexcept;
+bool menuWarning470PacketAppendCurrent(const OriginalUiOptionsDrawContribution50KG&,const OriginalUiMenuWarningPacket50KG&)const noexcept;
+// Shared private declarations required by the retained leaf implementation.
+// Parent owns actual operation/input/collector/current implementations.
+struct MenuWarningTextInputs {
+    std::uint32_t viewportWidth1E8=0,viewportHeight1EC=0;
+    float videoDepthMaximum60=0;
+};
+struct MenuWarningQuadInputs {
+    bool sourceQuadEnabled383678=false;
+    std::uint32_t viewportWidth1E8=0,viewportHeight1EC=0;
+};
+struct MenuWarningDimInputs {
+    bool sourceApertureEnabled383680=false;
+    std::uint32_t viewportWidth1E8=0,viewportHeight1EC=0;
+    std::int32_t videoDepthMaximum60=0;
+};
+bool menuWarning470TextCurrent(const Text&)const noexcept;
+bool menuWarning470QuadCurrent(const Quad&)const noexcept;
+bool menuWarning470DimCurrent()const noexcept;
+bool readMenuWarningTextInputs2E0170(const Text&,MenuWarningTextInputs&,std::uint32_t&)const noexcept;
+bool readMenuWarningQuadInputs2DF550(const Quad&,MenuWarningQuadInputs&,std::uint32_t&)const noexcept;
+bool readMenuWarningDimInputs2E21D0(MenuWarningDimInputs&,std::uint32_t&)const noexcept;
+bool menuWarning470PacketCaptureCurrent(const OriginalUiMenuWarningPacket50KG&)const noexcept;
+bool menuWarning470PacketCurrent(const OriginalUiMenuWarningPacket50KG&)const noexcept;
+bool menuWarning470PacketOffsetCurrent(const OriginalUiMenuWarningPacket50KG&,const std::array<std::uint32_t,2>&)const noexcept;
+bool collectMenuWarning470Text(Text&,std::size_t,Text::Diagnostic&)noexcept;
+bool collectMenuWarning470Quad(Quad&,Quad::Diagnostic&)noexcept;
+bool collectMenuWarning470Dim(Diagnostic&)noexcept;
+// Implemented by this leaf proposal in original_ui_shared_warning_dim50kg.cpp:
+bool drawMenuWarning470Dim2E21D0(Diagnostic&)noexcept;
+bool regenerateWarning470DimPacket2E21D0(std::uint32_t,std::uint32_t,std::int32_t,Diagnostic&)noexcept;
+bool retainMenuWarningDimPacket(OriginalUiMenuWarningPacket50KG&,Diagnostic&)noexcept;
+bool releaseMenuWarningDimPacket(OriginalUiMenuWarningPacket50KG&)noexcept;
+bool menuWarningDimPacketMatches(const OriginalUiMenuWarningPacket50KG&)const noexcept;
+bool lowerMenuWarningDimPacket(const OriginalUiMenuWarningPacket50KG&,const std::array<std::uint32_t,2>&,
+    OriginalUiMenuWarningGeometry50KG&,Diagnostic&)const noexcept;
+bool lowerWarning470DimPacketBody327E90(std::uint64_t,const std::array<std::uint32_t,2>&,
+    Quad::LoweredPacket327E90&,Diagnostic&)const noexcept;
+
+bool menuWarning470PacketImageCurrent(const OriginalUiMenuWarningPacket50KG&,const assets::OriginalUiMemberView50KG&)const noexcept;
+bool admitMenuWarningCollection(std::int32_t,bool&,Diagnostic&)noexcept;
+
+    enum class Menu470Phase:std::uint8_t {idle,callbacks,collectorPending,popupBody,popupProjection,cpuPending,framePrepared,submitting,failed};
+    Menu470Phase menu470Phase_=Menu470Phase::idle;
+    OriginalUiMainSession50KG* menuMainSession_=nullptr;
+    OriginalUiOptionsSession50KG* menuOptionsSession_=nullptr;
+    OriginalUiMainDraw50KG* menuMainDraw_=nullptr;
+    OriginalUiOptionsDrawContribution50KG* menuOptionsDraw_=nullptr;
+    const OriginalUiSourceOwner50KM* menuUpdateFailedOwner_=nullptr;
+    bool menuUpdateAborted_=false; // Terminal failed update cannot be resumed by a new Session.
+    OriginalUiMainDraw50KG* menuUpdateFailedMain_=nullptr;
+    OriginalUiOptionsDrawContribution50KG* menuUpdateFailedOptions_=nullptr;
+    std::uint64_t menu470Epoch_=0,menu470Invocation_=0,menu470Frame_=0,menu470Update_=0,menuUpdateEpoch_=0;
+    std::uint8_t menu470CompletedSlots_=0;
+    std::uint32_t menu470Slot_=0;
+    const C* menu470Callback_=nullptr;
+    const game::OriginalUiControllerPopupRender50KG* menuPopupPlan_=nullptr;
+    std::shared_ptr<::original_main_entry50KG::RaceDisplayLifetime50LA> menuDisplay_;
+    bool menuDisplayPinned_=false;
+    std::shared_ptr<::original_main_entry50KG::RaceDisplayLifetime50LA> menuUpdateFailedDisplay_;
+    bool menuUpdateFailedDisplayPinned_=false;
+    bool menuTopologyCurrent()const noexcept;
+    bool menu470Current()const noexcept;
+    bool menu470RenderCurrent()const noexcept;
+    const OriginalUiSourceOwner50KM* menu470Owner()const noexcept;
+    bool menu470PendingFor(const OriginalUiSourceOwner50KM&)const noexcept;
+    bool beginMenu470(OriginalUiMainSession50KG&,OriginalUiMainDraw50KG&,std::uint64_t,Diagnostic&)noexcept;
+    bool beginMenu470(OriginalUiOptionsSession50KG&,OriginalUiOptionsDrawContribution50KG&,std::uint64_t,Diagnostic&)noexcept;
+    bool beginMenu470Body(Diagnostic&)noexcept;
+    bool continueMenu470AfterCollectorBegin(const OriginalUiSourceOwner50KM&,Diagnostic&)noexcept;
+    bool advanceMenu470(OriginalUiMainSession50KG&,OriginalUiMainDraw50KG&,float,Diagnostic&)noexcept;
+    bool advanceMenu470(OriginalUiOptionsSession50KG&,OriginalUiOptionsDrawContribution50KG&,float,Diagnostic&)noexcept;
+    bool advanceMenu470Body(const OriginalUiSourceOwner50KM&,float,Diagnostic&)noexcept;
+    bool walkMenu470Inherited(std::uint32_t,std::uint32_t,Diagnostic&)noexcept;
+    bool serviceMenu141F3C(Diagnostic&)noexcept;
+    bool renderMenuPopupSibling(game::OriginalUiControllerPopupRender50KG&,Diagnostic&)noexcept;
+    bool menuPopupProjectionCurrent(const OriginalUiSourceOwner50KM&,const game::OriginalUiControllerPopupRender50KG&)const noexcept;
+    bool completeMenuPopupProjection(const OriginalUiSourceOwner50KM&,const game::OriginalUiControllerPopupRender50KG&,Diagnostic&)noexcept;
+    bool sealMenu470Frame(const OriginalUiSourceOwner50KM&,std::uint64_t,Diagnostic&)noexcept;
+    bool menu470FrameCurrent(const OriginalUiSourceOwner50KM&,std::uint64_t)const noexcept;
+    bool beginMenu470Submission(const OriginalUiSourceOwner50KM&,std::uint64_t,const VehicleWindowGl50DS&)noexcept;
+    bool finishMenu470Submission(const OriginalUiSourceOwner50KM&,std::uint64_t,bool,bool)noexcept;
+    void failMenu470Submission(const OriginalUiSourceOwner50KM&)noexcept;
+    bool menu470CloseRendererCurrent(const VehicleWindowGl50DS&)const noexcept;
+    bool menu470CloseOwnerCurrent(const OriginalUiMainSession50KG&,const VehicleWindowGl50DS&)const noexcept;
+    bool menu470CloseOwnerCurrent(const OriginalUiOptionsSession50KG&,const VehicleWindowGl50DS&)const noexcept;
+    bool retireMenu470AfterRenderer(const OriginalUiSourceOwner50KM&,const VehicleWindowGl50DS&,Diagnostic&)noexcept;
+    void releaseMenu470()noexcept;
     bool loadedCurrent()const noexcept;
     bool fail(Diagnostic&,Status,std::uint32_t)noexcept;
 };

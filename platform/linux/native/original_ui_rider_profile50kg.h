@@ -1,5 +1,6 @@
 // New reconstruction after rollback; source-only, unverified.
 #pragma once
+#include "original_persisted_profile_name50kg.h"
 #include "original_ui_main_session50kg.h"
 #include "../../../src/game/original_ui_course_selection50kg.h"
 #include "../../../src/game/original_ui_course_mode2_entry50kg.h"
@@ -14,6 +15,8 @@ namespace original_main_entry50KG { struct Application; }
 
 namespace rr::platform {
 class OriginalUiFrontend50KG;
+class OriginalSaveNativeReadStage50KG;
+class OriginalSaveProfileOwner50KG;
 class OriginalUiTournamentSession50KG;
 class OriginalUiHallOfFameSession50KG;
 struct OriginalUiRiderProfileDiagnostic50KG {
@@ -60,6 +63,10 @@ public:
     bool initializeGasganoTestProfileAtApplicationStartup(std::shared_ptr<OriginalUiMainProfile50KG>,
         std::shared_ptr<const assets::OriginalUiArchive50KG> podPhysics,
         OriginalUiRiderProfileDiagnostic50KG&) noexcept;
+    // Actual persisted names, not racer localization IDs3C. Copies are owned
+    // and survive later profile changes. Failure preserves out.
+    bool careerName219D(std::uint32_t career,OriginalPersistedProfileName50KG& out)const noexcept;
+    bool playerName10F68(std::uint32_t player,OriginalPersistedProfileName50KG& out)const noexcept;
     bool gasganoTestProfile() const noexcept;
     // Explicit native test override, not the retail cheat or earned progression.
     // Only visible, nonfresh riders with existing native Course owners:3/8/22.
@@ -234,6 +241,12 @@ private:
     // mode. Actual Rider entry and every profile commit still read live mode.
     bool selectionSnapshotForMode(std::uint32_t prospectiveMode,
         game::OriginalUiRiderSelectionProfile50KG&) const noexcept;
+    // Existing-owner facet for the future private load coordinator. It uses
+    // THIS sole Rider bank/common pointer and generation, not supplied careers.
+    // No mutation, storage IO, live import or completed-load capability.
+    bool prepareNativeReadMetadata(const std::shared_ptr<const OriginalSaveNativeReadStage50KG>&,
+        const OriginalUiMainProfile50KG& actualCommon,OriginalUiRiderProfileStamp50KG,
+        std::unique_ptr<OriginalSaveProfileOwner50KG>& out)const noexcept;
     // Concrete frontend commit boundary only. Public snapshots/stamps cannot
     // authorize mutation. No public adapter may forward into this method.
     // Only exact already-admitted Back decisions: one remembered-rider write,

@@ -1,4 +1,5 @@
 #pragma once
+#include "original_ui_menu_warning_packet50kg.h"
 #include "original_ui_garage_screen_text50kg.h"
 #include "../../../src/assets/original_standard_material_domain50la.h"
 #include <cstddef>
@@ -68,11 +69,13 @@ private:
     // Queued records borrow the actual Primitive and packet. Mutation and
     // source retirement wait for genuine105990 release of these same pins.
     std::uint32_t nativeGarageFifoPins_=0;
+    std::uint32_t nativeMenuWarningPins_=0; // Private Shared menu receipts, not FIFO.
     std::uint64_t packetRevision_=0;
     bool packetCurrent2DF550()const noexcept;
     bool canMutatePacket2DF550()const noexcept;
     bool draw2DF550(OriginalUiGarageDrawContribution50KG&,Diagnostic&)noexcept;
     bool drawWarning4702DF550(OriginalUiGarageDrawContribution50KG&,OriginalUiSharedDialogs50KG&,Diagnostic&)noexcept;
+    bool drawMenuWarning4702DF550(OriginalUiSharedDialogs50KG&,Diagnostic&)noexcept;
     static void initializeDrawAssertion2DF550()noexcept;
     bool regeneratePacket2DF550(std::uint32_t,std::uint32_t,Diagnostic&)noexcept;
     struct LoweredPacket327E90 {
@@ -83,6 +86,16 @@ private:
     };
     bool lowerPacket327E90(std::uint64_t expectedRevision,
         const std::array<std::uint32_t,2>& actualFixed4XyOffset,
+        LoweredPacket327E90&,Diagnostic&)const noexcept;
+    bool retainMenuWarningPacket(OriginalUiSharedDialogs50KG&,
+        OriginalUiMenuWarningPacket50KG&,Diagnostic&)noexcept;
+    bool releaseMenuWarningPacket(OriginalUiMenuWarningPacket50KG&)noexcept;
+    bool lowerMenuWarningPacket(const OriginalUiSharedDialogs50KG&,
+        const OriginalUiMenuWarningPacket50KG&,const std::array<std::uint32_t,2>&,
+        OriginalUiMenuWarningGeometry50KG&,Diagnostic&)const noexcept;
+    bool menuWarningPacketMatches(const OriginalUiSharedDialogs50KG&,
+        const OriginalUiMenuWarningPacket50KG&)const noexcept;
+    bool lowerRetainedPacketBody327E90(std::uint64_t,const std::array<std::uint32_t,2>&,
         LoweredPacket327E90&,Diagnostic&)const noexcept;
     std::uint8_t retirementDrainPhase_=0;
     bool demand1FDD60(Diagnostic&)noexcept;

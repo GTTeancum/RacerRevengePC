@@ -1,11 +1,13 @@
 #pragma once
 #include "../../../src/game/original_save_profile_stage50kg.h"
 #include "../../../src/game/original_ui_hall_records50kg.h"
+#include "original_persisted_profile_name50kg.h"
 #include <memory>
 #include <optional>
 
 namespace rr::platform {
 class OriginalUiRiderProfileOwner50KG;
+class OriginalSaveNativeReadStage50KG;
 // Original application globals, NOT per-profile/service observations. Source
 // data382BF0/382BF8 starts-3;433E98 is BSS0. Not instantiated by this proposal.
 // Any future service must retain ONE actual application instance, never reset
@@ -38,6 +40,14 @@ private:
     friend class OriginalUiRiderProfileOwner50KG;
     OriginalSaveProfileOwner50KG(const OriginalSaveProfileOwner50KG&)=default;
     OriginalSaveProfileOwner50KG& operator=(const OriginalSaveProfileOwner50KG&)=delete;
+    //17FFB0/180098..B0 and1864CC..F4 write empty C strings only.
+    void recordFreshNames() noexcept;
+    bool namesReady() const noexcept;
+    bool persistedName(bool career,std::uint32_t index,
+        OriginalPersistedProfileName50KG& out)const noexcept;
+    bool namesInitialized_=false;
+    std::array<OriginalPersistedProfileName50KG,27> careerNames_{};
+    std::array<OriginalPersistedProfileName50KG,2> playerNames_{};
     // Only the actual private Rider result commit calls this, after187D80.
     void markDirty1AB648() noexcept;
     // Only the existing authenticated fresh Hall initializer calls this.
@@ -45,10 +55,13 @@ private:
     // Private pure preparation for the future full transaction. NOT a complete
     // storage-read receipt: selected slot/seen-card/caches intentionally remain
     // unchanged because their real preceding service observations are missing.
-    // Identity comes ONLY from retained supplied bytes, not a synthetic seed.
+    // Identity comes ONLY from the retained actual full-read/projection join,
+    // never an independently supplied envelope or synthetic seed.
     // Failure leaves out unchanged. No current live caller exists.
-    bool preparePayloadMetadata(const game::OriginalSaveProfileStage50KG&,
+    bool preparePayloadMetadata(std::shared_ptr<const OriginalSaveNativeReadStage50KG>,
         std::unique_ptr<OriginalSaveProfileOwner50KG>& out) const noexcept;
+    // Concrete provenance check for actual current Hall data, not a caller bit.
+    bool hallRecordsCurrent(const game::OriginalUiHallRecords50KG&)const noexcept;
     //23AE90: slot99,seen0;17E300/308: caches0. Each is source constructor state,
     // not a present/missing-card answer or result of a native directory probe.
     std::uint32_t selectedServiceSlot_=99,seenCard3C8_=0;
@@ -62,5 +75,6 @@ private:
     const assets::OriginalUiMemberIdentity50KG* localizedNames_=nullptr;
     const assets::OriginalUiMemberIdentity50KG* localizedText_=nullptr;
     std::shared_ptr<const game::OriginalSavePayloadEnvelope50KG> payloadRecords_;
+    std::shared_ptr<const OriginalSaveNativeReadStage50KG> importedRead_;
 };
 }

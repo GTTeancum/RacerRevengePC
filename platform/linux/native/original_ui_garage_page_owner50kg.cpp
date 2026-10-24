@@ -1925,7 +1925,7 @@ bool OriginalUiGaragePageOwner50KG::retireAperture2E1980(std::size_t ordinal,Dia
     if(!drainEmbedded2DEFE0(apertureRetirementDrains_[ordinal],d,0x2E19B4,0x2E19CC))return false;
     if(!Quad::preflightPrimitive246260(p.primitives30[0],d.quad))
         return fail(d,Status::rendererRetirementPending,d.quad.sourcePC);
-    if(p.nativeGarageFifoPins_)return fail(d,Status::rendererRetirementPending,0x2E1A08);
+    if(p.nativeGarageFifoPins_||p.nativeMenuWarningPins_)return fail(d,Status::rendererRetirementPending,0x2E1A08);
     Quad::releasePrimitive246260(p.primitives30[0]); //2E1A08 BEFORE packet backing.
     p.primitives30.reset(); //2E1A28.
     p.packets44[0].allocation00.reset();p.packets44.reset(); //2E1A5C then2E1A80.
@@ -2665,7 +2665,7 @@ bool OriginalUiGaragePageOwner50KG::preflightFailedSharedPrompt(Diagnostic& d)co
         const auto& a=*owner;
         if(a.type0C!=1||a.count34!=1||a.count48!=1||a.capacity4C!=1||!a.primitives30||
            !a.packets44||a.count04!=4||a.count08!=4||a.owns38!=1||!a.vertices00||
-           a.nativeGarageFifoPins_||!a.packets44[0].allocation00||
+           a.nativeGarageFifoPins_||a.nativeMenuWarningPins_||!a.packets44[0].allocation00||
            !Quad::preflightPrimitive246260(a.primitives30[0],d.quad))
             return fail(d,Status::rendererRetirementPending,d.quad.sourcePC?d.quad.sourcePC:0x2E1980);
         primitives[i+1]=a.primitives30[0].get();

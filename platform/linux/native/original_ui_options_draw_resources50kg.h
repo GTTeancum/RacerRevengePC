@@ -132,6 +132,9 @@ public:
     bool selection(game::OriginalUiOptionsSelection50KG&,OriginalUiOptionsDrawDiagnostic50KG&) const noexcept;
     bool gameOptionsSelection(game::OriginalUiOptionsSelection50KG&,OriginalUiOptionsDrawDiagnostic50KG&) const noexcept;
 private:
+    friend class OriginalUiOptionsSession50KG;
+    bool menuCameraConstructionCurrent(const std::shared_ptr<const assets::OriginalUiArchive50KG>&,
+        const game::OriginalUiOptionsCamera50KG*)const noexcept;
     struct Storage;std::unique_ptr<Storage> storage_;
 };
 }

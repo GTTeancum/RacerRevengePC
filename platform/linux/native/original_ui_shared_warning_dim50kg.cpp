@@ -103,7 +103,17 @@ bool OriginalUiSharedDialogs50KG::drawWarning470Dim2E21D0(
     if(!draw.readWarning470DimInputs2E21D0(*this,input,pc))
         return stop(Status::phase,pc?pc:0x2E2228u);
     if(!input.sourceApertureEnabled383680){d.sourcePC=0x2E2408u;return true;}
-    if(!warning470DimPacketCurrent2E21D0()||dialog470_.dim160->nativeGarageFifoPins_||
+    if(!regenerateWarning470DimPacket2E21D0(input.viewportWidth1E8,input.viewportHeight1EC,
+        input.videoDepthMaximum60,d))return false;
+    const auto fifo=inputs_.root->nativeCollectorFifoOwner_;
+    if(!fifo||!fifo->collectShared470Dim246760(draw,*this,d.quad.material))
+        return stop(Status::resourcePending,d.quad.material.sourcePC?d.quad.material.sourcePC:0x2E23DCu);
+    d.sourcePC=0x2E2408u;return true;
+}
+bool OriginalUiSharedDialogs50KG::regenerateWarning470DimPacket2E21D0(
+    std::uint32_t width,std::uint32_t height,std::int32_t maximumDepth,Diagnostic& d)noexcept {
+    d={};const auto stop=[&](Status status,std::uint32_t pc){d.status=status;d.sourcePC=pc;return false;};
+    if(!warning470DimPacketCurrent2E21D0()||dialog470_.dim160->nativeGarageFifoPins_||dialog470_.dim160->nativeMenuWarningPins_||
        dialog470_.dim160->packetRevision_==std::numeric_limits<std::uint64_t>::max()||
        std::fegetround()!=FE_TONEAREST)return stop(Status::phase,0x2E23A8u);
     auto& p=*dialog470_.dim160;auto& descriptor=p.packets44[0];
@@ -116,12 +126,12 @@ bool OriginalUiSharedDialogs50KG::drawWarning470Dim2E21D0(
     ++p.packetRevision_;d.sourceEffectsCommitted=true;
     WarningDimScalar2E2ED0 arithmetic;
     //2E2ED0 viewport stores precede the dirty branch, even for clean vertices.
-    descriptor.tag0C->words={std::bit_cast<std::uint32_t>(arithmetic.unsignedWord(input.viewportWidth1E8)),
-        std::bit_cast<std::uint32_t>(arithmetic.unsignedWord(input.viewportHeight1EC)),0x3f800000u,0};
+    descriptor.tag0C->words={std::bit_cast<std::uint32_t>(arithmetic.unsignedWord(width)),
+        std::bit_cast<std::uint32_t>(arithmetic.unsignedWord(height)),0x3f800000u,0};
     if(p.dirty3C){
         const auto field18=arithmetic.read(p.field18);
         //2E2FF8 is ordered LESS THAN zero, not <= zero.
-        volatile float maximum=static_cast<float>(input.videoDepthMaximum60);
+        volatile float maximum=static_cast<float>(maximumDepth);
         const float depth=field18<0.f?-field18:arithmetic.sub(maximum,field18);
         float sine=0,cosine=0;
         const bool rotate=arithmetic.read(p.field14)!=0.f;
@@ -148,15 +158,19 @@ bool OriginalUiSharedDialogs50KG::drawWarning470Dim2E21D0(
         p.dirty3C=0; //2E3898 only after all source position writes.
     }
     if(!arithmetic.okay)return stop(Status::resourcePending,0x2E389Cu);
-    const auto fifo=inputs_.root->nativeCollectorFifoOwner_;
-    if(!fifo||!fifo->collectShared470Dim246760(draw,*this,d.quad.material))
-        return stop(Status::resourcePending,d.quad.material.sourcePC?d.quad.material.sourcePC:0x2E23DCu);
-    d.sourcePC=0x2E2408u;return true;
+    return true;
 }
 bool OriginalUiSharedDialogs50KG::lowerWarning470Dim327E90(std::uint64_t revision,const std::array<std::uint32_t,2>& xyOffset,
     Quad::LoweredPacket327E90& out,Diagnostic& d)const noexcept {
+    d={};if(!dialog470_.dim160||!dialog470_.dim160->nativeGarageFifoPins_){
+        d.status=Status::resourcePending;d.sourcePC=0x3281E8u;return false;
+    }
+    return lowerWarning470DimPacketBody327E90(revision,xyOffset,out,d);
+}
+bool OriginalUiSharedDialogs50KG::lowerWarning470DimPacketBody327E90(std::uint64_t revision,
+    const std::array<std::uint32_t,2>& xyOffset,Quad::LoweredPacket327E90& out,Diagnostic& d)const noexcept {
     d={};const auto stop=[&](std::uint32_t pc){d.status=Status::resourcePending;d.sourcePC=pc;return false;};
-    if(!warning470DimPacketCurrent2E21D0()||!dialog470_.dim160->nativeGarageFifoPins_||
+    if(!warning470DimPacketCurrent2E21D0()||
        dialog470_.dim160->packetRevision_!=revision||!revision||dialog470_.dim160->dirty3C||
        std::fegetround()!=FE_TONEAREST||xyOffset[0]>65535u||xyOffset[1]>65535u)
         return stop(0x3281E8u);
@@ -197,5 +211,69 @@ bool OriginalUiSharedDialogs50KG::lowerWarning470Dim327E90(std::uint64_t revisio
     for(std::size_t i=0;i<order.size();++i){next.vertices[i]=vertices[order[i]];
         next.stq[i]=stq[order[i]];next.rasterW[i]=1.f;next.fog[i]=0.f;}
     next.quadCount=2;out=next;d.sourcePC=0x328378u;return true;
+}
+}
+
+namespace rr::platform {
+bool OriginalUiSharedDialogs50KG::drawMenuWarning470Dim2E21D0(Diagnostic& d)noexcept {
+    d={};const auto stop=[&](Status status,std::uint32_t pc){d.status=status;d.sourcePC=pc;return false;};
+    auto& assertion=OriginalUiGaragePageOwner50KG::polygonDraw8F50();
+    if(!assertion.guard.load(std::memory_order_acquire)){
+        assertion.word.store(1,std::memory_order_relaxed);assertion.guard.store(1,std::memory_order_release);
+    }
+    MenuWarningDimInputs input;std::uint32_t pc=0;
+    if(!readMenuWarningDimInputs2E21D0(input,pc))return stop(Status::phase,pc?pc:0x2E2228u);
+    if(!input.sourceApertureEnabled383680){d.sourcePC=0x2E2408u;return true;}
+    if(!regenerateWarning470DimPacket2E21D0(input.viewportWidth1E8,input.viewportHeight1EC,
+        input.videoDepthMaximum60,d))return false;
+    const bool effects=d.sourceEffectsCommitted;
+    if(!collectMenuWarning470Dim(d)){d.sourceEffectsCommitted|=effects;return false;}
+    d.sourceEffectsCommitted|=effects;d.sourcePC=0x2E2408u;return true;
+}
+bool OriginalUiSharedDialogs50KG::retainMenuWarningDimPacket(
+    OriginalUiMenuWarningPacket50KG& receipt,Diagnostic& d)noexcept {
+    d={};const auto reject=[&](std::uint32_t pc){d.status=Status::phase;d.sourcePC=pc;return false;};
+    if(!menuWarning470PacketCaptureCurrent(receipt)||!menuWarning470DimCurrent()||
+       receipt.owner_!=this||receipt.kind_!=OriginalUiMenuWarningPacket50KG::Kind::dim||receipt.active_||
+       !warning470DimPacketCurrent2E21D0())return reject(0x2E23DCu);
+    auto& dim=*dialog470_.dim160;
+    if(dim.nativeGarageFifoPins_||dim.nativeMenuWarningPins_||dim.dirty3C||!dim.packetRevision_)
+        return reject(0x2E23DCu);
+    const auto& primitive=*dim.primitives30[0];
+    if(primitive.material00!=3228)return reject(0x246798u);
+    receipt.payload_=&dim;receipt.primitive_=&primitive;receipt.packet_=dim.packets44[0].allocation00.get();
+    receipt.primitiveIndex_=0;receipt.packetRevision_=dim.packetRevision_;receipt.materialToken_=primitive.material00;
+    ++dim.nativeMenuWarningPins_;receipt.active_=true;return true;
+}
+bool OriginalUiSharedDialogs50KG::menuWarningDimPacketMatches(
+    const OriginalUiMenuWarningPacket50KG& receipt)const noexcept {
+    if(!receipt.active_||receipt.owner_!=this||receipt.kind_!=OriginalUiMenuWarningPacket50KG::Kind::dim||
+       !dialog470_.dim160||receipt.payload_!=dialog470_.dim160.get())return false;
+    const auto& dim=*dialog470_.dim160;
+    return dim.nativeMenuWarningPins_&&receipt.packetRevision_&&receipt.packetRevision_==dim.packetRevision_&&
+       receipt.primitiveIndex_==0&&dim.primitives30&&dim.primitives30[0]&&dim.packets44&&
+       receipt.primitive_==dim.primitives30[0].get()&&receipt.packet_==dim.packets44[0].allocation00.get()&&
+       dim.primitives30[0]->packet10==dim.packets44[0].allocation00.get()&&
+       receipt.materialToken_==dim.primitives30[0]->material00;
+}
+bool OriginalUiSharedDialogs50KG::releaseMenuWarningDimPacket(OriginalUiMenuWarningPacket50KG& receipt)noexcept {
+    // The authenticated renderer acceptance/retirement check belongs to Shared's
+    // publication owner. This method only releases its exact retained payload.
+    if(!menuWarningDimPacketMatches(receipt))return false;
+    --dialog470_.dim160->nativeMenuWarningPins_;receipt.active_=false;return true;
+}
+bool OriginalUiSharedDialogs50KG::lowerMenuWarningDimPacket(const OriginalUiMenuWarningPacket50KG& receipt,
+    const std::array<std::uint32_t,2>& offset,OriginalUiMenuWarningGeometry50KG& out,Diagnostic& d)const noexcept {
+    d={};if(!menuWarning470PacketOffsetCurrent(receipt,offset)||!menuWarningDimPacketMatches(receipt)){
+        d.status=Status::resourcePending;d.sourcePC=0x3281E8u;return false;
+    }
+    Quad::LoweredPacket327E90 next;
+    if(!lowerWarning470DimPacketBody327E90(receipt.packetRevision_,offset,next,d))return false;
+    try{
+        OriginalUiMenuWarningGeometry50KG geometry;
+        geometry.vertices.assign(next.vertices.begin(),next.vertices.end());geometry.stq.assign(next.stq.begin(),next.stq.end());
+        geometry.rasterW.assign(next.rasterW.begin(),next.rasterW.end());geometry.fog.assign(next.fog.begin(),next.fog.end());
+        geometry.quadCount=next.quadCount;out=std::move(geometry);return true;
+    }catch(...){d.status=Status::allocation;d.sourcePC=0x328378u;return false;}
 }
 }

@@ -2,6 +2,7 @@
 #include "original_ui_material50kg.h"
 #include "original_ui_screen_assets50kg.h"
 
+namespace rr::platform {class OriginalUiSharedDialogMaterialHistory50KG;}
 namespace rr::assets {
 enum class OriginalUiMaterialEquivalence50KG : std::uint8_t {
     unsupported, notEquivalent, equivalent
@@ -40,6 +41,7 @@ public:
     bool prepared() const noexcept {return prepared_;}
     bool excludesMerging() const noexcept {return prepared_&&(uniqueAnimation_||uniqueGroup_);}
 private:
+    friend class rr::platform::OriginalUiSharedDialogMaterialHistory50KG;
     friend class OriginalUiMaterialBindingState50KG;
     bool prepared_=false,enabled_=false,fillColor_=false;
     bool uniqueAnimation_=false,uniqueGroup_=false;

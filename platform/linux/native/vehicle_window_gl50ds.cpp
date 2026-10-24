@@ -1,4 +1,5 @@
 #include "original_ui_garage_draw_contribution50kg.h"
+#include "original_ui_shared_dialogs50kg.h"
 #include "../../../tests/native/original_native_collector_fifo50la.h"
 #include "original_ui_garage_canonical_submission50kg.h"
 struct __GLsync; // OpenGL opaque sync type, never a native-dereferenced pointer.
@@ -41,6 +42,7 @@ struct __GLsync; // OpenGL opaque sync type, never a native-dereferenced pointer
 #include "../../../src/game/original_gameplay_binder_candidate.h"
 #include <algorithm>
 #include <chrono>
+#include <cfenv>
 #include <cmath>
 #include <cstring>
 #include <cstdio>
@@ -1668,6 +1670,28 @@ struct VehicleWindowGl50DS::Storage {
     bool initialized = false, active = false, frameSet = false, imageCommitted = false;
     bool frontendOnly = false;
     __GLsync* garagePollFence50KG=nullptr;
+    // This native raster lease is independent of guest Camera/Garage prelude
+    // authority and source-frame image acceptance. It survives failed GL work.
+    const OriginalUiSharedDialogs50KG* menuRasterShared50KG=nullptr;
+    const OriginalUiSourceOwner50KM* menuRasterOwner50KG=nullptr;
+    OriginalUiMenuRasterInputs50KG menuRasterInputs50KG;
+    std::uint64_t menuRasterEpoch50KG=0,menuRasterInvocation50KG=0,menuRasterDisplay50KG=0;
+    std::uint64_t menuRasterTextureEpoch50KG=0,menuRasterTargetGeneration50KG=0,menuRasterFrame50KG=0;
+    U menuRasterTarget50KG=0,menuRasterColor50KG=0,menuRasterDepth50KG=0;
+    const OriginalUiNativeDraw50KG* menuRasterNative50KG=nullptr;
+    bool menuRasterApplied50KG=false,menuRasterFailed50KG=false,menuRasterBackendActive50KG=false;
+    bool menuRasterSourceAccepted50KG=false;
+    const OriginalUiSharedDialogs50KG* menuRasterRetiredShared50KG=nullptr;
+    const OriginalUiSourceOwner50KM* menuRasterRetiredOwner50KG=nullptr;
+    std::uint64_t menuRasterRetiredEpoch50KG=0,menuRasterRetiredInvocation50KG=0;
+    void clearMenuRasterLease50KG()noexcept {
+        menuRasterShared50KG=nullptr;menuRasterOwner50KG=nullptr;menuRasterInputs50KG={};
+        menuRasterEpoch50KG=menuRasterInvocation50KG=menuRasterDisplay50KG=0;
+        menuRasterTextureEpoch50KG=menuRasterTargetGeneration50KG=menuRasterFrame50KG=0;
+        menuRasterTarget50KG=menuRasterColor50KG=menuRasterDepth50KG=0;menuRasterNative50KG=nullptr;
+        menuRasterApplied50KG=false;menuRasterFailed50KG=false;menuRasterBackendActive50KG=false;
+        menuRasterSourceAccepted50KG=false;
+    }
     const OriginalUiSourceOwner50KM* garagePreludeOwner50KG=nullptr;
     std::uint64_t garageCompletedPublication50KG=0,garageCompletedTarget50KG=0,garagePublishedPublication50KG=0;
 
@@ -1691,7 +1715,14 @@ bool uiCoverageDisjointTraced=false;
 #include "original_speed_boost_render.inl"
 
     bool current(VehicleWindowDiagnostic50DS& d,
-        const OriginalVideoBlockingNativeBackend* fadeOwner=nullptr) const noexcept {
+        const OriginalVideoBlockingNativeBackend* fadeOwner=nullptr,
+        const OriginalUiSharedDialogs50KG* menuOwner=nullptr) const noexcept {
+        // Every ordinary context-consuming renderer entry is excluded while
+        // the exact menu raster contract is pending. Poll is explicitly exempt
+        // because it never writes target, viewport or canvas. Only the sealed
+        // same-owner source backend and actual retirement may otherwise enter.
+        if(menuRasterShared50KG&&!menuRasterBackendActive50KG&&menuOwner!=menuRasterShared50KG)
+            return fail(d,VehicleWindowError50DS::frame,"pending native menu raster excludes unrelated renderer work");
         if(displayFadeOwner && displayFadeOwner!=fadeOwner)
             return fail(d,VehicleWindowError50DS::frame,"blocking display fade owns renderer until retirement");
         if (thread != std::this_thread::get_id())
@@ -5882,6 +5913,8 @@ void main() {
         return false;
     }
     bool cleanup(VehicleWindowDiagnostic50DS& d) noexcept {
+        if(menuRasterShared50KG){d.cleanupIncomplete=true;
+            return fail(d,VehicleWindowError50DS::cleanup,"native menu raster requires actual SourceOwner retirement before cleanup");}
         if(garagePreludeOwner50KG){d.cleanupIncomplete=true;
             return fail(d,VehicleWindowError50DS::cleanup,"Garage source-target prelude must retire its actual owner before renderer cleanup");}
         if (thread != std::this_thread::get_id()) {
@@ -6929,6 +6962,10 @@ bool VehicleWindowGl50DS::submitOriginalUiSourceFrame(const OriginalUiSourceFram
     d={};
     if (!originalUiSourceRgbaAvailable())return fail(d,VehicleWindowError50DS::context,"source UI composition is unavailable");
     auto& s=*storage_;
+    if(s.menuRasterShared50KG&&(!menuRasterPreludeCurrent50KG(*s.menuRasterShared50KG)||
+       frame.owner_!=s.menuRasterOwner50KG||frame.native_!=s.menuRasterNative50KG||
+       !s.menuRasterFrame50KG||frame.frameGeneration_!=s.menuRasterFrame50KG||frame.garageCanonical_))
+        return fail(d,VehicleWindowError50DS::frame,"source frame differs from retained native menu raster contract");
     if(s.garagePreludeOwner50KG&&(frame.owner_!=s.garagePreludeOwner50KG||
        frame.frameGeneration_!=s.garagePreludePublication50KG||s.garagePreludeFailed50KG))
         return fail(d,VehicleWindowError50DS::frame,"source frame differs from actual Garage viewport prelude");
@@ -6966,7 +7003,13 @@ bool VehicleWindowGl50DS::submitOriginalUiSourceFrame(const OriginalUiSourceFram
     bool sourceWorkStarted=false;
     const auto sourceTargetBefore=s.uiSourceTargetGeneration;
     const auto submitDiagnosticStart=Storage::UiCoverageClock::now();
+    s.menuRasterBackendActive50KG=s.menuRasterShared50KG!=nullptr;
     const bool accepted=submitOriginalUiImpl(*frame.native_,width,height,true,d,&sourceWorkStarted,publishSource,riderSparse,frame.directVideoPresent_?&frame.directVideo_:nullptr);
+    s.menuRasterBackendActive50KG=false;
+    if(s.menuRasterShared50KG){
+        s.menuRasterSourceAccepted50KG=d.originalUiSourceAccepted;
+        if(!d.originalUiSourceAccepted)s.menuRasterFailed50KG=true;
+    }
     const auto submitDiagnosticNs=Storage::uiCoverageNs(submitDiagnosticStart);
     if(s.uiCoverageSourceDiagnostic&&submitDiagnosticNs>=100000000ull&&s.uiCoverageSlowTotalReports<8){
         ++s.uiCoverageSlowTotalReports;
@@ -6978,6 +7021,10 @@ bool VehicleWindowGl50DS::submitOriginalUiSourceFrame(const OriginalUiSourceFram
     const bool canonicalHistoryAccepted=!frame.garageCanonical_||frame.garageCanonical_->finish(
         frame.frameGeneration_,d.originalUiSourceAccepted,sourceWorkStarted);
     frame.owner_->finishSourceSubmission(frame.frameGeneration_,d.originalUiSourceAccepted,sourceWorkStarted);
+    // A void SourceOwner callback can reject its history/Shared acceptance.
+    // Retained native custody proves that rejection; do not report overall
+    // success merely because the actual source pixels were accepted earlier.
+    const bool menuRasterFinishAccepted=!d.originalUiSourceAccepted||!s.menuRasterShared50KG;
     d.originalUiSourceFrameGeneration=frame.frameGeneration_;
     d.originalUiSourceTargetGeneration=s.uiSourceTargetGeneration;
     // Keep the attempted owner borrowed after any potentially partial source
@@ -6995,6 +7042,8 @@ bool VehicleWindowGl50DS::submitOriginalUiSourceFrame(const OriginalUiSourceFram
     }
     if(!canonicalHistoryAccepted)
         return fail(d,VehicleWindowError50DS::material,"Garage canonical history indeterminate after actual source work");
+    if(!menuRasterFinishAccepted)
+        return fail(d,VehicleWindowError50DS::frame,"menu SourceOwner acceptance failed after actual source work");
     return accepted;
 }
 bool VehicleWindowGl50DS::matchesOriginalUiSource(const OriginalUiSourceSubmission50KN& receipt)const noexcept {
@@ -7520,6 +7569,111 @@ bool VehicleWindowGl50DS::releaseOriginalUiByteBlend(VehicleWindowDiagnostic50DS
     if(!accepted)d.cleanupIncomplete=true;
     s.diagnostic=nullptr;return accepted;
 }
+bool VehicleWindowGl50DS::applyMenuRasterPrelude50KG(OriginalUiSharedDialogs50KG& shared,
+    VehicleWindowDiagnostic50DS& d)noexcept {
+    d={};
+    if(!storage_||!shared.menuRasterAttempted_||shared.menuRasterFailed_||
+       !shared.menu470RenderCurrent()||shared.menu470Phase_!=decltype(shared.menu470Phase_)::callbacks||
+       shared.menu470Slot_!=0x48||shared.menu470Callback_!=&shared.dialog470_.entity||
+       !shared.menuDisplay_||sessionDisplayOwner50LA_!=shared.menuDisplay_.get())
+        return fail(d,VehicleWindowError50DS::frame,"menu raster lacks actual Shared Session/display invocation");
+    auto& s=*storage_;
+    if(s.menuRasterShared50KG)
+        return fail(d,VehicleWindowError50DS::frame,"another or failed menu raster lease is still pending");
+    // Capture exact attempted ownership before the first fallible GL operation.
+    s.menuRasterShared50KG=&shared;s.menuRasterOwner50KG=shared.menu470Owner();
+    s.menuRasterInputs50KG=shared.menuRaster_;s.menuRasterEpoch50KG=shared.menu470Epoch_;
+    s.menuRasterInvocation50KG=shared.menu470Invocation_;s.menuRasterDisplay50KG=shared.menuDisplay_->generation();
+    s.menuRasterTextureEpoch50KG=s.uiTextureEpoch;s.menuRasterTargetGeneration50KG=s.uiSourceTargetGeneration;
+    s.menuRasterTarget50KG=s.uiSourceTarget;s.menuRasterColor50KG=s.uiSourceColor;s.menuRasterDepth50KG=s.uiSourceDepth;
+    s.menuRasterRetiredShared50KG=nullptr;s.menuRasterRetiredOwner50KG=nullptr;
+    s.menuRasterRetiredEpoch50KG=0;s.menuRasterRetiredInvocation50KG=0;
+    const auto reject=[&]()noexcept {s.menuRasterFailed50KG=true;return false;};
+    OriginalUiMenuRasterInputs50KG observed;
+    if(!shared.readMenu470RasterInputs(observed)||!sameOriginalUiMenuRasterInputs50KG(observed,s.menuRasterInputs50KG)||
+       !originalUiSourceRgbaAvailable()||std::fegetround()!=FE_TONEAREST||!s.current(d,nullptr,&shared)||!s.frontendOnly||
+       s.active||s.frameSet||s.diagnostic||s.nativeGlFaultObserved50KG||s.garagePreludeOwner50KG||
+       s.garagePollFence50KG||s.uiBlendOldSnapshot||s.uiBlendIncomingSource||
+       (s.uiSourceFrameOwner&&s.uiSourceFrameOwner!=s.menuRasterOwner50KG)||
+       !s.uiProgram||s.uiCanvasUniform<0||s.request.originalUiCpuTextures!=observed.cpu||
+       s.request.originalUiTextures!=observed.gpu||s.uiTexturePublication!=observed.publication||
+       !observed.gpu||!observed.gpu->matchesSourceBank(*observed.cpu,observed.publication)||
+       !observed.gpu->validBorrow(s.request.context,s.request.isCurrent,observed.publication)){
+        if(d.error==VehicleWindowError50DS::none)fail(d,VehicleWindowError50DS::frame,"menu raster owner/bank/target is not idle and current");
+        return reject();
+    }
+    s.diagnostic=&d;
+    bool okay=s.check("before native menu raster prelude");
+    if(okay){
+        // Exact existing full-source native contract. This writes no pixels,
+        // target generation, clear, material history or source acceptance flag.
+        s.gl.bindFramebuffer(framebuffer,s.uiSourceTarget);
+        s.gl.drawBuffer(colorAttachment);s.gl.readBuffer(colorAttachment);
+        if(s.gl.clipControl)s.gl.clipControl(0x8CA1,0x935E);
+        s.gl.viewport(0,0,640,448);
+        s.gl.scissor(0,0,640,448);s.gl.enable(0x0C11);
+        s.gl.useProgram(s.uiProgram);
+        s.gl.uniform4f(s.uiCanvasUniform,float(2.0/640.0),float(-2.0/448.0),-1.f,1.f);
+        okay=s.check("apply native menu source target viewport and canvas");
+    }
+    s.diagnostic=nullptr;
+    if(!okay)return reject();
+    s.menuRasterApplied50KG=true;return true;
+}
+bool VehicleWindowGl50DS::menuRasterPreludeCurrent50KG(const OriginalUiSharedDialogs50KG& shared)const noexcept {
+    if(!storage_||!shared.menu470Current()||!shared.menuRasterAttempted_||shared.menuRasterFailed_||
+       !shared.menuDisplay_||sessionDisplayOwner50LA_!=shared.menuDisplay_.get())return false;
+    const auto& s=*storage_;VehicleWindowDiagnostic50DS observed;
+    return s.menuRasterShared50KG==&shared&&s.menuRasterOwner50KG==shared.menu470Owner()&&
+        s.menuRasterEpoch50KG==shared.menu470Epoch_&&s.menuRasterInvocation50KG==shared.menu470Invocation_&&
+        s.menuRasterDisplay50KG==shared.menuDisplay_->generation()&&
+        sameOriginalUiMenuRasterInputs50KG(s.menuRasterInputs50KG,shared.menuRaster_)&&
+        s.menuRasterApplied50KG&&!s.menuRasterFailed50KG&&!s.menuRasterBackendActive50KG&&std::fegetround()==FE_TONEAREST&&
+        !s.nativeGlFaultObserved50KG&&!s.active&&!s.frameSet&&!s.diagnostic&&!s.garagePreludeOwner50KG&&
+        s.current(observed,nullptr,&shared)&&s.uiSourceTarget==s.menuRasterTarget50KG&&
+        s.uiSourceColor==s.menuRasterColor50KG&&s.uiSourceDepth==s.menuRasterDepth50KG&&
+        s.uiSourceTargetGeneration==s.menuRasterTargetGeneration50KG&&s.uiTextureEpoch==s.menuRasterTextureEpoch50KG&&
+        s.request.originalUiCpuTextures==s.menuRasterInputs50KG.cpu&&s.request.originalUiTextures==s.menuRasterInputs50KG.gpu&&
+        s.uiTexturePublication==s.menuRasterInputs50KG.publication&&
+        s.menuRasterInputs50KG.gpu->matchesSourceBank(*s.menuRasterInputs50KG.cpu,s.menuRasterInputs50KG.publication)&&
+        s.menuRasterInputs50KG.gpu->validBorrow(s.request.context,s.request.isCurrent,s.menuRasterInputs50KG.publication);
+}
+bool VehicleWindowGl50DS::sealMenuRasterSourceFrame50KG(const OriginalUiSharedDialogs50KG& shared,
+    VehicleWindowDiagnostic50DS& d)noexcept {
+    d={};if(!menuRasterPreludeCurrent50KG(shared))
+        return fail(d,VehicleWindowError50DS::frame,"menu raster changed before SourceFrame seal");
+    auto& s=*storage_;const auto* native=shared.menuRasterNative_;
+    if(s.menuRasterFrame50KG||s.menuRasterNative50KG||!shared.menuRasterFrame_||!native||
+       native->draw.canvasWidth!=float(s.menuRasterInputs50KG.viewport[2])||
+       native->draw.canvasHeight!=float(s.menuRasterInputs50KG.viewport[3])||
+       native->draw.textures!=s.menuRasterInputs50KG.gpu||native->draw.texturePublication!=s.menuRasterInputs50KG.publication||
+       native->opaquePresentationAlphaOnly||native->draw.retainRaceImage){
+        s.menuRasterFailed50KG=true;
+        return fail(d,VehicleWindowError50DS::frame,"sealed menu draw is not the applied native source contract");}
+    s.menuRasterFrame50KG=shared.menuRasterFrame_;s.menuRasterNative50KG=native;return true;
+}
+bool VehicleWindowGl50DS::acceptMenuRasterSource50KG(const OriginalUiSharedDialogs50KG& shared)noexcept {
+    if(!storage_)return false;auto& s=*storage_;VehicleWindowDiagnostic50DS observed;
+    if(s.menuRasterShared50KG!=&shared||s.menuRasterOwner50KG!=shared.menu470Owner()||
+       s.menuRasterEpoch50KG!=shared.menu470Epoch_||s.menuRasterInvocation50KG!=shared.menu470Invocation_||
+       shared.menu470Phase_!=decltype(shared.menu470Phase_)::submitting||
+       !s.menuRasterSourceAccepted50KG||s.menuRasterFailed50KG||s.menuRasterBackendActive50KG||
+       s.menuRasterFrame50KG!=shared.menuRasterFrame_||s.menuRasterFrame50KG!=shared.menu470Frame_||
+       s.menuRasterNative50KG!=shared.menuRasterNative_||!s.menuRasterFrame50KG||
+       s.menuRasterTargetGeneration50KG==std::numeric_limits<std::uint64_t>::max()||
+       s.uiSourceTargetGeneration!=s.menuRasterTargetGeneration50KG+1u||
+       !s.current(observed,nullptr,&shared))return false;
+    // SourceOwner completion has observed the actual backend accepted result.
+    // A later publication/window failure does not retroactively erase it.
+    s.clearMenuRasterLease50KG();return true;
+}
+bool VehicleWindowGl50DS::menuRasterRetired50KG(const OriginalUiSharedDialogs50KG& shared)const noexcept {
+    return storage_&&!storage_->menuRasterShared50KG&&
+        storage_->menuRasterRetiredShared50KG==&shared&&storage_->menuRasterRetiredOwner50KG==shared.menu470Owner()&&
+        storage_->menuRasterRetiredEpoch50KG==shared.menu470Epoch_&&
+        storage_->menuRasterRetiredInvocation50KG==shared.menu470Invocation_;
+}
+
 bool VehicleWindowGl50DS::applyGarageFogColor244A40(const OriginalUiSourceOwner50KM& owner,
     std::uint64_t publication,std::uint32_t argb,VehicleWindowDiagnostic50DS& d)noexcept {
     d={};if(!originalUiSourceRgbaAvailable()||!ownsGarageSourcePrelude50KG(owner,publication))
@@ -7612,7 +7766,7 @@ bool VehicleWindowGl50DS::releaseGarageSourcePrelude50KG(const OriginalUiSourceO
 bool VehicleWindowGl50DS::pollOriginalRenderer245030(bool& complete,VehicleWindowDiagnostic50DS& d)noexcept {
     d={};complete=false;
     if(!originalUiSourceRgbaAvailable())return fail(d,VehicleWindowError50DS::context,"Garage poll requires source RGBA renderer");
-    auto& s=*storage_;if(!s.current(d))return false;
+    auto& s=*storage_;if(!s.current(d,nullptr,s.menuRasterShared50KG))return false;
     if(!s.frontendOnly||s.active||s.frameSet||s.diagnostic||s.garagePollFence50KG||s.nativeGlFaultObserved50KG)
         return fail(d,VehicleWindowError50DS::frame,"Garage poll requires idle current frontend without a failed poll");
     s.diagnostic=&d;
@@ -7700,7 +7854,9 @@ bool VehicleWindowGl50DS::retireOriginalUiSourceOwner(
     if (!originalUiSourceRgbaAvailable())
         return fail(d,VehicleWindowError50DS::context,"source UI composition is unavailable");
     auto& s=*storage_;
-    if (!s.current(d))return false;
+    if(s.menuRasterShared50KG&&s.menuRasterOwner50KG!=&owner)
+        return fail(d,VehicleWindowError50DS::frame,"menu raster retirement requires its exact SourceOwner");
+    if (!s.current(d,nullptr,s.menuRasterShared50KG))return false;
     if (s.active || s.frameSet || s.diagnostic ||
         (s.uiSourceFrameOwner && s.uiSourceFrameOwner!=&owner))
         return fail(d,VehicleWindowError50DS::frame,"source UI retirement requires idle matching live owner");
@@ -7714,6 +7870,11 @@ bool VehicleWindowGl50DS::retireOriginalUiSourceOwner(
     if (accepted){s.uiSourceFrameOwner=nullptr;s.uiSourceFrameGeneration=0;
         s.uiSourceAcceptedTargetGeneration=0;s.uiSourcePublishedTargetGeneration=0;}
     s.diagnostic=nullptr;
+    if(accepted&&s.menuRasterShared50KG){
+        s.menuRasterRetiredShared50KG=s.menuRasterShared50KG;s.menuRasterRetiredOwner50KG=s.menuRasterOwner50KG;
+        s.menuRasterRetiredEpoch50KG=s.menuRasterEpoch50KG;s.menuRasterRetiredInvocation50KG=s.menuRasterInvocation50KG;
+        s.clearMenuRasterLease50KG();
+    }
     return accepted;
 }
 bool VehicleWindowGl50DS::completeGarageCollector24C160(OriginalUiGarageDrawContribution50KG& draw,
@@ -7795,6 +7956,16 @@ bool VehicleWindowGl50DS::submitOriginalUiImpl(const OriginalUiNativeDraw50KG& n
     if(sourceWorkStarted)*sourceWorkStarted=false;
     if (!initialized()) return fail(d, VehicleWindowError50DS::notInitialized, "renderer not initialized");
     auto& s = *storage_; const auto& input = native.draw;
+    if(s.menuRasterShared50KG&&(!s.menuRasterBackendActive50KG||!sourceRgba||garageBatch||
+       &native!=s.menuRasterNative50KG||!s.menuRasterApplied50KG||s.menuRasterFailed50KG||
+       input.canvasWidth!=float(s.menuRasterInputs50KG.viewport[2])||
+       input.canvasHeight!=float(s.menuRasterInputs50KG.viewport[3])||
+       input.textures!=s.menuRasterInputs50KG.gpu||input.texturePublication!=s.menuRasterInputs50KG.publication||
+       s.request.originalUiCpuTextures!=s.menuRasterInputs50KG.cpu||
+       s.uiTextureEpoch!=s.menuRasterTextureEpoch50KG||s.uiSourceTarget!=s.menuRasterTarget50KG||
+       s.uiSourceColor!=s.menuRasterColor50KG||s.uiSourceDepth!=s.menuRasterDepth50KG||
+       s.uiSourceTargetGeneration!=s.menuRasterTargetGeneration50KG))
+        return fail(d,VehicleWindowError50DS::frame,"native source draw changed its retained menu raster contract");
     if(garageBatch&&(!sourceRgba||publishSource||directVideo||!s.garagePreludeOwner50KG||s.garagePreludeFailed50KG))
         return fail(d,VehicleWindowError50DS::frame,"Garage batch requires retained unaccepted source target");
     if(s.garagePreludeOwner50KG&&!sourceRgba)
@@ -8211,6 +8382,9 @@ bool VehicleWindowGl50DS::submitOriginalUiImpl(const OriginalUiNativeDraw50KG& n
         s.gl.enable(0x0B71); s.gl.useProgram(s.uiProgram);
         s.gl.uniform4f(s.uiCanvasUniform,float(2.0*scale/rasterWidth),float(-2.0*scale/rasterHeight),
             float(2.0*ox/rasterWidth-1.0),float(1.0-2.0*oy/rasterHeight));
+        if(s.menuRasterShared50KG&&!s.check("reapply same native menu source raster before spans")){
+            s.menuRasterFailed50KG=true;s.diagnostic=nullptr;return false;
+        }
         s.gl.uniform1i(s.gcParticleModeUniform,0);
         s.gl.uniform1i(s.uiSourceCompositionUniform,sourceRgba?1:0);
         s.gl.uniform1i(s.uiCoveragePayloadUniform,0);
@@ -9157,6 +9331,8 @@ bool VehicleWindowGl50DS::close(VehicleWindowDiagnostic50DS& d) noexcept {
         return fail(d,VehicleWindowError50DS::request,"dependent primitive retirement must precede renderer close");
     }
     if (!storage_) return true;
+    if(storage_->menuRasterShared50KG){d.cleanupIncomplete=true;
+        return fail(d,VehicleWindowError50DS::cleanup,"native menu raster still owns renderer resources");}
     storage_->uiDirectVideoLifetime.reset();
     const bool result = storage_->cleanup(d);
     if (!d.cleanupIncomplete) {

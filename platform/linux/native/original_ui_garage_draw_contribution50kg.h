@@ -66,6 +66,7 @@ public:
 };
 class OriginalUiGarageDrawContribution50KG final:public OriginalUiSourceOwner50KM {
     friend struct ::original_main_entry50KG::Application;
+    friend class OriginalUiSharedDialogMaterialHistory50KG;
     friend class OriginalUiGarageCameraFrame50KG;
     friend class OriginalUiSharedDialogs50KG;
     friend class OriginalUiGarageSession50KG;

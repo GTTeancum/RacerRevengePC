@@ -106,6 +106,9 @@ bool OriginalUiControllerPopupResources50KG::loaded()const noexcept{return stora
  storage_->sharedOwner->phase_==OriginalUiSharedDialogs50KG::Phase::loaded);}
 bool OriginalUiControllerPopupResources50KG::poisoned()const noexcept{return storage_&&storage_->poisoned;}
 const game::OriginalUiControllerPopupGeometry50KG* OriginalUiControllerPopupResources50KG::geometry()const noexcept{return loaded()?&storage_->geometry:nullptr;}
+std::shared_ptr<OriginalUiSharedDialogMaterialHistory50KG> OriginalUiControllerPopupResources50KG::sharedHistory()const noexcept {
+ return storage_?storage_->sharedHistory:nullptr;
+}
 bool OriginalUiControllerPopupResources50KG::prepareOrRejoin(const OriginalUiOptionsColdInput50KG& in,
  std::shared_ptr<const assets::OriginalUiScreenAssets50KG> images,const std::vector<OriginalUiOptionsMaterialBinding50KG>& bindings,D& d)noexcept{
  d={};if(!in.english||!in.english->loaded()||!images||!images->loaded()||!in.appStart||!in.controllerPopup||!in.fonts)
@@ -118,7 +121,7 @@ bool OriginalUiControllerPopupResources50KG::prepareOrRejoin(const OriginalUiOpt
  if(storage_&&(storage_->poisoned||!loaded()))return fail(d,E::poisoned,0x1B8718);
  // A transferred owner cannot be "rejoined" through the old five-key API.
  // The accepted canonical/effective bridge must first replace that API.
- if(storage_&&storage_->sharedHistory)return fail(d,E::canonicalBridgePending,0x249BA0);
+ if(storage_&&storage_->sharedHistory)return storage_->sharedHistory->rejoinBank(in,std::move(images),bindings,d);
  if(storage_&&(!sameVideo(storage_->video,in.video)||!sameRuntime(storage_->runtime,in.runtime)))return fail(d,E::video,0x2476A0);
  try{
   std::array<assets::OriginalUiMaterialEquivalenceKey50KG,5> keys;
@@ -159,7 +162,7 @@ bool OriginalUiControllerPopupResources50KG::prepareOrRejoin(const OriginalUiMai
   input.fonts=in.fonts;input.english=in.english;input.runtime=in.runtime;
   input.video={in.video.lifetime,in.video.width,in.video.height,in.video.colorBits,in.video.packetZMaximum,in.video.zBufferFormat,{}};
   std::vector<OriginalUiOptionsMaterialBinding50KG> mapped;
-  for(const auto& b:bindings)for(auto token:registryTokens)if(b.registryToken==token){
+  for(const auto& b:bindings)for(auto token:OriginalUiSharedDialogMaterialHistory50KG::registryTokens)if(b.registryToken==token){
    OriginalUiOptionsMaterialBinding50KG copy;copy.registeredName=b.registeredName;copy.registryToken=b.registryToken;
    copy.registryIdentity=b.registryIdentity;copy.material=b.material;copy.images=b.images;mapped.push_back(std::move(copy));
   }

@@ -1,5 +1,6 @@
 // NEW unverified application clock/voice-static join; other declarations preserved.
 #pragma once
+#include "original_ui_menu_raster_inputs50kg.h"
 #include "original_ui_main_draw50kg.h"
 #include "window_host50dq.h"
 #include "../../../src/game/original_ui_controller_popup50kg.h"
@@ -256,6 +257,17 @@ public:
     const game::OriginalUiMainFireOwner50KG* fire() const noexcept;
     const game::OriginalUiMainParticleLighting50KG* lighting() const noexcept;
 private:
+    friend class OriginalUiFrontend50KG;
+    friend class OriginalUiSharedDialogs50KG;
+    // Initial Root bootstrap follows prepared Main binding and precedes the
+    // real activation/transition. No late or replacement-owner adoption.
+    bool bindInitialSharedMenu470(OriginalUiSharedDialogs50KG&,OriginalUiMainSessionDiagnostic50KG&)noexcept;
+    bool sharedMenuLifetimeCurrent(const OriginalUiSharedDialogs50KG&,const OriginalUiMainDraw50KG&)const noexcept;
+    bool readSharedMenuRasterInputs(const OriginalUiSharedDialogs50KG&,const OriginalUiMainDraw50KG&,OriginalUiMenuRasterInputs50KG&)const noexcept;
+    bool sharedMenuUnwindEntryCurrent(const OriginalUiSharedDialogs50KG&,const OriginalUiMainDraw50KG&)const noexcept;
+    bool sharedMenuRenderCurrent(const OriginalUiSharedDialogs50KG&,const OriginalUiMainDraw50KG&)const noexcept;
+    bool sharedMenuUpdateCurrent(const OriginalUiSharedDialogs50KG&,const OriginalUiMainDraw50KG&)const noexcept;
+
     struct Storage;
     std::unique_ptr<Storage> storage_;
 };

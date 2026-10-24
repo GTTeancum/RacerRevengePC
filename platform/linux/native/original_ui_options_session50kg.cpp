@@ -2,6 +2,7 @@
 #include "original_ui_options_session50kg.h"
 #include "original_ui_controller_popup_resources50kg.h"
 #include <cmath>
+#include <exception>
 #include <limits>
 #include <new>
 #include <utility>
@@ -33,6 +34,25 @@ bool controllerPopupRequest(const game::OriginalUiRouteDecision50KG& d) noexcept
     const auto&w=d.profileChanges.values[0];
     return w.field==OriginalUiProfileField50KG::optionsSlot6E4&&w.operation==OriginalUiProfileWrite50KG::word&&
         w.value==2&&w.replaceMask==0xFFFFFFFFu&&w.sourcePC==0x1F9940;
+}
+bool controls2EntryRequest(const game::OriginalUiRouteDecision50KG& d) noexcept {
+    using namespace game;
+    if(d.action!=OriginalUiRouteAction50KG::unavailable||d.admitted||!d.profileProposalComplete||
+       d.inputPC!=0x1F9640||d.selectedSlot!=2||d.request.kind!=OriginalUiRouteKind50KG::changePage||
+       d.request.sourceScreen!=12||d.request.sourcePage!=1||d.request.targetScreen!=12||d.request.targetPage!=3||
+       d.request.sourcePC!=0x1F9744||d.profileChanges.count!=1||
+       d.blockers!=static_cast<std::uint32_t>(OriginalUiRouteBlocker50KG::destinationOwner))return false;
+    const auto& w=d.profileChanges.values[0];
+    return w.field==OriginalUiProfileField50KG::optionsSlot6E4&&w.operation==OriginalUiProfileWrite50KG::word&&
+        w.value==2&&w.replaceMask==0xFFFFFFFFu&&w.sourcePC==0x1F9940;
+}
+bool sameNavigation(const game::OriginalUiNavigation50KG& a,const game::OriginalUiNavigation50KG& b) noexcept {
+    if(a.page!=b.page||a.controllerGroup!=b.controllerGroup)return false;
+    for(std::size_t i=0;i<a.groups.size();++i)
+        if(a.groups[i].enabled!=b.groups[i].enabled||a.groups[i].selectedSlot!=b.groups[i].selectedSlot)return false;
+    for(std::size_t i=0;i<a.controls.size();++i){const auto& x=a.controls[i];const auto& y=b.controls[i];
+        if(x.enabled!=y.enabled||x.blocked!=y.blocked||x.selected!=y.selected||x.shown!=y.shown)return false;}
+    return true;
 }
 bool sameDecision(const game::OriginalUiRouteDecision50KG& a,const game::OriginalUiRouteDecision50KG& b) noexcept {
     const auto& x=a.request;const auto& y=b.request;
@@ -66,6 +86,14 @@ struct OriginalUiOptionsSession50KG::Storage {
     game::ControlPresets49D pendingControlsBefore{},pendingControlsAfter{};
     game::OriginalUiControlsState50KG pendingControlsLocal{};
     bool pendingControlsCommitted=false;
+    // A pending input snapshot is distinct from the later actual manager-entry
+    // receipt. Neither is a device reservation or a completed render receipt.
+    std::uint64_t pendingControls2Poll=0,controls2EntrySerial=0,controls2EntryPoll=0;
+    OriginalUiOptionsProfile50KG pendingControls2Options{};
+    OriginalUiMainProfile50KG pendingControls2Common{};
+    game::ControlPresets49D pendingControls2Presets{};
+    game::OriginalUiControlsState50KG pendingControls2Local{};
+    game::OriginalUiNavigation50KG pendingControls2Navigation{};
     struct ControlsExecution {const game::OriginalUiControlsPlan50KG* plan=nullptr;bool stateCommitted=false;};
     ControlsExecution* controlsExecution=nullptr;
     OriginalUiOptionsSessionSnapshot50KG state;
@@ -357,8 +385,12 @@ struct OriginalUiOptionsSession50KG::Storage {
 };
 OriginalUiOptionsSession50KG::OriginalUiOptionsSession50KG() noexcept=default;
 OriginalUiOptionsSession50KG::~OriginalUiOptionsSession50KG(){
-    //A failed explicit close retains every object borrowed by source GL work.
-    //Destruction is not evidence that those submissions retired.
+    // Shared retains this Session facade as part of its exact invocation.
+    // Leaking only Storage cannot preserve the facade. Refuse destruction
+    // until actual explicit retirement instead of leaving a dangling authority.
+    if(storage_&&storage_->collector.menuShared_&&storage_->collector.sourceTeardownPending())std::terminate();
+    // Existing non-Shared fallback retains backing after failed explicit close.
+    // Destruction is not evidence of submission retirement or facade lifetime.
     if(sourceTeardownPending())storage_.release();
 }
 Status OriginalUiOptionsSession50KG::bind(const OriginalUiOptionsSessionCold50KG& cold,Diagnostic& d) noexcept {
@@ -414,19 +446,38 @@ Status OriginalUiOptionsSession50KG::bind(const OriginalUiOptionsSessionCold50KG
         }
         // No manager bind, tick, widget phase, shared-profile write or music
         // start during this cold prepare. Coordinator owns the initial notices.
-        s->state.bound=true;storage_=std::move(s);return result(d,Status::ok);
+        s->state.bound=true;storage_=std::move(s);
+        if(const auto shared=storage_->cold.application->sharedDialogs){
+            if(!storage_->collector.bindSharedMenu470(*this,shared)){
+                storage_->fault(Status::draw,0x204A00);d=storage_->callbackFault;return d.status;
+            }
+        }
+        return result(d,Status::ok);
     }catch(const std::bad_alloc&){return result(d,Status::allocation);}catch(...){return result(d,Status::resource);}
 }
 Status OriginalUiOptionsSession50KG::notifyTransition(const game::OriginalUiTransitionNotification50KG& event,Diagnostic& d) noexcept {
     d={};auto* s=storage_.get();if(!s)return result(d,Status::notBound);
+    if(s->cold.application->sharedDialogs&&s->cold.application->sharedDialogs->menu470PendingFor(s->collector))
+        return result(d,Status::unsupportedState,0x204A00);
     if(!s->operational()||s->inOperation||event.route.screen!=12||!s->ownsPage(event.route.page))return result(d,Status::unsupportedState,event.sourcePC);
+    // Prepared page ownership alone cannot manufacture a Controls2 lifecycle.
+    // Require the actual committed entry receipt before ANY page3 callback,
+    // including requested90/entry74 camera and widget effects.
+    if(event.route.page==3&&(!s->controls2EntrySerial||!s->controls2EntryPoll))
+        return result(d,Status::unsupportedState,event.sourcePC);
     const auto t=s->transition();
     if(!t.bound||event.lifecycle!=t.lifecycle||event.phase!=t.phase||
         !((t.current.screen==12&&t.current.page==event.route.page)||(t.requested.screen==12&&t.requested.page==event.route.page)))return result(d,Status::invalidInput,event.sourcePC);
     s->state.framePublished=false;s->state.backProposalPending=false;s->inOperation=true;
     switch(event.kind) {
     case Notice::requestedPage90:s->widgetPhase(Phase::requestedPage90,event.sourcePC,event.route.page);s->state.pageShown=true;break;
-    case Notice::previousPage94:s->widgetPhase(Phase::previousPage94,event.sourcePC,event.route.page);s->state.pageShown=false;break;
+    case Notice::previousPage94:
+        s->widgetPhase(Phase::previousPage94,event.sourcePC,event.route.page);s->state.pageShown=false;
+        // The old page's final frame must already have been accepted/retired:
+        // notifyTransition rejects any pending shared invocation above. B8 is
+        // deliberately NOT this boundary, and cannot revoke frame custody.
+        if(event.route.page==3){s->controls2EntrySerial=0;s->controls2EntryPoll=0;}
+        break;
     case Notice::pageEntry74:
         if(!s->popupAttached){
             // Original attachment happens during loading before manager entry.
@@ -489,6 +540,8 @@ bool OriginalUiOptionsSession50KG::ownsPreparedPage(std::uint8_t page) const noe
 }
 Status OriginalUiOptionsSession50KG::input(const OriginalUiMainSessionInput50KG& in,OriginalUiOptionsSessionInputReceipt50KG& receipt,Diagnostic& d) noexcept {
     d={};receipt={};auto* s=storage_.get();if(!s)return result(d,Status::notBound);
+    if(s->cold.application->sharedDialogs&&s->cold.application->sharedDialogs->menu470PendingFor(s->collector))
+        return result(d,Status::unsupportedState,0x204A00);
     if(s->state.faulted)return result(d,Status::faulted);if(s->state.quitRequested)return result(d,Status::quit);
     if(s->inOperation||s->updatePrepared||in.controller>1||in.originalInput>15)return result(d,Status::invalidInput);
     s->state.framePublished=false;s->state.backProposalPending=false;s->pendingAcceptCommitted=false;s->pendingControlsCommitted=false;receipt.sourceLifecycle=s->transition();
@@ -538,6 +591,15 @@ Status OriginalUiOptionsSession50KG::input(const OriginalUiMainSessionInput50KG&
     }
     if(Storage::isControlsPage(s->activePage())){
         const auto index=s->activePage()-2;
+        if(index==1){std::uint64_t poll=0;const auto shared=s->cold.application->sharedDialogs;
+            // A stale caller Present cannot edit, Accept or Cancel after an
+            // actual absent/unknown poll. The real host adapter additionally
+            // owns instance changes and neutral release-to-arm, unchanged.
+            if(in.controller!=1||in.secondControllerObservation!=WindowControllerPresence50DQ::Present||
+               !shared||!s->controls2EntrySerial||!s->controls2EntryPoll||
+               !shared->controls2ObservedPresent(poll)||poll<s->controls2EntryPoll||s->cold.application->courseUi474!=0||s->cold.application->courseUi478!=1){
+                s->inOperation=false;receipt.status=Status::noChange;return result(d,Status::noChange);}
+        }
         const auto status=s->controlsController[index].input(s->controlsState[index],in.controller,
             static_cast<assets::OriginalUiMovementInput50KG>(in.originalInput),true,true,receipt.controls);
         receipt.pageAccepted=receipt.controls.pageAccepted;Status returned=Status::noChange;
@@ -614,13 +676,21 @@ Status OriginalUiOptionsSession50KG::input(const OriginalUiMainSessionInput50KG&
             ++s->proposalSerial;if(!s->proposalSerial)++s->proposalSerial;
             receipt.routeProposal={this,s->proposalSerial,route};status=Status::screenProposed;
         }
-        // Page3 is prepared, but the connected-controller input/lifetime join
-        // remains unsupported. Genuine presence and the absent-device popup
-        // do not certify the connected Controls2 destination.
+        // Only page3 adds a retained real-poll and exact owner/resource proof.
+        // The actual Absent popup above and Unknown failure remain unchanged.
+        std::uint64_t controls2Poll=0;const auto shared=s->cold.application->sharedDialogs;
+        const bool controls2Ready=route.request.targetPage!=3||
+            (in.controller==0&&in.secondControllerObservation==WindowControllerPresence50DQ::Present&&
+             controls2EntryRequest(route)&&shared&&controls2EntryReady(*shared,controls2Poll));
         if(in.originalInput==4&&s->idleInput()&&(route.request.targetPage>=2&&route.request.targetPage<=6)&&
-            route.request.targetPage!=3&&s->ownsPage(route.request.targetPage)&&route.selectedSlot==(route.request.targetPage>=5?route.request.targetPage:route.request.targetPage-1)&&route.profileProposalComplete&&
+            controls2Ready&&s->ownsPage(route.request.targetPage)&&route.selectedSlot==(route.request.targetPage>=5?route.request.targetPage:route.request.targetPage-1)&&route.profileProposalComplete&&
             route.request.kind==game::OriginalUiRouteKind50KG::changePage&&route.request.targetScreen==12&&
             route.blockers==static_cast<std::uint32_t>(game::OriginalUiRouteBlocker50KG::destinationOwner)){
+            if(route.request.targetPage==3){
+                s->pendingControls2Poll=controls2Poll;s->pendingControls2Options=*s->cold.profile;
+                s->pendingControls2Common=*s->cold.commonProfile;s->pendingControls2Presets=*s->cold.controlsProfile;
+                s->pendingControls2Local=s->controlsState[1];s->pendingControls2Navigation=*s->bank().navigation();
+            }
             s->pendingBack=route;s->state.backProposalPending=true;++s->proposalSerial;if(!s->proposalSerial)++s->proposalSerial;
             receipt.routeProposal={this,s->proposalSerial,route};status=Status::pageProposed;
         }
@@ -635,6 +705,11 @@ bool OriginalUiOptionsSession50KG::routeProposalCurrent(const OriginalUiOptionsR
     const auto& decision=proposal.decision;
     const auto* s=storage_.get();if(!s||!s->operational()||s->inOperation||s->updatePrepared||!s->state.backProposalPending||!s->idleInput()||proposal.source!=this||!proposal.serial||proposal.serial!=s->proposalSerial)return false;
     const auto& expected=s->pendingBack;
+    if(expected.request.sourcePage==1&&expected.request.targetScreen==12&&expected.request.targetPage==3){
+        std::uint64_t poll=0;const auto shared=s->cold.application->sharedDialogs;
+        return controls2EntryRequest(expected)&&sameDecision(decision,expected)&&shared&&
+            controls2EntryReady(*shared,poll)&&poll==s->pendingControls2Poll&&controls2EntrySnapshotCurrent(false);
+    }
     if(hallRequest(expected)){
         if(!sameCommonHall(*s->cold.commonProfile,s->pendingHallCommon)||!sameDecision(decision,expected))return false;
         game::OriginalUiOptionsContext50KG context;context.mode34=s->cold.commonProfile->mode34;
@@ -787,6 +862,15 @@ Status OriginalUiOptionsSession50KG::notifyRouteAccepted(const OriginalUiOptions
         t.phase!=game::OriginalUiTransitionPhase50KG::none||t.applicationRequestQueued||t.initialRestartPending||
         !s->cold.profile->known||!s->cold.commonProfile->known||!s->cold.application->known||
         (s->cold.application->globalFlags228&4u)||s->cold.application->transportE00!=-1)return result(d,Status::unsupportedState);
+    if(controls2EntryRequest(decision)){
+        std::uint64_t poll=0;const auto shared=s->cold.application->sharedDialogs;
+        if(!shared||s->controls2EntrySerial||!shared->controls2ObservedPresent(poll)||
+           poll!=s->pendingControls2Poll||!controls2EntrySnapshotCurrent(true)||
+           !shared->controls2MenuResourcesCurrent(*this,s->collector))return result(d,Status::unsupportedState,0x1F9744);
+        // Issued only after the manager committed this exact source request and
+        // profile write. It survives opening and source B8 until previousPage94.
+        s->controls2EntrySerial=proposal.serial;s->controls2EntryPoll=poll;
+    }
     s->state.framePublished=false;s->state.backProposalPending=false;s->inOperation=true;
     const bool okay=s->audioEffect(cancel||!sameScreen?5:1);s->inOperation=false;
     // Accept1F51A0 reaches267BE0 only after SELECT1F5188. The preflighted
@@ -796,6 +880,8 @@ Status OriginalUiOptionsSession50KG::notifyRouteAccepted(const OriginalUiOptions
 }
 Status OriginalUiOptionsSession50KG::prepareUpdateAudio(const OriginalUiMainSessionUpdate50KG& in,Diagnostic& d) noexcept {
     d={};auto* s=storage_.get();if(!s)return result(d,Status::notBound);
+    if(s->cold.application->sharedDialogs&&s->cold.application->sharedDialogs->menu470PendingFor(s->collector))
+        return result(d,Status::unsupportedState,0x204A00);
     if(s->state.faulted)return result(d,Status::faulted);if(s->state.quitRequested)return result(d,Status::quit);
     if(s->inOperation)return result(d,Status::invalidInput);
     if(s->updatePrepared){s->fault(Status::unsupportedState,0x234440);d=s->callbackFault;return d.status;}
@@ -810,6 +896,8 @@ Status OriginalUiOptionsSession50KG::prepareUpdateAudio(const OriginalUiMainSess
 }
 Status OriginalUiOptionsSession50KG::update(const OriginalUiMainSessionUpdate50KG& in,Diagnostic& d) noexcept {
     d={};auto* s=storage_.get();if(!s)return result(d,Status::notBound);
+    if(s->cold.application->sharedDialogs&&s->cold.application->sharedDialogs->menu470PendingFor(s->collector))
+        return result(d,Status::unsupportedState,0x204A00);
     if(s->state.faulted)return result(d,Status::faulted);if(s->state.quitRequested)return result(d,Status::quit);
     if(s->inOperation||!s->currentPage())return result(d,Status::invalidInput);
     if(!s->updatePrepared||in.elapsedSeconds!=s->preparedUpdate.elapsedSeconds||in.paused!=s->preparedUpdate.paused||
@@ -817,14 +905,15 @@ Status OriginalUiOptionsSession50KG::update(const OriginalUiMainSessionUpdate50K
     s->updatePrepared=false;s->state.backProposalPending=false;s->inOperation=true;
     if(const auto shared=s->cold.application->sharedDialogs){
         OriginalUiSharedDialogs50KG::Diagnostic sharedDiagnostic;
-        if(!shared->advance4702048F0(in.elapsedSeconds,sharedDiagnostic)){
+        if(!shared->advanceMenu470(*this,s->collector,in.elapsedSeconds,sharedDiagnostic)){
             s->fault(Status::unsupportedState,sharedDiagnostic.sourcePC);s->inOperation=false;d=s->callbackFault;return d.status;
         }
+    }else{
+        game::OriginalUiControllerPopupPlan50KG popupUpdate;
+        if(game::OriginalUiControllerPopup50KG::update(s->cold.application->controllerPopupState,in.elapsedSeconds,popupUpdate)!=
+           game::OriginalUiControllerPopupStatus50KG::ok)s->fault(Status::unsupportedState,0x206420);
+        else s->cold.application->controllerPopupState=popupUpdate.state;
     }
-    game::OriginalUiControllerPopupPlan50KG popupUpdate;
-    if(game::OriginalUiControllerPopup50KG::update(s->cold.application->controllerPopupState,in.elapsedSeconds,popupUpdate)!=
-       game::OriginalUiControllerPopupStatus50KG::ok)s->fault(Status::unsupportedState,0x206420);
-    else s->cold.application->controllerPopupState=popupUpdate.state;
     const auto* order=s->bank().order();if(!s->state.faulted)s->updateWidgets(order->ordinaryWidgets,in.elapsedSeconds);
     if(!s->state.faulted&&s->state.pageShown&&s->activePage()==5){game::OriginalUiMemoryCardPlan50KG plan;
         if(game::OriginalUiMemoryCard50KG::update(*s->bank().memoryCardState(),in.elapsedSeconds,plan)!=game::OriginalUiMemoryCardStatus50KG::ok||
@@ -852,6 +941,93 @@ Status OriginalUiOptionsSession50KG::update(const OriginalUiMainSessionUpdate50K
     s->inOperation=false;if(s->state.faulted){d=s->callbackFault;return d.status;}
     ++s->state.updateCount;return result(d,Status::ok);
 }
+bool OriginalUiOptionsSession50KG::controls2EntryReady(const OriginalUiSharedDialogs50KG& shared,
+    std::uint64_t& poll)const noexcept {
+    const auto* s=storage_.get();poll=0;
+    const auto* nav=s&&s->cold.resources?s->cold.resources->widgets()->navigation():nullptr;
+    return nav&&nav->controllerGroup[0]==1&&nav->groups[1].selectedSlot==2&&s->operational()&&!s->updatePrepared&&s->state.updateCount&&s->idleInput()&&s->activePage()==1&&
+        !s->controls2EntrySerial&&s->ownsPage(3)&&s->controlsRegistryPublished&&
+        s->controlsState[1].controllerIndex4DC==1&&s->controlsState[1].navigation.page==s->controlsController[1].page()&&
+        s->cold.profile->known&&s->cold.commonProfile->known&&s->cold.application->known&&
+        !(s->cold.application->globalFlags228&4u)&&s->cold.application->transportE00==-1&&
+        !s->cold.application->controllerPopupState.active3CC&&s->cold.application->courseUi474==1&&s->cold.application->courseUi478==0&&
+        shared.controls2ObservedPresent(poll)&&!shared.menu470Owner()&&
+        shared.menu470Phase_==OriginalUiSharedDialogs50KG::Menu470Phase::idle&&
+        !shared.demand470Pending_&&!shared.update470Pending_&&
+        shared.controls2MenuResourcesCurrent(*this,s->collector);
+}
+bool OriginalUiOptionsSession50KG::controls2EntrySnapshotCurrent(bool committed)const noexcept {
+    const auto* s=storage_.get();if(!s||!s->pendingControls2Poll||!s->cold.profile||!s->cold.commonProfile||
+        !s->cold.controlsProfile||!s->cold.resources||!s->cold.resources->widgets()->navigation())return false;
+    return s->cold.profile->known==s->pendingControls2Options.known&&
+        s->cold.profile->savedSlot6E4==(committed?2u:s->pendingControls2Options.savedSlot6E4)&&
+        sameCommonHall(*s->cold.commonProfile,s->pendingControls2Common)&&
+        game::sameOriginalUiControlsPresets50KG(*s->cold.controlsProfile,s->pendingControls2Presets)&&
+        s->sameControlsLocal(s->controlsState[1],s->pendingControls2Local)&&
+        sameNavigation(s->controlsState[1].navigation,s->pendingControls2Local.navigation)&&
+        sameNavigation(*s->cold.resources->widgets()->navigation(),s->pendingControls2Navigation);
+}
+bool OriginalUiOptionsSession50KG::controls2WarningCurrent(const OriginalUiSharedDialogs50KG& shared,
+    const OriginalUiOptionsDrawContribution50KG& draw)const noexcept {
+    const auto* s=storage_.get();
+    return sharedMenuLifetimeCurrent(shared,draw)&&s->operational()&&!s->updatePrepared&&s->state.updateCount&&
+        s->currentPage()&&s->activePage()==3&&s->controls2EntrySerial&&s->controls2EntryPoll&&
+        s->controlsRegistryPublished&&s->controlsState[1].loaded&&s->controlsState[1].controllerIndex4DC==1&&
+        s->controlsState[1].navigation.page==s->controlsController[1].page();
+}
+bool OriginalUiOptionsSession50KG::admitSharedMenu470(const OriginalUiSharedDialogs50KG& shared)const noexcept {
+    const auto* s=storage_.get();OriginalUiSharedDialogs50KG::Diagnostic d;
+    return s&&shared.admitControls2Menu470(*this,s->collector,d);
+}
+bool OriginalUiOptionsSession50KG::readSharedMenuRasterInputs(const OriginalUiSharedDialogs50KG& shared,
+    const OriginalUiOptionsDrawContribution50KG& draw,OriginalUiMenuRasterInputs50KG& out)const noexcept {
+    const auto* s=storage_.get();
+    if(!sharedMenuLifetimeCurrent(shared,draw)||s->state.faulted||s->sourceClosing||
+       !s->cold.resources->loaded()||!s->cold.gpu||!s->cold.gpu->initialized()||
+       !draw.sharedMenuRasterResourcesCurrent(shared,s->cold.resources.get(),s->cold.gpu.get(),
+           s->cold.gpu->publicationToken()))return false;
+    const auto* video=s->cold.resources->video();
+    if(!video||!video->lifetime||video->width!=640||video->height!=448||
+       video->colorBits!=32||video->packetZMaximum!=0xFFFFFF||video->zBufferFormat!=0x31)return false;
+    OriginalUiMenuRasterInputs50KG next;
+    const auto* camera=s->cold.resources->camera();
+    if(!s->state.cameraActive||!s->cold.resources->menuCameraConstructionCurrent(s->cold.optionsArchive,camera))return false;
+    // This exact retained constructor is 1D0580 ->2361C0(640,448), not a
+    // borrowed Garage camera or display-size inference.
+    next.camera=camera;next.configurationIdentity=camera->uiIdentity;
+    next.viewport={{0,0,640,448}};
+    next.session=this;next.resources=s->cold.resources.get();next.videoLifetime=video->lifetime;
+    next.cpu=s->cold.resources->textures();next.gpu=s->cold.gpu.get();
+    next.publication=s->cold.gpu->publicationToken();
+    if(!next.cpu||!next.publication)return false;
+    next.xyOffsetFixed4={{(2048u-next.viewport[2]/2u-next.viewport[0])*16u,
+        (2048u-next.viewport[3]/2u-next.viewport[1])*16u}};
+    out=std::move(next);return true;
+}
+bool OriginalUiOptionsSession50KG::sharedMenuLifetimeCurrent(const OriginalUiSharedDialogs50KG& shared,
+    const OriginalUiOptionsDrawContribution50KG& draw)const noexcept {
+    const auto* s=storage_.get();
+    return s&&s->state.bound&&!s->sourceTornDown&& &s->collector==&draw&&s->cold.application&&
+        s->cold.application->sharedDialogs.get()==&shared&&s->cold.resources&&
+        s->cold.resources->controllerPopup()==shared.controller47C_.resources;
+}
+bool OriginalUiOptionsSession50KG::sharedMenuUnwindEntryCurrent(const OriginalUiSharedDialogs50KG& shared,
+    const OriginalUiOptionsDrawContribution50KG& draw)const noexcept {
+    const auto* s=storage_.get();
+    return sharedMenuLifetimeCurrent(shared,draw)&&!s->inOperation&&!s->rendering;
+}
+bool OriginalUiOptionsSession50KG::sharedMenuRenderCurrent(const OriginalUiSharedDialogs50KG& shared,
+    const OriginalUiOptionsDrawContribution50KG& draw)const noexcept {
+    const auto* s=storage_.get();
+    return sharedMenuLifetimeCurrent(shared,draw)&&s->inOperation&&s->rendering&&s->operational()&&
+        !s->updatePrepared&&s->state.updateCount&&s->currentPage();
+}
+bool OriginalUiOptionsSession50KG::sharedMenuUpdateCurrent(const OriginalUiSharedDialogs50KG& shared,
+    const OriginalUiOptionsDrawContribution50KG& draw)const noexcept {
+    const auto* s=storage_.get();
+    return sharedMenuLifetimeCurrent(shared,draw)&&s->inOperation&&!s->rendering&&s->operational()&&
+        !s->updatePrepared&&s->currentPage();
+}
 Status OriginalUiOptionsSession50KG::render(const OriginalUiOptionsClock50KG& clock,Diagnostic& d) noexcept {
     d={};auto* s=storage_.get();if(!s)return result(d,Status::notBound);
     if(s->inOperation)return result(d,Status::invalidInput);
@@ -865,8 +1041,16 @@ Status OriginalUiOptionsSession50KG::render(const OriginalUiOptionsClock50KG& cl
     const bool memoryShown=s->activePage()==5&&s->state.pageShown;
     if(memoryShown&&game::OriginalUiMemoryCard50KG::render(*s->bank().memoryCardState(),memoryRender)!=game::OriginalUiMemoryCardStatus50KG::ok){
         s->rendering=false;s->inOperation=false;return result(d,Status::widget,0x1F6DE0);}
-    bool okay=game::OriginalUiControllerPopup50KG::render(s->cold.application->controllerPopupState,popupRender)==
-        game::OriginalUiControllerPopupStatus50KG::ok&&s->collector.beginPage(s->activePage(),clock,d.draw)&&
+    bool okay=s->collector.beginPage(s->activePage(),clock,d.draw);
+    if(okay){
+        if(const auto shared=s->cold.application->sharedDialogs){
+            OriginalUiSharedDialogs50KG::Diagnostic sd;
+            okay=shared->renderMenuPopupSibling(popupRender,sd);
+            if(!okay)d.draw.sourcePC=sd.sourcePC;
+        }else okay=game::OriginalUiControllerPopup50KG::render(s->cold.application->controllerPopupState,popupRender)==
+            game::OriginalUiControllerPopupStatus50KG::ok;
+    }
+    okay=okay&&
         s->collector.projectControllerRequiredPopup(popupRender,d.draw)&&s->collector.projectOrdinaryWidgets(true,d.draw)&&
         (memoryShown?s->collector.projectMemoryCardPage(memoryRender,d.draw):s->activePage()==6&&s->state.pageShown?s->collector.projectCreditsPage(static_cast<std::uint32_t>(s->transition().phase),d.draw):s->collector.projectPage(s->state.pageShown,d.draw));
     if(okay&&Storage::isControlsPage(s->activePage())&&s->state.pageShown){
@@ -881,7 +1065,9 @@ Status OriginalUiOptionsSession50KG::render(const OriginalUiOptionsClock50KG& cl
     if(okay&&memoryShown)okay=widgetOkay(s->bank().commitMemoryCardRender(memoryRender,d.widget));
     s->rendering=false;s->inOperation=false;
     if(!okay){if(s->state.faulted){d=s->callbackFault;return d.status;}return result(d,Status::draw);}
-    s->cold.application->controllerPopupState=popupRender.state;
+    // The retained shared owner has already committed the genuine47C body
+    // before its fallible projection. Never replay or roll back that prefix.
+    if(!s->cold.application->sharedDialogs)s->cold.application->controllerPopupState=popupRender.state;
     ++s->state.renderCount;s->state.framePublished=true;return result(d,Status::ok);
 }
 OriginalUiOptionsSessionSnapshot50KG OriginalUiOptionsSession50KG::snapshot() const noexcept {

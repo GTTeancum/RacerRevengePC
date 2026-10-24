@@ -17,6 +17,8 @@
 
 namespace original_main_entry50KG { struct Application; struct Frontend; }
 namespace rr::platform {
+class OriginalSaveNativeReadStage50KG;
+class OriginalSaveProfileOwner50KG;
 class OriginalUiGarageSession50KG;
 // Concrete native host gate admits either its already-prepared same-world
 // destination or a supported cold-load request whose authentic source archive
@@ -295,6 +297,11 @@ private:
     bool canRearmGarageTextureServices50KG(const OriginalUiGarageDrawContribution50KG&)const noexcept;
     bool renewGarageTexturePublication140230(OriginalUiGarageDrawContribution50KG&,std::uint64_t)noexcept;
 
+    // Private existing-owner preflight, uncalled. Output is private metadata,
+    // NOT all-semantic readiness, a pending transaction or permission to load.
+    bool prepareNativeReadProfileMetadata50KG(
+        const std::shared_ptr<const OriginalSaveNativeReadStage50KG>&,
+        std::unique_ptr<OriginalSaveProfileOwner50KG>& out)const noexcept;
     // Bind the actual enclosing native owner, never a callback/readiness flag.
     bool bindGarageDestinationRoot50KG(::original_main_entry50KG::Frontend&)noexcept;
     //Exclusive same-Frontend request custody across one actual renderer reset.

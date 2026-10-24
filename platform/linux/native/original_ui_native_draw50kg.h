@@ -129,6 +129,7 @@ private:
 // must retire through VehicleWindowGl50DS before destination destruction; a
 // failed retirement retains that lifetime obligation for an explicit retry.
 class OriginalUiSourceFrame50KM final {
+    friend class OriginalUiSharedDialogMaterialHistory50KG;
 public:
     ~OriginalUiSourceFrame50KM() noexcept=default;
 private:

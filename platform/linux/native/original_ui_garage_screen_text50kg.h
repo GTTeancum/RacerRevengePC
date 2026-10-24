@@ -1,4 +1,5 @@
 #pragma once
+#include "original_ui_menu_warning_packet50kg.h"
 #include "../../../src/assets/original_application_fonts50la.h"
 #include "../../../src/assets/original_application_localization50kg.h"
 #include <array>
@@ -101,6 +102,7 @@ class OriginalUiGarageScreenText50KG final {
  bool draw2E0170(OriginalUiGarageDrawContribution50KG&,const OriginalUiGarageTextOverlay50KG&,Diagnostic&)noexcept;
  bool draw2E0170(OriginalUiGarageDrawContribution50KG&,Diagnostic&)noexcept;
  bool drawWarning4702E0170(OriginalUiGarageDrawContribution50KG&,OriginalUiSharedDialogs50KG&,Diagnostic&)noexcept;
+ bool drawMenuWarning4702E0170(OriginalUiSharedDialogs50KG&,Diagnostic&)noexcept;
  struct LoweredPacket {
   std::vector<assets::Vertex48B> vertices;
   std::vector<std::array<float,3>> stq;
@@ -115,6 +117,18 @@ class OriginalUiGarageScreenText50KG final {
  };
  bool lowerQueuedPacket(std::size_t,const std::array<std::uint32_t,2>&,LoweredPacket&,Diagnostic&)const;
  bool borrowQueuedFontAtlas(FontAtlasBorrow&,Diagnostic&)const noexcept;
+ bool retainMenuWarningPacket(OriginalUiSharedDialogs50KG&,std::size_t,
+   OriginalUiMenuWarningPacket50KG&,Diagnostic&)noexcept;
+ bool releaseMenuWarningPacket(OriginalUiMenuWarningPacket50KG&)noexcept;
+ bool lowerMenuWarningPacket(const OriginalUiSharedDialogs50KG&,
+   const OriginalUiMenuWarningPacket50KG&,const std::array<std::uint32_t,2>&,
+   OriginalUiMenuWarningGeometry50KG&,Diagnostic&)const;
+ bool borrowMenuWarningFontAtlas(const OriginalUiSharedDialogs50KG&,
+   const OriginalUiMenuWarningPacket50KG&,FontAtlasBorrow&,Diagnostic&)const noexcept;
+ bool menuWarningPacketMatches(const OriginalUiSharedDialogs50KG&,
+   const OriginalUiMenuWarningPacket50KG&)const noexcept;
+ bool lowerRetainedPacketBody(std::size_t,const std::array<std::uint32_t,2>&,LoweredPacket&,Diagnostic&)const;
+ bool borrowRetainedFontAtlasBody(FontAtlasBorrow&,Diagnostic&)const noexcept;
 
  bool applyOverlay29D690(std::uint32_t,std::int16_t,float,float,std::int32_t,std::int32_t,std::int32_t,Diagnostic&)noexcept;
  bool regenerate2E0F50(std::uint32_t viewportWidth,std::uint32_t viewportHeight,
@@ -174,6 +188,9 @@ class OriginalUiGarageScreenText50KG final {
  // Actual queued primitive borrows keep glyph, packet and material storage live.
  // Only the retained source FIFO may acquire/release these pins.
  std::uint32_t nativeGarageFifoPins_=0;
+ // Distinct retained Main/Options packet borrows, issued/released only by Shared.
+ std::uint32_t nativeMenuWarningPins_=0;
+ std::uint64_t packetRevision_=0;
  Phase phase_=Phase::constructed;
 public:
  ~OriginalUiGarageScreenText50KG()noexcept;

@@ -1,6 +1,6 @@
 #pragma once
 namespace original_main_entry50KG {struct Application;}
-namespace rr::platform { class OriginalUiGarageDrawContribution50KG; class OriginalUiGarageCameraFrame50KG;class OriginalUiGarageVisibility50KG;class OriginalUiGaragePodScene50KG;}
+namespace rr::platform { class OriginalUiSharedDialogs50KG; class OriginalUiGarageDrawContribution50KG; class OriginalUiGarageCameraFrame50KG;class OriginalUiGarageVisibility50KG;class OriginalUiGaragePodScene50KG;}
 namespace track_runtime_storage50IG {struct Storage;}
 namespace rr::assets {class OriginalApplicationLocalization50KG;}
 namespace rr::platform {class OriginalApplicationAural50KG;class OriginalUiGarageSceneCollision50KG;class OriginalAudioPendingWaves50KG;class OriginalUiLightManagerOwner50KG;class OriginalUiGarageScreenText50KG;class OriginalLocalizationRendererLease50KG;class OriginalUiGarageWidget1Owner50KG;}
@@ -128,6 +128,7 @@ private:
 class OriginalApplicationEntities50LA final {
     friend struct ::original_main_entry50KG::Application;
     friend class rr::platform::OriginalUiGarageDrawContribution50KG;
+    friend class rr::platform::OriginalUiSharedDialogs50KG;
     friend class rr::platform::OriginalUiGarageCameraFrame50KG;
     friend class rr::platform::OriginalUiGarageSceneCollision50KG;
     friend class OriginalFrontendCameraCold50LA;

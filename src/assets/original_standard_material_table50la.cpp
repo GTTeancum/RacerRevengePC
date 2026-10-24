@@ -10,6 +10,7 @@
 #include <limits>
 #include <new>
 #include <utility>
+#include <type_traits>
 
 namespace rr::assets {
 namespace {
@@ -64,6 +65,45 @@ bool equalCollectorState(const OriginalStandardMaterialStateContext50LA& a,
     for(std::size_t i=0;i<a.fields.size();++i)if(a.fields[i].value!=b.fields[i].value)return false;
     for(std::size_t i=0;i<a.sampler.size();++i)if(a.sampler[i].value!=b.sampler[i].value)return false;
     return a.videoDepthBase2E0==b.videoDepthBase2E0&&a.videoDepthFormat5C==b.videoDepthFormat5C;
+}
+// Exact host state, including provenance. Collector comparison intentionally
+// ignores provenance; the UI transaction must not erase or invent it.
+bool equalUiInteger(const OriginalStandardMaterialInteger50LA& a,
+    const OriginalStandardMaterialInteger50LA& b)noexcept {
+    return a.value==b.value&&a.origin==b.origin&&a.templateMember==b.templateMember&&
+        a.byteOffset==b.byteOffset&&a.sourcePC==b.sourcePC;
+}
+bool equalUiContext(const OriginalStandardMaterialStateContext50LA& a,
+    const OriginalStandardMaterialStateContext50LA& b)noexcept {
+    for(std::size_t i=0;i<a.fields.size();++i)if(!equalUiInteger(a.fields[i],b.fields[i]))return false;
+    for(std::size_t i=0;i<a.sampler.size();++i)if(!equalUiInteger(a.sampler[i],b.sampler[i]))return false;
+    return a.videoDepthBase2E0==b.videoDepthBase2E0&&a.videoDepthFormat5C==b.videoDepthFormat5C&&
+        a.runtime435670==b.runtime435670;
+}
+bool equalUiBindings(const std::array<OriginalStandardMaterialNativeBinding50KG,2>& a,
+    const std::array<OriginalStandardMaterialNativeBinding50KG,2>& b)noexcept {
+    return a[0].equivalent(b[0])&&a[1].equivalent(b[1]);
+}
+bool sameUiPassPointers(const OriginalStandardMaterialPassView50LA& a,
+    const OriginalStandardMaterialPassView50LA& b)noexcept {
+    return a.references04==b.references04&&a.program18==b.program18&&a.texture1A==b.texture1A&&
+        a.uv1E==b.uv1E&&a.mapCount20==b.mapCount20&&a.flags21==b.flags21&&a.group22==b.group22&&
+        a.fillRgba2C==b.fillRgba2C&&a.constructionTemplate==b.constructionTemplate&&a.state30==b.state30&&
+        a.parameterMask24==b.parameterMask24&&a.parameterCount28==b.parameterCount28&&
+        a.parameters34==b.parameters34&&a.animation10==b.animation10&&
+        a.textureAnimation10==b.textureAnimation10&&a.nativeBindings==b.nativeBindings;
+}
+bool sameUiSlotBefore(const OriginalStandardMaterialUiSharedHistorySlot50LA& a,
+    const OriginalStandardMaterialUiSharedHistorySlot50LA& b)noexcept {
+    return a.row==b.row&&a.pass==b.pass&&a.object==b.object&&a.state30==b.state30&&
+        a.nativeBindings==b.nativeBindings&&equalUiContext(a.beforeContext,b.beforeContext)&&
+        equalUiBindings(a.beforeNativeBindings,b.beforeNativeBindings);
+}
+bool sameUiSourceName(const std::string& a,const char* b)noexcept {
+    const auto fold=[](char c){return c=='\\'?'/':lower(c);};
+    std::size_t i=0;
+    for(;i<a.size()&&b[i];++i)if(fold(a[i])!=fold(b[i]))return false;
+    return i==a.size()&&!b[i];
 }
 bool equalCollectorPass249BA0(const OriginalStandardMaterialPassView50LA& a,
     const OriginalStandardMaterialPassView50LA& b) noexcept {
@@ -123,6 +163,11 @@ struct OriginalStandardMaterialTable50LA::Storage {
     bool collectorActive=false,collectorSealed=false;
     std::uint32_t nativeFifoPins=0;
     bool nativeBindingPoisoned=false,collectorBindingDirty=false;
+    // Distinct serial UI lease, not a FIFO pin. The actual bridge owns the
+    // receipt lifetime and must release it before ordered table retirement.
+    const UiSharedHistoryOwner* uiSharedHistoryOwner=nullptr;
+    const UiSharedHistoryReceipt* uiSharedHistoryReceipt=nullptr;
+    std::uint64_t uiSharedHistoryLeaseRevision=0,nativeBindingRevision=0;
     const ::original_main_entry50KG::NativeCollectorFifo50LA* uiNativeCollectorOwner=nullptr;
     void invalidateCollector() noexcept {
         collectorSealed=false;
@@ -138,7 +183,7 @@ struct OriginalStandardMaterialTable50LA::Storage {
     bool demandActive=false,demandTerminal=false;
     D demandTerminalDiagnostic{};
     ~Storage(){
-        if(nativeFifoPins)std::terminate();
+        if(nativeFifoPins||uiSharedHistoryOwner||uiSharedHistoryReceipt)std::terminate();
         invalidateCollector();
         //Terminal partial ownership is native cleanup, never a source success
         //or an automatic rollback of already-published table rows.
@@ -226,7 +271,7 @@ bool OriginalStandardMaterialTable50LA::serviceTournamentMarker24A740(std::int32
     d={};d.row=index;
     if(!storage_)return fail(d,S::unprepared,0x24A740);
     auto& s=*storage_;
-    if(s.populationTerminal||s.populationActive||s.demandActive||s.collectorActive||s.demandTerminal)
+    if(s.uiSharedHistoryOwner||s.populationTerminal||s.populationActive||s.demandActive||s.collectorActive||s.demandTerminal)
         return fail(d,S::phase,0x24A740);
     if(index<0||static_cast<std::size_t>(index)>=s.rows.size())return fail(d,S::range,0x24A740);
     const auto& row=s.rows[static_cast<std::size_t>(index)];
@@ -246,7 +291,7 @@ bool OriginalStandardMaterialTable50LA::demandTournamentMarker2DF8A0(
     d={};d.row=index;
     if(!storage_)return fail(d,S::unprepared,0x2DF8A0);
     auto& s=*storage_;
-    if(s.populationTerminal||s.populationActive||s.demandActive||s.collectorActive||s.demandTerminal)
+    if(s.uiSharedHistoryOwner||s.populationTerminal||s.populationActive||s.demandActive||s.collectorActive||s.demandTerminal)
         return fail(d,S::phase,0x2DF8A0);
     if(index<0||static_cast<std::size_t>(index)>=s.rows.size())return fail(d,S::range,0x2DF8B4);
     const auto& row=s.rows[static_cast<std::size_t>(index)];
@@ -262,7 +307,7 @@ bool OriginalStandardMaterialTable50LA::demandTournamentOutline2DF8A0(
     d={};d.row=index;
     if(!storage_)return fail(d,S::unprepared,0x2DF8A0);
     auto& s=*storage_;
-    if(s.populationTerminal||s.populationActive||s.demandActive||s.collectorActive||s.demandTerminal)
+    if(s.uiSharedHistoryOwner||s.populationTerminal||s.populationActive||s.demandActive||s.collectorActive||s.demandTerminal)
         return fail(d,S::phase,0x2DF8A0);
     if(index<0||static_cast<std::size_t>(index)>=s.rows.size())return fail(d,S::range,0x2DF8B4);
     const auto& row=s.rows[static_cast<std::size_t>(index)];
@@ -278,7 +323,7 @@ bool OriginalStandardMaterialTable50LA::demandSharedWarning2DF8A0(
     d={};d.row=index;
     if(!storage_)return fail(d,S::unprepared,0x2DF8A0);
     auto& s=*storage_;
-    if(s.populationTerminal||s.populationActive||s.demandActive||s.collectorActive||s.demandTerminal)
+    if(s.uiSharedHistoryOwner||s.populationTerminal||s.populationActive||s.demandActive||s.collectorActive||s.demandTerminal)
         return fail(d,S::phase,0x2DF8A0);
     if(index<0||static_cast<std::size_t>(index)>=s.rows.size())return fail(d,S::range,0x2DF8B4);
     const auto& row=s.rows[static_cast<std::size_t>(index)];
@@ -294,7 +339,7 @@ bool OriginalStandardMaterialTable50LA::demandGarage2DF8A0(
     d={};d.row=index;
     if(!storage_)return fail(d,S::unprepared,0x2DF8A0);
     auto& s=*storage_;
-    if(s.populationTerminal||s.populationActive||s.demandActive||s.collectorActive||s.demandTerminal)
+    if(s.uiSharedHistoryOwner||s.populationTerminal||s.populationActive||s.demandActive||s.collectorActive||s.demandTerminal)
         return fail(d,S::phase,0x2DF8A0);
     if(index<0||static_cast<std::size_t>(index)>=s.rows.size())return fail(d,S::range,0x2DF8B4);
     const auto& row=s.rows[static_cast<std::size_t>(index)];
@@ -310,7 +355,7 @@ bool OriginalStandardMaterialTable50LA::demandTournamentFallback2DF8A0(
     d={};d.row=index;
     if(!storage_)return fail(d,S::unprepared,0x2DF8A0);
     auto& s=*storage_;
-    if(s.populationTerminal||s.populationActive||s.demandActive||s.collectorActive||s.demandTerminal)
+    if(s.uiSharedHistoryOwner||s.populationTerminal||s.populationActive||s.demandActive||s.collectorActive||s.demandTerminal)
         return fail(d,S::phase,0x2DF8A0);
     if(index<0||static_cast<std::size_t>(index)>=s.rows.size())return fail(d,S::range,0x2DF8B4);
     const auto& row=s.rows[static_cast<std::size_t>(index)];
@@ -328,7 +373,7 @@ bool OriginalStandardMaterialTable50LA::rebuildColdCollector14D440(
     OriginalStandardMaterialCollectorReceipt50LA& output,D& d) noexcept {
     d={};if(!storage_)return fail(d,S::unprepared,0x14D440u);
     auto& s=*storage_;
-    if(s.nativeBindingPoisoned||s.nativeFifoPins||s.populationTerminal||s.populationActive||s.demandActive||s.collectorActive||demandTerminal())
+    if(s.uiSharedHistoryOwner||s.nativeBindingPoisoned||s.nativeFifoPins||s.populationTerminal||s.populationActive||s.demandActive||s.collectorActive||demandTerminal())
         return fail(d,S::phase,0x14D440u);
     if(s.populationBound&&(!s.construction||!s.construction->live()))return fail(d,S::video,0x14D440u);
     if(s.collectorGeneration==std::numeric_limits<std::uint64_t>::max())return fail(d,S::overflow,0x14D440u);
@@ -384,11 +429,11 @@ bool OriginalStandardMaterialTable50LA::bindUiNativeCollector1B73BC(
     const ::original_main_entry50KG::NativeCollectorFifo50LA& owner)noexcept {
     //Construction may precede14D440. This retains only actual native collector
     //lifetime; every later append still requires the separately sealed registry.
-    if(!prepared()||storage_->uiNativeCollectorOwner||storage_->nativeFifoPins||storage_->collectorActive)return false;
+    if(!prepared()||storage_->uiSharedHistoryOwner||storage_->uiNativeCollectorOwner||storage_->nativeFifoPins||storage_->collectorActive)return false;
     storage_->uiNativeCollectorOwner=&owner;return true;
 }
 bool OriginalStandardMaterialTable50LA::canRetireNativeCollector29C300()const noexcept {
-    return storage_&&!storage_->nativeFifoPins&&!storage_->collectorActive&&
+    return storage_&&!storage_->uiSharedHistoryOwner&&!storage_->nativeFifoPins&&!storage_->collectorActive&&
         !storage_->populationActive&&!storage_->demandActive;
 }
 void OriginalStandardMaterialTable50LA::retireNativeCollector29C300()noexcept {
@@ -408,7 +453,7 @@ bool OriginalStandardMaterialTable50LA::pinNativeCollector(
     ++storage_->nativeFifoPins;return true;
 }
 void OriginalStandardMaterialTable50LA::unpinNativeCollector() noexcept {
-    if(!storage_||!storage_->nativeFifoPins)std::terminate();
+    if(!storage_||storage_->uiSharedHistoryOwner||!storage_->nativeFifoPins)std::terminate();
     --storage_->nativeFifoPins;
     //Source registration leaves are fixed throughout the actual FIFO drain.
     //Accepted249610 history is real immediately, but14D440 cannot rebuild
@@ -419,7 +464,7 @@ void OriginalStandardMaterialTable50LA::unpinNativeCollector() noexcept {
 }
 bool OriginalStandardMaterialTable50LA::coldCollectorCurrent(
     const OriginalStandardMaterialCollectorReceipt50LA& receipt) const noexcept {
-    return storage_&&!storage_->nativeBindingPoisoned&&receipt.owner_==this&&receipt.generation_&&
+    return storage_&&!storage_->uiSharedHistoryOwner&&!storage_->nativeBindingPoisoned&&receipt.owner_==this&&receipt.generation_&&
         receipt.generation_==storage_->collectorGeneration&&storage_->collectorSealed&&
         !storage_->collectorActive&&!storage_->populationActive&&!storage_->populationTerminal&&
         !demandTerminal()&&(!storage_->populationBound||
@@ -501,7 +546,7 @@ bool OriginalStandardMaterialTable50LA::selectRacerMaterial29BFF0(std::int32_t i
     d={};d.row=index;
     if(!storage_)return fail(d,S::unprepared,0x298e60u);
     auto& s=*storage_;
-    if(s.populationActive||s.demandActive||s.collectorActive||s.populationTerminal||s.demandTerminal)
+    if(s.uiSharedHistoryOwner||s.populationActive||s.demandActive||s.collectorActive||s.populationTerminal||s.demandTerminal)
         return fail(d,S::phase,0x29bff0u);
     if(index<0||static_cast<std::size_t>(index)>=s.rows.size())return fail(d,S::range,0x298e60u);
     auto* material=s.rows[static_cast<std::size_t>(index)].object04.get();
@@ -576,7 +621,7 @@ OriginalCableMaterialCallbackStage50LA OriginalStandardMaterialTable50LA::servic
     const auto reject=[&](S status,std::uint32_t pc){fail(d,status,pc);return Stage::blocked;};
     if(!storage_)return reject(S::unprepared,0x2467c8u);
     auto& s=*storage_;
-    if(s.populationActive||s.demandActive||s.collectorActive||s.populationTerminal||s.demandTerminal)
+    if(s.uiSharedHistoryOwner||s.populationActive||s.demandActive||s.collectorActive||s.populationTerminal||s.demandTerminal)
         return reject(S::phase,0x2467c8u);
     if(index<0||static_cast<std::size_t>(index)>=s.rows.size())return reject(S::range,0x2467c8u);
     auto& row=s.rows[static_cast<std::size_t>(index)];
@@ -612,7 +657,7 @@ bool OriginalStandardMaterialTable50LA::serviceRetainedScreenPrototype24A740(
     d={};d.row=index;d.pass=passIndex;
     if(!storage_||!coldCollectorCurrent(receipt))return fail(d,S::collector,0x24A620);
     auto& s=*storage_;
-    if(s.populationActive||s.demandActive||s.collectorActive||s.populationTerminal||s.demandTerminal)
+    if(s.uiSharedHistoryOwner||s.populationActive||s.demandActive||s.collectorActive||s.populationTerminal||s.demandTerminal)
         return fail(d,S::phase,0x24A740);
     if(!s.construction||!s.construction->live())return fail(d,S::video,0x24A620);
     const auto& runtime=s.construction->materialRuntime();
@@ -641,7 +686,7 @@ bool OriginalStandardMaterialTable50LA::serviceRetainedModelPrototype24A740(
     d={};d.row=index;d.pass=passIndex;
     if(!storage_||!coldCollectorCurrent(receipt))return fail(d,S::collector,0x24A620);
     auto& s=*storage_;
-    if(s.populationActive||s.demandActive||s.collectorActive||s.populationTerminal||s.demandTerminal)
+    if(s.uiSharedHistoryOwner||s.populationActive||s.demandActive||s.collectorActive||s.populationTerminal||s.demandTerminal)
         return fail(d,S::phase,0x24A740);
     if(index<0||static_cast<std::size_t>(index)>=s.rows.size())return fail(d,S::range,0x24A740);
     auto& row=s.rows[static_cast<std::size_t>(index)];OriginalStandardMaterialPassView50LA pass;
@@ -787,7 +832,8 @@ bool OriginalStandardMaterialTable50LA::prepareGarageUntexturedState249BA0(
 bool OriginalStandardMaterialTable50LA::garageNativeBindingsCurrent(
     const OriginalStandardMaterialCollectorReceipt50LA& receipt,
     const std::vector<OriginalStandardMaterialMapBindingView50LA>& maps)const noexcept {
-    if(!coldCollectorCurrent(receipt)||!storage_->nativeFifoPins||maps.empty())return false;
+    if(!coldCollectorCurrent(receipt)||!storage_->nativeFifoPins||maps.empty()||
+        storage_->nativeBindingRevision==std::numeric_limits<std::uint64_t>::max())return false;
     for(const auto& expected:maps){
         OriginalStandardMaterialMapBindingView50LA now;D d;
         const bool prepared=expected.nativeParticleRoute?
@@ -820,10 +866,236 @@ void OriginalStandardMaterialTable50LA::commitGarageNativeBindings249610(
     }
     // The next14D440 must compare the retained effective history. A previous
     // construction/redirect receipt cannot be reused as that new comparison.
-    storage_->collectorBindingDirty=true;
+    ++storage_->nativeBindingRevision;storage_->collectorBindingDirty=true;
 }
 void OriginalStandardMaterialTable50LA::poisonGarageNativeBindings()noexcept {
+    if(storage_&&storage_->uiSharedHistoryOwner)std::terminate();
     if(storage_){storage_->nativeBindingPoisoned=true;storage_->collectorSealed=false;}
+}
+OriginalStandardMaterialTable50LA::UiSharedHistoryReceipt::~UiSharedHistoryReceipt()noexcept {
+    if(table_||owner_)std::terminate();
+}
+bool OriginalStandardMaterialTable50LA::nativeBindingHistoryUsable()const noexcept {
+    // A failed unrelated canonical batch can poison the SAME table after the
+    // UI lease has ended. Earlier accepted shared histories are not rolled
+    // back, but cannot be reused. Real in-flight canonical FIFO pins remain
+    // legitimate; this observation neither acquires nor substitutes for one.
+    return storage_&&storage_->populationBound&&storage_->construction&&storage_->construction->live()&&
+        !storage_->nativeBindingPoisoned&&!storage_->populationTerminal&&!demandTerminal()&&
+        !storage_->populationActive&&!storage_->demandActive&&!storage_->collectorActive&&!storage_->partial;
+}
+bool OriginalStandardMaterialTable50LA::uiSharedHistoryQuiescent()const noexcept {
+    if(!storage_)return false;
+    const auto& s=*storage_;
+    if(!s.populationBound||!s.construction||!s.construction->live()||!s.programs||!s.textures||
+       !s.templates||s.nativeBindingPoisoned||s.nativeFifoPins||s.populationActive||s.populationTerminal||
+       s.demandActive||s.collectorActive||demandTerminal()||s.partial)return false;
+    // No material or texture population is skipped to borrow the three rows.
+    // A pending foreign row is a pending real source operation, not a UI-only
+    // manager. All subsequent table mutations are excluded by this lease.
+    for(const auto& row:s.rows)if(row.references08>0&&!row.object04)return false;
+    for(std::size_t i=0;i<s.textures->rowCount();++i){
+        OriginalStandardTextureRowView50LA row;
+        if(i>static_cast<std::size_t>(std::numeric_limits<std::int16_t>::max())||
+           !s.textures->row(static_cast<std::int16_t>(i),row)||!row.references08||
+           (*row.references08>0&&!row.object04))return false;
+    }
+    return true;
+}
+bool OriginalStandardMaterialTable50LA::captureUiSharedHistorySlot(std::size_t index,
+    OriginalStandardMaterialUiSharedHistorySlot50LA& out,
+    OriginalStandardMaterialPassView50LA& pass,std::int32_t& references)const noexcept {
+    static constexpr const char* names[]={"ui/textures/dimpopup","ui/textures/overlay1popup","font/venus16popup"};
+    static constexpr const char* sources[]={"ui/textures/dimpopup.psm","ui/textures/overlay1popup.psm","font/venus16popup.psm"};
+    static constexpr std::uint32_t offsets[]={70804,70826,70853};
+    if(!storage_||index>=3||storage_->rows.size()!=tableRows||!storage_->construction||!storage_->templates||
+       !storage_->programs||!storage_->textures)return false;
+    const auto& s=*storage_;const auto number=static_cast<std::int32_t>(3228+index);
+    const auto& row=s.rows[static_cast<std::size_t>(number)];
+    const auto* object=row.object04.get();
+    const auto* screen=s.templates->get(OriginalUiTemplate50KG::screenMt);
+    if(row.references08<=0||row.associated30!=screen||row.byteOffset!=offsets[index]||
+       !sameUiSourceName(row.name00,names[index])||!object||!object->constructed29B550()||
+       !object->row40()||*object->row40()!=number||!object->passCount48()||*object->passCount48()!=1||
+       !object->source()||!object->source()->prepared()||!object->source()->member()||
+       !sameUiSourceName(*object->source()->member(),sources[index])||
+       object->textures383400()!=s.textures.get()||!object->pass4C(0,pass))return false;
+    OriginalStandardProgramRowView50LA program;
+    if(!pass.references04||*pass.references04<=0||!pass.program18||
+       !s.programs->row(*pass.program18,program)||!program.canonicalName||
+       std::strcmp(program.canonicalName,"ScreenObject")||!pass.texture1A||!pass.uv1E||
+       !pass.mapCount20||*pass.mapCount20!=(index?1u:0u)||!pass.flags21||
+       !(*pass.flags21&2u)||(*pass.flags21&~6u)||!pass.group22||
+       pass.constructionTemplate!=screen||pass.animation10||pass.textureAnimation10||
+       !pass.state30||pass.state30->contextCount()!=1u||!pass.nativeBindings||
+       (*pass.nativeBindings)[1].bound()||(!index&&(*pass.nativeBindings)[0].bound()))return false;
+    const auto* context=pass.state30->context(0);
+    if(!context||context->runtime435670||
+       context->videoDepthBase2E0!=s.construction->depthBufferBase2E0()||
+       context->videoDepthFormat5C!=static_cast<std::int32_t>(s.construction->depthBufferFormat5C())||
+       context->fields[static_cast<std::size_t>(OriginalUiGsField50KG::textureMappingOnOff)].value!=(index?1:0))return false;
+    OriginalStandardMaterialUiSharedHistorySlot50LA next;
+    next.row=number;next.object=object;next.state30=pass.state30;next.nativeBindings=pass.nativeBindings;
+    next.beforeContext=*context;next.afterContext=*context;
+    next.beforeNativeBindings=*pass.nativeBindings;next.afterNativeBindings=*pass.nativeBindings;
+    next.writeKind=index?OriginalStandardMaterialUiSharedHistoryWrite50LA::bound:
+        OriginalStandardMaterialUiSharedHistoryWrite50LA::untextured;
+    out=next;references=row.references08;return true;
+}
+bool OriginalStandardMaterialTable50LA::beginUiSharedHistory(const UiSharedHistoryOwner* owner,
+    const OriginalStandardMaterialContext50LA* context,UiSharedHistoryReceipt& receipt,
+    UiSharedHistorySlots& output)noexcept {
+    static_assert(std::is_nothrow_copy_assignable_v<UiSharedHistorySlots>);
+    if(!owner||!context||!uiSharedHistoryQuiescent()||storage_->construction.get()!=context||
+       storage_->uiSharedHistoryOwner||storage_->uiSharedHistoryReceipt||receipt.table_||receipt.owner_||
+       storage_->uiSharedHistoryLeaseRevision==std::numeric_limits<std::uint64_t>::max()||
+       storage_->nativeBindingRevision==std::numeric_limits<std::uint64_t>::max())return false;
+    UiSharedHistorySlots slots;
+    std::array<OriginalStandardMaterialPassView50LA,3> views;
+    std::array<std::int32_t,3> references;
+    for(std::size_t i=0;i<slots.size();++i)
+        if(!captureUiSharedHistorySlot(i,slots[i],views[i],references[i]))return false;
+    // Complete preflight before issuing the address-pinned private receipt.
+    auto& s=*storage_;
+    receipt.table_=this;receipt.owner_=owner;receipt.context_=context;
+    receipt.leaseRevision_=++s.uiSharedHistoryLeaseRevision;receipt.bindingRevision_=s.nativeBindingRevision;
+    receipt.snapshots_=slots;receipt.passViews_=views;receipt.retainedReferences_=references;
+    s.uiSharedHistoryOwner=owner;s.uiSharedHistoryReceipt=&receipt;output=slots;return true;
+}
+bool OriginalStandardMaterialTable50LA::ownsUiSharedHistoryLease(const UiSharedHistoryOwner* owner,
+    const UiSharedHistoryReceipt& receipt)const noexcept {
+    // Deliberately independent of poison/live context: authentic cancellation
+    // and retirement still have to release a lease after a failed callback.
+    return storage_&&owner&&receipt.table_==this&&receipt.owner_==owner&&
+        storage_->uiSharedHistoryOwner==owner&&storage_->uiSharedHistoryReceipt==&receipt&&
+        receipt.leaseRevision_&&receipt.leaseRevision_==storage_->uiSharedHistoryLeaseRevision;
+}
+bool OriginalStandardMaterialTable50LA::tableOwnerUiSharedHistory(const UiSharedHistoryOwner* owner,
+    const OriginalStandardMaterialContext50LA* context,const UiSharedHistoryReceipt& receipt)const noexcept {
+    return ownsUiSharedHistoryLease(owner,receipt)&&context&&receipt.context_==context&&
+        storage_->construction.get()==context&&context->live();
+}
+bool OriginalStandardMaterialTable50LA::bindingRevisionUiSharedHistory(const UiSharedHistoryOwner* owner,
+    const UiSharedHistoryReceipt& receipt,std::uint64_t& output)const noexcept {
+    if(!uiSharedHistoryCurrent(owner,receipt))return false;
+    output=receipt.bindingRevision_;return true;
+}
+bool OriginalStandardMaterialTable50LA::uiSharedHistoryCurrent(const UiSharedHistoryOwner* owner,
+    const UiSharedHistoryReceipt& receipt)const noexcept {
+    if(!tableOwnerUiSharedHistory(owner,receipt.context_,receipt)||!uiSharedHistoryQuiescent()||
+       receipt.bindingRevision_!=storage_->nativeBindingRevision)return false;
+    for(std::size_t i=0;i<receipt.snapshots_.size();++i){
+        OriginalStandardMaterialUiSharedHistorySlot50LA now;
+        OriginalStandardMaterialPassView50LA pass;std::int32_t references=0;
+        if(!captureUiSharedHistorySlot(i,now,pass,references)||
+           references!=receipt.retainedReferences_[i]||!sameUiPassPointers(pass,receipt.passViews_[i])||
+           !sameUiSlotBefore(now,receipt.snapshots_[i]))return false;
+    }
+    return true;
+}
+bool OriginalStandardMaterialTable50LA::commitUiSharedHistory(const UiSharedHistoryOwner* owner,
+    UiSharedHistoryReceipt& receipt,const UiSharedHistorySlots& slots)noexcept {
+    if(!uiSharedHistoryCurrent(owner,receipt)||
+       storage_->nativeBindingRevision==std::numeric_limits<std::uint64_t>::max())return false;
+    // Source ordering/accepted callback/history synchronization are the common
+    // owner's responsibility. This primitive cannot create their authority.
+    // Every check for all three slots precedes the first nonthrowing store.
+    for(std::size_t i=0;i<slots.size();++i){
+        const auto& slot=slots[i];const auto& before=receipt.snapshots_[i];
+        if(!sameUiSlotBefore(slot,before)||slot.writeKind!=before.writeKind)return false;
+        if(!slot.write){
+            if(!equalUiContext(slot.afterContext,before.beforeContext)||
+               !equalUiBindings(slot.afterNativeBindings,before.beforeNativeBindings))return false;
+            continue;
+        }
+        if(!i){
+            if(!equalUiContext(slot.afterContext,before.beforeContext)||
+               !equalUiBindings(slot.afterNativeBindings,before.beforeNativeBindings)||
+               slot.afterNativeBindings[0].bound()||slot.afterNativeBindings[1].bound())return false;
+            continue;
+        }
+        const auto& image=slot.afterNativeBindings[0];
+        if(!image.bound()||slot.afterNativeBindings[1].bound()||
+           !slot.afterNativeBindings[1].equivalent(before.beforeNativeBindings[1]))return false;
+        // Rejoin the SAME actual canonical map; no representative, redirect,
+        // null-key animation, synthetic registration or FIFO pin is involved.
+        OriginalStandardTextureRowView50LA textureRow;
+        const auto token=(*receipt.passViews_[i].texture1A)[0];
+        if(token<0||!storage_->textures->row(token,textureRow)||!textureRow.references08||
+           *textureRow.references08<=0||!textureRow.object04)return false;
+        const auto& texture=*textureRow.object04;
+        const auto* flags=texture.flagsF8();const auto* known=texture.flagsF8KnownMask();
+        if(!texture.constructed24DA30()||!texture.references00()||*texture.references00()<=0||
+           !flags||!known||!(*known&1u)||!texture.originalBytes()||!texture.sourceMember()||
+           !texture.sourceKind()||!texture.levelCountB0()||*texture.levelCountB0()<=0||
+           image.pstOffset_||image.pstBytes_!=texture.originalBytes()->size()||image.kind_!=*texture.sourceKind())return false;
+        const auto archive=i==1?OriginalUiArchiveId50KG::controllerPopup:OriginalUiArchiveId50KG::fonts;
+        const char* name=i==1?"ui/textures/overlay1.pst":"font/venus16.pst";
+        const auto* identity=originalUiArchiveIdentity50KG(archive);bool exactMember=false;
+        if(!identity)return false;
+        for(std::size_t member=0;member<identity->memberCount;++member){
+            const auto* candidate=originalUiMemberIdentity50KG(archive,member);
+            if(candidate==image.member_&&candidate&&sameUiSourceName(*texture.sourceMember(),candidate->name)&&
+               sameUiSourceName(*texture.sourceMember(),name)&&candidate->bytes==image.pstBytes_)exactMember=true;
+        }
+        if(!exactMember)return false;
+        bool exactLevel=false;
+        for(std::int32_t mip=0;mip<*texture.levelCountB0();++mip){
+            OriginalStandardTextureLevelView50LA level;
+            if(!texture.level100(static_cast<std::size_t>(mip),level))return false;
+            if(level.sourceMipOrdinal==image.storedMip_&&level.sourceHeaderOffset==image.header_&&
+               level.sourceIndicesOffset==image.payload_&&level.width104>0&&level.height110>0&&
+               static_cast<std::uint32_t>(level.width104)==image.width_&&
+               static_cast<std::uint32_t>(level.height110)==image.height_)exactLevel=true;
+        }
+        if(!exactLevel)return false;
+        auto expected=before.beforeContext;
+        if(*flags&1u){
+            using F=OriginalUiGsField50KG;
+            expected.fields[static_cast<std::size_t>(F::sourceAlphaValueWhenAis0)]={255,OriginalStandardMaterialValueOrigin50LA::runtime,nullptr,0,0x24983Cu};
+            expected.fields[static_cast<std::size_t>(F::sourceAlphaValueWhenAis1)]={255,OriginalStandardMaterialValueOrigin50LA::runtime,nullptr,0,0x24983Cu};
+            expected.fields[static_cast<std::size_t>(F::methodOfExpandingTextureAlpha)]={1,OriginalStandardMaterialValueOrigin50LA::runtime,nullptr,0,0x24983Cu};
+        }
+        if(!equalUiContext(expected,slot.afterContext))return false;
+    }
+    // The objects retain their own original context metadata except the exact
+    // source TEXA branch above. No allocation, dispatch, callback or fallible
+    // lookup occurs from this point until the transaction is fully published.
+    static_assert(std::is_nothrow_copy_assignable_v<OriginalStandardMaterialStateContext50LA>);
+    static_assert(std::is_nothrow_copy_assignable_v<OriginalStandardMaterialNativeBinding50KG>);
+    for(std::size_t i=0;i<slots.size();++i){const auto& slot=slots[i];if(!slot.write)continue;
+        auto& object=storage_->rows[3228+i].object04;
+        if(i)object->commitNativeBinding249610(0,0,slot.afterContext,slot.afterNativeBindings[0]);
+        else object->commitNativeUntexturedState249BA0(0,slot.afterContext);
+    }
+    ++storage_->nativeBindingRevision;receipt.bindingRevision_=storage_->nativeBindingRevision;
+    for(std::size_t i=0;i<slots.size();++i){
+        auto& snapshot=receipt.snapshots_[i];
+        snapshot.beforeContext=slots[i].afterContext;snapshot.afterContext=slots[i].afterContext;
+        snapshot.beforeNativeBindings=slots[i].afterNativeBindings;snapshot.afterNativeBindings=slots[i].afterNativeBindings;
+    }
+    // Unlike an in-flight canonical FIFO, UI has no registration that can
+    // remain current. Expire the comparison immediately, without rebuilding,
+    // clearing/forging registrations or issuing any collector receipt.
+    storage_->collectorSealed=false;storage_->collectorBindingDirty=true;return true;
+}
+bool OriginalStandardMaterialTable50LA::cancelUiSharedHistory(const UiSharedHistoryOwner* owner,
+    UiSharedHistoryReceipt& receipt)noexcept {
+    // Cancellation is lease retirement, never rollback of an accepted draw.
+    return releaseUiSharedHistory(owner,receipt);
+}
+bool OriginalStandardMaterialTable50LA::releaseUiSharedHistory(const UiSharedHistoryOwner* owner,
+    UiSharedHistoryReceipt& receipt)noexcept {
+    if(!ownsUiSharedHistoryLease(owner,receipt))return false;
+    storage_->uiSharedHistoryOwner=nullptr;storage_->uiSharedHistoryReceipt=nullptr;
+    receipt.table_=nullptr;receipt.owner_=nullptr;receipt.context_=nullptr;
+    receipt.leaseRevision_=0;receipt.bindingRevision_=0;
+    receipt.snapshots_={};receipt.passViews_={};receipt.retainedReferences_={};return true;
+}
+bool OriginalStandardMaterialTable50LA::poisonUiSharedHistory(const UiSharedHistoryOwner* owner,
+    const UiSharedHistoryReceipt& receipt)noexcept {
+    if(!ownsUiSharedHistoryLease(owner,receipt))return false;
+    storage_->nativeBindingPoisoned=true;storage_->collectorSealed=false;return true;
 }
 bool OriginalStandardMaterialTable50LA::demandTerminal() const noexcept {
     return storage_&&(storage_->demandTerminal||
@@ -844,7 +1116,7 @@ bool OriginalStandardMaterialTable50LA::demandSurface246810(
     if(s.populationTerminal){d=s.terminalDiagnostic;return false;}
     if(s.demandTerminal){d=s.demandTerminalDiagnostic;return false;}
     if(s.textures&&s.textures->populationTerminal())return fail(d,S::demandTerminal,0x29E340);
-    if(s.populationActive||s.demandActive||s.collectorActive)return fail(d,S::phase,0x246810);
+    if(s.uiSharedHistoryOwner||s.populationActive||s.demandActive||s.collectorActive)return fail(d,S::phase,0x246810);
     const auto* scene=resource.scene();
     if(!resource.prepared()||!scene||lod>=scene->lods.size()||ordinal>=scene->lods[lod].surfaces.size())
         return fail(d,S::input,0x246810);
@@ -892,7 +1164,7 @@ bool OriginalStandardMaterialTable50LA::populate14D370(
     d={};if(!storage_)return fail(d,S::unprepared,0x14D370);
     auto& s=*storage_;
     if(s.populationTerminal){d=s.terminalDiagnostic;return false;}
-    if(s.nativeFifoPins||s.populationActive||s.demandActive||s.collectorActive||demandTerminal())return fail(d,S::phase,0x14D370);
+    if(s.uiSharedHistoryOwner||s.nativeFifoPins||s.populationActive||s.demandActive||s.collectorActive||demandTerminal())return fail(d,S::phase,0x14D370);
     if(s.populationBound&&(s.programs!=input.actualPrograms382B70||s.textures!=input.actualTextures383400||
        s.construction!=input.construction))return fail(d,S::phase,0x14D370);
     // Only the concrete native Video factory can mint this context. Verify
@@ -1018,7 +1290,7 @@ bool OriginalStandardMaterialTable50LA::retainSpeedBoostFallback14D590(
 }
 bool OriginalStandardMaterialTable50LA::bindGarageScreenFallbackAfterRetain(std::int32_t index,
     std::shared_ptr<const OriginalGarageScreenFallback50KG> proof,D& d)noexcept {
-    if(!storage_||index<0||static_cast<std::size_t>(index)>=storage_->rows.size()||!proof||proof->row_!=index)
+    if(!storage_||storage_->uiSharedHistoryOwner||index<0||static_cast<std::size_t>(index)>=storage_->rows.size()||!proof||proof->row_!=index)
         return fail(d,S::source,0x29B638);
     auto& row=storage_->rows[static_cast<std::size_t>(index)];
     const auto rejected=[&](bool value,const char* guard)noexcept {
@@ -1112,7 +1384,7 @@ bool OriginalStandardMaterialTable50LA::retainScreen14D590(std::int32_t index,D&
 bool OriginalStandardMaterialTable50LA::retain14D590(std::int32_t index,
     OriginalUiTemplate50KG associated,D& d) noexcept {
     d.row=index;if(!storage_)return fail(d,S::unprepared,0x14D590);
-    if(storage_->nativeFifoPins||storage_->populationTerminal||storage_->populationActive||storage_->demandActive||
+    if(storage_->uiSharedHistoryOwner||storage_->nativeFifoPins||storage_->populationTerminal||storage_->populationActive||storage_->demandActive||
        storage_->collectorActive||demandTerminal())
         return fail(d,S::phase,0x14D590);
     if(index<0||static_cast<std::size_t>(index)>=storage_->rows.size())return fail(d,S::range,0x298A30);
@@ -1125,7 +1397,7 @@ bool OriginalStandardMaterialTable50LA::retain14D590(std::int32_t index,
 bool OriginalStandardMaterialTable50LA::release14D500(std::int32_t index) noexcept {
     if(!storage_||index<0||static_cast<std::size_t>(index)>=storage_->rows.size())return false;
     auto& r=storage_->rows[static_cast<std::size_t>(index)];
-    if(r.references08<=0||storage_->nativeFifoPins||storage_->populationActive||storage_->demandActive||storage_->collectorActive)return false;
+    if(r.references08<=0||storage_->uiSharedHistoryOwner||storage_->nativeFifoPins||storage_->populationActive||storage_->demandActive||storage_->collectorActive)return false;
     --r.references08; //298C64/68, before testing the result at14D534.
     if(r.references08==0&&r.object04){
         // Source nodes borrow pass pointers. Never preserve a usable seal or
@@ -1215,7 +1487,7 @@ bool OriginalStandardMaterialReferences50LA::canRelease26E4C0() const noexcept {
     const auto& s=*storage_;
     if(!s.table||!s.table->storage_||s.retained>s.handles.size())return false;
     const auto& table=*s.table->storage_;
-    if(table.populationActive||table.demandActive||table.collectorActive)return false;
+    if(table.uiSharedHistoryOwner||table.populationActive||table.demandActive||table.collectorActive)return false;
     for(std::size_t i=0;i<s.retained;++i){
         const auto row=s.handles[i];
         if(row<0||static_cast<std::size_t>(row)>=table.rows.size())return false;

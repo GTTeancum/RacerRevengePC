@@ -1,4 +1,5 @@
 #pragma once
+#include "original_ui_menu_raster_inputs50kg.h"
 #include "original_ui_options_draw_contribution50kg.h"
 #include "original_ui_main_session50kg.h"
 #include "original_sound_mode50kg.h"
@@ -77,9 +78,9 @@ struct OriginalUiOptionsSessionSnapshot50KG {
 };
 // Options menu, authentic Controls and bounded Game Options scene owner. Page4 Accept needs
 // the exact shared profile and actual frontend PCM sound-mode consumer.
-// Page3 remains unadmitted despite the genuine absent-controller popup join.
+// Page3 requires the private real-device entry proof and bounded shared warning owner.
 // MemoryCard page5 admits only authenticated state4 entry/Back with a live direct-video owner.
-// Storage actions remain unavailable before mutation; connected Controls2 stays closed.
+// Storage actions remain unavailable before mutation; no hardware qualification is implied.
 // Cross-screen admission, sole manager tick, deferred queue consumption and
 // renderer-bank publication belong to the root coordinator, not this page.
 class OriginalUiOptionsSession50KG final {
@@ -128,6 +129,19 @@ public:
     const OriginalUiSourceFrame50KM* sourceFrame() const noexcept;
     void requestQuit() noexcept;
 private:
+    friend class OriginalUiSharedDialogs50KG;
+    friend class OriginalUiOptionsDrawContribution50KG;
+    bool controls2EntryReady(const OriginalUiSharedDialogs50KG&,std::uint64_t&)const noexcept;
+    bool controls2EntrySnapshotCurrent(bool profileCommitted)const noexcept;
+    bool controls2WarningCurrent(const OriginalUiSharedDialogs50KG&,
+        const OriginalUiOptionsDrawContribution50KG&)const noexcept;
+    bool admitSharedMenu470(const OriginalUiSharedDialogs50KG&)const noexcept;
+    bool sharedMenuLifetimeCurrent(const OriginalUiSharedDialogs50KG&,const OriginalUiOptionsDrawContribution50KG&)const noexcept;
+    bool readSharedMenuRasterInputs(const OriginalUiSharedDialogs50KG&,const OriginalUiOptionsDrawContribution50KG&,OriginalUiMenuRasterInputs50KG&)const noexcept;
+    bool sharedMenuUnwindEntryCurrent(const OriginalUiSharedDialogs50KG&,const OriginalUiOptionsDrawContribution50KG&)const noexcept;
+    bool sharedMenuRenderCurrent(const OriginalUiSharedDialogs50KG&,const OriginalUiOptionsDrawContribution50KG&)const noexcept;
+    bool sharedMenuUpdateCurrent(const OriginalUiSharedDialogs50KG&,const OriginalUiOptionsDrawContribution50KG&)const noexcept;
+
     friend class OriginalUiFrontend50KG;
     // Only the concrete coordinator's manager commit callback may call this,
     // after destination admission. A holder of a proposal cannot manually
