@@ -291,7 +291,7 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
    }
   };
   platform::GameHostInput50ER hostInput;auto& input=hostInput.keys;
-  platform::OriginalUiControllerNavigation50LA originalUiControllerNavigation;
+  platform::OriginalUiControllerNavigation50LA originalUiControllerNavigation,originalUiSecondControllerNavigation;
   reportUiState("bound");
   std::cerr<<"Original UI controls: arrows select/change; Enter/Space confirm; Escape/menu back; "
       "R defaults/rotate; Tab controller configuration. Window Close, quit, or stdin EOF exits.\n";
@@ -364,9 +364,15 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
     ++traceGateReports;previousGateMask=gateMask;
     previousDrawableWidth=info.drawableWidth;previousDrawableHeight=info.drawableHeight;
    }
-   platform::OriginalUiControllerNavigation50LA::Events menuEvents;
+   platform::OriginalUiControllerNavigation50LA::Events menuEvents,secondMenuEvents;
    require50DU(originalUiControllerNavigation.observe(input,active,menuEvents),
        "original frontend physical controller snapshot invalid");
+   // Separate physical identity and release-to-arm lifetime for port two.
+   // An inactive Controls2 route disarms it; keyboard always remains port zero.
+   const auto secondInputRoute=originalMain.coordinator.snapshot().route;
+   require50DU(originalUiSecondControllerNavigation.observe(input,active&&
+       secondInputRoute.screen==12&&secondInputRoute.page==3,secondMenuEvents,1),
+       "original frontend second physical controller snapshot invalid");
    const auto mainClock=originalMain.sampleClock(applicationClock,active);
    originalMain.audioOutput.pause(!active);
    if(!active){
@@ -400,6 +406,14 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
    // actual keyboard/pad confirm edge dispatches once even if both are pressed.
    for(const unsigned event:{0u,1u,2u,3u,4u,5u,7u,6u})
     if(menuEvents[event])originalMain.input(static_cast<std::uint8_t>(event),input.secondControllerPresence);
+   // Never merge two physical ports or retag keyboard input as controller one.
+   if(secondInputRoute.screen==12&&secondInputRoute.page==3&&
+      input.secondControllerPresence==platform::WindowControllerPresence50DQ::Present)
+    for(const unsigned event:{0u,1u,2u,3u,4u,5u,7u,6u}){
+     const auto currentRoute=originalMain.coordinator.snapshot().route;
+     if(currentRoute.screen!=12||currentRoute.page!=3)break;
+     if(secondMenuEvents[event])originalMain.input(static_cast<std::uint8_t>(event),input.secondControllerPresence,1);
+    }
    }
    if(captureRoute.enabled()){
     require50DU(originalMain.inputCount==captureRoute.issuedActions(),"physical menu input interrupted unattended original UI route");

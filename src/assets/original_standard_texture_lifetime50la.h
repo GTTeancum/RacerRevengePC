@@ -4,6 +4,7 @@
 #include <limits>
 
 namespace original_main_entry50KG { struct Application; class RaceDisplayLifetime50LA; }
+namespace rr::platform { class OriginalUiSharedDialogs50KG; }
 
 namespace rr::assets {
 class OriginalStandardMaterialContext50LA;
@@ -48,6 +49,10 @@ class OriginalStandardTextureLifetime50LA final {
     friend class OriginalNativeTextureUploadBinding50LA;
     friend class ::original_main_entry50KG::RaceDisplayLifetime50LA;
     friend class OriginalStandardTextureTransferCold50LA;
+    friend class rr::platform::OriginalUiSharedDialogs50KG;
+    // Native in-flight first-pass fence. This is not source texture state.
+    const rr::platform::OriginalUiSharedDialogs50KG* nativeWarningDemandOwner_=nullptr;
+    std::uint64_t nativeWarningDemandEpoch_=0;
     //253DF0 initializes source13C null. Staging never publishes this field.
     OriginalStandardTextureTransferCold50LA* publishedTransfer13C_=nullptr;
     OriginalStandardTextureTransferCold50LA* coldTransferOwner_=nullptr;
@@ -92,7 +97,8 @@ class OriginalStandardTextureLifetime50LA final {
     // Defined beside the concrete resource. It is private for the future
     // actual Application texture-manager254AD0 frame entry; this candidate
     // installs no caller and never resets demand at lookup or selection.
-    void resetDemand14D180() noexcept;
+    // A future caller must handle false without claiming a source reset.
+    bool resetDemand14D180() noexcept;
     // Exact443870 vtable3D2220+88=255800: jr ra; addiu v0,zero,1.
     //The actual initialized owner's callback has no service/transfer effects.
     std::int32_t loadedResources255800()const noexcept{return 1;}
@@ -102,7 +108,7 @@ public:
     ~OriginalStandardTextureLifetime50LA(){
         // The retained context prevents manager teardown under live resources.
         // A violated native lifetime is not repaired by dropping real entries.
-        if(head00_||tail04_||count0C_||nativeUploads_||publishedTransfer13C_||coldTransferOwner_||treeCursor442B60_)std::terminate();
+        if(head00_||tail04_||count0C_||nativeUploads_||publishedTransfer13C_||coldTransferOwner_||treeCursor442B60_||nativeWarningDemandOwner_||nativeWarningDemandEpoch_)std::terminate();
     }
 };
 }

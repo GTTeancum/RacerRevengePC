@@ -30,7 +30,7 @@ OriginalUiGarageDrawContribution50KG::OriginalUiGarageDrawContribution50KG(const
 OriginalUiGarageDrawContribution50KG::~OriginalUiGarageDrawContribution50KG()noexcept {
     //No incomplete frame is ever published. A future sealed owner must first
     //discharge the renderer's actual SourceOwner lifetime before destruction.
-    if(frame_.owner_||textureCoordinator_||(drainGpu_&&drainGpu_->ownsResources())||
+    if(shared470FirstPassOwner_||shared470FirstPassEpoch_||shared470ThirdPassOwner_||shared470ThirdPassEpoch_||frame_.owner_||textureCoordinator_||(drainGpu_&&drainGpu_->ownsResources())||
        (renderer_&&renderer_->ownsRenderPrelude(*this,publication_)))std::terminate();
 }
 bool OriginalUiGarageDrawContribution50KG::identityCurrent()const noexcept {
@@ -55,6 +55,52 @@ bool OriginalUiGarageDrawContribution50KG::inheritedAuralRenderReceiverCurrent(c
     return observed.entity==&node&&observed.attached&&!observed.retired&&observed.nativeInitialized&&
         node.parent1C==entities->application10()&&node.kind==game::OriginalWreckComponentKind50LA::auralScape102BE0&&
         node.mask20==0xffffffffu&&(node.flags29&9u)==1u&&owner->current();
+}
+bool OriginalUiGarageDrawContribution50KG::shared470FirstPassReceiverCurrent(const OriginalUiSharedDialogs50KG& shared)const noexcept {
+ const auto session=session_.lock();const auto& node=shared.dialog470_.entity;
+ return phase_==Phase::firstPass&&identityCurrent()&&issuer_&&issuer_->state&&
+  issuer_->sourceApplicationMode22C_==3&&issuer_->state->sharedDialogs.get()==&shared&&
+  callback_==&node&&session&&shared.application_.lock()==issuer_->state&&shared.inputs_.root==issuer_&&
+  shared.scope_==session->scope_&&shared.loadedCurrent()&&!shared.reorderStep_&&!shared.reorderingPage_&&
+  shared.completedReorders_&&shared.reorderedPage_==page_.get()&&shared.reorderedGrant_.lock()==session->grant_&&
+  shared.dialog470_.manager30==dispatcher_&&node.parent1C==dispatcher_&&
+  node.kind==game::OriginalWreckComponentKind50LA::entity141300&&node.reference00==1&&
+  node.mask20==0xffffffffu&&(node.flags29&9u)==1u&&!node.firstChild18&&
+  shared.dialog470_.vtable==0x3D0910u&&shared.controller47C_.vtable==0x3D0890u;
+}
+bool OriginalUiGarageDrawContribution50KG::shared470FailedUnwindCurrent(const OriginalUiSharedDialogs50KG& shared)const noexcept {
+ const auto session=session_.lock();
+ return nativeRetirementPhase_==NativeRetirementPhase::preludeReleased&&nativeRetirementOwnerCurrent()&&
+  phase_==Phase::unavailable&&attempted_&&issuer_&&issuer_->state&&
+  issuer_->state->sharedDialogs.get()==&shared&&shared.inputs_.root==issuer_&&shared.loadedCurrent()&&
+  callback_==&shared.dialog470_.entity&&shared470FirstPassOwner_.get()==&shared&&
+  session&&session->unsealedRenderFailureHistoryCurrent(*issuer_)&&
+  !frame_.owner_&&!frame_.native_&&!drainBatchPending_&&!drainBatchFailed_&&
+  !textureCoordinator_&&!drainGpu_&&!drainImageBank_&&!drainBatchCanonical_&&
+  renderer_&&!renderer_->ownsRenderPrelude(*this,publication_);
+}
+bool OriginalUiGarageDrawContribution50KG::shared470ThirdPassReceiverCurrent(const OriginalUiSharedDialogs50KG& shared)const noexcept {
+ const auto session=session_.lock();const auto& node=shared.dialog470_.entity;
+ return !activeText_&&!activePageQuad_&&!activePageCostText_&&phase_==Phase::thirdPass&&identityCurrent()&&issuer_&&issuer_->state&&
+  issuer_->sourceApplicationMode22C_==5&&issuer_->state->sharedDialogs.get()==&shared&&
+  callback_==&node&&session&&shared.application_.lock()==issuer_->state&&shared.inputs_.root==issuer_&&
+  shared.scope_==session->scope_&&shared.loadedCurrent()&&!shared.reorderStep_&&!shared.reorderingPage_&&
+  shared.completedReorders_&&shared.reorderedPage_==page_.get()&&shared.reorderedGrant_.lock()==session->grant_&&
+  shared.dialog470_.manager30==dispatcher_&&node.parent1C==dispatcher_&&
+  node.kind==game::OriginalWreckComponentKind50LA::entity141300&&node.reference00==1&&
+  node.mask20==0xffffffffu&&(node.flags29&9u)==1u&&!node.firstChild18&&
+  shared.dialog470_.vtable==0x3D0910u&&shared.controller47C_.vtable==0x3D0890u;
+}
+bool OriginalUiGarageDrawContribution50KG::shared470ThirdPassFailedUnwindCurrent(const OriginalUiSharedDialogs50KG& shared)const noexcept {
+ const auto session=session_.lock();
+ return nativeRetirementPhase_==NativeRetirementPhase::preludeReleased&&nativeRetirementOwnerCurrent()&&
+  phase_==Phase::unavailable&&attempted_&&issuer_&&issuer_->state&&
+  issuer_->state->sharedDialogs.get()==&shared&&shared.inputs_.root==issuer_&&shared.loadedCurrent()&&
+  callback_==&shared.dialog470_.entity&&shared470ThirdPassOwner_.get()==&shared&&
+  session&&session->unsealedRenderFailureHistoryCurrent(*issuer_)&&
+  !frame_.owner_&&!frame_.native_&&!drainBatchPending_&&!drainBatchFailed_&&
+  !textureCoordinator_&&!drainGpu_&&!drainImageBank_&&!drainBatchCanonical_&&
+  renderer_&&!renderer_->ownsRenderPrelude(*this,publication_);
 }
 bool OriginalUiGarageDrawContribution50KG::invokeSharedDialogRender(
     C& node,std::uint32_t slot,bool& matched,Diagnostic& d)noexcept {
@@ -83,19 +129,47 @@ bool OriginalUiGarageDrawContribution50KG::invokeSharedDialogRender(
             (slot==0x40?0x204A00u:0x204AC0u);
         if(controller){
             //Actual206448 and2064D4 zero3CC branches skip no required
-            //primitive. Positive warning/Popup owners remain unsupported.
+            //primitive. Positive controller47C Popup remains unsupported.
             if(issuer_->state->controllerPopupState.active3CC)
                 return fail(d,slot==0x40?0x206458u:0x2064DCu);
         }else{
-            //The existing proof observes the actual2048F0 cached presence
-            //and source474/478, not a fresh device poll or invented invisibility.
             OriginalUiSharedDialogs50KG::Diagnostic sharedDiagnostic;
+            if(slot==0x40){
+                // Exact dispatcher470 receiver, independent of Page Quad/Text
+                // authority. This real callback owns one distinct native epoch.
+                if(!shared->begin470FirstPass(*this,sharedDiagnostic)||
+                   !shared->continue470FirstPass(*this,sharedDiagnostic))
+                    return fail(d,sharedDiagnostic.sourcePC);
+                sourcePC_=0x204A9C;
+                if(!walk141C30(node,d))return false;
+                shared470InheritedReturned_=true;
+                if(!shared->complete470FirstPass(*this,sharedDiagnostic))
+                    return fail(d,sharedDiagnostic.sourcePC);
+                sourcePC_=0x204AB8;return true;
+            }
+            // HARD ADMISSION BOUNDARY: canonical470 accepted histories are
+            // not yet bridged bidirectionally to Main/Options. A primary
+            // disconnect here must not bypass that boundary merely because
+            // Controller2/page3 is disabled. Keep the actual source visibility
+            // predicate before epoch issuance, mutation, FIFO or history work.
+            // Only a separately authenticated common-history owner may replace
+            // this gate; there is no caller readiness flag or public toggle.
             if(!shared->invisible470204AC0(sharedDiagnostic))
                 return fail(d,sharedDiagnostic.sourcePC);
+            // Actual shared470 +48 callback, never page geometry authority.
+            if(!shared->begin470ThirdPass(*this,sharedDiagnostic)||
+               !shared->continue470ThirdPass(*this,sharedDiagnostic))
+                return fail(d,sharedDiagnostic.sourcePC);
+            sourcePC_=0x2054A4;
+            if(!walk141D70(node,d))return false;
+            shared470ThirdPassInheritedReturned_=true;
+            if(!shared->complete470ThirdPass(*this,sharedDiagnostic))
+                return fail(d,sharedDiagnostic.sourcePC);
+            sourcePC_=0x2054BC;return true;
         }
     }
     //Concrete tables only. The first/third callbacks reach these inherited
-    //tails after the proven no-warning branches; +44/+4C inherit directly.
+    //tails after controller47C's proven inactive branch; +44/+4C inherit directly.
     if(slot==0x40)return walk141C30(node,d);
     if(slot==0x44)return walk141CE0(node,d);
     if(slot==0x48)return walk141D70(node,d);
@@ -664,6 +738,18 @@ bool OriginalUiGarageDrawContribution50KG::releaseUnsealedBeforeRetirement()noex
         nativeRetirementPhase_=R::preludeReleased;
     }
     if(!releaseDrainResourcesBeforeRetirement(retirement))return false;
+    if(shared470FirstPassOwner_){
+        // This is AFTER exact prelude/FIFO/GPU release, BEFORE clearing Draw
+        // identity. Failure preserves both owners and the native retry cursor.
+        const auto shared=shared470FirstPassOwner_;OriginalUiSharedDialogs50KG::Diagnostic sharedDiagnostic;
+        if(!shared->abort470AfterNativeRelease(*this,sharedDiagnostic))return false;
+    }
+    if(shared470ThirdPassOwner_){
+        // Exact prelude/FIFO/GPU release already returned. Nonempty or failed
+        // FIFO work still blocks above; abort never substitutes for105990.
+        const auto shared=shared470ThirdPassOwner_;OriginalUiSharedDialogs50KG::Diagnostic sharedDiagnostic;
+        if(!shared->abort470ThirdPassAfterNativeRelease(*this,sharedDiagnostic))return false;
+    }
     // The Window has retired this exact native target lease; published pixels
     // remain available until the next real image. No Source field/count or
     // Page child has been retired by this native resource cleanup.
@@ -676,5 +762,50 @@ bool OriginalUiGarageDrawContribution50KG::beginSourceSubmission(std::uint64_t,c
 }
 void OriginalUiGarageDrawContribution50KG::finishSourceSubmission(std::uint64_t,bool,bool)const noexcept {
     //Unreachable without the real begin authority. No pass/history commit.
+}
+}
+
+namespace rr::platform {
+bool OriginalUiGarageDrawContribution50KG::readWarning470QuadInputs2DF550(
+ const OriginalUiSharedDialogs50KG& shared,const OriginalUiGarageQuad50KG& quad,
+ QuadRenderInputs& out,std::uint32_t& pc)const noexcept {
+ pc=0x2DF550;if(!shared.warning470QuadCurrent(*this,quad))return false;
+ QuadRenderInputs next;next.publication=publication_;
+ next.sourceQuadEnabled383678=issuer_->entities()->screenQuadEnabled383678_!=0;
+ if(!next.sourceQuadEnabled383678){out=next;pc=0x2DF8CC;return true;}
+ if(!cameraFrame_.current()){pc=0x2DF608;return false;}
+ next.viewportWidth1E8=camera_->fields_.viewport1E0[2];next.viewportHeight1EC=camera_->fields_.viewport1E0[3];
+ if(!next.viewportWidth1E8||!next.viewportHeight1EC){pc=0x2DF608;return false;}
+ out=next;pc=0;return true;
+}
+bool OriginalUiGarageDrawContribution50KG::collectWarning470Quad246760(OriginalUiSharedDialogs50KG& shared,
+ OriginalUiGarageQuad50KG& quad,assets::OriginalStandardMaterialDiagnostic50LA& d)noexcept {
+ if(!shared.warning470QuadCurrent(*this,quad)||!issuer_->nativeCollectorFifoOwner_){
+  d.status=assets::OriginalStandardMaterialStatus50LA::phase;d.sourcePC=0x246760;return false;
+ }
+ return issuer_->nativeCollectorFifoOwner_->collectShared470Quad246760(*this,shared,quad,d);
+}
+bool OriginalUiGarageDrawContribution50KG::readWarning470TextInputs2E0170(
+ const OriginalUiSharedDialogs50KG& shared,const OriginalUiGarageScreenText50KG& text,
+ TextRenderInputs& out,std::uint32_t& pc)const noexcept {
+ pc=0x2E0F50;
+ if(!shared.warning470TextCurrent(*this,text)||!cameraFrame_.current()||!camera_->fields_.coreKnown||
+    !renderer_->display_->video_||renderer_->display_->video_.get()!=shared.inputs_.video.get()||
+    !renderer_->display_->video_->host.current())return false;
+ const auto& f=camera_->fields_;const auto depth=renderer_->display_->video_->packetZMaximum;
+ if(!f.viewport1E0[2]||!f.viewport1E0[3]||depth<0)return false;
+ TextRenderInputs next;next.viewportWidth1E8=f.viewport1E0[2];next.viewportHeight1EC=f.viewport1E0[3];
+ next.videoDepthMaximum60=static_cast<float>(depth);next.publication=publication_;out=next;pc=0;return true;
+}
+bool OriginalUiGarageDrawContribution50KG::collectWarning470Text246760(OriginalUiSharedDialogs50KG& shared,
+ OriginalUiGarageScreenText50KG& text,std::size_t primitive,OriginalUiGarageScreenTextDiagnostic50KG& d)noexcept {
+ if(!shared.warning470TextCurrent(*this,text)||!issuer_->nativeCollectorFifoOwner_){
+  d.status=OriginalUiGarageScreenTextStatus50KG::authority;d.sourcePC=0x246760;return false;
+ }
+ if(!issuer_->nativeCollectorFifoOwner_->collectShared470Text246760(*this,shared,text,primitive,d.material)){
+  d.status=OriginalUiGarageScreenTextStatus50KG::material;d.sourcePC=d.material.sourcePC;
+  d.sourceEffectsCommitted|=d.material.sourceEffectsCommitted;return false;
+ }
+ d.sourceEffectsCommitted|=d.material.sourceEffectsCommitted;return true;
 }
 }

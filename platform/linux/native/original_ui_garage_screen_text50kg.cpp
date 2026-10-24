@@ -1,5 +1,6 @@
 #include "original_ui_garage_screen_text50kg.h"
 #include "original_ui_garage_draw_contribution50kg.h"
+#include "original_ui_shared_dialogs50kg.h"
 #include "../../../tests/native/original_ui_main_entry50kg.h"
 #include <algorithm>
 #include <bit>
@@ -30,12 +31,15 @@ bool fontDirectory(const std::string& s)noexcept {
  for(std::size_t i=0;i<4;++i){const char c=s[i]>='A'&&s[i]<='Z'?char(s[i]+32):s[i];if(c!=literal[i])return false;}
  return n==4||s[4]=='\\'; //Never fold slash for source299BE0.
 }
-struct TextInputs {const char* material;const char* cel;const char* pst;std::string_view basename;};
+struct TextInputs {
+ const char* material;const char* cel;const char* pst;std::string_view basename;
+ assets::OriginalUiArchiveId50KG archive=assets::OriginalUiArchiveId50KG::garage;
+};
 bool textInputs(assets::OriginalApplicationFonts50LA::Name font,std::string_view material,
  std::int32_t capacity,TextInputs& out)noexcept {
  using N=assets::OriginalApplicationFonts50LA::Name;
  if(font==N::frontendVenus16&&material=="venus16popup"&&capacity==40){
-  out={"font\\venus16popup.psm","font\\venus16.cel","font\\venus16.pst","venus16popup"};return true;
+  out={"font\\venus16popup.psm","font\\venus16.cel","font\\venus16.pst","venus16popup",assets::OriginalUiArchiveId50KG::controllerPopup};return true;
  }
  // Only the authored Garage text rows. These are concrete input
  // identities, not a changed source capacity limit or a renderer budget.
@@ -52,6 +56,18 @@ bool textInputs(assets::OriginalApplicationFonts50LA::Name font,std::string_view
  if(font==N::frontendDenmrk14&&material=="denmrk14"&&
     (capacity==12||capacity==9||capacity==8||capacity==7||capacity==6)){
   out={"font\\denmrk14.psm","font\\denmrk14.cel","font\\denmrk14.pst","denmrk14"};return true;
+ }
+ return false;
+}
+bool retainedTextMaterial(const assets::OriginalUiArchive50KG& archive,
+ const assets::OriginalUiMemberIdentity50KG* identity,const char* expected)noexcept {
+ if(!identity||!expected)return false;
+ for(std::size_t i=0;i<archive.memberCount();++i){const auto member=archive.member(i);
+  if(member.identity!=identity)continue;
+  const char* actual=identity->name;if(!actual)return false;
+  const auto fold=[](char c)noexcept{return c=='\\'?'/' : c>='A'&&c<='Z'?char(c+32):c;};
+  for(;*actual&&*expected;++actual,++expected)if(fold(*actual)!=fold(*expected))return false;
+  return !*actual&&!*expected;
  }
  return false;
 }
@@ -84,6 +100,11 @@ bool OriginalUiGarageScreenText50KG::authorityThread(const std::shared_ptr<Autho
 }
 bool OriginalUiGarageScreenText50KG::coldInputsCurrent()const noexcept {
  if(ownerThread_!=std::this_thread::get_id()||!authorityThread(authority_))return false;
+ // Revalidate the exact immutable tuple admitted by loadColdSource2DFD90.
+ // The two real470 Venus16Popup texts retain Popup, not Garage. This is not
+ // permission for ordinary Garage text to adopt an arbitrary second archive.
+ TextInputs inputs{};
+ if(!textInputs(fontName_,materialName_,capacity5B_,inputs))return false;
  std::uint32_t pause=0;
  if(!lifetime_.readPause11C(pause)||!issuer_||!sameOwner(authority_,issuer_->entities())||
     !authority_->constructed_||authority_->released_)return false;
@@ -98,7 +119,8 @@ bool OriginalUiGarageScreenText50KG::coldInputsCurrent()const noexcept {
   font4C_->metrics().decoded()&&font4C_->texture281F90()&&font4C_->texture408_>=0&&
   Fonts::currentResource281F90(*domain_,*font4C_)&&
   garage_&&garage_->loaded()&&garage_->identity()==
-    assets::originalUiArchiveIdentity50KG(assets::OriginalUiArchiveId50KG::garage);
+    assets::originalUiArchiveIdentity50KG(inputs.archive)&&
+  retainedTextMaterial(*garage_,materialIdentity_,inputs.material);
 }
 bool OriginalUiGarageScreenText50KG::loadCold2DFD90(
  const Application& root,std::shared_ptr<Domain> domain,std::shared_ptr<const Context> context,
@@ -155,8 +177,7 @@ bool OriginalUiGarageScreenText50KG::loadColdSource2DFD90(
      !font->archive_||!font->archive_->loaded()||font->archive_->identity()!=
        assets::originalUiArchiveIdentity50KG(assets::OriginalUiArchiveId50KG::fonts)||
      !font->metrics().decoded()||!font->texture281F90()||font->texture408_<0||!Fonts::currentResource281F90(*domain,*font)||
-     !garage->loaded()||garage->identity()!=assets::originalUiArchiveIdentity50KG(
-       materialName=="venus16popup"?assets::OriginalUiArchiveId50KG::controllerPopup:assets::OriginalUiArchiveId50KG::garage))
+     !garage->loaded()||garage->identity()!=assets::originalUiArchiveIdentity50KG(inputs.archive))
    return stop(d,Status::authority,0x2DFD90);
   const auto material=garage->find(inputs.material);
   const auto cel=font->archive_->find(inputs.cel),pst=font->archive_->find(inputs.pst);
@@ -359,6 +380,21 @@ bool OriginalUiGarageScreenText50KG::draw2E0170(OriginalUiGarageDrawContribution
  if(!regenerate2E0F50(input.viewportWidth1E8,input.viewportHeight1EC,input.videoDepthMaximum60,d))return false;
  for(std::size_t p=0;p<active5E_;++p)if(!draw.collectScreenTextPrimitive246760(*this,p,d))return false;
  return true;
+}
+bool OriginalUiGarageScreenText50KG::drawWarning4702E0170(OriginalUiGarageDrawContribution50KG& draw,
+ OriginalUiSharedDialogs50KG& shared,Diagnostic& d)noexcept {
+ d={};
+ if(!shared.warning470TextCurrent(draw,*this)||!coldInputsCurrent())return stop(d,Status::authority,0x2E01C0);
+ if(!authority_->screenTextEnabled383688_)return true;
+ OriginalUiGarageDrawContribution50KG::TextRenderInputs input;std::uint32_t pc=0;
+ if(!draw.readWarning470TextInputs2E0170(shared,*this,input,pc))return stop(d,Status::authority,pc);
+ if(!regenerate2E0F50(input.viewportWidth1E8,input.viewportHeight1EC,input.videoDepthMaximum60,d))return false;
+ bool effects=d.sourceEffectsCommitted;
+ for(std::size_t p=0;p<active5E_;++p){
+  if(!draw.collectWarning470Text246760(shared,*this,p,d)){d.sourceEffectsCommitted|=effects;return false;}
+  effects|=d.sourceEffectsCommitted;
+ }
+ d.sourceEffectsCommitted=effects;return true;
 }
 bool OriginalUiGarageScreenText50KG::applyOverlay29D690(std::uint32_t color,
  std::int16_t alpha,float scale,float rotation,std::int32_t x,std::int32_t y,

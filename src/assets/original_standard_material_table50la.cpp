@@ -272,6 +272,22 @@ bool OriginalStandardMaterialTable50LA::demandTournamentOutline2DF8A0(
     struct Guard {bool& value;explicit Guard(bool& v):value(v){value=true;}~Guard(){value=false;}} guard(s.demandActive);
     return row.object04->demandTournamentOutline2DF8A0(textures,psm,pst,d);
 }
+bool OriginalStandardMaterialTable50LA::demandSharedWarning2DF8A0(
+    std::int32_t index,const OriginalStandardTextureTable50LA& textures,
+    const OriginalUiMemberView50KG& psm,const OriginalUiMemberView50KG& pst,D& d) const noexcept {
+    d={};d.row=index;
+    if(!storage_)return fail(d,S::unprepared,0x2DF8A0);
+    auto& s=*storage_;
+    if(s.populationTerminal||s.populationActive||s.demandActive||s.collectorActive||s.demandTerminal)
+        return fail(d,S::phase,0x2DF8A0);
+    if(index<0||static_cast<std::size_t>(index)>=s.rows.size())return fail(d,S::range,0x2DF8B4);
+    const auto& row=s.rows[static_cast<std::size_t>(index)];
+    if(row.references08<=0||row.associated30!=s.templates->get(OriginalUiTemplate50KG::screenMt)||
+       s.textures.get()!=&textures)return fail(d,S::reference,0x2DF8B4);
+    if(!row.object04)return fail(d,S::missingMaterialObject,0x2DF8BC);
+    struct Guard {bool& value;explicit Guard(bool& v):value(v){value=true;}~Guard(){value=false;}} guard(s.demandActive);
+    return row.object04->demandSharedWarning2DF8A0(textures,psm,pst,d);
+}
 bool OriginalStandardMaterialTable50LA::demandGarage2DF8A0(
     std::int32_t index,const OriginalStandardTextureTable50LA& textures,
     std::uint32_t pc,D& d) const noexcept {

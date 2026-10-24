@@ -2237,8 +2237,9 @@ public:
             " course_pc="+std::to_string(diagnostic.course.sourcePC)+
             " renderer="+std::to_string(static_cast<unsigned>(diagnostic.renderer.error))+garageRuntimeFailureText());
     }
-    void input(std::uint8_t sourceInput,rr::platform::WindowControllerPresence50DQ presence=rr::platform::WindowControllerPresence50DQ::Unknown) {
-        rr::platform::OriginalUiMainSessionInput50KG in;in.controller=0;in.originalInput=sourceInput;in.secondControllerObservation=presence;
+    void input(std::uint8_t sourceInput,rr::platform::WindowControllerPresence50DQ presence=rr::platform::WindowControllerPresence50DQ::Unknown,
+        std::uint8_t controller=0) {
+        rr::platform::OriginalUiMainSessionInput50KG in;in.controller=controller;in.originalInput=sourceInput;in.secondControllerObservation=presence;
         rr::platform::OriginalUiFrontendInputReceipt50KG receipt;
         const auto inputStart=stageStart();
         const auto status=coordinator.input(in,receipt,diagnostic);++inputCount;

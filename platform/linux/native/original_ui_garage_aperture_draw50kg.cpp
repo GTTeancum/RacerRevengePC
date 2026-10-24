@@ -47,6 +47,9 @@ struct ApertureScalar2E2ED0 {
     }
 };
 }
+OriginalUiGaragePageOwner50KG::PolygonAssertion& OriginalUiGaragePageOwner50KG::polygonDraw8F50()noexcept {
+    static PolygonAssertion source;return source;
+}
 bool OriginalUiGaragePageOwner50KG::aperturePacketCurrent2E21D0(std::size_t ordinal)const noexcept {
     if(ordinal>=apertures_.size()||!issuer_||!apertures_[ordinal]||
        !shared_.apertures424[ordinal]||*shared_.apertures424[ordinal]!=apertures_[ordinal].get())
@@ -91,10 +94,9 @@ bool OriginalUiGaragePageOwner50KG::drawAperture2E21D0(
     OriginalUiGarageDrawContribution50KG& draw,std::size_t ordinal,Diagnostic& d)noexcept {
     d={};const auto stop=[&](Status status,std::uint32_t pc){
         d.status=status;d.sourcePC=pc;apertureDrawSourcePC_=pc;return false;};
-    static std::atomic<std::uint8_t> guard8F50{0};
-    static std::atomic<std::uint32_t> assertion446740{0};
-    if(!guard8F50.load(std::memory_order_acquire)){
-        assertion446740.store(1,std::memory_order_relaxed);guard8F50.store(1,std::memory_order_release);
+    auto& assertion=polygonDraw8F50();
+    if(!assertion.guard.load(std::memory_order_acquire)){
+        assertion.word.store(1,std::memory_order_relaxed);assertion.guard.store(1,std::memory_order_release);
     }
     OriginalUiGarageDrawContribution50KG::ApertureRenderInputs input;std::uint32_t pc=0;
     // The Draw hook validates the exact same Page1D798C ordinal and actual

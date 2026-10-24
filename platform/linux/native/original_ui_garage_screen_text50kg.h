@@ -13,6 +13,7 @@
 namespace original_main_entry50KG { struct Application; class NativeCollectorFifo50LA; }
 namespace rr::platform {
 class OriginalUiGarageDrawContribution50KG;
+class OriginalUiSharedDialogs50KG;
 class OriginalUiGarageTextOverlay50KG;
 enum class OriginalUiGarageScreenTextStatus50KG : std::uint8_t {
  complete, phase, authority, source, allocation, material, assertion, selectedTextPending
@@ -99,6 +100,7 @@ class OriginalUiGarageScreenText50KG final {
  bool writeText29D990(std::string_view,Diagnostic&)noexcept;
  bool draw2E0170(OriginalUiGarageDrawContribution50KG&,const OriginalUiGarageTextOverlay50KG&,Diagnostic&)noexcept;
  bool draw2E0170(OriginalUiGarageDrawContribution50KG&,Diagnostic&)noexcept;
+ bool drawWarning4702E0170(OriginalUiGarageDrawContribution50KG&,OriginalUiSharedDialogs50KG&,Diagnostic&)noexcept;
  struct LoweredPacket {
   std::vector<assets::Vertex48B> vertices;
   std::vector<std::array<float,3>> stq;

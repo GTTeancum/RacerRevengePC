@@ -12,8 +12,10 @@ class OriginalUiControllerNavigation50LA final {
     bool armed_=false;
 public:
     using Events=std::array<bool,8>;
-    bool observe(const WindowInput50DQ& input,bool active,Events& events)noexcept {
-        events={};const auto& controller=input.controllers[0];
+    bool observe(const WindowInput50DQ& input,bool active,Events& events,
+        std::uint8_t slot=0)noexcept {
+        events={};if(slot>=input.controllers.size())return false;
+        const auto& controller=input.controllers[slot];
         if(!input.gameControllersEnabled||!controller.connected){instance_=-1;armed_=false;return true;}
         if(controller.instanceId<0)return false;
         const bool changed=instance_!=controller.instanceId;

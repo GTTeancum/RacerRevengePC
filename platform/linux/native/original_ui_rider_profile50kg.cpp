@@ -1,5 +1,6 @@
 // New reconstruction after rollback; source-only, unverified.
 #include "original_ui_rider_profile50kg.h"
+#include "original_save_profile_owner50kg.h"
 #include "../../../src/game/original_course_load_selection50kg.h"
 #include <cmath>
 #include <limits>
@@ -100,7 +101,7 @@ struct OriginalUiRiderProfileOwner50KG::Storage {
     std::uint8_t packed1125D=0,packed1125E=0,packed1125F=0;
     std::uint32_t subtype11258=1;
     std::uint32_t comparison100C0=0;
-    bool cardFlag100BC=false;
+    OriginalSaveProfileOwner50KG saveProfile;
     //17E330..33C clears only bit0, preserving opaque upper7E4 bits.
     //17E348 initializes the complete7E8 word. No synthetic full7E4 byte.
     bool bit0_7E4=false;
@@ -322,7 +323,7 @@ bool OriginalUiRiderProfileOwner50KG::initializeStartupProfile(
         if(gasganoSc)next->rememberedCourse[0]=9; // exact SC authored slot, not course ID
         next->packed1125D=0x98;next->packed1125E=0x12;
         next->comparison100C0=0xffffffffu; //17E17C
-        next->cardFlag100BC=false; //17E2C0
+        // saveProfile owns constructor-known100BC bits0/1; no duplicate bool.
         next->courseOrder100C4={{0,11,4,8,7,1,5,9,12,6,10,3,2}};
         next->racerNames3C=sourceRacerNames3C;next->trackText=sourceTrackText;
         //17E7D8..17E880 ->17F800..17F884; stride12, primary+79C/secondary+7A0.
@@ -358,7 +359,8 @@ bool OriginalUiRiderProfileOwner50KG::initializeHallRecordsAtApplicationStartup(
     game::OriginalUiHallRecords50KG next;game::OriginalUiHallRecordsDiagnostic50KG records;
     if(!game::initializeOriginalUiHallRecords50KG(english,next,records))
         return fail(d,records.error==game::OriginalUiHallRecordsDiagnostic50KG::Error::localization?Error::archive:Error::range,records.sourcePC);
-    storage_->hallRecords=next;storage_->hallRecordsInitialized=true;++storage_->generation;return true;
+    storage_->hallRecords=next;storage_->saveProfile.recordFreshHall(next);
+    storage_->hallRecordsInitialized=true;++storage_->generation;return true;
 }
 bool OriginalUiRiderProfileOwner50KG::hallRecordsReady() const noexcept {
     return storage_&&storage_->common&&storage_->common->known&&storage_->hallRecordsInitialized;
@@ -498,7 +500,7 @@ bool OriginalUiRiderProfileOwner50KG::courseSnapshot(game::OriginalUiCourseRemem
     game::OriginalUiCourseRememberedProfile50KG p;p.ownerReady=true;p.mode34=s.common->mode34;p.mawhonicRylothTest=s.testRider==9;p.wanMbTest=s.testRider==16;p.gasganoScTest=s.gasganoScTest;p.tzidikTcTest=s.tzidikTcTest;p.scorchRcTest=s.scorchRcTest;p.sebulbaTbTest=s.sebulbaTbTest;p.kraidGbTest=s.kraidGbTest;p.youngAnakinMcTest=s.youngAnakinMcTest;
     p.course700=s.rememberedCourse[0];p.laps704=s.rememberedCourse[1];p.entrants708=s.rememberedCourse[2];p.subtype70C=s.rememberedCourse[3];
     p.course710=s.rememberedCourse[4];p.entrants714=s.rememberedCourse[5];p.laps718=s.rememberedCourse[6];
-    p.packed1125E=s.packed1125E;p.cardFlag100BC=s.cardFlag100BC;p.availability11018=s.common->availability11018;
+    p.packed1125E=s.packed1125E;p.cardFlag100BC=s.saveProfile.dirty100BCBit0();p.availability11018=s.common->availability11018;
     p.planet0Primary79C=s.planetColors[0].primary79C;p.planet0Secondary7A0=s.planetColors[0].secondary7A0;p.courseOrder100C4=s.courseOrder100C4;out=p;return true;
 }
 bool OriginalUiRiderProfileOwner50KG::riderConfirmSnapshot(std::uint8_t& packed,std::uint32_t& comparison)const noexcept{
@@ -564,7 +566,7 @@ bool OriginalUiRiderProfileOwner50KG::tournamentCareerSnapshot(std::uint32_t ind
     const auto& c=storage_->tournament.careers[index];TournamentCareerSnapshot p;
     p.career100C0=index;p.earned2190=c.earned2190;p.unspent2194=c.unspent2194;p.kills2198=c.kills2198;
     p.progress219C=c.progress219C;p.availability11018=storage_->common->availability11018;
-    p.cardFlag100BC=storage_->cardFlag100BC;
+    p.cardFlag100BC=storage_->saveProfile.dirty100BCBit0();
     p.medals1938=c.pods[index].medals1938;p.remainingPrizes1946=c.pods[index].remainingPrizes1946;p.stamp=stamp();out=p;return true;
 }
 bool OriginalUiRiderProfileOwner50KG::selectedGarageProfileSnapshot(GarageProfileSnapshot& out)const noexcept {
@@ -651,7 +653,7 @@ bool OriginalUiRiderProfileOwner50KG::commitTournamentRaceResult(const game::Lap
     receipt=game::applyOriginalTournamentResult50KG(storage_->tournament,storage_->comparison100C0,storage_->packed1125F,
         racers,count,humans,storage_->common->availability11018,application.rawRandom308030);
     if(receipt.status!=game::OriginalTournamentResultStatus50KG::complete)return false;
-    storage_->cardFlag100BC=true; //actual1AB648 dirty bit AFTER187D80.
+    storage_->saveProfile.markDirty1AB648(); //actual1AB648 AFTER187D80.
     storage_->tournamentResultArmed=false;storage_->tournamentLaunchManager=nullptr;storage_->tournamentLaunchApplication=nullptr;
     ++storage_->generation;return true;
 }

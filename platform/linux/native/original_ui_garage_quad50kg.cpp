@@ -1,6 +1,7 @@
 #include "vehicle_window_gl50ds.h"
 #include "original_ui_garage_quad50kg.h"
 #include "original_ui_garage_draw_contribution50kg.h"
+#include "original_ui_shared_dialogs50kg.h"
 #include "../../../tests/native/original_ui_main_entry50kg.h"
 #include <bit>
 #include <atomic>
@@ -336,24 +337,21 @@ bool OriginalUiGarageQuad50KG::packetCurrent2DF550()const noexcept {
 bool OriginalUiGarageQuad50KG::canMutatePacket2DF550()const noexcept {
     return packetCurrent2DF550()&&!nativeGarageFifoPins_&&packetRevision_!=std::numeric_limits<std::uint64_t>::max();
 }
-bool OriginalUiGarageQuad50KG::draw2DF550(OriginalUiGarageDrawContribution50KG& draw,Diagnostic& d)noexcept {
-    d={};const auto stop=[&](Status status,std::uint32_t pc){d.status=status;d.sourcePC=pc;pendingPC_=pc;return false;};
+void OriginalUiGarageQuad50KG::initializeDrawAssertion2DF550()noexcept {
     // One real process-local lazy assertion history, not one copy per Quad.
     static std::atomic<std::uint8_t> guard8F10{0};static std::atomic<std::uint32_t> assertion444770{0};
     if(!guard8F10.load(std::memory_order_acquire)){
         assertion444770.store(1,std::memory_order_relaxed);guard8F10.store(1,std::memory_order_release);
     }
-    if(!draw.quadInvocation2DF550Current(*this))return stop(Status::phase,0x2df5b4u);
-    OriginalUiGarageDrawContribution50KG::QuadRenderInputs input;std::uint32_t pc=0;
-    if(!draw.readQuadInputs2DF550(*this,input,pc))return stop(Status::phase,pc?pc:0x2df5e8u);
-    // Original2DF5EC returns WITHOUT touching the packet or collector when
-    // this actual initialized process word is zero. It is never inferred.
-    if(!input.sourceQuadEnabled383678){d.sourcePC=0x2df87cu;return true;}
+}
+bool OriginalUiGarageQuad50KG::regeneratePacket2DF550(std::uint32_t viewportWidth,
+    std::uint32_t viewportHeight,Diagnostic& d)noexcept {
+    const auto stop=[&](Status status,std::uint32_t pc){d.status=status;d.sourcePC=pc;pendingPC_=pc;return false;};
     if(!canMutatePacket2DF550()||(flags5CKnownMask&3u)!=3u||std::fegetround()!=FE_TONEAREST)
         return stop(Status::phase,0x2df634u);
     QuadScalar2DF550 arithmetic;
-    const float width=arithmetic.unsignedWord(input.viewportWidth1E8);
-    const float height=arithmetic.unsignedWord(input.viewportHeight1EC);
+    const float width=arithmetic.unsignedWord(viewportWidth);
+    const float height=arithmetic.unsignedWord(viewportHeight);
     // These viewport writes happen even when position is not dirty. Their
     // retained packet mutation is visible if a later numeric/collector fails.
     resource58[3].words[0]=std::bit_cast<std::uint32_t>(width);
@@ -382,8 +380,34 @@ bool OriginalUiGarageQuad50KG::draw2DF550(OriginalUiGarageDrawContribution50KG& 
         if(flags5CValue&2u)flags5CValue&=std::uint8_t(~2u); //2DF808, only actual rotation branch.
         flags5CValue&=std::uint8_t(~1u); //2DF860, after all actual XY stores.
     }
+    return true;
+}
+bool OriginalUiGarageQuad50KG::draw2DF550(OriginalUiGarageDrawContribution50KG& draw,Diagnostic& d)noexcept {
+    d={};const auto stop=[&](Status status,std::uint32_t pc){d.status=status;d.sourcePC=pc;pendingPC_=pc;return false;};
+    initializeDrawAssertion2DF550();
+    if(!draw.quadInvocation2DF550Current(*this))return stop(Status::phase,0x2df5b4u);
+    OriginalUiGarageDrawContribution50KG::QuadRenderInputs input;std::uint32_t pc=0;
+    if(!draw.readQuadInputs2DF550(*this,input,pc))return stop(Status::phase,pc?pc:0x2df5e8u);
+    if(!input.sourceQuadEnabled383678){d.sourcePC=0x2df87cu;return true;}
+    if(!regeneratePacket2DF550(input.viewportWidth1E8,input.viewportHeight1EC,d))return false;
     if(!draw.collectQuadPrimitive246760(*this,d.material)){
         d.sourceEffectsCommitted=d.sourceEffectsCommitted||d.material.sourceEffectsCommitted;
+        return stop(Status::material,d.material.sourcePC?d.material.sourcePC:0x2df874u);
+    }
+    pendingPC_=0;d.sourcePC=0x2df87cu;return true;
+}
+bool OriginalUiGarageQuad50KG::drawWarning4702DF550(OriginalUiGarageDrawContribution50KG& draw,
+    OriginalUiSharedDialogs50KG& shared,Diagnostic& d)noexcept {
+    d={};const auto stop=[&](Status status,std::uint32_t pc){d.status=status;d.sourcePC=pc;pendingPC_=pc;return false;};
+    initializeDrawAssertion2DF550();
+    if(!shared.warning470QuadCurrent(draw,*this))return stop(Status::phase,0x2df5b4u);
+    OriginalUiGarageDrawContribution50KG::QuadRenderInputs input;std::uint32_t pc=0;
+    if(!draw.readWarning470QuadInputs2DF550(shared,*this,input,pc))return stop(Status::phase,pc?pc:0x2df5e8u);
+    // The same source process word, not warning visibility or a page exception.
+    if(!input.sourceQuadEnabled383678){d.sourcePC=0x2df87cu;return true;}
+    if(!regeneratePacket2DF550(input.viewportWidth1E8,input.viewportHeight1EC,d))return false;
+    if(!draw.collectWarning470Quad246760(shared,*this,d.material)){
+        d.sourceEffectsCommitted|=d.material.sourceEffectsCommitted;
         return stop(Status::material,d.material.sourcePC?d.material.sourcePC:0x2df874u);
     }
     pendingPC_=0;d.sourcePC=0x2df87cu;return true;

@@ -1827,6 +1827,18 @@ bool OriginalStandardTextureResource50LA::demandGarageFloor1FDD60(
     if(!(10.f<=demand10_)){demand10_=10.f;written=true;}
     return true;
 }
+bool OriginalStandardTextureResource50LA::demandSharedWarning204A84(bool& written,D& d) noexcept {
+    written=false;
+    if(!constructed_||references00_<=0||!construction_||!construction_->live())
+        return fail(d,E::phase,0x204A84);
+    using Math=detail::StandardTextureDemandMath50LA;
+    if(!Math::supported()||!Math::ordinary(demand10_)||demand10_<0.f)
+        return fail(d,E::number,0x204A74);
+    // 204A74 is c.le.s(10,current); the source skips the store when true.
+    // This changes the same canonical texture field, never an image-bank copy.
+    if(!(10.f<=demand10_)){demand10_=10.f;written=true;d.sourceEffectsCommitted=true;}
+    d.sourcePC=0x204A84;return true;
+}
 bool OriginalStandardTextureResource50LA::demandTournamentMarker1F264C(bool& written,D& d) noexcept {
     written=false;
     if(!aggregate_||!constructed_||references00_<=0||!construction_||!construction_->live())
@@ -1988,10 +2000,12 @@ bool OriginalStandardTextureResource50LA::demand104A00(float request,bool& writt
     return true;
 }
 void OriginalStandardTextureResource50LA::resetDemand14D1A8() noexcept {demand10_=0.f;}
-void OriginalStandardTextureLifetime50LA::resetDemand14D180() noexcept {
-    //No public/current caller exists. The future source254AD0 frame entry must
-    //invoke this exact shared-list reset; demand calls themselves never reset.
+bool OriginalStandardTextureLifetime50LA::resetDemand14D180() noexcept {
+    // No public/current caller exists. Do not invalidate a retained partial
+    // warning callback if the future254AD0 owner attempts a new frame reset.
+    if(nativeWarningDemandOwner_||nativeWarningDemandEpoch_)return false;
     for(cursor08_=head00_;cursor08_;cursor08_=cursor08_->nextA0_)
         cursor08_->resource_->resetDemand14D1A8();
+    return true;
 }
 }

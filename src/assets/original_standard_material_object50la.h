@@ -133,6 +133,9 @@ private:
     bool selectScreenPrototype24B278(std::size_t,std::size_t,
         const OriginalStandardTextureResource50LA&,
         const OriginalStandardTextureResource50LA*&,OriginalStandardMaterialDiagnostic50LA&) const noexcept;
+    bool demandSharedWarning2DF8A0(const OriginalStandardTextureTable50LA&,
+        const OriginalUiMemberView50KG&,const OriginalUiMemberView50KG&,
+        OriginalStandardMaterialDiagnostic50LA&) const noexcept;
     bool demandGarage2DF8A0(const OriginalStandardTextureTable50LA&,
         std::uint32_t storePC,OriginalStandardMaterialDiagnostic50LA&) const noexcept;
     bool demandTournamentFallback2DF8A0(const OriginalStandardTextureTable50LA&,

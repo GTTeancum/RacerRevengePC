@@ -11,7 +11,7 @@
 namespace rr::assets {struct OriginalStandardSurface246300_50LA;}
 namespace rr::platform {class OriginalUiGarageDrawContribution50KG;class OriginalUiGarageModelResource50KG;
 class OriginalUiGarageQuad50KG;class OriginalUiGarageScreenText50KG;class OriginalUiGarageVisibility50KG;
-class OriginalUiGarageSceneParticles50KG;}
+class OriginalUiGarageSceneParticles50KG;class OriginalUiSharedDialogs50KG;}
 namespace original_main_entry50KG {
 // Inactive native443848 semantic FIFO. The actual Application owns exactly
 //one active process-slot instance. Source race teardown clears that slot; a
@@ -22,6 +22,7 @@ class NativeCollectorFifo50LA final {
     friend class ::ra_source_camera50LA::OwnershipBridge;
     friend class rr::platform::VehicleWindowGl50DS;
     friend class rr::platform::OriginalUiGarageDrawContribution50KG;
+    friend class rr::platform::OriginalUiSharedDialogs50KG;
     using Table=rr::assets::OriginalStandardMaterialTable50LA;
     using Binding=rr::assets::OriginalCableEmissionBinding50LA;
     using Allocation=rr::game::OriginalPodCableAllocation50LA;
@@ -40,6 +41,14 @@ class NativeCollectorFifo50LA final {
         rr::platform::OriginalUiGarageScreenText50KG* garageText=nullptr;
         rr::platform::OriginalUiGarageQuad50KG* garageQuad=nullptr;
         std::uint64_t quadPacketRevision=0;
+        // UI470 is a distinct dispatcher receiver, never a Garage Page.
+        // The strong owner contains the exact private Dim160 payload; its
+        // dedicated tag cannot name an ordinal in any Page aperture array.
+        std::shared_ptr<rr::platform::OriginalUiSharedDialogs50KG> shared470Owner;
+        rr::platform::OriginalUiGarageScreenText50KG* warning470Text=nullptr;
+        rr::platform::OriginalUiGarageQuad50KG* warning470Quad=nullptr;
+        bool warning470Dim=false;
+        std::uint64_t warning470Epoch=0,warning470PacketRevision=0;
         rr::platform::OriginalUiGarageSceneParticles50KG* garageParticles=nullptr;
         std::uint64_t particlePacketRevision=0;
         std::shared_ptr<rr::platform::OriginalUiGaragePageOwner50KG> garageAperturePage;
@@ -93,6 +102,15 @@ class NativeCollectorFifo50LA final {
         rr::platform::OriginalUiGaragePageOwner50KG&,std::size_t,rr::assets::OriginalStandardMaterialDiagnostic50LA&)noexcept;
     bool collectGarageQuad246760(rr::platform::OriginalUiGarageDrawContribution50KG&,
         rr::platform::OriginalUiGarageQuad50KG&,rr::assets::OriginalStandardMaterialDiagnostic50LA&)noexcept;
+    bool collectShared470Text246760(rr::platform::OriginalUiGarageDrawContribution50KG&,
+        rr::platform::OriginalUiSharedDialogs50KG&,rr::platform::OriginalUiGarageScreenText50KG&,
+        std::size_t,rr::assets::OriginalStandardMaterialDiagnostic50LA&)noexcept;
+    bool collectShared470Quad246760(rr::platform::OriginalUiGarageDrawContribution50KG&,
+        rr::platform::OriginalUiSharedDialogs50KG&,rr::platform::OriginalUiGarageQuad50KG&,
+        rr::assets::OriginalStandardMaterialDiagnostic50LA&)noexcept;
+    bool collectShared470Dim246760(rr::platform::OriginalUiGarageDrawContribution50KG&,
+        rr::platform::OriginalUiSharedDialogs50KG&,rr::assets::OriginalStandardMaterialDiagnostic50LA&)noexcept;
+    bool shared470RecordCurrent(const Record&)const noexcept;
     bool publishGarageScissor280118(rr::platform::OriginalUiGarageDrawContribution50KG&,
         rr::platform::OriginalUiGarageVisibility50KG&,std::shared_ptr<rr::game::OriginalZoneScissor50LA>,
         rr::assets::OriginalStandardMaterialDiagnostic50LA&)noexcept;

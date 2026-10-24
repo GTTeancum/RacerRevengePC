@@ -8,6 +8,8 @@
 #include "original_ui_garage_text_overlay50kg.h"
 #include "original_ui_garage_page_owner50kg.h"
 #include "original_ui_garage_scene_particles50kg.h"
+#include "original_ui_shared_dialogs50kg.h"
+#include "original_ui_main_session50kg.h"
 #include <algorithm>
 #include <limits>
 namespace original_main_entry50KG {
@@ -64,7 +66,22 @@ bool NativeCollectorFifo50LA::appendGarage24B9B0(Record&& pending,std::int32_t r
     if(!pending.garageDraw||!pending.garagePublication||registration<0||
        !table_->coldCollectorEntry(registry_,static_cast<std::size_t>(registration),origin)||origin.finalLeaf<0||
        !table_->coldCollectorEntry(registry_,static_cast<std::size_t>(origin.finalLeaf),final)||
-       (unsigned(bool(pending.garageModel))+unsigned(bool(pending.garageText))+unsigned(bool(pending.garageQuad))+unsigned(bool(pending.garageAperturePage))+unsigned(bool(pending.garageParticles))!=1u))return reject(d,S::reference,0x24B9B0);
+       (unsigned(bool(pending.garageModel))+unsigned(bool(pending.garageText))+unsigned(bool(pending.garageQuad))+unsigned(bool(pending.garageAperturePage))+unsigned(bool(pending.garageParticles))+unsigned(bool(pending.warning470Text))+unsigned(bool(pending.warning470Quad))+unsigned(pending.warning470Dim)!=1u))return reject(d,S::reference,0x24B9B0);
+    const bool warningPayload=pending.warning470Text||pending.warning470Quad||pending.warning470Dim;
+    if(bool(pending.shared470Owner)!=warningPayload)return reject(d,S::reference,0x24B9B0);
+    if(warningPayload){const auto& owner=*pending.shared470Owner;
+        if(!application_->state||application_->state->sharedDialogs!=pending.shared470Owner||
+           owner.inputs_.root!=application_||!pending.warning470Epoch||pending.warning470Epoch!=owner.thirdPass470Epoch_||
+           (pending.warning470Text&&!owner.warning470TextCurrent(*pending.garageDraw,*pending.warning470Text))||
+           (pending.warning470Quad&&!owner.warning470QuadCurrent(*pending.garageDraw,*pending.warning470Quad))||
+           (pending.warning470Dim&&!owner.warning470DimCurrent(*pending.garageDraw)))
+            return reject(d,S::phase,0x24B9B0);
+        if(owner.nativeWarning470FifoPins_==std::numeric_limits<std::uint32_t>::max()||
+           (pending.warning470Text&&pending.warning470Text->nativeGarageFifoPins_==std::numeric_limits<std::uint32_t>::max())||
+           (pending.warning470Quad&&pending.warning470Quad->nativeGarageFifoPins_==std::numeric_limits<std::uint32_t>::max())||
+           (pending.warning470Dim&&(!owner.dialog470_.dim160||owner.dialog470_.dim160->nativeGarageFifoPins_==std::numeric_limits<std::uint32_t>::max())))
+            return reject(d,S::overflow,0x105720);
+    }
     for(const auto& r:records_)if(r.garageDraw!=pending.garageDraw||r.garagePublication!=pending.garagePublication)
         return reject(d,S::phase,0x24B9B0);
     if(pending.garageAperturePage&&(pending.apertureOrdinal>=pending.garageAperturePage->apertures_.size()||
@@ -92,6 +109,12 @@ bool NativeCollectorFifo50LA::appendGarage24B9B0(Record&& pending,std::int32_t r
     if(record.garageText)++record.garageText->nativeGarageFifoPins_;
     if(record.garageQuad)++record.garageQuad->nativeGarageFifoPins_;
     if(record.garageAperturePage)++record.garageAperturePage->apertures_[record.apertureOrdinal]->nativeGarageFifoPins_;
+    if(record.shared470Owner){
+        ++record.shared470Owner->nativeWarning470FifoPins_;
+        if(record.warning470Text)++record.warning470Text->nativeGarageFifoPins_;
+        if(record.warning470Quad)++record.warning470Quad->nativeGarageFifoPins_;
+        if(record.warning470Dim)++record.shared470Owner->dialog470_.dim160->nativeGarageFifoPins_;
+    }
     ++garageRecordCount_;d.sourceEffectsCommitted=true;d.sourcePC=0x24BA28;return true;
 }
 bool NativeCollectorFifo50LA::collectGarageModel241280(
@@ -257,6 +280,139 @@ bool NativeCollectorFifo50LA::collectGarageQuad246760(
     }
     d.sourcePC=0x24680C;return true;
 }
+bool NativeCollectorFifo50LA::collectShared470Text246760(
+    rr::platform::OriginalUiGarageDrawContribution50KG& draw,rr::platform::OriginalUiSharedDialogs50KG& owner,
+    rr::platform::OriginalUiGarageScreenText50KG& text,
+    std::size_t primitiveIndex,D& d)noexcept {
+    d={};RetainAppendEffects effects{d,garageRecordCount_,garageRecordCount_};
+    if(!application_||!retainGarageRegistry(*application_,d))return false;
+    const auto self=draw.retainSelfForFifo();
+    const auto held=application_->state?application_->state->sharedDialogs:nullptr;
+    if(!self||held.get()!=&owner||draw.issuer_!=application_||!owner.warning470TextCurrent(draw,text)||
+       text.issuer_!=application_||text.domain_!=application_->standardMaterialDomainOwner_||
+       !text.coldInputsCurrent()||text.phase_!=decltype(text.phase_)::coldLoaded||
+       primitiveIndex>=text.active5E_||primitiveIndex>=text.publishedPrimitives_||
+       !text.primitives4_||!text.primitives4_[primitiveIndex])return reject(d,S::phase,0x2E01F0);
+    if(!application_->materialRuntime.callbackOverrideKnown||application_->materialRuntime.callbackOverride435678)
+        return reject(d,S::runtime,0x24A674);
+    auto& primitive=*text.primitives4_[primitiveIndex];
+    if(!primitive.materialStored||!primitive.materialRetained||primitive.material00<0||!primitive.packet10||
+       primitive.optional04||primitive.optional14||(primitive.flags0F&1u))return reject(d,S::source,0x246760);
+    const rr::assets::OriginalStandardMaterialObject50LA* material=nullptr;
+    if(!table_->resolve298E60(primitive.material00,material,d)||!material||!material->passCount48()||
+       *material->passCount48()<0)return reject(d,S::reference,0x246798);
+    for(std::int32_t i=0;i<*material->passCount48();++i){
+        rr::assets::OriginalStandardMaterialPassView50LA pass;
+        rr::assets::OriginalStandardMaterialCollectorEntryView50LA entry;
+        if(!material->pass4C(static_cast<std::size_t>(i),pass)||!pass.flags21||
+           !table_->coldCollectorPass(registry_,primitive.material00,static_cast<std::size_t>(i),entry))
+            return reject(d,S::collector,0x24A728);
+        if(!(*pass.flags21&2u))continue;
+        if(!table_->serviceRetainedScreenPrototype24A740(registry_,primitive.material00,static_cast<std::size_t>(i),d))return false;
+        Record record;record.garageDraw=self;record.garagePublication=draw.publication_;
+        record.shared470Owner=held;record.warning470Epoch=owner.thirdPass470Epoch_;
+        record.warning470Text=&text;record.textPrimitive=primitiveIndex;record.primitive04=&primitive;
+        //2E02A0 passes no model attributes. The retained actual glyph packet
+        //contains its own STQ/RGBA/XYZ aliases, never replacement host geometry.
+        record.attributes08=nullptr;record.originParameters=pass.parameters34;
+        record.textureBase=pass.textureAnimation10;
+        if(!appendGarage24B9B0(std::move(record),entry.registration,d))return false;
+    }
+    d.sourcePC=0x24680C;return true;
+}
+bool NativeCollectorFifo50LA::collectShared470Quad246760(
+    rr::platform::OriginalUiGarageDrawContribution50KG& draw,rr::platform::OriginalUiSharedDialogs50KG& owner,
+    rr::platform::OriginalUiGarageQuad50KG& quad,D& d)noexcept {
+    d={};RetainAppendEffects effects{d,garageRecordCount_,garageRecordCount_};
+    if(!application_||!retainGarageRegistry(*application_,d))return false;
+    const auto self=draw.retainSelfForFifo();
+    const auto held=application_->state?application_->state->sharedDialogs:nullptr;
+    if(!self||held.get()!=&owner||draw.issuer_!=application_||!owner.warning470QuadCurrent(draw,quad)||
+       quad.domain_!=application_->standardMaterialDomainOwner_||!quad.packetCurrent2DF550()||
+       quad.nativeGarageFifoPins_||!quad.packetRevision_||!quad.material54||quad.material54!=quad.primitiveOwner_.get())
+        return reject(d,S::phase,0x2DF8B0);
+    if(!application_->materialRuntime.callbackOverrideKnown||application_->materialRuntime.callbackOverride435678)
+        return reject(d,S::runtime,0x24A674);
+    const auto& primitive=*quad.material54;
+    if(!primitive.materialStored||!primitive.materialRetained||primitive.material00<0||
+       primitive.packet10!=quad.resource58||primitive.optional04||primitive.optional14||(primitive.flags0F&1u))
+        return reject(d,S::source,0x246760);
+    const rr::assets::OriginalStandardMaterialObject50LA* material=nullptr;
+    if(!table_->resolve298E60(primitive.material00,material,d)||!material||!material->passCount48()||*material->passCount48()<0)
+        return reject(d,S::reference,0x246798);
+    for(std::int32_t i=0;i<*material->passCount48();++i){
+        rr::assets::OriginalStandardMaterialPassView50LA pass;rr::assets::OriginalStandardMaterialCollectorEntryView50LA entry;
+        if(!material->pass4C(static_cast<std::size_t>(i),pass)||!pass.flags21||
+           !table_->coldCollectorPass(registry_,primitive.material00,static_cast<std::size_t>(i),entry))
+            return reject(d,S::collector,0x24A728);
+        if(!(*pass.flags21&2u))continue;
+        if(!table_->serviceRetainedScreenPrototype24A740(registry_,primitive.material00,static_cast<std::size_t>(i),d))return false;
+        Record record;record.garageDraw=self;record.garagePublication=draw.publication_;
+        record.shared470Owner=held;record.warning470Epoch=owner.thirdPass470Epoch_;
+        record.warning470Quad=&quad;record.warning470PacketRevision=quad.packetRevision_;record.primitive04=&primitive;
+        record.attributes08=nullptr;record.originParameters=pass.parameters34;record.textureBase=pass.textureAnimation10;
+        if(!appendGarage24B9B0(std::move(record),entry.registration,d))return false;
+    }
+    d.sourcePC=0x24680C;return true;
+}
+bool NativeCollectorFifo50LA::collectShared470Dim246760(
+    rr::platform::OriginalUiGarageDrawContribution50KG& draw,rr::platform::OriginalUiSharedDialogs50KG& owner,D& d)noexcept {
+    d={};RetainAppendEffects effects{d,garageRecordCount_,garageRecordCount_};
+    if(!application_||!retainGarageRegistry(*application_,d))return false;
+    const auto self=draw.retainSelfForFifo();
+    const auto held=application_->state?application_->state->sharedDialogs:nullptr;
+    if(!self||held.get()!=&owner||draw.issuer_!=application_||!owner.warning470DimCurrent(draw)||
+       !owner.warning470DimPacketCurrent2E21D0()||owner.dialog470_.dim160->nativeGarageFifoPins_)
+        return reject(d,S::phase,0x2E23DC);
+    const auto& dim=*owner.dialog470_.dim160;const auto& primitive=*dim.primitives30[0];
+    if(dim.dirty3C||!application_->materialRuntime.callbackOverrideKnown||application_->materialRuntime.callbackOverride435678)
+        return reject(d,S::runtime,0x24A674);
+    const rr::assets::OriginalStandardMaterialObject50LA* material=nullptr;
+    if(!table_->resolve298E60(primitive.material00,material,d)||!material||!material->passCount48()||*material->passCount48()<0)
+        return reject(d,S::reference,0x246798);
+    for(std::int32_t i=0;i<*material->passCount48();++i){
+        rr::assets::OriginalStandardMaterialPassView50LA pass;rr::assets::OriginalStandardMaterialCollectorEntryView50LA entry;
+        if(!material->pass4C(static_cast<std::size_t>(i),pass)||!pass.flags21||
+           !table_->coldCollectorPass(registry_,primitive.material00,static_cast<std::size_t>(i),entry))
+            return reject(d,S::collector,0x24A728);
+        if(!(*pass.flags21&2u))continue;
+        if(!table_->serviceRetainedScreenPrototype24A740(registry_,primitive.material00,static_cast<std::size_t>(i),d))return false;
+        Record record;record.garageDraw=self;record.garagePublication=draw.publication_;
+        record.shared470Owner=held;record.warning470Epoch=owner.thirdPass470Epoch_;
+        record.warning470Dim=true;record.warning470PacketRevision=dim.packetRevision_;record.primitive04=&primitive;
+        record.originParameters=pass.parameters34;record.textureBase=pass.textureAnimation10;
+        if(!appendGarage24B9B0(std::move(record),entry.registration,d))return false;
+    }
+    d.sourcePC=0x24680C;return true;
+}
+bool NativeCollectorFifo50LA::shared470RecordCurrent(const Record& record)const noexcept {
+    const auto& owner=record.shared470Owner;
+    if(!application_||!application_->state||!owner||application_->state->sharedDialogs!=owner||
+       owner->inputs_.root!=application_||!owner->current()||!owner->dialog470_.loaded||
+       !owner->nativeWarning470FifoPins_||!record.warning470Epoch||record.warning470Epoch!=owner->thirdPass470Epoch_||
+       !record.garageDraw||record.garageDraw->issuer_!=application_||
+       record.garagePublication!=record.garageDraw->publication_||record.epoch!=epoch04_||
+       record.garageModel||record.garageText||record.garageQuad||record.garageAperturePage||record.garageParticles||
+       unsigned(bool(record.warning470Text))+unsigned(bool(record.warning470Quad))+unsigned(record.warning470Dim)!=1u)
+        return false;
+    if(record.warning470Text){const auto& text=*record.warning470Text;
+        return (&text==owner->dialog470_.message1B0.get()||&text==owner->dialog470_.alternate220.get())&&
+            text.issuer_==application_&&text.domain_==owner->inputs_.domain&&text.context_==owner->inputs_.context&&
+            text.nativeGarageFifoPins_&&text.coldInputsCurrent()&&text.phase_==decltype(text.phase_)::coldLoaded&&
+            record.textPrimitive<text.active5E_&&record.textPrimitive<text.publishedPrimitives_&&text.primitives4_&&
+            text.primitives4_[record.textPrimitive]&&record.primitive04==text.primitives4_[record.textPrimitive].get();
+    }
+    if(record.warning470Quad){const auto& quad=*record.warning470Quad;bool exact=false;
+        for(const auto& candidate:owner->dialog470_.strips)if(&candidate==&quad)exact=true;
+        return exact&&quad.nativeGarageFifoPins_&&quad.packetCurrent2DF550()&&
+            quad.domain_==owner->inputs_.domain&&quad.context_==owner->inputs_.context&&
+            record.warning470PacketRevision&&record.warning470PacketRevision==quad.packetRevision_&&
+            record.primitive04==quad.material54;
+    }
+    return owner->warning470DimPacketCurrent2E21D0()&&owner->dialog470_.dim160->nativeGarageFifoPins_&&
+        record.warning470PacketRevision&&record.warning470PacketRevision==owner->dialog470_.dim160->packetRevision_&&
+        record.primitive04==owner->dialog470_.dim160->primitives30[0].get();
+}
 bool NativeCollectorFifo50LA::publishGarageScissor280118(
     rr::platform::OriginalUiGarageDrawContribution50KG& draw,rr::platform::OriginalUiGarageVisibility50KG& visibility,
     std::shared_ptr<rr::game::OriginalZoneScissor50LA> zone,D& d)noexcept {
@@ -276,6 +432,15 @@ void NativeCollectorFifo50LA::releaseGarageRecordAfter105990(Record& record)noex
     if(record.garageQuad){if(!record.garageQuad->nativeGarageFifoPins_)std::terminate();--record.garageQuad->nativeGarageFifoPins_;}
     if(record.garageAperturePage){auto& a=*record.garageAperturePage->apertures_[record.apertureOrdinal];
         if(!a.nativeGarageFifoPins_)std::terminate();--a.nativeGarageFifoPins_;}
+    if(record.shared470Owner){
+        if(!shared470RecordCurrent(record))std::terminate();
+        auto& owner=*record.shared470Owner;
+        if(record.warning470Text)--record.warning470Text->nativeGarageFifoPins_;
+        if(record.warning470Quad)--record.warning470Quad->nativeGarageFifoPins_;
+        if(record.warning470Dim)--owner.dialog470_.dim160->nativeGarageFifoPins_;
+        --owner.nativeWarning470FifoPins_;
+        owner.release470QueueFenceIfQuiescent();
+    }
     --garageRecordCount_;table_->unpinNativeCollector();
 }
 }

@@ -72,6 +72,9 @@ private:
     bool packetCurrent2DF550()const noexcept;
     bool canMutatePacket2DF550()const noexcept;
     bool draw2DF550(OriginalUiGarageDrawContribution50KG&,Diagnostic&)noexcept;
+    bool drawWarning4702DF550(OriginalUiGarageDrawContribution50KG&,OriginalUiSharedDialogs50KG&,Diagnostic&)noexcept;
+    static void initializeDrawAssertion2DF550()noexcept;
+    bool regeneratePacket2DF550(std::uint32_t,std::uint32_t,Diagnostic&)noexcept;
     struct LoweredPacket327E90 {
         std::array<assets::Vertex48B,8> vertices{};
         std::array<std::array<float,3>,8> stq{};

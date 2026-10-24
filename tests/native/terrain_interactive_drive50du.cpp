@@ -9643,7 +9643,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   std::vector<std::uint8_t> captureRgbRow(headlessLive?static_cast<std::size_t>(nativeVideo->width)*3u:0u);
   const char* visibilitySetting=std::getenv("RR_CAPTURE_VISIBILITY");
   const bool captureVisibility=visibilitySetting&&std::string(visibilitySetting)=="1";
-  platform::OriginalUiControllerNavigation50LA originalUiControllerNavigation;
+  platform::OriginalUiControllerNavigation50LA originalUiControllerNavigation,originalUiSecondControllerNavigation;
   platform::OriginalSpectatorMenuInput50LA spectatorMenuInput;
   bool spectatorInputActive=false,spectatorClockResetRequired=true;
   std::uint64_t spectatorUnderlayPublication=0;
@@ -10027,9 +10027,15 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     }
     // At most eight receipts for the first inactive iteration, plus the two
     // second-poll receipts above. Logging never supplies a source-clock value.
-    platform::OriginalUiControllerNavigation50LA::Events menuEvents;
+    platform::OriginalUiControllerNavigation50LA::Events menuEvents,secondMenuEvents;
     require50DU(originalUiControllerNavigation.observe(input,active,menuEvents),
         "original frontend physical controller snapshot invalid");
+    // Separate physical identity and release-to-arm lifetime for port two.
+    // An inactive Controls2 route disarms it; keyboard always remains port zero.
+    const auto secondInputRoute=originalMain.coordinator.snapshot().route;
+    require50DU(originalUiSecondControllerNavigation.observe(input,active&&
+        secondInputRoute.screen==12&&secondInputRoute.page==3,secondMenuEvents,1),
+        "original frontend second physical controller snapshot invalid");
     const bool traceFirstMainInactive=originalMain.traceStages&&!active&&!firstMainInactiveReported;
     if(traceFirstMainInactive){
      firstMainInactiveReported=true;
@@ -10085,6 +10091,14 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     menuEvents[6]=menuEvents[6]||input.pressed[41]||hostInput.menuRequested;
     for(const unsigned event:{0u,1u,2u,3u,4u,5u,7u,6u})
      if(menuEvents[event])originalMain.input(static_cast<std::uint8_t>(event),input.secondControllerPresence);
+    // Never merge two physical ports or retag keyboard input as controller one.
+    if(secondInputRoute.screen==12&&secondInputRoute.page==3&&
+       input.secondControllerPresence==platform::WindowControllerPresence50DQ::Present)
+     for(const unsigned event:{0u,1u,2u,3u,4u,5u,7u,6u}){
+      const auto currentRoute=originalMain.coordinator.snapshot().route;
+      if(currentRoute.screen!=12||currentRoute.page!=3)break;
+      if(secondMenuEvents[event])originalMain.input(static_cast<std::uint8_t>(event),input.secondControllerPresence,1);
+     }
     const auto uiNow=monotonicNow50DU();
     const std::uint64_t elapsedNanoseconds=originalMain.acceptedElapsed(uiNow);
     const float elapsed=originalMain.preparedSourceUpdateSeconds();

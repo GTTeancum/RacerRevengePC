@@ -428,6 +428,8 @@ private:
     // Actual1FDD60 resolved prototype, not a selected animation frame.
     bool demandGarageFloor1FDD60(std::uint32_t storePC,bool& written,
         OriginalStandardTextureDiagnostic50LA&) noexcept;
+    // Direct204A84 floor on the resolved texture, not projected104A00 demand.
+    bool demandSharedWarning204A84(bool& written,OriginalStandardTextureDiagnostic50LA&) noexcept;
     bool demandTournamentMarker1F264C(bool& written,OriginalStandardTextureDiagnostic50LA&) noexcept;
     bool demandTournamentOutline1F2530(bool& written,OriginalStandardTextureDiagnostic50LA&) noexcept;
     //18BA70 texture/font/triangle floors. The concrete owner must first

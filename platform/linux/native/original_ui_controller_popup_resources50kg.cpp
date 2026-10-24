@@ -1,4 +1,5 @@
 #include "original_ui_controller_popup_resources50kg.h"
+#include "original_ui_shared_dialog_material_history50kg.h"
 #include "original_ui_shared_dialogs50kg.h"
 #include "../../../tests/native/original_ui_main_entry50kg.h"
 #include "original_ui_options_draw_resources50kg.h"
@@ -28,6 +29,9 @@ struct OriginalUiControllerPopupResources50KG::Storage {
  assets::OriginalUiMaterialRuntime50KG runtime;
  std::array<assets::OriginalUiMaterialEquivalenceKey50KG,5> keys;
  std::array<assets::OriginalUiMaterialBindingState50KG,5> history;
+ // Null preserves the existing five-role owner. Once transferred, those five
+ // history records are empty and the legacy acquire/copy/commit path is shut.
+ std::shared_ptr<OriginalUiSharedDialogMaterialHistory50KG> sharedHistory;
  game::OriginalUiControllerPopupGeometry50KG geometry;
  const OriginalUiSourceOwner50KM* lease=nullptr;
  std::uint64_t revision=0;
@@ -55,8 +59,23 @@ bool OriginalUiControllerPopupResources50KG::sharedDialogBoundCurrent(const Orig
  return sharedDialogOwnerCurrent(owner)&&storage_->sharedOwner==&owner;
 }
 bool OriginalUiControllerPopupResources50KG::preflightSharedRetirement20DF80(const OriginalUiSharedDialogs50KG& owner)const noexcept {
- return storage_&&storage_->sharedOwner==&owner&&!storage_->lease&&!storage_->poisoned&&
+ return storage_&&storage_->sharedOwner==&owner&&!storage_->lease&&
+  (storage_->sharedHistory?storage_->sharedHistory->preflight47CRetirement(owner):!storage_->poisoned)&&
   owner.controller47C_.resources.get()==this&&owner.nativeMaterialRetirementCurrent();
+}
+bool OriginalUiControllerPopupResources50KG::transferInitialHistoryTo(const OriginalUiSharedDialogs50KG& owner,
+ const std::shared_ptr<OriginalUiSharedDialogMaterialHistory50KG>& target,D& d)noexcept {
+ d={};if(!storage_||!target||storage_->sharedHistory||storage_->sharedOwner!=&owner||
+  storage_->lease||storage_->revision||storage_->poisoned||storage_->retiring||storage_->retiredSharedParts||
+  !sharedDialogBoundCurrent(owner)||owner.controller47C_.resources.get()!=this||
+  !target->source47CTransferCurrent(owner,*this))return fail(d,E::history,0x2055B0);
+ OriginalUiOptionsColdInput50KG original;original.appStart=storage_->appStart;original.controllerPopup=storage_->popup;
+ original.fonts=storage_->fonts;original.video=storage_->video;original.runtime=storage_->runtime;
+ if(!target->preparedSourcesCurrent(original))return fail(d,E::identity,0x2476A0);
+ if(!target->takeColdFive(owner,*this,storage_->keys,storage_->history,d))return false;
+ // Shared-pointer retention cannot allocate or fail after the exact record
+ // transfer. The genuine SharedDialogs bootstrap installs its second pin next.
+ storage_->sharedHistory=target;return true;
 }
 bool OriginalUiControllerPopupResources50KG::retireSharedPayloadPart20DF80(OriginalUiSharedDialogs50KG& owner,
  std::size_t step,D& d)noexcept {
@@ -79,7 +98,9 @@ bool OriginalUiControllerPopupResources50KG::finishSharedPayload20E008(OriginalU
  // All three native text strings/atlas borrows and all six native Quad/Dim
  // packet uses are gone. Release this real bank/Video/archive ownership last.
  // Other legitimate image-bank owners keep their own references unchanged.
- storage_.reset();return true;
+ const auto sharedHistory=storage_->sharedHistory;
+ storage_.reset();
+ return !sharedHistory||sharedHistory->finish47CPayload(owner,*this);
 }
 bool OriginalUiControllerPopupResources50KG::loaded()const noexcept{return storage_&&!storage_->retiring&&(!storage_->sharedOwner||
  storage_->sharedOwner->phase_==OriginalUiSharedDialogs50KG::Phase::loaded);}
@@ -95,6 +116,9 @@ bool OriginalUiControllerPopupResources50KG::prepareOrRejoin(const OriginalUiOpt
  // Prospective banks may validate immutable construction while another manager
  // leases the owner. They cannot copy histories or acquire until retirement.
  if(storage_&&(storage_->poisoned||!loaded()))return fail(d,E::poisoned,0x1B8718);
+ // A transferred owner cannot be "rejoined" through the old five-key API.
+ // The accepted canonical/effective bridge must first replace that API.
+ if(storage_&&storage_->sharedHistory)return fail(d,E::canonicalBridgePending,0x249BA0);
  if(storage_&&(!sameVideo(storage_->video,in.video)||!sameRuntime(storage_->runtime,in.runtime)))return fail(d,E::video,0x2476A0);
  try{
   std::array<assets::OriginalUiMaterialEquivalenceKey50KG,5> keys;
@@ -150,19 +174,20 @@ bool OriginalUiControllerPopupResources50KG::project(const game::OriginalUiContr
 bool OriginalUiControllerPopupResources50KG::copyHistory(std::uint32_t token,const assets::OriginalUiMaterialEquivalenceKey50KG& key,
  assets::OriginalUiMaterialBindingState50KG& out,D& d)const noexcept{
  d={};d.registryToken=token;if(!loaded()||storage_->poisoned||storage_->lease)return fail(d,E::history,0x29BEA0);
+ if(storage_->sharedHistory)return fail(d,E::canonicalBridgePending,0x249BA0);
  for(std::size_t i=0;i<registryTokens.size();++i)if(registryTokens[i]==token){
   if(assets::compareOriginalUiMaterialEquivalence50KG(storage_->keys[i],key)!=assets::OriginalUiMaterialEquivalence50KG::equivalent)return fail(d,E::history,0x249BA0);
   try{out=storage_->history[i];return true;}catch(...){return fail(d,E::allocation,0);}
  }return fail(d,E::identity,0x29BEA0);
 }
 bool OriginalUiControllerPopupResources50KG::acquire(const OriginalUiSourceOwner50KM* owner,std::uint64_t& revision)noexcept{
- if(!loaded()||!owner||storage_->poisoned||storage_->lease)return false;storage_->lease=owner;revision=storage_->revision;return true;
+ if(!loaded()||!owner||storage_->poisoned||storage_->lease||storage_->sharedHistory)return false;storage_->lease=owner;revision=storage_->revision;return true;
 }
 void OriginalUiControllerPopupResources50KG::release(const OriginalUiSourceOwner50KM* owner,bool retired)noexcept{
  if(!storage_||storage_->lease!=owner)return;if(!retired)storage_->poisoned=true;storage_->lease=nullptr;
 }
 bool OriginalUiControllerPopupResources50KG::current(const OriginalUiSourceOwner50KM* owner,std::uint64_t revision)const noexcept{
- return loaded()&&storage_->lease==owner&&!storage_->poisoned&&storage_->revision==revision;
+ return loaded()&&!storage_->sharedHistory&&storage_->lease==owner&&!storage_->poisoned&&storage_->revision==revision;
 }
 bool OriginalUiControllerPopupResources50KG::commit(const OriginalUiSourceOwner50KM* owner,std::uint64_t& revision,
  std::array<assets::OriginalUiMaterialBindingState50KG,5>& staged)noexcept{

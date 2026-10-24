@@ -18,6 +18,7 @@ namespace original_main_entry50KG {class NativeCollectorFifo50LA;}
 namespace rr::game {class OriginalZoneScissor50LA;}
 namespace rr::platform {
 class OriginalUiGarageSession50KG;
+class OriginalUiSharedDialogs50KG;
 class OriginalUiGarageTextOverlay50KG;class OriginalUiGarageScreenText50KG;class OriginalUiGarageWidget1Owner50KG;
 struct OriginalUiGarageScreenTextDiagnostic50KG;
 class OriginalUiGarageModelResource50KG;
@@ -66,6 +67,7 @@ public:
 class OriginalUiGarageDrawContribution50KG final:public OriginalUiSourceOwner50KM {
     friend struct ::original_main_entry50KG::Application;
     friend class OriginalUiGarageCameraFrame50KG;
+    friend class OriginalUiSharedDialogs50KG;
     friend class OriginalUiGarageSession50KG;
     friend class ::original_main_entry50KG::NativeCollectorFifo50LA;
     friend class OriginalUiGarageWidget1Owner50KG;
@@ -94,6 +96,19 @@ class OriginalUiGarageDrawContribution50KG final:public OriginalUiSourceOwner50K
     Phase phase_=Phase::issued;std::uint32_t sourcePC_=0x140230;
     std::size_t disabledSlots_=0,demandedPageQuads_=0;
     C* callback_=nullptr;bool attempted_=false;
+    // Strong native lease on the actual shared owner until inherited return
+    // or authenticated native failed-frame unwind, never page-Quad authority.
+    std::shared_ptr<OriginalUiSharedDialogs50KG> shared470FirstPassOwner_;
+    std::uint64_t shared470FirstPassEpoch_=0;
+    bool shared470InheritedReturned_=false;
+    std::uint64_t shared470FirstPassCompletedEpoch_=0,shared470FirstPassCompletedUpdate_=0;
+    std::shared_ptr<OriginalUiSharedDialogs50KG> shared470ThirdPassOwner_;
+    std::uint64_t shared470ThirdPassEpoch_=0;
+    bool shared470ThirdPassInheritedReturned_=false;
+    bool shared470ThirdPassReceiverCurrent(const OriginalUiSharedDialogs50KG&)const noexcept;
+    bool shared470ThirdPassFailedUnwindCurrent(const OriginalUiSharedDialogs50KG&)const noexcept;
+    bool shared470FirstPassReceiverCurrent(const OriginalUiSharedDialogs50KG&)const noexcept;
+    bool shared470FailedUnwindCurrent(const OriginalUiSharedDialogs50KG&)const noexcept;
     std::uint8_t textRestoreStep_=0;
     const OriginalUiGarageTextOverlay50KG* activeText_=nullptr;
     const OriginalUiGarageQuad50KG* activePageQuad_=nullptr;
@@ -103,6 +118,8 @@ class OriginalUiGarageDrawContribution50KG final:public OriginalUiSourceOwner50K
         bool sourceQuadEnabled383678=false;std::uint64_t publication=0;
     };
     bool readQuadInputs2DF550(const OriginalUiGarageQuad50KG&,QuadRenderInputs&,std::uint32_t&)const noexcept;
+    bool readWarning470QuadInputs2DF550(const OriginalUiSharedDialogs50KG&,const OriginalUiGarageQuad50KG&,QuadRenderInputs&,std::uint32_t&)const noexcept;
+    bool collectWarning470Quad246760(OriginalUiSharedDialogs50KG&,OriginalUiGarageQuad50KG&,assets::OriginalStandardMaterialDiagnostic50LA&)noexcept;
     bool quadInvocation2DF550Current(const OriginalUiGarageQuad50KG&)const noexcept;
     bool collectQuadPrimitive246760(OriginalUiGarageQuad50KG&,assets::OriginalStandardMaterialDiagnostic50LA&)noexcept;
     bool renderReturned140230Current(const Application&)const noexcept;
@@ -143,6 +160,9 @@ class OriginalUiGarageDrawContribution50KG final:public OriginalUiSourceOwner50K
     bool lowerAndBindQueuedParticle24B26C(std::size_t,assets::OriginalStandardMaterialDiagnostic50LA&)noexcept;
     bool drainParticleRecordCurrent()const noexcept;
     bool drainParticleClippedEmptyCurrent()const noexcept;
+    bool warning470DrainReceiverCurrent(const void*,std::int32_t,std::int32_t)const noexcept;
+    bool warning470DrainBindingCurrent(const void*,std::int32_t,std::int32_t)const noexcept;
+    bool prepareDrainWarning470DimPolicy24B130(const OriginalUiSharedDialogs50KG&,assets::OriginalStandardMaterialDiagnostic50LA&)noexcept;
     bool prepareDrainAperturePolicy24B130(std::size_t,assets::OriginalStandardMaterialDiagnostic50LA&)noexcept;
     bool prepareDrainScreenPolicies24B130(assets::OriginalStandardMaterialDiagnostic50LA&)noexcept;
     bool lowerAndBindQueuedScreen24B26C(std::size_t,assets::OriginalStandardMaterialDiagnostic50LA&)noexcept;
@@ -166,6 +186,9 @@ class OriginalUiGarageDrawContribution50KG final:public OriginalUiSourceOwner50K
         bool sourceApertureEnabled383680=false;std::uint64_t publication=0;};
     bool readApertureInputs2E21D0(const OriginalUiGaragePageOwner50KG&,std::size_t,ApertureRenderInputs&,std::uint32_t&)const noexcept;
     bool collectAperturePrimitive246760(OriginalUiGaragePageOwner50KG&,std::size_t,assets::OriginalStandardMaterialDiagnostic50LA&)noexcept;
+    bool readWarning470DimInputs2E21D0(const OriginalUiSharedDialogs50KG&,ApertureRenderInputs&,std::uint32_t&)const noexcept;
+    bool readWarning470TextInputs2E0170(const OriginalUiSharedDialogs50KG&,const OriginalUiGarageScreenText50KG&,TextRenderInputs&,std::uint32_t&)const noexcept;
+    bool collectWarning470Text246760(OriginalUiSharedDialogs50KG&,OriginalUiGarageScreenText50KG&,std::size_t,OriginalUiGarageScreenTextDiagnostic50KG&)noexcept;
     bool readPageTextInputs2E0170(const OriginalUiGarageScreenText50KG&,TextRenderInputs&,std::uint32_t&)const noexcept;
     bool readTextInputs29D3F0(const OriginalUiGarageTextOverlay50KG&,TextRenderInputs&,std::uint32_t&)const noexcept;
     bool textInvocation29D3F0Current(const OriginalUiGarageTextOverlay50KG&)const noexcept;

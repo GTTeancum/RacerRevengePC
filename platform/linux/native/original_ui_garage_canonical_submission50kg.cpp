@@ -252,6 +252,31 @@ bool OriginalUiGarageCanonicalSubmission50KG::stageParticleContexts249610(
         particleSpans_=spans;particleReceiver_=receiver;return true;
     }catch(...){return reject(d,S::allocation,0x24B218);}
 }
+bool OriginalUiGarageCanonicalSubmission50KG::stageWarning470ScreenPass(
+    OriginalUiGarageDrawContribution50KG& draw,std::int32_t row,std::uint32_t pass,const void* receiver,
+    const assets::OriginalUiArchive50KG& archive,const assets::OriginalUiMaterial50KG& material,
+    const assets::OriginalUiNativeMaterial50KG& policy,const OriginalUiMaterialSpanBinding50KG& binding,
+    OriginalUiMaterialSpan50KG& out,Map& mapOut,D& d)noexcept {
+    d={};assets::OriginalStandardMaterialCollectorEntryView50LA origin;
+    if(owner_!=&draw||generation_!=draw.publication_||draw.sourcePC_!=0x249610||!table_||
+       !table_->coldCollectorPass(receipt_,row,pass,origin)||
+       !draw.warning470DrainReceiverCurrent(receiver,origin.registration,origin.finalLeaf))
+        return reject(d,S::phase,0x249610);
+    // Shared material conversion/history, separate exact470 receiver proof.
+    return stageScreenPass(row,pass,receiver,archive,material,policy,binding,out,mapOut,d);
+}
+bool OriginalUiGarageCanonicalSubmission50KG::stageWarning470UntexturedScreenPass(
+    OriginalUiGarageDrawContribution50KG& draw,std::int32_t row,std::uint32_t pass,const void* receiver,
+    const assets::OriginalUiArchive50KG& archive,const assets::OriginalUiMaterial50KG& material,
+    const assets::OriginalUiNativeUntexturedMaterial50KG& policy,const OriginalUiUntexturedMaterialSpanBinding50KG& binding,
+    OriginalUiMaterialSpan50KG& out,Map& mapOut,D& d)noexcept {
+    d={};assets::OriginalStandardMaterialCollectorEntryView50LA origin;
+    if(owner_!=&draw||generation_!=draw.publication_||draw.sourcePC_!=0x249BA0||!table_||
+       !table_->coldCollectorPass(receipt_,row,pass,origin)||
+       !draw.warning470DrainReceiverCurrent(receiver,origin.registration,origin.finalLeaf))
+        return reject(d,S::phase,0x249BA0);
+    return stageUntexturedScreenPass(row,pass,receiver,archive,material,policy,binding,out,mapOut,d);
+}
 bool OriginalUiGarageCanonicalSubmission50KG::stageScreenPass(std::int32_t row,std::uint32_t pass,const void* receiver,
     const assets::OriginalUiArchive50KG& archive,const assets::OriginalUiMaterial50KG& material,
     const assets::OriginalUiNativeMaterial50KG& policy,const OriginalUiMaterialSpanBinding50KG& binding,
@@ -386,6 +411,11 @@ bool OriginalUiGarageCanonicalSubmission50KG::beginGarageBatch(
        draw.sourcePC_!=0x24B26Cu||!draw.drainBatchPending_||draw.drainBatchSubmitted_||draw.drainBatchFailed_||
        draw.drainBatchCanonical_.get()!=this||!draw.renderer_||
        !preflightBindingSet(&draw,draw.publication_,&draw.drainBatchNative_,renderer))return false;
+    // UI470's exact retained typed payload and epoch must still own the
+    // current FIFO record at submission, not only when geometry was lowered.
+    for(std::size_t i=0;i<contributions_.size();++i)if(contributions_[i].screenReceiver&&
+       !draw.warning470DrainBindingCurrent(contributions_[i].screenReceiver,
+           maps_[i].origin.registration,maps_[i].representative.registration))return false;
     renderer_=&renderer;attempted_=true;pending_=true;return true;
 }
 bool OriginalUiGarageCanonicalSubmission50KG::finish(std::uint64_t generation,bool accepted,bool started)noexcept {

@@ -129,7 +129,7 @@ namespace rr::platform {
 bool OriginalUiGarageDrawContribution50KG::publishReturnedTarget140A68(
  std::int32_t width,std::int32_t height,VehicleWindowDiagnostic50DS& d)noexcept {
  const auto session=session_.lock();d={};
- if(!issuer_||!renderReturned140230Current(*issuer_)||!session||
+ if(shared470FirstPassOwner_||shared470FirstPassEpoch_||shared470ThirdPassOwner_||shared470ThirdPassEpoch_||!issuer_||!renderReturned140230Current(*issuer_)||!session||
     session->runtimeTailPhase_!=OriginalUiGarageSession50KG::RootTailPhase::timingCommitted||
     session->runtimeTailPublication_!=publication_||targetPublishAttempted_||targetPublished140A68_){
    d.error=VehicleWindowError50DS::frame;d.operation="Garage target requires its exact committed Root audio/timing tail";return false;
@@ -141,7 +141,8 @@ bool OriginalUiGarageDrawContribution50KG::publishReturnedTarget140A68(
 bool OriginalUiGarageDrawContribution50KG::rearmNextPublication140230(
  ::original_ui_source_timing50LH::PublicationView timing,std::uint64_t serial,Diagnostic& d)noexcept {
  d={};const auto session=session_.lock();::original_ui_source_timing50LH::Sample sample;std::uint64_t prepared=0;
- if(!issuer_||!renderReturned140230Current(*issuer_)||!session||
+ if(shared470FirstPassOwner_||shared470FirstPassEpoch_||shared470ThirdPassOwner_||shared470ThirdPassEpoch_||
+    !issuer_||!renderReturned140230Current(*issuer_)||!session||
     session->runtimeTailPhase_!=OriginalUiGarageSession50KG::RootTailPhase::timingCommitted||
     session->runtimeTailPublication_!=publication_||!targetPublished140A68_||
     !timing.sameOwner(timing_)||!timing.sameOwner(session->entryTiming_)||
@@ -160,6 +161,7 @@ bool OriginalUiGarageDrawContribution50KG::rearmNextPublication140230(
  //changes no Frontend lease field. Preserve a failed unexpected prefix.
  if(!textureCoordinator_->renewGarageTexturePublication140230(*this,serial))return fail(d,0x140230);
  timing_=std::move(timing);publication_=serial;phase_=Phase::issued;sourcePC_=0x140230;
+ shared470FirstPassCompletedEpoch_=0;shared470FirstPassCompletedUpdate_=0;
  disabledSlots_=0;demandedPageQuads_=0;callback_=nullptr;attempted_=false;textRestoreStep_=0;
  viewportDepthCleared_=false;cameraPhase4Cleared_=false;finalEnabledSlots_=0;
  finalPassReturned140844_=false;rendererEndReturned2442CC_=false;

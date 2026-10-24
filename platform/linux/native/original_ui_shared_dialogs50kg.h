@@ -1,9 +1,12 @@
 #pragma once
 #include "original_ui_garage_page_owner50kg.h"
 #include "original_ui_controller_popup_resources50kg.h"
+#include "original_ui_warning_geometry50kg.h"
 #include "../../../src/game/original_ui_controller_popup50kg.h"
 namespace rr::platform {
 struct OriginalUiMainApplication50KG;
+class OriginalUiSharedDialogMaterialHistory50KG;
+class OriginalUiGarageDrawContribution50KG;
 // Native retained UI470/47C owners, not a second dispatcher or menu manager.
 // Initial construction is a Root boot operation. A preexisting UI without this
 // owner cannot be adopted by inventing prior470 activity or resetting47C.
@@ -13,9 +16,13 @@ class OriginalUiSharedDialogs50KG final {
     friend class OriginalUiGaragePageOwner50KG;
     friend class OriginalUiGarageDrawContribution50KG;
     friend class OriginalUiControllerPopupResources50KG;
+    friend class OriginalUiSharedDialogMaterialHistory50KG;
     friend class OriginalUiMainSession50KG;
     friend class OriginalUiOptionsSession50KG;
     friend class OriginalUiFrontend50KG;
+    friend class OriginalUiGarageQuad50KG;
+    friend class OriginalUiGarageScreenText50KG;
+    friend class ::original_main_entry50KG::NativeCollectorFifo50LA;
     using Root=::original_main_entry50KG::Application;
     using Scope=game::OriginalUiEntityScope50KG;
     using C=game::OriginalWreckComponent50LA;
@@ -67,6 +74,10 @@ private:
     } controller47C_;
     std::shared_ptr<Scope> scope_;
     std::weak_ptr<OriginalUiMainApplication50KG> application_;
+    // Dormant shared material-history foundation. No bootstrap call is added
+    // here: this must outlive47C payload and retire after actual470 payload.
+    std::shared_ptr<OriginalUiSharedDialogMaterialHistory50KG> sharedMaterialHistory_;
+    bool sharedHistoryFinalRetirementCurrent()const noexcept;
     Phase phase_=Phase::empty;
     bool successorConstructor_=false; // Only Application issues after exact retired-predecessor proof.
     std::size_t constructed470Quads_=0,loaded470Texts_=0,loaded470Quads_=0;
@@ -100,6 +111,50 @@ private:
     // Native keyboard transport supplies the first logical menu route. The
     // SDL second route remains unknown when enumeration/open was ambiguous.
     bool advance4702048F0(float,Diagnostic&)noexcept;
+    // A genuine dispatcher470 callback, not a Garage page receiver. The Draw
+    // owns the invocation lease; update count is never callback authority.
+    enum class FirstPass470Phase:std::uint8_t {idle,body,inheritedPending};
+    FirstPass470Phase firstPass470Phase_=FirstPass470Phase::idle;
+    OriginalUiGarageDrawContribution50KG* firstPass470Draw_=nullptr;
+    std::uint64_t firstPass470Epoch_=0,firstPass470Completed_=0,firstPass470Aborted_=0;
+    bool firstPass470Matches(const OriginalUiGarageDrawContribution50KG&)const noexcept;
+    bool begin470FirstPass(OriginalUiGarageDrawContribution50KG&,Diagnostic&)noexcept;
+    bool continue470FirstPass(OriginalUiGarageDrawContribution50KG&,Diagnostic&)noexcept;
+    bool complete470FirstPass(OriginalUiGarageDrawContribution50KG&,Diagnostic&)noexcept;
+    bool abort470AfterNativeRelease(OriginalUiGarageDrawContribution50KG&,Diagnostic&)noexcept;
+    void release470FirstPass(OriginalUiGarageDrawContribution50KG&)noexcept;
+    // Own470 +48 invocation. Numeric transcript is not receiver authority:
+    // each actual mutation/call rechecks this live callback and exact payload.
+    enum class ThirdPass470Phase:std::uint8_t {idle,body,inheritedPending};
+    ThirdPass470Phase thirdPass470Phase_=ThirdPass470Phase::idle;
+    OriginalUiGarageDrawContribution50KG* thirdPass470Draw_=nullptr;
+    std::uint64_t thirdPass470Epoch_=0,thirdPass470Completed_=0,thirdPass470Aborted_=0;
+    std::uint64_t thirdPass470Update_=0;
+    std::array<std::uint32_t,4> thirdPass470Cache_{};
+    OriginalUiWarningGeometryPlan50KG thirdPass470Plan_;
+    std::size_t thirdPass470Next_=0;
+    bool thirdPass470Effects_=false;
+    std::uint32_t nativeWarning470FifoPins_=0;
+    bool thirdPass470Matches(const OriginalUiGarageDrawContribution50KG&)const noexcept;
+    bool begin470ThirdPass(OriginalUiGarageDrawContribution50KG&,Diagnostic&)noexcept;
+    bool continue470ThirdPass(OriginalUiGarageDrawContribution50KG&,Diagnostic&)noexcept;
+    bool complete470ThirdPass(OriginalUiGarageDrawContribution50KG&,Diagnostic&)noexcept;
+    bool abort470ThirdPassAfterNativeRelease(OriginalUiGarageDrawContribution50KG&,Diagnostic&)noexcept;
+    void release470ThirdPass(OriginalUiGarageDrawContribution50KG&)noexcept;
+    void release470QueueFenceIfQuiescent()noexcept;
+    bool warning470TextCurrent(const OriginalUiGarageDrawContribution50KG&,const Text&)const noexcept;
+    bool warning470QuadCurrent(const OriginalUiGarageDrawContribution50KG&,const Quad&)const noexcept;
+    bool warning470DimCurrent(const OriginalUiGarageDrawContribution50KG&)const noexcept;
+    bool warning470DimPacketCurrent2E21D0()const noexcept;
+    bool drawWarning470Dim2E21D0(OriginalUiGarageDrawContribution50KG&,Diagnostic&)noexcept;
+    bool lowerWarning470Dim327E90(std::uint64_t,const std::array<std::uint32_t,2>&,
+        Quad::LoweredPacket327E90&,Diagnostic&)const noexcept;
+    // Material body only. The inherited tail and positive draw are separate.
+    bool demand470204A00(Diagnostic&)noexcept;
+    std::uint64_t demand470Update_=0;
+    std::uint8_t demand470Next_=0;
+    std::array<std::uint32_t,4> demand470Cache_{};
+    bool demand470Pending_=false,demand470Effects_=false;
     bool invisible470204AC0(Diagnostic&)const noexcept;
     std::uint64_t update470Count_=0,update470PollRevision_=0;
     bool update470Pending_=false,update470SampledPrimary_=false;

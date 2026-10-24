@@ -663,6 +663,36 @@ bool OriginalStandardMaterialObject50LA::demandTournamentOutline2DF8A0(
     d.pass=0;d.map=0;d.demandMapsVisited=1;d.texturesDemanded=1;
     d.textureDemandWritten=written;d.sourceEffectsCommitted=written;return true;
 }
+bool OriginalStandardMaterialObject50LA::demandSharedWarning2DF8A0(
+    const OriginalStandardTextureTable50LA& expected,const OriginalUiMemberView50KG& psm,
+    const OriginalUiMemberView50KG& pst,D& d) const noexcept {
+    if(!storage_||!storage_->constructed)return fail(d,E::missingMaterialObject,0x2DF8BC);
+    const auto& s=*storage_;
+    if(!s.construction||!s.construction->live()||s.textures.get()!=&expected)
+        return fail(d,E::source,0x2DF8A0);
+    if(!psm.identity||!psm.data||!pst.identity||!pst.data||!s.source||!s.source->originalBytes())
+        return fail(d,E::source,0x2DF8BC);
+    const auto& original=*s.source->originalBytes();
+    if(original.size()!=psm.size||std::memcmp(original.data(),psm.data,psm.size))
+        return fail(d,E::source,0x2DF8BC);
+    if(s.count48!=1||!s.passes4C[0])return fail(d,E::unsupportedPass,0x2DF8BC);
+    const auto& pass=*s.passes4C[0];
+    if(pass.mapCount20!=1||pass.texture1A[0]<0||pass.animation10||pass.textureAnimation10)
+        return fail(d,E::unsupportedPass,0x2DF8C4);
+    OriginalStandardTextureResource50LA* texture=nullptr;
+    if(!s.textures->resolve298E60(pass.texture1A[0],texture,d.texture))
+        return fail(d,E::texture,d.texture.sourcePC);
+    d.pass=0;d.map=0;d.demandMapsVisited=1;
+    // Unlike the Garage caller,204A5C explicitly skips a null return.
+    if(!texture){d.nullTexturesSkipped=1;d.sourcePC=0x204A5C;return true;}
+    const auto* bytes=texture->originalBytes();
+    if(!bytes||bytes->size()!=pst.size||std::memcmp(bytes->data(),pst.data,pst.size))
+        return fail(d,E::source,0x2DF8D0);
+    bool written=false;
+    if(!texture->demandSharedWarning204A84(written,d.texture))return fail(d,E::texture,d.texture.sourcePC);
+    d.texturesDemanded=1;d.textureDemandWritten=written;d.sourceEffectsCommitted=written;
+    d.sourcePC=0x204A84;return true;
+}
 bool OriginalStandardMaterialObject50LA::demandGarage2DF8A0(
     const OriginalStandardTextureTable50LA& expected,std::uint32_t pc,D& d) const noexcept {
     if(pc!=0x1FDDA8&&pc!=0x1FDDE8)return fail(d,E::source,pc);

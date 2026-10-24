@@ -11,13 +11,14 @@ struct OriginalUiMainColdInput50KG;
 struct OriginalUiMainMaterialBinding50KG;
 class OriginalUiMainDraw50KG;
 class OriginalUiSharedDialogs50KG;
+class OriginalUiSharedDialogMaterialHistory50KG;
 class OriginalUiMainDrawResources50KG;
 class OriginalUiSourceOwner50KM;
 struct OriginalUiOptionsMaterialBinding50KG;
 class OriginalUiOptionsDrawContribution50KG;
 class OriginalUiOptionsDrawResources50KG;
 enum class OriginalUiControllerPopupResourceError50KG : std::uint8_t {
- none,input,identity,video,material,geometry,history,busy,poisoned,allocation
+ none,input,identity,video,material,geometry,history,busy,poisoned,allocation,canonicalBridgePending
 };
 struct OriginalUiControllerPopupResourceDiagnostic50KG {
  OriginalUiControllerPopupResourceError50KG error=OriginalUiControllerPopupResourceError50KG::none;
@@ -38,6 +39,10 @@ public:
  const game::OriginalUiControllerPopupGeometry50KG* geometry() const noexcept;
  bool project(const game::OriginalUiControllerPopupRender50KG&,OriginalUiControllerPopupResourceDiagnostic50KG&) noexcept;
 private:
+ friend class OriginalUiSharedDialogMaterialHistory50KG;
+ bool transferInitialHistoryTo(const OriginalUiSharedDialogs50KG&,
+   const std::shared_ptr<OriginalUiSharedDialogMaterialHistory50KG>&,
+   OriginalUiControllerPopupResourceDiagnostic50KG&)noexcept;
  friend class OriginalUiSharedDialogs50KG;
  bool sharedDialogOwnerCurrent(const OriginalUiSharedDialogs50KG&)const noexcept;
  bool bindSharedDialogOwner2055B0(OriginalUiSharedDialogs50KG&)noexcept;

@@ -7,6 +7,7 @@
 #include <utility>
 
 namespace original_main_entry50KG { struct Video; }
+namespace rr::platform { class OriginalUiSharedDialogs50KG; }
 
 namespace rr::assets {
 // Construction-time projection of the ACTUAL native Video owner and the
@@ -20,6 +21,7 @@ class OriginalStandardMaterialContext50LA final {
     using ValidatePin=bool (*)(const Video&) noexcept;
     friend struct original_main_entry50KG::Video;
     friend class OriginalStandardTextureResource50LA;
+    friend class rr::platform::OriginalUiSharedDialogs50KG;
 
     std::shared_ptr<const Video> video_;
     std::shared_ptr<const OriginalUiMaterialApplication50LA> materialApplication_;

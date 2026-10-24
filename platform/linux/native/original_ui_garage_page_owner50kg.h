@@ -197,6 +197,7 @@ private:
         const std::array<std::uint32_t,2>&,Quad::LoweredPacket327E90&,Diagnostic&)const noexcept;
     //One BSS pair per original source location, not per Page instance.
     struct PolygonAssertion {std::atomic<std::uint8_t> guard{0};std::atomic<std::uint32_t> word{0};};
+    static PolygonAssertion& polygonDraw8F50()noexcept;
     static PolygonAssertion& polygonCount8F38()noexcept;
     static PolygonAssertion& polygonLimit8F3C()noexcept;
     static PolygonAssertion& polygonQuads8F44()noexcept;

@@ -8,7 +8,7 @@ namespace original_position_stats_prestage50LA { class Owner; }
 
 namespace ra_static_world50LA {class Owner;}
 namespace rr::game {class OriginalPositionStatsResources50LA;class OriginalPauseMaterialAdmission50LA;}
-namespace rr::platform { class OriginalUiTournamentPodReferences50KG; }
+namespace rr::platform { class OriginalUiTournamentPodReferences50KG; class OriginalUiSharedDialogs50KG; }
 namespace rr::platform {class OriginalUiGarageModelResource50KG;class OriginalUiGarageScreenText50KG;class OriginalUiGarageQuad50KG;class OriginalUiGaragePageOwner50KG;}
 namespace rr::platform { class OriginalUiGarageCanonicalSubmission50KG; class OriginalUiGarageDrawContribution50KG; }
 namespace rr::assets {
@@ -125,6 +125,7 @@ class OriginalStandardMaterialTable50LA final {
     friend class rr::platform::OriginalUiGarageScreenText50KG;
     friend class rr::platform::OriginalUiGarageQuad50KG;
     friend class rr::platform::OriginalUiGaragePageOwner50KG;
+    friend class rr::platform::OriginalUiSharedDialogs50KG;
 public:
     OriginalStandardMaterialTable50LA() noexcept;
     ~OriginalStandardMaterialTable50LA();
@@ -261,6 +262,10 @@ private:
         std::shared_ptr<OriginalStandardTextureTable50LA>,
         OriginalStandardMaterialDiagnostic50LA&) noexcept;
     bool screenApplicationMatches(const OriginalUiMaterialApplication50LA&) const noexcept;
+    // Exact UI470 first pass, reachable only from its retained native owner.
+    bool demandSharedWarning2DF8A0(std::int32_t,const OriginalStandardTextureTable50LA&,
+        const OriginalUiMemberView50KG&,const OriginalUiMemberView50KG&,
+        OriginalStandardMaterialDiagnostic50LA&) const noexcept;
     bool demandGarage2DF8A0(std::int32_t,const OriginalStandardTextureTable50LA&,
         std::uint32_t storePC,OriginalStandardMaterialDiagnostic50LA&) const noexcept;
     bool demandTournamentFallback2DF8A0(std::int32_t,const OriginalStandardTextureTable50LA&,

@@ -43,6 +43,14 @@ private:
     bool stageParticleContexts249610(std::int32_t,const void*,
         const assets::OriginalUiArchive50KG&,const assets::OriginalUiMainParticleMaterial50KG&,
         const std::array<std::uint32_t,2>&,const std::vector<OriginalUiMaterialSpan50KG>&,D&)noexcept;
+    bool stageWarning470ScreenPass(OriginalUiGarageDrawContribution50KG&,std::int32_t,std::uint32_t,const void*,
+        const assets::OriginalUiArchive50KG&,const assets::OriginalUiMaterial50KG&,
+        const assets::OriginalUiNativeMaterial50KG&,const OriginalUiMaterialSpanBinding50KG&,
+        OriginalUiMaterialSpan50KG&,Map&,D&)noexcept;
+    bool stageWarning470UntexturedScreenPass(OriginalUiGarageDrawContribution50KG&,std::int32_t,std::uint32_t,const void*,
+        const assets::OriginalUiArchive50KG&,const assets::OriginalUiMaterial50KG&,
+        const assets::OriginalUiNativeUntexturedMaterial50KG&,const OriginalUiUntexturedMaterialSpanBinding50KG&,
+        OriginalUiMaterialSpan50KG&,Map&,D&)noexcept;
     bool stageScreenPass(std::int32_t,std::uint32_t,const void*,
         const assets::OriginalUiArchive50KG&,const assets::OriginalUiMaterial50KG&,
         const assets::OriginalUiNativeMaterial50KG&,const OriginalUiMaterialSpanBinding50KG&,
