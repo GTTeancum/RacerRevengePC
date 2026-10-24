@@ -1,4 +1,5 @@
 #pragma once
+#include "../../src/assets/original_ta_cut_authoring_candidate.h"
 #include "../../src/game/original_racer_diffuse_camera50la.h"
 #include "track_navigation_view50tc.h"
 #include "track_navigation_view50tb.h"
@@ -43,6 +44,7 @@ namespace rr::game { class OriginalDamageObservation50LA; }
 #include <array>
 #include <cstring>
 #include <limits>
+#include <string>
 
 namespace ra_source_camera50LA { class OwnershipBridge; }
 namespace original_time_stats_adapter50LA { class Owner; }
@@ -294,6 +296,94 @@ class Session final {
         std::vector<std::uint8_t> cam,tob,phy;
     };
     std::unique_ptr<const NativeTaIssuance> nativeTaIssuance_;
+    // Optional native immutable input custody only. No source child/registry,
+    // global443200 value, numeric array or source readiness is represented.
+    // Every retained field is owned: cleanup never reads issuer/Rig/particles.
+    struct NativeTaCutAuthoringCustody {
+        struct Member {
+            std::string name;
+            std::size_t ordinal=0,bytes=0;
+        };
+        std::shared_ptr<const rr::assets::OriginalStandardArchiveProvider50LA> provider;
+        std::uint64_t generation=0,providerRevision=0,bankGeneration=0;
+        std::size_t mount=0;
+        std::array<Member,4> members;
+        std::unique_ptr<const rr::assets::OriginalTaCutAuthoringCandidate> authoring;
+    };
+    std::unique_ptr<const NativeTaCutAuthoringCustody> nativeTaCutAuthoring_;
+    // One real object-local constructor, held only in unpublished NATIVE
+    // custody. Not source74, not a registry member, not a loaded/active camera.
+    struct NativeUnpublishedTaCutChild final {
+        std::uint32_t vtable00=0;
+        std::array<std::uint32_t,4> offset10{};
+        // Source field order20,24,28,50,5C,58,60. All remain truly null.
+        std::array<const void*,7> arrays{};
+        std::uint32_t rate2C=0,elapsed38=0,field3C=0,mode40=0,lower44=0,active4C=0,loop54=0;
+        // Source282860 leaves30/34/48 unwritten: they are deliberately absent.
+        bool constructed=false,retired=false;
+        explicit NativeUnpublishedTaCutChild(const std::array<std::uint32_t,4>& actualOrigin)noexcept {
+            vtable00=0x3cca90u; //115AE0, no ref/Entity/count constructor.
+            vtable00=0x3d2ee0u; //28287C.
+            offset10={{0,0,0,0x3f800000u}}; //282884 SQC2 vf0.
+            field3C=0x42a00000u;rate2C=0x41f00000u;
+            elapsed38=0;active4C=1;mode40=0;loop54=0;lower44=0;
+            for(auto& pointer:arrays)pointer=nullptr; //2828B0..C8 exact field order.
+            offset10=actualOrigin; //2828D0/2828D8 copy the actual process443200.
+            constructed=true; //Native history, not source field or readiness.
+        }
+        NativeUnpublishedTaCutChild(const NativeUnpublishedTaCutChild&)=delete;
+        NativeUnpublishedTaCutChild& operator=(const NativeUnpublishedTaCutChild&)=delete;
+        NativeUnpublishedTaCutChild(NativeUnpublishedTaCutChild&&)=delete;
+        NativeUnpublishedTaCutChild& operator=(NativeUnpublishedTaCutChild&&)=delete;
+        bool setupNull282990()const noexcept {
+            //282994 branches before2829A0: null file changes NO field,
+            //including54. It returns1, not a load/activation certificate.
+            return constructed&&!retired;
+        }
+        bool retireUnloaded2828F0()noexcept {
+            if(!constructed||retired||vtable00!=0x3d2ee0u)return false;
+            // Native admission refuses unsupported populated arrays. No
+            // destructor can report success while silently skipping a free.
+            for(const auto* pointer:arrays)if(pointer)return false;
+            vtable00=0x3d2ee0u; //282918, before283460.
+            //283460 checks20/24/28/50/5C/58/60 in this order. Each is null;
+            //there are no allocator calls and no count/index reads or writes.
+            vtable00=0x3cca90u; //115B2C base reset; no ref/count decrement.
+            retired=true;
+            return true;
+        }
+        ~NativeUnpublishedTaCutChild()noexcept {
+            // Completed unpublished objects still need their local destructor;
+            // this is not retail controller174C20 or registry removal.
+            if(constructed&&!retired&&!retireUnloaded2828F0())std::terminate();
+        }
+    };
+    enum class NativeTaCutChildPhase : std::uint8_t {empty,constructed,aborted};
+    NativeTaCutChildPhase nativeTaCutChildPhase_=NativeTaCutChildPhase::empty;
+    std::unique_ptr<NativeUnpublishedTaCutChild> nativeUnpublishedTaCutChild_;
+    bool constructUnpublishedTaCutChild282860()noexcept {
+        const auto& app=actual_.applicationEntities;
+        if(nativeTaCutChildPhase_!=NativeTaCutChildPhase::empty||nativeUnpublishedTaCutChild_||
+           !app||!app->application10()||app->nativeOwnerThread_!=std::this_thread::get_id())return false;
+        try {
+            // Only native allocation can fail: it precedes every282860 write.
+            // No phantom2828F0 call occurs if operator new fails.
+            auto next=std::unique_ptr<NativeUnpublishedTaCutChild>(
+                new NativeUnpublishedTaCutChild(app->cutOrigin443200_));
+            if(!next->setupNull282990())std::terminate();
+            nativeUnpublishedTaCutChild_=std::move(next);
+            nativeTaCutChildPhase_=NativeTaCutChildPhase::constructed;
+            return true;
+        }catch(...){return false;}
+    }
+    bool abortUnpublishedTaCutChildNative()noexcept {
+        if(nativeTaCutChildPhase_==NativeTaCutChildPhase::aborted)return !nativeUnpublishedTaCutChild_;
+        if(nativeTaCutChildPhase_!=NativeTaCutChildPhase::constructed||!nativeUnpublishedTaCutChild_||
+           !nativeUnpublishedTaCutChild_->retireUnloaded2828F0())return false;
+        nativeUnpublishedTaCutChild_.reset(); //Native allocation delete; local source destructor already ran ONCE.
+        nativeTaCutChildPhase_=NativeTaCutChildPhase::aborted; //Never rearm/erase construction history.
+        return true;
+    }
     OriginalRaceCameraOwner controller_;
     // ONE noncopyable Entity counterpart for this existing copyable numeric
     // payload. No second controller, borrowed parent, or additional authority.
@@ -687,7 +777,11 @@ class Session final {
     }
 public:
     explicit Session(ActualOwners actual) noexcept:actual_(actual){}
-    ~Session(){if(coldController_.entity.reference00)std::terminate();}
+    ~Session(){
+        if(coldController_.entity.reference00)std::terminate();
+        if(nativeTaCutChildPhase_==NativeTaCutChildPhase::constructed&&
+           !abortUnpublishedTaCutChildNative())std::terminate();
+    }
     Session(const Session&)=delete;Session& operator=(const Session&)=delete;
     Session(Session&&)=delete;Session& operator=(Session&&)=delete;
     const Result& diagnostic()const noexcept{return result_;}
@@ -934,6 +1028,9 @@ public:
         // Unactivated constructor branch cannot enter the reduced native
         // initialization order, even after typed retirement. No fresh receipt.
         if(coldController_.started)return set(Status::sourcePath,0x174df0u);
+        // Unpublished constructor staging is a different private lifetime,
+        // not evidence for the existing reduced native prepare chronology.
+        if(nativeTaCutChildPhase_!=NativeTaCutChildPhase::empty)return set(Status::sourcePath,0x282860u);
         if(nativeTaIssuance_&&generation!=nativeTaIssuance_->generation)return set(Status::owner);
         if(coldBound_||closed_)return set(Status::order);
         if(frameStage_==FrameStage::failed)return set(Status::terminal);
@@ -1548,6 +1645,10 @@ public:
         // Once source ownership starts retiring, a partial failure can only
         // resume cleanup. It must not re-enter normal simulation/constructor work.
         coldBound_=false;frameStage_=FrameStage::failed;
+        // Unpublished native custody closes independently of fresh issuer
+        // admission; root borrows may already be terminal during abandonment.
+        if(nativeTaCutChildPhase_!=NativeTaCutChildPhase::empty&&
+           !abortUnpublishedTaCutChildNative())return set(Status::owner,0x2828f0u);
         if(!releaseColdController174C20())return set(Status::owner,0x174c20u);
         if(!releaseRacerEntityPrefixes())return set(Status::renderer,result_.entityCleanup.sourcePC);
         if(!actual_.bank.visit(0,[&](){return actual_.followQueries.close();}))return set(Status::owner,0x120290);
@@ -1570,6 +1671,10 @@ public:
         invalidateFogPreparation();
         abandoned_=true;coldBound_=false;frameStage_=FrameStage::failed;
         if(closed_)return set(Status::abandoned);
+        // Unpublished native custody closes independently of fresh issuer
+        // admission; root borrows may already be terminal during abandonment.
+        if(nativeTaCutChildPhase_!=NativeTaCutChildPhase::empty&&
+           !abortUnpublishedTaCutChildNative())return set(Status::owner,0x2828f0u);
         if(!releaseColdController174C20())return set(Status::owner,0x174c20u);
         if(!releaseRacerEntityPrefixes())return set(Status::renderer,result_.entityCleanup.sourcePC);
         if(!actual_.bank.visit(0,[&](){return actual_.followQueries.close();}))return set(Status::owner,0x120290);

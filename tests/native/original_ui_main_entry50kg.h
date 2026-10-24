@@ -239,7 +239,14 @@ private:
     mutable std::weak_ptr<original_camera_session50KX::Session> nativeTaCameraSession50LA_;
     // Uncalled private source prefix. Selects only the retained factory-issued
     // Session; no caller Session, key, generation, clock or readiness parameter.
+    std::shared_ptr<original_camera_session50KX::Session> freshNativeTaCameraSession50LA()const noexcept;
+    // Uncalled native custody leaf, not a source loader or child constructor.
+    bool retainNativeTaCutAuthoring50LA()const noexcept;
     bool constructNativeTaController174A30()const noexcept;
+    // Private, uncalled object-local unloaded child lifetime. No source74
+    // publication, registry key, VUB loader or replacement process input.
+    bool constructUnpublishedNativeTaCutChild282860()const noexcept;
+    bool abortUnpublishedNativeTaCutChild()const noexcept;
     mutable std::weak_ptr<RaceDisplayLifetime50LA> raceDisplayOwner50LA_;
     // The actual persistent dispatcher is Root-owned, never manufactured on
     // Garage entry. The two counted global dialog children share this scope.
@@ -1217,6 +1224,7 @@ public:
 // source Z format0x31 is the admitted original24-bit packet representation.
 struct Video {
     friend struct Application;
+    friend class rr::platform::OriginalUiFrontend50KG;
     friend class rr::platform::OriginalLocalizationRendererLease50KG;
     friend class rr::game::OriginalVideoPreFlipList50KG;
     friend class rr::platform::OriginalUiGarageDrawContribution50KG;
@@ -1232,10 +1240,15 @@ private:
     // Actual Video443A60 scalar, initialized by259F58. It is not a
     // resource pointer, renderer queue44, or a claim that race load ran.
     std::uint32_t sourceMode44_=0;
+    class OptionsModeEffect;
+    OptionsModeEffect* optionsModeEffect_=nullptr; // Exclusive actual scalar producer.
     // The ordinary RA aggregate still owns its separate recovered effect
     // continuation. Do not pretend its writes transferred back into these
     // same-Video frontend fields after a real race display use.
-    void beginRaceDisplay1A7658() noexcept { sourceMode44_=1;sourceFrontendEndEffectsKnown_=false; }
+    bool beginRaceDisplay1A7658() noexcept {
+        if(optionsModeEffect_)return false;
+        sourceMode44_=1;sourceFrontendEndEffectsKnown_=false;return true;
+    }
     struct EndView25B110 {
         std::uint32_t overlay40C=0; //25A1E8, four real slots.
         std::uint8_t overlay494=0; //25A250.
@@ -1246,7 +1259,94 @@ private:
     rr::game::OriginalVideoFadeState sourceEndFade_; //Actual259E00 initialized fields;3E8 remains unknown.
     bool sourceFrontendEndEffectsKnown_=true;
 
-    void clearRaceDisplay1A6870() noexcept { sourceMode44_=0; }
+    bool clearRaceDisplay1A6870() noexcept {
+        if(optionsModeEffect_)return false;
+        sourceMode44_=0;return true;
+    }
+    // Actual2A3A90 ownership, not a scalar-equality readiness test. This
+    // private native effect is separate from source manager completion.
+    class OptionsModeEffect final {
+        friend struct Video;
+        friend class rr::platform::OriginalUiFrontend50KG;
+        using Construction=rr::game::OriginalUiEntityScope50KG::OptionsConstruction;
+        std::shared_ptr<Video> video_;
+        std::shared_ptr<rr::game::OriginalUiEntityScope50KG> scope_;
+        Construction* construction_=nullptr;
+        const Application* issuer_=nullptr;
+        const rr::platform::OriginalUiFrontend50KG* frontend_=nullptr;
+        const void* manager_=nullptr;
+        std::thread::id thread_;
+        std::uint32_t before_=0;
+        bool acquired_=false,nativeAborted_=false;
+        OptionsModeEffect(std::shared_ptr<Video> video,Construction& construction,
+            const Application& issuer,const rr::platform::OriginalUiFrontend50KG* frontend,
+            const void* manager)noexcept
+            :video_(std::move(video)),scope_(construction.scope_),construction_(&construction),issuer_(&issuer),
+             frontend_(frontend),manager_(manager),thread_(std::this_thread::get_id()){}
+        bool pending()const noexcept {return acquired_&&!nativeAborted_;}
+        bool effectCurrent()const noexcept {
+            // No issuer dereference or live host/clock requirement on native
+            // cancellation. The exact retained Video and registration survive.
+            return pending()&&std::this_thread::get_id()==thread_&&video_&&construction_&&
+                scope_==construction_->scope_&&video_->optionsModeEffect_==this&&construction_->videoEffect_==this&&
+                construction_->videoOwnedPhase()&&
+                construction_->frontend_==frontend_&&construction_->managerOwner_==manager_&&
+                construction_->registrationCurrent();
+        }
+        bool abortCurrent()const noexcept {
+            return effectCurrent()&&!construction_->cameraAcquired_;
+        }
+        bool current(const Application& root,const std::shared_ptr<Video>& video,
+            Construction& construction,const rr::platform::OriginalUiFrontend50KG* frontend,
+            const void* manager)const noexcept {
+            return issuer_==&root&&video_==video&&!video_.owner_before(video)&&!video.owner_before(video_)&&
+                construction_==&construction&&frontend_==frontend&&manager_==manager&&effectCurrent()&&
+                construction.current(frontend,manager);
+        }
+        bool abortNative()noexcept {
+            if(!acquired_||nativeAborted_)return true;
+            if(!abortCurrent())return false;
+            // Exclusive producer custody, NOT equality with1, proves which
+            // write is being undone. Restore only actual observed Video44.
+            video_->sourceMode44_=before_;
+            video_->optionsModeEffect_=nullptr;
+            construction_->videoEffect_=nullptr;
+            construction_->phase_=Construction::Phase::nativeVideoAborted;
+            nativeAborted_=true;return true;
+        }
+    public:
+        OptionsModeEffect(const OptionsModeEffect&)=delete;
+        OptionsModeEffect& operator=(const OptionsModeEffect&)=delete;
+        ~OptionsModeEffect()noexcept {
+            // Even terminal effects release retained native Video/Scope pins.
+            if(std::this_thread::get_id()!=thread_)std::terminate();
+            if(pending()&&!abortNative())std::terminate();
+        }
+    };
+    bool acquireOptionsMode2A3A90(const Application& root,const std::shared_ptr<Video>& retained,
+        rr::game::OriginalUiEntityScope50KG::OptionsConstruction& construction,
+        const rr::platform::OriginalUiFrontend50KG* frontend,const void* manager,
+        std::unique_ptr<OptionsModeEffect>& output)noexcept {
+        using Construction=rr::game::OriginalUiEntityScope50KG::OptionsConstruction;
+        if(output||retained.get()!=this||root.videoOwner_!=retained||
+           root.videoOwner_.owner_before(retained)||retained.owner_before(root.videoOwner_)||
+           !originalMain||optionsModeEffect_||!construction.issuedBy(&root,root.sharedUiScopeOwner_)||
+           !construction.current(frontend,manager)||construction.videoEffect_||
+           construction.phase_!=Construction::Phase::beforeVideo2A3A90)return false;
+        std::unique_ptr<OptionsModeEffect> next;
+        try {next.reset(new OptionsModeEffect(retained,construction,root,frontend,manager));}
+        catch(...){return false;}
+        if(optionsModeEffect_||root.videoOwner_!=retained||
+           !construction.issuedBy(&root,root.sharedUiScopeOwner_)||
+           !construction.current(frontend,manager)||construction.videoEffect_||
+           construction.phase_!=Construction::Phase::beforeVideo2A3A90)return false;
+        next->before_=sourceMode44_;
+        // All allocation/owner validation precedes this callback-free interval.
+        optionsModeEffect_=next.get();construction.videoEffect_=next.get();
+        sourceMode44_=1; // Actual2A3A90 only; no race-display companion effect.
+        construction.phase_=Construction::Phase::afterVideo2A3A90;
+        next->acquired_=true;output=std::move(next);return true;
+    }
     rr::game::OriginalApplicationAnimationClockView50KG applicationAnimation_;
     explicit Video(bool main,rr::game::OriginalApplicationAnimationClockView50KG animation,
         const Application& application)

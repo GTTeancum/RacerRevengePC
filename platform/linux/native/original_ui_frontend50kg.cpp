@@ -167,6 +167,34 @@ struct OriginalUiFrontend50KG::Storage {
             std::shared_ptr<game::OriginalFrontendCameraCold50LA> cameraStorage;
             std::shared_ptr<assets::OriginalStandardArchiveProvider50LA> provider;
             std::unique_ptr<assets::OriginalStandardArchiveProvider50LA::Mount> bankStorage;
+            std::unique_ptr<game::OriginalUiEntityScope50KG::OptionsConstruction> construction;
+            // Declared later: its native rollback precedes construction release.
+            std::unique_ptr<::original_main_entry50KG::Video::OptionsModeEffect> videoEffect;
+            bool constructionAbortCurrent()const noexcept {
+                if(construction&&construction->cameraAcquired_&&
+                   (!cameraStorage||construction->cameraOwner_!=cameraStorage.get()||
+                    construction->camera2B0_!=&cameraStorage->entity_||
+                    !cameraStorage->unpublishedAbortCurrent(issuer,entities)))return false;
+                if(videoEffect&&videoEffect->pending())return construction&&
+                    construction->registrationCurrent()&&videoEffect->effectCurrent();
+                return !construction||!construction->pending()||construction->acquiredCurrent();
+            }
+            bool abortConstructionNative()noexcept {
+                if(!constructionAbortCurrent())return false;
+                if(construction&&construction->cameraAcquired_){
+                    if(!cameraStorage->abortUnpublished236180(issuer,entities).okay())return false;
+                    construction->cameraAcquired_=false;
+                    // Preserve the historical source2B0 pointer and owner.
+                    construction->phase_=game::OriginalUiEntityScope50KG::OptionsConstruction::Phase::nativeCameraAborted;
+                }
+                if(videoEffect&&!videoEffect->abortNative())return false;
+                return !construction||construction->abortNative().okay();
+            }
+            ~OptionsNativeInputs()noexcept {
+                // Aggregate native abort must run before member destruction:
+                // acquired Camera, then Video effect, then manager registration.
+                if(!abortConstructionNative())std::terminate();
+            }
             struct Row {
                 std::string sectionName;
                 std::uint16_t authoredId=0;
@@ -181,16 +209,17 @@ struct OriginalUiFrontend50KG::Storage {
             const std::array<std::string,5> fieldNames{{"Type","TextID","FontName","MaterialName","OnTop"}};
             std::array<Row,357> orderedRows{};
             std::int32_t authoredWidgetCount=0; // Input, NOT source count158.
-            // No producer exists in this proposal. A later genuine manager
-            // implementation must supply Camera/bank/ordered children and
-            // complete partial retirement BEFORE introducing any such store.
-            bool managerConstructed=false,cameraConstructed=false,bankAdmitted=false;
+            // Constructor and Camera acquisition are represented by their
+            // actual owners, never duplicate readiness flags. Bank, tables
+            // and containing-page publication are still unimplemented.
+            bool bankAdmitted=false;
             bool name194Known=false,lights29CKnown=false,widgets154Known=false,pages144Known=false;
-            bool sourceCount158Known=false,video44Written=false,caller394Stored=false;
+            bool sourceCount158Known=false,caller394Stored=false;
             bool disposable()const noexcept {
-                if(managerConstructed||cameraConstructed||bankAdmitted||name194Known||lights29CKnown||
-                   widgets154Known||pages144Known||sourceCount158Known||video44Written||caller394Stored)return false;
-                if(cameraStorage&&!cameraStorage->inertStorageCurrent(issuer,entities))return false;
+                if(bankAdmitted||name194Known||lights29CKnown||
+                   widgets154Known||pages144Known||sourceCount158Known||caller394Stored)return false;
+                if((construction&&construction->pending())||(videoEffect&&videoEffect->pending()))return false;
+                if(cameraStorage&&!cameraStorage->nativeStorageDisposable(issuer,entities))return false;
                 if(bankStorage&&(!provider||!provider->preparedUiMountCurrent(*bankStorage,archive)))return false;
                 for(const auto& row:orderedRows)if(row.sourceSlotKnown||row.publishedWidget)return false;
                 return true;
@@ -948,9 +977,12 @@ struct OriginalUiFrontend50KG::Storage {
         catch(...){result(d,Status::resource);return false;}
     }
     bool retireSource(Manager& m,Diagnostic& d) noexcept {
-        // Prepared inputs issued no source refs/mounts/stores. Release them
-        // before this Manager's real Session/resource retirement, never as a
-        // substitute for any future native manager or child destruction.
+        // Abort any acquired unpublished base prefix first. The remaining
+        // v44/v45 input/Camera/bank storage has no source refs or mounts.
+        // This is native acquired-owner abort, never retail manager teardown.
+        if(m.optionsNativeInputs&&!m.optionsNativeInputs->abortConstructionNative()){
+            result(d,Status::cleanup);return false;
+        }
         if(m.optionsNativeInputs&&!m.optionsNativeInputs->disposable()){
             result(d,Status::cleanup,0x1D04E0);return false;
         }
@@ -1170,7 +1202,9 @@ OriginalUiFrontend50KG::~OriginalUiFrontend50KG() noexcept {
     if(storage_&&storage_->lightManagerEntered&&storage_->cold.lightManager)
         storage_->cold.lightManager->invalidateForUntrackedScene();
     if(storage_)for(const auto* manager:{storage_->retiring.get(),storage_->pending.get(),storage_->active.get(),storage_->garageRestoration.get()})
-        if(manager&&((manager->garageEntryAttempted&&!manager->garageRetired)||
+        if(manager&&((manager->optionsNativeInputs&&manager->optionsNativeInputs->construction&&
+                       manager->optionsNativeInputs->construction->pending())||
+            (manager->garageEntryAttempted&&!manager->garageRetired)||
             (manager->main&&manager->main->sourceTeardownPending())||
             (manager->rider&&manager->rider->sourceTeardownPending())||
             (manager->tournament&&manager->tournament->sourceTeardownPending())||
@@ -2086,6 +2120,17 @@ Status OriginalUiFrontend50KG::close(Diagnostic& d) noexcept {
         if(retired!=Status::ok&&retired!=Status::noChange)return retired;
     }
     if(s->inOperation||s->garageTextureDraw)return result(d,Status::busy);
+    // Cancel only acquired unpublished native prefixes before ordinary Scope
+    // consumers (including Shared470 pre-close). Validate all before mutation.
+    {
+        Operation operation(s->inOperation);
+        for(auto* manager:{s->retiring.get(),s->pending.get(),s->active.get(),s->garageRestoration.get()})
+            if(manager&&manager->optionsNativeInputs&&manager->optionsNativeInputs->construction&&
+               !manager->optionsNativeInputs->constructionAbortCurrent())return result(d,Status::cleanup);
+        for(auto* manager:{s->retiring.get(),s->pending.get(),s->active.get(),s->garageRestoration.get()})
+            if(manager&&manager->optionsNativeInputs&&manager->optionsNativeInputs->construction&&
+               !manager->optionsNativeInputs->abortConstructionNative())return result(d,Status::cleanup);
+    }
     // A failed/unsubmitted bounded Main/Options callback owns its own real
     // Display pin. Retire only that authenticated Session before the general
     // dependent gate, otherwise close would wait for the pin it must release.
@@ -2202,6 +2247,69 @@ const MaterialTextureGl50EB* OriginalUiFrontend50KG::gpu() const noexcept {retur
 const OriginalUiNativeDraw50KG* OriginalUiFrontend50KG::draw() const noexcept {
     const auto* s=storage_.get();return s&&!s->inOperation&&!s->garageTextureDraw&&!s->faulted&&!s->quit&&!s->closing&&s->frameRendered&&s->active?s->active->draw():nullptr;
 }
+bool OriginalUiFrontend50KG::beginOptionsManagerPrefix50KG(
+    const ::original_main_entry50KG::Application& root)noexcept {
+    auto* s=storage_.get();
+    if(!s||!s->prepared||!s->activated||s->inOperation||s->faulted||s->quit||s->closing||s->retiring||
+       s->garageTextureDraw||s->courseLaunchReady||s->courseLaunchTaken||
+       s->updates!=s->submittedUpdate||(s->frameRendered&&!s->frameSubmitted)||
+       !s->garageDestinationFrontend||&s->garageDestinationFrontend->coordinator!=this||
+       s->garageDestinationFrontend->materialApplicationOwner!=&root)return false;
+    auto* m=s->pending?s->pending.get():s->active.get();
+    if(!m||!m->optionsNativeInputs||m->owner!=s||!m->options||m->optionsRetired||
+       m->initialRoute.screen!=12||!m->prepared())return false;
+    auto& n=*m->optionsNativeInputs;
+    if(n.issuer!=&root||n.manager!=m||n.frontend!=s||n.session!=m->options.get()||
+       n.resources!=m->optionsResources||n.scope!=root.sharedUiScopeOwner_||n.entities!=root.entities()||
+       n.video!=root.videoOwner_||n.domain!=root.standardMaterialDomainOwner_||
+       !n.lifetime.sameOwner(root.animationClock()))return false;
+    if(n.construction)return n.construction->current(this,m);
+    if(!n.disposable()||!n.cameraStorage||!n.bankStorage||!s->sourceCurrent()||
+       !m->publication||n.archive!=s->cold.options)return false;
+    const assets::OriginalUiDat50KG* dat=nullptr;
+    if(!n.widgets||!n.widgets->nativeManagerSourceCurrent(n.archive,dat)||dat!=n.dat)return false;
+    Operation operation(s->inOperation);
+    return n.scope->beginOptionsConstructorPrefix(&root,n.scope,this,m,m->publication,n.construction).okay();
+}
+bool OriginalUiFrontend50KG::abortOptionsManagerPrefix50KG()noexcept {
+    auto* s=storage_.get();if(!s||s->inOperation)return false;
+    auto* m=s->pending?s->pending.get():s->active.get();
+    if(!m||!m->optionsNativeInputs||!m->optionsNativeInputs->construction)return false;
+    Operation operation(s->inOperation);
+    return m->optionsNativeInputs->abortConstructionNative();
+}
+bool OriginalUiFrontend50KG::writeOptionsVideo44Prefix50KG(
+    const ::original_main_entry50KG::Application& root)noexcept {
+    if(!beginOptionsManagerPrefix50KG(root))return false;
+    auto* s=storage_.get();auto* m=s->pending?s->pending.get():s->active.get();
+    auto& n=*m->optionsNativeInputs;
+    Operation operation(s->inOperation);
+    if(n.videoEffect)return n.videoEffect->current(root,n.video,*n.construction,this,m);
+    return n.video->acquireOptionsMode2A3A90(root,n.video,*n.construction,this,m,n.videoEffect);
+}
+bool OriginalUiFrontend50KG::adoptOptionsCameraPrefix50KG(
+    const ::original_main_entry50KG::Application& root)noexcept {
+    if(!writeOptionsVideo44Prefix50KG(root))return false;
+    auto* s=storage_.get();auto* m=s->pending?s->pending.get():s->active.get();
+    auto& n=*m->optionsNativeInputs;auto& construction=*n.construction;
+    using Phase=game::OriginalUiEntityScope50KG::OptionsConstruction::Phase;
+    Operation operation(s->inOperation);
+    if(!n.cameraStorage||!n.videoEffect->current(root,n.video,construction,this,m))return false;
+    if(construction.phase_==Phase::cameraCold1D05C8)
+        return construction.cameraAcquired_&&construction.cameraOwner_==n.cameraStorage.get()&&
+            construction.camera2B0_==&n.cameraStorage->entity_&&
+            n.cameraStorage->unpublishedAbortCurrent(&root,n.entities);
+    if(!construction.completeDerived1D0470())return false;
+    // Source1D05C0 reuses the exact v45 allocated Camera owner. Registry
+    // capacity failure leaves the completed constructor and Video effect held.
+    const auto adopted=game::OriginalFrontendCameraCold50LA::adoptPrepared236180(&root,n.entities,n.cameraStorage);
+    if(!adopted.okay())return false;
+    // No allocation, callback or failing validation after Camera acquisition.
+    construction.cameraOwner_=n.cameraStorage.get();
+    construction.camera2B0_=&n.cameraStorage->entity_; // Actual1D05C8 publication.
+    construction.cameraAcquired_=true;construction.phase_=Phase::cameraCold1D05C8;
+    return true; // Stop before2361C0; no observer, viewport, bank or child grant.
+}
 bool OriginalUiFrontend50KG::prepareOptionsNativeInputs50KG(
     const ::original_main_entry50KG::Application& root)noexcept {
     auto* s=storage_.get();
@@ -2237,8 +2345,8 @@ bool OriginalUiFrontend50KG::prepareOptionsNativeInputs50KG(
            n.fonts!=fonts||n.localization!=localization||n.resources!=m->optionsResources||n.archive!=s->cold.options||
            !n.lifetime.sameOwner(root.animationClock())||n.authoredWidgetCount!=357||
            n.provider!=provider||!n.cameraStorage||!n.bankStorage||!n.disposable()||
-           n.managerConstructed||n.cameraConstructed||n.bankAdmitted||n.name194Known||n.lights29CKnown||
-           n.widgets154Known||n.pages144Known||n.sourceCount158Known||n.video44Written||n.caller394Stored)return false;
+           n.bankAdmitted||n.name194Known||n.lights29CKnown||
+           n.widgets154Known||n.pages144Known||n.sourceCount158Known||n.caller394Stored)return false;
         for(std::size_t i=0;i<n.orderedRows.size();++i){const auto& row=n.orderedRows[i];
             if(row.authoredId!=i+1||row.source!=dat->section(row.sectionName)||row.sourceSlotKnown||row.publishedWidget)return false;
             for(std::size_t k=0;k<n.fieldNames.size();++k)

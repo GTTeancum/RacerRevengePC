@@ -96,9 +96,9 @@ inline std::shared_ptr<original_camera_session50KX::Session> Application::create
         return session;
     }catch(...){return {};}
 }
-inline bool Application::constructNativeTaController174A30()const noexcept {
+inline std::shared_ptr<original_camera_session50KX::Session> Application::freshNativeTaCameraSession50LA()const noexcept {
     namespace d=ta_camera_issuer_detail;
-    if(garageAudioOwnerThread_!=std::this_thread::get_id())return false;
+    if(garageAudioOwnerThread_!=std::this_thread::get_id())return {};
     const auto session=nativeTaCameraSession50LA_.lock();
     // CRITICAL: closed/prepared/abandoned rejection precedes ANY dereference of
     // captured root-owned Rig/particle borrows. TA closes particles immediately
@@ -106,8 +106,9 @@ inline bool Application::constructNativeTaController174A30()const noexcept {
     if(!session||session->closed_||session->abandoned_||session->coldBound_||
        session->generation_||session->displayInputs_||session->coldPhase_||session->authoredPhase_||
        session->readsBound_||session->coldController_.started||
+       session->nativeTaCutChildPhase_!=original_camera_session50KX::Session::NativeTaCutChildPhase::empty||
        session->frameStage_!=original_camera_session50KX::Session::FrameStage::idle||
-       !session->nativeTaIssuance_)return false;
+       !session->nativeTaIssuance_)return {};
     const auto& pin=*session->nativeTaIssuance_;const auto& actual=session->actual_;
     if(pin.issuer!=this||!pin.generation||!standardMaterialDomainOwner_||
        !standardMaterialDomainOwner_->prepared()||!d::sameOwner(actual.applicationEntities,entitiesOwner_)||
@@ -117,7 +118,7 @@ inline bool Application::constructNativeTaController174A30()const noexcept {
        !actual.applicationAnimation.sameOwner(animationClock())||
        &actual.applicationClock!=animationClockBackend_.get()||
        !actual.actualRigs||!(*actual.actualRigs)[0]||(*actual.actualRigs)[0].get()!=pin.selectedRig||
-       !pin.particles||actual.actualTrackParticles4A0!=pin.particles)return false;
+       !pin.particles||actual.actualTrackParticles4A0!=pin.particles)return {};
     const auto& particles=*pin.particles;const auto& rig=*pin.selectedRig;
     const auto* pod=original_player_identity50IK::find(rig.podId);
     d::Provider::MemberView member;
@@ -128,9 +129,82 @@ inline bool Application::constructNativeTaController174A30()const noexcept {
        !pod||pod->racer60!=pin.selectedPod||actual.racer60[0]!=pin.selectedPod||rig.phy!=pin.phy||
        !d::taMember(*pin.provider,member)||member.revision!=pin.providerRevision||
        member.bankGeneration!=pin.bankGeneration||member.mount!=pin.mount||member.ordinal!=pin.ordinal||
-       member.size!=pin.tob.size()||std::memcmp(member.data,pin.tob.data(),member.size))return false;
-    // This zero-argument private method remains UNCALLED. Only this exact
-    // Application-issued Session and genuine retained generation may reach v7.
-    return session->constructColdController174A30(pin.generation);
+       member.size!=pin.tob.size()||std::memcmp(member.data,pin.tob.data(),member.size))return {};
+    return session;
+}
+inline bool Application::constructNativeTaController174A30()const noexcept {
+    // Still UNCALLED. Shared admission performs the same V8 freshness and
+    // exact Application-issued ownership checks before any constructor effect.
+    const auto session=freshNativeTaCameraSession50LA();
+    return session&&session->constructColdController174A30(session->nativeTaIssuance_->generation);
+}
+inline bool Application::retainNativeTaCutAuthoring50LA()const noexcept {
+    namespace d=ta_camera_issuer_detail;
+    namespace a=rr::assets;
+    using Session=original_camera_session50KX::Session;
+    const auto session=freshNativeTaCameraSession50LA();
+    if(!session||session->nativeTaCutAuthoring_)return false;
+    const auto& pin=*session->nativeTaIssuance_;
+    // Exact original TA directory order, not caller-selected members/handles.
+    constexpr std::array<const char*,4> names{{
+        "tracks\\ta.tob","tracks\\ta01.vub","tracks\\ta02.vub","tracks\\ta03.vub"}};
+    constexpr std::array<std::size_t,4> ordinals{{0,376,377,378}};
+    constexpr std::array<std::size_t,4> sizes{{13887,53488,17528,17528}};
+    try {
+        std::array<d::Provider::MemberView,4> views{};
+        std::array<a::OriginalTaCutMemberInputCandidate,4> inputs{};
+        for(std::size_t i=0;i<views.size();++i){
+            auto& v=views[i];
+            if(pin.provider->lookup132820(names[i],v)!=d::Provider::Lookup::present||
+               !v.member||*v.member!=names[i]||!v.data||v.size!=sizes[i]||
+               v.ordinal!=ordinals[i]||v.mount!=pin.mount||
+               v.revision!=pin.providerRevision||v.bankGeneration!=pin.bankGeneration)return false;
+            inputs[i]={*v.member,v.data,v.size};
+        }
+        if(views[0].ordinal!=pin.ordinal||views[0].size!=pin.tob.size()||
+           std::memcmp(views[0].data,pin.tob.data(),pin.tob.size()))return false;
+        // All copied bytes are independently hashed by the existing immutable
+        // owner. This performs no V2 floating-point load or process-global read.
+        a::OriginalTaCutAuthoringCandidate::Status status;
+        auto authoring=a::OriginalTaCutAuthoringCandidate::create(inputs,status);
+        if(!authoring)return false;
+        auto next=std::make_unique<Session::NativeTaCutAuthoringCustody>();
+        next->provider=pin.provider;next->generation=pin.generation;
+        next->providerRevision=pin.providerRevision;next->bankGeneration=pin.bankGeneration;
+        next->mount=pin.mount;
+        for(std::size_t i=0;i<views.size();++i)
+            next->members[i]={*views[i].member,views[i].ordinal,views[i].size};
+        next->authoring=std::move(authoring);
+        // Retained bytes do not prove a still-active mount. Revalidate the
+        // original same-owner admission and each current member after owned
+        // allocation/copying, before the sole custody publication.
+        const auto current=freshNativeTaCameraSession50LA();
+        if(!d::sameOwner(current,session)||session->nativeTaCutAuthoring_)return false;
+        for(std::size_t i=0;i<views.size();++i){
+            d::Provider::MemberView currentMember;
+            if(pin.provider->lookup132820(names[i],currentMember)!=d::Provider::Lookup::present||
+               !currentMember.member||*currentMember.member!=names[i]||
+               currentMember.data!=views[i].data||currentMember.size!=views[i].size||
+               currentMember.mount!=pin.mount||currentMember.ordinal!=ordinals[i]||
+               currentMember.revision!=pin.providerRevision||
+               currentMember.bankGeneration!=pin.bankGeneration)return false;
+        }
+        session->nativeTaCutAuthoring_=std::move(next);
+        return true; // Native immutable custody only, not any source return/ready flag.
+    }catch(...){return false;} // Native allocation/lookup failure leaves Session unchanged.
+}
+inline bool Application::constructUnpublishedNativeTaCutChild282860()const noexcept {
+    // Authentic same-Application fresh Session admission, before touching the
+    // actual process owner. Unloaded282860 consumes no VUB or numeric receipt.
+    const auto session=freshNativeTaCameraSession50LA();
+    return session&&session->constructUnpublishedTaCutChild282860();
+}
+inline bool Application::abortUnpublishedNativeTaCutChild()const noexcept {
+    if(garageAudioOwnerThread_!=std::this_thread::get_id())return false;
+    const auto session=nativeTaCameraSession50LA_.lock();
+    // Abort is valid even after close. It must never run fresh-owner checks
+    // that dereference already-retired root Rig/particle borrows.
+    if(!session||!session->nativeTaIssuance_||session->nativeTaIssuance_->issuer!=this)return false;
+    return session->abortUnpublishedTaCutChildNative();
 }
 } // namespace original_main_entry50KG

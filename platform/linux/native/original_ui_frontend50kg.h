@@ -308,8 +308,13 @@ private:
         std::unique_ptr<OriginalSaveProfileOwner50KG>& out)const noexcept;
     // Bind the actual enclosing native owner, never a callback/readiness flag.
     // Private source-custody handoff only; uncalled and not page438 admission.
-    // Non-counted preparation within the existing Manager only. This cannot
-    // construct/mount/publish any source owner or issue a native caller grant.
+    // Private counted base-constructor prefix in the existing Scope slot;
+    // explicit native abort, not source completion or dispatcher publication.
+    bool beginOptionsManagerPrefix50KG(const ::original_main_entry50KG::Application&)noexcept;
+    bool abortOptionsManagerPrefix50KG()noexcept;
+    bool writeOptionsVideo44Prefix50KG(const ::original_main_entry50KG::Application&)noexcept;
+    bool adoptOptionsCameraPrefix50KG(const ::original_main_entry50KG::Application&)noexcept;
+    // Non-counted input preparation; cannot mount/publish a source owner.
     bool prepareOptionsNativeInputs50KG(const ::original_main_entry50KG::Application&)noexcept;
     bool retainMemoryCardOptionsSources50KG(const ::original_main_entry50KG::Application&,
         OriginalUiMemoryCardConstructor50KG&)noexcept;

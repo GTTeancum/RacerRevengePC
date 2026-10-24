@@ -45,7 +45,8 @@ public:
         insideViewport114A00,afterViewport114A00,selectedBeforeBounds236214,
         viewportInitialized2361C0,poseSet114F90, // Page-owned renderer continuation; no cold retirement
         pageAttached1FB620,pageRetiring1155C0, // Genuine attached Page forest phases.
-        failedLoaderRetiring1155C0 // Distinct real ref0 detached failure destructor.
+        failedLoaderRetiring1155C0, // Distinct real ref0 detached failure destructor.
+        nativeUnpublishedAborted // Appended native-only terminal; no retail destructor claim.
     };
     struct Result {
         Status status=Status::owner;
@@ -298,16 +299,18 @@ private:
         return issuer&&issuer_==issuer&&entities_==entities&&onAffinity()&&
             phase_==Phase::empty&&!entityConstructed_&&!fieldsComplete_&&!enrolled_&&freshComponent();
     }
-    static Result construct(const ::original_main_entry50KG::Application* issuer,
+    static Result adoptPrepared236180(const ::original_main_entry50KG::Application* issuer,
         const std::shared_ptr<Entities>& entities,
-        std::shared_ptr<OriginalFrontendCameraCold50LA>& output)noexcept {
-        if(output)return {Status::outputNotEmpty,0x236180u};
-        std::shared_ptr<OriginalFrontendCameraCold50LA> next;
-        const auto prepared=prepareStorage(issuer,entities,next);
-        if(!prepared.okay())return prepared;
+        const std::shared_ptr<OriginalFrontendCameraCold50LA>& next)noexcept {
+        if(!next||!next->inertStorageCurrent(issuer,entities)||!next->actualEntitiesAlive())
+            return {Status::identity,0x236180};
+        if(entities->attachmentLock423F58_)return {Status::attachmentLocked,0x236180};
+        if(entities->objectCount423F60_==std::numeric_limits<std::uint32_t>::max())
+            return {Status::reservation,0x141300};
         auto& authority=entities->entityAuthority_;
         if(!authority.reserveAdditional(1))return {Status::reservation,0x141300u};
         if(!next->actualEntitiesAlive()||entities->attachmentLock423F58_||
+           entities->objectCount423F60_==std::numeric_limits<std::uint32_t>::max()||
            !next->freshComponent()||!authority.canEnroll(next->entity_,next->key_))
             return {Status::identity,0x141300u};
         // Native allocations end before this source141300 boundary.
@@ -320,8 +323,18 @@ private:
         next->enrolled_=true;
         // Canonical enrollment completed; no source service was invoked.
         next->phase_=Phase::constructedCold;
-        output=std::move(next);
         return {Status::complete,0x2361bcu};
+    }
+    static Result construct(const ::original_main_entry50KG::Application* issuer,
+        const std::shared_ptr<Entities>& entities,
+        std::shared_ptr<OriginalFrontendCameraCold50LA>& output)noexcept {
+        if(output)return {Status::outputNotEmpty,0x236180u};
+        std::shared_ptr<OriginalFrontendCameraCold50LA> next;
+        const auto prepared=prepareStorage(issuer,entities,next);
+        if(!prepared.okay())return prepared;
+        const auto adopted=adoptPrepared236180(issuer,entities,next);
+        if(!adopted.okay())return adopted;
+        output=std::move(next);return adopted;
     }
     Result coldRetirementPreflight()const noexcept {
         if(!onAffinity())return {Status::affinity,0x104970u};
@@ -455,6 +468,26 @@ private:
         if(phase_==Phase::released)return {Status::complete,0x141420u};
         return retireRetained();
     }
+    bool unpublishedAbortCurrent(const ::original_main_entry50KG::Application* issuer,
+        const std::shared_ptr<Entities>& entities)const noexcept {
+        return issuer&&issuer_==issuer&&entities_==entities&&onAffinity()&&phase_==Phase::constructedCold&&
+            coldRetirementPreflight().okay()&&entities_->objectCount423F60_;
+    }
+    Result abortUnpublished236180(const ::original_main_entry50KG::Application* issuer,
+        const std::shared_ptr<Entities>& entities)noexcept {
+        if(!issuer||issuer_!=issuer||entities_!=entities||!onAffinity())return {Status::identity,0};
+        if(phase_==Phase::nativeUnpublishedAborted)return {Status::complete,0};
+        if(!unpublishedAbortCurrent(issuer,entities))return {Status::phase,0};
+        if(!entities_->entityAuthority_.retire(entity_))return {Status::identity,0};
+        enrolled_=false;--entity_.reference00;--entities_->objectCount423F60_;
+        phase_=Phase::nativeUnpublishedAborted;return {Status::complete,0};
+    }
+    bool nativeStorageDisposable(const ::original_main_entry50KG::Application* issuer,
+        const std::shared_ptr<Entities>& entities)const noexcept {
+        if(inertStorageCurrent(issuer,entities))return true;
+        return issuer&&issuer_==issuer&&entities_==entities&&onAffinity()&&
+            phase_==Phase::nativeUnpublishedAborted&&!enrolled_&&!entity_.reference00;
+    }
     static KnownWord known(std::uint32_t value)noexcept{return {value,0xffffffffu};}
 public:
     OriginalFrontendCameraCold50LA(const OriginalFrontendCameraCold50LA&)=delete;
@@ -470,7 +503,7 @@ public:
             if(entityConstructed_||fieldsComplete_||enrolled_)std::terminate();
             return;
         }
-        if(phase_==Phase::released){
+        if(phase_==Phase::released||phase_==Phase::nativeUnpublishedAborted){
             if(enrolled_||entity_.reference00)std::terminate();
             return; // camera retirement is inert; retained-pin destruction is not
         }

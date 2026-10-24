@@ -2,7 +2,8 @@
 // callable dispatch, source-clock input, parent attachment or readiness grant.
 bool constructColdController174A30(std::uint64_t issuerGeneration)noexcept {
     auto& p=coldController_;const auto& app=actual_.applicationEntities;
-    if(!issuerGeneration||p.started||p.entity.reference00||!app||!app->application10()||
+    if(nativeTaCutChildPhase_!=NativeTaCutChildPhase::empty||
+       !issuerGeneration||p.started||p.entity.reference00||!app||!app->application10()||
        app->nativeOwnerThread_!=std::this_thread::get_id()||app->attachmentLock423F58()||
        app->objectCount423F60()==std::numeric_limits<std::uint32_t>::max()||
        generation_||displayInputs_||coldPhase_||authoredPhase_||coldBound_||readsBound_||

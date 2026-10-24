@@ -18,7 +18,8 @@ enum class OriginalWreckComponentKind50LA : std::uint8_t {
     staticModels27B610,podCables173CC0,strip23BCA0,constraint1276E0,podSphere1B6200,body164ED0,searchNode27F120,collisionObjects27BB40,
     camera236180, // Cold typed ownership only; no live camera dispatch.
     character11A750,uiDispatcher1B7140,uiGarageManager1D1860,toyList2D9B40,animationManager101330,wattoWidget1D4320,soundGroup2350D0,wattoEmitter2921C0,lightManager147ED0,light146720,fog13E6B0,fogOff13F850,fogOn13F980,uiOverlayText2A8F00,uiTextOverlay29C850,uiMovementControl2AAF40,uiGaragePage1F9FF0,uiRouter2A6FD0,uiControl1D5D10,uiControlGroup2A4B70,sceneEmitter15F100,sceneEmitter15DE00,sceneEmitter15B860,sceneEmitter15E800,loopSoundList2795E0,auralScape102BE0, // Exact Garage constructor identities; no dispatch admission.
-    cameraController174A30 // Same Session-owned controller; cold ownership, no dispatch.
+    cameraController174A30, // Same Session-owned controller; cold ownership, no dispatch.
+    uiOptionsManager1D0470 // Appended identity; unpublished constructor prefix only.
 };
 struct OriginalWreckComponent50LA final {
     //1048F0 base constructor owns the actual64-bit reference at source00.

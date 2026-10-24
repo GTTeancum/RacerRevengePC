@@ -242,6 +242,14 @@ class OriginalApplicationEntities50LA final {
     friend class OriginalRacerStripOwners50LA;
     friend class OriginalRacerMainBodyOwner50LA;
     friend class OriginalRacerGravityOwner50LA;
+    // Real startup239C54->2EADE0->2E91F0 table3CC598 invokes3CAAA0.
+    // Exact stores3CAAFC/3CAB04/3CAB0C/3CAB1C, once per actual native
+    // Application process owner, never supplied/reset by a child or Session.
+    // No later direct writer/admitted native writer; not an indirect-alias proof.
+    const std::array<std::uint32_t,4> cutOrigin443200_{{0,0,0,0x3f800000u}};
+    const std::array<std::uint32_t,4> cutAxisX443210_{{0x3f800000u,0,0,0x3f800000u}};
+    const std::array<std::uint32_t,4> cutAxisY443220_{{0,0x3f800000u,0,0x3f800000u}};
+    const std::array<std::uint32_t,4> cutAxisZ443230_{{0,0,0x3f800000u,0x3f800000u}};
     // Original static3CAA20 ->3CAA7C; shared SelectiveGravityModel vector.
     const std::array<std::uint32_t,4> gravityOrigin4431C0_{{0,0,0,0x3f800000u}};
     // Source startup3C9190/3C9290 and file382B60, shared once per Application.

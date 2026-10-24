@@ -10,7 +10,7 @@
 #include <array>
 #include <optional>
 
-namespace original_main_entry50KG { struct Application; struct Frontend; class RaceDisplayLifetime50LA; }
+namespace original_main_entry50KG { struct Application; struct Frontend; struct Video; class RaceDisplayLifetime50LA; }
 namespace rr::assets { class OriginalStandardArchiveProvider50LA; }
 namespace rr::platform { class OriginalUiFrontend50KG; class OriginalUiGarageSession50KG;
 class OriginalUiGarageSelectedModel50KG; class OriginalUiGarageActors50GN;
@@ -37,6 +37,7 @@ class OriginalFrontendCameraCold50LA;
 // No page, model or required service child is implicitly constructed here.
 class OriginalUiEntityScope50KG final {
     friend struct ::original_main_entry50KG::Application;
+    friend struct ::original_main_entry50KG::Video;
     friend class rr::platform::OriginalUiSharedDialogs50KG;
     friend class rr::platform::OriginalUiMemoryCardConstructor50KG;
     friend class rr::platform::OriginalUiFrontend50KG;
@@ -52,6 +53,8 @@ private:
     std::shared_ptr<OriginalApplicationEntities50LA> application_;
     const ::original_main_entry50KG::Application* issuer_=nullptr;
     C dispatcher_,manager_;
+    class OptionsConstruction;
+    OptionsConstruction* optionsConstruction_=nullptr; // Exclusive native slot, never Garage authority.
     const rr::platform::OriginalUiGarageSession50KG* managerPageTableOwner_=nullptr;
     C** managerPageTable144Borrow_=nullptr;
     std::int32_t managerPageTableCount_=0;
@@ -257,12 +260,13 @@ private:
     OriginalUiEntityScope50KG(const ::original_main_entry50KG::Application* issuer,
         std::shared_ptr<OriginalApplicationEntities50LA> app)noexcept
         :application_(std::move(app)),issuer_(issuer),scopeGeneration_(key(this)){}
-    Result live(bool allowManagerPayload=false)const noexcept {
+    Result live(bool allowManagerPayload=false,bool allowOptionsConstruction=false)const noexcept {
         if(!issuer_||!application_)return {Status::owner,0x17C1D8};
         if(application_->nativeOwnerThread_!=std::this_thread::get_id())return {Status::affinity,0x17C1D8};
         if(!application_->constructed_||application_->released_||closed_)
             return {Status::owner,0x17C1D8};
         if(application_->attachmentLock423F58_)return {Status::locked,0x14197C};
+        if(optionsConstruction_&&!allowOptionsConstruction)return {Status::phase,0};
         if(dispatcherLive_&&(dispatcher_.kind!=K::uiDispatcher1B7140||
            dispatcher_.sessionGeneration!=scopeGeneration_||dispatcher_.objectKey!=key(&dispatcher_)||
            dispatcher_.parent1C!=&application_->root10_))return {Status::generation,0x17C21C};
@@ -3216,6 +3220,159 @@ private:
             dispatcherCurrentManager30_==&manager_&&!garagePage_&&!garagePageOwner_&&
             !garagePageRetiring_&&!garageScene_&&!garageSceneOwner_;
     }
+    // Native unpublished-construction ownership. This is NOT source manager
+    // destruction and never reads source-unwritten tables/name/light fields.
+    class OptionsConstruction final {
+        friend class OriginalUiEntityScope50KG;
+        friend class rr::platform::OriginalUiFrontend50KG;
+        friend struct ::original_main_entry50KG::Video;
+        enum class Phase : std::uint8_t {empty,beforeVideo2A3A90,nativeAborted,
+            afterVideo2A3A90,nativeVideoAborted,derivedComplete1D04C0,
+            cameraCold1D05C8,nativeCameraAborted};
+        const void* videoEffect_=nullptr; // Only actual Video owner may bind it.
+        std::shared_ptr<OriginalUiEntityScope50KG> scope_;
+        const rr::platform::OriginalUiFrontend50KG* frontend_=nullptr;
+        const void* managerOwner_=nullptr;
+        std::uint64_t generation_=0,epoch_=0,priorEpoch_=0;
+        std::uint32_t countBefore_=0; // Observation only; NEVER restored.
+        Phase phase_=Phase::empty;
+        // Actual base constructor writes. Safe backing of the omitted row10
+        // is NOT source knowledge; mask records only rows00,20,30.
+        std::array<std::array<std::uint32_t,16>,4> matrices_{};
+        std::array<std::uint16_t,4> matrixKnown_{};
+        std::uint32_t ancestry8_=0,word17C_=0;
+        std::array<std::uint32_t,9> zeroWords_{}; //34,140,148,14C,174,15C,160,16C,170.
+        bool basePrefixKnown_=false,derivedKnown_=false;
+        std::array<std::uint32_t,9> derivedZeros_{}; //180,188,184,18C,190,2A0,2A4,2A8,2B4.
+        const OriginalFrontendCameraCold50LA* cameraOwner_=nullptr;
+        C* camera2B0_=nullptr; // Historical source borrow, NEVER zeroed by native abort.
+        bool cameraAcquired_=false; // Native acquired-resource ledger, not source readiness.
+        OptionsConstruction(std::shared_ptr<OriginalUiEntityScope50KG> scope,
+            const rr::platform::OriginalUiFrontend50KG* frontend,const void* manager,
+            std::uint64_t generation)noexcept
+            :scope_(std::move(scope)),frontend_(frontend),managerOwner_(manager),generation_(generation){}
+        bool registrationCurrent()const noexcept {
+            if(!scope_||!pending()||!frontend_||!managerOwner_||
+               scope_->optionsConstruction_!=this||scope_->managerEpoch_!=epoch_||
+               !scope_->live(false,true).okay()||scope_->managerLive_||scope_->managerPublished_||
+               scope_->dispatcherCurrentManager30_||scope_->managerRetiring_||scope_->managerForestRetiring_)
+                return false;
+            const auto& c=scope_->manager_;const auto& app=*scope_->application_;
+            if(cameraAcquired_&&(!cameraOwner_||!camera2B0_||
+               camera2B0_->kind!=K::camera236180||camera2B0_->reference00!=1||
+               camera2B0_->parent1C||camera2B0_->previous10||camera2B0_->next14||camera2B0_->firstChild18||
+               app.objectCount423F60_<2||!app.entityAuthority_.canRetire(*camera2B0_)))return false;
+            return c.kind==K::uiOptionsManager1D0470&&c.sessionGeneration==generation_&&
+                c.objectKey==key(&c)&&c.reference00==1&&!c.previous10&&!c.next14&&!c.firstChild18&&
+                !c.parent1C&&!c.mask20&&!c.descendants24&&app.objectCount423F60_&&
+                app.entityAuthority_.canRetire(c);
+        }
+        bool acquiredCurrent()const noexcept {
+            return registrationCurrent()&&!videoEffect_&&!cameraAcquired_&&
+                (phase_==Phase::beforeVideo2A3A90||phase_==Phase::nativeVideoAborted);
+        }
+        bool issuedBy(const ::original_main_entry50KG::Application* root,
+            const std::shared_ptr<OriginalUiEntityScope50KG>& scope)const noexcept {
+            return root&&scope_==scope&&scope_->issuer_==root;
+        }
+        bool current(const rr::platform::OriginalUiFrontend50KG* frontend,const void* manager)const noexcept {
+            if(frontend_!=frontend||managerOwner_!=manager||!registrationCurrent()||
+               (phase_!=Phase::beforeVideo2A3A90&&phase_!=Phase::afterVideo2A3A90&&
+                phase_!=Phase::derivedComplete1D04C0&&phase_!=Phase::cameraCold1D05C8)||
+               ((phase_!=Phase::beforeVideo2A3A90)!=bool(videoEffect_))||!basePrefixKnown_||word17C_!=1)
+                return false;
+            const bool derived=phase_==Phase::derivedComplete1D04C0||phase_==Phase::cameraCold1D05C8;
+            if(derivedKnown_!=derived||ancestry8_!=(derived?0x3cfa20u:0x3d3ab0u)||
+               cameraAcquired_!=(phase_==Phase::cameraCold1D05C8))return false;
+            if(derived)for(auto word:derivedZeros_)if(word)return false;
+            for(auto word:zeroWords_)if(word)return false;
+            for(std::size_t m=0;m<4;++m){if(matrixKnown_[m]!=0xff0f)return false;
+                for(std::size_t row:{std::size_t(0),std::size_t(2),std::size_t(3)})
+                    for(std::size_t col=0;col<4;++col)
+                        if(matrices_[m][row*4+col]!=(col==3?0x3f800000u:0u))return false;
+            }
+            return true;
+        }
+        bool videoOwnedPhase()const noexcept {
+            return phase_==Phase::afterVideo2A3A90||phase_==Phase::derivedComplete1D04C0||
+                phase_==Phase::cameraCold1D05C8||phase_==Phase::nativeCameraAborted;
+        }
+        bool completeDerived1D0470()noexcept {
+            if(phase_==Phase::derivedComplete1D04C0||phase_==Phase::cameraCold1D05C8)
+                return current(frontend_,managerOwner_);
+            if(phase_!=Phase::afterVideo2A3A90||!current(frontend_,managerOwner_))return false;
+            ancestry8_=0x3cfea0; //1D048C: actual common manager vtable.
+            for(std::size_t i=0;i<8;++i)derivedZeros_[i]=0; //1D0490..1D04B4, authored order.
+            ancestry8_=0x3cfa20; //1D04B8: Options vtable.
+            derivedZeros_[8]=0; //1D04BC:2B4, after that vtable store.
+            derivedKnown_=true;phase_=Phase::derivedComplete1D04C0;return true;
+        }
+        bool pending()const noexcept {return phase_!=Phase::empty&&phase_!=Phase::nativeAborted;}
+        Result abortNative()noexcept {
+            if(phase_==Phase::empty||phase_==Phase::nativeAborted)return {Status::complete,0};
+            if(!acquiredCurrent())return {Status::phase,0};
+            auto& app=*scope_->application_;auto& c=scope_->manager_;
+            // Exact detached acquired registration only. No142590/1D04E0,
+            // Video write, source-null invention or historical counter reset.
+            if(!app.entityAuthority_.retire(c))return {Status::reference,0};
+            --c.reference00;--app.objectCount423F60_;
+            scope_->optionsConstruction_=nullptr;phase_=Phase::nativeAborted;
+            return {Status::complete,0}; // Native terminal, NOT a source return PC.
+        }
+    public:
+        OptionsConstruction(const OptionsConstruction&)=delete;
+        OptionsConstruction& operator=(const OptionsConstruction&)=delete;
+        ~OptionsConstruction()noexcept {
+            if(pending()&&!abortNative().okay())std::terminate();
+        }
+    };
+    Result beginOptionsConstructorPrefix(const ::original_main_entry50KG::Application* issuer,
+        const std::shared_ptr<OriginalUiEntityScope50KG>& retained,
+        const rr::platform::OriginalUiFrontend50KG* frontend,const void* manager,
+        std::uint64_t generation,std::unique_ptr<OptionsConstruction>& output)noexcept {
+        if(output||!issuer||issuer!=issuer_||retained.get()!=this||!frontend||!manager||!generation)
+            return {Status::owner,0};
+        auto result=live();if(!result.okay())return result;
+        if(!dispatcherLive_||managerLive_||managerPublished_||managerRetiring_||managerForestRetiring_||
+           dispatcherCurrentManager30_||manager_.reference00||optionsConstruction_||
+           transitionDisplayPinned_||detachedMemoryCardOwner_||managerSearchOwner_||
+           !garageChildren_.empty()||managerEpoch_==std::numeric_limits<std::uint64_t>::max()||
+           application_->objectCount423F60_==std::numeric_limits<std::uint32_t>::max()||
+           !linked(dispatcher_,&application_->root10_))return {Status::phase,0};
+        std::unique_ptr<OptionsConstruction> next;
+        try {next.reset(new OptionsConstruction(retained,frontend,manager,generation));}
+        catch(...){return {Status::allocation,0};}
+        auto& authority=application_->entityAuthority_;
+        if(!authority.reserveAdditional(1))return {Status::allocation,0};
+        if(!live().okay()||managerLive_||optionsConstruction_||manager_.reference00||
+           managerPublished_||managerRetiring_||managerForestRetiring_||dispatcherCurrentManager30_||
+           transitionDisplayPinned_||detachedMemoryCardOwner_||managerSearchOwner_||!garageChildren_.empty()||
+           managerEpoch_==std::numeric_limits<std::uint64_t>::max()||
+           application_->objectCount423F60_==std::numeric_limits<std::uint32_t>::max()||
+           !linked(dispatcher_,&application_->root10_)||!authority.canEnroll(manager_,key(&manager_)))
+            return {Status::phase,0};
+        next->priorEpoch_=managerEpoch_;next->epoch_=managerEpoch_+1;
+        next->countBefore_=application_->objectCount423F60_;
+        // All allocations and registry capacity precede the first source count.
+        manager_.~C();new(&manager_) C;++managerEpoch_;
+        optionsConstruction_=next.get();
+        const auto init=initializeOriginalWreckComponent50LA(manager_,K::uiOptionsManager1D0470,
+            generation,key(&manager_),true,application_->objectCount423F60_);
+        if(init.status!=OriginalWreckComponentStatus50LA::complete||!authority.enroll(manager_))std::terminate();
+        next->phase_=OptionsConstruction::Phase::beforeVideo2A3A90;
+        next->ancestry8_=0x3d3ab0; //2A3A18.
+        for(std::size_t m=0;m<4;++m){ //2A3A2C/2A3AB0: each real vf0 row.
+            for(std::size_t row:{std::size_t(0),std::size_t(2),std::size_t(3)})
+                for(std::size_t col=0;col<4;++col)next->matrices_[m][row*4+col]=col==3?0x3f800000u:0u;
+            next->matrixKnown_[m]=0xff0f;
+        }
+        next->word17C_=1; //2A3A40, before the nine zero stores.
+        for(auto& word:next->zeroWords_)word=0;
+        next->basePrefixKnown_=true;
+        // Stop BEFORE global Video44 at2A3A90 and derived1D0484 fields.
+        // Do not claim completed1D0470, managerLive, name194 or dispatcher30.
+        output=std::move(next);return {Status::complete,0x2A3A90};
+    }
     Result prepareGarageManager(std::uint64_t generation)noexcept {
         auto r=live();if(!r.okay())return r;
         if(!dispatcherLive_||managerLive_||dispatcherCurrentManager30_||!generation||managerEpoch_==std::numeric_limits<std::uint64_t>::max()||!linked(dispatcher_,&application_->root10_))
@@ -3261,6 +3418,7 @@ private:
             dispatcherCurrentManager30_=nullptr;dispatcherCurrentManagerGeneration30_=0;}return r;
     }
     Result close()noexcept {
+        if(optionsConstruction_)return {Status::phase,0};
         if(detachedMemoryCardOwner_||detachedMemoryCard_)return {Status::phase,0x1FEE40};
         if(transitionDisplayPinned_)return {Status::phase,0x2A3550};
         if(sharedDialogs_[0]||sharedDialogs_[1])return {Status::phase,0x1425B8};
@@ -3301,7 +3459,7 @@ public:
         GarageConstructionGrant(std::shared_ptr<OriginalUiEntityScope50KG> s,std::uint64_t g)
             :scope_(std::move(s)),generation_(g),epoch_(scope_->managerEpoch_){}
         bool current()const noexcept{return scope_&&scope_->live().okay()&&scope_->managerLive_&&
-            generation_==scope_->managerGeneration_&&epoch_==scope_->managerEpoch_;}
+            scope_->manager_.kind==K::uiGarageManager1D1860&&generation_==scope_->managerGeneration_&&epoch_==scope_->managerEpoch_;}
         std::shared_ptr<OriginalApplicationEntities50LA> application()const noexcept{return current()?scope_->application_:nullptr;}
         const ::original_main_entry50KG::Application* issuer()const noexcept{return current()?scope_->issuer_:nullptr;}
         C* manager()const noexcept{return current()?&scope_->manager_:nullptr;}
