@@ -372,6 +372,10 @@ private:
         bool& firstPending,bool& noTexturePending,OriginalStandardMaterialDiagnostic50LA&,std::size_t role=0)const noexcept;
     bool preflightGarageLoadedSharedIcon(const rr::platform::OriginalUiGarageQuad50KG&,
         OriginalStandardMaterialDiagnostic50LA&)const noexcept;
+    bool preflightMemoryCardFirstStripPopulation(const rr::platform::OriginalUiMemoryCardConstructor50KG&,
+        bool&,bool&,OriginalStandardMaterialDiagnostic50LA&)const noexcept;
+    bool preflightMemoryCardFirstStripBinding(const rr::platform::OriginalUiMemoryCardConstructor50KG&,
+        OriginalStandardMaterialDiagnostic50LA&)const noexcept;
     bool preflightMemoryCardIconBinding(const rr::platform::OriginalUiMemoryCardConstructor50KG&,
         std::size_t,OriginalStandardMaterialDiagnostic50LA&)const noexcept;
     bool preflightMemoryCardFirstIconBinding(const rr::platform::OriginalUiMemoryCardConstructor50KG&,

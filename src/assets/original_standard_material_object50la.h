@@ -27,6 +27,12 @@ struct OriginalStandardMaterialPopulationInput50LA {
     // Sealed capability from the actual native Video factory. Holds the real
     // display/application/runtime lifetimes and source-derived mode fields.
     std::shared_ptr<const OriginalStandardMaterialContext50LA> construction;
+private:
+    friend class OriginalStandardMaterialDomain50LA;
+    friend class OriginalStandardMaterialObject50LA;
+    // Actual Domain handoff only; never a public readiness/provider setter.
+    // Constructor-only observation, not mutable corpus-admission history.
+    std::shared_ptr<const OriginalStandardArchiveProvider50LA> positiveConstructionProvider_;
 };
 enum class OriginalStandardMaterialValueOrigin50LA : std::uint8_t {
     sourceDefault,templateValue,authored,runtime
@@ -105,6 +111,14 @@ private:
     friend class rr::platform::OriginalUiGarageCanonicalSubmission50KG;
     // Private synchronous existing-object observation; not queue/population
     // authority and not a stored capability detached from its occurrence.
+    void captureOverlayConstruction29B628(const OriginalStandardMaterialPopulationInput50LA&)noexcept;
+    bool preflightCapturedOverlayBinding(std::int32_t,
+        const std::shared_ptr<const OriginalStandardMaterialContext50LA>&,
+        const std::shared_ptr<OriginalStandardTextureTable50LA>&,
+        const std::shared_ptr<const OriginalStandardProgramTable50LA>&,
+        const std::shared_ptr<const OriginalStandardArchiveProvider50LA>&,
+        const std::shared_ptr<OriginalStandardTextureResolver50LA>&,
+        OriginalStandardMaterialDiagnostic50LA&)const noexcept;
     bool preflightCapturedSharedIconBinding(std::int32_t,
         const std::shared_ptr<const OriginalStandardMaterialContext50LA>&,
         const std::shared_ptr<OriginalStandardTextureTable50LA>&,

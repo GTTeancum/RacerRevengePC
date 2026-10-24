@@ -307,6 +307,18 @@ struct OriginalStandardMaterialObject50LA::Storage {
     std::array<std::unique_ptr<Pass>,4> passes4C{};
     std::array<std::int32_t,4> collectors5C{{-1,-1,-1,-1}};
     std::shared_ptr<const OriginalStandardMaterialSource50LA> source;
+    struct PositiveOverlayConstruction {
+        std::shared_ptr<const OriginalStandardMaterialSource50LA> source;
+        std::shared_ptr<const OriginalStandardArchiveProvider50LA> provider;
+        OriginalUiEncodedArchiveView50KG archive;
+        const OriginalUiMemberIdentity50KG* member=nullptr;
+        const std::uint8_t* data=nullptr;std::size_t bytes=0;
+        std::size_t mount=static_cast<std::size_t>(-1),ordinal=static_cast<std::size_t>(-1);
+        std::uint64_t revision=0,generation=0;
+    };
+    // First actual positive construction only. Never filled by a loaded-row
+    // consumer, and never labeled with a later MemoryCard occurrence/caller.
+    std::optional<PositiveOverlayConstruction> overlayConstruction;
     std::shared_ptr<const OriginalUiArchive50KG> tournamentMissingPsm;
     std::unique_ptr<OriginalUiMaterial50KG> tournamentFallback;
     std::shared_ptr<const OriginalUiArchive50KG> speedBoostMissingPsm;
@@ -405,6 +417,92 @@ const OriginalUiMaterialProvenance50KG* OriginalStandardMaterialObject50LA::dama
 const OriginalUiMaterialProvenance50KG* OriginalStandardMaterialObject50LA::pauseBackdropFallbackProvenance() const noexcept {
     return storage_&&storage_->pauseBackdropFallback?&storage_->pauseBackdropFallback->provenance:nullptr;
 }
+namespace {
+bool overlayConstructionMember(const OriginalUiArchiveIdentity50KG* archive,std::size_t ordinal,
+    const OriginalUiMemberIdentity50KG*& member)noexcept {
+    member=nullptr;
+    if(!archive||archive!=originalUiArchiveIdentity50KG(archive->id))return false;
+    member=originalUiMemberIdentity50KG(archive->id,ordinal);
+    return member&&member->name&&member->bytes==1090&&member->sha256&&
+        OriginalStandardArchiveProvider50LA::sameName(member->name,"ui\\textures\\overlay1top.psm")&&
+        std::strcmp(member->sha256,"8dcfc7644c8a2d60deb40cf20e2bc8a9b358f0200024da31612563302a9f4230")==0;
+}
+}
+void OriginalStandardMaterialObject50LA::captureOverlayConstruction29B628(
+    const OriginalStandardMaterialPopulationInput50LA& input)noexcept {
+    if(!storage_||storage_->constructed||storage_->overlayConstruction)return;
+    auto& s=*storage_;const auto provider=input.positiveConstructionProvider_;
+    if(!s.source||!s.source->prepared()||!s.source->member()||!s.source->originalBytes()||
+       !OriginalStandardArchiveProvider50LA::sameName(s.name00,"ui\\textures\\overlay1top.psm")||
+       !OriginalStandardArchiveProvider50LA::sameName(*s.source->member(),s.name00)||!provider||!provider->sealed())return;
+    using Provider=OriginalStandardArchiveProvider50LA;Provider::MemberView selected;
+    const auto revision=provider->revision();const auto& bytes=*s.source->originalBytes();
+    if(provider->lookup132820(s.name00,selected)!=Provider::Lookup::present||
+       !selected.member||!selected.data||!selected.bankGeneration||selected.revision!=revision||
+       !Provider::sameName(*selected.member,s.name00)||selected.size!=bytes.size()||
+       (selected.size&&std::memcmp(selected.data,bytes.data(),selected.size)))return;
+    OriginalUiEncodedArchiveView50KG archive;const OriginalUiMemberIdentity50KG* member=nullptr;
+    if(!provider->encodedUiInput(selected.mount,archive)||archive.providerIdentity()!=provider.get()||
+       !overlayConstructionMember(archive.identity(),selected.ordinal,member)||member->bytes!=selected.size||
+       !Provider::sameName(member->name,*selected.member)||provider->revision()!=revision||!provider->sealed())return;
+    Storage::PositiveOverlayConstruction receipt;
+    receipt.source=s.source;receipt.provider=provider;receipt.archive=std::move(archive);receipt.member=member;
+    receipt.data=selected.data;receipt.bytes=selected.size;receipt.mount=selected.mount;receipt.ordinal=selected.ordinal;
+    receipt.revision=revision;receipt.generation=selected.bankGeneration;
+    s.overlayConstruction=std::move(receipt);
+    // Missing/unsupported actual selection leaves this observation absent;
+    // it does not change existing construction behavior or mint source history.
+}
+bool OriginalStandardMaterialObject50LA::preflightCapturedOverlayBinding(std::int32_t row,
+    const std::shared_ptr<const OriginalStandardMaterialContext50LA>& context,
+    const std::shared_ptr<OriginalStandardTextureTable50LA>& textures,
+    const std::shared_ptr<const OriginalStandardProgramTable50LA>& programs,
+    const std::shared_ptr<const OriginalStandardArchiveProvider50LA>& provider,
+    const std::shared_ptr<OriginalStandardTextureResolver50LA>& resolver,D& d)const noexcept {
+    d={};d.row=row;d.pass=0;
+    if(!storage_||!storage_->constructed||storage_->row40!=row||!storage_->source||
+       !storage_->overlayConstruction||storage_->count48!=1||!storage_->passes4C[0])
+        return fail(d,E::source,0x29B628,"actual captured positive overlay1top construction");
+    const auto& s=*storage_;const auto& receipt=*s.overlayConstruction;const auto& pass=*s.passes4C[0];
+    using Provider=OriginalStandardArchiveProvider50LA;const OriginalUiMemberIdentity50KG* selected=nullptr;
+    const auto* bytes=s.source->originalBytes();
+    if(receipt.source!=s.source||receipt.source.owner_before(s.source)||s.source.owner_before(receipt.source)||
+       receipt.provider!=provider||!provider||receipt.archive.providerIdentity()!=provider.get()||
+       !overlayConstructionMember(receipt.archive.identity(),receipt.ordinal,selected)||selected!=receipt.member||
+       !receipt.revision||!receipt.generation||!receipt.data||receipt.bytes!=selected->bytes||
+       !s.source->member()||!Provider::sameName(*s.source->member(),selected->name)||
+       !Provider::sameName(s.name00,selected->name)||!bytes||bytes->size()!=receipt.bytes||
+       std::memcmp(bytes->data(),receipt.data,receipt.bytes))
+        return fail(d,E::source,0x29B628,"immutable positive member and exact parsed source owner");
+    if(s.programs!=programs||s.textures!=textures||s.construction!=context||!context||!context->live()||
+       !s.templates||!context->materialApplication()||&context->materialApplication()->templates()!=s.templates.get()||
+       pass.constructionTemplate!=s.templates->get(OriginalUiTemplate50KG::screenMt)||
+       !pass.constructionTemplate||pass.references04!=1||pass.mapCount20!=1||pass.flags21!=2||
+       pass.uv1E[0]||pass.uv1E[1]||pass.texture1A[0]<0||pass.texture1A[1]!=-1||
+       pass.parameterMask24||pass.parameterCount28||pass.parameters34||pass.animation10||pass.textureAnimation10||
+       !pass.state30||pass.state30->contextCount()!=1u)
+        return fail(d,E::reference,0x247110,"actual authored ScreenMT pass and live state30");
+    // Observe the genuine named-group owner; never acquire or guess its token.
+    const auto& groups=OriginalShaderPassGroups50LA::instance().names_;
+    if(pass.group22<0||static_cast<std::size_t>(pass.group22)>=groups.size()||
+       !Provider::sameName(groups[static_cast<std::size_t>(pass.group22)],"top"))
+        return fail(d,E::reference,0x2475AC,"actual named top group");
+    OriginalStandardProgramRowView50LA program;
+    if(!programs||!programs->row(pass.program18,program)||!program.canonicalName||
+       std::strcmp(program.canonicalName,"ScreenObject"))return fail(d,E::program,0x2471BC);
+    OriginalStandardTextureResource50LA* texture=nullptr;OriginalStandardTextureRowView50LA textureRow;
+    if(!textures||!textures->row(pass.texture1A[0],textureRow)||!textureRow.name00||
+       !Provider::sameName(*textureRow.name00,"ui\\textures\\overlay1")||!textureRow.references08||*textureRow.references08<=0||
+       !textures->resolve298E60(pass.texture1A[0],texture,d.texture)||!texture||textureRow.object04!=texture||
+       texture->construction_!=context||texture->resolver_!=resolver||!resolver||
+       texture->firstUiSource_.providerIdentity!=provider.get()||!texture->firstUiSourceCurrent()||
+       !texture->sourceMember()||!Provider::sameName(*texture->sourceMember(),"ui\\textures\\overlay1.pst"))
+        return fail(d,E::texture,0x2472F0,"independent actual overlay1 first-source owner");
+    // The retained authored parser created this state. Preserve its current
+    // GS/sampler/provenance fields; neither fallback defaults nor a new state
+    // are generated by this read-only resource join. No collector/draw grant.
+    return true;
+}
 bool OriginalStandardMaterialObject50LA::capturedSharedIconName()const noexcept {
     if(!storage_)return false;using P=OriginalStandardArchiveProvider50LA;
     return P::sameName(storage_->name00,"ui\\textures\\icon_x.psm")||
@@ -464,13 +562,16 @@ bool OriginalStandardMaterialObject50LA::preflightCapturedSharedIconBinding(std:
             (card.roleIndex==0&&card.constructionIndex==3&&card.componentOffset==0x160&&card.sourceCallerPC==0x1FF058&&
              Provider::sameName(s.name00,"ui\\textures\\icon_x.psm"))||
             (card.roleIndex==1&&card.constructionIndex==4&&card.componentOffset==0x1C0&&card.sourceCallerPC==0x1FF110&&
-             Provider::sameName(s.name00,"ui\\textures\\icon_tri.psm"));
+             Provider::sameName(s.name00,"ui\\textures\\icon_tri.psm"))||
+            (card.roleIndex==2&&card.constructionIndex==5&&card.componentOffset==0x220&&card.sourceCallerPC==0x1FF1C8&&
+             Provider::sameName(s.name00,"ui\\textures\\icon_sqr.psm"))||
+            (card.roleIndex==3&&card.constructionIndex==6&&card.componentOffset==0x280&&card.sourceCallerPC==0x1FF280&&
+             Provider::sameName(s.name00,"ui\\textures\\icon_cir.psm"));
         if(!authoredOccurrence||!card.options||
            !card.options->loaded()||card.options->identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::options)||
            card.options->member(46).identity!=originalUiMemberIdentity50KG(OriginalUiArchiveId50KG::options,46)||
            card.options->member(1).identity!=originalUiMemberIdentity50KG(OriginalUiArchiveId50KG::options,1)||card.provider!=provider||
-           (card.selectedArchive.identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::controllerPopup)&&
-            card.selectedArchive.identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::overlays))||
+           !OriginalMemoryCardScreenFallback50KG::constructionMemberSupported(card.roleIndex,card.selectedArchive.identity(),card.ordinal)||
            card.selectedArchive.providerIdentity()!=provider.get()||
            !card.revision||!card.bankGeneration||!card.selectedBytes||card.pstBytes.empty()||
            std::memcmp(card.selectedBytes,card.pstBytes.data(),card.pstBytes.size()))
@@ -1021,6 +1122,7 @@ bool OriginalStandardMaterialObject50LA::construct29B550(std::int32_t row,const 
             if(s.source)return fail(d,E::source,0x29B628,"ambiguous resolved PSM member");
             s.source=source;
         }
+        if(s.source)captureOverlayConstruction29B628(input);
         if((tournamentMissingPsm&&speedBoostMissingPsm)||
            (damageMissingPsm&&(tournamentMissingPsm||speedBoostMissingPsm))||
            (pauseBackdropMissingPsm&&(tournamentMissingPsm||speedBoostMissingPsm||damageMissingPsm)))return fail(d,E::source,0x29B638);

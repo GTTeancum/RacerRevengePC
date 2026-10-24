@@ -49,6 +49,7 @@ namespace original_time_stats_adapter50LA { class Owner; }
 namespace original_speed_boost_adapter50LA { class Owner; }
 namespace original_position_stats_adapter50LA { class Owner; }
 namespace original_pause_observation50LA { class Owner; }
+namespace original_main_entry50KG { struct Application; }
 namespace original_camera_session50KX {
 using namespace rr::game;
 using Bank=native_racer50HN::Bank;
@@ -196,6 +197,7 @@ struct Result {
 };
 
 class Session final {
+    friend struct ::original_main_entry50KG::Application;
     friend class ::gb_particle_render50GB::Owner;
     friend class ::mc_particle_render50MC::Owner;
     friend class ::original_cable_selection50LA::Binding;
@@ -278,7 +280,40 @@ class Session final {
     std::uint8_t raceFlags1B0_=1,uiFlags1E4_=1,sceneFlags29_=3;
     std::uint8_t raceEntityFlags29_=1; //Enabled native race entity, distinct from scene flags29.
     OriginalRaceHudBlink50LA raceHudBlink_; //Actual race D8/E8, no separate clock.
+    // Immutable native custody, not source camera fields or a readiness grant.
+    // Root still owns all Rig/particle borrows; closed/prepared sessions cannot
+    // use this record to re-enter the private fresh constructor.
+    struct NativeTaIssuance {
+        const original_main_entry50KG::Application* issuer=nullptr;
+        std::shared_ptr<const rr::assets::OriginalStandardArchiveProvider50LA> provider;
+        std::uint64_t generation=0,providerRevision=0,bankGeneration=0;
+        std::size_t mount=0,ordinal=0;
+        const native_racer50HW::Rig* selectedRig=nullptr;
+        OriginalTrackParticleCold50LA* particles=nullptr;
+        std::uint32_t selectedPod=0;
+        std::vector<std::uint8_t> cam,tob,phy;
+    };
+    std::unique_ptr<const NativeTaIssuance> nativeTaIssuance_;
     OriginalRaceCameraOwner controller_;
+    // ONE noncopyable Entity counterpart for this existing copyable numeric
+    // payload. No second controller, borrowed parent, or additional authority.
+    struct ColdController174A30 {
+        OriginalWreckComponent50LA entity;
+        std::uint64_t issuerGeneration=0;
+        bool started=false,released=false;
+        std::uint32_t vtable08=0;
+        const void* scene3C=nullptr;
+        const void* racer40=nullptr;
+        std::array<const void*,4> queries48{}; //48,4C,50,54.
+        std::uint32_t word58=0; //Constructor zero; no pointer/ownership meaning inferred.
+        const void* script5C=nullptr;
+        std::array<const void*,8> children64{}; //64..80, including intro emitter80.
+        std::uint32_t mode84=0; //174DF0 later receives the actual race8C integer.
+        // Constructor-unwritten88 is deliberately absent. Native safe backing
+        // is not source knowledge: only these masks become established.
+        std::uint32_t word60Value=0,word60Known=0;
+        std::uint16_t halfA8Value=0,halfA8Known=0;
+    } coldController_;
     OriginalFollowCamera follow_;
     OriginalAttachedCamera attached_;
     OriginalDeathCamera50KG death_;
@@ -337,6 +372,7 @@ class Session final {
         return static_cast<std::uint64_t>(reinterpret_cast<std::uintptr_t>(&owner));
     }
     static bool same(float a,float b) noexcept{return std::memcmp(&a,&b,sizeof a)==0;}
+    #include "original_camera_controller_cold_candidate.inl"
     #include "original_camera_fog_publication50la.inl"
     rr::game::OriginalRacerDiffuseCamera50LA racerDiffuseCamera_;
     Result set(Status s,std::uint32_t pc=0) noexcept {result_.status=s;result_.sourcePC=pc;return result_;}
@@ -651,6 +687,7 @@ class Session final {
     }
 public:
     explicit Session(ActualOwners actual) noexcept:actual_(actual){}
+    ~Session(){if(coldController_.entity.reference00)std::terminate();}
     Session(const Session&)=delete;Session& operator=(const Session&)=delete;
     Session(Session&&)=delete;Session& operator=(Session&&)=delete;
     const Result& diagnostic()const noexcept{return result_;}
@@ -894,6 +931,10 @@ public:
     //generation is the native race lifetime key; it does not assert a guest ID.
     Result prepare(std::uint64_t generation,const AuthoredInputs& authored,DisplayInputs& app){
         invalidateFogPreparation();
+        // Unactivated constructor branch cannot enter the reduced native
+        // initialization order, even after typed retirement. No fresh receipt.
+        if(coldController_.started)return set(Status::sourcePath,0x174df0u);
+        if(nativeTaIssuance_&&generation!=nativeTaIssuance_->generation)return set(Status::owner);
         if(coldBound_||closed_)return set(Status::order);
         if(frameStage_==FrameStage::failed)return set(Status::terminal);
         const bool mc=authored.course==OriginalCameraStartCourse::mc;
@@ -1507,6 +1548,7 @@ public:
         // Once source ownership starts retiring, a partial failure can only
         // resume cleanup. It must not re-enter normal simulation/constructor work.
         coldBound_=false;frameStage_=FrameStage::failed;
+        if(!releaseColdController174C20())return set(Status::owner,0x174c20u);
         if(!releaseRacerEntityPrefixes())return set(Status::renderer,result_.entityCleanup.sourcePC);
         if(!actual_.bank.visit(0,[&](){return actual_.followQueries.close();}))return set(Status::owner,0x120290);
         if(spatial_.registration34.attached){
@@ -1528,6 +1570,7 @@ public:
         invalidateFogPreparation();
         abandoned_=true;coldBound_=false;frameStage_=FrameStage::failed;
         if(closed_)return set(Status::abandoned);
+        if(!releaseColdController174C20())return set(Status::owner,0x174c20u);
         if(!releaseRacerEntityPrefixes())return set(Status::renderer,result_.entityCleanup.sourcePC);
         if(!actual_.bank.visit(0,[&](){return actual_.followQueries.close();}))return set(Status::owner,0x120290);
         if(spatial_.registration34.attached){

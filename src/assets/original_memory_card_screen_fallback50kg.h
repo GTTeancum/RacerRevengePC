@@ -10,7 +10,7 @@ class OriginalStandardMaterialObject50LA;
 class OriginalStandardTextureTable50LA;
 class OriginalStandardProgramTable50LA;
 // Pending source-construction capability, NOT historical origin or page authority.
-// Only the real retained X/Triangle occurrence owner can mint it. It never owns its issuer/table/domain.
+// Only the real retained ordinary-icon occurrence owner can mint it. It never owns its issuer/table/domain.
 class OriginalMemoryCardScreenFallback50KG final {
     friend class rr::platform::OriginalUiMemoryCardConstructor50KG;
     friend class OriginalStandardMaterialTable50LA;
@@ -39,6 +39,7 @@ class OriginalMemoryCardScreenFallback50KG final {
     std::shared_ptr<const OriginalStandardMaterialContext50LA> context_;
     std::shared_ptr<OriginalStandardTextureTable50LA> textures_;
     std::shared_ptr<const OriginalStandardProgramTable50LA> programs_;
+    static bool constructionMemberSupported(std::size_t,const OriginalUiArchiveIdentity50KG*,std::size_t)noexcept;
     bool occurrenceCurrent()const noexcept;
     bool captureAt29B638(const std::string&,
         const std::shared_ptr<const OriginalStandardMaterialContext50LA>&,

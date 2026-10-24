@@ -113,7 +113,7 @@ bool OriginalUiMemoryCardConstructor50KG::firstIconPacketStateCurrent()const noe
     return iconPacketStateCurrent(0);
 }
 bool OriginalUiMemoryCardConstructor50KG::iconPacketStateCurrent(std::size_t role)const noexcept {
-    if(role>1)return false;
+    if(role>3)return false;
     const auto& q=quads_[loadRoles_[role].constructionIndex];
     if(q.nativeGarageFifoPins_||q.nativeMenuWarningPins_)return false;
     if(q.stage_==Quad::Stage::loaded){
@@ -124,73 +124,82 @@ bool OriginalUiMemoryCardConstructor50KG::iconPacketStateCurrent(std::size_t rol
     const bool prefix=(q.stage_==Quad::Stage::materialRetained&&q.pendingPC_==0x2DF144)||
         (q.stage_==Quad::Stage::populated&&q.pendingPC_==0x2DF158)||
         (q.stage_==Quad::Stage::dimensionsStored&&q.pendingPC_==0x2DF1CC);
-    return prefix&&!(role==0?firstIconPostLoadApplied_:trianglePostLoadApplied_)&&!q.resource58&&!q.packetOwner_&&!q.dmaData4_&&!q.packetRevision_&&
+    return prefix&&!iconPostLoadApplied_[role]&&!q.resource58&&!q.packetOwner_&&!q.dmaData4_&&!q.packetRevision_&&
         (!q.material54||!q.material54->packet10);
 }
 bool OriginalUiMemoryCardConstructor50KG::completeFirstIconComponent1FF058(Diagnostic& d)noexcept {
-    d={};const auto table=domain_?domain_->materials382B38():nullptr;std::int32_t row=-1;
-    if(!table||!optionsSource_||!firstIconOccurrenceCurrent(*table,row)) {d.sourcePC=0x2DF158;return false;}
-    auto& q=quads_[loadRoles_[0].constructionIndex];
-    if(q.stage_!=Quad::Stage::loaded){
-        if(!q.completeMemoryCardFirstIcon2DF158(*this,d.quad)){
-            d.sourcePC=d.quad.sourcePC;d.sourceEffectsCommitted=d.quad.sourceEffectsCommitted;return false;
-        }
-        d.sourceEffectsCommitted=true;
-    }
-    if(!firstIconOccurrenceCurrent(*table,row)||!table->preflightMemoryCardFirstIconBinding(*this,d.quad.material)){
-        d.sourcePC=d.quad.material.sourcePC?d.quad.material.sourcePC:0x1FF060;return false;
-    }
-    // Exact caller post-return stores1FF060..0FC. The packet remains its real
-    // zero-position initialized allocation; dirty marking is not regeneration.
-    if(!firstIconPostLoadApplied_){
-        if(q.position10[0]!=514.f||q.position10[1]!=378.f){
-            q.position10[0]=514.f;q.position10[1]=378.f;
-            q.flags5CValue=std::uint8_t((q.flags5CValue&~1u)|1u);q.flags5CKnownMask|=1;
-            if(q.uv30[3]!=0.f){q.flags5CValue=std::uint8_t((q.flags5CValue&~2u)|2u);q.flags5CKnownMask|=2;}
-        }
-        firstIconPostLoadApplied_=true;d.sourceEffectsCommitted=true;
-    }
-    if(q.position10[0]!=514.f||q.position10[1]!=378.f){d.sourcePC=0x1FF0AC;return false;}
-    d.sourcePC=0x1FF100;return true; // Stop BEFORE next-role setup/call.
+    return completeIconComponent(0,d);
 }
 bool OriginalUiMemoryCardConstructor50KG::completeTriangleComponent1FF110(Diagnostic& d)noexcept {
+    return completeIconComponent(1,d);
+}
+bool OriginalUiMemoryCardConstructor50KG::completeIconComponent(std::size_t role,Diagnostic& d)noexcept {
     d={};const auto table=domain_?domain_->materials382B38():nullptr;std::int32_t row=-1;
-    if(!table||!optionsSource_||!iconOccurrenceCurrent(1,*table,row)){d.sourcePC=0x2DF158;return false;}
-    auto& q=quads_[loadRoles_[1].constructionIndex];
+    if(role>3||!table||!optionsSource_||!iconOccurrenceCurrent(role,*table,row)){d.sourcePC=0x2DF158;return false;}
+    // These preflights are outside any population callback. Earlier packet,
+    // placement and exact canonical bindings remain actual prerequisites.
+    for(std::size_t prior=0;prior<role;++prior)
+        if(!completedIconStateCurrent(prior)||!table->preflightMemoryCardIconBinding(*this,prior,d.quad.material)){
+            d.sourcePC=d.quad.material.sourcePC?d.quad.material.sourcePC:iconProgressPC(prior);return false;
+        }
+    auto& q=quads_[loadRoles_[role].constructionIndex];const auto& post=iconPostLoads_[role];
     if(q.stage_!=Quad::Stage::loaded){
-        if(!q.completeMemoryCardIcon2DF158(*this,1,d.quad)){
+        if(!q.completeMemoryCardIcon2DF158(*this,role,d.quad)){
             d.sourcePC=d.quad.sourcePC;d.sourceEffectsCommitted=d.quad.sourceEffectsCommitted;return false;
         }
         d.sourceEffectsCommitted=true;
     }
-    if(!iconOccurrenceCurrent(1,*table,row)||!table->preflightMemoryCardIconBinding(*this,1,d.quad.material)){
-        d.sourcePC=d.quad.material.sourcePC?d.quad.material.sourcePC:0x1FF118;return false;
+    if(!iconOccurrenceCurrent(role,*table,row)||!table->preflightMemoryCardIconBinding(*this,role,d.quad.material)){
+        d.sourcePC=d.quad.material.sourcePC?d.quad.material.sourcePC:post.startPC;return false;
     }
-    // Actual caller1FF118..1FF1B4. The freshly initialized packet remains
-    // at zero position: dirty bits request later source work, not regeneration.
-    if(!trianglePostLoadApplied_){
-        if(q.position10[0]!=427.f||q.position10[1]!=378.f){
-            q.position10[0]=427.f;q.position10[1]=378.f;
+    // Source compares X then Y, stores X then Y, marks dirty bit0, and only
+    // inside that changed-position branch marks bit1 for nonzero rotation.
+    // No packet regeneration; each packet remains its real initialized owner.
+    if(!iconPostLoadApplied_[role]){
+        if(q.position10[0]!=post.x||q.position10[1]!=post.y){
+            q.position10[0]=post.x;q.position10[1]=post.y;
             q.flags5CValue=std::uint8_t((q.flags5CValue&~1u)|1u);q.flags5CKnownMask|=1;
             if(q.uv30[3]!=0.f){q.flags5CValue=std::uint8_t((q.flags5CValue&~2u)|2u);q.flags5CKnownMask|=2;}
         }
-        trianglePostLoadApplied_=true;d.sourceEffectsCommitted=true;
+        iconPostLoadApplied_[role]=true;d.sourceEffectsCommitted=true;
     }
-    if(q.position10[0]!=427.f||q.position10[1]!=378.f){d.sourcePC=0x1FF164;return false;}
-    d.sourcePC=0x1FF1B8;return true; // Stop BEFORE Square setup/call.
+    if(q.position10[0]!=post.x||q.position10[1]!=post.y){d.sourcePC=post.positionPC;return false;}
+    d.sourcePC=post.stopPC;return true; // No following role setup here.
+}
+bool OriginalUiMemoryCardConstructor50KG::loadSquareCirclePrefix1FF1C8(Diagnostic& d)noexcept {
+    d={};bool effects=false;
+    if(!resourcePrefixCurrent()||!loadRolePrefixCurrent()){d.sourcePC=0x1FF1C8;return false;}
+    for(std::size_t role=2;role<4;++role){Diagnostic step;
+        // Completed predecessors are not re-populated on a resumed call. The
+        // next real operation validates their bindings before any new effect.
+        if(completedIconStateCurrent(role)){effects=true;continue;}
+        if(!retainIconRolePrefix(role,step)){d=step;d.sourceEffectsCommitted|=effects;return false;}
+        effects|=step.sourceEffectsCommitted;
+        if(!populateIconResources2DF144(role,step)){d=step;d.sourceEffectsCommitted|=effects;return false;}
+        effects|=step.sourceEffectsCommitted;
+        if(!completeIconComponent(role,step)){d=step;d.sourceEffectsCommitted|=effects;return false;}
+        effects|=step.sourceEffectsCommitted;d=step;
+    }
+    const auto table=domain_->materials382B38();
+    for(std::size_t role=0;role<4;++role)
+        if(!completedIconStateCurrent(role)||!table->preflightMemoryCardIconBinding(*this,role,d.quad.material)){
+            d.sourcePC=d.quad.material.sourcePC?d.quad.material.sourcePC:iconProgressPC(role);
+            d.sourceEffectsCommitted|=effects;return false;
+        }
+    d.sourcePC=0x1FF328;d.sourceEffectsCommitted|=effects;return true; // Before authored strips.
 }
 bool OriginalUiMemoryCardConstructor50KG::iconOccurrenceCurrent(std::size_t role,
     const assets::OriginalStandardMaterialTable50LA& table,std::int32_t& row)const noexcept {
     if(role==0)return firstIconOccurrenceCurrent(table,row);
     row=-1;
-    if(role!=1||!resourcePrefixCurrent()||retainedLoadRoles_!=2||!loadRolePrefixCurrent()||
+    if(role>3||role>=retainedLoadRoles_||!resourcePrefixCurrent()||!loadRolePrefixCurrent()||
        domain_->materials382B38().get()!=&table)return false;
     row=quads_[loadRoles_[role].constructionIndex].material54->material00;return row>=0;
 }
 bool OriginalUiMemoryCardConstructor50KG::pendingFamilyOccurrenceCurrent(
     const assets::OriginalMemoryCardScreenFallback50KG& proof)const noexcept {
     std::int32_t row=-1;const auto table=domain_?domain_->materials382B38():nullptr;
-    return proof.roleIndex_<=1&&table&&iconOccurrenceCurrent(proof.roleIndex_,*table,row)&&optionsSource_&&proof.options_==optionsSource_&&
+    return proof.roleIndex_<=3&&table&&iconOccurrenceCurrent(proof.roleIndex_,*table,row)&&optionsSource_&&proof.options_==optionsSource_&&
         quads_[loadRoles_[proof.roleIndex_].constructionIndex].stage_==Quad::Stage::materialRetained&&
         !pendingFamilyRetired_&&proof.name_==loadRoles_[proof.roleIndex_].qualifiedName&&
         proof.constructionIndex_==loadRoles_[proof.roleIndex_].constructionIndex&&
@@ -205,7 +214,7 @@ bool OriginalUiMemoryCardConstructor50KG::prepareFirstIconConstructionFamily(Dia
 }
 bool OriginalUiMemoryCardConstructor50KG::prepareIconConstructionFamily(std::size_t role,Diagnostic& d)noexcept {
     d={};std::int32_t row=-1;const auto table=domain_?domain_->materials382B38():nullptr;
-    if(role>1||!table||!iconOccurrenceCurrent(role,*table,row)||!optionsSource_||pendingFamilyRetired_||
+    if(role>3||!table||!iconOccurrenceCurrent(role,*table,row)||!optionsSource_||pendingFamilyRetired_||
        quads_[loadRoles_[role].constructionIndex].stage_!=Quad::Stage::materialRetained){d.sourcePC=0x29B638;return false;}
     try {
         auto proof=std::shared_ptr<assets::OriginalMemoryCardScreenFallback50KG>(new assets::OriginalMemoryCardScreenFallback50KG);
@@ -227,16 +236,14 @@ bool OriginalUiMemoryCardConstructor50KG::populateTriangleResources2DF144(Diagno
     return populateIconResources2DF144(1,d);
 }
 bool OriginalUiMemoryCardConstructor50KG::populateIconResources2DF144(std::size_t role,Diagnostic& d)noexcept {
-    d={};if(role>1){d.sourcePC=0x2DF144;return false;}
+    d={};if(role>3){d.sourcePC=0x2DF144;return false;}
     auto& progress=iconPopulation_[role];d.sourceInputsAdmitted=progress.inputsAdmitted;
     const auto table=domain_?domain_->materials382B38():nullptr;std::int32_t row=-1;
     if(!table||!iconOccurrenceCurrent(role,*table,row)||!optionsSource_||pendingFamilyRetired_){d.sourcePC=0x2DF144;return false;}
     auto& quad=quads_[loadRoles_[role].constructionIndex];
     if(quad.stage_!=Quad::Stage::materialRetained){
         const bool okay=table->preflightMemoryCardIconBinding(*this,role,d.quad.material);
-        d.sourcePC=okay?((role==0&&firstIconPostLoadApplied_)?0x1FF100:
-            (role==1&&trianglePostLoadApplied_)?0x1FF1B8:quad.stage_==Quad::Stage::loaded?0x2DF54C:
-            quad.stage_==Quad::Stage::dimensionsStored?0x2DF1CC:0x2DF158):d.quad.material.sourcePC;
+        d.sourcePC=okay?iconProgressPC(role):d.quad.material.sourcePC;
         d.sourceInputsAdmitted=progress.inputsAdmitted;return okay;
     }
     if(progress.attempted){d.sourcePC=progress.stopPC;d.sourceInputsAdmitted=progress.inputsAdmitted;return false;}
@@ -288,8 +295,7 @@ bool OriginalUiMemoryCardConstructor50KG::populateIconResources2DF144(std::size_
                !pst.member||!pst.data||!pst.size){d.sourcePC=0x29B638;return false;}
             assets::OriginalUiEncodedArchiveView50KG input;
             if(!provider->encodedUiInput(pst.mount,input)||input.providerIdentity()!=provider.get()||
-               (input.identity()!=assets::originalUiArchiveIdentity50KG(assets::OriginalUiArchiveId50KG::controllerPopup)&&
-                input.identity()!=assets::originalUiArchiveIdentity50KG(assets::OriginalUiArchiveId50KG::overlays))){d.sourcePC=0x132820;return false;}
+               !assets::OriginalMemoryCardScreenFallback50KG::constructionMemberSupported(role,input.identity(),pst.ordinal)){d.sourcePC=0x132820;return false;}
             const auto* member=assets::originalUiMemberIdentity50KG(input.identity()->id,pst.ordinal);
             if(!member||member->bytes!=pst.size||!Provider::sameName(member->name,*pst.member)||
                !Provider::sameName(*pst.member,materialName+".pst")){d.sourcePC=0x132820;return false;}
@@ -329,13 +335,164 @@ bool OriginalUiMemoryCardConstructor50KG::populateIconResources2DF144(std::size_
     }catch(...){d.sourcePC=progress.attempted?progress.stopPC:0x2DF144;
         d.sourceInputsAdmitted=progress.inputsAdmitted;return false;}
 }
+bool OriginalUiMemoryCardConstructor50KG::populateFirstStripResources2DF144(Diagnostic& d)noexcept {
+    d={};auto& progress=firstStripPopulation_;d.sourceInputsAdmitted=progress.inputsAdmitted;
+    const auto failurePC=[](const assets::OriginalStandardMaterialDiagnostic50LA& material,std::uint32_t fallback)noexcept {
+        return material.status==assets::OriginalStandardMaterialStatus50LA::texture&&material.texture.sourcePC?
+            material.texture.sourcePC:(material.sourcePC?material.sourcePC:fallback);
+    };
+    const auto table=domain_?domain_->materials382B38():nullptr;std::int32_t row=-1;
+    if(!table||!firstStripOccurrenceCurrent(*table,row)||!optionsSource_||pendingFamilyRetired_){d.sourcePC=0x2DF144;return false;}
+    auto& quad=quads_[loadRoles_[4].constructionIndex];
+    if(quad.stage_!=Quad::Stage::materialRetained){
+        const bool okay=table->preflightMemoryCardFirstStripBinding(*this,d.quad.material);
+        d.sourcePC=okay?firstStripProgressPC():failurePC(d.quad.material,0x2DF158);
+        d.sourceInputsAdmitted=progress.inputsAdmitted;return okay;
+    }
+    if(progress.attempted){d.sourcePC=progress.stopPC;d.sourceInputsAdmitted=progress.inputsAdmitted;return false;}
+    using Provider=assets::OriginalStandardArchiveProvider50LA;
+    const auto provider=domain_->archiveProvider3E1A70();
+    bool firstPending=false,noTexturePending=false;
+    if(!provider||!provider->sealed()||!table->preflightMemoryCardFirstStripPopulation(*this,firstPending,noTexturePending,d.quad.material)){
+        d.sourcePC=failurePC(d.quad.material,0x2DF144);return false;
+    }
+    const auto revision=provider->revision();
+    try {
+        std::vector<std::shared_ptr<const assets::OriginalStandardMaterialSource50LA>> sources;
+        std::vector<assets::OriginalStandardTextureSourceInput50LA> textures;
+        if(noTexturePending){
+            Provider::MemberView member;
+            if(provider->lookup132820("ui\\textures\\NoTexture.psm",member)!=Provider::Lookup::present||
+               !member.member||!member.data||!member.size){d.sourcePC=0x29B628;return false;}
+            assets::OriginalUiEncodedArchiveView50KG input;
+            if(!provider->encodedUiInput(member.mount,input)||input.providerIdentity()!=provider.get()||!input.identity()){
+                d.sourcePC=0x132820;return false;
+            }
+            const auto* identity=assets::originalUiMemberIdentity50KG(input.identity()->id,member.ordinal);
+            if(!identity||!identity->sha256||identity->bytes!=491||member.size!=identity->bytes||
+               !Provider::sameName(identity->name,*member.member)||
+               !Provider::sameName(*member.member,"ui\\textures\\NoTexture.psm")||
+               std::strcmp(identity->sha256,"f88625f9aaaa564646d77f3a95d47e1d60f94a9bf6c3052beda86bbe00bd5b8a")){
+                d.sourcePC=0x29B628;return false;
+            }
+            auto source=std::make_shared<assets::OriginalStandardMaterialSource50LA>();
+            std::vector<std::uint8_t> bytes(member.data,member.data+member.size);
+            if(!source->prepare(*member.member,bytes,d.quad.material.document)||source->section("Prologue")){
+                d.sourcePC=0x29B6D8;return false;
+            }
+            const auto* general=source->section("General");const auto* pass=source->section("ShaderPass_1");
+            std::int32_t count=0,maps=1;
+            if(!general||!pass||!assets::originalUiInteger50KG(*general,"TotalShaderPasses",0,count,d.quad.material.document,0x29B718)||count!=1||
+               !assets::originalUiInteger50KG(*pass,"totalTextureMaps",1,maps,d.quad.material.document,0x247214)||maps!=0){
+                d.sourcePC=0x247214;return false;
+            }
+            const auto* program=pass->find("microProgramName");
+            if(program&&!Provider::sameName(program->text,"ScreenObject")){d.sourcePC=0x2471BC;return false;}
+            sources.push_back(std::move(source));
+        }
+        if(firstPending){
+            // Separate real active selections: authored PSM and its map image
+            // need not (and here do not) come from the same archive.
+            Provider::MemberView psm,pst;
+            if(provider->lookup132820("ui\\textures\\overlay1top.psm",psm)!=Provider::Lookup::present||
+               !psm.member||!psm.data||!psm.size||!psm.bankGeneration||psm.revision!=revision){d.sourcePC=0x29B628;return false;}
+            assets::OriginalUiEncodedArchiveView50KG psmInput;
+            if(!provider->encodedUiInput(psm.mount,psmInput)||psmInput.providerIdentity()!=provider.get()||!psmInput.identity()){
+                d.sourcePC=0x132820;return false;
+            }
+            const auto* psmIdentity=assets::originalUiMemberIdentity50KG(psmInput.identity()->id,psm.ordinal);
+            if(!psmIdentity||!psmIdentity->name||!psmIdentity->sha256||psmIdentity->bytes!=1090||psm.size!=psmIdentity->bytes||
+               !Provider::sameName(psmIdentity->name,*psm.member)||!Provider::sameName(*psm.member,"ui\\textures\\overlay1top.psm")||
+               std::strcmp(psmIdentity->sha256,"8dcfc7644c8a2d60deb40cf20e2bc8a9b358f0200024da31612563302a9f4230")){
+                d.sourcePC=0x29B628;return false;
+            }
+            auto source=std::make_shared<assets::OriginalStandardMaterialSource50LA>();
+            const std::vector<std::uint8_t> bytes(psm.data,psm.data+psm.size);
+            if(!source->prepare(*psm.member,bytes,d.quad.material.document)||source->section("Prologue")||source->section("Epilogue")){
+                d.sourcePC=0x29B6D8;return false;
+            }
+            const auto* general=source->section("General");const auto* pass=source->section("ShaderPass_1");
+            std::int32_t count=0,maps=0;
+            if(!general||!pass||!assets::originalUiInteger50KG(*general,"TotalShaderPasses",0,count,d.quad.material.document,0x29B718)||count!=1||
+               !assets::originalUiInteger50KG(*pass,"totalTextureMaps",1,maps,d.quad.material.document,0x247214)||maps!=1){
+                d.sourcePC=0x247214;return false;
+            }
+            const auto* program=pass->find("microProgramName");const auto* map=pass->find("TextureMap_1");
+            const auto* group=pass->find("ShaderPassGroup");
+            if(!program||!Provider::sameName(program->text,"ScreenObject")||!map||!Provider::sameName(map->text,"overlay1")||
+               !group||!Provider::sameName(group->text,"top")){d.sourcePC=0x247110;return false;}
+            // Keep the genuine parsed source, including empty/default-valued
+            // attributes. The actual constructor interprets it, not a recipe.
+            sources.push_back(std::move(source));
+            if(provider->lookup132820("ui\\textures\\overlay1.pst",pst)!=Provider::Lookup::present||
+               !pst.member||!pst.data||!pst.size||!pst.bankGeneration||pst.revision!=revision){d.sourcePC=0x2472F0;return false;}
+            assets::OriginalUiEncodedArchiveView50KG pstInput;
+            if(!provider->encodedUiInput(pst.mount,pstInput)||pstInput.providerIdentity()!=provider.get()||
+               pstInput.identity()!=assets::originalUiArchiveIdentity50KG(assets::OriginalUiArchiveId50KG::controllerPopup)){
+                d.sourcePC=0x132820;return false;
+            }
+            const auto* pstIdentity=assets::originalUiMemberIdentity50KG(pstInput.identity()->id,pst.ordinal);
+            if(!pstIdentity||pstIdentity!=assets::originalUiMemberIdentity50KG(assets::OriginalUiArchiveId50KG::controllerPopup,3)||
+               !pstIdentity->sha256||pstIdentity->bytes!=604||pst.size!=pstIdentity->bytes||
+               !Provider::sameName(pstIdentity->name,*pst.member)||!Provider::sameName(*pst.member,"ui\\textures\\overlay1.pst")||
+               std::strcmp(pstIdentity->sha256,"f562a3dded6733713aeaaaf833a95a3c1f243f75086a4a72d7e8e2aca03e32d9")){
+                d.sourcePC=0x2472F0;return false;
+            }
+            textures.push_back({*pst.member,std::vector<std::uint8_t>(pst.data,pst.data+pst.size)});
+        }
+        bool stillFirst=false,stillNoTexture=false;
+        const bool beforeAdmission=table->preflightMemoryCardFirstStripPopulation(*this,stillFirst,stillNoTexture,d.quad.material);
+        if(!beforeAdmission||stillFirst!=firstPending||stillNoTexture!=noTexturePending||provider->revision()!=revision||!provider->sealed()){
+            d.sourcePC=beforeAdmission?0x2DF144:failurePC(d.quad.material,0x2DF144);return false;
+        }
+        // Authored positive construction: no ordinary-icon absence proof is
+        // created. The actual Object captures its own positive history.
+        // Real corpus admission owns its own immutable/provider receipts. It
+        // may retain input files, but does not fabricate material publication.
+        if(!domain_->appendOriginalSources(sources,textures,d.quad.material)){
+            d.sourcePC=failurePC(d.quad.material,0x2DF144);return false;
+        }
+        progress.inputsAdmitted=true;d.sourceInputsAdmitted=true;
+        const bool afterAdmission=table->preflightMemoryCardFirstStripPopulation(*this,stillFirst,stillNoTexture,d.quad.material);
+        if(!afterAdmission||stillFirst!=firstPending||stillNoTexture!=noTexturePending||provider->revision()!=revision||!provider->sealed()){
+            d.sourcePC=afterAdmission?0x2DF144:failurePC(d.quad.material,0x2DF144);return false;
+        }
+        progress.attempted=true;progress.stopPC=0x2DF144;
+        // Actual full ascending scans, exactly14D370 then29E340. No collector
+        // rebuild, per-row shortcut, borrowed Garage proof or source re-retain.
+        if(!domain_->populateMemoryCardResources2DF144(context_,d.quad.material)){
+            d.sourceEffectsCommitted=d.quad.material.sourceEffectsCommitted;
+            d.sourcePC=failurePC(d.quad.material,0x2DF144);
+            progress.stopPC=d.sourcePC;return false;
+        }
+        const auto populated=d.quad.material;d.sourceEffectsCommitted=populated.sourceEffectsCommitted;
+        assets::OriginalStandardMaterialDiagnostic50LA binding;
+        if(!table->preflightMemoryCardFirstStripBinding(*this,binding)){
+            d.sourcePC=failurePC(binding,0x2DF158);d.quad.material=binding;
+            // Keep real pair telemetry/effects while reporting the subsequent
+            // binding failure. A read-only preflight must not erase history.
+            d.quad.material.populationVisited=populated.populationVisited;
+            d.quad.material.populationPublished=populated.populationPublished;
+            d.quad.material.sourceEffectsCommitted|=populated.sourceEffectsCommitted;
+            d.quad.material.texture.populationVisited=populated.texture.populationVisited;
+            d.quad.material.texture.populationPublished=populated.texture.populationPublished;
+            d.quad.material.texture.sourceEffectsCommitted|=populated.texture.sourceEffectsCommitted;
+            progress.stopPC=d.sourcePC;return false;
+        }
+        // Preserve the successful pair's material/texture diagnostics unchanged;
+        // the binding observation above grants no additional source effects.
+        quad.stage_=Quad::Stage::populated;quad.pendingPC_=0x2DF158;
+        progress.stopPC=0x2DF158;d.sourcePC=0x2DF158;return true;
+    }catch(...){d.sourcePC=progress.attempted?progress.stopPC:0x2DF144;
+        d.sourceInputsAdmitted=progress.inputsAdmitted;return false;}
+}
 bool OriginalUiMemoryCardConstructor50KG::firstIconRetirementIdentity(
     const assets::OriginalStandardMaterialTable50LA& table,std::int32_t& row)const noexcept {
-    return iconRetirementIdentity(0,table,row);
+    return retainedRoleRetirementIdentity(0,table,row);
 }
-bool OriginalUiMemoryCardConstructor50KG::iconRetirementIdentity(std::size_t role,
+bool OriginalUiMemoryCardConstructor50KG::retainedRoleRetirementIdentity(std::size_t role,
     const assets::OriginalStandardMaterialTable50LA& table,std::int32_t& row)const noexcept {
-    row=-1;if(role>1||role>=retainedLoadRoles_||!inputsCurrent()||phase_!=Phase::retiring||!retainedLoadRoles_||retiredQuads_||
+    row=-1;if(role>4||role>=retainedLoadRoles_||!inputsCurrent()||phase_!=Phase::retiring||!retainedLoadRoles_||retiredQuads_||
        !display_||!displayPinned_||display_->application_!=root_||display_->video_!=video_||
        !display_->memoryCardConstructorDrainCurrent50KG()||domain_->materials382B38().get()!=&table||
        !scope_->detachedMemoryCardCurrent(*this,entity_,true))return false;
@@ -350,7 +507,7 @@ bool OriginalUiMemoryCardConstructor50KG::preflightExistingFirstIconBinding(Diag
     const bool result=table&&table->preflightMemoryCardFirstIconBinding(*this,d.quad.material);
     d.resourcePopulationPending=result&&quads_[loadRoles_[0].constructionIndex].stage_==Quad::Stage::materialRetained;
     const auto stage=quads_[loadRoles_[0].constructionIndex].stage_;
-    d.sourcePC=result?(firstIconPostLoadApplied_?0x1FF100:stage==Quad::Stage::loaded?0x2DF54C:
+    d.sourcePC=result?(iconPostLoadApplied_[0]?0x1FF100:stage==Quad::Stage::loaded?0x2DF54C:
         stage==Quad::Stage::dimensionsStored?0x2DF1CC:0x2DF158):d.quad.material.sourcePC;return result;
 }
 bool OriginalUiMemoryCardConstructor50KG::retainFirstIconPrefix1FF058(Diagnostic& d)noexcept {
@@ -363,7 +520,7 @@ bool OriginalUiMemoryCardConstructor50KG::retainFirstIconPrefix1FF058(Diagnostic
         if(!firstIconOccurrenceCurrent(*domain_->materials382B38(),row)){d.sourcePC=0x1FF058;return false;}
         const auto stage=quads_[loadRoles_[0].constructionIndex].stage_;d.sourceEffectsCommitted=true;
         d.resourcePopulationPending=stage==Quad::Stage::materialRetained;
-        d.sourcePC=d.resourcePopulationPending?0x2DF144:firstIconPostLoadApplied_?0x1FF100:
+        d.sourcePC=d.resourcePopulationPending?0x2DF144:iconPostLoadApplied_[0]?0x1FF100:
             stage==Quad::Stage::loaded?0x2DF54C:stage==Quad::Stage::dimensionsStored?0x2DF1CC:0x2DF158;return true;}
     const bool result=quads_[loadRoles_[0].constructionIndex].retainMemoryCardFirstIcon2465B0(*this,d.quad);
     d.sourceEffectsCommitted=d.quad.sourceEffectsCommitted;d.resourcePopulationPending=result;d.sourcePC=d.quad.sourcePC;return result;
@@ -378,20 +535,102 @@ bool OriginalUiMemoryCardConstructor50KG::retainedRoleCurrent(std::size_t roleIn
        q.material54->domain!=domain_||q.material54->context!=context_||
        q.domain_!=domain_||q.context_!=context_||q.video_!=video_||
        q.nativeGarageFifoPins_||q.nativeMenuWarningPins_)return false;
+    if(roleIndex==4)return firstStripPacketStateCurrent();
     return iconPacketStateCurrent(roleIndex);
 }
+bool OriginalUiMemoryCardConstructor50KG::firstStripPacketStateCurrent()const noexcept {
+    const auto& q=quads_[loadRoles_[4].constructionIndex];
+    if(q.nativeGarageFifoPins_||q.nativeMenuWarningPins_)return false;
+    if(q.stage_==Quad::Stage::loaded)
+        return q.pendingPC_==0&&q.packetRevision_==1&&q.resource58&&q.resource58==q.packetOwner_.get()&&
+            q.material54&&q.material54->packet10==q.resource58&&q.dmaData4_==q.resource58+1&&
+            reinterpret_cast<std::uintptr_t>(q.resource58)%64u==0;
+    const bool prefix=(q.stage_==Quad::Stage::materialRetained&&q.pendingPC_==0x2DF144)||
+        (q.stage_==Quad::Stage::populated&&q.pendingPC_==0x2DF158)||
+        (q.stage_==Quad::Stage::dimensionsStored&&q.pendingPC_==0x2DF1CC);
+    return prefix&&!firstStripPostLoadApplied_&&!q.resource58&&!q.packetOwner_&&!q.dmaData4_&&!q.packetRevision_&&
+        (!q.material54||!q.material54->packet10);
+}
+bool OriginalUiMemoryCardConstructor50KG::completedFirstStripStateCurrent()const noexcept {
+    if(retainedLoadRoles_!=5||!firstStripPostLoadApplied_||!retainedRoleCurrent(4))return false;
+    const auto& q=quads_[loadRoles_[4].constructionIndex];
+    if(q.stage_!=Quad::Stage::loaded||q.position10[0]!=0.f||q.position10[1]!=0.f||
+       q.uv30[1]!=640.f||q.uv30[2]!=16.f||q.color44!=0xFFF2851Bu)return false;
+    for(std::size_t i=0;i<4;++i){const auto& rgba=q.resource58[4+3*i].words;
+        if(rgba[0]!=121u||rgba[1]!=66u||rgba[2]!=13u||
+           rgba[3]!=std::uint32_t(std::int16_t(q.alpha48)>>2))return false;
+    }
+    return true;
+}
+std::uint32_t OriginalUiMemoryCardConstructor50KG::firstStripProgressPC()const noexcept {
+    const auto& q=quads_[loadRoles_[4].constructionIndex];
+    return firstStripPostLoadApplied_?0x1FF49C:q.stage_==Quad::Stage::loaded?0x2DF54C:q.pendingPC_;
+}
+bool OriginalUiMemoryCardConstructor50KG::completeFirstStripComponent1FF338(Diagnostic& d)noexcept {
+    d={};const auto table=domain_?domain_->materials382B38():nullptr;std::int32_t row=-1;
+    if(!table||!optionsSource_||!firstStripOccurrenceCurrent(*table,row)){d.sourcePC=0x2DF158;return false;}
+    for(std::size_t prior=0;prior<4;++prior)
+        if(!completedIconStateCurrent(prior)||!table->preflightMemoryCardIconBinding(*this,prior,d.quad.material)){
+            d.sourcePC=d.quad.material.sourcePC?d.quad.material.sourcePC:iconProgressPC(prior);return false;
+        }
+    auto& q=quads_[loadRoles_[4].constructionIndex];
+    if(q.stage_!=Quad::Stage::loaded){
+        if(!q.completeMemoryCardFirstStrip2DF158(*this,d.quad)){
+            d.sourcePC=d.quad.sourcePC;d.sourceEffectsCommitted=d.quad.sourceEffectsCommitted;return false;
+        }
+        d.sourceEffectsCommitted=true;
+    }
+    // Real positive construction history and current occurrence, not an icon
+    // fallback capability. Allocation failure retains dimensionsStored; a
+    // post-allocation binding failure retains the actual initialized packet.
+    if(!firstStripOccurrenceCurrent(*table,row)||!table->preflightMemoryCardFirstStripBinding(*this,d.quad.material)){
+        d.sourcePC=d.quad.material.sourcePC?d.quad.material.sourcePC:0x1FF340;return false;
+    }
+    if(!firstStripPostLoadApplied_){
+        // 1FF360 then1FF3CC: independent scalar comparisons/stores. These are
+        // UV extents, NOT reciprocal scales, XY placement or STQ rewrites.
+        if(q.uv30[1]!=640.f){
+            q.uv30[1]=640.f;q.flags5CValue|=1;q.flags5CKnownMask|=1;
+            if(q.uv30[3]!=0.f){q.flags5CValue|=2;q.flags5CKnownMask|=2;}
+        }
+        if(q.uv30[2]!=16.f){
+            q.uv30[2]=16.f;q.flags5CValue|=1;q.flags5CKnownMask|=1;
+            if(q.uv30[3]!=0.f){q.flags5CValue|=2;q.flags5CKnownMask|=2;}
+        }
+        // 1FF43C..498: channel-major, reverse vertex order on the actual
+        // allocated packet. Preserve alpha, STQ and every other packet word.
+        if(q.color44!=0xFFF2851Bu){
+            q.resource58[13].words[0]=121;q.resource58[10].words[0]=121;
+            q.resource58[7].words[0]=121;q.resource58[4].words[0]=121;
+            q.resource58[13].words[1]=66;q.resource58[10].words[1]=66;
+            q.resource58[7].words[1]=66;q.resource58[4].words[1]=66;
+            q.resource58[13].words[2]=13;q.resource58[10].words[2]=13;
+            q.resource58[7].words[2]=13;q.resource58[4].words[2]=13;
+            q.color44=0xFFF2851Bu;
+        }
+        firstStripPostLoadApplied_=true;d.sourceEffectsCommitted=true;
+    }
+    if(!completedFirstStripStateCurrent()){d.sourcePC=0x1FF498;return false;}
+    d.sourcePC=0x1FF49C;return true; // Before second-strip setup, never page readiness.
+}
+bool OriginalUiMemoryCardConstructor50KG::completedIconStateCurrent(std::size_t role)const noexcept {
+    if(role>3||role>=retainedLoadRoles_||!iconPostLoadApplied_[role]||!retainedRoleCurrent(role))return false;
+    const auto& q=quads_[loadRoles_[role].constructionIndex];const auto& post=iconPostLoads_[role];
+    return q.stage_==Quad::Stage::loaded&&q.position10[0]==post.x&&q.position10[1]==post.y;
+}
+std::uint32_t OriginalUiMemoryCardConstructor50KG::iconProgressPC(std::size_t role)const noexcept {
+    if(role>3||role>=retainedLoadRoles_)return role<loadRoles_.size()?loadRoles_[role].callPC:0x1FF328;
+    const auto& q=quads_[loadRoles_[role].constructionIndex];
+    return iconPostLoadApplied_[role]?iconPostLoads_[role].stopPC:
+        q.stage_==Quad::Stage::loaded?0x2DF54C:q.pendingPC_;
+}
 bool OriginalUiMemoryCardConstructor50KG::loadRolePrefixCurrent()const noexcept {
-    // Only X/Triangle component prefixes are represented here. No later
-    // retain is admitted even after Triangle completion; no scalar broadening.
-    if(retainedLoadRoles_>2||constructedQuads_!=7||retiredQuads_)return false;
-    if(retainedLoadRoles_>1&&(!firstIconPostLoadApplied_||
-       quads_[loadRoles_[0].constructionIndex].stage_!=Quad::Stage::loaded||
-       quads_[loadRoles_[0].constructionIndex].position10[0]!=514.f||
-       quads_[loadRoles_[0].constructionIndex].position10[1]!=378.f))return false;
+    if(retainedLoadRoles_>5||constructedQuads_!=7||retiredQuads_)return false;
     for(std::size_t r=0;r<loadRoles_.size();++r){
         const auto& role=loadRoles_[r];const auto& q=quads_[role.constructionIndex];
-        if(r<retainedLoadRoles_){if(!retainedRoleCurrent(r))return false;}
-        else if(!q.memoryCardPrefixOnly_||q.offset!=role.offset||!q.constructed||q.garage_||
+        if(r<retainedLoadRoles_){
+            if(!retainedRoleCurrent(r)||(r+1<retainedLoadRoles_&&!completedIconStateCurrent(r)))return false;
+        }else if(!q.memoryCardPrefixOnly_||q.offset!=role.offset||!q.constructed||q.garage_||
             q.stage_!=Quad::Stage::constructed||q.material54||q.primitiveOwner_||q.resource58||
             q.packetOwner_||q.dmaData4_||q.packetRevision_||q.nativeGarageFifoPins_||q.nativeMenuWarningPins_)return false;
     }
@@ -400,45 +639,70 @@ bool OriginalUiMemoryCardConstructor50KG::loadRolePrefixCurrent()const noexcept 
 bool OriginalUiMemoryCardConstructor50KG::nextRetainRole(std::size_t& role,Diagnostic& d)const noexcept {
     role=loadRoles_.size();
     if(!resourcePrefixCurrent()||!loadRolePrefixCurrent()){
-        d.sourcePC=loadRoles_[retainedLoadRoles_?1:0].callPC;return false;
+        d.sourcePC=loadRoles_[retainedLoadRoles_<5?retainedLoadRoles_:4].callPC;return false;
     }
-    if(!retainedLoadRoles_){role=0;return true;}
-    // Completion is not inferred from reference count, stage alone, or a caller
-    // scalar. Require actual X packet, applied post-load stores and canonical
-    // current binding before entering the next authored component call.
-    if(retainedLoadRoles_!=1){
-        const auto& triangle=quads_[loadRoles_[1].constructionIndex];
-        d.sourcePC=trianglePostLoadApplied_?0x1FF1B8:
-            triangle.stage_==Quad::Stage::loaded?0x2DF54C:triangle.pendingPC_;
-        d.resourcePopulationPending=triangle.stage_==Quad::Stage::materialRetained;
-        return false; // Actual triangle cursor; no square admission.
+    if(retainedLoadRoles_==5){d.sourcePC=firstStripProgressPC();return false;} // No later strip grant.
+    const auto table=domain_->materials382B38();
+    for(std::size_t prior=0;prior<retainedLoadRoles_;++prior){
+        if(!completedIconStateCurrent(prior)){
+            d.sourcePC=iconProgressPC(prior);
+            d.resourcePopulationPending=quads_[loadRoles_[prior].constructionIndex].stage_==Quad::Stage::materialRetained;
+            return false;
+        }
+        if(!table->preflightMemoryCardIconBinding(*this,prior,d.quad.material)){
+            d.sourcePC=d.quad.material.sourcePC;return false;
+        }
     }
-    const auto& first=quads_[loadRoles_[0].constructionIndex];
-    if(first.stage_!=Quad::Stage::loaded||!firstIconPostLoadApplied_){
-        d.sourcePC=first.stage_==Quad::Stage::materialRetained?0x2DF144:
-            first.stage_==Quad::Stage::populated?0x2DF158:
-            first.stage_==Quad::Stage::dimensionsStored?0x2DF1CC:0x2DF54C;
-        d.resourcePopulationPending=first.stage_==Quad::Stage::materialRetained;return false;
-    }
-    if(first.position10[0]!=514.f||first.position10[1]!=378.f){d.sourcePC=0x1FF0AC;return false;}
-    if(!domain_->materials382B38()->preflightMemoryCardFirstIconBinding(*this,d.quad.material)){
-        d.sourcePC=d.quad.material.sourcePC;return false;}
-    role=1;return true;
+    role=retainedLoadRoles_;return true;
 }
 bool OriginalUiMemoryCardConstructor50KG::retainNextRolePrefix1FF110(Diagnostic& d)noexcept {
-    d={};std::size_t role=loadRoles_.size();
-    if(retainedLoadRoles_==2){
-        if(!resourcePrefixCurrent()||!loadRolePrefixCurrent()){d.sourcePC=0x1FF110;return false;}
-        const auto& q=quads_[loadRoles_[1].constructionIndex];
+    return retainIconRolePrefix(1,d);
+}
+bool OriginalUiMemoryCardConstructor50KG::retainIconRolePrefix(std::size_t requested,Diagnostic& d)noexcept {
+    d={};if(requested>3){d.sourcePC=0x1FF328;return false;}
+    if(requested<retainedLoadRoles_){
+        std::int32_t row=-1;
+        if(!resourcePrefixCurrent()||!loadRolePrefixCurrent()||
+           !iconOccurrenceCurrent(requested,*domain_->materials382B38(),row)){d.sourcePC=loadRoles_[requested].callPC;return false;}
+        const auto& q=quads_[loadRoles_[requested].constructionIndex];
         d.sourceEffectsCommitted=true;d.resourcePopulationPending=q.stage_==Quad::Stage::materialRetained;
-        d.sourcePC=trianglePostLoadApplied_?0x1FF1B8:q.stage_==Quad::Stage::loaded?0x2DF54C:
-            q.stage_==Quad::Stage::dimensionsStored?0x2DF1CC:q.pendingPC_;return true;
+        d.sourcePC=iconProgressPC(requested);return true;
     }
-    if(!retainedLoadRoles_){d.sourcePC=0x1FF058;return false;}
-    if(!nextRetainRole(role,d)||role!=1)return false;
-    const bool result=quads_[loadRoles_[role].constructionIndex].retainMemoryCardRole2465B0(*this,role,d.quad);
+    std::size_t actual=loadRoles_.size();if(!nextRetainRole(actual,d))return false;
+    if(actual!=requested){d.sourcePC=loadRoles_[actual].callPC;return false;}
+    const bool result=quads_[loadRoles_[actual].constructionIndex].retainMemoryCardRole2465B0(*this,actual,d.quad);
     d.sourceEffectsCommitted=d.quad.sourceEffectsCommitted;d.resourcePopulationPending=result;
     d.sourcePC=d.quad.sourcePC;return result;
+}
+bool OriginalUiMemoryCardConstructor50KG::firstStripOccurrenceCurrent(
+    const assets::OriginalStandardMaterialTable50LA& table,std::int32_t& row)const noexcept {
+    row=-1;
+    if(!resourcePrefixCurrent()||retainedLoadRoles_!=5||!loadRolePrefixCurrent()||
+       domain_->materials382B38().get()!=&table)return false;
+    row=quads_[loadRoles_[4].constructionIndex].material54->material00;return row>=0;
+}
+bool OriginalUiMemoryCardConstructor50KG::retainFirstStripPrefix1FF338(Diagnostic& d)noexcept {
+    d={};if(retainedLoadRoles_==5){std::int32_t row=-1;
+        if(!domain_||!firstStripOccurrenceCurrent(*domain_->materials382B38(),row)){d.sourcePC=0x1FF338;return false;}
+        const auto& q=quads_[loadRoles_[4].constructionIndex];
+        d.sourceEffectsCommitted=true;d.resourcePopulationPending=q.stage_==Quad::Stage::materialRetained;
+        d.sourcePC=firstStripProgressPC();return true;
+    }
+    std::size_t role=loadRoles_.size();if(!nextRetainRole(role,d))return false;
+    if(role!=4){d.sourcePC=loadRoles_[role].callPC;return false;}
+    const bool result=quads_[loadRoles_[4].constructionIndex].retainMemoryCardRole2465B0(*this,4,d.quad);
+    d.sourceEffectsCommitted=d.quad.sourceEffectsCommitted;d.resourcePopulationPending=result;
+    d.sourcePC=d.quad.sourcePC;return result;
+}
+bool OriginalUiMemoryCardConstructor50KG::preflightFirstStripBinding(Diagnostic& d)const noexcept {
+    d={};const auto table=domain_?domain_->materials382B38():nullptr;
+    if(!table){d.sourcePC=0x2DF144;return false;}
+    const bool result=table->preflightMemoryCardFirstStripBinding(*this,d.quad.material);
+    // Binding observation does not advance the Quad: report its actual pair
+    // cursor, including retained-before-pair versus genuinely populated.
+    const auto& q=quads_[loadRoles_[4].constructionIndex];
+    d.sourcePC=result?firstStripProgressPC():d.quad.material.sourcePC;
+    d.resourcePopulationPending=result&&q.stage_==Quad::Stage::materialRetained;return result;
 }
 bool OriginalUiMemoryCardConstructor50KG::drainColdQuad2DEFE0(Diagnostic& d)noexcept {
     if(phase_!=Phase::retiring||drainPhase_>2||!inputsCurrent()||
@@ -539,6 +803,22 @@ OriginalUiEntityScope50KG::Result OriginalUiEntityScope50KG::finishDetachedMemor
 }
 
 namespace rr::assets {
+bool OriginalMemoryCardScreenFallback50KG::constructionMemberSupported(std::size_t role,
+    const OriginalUiArchiveIdentity50KG* archive,std::size_t ordinal)noexcept {
+    if(role>3||!archive||archive!=originalUiArchiveIdentity50KG(archive->id))return false;
+    if(role<2&&archive!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::controllerPopup)&&
+       archive!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::overlays))return false;
+    constexpr const char* names[]{"ui\\textures\\icon_x.pst","ui\\textures\\icon_tri.pst",
+        "ui\\textures\\icon_sqr.pst","ui\\textures\\icon_cir.pst"};
+    const auto* member=originalUiMemberIdentity50KG(archive->id,ordinal);
+    if(!member||!member->name||!OriginalStandardArchiveProvider50LA::sameName(member->name,names[role]))return false;
+    if(role<2)return true;
+    // Catalog identity, not equal bytes, identifies the actual selected archive.
+    // These exact original members occur in eight authenticated UI archives.
+    const char* hash=role==2?"4ab9cac37b5359729352e70d6ff92bf91a2841db60e98f91cff467ba37e51ae8":
+        "24f6ea44860157377c506324176cf3ea93802ec7fe0708bd91c74a3030967abf";
+    return member->bytes==604&&member->sha256&&std::strcmp(member->sha256,hash)==0;
+}
 bool OriginalMemoryCardScreenFallback50KG::occurrenceCurrent()const noexcept {
     const auto owner=issuer_.lock();return owner&&owner->pendingFamilyOccurrenceCurrent(*this);
 }
@@ -548,7 +828,7 @@ bool OriginalMemoryCardScreenFallback50KG::captureAt29B638(const std::string& ma
     const std::shared_ptr<const OriginalStandardProgramTable50LA>& programs,Observation& out)const noexcept {
     out=Observation{};
     if(!occurrenceCurrent()||context!=context_||textures!=textures_||programs!=programs_||!programs||!provider_||!provider_->sealed()||
-       roleIndex_>1||material.size()!=name_.size()+4||
+       roleIndex_>3||material.size()!=name_.size()+4||
        !OriginalStandardArchiveProvider50LA::sameName(std::string_view(material).substr(0,name_.size()),name_)||
        !OriginalStandardArchiveProvider50LA::sameName(std::string_view(material).substr(name_.size()),".psm")||
        !options_||!options_->loaded()||options_->identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::options))return false;
@@ -565,8 +845,7 @@ bool OriginalMemoryCardScreenFallback50KG::captureAt29B638(const std::string& ma
         OriginalUiEncodedArchiveView50KG retained;
         if(!provider_->encodedUiInput(pst.mount,retained)||retained.providerIdentity()!=provider_.get())return false;
         const auto* identity=retained.identity();
-        if(identity!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::controllerPopup)&&
-           identity!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::overlays))return false;
+        if(!constructionMemberSupported(roleIndex_,identity,pst.ordinal))return false;
         const auto* member=originalUiMemberIdentity50KG(identity->id,pst.ordinal);
         if(!member||!Provider::sameName(member->name,*pst.member)||member->bytes!=pst.size||
            !Provider::sameName(*pst.member,name_+".pst"))return false;

@@ -1408,13 +1408,13 @@ bool OriginalStandardMaterialTable50LA::bindMemoryCardPendingAfterRetain(
 }
 bool OriginalStandardMaterialTable50LA::clearMemoryCardPendingForRetirement(
     const rr::platform::OriginalUiMemoryCardConstructor50KG& owner,D& d)noexcept {
-    d={};std::array<std::int32_t,2> indices{{-1,-1}};
-    if(!storage_||!canRetireNativeCollector29C300()||!owner.retainedLoadRoles_||owner.retainedLoadRoles_>2)
+    d={};std::array<std::int32_t,4> indices{{-1,-1,-1,-1}};
+    if(!storage_||!canRetireNativeCollector29C300()||!owner.retainedLoadRoles_||owner.retainedLoadRoles_>5)
         return fail(d,S::phase,0x14D500);
     // Validate EVERY actual pending capability before removing any. No source
     // ref/packet is released here, and no allocation/callback follows validation.
-    for(std::size_t role=0;role<owner.retainedLoadRoles_;++role){auto& index=indices[role];
-        if(!owner.iconRetirementIdentity(role,*this,index))return fail(d,S::phase,0x14D500);
+    for(std::size_t role=0;role<owner.retainedLoadRoles_&&role<4;++role){auto& index=indices[role];
+        if(!owner.retainedRoleRetirementIdentity(role,*this,index))return fail(d,S::phase,0x14D500);
         if(index<0||static_cast<std::size_t>(index)>=storage_->rows.size())return fail(d,S::range,0x14D500);
         const auto& row=storage_->rows[static_cast<std::size_t>(index)];
         if(!OriginalStandardArchiveProvider50LA::sameName(row.name00,owner.loadRoles_[role].qualifiedName))
@@ -1424,9 +1424,35 @@ bool OriginalStandardMaterialTable50LA::clearMemoryCardPendingForRetirement(
            row.memoryCardPending->row_!=index||row.memoryCardPending->primitive_!=
                 owner.quads_[owner.loadRoles_[role].constructionIndex].material54))return fail(d,S::phase,0x14D500);
     }
-    for(std::size_t role=0;role<owner.retainedLoadRoles_;++role)
+    if(owner.retainedLoadRoles_==5){std::int32_t strip=-1;
+        if(!owner.retainedRoleRetirementIdentity(4,*this,strip)||strip<0||
+           static_cast<std::size_t>(strip)>=storage_->rows.size())return fail(d,S::phase,0x14D500);
+        const auto& row=storage_->rows[static_cast<std::size_t>(strip)];
+        if(row.memoryCardPending||!OriginalStandardArchiveProvider50LA::sameName(row.name00,owner.loadRoles_[4].qualifiedName))
+            return fail(d,S::source,0x14D500);
+    }
+    for(std::size_t role=0;role<owner.retainedLoadRoles_&&role<4;++role)
         storage_->rows[static_cast<std::size_t>(indices[role])].memoryCardPending.reset();
     return true;
+}
+bool OriginalStandardMaterialTable50LA::preflightMemoryCardFirstStripBinding(
+    const rr::platform::OriginalUiMemoryCardConstructor50KG& owner,D& d)const noexcept {
+    d={};std::int32_t index=-1;
+    if(!storage_||storage_->uiSharedHistoryOwner||storage_->nativeFifoPins||storage_->nativeBindingPoisoned||
+       storage_->populationTerminal||storage_->populationActive||storage_->demandActive||storage_->collectorActive||demandTerminal()||
+       !owner.firstStripOccurrenceCurrent(*this,index))return fail(d,S::phase,0x2DF144);
+    if(index<0||static_cast<std::size_t>(index)>=storage_->rows.size())return fail(d,S::range,0x298E60);
+    for(std::size_t role=0;role<4;++role)
+        if(!owner.completedIconStateCurrent(role)||!preflightMemoryCardIconBinding(owner,role,d))return false;
+    const auto& row=storage_->rows[static_cast<std::size_t>(index)];d.row=index;
+    if(row.references08<=0||!row.object04||row.memoryCardPending||row.garageFallback||
+       !storage_->templates||!storage_->populationBound||storage_->construction!=owner.context_||
+       storage_->programs!=owner.domain_->programs382B70()||storage_->textures!=owner.domain_->textures383400()||
+       row.associated30!=storage_->templates->get(OriginalUiTemplate50KG::screenMt)||
+       !OriginalStandardArchiveProvider50LA::sameName(row.name00,owner.loadRoles_[4].qualifiedName))
+        return fail(d,S::reference,0x2DF144);
+    return row.object04->preflightCapturedOverlayBinding(index,owner.context_,owner.domain_->textures383400(),
+        storage_->programs,owner.domain_->archiveProvider3E1A70(),owner.domain_->resolver3E1A70(),d);
 }
 bool OriginalStandardMaterialTable50LA::preflightMemoryCardFirstIconBinding(
     const rr::platform::OriginalUiMemoryCardConstructor50KG& occurrence,D& d)const noexcept {
@@ -1461,7 +1487,8 @@ bool OriginalStandardMaterialTable50LA::preflightMemoryCardPopulation(
        !owner.iconOccurrenceCurrent(role,*this,first)||!owner.optionsSource_||!storage_->templates||
        !owner.domain_->textures383400()||owner.domain_->textures383400()->populationTerminal()||
        first<0||static_cast<std::size_t>(first)>=storage_->rows.size())return fail(d,S::phase,0x2DF144);
-    if(role==1&&!preflightMemoryCardFirstIconBinding(owner,d))return false;
+    for(std::size_t prior=0;prior<role;++prior)
+        if(!owner.completedIconStateCurrent(prior)||!preflightMemoryCardIconBinding(owner,prior,d))return false;
     if(!owner.domain_->textures383400()->preflightPopulationOwners(owner.domain_->resolver3E1A70(),
         owner.context_,owner.domain_->archiveProvider3E1A70(),d.texture))return fail(d,S::texture,d.texture.sourcePC);
     const auto& actual=storage_->rows[static_cast<std::size_t>(first)];
@@ -1497,6 +1524,54 @@ bool OriginalStandardMaterialTable50LA::preflightMemoryCardPopulation(
         // A loaded icon with unresolved texture requires a different material-only
         // receipt join, not v29's completed-resource preflight. Keep it closed.
         if(!firstPending||!OriginalStandardArchiveProvider50LA::sameName(*row.name00,owner.loadRoles_[role].qualifiedName))
+            return fail(d,S::texture,0x29E340);
+    }
+    d.sourcePC=0x2DF144;return true;
+}
+bool OriginalStandardMaterialTable50LA::preflightMemoryCardFirstStripPopulation(
+    const rr::platform::OriginalUiMemoryCardConstructor50KG& owner,
+    bool& firstPending,bool& noTexturePending,D& d)const noexcept {
+    d={};firstPending=noTexturePending=false;std::int32_t first=-1;
+    if(!storage_||storage_->uiSharedHistoryOwner||storage_->nativeFifoPins||storage_->nativeBindingPoisoned||
+       storage_->populationTerminal||storage_->populationActive||storage_->demandActive||storage_->collectorActive||demandTerminal()||
+       !owner.firstStripOccurrenceCurrent(*this,first)||!owner.optionsSource_||!storage_->templates||
+       !owner.domain_->textures383400()||owner.domain_->textures383400()->populationTerminal()||
+       first<0||static_cast<std::size_t>(first)>=storage_->rows.size())return fail(d,S::phase,0x2DF144);
+    for(std::size_t prior=0;prior<4;++prior)
+        if(!owner.completedIconStateCurrent(prior)||!preflightMemoryCardIconBinding(owner,prior,d))return false;
+    if(!owner.domain_->textures383400()->preflightPopulationOwners(owner.domain_->resolver3E1A70(),
+        owner.context_,owner.domain_->archiveProvider3E1A70(),d.texture))return fail(d,S::texture,d.texture.sourcePC);
+    const auto& actual=storage_->rows[static_cast<std::size_t>(first)];
+    if(actual.references08<=0||actual.memoryCardPending||actual.associated30!=storage_->templates->get(OriginalUiTemplate50KG::screenMt)||
+       !OriginalStandardArchiveProvider50LA::sameName(actual.name00,owner.loadRoles_[4].qualifiedName))return fail(d,S::reference,0x2DF144);
+    if(storage_->populationBound&&(storage_->construction!=owner.context_||
+       storage_->programs!=owner.domain_->programs382B70()||storage_->textures!=owner.domain_->textures383400()))
+        return fail(d,S::phase,0x2DF144);
+    // Enumerate the WHOLE actual pending material set. These bounds reject
+    // unsupported obligations before admission; they do not shorten14D370.
+    for(std::size_t i=0;i<storage_->rows.size();++i){const auto& row=storage_->rows[i];
+        if(row.references08<=0||row.object04)continue;d.row=static_cast<std::int32_t>(i);
+        if(row.associated30!=storage_->templates->get(OriginalUiTemplate50KG::screenMt)||
+           row.garageFallback||row.tournamentMissingPsm||row.speedBoostMissingPsm||row.damageMissingPsm||row.pauseBackdropMissingPsm)
+            return fail(d,S::source,0x29B628);
+        if(row.memoryCardPending)return fail(d,S::source,0x29B628);
+        if(static_cast<std::int32_t>(i)==first){
+            firstPending=true; // Only the exact positive authored-role row.
+        }else if(OriginalStandardArchiveProvider50LA::sameName(row.name00,"ui\\textures\\NoTexture")&&!row.memoryCardPending){
+            if(noTexturePending)return fail(d,S::duplicatePublication,0x29B854);
+            noTexturePending=true;
+        }else return fail(d,S::source,0x29B628);
+    }
+    if(actual.object04&&!preflightMemoryCardFirstStripBinding(owner,d))return false;
+    const auto textures=owner.domain_->textures383400();
+    for(std::size_t i=0;i<textures->rowCount();++i){
+        if(i>static_cast<std::size_t>(std::numeric_limits<std::int16_t>::max()))return fail(d,S::range,0x29E340);
+        OriginalStandardTextureRowView50LA row;
+        if(!textures->row(static_cast<std::int16_t>(i),row)||!row.references08||!row.name00)return fail(d,S::texture,0x29E340);
+        if(*row.references08<=0||row.object04)continue;
+        // A loaded authored material with unresolved texture requires a material-only
+        // receipt join, not the existing complete-resource join. Keep it closed.
+        if(!firstPending||!OriginalStandardArchiveProvider50LA::sameName(*row.name00,"ui\\textures\\overlay1"))
             return fail(d,S::texture,0x29E340);
     }
     d.sourcePC=0x2DF144;return true;

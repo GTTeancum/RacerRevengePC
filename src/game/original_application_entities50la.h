@@ -1,4 +1,5 @@
 #pragma once
+namespace original_camera_session50KX { class Session; }
 namespace original_main_entry50KG {struct Application;}
 namespace rr::platform { class OriginalUiSharedDialogs50KG; class OriginalUiGarageDrawContribution50KG; class OriginalUiGarageCameraFrame50KG;class OriginalUiGarageVisibility50KG;class OriginalUiGaragePodScene50KG;}
 namespace track_runtime_storage50IG {struct Storage;}
@@ -172,6 +173,7 @@ class OriginalApplicationEntities50LA final {
     friend class OriginalPauseStorage50LA;
     friend class OriginalTunnelTrack50LA;
     friend class OriginalRaceConstructor50LA;
+    friend class ::original_camera_session50KX::Session;
     friend class rr::platform::RaceAudioGroups50IC;
     // Actual process434A10 slot authority. BSS startup initializes all25 free.
     std::array<OriginalWreckComponent50LA*,25> soundGroups434A10_{};

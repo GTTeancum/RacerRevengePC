@@ -7,7 +7,7 @@ namespace ra_cold_aggregate50LA { class Owner; }
 namespace ra_cold_sources50LA { class ColdNavigationLease; }
 namespace rr::game { class OriginalRacerModelRenderGlobals50LA; class OriginalRaceConstructor50LA; class OriginalRaceTuning50LA; class OriginalTunnelTrack50LA; enum class OriginalTunnelTrackRole50LA : unsigned; class OriginalPauseStorage50LA; class OriginalPositionStatsPrimitiveOwner50LA; class OriginalPositionStatsResources50LA;
 struct OriginalPositionStatsNumbers50LA; struct OriginalPositionStatsResourceDiagnostic50LA; }
-namespace original_camera_session50KX { class Session; }
+namespace original_camera_session50KX { class Session; struct ActualOwners; struct AuthoredStorage; }
 namespace rr::assets {class OriginalUiGarageSceneAssets50KG; struct OriginalUiGaragePageData50KG;}
 namespace rr::platform {class OriginalUiMemoryCardConstructor50KG; class OriginalUiSharedDialogs50KG; class OriginalUiGarageSharedPageDrawOwner50KG; class OriginalUiGarageSession50KG; struct OriginalUiGarageNativeInput50KG; struct OriginalUiGarageNativeState50KG; class OriginalUiGarageModelResources50KG; class OriginalUiGarageVisibility50KG; class OriginalUiGarageTextOverlay50KG; class OriginalUiGarageFogColorLease50KG; class OriginalUiGarageScreenText50KG; struct OriginalUiGarageScreenTextDiagnostic50KG; class OriginalUiGarageWidget1Owner50KG; struct OriginalUiGarageWidget1Diagnostic50KG; class OriginalUiGarageManagerFog50KG;}
 namespace rr::platform { class OriginalUiMainDrawResources50KG; }
@@ -234,6 +234,12 @@ private:
     mutable std::optional<float> sourceApplicationElapsed23C_;
     void clearRaceProcessWord1A6884() noexcept { sourceProcessWord3E1C10_=0; }
 
+    // Weak custody of the ONE Application-created canonical TA native Session.
+    // Root/consumers own its lifetime; this never prolongs borrowed stack owners.
+    mutable std::weak_ptr<original_camera_session50KX::Session> nativeTaCameraSession50LA_;
+    // Uncalled private source prefix. Selects only the retained factory-issued
+    // Session; no caller Session, key, generation, clock or readiness parameter.
+    bool constructNativeTaController174A30()const noexcept;
     mutable std::weak_ptr<RaceDisplayLifetime50LA> raceDisplayOwner50LA_;
     // The actual persistent dispatcher is Root-owned, never manufactured on
     // Garage entry. The two counted global dialog children share this scope.
@@ -604,6 +610,11 @@ private:
     //17C848/84C copies the six original bytes at3A8600 into36B420.
     const std::string fontDirectory36B420_="font\\";
 public:
+    // Native allocation/custody only, replacing the existing canonical-TA
+    // make_shared at its real root. Does not call the source constructor.
+    std::shared_ptr<original_camera_session50KX::Session> createNativeTaCameraSession50LA(
+        original_camera_session50KX::ActualOwners,
+        const original_camera_session50KX::AuthoredStorage&)const noexcept;
     const rr::assets::OriginalUiMaterialRuntime50KG& materialRuntime=*materialRuntimeOwner_;
     rr::game::OriginalApplicationAnimationClockView50KG animationClock()const noexcept {
         return rr::game::OriginalApplicationAnimationClockView50KG(animationClockOwner_);
@@ -895,6 +906,7 @@ public:
     Application(const Application&)=delete;
     Application& operator=(const Application&)=delete;
     ~Application() {
+        if(!nativeTaCameraSession50LA_.expired())std::terminate();
         if(memoryCardConstructorOwner_||(state&&state->sharedDialogs)||(sharedUiScopeOwner_&&!sharedUiScopeOwner_->closed_))std::terminate();
         // A live source slot may still own renderer/context and counted state.
         // Application destruction cannot substitute for its checked retirement.

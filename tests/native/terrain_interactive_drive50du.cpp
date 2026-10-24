@@ -187,6 +187,7 @@
 #include "../../platform/linux/native/game_host50er.h"
 #include "../../platform/linux/native/host_session_menu50if.h"
 #include "original_ui_main_entry50kg.h"
+#include "original_ta_camera_issuer_candidate.h" // Native single-Session custody; source constructor remains uncalled.
 #include "original_race_tuning50la.h" // Inactive same-source C0 ownership.
 #include "original_tunnel_track50la.h" // Inactive genuine spline Entity ownership.
 #include "original_world_cold_prefix50la.h" // Inactive same-scene world constructor prefix.
@@ -9332,7 +9333,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     require50DU(bool(sourceCameraSession),"same-owner RA camera preparation rejected");
    }else{
    requireMbRuntimeNavigation50MB();
-   sourceCameraSession=std::make_shared<sourceCamera::Session>(sourceCamera::ActualOwners{
+   sourceCamera::ActualOwners sourceCameraActual{
        racerBank,s,x.bindings,baseTail,originalAi,lapContinuity.timing,originalAiSession.manager,raceBorrow,
        sessionRandom,sourceAttachedGlobals,applicationClock,controlPresets,nativeOrdinaryLaunch11258,
        dynamicProfile.game34,cameraStartup350,
@@ -9356,7 +9357,11 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
        directOriginalHuman&&isTcTrack?tcMapView:TrackNavigationView50TC{},
        directOriginalHuman&&isTbTrack?tbMapView:TrackNavigationView50TB{},
        directOriginalHuman&&isGbTrack?gbMapView:TrackNavigationView50GB{},
-       directOriginalHuman&&isMcTrack?mcMapView:TrackNavigationView50MC{}});
+       directOriginalHuman&&isMcTrack?mcMapView:TrackNavigationView50MC{}};
+   if(isTaTrack&&trackMaterialRequest.canonicalDomain){
+    sourceCameraSession=originalMainApplication.createNativeTaCameraSession50LA(sourceCameraActual,sourceCameraAssets);
+    require50DU(bool(sourceCameraSession),"same-Application TA native camera custody rejected");
+   }else sourceCameraSession=std::make_shared<sourceCamera::Session>(sourceCameraActual);
    const auto prepared=sourceCameraSession->prepare(sessionIndex+1,isMcTrack?*mcSourceCameraAssets->inputs():sourceCameraAssets.inputs,*sourceCameraDisplay);
    if(prepared.status!=sourceCamera::Status::complete)std::cerr<<"original_camera_cold_rejected status="
        <<static_cast<unsigned>(prepared.status)<<" source_pc="<<prepared.sourcePC

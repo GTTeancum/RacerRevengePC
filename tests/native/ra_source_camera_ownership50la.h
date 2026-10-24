@@ -280,6 +280,15 @@ class OwnershipBridge final {
         }
     };
     std::unique_ptr<CameraBinding> camera_;
+    // UNACTIVATED: the actual issuer selects its OWN retained Session and
+    // generation. No caller Session/key/generation or public grant is accepted.
+    bool constructCurrentColdController174A30()noexcept {
+        if(terminal_||closed_||cameraPrepareTerminal_||!camera_||!camera_->session||
+           !camera_->generation||!camera_->display||!cameraBankCurrent()||
+           !freshLighting_||camera_->lighting!=freshLighting_||!camera_->fog.current()||
+           camera_->display->trackFog3EC!=&camera_->fog.fields_)return false;
+        return camera_->session->constructColdController174A30(camera_->generation);
+    }
     bool cameraAttempted_=false,cameraPrepareTerminal_=false;
     bool storageAttempted_=false,capacitySealed_=false,storageConstructed_=false;
     bool bindAttempted_=false,queriesConstructed_=false,terminal_=false,closed_=false;

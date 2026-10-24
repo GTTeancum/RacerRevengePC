@@ -9,7 +9,7 @@
 #include "../../../src/game/original_ui_entity_scope50kg.h"
 namespace original_main_entry50KG {class RaceDisplayLifetime50LA;}
 namespace rr::platform {
-// Actual detached1FEC80 owner with private X/Triangle component prefixes.
+// Actual detached1FEC80 owner: four ordinary icons and a first authored-strip retain.
 // No page438 publication, complete1FF020 load, attachment, input, pre-render
 // or draw admission. Component population/binding remains private and uncalled.
 class OriginalUiMemoryCardConstructor50KG final {
@@ -55,14 +55,36 @@ private:
         {1,0xA0,0x1FF4AC,"ui\\textures\\overlay1top",MaterialFamily::authoredStrip},
         {2,0x100,0x1FF68C,"ui\\textures\\overlay1top",MaterialFamily::authoredStrip}
     }};
-    // Incremented only after the real canonical retain. No completion flags for
-    // unimplemented roles: today the maximal reachable prefix is X + triangle.
+    // Incremented only after the actual canonical retain. Later strips stay cold;
+    // no count or marker alone admits the next ordinary component.
+    struct IconPostLoad {float x,y;std::uint32_t startPC,positionPC,stopPC;};
+    static constexpr std::array<IconPostLoad,4> iconPostLoads_{{
+        {514.f,378.f,0x1FF060,0x1FF0AC,0x1FF100},
+        {427.f,378.f,0x1FF118,0x1FF164,0x1FF1B8},
+        {305.f,378.f,0x1FF1D0,0x1FF21C,0x1FF270},
+        {305.f,378.f,0x1FF288,0x1FF2D4,0x1FF328}
+    }};
+    bool completedIconStateCurrent(std::size_t)const noexcept;
+    std::uint32_t iconProgressPC(std::size_t)const noexcept;
+    bool retainIconRolePrefix(std::size_t,Diagnostic&)noexcept;
+    bool completeIconComponent(std::size_t,Diagnostic&)noexcept;
+    // Actual Square then Circle component sequence. No strip or page grant.
+    bool loadSquareCirclePrefix1FF1C8(Diagnostic&)noexcept;
     std::size_t retainedLoadRoles_=0;
     bool retainedRoleCurrent(std::size_t)const noexcept;
+    bool retainFirstStripPrefix1FF338(Diagnostic&)noexcept;
+    bool firstStripOccurrenceCurrent(const assets::OriginalStandardMaterialTable50LA&,std::int32_t&)const noexcept;
+    bool preflightFirstStripBinding(Diagnostic&)const noexcept;
+    // Actual authored-role admission/full pair; stops packetless at2DF158.
+    bool populateFirstStripResources2DF144(Diagnostic&)noexcept;
+    bool completeFirstStripComponent1FF338(Diagnostic&)noexcept;
+    bool firstStripPacketStateCurrent()const noexcept;
+    bool completedFirstStripStateCurrent()const noexcept;
+    std::uint32_t firstStripProgressPC()const noexcept;
     bool loadRolePrefixCurrent()const noexcept;
     bool nextRetainRole(std::size_t&,Diagnostic&)const noexcept;
-    // Private next component reference prefix only; stops at2DF144. In this
-    // increment triangle is the only reachable continuation. No family proof.
+    // Private Triangle reference prefix wrapper; source-ordered mechanics
+    // below also serve Square/Circle without granting any family proof.
     bool retainNextRolePrefix1FF110(Diagnostic&)noexcept;
     bool resourcePrefixCurrent()const noexcept;
     // Actual same-Root Frontend supplies its own authenticated cold Options
@@ -72,7 +94,7 @@ private:
     bool prepareFirstIconConstructionFamily(Diagnostic&)noexcept;
     bool prepareIconConstructionFamily(std::size_t,Diagnostic&)noexcept;
     bool iconOccurrenceCurrent(std::size_t,const assets::OriginalStandardMaterialTable50LA&,std::int32_t&)const noexcept;
-    bool iconRetirementIdentity(std::size_t,const assets::OriginalStandardMaterialTable50LA&,std::int32_t&)const noexcept;
+    bool retainedRoleRetirementIdentity(std::size_t,const assets::OriginalStandardMaterialTable50LA&,std::int32_t&)const noexcept;
     bool populateIconResources2DF144(std::size_t,Diagnostic&)noexcept;
     // Triangle only: retained reference through genuine global population.
     // Separate completion below owns its dimensions/packet/post-load stores.
@@ -87,9 +109,11 @@ private:
     bool firstIconPacketStateCurrent()const noexcept;
     bool iconPacketStateCurrent(std::size_t)const noexcept;
     bool completeTriangleComponent1FF110(Diagnostic&)noexcept;
-    bool firstIconPostLoadApplied_=false,trianglePostLoadApplied_=false;
+    std::array<bool,4> iconPostLoadApplied_{};
     struct PopulationProgress {bool attempted=false,inputsAdmitted=false;std::uint32_t stopPC=0;};
-    std::array<PopulationProgress,2> iconPopulation_{};
+    std::array<PopulationProgress,4> iconPopulation_{};
+    PopulationProgress firstStripPopulation_;
+    bool firstStripPostLoadApplied_=false;
     bool firstIconRetirementIdentity(const assets::OriginalStandardMaterialTable50LA&,std::int32_t&)const noexcept;
     bool pendingFamilyRetired_=false;
     bool pendingFamilyOccurrenceCurrent(const assets::OriginalMemoryCardScreenFallback50KG&)const noexcept;

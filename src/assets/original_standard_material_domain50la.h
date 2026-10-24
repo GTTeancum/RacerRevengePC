@@ -266,6 +266,7 @@ private:
         OriginalStandardMaterialPopulationInput50LA input;
         input.sources=&sources_;input.actualPrograms382B70=programs_;
         input.actualTextures383400=textures_;input.construction=context;
+        input.positiveConstructionProvider_=archiveProvider_;
         if(!materials_->populate14D370(input,d))return false;
         const bool texturesOkay=textures_->populate29E340(resolver_,std::move(context),d.texture);
         d.sourceEffectsCommitted=d.sourceEffectsCommitted||d.texture.sourceEffectsCommitted;

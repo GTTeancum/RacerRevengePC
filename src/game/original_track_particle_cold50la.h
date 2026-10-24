@@ -28,6 +28,9 @@ struct OriginalTrackParticleColdDiagnostic50LA {
 // attach children, populate14D370, draw, demand textures, or certify the full
 //160E00 auxiliary, renderer-scratch, bounding/transform or packet fields.
 class OriginalTrackParticleCold50LA final {
+    // Read-only provenance for the actual Application's native TA camera
+    // issuer. Public component fields alone cannot establish generation.
+    friend struct ::original_main_entry50KG::Application;
 public:
     OriginalTrackParticleCold50LA() noexcept=default;
     OriginalTrackParticleCold50LA(const OriginalTrackParticleCold50LA&)=delete;

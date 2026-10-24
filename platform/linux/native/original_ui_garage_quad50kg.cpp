@@ -338,18 +338,38 @@ bool OriginalUiGarageQuad50KG::completeZeroPosition2DF158(Diagnostic& d)noexcept
         stage_=Stage::loaded;packetRevision_=1;pendingPC_=0;d.sourceEffectsCommitted=true;d.sourcePC=0x2DF54C;return true;
     }catch(...){return stop(Status::allocation,0x2DF1CC);}
 }
+bool OriginalUiGarageQuad50KG::completeMemoryCardFirstStrip2DF158(
+    OriginalUiMemoryCardConstructor50KG& owner,Diagnostic& d)noexcept {
+    d={};std::int32_t row=-1;const auto table=owner.domain_?owner.domain_->materials382B38():nullptr;
+    if(!table||!owner.firstStripOccurrenceCurrent(*table,row)||
+       &owner.quads_[owner.loadRoles_[4].constructionIndex]!=this||!memoryCardPrefixOnly_||
+       offset!=owner.loadRoles_[4].offset||garage_||
+       (stage_!=Stage::populated&&stage_!=Stage::dimensionsStored)||
+       !table->preflightMemoryCardFirstStripBinding(owner,d.material)){
+        d.status=Status::phase;d.sourcePC=d.material.sourcePC?d.material.sourcePC:0x2DF158;return false;
+    }
+    for(std::size_t prior=0;prior<4;++prior)
+        if(!owner.completedIconStateCurrent(prior)||!table->preflightMemoryCardIconBinding(owner,prior,d.material)){
+            d.status=Status::phase;d.sourcePC=d.material.sourcePC?d.material.sourcePC:owner.iconProgressPC(prior);return false;
+        }
+    return completeZeroPosition2DF158(d);
+}
 bool OriginalUiGarageQuad50KG::completeMemoryCardFirstIcon2DF158(OriginalUiMemoryCardConstructor50KG& owner,Diagnostic& d)noexcept {
     return completeMemoryCardIcon2DF158(owner,0,d);
 }
 bool OriginalUiGarageQuad50KG::completeMemoryCardIcon2DF158(
     OriginalUiMemoryCardConstructor50KG& owner,std::size_t role,Diagnostic& d)noexcept {
     d={};std::int32_t row=-1;const auto table=owner.domain_?owner.domain_->materials382B38():nullptr;
-    if(role>1||!table||!owner.iconOccurrenceCurrent(role,*table,row)||
+    if(role>3||!table||!owner.iconOccurrenceCurrent(role,*table,row)||
        &owner.quads_[owner.loadRoles_[role].constructionIndex]!=this||!memoryCardPrefixOnly_||offset!=owner.loadRoles_[role].offset||garage_||
        (stage_!=Stage::populated&&stage_!=Stage::dimensionsStored)||
        !table->preflightMemoryCardIconBinding(owner,role,d.material)){
         d.status=Status::phase;d.sourcePC=d.material.sourcePC?d.material.sourcePC:0x2DF158;return false;
     }
+    for(std::size_t prior=0;prior<role;++prior)
+        if(!owner.completedIconStateCurrent(prior)||!table->preflightMemoryCardIconBinding(owner,prior,d.material)){
+            d.status=Status::phase;d.sourcePC=d.material.sourcePC?d.material.sourcePC:owner.iconProgressPC(prior);return false;
+        }
     return completeZeroPosition2DF158(d);
 }
 bool OriginalUiGarageQuad50KG::preflightPrimitive246260(const std::unique_ptr<Primitive>& p,Diagnostic& d)noexcept {
