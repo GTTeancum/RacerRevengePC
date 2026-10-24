@@ -37,15 +37,23 @@ class OriginalGarageScreenFallback50KG final {
             auto requested=materialName;for(char& c:requested)if(c>='A'&&c<='Z')c=char(c-'A'+'a');
             if(requested!=name_+".psm")return false;
             const bool overlay=name_=="ui\\textures\\icon_x"||name_=="ui\\textures\\icon_tri";
-            const bool garage=name_=="ui\\textures\\icon_sqr"||name_=="ui\\textures\\icon_cir"||
-                name_=="ui\\textures\\podstat2"||name_=="ui\\textures\\notch";
+            const bool sharedGarageIcon=name_=="ui\\textures\\icon_sqr"||name_=="ui\\textures\\icon_cir";
+            const bool garage=sharedGarageIcon||name_=="ui\\textures\\podstat2"||name_=="ui\\textures\\notch";
             //The proof retains the actual132820 winner, not a preferred
             //archive alias. Only these two shared icons have this authenticated
             //equal-byte CONTPOP/OVERLAYS source relationship.
             const bool sharedSource=pstArchive_==OriginalUiArchiveId50KG::overlays||
                 pstArchive_==OriginalUiArchiveId50KG::controllerPopup;
             if((!overlay&&!garage)||(overlay&&!sharedSource)||
-               (garage&&pstArchive_!=OriginalUiArchiveId50KG::garage))return false;
+               (garage&&pstArchive_!=OriginalUiArchiveId50KG::garage&&
+                !(sharedGarageIcon&&pstArchive_==OriginalUiArchiveId50KG::overlays)))return false;
+            if(sharedGarageIcon){
+                // Both original archives carry the same square/circle image.
+                // Retain the actual lookup winner, never replace its bytes.
+                const auto authored=garage_->find(name_+".pst");
+                if(!authored.identity||!authored.data||authored.size!=pstBytes_.size()||
+                   std::memcmp(authored.data,pstBytes_.data(),authored.size))return false;
+            }
             OriginalStandardArchiveProvider50LA::MemberView psm,pst;
             if(provider_->lookup132820(requested,psm)!=OriginalStandardArchiveProvider50LA::Lookup::absent||
                provider_->lookup132820(name_+".pst",pst)!=OriginalStandardArchiveProvider50LA::Lookup::present||

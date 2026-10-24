@@ -58,7 +58,8 @@ bool OriginalUiGarageDrawContribution50KG::prepareDrainScreenPolicies24B130(D& d
    if(text){
     if(queued){OriginalUiGarageScreenText50KG::FontAtlasBorrow atlas;OriginalUiGarageScreenText50KG::Diagnostic td;
      if(!text->borrowQueuedFontAtlas(atlas,td)||atlas.pst.identity!=textureMember.identity||
-        atlas.pst.data!=textureMember.data||atlas.pst.size!=textureMember.size||atlas.canonicalTexture!=map.textureToken)
+        !atlas.pst.data||atlas.pst.size!=textureMember.size||atlas.canonicalTexture!=map.textureToken||
+        (atlas.pst.data!=textureMember.data&&std::memcmp(atlas.pst.data,textureMember.data,textureMember.size)!=0))
         return rejectScreen(d,S::texture,td.sourcePC?td.sourcePC:0x281F90,"actual retained font atlas");
     }else if(text->phase_!=OriginalUiGarageScreenText50KG::Phase::coldLoaded||!text->coldInputsCurrent()||
         !text->font4C_||text->font4C_->atlasIdentity()!=textureMember.identity||

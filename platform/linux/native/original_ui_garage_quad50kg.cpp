@@ -8,6 +8,7 @@
 #include <cfenv>
 #include <cmath>
 #include <cstring>
+#include <cstdio>
 #include <exception>
 #include <new>
 namespace rr::platform {
@@ -170,32 +171,47 @@ bool OriginalUiGarageQuad50KG::load2DF0B0(const RootInputs& in,Diagnostic& d)noe
             for(char& c:proof->name_)if(c>='A'&&c<='Z')c=char(c-'A'+'a');
             proof->garage_=garage_;proof->provider_=provider;proof->context_=context_;proof->textures_=domain_->textures383400();
             const bool sharedIcon=proof->name_=="ui\\textures\\icon_x"||proof->name_=="ui\\textures\\icon_tri";
+            const bool sharedGarageIcon=proof->name_=="ui\\textures\\icon_sqr"||proof->name_=="ui\\textures\\icon_cir";
             proof->pstArchive_=assets::OriginalUiArchiveId50KG::garage;
+            const auto rejectFallback=[&](const char* stage)noexcept {
+                std::fprintf(stderr,"original_garage_prompt_fallback_failed stage=%s name=%s row=%d material_status=%u material_pc=%u\n",
+                    stage,requested.c_str(),row,static_cast<unsigned>(d.material.status),d.material.sourcePC);
+                std::fflush(stderr);
+                return fail(d,Status::missingPsmFallbackPending,0x29B638);
+            };
             assets::OriginalStandardArchiveProvider50LA::MemberView pst;
             if(provider->lookup132820(proof->name_+".pst",pst)!=assets::OriginalStandardArchiveProvider50LA::Lookup::present||!pst.member||!pst.data)
-                return fail(d,Status::missingPsmFallbackPending,0x29B638);
-            if(sharedIcon){
+                return rejectFallback("pst_lookup");
+            if(sharedIcon||sharedGarageIcon){
                 //132820 retains the first active equal-byte member. Dedicated
                 //Main already mounted CONTPOP at real shared-dialog boot;
-                //race-hosted UI may have mounted OVERLAYS first. Both original
-                //archives contain these exact two identical indexed PSTs.
+                //race-hosted UI may have mounted OVERLAYS first. X/Triangle
+                //are equal in CONTPOP/OVERLAYS; Square/Circle are equal in
+                //Garage/OVERLAYS and current() checks the Garage bytes.
                 assets::OriginalStandardArchiveProvider50LA::MountView mount;
                 if(!provider->mount(pst.mount,mount)||!mount.archiveSha256)
-                    return fail(d,Status::missingPsmFallbackPending,0x29B638);
+                    return rejectFallback("pst_mount");
                 const auto matches=[&](assets::OriginalUiArchiveId50KG id)noexcept {
                     const auto* expected=assets::originalUiArchiveIdentity50KG(id);
                     return expected&&*mount.archiveSha256==expected->sha256&&mount.archiveBytes==expected->bytes;
                 };
-                if(matches(assets::OriginalUiArchiveId50KG::controllerPopup))
+                if(sharedIcon&&matches(assets::OriginalUiArchiveId50KG::controllerPopup))
                     proof->pstArchive_=assets::OriginalUiArchiveId50KG::controllerPopup;
                 else if(matches(assets::OriginalUiArchiveId50KG::overlays))
                     proof->pstArchive_=assets::OriginalUiArchiveId50KG::overlays;
-                else return fail(d,Status::missingPsmFallbackPending,0x29B638);
+                else if(sharedGarageIcon&&matches(assets::OriginalUiArchiveId50KG::garage))
+                    proof->pstArchive_=assets::OriginalUiArchiveId50KG::garage;
+                else {
+                    std::fprintf(stderr,"original_garage_prompt_pst_archive name=%s sha=%s bytes=%zu member=%zu\n",
+                        mount.archiveName?mount.archiveName->c_str():"<null>",mount.archiveSha256->c_str(),mount.archiveBytes,pst.ordinal);
+                    return rejectFallback("pst_archive");
+                }
             }
             proof->pstMember_=*pst.member;proof->pstBytes_.assign(pst.data,pst.data+pst.size);
-            if(!proof->current(proof->name_+".psm",context_,proof->textures_)||
-               !table->bindGarageScreenFallbackAfterRetain(row,proof,d.material))
-                return fail(d,Status::missingPsmFallbackPending,0x29B638);
+            if(!proof->current(proof->name_+".psm",context_,proof->textures_))
+                return rejectFallback("proof_current");
+            if(!table->bindGarageScreenFallbackAfterRetain(row,proof,d.material))
+                return rejectFallback("table_bind");
             appendTextureInput(proof->name_);
         }
         if(!domain_->appendOriginalSources(sources,textures,d.material))

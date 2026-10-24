@@ -2289,8 +2289,14 @@ bool OriginalUiMainAudio50KG::publishColdSceneSampleGroupGain(OriginalUiGarageDr
         if(!c)return false;
         if(c->kind!=NativeGroupControlKind::scene)continue;
         if(c->scene.get()!=scene||!queuedGroupIdentityCurrent(*c)||!queuedGroupRoutingCurrent(*c))return false;
-        if(backend.retiredVoices_[ordinal].present){
-            if(!nativeWetInterfaceCurrent()||!backend.retainedStoppedVoiceCurrent(ordinal))return false;
+        // The accepted routing claim owns the whole four-voice range. A new
+        // never-played Sound can share that range with retained stopped history
+        // from another Sound; it is not a cold range merely because this slot
+        // has no prior playback. Keep the existing exact per-slot lease proof.
+        if(c->retainedHistory){
+            if(!nativeWetInterfaceCurrent()||
+               (backend.retiredVoices_[ordinal].present&&
+                !backend.retainedStoppedVoiceCurrent(ordinal)))return false;
             return mixer_->publishRetainedNativeSceneVoiceGroup50IC(c.get(),slot,sourceGain);
         }
         return mixer_->publishColdNativeSceneVoiceGroup50IC(c.get(),slot,sourceGain);

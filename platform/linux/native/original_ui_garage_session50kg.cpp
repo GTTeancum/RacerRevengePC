@@ -3394,8 +3394,13 @@ bool Application::continueGarageManagerLoadReturnCold(std::int32_t requestedPage
     if(owner->managerLoadPhase_==Phase::scopeReturned){
         const GarageColdStageTiming phaseTiming{"managerReturn.scopeReturned",diagnostic};
         const Pending::RootOperation operation(*this,entities(),Pending::RootOperation::Kind::nativeSceneResolve1D1B9C);
-        if(!owner->pending_->flushNativeScene26D9F0(operation,*owner->podScene_,error))
+        if(!owner->pending_->flushNativeScene26D9F0(operation,*owner->podScene_,error)){
+            // Preserve the already-produced nested refusal before the public
+            // manager-stage diagnostic replaces it. No partial owner reads.
+            std::fprintf(stderr,"original_garage_pending_sound_resolution_failed detail=%s\n",error.c_str());
+            std::fflush(stderr);
             return fail(0x1D1B9C,"Garage final genuine pending-Sound resolution failed; prefix retained");
+        }
         owner->managerLoadPhase_=Phase::soundReturned;
     }
     if(owner->managerLoadPhase_!=Phase::soundReturned||!owner->page_->sourceEntryReturned1FAE00())

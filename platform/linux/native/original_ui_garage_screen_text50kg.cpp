@@ -182,10 +182,38 @@ bool OriginalUiGarageScreenText50KG::loadColdSource2DFD90(
   };
   if(!provider||!provider->sealed()||!materialSourceCurrent()||
      !cel.identity||!cel.data||!pst.identity||!pst.data||
-     cel.identity!=font->celIdentity()||pst.identity!=font->atlasIdentity()||
-     provider->lookup132820(cel.identity->name,mounted)!=Lookup::present||mounted.data!=cel.data||mounted.size!=cel.size||
-     provider->lookup132820(pst.identity->name,mounted)!=Lookup::present||mounted.data!=pst.data||mounted.size!=pst.size)
+     cel.identity!=font->celIdentity()||pst.identity!=font->atlasIdentity())
    return stop(d,Status::source,0x132820);
+  const auto fontSourceCurrent=[&](const assets::OriginalUiMemberView50KG& source)noexcept {
+   if(source.size!=source.identity->bytes||
+      provider->lookup132820(source.identity->name,mounted)!=Lookup::present||
+      !mounted.member||!mounted.data||mounted.size!=source.size)return false;
+   if(mounted.data==source.data)return true;
+   //282430 authenticates the supplied font archive against canonical bytes,
+   //then retains that Entry's archive. After frontend reentry this may be a
+   //fresh equal-byte allocation while132820 still owns the original mount.
+   //Keep the exact Entry/resource identities above and require genuine UIFONTS
+   //provenance plus the complete member bytes, not merely atlas dimensions.
+   if(*mounted.member!=source.identity->name)return false;
+   assets::OriginalStandardArchiveProvider50LA::MountView mount;
+   const auto* expected=assets::originalUiArchiveIdentity50KG(assets::OriginalUiArchiveId50KG::fonts);
+   const auto* canonical=assets::originalUiMemberIdentity50KG(assets::OriginalUiArchiveId50KG::fonts,mounted.ordinal);
+   return expected&&canonical&&canonical->name&&canonical->sha256&&source.identity->sha256&&
+    *mounted.member==canonical->name&&canonical->bytes==source.size&&
+    std::strcmp(canonical->sha256,source.identity->sha256)==0&&
+    provider->mount(mounted.mount,mount)&&mount.archiveName&&mount.archiveSha256&&
+    *mount.archiveName==expected->discPath&&*mount.archiveSha256==expected->sha256&&
+    mount.archiveBytes==expected->bytes&&mount.memberCount==expected->memberCount&&
+    std::memcmp(mounted.data,source.data,source.size)==0;
+  };
+  if(!fontSourceCurrent(cel)){
+   std::fprintf(stderr,"original_screen_text_source_failed field=font_cel source_pc=1255456\n");
+   return stop(d,Status::source,0x132820);
+  }
+  if(!fontSourceCurrent(pst)){
+   std::fprintf(stderr,"original_screen_text_source_failed field=font_pst source_pc=1255456\n");
+   return stop(d,Status::source,0x132820);
+  }
   if(domain->materials382B38()->populationTerminal()||domain->materials382B38()->demandTerminal()||
      !domain->textures383400()||domain->textures383400()->populationTerminal())return stop(d,Status::phase,0x14D590);
   issuer_=&root;authority_=root.entities();lifetime_=root.animationClock();
@@ -579,7 +607,22 @@ bool OriginalUiGarageScreenText50KG::borrowQueuedFontAtlas(FontAtlasBorrow& out,
  if(member.identity!=font4C_->pst_.identity||member.data!=font4C_->pst_.data||member.size!=font4C_->pst_.size||
     !provider||!provider->sealed()||provider->lookup132820(member.identity->name,mounted)!=
        assets::OriginalStandardArchiveProvider50LA::Lookup::present||
-    mounted.data!=member.data||mounted.size!=member.size){d.status=Status::source;d.sourcePC=0x132820;return false;}
+    !mounted.member||!mounted.data||mounted.size!=member.size){d.status=Status::source;d.sourcePC=0x132820;return false;}
+ if(mounted.data!=member.data){
+  //The queued Entry retains its authenticated archive after282430 reentry,
+  //while132820 keeps its original equal-byte backing. Match the same narrow
+  //canonical UIFONTS proof used by loadColdSource2DFD90, not pointer freshness.
+  assets::OriginalStandardArchiveProvider50LA::MountView mount;
+  const auto* expected=assets::originalUiArchiveIdentity50KG(assets::OriginalUiArchiveId50KG::fonts);
+  const auto* canonical=assets::originalUiMemberIdentity50KG(assets::OriginalUiArchiveId50KG::fonts,mounted.ordinal);
+  if(!expected||!canonical||!canonical->name||!canonical->sha256||!member.identity->sha256||
+     *mounted.member!=member.identity->name||*mounted.member!=canonical->name||canonical->bytes!=member.size||
+     std::strcmp(canonical->sha256,member.identity->sha256)!=0||
+     !provider->mount(mounted.mount,mount)||!mount.archiveName||!mount.archiveSha256||
+     *mount.archiveName!=expected->discPath||*mount.archiveSha256!=expected->sha256||
+     mount.archiveBytes!=expected->bytes||mount.memberCount!=expected->memberCount||
+     std::memcmp(mounted.data,member.data,member.size)!=0){d.status=Status::source;d.sourcePC=0x132820;return false;}
+ }
  out={font4C_,font4C_->archive_,font4C_->pst_,font4C_->texture408_};return true;
 }
 bool OriginalUiGarageScreenText50KG::lowerQueuedPacket(std::size_t primitiveIndex,

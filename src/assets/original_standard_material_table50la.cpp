@@ -5,6 +5,7 @@
 #include <cfenv>
 #include <cmath>
 #include <cstring>
+#include <cstdio>
 #include <exception>
 #include <limits>
 #include <new>
@@ -1004,14 +1005,21 @@ bool OriginalStandardMaterialTable50LA::bindGarageScreenFallbackAfterRetain(std:
     if(!storage_||index<0||static_cast<std::size_t>(index)>=storage_->rows.size()||!proof||proof->row_!=index)
         return fail(d,S::source,0x29B638);
     auto& row=storage_->rows[static_cast<std::size_t>(index)];
-    if(row.references08<=0||!storage_->templates||row.associated30!=storage_->templates->get(OriginalUiTemplate50KG::screenMt)||
-       row.tournamentMissingPsm||row.speedBoostMissingPsm||row.damageMissingPsm||row.pauseBackdropMissingPsm||
-       (row.object04&&!row.garageFallback)||!proof->current(row.name00+".psm",proof->context_,proof->textures_))
+    const auto rejected=[&](bool value,const char* guard)noexcept {
+        if(value){std::fprintf(stderr,"original_garage_fallback_binding_failed guard=%s row=%d\n",guard,index);std::fflush(stderr);}
+        return value;
+    };
+    if(rejected(row.references08<=0,"references")||rejected(!storage_->templates,"templates")||
+       rejected(row.associated30!=storage_->templates->get(OriginalUiTemplate50KG::screenMt),"template_identity")||
+       rejected(bool(row.tournamentMissingPsm),"tournament_owner")||rejected(bool(row.speedBoostMissingPsm),"speedboost_owner")||
+       rejected(bool(row.damageMissingPsm),"damage_owner")||rejected(bool(row.pauseBackdropMissingPsm),"pause_owner")||
+       rejected(row.object04&&!row.garageFallback,"object_without_garage_proof")||
+       rejected(!proof->current(row.name00+".psm",proof->context_,proof->textures_),"new_proof_current"))
         return fail(d,S::phase,0x29B638);
     //Numeric104960 retain already happened at2465B0. This is native source
     //admission only and MUST NOT add a second source reference.
     if(row.garageFallback){
-        if(!row.garageFallback->current(row.name00+".psm",proof->context_,proof->textures_))
+        if(rejected(!row.garageFallback->current(row.name00+".psm",proof->context_,proof->textures_),"retained_proof_current"))
             return fail(d,S::source,0x29B638);
     }else row.garageFallback=std::move(proof);
     return true;
