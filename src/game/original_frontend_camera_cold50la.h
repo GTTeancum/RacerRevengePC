@@ -12,7 +12,7 @@
 #include <utility>
 
 namespace original_main_entry50KG { struct Application; class RaceDisplayLifetime50LA; }
-namespace rr::platform { class OriginalUiGarageDrawContribution50KG; class OriginalUiGarageCameraFrame50KG; class OriginalUiGaragePageOwner50KG; class OriginalUiGarageManagerSearch50KG; class OriginalUiGarageVisibility50KG; class OriginalUiGarageRendererLease50KG; }
+namespace rr::platform { class OriginalUiFrontend50KG; class OriginalUiGarageDrawContribution50KG; class OriginalUiGarageCameraFrame50KG; class OriginalUiGaragePageOwner50KG; class OriginalUiGarageManagerSearch50KG; class OriginalUiGarageVisibility50KG; class OriginalUiGarageRendererLease50KG; }
 namespace rr::game {
 class OriginalUiEntityScope50KG;
 
@@ -24,6 +24,7 @@ class OriginalUiEntityScope50KG;
 // operation; this owner does not pretend to retrofit a universal registry lock.
 class OriginalFrontendCameraCold50LA final {
     friend struct ::original_main_entry50KG::Application;
+    friend class rr::platform::OriginalUiFrontend50KG;
     friend class rr::platform::OriginalUiGarageDrawContribution50KG;
     friend class rr::platform::OriginalUiGarageCameraFrame50KG;
     friend class ::original_main_entry50KG::RaceDisplayLifetime50LA;
@@ -270,7 +271,7 @@ private:
         fields_.zoom32C=0x3f800000u;                  //2361A8
         fieldsComplete_=true;
     }
-    static Result construct(const ::original_main_entry50KG::Application* issuer,
+    static Result prepareStorage(const ::original_main_entry50KG::Application* issuer,
         const std::shared_ptr<Entities>& entities,
         std::shared_ptr<OriginalFrontendCameraCold50LA>& output)noexcept {
         if(output)return {Status::outputNotEmpty,0x236180u};
@@ -289,6 +290,21 @@ private:
             next=std::shared_ptr<OriginalFrontendCameraCold50LA>(
                 new OriginalFrontendCameraCold50LA(issuer,entities));
         }catch(...){return {Status::allocation,0x236180u};}
+        output=std::move(next);
+        return {Status::complete,0x236180u}; // Inert allocation, NOT source execution.
+    }
+    bool inertStorageCurrent(const ::original_main_entry50KG::Application* issuer,
+        const std::shared_ptr<Entities>& entities)const noexcept {
+        return issuer&&issuer_==issuer&&entities_==entities&&onAffinity()&&
+            phase_==Phase::empty&&!entityConstructed_&&!fieldsComplete_&&!enrolled_&&freshComponent();
+    }
+    static Result construct(const ::original_main_entry50KG::Application* issuer,
+        const std::shared_ptr<Entities>& entities,
+        std::shared_ptr<OriginalFrontendCameraCold50LA>& output)noexcept {
+        if(output)return {Status::outputNotEmpty,0x236180u};
+        std::shared_ptr<OriginalFrontendCameraCold50LA> next;
+        const auto prepared=prepareStorage(issuer,entities,next);
+        if(!prepared.okay())return prepared;
         auto& authority=entities->entityAuthority_;
         if(!authority.reserveAdditional(1))return {Status::reservation,0x141300u};
         if(!next->actualEntitiesAlive()||entities->attachmentLock423F58_||

@@ -79,7 +79,7 @@ private:
     // their separate source authority; this function grants none by itself.
     bool completeZeroPosition2DF158(Diagnostic&)noexcept;
     bool completeMemoryCardIcon2DF158(OriginalUiMemoryCardConstructor50KG&,std::size_t,Diagnostic&)noexcept;
-    bool completeMemoryCardFirstStrip2DF158(OriginalUiMemoryCardConstructor50KG&,Diagnostic&)noexcept;
+    bool completeMemoryCardStrip2DF158(OriginalUiMemoryCardConstructor50KG&,Diagnostic&,std::size_t role=4)noexcept;
     bool completeMemoryCardFirstIcon2DF158(OriginalUiMemoryCardConstructor50KG&,Diagnostic&)noexcept;
     // Queued records borrow the actual Primitive and packet. Mutation and
     // source retirement wait for genuine105990 release of these same pins.

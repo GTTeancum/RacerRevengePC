@@ -53,6 +53,11 @@ struct OriginalUiOptionsMenuWidgets50KG::Storage {
     OriginalUiOptionsWidgetOrder50KG order;
     std::uint32_t flags42C=0;
 };
+bool OriginalUiOptionsMenuWidgets50KG::nativeManagerSourceCurrent(
+    const std::shared_ptr<const assets::OriginalUiArchive50KG>& expected,
+    const assets::OriginalUiDat50KG*& out)const noexcept {
+    out=nullptr;return storage_&&storage_->controller.nativeSourceCurrent(expected,out);
+}
 OriginalUiOptionsMenuWidgets50KG::OriginalUiOptionsMenuWidgets50KG() noexcept=default;
 OriginalUiOptionsMenuWidgets50KG::~OriginalUiOptionsMenuWidgets50KG()=default;
 Status OriginalUiOptionsMenuWidgets50KG::bind(std::shared_ptr<const assets::OriginalUiArchive50KG> archive,

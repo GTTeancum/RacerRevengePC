@@ -308,6 +308,9 @@ private:
         std::unique_ptr<OriginalSaveProfileOwner50KG>& out)const noexcept;
     // Bind the actual enclosing native owner, never a callback/readiness flag.
     // Private source-custody handoff only; uncalled and not page438 admission.
+    // Non-counted preparation within the existing Manager only. This cannot
+    // construct/mount/publish any source owner or issue a native caller grant.
+    bool prepareOptionsNativeInputs50KG(const ::original_main_entry50KG::Application&)noexcept;
     bool retainMemoryCardOptionsSources50KG(const ::original_main_entry50KG::Application&,
         OriginalUiMemoryCardConstructor50KG&)noexcept;
     bool bindGarageDestinationRoot50KG(::original_main_entry50KG::Frontend&)noexcept;

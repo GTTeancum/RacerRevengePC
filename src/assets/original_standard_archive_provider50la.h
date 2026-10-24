@@ -14,7 +14,7 @@ namespace rc_cold_sources50LA { class Owner; }
 namespace tb_cold_sources50LA { class Owner; }
 namespace gb_cold_sources50LA { class Owner; }
 namespace mc_cold_sources50LA { class Owner; }
-namespace rr::platform {class OriginalUiGarageDrawContribution50KG;}
+namespace rr::platform {class OriginalUiGarageDrawContribution50KG; class OriginalUiFrontend50KG;}
 namespace rr::assets {
 class OriginalArchiveStagedReader50LA;
 class OriginalStandardTextureResolver50LA;
@@ -79,28 +79,12 @@ public:
     // lookup. Pinning the loaded owner keeps original member data stable.
     bool mountAuthenticatedUi(std::shared_ptr<const OriginalUiArchive50KG> archive,
         Diagnostic& d) noexcept {
-        d={};const auto* identity=archive?archive->identity():nullptr;
-        if(!archive||!archive->loaded()||!identity||
-           archive->memberCount()!=identity->memberCount||!identity->memberCount)
-            return fail(d,Status::input);
-        try {
-            auto next=std::make_unique<Mount>();next->name=identity->discPath;
-            next->digest=identity->sha256;next->archiveBytes=identity->bytes;next->ui=std::move(archive);
-            next->admittedUi=next->ui;
-            if(!nameOkay(next->name)||!digestOkay(next->digest)||!next->archiveBytes||
-               identity->memberCount>maxEntries)return fail(d,Status::identity);
-            next->rows.reserve(identity->memberCount);
-            for(std::size_t i=0;i<identity->memberCount;++i){
-                d.ordinal=i;const auto source=next->ui->member(i);
-                if(!source.identity||!source.data||source.size!=source.identity->bytes||
-                   !nameOkay(source.identity->name))return fail(d,Status::identity);
-                if(source.size>maxBytes-next->retainedBytes)return fail(d,Status::capacity);
-                next->retainedBytes+=source.size;
-                next->rows.push_back({source.identity->name,source.data,source.size,source.identity->logicalOffset});
-            }
-            return commit(std::move(next),d);
-        }catch(...){return fail(d,Status::allocation);}
+        std::unique_ptr<Mount> next;
+        if(!prepareUiMount(std::move(archive),next,d))return false;
+        try {return commit(std::move(next),d);}
+        catch(...){return fail(d,Status::allocation);}
     }
+
     // Called after the real caller has mounted every archive participating in
     // THIS native namespace. New mounts unseal it. This is a transaction phase,
     // not a fabricated proof about unmounted retail archives or selected files.
@@ -273,6 +257,56 @@ private:
             (mcSource&&mcThread!=std::this_thread::get_id()))std::terminate();}
         std::vector<Row> rows;
     };
+    friend class rr::platform::OriginalUiFrontend50KG;
+    // Detached complete directory custody only. Not in mounts_, not a bank
+    // admission, lookup result, source12CEA0 execution or readiness receipt.
+    static bool prepareUiMount(std::shared_ptr<const OriginalUiArchive50KG> archive,
+        std::unique_ptr<Mount>& output,Diagnostic& d)noexcept {
+        d={};if(output)return fail(d,Status::input);
+        const auto* identity=archive?archive->identity():nullptr;
+        if(!archive||!archive->loaded()||!identity||
+           archive->memberCount()!=identity->memberCount||!identity->memberCount)
+            return fail(d,Status::input);
+        try {
+            auto next=std::make_unique<Mount>();next->name=identity->discPath;
+            next->digest=identity->sha256;next->archiveBytes=identity->bytes;next->ui=std::move(archive);
+            next->admittedUi=next->ui;
+            if(!nameOkay(next->name)||!digestOkay(next->digest)||!next->archiveBytes||
+               identity->memberCount>maxEntries)return fail(d,Status::identity);
+            next->rows.reserve(identity->memberCount);
+            for(std::size_t i=0;i<identity->memberCount;++i){
+                d.ordinal=i;const auto source=next->ui->member(i);
+                if(!source.identity||!source.data||source.size!=source.identity->bytes||
+                   !nameOkay(source.identity->name))return fail(d,Status::identity);
+                if(source.size>maxBytes-next->retainedBytes)return fail(d,Status::capacity);
+                next->retainedBytes+=source.size;
+                next->rows.push_back({source.identity->name,source.data,source.size,source.identity->logicalOffset});
+            }
+            output=std::move(next);return true;
+        }catch(...){return fail(d,Status::allocation);}
+
+    }
+    bool preparedUiMountCurrent(const Mount& mount,
+        const std::shared_ptr<const OriginalUiArchive50KG>& archive)const noexcept {
+        for(const auto& current:mounts_)if(current.get()==&mount)return false;
+        const auto admitted=mount.admittedUi.lock();
+        const auto* identity=archive?archive->identity():nullptr;
+        if(!archive||!archive->loaded()||!identity||mount.ui!=archive||admitted!=archive||
+           mount.ui.owner_before(archive)||archive.owner_before(mount.ui)||
+           admitted.owner_before(archive)||archive.owner_before(admitted)||
+           mount.name!=identity->discPath||mount.digest!=identity->sha256||
+           mount.archiveBytes!=identity->bytes||mount.rows.size()!=archive->memberCount()||
+           mount.rows.size()!=identity->memberCount||mount.backing||mount.rcSource||mount.tbSource||
+           mount.gbSource||mount.mcSource)return false;
+        std::size_t bytes=0;
+        for(std::size_t i=0;i<mount.rows.size();++i){const auto member=archive->member(i);const auto& row=mount.rows[i];
+            if(!member.identity||!member.data||row.data!=member.data||row.size!=member.size||
+               row.size!=member.identity->bytes||row.name!=member.identity->name||
+               row.offset!=member.identity->logicalOffset||row.size>maxBytes-bytes)return false;
+            bytes+=row.size;
+        }
+        return mount.retainedBytes==bytes;
+    }
     static constexpr std::size_t maxMounts=64,maxEntries=65536,maxBytes=256u*1024u*1024u;
     static char lower(char c)noexcept{return c>='A'&&c<='Z'?char(c+('a'-'A')):c;}
     static bool nameOkay(const std::string& s)noexcept {

@@ -143,6 +143,60 @@ struct OriginalUiFrontend50KG::Storage {
         bool garageResourcesPrepared=false,garageEntryAttempted=false,garageRetired=false;
         std::shared_ptr<const OriginalUiGarageSession50KG> garageReturnOrigin;
         bool riderRetired=false,optionsRetired=false,hallRetired=false,mainRetired=false,tournamentRetired=false;
+        // Owned by this SAME logical Manager, never a parallel source manager.
+        // Only host preparation: the parsed DAT is the controller's existing
+        // preserveInOrder object, pinned by these exact resources/archive.
+        struct OptionsNativeInputs {
+            const ::original_main_entry50KG::Application* issuer=nullptr;
+            Manager* manager=nullptr;Storage* frontend=nullptr;
+            const OriginalUiOptionsSession50KG* session=nullptr;
+            const game::OriginalUiOptionsMenuWidgets50KG* widgets=nullptr;
+            const assets::OriginalUiDat50KG* dat=nullptr;
+            game::OriginalApplicationAnimationClockView50KG lifetime;
+            std::shared_ptr<game::OriginalUiEntityScope50KG> scope;
+            std::shared_ptr<game::OriginalApplicationEntities50LA> entities;
+            std::shared_ptr<::original_main_entry50KG::Video> video;
+            std::shared_ptr<assets::OriginalStandardMaterialDomain50LA> domain;
+            std::shared_ptr<const assets::OriginalStandardMaterialContext50LA> context;
+            std::shared_ptr<assets::OriginalApplicationFonts50LA> fonts;
+            std::shared_ptr<assets::OriginalApplicationLocalization50KG> localization;
+            std::shared_ptr<const assets::OriginalUiArchive50KG> archive;
+            std::shared_ptr<OriginalUiOptionsDrawResources50KG> resources;
+            // Actual owner storage, still before any source manager/Camera or
+            // bank effect. Neither is published to Entity or provider tables.
+            std::shared_ptr<game::OriginalFrontendCameraCold50LA> cameraStorage;
+            std::shared_ptr<assets::OriginalStandardArchiveProvider50LA> provider;
+            std::unique_ptr<assets::OriginalStandardArchiveProvider50LA::Mount> bankStorage;
+            struct Row {
+                std::string sectionName;
+                std::uint16_t authoredId=0;
+                const assets::OriginalUiDatSection50KG* source=nullptr;
+                // Raw authored presence/value/order stays in the retained DAT.
+                // Missing sections/keys remain missing, not invented defaults.
+                std::array<const assets::OriginalUiDatValue50KG*,5> fields{};
+                // Safe backing is NOT a source-null entry or constructed Widget.
+                const game::OriginalWreckComponent50LA* publishedWidget=nullptr;
+                bool sourceSlotKnown=false;
+            };
+            const std::array<std::string,5> fieldNames{{"Type","TextID","FontName","MaterialName","OnTop"}};
+            std::array<Row,357> orderedRows{};
+            std::int32_t authoredWidgetCount=0; // Input, NOT source count158.
+            // No producer exists in this proposal. A later genuine manager
+            // implementation must supply Camera/bank/ordered children and
+            // complete partial retirement BEFORE introducing any such store.
+            bool managerConstructed=false,cameraConstructed=false,bankAdmitted=false;
+            bool name194Known=false,lights29CKnown=false,widgets154Known=false,pages144Known=false;
+            bool sourceCount158Known=false,video44Written=false,caller394Stored=false;
+            bool disposable()const noexcept {
+                if(managerConstructed||cameraConstructed||bankAdmitted||name194Known||lights29CKnown||
+                   widgets154Known||pages144Known||sourceCount158Known||video44Written||caller394Stored)return false;
+                if(cameraStorage&&!cameraStorage->inertStorageCurrent(issuer,entities))return false;
+                if(bankStorage&&(!provider||!provider->preparedUiMountCurrent(*bankStorage,archive)))return false;
+                for(const auto& row:orderedRows)if(row.sourceSlotKnown||row.publishedWidget)return false;
+                return true;
+            }
+        };
+        std::unique_ptr<OptionsNativeInputs> optionsNativeInputs;
         Route currentRoute() const noexcept {
             return transition&&transition->snapshot().bound?transition->snapshot().current:initialRoute;
         }
@@ -894,6 +948,13 @@ struct OriginalUiFrontend50KG::Storage {
         catch(...){result(d,Status::resource);return false;}
     }
     bool retireSource(Manager& m,Diagnostic& d) noexcept {
+        // Prepared inputs issued no source refs/mounts/stores. Release them
+        // before this Manager's real Session/resource retirement, never as a
+        // substitute for any future native manager or child destruction.
+        if(m.optionsNativeInputs&&!m.optionsNativeInputs->disposable()){
+            result(d,Status::cleanup,0x1D04E0);return false;
+        }
+        m.optionsNativeInputs.reset();
         if(same(m.initialRoute,{13,1})&&m.garageEntryAttempted&&!m.garageRetired){
             if(!m.garage||!garageDestinationFrontend||!garageDestinationFrontend->materialApplicationOwner){
                 result(d,Status::cleanup,0x1D1CD0);return false;
@@ -2140,6 +2201,81 @@ const assets::MaterialTextureAssets50EA* OriginalUiFrontend50KG::textures() cons
 const MaterialTextureGl50EB* OriginalUiFrontend50KG::gpu() const noexcept {return storage_&&storage_->active?storage_->active->gpu.get():nullptr;}
 const OriginalUiNativeDraw50KG* OriginalUiFrontend50KG::draw() const noexcept {
     const auto* s=storage_.get();return s&&!s->inOperation&&!s->garageTextureDraw&&!s->faulted&&!s->quit&&!s->closing&&s->frameRendered&&s->active?s->active->draw():nullptr;
+}
+bool OriginalUiFrontend50KG::prepareOptionsNativeInputs50KG(
+    const ::original_main_entry50KG::Application& root)noexcept {
+    auto* s=storage_.get();
+    if(!s||!s->prepared||!s->activated||s->inOperation||s->faulted||s->quit||s->closing||s->retiring||
+       s->garageTextureDraw||s->courseLaunchReady||s->courseLaunchTaken||
+       s->updates!=s->submittedUpdate||(s->frameRendered&&!s->frameSubmitted)||
+       !s->garageDestinationFrontend||&s->garageDestinationFrontend->coordinator!=this||
+       s->garageDestinationFrontend->materialApplicationOwner!=&root||
+       s->cold.application!=root.state||s->cold.profile!=root.profile||!s->sourceCurrent())return false;
+    // Input preparation may coexist with the outgoing manager. It neither
+    // reserves the shared native manager slot nor asserts outgoing retirement.
+    auto* m=s->pending?s->pending.get():s->active.get();
+    if(!m||m->owner!=s||!m->options||m->optionsRetired||!m->optionsResources||
+       !m->optionsResources->loaded()||m->initialRoute.screen!=12||!m->prepared())return false;
+    const auto scope=root.sharedUiScopeOwner_;
+    const auto entities=root.entities();const auto video=root.videoOwner_;
+    const auto domain=root.standardMaterialDomainOwner_;const auto context=root.materialContextOwner_;
+    const auto fonts=root.fonts328Owner_;const auto localization=root.sourceLocalization32COwner_;
+    std::uint32_t pause=0;
+    if(!root.animationClock().readPause11C(pause)||!scope||scope->issuer_!=&root||scope->application_!=entities||
+       !scope->live().okay()||!scope->dispatcherLive_||!entities||!video||!video->originalMain||
+       !domain||!domain->prepared()||!context||!context->live()||context->videoIdentity()!=video.get()||
+       !context->applicationAnimationClock().sameOwner(root.animationClock())||
+       context->materialApplication()!=root.materialApplication||!fonts||!localization)return false;
+    const auto provider=domain->archiveProvider3E1A70();
+    if(!provider)return false;
+    const auto* widgets=m->optionsResources->widgets();const assets::OriginalUiDat50KG* dat=nullptr;
+    if(!widgets||!widgets->nativeManagerSourceCurrent(s->cold.options,dat)||!dat)return false;
+    Operation operation(s->inOperation);
+    if(m->optionsNativeInputs){const auto& n=*m->optionsNativeInputs;
+        if(n.manager!=m||n.frontend!=s||n.session!=m->options.get()||n.widgets!=widgets||n.dat!=dat||n.issuer!=&root||
+           n.scope!=scope||n.entities!=entities||n.video!=video||n.domain!=domain||n.context!=context||
+           n.fonts!=fonts||n.localization!=localization||n.resources!=m->optionsResources||n.archive!=s->cold.options||
+           !n.lifetime.sameOwner(root.animationClock())||n.authoredWidgetCount!=357||
+           n.provider!=provider||!n.cameraStorage||!n.bankStorage||!n.disposable()||
+           n.managerConstructed||n.cameraConstructed||n.bankAdmitted||n.name194Known||n.lights29CKnown||
+           n.widgets154Known||n.pages144Known||n.sourceCount158Known||n.video44Written||n.caller394Stored)return false;
+        for(std::size_t i=0;i<n.orderedRows.size();++i){const auto& row=n.orderedRows[i];
+            if(row.authoredId!=i+1||row.source!=dat->section(row.sectionName)||row.sourceSlotKnown||row.publishedWidget)return false;
+            for(std::size_t k=0;k<n.fieldNames.size();++k)
+                if(row.fields[k]!=(row.source?row.source->find(n.fieldNames[k]):nullptr))return false;
+        }
+        return true;
+    }
+    try {
+        auto n=std::make_unique<Storage::Manager::OptionsNativeInputs>();
+        n->issuer=&root;n->manager=m;n->frontend=s;n->session=m->options.get();n->widgets=widgets;n->dat=dat;
+        n->lifetime=root.animationClock();n->scope=scope;n->entities=entities;n->video=video;
+        n->domain=domain;n->context=context;n->fonts=fonts;n->localization=localization;
+        n->archive=s->cold.options;n->resources=m->optionsResources;
+        const auto* general=dat->section("General");assets::OriginalUiPageDiagnostic50KG parse;
+        if(!general||!assets::originalUiInteger50KG(*general,"NumberOfWidgets",0,n->authoredWidgetCount,parse,0x1CD83C)||
+           n->authoredWidgetCount!=357)return false;
+        for(std::size_t i=0;i<n->orderedRows.size();++i){auto& row=n->orderedRows[i];
+            row.authoredId=static_cast<std::uint16_t>(i+1);row.sectionName="Widget "+std::to_string(i+1);
+            row.source=dat->section(row.sectionName);
+            for(std::size_t k=0;k<n->fieldNames.size();++k)row.fields[k]=row.source?row.source->find(n->fieldNames[k]):nullptr;
+        }
+        // Allocate actual reusable owner storage only. No Camera141300,
+        // manager constructor, source field or provider commit is permitted.
+        if(!game::OriginalFrontendCameraCold50LA::prepareStorage(&root,entities,n->cameraStorage).okay())return false;
+        n->provider=provider;assets::OriginalStandardArchiveProvider50LA::Diagnostic bankDiagnostic;
+        if(!assets::OriginalStandardArchiveProvider50LA::prepareUiMount(n->archive,n->bankStorage,bankDiagnostic)||
+           !n->disposable())return false;
+        // Final actual-owner check. This publishes only disposable native
+        // input custody; no source count158/table154 or manager Entity exists.
+        const assets::OriginalUiDat50KG* current=nullptr;
+        if(m!=(s->pending?s->pending.get():s->active.get())||m->optionsNativeInputs||
+           m->options.get()!=n->session||m->optionsResources!=n->resources||
+           !widgets->nativeManagerSourceCurrent(n->archive,current)||current!=dat||
+           !scope->live().okay()||root.sharedUiScopeOwner_!=scope||
+           domain->archiveProvider3E1A70()!=provider)return false;
+        m->optionsNativeInputs=std::move(n);return true;
+    }catch(...){return false;}
 }
 bool OriginalUiFrontend50KG::retainMemoryCardOptionsSources50KG(
     const ::original_main_entry50KG::Application& root,OriginalUiMemoryCardConstructor50KG& owner)noexcept {

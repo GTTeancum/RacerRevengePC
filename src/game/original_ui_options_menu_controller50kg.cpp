@@ -57,6 +57,17 @@ struct OriginalUiOptionsMenuController50KG::Storage {
     assets::OriginalUiPage50KG page;
     assets::OriginalUiMovementControl50KG movement;
 };
+bool OriginalUiOptionsMenuController50KG::nativeSourceCurrent(
+    const std::shared_ptr<const assets::OriginalUiArchive50KG>& expected,
+    const assets::OriginalUiDat50KG*& out)const noexcept {
+    out=nullptr;
+    if(!storage_||!expected||storage_->archive.get()!=expected.get()||
+       storage_->archive.owner_before(expected)||expected.owner_before(storage_->archive)||
+       !expected->loaded()||expected->identity()!=assets::originalUiArchiveIdentity50KG(assets::OriginalUiArchiveId50KG::options)||
+       storage_->widgets.identity()!=assets::originalUiMemberIdentity50KG(assets::OriginalUiArchiveId50KG::options,1)||
+       storage_->page.widgetCount!=357)return false;
+    out=&storage_->widgets;return true;
+}
 OriginalUiOptionsMenuController50KG::OriginalUiOptionsMenuController50KG() noexcept=default;
 OriginalUiOptionsMenuController50KG::~OriginalUiOptionsMenuController50KG()=default;
 Status OriginalUiOptionsMenuController50KG::bind(std::shared_ptr<const assets::OriginalUiArchive50KG> archive,

@@ -74,6 +74,9 @@ public:
         const OriginalUiOptionsMenuInput50KG&,bool pageAccepted,
         OriginalUiOptionsMenuPlan50KG&,OriginalUiMovementNotification50KG&) const noexcept;
 private:
+    friend class OriginalUiOptionsMenuWidgets50KG;
+    bool nativeSourceCurrent(const std::shared_ptr<const assets::OriginalUiArchive50KG>&,
+        const assets::OriginalUiDat50KG*&)const noexcept;
     struct Storage;
     std::unique_ptr<Storage> storage_;
 };

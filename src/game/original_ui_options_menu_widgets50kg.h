@@ -10,6 +10,7 @@
 #include <memory>
 #include <vector>
 
+namespace rr::platform { class OriginalUiFrontend50KG; }
 namespace rr::game {
 // Authenticated menu, Controls and Game Options population. Shared widgets
 // retain one manager owner; explicit callback-only3/124 are admitted too.
@@ -172,6 +173,9 @@ public:
     OriginalUiOptionsWidgetStatus50KG projectIcon(std::uint16_t,bool ancestorsShown,
         OriginalUiOptionsIconProjection50KG&,OriginalUiOptionsWidgetDiagnostic50KG&) const noexcept;
 private:
+    friend class rr::platform::OriginalUiFrontend50KG;
+    bool nativeManagerSourceCurrent(const std::shared_ptr<const assets::OriginalUiArchive50KG>&,
+        const assets::OriginalUiDat50KG*&)const noexcept;
     struct Storage;std::unique_ptr<Storage> storage_;
     OriginalUiOptionsWidgetStatus50KG commitCallbacks(const OriginalUiOptionsMenuCallback50KG*,std::size_t,
         OriginalUiOptionsWidgetDiagnostic50KG&) noexcept;

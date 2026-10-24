@@ -338,14 +338,14 @@ bool OriginalUiGarageQuad50KG::completeZeroPosition2DF158(Diagnostic& d)noexcept
         stage_=Stage::loaded;packetRevision_=1;pendingPC_=0;d.sourceEffectsCommitted=true;d.sourcePC=0x2DF54C;return true;
     }catch(...){return stop(Status::allocation,0x2DF1CC);}
 }
-bool OriginalUiGarageQuad50KG::completeMemoryCardFirstStrip2DF158(
-    OriginalUiMemoryCardConstructor50KG& owner,Diagnostic& d)noexcept {
+bool OriginalUiGarageQuad50KG::completeMemoryCardStrip2DF158(
+    OriginalUiMemoryCardConstructor50KG& owner,Diagnostic& d,std::size_t role)noexcept {
     d={};std::int32_t row=-1;const auto table=owner.domain_?owner.domain_->materials382B38():nullptr;
-    if(!table||!owner.firstStripOccurrenceCurrent(*table,row)||
-       &owner.quads_[owner.loadRoles_[4].constructionIndex]!=this||!memoryCardPrefixOnly_||
-       offset!=owner.loadRoles_[4].offset||garage_||
+    if(role<4||role>6||!table||!owner.stripOccurrenceCurrent(*table,row,role)||
+       &owner.quads_[owner.loadRoles_[role].constructionIndex]!=this||!memoryCardPrefixOnly_||
+       offset!=owner.loadRoles_[role].offset||garage_||
        (stage_!=Stage::populated&&stage_!=Stage::dimensionsStored)||
-       !table->preflightMemoryCardFirstStripBinding(owner,d.material)){
+       !table->preflightMemoryCardStripBinding(owner,d.material,role)){
         d.status=Status::phase;d.sourcePC=d.material.sourcePC?d.material.sourcePC:0x2DF158;return false;
     }
     for(std::size_t prior=0;prior<4;++prior)

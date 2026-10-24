@@ -73,15 +73,24 @@ private:
     std::size_t retainedLoadRoles_=0;
     bool retainedRoleCurrent(std::size_t)const noexcept;
     bool retainFirstStripPrefix1FF338(Diagnostic&)noexcept;
-    bool firstStripOccurrenceCurrent(const assets::OriginalStandardMaterialTable50LA&,std::int32_t&)const noexcept;
+    bool stripOccurrenceCurrent(const assets::OriginalStandardMaterialTable50LA&,std::int32_t&,std::size_t role=4)const noexcept;
     bool preflightFirstStripBinding(Diagnostic&)const noexcept;
     // Actual authored-role admission/full pair; stops packetless at2DF158.
-    bool populateFirstStripResources2DF144(Diagnostic&)noexcept;
-    bool completeFirstStripComponent1FF338(Diagnostic&)noexcept;
-    bool firstStripPacketStateCurrent()const noexcept;
-    bool completedFirstStripStateCurrent()const noexcept;
-    std::uint32_t firstStripProgressPC()const noexcept;
-    bool loadRolePrefixCurrent()const noexcept;
+    bool populateStripResources2DF144(Diagnostic&,std::size_t role=4)noexcept;
+    bool completeStripComponent(Diagnostic&,std::size_t role=4)noexcept;
+    bool stripPacketStateCurrent(std::size_t role=4)const noexcept;
+    bool completedStripStateCurrent(std::size_t role=4)const noexcept;
+    std::uint32_t stripProgressPC(std::size_t role=4)const noexcept;
+    bool retainStripRolePrefix(std::size_t,Diagnostic&)noexcept;
+    bool loadLaterStrips1FF4AC(Diagnostic&)noexcept;
+    // Sole literal renderer+2C store at1FF874. Does not resolve the caller's
+    // optional template tuple or run2037D0 / publish the containing page.
+    bool storeRendererClearMode1FF874(Diagnostic&)noexcept;
+    bool rendererClearModeStored1FF874_=false;
+    bool completedLoadRoleCurrent(std::size_t)const noexcept;
+    bool preflightLoadRoleBinding(std::size_t,Diagnostic&)const noexcept;
+    bool stripStqCurrent(std::size_t)const noexcept;
+    bool loadRolePrefixCurrent(bool completedPredecessors=true)const noexcept;
     bool nextRetainRole(std::size_t&,Diagnostic&)const noexcept;
     // Private Triangle reference prefix wrapper; source-ordered mechanics
     // below also serve Square/Circle without granting any family proof.
@@ -112,8 +121,8 @@ private:
     std::array<bool,4> iconPostLoadApplied_{};
     struct PopulationProgress {bool attempted=false,inputsAdmitted=false;std::uint32_t stopPC=0;};
     std::array<PopulationProgress,4> iconPopulation_{};
-    PopulationProgress firstStripPopulation_;
-    bool firstStripPostLoadApplied_=false;
+    std::array<PopulationProgress,3> stripPopulation_{};
+    std::array<bool,3> stripPostLoadApplied_{};
     bool firstIconRetirementIdentity(const assets::OriginalStandardMaterialTable50LA&,std::int32_t&)const noexcept;
     bool pendingFamilyRetired_=false;
     bool pendingFamilyOccurrenceCurrent(const assets::OriginalMemoryCardScreenFallback50KG&)const noexcept;
