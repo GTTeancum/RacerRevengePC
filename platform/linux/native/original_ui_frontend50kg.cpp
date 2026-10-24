@@ -5,6 +5,7 @@
 #include "../../../tests/native/original_race_display_lifetime50la.h"
 // Source-reviewed bounded Course/Tournament integration; runtime acceptance is pending.
 #include "original_ui_frontend50kg.h"
+#include "original_ui_memory_card_constructor50kg.h"
 #include "original_save_profile_owner50kg.h"
 #include "original_save_native_read_stage50kg.h"
 #include "../../../src/game/original_ui_controls_controller50kg.h"
@@ -2139,6 +2140,23 @@ const assets::MaterialTextureAssets50EA* OriginalUiFrontend50KG::textures() cons
 const MaterialTextureGl50EB* OriginalUiFrontend50KG::gpu() const noexcept {return storage_&&storage_->active?storage_->active->gpu.get():nullptr;}
 const OriginalUiNativeDraw50KG* OriginalUiFrontend50KG::draw() const noexcept {
     const auto* s=storage_.get();return s&&!s->inOperation&&!s->garageTextureDraw&&!s->faulted&&!s->quit&&!s->closing&&s->frameRendered&&s->active?s->active->draw():nullptr;
+}
+bool OriginalUiFrontend50KG::retainMemoryCardOptionsSources50KG(
+    const ::original_main_entry50KG::Application& root,OriginalUiMemoryCardConstructor50KG& owner)noexcept {
+    auto* s=storage_.get();
+    if(!s||!s->prepared||!s->activated||s->inOperation||s->faulted||s->quit||s->closing||
+       s->pending||s->retiring||s->queued||s->garageTextureDraw||s->courseLaunchReady||s->courseLaunchTaken||
+       s->updates!=s->submittedUpdate||(s->frameRendered&&!s->frameSubmitted)||
+       !s->garageDestinationFrontend||&s->garageDestinationFrontend->coordinator!=this||
+       s->garageDestinationFrontend->materialApplicationOwner!=&root||
+       s->cold.application!=root.state||s->cold.profile!=root.profile||
+       root.memoryCardConstructorOwner_.get()!=&owner||owner.root_!=&root||
+       !s->active||!s->active->options||s->active->optionsRetired||
+       !s->active->optionsResources||!s->active->optionsResources->loaded()||!s->sourceCurrent())return false;
+    Operation operation(s->inOperation);
+    // This is the actual retained Cold.options owner used to construct the
+    // current Options session/resources. No archive caller or page scalar is accepted.
+    return owner.retainOptionsSources(s->cold.options);
 }
 bool OriginalUiFrontend50KG::installNativeReadProfile50KG(
     const std::shared_ptr<const OriginalSaveNativeReadStage50KG>& read)noexcept {

@@ -13,6 +13,7 @@
 #include <cstdio>
 #include <exception>
 #include <new>
+#include <optional>
 namespace rr::platform {
 void OriginalUiGarageQuad50KG::PacketDelete::operator()(Qword* p)const noexcept {::operator delete[](p,std::align_val_t{64});}
 OriginalUiGarageQuad50KG::~OriginalUiGarageQuad50KG()noexcept {
@@ -153,10 +154,19 @@ bool OriginalUiGarageQuad50KG::load2DF0B0(const RootInputs& in,Diagnostic& d)noe
             return fail(d,d.status,d.sourcePC);
         const auto table=domain_->materials382B38();const auto row=material54->material00;
         stage_=Stage::materialRetained;
+        assets::OriginalStandardMaterialRowView50LA retainedRow;
+        if(!table->row(row,retainedRow))return fail(d,Status::material,0x298E60);
+        const bool sharedIcon=offset==0x2A0||offset==0x300||offset==0x360||offset==0x3C0;
+        const bool reuseShared=sharedIcon&&retainedRow.object04;
+        // Authentic current RootInputs and the actual retained primitive are
+        // checked independently of historical construction family.
+        if(reuseShared&&(!inputsCurrent(in)||in.domain_!=domain_||in.context_!=context_||in.video_!=video_||in.garage_!=garage_||
+           !table->preflightGarageLoadedSharedIcon(*this,d.material)))return fail(d,Status::material,0x2DF144);
         assets::OriginalStandardArchiveProvider50LA::MemberView psm;
-        const auto lookup=provider->lookup132820(requested+".psm",psm);
-        if(lookup!=assets::OriginalStandardArchiveProvider50LA::Lookup::present&&
-           lookup!=assets::OriginalStandardArchiveProvider50LA::Lookup::absent)
+        std::optional<assets::OriginalStandardArchiveProvider50LA::Lookup> lookup;
+        if(!reuseShared)lookup=provider->lookup132820(requested+".psm",psm);
+        if(lookup&&*lookup!=assets::OriginalStandardArchiveProvider50LA::Lookup::present&&
+           *lookup!=assets::OriginalStandardArchiveProvider50LA::Lookup::absent)
             return fail(d,Status::material,0x132820);
         //Native source corpus input only. Parsing authenticated bytes does not
         //create canonical materials/textures or replace their source refcounts.
@@ -208,7 +218,10 @@ bool OriginalUiGarageQuad50KG::load2DF0B0(const RootInputs& in,Diagnostic& d)noe
            *noTexture.references08<0)return fail(d,Status::material,0x29B628);
         if(*noTexture.references08>0&&!noTexture.object04&&
            !appendPsm("ui\\textures\\NoTexture"))return fail(d,Status::material,0x29B628);
-        if(lookup==assets::OriginalStandardArchiveProvider50LA::Lookup::present){
+        if(reuseShared){
+            // Source14D370 skips loaded object04. Do not replay missing-PSM
+            // selection, bind a new family, or seed this loaded row's texture.
+        }else if(lookup&&*lookup==assets::OriginalStandardArchiveProvider50LA::Lookup::present){
             if(!appendPsm(requested))return fail(d,Status::material,0x29B628);
         }else{
             using Proof=assets::OriginalGarageScreenFallback50KG;

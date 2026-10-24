@@ -7,7 +7,7 @@
 
 namespace ra_static_world50LA {class Owner;}
 namespace rr::game { class OriginalRaceConstructor50LA; class OriginalPauseStorage50LA; class OriginalTimeStats50LA; class OriginalSpeedBoost50LA; class OriginalDamage50LA; class OriginalPositionStatsResources50LA; }
-namespace rr::platform {class OriginalUiGarageQuad50KG;}
+namespace rr::platform {class OriginalUiGarageQuad50KG;class OriginalUiMemoryCardConstructor50KG;}
 namespace rr::assets {
 // The one Application-owned canonical382B38/382B70/383400 domain. Its tables
 // retain their identities across native scene/Video close and reopen. This is
@@ -19,6 +19,7 @@ class OriginalStandardMaterialDomain50LA final {
     friend class ::ra_static_world50LA::Owner;
     friend class OriginalApplicationFonts50LA;
     friend class rr::platform::OriginalUiGarageQuad50KG;
+    friend class rr::platform::OriginalUiMemoryCardConstructor50KG;
     friend class OriginalTimeStatsMaterialReference50LA;
     friend class OriginalSpeedBoostMaterialReference50LA;
     friend class OriginalDamageMaterialReference50LA;
@@ -231,6 +232,13 @@ public:
         }catch(...){d.status=OriginalStandardMaterialStatus50LA::allocation;return false;}
     }
 private:
+    // Same source population pair, not Garage/TimeStats caller authority.
+    // Only the actual private MemoryCard owner invokes this after its whole
+    // pending-set admission. No collector rebuild or page publication.
+    bool populateMemoryCardResources2DF144(std::shared_ptr<const OriginalStandardMaterialContext50LA> context,
+        OriginalStandardMaterialDiagnostic50LA& d) noexcept {
+        return populateTimeStatsResources2DF144(std::move(context),d);
+    }
     bool populateGarageResources2DF144(std::shared_ptr<const OriginalStandardMaterialContext50LA> context,
         OriginalStandardMaterialDiagnostic50LA& d) noexcept {
         return populateTimeStatsResources2DF144(std::move(context),d);

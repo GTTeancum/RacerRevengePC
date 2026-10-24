@@ -1248,6 +1248,19 @@ bool OriginalStandardTextureResolver50LA::reclaimGaragePsgBackingAfterManagerRet
     lease.closedBacking_={}; // Consumed historical receipt, never a live lease.
     d={};d.sourceEffectsCommitted=releaseBytes!=0||releasePstBytes!=0;return true;
 }
+bool OriginalStandardTextureResolver50LA::preflightPopulationOwners(
+    const std::shared_ptr<const OriginalStandardMaterialContext50LA>& context,
+    const std::shared_ptr<const OriginalStandardArchiveProvider50LA>& provider,D& d)const noexcept {
+    d={};
+    if(!storage_||!provider||!provider->sealed()||storage_->provider!=provider)
+        return fail(d,E::source,0x132820);
+    if(!context||!context->live())return fail(d,E::video,0x29C768);
+    if(storage_->bound&&storage_->construction.lock()!=context)return fail(d,E::phase,0x132820);
+    // Preserve the original global resolver namespace guard, including its
+    // actual cached-resource re-resolution. Historical receipt validation is
+    // not authority to bypass this separate population prerequisite.
+    return validateProviderCache(d);
+}
 bool OriginalStandardTextureResolver50LA::bind(
     const std::shared_ptr<const OriginalStandardMaterialContext50LA>& context,D& d) noexcept {
     if(!prepared())return fail(d,E::unprepared,0x132820);

@@ -304,11 +304,19 @@ bool OriginalUiGarageCanonicalSubmission50KG::stageScreenPass(std::int32_t row,s
             const auto* textureName=map.texture->sourceMember();
             const auto textureMember=textureName?archive.find(*textureName):assets::OriginalUiMemberView50KG{};
             if(material.identity||material.passes.size()!=1||
-               material.provenance.origin!=assets::OriginalUiMaterialOrigin50KG::garageCanonicalScreenMissingPsmFallback)
+               (material.provenance.origin!=assets::OriginalUiMaterialOrigin50KG::garageCanonicalScreenMissingPsmFallback&&
+                material.provenance.origin!=assets::OriginalUiMaterialOrigin50KG::memoryCardCanonicalScreenMissingPsmFallback))
                 return reject(d,S::reference,0x2475C0);
             if(!map.representative.material->prepareGarageScreenFallback2475C0(static_cast<std::size_t>(rp),
                 *map.texture,archive,textureMember,*decoded,fallback,fallbackPolicy,d))return false;
-            if(material.provenance.archive!=fallback.provenance.archive||
+            if(material.provenance.origin!=fallback.provenance.origin||
+               material.provenance.fallbackConstructionArchive!=fallback.provenance.fallbackConstructionArchive||
+               material.provenance.fallbackConstructionTexture!=fallback.provenance.fallbackConstructionTexture||
+               material.provenance.fallbackPageSource!=fallback.provenance.fallbackPageSource||
+               material.provenance.fallbackWidgetSource!=fallback.provenance.fallbackWidgetSource||
+               material.provenance.sourceCallerPC!=fallback.provenance.sourceCallerPC||
+               material.provenance.creationPC!=fallback.provenance.creationPC||
+               material.provenance.archive!=fallback.provenance.archive||
                material.provenance.fallbackTexture!=fallback.provenance.fallbackTexture||
                material.provenance.registeredName!=fallback.provenance.registeredName||
                material.provenance.attemptedPsmMember!=fallback.provenance.attemptedPsmMember)

@@ -81,8 +81,8 @@ inline bool RaceAudioGroups50IC::constructNextCold2350D0(AudioMixer50HD& mixer,
        app->objectCount423F60()==std::numeric_limits<std::uint32_t>::max())return false;
     // Native backing is reserved before any source reference/count effect.
     //235900 allocates8 pointers; no element is read while actual count48 is0.
-    std::unique_ptr<game::OriginalWreckComponent50LA*[]> storage;
-    try {storage.reset(new game::OriginalWreckComponent50LA*[8]);}catch(...){return false;}
+    std::unique_ptr<ColdSound*[]> storage;
+    try {storage.reset(new ColdSound*[8]);}catch(...){return false;}
     std::size_t slot=0;
     while(slot<app->soundGroups434A10_.size()&&(app->soundGroups434A10_[slot]||app->soundGroupReserved434A10_[slot]))++slot;
     if(slot==app->soundGroups434A10_.size())return false; //No invalid-1 owner admitted.
@@ -112,6 +112,8 @@ inline bool RaceAudioGroups50IC::canReleaseEmptyCold142590(game::RaceAudioGroup5
        e.sessionGeneration!=coldSession_||e.objectKey!=static_cast<std::uint64_t>(reinterpret_cast<std::uintptr_t>(&e))||
        p.slot40<0||static_cast<std::size_t>(p.slot40)>=coldApplication_->soundGroups434A10_.size()||
        coldApplication_->soundGroups434A10_[p.slot40]!=&e||!coldApplication_->objectCount423F60())return false;
+    if(p.taIntroAuthoring||p.taIntroManager)return false;
+    for(const auto& sound:p.taIntroSounds)if(sound)return false;
     // Native provider membership must actually be retired first. A constructor
     // that never acquired any binding still has a genuinely empty ledger.
     for(std::size_t i=0;i<coldMixer_->count();++i)
@@ -126,7 +128,7 @@ inline bool RaceAudioGroups50IC::releaseEmptyCold142590(game::RaceAudioGroup50IC
     coldRetiring_=true; // A partially retired group set cannot resume loading.
     --e.reference00; //142590/104970 -> concrete235150.
     coldApplication_->soundGroups434A10_[p.slot40]=nullptr; //23518C precedes2353D0.
-    // The real list has always had count0:2353E8 skips snapshot/callback loop.
+    // Actual count0 (fresh or concretely drained):2353E8 skips callback loop.
     // No voice state is substituted for a logical member callback.
     p.logicalMembers4C.reset(); //2351AC..B0, after the empty typed clear.
     --coldApplication_->objectCount423F60(); //102670 ->1413E0.

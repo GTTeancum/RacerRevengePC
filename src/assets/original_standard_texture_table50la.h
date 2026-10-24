@@ -7,6 +7,8 @@
 namespace rr::game { class OriginalTimeStats50LA; class OriginalSpeedBoost50LA; class OriginalDamage50LA; class OriginalPositionStatsHud50LA; class OriginalPauseStorage50LA; }
 namespace rr::assets {
 class OriginalStandardMaterialObject50LA;
+class OriginalStandardMaterialTable50LA;
+class OriginalStandardArchiveProvider50LA;
 class OriginalStandardTextureResource50LA;
 class OriginalStandardTextureResolver50LA;
 class OriginalStandardMaterialContext50LA;
@@ -63,6 +65,11 @@ public:
     const OriginalStandardTextureResource50LA* partialConstruction() const noexcept;
 private:
     friend class OriginalStandardMaterialObject50LA;
+    friend class OriginalStandardMaterialTable50LA;
+    bool preflightPopulationOwners(const std::shared_ptr<OriginalStandardTextureResolver50LA>&,
+        const std::shared_ptr<const OriginalStandardMaterialContext50LA>&,
+        const std::shared_ptr<const OriginalStandardArchiveProvider50LA>&,
+        OriginalStandardTextureDiagnostic50LA&)const noexcept;
     friend class OriginalApplicationFonts50LA;
     friend class rr::game::OriginalTimeStats50LA;
     friend class rr::game::OriginalSpeedBoost50LA;

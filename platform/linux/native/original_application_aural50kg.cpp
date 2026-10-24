@@ -59,6 +59,22 @@ bool OriginalApplicationAural50KG::current()const noexcept {
     for(const auto& list:lists_)if(!list.valid())return false;
     return game::original_entity_chain_detail50LA::forest(entities_->entityAuthority_.view());
 }
+std::shared_ptr<const OriginalApplicationAural50KG>
+OriginalApplicationAural50KG::retainColdStreamManager232DB0(
+    const std::shared_ptr<E>& app,
+    const std::shared_ptr<const assets::OriginalStreamMetadata50KZ>& metadata,
+    const std::shared_ptr<const assets::OriginalStandardArchiveProvider50LA>& provider)const noexcept {
+    if(!current()||!nativeInitialized_||!backendCurrent()||!same(entities_,app)||
+       !issuer_->sourceAural00Owner_||issuer_->sourceAural00Owner_.get()!=this||
+       !issuer_->standardMaterialDomainOwner_||!issuer_->standardMaterialDomainOwner_->prepared())return {};
+    const auto& main=(**interfaceA0_).main;
+    const std::shared_ptr<const assets::OriginalStandardArchiveProvider50LA> canonicalProvider=
+        issuer_->standardMaterialDomainOwner_->archiveProvider3E1A70();
+    if(!main||!same(main->nativeSourceMetadata_,metadata)||!same(canonicalProvider,provider))return {};
+    // current checked issuer lifetime before raw issuer access. Return the
+    // actual Application's control block, never shared_ptr(this).
+    return issuer_->sourceAural00Owner_;
+}
 bool OriginalApplicationAural50KG::exactAuralOnlyStartupPrefix()const noexcept {
     if(!current()||attached_||entity_.parent1C||entity_.previous10||entity_.next14||entity_.firstChild18||
        entity_.mask20||entity_.descendants24||(entity_.flags29&15u)||entities_->root10_.firstChild18||

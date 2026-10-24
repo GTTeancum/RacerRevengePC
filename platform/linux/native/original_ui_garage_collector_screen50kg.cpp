@@ -41,7 +41,11 @@ bool OriginalUiGarageDrawContribution50KG::prepareDrainScreenPolicies24B130(D& d
    const auto* source=map.representative.material->source();
    std::shared_ptr<const assets::OriginalUiArchive50KG> materialArchive,textureArchive;
    assets::OriginalUiMemberView50KG materialMember,textureMember;
-   if(!provider->borrowGarageUiMember132820(*map.texture->sourceMember(),textureArchive,textureMember))
+   if(!source&&map.representative.material->capturedSharedIconName()){
+    // Loaded objects retain their original texture winner. Current menu order
+    // cannot relabel it or force a new132820 choice.
+    if(!map.representative.material->borrowCapturedSharedIconTexture(*map.texture,textureArchive,textureMember,d))return false;
+   }else if(!provider->borrowGarageUiMember132820(*map.texture->sourceMember(),textureArchive,textureMember))
       return rejectScreen(d,S::source,0x132820,"winning live canonical UI texture mount");
    if(source){
     if(!source->member()||!source->originalBytes()||
@@ -49,8 +53,8 @@ bool OriginalUiGarageDrawContribution50KG::prepareDrainScreenPolicies24B130(D& d
        source->originalBytes()->size()!=materialMember.size||std::memcmp(source->originalBytes()->data(),materialMember.data,materialMember.size))
        return rejectScreen(d,S::source,0x132820,"winning live canonical UI source mount");
    }else{
-    // The private canonical conversion below must prove a real2475C0
-    // Garage fallback. This is its actual texture archive, never a fake PSM.
+    // The private conversion proves a real2475C0 fallback and retains
+    // its first family. This is the actual texture archive, never a fake PSM.
     materialArchive=textureArchive;
    }
    const auto* original=map.texture->originalBytes();std::size_t offset=0,bytes=0;

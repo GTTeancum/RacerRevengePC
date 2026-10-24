@@ -8,6 +8,8 @@
 #include <thread>
 #include "../../../src/game/original_application_entities50la.h"
 #include <exception>
+#include "original_application_aural50kg.h"
+#include "../../../src/assets/original_ta_intro_authoring_candidate.h"
 
 namespace live_audio50HF { class Owner; }
 namespace rr::game { class OriginalRaceConstructor50LA; }
@@ -40,6 +42,10 @@ public:
         settings_=settings;groups_=next;duck_={};return true;
     }
     bool current()const noexcept {
+        if(coldStarted_&&coldThread_!=std::this_thread::get_id())return false;
+        // Populated source Sounds need their concrete setters/service. Close
+        // existing native callbacks until typed clear; empty behavior is unchanged.
+        for(const auto& p:coldGroups_)if(p.count48)return false;
         return (!coldStarted_||coldThread_==std::this_thread::get_id())&&
             !coldRetiring_&&!nativeBindingsRetired_&&mixer_&&mixer_->groupEpoch50IC()==epoch_&&mixer_->count()==count_&&
             mixer_->requiresVoiceGroupGains50IC();
@@ -139,6 +145,14 @@ public:
     // live playback or execute source2353D0 logical-member callbacks.
     bool retireNativeVoiceBindings()noexcept;
 private:
+    // Private unactivated proposal leaves for the existing actual race-owner
+    // friends only. Intentionally uncalled. Genuine canonical
+    // Announcer120 membership, no emitter/voice/play/service capability.
+    bool constructColdTaIntroSounds232ED0(
+        std::shared_ptr<const assets::OriginalTaIntroAuthoringCandidate>)noexcept;
+    // Never-started stop/release, then235C40. SAME group remains alive for its
+    // existing empty typed retirement. No source or native clock is involved.
+    bool clearColdTaIntroSounds2353D0()noexcept;
     // Concrete2356A0 for this owner's actual counted group. Only the real
     // race/world owner friends can call it; no synthetic component is accepted.
     bool canPauseColdGroup2356A0(game::RaceAudioGroup50IC,bool)const noexcept;
@@ -164,12 +178,44 @@ private:
         return true;
     }
     bool canReleaseEmptyCold142590(game::RaceAudioGroup50IC)const noexcept;
+    struct ColdGroup;
+    // Typed source Sound projection, NOT Entity or native voice. Unknown guest
+    // words are absent rather than fabricated zero bytes. No method can assign
+    // a nonnegative channel to this exclusively never-started owner.
+    struct ColdSound {
+        std::uint64_t reference00=0;
+        std::uint32_t flags10=0,word14=0,word18=0;
+        float duration20=0.f;
+        std::uint32_t elapsedBits24=0;
+        std::int32_t sample28=-1,channel2C=-1;
+        const void* manager30=nullptr; // Actual retained Aural interfaceA0.
+        ColdGroup* group34=nullptr;
+        std::int32_t volume38=0,pan3C=0,pitch40=0;
+        std::int32_t volume44=0,pan48=0,pitch4C=0,basePitch50=0;
+        std::uint32_t factor54Bits=0,factor58Bits=0,factor5CBits=0;
+        std::array<std::uint32_t,4> vector60Bits{},vector90Bits{};
+        std::uint32_t word70=0,word74=0,word78=0,word7C=0,word80=0;
+        std::int32_t resourceA0=-1;
+        std::array<char,260> filenameA4{};
+        bool stream1A8=false,stereo1AC=false,loop1B0=false;
+        std::uint32_t word1B4=0;
+        std::int32_t directoryOrdinal1B8=-1; // TXT ordinal, never a channel.
+        const assets::OriginalStreamMetadataRow50KZ* metadata=nullptr;
+    };
+    bool coldTaIntroGroupIdentity()const noexcept;
+    bool coldTaIntroSoundIdentity(std::size_t)const noexcept;
     struct ColdGroup {
         game::OriginalWreckComponent50LA entity;
-        std::unique_ptr<game::OriginalWreckComponent50LA*[]> logicalMembers4C;
+        std::unique_ptr<ColdSound*[]> logicalMembers4C;
         std::uint32_t count48=0,growth50=0,capacity54=0;
         std::int32_t slot40=2;
         bool constructed=false,loaded=false,enabled30=false,allocated58=false;
+        // Native lifetime only; Sound reference00 remains1. Actual canonical
+        // slot occupancy already bars Aural102CD0/interface retirement.
+        std::array<std::unique_ptr<ColdSound>,3> taIntroSounds;
+        std::shared_ptr<const assets::OriginalTaIntroAuthoringCandidate> taIntroAuthoring;
+        std::shared_ptr<const OriginalApplicationAural50KG> taIntroManager;
+        bool taIntroConstructed=false; // Historical one-shot constructor phase.
     };
     std::array<ColdGroup,game::raceAudioGroupCount50IC> coldGroups_;
     std::shared_ptr<game::OriginalApplicationEntities50LA> coldApplication_;
@@ -209,3 +255,5 @@ private:
 } // namespace rr::platform
 
 #include "race_audio_groups_cold50la.inl"
+
+#include "race_audio_groups_ta_intro_cold_candidate.inl"

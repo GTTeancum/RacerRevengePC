@@ -17,6 +17,7 @@
 
 namespace original_main_entry50KG { struct Application; struct Frontend; }
 namespace rr::platform {
+class OriginalUiMemoryCardConstructor50KG;
 class OriginalSaveNativeReadStage50KG;
 class OriginalSaveProfileOwner50KG;
 class OriginalUiGarageSession50KG;
@@ -306,6 +307,9 @@ private:
         const std::shared_ptr<const OriginalSaveNativeReadStage50KG>&,
         std::unique_ptr<OriginalSaveProfileOwner50KG>& out)const noexcept;
     // Bind the actual enclosing native owner, never a callback/readiness flag.
+    // Private source-custody handoff only; uncalled and not page438 admission.
+    bool retainMemoryCardOptionsSources50KG(const ::original_main_entry50KG::Application&,
+        OriginalUiMemoryCardConstructor50KG&)noexcept;
     bool bindGarageDestinationRoot50KG(::original_main_entry50KG::Frontend&)noexcept;
     //Exclusive same-Frontend request custody across one actual renderer reset.
     //The private caller supplies no readiness flag or replacement context.

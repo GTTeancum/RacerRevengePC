@@ -7,7 +7,8 @@
 #include <optional>
 #include <thread>
 namespace original_main_entry50KG {struct Application;}
-namespace rr::assets {struct OriginalStreamMetadataRow50KZ;}
+namespace rr::assets {struct OriginalStreamMetadataRow50KZ;
+class OriginalStreamMetadata50KZ;class OriginalStandardArchiveProvider50LA;}
 namespace rr::platform {
 class OriginalUiGarageAudioBacking50KG;
 class OriginalUiLightManagerOwner50KG;
@@ -24,6 +25,7 @@ class OriginalApplicationAural50KG final {
     friend struct ::original_main_entry50KG::Application;
     friend class OriginalUiLightManagerOwner50KG;
     friend class OriginalUiGaragePageOwner50KG;
+    friend class RaceAudioGroups50IC;
     using Application=::original_main_entry50KG::Application;
     using E=game::OriginalApplicationEntities50LA;
     using C=game::OriginalWreckComponent50LA;
@@ -54,6 +56,12 @@ public:
     bool current()const noexcept;
     Observation inspect()const noexcept;
 private:
+    // Read-only native construction custody for the canonical race group.
+    // Ownership comes from the actual Application, never a caller alias.
+    std::shared_ptr<const OriginalApplicationAural50KG> retainColdStreamManager232DB0(
+        const std::shared_ptr<E>&,
+        const std::shared_ptr<const assets::OriginalStreamMetadata50KZ>&,
+        const std::shared_ptr<const assets::OriginalStandardArchiveProvider50LA>&)const noexcept;
     bool playNativeMainSong234170(OriginalUiMainAudio50KG&,std::uint32_t,
         const AudioClip50HD&,float,float)const noexcept;
     bool playNativeMainEffect233410(OriginalUiMainAudio50KG&,std::size_t,

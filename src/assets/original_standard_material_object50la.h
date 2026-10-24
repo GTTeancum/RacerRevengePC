@@ -6,6 +6,7 @@
 #include "original_standard_texture_table50la.h"
 #include "original_ui_material50kg.h"
 #include "original_garage_screen_fallback50kg.h"
+#include "original_memory_card_screen_fallback50kg.h"
 #include "original_standard_material_native_binding50kg.h"
 #include <array>
 #include <optional>
@@ -113,6 +114,10 @@ private:
         OriginalStandardMaterialDiagnostic50LA&)const noexcept;
     // Only the actual queued representative may expose its constructed
     // missing-PSM state. Neither projection creates source() or an authored PSM.
+    bool capturedSharedIconName()const noexcept;
+    bool borrowCapturedSharedIconTexture(const OriginalStandardTextureResource50LA&,
+        std::shared_ptr<const OriginalUiArchive50KG>&,OriginalUiMemberView50KG&,
+        OriginalStandardMaterialDiagnostic50LA&)const noexcept;
     bool borrowGarageScreenFallback2475C0(std::size_t,
         const OriginalStandardTextureResource50LA&,const OriginalUiArchive50KG&,
         const OriginalUiMemberView50KG&,OriginalUiMaterial50KG&,
@@ -169,6 +174,7 @@ private:
         std::shared_ptr<const OriginalUiArchive50KG> damageMissingPsm,
         std::shared_ptr<const OriginalUiArchive50KG> pauseBackdropMissingPsm,
         std::shared_ptr<const OriginalGarageScreenFallback50KG> garageFallback,
+        std::shared_ptr<const OriginalMemoryCardScreenFallback50KG> memoryCardFallback,
         OriginalStandardMaterialDiagnostic50LA&) noexcept;
     // Source24A430. Only the canonical manager supplies its one persistent
     // lazy application state. Surface values come from the retained PSG;

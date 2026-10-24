@@ -13,6 +13,7 @@ class OriginalUiMemoryCardConstructor50KG;
 class OriginalUiGarageQuad50KG final {
     friend class ::original_main_entry50KG::NativeCollectorFifo50LA;
     friend class OriginalUiSharedDialogs50KG;
+    friend class rr::assets::OriginalStandardMaterialTable50LA;
     friend class OriginalUiMemoryCardConstructor50KG;
     friend class OriginalUiGaragePageOwner50KG;
     friend class OriginalUiGarageDrawContribution50KG;

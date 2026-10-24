@@ -142,6 +142,18 @@ bool OriginalStandardTextureTable50LA::populationTerminal() const noexcept {
 const OriginalStandardTextureResource50LA* OriginalStandardTextureTable50LA::partialConstruction() const noexcept {
     return storage_?storage_->partial.get():nullptr;
 }
+bool OriginalStandardTextureTable50LA::preflightPopulationOwners(
+    const std::shared_ptr<OriginalStandardTextureResolver50LA>& resolver,
+    const std::shared_ptr<const OriginalStandardMaterialContext50LA>& context,
+    const std::shared_ptr<const OriginalStandardArchiveProvider50LA>& provider,D& d)const noexcept {
+    d={};if(!storage_||storage_->populationActive||storage_->populationTerminal||storage_->partial)
+        return fail(d,E::phase,0x29E340);
+    if(!resolver||!context||!context->live())return fail(d,E::video,0x29C768);
+    if((storage_->construction&&storage_->construction!=context)||
+       (storage_->populationBound&&(storage_->resolver!=resolver||storage_->construction!=context)))
+        return fail(d,E::phase,0x29E340);
+    return resolver->preflightPopulationOwners(context,provider,d);
+}
 bool OriginalStandardTextureTable50LA::populate29E340(
     std::shared_ptr<OriginalStandardTextureResolver50LA> resolver,
     std::shared_ptr<const OriginalStandardMaterialContext50LA> construction,D& d) noexcept {

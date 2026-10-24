@@ -292,6 +292,9 @@ private:
     friend class OriginalStandardIpumCompressedFrames50LA;
     friend class OriginalStandardTextureTable50LA;
     friend class OriginalStandardTextureResource50LA;
+    bool preflightPopulationOwners(const std::shared_ptr<const OriginalStandardMaterialContext50LA>&,
+        const std::shared_ptr<const OriginalStandardArchiveProvider50LA>&,
+        OriginalStandardTextureDiagnostic50LA&)const noexcept;
     bool bind(const std::shared_ptr<const OriginalStandardMaterialContext50LA>&,
         OriginalStandardTextureDiagnostic50LA&) noexcept;
     // Captured only from the actual positive resolver lookup. This private

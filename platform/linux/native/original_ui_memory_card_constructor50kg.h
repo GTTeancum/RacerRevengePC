@@ -3,19 +3,22 @@
 #include <cstdint>
 #include <memory>
 #include <optional>
+#include "../../../src/assets/original_memory_card_screen_fallback50kg.h"
 #include "original_ui_garage_quad50kg.h"
 #include "vehicle_window_gl50ds.h"
 #include "../../../src/game/original_ui_entity_scope50kg.h"
 namespace original_main_entry50KG {class RaceDisplayLifetime50LA;}
 namespace rr::platform {
 // Actual detached1FEC80 owner with a private first-X retained resource prefix.
-// No page438 publication, complete1FF020 load, attachment, input, authenticated
-// loaded-material binding, pre-render or draw admission.
+// No page438 publication, complete1FF020 load, attachment, input, pre-render
+// or draw admission. First-X population/binding remains private and uncalled.
 class OriginalUiMemoryCardConstructor50KG final {
     friend struct ::original_main_entry50KG::Application;
     friend class game::OriginalUiEntityScope50KG;
     friend class OriginalUiGarageQuad50KG;
+    friend class OriginalUiFrontend50KG;
     friend class assets::OriginalStandardMaterialTable50LA;
+    friend class assets::OriginalMemoryCardScreenFallback50KG;
     using Root=::original_main_entry50KG::Application;
     using Scope=game::OriginalUiEntityScope50KG;
     using C=game::OriginalWreckComponent50LA;
@@ -28,7 +31,7 @@ private:
     enum class Phase : std::uint8_t {empty,bound,detachedConstructed,retiring,retired};
     struct Diagnostic {
         Scope::Result entity{};Quad::Diagnostic quad{};VehicleWindowDiagnostic50DS renderer{};
-        std::uint32_t sourcePC=0;bool sourceEffectsCommitted=false,resourcePopulationPending=false;
+        std::uint32_t sourcePC=0;bool sourceEffectsCommitted=false,resourcePopulationPending=false,sourceInputsAdmitted=false;
     };
     OriginalUiMemoryCardConstructor50KG()noexcept=default;
     // Root is the only caller, and this factory remains uncalled. It pins the
@@ -52,6 +55,20 @@ private:
     }};
     bool firstIconRetained_=false;
     bool resourcePrefixCurrent()const noexcept;
+    // Actual same-Root Frontend supplies its own authenticated cold Options
+    // bytes. This retains source custody only, not containing page authority.
+    bool retainOptionsSources(const std::shared_ptr<const assets::OriginalUiArchive50KG>&)noexcept;
+    std::shared_ptr<const assets::OriginalUiArchive50KG> optionsSource_;
+    bool prepareFirstIconConstructionFamily(Diagnostic&)noexcept;
+    // Private uncalled component step. Completes real global14D370/29E340,
+    // stops at2DF158 before numeric resolution/dimensions, packet allocation
+    //305500 at2DF1CC/publication2DF1D4, and any later role.
+    bool populateFirstIconResources2DF144(Diagnostic&)noexcept;
+    bool firstPopulationAttempted_=false,firstPopulationInputsAdmitted_=false;
+    std::uint32_t firstPopulationStopPC_=0;
+    bool firstIconRetirementIdentity(const assets::OriginalStandardMaterialTable50LA&,std::int32_t&)const noexcept;
+    bool pendingFamilyRetired_=false;
+    bool pendingFamilyOccurrenceCurrent(const assets::OriginalMemoryCardScreenFallback50KG&)const noexcept;
     bool firstIconOccurrenceCurrent(const assets::OriginalStandardMaterialTable50LA&,std::int32_t&)const noexcept;
     // Read-only component preflight, not permission to call population or
     // claim the containing1FF020 call/attachment occurred.

@@ -84,7 +84,8 @@ enum class OriginalUiMaterialOrigin50KG : std::uint8_t {
     courseTrophyMissingPsmFallback,
     // Only the private canonical Object conversion admits this provenance.
     // The public recipe converter continues to reject it without that owner.
-    garageCanonicalScreenMissingPsmFallback
+    garageCanonicalScreenMissingPsmFallback,
+    memoryCardCanonicalScreenMissingPsmFallback
 };
 struct OriginalUiMaterialProvenance50KG {
     OriginalUiMaterialOrigin50KG origin = OriginalUiMaterialOrigin50KG::authoredPsm;
@@ -92,6 +93,10 @@ struct OriginalUiMaterialProvenance50KG {
     // Only the bounded no-PSM branch uses these fields. A real texture member
     // does not become a fabricated PSM identity or authored shader section.
     const OriginalUiMemberIdentity50KG* fallbackTexture = nullptr;
+    // Captured shared canonical fallbacks keep29B638 selection separate from
+    // archive/fallbackTexture, which describe the actual resource image input.
+    const OriginalUiArchiveIdentity50KG* fallbackConstructionArchive = nullptr;
+    const OriginalUiMemberIdentity50KG* fallbackConstructionTexture = nullptr;
     const OriginalUiMemberIdentity50KG* fallbackWidgetSource = nullptr;
     const OriginalUiMemberIdentity50KG* fallbackPageSource = nullptr;
     std::uint32_t sourceCallerPC = 0;

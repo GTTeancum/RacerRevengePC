@@ -1073,10 +1073,12 @@ static bool prepareOriginalUiOneMapMaterial50KM(const OriginalUiMaterialPass50KG
                  "AppStart\\DefaultMT.psm")) : pass.microprogram == "ScreenObject";
         // This internal-only alternative is issued by the private Object
         // member below after its exact constructed fallback/texture borrow.
+        // Garage rendering is the consumer, not the required first-origin family.
         // All standalone callers still require sourceIdentityKnown unchanged.
         const bool canonicalGarageScreen=authenticatedGarageScreen && !litProgram &&
             authenticatedGarageScreen->constructed29B550() && !authenticatedGarageScreen->source() &&
-            pass.provenance.origin==OriginalUiMaterialOrigin50KG::garageCanonicalScreenMissingPsmFallback &&
+            (pass.provenance.origin==OriginalUiMaterialOrigin50KG::garageCanonicalScreenMissingPsmFallback ||
+             pass.provenance.origin==OriginalUiMaterialOrigin50KG::memoryCardCanonicalScreenMissingPsmFallback) &&
             !pass.identity && pass.pass==1 && pass.provenance.creationPC==0x2475C0 &&
             pass.authored.values.empty() && pass.authored.name.empty();
         if ((!sourceIdentityKnown(pass) && !canonicalGarageScreen) || !pass.inheritedTemplate || !programMatches ||

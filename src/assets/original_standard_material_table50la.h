@@ -1,4 +1,5 @@
 #pragma once
+#include "original_memory_card_screen_fallback50kg.h"
 namespace original_main_entry50KG {class NativeCollectorFifo50LA;}
 namespace original_cable_selection50LA { class Binding; }
 namespace original_position_stats_prestage50LA { class Owner; }
@@ -363,6 +364,14 @@ private:
     bool retain14D590(std::int32_t,OriginalUiTemplate50KG,
         OriginalStandardMaterialDiagnostic50LA&) noexcept;
     bool retainDefault14D590(std::int32_t,OriginalStandardMaterialDiagnostic50LA&) noexcept;
+    bool bindMemoryCardPendingAfterRetain(const rr::platform::OriginalUiMemoryCardConstructor50KG&,
+        std::shared_ptr<const OriginalMemoryCardScreenFallback50KG>,OriginalStandardMaterialDiagnostic50LA&)noexcept;
+    bool clearMemoryCardPendingForRetirement(const rr::platform::OriginalUiMemoryCardConstructor50KG&,
+        OriginalStandardMaterialDiagnostic50LA&)noexcept;
+    bool preflightMemoryCardPopulation(const rr::platform::OriginalUiMemoryCardConstructor50KG&,
+        bool& firstPending,bool& noTexturePending,OriginalStandardMaterialDiagnostic50LA&)const noexcept;
+    bool preflightGarageLoadedSharedIcon(const rr::platform::OriginalUiGarageQuad50KG&,
+        OriginalStandardMaterialDiagnostic50LA&)const noexcept;
     bool preflightMemoryCardFirstIconBinding(const rr::platform::OriginalUiMemoryCardConstructor50KG&,
         OriginalStandardMaterialDiagnostic50LA&)const noexcept;
     bool preflightRetain14D590(std::int32_t,OriginalStandardMaterialDiagnostic50LA&)const noexcept;

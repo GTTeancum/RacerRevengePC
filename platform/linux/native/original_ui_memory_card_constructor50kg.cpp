@@ -1,7 +1,9 @@
 #include "original_ui_memory_card_constructor50kg.h"
+#include "../../../src/assets/original_ui_pages50kg.h"
 #include "../../../tests/native/original_ui_main_entry50kg.h"
 #include "../../../tests/native/original_race_display_lifetime50la.h"
 #include <exception>
+#include <cstring>
 #include <limits>
 namespace rr::platform {
 OriginalUiMemoryCardConstructor50KG::~OriginalUiMemoryCardConstructor50KG()noexcept {
@@ -60,13 +62,47 @@ bool OriginalUiMemoryCardConstructor50KG::resourcePrefixCurrent()const noexcept 
         display_->memoryCardConstructorDrainCurrent50KG()&&
         scope_->detachedMemoryCardCurrent(*this,entity_,false);
 }
+bool OriginalUiMemoryCardConstructor50KG::retainOptionsSources(
+    const std::shared_ptr<const assets::OriginalUiArchive50KG>& archive)noexcept {
+    std::int32_t row=-1;
+    const auto table=domain_?domain_->materials382B38():nullptr;
+    if(!table||!firstIconOccurrenceCurrent(*table,row)||!archive||!archive->loaded()||
+       archive->identity()!=assets::originalUiArchiveIdentity50KG(assets::OriginalUiArchiveId50KG::options))return false;
+    if(optionsSource_)return optionsSource_==archive;
+    try {
+        // Reuse the actual source parsers, never caller-supplied page values or
+        // the cold bank's readiness flag as canonical issuer authority.
+        const auto widgets=archive->member(1),memoryCard=archive->member(46);
+        if(widgets.identity!=assets::originalUiMemberIdentity50KG(assets::OriginalUiArchiveId50KG::options,1)||
+           memoryCard.identity!=assets::originalUiMemberIdentity50KG(assets::OriginalUiArchiveId50KG::options,46)||
+           !widgets.data||widgets.size!=widgets.identity->bytes||
+           !memoryCard.data||memoryCard.size!=memoryCard.identity->bytes)return false;
+        assets::OriginalUiDat50KG widgetDat,pageDat;assets::OriginalUiPage50KG page;
+        assets::OriginalUiPageDiagnostic50KG diagnostic;
+        if(!assets::readOriginalUiDat50KG(*archive,"UI/UIOption/Widgets.Dat",widgetDat,diagnostic,
+               assets::OriginalUiRepeatedKeyPolicy50KG::preserveInOrder)||
+           !assets::readOriginalUiDat50KG(*archive,"UI/UIOption/memcard.dat",pageDat,diagnostic)||
+           !assets::readOriginalUiPage50KG(pageDat,widgetDat,page,diagnostic))return false;
+        if(page.identity!=memoryCard.identity||page.pageNo!=5||page.widgetCount!=357||
+           page.controls.size()!=1||page.groups.size()!=1||page.controls[0].widgets.size()!=2||
+           page.controls[0].widgets[0]!=2||page.controls[0].widgets[1]!=16||
+           page.groups[0].controls.size()!=1||page.groups[0].controls[0]!=0||!page.groups[0].keepEnabled||
+           !page.groups[0].associations.empty()||!page.hasPopup||
+           page.popupWidgets!=std::array<std::int32_t,9>{{23,43,41,42,30,31,40,44,45}}||
+           page.openSize!=69||page.openTime!=.5f||page.start!="Open")return false;
+        // Final actual-owner check after parsing/allocation and before the sole
+        // source-custody store. No callbacks, source refs or material stores.
+        if(!firstIconOccurrenceCurrent(*table,row)||optionsSource_)return false;
+        optionsSource_=archive;return true;
+    }catch(...){return false;}
+}
 bool OriginalUiMemoryCardConstructor50KG::firstIconOccurrenceCurrent(
     const assets::OriginalStandardMaterialTable50LA& table,std::int32_t& row)const noexcept {
     row=-1;if(!resourcePrefixCurrent()||!firstIconRetained_||constructedQuads_!=7||retiredQuads_||
        domain_->materials382B38().get()!=&table)return false;
     const auto& role=loadRoles_[0];const auto& quad=quads_[role.constructionIndex];
-    if(!quad.memoryCardPrefixOnly_||quad.offset!=role.offset||quad.stage_!=Quad::Stage::materialRetained||
-       quad.pendingPC_!=0x2DF144||!quad.constructed||quad.resource58||quad.packetOwner_||
+    if(!quad.memoryCardPrefixOnly_||quad.offset!=role.offset||!((quad.stage_==Quad::Stage::materialRetained&&quad.pendingPC_==0x2DF144)||
+         (quad.stage_==Quad::Stage::populated&&quad.pendingPC_==0x2DF158))||!quad.constructed||quad.resource58||quad.packetOwner_||
        !quad.material54||quad.material54!=quad.primitiveOwner_.get()||
        !quad.material54->materialStored||!quad.material54->materialRetained||
        quad.material54->type0C!=15||(quad.material54->flags0F&1u)||
@@ -74,18 +110,155 @@ bool OriginalUiMemoryCardConstructor50KG::firstIconOccurrenceCurrent(
        quad.domain_!=domain_||quad.context_!=context_||quad.video_!=video_)return false;
     row=quad.material54->material00;return row>=0;
 }
+bool OriginalUiMemoryCardConstructor50KG::pendingFamilyOccurrenceCurrent(
+    const assets::OriginalMemoryCardScreenFallback50KG& proof)const noexcept {
+    std::int32_t row=-1;const auto table=domain_?domain_->materials382B38():nullptr;
+    return table&&firstIconOccurrenceCurrent(*table,row)&&optionsSource_&&proof.options_==optionsSource_&&
+        quads_[loadRoles_[0].constructionIndex].stage_==Quad::Stage::materialRetained&&
+        !pendingFamilyRetired_&&proof.table_==table.get()&&proof.row_==row&&
+        proof.primitive_==quads_[loadRoles_[0].constructionIndex].material54&&
+        proof.context_==context_&&proof.textures_==domain_->textures383400()&&
+        proof.programs_==domain_->programs382B70()&&
+        proof.provider_==domain_->archiveProvider3E1A70();
+}
+bool OriginalUiMemoryCardConstructor50KG::prepareFirstIconConstructionFamily(Diagnostic& d)noexcept {
+    d={};std::int32_t row=-1;const auto table=domain_?domain_->materials382B38():nullptr;
+    if(!table||!firstIconOccurrenceCurrent(*table,row)||!optionsSource_||pendingFamilyRetired_){d.sourcePC=0x29B638;return false;}
+    try {
+        auto proof=std::shared_ptr<assets::OriginalMemoryCardScreenFallback50KG>(new assets::OriginalMemoryCardScreenFallback50KG);
+        proof->issuer_=root_->memoryCardConstructorOwner_;proof->table_=table.get();proof->row_=row;
+        proof->primitive_=quads_[loadRoles_[0].constructionIndex].material54;
+        proof->options_=optionsSource_;proof->context_=context_;proof->textures_=domain_->textures383400();
+        proof->provider_=domain_->archiveProvider3E1A70();proof->programs_=domain_->programs382B70();
+        const bool result=table->bindMemoryCardPendingAfterRetain(*this,std::move(proof),d.quad.material);
+        d.sourcePC=result?0x2DF144:d.quad.material.sourcePC;d.resourcePopulationPending=result;return result;
+    }catch(...){d.sourcePC=0x29B638;return false;}
+}
+bool OriginalUiMemoryCardConstructor50KG::populateFirstIconResources2DF144(Diagnostic& d)noexcept {
+    d={};d.sourceInputsAdmitted=firstPopulationInputsAdmitted_;
+    const auto table=domain_?domain_->materials382B38():nullptr;std::int32_t row=-1;
+    if(!table||!firstIconOccurrenceCurrent(*table,row)||!optionsSource_||pendingFamilyRetired_){d.sourcePC=0x2DF144;return false;}
+    auto& quad=quads_[loadRoles_[0].constructionIndex];
+    if(quad.stage_==Quad::Stage::populated){
+        const bool okay=table->preflightMemoryCardFirstIconBinding(*this,d.quad.material);
+        d.sourcePC=okay?0x2DF158:d.quad.material.sourcePC;d.sourceInputsAdmitted=firstPopulationInputsAdmitted_;return okay;
+    }
+    if(firstPopulationAttempted_){d.sourcePC=firstPopulationStopPC_;d.sourceInputsAdmitted=firstPopulationInputsAdmitted_;return false;}
+    using Provider=assets::OriginalStandardArchiveProvider50LA;
+    const auto provider=domain_->archiveProvider3E1A70();
+    bool firstPending=false,noTexturePending=false;
+    if(!provider||!provider->sealed()||!table->preflightMemoryCardPopulation(*this,firstPending,noTexturePending,d.quad.material)){
+        d.sourcePC=d.quad.material.sourcePC?d.quad.material.sourcePC:0x2DF144;return false;
+    }
+    const auto revision=provider->revision();
+    try {
+        std::vector<std::shared_ptr<const assets::OriginalStandardMaterialSource50LA>> sources;
+        std::vector<assets::OriginalStandardTextureSourceInput50LA> textures;
+        if(noTexturePending){
+            Provider::MemberView member;
+            if(provider->lookup132820("ui\\textures\\NoTexture.psm",member)!=Provider::Lookup::present||
+               !member.member||!member.data||!member.size){d.sourcePC=0x29B628;return false;}
+            assets::OriginalUiEncodedArchiveView50KG input;
+            if(!provider->encodedUiInput(member.mount,input)||input.providerIdentity()!=provider.get()||!input.identity()){
+                d.sourcePC=0x132820;return false;
+            }
+            const auto* identity=assets::originalUiMemberIdentity50KG(input.identity()->id,member.ordinal);
+            if(!identity||!identity->sha256||identity->bytes!=491||member.size!=identity->bytes||
+               !Provider::sameName(identity->name,*member.member)||
+               !Provider::sameName(*member.member,"ui\\textures\\NoTexture.psm")||
+               std::strcmp(identity->sha256,"f88625f9aaaa564646d77f3a95d47e1d60f94a9bf6c3052beda86bbe00bd5b8a")){
+                d.sourcePC=0x29B628;return false;
+            }
+            auto source=std::make_shared<assets::OriginalStandardMaterialSource50LA>();
+            std::vector<std::uint8_t> bytes(member.data,member.data+member.size);
+            if(!source->prepare(*member.member,bytes,d.quad.material.document)||source->section("Prologue")){
+                d.sourcePC=0x29B6D8;return false;
+            }
+            const auto* general=source->section("General");const auto* pass=source->section("ShaderPass_1");
+            std::int32_t count=0,maps=1;
+            if(!general||!pass||!assets::originalUiInteger50KG(*general,"TotalShaderPasses",0,count,d.quad.material.document,0x29B718)||count!=1||
+               !assets::originalUiInteger50KG(*pass,"totalTextureMaps",1,maps,d.quad.material.document,0x247214)||maps!=0){
+                d.sourcePC=0x247214;return false;
+            }
+            const auto* program=pass->find("microProgramName");
+            if(program&&!Provider::sameName(program->text,"ScreenObject")){d.sourcePC=0x2471BC;return false;}
+            sources.push_back(std::move(source));
+        }
+        if(firstPending){
+            Provider::MemberView psm,pst;
+            if(provider->lookup132820("ui\\textures\\icon_x.psm",psm)!=Provider::Lookup::absent||
+               provider->lookup132820("ui\\textures\\icon_x.pst",pst)!=Provider::Lookup::present||
+               !pst.member||!pst.data||!pst.size){d.sourcePC=0x29B638;return false;}
+            assets::OriginalUiEncodedArchiveView50KG input;
+            if(!provider->encodedUiInput(pst.mount,input)||input.providerIdentity()!=provider.get()||
+               (input.identity()!=assets::originalUiArchiveIdentity50KG(assets::OriginalUiArchiveId50KG::controllerPopup)&&
+                input.identity()!=assets::originalUiArchiveIdentity50KG(assets::OriginalUiArchiveId50KG::overlays))){d.sourcePC=0x132820;return false;}
+            const auto* member=assets::originalUiMemberIdentity50KG(input.identity()->id,pst.ordinal);
+            if(!member||member->bytes!=pst.size||!Provider::sameName(member->name,*pst.member)||
+               !Provider::sameName(*pst.member,"ui\\textures\\icon_x.pst")){d.sourcePC=0x132820;return false;}
+            textures.push_back({*pst.member,std::vector<std::uint8_t>(pst.data,pst.data+pst.size)});
+        }
+        bool stillFirst=false,stillNoTexture=false;
+        if(!table->preflightMemoryCardPopulation(*this,stillFirst,stillNoTexture,d.quad.material)||
+           stillFirst!=firstPending||stillNoTexture!=noTexturePending||provider->revision()!=revision||!provider->sealed()){
+            d.sourcePC=0x2DF144;return false;
+        }
+        if(firstPending){Diagnostic family;if(!prepareFirstIconConstructionFamily(family)){d=family;d.sourceInputsAdmitted=firstPopulationInputsAdmitted_;return false;}}
+        // Real corpus admission owns its own immutable/provider receipts. It
+        // may retain input files, but does not fabricate material publication.
+        if(!domain_->appendOriginalSources(sources,textures,d.quad.material)){
+            d.sourcePC=d.quad.material.sourcePC;return false;
+        }
+        firstPopulationInputsAdmitted_=true;d.sourceInputsAdmitted=true;
+        if(!table->preflightMemoryCardPopulation(*this,stillFirst,stillNoTexture,d.quad.material)||
+           stillFirst!=firstPending||stillNoTexture!=noTexturePending||provider->revision()!=revision||!provider->sealed()){
+            d.sourcePC=0x2DF144;return false;
+        }
+        firstPopulationAttempted_=true;firstPopulationStopPC_=0x2DF144;
+        // Actual full ascending scans, exactly14D370 then29E340. No collector
+        // rebuild, per-row shortcut, borrowed Garage proof or source re-retain.
+        if(!domain_->populateMemoryCardResources2DF144(context_,d.quad.material)){
+            d.sourceEffectsCommitted=d.quad.material.sourceEffectsCommitted;
+            d.sourcePC=d.quad.material.status==assets::OriginalStandardMaterialStatus50LA::texture&&d.quad.material.texture.sourcePC?
+                d.quad.material.texture.sourcePC:(d.quad.material.sourcePC?d.quad.material.sourcePC:0x2DF144);
+            firstPopulationStopPC_=d.sourcePC;return false;
+        }
+        d.sourceEffectsCommitted=d.quad.material.sourceEffectsCommitted;
+        if(!table->preflightMemoryCardFirstIconBinding(*this,d.quad.material)){
+            d.sourcePC=d.quad.material.sourcePC;firstPopulationStopPC_=d.sourcePC;return false;
+        }
+        quad.stage_=Quad::Stage::populated;quad.pendingPC_=0x2DF158;
+        firstPopulationStopPC_=0x2DF158;d.sourcePC=0x2DF158;return true;
+    }catch(...){d.sourcePC=firstPopulationAttempted_?firstPopulationStopPC_:0x2DF144;
+        d.sourceInputsAdmitted=firstPopulationInputsAdmitted_;return false;}
+}
+bool OriginalUiMemoryCardConstructor50KG::firstIconRetirementIdentity(
+    const assets::OriginalStandardMaterialTable50LA& table,std::int32_t& row)const noexcept {
+    row=-1;if(!inputsCurrent()||phase_!=Phase::retiring||!firstIconRetained_||retiredQuads_||
+       !display_||!displayPinned_||display_->application_!=root_||display_->video_!=video_||
+       !display_->memoryCardConstructorDrainCurrent50KG()||domain_->materials382B38().get()!=&table||
+       !scope_->detachedMemoryCardCurrent(*this,entity_,true))return false;
+    const auto& quad=quads_[loadRoles_[0].constructionIndex];
+    if((quad.stage_!=Quad::Stage::materialRetained&&quad.stage_!=Quad::Stage::populated)||!quad.material54||quad.material54!=quad.primitiveOwner_.get()||
+       !quad.material54->materialRetained||quad.material54->domain!=domain_||quad.material54->context!=context_)return false;
+    row=quad.material54->material00;return row>=0;
+}
 bool OriginalUiMemoryCardConstructor50KG::preflightExistingFirstIconBinding(Diagnostic& d)const noexcept {
     d={};if(!inputsCurrent()){d.sourcePC=0x2DF158;return false;}
     const auto table=domain_->materials382B38();
     const bool result=table&&table->preflightMemoryCardFirstIconBinding(*this,d.quad.material);
-    d.resourcePopulationPending=result;d.sourcePC=d.quad.material.sourcePC;return result;
+    d.resourcePopulationPending=result&&quads_[loadRoles_[0].constructionIndex].stage_==Quad::Stage::materialRetained;
+    d.sourcePC=d.quad.material.sourcePC;return result;
 }
 bool OriginalUiMemoryCardConstructor50KG::retainFirstIconPrefix1FF058(Diagnostic& d)noexcept {
     d={};
     if(!resourcePrefixCurrent()){d.sourcePC=0x1FF058;return false;}
     // True means only this component's reference prefix is represented. It
-    // does not mean1FF058 returned: population and packet work remain pending.
-    if(firstIconRetained_){d.sourceEffectsCommitted=true;d.resourcePopulationPending=true;d.sourcePC=0x2DF144;return true;}
+    // does not mean1FF058 returned: packet work remains pending, even if the
+    // separately guarded resource step has completed.
+    if(firstIconRetained_){d.sourceEffectsCommitted=true;
+        d.resourcePopulationPending=quads_[loadRoles_[0].constructionIndex].stage_==Quad::Stage::materialRetained;
+        d.sourcePC=d.resourcePopulationPending?0x2DF144:0x2DF158;return true;}
     const bool result=quads_[loadRoles_[0].constructionIndex].retainMemoryCardFirstIcon2465B0(*this,d.quad);
     d.sourceEffectsCommitted=d.quad.sourceEffectsCommitted;d.resourcePopulationPending=result;d.sourcePC=d.quad.sourcePC;return result;
 }
@@ -121,7 +294,7 @@ bool OriginalUiMemoryCardConstructor50KG::retireDetached142590(Diagnostic& d)noe
         for(std::size_t i=0;i<quads_.size();++i){const auto& q=quads_[i];
             const bool retainedFirst=i==loadRoles_[0].constructionIndex&&firstIconRetained_;
             const bool expected=retainedFirst?
-                (q.stage_==Quad::Stage::materialRetained&&q.material54==q.primitiveOwner_.get()&&
+                ((q.stage_==Quad::Stage::materialRetained||q.stage_==Quad::Stage::populated)&&q.material54==q.primitiveOwner_.get()&&
                  q.material54&&q.material54->materialStored&&q.material54->materialRetained&&
                  q.material54->domain==domain_&&q.material54->context==context_):
                 (q.stage_==Quad::Stage::constructed&&!q.material54);
@@ -138,6 +311,12 @@ bool OriginalUiMemoryCardConstructor50KG::retireDetached142590(Diagnostic& d)noe
         dynamicCounts_.fill(0);for(auto& count:staticCounts370_)count=0;
     }
     d.sourceEffectsCommitted=true;
+    if(firstIconRetained_&&!pendingFamilyRetired_){
+        if(!domain_->materials382B38()->clearMemoryCardPendingForRetirement(*this,d.quad.material)){
+            d.sourcePC=d.quad.material.sourcePC;return false;
+        }
+        pendingFamilyRetired_=true;
+    }
     while(retiredQuads_<7){auto& q=quads_[6-retiredQuads_];
         if(!q.preflightRetirement2DEFE0(d.quad)){d.sourcePC=d.quad.sourcePC;return false;}
         if(!drainColdQuad2DEFE0(d))return false;
@@ -184,5 +363,45 @@ OriginalUiEntityScope50KG::Result OriginalUiEntityScope50KG::finishDetachedMemor
         return {Status::phase,0x1413E0};
     --application_->objectCount423F60_;detachedMemoryCard_=nullptr;detachedMemoryCardOwner_=nullptr;
     detachedMemoryCardRetiring_=false;return {Status::complete,0x1413E0};
+}
+}
+
+namespace rr::assets {
+bool OriginalMemoryCardScreenFallback50KG::occurrenceCurrent()const noexcept {
+    const auto owner=issuer_.lock();return owner&&owner->pendingFamilyOccurrenceCurrent(*this);
+}
+bool OriginalMemoryCardScreenFallback50KG::captureAt29B638(const std::string& material,
+    const std::shared_ptr<const OriginalStandardMaterialContext50LA>& context,
+    const std::shared_ptr<OriginalStandardTextureTable50LA>& textures,
+    const std::shared_ptr<const OriginalStandardProgramTable50LA>& programs,Observation& out)const noexcept {
+    out=Observation{};
+    if(!occurrenceCurrent()||context!=context_||textures!=textures_||programs!=programs_||!programs||!provider_||!provider_->sealed()||
+       !OriginalStandardArchiveProvider50LA::sameName(material,"ui\\textures\\icon_x.psm")||
+       !options_||!options_->loaded()||options_->identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::options))return false;
+    try {
+        const auto page=options_->member(46),widgets=options_->member(1);
+        if(page.identity!=originalUiMemberIdentity50KG(OriginalUiArchiveId50KG::options,46)||
+           widgets.identity!=originalUiMemberIdentity50KG(OriginalUiArchiveId50KG::options,1)||!page.data||!widgets.data)return false;
+        using Provider=OriginalStandardArchiveProvider50LA;Provider::MemberView absent,pst;
+        const auto revision=provider_->revision();
+        if(provider_->lookup132820(material,absent)!=Provider::Lookup::absent||
+           provider_->lookup132820(name_+".pst",pst)!=Provider::Lookup::present||
+           !pst.member||!pst.data||!pst.size||absent.revision!=revision||pst.revision!=revision||
+           !pst.bankGeneration||provider_->revision()!=revision||!provider_->sealed())return false;
+        OriginalUiEncodedArchiveView50KG retained;
+        if(!provider_->encodedUiInput(pst.mount,retained)||retained.providerIdentity()!=provider_.get())return false;
+        const auto* identity=retained.identity();
+        if(identity!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::controllerPopup)&&
+           identity!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::overlays))return false;
+        const auto* member=originalUiMemberIdentity50KG(identity->id,pst.ordinal);
+        if(!member||!Provider::sameName(member->name,*pst.member)||member->bytes!=pst.size||
+           !Provider::sameName(*pst.member,"ui\\textures\\icon_x.pst"))return false;
+        Observation next;next.options=options_;next.selectedArchive=std::move(retained);next.provider=provider_;
+        next.selectedBytes=pst.data;next.pstBytes.assign(pst.data,pst.data+pst.size);
+        next.mount=pst.mount;next.ordinal=pst.ordinal;next.revision=revision;next.bankGeneration=pst.bankGeneration;
+        // Capture is still the same construction event after allocations.
+        if(!occurrenceCurrent()||provider_->revision()!=revision||!provider_->sealed())return false;
+        out=std::move(next);return true;
+    }catch(...){return false;}
 }
 }

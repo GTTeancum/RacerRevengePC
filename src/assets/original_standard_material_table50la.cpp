@@ -145,6 +145,7 @@ struct OriginalStandardMaterialTable50LA::Storage {
         std::shared_ptr<const OriginalUiArchive50KG> pauseBackdropMissingPsm;
         std::shared_ptr<OriginalStandardTextureTable50LA> pauseBackdropTextures;
         std::shared_ptr<const OriginalGarageScreenFallback50KG> garageFallback;
+        std::shared_ptr<const OriginalMemoryCardScreenFallback50KG> memoryCardPending;
     };
     std::shared_ptr<const OriginalUiArchive50KG> appStart;
     std::shared_ptr<const OriginalUiMaterialTemplates50KG> templates;
@@ -1213,7 +1214,7 @@ bool OriginalStandardMaterialTable50LA::populate14D370(
             if(row.tournamentMissingPsm&&row.tournamentTextures!=input.actualTextures383400){
                 fail(d,S::texture,0x247638);return terminal();
             }
-            if(!s.partial->construct29B550(canonical,row.name00,s.templates,row.associated30,input,row.tournamentMissingPsm,row.speedBoostMissingPsm,row.damageMissingPsm,row.pauseBackdropMissingPsm,row.garageFallback,d))return terminal();
+            if(!s.partial->construct29B550(canonical,row.name00,s.templates,row.associated30,input,row.tournamentMissingPsm,row.speedBoostMissingPsm,row.damageMissingPsm,row.pauseBackdropMissingPsm,row.garageFallback,row.memoryCardPending,d))return terminal();
             if(!s.partial->constructed29B550()){
                 fail(d,S::phase,0x29B854);return terminal();
             }
@@ -1222,6 +1223,7 @@ bool OriginalStandardMaterialTable50LA::populate14D370(
             }
             s.invalidateCollector(); //A newly published pass set requires a complete rebuild.
             row.object04=std::move(s.partial); //29B854 real loaded owner publication.
+            row.memoryCardPending.reset(); //Consumed capability; history is now object-owned.
             //14D3FC repeats298F80 with the identical object and row. It creates
             //no second ownership reference and does not rebuild collector14D440.
             ++d.populationPublished;
@@ -1302,6 +1304,7 @@ bool OriginalStandardMaterialTable50LA::bindGarageScreenFallbackAfterRetain(std:
        rejected(row.associated30!=storage_->templates->get(OriginalUiTemplate50KG::screenMt),"template_identity")||
        rejected(bool(row.tournamentMissingPsm),"tournament_owner")||rejected(bool(row.speedBoostMissingPsm),"speedboost_owner")||
        rejected(bool(row.damageMissingPsm),"damage_owner")||rejected(bool(row.pauseBackdropMissingPsm),"pause_owner")||
+       rejected(bool(row.memoryCardPending),"memorycard_pending")||
        rejected(row.object04&&!row.garageFallback,"object_without_garage_proof")||
        rejected(!proof->current(row.name00+".psm",proof->context_,proof->textures_),"new_proof_current"))
         return fail(d,S::phase,0x29B638);
@@ -1379,6 +1382,40 @@ bool OriginalStandardMaterialTable50LA::retainPauseBackdropFallback14D590(
     if(!row.pauseBackdropTextures)row.pauseBackdropTextures=std::move(textures);
     return true;
 }
+bool OriginalStandardMaterialTable50LA::bindMemoryCardPendingAfterRetain(
+    const rr::platform::OriginalUiMemoryCardConstructor50KG& owner,
+    std::shared_ptr<const OriginalMemoryCardScreenFallback50KG> proof,D& d)noexcept {
+    d={};std::int32_t index=-1;
+    if(!storage_||storage_->uiSharedHistoryOwner||storage_->nativeFifoPins||storage_->nativeBindingPoisoned||
+       storage_->populationTerminal||storage_->populationActive||storage_->demandActive||storage_->collectorActive||demandTerminal()||
+       !owner.firstIconOccurrenceCurrent(*this,index)||!proof||proof->table_!=this||proof->row_!=index||
+       proof->issuer_.lock().get()!=&owner||!proof->occurrenceCurrent())return fail(d,S::phase,0x29B638);
+    if(index<0||static_cast<std::size_t>(index)>=storage_->rows.size())return fail(d,S::range,0x29B638);
+    auto& row=storage_->rows[static_cast<std::size_t>(index)];d.row=index;
+    if(row.references08<=0||row.object04||!storage_->templates||
+       row.associated30!=storage_->templates->get(OriginalUiTemplate50KG::screenMt)||
+       !OriginalStandardArchiveProvider50LA::sameName(row.name00,proof->name_)||
+       row.garageFallback||row.tournamentMissingPsm||row.speedBoostMissingPsm||row.damageMissingPsm||row.pauseBackdropMissingPsm)
+        return fail(d,S::source,0x29B638);
+    if(row.memoryCardPending){
+        if(row.memoryCardPending->issuer_.lock().get()!=&owner||!row.memoryCardPending->occurrenceCurrent())
+            return fail(d,S::phase,0x29B638);
+    }else row.memoryCardPending=std::move(proof);
+    return true; //No source reference or population effect.
+}
+bool OriginalStandardMaterialTable50LA::clearMemoryCardPendingForRetirement(
+    const rr::platform::OriginalUiMemoryCardConstructor50KG& owner,D& d)noexcept {
+    d={};std::int32_t index=-1;
+    if(!storage_||!canRetireNativeCollector29C300()||!owner.firstIconRetirementIdentity(*this,index))
+        return fail(d,S::phase,0x14D500);
+    if(index<0||static_cast<std::size_t>(index)>=storage_->rows.size())return fail(d,S::range,0x14D500);
+    auto& row=storage_->rows[static_cast<std::size_t>(index)];
+    if(row.memoryCardPending){
+        if(row.memoryCardPending->issuer_.lock().get()!=&owner)return fail(d,S::phase,0x14D500);
+        row.memoryCardPending.reset();
+    }
+    return true;
+}
 bool OriginalStandardMaterialTable50LA::preflightMemoryCardFirstIconBinding(
     const rr::platform::OriginalUiMemoryCardConstructor50KG& occurrence,D& d)const noexcept {
     d={};std::int32_t index=-1;
@@ -1387,7 +1424,7 @@ bool OriginalStandardMaterialTable50LA::preflightMemoryCardFirstIconBinding(
        !occurrence.firstIconOccurrenceCurrent(*this,index))return fail(d,S::phase,0x2DF158);
     if(index<0||static_cast<std::size_t>(index)>=storage_->rows.size())return fail(d,S::range,0x298E60);
     const auto& row=storage_->rows[static_cast<std::size_t>(index)];d.row=index;
-    // Current actual occurrence is MemoryCard; the object's original Garage
+    // Current actual occurrence is MemoryCard; the object's captured first
     // construction family remains unchanged and is validated separately.
     if(row.references08<=0||!row.object04||!storage_->templates||!storage_->populationBound||
        storage_->construction!=occurrence.context_||storage_->programs!=occurrence.domain_->programs382B70()||
@@ -1398,6 +1435,83 @@ bool OriginalStandardMaterialTable50LA::preflightMemoryCardFirstIconBinding(
     return row.object04->preflightCapturedSharedIconBinding(index,occurrence.context_,
         occurrence.domain_->textures383400(),storage_->programs,occurrence.domain_->archiveProvider3E1A70(),
         occurrence.domain_->resolver3E1A70(),d);
+}
+bool OriginalStandardMaterialTable50LA::preflightMemoryCardPopulation(
+    const rr::platform::OriginalUiMemoryCardConstructor50KG& owner,
+    bool& firstPending,bool& noTexturePending,D& d)const noexcept {
+    d={};firstPending=noTexturePending=false;std::int32_t first=-1;
+    if(!storage_||storage_->uiSharedHistoryOwner||storage_->nativeFifoPins||storage_->nativeBindingPoisoned||
+       storage_->populationTerminal||storage_->populationActive||storage_->demandActive||storage_->collectorActive||demandTerminal()||
+       !owner.firstIconOccurrenceCurrent(*this,first)||!owner.optionsSource_||!storage_->templates||
+       !owner.domain_->textures383400()||owner.domain_->textures383400()->populationTerminal()||
+       first<0||static_cast<std::size_t>(first)>=storage_->rows.size())return fail(d,S::phase,0x2DF144);
+    if(!owner.domain_->textures383400()->preflightPopulationOwners(owner.domain_->resolver3E1A70(),
+        owner.context_,owner.domain_->archiveProvider3E1A70(),d.texture))return fail(d,S::texture,d.texture.sourcePC);
+    const auto& actual=storage_->rows[static_cast<std::size_t>(first)];
+    if(actual.references08<=0||actual.associated30!=storage_->templates->get(OriginalUiTemplate50KG::screenMt)||
+       !OriginalStandardArchiveProvider50LA::sameName(actual.name00,"ui\\textures\\icon_x"))return fail(d,S::reference,0x2DF144);
+    if(storage_->populationBound&&(storage_->construction!=owner.context_||
+       storage_->programs!=owner.domain_->programs382B70()||storage_->textures!=owner.domain_->textures383400()))
+        return fail(d,S::phase,0x2DF144);
+    // Enumerate the WHOLE actual pending material set. These bounds reject
+    // unsupported obligations before admission; they do not shorten14D370.
+    for(std::size_t i=0;i<storage_->rows.size();++i){const auto& row=storage_->rows[i];
+        if(row.references08<=0||row.object04)continue;d.row=static_cast<std::int32_t>(i);
+        if(row.associated30!=storage_->templates->get(OriginalUiTemplate50KG::screenMt)||
+           row.garageFallback||row.tournamentMissingPsm||row.speedBoostMissingPsm||row.damageMissingPsm||row.pauseBackdropMissingPsm)
+            return fail(d,S::source,0x29B638);
+        if(static_cast<std::int32_t>(i)==first){
+            if(row.memoryCardPending&&(!row.memoryCardPending->occurrenceCurrent()||
+               row.memoryCardPending->issuer_.lock().get()!=&owner))return fail(d,S::source,0x29B638);
+            firstPending=true;
+        }else if(OriginalStandardArchiveProvider50LA::sameName(row.name00,"ui\\textures\\NoTexture")&&!row.memoryCardPending){
+            if(noTexturePending)return fail(d,S::duplicatePublication,0x29B854);
+            noTexturePending=true;
+        }else return fail(d,S::source,0x29B628);
+    }
+    if(actual.object04&&!preflightMemoryCardFirstIconBinding(owner,d))return false;
+    const auto textures=owner.domain_->textures383400();
+    for(std::size_t i=0;i<textures->rowCount();++i){
+        if(i>static_cast<std::size_t>(std::numeric_limits<std::int16_t>::max()))return fail(d,S::range,0x29E340);
+        OriginalStandardTextureRowView50LA row;
+        if(!textures->row(static_cast<std::int16_t>(i),row)||!row.references08||!row.name00)return fail(d,S::texture,0x29E340);
+        if(*row.references08<=0||row.object04)continue;
+        // A loaded X with unresolved texture requires a different material-only
+        // receipt join, not v29's completed-resource preflight. Keep it closed.
+        if(!firstPending||!OriginalStandardArchiveProvider50LA::sameName(*row.name00,"ui\\textures\\icon_x"))
+            return fail(d,S::texture,0x29E340);
+    }
+    d.sourcePC=0x2DF144;return true;
+}
+bool OriginalStandardMaterialTable50LA::preflightGarageLoadedSharedIcon(
+    const rr::platform::OriginalUiGarageQuad50KG& occurrence,D& d)const noexcept {
+    d={};using Quad=rr::platform::OriginalUiGarageQuad50KG;
+    const auto& q=occurrence;const auto* p=q.material54;
+    if(!storage_||storage_->uiSharedHistoryOwner||storage_->nativeFifoPins||storage_->nativeBindingPoisoned||
+       storage_->populationTerminal||storage_->populationActive||storage_->demandActive||storage_->collectorActive||demandTerminal()||
+       q.memoryCardPrefixOnly_||!q.constructed||q.stage_!=Quad::Stage::materialRetained||
+       !q.domain_||!q.domain_->prepared()||q.domain_->materials382B38().get()!=this||
+       !q.context_||!q.context_->live()||!q.video_||!q.garage_||!q.garage_->loaded()||
+       q.garage_->identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::garage)||
+       (q.offset!=0x2A0&&q.offset!=0x300&&q.offset!=0x360&&q.offset!=0x3C0)||
+       !p||p!=q.primitiveOwner_.get()||!p->materialStored||!p->materialRetained||p->type0C!=15||
+       (p->flags0F&1u)||p->domain!=q.domain_||p->context!=q.context_||p->packet10||q.resource58||q.packetOwner_||
+       q.nativeGarageFifoPins_||q.nativeMenuWarningPins_)
+        return fail(d,S::phase,0x2DF144);
+    const auto index=p->material00;d.row=index;
+    if(index<0||static_cast<std::size_t>(index)>=storage_->rows.size())return fail(d,S::range,0x298E60);
+    const auto& row=storage_->rows[static_cast<std::size_t>(index)];
+    const char* expected=q.offset==0x2A0?"ui\\textures\\icon_x":q.offset==0x300?"ui\\textures\\icon_tri":
+        q.offset==0x360?"ui\\textures\\icon_sqr":"ui\\textures\\icon_cir";
+    if(row.references08<=0||!row.object04||row.memoryCardPending||!storage_->templates||!storage_->populationBound||
+       storage_->construction!=q.context_||storage_->programs!=q.domain_->programs382B70()||
+       storage_->textures!=q.domain_->textures383400()||
+       row.associated30!=storage_->templates->get(OriginalUiTemplate50KG::screenMt)||
+       !OriginalStandardArchiveProvider50LA::sameName(row.name00,expected))return fail(d,S::reference,0x2DF144);
+    // No proof is minted/stored for this occurrence. The object retains its
+    // own first family, and the real global population call still follows.
+    return row.object04->preflightCapturedSharedIconBinding(index,q.context_,q.domain_->textures383400(),
+        storage_->programs,q.domain_->archiveProvider3E1A70(),q.domain_->resolver3E1A70(),d);
 }
 bool OriginalStandardMaterialTable50LA::preflightRetain14D590(std::int32_t index,D& d)const noexcept {
     d.row=index;if(!storage_)return fail(d,S::unprepared,0x14D590);
@@ -1430,6 +1544,12 @@ bool OriginalStandardMaterialTable50LA::release14D500(std::int32_t index) noexce
         // dangling internal node across14D55C..578's real pass/texture cleanup.
         storage_->invalidateCollector();
         r.object04.reset();
+    }
+    if(r.references08==0){
+        r.memoryCardPending.reset();
+        // Native construction-family admission cannot govern a later fresh
+        // null-row lifetime. Loaded-object history was destroyed above.
+        r.garageFallback.reset();
     }
     //Zero + pending null still takes14D54C's genuine no-destroy branch.
     //14D500 does NOT clear associated30, even on the final release.
