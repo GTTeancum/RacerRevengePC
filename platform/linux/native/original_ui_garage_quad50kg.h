@@ -24,7 +24,7 @@ class OriginalUiGarageQuad50KG final {
     using Archive=assets::OriginalUiArchive50KG;
 public:
     enum class Status:std::uint8_t {complete,input,phase,allocation,material,missingPsmFallbackPending,texture,arithmetic,rendererRetirementPending};
-    enum class Stage:std::uint8_t {empty,constructed,primitivePublished,materialRetained,populated,packetPublished,loaded,failed,retired};
+    enum class Stage:std::uint8_t {empty,constructed,primitivePublished,materialRetained,populated,packetPublished,loaded,failed,retired,dimensionsStored};
     struct Diagnostic {Status status=Status::complete;std::uint32_t sourcePC=0;bool sourceEffectsCommitted=false;assets::OriginalStandardMaterialDiagnostic50LA material{};};
     OriginalUiGarageQuad50KG()noexcept=default;
     ~OriginalUiGarageQuad50KG()noexcept;
@@ -71,9 +71,15 @@ private:
     bool initializeColdPrefix2DEF40(std::uint32_t,bool memoryCardOnly)noexcept;
     // Separate detached page438 prefix only. Never admits Garage load/name mapping.
     bool constructMemoryCardPrefix2DEF40(std::uint32_t)noexcept;
+    bool retainMemoryCardRole2465B0(OriginalUiMemoryCardConstructor50KG&,std::size_t,Diagnostic&)noexcept;
     bool retainMemoryCardFirstIcon2465B0(OriginalUiMemoryCardConstructor50KG&,Diagnostic&)noexcept;
     bool memoryCardPrefixOnly_=false;
     bool load2DF0B0(const RootInputs&,Diagnostic&)noexcept;
+    // Owner-neutral zero-coordinate numeric/packet mechanics. Callers retain
+    // their separate source authority; this function grants none by itself.
+    bool completeZeroPosition2DF158(Diagnostic&)noexcept;
+    bool completeMemoryCardIcon2DF158(OriginalUiMemoryCardConstructor50KG&,std::size_t,Diagnostic&)noexcept;
+    bool completeMemoryCardFirstIcon2DF158(OriginalUiMemoryCardConstructor50KG&,Diagnostic&)noexcept;
     // Queued records borrow the actual Primitive and packet. Mutation and
     // source retirement wait for genuine105990 release of these same pins.
     std::uint32_t nativeGarageFifoPins_=0;

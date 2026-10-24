@@ -460,7 +460,12 @@ bool OriginalStandardMaterialObject50LA::preflightCapturedSharedIconBinding(std:
             return fail(d,E::source,0x29B638,"retained Garage construction observation");
         retained=&garage->pstBytes_;
     }else{
-        if(!Provider::sameName(s.name00,"ui\\textures\\icon_x.psm")||!card.options||
+        const bool authoredOccurrence=
+            (card.roleIndex==0&&card.constructionIndex==3&&card.componentOffset==0x160&&card.sourceCallerPC==0x1FF058&&
+             Provider::sameName(s.name00,"ui\\textures\\icon_x.psm"))||
+            (card.roleIndex==1&&card.constructionIndex==4&&card.componentOffset==0x1C0&&card.sourceCallerPC==0x1FF110&&
+             Provider::sameName(s.name00,"ui\\textures\\icon_tri.psm"));
+        if(!authoredOccurrence||!card.options||
            !card.options->loaded()||card.options->identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::options)||
            card.options->member(46).identity!=originalUiMemberIdentity50KG(OriginalUiArchiveId50KG::options,46)||
            card.options->member(1).identity!=originalUiMemberIdentity50KG(OriginalUiArchiveId50KG::options,1)||card.provider!=provider||
@@ -535,7 +540,7 @@ bool OriginalStandardMaterialObject50LA::borrowGarageScreenFallback2475C0(
                 s.memoryCardConstruction.options->find("UI/UIOption/memcard.dat").identity;
             if(!s.garageFallback){
                 provenance.fallbackWidgetSource=s.memoryCardConstruction.options->find("UI/UIOption/Widgets.Dat").identity;
-                provenance.sourceCallerPC=0x1FF058;
+                provenance.sourceCallerPC=s.memoryCardConstruction.sourceCallerPC;
             }
             provenance.registeredName=s.name00.substr(0,s.name00.size()-4);
             provenance.attemptedPsmMember=s.name00;provenance.creationPC=0x2475C0;
@@ -1027,7 +1032,7 @@ bool OriginalStandardMaterialObject50LA::construct29B550(std::int32_t row,const 
                 return fail(d,E::source,0x29B638,"Garage canonical absent-PSM proof");
             if(memoryCardFallback&&(memoryCardFallback->row_!=row||
                !memoryCardFallback->captureAt29B638(s.name00,input.construction,input.actualTextures383400,input.actualPrograms382B70,s.memoryCardConstruction)))
-                return fail(d,E::source,0x29B638,"actual MemoryCard first-X absent-PSM construction");
+                return fail(d,E::source,0x29B638,"actual MemoryCard role-derived absent-PSM construction");
             if(!templates||association!=templates->get(OriginalUiTemplate50KG::screenMt)||
                !input.construction||!input.construction->live()||
                &input.construction->materialApplication()->templates()!=templates.get())

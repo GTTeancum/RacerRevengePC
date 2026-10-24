@@ -98,11 +98,10 @@ bool OriginalUiMemoryCardConstructor50KG::retainOptionsSources(
 }
 bool OriginalUiMemoryCardConstructor50KG::firstIconOccurrenceCurrent(
     const assets::OriginalStandardMaterialTable50LA& table,std::int32_t& row)const noexcept {
-    row=-1;if(!resourcePrefixCurrent()||!firstIconRetained_||constructedQuads_!=7||retiredQuads_||
+    row=-1;if(!resourcePrefixCurrent()||!retainedLoadRoles_||constructedQuads_!=7||retiredQuads_||
        domain_->materials382B38().get()!=&table)return false;
     const auto& role=loadRoles_[0];const auto& quad=quads_[role.constructionIndex];
-    if(!quad.memoryCardPrefixOnly_||quad.offset!=role.offset||!((quad.stage_==Quad::Stage::materialRetained&&quad.pendingPC_==0x2DF144)||
-         (quad.stage_==Quad::Stage::populated&&quad.pendingPC_==0x2DF158))||!quad.constructed||quad.resource58||quad.packetOwner_||
+    if(!quad.memoryCardPrefixOnly_||quad.offset!=role.offset||quad.garage_||!firstIconPacketStateCurrent()||!quad.constructed||
        !quad.material54||quad.material54!=quad.primitiveOwner_.get()||
        !quad.material54->materialStored||!quad.material54->materialRetained||
        quad.material54->type0C!=15||(quad.material54->flags0F&1u)||
@@ -110,24 +109,111 @@ bool OriginalUiMemoryCardConstructor50KG::firstIconOccurrenceCurrent(
        quad.domain_!=domain_||quad.context_!=context_||quad.video_!=video_)return false;
     row=quad.material54->material00;return row>=0;
 }
+bool OriginalUiMemoryCardConstructor50KG::firstIconPacketStateCurrent()const noexcept {
+    return iconPacketStateCurrent(0);
+}
+bool OriginalUiMemoryCardConstructor50KG::iconPacketStateCurrent(std::size_t role)const noexcept {
+    if(role>1)return false;
+    const auto& q=quads_[loadRoles_[role].constructionIndex];
+    if(q.nativeGarageFifoPins_||q.nativeMenuWarningPins_)return false;
+    if(q.stage_==Quad::Stage::loaded){
+        return q.pendingPC_==0&&q.packetRevision_==1&&q.resource58&&q.resource58==q.packetOwner_.get()&&
+            q.material54&&q.material54->packet10==q.resource58&&q.dmaData4_==q.resource58+1&&
+            reinterpret_cast<std::uintptr_t>(q.resource58)%64u==0;
+    }
+    const bool prefix=(q.stage_==Quad::Stage::materialRetained&&q.pendingPC_==0x2DF144)||
+        (q.stage_==Quad::Stage::populated&&q.pendingPC_==0x2DF158)||
+        (q.stage_==Quad::Stage::dimensionsStored&&q.pendingPC_==0x2DF1CC);
+    return prefix&&!(role==0?firstIconPostLoadApplied_:trianglePostLoadApplied_)&&!q.resource58&&!q.packetOwner_&&!q.dmaData4_&&!q.packetRevision_&&
+        (!q.material54||!q.material54->packet10);
+}
+bool OriginalUiMemoryCardConstructor50KG::completeFirstIconComponent1FF058(Diagnostic& d)noexcept {
+    d={};const auto table=domain_?domain_->materials382B38():nullptr;std::int32_t row=-1;
+    if(!table||!optionsSource_||!firstIconOccurrenceCurrent(*table,row)) {d.sourcePC=0x2DF158;return false;}
+    auto& q=quads_[loadRoles_[0].constructionIndex];
+    if(q.stage_!=Quad::Stage::loaded){
+        if(!q.completeMemoryCardFirstIcon2DF158(*this,d.quad)){
+            d.sourcePC=d.quad.sourcePC;d.sourceEffectsCommitted=d.quad.sourceEffectsCommitted;return false;
+        }
+        d.sourceEffectsCommitted=true;
+    }
+    if(!firstIconOccurrenceCurrent(*table,row)||!table->preflightMemoryCardFirstIconBinding(*this,d.quad.material)){
+        d.sourcePC=d.quad.material.sourcePC?d.quad.material.sourcePC:0x1FF060;return false;
+    }
+    // Exact caller post-return stores1FF060..0FC. The packet remains its real
+    // zero-position initialized allocation; dirty marking is not regeneration.
+    if(!firstIconPostLoadApplied_){
+        if(q.position10[0]!=514.f||q.position10[1]!=378.f){
+            q.position10[0]=514.f;q.position10[1]=378.f;
+            q.flags5CValue=std::uint8_t((q.flags5CValue&~1u)|1u);q.flags5CKnownMask|=1;
+            if(q.uv30[3]!=0.f){q.flags5CValue=std::uint8_t((q.flags5CValue&~2u)|2u);q.flags5CKnownMask|=2;}
+        }
+        firstIconPostLoadApplied_=true;d.sourceEffectsCommitted=true;
+    }
+    if(q.position10[0]!=514.f||q.position10[1]!=378.f){d.sourcePC=0x1FF0AC;return false;}
+    d.sourcePC=0x1FF100;return true; // Stop BEFORE next-role setup/call.
+}
+bool OriginalUiMemoryCardConstructor50KG::completeTriangleComponent1FF110(Diagnostic& d)noexcept {
+    d={};const auto table=domain_?domain_->materials382B38():nullptr;std::int32_t row=-1;
+    if(!table||!optionsSource_||!iconOccurrenceCurrent(1,*table,row)){d.sourcePC=0x2DF158;return false;}
+    auto& q=quads_[loadRoles_[1].constructionIndex];
+    if(q.stage_!=Quad::Stage::loaded){
+        if(!q.completeMemoryCardIcon2DF158(*this,1,d.quad)){
+            d.sourcePC=d.quad.sourcePC;d.sourceEffectsCommitted=d.quad.sourceEffectsCommitted;return false;
+        }
+        d.sourceEffectsCommitted=true;
+    }
+    if(!iconOccurrenceCurrent(1,*table,row)||!table->preflightMemoryCardIconBinding(*this,1,d.quad.material)){
+        d.sourcePC=d.quad.material.sourcePC?d.quad.material.sourcePC:0x1FF118;return false;
+    }
+    // Actual caller1FF118..1FF1B4. The freshly initialized packet remains
+    // at zero position: dirty bits request later source work, not regeneration.
+    if(!trianglePostLoadApplied_){
+        if(q.position10[0]!=427.f||q.position10[1]!=378.f){
+            q.position10[0]=427.f;q.position10[1]=378.f;
+            q.flags5CValue=std::uint8_t((q.flags5CValue&~1u)|1u);q.flags5CKnownMask|=1;
+            if(q.uv30[3]!=0.f){q.flags5CValue=std::uint8_t((q.flags5CValue&~2u)|2u);q.flags5CKnownMask|=2;}
+        }
+        trianglePostLoadApplied_=true;d.sourceEffectsCommitted=true;
+    }
+    if(q.position10[0]!=427.f||q.position10[1]!=378.f){d.sourcePC=0x1FF164;return false;}
+    d.sourcePC=0x1FF1B8;return true; // Stop BEFORE Square setup/call.
+}
+bool OriginalUiMemoryCardConstructor50KG::iconOccurrenceCurrent(std::size_t role,
+    const assets::OriginalStandardMaterialTable50LA& table,std::int32_t& row)const noexcept {
+    if(role==0)return firstIconOccurrenceCurrent(table,row);
+    row=-1;
+    if(role!=1||!resourcePrefixCurrent()||retainedLoadRoles_!=2||!loadRolePrefixCurrent()||
+       domain_->materials382B38().get()!=&table)return false;
+    row=quads_[loadRoles_[role].constructionIndex].material54->material00;return row>=0;
+}
 bool OriginalUiMemoryCardConstructor50KG::pendingFamilyOccurrenceCurrent(
     const assets::OriginalMemoryCardScreenFallback50KG& proof)const noexcept {
     std::int32_t row=-1;const auto table=domain_?domain_->materials382B38():nullptr;
-    return table&&firstIconOccurrenceCurrent(*table,row)&&optionsSource_&&proof.options_==optionsSource_&&
-        quads_[loadRoles_[0].constructionIndex].stage_==Quad::Stage::materialRetained&&
-        !pendingFamilyRetired_&&proof.table_==table.get()&&proof.row_==row&&
-        proof.primitive_==quads_[loadRoles_[0].constructionIndex].material54&&
+    return proof.roleIndex_<=1&&table&&iconOccurrenceCurrent(proof.roleIndex_,*table,row)&&optionsSource_&&proof.options_==optionsSource_&&
+        quads_[loadRoles_[proof.roleIndex_].constructionIndex].stage_==Quad::Stage::materialRetained&&
+        !pendingFamilyRetired_&&proof.name_==loadRoles_[proof.roleIndex_].qualifiedName&&
+        proof.constructionIndex_==loadRoles_[proof.roleIndex_].constructionIndex&&
+        proof.componentOffset_==loadRoles_[proof.roleIndex_].offset&&proof.sourceCallerPC_==loadRoles_[proof.roleIndex_].callPC&&proof.table_==table.get()&&proof.row_==row&&
+        proof.primitive_==quads_[loadRoles_[proof.roleIndex_].constructionIndex].material54&&
         proof.context_==context_&&proof.textures_==domain_->textures383400()&&
         proof.programs_==domain_->programs382B70()&&
         proof.provider_==domain_->archiveProvider3E1A70();
 }
 bool OriginalUiMemoryCardConstructor50KG::prepareFirstIconConstructionFamily(Diagnostic& d)noexcept {
+    return prepareIconConstructionFamily(0,d);
+}
+bool OriginalUiMemoryCardConstructor50KG::prepareIconConstructionFamily(std::size_t role,Diagnostic& d)noexcept {
     d={};std::int32_t row=-1;const auto table=domain_?domain_->materials382B38():nullptr;
-    if(!table||!firstIconOccurrenceCurrent(*table,row)||!optionsSource_||pendingFamilyRetired_){d.sourcePC=0x29B638;return false;}
+    if(role>1||!table||!iconOccurrenceCurrent(role,*table,row)||!optionsSource_||pendingFamilyRetired_||
+       quads_[loadRoles_[role].constructionIndex].stage_!=Quad::Stage::materialRetained){d.sourcePC=0x29B638;return false;}
     try {
         auto proof=std::shared_ptr<assets::OriginalMemoryCardScreenFallback50KG>(new assets::OriginalMemoryCardScreenFallback50KG);
+        proof->roleIndex_=role;proof->name_=loadRoles_[role].qualifiedName;
+        proof->constructionIndex_=loadRoles_[role].constructionIndex;proof->componentOffset_=loadRoles_[role].offset;
+        proof->sourceCallerPC_=loadRoles_[role].callPC;
         proof->issuer_=root_->memoryCardConstructorOwner_;proof->table_=table.get();proof->row_=row;
-        proof->primitive_=quads_[loadRoles_[0].constructionIndex].material54;
+        proof->primitive_=quads_[loadRoles_[role].constructionIndex].material54;
         proof->options_=optionsSource_;proof->context_=context_;proof->textures_=domain_->textures383400();
         proof->provider_=domain_->archiveProvider3E1A70();proof->programs_=domain_->programs382B70();
         const bool result=table->bindMemoryCardPendingAfterRetain(*this,std::move(proof),d.quad.material);
@@ -135,19 +221,29 @@ bool OriginalUiMemoryCardConstructor50KG::prepareFirstIconConstructionFamily(Dia
     }catch(...){d.sourcePC=0x29B638;return false;}
 }
 bool OriginalUiMemoryCardConstructor50KG::populateFirstIconResources2DF144(Diagnostic& d)noexcept {
-    d={};d.sourceInputsAdmitted=firstPopulationInputsAdmitted_;
+    return populateIconResources2DF144(0,d);
+}
+bool OriginalUiMemoryCardConstructor50KG::populateTriangleResources2DF144(Diagnostic& d)noexcept {
+    return populateIconResources2DF144(1,d);
+}
+bool OriginalUiMemoryCardConstructor50KG::populateIconResources2DF144(std::size_t role,Diagnostic& d)noexcept {
+    d={};if(role>1){d.sourcePC=0x2DF144;return false;}
+    auto& progress=iconPopulation_[role];d.sourceInputsAdmitted=progress.inputsAdmitted;
     const auto table=domain_?domain_->materials382B38():nullptr;std::int32_t row=-1;
-    if(!table||!firstIconOccurrenceCurrent(*table,row)||!optionsSource_||pendingFamilyRetired_){d.sourcePC=0x2DF144;return false;}
-    auto& quad=quads_[loadRoles_[0].constructionIndex];
-    if(quad.stage_==Quad::Stage::populated){
-        const bool okay=table->preflightMemoryCardFirstIconBinding(*this,d.quad.material);
-        d.sourcePC=okay?0x2DF158:d.quad.material.sourcePC;d.sourceInputsAdmitted=firstPopulationInputsAdmitted_;return okay;
+    if(!table||!iconOccurrenceCurrent(role,*table,row)||!optionsSource_||pendingFamilyRetired_){d.sourcePC=0x2DF144;return false;}
+    auto& quad=quads_[loadRoles_[role].constructionIndex];
+    if(quad.stage_!=Quad::Stage::materialRetained){
+        const bool okay=table->preflightMemoryCardIconBinding(*this,role,d.quad.material);
+        d.sourcePC=okay?((role==0&&firstIconPostLoadApplied_)?0x1FF100:
+            (role==1&&trianglePostLoadApplied_)?0x1FF1B8:quad.stage_==Quad::Stage::loaded?0x2DF54C:
+            quad.stage_==Quad::Stage::dimensionsStored?0x2DF1CC:0x2DF158):d.quad.material.sourcePC;
+        d.sourceInputsAdmitted=progress.inputsAdmitted;return okay;
     }
-    if(firstPopulationAttempted_){d.sourcePC=firstPopulationStopPC_;d.sourceInputsAdmitted=firstPopulationInputsAdmitted_;return false;}
+    if(progress.attempted){d.sourcePC=progress.stopPC;d.sourceInputsAdmitted=progress.inputsAdmitted;return false;}
     using Provider=assets::OriginalStandardArchiveProvider50LA;
     const auto provider=domain_->archiveProvider3E1A70();
     bool firstPending=false,noTexturePending=false;
-    if(!provider||!provider->sealed()||!table->preflightMemoryCardPopulation(*this,firstPending,noTexturePending,d.quad.material)){
+    if(!provider||!provider->sealed()||!table->preflightMemoryCardPopulation(*this,firstPending,noTexturePending,d.quad.material,role)){
         d.sourcePC=d.quad.material.sourcePC?d.quad.material.sourcePC:0x2DF144;return false;
     }
     const auto revision=provider->revision();
@@ -185,9 +281,10 @@ bool OriginalUiMemoryCardConstructor50KG::populateFirstIconResources2DF144(Diagn
             sources.push_back(std::move(source));
         }
         if(firstPending){
+            const std::string materialName=loadRoles_[role].qualifiedName;
             Provider::MemberView psm,pst;
-            if(provider->lookup132820("ui\\textures\\icon_x.psm",psm)!=Provider::Lookup::absent||
-               provider->lookup132820("ui\\textures\\icon_x.pst",pst)!=Provider::Lookup::present||
+            if(provider->lookup132820(materialName+".psm",psm)!=Provider::Lookup::absent||
+               provider->lookup132820(materialName+".pst",pst)!=Provider::Lookup::present||
                !pst.member||!pst.data||!pst.size){d.sourcePC=0x29B638;return false;}
             assets::OriginalUiEncodedArchiveView50KG input;
             if(!provider->encodedUiInput(pst.mount,input)||input.providerIdentity()!=provider.get()||
@@ -195,51 +292,55 @@ bool OriginalUiMemoryCardConstructor50KG::populateFirstIconResources2DF144(Diagn
                 input.identity()!=assets::originalUiArchiveIdentity50KG(assets::OriginalUiArchiveId50KG::overlays))){d.sourcePC=0x132820;return false;}
             const auto* member=assets::originalUiMemberIdentity50KG(input.identity()->id,pst.ordinal);
             if(!member||member->bytes!=pst.size||!Provider::sameName(member->name,*pst.member)||
-               !Provider::sameName(*pst.member,"ui\\textures\\icon_x.pst")){d.sourcePC=0x132820;return false;}
+               !Provider::sameName(*pst.member,materialName+".pst")){d.sourcePC=0x132820;return false;}
             textures.push_back({*pst.member,std::vector<std::uint8_t>(pst.data,pst.data+pst.size)});
         }
         bool stillFirst=false,stillNoTexture=false;
-        if(!table->preflightMemoryCardPopulation(*this,stillFirst,stillNoTexture,d.quad.material)||
+        if(!table->preflightMemoryCardPopulation(*this,stillFirst,stillNoTexture,d.quad.material,role)||
            stillFirst!=firstPending||stillNoTexture!=noTexturePending||provider->revision()!=revision||!provider->sealed()){
             d.sourcePC=0x2DF144;return false;
         }
-        if(firstPending){Diagnostic family;if(!prepareFirstIconConstructionFamily(family)){d=family;d.sourceInputsAdmitted=firstPopulationInputsAdmitted_;return false;}}
+        if(firstPending){Diagnostic family;if(!prepareIconConstructionFamily(role,family)){d=family;d.sourceInputsAdmitted=progress.inputsAdmitted;return false;}}
         // Real corpus admission owns its own immutable/provider receipts. It
         // may retain input files, but does not fabricate material publication.
         if(!domain_->appendOriginalSources(sources,textures,d.quad.material)){
             d.sourcePC=d.quad.material.sourcePC;return false;
         }
-        firstPopulationInputsAdmitted_=true;d.sourceInputsAdmitted=true;
-        if(!table->preflightMemoryCardPopulation(*this,stillFirst,stillNoTexture,d.quad.material)||
+        progress.inputsAdmitted=true;d.sourceInputsAdmitted=true;
+        if(!table->preflightMemoryCardPopulation(*this,stillFirst,stillNoTexture,d.quad.material,role)||
            stillFirst!=firstPending||stillNoTexture!=noTexturePending||provider->revision()!=revision||!provider->sealed()){
             d.sourcePC=0x2DF144;return false;
         }
-        firstPopulationAttempted_=true;firstPopulationStopPC_=0x2DF144;
+        progress.attempted=true;progress.stopPC=0x2DF144;
         // Actual full ascending scans, exactly14D370 then29E340. No collector
         // rebuild, per-row shortcut, borrowed Garage proof or source re-retain.
         if(!domain_->populateMemoryCardResources2DF144(context_,d.quad.material)){
             d.sourceEffectsCommitted=d.quad.material.sourceEffectsCommitted;
             d.sourcePC=d.quad.material.status==assets::OriginalStandardMaterialStatus50LA::texture&&d.quad.material.texture.sourcePC?
                 d.quad.material.texture.sourcePC:(d.quad.material.sourcePC?d.quad.material.sourcePC:0x2DF144);
-            firstPopulationStopPC_=d.sourcePC;return false;
+            progress.stopPC=d.sourcePC;return false;
         }
         d.sourceEffectsCommitted=d.quad.material.sourceEffectsCommitted;
-        if(!table->preflightMemoryCardFirstIconBinding(*this,d.quad.material)){
-            d.sourcePC=d.quad.material.sourcePC;firstPopulationStopPC_=d.sourcePC;return false;
+        if(!table->preflightMemoryCardIconBinding(*this,role,d.quad.material)){
+            d.sourcePC=d.quad.material.sourcePC;progress.stopPC=d.sourcePC;return false;
         }
         quad.stage_=Quad::Stage::populated;quad.pendingPC_=0x2DF158;
-        firstPopulationStopPC_=0x2DF158;d.sourcePC=0x2DF158;return true;
-    }catch(...){d.sourcePC=firstPopulationAttempted_?firstPopulationStopPC_:0x2DF144;
-        d.sourceInputsAdmitted=firstPopulationInputsAdmitted_;return false;}
+        progress.stopPC=0x2DF158;d.sourcePC=0x2DF158;return true;
+    }catch(...){d.sourcePC=progress.attempted?progress.stopPC:0x2DF144;
+        d.sourceInputsAdmitted=progress.inputsAdmitted;return false;}
 }
 bool OriginalUiMemoryCardConstructor50KG::firstIconRetirementIdentity(
     const assets::OriginalStandardMaterialTable50LA& table,std::int32_t& row)const noexcept {
-    row=-1;if(!inputsCurrent()||phase_!=Phase::retiring||!firstIconRetained_||retiredQuads_||
+    return iconRetirementIdentity(0,table,row);
+}
+bool OriginalUiMemoryCardConstructor50KG::iconRetirementIdentity(std::size_t role,
+    const assets::OriginalStandardMaterialTable50LA& table,std::int32_t& row)const noexcept {
+    row=-1;if(role>1||role>=retainedLoadRoles_||!inputsCurrent()||phase_!=Phase::retiring||!retainedLoadRoles_||retiredQuads_||
        !display_||!displayPinned_||display_->application_!=root_||display_->video_!=video_||
        !display_->memoryCardConstructorDrainCurrent50KG()||domain_->materials382B38().get()!=&table||
        !scope_->detachedMemoryCardCurrent(*this,entity_,true))return false;
-    const auto& quad=quads_[loadRoles_[0].constructionIndex];
-    if((quad.stage_!=Quad::Stage::materialRetained&&quad.stage_!=Quad::Stage::populated)||!quad.material54||quad.material54!=quad.primitiveOwner_.get()||
+    const auto& quad=quads_[loadRoles_[role].constructionIndex];
+    if(!retainedRoleCurrent(role)||!quad.material54||quad.material54!=quad.primitiveOwner_.get()||
        !quad.material54->materialRetained||quad.material54->domain!=domain_||quad.material54->context!=context_)return false;
     row=quad.material54->material00;return row>=0;
 }
@@ -248,19 +349,96 @@ bool OriginalUiMemoryCardConstructor50KG::preflightExistingFirstIconBinding(Diag
     const auto table=domain_->materials382B38();
     const bool result=table&&table->preflightMemoryCardFirstIconBinding(*this,d.quad.material);
     d.resourcePopulationPending=result&&quads_[loadRoles_[0].constructionIndex].stage_==Quad::Stage::materialRetained;
-    d.sourcePC=d.quad.material.sourcePC;return result;
+    const auto stage=quads_[loadRoles_[0].constructionIndex].stage_;
+    d.sourcePC=result?(firstIconPostLoadApplied_?0x1FF100:stage==Quad::Stage::loaded?0x2DF54C:
+        stage==Quad::Stage::dimensionsStored?0x2DF1CC:0x2DF158):d.quad.material.sourcePC;return result;
 }
 bool OriginalUiMemoryCardConstructor50KG::retainFirstIconPrefix1FF058(Diagnostic& d)noexcept {
     d={};
     if(!resourcePrefixCurrent()){d.sourcePC=0x1FF058;return false;}
-    // True means only this component's reference prefix is represented. It
-    // does not mean1FF058 returned: packet work remains pending, even if the
-    // separately guarded resource step has completed.
-    if(firstIconRetained_){d.sourceEffectsCommitted=true;
-        d.resourcePopulationPending=quads_[loadRoles_[0].constructionIndex].stage_==Quad::Stage::materialRetained;
-        d.sourcePC=d.resourcePopulationPending?0x2DF144:0x2DF158;return true;}
+    // True means this component's reference prefix is represented. It does
+    // not claim the containing caller ran; later component progress is
+    // reported by its exact retained cursor, without replaying the retain.
+    if(retainedLoadRoles_){std::int32_t row=-1;
+        if(!firstIconOccurrenceCurrent(*domain_->materials382B38(),row)){d.sourcePC=0x1FF058;return false;}
+        const auto stage=quads_[loadRoles_[0].constructionIndex].stage_;d.sourceEffectsCommitted=true;
+        d.resourcePopulationPending=stage==Quad::Stage::materialRetained;
+        d.sourcePC=d.resourcePopulationPending?0x2DF144:firstIconPostLoadApplied_?0x1FF100:
+            stage==Quad::Stage::loaded?0x2DF54C:stage==Quad::Stage::dimensionsStored?0x2DF1CC:0x2DF158;return true;}
     const bool result=quads_[loadRoles_[0].constructionIndex].retainMemoryCardFirstIcon2465B0(*this,d.quad);
     d.sourceEffectsCommitted=d.quad.sourceEffectsCommitted;d.resourcePopulationPending=result;d.sourcePC=d.quad.sourcePC;return result;
+}
+bool OriginalUiMemoryCardConstructor50KG::retainedRoleCurrent(std::size_t roleIndex)const noexcept {
+    if(roleIndex>=retainedLoadRoles_||roleIndex>=loadRoles_.size())return false;
+    const auto& role=loadRoles_[roleIndex];const auto& q=quads_[role.constructionIndex];
+    if(!q.memoryCardPrefixOnly_||q.offset!=role.offset||!q.constructed||q.garage_||
+       !q.material54||q.material54!=q.primitiveOwner_.get()||
+       !q.material54->materialStored||!q.material54->materialRetained||
+       q.material54->material00<0||q.material54->type0C!=15||(q.material54->flags0F&1u)||
+       q.material54->domain!=domain_||q.material54->context!=context_||
+       q.domain_!=domain_||q.context_!=context_||q.video_!=video_||
+       q.nativeGarageFifoPins_||q.nativeMenuWarningPins_)return false;
+    return iconPacketStateCurrent(roleIndex);
+}
+bool OriginalUiMemoryCardConstructor50KG::loadRolePrefixCurrent()const noexcept {
+    // Only X/Triangle component prefixes are represented here. No later
+    // retain is admitted even after Triangle completion; no scalar broadening.
+    if(retainedLoadRoles_>2||constructedQuads_!=7||retiredQuads_)return false;
+    if(retainedLoadRoles_>1&&(!firstIconPostLoadApplied_||
+       quads_[loadRoles_[0].constructionIndex].stage_!=Quad::Stage::loaded||
+       quads_[loadRoles_[0].constructionIndex].position10[0]!=514.f||
+       quads_[loadRoles_[0].constructionIndex].position10[1]!=378.f))return false;
+    for(std::size_t r=0;r<loadRoles_.size();++r){
+        const auto& role=loadRoles_[r];const auto& q=quads_[role.constructionIndex];
+        if(r<retainedLoadRoles_){if(!retainedRoleCurrent(r))return false;}
+        else if(!q.memoryCardPrefixOnly_||q.offset!=role.offset||!q.constructed||q.garage_||
+            q.stage_!=Quad::Stage::constructed||q.material54||q.primitiveOwner_||q.resource58||
+            q.packetOwner_||q.dmaData4_||q.packetRevision_||q.nativeGarageFifoPins_||q.nativeMenuWarningPins_)return false;
+    }
+    return true;
+}
+bool OriginalUiMemoryCardConstructor50KG::nextRetainRole(std::size_t& role,Diagnostic& d)const noexcept {
+    role=loadRoles_.size();
+    if(!resourcePrefixCurrent()||!loadRolePrefixCurrent()){
+        d.sourcePC=loadRoles_[retainedLoadRoles_?1:0].callPC;return false;
+    }
+    if(!retainedLoadRoles_){role=0;return true;}
+    // Completion is not inferred from reference count, stage alone, or a caller
+    // scalar. Require actual X packet, applied post-load stores and canonical
+    // current binding before entering the next authored component call.
+    if(retainedLoadRoles_!=1){
+        const auto& triangle=quads_[loadRoles_[1].constructionIndex];
+        d.sourcePC=trianglePostLoadApplied_?0x1FF1B8:
+            triangle.stage_==Quad::Stage::loaded?0x2DF54C:triangle.pendingPC_;
+        d.resourcePopulationPending=triangle.stage_==Quad::Stage::materialRetained;
+        return false; // Actual triangle cursor; no square admission.
+    }
+    const auto& first=quads_[loadRoles_[0].constructionIndex];
+    if(first.stage_!=Quad::Stage::loaded||!firstIconPostLoadApplied_){
+        d.sourcePC=first.stage_==Quad::Stage::materialRetained?0x2DF144:
+            first.stage_==Quad::Stage::populated?0x2DF158:
+            first.stage_==Quad::Stage::dimensionsStored?0x2DF1CC:0x2DF54C;
+        d.resourcePopulationPending=first.stage_==Quad::Stage::materialRetained;return false;
+    }
+    if(first.position10[0]!=514.f||first.position10[1]!=378.f){d.sourcePC=0x1FF0AC;return false;}
+    if(!domain_->materials382B38()->preflightMemoryCardFirstIconBinding(*this,d.quad.material)){
+        d.sourcePC=d.quad.material.sourcePC;return false;}
+    role=1;return true;
+}
+bool OriginalUiMemoryCardConstructor50KG::retainNextRolePrefix1FF110(Diagnostic& d)noexcept {
+    d={};std::size_t role=loadRoles_.size();
+    if(retainedLoadRoles_==2){
+        if(!resourcePrefixCurrent()||!loadRolePrefixCurrent()){d.sourcePC=0x1FF110;return false;}
+        const auto& q=quads_[loadRoles_[1].constructionIndex];
+        d.sourceEffectsCommitted=true;d.resourcePopulationPending=q.stage_==Quad::Stage::materialRetained;
+        d.sourcePC=trianglePostLoadApplied_?0x1FF1B8:q.stage_==Quad::Stage::loaded?0x2DF54C:
+            q.stage_==Quad::Stage::dimensionsStored?0x2DF1CC:q.pendingPC_;return true;
+    }
+    if(!retainedLoadRoles_){d.sourcePC=0x1FF058;return false;}
+    if(!nextRetainRole(role,d)||role!=1)return false;
+    const bool result=quads_[loadRoles_[role].constructionIndex].retainMemoryCardRole2465B0(*this,role,d.quad);
+    d.sourceEffectsCommitted=d.quad.sourceEffectsCommitted;d.resourcePopulationPending=result;
+    d.sourcePC=d.quad.sourcePC;return result;
 }
 bool OriginalUiMemoryCardConstructor50KG::drainColdQuad2DEFE0(Diagnostic& d)noexcept {
     if(phase_!=Phase::retiring||drainPhase_>2||!inputsCurrent()||
@@ -290,17 +468,11 @@ bool OriginalUiMemoryCardConstructor50KG::retireDetached142590(Diagnostic& d)noe
     if(!inputsCurrent()||(phase_!=Phase::detachedConstructed&&phase_!=Phase::retiring)){
         d.sourcePC=0x142590;return false;}
     if(phase_==Phase::detachedConstructed){
-        if(constructedQuads_!=7||retiredQuads_||drainPhase_||!display_||!displayPinned_)return false;
-        for(std::size_t i=0;i<quads_.size();++i){const auto& q=quads_[i];
-            const bool retainedFirst=i==loadRoles_[0].constructionIndex&&firstIconRetained_;
-            const bool expected=retainedFirst?
-                ((q.stage_==Quad::Stage::materialRetained||q.stage_==Quad::Stage::populated)&&q.material54==q.primitiveOwner_.get()&&
-                 q.material54&&q.material54->materialStored&&q.material54->materialRetained&&
-                 q.material54->domain==domain_&&q.material54->context==context_):
-                (q.stage_==Quad::Stage::constructed&&!q.material54);
-            if(!q.memoryCardPrefixOnly_||!expected||q.resource58||!q.preflightRetirement2DEFE0(d.quad)){
-                d.sourcePC=0x1FEE40;return false;
-            }
+        if(!loadRolePrefixCurrent()||drainPhase_||!display_||!displayPinned_){d.sourcePC=0x1FEE40;return false;}
+        // Full role-prefix identity was checked above. Cleanup still follows
+        // reverse CONSTRUCTION order, never the distinct load-role sequence.
+        for(const auto& q:quads_)if(!q.preflightRetirement2DEFE0(d.quad)){
+            d.sourcePC=0x1FEE40;return false;
         }
         for(auto p:dynamicArrays_)if(p){d.sourcePC=0x1FEF20;return false;}
         for(auto p:staticArrays34C_)if(p){d.sourcePC=0x1FEE7C;return false;}
@@ -311,7 +483,7 @@ bool OriginalUiMemoryCardConstructor50KG::retireDetached142590(Diagnostic& d)noe
         dynamicCounts_.fill(0);for(auto& count:staticCounts370_)count=0;
     }
     d.sourceEffectsCommitted=true;
-    if(firstIconRetained_&&!pendingFamilyRetired_){
+    if(retainedLoadRoles_&&!pendingFamilyRetired_){
         if(!domain_->materials382B38()->clearMemoryCardPendingForRetirement(*this,d.quad.material)){
             d.sourcePC=d.quad.material.sourcePC;return false;
         }
@@ -376,7 +548,9 @@ bool OriginalMemoryCardScreenFallback50KG::captureAt29B638(const std::string& ma
     const std::shared_ptr<const OriginalStandardProgramTable50LA>& programs,Observation& out)const noexcept {
     out=Observation{};
     if(!occurrenceCurrent()||context!=context_||textures!=textures_||programs!=programs_||!programs||!provider_||!provider_->sealed()||
-       !OriginalStandardArchiveProvider50LA::sameName(material,"ui\\textures\\icon_x.psm")||
+       roleIndex_>1||material.size()!=name_.size()+4||
+       !OriginalStandardArchiveProvider50LA::sameName(std::string_view(material).substr(0,name_.size()),name_)||
+       !OriginalStandardArchiveProvider50LA::sameName(std::string_view(material).substr(name_.size()),".psm")||
        !options_||!options_->loaded()||options_->identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::options))return false;
     try {
         const auto page=options_->member(46),widgets=options_->member(1);
@@ -395,8 +569,10 @@ bool OriginalMemoryCardScreenFallback50KG::captureAt29B638(const std::string& ma
            identity!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::overlays))return false;
         const auto* member=originalUiMemberIdentity50KG(identity->id,pst.ordinal);
         if(!member||!Provider::sameName(member->name,*pst.member)||member->bytes!=pst.size||
-           !Provider::sameName(*pst.member,"ui\\textures\\icon_x.pst"))return false;
-        Observation next;next.options=options_;next.selectedArchive=std::move(retained);next.provider=provider_;
+           !Provider::sameName(*pst.member,name_+".pst"))return false;
+        Observation next;next.roleIndex=roleIndex_;next.constructionIndex=constructionIndex_;
+        next.componentOffset=componentOffset_;next.sourceCallerPC=sourceCallerPC_;
+        next.options=options_;next.selectedArchive=std::move(retained);next.provider=provider_;
         next.selectedBytes=pst.data;next.pstBytes.assign(pst.data,pst.data+pst.size);
         next.mount=pst.mount;next.ordinal=pst.ordinal;next.revision=revision;next.bankGeneration=pst.bankGeneration;
         // Capture is still the same construction event after allocations.

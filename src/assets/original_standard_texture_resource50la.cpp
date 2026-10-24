@@ -1295,11 +1295,13 @@ bool OriginalStandardTextureResolver50LA::resolve24DADC(
                    view->size!=entry.file->bytes.size()||view->revision!=revision||
                    !std::equal(entry.file->bytes.begin(),entry.file->bytes.end(),view->data)))
                     return fail(d,E::source,pc);
-                // Freeze only the four ordinary shared UI PST selections at
-                // their real resolver lookup. No retrospective provider query.
+                // Freeze the ordinary shared icons and authored overlay1
+                // image at their real resolver lookup. No retrospective query,
+                // authored-material authority or containing-page grant.
                 if(capture&&view&&provider&&entry.file->format==OriginalStandardTextureSourceFormat50LA::pstIndexed&&
                    (Provider::sameName(name,"ui\\textures\\icon_x.pst")||Provider::sameName(name,"ui\\textures\\icon_tri.pst")||
-                    Provider::sameName(name,"ui\\textures\\icon_sqr.pst")||Provider::sameName(name,"ui\\textures\\icon_cir.pst"))&&
+                    Provider::sameName(name,"ui\\textures\\icon_sqr.pst")||Provider::sameName(name,"ui\\textures\\icon_cir.pst")||
+                    Provider::sameName(name,"ui\\textures\\overlay1.pst"))&&
                    view->mount<provider->mounts_.size()){
                     const auto& bank=*provider->mounts_[view->mount];
                     if(bank.active&&bank.ui&&bank.ui->loaded()&&bank.generation==view->bankGeneration&&

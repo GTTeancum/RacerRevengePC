@@ -369,9 +369,11 @@ private:
     bool clearMemoryCardPendingForRetirement(const rr::platform::OriginalUiMemoryCardConstructor50KG&,
         OriginalStandardMaterialDiagnostic50LA&)noexcept;
     bool preflightMemoryCardPopulation(const rr::platform::OriginalUiMemoryCardConstructor50KG&,
-        bool& firstPending,bool& noTexturePending,OriginalStandardMaterialDiagnostic50LA&)const noexcept;
+        bool& firstPending,bool& noTexturePending,OriginalStandardMaterialDiagnostic50LA&,std::size_t role=0)const noexcept;
     bool preflightGarageLoadedSharedIcon(const rr::platform::OriginalUiGarageQuad50KG&,
         OriginalStandardMaterialDiagnostic50LA&)const noexcept;
+    bool preflightMemoryCardIconBinding(const rr::platform::OriginalUiMemoryCardConstructor50KG&,
+        std::size_t,OriginalStandardMaterialDiagnostic50LA&)const noexcept;
     bool preflightMemoryCardFirstIconBinding(const rr::platform::OriginalUiMemoryCardConstructor50KG&,
         OriginalStandardMaterialDiagnostic50LA&)const noexcept;
     bool preflightRetain14D590(std::int32_t,OriginalStandardMaterialDiagnostic50LA&)const noexcept;

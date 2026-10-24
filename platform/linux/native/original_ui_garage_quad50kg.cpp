@@ -47,12 +47,22 @@ bool OriginalUiGarageQuad50KG::constructMemoryCardPrefix2DEF40(std::uint32_t at)
     return initializeColdPrefix2DEF40(at,true);
 }
 bool OriginalUiGarageQuad50KG::retainMemoryCardFirstIcon2465B0(OriginalUiMemoryCardConstructor50KG& owner,Diagnostic& d)noexcept {
-    d={};const auto& role=owner.loadRoles_[0];
+    if(owner.retainedLoadRoles_){d={};d.status=Status::phase;d.sourcePC=0x1FF058;return false;}
+    return retainMemoryCardRole2465B0(owner,0,d);
+}
+bool OriginalUiGarageQuad50KG::retainMemoryCardRole2465B0(
+    OriginalUiMemoryCardConstructor50KG& owner,std::size_t roleIndex,Diagnostic& d)noexcept {
+    d={};OriginalUiMemoryCardConstructor50KG::Diagnostic ownerDiagnostic;std::size_t actualRole=0;
+    if(!owner.nextRetainRole(actualRole,ownerDiagnostic)||actualRole!=roleIndex){
+        d.status=Status::phase;d.sourcePC=ownerDiagnostic.sourcePC?ownerDiagnostic.sourcePC:
+            actualRole<owner.loadRoles_.size()?owner.loadRoles_[actualRole].callPC:0x2DF144;return false;
+    }
+    const auto& role=owner.loadRoles_[roleIndex];
     if(!owner.resourcePrefixCurrent()||owner.phase_!=OriginalUiMemoryCardConstructor50KG::Phase::detachedConstructed||
-       owner.constructedQuads_!=7||owner.retiredQuads_||owner.firstIconRetained_||
+       owner.constructedQuads_!=7||owner.retiredQuads_||owner.retainedLoadRoles_!=roleIndex||
        &owner.quads_[role.constructionIndex]!=this||!memoryCardPrefixOnly_||offset!=role.offset||
        stage_!=Stage::constructed||!constructed||material54||resource58)
-        {d.status=Status::phase;d.sourcePC=0x1FF058;return false;}
+        {d.status=Status::phase;d.sourcePC=role.callPC;return false;}
     // Actual component2461E0 ownership, prepared before any published effect.
     // No Garage RootInputs, archive, fallback proof or caller-supplied row/name.
     try {
@@ -76,7 +86,7 @@ bool OriginalUiGarageQuad50KG::retainMemoryCardFirstIcon2465B0(OriginalUiMemoryC
         if(!table->retainScreen14D590(row,d.material))std::terminate();
         material54->materialRetained=true;material54->type0C=15;material54->flags0F&=std::uint8_t(~1u);
         stage_=Stage::materialRetained;pendingPC_=0x2DF144;
-        owner.firstIconRetained_=true;d.sourceEffectsCommitted=true;d.sourcePC=0x2DF144;
+        ++owner.retainedLoadRoles_;d.sourceEffectsCommitted=true;d.sourcePC=0x2DF144;
         return true;
     }catch(...){return fail(d,Status::allocation,0x2DF0E8);}
 }
@@ -278,17 +288,38 @@ bool OriginalUiGarageQuad50KG::load2DF0B0(const RootInputs& in,Diagnostic& d)noe
         if(!domain_->populateGarageResources2DF144(context_,d.material))
             return fail(d,Status::material,d.material.sourcePC?d.material.sourcePC:0x2DF144);
         stage_=Stage::populated;
+        if(!completeZeroPosition2DF158(d))return fail(d,d.status,d.sourcePC);
+        return true;
+    }catch(...){return fail(d,Status::allocation,resource58?0x2DF1D4:material54?0x2DF11C:0x2DF0E8);}
+}
+bool OriginalUiGarageQuad50KG::completeZeroPosition2DF158(Diagnostic& d)noexcept {
+    d={};const auto stop=[&](Status status,std::uint32_t pc)noexcept {d.status=status;d.sourcePC=pc;return false;};
+    if(!constructed||(stage_!=Stage::populated&&stage_!=Stage::dimensionsStored)||
+       !domain_||!domain_->prepared()||!context_||!context_->live()||!video_||!video_->originalMain||video_->packetZMaximum!=0xffffff||
+       !material54||material54!=primitiveOwner_.get()||!material54->materialStored||!material54->materialRetained||
+       material54->domain!=domain_||material54->context!=context_||material54->type0C!=15||
+       material54->optional04||material54->optional14||(material54->flags0F&1u)||material54->packet10||
+       resource58||packetOwner_||dmaData4_||packetRevision_||nativeGarageFifoPins_||nativeMenuWarningPins_||
+       std::fegetround()!=FE_TONEAREST||!std::isfinite(field40))return stop(Status::phase,0x2DF158);
+    try {
+        const auto table=domain_->materials382B38();const auto row=material54->material00;
         assets::OriginalStandardMaterialRowView50LA material;
         assets::OriginalStandardMaterialPassView50LA pass;
         assets::OriginalStandardTextureRowView50LA texture;
         if(!table->row(row,material)||!material.object04||!material.object04->pass4C(0,pass)||
            !pass.texture1A||!pass.mapCount20||!*pass.mapCount20||
            !domain_->textures383400()->row((*pass.texture1A)[0],texture)||!texture.object04||
-           !texture.object04->sourceWidth14()||!texture.object04->sourceHeight18())return fail(d,Status::texture,0x2DF178);
+           !texture.object04->sourceWidth14()||!texture.object04->sourceHeight18())return stop(Status::texture,0x2DF178);
         const auto width=*texture.object04->sourceWidth14(),height=*texture.object04->sourceHeight18();
-        if(width<=0||height<=0||width>0x1000000||height>0x1000000)return fail(d,Status::arithmetic,0x2DF194);
+        if(width<=0||height<=0||width>0x1000000||height>0x1000000)return stop(Status::arithmetic,0x2DF194);
         volatile float w=float(width),h=float(height),reciprocalW=1.0f/w,reciprocalH=1.0f/h;
-        scale4C=reciprocalW;scale50=reciprocalH;uv30[1]=w;uv30[2]=h;position10[0]=position10[1]=0;
+        if(stage_==Stage::populated){
+            scale4C=reciprocalW;scale50=reciprocalH;uv30[1]=w;uv30[2]=h;position10[0]=position10[1]=0;
+            stage_=Stage::dimensionsStored;pendingPC_=0x2DF1CC;d.sourceEffectsCommitted=true;
+        }else if(scale4C!=reciprocalW||scale50!=reciprocalH||uv30[1]!=w||uv30[2]!=h||position10[0]!=0||position10[1]!=0)
+            return stop(Status::phase,0x2DF1CC);
+        // The retained stores above survive allocation failure. A retry starts
+        // here only after exact current owner/bindings/dimensions validation.
         auto* packet=static_cast<Qword*>(::operator new[](17*sizeof(Qword),std::align_val_t{64}));
         packetOwner_.reset(packet);resource58=packet;stage_=Stage::packetPublished;
         for(std::size_t i=0;i<17;++i)std::construct_at(packet+i);
@@ -305,7 +336,21 @@ bool OriginalUiGarageQuad50KG::load2DF0B0(const RootInputs& in,Diagnostic& d)noe
             packet[5+3*i].words={0,0,zbits,0x3F800000};packet[6+3*i].words=stq[i];}
         packet[16].words={0x140000B0,0x10000000,0,0};flags5CValue|=1;flags5CKnownMask|=1;
         stage_=Stage::loaded;packetRevision_=1;pendingPC_=0;d.sourceEffectsCommitted=true;d.sourcePC=0x2DF54C;return true;
-    }catch(...){return fail(d,Status::allocation,resource58?0x2DF1D4:material54?0x2DF11C:0x2DF0E8);}
+    }catch(...){return stop(Status::allocation,0x2DF1CC);}
+}
+bool OriginalUiGarageQuad50KG::completeMemoryCardFirstIcon2DF158(OriginalUiMemoryCardConstructor50KG& owner,Diagnostic& d)noexcept {
+    return completeMemoryCardIcon2DF158(owner,0,d);
+}
+bool OriginalUiGarageQuad50KG::completeMemoryCardIcon2DF158(
+    OriginalUiMemoryCardConstructor50KG& owner,std::size_t role,Diagnostic& d)noexcept {
+    d={};std::int32_t row=-1;const auto table=owner.domain_?owner.domain_->materials382B38():nullptr;
+    if(role>1||!table||!owner.iconOccurrenceCurrent(role,*table,row)||
+       &owner.quads_[owner.loadRoles_[role].constructionIndex]!=this||!memoryCardPrefixOnly_||offset!=owner.loadRoles_[role].offset||garage_||
+       (stage_!=Stage::populated&&stage_!=Stage::dimensionsStored)||
+       !table->preflightMemoryCardIconBinding(owner,role,d.material)){
+        d.status=Status::phase;d.sourcePC=d.material.sourcePC?d.material.sourcePC:0x2DF158;return false;
+    }
+    return completeZeroPosition2DF158(d);
 }
 bool OriginalUiGarageQuad50KG::preflightPrimitive246260(const std::unique_ptr<Primitive>& p,Diagnostic& d)noexcept {
     if(!p)return true;
