@@ -76,7 +76,7 @@ bool sameCareerValues(const OriginalUiRiderProfileOwner50KG::TournamentCareerSna
     const OriginalUiRiderProfileOwner50KG::TournamentCareerSnapshot& b) noexcept {
     return a.career100C0==b.career100C0&&a.earned2190==b.earned2190&&a.unspent2194==b.unspent2194&&
         a.kills2198==b.kills2198&&a.progress219C==b.progress219C&&a.availability11018==b.availability11018&&
-        a.cardFlag100BC==b.cardFlag100BC&&a.medals1938==b.medals1938&&a.remainingPrizes1946==b.remainingPrizes1946;
+        a.cardFlag100BC==b.cardFlag100BC&&a.nativeBetaStorage==b.nativeBetaStorage&&a.medals1938==b.medals1938&&a.remainingPrizes1946==b.remainingPrizes1946;
 }
 bool sameTextMetadata(const OriginalUiRiderProfileOwner50KG::TournamentTextMetadataSnapshot& a,
     const OriginalUiRiderProfileOwner50KG::TournamentTextMetadataSnapshot& b) noexcept {
@@ -143,8 +143,8 @@ bool sameDependencies(const ConfirmDependencies& a,const ConfirmDependencies& b)
 bool exactTournamentProposal(const OriginalUiRiderRouteProposal50KG& proposal,const ConfirmDependencies& before) noexcept {
     const auto selected=before.career.career100C0;
     if(!proposal.source||!proposal.serial||!sameStamp(proposal.profileStamp,before.career.stamp)||
-       before.common.mode34!=2||(before.common.playerBits1125C&0x60)!=0x20||before.career.cardFlag100BC||
-       before.course.cardFlag100BC||selected>=before.selection.riders.size()||
+       before.common.mode34!=2||(before.common.playerBits1125C&0x60)!=0x20||(before.career.cardFlag100BC&&!before.career.nativeBetaStorage)||
+       (before.course.cardFlag100BC&&!before.career.nativeBetaStorage)||selected>=before.selection.riders.size()||
        !before.selection.riders[selected].ownerReady||!before.selection.riders[selected].unlock10FAC)return false;
     game::OriginalUiRiderContext50KG context;context.playerIndex=0;context.selectedRider=selected;context.mode34=2;
     context.packed1125C=before.common.playerBits1125C;context.unlockOwnerReady=true;
@@ -159,11 +159,11 @@ bool exactTournamentProposal(const OriginalUiRiderRouteProposal50KG& proposal,co
 }
 bool exactCourseBackProposal(const OriginalUiCourseRouteProposal50KG& proposal,const ConfirmDependencies& before) noexcept {
     if(!proposal.source||!proposal.serial||!sameStamp(proposal.profileStamp,before.career.stamp)||
-       before.common.mode34!=2||(before.common.playerBits1125C&0x60)!=0x20||before.career.cardFlag100BC||
-       before.course.cardFlag100BC||(before.career.progress219C&31u)!=0||
+       before.common.mode34!=2||(before.common.playerBits1125C&0x60)!=0x20||(before.career.cardFlag100BC&&!before.career.nativeBetaStorage)||
+       (before.course.cardFlag100BC&&!before.career.nativeBetaStorage)||(before.career.progress219C&31u)>=13||
        before.comparison100C0!=before.career.career100C0||(before.packed1125D>>3)!=before.career.career100C0)return false;
     game::OriginalUiCourseContext50KG context;game::OriginalUiRouteDecision50KG exact;
-    return proposal.source->routeContext(proposal,context)&&context.mode34==2&&context.courseSlot14E4==1&&
+    return proposal.source->routeContext(proposal,context)&&context.mode34==2&&context.courseSlot14E4>=1&&context.courseSlot14E4<=13&&
         game::dispatchOriginalUiCourse50KG(0,game::OriginalUiRouteInput50KG::back,context,exact)==game::OriginalUiRouteStatus50KG::unavailable&&
         exact.request.targetScreen==9&&exact.request.targetPage==1&&exact.request.sourcePC==0x1DF0B4&&
         exact.profileChanges.count==0&&exact.blockers==static_cast<std::uint32_t>(game::OriginalUiRouteBlocker50KG::destinationOwner)&&

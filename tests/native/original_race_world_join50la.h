@@ -1,6 +1,7 @@
 #pragma once
 #include "original_race_constructor50la.h"
 #include "original_world_cold_prefix50la.h"
+#include "original_ta_world_cold_prefix50la.h"
 
 namespace rr::game {
 inline bool OriginalRaceConstructor50LA::constructWorld1A6BC0(
@@ -8,7 +9,7 @@ inline bool OriginalRaceConstructor50LA::constructWorld1A6BC0(
     std::uint32_t& pc)noexcept {
     pc=0x1a6bc0;
     if(!counted_||rolledBack_||!constructorSuffix_||!loadPrefixReached_||!resourcesPrepared_||
-       worldAttempted_||world74_||!world||!raceAudio_||raceGroupCount_!=6||raceGroupsAttached_!=6||
+       worldAttempted_||world74_||taWorld74_||taWorldCounted_||!world||!raceAudio_||raceGroupCount_!=6||raceGroupsAttached_!=6||
        world->worldColdAttempted_||world->worldColdConstructed_||world->worldApplication_||
        raceAudio_->coldApplication_!=application_||raceAudio_->coldSession_!=entity_.sessionGeneration||
        raceAudio_->coldThread_!=std::this_thread::get_id()||!raceAudio_->coldMixer_||
@@ -28,6 +29,7 @@ inline bool OriginalRaceConstructor50LA::constructWorld1A6BC0(
 }
 inline bool OriginalRaceConstructor50LA::rollbackNativeRaceWorldFailure(std::uint32_t& pc)noexcept {
     pc=0x1a6bc0;
+    if(taWorld74_||taWorldCounted_)return retireNativeTaWorldPrefix(pc);
     if(!world74_)return true;
     if(!counted_||rolledBack_||!application_||application_->attachmentLock423F58())return false;
     // A rejected world preflight may have acquired no count. Never invoke a

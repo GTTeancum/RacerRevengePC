@@ -24,8 +24,8 @@ bool decision(const game::OriginalUiRouteDecision50KG&a,const game::OriginalUiRo
  for(std::size_t i=0;i<a.profileChanges.count;++i){const auto&x=a.profileChanges.values[i];const auto&y=b.profileChanges.values[i];if(x.field!=y.field||x.operation!=y.operation||x.value!=y.value||x.replaceMask!=y.replaceMask||x.sourcePC!=y.sourcePC)return false;}return true;
 }
 bool genuine(const std::shared_ptr<const assets::OriginalUiArchive50KG>&a,assets::OriginalUiArchiveId50KG id)noexcept{return a&&a->loaded()&&a->identity()==assets::originalUiArchiveIdentity50KG(id);}
-bool fresh(const OriginalUiRiderProfileOwner50KG::TournamentCareerSnapshot&p)noexcept{
- return !p.cardFlag100BC&&(p.progress219C&31u)==0&&p.earned2190==0&&p.unspent2194==0&&p.kills2198==0&&std::all_of(p.medals1938.begin(),p.medals1938.end(),[](auto x){return x==0;});
+bool resumable(const OriginalUiRiderProfileOwner50KG::TournamentCareerSnapshot&p)noexcept{
+ return (!p.cardFlag100BC||p.nativeBetaStorage)&&(p.progress219C&31u)<13&&std::all_of(p.medals1938.begin(),p.medals1938.end(),[](auto x){return x<=8;});
 }
 void controlState(game::OriginalUiControlState50KG&s,O op,bool value)noexcept{
  switch(op){case O::show:s.shown=true;break;case O::hide:s.shown=false;break;case O::select:s.selected=true;break;case O::deselect:case O::clearSelection:s.selected=false;break;case O::setEnabled:s.enabled=value;break;case O::reset:break;}
@@ -81,7 +81,7 @@ struct OriginalUiTournamentSession50KG::Storage {
  }
  bool profileCurrent()const noexcept{
   OriginalUiRiderProfileOwner50KG::TournamentCareerSnapshot p;
-  return process()&&entryCommitted&&common(coldCommon,*cold.commonProfile)&&stamp(cold.profile->stamp(),liveStamp)&&cold.resources->current()&&cold.profile->tournamentCareerSnapshot(state.career,p)&&fresh(p)&&stamp(p.stamp,liveStamp);
+  return process()&&entryCommitted&&common(coldCommon,*cold.commonProfile)&&stamp(cold.profile->stamp(),liveStamp)&&cold.resources->current()&&cold.profile->tournamentCareerSnapshot(state.career,p)&&resumable(p)&&stamp(p.stamp,liveStamp);
  }
  bool lightCurrent()const noexcept{return cold.lightManager&&camera&&camera->authoredLighting()&&lightGeneration&&cold.lightManager->managerGeneration()==lightGeneration&&cold.lightManager->activeUiIdentity()==cold.tournamentArchive->identity()&&cold.lightManager->matchesTournamentRegistry(*camera->authoredLighting());}
  bool popupCurrent()const noexcept{
@@ -139,7 +139,7 @@ struct OriginalUiTournamentSession50KG::Storage {
  }
  bool phase(P phase)noexcept{
   OriginalUiRiderProfileOwner50KG::TournamentCareerSnapshot profile;game::OriginalUiTournamentCleanPlan50KG plan;
-  if(!profileCurrent()||!cold.profile->tournamentCareerSnapshot(state.career,profile)||!game::planOriginalUiTournamentCleanPhase50KG(phase,profile.cardFlag100BC,bool(camera),plan))return false;
+  if(!profileCurrent()||!cold.profile->tournamentCareerSnapshot(state.career,profile)||!game::planOriginalUiTournamentCleanPhase50KG(phase,profile.cardFlag100BC&&!profile.nativeBetaStorage,bool(camera),plan))return false;
   for(std::size_t i=0;i<plan.count;++i){const auto&step=plan.steps[i];
    if(step.kind==E::startSong11&&(!audioReady()||(!muted()&&!cold.audio->canStartCourseLoop11())))return false;
    if(step.kind==E::fadeMusic1&&(!audioReady()||(!muted()&&!cold.audio->canFadeCourseMusic())))return false;
@@ -194,10 +194,10 @@ S OriginalUiTournamentSession50KG::bind(const OriginalUiTournamentSessionCold50K
   sourceCurrent=*p&&(*p)->profileOwnerForReturn17DE10()==cold.profile&&cold.resources->garageBackPreparationCurrent(*p);
  if(!sourceCurrent||!cold.resources->sameProfileOwner(*cold.profile))return result(d,S::profile);
  try{auto s=std::make_unique<Storage>();s->cold=cold;s->cold.english=nullptr;s->coldCommon=*cold.commonProfile;s->coldStamp=cold.profile->stamp();
-  if(!s->process()||!cold.resources->career()||!fresh(*cold.resources->career())||!stamp(cold.resources->career()->stamp,s->coldStamp))return result(d,S::profile);
+  if(!s->process()||!cold.resources->career()||!resumable(*cold.resources->career())||!stamp(cold.resources->career()->stamp,s->coldStamp))return result(d,S::profile);
   std::uint32_t pause=0;if(!cold.applicationAnimation.readPause11C(pause))return result(d,S::unsupportedState,0x140C50);
   s->state.career=cold.resources->career()->career100C0;
-  if(!cold.resources->pod()||!cold.resources->pod()->loaded()||!cold.profile->tournamentTextMetadataSnapshot(s->state.career,s->textMetadata)||!stamp(s->textMetadata.stamp,s->coldStamp)||s->textMetadata.progressIndex!=0||!cold.profile->colors(s->state.career,s->colors)||!game::bindOriginalUiNavigation50KG(*cold.widgets->page(),s->nav))return result(d,S::profile);
+  if(!cold.resources->pod()||!cold.resources->pod()->loaded()||!cold.profile->tournamentTextMetadataSnapshot(s->state.career,s->textMetadata)||!stamp(s->textMetadata.stamp,s->coldStamp)||s->textMetadata.progressIndex>=13||!cold.profile->colors(s->state.career,s->colors)||!game::bindOriginalUiNavigation50KG(*cold.widgets->page(),s->nav))return result(d,S::profile);
   if(s->nav.page->groups.size()!=3||s->nav.page->controls.size()!=3||!s->nav.page->hasPopup)return result(d,S::resource);
   s->widgets=std::make_shared<OriginalUiTournamentWidgets50KG>();if(!s->widgets->bind(cold.widgets,d.widget))return result(d,S::widget);
   const auto localized=[&](std::int32_t id)->const std::string*{if(id<0)return nullptr;const auto*e=cold.english->at(std::size_t(id));return e?&e->text:nullptr;};

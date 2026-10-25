@@ -1,5 +1,7 @@
 #pragma once
 #include "original_camera_start_effects.h"
+#include "original_wreck_components50la.h"
+#include "../../platform/linux/native/race_audio_groups50ic.h"
 #include "original_attached_camera_controller.h"
 #include "original_gc_camera_start_lifecycle.h"
 #include "original_camera_racer_fields.h"
@@ -88,6 +90,8 @@ inline OriginalCameraStartResult resetOriginalRenderer2450A0(
 struct OriginalCameraControllerEntityFields {
     std::uint64_t controllerKey=0,firstEntityChild18=0;
     std::uint8_t flags29=3;
+    OriginalWreckComponent50LA* actualController=nullptr;
+    OriginalWreckComponent50LA* actualIntroAudio=nullptr;
 };
 struct OriginalRaceCameraDisplayFields {
     std::uint64_t sessionGeneration=0,raceKey=0;
@@ -143,8 +147,21 @@ class OriginalRaceViewportCall final {
     OriginalCameraStartResult controllers(OriginalRaceCameraDisplayFields& d) noexcept {
         //The real fresh controller entity trees have no generic children.
         //Do not claim that unknown virtual notification descendants ran.
-        for(const auto* c:d.controllers48)if(c&&c->firstEntityChild18)
-            return {OriginalCameraStartStatus::sceneChildren,0x1414cc};
+        for(unsigned i=0;i<d.controllers48.size();++i){
+            auto* c=d.controllers48[i];if(!c||!c->firstEntityChild18)continue;
+            auto* parent=c->actualController;auto* child=c->actualIntroAudio;
+            if(!parent||!child||parent->firstChild18!=child||child->parent1C!=parent||
+               child->next14||child->previous10||child->firstChild18||
+               child->kind!=OriginalWreckComponentKind50LA::wattoEmitter2921C0||
+               c->firstEntityChild18!=static_cast<std::uint64_t>(reinterpret_cast<std::uintptr_t>(child)))
+                return {OriginalCameraStartStatus::sceneChildren,0x1414cc};
+            OriginalWreckComponent50LA* nodes[]={parent,child};
+            const OriginalWreckComponentDomain50LA domain{parent->sessionGeneration,nodes,2};
+            const auto r=setOriginalWreckBaseActivity50LA(domain,*parent,i==0);
+            if(r.status!=OriginalWreckComponentStatus50LA::complete)
+                return {OriginalCameraStartStatus::sceneChildren,r.sourcePC};
+            c->flags29=parent->flags29;
+        }
         if(d.controllers48[0])d.controllers48[0]->flags29|=3u;
         for(unsigned i=1;i<4;++i)if(d.controllers48[i])d.controllers48[i]->flags29&=static_cast<std::uint8_t>(~3u);
         return {OriginalCameraStartStatus::complete,0x1a9938};
@@ -246,6 +263,10 @@ struct OriginalGcIntroExitBindings {
     CoupledNoiseContext49M* startRandom=nullptr;
     void* startMusicContext=nullptr;
     bool (*startMusicRequest)(void*,std::int32_t,std::int32_t)=nullptr;
+    platform::RaceAudioGroups50IC* introAudioOwner=nullptr;
+    //0 natural mode7 completion;1 genuine mode7 skip;2 no7C skip;3 no7C exhaustion.
+    unsigned taExitReason=0;
+    bool (*introMusicFadeRequest)(void*,float)=nullptr;
 };
 //1AFD80 returns from1A9750 before types2/3 call1AD3C0. The one
 //308030 draw is retained even if the actual music consumer cannot yet finish.
@@ -338,7 +359,7 @@ public:
         using S=OriginalCameraStartStatus;
         if(completed_)return {S::alreadyComplete,0x176728};
         const auto* registry=b.introChild.collection;
-        if(!b.controller.bound||!b.start7C.prepared||!b.start7C.active||!b.start7C.complete240||
+        if(!b.controller.bound||!b.start7C.prepared||(!b.start7C.active&&b.taExitReason<2)||(!b.start7C.complete240&&!b.taExitReason)||
            b.introChild.start7C!=&b.start7C||!registry||!registry->bound||
            registry!=b.attachedChild.collection||registry!=b.followChild.collection||registry->sessionGeneration!=b.controller.binding.sessionGeneration||
            registry->sceneKey!=b.controller.binding.sceneKey||b.start7C.sessionGeneration!=registry->sessionGeneration||
@@ -348,11 +369,12 @@ public:
            b.follow64.sessionGeneration!=registry->sessionGeneration||b.follow64.racerKey!=b.controller.binding.racerKey)
             return {S::owner,0x176654};
         if((b.actualLaunch11258!=1&&b.actualLaunch11258!=3)||(b.actualPreference11030!=5&&b.actualPreference11030!=0)||
-           b.actualRacerState40!=0||b.actualIntroAudio80||b.controller.flags62&0xe0u||
+           b.actualRacerState40!=0||(b.actualIntroAudio80&&(!b.introAudioOwner||
+               b.introAudioOwner->taIntroEntity80()==nullptr))||b.controller.flags62&0xe0u||
            (b.raceFlags1B0&3u)!=1u||!b.startActions.authenticated())return {S::sourcePath,0x176664};
         if(!begun_){
-            if(b.controller.mode44!=7||registry->registered38[registry->selected34]!=b.introChild.start7CKey)
-                return {S::owner,0x176648};
+            if((b.taExitReason<2&&(b.controller.mode44!=7||registry->registered38[registry->selected34]!=b.introChild.start7CKey))||
+               (b.taExitReason>=2&&b.controller.mode44!=4))return {S::owner,0x176648};
             generation_=registry->sessionGeneration;controllerKey_=registry->controllerKey;begun_=true;
         }else if(generation_!=registry->sessionGeneration||controllerKey_!=registry->controllerKey)
             return {S::owner,0x176664};
@@ -366,7 +388,10 @@ public:
                 });
                 break;
             case 2:r=requestOriginalCameraExitFade2AED60(b.actualFadeManagerA8,b.actualApplicationMode22C,b.video,b.sharedClock);break;
-            case 3:b.raceFlags1B0|=8u;break;
+            case 3:
+                if(b.taExitReason>=2&&(!b.introMusicFadeRequest||!b.introMusicFadeRequest(b.startMusicContext,.5f)))
+                    return {S::sourcePath,0x1a4ab0};
+                b.raceFlags1B0|=8u;break;
             case 4:
                 //178700 reads the actual saved mode AND Follow preset ID.
                 //Single view skips17878C's destructive multi-view clamp.
@@ -380,7 +405,7 @@ public:
                  if(switched.status!=OriginalFollowControllerStatus::complete)return {S::sourcePath,switched.sourcePC};}
                 break;
             case 5:
-                b.follow64.distanceOffset58=b.follow64.yawOffset5C=b.follow64.pitchOffset60=b.follow64.fovOffset64=0;
+                if(!b.taExitReason)b.follow64.distanceOffset58=b.follow64.yawOffset5C=b.follow64.pitchOffset60=b.follow64.fovOffset64=0;
                 break;
             case 6:r=beginOriginalRaceCountdown1AFD80(b.countdown,b.actualManager,b.actualApplication33C,
                     b.actualLaunch11258,b.startActions);break;
@@ -388,11 +413,11 @@ public:
             case 8:
                 r=music_.advance(b);if(r.status!=S::complete)return r;
                 revealOriginalRaceUi199770(b.actualUiFlags1E4);break;
-            case 9:b.controller.cooldown8C=1;break;
-            case 10:b.controller.flags63Low5|=1u;break;
+            case 9:if(!b.taExitReason)b.controller.cooldown8C=1;break;
+            case 10:if(!b.taExitReason)b.controller.flags63Low5|=1u;break;
             case 11:
-                //Actual80==null and racer40==0,mode44==0/5:2924A0 and
-                //176728..1767C4's mode correction both genuinely skip.
+                if(b.actualIntroAudio80&&!b.introAudioOwner->stopTaIntro2924A0())return {S::sourcePath,0x2924a0};
+                // Current racer40=0, mode0/5: no mode correction follows.
                 completed_=true;return {S::complete,0x1767c4};
             default:return {S::owner,0x176664};
             }

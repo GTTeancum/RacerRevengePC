@@ -1,5 +1,6 @@
 #pragma once
 #include "audio_mixer50hd.h"
+#include "native_race_intro_transport50la.h"
 #include "../../../src/game/original_application_entities50la.h"
 #include "../../../src/game/original_application_animation_clock50kg.h"
 #include <array>
@@ -26,6 +27,7 @@ class OriginalApplicationAural50KG final {
     friend class OriginalUiLightManagerOwner50KG;
     friend class OriginalUiGaragePageOwner50KG;
     friend class RaceAudioGroups50IC;
+    friend class NativeRaceIntroTransport50LA;
     using Application=::original_main_entry50KG::Application;
     using E=game::OriginalApplicationEntities50LA;
     using C=game::OriginalWreckComponent50LA;
@@ -55,6 +57,8 @@ public:
     OriginalApplicationAural50KG& operator=(const OriginalApplicationAural50KG&)=delete;
     bool current()const noexcept;
     Observation inspect()const noexcept;
+    // Actual authenticated APPSTART owner already retained by this same interface.
+    std::shared_ptr<const assets::OriginalStreamMetadata50KZ> retainedStreamMetadata()const noexcept;
 private:
     // Read-only native construction custody for the canonical race group.
     // Ownership comes from the actual Application, never a caller alias.
@@ -92,18 +96,20 @@ private:
         // third contents are unknown until a producer writes them.
         std::unique_ptr<std::uint32_t[]> handles9C0,reuseAge9C8;
         std::unique_ptr<std::uint64_t[]> rows9CC;
-        enum class StreamKind : std::uint8_t {song,riderConfirm,watto};
+        enum class StreamKind : std::uint8_t {song,riderConfirm,watto,raceIntro};
         struct StreamSlot {
             StreamKind kind=StreamKind::song;
             std::uint32_t sourceOrdinal=0; // Song selection or retained Sound ordinal.
             std::uint64_t generation=0; // Native lifetime identity, NOT a guest handle.
             const assets::OriginalStreamMetadataRow50KZ* metadata=nullptr;
             AudioClip50HD clip{};
+            std::shared_ptr<const NativeRaceIntroTransport50LA::Assets> raceAssets;
             float age=180.f;
             bool occupied=false;
         };
         std::array<StreamSlot,8> streamSlots{};
         std::uint64_t streamGeneration=0;
+        const NativeRaceIntroTransport50LA* raceIntroLease=nullptr;
         bool streamRetirementAuthorized=false;
         // Native synchronous submission-boundary observations, NOT guest E00,
         // RPC packet indexes, source channel ages or a hardware-complete flag.
@@ -141,6 +147,10 @@ private:
         std::array<NativeInterface::StreamSlot,8>&,AudioMixer50HD::NativeSourceStreamStart50KG&)const noexcept;
     void commitNativeStreamSlots(const std::array<NativeInterface::StreamSlot,8>&)const noexcept;
     bool previewNativeStreamSuffix(float,std::array<NativeInterface::StreamSlot,8>&)const noexcept;
+    bool raceIntroTransportCurrent(const NativeRaceIntroTransport50LA&,bool acquiring=false)const noexcept;
+    bool raceIntroPublicationServiced(const original_ui_source_timing50LH::PublicationView&,std::uint64_t)const noexcept;
+    bool raceIntroFactorCurrent(const NativeRaceIntroTransport50LA&,
+        const original_ui_source_timing50LH::PublicationView&,float&,std::uint64_t&)const noexcept;
     std::optional<std::unique_ptr<NativeInterface>> interfaceA0_;
     bool initializationAttempted_=false,nativeInitialized_=false;
     std::uint64_t clearCalls_=0;

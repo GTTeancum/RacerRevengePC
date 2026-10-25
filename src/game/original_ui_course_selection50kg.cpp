@@ -73,6 +73,6 @@ S planOriginalUiCourseEntryPrefix50KG(const OriginalUiCourseSelectionData50KG& d
     next.laps14EC=p.mode34==0?p.laps704:p.laps718;next.entrants14F0=p.mode34==0?p.entrants708:p.entrants714;
     if(!data.control(next.courseSlot14E4,next.selectedControl))return S::invalidSelection;
     next.planetProfileChange={OriginalUiProfileField50KG::rider2Bits1125E,OriginalUiProfileWrite50KG::maskedByte,next.selectedControl.planet40<<5,0xe0,0x1DA618};
-    next.showPopup438=p.cardFlag100BC;out=next;return S::ok;
+    next.showPopup438=p.cardFlag100BC&&!p.nativeBetaStorage;out=next;return S::ok;
 }
 }

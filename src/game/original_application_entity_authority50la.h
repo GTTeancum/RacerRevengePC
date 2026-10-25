@@ -1,6 +1,7 @@
 #pragma once
 namespace original_racer_manager_entity { class Owner; }
 namespace original_camera_session50KX { class Session; }
+namespace original_main_entry50KG { struct Application; }
 #include "original_entity_chains50la.h"
 #include <array>
 #include <exception>
@@ -20,6 +21,7 @@ class OriginalPauseStorage50LA;
 // original forest, dispatch targets, or a completed Application phase.
 class OriginalApplicationEntityAuthority50LA final {
     friend class OriginalApplicationEntities50LA;
+    friend struct ::original_main_entry50KG::Application;
     friend class OriginalFrontendCameraCold50LA;
     friend class OriginalUiEntityScope50KG;
     friend class OriginalPauseStorage50LA;

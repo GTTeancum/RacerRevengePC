@@ -95,7 +95,16 @@ bool coldControllerIdentity174A30()const noexcept {
 bool releaseColdController174C20()noexcept {
     auto& p=coldController_;
     if(!p.started||p.released)return !p.entity.reference00;
-    if(!coldControllerIdentity174A30()||!actual_.applicationEntities->objectCount423F60())return false;
+    const auto& app=actual_.applicationEntities;auto& e=p.entity;
+    // Retirement after actual child/registry closure also accepts a live-used
+    // controller. Never erase links or counts to make the cold predicate pass.
+    if(!app||app->nativeOwnerThread_!=std::this_thread::get_id()||!app->objectCount423F60()||
+       e.reference00!=1||e.kind!=OriginalWreckComponentKind50LA::cameraController174A30||
+       e.objectKey!=key(controller_)||e.sessionGeneration!=p.issuerGeneration||
+       e.firstChild18||e.parent1C||e.previous10||e.next14||e.descendants24||
+       collection_.registered38||collection_.bound||display_.controllers48[0]||taCuts_||
+       !app->entityAuthority_.canRetire(e)||!original_entity_chain_detail50LA::forest(app->entityAuthority_.view()))return false;
+    for(const auto* child:p.children64)if(child)return false;
     auto& authority=actual_.applicationEntities->entityAuthority_;
     if(!authority.retire(p.entity))std::terminate();
     --p.entity.reference00; //142590->104970 last reference, before subclass destructor.

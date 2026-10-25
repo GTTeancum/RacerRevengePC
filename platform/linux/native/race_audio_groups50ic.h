@@ -11,14 +11,17 @@
 #include <optional>
 #include "original_application_aural50kg.h"
 #include "../../../src/assets/original_ta_intro_authoring_candidate.h"
+#include "native_race_intro_transport50la.h"
 
 namespace live_audio50HF { class Owner; }
-namespace rr::game { class OriginalRaceConstructor50LA; }
+namespace rr::game { class OriginalRaceConstructor50LA; class OriginalGcIntroExitOwner; }
 namespace rr::platform {
 class RaceAudioGroups50IC final {
     friend class ::ra_pod_scene50LA::Owner;
     friend class ::live_audio50HF::Owner;
     friend class rr::game::OriginalRaceConstructor50LA;
+    friend class rr::game::OriginalGcIntroExitOwner;
+    friend class ::original_camera_session50KX::Session;
 public:
     RaceAudioGroups50IC() noexcept { bindings_.fill(game::RaceAudioGroup50IC::Unrepresented); }
     ~RaceAudioGroups50IC()noexcept { if(coldTaIntroEmitter_)std::terminate();for(const auto& p:coldGroups_)if(p.constructed)std::terminate(); }
@@ -44,10 +47,13 @@ public:
     }
     bool current()const noexcept {
         if(coldStarted_&&coldThread_!=std::this_thread::get_id())return false;
-        // Populated source Sounds need their concrete setters/service. Close
-        // existing native callbacks until typed clear; empty behavior is unchanged.
-        if(coldTaIntroEmitter_)return false; // Count0 emitter/pending prefixes are NOT native-ready.
-        for(const auto& p:coldGroups_)if(p.count48||p.taIntroAuthoring||p.taIntroManager)return false;
+        // Populated source Sounds are admitted only through the concrete TA
+        // source transport, member/service and lifetime checks below.
+        if(coldTaIntroEmitter_&&!taIntroReady())return false;
+        for(std::size_t n=0;n<coldGroups_.size();++n){const auto& p=coldGroups_[n];
+            if((p.count48||p.taIntroAuthoring||p.taIntroManager)&&
+               (n!=static_cast<std::size_t>(game::RaceAudioGroup50IC::Announcer120)||!taIntroReady()))return false;
+        }
         return (!coldStarted_||coldThread_==std::this_thread::get_id())&&
             !coldRetiring_&&!nativeBindingsRetired_&&mixer_&&mixer_->groupEpoch50IC()==epoch_&&mixer_->count()==count_&&
             mixer_->requiresVoiceGroupGains50IC();
@@ -63,7 +69,7 @@ public:
         if(coldStarted_){
             const auto& p=coldGroups_[static_cast<std::size_t>(group)];
             if(coldThread_!=std::this_thread::get_id()||coldMixer_!=mixer_||coldEpoch_!=epoch_||
-               !coldApplication_||!p.constructed||!p.loaded||p.count48||
+               !coldApplication_||!p.constructed||!p.loaded||(p.count48&&(!taIntroReady()||group!=game::RaceAudioGroup50IC::Announcer120))||
                p.slot40<0||static_cast<std::size_t>(p.slot40)>=coldApplication_->soundGroups434A10_.size()||
                coldApplication_->soundGroups434A10_[p.slot40]!=&p.entity)return false;
         }
@@ -137,6 +143,12 @@ public:
     const game::RaceAudioGroups50IC& levels()const noexcept{return groups_;}
     const game::RaceAudioSettings50IC& configuredLevels()const noexcept{return settings_;}
     const game::AnnouncerDuckingState50IC& ducking()const noexcept{return duck_;}
+    enum class TaIntroDispatchResult : std::uint8_t {unavailable,sourceFalse,sourceTrue};
+    bool taIntroReady()const noexcept;
+    TaIntroDispatchResult dispatchTaIntro292360(unsigned eventId,unsigned restart=0,unsigned immediate=0)noexcept;
+    bool stopTaIntro2924A0()noexcept;
+    bool serviceTaIntro235720(const original_ui_source_timing50LH::PublicationView&)noexcept;
+    bool retireTaIntro142590()noexcept;
     // Inactive source constructor/load leaves. Caller must interleave actual
     // world141300 before the seventh group and attach the six groups as race children itself.
     bool constructNextCold2350D0(AudioMixer50HD&,
@@ -150,9 +162,32 @@ private:
     struct ColdSound;
     struct ColdGroup;
     struct ColdTaIntroEmitter;
+    bool beginTaIntro177750(std::shared_ptr<const assets::OriginalTaIntroAuthoringCandidate>,
+        game::OriginalWreckComponent50LA&,std::shared_ptr<const assets::AudioBank50HC>,
+        std::size_t firstVoice,std::size_t voiceCount)noexcept;
+    bool finishTaIntro177750(game::OriginalWreckComponent50LA&)noexcept;
+    game::OriginalWreckComponent50LA* taIntroExpectedController_=nullptr;
+    // Camera Session is the sole caller. These are reached source construction
+    // and never-started generic-child closure, not playback capabilities.
+    enum class TaIntroConstructionResult : std::uint8_t {
+        rejected, allocationPending, eventsComplete
+    };
+    TaIntroConstructionResult constructTaIntroEvents177750(
+        std::shared_ptr<const assets::OriginalTaIntroAuthoringCandidate>)noexcept;
+    bool attachTaIntro141960(game::OriginalWreckComponent50LA&)noexcept;
+    bool retireNeverStartedTaIntro142590()noexcept;
+    game::OriginalWreckComponent50LA* taIntroEntity80()noexcept {
+        return coldTaIntroEmitter_?&coldTaIntroEmitter_->entity:nullptr;
+    }
     // Private unactivated proposal leaves for the existing actual race-owner
     // friends only. Intentionally uncalled. Genuine canonical
     // Announcer120 membership; no voice/play/service or controller attachment.
+    std::unique_ptr<NativeRaceIntroTransport50LA> taIntroTransport_;
+    std::array<NativeRaceIntroTransport50LA::Playback,3> taIntroLatest_{};
+    bool taIntroLive_=false;
+    bool taIntroConstructionAdmission_=false;
+    std::size_t taIntroFirstVoice_=0,taIntroVoiceCount_=0;
+    bool taIntroExistingBindingsCurrent()const noexcept;
     bool constructColdTaIntroSounds232ED0(
         std::shared_ptr<const assets::OriginalTaIntroAuthoringCandidate>)noexcept;
     // Never-started stop/release, then235C40. SAME group remains alive for its
@@ -192,6 +227,8 @@ private:
     bool pauseColdGroup2356A0(game::RaceAudioGroup50IC,bool)noexcept;
     bool canPauseGroupSuffix2356EC(game::RaceAudioGroup50IC group,bool requested)const noexcept {
         if(!current()||!groups_.initialized||!represented(group))return false;
+        if(group==game::RaceAudioGroup50IC::Announcer120&&taIntroLive_&&
+           (!taIntroTransport_||!taIntroTransport_->canSetPaused(requested)))return false;
         const auto state=groups_.state44[static_cast<std::size_t>(group)];
         if((state!=0)==requested)return true;
         std::uint64_t changes=0;
@@ -208,13 +245,15 @@ private:
         state=requested?1u:0u; //2356EC precedes26D380 on the actual allocated group.
         for(std::size_t i=0;i<count_;++i)if(bindings_[i]==group)
             if(!mixer_->setVoiceGroupPaused50IC(i,requested))std::terminate();
+        if(group==game::RaceAudioGroup50IC::Announcer120&&taIntroLive_&&
+           !taIntroTransport_->setPaused(requested))std::terminate();
         return true;
     }
     bool canReleaseEmptyCold142590(game::RaceAudioGroup50IC)const noexcept;
     struct ColdGroup;
     // Typed source Sound projection, NOT Entity or native voice. Unknown guest
-    // words are absent rather than fabricated zero bytes. No method can assign
-    // a nonnegative channel to this exclusively never-started owner.
+    // words are absent rather than fabricated zero bytes. The concrete TA live
+    // path publishes revision-safe transport serials, never guest channel IDs.
     struct ColdSound {
         std::uint64_t reference00=0;
         std::uint32_t flags10=0,word14=0,word18=0;
@@ -250,8 +289,9 @@ private:
         std::shared_ptr<const OriginalApplicationAural50KG> taIntroManager;
         bool taIntroStarted=false,taIntroConstructed=false; // Historical begun vs all-three-complete.
     };
-    // Native holding storage, NOT source group ownership or a controller parent.
-    // The detached counted Entity is independently retired before group Sounds.
+    // Native holding storage, NOT source Sound-group ownership. The counted
+    // Entity starts detached, then attaches to the actual controller generic
+    // child chain; it is independently retired before group-owned Sounds.
     struct ColdTaIntroEmitter {
         struct Event {std::uint32_t id00=0;std::optional<ColdSound*> sound04;};
         game::OriginalWreckComponent50LA entity;
@@ -274,6 +314,8 @@ private:
         std::array<std::unique_ptr<Event>,3> ownedEvents;
         std::unique_ptr<Event> pendingEvent; // Native retained292650 in-flight allocation.
         bool configured=false,nativeAppendAborted=false;
+        game::OriginalWreckComponent50LA* controllerParent=nullptr;
+        bool everAttached=false; // Native custody history; not a source flag.
     };
     std::unique_ptr<ColdTaIntroEmitter> coldTaIntroEmitter_;
     std::array<ColdGroup,game::raceAudioGroupCount50IC> coldGroups_;
@@ -320,3 +362,7 @@ private:
 #include "race_audio_groups_ta_intro_setters_candidate.inl"
 
 #include "race_audio_groups_ta_intro_emitter_candidate.inl"
+
+#include "race_audio_groups_ta_intro_controller_candidate.inl"
+
+#include "race_audio_groups_ta_intro_live_candidate.inl"

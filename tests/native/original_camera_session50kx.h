@@ -2,6 +2,10 @@
 #include "../../src/assets/original_ta_cut_authoring_candidate.h"
 #include "../../src/game/original_ta_cut_resource_candidate.h"
 #include <optional>
+#include "source_grid50ig_fixture.h"
+#include "../../platform/linux/native/race_audio_groups50ic.h"
+#include "../../src/assets/original_ta_intro_authoring_candidate.h"
+#include "../../src/game/pod_speech50hg.h"
 #include "../../src/game/original_racer_diffuse_camera50la.h"
 #include "track_navigation_view50tc.h"
 #include "track_navigation_view50tb.h"
@@ -168,6 +172,10 @@ struct ActualOwners {
     void* startMusicContext=nullptr;
     bool (*startMusicRequest)(void*,std::int32_t,std::int32_t)=nullptr;
     const original_subtype3_record::Owner* recordManager40=nullptr;
+    rr::platform::RaceAudioGroups50IC* taIntroAudio=nullptr;
+    std::shared_ptr<const rr::assets::OriginalTaIntroAuthoringCandidate> taIntroAuthoring;
+    bool (*introMusicFadeRequest)(void*,float)=nullptr;
+
 };
 enum class Cut : std::uint8_t {
     // Native hold: use real current final-grid/last-published body state while
@@ -263,7 +271,7 @@ class Session final {
     } reads_;
     enum class FrameStage : std::uint8_t {
         idle,earlyDispatch,earlyTick,earlyMatrix,earlyVisibility,cameraReady,
-        cameraDispatch,cameraUpdate,retirementHud,retirementPose,exit,exitPose,lateTick,lateMatrix,lateVisibility,
+        cameraDispatch,cameraUpdate,taSkipVideo,retirementHud,retirementPose,exit,exitPose,lateTick,lateMatrix,lateVisibility,
         stableMatrix,published,failed
     } frameStage_=FrameStage::idle;
     ActualOwners actual_;
@@ -458,6 +466,10 @@ class Session final {
         nativeTaCutChildPhase_=NativeTaCutChildPhase::aborted; //Never rearm/erase construction history.
         return true;
     }
+    std::unique_ptr<OriginalTaCutChildrenCandidate> taCuts_;
+    unsigned taCutCursor_=0;
+    bool taPositive_=false,taFirstSelected_=false;
+    std::array<TrackIntroLine50HG,3> taLines_{};
     OriginalRaceCameraOwner controller_;
     // ONE noncopyable Entity counterpart for this existing copyable numeric
     // payload. No second controller, borrowed parent, or additional authority.
@@ -493,7 +505,7 @@ class Session final {
     RaceStartPreparationReceipt preparation_;
     std::array<std::uint32_t,16> seedSamples_{};std::size_t seedCount_=0;
     OriginalCameraChildRegistry collection_;
-    std::array<std::uint64_t,4> childOrder_{};
+    std::array<std::uint64_t,7> childOrder_{};
     OriginalStartChildBinding introChild_;
     OriginalAttachedChildRegistry attachedChild_;
     OriginalFollowChildRegistry followChild_;
@@ -516,7 +528,7 @@ class Session final {
     bool directStartPending_=false;
     OriginalRaceStartCountdown countdown_;
     OriginalVideoBlockingFade blockingFade_;
-    AsyncRetainedFade asyncFade_,endingFade_;
+    AsyncRetainedFade asyncFade_,endingFade_,taSkipAsyncFade_;
     //2255B0 camera tail belongs to this one genuine Player camera, outside
     // all racer snapshots. It is separate from the ordinary camera-frame cursor.
     struct HumanResetCamera {
@@ -530,7 +542,7 @@ class Session final {
     } humanResetCamera_;
     OriginalHumanEndClock50KG endingClock_;
     OriginalHumanEndClockCursor50KG endingClockCursor_;
-    bool fadeInRequested_=false,endingFadeRequested_=false;
+    bool fadeInRequested_=false,endingFadeRequested_=false,taSkipFadeInRequested_=false;
     Result result_;
     OriginalCameraModeInputResult lastInput_{};
 
@@ -829,11 +841,12 @@ class Session final {
             app.fadeManagerA8,app.currentApplicationMode22C(),app.application33C,
             static_cast<std::int32_t>(actual_.launchKind11258),
             static_cast<std::int32_t>(preference.field11030),static_cast<std::int32_t>(preference.field11038),
-            0,static_cast<std::int32_t>(actual_.bank.read(0,reads_.state40)),
-            &actual_.arena.noiseOwner(),actual_.startMusicContext,actual_.startMusicRequest};
-        //Source80 null is proved by the retained effective controllerA8=0;
-        //it is not a muted-audio success override. Native existing suffix audio
-        //continues in its real caller, outside this camera owner.
+            taPositive_&&actual_.taIntroAudio->taIntroEntity80()?key(*actual_.taIntroAudio->taIntroEntity80()):0,
+            static_cast<std::int32_t>(actual_.bank.read(0,reads_.state40)),
+            &actual_.arena.noiseOwner(),actual_.startMusicContext,actual_.startMusicRequest,actual_.taIntroAudio,taExitReason_,actual_.introMusicFadeRequest};
+        // Effective zero-cut paths retain actual80=null. Positive TA passes
+        // the real retained emitter and stops it at the ordered2924A0 stage;
+        // stop does not retire its Entity or race-owned Sounds.
         result_.start=directStartPending_?directStart_.advance(bindings,app.renderer,app.diagnostic):
             exit_.advance(bindings,actual_.bank,actual_.baseTail,actual_.arena.fields,app.renderer,app.diagnostic);
         if(result_.start.status!=OriginalCameraStartStatus::complete)
@@ -852,8 +865,19 @@ class Session final {
         }
         frameStage_=FrameStage::exitPose;return set(Status::complete,0x1767c4);
     }
+#include "original_ta_camera_lifecycle.inl"
 public:
     explicit Session(ActualOwners actual) noexcept:actual_(actual){}
+    OriginalWreckComponent50LA* taControllerEntity174A30()noexcept {
+        return coldController_.started&&!coldController_.released&&!closed_?&coldController_.entity:nullptr;
+    }
+    bool constructTaIntro177750(std::shared_ptr<const rr::assets::AudioBank50HC> bank,
+        std::size_t firstVoice,std::size_t voiceCount)noexcept {
+        return constructTaIntroAudio177750(std::move(bank),firstVoice,voiceCount);
+    }
+    const rr::assets::OriginalTaCutAuthoringCandidate* taCutAuthoring()const noexcept {
+        return nativeTaCutAuthoring_?nativeTaCutAuthoring_->authoring.get():nullptr;
+    }
     ~Session(){
         if(coldController_.entity.reference00)std::terminate();
         if(nativeTaCutChildPhase_==NativeTaCutChildPhase::constructed&&
@@ -1075,13 +1099,15 @@ public:
     bool asyncVideoPending()const noexcept {
         //Numeric25B5D0 may clear direction bits before the final staged GPU
         //sample/restore retires. Retained owner state, not flags alone, wins.
-        return !abandoned_&&((fadeInRequested_&&!asyncFade_.complete())||
+        return !abandoned_&&((taSkipFadeInRequested_&&!taSkipAsyncFade_.complete())||
+            (fadeInRequested_&&!asyncFade_.complete())||
             (endingFadeRequested_&&!endingFade_.complete()));
     }
     bool pendingDisplayWork()const noexcept {
         return displayInputs_&&((displayInputs_->video.flags404Low6&3u)||
             (raceFlags1B0_&8u)||displayInputs_->fadeManagerA8==8||
             (asyncFade_.started()&&!asyncFade_.complete())||
+            (taSkipAsyncFade_.started()&&!taSkipAsyncFade_.complete())||
             (endingFadeRequested_&&!endingFade_.complete()));
     }
     std::uint64_t publishedFrame()const noexcept{return completedFrame_;}
@@ -1102,9 +1128,11 @@ public:
     //generation is the native race lifetime key; it does not assert a guest ID.
     Result prepare(std::uint64_t generation,const AuthoredInputs& authored,DisplayInputs& app){
         invalidateFogPreparation();
-        // Unactivated constructor branch cannot enter the reduced native
-        // initialization order, even after typed retirement. No fresh receipt.
-        if(coldController_.started)return set(Status::sourcePath,0x174df0u);
+        // The consumed TA constructor has one retained, generation-bound
+        // real74 collection. Other unpublished constructor experiments do not
+        // admit this source lifecycle, and retired owners cannot be reused.
+        if(coldController_.started&&(!taCuts_||coldController_.released||
+           coldController_.issuerGeneration!=generation))return set(Status::sourcePath,0x174df0u);
         // Unpublished constructor staging is a different private lifetime,
         // not evidence for the existing reduced native prepare chronology.
         if(nativeTaCutChildPhase_!=NativeTaCutChildPhase::empty)return set(Status::sourcePath,0x282860u);
@@ -1174,7 +1202,21 @@ public:
                     return set(Status::authoring,0x174e48);
                 // A source-positive count reaches the real74 cut collection.
                 // Never substitute the procedural7C path for those children.
-                if(startPrelude_.controllerCutCountA8()!=0)return set(Status::sourcePath,0x174fa4);
+                if(startPrelude_.controllerCutCountA8()!=0){
+                    if(startPrelude_.controllerCutCountA8()!=3||!taCuts_||!coldController_.started||
+                       !actual_.taIntroAudio||!actual_.taIntroAuthoring||!actual_.actualRadarMapB8||
+                       !actual_.startMusicRequest||!actual_.introMusicFadeRequest)
+                        return fail(Status::sourcePath,0x174fa4);
+                    taPositive_=true;
+                    if(!bindTaIntroEntity())return fail(Status::owner,0x177750);
+                    if(!taCuts_->loaded()){
+                        if(!original_ta_cut_resource_candidate_detail::arithmeticAdmitted())return fail(Status::numeric,0x282cd0);
+                        if(actual_.applicationEntities->cutOrigin443200_!=std::array<std::uint32_t,4>{{0,0,0,0x3f800000u}})
+                            return fail(Status::sourcePath,0x282d18);
+                        const auto loaded=taCuts_->load175510();
+                        if(!loaded.okay())return fail(Status::authoring,loaded.sourcePC);
+                    }
+                }
                 const auto pod=identity_[0].pod60;
                 if(pod>static_cast<std::uint32_t>(std::numeric_limits<std::int32_t>::max()))return set(Status::owner);
                 if(authoredPhase_==1){
@@ -1211,6 +1253,16 @@ public:
                 if(!actual_.followQueries.bindDeathChild(key(death_)))return set(Status::owner,0x1752d0u);
                 ++coldPhase_;break;}
             case 5:{
+                if(taPositive_&&!taFirstSelected_){
+                    if(!bindTaRegistryBefore7C())return fail(Status::owner,0x1752d0);
+                    result_.visibilityJoin=attachFreshSelectedOriginalCamera0Visibility50SC(actual_.visibility,generation_,key(scene_),
+                        spatial_,visibilityBacking_,visibilityKeys_,sceneBinding_);
+                    if(result_.visibilityJoin.status!=OriginalCameraVisibilityJoinStatus::complete)
+                        return fail(Status::visibility,0x175224);
+                    pose_.position=sceneBinding_.position180;
+                    if(!nextTaCut1756D0())return fail(Status::sourcePath,taFailurePC_);
+                    taFirstSelected_=true;
+                }
                 RaceStartRacerBank bank;GcStartRacerEffectBank unused;
                 if(!readRacers(bank,unused))return set(Status::owner);
                 const auto status=prepareOriginalRaceStartCamera(start_,bank,actual_.sharedRandom,actual_.arena.noiseOwner(),
@@ -1229,20 +1281,32 @@ public:
                 const RaceCameraBinding b{generation_,key(scene_),key(identity_[0].racerTag),key(identity_[0].mainBodyTag),
                     0,actual_.humanCount34?CameraRacerClass::player:CameraRacerClass::ai,
                     actual_.humanCount34?CameraBootstrap::original_single_player:CameraBootstrap::native_all_ai};
-                if(!bindFreshOriginalRaceCamera(controller_,b))return set(Status::owner);
+                if(!controller_.bound&&!bindFreshOriginalRaceCamera(controller_,b))return set(Status::owner);
                 //Explicit reduced NATIVE registry: actual fully owned children
                 //in source relative order. Source unused70/78 are omitted;
                 //count/ordinals are not retail parity. No dummy success owners.
-                childOrder_={{key(follow_),key(death_),key(attached_),key(start_)}};
-                if(!bindFreshOriginalCameraChildRegistry(collection_,generation_,key(controller_),key(scene_),
-                    childOrder_.data(),childOrder_.size()))return set(Status::owner);
+                if(taPositive_){
+                    //1753CC follows the real first1756D0. Append actual7C only now.
+                    childOrder_[6]=key(start_);collection_.count30=7;
+                    coldController_.children64[6]=&start_;
+                }else{
+                    childOrder_={{key(follow_),key(death_),key(attached_),key(start_),0,0,0}};
+                    if(!bindFreshOriginalCameraChildRegistry(collection_,generation_,key(controller_),key(scene_),
+                        childOrder_.data(),4))return set(Status::owner);
+                }
                 introChild_={&start_,key(start_),&collection_};attachedChild_={&attached_,key(attached_),&collection_};
                 followChild_={&follow_,key(follow_),&collection_};
                 deathChild_={&death_,key(death_),&collection_};
-                objectChildren_={generation_,key(controller_),key(scene_),0,0};
+                objectChildren_={generation_,key(controller_),key(scene_),taPositive_?key(*coldController_.entity.firstChild18):0,0};
                 controllerEntity_.controllerKey=key(controller_);display_.controllers48[0]=&controllerEntity_;
+                if(taPositive_){
+                    if(!bindTaIntroEntity())return fail(Status::owner,0x177750);
+                    objectChildren_.actualController=&coldController_.entity;
+                    objectChildren_.actualIntroAudio=coldController_.entity.firstChild18;
+                }
                 ++coldPhase_;break;}
             case 7:
+                if(taPositive_){++coldPhase_;break;}
                 result_.visibilityJoin=attachFreshSelectedOriginalCamera0Visibility50SC(actual_.visibility,generation_,key(scene_),
                     spatial_,visibilityBacking_,visibilityKeys_,sceneBinding_);
                 if(result_.visibilityJoin.status!=OriginalCameraVisibilityJoinStatus::complete){
@@ -1325,6 +1389,15 @@ public:
             frameStage_=FrameStage::cameraUpdate;break;
         case FrameStage::cameraUpdate:{
             StableRaceCameraFrame current;if(!stableFrame(current))return fail(Status::sourcePath,0x175d70);
+            if(taPositive_&&(controller_.mode44==4||(controller_.mode44==7&&(controller_.flags62&0x80u)))){
+                if(current.racerState40!=0||(current.raceFlags1B0&3u)!=1u||
+                   (current.raceFlags1B0&0x10u)||((current.raceStateFlags58&1u)&&current.racerCD4==0))
+                    return fail(Status::sourcePath,0x175d70);
+                if(!advanceTaCut175D70())return fail(Status::sourcePath,taFailurePC_);
+                if(frameStage_==FrameStage::exit)break;
+                if(frameStage_==FrameStage::taSkipVideo)return set(Status::videoPending,0x260850);
+                frameStage_=FrameStage::lateTick;break;
+            }
             if(controller_.mode44==4||controller_.mode44==7){
                 RaceStartRacerBank bank;GcStartRacerEffectBank fields;if(!readRacers(bank,fields))return fail(Status::owner);
                 const auto& p=actual_.preferences.slots[0];
@@ -1460,6 +1533,13 @@ public:
             result_.attached=r.pose;
             if(r.status!=OriginalAttachedRaceFrameStatus::complete)return fail(Status::sourcePath,r.pose.sourcePC);
             frameStage_=FrameStage::stableMatrix;break;}
+        case FrameStage::taSkipVideo:
+            if(!taSkipBlockingFade_.complete())return set(Status::videoPending,0x260850);
+            if(!taFinishSkipFade())return fail(Status::sourcePath,taFailurePC_);
+            {RaceStartRacerBank bank;GcStartRacerEffectBank unused;
+            if(!readRacers(bank,unused)||advanceOriginalRaceStartCameraView(start_,bank,frameDelta_,scene_,pose_,matrices_,
+                displayInputs_->rootFlags228,sceneFlags29_)!=RaceStartStatus::ok)return fail(Status::numeric,0x2d6f10);}
+            frameStage_=FrameStage::lateTick;break;
         case FrameStage::retirementHud:
             if(!actual_.raceHud||!actual_.raceHud->loaded()||!actual_.raceHud->stopAll1AD230())
                 return fail(Status::owner,0x1ad230u);
@@ -1534,12 +1614,14 @@ public:
             frameStage_=FrameStage::lateVisibility;break;
         case FrameStage::lateVisibility:
             if(!updateSpatial())return fail(Status::visibility,0x114c44);
+            if(!dispatchTaEntity141ED0())return fail(Status::sourcePath,taFailurePC_);
             frameStage_=FrameStage::published;completedFrame_=frameNumber_;++publicationCount_;return set(Status::framePublished,0x115dd0);
         case FrameStage::stableMatrix:
             //Stable composition already did the second actual tick/visibility.
             //Complete the derived236DD0 screen/guard caches for this same pose.
             result_.start=rebuildOriginalRaceScene236DD0(viewport_,scene_,pose_.position,matrices_);
             if(result_.start.status!=OriginalCameraStartStatus::complete)return fail(Status::numeric,result_.start.sourcePC);
+            if(!dispatchTaEntity141ED0())return fail(Status::sourcePath,taFailurePC_);
             frameStage_=FrameStage::published;completedFrame_=frameNumber_;++publicationCount_;return set(Status::framePublished,0x115dd0);
         default:return set(Status::order);
         }}
@@ -1576,20 +1658,23 @@ public:
             if(sound!=AudioResult::started&&sound!=AudioResult::unavailable&&sound!=AudioResult::muted)return {false,0};
             if(!saveOriginalCameraModePreference178670(controller_,follow_,actual_.preferences,0))return {false,0};
         }else if(lastInput_.status!=OriginalCameraModeInputStatus::needsChildRoute142350)return {false,0};
-        //Actual reduced native object graph has no controller18 descendants;
-        //these are NOT the camera collection38 whose selected child owns pose.
-        if(objectChildren_.controllerChild18)return {false,0};
+        // Generic Entity18 is distinct from camera collection38. Positive TA
+        // traverses the real emitter; zero-cut paths retain empty Entity lists.
+        if(objectChildren_.controllerChild18)return routeTaEntityInput(event,record,true);
         const EventChildRouter48Z children{0x600u,noEventChild48Z,nullptr,0};
         const auto routed=routeChildInputEvent48Z(children,true,event,record,nullptr,nullptr,0);
         return {routed.status==EventRouteStatus48Z::Complete,routed.handled?1u:0u};
     }
     EventCallbackResult48Z release(InputEvent48Z& event,DeviceButtonRecord48Y& record) noexcept {
-        if(objectChildren_.controllerChild18)return {false,0};
+        if(objectChildren_.controllerChild18)return routeTaEntityInput(event,record,false);
         const EventChildRouter48Z children{0x600u,noEventChild48Z,nullptr,0};
         const auto routed=routeChildInputEvent48Z(children,false,event,record,nullptr,nullptr,0);
         return {routed.status==EventRouteStatus48Z::Complete,routed.handled?1u:0u};
     }
     const OriginalCameraModeInputResult& lastInput()const noexcept{return lastInput_;}
+    bool taSkipVideoPending()const noexcept{return frameStage_==FrameStage::taSkipVideo&&!taSkipBlockingFade_.complete();}
+    bool taSkipVideoResumePending()const noexcept{return frameStage_==FrameStage::taSkipVideo;}
+
 
     //ONE existing host countdown. Root calls once per unpaused planned native
     //tick instead of its former advanceCountdown call; never call both. Intro
@@ -1619,7 +1704,9 @@ public:
         auto& v=displayInputs_->video;
         if(!(v.flags404Low6&3u))return set(Status::complete);
         if(v.flags404Low6&4u)return set(Status::sourcePath,0x25aa38);
-        result_.start=blockingFade_.advance(v,actual_.applicationClock,backend);
+        result_.start=frameStage_==FrameStage::taSkipVideo?
+            taSkipBlockingFade_.advance(v,actual_.applicationClock,backend):
+            blockingFade_.advance(v,actual_.applicationClock,backend);
         return set(result_.start.status==OriginalCameraStartStatus::complete?Status::complete:Status::videoPending,
             result_.start.sourcePC);
     }
@@ -1629,7 +1716,7 @@ public:
     //numeric camera counter. The backend will capture/validate the image.
     Result advanceRaceFadeInPrefix(){
         if(abandoned_)return set(Status::abandoned);
-        if(!coldBound_||!displayInputs_||(!exit_.complete()&&!directStart_.complete())||!hasView())return set(Status::owner);
+        if(!coldBound_||!displayInputs_||(!exit_.complete()&&!directStart_.complete()&&!taSkipFadeFinished_)||!hasView())return set(Status::owner);
         auto& app=*displayInputs_;auto& video=app.video;
         if((video.flags404Low6&3u)&&!(video.flags404Low6&4u))return set(Status::videoPending);
         if(raceFlags1B0_&8u){
@@ -1646,7 +1733,9 @@ public:
             result_.start=requestOriginalVideoFade260610(video,actual_.applicationClock,
                 app.currentApplicationMode22C(),app.fadeDuration98,true);
             if(result_.start.status!=OriginalCameraStartStatus::complete)return set(Status::videoPending,result_.start.sourcePC);
-            app.fadeManagerA8=0;fadeInRequested_=true;
+            app.fadeManagerA8=0;
+            if(taSkipFadeFinished_&&!exit_.complete()&&!directStart_.complete())taSkipFadeInRequested_=true;
+            else fadeInRequested_=true;
         }else if(app.fadeManagerA8)return set(Status::sourcePath,0x2ae7fc);
         return set(Status::complete,0x2ae958);
     }
@@ -1705,6 +1794,8 @@ public:
         if(!coldBound_||!displayInputs_)return set(Status::owner);
         if(endingVideoPending())result_.start=endingFade_.advance(displayInputs_->video,actual_.applicationClock,
             publicationCount_,backend,OriginalVideoFadeDirection::out260850);
+        else if(taSkipFadeInRequested_&&!taSkipAsyncFade_.complete())result_.start=taSkipAsyncFade_.advance(
+            displayInputs_->video,actual_.applicationClock,publicationCount_,backend);
         else if(fadeInRequested_)result_.start=asyncFade_.advance(displayInputs_->video,actual_.applicationClock,
             publicationCount_,backend);
         else return set(Status::owner);
@@ -1729,7 +1820,7 @@ public:
         // admission; root borrows may already be terminal during abandonment.
         if(nativeTaCutChildPhase_!=NativeTaCutChildPhase::empty&&
            !abortUnpublishedTaCutChildNative())return set(Status::owner,0x2828f0u);
-        if(!releaseColdController174C20())return set(Status::owner,0x174c20u);
+
         if(!releaseRacerEntityPrefixes())return set(Status::renderer,result_.entityCleanup.sourcePC);
         if(!actual_.bank.visit(0,[&](){return actual_.followQueries.close();}))return set(Status::owner,0x120290);
         if(spatial_.registration34.attached){
@@ -1739,6 +1830,7 @@ public:
             result_.spatial=removeOriginalCameraScene1148D0(*world,spatial_,*work);
             if(result_.spatial.status!=LiveZoneStatus50EN::Complete)return set(Status::visibility,0x1148d0);
         }
+        if(!retireTaController())return set(Status::owner,0x174c20u);
         coldBound_=false;closed_=true;return set(Status::complete,0x1148d0);
     }
     //Quit/error cleanup is separate from successful numeric completion. Stop
@@ -1755,7 +1847,7 @@ public:
         // admission; root borrows may already be terminal during abandonment.
         if(nativeTaCutChildPhase_!=NativeTaCutChildPhase::empty&&
            !abortUnpublishedTaCutChildNative())return set(Status::owner,0x2828f0u);
-        if(!releaseColdController174C20())return set(Status::owner,0x174c20u);
+
         if(!releaseRacerEntityPrefixes())return set(Status::renderer,result_.entityCleanup.sourcePC);
         if(!actual_.bank.visit(0,[&](){return actual_.followQueries.close();}))return set(Status::owner,0x120290);
         if(spatial_.registration34.attached){
@@ -1765,6 +1857,7 @@ public:
             result_.spatial=removeOriginalCameraScene1148D0(*world,spatial_,*work);
             if(result_.spatial.status!=LiveZoneStatus50EN::Complete)return set(Status::visibility,0x1148d0);
         }
+        if(!retireTaController())return set(Status::owner,0x174c20u);
         coldBound_=false;closed_=true;return set(Status::abandoned,0x1148d0);
     }
 };

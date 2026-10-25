@@ -1,6 +1,7 @@
 #pragma once
 #include "original_attached_camera_controller.h"
 #include "original_camera_scene_tick.h"
+#include "original_wreck_components50la.h"
 
 namespace rr::game {
 //Actual141300 object-child heads, not the115DE0 camera collection38. The
@@ -9,6 +10,17 @@ namespace rr::game {
 struct OriginalCameraObjectChildHeads {
     std::uint64_t sessionGeneration=0,controllerKey=0,sceneKey=0;
     std::uint64_t controllerChild18=0,sceneChild18=0;
+    const OriginalWreckComponent50LA* actualController=nullptr;
+    const OriginalWreckComponent50LA* actualIntroAudio=nullptr;
+    bool boundedChildTree()const noexcept {
+        if(sceneChild18)return false;
+        if(!controllerChild18)return !actualController&&!actualIntroAudio;
+        const auto* c=actualController;const auto* e=actualIntroAudio;
+        return c&&e&&c->reference00&&e->reference00&&c->firstChild18==e&&e->parent1C==c&&
+            !e->previous10&&!e->next14&&!e->firstChild18&&!e->descendants24&&
+            e->kind==OriginalWreckComponentKind50LA::wattoEmitter2921C0&&
+            controllerChild18==static_cast<std::uint64_t>(reinterpret_cast<std::uintptr_t>(e));
+    }
 };
 enum class OriginalAttachedRaceFrameStatus : std::uint8_t {
     complete,owner,requiresObjectChildren,requiresOrdinaryScene,
@@ -68,7 +80,7 @@ inline OriginalAttachedRaceFrameResult advanceOriginalStableAttachedRaceFrame(
        !tick.bound||tick.sessionGeneration!=b.sessionGeneration||tick.sceneKey!=b.sceneKey||
        !graph.nodes||graph.count>maxSceneNodes49P||!zones.keys4C0||
        zones.count!=visibility.lifecycle.zoneCount)return r;
-    if(objectChildren.controllerChild18||objectChildren.sceneChild18){
+    if(!objectChildren.boundedChildTree()){
         r.status=OriginalAttachedRaceFrameStatus::requiresObjectChildren;return r;}
     if((rootFlags228&4u)||(sceneFlags29&4u)){
         r.status=OriginalAttachedRaceFrameStatus::requiresOrdinaryScene;return r;}

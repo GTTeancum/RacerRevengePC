@@ -73,6 +73,20 @@ inline RaceMusicPlan50IE planPracticeMusic50IE(const RaceMusicState50IE& s,
     r.loop=true;r.writeLatchBeforeStop=true;r.timer128=0.f;r.playPC=0x234900u;
     return r;
 }
+//175A70 supplies genuine TA intro Song25 with A2=0. It takes the
+// ordinary one-shot branch1A48AC, not final-lap or practice looping.
+inline RaceMusicPlan50IE planTaIntroMusic50IE(const RaceMusicState50IE& s,
+    std::uint32_t liveMode11258,std::uint32_t song,std::uint32_t argumentA2)noexcept {
+    RaceMusicPlan50IE r;r.song=song;
+    if(song!=25u){r.status=RaceMusicPlanStatus50IE::UnsupportedEvent;return r;}
+    if(argumentA2||!validRaceMusicState50IE(s))return r;
+    // Both owner2 and owner3 allowlists omit25; owner4 rejects everything.
+    if(liveMode11258!=1u||s.mode12C>=2){
+        r.status=RaceMusicPlanStatus50IE::Suppressed;return r;
+    }
+    r.status=RaceMusicPlanStatus50IE::Play;r.nextMode12C=1;
+    r.writeLatchBeforeStop=true;r.playPC=0x234880u;return r;
+}
 // Source writes before the backend play call: generic1A48A8 first writes130=1,
 // then1A4AB0 overwrites130=-1 and12C=0 while stopping.1A4820/1A48C4 writes
 // the new12C. The backend start is ordered after these writes and the stop.
@@ -151,18 +165,20 @@ inline RaceMusicLoopFadeResult50IW beginCollisionLoopFade23444050IW(
 // The adapter explicitly supplies native decoded-PCM remaining seconds for
 // mode1; it must not claim reconstructed original stream64/68 clock parity.
 // Source234598/5AC chooses the short-tail branch before any duration writes.
-inline RaceMusicLoopFadeResult50IW beginEndingMusicFade23444050IW(
-    bool actualLoop,float actualRemainingSeconds,RaceMusicLoopFade23444050IW& s) noexcept {
+inline RaceMusicLoopFadeResult50IW beginRequestedMusicFade23444050IW(
+    bool actualLoop,float actualRemainingSeconds,float requestedSeconds,
+    RaceMusicLoopFade23444050IW& s) noexcept {
     if(s.flag20||s.retirement6C!=0.f||s.duration70!=0.f||
        std::fegetround()!=FE_TONEAREST||!std::isfinite(actualRemainingSeconds)||
-       (!actualLoop&&actualRemainingSeconds<=0.f))return {};
-    float duration=1.f,retirement=0.f;
-    if(actualLoop){volatile float next=0.35f+1.f;retirement=next;}
-    else if(actualRemainingSeconds<1.f){
+       (!actualLoop&&actualRemainingSeconds<=0.f)||
+       (requestedSeconds!=0.5f&&requestedSeconds!=1.f))return {};
+    float duration=requestedSeconds,retirement=0.f;
+    if(actualLoop){volatile float next=0.35f+requestedSeconds;retirement=next;}
+    else if(actualRemainingSeconds<requestedSeconds){
         volatile float tailRetirement=0.9f*actualRemainingSeconds;
         volatile float tailDuration=0.8f*actualRemainingSeconds;
         retirement=tailRetirement;duration=tailDuration; //2346D4..23471C.
-    }else{volatile float next=0.25f+1.f;retirement=next;} //234728..234760.
+    }else{volatile float next=0.25f+requestedSeconds;retirement=next;} //234728..234760.
     volatile float milliseconds=1000.f*duration; //23509C before2350A0.
     if(!std::isfinite(retirement)||!std::isfinite(duration)||duration<=0.f||
        retirement<=0.f||milliseconds<0.f||milliseconds>1000.f)return {};
@@ -170,6 +186,11 @@ inline RaceMusicLoopFadeResult50IW beginEndingMusicFade23444050IW(
     s.flag20=true;s.retirement6C=retirement;s.duration70=duration;
     return {RaceMusicLoopFadeStatus50IW::NeedTimedVolume26C8F0,
         {0x2350a8u,0x26c8f0u,0,0,rounded}};
+}
+// Preserve the existing ending-only entry point and its one-second contract.
+inline RaceMusicLoopFadeResult50IW beginEndingMusicFade23444050IW(
+    bool actualLoop,float actualRemainingSeconds,RaceMusicLoopFade23444050IW& s) noexcept {
+    return beginRequestedMusicFade23444050IW(actualLoop,actualRemainingSeconds,1.f,s);
 }
 enum class RaceMusicUpdateStatus50IW : std::uint8_t {Complete,NeedFade234440,InvalidInput};
 struct RaceMusicUpdate50IW {

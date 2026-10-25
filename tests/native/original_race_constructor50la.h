@@ -46,6 +46,18 @@ class OriginalRaceConstructor50LA final {
     bool loadPrefixAttempted_=false,loadPrefixReached_=false;
     std::shared_ptr<ra_cold_aggregate50LA::Owner> world74_;
     bool worldAttempted_=false;
+    // Distinct TA source backing and counted World prefix. No RA cast/alias,
+    // no fabricated full-world load, physics-index or runtime topology owner.
+    std::shared_ptr<ta_original_world50LE::Owner> taWorld74_;
+    OriginalWreckComponent50LA taWorldEntity_;
+    bool taWorldCounted_=false,taWorldPrefixComplete_=false;
+    OriginalWreckComponent50LA* nativeTaController48_=nullptr;
+    std::uint32_t taWorldMode30_=0,taUseEnvironment35C_=0,taWorldMode524_=0;
+    std::unique_ptr<OriginalWreckComponent50LA*[]> taWorldList500_;
+    std::uint32_t taWorldListCapacity504_=0,taWorldListGrowth508_=0,taWorldListCount50C_=0;
+    bool constructTaWorld1A6BC0(const original_main_entry50KG::Application&,
+        std::shared_ptr<ta_original_world50LE::Owner>,std::uint32_t&)noexcept;
+    bool retireNativeTaWorldPrefix(std::uint32_t&)noexcept;
     std::shared_ptr<OriginalPauseStorage50LA> pause100_;
     bool nativeRootAttached_=false,nativeRootMaskReached_=false;
     bool canRetainPause100()const noexcept;
@@ -130,11 +142,40 @@ public:
         sourcePC=0x1a6bc0;return true;
     }
     bool rollbackNativeRaceWorldFailure(std::uint32_t& sourcePC)noexcept;
+    // Borrowed identities only. Actual attachment/retirement stays with this
+    // consumed race's Application authority, never caller-supplied counts.
+    const OriginalWreckComponent50LA* nativeTaRaceEntity()const noexcept {
+        return counted_&&!rolledBack_&&taWorldCounted_&&taWorldPrefixComplete_?&entity_:nullptr;
+    }
+    // Actual1A95DC slot48 publication. This is a pointer store, NOT141960:
+    // the inspected original caller/174DF0 path does not attach a parent edge.
+    bool retainNativeTaControllerSlot48(OriginalWreckComponent50LA& controller)noexcept {
+        if(!nativeTaRaceEntity()||nativeTaController48_||!application_||
+           application_->attachmentLock423F58()||controller.kind!=OriginalWreckComponentKind50LA::cameraController174A30||
+           controller.reference00!=1||controller.sessionGeneration!=entity_.sessionGeneration||
+           controller.parent1C||controller.previous10||controller.next14||controller.mask20||
+           !application_->entityAuthority_.canRetire(controller))return false;
+        nativeTaController48_=&controller;return true;
+    }
+    bool clearNativeTaControllerSlot48(const OriginalWreckComponent50LA& controller)noexcept {
+        if(!nativeTaController48_)return true;
+        if(nativeTaController48_!=&controller||!application_||application_->attachmentLock423F58()||
+           controller.sessionGeneration!=entity_.sessionGeneration||
+           !application_->entityAuthority_.canRetire(controller))return false;
+        nativeTaController48_=nullptr;return true;
+    }
+    const OriginalWreckComponent50LA* nativeTaControllerSlot48()const noexcept {return nativeTaController48_;}
+    const OriginalWreckComponent50LA* nativeTaWorldEntity()const noexcept {
+        return nativeTaRaceEntity()?&taWorldEntity_:nullptr;
+    }
+    const ta_original_world50LE::Owner* nativeTaWorldBacking()const noexcept {
+        return nativeTaRaceEntity()?taWorld74_.get():nullptr;
+    }
     // Reverse native construction-failure cleanup. If world construction has
     // acquired its seventh group, its own explicit rollback must run first.
     bool rollbackNativeRaceGroupsFailure(std::uint32_t& sourcePC)noexcept {
         sourcePC=0x1a6b5c;
-        if(world74_)return false;
+        if(world74_||taWorld74_||taWorldCounted_||nativeTaController48_)return false;
         if(!raceAudio_)return raceGroupCount_==0;
         auto& audio=*raceAudio_;
         if(!counted_||rolledBack_||application_->attachmentLock423F58()||
@@ -175,7 +216,7 @@ public:
         sourcePC=0x1a65cc;
         if(rolledBack_)return true;
         if(!counted_){rolledBack_=true;return true;}
-        if(pause100_||nativeRootAttached_||world74_||loadDisplay_||loadFifo_||raceAudio_||raceGroupCount_||!detachedPrefix()||application_->attachmentLock423F58()||
+        if(pause100_||nativeRootAttached_||world74_||taWorld74_||taWorldCounted_||nativeTaController48_||loadDisplay_||loadFifo_||raceAudio_||raceGroupCount_||!detachedPrefix()||application_->attachmentLock423F58()||
            !application_->objectCount423F60()||!application_->entityAuthority_.retire(entity_))return false;
         --entity_.reference00;--application_->objectCount423F60();
         rolledBack_=true;profile_.reset();resourceContext_.reset();resourceDomain_.reset();return true;

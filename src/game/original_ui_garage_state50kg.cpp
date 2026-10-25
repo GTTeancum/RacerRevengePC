@@ -9,7 +9,7 @@ bool zeroDelta(const OriginalUiGarageState50KG& s) noexcept {
     return true;
 }
 bool validFresh(const OriginalUiGarageState50KG& s) noexcept {
-    if(!s.known||s.selected4E4>=6||s.available34B0!=0||!zeroDelta(s))return false;
+    if(!s.known||s.selected4E4>=6||s.available34B0<0||!zeroDelta(s))return false;
     for(unsigned i=0;i<6;++i)
         if(s.base[i]<0||s.current4E8[i]!=s.base[i]||
            s.maximum[i]<s.current4E8[i]||s.maximum[i]>20)return false;
@@ -29,7 +29,7 @@ bool convertOriginalUiGarageStat50KG(float value,std::int32_t& out) noexcept {
 }
 bool enterOriginalUiGarageFreshState50KG(const OriginalUiGarageProfileNumbers50KG& p,
     OriginalUiGarageState50KG& state) noexcept {
-    if(state.selected4E4>=6||p.unspent2194!=0)return false;
+    if(state.selected4E4>=6||p.unspent2194>static_cast<std::uint32_t>(std::numeric_limits<std::int32_t>::max()))return false;
     OriginalUiGarageState50KG s;s.selected4E4=state.selected4E4;
     for(unsigned i=0;i<6;++i){
         if(!std::isfinite(p.base0180[i])||!std::isfinite(p.current1920[i])||
@@ -100,8 +100,15 @@ OriginalUiGarageInputPlan50KG planOriginalUiGarageFreshInput50KG(
             p.intent=I::maximumRejected;p.next.delta500[row]=state.maximum[row]-state.current4E8[row];
             p.stateWritePC=0x1FE444;p.sound=7;p.soundPC=0x1FE460;p.transportPC=0x1FE478;
         }else{
-            //Cash0 can never fund the positive next price in the admitted
-            //0..20 count domain.1FE5DC branches to1FE5E8 before either write.
+            // Earned cash no longer blocks viewing or leaving Garage. A
+            // funded purchase still requires the real retained transaction,
+            // not a false insufficient-funds response or an unowned mutation.
+            const auto price=50*(state.current4E8[row]+1)+300;
+            if(state.available34B0>=price){
+                p.status=OriginalUiGarageInputStatus50KG::unavailableApply;
+                p.branchPC=0x1FE5DC;return p;
+            }
+            // The genuine insufficient-funds branch precedes either write.
             p.intent=I::insufficientFunds;p.hasWattoAction=true;p.wattoAction=1;p.wattoPC=0x1FE5EC;
             p.sound=7;p.soundPC=0x1FE60C;p.transportPC=0x1FE624;
         }

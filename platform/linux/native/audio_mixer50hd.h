@@ -8,6 +8,7 @@
 
 namespace rr::game {struct OriginalWreckComponent50LA;}
 namespace rr::platform {
+class NativeRaceIntroTransport50LA;
 class OriginalSoundMode50KG;
 class OriginalApplicationAural50KG;
 class NativeSourceReverb50KG;
@@ -29,8 +30,10 @@ inline constexpr std::size_t originalSpeechFirstVoice50HD=originalMaterialFirstV
 // All eight racers retain distinct logical voices, including the followed AI.
 inline constexpr std::size_t originalSpeechVoicesPerRacer50HD=47;
 inline constexpr std::size_t originalSpeechRacers50HD=8;
-inline constexpr std::size_t audioMaximumVoices50HD=originalSpeechFirstVoice50HD+
+inline constexpr std::size_t originalTaIntroFirstVoice50HD=originalSpeechFirstVoice50HD+
     originalSpeechVoicesPerRacer50HD*originalSpeechRacers50HD;
+inline constexpr std::size_t originalTaIntroVoices50HD=3;
+inline constexpr std::size_t audioMaximumVoices50HD=originalTaIntroFirstVoice50HD+originalTaIntroVoices50HD;
 
 // Borrowed decoded, signed PCM16. Samples and the voice array must outlive use.
 // Mono or interleaved stereo; frame counts are not scalar sample counts.
@@ -167,6 +170,14 @@ public:
 private:
     friend class RaceAudioGroups50IC;
     friend class OriginalApplicationAural50KG;
+    friend class NativeRaceIntroTransport50LA;
+    const NativeRaceIntroTransport50LA* nativeRaceIntroTransport_=nullptr;
+    bool (*nativeRaceIntroRenderCurrent_)(const void*,std::size_t)noexcept=nullptr;
+    std::size_t nativeRaceIntroFirst_=0,nativeRaceIntroCount_=0;
+    bool nativeRaceIntroClaimed(std::size_t slot)const noexcept {
+        return nativeRaceIntroTransport_&&slot>=nativeRaceIntroFirst_&&
+            slot-nativeRaceIntroFirst_<nativeRaceIntroCount_;
+    }
     friend class OriginalUiGarageWattoAudio50KG;
     friend class OriginalUiGarageDroidAudio50GN;
     bool nativeSourceVoiceReserved(std::size_t,std::uint64_t)const noexcept;

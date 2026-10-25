@@ -50,7 +50,7 @@ inline OriginalFollowRaceFrameResult advanceOriginalStableFollowRaceFrame(
        !tick.bound||tick.sessionGeneration!=b.sessionGeneration||tick.sceneKey!=b.sceneKey||
        !graph.nodes||graph.count>maxSceneNodes49P||sources.graph!=&graph||!sources.history||
        !zones.keys4C0||zones.count!=visibility.lifecycle.zoneCount)return r;
-    if(objectChildren.controllerChild18||objectChildren.sceneChild18){
+    if(!objectChildren.boundedChildTree()){
         r.status=OriginalFollowRaceFrameStatus::requiresObjectChildren;return r;}
     if((rootFlags228&4u)||(sceneFlags29&4u)){
         r.status=OriginalFollowRaceFrameStatus::requiresOrdinaryScene;return r;}

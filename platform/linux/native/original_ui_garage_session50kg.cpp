@@ -1150,7 +1150,7 @@ bool OriginalUiGarageSession50KG::unsealedRenderFailurePreflightCurrent(const Ap
         visibility_->matchesRetainedSceneOwnership(grant_,sceneAssets_,*page_,*podScene_)&&
         visibility_->nativeTerminalRenderQuiescent(*page_,unsealedRenderPublication_)&&
         page_->sourceEntryReturned1FAE00()&&page_->entryProfileCurrent()&&page_->entryProfile_&&
-        page_->entryProfile_->unspent2194==0&&page_->entryProfile_->mode==2&&sceneAssets_&&page_->entryProfile_->career100C0==sceneAssets_->selectedCareer()&&
+        page_->entryProfile_->mode==2&&sceneAssets_&&page_->entryProfile_->career100C0==sceneAssets_->selectedCareer()&&
         widgets_&&widgets_->pageEntryCustodyCurrent(*page_)&&widgets_->fog_&&widgets_->fog_->lights_&&
         widgets_->fog_->lights_->search_&&widgets_->fog_->lights_->search_->selected_;
 }
@@ -1302,7 +1302,7 @@ bool OriginalUiGarageSession50KG::actorSampleFailurePreflightCurrent(const Appli
         visibility_&&podScene_->currentPrefix()&&podScene_->visibility_==visibility_&&
         visibility_->matchesRetainedSceneOwnership(grant_,sceneAssets_,*page_,*podScene_)&&
         page_->sourceEntryReturned1FAE00()&&page_->entryProfileCurrent()&&page_->entryProfile_&&
-        page_->entryProfile_->unspent2194==0&&page_->entryProfile_->mode==2&&sceneAssets_&&page_->entryProfile_->career100C0==sceneAssets_->selectedCareer()&&
+        page_->entryProfile_->mode==2&&sceneAssets_&&page_->entryProfile_->career100C0==sceneAssets_->selectedCareer()&&
         widgets_&&widgets_->pageEntryCustodyCurrent(*page_)&&widgets_->fog_&&widgets_->fog_->lights_&&
         widgets_->fog_->lights_->search_&&widgets_->fog_->lights_->search_->selected_;
 }
@@ -1415,7 +1415,7 @@ bool OriginalUiGarageSession50KG::publishedObservationFailurePreflightCurrent(co
        !podScene_||!visibility_||page_->borrowScene4C0()!=podScene_||!podScene_->currentPrefix()||
        podScene_->visibility_!=visibility_||!visibility_->matchesRetainedSceneOwnership(grant_,sceneAssets_,*page_,*podScene_)||
        !page_->sourceEntryReturned1FAE00()||!page_->entryProfileCurrent()||!page_->entryProfile_||
-       page_->entryProfile_->unspent2194!=0||page_->entryProfile_->mode!=2||!sceneAssets_||page_->entryProfile_->career100C0!=sceneAssets_->selectedCareer()||
+       page_->entryProfile_->mode!=2||!sceneAssets_||page_->entryProfile_->career100C0!=sceneAssets_->selectedCareer()||
        !widgets_||!widgets_->pageEntryCustodyCurrent(*page_)||!widgets_->fog_||!widgets_->fog_->lights_||
        !widgets_->fog_->lights_->search_||!widgets_->fog_->lights_->search_->selected_||!managerBankLease_||
        managerPageCount148_!=1||!managerPageTable144_||managerPageTable144_[0]!=&page_->entity_||
@@ -1483,7 +1483,7 @@ bool OriginalUiGarageSession50KG::prepareNormalRetirement(const Application& roo
     if(normalRetirementPhase_!=NormalRetirementPhase::notStarted||!publishedOwnerCurrent(root)||
        !managerPublished1B8274_||managerLoadPhase_!=ManagerLoadPhase::published||
        !page_||!podScene_||!page_->sourceEntryReturned1FAE00()||
-       !page_->entryProfileCurrent()||!page_->entryProfile_||page_->entryProfile_->unspent2194!=0||
+       !page_->entryProfileCurrent()||!page_->entryProfile_||
        page_->entryProfile_->mode!=2||!sceneAssets_||page_->entryProfile_->career100C0!=sceneAssets_->selectedCareer()||
        !widgets_||!widgets_->pageEntryCustodyCurrent(*page_)||!widgets_->fog_||
        !widgets_->fog_->lights_||!widgets_->fog_->lights_->search_||
@@ -1492,7 +1492,7 @@ bool OriginalUiGarageSession50KG::prepareNormalRetirement(const Application& roo
        managerPageCount148_!=1||!managerPageTable144_||
        managerPageTable144_[0]!=&page_->entity_||managerCurrentPage14C_!=&page_->entity_||
        managerSelected150_!=1||!managerDeferred190Empty_||managerDat298_||managerArchiveOnlyScope170_)
-        return custodyFailure(error,"Normal Garage Back requires the exact published zero-cash Page and live owner chain");
+        return custodyFailure(error,"Normal Garage Back requires the exact published unchanged Page and live owner chain");
     if(!normalRetirementFrameCurrent(root))
         return custodyFailure(error,"Normal Garage retirement requires no started frame or the exact published, timing-committed, retired-FIFO target");
     if(drawContribution_&&!drawContribution_->releaseUnsealedBeforeRetirement())
@@ -2244,7 +2244,7 @@ void Application::prepareGarageDestinationResources1F241C(Frontend& frontend,
         if(riderProfile->commonProfile()!=profile.get()||!riderProfile->selectedGarageProfileSnapshot(selected)||
            selected.career.career100C0>=frontend.garageCareerResources_.size()||
            !rr::assets::originalUiGaragePodArchive50KG(selected.career.career100C0)||
-           selected.career.stamp.mode34!=2||selected.career.unspent2194!=0||
+           selected.career.stamp.mode34!=2||
            decision.selectedRider!=selected.career.career100C0){
             d.status=S::profile;d.pendingSourcePC=0x1D1CD0;return;
         }
@@ -2539,8 +2539,8 @@ bool Application::prepareGarageManagerEntry1D1950(Frontend& frontend,
     if(!riderProfile||riderProfile->commonProfile()!=profile.get()||
        !riderProfile->selectedGarageProfileSnapshot(selected)||
        !assets||assets->selectedCareer()!=static_cast<int>(selected.career.career100C0)||
-       selected.career.stamp.mode34!=2||selected.career.unspent2194!=0)
-        return fail(Status::input,0x1D1CD0,"Garage entry is bounded to the actual zero-cash selected-career profile");
+       selected.career.stamp.mode34!=2)
+        return fail(Status::input,0x1D1CD0,"Garage entry is bounded to the actual unchanged selected-career profile");
     try {
         auto next=std::shared_ptr<Custody>(new Custody(*this,std::move(assets)));
         garageCustodyOwner_=std::move(next);garageCustodyAttempted_=true;

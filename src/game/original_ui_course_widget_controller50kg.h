@@ -24,6 +24,7 @@ struct OriginalUiCourseWidgetProfile50KG {
     // Actual selected profile facts, not a blanket native capability flag.
     std::uint32_t selectedRider=0xffffffffu;
     std::uint8_t selectedUnlock10FAC=0;
+    bool nativeBetaStorage=false;
 };
 enum class OriginalUiCourseWidgetStepKind50KG :std::uint8_t {widget,audioStartLoop11,audioFade1,promptMask42C};
 struct OriginalUiCourseWidgetStep50KG {

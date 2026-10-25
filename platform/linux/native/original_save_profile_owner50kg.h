@@ -21,7 +21,7 @@ public:
     // has been probed, supports native IO, or has an authenticated selected path.
     OriginalSaveProfileOwner50KG() noexcept;
     ~OriginalSaveProfileOwner50KG()=default;
-    enum class HallOrigin:std::uint8_t {none,localizedFreshRecords,originalPayload};
+    enum class HallOrigin:std::uint8_t {none,localizedFreshRecords,originalPayload,nativeBeta};
     struct KnownFlags100BC {
         std::uint8_t value=0,knownMask=0;
         // Unknown bits are not defined by value. No whole-byte export exists.
@@ -76,5 +76,6 @@ private:
     const assets::OriginalUiMemberIdentity50KG* localizedText_=nullptr;
     std::shared_ptr<const game::OriginalSavePayloadEnvelope50KG> payloadRecords_;
     std::shared_ptr<const OriginalSaveNativeReadStage50KG> importedRead_;
+    std::shared_ptr<const game::OriginalUiHallRecords50KG> nativeBetaHall_;
 };
 }

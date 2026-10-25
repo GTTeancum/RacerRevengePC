@@ -12,7 +12,8 @@ inline bool RaceAudioGroups50IC::canPauseColdGroup2356A0(
        coldApplication_->attachmentLock423F58()||
        !canPauseGroupSuffix2356EC(group,requested))return false;
     auto& p=coldGroups_[static_cast<std::size_t>(group)];auto& e=p.entity;
-    if(!p.constructed||!p.loaded||!p.logicalMembers4C||p.count48||
+    if(!p.constructed||!p.loaded||!p.logicalMembers4C||
+       (p.count48&&(group!=game::RaceAudioGroup50IC::Announcer120||!taIntroReady()))||
        e.firstChild18||e.descendants24||e.sessionGeneration!=coldSession_||
        e.objectKey!=static_cast<std::uint64_t>(reinterpret_cast<std::uintptr_t>(&e))||
        p.slot40<0||static_cast<std::size_t>(p.slot40)>=coldApplication_->soundGroups434A10_.size()||

@@ -68,11 +68,18 @@ bool OriginalSaveProfileOwner50KG::hallRecordsCurrent(const game::OriginalUiHall
     if(hallOrigin_==HallOrigin::localizedFreshRecords)
         return localizedNames_&&localizedText_&&!payloadRecords_&&!importedRead_&&
             records.namesSource==localizedNames_&&records.textSource==localizedText_;
-    if(hallOrigin_!=HallOrigin::originalPayload||!payloadRecords_||!importedRead_||
-       records.namesSource||records.textSource||localizedNames_||localizedText_||
-       importedRead_->projection().retainedEnvelope().get()!=payloadRecords_.get()||
-       importedRead_->receipt().kind()!=OriginalSaveNativeReader50KG::Kind::payload186C70)return false;
-    const auto& saved=importedRead_->projection().records().courses();
+    const std::array<game::OriginalUiHallCourseRecords50KG,13>* savedRows=nullptr;
+    if(hallOrigin_==HallOrigin::nativeBeta){
+        if(!nativeBetaHall_||records.namesSource||records.textSource||localizedNames_||localizedText_)return false;
+        savedRows=&nativeBetaHall_->courses;
+    }else{
+        if(hallOrigin_!=HallOrigin::originalPayload||!payloadRecords_||!importedRead_||
+           records.namesSource||records.textSource||localizedNames_||localizedText_||
+           importedRead_->projection().retainedEnvelope().get()!=payloadRecords_.get()||
+           importedRead_->receipt().kind()!=OriginalSaveNativeReader50KG::Kind::payload186C70)return false;
+        savedRows=&importedRead_->projection().records().courses();
+    }
+    const auto& saved=*savedRows;
     for(std::size_t i=0;i<records.courses.size();++i){
         const auto& a=records.courses[i];const auto& b=saved[i];
         if(a.knockouts10388!=b.knockouts10388||a.lapNames102FC!=b.lapNames102FC||

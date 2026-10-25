@@ -24,6 +24,7 @@ public:
     }
 private:
     friend class OriginalSaveProfileOwner50KG;
+    friend class OriginalUiRiderProfileOwner50KG;
     bool valid()const noexcept {
         if(!knownBytes_||knownBytes_>bytes_.size())return false;
         for(std::size_t i=0;i<knownBytes_;++i)if(bytes_[i]==0)return true;

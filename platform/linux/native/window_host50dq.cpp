@@ -657,6 +657,17 @@ bool WindowHost50DQ::swap(WindowHostDiagnostic50DQ& d) noexcept {
     state_->swapWindow(state_->window);
     return true;
 }
+bool WindowHost50DQ::setTitle(const char* title,WindowHostDiagnostic50DQ& d) noexcept {
+    d={};
+    if(!ownerThread())return fail(d,WindowHostError50DQ::WrongThread,"setTitle");
+    if(!created())return fail(d,WindowHostError50DQ::NotCreated,"setTitle");
+    if(!title||!*title)return fail(d,WindowHostError50DQ::InvalidRequest,"setTitle");
+    char detail[256]{};
+    using SetTitle=void (RR_SDL50WIN_CALL *)(SdlWindow*,const char*);
+    const auto setTitle=reinterpret_cast<SetTitle>(native_library50win::symbol(state_->library,"SDL_SetWindowTitle",detail));
+    if(!setTitle)return fail(d,WindowHostError50DQ::MissingEntryPoint,"SDL_SetWindowTitle",detail);
+    setTitle(state_->window,title);return true;
+}
 bool WindowHost50DQ::setSwapInterval(std::int32_t interval,WindowHostDiagnostic50DQ& d) noexcept {
     d={};
     if(!ownerThread())return fail(d,WindowHostError50DQ::WrongThread,"setSwapInterval");

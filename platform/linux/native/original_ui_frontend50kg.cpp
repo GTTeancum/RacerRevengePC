@@ -546,21 +546,21 @@ struct OriginalUiFrontend50KG::Storage {
         game::OriginalUiCourseRememberedProfile50KG p;
         if(mode==2){
             // Native capability envelope only, not an original unlock rule.
-            // Require the actual unlocked selected rider and clean first-course
+            // Require the actual unlocked selected rider and resumable next-course
             // data before cold preparation. No career is substituted or unlocked.
             OriginalUiRiderProfileOwner50KG::TournamentCareerSnapshot career;
             OriginalUiRiderProfileOwner50KG::RiderSelectionFacts rider;
             return cold.riderProfile->selectedTournamentCourseSnapshot(career,p)&&p.ownerReady&&p.mode34==2&&
                 cold.riderProfile->courseRiderSelectionSnapshot(rider)&&rider.rider==career.career100C0&&
-                career.progress219C==0&&!p.cardFlag100BC&&!career.cardFlag100BC&&
-                career.earned2190==0&&career.unspent2194==0&&career.kills2198==0&&
-                std::all_of(career.medals1938.begin(),career.medals1938.end(),[](auto value){return value==0;})&&
+                (career.progress219C&31u)<13u&&
+                ((!p.cardFlag100BC&&!career.cardFlag100BC)||career.nativeBetaStorage)&&
+                std::all_of(career.medals1938.begin(),career.medals1938.end(),[](auto value){return value<=8;})&&
                 p.planet0Primary79C==0xC2A684&&p.planet0Secondary7A0==0x80674A;
         }
         return cold.riderProfile->courseSnapshot(p)&&p.ownerReady&&p.mode34==0&&
             (p.availability11018&31u)>=1&&(p.availability11018&31u)<=13&&
             p.course700>=1&&p.course700<=13&&p.subtype70C>=1&&p.subtype70C<=3&&
-            p.laps704>=1&&p.laps704<=25&&p.entrants708>=1&&p.entrants708<=8&&!p.cardFlag100BC&&assets::originalUiCourseBackgroundName50KG(p.packed1125E>>5)&&
+            p.laps704>=1&&p.laps704<=25&&p.entrants708>=1&&p.entrants708<=8&&(!p.cardFlag100BC||p.nativeBetaStorage)&&assets::originalUiCourseBackgroundName50KG(p.packed1125E>>5)&&
             p.planet0Primary79C==0xC2A684&&p.planet0Secondary7A0==0x80674A;
     }
     bool tournamentInputsReady(std::uint32_t selected) const noexcept {
@@ -569,7 +569,8 @@ struct OriginalUiFrontend50KG::Storage {
            (cold.profile->playerBits1125C&0x60)!=0x20||
            (cold.audioMode==OriginalUiMainAudioMode50KG::enabled&&!cold.audio->courseMenuReady()))return false;
         OriginalUiRiderProfileOwner50KG::TournamentCareerSnapshot career;
-        return cold.riderProfile->tournamentCareerSnapshot(selected,career)&&!career.cardFlag100BC&&(career.progress219C&31u)==0;
+        return cold.riderProfile->tournamentCareerSnapshot(selected,career)&&
+            (!career.cardFlag100BC||career.nativeBetaStorage)&&(career.progress219C&31u)<13u;
     }
     bool garageActive()const noexcept {return active&&active->garage&&same(active->initialRoute,{13,1});}
     bool garageBankCurrent()const noexcept {

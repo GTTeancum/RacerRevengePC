@@ -18,13 +18,14 @@ bool audio(P& p,K k,std::uint32_t pc)noexcept {if(p.count==p.steps.size())return
 bool prompt(P& p,std::uint32_t mask,std::uint32_t pc)noexcept {if(p.count==p.steps.size())return false;p.steps[p.count++]={K::promptMask42C,0,O::hide,false,pc,mask};p.writesPromptMask42C=true;p.promptMask42C=mask;return true;}
 bool bounded(const OriginalUiCourseWidgetProfile50KG& p)noexcept {
  constexpr std::array<std::uint8_t,13> order{{0,11,4,8,7,1,5,9,12,6,10,3,2}};
- return p.mode34==0&&p.course700>=1&&p.course700<=13&&p.subtype70C>=1&&p.subtype70C<=3&&!(p.flags100BC&1)&&(p.flags11018&31u)>=1&&(p.flags11018&31u)<=13&&((p.flags1125C>>5)&3)<2&&p.courseRecords100C4==order;}
-bool boundedFreshTournament(const OriginalUiCourseWidgetProfile50KG& p)noexcept {
+ return p.mode34==0&&p.course700>=1&&p.course700<=13&&p.subtype70C>=1&&p.subtype70C<=3&&(!(p.flags100BC&1)||p.nativeBetaStorage)&&(p.flags11018&31u)>=1&&(p.flags11018&31u)<=13&&((p.flags1125C>>5)&3)<2&&p.courseRecords100C4==order;}
+bool boundedResumableTournament(const OriginalUiCourseWidgetProfile50KG& p)noexcept {
  constexpr std::array<std::uint8_t,13> order{{0,11,4,8,7,1,5,9,12,6,10,3,2}};
  if(p.mode34!=2||p.career100C0>=27||p.career100C0!=p.selectedRider||!p.selectedUnlock10FAC||
-    p.progress219C!=0||p.courseSlot14E4!=1||p.tier14E8!=1||
-    (p.flags100BC&1)||((p.flags1125C>>5)&3)!=1||p.courseRecords100C4!=order)return false;
- for(auto medal:p.medals1938)if(medal)return false;
+    (p.progress219C&31u)>=13u||p.courseSlot14E4!=(p.progress219C&31u)+1u||
+    p.tier14E8!=(p.courseSlot14E4<5?1u:p.courseSlot14E4<9?2u:3u)||
+    ((p.flags100BC&1)&&!p.nativeBetaStorage)||((p.flags1125C>>5)&3)!=1||p.courseRecords100C4!=order)return false;
+ for(auto medal:p.medals1938)if(medal>8)return false;
  return true;
 }
 }
@@ -114,7 +115,7 @@ S OriginalUiCourseWidgetController50KG::moveLaps(const OriginalUiNavigation50KG&
 }
 S OriginalUiCourseWidgetController50KG::phase(const OriginalUiNavigation50KG& n,OriginalUiCourseWidgetPhase50KG phase,const OriginalUiCourseWidgetProfile50KG& profile,P& out)const noexcept {
  if(!storage_)return S::notBound;if(n.page!=page())return S::page;
- const bool tournament=boundedFreshTournament(profile);
+ const bool tournament=boundedResumableTournament(profile);
  if(!bounded(profile)&&!tournament)return S::unsupportedProfile;
  P p;p.navigation=n;bool ok=true;switch(phase){
  case OriginalUiCourseWidgetPhase50KG::requestedPage90:p.navigation.controllerGroup={{-1,-1}};for(std::size_t i=0;i<6&&ok;++i)ok=group(p,i,O::reset,false,0x2A57D8,0x2A5818);break;
@@ -126,7 +127,7 @@ S OriginalUiCourseWidgetController50KG::phase(const OriginalUiNavigation50KG& n,
  OriginalUiCommands50KG commands;
  if(tournament){
   // 1DA810 sets a1=1 in the branch delay slot. 1DA8A8 enables group5;
-  // mode2 never enables groups2/3. Fresh slot-1==progress skips Widget63 disable.
+  // mode2 never enables groups2/3. Current slot-1==progress skips Widget63 disable.
   if(ok)ok=enable(p,5,true);
  }else{
   if(ok)ok=enable(p,2,true);if(ok){if(selectOriginalUiGroupSlot50KG(p.navigation,2,static_cast<std::uint16_t>(profile.subtype70C),commands)!=OriginalUiNavigationStatus50KG::ok)return S::invalidNavigation;ok=expand(p,commands);}
@@ -138,8 +139,8 @@ S OriginalUiCourseWidgetController50KG::phase(const OriginalUiNavigation50KG& n,
  if(ok)ok=audio(p,K::audioStartLoop11,0x1DA924);if(ok)ok=enable(p,4,false);break;}
  case OriginalUiCourseWidgetPhase50KG::openedB0:
   ok=enable(p,4,true);if(ok)ok=prompt(p,3,0x1DA974);
-  // The genuine selected own-pod medal record is validated above as zero.
-  // The byte==1 prompt2/Widget1 branch is not silently generalized here.
+  // Resumed next-course entry preserves source input ownership; a completed
+  // podium advances to the next slot, while nonpodium retries retain Confirm.
   if(tournament){if(ok)ok=step(p,7,O::deselect,false,0x1DAA38);if(ok)ok=step(p,8,O::deselect,false,0x1DAA54);}break;
  case OriginalUiCourseWidgetPhase50KG::closingB4:ok=prompt(p,0,0x1DAA7C);if(ok)ok=enable(p,4,false);if(ok)ok=audio(p,K::audioFade1,0x1DAAA4);break;
  case OriginalUiCourseWidgetPhase50KG::closedB8:break;

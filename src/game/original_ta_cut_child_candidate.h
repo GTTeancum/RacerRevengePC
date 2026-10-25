@@ -1,6 +1,7 @@
 #pragma once
-// PRIVATE, UNACTIVATED CANDIDATE. No registry, Scene, camera manager or audio
-// integration. No compilation or execution is claimed for this source packet.
+// Bounded authored child owner. The consumed TA Session supplies actual
+// registry/Scene/audio custody; this numerical owner cannot certify those.
+// No compilation or execution is claimed by this source-only change.
 // Source282860/282CD0/282C20/2829C0, bounded to the actual175510 TA call:
 // mode40=0, loop54=0, one node, null load/activation offsets, and process443200
 // in its source3CAAA0-initialized(+0,+0,+0,1) state. This is NOT a provider of
@@ -260,6 +261,32 @@ public:
         for(auto& child:children_)child.reset(); //actual controller74 source order
         authoring_.reset();
     }
+    // Actual controller74 allocation phase precedes177750. Loading175510 is
+    // separate; active4C=1 at construction never certifies loaded motion.
+    static std::unique_ptr<OriginalTaCutChildrenCandidate> construct174FA4(
+        std::unique_ptr<const assets::OriginalTaCutAuthoringCandidate> authoring,
+        const std::array<std::uint32_t,4>& actualOrigin,D& diagnostic) noexcept {
+        diagnostic={S::input,0x174FA4,0,0};
+        if(!authoring||actualOrigin!=std::array<std::uint32_t,4>{{0,0,0,0x3f800000u}})return {};
+        try {
+            auto out=std::unique_ptr<OriginalTaCutChildrenCandidate>(new OriginalTaCutChildrenCandidate);
+            out->authoring_=std::move(authoring);
+            for(unsigned i=0;i<3;++i){
+                out->children_[i].reset(new OriginalTaCutChildCandidate(i+1));
+                for(unsigned k=0;k<4;++k)out->children_[i]->fields_.offset10[k]=
+                    original_ta_cut_numeric_candidate_detail::value(actualOrigin[k]);
+                //282990(null) returns without changing any child field.
+            }
+            diagnostic={S::complete,0x175038,0,0};return out;
+        }catch(...){diagnostic={S::allocation,0x174FC4,0,0};return {};}
+    }
+    D load175510() noexcept {
+        if(loaded_||loadAttempted_)return {S::phase,0x175510,0,0};
+        loadAttempted_=true;
+        for(auto& child:children_){auto d=child->load(*authoring_);if(!d.okay())return d;}
+        loaded_=true;return {S::complete,0x1756BC,0,0};
+    }
+    bool loaded()const noexcept{return loaded_;}
     static std::unique_ptr<OriginalTaCutChildrenCandidate> createInitializedTa(
         std::unique_ptr<const assets::OriginalTaCutAuthoringCandidate> authoring,D& diagnostic) noexcept {
         static_assert(sizeof(float)==4&&std::numeric_limits<float>::is_iec559&&
@@ -276,6 +303,7 @@ public:
                 diagnostic=child->load(*next->authoring_);
                 if(!diagnostic.okay())return nullptr;
             }
+            next->loaded_=next->loadAttempted_=true;
             diagnostic={S::complete,0x175610,0,0};return next;
         }catch(...){diagnostic={S::allocation,0x174FC4,0,0};return nullptr;}
     }
@@ -297,6 +325,7 @@ public:
     }
 private:
     OriginalTaCutChildrenCandidate()=default;
+    bool loaded_=false,loadAttempted_=false;
     std::unique_ptr<const assets::OriginalTaCutAuthoringCandidate> authoring_;
     std::array<std::unique_ptr<OriginalTaCutChildCandidate>,3> children_{};
 };

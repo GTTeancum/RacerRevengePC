@@ -45,9 +45,9 @@ bool OriginalUiGaragePageOwner50KG::draw1FBE10(
            *current4E8_[row]!=base[row]||base[row]<0||maximum[row]<base[row]||maximum[row]>20)
             return fail(d,Status::entryProfilePending,0x1FC2C4);
     }
-    // Native bounded fresh-career envelope only. This does not change profile,
+    // Native bounded unchanged-upgrade envelope. This does not change profile,
     // cash, unlocks or deltas, and does not manufacture nonzero-purchase paths.
-    if(!available34B0_||*available34B0_!=0)return fail(d,Status::entryProfilePending,0x1FD864);
+    if(!available34B0_||*available34B0_<0)return fail(d,Status::entryProfilePending,0x1FD864);
     auto quad=[&](std::uint32_t offset)->Quad*{
         for(std::size_t i=0;i<quadCount_;++i)if(quads_[i].offset==offset)return &quads_[i];
         return nullptr;

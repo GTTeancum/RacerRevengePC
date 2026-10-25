@@ -37,7 +37,7 @@ bool sameLife(const game::OriginalUiTransitionSnapshot50KG& a,const game::Origin
 bool bounded(const game::OriginalUiCourseRememberedProfile50KG& p,const OriginalUiMainProfile50KG& common)noexcept{
     constexpr std::array<std::uint8_t,13> order{{0,11,4,8,7,1,5,9,12,6,10,3,2}};
     return p.ownerReady&&p.mode34==0&&common.mode34==0&&p.course700>=1&&p.course700<=13&&p.subtype70C>=1&&p.subtype70C<=3&&
-        p.laps704>=1&&p.laps704<=25&&p.entrants708>=1&&p.entrants708<=8&&!p.cardFlag100BC&&(p.availability11018&31u)>=1&&(p.availability11018&31u)<=13&&
+        p.laps704>=1&&p.laps704<=25&&p.entrants708>=1&&p.entrants708<=8&&(!p.cardFlag100BC||p.nativeBetaStorage)&&(p.availability11018&31u)>=1&&(p.availability11018&31u)<=13&&
         ((common.playerBits1125C>>5)&3)==1&&p.courseOrder100C4==order&&
         p.planet0Primary79C==0xc2a684&&p.planet0Secondary7A0==0x80674a;
 }
@@ -99,20 +99,20 @@ struct OriginalUiCourseSession50KG::Storage {
     }
     bool testProfileCurrent(const game::OriginalUiCourseRememberedProfile50KG& p)const noexcept{
         return p.youngAnakinMcTest==youngAnakinMcTest&&p.youngAnakinMcTest==cold.profile->youngAnakinMcTestProfile()&&p.kraidGbTest==kraidGbTest&&p.kraidGbTest==cold.profile->kraidGbTestProfile()&&p.sebulbaTbTest==sebulbaTbTest&&p.sebulbaTbTest==cold.profile->sebulbaTbTestProfile()&&p.scorchRcTest==scorchRcTest&&p.scorchRcTest==cold.profile->scorchRcTestProfile()&&p.tzidikTcTest==tzidikTcTest&&p.tzidikTcTest==cold.profile->tzidikTcTestProfile()&&p.gasganoScTest==gasganoScTest&&p.gasganoScTest==cold.profile->gasganoScTestProfile();}
-    bool freshTournamentProfile(OriginalUiRiderProfileOwner50KG::TournamentCareerSnapshot& c,
+    bool resumableTournamentProfile(OriginalUiRiderProfileOwner50KG::TournamentCareerSnapshot& c,
         game::OriginalUiCourseRememberedProfile50KG& p)const noexcept{
         constexpr std::array<std::uint8_t,13> order{{0,11,4,8,7,1,5,9,12,6,10,3,2}};
         OriginalUiRiderProfileOwner50KG::RiderSelectionFacts rider;
         if(!cold.profile->selectedTournamentCourseSnapshot(c,p)||!p.ownerReady||p.mode34!=2||cold.commonProfile->mode34!=2||
-           !cold.profile->courseRiderSelectionSnapshot(rider)||rider.rider!=c.career100C0||c.progress219C||c.cardFlag100BC||p.cardFlag100BC||c.earned2190||c.unspent2194||c.kills2198||
+           !cold.profile->courseRiderSelectionSnapshot(rider)||rider.rider!=c.career100C0||(c.progress219C&31u)>=13u||((c.cardFlag100BC||p.cardFlag100BC)&&!c.nativeBetaStorage)||
            ((cold.commonProfile->playerBits1125C>>5)&3)!=1||p.courseOrder100C4!=order||
            !sameStamp(c.stamp,cold.profile->stamp())||!testProfileCurrent(p))return false;
-        for(auto medal:c.medals1938)if(medal)return false;
+        for(auto medal:c.medals1938)if(medal>8)return false;
         return true;
     }
     bool profileCurrent()const noexcept{game::OriginalUiCourseRememberedProfile50KG p;
         OriginalUiRiderProfileOwner50KG::TournamentCareerSnapshot c;
-        const bool valid=state.mode34==2?freshTournamentProfile(c,p):
+        const bool valid=state.mode34==2?resumableTournamentProfile(c,p):
             cold.profile->courseSnapshot(p)&&bounded(p,*cold.commonProfile)&&testProfileCurrent(p);
         return valid&&(!entered||sameStamp(cold.profile->stamp(),liveStamp))&&
             (!entered||(p.packed1125E>>5)==state.selectedPlanet40);
@@ -121,11 +121,11 @@ struct OriginalUiCourseSession50KG::Storage {
         game::OriginalUiCourseRememberedProfile50KG p;
         if(state.mode34==2){
             OriginalUiRiderProfileOwner50KG::TournamentCareerSnapshot c;
-            if(!freshTournamentProfile(c,p)||game::planOriginalUiCourseMode2Entry50KG(selection,
+            if(!resumableTournamentProfile(c,p)||game::planOriginalUiCourseMode2Entry50KG(selection,
                 {2,c.career100C0,c.progress219C},mode2)!=game::OriginalUiCourseSelectionStatus50KG::ok)return false;
             e={};e.courseSlot14E4=mode2.courseSlot14E4;e.subtypeSlot14F4=mode2.subtypeSlot14F4;
             e.selectedControl=mode2.selectedControl;e.planetProfileChange=mode2.planetProfileChange;
-            return e.courseSlot14E4==1&&mode2.tier14E8==1;
+            return e.courseSlot14E4>=1&&e.courseSlot14E4<=13&&mode2.tier14E8>=1&&mode2.tier14E8<=3;
         }
         return cold.profile->courseSnapshot(p)&&game::planOriginalUiCourseEntryPrefix50KG(selection,p,e)==game::OriginalUiCourseSelectionStatus50KG::ok;
     }
@@ -144,7 +144,8 @@ struct OriginalUiCourseSession50KG::Storage {
         if(state.mode34==2){
             if(n->controllerGroup[0]!=1||n->controllerGroup[1]!=-1||!n->groups[1].enabled||
                n->groups[2].enabled||n->groups[3].enabled||!n->groups[5].enabled||
-               n->groups[1].selectedSlot!=1||state.courseSlot14E4!=1||state.subtypeSlot14F4!=1||state.tier14E8!=1)return false;
+               n->groups[1].selectedSlot!=state.courseSlot14E4||state.courseSlot14E4<1||state.courseSlot14E4>13||state.subtypeSlot14F4!=1||
+               state.tier14E8!=(state.courseSlot14E4<5?1u:state.courseSlot14E4<9?2u:3u))return false;
         }else if(n->controllerGroup[0]<1||n->controllerGroup[0]>3||state.laps14EC<1||state.laps14EC>25||
             state.entrants14F0<1||state.entrants14F0>8||state.subtypeSlot14F4<1||state.subtypeSlot14F4>3||
             (state.subtypeSlot14F4==3&&n->controllerGroup[0]==3)||n->groups[1].selectedSlot!=state.courseSlot14E4||
@@ -165,7 +166,7 @@ struct OriginalUiCourseSession50KG::Storage {
     }
     bool widgetProfile(game::OriginalUiCourseWidgetProfile50KG& out)const noexcept{
         game::OriginalUiCourseRememberedProfile50KG p;OriginalUiRiderProfileOwner50KG::TournamentCareerSnapshot c;
-        if(state.mode34==2){if(!freshTournamentProfile(c,p))return false;}
+        if(state.mode34==2){if(!resumableTournamentProfile(c,p))return false;}
         else if(!cold.profile->courseSnapshot(p)||!bounded(p,*cold.commonProfile)||!testProfileCurrent(p))return false;
         out={};
         if(state.mode34==2){
@@ -178,16 +179,16 @@ struct OriginalUiCourseSession50KG::Storage {
             out.courseSlot14E4=m.courseSlot14E4;out.tier14E8=m.tier14E8;
         }
         out.mawhonicRylothTest=p.mawhonicRylothTest;out.wanMbTest=p.wanMbTest;out.gasganoScTest=p.gasganoScTest;out.tzidikTcTest=p.tzidikTcTest;out.scorchRcTest=p.scorchRcTest;out.sebulbaTbTest=p.sebulbaTbTest;out.kraidGbTest=p.kraidGbTest;out.youngAnakinMcTest=p.youngAnakinMcTest;out.mode34=p.mode34;out.course700=p.course700;out.subtype70C=p.subtype70C;
-        out.flags100BC=p.cardFlag100BC?1:0;out.flags11018=p.availability11018;
+        out.nativeBetaStorage=p.nativeBetaStorage;out.flags100BC=p.cardFlag100BC?1:0;out.flags11018=p.availability11018;
         out.flags1125C=cold.commonProfile->playerBits1125C;out.courseRecords100C4=p.courseOrder100C4;return true;
     }
     bool tournamentDrawState(game::OriginalUiCourseTournamentDrawState50KG& out)const noexcept{
         OriginalUiRiderProfileOwner50KG::TournamentCareerSnapshot c;
         OriginalUiRiderProfileOwner50KG::TournamentCourseRecordSnapshot record;
         game::OriginalUiCourseRememberedProfile50KG p;
-        if(state.mode34!=2||!freshTournamentProfile(c,p)||!cold.profile->selectedTournamentCourseRecordSnapshot(record)||
+        if(state.mode34!=2||!resumableTournamentProfile(c,p)||!cold.profile->selectedTournamentCourseRecordSnapshot(record)||
            !sameStamp(c.stamp,record.stamp)||!sameStamp(record.stamp,cold.profile->stamp())||
-           record.slot!=state.courseSlot14E4||record.course100C4!=state.selectedCourse44||record.slot!=1)return false;
+           record.slot!=state.courseSlot14E4||record.course100C4!=state.selectedCourse44||record.slot<1||record.slot>13)return false;
         out={};out.career=c.career100C0;out.slot=state.courseSlot14E4;out.tier=state.tier14E8;
         out.progress=c.progress219C;out.medal=c.medals1938[record.slot-1];out.remainingPrize=c.remainingPrizes1946[record.slot-1];
         out.killPercent=record.killPercent100CC;out.par=record.par100E8;return true;
@@ -556,7 +557,7 @@ S OriginalUiCourseSession50KG::notifyRouteAccepted(const OriginalUiCourseRoutePr
             OriginalUiRiderProfileOwner50KG::TournamentCareerSnapshot career;
             if(p.decision.profileChanges.count!=4||s->pendingStamp.generation==std::numeric_limits<std::uint64_t>::max()||
                stamp.generation!=s->pendingStamp.generation+1||stamp.mode34!=2||
-               !s->freshTournamentProfile(career,profile)||!s->cold.profile->courseRaceSnapshot(actual)||
+               !s->resumableTournamentProfile(career,profile)||!s->cold.profile->courseRaceSnapshot(actual)||
                actual.mode34!=2||actual.course!=s->pendingContext.selectedControlWord44||
                actual.planet!=s->state.selectedPlanet40||actual.rider!=career.career100C0||
                actual.subtype!=1||actual.laps!=3||actual.entrants!=8||

@@ -81,10 +81,16 @@ inline bool RaceAudioGroups50IC::coldTaIntroEmitterIdentity()const noexcept {
     if(!p.taIntroStarted||!p.taIntroAuthoring||!p.taIntroManager||!e.configured||
        node.kind!=game::OriginalWreckComponentKind50LA::wattoEmitter2921C0||node.reference00!=1||
        node.sessionGeneration!=coldSession_||node.objectKey!=static_cast<std::uint64_t>(reinterpret_cast<std::uintptr_t>(&node))||
-       node.previous10||node.next14||node.parent1C||node.firstChild18||node.mask20||node.descendants24||
+       node.next14||node.firstChild18||node.descendants24||
+       node.parent1C!=e.controllerParent||(!e.controllerParent&&node.previous10)||
+       node.mask20!=(e.everAttached?0xffffffffu:0u)||
+       (e.controllerParent&&(!e.everAttached||
+         e.controllerParent->kind!=game::OriginalWreckComponentKind50LA::cameraController174A30||
+         e.controllerParent->sessionGeneration!=coldSession_||
+         !coldApplication_->entityAuthority_.canRetire(*e.controllerParent)))||
        !(node.flags29&1u)||!coldApplication_->entityAuthority_.canRetire(node)||
        e.manager1D8!=coldApplication_->aural00_||e.manager1D8!=p.taIntroManager->inspect().entity||
-       e.group30!=&p||e.sound1F0||e.type1E4!=6||e.flags158!=2||e.flags1D4Low5||
+       e.group30!=&p||(!taIntroLive_&&e.sound1F0)||e.type1E4!=6||e.flags158!=2||e.flags1D4Low5||
        e.trigger1DCBits!=0x41a00000u||e.chance1E0Bits!=0x42c80000u||
        e.distance1D0Bits||e.word1E8||e.word1EC!=1||e.name54||
        !e.members204||!e.allocated210||e.growth208!=16||e.count200>3||
@@ -131,7 +137,9 @@ RaceAudioGroups50IC::appendNextColdTaIntroEvent292650()noexcept {
     auto& e=*coldTaIntroEmitter_;
     auto& p=coldGroups_[static_cast<std::size_t>(game::RaceAudioGroup50IC::Announcer120)];
     if(e.nativeAppendAborted||e.count200==3||!p.taIntroManager->current())return ColdTaEmitterAppendResult::ownerRejected;
-    for(std::size_t n=0;n<count_;++n)
+    if(taIntroConstructionAdmission_){
+        if(!taIntroExistingBindingsCurrent())return ColdTaEmitterAppendResult::ownerRejected;
+    }else for(std::size_t n=0;n<count_;++n)
         if(mixer_->active(n)||mixer_->hasVoiceGroupGain50IC(n)||
            bindings_[n]!=game::RaceAudioGroup50IC::Unrepresented)return ColdTaEmitterAppendResult::ownerRejected;
     if(!e.pendingEvent){
@@ -175,7 +183,7 @@ inline bool RaceAudioGroups50IC::abortPendingColdTaIntroEventNative()noexcept {
     e.pendingEvent.reset();e.nativeAppendAborted=true;return true;
 }
 inline bool RaceAudioGroups50IC::retireDetachedColdTaIntroEmitter142590()noexcept {
-    if(!coldTaIntroEmitterIdentity()||coldTaIntroEmitter_->pendingEvent||
+    if(!coldTaIntroEmitterIdentity()||coldTaIntroEmitter_->controllerParent||coldTaIntroEmitter_->pendingEvent||
        !coldApplication_->objectCount423F60())return false;
     auto& e=*coldTaIntroEmitter_;
     //142590's actual admitted detached/no-children/no-sibling arm. No invented

@@ -3117,7 +3117,13 @@ bool OriginalUiMainAudio50KG::canPlayEffectClip(std::size_t clip) const noexcept
         if(!mode->ready()||!game::projectOriginalSoundRouting26CBA050KG(mode->fields(),0,100,routing)||
             routing.phaseSelector!=0)return false;
     }
-    return true;
+    // A repeated original effect performs stop-before-play. Reserve both
+    // mixer revisions before touching the old voice, plus the one transport
+    // revision published by playEffectClip. All callers (including Back and
+    // Accept route preflights) now observe the same real playback capacity.
+    // No reservation token is needed: these owners are producer-thread-only.
+    return canRecordControlChange()&&mixer_->canRecordControlChanges(
+        ownsEffect_[clip-1]?2u:1u);
 }
 bool OriginalUiMainAudio50KG::playEffectClip(std::size_t clip) noexcept {
     if(!canPlayEffectClip(clip))return false;

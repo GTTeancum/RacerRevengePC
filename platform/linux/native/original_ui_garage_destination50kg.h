@@ -23,7 +23,7 @@ inline const char* originalUiGarageDestinationStatusName50KG(
     case OriginalUiGarageDestinationStatus50KG::notRequested:return "not-requested";
     case OriginalUiGarageDestinationStatus50KG::rootOwner:return "same-root-frontend-owner";
     case OriginalUiGarageDestinationStatus50KG::origin:return "current-tournament-origin";
-    case OriginalUiGarageDestinationStatus50KG::profile:return "actual-zero-cash-selected-career-profile";
+    case OriginalUiGarageDestinationStatus50KG::profile:return "actual-selected-career-profile";
     case OriginalUiGarageDestinationStatus50KG::archive:return "authenticated-garage-archive";
     case OriginalUiGarageDestinationStatus50KG::sceneAssets:return "immutable-garage-scene-payload";
     case OriginalUiGarageDestinationStatus50KG::allocation:return "native-resource-allocation";

@@ -37,13 +37,17 @@ inline bool OriginalRaceConstructor50LA::retireNativeWorldAndGroups(std::uint32_
         // provider preparation is handled by the same actual membership ledger.
         gate="native stopped voice membership retirement";
         if(audio.mixer_&&!audio.retireNativeVoiceBindings())return false;
-    }else if(raceGroupCount_||world74_){gate="missing audio owner with acquired race children";return false;}
+    }else if(raceGroupCount_||world74_||taWorld74_){gate="missing audio owner with acquired race children";return false;}
     if(world74_){
         // Actual aggregate borrows, renderer publication, runtime topology and
         // resource gates remain authoritative. Failure retains this same owner.
         gate="actual aggregate native loaded-world retirement";
         if(!world74_->closeNativeLoadedWorld())return false;
         world74_.reset();
+    }
+    if(taWorld74_||taWorldCounted_){
+        gate="actual TA counted world-prefix retirement";
+        if(!retireNativeTaWorldPrefix(pc))return false;
     }
     // This existing native unwind kernel performs exact canonical detach and
     // actual acquired empty-group release, with retryable partial progress.

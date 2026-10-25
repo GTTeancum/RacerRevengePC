@@ -29,7 +29,7 @@ inline bool RaceAudioGroups50IC::coldTaIntroSoundIdentity(std::size_t n)const no
        coldApplication_->auralNativeOwner_!=p.taIntroManager.get()||!coldApplication_->aural00Live_||
        coldApplication_->aural00_!=observation.entity||s.manager30!=observation.interfaceA0||
        s.group34!=&p||s.reference00!=1||s.flags10!=2||s.word14||s.word18||
-       s.sample28!=-1||s.channel2C!=-1||s.elapsedBits24||s.resourceA0!=-1||
+       s.sample28!=-1||(!taIntroLive_&&(s.channel2C!=-1||s.elapsedBits24))||s.resourceA0!=-1||
        !s.stream1A8||s.stereo1AC||s.loop1B0||s.word1B4||
        s.metadata!=event->metadata||s.directoryOrdinal1B8!=static_cast<std::int32_t>(event->metadata->sourceIndex)||
        s.duration20!=event->metadata->admittedDurationSeconds||
@@ -41,7 +41,7 @@ inline bool RaceAudioGroups50IC::coldTaIntroSoundIdentity(std::size_t n)const no
        static_cast<std::uint32_t>(s.volume38)>100u||
        static_cast<std::uint32_t>(s.volume44)>100u||s.pan3C||s.pan48||
        s.factor54Bits!=0x3f800000u||s.factor58Bits!=0x3f800000u||s.factor5CBits!=0x3e800000u||
-       s.word70||s.word74||s.word78||s.word7C||s.word80||
+       s.word70||s.word74||s.word78||(!taIntroLive_&&s.word7C)||s.word7C>1||s.word80||
        event->filename.empty()||event->filename.size()>259||
        std::memcmp(s.filenameA4.data(),event->filename.data(),event->filename.size())||
        s.filenameA4[event->filename.size()]!='\0')return false;
@@ -59,7 +59,9 @@ inline bool RaceAudioGroups50IC::prepareColdTaIntroConstruction(
     const auto& p=coldGroups_[static_cast<std::size_t>(game::RaceAudioGroup50IC::Announcer120)];
     if(p.count48||p.taIntroStarted||p.taIntroConstructed||p.taIntroAuthoring||p.taIntroManager)return false;
     for(const auto& sound:p.taIntroSounds)if(sound)return false;
-    for(std::size_t n=0;n<count_;++n)
+    if(taIntroConstructionAdmission_){
+        if(!taIntroExistingBindingsCurrent())return false;
+    }else for(std::size_t n=0;n<count_;++n)
         if(mixer_->active(n)||mixer_->hasVoiceGroupGain50IC(n)||
            bindings_[n]!=game::RaceAudioGroup50IC::Unrepresented)return false;
     const auto* actualAural=coldApplication_->auralNativeOwner_;

@@ -1,8 +1,22 @@
 # RacerRevengePC: Fastest Path to Beta Testers
 
+## Current controlling direction: October 24, 2026, 9:32 p.m. EDT
+
+Items 1 and 2 are code-complete, compiled, basic-navigation smoke-tested and published as ccc051a099919a67b0af1e35bb8b234be2d5918c. Broader routes remain unverified.
+
+Steve now authorizes minimum beta progression/persistence plus the remaining inactive cutscene, audio and Options infrastructure. Write and integrate ALL code in this requested batch first, then compile and run one focused basic human-navigation smoke. Do not perform per-patch tests, exhaustive racer/track combinations, lap completion, finish or Results tests. The earlier stop/sign-off instructions below are historical for the completed items 1–2 batch, not a block on this new work.
+
+Three parallel coding tracks: progression/persistence; cutscene/audio routes; Options routes. Parent owns shared integration into v101. Preserve v100 and prior evidence unchanged. Continue 20-minute Eastern updates. Use original disc files without generated runtime asset packs; ordinary user save/config files are necessary persistence.
+
+Source: Sentinel_8515a33576ac8191be21ecedc5fb8fd1.
+
 Approved working direction: October 24, 2026, Eastern time.
 
 ## Controlling instruction: code first, testing requires sign-off
+
+### Verification sign-off received
+
+October 24, 2026, 8:48 p.m. EDT: Steve explicitly authorized compilation and **basic functionality through human navigation paths** (Sentinel_8d0c6b0249e88191bfe2d715bc58f6a1). The source-completion stop was honored before this approval. Compile the completed batch, fix any actual compilation failures, then perform a minimal normal-menu/manual-navigation smoke. This is not permission for a racer/track sweep, lap completion, finish, Results, fake-controller input, or broader feature testing. Preserve the frozen source while its build runs. The earlier stop-point text below records the completed code-first phase, not a continuing prohibition after this explicit sign-off.
 
 Complete all remaining code for priorities **1 and 2** before requesting testing sign-off. **Do not test until that code is complete and Steve explicitly signs off.** Do not rerun racer/track combinations; that coverage has already been done and further combination testing belongs to beta testers. Lap completion, race finish, and Results testing remain tester-owned.
 

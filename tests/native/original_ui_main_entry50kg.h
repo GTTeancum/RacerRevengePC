@@ -1,9 +1,11 @@
 #pragma once
+#include "../../platform/linux/native/native_beta_settings50kg.h"
 #include "../../src/game/original_camera_start_effects.h"
 #include "../../platform/linux/native/original_application_aural50kg.h"
 namespace original_pause_observation50LA { class Owner; }
 namespace original_course_targets50KX { class ConsumedLaunch; }
 namespace ra_cold_aggregate50LA { class Owner; }
+namespace ta_original_world50LE { class Owner; }
 namespace ra_cold_sources50LA { class ColdNavigationLease; }
 namespace rr::game { class OriginalRacerModelRenderGlobals50LA; class OriginalRaceConstructor50LA; class OriginalRaceTuning50LA; class OriginalTunnelTrack50LA; enum class OriginalTunnelTrackRole50LA : unsigned; class OriginalPauseStorage50LA; class OriginalPositionStatsPrimitiveOwner50LA; class OriginalPositionStatsResources50LA;
 struct OriginalPositionStatsNumbers50LA; struct OriginalPositionStatsResourceDiagnostic50LA; }
@@ -236,6 +238,11 @@ private:
     // Source23C is not constructor-written here. Only the actual140CE4
     // continuation publishes its passed/capped factor, never raw250.
     mutable std::optional<float> sourceApplicationElapsed23C_;
+    mutable original_ui_source_timing50LH::PublicationView nativeTaRootTiming_;
+    mutable const rr::game::OriginalRaceConstructor50LA* nativeTaRootRace_=nullptr;
+    mutable const rr::game::OriginalWreckComponent50LA* nativeTaRootController_=nullptr;
+    mutable std::uint64_t nativeTaRootPublication_=0,nativeTaRootGeneration_=0;
+    mutable bool nativeTaRootEntered_=false,nativeTaRootAborted_=false;
     void clearRaceProcessWord1A6884() noexcept { sourceProcessWord3E1C10_=0; }
 
     // Weak custody of the ONE Application-created canonical TA native Session.
@@ -726,7 +733,20 @@ public:
     bool pauseConsumedRaceWorld1ACF50(rr::game::OriginalRaceConstructor50LA&,bool)const noexcept;
     bool constructConsumedRaceWorld1A6BC0(rr::game::OriginalRaceConstructor50LA&,
         std::shared_ptr<ra_cold_aggregate50LA::Owner>,std::uint32_t& sourcePC)const noexcept;
+    bool constructConsumedTaRaceWorld1A6BC0(rr::game::OriginalRaceConstructor50LA&,
+        std::shared_ptr<ta_original_world50LE::Owner>,std::uint32_t& sourcePC)const noexcept;
     const std::int32_t& applicationMode22C()const noexcept{return sourceApplicationMode22C_;}
+    bool constructNativeTaIntroCamera50LA()const noexcept;
+    std::shared_ptr<const rr::assets::OriginalTaIntroAuthoringCandidate> retainNativeTaIntroAuthoring50LA()const noexcept;
+    bool beginNativeTaRaceRoot140CE0(rr::game::OriginalRaceConstructor50LA&,
+        const rr::game::OriginalWreckComponent50LA&,const original_ui_source_timing50LH::PublicationView&,
+        std::string&)const noexcept;
+    bool abandonNativeTaRaceRootForTeardown50LA(rr::game::OriginalRaceConstructor50LA&,
+        const rr::game::OriginalWreckComponent50LA&,const original_ui_source_timing50LH::PublicationView&,
+        std::string&)const noexcept;
+    bool finishNativeTaRaceRoot140CFC(rr::game::OriginalRaceConstructor50LA&,
+        const rr::game::OriginalWreckComponent50LA&,const original_ui_source_timing50LH::PublicationView&,
+        std::string&)const noexcept;
     // Exact conditional443848 typed destruction leaf; never an implicit drain.
     bool retireNativeCollector1A6948(rr::assets::OriginalStandardMaterialDiagnostic50LA&)const noexcept;
     // Source-only detached ownership. Definitions are in original_pause_entity50la.h.
@@ -951,6 +971,19 @@ public:
     std::shared_ptr<rr::platform::OriginalUiOptionsProfile50KG> optionsProfile;
     std::shared_ptr<rr::game::OriginalUiGameSettingsProfile50KG> gameSettingsProfile;
     std::shared_ptr<rr::game::ControlPresets49D> controlsProfile;
+    mutable rr::platform::native_beta50kg::SettingsStore betaSettings;
+    mutable rr::platform::native_beta50kg::Result betaSettingsStatus=rr::platform::native_beta50kg::Result::unavailable;
+    void showBetaPersistenceStatus(const char* normalTitle=nullptr) const noexcept;
+    void saveAcceptedSettings() const noexcept {
+        using Result=rr::platform::native_beta50kg::Result;
+        betaSettingsStatus=gameSettingsProfile&&controlsProfile?
+            betaSettings.save(*gameSettingsProfile,*controlsProfile):Result::unavailable;
+        if(betaSettingsStatus!=Result::ok)
+            std::cerr<<"BETA SETTINGS: accepted for this session, but "
+                <<(betaSettingsStatus==Result::durabilityUnknown?"disk durability is unconfirmed":"preferences could not be saved")
+                <<" (status "<<static_cast<unsigned>(betaSettingsStatus)
+                <<"). Previous disk preferences are not claimed updated. Accept again to retry.\n";
+    }
     std::shared_ptr<rr::platform::OriginalSoundMode50KG> soundMode;
     std::shared_ptr<rr::platform::OriginalUiMainApplication50KG> state;
     //140084/147FF8 application lifetime, shared by every frontend incarnation.
@@ -1216,6 +1249,7 @@ public:
                 riderProfile->initializeGasganoTestProfileAtApplicationStartup(profile,physics,riderProfileDiagnostic):
                 riderProfile->initializeAtApplicationStartup(profile,physics,riderProfileDiagnostic),
                 "Rider startup profile initialization rejected");
+            riderProfile->bindNativeBetaAutosave(gameSettingsProfile);
             // Original17DE80/1801D0 fresh-profile record producer. Populate
             // once at APPLICATION startup, never Hall entry or missing-save recovery.
             const auto recordLocalization=readArchive(assetRoot,rr::assets::OriginalUiArchiveId50KG::localization);
@@ -1250,6 +1284,17 @@ public:
             if(gasganoTest)std::cerr<<"TEST PROFILE: Gasgano available and initially remembered for this process only; "
                 "no earned unlock, qualification, saved-profile import or save write is claimed.\n";
         }
+        // Restore preferences before the real sound-mode owner and all later
+        // frontend/race borrowers observe this application's canonical fields.
+        if(controlsProfile){
+            betaSettingsStatus=betaSettings.load(rr::platform::native_beta50kg::defaultDirectory(),
+                *gameSettingsProfile,*controlsProfile);
+            using Result=rr::platform::native_beta50kg::Result;
+            if(betaSettingsStatus!=Result::ok&&betaSettingsStatus!=Result::missing)
+                std::cerr<<"BETA SETTINGS: saved preferences unavailable (status "
+                    <<static_cast<unsigned>(betaSettingsStatus)
+                    <<"). Using session defaults; existing settings file will not be overwritten.\n";
+        }
         require(rr::game::validOriginalUiGameSettingsProfile50KG(*gameSettingsProfile),
             "fresh original Game Options profile rejected");
         require(soundMode->initializeFromProfile1101C(gameSettingsProfile->soundMode1101C),
@@ -1259,16 +1304,17 @@ public:
         require(rr::game::sampleHostTimestamp50ID(*state->clock101A50,state->rawRandom308030),
             "Main startup shared application timestamp unavailable");
         state->known=true;
-        std::cerr<<"ORIGINAL MAIN: "<<(youngAnakinMcTest?"explicit Young Anakin/MC human test profile":kraidGbTest?"explicit Kraid/GB human test profile":sebulbaTbTest?"explicit Sebulba/TB human test profile":scorchRcTest?"explicit Scorch/RC human test profile":tzidikTcTest?"explicit Tzidik/TC human test profile":gasganoScTest?"explicit Gasgano/SC human test profile":wanMbTest?"explicit Wan/MB test unlock profile":visibleRiderTest?"explicit visible-Rider test unlock profile":mawhonicRylothTest?"explicit Mawhonic/Ryloth test profile":gasganoTest?"explicit Gasgano test profile":"fresh native profile")
+        std::cerr<<"ORIGINAL MAIN: "<<(youngAnakinMcTest?"explicit Young Anakin/MC human test profile":kraidGbTest?"explicit Kraid/GB human test profile":sebulbaTbTest?"explicit Sebulba/TB human test profile":scorchRcTest?"explicit Scorch/RC human test profile":tzidikTcTest?"explicit Tzidik/TC human test profile":gasganoScTest?"explicit Gasgano/SC human test profile":wanMbTest?"explicit Wan/MB test unlock profile":visibleRiderTest?"explicit visible-Rider test unlock profile":mawhonicRylothTest?"explicit Mawhonic/Ryloth test profile":gasganoTest?"explicit Gasgano test profile":"native profile (loaded or fresh)")
             <<"/application ownership; "
             "one clock-derived native RNG seed="<<state->rawRandom308030
             <<"; Main audio="<<audio<<". Main, Options menu and Game Options routing is wired; "
-            "Game Options Accept requires enabled concrete audio and commits process-owned settings. "
-            "Prepared default-unlocked Riders 2/4/10/11/12/15/19/20 use their authenticated original resources and image caches; enabled audio uses original Song7. "
-            "Mode0 Rider Confirm to Course and Back supports explicit mute or the original Confirm voice/Song11 owner. Course Left/Right selects the four fresh unlocked tracks; "
-            "Controls uses original presets and its animated controller: Left/Right chooses, Tab changes Normal/Advanced, R rotates, Enter/Space accepts and Escape cancels. Accept applies only controller0; Cancel preserves the saved preset. "
-            "Second-controller Controls remains unavailable until native menu-controller/hotplug and the original missing-controller popup are joined. Gallery, Memory Card and Credits remain unavailable. "
-            "Course admits bounded TA human driving with one actual Player and seven original AI, or authenticated TA/SA/MA/GA ALL8 driving, using prepared Riders2/4/10/11/12/15/19/20. Human selections always use the typed whole-world cold-load boundary, including unchanged selections. Other human tracks remain unavailable. No original boot/save parity is claimed.\n";
+            "Game Options Accept requires enabled concrete audio, commits shared settings and attempts native preference persistence. "
+            "The original catalog contains 23 racers and 13 courses; actual choices still require original unlock state, authenticated resources and a concrete destination. Catalog coverage is not runtime verification. "
+            "Mode0 Rider Confirm to Course and Back supports explicit mute or the original Confirm voice/Song11 owner. Course navigation follows the retained profile's unlocked selections. "
+            "Controls uses original presets and its animated controller: Left/Right chooses, Tab changes Normal/Advanced, R rotates, Enter/Space accepts and Escape cancels. Accept applies to the page's controller; Cancel preserves its saved preset. "
+            "Second-controller Controls requires a present native controller. Credits uses its authored cards, music and Back/automatic return routes. "
+            "Memory Card provides the separate native beta profile Save/confirmed Load route, not original-card emulation. Gallery art screens remain unavailable. "
+            "Supported human Course selections use the typed whole-world cold-load boundary, including unchanged selections, and the real selected-track owners. Native beta profile/settings persistence is separate from original memory-card format; original boot/save parity and full racer/course runtime verification are not claimed.\n";
     }
 };
 // Owns the actual host/context and its native source-canvas mode together.
@@ -2336,6 +2382,10 @@ public:
         require(coordinator.bindGarageDestinationRoot50KG(*this),"original UI same-Root destination binding failed");
         if(coordinator.configureRendererRequest(rendererRequest,diagnostic)!=Status::ok)fail("renderer configuration");
     }
+    void showBetaSettingsStatus() const noexcept {
+        if(materialApplicationOwner)materialApplicationOwner->showBetaPersistenceStatus(
+            "Racer Revenge | Original UI | Arrows select/change | Enter confirm | R defaults | Esc back");
+    }
     void activate(rr::platform::VehicleWindowGl50DS& renderer) {
         std::string languageError;
         if(!materialApplicationOwner||!materialApplicationOwner->prepareFrontendLanguageServices(*this,renderer,languageError))
@@ -2343,6 +2393,7 @@ public:
         if(!materialApplicationOwner||!coordinator.prepareSharedDialogsInitial(*materialApplicationOwner,renderer,diagnostic))
             fail("shared UI initial ownership");
         if(coordinator.activate(renderer,diagnostic)!=Status::ok)fail("activation");
+        showBetaSettingsStatus();
     }
     std::string garageRuntimeFailureText() const {
         const auto& g=diagnostic.garageRuntime;
@@ -2411,8 +2462,26 @@ public:
             " course_pc="+std::to_string(diagnostic.course.sourcePC)+
             " renderer="+std::to_string(static_cast<unsigned>(diagnostic.renderer.error))+garageRuntimeFailureText());
     }
+    bool nativeBetaLoadPending=false;
     Status input(std::uint8_t sourceInput,rr::platform::WindowControllerPresence50DQ presence=rr::platform::WindowControllerPresence50DQ::Unknown,
         std::uint8_t controller=0) {
+        const auto current=coordinator.snapshot().route;
+        const bool nativeCard=current.screen==12&&current.page==5;
+        // Match the authored Memory Card artwork: Square/R LOAD, Circle/Tab SAVE.
+        // The bounded page returns unavailableStorage for both, not an operation intent.
+        constexpr auto nativeLoadInput=static_cast<std::uint8_t>(rr::assets::OriginalUiMovementInput50KG::rpadLeft);
+        constexpr auto nativeSaveInput=static_cast<std::uint8_t>(rr::assets::OriginalUiMovementInput50KG::rpadRight);
+        if(!nativeCard)nativeBetaLoadPending=false;
+        // Native beta Load is explicit and destructive to unsaved in-memory
+        // profile changes. First R/Square arms; second R/Square confirms; Escape cancels
+        // that confirmation without accidentally leaving the page.
+        if(nativeCard&&controller==0&&nativeBetaLoadPending&&sourceInput==6){
+            nativeBetaLoadPending=false;
+            materialApplicationOwner->showBetaPersistenceStatus(
+                "Racer Revenge | Native beta profile file | R Load | Tab Save | Esc Back");
+            return Status::noChange;
+        }
+        if(sourceInput!=nativeLoadInput)nativeBetaLoadPending=false;
         rr::platform::OriginalUiMainSessionInput50KG in;in.controller=controller;in.originalInput=sourceInput;in.secondControllerObservation=presence;
         rr::platform::OriginalUiFrontendInputReceipt50KG receipt;
         const auto inputStart=stageStart();
@@ -2420,6 +2489,47 @@ public:
         reportStage("source_input",inputStart,status==Status::ok||status==Status::noChange||
             status==Status::routeAccepted||status==Status::unavailableDestination||status==Status::secondControllerRequired);
         accountColdInterval(receipt.coldInterval);
+        if(receipt.routeAccepted&&receipt.requested.screen==12&&receipt.requested.page==5)
+            materialApplicationOwner->showBetaPersistenceStatus(
+                "Racer Revenge | Native beta profile file (not memory card) | R Load | Tab Save | Esc Back");
+        if(nativeCard&&controller==0&&status==Status::unavailableDestination&&
+            receipt.options.pageAccepted&&(sourceInput==nativeLoadInput||sourceInput==nativeSaveInput)){
+            const auto* session=coordinator.optionsSession();
+            const auto* card=session?session->memoryCardState():nullptr;
+            if(card&&card->entered&&!card->inputBlocked4CC&&!card->closing3AC&&card->timer398<=0){
+                const auto profile=materialApplicationOwner->riderProfile;
+                if(sourceInput==nativeLoadInput&&!nativeBetaLoadPending){
+                    nativeBetaLoadPending=true;
+                    materialApplicationOwner->showBetaPersistenceStatus(
+                        "Racer Revenge | Load replaces unsaved profile changes | R Confirm Load | Esc Cancel");
+                    return Status::ok;
+                }
+                nativeBetaLoadPending=false;
+                const bool completed=profile&&(sourceInput==nativeSaveInput?profile->saveNativeBetaProgress():
+                    profile->reloadNativeBetaProgressFromMenu());
+                materialApplicationOwner->showBetaPersistenceStatus(completed?
+                    (sourceInput==nativeSaveInput?"Racer Revenge | Native beta profile SAVED | R Load | Tab Save | Esc Back":
+                        "Racer Revenge | Native beta profile LOADED | R Load | Tab Save | Esc Back"):
+                    "Racer Revenge | Native beta profile operation FAILED | Current session retained | Esc Back");
+                std::cerr<<"BETA PROFILE: "<<(sourceInput==nativeSaveInput?"manual save":"manual load")
+                    <<(completed?" completed":" failed; no successful save/load claimed")<<'\n';
+                return Status::ok;
+            }
+        }
+        if(receipt.routeAccepted&&receipt.source.screen==12&&receipt.source.page==5){
+            nativeBetaLoadPending=false;
+            showBetaSettingsStatus();
+        }
+        if(receipt.routeAccepted&&receipt.source.screen==12&&
+            ((receipt.source.page==4&&receipt.options.gameOptions.intent==rr::game::OriginalUiGameOptionsIntent50KG::accept)||
+             ((receipt.source.page==2||receipt.source.page==3)&&
+              receipt.options.controls.intent==rr::game::OriginalUiControlsIntent50KG::accept)))
+        {
+            materialApplicationOwner->saveAcceptedSettings();
+            showBetaSettingsStatus();
+        }
+        if(receipt.routeAccepted&&receipt.source.screen==5)
+            materialApplicationOwner->showBetaPersistenceStatus();
         if(receipt.options.popupChanged||receipt.main.popupChanged){
             const auto ui=coordinator.snapshot();const auto& popup=receipt.main.popupChanged?ui.main.controllerPopup:ui.options.controllerPopup;
             std::cerr<<"original_controller_popup {\"source_pc\":"<<(receipt.main.popupChanged?receipt.main.popupSourcePC:receipt.options.popupSourcePC)
@@ -2679,6 +2789,7 @@ public:
         if(ordinarySourceAudio&&!materialApplicationOwner->beginNativeFrontendRootAudio140CE0(*this,in,diagnostic,rootAudioError)){
             reportStage("source_update",updateStart,false);throw std::runtime_error(rootAudioError);
         }
+        const auto beforeUpdateRoute=coordinator.snapshot();
         bool updated=coordinator.update(in,receipt,diagnostic)==Status::ok&&receipt.accepted&&receipt.sequence==lastAudioSequence+1;
         if(ordinarySourceAudio&&updated)
             updated=materialApplicationOwner->finishNativeFrontendRootAudio140CFC(*this,receipt,diagnostic,rootAudioError);
@@ -2697,6 +2808,16 @@ public:
         if(!updated){
             if(!rootAudioError.empty())throw std::runtime_error(rootAudioError);
             fail("update");
+        }
+        // Memory Card Back completes asynchronously: its accepted return is
+        // emitted by update, not by the Escape input receipt. Clear page-only
+        // Save/Load help on that actual request while retaining real warnings.
+        const auto afterUpdateRoute=coordinator.snapshot();
+        if(beforeUpdateRoute.route.screen==12&&beforeUpdateRoute.route.page==5&&
+            beforeUpdateRoute.transition.requested.screen==12&&beforeUpdateRoute.transition.requested.page==5&&
+            (afterUpdateRoute.transition.requested.screen!=12||afterUpdateRoute.transition.requested.page!=5)){
+            nativeBetaLoadPending=false;
+            showBetaSettingsStatus();
         }
         // One PCM advance for this exact accepted source update; never for
         // loading, rejected updates, or a second screen's copied clock.
@@ -3093,4 +3214,28 @@ public:
         reportRiderProfile();std::cerr<<"}\n";
     }
 };
+}
+
+inline void original_main_entry50KG::Application::showBetaPersistenceStatus(const char* normalTitle) const noexcept {
+    if(!videoOwner_||!videoOwner_->host.hasWindow())return;
+    using Result=rr::platform::native_beta50kg::Result;
+    using Progress=rr::platform::OriginalUiRiderProfileOwner50KG::BetaPersistenceStatus;
+    const auto progress=riderProfile?riderProfile->betaPersistenceStatus():Progress::notStarted;
+    const bool settingsFailed=betaSettingsStatus!=Result::ok&&betaSettingsStatus!=Result::missing;
+    const bool progressFailed=progress==Progress::unavailable||progress==Progress::locked||
+        progress==Progress::invalid||progress==Progress::readError||progress==Progress::writeError||
+        progress==Progress::durabilityUnknown;
+    if(!normalTitle&&!settingsFailed&&!progressFailed)return;
+    rr::platform::GameHostDiagnostic50ER d;
+    try {
+        std::string title=normalTitle?normalTitle:"Racer Revenge";
+        if(settingsFailed)title+=betaSettingsStatus==Result::durabilityUnknown?
+            " | SETTINGS SAVE UNCONFIRMED":" | SETTINGS NOT SAVED";
+        if(progressFailed)title+=progress==Progress::durabilityUnknown?
+            " | CAREER SAVE UNCONFIRMED":" | CAREER NOT SAVED";
+        if(!videoOwner_->host.setWindowTitle(title.c_str(),d))
+            std::cerr<<"BETA SAVE: native window status unavailable.\n";
+    }catch(...){
+        videoOwner_->host.setWindowTitle("Racer Revenge | SAVE STATUS UNAVAILABLE - check application log",d);
+    }
 }

@@ -342,6 +342,12 @@ bool GameHost50ER::swapWindow(GameHostDiagnostic50ER& d) noexcept {
         return fail(d, GameHostError50ER::NotWindow, "swapWindow/headless has no window swap");
     return window_.swap(d.window) || fail(d, GameHostError50ER::Window, "WindowHost50DQ::swap");
 }
+bool GameHost50ER::setWindowTitle(const char* title,GameHostDiagnostic50ER& d) noexcept {
+    d={};
+    if(!ownerThread())return fail(d,GameHostError50ER::WrongThread,"setWindowTitle");
+    if(!created()||mode_!=GameHostMode50ER::Window)return fail(d,GameHostError50ER::NotWindow,"setWindowTitle");
+    return window_.setTitle(title,d.window)||fail(d,GameHostError50ER::Window,"WindowHost50DQ::setTitle");
+}
 bool GameHost50ER::setSwapInterval(std::int32_t interval,GameHostDiagnostic50ER& d) noexcept {
     d={};
     if(!ownerThread())return fail(d,GameHostError50ER::WrongThread,"setSwapInterval");

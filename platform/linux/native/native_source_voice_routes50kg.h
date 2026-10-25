@@ -10,6 +10,7 @@ class AudioMixer50HD;
 // voice capacity is unchanged. Never derive a core from a logical voice ID.
 class NativeSourceVoiceRoutes50KG final {
     friend class AudioMixer50HD;
+    friend class NativeRaceIntroTransport50LA;
     enum class Kind : std::uint8_t { unknown, sample, stream };
     struct Cell {
         float age=180.f;

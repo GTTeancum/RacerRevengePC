@@ -112,6 +112,8 @@ public:
     // Submission only: SDL's void swap API cannot prove presentation/completion.
     bool swap(WindowHostDiagnostic50DQ&) noexcept;
     bool setSwapInterval(std::int32_t,WindowHostDiagnostic50DQ&) noexcept;
+    // Nonmodal native status only; never changes the original menu artwork.
+    bool setTitle(const char*,WindowHostDiagnostic50DQ&) noexcept;
     // Sends only to the actual opened SDL instance. A missing/disconnected/
     // non-rumble device is an explicit receipt, never a claimed submission.
     // Source motor bytes map small(0/1) to high(0/65535), large(0..255) to

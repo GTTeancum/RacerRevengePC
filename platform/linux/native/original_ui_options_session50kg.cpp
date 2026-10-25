@@ -666,7 +666,9 @@ Status OriginalUiOptionsSession50KG::input(const OriginalUiMainSessionInput50KG&
                 s->pendingBack=route;s->state.backProposalPending=true;++s->proposalSerial;if(!s->proposalSerial)++s->proposalSerial;
                 receipt.routeProposal={this,s->proposalSerial,route};status=Status::pageProposed;
             }
-        }else if(receipt.gameOptions.intent==game::OriginalUiGameOptionsIntent50KG::cancel&&s->idleInput()){
+        }else if(receipt.gameOptions.intent==game::OriginalUiGameOptionsIntent50KG::cancel&&s->idleInput()&&
+            (s->cold.audioMode==OriginalUiMainAudioMode50KG::muted||
+             (s->cold.audio&&s->cold.audio->canPlayGameOptionsEffect(5)))){
             game::OriginalUiRouteDecision50KG route;route.inputPC=0x1F50F0;route.profileProposalComplete=true;
             route.action=game::OriginalUiRouteAction50KG::unavailable;
             route.blockers=static_cast<std::uint32_t>(game::OriginalUiRouteBlocker50KG::destinationOwner);
@@ -770,7 +772,16 @@ bool OriginalUiOptionsSession50KG::routeProposalCurrent(const OriginalUiOptionsR
         (s->cold.application->globalFlags228&4u)||s->cold.application->transportE00!=-1||
         !selection||s->activePage()!=expected.request.sourcePage||
         !decision.profileProposalComplete||!sameDecision(decision,expected))return false;
-    return !game::originalUiGameOptionsAcceptShape50KG(expected)||s->pendingAcceptCurrent();
+    if(game::originalUiGameOptionsAcceptShape50KG(expected))return s->pendingAcceptCurrent();
+    // Cancel commits the remembered group before BACK5. Recheck the exact
+    // real effect at coordinator admission, not just when input proposed it,
+    // so a stale proposal cannot publish the route after capacity was lost.
+    if(expected.request.sourceScreen==12&&expected.request.sourcePage==4&&
+       expected.request.targetScreen==12&&expected.request.targetPage==1&&
+       expected.request.sourcePC==0x1F51D8)
+        return s->cold.audioMode==OriginalUiMainAudioMode50KG::muted||
+            (s->cold.audio&&s->cold.audio->canPlayGameOptionsEffect(5));
+    return true;
 }
 bool OriginalUiOptionsSession50KG::commitGameOptionsAccept(const OriginalUiOptionsRouteProposal50KG& proposal,
     const game::OriginalUiRouteDecision50KG& admitted) noexcept {

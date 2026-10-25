@@ -1,6 +1,7 @@
 // New reconstruction after rollback; source-only, unverified.
 #pragma once
 #include "original_persisted_profile_name50kg.h"
+#include "native_beta_file50kg.h"
 #include "original_ui_main_session50kg.h"
 #include "../../../src/game/original_ui_course_selection50kg.h"
 #include "../../../src/game/original_ui_course_mode2_entry50kg.h"
@@ -114,6 +115,14 @@ public:
     bool initializeYoungAnakinMcTestProfileAtApplicationStartup(std::shared_ptr<OriginalUiMainProfile50KG>,
         std::shared_ptr<const assets::OriginalUiArchive50KG>,OriginalUiRiderProfileDiagnostic50KG&,
         std::uint32_t mcRider=1) noexcept;
+    // Native beta progress is a separate versioned user file, never a PS2 card.
+    // Load is one-shot at application startup, before any frontend owns snapshots.
+    enum class BetaPersistenceStatus {notStarted,ready,loaded,saved,disabledFixture,
+        unavailable,locked,invalid,readError,writeError,durabilityUnknown};
+    BetaPersistenceStatus betaPersistenceStatus() const noexcept;
+    bool saveNativeBetaProgress() noexcept;
+    bool reloadNativeBetaProgressFromMenu() noexcept;
+    void bindNativeBetaAutosave(std::shared_ptr<const game::OriginalUiGameSettingsProfile50KG>) noexcept;
     bool youngAnakinMcTestProfile() const noexcept;
     // Source17DE80 loads actual localized names before1801D0. One explicit
     // startup population, never a menu-entry reset or missing-save fallback.
@@ -158,6 +167,7 @@ public:
         // Actual profile100BC bit0, tested by Tournament entry1EEA64/68.
         // Observation only: a clean value never certifies popup ownership.
         bool cardFlag100BC=false;
+        bool nativeBetaStorage=false; // Native save UI, not original memory-card popup.
         std::array<std::uint8_t,13> medals1938{};
         std::array<std::int16_t,13> remainingPrizes1946{};
         OriginalUiRiderProfileStamp50KG stamp{};
@@ -182,7 +192,8 @@ public:
         std::array<std::int32_t,7> killPercent100CC{};
         OriginalUiRiderProfileStamp50KG stamp{};
     };
-    // Only the authenticated first constructor row is represented here.
+    // Actual next course uses the retained original order and constructor prizes.
+    // par100E8=-1 means unrecovered PAR; renderer must omit that annotation.
     // Actual remaining purse remains in the selected career/pod snapshot.
     bool selectedTournamentCourseRecordSnapshot(TournamentCourseRecordSnapshot&) const noexcept;
     bool tournamentPodCareerSnapshot(std::uint32_t career,std::uint32_t pod,
@@ -199,6 +210,14 @@ public:
     // is represented; progress13 has its own source text path and rejects.
     bool tournamentTextMetadataSnapshot(std::uint32_t career,
         TournamentTextMetadataSnapshot&) const noexcept;
+    bool armTournamentResultForCommittedRace(const CourseRaceSelection&,OriginalUiRiderProfileStamp50KG,
+        const game::LapTimingManager50ID&,OriginalUiMainApplication50KG&)noexcept;
+    bool commitTournamentRaceResult(const game::LapTimingManager50ID&,
+        const game::OriginalTournamentResultRacer50KG*,std::size_t,std::uint32_t humanCount,
+        const CourseRaceSelection&,OriginalUiRiderProfileStamp50KG,
+        OriginalUiMainApplication50KG&,game::OriginalTournamentResultReceipt50KG&)noexcept;
+    // Restart/leave must call this before destroying its real timing manager.
+    void cancelTournamentResultForRace(const game::LapTimingManager50ID&) noexcept;
 private:
     friend struct ::original_main_entry50KG::Application;
     friend class ::original_racer_manager_entity::Owner;
@@ -229,12 +248,6 @@ private:
     // launch commits its exact original selected profile fields and the SAME
     // real manager reaches active bit1 (before ended bit0). Arming never
     // unlocks/mutates progress. Existing mode0-only launch cannot arm this.
-    bool armTournamentResultForCommittedRace(const CourseRaceSelection&,OriginalUiRiderProfileStamp50KG,
-        const game::LapTimingManager50ID&,OriginalUiMainApplication50KG&)noexcept;
-    bool commitTournamentRaceResult(const game::LapTimingManager50ID&,
-        const game::OriginalTournamentResultRacer50KG*,std::size_t,std::uint32_t humanCount,
-        const CourseRaceSelection&,OriginalUiRiderProfileStamp50KG,
-        OriginalUiMainApplication50KG&,game::OriginalTournamentResultReceipt50KG&)noexcept;
     bool commitCourseEntry(const game::OriginalUiCourseSelectionData50KG&,const game::OriginalUiCourseEntryPrefix50KG&,OriginalUiRiderProfileStamp50KG)noexcept;
     bool commitCourseMode2Entry(const game::OriginalUiCourseSelectionData50KG&,
         const game::OriginalUiCourseMode2EntryPlan50KG&,OriginalUiRiderProfileStamp50KG) noexcept;
@@ -270,6 +283,7 @@ private:
     // on rejection; expected stamp must be from that same source snapshot.
     bool commitBack(const game::OriginalUiRouteDecision50KG&,
         OriginalUiRiderProfileStamp50KG expected) noexcept;
+    void loadNativeBetaProgressAtStartup() noexcept;
     struct Storage;std::unique_ptr<Storage> storage_;
 };
 }

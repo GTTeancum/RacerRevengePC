@@ -31,6 +31,7 @@ struct OriginalUiCourseRememberedProfile50KG {
     std::uint32_t course700=0,laps704=0,entrants708=0,subtype70C=0;
     std::uint32_t course710=0,entrants714=0,laps718=0;
     std::uint8_t packed1125E=0;bool cardFlag100BC=false;
+    bool nativeBetaStorage=false; // Actual native user-data owner, not a claim of successful save.
     std::uint8_t availability11018=0;
     std::uint32_t planet0Primary79C=0,planet0Secondary7A0=0;
     std::array<std::uint8_t,13> courseOrder100C4{};

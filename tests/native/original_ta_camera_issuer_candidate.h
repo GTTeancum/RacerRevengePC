@@ -1,7 +1,8 @@
 #pragma once
-// Native single-Session allocation/custody seam only. The source174A30
-// constructor entry below is private and UNCALLED. No source loader/clock,
-// attachment, audio publication, renderer callback or admission is supplied.
+// Same-Application TA Session issuance and consumed source constructor entry.
+// The public root wrapper below retains authenticated authoring and allocates
+// the actual controller/three cuts. Root audio and Session::prepare
+// then complete177750/175510/1752D0; immutable custody alone is not admission.
 #include "original_ui_main_entry50kg.h"
 #include "original_camera_assets50kx.h"
 #include "../../src/assets/original_ta_cut_authoring_candidate.h"
@@ -198,10 +199,11 @@ inline std::shared_ptr<original_camera_session50KX::Session> Application::resour
     return session;
 }
 inline bool Application::constructNativeTaController174A30()const noexcept {
-    // Still UNCALLED. Shared admission performs the same V8 freshness and
+    // Shared admission performs the same native freshness and
     // exact Application-issued ownership checks before any constructor effect.
     const auto session=freshNativeTaCameraSession50LA();
-    return session&&session->constructColdController174A30(session->nativeTaIssuance_->generation);
+    return session&&session->constructColdController174A30(session->nativeTaIssuance_->generation)&&
+        session->constructTaOwners174FA4();
 }
 inline bool Application::retainNativeTaCutAuthoring50LA()const noexcept {
     namespace d=ta_camera_issuer_detail;
@@ -291,5 +293,10 @@ inline bool Application::abortUnpublishedNativeTaCutChild()const noexcept {
     // that dereference already-retired root Rig/particle borrows.
     if(!session||!session->nativeTaIssuance_||session->nativeTaIssuance_->issuer!=this)return false;
     return session->abortUnpublishedTaCutChildNative();
+}
+// One consumed root entry: immutable source custody, actual174A30, real74
+// constructor allocation. Session next constructs actual audio80 and cue5C.
+inline bool Application::constructNativeTaIntroCamera50LA()const noexcept {
+    return retainNativeTaCutAuthoring50LA()&&constructNativeTaController174A30();
 }
 } // namespace original_main_entry50KG

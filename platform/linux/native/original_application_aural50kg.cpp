@@ -14,7 +14,7 @@ template<class T> bool same(const std::shared_ptr<T>& a,const std::shared_ptr<T>
 }
 }
 OriginalApplicationAural50KG::NativeInterface::~NativeInterface()noexcept {
-    if(streamGeneration&&!streamRetirementAuthorized)std::terminate();
+    if(raceIntroLease||(streamGeneration&&!streamRetirementAuthorized))std::terminate();
     // Only actual interface destruction discharges remaining stopped stream
     // slots. No ordinary stop, clear103DD0, Group retirement or reentry does.
     streamSlots={};
@@ -499,7 +499,9 @@ bool OriginalApplicationAural50KG::nativeStreamSlotsCurrent(bool permitRetired)c
             slot.kind==NativeInterface::StreamKind::riderConfirm?
             i.main->nativeRiderSourceCurrent(slot.sourceOrdinal,slot.clip):
             slot.kind==NativeInterface::StreamKind::watto?
-            i.main->nativeWattoStreamSourceCurrent(slot.sourceOrdinal,slot.clip):nullptr;
+            i.main->nativeWattoStreamSourceCurrent(slot.sourceOrdinal,slot.clip):
+            slot.kind==NativeInterface::StreamKind::raceIntro&&slot.raceAssets?
+            slot.raceAssets->source(slot.sourceOrdinal,slot.clip):nullptr;
         if(row!=slot.metadata)return false;
     }
     return true;
@@ -524,7 +526,7 @@ bool OriginalApplicationAural50KG::nativeStreamFinalRetirementCurrent()const noe
 bool OriginalApplicationAural50KG::prepareNativeStreamStart(OriginalUiMainAudio50KG& main,
     NativeInterface::StreamKind kind,std::uint32_t ordinal,const AudioClip50HD& clip,bool loop,
     std::array<NativeInterface::StreamSlot,8>& next,AudioMixer50HD::NativeSourceStreamStart50KG& start)const noexcept {
-    if(!nativeStreamSlotsCurrent()||(**interfaceA0_).main.get()!=&main)return false;
+    if(!nativeStreamSlotsCurrent()||(**interfaceA0_).raceIntroLease||(**interfaceA0_).main.get()!=&main)return false;
     const bool music=kind==NativeInterface::StreamKind::song;
     if(loop!=music||clip.channels!=(music?2u:1u))return false;
     const auto* row=music?main.nativeSongSourceCurrent(ordinal,clip):
@@ -578,7 +580,7 @@ bool OriginalApplicationAural50KG::playNativeMainSong234170(OriginalUiMainAudio5
 }
 bool OriginalApplicationAural50KG::playNativeMainEffect233410(OriginalUiMainAudio50KG& main,
     std::size_t index,const AudioClip50HD& clip,float gain,float pitch)const noexcept {
-    if(!nativeStreamSlotsCurrent()||(**interfaceA0_).main.get()!=&main)return false;
+    if(!nativeStreamSlotsCurrent()||(**interfaceA0_).raceIntroLease||(**interfaceA0_).main.get()!=&main)return false;
     AudioMixer50HD::NativeSourceSampleStart50KG start;
     if(!main.nativeEffectSourceCurrent(index,clip,start))return false;
     auto& i=**interfaceA0_;const auto voice=OriginalUiMainAudio50KG::firstEffectVoice+index-1;
@@ -639,7 +641,7 @@ bool OriginalApplicationAural50KG::boundedSourceBodyCurrent()const noexcept {
 }
 bool OriginalApplicationAural50KG::canPublishNativeGarageVoices(const OriginalUiMainAudio50KG& main,
     std::size_t maximumMonoPlays)const noexcept {
-    if(!current()||!backendCurrent()||!nativeStreamSlotsCurrent()||(**interfaceA0_).main.get()!=&main||
+    if(!current()||!backendCurrent()||!nativeStreamSlotsCurrent()||(**interfaceA0_).raceIntroLease||(**interfaceA0_).main.get()!=&main||
        !attached_||entity_.parent1C!=&entities_->root10_||(entity_.flags29&0x0du)!=1u||
        !(entity_.mask20&2u)||!boundedSourceBodyCurrent()||
        !issuer_->nativeSourceAudioDispatcherCurrent(*this))return false;
@@ -656,7 +658,7 @@ bool OriginalApplicationAural50KG::canPublishNativeGarageVoices(const OriginalUi
 bool OriginalApplicationAural50KG::canUpdate103720(float factor,Diagnostic& d)const noexcept {
     d={};if(!current()||!backendCurrent()||!attached_||entity_.parent1C!=&entities_->root10_||
        (entity_.flags29&0x0du)!=1u||!(entity_.mask20&2u))return fail(d,Status::owner,0x103720);
-    if(!std::isfinite(factor)||factor<0.f||issuer_->sourceApplicationMode22C_!=2||
+    if((**interfaceA0_).raceIntroLease||!std::isfinite(factor)||factor<0.f||issuer_->sourceApplicationMode22C_!=2||
        !issuer_->sourceApplicationElapsed23C_||std::bit_cast<std::uint32_t>(factor)!=
        std::bit_cast<std::uint32_t>(*issuer_->sourceApplicationElapsed23C_))
         return fail(d,Status::phase,0x103758);
@@ -819,3 +821,5 @@ bool Application::stageAuralLightNativePrefix13FE24(std::uint32_t nativeOutputRa
     return attachAuralNativePrefix140108(d);
 }
 }
+
+#include "native_race_intro_transport50la.inl"

@@ -206,9 +206,13 @@ bool OriginalUiCoursePageDraw50KG::setTournamentPlanetName(std::uint32_t planet,
 bool OriginalUiCoursePageDraw50KG::updateTournamentFresh(OriginalUiCourseWidgets50KG& widgets,
     const OriginalUiCourseTournamentDrawState50KG& state,D& d)noexcept{
     d={};using J=assets::OriginalUiTextJustification50KG;
-    constexpr std::array<std::int32_t,7> firstPercent{{30,50,60,70,80,90,100}};
-    if(!tournamentFresh()||!tournamentPlanet_||state.career>=27||state.slot!=1||state.tier!=1||
-       (state.progress&31u)||state.medal||state.remainingPrize!=2200||state.par!=2||state.killPercent!=firstPercent)
+    constexpr std::array<std::int32_t,7> taMbPercent{{30,50,60,70,80,90,100}};
+    constexpr std::array<std::int32_t,7> ordinaryPercent{{20,30,50,60,70,80,100}};
+    if(!tournamentFresh()||!tournamentPlanet_||state.career>=27||state.slot<1||state.slot>13||
+       (state.progress&31u)>=13u||state.slot!=(state.progress&31u)+1u||
+       state.tier!=(state.slot<5?1u:state.slot<9?2u:3u)||state.medal>8||
+       state.remainingPrize<0||state.par < -1||state.par>7||
+       state.killPercent!=((state.slot==1||state.slot==7)?taMbPercent:ordinaryPercent))
         return fail(d,E::geometry,0x1DB814);
     const auto* nav=widgets.navigation();if(widgets.poisoned()||!nav||!nav->page||nav->page->identity!=pageIdentity_)return fail(d,E::widget,0x1DB81C);
     try{
@@ -225,11 +229,18 @@ bool OriginalUiCoursePageDraw50KG::updateTournamentFresh(OriginalUiCourseWidgets
             auto& p=packets[pi];p.sourcePC=pc;p.pageMemberOffset=offset;
             return tournamentText(value,offset,cap,x,y,j,rgb,font,atlas,packetZ_,texts[ti],p,d);
         };
-        if(!text(3,0,tournamentLabels_[153-122],0xC80,40,223,90,J::left,0xCCCCCC,0x1DC644)||
+        // Native beta uses the actual retained prior place on retry, not the
+        // fresh-course status or an invented medal/trophy branch.
+        const auto priorPlace=state.medal?"Best place: "+std::to_string(state.medal):tournamentLabels_[153-122];
+        if(!text(3,0,priorPlace,0xC80,40,223,90,J::left,0xCCCCCC,0x1DC644)||
            !text(4,1,std::to_string(state.remainingPrize)+" "+tournamentLabels_[139-122],0xD60,40,293,130,J::left,0xCCCCCC,0x1DC824)||
            !text(5,2,tournamentLabels_[147-122]+" "+tournamentLabels_[144-122],0xCF0,40,285,110,J::left,0xCCCCCC,0x1DCAA8)||
-           !text(6,3,tournamentLabels_[138-122],0xC10,10,75,225+17*state.par,J::right,0xCCCCCC,0x1DD30C))return false;
-        for(std::size_t i=0;i<8;++i){const auto rgb=i==0?primary_:i==std::size_t(state.par)?0xCCCCCC:secondary_;
+           !text(6,3,state.par>=0?tournamentLabels_[138-122]:std::string{},0xC10,10,75,
+               state.par>=0?225+17*state.par:225,J::right,0xCCCCCC,0x1DD30C))return false;
+        // Other course PAR constructor operands remain unrecovered. -1 means
+        // omit only the marker/highlight, never substitute a guessed number.
+        for(std::size_t i=0;i<8;++i){const auto rgb=i==0?primary_:
+            state.par>=0&&i==std::size_t(state.par)?0xCCCCCC:secondary_;
             if(!text(7+2*i,4+2*i,i?std::to_string(i):tournamentLabels_[137-122],std::uint16_t(0xDD0+i*0x70),10,100,225+int(i)*17,J::centerHorizontal,rgb,0x1DD4B8)||
                !text(8+2*i,5+2*i,i?"+"+std::to_string(state.killPercent[i-1])+"%":"% WINNINGS",std::uint16_t(0x1150+i*0x70),15,200,225+int(i)*17,J::centerHorizontal,rgb,0x1DD4D0))return false;
         }
