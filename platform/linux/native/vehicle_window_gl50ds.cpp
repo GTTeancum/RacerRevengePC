@@ -1,3 +1,4 @@
+#include "../../../src/game/original_options_mutation_interlock50kg.h"
 #include "original_ui_garage_draw_contribution50kg.h"
 #include "original_ui_shared_dialogs50kg.h"
 #include "../../../tests/native/original_native_collector_fifo50la.h"
@@ -1716,7 +1717,10 @@ bool uiCoverageDisjointTraced=false;
 
     bool current(VehicleWindowDiagnostic50DS& d,
         const OriginalVideoBlockingNativeBackend* fadeOwner=nullptr,
-        const OriginalUiSharedDialogs50KG* menuOwner=nullptr) const noexcept {
+        const OriginalUiSharedDialogs50KG* menuOwner=nullptr,
+        const OriginalOptionsMutationInterlock50KG* optionsOwner=nullptr) const noexcept {
+        if(!OriginalOptionsMutationInterlock50KG::permitted(optionsOwner))
+            return fail(d,VehicleWindowError50DS::frame,"Options viewport excludes renderer mutation");
         // Every ordinary context-consuming renderer entry is excluded while
         // the exact menu raster contract is pending. Poll is explicitly exempt
         // because it never writes target, viewport or canvas. Only the sealed
@@ -1727,8 +1731,9 @@ bool uiCoverageDisjointTraced=false;
             return fail(d,VehicleWindowError50DS::frame,"blocking display fade owns renderer until retirement");
         if (thread != std::this_thread::get_id())
             return fail(d, VehicleWindowError50DS::wrongThread, "renderer requires creating thread");
-        return (request.isCurrent && request.isCurrent(request.context)) ||
-            fail(d, VehicleWindowError50DS::notCurrent, "caller context/host surface is not current");
+        return (request.isCurrent && request.isCurrent(request.context)&&
+            OriginalOptionsMutationInterlock50KG::permitted(optionsOwner)) ||
+            fail(d, VehicleWindowError50DS::notCurrent, "caller context/host surface is not current or mutation owner changed");
     }
     std::uint64_t gameplayBinderPublication=0;
     const game::original_gameplay_binder_candidate::Mesh* frameGameplayBinders=nullptr;
@@ -6147,6 +6152,9 @@ VehicleWindowGl50DS::~VehicleWindowGl50DS() noexcept {
 
 bool VehicleWindowGl50DS::create(const VehicleWindowRequest50DS& request,
     const assets::VehicleDrawAssets50CR& assets, VehicleWindowDiagnostic50DS& d) noexcept {
+    OriginalOptionsMutationInterlock50KG::Operation optionsMutation;
+    if(!optionsMutation.admitted()){return fail(d,VehicleWindowError50DS::frame,"Options viewport owns native mutation until cancellation");}
+
     d = {};
     if(sessionDisplayFrontendCreate50KG_||(sessionDisplayOwner50LA_&&!sessionDisplayCreate50LA_))
         return fail(d,VehicleWindowError50DS::request,"session renderer creation requires its actual display owner");
@@ -6255,6 +6263,9 @@ bool VehicleWindowGl50DS::create(const VehicleWindowRequest50DS& request,
 
 bool VehicleWindowGl50DS::createOriginalFrontend(const OriginalFrontendWindowRequest50LA& input,
     VehicleWindowDiagnostic50DS& d) noexcept {
+    OriginalOptionsMutationInterlock50KG::Operation optionsMutation;
+    if(!optionsMutation.admitted()){return fail(d,VehicleWindowError50DS::frame,"Options viewport owns native mutation until cancellation");}
+
     if(sessionDisplayCreate50LA_||(sessionDisplayOwner50LA_&&!sessionDisplayFrontendCreate50KG_)){
         d={};return fail(d,VehicleWindowError50DS::request,
             "frontend renderer creation requires its actual frontend display scope");}
@@ -6286,6 +6297,9 @@ bool VehicleWindowGl50DS::createOriginalFrontend(const OriginalFrontendWindowReq
 
 bool VehicleWindowGl50DS::updateWorldFog(const VehicleWindowWorldFog50DS& fog,
     VehicleWindowDiagnostic50DS& d) noexcept {
+    OriginalOptionsMutationInterlock50KG::Operation optionsMutation;
+    if(!optionsMutation.admitted()){return fail(d,VehicleWindowError50DS::frame,"Options viewport owns native mutation until cancellation");}
+
     d={};
     if(!initialized())return fail(d,VehicleWindowError50DS::notInitialized,"world-fog update requires initialized renderer");
     auto& s=*storage_;
@@ -6307,6 +6321,9 @@ bool VehicleWindowGl50DS::updateWorldFog(const VehicleWindowWorldFog50DS& fog,
 
 bool VehicleWindowGl50DS::bindOriginalSpeedBoost(std::shared_ptr<game::OriginalSpeedBoost50LA> owner,
     VehicleWindowDiagnostic50DS& d) noexcept {
+    OriginalOptionsMutationInterlock50KG::Operation optionsMutation;
+    if(!optionsMutation.admitted()){return fail(d,VehicleWindowError50DS::frame,"Options viewport owns native mutation until cancellation");}
+
     d={};if(!initialized())return fail(d,VehicleWindowError50DS::notInitialized,"renderer not initialized");
     auto& s=*storage_;if(!s.current(d))return false;
     if(s.frontendOnly||s.active||s.frameSet||s.diagnostic)
@@ -6330,6 +6347,9 @@ bool VehicleWindowGl50DS::bindOriginalSpeedBoost(std::shared_ptr<game::OriginalS
 }
 bool VehicleWindowGl50DS::bindOriginalTimeStats(std::shared_ptr<game::OriginalTimeStats50LA> owner,
     VehicleWindowDiagnostic50DS& d) noexcept {
+    OriginalOptionsMutationInterlock50KG::Operation optionsMutation;
+    if(!optionsMutation.admitted()){return fail(d,VehicleWindowError50DS::frame,"Options viewport owns native mutation until cancellation");}
+
     d={};if(!initialized())return fail(d,VehicleWindowError50DS::notInitialized,"renderer not initialized");
     auto& s=*storage_;if(!s.current(d))return false;
     if(s.frontendOnly||s.active||s.frameSet||s.diagnostic)
@@ -6353,6 +6373,9 @@ bool VehicleWindowGl50DS::bindOriginalTimeStats(std::shared_ptr<game::OriginalTi
 }
 bool VehicleWindowGl50DS::bindOriginalDamage(std::shared_ptr<game::OriginalDamage50LA> owner,
     VehicleWindowDiagnostic50DS& d) noexcept {
+    OriginalOptionsMutationInterlock50KG::Operation optionsMutation;
+    if(!optionsMutation.admitted()){return fail(d,VehicleWindowError50DS::frame,"Options viewport owns native mutation until cancellation");}
+
     d={};if(!initialized())return fail(d,VehicleWindowError50DS::notInitialized,"renderer not initialized");
     auto& s=*storage_;if(!s.current(d))return false;
     if(s.frontendOnly||s.active||s.frameSet||s.diagnostic)
@@ -6375,6 +6398,9 @@ bool VehicleWindowGl50DS::bindOriginalDamage(std::shared_ptr<game::OriginalDamag
     return accepted;
 }
 bool VehicleWindowGl50DS::retireOriginalPauseDerived(VehicleWindowDiagnostic50DS& d) noexcept {
+    OriginalOptionsMutationInterlock50KG::Operation optionsMutation;
+    if(!optionsMutation.admitted()){return fail(d,VehicleWindowError50DS::frame,"Options viewport owns native mutation until cancellation");}
+
     d={};
     if(!storage_||!storage_->pauseDerived)return true;
     if(!initialized())return fail(d,VehicleWindowError50DS::notInitialized,"Pause retirement requires its live renderer");
@@ -6390,6 +6416,9 @@ bool VehicleWindowGl50DS::retireOriginalPauseDerived(VehicleWindowDiagnostic50DS
 }
 bool VehicleWindowGl50DS::bindOriginalPauseDerived(std::shared_ptr<game::OriginalPauseNativeDraw50LA> owner,
     VehicleWindowDiagnostic50DS& d) noexcept {
+    OriginalOptionsMutationInterlock50KG::Operation optionsMutation;
+    if(!optionsMutation.admitted()){return fail(d,VehicleWindowError50DS::frame,"Options viewport owns native mutation until cancellation");}
+
     d={};if(!initialized())return fail(d,VehicleWindowError50DS::notInitialized,"renderer not initialized");
     auto& s=*storage_;if(!s.current(d))return false;
     if(s.frontendOnly||s.active||s.frameSet||s.diagnostic)
@@ -6413,6 +6442,9 @@ bool VehicleWindowGl50DS::bindOriginalPauseDerived(std::shared_ptr<game::Origina
 }
 bool VehicleWindowGl50DS::bindOriginalPositionStats(std::shared_ptr<game::OriginalPositionStatsNativeOwner50LA> owner,
     VehicleWindowDiagnostic50DS& d) noexcept {
+    OriginalOptionsMutationInterlock50KG::Operation optionsMutation;
+    if(!optionsMutation.admitted()){return fail(d,VehicleWindowError50DS::frame,"Options viewport owns native mutation until cancellation");}
+
     d={};if(!initialized())return fail(d,VehicleWindowError50DS::notInitialized,"renderer not initialized");
     auto& s=*storage_;if(!s.current(d))return false;
     if(s.frontendOnly||s.active||s.frameSet||s.diagnostic)
@@ -6436,6 +6468,9 @@ bool VehicleWindowGl50DS::bindOriginalPositionStats(std::shared_ptr<game::Origin
 }
 bool VehicleWindowGl50DS::bindOriginalRaceHud(const game::OriginalRaceHud50KG& owner,
     VehicleWindowDiagnostic50DS& d) noexcept {
+    OriginalOptionsMutationInterlock50KG::Operation optionsMutation;
+    if(!optionsMutation.admitted()){return fail(d,VehicleWindowError50DS::frame,"Options viewport owns native mutation until cancellation");}
+
     d={};if(!initialized())return fail(d,VehicleWindowError50DS::notInitialized,"renderer not initialized");
     auto& s=*storage_;if(!s.current(d))return false;
     if(s.frontendOnly||s.active||s.frameSet||s.diagnostic)
@@ -6459,6 +6494,9 @@ bool VehicleWindowGl50DS::bindOriginalRaceHud(const game::OriginalRaceHud50KG& o
 }
 bool VehicleWindowGl50DS::submit(const game::VehicleDrawBatch50CO& batch,
     const VehicleWindowFrame50DS& frame, VehicleWindowDiagnostic50DS& d) noexcept {
+    OriginalOptionsMutationInterlock50KG::Operation optionsMutation;
+    if(!optionsMutation.admitted()){return fail(d,VehicleWindowError50DS::frame,"Options viewport owns native mutation until cancellation");}
+
     d = {};
     if (!initialized()) return fail(d, VehicleWindowError50DS::notInitialized, "renderer not initialized");
     auto& s = *storage_;
@@ -6835,6 +6873,9 @@ bool VehicleWindowGl50DS::submit(const game::VehicleDrawBatch50CO& batch,
 
 bool VehicleWindowGl50DS::bindOriginalUiTextures(const assets::MaterialTextureAssets50EA& cpu,
     const MaterialTextureGl50EB& gpu, VehicleWindowDiagnostic50DS& d) noexcept {
+    OriginalOptionsMutationInterlock50KG::Operation optionsMutation;
+    if(!optionsMutation.admitted()){return fail(d,VehicleWindowError50DS::frame,"Options viewport owns native mutation until cancellation");}
+
     d = {};
     if (!initialized()) return fail(d, VehicleWindowError50DS::notInitialized, "renderer not initialized");
     auto& s = *storage_;
@@ -6862,6 +6903,9 @@ bool VehicleWindowGl50DS::bindOriginalUiTextures(const assets::MaterialTextureAs
 
 bool VehicleWindowGl50DS::prevalidateRiderTextures(const OriginalUiRiderResidencyDemand50KG& demand,
     const MaterialTextureGl50EB& gpu,OriginalUiRiderTextureValidation50KG& out,VehicleWindowDiagnostic50DS& d)noexcept {
+    OriginalOptionsMutationInterlock50KG::Operation optionsMutation;
+    if(!optionsMutation.admitted()){return fail(d,VehicleWindowError50DS::frame,"Options viewport owns native mutation until cancellation");}
+
     d={};out={};
     if(!initialized())return fail(d,VehicleWindowError50DS::notInitialized,"Rider validation requires actual initialized renderer");
     auto& s=*storage_;
@@ -6894,6 +6938,9 @@ bool VehicleWindowGl50DS::prevalidateRiderTextures(const OriginalUiRiderResidenc
 }
 bool VehicleWindowGl50DS::commitRiderTextures(const OriginalUiRiderResidencyDemand50KG& demand,
     OriginalUiRiderTextureValidation50KG& receipt,VehicleWindowDiagnostic50DS& d)noexcept {
+    OriginalOptionsMutationInterlock50KG::Operation optionsMutation;
+    if(!optionsMutation.admitted()){return fail(d,VehicleWindowError50DS::frame,"Options viewport owns native mutation until cancellation");}
+
     d={};if(!initialized())return fail(d,VehicleWindowError50DS::notInitialized,"Rider commit requires initialized renderer");
     auto& s=*storage_;const auto* gpu=receipt.gpu_;
     if(!s.current(d))return false;
@@ -6920,6 +6967,9 @@ bool VehicleWindowGl50DS::commitRiderTextures(const OriginalUiRiderResidencyDema
 
 bool VehicleWindowGl50DS::submitOriginalUi(const OriginalUiDraw50KG&,
     std::int32_t, std::int32_t, VehicleWindowDiagnostic50DS& d) noexcept {
+    OriginalOptionsMutationInterlock50KG::Operation optionsMutation;
+    if(!optionsMutation.admitted()){return fail(d,VehicleWindowError50DS::frame,"Options viewport owns native mutation until cancellation");}
+
     d = {};
     return fail(d, VehicleWindowError50DS::material,
         "draw-only original UI lacks explicit depth and alpha-consumer ownership; use native descriptor");
@@ -6927,6 +6977,9 @@ bool VehicleWindowGl50DS::submitOriginalUi(const OriginalUiDraw50KG&,
 
 bool VehicleWindowGl50DS::submitOriginalUi(const OriginalUiNativeDraw50KG& native,
     std::int32_t width, std::int32_t height, VehicleWindowDiagnostic50DS& d) noexcept {
+    OriginalOptionsMutationInterlock50KG::Operation optionsMutation;
+    if(!optionsMutation.admitted()){return fail(d,VehicleWindowError50DS::frame,"Options viewport owns native mutation until cancellation");}
+
     return submitOriginalUiImpl(native,width,height,false,d);
 }
 bool VehicleWindowGl50DS::originalUiSourceRgbaAvailable() const noexcept {
@@ -6936,6 +6989,9 @@ bool VehicleWindowGl50DS::originalUiSourceRgbaAvailable() const noexcept {
         storage_->uiSourceIndexBuffer && storage_->uiSourceIndices;
 }
 bool VehicleWindowGl50DS::prepareOriginalUiDirectVideo(OriginalUiDirectVideoCapability50KG& out,VehicleWindowDiagnostic50DS& d) noexcept {
+    OriginalOptionsMutationInterlock50KG::Operation optionsMutation;
+    if(!optionsMutation.admitted()){return fail(d,VehicleWindowError50DS::frame,"Options viewport owns native mutation until cancellation");}
+
     d={};out={};
     if(!originalUiSourceRgbaAvailable())return fail(d,VehicleWindowError50DS::context,"direct video requires actual source RGBA renderer");
     auto& s=*storage_;
@@ -6955,10 +7011,16 @@ bool VehicleWindowGl50DS::prepareOriginalUiDirectVideo(OriginalUiDirectVideoCapa
 }
 bool VehicleWindowGl50DS::submitOriginalUiSourceRgba(const OriginalUiSourceFrame50KM& frame,
     std::int32_t width,std::int32_t height,VehicleWindowDiagnostic50DS& d) noexcept {
+    OriginalOptionsMutationInterlock50KG::Operation optionsMutation;
+    if(!optionsMutation.admitted()){return fail(d,VehicleWindowError50DS::frame,"Options viewport owns native mutation until cancellation");}
+
     return submitOriginalUiSourceFrame(frame,width,height,true,d);
 }
 bool VehicleWindowGl50DS::submitOriginalUiSourceFrame(const OriginalUiSourceFrame50KM& frame,
     std::int32_t width,std::int32_t height,bool publishSource,VehicleWindowDiagnostic50DS& d) noexcept {
+    OriginalOptionsMutationInterlock50KG::Operation optionsMutation;
+    if(!optionsMutation.admitted()){return fail(d,VehicleWindowError50DS::frame,"Options viewport owns native mutation until cancellation");}
+
     d={};
     if (!originalUiSourceRgbaAvailable())return fail(d,VehicleWindowError50DS::context,"source UI composition is unavailable");
     auto& s=*storage_;
@@ -7057,6 +7119,9 @@ bool VehicleWindowGl50DS::matchesOriginalUiSource(const OriginalUiSourceSubmissi
 }
 bool VehicleWindowGl50DS::originalUiSourceSubmission(OriginalUiSourceSubmission50KN& receipt,
     VehicleWindowDiagnostic50DS& d) noexcept {
+    OriginalOptionsMutationInterlock50KG::Operation optionsMutation;
+    if(!optionsMutation.admitted()){return fail(d,VehicleWindowError50DS::frame,"Options viewport owns native mutation until cancellation");}
+
     receipt={};d={};
     if (!originalUiSourceRgbaAvailable())return fail(d,VehicleWindowError50DS::context,"source UI composition is unavailable");
     auto& s=*storage_;if(!s.current(d))return false;
@@ -7073,6 +7138,9 @@ bool VehicleWindowGl50DS::originalUiSourceSubmission(OriginalUiSourceSubmission5
 bool VehicleWindowGl50DS::submitOriginalUiSourceUnpublished(const OriginalUiSourceFrame50KM& frame,
     std::int32_t width,std::int32_t height,OriginalUiSourceSubmission50KN& receipt,
     VehicleWindowDiagnostic50DS& d) noexcept {
+    OriginalOptionsMutationInterlock50KG::Operation optionsMutation;
+    if(!optionsMutation.admitted()){return fail(d,VehicleWindowError50DS::frame,"Options viewport owns native mutation until cancellation");}
+
     receipt={};d={};
     if (!originalUiSourceRgbaAvailable())return fail(d,VehicleWindowError50DS::context,"source UI composition is unavailable");
     auto& s=*storage_;
@@ -7085,6 +7153,9 @@ bool VehicleWindowGl50DS::submitOriginalUiSourceUnpublished(const OriginalUiSour
 }
 bool VehicleWindowGl50DS::completeOriginalUiSource(const OriginalUiSourceSubmission50KN& input,
     OriginalUiSourceSubmission50KN& completed,VehicleWindowDiagnostic50DS& d) noexcept {
+    OriginalOptionsMutationInterlock50KG::Operation optionsMutation;
+    if(!optionsMutation.admitted()){return fail(d,VehicleWindowError50DS::frame,"Options viewport owns native mutation until cancellation");}
+
     d={};
     if(&input==&completed)return fail(d,VehicleWindowError50DS::request,"source completion input and output must be distinct");
     completed={};
@@ -7107,6 +7178,9 @@ bool VehicleWindowGl50DS::completeOriginalUiSource(const OriginalUiSourceSubmiss
 }
 bool VehicleWindowGl50DS::publishOriginalUiSource(const OriginalUiSourceSubmission50KN& source,
     std::int32_t width,std::int32_t height,VehicleWindowDiagnostic50DS& d) noexcept {
+    OriginalOptionsMutationInterlock50KG::Operation optionsMutation;
+    if(!optionsMutation.admitted()){return fail(d,VehicleWindowError50DS::frame,"Options viewport owns native mutation until cancellation");}
+
     d={};
     if(!originalUiSourceRgbaAvailable())return fail(d,VehicleWindowError50DS::context,"source UI composition is unavailable");
     auto& s=*storage_;if(!s.current(d))return false;
@@ -7125,6 +7199,9 @@ bool VehicleWindowGl50DS::publishOriginalUiSource(const OriginalUiSourceSubmissi
 }
 bool VehicleWindowGl50DS::retainPublishedOriginalUiSource(OriginalUiRetainedSource50KN& retained,
     VehicleWindowDiagnostic50DS& d) noexcept {
+    OriginalOptionsMutationInterlock50KG::Operation optionsMutation;
+    if(!optionsMutation.admitted()){return fail(d,VehicleWindowError50DS::frame,"Options viewport owns native mutation until cancellation");}
+
     retained={};d={};
     if(!originalUiSourceRgbaAvailable())return fail(d,VehicleWindowError50DS::context,"source UI composition is unavailable");
     auto& s=*storage_;if(!s.current(d))return false;
@@ -7165,6 +7242,9 @@ bool VehicleWindowGl50DS::retainPublishedOriginalUiSource(OriginalUiRetainedSour
 }
 bool VehicleWindowGl50DS::readRetainedOriginalUiSourceRgba(const OriginalUiRetainedSource50KN& retained,
     std::uint8_t* rgba,std::size_t capacityBytes,VehicleWindowDiagnostic50DS& d) noexcept {
+    OriginalOptionsMutationInterlock50KG::Operation optionsMutation;
+    if(!optionsMutation.admitted()){return fail(d,VehicleWindowError50DS::frame,"Options viewport owns native mutation until cancellation");}
+
     d={};
     if(!originalUiSourceRgbaAvailable())return fail(d,VehicleWindowError50DS::context,"source UI composition is unavailable");
     auto& s=*storage_;if(!s.current(d))return false;
@@ -7182,6 +7262,9 @@ bool VehicleWindowGl50DS::readRetainedOriginalUiSourceRgba(const OriginalUiRetai
     d.originalUiSnapshotGeneration=retained.snapshotGeneration_;return accepted;
 }
 bool VehicleWindowGl50DS::releaseRetainedOriginalUiSource(VehicleWindowDiagnostic50DS& d) noexcept {
+    OriginalOptionsMutationInterlock50KG::Operation optionsMutation;
+    if(!optionsMutation.admitted()){return fail(d,VehicleWindowError50DS::frame,"Options viewport owns native mutation until cancellation");}
+
     d={};
     if(!originalUiSourceRgbaAvailable())return fail(d,VehicleWindowError50DS::context,"source UI composition is unavailable");
     auto& s=*storage_;if(!s.current(d))return false;
@@ -7250,6 +7333,9 @@ bool VehicleWindowGl50DS::matchesOriginalUiByteBlendSample(const OriginalUiByteB
 bool VehicleWindowGl50DS::beginOriginalUiByteBlend(const OriginalUiRetainedSource50KN& oldSource,
     const OriginalUiSourceSubmission50KN& incoming,OriginalUiByteBlend50KO& blend,
     VehicleWindowDiagnostic50DS& d) noexcept {
+    OriginalOptionsMutationInterlock50KG::Operation optionsMutation;
+    if(!optionsMutation.admitted()){return fail(d,VehicleWindowError50DS::frame,"Options viewport owns native mutation until cancellation");}
+
     d={};
     if(&oldSource==&blend.old_ || &incoming==&blend.incoming_ || &incoming==&blend.old_.source_)
         return fail(d,VehicleWindowError50DS::request,"byte-blend input and output storage must be distinct");
@@ -7297,6 +7383,9 @@ bool VehicleWindowGl50DS::beginOriginalUiByteBlend(const OriginalUiRetainedSourc
 }
 bool VehicleWindowGl50DS::renderOriginalUiByteBlendSample(const OriginalUiByteBlend50KO& blend,
     std::uint32_t alpha,OriginalUiByteBlendSample50KO& sample,VehicleWindowDiagnostic50DS& d) noexcept {
+    OriginalOptionsMutationInterlock50KG::Operation optionsMutation;
+    if(!optionsMutation.admitted()){return fail(d,VehicleWindowError50DS::frame,"Options viewport owns native mutation until cancellation");}
+
     sample={};d={};
     if(!originalUiSourceRgbaAvailable())return fail(d,VehicleWindowError50DS::context,"source UI composition is unavailable");
     auto& s=*storage_;if(!s.current(d))return false;
@@ -7341,6 +7430,9 @@ bool VehicleWindowGl50DS::renderOriginalUiByteBlendSample(const OriginalUiByteBl
 }
 bool VehicleWindowGl50DS::completeOriginalUiByteBlendSample(const OriginalUiByteBlendSample50KO& input,
     OriginalUiByteBlendSample50KO& completed,VehicleWindowDiagnostic50DS& d) noexcept {
+    OriginalOptionsMutationInterlock50KG::Operation optionsMutation;
+    if(!optionsMutation.admitted()){return fail(d,VehicleWindowError50DS::frame,"Options viewport owns native mutation until cancellation");}
+
     d={};
     if(&input==&completed)return fail(d,VehicleWindowError50DS::request,"byte-blend completion input and output must be distinct");
     completed={};
@@ -7358,6 +7450,9 @@ bool VehicleWindowGl50DS::completeOriginalUiByteBlendSample(const OriginalUiByte
 }
 bool VehicleWindowGl50DS::readOriginalUiByteBlendSampleRgba(const OriginalUiByteBlendSample50KO& sample,
     std::uint8_t* rgba,std::size_t capacityBytes,VehicleWindowDiagnostic50DS& d) noexcept {
+    OriginalOptionsMutationInterlock50KG::Operation optionsMutation;
+    if(!optionsMutation.admitted()){return fail(d,VehicleWindowError50DS::frame,"Options viewport owns native mutation until cancellation");}
+
     d={};
     if(!originalUiSourceRgbaAvailable())return fail(d,VehicleWindowError50DS::context,"source UI composition is unavailable");
     auto& s=*storage_;if(!s.current(d))return false;
@@ -7381,6 +7476,9 @@ bool VehicleWindowGl50DS::matchesOriginalUiPrivatePublication(const OriginalUiPr
 bool VehicleWindowGl50DS::publishOriginalUiBlendImage(const OriginalUiByteBlend50KO& blend,
     const OriginalUiByteBlendSample50KO* sample,std::int32_t width,std::int32_t height,
     OriginalUiPrivatePublication50KP& publication,VehicleWindowDiagnostic50DS& d) noexcept {
+    OriginalOptionsMutationInterlock50KG::Operation optionsMutation;
+    if(!optionsMutation.admitted()){return fail(d,VehicleWindowError50DS::frame,"Options viewport owns native mutation until cancellation");}
+
     publication={};d={};
     if(!originalUiSourceRgbaAvailable())return fail(d,VehicleWindowError50DS::context,"source UI composition is unavailable");
     auto& s=*storage_;if(!s.current(d))return false;
@@ -7422,11 +7520,17 @@ bool VehicleWindowGl50DS::publishOriginalUiBlendImage(const OriginalUiByteBlend5
 bool VehicleWindowGl50DS::publishOriginalUiByteBlendSample(const OriginalUiByteBlend50KO& blend,
     const OriginalUiByteBlendSample50KO& sample,std::int32_t width,std::int32_t height,
     OriginalUiPrivatePublication50KP& publication,VehicleWindowDiagnostic50DS& d) noexcept {
+    OriginalOptionsMutationInterlock50KG::Operation optionsMutation;
+    if(!optionsMutation.admitted()){return fail(d,VehicleWindowError50DS::frame,"Options viewport owns native mutation until cancellation");}
+
     return publishOriginalUiBlendImage(blend,&sample,width,height,publication,d);
 }
 bool VehicleWindowGl50DS::promoteOriginalUiByteBlendIncoming(const OriginalUiByteBlend50KO& blend,
     std::int32_t width,std::int32_t height,OriginalUiPrivatePublication50KP& publication,
     OriginalUiPromotedIncoming50KP& incoming,VehicleWindowDiagnostic50DS& d) noexcept {
+    OriginalOptionsMutationInterlock50KG::Operation optionsMutation;
+    if(!optionsMutation.admitted()){return fail(d,VehicleWindowError50DS::frame,"Options viewport owns native mutation until cancellation");}
+
     incoming={};
     if(!publishOriginalUiBlendImage(blend,nullptr,width,height,publication,d))return false;
     auto& s=*storage_;
@@ -7444,6 +7548,9 @@ bool VehicleWindowGl50DS::promoteOriginalUiByteBlendIncoming(const OriginalUiByt
 }
 bool VehicleWindowGl50DS::completeOriginalUiPrivatePublication(const OriginalUiPrivatePublication50KP& input,
     OriginalUiPrivatePublication50KP& completed,VehicleWindowDiagnostic50DS& d) noexcept {
+    OriginalOptionsMutationInterlock50KG::Operation optionsMutation;
+    if(!optionsMutation.admitted()){return fail(d,VehicleWindowError50DS::frame,"Options viewport owns native mutation until cancellation");}
+
     d={};
     if(&input==&completed)return fail(d,VehicleWindowError50DS::request,"publication completion input and output must be distinct");
     completed={};
@@ -7463,6 +7570,9 @@ bool VehicleWindowGl50DS::completeOriginalUiPrivatePublication(const OriginalUiP
 }
 bool VehicleWindowGl50DS::copyOriginalUiPrivatePublicationToWindow(const OriginalUiPrivatePublication50KP& publication,
     OriginalUiWindowBackBufferCopy& copied,VehicleWindowDiagnostic50DS& d) noexcept {
+    OriginalOptionsMutationInterlock50KG::Operation optionsMutation;
+    if(!optionsMutation.admitted()){return fail(d,VehicleWindowError50DS::frame,"Options viewport owns native mutation until cancellation");}
+
     d={};
     if(&publication==&copied.publication_)
         return fail(d,VehicleWindowError50DS::request,"window copy input and output must be distinct");
@@ -7499,6 +7609,9 @@ bool VehicleWindowGl50DS::copyOriginalUiPrivatePublicationToWindow(const Origina
 }
 bool VehicleWindowGl50DS::readOriginalUiPrivatePublicationRgba(const OriginalUiPrivatePublication50KP& publication,
     std::uint8_t* rgba,std::size_t capacityBytes,VehicleWindowDiagnostic50DS& d) noexcept {
+    OriginalOptionsMutationInterlock50KG::Operation optionsMutation;
+    if(!optionsMutation.admitted()){return fail(d,VehicleWindowError50DS::frame,"Options viewport owns native mutation until cancellation");}
+
     d={};
     if(!originalUiSourceRgbaAvailable())return fail(d,VehicleWindowError50DS::context,"source UI composition is unavailable");
     auto& s=*storage_;if(!s.current(d))return false;
@@ -7515,6 +7628,9 @@ bool VehicleWindowGl50DS::readOriginalUiPrivatePublicationRgba(const OriginalUiP
 }
 bool VehicleWindowGl50DS::readPromotedOriginalUiIncomingRgba(const OriginalUiPromotedIncoming50KP& incoming,
     std::uint8_t* rgba,std::size_t capacityBytes,VehicleWindowDiagnostic50DS& d) noexcept {
+    OriginalOptionsMutationInterlock50KG::Operation optionsMutation;
+    if(!optionsMutation.admitted()){return fail(d,VehicleWindowError50DS::frame,"Options viewport owns native mutation until cancellation");}
+
     d={};
     if(!originalUiSourceRgbaAvailable())return fail(d,VehicleWindowError50DS::context,"source UI composition is unavailable");
     auto& s=*storage_;if(!s.current(d))return false;
@@ -7530,6 +7646,9 @@ bool VehicleWindowGl50DS::readPromotedOriginalUiIncomingRgba(const OriginalUiPro
     d.originalUiPromotedIncomingGeneration=incoming.generation_;return accepted;
 }
 bool VehicleWindowGl50DS::releasePromotedOriginalUiIncoming(VehicleWindowDiagnostic50DS& d) noexcept {
+    OriginalOptionsMutationInterlock50KG::Operation optionsMutation;
+    if(!optionsMutation.admitted()){return fail(d,VehicleWindowError50DS::frame,"Options viewport owns native mutation until cancellation");}
+
     d={};
     if(!originalUiSourceRgbaAvailable())return fail(d,VehicleWindowError50DS::context,"source UI composition is unavailable");
     auto& s=*storage_;if(!s.current(d))return false;
@@ -7550,6 +7669,9 @@ bool VehicleWindowGl50DS::releasePromotedOriginalUiIncoming(VehicleWindowDiagnos
     s.diagnostic=nullptr;return accepted;
 }
 bool VehicleWindowGl50DS::releaseOriginalUiByteBlend(VehicleWindowDiagnostic50DS& d) noexcept {
+    OriginalOptionsMutationInterlock50KG::Operation optionsMutation;
+    if(!optionsMutation.admitted()){return fail(d,VehicleWindowError50DS::frame,"Options viewport owns native mutation until cancellation");}
+
     d={};
     if(!originalUiSourceRgbaAvailable())return fail(d,VehicleWindowError50DS::context,"source UI composition is unavailable");
     auto& s=*storage_;if(!s.current(d))return false;
@@ -7571,6 +7693,9 @@ bool VehicleWindowGl50DS::releaseOriginalUiByteBlend(VehicleWindowDiagnostic50DS
 }
 bool VehicleWindowGl50DS::applyMenuRasterPrelude50KG(OriginalUiSharedDialogs50KG& shared,
     VehicleWindowDiagnostic50DS& d)noexcept {
+    OriginalOptionsMutationInterlock50KG::Operation optionsMutation;
+    if(!optionsMutation.admitted()){return fail(d,VehicleWindowError50DS::frame,"Options viewport owns native mutation until cancellation");}
+
     d={};
     if(!storage_||!shared.menuRasterAttempted_||shared.menuRasterFailed_||
        !shared.menu470RenderCurrent()||shared.menu470Phase_!=decltype(shared.menu470Phase_)::callbacks||
@@ -7640,6 +7765,9 @@ bool VehicleWindowGl50DS::menuRasterPreludeCurrent50KG(const OriginalUiSharedDia
 }
 bool VehicleWindowGl50DS::sealMenuRasterSourceFrame50KG(const OriginalUiSharedDialogs50KG& shared,
     VehicleWindowDiagnostic50DS& d)noexcept {
+    OriginalOptionsMutationInterlock50KG::Operation optionsMutation;
+    if(!optionsMutation.admitted()){return fail(d,VehicleWindowError50DS::frame,"Options viewport owns native mutation until cancellation");}
+
     d={};if(!menuRasterPreludeCurrent50KG(shared))
         return fail(d,VehicleWindowError50DS::frame,"menu raster changed before SourceFrame seal");
     auto& s=*storage_;const auto* native=shared.menuRasterNative_;
@@ -7676,6 +7804,9 @@ bool VehicleWindowGl50DS::menuRasterRetired50KG(const OriginalUiSharedDialogs50K
 
 bool VehicleWindowGl50DS::applyGarageFogColor244A40(const OriginalUiSourceOwner50KM& owner,
     std::uint64_t publication,std::uint32_t argb,VehicleWindowDiagnostic50DS& d)noexcept {
+    OriginalOptionsMutationInterlock50KG::Operation optionsMutation;
+    if(!optionsMutation.admitted()){return fail(d,VehicleWindowError50DS::frame,"Options viewport owns native mutation until cancellation");}
+
     d={};if(!originalUiSourceRgbaAvailable()||!ownsGarageSourcePrelude50KG(owner,publication))
         return fail(d,VehicleWindowError50DS::context,"Garage Fog command requires exact live source-target owner");
     auto& s=*storage_;
@@ -7692,6 +7823,9 @@ bool VehicleWindowGl50DS::applyGarageFogColor244A40(const OriginalUiSourceOwner5
 }
 bool VehicleWindowGl50DS::clearGarageSourceViewport50KG(const OriginalUiSourceOwner50KM& owner,
     std::uint64_t publication,bool color,std::uint32_t argb,VehicleWindowDiagnostic50DS& d)noexcept {
+    OriginalOptionsMutationInterlock50KG::Operation optionsMutation;
+    if(!optionsMutation.admitted()){return fail(d,VehicleWindowError50DS::frame,"Options viewport owns native mutation until cancellation");}
+
     d={};
     if(!publication||!originalUiSourceRgbaAvailable())return fail(d,VehicleWindowError50DS::context,"Garage source clear requires actual source target and publication");
     auto& s=*storage_;if(!s.current(d))return false;
@@ -7750,6 +7884,9 @@ bool VehicleWindowGl50DS::garageUnsealedRenderQuiescent50KG(
 }
 bool VehicleWindowGl50DS::releaseGarageSourcePrelude50KG(const OriginalUiSourceOwner50KM& owner,
     std::uint64_t publication,VehicleWindowDiagnostic50DS& d)noexcept {
+    OriginalOptionsMutationInterlock50KG::Operation optionsMutation;
+    if(!optionsMutation.admitted()){return fail(d,VehicleWindowError50DS::frame,"Options viewport owns native mutation until cancellation");}
+
     d={};if(!storage_)return false;auto& s=*storage_;
     if(!s.garagePreludeOwner50KG)return true;
     if(s.garagePreludeOwner50KG!=&owner||s.garagePreludePublication50KG!=publication||
@@ -7764,6 +7901,9 @@ bool VehicleWindowGl50DS::releaseGarageSourcePrelude50KG(const OriginalUiSourceO
     return okay;
 }
 bool VehicleWindowGl50DS::pollOriginalRenderer245030(bool& complete,VehicleWindowDiagnostic50DS& d)noexcept {
+    OriginalOptionsMutationInterlock50KG::Operation optionsMutation;
+    if(!optionsMutation.admitted()){return fail(d,VehicleWindowError50DS::frame,"Options viewport owns native mutation until cancellation");}
+
     d={};complete=false;
     if(!originalUiSourceRgbaAvailable())return fail(d,VehicleWindowError50DS::context,"Garage poll requires source RGBA renderer");
     auto& s=*storage_;if(!s.current(d,nullptr,s.menuRasterShared50KG))return false;
@@ -7796,6 +7936,9 @@ bool VehicleWindowGl50DS::pollOriginalRenderer245030(bool& complete,VehicleWindo
 }
 bool VehicleWindowGl50DS::completeGarageSourceTarget140A38(
     OriginalUiGarageDrawContribution50KG& draw,VehicleWindowDiagnostic50DS& d)noexcept {
+    OriginalOptionsMutationInterlock50KG::Operation optionsMutation;
+    if(!optionsMutation.admitted()){return fail(d,VehicleWindowError50DS::frame,"Options viewport owns native mutation until cancellation");}
+
     d={};
     if(!originalUiSourceRgbaAvailable()||!draw.identityCurrent()||
        draw.phase_!=decltype(draw.phase_)::finalPass||draw.sourcePC_!=0x140A38||
@@ -7814,6 +7957,9 @@ bool VehicleWindowGl50DS::completeGarageSourceTarget140A38(
 }
 bool VehicleWindowGl50DS::publishGarageSourceTarget140A68(
     OriginalUiGarageDrawContribution50KG& draw,std::int32_t width,std::int32_t height,VehicleWindowDiagnostic50DS& d)noexcept {
+    OriginalOptionsMutationInterlock50KG::Operation optionsMutation;
+    if(!optionsMutation.admitted()){return fail(d,VehicleWindowError50DS::frame,"Options viewport owns native mutation until cancellation");}
+
     d={};if(!originalUiSourceRgbaAvailable()||!draw.issuer_||!draw.renderReturned140230Current(*draw.issuer_)||
        !draw.targetPublishAttempted_||draw.targetPublished140A68_||!ownsGarageSourcePrelude50KG(draw,draw.publication_))
         return fail(d,VehicleWindowError50DS::frame,"Garage publication requires this actual completed Root target");
@@ -7832,6 +7978,9 @@ bool VehicleWindowGl50DS::publishGarageSourceTarget140A68(
 }
 bool VehicleWindowGl50DS::rearmGarageSourceTarget140230(
     OriginalUiGarageDrawContribution50KG& draw,VehicleWindowDiagnostic50DS& d)noexcept {
+    OriginalOptionsMutationInterlock50KG::Operation optionsMutation;
+    if(!optionsMutation.admitted()){return fail(d,VehicleWindowError50DS::frame,"Options viewport owns native mutation until cancellation");}
+
     d={};if(!storage_||!draw.issuer_||!draw.renderReturned140230Current(*draw.issuer_)||
        !draw.targetPublished140A68_||!ownsGarageSourcePrelude50KG(draw,draw.publication_))
         return fail(d,VehicleWindowError50DS::frame,"Garage rearm requires its published completed target");
@@ -7850,6 +7999,9 @@ bool VehicleWindowGl50DS::rearmGarageSourceTarget140230(
 }
 bool VehicleWindowGl50DS::retireOriginalUiSourceOwner(
     const OriginalUiSourceOwner50KM& owner,VehicleWindowDiagnostic50DS& d) noexcept {
+    OriginalOptionsMutationInterlock50KG::Operation optionsMutation;
+    if(!optionsMutation.admitted()){return fail(d,VehicleWindowError50DS::frame,"Options viewport owns native mutation until cancellation");}
+
     d={};
     if (!originalUiSourceRgbaAvailable())
         return fail(d,VehicleWindowError50DS::context,"source UI composition is unavailable");
@@ -7879,6 +8031,9 @@ bool VehicleWindowGl50DS::retireOriginalUiSourceOwner(
 }
 bool VehicleWindowGl50DS::completeGarageCollector24C160(OriginalUiGarageDrawContribution50KG& draw,
     VehicleWindowDiagnostic50DS& d)noexcept {
+    OriginalOptionsMutationInterlock50KG::Operation optionsMutation;
+    if(!optionsMutation.admitted()){return fail(d,VehicleWindowError50DS::frame,"Options viewport owns native mutation until cancellation");}
+
     d={};if(!initialized()||!draw.identityCurrent()||draw.phase_!=decltype(draw.phase_)::collectorDrain24B7B0||
        draw.sourcePC_!=0x105990u||!draw.drainContextCaptured_||!ownsGarageSourcePrelude50KG(draw,draw.publication_))
         return fail(d,VehicleWindowError50DS::frame,"actual completed Garage leaf traversal required");
@@ -7904,6 +8059,9 @@ bool VehicleWindowGl50DS::completeGarageCollector24C160(OriginalUiGarageDrawCont
 }
 bool VehicleWindowGl50DS::submitGarageCollectorBatch24B26C(
     OriginalUiGarageDrawContribution50KG& draw,VehicleWindowDiagnostic50DS& d)noexcept {
+    OriginalOptionsMutationInterlock50KG::Operation optionsMutation;
+    if(!optionsMutation.admitted()){return fail(d,VehicleWindowError50DS::frame,"Options viewport owns native mutation until cancellation");}
+
     d={};
     if(!initialized()||!draw.identityCurrent()||
        draw.phase_!=decltype(draw.phase_)::collectorDrain24B7B0||draw.sourcePC_!=0x24B26Cu||
@@ -7952,6 +8110,9 @@ bool VehicleWindowGl50DS::submitGarageCollectorBatch24B26C(
 bool VehicleWindowGl50DS::submitOriginalUiImpl(const OriginalUiNativeDraw50KG& native,
     std::int32_t width,std::int32_t height,bool sourceRgba,VehicleWindowDiagnostic50DS& d,
     bool* sourceWorkStarted,bool publishSource,bool riderReceiptChecked,const OriginalUiDirectVideo50KG* directVideo,bool garageBatch) noexcept {
+    OriginalOptionsMutationInterlock50KG::Operation optionsMutation;
+    if(!optionsMutation.admitted()){return fail(d,VehicleWindowError50DS::frame,"Options viewport owns native mutation until cancellation");}
+
     d = {};
     if(sourceWorkStarted)*sourceWorkStarted=false;
     if (!initialized()) return fail(d, VehicleWindowError50DS::notInitialized, "renderer not initialized");
@@ -8657,6 +8818,9 @@ bool VehicleWindowGl50DS::submitOriginalUiImpl(const OriginalUiNativeDraw50KG& n
 
 bool VehicleWindowGl50DS::submitHostMenu(const VehicleWindowHostMenu50DS& input,
     std::int32_t width, std::int32_t height, VehicleWindowDiagnostic50DS& d) noexcept {
+    OriginalOptionsMutationInterlock50KG::Operation optionsMutation;
+    if(!optionsMutation.admitted()){return fail(d,VehicleWindowError50DS::frame,"Options viewport owns native mutation until cancellation");}
+
     d = {};
     if (!initialized()) return fail(d, VehicleWindowError50DS::notInitialized, "renderer not initialized");
     auto& s = *storage_;
@@ -8734,6 +8898,9 @@ bool VehicleWindowGl50DS::submitHostMenu(const VehicleWindowHostMenu50DS& input,
 bool VehicleWindowGl50DS::submitRetainedOriginalPause(
     const game::OriginalPauseNativeDraw50LA& owner,I width,I height,
     VehicleWindowDiagnostic50DS& d) noexcept {
+    OriginalOptionsMutationInterlock50KG::Operation optionsMutation;
+    if(!optionsMutation.admitted()){return fail(d,VehicleWindowError50DS::frame,"Options viewport owns native mutation until cancellation");}
+
     d={};
     if(!initialized())return fail(d,VehicleWindowError50DS::notInitialized,"Pause requires initialized renderer");
     auto& s=*storage_;
@@ -8784,6 +8951,9 @@ bool VehicleWindowGl50DS::submitRetainedOriginalPause(
 
 bool VehicleWindowGl50DS::readbackRgba(std::uint8_t* destination, std::size_t capacityBytes,
     VehicleWindowDiagnostic50DS& d) noexcept {
+    OriginalOptionsMutationInterlock50KG::Operation optionsMutation;
+    if(!optionsMutation.admitted()){return fail(d,VehicleWindowError50DS::frame,"Options viewport owns native mutation until cancellation");}
+
     d = {};
     if (!initialized()) return fail(d, VehicleWindowError50DS::notInitialized, "renderer not initialized");
     auto& s = *storage_;
@@ -8805,17 +8975,26 @@ bool VehicleWindowGl50DS::readbackRgba(std::uint8_t* destination, std::size_t ca
 
 bool VehicleWindowGl50DS::readbackWindowFrontRgba(std::uint8_t* destination,
     std::size_t capacityBytes,I width,I height,VehicleWindowDiagnostic50DS& d) noexcept {
+    OriginalOptionsMutationInterlock50KG::Operation optionsMutation;
+    if(!optionsMutation.admitted()){return fail(d,VehicleWindowError50DS::frame,"Options viewport owns native mutation until cancellation");}
+
     return readbackWindowBufferRgba(destination,capacityBytes,width,height,true,nullptr,d);
 }
 
 bool VehicleWindowGl50DS::readbackWindowBackRgba(GameHost50ER& host,std::uint8_t* destination,
     std::size_t capacityBytes,I width,I height,VehicleWindowDiagnostic50DS& d) noexcept {
+    OriginalOptionsMutationInterlock50KG::Operation optionsMutation;
+    if(!optionsMutation.admitted()){return fail(d,VehicleWindowError50DS::frame,"Options viewport owns native mutation until cancellation");}
+
     return readbackWindowBufferRgba(destination,capacityBytes,width,height,false,&host,d);
 }
 
 bool VehicleWindowGl50DS::readbackWindowBufferRgba(std::uint8_t* destination,
     std::size_t capacityBytes,I width,I height,bool front,const GameHost50ER* expectedHost,
     VehicleWindowDiagnostic50DS& d) noexcept {
+    OriginalOptionsMutationInterlock50KG::Operation optionsMutation;
+    if(!optionsMutation.admitted()){return fail(d,VehicleWindowError50DS::frame,"Options viewport owns native mutation until cancellation");}
+
     d={};
     if(!initialized())return fail(d,VehicleWindowError50DS::notInitialized,"window readback requires initialized renderer");
     auto& s=*storage_;
@@ -8875,6 +9054,9 @@ bool VehicleWindowGl50DS::readbackWindowBufferRgba(std::uint8_t* destination,
 }
 
 bool VehicleWindowGl50DS::finishSubmittedWork(VehicleWindowDiagnostic50DS& d) noexcept {
+    OriginalOptionsMutationInterlock50KG::Operation optionsMutation;
+    if(!optionsMutation.admitted()){return fail(d,VehicleWindowError50DS::frame,"Options viewport owns native mutation until cancellation");}
+
     d = {};
     if (!initialized()) return fail(d, VehicleWindowError50DS::notInitialized, "renderer not initialized");
     auto& s = *storage_;
@@ -8906,6 +9088,9 @@ bool VehicleWindowGl50DS::finishSubmittedWork(VehicleWindowDiagnostic50DS& d) no
 
 bool VehicleWindowGl50DS::completedRaStaticFire(
     ra_static_fire_visual50LA::CompletedDrawReceipt& out,VehicleWindowDiagnostic50DS& d) const noexcept {
+    OriginalOptionsMutationInterlock50KG::Operation optionsMutation;
+    if(!optionsMutation.admitted()){return fail(d,VehicleWindowError50DS::frame,"Options viewport owns native mutation until cancellation");}
+
     out={};d={};
     if(!initialized())return fail(d,VehicleWindowError50DS::notInitialized,"FireP0t completion requires live renderer");
     const auto& s=*storage_;
@@ -8929,6 +9114,9 @@ bool VehicleWindowGl50DS::completedRaStaticFire(
 bool VehicleWindowGl50DS::completedTrackSpanVisibility(const std::uint32_t* indices,
     std::uint8_t* submitted,std::uint32_t count,VehicleWindowTrackVisibilityReceipt50DS& receipt,
     VehicleWindowDiagnostic50DS& d) const noexcept {
+    OriginalOptionsMutationInterlock50KG::Operation optionsMutation;
+    if(!optionsMutation.admitted()){return fail(d,VehicleWindowError50DS::frame,"Options viewport owns native mutation until cancellation");}
+
     d={};receipt={};
     if(!initialized())return fail(d,VehicleWindowError50DS::notInitialized,"track visibility requires initialized renderer");
     const auto& s=*storage_;if(!s.current(d))return false;
@@ -8962,6 +9150,8 @@ game::OriginalCameraStartResult OriginalVideoBlockingNativeBackend::failure(std:
         game::OriginalCameraStartStatus::rendererNoImage:game::OriginalCameraStartStatus::videoBackend,pc};
 }
 bool OriginalVideoBlockingNativeBackend::ownersCurrent() noexcept {
+    OriginalOptionsMutationInterlock50KG::Operation operation;
+    if(!operation.admitted())return false;
     if(!renderer_.initialized())return fail(diagnostic_,VehicleWindowError50DS::notInitialized,"display fade requires live renderer");
     auto& s=*renderer_.storage_;
     if(s.frontendOnly)return fail(diagnostic_,VehicleWindowError50DS::request,"dedicated frontend owns no gameplay fade capability");
@@ -8974,6 +9164,8 @@ bool OriginalVideoBlockingNativeBackend::ownersCurrent() noexcept {
 }
 game::OriginalCameraStartResult OriginalVideoBlockingNativeBackend::begin(
     game::OriginalVideoFadeDirection direction,const game::OriginalVideoFadeState& video) {
+    OriginalOptionsMutationInterlock50KG::Operation operation;
+    if(!operation.admitted())return {game::OriginalCameraStartStatus::owner,0};
     using S=game::OriginalCameraStartStatus;
     const bool async=use_==OriginalVideoNativeUse::asyncFrozenUnderlay25B5D0;
     const auto pc=async?0x25e610u:(direction==game::OriginalVideoFadeDirection::out260850?0x260850u:0x261630u);
@@ -9034,6 +9226,8 @@ game::OriginalCameraStartResult OriginalVideoBlockingNativeBackend::begin(
 }
 game::OriginalCameraStartResult OriginalVideoBlockingNativeBackend::copyDrawAndComplete(
     const game::OriginalVideoBlockingSample& sample) {
+    OriginalOptionsMutationInterlock50KG::Operation operation;
+    if(!operation.admitted())return {game::OriginalCameraStartStatus::owner,0};
     using S=game::OriginalCameraStartStatus;
     const bool async=use_==OriginalVideoNativeUse::asyncFrozenUnderlay25B5D0;
     const auto pc=async?0x25e610u:(direction_==game::OriginalVideoFadeDirection::out260850?0x262c70u:0x262d80u);
@@ -9128,6 +9322,8 @@ game::OriginalCameraStartResult OriginalVideoBlockingNativeBackend::copyDrawAndC
     return {S::complete,pc};
 }
 bool OriginalVideoBlockingNativeBackend::retire(bool cancelled) noexcept {
+    OriginalOptionsMutationInterlock50KG::Operation operation;
+    if(!operation.admitted())return false;
     if(!renderer_.storage_ || renderer_.storage_->displayFadeOwner!=this){
         if(phase_==OriginalVideoNativePhase::idle || phase_==OriginalVideoNativePhase::retired ||
            phase_==OriginalVideoNativePhase::cancelled)return true;
@@ -9151,6 +9347,8 @@ bool OriginalVideoBlockingNativeBackend::retire(bool cancelled) noexcept {
 }
 game::OriginalCameraStartResult OriginalVideoBlockingNativeBackend::restoreAndComplete(
     game::OriginalVideoFadeDirection direction) {
+    OriginalOptionsMutationInterlock50KG::Operation operation;
+    if(!operation.admitted())return {game::OriginalCameraStartStatus::owner,0};
     using S=game::OriginalCameraStartStatus;
     const auto pc=use_==OriginalVideoNativeUse::asyncFrozenUnderlay25B5D0?0x25e610u:
         (direction_==game::OriginalVideoFadeDirection::out260850?0x261594u:0x261df0u);
@@ -9165,10 +9363,15 @@ game::OriginalCameraStartResult OriginalVideoBlockingNativeBackend::restoreAndCo
     return retire(false)?game::OriginalCameraStartResult{S::complete,pc}:failure(pc);
 }
 bool OriginalVideoBlockingNativeBackend::cancelAndRetire() noexcept {
+    OriginalOptionsMutationInterlock50KG::Operation operation;
+    if(!operation.admitted())return false;
     diagnostic_={};return retire(true);
 }
 
 bool VehicleWindowGl50DS::idleForRaceReset50LA(VehicleWindowDiagnostic50DS& d) const noexcept {
+    OriginalOptionsMutationInterlock50KG::Operation optionsMutation;
+    if(!optionsMutation.admitted()){return fail(d,VehicleWindowError50DS::frame,"Options viewport owns native mutation until cancellation");}
+
     d={};
     if(!initialized())return fail(d,VehicleWindowError50DS::notInitialized,"race reset requires initialized renderer");
     const auto& s=*storage_;
@@ -9179,6 +9382,9 @@ bool VehicleWindowGl50DS::idleForRaceReset50LA(VehicleWindowDiagnostic50DS& d) c
 }
 
 bool VehicleWindowGl50DS::garageFirstCameraViewportIdle50KG(VehicleWindowDiagnostic50DS& d) const noexcept {
+    OriginalOptionsMutationInterlock50KG::Operation optionsMutation;
+    if(!optionsMutation.admitted()){return fail(d,VehicleWindowError50DS::frame,"Options viewport owns native mutation until cancellation");}
+
     if(!idleForRaceReset50LA(d))return false;
     const auto& s=*storage_;
     // Sealed Main/Rider/Career RGBA frames own pixels, not source Scene0.
@@ -9190,6 +9396,9 @@ bool VehicleWindowGl50DS::garageFirstCameraViewportIdle50KG(VehicleWindowDiagnos
 }
 
 bool VehicleWindowGl50DS::frontendLocalizationIdle50KG(VehicleWindowDiagnostic50DS& d) const noexcept {
+    OriginalOptionsMutationInterlock50KG::Operation optionsMutation;
+    if(!optionsMutation.admitted()){return fail(d,VehicleWindowError50DS::frame,"Options viewport owns native mutation until cancellation");}
+
     if(!idleForRaceReset50LA(d))return false;
     const auto& s=*storage_;
     if(!s.frontendOnly||s.nativeGlFaultObserved50KG)
@@ -9215,7 +9424,36 @@ bool VehicleWindowGl50DS::frontendLocalizationIdle50KG(VehicleWindowDiagnostic50
     return true;
 }
 
+bool VehicleWindowGl50DS::optionsViewportReservedCurrent50KG(const OriginalOptionsMutationInterlock50KG& owner)const noexcept {
+    if(!storage_||!initialized())return false;
+    const auto& s=*storage_;
+    return owner.current(s.request.context)&&s.thread==std::this_thread::get_id()&&
+        s.frontendOnly&&!s.nativeGlFaultObserved50KG&&!s.active&&!s.frameSet&&!s.diagnostic&&
+        !s.displayFadeOwner&&!s.menuRasterShared50KG&&!s.garagePollFence50KG;
+}
+bool VehicleWindowGl50DS::optionsViewportIdle50KG(VehicleWindowDiagnostic50DS& d)const noexcept {
+    OriginalOptionsMutationInterlock50KG::Operation operation;
+    if(!operation.admitted()||!idleForRaceReset50LA(d))return false;
+    return storage_->frontendOnly&&!storage_->nativeGlFaultObserved50KG&&!storage_->frameSet;
+}
+bool VehicleWindowGl50DS::finishOptionsViewportWork50KG(
+    const OriginalOptionsMutationInterlock50KG& owner,VehicleWindowDiagnostic50DS& d)noexcept {
+    OriginalOptionsMutationInterlock50KG::Operation operation(owner);
+    d={};if(!operation.admitted()||!initialized())return fail(d,VehicleWindowError50DS::frame,"actual Options reservation required");
+    auto& s=*storage_;
+    if(!owner.current(s.request.context)||!s.current(d,nullptr,nullptr,&owner)||
+       s.active||s.frameSet||s.diagnostic||!s.frontendOnly||s.nativeGlFaultObserved50KG||
+       s.contextDrainGeneration==std::numeric_limits<std::uint64_t>::max())return false;
+    s.diagnostic=&d;
+    bool okay=s.check("before Options initialized-context completion");
+    if(okay){s.gl.finish();okay=s.check("complete Options initialized-context work");}
+    if(okay){++s.contextDrainGeneration;d.contextWorkCompleted=true;d.contextDrainGeneration=s.contextDrainGeneration;}
+    s.diagnostic=nullptr;return okay;
+}
 bool VehicleWindowGl50DS::finishInitializedContextWork(VehicleWindowDiagnostic50DS& d) noexcept {
+    OriginalOptionsMutationInterlock50KG::Operation optionsMutation;
+    if(!optionsMutation.admitted()){return fail(d,VehicleWindowError50DS::frame,"Options viewport owns native mutation until cancellation");}
+
     d = {};
     if (!initialized()) return fail(d, VehicleWindowError50DS::notInitialized, "renderer not initialized");
     auto& s = *storage_;
@@ -9241,6 +9479,9 @@ bool VehicleWindowGl50DS::completeGameplayDisplayImpl(GameHost50ER& host,
     GameHostDiagnostic50ER& hostDiagnostic,
     bool (*checkHost)(GameHost50ER&,bool,I,I,VehicleWindowDiagnostic50DS&) noexcept,
     bool (*swapHost)(GameHost50ER&,GameHostDiagnostic50ER&) noexcept,VehicleWindowDiagnostic50DS& d) noexcept {
+    OriginalOptionsMutationInterlock50KG::Operation optionsMutation;
+    if(!optionsMutation.admitted()){return fail(d,VehicleWindowError50DS::frame,"Options viewport owns native mutation until cancellation");}
+
     d={};
     if(!initialized())return fail(d,VehicleWindowError50DS::notInitialized,"gameplay display requires initialized renderer");
     auto& s=*storage_;
@@ -9303,6 +9544,9 @@ bool VehicleWindowGl50DS::completeGameplayDisplayImpl(GameHost50ER& host,
 }
 
 bool VehicleWindowGl50DS::clearGameplayBlurStrengths(VehicleWindowDiagnostic50DS& d) noexcept {
+    OriginalOptionsMutationInterlock50KG::Operation optionsMutation;
+    if(!optionsMutation.admitted()){return fail(d,VehicleWindowError50DS::frame,"Options viewport owns native mutation until cancellation");}
+
     d={};
     if(!initialized())return fail(d,VehicleWindowError50DS::notInitialized,"gameplay blur clear requires initialized renderer");
     auto& s=*storage_;
@@ -9315,6 +9559,8 @@ bool VehicleWindowGl50DS::clearGameplayBlurStrengths(VehicleWindowDiagnostic50DS
 }
 
 void VehicleWindowGl50DS::logRaCapturePixelProvenance() noexcept {
+    OriginalOptionsMutationInterlock50KG::Operation operation;
+    if(!operation.admitted())return;
     if(!initialized())return;
     auto& s=*storage_;
     if(s.thread!=std::this_thread::get_id()||s.active||s.frameSet||s.diagnostic||
@@ -9325,6 +9571,9 @@ void VehicleWindowGl50DS::logRaCapturePixelProvenance() noexcept {
 }
 
 bool VehicleWindowGl50DS::close(VehicleWindowDiagnostic50DS& d) noexcept {
+    OriginalOptionsMutationInterlock50KG::Operation optionsMutation;
+    if(!optionsMutation.admitted()){d.cleanupIncomplete=bool(storage_);return fail(d,VehicleWindowError50DS::frame,"Options viewport owns native mutation until cancellation");}
+
     d = {};
     if(sessionDependentPins50LA_){
         d.cleanupIncomplete=true;

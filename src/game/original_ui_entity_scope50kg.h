@@ -3228,7 +3228,7 @@ private:
         friend struct ::original_main_entry50KG::Video;
         enum class Phase : std::uint8_t {empty,beforeVideo2A3A90,nativeAborted,
             afterVideo2A3A90,nativeVideoAborted,derivedComplete1D04C0,
-            cameraCold1D05C8,nativeCameraAborted};
+            cameraCold1D05C8,nativeCameraAborted,cameraViewportPrefix1149D4,cameraViewportComplete2361C0};
         const void* videoEffect_=nullptr; // Only actual Video owner may bind it.
         std::shared_ptr<OriginalUiEntityScope50KG> scope_;
         const rr::platform::OriginalUiFrontend50KG* frontend_=nullptr;
@@ -3278,12 +3278,12 @@ private:
         bool current(const rr::platform::OriginalUiFrontend50KG* frontend,const void* manager)const noexcept {
             if(frontend_!=frontend||managerOwner_!=manager||!registrationCurrent()||
                (phase_!=Phase::beforeVideo2A3A90&&phase_!=Phase::afterVideo2A3A90&&
-                phase_!=Phase::derivedComplete1D04C0&&phase_!=Phase::cameraCold1D05C8)||
+                phase_!=Phase::derivedComplete1D04C0&&phase_!=Phase::cameraCold1D05C8&&phase_!=Phase::cameraViewportPrefix1149D4&&phase_!=Phase::cameraViewportComplete2361C0)||
                ((phase_!=Phase::beforeVideo2A3A90)!=bool(videoEffect_))||!basePrefixKnown_||word17C_!=1)
                 return false;
-            const bool derived=phase_==Phase::derivedComplete1D04C0||phase_==Phase::cameraCold1D05C8;
+            const bool derived=phase_==Phase::derivedComplete1D04C0||phase_==Phase::cameraCold1D05C8||phase_==Phase::cameraViewportPrefix1149D4||phase_==Phase::cameraViewportComplete2361C0;
             if(derivedKnown_!=derived||ancestry8_!=(derived?0x3cfa20u:0x3d3ab0u)||
-               cameraAcquired_!=(phase_==Phase::cameraCold1D05C8))return false;
+               cameraAcquired_!=(phase_==Phase::cameraCold1D05C8||phase_==Phase::cameraViewportPrefix1149D4||phase_==Phase::cameraViewportComplete2361C0))return false;
             if(derived)for(auto word:derivedZeros_)if(word)return false;
             for(auto word:zeroWords_)if(word)return false;
             for(std::size_t m=0;m<4;++m){if(matrixKnown_[m]!=0xff0f)return false;
@@ -3295,10 +3295,11 @@ private:
         }
         bool videoOwnedPhase()const noexcept {
             return phase_==Phase::afterVideo2A3A90||phase_==Phase::derivedComplete1D04C0||
-                phase_==Phase::cameraCold1D05C8||phase_==Phase::nativeCameraAborted;
+                phase_==Phase::cameraCold1D05C8||phase_==Phase::cameraViewportPrefix1149D4||phase_==Phase::cameraViewportComplete2361C0||
+                phase_==Phase::nativeCameraAborted;
         }
         bool completeDerived1D0470()noexcept {
-            if(phase_==Phase::derivedComplete1D04C0||phase_==Phase::cameraCold1D05C8)
+            if(phase_==Phase::derivedComplete1D04C0||phase_==Phase::cameraCold1D05C8||phase_==Phase::cameraViewportPrefix1149D4||phase_==Phase::cameraViewportComplete2361C0)
                 return current(frontend_,managerOwner_);
             if(phase_!=Phase::afterVideo2A3A90||!current(frontend_,managerOwner_))return false;
             ancestry8_=0x3cfea0; //1D048C: actual common manager vtable.

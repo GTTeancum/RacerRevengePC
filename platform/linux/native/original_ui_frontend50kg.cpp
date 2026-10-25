@@ -1,3 +1,4 @@
+#include "../../../src/game/original_options_mutation_interlock50kg.h"
 #include "original_ui_garage_draw_contribution50kg.h"
 #include "original_ui_garage_session50kg.h"
 #include "original_ui_shared_dialogs50kg.h"
@@ -170,19 +171,44 @@ struct OriginalUiFrontend50KG::Storage {
             std::unique_ptr<game::OriginalUiEntityScope50KG::OptionsConstruction> construction;
             // Declared later: its native rollback precedes construction release.
             std::unique_ptr<::original_main_entry50KG::Video::OptionsModeEffect> videoEffect;
+            std::unique_ptr<OriginalOptionsMutationInterlock50KG> viewportReservation;
+            std::shared_ptr<::original_main_entry50KG::RaceDisplayLifetime50LA> viewportDisplay;
+            std::uint8_t viewportDrainPhase=0,viewportCallbackCount=0;
+            bool viewportSelected=false,viewportSelectionRetired=false;
+            bool viewportDrainFailed=false;
+            std::uint64_t viewportDrainGeneration=0;
+            bool viewportReservationCurrent()const noexcept {
+                return viewportReservation&&viewportDisplay&&viewportReservation->current(&video->host)&&
+                    viewportDisplay->video_==video&&viewportDisplay->optionsViewportPinnedCurrent50KG(
+                        viewportSelected?cameraStorage:std::shared_ptr<game::OriginalFrontendCameraCold50LA>{});
+            }
             bool constructionAbortCurrent()const noexcept {
+                if(viewportReservation&&!viewportReservationCurrent())return false;
                 if(construction&&construction->cameraAcquired_&&
                    (!cameraStorage||construction->cameraOwner_!=cameraStorage.get()||
                     construction->camera2B0_!=&cameraStorage->entity_||
-                    !cameraStorage->unpublishedAbortCurrent(issuer,entities)))return false;
+                    !cameraStorage->unpublishedAbortCurrent(issuer,entities,viewportSelected)))return false;
+                if(viewportSelected&&!viewportSelectionRetired&&
+                   (!viewportReservation||viewportCallbackCount!=2||viewportDrainPhase!=2))return false;
                 if(videoEffect&&videoEffect->pending())return construction&&
                     construction->registrationCurrent()&&videoEffect->effectCurrent();
                 return !construction||!construction->pending()||construction->acquiredCurrent();
             }
             bool abortConstructionNative()noexcept {
                 if(!constructionAbortCurrent())return false;
+                std::shared_ptr<::original_main_entry50KG::RaceDisplayLifetime50LA> retiredViewport;
+                if(viewportReservation){
+                    // Native cancellation drops only this reservation/pin. Drain
+                    // generations, poison and Camera counters remain history.
+                    if(!viewportReservation->release(&video->host))return false;
+                    // The exact selected owner was preflighted. cameraStorage
+                    // retains it across removal; no source refcount is invented.
+                    if(viewportSelected){viewportDisplay->sourceSelectedCamera0_.reset();viewportSelectionRetired=true;}
+                    viewportDisplay->unpin();retiredViewport=std::move(viewportDisplay);viewportReservation.reset();
+                    // Keep the old Display alive outside the entire native store interval.
+                }
                 if(construction&&construction->cameraAcquired_){
-                    if(!cameraStorage->abortUnpublished236180(issuer,entities).okay())return false;
+                    if(!cameraStorage->abortUnpublished236180(issuer,entities,viewportSelected).okay())return false;
                     construction->cameraAcquired_=false;
                     // Preserve the historical source2B0 pointer and owner.
                     construction->phase_=game::OriginalUiEntityScope50KG::OptionsConstruction::Phase::nativeCameraAborted;
@@ -2295,9 +2321,14 @@ bool OriginalUiFrontend50KG::adoptOptionsCameraPrefix50KG(
     using Phase=game::OriginalUiEntityScope50KG::OptionsConstruction::Phase;
     Operation operation(s->inOperation);
     if(!n.cameraStorage||!n.videoEffect->current(root,n.video,construction,this,m))return false;
-    if(construction.phase_==Phase::cameraCold1D05C8)
+    if(construction.phase_==Phase::cameraCold1D05C8||
+       construction.phase_==Phase::cameraViewportPrefix1149D4)
         return construction.cameraAcquired_&&construction.cameraOwner_==n.cameraStorage.get()&&
             construction.camera2B0_==&n.cameraStorage->entity_&&
+            ((construction.phase_==Phase::cameraCold1D05C8&&
+              n.cameraStorage->phase_==game::OriginalFrontendCameraCold50LA::Phase::constructedCold)||
+             (construction.phase_==Phase::cameraViewportPrefix1149D4&&
+              n.cameraStorage->phase_==game::OriginalFrontendCameraCold50LA::Phase::beforeViewport114A00))&&
             n.cameraStorage->unpublishedAbortCurrent(&root,n.entities);
     if(!construction.completeDerived1D0470())return false;
     // Source1D05C0 reuses the exact v45 allocated Camera owner. Registry
@@ -2309,6 +2340,158 @@ bool OriginalUiFrontend50KG::adoptOptionsCameraPrefix50KG(
     construction.camera2B0_=&n.cameraStorage->entity_; // Actual1D05C8 publication.
     construction.cameraAcquired_=true;construction.phase_=Phase::cameraCold1D05C8;
     return true; // Stop before2361C0; no observer, viewport, bank or child grant.
+}
+bool OriginalUiFrontend50KG::stageOptionsCameraViewportPrefix50KG(
+    const ::original_main_entry50KG::Application& root)noexcept {
+    if(!adoptOptionsCameraPrefix50KG(root))return false;
+    auto* s=storage_.get();auto* m=s->pending?s->pending.get():s->active.get();
+    auto& n=*m->optionsNativeInputs;auto& construction=*n.construction;
+    using Phase=game::OriginalUiEntityScope50KG::OptionsConstruction::Phase;
+    using Camera=game::OriginalFrontendCameraCold50LA;
+    Operation operation(s->inOperation);
+    if(!n.videoEffect->current(root,n.video,construction,this,m)||
+       !n.constructionAbortCurrent())return false;
+    if(construction.phase_==Phase::cameraViewportPrefix1149D4)
+        return n.cameraStorage->phase_==Camera::Phase::beforeViewport114A00;
+    if(construction.phase_!=Phase::cameraCold1D05C8||
+       n.cameraStorage->phase_!=Camera::Phase::constructedCold)return false;
+    // Actual Options1D05E0 supplies640/448/3FAAAAAB. Reuse the canonical
+    // Camera's ordered scalar stores, not Garage's renderer/page authority.
+    const auto staged=n.cameraStorage->stageViewportPrefix1149D4(&root,n.entities);
+    if(!staged.okay())return false; // Arithmetic rejection precedes all stores.
+    construction.phase_=Phase::cameraViewportPrefix1149D4;
+    return true; // Stop BEFORE114A00;2361C0 has not returned. No observer/bank.
+}
+bool OriginalUiFrontend50KG::continueOptionsViewportDrains50KG(
+    const ::original_main_entry50KG::Application& root)noexcept {
+    auto* s=storage_.get();if(!s||s->inOperation)return false;
+    auto* m=s->pending?s->pending.get():s->active.get();
+    if(!m||!m->optionsNativeInputs)return false;
+    if(!m->optionsNativeInputs->viewportReservation&&!stageOptionsCameraViewportPrefix50KG(root))return false;
+    auto& n=*m->optionsNativeInputs;
+    Operation operation(s->inOperation);
+    if(n.issuer!=&root||!n.construction||!n.videoEffect||
+       !n.videoEffect->current(root,n.video,*n.construction,this,m))return false;
+    using Camera=game::OriginalFrontendCameraCold50LA;
+    if(!n.viewportReservation){
+        const auto display=root.raceDisplayOwner50LA_.lock();
+        VehicleWindowDiagnostic50DS d;
+        if(!display||display->application_!=&root||display->video_!=n.video||
+           !display->optionsViewportInitialCurrent50KG(d)||
+           n.cameraStorage->phase_!=Camera::Phase::beforeViewport114A00||!n.constructionAbortCurrent())return false;
+        std::unique_ptr<OriginalOptionsMutationInterlock50KG> next(new(std::nothrow) OriginalOptionsMutationInterlock50KG);
+        if(!next||!display->sourceCurrentCamera0Known_||display->sourceSelectedCamera0_||
+           display->sourceBufferCount0C_!=2u||display->dispatch_.pendingCallbackDC||
+           display->dispatch_.count54||display->dispatch_.count60||
+           !next->acquire(&n.video->host))return false;
+        if(!display->optionsViewportReservedCurrent50KG(*next)||
+           display->application_!=&root||display->video_!=n.video||
+           !n.videoEffect->current(root,n.video,*n.construction,this,m)||
+           n.cameraStorage->phase_!=Camera::Phase::beforeViewport114A00||!n.constructionAbortCurrent()){
+            if(!next->release(&n.video->host))std::terminate();return false;
+        }
+        // No callback/allocation after acquisition and before publication.
+        display->pin();n.viewportDisplay=display;n.viewportReservation=std::move(next);
+        n.cameraStorage->fields_.count210=display->sourceBufferCount0C_+1u; //114A24
+        n.cameraStorage->fields_.count20C=n.cameraStorage->fields_.count210; //114A28
+        n.cameraStorage->phase_=Camera::Phase::insideViewport114A00;
+    }
+    if(!n.viewportReservationCurrent()||n.viewportDrainFailed)return false;
+    auto& display=*n.viewportDisplay;
+    if(!display.optionsViewportAdvanceCurrent50KG(*n.viewportReservation))return false;
+    if(display.dispatch_.pendingCallbackDC||display.dispatch_.count54||display.dispatch_.count60)return false;
+    if(n.viewportDrainPhase==2)return n.cameraStorage->phase_==Camera::Phase::afterViewport114A00;
+    if(n.cameraStorage->phase_!=Camera::Phase::insideViewport114A00)return false;
+    while(n.viewportDrainPhase<2){
+        if(!display.optionsViewportAdvanceCurrent50KG(*n.viewportReservation))return false;
+        //244D60's D8-disabled branch skips its drain, never245910's second.
+        if(n.viewportDrainPhase==0&&!(display.dispatch_.flagsD8&1u)){++n.viewportDrainPhase;continue;}
+        VehicleWindowDiagnostic50DS d;
+        if(!display.renderer_.finishOptionsViewportWork50KG(*n.viewportReservation,d)||!d.contextWorkCompleted){
+            n.viewportDrainFailed=true;return false; // May have issued GL: never blind retry.
+        }
+        n.viewportDrainGeneration=d.contextDrainGeneration;++n.viewportDrainPhase;
+    }
+    // Genuine known-null previous selection excludes245AD4/AD8. No callbacks,
+    // bounds, selection or loader suffix are implemented after this return.
+    if(!display.optionsViewportAdvanceCurrent50KG(*n.viewportReservation))return false;
+    n.cameraStorage->phase_=Camera::Phase::afterViewport114A00;return true;
+}
+bool OriginalUiFrontend50KG::continueOptionsCameraSuffix2361C0(
+    const ::original_main_entry50KG::Application& root)noexcept {
+    auto* s=storage_.get();if(!s||s->inOperation)return false;
+    auto* m=s->pending?s->pending.get():s->active.get();
+    if(!m||!m->optionsNativeInputs)return false;
+    auto& n=*m->optionsNativeInputs;
+    // A selected retry must not re-enter either completed drain.
+    if(!n.viewportSelected&&!continueOptionsViewportDrains50KG(root))return false;
+    Operation operation(s->inOperation);
+    using Camera=game::OriginalFrontendCameraCold50LA;
+    using Phase=game::OriginalUiEntityScope50KG::OptionsConstruction::Phase;
+    if(n.issuer!=&root||!n.construction||!n.videoEffect||!n.cameraStorage||
+       !n.videoEffect->current(root,n.video,*n.construction,this,m)||
+       !n.viewportReservationCurrent()||n.viewportDrainFailed||n.viewportDrainPhase!=2||
+       !n.constructionAbortCurrent())return false;
+    auto& display=*n.viewportDisplay;auto& camera=*n.cameraStorage;auto& f=camera.fields_;
+    if(!display.optionsViewportAdvanceCurrent50KG(*n.viewportReservation,
+           n.viewportSelected?n.cameraStorage:std::shared_ptr<Camera>{}))return false;
+    if(camera.phase_==Camera::Phase::viewportInitialized2361C0)
+        return n.viewportSelected&&n.viewportCallbackCount==2&&n.construction->phase_==Phase::cameraViewportComplete2361C0;
+    const auto fp=[](std::uint32_t word)noexcept{return Camera::floatFromBits(word);};
+    const auto words=[](const std::array<float,16>& input)noexcept {
+        Camera::Words16 output{};for(std::size_t i=0;i<16;++i)output[i]=Camera::floatBits(input[i]);return output;
+    };
+    const auto vector=[&](const Camera::Words4& v)noexcept {
+        return assets::TVCameraVector49E{fp(v[0]),fp(v[1]),fp(v[2]),fp(v[3])};
+    };
+    game::CameraSceneState49F scene;
+    scene.look=vector(f.look190);scene.up=vector(f.up1A0);scene.fovDegrees=fp(f.fov1D0);
+    scene.rollRadians=fp(f.roll1D4);scene.aspect1F8=fp(f.aspect1F8);
+    scene.nearPlane=fp(f.near1FC);scene.farPlane=fp(f.far200);
+    while(n.viewportCallbackCount<2){
+        if(n.viewportSelected||camera.phase_!=Camera::Phase::afterViewport114A00)return false;
+        // Each source virtual+78 invocation is the actual236DD0 target for this
+        // canonical Camera type. Precompute the independent known arithmetic;
+        // never read the source-unwritten bounds or claim their dependent caches.
+        game::CameraViewOutput49F core;float focal=0,angle=0;
+        const auto rebuilt=game::rebuildOriginalSceneCore115350(scene,vector(f.position180),
+            static_cast<std::int32_t>(f.viewport1E0[2]),core,focal);
+        if(rebuilt.status!=game::OriginalCameraStartStatus::complete)return false;
+        if(game::computeOriginalGuardAngle2371D0(focal,angle).status!=game::OriginalCameraStartStatus::complete)return false;
+        f.viewC0=words(core.view);f.projection80=words(core.projection);
+        f.combined100=words(core.combined);f.focal1D8=Camera::floatBits(focal);f.coreKnown=true;
+        f.screen140Known=false;f.combinedScreen250Known=false;
+        f.guardProjection290Known=false;f.guardCombined2D0Known=false;
+        f.guardAngle330=Camera::floatBits(angle);
+        ++n.viewportCallbackCount; //1149E0 first,11471C second; no replay.
+    }
+    if(!n.viewportSelected){
+        if(camera.phase_!=Camera::Phase::afterViewport114A00||!(camera.entity_.flags29&1u)||
+           !display.optionsViewportAdvanceCurrent50KG(*n.viewportReservation))return false;
+        //26F948 selects before its dimension comparison. The reservation owns
+        // genuine prior-null selection, not a copied or equality-restored owner.
+        display.sourceSelectedCamera0_=n.cameraStorage;n.viewportSelected=true;
+        camera.phase_=Camera::Phase::selectedBeforeBounds236214;
+    }
+    if(camera.phase_!=Camera::Phase::selectedBeforeBounds236214||
+       !display.optionsViewportPinnedCurrent50KG(n.cameraStorage)||
+       display.sourceWidth4_!=static_cast<std::int32_t>(f.fullWidth204)||
+       display.sourceHeight8_!=static_cast<std::int32_t>(f.fullHeight208))return false;
+    game::OriginalCameraViewportFields numeric;
+    const auto prepared=game::prepareOriginalRaceViewport2361C0(numeric,camera.generation_,camera.key_,scene);
+    if(prepared.status!=game::OriginalCameraStartStatus::complete)return false;
+    //236214 suffix: canonical source fields only, not another Camera owner.
+    f.depth310=Camera::floatBits(numeric.depth310);f.depth314=Camera::floatBits(numeric.depth314);
+    f.left318=Camera::floatBits(numeric.left318);f.right31C=Camera::floatBits(numeric.right31C);
+    f.top320=Camera::floatBits(numeric.top320);f.bottom324=Camera::floatBits(numeric.bottom324);
+    f.aspect1F8=Camera::floatBits(scene.aspect1F8);f.matrix140=words(numeric.screen140);f.screen140Known=true;
+    f.combinedScreen250=words(numeric.combinedScreen250);f.combinedScreen250Known=true;
+    f.guardCombined2D0=words(numeric.guardCombined2D0);f.guardCombined2D0Known=true;
+    f.guardX334=Camera::floatBits(numeric.guardX334);f.guardY338=Camera::floatBits(numeric.guardY338);
+    //290 stays unknown: later authored pose/rebuild must produce it.
+    camera.phase_=Camera::Phase::viewportInitialized2361C0;
+    n.construction->phase_=Phase::cameraViewportComplete2361C0;
+    return true; // Stop before Options1D05E8 bank/loader; reservation stays held.
 }
 bool OriginalUiFrontend50KG::prepareOptionsNativeInputs50KG(
     const ::original_main_entry50KG::Application& root)noexcept {

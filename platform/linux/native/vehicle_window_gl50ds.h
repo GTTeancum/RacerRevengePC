@@ -1,3 +1,4 @@
+#include "../../../src/game/original_options_mutation_interlock50kg.h"
 #pragma once
 #include "vehicle_draw_gl50cv.h"
 #include "../../../src/game/original_racer_diffuse_camera50la.h"
@@ -1337,6 +1338,9 @@ private:
     bool garageUnsealedRenderQuiescent50KG(const OriginalUiGarageDrawContribution50KG&,
         std::uint64_t)const noexcept;
     friend class OriginalUiFrontend50KG;
+    bool optionsViewportReservedCurrent50KG(const OriginalOptionsMutationInterlock50KG&)const noexcept;
+    bool optionsViewportIdle50KG(VehicleWindowDiagnostic50DS&)const noexcept;
+    bool finishOptionsViewportWork50KG(const OriginalOptionsMutationInterlock50KG&,VehicleWindowDiagnostic50DS&)noexcept;
     bool prevalidateRiderTextures(const OriginalUiRiderResidencyDemand50KG&,
         const MaterialTextureGl50EB&,OriginalUiRiderTextureValidation50KG&,VehicleWindowDiagnostic50DS&) noexcept;
     bool commitRiderTextures(const OriginalUiRiderResidencyDemand50KG&,

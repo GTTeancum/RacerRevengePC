@@ -1,3 +1,4 @@
+#include "../../src/game/original_options_mutation_interlock50kg.h"
 #pragma once
 namespace original_cable_selection50LA { class Binding; }
 #include "original_ui_main_entry50kg.h"
@@ -19,6 +20,7 @@ class PositionStatsTextureLease50LA;
 // borrow these same members. No PositionStats resources are activated here.
 class RaceDisplayLifetime50LA final : public std::enable_shared_from_this<RaceDisplayLifetime50LA> {
     friend struct Application;
+    friend class rr::platform::OriginalUiFrontend50KG;
     friend struct Frontend;
     friend class rr::platform::OriginalUiGaragePageOwner50KG;
     friend class rr::platform::OriginalUiSharedDialogs50KG;
@@ -96,6 +98,42 @@ class RaceDisplayLifetime50LA final : public std::enable_shared_from_this<RaceDi
     std::shared_ptr<rr::game::OriginalFrontendCameraCold50LA> sourceSelectedCamera0_;
     std::int32_t sourceWidth4_=0,sourceHeight8_=0; //243E1C/28 after native init.
     bool sourceCurrentCamera0Known_=true;
+    bool optionsViewportPinnedCurrent50KG(
+        const std::shared_ptr<rr::game::OriginalFrontendCameraCold50LA>& selected={})const noexcept {
+        return ownerThread()&&video_&&video_->host.sessionDisplayRenderer50LA_==&renderer_&&
+            renderer_.sessionDisplayOwner50LA_==this&&renderer_.sessionDependentPins50LA_&&
+            video_->host.sessionDependentPins50LA_&&sourceCurrentCamera0Known_&&
+            sourceSelectedCamera0_==selected&&!sourceSelectedCamera0_.owner_before(selected)&&!selected.owner_before(sourceSelectedCamera0_)&&
+            sourceBufferCount0CInitialized_&&sourceBufferCount0C_==2u;
+    }
+    bool optionsViewportReservedCurrent50KG(const rr::platform::OriginalOptionsMutationInterlock50KG& owner)const noexcept {
+        // Final callback-free validation AFTER allocation and reservation.
+        return frontendOwnerCurrent50KG()&&!retiring_&&created_&&frontendCreated_&&video_->originalMain&&video_->host.created()&&
+            video_->host.sessionDisplayRenderer50LA_==&renderer_&&renderer_.sessionDisplayOwner50LA_==this&&
+            renderer_.sessionDependentPins50LA_<std::numeric_limits<std::uint32_t>::max()&&
+            video_->host.sessionDependentPins50LA_<std::numeric_limits<std::uint32_t>::max()&&
+            sourceBufferCount0CInitialized_&&sourceBufferCount0C_==2u&&sourceCurrentCamera0Known_&&
+            !sourceSelectedCamera0_&&sourceWidth4_==640&&sourceHeight8_==448&&
+            !textureLifetime_->nativeUploads_&&!localizationServiceActive_&&
+            !dispatch_.pendingCallbackDC&&!dispatch_.count54&&!dispatch_.count60&&
+            renderer_.optionsViewportReservedCurrent50KG(owner);
+    }
+    bool optionsViewportAdvanceCurrent50KG(const rr::platform::OriginalOptionsMutationInterlock50KG& owner,
+        const std::shared_ptr<rr::game::OriginalFrontendCameraCold50LA>& selected={})const noexcept {
+        return optionsViewportPinnedCurrent50KG(selected)&&frontendOwnerCurrent50KG()&&!retiring_&&created_&&frontendCreated_&&
+            video_->originalMain&&video_->host.created()&&sourceWidth4_==640&&sourceHeight8_==448&&
+            !textureLifetime_->nativeUploads_&&!localizationServiceActive_&&
+            !dispatch_.pendingCallbackDC&&!dispatch_.count54&&!dispatch_.count60&&
+            renderer_.optionsViewportReservedCurrent50KG(owner);
+    }
+    bool optionsViewportInitialCurrent50KG(rr::platform::VehicleWindowDiagnostic50DS& d)noexcept {
+        if(!frontendOwnerCurrent50KG()||!canRetain()||!frontendCreated_||
+           !sourceBufferCount0CInitialized_||sourceBufferCount0C_!=2u||
+           !sourceCurrentCamera0Known_||sourceSelectedCamera0_||sourceWidth4_!=640||sourceHeight8_!=448||
+           textureLifetime_->nativeUploads_||localizationServiceActive_||
+           dispatch_.pendingCallbackDC||dispatch_.count54||dispatch_.count60)return false;
+        return renderer_.optionsViewportIdle50KG(d);
+    }
     bool garageFirstViewportCurrent50KG(rr::platform::VehicleWindowDiagnostic50DS& d)noexcept {
         if(!frontendOwnerCurrent50KG()||!canRetain()||!frontendCreated_||
            !sourceBufferCount0CInitialized_||sourceBufferCount0C_!=2u||
@@ -120,6 +158,8 @@ class RaceDisplayLifetime50LA final : public std::enable_shared_from_this<RaceDi
         return renderer_.garageFirstCameraViewportIdle50KG(d);
     }
     bool retireFailedLoaderSelectedCamera115690(const rr::game::OriginalFrontendCameraCold50LA& camera)noexcept {
+        rr::platform::OriginalOptionsMutationInterlock50KG::Operation operation;
+        if(!operation.admitted())return false;
         if(!frontendOwnerCurrent50KG()||!sourceCurrentCamera0Known_||
            camera.issuer_!=application_||!camera.failedLoaderRef0Current1155C0()||
            camera.failedLoaderRetirementStep_!=4)return false;
@@ -129,6 +169,8 @@ class RaceDisplayLifetime50LA final : public std::enable_shared_from_this<RaceDi
         return true;
     }
     bool retireSelectedCamera115690(const rr::game::OriginalFrontendCameraCold50LA& camera)noexcept {
+        rr::platform::OriginalOptionsMutationInterlock50KG::Operation operation;
+        if(!operation.admitted())return false;
         if(!frontendOwnerCurrent50KG()||!sourceCurrentCamera0Known_||
            camera.issuer_!=application_||!camera.onAffinity()||!camera.actualEntitiesAlive()||
            camera.phase_!=rr::game::OriginalFrontendCameraCold50LA::Phase::pageRetiring1155C0||

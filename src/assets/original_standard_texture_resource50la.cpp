@@ -454,6 +454,151 @@ bool OriginalStandardTextureResolver50LA::restoreScratch132BD0(D& d)noexcept {
     // allocation and each failed slot's authentic -2/negative-size state.
     return allocated?true:fail(d,E::allocation,0x132C74);
 }
+// Bounded, never-registered capacity owned by the SAME resolver as Scratch.
+// Native pointers/layout, not guest rows or a second canonical file namespace.
+// All fields below are private: no mount/lookup can turn capacity into a handle.
+struct OriginalStandardTextureResolver50LA::FreshFileCapacity {
+    // The actual fresh domain provider, retained before its first native mount.
+    // This is native lifetime/identity custody, NOT original registration history.
+    // No provider-to-resolver back edge or second file/association ledger exists.
+    std::shared_ptr<const OriginalStandardArchiveProvider50LA> provider;
+    struct Device {
+        std::int32_t id00;
+        char* name04;
+        std::uint32_t cursor08,flags0C;
+        void* handle10;
+        std::uint32_t length14,payload18,tableOffset1C,tableBytes20;
+        std::uint8_t byte24;
+        void initialize(std::int32_t id)noexcept {
+            flags0C=1;name04=nullptr;cursor08=0;length14=0;handle10=nullptr;
+            id00=id;payload18=0;tableBytes20=0;tableOffset1C=0;byte24=0;
+        }
+    };
+    struct Member {
+        std::int32_t deviceID00,auxiliarySlot04;
+        char* filename08;
+        std::uint32_t logicalStart0C,cursor10,length14,flags18;
+        void* associatedObject1C;
+        void initialize()noexcept {
+            flags18=1;filename08=nullptr;deviceID00=0;logicalStart0C=0;
+            cursor10=0;length14=0;auxiliarySlot04=0;associatedObject1C=nullptr;
+        }
+    };
+    struct Input {
+        std::uint8_t* pointer=nullptr;
+        // Native safety metadata is not an original constructor length write.
+        std::uint32_t length; // Unwritten on a later allocation failure.
+        bool lengthWritten=false;
+    };
+    std::int32_t freeDevice10=-1,deviceCount18=0,freeMember14C=-1,memberCount154=0;
+    Device* devices14=nullptr;
+    Member* members150=nullptr;
+    std::array<std::int32_t,4> active; // First filled by the cleanup prefix.
+    std::array<Input,8> inputs;
+    std::uint32_t total78=0,read174=0;
+    std::int32_t current74=-1,window7C=-1,window80=-1;
+    std::uint32_t* lengthTable84=nullptr;
+    std::int64_t cursor160=-1,cursor168=-1;
+    bool sourceResult=false; // Native record, not a new source field.
+    static constexpr std::size_t inputBytes=0x100000/8,alignment=64;
+    FreshFileCapacity()noexcept {active.fill(-1);} //12CBA0 -> cold12CA10/131670.
+    FreshFileCapacity(const FreshFileCapacity&)=delete;
+    FreshFileCapacity& operator=(const FreshFileCapacity&)=delete;
+    void allocateTablesAndInput()noexcept {
+        // One-row retry applies even when the original requested count was one.
+        deviceCount18=1;
+        devices14=new(std::nothrow) Device[deviceCount18];
+        freeDevice10=0;read174=0;
+        if(!devices14){
+            deviceCount18=1;devices14=new(std::nothrow) Device[deviceCount18];
+            if(!devices14){deviceCount18=0;freeDevice10=-1;}
+        }
+        for(std::int32_t i=0;i<deviceCount18;++i)devices14[i].initialize(i);
+        memberCount154=10;
+        members150=new(std::nothrow) Member[memberCount154];freeMember14C=0;
+        if(!members150){
+            memberCount154=1;members150=new(std::nothrow) Member[memberCount154];
+            if(!members150){memberCount154=0;freeMember14C=-1;}
+        }
+        for(std::int32_t i=0;i<memberCount154;++i)members150[i].initialize();
+        cursor160=-1;cursor168=-1;total78=0;
+        sourceResult=true;
+        for(std::size_t i=0;i<inputs.size();++i){auto& input=inputs[i];
+            input.pointer=static_cast<std::uint8_t*>(::operator new(
+                inputBytes,std::align_val_t(alignment),std::nothrow));
+            if(i==0&&!input.pointer){
+                input.length=inputBytes;input.lengthWritten=true;sourceResult=false;
+            }
+            if(input.pointer){
+                total78+=inputBytes;input.length=inputBytes;input.lengthWritten=true;
+            }
+        }
+    }
+    void retireEmptyMember(std::int32_t i)noexcept {
+        // Source12EAA0 scratch comparison cannot match: all scratch statuses
+        // remain -1/-2 here, whereas i>=0. No association or filename exists.
+        auto& row=members150[i];
+        row.auxiliarySlot04=0;row.cursor10=0;row.deviceID00=0;
+        row.flags18=1;row.associatedObject1C=nullptr;row.length14=0;row.logicalStart0C=0;
+        freeMember14C=i;
+    }
+    void retireEmptyDevice(Device& row)noexcept {
+        // No active/current device, name or handle has ever been installed.
+        freeDevice10=row.id00;row.flags0C=1;row.cursor08=0;row.length14=0;
+        row.payload18=0;row.tableBytes20=0;row.tableOffset1C=0;row.byte24=0;
+    }
+    ~FreshFileCapacity(){
+        // Restricted cold12CA10 order, not a general live file-service destructor.
+        //12E7E0 force visits even empty devices; matching empty members retire.
+        if(devices14&&members150){
+            for(std::int32_t i=0;i<deviceCount18;++i){auto& device=devices14[i];
+                device.flags0C|=0x20;
+                for(std::int32_t j=0;j<memberCount154;++j)
+                    if(members150[j].deviceID00==device.id00)retireEmptyMember(j);
+                retireEmptyDevice(device);
+            }
+            active.fill(-1);
+        }
+        active.fill(-1);
+        for(std::int32_t i=0;i<deviceCount18;++i)retireEmptyDevice(devices14[i]);
+        delete[] devices14;devices14=nullptr;
+        for(std::int32_t i=0;i<memberCount154;++i)retireEmptyMember(i);
+        delete[] members150;members150=nullptr;
+        // current74 remains -1: no input synchronization or IO is needed.
+        for(auto& input:inputs){
+            if(input.pointer)::operator delete(input.pointer,std::align_val_t(alignment));
+            input.pointer=nullptr;
+        }
+        total78=0; //1331C0 does not clear lengths, counts or free indices.
+        delete[] lengthTable84;lengthTable84=nullptr;
+        // The resolver explicitly releases its EXISTING Scratch owner next.
+    }
+};
+bool OriginalStandardTextureResolver50LA::bootstrapFreshFileCapacity12CBA0(
+    std::shared_ptr<const OriginalStandardArchiveProvider50LA> provider,D& d)noexcept {
+    d={};
+    // Reject ANY previous native corpus/provider/storage, not merely a warm
+    // texture flag. Never clear/reconstruct canonical associations to get here.
+    if(storage_||scratch_||freshFileCapacity_||!provider||provider->mountCount()!=0||
+       provider->revision()!=0||provider->sealed())return fail(d,E::phase,0x12CBA0);
+    freshFileCapacity_.reset(new(std::nothrow) FreshFileCapacity);
+    if(!freshFileCapacity_)return fail(d,E::allocation,0x12C820);
+    freshFileCapacity_->provider=std::move(provider);
+    freshFileCapacity_->allocateTablesAndInput();
+    D scratchDiagnostic;
+    const bool scratchResult=initializeScratch12CDF0(scratchDiagnostic);
+    freshFileCapacity_->sourceResult=freshFileCapacity_->sourceResult&&scratchResult;
+    freshFileCapacity_->active.fill(-1); //131670 after selected148 publication.
+    d.sourceEffectsCommitted=true;
+    // Original12C820 retains/returns its owner even on false12CBA0. This native
+    // caller instead reports admission failure, retaining ALL partial owners
+    // here until ordered destruction; it does not simulate source rollback.
+    // Missing capacity tables are an explicit ADDITIONAL native admission gate,
+    // not part of the source Boolean (slot0 success && >=2 auxiliary slots).
+    if(!freshFileCapacity_->sourceResult||!freshFileCapacity_->devices14||
+       !freshFileCapacity_->members150)return fail(d,E::allocation,0x12CBA0);
+    return true;
+}
 OriginalStandardTextureResolver50LA::OriginalStandardTextureResolver50LA() noexcept=default;
 OriginalStandardTextureResolver50LA::~OriginalStandardTextureResolver50LA() {
     //Every cached live resource pins this resolver. Only cleared associations
@@ -463,6 +608,15 @@ OriginalStandardTextureResolver50LA::~OriginalStandardTextureResolver50LA() {
            file->geometryIdentity||!file->geometry.expired()||
            file->collisionIdentity||!file->collision.expired())
             std::terminate();
+    // Only after the existing live-association preflight: empty rows/device,
+    // eight input buffers, then the same scratch free/reset suffix. All later
+    // native Storage/corpus retirement remains separate from source service IO.
+    // Keep the real provider alive through BOTH ordered allocation owners,
+    // even before ordinary canonical Storage/provider binding has occurred.
+    std::shared_ptr<const OriginalStandardArchiveProvider50LA> bootstrapProvider;
+    if(freshFileCapacity_)bootstrapProvider=std::move(freshFileCapacity_->provider);
+    freshFileCapacity_.reset();
+    scratch_.reset();
 }
 bool OriginalStandardTextureResolver50LA::bindGarageStaticIpumCache24E880(
     const std::shared_ptr<const OriginalUiIpumTextureCache50KG>& cache,
@@ -740,6 +894,11 @@ bool OriginalStandardTextureResolver50LA::bindProvider3E1A70(
     std::shared_ptr<const OriginalStandardArchiveProvider50LA> provider,D& d) noexcept {
     d={};
     if(!provider||!provider->sealed())return fail(d,E::unresolved,0x132820);
+    // A bootstrapped domain must bind the SAME retained provider. Reject a
+    // substitute before Storage allocation, association provenance or mutation.
+    // Legacy stand-alone resolvers without this fresh facet remain unchanged.
+    if(freshFileCapacity_&&freshFileCapacity_->provider!=provider)
+        return fail(d,E::phase,0x132820);
     if(storage_&&storage_->provider&&storage_->provider!=provider)return fail(d,E::phase,0x132820);
     try {
         if(!storage_)storage_=std::make_unique<Storage>();

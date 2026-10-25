@@ -96,6 +96,29 @@ inline V normalize(const V& a,Math& m,std::uint32_t mulPC,std::uint32_t addYPC,
 }
 }
 
+namespace original_ta_cut_storage_candidate_detail {
+using V3=OriginalTaCutVector3Candidate;
+    struct Node {
+        std::array<std::uint32_t,10> originalPayloadWords{};
+        std::array<std::uint8_t,64> originalNameBytes{};
+    };
+    struct Arrays {
+        std::vector<V3> look20,up24,position28;
+        std::vector<float> scalar50;
+        std::vector<std::array<std::uint32_t,2>> frameHeaders5C;
+        std::vector<std::uint32_t> nodeIdentifiers58;
+        std::vector<Node> nodes60;
+        ~Arrays() noexcept {
+            //283460 frees actual allocations20/24/28,50,5C,58,60 in this order.
+            std::vector<V3>().swap(look20);std::vector<V3>().swap(up24);
+            std::vector<V3>().swap(position28);std::vector<float>().swap(scalar50);
+            std::vector<std::array<std::uint32_t,2>>().swap(frameHeaders5C);
+            std::vector<std::uint32_t>().swap(nodeIdentifiers58);
+            std::vector<Node>().swap(nodes60);
+        }
+    };
+}
+
 class OriginalTaCutChildrenCandidate;
 class OriginalTaCutChildCandidate final {
 public:
@@ -121,25 +144,7 @@ public:
     const float* scalar50() const noexcept{return arrays_?arrays_->scalar50.data():nullptr;}
 private:
     friend class OriginalTaCutChildrenCandidate;
-    struct Node {
-        std::array<std::uint32_t,10> originalPayloadWords{};
-        std::array<std::uint8_t,64> originalNameBytes{};
-    };
-    struct Arrays {
-        std::vector<V3> look20,up24,position28;
-        std::vector<float> scalar50;
-        std::vector<std::array<std::uint32_t,2>> frameHeaders5C;
-        std::vector<std::uint32_t> nodeIdentifiers58;
-        std::vector<Node> nodes60;
-        ~Arrays() noexcept {
-            //283460 frees actual allocations20/24/28,50,5C,58,60 in this order.
-            std::vector<V3>().swap(look20);std::vector<V3>().swap(up24);
-            std::vector<V3>().swap(position28);std::vector<float>().swap(scalar50);
-            std::vector<std::array<std::uint32_t,2>>().swap(frameHeaders5C);
-            std::vector<std::uint32_t>().swap(nodeIdentifiers58);
-            std::vector<Node>().swap(nodes60);
-        }
-    };
+    using Arrays=original_ta_cut_storage_candidate_detail::Arrays;
     explicit OriginalTaCutChildCandidate(unsigned ordinal) noexcept:ordinal_(ordinal){}
     unsigned ordinal_=0;
     OriginalTaCutChildFieldsCandidate fields_{};

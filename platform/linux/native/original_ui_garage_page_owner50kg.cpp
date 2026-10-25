@@ -1,3 +1,4 @@
+#include "../../../src/game/original_options_mutation_interlock50kg.h"
 #include "original_ui_garage_page_owner50kg.h"
 #include "original_ui_garage_actors50gn.h"
 #include "original_ui_garage_session50kg.h"
@@ -324,6 +325,9 @@ bool OriginalUiGaragePageOwner50KG::continueSharedCameraViewport114A00(Diagnosti
     return continueSharedCameraConstructor2361C0(d);
 }
 bool OriginalUiGaragePageOwner50KG::continueSharedCameraConstructor2361C0(Diagnostic& d)noexcept {
+    OriginalOptionsMutationInterlock50KG::Operation optionsMutation;
+    if(!optionsMutation.admitted())return fail(d,Status::phase,0x26F940);
+
     using Camera=game::OriginalFrontendCameraCold50LA;
     if(!currentConstructor()||stage_!=Stage::sharedCameraCallbackPending||!sharedCamera_||
        !sharedCameraDisplay_||!sharedCameraDisplayPinned_||sharedViewportDrainPhase_!=2||
@@ -1496,6 +1500,9 @@ bool OriginalUiGaragePageOwner50KG::continueEntryControls1FAC24(Diagnostic& d)no
     return true;
 }
 bool OriginalUiGaragePageOwner50KG::continueEntryCamera1156E0(Diagnostic& d)noexcept {
+    OriginalOptionsMutationInterlock50KG::Operation optionsMutation;
+    if(!optionsMutation.admitted())return fail(d,Status::phase,0x26F940);
+
     if(entryPhase_!=EntryPhase::cameraActivationPending||!sharedCamera_||
        shared_.camera4BC!=sharedCamera_.get()||!grant_->garagePageCameraCurrent(*this,*sharedCamera_)||
        !sharedCameraDisplayPinned_||!sharedCameraDisplay_||sharedCameraDisplay_->application_!=issuer_||

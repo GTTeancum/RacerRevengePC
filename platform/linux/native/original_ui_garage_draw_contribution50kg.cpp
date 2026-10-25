@@ -1,3 +1,4 @@
+#include "../../../src/game/original_options_mutation_interlock50kg.h"
 #include "original_ui_garage_draw_contribution50kg.h"
 #include "original_ui_garage_session50kg.h"
 #include "original_ui_shared_dialogs50kg.h"
@@ -501,6 +502,9 @@ bool OriginalUiGarageDrawContribution50KG::camera114D50(Diagnostic& d)noexcept {
     return walk141D70(camera_->entity_,d);
 }
 bool OriginalUiGarageDrawContribution50KG::select26F940(Diagnostic& d)noexcept {
+    OriginalOptionsMutationInterlock50KG::Operation optionsMutation;
+    if(!optionsMutation.admitted())return fail(d,0x26F940);
+
     if(!identityCurrent())return fail(d,0x26F940);
     auto& display=*renderer_->display_;
     if(!display.sourceCurrentCamera0Known_)return fail(d,0x26F940);

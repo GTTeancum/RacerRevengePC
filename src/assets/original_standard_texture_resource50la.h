@@ -273,8 +273,16 @@ private:
         OriginalStandardTextureDiagnostic50LA&) const noexcept;
     bool retireGarageBank12E5E0(GarageBankLease50LA&,
         OriginalStandardTextureDiagnostic50LA&) noexcept;
-    // Actual resolver-owned native scratch backing. Explicit dormant suffixes,
-    // never inferred from file/cache readiness or called by ordinary lookup.
+    friend class OriginalStandardMaterialDomain50LA;
+    // Private one-shot native construction prerequisite, before any provider bind
+    // or corpus. Not source13FB6C publication, registration, open/read or readiness.
+    bool bootstrapFreshFileCapacity12CBA0(
+        std::shared_ptr<const OriginalStandardArchiveProvider50LA>,
+        OriginalStandardTextureDiagnostic50LA&)noexcept;
+    struct FreshFileCapacity;
+    std::unique_ptr<FreshFileCapacity> freshFileCapacity_;
+    // Actual resolver-owned native scratch backing. Initialization is reached
+    // only by that fresh prefix; restoration remains dormant, never lookup-driven.
     bool initializeScratch12CDF0(OriginalStandardTextureDiagnostic50LA&)noexcept;
     bool restoreScratch132BD0(OriginalStandardTextureDiagnostic50LA&)noexcept;
     struct Scratch;

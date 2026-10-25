@@ -247,6 +247,10 @@ private:
     // publication, registry key, VUB loader or replacement process input.
     bool constructUnpublishedNativeTaCutChild282860()const noexcept;
     bool abortUnpublishedNativeTaCutChild()const noexcept;
+    // Private, UNCALLED first-TA01 copied-input resource prerequisite only.
+    // No caller child/ordinal/file/FP promise or source IO completion authority.
+    std::shared_ptr<original_camera_session50KX::Session> resourceNativeTaCameraSession50LA()const noexcept;
+    bool deriveUnpublishedNativeTa01Resources()const noexcept;
     mutable std::weak_ptr<RaceDisplayLifetime50LA> raceDisplayOwner50LA_;
     // The actual persistent dispatcher is Root-owned, never manufactured on
     // Garage entry. The two counted global dialog children share this scope.

@@ -4,6 +4,7 @@
 #include "source_texture50fc_fixture.h"
 
 #include "../../src/assets/import_world48f.h"
+#include "../../src/assets/original_ta_encoded_archive50la.h"
 #include "../../src/assets/original_ipu_decoder.h"
 #include "../../src/assets/original_standard_ipum_framing50la.h"
 #include "../../src/assets/original_ui_atm50kg.h"
@@ -293,6 +294,7 @@ class Owner final {
     struct Scene {a::Scene48D decoded;std::uint64_t identity=0;std::vector<std::uint32_t> materials;};
     struct Storage {
         a::ResArchive48C archive;
+        std::shared_ptr<const a::OriginalTaEncodedArchive50LA> encodedInput;
         std::map<std::string,std::size_t> entries;
         std::map<std::string,Scene> scenes;
         std::vector<a::Material48E> materials;
@@ -331,7 +333,17 @@ public:
     const std::vector<std::uint8_t>* independentlyPinnedImages()const noexcept{return storage_?&storage_->independentlyPinnedImages:nullptr;}
     const std::vector<a::TrackProjectedUv>* projectionUvs()const noexcept{return storage_?&storage_->projectionUvs:nullptr;}
 
+    // Compatibility form copies original encoded bytes only on successful load.
     bool load(const Bytes& original,const a::World48F& world,Diagnostic& d)noexcept{
+        return loadImpl(original,nullptr,world,d);
+    }
+    // Root's actual temporary transfers once after all fallible preparation.
+    // Failure leaves input unchanged; success relinquishes mutable aliases.
+    bool loadOwned(Bytes&& original,const a::World48F& world,Diagnostic& d)noexcept{
+        return loadImpl(original,&original,world,d);
+    }
+private:
+    bool loadImpl(const Bytes& original,Bytes* transfer,const a::World48F& world,Diagnostic& d)noexcept{
         try{
             d={};shared::need(!storage_&&std::fegetround()==FE_TONEAREST,"TA direct cold owner already loaded or rounding mode differs");
             shared::need(original.size()==archiveBytes&&shared::sha256(original)==archiveSha,"Original TA archive identity differs");
@@ -512,9 +524,28 @@ public:
             input.slots=slots.data();input.slotCount=static_cast<std::uint32_t>(slots.size());
             input.budgets={29,29,16u*1024u*1024u,16u*1024u*1024u,1024};
             d.stage="pixel_bank";shared::need(next->bank.load(input,d.bank),"Original TA pixel bank rejected: "+d.bank.parserMessage);
+            // One input-only owner. Its control block and real block metadata
+            // allocate before transfer/publication; no provider/domain back-link.
+            auto encoded=std::shared_ptr<a::OriginalTaEncodedArchive50LA>(new a::OriginalTaEncodedArchive50LA);
+            encoded->blocks_=next->archive.blocks;
+            if(transfer)encoded->bytes_.swap(*transfer);else encoded->bytes_=original;
+            next->encodedInput=std::move(encoded);
             storage_=std::move(next);d.stage="complete";return true;
         }catch(const std::exception& error){try{d.message=error.what();}catch(...){}return false;}
         catch(...){try{d.message="Original TA native cold preparation failed";}catch(...){}return false;}
+    }
+
+public:
+    // Both actual TA mount producers use this one complete decoded mount plus
+    // immutable encoded-input binding. Original commit/revision semantics stay
+    // with the existing provider; no alternate service or namespace is created.
+    bool mountCanonicalArchive(a::OriginalStandardArchiveProvider50LA& provider,
+        a::OriginalStandardArchiveProvider50LA::Diagnostic& d)noexcept {
+        if(!storage_||!storage_->encodedInput){d={};d.status=a::OriginalStandardArchiveProvider50LA::Status::input;return false;}
+        try {
+            return provider.mountAuthenticatedRes("TRACKS/TA.RES",archiveSha,archiveBytes,storage_->archive,d)&&
+                provider.retainTaEncodedInput(storage_->archive,storage_->encodedInput,d);
+        }catch(...){d={};d.status=a::OriginalStandardArchiveProvider50LA::Status::allocation;return false;}
     }
 
     // Same Application-owned domain as the actual installed racers. This does
@@ -534,7 +565,7 @@ public:
             storage_->canonicalAttempted=true;storage_->canonicalDomain=request.canonicalDomain;
             const auto& provider=request.canonicalDomain->archiveProvider3E1A70();
             a::OriginalStandardArchiveProvider50LA::Diagnostic mounted;d.stage="ta_original_archive_mount";
-            shared::need(provider&&provider->mountAuthenticatedRes("TRACKS/TA.RES",archiveSha,archiveBytes,storage_->archive,mounted)&&
+            shared::need(provider&&mountCanonicalArchive(*provider,mounted)&&
                 provider->sealNativeMounts(mounted)&&request.canonicalDomain->resolver3E1A70()->bindProvider3E1A70(provider,d.canonical.texture),
                 "Original TA canonical provider mount rejected");
             std::vector<std::shared_ptr<const a::OriginalStandardMaterialSource50LA>> materials;

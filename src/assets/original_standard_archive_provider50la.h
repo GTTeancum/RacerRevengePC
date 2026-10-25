@@ -1,6 +1,7 @@
 #pragma once
 #include "import_decode48c.h"
 #include "original_ui_archive50kg.h"
+#include "original_ta_encoded_archive50la.h"
 #include <cstring>
 #include <exception>
 #include <thread>
@@ -146,7 +147,7 @@ public:
         }
         return matched?Lookup::present:Lookup::absent;
     }
-    // Only UI mounts carry this authenticated original-file backing. No
+    // This UI-specific accessor accepts only authenticated UI backing. No
     // registration, revision/seal change, cache activation or page admission.
     // A view keeps immutable bytes alive even after this mount owner retires;
     // its provider pointer is identity only, not a lifetime/service capability.
@@ -156,6 +157,24 @@ public:
         out=OriginalUiEncodedArchiveView50KG(this,mounts_[mountIndex]->ui);
         return out.identity() && out.data() && out.size();
     }
+    // Exact original encoded TA backing, not decoded-member substitution or
+    // a reader handle. No row/open/cache/lookup/seal/revision mutation.
+    bool encodedTaInput(std::size_t mountIndex,OriginalTaEncodedArchiveView50LA& out)const noexcept {
+        out={};
+        if(!sealed_||!retainedSourcesAccessible()||mountIndex>=mounts_.size())return false;
+        const auto& mount=*mounts_[mountIndex];
+        if(!mount.active||!mount.taEncoded)return false;
+        out=OriginalTaEncodedArchiveView50LA(this,mount.taEncoded,mountIndex,revision_,mount.generation);
+        return true;
+    }
+    bool encodedTaInputCurrent(const OriginalTaEncodedArchiveView50LA& view)const noexcept {
+        if(view.provider_!=this||!view.binding_||!sealed_||!retainedSourcesAccessible()||
+           view.revision_!=revision_||view.mount_>=mounts_.size())return false;
+        const auto& mount=*mounts_[view.mount_];
+        return mount.active&&mount.generation==view.generation_&&mount.taEncoded&&
+            mount.taEncoded.get()==view.binding_.get()&&!mount.taEncoded.owner_before(view.binding_)&&
+            !view.binding_.owner_before(mount.taEncoded);
+    }
     // Allocation-free even for the literal special-case query inside noexcept
     // lookup132820. ASCII case folds only; slash spelling remains significant.
     static bool sameName(std::string_view a,std::string_view b)noexcept {
@@ -164,6 +183,58 @@ public:
         return true;
     }
 private:
+    friend class ::ta_original_world50LE::Owner;
+    // Called only by the genuine loaded TA owner after the unchanged ordinary
+    // complete-archive mount. Reconcile immutable custody, never source rows.
+    bool retainTaEncodedInput(const ResArchive48C& archive,
+        std::shared_ptr<const OriginalTaEncodedArchive50LA>& input,Diagnostic& d)noexcept {
+        d={};
+        if(!input||input->bytes_.size()!=3334562u||input->blocks_.size()!=533u||
+           archive.entries.size()!=383u||archive.decoded.size()!=13099008u||
+           archive.blocks.size()!=input->blocks_.size()||!retainedSourcesAccessible())
+            return fail(d,Status::identity);
+        for(std::size_t i=0;i<archive.blocks.size();++i)
+            if(archive.blocks[i].compressed_offset!=input->blocks_[i].compressed_offset||
+               archive.blocks[i].compressed_bytes!=input->blocks_[i].compressed_bytes)
+                return fail(d,Status::identity);
+        for(std::size_t m=0;m<mounts_.size();++m){
+            const auto& mount=*mounts_[m];
+            if(!sameName(mount.name,"TRACKS/TA.RES"))continue;
+            if(!mount.active||mount.digest!="b491e34bf6cbd27869d5b9dc8db394b101ebaf4ac7f5e0d44fcca33a00d41ab8"||
+               mount.archiveBytes!=3334562u||mount.rows.size()!=archive.entries.size())
+                return fail(d,Status::identity);
+            for(std::size_t i=0;i<mount.rows.size();++i){
+                const auto& row=mount.rows[i];const auto& original=archive.entries[i];
+                if(row.name!=original.name||row.offset!=original.logical_offset||row.size!=original.bytes||
+                   original.logical_offset>archive.decoded.size()||
+                   original.bytes>archive.decoded.size()-original.logical_offset||
+                   (row.size&&std::memcmp(row.data,archive.decoded.data()+original.logical_offset,row.size)))
+                    return fail(d,Status::identity);
+            }
+            if(mount.taEncoded){
+                // Preserve FIRST encoded allocation across repeated authentic
+                // loads, just as ordinary mount preserves existing decoded rows.
+                const auto& old=*mount.taEncoded->input_;
+                if(old.bytes_!=input->bytes_||old.blocks_.size()!=input->blocks_.size())
+                    return fail(d,Status::identity);
+                for(std::size_t i=0;i<old.blocks_.size();++i)
+                    if(old.blocks_[i].compressed_offset!=input->blocks_[i].compressed_offset||
+                       old.blocks_[i].compressed_bytes!=input->blocks_[i].compressed_bytes)
+                        return fail(d,Status::identity);
+                input=mount.taEncoded->input_; //Drops the later duplicate allocation.
+            }else{
+                try {
+                    // Independent mount allocation identity closes raw-provider
+                    // address reuse. No publication until allocation succeeds.
+                    auto binding=std::shared_ptr<const OriginalTaEncodedBinding50LA>(
+                        new OriginalTaEncodedBinding50LA(input));
+                    mount.taEncoded=std::move(binding);
+                }catch(...){return fail(d,Status::allocation);}
+            }
+            return true; //No source handle, service history or readiness minted.
+        }
+        return fail(d,Status::identity);
+    }
     friend class OriginalStandardTextureResolver50LA;
     friend class OriginalStandardMaterialDomain50LA;
     // Historical corpus custody, NOT a bank/file-manager lookup capability.
@@ -230,6 +301,10 @@ private:
         std::string name,digest;std::size_t archiveBytes=0,retainedBytes=0;
         std::shared_ptr<const std::vector<std::uint8_t>> backing;
         std::shared_ptr<const OriginalUiArchive50KG> ui;
+        // Input-only shared ownership, never the TA world (which retains Domain).
+        // One exact3,334,562-byte TA payload plus533 block records here;
+        // distinct from the existing decoded/member accounting and identities.
+        mutable std::shared_ptr<const OriginalTaEncodedBinding50LA> taEncoded;
         // Exact current-generation admission owner. A new authenticated load
         // may reenter without replacing old borrowed bytes or doubling this
         // provider's retained backing. The caller/lease pins the new owner.

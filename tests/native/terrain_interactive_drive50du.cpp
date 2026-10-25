@@ -7008,7 +7008,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  if(taOriginalDisc){
   taOriginalWorld=std::make_unique<ta_original_world50LE::Owner>();
   ta_original_world50LE::Diagnostic diagnostic;
-  const bool loaded=taOriginalWorld->load(runtime_startup50fl::readBytes(trackSession->archive),actualWorld,diagnostic);
+  const bool loaded=taOriginalWorld->loadOwned(runtime_startup50fl::readBytes(trackSession->archive),actualWorld,diagnostic);
   require50DU(loaded,diagnostic.message.empty()?"TA original static world rejected":diagnostic.message.c_str());
   require50DU(taOriginalWorld->mesh(),"TA original mesh publication missing");
   trackMesh=*taOriginalWorld->mesh();
@@ -8199,8 +8199,9 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
    const auto provider=trackMaterialRequest.canonicalDomain->archiveProvider3E1A70();
    rr::assets::OriginalStandardArchiveProvider50LA::Diagnostic mounted;
    require50DU(provider&&archive&&
-       provider->mountAuthenticatedRes(trackSession->world->container,trackSession->archiveSha256,trackSession->archiveBytes,
-           *archive,mounted)&&provider->sealNativeMounts(mounted)&&
+       (taOriginalWorld?taOriginalWorld->mountCanonicalArchive(*provider,mounted):
+           provider->mountAuthenticatedRes(trackSession->world->container,trackSession->archiveSha256,trackSession->archiveBytes,
+               *archive,mounted))&&provider->sealNativeMounts(mounted)&&
        trackMaterialRequest.canonicalDomain->resolver3E1A70()->bindProvider3E1A70(provider,trackMaterialDiagnostic.canonical.texture),
        "canonical selected-track archive mount rejected");
    require50DU(native_ta_particle_cold50LA::prepare(nativeTaParticles,*trackSession,actualWorld,

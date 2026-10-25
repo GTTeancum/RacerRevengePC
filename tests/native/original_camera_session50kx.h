@@ -1,5 +1,7 @@
 #pragma once
 #include "../../src/assets/original_ta_cut_authoring_candidate.h"
+#include "../../src/game/original_ta_cut_resource_candidate.h"
+#include <optional>
 #include "../../src/game/original_racer_diffuse_camera50la.h"
 #include "track_navigation_view50tc.h"
 #include "track_navigation_view50tb.h"
@@ -316,10 +318,17 @@ class Session final {
     struct NativeUnpublishedTaCutChild final {
         std::uint32_t vtable00=0;
         std::array<std::uint32_t,4> offset10{};
-        // Source field order20,24,28,50,5C,58,60. All remain truly null.
+        // Source field order20,24,28,50,5C,58,60. Unloaded constructor makes all null.
         std::array<const void*,7> arrays{};
         std::uint32_t rate2C=0,elapsed38=0,field3C=0,mode40=0,lower44=0,active4C=0,loop54=0;
-        // Source282860 leaves30/34/48 unwritten: they are deliberately absent.
+        // Unwritten constructor30/34/48 stay absent until actual resource publication.
+        std::optional<std::uint64_t> frameCount30;
+        std::optional<std::int32_t> upper48;
+        using ResourceArrays=original_ta_cut_storage_candidate_detail::Arrays;
+        enum class ResourcePhase : std::uint8_t {unloaded,published,derived,terminal,retired};
+        ResourcePhase resourcePhase=ResourcePhase::unloaded;
+        std::unique_ptr<ResourceArrays> resourceArrays;
+        std::uint32_t resourceFailurePC=0,resourceFrame=0; //Native diagnostic only.
         bool constructed=false,retired=false;
         explicit NativeUnpublishedTaCutChild(const std::array<std::uint32_t,4>& actualOrigin)noexcept {
             vtable00=0x3cca90u; //115AE0, no ref/Entity/count constructor.
@@ -340,14 +349,75 @@ class Session final {
             //including54. It returns1, not a load/activation certificate.
             return constructed&&!retired;
         }
-        bool retireUnloaded2828F0()noexcept {
-            if(!constructed||retired||vtable00!=0x3d2ee0u)return false;
-            // Native admission refuses unsupported populated arrays. No
-            // destructor can report success while silently skipping a free.
+        bool deriveReservedTa01(const rr::assets::OriginalTaCutAuthoringCandidate& source,
+            const std::array<std::uint32_t,4>& actualLoadOrigin,
+            std::unique_ptr<ResourceArrays> reserved)noexcept {
+            namespace r=original_ta_cut_resource_candidate_detail;
+            if(!constructed||retired||vtable00!=0x3d2ee0u||
+               resourcePhase!=ResourcePhase::unloaded||resourceArrays||frameCount30||upper48||
+               !reserved||!r::ta01Reservation(*reserved)||source.frameCount(1)!=461||
+               !r::arithmeticAdmitted())return false;
             for(const auto* pointer:arrays)if(pointer)return false;
+            //282D18 is a fresh load-local process read, NOT child.offset10.
+            const auto loadOffset=actualLoadOrigin;
+            //Reached283460 sees only the authenticated all-null first-load state.
+            //No allocator effects or source fields change at that empty cleanup.
+            resourceArrays=std::move(reserved);resourcePhase=ResourcePhase::published;
+            auto& a=*resourceArrays;
+            //Native backing was reserved earlier. These are the actual child
+            //source-field publications, in282ECC..282FD8 order.
+            arrays[4]=a.frameHeaders5C.data(); //5C
+            arrays[5]=a.nodeIdentifiers58.data(); //58
+            arrays[6]=a.nodes60.data(); //60
+            frameCount30=std::uint64_t{461}; //282F08 sign-extended N stored at30/34.
+            r::vectorConstructor11C090(a.look20);arrays[0]=a.look20.data();
+            r::vectorConstructor11C090(a.up24);arrays[1]=a.up24.data();
+            r::vectorConstructor11C090(a.position28);arrays[2]=a.position28.data();
+            arrays[3]=a.scalar50.data(); //50
+            upper48=461; //N, not N-1. No activation/loop/mode/cursor/time writes.
+            for(std::uint32_t frame=0;frame<461;++frame){
+                rr::assets::OriginalTaCutFrameBitsCandidate raw;
+                resourceFrame=frame;
+                if(!source.frameBits(1,frame,raw))resourceFailurePC=0x282fdcu;
+                else resourceFailurePC=r::deriveFrameTa01(raw,loadOffset,a,frame);
+                if(resourceFailurePC){resourcePhase=ResourcePhase::terminal;return false;}
+            }
+            resourcePhase=ResourcePhase::derived;
+            return true; //Only native copied-input derivation; NOT282CD0/service return.
+        }
+        bool retireOwned2828F0()noexcept {
+            if(!constructed||retired||vtable00!=0x3d2ee0u)return false;
+            if(resourceArrays){
+                const auto& a=*resourceArrays;
+                if((resourcePhase!=ResourcePhase::derived&&resourcePhase!=ResourcePhase::terminal)||
+                   !original_ta_cut_resource_candidate_detail::ta01Reservation(a)||
+                   !frameCount30||*frameCount30!=461||!upper48||*upper48!=461||
+                   arrays[0]!=a.look20.data()||arrays[1]!=a.up24.data()||
+                   arrays[2]!=a.position28.data()||arrays[3]!=a.scalar50.data()||
+                   arrays[4]!=a.frameHeaders5C.data()||arrays[5]!=a.nodeIdentifiers58.data()||
+                   arrays[6]!=a.nodes60.data())return false;
+            }else{
+                if(resourcePhase!=ResourcePhase::unloaded||frameCount30||upper48)return false;
+                for(const auto* pointer:arrays)if(pointer)return false;
+            }
             vtable00=0x3d2ee0u; //282918, before283460.
-            //283460 checks20/24/28/50/5C/58/60 in this order. Each is null;
-            //there are no allocator calls and no count/index reads or writes.
+            if(resourceArrays){
+                auto& a=*resourceArrays;
+                //Concrete native allocations released in283460 source order.
+                //Retail's vector header/delete helper is NOT a native ABI claim.
+                std::vector<OriginalTaCutVector3Candidate>().swap(a.look20);
+                std::vector<OriginalTaCutVector3Candidate>().swap(a.up24);
+                std::vector<OriginalTaCutVector3Candidate>().swap(a.position28);
+                std::vector<float>().swap(a.scalar50);arrays[3]=nullptr;
+                std::vector<std::array<std::uint32_t,2>>().swap(a.frameHeaders5C);arrays[4]=nullptr;
+                std::vector<std::uint32_t>().swap(a.nodeIdentifiers58);arrays[5]=nullptr;
+                std::vector<original_ta_cut_storage_candidate_detail::Node>().swap(a.nodes60);arrays[6]=nullptr;
+                //Source leaves20/24/28 dangling. Native custody invalidates these
+                //only AFTER the source-ordered frees, then deletes empty backing.
+                arrays[0]=nullptr;arrays[1]=nullptr;arrays[2]=nullptr;
+                resourceArrays.reset();
+            }
+            resourcePhase=ResourcePhase::retired;
             vtable00=0x3cca90u; //115B2C base reset; no ref/count decrement.
             retired=true;
             return true;
@@ -355,7 +425,7 @@ class Session final {
         ~NativeUnpublishedTaCutChild()noexcept {
             // Completed unpublished objects still need their local destructor;
             // this is not retail controller174C20 or registry removal.
-            if(constructed&&!retired&&!retireUnloaded2828F0())std::terminate();
+            if(constructed&&!retired&&!retireOwned2828F0())std::terminate();
         }
     };
     enum class NativeTaCutChildPhase : std::uint8_t {empty,constructed,aborted};
@@ -379,7 +449,7 @@ class Session final {
     bool abortUnpublishedTaCutChildNative()noexcept {
         if(nativeTaCutChildPhase_==NativeTaCutChildPhase::aborted)return !nativeUnpublishedTaCutChild_;
         if(nativeTaCutChildPhase_!=NativeTaCutChildPhase::constructed||!nativeUnpublishedTaCutChild_||
-           !nativeUnpublishedTaCutChild_->retireUnloaded2828F0())return false;
+           !nativeUnpublishedTaCutChild_->retireOwned2828F0())return false;
         nativeUnpublishedTaCutChild_.reset(); //Native allocation delete; local source destructor already ran ONCE.
         nativeTaCutChildPhase_=NativeTaCutChildPhase::aborted; //Never rearm/erase construction history.
         return true;

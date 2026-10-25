@@ -2,6 +2,7 @@
 #include "material_texture_gl50eb.h"
 #include "original_ui_rider_residency50kg.h"
 #include "../../../src/assets/original_native_texture_upload50la.h"
+#include "../../../src/game/original_options_mutation_interlock50kg.h"
 #include "../../../tests/native/ra_cold_aggregate50la.h"
 #include <exception>
 #include <limits>
@@ -263,6 +264,9 @@ MaterialTextureGl50EB::~MaterialTextureGl50EB() noexcept {
 bool MaterialTextureGl50EB::create(const MaterialTextureGlRequest50EB& request,
     const assets::MaterialTextureAssets50EA& bank, MaterialTextureGlDiagnostic50EB& d) noexcept {
     d = {};
+    OriginalOptionsMutationInterlock50KG::Operation operation;
+    if(!operation.admitted())
+        return fail(d,MaterialTextureGlError50EB::request,"Options reservation excludes native texture creation");
     if (storage_)
         return fail(d, MaterialTextureGlError50EB::alreadyOwned, "texture owner already owns a bank");
     if (lastPublication_ == std::numeric_limits<std::uint64_t>::max())
@@ -297,6 +301,9 @@ bool MaterialTextureGl50EB::create(const MaterialTextureGlRequest50EB& request,
 bool MaterialTextureGl50EB::createRaStaticWorld(const MaterialTextureGlRequest50EB& request,
     const ra_cold_aggregate50LA::Owner& aggregate,MaterialTextureGlDiagnostic50EB& d) noexcept {
     d={};
+    OriginalOptionsMutationInterlock50KG::Operation operation;
+    if(!operation.admitted())
+        return fail(d,MaterialTextureGlError50EB::request,"Options reservation excludes native world image publication");
     if(storage_||raStaticFire_||raStaticWorld_||aggregate.closed_||aggregate.terminal_||
        !aggregate.prefix_.staticWorldImages||!aggregate.world_)
         return fail(d,MaterialTextureGlError50EB::assets,"actual unpublished full RA world required");
@@ -389,6 +396,9 @@ bool MaterialTextureGl50EB::createRaStaticWorld(const MaterialTextureGlRequest50
 bool MaterialTextureGl50EB::createRaStaticFire(const MaterialTextureGlRequest50EB& request,
     std::shared_ptr<ra_static_fire_visual50LA::Owner> owner,MaterialTextureGlDiagnostic50EB& d) noexcept {
     d={};
+    OriginalOptionsMutationInterlock50KG::Operation operation;
+    if(!operation.admitted())
+        return fail(d,MaterialTextureGlError50EB::request,"Options reservation excludes native fire image publication");
     if(storage_||raStaticFire_||raStaticWorld_||!owner||!owner->pixels())
         return fail(d,MaterialTextureGlError50EB::assets,"actual unpublished FireP0t bank required");
     assets::OriginalStandardMaterialMapBindingView50LA map;
@@ -415,6 +425,12 @@ bool MaterialTextureGl50EB::createRaStaticFire(const MaterialTextureGlRequest50E
 }
 bool MaterialTextureGl50EB::close(MaterialTextureGlDiagnostic50EB& d) noexcept {
     d = {};
+    OriginalOptionsMutationInterlock50KG::Operation operation;
+    if(!operation.admitted()){
+        if(!storage_)return true;
+        d.cleanupIncomplete=true;
+        return fail(d,MaterialTextureGlError50EB::cleanup,"Options reservation retains native texture ownership");
+    }
     if(riderPool_){
         for(const auto* borrower:storage_->riderBorrowers)if(borrower){
             d.cleanupIncomplete=true;return fail(d,MaterialTextureGlError50EB::cleanup,"Rider renderer/collector still borrows publication");}
@@ -457,6 +473,8 @@ bool MaterialTextureGl50EB::matchesSourceBank(const assets::MaterialTextureAsset
 }
 bool MaterialTextureGl50EB::validBorrow(void* context, bool (*isCurrent)(void*) noexcept,
     std::uint64_t token) const noexcept {
+    OriginalOptionsMutationInterlock50KG::Operation operation;
+    if(!operation.admitted())return false;
     // The full-world image bank has no admitted renderer route yet. A future
     // typed friend renderer must hold its actual private lease before generic
     // borrowing can succeed. This also rejects stale CPU/canonical ownership.
@@ -548,6 +566,9 @@ bool OriginalUiRiderResidentPool50KG::stage(const std::shared_ptr<OriginalUiRide
     const OriginalUiRiderResidencyDemand50KG& demand,const MaterialTextureGlRequest50EB& request,
     MaterialTextureGl50EB& out,MaterialTextureGlDiagnostic50EB& d)noexcept {
     d={};auto& s=*storage_;constexpr std::size_t ceiling=32u*1024u*1024u;
+    OriginalOptionsMutationInterlock50KG::Operation operation;
+    if(!operation.admitted())
+        return fail(d,MaterialTextureGlError50EB::request,"Options reservation excludes native Rider staging");
     if(self.get()!=this||s.closed||s.fault||s.restorePending||out.ownsResources()||out.riderPool_||
        demand.session_!=s.session||!demand.serial_||demand.indices_.empty()||demand.consumed_||demand.bank_!=s.bank||!s.bank||!s.bank->loaded()||
        !request.context||!request.isCurrent||!request.isCurrent(request.context)||!request.originalUploadBinding||
@@ -657,6 +678,11 @@ bool OriginalUiRiderResidentPool50KG::stage(const std::shared_ptr<OriginalUiRide
 }
 bool OriginalUiRiderResidentPool50KG::collect(MaterialTextureGlDiagnostic50EB& d)noexcept {
     d={};auto& s=*storage_;if(!s.configured)return true;
+    OriginalOptionsMutationInterlock50KG::Operation operation;
+    if(!operation.admitted()){
+        d.cleanupIncomplete=true;
+        return fail(d,MaterialTextureGlError50EB::cleanup,"Options reservation retains native Rider pool ownership");
+    }
     if(!s.current(d)){d.cleanupIncomplete=true;return false;}
     if(!s.restore(d))return false;
     bool settled=false;for(unsigned i=0;i<32;++i){const U e=s.gl.getError();if(!e){settled=true;break;}if(!d.cleanupGlError)d.cleanupGlError=e;}
@@ -673,11 +699,22 @@ bool OriginalUiRiderResidentPool50KG::collect(MaterialTextureGlDiagnostic50EB& d
     s.fault=false;d.cleanupIncomplete=false;return true;
 }
 bool OriginalUiRiderResidentPool50KG::close(MaterialTextureGlDiagnostic50EB& d)noexcept {
-    d={};for(const auto& i:storage_->images)if(i.references){d.cleanupIncomplete=true;
+    d={};
+    OriginalOptionsMutationInterlock50KG::Operation operation;
+    if(!operation.admitted()){
+        d.cleanupIncomplete=true;
+        return fail(d,MaterialTextureGlError50EB::cleanup,"Options reservation retains native Rider pool ownership");
+    }
+    for(const auto& i:storage_->images)if(i.references){d.cleanupIncomplete=true;
         return fail(d,MaterialTextureGlError50EB::cleanup,"Rider publications must close before pool");}
     if(!collect(d))return false;storage_->closed=true;return true;
 }
 bool OriginalUiRiderResidentPool50KG::dropPublication(MaterialTextureGl50EB& owner,MaterialTextureGlDiagnostic50EB& d)noexcept {
+    OriginalOptionsMutationInterlock50KG::Operation operation;
+    if(!operation.admitted()){
+        d.cleanupIncomplete=true;
+        return fail(d,MaterialTextureGlError50EB::cleanup,"Options reservation retains native Rider publication ownership");
+    }
     auto& s=*storage_;auto& p=*owner.storage_;
     if(!s.current(d)){d.cleanupIncomplete=true;return false;}
     if(!p.riderRefsReleased){
@@ -699,6 +736,8 @@ bool MaterialTextureGl50EB::riderSamplerMatches(U index,const MaterialTextureSam
 }
 bool MaterialTextureGl50EB::acquireRiderBorrow(const void* borrower)const noexcept {
     if(!riderPool_)return true;
+    OriginalOptionsMutationInterlock50KG::Operation operation;
+    if(!operation.admitted())return false;
     if(!borrower||!initialized()||riderPool_->faulted()||storage_->thread!=std::this_thread::get_id()||
        !storage_->isCurrent||!storage_->isCurrent(storage_->context))return false;
     for(const auto* existing:storage_->riderBorrowers)if(existing==borrower)return false;
@@ -706,6 +745,8 @@ bool MaterialTextureGl50EB::acquireRiderBorrow(const void* borrower)const noexce
 }
 bool MaterialTextureGl50EB::releaseRiderBorrow(const void* borrower)const noexcept {
     if(!riderPool_)return true;
+    OriginalOptionsMutationInterlock50KG::Operation operation;
+    if(!operation.admitted())return false;
     if(!borrower||!storage_||storage_->thread!=std::this_thread::get_id()||!storage_->isCurrent||!storage_->isCurrent(storage_->context))return false;
     for(auto& slot:storage_->riderBorrowers)if(slot==borrower){slot=nullptr;return true;}return false;
 }

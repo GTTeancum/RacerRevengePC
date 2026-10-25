@@ -132,6 +132,71 @@ inline std::shared_ptr<original_camera_session50KX::Session> Application::freshN
        member.size!=pin.tob.size()||std::memcmp(member.data,pin.tob.data(),member.size))return {};
     return session;
 }
+inline std::shared_ptr<original_camera_session50KX::Session> Application::resourceNativeTaCameraSession50LA()const noexcept {
+    namespace d=ta_camera_issuer_detail;
+    if(garageAudioOwnerThread_!=std::this_thread::get_id())return {};
+    const auto session=nativeTaCameraSession50LA_.lock();
+    // Separate constructed-child admission; the original fresh helper is unchanged.
+    // CRITICAL: closed/prepared/abandoned rejection precedes ANY dereference of
+    // captured root-owned Rig/particle borrows. TA closes particles immediately
+    // after Session retirement even while other shared Session borrowers survive.
+    if(!session||session->closed_||session->abandoned_||session->coldBound_||
+       session->generation_||session->displayInputs_||session->coldPhase_||session->authoredPhase_||
+       session->readsBound_||session->coldController_.started||
+       session->nativeTaCutChildPhase_!=original_camera_session50KX::Session::NativeTaCutChildPhase::constructed||
+       !session->nativeUnpublishedTaCutChild_||!session->nativeTaCutAuthoring_||
+       !session->nativeTaCutAuthoring_->authoring||
+       session->nativeUnpublishedTaCutChild_->resourcePhase!=
+           original_camera_session50KX::Session::NativeUnpublishedTaCutChild::ResourcePhase::unloaded||
+       session->frameStage_!=original_camera_session50KX::Session::FrameStage::idle||
+       !session->nativeTaIssuance_)return {};
+    const auto& pin=*session->nativeTaIssuance_;const auto& actual=session->actual_;
+    if(pin.issuer!=this||!pin.generation||!standardMaterialDomainOwner_||
+       !standardMaterialDomainOwner_->prepared()||!d::sameOwner(actual.applicationEntities,entitiesOwner_)||
+       !d::sameOwner(actual.applicationMaterials,standardMaterialDomainOwner_->materials382B38())||
+       !d::sameOwner(pin.provider,standardMaterialDomainOwner_->archiveProvider3E1A70())||
+       actual.actualMaterialDirectory36B970!=&materialDirectory36B970_||materialDirectory36B970_!="textures\\"||
+       !actual.applicationAnimation.sameOwner(animationClock())||
+       &actual.applicationClock!=animationClockBackend_.get()||
+       !actual.actualRigs||!(*actual.actualRigs)[0]||(*actual.actualRigs)[0].get()!=pin.selectedRig||
+       !pin.particles||actual.actualTrackParticles4A0!=pin.particles)return {};
+    const auto& particles=*pin.particles;const auto& rig=*pin.selectedRig;
+    const auto* pod=original_player_identity50IK::find(rig.podId);
+    d::Provider::MemberView member;
+    if(!particles.prepared()||particles.generation_!=pin.generation||
+       particles.component_.sessionGeneration!=pin.generation||particles.component_.reference00!=1||
+       !d::sameOwner(particles.application_,entitiesOwner_)||
+       !d::sameOwner(particles.table_,standardMaterialDomainOwner_->materials382B38())||
+       !pod||pod->racer60!=pin.selectedPod||actual.racer60[0]!=pin.selectedPod||rig.phy!=pin.phy||
+       !d::taMember(*pin.provider,member)||member.revision!=pin.providerRevision||
+       member.bankGeneration!=pin.bankGeneration||member.mount!=pin.mount||member.ordinal!=pin.ordinal||
+       member.size!=pin.tob.size()||std::memcmp(member.data,pin.tob.data(),member.size))return {};
+    const auto& custody=*session->nativeTaCutAuthoring_;
+    if(!d::sameOwner(custody.provider,pin.provider)||custody.generation!=pin.generation||
+       custody.providerRevision!=pin.providerRevision||custody.bankGeneration!=pin.bankGeneration||
+       custody.mount!=pin.mount)return {};
+    // Retained exact bytes alone are not a current mount/epoch certificate.
+    constexpr std::array<const char*,4> names{{
+        "tracks\\ta.tob","tracks\\ta01.vub","tracks\\ta02.vub","tracks\\ta03.vub"}};
+    constexpr std::array<std::size_t,4> ordinals{{0,376,377,378}};
+    constexpr std::array<std::size_t,4> sizes{{13887,53488,17528,17528}};
+    try {
+        for(std::size_t i=0;i<names.size();++i){
+            const auto& retained=custody.members[i];
+            const auto bytes=i?custody.authoring->originalVubBytes(static_cast<unsigned>(i)):
+                custody.authoring->originalTobBytes();
+            d::Provider::MemberView current;
+            if(retained.name!=names[i]||retained.ordinal!=ordinals[i]||retained.bytes!=sizes[i]||
+               !bytes.data||bytes.size!=sizes[i]||
+               custody.provider->lookup132820(names[i],current)!=d::Provider::Lookup::present||
+               !current.member||*current.member!=names[i]||!current.data||current.size!=sizes[i]||
+               current.ordinal!=ordinals[i]||current.mount!=pin.mount||
+               current.revision!=pin.providerRevision||current.bankGeneration!=pin.bankGeneration||
+               std::memcmp(current.data,bytes.data,bytes.size))return {};
+        }
+    }catch(...){return {};}
+    return session;
+}
 inline bool Application::constructNativeTaController174A30()const noexcept {
     // Still UNCALLED. Shared admission performs the same V8 freshness and
     // exact Application-issued ownership checks before any constructor effect.
@@ -198,6 +263,26 @@ inline bool Application::constructUnpublishedNativeTaCutChild282860()const noexc
     // actual process owner. Unloaded282860 consumes no VUB or numeric receipt.
     const auto session=freshNativeTaCameraSession50LA();
     return session&&session->constructUnpublishedTaCutChild282860();
+}
+inline bool Application::deriveUnpublishedNativeTa01Resources()const noexcept {
+    namespace d=ta_camera_issuer_detail;
+    namespace r=rr::game::original_ta_cut_resource_candidate_detail;
+    // UNCALLED. Fixed native TA01 association is NOT a source74 index or a
+    // reached175510 call. The one constructed child is never replaced.
+    const auto session=resourceNativeTaCameraSession50LA();
+    if(!session||!r::arithmeticAdmitted())return false;
+    auto* const child=session->nativeUnpublishedTaCutChild_.get();
+    auto reserved=r::reserveTa01();
+    if(!reserved)return false; //Native pre-effect reservation failure only.
+    // Allocation is followed by current same-owner/epoch/closed-state admission
+    // again. Every failure here frees local backing, not the actual child.
+    const auto current=resourceNativeTaCameraSession50LA();
+    if(!d::sameOwner(current,session)||current->nativeUnpublishedTaCutChild_.get()!=child)return false;
+    const auto& actualProcess=current->actual_.applicationEntities;
+    if(!actualProcess||!actualProcess->application10()||
+       actualProcess->nativeOwnerThread_!=std::this_thread::get_id())return false;
+    return child->deriveReservedTa01(*current->nativeTaCutAuthoring_->authoring,
+        actualProcess->cutOrigin443200_,std::move(reserved));
 }
 inline bool Application::abortUnpublishedNativeTaCutChild()const noexcept {
     if(garageAudioOwnerThread_!=std::this_thread::get_id())return false;

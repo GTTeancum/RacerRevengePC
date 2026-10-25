@@ -336,10 +336,12 @@ private:
         if(!adopted.okay())return adopted;
         output=std::move(next);return adopted;
     }
-    Result coldRetirementPreflight()const noexcept {
+    Result coldRetirementPreflight(bool nativeViewport=false,bool nativeSelected=false)const noexcept {
         if(!onAffinity())return {Status::affinity,0x104970u};
         if(!actualEntitiesAlive())return {Status::owner,0x104970u};
-        if((phase_!=Phase::constructedCold&&phase_!=Phase::beforeViewport114A00)||
+        if((phase_!=Phase::constructedCold&&phase_!=Phase::beforeViewport114A00&&
+            !(nativeViewport&&(phase_==Phase::insideViewport114A00||phase_==Phase::afterViewport114A00||
+                (nativeSelected&&(phase_==Phase::selectedBeforeBounds236214||phase_==Phase::viewportInitialized2361C0)))))||
            !entityConstructed_||!fieldsComplete_||!enrolled_)
             return {Status::phase,0x104970u};
         if(entities_->attachmentLock423F58_)return {Status::attachmentLocked,0x104970u};
@@ -353,20 +355,23 @@ private:
         if(ancestryTable_!=0x3d1c10u||fields_.searchable30||fields_.type32!=0xffu||
            (fields_.flags33&7u)||fields_.registration34||fields_.parent38||fields_.resource224)
             return {Status::phase,0x104970u};
-        if(!scalarPrefixStateValid())return {Status::phase,0x104970u};
+        if(!scalarPrefixStateValid(nativeViewport,nativeSelected))return {Status::phase,0x104970u};
         if(!entities_->entityAuthority_.canRetire(entity_))return {Status::identity,0x104970u};
         return {Status::complete,0x104970u};
     }
-    bool scalarPrefixStateValid()const noexcept {
-        // Neither admitted phase has entered114A00's renderer-counter stores.
-        if(fields_.count20C||fields_.count210)return false;
+    bool scalarPrefixStateValid(bool nativeViewport=false,bool nativeSelected=false)const noexcept {
+        // Ordinary cold retirement remains counter-free; native cancellation
+        // separately admits the exact acquired viewport/selection phases.
+        const bool counters=nativeViewport&&(phase_==Phase::insideViewport114A00||phase_==Phase::afterViewport114A00||
+            (nativeSelected&&(phase_==Phase::selectedBeforeBounds236214||phase_==Phase::viewportInitialized2361C0)));
+        if(counters?(fields_.count20C!=3u||fields_.count210!=3u):(fields_.count20C||fields_.count210))return false;
         if(phase_==Phase::constructedCold){
             // Zero host backing for unwritten source words is only an invariant;
             // knownWord continues to report these four offsets as unknown.
             return !fields_.aspect1DC&&!fields_.aspect1F8&&!fields_.fullWidth204&&
                 !fields_.fullHeight208&&fields_.viewport1E0==std::array<std::uint32_t,6>{};
         }
-        return phase_==Phase::beforeViewport114A00&&
+        return (phase_==Phase::beforeViewport114A00||counters)&&
             fields_.fullWidth204==640u&&fields_.fullHeight208==448u&&
             fields_.aspect1DC==0x3faaaaabu&&fields_.aspect1F8==0x3f400000u&&
             fields_.viewport1E0==std::array<std::uint32_t,6>{{0,0,640,448,0,0x3f800000u}};
@@ -426,7 +431,7 @@ private:
         std::uint32_t aspectBits=0;
         if(!admitViewportArithmetic114960(aspectBits))return {Status::arithmetic,0x114960u};
         // Native atomic preflight above is not an original failure branch. The
-        // authentic Main1CF320/shared-page1D7B28 arguments are fixed640/448 and
+        // authentic Main1CF320/shared-page1D7B28/Options1D05E0 arguments are fixed640/448 and
         //3FAAAAAB. Source2361C0 enters1146B0, whose inert141C20 returns
         // before114920 enters114960. No service/callback is run.
         // All ten source stores publish in recovered order after admission.
@@ -469,15 +474,18 @@ private:
         return retireRetained();
     }
     bool unpublishedAbortCurrent(const ::original_main_entry50KG::Application* issuer,
-        const std::shared_ptr<Entities>& entities)const noexcept {
-        return issuer&&issuer_==issuer&&entities_==entities&&onAffinity()&&phase_==Phase::constructedCold&&
-            coldRetirementPreflight().okay()&&entities_->objectCount423F60_;
+        const std::shared_ptr<Entities>& entities,bool nativeSelected=false)const noexcept {
+        return issuer&&issuer_==issuer&&entities_==entities&&onAffinity()&&
+            (phase_==Phase::constructedCold||phase_==Phase::beforeViewport114A00||
+             phase_==Phase::insideViewport114A00||phase_==Phase::afterViewport114A00||
+             (nativeSelected&&(phase_==Phase::selectedBeforeBounds236214||phase_==Phase::viewportInitialized2361C0)))&&
+            coldRetirementPreflight(true,nativeSelected).okay()&&entities_->objectCount423F60_;
     }
     Result abortUnpublished236180(const ::original_main_entry50KG::Application* issuer,
-        const std::shared_ptr<Entities>& entities)noexcept {
+        const std::shared_ptr<Entities>& entities,bool nativeSelected=false)noexcept {
         if(!issuer||issuer_!=issuer||entities_!=entities||!onAffinity())return {Status::identity,0};
         if(phase_==Phase::nativeUnpublishedAborted)return {Status::complete,0};
-        if(!unpublishedAbortCurrent(issuer,entities))return {Status::phase,0};
+        if(!unpublishedAbortCurrent(issuer,entities,nativeSelected))return {Status::phase,0};
         if(!entities_->entityAuthority_.retire(entity_))return {Status::identity,0};
         enrolled_=false;--entity_.reference00;--entities_->objectCount423F60_;
         phase_=Phase::nativeUnpublishedAborted;return {Status::complete,0};

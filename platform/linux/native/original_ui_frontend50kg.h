@@ -314,6 +314,9 @@ private:
     bool abortOptionsManagerPrefix50KG()noexcept;
     bool writeOptionsVideo44Prefix50KG(const ::original_main_entry50KG::Application&)noexcept;
     bool adoptOptionsCameraPrefix50KG(const ::original_main_entry50KG::Application&)noexcept;
+    bool stageOptionsCameraViewportPrefix50KG(const ::original_main_entry50KG::Application&)noexcept;
+    bool continueOptionsViewportDrains50KG(const ::original_main_entry50KG::Application&)noexcept;
+    bool continueOptionsCameraSuffix2361C0(const ::original_main_entry50KG::Application&)noexcept;
     // Non-counted input preparation; cannot mount/publish a source owner.
     bool prepareOptionsNativeInputs50KG(const ::original_main_entry50KG::Application&)noexcept;
     bool retainMemoryCardOptionsSources50KG(const ::original_main_entry50KG::Application&,

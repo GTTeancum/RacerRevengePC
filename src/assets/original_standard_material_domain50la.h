@@ -65,6 +65,12 @@ public:
             auto materials=std::make_shared<OriginalStandardMaterialTable50LA>();
             auto resolver=std::make_shared<OriginalStandardTextureResolver50LA>();
             auto provider=std::make_shared<OriginalStandardArchiveProvider50LA>();
+            // Same resolver survives into this domain. This allocation prerequisite
+            // must precede even the first native APPSTART mount; no source mount
+            // registration or process-global service publication is inferred.
+            if(!resolver->bootstrapFreshFileCapacity12CBA0(provider,d.texture)){
+                d.status=OriginalStandardMaterialStatus50LA::allocation;return false;
+            }
             OriginalStandardArchiveProvider50LA::Diagnostic providerDiagnostic;
             if(!provider->mountAuthenticatedUi(application->appStart(),providerDiagnostic)){
                 d.status=OriginalStandardMaterialStatus50LA::source;return false;
