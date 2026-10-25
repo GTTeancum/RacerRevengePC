@@ -13,7 +13,6 @@
 #include <utility>
 #include <type_traits>
 #include <cstring>
-#include <sys/file.h>
 
 namespace rr::platform {
 namespace {
@@ -132,10 +131,9 @@ struct OriginalUiRiderProfileOwner50KG::Storage {
     std::uint64_t generation=1;
     BetaPersistenceStatus betaStatus=BetaPersistenceStatus::notStarted;
     std::filesystem::path betaPath;
-    int betaLock=-1;
+    native_beta50kg::ProcessLock betaLock;
     bool betaWritable=false;
     std::shared_ptr<const game::OriginalUiGameSettingsProfile50KG> betaSettings;
-    ~Storage(){if(betaLock>=0)::close(betaLock);}
     bool readable() const noexcept {return common&&common->known&&common->mode34<=2;}
 };
 OriginalUiRiderProfileOwner50KG::OriginalUiRiderProfileOwner50KG() noexcept=default;
@@ -983,9 +981,7 @@ void OriginalUiRiderProfileOwner50KG::loadNativeBetaProgressAtStartup() noexcept
   const auto directory=s.betaPath.empty()?native_beta50kg::defaultDirectory():s.betaPath.parent_path();if(directory.empty()){s.betaStatus=Status::unavailable;return;}
   std::error_code ec;std::filesystem::create_directories(directory,ec);if(ec){s.betaStatus=Status::readError;return;}
   s.betaPath=directory/"progress-v1.bin";
-  if(s.betaLock<0)s.betaLock=::open((directory/"progress-v1.lock").c_str(),O_RDWR|O_CREAT|O_CLOEXEC|O_NOFOLLOW|O_NONBLOCK,0600);
-  struct stat lockStat{};
-  if(s.betaLock<0||::fstat(s.betaLock,&lockStat)||!S_ISREG(lockStat.st_mode)||::flock(s.betaLock,LOCK_EX|LOCK_NB)){s.betaStatus=Status::locked;return;}
+  if(s.betaLock.acquire(directory/"progress-v1.lock")!=R::ok){s.betaStatus=Status::locked;return;}
   BetaBytes bytes;const auto result=native_beta50kg::readFile(s.betaPath,bytes);
   if(result==R::missing){s.betaWritable=true;s.betaStatus=Status::ready;return;}
   if(result!=R::ok){s.betaStatus=result==R::invalid?Status::invalid:Status::readError;return;}
@@ -1037,7 +1033,7 @@ void OriginalUiRiderProfileOwner50KG::loadNativeBetaProgressAtStartup() noexcept
  }catch(...){s.betaStatus=Status::readError;}
 }
 bool OriginalUiRiderProfileOwner50KG::saveNativeBetaProgress() noexcept {
- if(!storage_||!storage_->betaWritable||storage_->betaLock<0||storage_->tournamentResultArmed)return false;
+ if(!storage_||!storage_->betaWritable||!storage_->betaLock.held()||storage_->tournamentResultArmed)return false;
  auto& s=*storage_;using R=native_beta50kg::Result;
  try {
   BetaBytes bytes;bytes.reserve(100000);native_beta50kg::put32(bytes,0x42505252u);native_beta50kg::put32(bytes,1);native_beta50kg::put32(bytes,0);native_beta50kg::put32(bytes,0);

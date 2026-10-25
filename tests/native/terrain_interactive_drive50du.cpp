@@ -1126,6 +1126,12 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   if(isGaTrack)windowRequest.title="Racer Revenge | GA | Player 1 + 7 original AI | Esc pause/menu";
   if(originalUiActive)windowRequest.title="Racer Revenge | Original UI | Arrows select/change | Enter confirm | R defaults | Esc back";
   windowRequest.width=nativeVideo->width;windowRequest.height=nativeVideo->height;
+#if defined(_WIN32)
+  // Presentation only: the retained source Video stays 640x448.
+  if(!headlessLive&&nativeVideo->width==640&&nativeVideo->height==448){
+   windowRequest.width=1280;windowRequest.height=896;
+  }
+#endif
   windowRequest.major=3;windowRequest.minor=2;
   windowRequest.profile=rr::platform::WindowGlProfile50DQ::Core;
   windowRequest.samples=requestedWindowSamples;windowRequest.swapInterval=0;windowRequest.resizable=true;
@@ -8809,7 +8815,11 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     std::cerr<<"GL "<<field<<": "<<(value?reinterpret_cast<const char*>(value):"unavailable")<<'\n';
    }
   }
+  #if defined(_WIN32)
+  constexpr std::int32_t maximumWidth=1280,maximumHeight=896;
+#else
   constexpr std::int32_t maximumWidth=1280,maximumHeight=720;
+#endif
   platform::VehicleWindowRequest50DS renderRequest{};
   sourceDisplayLifetime->bindCreationRequest(renderRequest);
   renderRequest.maximumWidth=maximumWidth;renderRequest.maximumHeight=maximumHeight;
@@ -10750,7 +10760,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
    }
    const bool oversize=info.drawableWidth>maximumWidth||info.drawableHeight>maximumHeight;
    if(oversize&&!oversizeReported){
-    std::cerr<<"Paused: drawable exceeds 1280x720; resize smaller to resume.\n";
+    std::cerr<<"Paused: drawable exceeds "<<maximumWidth<<'x'<<maximumHeight<<"; resize smaller to resume.\n";
     oversizeReported=true;
    }else if(!oversize&&oversizeReported){
     std::cerr<<"Drawable fits again.\n";oversizeReported=false;
@@ -12643,6 +12653,11 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
      checkpointRequested?SessionExit50DU::Checkpoint:(restartRequested?SessionExit50DU::Restart:SessionExit50DU::Quit);
 }
 int main(int argc,char**argv){try{
+#if defined(_WIN32)
+ // Preserve diagnostics even if native ownership cleanup terminates abruptly.
+ std::cout.setf(std::ios::unitbuf);std::cerr.setf(std::ios::unitbuf);
+ std::cerr<<"windows_tester_start source_canvas=640x448 presentation=1280x896 windowed=1 telemetry=0\n";
+#endif
  // A distributable original-disc entry does not require a diagnostic corpus
  // filename. Legacy explicit-corpus invocations remain available for tests.
  const bool discEntry=argc==3&&std::string(argv[1])=="--assets";

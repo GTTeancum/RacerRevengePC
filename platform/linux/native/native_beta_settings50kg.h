@@ -3,7 +3,6 @@
 #include "native_beta_file50kg.h"
 #include "../../../src/game/original_ui_game_options_controller50kg.h"
 #include "../../../src/game/control_presets49d.h"
-#include <sys/file.h>
 
 namespace rr::platform::native_beta50kg {
 class SettingsStore final {
@@ -11,7 +10,7 @@ public:
     SettingsStore()=default;
     SettingsStore(const SettingsStore&)=delete;
     SettingsStore& operator=(const SettingsStore&)=delete;
-    ~SettingsStore(){if(lock_>=0)::close(lock_);}
+    ~SettingsStore()=default;
     // Startup only, before sound-mode/mixer construction. Parse into temporaries
     // and install together; corrupt/unreadable files remain untouched and read-only.
     Result load(const std::filesystem::path& directory,
@@ -24,10 +23,8 @@ public:
             path_=directory/"settings-v1.bin";
             std::error_code ec;std::filesystem::create_directories(directory,ec);
             if(ec)return Result::ioError;
-            lock_=::open((directory/"settings-v1.lock").c_str(),O_RDWR|O_CREAT|O_CLOEXEC|O_NOFOLLOW,0600);
-            if(lock_<0)return Result::ioError;
-            struct stat st{};
-            if(::fstat(lock_,&st)||!S_ISREG(st.st_mode)||::flock(lock_,LOCK_EX|LOCK_NB))return Result::unavailable;
+            const auto locked=lock_.acquire(directory/"settings-v1.lock");
+            if(locked!=Result::ok)return locked;
             Bytes bytes;const auto read=readFile(path_,bytes);
             if(read==Result::missing){writable_=true;return read;}
             if(read!=Result::ok)return read;
@@ -72,7 +69,7 @@ private:
             (std::uint32_t(b[at+2])<<16)|(std::uint32_t(b[at+3])<<24);
     }
     std::filesystem::path path_;
-    int lock_=-1;
+    ProcessLock lock_;
     bool attempted_=false,writable_=false;
 };
 }

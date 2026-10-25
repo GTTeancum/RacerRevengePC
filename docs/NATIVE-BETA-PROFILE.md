@@ -1,6 +1,6 @@
-# v101 native profile and Options usage
+# v104 native profile and Options usage
 
-Implementation draft for the integrated beta candidate. The code described below has been written; this document does not certify a build or runtime smoke check.
+Usage notes for the integrated experimental beta candidate. These describe implemented behavior, not a guarantee of complete beta functionality. The native Windows runtime has not been launched or tested on Windows. Compilation and existing Linux smoke coverage do not establish Windows operation, Windows save correctness, or comprehensive gameplay coverage. Consult the package build and validation receipt for the exact checks performed.
 
 ## What is retained
 
@@ -11,13 +11,26 @@ The beta keeps two separate native user-data files:
 
 These are versioned native beta files, not original PlayStation 2 memory-card images. The beta does not write over an imported original-card file. Saving a split-screen preference does not create a supported two-player race mode.
 
+## Windows save location
+
+The Windows implementation chooses its user-data directory in this order:
+
+1. `RR_NATIVE_SAVE_DIR`, if explicitly present. A deliberately empty override selects no directory.
+2. An absolute `LOCALAPPDATA`, followed by `RacerRevengePC/Saves`.
+
+Normal packaged launchers clear inherited `RR_` overrides, including `RR_NATIVE_SAVE_DIR`, so their default is `%LOCALAPPDATA%\RacerRevengePC\Saves`. `progress-v1.bin` and `settings-v1.bin` are stored there, not beside the EXE or inside the original disc assets. There is no executable-directory fallback when the per-user location is unavailable. Retained in-memory state is not evidence of a successful durable write; check the displayed persistence result.
+
+Native Windows file operations and failure handling are implemented but not runtime-verified on Windows. Back up native save files separately. Do not include them or original game assets in routine diagnostic uploads.
+
+## Linux save location
+
 The Linux implementation chooses its user-data directory in this order:
 
 1. `RR_NATIVE_SAVE_DIR`, when set to a nonempty path.
 2. An absolute `XDG_DATA_HOME`, followed by `racer-revenge`.
 3. `HOME`, followed by `.local/share/racer-revenge`.
 
-An explicitly empty `RR_NATIVE_SAVE_DIR` disables selection of a save directory. If no usable directory is available, the application retains its current session but cannot claim persistence. The current file helper is POSIX-based; this draft does not claim Windows save support.
+An explicitly empty `RR_NATIVE_SAVE_DIR` disables selection of a save directory. If no usable directory is available, the application retains its current session but cannot claim persistence. Linux uses its POSIX file backend; Windows uses the separate native Windows backend described above.
 
 ## Game Options and Controls
 
@@ -72,3 +85,7 @@ Only the first course's PAR value is currently authenticated. For other courses,
 ## Vibration
 
 The race impact-feedback path now consumes the committed Game Options vibration bit instead of always using an enabled default. This feeds the existing actual controller-feedback/SDL rumble path. It does not invent keyboard vibration or claim feedback from an absent, disconnected or unsupported controller. Physical rumble still requires a compatible connected gamepad and a qualifying original gameplay feedback event; changing the option alone does not play a test vibration.
+
+## Windows diagnostics
+
+The packaged CMD launcher writes a new timestamped run folder under `RacerRevenge-logs` beside the package, or `%LOCALAPPDATA%\RacerRevenge\logs` if the package location is not writable. This log directory is separate from `%LOCALAPPDATA%\RacerRevengePC\Saves`. Close the game and ZIP only the selected run folder when returning diagnostics. Logs may include local paths, device/driver details and game selections; review them before sharing. No automatic upload or telemetry is enabled. Original disc assets and imported original memory-card files remain unchanged.

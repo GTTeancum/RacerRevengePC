@@ -87,6 +87,12 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
   auto& window=hostRequest.window;
   window.title="Racer Revenge | Original UI | Arrows select/change | Enter confirm | R defaults | Esc back";
   window.width=nativeVideo->width;window.height=nativeVideo->height;
+#if defined(_WIN32)
+  // Integer-sized host presentation; original Video and source UI remain unchanged.
+  if(!headlessLive&&nativeVideo->width==640&&nativeVideo->height==448){
+   window.width=1280;window.height=896;
+  }
+#endif
   window.major=3;window.minor=2;window.profile=platform::WindowGlProfile50DQ::Core;
   window.samples=0;window.swapInterval=0;window.resizable=true;
   // Physical menu devices belong to this actual frontend window. There is no
@@ -301,6 +307,9 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
   std::int32_t previousDrawableWidth=0,previousDrawableHeight=0;
   bool previousDrawableOversized=false;
   std::uint32_t drawableCapacityReports=0;
+#if defined(_WIN32)
+  std::array<std::int64_t,6> loggedSelection{{-1,-1,-1,-1,-1,-1}};
+#endif
   for(;;){
    if(captureRun.deadlineExpired()){originalMain.requestQuit();break;}
    const bool tracePoll=originalMain.traceStages&&tracePolls<2;
@@ -465,6 +474,21 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
    // Garage Root already committed its exact source timing; PCM was still advanced once.
    if(!acceptedSource.sourceTimingCommitted)originalMain.commitSourceUpdateTiming();
    originalMain.render(mainClock,renderer,info.drawableWidth,info.drawableHeight);
+#if defined(_WIN32)
+   // Change-only human navigation diagnostics, not a per-frame timing trace.
+   {
+    const auto observed=originalMain.coordinator.snapshot();
+    const std::array<std::int64_t,6> selection{{observed.route.screen,observed.route.page,
+        observed.rider.rider4C4,observed.rider.slot4C8,
+        observed.course.selectedCourse44,observed.course.selectedPlanet40}};
+    if(selection!=loggedSelection){
+     std::cerr<<"windows_menu_selection screen="<<selection[0]<<" page="<<selection[1]
+         <<" rider="<<selection[2]<<" slot="<<selection[3]<<" course="<<selection[4]
+         <<" planet="<<selection[5]<<" source_frame="<<originalMain.frameCount<<'\n';
+     loggedSelection=selection;
+    }
+   }
+#endif
    if(!originalMain.coordinator.snapshot().rider.deferred4EC){
     const auto snapshot=originalMain.coordinator.snapshot();
     const auto stage=snapshot.route.screen==4?windows_capture50LD::Stage::main:

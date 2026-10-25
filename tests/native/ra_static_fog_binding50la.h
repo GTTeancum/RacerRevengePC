@@ -75,9 +75,9 @@ class Binding final {
             std::array<float,4> center{{next.center140[0],next.center140[1],next.center140[2],0}};
             if(!rr::game::projectOriginalRacerDistance26F070(center,next.localTranslation,
                 observation.position,next.distanceCandidate))return false;
-            const auto far=rr::game::original_racer_model_view_detail50LA::add(next.distanceCandidate,next.radius194);
-            if(!std::isfinite(far))return false;
-            next.computeFogCandidate02=!(far<observation.source.start34);
+            const auto farDistance=rr::game::original_racer_model_view_detail50LA::add(next.distanceCandidate,next.radius194);
+            if(!std::isfinite(farDistance))return false;
+            next.computeFogCandidate02=!(farDistance<observation.source.start34);
         }
         return current(observation);
     }

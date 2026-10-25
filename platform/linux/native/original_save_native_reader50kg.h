@@ -5,7 +5,7 @@
 #include <vector>
 
 namespace rr::platform {
-// Linux read-only transport, NOT a PS2 memory-card implementation. Nothing
+// Linux/Windows read-only transport, NOT a PS2 memory-card implementation. Nothing
 // constructs this provider in the application. Opening requires explicit opt-in.
 class OriginalSaveNativeReader50KG final:
     public std::enable_shared_from_this<OriginalSaveNativeReader50KG> {
@@ -16,6 +16,7 @@ public:
         notConfigured
     };
     enum class Kind:std::uint8_t {header186E50,payload186C70};
+    // hostErrno contains errno on Linux or GetLastError on Windows.
     struct Diagnostic {Status status=Status::ok;int hostErrno=0;};
     struct Identity {
         std::uint64_t device,inode;
@@ -43,6 +44,8 @@ public:
         std::vector<std::uint8_t> bytes_;
     };
     // Exact absolute directory, no '.', '..', empty components or symlinks.
+    // Windows: UTF-8 local-drive absolute path; UNC/device roots unsupported.
+    // Windows pins every ancestor and rejects reparse points/normalization aliases.
     // No default HOME/XDG/asset-root mapping, mkdir, write, format or delete.
     // Output is unchanged on failure. This function performs IO if called.
     static Status openExplicitRoot(const std::string& absoluteRoot,
@@ -63,8 +66,14 @@ public:
     // preceding header receipt, even if device/inode/identity happen to match.
     Status read(Kind,std::unique_ptr<const Receipt>& out,Diagnostic&)const noexcept;
 private:
+#if defined(_WIN32)
+    struct State;
+    OriginalSaveNativeReader50KG(std::unique_ptr<State>,Identity,std::string);
+    std::unique_ptr<State> windows_;
+#else
     OriginalSaveNativeReader50KG(int,Identity,std::string);
     int rootFd_;
+#endif
     Identity root_;
     std::string rootPath_;
 };

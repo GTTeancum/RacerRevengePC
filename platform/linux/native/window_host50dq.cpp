@@ -366,7 +366,13 @@ bool WindowHost50DQ::create(const WindowHostRequest50DQ& r, WindowHostDiagnostic
     const char* fixedSetting=std::getenv("RR_NATIVE_FIXED_WINDOW");
     if(fixedSetting&&std::strcmp(fixedSetting,"0")&&std::strcmp(fixedSetting,"1"))
         return sdlFail(WindowHostError50DQ::WindowFailure,"RR_NATIVE_FIXED_WINDOW must be 0 or 1");
+    #if defined(_WIN32)
+    // Fixed, non-HiDPI presentation by default keeps a requested 1280x896
+    // client drawable inside the renderer's actual bounded capacity.
+    const bool fixedWindow=!fixedSetting||std::strcmp(fixedSetting,"1")==0;
+#else
     const bool fixedWindow=fixedSetting&&std::strcmp(fixedSetting,"1")==0;
+#endif
     using WindowSizePolicy=void (*)(SdlWindow*,Int,Int);
     using RestoreWindow=void (*)(SdlWindow*);
     WindowSizePolicy setMinimum=nullptr,setMaximum=nullptr,setSize=nullptr;
