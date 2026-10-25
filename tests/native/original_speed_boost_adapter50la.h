@@ -31,7 +31,7 @@ public:
         d={};if(camera_)return false;
         try {
             if(!camera.coldBound_||!camera.readsBound_||camera.closed_||camera.abandoned_||
-               !camera.generation_||camera.actual_.bank.count()!=8||!supportedSourceView(camera))
+               !camera.generation_||(!camera.actual_.bank.count()||camera.actual_.bank.count()>8)||!supportedSourceView(camera))
                 return false;
             if((camera.frameStage_!=Camera::FrameStage::idle&&camera.frameStage_!=Camera::FrameStage::published)||
                !camera.identitiesCurrent()){d.status=Status::phase;return false;}
@@ -53,7 +53,7 @@ public:
                c.generation_!=generation_||c.frameStage_!=Camera::FrameStage::published||
                !c.publicationCount_||!c.completedFrame_||!c.viewport_.prepared||!c.viewport_.matricesReady||
                c.viewport_.sessionGeneration!=generation_){d.status=Status::phase;return false;}
-            if(bank.count()!=8||!supportedSourceView(c)||
+            if((!bank.count()||bank.count()>8)||!supportedSourceView(c)||
                c.controller_.binding.sessionGeneration!=generation_||
                c.controller_.binding.managerIndex!=c.identity_[0].managerIndex||
                c.controller_.binding.racerKey!=Camera::key(c.identity_[0].racerTag)||

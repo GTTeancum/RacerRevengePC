@@ -28,7 +28,7 @@ class Binding final {
  bool thread()const noexcept{return thread_==std::this_thread::get_id();}
  mc_trigger_actions50MC::Owner* actions()const noexcept{return world_?world_->actions_.get():nullptr;}
  bool idleBank()const noexcept {
-  return bank_&&!bank_->retired_&&bank_->sealed_&&bank_->count_==8&&
+  return bank_&&!bank_->retired_&&bank_->sealed_&&bank_->count_>0&&bank_->count_<=8&&
    !bank_->visiting_&&!bank_->readBlocked_&&!bank_->visitDepth_&&!bank_->pendingToken_&&
    !bank_->sourceIssuer_&&!bank_->retirementVisit_&&!bank_->nativeFifoPins_&&
    !bank_->mcAnimationVisit_&&!bank_->mcQueryActive_&&!bank_->gbAnimationVisit_&&!bank_->gbQueryActive_&&!bank_->gbQueryIssuer_;
@@ -63,7 +63,7 @@ class Binding final {
   if(c.phase==P::Idle)return !c.group&&!c.hooks&&!c.querySerial&&!c.triggerCollider&&!c.otherCollider&&
    !c.nextAction&&!c.actionCount&&!c.dispatchCounted;
   if(!everIssued_||!c.querySerial||c.querySerial>serial_||c.querySerial!=a.group_.querySerial||
-    c.group!=&a.group_||c.hooks!=&a.group_.actions||c.triggerIndex>=21||c.colliderIndex>=16||
+    c.group!=&a.group_||c.hooks!=&a.group_.actions||c.triggerIndex>=21||c.colliderIndex>=a.group_.colliders.size()||
     c.triggerCollider!=a.group_.triggers[c.triggerIndex].collider.identity||
     c.otherCollider!=a.group_.colliders[c.colliderIndex].identity||
     c.actionCount!=a.source_->source(c.triggerIndex).actionCount||c.candidateOrdinal>=111)return false;
@@ -96,8 +96,8 @@ public:
     !disjoint(&a,sizeof a)||!disjoint(this,sizeof *this)||!disjoint(chance_.raw,sizeof(*chance_.raw))||!disjoint(chance_.shared,sizeof(*chance_.shared))||!disjoint(chance_.clock,sizeof(*chance_.clock))||bank.mcAnimationBacking_.get()!=world_.get())return undo();
   try{mainRead_=bank.bindRead(mainIdentity);secondaryRead_=bank.bindRead(secondaryIdentity);
    std::array<mc_trigger_actions50MC::RacerIdentities,8> identities{};
-   for(std::size_t i=0;i<8;++i)identities[i]={bank.read(i,mainRead_),bank.read(i,secondaryRead_)};
-   if(!a.bindRacerIdentities(identities,playerPrefixCount34,chance_))return undo();
+   for(std::size_t i=0;i<bank.count();++i)identities[i]={bank.read(i,mainRead_),bank.read(i,secondaryRead_)};
+   if(!a.bindRacerIdentities(identities,playerPrefixCount34,chance_,bank.count()))return undo();
    a.queryBinding_=this;bank.mcQueryIssuer_=this;
    if(!backing()){a.queryBinding_=nullptr;bank.mcQueryIssuer_=nullptr;return undo();}
    return true;
@@ -116,7 +116,7 @@ public:
  // Must enclose the real indexed query, not merely its dispatch call. The
  // actual Bank visit is held by its caller and cannot restore during this loan.
  template<class Operation>bool query(std::size_t peer,bool secondary,Operation&& operation)noexcept {
-  if(!ready()||active_||peer>=8||bank_->mcQueryActive_||bank_->visitDepth_!=1||bank_->currentSlot_!=peer||
+  if(!ready()||active_||peer>=bank_->count_||bank_->mcQueryActive_||bank_->visitDepth_!=1||bank_->currentSlot_!=peer||
     bank_->pendingToken_||bank_->retirementVisit_||bank_->mcAnimationVisit_||bank_->mcAnimationBlocked_||
     serial_==std::numeric_limits<std::uint64_t>::max())return false;
   auto borrow=world_->query();if(!borrow)return false;auto* storage=borrow.storage();auto& a=*actions();
@@ -136,7 +136,7 @@ public:
   }catch(...){return failQuery();}
  }
  bool observePrepared(std::uint32_t collider,const g::Type2ResourceView49X& resource,const g::BodyMatrix48G& matrix)noexcept {
-  if(!thread()||fenced_||!backing()||bank_->visitDepth_!=1||bank_->currentSlot_>=8||bank_->pendingToken_||bank_->retirementVisit_)return false;
+  if(!thread()||fenced_||!backing()||bank_->visitDepth_!=1||bank_->currentSlot_>=bank_->count_||bank_->pendingToken_||bank_->retirementVisit_)return false;
   const auto peer=bank_->currentSlot_;const auto& a=*actions();
   if(*main_!=a.racers_[peer].main690||*secondary_!=a.racers_[peer].secondary||
     (collider!=*main_&&collider!=*secondary_))return false;
@@ -186,7 +186,7 @@ public:
     terminal_.completedPeers|=static_cast<std::uint16_t>(1u<<peer);return true;
    }))return reject(TerminalStatus::Peer);
   }catch(...){return reject(TerminalStatus::Peer);}
-  if(terminal_.completedPeers!=0xffu||!idleBank())return reject(TerminalStatus::Peer);
+  if(terminal_.completedPeers!=static_cast<std::uint16_t>((1u<<bank_->count_)-1u)||!idleBank())return reject(TerminalStatus::Peer);
   const auto validation=g::validateNativeTriggerTerminalGraph50MC(a.group_);
   terminal_.owner=validation.owner;terminal_.slot=validation.slot;
   if(!validation.valid)return reject(TerminalStatus::Contacts);

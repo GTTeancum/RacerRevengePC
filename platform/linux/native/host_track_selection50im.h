@@ -13,7 +13,7 @@ struct HostTrackAdmission50IM {
     // actual ALL8, camera, trigger, audio, water/effect and GPU owners. This
     // does not imply profile unlocks or completed destination preparation.
     bool gcNativeWorldRequested = false;
-    bool raNativeWorldRequested = false; // Explicit bounded native RA cold request; runtime checks remain mandatory.
+    bool raNativeWorldRequested = false; // Normal rooted human Course or explicit legacy ALL8 request; runtime ownership checks remain mandatory.
     bool mbNativeWorldRequested = false; // Shared native cold request capability; original profile unlocks and actual owners are independent.
     bool scNativeWorldRequested = false; // Shared native cold request capability; original profile unlocks and actual owners are independent.
     bool tcNativeWorldRequested = false; // Shared native cold request capability; original profile unlocks and actual owners are independent.

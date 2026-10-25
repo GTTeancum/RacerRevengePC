@@ -49,9 +49,9 @@ public:
         g::OriginalRaceConstructor50LA* consumedRace=nullptr,
         original_pause_cold50LA::Owner* pause=nullptr)noexcept {
         d={};
-        if(attempted_||retired_||!aggregate_||!generation_||bank_.count()!=8u||
+        if(attempted_||retired_||!aggregate_||!generation_||(!bank_.count()||bank_.count()>8u)||
            bool(consumedRace)!=bool(pause))
-            return fail(d,"RA construction requires the same fresh sealed eight-racer session");
+            return fail(d,"RA construction requires the same fresh sealed active-roster session");
         attempted_=true;
         try {
             const auto prefix=aggregate_->completedPrefixes();
@@ -73,7 +73,7 @@ public:
             roster_=ra_cold_roster50LA::Operation::bind(aggregate_,application_,bank_,arena,
                 std::move(constructorProbe),d.roster,std::move(owners));
             if(!roster_)return false;
-            d.operation="eight original racer constructors";
+            d.operation="active original racer constructors";
             for(std::size_t slot=0;slot<bank_.count();++slot)
                 if(!roster_->constructSlot(bank_,slot,d.roster))return false;
             // Every constructor precedes every grid; every grid precedes every
@@ -138,7 +138,7 @@ public:
         if(!aggregate_)return fail(d,"RA aggregate was not retained");
         if(cameraAttempted_&&aggregate_->closeRuntimeSourceCamera(d.aggregate).status!=
             original_camera_session50KX::Status::complete)return false;
-        for(std::size_t slot=8;slot-->0;){
+        for(std::size_t slot=bank_.count();slot-->0;){
             if(freshAttempted_[slot]&&!aggregate_->retireRuntimeFreshSlot(bank_,slot,d.aggregate))return false;
             freshAttempted_[slot]=false;
             if(gridAttempted_[slot]&&!aggregate_->retireRuntimeGridSlot(bank_,slot,d.aggregate))return false;

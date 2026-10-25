@@ -3,6 +3,7 @@
 #include <memory>
 #include <utility>
 
+namespace original_main_entry50KG {struct Application;}
 namespace rr::assets {
 // One native application lifetime for authenticated APPSTART and its genuine
 // DefaultMT/ScreenMT template objects. No material-registry row, reference
@@ -12,6 +13,24 @@ namespace rr::assets {
 class OriginalUiMaterialApplication50LA final {
     std::shared_ptr<const OriginalUiArchive50KG> appStart_;
     OriginalUiMaterialTemplates50KG templates_;
+    std::shared_ptr<OriginalStandardTextureResolver50LA> sourceResolver_;
+    friend struct ::original_main_entry50KG::Application;
+    // Only the actual Application continuation can enter this source path.
+    // Pin input and reader BEFORE work; partial template fields remain in the
+    // same persistent templates_ on failure, and cannot fall back to legacy.
+    bool prepareSourceApplication(std::shared_ptr<const OriginalUiArchive50KG> appStart,
+        std::shared_ptr<OriginalStandardTextureResolver50LA> resolver,
+        std::shared_ptr<OriginalStandardProgramTable50LA> programs,
+        OriginalUiMaterialDiagnostic50KG& diagnostic) noexcept {
+        diagnostic={};
+        if(appStart_||sourceResolver_){diagnostic.error=OriginalUiMaterialError50KG::alreadyLoaded;return false;}
+        if(!appStart||!appStart->loaded()||!resolver||!programs||
+           appStart->identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::appStart)){
+            diagnostic.error=OriginalUiMaterialError50KG::archive;return false;
+        }
+        appStart_=std::move(appStart);sourceResolver_=std::move(resolver);
+        return templates_.loadSourceApplication(*appStart_,*sourceResolver_,std::move(programs),diagnostic);
+    }
 public:
     OriginalUiMaterialApplication50LA() noexcept=default;
     OriginalUiMaterialApplication50LA(const OriginalUiMaterialApplication50LA&)=delete;

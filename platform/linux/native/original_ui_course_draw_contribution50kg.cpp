@@ -280,6 +280,7 @@ bool OriginalUiCourseDrawContribution50KG::projectPage(game::OriginalUiCoursePag
  const auto collect=[&](const auto* packets){if(!packets)return fail(d,E::geometry);
   std::size_t ordinal=0;
   for(const auto& p:*packets){
+   if(!s.tournament&&ordinal>=3&&!page.eventDetailVisible()){++ordinal;continue;}
    if(s.tournament&&(ordinal==0||ordinal==3||ordinal==4||ordinal==5||ordinal==23)){
     const auto stage=std::uint8_t(ordinal==0?0:ordinal==3?1:ordinal==4?2:ordinal==5?3:4);
     game::OriginalUiCoursePageDrawDiagnostic50KG detail;

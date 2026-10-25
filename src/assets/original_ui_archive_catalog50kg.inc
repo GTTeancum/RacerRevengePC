@@ -18,6 +18,28 @@ constexpr OriginalUiArchiveIdentity50KG archiveCatalog[] = {
     {OriginalUiArchiveId50KG::hallOfFame, "UI/UIHOF/UIHOF.RES", 598215u, "568f79e42c9ac86e5607d19bff81275562c413db9c920d73cf2169109c72961e", 1284u, 22u},
     {OriginalUiArchiveId50KG::garage, "UI/UIGARAGE/UIGARAGE.RES", 1926215u, "fdc7af917de37df46c3801323092e7abde1a2056df242825faf3e4b45fef57da", 1306u, 170u},
     {OriginalUiArchiveId50KG::garagePod19, "UI/UIGARAGE/19E.RES", 116288u, "72d443450ac68811cbd75491357d730ed9715478864957abd77a8bac56d760c6", 1476u, 4u},
+    {OriginalUiArchiveId50KG::garagePod01, "UI/UIGARAGE/01E.RES", 96769u, "0a349ff93df989a26d1e54513d8e241414ef8935a3c403bc0cc78ffb383a7a1b", 1480u, 4u},
+    {OriginalUiArchiveId50KG::garagePod02, "UI/UIGARAGE/02E.RES", 89989u, "3329116863a8ae8400766b14173c3611a58ebfb273cd22fe4e6cc39d387c706c", 1484u, 4u},
+    {OriginalUiArchiveId50KG::garagePod03, "UI/UIGARAGE/03E.RES", 84989u, "693860e615913fcad34b01cd07b23e4d31aa73c9eed61c78b247cdf929faeba6", 1488u, 4u},
+    {OriginalUiArchiveId50KG::garagePod04, "UI/UIGARAGE/04E.RES", 75383u, "6e798f8ae49e3d6b164548b1cc3634cf79a361ea75165514c2ac5345b15bc5dd", 1492u, 4u},
+    {OriginalUiArchiveId50KG::garagePod07, "UI/UIGARAGE/07E.RES", 82478u, "ccb07ed6b076ddcdd374e3e1678fcea09a524d47687d86cc5b91dd9106c9c88d", 1496u, 4u},
+    {OriginalUiArchiveId50KG::garagePod08, "UI/UIGARAGE/08E.RES", 97878u, "8ee74b22090f5949eec7d8aadb36208b0829e05d5c67eef79e27aeb66c08341a", 1500u, 4u},
+    {OriginalUiArchiveId50KG::garagePod09, "UI/UIGARAGE/09E.RES", 92331u, "e9d1f0fd0f7b668af35eaf8432192222b1d6f9af487665f64cf24604277989cc", 1504u, 4u},
+    {OriginalUiArchiveId50KG::garagePod10, "UI/UIGARAGE/10E.RES", 78482u, "41042408e980e9c1623a83fcf8978d9f4aec6e053e922b4f9988f7b2cb8c71ba", 1508u, 4u},
+    {OriginalUiArchiveId50KG::garagePod11, "UI/UIGARAGE/11E.RES", 82302u, "145bb290f3d3ebe23795ac445fd12a19924eaba609c77f56a0e9432bd070511f", 1512u, 4u},
+    {OriginalUiArchiveId50KG::garagePod12, "UI/UIGARAGE/12E.RES", 125797u, "311d5227485e9b7ead99418e1f75741477c5848c7dcc37c45c2052061787ef10", 1516u, 4u},
+    {OriginalUiArchiveId50KG::garagePod14, "UI/UIGARAGE/14E.RES", 82257u, "906d4bbe932652f7fa6fe8f6c3e9bb960292784a36ddbe0eeb70f323277563ab", 1520u, 4u},
+    {OriginalUiArchiveId50KG::garagePod15, "UI/UIGARAGE/15E.RES", 84936u, "7a9b6cd48b9fa5d02bcd543b7512527a5ec3f96d6947ab10b4d76693604594b0", 1524u, 4u},
+    {OriginalUiArchiveId50KG::garagePod16, "UI/UIGARAGE/16E.RES", 72951u, "6cd8ac581839f510938ef1061aabc6ba470b3edf805193dd3435d7bb3858ff23", 1528u, 4u},
+    {OriginalUiArchiveId50KG::garagePod17, "UI/UIGARAGE/17E.RES", 92655u, "f96ddbd29f8e05adc5f3801a7e7239bad99e10ad952a6937b6f51c7c9879b2a6", 1532u, 4u},
+    {OriginalUiArchiveId50KG::garagePod18, "UI/UIGARAGE/18E.RES", 91832u, "ac440ae531c16466d7aa6a102632839fb1e3df6284fe31191344bb96ee36318a", 1536u, 4u},
+    {OriginalUiArchiveId50KG::garagePod20, "UI/UIGARAGE/20E.RES", 88137u, "295e46e4b7bf2a6febe3a8edb3cf54785260de19fe1aa60d07d84ece61517a94", 1540u, 4u},
+    {OriginalUiArchiveId50KG::garagePod21, "UI/UIGARAGE/21E.RES", 88826u, "647a9b54c97567656188ed8661fd055558ade11ff2d3a486bc321b0198209442", 1544u, 4u},
+    {OriginalUiArchiveId50KG::garagePod22, "UI/UIGARAGE/22E.RES", 114964u, "6a29047b609625969790fb4f8fdbda55a42736a2d09a0cec04a248ba3a156cdc", 1548u, 4u},
+    {OriginalUiArchiveId50KG::garagePod23, "UI/UIGARAGE/23E.RES", 104880u, "5c12e45267b62f2a4b14f7ecc529ed4e1732b34500ae7357148d8d2daa2a4a46", 1552u, 4u},
+    {OriginalUiArchiveId50KG::garagePod24, "UI/UIGARAGE/24E.RES", 88662u, "321c7c361f4ff7cf182ba364f397cfd491fe3d65770d2a5a689a4cfa4aa449c0", 1556u, 4u},
+    {OriginalUiArchiveId50KG::garagePod25, "UI/UIGARAGE/25E.RES", 108908u, "55fe65ca1b218b627d66e0a50e60d716bd22d47f543a025ff3d0d32887114c43", 1560u, 4u},
+    {OriginalUiArchiveId50KG::garagePod26, "UI/UIGARAGE/26E.RES", 98832u, "2600f337da877c5f73f8b991412c021ee486d130bfd4e02ae593486b795e4331", 1564u, 4u},
 };
 constexpr OriginalUiMemberIdentity50KG memberCatalog[] = {
     {"AppStart\\Mat_Stbl.txt", 0u, 70962u, "a3b786f57a1a5f468e649a7f1b3d076a95c318a2fab2f622b754038d01dedd35"},
@@ -1327,5 +1349,6 @@ constexpr OriginalUiMemberIdentity50KG memberCatalog[] = {
     {"font\\denmrk14top.psm", 1572864u, 1090u, "fdc8a373d7c017b1eb9cd5872d45cdf2bfbd020345b6f51cea26b4bb509fb450"},
     {"UI\\Textures\\tat_bkg.pst", 1597440u, 287772u, "bb0f37a5ddf5e0cf99bdb3417f11f4c947ffd10a5fdb9b6ec9ea3ac7b22feab9"},
 #include "original_ui_garage_member_catalog50kg.inc"
+#include "original_ui_garage_selected_member_catalog50kg.inc"
 };
 

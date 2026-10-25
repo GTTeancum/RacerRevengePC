@@ -54,8 +54,8 @@ struct Math {
     }
 };
 bool bankValid(const RaceStartRacerBank& b) noexcept {
-    if(!b.sessionGeneration)return false;
-    for(std::size_t i=0;i<8;++i){
+    if(!b.sessionGeneration||!b.racerCount||b.racerCount>8)return false;
+    for(std::size_t i=0;i<b.racerCount;++i){
         if(!b.racers[i].racerKey||!b.racers[i].bodyNodeKey)return false;
         for(std::size_t j=0;j<i;++j)
             if(b.racers[i].racerKey==b.racers[j].racerKey||b.racers[i].bodyNodeKey==b.racers[j].bodyNodeKey)return false;
@@ -63,8 +63,8 @@ bool bankValid(const RaceStartRacerBank& b) noexcept {
     return true;
 }
 bool matches(const C& c,const RaceStartRacerBank& b) noexcept {
-    if(!bankValid(b)||c.sessionGeneration!=b.sessionGeneration)return false;
-    for(std::size_t i=0;i<8;++i)
+    if(!bankValid(b)||c.sessionGeneration!=b.sessionGeneration||c.racerCount!=b.racerCount)return false;
+    for(std::size_t i=0;i<b.racerCount;++i)
         if(c.racerKeys[i]!=b.racers[i].racerKey||c.bodyNodeKeys[i]!=b.racers[i].bodyNodeKey)return false;
     return true;
 }
@@ -278,11 +278,15 @@ RaceStartStatus prepareOriginalRaceStartCamera(C& destination,const RaceStartRac
     RaceStartPreparationReceipt& receipt) noexcept {
     if(!bankValid(bank))return RaceStartStatus::invalidOwner;
     if(std::fegetround()!=FE_TONEAREST)return RaceStartStatus::unsupportedNumericDomain;
-    C next{};next.sessionGeneration=bank.sessionGeneration;
+    C next{};next.sessionGeneration=bank.sessionGeneration;next.racerCount=bank.racerCount;
     next.directionFilter={{{0,1.2f,1},{0,1.2f,1},{0,1.2f,1}}};
     next.positionFilter={{{0,0.6f,1},{0,0.6f,1},{0,0.6f,1}}};
     next.fovFilter={35,0.8f,1};
-    for(std::size_t i=0;i<8;++i){next.racerKeys[i]=bank.racers[i].racerKey;next.bodyNodeKeys[i]=bank.racers[i].bodyNodeKey;}
+    for(std::size_t i=0;i<bank.racerCount;++i){next.racerKeys[i]=bank.racers[i].racerKey;next.bodyNodeKeys[i]=bank.racers[i].bodyNodeKey;}
+    //2D53A4..2D53B4: fewer than eight actual racers leaves route[0]=-1.
+    //The constructed child is retained, but procedural preparation did not succeed.
+    //No grid access and no shared RNG draw occur on this authored branch.
+    if(bank.racerCount<8){destination=next;receipt={};return RaceStartStatus::ok;}
     Math math;auto stagedGlobals=globals;auto stagedRaw=shared.sharedRandomState;
     RaceStartPreparationReceipt stagedReceipt{};
     Random random{math,stagedGlobals,stagedRaw,samples,stagedReceipt};

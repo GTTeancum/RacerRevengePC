@@ -105,9 +105,18 @@ private:
             return fail(d,S::source,0x132820,"garage.model.provider.lookup132820");
         // These are exact archive identities, not arbitrary supplied PSGs.
         const auto* archive=source->archive->identity();
-        if(archive!=assets::originalUiArchiveIdentity50KG(assets::OriginalUiArchiveId50KG::garage)&&
-           archive!=assets::originalUiArchiveIdentity50KG(assets::OriginalUiArchiveId50KG::garagePod19))
+        const int selectedCareer=archive?assets::originalUiGaragePodCareer50KG(archive->id):-1;
+        const bool selectedArchive=selectedCareer>=0&&
+            archive==assets::originalUiGaragePodArchive50KG(static_cast<std::uint32_t>(selectedCareer));
+        if(!source->archive->loaded()||
+           (archive!=assets::originalUiArchiveIdentity50KG(assets::OriginalUiArchiveId50KG::garage)&&
+            !selectedArchive))
             return fail(d,S::source,0x132820,"garage.model.archive.identity");
+        // Every authenticated selected E archive has its exact single PSG at
+        // ordinal1. Do not admit a different catalog member just because its
+        // archive belongs to the selected-pod family.
+        if(selectedArchive&&source->source.identity!=assets::originalUiMemberIdentity50KG(archive->id,1))
+            return fail(d,S::source,0x132820,"garage.model.selected.geometry.identity");
         // This public immutable descriptor must still retain the exact archive
         // view and its matching decoded payload/hierarchy. A genuine identity
         // alone cannot authenticate a substituted PSG or a foreign row view.

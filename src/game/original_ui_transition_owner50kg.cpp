@@ -157,8 +157,19 @@ Status OriginalUiTransitionOwner50KG::requestRouteDecision(const OriginalUiRoute
         request.sourceScreen!=state_.current.screen || request.sourcePage!=state_.current.page)
         return Status::invalidDecision;
     if (request.kind==Kind::courseLaunch) {
+        // Mode0 has eight writes including remembered choices. Tournament
+        // mode2 has only four, with its distinct fixed subtype/lap source PCs.
+        // The actual profile owner below replays and compares every write.
+        const auto& changes=decision.profileChanges;
+        const bool tournament=changes.count==4&&
+            changes.values[2].field==OriginalUiProfileField50KG::subtype11258&&
+            changes.values[2].operation==OriginalUiProfileWrite50KG::word&&
+            changes.values[2].value==1&&changes.values[2].sourcePC==0x1DEEB0&&
+            changes.values[3].field==OriginalUiProfileField50KG::packed1125C&&
+            changes.values[3].operation==OriginalUiProfileWrite50KG::maskedByte&&
+            changes.values[3].replaceMask==0x1f&&changes.values[3].value==3&&changes.values[3].sourcePC==0x1DEEE4;
         if(state_.current.screen!=6||state_.current.page!=1||request.targetScreen||request.targetPage||
-           request.sourcePC!=0x1DED58||decision.inputPC!=0x1DEB90||decision.profileChanges.count!=8)
+           request.sourcePC!=0x1DED58||decision.inputPC!=0x1DEB90||(changes.count!=8&&!tournament))
             return Status::invalidDecision;
         if(!callbacks_.admitCourseLaunch||!callbacks_.commitRouteSelection||!callbacks_.queueApplication)
             return Status::missingCallback;

@@ -18,10 +18,11 @@ bool audio(P& p,K k,std::uint32_t pc)noexcept {if(p.count==p.steps.size())return
 bool prompt(P& p,std::uint32_t mask,std::uint32_t pc)noexcept {if(p.count==p.steps.size())return false;p.steps[p.count++]={K::promptMask42C,0,O::hide,false,pc,mask};p.writesPromptMask42C=true;p.promptMask42C=mask;return true;}
 bool bounded(const OriginalUiCourseWidgetProfile50KG& p)noexcept {
  constexpr std::array<std::uint8_t,13> order{{0,11,4,8,7,1,5,9,12,6,10,3,2}};
- return p.mode34==0&&p.course700>=1&&p.course700<=13&&p.subtype70C==1&&!(p.flags100BC&1)&&(p.flags11018&31u)>=1&&(p.flags11018&31u)<=13&&((p.flags1125C>>5)&3)<2&&p.courseRecords100C4==order;}
+ return p.mode34==0&&p.course700>=1&&p.course700<=13&&p.subtype70C>=1&&p.subtype70C<=3&&!(p.flags100BC&1)&&(p.flags11018&31u)>=1&&(p.flags11018&31u)<=13&&((p.flags1125C>>5)&3)<2&&p.courseRecords100C4==order;}
 bool boundedFreshTournament(const OriginalUiCourseWidgetProfile50KG& p)noexcept {
  constexpr std::array<std::uint8_t,13> order{{0,11,4,8,7,1,5,9,12,6,10,3,2}};
- if(p.mode34!=2||p.career100C0!=19||p.progress219C!=0||p.courseSlot14E4!=1||p.tier14E8!=1||
+ if(p.mode34!=2||p.career100C0>=27||p.career100C0!=p.selectedRider||!p.selectedUnlock10FAC||
+    p.progress219C!=0||p.courseSlot14E4!=1||p.tier14E8!=1||
     (p.flags100BC&1)||((p.flags1125C>>5)&3)!=1||p.courseRecords100C4!=order)return false;
  for(auto medal:p.medals1938)if(medal)return false;
  return true;
@@ -51,16 +52,32 @@ S OriginalUiCourseWidgetController50KG::moveCourse(const OriginalUiNavigation50K
     if(!slot||slot>page()->groups[1].controls.size()||!control(p,page()->groups[1].controls[slot-1],O::reset,false,0x2A5A38))return S::invalidNavigation;
     out=p;return S::ok;
 }
+S OriginalUiCourseWidgetController50KG::moveEventType(const OriginalUiNavigation50KG& n,bool forward,
+    const OriginalUiCourseWidgetProfile50KG& profile,P& out)const noexcept {
+    if(!storage_)return S::notBound;if(n.page!=page())return S::page;if(!bounded(profile))return S::unsupportedProfile;
+    if(n.controllerGroup[0]!=2||!n.groups[2].enabled)return S::invalidNavigation;
+    P p;p.navigation=n;OriginalUiCommands50KG commands;
+    //1DF210/1DF4C8 move the real group2;1DF224/1DF4DC read its slot.
+    if(moveOriginalUiControl50KG(p.navigation,2,forward,commands)!=OriginalUiNavigationStatus50KG::ok||!expand(p,commands))return S::invalidNavigation;
+    const auto subtype=p.navigation.groups[2].selectedSlot;
+    if(subtype<1||subtype>3)return S::invalidNavigation;
+    //2A4C70/2A4D20 show/hide controls then associations, not enable/disable.
+    if(!group(p,3,subtype==3?O::hide:O::show,false,
+        subtype==3?0x2A4D58:0x2A4CA8,subtype==3?0x2A4D8C:0x2A4CDC))return S::capacity;
+    out=p;return S::ok;
+}
 S OriginalUiCourseWidgetController50KG::moveRow(const OriginalUiNavigation50KG& n,bool down,
     const OriginalUiCourseWidgetProfile50KG& profile,P& out)const noexcept {
     if(!storage_)return S::notBound;if(n.page!=page())return S::page;if(!bounded(profile))return S::unsupportedProfile;
     const auto old=n.controllerGroup[0];
     if(old<1||old>3||n.controllerGroup[1]!=-1||!n.groups[1].enabled||!n.groups[2].enabled||!n.groups[3].enabled||
        !n.groups[1].selectedSlot||n.groups[1].selectedSlot>page()->groups[1].controls.size()||
-       n.groups[2].selectedSlot!=1||n.groups[3].selectedSlot!=0)return S::invalidNavigation;
+       (n.groups[2].selectedSlot<1||n.groups[2].selectedSlot>3)||n.groups[3].selectedSlot!=0)return S::invalidNavigation;
     // Source1DF674/1DF810 choose the destination explicitly, not by scanning
     // every enabled group (the enabled Back/Confirm groups are not rows).
-    const auto id=static_cast<std::size_t>(down?(old==3?1:old+1):(old==1?3:old-1));
+    const auto last=n.groups[2].selectedSlot==3?2:3;
+    if(old>last)return S::invalidNavigation;
+    const auto id=static_cast<std::size_t>(down?(old==last?1:old+1):(old==1?last:old-1));
     P p;p.navigation=n;const auto& previous=page()->groups[static_cast<std::size_t>(old)];
     //2A6A80 -> 2A4E40: associations first, then controls in authored order.
     for(auto c:previous.associations)if(!control(p,c,O::deselect,false,0x2A4E78))return S::capacity;
@@ -84,10 +101,11 @@ S OriginalUiCourseWidgetController50KG::moveLaps(const OriginalUiNavigation50KG&
     if(!storage_)return S::notBound;if(n.page!=page())return S::page;if(!bounded(profile))return S::unsupportedProfile;
     if(n.controllerGroup[0]!=3||n.controllerGroup[1]!=-1||!n.groups[1].enabled||!n.groups[2].enabled||!n.groups[3].enabled||
        !n.groups[1].selectedSlot||n.groups[1].selectedSlot>page()->groups[1].controls.size()||
-       n.groups[3].selectedSlot!=0||n.groups[2].selectedSlot!=1||laps<1||laps>25)return S::invalidNavigation;
+       n.groups[3].selectedSlot!=0||(n.groups[2].selectedSlot!=1&&n.groups[2].selectedSlot!=2)||laps<1||laps>(n.groups[2].selectedSlot==2?8u:25u))return S::invalidNavigation;
     OriginalUiCourseLapMove50KG next;
-    next.laps14EC=forward?(laps==25?1:laps+1):(laps==1?25:laps-1);
-    next.sourcePC=forward?0x1DF5C4:0x1DF310;
+    const auto maximum=n.groups[2].selectedSlot==2?8u:25u;
+    next.laps14EC=forward?(laps==maximum?1:laps+1):(laps==1?maximum:laps-1);
+    next.sourcePC=n.groups[2].selectedSlot==2?(forward?0x1DF604:0x1DF350):(forward?0x1DF5C4:0x1DF310);
     next.audioPC=forward?0x1DF64C:0x1DF398;next.effectId=forward?4u:3u;
     // Source bits3F266666. The host supplies physical input edges; retained
     // timer writes do not claim that original held-input repeat is joined.
@@ -113,6 +131,7 @@ S OriginalUiCourseWidgetController50KG::phase(const OriginalUiNavigation50KG& n,
  }else{
   if(ok)ok=enable(p,2,true);if(ok){if(selectOriginalUiGroupSlot50KG(p.navigation,2,static_cast<std::uint16_t>(profile.subtype70C),commands)!=OriginalUiNavigationStatus50KG::ok)return S::invalidNavigation;ok=expand(p,commands);}
   if(ok)ok=enable(p,3,true);
+  if(ok&&profile.subtype70C==3)ok=group(p,3,O::hide,false,0x2A4D58,0x2A4D8C);
  }
  const auto slot=tournament?profile.courseSlot14E4:profile.course700;
  if(ok){if(enterOriginalUiGroup50KG(p.navigation,1,static_cast<std::uint16_t>(slot),0,commands)!=OriginalUiNavigationStatus50KG::ok)return S::invalidNavigation;ok=expand(p,commands);}

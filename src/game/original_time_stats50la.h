@@ -556,7 +556,7 @@ public:
         OriginalTimeStatsDiagnostic50LA& d)noexcept {
         d={};nativeDraw_.prepared=false;nativeDraw_.quadCount=nativeDraw_.packetCount=0;
         if(!nativeCpuResourcesPrepared()||!frame.viewport||!frame.preferences||frame.viewIndex||
-           frame.count!=8||frame.selectedSlot>=frame.count||frame.raceMode8C!=0||
+           (!frame.count||frame.count>frame.records.size())||frame.selectedSlot>=frame.count||frame.raceMode8C!=0||
            (frame.raceFlags1B0&3u)!=1u||frame.sessionGeneration!=entity_.session||
            !frame.cameraPublication||frame.cameraPublication<nativeDraw_.cameraPublication)
             return stop(d,Error::phase,0x194FF0);

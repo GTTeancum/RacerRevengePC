@@ -11,7 +11,7 @@ namespace ra_cold_aggregate50LA { class Owner; }
 namespace ra_cold_roster50LA {
 namespace g=rr::game;namespace a=rr::assets;
 class Operation;
-// One-time adoption of the EXISTING eight objects, before world reservation.
+// One-time adoption of the EXISTING active roster objects (capacity eight), before world reservation.
 // Unique-pointer movement changes no Rig/COL address. No public array getter:
 // the private stable array is the future aggregate grid/camera borrow.
 struct SharedOwners final {
@@ -26,17 +26,21 @@ class Resources final {
     const std::array<std::unique_ptr<native_racer_collision50HW::Owner>,8>& collisions_;
     std::array<std::vector<std::uint8_t>,8> aiSources_;
     std::array<std::vector<std::uint8_t>,6> effects_;
+    std::uint32_t humanCount_=0;
+    std::size_t racerCount_=8;
     explicit Resources(std::shared_ptr<SharedOwners> owners)
         :owners_(std::move(owners)),rigs_(owners_->rigs),collisions_(owners_->collisions){}
 public:
     Resources(const Resources&)=delete;Resources& operator=(const Resources&)=delete;
     static std::shared_ptr<const Resources> adopt(
-        std::shared_ptr<SharedOwners> owners,std::string& error) noexcept {
+        std::shared_ptr<SharedOwners> owners,std::string& error,std::uint32_t humanCount=0,std::size_t racerCount=8) noexcept {
         try {
+            if(!racerCount||racerCount>8u||humanCount>1u||humanCount>racerCount)throw std::runtime_error("RA roster requires zero or one actual human");
             if(!owners)throw std::runtime_error("actual retained roster storage absent");
             auto result=std::shared_ptr<Resources>(new Resources(std::move(owners)));
+            result->humanCount_=humanCount;result->racerCount_=racerCount;
             const auto& rigs=result->rigs_;const auto& collisions=result->collisions_;
-            for(std::size_t slot=0;slot<8;++slot){
+            for(std::size_t slot=0;slot<racerCount;++slot){
                 const auto* rig=rigs[slot].get();const auto* collision=collisions[slot].get();
                 if(!rig||!collision||!collision->prepared()||(rig->modelCount!=3u&&rig->modelCount!=5u))
                     throw std::runtime_error("actual original roster owners or bounded model roles absent");

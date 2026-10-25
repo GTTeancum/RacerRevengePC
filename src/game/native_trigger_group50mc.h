@@ -50,7 +50,7 @@ struct SourceTriggerContactReceipt50MC {
 };
 struct NativeTriggerGroup50MC {
  std::array<TriggerEntryState50IN,nativeTriggerCount50MC> triggers{};
- std::array<TriggerColliderContacts50IN,nativeTriggerColliderCount50MC> colliders{};
+ TriggerColliderStorage50IN<nativeTriggerColliderCount50MC> colliders{};
  std::array<std::uint32_t,nativeTriggerCount50MC> ignoreCollider{};
  std::array<std::array<std::uint32_t,8>,nativeTriggerCount50MC> ignoreColliders{};
  std::array<std::size_t,nativeTriggerCount50MC> ignoreColliderCount{};

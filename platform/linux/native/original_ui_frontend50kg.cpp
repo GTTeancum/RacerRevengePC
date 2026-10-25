@@ -6,6 +6,7 @@
 #include "../../../tests/native/original_race_display_lifetime50la.h"
 // Source-reviewed bounded Course/Tournament integration; runtime acceptance is pending.
 #include "original_ui_frontend50kg.h"
+#include "original_ui_overlay_text_storage50kg.h"
 #include "original_ui_memory_card_constructor50kg.h"
 #include "original_save_profile_owner50kg.h"
 #include "original_save_native_read_stage50kg.h"
@@ -183,6 +184,7 @@ struct OriginalUiFrontend50KG::Storage {
                         viewportSelected?cameraStorage:std::shared_ptr<game::OriginalFrontendCameraCold50LA>{});
             }
             bool constructionAbortCurrent()const noexcept {
+                if(!overlayStorageAbortCurrent())return false;
                 if(viewportReservation&&!viewportReservationCurrent())return false;
                 if(construction&&construction->cameraAcquired_&&
                    (!cameraStorage||construction->cameraOwner_!=cameraStorage.get()||
@@ -196,6 +198,7 @@ struct OriginalUiFrontend50KG::Storage {
             }
             bool abortConstructionNative()noexcept {
                 if(!constructionAbortCurrent())return false;
+                if(!abortOverlayStorageNative())return false;
                 std::shared_ptr<::original_main_entry50KG::RaceDisplayLifetime50LA> retiredViewport;
                 if(viewportReservation){
                     // Native cancellation drops only this reservation/pin. Drain
@@ -221,6 +224,44 @@ struct OriginalUiFrontend50KG::Storage {
                 // acquired Camera, then Video effect, then manager registration.
                 if(!abortConstructionNative())std::terminate();
             }
+            // Native pre-counted source owners, not copies of Widgets' rendering
+            // projection. Only this SAME OptionsNativeInputs may allocate/use them.
+            static bool inertComponent(const game::OriginalWreckComponent50LA& c)noexcept {
+                return !c.reference00&&!c.sessionGeneration&&!c.objectKey&&!c.nativeEffectControlId&&
+                    c.kind==game::OriginalWreckComponentKind50LA::unbound&&!c.previous10&&!c.next14&&
+                    !c.firstChild18&&!c.parent1C&&!c.mask20&&!c.descendants24&&!c.category28&&!c.flags29;
+            }
+            struct Row;
+            struct OptionsTextOverlayStorage {
+                const OptionsNativeInputs* const inputs;
+                const Row* const row;
+                const std::thread::id thread=std::this_thread::get_id();
+                game::OriginalWreckComponent50LA entity;
+                OriginalUiTextOverlayFields50KG fields;
+                // No ScreenText30 or Font34 acquisition occurs in storage prep.
+                // Later29CA40 must own those actual payloads before publishing them.
+                bool sourceConstructed=false,sourcePublished=false;
+                OptionsTextOverlayStorage(const OptionsNativeInputs* i,const Row* r)noexcept:inputs(i),row(r){}
+                bool inert()const noexcept {
+                    return thread==std::this_thread::get_id()&&!sourceConstructed&&!sourcePublished&&inertComponent(entity);
+                }
+                ~OptionsTextOverlayStorage()noexcept {if(!inert())std::terminate();}
+            };
+            struct OptionsOverlayTextStorage {
+                const OptionsNativeInputs* const inputs;
+                const Row* const row;
+                const std::thread::id thread=std::this_thread::get_id();
+                OriginalUiOverlayTextFields50KG fields;
+                std::unique_ptr<OptionsTextOverlayStorage> firstLine;
+                bool sourceConstructed=false,sourcePublished=false;
+                OptionsOverlayTextStorage(const OptionsNativeInputs* i,const Row* r)noexcept:inputs(i),row(r){}
+                bool inert()const noexcept {
+                    return thread==std::this_thread::get_id()&&!sourceConstructed&&!sourcePublished&&
+                        inertComponent(fields.entity)&&!fields.manager30&&!fields.lines60&&!fields.lineCount168&&
+                        (!firstLine||(firstLine->inputs==inputs&&firstLine->row==row&&firstLine->inert()));
+                }
+                ~OptionsOverlayTextStorage()noexcept {if(!inert())std::terminate();}
+            };
             struct Row {
                 std::string sectionName;
                 std::uint16_t authoredId=0;
@@ -231,10 +272,32 @@ struct OriginalUiFrontend50KG::Storage {
                 // Safe backing is NOT a source-null entry or constructed Widget.
                 const game::OriginalWreckComponent50LA* publishedWidget=nullptr;
                 bool sourceSlotKnown=false;
+                std::unique_ptr<OptionsOverlayTextStorage> overlayStorage;
             };
             const std::array<std::string,5> fieldNames{{"Type","TextID","FontName","MaterialName","OnTop"}};
             std::array<Row,357> orderedRows{};
             std::int32_t authoredWidgetCount=0; // Input, NOT source count158.
+            std::size_t overlayStorageCursor=0; // Input scan cursor, NEVER source count158.
+            bool overlayStorageAttempted=false,overlayStorageRetired=false;
+            bool overlayStorageAbortCurrent()const noexcept {
+                for(const auto& row:orderedRows){
+                    if(!row.overlayStorage)continue;
+                    if(row.sourceSlotKnown||row.publishedWidget||row.overlayStorage->inputs!=this||
+                       row.overlayStorage->row!=&row||!row.overlayStorage->inert())return false;
+                }
+                return true;
+            }
+            bool abortOverlayStorageNative()noexcept {
+                if(!overlayStorageAbortCurrent())return false;
+                // Preflight every owned row before changing any. Release native
+                // line candidate before outer, reverse input order, no1413E0.
+                for(std::size_t i=orderedRows.size();i>0;--i){
+                    auto& owner=orderedRows[i-1].overlayStorage;
+                    if(owner){owner->firstLine.reset();owner.reset();}
+                }
+                if(overlayStorageAttempted)overlayStorageRetired=true;
+                return true; // Preserve scan/attempt history; no source table exists.
+            }
             // Constructor and Camera acquisition are represented by their
             // actual owners, never duplicate readiness flags. Bank, tables
             // and containing-page publication are still unimplemented.
@@ -242,6 +305,7 @@ struct OriginalUiFrontend50KG::Storage {
             bool name194Known=false,lights29CKnown=false,widgets154Known=false,pages144Known=false;
             bool sourceCount158Known=false,caller394Stored=false;
             bool disposable()const noexcept {
+                if(!overlayStorageAbortCurrent())return false;
                 if(bankAdmitted||name194Known||lights29CKnown||
                    widgets154Known||pages144Known||sourceCount158Known||caller394Stored)return false;
                 if((construction&&construction->pending())||(videoEffect&&videoEffect->pending()))return false;
@@ -482,18 +546,21 @@ struct OriginalUiFrontend50KG::Storage {
         game::OriginalUiCourseRememberedProfile50KG p;
         if(mode==2){
             // Native capability envelope only, not an original unlock rule.
-            // Reject unsupported careers/progress before cold preparation or effects.
+            // Require the actual unlocked selected rider and clean first-course
+            // data before cold preparation. No career is substituted or unlocked.
             OriginalUiRiderProfileOwner50KG::TournamentCareerSnapshot career;
+            OriginalUiRiderProfileOwner50KG::RiderSelectionFacts rider;
             return cold.riderProfile->selectedTournamentCourseSnapshot(career,p)&&p.ownerReady&&p.mode34==2&&
-                career.career100C0==19&&career.progress219C==0&&!p.cardFlag100BC&&!career.cardFlag100BC&&
+                cold.riderProfile->courseRiderSelectionSnapshot(rider)&&rider.rider==career.career100C0&&
+                career.progress219C==0&&!p.cardFlag100BC&&!career.cardFlag100BC&&
                 career.earned2190==0&&career.unspent2194==0&&career.kills2198==0&&
                 std::all_of(career.medals1938.begin(),career.medals1938.end(),[](auto value){return value==0;})&&
                 p.planet0Primary79C==0xC2A684&&p.planet0Secondary7A0==0x80674A;
         }
         return cold.riderProfile->courseSnapshot(p)&&p.ownerReady&&p.mode34==0&&
             (p.availability11018&31u)>=1&&(p.availability11018&31u)<=13&&
-            p.course700>=1&&p.course700<=13&&p.subtype70C==1&&
-            p.laps704>=1&&p.laps704<=25&&p.entrants708==8&&!p.cardFlag100BC&&assets::originalUiCourseBackgroundName50KG(p.packed1125E>>5)&&
+            p.course700>=1&&p.course700<=13&&p.subtype70C>=1&&p.subtype70C<=3&&
+            p.laps704>=1&&p.laps704<=25&&p.entrants708>=1&&p.entrants708<=8&&!p.cardFlag100BC&&assets::originalUiCourseBackgroundName50KG(p.packed1125E>>5)&&
             p.planet0Primary79C==0xC2A684&&p.planet0Secondary7A0==0x80674A;
     }
     bool tournamentInputsReady(std::uint32_t selected) const noexcept {
@@ -619,11 +686,17 @@ struct OriginalUiFrontend50KG::Storage {
         if(actual.selectedCourse44!=c.selectedControlWord44)return reject(A::invalidSelection);
         // Original control data and retained profile determine identities. Native
         // mode/resource capability is checked separately, never as an unlock.
-        selection={c.selectedControlWord44,actual.selectedPlanet40,rider.rider,c.subtypeSlot14F4,
-            c.laps14EC,c.entrants14F0,game::originalCourseLaunchPackedMode050KG(
-                c.packed1125C,c.subtypeSlot14F4,c.laps14EC,c.entrants14F0)};
+        const bool tournament=c.mode34==2;
+        const auto subtype=tournament?1u:c.subtypeSlot14F4;
+        const auto laps=tournament?3u:c.laps14EC;
+        // Only subtype2 consumes the remembered entrant selector. Other
+        // source types retain that menu preference but construct eight racers.
+        const auto entrants=!tournament&&subtype==2?c.entrants14F0:8u;
+        selection={c.selectedControlWord44,actual.selectedPlanet40,rider.rider,subtype,
+            laps,entrants,game::originalCourseLaunchPackedMode050KG(
+                c.packed1125C,subtype,laps,entrants),c.mode34};
         if(!game::originalCourseSelectionEncoding50KG(selection))return reject(A::invalidSelection);
-        if(c.mode34!=0||!game::nativeSingleHumanCourseMode50KG(selection))return reject(A::unsupportedNativeMode);
+        if((c.mode34!=0&&!tournament)||!game::nativeSingleHumanCourseMode50KG(selection))return reject(A::unsupportedNativeMode);
         const auto availability=cold.courseRaceDestination->availability(selection);
         if(reason)*reason=availability;
         return availability==A::ready;
@@ -2534,6 +2607,8 @@ bool OriginalUiFrontend50KG::prepareOptionsNativeInputs50KG(
             if(row.authoredId!=i+1||row.source!=dat->section(row.sectionName)||row.sourceSlotKnown||row.publishedWidget)return false;
             for(std::size_t k=0;k<n.fieldNames.size();++k)
                 if(row.fields[k]!=(row.source?row.source->find(n.fieldNames[k]):nullptr))return false;
+            if(row.overlayStorage&&(!row.fields[0]||row.fields[0]->text!="Overlay_Text"||
+               row.overlayStorage->inputs!=&n||row.overlayStorage->row!=&row||!row.overlayStorage->inert()))return false;
         }
         return true;
     }
@@ -2567,6 +2642,53 @@ bool OriginalUiFrontend50KG::prepareOptionsNativeInputs50KG(
            domain->archiveProvider3E1A70()!=provider)return false;
         m->optionsNativeInputs=std::move(n);return true;
     }catch(...){return false;}
+}
+bool OriginalUiFrontend50KG::prepareOptionsOverlayTextStorage50KG(
+    const ::original_main_entry50KG::Application& root)noexcept {
+    // Existing actual Controller/DAT custody, never a replacement parsed DAT.
+    // Storage preparation stays before counted construction and bank effects.
+    if(!prepareOptionsNativeInputs50KG(root))return false;
+    auto* s=storage_.get();auto* m=s->pending?s->pending.get():s->active.get();
+    auto& n=*m->optionsNativeInputs;Operation operation(s->inOperation);
+    if(n.overlayStorageRetired||n.construction||n.videoEffect||!n.cameraStorage||
+       !n.cameraStorage->inertStorageCurrent(n.issuer,n.entities)||!n.disposable()||n.authoredWidgetCount!=357)return false;
+    const auto inputsCurrent=[&]()noexcept {
+        const assets::OriginalUiDat50KG* current=nullptr;
+        return n.issuer==&root&&n.manager==m&&n.frontend==s&&n.session==m->options.get()&&
+            n.resources==m->optionsResources&&n.archive==s->cold.options&&n.widgets&&
+            n.widgets->nativeManagerSourceCurrent(n.archive,current)&&current==n.dat&&
+            n.scope==root.sharedUiScopeOwner_&&n.entities==root.entities()&&!n.construction&&!n.videoEffect&&
+            n.cameraStorage->inertStorageCurrent(n.issuer,n.entities)&&n.disposable();
+    };
+    if(!inputsCurrent())return false;n.overlayStorageAttempted=true;
+    try {
+        while(n.overlayStorageCursor<n.orderedRows.size()){
+            auto& row=n.orderedRows[n.overlayStorageCursor];
+            if(!inputsCurrent()||row.authoredId!=n.overlayStorageCursor+1||
+               row.source!=n.dat->section(row.sectionName)||row.sourceSlotKnown||row.publishedWidget)return false;
+            for(std::size_t k=0;k<n.fieldNames.size();++k)
+                if(row.fields[k]!=(row.source?row.source->find(n.fieldNames[k]):nullptr))return false;
+            // No row is omitted from source order. Non-text/missing types stay
+            // unconstructed and are NOT certified as successful native slots.
+            if(row.fields[0]&&row.fields[0]->text=="Overlay_Text"){
+                if(!row.overlayStorage){
+                    auto outer=std::make_unique<Storage::Manager::OptionsNativeInputs::OptionsOverlayTextStorage>(&n,&row);
+                    if(!inputsCurrent())return false;
+                    row.overlayStorage=std::move(outer);
+                }
+                if(!row.overlayStorage->inert())return false;
+                if(!row.overlayStorage->firstLine){
+                    auto line=std::make_unique<Storage::Manager::OptionsNativeInputs::OptionsTextOverlayStorage>(&n,&row);
+                    if(!inputsCurrent())return false;
+                    row.overlayStorage->firstLine=std::move(line);
+                }
+                // One reusable FIRST-line allocation candidate only. Source
+                // lineCount168/array60/selected text/capacity remain unknown.
+            }
+            ++n.overlayStorageCursor;
+        }
+        return inputsCurrent();
+    }catch(...){return false;} // Retain exact prepared prefix for retry/abort.
 }
 bool OriginalUiFrontend50KG::retainMemoryCardOptionsSources50KG(
     const ::original_main_entry50KG::Application& root,OriginalUiMemoryCardConstructor50KG& owner)noexcept {

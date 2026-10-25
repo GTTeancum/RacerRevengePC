@@ -39,6 +39,9 @@ struct CameraCallerOwners {
     const std::array<std::unique_ptr<native_racer_model50LA::Owner>,8>* actualBottomLeftModels=nullptr;
     rr::game::OriginalRaceHud50KG* raceHud=nullptr;
     const rr::game::OriginalDeathCameraDebrisView50KG* deathDebris=nullptr;
+    void* startMusicContext=nullptr;
+    bool (*startMusicRequest)(void*,std::int32_t,std::int32_t)=nullptr;
+    const original_subtype3_record::Owner* recordManager40=nullptr;
 };
 // Same runtime services, without caller-supplied roster arrays. The retained
 // roster handoff obtains model/rig/cable ownership from the actual Bank pin.
@@ -68,5 +71,8 @@ struct CameraRuntimeOwners {
     const rr::game::ManagerHeldSources49A& humanHeld;
     rr::game::OriginalRaceHud50KG* raceHud=nullptr;
     const rr::game::OriginalDeathCameraDebrisView50KG* deathDebris=nullptr;
+    void* startMusicContext=nullptr;
+    bool (*startMusicRequest)(void*,std::int32_t,std::int32_t)=nullptr;
+    const original_subtype3_record::Owner* recordManager40=nullptr;
 };
 } // namespace ra_source_camera50LA

@@ -16,6 +16,7 @@ namespace rr::assets {
 // AIDamage must borrow materials382B38() from this same object. Its separate
 // sequential ScreenMT join and all manager-wide terminal guards remain intact.
 class OriginalStandardMaterialDomain50LA final {
+    friend struct ::original_main_entry50KG::Application;
     friend class ::ra_static_world50LA::Owner;
     friend class OriginalApplicationFonts50LA;
     friend class rr::platform::OriginalUiGarageQuad50KG;
@@ -34,6 +35,13 @@ class OriginalStandardMaterialDomain50LA final {
     std::shared_ptr<OriginalStandardTextureTable50LA> textures_;
     std::shared_ptr<OriginalStandardTextureResolver50LA> resolver_;
     std::shared_ptr<OriginalStandardArchiveProvider50LA> archiveProvider_;
+    // Actual original input mounted before Application template preparation.
+    // Keeps failed material preparation retrying the SAME authenticated owner.
+    // A native input/mount pin, never a source12CEA0 registration receipt.
+    std::shared_ptr<const OriginalUiArchive50KG> serviceAppStart_;
+    // The SAME canonical material table, with actual17CAD4 names reached
+    // before templates; never exposed as a prepared domain during this prefix.
+    std::shared_ptr<OriginalStandardMaterialTable50LA> earlyAppStartMaterials_;
     std::vector<std::shared_ptr<const OriginalStandardMaterialSource50LA>> sources_;
     struct SourceAdmission {
         std::shared_ptr<const OriginalStandardMaterialSource50LA> source;
@@ -47,6 +55,80 @@ class OriginalStandardMaterialDomain50LA final {
     // the remaining domain owners. Actual model refs independently pin this
     // same table until their ordered26E4C0 cleanup has finished.
     std::shared_ptr<OriginalStandardMaterialTable50LA> materials_;
+    // Only the actual Application starts this phase before APPSTART/material
+    // loading. Legacy standalone prepareFresh may still call it later; no
+    // source startup chronology is inferred from either native allocation.
+    bool prepareFreshNativeService(OriginalStandardMaterialDiagnostic50LA& d)noexcept {
+        d={};
+        if(resolver_||archiveProvider_||serviceAppStart_||application_||prepared()){
+            d.status=OriginalStandardMaterialStatus50LA::alreadyPrepared;return false;
+        }
+        try {
+            auto resolver=std::make_shared<OriginalStandardTextureResolver50LA>();
+            auto provider=std::make_shared<OriginalStandardArchiveProvider50LA>();
+            if(!resolver->bootstrapFreshFileCapacity12CBA0(provider,d.texture)){
+                d.status=OriginalStandardMaterialStatus50LA::allocation;return false;
+            }
+            resolver_=std::move(resolver);archiveProvider_=std::move(provider);return true;
+        }catch(...){d.status=OriginalStandardMaterialStatus50LA::allocation;return false;}
+    }
+    bool retainNativeAppStart(std::shared_ptr<const OriginalUiArchive50KG> archive,
+        OriginalStandardMaterialDiagnostic50LA& d)noexcept {
+        d={};
+        if(!resolver_||!archiveProvider_||application_||prepared()||!archive||!archive->loaded()||
+           archive->identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::appStart)){
+            d.status=OriginalStandardMaterialStatus50LA::source;return false;
+        }
+        if(serviceAppStart_){
+            if(serviceAppStart_==archive)return true;
+            d.status=OriginalStandardMaterialStatus50LA::source;return false;
+        }
+        // Never import a warm directory into this early single-input phase.
+        if(archiveProvider_->mountCount()!=0||archiveProvider_->revision()!=0||archiveProvider_->sealed()){
+            d.status=OriginalStandardMaterialStatus50LA::source;return false;
+        }
+        OriginalStandardArchiveProvider50LA::Diagnostic providerDiagnostic;
+        if(!archiveProvider_->mountAuthenticatedUi(archive,providerDiagnostic)){
+            d.status=OriginalStandardMaterialStatus50LA::source;return false;
+        }
+        // Join actual source rows only if the Application reached17CAB8.
+        // Legacy standalone/externally prepared paths never synthesize them.
+        if(!resolver_->joinAppStartCanonicalMount(d.texture)){
+            d.status=OriginalStandardMaterialStatus50LA::source;return false;
+        }
+        serviceAppStart_=std::move(archive);return true;
+    }
+    bool prepareAppStartNames17CAD4(OriginalStandardMaterialDiagnostic50LA& d)noexcept {
+        d={};if(earlyAppStartMaterials_)return true; // Native continuation only.
+        if(!resolver_||!serviceAppStart_||application_||prepared()){
+            d.status=OriginalStandardMaterialStatus50LA::source;return false;
+        }
+        try {
+            auto table=std::make_shared<OriginalStandardMaterialTable50LA>();
+            std::vector<std::uint8_t> bytes;
+            if(!resolver_->readAppStartNames17CAD4(bytes,d.texture)){
+                d.status=OriginalStandardMaterialStatus50LA::source;return false;
+            }
+            // FClose already happened. These bytes came through the actual
+            // encoded cache/decoded slot, not an immutable-member substitute.
+            const auto readDiagnostic=d.texture;
+            const bool parsed=table->prepareAppStartNames17CAD4(serviceAppStart_,bytes,d);
+            d.texture=readDiagnostic; // Preserve reached source effects if parsing fails.
+            if(!parsed)return false;
+            earlyAppStartMaterials_=std::move(table);return true;
+        }catch(...){d.status=OriginalStandardMaterialStatus50LA::allocation;return false;}
+    }
+    bool prepareAppStartPrograms17CAE8(OriginalStandardMaterialDiagnostic50LA& d)noexcept {
+        d={};if(programs_)return programs_->prepared();
+        if(!earlyAppStartMaterials_||!resolver_||!serviceAppStart_||application_||prepared()){
+            d.status=OriginalStandardMaterialStatus50LA::source;return false;
+        }
+        try {
+            auto programs=std::make_shared<OriginalStandardProgramTable50LA>();
+            if(!programs->prepareFresh(d.program)){d.status=OriginalStandardMaterialStatus50LA::program;return false;}
+            programs_=std::move(programs);return true;
+        }catch(...){d.status=OriginalStandardMaterialStatus50LA::allocation;return false;}
+    }
 public:
     OriginalStandardMaterialDomain50LA() noexcept=default;
     OriginalStandardMaterialDomain50LA(const OriginalStandardMaterialDomain50LA&)=delete;
@@ -60,31 +142,27 @@ public:
             d.status=OriginalStandardMaterialStatus50LA::templates;return false;
         }
         try {
-            auto programs=std::make_shared<OriginalStandardProgramTable50LA>();
+            auto programs=programs_?programs_:std::make_shared<OriginalStandardProgramTable50LA>();
             auto textures=std::make_shared<OriginalStandardTextureTable50LA>();
-            auto materials=std::make_shared<OriginalStandardMaterialTable50LA>();
-            auto resolver=std::make_shared<OriginalStandardTextureResolver50LA>();
-            auto provider=std::make_shared<OriginalStandardArchiveProvider50LA>();
-            // Same resolver survives into this domain. This allocation prerequisite
-            // must precede even the first native APPSTART mount; no source mount
-            // registration or process-global service publication is inferred.
-            if(!resolver->bootstrapFreshFileCapacity12CBA0(provider,d.texture)){
-                d.status=OriginalStandardMaterialStatus50LA::allocation;return false;
-            }
-            OriginalStandardArchiveProvider50LA::Diagnostic providerDiagnostic;
-            if(!provider->mountAuthenticatedUi(application->appStart(),providerDiagnostic)){
-                d.status=OriginalStandardMaterialStatus50LA::source;return false;
-            }
-            if(!programs->prepareFresh(d.program)){
+            auto materials=earlyAppStartMaterials_?earlyAppStartMaterials_:
+                std::make_shared<OriginalStandardMaterialTable50LA>();
+            // Reuse early Application custody. Standalone callers retain the
+            // legacy late preparation route, explicitly without tracked history.
+            if(!resolver_&&!archiveProvider_){if(!prepareFreshNativeService(d))return false;}
+            if(!resolver_||!archiveProvider_){d.status=OriginalStandardMaterialStatus50LA::source;return false;}
+            if(!retainNativeAppStart(application->appStart(),d))return false;
+            if(!programs->prepared()&&!programs->prepareFresh(d.program)){
                 d.status=OriginalStandardMaterialStatus50LA::program;return false;
             }
             if(!textures->prepareFresh(d.texture)){
                 d.status=OriginalStandardMaterialStatus50LA::texture;return false;
             }
-            if(!materials->prepareFresh(application,d))return false;
+            if(earlyAppStartMaterials_){
+                if(!materials->attachAppStartTemplates(application,d))return false;
+            }else if(!materials->prepareFresh(application,d))return false;
             application_=std::move(application);programs_=std::move(programs);
-            textures_=std::move(textures);resolver_=std::move(resolver);archiveProvider_=std::move(provider);
-            materials_=std::move(materials);return true;
+            textures_=std::move(textures);
+            materials_=std::move(materials);earlyAppStartMaterials_.reset();return true;
         }catch(...){d.status=OriginalStandardMaterialStatus50LA::allocation;return false;}
     }
     const std::shared_ptr<OriginalStandardMaterialTable50LA>& materials382B38() const noexcept {return materials_;}

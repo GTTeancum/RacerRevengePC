@@ -294,7 +294,7 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
   platform::OriginalUiControllerNavigation50LA originalUiControllerNavigation,originalUiSecondControllerNavigation;
   reportUiState("bound");
   std::cerr<<"Original UI controls: arrows select/change; Enter/Space confirm; Escape/menu back; "
-      "R defaults/rotate; Tab controller configuration. Window Close, quit, or stdin EOF exits.\n";
+      "R defaults/rotate; Tab controller configuration. Pad: D-pad select/change, A confirm, Y back. Accepted Course Confirm retains that input device for driving unless RR_HUMAN_INPUT_DEVICE overrides it; keyboard wins simultaneous confirms. In race: Start opens Pause/resumes from its main page, D-pad selects, A confirms, Y cancels/backs out. Window Close, quit, or stdin EOF exits.\n";
   // Bounded, opt-in observations only. Keep focus, timing and draw admission
   // unchanged; a bound frontend is not evidence that this gate ever opened.
   std::uint32_t tracePolls=0,traceGateReports=0,previousGateMask=0;
@@ -398,6 +398,10 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
     menuEvents[2]=menuEvents[2]||input.pressed[82]||input.pressed[80]||input.pressed[26];
     menuEvents[3]=menuEvents[3]||input.pressed[81]||input.pressed[79]||input.pressed[22];
    }
+   // Preserve the actual release-armed pad edge before merging keyboard input.
+   // Keyboard wins simultaneous confirms, matching its explicit user action.
+   const bool courseConfirmFromController=menuEvents[4]&&
+       !(input.pressed[40]||input.pressed[88]||input.pressed[44]);
    menuEvents[4]=menuEvents[4]||input.pressed[40]||input.pressed[88]||input.pressed[44];
    menuEvents[5]=menuEvents[5]||((gameOptions||controls||memoryCard||tournament)&&input.pressed[21]);
    menuEvents[7]=menuEvents[7]||((controls||memoryCard)&&input.pressed[43]);
@@ -405,7 +409,11 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
    // Same source-ID merge/order as the existing race-hosted frontend. One
    // actual keyboard/pad confirm edge dispatches once even if both are pressed.
    for(const unsigned event:{0u,1u,2u,3u,4u,5u,7u,6u})
-    if(menuEvents[event])originalMain.input(static_cast<std::uint8_t>(event),input.secondControllerPresence);
+    if(menuEvents[event]){
+     const auto accepted=originalMain.input(static_cast<std::uint8_t>(event),input.secondControllerPresence);
+     if(course&&event==4&&accepted==platform::OriginalUiFrontendStatus50KG::routeAccepted)
+      originalMainApplication.courseHumanController=courseConfirmFromController;
+    }
    // Never merge two physical ports or retag keyboard input as controller one.
    if(secondInputRoute.screen==12&&secondInputRoute.page==3&&
       input.secondControllerPresence==platform::WindowControllerPresence50DQ::Present)

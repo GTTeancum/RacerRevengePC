@@ -71,12 +71,13 @@ struct OriginalUiCourseSessionSnapshot50KG {
     game::OriginalUiApertureSnapshot50KG aperture{};
     OriginalUiMainSessionAudioReceipt50KG audio{};
 };
-// Bounded mode0/subtype1/laps1..25/entrants8, fresh unlocked Course slots1..4.
+// Mode0 retains authored unlocked Course choices and native destination admission.
 // Left/right uses genuine authored controls/models/text/backgrounds. Original
 // Back creates a fresh Rider owner; Confirm proposes only the source launch transaction.
 // The frontend independently admits its actual cold native race destination.
-// Distinct mode2 navigation is restricted to actual fresh clean career19,
-// fixed slot1, original Continue entry and zero-write Back. No race admission.
+// Distinct mode2 entry requires the actual unlocked selected clean career,
+// fixed slot1 and original Continue. Back writes nothing; Confirm proposes
+// the four-write fixed-three-lap Tournament launch to its real destination.
 class OriginalUiCourseSession50KG final {
 public:
     OriginalUiCourseSession50KG()noexcept;~OriginalUiCourseSession50KG();

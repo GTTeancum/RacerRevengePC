@@ -151,6 +151,29 @@ struct OriginalStandardMaterialTable50LA::Storage {
     std::shared_ptr<const OriginalUiArchive50KG> appStart;
     std::shared_ptr<const OriginalUiMaterialTemplates50KG> templates;
     std::vector<Row> rows;
+    // Both the legacy complete preparation and early source consumer use
+    // this one parser against their supplied authenticated decoded bytes.
+    // It constructs these exact rows once; template attachment never calls it.
+    bool loadFreshNames(const std::uint8_t* sourceData,std::size_t sourceSize,D& d) {
+        rows.reserve(tableRows);
+        const auto delimiter=[](std::uint8_t c){return c==' '||c=='\r'||c=='\n';};
+        std::size_t cursor=0;
+        while(cursor<sourceSize){
+            while(cursor<sourceSize&&delimiter(sourceData[cursor]))++cursor;
+            if(cursor==sourceSize)break;
+            const auto start=cursor;
+            while(cursor<sourceSize&&!delimiter(sourceData[cursor]))++cursor;
+            Storage::Row row;row.byteOffset=static_cast<std::uint32_t>(start);
+            row.name00.assign(reinterpret_cast<const char*>(sourceData+start),cursor-start);
+            if(!ascii(row.name00,255,false)||rows.size()>=tableRows)return fail(d,S::table,0x298788);
+            for(char& c:row.name00)c=lower(c); //3094E0. No separator conversion.
+            //29888C/2988B0 and14D344 are the real fresh null/zero stores.
+            row.object04=nullptr;row.references08=0;row.associated30=nullptr;
+            rows.push_back(std::move(row));
+        }
+        if(rows.size()!=tableRows)return fail(d,S::table,0x2988D8);
+        return true;
+    }
     std::unique_ptr<OriginalStandardMaterialObject50LA> partial;
     std::shared_ptr<const OriginalStandardProgramTable50LA> programs;
     std::shared_ptr<OriginalStandardTextureTable50LA> textures;
@@ -199,7 +222,7 @@ OriginalStandardMaterialTable50LA::~OriginalStandardMaterialTable50LA()=default;
 bool OriginalStandardMaterialTable50LA::prepareFresh(
     std::shared_ptr<const OriginalUiArchive50KG> app,
     std::shared_ptr<const OriginalUiMaterialTemplates50KG> templates,D& d) noexcept {
-    d={};if(storage_)return fail(d,S::alreadyPrepared,0x14D2F0);
+    d={};if(storage_||appStartNames_)return fail(d,S::alreadyPrepared,0x14D2F0);
     if(!app||!app->loaded()||app->identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::appStart))
         return fail(d,S::archive,0x2985B0);
     const auto* defaults=templates?templates->get(OriginalUiTemplate50KG::defaultMt):nullptr;
@@ -211,23 +234,7 @@ bool OriginalStandardMaterialTable50LA::prepareFresh(
         if(!source.identity||source.identity!=appMember("AppStart\\Mat_Stbl.txt")||
            !source.data||source.size!=tableBytes)return fail(d,S::table,0x298724);
         auto next=std::make_unique<Storage>();next->appStart=std::move(app);next->templates=std::move(templates);
-        next->rows.reserve(tableRows);
-        const auto delimiter=[](std::uint8_t c){return c==' '||c=='\r'||c=='\n';};
-        std::size_t cursor=0;
-        while(cursor<source.size){
-            while(cursor<source.size&&delimiter(source.data[cursor]))++cursor;
-            if(cursor==source.size)break;
-            const auto start=cursor;
-            while(cursor<source.size&&!delimiter(source.data[cursor]))++cursor;
-            Storage::Row row;row.byteOffset=static_cast<std::uint32_t>(start);
-            row.name00.assign(reinterpret_cast<const char*>(source.data+start),cursor-start);
-            if(!ascii(row.name00,255,false)||next->rows.size()>=tableRows)return fail(d,S::table,0x298788);
-            for(char& c:row.name00)c=lower(c); //3094E0. No separator conversion.
-            //29888C/2988B0 and14D344 are the real fresh null/zero stores.
-            row.object04=nullptr;row.references08=0;row.associated30=nullptr;
-            next->rows.push_back(std::move(row));
-        }
-        if(next->rows.size()!=tableRows)return fail(d,S::table,0x2988D8);
+        if(!next->loadFreshNames(source.data,source.size,d))return false;
         storage_=std::move(next);return true;
     }catch(const std::bad_alloc&){return fail(d,S::allocation,0x2987DC);}
     catch(...){return fail(d,S::input,0x2985B0);}
@@ -238,6 +245,45 @@ bool OriginalStandardMaterialTable50LA::prepareFresh(
     const auto* templates=&application->templates();
     std::shared_ptr<const OriginalUiMaterialTemplates50KG> retained(application,templates);
     return prepareFresh(application->appStart(),std::move(retained),d);
+}
+bool OriginalStandardMaterialTable50LA::prepareAppStartNames17CAD4(
+    std::shared_ptr<const OriginalUiArchive50KG> app,
+    const std::vector<std::uint8_t>& sourceBytes,D& d) noexcept {
+    d={};if(storage_||appStartNames_)return fail(d,S::alreadyPrepared,0x14D2F0);
+    if(!app||!app->loaded()||app->identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::appStart))
+        return fail(d,S::archive,0x2985B0);
+    try {
+        const auto source=app->find("AppStart\\Mat_Stbl.txt");
+        if(!source.identity||source.identity!=appMember("AppStart\\Mat_Stbl.txt")||
+           !source.data||source.size!=tableBytes)return fail(d,S::table,0x298724);
+        // The canonical member authenticates the actual service result; its
+        // resident view is NOT substituted for the just-completed source read.
+        // The domain alone proves the131230/12EC90/12FB30/131040 chronology.
+        if(sourceBytes.size()!=source.size||
+           std::memcmp(sourceBytes.data(),source.data,source.size)!=0)return fail(d,S::source,0x298724);
+        auto next=std::make_unique<Storage>();next->appStart=std::move(app);
+        if(!next->loadFreshNames(sourceBytes.data(),sourceBytes.size(),d))return false;
+        // Remains publicly unprepared: no references, objects or templates can
+        // be observed/mutated through the existing storage_-gated consumers.
+        appStartNames_=std::move(next);return true;
+    }catch(const std::bad_alloc&){return fail(d,S::allocation,0x2987DC);}
+    catch(...){return fail(d,S::input,0x2985B0);}
+}
+bool OriginalStandardMaterialTable50LA::attachAppStartTemplates(
+    std::shared_ptr<const OriginalUiMaterialApplication50LA> application,D& d) noexcept {
+    d={};if(storage_)return fail(d,S::alreadyPrepared,0x14D2F0);
+    if(!appStartNames_)return fail(d,S::unprepared,0x14D2F0);
+    if(!application||!application->prepared())return fail(d,S::templates,0x14D590);
+    if(application->appStart()!=appStartNames_->appStart)return fail(d,S::archive,0x14D590);
+    const auto& templates=application->templates();
+    const auto* defaults=templates.get(OriginalUiTemplate50KG::defaultMt);
+    const auto* screen=templates.get(OriginalUiTemplate50KG::screenMt);
+    if(!defaults||!screen||defaults->identity!=appMember("AppStart\\DefaultMT.psm")||
+       screen->identity!=appMember("AppStart\\ScreenMT.psm"))return fail(d,S::templates,0x14D590);
+    // The alias pins the actual application. Neither its templates nor the
+    // early canonical rows are copied; all null associations remain null.
+    appStartNames_->templates=std::shared_ptr<const OriginalUiMaterialTemplates50KG>(application,&templates);
+    storage_=std::move(appStartNames_);return true;
 }
 bool OriginalStandardMaterialTable50LA::prepared() const noexcept {return bool(storage_);}
 std::size_t OriginalStandardMaterialTable50LA::rowCount() const noexcept {return storage_?storage_->rows.size():0;}

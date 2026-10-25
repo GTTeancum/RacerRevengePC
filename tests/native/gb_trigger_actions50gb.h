@@ -39,6 +39,7 @@ class Owner final {
  std::shared_ptr<gb_pod_sound50GB::Owner> sounds_;
  std::shared_ptr<gb_particle_runtime50GB::Owner> particles_;
  std::array<RacerIdentities,racers> racers_{};
+ std::size_t racerCount_=0;
  g::NativeTriggerGroup50GB group_{};
  struct Geometry {g::BodyMatrix48G world{};std::array<float,3> center{},half{};bool valid=false;};
  std::array<Geometry,colliders> geometry_{};
@@ -82,7 +83,7 @@ class Owner final {
   if(!source_||!preparedSourceFor(*source_)||!identitiesBound_||!group_.ready||particles_->visiting_||
      !g::validNativeTriggerGroup50GB(group_)||call.triggerCollider<firstTriggerIdentity)return false;
   const auto t=call.triggerCollider-firstTriggerIdentity;const auto c=colliderIndex(call.otherCollider);
-  if(t>=source::count||c>=colliders)return false;
+  if(t>=source::count||c>=group_.colliders.size())return false;
   const auto& authored=source_->source(t);
   if(call.actionIndex>=authored.actionCount||!authored.actions[call.actionIndex].original)return false;
   if(!call.entering)return servicing_&&!lease_&&!group_.queryActive&&event.querySerial==0&&
@@ -133,7 +134,7 @@ class Owner final {
    if(action.kind==source::Action::LostAI){
     // Source scans actual main690 identities in race order. A secondary
     // collider completes without a C80 store. Every GB Reset is absent/false.
-    for(const auto& racer:racers_)if(racer.main690==call.otherCollider){
+    for(std::size_t i=0;i<racerCount_;++i)if(racers_[i].main690==call.otherCollider){
      *lease_->nodeC80=action.targetNodeIndex;increment(counters_.lostAiWrites);}
     return {A::Complete,0x1b27c0u,0xc80u};
    }
@@ -170,7 +171,7 @@ class Owner final {
   for(std::size_t t=0;t<source::count;++t){const auto& state=group_.triggers[t];const auto& authored=source_->source(t);
    std::array<g::TriggerOverlap50IN,g::triggerContactCapacity50IN> observations{};
    for(std::size_t slot=0;slot<state.collider.highWaterD0;++slot){const auto id=state.collider.membersCC[slot];if(!id)continue;
-    const auto c=colliderIndex(id);if(c==colliders||!geometry_[c].valid)return fail(Status::Input);
+    const auto c=colliderIndex(id);if(c==group_.colliders.size()||!geometry_[c].valid)return fail(Status::Input);
     const auto& geometry=geometry_[c];bool overlap=false;g::TriggerSphereRootExitInput50IN input{};
     input.type2PreparedWorld=geometry.world;
     for(unsigned k=0;k<3;++k){input.sphere.localCenter.v[k]=authored.sphere.center.v[k];
@@ -244,26 +245,27 @@ public:
  // Stages the actual eight-racer roster and source PLAYER/AI main690 lists.
  // It never publishes live readiness or creates a query/Bank borrow.
  bool bindRacerIdentities(const std::array<RacerIdentities,racers>& identities,
-  std::uint32_t actualPlayerPrefixCount34)noexcept {
+  std::uint32_t actualPlayerPrefixCount34,std::size_t racerCount=racers)noexcept {
   if(!thread()||bindAttempted_||!source_||!preparedSourceFor(*source_)||group_.ready||!queryIdle())return false;
-  bindAttempted_=true;if(actualPlayerPrefixCount34>racers)return false;
+  bindAttempted_=true;if(!racerCount||racerCount>racers||actualPlayerPrefixCount34>racerCount)return false;
   std::array<std::uint32_t,colliders> ids{};
-  for(std::size_t i=0;i<racers;++i){ids[i*2]=identities[i].main690;ids[i*2+1]=identities[i].secondary;}
-  for(std::size_t i=0;i<ids.size();++i){
+  for(std::size_t i=0;i<racerCount;++i){ids[i*2]=identities[i].main690;ids[i*2+1]=identities[i].secondary;}
+  for(std::size_t i=0;i<racerCount*2;++i){
    if(!ids[i]||reservedIdentity(ids[i]))return false;
    for(std::size_t j=0;j<i;++j)if(ids[i]==ids[j])return false;
   }
   auto next=group_;
-  for(std::size_t i=0;i<ids.size();++i)next.colliders[i].identity=ids[i];
+  if(!next.colliders.setCount(racerCount*2))return false;
+  for(std::size_t i=0;i<racerCount*2;++i)next.colliders[i].identity=ids[i];
   for(std::size_t i=0;i<source::count;++i){const auto ignore=source_->source(i).ignore;
    const auto first=ignore==source::Ignore::AI?actualPlayerPrefixCount34:0u;
-   const auto last=ignore==source::Ignore::Player?actualPlayerPrefixCount34:ignore==source::Ignore::AI?racers:0u;
+   const auto last=ignore==source::Ignore::Player?actualPlayerPrefixCount34:ignore==source::Ignore::AI?racerCount:0u;
    for(std::size_t j=first;j<last;++j)next.ignoreColliders[i][next.ignoreColliderCount[i]++]=identities[j].main690;
   }
   // A temporary scalar copy is validated; the stable published group remains
   // closed. No source callback, current query or target view is copied.
   next.ready=true;if(!g::validNativeTriggerGroup50GB(next))return false;next.ready=false;
-  racers_=identities;group_=std::move(next);identitiesBound_=true;return true;
+  racers_=identities;racerCount_=racerCount;group_=std::move(next);identitiesBound_=true;return true;
  }
 private:
  // Stores only real prepared root geometry scalars for later source exits.
@@ -275,7 +277,7 @@ private:
      !resource.nodes||!resource.nodeCount||!resource.rays||!resource.rayCount||
      (resource.root&g::type2Leaf49X)||resource.root>=resource.nodeCount||
      !g::trigger_sphere50in_detail::affine(world))return false;
-  const auto c=colliderIndex(collider);if(c==colliders)return false;
+  const auto c=colliderIndex(collider);if(c==group_.colliders.size())return false;
   const auto& root=resource.nodes[resource.root];Geometry next{};next.world=world;
   for(unsigned k=0;k<3;++k){if(!std::isfinite(root.center[k])||!std::isfinite(root.half[k])||root.half[k]<0.f)return false;
    next.center[k]=root.center[k];next.half[k]=root.half[k];}

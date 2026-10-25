@@ -129,7 +129,10 @@ public:
     // configuration/selection must have been prepared before this binding.
     bool initializeTiming() noexcept {
         if(!continuity||!nativeConfig||!nativeConfig->initialized||
-           continuity->timingInitialized||nativeConfig->mode11258!=1u)return false;
+           continuity->timingInitialized||nativeConfig->mode11258<1u||
+           nativeConfig->mode11258>3u)return false;
+        // Preserve the authored subtype3 best-lap field; use the shared
+        // 216690 initializer rather than substituting subtype1 timing.
         initializeLapTimingFields50ID(continuity->timing,nativeConfig->mode11258);
         continuity->timingInitialized=true;return true;
     }

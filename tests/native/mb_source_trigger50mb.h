@@ -60,7 +60,7 @@ class Owner final {
   const auto trigger=call.source.triggerCollider-mb_collision_world50MB::Owner::triggerIdentity;
   if(trigger>=3)return false;
   const auto collider=g::nativeTriggerCollider50GA(world_->triggers_,call.source.otherCollider);
-  if(collider>=16)return false;
+  if(collider>=world_->triggers_.colliders.size())return false;
   if(!call.source.entering)return servicing_&&!active_&&!suspended_&&!borrow_&&call.querySerial==0;
   if(!active_||!borrow_||call.querySerial!=serial_||collider/2!=slot_||world_->source_.source(trigger).targetNodeIndex>=292)return false;
   if(!(collider&1u)&&world_->source_.source(trigger).reset)
@@ -97,14 +97,15 @@ public:
  ~Owner(){if(bound_||active_||suspended_||borrow_||resultBinding_.borrowed())std::terminate();}
  bool bind(native_racer50HN::Bank& bank,std::shared_ptr<mb_collision_world50MB::Owner> world,
      const std::array<std::array<std::uint32_t,2>,8>& actualRacerIdentities,std::uint32_t playerPrefixCount34) noexcept {
-  if(bound_||world_||bank.count()!=8||!world||!world->ready()||world->actionOwner_||playerPrefixCount34>8)return false;
+  if(bound_||world_||(!bank.count()||bank.count()>8)||!world||!world->ready()||world->actionOwner_||playerPrefixCount34>bank.count())return false;
   // The root supplies identities read by genuine visits to the completed Bank.
   // Cold geometry preparation never predicts or publishes racer identities.
-  for(std::size_t i=0;i<16;++i){const auto id=actualRacerIdentities[i/2][i%2];
+  for(std::size_t i=0;i<bank.count()*2;++i){const auto id=actualRacerIdentities[i/2][i%2];
    if(!id||(id>=world->triggerIdentity&&id<world->triggerIdentity+3))return false;
    for(std::size_t j=0;j<i;++j)if(actualRacerIdentities[j/2][j%2]==id)return false;
   }
-  for(std::size_t i=0;i<16;++i)world->triggers_.colliders[i].identity=actualRacerIdentities[i/2][i%2];
+  if(!world->triggers_.colliders.setCount(bank.count()*2))return false;
+  for(std::size_t i=0;i<bank.count()*2;++i)world->triggers_.colliders[i].identity=actualRacerIdentities[i/2][i%2];
   for(std::size_t i=0;i<3;++i){world->triggers_.ignoreColliderCount[i]=playerPrefixCount34;
    for(std::size_t j=0;j<playerPrefixCount34;++j)world->triggers_.ignoreColliders[i][j]=actualRacerIdentities[j][0];
   }
@@ -125,7 +126,7 @@ public:
       !resource.rays||!resource.rayCount||(resource.root&g::type2Leaf49X)||resource.root>=resource.nodeCount||
       !g::trigger_sphere50in_detail::affine(world))return false;
   const auto c=g::nativeTriggerCollider50GA(world_->triggers_,collider);
-  if(c>=16||bank_->visitDepth_!=1||bank_->currentSlot_!=c/2)return false;
+  if(c>=world_->triggers_.colliders.size()||bank_->visitDepth_!=1||bank_->currentSlot_!=c/2)return false;
   Geometry next{};next.world=world;const auto& root=resource.nodes[resource.root];
   for(unsigned k=0;k<3;++k){next.center.v[k]=root.center[k];next.half.v[k]=root.half[k];}
   next.center.v[3]=next.half.v[3]=1.f;next.valid=true;geometry_[c]=next;return true;
@@ -138,7 +139,7 @@ public:
      g::SourceType2QueryOwners50MB& owners,const std::size_t* indices,std::size_t count,
      const g::Type2StaticWorkspace49X& workspace,const g::Type2StaticDestination49X& destination) noexcept {
   g::SourceType2QueryReceipt50MB receipt{};
-  if(!bound_||faulted_||servicing_||active_||suspended_||borrow_||slot>=8||
+  if(!bound_||faulted_||servicing_||active_||suspended_||borrow_||slot>=bank_->count()||
      borrow.frame.phase!=g::VehicleFramePhase49W::PostWorld||serial_==std::numeric_limits<std::uint64_t>::max()||
      &owners.triggers!=&world_->triggers_||&owners.actions!=&hooks_||&owners.resultBinding!=&resultBinding_||
      !borrow.racer60)return receipt;
@@ -182,7 +183,7 @@ public:
   for(std::size_t t=0;t<3;++t){const auto& state=world_->triggers_.triggers[t];const auto& source=world_->source_.source(t);
    std::array<g::TriggerOverlap50IN,g::triggerContactCapacity50IN> observations{};
    for(std::size_t i=0;i<state.collider.highWaterD0;++i){const auto id=state.collider.membersCC[i];if(!id)continue;
-    const auto c=g::nativeTriggerCollider50GA(world_->triggers_,id);if(c>=16||!geometry_[c].valid)return fail();
+    const auto c=g::nativeTriggerCollider50GA(world_->triggers_,id);if(c>=world_->triggers_.colliders.size()||!geometry_[c].valid)return fail();
     const auto& geometry=geometry_[c];g::TriggerSphereRootExitInput50IN input{};
     input.type2PreparedWorld=geometry.world;
     for(unsigned k=0;k<3;++k){input.sphere.localCenter.v[k]=source.sphere.center.v[k];input.rootCenter.v[k]=geometry.center.v[k];input.rootHalf.v[k]=geometry.half.v[k];}

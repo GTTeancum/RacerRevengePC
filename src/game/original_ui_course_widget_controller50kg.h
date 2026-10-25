@@ -21,6 +21,9 @@ struct OriginalUiCourseWidgetProfile50KG {
     std::uint32_t career100C0=0xffffffffu,courseSlot14E4=0,tier14E8=0;
     std::uint8_t progress219C=0;
     std::array<std::uint8_t,13> medals1938{};
+    // Actual selected profile facts, not a blanket native capability flag.
+    std::uint32_t selectedRider=0xffffffffu;
+    std::uint8_t selectedUnlock10FAC=0;
 };
 enum class OriginalUiCourseWidgetStepKind50KG :std::uint8_t {widget,audioStartLoop11,audioFade1,promptMask42C};
 struct OriginalUiCourseWidgetStep50KG {
@@ -51,7 +54,9 @@ public:
     bool initialNavigation(OriginalUiNavigation50KG&)const noexcept;
     OriginalUiCourseWidgetControllerStatus50KG moveCourse(const OriginalUiNavigation50KG&,bool forward,
         const OriginalUiCourseWidgetProfile50KG&,OriginalUiCourseWidgetPlan50KG&)const noexcept;
-    // Exact mode0/subtype1 row cycle from 1DF674/1DF810. Group3 is an
+    OriginalUiCourseWidgetControllerStatus50KG moveEventType(const OriginalUiNavigation50KG&,bool forward,
+        const OriginalUiCourseWidgetProfile50KG&,OriginalUiCourseWidgetPlan50KG&)const noexcept;
+    // Exact mode0 event-dependent row cycle from 1DF674/1DF810. Group3 is an
     // authenticated empty-control group with real association callbacks.
     OriginalUiCourseWidgetControllerStatus50KG moveRow(const OriginalUiNavigation50KG&,bool down,
         const OriginalUiCourseWidgetProfile50KG&,OriginalUiCourseWidgetPlan50KG&)const noexcept;

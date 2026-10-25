@@ -139,6 +139,6 @@ private:
     std::array<std::unique_ptr<Storage>,originalUiIpumAdditionalCapacity50KG> additional_{};
     // Logical constness: fixed-address immutable publications are appended,
     // never mutated. Existing Rider/static canonical leases remain valid.
-    mutable std::array<std::unique_ptr<Storage>,11> garage_{};
+    mutable std::array<std::unique_ptr<Storage>,33> garage_{};
 };
 } // namespace rr::assets

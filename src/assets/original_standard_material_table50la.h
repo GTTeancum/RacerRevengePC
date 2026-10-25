@@ -6,6 +6,7 @@ namespace original_position_stats_prestage50LA { class Owner; }
 #include "original_standard_model_resource50la.h"
 #include "original_standard_material_object50la.h"
 #include <memory>
+#include <vector>
 
 namespace ra_static_world50LA {class Owner;}
 namespace rr::game {class OriginalPositionStatsResources50LA;class OriginalPauseMaterialAdmission50LA;}
@@ -23,6 +24,7 @@ class OriginalStandardMaterialReferences50LA;
 class OriginalStandardScreenMaterialReference50LA;
 class OriginalPausePrimitiveReferences50LA;
 class OriginalStandardMaterialTable50LA;
+class OriginalStandardMaterialDomain50LA;
 class OriginalStandardMaterialAnimationInstance50LA;
 // A sealed observation of this actual table's complete current registry.
 // Initially construction-state; subsequent accepted native bindings remain
@@ -228,6 +230,17 @@ public:
     bool firstPending14D370(std::int32_t& row,const std::string*& name,
         OriginalStandardMaterialDiagnostic50LA&) const noexcept;
 private:
+    friend class OriginalStandardMaterialDomain50LA;
+    // Actual Application17CAD4 ->14D2F0 ->2985B0 consumes the service's decoded
+    // full-item read only AFTER131040 closes its virtual member (not the persistent device handle). The domain is
+    // the sole issuer and keeps this table private until template attachment.
+    // Bytes must equal this SAME authenticated APPSTART Mat_Stbl member.
+    bool prepareAppStartNames17CAD4(std::shared_ptr<const OriginalUiArchive50KG>,
+        const std::vector<std::uint8_t>& sourceBytes,OriginalStandardMaterialDiagnostic50LA&) noexcept;
+    // Aliases the same actual application's templates after their success.
+    // Promotes the SAME Storage/rows, without another parse or table copy.
+    bool attachAppStartTemplates(std::shared_ptr<const OriginalUiMaterialApplication50LA>,
+        OriginalStandardMaterialDiagnostic50LA&) noexcept;
     friend class rr::platform::OriginalUiSharedDialogMaterialHistory50KG;
     using UiSharedHistoryOwner=rr::platform::OriginalUiSharedDialogMaterialHistory50KG;
     using UiSharedHistorySlots=std::array<OriginalStandardMaterialUiSharedHistorySlot50LA,3>;
@@ -386,6 +399,10 @@ private:
         std::shared_ptr<const OriginalGarageScreenFallback50KG>,OriginalStandardMaterialDiagnostic50LA&)noexcept;
     bool release14D500(std::int32_t) noexcept;
     struct Storage;
+    // Every existing consumer uses storage_ as its template-ready boundary.
+    // Names-only storage is unreachable through ALL public row/lookup APIs,
+    // including prepared(), until the private attachment promotes it intact.
+    std::unique_ptr<Storage> appStartNames_;
     std::unique_ptr<Storage> storage_;
 };
 // The ACTUAL caller-owned36B970 path text at26E6AC, borrowed only during the

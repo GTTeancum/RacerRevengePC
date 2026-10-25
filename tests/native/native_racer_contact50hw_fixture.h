@@ -32,7 +32,7 @@ public:
     // Cold only. All resource owners must remain alive and immutable. Parameter
     // copies are per-racer; no borrowed pointer into a changing bank arena is kept.
     bool prepare(const Binding* binding,std::size_t count,std::string& error) {
-        if(ready_||!binding||count<2||count>maxRacers)
+        if(ready_||!binding||count<1||count>maxRacers)
             return fail(error,"invalid fresh heterogeneous contact binding");
         std::size_t rayCapacity=0,queryDepth=0,targetDepth=0;
         for(std::size_t i=0;i<count;++i){
@@ -69,7 +69,7 @@ public:
     Status run(const Body* input,std::size_t count,const Pair* order,std::size_t pairCount,
                Body* output,Receipt& receipt) noexcept {
         if(!ready_)return Status::Unprepared;
-        if(!input||!output||count!=count_||count<2||count>maxRacers||
+        if(!input||!output||count!=count_||count<1||count>maxRacers||
            pairCount>maxRacers*(maxRacers-1)||(pairCount&&!order))
             return Status::InvalidInput;
         if(!disjoint(input,count,order,pairCount,output,receipt))return Status::InvalidInput;
@@ -79,6 +79,9 @@ public:
         }
         for(std::size_t i=0;i<pairCount;++i)
             if(order[i].primary>=count||order[i].other>=count||order[i].primary==order[i].other)return Status::InvalidInput;
+        // Count1 is a real no-peer world. Pair validation above rejects any
+        // requested self/nonexistent partner; the ordinary empty pass preserves
+        // all source body/list bytes and produces a zero-contact receipt.
         std::array<Body,maxRacers> staged{};
         std::memcpy(staged.data(),input,count*sizeof(Body));
         std::array<ProcessedList,maxRacers> processed{};Receipt result{};

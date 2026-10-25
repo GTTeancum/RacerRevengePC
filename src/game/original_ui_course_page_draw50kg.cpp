@@ -114,27 +114,36 @@ bool OriginalUiCoursePageDraw50KG::prepare(
             p.vertices={vertex(0,y,z,0,v0),vertex(640,y,z,1,v0),vertex(640,y+h,z,1,v1),vertex(0,y+h,z,0,v1)};
             color(p,0xFFFFFF);}
         lapLabel126_=c->text;singularLap133_=singular->text;pluralLaps134_=e->text;
+        const auto* entrants=english.at(127);const auto* type2=english.at(131);const auto* type3=english.at(132);
+        if(!entrants||!type2||!type3)return fail(d,E::localization,0x1DAB00);
+        eventLabel125_=a->text;entrantsLabel127_=entrants->text;eventNames_={{b->text,type2->text,type3->text}};
         fontImage_=fontImage;packetZ_=z;lapCount_=3;
         archive_=std::move(archive);images_=std::move(images);pageIdentity_=page.identity();
         packets_=std::move(packets);texts_=std::move(texts);prepared_=true;return true;
     }catch(...){return fail(d,E::allocation,0x1D8F10);}
 }
 bool OriginalUiCoursePageDraw50KG::setLapCount(std::uint32_t laps,D& d)noexcept{
+    return setEventSelection(eventSubtype_,laps,eventEntrants_,d);
+}
+bool OriginalUiCoursePageDraw50KG::setEventSelection(std::uint32_t subtype,std::uint32_t laps,std::uint32_t entrants,D& d)noexcept{
     d={};if(!prepared())return fail(d,poisoned_?E::poisoned:E::notPrepared,0x1DAF78);
-    if(tournament_)return fail(d,E::geometry,0x1DB814);
-    if(laps<1||laps>25)return fail(d,E::geometry,0x1DAF78);
-    if(laps==lapCount_)return true;
+    if(tournament_||subtype<1||subtype>3||laps<1||laps>25||entrants<1||entrants>8)return fail(d,E::geometry,0x1DAB00);
+    if(subtype==eventSubtype_&&laps==lapCount_&&entrants==eventEntrants_)return true;
     const auto* font=images_->font(fontImage_);const auto* atlas=images_->textures()->texture(fontImage_);
     if(!font||!atlas)return fail(d,E::images,0x1DB1C8);
     try{
-        //1DB090/1DB1B4 select the authenticated singular/plural format. Keep
-        // the source60-character allocation and original layout/material owner.
-        const auto formatted=lapLabel126_+"  "+std::to_string(laps)+" "+(laps==1?singularLap133_:pluralLaps134_);
-        auto packet=packets_[3];packet.vertices.clear();OriginalUiCoursePageTextSnapshot50KG snapshot;
-        snapshot.color54=texts_[1].color54;
-        if(!embeddedText(formatted,0xB30,147,*font,atlas->texture,packetZ_,snapshot,packet,d))return false;
-        packets_[3]=std::move(packet);texts_[1]=std::move(snapshot);lapCount_=laps;return true;
-    }catch(...){return fail(d,E::allocation,0x1DB1C8);}
+        auto title=packets_[0],detail=packets_[3];title.vertices.clear();detail.vertices.clear();
+        OriginalUiCoursePageTextSnapshot50KG titleText,detailText;
+        titleText.color54=texts_[0].color54;detailText.color54=texts_[1].color54;
+        if(!embeddedText(eventLabel125_+"  "+eventNames_[subtype-1],0xAC0,101,*font,atlas->texture,packetZ_,titleText,title,d))return false;
+        // Original mode0 branches: LOC126 + singular/plural laps, LOC127 +
+        // entrant count, or no B30/580/5E0 submission for subtype3.
+        const auto formatted=subtype==2?entrantsLabel127_+" "+std::to_string(entrants):
+            lapLabel126_+"  "+std::to_string(laps)+" "+(laps==1?singularLap133_:pluralLaps134_);
+        if(!embeddedText(formatted,0xB30,147,*font,atlas->texture,packetZ_,detailText,detail,d))return false;
+        packets_[0]=std::move(title);packets_[3]=std::move(detail);texts_[0]=std::move(titleText);texts_[1]=std::move(detailText);
+        eventSubtype_=subtype;lapCount_=laps;eventEntrants_=entrants;return true;
+    }catch(...){return fail(d,E::allocation,0x1DAB00);}
 }
 bool OriginalUiCoursePageDraw50KG::prepareTournamentFresh(
     std::shared_ptr<const assets::OriginalUiArchive50KG> archive,const assets::OriginalUiEnglish50KG& english,

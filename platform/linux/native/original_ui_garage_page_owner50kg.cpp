@@ -1593,11 +1593,13 @@ bool OriginalUiGaragePageOwner50KG::continueEntry1FAAF0(Diagnostic& d)noexcept {
         OriginalUiRiderProfileOwner50KG::GarageProfileSnapshot actual;
         if(!issuer_->riderProfile->selectedGarageProfileSnapshot(actual))
             return fail(d,Status::entryProfilePending,0x1FAB38);
-        //This native SceneAssets factory authenticates19E only. Do not recolor
-        //or publish statistics for another career while borrowing that model.
+        // Do not recolor or publish statistics for another career while
+        // borrowing the manager's authenticated selected model.
         //The original -1/packed fallback is not manufactured by this API.
         pendingPC_=0x1FAB5C;
-        if(actual.career.career100C0!=19||actual.career.stamp.mode34!=2)
+        if(!issuer_->garageCustodyOwner_||!issuer_->garageCustodyOwner_->sceneAssets_||
+           issuer_->garageCustodyOwner_->sceneAssets_->selectedCareer()!=static_cast<int>(actual.career.career100C0)||
+           actual.career.stamp.mode34!=2)
             return fail(d,Status::entryProfilePending,0x1FAB5C);
         EntryProfile held;held.owner=issuer_->riderProfile;
         held.generation=actual.career.stamp.generation;held.mode=actual.career.stamp.mode34;

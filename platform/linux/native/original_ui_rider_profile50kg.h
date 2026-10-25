@@ -12,6 +12,7 @@
 #include "../../../src/game/original_ui_hall_records50kg.h"
 
 namespace original_main_entry50KG { struct Application; }
+namespace original_racer_manager_entity { class Owner; }
 namespace rr::game { struct ControlPresets49D; struct OriginalUiGameSettingsProfile50KG; }
 
 namespace rr::platform {
@@ -146,6 +147,8 @@ public:
     struct CourseRaceSelection {
         std::uint32_t course=0,planet=0,rider=0,subtype=0,laps=0,entrants=0;
         std::uint16_t packed1125C=0;
+        // Original frontend mode, independent of the native loader mode.
+        std::uint32_t mode34=0;
     };
     bool courseRaceSnapshot(CourseRaceSelection&)const noexcept;
     bool riderConfirmSnapshot(std::uint8_t& packed1125D,std::uint32_t& comparison100C0)const noexcept;
@@ -198,6 +201,8 @@ public:
         TournamentTextMetadataSnapshot&) const noexcept;
 private:
     friend struct ::original_main_entry50KG::Application;
+    friend class ::original_racer_manager_entity::Owner;
+    bool commitRacerManager1AD520(const CourseRaceSelection& expected,CourseRaceSelection& actual)noexcept;
     // Actual Application2DC owner only. Called at the future admitted race
     // constructor boundary, never on a page proposal or resource prewarm.
     // Represents only proven7E4 bit0; upper seven bits stay unrepresented.

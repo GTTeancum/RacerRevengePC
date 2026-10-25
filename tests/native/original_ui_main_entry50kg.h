@@ -180,6 +180,10 @@ struct Application {
     friend class rr::platform::OriginalUiMemoryCardConstructor50KG;
     friend class rr::platform::OriginalUiFrontend50KG;
     bool enabled=false;
+    // Host-only device choice from an accepted Course Confirm, not save/profile
+    // data. A new SDL window must authenticate and neutral-arm its own device;
+    // the old window's instance ID and button levels are never reused.
+    mutable bool courseHumanController=false;
     // Persistent native preview request only; never a profile unlock or race grant.
     // Legacy Clegg request remains separate; each frontend authenticates its caches.
     bool prepareCleggLockedPreview=false;
@@ -564,6 +568,8 @@ private:
     // Its dependencies pin Video/templates/runtime/list, never Application,
     // so these two application-owned handles do not form a reference cycle.
     mutable std::shared_ptr<const rr::assets::OriginalStandardMaterialContext50LA> materialContextOwner_;
+    // Created by this Application before original APPSTART/material loading.
+    // Canonical tables remain lazy; the same service pair is never replaced.
     mutable std::shared_ptr<rr::assets::OriginalStandardMaterialDomain50LA> standardMaterialDomainOwner_;
     // Native identity of each actual detached Tournament construction attempt.
     // No source clock/profile/result meaning. Never reset on page return.
@@ -830,12 +836,15 @@ public:
     std::shared_ptr<rr::assets::OriginalStandardMaterialDomain50LA> standardMaterialDomain() const {
         require(materialApplication&&materialApplication->prepared(),
             "canonical domain requires actual application APPSTART owners");
-        if(!standardMaterialDomainOwner_){
-            auto domain=std::make_shared<rr::assets::OriginalStandardMaterialDomain50LA>();
+        require(bool(standardMaterialDomainOwner_),"application early native service owner missing");
+        if(standardMaterialDomainOwner_->prepared())
+            require(standardMaterialDomainOwner_->application_==materialApplication&&
+                standardMaterialDomainOwner_->serviceAppStart_==materialApplication->appStart(),
+                "application canonical material/input owner changed after preparation");
+        if(!standardMaterialDomainOwner_->prepared()){
             rr::assets::OriginalStandardMaterialDiagnostic50LA diagnostic;
-            require(domain->prepareFresh(materialApplication,diagnostic),
+            require(standardMaterialDomainOwner_->prepareFresh(materialApplication,diagnostic),
                 "application canonical material/program/texture domain rejected");
-            standardMaterialDomainOwner_=std::move(domain);
         }
         return standardMaterialDomainOwner_;
     }
@@ -897,10 +906,42 @@ public:
         const std::filesystem::path& originalRoot) const {
         require(bool(materialApplication),"application material owner missing");
         if(!materialApplication->prepared()){
-            auto archive=readArchive(originalRoot,rr::assets::OriginalUiArchiveId50KG::appStart);
+            require(bool(standardMaterialDomainOwner_),"application early native service owner missing");
+            // Retain the first actual authenticated input before any template
+            // work. A failed template attempt reuses it, never remounts a copy.
+            auto archive=standardMaterialDomainOwner_->serviceAppStart_;
+            if(!archive)archive=standardMaterialDomainOwner_->resolver_->registeredAppStart17CAB8();
+            if(!archive)archive=readArchive(originalRoot,rr::assets::OriginalUiArchiveId50KG::appStart);
+            // Actual17CAB8, activate=0: source names/rows precede both native
+            // mounting and DefaultMT/ScreenMT consumers. A completed call is
+            // resumed, never replayed, when a later native/template step fails.
+            rr::assets::OriginalStandardTextureDiagnostic50LA registrationDiagnostic;
+            require(standardMaterialDomainOwner_->resolver_->registerAppStart17CAB8(archive,registrationDiagnostic),
+                "application fresh APPSTART source registration rejected");
+            rr::assets::OriginalStandardMaterialDiagnostic50LA serviceDiagnostic;
+            require(standardMaterialDomainOwner_->retainNativeAppStart(archive,serviceDiagnostic),
+                "application early native APPSTART input custody rejected");
+            require(standardMaterialDomainOwner_->prepareAppStartNames17CAD4(serviceDiagnostic),
+                "application first APPSTART material-name source read rejected");
+            require(standardMaterialDomainOwner_->prepareAppStartPrograms17CAE8(serviceDiagnostic),
+                "application early canonical program-name table rejected");
             rr::assets::OriginalUiMaterialDiagnostic50KG diagnostic;
-            require(materialApplication->prepareFreshApplication(std::move(archive),diagnostic),
+            require(materialApplication->prepareSourceApplication(std::move(archive),
+                standardMaterialDomainOwner_->resolver_,standardMaterialDomainOwner_->programs_,diagnostic),
                 "application authentic DefaultMT/ScreenMT owners rejected");
+        }else{
+            // Compatibility for callers that prepared the public material owner
+            // directly. Retain its actual input, but do not infer that this
+            // late native mount preceded those already-completed consumers.
+            require(bool(standardMaterialDomainOwner_),"application early native service owner missing");
+            if(!standardMaterialDomainOwner_->serviceAppStart_){
+                rr::assets::OriginalStandardMaterialDiagnostic50LA serviceDiagnostic;
+                require(standardMaterialDomainOwner_->retainNativeAppStart(
+                    materialApplication->appStart(),serviceDiagnostic),
+                    "application existing native APPSTART input custody rejected");
+            }
+            require(standardMaterialDomainOwner_->serviceAppStart_==materialApplication->appStart(),
+                "application APPSTART owner changed after native input custody");
         }
         return materialApplication->appStart();
     }
@@ -936,6 +977,14 @@ public:
         :animationClockBackend_(clock),controlsProfile(std::move(controls)) {
         // Retain the one application epoch even on the disabled-Main branch.
         require(bool(animationClockBackend_),"application animation clock owner missing");
+        // Actual Application lifetime, before APPSTART IO or template consumers,
+        // including direct entry and disabled Main. This is native ownership;
+        // original13FB6C publication/12CEA0 registration are still unimplemented.
+        auto domain=std::make_shared<rr::assets::OriginalStandardMaterialDomain50LA>();
+        rr::assets::OriginalStandardMaterialDiagnostic50LA serviceDiagnostic;
+        require(domain->prepareFreshNativeService(serviceDiagnostic),
+            "application early native file capacity/provider rejected");
+        standardMaterialDomainOwner_=std::move(domain);
         const char* originalRoot=std::getenv("RR_ORIGINAL_ASSET_ROOT");
         require(!originalRoot||*originalRoot,"RR_ORIGINAL_ASSET_ROOT must name a nonempty directory");
         decodeRiderImagesInProcess=originalRoot&&*originalRoot;
@@ -1813,6 +1862,12 @@ private:
     // Immutable catalog resources only. They own no Entity/material/GPU/audio
     // references and can be released normally even when the destination is
     // unavailable. A failed native resource attempt is retained, not replayed.
+    struct GarageCareerResources {
+        bool attempted=false;
+        std::shared_ptr<const rr::assets::OriginalUiGarageSceneAssets50KG> assets;
+        rr::platform::OriginalUiGarageDestinationDiagnostic50KG failure{};
+    };
+    std::array<GarageCareerResources,27> garageCareerResources_{};
     bool garageDestinationAssetsAttempted_=false;
     std::shared_ptr<const rr::assets::OriginalUiArchive50KG> garageDestinationArchive_,garageDestinationPod19_;
     std::shared_ptr<const rr::assets::OriginalUiGarageSceneAssets50KG> garageDestinationAssets_;
@@ -2356,7 +2411,7 @@ public:
             " course_pc="+std::to_string(diagnostic.course.sourcePC)+
             " renderer="+std::to_string(static_cast<unsigned>(diagnostic.renderer.error))+garageRuntimeFailureText());
     }
-    void input(std::uint8_t sourceInput,rr::platform::WindowControllerPresence50DQ presence=rr::platform::WindowControllerPresence50DQ::Unknown,
+    Status input(std::uint8_t sourceInput,rr::platform::WindowControllerPresence50DQ presence=rr::platform::WindowControllerPresence50DQ::Unknown,
         std::uint8_t controller=0) {
         rr::platform::OriginalUiMainSessionInput50KG in;in.controller=controller;in.originalInput=sourceInput;in.secondControllerObservation=presence;
         rr::platform::OriginalUiFrontendInputReceipt50KG receipt;
@@ -2536,6 +2591,7 @@ public:
                 <<" renderer="<<unsigned(diagnostic.renderer.error)
                 <<"; no destination or gameplay entered.\n";
         }else if(status!=Status::ok&&status!=Status::noChange&&status!=Status::routeAccepted)fail("input");
+        return status;
     }
     void reportElapsedFailure(const original_ui_elapsed50LH::Interval& interval,std::uint64_t before,
         std::uint64_t now,std::uint64_t pending,StageClock::time_point observedNow) const {

@@ -57,6 +57,7 @@ public:
     bool popupTemplatesHidden438()const noexcept;
     const std::array<std::vector<OriginalUiCoursePopupTextClone50KG>,9>* popupClones438()const noexcept;
     bool moveCourse(bool forward,const OriginalUiCourseWidgetProfile50KG&,const OriginalUiCourseWidgetHooks50KG&,OriginalUiCourseWidgetDiagnostic50KG&)noexcept;
+    bool moveEventType(bool forward,const OriginalUiCourseWidgetProfile50KG&,const OriginalUiCourseWidgetHooks50KG&,OriginalUiCourseWidgetDiagnostic50KG&)noexcept;
     bool moveRow(bool down,const OriginalUiCourseWidgetProfile50KG&,const OriginalUiCourseWidgetHooks50KG&,OriginalUiCourseWidgetDiagnostic50KG&)noexcept;
     bool phase(OriginalUiCourseWidgetPhase50KG,const OriginalUiCourseWidgetProfile50KG&,const OriginalUiCourseWidgetHooks50KG&,OriginalUiCourseWidgetDiagnostic50KG&)noexcept;
     bool apply(const OriginalUiCourseWidgetStep50KG*,std::size_t,const OriginalUiCourseWidgetHooks50KG&,OriginalUiCourseWidgetDiagnostic50KG&)noexcept;

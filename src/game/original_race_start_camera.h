@@ -20,6 +20,7 @@ struct RaceStartRacerBody {
 struct RaceStartRacerBank {
     std::uint64_t sessionGeneration=0;
     std::array<RaceStartRacerBody,8> racers{};
+    std::size_t racerCount=8; // Actual manager30, never padded racers.
 };
 struct RaceStartGridNode {
     RaceStartVector position{};
@@ -33,6 +34,7 @@ struct OriginalRaceStartCamera {
     std::uint64_t sessionGeneration=0;
     std::array<std::uint64_t,8> racerKeys{}, bodyNodeKeys{};
     bool prepared=false, active=false;
+    std::size_t racerCount=8;
     std::array<RaceStartGridNode,12> grid{};
     std::array<std::int32_t,12> route{{-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1}};
     std::int32_t routeCount1FC=0, nextRoute1F8=0;

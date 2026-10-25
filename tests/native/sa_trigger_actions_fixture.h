@@ -27,6 +27,7 @@ enum class Status {Complete,Unprepared,Input,IgnoredPlayer,Entry,Action,Service}
 class Owner final {
  const sa_trigger_authoring::Owner* source_=nullptr;
  std::array<RacerIdentities,racers> racers_{};
+ std::size_t racerCount_=0;
  g::NativeTriggerGroup50GA group_{};
  struct Geometry {const g::Type2ResourceView49X* resource=nullptr;g::BodyMatrix48G world{};bool valid=false;};
  std::array<Geometry,colliders> geometry_{};
@@ -56,10 +57,10 @@ class Owner final {
   // still owns lifecycle membership but never writes any racer's C80.
   // PLAYER exclusion is identity-based, independent of slot and AI role.
   std::array<g::LostAiRacer50IN,racers> destinations{};
-  for(std::size_t i=0;i<racers;++i)destinations[i]={racers_[i].main690,
+  for(std::size_t i=0;i<racerCount_;++i)destinations[i]={racers_[i].main690,
     racers_[i].main690==lease_->racerMain690?lease_->nodeC80:nullptr};
   const auto result=g::triggerLostAi50IN(true,call.otherCollider,
-    {action.targetNodeIndex,action.reset},destinations.data(),destinations.size(),originalAiNodeCount_);
+    {action.targetNodeIndex,action.reset},destinations.data(),racerCount_,originalAiNodeCount_);
   actionFailed_=actionFailed_||result.status!=g::TriggerActionStatus50IN::Complete;
   group_.actionsFailed=actionFailed_;counters_.lostAiWrites+=result.changedRacers;
  }
@@ -73,16 +74,16 @@ public:
  Owner(Owner&&)=delete;Owner&operator=(Owner&&)=delete;
  bool prepare(const sa_trigger_authoring::Owner& source,
      const std::array<RacerIdentities,racers>& identities,
-     std::uint32_t playerPrefixCount34,std::uint32_t aiNodeCount)noexcept {
+     std::uint32_t playerPrefixCount34,std::uint32_t aiNodeCount,std::size_t racerCount=racers)noexcept {
   if(attempted_)return false;attempted_=true;
-  if(!source.ready()||aiNodeCount<=sa_trigger_authoring::maxTargetNodeIndex||playerPrefixCount34>racers)return false;
+  if(!source.ready()||aiNodeCount<=sa_trigger_authoring::maxTargetNodeIndex||!racerCount||racerCount>racers||playerPrefixCount34>racerCount)return false;
   // Original1B5340 resolves PLAYER by source roster prefix[0,manager+34),
   // via1AF330(index)->main690. The caller supplies that genuine count and
   // source-order identities. It is not class58, AI role, or camera choice.
   // Zero explicitly means an empty source prefix, never a slot0 fallback.
   std::array<std::uint32_t,colliders> ids{};
-  for(std::size_t i=0;i<racers;++i){ids[i*2]=identities[i].main690;ids[i*2+1]=identities[i].secondary;}
-  for(std::size_t i=0;i<ids.size();++i){
+  for(std::size_t i=0;i<racerCount;++i){ids[i*2]=identities[i].main690;ids[i*2+1]=identities[i].secondary;}
+  for(std::size_t i=0;i<racerCount*2;++i){
    if(!ids[i]||(ids[i]>=firstTriggerIdentity&&ids[i]<firstTriggerIdentity+sa_trigger_authoring::count))return false;
    for(std::size_t j=0;j<i;++j)if(ids[i]==ids[j])return false;
   }
@@ -93,8 +94,9 @@ public:
   // Shared MA/SA candidate extension: capacity13, default GA active count10.
   // Set exactly four before any state writes. No zero-filled extra triggers.
   if(!group_.triggers.setCount(sa_trigger_authoring::count))return false;
-  source_=&source;racers_=identities;playerPrefixCount34_=playerPrefixCount34;originalAiNodeCount_=aiNodeCount;
-  for(std::size_t i=0;i<ids.size();++i)group_.colliders[i].identity=ids[i];
+  source_=&source;racers_=identities;racerCount_=racerCount;playerPrefixCount34_=playerPrefixCount34;originalAiNodeCount_=aiNodeCount;
+  if(!group_.colliders.setCount(racerCount*2))return false;
+  for(std::size_t i=0;i<racerCount*2;++i)group_.colliders[i].identity=ids[i];
   for(std::size_t i=0;i<group_.triggers.size();++i){const auto& s=source.source(i);auto& state=group_.triggers[i];
    state.flags29=s.startEnabled?3u:0u;
    state.flags1B8=static_cast<std::uint8_t>(3u|(s.oneTimeOnly?4u:0u));
@@ -146,7 +148,7 @@ public:
  // arena visit. The live C80 lease must outlive the whole synchronous query.
  bool beginQuery(const ActionLease& lease)noexcept {
   if(!ready_||lease_||terminal_!=Status::Complete||!lease.nodeC80)return false;
-  bool found=false;for(const auto& r:racers_)found=found||r.main690==lease.racerMain690;
+  bool found=false;for(std::size_t i=0;i<racerCount_;++i)found=found||racers_[i].main690==lease.racerMain690;
   if(!found)return false;lease_=&lease;return true;
  }
  bool endQuery()noexcept {

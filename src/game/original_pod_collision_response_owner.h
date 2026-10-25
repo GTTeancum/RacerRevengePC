@@ -54,15 +54,15 @@ public:
     OriginalPodCollisionResponseOwners(OriginalPodCollisionResponseOwners&&)=delete;
     OriginalPodCollisionResponseOwners& operator=(OriginalPodCollisionResponseOwners&&)=delete;
 
-    // Bounded actual eight-racer configurations: zero humans/eight opponents,
-    // or one human/seven opponents. The actual packed profile is mandatory.
+    // Bounded actual roster: zero or one human, one through eight total.
+    // The actual packed profile is mandatory; unused fixed pool rows are not racers.
     // The source creates all eight rows in both cases;1AE524..1AE540 selects
     // each AI row by its opponent ordinal plus profile human count. A human
     // prefix is never rebound to an AI D40 or claimed as a completed AI owner.
     bool prepare(std::uint64_t session,std::uint16_t actualPacked1125C) noexcept {
         const auto humans=std::uint32_t((actualPacked1125C>>5u)&3u);
         const auto opponents=std::uint32_t((actualPacked1125C>>7u)&15u);
-        if(closed_||session_||!session||humans>1u||humans+opponents!=count)return false;
+        if(closed_||session_||!session||humans>1u||! (humans+opponents)||humans+opponents>count)return false;
         session_=session;humanCount_=humans;opponentCount_=opponents;
         for(std::size_t i=0;i<count;++i){auto& row=emitters_[i];
             row.pool_=this;row.poolOrdinal_=static_cast<std::uint32_t>(i);
@@ -81,6 +81,7 @@ public:
             actualManagerOrdinal-humanCount_<opponentCount_;
     }
     std::uint32_t humanCount()const noexcept{return humanCount_;}
+    std::uint32_t racerCount()const noexcept{return humanCount_+opponentCount_;}
     // Retains the native lifetime/vehicle identity of the same selected row.
     // This does not execute source GameObject virtual0C or child traversal.
     // The source row is borrowed, never cloned into a racer-bank snapshot.

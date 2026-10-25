@@ -1150,7 +1150,7 @@ bool OriginalUiGarageSession50KG::unsealedRenderFailurePreflightCurrent(const Ap
         visibility_->matchesRetainedSceneOwnership(grant_,sceneAssets_,*page_,*podScene_)&&
         visibility_->nativeTerminalRenderQuiescent(*page_,unsealedRenderPublication_)&&
         page_->sourceEntryReturned1FAE00()&&page_->entryProfileCurrent()&&page_->entryProfile_&&
-        page_->entryProfile_->unspent2194==0&&page_->entryProfile_->mode==2&&page_->entryProfile_->career100C0==19&&
+        page_->entryProfile_->unspent2194==0&&page_->entryProfile_->mode==2&&sceneAssets_&&page_->entryProfile_->career100C0==sceneAssets_->selectedCareer()&&
         widgets_&&widgets_->pageEntryCustodyCurrent(*page_)&&widgets_->fog_&&widgets_->fog_->lights_&&
         widgets_->fog_->lights_->search_&&widgets_->fog_->lights_->search_->selected_;
 }
@@ -1302,7 +1302,7 @@ bool OriginalUiGarageSession50KG::actorSampleFailurePreflightCurrent(const Appli
         visibility_&&podScene_->currentPrefix()&&podScene_->visibility_==visibility_&&
         visibility_->matchesRetainedSceneOwnership(grant_,sceneAssets_,*page_,*podScene_)&&
         page_->sourceEntryReturned1FAE00()&&page_->entryProfileCurrent()&&page_->entryProfile_&&
-        page_->entryProfile_->unspent2194==0&&page_->entryProfile_->mode==2&&page_->entryProfile_->career100C0==19&&
+        page_->entryProfile_->unspent2194==0&&page_->entryProfile_->mode==2&&sceneAssets_&&page_->entryProfile_->career100C0==sceneAssets_->selectedCareer()&&
         widgets_&&widgets_->pageEntryCustodyCurrent(*page_)&&widgets_->fog_&&widgets_->fog_->lights_&&
         widgets_->fog_->lights_->search_&&widgets_->fog_->lights_->search_->selected_;
 }
@@ -1415,7 +1415,7 @@ bool OriginalUiGarageSession50KG::publishedObservationFailurePreflightCurrent(co
        !podScene_||!visibility_||page_->borrowScene4C0()!=podScene_||!podScene_->currentPrefix()||
        podScene_->visibility_!=visibility_||!visibility_->matchesRetainedSceneOwnership(grant_,sceneAssets_,*page_,*podScene_)||
        !page_->sourceEntryReturned1FAE00()||!page_->entryProfileCurrent()||!page_->entryProfile_||
-       page_->entryProfile_->unspent2194!=0||page_->entryProfile_->mode!=2||page_->entryProfile_->career100C0!=19||
+       page_->entryProfile_->unspent2194!=0||page_->entryProfile_->mode!=2||!sceneAssets_||page_->entryProfile_->career100C0!=sceneAssets_->selectedCareer()||
        !widgets_||!widgets_->pageEntryCustodyCurrent(*page_)||!widgets_->fog_||!widgets_->fog_->lights_||
        !widgets_->fog_->lights_->search_||!widgets_->fog_->lights_->search_->selected_||!managerBankLease_||
        managerPageCount148_!=1||!managerPageTable144_||managerPageTable144_[0]!=&page_->entity_||
@@ -1484,7 +1484,7 @@ bool OriginalUiGarageSession50KG::prepareNormalRetirement(const Application& roo
        !managerPublished1B8274_||managerLoadPhase_!=ManagerLoadPhase::published||
        !page_||!podScene_||!page_->sourceEntryReturned1FAE00()||
        !page_->entryProfileCurrent()||!page_->entryProfile_||page_->entryProfile_->unspent2194!=0||
-       page_->entryProfile_->mode!=2||page_->entryProfile_->career100C0!=19||
+       page_->entryProfile_->mode!=2||!sceneAssets_||page_->entryProfile_->career100C0!=sceneAssets_->selectedCareer()||
        !widgets_||!widgets_->pageEntryCustodyCurrent(*page_)||!widgets_->fog_||
        !widgets_->fog_->lights_||!widgets_->fog_->lights_->search_||
        !widgets_->fog_->lights_->search_->selected_||!managerBankLease_||
@@ -2242,8 +2242,10 @@ void Application::prepareGarageDestinationResources1F241C(Frontend& frontend,
         }
         rr::platform::OriginalUiRiderProfileOwner50KG::GarageProfileSnapshot selected;
         if(riderProfile->commonProfile()!=profile.get()||!riderProfile->selectedGarageProfileSnapshot(selected)||
-           selected.career.career100C0!=19||selected.career.stamp.mode34!=2||selected.career.unspent2194!=0||
-           decision.selectedRider!=19){
+           selected.career.career100C0>=frontend.garageCareerResources_.size()||
+           !rr::assets::originalUiGaragePodArchive50KG(selected.career.career100C0)||
+           selected.career.stamp.mode34!=2||selected.career.unspent2194!=0||
+           decision.selectedRider!=selected.career.career100C0){
             d.status=S::profile;d.pendingSourcePC=0x1D1CD0;return;
         }
         if(garageCustodyOwner_||garageCustodyAttempted_){
@@ -2254,6 +2256,23 @@ void Application::prepareGarageDestinationResources1F241C(Frontend& frontend,
                 d.pendingSourcePC=garageCustodyOwner_->entryFailureSourcePC_;
             return;
         }
+        auto& retained=frontend.garageCareerResources_[selected.career.career100C0];
+        frontend.garageDestinationAssetsAttempted_=retained.attempted;
+        frontend.garageDestinationAssets_=retained.assets;
+        frontend.garageDestinationFailure_=retained.failure;
+        frontend.garageDestinationPod19_=retained.assets?retained.assets->selectedArchive():nullptr;
+        // Keep the exact cold resource result for this career on every return,
+        // including an allocation failure. Never replay a failed source attempt.
+        struct RetainCareer {
+            Frontend::GarageCareerResources& slot;Frontend& frontend;
+            rr::platform::OriginalUiGarageDestinationDiagnostic50KG& diagnostic;
+            ~RetainCareer()noexcept {
+                slot.attempted=frontend.garageDestinationAssetsAttempted_;
+                slot.assets=frontend.garageDestinationAssets_;
+                try{slot.failure=slot.assets?frontend.garageDestinationFailure_:diagnostic;}
+                catch(...){slot.failure.status=S::allocation;}
+            }
+        } retain{retained,frontend,d};
         if(frontend.garageDestinationAssetsAttempted_){
             if(!frontend.garageDestinationAssets_){
                 d=frontend.garageDestinationFailure_;d.proposalSerial=proposal.serial;return;
@@ -2263,9 +2282,10 @@ void Application::prepareGarageDestinationResources1F241C(Frontend& frontend,
             // The catalog is the sole path/digest authority. Reuse the native
             // Root's exact assetRoot, never an environment/test supplied bank.
             d.status=S::archive;d.pendingSourcePC=0x1D1950;d.archive=Id::garage;
-            frontend.garageDestinationArchive_=readArchive(assetRoot,Id::garage);
-            d.archive=Id::garagePod19;
-            frontend.garageDestinationPod19_=readArchive(assetRoot,Id::garagePod19);
+            if(!frontend.garageDestinationArchive_)
+                frontend.garageDestinationArchive_=readArchive(assetRoot,Id::garage);
+            d.archive=rr::assets::originalUiGaragePodArchive50KG(selected.career.career100C0)->id;
+            frontend.garageDestinationPod19_=readArchive(assetRoot,d.archive);
             d.status=S::sceneAssets;d.pendingSourcePC=0x2710F0;
             auto assets=std::make_shared<SceneAssets>();
             if(!assets->load(frontend.garageDestinationArchive_,frontend.garageDestinationPod19_,d.scene)){
@@ -2275,6 +2295,7 @@ void Application::prepareGarageDestinationResources1F241C(Frontend& frontend,
             frontend.garageDestinationAssets_=std::move(assets);
         }
         if(!frontend.garageDestinationAssets_->loaded()||
+           frontend.garageDestinationAssets_->selectedCareer()!=static_cast<int>(selected.career.career100C0)||
            frontend.garageDestinationAssets_->archive()!=frontend.garageDestinationArchive_){
             d.status=S::sceneAssets;d.pendingSourcePC=0x2710F0;return;
         }
@@ -2512,13 +2533,14 @@ bool Application::prepareGarageManagerEntry1D1950(Frontend& frontend,
        !sourceLightManager426F60Owner_||!sourceLightManager426F60Owner_->sourceMutationAvailable()||
        sourceBuildUiResFiles344_!=0)
         return fail(Status::input,0x1B823C,"Garage entry needs actual shared dispatcher/dialogs/LightManager, native Frontend, material namespace and prepared audio");
-    //The only authenticated model population is19E. Read the actual retained
-    //career before any mutation; do not seed a profile or silently select19.
+    // Read the actual retained career and its exact authenticated model before
+    // any mutation. Do not seed a profile or substitute another racer.
     rr::platform::OriginalUiRiderProfileOwner50KG::GarageProfileSnapshot selected;
     if(!riderProfile||riderProfile->commonProfile()!=profile.get()||
-       !riderProfile->selectedGarageProfileSnapshot(selected)||selected.career.career100C0!=19||
+       !riderProfile->selectedGarageProfileSnapshot(selected)||
+       !assets||assets->selectedCareer()!=static_cast<int>(selected.career.career100C0)||
        selected.career.stamp.mode34!=2||selected.career.unspent2194!=0)
-        return fail(Status::input,0x1D1CD0,"Garage entry is bounded to the actual zero-cash career19 profile");
+        return fail(Status::input,0x1D1CD0,"Garage entry is bounded to the actual zero-cash selected-career profile");
     try {
         auto next=std::shared_ptr<Custody>(new Custody(*this,std::move(assets)));
         garageCustodyOwner_=std::move(next);garageCustodyAttempted_=true;

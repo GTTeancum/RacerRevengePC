@@ -406,15 +406,17 @@ public:
     }
     // Native continuation of this SAME racer owner. The caller lends the real
     // track4A0 provider and actual330/334 domain; missing providers are never
-    // converted into source-null branches. This admitted caller has launch1,
-    // so2109D8 does not consume the unrelated racer3C special-mode field.
+    // converted into source-null branches.2109D8 only suppresses the parent
+    // for launch3 with a nonzero actual racer3C ghost mode. Fresh ordinary
+    // racers retain their source20F660 mode3C=0 for all three event types.
     OriginalRacerEntityColdResult50LA constructPostOverlay210890(
         OriginalGcParticleManager50KG& actualParticles4A0,
         const UndertrackPhysicsDomain50EW& actualHeights,
         const std::uint32_t& actualLaunch11258,std::uint64_t particleKey)noexcept {
         using S=OriginalRacerEntityColdStatus50LA;
         if(postOverlayAttempted_||released_)return result(S::alreadyConstructed,0x210890u);
-        if(!atParticleParentColdCut210A18()||actualLaunch11258!=1u||
+        if(!atParticleParentColdCut210A18()||actualLaunch11258<1u||actualLaunch11258>3u||
+           (actualLaunch11258==3u&&mode3C_!=0u)||
            !actualParticles4A0.prepared()||!particleKey||particleKey==racer.objectKey||
            particleKey==detached7F8.objectKey||particleKey==overlay240.component.objectKey||
            actualHeights.water334==UndertrackHeightOwner50EW::Unbound||
@@ -435,7 +437,7 @@ public:
             slots80C_=std::make_unique<Slots4>();
             slots818_=std::make_unique<Slots10>();
         }catch(...){return result(S::allocation,0x210890u);}
-        // Nonnull actual4A0 and launch1 take the real2109F0/210A04 branch.
+        // Nonnull actual4A0 and the actual non-ghost branch reach2109F0/210A04.
         const auto initialized=initializeOriginalWreckComponent50LA(particle7FC,
             OriginalWreckComponentKind50LA::entity141300,binding_.sessionGeneration,
             particleKey,true,*binding_.actualObjectCount423F60);

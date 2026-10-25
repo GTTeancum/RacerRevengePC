@@ -18,7 +18,8 @@ struct OriginalUiMaterialTemplateStorage50KG;
 enum class OriginalUiArchiveId50KG : std::uint8_t {
     appStart = 0, localization = 1, overlays = 2, fonts = 3, mainMenu = 4,
     backgrounds = 5, controllerPopup = 6, course = 7, rider = 8, options = 9, podTextures = 10, podPhysics = 11, tournament = 12, hallOfFame = 13,
-    garage = 14, garagePod19 = 15
+    garage = 14, garagePod19 = 15,
+    garagePod01 = 16, garagePod02 = 17, garagePod03 = 18, garagePod04 = 19, garagePod07 = 20, garagePod08 = 21, garagePod09 = 22, garagePod10 = 23, garagePod11 = 24, garagePod12 = 25, garagePod14 = 26, garagePod15 = 27, garagePod16 = 28, garagePod17 = 29, garagePod18 = 30, garagePod20 = 31, garagePod21 = 32, garagePod22 = 33, garagePod23 = 34, garagePod24 = 35, garagePod25 = 36, garagePod26 = 37
 };
 struct OriginalUiArchiveIdentity50KG {
     OriginalUiArchiveId50KG id;
@@ -34,6 +35,9 @@ struct OriginalUiMemberIdentity50KG {
 };
 const OriginalUiArchiveIdentity50KG* originalUiArchiveIdentity50KG(
     OriginalUiArchiveId50KG) noexcept;
+// Exact original selected-career Garage archive; unsupported identities stay absent.
+const OriginalUiArchiveIdentity50KG* originalUiGaragePodArchive50KG(std::uint32_t career) noexcept;
+int originalUiGaragePodCareer50KG(OriginalUiArchiveId50KG) noexcept;
 // Ordinal is local to this archive, retaining its original archive order.
 const OriginalUiMemberIdentity50KG* originalUiMemberIdentity50KG(
     OriginalUiArchiveId50KG, std::size_t ordinal) noexcept;
@@ -102,11 +106,16 @@ private:
     mutable std::shared_ptr<const OriginalUiMaterialTemplateStorage50KG> materialTemplates_;
 };
 // Immutable original-file input, not decoded member data or manager readiness.
-// Only a real mounted UI archive in the existing provider can mint this view.
+// Normally minted by a real mounted UI archive in the existing provider.
+// The private actual Application17CAB8 issuer alone may mint a pre-mount view
+// from its authenticated APPSTART owner and exact fresh provider.
 // It pins that SAME archive, not a duplicate encoded buffer. providerIdentity is
 // comparison-only provenance and must never be dereferenced through this view.
 class OriginalUiEncodedArchiveView50KG final {
     friend class OriginalStandardArchiveProvider50LA;
+    // Only the fresh actual Application issuer may read authenticated original
+    // encoded input before its first native mount, for source17CAB8 registration.
+    friend class OriginalStandardTextureResolver50LA;
     const OriginalStandardArchiveProvider50LA* provider_=nullptr;
     std::shared_ptr<const OriginalUiArchive50KG> archive_;
     OriginalUiEncodedArchiveView50KG(const OriginalStandardArchiveProvider50LA* provider,

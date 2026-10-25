@@ -59,7 +59,27 @@ struct GarageSourceRecord {
     const char* archiveSha;
     AdditionalSourceRecord source;
 };
+// The 23 authenticated E archives carry the identical original spcgarge PST.
+// Reuse its compressed-layout metadata, never its archive/member provenance.
+#define garageSourceCount garageBaseSourceCount
+#define garageSources garageBaseSources
 #include "original_ui_ipum_texture_cache50kg_garage_generated.inc"
+#undef garageSources
+#undef garageSourceCount
+constexpr std::size_t garageSourceCount=33;
+const std::array<GarageSourceRecord,garageSourceCount> garageSources=[] {
+    std::array<GarageSourceRecord,garageSourceCount> rows{};
+    for(std::size_t i=0;i<garageBaseSourceCount;++i)rows[i]=garageBaseSources[i];
+    constexpr std::uint32_t careers[]{1,2,3,4,7,8,9,10,11,12,14,15,16,17,18,20,21,22,23,24,25,26};
+    std::size_t next=garageBaseSourceCount;
+    for(const auto career:careers){
+        const auto* archive=originalUiGaragePodArchive50KG(career);
+        auto row=garageBaseSources[10];
+        if(archive){row.archive=archive->id;row.archiveSha=archive->sha256;}
+        rows[next++]=row;
+    }
+    return rows;
+}();
 
 // Independently retained original whole-member pins. Generated conversion
 // records may describe only this finite source set. The Gasgano source pin
@@ -351,10 +371,10 @@ bool additionalCatalogValid() noexcept {
     return true;
 }
 bool garageCatalogValid() noexcept {
-    if(!garageCatalogAvailable||garageSourceCount!=11)return false;
+    if(!garageCatalogAvailable||garageSourceCount!=33)return false;
     for(std::size_t index=0;index<garageSourceCount;++index){
         const auto& binding=garageSources[index];const auto& a=binding.source;const auto& c=a.codec;
-        if(binding.archive!=OriginalUiArchiveId50KG::garage&&binding.archive!=OriginalUiArchiveId50KG::garagePod19)return false;
+        if(binding.archive!=OriginalUiArchiveId50KG::garage&&originalUiGaragePodCareer50KG(binding.archive)<0)return false;
         const auto* archive=originalUiArchiveIdentity50KG(binding.archive);
         const auto* member=originalUiMemberIdentity50KG(binding.archive,binding.memberIndex);
         if(!archive||!member||!hexHash(binding.archiveSha)||std::strcmp(archive->sha256,binding.archiveSha)||
@@ -395,7 +415,7 @@ bool sourceRetainedBytes(const SourceMipRecord* mips,std::size_t count,std::size
 bool completeGarageCatalogRetainedLimit(std::size_t& out) noexcept {
     out=0;
     if(!catalogValid()||!additionalCatalogValid()||!garageCatalogValid()||
-       additionalSourceCount!=29||garageSourceCount!=11)return false;
+       additionalSourceCount!=29||garageSourceCount!=33)return false;
     std::size_t bytes=0;
     if(!sourceRetainedBytes(sourceMips,originalUiIpumMipCount50KG,bytes)||
        bytes!=retainedDecodedBytes||!addRetainedBytes(out,bytes))return false;
@@ -405,7 +425,8 @@ bool completeGarageCatalogRetainedLimit(std::size_t& out) noexcept {
         if(!sourceRetainedBytes(record.sourceMips,record.mipCount,bytes)||!addRetainedBytes(out,bytes))return false;
     }
     // Exact current authored corpus, no rounded-up headroom or implicit growth.
-    return out==std::size_t(20018832);
+    // 22 additional authenticated copies, each 611344 retained bytes.
+    return out==std::size_t(33468400);
 }
 std::uint16_t u16(const std::uint8_t* p) noexcept {
     return static_cast<std::uint16_t>(std::uint16_t(p[0])|(std::uint16_t(p[1])<<8));

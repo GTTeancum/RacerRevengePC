@@ -49,7 +49,7 @@ public:
             if(!camera.coldBound_||!camera.readsBound_||camera.closed_||camera.abandoned_||
                !camera.generation_||!supportedSourceView(camera)||
                &camera.actual_.all8Manager!=&manager.manager||
-               &camera.actual_.racerTiming!=&continuity.timing||camera.actual_.bank.count()!=8)
+               &camera.actual_.racerTiming!=&continuity.timing||(!camera.actual_.bank.count()||camera.actual_.bank.count()>8))
                 return false;
             if(camera.frameStage_!=Camera::FrameStage::idle&&camera.frameStage_!=Camera::FrameStage::published){
                 d.status=Status::phase;return false;
@@ -85,7 +85,7 @@ public:
                !camera.publicationCount_||!camera.completedFrame_||
                !camera.viewport_.prepared||!camera.viewport_.matricesReady||
                camera.viewport_.sessionGeneration!=generation_){d.status=Status::phase;return false;}
-            if(!supportedSourceView(camera)||bank.count()!=8||
+            if(!supportedSourceView(camera)||(!bank.count()||bank.count()>8)||
                &camera.actual_.all8Manager!=&manager.manager||!manager.managerBound||!manager.rankBound||
                !manager.retired40.bound||manager.retired40.activeCount50>bank.count()||
                camera.controller_.binding.sessionGeneration!=generation_||

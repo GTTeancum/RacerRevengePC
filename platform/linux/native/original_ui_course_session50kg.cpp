@@ -1,3 +1,4 @@
+#include "../../../src/game/original_course_load_selection50kg.h"
 // RECONSTRUCTED FROM VISIBLE TASK CONTEXT AFTER WORKSPACE ROLLBACK.
 // Not byte-verified against lost candidate. Popup cloning/disable owner joined;
 // source-only review still required before destination admission.
@@ -35,8 +36,8 @@ bool sameLife(const game::OriginalUiTransitionSnapshot50KG& a,const game::Origin
 }
 bool bounded(const game::OriginalUiCourseRememberedProfile50KG& p,const OriginalUiMainProfile50KG& common)noexcept{
     constexpr std::array<std::uint8_t,13> order{{0,11,4,8,7,1,5,9,12,6,10,3,2}};
-    return p.ownerReady&&p.mode34==0&&common.mode34==0&&p.course700>=1&&p.course700<=13&&p.subtype70C==1&&
-        p.laps704>=1&&p.laps704<=25&&p.entrants708==8&&!p.cardFlag100BC&&(p.availability11018&31u)>=1&&(p.availability11018&31u)<=13&&
+    return p.ownerReady&&p.mode34==0&&common.mode34==0&&p.course700>=1&&p.course700<=13&&p.subtype70C>=1&&p.subtype70C<=3&&
+        p.laps704>=1&&p.laps704<=25&&p.entrants708>=1&&p.entrants708<=8&&!p.cardFlag100BC&&(p.availability11018&31u)>=1&&(p.availability11018&31u)<=13&&
         ((common.playerBits1125C>>5)&3)==1&&p.courseOrder100C4==order&&
         p.planet0Primary79C==0xc2a684&&p.planet0Secondary7A0==0x80674a;
 }
@@ -101,8 +102,9 @@ struct OriginalUiCourseSession50KG::Storage {
     bool freshTournamentProfile(OriginalUiRiderProfileOwner50KG::TournamentCareerSnapshot& c,
         game::OriginalUiCourseRememberedProfile50KG& p)const noexcept{
         constexpr std::array<std::uint8_t,13> order{{0,11,4,8,7,1,5,9,12,6,10,3,2}};
+        OriginalUiRiderProfileOwner50KG::RiderSelectionFacts rider;
         if(!cold.profile->selectedTournamentCourseSnapshot(c,p)||!p.ownerReady||p.mode34!=2||cold.commonProfile->mode34!=2||
-           c.career100C0!=19||c.progress219C||c.cardFlag100BC||p.cardFlag100BC||c.earned2190||c.unspent2194||c.kills2198||
+           !cold.profile->courseRiderSelectionSnapshot(rider)||rider.rider!=c.career100C0||c.progress219C||c.cardFlag100BC||p.cardFlag100BC||c.earned2190||c.unspent2194||c.kills2198||
            ((cold.commonProfile->playerBits1125C>>5)&3)!=1||p.courseOrder100C4!=order||
            !sameStamp(c.stamp,cold.profile->stamp())||!testProfileCurrent(p))return false;
         for(auto medal:c.medals1938)if(medal)return false;
@@ -144,7 +146,8 @@ struct OriginalUiCourseSession50KG::Storage {
                n->groups[2].enabled||n->groups[3].enabled||!n->groups[5].enabled||
                n->groups[1].selectedSlot!=1||state.courseSlot14E4!=1||state.subtypeSlot14F4!=1||state.tier14E8!=1)return false;
         }else if(n->controllerGroup[0]<1||n->controllerGroup[0]>3||state.laps14EC<1||state.laps14EC>25||
-            n->groups[1].selectedSlot!=state.courseSlot14E4||
+            state.entrants14F0<1||state.entrants14F0>8||state.subtypeSlot14F4<1||state.subtypeSlot14F4>3||
+            (state.subtypeSlot14F4==3&&n->controllerGroup[0]==3)||n->groups[1].selectedSlot!=state.courseSlot14E4||
             n->groups[2].selectedSlot!=state.subtypeSlot14F4)return false;
         game::OriginalUiCourseControl50KG control;
         if(!selection.control(static_cast<std::uint16_t>(state.courseSlot14E4),control)||
@@ -168,7 +171,10 @@ struct OriginalUiCourseSession50KG::Storage {
         if(state.mode34==2){
             game::OriginalUiCourseEntryPrefix50KG e;game::OriginalUiCourseMode2EntryPlan50KG m;
             if(!entryPlan(e,m))return false;
+            OriginalUiRiderProfileOwner50KG::RiderSelectionFacts rider;
+            if(!cold.profile->courseRiderSelectionSnapshot(rider)||rider.rider!=c.career100C0)return false;
             out.career100C0=c.career100C0;out.progress219C=c.progress219C;out.medals1938=c.medals1938;
+            out.selectedRider=rider.rider;out.selectedUnlock10FAC=rider.unlock10FAC;
             out.courseSlot14E4=m.courseSlot14E4;out.tier14E8=m.tier14E8;
         }
         out.mawhonicRylothTest=p.mawhonicRylothTest;out.wanMbTest=p.wanMbTest;out.gasganoScTest=p.gasganoScTest;out.tzidikTcTest=p.tzidikTcTest;out.scorchRcTest=p.scorchRcTest;out.sebulbaTbTest=p.sebulbaTbTest;out.kraidGbTest=p.kraidGbTest;out.youngAnakinMcTest=p.youngAnakinMcTest;out.mode34=p.mode34;out.course700=p.course700;out.subtype70C=p.subtype70C;
@@ -425,9 +431,8 @@ S OriginalUiCourseSession50KG::input(const OriginalUiMainSessionInput50KG& in,Or
             const std::uint32_t pcs[]={0x1DF19C,0x1DF454,0x1DF760,0x1DF8FC};
             out.status=S::noChange;return result(d,S::noChange,pcs[in.originalInput]);
         }
-        // Confirm/race is outside this navigation owner. Reject before source
-        // profile writes, effect1, manager state8 or application launch flags.
-        if(in.originalInput==4){out.status=S::unavailableDestination;return result(d,out.status,0x1DED58);}
+        // Confirm follows the same owned proposal/admission transaction below,
+        // with Tournament's four source writes and fixed three-lap launch.
     }
     if(in.originalInput==2||in.originalInput==3){
         const bool down=in.originalInput==3;const auto pc=down?0x1DF8D0u:0x1DF734u;
@@ -444,20 +449,29 @@ S OriginalUiCourseSession50KG::input(const OriginalUiMainSessionInput50KG& in,Or
         const bool forward=in.originalInput==1;
         const auto* row=s->widgets().navigation();
         if(!row)return result(d,S::widget);
-        // Event-type owners remain unavailable. Visiting that authored row is
-        // legitimate, but Left/Right must not silently change it or the course.
-        if(row->controllerGroup[0]==2){out.status=S::unavailableDestination;return result(d,out.status,forward?0x1DF4A8:0x1DF1F0);}
+        if(row->controllerGroup[0]==2){
+            game::OriginalUiCourseWidgetProfile50KG profile;
+            if(!s->widgetProfile(profile))return result(d,S::profile);
+            if(!s->effectReady(forward?4u:3u))return result(d,S::audio,forward?0x1DF58C:0x1DF2D8);
+            s->cpuDrain();s->inOperation=true;
+            if(!s->widgets().moveEventType(forward,profile,s->hooks(),d.widget))s->fault(S::widget,forward?0x1DF4A8:0x1DF1F0);
+            else {s->state.subtypeSlot14F4=s->widgets().navigation()->groups[2].selectedSlot;
+                s->effect(forward?4u:3u,forward?0x1DF58C:0x1DF2D8);out.selectionChanged=true;}
+            s->inOperation=false;if(s->state.faulted){d=s->faultDetail;return d.status;}
+            out.status=S::ok;return result(d,S::ok,forward?0x1DF4A8:0x1DF1F0);
+        }
         if(row->controllerGroup[0]==3){
             game::OriginalUiCourseWidgetProfile50KG profile;game::OriginalUiCourseLapMove50KG move;
             const auto* controller=s->widgets().controller();
             if(!controller||!s->widgetProfile(profile))return result(d,S::profile);
-            if(controller->moveLaps(*row,s->state.laps14EC,forward,profile,move)!=game::OriginalUiCourseWidgetControllerStatus50KG::ok)
+            if(controller->moveLaps(*row,s->state.subtypeSlot14F4==2?s->state.entrants14F0:s->state.laps14EC,forward,profile,move)!=game::OriginalUiCourseWidgetControllerStatus50KG::ok)
                 return result(d,S::unsupportedState,forward?0x1DF5C4:0x1DF310);
             if(!s->effectReady(move.effectId))return result(d,S::audio,move.audioPC);
             s->cpuDrain();s->inOperation=true;
             // Page+14EC changes now. Remembered+704 and packed1125C change
             // only when the existing authentic Back/Confirm owner commits.
-            s->state.laps14EC=move.laps14EC;s->state.repeatRight14D4=move.repeatRight14D4;s->state.repeatLeft14D8=move.repeatLeft14D8;
+            if(s->state.subtypeSlot14F4==2)s->state.entrants14F0=move.laps14EC;else s->state.laps14EC=move.laps14EC;
+            s->state.repeatRight14D4=move.repeatRight14D4;s->state.repeatLeft14D8=move.repeatLeft14D8;
             s->effect(move.effectId,move.audioPC);out.selectionChanged=true;s->inOperation=false;
             if(s->state.faulted){d=s->faultDetail;return d.status;}
             out.status=S::ok;return result(d,S::ok,move.sourcePC);
@@ -502,7 +516,7 @@ S OriginalUiCourseSession50KG::input(const OriginalUiMainSessionInput50KG& in,Or
     const auto blocker=confirm?game::OriginalUiRouteBlocker50KG::courseLaunchOwner:game::OriginalUiRouteBlocker50KG::destinationOwner;
     if(status!=game::OriginalUiRouteStatus50KG::unavailable||decision.admitted||!decision.profileProposalComplete||
         decision.blockers!=static_cast<std::uint32_t>(blocker)||
-        (confirm?(decision.request.kind!=game::OriginalUiRouteKind50KG::courseLaunch||decision.profileChanges.count!=8):
+        (confirm?(decision.request.kind!=game::OriginalUiRouteKind50KG::courseLaunch||decision.profileChanges.count!=(s->state.mode34==2?4u:8u)):
                  (decision.request.targetScreen!=(s->state.mode34==2?9:5)||decision.request.targetPage!=1||
                   (s->state.mode34==2&&decision.profileChanges.count))))return result(d,S::unavailableDestination,decision.inputPC);
     if(s->proposalSerial==std::numeric_limits<std::uint64_t>::max())return result(d,S::unsupportedState);
@@ -537,7 +551,18 @@ S OriginalUiCourseSession50KG::notifyRouteAccepted(const OriginalUiCourseRoutePr
     const auto stamp=s->cold.profile->stamp();game::OriginalUiCourseRememberedProfile50KG profile;
     if(!sameLife(s->transition(),expected))return result(d,S::profile,0x1DEFCC);
     if(s->state.mode34==2){
-        if(launch||p.decision.profileChanges.count||p.decision.request.targetScreen!=9||
+        if(launch){
+            OriginalUiRiderProfileOwner50KG::CourseRaceSelection actual;
+            OriginalUiRiderProfileOwner50KG::TournamentCareerSnapshot career;
+            if(p.decision.profileChanges.count!=4||s->pendingStamp.generation==std::numeric_limits<std::uint64_t>::max()||
+               stamp.generation!=s->pendingStamp.generation+1||stamp.mode34!=2||
+               !s->freshTournamentProfile(career,profile)||!s->cold.profile->courseRaceSnapshot(actual)||
+               actual.mode34!=2||actual.course!=s->pendingContext.selectedControlWord44||
+               actual.planet!=s->state.selectedPlanet40||actual.rider!=career.career100C0||
+               actual.subtype!=1||actual.laps!=3||actual.entrants!=8||
+               actual.packed1125C!=game::originalCourseLaunchPackedMode050KG(s->pendingContext.packed1125C,1,3,8))
+                return result(d,S::profile,0x1DEEB0);
+        }else if(p.decision.profileChanges.count||p.decision.request.targetScreen!=9||
            p.decision.request.targetPage!=1||p.decision.request.sourcePC!=0x1DF0B4||
            !sameStamp(stamp,s->pendingStamp)||!s->profileCurrent())return result(d,S::profile,0x1DF0B4);
     }else if(s->pendingStamp.generation==std::numeric_limits<std::uint64_t>::max()||
@@ -620,7 +645,7 @@ S OriginalUiCourseSession50KG::render(const OriginalUiCourseDrawClock50KG& clock
     s->cpuDrain();s->state.backProposalPending=false;s->inOperation=true;s->rendering=true;
     bool okay=s->collector.begin(clock,s->renderContext,s->lighting,d.draw,s->state.selectedPlanet40)&&s->collector.projectOrdinaryWidgets(true,d.draw);
     game::OriginalUiCoursePageDrawDiagnostic50KG pageDiagnostic;
-    if(okay&&s->state.mode34==0&&!s->page.setLapCount(s->state.laps14EC,pageDiagnostic)){s->fault(S::widget,pageDiagnostic.sourcePC);okay=false;}
+    if(okay&&s->state.mode34==0&&!s->page.setEventSelection(s->state.subtypeSlot14F4,s->state.laps14EC,s->state.entrants14F0,pageDiagnostic)){s->fault(S::widget,pageDiagnostic.sourcePC);okay=false;}
     if(okay&&!s->page.applyPlanetPalette(s->widgets(),colors.primary79C,colors.secondary7A0,pageDiagnostic)){s->fault(S::widget,pageDiagnostic.sourcePC);okay=false;}
     if(okay&&s->state.mode34==2){
         game::OriginalUiCourseTournamentDrawState50KG actual;

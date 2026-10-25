@@ -21,10 +21,20 @@ constexpr std::uint16_t originalCourseLaunchPackedMode050KG(std::uint16_t before
     const auto opponents=((subtype==2?entrants:8u)-humans)&15u;
     return static_cast<std::uint16_t>((before&~0x79fu)|(opponents<<7)|(laps&31u));
 }
-// This host currently implements only single-human mode0/subtype1 with seven
-// opponents. Keeping this explicit must not suggest the original rejects other modes.
+// Single-human native capability, separate from the authored UI transaction.
+// Mode2 has its real fixed-three-lap eight-racer launch. Mode0 subtype2 uses
+// its selected active extent. Subtype3's Course request initially packs eight,
+// then its real1AD520 writer clears AI bits to leave one live human; both
+// phases retain the same selected rider/course, never fabricated opponent rows.
 template<class Selection> constexpr bool nativeSingleHumanCourseMode50KG(const Selection& s) noexcept {
-    return s.subtype==1&&s.laps>=1&&s.laps<=25&&s.entrants==8&&
-        ((s.packed1125C>>5)&3u)==1&&((s.packed1125C>>7)&15u)==7;
+    const auto humans=(s.packed1125C>>5)&3u;
+    const auto opponents=(s.packed1125C>>7)&15u;
+    if(humans!=1||s.laps<1||s.laps>25||s.entrants!=humans+opponents)return false;
+    if(s.mode34==2)return s.subtype==1&&s.laps==3&&s.entrants==8;
+    if(s.mode34!=0)return false;
+    if(s.subtype==1)return s.entrants==8;
+    if(s.subtype==2)return s.entrants>=1&&s.entrants<=8;
+    if(s.subtype==3)return s.entrants==8||s.entrants==1;
+    return false;
 }
 }

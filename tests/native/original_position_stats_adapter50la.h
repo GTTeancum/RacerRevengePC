@@ -2,6 +2,7 @@
 // Actual packed-racer view0 numeric observation. No scheduling or drawing is implied.
 namespace original_main_entry50KG { struct Application; }
 #include "original_camera_session50kx.h"
+#include "original_subtype3_record_owner50la.h"
 #include "native_ai_session50iv_fixture.h"
 #include "../../src/game/original_position_stats_frame50la.h"
 #include <array>
@@ -39,9 +40,9 @@ class Owner final {
     bool identityCurrent()const {
         const auto& c=*camera_;const auto& m=*manager_;
         return !c.closed_&&!c.abandoned_&&c.coldBound_&&c.readsBound_&&
-            c.generation_==generation_&&c.actual_.bank.count()==8&&supportedSourceView(c)&&
+            c.generation_==generation_&&c.actual_.bank.count()>0&&c.actual_.bank.count()<=8&&supportedSourceView(c)&&
             &c.actual_.all8Manager==&m.manager&&m.managerBound&&m.rankBound&&
-            m.retired40.bound&&m.retired40.activeCount50<=8&&
+            m.retired40.bound&&m.retired40.activeCount50<=c.actual_.bank.count()&&
             c.controller_.bound&&c.controller_.binding.sessionGeneration==generation_&&
             c.controller_.binding.managerIndex==0&&c.identity_[0].managerIndex==0&&
             c.controller_.binding.racerKey==Camera::key(c.identity_[0].racerTag)&&
@@ -61,7 +62,7 @@ public:
         try {
             if(!camera.generation_||camera.closed_||camera.abandoned_||
                !camera.coldBound_||!camera.readsBound_||!supportedSourceView(camera)||
-               camera.actual_.bank.count()!=8||&camera.actual_.all8Manager!=&manager.manager||
+               (!camera.actual_.bank.count()||camera.actual_.bank.count()>8)||&camera.actual_.all8Manager!=&manager.manager||
                !camera.identitiesCurrent())return false;
             if(camera.frameStage_!=Camera::FrameStage::idle&&camera.frameStage_!=Camera::FrameStage::published){
                 d.status=Status::phase;return false;}
@@ -94,7 +95,7 @@ public:
                 d.status=Status::identity;return false;}
             rr::game::OriginalPositionStatsNumbers50LA next;
             next.sessionGeneration=generation_;next.cameraPublication=c.publicationCount_;
-            next.viewIndex=0;next.cameraManagerIndex=index;next.managerCount30=8;
+            next.viewIndex=0;next.cameraManagerIndex=index;next.managerCount30=static_cast<std::uint32_t>(c.actual_.bank.count());
             next.placeCCC=m.rank[index].placeCCC;next.activeCount50=m.retired40.activeCount50;
             next.viewState40=c.actual_.bank.read(0,state40_);
             next.viewCountCD0=c.actual_.bank.read(0,countCD0_);
@@ -120,6 +121,8 @@ private:
         std::array<std::array<float,3>,8> racerCenters{};
         std::array<std::uint32_t,8> racerStates{};
         std::uint64_t publication=0;
+        bool recordBound=false,recordVisible=false;
+        std::array<float,3> recordPosition{};
     };
     //1924C0 resolves managerB0[Application268], body340->scene288 and E4.
     //Use that same current view0 racer. The bank visit performs the original
@@ -154,7 +157,13 @@ private:
             if(tc)next.tcMap=c.actual_.actualRadarMapTc;
             if(mb)next.mbMap=c.actual_.actualRadarMapMb;
             next.publication=observation.cameraPublication;
-            for(std::size_t slot=0;slot<8;++slot){
+            if(observation.subtype11258==3){
+                std::uint8_t flags29=0;
+                if(!c.actual_.recordManager40||!c.actual_.recordManager40->radarObservation(
+                    generation_,flags29,next.recordPosition)){d.status=Status::owner;return false;}
+                next.recordBound=true;next.recordVisible=(flags29&1u)!=0;
+            }
+            for(std::size_t slot=0;slot<c.actual_.bank.count();++slot){
             next.racerStates[slot]=c.actual_.bank.read(slot,c.reads_.state40);
             if(slot!=observation.viewIndex&&next.racerStates[slot]!=0)continue;
             const bool read=c.actual_.bank.visit(slot,[&]()noexcept {

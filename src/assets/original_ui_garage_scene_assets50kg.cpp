@@ -63,7 +63,9 @@ bool OriginalUiGarageSceneAssets50KG::load(std::shared_ptr<const OriginalUiArchi
     std::shared_ptr<const OriginalUiArchive50KG> pod19,D& d) noexcept {
     d={};if(storage_)return fail(d,E::alreadyLoaded,0x1FB0F0);
     if(!archiveIs(garage,OriginalUiArchiveId50KG::garage)||
-       !archiveIs(pod19,OriginalUiArchiveId50KG::garagePod19))return fail(d,E::archive,0x1FB0F0);
+       (!pod19||!pod19->loaded()||!pod19->identity()||
+        originalUiGaragePodCareer50KG(pod19->identity()->id)<0||
+        !archiveIs(pod19,pod19->identity()->id)))return fail(d,E::archive,0x1FB0F0);
     try {
         auto n=std::make_unique<Storage>();n->garage=std::move(garage);n->pod19=std::move(pod19);
         if(!readOriginalUiDat50KG(*n->garage,"UI/UIGarage/garage.scn",n->scene,d.text,OriginalUiRepeatedKeyPolicy50KG::preserveInOrder)||
@@ -133,7 +135,10 @@ bool OriginalUiGarageSceneAssets50KG::load(std::shared_ptr<const OriginalUiArchi
                 // MCF FrameCount/FPS (which is double duration here).
             }
         }
-        d.ordinal=0;n->selected.model=model(n->pod19,"UI/Geometry/19e.psg",1,d);
+        const int career=originalUiGaragePodCareer50KG(n->pod19->identity()->id);
+        const std::string selectedPath="UI/Geometry/"+std::string(career<10?"0":"")+
+            std::to_string(career)+"e.psg";
+        d.ordinal=0;n->selected.model=model(n->pod19,selectedPath.c_str(),1,d);
         if(!n->selected.model)return false;
         //1D1D94..1D1DCC immediate source words, NOT PSG bind translation.
         n->selected.position={{std::bit_cast<float>(0x4278ab14u),std::bit_cast<float>(0x4141c3edu),std::bit_cast<float>(0x423dd6d4u)}};
@@ -149,4 +154,11 @@ const OriginalUiDat50KG* OriginalUiGarageSceneAssets50KG::sceneDat()const noexce
 const OriginalUiDat50KG* OriginalUiGarageSceneAssets50KG::toyDat()const noexcept{return storage_?&storage_->toy:nullptr;}
 std::shared_ptr<const OriginalUiArchive50KG> OriginalUiGarageSceneAssets50KG::archive()const noexcept{return storage_?storage_->garage:nullptr;}
 std::shared_ptr<const OriginalUiArchive50KG> OriginalUiGarageSceneAssets50KG::selectedArchive()const noexcept{return storage_?storage_->pod19:nullptr;}
+}
+
+namespace rr::assets {
+int OriginalUiGarageSceneAssets50KG::selectedCareer()const noexcept {
+    const auto archive=selectedArchive();
+    return archive&&archive->identity()?originalUiGaragePodCareer50KG(archive->identity()->id):-1;
+}
 }

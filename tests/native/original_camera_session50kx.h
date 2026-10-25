@@ -7,6 +7,7 @@
 #include "track_navigation_view50tb.h"
 #include "track_navigation_view50gb.h"
 #include "track_navigation_view50mc.h"
+namespace original_subtype3_record { class Owner; }
 namespace original_cable_selection50LA { class Binding; }
 namespace gb_particle_render50GB {class Owner;}
 namespace mc_particle_render50MC {class Owner;}
@@ -164,6 +165,9 @@ struct ActualOwners {
     TrackNavigationView50TB actualRadarMapTb{};
     TrackNavigationView50GB actualRadarMapGb{};
     TrackNavigationView50MC actualRadarMapMc{};
+    void* startMusicContext=nullptr;
+    bool (*startMusicRequest)(void*,std::int32_t,std::int32_t)=nullptr;
+    const original_subtype3_record::Owner* recordManager40=nullptr;
 };
 enum class Cut : std::uint8_t {
     // Native hold: use real current final-grid/last-published body state while
@@ -508,6 +512,8 @@ class Session final {
     OriginalRaceCameraDisplayFields display_;
     OriginalRaceViewportCall coldViewport_;
     OriginalGcGaIntroExitOwner exit_;
+    OriginalDirectRaceStartOwner directStart_;
+    bool directStartPending_=false;
     OriginalRaceStartCountdown countdown_;
     OriginalVideoBlockingFade blockingFade_;
     AsyncRetainedFade asyncFade_,endingFade_;
@@ -555,7 +561,7 @@ class Session final {
         }
         const auto& directory=*actual_.actualMaterialDirectory36B970;
         auto& application=*actual_.applicationEntities;
-        for(std::size_t i=0;i<racerEntities_.size();++i){
+        for(std::size_t i=0;i<actual_.bank.count();++i){
             auto& owner=racerEntities_[i];
             if(owner.prepared())continue; // Actual completed constructor, not bank phase.
             OriginalRacerEntityColdBinding50LA binding;
@@ -587,7 +593,7 @@ class Session final {
             result_.entityCold.status=OriginalRacerEntityColdStatus50LA::binding;
             result_.entityCold.sourcePC=0x2109b4u;return false;
         }
-        for(std::size_t i=0;i<racerEntities_.size();++i){
+        for(std::size_t i=0;i<actual_.bank.count();++i){
             const auto* rig=(*actual_.actualRigs)[i].get();
             constexpr auto right=native_racer50HW::Rig::right;
             constexpr auto left=native_racer50HW::Rig::left;
@@ -674,7 +680,7 @@ class Session final {
     bool releaseRacerEntityPrefixes()noexcept {
         // Native storage lifetime releases only the represented cold prefixes.
         // No manager/race/root Entity list has been invented for these racers.
-        for(std::size_t i=racerEntities_.size();i>0;--i){
+        for(std::size_t i=actual_.bank.count();i>0;--i){
             // Actual Cables allocation owns a raw backlink to this racer. Close
             // it while Session/racer/models and canonical Bank still exist.
             if(actual_.actualCables){
@@ -707,8 +713,8 @@ class Session final {
         return {&viewport_,&scene_,&tick_,&pose_.position,&matrices_};
     }
     bool identitiesCurrent() const {
-        if(actual_.bank.count()!=8||actual_.humanCount34>1u)return false;
-        for(std::size_t i=0;i<8;++i){
+        if((!actual_.bank.count()||actual_.bank.count()>8)||actual_.humanCount34>1u)return false;
+        for(std::size_t i=0;i<actual_.bank.count();++i){
             const bool human=i<actual_.humanCount34;
             if(!actual_.bank.active(i)||!actual_.racer60[i]||actual_.racer60[i]!=identity_[i].pod60||
                actual_.bank.read(i,reads_.class58)!=(human?0u:1u))return false;
@@ -721,7 +727,7 @@ class Session final {
     bool cutCurrent(Cut cut) const {
         if(!identitiesCurrent())return false;
         if(cut==Cut::heldBeforeStart&&(actual_.all8Manager.flags58&2u))return false;
-        for(std::size_t i=0;i<8;++i){
+        for(std::size_t i=0;i<actual_.bank.count();++i){
             const auto expected=cut==Cut::heldBeforeStart?Phase::Ready:Phase::AfterBodyChildren;
             if(actual_.bank.read(i,reads_.phase)!=expected)return false;
             if(cut==Cut::afterAllRacerPrefixes&&
@@ -731,8 +737,8 @@ class Session final {
     }
     bool readRacers(RaceStartRacerBank& out,GcStartRacerEffectBank& effects) const {
         if(!identitiesCurrent())return false;
-        out.sessionGeneration=generation_;
-        for(std::size_t i=0;i<8;++i){
+        out.sessionGeneration=generation_;out.racerCount=actual_.bank.count();
+        for(std::size_t i=0;i<actual_.bank.count();++i){
             const auto node=static_cast<std::int32_t>(actual_.bank.read(i,reads_.body288));
             const auto count=actual_.bank.read(i,reads_.nodeCount);
             if(node<0||!count||count>reads_.local.size()||static_cast<std::uint32_t>(node)>=count)return false;
@@ -823,19 +829,20 @@ class Session final {
             app.fadeManagerA8,app.currentApplicationMode22C(),app.application33C,
             static_cast<std::int32_t>(actual_.launchKind11258),
             static_cast<std::int32_t>(preference.field11030),static_cast<std::int32_t>(preference.field11038),
-            0,static_cast<std::int32_t>(actual_.bank.read(0,reads_.state40))};
+            0,static_cast<std::int32_t>(actual_.bank.read(0,reads_.state40)),
+            &actual_.arena.noiseOwner(),actual_.startMusicContext,actual_.startMusicRequest};
         //Source80 null is proved by the retained effective controllerA8=0;
         //it is not a muted-audio success override. Native existing suffix audio
         //continues in its real caller, outside this camera owner.
-        result_.start=exit_.advance(bindings,actual_.bank,actual_.baseTail,actual_.arena.fields,
-            app.renderer,app.diagnostic);
+        result_.start=directStartPending_?directStart_.advance(bindings,app.renderer,app.diagnostic):
+            exit_.advance(bindings,actual_.bank,actual_.baseTail,actual_.arena.fields,app.renderer,app.diagnostic);
         if(result_.start.status!=OriginalCameraStartStatus::complete)
             return set(Status::exitPending,result_.start.sourcePC);
         if(!countdownInstalled_){
             auto& host=actual_.hostRace.rows();
             //The already initialized route/standings owner is retained. This
             //is the ONE advancing countdown; source34 is only its start input.
-            if(host.phase!=race_session50HM::Phase::Countdown||host.racerCount!=8||host.raceSeconds!=0||
+            if(host.phase!=race_session50HM::Phase::Countdown||host.racerCount!=actual_.bank.count()||host.raceSeconds!=0||
                host.finishCount||host.resultsClosed||(actual_.all8Manager.flags58&2u)||
                !std::isfinite(countdown_.countdown34)||countdown_.countdown34<0)
                 return fail(Status::sourcePath,0x1afd80);
@@ -965,7 +972,7 @@ public:
     std::int32_t authoredSceneCutCount3E4()const noexcept{return startActions_.sourceSceneCutCount3E4();}
     std::int32_t effectiveControllerCutCountA8()const noexcept{return startPrelude_.controllerCutCountA8();}
     std::uint64_t sessionGeneration()const noexcept{return generation_;}
-    std::uint64_t racerKey(std::size_t i)const noexcept{return i<8?key(identity_[i].racerTag):0;}
+    std::uint64_t racerKey(std::size_t i)const noexcept{return i<actual_.bank.count()?key(identity_[i].racerTag):0;}
     const OriginalRacerAnimationCold50LA* rightAnimation1A4(std::size_t i)const noexcept {
         const auto* model=actual_.actualRightModels&&i<actual_.actualRightModels->size()?
             (*actual_.actualRightModels)[i].get():nullptr;
@@ -979,7 +986,7 @@ public:
     const native_racer50HW::Rig* actualRacerRig(std::size_t i)const noexcept {
         return actual_.actualRigs&&i<actual_.actualRigs->size()?(*actual_.actualRigs)[i].get():nullptr;
     }
-    std::uint64_t mainBodyKey(std::size_t i)const noexcept{return i<8?key(identity_[i].mainBodyTag):0;}
+    std::uint64_t mainBodyKey(std::size_t i)const noexcept{return i<actual_.bank.count()?key(identity_[i].mainBodyTag):0;}
     // Bound once from an actual cold Session when a selected render consumer
     // requires the source fog phase. This is a nonowning scheduling capability,
     // never a prepared camera publication or substitute renderer authority.
@@ -1112,22 +1119,22 @@ public:
                 actual_.actualRadarMapTb.gatesPrepared()||actual_.actualRadarMapGb.gatesPrepared()):
               (authored.mcSourceIdentity||actual_.actualRadarMapMc.gatesPrepared()))return set(Status::owner);
         if(!actual_.hostRace.runtimeValid())return set(Status::owner);
-        if(!generation||actual_.bank.count()!=8||actual_.all8Manager.flags58&2u||
-           actual_.launchKind11258!=1u||
-           actual_.hostRace.rows().phase!=race_session50HM::Phase::Countdown||actual_.hostRace.rows().racerCount!=8||
+        if(!generation||(!actual_.bank.count()||actual_.bank.count()>8)||actual_.all8Manager.flags58&2u||
+           (actual_.launchKind11258<1u||actual_.launchKind11258>3u)||
+           actual_.hostRace.rows().phase!=race_session50HM::Phase::Countdown||actual_.hostRace.rows().racerCount!=actual_.bank.count()||
            actual_.hostRace.rows().raceSeconds!=0||actual_.hostRace.rows().finishCount)return set(Status::owner);
         if(displayInputs_&&displayInputs_!=&app)return set(Status::owner);
         if(generation_&&generation_!=generation)return set(Status::owner);
         generation_=generation;displayInputs_=&app;
         if(!readsBound_){
             reads_.bind(actual_);readsBound_=true;
-            for(std::size_t i=0;i<8;++i){
+            for(std::size_t i=0;i<actual_.bank.count();++i){
                 identity_[i].managerIndex=static_cast<std::uint32_t>(i);
                 identity_[i].pod60=actual_.racer60[i];
             }
         }
         if(!identitiesCurrent())return set(Status::owner);
-        for(std::size_t i=0;i<8;++i)if(actual_.bank.read(i,reads_.phase)!=Phase::Ready)return set(Status::phase);
+        for(std::size_t i=0;i<actual_.bank.count();++i)if(actual_.bank.read(i,reads_.phase)!=Phase::Ready)return set(Status::phase);
         // At this native cold caller, genuinely construct the represented
         // racer27E130/7F8/240 prefix, then concrete7FC/model lifetime below.
         // No physics/collection or outer manager attachment is inferred.
@@ -1321,11 +1328,14 @@ public:
             if(controller_.mode44==4||controller_.mode44==7){
                 RaceStartRacerBank bank;GcStartRacerEffectBank fields;if(!readRacers(bank,fields))return fail(Status::owner);
                 const auto& p=actual_.preferences.slots[0];
-                if(actual_.launchKind11258!=1u)return fail(Status::sourcePath,0x175d70);
+                if((actual_.launchKind11258<1u||actual_.launchKind11258>3u))return fail(Status::sourcePath,0x175d70);
                 const GcCameraStartContext context{startPrelude_.controllerCutCountA8(),static_cast<std::int32_t>(actual_.launchKind11258),static_cast<std::int32_t>(p.field11030),
                     static_cast<std::int32_t>(p.field11038),displayInputs_->rootFlags228,sceneFlags29_};
                 const auto r=advanceOriginalGcCameraStartFrame(controller_,start_,introChild_,fields,bank,current,
                     context,actual_.blur,scene_,pose_,matrices_);
+                if(r.status==GcStartFrameStatus::needsDirectStart){
+                    directStartPending_=true;frameStage_=FrameStage::exit;break;
+                }
                 if(r.status==GcStartFrameStatus::needsOriginalExit){
                     if(!completionPrefix())return fail(Status::numeric,0x175d70);
                     frameStage_=FrameStage::exit;break;
@@ -1334,7 +1344,7 @@ public:
                 if(r.activatedStartCamera){
                     //Temporary value projection is discarded. The actual AE8
                     //entry stores land in all eight real banked base tails.
-                    for(std::size_t i=0;i<8;++i)actual_.bank.visit(i,[&](){setOriginalCameraRacerIntroActive(actual_.baseTail);});
+                    for(std::size_t i=0;i<actual_.bank.count();++i)actual_.bank.visit(i,[&](){setOriginalCameraRacerIntroActive(actual_.baseTail);});
                 }
                 frameStage_=FrameStage::lateTick;break;
             }
@@ -1544,8 +1554,8 @@ public:
         if(!coldBound_||abandoned_||pendingDisplayWork()||
            (frameStage_!=FrameStage::idle&&frameStage_!=FrameStage::published))return {false,0};
         std::array<std::uint32_t,8> viewState{};
-        for(std::size_t i=0;i<viewState.size();++i)viewState[i]=actual_.bank.read(i,reads_.retirementCD4);
-        OriginalCameraModeInputEnvironment environment{held,actual_.preferences,viewState.data(),viewState.size(),
+        for(std::size_t i=0;i<actual_.bank.count();++i)viewState[i]=actual_.bank.read(i,reads_.retirementCD4);
+        OriginalCameraModeInputEnvironment environment{held,actual_.preferences,viewState.data(),actual_.bank.count(),
             actual_.bank.read(0,reads_.class58),0,raceEntityFlags29_,actual_.all8Manager.flags58,raceFlags1B0_};
         lighting::CameraVisibilityLease lease;lighting::Diagnostic diagnostic;
         if(!actual_.visibility.beginCameraVisibility(0,lease,diagnostic)||
@@ -1595,7 +1605,7 @@ public:
         }
         if(!goPublished_){
             actual_.all8Manager.flags58=static_cast<std::uint8_t>(actual_.all8Manager.flags58|2u);
-            for(std::size_t i=0;i<8;++i)actual_.bank.visit(i,[&](){actual_.arena.fields.applicationByte58=actual_.all8Manager.flags58;});
+            for(std::size_t i=0;i<actual_.bank.count();++i)actual_.bank.visit(i,[&](){actual_.arena.fields.applicationByte58=actual_.all8Manager.flags58;});
             goPublished_=true;
         }
         return set(Status::simulationAllowed);
@@ -1619,7 +1629,7 @@ public:
     //numeric camera counter. The backend will capture/validate the image.
     Result advanceRaceFadeInPrefix(){
         if(abandoned_)return set(Status::abandoned);
-        if(!coldBound_||!displayInputs_||!exit_.complete()||!hasView())return set(Status::owner);
+        if(!coldBound_||!displayInputs_||(!exit_.complete()&&!directStart_.complete())||!hasView())return set(Status::owner);
         auto& app=*displayInputs_;auto& video=app.video;
         if((video.flags404Low6&3u)&&!(video.flags404Low6&4u))return set(Status::videoPending);
         if(raceFlags1B0_&8u){

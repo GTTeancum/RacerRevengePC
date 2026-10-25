@@ -26,7 +26,8 @@ inline bool Owner::constructRuntimeSourceCamera(
            !runtime.actual_||&actual.arena!=&runtime.actual_->frame||
            (runtime.gridArena_&&(&actual.bindings!=&runtime.gridArena_->bindings||
                &actual.ai!=&runtime.gridArena_->ai||&actual.poseHistory!=&runtime.gridArena_->history||
-               &actual.actualRigs!=&runtime.gridArena_->rigs))||
+               &actual.actualRigs!=&runtime.gridArena_->rigs||
+               actual.humanCount34!=runtime.gridArena_->humanCount))||
            !source||!lighting_||!lighting_->world()||!trackParticles_||!trackParticles_->prepared()||
            !trackParticleGeneration_||trackParticleHostApplication_!=&application||
            trackParticleDomain_!=domain||trackParticleApplication_!=entities||
@@ -38,13 +39,13 @@ inline bool Owner::constructRuntimeSourceCamera(
            display.trackFog3EC||selectedOriginalCam.empty()||!actual.actualRigs[0]||actual.actualRigs[0]->phy.empty()||
            bool(actual.actualBottomRightModels)!=bool(actual.actualBottomLeftModels))
             return fail(d,"RA camera Bank/Application/context/manager or selected rig ownership differs");
-        for(std::size_t i=0;i<8;++i){
+        for(std::size_t i=0;i<actual.bank.count();++i){
             const auto* rig=actual.actualRigs[i].get();
             if(!rig||!actual.actualCables[i]||actual.actualCables[i]->sourceRig_!=rig||!actual.actualRightModels[i]||!actual.actualLeftModels[i]||!actual.actualChariotModels[i]||
                rig->podId.size()!=5u||rig->podId.compare(0,3,"POD")||
                rig->podId[3]<'0'||rig->podId[3]>'9'||rig->podId[4]<'0'||rig->podId[4]>'9'||
                static_cast<std::uint32_t>((rig->podId[3]-'0')*10+rig->podId[4]-'0')!=actual.racer60[i])
-                return fail(d,"RA camera requires the actual eight rig/model identities");
+                return fail(d,"RA camera requires the actual active rig/model identities");
         }
         // Already authenticated from this same retained RA archive by the
         // particle authoring owner. Do not re-read another SessionAssets route.
@@ -64,7 +65,7 @@ inline bool Owner::constructRuntimeSourceCamera(
         runtime.camera_.reset(new ra_source_camera50LA::OwnershipBridge::CameraBinding());
         auto& camera=*runtime.camera_;
         camera.lighting=lighting_;camera.particles=trackParticles_;
-        for(std::size_t i=0;i<8;++i){
+        for(std::size_t i=0;i<actual.bank.count();++i){
             camera.cablePins[i]=actual.actualCables[i]->retainSourceCamera(*actual.actualRigs[i]);
             if(!camera.cablePins[i])return fail(d,"actual persistent Cables camera lifetime unavailable");
             camera.cables[i]=actual.actualCables[i].get();
@@ -90,7 +91,8 @@ inline bool Owner::constructRuntimeSourceCamera(
             &application.materialDirectory36B970(),&actual.actualRigs,camera.particles.get(),
             &source->height.sourceDomain,&actual.actualRightModels,&actual.actualLeftModels,
             &actual.actualChariotModels,actual.actualBottomRightModels,actual.actualBottomLeftModels,
-            application.animationClock(),&camera.cables,&source->map}));
+            application.animationClock(),&camera.cables,&source->map,{},{},{},{},{},
+            actual.startMusicContext,actual.startMusicRequest,actual.recordManager40}));
         // No prepare, pose, viewport publication, RNG/clock sampling or
         // source-ready flag. Only an actual retained Session now exists.
         return true;

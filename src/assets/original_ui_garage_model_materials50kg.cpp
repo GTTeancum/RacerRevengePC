@@ -60,7 +60,9 @@ bool OriginalUiGarageModelMaterials50KG::load(std::shared_ptr<const void> pin,co
     const OriginalUiMaterialRuntime50KG& runtime,const OriginalUiIpumTextureCache50KG* cache,D& d)noexcept{
     d={};if(storage_)return fail(d,E::alreadyLoaded);
     if(!pin||!scene||!identity||scene->materials.empty()||scene->materials.size()>256||kind==K::absent||
-       !authentic(archive,kind==K::selected19E?OriginalUiArchiveId50KG::garagePod19:OriginalUiArchiveId50KG::garage)||
+       (kind==K::selected19E?(!archive||!archive->identity()||
+        originalUiGaragePodCareer50KG(archive->identity()->id)<0||!authentic(archive,archive->identity()->id)):
+        !authentic(archive,OriginalUiArchiveId50KG::garage))||
        !authentic(app,OriginalUiArchiveId50KG::appStart))return fail(d,E::input);
     try {
         auto n=std::make_unique<Storage>();n->modelPin=std::move(pin);n->archive=std::move(archive);n->appStart=std::move(app);
@@ -130,10 +132,11 @@ bool prepareOriginalUiGaragePrelitMaterial50KG(const OriginalUiGarageModelMateri
         const auto* row=owner.pass(materialSlot,passIndex);
         const auto archive=owner.archive();const auto images=owner.images();
         const bool selected=owner.kind()==OriginalUiGarageMaterialKind50KG::selected19E;
-        const auto archiveId=selected?OriginalUiArchiveId50KG::garagePod19:OriginalUiArchiveId50KG::garage;
+        const auto archiveId=selected&&archive&&archive->identity()?archive->identity()->id:OriginalUiArchiveId50KG::garage;
         if(!owner.loaded() || !owner.modelIdentity() ||
            (!selected && owner.kind()!=OriginalUiGarageMaterialKind50KG::staticModel) ||
-           !archive || !archive->loaded() || archive->identity()!=originalUiArchiveIdentity50KG(archiveId) ||
+           !archive || !archive->loaded() || (selected&&originalUiGaragePodCareer50KG(archiveId)<0) ||
+           archive->identity()!=originalUiArchiveIdentity50KG(archiveId) ||
            !row || !images || !images->loaded())
             return fail(d,Error::profile,"actual Garage static/selected material and image owner",0x26EA0Cu);
         const auto& pass=row->source;d.pass=pass.pass;
@@ -187,11 +190,12 @@ bool prepareOriginalUiGarageLitMaterial50KG(const OriginalUiGarageModelMaterials
         const auto* row=owner.pass(materialSlot,passIndex);
         const auto archive=owner.archive();const auto images=owner.images();
         const bool selected=owner.kind()==OriginalUiGarageMaterialKind50KG::selected19E;
-        const auto archiveId=selected?OriginalUiArchiveId50KG::garagePod19:OriginalUiArchiveId50KG::garage;
+        const auto archiveId=selected&&archive&&archive->identity()?archive->identity()->id:OriginalUiArchiveId50KG::garage;
         if(!owner.loaded() || !owner.modelIdentity() ||
            (!selected && owner.kind()!=OriginalUiGarageMaterialKind50KG::staticModel &&
             owner.kind()!=OriginalUiGarageMaterialKind50KG::actor && owner.kind()!=OriginalUiGarageMaterialKind50KG::watto) ||
-           !archive || !archive->loaded() || archive->identity()!=originalUiArchiveIdentity50KG(archiveId) ||
+           !archive || !archive->loaded() || (selected&&originalUiGaragePodCareer50KG(archiveId)<0) ||
+           archive->identity()!=originalUiArchiveIdentity50KG(archiveId) ||
            !row || !images || !images->loaded())
             return fail(d,Error::profile,"actual Garage model material and image owner",0x26EA0Cu);
         const auto& pass=row->source;d.pass=pass.pass;

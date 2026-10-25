@@ -58,7 +58,7 @@ inline Status applyAtWorldBoundary(
     const native_dynamic_contact50IW::Registry* dynamicRegistry=nullptr) {
     if(aiBoundary)*aiBoundary={};
     const auto count=bank.count();
-    if(count<2||count>maxRacers||count!=contacts.count())return Status::InvalidInput;
+    if(count<1||count>maxRacers||count!=contacts.count())return Status::InvalidInput;
     if(dynamicJoined&&(!dynamicRegistry||
        !dynamicRegistry->matchesContactIdentities(identity.data(),count))){
         if(aiBoundary)*aiBoundary={true,0,0x22a280u,0};
@@ -89,7 +89,7 @@ inline Status applyAtWorldBoundary(
                 std::memcpy(contactBefore[i].slots210.data(),live.mainContactPartners210,
                     sizeof(live.mainContactPartners210));
             }
-            if(participates[i]&&(live.phase!=VehicleFramePhase49W::Ready||
+            if((participates[i]||count==1)&&(live.phase!=VehicleFramePhase49W::Ready||
                std::memcmp(&root.scene,&live.nodes[node].world100,sizeof(BodyMatrix48G))))return false;
             before[i].physical.identity=identity[i];before[i].physical.body.state=root;
             before[i].physical.body.parameters=parameters.bodies.main.body;
@@ -100,7 +100,7 @@ inline Status applyAtWorldBoundary(
     }
     // Joined ownership admission precedes all response/list mutations. Every
     // participant remains a real active Ready racer, even when no pair hits.
-    if(dynamicJoined)for(std::size_t i=0;i<count;++i)if(participates[i]){
+    if(dynamicJoined)for(std::size_t i=0;i<count;++i)if(participates[i]||count==1){
         if(!bank.active(i)||!dynamicBound[i]){
             if(aiBoundary)*aiBoundary={true,i,0x223110u,contactBefore[i].count20C};
             return Status::ResponseRejected;
@@ -111,6 +111,10 @@ inline Status applyAtWorldBoundary(
             return Status::ResponseRejected;
         }
     }
+    // A genuine singleton still validates its Ready owner and canonical lists.
+    // Its legal pair sequence is empty: retain20C/210 and238/23C unchanged;
+    // their ordinary per-body lifecycle owns clearing, not this no-peer pass.
+    // No response body is committed because no racer participates in a pair.
     Receipt staged{};
     const auto status=contacts.run(before.data(),count,order,pairCount,after.data(),staged);
     if(status!=Status::Complete)return status;
@@ -143,7 +147,7 @@ inline Status applyAtWorldBoundary(
     // caller that changed a racer while collecting snapshots. No retained body
     // or scene pointer crosses a visit: only copied POD snapshots do.
     for(std::size_t i=0;i<count;++i)
-        if(participates[i]&&!bank.visit(i,[&](){
+        if((participates[i]||count==1)&&!bank.visit(i,[&](){
             if(live.phase!=VehicleFramePhase49W::Ready||
                std::memcmp(&live.bodies.main.components.root,&before[i].physical.body.state,sizeof(RootBodyState48H)))
                 return false;

@@ -4,6 +4,13 @@
 #include "original_standard_material_object50la.h"
 #include "original_standard_material_table50la.h"
 #include "original_standard_material_animation50la.h"
+#include "original_appstart_template_cache50kg.h"
+#include "original_standard_texture_resource50la.h"
+#include "original_standard_program_table50la.h"
+#include <algorithm>
+#include <cerrno>
+#include <cstdlib>
+#include <limits>
 #include <utility>
 
 namespace rr::assets {
@@ -12,6 +19,7 @@ namespace rr::assets {
 // immutable object addresses, including cold consumers between UI sessions.
 struct OriginalUiMaterialTemplateStorage50KG {
     OriginalUiMaterialTemplateState50KG defaults, screen;
+    std::shared_ptr<const OriginalStandardProgramTable50LA> sourcePrograms;
 };
 namespace {
 using Field = OriginalUiGsField50KG;
@@ -429,11 +437,58 @@ const char* originalUiGsFieldName50KG(Field field) noexcept {
     const auto i = static_cast<std::size_t>(field);
     return i < originalUiGsFieldCount50KG ? specs[i].name : nullptr;
 }
+bool OriginalAppStartTemplateCache50KG::getString158240(const char* name,
+    std::string& output,std::size_t maximumBytes,std::size_t& sourceOffset)const {
+    // 158648 iterates the selected cache in source order. 29FFA0 splits the
+    // key on "=\n", skips successive key delimiters, then takes the value
+    // through the first LF. A key with no following value is skipped, not a
+    // match that shadows a later present value. Semicolons remain value data.
+    for(const auto& line:lines){
+        const auto separator=line.text.find_first_of("=\n");
+        if(separator==std::string::npos)continue;
+        auto first=separator+1;
+        while(first<line.text.size()&&(line.text[first]=='='||line.text[first]=='\n'))++first;
+        if(first==line.text.size()||!same(line.text.substr(0,separator),name))continue;
+        auto last=line.text.find('\n',first);
+        if(last==std::string::npos)last=line.text.size();
+        // 158824/158858 remove leading and trailing quotes independently.
+        if(first<last&&line.text[first]=='"')++first;
+        if(first<last&&line.text[last-1]=='"')--last;
+        auto length=last-first;
+        if(maximumBytes!=static_cast<std::size_t>(-1))
+            length=maximumBytes?std::min(length,maximumBytes-1):0;
+        output.assign(line.text,first,length);
+        sourceOffset=first<line.offsets.size()?line.offsets[first]:
+            (line.offsets.empty()?0:line.offsets.back()+1);
+        return true;
+    }
+    output.clear();sourceOffset=0;return false;
+}
+bool OriginalAppStartTemplateCache50KG::getInteger158920(const char* name,
+    std::int32_t& output,std::size_t& sourceOffset,bool& unsupported)const {
+    unsupported=false;std::string text;
+    if(!getString158240(name,text,static_cast<std::size_t>(-1),sourceOffset))return false;
+    const auto first=text.empty()?'\0':char(text[0]>='A'&&text[0]<='Z'?text[0]+32:text[0]);
+    if(first=='t'||first=='y'||same(text,"ON")){output=1;return true;}
+    if(first=='f'||first=='n'||same(text,"OFF")){output=0;return true;}
+    // 158A34 uses strtol(base=0) and ignores the end pointer. In particular,
+    // an empty/nonnumeric present value is zero and trailing text is allowed.
+    // Host long widths differ: only representable signed32 conversion is
+    // admitted here. Overflow rejects as native safety, not retail parity.
+    errno=0;char* end=nullptr;
+    const auto value=std::strtoll(text.c_str(),&end,0);
+    (void)end;
+    if(errno==ERANGE||value<std::numeric_limits<std::int32_t>::min()||
+       value>std::numeric_limits<std::int32_t>::max()){
+        unsupported=true;return true;
+    }
+    output=static_cast<std::int32_t>(value);return true;
+}
 bool OriginalUiMaterialTemplates50KG::load(const OriginalUiArchive50KG& archive,
     OriginalUiMaterialDiagnostic50KG& d) noexcept {
     d = {};
     try {
-        if (storage_) return fail(d, Error::alreadyLoaded, "APPSTART");
+        if (storage_||sourceAttempted_) return fail(d, Error::alreadyLoaded, "APPSTART");
         if (!archive.identity() || archive.identity()->id != OriginalUiArchiveId50KG::appStart)
             return fail(d, Error::archive, "APPSTART");
         if (archive.materialTemplates_) {
@@ -449,6 +504,93 @@ bool OriginalUiMaterialTemplates50KG::load(const OriginalUiArchive50KG& archive,
         storage_ = std::move(next);
         return true;
     } catch (...) { d.error = Error::allocation; return false; }
+}
+bool OriginalUiMaterialTemplates50KG::loadSourceTemplate(bool screen,
+    OriginalUiMaterialTemplateState50KG& result,OriginalStandardTextureResolver50LA& resolver,
+    const OriginalStandardProgramTable50LA& programs,OriginalUiMaterialDiagnostic50KG& d) noexcept {
+    OriginalAppStartTemplateCache50KG cache;
+    OriginalStandardTextureDiagnostic50LA readDiagnostic;
+    const bool began=resolver.beginAppStartTemplate24AA10(screen,cache,readDiagnostic);
+    bool consumed=false;
+    try {
+        if(!began){
+            d.document.byteOffset=readDiagnostic.byteOffset;
+            d.document.sourcePC=readDiagnostic.sourcePC;
+            fail(d,Error::document,screen?"AppStart\\ScreenMT.psm":"AppStart\\DefaultMT.psm",
+                readDiagnostic.sourcePC?readDiagnostic.sourcePC:0x24aa10u);
+        }else{
+            const auto consume=[&]()->bool {
+                const auto* expected=catalogMember(OriginalUiArchiveId50KG::appStart,
+                    screen?"AppStart\\ScreenMT.psm":"AppStart\\DefaultMT.psm");
+                if(!cache.identity||cache.identity!=expected||(!cache.sectionFound&&!cache.lines.empty()))
+                    return fail(d,Error::document,"APPSTART source cache",0x157d00u);
+                for(const auto& line:cache.lines){
+                    if(line.text.size()!=line.offsets.size()||line.text.size()>1023)
+                        return fail(d,Error::document,"APPSTART source cache",0x1581f4u);
+                    for(std::size_t i=0;i<line.offsets.size();++i)
+                        if(line.offsets[i]>=cache.identity->bytes||
+                           (i&&line.offsets[i]<=line.offsets[i-1]))
+                            return fail(d,Error::document,"APPSTART source offsets",0x1581f4u);
+                }
+                result.identity=cache.identity;
+                // 24AAAC ignores SetSection's result. Missing keys therefore
+                // retain constructor values; no generic document validation.
+                std::string microprogram;std::size_t offset=0;
+                if(cache.getString158240("microProgramName",microprogram,64,offset))
+                    result.microprogram=std::move(microprogram);
+                OriginalStandardProgramDiagnostic50LA programDiagnostic;
+                std::int16_t programIndex=-1;
+                if(!programs.find298C80(result.microprogram,programIndex,programDiagnostic))
+                    return fail(d,Error::value,"microProgramName",0x24aadcu);
+                result.sourceProgramIndex=programIndex;result.sourceProgramIndexKnown=true;
+                for(std::size_t i=0;i<originalUiGsFieldCount50KG;++i){
+                    auto& field=result.gs.fields[i];auto value=field.value;bool unsupported=false;
+                    const bool present=cache.getInteger158920(specs[i].name,value,offset,unsupported);
+                    if(unsupported){d.document.byteOffset=offset;
+                        return fail(d,Error::value,specs[i].name,specs[i].templatePC);}
+                    if(present)field={value,cache.identity,offset,specs[i].templatePC};
+                }
+                return true;
+            };
+            consumed=consume();
+        }
+    }catch(...){d.error=Error::allocation;}
+    // No cache result escapes while an open handle could be mistaken for a
+    // completed consumer. Close is also safe for a begin that failed before
+    // opening; all reached fields and reader effects survive failure.
+    OriginalStandardTextureDiagnostic50LA closeDiagnostic;
+    const bool closed=resolver.closeAppStartTemplate1573B0(consumed,closeDiagnostic);
+    if(!closed){
+        d.error=Error::document;d.sourcePC=closeDiagnostic.sourcePC?closeDiagnostic.sourcePC:0x1573b0u;
+        d.document.byteOffset=closeDiagnostic.byteOffset;d.document.sourcePC=d.sourcePC;
+    }
+    return consumed&&closed;
+}
+bool OriginalUiMaterialTemplates50KG::loadSourceApplication(const OriginalUiArchive50KG& archive,
+    OriginalStandardTextureResolver50LA& resolver,std::shared_ptr<OriginalStandardProgramTable50LA> programs,
+    OriginalUiMaterialDiagnostic50KG& d) noexcept {
+    d={};
+    try {
+        if(storage_||sourceAttempted_||sourceStorage_)
+            return fail(d,Error::alreadyLoaded,"APPSTART",0x17cae8u);
+        sourceAttempted_=true;
+        if(archive.identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::appStart)||
+           !archive.loaded()||!programs||!programs->prepared())
+            return fail(d,Error::archive,"APPSTART",0x17cae8u);
+        // Never bless a previously parsed cache as source-loaded. The private
+        // Application path must start cold and do both genuine Config reads.
+        if(archive.materialTemplates_)return fail(d,Error::alreadyLoaded,"APPSTART",0x17cae8u);
+        sourceStorage_=std::make_shared<OriginalUiMaterialTemplateStorage50KG>();
+        sourceStorage_->sourcePrograms=std::move(programs);
+        for(auto* state:{&sourceStorage_->defaults,&sourceStorage_->screen})
+            for(std::size_t i=0;i<originalUiGsFieldCount50KG;++i)
+                state->gs.fields[i]={specs[i].initial,nullptr,0,0x24a8e0u};
+        if(!loadSourceTemplate(false,sourceStorage_->defaults,resolver,*sourceStorage_->sourcePrograms,d)||
+           !loadSourceTemplate(true,sourceStorage_->screen,resolver,*sourceStorage_->sourcePrograms,d))return false;
+        // Publication is native admission only. All source reads/getters and
+        // their closes have already occurred on these same persistent objects.
+        archive.materialTemplates_=sourceStorage_;storage_=sourceStorage_;return true;
+    }catch(...){d.error=Error::allocation;return false;}
 }
 const OriginalUiMaterialTemplateState50KG* OriginalUiMaterialTemplates50KG::get(
     OriginalUiTemplate50KG owner) const noexcept {

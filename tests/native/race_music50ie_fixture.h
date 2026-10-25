@@ -1,6 +1,6 @@
 #pragma once
 // Native cold preload/shared-mixer transport for category6 and collision music.
-// Default preparation admits six originals; explicit50IW preparation adds six. It does not widen
+// Default admits six originals; explicit50IW adds six. Practice-only admits44/45 instead. It does not widen
 //50HC's generic mono admission, run the original IOP streamer, or invent music.
 #include "pod_materials50ed_fixture.h"
 #include "../../src/assets/audio_assets50hc.h"
@@ -15,6 +15,7 @@
 
 namespace race_music50IE {
 inline constexpr std::size_t voice=117,clipCount=6,contactClipCount=6,totalClipCount=12;
+inline constexpr std::size_t practiceClipCount=2,catalogClipCount=totalClipCount+practiceClipCount;
 inline constexpr std::size_t pcmByteCapacity=24u*1024u*1024u;
 inline constexpr std::size_t sourceByteCapacity=16u*1024u*1024u;
 struct Definition {
@@ -24,7 +25,7 @@ struct Definition {
     std::uint32_t bytes,payloadBytes,frames;
     const char* sha256;
 };
-inline constexpr std::array<Definition,totalClipCount> catalog{{
+inline constexpr std::array<Definition,catalogClipCount> catalog{{
     {26,"Music\\Race\\Finish\\bad_fin.vag","MUSIC/RACE/FINISH/BAD_FIN.VAG",
         97184,47584,83244,"092f622aa2e170d109f36a09f9f23f823789437568d1da01aba374c0f7df7849"},
     {27,"Music\\Race\\Finish\\best_fin.vag","MUSIC/RACE/FINISH/BEST_FIN.VAG",
@@ -48,7 +49,11 @@ inline constexpr std::array<Definition,totalClipCount> catalog{{
     {42,"Music\\Race\\Combat\\combat02.vag","MUSIC/RACE/COMBAT/COMBAT02.VAG",
         479328,238656,417620,"50b48c1f1381331ecee0975f00eed8918f3bb1a2bbaed4e639363a05a90c6ea2"},
     {43,"Music\\Race\\Combat\\combat06.vag","MUSIC/RACE/COMBAT/COMBAT06.VAG",
-        490112,244048,427056,"e0b49fa206c62f51620d28f9193664fc923875ea2f1967315c96cc15e3ce7b64"}
+        490112,244048,427056,"e0b49fa206c62f51620d28f9193664fc923875ea2f1967315c96cc15e3ce7b64"},
+    {44,"Music\\Race\\Practice\\practc2.vag","MUSIC/RACE/PRACTICE/PRACTC2.VAG",
+        642656,320320,560532,"5c7a6705173196dbcdd78869d37e811108e1dd715801956863d9eaa68249c95b"},
+    {45,"Music\\Race\\Practice\\practc1.vag","MUSIC/RACE/PRACTICE/PRACTC1.VAG",
+        809920,403952,706888,"4fe7592ab8e0ae75bd451e2414afd8373e1ec6b8161a5188db04a83fedae7088"}
 }};
 namespace detail {
 namespace d=pod_materials50ed_fixture::detail;
@@ -179,11 +184,14 @@ public:
     bool prepare(const std::filesystem::path& discRoot,const std::filesystem::path& audioRoot,
         rr::platform::AudioMixer50HD& mixer,rr::platform::RaceAudioGroups50IC& groups,
         std::string& error,bool includeContactMusic=false,
-        TimedVolumePolicy50IW timedVolumePolicy=TimedVolumePolicy50IW::StrictSourceBoundary) {
+        TimedVolumePolicy50IW timedVolumePolicy=TimedVolumePolicy50IW::StrictSourceBoundary,
+        bool practiceMusicOnly=false) {
         namespace d=pod_materials50ed_fixture::detail;
         if(attempted_){error="50IE preparation requires a fresh stable owner";return false;}
         attempted_=true;
         try {
+            d::need(!practiceMusicOnly||!includeContactMusic,
+                "Practice profile cannot preload unrelated collision music");
             d::need(timedVolumePolicy==TimedVolumePolicy50IW::StrictSourceBoundary||
                 timedVolumePolicy==TimedVolumePolicy50IW::NativeLinearSharedMix,
                 "50IW unknown timed-volume policy");
@@ -197,9 +205,13 @@ public:
                 "676a9f212a588f0c489f92e46b0c928abee578b10f93f54c5a88068a985d5ec5");
             detail::authenticate(input,audioRoot,"RACEMUS.JUB",14043,
                 "bff85d5a51a94157669be85bb90bb4d6be8bf4d802d95d08b1d2b235e9483bf1");
-            const auto selectedCount=includeContactMusic?totalClipCount:clipCount;
+            // Practice subtype2/3 uses its two original loops, not category6 or
+            // collision clips. Keep the existing PCM/source caps unchanged.
+            const auto firstClip=practiceMusicOnly?totalClipCount:std::size_t(0);
+            const auto selectedCount=practiceMusicOnly?catalogClipCount:
+                (includeContactMusic?totalClipCount:clipCount);
             bank_.clips.resize(selectedCount);std::size_t pcmBytes=0;
-            for(std::size_t i=0;i<selectedCount;++i){
+            for(std::size_t i=firstClip;i<selectedCount;++i){
                 const auto& definition=catalog[i];auto& clip=bank_.clips[i];
                 clip.request={definition.name,false,true,true};
                 const auto path=detail::selectedPath(audioRoot,definition.path);
@@ -230,7 +242,7 @@ public:
             d::need(groups.bind(voice,rr::game::RaceAudioGroup50IC::Music118),
                 "50IE source Music118 binding rejected");
             mixer_=&mixer;groups_=&groups;pcmBytes_=pcmBytes;
-            contactMusicEnabled_=includeContactMusic;timedVolumePolicy_=timedVolumePolicy;
+            contactMusicEnabled_=includeContactMusic;practiceMusicEnabled_=practiceMusicOnly;timedVolumePolicy_=timedVolumePolicy;
             error.clear();return true;
         }catch(const std::exception& e){error=e.what();return false;}
         catch(...){error="50IE music cold preparation failed";return false;}
@@ -242,17 +254,20 @@ public:
         if(paused_)return rejected(r,Result::Paused);
         if(fadePending_)return rejected(r,fade_.flag20?Result::PendingTimedVolume26C8F0:Result::PendingFade234440);
         if(playPending_){
-            if(song!=pendingSong_||argumentA2)return rejected(r,Result::Ownership);
+            if(song!=pendingSong_||argumentA2!=pendingArgumentA2_)return rejected(r,Result::Ownership);
             return resumePlay(r);
         }
         const bool contact=rr::game::collisionMusicSong50IW(song);
+        const bool practice=rr::game::practiceMusicSong50IE(song);
+        if(practice&&!practiceMusicEnabled_)return rejected(r,Result::UnsupportedEvent);
         if(contact&&!contactMusicEnabled_)return rejected(r,Result::UnsupportedEvent);
         //1A46E0 reads existing mode/timer directly. Do not synthesize an
         //activity update before collision admission or the timer refresh.
-        if(contact){
+        if(contact||practice){
             if(!transportIdentity())return rejected(r,Result::Ownership);
         }else if(!pollCompletion())return rejected(r,Result::Ownership);
-        const auto plan=contact?rr::game::planCollisionMusic50IW(state_,liveMode11258,song,argumentA2):
+        const auto plan=practice?rr::game::planPracticeMusic50IE(state_,liveMode11258,song,argumentA2):
+            contact?rr::game::planCollisionMusic50IW(state_,liveMode11258,song,argumentA2):
             rr::game::planCategory6Music50IE(state_,liveMode11258,song,argumentA2);
         if(plan.status==rr::game::RaceMusicPlanStatus50IE::Suppressed){
             r.result=Result::Suppressed;++counters_.suppressed;return r;
@@ -282,9 +297,9 @@ public:
         // Retain the exact pending start after committed timer/stop/mode
         //writes. A backend rejection must not turn a retry into a timer-only
         //Refresh and falsely acknowledge a song which never started.
-        playPending_=true;pendingSong_=song;pendingLoop_=plan.loop;
+        playPending_=true;pendingSong_=song;pendingArgumentA2_=argumentA2;pendingLoop_=plan.loop;
         pendingPlayPC_=plan.playPC;pendingStoppedPrevious_=r.stoppedPrevious;
-        pendingCallPC_=contact?0x1a47fcu:(plan.loop?0x1a482cu:0x1a48ccu);
+        pendingCallPC_=practice?0x1a4898u:contact?0x1a47fcu:(plan.loop?0x1a482cu:0x1a48ccu);
         return resumePlay(r);
     }
     // Actual1A7E44 ending gate reads1A4AD0/1A65A0 before1A4AB0(1.0).
@@ -371,6 +386,10 @@ public:
         return {Result::Updated,0x1a4b64u,0,0.f,nativeFade_.phase,false};
     }
     bool contactMusicEnabled()const noexcept{return contactMusicEnabled_;}
+    bool practiceMusicEnabled()const noexcept{return practiceMusicEnabled_;}
+    std::size_t expectedReadyClips()const noexcept {
+        return practiceMusicEnabled_?practiceClipCount:(contactMusicEnabled_?totalClipCount:clipCount);
+    }
     TimedVolumePolicy50IW timedVolumePolicy()const noexcept{return timedVolumePolicy_;}
     bool fadePending()const noexcept{return fadePending_;}
     // Source prefix parameters retained for the native schedule. This is not
@@ -403,7 +422,7 @@ public:
     void reset()noexcept {
         if(transportIdentity()&&owned_)mixer_->stop(voice);
         owned_=false;currentSong_=0;state_={};paused_=false;fadePending_=false;playPending_=false;
-        pendingSong_=0;pendingPlayPC_=0;pendingCallPC_=0;
+        pendingSong_=0;pendingArgumentA2_=0;pendingPlayPC_=0;pendingCallPC_=0;
         fade_={};pendingVolume_={};nativeFade_={};playbackRevision_=0;endingFade_=false;
         fadeCallPC_=0x1a4b3cu;fadeRequestedSeconds_=1.5f;
         pendingLoop_=false;pendingStoppedPrevious_=false;++counters_.resets;
@@ -428,12 +447,13 @@ private:
     bool ownedMusicIdentity(rr::platform::AudioVoiceObservation50HD& observed)const noexcept {
         if(!transportIdentity()||!owned_)return false;
         const bool collision=rr::game::collisionMusicSong50IW(currentSong_);
-        if(!collision&&!rr::game::category6MusicSong50IE(currentSong_))return false;
+        const bool practice=rr::game::practiceMusicSong50IE(currentSong_);
+        if(!collision&&!practice&&!rr::game::category6MusicSong50IE(currentSong_))return false;
         const auto i=detail::index(currentSong_);
         if(i>=bank_.clips.size())return false;
         if(!mixer_->inspectVoice(voice,observed))return false;
         const auto& live=observed.voice;const auto& clip=clips_[i];
-        const bool loop=collision||currentSong_==29u||currentSong_==33u||currentSong_==34u;
+        const bool loop=collision||practice||currentSong_==29u||currentSong_==33u||currentSong_==34u;
         return live.loop==loop&&live.gain==nativeFade_.gain&&live.pitch==1.f&&live.pan==0.f&&
             observed.groupKnown&&live.clip.samples==clip.samples&&live.clip.frames==clip.frames&&
             live.clip.sampleRate==clip.sampleRate&&live.clip.channels==clip.channels&&
@@ -545,14 +565,14 @@ private:
         currentSong_=pendingSong_;r.result=Result::Started;r.originalV0=1;
         ++counters_.starts;if(pendingLoop_)++counters_.loopStarts;else ++counters_.oneShotStarts;
         if(pendingStoppedPrevious_)++counters_.stoppedPrevious;
-        playPending_=false;pendingSong_=0;pendingPlayPC_=0;pendingCallPC_=0;
+        playPending_=false;pendingSong_=0;pendingArgumentA2_=0;pendingPlayPC_=0;pendingCallPC_=0;
         pendingLoop_=false;pendingStoppedPrevious_=false;return r;
     }
     Receipt rejected(Receipt r,Result result)noexcept {
         r.result=result;++counters_.rejected;return r;
     }
     rr::assets::AudioBank50HC bank_{};
-    std::array<rr::platform::AudioClip50HD,totalClipCount> clips_{};
+    std::array<rr::platform::AudioClip50HD,catalogClipCount> clips_{};
     rr::platform::AudioMixer50HD* mixer_=nullptr;
     rr::platform::RaceAudioGroups50IC* groups_=nullptr;
     rr::game::RaceMusicState50IE state_{};
@@ -565,11 +585,11 @@ private:
     std::size_t pcmBytes_=0;
     std::uint32_t currentSong_=0;
     bool attempted_=false,paused_=false,owned_=false;
-    bool contactMusicEnabled_=false,fadePending_=false,playPending_=false;
+    bool contactMusicEnabled_=false,practiceMusicEnabled_=false,fadePending_=false,playPending_=false;
     bool endingFade_=false;
     std::uint32_t fadeCallPC_=0x1a4b3cu;
     float fadeRequestedSeconds_=1.5f;
-    std::uint32_t pendingSong_=0,pendingPlayPC_=0,pendingCallPC_=0;
+    std::uint32_t pendingSong_=0,pendingArgumentA2_=0,pendingPlayPC_=0,pendingCallPC_=0;
     bool pendingLoop_=false,pendingStoppedPrevious_=false;
 };
 } // namespace race_music50IE

@@ -1,4 +1,5 @@
 #pragma once
+namespace original_racer_manager_entity { class Owner; }
 namespace original_camera_session50KX { class Session; }
 #include "original_entity_chains50la.h"
 #include <array>
@@ -25,6 +26,7 @@ class OriginalApplicationEntityAuthority50LA final {
     friend class OriginalTunnelTrack50LA;
     friend class OriginalRaceConstructor50LA;
     friend class ::original_camera_session50KX::Session;
+    friend class ::original_racer_manager_entity::Owner;
     friend class rr::platform::RaceAudioGroups50IC;
     friend class rr::platform::OriginalUiLightManagerOwner50KG;
     friend class rr::platform::OriginalApplicationAural50KG;

@@ -14,6 +14,7 @@ namespace original_cable_selection50LA { class Binding; }
 #include "../../src/game/query_prepare48o.h"
 #include "../../src/game/collection_projection50cf.h"
 #include "../../src/game/pod_live_query50iz.h"
+#include "../../src/game/original_racer_selection50ij.h"
 #include <cstddef>
 #include <algorithm>
 #include <exception>
@@ -42,6 +43,7 @@ struct RuntimeQueryCapacityInputs {
     // its true membership capacity is derived by this world's construction.
     undertrack_owners50ew_fixture::Owners* recovery=nullptr;
     std::vector<WreckReservation> wreck;
+    std::uint32_t humanCount=0;
 };
 struct ActualQueryOwners {
     g::VehicleFrameState49W& frame;
@@ -66,6 +68,7 @@ struct GridArenaOwners {
     g::AiRuntimeState50IV& ai;
     g::BasePoseHistoryState50Y& history;
     const std::array<std::unique_ptr<native_racer50HW::Rig>,8>& rigs;
+    std::uint32_t humanCount=0;
 };
 struct FreshRecoveryArenaOwners {
     g::SpringVector4_48N (&endpoints)[2];
@@ -314,6 +317,8 @@ class OwnershipBridge final {
     g::VehicleFrameBindings49W* podBindings_=nullptr;
     g::VehicleFrameParameters49W* podParameters_=nullptr;
     std::array<bool,8> podBindingInstalled_{};
+    // One immutable role split accompanies the retained shared pod context.
+    std::uint32_t podHumanCount_=0;
     // Outside Bank snapshots: real cleanup must discharge every reached slot.
     std::array<bool,8> gridRetirementRequired_{};
     std::array<const native_racer50HW::Rig*,8> gridRigIdentity_{};
@@ -373,7 +378,7 @@ class OwnershipBridge final {
             const auto* source=candidates?candidates->decodedSource():nullptr;
             const auto* bindings=candidates?candidates->staticBindings():nullptr;
             if(!source||!bindings||source->collisions.size()!=178u||bindings->size()!=(candidates->triggerActions_?180u:178u)||
-               input.collisionRoster.empty()||input.collisionRoster.size()>8u||
+               input.humanCount>1u||input.humanCount>input.collisionRoster.size()||input.collisionRoster.empty()||input.collisionRoster.size()>8u||
                input.wreck.size()>(storage::runtimeSearchSlotLimit-8u)/3u)
                 return fail(d,"actual RA static source and bounded original collision roster required");
             for(std::size_t i=0;i<bindings->size();++i){const auto& b=(*bindings)[i];
@@ -460,13 +465,13 @@ class OwnershipBridge final {
                 }
             }
             if(candidates_->triggerActions_){
-                if(inputs_.collisionRoster.size()!=8u||!rosterResources_)
-                    return fail(d,"RA triggers require the actual all-eight retained roster");
+                if(inputs_.collisionRoster.empty()||!rosterResources_)
+                    return fail(d,"RA triggers require the actual active retained roster");
                 std::array<ra_trigger_actions50LA::RacerIdentities,8> ids{};
-                for(std::size_t i=0;i<8u;++i)ids[i]={bodyIdentities_[i].main,bodyIdentities_[i].secondary};
-                // This retained RA route constructs eight original AI racers.
-                // No human-prefix0 fallback or camera-derived exclusion.
-                if(!candidates_->triggerActions_->prepare(*candidates_->triggerSource_,ids,0u,source->ai.track.count))
+                for(std::size_t i=0;i<inputs_.collisionRoster.size();++i)ids[i]={bodyIdentities_[i].main,bodyIdentities_[i].secondary};
+                // Preserve the actual source PLAYER prefix for IgnorePlayer.
+                // Normal Course owns Player0; legacy ALL8 has an empty prefix.
+                if(!candidates_->triggerActions_->prepare(*candidates_->triggerSource_,ids,inputs_.humanCount,source->ai.track.count,inputs_.collisionRoster.size()))
                     return fail(d,"RA original trigger identity/action preparation failed");
             }
             capacitySealed_=true;
@@ -597,13 +602,13 @@ class OwnershipBridge final {
     bool triggerBankCurrent(const native_racer50HN::Bank& bank,std::size_t slot,bool inVisit)const noexcept {
         const auto pin=bankLifetime_.lock();
         if(!pin||bankIdentity_!=&bank||pin->identity!=&bank||
-           bank.raWorldLifetime_.get()!=pin.get()||!bank.sealed_||bank.count_!=8u||
+           bank.raWorldLifetime_.get()!=pin.get()||!bank.sealed_||bank.count_!=inputs_.collisionRoster.size()||
            !candidates_->triggerActions_||!actual_)return false;
         // visit(0) uses readBlocked rather than the swapping lease; batched
         // visits use visiting for every slot, including zero.
         if(inVisit?(!bank.visiting_&&!(slot==0u&&bank.readBlocked_)):
             (bank.visiting_||bank.readBlocked_))return false;
-        return !inVisit||(slot<8u&&actual_->mainFilter.identity==bodyIdentities_[slot].main&&
+        return !inVisit||(slot<inputs_.collisionRoster.size()&&actual_->mainFilter.identity==bodyIdentities_[slot].main&&
             actual_->secondaryFilter.identity==bodyIdentities_[slot].secondary&&
             actual_->main.resource==&bodyIdentities_[slot].collision->main()&&
             actual_->secondary.resource==&bodyIdentities_[slot].collision->secondary());
@@ -621,7 +626,7 @@ class OwnershipBridge final {
         const auto pin=bankLifetime_.lock();
         return pin&&bankIdentity_&&pin->identity==bankIdentity_&&
             bankIdentity_->raWorldLifetime_.get()==pin.get()&&bankIdentity_->sealed_&&
-            bankIdentity_->count_==8u&&!bankIdentity_->visiting_&&!bankIdentity_->readBlocked_;
+            bankIdentity_->count_==inputs_.collisionRoster.size()&&!bankIdentity_->visiting_&&!bankIdentity_->readBlocked_;
     }
     bool registeredRange(const void* address,std::size_t bytes)const noexcept {
         const auto first=reinterpret_cast<std::uintptr_t>(address);
@@ -631,13 +636,23 @@ class OwnershipBridge final {
         }
         return false;
     }
+    static bool coldRoleMatches(const g::VehicleFrameState49W& frame,
+        const g::AiRuntimeState50IV& ai,const native_racer50HW::Rig& rig,
+        std::size_t slot,std::uint32_t humanCount)noexcept {
+        if(humanCount>1u||slot>=8u)return false;
+        const auto* identity=g::original_racer_selection50IJ::findByPodId(rig.podId);
+        if(!identity)return false;
+        if(slot<humanCount)return frame.fields.vehicle58==0u&&!frame.fields.nativeAiOwnersBound50IV&&!ai.initialized;
+        return frame.fields.vehicle58==1u&&frame.fields.nativeAiOwnersBound50IV&&ai.initialized&&
+            ai.managerIndexFE0==slot&&ai.racer60==identity->racer60;
+    }
     bool gridInputsRegistered(const GridArenaOwners& a)const noexcept {
         const auto& q=*actual_;const auto& frame=q.frame;
         // Actual AI registration deliberately excludes the shared noise lane.
         constexpr auto noise=offsetof(g::VehicleFrameState49W,noise);
         constexpr auto after=noise+sizeof(g::CoupledNoiseContext49M);
         const auto* bytes=reinterpret_cast<const unsigned char*>(&frame);
-        return registeredRange(bytes,noise)&&registeredRange(bytes+after,sizeof(frame)-after)&&
+        return a.humanCount<=1u&&a.humanCount==inputs_.humanCount&&registeredRange(bytes,noise)&&registeredRange(bytes+after,sizeof(frame)-after)&&
             registeredRange(&a.bindings,sizeof(a.bindings))&&registeredRange(&a.parameters,sizeof(a.parameters))&&
             registeredRange(&a.ai,sizeof(a.ai))&&registeredRange(&a.history,sizeof(a.history))&&
             registeredRange(&q.main,sizeof(q.main))&&registeredRange(&q.secondary,sizeof(q.secondary))&&
@@ -666,10 +681,12 @@ class OwnershipBridge final {
         bounds.type2Resource=query.resource;return true;
     }
     bool bindPodLiveQuery(native_racer50HN::Bank& bank,std::size_t slot,
-        g::VehicleFrameBindings49W& bindings,g::VehicleFrameParameters49W& parameters,Diagnostic& d)noexcept {
+        g::VehicleFrameBindings49W& bindings,g::VehicleFrameParameters49W& parameters,Diagnostic& d,
+        std::uint32_t humanCount=0)noexcept {
         d={};
         if(terminal_||closed_||cameraAttempted_||!worldOwnersRegistered_||!actual_||!actual_->recovery||
-           !cameraBankCurrent()||&bank!=bankIdentity_||slot>=8u||gridAttempted_[slot]||podBindingInstalled_[slot]||
+           !cameraBankCurrent()||&bank!=bankIdentity_||slot>=inputs_.collisionRoster.size()||humanCount>1u||humanCount!=inputs_.humanCount||
+           (podContext_&&podHumanCount_!=humanCount)||gridAttempted_[slot]||podBindingInstalled_[slot]||
            !registeredRange(&bindings,sizeof(bindings))||!registeredRange(&parameters,sizeof(parameters))||
            (podBindings_&&podBindings_!=&bindings)||(podParameters_&&podParameters_!=&parameters))
             return fail(d,"RA pod binding requires same actual cold Bank/arena before final grid");
@@ -690,12 +707,13 @@ class OwnershipBridge final {
             if(!podContext_){
                 podContext_.reset(new g::PodLiveQueryContext50IZ{
                     {s.lifecycle,s.world,recovery.memberships[0],s.membershipWork,s.count.podQuery},&parameters.shape});
-                podBindings_=&bindings;podParameters_=&parameters;
+                podBindings_=&bindings;podParameters_=&parameters;podHumanCount_=humanCount;
             }
             bool complete=false;
             bank.visit(slot,[&](){auto& q=*actual_;const auto& r=*q.recovery;
                 if(q.frame.phase!=g::VehicleFramePhase49W::Ready||q.frame.bodies.main.frameFactor!=0.f||
-                   q.frame.fields.vehicle58!=1u||!q.frame.fields.nativeAiOwnersBound50IV||
+                   (slot<humanCount?(q.frame.fields.vehicle58!=0u||q.frame.fields.nativeAiOwnersBound50IV):
+                       (q.frame.fields.vehicle58!=1u||!q.frame.fields.nativeAiOwnersBound50IV))||
                    !r.sourcePrepared||!r.selectedSource||!r.selectedSource->prepared()||
                    q.main.resource!=&r.selectedSource->main()||q.secondary.resource!=&r.selectedSource->secondary()||
                    q.frame.shape.registrationE0||r.memberships[0].attached||r.memberships[1].attached||
@@ -716,25 +734,25 @@ class OwnershipBridge final {
         const GridArenaOwners& input,Diagnostic& d)noexcept {
         d={};
         if(terminal_||closed_||cameraAttempted_||!worldOwnersRegistered_||!actual_||
-           !cameraBankCurrent()||&bank!=bankIdentity_||slot>=8u||gridAttempted_[slot]||
-           inputs_.collisionRoster.size()!=8u||!gridInputsRegistered(input)||
+           !cameraBankCurrent()||&bank!=bankIdentity_||slot>=inputs_.collisionRoster.size()||gridAttempted_[slot]||
+           inputs_.collisionRoster.size()!=bank.count()||!gridInputsRegistered(input)||
            (rosterResources_&&!rosterSlotComplete_[slot]))
-            return fail(d,"RA cold grid requires the same sealed eight-slot Bank and registered actual arena");
-        if(actual_->recovery&&(!podBindingInstalled_[slot]||podBindings_!=&input.bindings||podParameters_!=&input.parameters))
+            return fail(d,"RA cold grid requires the same sealed active-roster Bank and registered actual arena");
+        if(actual_->recovery&&(!podBindingInstalled_[slot]||podHumanCount_!=input.humanCount||podBindings_!=&input.bindings||podParameters_!=&input.parameters))
             return fail(d,"RA recovery grid requires the actual previously bound pod context");
         try {
             if(gridArena_){
                 const auto& a=*gridArena_;
                 if(&a.bindings!=&input.bindings||&a.parameters!=&input.parameters||&a.ai!=&input.ai||
-                   &a.history!=&input.history||&a.rigs!=&input.rigs)
+                   &a.history!=&input.history||&a.rigs!=&input.rigs||a.humanCount!=input.humanCount)
                     return fail(d,"RA grid arena borrows cannot be replaced");
             }else{
-                // Validate all eight identity lanes before any placement. Each
+                // Validate every active identity lane before any placement. Each
                 // visited slot separately proves its actual Ready constructor.
                 const auto idMain=bank.bindRead(actual_->mainFilter.identity);
                 const auto idSecondary=bank.bindRead(actual_->secondaryFilter.identity);
-                for(unsigned i=0;i<8;++i){
-                    if(!input.rigs[i])return fail(d,"RA grid requires eight retained actual Rig owners");
+                for(std::size_t i=0;i<inputs_.collisionRoster.size();++i){
+                    if(!input.rigs[i])return fail(d,"RA grid requires every active retained Rig owner");
                     const auto m=bank.read(i,idMain),s=bank.read(i,idSecondary);
                     const auto terrain=actual_->terrain.metadata.filter.identity;
                     if(m==terrain||s==terrain)return fail(d,"RA grid body identity conflicts with terrain query");
@@ -754,9 +772,9 @@ class OwnershipBridge final {
                     stack=std::max(stack,extent);}
                 groundStack_.resize(stack);
                 gridArena_=std::make_unique<GridArenaOwners>(input);
-                for(unsigned i=0;i<8;++i)gridRigIdentity_[i]=input.rigs[i].get();
+                for(std::size_t i=0;i<inputs_.collisionRoster.size();++i)gridRigIdentity_[i]=input.rigs[i].get();
             }
-            for(unsigned i=0;i<8;++i)if(input.rigs[i].get()!=gridRigIdentity_[i])
+            for(std::size_t i=0;i<inputs_.collisionRoster.size();++i)if(input.rigs[i].get()!=gridRigIdentity_[i])
                 return fail(d,"actual retained grid Rig owner was replaced");
             gridAttempted_[slot]=true;
             bool complete=false;
@@ -771,9 +789,7 @@ class OwnershipBridge final {
                 for(const auto* item:inputs_.collisionRoster)if(q.main.resource==&item->main()&&
                     q.secondary.resource==&item->secondary())collision=item;
                 if(!collision||state.phase!=g::VehicleFramePhase49W::Ready||state.bodies.main.frameFactor!=0.f||
-                   state.fields.vehicle58!=1u||!state.fields.nativeAiOwnersBound50IV||!a.ai.initialized||
-                   a.ai.managerIndexFE0!=slot||rig.podId.size()!=5u||a.ai.racer60>99u||
-                   rig.podId!=std::string("POD")+char('0'+a.ai.racer60/10u)+char('0'+a.ai.racer60%10u)||
+                   !coldRoleMatches(state,a.ai,rig,slot,a.humanCount)||
                    collision->binding().archivePath!=rig.resourceFile.string()||
                    !g::validVehicleSceneCount49W(state,a.bindings)||main>=state.sceneNodeCount||
                    physical>=state.sceneNodeCount||a.bindings.lifecycle.main190!=rig.main||
@@ -790,7 +806,7 @@ class OwnershipBridge final {
                    std::bit_cast<std::uint32_t>(q.terrain.receipt.authoredLift)!=
                        std::bit_cast<std::uint32_t>(a.parameters.visual.verticalLimit7EC)||
                    !live_terrain_probe50fr::matches(q.terrainLive,q.terrain.initial)){
-                    fail(d,"actual Ready AI/rig/COL/PHY/query ownership differs at grid slot");return;}
+                    fail(d,"actual Ready racer-role/rig/COL/PHY/query ownership differs at grid slot");return;}
                 constexpr std::uint32_t hostRank[8]={4,0,1,2,3,5,6,7};
                 g::GridCenterResult50AC grid{};
                 if(!source_grid50IG::prepare(candidates_->decodedSource()->map,hostRank[slot],grid)){
@@ -879,7 +895,7 @@ class OwnershipBridge final {
         const std::shared_ptr<g::original_gc_gameplay_lighting_candidate::Owner>& light,
         const FreshRecoveryArenaOwners* recovery,Diagnostic& d)noexcept {
         d={};
-        if(terminal_||closed_||cameraAttempted_||!cameraBankCurrent()||&bank!=bankIdentity_||slot>=8u||
+        if(terminal_||closed_||cameraAttempted_||!cameraBankCurrent()||&bank!=bankIdentity_||slot>=inputs_.collisionRoster.size()||
            !actual_||!gridArena_||!gridCompletion_[slot].complete||freshAttempted_[slot]||!light||
            (freshLighting_&&freshLighting_!=light)||bool(recovery)!=bool(actual_->recovery))
             return fail(d,"RA fresh attachment requires actual completed grid and same cold owners");
@@ -906,7 +922,7 @@ class OwnershipBridge final {
                 const auto physical=static_cast<unsigned>(a.bindings.lifecycle.physical19C);
                 if(!a.rigs[slot]||a.rigs[slot].get()!=gridRigIdentity_[slot]||
                    f.phase!=g::VehicleFramePhase49W::Ready||f.bodies.main.frameFactor!=0.f||
-                   f.fields.vehicle58!=1u||!f.fields.nativeAiOwnersBound50IV||!a.ai.initialized||a.ai.managerIndexFE0!=slot||
+                   !coldRoleMatches(f,a.ai,*a.rigs[slot],slot,a.humanCount)||
                    main>=f.sceneNodeCount||physical>=f.sceneNodeCount||
                    q.main.resource!=proof.mainResource||q.secondary.resource!=proof.secondaryResource||
                    std::memcmp(&proof.main,&f.nodes[main].world100,sizeof(proof.main))||
@@ -956,7 +972,9 @@ class OwnershipBridge final {
                 if(recovery){
                     auto& r=*q.recovery;
                     if(!undertrack_owners50ew_fixture::attachFreshQueries(r,f,a.bindings,a.parameters,recoveryBorrows(),
-                        {s.count.podQuery,s.count.movementQuery},s.lifecycle,s.world,s.membershipWork,1)){
+                        {s.count.podQuery,s.count.movementQuery},s.lifecycle,s.world,s.membershipWork,1,
+                        slot<a.humanCount?undertrack_owners50ew_fixture::ColdQueryRole50LH::humanPlayer:
+                            undertrack_owners50ew_fixture::ColdQueryRole50LH::originalAi)){
                         fail(d,"actual fresh694/7A4 attachment incomplete");return;}
                     g::CollisionSphere48J sphere{};
                     std::memcpy(sphere.center.v,f.shape.center60.v,sizeof sphere.center.v);sphere.radius=f.shape.radius80;
@@ -979,7 +997,7 @@ class OwnershipBridge final {
     }
     bool retireFresh(native_racer50HN::Bank& bank,std::size_t slot,Diagnostic& d)noexcept {
         d={};
-        if(nativeFifoPins_||closed_||!cameraBankCurrent()||&bank!=bankIdentity_||slot>=8u||
+        if(nativeFifoPins_||closed_||!cameraBankCurrent()||&bank!=bankIdentity_||slot>=inputs_.collisionRoster.size()||
            (camera_&&camera_->session&&!camera_->session->closed_)||
            (follow_&&follow_->attempted_&&!follow_->closed_)){
             d.message="RA fresh retirement requires real camera/Follow cleanup and live Bank";return false;}
@@ -1018,7 +1036,7 @@ class OwnershipBridge final {
     bool retireGrid(native_racer50HN::Bank& bank,std::size_t slot,Diagnostic& d)noexcept {
         d={};
         // Cleanup deliberately remains callable after terminal partial failure.
-        if(nativeFifoPins_||closed_||!cameraBankCurrent()||&bank!=bankIdentity_||slot>=8u||
+        if(nativeFifoPins_||closed_||!cameraBankCurrent()||&bank!=bankIdentity_||slot>=inputs_.collisionRoster.size()||
            (camera_&&camera_->session&&!camera_->session->closed_)||
            (follow_&&follow_->attempted_&&!follow_->closed_)){
             d.message="RA grid retirement requires its live Bank after actual camera/Follow cleanup";return false;}

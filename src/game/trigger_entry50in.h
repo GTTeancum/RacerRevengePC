@@ -5,6 +5,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <stdexcept>
 
 namespace rr::game {
 inline constexpr std::size_t triggerContactCapacity50IN=32;
@@ -15,6 +16,34 @@ struct TriggerColliderContacts50IN {
     std::uint32_t identity=0;
     std::array<std::uint32_t,triggerContactCapacity50IN> membersCC{};
     std::size_t highWaterD0=0;
+};
+// Fixed allocation with a cold-selected live prefix. Tail capacity is not a
+// fabricated racer or collider, and cannot participate in membership walks.
+template<std::size_t Capacity> class TriggerColliderStorage50IN final {
+    std::array<TriggerColliderContacts50IN,Capacity> storage_{};
+    std::size_t count_=Capacity;
+    bool selected_=false;
+public:
+    bool setCount(std::size_t count) noexcept {
+        if(selected_||!count||count>Capacity)return false;
+        for(const auto& c:storage_){
+            if(c.identity||c.highWaterD0)return false;
+            for(const auto id:c.membersCC)if(id)return false;
+        }
+        count_=count;selected_=true;return true;
+    }
+    std::size_t size()const noexcept{return count_;}
+    bool empty()const noexcept{return count_==0;}
+    auto data()noexcept{return storage_.data();}
+    auto data()const noexcept{return storage_.data();}
+    auto begin()noexcept{return storage_.begin();}
+    auto end()noexcept{return storage_.begin()+count_;}
+    auto begin()const noexcept{return storage_.begin();}
+    auto end()const noexcept{return storage_.begin()+count_;}
+    TriggerColliderContacts50IN& operator[](std::size_t i)noexcept{return storage_[i];}
+    const TriggerColliderContacts50IN& operator[](std::size_t i)const noexcept{return storage_[i];}
+    TriggerColliderContacts50IN& at(std::size_t i){if(i>=count_)throw std::out_of_range("trigger collider index");return storage_[i];}
+    const TriggerColliderContacts50IN& at(std::size_t i)const {if(i>=count_)throw std::out_of_range("trigger collider index");return storage_[i];}
 };
 struct TriggerEntryState50IN {
     std::uint8_t flags29=3;

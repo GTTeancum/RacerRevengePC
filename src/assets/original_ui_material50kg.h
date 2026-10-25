@@ -9,6 +9,9 @@
 
 namespace rr::assets {
 class OriginalUiScreenAssets50KG;
+class OriginalStandardTextureResolver50LA;
+class OriginalStandardProgramTable50LA;
+class OriginalUiMaterialApplication50LA;
 enum class OriginalUiGsField50KG : std::uint8_t {
     textureColorComponent, textureFunction, sourceAlphaValueWhenAis0,
     sourceAlphaValueWhenAis1, methodOfExpandingTextureAlpha,
@@ -54,6 +57,11 @@ struct OriginalUiMaterialTemplateState50KG {
     const OriginalUiMemberIdentity50KG* identity = nullptr;
     std::string microprogram;
     OriginalUiGsState50KG gs;
+    // Actual 24AADC lookup into the SAME retained 382B70 owner, followed by
+    // 24AAE4's signed16 store. Legacy parsed templates leave this unknown;
+    // it is neither a UI-program enum nor a program-object reference.
+    std::int16_t sourceProgramIndex = -1;
+    bool sourceProgramIndexKnown = false;
 };
 // Only authenticated APPSTART can construct the real DefaultMT and ScreenMT
 // owners. Both start with original 24A8E0, then apply their own file overrides.
@@ -69,6 +77,17 @@ public:
     bool loaded() const noexcept { return bool(storage_); }
     const OriginalUiMaterialTemplateState50KG* get(OriginalUiTemplate50KG) const noexcept;
 private:
+    friend class OriginalUiMaterialApplication50LA;
+    bool loadSourceApplication(const OriginalUiArchive50KG&,
+        OriginalStandardTextureResolver50LA&,
+        std::shared_ptr<OriginalStandardProgramTable50LA>,OriginalUiMaterialDiagnostic50KG&) noexcept;
+    bool loadSourceTemplate(bool,OriginalUiMaterialTemplateState50KG&,
+        OriginalStandardTextureResolver50LA&,const OriginalStandardProgramTable50LA&,
+        OriginalUiMaterialDiagnostic50KG&) noexcept;
+    // A reached source prefix is owned even when publication fails. No local
+    // next object, legacy parser fallback, or retry can erase/replay it.
+    bool sourceAttempted_ = false;
+    std::shared_ptr<OriginalUiMaterialTemplateStorage50KG> sourceStorage_;
     std::shared_ptr<const OriginalUiMaterialTemplateStorage50KG> storage_;
 };
 enum class OriginalUiMaterialOrigin50KG : std::uint8_t {

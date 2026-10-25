@@ -35,7 +35,7 @@ public:
 };
 struct NativeTriggerGroup50GA {
  NativeTriggerStates50GA triggers{};
- std::array<TriggerColliderContacts50IN,nativeTriggerColliderCount50GA> colliders{};
+ TriggerColliderStorage50IN<nativeTriggerColliderCount50GA> colliders{};
  std::array<std::uint32_t,nativeTriggerCapacity50GA> ignoreCollider{}; // legacy single-identity GA policy
  // Authentic PLAYER resolver1B5340 visits [0,source manager+34). These are
  // actual main690 identities in source roster order, never a class58 scan.

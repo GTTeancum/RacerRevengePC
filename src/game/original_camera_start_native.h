@@ -243,12 +243,89 @@ struct OriginalGcIntroExitBindings {
     std::uint64_t actualIntroAudio80;
     //Current common racer40, not class58 or an input-role inference.
     std::int32_t actualRacerState40;
+    CoupledNoiseContext49M* startRandom=nullptr;
+    void* startMusicContext=nullptr;
+    bool (*startMusicRequest)(void*,std::int32_t,std::int32_t)=nullptr;
+};
+//1AFD80 returns from1A9750 before types2/3 call1AD3C0. The one
+//308030 draw is retained even if the actual music consumer cannot yet finish.
+class OriginalEventStartMusic final {
+    bool drawn_=false,complete_=false;std::int32_t line_=0;
+public:
+    OriginalCameraStartResult advance(OriginalGcIntroExitBindings& b) noexcept {
+        using S=OriginalCameraStartStatus;
+        if(complete_)return {S::complete,0x1afe20};
+        if(b.actualLaunch11258==1){complete_=true;return {S::complete,0x1afe20};}
+        if((b.actualLaunch11258!=2&&b.actualLaunch11258!=3)||!b.startRandom||!b.startMusicRequest)
+            return {S::owner,0x1ad3c0};
+        if(!drawn_){
+            if(std::fegetround()!=FE_TONEAREST)return {S::arithmetic,0x1ad3dc};
+            auto& raw=b.startRandom->sharedRandomState;raw=raw*0x41c64e6du+0x3039u;
+            volatile float converted=static_cast<float>(static_cast<std::int32_t>(raw&0x7fffffffu));
+            volatile float probability=converted*0x1p-31f;
+            line_=probability<0.5f?45:44;drawn_=true;
+        }
+        if(!b.startMusicRequest(b.startMusicContext,line_,1))return {S::sourcePath,0x1a46e0};
+        complete_=true;return {S::complete,0x1afe20};
+    }
+};
+//1762F4, not the completed mode7 exit: no fade, racer AE8 reset, raceFlag8,
+//intro-finished flag or cooldown. Real saved preference, viewport and music
+//owners are still executed in the original order.
+class OriginalDirectRaceStartOwner final {
+    unsigned phase_=0;bool complete_=false;std::uint64_t generation_=0;
+    OriginalRaceViewportCall viewport_;OriginalEventStartMusic music_;
+public:
+    bool complete()const noexcept{return complete_;}
+    OriginalCameraStartResult advance(OriginalGcIntroExitBindings& b,
+        platform::VehicleWindowGl50DS& renderer,platform::VehicleWindowDiagnostic50DS& diagnostic) noexcept {
+        using S=OriginalCameraStartStatus;
+        auto* registry=b.followChild.collection;
+        if(complete_)return {S::alreadyComplete,0x176728};
+        if(!registry||!registry->bound||registry!=b.introChild.collection||registry!=b.attachedChild.collection||
+           !registry->registered38||!registry->count30||registry->selected34>=registry->count30||
+           !b.controller.bound||registry->sessionGeneration!=b.controller.binding.sessionGeneration||
+           registry->sceneKey!=b.controller.binding.sceneKey||!b.follow64.prepared||
+           b.follow64.sessionGeneration!=registry->sessionGeneration||
+           (generation_&&generation_!=registry->sessionGeneration))return {S::owner,0x1762f4};
+        if(b.actualLaunch11258<1||b.actualLaunch11258>3||
+           (b.actualLaunch11258!=2&&b.start7C.route[0]!=-1)||
+           (b.actualPreference11030!=0&&b.actualPreference11030!=5)||
+           b.actualRacerState40!=0||b.actualIntroAudio80||(b.raceFlags1B0&3u)!=1u||
+           b.controller.flags62&0xe0u||!b.startActions.authenticated())return {S::sourcePath,0x1762f4};
+        if(!generation_){if(b.controller.mode44!=4)return {S::owner,0x1762f4};generation_=registry->sessionGeneration;}
+        for(;;){OriginalCameraStartResult r{S::complete,0};switch(phase_){
+        case 0:{
+            std::size_t index=0;for(;index<registry->count30;++index)if(registry->registered38[index]==b.followChild.follow64Key)break;
+            if(index==registry->count30)return {S::owner,0x115e60};
+            registry->selected34=index;b.controller.mode44=0;
+            //Native active is a dispatch-lifetime guard, not a source field.
+            //This direct selection uses the already initialized constructor
+            //values and must NOT replay179F40 or reset snap/filter state.
+            b.follow64.active=true;break;}
+        case 1:{
+            b.controller.flags63Low5&=static_cast<std::uint8_t>(~2u);b.controller.specialDelayA4=1;
+            const auto switched=b.actualPreference11030==0?
+                transitionOriginalFollow177AB0(b.controller,b.follow64,b.numericScene,b.followChild,
+                    b.visibility,b.spatialScene,b.zoneKeys,b.workspace,0,&b.actualVariant11038,b.transitionInput):
+                transitionOriginalAttached177AB0(b.controller,b.attached6C,b.numericScene,b.attachedChild,
+                    b.visibility,b.spatialScene,b.zoneKeys,b.workspace,5,b.transitionInput);
+            if(switched.status!=OriginalFollowControllerStatus::complete)return {S::sourcePath,switched.sourcePC};
+            b.follow64.distanceOffset58=b.follow64.yawOffset5C=b.follow64.pitchOffset60=b.follow64.fovOffset64=0;break;}
+        case 2:r=beginOriginalRaceCountdown1AFD80(b.countdown,b.actualManager,b.actualApplication33C,b.actualLaunch11258,b.startActions);break;
+        case 3:r=viewport_.advance(false,b.display,b.scene,renderer,diagnostic);break;
+        case 4:r=music_.advance(b);break;
+        case 5:revealOriginalRaceUi199770(b.actualUiFlags1E4);break;
+        default:complete_=true;return {S::complete,0x176728};
+        }if(r.status!=S::complete)return r;++phase_;}
+    }
 };
 class OriginalGcIntroExitOwner final {
     unsigned phase_=0;std::size_t nextRacer_=0;
     bool begun_=false,completed_=false;
     std::uint64_t generation_=0,controllerKey_=0;
     OriginalRaceViewportCall viewportCall_;
+    OriginalEventStartMusic music_;
 public:
     bool complete() const noexcept {return completed_;}
     //RacerBank must be the actual stable50HN Bank. The references point to
@@ -270,7 +347,7 @@ public:
            b.display.controllers48[0]->controllerKey!=registry->controllerKey||!b.follow64.prepared||
            b.follow64.sessionGeneration!=registry->sessionGeneration||b.follow64.racerKey!=b.controller.binding.racerKey)
             return {S::owner,0x176654};
-        if(b.actualLaunch11258!=1||(b.actualPreference11030!=5&&b.actualPreference11030!=0)||
+        if((b.actualLaunch11258!=1&&b.actualLaunch11258!=3)||(b.actualPreference11030!=5&&b.actualPreference11030!=0)||
            b.actualRacerState40!=0||b.actualIntroAudio80||b.controller.flags62&0xe0u||
            (b.raceFlags1B0&3u)!=1u||!b.startActions.authenticated())return {S::sourcePath,0x176664};
         if(!begun_){
@@ -308,7 +385,9 @@ public:
             case 6:r=beginOriginalRaceCountdown1AFD80(b.countdown,b.actualManager,b.actualApplication33C,
                     b.actualLaunch11258,b.startActions);break;
             case 7:r=viewportCall_.advance(false,b.display,b.scene,renderer,d);break;
-            case 8:revealOriginalRaceUi199770(b.actualUiFlags1E4);break;
+            case 8:
+                r=music_.advance(b);if(r.status!=S::complete)return r;
+                revealOriginalRaceUi199770(b.actualUiFlags1E4);break;
             case 9:b.controller.cooldown8C=1;break;
             case 10:b.controller.flags63Low5|=1u;break;
             case 11:

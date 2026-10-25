@@ -18,6 +18,8 @@ class OriginalStandardModelGeometry50LA;
 class OriginalStandardCollisionType0Resource50LA;
 class OriginalStandardArchiveProvider50LA;
 class OriginalUiArchive50KG;
+class OriginalAppStartTemplateCache50KG;
+class OriginalUiMaterialTemplates50KG;
 struct OriginalUiMemberIdentity50KG;
 class OriginalUiIpumTextureCache50KG;
 struct OriginalUiIpumProvenance50KG;
@@ -278,6 +280,22 @@ private:
     // or corpus. Not source13FB6C publication, registration, open/read or readiness.
     bool bootstrapFreshFileCapacity12CBA0(
         std::shared_ptr<const OriginalStandardArchiveProvider50LA>,
+        OriginalStandardTextureDiagnostic50LA&)noexcept;
+    // Actual Application-only, bounded first source17CAB8 call. No general
+    // registration API, mount-derived history, activation or readiness token.
+    bool registerAppStart17CAB8(std::shared_ptr<const OriginalUiArchive50KG>,
+        OriginalStandardTextureDiagnostic50LA&)noexcept;
+    std::shared_ptr<const OriginalUiArchive50KG> registeredAppStart17CAB8()const noexcept;
+    bool joinAppStartCanonicalMount(OriginalStandardTextureDiagnostic50LA&)noexcept;
+    // Actual first17CAD4/2985B0 Mat_Stbl consumer only. It opens/reads/closes
+    // its real source member and supplies bytes to the same canonical table.
+    bool readAppStartNames17CAD4(std::vector<std::uint8_t>&,
+        OriginalStandardTextureDiagnostic50LA&)noexcept;
+    friend class OriginalUiMaterialTemplates50KG;
+    // Exactly DefaultMT then ScreenMT after the reached first Mat_Stbl read.
+    bool beginAppStartTemplate24AA10(bool screen,OriginalAppStartTemplateCache50KG&,
+        OriginalStandardTextureDiagnostic50LA&)noexcept;
+    bool closeAppStartTemplate1573B0(bool success,
         OriginalStandardTextureDiagnostic50LA&)noexcept;
     struct FreshFileCapacity;
     std::unique_ptr<FreshFileCapacity> freshFileCapacity_;

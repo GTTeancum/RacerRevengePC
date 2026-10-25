@@ -27,7 +27,7 @@ using Track=rr::platform::HostTrack50IM;
 // Actual source profile visibility, rider/roster identity, mode2 and target
 // archive authentication remain independent requirements below.
 inline constexpr bool directHumanTrack(Track track) noexcept {
-    return track==Track::GC||track==Track::TA||track==Track::GA||track==Track::MA||track==Track::SA||track==Track::MB||track==Track::SC||track==Track::TC||track==Track::RC||track==Track::TB||track==Track::GB||track==Track::MC;
+    return track==Track::RA||track==Track::GC||track==Track::TA||track==Track::GA||track==Track::MA||track==Track::SA||track==Track::MB||track==Track::SC||track==Track::TC||track==Track::RC||track==Track::TB||track==Track::GB||track==Track::MC;
 }
 inline constexpr bool directDiscTarget(Track track) noexcept {
     return directHumanTrack(track)||track==Track::RA;
@@ -64,7 +64,8 @@ inline const Target* target(const Selection& s) noexcept {
 }
 inline bool same(const Selection& a,const Selection& b) noexcept {
     return a.course==b.course&&a.planet==b.planet&&a.rider==b.rider&&a.subtype==b.subtype&&
-        a.laps==b.laps&&a.entrants==b.entrants&&a.packed1125C==b.packed1125C;
+        a.laps==b.laps&&a.entrants==b.entrants&&a.packed1125C==b.packed1125C&&
+        a.mode34==b.mode34;
 }
 // Cold request admission only. Retains each actual authenticated target archive
 // before Course input starts. Native mesh/texture/AI/camera construction is NOT

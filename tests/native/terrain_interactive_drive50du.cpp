@@ -475,6 +475,9 @@ enum class SessionExit50DU { Quit, Restart, Checkpoint, ReturnOriginalMain, Cour
 #include "windows_framebuffer_capture50ld.h"
 #include "original_ui_capture_navigation50la.h"
 #include "original_frontend_session50la.h"
+#include "original_racer_manager_entity50la.h"
+#include "original_subtype3_record_owner50la.h"
+#include "original_record_grid_pose50la.h"
 SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const char* capturePath,
     const recovery50FI::Plan* checkpointInput,recovery50FI::Plan& checkpointOutput,
     lap_drive50GJ::Continuity& lapContinuity,std::uint64_t sessionIndex,
@@ -490,6 +493,11 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     const std::shared_ptr<native_gc_water_session50KG::Application>& nativeWaterGlobals,windows_capture50LD::Run& captureRun,
     original_course_targets50KX::ConsumedLaunch* consumedLaunch){
  auto& nativeWaterApplication=*nativeWaterGlobals;
+ // Declare before every race/camera/radar borrower. Reverse destruction
+ // retires the distinct record child before its actual racer-manager parent.
+ std::unique_ptr<original_racer_manager_entity::Owner> nativeRacerManager;
+ std::unique_ptr<original_subtype3_record::Owner> nativeRecordActor;
+ rr::platform::OriginalUiRiderProfileOwner50KG::CourseRaceSelection managerRuntimeSelection{};
  const bool originalUiStarted=originalMainApplication.enabled;
  bool originalUiActive=originalUiStarted&&enterOriginalUi,courseRaceLaunched=false;
  // Capture the immutable loaded identity before any front-menu choice changes
@@ -547,7 +555,11 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  const bool mcOriginalDisc=isMcTrack&&!runtime_asset_paths50LB::configuredRoot("RR_ORIGINAL_ASSET_ROOT").empty();
  const bool tbOriginalDisc=isTbTrack&&
      !runtime_asset_paths50LB::configuredRoot("RR_ORIGINAL_ASSET_ROOT").empty();
- const bool directOriginalHuman=gcOriginalDisc||gaOriginalDisc||taOriginalDisc||maOriginalDisc||saOriginalDisc||mbOriginalDisc||scOriginalDisc||tcOriginalDisc||rcOriginalDisc||tbOriginalDisc||gbOriginalDisc||mcOriginalDisc;
+ const char* raAllAiSetting=std::getenv("RR_ORIGINAL_AI_ALL_RACERS");
+ const bool raOriginalDisc=isRaTrack&&originalUiStarted&&
+     !runtime_asset_paths50LB::configuredRoot("RR_ORIGINAL_ASSET_ROOT").empty()&&
+     !(raAllAiSetting&&std::string(raAllAiSetting)=="1");
+ const bool directOriginalHuman=raOriginalDisc||gcOriginalDisc||gaOriginalDisc||taOriginalDisc||maOriginalDisc||saOriginalDisc||mbOriginalDisc||scOriginalDisc||tcOriginalDisc||rcOriginalDisc||tbOriginalDisc||gbOriginalDisc||mcOriginalDisc;
  const bool directOriginalInputs=isRaTrack||directOriginalHuman;
  // Collision ownership is separate from the legacy all-pass/render-policy flag.
  const bool sourceStaticCandidates=trackSession->originalStaticCandidates||taOriginalDisc;
@@ -676,7 +688,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  const char* inputDeviceSetting=std::getenv("RR_HUMAN_INPUT_DEVICE");
  require50DU(!inputDeviceSetting||std::string(inputDeviceSetting)=="keyboard"||
      std::string(inputDeviceSetting)=="controller","RR_HUMAN_INPUT_DEVICE must be keyboard or controller");
- const bool usePhysicalGameController=!allAiEnabled&&inputDeviceSetting&&std::string(inputDeviceSetting)=="controller";
+ const bool usePhysicalGameController=!allAiEnabled&&(inputDeviceSetting?
+     std::string(inputDeviceSetting)=="controller":originalMainApplication.courseHumanController);
  require50DU(!usePhysicalGameController||!headlessLive,"physical game controller requires the native SDL window");
  constexpr std::uint32_t deviceIndex=0,playerSource5C=0,playerActionIndexFFC=0;
  rr::platform::SelectedControlInput50KY humanControlInput{};
@@ -724,8 +737,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  require50DU(!isMcTrack||(raceEnabled&&humanCourseEnabled&&!allAiEnabled&&!checkpointInput&&!startAtMenu&&
      trackAdmission.mcNativeWorldRequested&&trackAdmission.gcMode2),
      "MC requires genuine rooted human Course mode2 and actual runtime owners");
- require50DU(!isRaTrack||(raceEnabled&&allAiEnabled&&!checkpointInput&&!startAtMenu),
-     "RA requires all eight actual original-AI owners including camera racer0");
+ require50DU(!isRaTrack||(raceEnabled&&(allAiEnabled||humanCourseEnabled)&&!checkpointInput&&!startAtMenu),
+     "RA requires a fresh original Course human roster or explicit legacy ALL8 roster");
  const auto originalAiCreateSelection=[&](){
   AiFreshCreateSelection50IU selected{};
   require50DU(!originalAiEnabled||(raceEnabled&&bindFreshAiCreateSelection50IU(
@@ -791,32 +804,77 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
      !(disableRacerContacts&&std::string(disableRacerContacts)=="1");
  require50DU(!originalAiEnabled||racerContactsEnabled,
      "original AI first slice requires actual racer contacts and their source boundary");
- constexpr std::uint32_t raceRacerCount=rr::game::defaultHostRaceRacers50HT;
- constexpr std::uint32_t raceOpponentCount=raceRacerCount-1; // Camera-relative presentation count.
+ // Course's immutable consumption was checked at entry, before1AD520
+ // mutates the actual profile. A Restart has no receipt and reexecutes the
+ // source clear against the already-singleton retained subtype3 snapshot.
+ if(humanCourseEnabled&&!originalUiActive){
+  rr::platform::OriginalUiRiderProfileOwner50KG::CourseRaceSelection before;
+  require50DU(originalMainApplication.riderProfile&&
+      originalMainApplication.riderProfile->courseRaceSnapshot(before),
+      "racer manager requires the actual Course profile");
+  if(before.subtype==3u){
+   std::string error;
+   nativeRacerManager=std::make_unique<original_racer_manager_entity::Owner>();
+   require50DU(nativeRacerManager->construct(originalMainApplication,sessionIndex+1,error),error.c_str());
+   require50DU(nativeRacerManager->initializeSelection(*originalMainApplication.riderProfile,
+       before,managerRuntimeSelection),"actual racer manager1AD520 profile transition failed");
+   require50DU(managerRuntimeSelection.rider==playerRacer60&&
+       managerRuntimeSelection.entrants==1u&&nativeRacerManager->count30()==1u&&
+       nativeRacerManager->humans34()==1u&&nativeRacerManager->opponents38()==0u,
+       "time-trial manager did not produce the actual singleton roster");
+  }
+ }
+ constexpr std::uint32_t raceRacerCapacity=rr::game::defaultHostRaceRacers50HT;
+ constexpr std::uint32_t raceOpponentCapacity=raceRacerCapacity-1;
+ // Capacity is not a fabricated live roster. Native Course uses its actual
+ // committed human/opponent lanes; direct diagnostic clients keep eight.
+ const std::uint32_t raceRacerCount=[&](){
+  if(humanCourseEnabled&&!originalUiActive){
+   rr::platform::OriginalUiRiderProfileOwner50KG::CourseRaceSelection selected;
+   require50DU(originalMainApplication.profile&&originalMainApplication.profile->known&&
+       originalMainApplication.riderProfile&&originalMainApplication.riderProfile->courseRaceSnapshot(selected)&&
+       selected.mode34==originalMainApplication.profile->mode34&&
+       (selected.mode34==0||selected.mode34==2)&&selected.subtype>=1&&selected.subtype<=3&&
+       selected.entrants>=1&&selected.entrants<=raceRacerCapacity&&
+       ((selected.packed1125C>>5)&3u)==1&&
+       ((selected.packed1125C>>7)&15u)+1u==selected.entrants&&
+       (selected.subtype==2||
+        (selected.subtype==3?nativeRacerManager&&selected.entrants==1u:
+         selected.entrants==raceRacerCapacity))&&
+       (selected.mode34!=2||(selected.subtype==1&&selected.laps==3)),
+       "native Course requires its actual committed live roster extent");
+   return selected.entrants;
+  }
+  return raceRacerCapacity;
+ }();
+ const std::uint32_t raceOpponentCount=raceRacerCount-1;
  // Native selected roster, not the retail human-dependent boot root1AE620.
  // Counts use the original1125C layout; every AI retains its real pod/profile.
  const std::uint32_t originalAiHumanCount=allAiEnabled?0u:1u;
  const std::uint32_t originalAiOpponentCount=raceRacerCount-originalAiHumanCount;
  const std::uint16_t originalAiSettings1125C=[&]() -> std::uint16_t {
-  // Only an actual mode0 human Course launch/restart consumes the retained
-  // source lap choice. Direct/ALL8 diagnostic clients retain their default3.
+  // Actual mode0/mode2 human Course launch and Restart consume the retained
+  // source lap choice. Tournament mode2 has committed fixed three laps;
+  // direct/ALL8 diagnostic clients retain their separate default3.
   if(humanCourseEnabled&&!originalUiActive){
    rr::platform::OriginalUiRiderProfileOwner50KG::CourseRaceSelection selected;
    require50DU(originalMainApplication.profile&&originalMainApplication.profile->known&&
-       originalMainApplication.profile->mode34==0&&originalMainApplication.riderProfile&&
+       originalMainApplication.riderProfile&&
        originalMainApplication.riderProfile->courseRaceSnapshot(selected)&&
        original_course_targets50KX::target(selected)&&
        original_course_targets50KX::target(selected)->track==loadedTrack&&
-       selected.rider==playerRacer60&&selected.subtype==1&&selected.laps>=1&&selected.laps<=25&&
-       selected.entrants==8&&((selected.packed1125C>>5)&3u)==1&&
-       ((selected.packed1125C>>7)&15u)==7,
+       selected.mode34==originalMainApplication.profile->mode34&&
+       rr::game::nativeSingleHumanCourseMode50KG(selected)&&
+       selected.rider==playerRacer60&&selected.subtype>=1&&selected.subtype<=3&&selected.laps>=1&&selected.laps<=25&&
+       selected.entrants==raceRacerCount&&((selected.packed1125C>>5)&3u)==1&&
+       ((selected.packed1125C>>7)&15u)==raceOpponentCount,
        "human Course lap configuration requires its actual retained profile");
    return static_cast<std::uint16_t>(selected.packed1125C&0x7ffu);
   }
   return static_cast<std::uint16_t>(3u|(originalAiHumanCount<<5u)|(originalAiOpponentCount<<7u));
  }();
  std::uint64_t allAiHostDriverCalls=0,allAiControllerSamples=0,allAiKeyboardPackets=0;
- static_assert(raceRacerCount<=rr::platform::maxVehicleWindowStandings50DS);
+ static_assert(raceRacerCapacity<=rr::platform::maxVehicleWindowStandings50DS);
  static_assert(maxHostRaceOpponents50HT==rr::platform::maxVehicleWindowOpponents50DS);
  static_assert(maxHostRaceRacers50HT<=native_racer_contact50HW::maxRacers);
  static_assert(live_audio50HF::lapFirstVoice+live_audio50HF::lapVoiceCount<=64);
@@ -928,9 +986,11 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
       originalMainApplication.riderProfile->courseRaceSnapshot(selected)&&
       original_course_targets50KX::target(selected)&&
       original_course_targets50KX::target(selected)->track==loadedTrack&&
-      selected.rider==playerRacer60&&
-      selected.subtype==1&&selected.laps==(humanCourseEnabled?(originalAiSettings1125C&31u):3u)&&selected.entrants==8&&
-      ((selected.packed1125C>>5)&3)==1&&((selected.packed1125C>>7)&15)==7&&
+      selected.rider==playerRacer60&&originalMainApplication.profile&&
+      selected.mode34==originalMainApplication.profile->mode34&&
+      rr::game::nativeSingleHumanCourseMode50KG(selected)&&
+      selected.subtype>=1&&selected.subtype<=3&&selected.laps==(humanCourseEnabled?(originalAiSettings1125C&31u):3u)&&selected.entrants==raceRacerCount&&
+      ((selected.packed1125C>>5)&3)==1&&((selected.packed1125C>>7)&15)==raceOpponentCount&&
       (!humanCourseEnabled||(selected.packed1125C&0x7ffu)==originalAiSettings1125C),
       "native Course cold load requires its actual retained track/racer profile");
   dynamicProfile.game34=originalMainApplication.profile->mode34;
@@ -953,10 +1013,10 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  native_dynamic_contact50IW::Snapshot dynamicPeers{};
  std::size_t dynamicSelfSlot=0;
  struct DynamicActors50IW {
-  std::array<RaceActorSnapshot50ID,raceRacerCount> values{};
-  std::array<bool,raceRacerCount> bound{};
+  std::array<RaceActorSnapshot50ID,raceRacerCapacity> values{};
+  std::array<bool,raceRacerCapacity> bound{};
  } dynamicActors;
- std::array<std::uint32_t,raceRacerCount> dynamicRacer60{};
+ std::array<std::uint32_t,raceRacerCapacity> dynamicRacer60{};
  const RaceActorResolver50ID dynamicActorResolver{&dynamicActors,
   [](void* opaque,RaceActorId50ID id,RaceActorSnapshot50ID& out)noexcept{
    const auto& actors=*static_cast<const DynamicActors50IW*>(opaque);
@@ -1031,7 +1091,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   const bool soundReady=gbPodSound->prepare(std::move(authored),*mixer,*groups,gbPreparedAudioRoot,error);
   require50DU(soundReady,error.empty()?"GB actual BIGDOOR source/voice126 rejected":error.c_str());
  };
- std::uint32_t nativeOrdinaryLaunch11258=1;
+ // Retain the actual accepted source event type; never relabel it as a normal race.
+ std::uint32_t nativeOrdinaryLaunch11258=dynamicMusicProfile.mode11258;
  std::unique_ptr<OriginalRacerModelRenderGlobals50LA> sourceModelRenderGlobals;
  auto& host=nativeVideo->host;
  rr::platform::GameHostDiagnostic50ER hostDiagnostic{};
@@ -1083,8 +1144,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  auto nativeRosterOwners=std::make_shared<ra_cold_roster50LA::RuntimeOwners>();
  auto& racerVisuals=nativeRosterOwners->visuals;
  auto& racerCables=nativeRosterOwners->cables;
- std::array<std::string,raceRacerCount> racerNames;
- std::array<std::array<char,rr::platform::maxVehicleWindowRacerName50DS+1>,raceRacerCount> racerHudNames{};
+ std::array<std::string,raceRacerCapacity> racerNames;
+ std::array<std::array<char,rr::platform::maxVehicleWindowRacerName50DS+1>,raceRacerCapacity> racerHudNames{};
  std::size_t mainPairCapacity=mainQueryResource.rayCount,secondaryPairCapacity=0;
  const auto matchesEndpointPolicy=[&](const Type2ResourceView49X& resource){
   for(std::size_t index=0;index<resource.rayCount;++index){
@@ -1100,8 +1161,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   const auto rosterRoot=runtime_asset_paths50LB::resolve("evidence/originalRoster50HW/raw-imports");
   auto roster=directOriginalInputs?original_course_roster50KG::directDiscRoster(playerRacer60):
       native_racer50HW::rig_detail::json(rosterRoot/"roster.json");
-  require50DU(roster.at("player_index")==0&&roster.at("racers").size()==raceRacerCount,
-      "original roster must contain the player and seven original opponents");
+  require50DU(roster.at("player_index")==0&&roster.at("racers").size()==raceRacerCapacity,
+      "original roster candidate must contain eight distinct source identities");
   require50DU(directOriginalInputs||roster.at("racers").at(0).at("pod_id")=="POD01",
       "retained original roster player identity differs");
   if(courseRaceCold&&!directOriginalInputs){
@@ -1109,15 +1170,20 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
    const bool selected=original_course_roster50KG::selectPreparedRider(".",rosterRoot,roster,playerRacer60,rosterError);
    require50DU(selected,rosterError.empty()?"Course selected original racer cold owner is unavailable":rosterError.c_str());
   }
-  std::size_t selectedSlot=raceRacerCount;
-  for(std::size_t racer=0;racer<raceRacerCount;++racer)
+  std::size_t selectedSlot=raceRacerCapacity;
+  for(std::size_t racer=0;racer<raceRacerCapacity;++racer)
    if(roster.at("racers").at(racer).at("pod_id")==playerPodId){
-    require50DU(selectedSlot==raceRacerCount,"duplicate selected original racer");selectedSlot=racer;
+    require50DU(selectedSlot==raceRacerCapacity,"duplicate selected original racer");selectedSlot=racer;
    }
-  require50DU(selectedSlot<raceRacerCount,"selected original racer absent from retained roster");
+  require50DU(selectedSlot<raceRacerCapacity,"selected original racer absent from retained roster");
   // Swap complete authenticated entries, preserving all eight distinct racers.
   // The selected pod's former opponent slot receives Anakin's original resources.
   if(selectedSlot)std::swap(roster.at("racers").at(0),roster.at("racers").at(selectedSlot));
+  // Only the authored active prefix is instantiated, registered or drawn.
+  // Inactive capacity does not allocate pods, participate in AI, or become an
+  // invisible opponent. Preserve Player0 before trimming the real roster.
+  auto& activeRoster=roster.at("racers");
+  activeRoster.erase(activeRoster.begin()+raceRacerCount,activeRoster.end());
   for(std::size_t racer=0;racer<raceRacerCount;++racer){
    const auto& entry=roster.at("racers").at(racer);
    const auto id=entry.at("pod_id").get<std::string>();
@@ -1251,13 +1317,13 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   raNames.preservedFlags31=static_cast<std::uint8_t>(qfilter.flags31&0xf0u);
   raNames.preservedFlagsF8=static_cast<std::uint8_t>(qfilter.flagsF8&0xc0u);
   std::string error;
-  auto roster=ra_cold_roster50LA::Resources::adopt(raRosterOwners,error);
+  auto roster=ra_cold_roster50LA::Resources::adopt(raRosterOwners,error,originalAiHumanCount,raceRacerCount);
   require50DU(bool(roster),error.empty()?"RA actual eight-racer source adoption rejected":error.c_str());
   const bool raColdReady=raWorld->decodeSources(runtime_startup50fl::readBytes(trackSession->archive),
       s.animationShared.libm,{4,16,32,64},raDiagnostic)&&
       raWorld->prepareStaticCandidates(raNames,raDiagnostic)&&
       raWorld->prepareAuthoring(raDiagnostic)&&raWorld->prepareNativeTriggers(raDiagnostic)&&
-      raWorld->prepareLighting(static_cast<std::uint32_t>(racerRigs.size()),raDiagnostic);
+      raWorld->prepareLighting(raceRacerCount,raDiagnostic);
   // Compiled real prefix initializer, intentionally not invoked until the
   // remaining slot30 load, scheduler/parent and retirement joins are reviewed.
   [[maybe_unused]] auto beginConsumedRaPrefix=[&](){
@@ -1613,7 +1679,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  std::shared_ptr<mc_water50MC::Owner> mcWaterOwner;
  std::uint64_t mcWaterUpdateSequence=0;
  std::unique_ptr<native_gc_water_session50KG::Owner> nativeGcWater;
- std::array<std::unique_ptr<native_gc_water_racer50KG::Owner>,raceRacerCount> nativeWaterRacers;
+ std::array<std::unique_ptr<native_gc_water_racer50KG::Owner>,raceRacerCapacity> nativeWaterRacers;
  auto& nativeFireSerial=originalUiStarted?originalMainApplication.state->fireSerial433970:
      nativeWaterApplication.directFireSerial433970;
  if(nativeWaterEnabled){
@@ -2595,6 +2661,17 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  auto raceAudio=std::make_unique<race_audio50HQ::Owner>();
  auto sourceAnnouncer=std::make_unique<source_announcer50IE::Owner>();
  auto raceMusic=std::make_unique<race_music50IE::Owner>();
+ struct StartMusicContext {
+  race_music50IE::Owner* music;
+  live_audio50HF::Owner* audio;
+  const std::uint32_t* sourceEventType;
+ } startMusicContext{raceMusic.get(),liveAudio.get(),&nativeOrdinaryLaunch11258};
+ const auto requestStartMusic=+[](void* opaque,std::int32_t song,std::int32_t argument)noexcept {
+  auto* context=static_cast<StartMusicContext*>(opaque);
+  return context&&context->music&&context->audio&&context->sourceEventType&&
+      (song==44||song==45)&&argument==1&&context->audio->outputOpen()&&
+      context->music->request(static_cast<std::uint32_t>(song),1,*context->sourceEventType).completed();
+ };
  std::unique_ptr<race_mode1_host50ID::Owner> mode1;
  auto materialAudio=std::make_unique<material_audio50HI::Provider>();
  // This owner dies before the live mixer/shared boost PCM and owns96..116.
@@ -2779,13 +2856,14 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
        dynamicContactEnabled?dynamicRacer60.data():nullptr,
        dynamicContactEnabled?raceRacerCount:0,&sessionRandom.range),
        audioError.empty()?"source Dax cold preparation failed; explicit fallback RR_RACE_MODE=2":audioError.c_str());
+   const bool practiceMusicOnly=nativeOrdinaryLaunch11258==2u||nativeOrdinaryLaunch11258==3u;
    require50DU(materialMixer&&raceMusic->prepare(runtime_asset_paths50LB::resolve("work/native/project/disc"),audioRoot,
-       *materialMixer,*audioGroups,audioError,dynamicContactEnabled,
+       *materialMixer,*audioGroups,audioError,dynamicContactEnabled&&!practiceMusicOnly,
        dynamicContactEnabled?race_music50IE::TimedVolumePolicy50IW::NativeLinearSharedMix:
-           race_music50IE::TimedVolumePolicy50IW::StrictSourceBoundary),
+           race_music50IE::TimedVolumePolicy50IW::StrictSourceBoundary,practiceMusicOnly),
        audioError.empty()?"source music cold preparation failed; explicit fallback RR_RACE_MODE=2":audioError.c_str());
    require50DU(sourceAnnouncer->prepared()&&raceMusic->bank().ready==
-       (dynamicContactEnabled?race_music50IE::totalClipCount:race_music50IE::clipCount),
+       raceMusic->expectedReadyClips(),
        "mode1 source providers/music PCM incomplete; no silent fallback (RR_RACE_MODE=2 is explicit)");
    require50DU(raceAudio->setHostSpeechEnabled(false),"mode1 HOST Dax suppression binding failed");
    mode1Enabled=mode1Requested;
@@ -2922,7 +3000,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   }
   if(originalAiAudioEnabled){
    std::array<opponent_audio50HX::Source,8> sources{};
-   for(std::size_t racer=0;racer<8;++racer){
+   for(std::size_t racer=0;racer<raceRacerCount;++racer){
     require50DU(racerRigs[racer]!=nullptr,"ALL8 audio requires every actual original rig");
     sources[racer]={racerRigs[racer]->podId,&racerRigs[racer]->phy};
    }
@@ -3533,7 +3611,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
       "original shared effect authoring identity differs");
  }
  native_gc_other_particle_children50KG::SharedAuthoring nativeParticleAuthoring;
- std::array<native_gc_other_particle_children50KG::Runtime,raceRacerCount> nativeParticleChildren;
+ std::array<native_gc_other_particle_children50KG::Runtime,raceRacerCapacity> nativeParticleChildren;
  std::shared_ptr<mc_particle_vehicle50MC::Owner> mcParticleVehicles;
  if(isMcTrack){
   require50DU(mcWaterOwner&&mcWaterOwner->ready()&&mcParticleSource&&mcTrackParticles,"MC real water/source pool before racer producers");
@@ -3547,13 +3625,13 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   std::vector<std::uint8_t> spray;
   require50DU(rr::assets::decodeResource48C(raw,pod,decoded,nullptr,limits)&&rr::assets::extractResMember48C(pod,"particle\\podSpray.emt",spray,decoded,1027),"MC actual selected-POD spray member rejected");
   mcParticleVehicles=std::make_shared<mc_particle_vehicle50MC::Owner>();std::string error;
-  require50DU(mcParticleVehicles->prepare(mcParticleSource,mcWaterOwner,mcTrackParticles,effectSources,std::move(spray),mc_particle_vehicle50MC::Owner::maximumAdditionalPayloadBytes(),error),error.c_str());
+  require50DU(mcParticleVehicles->prepare(mcParticleSource,mcWaterOwner,mcTrackParticles,effectSources,std::move(spray),mc_particle_vehicle50MC::Owner::maximumAdditionalPayloadBytes(),error,raceRacerCount),error.c_str());
   } // raw RES, decoded directory/data and local source diagnostics are destroyed.
   require50DU(mcAdditionalPayloadReserved>=selectedPodScratch,"MC scratch release accounting");
   mcAdditionalPayloadReserved-=selectedPodScratch;
  }
 
- std::array<std::uint64_t,raceRacerCount> nativeParticleChildSequence{};
+ std::array<std::uint64_t,raceRacerCapacity> nativeParticleChildSequence{};
  if(nativeGcWater)require50DU(nativeParticleAuthoring.parse(effectSources).okay(),
      "actual native particle derived/common authoring rejected");
  ResetEffectBindings50BK resetEffectBindings{};ResetEffectState50BK resetEffectState{};ResetEffectWorkspace50BK resetEffectWorkspace{};
@@ -3615,8 +3693,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  gcLighting::Diagnostic gcLightDiagnostic{};
  // Session owners are deliberately OUTSIDE the transient native racer bank.
  // This count advances at actual graphics success, before later failure cuts.
- std::array<std::uint64_t,raceRacerCount> gcGraphicsSequence{};
- std::array<NativeGcSelectedLightsCandidate,raceRacerCount> gcDrawLights{};
+ std::array<std::uint64_t,raceRacerCapacity> gcGraphicsSequence{};
+ std::array<NativeGcSelectedLightsCandidate,raceRacerCapacity> gcDrawLights{};
  const auto nativeLightingPolicy=nativeMcSelection?gcLighting::CachePolicy::nativeMcAuthoredZoneLightSelection:nativeGbSelection?
      gcLighting::CachePolicy::nativeGbAuthoredZoneLightSelection:nativeTbSelection?
      gcLighting::CachePolicy::nativeTbAuthoredZoneLightSelection:nativeRcSelection?
@@ -5137,7 +5215,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   require50DU(rcTriggerActions&&rcTriggerActions->ready()&&rcWorldBorrow&&
       rcWorldBorrow->world()==&liveWorld&&rcWorldBorrow->actions()==rcTriggerActions&&
       rcTriggerActions->sourceOwner()==rcTriggerAuthoring.get()&&
-      racerBank.count()==8&&actualRacerSlot<racerBank.count(),
+      racerBank.count()==raceRacerCount&&actualRacerSlot<racerBank.count(),
       "RC query requires its actual same-source world and current Bank arena");
   const rc_trigger_actions::ActionLease lease{qfilter.identity,&navigationProgress.reset.vehicleC80};
   require50DU(rcTriggerActions->beginQuery(lease),"RC genuine main690/C80 query lease rejected");
@@ -5155,7 +5233,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  };
  auto withScTriggerLease=[&](auto&& queryOperation){
   if(!scTriggerActions)return queryOperation();
-  require50DU(racerBank.count()==8&&actualRacerSlot<racerBank.count(),"SC query requires actual current racer slot");
+  require50DU(racerBank.count()==raceRacerCount&&actualRacerSlot<racerBank.count(),"SC query requires actual current racer slot");
   const sc_trigger_actions::ActionLease lease{qfilter.identity,&navigationProgress.reset.vehicleC80};
   require50DU(scTriggerActions->beginQuery(lease),"SC genuine main690/C80 query lease rejected");
   bool active=true;
@@ -5174,7 +5252,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  // Failed numerical/prefix work is terminal, even when no action was reached.
  auto withTbTriggerLease=[&](std::uint32_t actualCollider,auto&& queryOperation){
   if(!tbTriggerActions)return queryOperation();
-  require50DU(tbWorldBorrow&&tbWorldBorrow->world()==&liveWorld&&racerBank.count()==8&&
+  require50DU(tbWorldBorrow&&tbWorldBorrow->world()==&liveWorld&&racerBank.count()==raceRacerCount&&
       actualRacerSlot<racerBank.count(),"TB query requires its actual world/Bank arena");
   Vector3_48C listener{{audioListener.x,0.f,audioListener.z}};
   const tb_trigger_actions50TB::ActionLease lease{qfilter.identity,actualCollider,&navigationProgress.reset.vehicleC80,
@@ -5221,7 +5299,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  };
  auto withTcTriggerLease=[&](std::uint32_t actualCollider,auto&& queryOperation){
   if(!tcTriggerActions)return queryOperation();
-  require50DU(tcWorldBorrow&&tcWorldBorrow->world()==&liveWorld&&racerBank.count()==8&&
+  require50DU(tcWorldBorrow&&tcWorldBorrow->world()==&liveWorld&&racerBank.count()==raceRacerCount&&
       actualRacerSlot<racerBank.count(),"TC query requires its actual world/Bank arena");
   const tc_trigger_actions50TC::ActionLease lease{qfilter.identity,actualCollider,&navigationProgress.reset.vehicleC80};
   tc_trigger_actions50TC::Owner::QueryBorrow borrow(*tcTriggerActions,lease);
@@ -5714,7 +5792,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
      original_all8_frame::AudioIntegrationPolicy audioPolicy,
      auto&& remainingRaceChildren){
   require50DU(originalAiEnabled&&nativeOriginalFleet&&originalAiHumanCount==(humanCourseEnabled?1u:0u)&&
-      racerBank.count()==8,"two-phase entry requires the actual native roster and source manager");
+      racerBank.count()==raceRacerCount,"two-phase entry requires the actual native roster and source manager");
   // The native AI policy services real D40/Aural owners without certifying
   // the missing intervening retail children or their complete RNG chronology.
   using AudioPolicy=original_all8_frame::AudioIntegrationPolicy;
@@ -5853,7 +5931,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  //source flag, or feed its clock/distance back to any original AI owner.
  auto publishOriginalAiStandings=[&](){
   require50DU(nativeOriginalFleet&&originalAiSession.managerBound&&originalAiSession.rankBound&&
-      race.racerCount==racerBank.count()&&race.racerCount==8,
+      race.racerCount==racerBank.count()&&race.racerCount==raceRacerCount,
       "native presentation requires the complete actual source manager");
   std::array<std::uint32_t,aiRaceRankCapacity50IV> finishPlaces{};
   for(std::uint32_t n=0;n<originalAiSession.finished44.count54;++n){
@@ -6068,7 +6146,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   }}
  } mbColdPrefixGuard{closeMbColdPrefix};
  if(raceEnabled){
-  std::array<native_racer_contact50HW::Binding,raceRacerCount> contactBindings{};
+  std::array<native_racer_contact50HW::Binding,raceRacerCapacity> contactBindings{};
   contactBindings[0]={racerCollisions[0].get(),settings,response};
   for(std::size_t racer=0;racer<raceRacerCount;++racer){
    racerContactIds[racer]=static_cast<std::uint32_t>(racer+1);
@@ -6174,7 +6252,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
        originalMainApplication.assetRoot,sessionIndex+1,sourceSpeedBoost),"RA Speed/Boost source staging failed");
    require50DU(originalMainApplication.stageTimeStatsNativeCold50LA(
        originalMainApplication.assetRoot,sessionIndex+1,sourceTimeStats,true),"RA TimeStats source staging failed");
-   if(allAiEnabled)require50DU(originalMainApplication.stageDamageNativeCold50LA(
+   if(allAiEnabled||humanCourseEnabled)require50DU(originalMainApplication.stageDamageNativeCold50LA(
        originalMainApplication.assetRoot,sessionIndex+1,sourceDamage),"RA Damage source staging failed");
    require50DU(sourcePositionStatsPrestage.stage(originalMainApplication,
        originalMainApplication.assetRoot,raMaterialContext,sourcePositionStatsPrestageDiagnostic),
@@ -6196,7 +6274,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
        selection,originalAi,originalAiSession,navigationProgress,lapContinuity,poseHistory,
        rebaseModels,rebaseModelCount,rebaseWorkspace,rebaseBounds,rebaseDiagnostic,namesForEffects,
        nativeEffects,nativeEffectCount,resetEffectBindings,resetEffectState,resetEffectWorkspace,
-       originalRecoveryModels,terrainBindings,coldFlame,nativeOrdinaryLaunch11258};
+       originalRecoveryModels,terrainBindings,coldFlame,nativeOrdinaryLaunch11258,
+       originalAiHumanCount,&authored,&authoredFinishSteering10A4};
    const bool raSessionReady=raSession->construct(arena,raFreshProbe,{endpoints,endpointScenes,movementSource},
        raMaterialContext,crowdImages,raSessionDiagnostic,nativeRosterOwners,
        consumedRaStage.race().get(),consumedRaStage.race()?&sourcePause:nullptr);
@@ -6235,6 +6314,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
        "RA PositionStats preloaded canonical sources changed during construction");
    require50DU(originalMainApplication.finishSpeedBoostNativeCold50LA(sourceSpeedBoost),
        "RA Speed/Boost final shared material verification failed");
+   if(humanCourseEnabled)racerBank.visit(0,[&](){initializeOriginalHumanResetTimers50LC(playerEvents);});
    contactBindings=nativeRosterOwners->contacts;
    for(std::size_t slot=0;slot<racerBank.count();++slot)racerNames[slot]=racerVisuals[slot]->displayName;
   }
@@ -6459,6 +6539,32 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
       selectedGridNavigation.bindLegacy(navigationMap);
   require50DU(bound,"selected authenticated map has no cold grid capability");
  }
+ //1AE9EC requests rank0 from the same authenticated course, not the
+ //player's rank4 transform. TA's ordinary player HOST grid stays unchanged.
+ if(nativeRacerManager){
+  require50DU(nativeRacerManager->count30()==racerBank.count()&&racerBank.count()==1u&&
+      managerRuntimeSelection.rider==playerRacer60&&
+      (managerRuntimeSelection.packed1125C>>11u)==playerRacer60,
+      "record actor requires its actual selected rider and singleton bank");
+  source_grid50IG::SelectedMapGrid recordGrid=selectedGridNavigation;
+  if(!trackSession->originalStaticCandidates)
+   require50DU(recordGrid.bindLegacy(navigationMap),"record actor original rank0 map unavailable");
+  racerBank.visit(0,[&](){
+   BodyMatrix48G rankZero{},groundedRankZero{};UndertrackDiagnostic50ET diagnostic{};
+   const float selectedLift=x.parameters.visual.verticalLimit7EC;
+   require50DU(original_record_grid50LA::prepareRankZeroPose(recordGrid,selectedLift,
+       s.lifecycleShared.up434650.v,rankZero,diagnostic),
+       "record actor original rank0 pose construction failed");
+   require50DU(native_racer50HN::groundGridPose(ground,rankZero,selectedLift,
+       groundStack.data(),groundStack.size(),groundedRankZero),
+       "record actor rank0 has no actual ground hit");
+   nativeRecordActor=std::make_unique<original_subtype3_record::Owner>();
+   std::string error;
+   require50DU(nativeRecordActor->constructFreshNoRecord(sessionIndex+1,
+       managerRuntimeSelection.packed1125C,playerArchive,groundedRankZero,
+       originalMainApplication.entities(),s,*nativeRacerManager,error),error.c_str());
+  });
+ }
 #include "native_racer_grid50hn.inc"
   if(!isRaTrack&&playerUsesRosterRig)coldRacerStage50DU(playerPodId,"human grounded grid placement",[&](){
    placeOpponentAtGrid50HN(0);
@@ -6477,14 +6583,14 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   // Material/GPU preparation remains at the later renderer boundary.
   if(gcTriggerActions){
    require50DU(nativeOriginalFleet&&originalAiEnabled&&
-       originalAiHumanCount==(humanCourseEnabled?1u:0u)&&racerBank.count()==8&&
+       originalAiHumanCount==(humanCourseEnabled?1u:0u)&&racerBank.count()==raceRacerCount&&
        navigationAI->track.count==195,"GC triggers require the actual selected roster and195-node AI spline");
    std::array<gc_trigger_actions50KG::RacerIdentities,gc_trigger_actions50KG::racers> identities{};
    for(std::size_t racer=0;racer<racerBank.count();++racer)racerBank.visit(racer,[&](){
     identities[racer]={qfilter.identity,secondaryFilter.identity};
    });
    require50DU(gcTriggerActions->prepare(*gcTriggerAuthoring,*gcAnimatedWorld,identities,
-       navigationAI->track.count,gcGateAudio.get(),!audioEnabled,originalAiHumanCount),
+       navigationAI->track.count,gcGateAudio.get(),!audioEnabled,originalAiHumanCount,raceRacerCount),
        "GC actual trigger/action destinations rejected");
    for(std::size_t racer=0;racer<racerBank.count();++racer)racerBank.visit(racer,[&](){
     require50DU(gcTriggerActions->observePrepared(qfilter.identity,*query.resource,mainMembership.lastShapeWorld)&&
@@ -6497,16 +6603,16 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
    if(audioEnabled)std::cerr<<"GC BIGDOOR borrows the accepted native camera listener in XZ; original listener-object cadence parity remains unclaimed.\n";
   }
   if(isMbTrack){
-   require50DU(originalAiEnabled&&racerBank.count()==8&&mbAiView.runtimeValid()&&mbAiView.count()==292&&
-       mbOriginalDisc&&humanCourseEnabled&&!allAiEnabled&&originalAiHumanCount==1&&originalAiOpponentCount==7,
+   require50DU(originalAiEnabled&&racerBank.count()==raceRacerCount&&mbAiView.runtimeValid()&&mbAiView.count()==292&&
+       mbOriginalDisc&&humanCourseEnabled&&!allAiEnabled&&originalAiHumanCount==1&&originalAiOpponentCount==raceOpponentCount,
        "MB requires actual human and seven AI owners");
    std::array<std::array<std::uint32_t,2>,8> identities{};
-   for(std::size_t slot=0;slot<8;++slot)racerBank.visit(slot,[&](){identities[slot]={qfilter.identity,secondaryFilter.identity};});
+   for(std::size_t slot=0;slot<raceRacerCount;++slot)racerBank.visit(slot,[&](){identities[slot]={qfilter.identity,secondaryFilter.identity};});
    mbSourceTriggers=std::make_unique<mb_source_trigger50MB::Owner>();
    require50DU(mbSourceTriggers->bind(racerBank,mbCollisionWorld,identities,originalAiHumanCount),
        "MB genuine late trigger identity binding rejected");
    mbColdBound=true;
-   for(std::size_t slot=0;slot<8;++slot)racerBank.visit(slot,[&](){
+   for(std::size_t slot=0;slot<raceRacerCount;++slot)racerBank.visit(slot,[&](){
     require50DU(mbSourceTriggers->observePrepared(qfilter.identity,*query.resource,mainMembership.lastShapeWorld)&&
         mbSourceTriggers->observePrepared(secondaryFilter.identity,*secondaryQuery.resource,secondaryMembership.lastShapeWorld),
         "MB actual cold query geometry observation rejected");
@@ -6514,22 +6620,22 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   }
   if(isMcTrack){
    require50DU(originalAiEnabled&&humanCourseEnabled&&!allAiEnabled&&originalAiHumanCount==1&&
-       originalAiOpponentCount==7&&racerBank.count()==8,"MC actual human/seven-AI Bank roster required");
+       originalAiOpponentCount==raceOpponentCount&&racerBank.count()==raceRacerCount,"MC actual human/seven-AI Bank roster required");
    mcQueryBinding=std::make_unique<mc_query50MC::Binding>();
    require50DU(mcQueryBinding->enroll(racerBank,mcCollisionWorld,mcNavigationOwner,qfilter.identity,
        secondaryFilter.identity,navigationProgress.reset.vehicleC80,originalAiHumanCount,s,sessionRandom,applicationClock),"MC typed current Bank/C80 enrollment rejected");
-   for(std::size_t slot=0;slot<8;++slot)racerBank.visit(slot,[&](){
+   for(std::size_t slot=0;slot<raceRacerCount;++slot)racerBank.visit(slot,[&](){
     require50DU(mcQueryBinding->observePrepared(qfilter.identity,*query.resource,mainMembership.lastShapeWorld)&&
         mcQueryBinding->observePrepared(secondaryFilter.identity,*secondaryQuery.resource,secondaryMembership.lastShapeWorld),
         "MC actual cold Bank geometry observation rejected");
    });
   }else if(isGbTrack){
    require50DU(originalAiEnabled&&humanCourseEnabled&&!allAiEnabled&&originalAiHumanCount==1&&
-       originalAiOpponentCount==7&&racerBank.count()==8,"GB actual human/seven-AI Bank roster required");
+       originalAiOpponentCount==raceOpponentCount&&racerBank.count()==raceRacerCount,"GB actual human/seven-AI Bank roster required");
    gbQueryBinding=std::make_unique<gb_query50GB::Binding>();
    require50DU(gbQueryBinding->enroll(racerBank,gbCollisionWorld,gbNavigationOwner,qfilter.identity,
        secondaryFilter.identity,navigationProgress.reset.vehicleC80,originalAiHumanCount),"GB typed current Bank/C80 enrollment rejected");
-   for(std::size_t slot=0;slot<8;++slot)racerBank.visit(slot,[&](){
+   for(std::size_t slot=0;slot<raceRacerCount;++slot)racerBank.visit(slot,[&](){
     require50DU(gbQueryBinding->observePrepared(qfilter.identity,*query.resource,mainMembership.lastShapeWorld)&&
         gbQueryBinding->observePrepared(secondaryFilter.identity,*secondaryQuery.resource,secondaryMembership.lastShapeWorld),
         "GB actual cold Bank geometry observation rejected");
@@ -6537,15 +6643,15 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   }
   if(tbTriggerActions){
    require50DU(tbColdSources&&tbCollisionWorld->coldSource()==tbColdSources.get()&&
-       tbWorldBorrow&&tbWorldBorrow->world()==&liveWorld&&originalAiEnabled&&racerBank.count()==8&&
+       tbWorldBorrow&&tbWorldBorrow->world()==&liveWorld&&originalAiEnabled&&racerBank.count()==raceRacerCount&&
        tbAiView.runtimeValid()&&tbAiView.count()==269&&tbMapView.runtimeValid()&&tbMapView.count()==270&&
-       tbOriginalDisc&&humanCourseEnabled&&!allAiEnabled&&originalAiHumanCount==1&&originalAiOpponentCount==7,
+       tbOriginalDisc&&humanCourseEnabled&&!allAiEnabled&&originalAiHumanCount==1&&originalAiOpponentCount==raceOpponentCount,
        "TB triggers require actual source/world/navigation and human/seven-AI ownership");
    std::array<tb_trigger_actions50TB::RacerIdentities,tb_trigger_actions50TB::racers> identities{};
    for(std::size_t slot=0;slot<racerBank.count();++slot)racerBank.visit(slot,[&](){
     identities[slot]={qfilter.identity,secondaryFilter.identity};
    });
-   const bool bound=tbTriggerActions->bindRacerIdentities(identities,originalAiHumanCount);
+   const bool bound=tbTriggerActions->bindRacerIdentities(identities,originalAiHumanCount,raceRacerCount);
    require50DU(bound,"TB genuine late trigger identity/action binding rejected");
    for(std::size_t slot=0;slot<racerBank.count();++slot)racerBank.visit(slot,[&](){
     require50DU(tbTriggerActions->observePrepared(qfilter.identity,*query.resource,mainMembership.lastShapeWorld)&&
@@ -6555,15 +6661,15 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   }
   if(tcTriggerActions){
    require50DU(tcColdSources&&tcCollisionWorld->coldSource()==tcColdSources.get()&&
-       tcWorldBorrow&&tcWorldBorrow->world()==&liveWorld&&originalAiEnabled&&racerBank.count()==8&&
+       tcWorldBorrow&&tcWorldBorrow->world()==&liveWorld&&originalAiEnabled&&racerBank.count()==raceRacerCount&&
        tcAiView.runtimeValid()&&tcAiView.count()==293&&tcMapView.runtimeValid()&&tcMapView.count()==268&&
-       tcOriginalDisc&&humanCourseEnabled&&!allAiEnabled&&originalAiHumanCount==1&&originalAiOpponentCount==7,
+       tcOriginalDisc&&humanCourseEnabled&&!allAiEnabled&&originalAiHumanCount==1&&originalAiOpponentCount==raceOpponentCount,
        "TC triggers require actual source/world/navigation and human/seven-AI ownership");
    std::array<tc_trigger_actions50TC::RacerIdentities,tc_trigger_actions50TC::racers> identities{};
    for(std::size_t slot=0;slot<racerBank.count();++slot)racerBank.visit(slot,[&](){
     identities[slot]={qfilter.identity,secondaryFilter.identity};
    });
-   const bool bound=tcTriggerActions->bindRacerIdentities(identities,originalAiHumanCount);
+   const bool bound=tcTriggerActions->bindRacerIdentities(identities,originalAiHumanCount,raceRacerCount);
    require50DU(bound,"TC genuine late trigger identity/action binding rejected");
    for(std::size_t slot=0;slot<racerBank.count();++slot)racerBank.visit(slot,[&](){
     require50DU(tcTriggerActions->observePrepared(qfilter.identity,*query.resource,mainMembership.lastShapeWorld)&&
@@ -6576,14 +6682,14 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
    require50DU(rcTriggerActions&&rcTriggerAuthoring&&rcTriggerAuthoring->ready()&&
        rcTriggerAuthoring->coldSource()==rcColdSources.get()&&rcWorldBorrow&&
        rcWorldBorrow->world()==&liveWorld&&rcWorldBorrow->actions()==rcTriggerActions&&
-       originalAiEnabled&&racerBank.count()==8&&rcNavigationBorrow.ai().track.count==209&&
-       rcOriginalDisc&&humanCourseEnabled&&!allAiEnabled&&originalAiHumanCount==1&&originalAiOpponentCount==7,
+       originalAiEnabled&&racerBank.count()==raceRacerCount&&rcNavigationBorrow.ai().track.count==209&&
+       rcOriginalDisc&&humanCourseEnabled&&!allAiEnabled&&originalAiHumanCount==1&&originalAiOpponentCount==raceOpponentCount,
        "RC triggers require actual source/world/navigation and human/seven-AI ownership");
    std::array<rc_trigger_actions::RacerIdentities,rc_trigger_actions::racers> identities{};
    for(std::size_t slot=0;slot<racerBank.count();++slot)racerBank.visit(slot,[&](){
     identities[slot]={qfilter.identity,secondaryFilter.identity};
    });
-   require50DU(rcTriggerActions->prepare(rcTriggerAuthoring,identities,rcNavigationBorrow.ai().track.count,originalAiHumanCount),
+   require50DU(rcTriggerActions->prepare(rcTriggerAuthoring,identities,rcNavigationBorrow.ai().track.count,originalAiHumanCount,raceRacerCount),
        "RC genuine late trigger identity/action binding rejected");
    for(std::size_t slot=0;slot<racerBank.count();++slot)racerBank.visit(slot,[&](){
     require50DU(rcTriggerActions->observePrepared(qfilter.identity,*query.resource,mainMembership.lastShapeWorld)&&
@@ -6592,15 +6698,15 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
    });
   }
   if(scTriggerActions){
-   require50DU(scColdSources&&scGround->coldSource()==scColdSources.get()&&originalAiEnabled&&racerBank.count()==8&&
+   require50DU(scColdSources&&scGround->coldSource()==scColdSources.get()&&originalAiEnabled&&racerBank.count()==raceRacerCount&&
        navigationAI->track.count==180&&navigationAI->indicesPrepared&&navigationMap->track.count==179&&navigationMap->indicesPrepared&&
-       scOriginalDisc&&humanCourseEnabled&&!allAiEnabled&&originalAiHumanCount==1&&originalAiOpponentCount==7,
+       scOriginalDisc&&humanCourseEnabled&&!allAiEnabled&&originalAiHumanCount==1&&originalAiOpponentCount==raceOpponentCount,
        "SC triggers require actual source/navigation and human/seven-AI manager ownership");
    std::array<sc_trigger_actions::RacerIdentities,sc_trigger_actions::racers> identities{};
    for(std::size_t slot=0;slot<racerBank.count();++slot)racerBank.visit(slot,[&](){
     identities[slot]={qfilter.identity,secondaryFilter.identity};
    });
-   require50DU(scTriggerActions->prepare(scTriggerAuthoring,identities,navigationAI->track.count,originalAiHumanCount),
+   require50DU(scTriggerActions->prepare(scTriggerAuthoring,identities,navigationAI->track.count,originalAiHumanCount,raceRacerCount),
        "SC genuine late trigger identity/action binding rejected");
    for(std::size_t slot=0;slot<racerBank.count();++slot)racerBank.visit(slot,[&](){
     require50DU(scTriggerActions->observePrepared(qfilter.identity,*query.resource,mainMembership.lastShapeWorld)&&
@@ -6609,15 +6715,15 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
    });
   }
   if(maTriggerActions){
-   require50DU(originalAiEnabled&&racerBank.count()==8&&navigationAI->track.count==213&&
+   require50DU(originalAiEnabled&&racerBank.count()==raceRacerCount&&navigationAI->track.count==213&&
        ((allAiEnabled&&originalAiHumanCount==0&&originalAiOpponentCount==8)||
-        (maOriginalDisc&&humanCourseEnabled&&!allAiEnabled&&originalAiHumanCount==1&&originalAiOpponentCount==7)),
+        (maOriginalDisc&&humanCourseEnabled&&!allAiEnabled&&originalAiHumanCount==1&&originalAiOpponentCount==raceOpponentCount)),
        "MA triggers require actual human/AI manager ownership and their original AI spline");
    std::array<ma_trigger_actions::RacerIdentities,ma_trigger_actions::racers> identities{};
    for(std::size_t racer=0;racer<racerBank.count();++racer)racerBank.visit(racer,[&](){
     identities[racer]={qfilter.identity,secondaryFilter.identity};
    });
-   require50DU(maTriggerActions->prepare(*maTriggerAuthoring,identities,navigationAI->track.count,originalAiHumanCount),
+   require50DU(maTriggerActions->prepare(*maTriggerAuthoring,identities,navigationAI->track.count,originalAiHumanCount,raceRacerCount),
        "MA actual trigger/action destinations rejected");
    for(std::size_t racer=0;racer<racerBank.count();++racer)racerBank.visit(racer,[&](){
     require50DU(maTriggerActions->observePrepared(qfilter.identity,*query.resource,mainMembership.lastShapeWorld)&&
@@ -6626,15 +6732,15 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
    });
   }
   if(saTriggerActions){
-   require50DU(originalAiEnabled&&racerBank.count()==8&&navigationAI->track.count==121&&
+   require50DU(originalAiEnabled&&racerBank.count()==raceRacerCount&&navigationAI->track.count==121&&
        ((allAiEnabled&&originalAiHumanCount==0&&originalAiOpponentCount==8)||
-        (saOriginalDisc&&humanCourseEnabled&&!allAiEnabled&&originalAiHumanCount==1&&originalAiOpponentCount==7)),
+        (saOriginalDisc&&humanCourseEnabled&&!allAiEnabled&&originalAiHumanCount==1&&originalAiOpponentCount==raceOpponentCount)),
        "SA triggers require actual human/AI manager ownership and their original AI spline");
    std::array<sa_trigger_actions::RacerIdentities,sa_trigger_actions::racers> identities{};
    for(std::size_t racer=0;racer<racerBank.count();++racer)racerBank.visit(racer,[&](){
     identities[racer]={qfilter.identity,secondaryFilter.identity};
    });
-   require50DU(saTriggerActions->prepare(*saTriggerAuthoring,identities,originalAiHumanCount,navigationAI->track.count),
+   require50DU(saTriggerActions->prepare(*saTriggerAuthoring,identities,originalAiHumanCount,navigationAI->track.count,raceRacerCount),
        "SA actual trigger/action destinations rejected");
    for(std::size_t racer=0;racer<racerBank.count();++racer)racerBank.visit(racer,[&](){
     require50DU(saTriggerActions->observePrepared(qfilter.identity,*query.resource,mainMembership.lastShapeWorld)&&
@@ -6644,14 +6750,14 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   }
   if(gaAnimatedWorld){
    require50DU(humanCourseEnabled&&originalAiEnabled&&originalAiHumanCount==1&&
-       originalAiOpponentCount==7&&racerBank.count()==8&&navigationAI->track.count==107,
+       originalAiOpponentCount==raceOpponentCount&&racerBank.count()==raceRacerCount&&navigationAI->track.count==107,
        "GA triggers require real Player0, seven original AI and canonical107-node navigation");
    std::array<ga_trigger_actions::RacerIdentities,ga_trigger_actions::racers> triggerIdentities{};
    for(std::size_t racer=0;racer<racerBank.count();++racer)racerBank.visit(racer,[&](){
     triggerIdentities[racer]={qfilter.identity,secondaryFilter.identity};
    });
    require50DU(gaTriggerActions->prepare(*gaTriggerAuthoring,*gaAnimatedWorld,triggerIdentities,
-       navigationAI->track.count,gaGateAudio.get(),!audioEnabled,originalAiHumanCount),"GA actual trigger/action destinations unavailable");
+       navigationAI->track.count,gaGateAudio.get(),!audioEnabled,originalAiHumanCount,raceRacerCount),"GA actual trigger/action destinations unavailable");
    for(std::size_t racer=0;racer<racerBank.count();++racer)racerBank.visit(racer,[&](){
     require50DU(gaTriggerActions->observePrepared(qfilter.identity,*query.resource,mainMembership.lastShapeWorld)&&
         gaTriggerActions->observePrepared(secondaryFilter.identity,*secondaryQuery.resource,secondaryMembership.lastShapeWorld),
@@ -6689,7 +6795,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   if(racerContactsEnabled){
    racerContactOwner=std::make_unique<native_racer_contact50HW::Owner>();
    std::string error;
-   const bool contactsReady=racerContactOwner->prepare(contactBindings.data(),contactBindings.size(),error);
+   const bool contactsReady=racerContactOwner->prepare(contactBindings.data(),raceRacerCount,error);
    require50DU(contactsReady,error.empty()?"original racer contact world preparation failed":error.c_str());
   }
   for(std::size_t racer=1;racer<racerBank.count();++racer){
@@ -6708,7 +6814,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
    });
   }
   if(dynamicContactEnabled){
-   std::array<native_dynamic_contact50IW::ManagerBinding,raceRacerCount> bindings{};
+   std::array<native_dynamic_contact50IW::ManagerBinding,raceRacerCapacity> bindings{};
    for(std::size_t slot=0;slot<raceRacerCount;++slot){
     bindings[slot]={slot,{racerContactIds[slot]}};
     // Default camera POD01 may use the retained fixture in the mixed path;
@@ -6722,7 +6828,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
         "actual dynamic actor and shared announcer bank identity differ");
    }
    std::string error;
-   require50DU(dynamicRegistry.prepare(bindings.data(),bindings.size(),originalAiHumanCount,error),
+   require50DU(dynamicRegistry.prepare(bindings.data(),raceRacerCount,originalAiHumanCount,error),
        error.empty()?"original dynamic manager registry unavailable":error.c_str());
    for(std::size_t slot=0;slot<racerBank.count();++slot)racerBank.visit(slot,[&](){
     require50DU(s.phase==VehicleFramePhase49W::Ready&&m.components.body20C==0&&
@@ -6758,7 +6864,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     auto* racer=mcParticleVehicles->racer(slot);require50DU(racer,"MC completed racer water owner absent");resetEffectBindings.table81CPresent=true;
     for(unsigned side=0;side<2;++side){resetEffectBindings.owners81C[side]=0;resetEffectBindings.controls81C[side]=&racer->spray(side).controls();}
    });
-   require50DU(mcParticleVehicles->initializedRacers()==raceRacerCount,"MC actual eight-racer constructor coverage");
+   require50DU(mcParticleVehicles->constructorsComplete()&&mcParticleVehicles->expectedRacers()==raceRacerCount&&
+       mcParticleVehicles->initializedRacers()==raceRacerCount,"MC actual eight-racer constructor coverage");
   }
   if(nativeGcWater){
    require50DU(nativeGcWater->activate(s.noiseOwner().sharedRandomState,sessionRandom,applicationClock),
@@ -6869,16 +6976,16 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   else require50DU(withRace([&](auto& actualRace){return race_session50HM::commitFrame(actualRace,0);}),"race grid observations rejected");
   if(mode1Enabled){
    mode1=withRace([&](auto& actualRace){return std::make_unique<race_mode1_host50ID::Owner>(racerBank,lapOwner,s.fields,actualRace);});
-   std::array<race_mode1_host50ID::RosterEntry,raceRacerCount> roles{};
+   std::array<race_mode1_host50ID::RosterEntry,raceRacerCapacity> roles{};
    roles[0]={playerRacer60,0,true,true}; // Authenticated selected identity, one human.
    // Bot IDs are not synthesized. Category6 sees HOST AI role and returns
    // before identity-dependent speech; arena vehicle58 remains unchanged.
-   require50DU(mode1->initialize(roles.data(),roles.size()),"cold mode1 lap/record/FIFO binding failed");
+   require50DU(mode1->initialize(roles.data(),raceRacerCount),"cold mode1 lap/record/FIFO binding failed");
   }
   if(allAiEnabled)std::cerr<<"ORIGINAL ALL8 MANAGER: native1AFF50 timing/event6,1B0400 rank, "
       "1B02F0 finish list/count/time and1B0920 gaps. Explicit zero-human end policy waits for all "
       "eight genuine finishes, then retains the actual completed scene in native Results.\n";
-  else if(humanCourseEnabled)std::cerr<<"ORIGINAL HUMAN MANAGER: one Player, seven original AI; source timing/rank/finish/end predicate, "
+  else if(humanCourseEnabled)std::cerr<<"ORIGINAL HUMAN MANAGER: one Player, "<<raceOpponentCount<<" original AI; source timing/rank/finish/end predicate, "
       "ending camera/audio/fade; bounded native Results presentation.\n";
   else std::cerr<<"RACE MODE "<<(mode1Enabled?1:2)
       <<(mode1Enabled?": source lap/records/event FIFO; explicit HOST world/rank/finish and distance projection.\n":
@@ -6886,7 +6993,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   std::cerr<<"NATIVE RACE: "<<raceRacerCount<<" distinct original racers, "<<race.config.lapTarget<<" laps, 3-second countdown. "
       "Field count matches the original normal race; starting-grid placement and world scheduling are host-owned. ";
   if(allAiEnabled)std::cerr<<"Every racer, including the camera-followed racer, uses original in-game AI. ";
-  else if(humanCourseEnabled)std::cerr<<"The selected human uses actual host input; all seven opponents retain their original AI. ";
+  else if(humanCourseEnabled)std::cerr<<"The selected human uses actual host input; "<<raceOpponentCount<<" opponents retain their original AI. ";
   else if(originalAiEnabled)std::cerr<<"One designated racer uses original in-game AI; other control paths remain separate. ";
   else std::cerr<<"This session has no original AI controller enabled. ";
   std::cerr<<"Each racer owns "<<racerBank.bytesPerRacer()<<" bytes of native state.\n";
@@ -7406,7 +7513,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  if(gameplayBinderEnabled){
   require50DU(((isGaTrack&&gaAnimatedWorld)||(isGcTrack&&gcAnimatedWorld)||
       (isTaTrack&&nativeTaSelection)||(isMaTrack&&nativeMaSelection)||(isSaTrack&&nativeSaSelection)||(isMbTrack&&nativeMbSelection)||(isScTrack&&nativeScSelection)||(isTcTrack&&nativeTcSelection)||(isRcTrack&&nativeRcSelection)||(isTbTrack&&nativeTbSelection)||(isGbTrack&&nativeGbSelection)||(isMcTrack&&nativeMcSelection)||
-      (isRaTrack&&nativeRaSelection&&originalCameraEnabled))&&racerBank.count()==8,
+      (isRaTrack&&nativeRaSelection&&originalCameraEnabled))&&racerBank.count()==raceRacerCount,
       "Binder requires an actual eight-racer authenticated ordinary session");
   gameplayBinderAppStart=originalMainApplication.appStart(
       runtime_asset_paths50LB::resolve("work/native/project/disc"));
@@ -7596,8 +7703,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  };
  platform::MaterialTextureGl50EB gpuTextures,trackGpuTextures,cableGpuTextures,skyGpuTextures;
  platform::MaterialTextureGl50EB specularGpuTextures50LA;
- std::array<platform::MaterialTextureGl50EB,raceOpponentCount> opponentGpuTextures,opponentCableGpuTextures;
- std::array<platform::MaterialTextureGl50EB,raceOpponentCount> opponentSpecularGpuTextures50LA;
+ std::array<platform::MaterialTextureGl50EB,raceOpponentCapacity> opponentGpuTextures,opponentCableGpuTextures;
+ std::array<platform::MaterialTextureGl50EB,raceOpponentCapacity> opponentSpecularGpuTextures50LA;
  platform::MaterialTextureGlDiagnostic50EB textureDiagnostic{};
  auto& renderer=sourceDisplayLifetime->renderer();
  // Borrowed by Session cold teardown, including partial-construction unwind.
@@ -8113,7 +8220,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
        nativeVideo,originalMainApplication);
    trackMaterialRequest.canonicalMaterialPath={&originalMainApplication.materialDirectory36B970()};
   }
-  if(humanOriginalHud){
+  if(humanOriginalHud&&!isRaTrack){
    // Acquire every actual HUD and particle reference before the single final
    // whole-table population. All borrowers share the same Application domain.
    require50DU(originalMainApplication.stageSpeedBoostNativeCold50LA(
@@ -8308,7 +8415,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   }
   require50DU(trackMaterialsLoaded,
       trackMaterialDiagnostic.message.empty()?"selected-track material load failed":trackMaterialDiagnostic.message.c_str());
-  if(humanOriginalHud){
+  if(humanOriginalHud&&!isRaTrack){
    require50DU(originalMainApplication.finishTimeStatsNativeCold50LA(sourceTimeStats),"direct human TimeStats final verification rejected");
    require50DU(originalMainApplication.finishDamageNativeCold50LA(sourceDamage),"direct human Damage final verification rejected");
    require50DU(sourcePositionStatsPrestage.verify(sourcePositionStatsPrestageDiagnostic),"direct human PositionStats final verification rejected");
@@ -8615,7 +8722,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     const auto* target=courseTargets.admits(selected);
     if(!target||!courseRaceCold||!originalUiActive||courseRaceLaunched||courseColdLoad.pending()||
        !raceEnabled||!nativeOriginalFleet||!originalAiEnabled||!originalCameraEnabled||
-       race.phase!=race_session50HM::Phase::Uninitialized||racerBank.count()!=8||
+       race.phase!=race_session50HM::Phase::Uninitialized||racerBank.count()!=raceRacerCount||
        !renderer.initialized()||!trackGpuTextures.initialized()||!skyGpuTextures.initialized()||
        !gameplayBinder.loaded()||!gameplayBinder.ownsResources()||!activateColdRace||
        &s.noiseOwner()!=&originalMainApplication.state->sharedNoise308030||
@@ -9040,7 +9147,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   renderRequest.sky.spans=skyBindings.data();
   renderRequest.sky.spanCount=static_cast<std::uint32_t>(skyBindings.size());
   }
-  std::array<platform::VehicleWindowRacerArchetype50DS,raceOpponentCount> racerArchetypes{};
+  std::array<platform::VehicleWindowRacerArchetype50DS,raceOpponentCapacity> racerArchetypes{};
   if(raceEnabled){
    for(std::size_t racer=1;racer<racerBank.count();++racer){
     const auto index=racer-1;const auto& visual=*racerVisuals[racer];
@@ -9074,7 +9181,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
      archetype.cables.textures=&opponentCableGpuTextures[index];archetype.cables.textureIndex=0;
     });
    }
-   renderRequest.racerArchetypes=racerArchetypes.data();renderRequest.racerArchetypeCount=raceOpponentCount;
+   renderRequest.racerArchetypes=raceOpponentCount?racerArchetypes.data():nullptr;renderRequest.racerArchetypeCount=raceOpponentCount;
   }
   if(gcAnimatedWorld){
    require50DU(gcDynamicWindow.createGpu(textureRequest,*gcAnimatedWorld,textureDiagnostic),"original GC dynamic texture upload failed");
@@ -9274,7 +9381,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
    else if(isRcTrack)sourceCameraAssets.loadRc(*trackSession,playerPodId,racerRigs[0]->phy,rcColdSources);
    else if(!isRaTrack)sourceCameraAssets.load(*trackSession,playerPodId,racerRigs[0]->phy);
    else sourceCameraAssets.cam=runtime_startup50fl::readBytes(
-       std::filesystem::path("work/native/project/disc/PODS")/playerPodId/(playerPodId+".CAM"));
+       runtime_asset_paths50LB::resolve("work/native/project/disc/PODS")/playerPodId/(playerPodId+".CAM"));
    sourceCameraDisplay=std::make_unique<sourceCamera::DisplayInputs>(sourceCamera::DisplayInputs{
        sourceVideo,sourceRendererDispatch,renderer,rendererDiagnostic,2,640,448,
        sourceFadeManagerA8,sourceFadeDuration98,0,0,
@@ -9323,7 +9430,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
         lapContinuity.timing,originalAiSession.manager,legacyRace,sessionRandom,sourceAttachedGlobals,
         applicationClock,controlPresets,nativeOrdinaryLaunch11258,dynamicProfile.game34,cameraStartup350,
         sourceBlur,poseHistory,boostState,sourceCameraCycleAudio,dynamicRacer60,originalAiHumanCount,
-        humanResultsCountdown,playerEnvironment.held};
+        humanResultsCountdown,playerEnvironment.held,humanCourseEnabled?&sourceRaceHud:nullptr,nullptr,
+        &startMusicContext,requestStartMusic,nativeRecordActor.get()};
     const bool cameraConstructed=raSession&&raSession->constructCamera(runtime,sourceCameraAssets.cam,*sourceCameraDisplay,raSessionDiagnostic);
     if(!cameraConstructed){
      std::cerr<<"RA camera failure="<<(raSessionDiagnostic.aggregate.failure?raSessionDiagnostic.aggregate.failure:"")
@@ -9358,7 +9466,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
        directOriginalHuman&&isTcTrack?tcMapView:TrackNavigationView50TC{},
        directOriginalHuman&&isTbTrack?tbMapView:TrackNavigationView50TB{},
        directOriginalHuman&&isGbTrack?gbMapView:TrackNavigationView50GB{},
-       directOriginalHuman&&isMcTrack?mcMapView:TrackNavigationView50MC{}};
+       directOriginalHuman&&isMcTrack?mcMapView:TrackNavigationView50MC{},
+       &startMusicContext,requestStartMusic,nativeRecordActor.get()};
    if(isTaTrack&&trackMaterialRequest.canonicalDomain){
     sourceCameraSession=originalMainApplication.createNativeTaCameraSession50LA(sourceCameraActual,sourceCameraAssets);
     require50DU(bool(sourceCameraSession),"same-Application TA native camera custody rejected");
@@ -9607,13 +9716,14 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
         <<" native_geometry_policy=type2_endpoint_swept_surface\n";
    }
    std::array<original_all8_frame::RacerBinding,8> cameraRoster{};
-   for(std::size_t slot=0;slot<cameraRoster.size();++slot)
+   for(std::size_t slot=0;slot<racerBank.count();++slot)
     cameraRoster[slot]={slot,sourceCameraSession->racerKey(slot)};
    require50DU(sourceFrameSchedule.bind(racerBank,s,racerFrameReads,cameraRoster,originalAiHumanCount,
        sourceCameraSession->sessionGeneration()),"original camera ALL8 scheduler binding rejected");
    publishSourceCameraFog();
    std::cerr<<"ORIGINAL CAMERA: source mode4 intro then saved Attached/Follow mode; "
-       <<(humanCourseEnabled?"one actual Player/seven original AI; ":"ALL8 original AI; ")
+       <<(humanCourseEnabled?"one actual Player; ":"ALL8 original AI; ")
+       <<"actual live roster="<<raceRacerCount<<"; "
        <<"native root/world/audio policy, one actual RNG owner, source640x448 projection; selected camera action cycles Attached/Follow presets. "
        <<"track_cuts3E4="<<sourceCameraSession->authoredSceneCutCount3E4()
        <<" controller_cutsA8="<<sourceCameraSession->effectiveControllerCutCountA8()<<'\n';
@@ -9662,7 +9772,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
       "RR_TRACK_FPS_BASELINE must be 0 or 1");
   const bool baselineRequested=baselineSetting&&std::string(baselineSetting)=="1";
   require50DU(!baselineRequested||(!headlessLive&&host.hasWindow()&&raceEnabled&&allAiEnabled&&
-      originalAiEnabled&&originalCameraEnabled&&racerBank.count()==8&&originalAiHumanCount==0&&!autoDriveEnabled),
+      originalAiEnabled&&originalCameraEnabled&&racerBank.count()==raceRacerCount&&originalAiHumanCount==0&&!autoDriveEnabled),
       "track FPS baseline requires eight original AI owners, including the followed racer, and the original camera window");
   track_fps_baseline50LA::Baseline trackBaseline{baselineRequested};
   BaselineDisplayWall50DU baselineDisplayWall{phaseTiming.enabled&&baselineRequested};
@@ -9923,12 +10033,12 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
       <<" repair/boost/powerslide="<<repairButtonCode<<'/'<<boostButtonCode<<'/'<<powerslideButtonCode<<'\n';
   if(usePhysicalGameController)std::cerr<<"The selected original button layout is preserved on the actual SDL pad. "
       "Left/right stick Y remain independent in advanced mode; normal mode uses its selected throttle/brake buttons and left X steering. "
-      "Pad Start or keyboard Escape opens the native host pause menu; keyboard F5/Backspace retain restart actions. SELECT/Back uses the original manual reset when bound; unjoined look actions stop explicitly.\n";
+      "Pad Start or keyboard Escape opens Pause or resumes from its main page. In Pause: D-pad selects, A confirms, Y backs out/cancels; Restart and Main return use their confirmation menu. Keyboard arrows/Enter/Escape remain available; F5/Backspace retain restart actions. SELECT/Back uses the original manual reset when bound; unjoined look actions stop explicitly.\n";
   else std::cerr<<(humanControlInput.twinEngine?
       "W/S left engine; Up/Down right engine; unequal input steers. ":
       "W throttle; S brake; Left/Right steer; Up/Down feed original left-stick Y. ")
       <<"Space boost; R repair; Left Shift powerslide; T original manual reset when bound. Opposite axis keys center. "
-      "The selected original row supplies each action code. Escape pauses; F5 restarts.\n";
+      "The selected original row supplies each action code. Escape opens Pause or resumes from its main page; arrows select, Enter confirms, Escape backs out/cancels; F5 restarts.\n";
   std::cerr<<"16ms host ticks, maximum4 catch-up ticks. Focus loss/minimize pauses.\n"
       <<"Actual selected original colliders="<<terrainOwnerCount<<" zones="<<zoneCount
       <<" navigation map/AI="<<selectedMapCount50MB()<<'/'<<selectedAiCount50MB()<<'\n'
@@ -9955,7 +10065,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
        "Controls Left/Right changes preset(0/1), R rotates the actual controller(5), Tab selects Normal/Advanced(7). "
        "Escape/menu back(6; source Main does not handle back). Window Close, quit, or stdin EOF exits. "
        "Game Options Accept requires the live enabled audio owner and commits process settings; Cancel remembers the group without applying local edits. "
-       "Mode0 prepared Rider Confirm opens Course with original enabled audio or explicit mute; Left/Right selects four tracks, and Back returns. TA/SA/MA/GA Confirm starts original-AI races for prepared Riders 2/4/10/11/12/15/19/20; changing track or rider performs a full cold reload. "
+       "Rider Confirm opens its prepared destination with original enabled audio or explicit mute. Course uses original selection/unlock rules; Confirm on a supported native destination performs a full cold race load. The accepted pad A or keyboard Confirm chooses driving input unless RR_HUMAN_INPUT_DEVICE explicitly overrides it. "
        "F5/restart and checkpoint have no original UI destination. capture writes the existing live PPM target.\n";
   }
   // Opt-in host observations only; each receipt is bounded to this session.
@@ -9991,13 +10101,11 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
        hostInput.captureRequested||(windowCapture.enabled()&&input.pressed[69])||
        hostInput.pauseRequested||hostInput.menuRequested||hostInput.restartRequested||
        hostInput.checkpointRequested||input.quitRequested)discardTrackBaseline();
-   // An authentic SDL Start press toggles the existing native host Pause owner.
-   // It is a presentation policy, not a fabricated source action6A0 callback.
-   if(!originalUiActive&&usePhysicalGameController&&input.focused&&!input.minimized&&!input.activityLost&&
-       !input.eventBudgetExhausted&&input.controllers[0].connected&&input.controllers[0].pressed[6]){
-    if(sessionMenu.page()==platform::HostSessionMenu50IF::Page::Closed)hostInput.pauseRequested=true;
-    else if(sessionMenu.page()==platform::HostSessionMenu50IF::Page::Pause)hostInput.resumeRequested=true;
-   }
+   // Physical Pause navigation is owned by the native menu, not gameplay
+   // descriptors. Observe even inactive polls to retire stale device/focus
+   // edges; the original frontend and source spectator Pause keep their own
+   // input owners. This also supplies D-pad/Confirm/Back, not just Start.
+   sessionMenu.observeController(input,!originalUiActive&&!sourcePauseParentAttached&&usePhysicalGameController);
    if(hostInput.inputError){terminalInputError=hostInput.inputError;std::cerr<<"stdin input error "<<terminalInputError<<'\n';}
    windowCapture.request(input);
    if(captureRun.deadlineExpired()){
@@ -10091,12 +10199,20 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
      menuEvents[2]=menuEvents[2]||input.pressed[82]||input.pressed[80]||input.pressed[26];
      menuEvents[3]=menuEvents[3]||input.pressed[81]||input.pressed[79]||input.pressed[22];
     }
+    // Preserve the actual release-armed pad edge before merging keyboard input.
+    // Keyboard wins simultaneous confirms, matching its explicit user action.
+    const bool courseConfirmFromController=menuEvents[4]&&
+        !(input.pressed[40]||input.pressed[88]||input.pressed[44]);
     menuEvents[4]=menuEvents[4]||input.pressed[40]||input.pressed[88]||input.pressed[44];
     menuEvents[5]=menuEvents[5]||((gameOptionsInput||controlsInput||memoryCardInput||tournamentInput)&&input.pressed[21]);
     menuEvents[7]=menuEvents[7]||((controlsInput||memoryCardInput)&&input.pressed[43]);
     menuEvents[6]=menuEvents[6]||input.pressed[41]||hostInput.menuRequested;
     for(const unsigned event:{0u,1u,2u,3u,4u,5u,7u,6u})
-     if(menuEvents[event])originalMain.input(static_cast<std::uint8_t>(event),input.secondControllerPresence);
+     if(menuEvents[event]){
+      const auto accepted=originalMain.input(static_cast<std::uint8_t>(event),input.secondControllerPresence);
+      if(courseInput&&event==4&&accepted==platform::OriginalUiFrontendStatus50KG::routeAccepted)
+       originalMainApplication.courseHumanController=courseConfirmFromController;
+     }
     // Never merge two physical ports or retag keyboard input as controller one.
     if(secondInputRoute.screen==12&&secondInputRoute.page==3&&
        input.secondControllerPresence==platform::WindowControllerPresence50DQ::Present)
@@ -11254,7 +11370,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
        hud.bestLapSeconds=lapContinuity.timing.bestLapCB4;
       }
      }
-     require50DU(race.racerCount==racerHudNames.size(),"standings require the complete original race field");
+     require50DU(race.racerCount==raceRacerCount&&race.racerCount<=racerHudNames.size(),"standings require the actual complete live race field");
      hud.standingsCount=race.racerCount;hud.standingsPlayerIndex=0;
      hud.standingsSourceRanks=nativeOriginalFleet;
      for(std::uint32_t place=0;place<race.racerCount;++place){
@@ -11838,8 +11954,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     const bool captureWindowImage=host.hasWindow()&&!privateUnderlay&&
         !(sourceCameraSession&&(sourceCameraSession->blockingVideoPending()||sourceCameraSession->asyncVideoPending()))&&
         windowCapture.due(windows_capture50LD::Stage::race,
-            race.phase==race_session50HM::Phase::Racing&&allAiEnabled&&race.racerCount==8&&
-            racerBank.count()==8&&rendererDiagnostic.trackDraws>0);
+            race.phase==race_session50HM::Phase::Racing&&allAiEnabled&&race.racerCount==raceRacerCount&&
+            racerBank.count()==raceRacerCount&&rendererDiagnostic.trackDraws>0);
     // Discard BEFORE readback or observation: even a capture at the exact FPS
     // threshold must not complete an interval containing readback latency.
     if(captureWindowImage){
@@ -11974,7 +12090,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     const bool windowImage=host.hasWindow()&&(actualGameplayImageCompleted||!sourceCameraSession)&&
         !(sourceCameraSession&&(sourceCameraSession->blockingVideoPending()||sourceCameraSession->asyncVideoPending()));
     const bool settledTrack=race.phase==race_session50HM::Phase::Racing&&allAiEnabled&&
-        race.racerCount==8&&racerBank.count()==8&&rendererDiagnostic.trackDraws>0;
+        race.racerCount==raceRacerCount&&racerBank.count()==raceRacerCount&&rendererDiagnostic.trackDraws>0;
 #if defined(__linux__)
     if(captureWindowImage&&windowImage){
 #else
@@ -12353,20 +12469,35 @@ int main(int argc,char**argv){try{
   require50DU(configure("RR_ORIGINAL_ASSET_ROOT",root.c_str())&&
       configure("RR_ORIGINAL_UI_ROOT",root.c_str())&&configure("RR_ORIGINAL_MAIN_MENU","1"),
       "original disc environment configuration failed");
-  // A bare asset-root entry must be able to show Main. Explicit audio policy
-  // remains authoritative; absent policy starts muted rather than inventing
-  // an audio device or making a missing configuration fatal.
+  // A normal disc entry uses the existing logical audio owner even when
+  // host output is disabled. Game Options Accept needs that real owner to
+  // commit188740; the diagnostic muted policy deliberately has no mixer.
+  // Keep the existing host-device policy and all explicit output choices.
   if(!std::getenv("RR_ORIGINAL_MAIN_AUDIO"))
-   require50DU(configure("RR_ORIGINAL_MAIN_AUDIO","muted"),"default Main audio policy failed");
+   require50DU(configure("RR_ORIGINAL_MAIN_AUDIO","enabled"),"default Main audio policy failed");
+  if(std::string(std::getenv("RR_ORIGINAL_MAIN_AUDIO"))=="enabled"&&
+     !std::getenv("RR_ORIGINAL_MAIN_AUDIO_ROOT")){
+   const auto audioRoot=(std::filesystem::path(root)/"AUDIO").string();
+   require50DU(configure("RR_ORIGINAL_MAIN_AUDIO_ROOT",audioRoot.c_str()),
+       "default Main audio directory configuration failed");
+  }
+  // Original Main is the only initial menu. Its existing human Course
+  // handoff uses native mode2; do not require diagnostic launcher variables
+  // just to reach the normal selection/loading route. Explicit overrides
+  // remain visible to the existing validation rather than silently repaired.
+  if(!std::getenv("RR_RACE_MODE"))
+   require50DU(configure("RR_RACE_MODE","2"),"default native Course mode failed");
+  if(!std::getenv("RR_START_MENU"))
+   require50DU(configure("RR_START_MENU","0"),"default native Course entry failed");
  }
  const bool headlessLive=argc==4&&std::string(argv[2])=="--headless-live";
  if(argc!=2&&!headlessLive&&!discEntry){
   std::cerr<<"usage: terrain_interactive_drive50du CORPUS_JSON [--headless-live CAPTURE_PPM]\n"
-             "Use --assets ORIGINAL_DISC_DIRECTORY for the direct-disc original Main entry. RA does not read the legacy diagnostic corpus. Default paths use the repository root. RR_ORIGINAL_ASSET_ROOT selects original disc files; RR_GENERATED_RUNTIME_ROOT selects prepared evidence/work inputs and relative CORPUS_JSON. The process cwd is never changed. RR_RACE_MODE=1 (default with fully prepared providers); "
-             "RR_HUMAN_CONTROL_PRESET=0..7 selects a real original row only in direct human startup (default4); original Main keeps its own selection. RR_HUMAN_INPUT_DEVICE=keyboard (default) or controller selects actual native input, never an AI role. Normal keyboard rows: W/S throttle/brake, Left/Right steer, Up/Down original left Y. Advanced keyboard rows: W/S left engine, Up/Down right engine. "
-             "RR_RACE_MODE=2 selects the existing HOST audio/timing fallback. Space: boost; R: hold repair; Left Shift: powerslide; Backspace/checkpoint: current checkpoint; F5/restart: new grid session; Escape: menu; quit: exit. RR_START_MENU=1/0 overrides initial front-menu display.\n"
-             "GA human entry uses actual original Main/Rider/Course with RR_ORIGINAL_ASSET_ROOT, RR_RACE_MODE=2 and RR_START_MENU=0. Slot0 remains the selected Player; seven opponents use original AI. F5 or Restart Race rebuilds the full native race and intro. Checkpoints remain unavailable.\n"
-             "RR_ORIGINAL_MAIN_MENU=1 opens original Main/Options with dedicated UI cold ownership; its corpus argument is not opened before Course race entry; requires RR_ORIGINAL_UI_ROOT and RR_ORIGINAL_MAIN_AUDIO=muted or enabled (enabled also requires RR_ORIGINAL_MAIN_AUDIO_ROOT pointing to AUDIO). Optional RR_ORIGINAL_RIDER_IPUM_CACHE admits authenticated default-unlocked Riders 2/4/10/11/12/15/19/20 when each original image cache is present. Native-window Left/Right preserves original roster order and transitions; an unprepared neighbor remains unavailable. Mode0 prepared Rider Confirm opens Course with original enabled audio or explicit mute, Left/Right selects the first four, and Back returns. Course Confirm supports bounded TA human play with one selected Player and seven original AI, or the explicit ALL8 route on admitted tracks. Human Course always queues a complete cold reload after the original exit, including unchanged track/rider so accepted controls are applied; each destination must cold-load its own original archive, native assets and source owners; other riders remain unavailable as race destinations. RR_RACE_MODE=2 and RR_START_MENU=0 remain required for this native Course path. RR_AUDIO controls race audio. With RR_AUDIO_WAV, first frontend capture uses the supplied filename; later Main visits add -menu-session-N and race captures add -race-session-N before the extension.\n";
+             "Use --assets ORIGINAL_DISC_DIRECTORY for normal original Main/Rider/Course entry directly from disc files. This sets the original asset/UI roots and, unless explicitly supplied, RR_RACE_MODE=2, RR_START_MENU=0, RR_ORIGINAL_MAIN_AUDIO=enabled and its AUDIO directory. Existing host-device policy is unchanged; RR_AUDIO_DEVICE=0 disables physical output while retaining logical audio owners. Explicit audio/device policy remains authoritative.\n"
+             "Legacy CORPUS_JSON entry remains available separately. RR_GENERATED_RUNTIME_ROOT resolves diagnostic evidence/work inputs and relative CORPUS_JSON; it is not required data for the normal original-disc route. The process cwd is never changed. RR_RACE_MODE=1 requires fully prepared source providers; RR_RACE_MODE=2 uses the existing native audio/timing fallback.\n"
+             "RR_HUMAN_CONTROL_PRESET=0..7 selects an original row only for direct human startup (default4); original Main retains its own configuration. Normal menu entry retains the device used for an accepted Course Confirm: pad A selects controller driving; keyboard Enter/Space selects keyboard driving (keyboard wins simultaneous confirms). Direct startup defaults to keyboard. RR_HUMAN_INPUT_DEVICE=keyboard or controller explicitly overrides that choice, never an AI role. Normal keyboard rows: W/S throttle/brake, Left/Right steer, Up/Down original left Y. Advanced rows: W/S left engine, Up/Down right engine. Space: boost; R: hold repair; Left Shift: powerslide; Escape: Pause/Resume; F5 or Restart Race: new grid session. On the pad, Start opens Pause or resumes from its main page; D-pad selects, A confirms, Y backs out or cancels. Restart and Main return use their confirmation menu. Checkpoint recovery remains a separately admitted diagnostic path.\n"
+             "Normal Main uses authored roster/course order and unlocks. Original-disc Rider images are decoded in process; RR_ORIGINAL_RIDER_IPUM_CACHE is an optional legacy authenticated cache, not a normal runtime data pack. Each race selection must resolve its own original archive, native assets and source owners. Human Course queues a complete cold reload after exit, including unchanged track/rider, so accepted controls apply. No unsupported destination is silently substituted.\n"
+             "Main/Options logical audio uses RR_ORIGINAL_MAIN_AUDIO=enabled and RR_ORIGINAL_MAIN_AUDIO_ROOT pointing to AUDIO. The explicit diagnostic muted policy suppresses logical audio and cannot commit Game Options Accept. RR_AUDIO and RR_AUDIO_DEVICE independently control host race output/device policy. With RR_AUDIO_WAV, later Main visits add -menu-session-N and races add -race-session-N before the extension.\n";
   return 2;
  }
  const auto resolvedCorpusPath=runtime_asset_paths50LB::generatedInput(discEntry?
@@ -12466,10 +12597,11 @@ int main(int argc,char**argv){try{
  require50DU(!raRequestSetting||std::string(raRequestSetting)=="0"||std::string(raRequestSetting)=="1",
      "RR_RA_NATIVE_WORLD must be 0 or 1");
  const char* raProfileSetting=std::getenv("RR_ORIGINAL_TEST_PROFILE");
- const bool raNativeWorldRequested=raRequestSetting&&std::string(raRequestSetting)=="1"&&
-     originalMainApplication.enabled&&raProfileSetting&&std::string(raProfileSetting)=="mawhonic-ryloth";
+ const bool raNativeWorldRequested=sharedHumanCourseRequested||
+     (raRequestSetting&&std::string(raRequestSetting)=="1"&&
+      originalMainApplication.enabled&&raProfileSetting&&std::string(raProfileSetting)=="mawhonic-ryloth");
  require50DU(!initialRa||(raNativeWorldRequested&&!startAtMenu),
-     "RA requires explicit original Main Mawhonic/Ryloth fixture and RR_RA_NATIVE_WORLD=1");
+     "RA requires original-disc Main/Course human entry or the explicit legacy ALL8 request");
  require50DU(!gaCandidate||initialGa||originalMainApplication.enabled,
      "GA candidate admission on another startup track requires the original Course application");
  require50DU(!initialGa||(rootedHumanCourseSupported&&!startAtMenu),
@@ -12549,6 +12681,7 @@ int main(int argc,char**argv){try{
         effectiveTrack==rr::platform::HostTrack50IM::GA||
         effectiveTrack==rr::platform::HostTrack50IM::MA||effectiveTrack==rr::platform::HostTrack50IM::SA||
         effectiveTrack==rr::platform::HostTrack50IM::MB||
+        (effectiveTrack==rr::platform::HostTrack50IM::RA&&raNativeWorldRequested)||
         (effectiveTrack==rr::platform::HostTrack50IM::SC&&scNativeWorldRequested)||
         (effectiveTrack==rr::platform::HostTrack50IM::TC&&tcNativeWorldRequested)||
         (effectiveTrack==rr::platform::HostTrack50IM::RC&&rcNativeWorldRequested)||

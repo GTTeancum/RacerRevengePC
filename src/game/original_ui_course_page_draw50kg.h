@@ -65,6 +65,8 @@ public:
     const std::array<OriginalUiCoursePageTextSnapshot50KG,2>* texts()const noexcept{return prepared()?&texts_:nullptr;}
     std::shared_ptr<const assets::OriginalUiScreenAssets50KG> images()const noexcept{return images_;}
     // Source1DAF78..1DB258: genuine embedded B30 text, LOC126/133/134.
+    bool setEventSelection(std::uint32_t subtype,std::uint32_t laps,std::uint32_t entrants,OriginalUiCoursePageDrawDiagnostic50KG&)noexcept;
+    bool eventDetailVisible()const noexcept{return eventSubtype_!=3;}
     bool setLapCount(std::uint32_t laps,OriginalUiCoursePageDrawDiagnostic50KG&) noexcept;
     // Separate original mode2 branch1DB81C..1DD530. No mode0 lap/entrant
     // text is constructed. Retains original40/10/15-character allocations.
@@ -96,7 +98,9 @@ private:
     const assets::OriginalUiMemberIdentity50KG* pageIdentity_=nullptr;
     std::uint32_t fontImage_=0,lapCount_=0;
     float packetZ_=0;
-    std::string lapLabel126_,singularLap133_,pluralLaps134_;
+    std::string lapLabel126_,singularLap133_,pluralLaps134_,eventLabel125_,entrantsLabel127_;
+    std::array<std::string,3> eventNames_{};
+    std::uint32_t eventSubtype_=1,eventEntrants_=8;
     std::array<OriginalUiCoursePagePacket50KG,6> packets_{};
     std::array<OriginalUiCoursePageTextSnapshot50KG,2> texts_{};
     bool tournament_=false,tournamentFrame_=false,tournamentPlanet_=false;

@@ -238,7 +238,7 @@ OriginalCameraStartResult beginOriginalRaceCountdown1AFD80(OriginalRaceStartCoun
     LapTimingManager50ID& manager,std::int32_t app33C,std::int32_t launch,
     const OriginalCourseStartActions& actions) noexcept {
     if(!actions.authenticated())return result(S::owner,0x1ad344);
-    if(launch!=1)return result(S::sourcePath,0x1afe04);
+    if(launch<1||launch>3)return result(S::sourcePath,0x1afe04);
     countdown.countdown34=constant(app33C?0x3e4ccccd:0x40a66666);
     manager.flags58=static_cast<std::uint8_t>(manager.flags58|4u);
     // Source1AD330 sees authenticated Num321Anims0 and makes no101C10 calls.

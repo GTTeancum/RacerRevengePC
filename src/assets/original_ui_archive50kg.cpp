@@ -12,7 +12,7 @@ namespace {
 constexpr bool validCatalogLayout() noexcept {
     constexpr auto archiveCount = sizeof(archiveCatalog) / sizeof(archiveCatalog[0]);
     constexpr auto memberCount = sizeof(memberCatalog) / sizeof(memberCatalog[0]);
-    if (archiveCount != 16 || memberCount != 1480) return false;
+    if (archiveCount != 38 || memberCount != 1568) return false;
     std::size_t next = 0;
     for (std::size_t i = 0; i < archiveCount; ++i) {
         const auto& archive = archiveCatalog[i];
@@ -108,6 +108,62 @@ const OriginalUiArchiveIdentity50KG* originalUiArchiveIdentity50KG(OriginalUiArc
     const auto ordinal = static_cast<std::size_t>(id);
     if (ordinal >= sizeof(archiveCatalog) / sizeof(archiveCatalog[0])) return nullptr;
     return &archiveCatalog[ordinal];
+}
+const OriginalUiArchiveIdentity50KG* originalUiGaragePodArchive50KG(std::uint32_t career) noexcept {
+    switch(career){
+    case 1: return originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::garagePod01);
+    case 2: return originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::garagePod02);
+    case 3: return originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::garagePod03);
+    case 4: return originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::garagePod04);
+    case 7: return originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::garagePod07);
+    case 8: return originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::garagePod08);
+    case 9: return originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::garagePod09);
+    case 10: return originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::garagePod10);
+    case 11: return originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::garagePod11);
+    case 12: return originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::garagePod12);
+    case 14: return originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::garagePod14);
+    case 15: return originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::garagePod15);
+    case 16: return originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::garagePod16);
+    case 17: return originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::garagePod17);
+    case 18: return originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::garagePod18);
+    case 19: return originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::garagePod19);
+    case 20: return originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::garagePod20);
+    case 21: return originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::garagePod21);
+    case 22: return originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::garagePod22);
+    case 23: return originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::garagePod23);
+    case 24: return originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::garagePod24);
+    case 25: return originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::garagePod25);
+    case 26: return originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::garagePod26);
+    default: return nullptr;
+    }
+}
+int originalUiGaragePodCareer50KG(OriginalUiArchiveId50KG id) noexcept {
+    switch(id){
+    case OriginalUiArchiveId50KG::garagePod01: return 1;
+    case OriginalUiArchiveId50KG::garagePod02: return 2;
+    case OriginalUiArchiveId50KG::garagePod03: return 3;
+    case OriginalUiArchiveId50KG::garagePod04: return 4;
+    case OriginalUiArchiveId50KG::garagePod07: return 7;
+    case OriginalUiArchiveId50KG::garagePod08: return 8;
+    case OriginalUiArchiveId50KG::garagePod09: return 9;
+    case OriginalUiArchiveId50KG::garagePod10: return 10;
+    case OriginalUiArchiveId50KG::garagePod11: return 11;
+    case OriginalUiArchiveId50KG::garagePod12: return 12;
+    case OriginalUiArchiveId50KG::garagePod14: return 14;
+    case OriginalUiArchiveId50KG::garagePod15: return 15;
+    case OriginalUiArchiveId50KG::garagePod16: return 16;
+    case OriginalUiArchiveId50KG::garagePod17: return 17;
+    case OriginalUiArchiveId50KG::garagePod18: return 18;
+    case OriginalUiArchiveId50KG::garagePod19: return 19;
+    case OriginalUiArchiveId50KG::garagePod20: return 20;
+    case OriginalUiArchiveId50KG::garagePod21: return 21;
+    case OriginalUiArchiveId50KG::garagePod22: return 22;
+    case OriginalUiArchiveId50KG::garagePod23: return 23;
+    case OriginalUiArchiveId50KG::garagePod24: return 24;
+    case OriginalUiArchiveId50KG::garagePod25: return 25;
+    case OriginalUiArchiveId50KG::garagePod26: return 26;
+    default: return -1;
+    }
 }
 const OriginalUiMemberIdentity50KG* originalUiMemberIdentity50KG(
     OriginalUiArchiveId50KG id, std::size_t ordinal) noexcept {

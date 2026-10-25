@@ -319,6 +319,7 @@ private:
     bool continueOptionsCameraSuffix2361C0(const ::original_main_entry50KG::Application&)noexcept;
     // Non-counted input preparation; cannot mount/publish a source owner.
     bool prepareOptionsNativeInputs50KG(const ::original_main_entry50KG::Application&)noexcept;
+    bool prepareOptionsOverlayTextStorage50KG(const ::original_main_entry50KG::Application&)noexcept;
     bool retainMemoryCardOptionsSources50KG(const ::original_main_entry50KG::Application&,
         OriginalUiMemoryCardConstructor50KG&)noexcept;
     bool bindGarageDestinationRoot50KG(::original_main_entry50KG::Frontend&)noexcept;

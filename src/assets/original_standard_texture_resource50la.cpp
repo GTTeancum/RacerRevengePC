@@ -17,6 +17,8 @@
 #include <exception>
 #include <limits>
 #include <utility>
+#include <zlib.h>
+#include "original_appstart_template_cache50kg.h"
 
 namespace rr::assets {
 namespace {
@@ -392,7 +394,8 @@ bool OriginalStandardTextureResolver50LA::bindIpumImages(
     file.ipumImages=images;return true;
 }
 // Same resolver's eight source88..130 slots. This is native CPU storage,
-// not guest addresses or an emulated allocator. No file reader currently borrows it.
+// not guest addresses or an emulated allocator. The bounded17CAB8 parser
+// reserves one real slot temporarily; no persistent file reader borrows it.
 struct OriginalStandardTextureResolver50LA::Scratch {
     static constexpr std::size_t bytes=0x6000,alignment=64;
     struct Slot {
@@ -454,19 +457,36 @@ bool OriginalStandardTextureResolver50LA::restoreScratch132BD0(D& d)noexcept {
     // allocation and each failed slot's authentic -2/negative-size state.
     return allocated?true:fail(d,E::allocation,0x132C74);
 }
-// Bounded, never-registered capacity owned by the SAME resolver as Scratch.
+// Bounded fresh capacity and first APPSTART registration, on the SAME resolver.
 // Native pointers/layout, not guest rows or a second canonical file namespace.
 // All fields below are private: no mount/lookup can turn capacity into a handle.
 struct OriginalStandardTextureResolver50LA::FreshFileCapacity {
     // The actual fresh domain provider, retained before its first native mount.
-    // This is native lifetime/identity custody, NOT original registration history.
+    // Merely retaining this provider does not establish source history.
     // No provider-to-resolver back edge or second file/association ledger exists.
     std::shared_ptr<const OriginalStandardArchiveProvider50LA> provider;
+    // Native13C980/13D0F0/13D8F0/13D9F0 adapter over the SAME authenticated
+    // immutable encoded input. It is not a decoded-member reader or OS file.
+    struct Handle {
+        OriginalUiEncodedArchiveView50KG input;
+        std::size_t cursor=0;
+        explicit Handle(OriginalUiEncodedArchiveView50KG value)noexcept:input(std::move(value)){}
+        bool seek(std::size_t at)noexcept {if(at>input.size())return false;cursor=at;return true;}
+        bool read(void* output,std::size_t bytes)noexcept {
+            if(cursor>input.size()||bytes>input.size()-cursor)return false;
+            if(bytes)std::memcpy(output,input.data()+cursor,bytes);cursor+=bytes;return true;
+        }
+        bool word(std::uint32_t& out)noexcept {
+            std::uint8_t b[4];if(!read(b,4))return false;
+            out=std::uint32_t(b[0])|(std::uint32_t(b[1])<<8)|
+                (std::uint32_t(b[2])<<16)|(std::uint32_t(b[3])<<24);return true;
+        }
+    };
     struct Device {
         std::int32_t id00;
         char* name04;
         std::uint32_t cursor08,flags0C;
-        void* handle10;
+        Handle* handle10;
         std::uint32_t length14,payload18,tableOffset1C,tableBytes20;
         std::uint8_t byte24;
         void initialize(std::int32_t id)noexcept {
@@ -479,6 +499,11 @@ struct OriginalStandardTextureResolver50LA::FreshFileCapacity {
         char* filename08;
         std::uint32_t logicalStart0C,cursor10,length14,flags18;
         void* associatedObject1C;
+        // Identity-only bridge into the existing authenticated directory, not
+        // another cache association, decoded payload or source member index.
+        const OriginalUiMemberIdentity50KG* originalMember=nullptr;
+        const std::string* canonicalName=nullptr;
+        const std::uint8_t* canonicalData=nullptr;
         void initialize()noexcept {
             flags18=1;filename08=nullptr;deviceID00=0;logicalStart0C=0;
             cursor10=0;length14=0;auxiliarySlot04=0;associatedObject1C=nullptr;
@@ -500,6 +525,13 @@ struct OriginalStandardTextureResolver50LA::FreshFileCapacity {
     std::uint32_t* lengthTable84=nullptr;
     std::int64_t cursor160=-1,cursor168=-1;
     bool sourceResult=false; // Native record, not a new source field.
+    enum class Registration { untouched,attempted,complete };
+    Registration registration=Registration::untouched;
+    std::shared_ptr<const OriginalUiArchive50KG> appStart;
+    Scratch* scratchOwner=nullptr; // Same resolver; destroyed strictly after this owner.
+    bool namesReadAttempted=false; // Terminal native prefix guard, not source readiness.
+    std::int32_t templateStage=0,templateMember=-1;
+    bool templateFailed=false;
     static constexpr std::size_t inputBytes=0x100000/8,alignment=64;
     FreshFileCapacity()noexcept {active.fill(-1);} //12CBA0 -> cold12CA10/131670.
     FreshFileCapacity(const FreshFileCapacity&)=delete;
@@ -534,37 +566,55 @@ struct OriginalStandardTextureResolver50LA::FreshFileCapacity {
             }
         }
     }
-    void retireEmptyMember(std::int32_t i)noexcept {
-        // Source12EAA0 scratch comparison cannot match: all scratch statuses
-        // remain -1/-2 here, whereas i>=0. No association or filename exists.
+    void retireMember12EAA0(std::int32_t i)noexcept {
+        // Bounded APPSTART rows: source virtual open/cache slot may be reached;
+        // no typed resource object is invented or owned by this row.
+        // Names are genuinely owned, including partial insertion failures.
         auto& row=members150[i];
+        if(scratchOwner&&row.auxiliarySlot04>=0&&
+           static_cast<std::size_t>(row.auxiliarySlot04)<scratchOwner->slots.size()){
+            auto& slot=scratchOwner->slots[row.auxiliarySlot04];
+            if(slot.status08==i){slot.status08=-1;scratchOwner->selected148=row.auxiliarySlot04;}
+        }
+        delete[] row.filename08;row.filename08=nullptr;
+        row.originalMember=nullptr;row.canonicalName=nullptr;row.canonicalData=nullptr;
         row.auxiliarySlot04=0;row.cursor10=0;row.deviceID00=0;
         row.flags18=1;row.associatedObject1C=nullptr;row.length14=0;row.logicalStart0C=0;
         freeMember14C=i;
     }
-    void retireEmptyDevice(Device& row)noexcept {
-        // No active/current device, name or handle has ever been installed.
-        freeDevice10=row.id00;row.flags0C=1;row.cursor08=0;row.length14=0;
+    void retireDevice12EB60(Device& row)noexcept {
+        // Bounded sole activated APPSTART: source12EB60 removes its head.
+        // No generalized recency-list eviction/promotion is admitted here.
+        for(auto& id:active)if(id==row.id00)id=-1;
+        if(current74==row.id00){
+            // Native immutable-input backend has no outstanding asynchronous
+            // work;132CD0 synchronization completes before invalidation/close.
+            window7C=-1;window80=-1;current74=-1;
+        }
+        freeDevice10=row.id00;
+        delete row.handle10;row.handle10=nullptr;
+        delete[] row.name04;row.name04=nullptr;
+        row.flags0C=1;row.cursor08=0;row.length14=0;
         row.payload18=0;row.tableBytes20=0;row.tableOffset1C=0;row.byte24=0;
     }
     ~FreshFileCapacity(){
-        // Restricted cold12CA10 order, not a general live file-service destructor.
+        // Bounded one-device12CA10 order, including reached first-file activation.
         //12E7E0 force visits even empty devices; matching empty members retire.
         if(devices14&&members150){
             for(std::int32_t i=0;i<deviceCount18;++i){auto& device=devices14[i];
                 device.flags0C|=0x20;
                 for(std::int32_t j=0;j<memberCount154;++j)
-                    if(members150[j].deviceID00==device.id00)retireEmptyMember(j);
-                retireEmptyDevice(device);
+                    if(members150[j].deviceID00==device.id00)retireMember12EAA0(j);
+                retireDevice12EB60(device);
             }
             active.fill(-1);
         }
         active.fill(-1);
-        for(std::int32_t i=0;i<deviceCount18;++i)retireEmptyDevice(devices14[i]);
+        for(std::int32_t i=0;i<deviceCount18;++i)retireDevice12EB60(devices14[i]);
         delete[] devices14;devices14=nullptr;
-        for(std::int32_t i=0;i<memberCount154;++i)retireEmptyMember(i);
+        for(std::int32_t i=0;i<memberCount154;++i)retireMember12EAA0(i);
         delete[] members150;members150=nullptr;
-        // current74 remains -1: no input synchronization or IO is needed.
+        // Device retirement above invalidated current/window before handle close.
         for(auto& input:inputs){
             if(input.pointer)::operator delete(input.pointer,std::align_val_t(alignment));
             input.pointer=nullptr;
@@ -587,6 +637,7 @@ bool OriginalStandardTextureResolver50LA::bootstrapFreshFileCapacity12CBA0(
     freshFileCapacity_->allocateTablesAndInput();
     D scratchDiagnostic;
     const bool scratchResult=initializeScratch12CDF0(scratchDiagnostic);
+    freshFileCapacity_->scratchOwner=scratch_.get();
     freshFileCapacity_->sourceResult=freshFileCapacity_->sourceResult&&scratchResult;
     freshFileCapacity_->active.fill(-1); //131670 after selected148 publication.
     d.sourceEffectsCommitted=true;
@@ -599,6 +650,489 @@ bool OriginalStandardTextureResolver50LA::bootstrapFreshFileCapacity12CBA0(
        !freshFileCapacity_->members150)return fail(d,E::allocation,0x12CBA0);
     return true;
 }
+std::shared_ptr<const OriginalUiArchive50KG>
+OriginalStandardTextureResolver50LA::registeredAppStart17CAB8()const noexcept {
+    return freshFileCapacity_&&freshFileCapacity_->registration==FreshFileCapacity::Registration::complete?
+        freshFileCapacity_->appStart:std::shared_ptr<const OriginalUiArchive50KG>{};
+}
+bool OriginalStandardTextureResolver50LA::registerAppStart17CAB8(
+    std::shared_ptr<const OriginalUiArchive50KG> archive,D& d)noexcept {
+    d={};using Capacity=FreshFileCapacity;
+    if(!freshFileCapacity_||!scratch_||!archive||!archive->loaded()||
+       archive->identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::appStart))
+        return fail(d,E::source,0x17CAB8);
+    auto& state=*freshFileCapacity_;
+    // Native continuation of THIS completed call after a later material/mount
+    // failure, not another12CEA0 invocation or a duplicate archive success.
+    if(state.registration==Capacity::Registration::complete)
+        return state.appStart==archive?true:fail(d,E::phase,0x17CAB8);
+    if(state.registration!=Capacity::Registration::untouched||storage_||!state.provider||
+       state.provider->mountCount()!=0||state.provider->revision()!=0||state.provider->sealed()||
+       state.deviceCount18!=1||state.freeDevice10!=0||!state.devices14||!state.members150||
+       state.memberCount154<1||state.freeMember14C!=0||state.current74!=-1||
+       !scratch_->initialAllocationReached)return fail(d,E::phase,0x17CAB8);
+    for(const auto active:state.active)if(active!=-1)return fail(d,E::phase,0x17CAB8);
+    const auto& cold=state.devices14[0];
+    if(cold.id00!=0||cold.name04||cold.handle10||cold.flags0C!=1||cold.cursor08||
+       cold.length14||cold.payload18||cold.tableOffset1C||cold.tableBytes20||cold.byte24)
+        return fail(d,E::phase,0x17CAB8);
+    for(std::int32_t i=0;i<state.memberCount154;++i){const auto& row=state.members150[i];
+        if(row.filename08||row.flags18!=1||row.associatedObject1C||row.deviceID00||
+           row.auxiliarySlot04||row.logicalStart0C||row.cursor10||row.length14||
+           row.originalMember||row.canonicalName||row.canonicalData)return fail(d,E::phase,0x17CAB8);
+    }
+    for(const auto& slot:scratch_->slots)
+        if((slot.status08!=-1&&slot.status08!=-2)||
+           (slot.status08==-2?slot.pointer00!=nullptr:slot.pointer00==nullptr))
+            return fail(d,E::phase,0x17CAB8);
+    // EXACT12CF18..24 branch: count18==1 bypasses the archive duplicate scan.
+    // Its pending-match overshoot is not repaired or generalized here. The
+    // untouched proof above also forbids replay on a registered one-row service.
+    const auto selected=scratch_->selected148;
+    if(selected<0||static_cast<std::size_t>(selected)>=scratch_->slots.size()||
+       !scratch_->slots[selected].pointer00||scratch_->slots[selected].status08!=-1)
+        return fail(d,E::phase,0x12CF98);
+    state.registration=Capacity::Registration::attempted;
+    state.appStart=archive;d.sourceEffectsCommitted=true;
+    auto& slot=scratch_->slots[selected];slot.status08=-1;slot.offset10=-0x6000;
+    scratch_->selected148=-1; //12CF98..12CFE0 actual reservation.
+    state.freeDevice10=-1; // One source row consumed; no other free device.
+    std::unique_ptr<Capacity::Handle> input(new(std::nothrow) Capacity::Handle(
+        OriginalUiEncodedArchiveView50KG(state.provider.get(),archive)));
+    const auto closeInput=[&]()noexcept {
+        if(input){input->seek(input->input.size());input.reset();} // EOF/tell/13D9F0.
+        scratch_->selected148=selected; //12DAD8, before success publication.
+    };
+    bool memberWork=false;
+    const auto abort=[&](E error,std::uint32_t pc)noexcept {
+        // Insertion failure12DA18..50 retires matching members BEFORE EOF,
+        // close and scratch restoration. Open/header failure skips this sweep.
+        // A later native-only allocation/validation failure also safely frees
+        // its reached names; source unchecked malloc has no equivalent branch.
+        if(memberWork)for(std::int32_t i=0;i<state.memberCount154;++i)
+            if(state.members150[i].deviceID00==0)state.retireMember12EAA0(i);
+        closeInput();
+        state.retireDevice12EB60(state.devices14[0]);state.freeDevice10=0;
+        // Native failure is terminal for this issuer, not an invented fresh
+        // origin. Allocated capacity survives until ordered final destruction.
+        return fail(d,error,pc);
+    };
+    if(!input)return abort(E::allocation,0x13C980);
+    std::uint32_t version=0,meta=0,flags=0,user=0,tableBytes=0,count=0,directoryBytes=0;
+    if(!input->seek(0)||!input->word(version)||!input->word(meta))return abort(E::source,0x12D318);
+    // The authenticated APPSTART subset only. Source v2/optional headers and
+    // other archives are deliberately not admitted by this private call.
+    if(version!=3||!input->word(flags)||!input->word(user)||flags!=0x340||user!=0||
+       !input->word(tableBytes)||tableBytes<2||(tableBytes&1)||
+       std::uint64_t(tableBytes)+20!=std::uint64_t(meta)+8||
+       !input->seek(std::size_t(tableBytes)+20)||!input->word(count)||!input->word(directoryBytes)||
+       count!=archive->memberCount()||!count||directoryBytes>=Capacity::inputBytes||
+       directoryBytes>=Scratch::bytes||directoryBytes>input->input.size()-input->cursor)
+        return abort(E::source,0x12D51C);
+    const auto payload=static_cast<std::uint32_t>(input->cursor+directoryBytes);
+    const auto fileLength=static_cast<std::uint32_t>(input->input.size());
+    if(!input->read(slot.pointer00,directoryBytes))return abort(E::source,0x12D58C);
+    std::size_t at=0;
+    const auto word=[&](std::uint32_t& value)noexcept {
+        if(at>directoryBytes||directoryBytes-at<4)return false;
+        const auto* b=slot.pointer00+at;at+=4;
+        value=std::uint32_t(b[0])|(std::uint32_t(b[1])<<8)|
+            (std::uint32_t(b[2])<<16)|(std::uint32_t(b[3])<<24);return true;
+    };
+    bool inserted=true;
+    for(std::uint32_t ordinal=0;ordinal<count;++ordinal){
+        std::uint32_t nameBytes=0,offset=0,length=0;
+        if(!word(nameBytes)||!nameBytes||nameBytes>1024||at>directoryBytes||
+           nameBytes>directoryBytes-at)return abort(E::source,0x12E2B0);
+        const auto* name=reinterpret_cast<const char*>(slot.pointer00+at);at+=nameBytes;
+        if(!word(offset)||!word(length))return abort(E::source,0x12E2B0);
+        const auto member=archive->member(ordinal);
+        if(!member.identity||std::strlen(member.identity->name)!=nameBytes||
+           std::memcmp(name,member.identity->name,nameBytes)||
+           member.identity->logicalOffset!=offset||member.size!=length)
+            return abort(E::source,0x12E2B0);
+        bool duplicate=false;
+        for(std::int32_t i=0;i<state.memberCount154;++i)
+            if(state.members150[i].filename08&&OriginalStandardArchiveProvider50LA::sameName(
+                std::string_view(name,nameBytes),state.members150[i].filename08)){duplicate=true;break;}
+        if(duplicate)continue; //12E2B0 first-name wins, no native dedup/ordinal IDs.
+        memberWork=true;
+        if(state.freeMember14C==-1){
+            const auto growth=static_cast<std::int32_t>(count-ordinal); // Remaining entries.
+            const auto oldCount=state.memberCount154;
+            auto* grown=new(std::nothrow) Capacity::Member[oldCount+growth];
+            if(!grown){inserted=false;continue;}
+            // Native allocator safety divergence: keep original owner on OOM,
+            // rather than overwrite/leak it like source3080C0's unchecked store.
+            for(std::int32_t i=0;i<oldCount;++i)grown[i]=state.members150[i];
+            delete[] state.members150;state.members150=grown;state.freeMember14C=oldCount;
+            for(std::int32_t i=oldCount;i<oldCount+growth;++i){
+                grown[i].initialize();++state.memberCount154;
+            }
+        }
+        const auto index=state.freeMember14C;state.freeMember14C=-1;
+        if(index<0||index>=state.memberCount154)return abort(E::phase,0x12E2B0);
+        for(std::int32_t n=1;n<state.memberCount154;++n){
+            const auto next=(index+n)%state.memberCount154;
+            if(state.members150[next].flags18&1){state.freeMember14C=next;break;}
+        }
+        auto& row=state.members150[index];row.flags18=0;
+        if(row.filename08)return abort(E::phase,0x12E554);
+        row.filename08=new(std::nothrow) char[std::size_t(nameBytes)+1];
+        // Source would copy through null here. Native safe failure is explicit.
+        if(!row.filename08){inserted=false;continue;}
+        std::memcpy(row.filename08,name,nameBytes);row.filename08[nameBytes]=0;
+        row.deviceID00=0;row.logicalStart0C=offset;row.cursor10=0;row.length14=length;
+        row.auxiliarySlot04=0;row.associatedObject1C=nullptr;row.originalMember=member.identity;
+    }
+    if(at!=directoryBytes)return abort(E::source,0x12DAB0);
+    if(!inserted)return abort(E::allocation,0x12E2B0);
+    closeInput(); // Temporary parser handle is NEVER persistent device.handle10.
+    auto& device=state.devices14[0];device.flags0C=flags|2;device.handle10=nullptr;
+    constexpr char sourceName[]="appstart.res";
+    device.name04=new(std::nothrow) char[sizeof(sourceName)];
+    if(!device.name04)return abort(E::allocation,0x12DBE4);
+    std::memcpy(device.name04,sourceName,sizeof(sourceName));device.cursor08=0;
+    device.length14=fileLength;device.payload18=payload;device.tableBytes20=tableBytes;
+    device.tableOffset1C=20;device.byte24=0;
+    // Actual17CAB8 has activate=0: no12E8B0,130340, persistent handle,
+    // current74/active-list mutation, member opens or reader readiness.
+    state.registration=Capacity::Registration::complete;return true;
+}
+bool OriginalStandardTextureResolver50LA::joinAppStartCanonicalMount(D& d)noexcept {
+    d={};if(!freshFileCapacity_)return fail(d,E::phase,0x17CAB8);
+    auto& state=*freshFileCapacity_;
+    if(state.registration==FreshFileCapacity::Registration::untouched)return true; // Legacy route.
+    if(state.registration!=FreshFileCapacity::Registration::complete||!state.provider||
+       state.provider->mounts_.size()!=1)return fail(d,E::phase,0x17CAB8);
+    const auto& mount=*state.provider->mounts_[0];
+    if(!mount.active||mount.ui!=state.appStart||mount.rows.size()!=state.appStart->memberCount())
+        return fail(d,E::source,0x17CAB8);
+    // Reconcile actual source-selected first names to the SAME canonical
+    // provider rows. Mount ordinal is never substituted for source member ID.
+    for(std::int32_t i=0;i<state.memberCount154;++i){auto& member=state.members150[i];
+        if(!member.filename08)continue;
+        const OriginalStandardArchiveProvider50LA::Row* selected=nullptr;
+        for(const auto& row:mount.rows)if(OriginalStandardArchiveProvider50LA::sameName(row.name,member.filename08)){
+            selected=&row;break;
+        }
+        if(!selected||selected->offset!=member.logicalStart0C||selected->size!=member.length14||
+           !member.originalMember||member.originalMember->logicalOffset!=selected->offset)
+            return fail(d,E::source,0x12E2B0);
+        member.canonicalName=&selected->name;member.canonicalData=selected->data;
+    }
+    return true;
+}
+bool OriginalStandardTextureResolver50LA::readAppStartNames17CAD4(
+    std::vector<std::uint8_t>& bytes,D& d)noexcept {
+    d={};using Capacity=FreshFileCapacity;
+    if(!bytes.empty()||!freshFileCapacity_||!scratch_)return fail(d,E::phase,0x17CAD4);
+    auto& state=*freshFileCapacity_;
+    if(state.registration!=Capacity::Registration::complete||state.namesReadAttempted||
+       !state.appStart||!state.provider||state.provider->mountCount()!=1||storage_||
+       state.deviceCount18!=1||state.current74!=-1||state.window7C!=-1||state.window80!=-1||
+       state.lengthTable84||state.cursor168!=-1||state.cursor160!=-1||state.read174)
+        return fail(d,E::phase,0x17CAD4);
+    for(const auto id:state.active)if(id!=-1)return fail(d,E::phase,0x17CAD4);
+    auto& device=state.devices14[0];
+    if(device.id00||device.flags0C!=0x342||device.handle10||device.cursor08||
+       device.length14!=58977||device.payload18!=283||device.tableOffset1C!=20||device.tableBytes20!=64)
+        return fail(d,E::source,0x17CAD4);
+    // Exact first1315B0 search after V16. Source rows, not provider ordinals.
+    if(state.memberCount154<1)return fail(d,E::source,0x1315B0);
+    auto& member=state.members150[0];
+    if(!member.filename08||std::strcmp(member.filename08,"AppStart\\Mat_Stbl.txt")||
+       member.deviceID00||member.logicalStart0C||member.length14!=70962||member.flags18||
+       member.cursor10||member.associatedObject1C||!member.canonicalName||!member.canonicalData||
+       !member.originalMember)return fail(d,E::source,0x1315B0);
+    const auto chosen=scratch_->selected148;
+    if(chosen<0||static_cast<std::size_t>(chosen)>=scratch_->slots.size()||
+       !scratch_->slots[chosen].pointer00||scratch_->slots[chosen].status08!=-1)
+        return fail(d,E::phase,0x131380);
+    if(!state.inputs[0].pointer||!state.inputs[0].lengthWritten||
+       state.inputs[0].length<device.length14-device.payload18)
+        return fail(d,E::phase,0x130560);
+    for(const auto& input:state.inputs)
+        if(input.pointer&&(!input.lengthWritten||input.length!=Capacity::inputBytes))
+            return fail(d,E::phase,0x130560);
+    state.namesReadAttempted=true;d.sourceEffectsCommitted=true;
+    ++state.cursor168; //1315B0 first compare matches row0; cursor160 unchanged.
+    member.flags18|=4;member.cursor10=0; //131380 before scratch selection.
+    member.auxiliarySlot04=chosen;
+    auto& slot=scratch_->slots[chosen];slot.status08=0;slot.offset10=-0x6000;
+    scratch_->selected148=-1;
+    const auto close=[&]()noexcept {
+        //131040: archive member close is NOT device/name/cache retirement.
+        member.cursor10=0;member.flags18&=~4u;
+        if(slot.status08==0)scratch_->selected148=chosen;
+    };
+    const auto abort=[&](E error,std::uint32_t pc,std::size_t at=0)noexcept {
+        close();return fail(d,error,pc,at);
+    };
+    try {bytes.resize(std::size_t(member.length14)+1);} //2986D4 size+terminator storage.
+    catch(...){return abort(E::allocation,0x2986D4);}
+    bytes[member.length14]=0;
+    //12FB30 inline activation, before request clamp. One actual fresh device,
+    // no fabricated promotion/eviction history or generalized warm admission.
+    state.active[0]=device.id00;
+    state.window7C=-1;state.window80=-1;state.current74=device.id00; //132CD0.
+    device.handle10=new(std::nothrow) Capacity::Handle(
+        OriginalUiEncodedArchiveView50KG(state.provider.get(),state.appStart));
+    if(!device.handle10)return abort(E::allocation,0x12FE7C);
+    device.cursor08=member.logicalStart0C+member.cursor10;
+    auto& input=*device.handle10;
+    //130560 cold blocked-cache refill. The backend's actual immutable reads
+    // are synchronous; no emulated asynchronous-media success is asserted.
+    state.lengthTable84=new(std::nothrow) std::uint32_t[(device.tableBytes20+3)/4];
+    if(!state.lengthTable84)return abort(E::allocation,0x130910);
+    if(!input.seek(device.tableOffset1C)||!input.read(state.lengthTable84,device.tableBytes20))
+        return abort(E::source,0x130934);
+    const auto* table=reinterpret_cast<const std::uint8_t*>(state.lengthTable84);
+    const auto lengthAt=[&](std::size_t index)noexcept->std::uint32_t {
+        return std::uint32_t(table[2*index])|(std::uint32_t(table[2*index+1])<<8);
+    };
+    const auto tableCount=device.tableBytes20/2;
+    for(auto& buffer:state.inputs)if(buffer.pointer)std::memset(buffer.pointer,0,buffer.length);
+    if(!input.seek(device.payload18))return abort(E::source,0x130560);
+    const auto requested=std::min<std::uint32_t>(device.length14-device.payload18,state.total78);
+    state.read174=1;
+    std::int64_t remaining=requested;std::size_t actual=0;
+    for(auto& buffer:state.inputs){
+        if(!buffer.pointer)continue;
+        const auto amount=std::min<std::int64_t>(remaining,buffer.length);
+        remaining-=buffer.length;
+        if(amount<=0)continue;
+        if(!input.read(buffer.pointer,static_cast<std::size_t>(amount)))
+            return abort(E::source,0x133290,actual);
+        actual+=static_cast<std::size_t>(amount);
+    }
+    state.window7C=0;state.window80=0;
+    // Exact table-loop order: subtract current, read next, conditionally
+    // increment end, then test remaining. Added bounds reject unsafe variants.
+    std::int64_t residentRemaining=static_cast<std::int64_t>(actual);std::size_t tableIndex=0;
+    do {
+        if(tableIndex+1>=tableCount||!lengthAt(tableIndex))return abort(E::source,0x130A00);
+        residentRemaining-=std::int64_t(lengthAt(tableIndex))+1;++tableIndex;
+        const auto next=lengthAt(tableIndex);
+        if(std::int64_t(next)<residentRemaining)++state.window80;
+    }while(residentRemaining>0);
+    if(residentRemaining!=0||tableIndex+1!=tableCount||lengthAt(tableIndex)!=0||
+       actual!=device.length14-device.payload18)return abort(E::source,0x130A30);
+    // All original APPSTART input is genuinely resident in the existing first
+    //128KiB buffer; never copy decoded canonical bytes into these buffers.
+    if(actual>state.inputs[0].length)return abort(E::source,0x133290);
+    std::size_t copied=0;
+    while(copied<member.length14){
+        const auto block=std::size_t(device.cursor08)/Scratch::bytes;
+        if(block>=tableIndex||block>static_cast<std::size_t>(state.window80))
+            return abort(E::source,0x1308C0,copied);
+        const auto blockStart=block*Scratch::bytes;
+        if(slot.offset10!=static_cast<std::int32_t>(blockStart)){
+            std::size_t encodedOffset=0;
+            for(std::size_t i=0;i<block;++i)encodedOffset+=lengthAt(i)+1;
+            const auto encodedLength=lengthAt(block);
+            ResourceBlock48C authenticated;
+            if(!input.input.block(block,authenticated)||!encodedLength||encodedLength>=Scratch::bytes||
+               authenticated.compressed_bytes!=encodedLength||
+               authenticated.compressed_offset!=device.payload18+encodedOffset||
+               encodedOffset>=actual||encodedLength>=actual-encodedOffset)
+                return abort(E::source,0x133330,copied);
+            //13D880 completion is observed from our synchronous backend after
+            // actual reads, not blindly cleared as a general source I/O rule.
+            state.read174=0;
+            const auto* encoded=state.inputs[0].pointer+encodedOffset;
+            if(encoded[encodedLength]!=0xff)return abort(E::source,0x133580,copied);
+            slot.offset10=static_cast<std::int32_t>(blockStart); // BEFORE codec.
+            z_stream z{};
+            if(inflateInit(&z)!=Z_OK)return abort(E::allocation,0x2B0780,copied);
+            z.next_in=const_cast<Bytef*>(encoded);z.avail_in=encodedLength;
+            z.next_out=slot.pointer00;z.avail_out=Scratch::bytes;
+            const auto result=inflate(&z,Z_FINISH);
+            const bool decoded=result==Z_STREAM_END&&z.total_in==encodedLength&&
+                z.total_out==Scratch::bytes&&z.avail_in==0;
+            inflateEnd(&z);
+            // Native safety is stricter than the source's unchecked codec.
+            // Cached-start stamp and any partial output remain on failure.
+            if(!decoded)return abort(result==Z_MEM_ERROR?E::allocation:E::source,0x2B0780,copied);
+        }
+        const auto within=std::size_t(device.cursor08)-blockStart;
+        const auto count=std::min<std::size_t>(member.length14-copied,Scratch::bytes-within);
+        std::memcpy(bytes.data()+copied,slot.pointer00+within,count);
+        copied+=count;device.cursor08+=static_cast<std::uint32_t>(count);
+    }
+    member.cursor10+=static_cast<std::uint32_t>(copied); //12FB30 after130560 return.
+    // Exactly one full requested item. Source2985B0 ignores this count; native
+    // consumer rejects short/failed reads rather than parsing invented bytes.
+    close(); //298714 before lowercase/tokenization/publication.
+    bytes.resize(member.length14);return true;
+}
+bool OriginalStandardTextureResolver50LA::beginAppStartTemplate24AA10(
+    bool screen,OriginalAppStartTemplateCache50KG& cache,D& d)noexcept {
+    d={};using Capacity=FreshFileCapacity;
+    if(!freshFileCapacity_||!scratch_||cache.identity||!cache.sections.empty()||!cache.lines.empty())
+        return fail(d,E::phase,0x24AA10);
+    auto& state=*freshFileCapacity_;
+    const std::int32_t index=screen?2:1;
+    if(state.templateFailed||state.templateMember!=-1||state.templateStage!=(screen?1:0)||
+       state.registration!=Capacity::Registration::complete||!state.namesReadAttempted||
+       !state.appStart||!state.provider||state.provider->mountCount()!=1||storage_||
+       state.deviceCount18!=1||state.memberCount154<=index||state.cursor168!=index-1||
+       state.current74!=0||state.active[0]!=0||state.active[1]!=-1||state.active[2]!=-1||state.active[3]!=-1||
+       state.window7C!=0||state.window80!=30||!state.lengthTable84||state.read174)
+        return fail(d,E::phase,0x24AA10);
+    auto& device=state.devices14[0];auto& member=state.members150[index];
+    const auto authenticated=state.appStart->member(static_cast<std::size_t>(index));
+    const auto expectedOffset=screen?98304u:73728u,expectedBytes=screen?748u:82u;
+    const auto previousCursor=screen?73810u:70962u;
+    const auto previousBlock=screen?73728:49152;
+    const auto selected=scratch_->selected148;
+    if(device.id00||device.flags0C!=0x342||!device.handle10||device.cursor08!=previousCursor||
+       device.payload18!=283||device.tableOffset1C!=20||device.tableBytes20!=64||device.length14!=58977||
+       !authenticated.identity||member.originalMember!=authenticated.identity||!member.filename08||
+       std::strcmp(member.filename08,screen?"AppStart\\ScreenMT.psm":"AppStart\\DefaultMT.psm")||
+       member.deviceID00||member.logicalStart0C!=expectedOffset||member.length14!=expectedBytes||
+       member.flags18||member.cursor10||member.associatedObject1C||!member.canonicalName||!member.canonicalData||
+       selected<0||static_cast<std::size_t>(selected)>=scratch_->slots.size())
+        return fail(d,E::source,0x24AA10);
+    auto& slot=scratch_->slots[selected];
+    if(!slot.pointer00||slot.status08!=index-1||slot.offset10!=previousBlock||
+       !state.inputs[0].pointer||!state.inputs[0].lengthWritten||state.inputs[0].length<58694)
+        return fail(d,E::phase,0x131380);
+    for(std::int32_t i=0;i<state.memberCount154;++i)
+        if(state.members150[i].flags18&4)return fail(d,E::phase,0x131380);
+    // Actual next1315B0 match, not a lookup receipt minted from a native mount.
+    ++state.cursor168;state.templateMember=index;d.sourceEffectsCommitted=true;
+    member.flags18|=4;member.cursor10=0;member.auxiliarySlot04=selected;
+    slot.status08=index;slot.offset10=-0x6000;scratch_->selected148=-1;
+    cache.identity=member.originalMember;
+    // Supported warm12FB30/12EE90/130560 branch: same head device, handle and
+    // complete resident APPSTART window. No eviction/refill/general warm API.
+    const auto readSpan=[&](char* destination,std::size_t count)noexcept {
+        if(!(member.flags18&4)||member.cursor10>member.length14||count>member.length14-member.cursor10)
+            return fail(d,E::phase,0x12FB30);
+        device.cursor08=member.logicalStart0C+member.cursor10; // Inline activation repositions.
+        const auto block=std::size_t(device.cursor08)/Scratch::bytes;
+        const auto blockStart=block*Scratch::bytes;
+        if(block!=(screen?4u:3u)||count>Scratch::bytes-(device.cursor08-blockStart))
+            return fail(d,E::source,0x130560);
+        if(slot.offset10!=static_cast<std::int32_t>(blockStart)){
+            const auto* table=reinterpret_cast<const std::uint8_t*>(state.lengthTable84);
+            const auto lengthAt=[&](std::size_t n)noexcept {
+                return std::uint32_t(table[2*n])|(std::uint32_t(table[2*n+1])<<8);
+            };
+            std::size_t encodedOffset=0;for(std::size_t i=0;i<block;++i)encodedOffset+=lengthAt(i)+1;
+            const auto encodedLength=lengthAt(block);ResourceBlock48C actual;
+            if(!device.handle10->input.block(block,actual)||!encodedLength||encodedLength>=Scratch::bytes||
+               actual.compressed_bytes!=encodedLength||actual.compressed_offset!=device.payload18+encodedOffset||
+               encodedOffset>=58694||encodedLength>=58694-encodedOffset)
+                return fail(d,E::source,0x133330);
+            const auto* encoded=state.inputs[0].pointer+encodedOffset;
+            if(encoded[encodedLength]!=0xff)return fail(d,E::source,0x133580);
+            slot.offset10=static_cast<std::int32_t>(blockStart); // Reached BEFORE decoder.
+            z_stream z{};if(inflateInit(&z)!=Z_OK)return fail(d,E::allocation,0x2B0780);
+            z.next_in=const_cast<Bytef*>(encoded);z.avail_in=encodedLength;
+            z.next_out=slot.pointer00;z.avail_out=Scratch::bytes;
+            const auto result=inflate(&z,Z_FINISH);
+            const bool decoded=result==Z_STREAM_END&&z.total_in==encodedLength&&
+                z.total_out==Scratch::bytes&&z.avail_in==0;
+            inflateEnd(&z);
+            if(!decoded)return fail(d,result==Z_MEM_ERROR?E::allocation:E::source,0x2B0780);
+        }
+        if(count)std::memcpy(destination,slot.pointer00+device.cursor08-blockStart,count);
+        device.cursor08+=static_cast<std::uint32_t>(count);return true;
+    };
+    const auto readLine=[&](OriginalAppStartTemplateCache50KG::Line& line,bool& present) {
+        line={};present=false;
+        if(member.cursor10>=member.length14)return true; //12EE90 EOF: no activation.
+        const auto start=member.cursor10;
+        const auto count=std::min<std::size_t>(member.length14-start,1022);
+        std::array<char,1024> text{};
+        if(!readSpan(text.data(),count))return false;
+        text[count]=0;
+        std::size_t end=0;while(end<count&&text[end]&&text[end]!='\n')++end;
+        std::size_t consumed=count;
+        if(end<count&&text[end]=='\n'){
+            consumed=end+1;
+            if(end&&text[end-1]=='\r'){text[end-1]='\n';text[end]=0;}
+            else text[end+1]=0;
+        }
+        member.cursor10+=static_cast<std::uint32_t>(consumed);
+        present=true;
+        return originalAppStartCleanLine159440(text.data(),std::strlen(text.data()),start,line.text,line.offsets)?
+            true:fail(d,E::allocation,0x159440);
+    };
+    try {
+        //1577D0 reads exactly one 7-byte probe, overwrites byte6, then compares
+        //BINARY. It does not read the whole file or close before field getters.
+        std::array<char,7> probe{};
+        if(!readSpan(probe.data(),probe.size()))return false;
+        member.cursor10+=7;probe[6]=0;
+        if(!std::strcmp(probe.data(),"BINARY"))return fail(d,E::source,0x157914);
+        member.cursor10=0; //12F640 SEEK_SET; device/cache remain reached.
+        std::size_t physicalLine=0,lastHeader=0;
+        for(;;){OriginalAppStartTemplateCache50KG::Line line;bool present=false;
+            if(!readLine(line,present))return false;if(!present)break;
+            if(!line.text.empty()&&line.text[0]=='['){
+                const auto end=line.text.find(']');
+                if(end==std::string::npos)return fail(d,E::source,0x157500);
+                const auto name=line.text.substr(1,end-1);
+                // Duplicate/malformed index variants are outside these two
+                // authenticated files; never silently replace source indices.
+                for(const auto& old:cache.sections)
+                    if(OriginalStandardArchiveProvider50LA::sameName(old.name,name))return fail(d,E::source,0x157AF0);
+                if(!cache.sections.empty())cache.sections.back().physicalLines=physicalLine-lastHeader-1;
+                cache.sections.push_back({name,member.cursor10,0});lastHeader=physicalLine;
+            }
+            ++physicalLine;
+        }
+        if(!cache.sections.empty())cache.sections.back().physicalLines=physicalLine-lastHeader-1;
+        const OriginalAppStartTemplateCache50KG::Section* selectedSection=nullptr;
+        for(const auto& section:cache.sections)
+            if(OriginalStandardArchiveProvider50LA::sameName(section.name,"DefaultShaderParams")){
+                selectedSection=&section;break;
+            }
+        //24A9A0 ignores SetSection failure; genuine getter defaults remain
+        //possible. No fabricated section or input-read success is inserted.
+        if(!selectedSection)return true;
+        cache.sectionFound=true;
+        member.cursor10=static_cast<std::uint32_t>(selectedSection->bodyOffset);
+        std::size_t retained=0;
+        for(std::size_t i=0;i<selectedSection->physicalLines;++i){
+            OriginalAppStartTemplateCache50KG::Line line;bool present=false;
+            if(!readLine(line,present))return false;
+            if(!present)return fail(d,E::source,0x157D00);
+            if(!line.text.empty()&&line.text[0]!=';')++retained;
+        }
+        cache.lines.reserve(retained);
+        member.cursor10=static_cast<std::uint32_t>(selectedSection->bodyOffset);
+        for(std::size_t i=0;i<selectedSection->physicalLines;++i){
+            OriginalAppStartTemplateCache50KG::Line line;bool present=false;
+            if(!readLine(line,present))return false;
+            if(!present)return fail(d,E::source,0x157D00);
+            if(!line.text.empty()&&line.text[0]!=';')cache.lines.push_back(std::move(line));
+        }
+        if(cache.lines.size()!=retained)return fail(d,E::source,0x157D00);
+        return true; // Actual member stays open while template getters consume this cache.
+    }catch(...){return fail(d,E::allocation,0x157D00);}
+}
+bool OriginalStandardTextureResolver50LA::closeAppStartTemplate1573B0(bool success,D& d)noexcept {
+    d={};if(!freshFileCapacity_||!scratch_)return fail(d,E::phase,0x1573B0);
+    auto& state=*freshFileCapacity_;const auto index=state.templateMember;
+    if(index<0)return !success; // Failed begin before open: no fabricated close.
+    if(index>=state.memberCount154)return fail(d,E::phase,0x1573B0);
+    auto& member=state.members150[index];
+    if(!(member.flags18&4)||member.auxiliarySlot04<0||
+       static_cast<std::size_t>(member.auxiliarySlot04)>=scratch_->slots.size())
+        return fail(d,E::phase,0x131040);
+    //12F290 calls handle13D9E0, whose recovered body is a no-op return0.
+    //131040 closes the virtual member, retaining persistent handle/cache state.
+    member.cursor10=0;member.flags18&=~4u;
+    const auto slot=member.auxiliarySlot04;
+    if(scratch_->slots[slot].status08==index)scratch_->selected148=slot;
+    state.templateMember=-1;
+    if(success)++state.templateStage;else state.templateFailed=true;
+    d.sourceEffectsCommitted=true;return true;
+}
 OriginalStandardTextureResolver50LA::OriginalStandardTextureResolver50LA() noexcept=default;
 OriginalStandardTextureResolver50LA::~OriginalStandardTextureResolver50LA() {
     //Every cached live resource pins this resolver. Only cleared associations
@@ -608,7 +1142,7 @@ OriginalStandardTextureResolver50LA::~OriginalStandardTextureResolver50LA() {
            file->geometryIdentity||!file->geometry.expired()||
            file->collisionIdentity||!file->collision.expired())
             std::terminate();
-    // Only after the existing live-association preflight: empty rows/device,
+    // Only after the existing live-association preflight: source rows/device,
     // eight input buffers, then the same scratch free/reset suffix. All later
     // native Storage/corpus retirement remains separate from source service IO.
     // Keep the real provider alive through BOTH ordered allocation owners,
@@ -928,10 +1462,11 @@ bool OriginalStandardTextureResolver50LA::issueGarageBank(
     const std::shared_ptr<const OriginalUiArchive50KG>& archive,GarageBankLease50LA& lease,
     bool selected19E,D& d) noexcept {
     d={};
-    const auto expected=selected19E?OriginalUiArchiveId50KG::garagePod19:OriginalUiArchiveId50KG::garage;
+    // selected19E is the historical selected-pod lease kind, not a racer ID.
     if(lease.resolver_||!storage_||!provider||storage_->provider!=provider||!provider->sealed_||
        !provider->retainedSourcesAccessible()||!archive||!archive->loaded()||!archive->identity()||
-       archive->identity()->id!=expected)
+       (selected19E?originalUiGaragePodCareer50KG(archive->identity()->id)<0:
+        archive->identity()->id!=OriginalUiArchiveId50KG::garage))
         return fail(d,E::phase,0x12E5E0);
     std::size_t bank=static_cast<std::size_t>(-1);
     for(std::size_t i=0;i<provider->mounts_.size();++i){const auto& mount=*provider->mounts_[i];
@@ -960,8 +1495,8 @@ bool OriginalStandardTextureResolver50LA::canRetireGarageBank12E5E0(
     const auto& bank=*provider->mounts_[lease.mount_];
     if(!bank.active||bank.generation!=lease.generation_||bank.admittedUi.lock()!=lease.archive_||
        !lease.archive_||!bank.ui||!bank.ui->identity()||
-       bank.ui->identity()->id!=(lease.selected19E_?OriginalUiArchiveId50KG::garagePod19:
-            OriginalUiArchiveId50KG::garage))return fail(d,E::phase,0x12E6D0);
+       (lease.selected19E_?originalUiGaragePodCareer50KG(bank.ui->identity()->id)<0:
+            bank.ui->identity()->id!=OriginalUiArchiveId50KG::garage))return fail(d,E::phase,0x12E6D0);
     return validateGarageBankRows12EAA0(lease.mount_,lease.generation_,d);
 }
 bool OriginalStandardTextureResolver50LA::validateGarageBankRows12EAA0(
@@ -1235,7 +1770,7 @@ void OriginalStandardTextureResolver50LA::reclaimRetiredPsgBacking26E5C8(
         const auto& bank=*storage_->provider->mounts_[file.bank];
         if(!bank.active||bank.generation!=file.bankGeneration||!bank.ui||!bank.ui->identity()||
            (bank.ui->identity()->id!=OriginalUiArchiveId50KG::garage&&
-            bank.ui->identity()->id!=OriginalUiArchiveId50KG::garagePod19))return;
+            originalUiGaragePodCareer50KG(bank.ui->identity()->id)<0))return;
     }
     const auto owner=file.payloadGeometry.lock();
     const auto* references=geometry.references00();
@@ -1566,7 +2101,7 @@ bool OriginalStandardTextureResolver50LA::reclaimNeverBorrowedSelectedPstAfterBa
        receipt.mount>=receipt.provider->mounts_.size())return fail(d,E::phase,0x12EB60);
     const auto& bank=*receipt.provider->mounts_[receipt.mount];
     if(bank.active||bank.generation!=receipt.generation||!bank.admittedUi.expired()||
-       !bank.ui||!bank.ui->identity()||bank.ui->identity()->id!=OriginalUiArchiveId50KG::garagePod19)
+       !bank.ui||!bank.ui->identity()||originalUiGaragePodCareer50KG(bank.ui->identity()->id)<0)
         return fail(d,E::phase,0x12EB60);
     std::size_t residentBytes=0,releaseBytes=0;
     for(std::size_t index=0;index<storage_->files.size();++index){
@@ -1643,7 +2178,7 @@ bool OriginalStandardTextureResolver50LA::preflightRetiredGaragePstBacking(
     if(bank.active||bank.generation!=file.bankGeneration||!bank.admittedUi.expired()||
        !bank.ui||!bank.ui->identity()||
        (bank.ui->identity()->id!=OriginalUiArchiveId50KG::garage&&
-        bank.ui->identity()->id!=OriginalUiArchiveId50KG::garagePod19)||file.bankOrdinal>=bank.rows.size())
+        originalUiGaragePodCareer50KG(bank.ui->identity()->id)<0)||file.bankOrdinal>=bank.rows.size())
         return fail(d,E::phase,0x12EB60);
     if(file.cacheIdentity||!file.cached.expired()||file.animation||file.geometryIdentity||
        !file.geometry.expired()||!file.payloadGeometry.expired()||file.collisionIdentity||

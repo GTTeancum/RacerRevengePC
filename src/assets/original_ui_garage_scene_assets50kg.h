@@ -67,8 +67,8 @@ struct OriginalUiGarageSelectedPodAsset50KG {
     // User_Rotate widget or another static/animation row in garage.scn/toy.
 };
 // Cold, transactional preparation from the SAME retained authenticated Garage
-// and19E archives. Exactly30 static placements,10 keyframed actors and normal
-// startup selected19E. Watto belongs to its separate widget10 owner. Reusing
+// and selected-career E archives. Exactly30 static placements,10 keyframed actors
+// and the actual selected pod. Watto belongs to its separate widget10 owner. Reusing
 // an immutable PSG payload does not clone a model or change source row order.
 // Success provides no route, Entity, observer, camera, material, renderer,
 // animation tick, audio, particle, profile or purchase authority.
@@ -82,6 +82,7 @@ public:
         std::shared_ptr<const OriginalUiArchive50KG> garagePod19,
         OriginalUiGarageSceneAssetDiagnostic50KG&) noexcept;
     bool loaded() const noexcept;
+    int selectedCareer() const noexcept;
     const OriginalUiGarageStaticModel50KG* staticModel(std::size_t) const noexcept;
     const OriginalUiGarageActorAsset50KG* actor(std::size_t) const noexcept;
     const OriginalUiGarageSelectedPodAsset50KG* selectedPod() const noexcept;

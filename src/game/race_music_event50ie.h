@@ -4,7 +4,7 @@
 #include <cstdint>
 
 namespace rr::game {
-// Bounded original1A46E0 music owner for category6 and collision38..43.
+// Bounded original1A46E0 music owner for category6, collision38..43 and practice44/45.
 // Music backend transport is separate. No track selection or RNG occurs here.
 struct RaceMusicState50IE {
     float timer128=0.0f;
@@ -48,6 +48,29 @@ inline RaceMusicPlan50IE planCategory6Music50IE(const RaceMusicState50IE& s,
     r.loop=finalLap;r.nextMode12C=finalLap?2:1;
     r.writeLatchBeforeStop=!finalLap;
     r.playPC=finalLap?0x234900u:0x234880u;
+    return r;
+}
+// Actual1AD3C0 startup request. The caller owns the single shared RNG draw;
+// this helper neither chooses another song nor consumes random state.
+inline bool practiceMusicSong50IE(std::uint32_t song)noexcept {
+    return song==44u||song==45u;
+}
+inline RaceMusicPlan50IE planPracticeMusic50IE(const RaceMusicState50IE& s,
+    std::uint32_t liveMode11258,std::uint32_t song,std::uint32_t argumentA2)noexcept {
+    RaceMusicPlan50IE r;r.song=song;
+    if(!practiceMusicSong50IE(song)){
+        r.status=RaceMusicPlanStatus50IE::UnsupportedEvent;return r;
+    }
+    // Bound to the actual1AD3C0 A2=1 call, not arbitrary generic song requests.
+    if(argumentA2!=1u||!validRaceMusicState50IE(s))return r;
+    //1A491C..492C admits44/45 in non-race modes without consulting12C.
+    // In mode1 the owner2/3 song allowlists omit44/45; owner4 rejects all.
+    if(liveMode11258==1u&&s.mode12C>=2){
+        r.status=RaceMusicPlanStatus50IE::Suppressed;return r;
+    }
+    //1A4874..489C: latch1, timer0, stop1A4AB0, mode1, then234900(loop).
+    r.status=RaceMusicPlanStatus50IE::Play;r.nextMode12C=1;
+    r.loop=true;r.writeLatchBeforeStop=true;r.timer128=0.f;r.playPC=0x234900u;
     return r;
 }
 // Source writes before the backend play call: generic1A48A8 first writes130=1,

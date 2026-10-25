@@ -142,10 +142,11 @@ public:
         elements(values.data(),values.size());
     }
     // Call after all cold owners/pointers are established, before player input.
+    // A one-entrant race owns only the real player slot; no opponent is synthesized.
     // Slot zero is the player. Opponents begin from identical cold native state;
     // initialize each slot at its separate host grid position before stepping.
     void seal(std::size_t count) {
-        if(retired_||sealed_||spans_.empty()||count<2||count>maximumRacers)
+        if(retired_||sealed_||spans_.empty()||count<1||count>maximumRacers)
             throw std::runtime_error("invalid native racer bank seal");
         for(std::size_t i=0;i<count;++i){slots_[i].bytes.resize(bytes_);slots_[i].active=true;}
         count_=count;sealed_=true;

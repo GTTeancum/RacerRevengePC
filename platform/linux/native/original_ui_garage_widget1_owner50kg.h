@@ -1,4 +1,5 @@
 #pragma once
+#include "original_ui_overlay_text_storage50kg.h"
 #include "../../../tests/native/original_ui_source_timing50lh.h"
 #include "original_ui_garage_manager_fog50kg.h"
 #include "original_ui_garage_text_overlay50kg.h"
@@ -119,18 +120,7 @@ private:
     static std::array<std::size_t,4> activationCallKey(const Page&)noexcept;
     bool applyPageEntryWidgetCall(const Page&,std::size_t,std::uint32_t,std::int32_t,D&)noexcept;
     static std::array<std::size_t,6> entryCallKey(const Page&)noexcept;
-    struct OverlayText {
-        C entity;const C* manager30=nullptr;
-        std::uint32_t type34=0,field38=0,field3C=0,field40=0,field44=0,field48=0;
-        std::uint32_t field4C=0,field50=0,field54=0,field58=0;
-        void* lines60=nullptr;std::uint32_t field64=0;
-        std::array<char,128> font68{},materialE8{};
-        std::int32_t lineCount168=0,dynamicLength16C=0,justify170=0;
-        float leading174=0;std::int32_t dynamic178=0;
-        std::uint32_t color17C=0;std::int32_t x180=0,y184=0,height188=0;
-        std::int32_t alpha18C=255;float depth190=1;
-        std::uint32_t highlight194=0,highlight198=0,disabled19C=0,disabled1A0=0,field1A4=0;
-    };
+    using OverlayText=OriginalUiOverlayTextFields50KG;
     const std::thread::id ownerThread_=std::this_thread::get_id();
     const ::original_main_entry50KG::Application* issuer_=nullptr;
     std::shared_ptr<Authority> authority_;std::shared_ptr<Grant> grant_;

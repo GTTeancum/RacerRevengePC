@@ -51,7 +51,7 @@ struct Snapshot {
             diagnostic={error,pc,selfBankSlot,selfManagerIndex};return false;
         };
         if(!bound)return reject(Error::Unprepared,0x22a280u);
-        if(total30<2||total30>static_cast<std::int32_t>(maximumRacers)||
+        if(total30<1||total30>static_cast<std::int32_t>(maximumRacers)||
            selfManagerIndex<0||selfManagerIndex>=total30||
            selfBankSlot>=static_cast<std::size_t>(total30))
             return reject(Error::Roster,0x1af330u);
@@ -91,7 +91,7 @@ public:
     // is never inferred from that boundary, bankSlot, or a HOST driving role.
     bool prepare(const ManagerBinding* entriesInSourceManagerOrder,
         std::size_t total30,std::uint32_t humanCount34,std::string& error) {
-        if(ready_||!entriesInSourceManagerOrder||total30<2||total30>maximumRacers||
+        if(ready_||!entriesInSourceManagerOrder||total30<1||total30>maximumRacers||
            humanCount34>total30)
             return fail(error,"invalid fresh dynamic-contact source manager binding");
         std::array<bool,maximumRacers> seenSlots{};

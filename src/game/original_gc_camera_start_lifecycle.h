@@ -37,7 +37,7 @@ struct GcStartRacerEffectBank {
     std::array<GcStartRacerEffectFields,8> racers{};
 };
 enum class GcStartFrameStatus : std::uint8_t {
-    posePublished, needsOriginalExit, requiresOtherSourcePath,
+    posePublished, needsOriginalExit, needsDirectStart, requiresOtherSourcePath,
     invalidBinding, invalidState, unsupportedNumericDomain
 };
 struct GcStartFrameReceipt {
@@ -81,9 +81,10 @@ inline GcStartFrameReceipt advanceOriginalGcCameraStartFrame(
         owner.binding.racerKey!=bank.racers[0].racerKey||
         owner.binding.racerKey!=frame.racerKey||owner.binding.mainBodyKey!=frame.mainBodyKey)
         return result;
-    for(std::size_t i=0;i<8;++i)if(racerEffects.racers[i].racerKey!=bank.racers[i].racerKey)return result;
+    if(!bank.racerCount||bank.racerCount>8)return result;
+    for(std::size_t i=0;i<bank.racerCount;++i)if(racerEffects.racers[i].racerKey!=bank.racers[i].racerKey)return result;
     result.status=GcStartFrameStatus::requiresOtherSourcePath;
-    if(context.sourceControllerCutCountA8!=0||context.sourceLaunchKind11258==2||
+    if(context.sourceControllerCutCountA8!=0||(context.sourceLaunchKind11258<1||context.sourceLaunchKind11258>3)||
         (owner.mode44!=4&&owner.mode44!=7)||(frame.raceFlags1B0&3u)!=1u||frame.racerState40!=0||
         (frame.raceFlags1B0&0x10)||((frame.raceStateFlags58&1)&&frame.racerCD4==0)||
         (owner.flags62&0x80)||owner.shakeRemaining94>=0)return result;
@@ -104,6 +105,12 @@ inline GcStartFrameReceipt advanceOriginalGcCameraStartFrame(
             if(!d::scalar(remaining))return result;nextOwner.cutRemaining90=remaining<=0?0:remaining;}
     }
     nextOwner.flags63Low5=static_cast<std::uint8_t>(nextOwner.flags63Low5&~0x18u);
+    //176290..1762F4: no procedural route, or actual event type2, selects
+    //the distinct direct-start transaction after the common timer prefix.
+    if(nextOwner.mode44==4&&(nextStart.route[0]==-1||context.sourceLaunchKind11258==2)){
+        owner=nextOwner;pending=nextPending;
+        result.status=GcStartFrameStatus::needsDirectStart;return result;
+    }
     bool activated=false;
     if(nextOwner.mode44==4){
         if(!nextStart.prepared||nextStart.route[0]==-1){result.status=GcStartFrameStatus::requiresOtherSourcePath;return result;}

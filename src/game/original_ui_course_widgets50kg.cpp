@@ -71,6 +71,12 @@ bool OriginalUiCourseWidgets50KG::moveCourse(bool forward,const OriginalUiCourse
  if(d.controller!=OriginalUiCourseWidgetControllerStatus50KG::ok)return fail(d,E::controller);
  if(!apply(plan.steps.data(),plan.count,h,d))return false;storage_->navigation=plan.navigation;return true;
 }
+bool OriginalUiCourseWidgets50KG::moveEventType(bool forward,const OriginalUiCourseWidgetProfile50KG& p,const OriginalUiCourseWidgetHooks50KG& h,D& d)noexcept{
+ d={};if(!storage_)return fail(d,E::notBound);if(storage_->poisoned||storage_->inCallback)return fail(d,E::poisoned);
+ OriginalUiCourseWidgetPlan50KG plan;d.controller=storage_->controller.moveEventType(storage_->navigation,forward,p,plan);
+ if(d.controller!=OriginalUiCourseWidgetControllerStatus50KG::ok)return fail(d,E::controller);
+ if(!apply(plan.steps.data(),plan.count,h,d))return false;storage_->navigation=plan.navigation;return true;
+}
 bool OriginalUiCourseWidgets50KG::moveRow(bool down,const OriginalUiCourseWidgetProfile50KG& p,const OriginalUiCourseWidgetHooks50KG& h,D& d)noexcept{
  d={};if(!storage_)return fail(d,E::notBound);if(storage_->poisoned||storage_->inCallback)return fail(d,E::poisoned);
  OriginalUiCourseWidgetPlan50KG plan;d.controller=storage_->controller.moveRow(storage_->navigation,down,p,plan);

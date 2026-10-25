@@ -438,22 +438,24 @@ class OriginalPositionStatsResources50LA final {
     //1927F0..192A4C: original ordinary ALL8 rival markers. Source skips
     //the current view racer, never changes its AI, and preserves manager order.
     bool prepareRadarMarkers1927F0(const std::array<std::array<float,3>,8>& positions,
-        const std::array<std::uint32_t,8>& states,std::uint32_t subtype,D& d)noexcept {
+        const std::array<std::uint32_t,8>& states,std::uint32_t subtype,D& d,std::size_t racerCount=8,
+        bool recordBound=false,bool recordVisible=false,const std::array<float,3>* recordPosition=nullptr)noexcept {
         radarMarkerCount_=0;
+        if(!racerCount||racerCount>positions.size()){d.error=E::phase;return false;}
         //Subtype3's separate manager+40 entity is not the ALL8 view0 racer.
         //Do not silently alias it to a bank slot or draw a fabricated self dot.
-        if(subtype==3){d.error=E::phase;d.sourcePC=0x192a60;return false;}
+        if(subtype==3&&(!recordBound||(recordVisible&&!recordPosition))){
+            d.error=E::phase;d.sourcePC=0x192a60;return false;}
         const position_stats_detail50LA::RadarProjectionInputs projection{
             field32C0_[0],field32C0_[2],field32D4_,field32D8_,field32DC_,field32E4_,field32E8_};
         const auto add=[](float a,float b)noexcept{volatile float r=a+b;return r;};
         const auto sub=[](float a,float b)noexcept{volatile float r=a-b;return r;};
-        for(std::size_t slot=1;slot<8;++slot){
-            if(states[slot]!=0)continue;
+        const auto marker=[&](std::size_t index,const std::array<float,3>& position,std::uint32_t pc)noexcept {
             position_stats_detail50LA::RadarProjectedPoint point;
             if(!position_stats_detail50LA::projectRadarPoint1922B0(projection,
-                    positions[slot][0],positions[slot][2],point)){
-                d.error=E::phase;d.sourcePC=0x192844;return false;}
-            const std::size_t index=117-slot;auto& t=map_[index];
+                    position[0],position[2],point)){
+                d.error=E::phase;d.sourcePC=pc;return false;}
+            auto& t=map_[index];
             if(!t.buffer58||!t.buffer58->vertices||t.buffer58->count!=4){
                 d.error=E::phase;d.sourcePC=0x192938;return false;}
             const float x=add(sub(point.x,3.f),field32B0_),y=add(sub(point.y,3.f),field32B4_);
@@ -469,7 +471,15 @@ class OriginalPositionStatsResources50LA final {
                     rgba[0]=107;rgba[1]=9;rgba[2]=23;}
             }
             radarMarkerIndices_[radarMarkerCount_++]=index;
+            return true;
+        };
+        for(std::size_t slot=1;slot<racerCount;++slot){
+            if(states[slot]!=0)continue;
+            if(!marker(117-slot,positions[slot],0x192844))return false;
         }
+        //192A70 reads the distinct manager+40 flags29 before world projection.
+        //The dedicated31B0 texture follows all ordinary rival markers.
+        if(subtype==3&&recordVisible&&!marker(117,*recordPosition,0x192ab8))return false;
         return true;
     }
     bool lowerRadarGeometry2E21D0(std::uint32_t videoMaximum,D& d)noexcept {
@@ -616,7 +626,8 @@ inline bool Application::preparePositionStatsRadar50LA(
         radar.mbMap.gatesPrepared()?resources.prepareRadarRoute1924C0(radar.mbMap,radar.center,radar.headingE4,d):
         resources.prepareRadarRoute1924C0(*radar.map,radar.center,radar.headingE4,d))&&
         resources.lowerRadarGeometry2E21D0(static_cast<std::uint32_t>(videoOwner_->packetZMaximum),d)&&
-        resources.prepareRadarMarkers1927F0(radar.racerCenters,radar.racerStates,observation.subtype11258,d);
+        resources.prepareRadarMarkers1927F0(radar.racerCenters,radar.racerStates,observation.subtype11258,d,observation.managerCount30,
+            radar.recordBound,radar.recordVisible,&radar.recordPosition);
 }
 struct PositionStatsResourceResult50LA {
     bool attempted=false,coldResourcesLoaded=false;

@@ -1,4 +1,5 @@
 #pragma once
+#include "original_ui_overlay_text_storage50kg.h"
 #include "original_ui_garage_screen_text50kg.h"
 #include "../../../src/game/original_ui_entity_scope50kg.h"
 #include "../../../src/game/original_ui_text_widget50kg.h"
@@ -23,7 +24,7 @@ struct OriginalUiGarageTextOverlayDiagnostic50KG {
 // backing retains typed fields rather than claiming the guest pointer ABI.
 // Concrete Garage manager construction and its typed Page-entry color call
 // are admitted; update/draw and packet color flushing remain separate.
-class OriginalUiGarageTextOverlay50KG final {
+class OriginalUiGarageTextOverlay50KG final : private OriginalUiTextOverlayFields50KG {
  friend class OriginalUiGarageWidget1Owner50KG;
  friend class OriginalUiGarageDrawContribution50KG;
  friend class game::OriginalUiEntityScope50KG;
@@ -37,10 +38,7 @@ class OriginalUiGarageTextOverlay50KG final {
  using Text=OriginalUiGarageScreenText50KG;
  using D=OriginalUiGarageTextOverlayDiagnostic50KG;
  using S=OriginalUiGarageTextOverlayStatus50KG;
- template<class T>struct Known {
-  T value{};bool produced=false;
-  void store(T v)noexcept{value=v;produced=true;}
- };
+
  enum class Phase:std::uint8_t {empty,constructed,loading,loaded,failed,retiring,retired};
  OriginalUiGarageTextOverlay50KG()noexcept=default;
  bool construct29C850(const Application&,std::shared_ptr<Grant>,const Widget*,C& outer,D&)noexcept;
@@ -96,23 +94,6 @@ class OriginalUiGarageTextOverlay50KG final {
  std::int32_t capacityInput_=0;bool dynamicCaller_=false;
  std::unique_ptr<Text> screenText30_;
  std::shared_ptr<const Fonts::Entry> font34_;
- //38..64, including source-unknown60/64.29DB50's16-byte copy propagates
- //knownness into40/44 without reading indeterminate native integers.
- std::array<Known<std::int32_t>,12> rectangle38_{};
- float elapsed68_=0,duration6C_=0;
- std::uint32_t enabled70_=0;std::int32_t justification74_=0;
- float timer78_=0,blink7C_=0;std::uint32_t blinkOn80_=0;
- float hold84_=0;std::uint32_t indefinite88_=0;const void* scene8C_=nullptr;
- Known<std::int32_t> alphaFrom90_,alphaTarget94_;
- float field98_=0,alphaElapsed9C_=0,alphaDurationA0_=0;
- Known<float> scaleFromA4_,scaleTargetA8_;float scaleElapsedAC_=0,scaleDurationB0_=0;
- Known<float> rotationTargetB4_,rotationFromB8_;float rotationElapsedBC_=0,rotationDurationC0_=0;
- float scaleC4_=0,scaleC8_=0;std::uint32_t lockCC_=0;float secondDelayD0_=0;
- Known<std::int32_t> secondAlphaD4_;Known<float> secondScaleD8_,secondRotationDC_;
- std::array<std::uint32_t,4> fieldsE0_{};
- std::array<char,64> nameF0_{},name130_{}; //Only byte0 is source produced.
- Known<std::uint32_t> color170_;Known<float> alpha174_,scale178_,rotation17C_;
- std::uint32_t colorDirty180_=0,alphaDirty184_=0,scaleDirty188_=0,rotationDirty18C_=0;
  Phase phase_=Phase::empty;
  bool attached_=false,constructed_=false;
 public:

@@ -275,11 +275,11 @@ public:
     // recovery/action dispatch or camera algorithm and publishes no capability.
     bool bindRuntimePodLiveQuerySlot(native_racer50HN::Bank& actualBank,std::size_t slot,
         g::VehicleFrameBindings49W& actualBindings,g::VehicleFrameParameters49W& actualParameters,
-        Diagnostic& d)noexcept {
+        Diagnostic& d,std::uint32_t humanCount=0)noexcept {
         d={};d.stage=Stage::runtimeQueryWorldOwners;
         if(terminal_||closed_||!prefix_.runtimeQueryWorldOwners||!runtimeQueries_)
             return fail(d,"RA pod context requires actual registered runtime backing");
-        if(!runtimeQueries_->bindPodLiveQuery(actualBank,slot,actualBindings,actualParameters,d.runtimeQueries))
+        if(!runtimeQueries_->bindPodLiveQuery(actualBank,slot,actualBindings,actualParameters,d.runtimeQueries,humanCount))
             return fail(d,"RA actual pod context binding failed; retained partial slot effects");
         return true;
     }

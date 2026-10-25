@@ -25,7 +25,7 @@ class OriginalDamageObservation50LA final {
     bool identity(const Camera& c,const OriginalDamage50LA& owner)const noexcept {
         return !c.closed_&&!c.abandoned_&&c.coldBound_&&c.readsBound_&&c.displayInputs_&&
             c.generation_==generation_&&owner.entity_.session==generation_&&
-            c.actual_.bank.count()==8&&supportedSourceView(c)&&
+            c.actual_.bank.count()>0&&c.actual_.bank.count()<=8&&supportedSourceView(c)&&
             c.controller_.binding.sessionGeneration==generation_&&
             c.controller_.binding.managerIndex==0&&c.identity_[0].managerIndex==0&&
             c.controller_.binding.racerKey==Camera::key(c.identity_[0].racerTag)&&
@@ -60,7 +60,7 @@ public:
             next.raceFlags1B0=c.raceFlags1B0_;next.raceEntityFlags29=c.raceEntityFlags29_;next.uiFlags1E4=c.uiFlags1E4_;
             std::array<OriginalDamageProximityRacer50LA,8> racers{};
             std::array<float,3> forward{};
-            for(std::size_t slot=0;slot<racers.size();++slot){d.slot=slot;
+            for(std::size_t slot=0;slot<c.actual_.bank.count();++slot){d.slot=slot;
                 racers[slot].state40=c.actual_.bank.read(slot,c.reads_.state40);
                 if(slot!=0&&racers[slot].state40!=0)continue;
                 const bool read=c.actual_.bank.visit(slot,[&]()noexcept {
@@ -84,7 +84,7 @@ public:
             }
             // This query replaces only the Player-owned presentation output,
             // preserving the original scan's actual input owners and algorithm.
-            if(!observeOriginalDamageProximity1A1EB0(racers.data(),racers.size(),0,forward,next.proximity)){
+            if(!observeOriginalDamageProximity1A1EB0(racers.data(),c.actual_.bank.count(),0,forward,next.proximity)){
                 d.status=Status::geometry;d.sourcePC=0x1a1eb0;return false;}
             if(c.frameStage_!=Camera::FrameStage::published||c.publicationCount_!=next.cameraPublication||!identity(c,*owner)){
                 d.status=Status::phase;return false;}

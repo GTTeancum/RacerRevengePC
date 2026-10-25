@@ -1,5 +1,6 @@
 #pragma once
 #include "game_host50er.h"
+#include <array>
 #include "host_audio_options50ik.h"
 #include "host_track_selection50im.h"
 #include "vehicle_window_gl50ds.h"
@@ -52,10 +53,44 @@ public:
     HostTrack50IM selectedTrack() const noexcept { return selectedTrack_; }
     bool trackChangesPending() const noexcept { return selectedTrack_ != loadedTrack_; }
 
+    // Observe every host poll, including inactive polls, so reconnect/focus
+    // changes cannot carry a held pad button into a menu action. These edges
+    // belong only to this native Pause owner: no gameplay packet is altered.
+    void observeController(const WindowInput50DQ& input,bool enabled) noexcept {
+        controllerEdges_={};
+        const auto& pad=input.controllers[0];
+        if(!enabled||!input.gameControllersEnabled||!pad.connected||pad.instanceId<0){
+            controllerInstance_=-1;controllerArmed_=false;return;
+        }
+        const bool changed=controllerInstance_!=pad.instanceId;
+        if(changed){controllerInstance_=pad.instanceId;controllerArmed_=false;}
+        if(!input.focused||input.minimized||input.activityLost||
+           input.eventBudgetExhausted||input.quitRequested){controllerArmed_=false;return;}
+        // SDL mapped D-pad up/down/left/right, Cross(A), Triangle(Y), Start.
+        // Triangle remains the original frontend Back position. The native
+        // confirmation owner still defaults to Cancel and requires a new edge.
+        constexpr unsigned buttons[]={11,12,13,14,0,3,6};
+        bool neutral=true;
+        for(auto button:buttons){
+            if(pad.buttons[button]>1||pad.pressed[button]>1||pad.released[button]>1){
+                controllerArmed_=false;return;
+            }
+            neutral=neutral&&!pad.buttons[button]&&!pad.pressed[button];
+        }
+        if(changed||!controllerArmed_){controllerArmed_=neutral;return;}
+        for(unsigned i=0;i<controllerEdges_.size();++i)
+            controllerEdges_[i]=pad.pressed[buttons[i]]!=0;
+    }
+
     // Called only for a focused, fully drained input snapshot. Escape/Enter
     // and row movement use fresh edges, never held keys or auto-repeat.
     Result poll(const GameHostInput50ER& input, bool canResume) noexcept {
-        const auto& key = input.keys.pressed;
+        // Merge into a menu-local copy, never input.keys or a driving sample.
+        auto key = input.keys.pressed;
+        constexpr unsigned scancodes[]={82,81,80,79,40,41};
+        for(unsigned i=0;i<6;++i)if(controllerEdges_[i])key[scancodes[i]]=1;
+        const bool controllerStart=controllerEdges_[6];
+        controllerEdges_={}; // A menu edge is consumed at most once.
         const bool back = key[41] != 0;
         if (input.menuRequested) {
             if (nativeAllAiRestart_ || loadedTrack_ == HostTrack50IM::GA) { change(Page::Pause); return Result::None; }
@@ -64,10 +99,10 @@ public:
             return Result::None;
         }
         if (page_ == Page::Closed) {
-            if (back || input.pauseRequested) change(Page::Pause);
+            if (back || input.pauseRequested || controllerStart) change(Page::Pause);
             return Result::None;
         }
-        if (page_ == Page::Pause && (back || input.resumeRequested)) {
+        if (page_ == Page::Pause && (back || input.resumeRequested || controllerStart)) {
             if (canResume) change(Page::Closed);
             return Result::None;
         }
@@ -106,6 +141,9 @@ public:
             // a destructive row before it has appeared on screen.
             return Result::None;
         }
+        // Opposed navigation is not permission to activate the current row.
+        // This covers mixed keyboard/pad edges as well as one device.
+        if (up && down) return Result::None;
         if (page_ == Page::Audio) {
             const bool left = key[80] != 0, right = key[79] != 0;
             if (left || right) {
@@ -183,7 +221,7 @@ public:
     VehicleWindowHostMenu50DS view(bool canResume) const noexcept {
         VehicleWindowHostMenu50DS out{};
         out.title = "RACER REVENGE"; out.subtitle = "RACE SETUP";
-        out.footer = "UP/DOWN SELECT  ENTER CONFIRM  ESC BACK";
+        out.footer = humanPhysical_ ? "DPAD SELECT  A CONFIRM  Y BACK" : "UP/DOWN SELECT  ENTER CONFIRM  ESC BACK";
         out.retainRaceImage = page_ == Page::Pause ||
             (page_ != Page::Main && returnPage_ == Page::Pause);
         out.selectedRow = selected_;
@@ -228,7 +266,7 @@ public:
                 out.rows[5] = "NO MANUAL DRIVING OR TRACK LAUNCH";
                 out.rows[6] = "EXIT AND RELAUNCH FOR A FRESH PREVIEW";
                 out.rows[7] = "BACK"; out.rowCount = 8; out.selectedRow = 7;
-                out.footer = "ENTER OR ESC RETURNS TO THE MENU";
+                out.footer = humanPhysical_ ? "A OR Y RETURNS TO THE MENU" : "ENTER OR ESC RETURNS TO THE MENU";
             } else if (page_ == Page::Exit) {
                 out.title = "EXIT GA PREVIEW";
                 out.subtitle = "CURRENT SESSION PROGRESS WILL BE LOST";
@@ -316,7 +354,7 @@ public:
             out.rows[7] = "F5         RESTART FROM GRID";
             out.rows[8] = humanPhysical_?"START / ESC  NATIVE PAUSE / RESUME":"ESC        PAUSE / RESUME";
             out.rows[9] = "BACK"; out.rowCount = 10; out.selectedRow = 9;
-            out.footer = "ENTER OR ESC RETURNS TO THE MENU";
+            out.footer = humanPhysical_ ? "A OR Y RETURNS TO THE MENU" : "ENTER OR ESC RETURNS TO THE MENU";
         } else {
             out.title = page_ == Page::Restart ? "RESTART SESSION" : page_ == Page::Leave ? "RETURN TO MAIN MENU" : "EXIT GAME";
             out.subtitle = started_ && !staleSession_ ? "CURRENT SESSION PROGRESS WILL BE LOST" : "CONFIRM YOUR CHOICE";
@@ -340,5 +378,8 @@ private:
     bool nativeAllAiRestart_=false,returnOriginalMain_=false,nativeHumanRace_=false;
     std::uint32_t humanPreset_=4;
     bool humanTwinEngine_=true,humanPhysical_=false;
+    std::array<bool,7> controllerEdges_{};
+    std::int32_t controllerInstance_=-1;
+    bool controllerArmed_=false;
 };
 }
