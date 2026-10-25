@@ -566,10 +566,11 @@ private:
         std::shared_ptr<rr::assets::OriginalStandardTextureLifetime50LA>(
             new rr::assets::OriginalStandardTextureLifetime50LA);
     // One real native Video identity per application, including direct entry.
-    // Each serial frontend/race still closes its GL resources and host. A later
-    // session reopens this SAME host owner only after that cleanup completed.
-    // CPU material resources are not GL objects and retain this stable owner;
-    // no renderer, texture name or GPU readiness survives session teardown.
+    // Normal player entry retains its actual native window/context through
+    // serial frontend/race generations. Each generation still drains and
+    // retires every renderer and GPU borrower before the next can begin.
+    // Explicit diagnostic/headless entry keeps its original close/reopen policy.
+    const bool retainPlayerWindow50DU_;
     mutable std::shared_ptr<Video> videoOwner_;
     // Retain the exact construction capability, not just equivalent fields.
     // Its dependencies pin Video/templates/runtime/list, never Application,
@@ -692,6 +693,13 @@ public:
         animationClockOwner_->value_.pause11C=paused?1u:0u;
     }
     std::shared_ptr<Video> videoForSession() const;
+    bool retainsPlayerWindow50DU()const noexcept{return retainPlayerWindow50DU_;}
+    // Read-only host access for the root loading presentation; not a display
+    // factory, source readiness capability, or renderer/GPU lease.
+    std::shared_ptr<Video> playerVideo50DU()const noexcept {
+        return retainPlayerWindow50DU_?videoOwner_:std::shared_ptr<Video>{};
+    }
+    bool closePlayerWindow50DU(rr::platform::GameHostDiagnostic50ER&)const noexcept;
     std::shared_ptr<RaceDisplayLifetime50LA> raceDisplayForSession50LA() const;
     bool stagePositionStatsPrimitives50LA(const std::filesystem::path& originalRoot,
         PositionStatsPrimitiveResult50LA&) const noexcept;
@@ -1006,8 +1014,8 @@ public:
         animationClockOwner_->applicationAlive_=false;
     }
     explicit Application(std::shared_ptr<rr::game::HostMonotonicClock50ID> clock,
-        std::shared_ptr<rr::game::ControlPresets49D> controls={})
-        :animationClockBackend_(clock),controlsProfile(std::move(controls)) {
+        std::shared_ptr<rr::game::ControlPresets49D> controls={},bool retainPlayerWindow=false)
+        :animationClockBackend_(clock),retainPlayerWindow50DU_(retainPlayerWindow),controlsProfile(std::move(controls)) {
         // Retain the one application epoch even on the disabled-Main branch.
         require(bool(animationClockBackend_),"application animation clock owner missing");
         // Actual Application lifetime, before APPSTART IO or template consumers,
@@ -1508,9 +1516,21 @@ inline std::shared_ptr<Video> Application::videoForSession() const {
     }
     require(videoOwner_->originalMain==enabled,
         "native application cannot replace its original/direct video mode");
-    require(!videoOwner_->host.created()&&!videoOwner_->host.ownsResources(),
-        "native session requires completed outgoing video/host cleanup");
+    require((!videoOwner_->host.created()&&!videoOwner_->host.ownsResources())||
+        (retainPlayerWindow50DU_&&enabled&&videoOwner_->host.hasWindow()&&
+         videoOwner_->host.created()&&videoOwner_->host.current()),
+        "native session requires retired display and closed or retained current player Video");
     return videoOwner_;
+}
+inline bool Application::closePlayerWindow50DU(rr::platform::GameHostDiagnostic50ER& d)const noexcept {
+    d={};
+    // Session locals and Root service borrowers must retire first. GameHost
+    // independently refuses closure while any display pins/resources survive.
+    if(!raceDisplayOwner50LA_.expired()){
+        d.error=rr::platform::GameHostError50ER::AlreadyOwned;
+        d.operation="terminal player window still has a display owner";return false;
+    }
+    return !videoOwner_||!videoOwner_->host.ownsResources()||videoOwner_->host.close(d);
 }
 inline bool Application::stageTournamentPodReferencesCold(
     std::shared_ptr<const rr::platform::OriginalUiTournamentCareerResources50KG> resource,

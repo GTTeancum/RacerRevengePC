@@ -1,4 +1,6 @@
 #include <exception>
+#include "../../platform/linux/native/loading_progress50du.h"
+#include "cold_load_diagnostics50du.h"
 #include "../../platform/linux/native/original_ta_intro_preload50la.h"
 #include "original_ui_source_timing50lh.h"
 #include "mc_particle_render50mc.h"
@@ -479,6 +481,7 @@ namespace recovery50FI=checkpoint_recovery50fi_fixture;
 enum class SessionExit50DU { Quit, Restart, Checkpoint, ReturnOriginalMain, CourseColdLoad };
 #include "windows_framebuffer_capture50ld.h"
 #include "original_ui_capture_navigation50la.h"
+#include "player_loading_session50du.h"
 #include "original_frontend_session50la.h"
 #include "original_racer_manager_entity50la.h"
 #include "original_subtype3_record_owner50la.h"
@@ -515,7 +518,11 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
      consumedLaunch->matches(*originalMainApplication.riderProfile,sessionIndex+1,loadedTrack,playerRacer60),
      "consumed Course launch lost its same-profile next-session identity");
  require50DU(rr::platform::validHostTrack50IM(loadedTrack),"unsupported loaded track identity");
+ ColdLoadDiagnostics50DU coldLoadDiagnostics(originalUiStarted&&!enterOriginalUi,
+     rr::platform::hostTrackCode50IM(loadedTrack),playerRacer60,sessionIndex+1);
+ coldLoadDiagnostics.begin("source_bootstrap");
  const char* trackSelectionError=nullptr;
+ rr::platform::loading_progress50DU::pulse("Reading original track");
  const auto* selectedTrackAssets=track_session_assets50IG::select(rr::platform::hostTrackCode50IM(loadedTrack),trackSelectionError);
  require50DU(selectedTrackAssets,trackSelectionError?trackSelectionError:"original track admission failed");
  track_session_assets50IG::ResolvedSessionAssets resolvedTrackAssets(*selectedTrackAssets);
@@ -696,6 +703,10 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  const bool usePhysicalGameController=!allAiEnabled&&(inputDeviceSetting?
      std::string(inputDeviceSetting)=="controller":originalMainApplication.courseHumanController);
  require50DU(!usePhysicalGameController||!headlessLive,"physical game controller requires the native SDL window");
+#if defined(_WIN32)
+ std::cerr<<"selected_input_mode="<<(allAiEnabled?"all_ai":usePhysicalGameController?"controller":"keyboard")
+     <<" session="<<sessionIndex+1<<" explicit_override="<<(inputDeviceSetting?1:0)<<'\n';
+#endif
  constexpr std::uint32_t deviceIndex=0,playerSource5C=0,playerActionIndexFFC=0;
  rr::platform::SelectedControlInput50KY humanControlInput{};
  require50DU(allAiEnabled||rr::platform::bindSelectedControlInput50KY(controlPresets,
@@ -1044,6 +1055,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   }};
  // Same owners are available before any RA counted Storage construction.
  // Merely declaring the open lambda does not create a window or activate a race.
+ rr::platform::loading_progress50DU::pulse("Preparing source owners");
  auto nativeVideo=originalMainApplication.videoForSession();
  auto sourceDisplayLifetime=originalMainApplication.raceDisplayForSession50LA();
  auto liveAudio=std::make_unique<live_audio50HF::Owner>();
@@ -1724,6 +1736,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   }
  }
 
+ rr::platform::loading_progress50DU::pulse("Preparing terrain");
+ coldLoadDiagnostics.begin("ground_query");
  const auto& actualHeight=isRaTrack?raRuntime->source.height:ground.height;
  if(originalAiEnabled){
   require50DU(actualHeight.sourceBound&&actualHeight.descriptor.bound,
@@ -1760,6 +1774,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  }
  } // RA retained roster operation owns its actual M-spline/grid-ground placement.
  require50DU(::allocations==groundAllocations,"actual ground query without allocations");
+ rr::platform::loading_progress50DU::pulse("Preparing collision");
+ coldLoadDiagnostics.begin("static_candidates");
  std::vector<track_runtime_storage50IG::Binding> legacyTrackBindings;
  auto& preparedBindings=legacyTrackBindings;
  std::vector<track_static_candidates50IG::Radii> originalStaticRadii;
@@ -2087,8 +2103,10 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  if(!isMbTrack&&!isTcTrack&&!isRcTrack&&!isTbTrack&&!isGbTrack&&!isMcTrack)legacyGround.audit=J{};
  std::span<Type2StaticCandidate49X> candidates=isMcTrack?mcWorldBorrow->candidateStorage():isGbTrack?gbWorldBorrow->candidateStorage():isTbTrack?tbWorldBorrow->candidateStorage():isRcTrack?rcWorldBorrow->candidateStorage():isTcTrack?tcWorldBorrow->candidateStorage():isMbTrack?mbCollisionWorld->candidateStorage():std::span<Type2StaticCandidate49X>(preparedCandidates);
  std::span<const track_runtime_storage50IG::Binding> trackBindings=isMcTrack?mcWorldBorrow->bindingStorage():isGbTrack?gbWorldBorrow->bindingStorage():isTbTrack?tbWorldBorrow->bindingStorage():isRcTrack?rcWorldBorrow->bindingStorage():isTcTrack?tcWorldBorrow->bindingStorage():isMbTrack?mbCollisionWorld->bindingStorage():std::span<const track_runtime_storage50IG::Binding>(preparedBindings);
+ coldLoadDiagnostics.begin("track_storage");
  // Cold, immovable, count-derived storage. Candidate order and every borrowed
  // source mesh/radius remain owned above; publication checks complete coverage.
+ rr::platform::loading_progress50DU::pulse("Preparing track storage");
  track_runtime_storage50IG::Owner trackStorageOwner;
  track_runtime_storage50IG::Diagnostic trackStorageDiagnostic{};
  if(isMbTrack){
@@ -2135,6 +2153,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  std::array<std::unique_ptr<track_runtime_storage50IG::Membership>,gc_trigger_authoring50IN::count> gcTriggerMembership;
  if(gcTriggerActions)for(auto& membership:gcTriggerMembership)
   membership=std::make_unique<track_runtime_storage50IG::Membership>(trackCounts.membership);
+ rr::platform::loading_progress50DU::pulse("Preparing physics");
+ coldLoadDiagnostics.begin("physics_navigation_setup");
  const auto terrainOwnerCount=trackCounts.terrain;
  auto* audioContactMaterials=trackStorage.contactMaterials.data();
  require50DU(setLocalMatrix49P({s.nodes,s.sceneNodeCount},x.bindings.lifecycle.main190,pose)&&refreshSceneWorld49P({s.nodes,s.sceneNodeCount},x.bindings.lifecycle.main190),"supplied initial pose");f::project(s,x.bindings);
@@ -2846,6 +2866,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   const std::filesystem::path audioRoot=suppliedAudioRoot?std::filesystem::path(suppliedAudioRoot):
       runtime_asset_paths50LB::resolve("work/native/project/disc/AUDIO");
   std::string audioError;
+  rr::platform::loading_progress50DU::pulse("Loading audio");
+ coldLoadDiagnostics.begin("audio_native_bank");
   if(!tcLiveAudioPrepared&&!tbLiveAudioPrepared&&!gbLiveAudioPrepared){
    const bool prepared=liveAudio->prepare(runtime_asset_paths50LB::resolve("work/native/project/disc"),audioRoot,audioError,playerRacer60,loadedAudioSettings);
    require50DU(prepared,audioError.empty()?"native audio bank preparation failed":audioError.c_str());
@@ -2854,6 +2876,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
       (isGbTrack&&gbLiveAudioPrepared&&!tcLiveAudioPrepared&&!tbLiveAudioPrepared&&audioRoot==gbPreparedAudioRoot))&&
       liveAudio->bank().ready&&liveAudio->mixerForMaterialOwner()&&liveAudio->groupsForProviders(),
       "TC/TB/GB early audio owner no longer matches actual later consumers");
+ coldLoadDiagnostics.begin("audio_camera_and_race");
   auto* materialMixer=liveAudio->mixerForMaterialOwner();
   if(originalAiAudioEnabled){
    if(isGbTrack){
@@ -2904,6 +2927,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
    require50DU(raceAudioPrepared,
        audioError.empty()?"original race audio preparation failed":audioError.c_str());
   }
+ coldLoadDiagnostics.begin("audio_announcer_music");
   if(mode1Requested||dynamicContactEnabled){
    if(dynamicContactEnabled)for(std::size_t slot=0;slot<raceRacerCount;++slot){
     //2C4B30 binds Dax named banks from the same actual manager racer60 as
@@ -2942,6 +2966,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     dynamicEventBindings.eventOwner33CBound=true;
    }
   }
+  rr::platform::loading_progress50DU::pulse("Loading track sounds");
+ coldLoadDiagnostics.begin("audio_materials");
   const bool materialAudioReady=materialMixer&&(isMcTrack?
       materialAudio->prepareMc(mcColdSources,audioRoot,*materialMixer,64,audioError):isGbTrack?
       materialAudio->prepareGb(gbColdSources,audioRoot,*materialMixer,64,audioError):isTbTrack?
@@ -3046,6 +3072,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
    require50DU(prepared,audioError.empty()?"GB positional audio preparation rejected":audioError.c_str());
    std::cerr<<"gb_native_audio ambient_rows=4 ambient_scheduling=unsupported positional_rows=49 native_transport_slots=24\n";
   }
+ coldLoadDiagnostics.begin("audio_roster_banks");
   if(raceEnabled&&!originalAiAudioEnabled){
    std::array<opponent_audio50HX::Source,opponent_audio50HX::maxOpponents> sources{};
    for(std::size_t racer=1;racer<raceRacerCount;++racer)
@@ -3122,6 +3149,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
        result.status==pod_audio50HE::DispatchStatus::CompletedUnavailable,result.originalV0};
   };
  }
+ rr::platform::loading_progress50DU::pulse("Preparing navigation");
+ coldLoadDiagnostics.begin("navigation_runtime");
  TrackNavigationDiagnostic50EU navigationDiagnostic{};
  auto reportNavigation=[&](bool ok,const char* operation){
   if(!ok)std::cerr<<operation<<" navigation error "
@@ -4409,9 +4438,11 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  enum class NativeRacerFramePart { Children,Physics };
  // The earlier same display/audio stage outlives Bank/Join and their retained
  // native model owners on unwind. RA opens that same Video context below.
+ rr::platform::loading_progress50DU::pulse("Preparing race owners");
  original_main_entry50KG::SpeedBoostColdResult50LA sourceSpeedBoost;
  original_main_entry50KG::TimeStatsColdResult50LA sourceTimeStats;
  original_main_entry50KG::DamageColdResult50LA sourceDamage;
+ coldLoadDiagnostics.begin("roster_runtime");
  native_racer50HN::Bank racerBank;
  auto closeRcBankCollision=[&]() noexcept -> bool {try{
   if(rcCollisionCleanupDone)return true;
@@ -7125,6 +7156,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
 
  // Cold-selected player publications borrow stable owners through shutdown.
  // POD01 fixture resources never supply another original racer's draw or cable.
+ coldLoadDiagnostics.begin("render_source_preparation");
  auto& playerDrawAssets=playerUsesRosterRig?racerVisuals[0]->drawAssets:drawAssets;
  const auto playerCableBindings=playerUsesRosterRig?racerCables[0]->bindings():cableBindings;
  std::vector<platform::VehicleWindowMaterialUv50DS> playerFlameUvs;
@@ -7979,6 +8011,15 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   const auto closeAccumulated=[](const char* gate){
    std::cerr<<"native_close_accumulated gate="<<gate<<'\n';return false;
   };
+  // Host no longer closes between player sessions. Retire any real motor
+  // lease explicitly rather than depending on SDL window destruction.
+  if(originalMainApplication.retainsPlayerWindow50DU()&&feedbackHost&&
+     usePhysicalGameController&&feedbackPhysicalDevice.connected){
+   platform::ControllerRumbleReceipt50KZ stopped;
+   platform::GameHostDiagnostic50ER stopDiagnostic;
+   if(!feedbackHost->rumbleController50KZ(playerSource5C,feedbackPhysicalDevice.instanceId,
+       0,0,stopped,stopDiagnostic))return closeRejected("retained_window_rumble_stop");
+  }
   if(gbQueryBinding&&gbQueryBinding->enrolled()&&!gbQueryBinding->fence())return closeRejected("gb_query_terminal_fence");
   if(gbParticleRender&&!gbParticleRender->closed()&&!gbParticleRender->close())return closeRejected("gb_real_renderer_borrow_retirement");
   if(mcParticleRender&&!mcParticleRender->closed()&&!mcParticleRender->close())return closeRejected("mc_real_renderer_borrow_retirement");
@@ -8306,7 +8347,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   if(consumedTaStage.race()&&!consumedTaStage.close())return closeRejected("TA consumed race/world retirement");
   if(!sourcePause.close())return closeRejected("if(!sourcePause.close())");
   if(!sourceDisplayLifetime->beginCloseAfterDependents())return closeRejected("if(!sourceDisplayLifetime->beginCloseAfterDependents())");
-  if(host.ownsResources()&&!host.close(hostDiagnostic)){
+  if(!originalMainApplication.retainsPlayerWindow50DU()&&host.ownsResources()&&!host.close(hostDiagnostic)){
    reportHost50DU(hostDiagnostic);clean=closeAccumulated("reportHost50DU(hostDiagnostic);clean=false;");
   }
   if(hostDiagnostic.window.cleanupError==platform::WindowHostError50DQ::ControllerFailure)
@@ -8323,6 +8364,9 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  tcColdPrefixGuard.armed=false;tcGatePrefixGuard.armed=false;
  tbColdPrefixGuard.armed=false;tbDoorPrefixGuard.armed=false;
  try {
+  rr::platform::loading_progress50DU::pulse("Preparing graphics");
+  PlayerLoadingSession50DU::checkStop();
+ coldLoadDiagnostics.begin("video_and_renderer_publication");
   openNativeVideo();
   feedbackHost=&host;
   // Publish the track bank only after this application's real Video host is
@@ -8820,6 +8864,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
 #else
   constexpr std::int32_t maximumWidth=1280,maximumHeight=720;
 #endif
+  rr::platform::loading_progress50DU::pulse("Allocating graphics targets");
+  PlayerLoadingSession50DU::checkStop();
   platform::VehicleWindowRequest50DS renderRequest{};
   sourceDisplayLifetime->bindCreationRequest(renderRequest);
   renderRequest.maximumWidth=maximumWidth;renderRequest.maximumHeight=maximumHeight;
@@ -9893,7 +9939,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   platform::HostRaceResults50IL resultsUi;
   std::uint64_t drawnMenuRevision=0;
   std::int32_t drawnMenuWidth=0,drawnMenuHeight=0;
-  bool menuImagePublished=false,suppressResumeKeys=false,forceSceneRender=false;
+  bool menuImagePublished=false,suppressResumeKeys=originalMainApplication.retainsPlayerWindow50DU(),forceSceneRender=false;
   bool capturePending=false;int terminalInputError=0;
   windows_capture50LD::Session windowCapture;
   windowCapture.prepare(captureRun,sessionIndex,maximumWidth,maximumHeight,"race");
@@ -10239,6 +10285,9 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
        <<" advanced="<<receipt.careerAdvanced<<" retired="<<receipt.retired
        <<" prize="<<receipt.prize<<" bonus="<<receipt.killBonus<<'\n';
   };
+  rr::platform::loading_progress50DU::finish();
+  PlayerLoadingSession50DU::checkStop();
+  coldLoadDiagnostics.complete();
   // Opt-in host observations only; each receipt is bounded to this session.
   bool firstMainPollReported=false,firstMainActivityGateReported=false;
   bool secondMainPollReported=false,firstMainInactiveReported=false;
@@ -12586,11 +12635,14 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
    std::cerr<<"track_fps_baseline_unavailable: no uninterrupted five-second warmup plus five-second measurement completed\n";
   require50DU(terminalInputError==0,"live input stream failed");
  }catch(...){
+  const auto failure=std::current_exception();
   const bool closed=closeWindow();
   if(originalCameraEnabled&&!closed&&!closeWindow()){
    std::cerr<<"camera/display cleanup remains unresolved; preserving owners by terminating\n";
    std::terminate();
   }
+  try{std::rethrow_exception(failure);}
+  catch(const PlayerLoadingCancelled50DU&){return SessionExit50DU::Quit;}
   throw;
  }
  const auto closedNavigationAnchor=originalUiActive?0u:static_cast<unsigned>(
@@ -12652,7 +12704,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  return returnOriginalMainRequested?SessionExit50DU::ReturnOriginalMain:
      checkpointRequested?SessionExit50DU::Checkpoint:(restartRequested?SessionExit50DU::Restart:SessionExit50DU::Quit);
 }
-int main(int argc,char**argv){try{
+#include "windows_native_entry50lb.h"
+int nativeApplicationMain50DU(int argc,char**argv){try{
 #if defined(_WIN32)
  // Preserve diagnostics even if native ownership cleanup terminates abruptly.
  std::cout.setf(std::ios::unitbuf);std::cerr.setf(std::ios::unitbuf);
@@ -12663,7 +12716,14 @@ int main(int argc,char**argv){try{
  const bool discEntry=argc==3&&std::string(argv[1])=="--assets";
  if(discEntry){
   require50DU(argv[2]&&*argv[2],"--assets requires an original disc directory");
+#if defined(_WIN32)
+  // The no-argument entry already anchored cwd with SetCurrentDirectoryW.
+  // Keep its ASCII relative root across legacy narrow argv/env consumers.
+  const auto root=windows_native_entry50LB::active()?std::string("."):
+      std::filesystem::absolute(argv[2]).string();
+#else
   const auto root=std::filesystem::absolute(argv[2]).string();
+#endif
   require50DU(std::filesystem::is_directory(root),"--assets directory is unavailable");
   const auto configure=[](const char* name,const char* value){
 #if defined(_WIN32)
@@ -12700,7 +12760,7 @@ int main(int argc,char**argv){try{
  if(argc!=2&&!headlessLive&&!discEntry){
   std::cerr<<"usage: terrain_interactive_drive50du CORPUS_JSON [--headless-live CAPTURE_PPM]\n"
              "Use --assets ORIGINAL_DISC_DIRECTORY for normal original Main/Rider/Course entry directly from disc files. This sets the original asset/UI roots and, unless explicitly supplied, RR_RACE_MODE=2, RR_START_MENU=0, RR_ORIGINAL_MAIN_AUDIO=enabled and its AUDIO directory. Existing host-device policy is unchanged; RR_AUDIO_DEVICE=0 disables physical output while retaining logical audio owners. Explicit audio/device policy remains authoritative.\n"
-             "Legacy CORPUS_JSON entry remains available separately. RR_GENERATED_RUNTIME_ROOT resolves diagnostic evidence/work inputs and relative CORPUS_JSON; it is not required data for the normal original-disc route. The process cwd is never changed. RR_RACE_MODE=1 requires fully prepared source providers; RR_RACE_MODE=2 uses the existing native audio/timing fallback.\n"
+             "Legacy CORPUS_JSON entry remains available separately. RR_GENERATED_RUNTIME_ROOT resolves diagnostic evidence/work inputs and relative CORPUS_JSON; it is not required data for the normal original-disc route. Explicit CLI entry never changes process cwd; Windows no-argument launch anchors it to the executable directory and logs to RacerRevenge.log there. RR_RACE_MODE=1 requires fully prepared source providers; RR_RACE_MODE=2 uses the existing native audio/timing fallback.\n"
              "RR_HUMAN_CONTROL_PRESET=0..7 selects an original row only for direct human startup (default4); original Main retains its own configuration. Normal menu entry retains the device used for an accepted Course Confirm: pad A selects controller driving; keyboard Enter/Space selects keyboard driving (keyboard wins simultaneous confirms). Direct startup defaults to keyboard. RR_HUMAN_INPUT_DEVICE=keyboard or controller explicitly overrides that choice, never an AI role. Normal keyboard rows: W/S throttle/brake, Left/Right steer, Up/Down original left Y. Advanced rows: W/S left engine, Up/Down right engine. Space: boost; R: hold repair; Left Shift: powerslide; Escape: Pause/Resume; F5 or Restart Race: new grid session. On the pad, Start opens Pause or resumes from its main page; D-pad selects, A confirms, Y backs out or cancels. Restart and Main return use their confirmation menu. Checkpoint recovery remains a separately admitted diagnostic path.\n"
              "Normal Main uses authored roster/course order and unlocks. Original-disc Rider images are decoded in process; RR_ORIGINAL_RIDER_IPUM_CACHE is an optional legacy authenticated cache, not a normal runtime data pack. Each race selection must resolve its own original archive, native assets and source owners. Human Course queues a complete cold reload after exit, including unchanged track/rider, so accepted controls apply. No unsupported destination is silently substituted.\n"
              "Main/Options logical audio uses RR_ORIGINAL_MAIN_AUDIO=enabled and RR_ORIGINAL_MAIN_AUDIO_ROOT pointing to AUDIO. The explicit diagnostic muted policy suppresses logical audio and cannot commit Game Options Accept. RR_AUDIO and RR_AUDIO_DEVICE independently control host race output/device policy. With RR_AUDIO_WAV, later Main visits add -menu-session-N and races add -race-session-N before the extension.\n";
@@ -12721,7 +12781,8 @@ int main(int argc,char**argv){try{
  auto applicationControlsOwner=std::make_shared<ControlPresets49D>();
  initializeControlPresets49D(*applicationControlsOwner);
  auto& applicationControls=*applicationControlsOwner;
- original_main_entry50KG::Application originalMainApplication(applicationClockOwner,applicationControlsOwner);
+ original_main_entry50KG::Application originalMainApplication(applicationClockOwner,applicationControlsOwner,
+     discEntry&&!headlessLive&&!captureRun.enabled());
  // Keep the actual Application alive while terminal exception cleanup retires
  // its source Aural/Pending/Light/backing. Session-local owners unwind FIRST.
  // Normal Course handoffs remain inside this scope and do not retire services.
@@ -12852,6 +12913,10 @@ int main(int argc,char**argv){try{
  std::unique_ptr<original_course_targets50KX::ConsumedLaunch> consumedCourseLaunch;
  for(;;){
   if(captureRun.deadlineExpired())break;
+  PlayerLoadingSession50DU playerLoading(originalMainApplication,
+      enterOriginalUi?"Preparing Main":"Preparing race");
+  try{PlayerLoadingSession50DU::checkStop();}
+  catch(const PlayerLoadingCancelled50DU&){break;}
   const auto exit=enterOriginalUi?
       runOriginalFrontend50LA(resolvedCorpusPath.c_str(),headlessLive,headlessLive?argv[3]:nullptr,sessionIndex,
           applicationClock,trackAdmission,originalMainApplication,courseColdLoad,captureRun):
@@ -12862,9 +12927,10 @@ int main(int argc,char**argv){try{
   // Expire even on restart/return: only a new actual Course consumption can
   // create another owner. Stack unwinding also releases it on session failure.
   consumedCourseLaunch.reset();
-  // The selected frontend/race session has returned: its local GL, audio and
-  // race resource owners have closed and been destroyed. Application retains
-  // the same Video object, with its real host closed before the next session.
+  // Session renderer, GPU, audio and world owners are actually retired.
+  // Normal player entry retains the SAME native host/context, not merely the
+  // Video wrapper. Explicit diagnostics retain their original closed host.
+  playerLoading.end();
   if(originalMainApplication.enabled&&originalMainApplication.lightManager->nativeGameplayGeneration()){
    OriginalUiLightManagerLifetimeDiagnostic50KG lightDiagnostic;
    require50DU(originalMainApplication.lightManager->endNativeGameplay(sessionIndex+1,lightDiagnostic),
@@ -12921,6 +12987,9 @@ int main(int argc,char**argv){try{
  std::string frontendShutdownError;
  const bool frontendServicesClosed=originalMainApplication.finishNativeFrontendAudio(frontendShutdownError);
  require50DU(frontendServicesClosed,frontendShutdownError.c_str());
+ rr::platform::GameHostDiagnostic50ER terminalHostDiagnostic;
+ require50DU(originalMainApplication.closePlayerWindow50DU(terminalHostDiagnostic),
+     "terminal native player window cleanup rejected");
  captureRun.reportClosed();
  return captureRun.timedOut()||(captureRun.navigate()&&(!captureRun.evidenceComplete()||!captureRun.videoHoldComplete()))?3:0;
  }catch(...){
@@ -12936,6 +13005,18 @@ int main(int argc,char**argv){try{
        <<"; retaining actual owners by terminating\n";
    std::terminate();
   }
+  rr::platform::GameHostDiagnostic50ER terminalHostDiagnostic;
+  if(!originalMainApplication.closePlayerWindow50DU(terminalHostDiagnostic)){
+   reportHost50DU(terminalHostDiagnostic);std::terminate();
+  }
   std::rethrow_exception(originalFailure);
  }
 }catch(const std::exception&e){std::cerr<<"interactive drive: "<<e.what()<<'\n';return 1;}}
+
+int main(int argc,char** argv){
+#if defined(_WIN32)
+ if(argc==1||(argc==3&&std::string(argv[1])=="--assets"))
+  return windows_native_entry50LB::run(nativeApplicationMain50DU,argc,argv,argc==1);
+#endif
+ return nativeApplicationMain50DU(argc,argv);
+}

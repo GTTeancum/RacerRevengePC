@@ -101,6 +101,12 @@ public:
     // Like 50DQ, down is the latest drained state. A down/up pair in one poll
     // is NOT turned into a native button pulse or queued for a later tick.
     bool poll(GameHostInput50ER&, GameHostDiagnostic50ER&) noexcept;
+    // Main-thread loading pump: consumes real native events and latches Close,
+    // but publishes no frontend or gameplay input. The next ordinary poll is
+    // release-to-arm so controls pressed during loading cannot leak through.
+    bool pollLoading50DU(bool& quitRequested,GameHostDiagnostic50ER&)noexcept;
+    // Inter-session native GL baseline only after the old Display has died.
+    bool prepareRetainedPlayerSession50DU(GameHostDiagnostic50ER&)noexcept;
     // Window mode only. HeadlessLive explicitly rejects this operation.
     // Renderer submit/commit is separate and never performed by this facade.
     bool swapWindow(GameHostDiagnostic50ER&) noexcept;
@@ -116,6 +122,7 @@ public:
     GameHostGlProc50ER procAddress(const char*) const noexcept;
     GameHostMode50ER mode() const noexcept { return mode_; }
     bool hasWindow() const noexcept { return mode_ == GameHostMode50ER::Window; }
+    std::uint32_t nativeWindowId50DU()const noexcept{return window_.nativeWindowId50DU();}
     const GameHostInfo50ER& info() const noexcept { return info_; }
 private:
     friend class ::original_main_entry50KG::RaceDisplayLifetime50LA;
@@ -147,6 +154,7 @@ private:
     GameHostMode50ER mode_ = GameHostMode50ER::Unspecified;
     GameHostInfo50ER info_{};
     bool ready_ = false;
+    bool loadingInputBarrier50DU_=false;
 #if defined(__linux__)
     bool restoreStdinFlags_ = false;
     int originalStdinFlags_ = 0;

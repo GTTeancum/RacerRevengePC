@@ -126,6 +126,7 @@ public:
     // resource teardown continues; it does not turn destruction into terminate.
     bool close(WindowHostDiagnostic50DQ&) noexcept;
     bool created() const noexcept;
+    std::uint32_t nativeWindowId50DU()const noexcept;
     bool ownsResources() const noexcept;
     bool current() const noexcept;
     WindowGlProc50DQ procAddress(const char* name) const noexcept;

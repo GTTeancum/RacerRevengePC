@@ -1,6 +1,6 @@
 # v104 native profile and Options usage
 
-Usage notes for the integrated experimental beta candidate. These describe implemented behavior, not a guarantee of complete beta functionality. The native Windows runtime has not been launched or tested on Windows. Compilation and existing Linux smoke coverage do not establish Windows operation, Windows save correctness, or comprehensive gameplay coverage. Consult the package build and validation receipt for the exact checks performed.
+Usage notes for the integrated experimental beta candidate. These describe implemented behavior, not a guarantee of complete beta functionality. The earlier Windows tester reached menus at 1280x896 on the user PC, but race loading and this next integrated build are not thereby validated. Compilation and existing Linux smoke coverage do not establish Windows operation, Windows save correctness, or comprehensive gameplay coverage. Consult the package build and validation receipt for the exact checks performed.
 
 ## What is retained
 
@@ -86,6 +86,8 @@ Only the first course's PAR value is currently authenticated. For other courses,
 
 The race impact-feedback path now consumes the committed Game Options vibration bit instead of always using an enabled default. This feeds the existing actual controller-feedback/SDL rumble path. It does not invent keyboard vibration or claim feedback from an absent, disconnected or unsupported controller. Physical rumble still requires a compatible connected gamepad and a qualifying original gameplay feedback event; changing the option alone does not play a test vibration.
 
-## Windows diagnostics
+## Windows diagnostics (next-build default)
 
-The packaged CMD launcher writes a new timestamped run folder under `RacerRevenge-logs` beside the package, or `%LOCALAPPDATA%\RacerRevenge\logs` if the package location is not writable. This log directory is separate from `%LOCALAPPDATA%\RacerRevengePC\Saves`. Close the game and ZIP only the selected run folder when returning diagnostics. Logs may include local paths, device/driver details and game selections; review them before sharing. No automatic upload or telemetry is enabled. Original disc assets and imported original memory-card files remain unchanged.
+Windows no-argument EXE launch appends all startup, stdout/stderr, menu/load diagnostics and normal exit status to one `RacerRevenge.log` in the executable/original-game folder. UTC session boundaries distinguish runs without deleting earlier log data. Competing writers are rejected while the game owns the file. If the game root is unwritable, startup reports a visible error instead of silently changing the log location. No sidecar logs or per-run folders are created by this entry. Normal `--assets` entry and optional launchers use that same single log beside the EXE. Other explicit diagnostic modes retain caller-owned output behavior.
+
+This log is separate from native user saves at `%LOCALAPPDATA%\RacerRevengePC\Saves`. Close the game, review `RacerRevenge.log`, and attach that file when returning diagnostics. It may contain local paths, device/driver details and game selections from multiple sessions. Do not include save files or original game assets. No automatic upload or telemetry is enabled. Original disc assets and imported original memory-card files remain unchanged. Abrupt termination or pre-main Windows DLL loading failures may leave no final session marker, or no new log session.

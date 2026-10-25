@@ -1,3 +1,4 @@
+#include "player_session_gl_reset50du.h"
 #include "game_host50er.h"
 #include "vehicle_window_gl50ds.h"
 #include <exception>
@@ -276,6 +277,22 @@ bool GameHost50ER::poll(GameHostInput50ER& input, GameHostDiagnostic50ER& d) noe
     if (mode_ == GameHostMode50ER::Window) {
         if (!window_.poll(input.keys, d.window))
             return fail(d, GameHostError50ER::Window, "WindowHost50DQ::poll");
+        if(loadingInputBarrier50DU_){
+            bool held=input.keys.eventBudgetExhausted;
+            for(const auto key:input.keys.down)held=held||key!=0;
+            for(const auto key:input.keys.pressed)held=held||key!=0;
+            for(const auto& controller:input.keys.controllers)if(controller.connected){
+                for(const auto button:controller.buttons)held=held||button!=0;
+                for(const auto button:controller.pressed)held=held||button!=0;
+                for(const auto axis:controller.axes)held=held||axis>4096||axis< -4096;
+            }
+            loadingInputBarrier50DU_=held;
+            input.keys.down.fill(0);input.keys.pressed.fill(0);input.keys.released.fill(0);
+            for(auto& controller:input.keys.controllers){
+                controller.axes.fill(0);controller.buttons.fill(0);
+                controller.pressed.fill(0);controller.released.fill(0);
+            }
+        }
         input.restartRequested = input.keys.pressed[62] != 0; // SDL physical F5
         // 50DQ emits pressed only on a fresh, non-repeat key-down edge.
         // Never use down here: holding Backspace must not request another reset.
@@ -334,6 +351,31 @@ bool GameHost50ER::poll(GameHostInput50ER& input, GameHostDiagnostic50ER& d) noe
     return fail(d, GameHostError50ER::UnsupportedMode, "poll/HeadlessLive is unsupported on Windows");
 #endif
 }
+bool GameHost50ER::prepareRetainedPlayerSession50DU(GameHostDiagnostic50ER& d)noexcept {
+    d={};
+    if(!ownerThread())return fail(d,GameHostError50ER::WrongThread,"preparePlayerSession");
+    if(!created()||!current()||!hasWindow())
+        return fail(d,GameHostError50ER::NotWindow,"preparePlayerSession/current window required");
+    if(sessionDisplayRenderer50LA_||sessionDependentPins50LA_)
+        return fail(d,GameHostError50ER::AlreadyOwned,"preparePlayerSession/previous display still retained");
+    if(!setSwapInterval(0,d))return false;
+    if(!resetPlayerSessionGl50DU(*this))
+        return fail(d,GameHostError50ER::Window,"preparePlayerSession/GL baseline rejected");
+    return true;
+}
+bool GameHost50ER::pollLoading50DU(bool& quitRequested,GameHostDiagnostic50ER& d)noexcept {
+    d={};quitRequested=false;
+    if(!ownerThread())return fail(d,GameHostError50ER::WrongThread,"pollLoading");
+    if(!created())return fail(d,GameHostError50ER::NotCreated,"pollLoading");
+    if(!hasWindow())return fail(d,GameHostError50ER::NotWindow,"pollLoading");
+    sharedDialogPollCurrent50KG_=false;
+    WindowInput50DQ discarded;
+    if(!window_.poll(discarded,d.window))
+        return fail(d,GameHostError50ER::Window,"WindowHost50DQ::pollLoading");
+    refreshInfo();loadingInputBarrier50DU_=true;
+    quitRequested=discarded.quitRequested;
+    return true;
+}
 bool GameHost50ER::swapWindow(GameHostDiagnostic50ER& d) noexcept {
     d = {};
     if (!ownerThread()) return fail(d, GameHostError50ER::WrongThread, "swapWindow");
@@ -375,6 +417,7 @@ bool GameHost50ER::closeOwned(GameHostDiagnostic50ER& d) noexcept {
     // Also reached directly by the destructor: never invalidate a retained context.
     if(sessionDisplayBlocksClose50LA())return fail(d,GameHostError50ER::AlreadyOwned,"session renderer/context still retained");
     ready_ = false;
+    loadingInputBarrier50DU_=false;
     sharedDialogPollCurrent50KG_=false;
     bool okay = true;
     if (window_.ownsResources() && !window_.close(d.window))

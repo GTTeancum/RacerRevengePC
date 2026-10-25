@@ -1,0 +1,211 @@
+#pragma once
+#if defined(_WIN32)
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <windows.h>
+#include <io.h>
+#include <fcntl.h>
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <cwchar>
+#include <filesystem>
+#include <iostream>
+#include <stdexcept>
+#include <string>
+#include <vector>
+
+// Normal Windows player entry (no arguments or --assets) uses one native log.
+// Other explicit diagnostic modes retain their previous output/entry behavior.
+namespace windows_native_entry50LB {
+inline bool automaticEntryActive=false;
+inline bool active() noexcept {return automaticEntryActive;}
+namespace fs=std::filesystem;
+#ifndef RR_WINDOWS_BUILD_ID
+#define RR_WINDOWS_BUILD_ID "native-player-next-unversioned"
+#endif
+inline HANDLE faultLog=INVALID_HANDLE_VALUE;
+inline LPTOP_LEVEL_EXCEPTION_FILTER previousFilter=nullptr;
+inline LONG WINAPI nativeFaultFilter(EXCEPTION_POINTERS* fault) noexcept {
+    // Fixed stack storage and Win32 writes only; no streams, heap, symbols,
+    // dumps or attempts to continue execution after a native fault.
+    char text[512]{};std::size_t length=0;
+    auto literal=[&](const char* value){while(*value&&length+1<sizeof(text))text[length++]=*value++;};
+    auto hex=[&](std::uintptr_t value){
+        literal("0x");bool emitted=false;
+        for(int shift=int(sizeof(value)*8)-4;shift>=0;shift-=4){
+            const unsigned digit=unsigned((value>>shift)&15u);
+            if(digit||emitted||shift==0){if(length+1<sizeof(text))text[length++]="0123456789abcdef"[digit];emitted=true;}
+        }
+    };
+    literal("\nNATIVE_UNHANDLED_EXCEPTION code=");
+    const auto* record=fault?fault->ExceptionRecord:nullptr;
+    hex(record?record->ExceptionCode:0);literal(" address=");
+    const auto address=record?reinterpret_cast<std::uintptr_t>(record->ExceptionAddress):0;
+    hex(address);MEMORY_BASIC_INFORMATION memory{};
+    if(address&&VirtualQuery(reinterpret_cast<const void*>(address),&memory,sizeof(memory))==sizeof(memory)&&memory.Type==MEM_IMAGE){
+        const auto base=reinterpret_cast<std::uintptr_t>(memory.AllocationBase);
+        literal(" image_base=");hex(base);literal(" image_offset=");hex(address-base);
+    }
+    literal(" thread_id=");hex(GetCurrentThreadId());
+    literal(" disposition=EXCEPTION_CONTINUE_SEARCH\n");
+    if(faultLog!=INVALID_HANDLE_VALUE){DWORD written=0;WriteFile(faultLog,text,static_cast<DWORD>(length),&written,nullptr);FlushFileBuffers(faultLog);}
+    return EXCEPTION_CONTINUE_SEARCH;
+}
+struct FaultLogLifetime {
+    ~FaultLogLifetime(){
+        if(faultLog!=INVALID_HANDLE_VALUE){SetUnhandledExceptionFilter(previousFilter);CloseHandle(faultLog);faultLog=INVALID_HANDLE_VALUE;}
+    }
+};
+inline std::string utf8Path(const fs::path& path) {
+    const auto bytes=path.u8string();
+    return std::string(reinterpret_cast<const char*>(bytes.data()),bytes.size());
+}
+inline fs::path executableDirectory() {
+    std::vector<wchar_t> path(32768);
+    const DWORD size=GetModuleFileNameW(nullptr,path.data(),static_cast<DWORD>(path.size()));
+    if(!size||size>=path.size())throw std::runtime_error("Cannot determine executable directory");
+    const fs::path file(std::wstring(path.data(),size));
+    if(!file.is_absolute()||file.parent_path().empty())
+        throw std::runtime_error("Executable directory is not absolute");
+    return file.parent_path();
+}
+inline void cleanInheritedOverrides() {
+    // Snapshot before editing the environment. _wputenv_s updates CRT and
+    // Windows copies together; no registry/system/user settings are changed.
+    wchar_t* block=GetEnvironmentStringsW();
+    if(!block)throw std::runtime_error("Cannot inspect inherited launch environment");
+    std::vector<std::wstring> names;
+    try {
+        for(const wchar_t* at=block;*at;at+=std::wcslen(at)+1){
+            const std::wstring item(at);const auto equal=item.find(L'=');
+            if(equal==std::wstring::npos||equal==0)continue;
+            const auto name=item.substr(0,equal);
+            if(_wcsnicmp(name.c_str(),L"RR_",3)==0||_wcsnicmp(name.c_str(),L"SDL_",4)==0||
+               _wcsnicmp(name.c_str(),L"MESA_",5)==0||_wcsnicmp(name.c_str(),L"LIBGL_",6)==0)
+                names.push_back(name);
+        }
+    }catch(...){FreeEnvironmentStringsW(block);throw;}
+    FreeEnvironmentStringsW(block);
+    for(const auto& name:names)
+        if(_wputenv_s(name.c_str(),L"")!=0)throw std::runtime_error("Cannot clear inherited diagnostic override");
+    if(_wputenv_s(L"RR_NATIVE_FIXED_WINDOW",L"1")!=0||
+       _wputenv_s(L"RR_ORIGINAL_RIDER_PRESENTATION",L"allow-native-pc-deadline60hz")!=0)
+        throw std::runtime_error("Cannot set normal native presentation policy");
+}
+inline void redirectToLog(const fs::path& path) {
+    // OPEN_ALWAYS never truncates the user's previous sessions. FILE_SHARE_READ
+    // permits readers but denies another writer for this process's lifetime.
+    HANDLE file=CreateFileW(path.c_str(),GENERIC_WRITE,FILE_SHARE_READ,nullptr,
+        OPEN_ALWAYS,FILE_ATTRIBUTE_NORMAL,nullptr);
+    if(file==INVALID_HANDLE_VALUE)
+        throw std::runtime_error("Cannot open RacerRevenge.log in the game folder. The folder may be read-only, or another game/log writer may already have it open. No alternate log location was used");
+    LARGE_INTEGER zero{};
+    if(!SetFilePointerEx(file,zero,nullptr,FILE_END)){
+        CloseHandle(file);throw std::runtime_error("Cannot append to RacerRevenge.log");
+    }
+    // GUI-subsystem startup may expose invalid CRT descriptors. Reopen the
+    // actual CRT streams on NUL first, without creating or attaching a console.
+    if(!_wfreopen(L"NUL",L"wb",stdout)||!_wfreopen(L"NUL",L"wb",stderr)){
+        CloseHandle(file);throw std::runtime_error("Cannot initialize GUI stdout/stderr streams");
+    }
+    HANDLE crashHandle=INVALID_HANDLE_VALUE;
+    if(!DuplicateHandle(GetCurrentProcess(),file,GetCurrentProcess(),&crashHandle,0,FALSE,DUPLICATE_SAME_ACCESS)){
+        CloseHandle(file);throw std::runtime_error("Cannot retain native diagnostic handle");
+    }
+    const int descriptor=_open_osfhandle(reinterpret_cast<std::intptr_t>(file),_O_WRONLY|_O_BINARY|_O_APPEND);
+    if(descriptor<0){CloseHandle(crashHandle);CloseHandle(file);throw std::runtime_error("Cannot attach native log handle");}
+    // _dup2 uses duplicate handles to the SAME file object/current position.
+    // Both standard streams share the writer lock and append destination.
+    std::fflush(stdout);std::fflush(stderr);
+    const bool okay=_dup2(descriptor,_fileno(stdout))==0&&_dup2(descriptor,_fileno(stderr))==0;
+    _close(descriptor);
+    if(!okay){CloseHandle(crashHandle);throw std::runtime_error("Cannot redirect stdout and stderr to RacerRevenge.log");}
+    // Windows-level writers and the CRT now address the same locked log.
+    if(!SetStdHandle(STD_OUTPUT_HANDLE,reinterpret_cast<HANDLE>(_get_osfhandle(_fileno(stdout))))||
+       !SetStdHandle(STD_ERROR_HANDLE,reinterpret_cast<HANDLE>(_get_osfhandle(_fileno(stderr))))){
+        CloseHandle(crashHandle);throw std::runtime_error("Cannot publish native standard log handles");
+    }
+    faultLog=crashHandle;previousFilter=SetUnhandledExceptionFilter(nativeFaultFilter);
+    std::setvbuf(stdout,nullptr,_IONBF,0);std::setvbuf(stderr,nullptr,_IONBF,0);
+    std::cout.clear();std::cerr.clear();
+    std::cout.setf(std::ios::unitbuf);std::cerr.setf(std::ios::unitbuf);
+}
+inline void sessionMarker(const char* stage) {
+    SYSTEMTIME now{};GetSystemTime(&now);
+    std::fprintf(stderr,"\n========== RacerRevenge %s UTC %04u-%02u-%02u %02u:%02u:%02u.%03u PID %lu ==========\n",
+        stage,unsigned(now.wYear),unsigned(now.wMonth),unsigned(now.wDay),unsigned(now.wHour),
+        unsigned(now.wMinute),unsigned(now.wSecond),unsigned(now.wMilliseconds),
+        static_cast<unsigned long>(GetCurrentProcessId()));
+}
+inline void visibleFailure(const std::wstring& detail,const fs::path& log) noexcept {
+    try {
+        std::wstring message=detail;
+        if(!log.empty())message+=L"\n\nLog file (if startup could open it):\n"+log.native()+
+            L"\n\nAttach RacerRevenge.log in your conversation after closing the game. Review it before sharing; nothing is uploaded automatically.";
+        MessageBoxW(nullptr,message.c_str(),L"Racer Revenge - startup / session error",MB_OK|MB_ICONERROR|MB_SETFOREGROUND);
+    }catch(...){MessageBoxW(nullptr,L"Racer Revenge could not finish startup. Check the original files and RacerRevenge.log in the game folder.",
+        L"Racer Revenge",MB_OK|MB_ICONERROR);}
+}
+inline std::wstring readableError(const char* text) {
+    if(!text)return L"Unknown native startup error.";
+    const int count=MultiByteToWideChar(CP_UTF8,MB_ERR_INVALID_CHARS,text,-1,nullptr,0);
+    if(count<=0)return L"Native startup failed; see RacerRevenge.log for details.";
+    std::wstring result(static_cast<std::size_t>(count),L'\0');
+    MultiByteToWideChar(CP_UTF8,MB_ERR_INVALID_CHARS,text,-1,result.data(),count);
+    result.resize(static_cast<std::size_t>(count)-1);return result;
+}
+template<class Entry> int run(Entry entry,int argc,char** argv,bool automatic) {
+    fs::path log;bool logging=false;FaultLogLifetime faultLifetime;
+    try {
+        const auto assets=executableDirectory();log=assets/L"RacerRevenge.log";
+        redirectToLog(log);logging=true;sessionMarker("SESSION START");
+        std::cerr<<"build_id="<<RR_WINDOWS_BUILD_ID<<" compiled="<<__DATE__<<" "<<__TIME__<<'\n';
+        std::cerr<<"native_player_entry="<<(automatic?"doubleclick":"explicit_assets")<<" executable_directory="<<utf8Path(assets)
+            <<" window=1280x896 source_canvas=640x448 telemetry=false\n";
+        if(automatic)cleanInheritedOverrides();
+        else {
+            if(!std::getenv("RR_ORIGINAL_RIDER_PRESENTATION")&&
+               _putenv_s("RR_ORIGINAL_RIDER_PRESENTATION","allow-native-pc-deadline60hz")!=0)
+                throw std::runtime_error("Cannot set normal Rider presentation policy");
+        }
+        std::cerr<<"rider_presentation="<<std::getenv("RR_ORIGINAL_RIDER_PRESENTATION")<<'\n';
+        // Exact wide directory only, never cwd/PATH search or fallback assets.
+        // ASCII relative roots avoid the legacy narrow argv/environment seam.
+        if(automatic&&!SetCurrentDirectoryW(assets.c_str()))throw std::runtime_error("Cannot open executable directory as original asset root");
+        if(automatic)for(const wchar_t* relative:{L"SLUS_202.68",L"APPSTART.RES",L"LOC.RES",L"UI/UIFONTS.RES",L"UI/UIMAIN/UIMAIN.RES"}){
+            std::error_code error;
+            if(!fs::is_regular_file(assets/relative,error)){
+                std::cerr<<"native_player_missing_original_asset="<<utf8Path(fs::path(relative))<<'\n';
+                sessionMarker("SESSION END exit=1 missing-assets");
+                visibleFailure(L"An original disc file is missing or unreadable:\n"+std::wstring(relative)+
+                    L"\n\nPlace this native EXE and its required DLLs in the folder containing your intact original disc files (including SLUS_202.68, APPSTART.RES, LOC.RES, UI and AUDIO). Do not execute or rename SLUS_202.68. No replacement assets are downloaded or substituted.",log);
+                return 1;
+            }
+        }
+        automaticEntryActive=automatic;
+        char program[]="RacerRevengePC.exe",option[]="--assets",root[]=".";
+        char* arguments[]={program,option,root,nullptr};
+        std::cerr<<"native_player_entering_normal_original_menu\n";
+        const int result=automatic?entry(3,arguments):entry(argc,argv);automaticEntryActive=false;
+        std::cerr<<"native_exit_code="<<result<<'\n';sessionMarker("SESSION END");
+        std::fflush(stdout);std::fflush(stderr);
+        if(result!=0)visibleFailure(L"The native game stopped with exit code "+std::to_wstring(result)+
+            L". RacerRevenge.log contains startup, selection, loading and error diagnostics.",log);
+        return result;
+    }catch(const std::exception& error){
+        automaticEntryActive=false;
+        if(logging){std::cerr<<"native_player_failure: "<<error.what()<<'\n';sessionMarker("SESSION END exit=1 startup-error");}
+        visibleFailure(readableError(error.what()),log);return 1;
+    }catch(...){
+        automaticEntryActive=false;
+        if(logging){std::cerr<<"native_player_failure: non-standard exception\n";sessionMarker("SESSION END exit=1 startup-error");}
+        visibleFailure(L"An unexpected native startup failure occurred.",log);return 1;
+    }
+}
+} // namespace windows_native_entry50LB
+#endif

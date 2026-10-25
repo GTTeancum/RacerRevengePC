@@ -4,8 +4,8 @@
 // Native original Main session. Included by50DU after its host diagnostics and
 // SessionExit50DU declaration. This lifetime owns no vehicle, world, race audio,
 // shared particle manager, or cold gameplay renderer. Course publishes only a
-// typed cold request, consumed after UI/GPU teardown and actual host closure.
-// The Application's same Video object survives; no GL publication is retained.
+// typed cold request, consumed after UI/GPU teardown. Normal player entry keeps
+// the same native window/context; no session GL publication is retained.
 inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headlessLive,
     const char* capturePath,std::uint64_t sessionIndex,HostMonotonicClock50ID& applicationClock,
     const rr::platform::HostTrackAdmission50IM& trackAdmission,
@@ -74,7 +74,9 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
   if(!originalMain.closeAudio())clean=false;
   if(renderer.ownsResources()&&!renderer.close(rendererDiagnostic))return false;
   if(renderer.ownsResources())return false;
-  if(host.ownsResources()&&!host.close(hostDiagnostic))clean=false;
+  if(!sourceDisplayLifetime->beginCloseAfterDependents())return false;
+  if(!originalMainApplication.retainsPlayerWindow50DU()&&
+     host.ownsResources()&&!host.close(hostDiagnostic))clean=false;
   return clean;
  };
  // Keep the original 640x448 logical/source canvas. Private target capacity
@@ -102,9 +104,24 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
   window.depthBits=24;window.stencilBits=0;
   hostRequest.headless={platform::OffscreenGlPlatform50DC::MesaSurfaceless,nativeVideo->width,nativeVideo->height,
       3,2,platform::OffscreenGlProfile50DC::Core,8,8,8,8,24,0,0};
-  if(!host.create(hostRequest,hostDiagnostic)){
+  if(host.created()){
+   require50DU(originalMainApplication.retainsPlayerWindow50DU()&&host.hasWindow()&&host.current(),
+       "original frontend requires the same retained current player window");
+  }else if(!host.create(hostRequest,hostDiagnostic)){
    reportHost50DU(hostDiagnostic);throw std::runtime_error("original frontend host creation failed");
   }
+  rr::platform::loading_progress50DU::pulse("Preparing Main");
+#if defined(_WIN32)
+  // Observe the actual current frontend context, never a guessed GPU identity.
+  using NativeGlString=const unsigned char*(*)(unsigned int);
+  const auto nativeGlString=reinterpret_cast<NativeGlString>(host.procAddress("glGetString"));
+  if(nativeGlString){
+   const char* labels[]={"vendor","renderer","version"};
+   const unsigned int fields[]={0x1f00u,0x1f01u,0x1f02u};
+   for(unsigned i=0;i<3;++i){const auto* value=nativeGlString(fields[i]);
+    std::cerr<<"native_gl_"<<labels[i]<<'='<<(value?reinterpret_cast<const char*>(value):"unavailable")<<'\n';}
+  }
+#endif
   const auto initialDrawableWidth=host.info().drawableWidth;
   const auto initialDrawableHeight=host.info().drawableHeight;
   if(initialDrawableWidth<=0||initialDrawableHeight<=0||
@@ -310,6 +327,8 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
 #if defined(_WIN32)
   std::array<std::int64_t,6> loggedSelection{{-1,-1,-1,-1,-1,-1}};
 #endif
+  rr::platform::loading_progress50DU::finish();
+  PlayerLoadingSession50DU::checkStop();
   for(;;){
    if(captureRun.deadlineExpired()){originalMain.requestQuit();break;}
    const bool tracePoll=originalMain.traceStages&&tracePolls<2;
@@ -576,6 +595,7 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
   // Preserve the original failure before any strict retained-owner cleanup
   // can terminate. This observation does not relax or skip that cleanup.
   try{std::rethrow_exception(originalFailure);}
+  catch(const PlayerLoadingCancelled50DU&){std::cerr<<"original frontend loading cancelled by window Close"<<std::endl;}
   catch(const std::exception& e){std::cerr<<"original frontend failure before cleanup: "<<e.what()<<std::endl;}
   catch(...){std::cerr<<"original frontend failure before cleanup: non-standard exception"<<std::endl;}
   if(!closeWindow()&&!closeWindow()){
@@ -584,7 +604,8 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
   // Actual output close has stopped/drained its native voices. The enclosing
   // terminal boundary retires Root services only after these session locals
   // (including the real Display) unwind, before Application destruction.
-  std::rethrow_exception(originalFailure);
+  try{std::rethrow_exception(originalFailure);}
+  catch(const PlayerLoadingCancelled50DU&){return SessionExit50DU::Quit;}
  }
  bool closed=closeWindow();
  if(!closed&&!(closed=closeWindow())){

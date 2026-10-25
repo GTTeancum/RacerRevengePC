@@ -1,4 +1,5 @@
 #pragma once
+#include "../../platform/linux/native/loading_progress50du.h"
 #include "track_materials50fa_fixture.h"
 #include "material_alpha50gx_fixture.h"
 #include "source_texture50fc_fixture.h"
@@ -451,6 +452,7 @@ public:
             };
             constexpr std::array<double,16> identity{{1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1}};
             for(std::size_t wi=0;wi<world.instances.size();++wi){
+                rr::platform::loading_progress50DU::pulse();
                 const auto& placement=world.instances[wi];d.stage="scene";d.member=placement.geometry_member;
                 const auto* entry=next->entry(placement.geometry_member);
                 if(!entry){shared::need(next->entry(placement.collision_member),"GA placement lacks both original PSG and COL");++d.collisionOnly;continue;}
@@ -469,6 +471,7 @@ public:
                 a::WorldNormalTransform50HK normalTransform;
                 shared::need(a::prepareWorldNormalTransform50HK(matrix,normalTransform),"Original GA visual/normal transform");
                 for(std::size_t si=0;si<scene.decoded.lods.front().surfaces.size();++si){
+                rr::platform::loading_progress50DU::pulse();
                     const auto& surface=scene.decoded.lods.front().surfaces[si];d.stage="surface";d.member=entry->name;
                     shared::need(surface.material_index<scene.materials.size()&&!surface.vertices.empty()&&!surface.indices.empty()&&
                         !(surface.indices.size()%3)&&surface.vertices.size()<=a::max_mesh_vertices-next->mesh.vertices.size()&&

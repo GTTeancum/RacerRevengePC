@@ -5,6 +5,7 @@ namespace original_cable_selection50LA { class Binding; }
 #include "../../src/assets/original_native_texture_upload50la.h"
 #include "../../src/game/original_camera_start_native.h"
 #include <exception>
+#include <cstdio>
 #include <limits>
 #include <memory>
 #include <thread>
@@ -609,12 +610,21 @@ inline std::unique_ptr<PositionStatsTextureLease50LA> RaceDisplayLifetime50LA::r
 inline std::shared_ptr<RaceDisplayLifetime50LA> Application::raceDisplayForSession50LA()const {
     require(rr::game::OriginalVideoPreFlipList50KG::applicationVideoEntryCurrent(*this),
         "display factory requires the live Application owner thread");
-    require(videoOwner_&&raceDisplayOwner50LA_.expired()&&!videoOwner_->host.created()&&
-        !videoOwner_->host.ownsResources(),"race display requires actual closed Application Video");
+    require(videoOwner_&&raceDisplayOwner50LA_.expired(),
+        "race display requires the actual Application Video and retired previous display");
+    // Revalidate the real host policy without resetting Video/material/source
+    // state. The previous display destructor cleared its private host link.
+    (void)videoForSession();
     require(raceDisplayGeneration50LA_!=std::numeric_limits<std::uint64_t>::max(),
         "race display generation exhausted");
     auto owner=std::shared_ptr<RaceDisplayLifetime50LA>(new RaceDisplayLifetime50LA(
         videoOwner_,raceDisplayGeneration50LA_+1,*this,textureLifetimeOwner_));
-    ++raceDisplayGeneration50LA_;raceDisplayOwner50LA_=owner;return owner;
+    ++raceDisplayGeneration50LA_;raceDisplayOwner50LA_=owner;
+    if(retainPlayerWindow50DU_)std::fprintf(stderr,
+        "native_player_display generation=%llu sdl_id=%u video=%p host=%p\n",
+        static_cast<unsigned long long>(raceDisplayGeneration50LA_),
+        static_cast<unsigned>(videoOwner_->host.nativeWindowId50DU()),
+        static_cast<void*>(videoOwner_.get()),static_cast<void*>(&videoOwner_->host));
+    return owner;
 }
 }

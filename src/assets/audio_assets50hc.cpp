@@ -1,3 +1,4 @@
+#include "../../platform/linux/native/loading_progress50du.h"
 #include "audio_assets50hc.h"
 #include "import_decode48c.h"
 #include <algorithm>
@@ -34,6 +35,9 @@ inline std::string sha256(const Bytes& input) {
     while (data.size() % 64 != 56) data.push_back(0);
     for (int i = 7; i >= 0; --i) data.push_back(static_cast<std::uint8_t>(bits >> (i * 8)));
     for (std::size_t at = 0; at < data.size(); at += 64) {
+        // Bounded host observation during authenticated cold SHA work. The
+        // hashed bytes, digest, original identity gates and source order do not change.
+        if((at&65535u)==0)rr::platform::loading_progress50DU::pulse();
         std::uint32_t w[64]{};
         for (unsigned i = 0; i < 16; ++i)
             for (unsigned j = 0; j < 4; ++j) w[i] = (w[i] << 8) | data[at+i*4+j];
@@ -175,6 +179,7 @@ bool decodeVagMono50HC(const std::uint8_t* bytes, std::size_t size, AudioPcm50HC
         constexpr int a[5] = {0, 60, 115, 98, 122}, b[5] = {0, 0, -52, -55, -60};
         std::int64_t h1 = 0, h2 = 0; bool loopStart = false, ended = false;
         for (std::size_t offset = 48; offset < 48 + payload; offset += 16) {
+            if(((offset-48)&65535u)==0)rr::platform::loading_progress50DU::pulse();
             const unsigned filter = bytes[offset] >> 4, shift = bytes[offset] & 15, flags = bytes[offset+1];
             need(filter <= 4 && shift <= 12, "unsupported.vag_predictor");
             need(flags <= 7, "unsupported.vag_flags");

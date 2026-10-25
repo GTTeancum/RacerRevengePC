@@ -1,4 +1,5 @@
 #include "import_decode48c.h"
+#include "../../platform/linux/native/loading_progress50du.h"
 #include "indexed_resource48c.h"
 #include <cstddef>
 #include <zlib.h>
@@ -234,6 +235,7 @@ bool decodeResourceData48C(const std::vector<std::uint8_t>& input, ResourceReadD
         }
         progress(hooks, "res_blocks", 0, static_cast<std::uint32_t>(blockCount));
         for (std::size_t i = 0; i < blockCount; ++i) {
+            rr::platform::loading_progress50DU::pulse();
             checkCancel(hooks, offset);
             const std::uint16_t compressedBytes = reader.u16(20 + i * 2);
             reader.range(offset, static_cast<std::size_t>(compressedBytes) + 1);
@@ -450,6 +452,7 @@ bool decodeMesh48C(const std::vector<std::uint8_t>& input, PsgMesh48C& output,
         };
         progress(hooks, "psg_vertices", 0, declaredVertices);
         while (offset < input.size() && reader.u32(offset) != 0) {
+            rr::platform::loading_progress50DU::pulse();
             checkCancel(hooks, offset);
             const std::size_t tag = unpack(0x6c, 1, 0x8000, 16);
             const std::uint32_t count = reader.u32(tag) & 0x7fff;

@@ -397,6 +397,8 @@ bool WindowHost50DQ::create(const WindowHostRequest50DQ& r, WindowHostDiagnostic
     }
     s.windowId = s.getWindowId(s.window);
     if (!s.windowId) return sdlFail(WindowHostError50DQ::WindowFailure, "SDL_GetWindowID");
+    std::fprintf(stderr,"native_window_lifetime phase=created sdl_id=%u window=%p\n",
+        static_cast<unsigned>(s.windowId),static_cast<void*>(s.window));
     s.context = s.createContext(s.window);
     if (!s.context) return sdlFail(WindowHostError50DQ::ContextFailure, "SDL_GL_CreateContext");
     if (s.makeCurrent(s.window, s.context) != 0)
@@ -560,6 +562,9 @@ bool WindowHost50DQ::release(WindowHostDiagnostic50DQ& d) noexcept {
     return true;
 }
 
+std::uint32_t WindowHost50DQ::nativeWindowId50DU()const noexcept {
+    return ownerThread()&&created()&&state_?state_->windowId:0;
+}
 bool WindowHost50DQ::poll(WindowInput50DQ& input, WindowHostDiagnostic50DQ& d) noexcept {
     d = {};
     if (!ownerThread()) return fail(d, WindowHostError50DQ::WrongThread, "poll");
@@ -741,7 +746,11 @@ bool WindowHost50DQ::closeOwned(WindowHostDiagnostic50DQ& d) noexcept {
         }
         s.controllersEnabled=false;
         if (s.context) { s.deleteContext(s.context); s.context = nullptr; }
-        if (s.window) { s.destroyWindow(s.window); s.window = nullptr; }
+        if (s.window) {
+            std::fprintf(stderr,"native_window_lifetime phase=destroyed sdl_id=%u window=%p\n",
+                static_cast<unsigned>(s.windowId),static_cast<void*>(s.window));
+            s.destroyWindow(s.window);s.window=nullptr;
+        }
         s.quit();
         s.initAttempted = false;
     }
