@@ -23,6 +23,11 @@ struct Owner {
     Sound* selectedOwner1F0=nullptr;
     rr::platform::AudioMixer50HD* mixer=nullptr;
     std::size_t firstVoice=0,voiceCount=0;
+    // Native playback identities, not source channel2C or source fields.
+    // Every overlap is retained; selectedOwner's latest handle alone cannot
+    // attest older simultaneous lap instances. Actual live Owner encloses us.
+    std::uint64_t mixerEpoch=0;
+    std::array<std::uint64_t,rr::platform::audioMaximumVoices50HD> playbackRevisions{};
     std::uint64_t providerRequests=0,playbackCalls=0,started=0,unavailable=0,noChannel=0;
     Owner()=default;Owner(const Owner&)=delete;Owner& operator=(const Owner&)=delete;
     Owner(Owner&&)=delete;Owner& operator=(Owner&&)=delete;
@@ -91,7 +96,7 @@ inline bool prepareFromPod01(Owner& out,rr::platform::AudioMixer50HD& mixer,
         for(std::size_t n=0;n<eventCount;++n)
             out.rows[n]={&out.sounds[n],out.sounds[n].fields.sample28};
         out.firstVoice=firstVoice;out.voiceCount=voiceCount;out.providerRequests=eventCount;
-        out.mixer=&mixer;error.clear();return true;
+        out.mixer=&mixer;out.mixerEpoch=mixer.groupEpoch50IC();error.clear();return true;
     }catch(const std::exception& e){try{error=e.what();}catch(...){}return false;}
     catch(...){try{error="50HE native event owner preparation failed";}catch(...){}return false;}
 }
@@ -153,6 +158,7 @@ inline DispatchReceipt dispatchLap(Owner& owner,std::uint32_t key=1,
     sound.fields.word48=sound.fields.word3C;
     r.channel=sound.fields.channel2C;
     if(!started){++owner.noChannel;r.status=DispatchStatus::CompletedNoChannel;r.after=sound.fields;return r;}
+    owner.playbackRevisions[slot]=owner.mixer->playbackRevision(slot);
     sound.fields.word24=0;sound.fields.word7C=1;++owner.started;
     r.originalV0=1;r.status=DispatchStatus::CompletedStarted;r.after=sound.fields;return r;
 }

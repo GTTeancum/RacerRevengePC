@@ -1,26 +1,40 @@
 #pragma once
+namespace original_local_flare50LA {class Emission;}
 #include "original_standard_texture_table50la.h"
 #include "original_standard_texture_lifetime50la.h"
 #include <array>
 #include <vector>
 #include <thread>
+#include <new>
+#include <optional>
+
+namespace ra_pod_scene50LA {class Owner;}
+namespace ra_cold_sources50LA {class Owner;}
+namespace sky50gw_fixture {class Owner;}
+namespace original_world_sky50LA {struct NativeSkyPalette2E38C0;}
 
 namespace original_main_entry50KG { struct Application; }
 namespace ra_crowd_image50LA { class Verifier; }
 namespace ra_tga_source50LA { class Verifier; }
+namespace ra_cold_aggregate50LA { class Owner; }
 namespace rr::platform { class OriginalUiGarageSession50KG; class OriginalUiGarageActors50GN; class OriginalUiGarageWattoOwner50KG; }
-namespace rr::game { class OriginalRacerAnimationCold50LA; class OriginalTimeStats50LA; class OriginalSpeedBoost50LA; class OriginalDamage50LA; class OriginalPositionStatsHud50LA; class OriginalPauseStorage50LA; }
+namespace rr::game { class OriginalRacerAnimationCold50LA; class OriginalTimeStats50LA; class OriginalSpeedBoost50LA; class OriginalDamage50LA; class OriginalPositionStatsHud50LA; class OriginalPauseStorage50LA; class OriginalRaceF850LA; class OriginalResults10450LA; }
 namespace rr::assets {
+class MaterialTextureAssets50EA;
+struct MaterialTextureAsset50EA;
+class OriginalResultsPrimitiveReferences50LA;
 class OriginalStandardMaterialContext50LA;
 class OriginalStandardMaterialObject50LA;
 class OriginalStandardTextureResolver50LA;
 class OriginalStandardModelGeometry50LA;
 class OriginalStandardCollisionType0Resource50LA;
 class OriginalStandardArchiveProvider50LA;
+class NativeRaceMountLease50LA;
 class OriginalUiArchive50KG;
 class OriginalAppStartTemplateCache50KG;
 class OriginalUiMaterialTemplates50KG;
 struct OriginalUiMemberIdentity50KG;
+struct OriginalUiMemberView50KG;
 class OriginalUiIpumTextureCache50KG;
 struct OriginalUiIpumProvenance50KG;
 class OriginalStandardGarageIpumLease50KG;
@@ -219,6 +233,11 @@ public:
     void clearAnimation1327D0(const rr::game::OriginalRacerAnimationCold50LA*) noexcept;
     void clearGeometry1327D0(const OriginalStandardModelGeometry50LA*) noexcept;
 private:
+    friend class ::ra_cold_aggregate50LA::Owner;
+    // Native scoped1316A0 mapping: exact producer-issued RA banks only,
+    // after real borrowers retire. Preserves process/serial UI mount backing.
+    bool retireNativeRaceMounts1316A0(NativeRaceMountLease50LA&,
+        OriginalStandardTextureDiagnostic50LA&)noexcept;
     friend class OriginalStandardModelGeometry50LA;
     friend class rr::platform::OriginalUiGarageActors50GN;
     friend class rr::platform::OriginalUiGarageWattoOwner50KG;
@@ -339,7 +358,16 @@ private:
         std::size_t bytes=0,sourceIndex=static_cast<std::size_t>(-1);
         std::size_t mount=static_cast<std::size_t>(-1),ordinal=static_cast<std::size_t>(-1);
         std::uint64_t providerRevision=0,bankGeneration=0;
+        // Separate concrete raw-RES flare capture. Never a UI archive/member
+        // identity and never a retrospective resolver File.bank observation.
+        struct NativeFlare {
+            std::shared_ptr<const std::vector<std::uint8_t>> backing;
+            const std::string* member=nullptr;
+            const void* mountIdentity=nullptr;
+            std::size_t offset=0;
+        } nativeFlare;
     };
+    bool nativeFlareSourceCurrent(const UiSelection&)const noexcept;
     bool resolve24DADC(const std::string&,std::size_t&,std::string& resolvedName,
         OriginalStandardTextureDiagnostic50LA&,UiSelection* capture=nullptr) const noexcept;
     bool validateProviderCache(OriginalStandardTextureDiagnostic50LA&) const noexcept;
@@ -455,11 +483,75 @@ private:
     friend class OriginalStandardTextureResolver50LA;
     friend class OriginalStandardMaterialObject50LA;
     friend class OriginalStandardTextureLifetime50LA;
+    friend class OriginalResultsPrimitiveReferences50LA;
     friend class rr::game::OriginalTimeStats50LA;
     friend class rr::game::OriginalSpeedBoost50LA;
     friend class rr::game::OriginalDamage50LA;
     friend class rr::game::OriginalPositionStatsHud50LA;
     friend class rr::game::OriginalPauseStorage50LA;
+    friend class rr::game::OriginalRaceF850LA;
+    friend class rr::game::OriginalResults10450LA;
+    friend class ::ra_pod_scene50LA::Owner;
+    // Only the reached actual World can construct this private source capability.
+    // No generic resolver/file-table admission or caller-created public view.
+    struct CubSource1295B0 {
+        std::shared_ptr<const ::ra_cold_sources50LA::Owner> sourcePin;
+        std::shared_ptr<OriginalStandardArchiveProvider50LA> provider;
+        const std::string* member=nullptr;
+        const std::uint8_t* memberData=nullptr;
+        std::size_t memberBytes=0,mount=0,ordinal=0;
+        std::uint64_t providerRevision=0,bankGeneration=0;
+        const std::uint8_t* authenticatedMemberData=nullptr;
+        const ::sky50gw_fixture::Owner* imageOwner=nullptr;
+        const MaterialTextureAssets50EA* bank=nullptr;
+        const MaterialTextureAsset50EA* image=nullptr;
+        ::original_world_sky50LA::NativeSkyPalette2E38C0* palette=nullptr;
+        std::size_t tileOrdinal=0,tileOffset=0,tileBytes=0;
+        std::uint32_t face=0,tile=0,descriptorWord0=0;
+    };
+    struct CubAlignedDelete {
+        void operator()(std::uint8_t* p)const noexcept {::operator delete(p,std::align_val_t(64));}
+    };
+    struct CubMip24F7B8 {
+        std::unique_ptr<std::uint8_t,CubAlignedDelete> allocation;
+        std::size_t allocationBytes=0,sourceLengthOffset=0,sourcePayloadOffset=0;
+        const std::uint8_t* pointer100=nullptr;
+        const std::uint8_t* codec118=nullptr;
+        std::int32_t width104=-1,blocks108=-1,logWidth10C=-1,height110=-1,logHeight114=-1;
+        std::int32_t bytes11C=-1,height128=-1,width12C=-1;
+        std::uint16_t width124=0xffff;
+        std::uint8_t flags130=0,flags130KnownMask=3;
+        bool payloadRead=false;
+    };
+    struct CubBuffer257750 {
+        // Source object0x20 bytes; native pointers are wider, explicitly adapted.
+        std::unique_ptr<std::uint8_t,CubAlignedDelete> backing;
+        std::uint8_t* first00=nullptr;
+        std::uint8_t* current04=nullptr;
+        std::uint32_t capacity08=0,field0C=0,field10=0,field14=0,field18=0,field1C=0;
+    };
+    struct CubFacet1295B0 {
+        CubSource1295B0 source;
+        std::array<CubMip24F7B8,5> mips;
+        std::unique_ptr<CubBuffer257750> bufferFCOwner;
+        CubBuffer257750* bufferFC=nullptr; //257740 null; published only after2592D0.
+        std::array<std::uint32_t,5> offsetWords{};
+        std::size_t orderedReadBytes=0,compressedAllocationBytes=0,finalCursor=0;
+        std::uint32_t lastPC=0x24e1b0;
+        std::optional<std::int32_t> fieldA8;
+        bool constructed24E1B0=false,loadAttempted=false,loadActive=false;
+        bool loadComplete24F2C0=false,finished2516F0=false;
+    };
+    std::unique_ptr<CubFacet1295B0> cub_;
+    bool constructCub24E1B0(const CubSource1295B0&,
+        std::shared_ptr<const OriginalStandardMaterialContext50LA>,OriginalStandardTextureDiagnostic50LA&)noexcept;
+    bool loadCub24F2C0(std::size_t&,const std::array<std::uint32_t,5>&,
+        OriginalStandardTextureDiagnostic50LA&)noexcept;
+    bool finishCub2516F0(std::uint32_t,std::uint32_t,std::uint32_t,
+        OriginalStandardTextureDiagnostic50LA&)noexcept;
+    bool cubSourceCurrent1295B0()const noexcept;
+    bool canRetireCub24E370()const noexcept;
+    bool withdrawCubPaletteBorrow()noexcept;
     static std::shared_ptr<OriginalStandardTextureResource50LA> allocate();
     bool construct24DA30(std::shared_ptr<OriginalStandardTextureResolver50LA>,std::size_t,
         const std::string& resolvedName,
@@ -494,6 +586,13 @@ private:
     // Exact1BAE00 stores; the Pause owner proves each original resource lease.
     bool demandPause1BAE00(std::uint32_t storePC,bool& written,
         OriginalStandardTextureDiagnostic50LA&) noexcept;
+    // Exact199350 three stores. The actual F8 owner proves the retained
+    // font / first-pass icon resource before requesting this CPU demand floor.
+    bool demandRaceF8199350(std::uint32_t storePC,bool& written,
+        OriginalStandardTextureDiagnostic50LA&) noexcept;
+    // Exact Results slot40 per-occurrence floor, not a preload or image selection.
+    bool demandResults1C15B0(std::uint32_t storePC,bool& written,
+        OriginalStandardTextureDiagnostic50LA&) noexcept;
     bool demandSelection249580(bool& written,OriginalStandardTextureDiagnostic50LA&) noexcept;
     bool demand104A00(float,bool& written,OriginalStandardTextureDiagnostic50LA&) noexcept;
     void resetDemand14D1A8() noexcept;
@@ -501,6 +600,15 @@ private:
     // resolver File.bank association. Cached aliases never replace it.
     OriginalStandardTextureResolver50LA::UiSelection firstUiSource_;
     bool firstUiSourceCurrent()const noexcept;
+    // Results' actual reference ledger fences its immutable creator thread.
+    // Called on the live texture-table object, not on a guessed ATM child.
+    // This only authenticates pixels; no material policy/service/GPU authority.
+    friend class ::original_local_flare50LA::Emission;
+    bool borrowLocalFlarePstImage50LA(std::shared_ptr<const std::vector<std::uint8_t>>&,
+        const std::string*&,const std::uint8_t*&,std::size_t&)const noexcept;
+    bool borrowResultsUiPstImage50LA(const OriginalStandardTextureResource50LA& selected,
+        std::shared_ptr<const OriginalUiArchive50KG>&,OriginalUiMemberView50KG&,
+        std::size_t& offset,std::size_t& bytes)const noexcept;
     std::shared_ptr<OriginalStandardTextureResolver50LA> resolver_;
     std::shared_ptr<const OriginalStandardMaterialContext50LA> construction_;
     OriginalStandardTextureLifetimeLink50LA lifetimeLink_;

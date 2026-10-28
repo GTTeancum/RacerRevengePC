@@ -17,10 +17,10 @@ struct Math {
     }
 };
 }
-bool applySpringForce48L(const V& normal,const V& point,float penetration,
-    const SpringForceParameters48L& p,const SpringImpactBody48K& primary,
-    const SpringImpactBody48K* other,SpringFrictionResult48J& output) noexcept {
-    if(other==&primary||!finite(normal)||!finite(p.contactVelocity120)||
+bool prepareSpringWorldForcePrefix48L(const V& normal,float penetration,
+    const SpringForceParameters48L& p,const BodyParameters48C& primary,
+    const BodyParameters48C* other,V& output)noexcept {
+    if(!finite(normal)||!finite(p.contactVelocity120)||
        !std::isfinite(penetration)||!std::isfinite(p.maxPenetration90)||!std::isfinite(p.maxSpeed94))return false;
     const bool impact=p.impact54&&(!other||!p.otherSpring58);
     const float stiffness=impact?p.impactStiffnessA4:p.stiffness9C;
@@ -28,13 +28,13 @@ bool applySpringForce48L(const V& normal,const V& point,float penetration,
     if(!std::isfinite(stiffness)||!std::isfinite(damping))return false;
     Math math;float ratio=1;
     if(other) {
-        if(!std::isfinite(primary.parameters.mass)||!std::isfinite(other->parameters.mass))return false;
-        if(primary.parameters.mass<=other->parameters.mass) {
-            if(!std::isfinite(other->parameters.inverseMass))return false;
-            ratio=math.mul(primary.parameters.mass,other->parameters.inverseMass);
+        if(!std::isfinite(primary.mass)||!std::isfinite(other->mass))return false;
+        if(primary.mass<=other->mass) {
+            if(!std::isfinite(other->inverseMass))return false;
+            ratio=math.mul(primary.mass,other->inverseMass);
         } else {
-            if(!std::isfinite(primary.parameters.inverseMass))return false;
-            ratio=math.mul(primary.parameters.inverseMass,other->parameters.mass);
+            if(!std::isfinite(primary.inverseMass))return false;
+            ratio=math.mul(primary.inverseMass,other->mass);
         }
     }
     // Scalar MIN.S/MAX.S use signed-word ordering, including -0 below +0.
@@ -47,9 +47,18 @@ bool applySpringForce48L(const V& normal,const V& point,float penetration,
     const float clamped=detail::scalarMin48O(lower,p.maxSpeed94);
     const float damped=math.sub(spring,math.mul(damping,clamped));
     const float magnitude=math.mul(ratio,detail::scalarMax48O(damped,0.f));
+    V result{};
+    for(unsigned i=0;i<3;++i)result.v[i]=math.mul(magnitude,normal.v[i]);
+    if(!math.valid)return false;output=result;return true;
+}
+bool applySpringForce48L(const V& normal,const V& point,float penetration,
+    const SpringForceParameters48L& p,const SpringImpactBody48K& primary,
+    const SpringImpactBody48K* other,SpringFrictionResult48J& output) noexcept {
+    if(other==&primary)return false;
     SpringFrictionResult48J result{};
-    for(unsigned i=0;i<3;++i)result.worldForce.v[i]=math.mul(magnitude,normal.v[i]);
-    if(!math.valid||!addSpringPointForce48J(primary.state.scene,primary.state.loads,
+    if(!prepareSpringWorldForcePrefix48L(normal,penetration,p,primary.parameters,
+        other?&other->parameters:nullptr,result.worldForce))return false;
+    if(!addSpringPointForce48J(primary.state.scene,primary.state.loads,
         p.pointForce,result.worldForce,point,result.primary))return false;
     if(other) {
         V opposite{};for(unsigned i=0;i<3;++i)opposite.v[i]=-result.worldForce.v[i];
@@ -57,6 +66,13 @@ bool applySpringForce48L(const V& normal,const V& point,float penetration,
             p.pointForce,opposite,point,result.other))return false;
     }
     output=result;return true;
+}
+bool prepareSpringInwardDelta48L(const V& normal,const V& cached,V& output)noexcept {
+    if(!finite(normal)||!finite(cached))return false;
+    Math math;const float speed=math.dot(cached,normal);
+    const float correction=-detail::scalarMin48O(speed,0.f);
+    V result{};for(unsigned i=0;i<3;++i)result.v[i]=math.mul(correction,normal.v[i]);
+    if(!math.valid)return false;output=result;return true;
 }
 bool removeSpringInwardVelocity48L(const V& normal,const V& cached,
     const V& primaryVelocity,V& output) noexcept {

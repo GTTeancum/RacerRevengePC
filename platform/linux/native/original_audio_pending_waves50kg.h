@@ -28,6 +28,9 @@ class OriginalAudioPendingWaves50KG final {
  using Directory=assets::OriginalAudioDirectory50KX;
  friend struct ::original_main_entry50KG::Application;
  friend class OriginalAudioSampleCache50KG;
+ // Actual same-root Aural may validate this namespace and invalidate its
+ // native cache at268300, but must not clear these independent98A4 rows.
+ friend class OriginalApplicationAural50KG;
  friend class OriginalUiGaragePodScene50KG;
  // Exact members can register/check retirement, but cannot construct the
  // separate nested root capability needed for namespace root operations.

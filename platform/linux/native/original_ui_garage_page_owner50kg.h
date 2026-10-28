@@ -313,7 +313,7 @@ private:
     // One genuine private1FDE70 invocation. The enclosing input consumer must
     // call once per translated source event, not replay a completed receipt.
     // A failure after any source prefix permanently closes this cursor.
-    enum class InputPhase : std::uint8_t {idle,planned,stateWrite,group,request,watto,effect,transport,returned,failed};
+    enum class InputPhase : std::uint8_t {idle,planned,stateWrite,group,confirmation,apply,request,watto,effect,transport,returned,failed};
     struct InputOutcome {
         enum class Status : std::uint8_t {unavailable,ignored,completed,failed};
         Status status=Status::unavailable;
@@ -324,6 +324,7 @@ private:
         std::uint32_t sourceReturn=0,sourcePC=0;
     };
     InputPhase inputPhase_=InputPhase::idle;
+    bool purchaseConfirmationPending_=false,purchaseCommitted_=false;
     std::uint64_t inputSerial_=0,inputTransportBoundary_=0;
     std::uint32_t inputSource_=0,inputController_=0,inputFailurePC_=0;
     bool inputEffectsCommitted_=false,inputRequestWritten_=false;

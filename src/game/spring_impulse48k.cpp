@@ -54,6 +54,58 @@ bool bodyFinite(const SpringImpactBody48K& b) noexcept {
     return true;
 }
 }
+bool prepareSpringImpactImpulsePrefix48K(const V& normal,const V& point,
+    const SpringImpactParameters48K& p,const SpringImpactBody48K& primary,
+    const SpringImpactBody48K* other,SpringImpactImpulsePrefix48K& output)noexcept {
+    if(!finite(normal)||!finite(point)||!finite(p.contactVelocity120)||!bodyFinite(primary)||other==&primary)return false;
+    if(other&&(!bodyFinite(*other)||!std::isfinite(other->parameters.mass)))return false;
+    Math m;
+    const float restitution=other?(other->parameters.mass>1000?.25f:p.restitutionC0):(normal.v[1]>.8f?p.restitutionBC:p.restitutionB8);
+    V arm{},otherArm{};
+    if(!p.disableLeverArms5C){
+        arm=m.inverse(primary.state.scene,m.difference(point,p.worldCenter110));
+        if(other)otherArm=m.inverse(other->state.scene,m.difference(point,m.transform(other->state.scene,other->localCenter,true)));
+    }
+    const auto localNormal=m.inverse(primary.state.scene,normal);
+    const float primaryRot=m.dot(localNormal,m.cross(m.inertia(primary.parameters,m.cross(arm,localNormal)),arm));
+    float otherRot=0,otherInv=0;
+    if(other){
+        const auto localOtherNormal=m.inverse(other->state.scene,normal);otherInv=other->parameters.inverseMass;
+        otherRot=m.dot(localOtherNormal,m.cross(m.inertia(other->parameters,m.cross(otherArm,localOtherNormal)),otherArm));
+    }
+    const float effective=m.div(1,m.add(otherRot,m.add(otherInv,m.add(primary.parameters.inverseMass,primaryRot))));
+    const float normalSpeed=m.dot(p.contactVelocity120,normal);
+    SpringImpactImpulsePrefix48K result{};
+    result.arm=arm;result.otherArm=otherArm;result.effectiveMass=effective;
+    result.normalSpeed=normalSpeed;result.inward=normalSpeed<0;
+    if(result.inward)result.impulse=m.scale(m.mul(effective,m.mul(-m.add(1,restitution),normalSpeed)),normal);
+    if(!m.valid)return false;output=result;return true;
+}
+bool prepareSpringImpactAngularPrefix48K(const V& arm,const V& localImpulse,
+    const BodyParameters48C& parameters,float scale,bool yawOnly,V& output)noexcept {
+    if(!finite(arm)||!finite(localImpulse)||!std::isfinite(scale))return false;
+    for(const auto& column:parameters.inverseInertiaColumns)if(!finite(column))return false;
+    Math m;const auto value=m.scale(scale,yaw(m.inertia(parameters,m.cross(arm,localImpulse)),yawOnly));
+    if(!m.valid)return false;output=value;return true;
+}
+bool prepareSpringImpactTorqueArm48K(const BodyParameters48C& parameters,const V& torque,
+    const V& arm,V& output)noexcept {
+    if(!finite(torque)||!finite(arm))return false;
+    for(const auto& column:parameters.inverseInertiaColumns)if(!finite(column))return false;
+    Math m;const auto value=m.cross(m.inertia(parameters,torque),arm);
+    if(!m.valid)return false;output=value;return true;
+}
+bool prepareSpringCorrectionDelta48K(const V& current,const V& incoming,V& output)noexcept {
+    if(!finite(current)||!finite(incoming))return false;
+    Math m;const float square=m.dot(current,current);
+    volatile float root=static_cast<float>(std::sqrt(static_cast<double>(square)));
+    const float q=square==0?std::numeric_limits<float>::max():m.div(1,root);
+    const V unit=m.scale(q,current);const float projection=m.dot(incoming,unit);
+    const V perpendicular=m.difference(incoming,m.scale(projection,unit));
+    const float excess=m.sub(projection,root);
+    const auto delta=m.sum(perpendicular,m.scale(excess>0?excess:0,unit));
+    if(!m.valid)return false;output=delta;return true;
+}
 bool applySpringImpact48K(const V& normal,const V& point,float penetration,
     const SpringImpactParameters48K& p,const SpringImpactBody48K& primary,
     const SpringImpactBody48K* other,SpringImpactResult48K& output) noexcept {

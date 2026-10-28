@@ -3,7 +3,10 @@
 #include "track_static_candidates50ig_fixture.h"
 #include "ra_trigger_candidates50la.h"
 namespace ra_collision_resources50LA {class Owner;}
+namespace ra_pod_scene50LA {class Owner;}
 namespace ra_cold_aggregate50LA { class Owner; }
+#include <array>
+#include <string>
 #include <memory>
 #include <utility>
 
@@ -14,12 +17,22 @@ namespace ra_static_candidates50LA {
 // Course admission or a source parent. Root supplies actual namespace bindings.
 class Owner final {
     friend class ra_collision_resources50LA::Owner;
+    friend class ::ra_pod_scene50LA::Owner;
     friend class ra_cold_aggregate50LA::Owner;
     friend class ra_static_registry50LA::ColdStage;
     friend class ra_cold_aggregate50LA::Owner;
     friend class ra_source_camera50LA::OwnershipBridge;
     // Declared first: every candidate/radius borrow dies before source backing.
     std::shared_ptr<const ra_cold_sources50LA::Owner> source_;
+    // Native descriptor metadata for the actual178 COL candidates ONLY.
+    // No second3CC, wrapper Entity, geometry, registry or physics object.
+    // Declared before candidates so their aliases retire before this backing.
+    struct NativeTerrainDescriptor {
+        const rr::assets::WorldInstance48F* source=nullptr;
+        std::string name00;
+        std::uint32_t field180=0; //27B004 default, not a terrain inference.
+    };
+    std::array<NativeTerrainDescriptor,178> terrainDescriptors_{};
     std::vector<rr::game::Type2StaticCandidate49X> candidates_;
     std::vector<track_static_candidates50IG::Radii> radii_;
     std::vector<track_runtime_storage50IG::Binding> bindings_;

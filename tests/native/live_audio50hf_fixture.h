@@ -53,9 +53,58 @@ inline constexpr std::size_t unsupportedTriggerCues() noexcept{return gameplay_a
 // All public methods belong to the simulation/main thread. Backend callbacks
 // only consume the output's separately owned PCM ring.
 class Owner final {
+    friend class rr::platform::OriginalApplicationAural50KG;
+    bool canStopResultsGameplay26D070(const rr::platform::AudioMixer50HD&,
+        const rr::platform::RaceAudioGroups50IC&,std::uint64_t)const noexcept;
+    bool resultsGameplayStopVoice26D070(std::size_t n,std::size_t& slot)const noexcept {
+        return provider_.resultsStopVoice26D070(n,slot);
+    }
+    void stopResultsGameplayPreflighted26D070()noexcept {
+        provider_.stopResultsNativePreflighted26D070();
+    }
+    bool canStopResultsLap26D070(const rr::platform::AudioMixer50HD& mixer,
+        const rr::platform::RaceAudioGroups50IC& groups,std::uint64_t session)const noexcept {
+        if(!canStopResultsGameplay26D070(mixer,groups,session)||lap_.mixer!=&mixer||
+           lap_.mixerEpoch!=mixer.groupEpoch50IC()||!lap_.voiceCount||
+           lap_.firstVoice>=mixer.count()||lap_.voiceCount>mixer.count()-lap_.firstVoice||
+           !mixer.canRecordControlChanges(lap_.voiceCount))return false;
+        for(std::size_t n=0;n<pod_audio50HE::eventCount;++n){
+            const auto& s=lap_.sounds[n];const auto& row=lap_.rows[n];
+            if(s.authored.key!=n+1||row.owner!=&s||s.fields.resourceIndexA0!=static_cast<std::int32_t>(n)||
+               s.authored.stereo||s.authored.stream||s.authored.loop!=(n>=2)||
+               row.sampleResult!=s.fields.sample28)return false;
+        }
+        // Only actual dispatchLap event1 has this transport. Do not infer
+        // permission for other authenticated but unimplemented event rows.
+        const auto& sound=lap_.sounds[0];
+        if(lap_.selectedOwner1F0&&lap_.selectedOwner1F0!=&sound)return false;
+        for(std::size_t n=0;n<lap_.voiceCount;++n){const auto slot=lap_.firstVoice+n;
+            rr::platform::AudioVoiceObservation50HD v;
+            if(groups.binding(slot)!=rr::game::RaceAudioGroup50IC::Effects110||
+               !mixer.inspectVoice(slot,v)||!v.groupKnown||
+               v.playbackRevision!=lap_.playbackRevisions[slot])return false;
+            if(!v.playbackRevision){if(v.voice.active)return false;continue;}
+            const auto& a=v.voice.clip;const auto& b=sound.clip;
+            if(sound.availability!=rr::assets::AudioAssetState50HC::ready||
+               sound.fields.sample28!=0||!rr::platform::AudioMixer50HD::validClip(b)||
+               a.samples!=b.samples||a.frames!=b.frames||a.sampleRate!=b.sampleRate||
+               a.channels!=b.channels||a.loopStart!=b.loopStart||a.loopEnd!=b.loopEnd||
+               v.voice.loop)return false;
+        }
+        return true;
+    }
+    std::size_t resultsLapStopCount26D070()const noexcept{return lap_.voiceCount;}
+    std::size_t resultsLapStopVoice26D070(std::size_t n)const noexcept {
+        return n<lap_.voiceCount?lap_.firstVoice+n:rr::platform::audioMaximumVoices50HD;
+    }
+    void stopResultsLapPreflighted26D070()noexcept {
+        for(std::size_t n=0;n<lap_.voiceCount;++n)mixer_.stop(lap_.firstVoice+n);
+        // Preserve selectedOwner, latest source channel2C/24/7C, retained PCM,
+        // every captured native overlap identity and existing callback order.
+    }
 public:
     Owner()=default;
-    ~Owner()noexcept {rr::platform::AudioOutputDiagnostic50HD diagnostic;close(diagnostic);}
+    ~Owner()noexcept;
     Owner(const Owner&)=delete;Owner& operator=(const Owner&)=delete;
     Owner(Owner&&)=delete;Owner& operator=(Owner&&)=delete;
 

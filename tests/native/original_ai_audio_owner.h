@@ -19,6 +19,28 @@ namespace native_original_ai_audio {
 // Native phase policy: D48/D40 after the represented body children; Aural at
 // the accepted world-audio boundary. Full retail child chronology is unclaimed.
 class Owner final {
+    friend class rr::platform::OriginalApplicationAural50KG;
+    // Additional SAME-owner original PCM: D40 wreck sounds, all roster D44
+    // arrays (including actual human row0), and each AI D48 speech provider.
+    // Private uncalled leaves until Aural adds aggregate claims/capacity.
+    bool canStopResultsAuxiliary26D070(const rr::platform::AudioMixer50HD&,
+        const rr::platform::RaceAudioGroups50IC&,std::uint64_t)const noexcept;
+    std::size_t resultsAuxiliaryStopCount26D070()const noexcept;
+    std::size_t resultsAuxiliaryStopVoice26D070(std::size_t)const noexcept;
+    void stopResultsAuxiliaryPreflighted26D070()noexcept;
+    bool canStopResultsEngines26D070(const rr::platform::AudioMixer50HD&,
+        const rr::platform::RaceAudioGroups50IC&,std::uint64_t)const noexcept;
+    std::size_t resultsEngineStopCount26D070()const noexcept {
+        return (racerCount_-firstAiSlot_)*3;
+    }
+    std::size_t resultsEngineStopVoice26D070(std::size_t ordinal)const noexcept {
+        if(ordinal>=resultsEngineStopCount26D070())return rr::platform::audioMaximumVoices50HD;
+        return racers_[firstAiSlot_+ordinal/3].loops.resultsStopVoice26D070(ordinal%3);
+    }
+    void stopResultsEnginesPreflighted26D070()noexcept {
+        for(std::size_t i=firstAiSlot_;i<racerCount_;++i)
+            racers_[i].loops.stopResultsNativePreflighted26D070();
+    }
     using E=rr::game::OriginalAiEngineEmitter;
     using Sound=rr::game::OriginalAiEmitterSound;
     using Channel=rr::platform::LogicalAudioOwner;
@@ -35,7 +57,7 @@ class Owner final {
 public:
     Owner()=default;
     Owner(const Owner&)=delete;Owner& operator=(const Owner&)=delete;
-    ~Owner(){close();}
+    ~Owner();
     bool prepare(const std::array<opponent_audio50HX::Source,8>& sources,
         const std::filesystem::path& audioRoot,const rr::assets::AudioBank50HC& events,
         rr::platform::AudioMixer50HD& mixer,std::uint64_t session,std::uint16_t actualPacked1125C,std::string& error) {

@@ -1,3 +1,5 @@
+namespace ra_pod_scene50LA {class Owner;}
+namespace original_local_flare50LA {class Emission;}
 #pragma once
 namespace original_cable_selection50LA { class Binding; }
 #include "original_application_entities50la.h"
@@ -13,6 +15,7 @@ class OriginalPodCableAllocation50LA;
 // interpreter or submission capability. A later native renderer consumes these
 // typed attributes after their genuine producers have supplied every value.
 class OriginalCableStripAttributes50LA final {
+    friend class ::original_local_flare50LA::Emission;
 public:
     struct Scalar {
         std::optional<float> value;
@@ -54,6 +57,7 @@ public:
     const VertexCopies* originalVertices()const noexcept{return group_?group_->aliases.get():nullptr;}
 private:
     friend class OriginalPodCableAllocation50LA;
+    friend class ::ra_pod_scene50LA::Owner; //Concrete14AB30 and1B3BB0 World strip services; no racer-owner substitution.
     friend class ::original_cable_selection50LA::Binding;
     friend class OriginalRacerStripOwners50LA;
     using Matrix=std::array<std::array<float,4>,4>;

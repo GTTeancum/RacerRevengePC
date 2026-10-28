@@ -35,9 +35,15 @@ public:
     bool acceptReachedSourceDispatch50MB(std::uint32_t actualShapeMode,bool bound) noexcept {
         if(!bound)return false;value_=actualShapeMode;written_=true;return true;
     }
+    // Reached11DD64/11DD6C only. Unlike121920 this does not touch or
+    // authenticate the lazy GP8184/sentinel3E0860 lanes or normal-mode word.
+    void acceptReachedLimitedQueryCounts11DD00() noexcept {
+        worldGlobals_.count3DFDC0=0;worldGlobals_.count3DFDC8=0;limitedCountsWritten_=true;
+    }
+    bool limitedQueryCountsKnown11DD00()const noexcept{return limitedCountsWritten_;}
     void acceptCompletedWorldReset() noexcept {
         if(!worldGlobals_.initializedGp8184){worldGlobals_.sentinel3E0860=0xffffffffu;worldGlobals_.initializedGp8184=1;}
-        worldGlobals_.count3DFDC0=0;worldGlobals_.count3DFDC8=0;worldGlobalsWritten_=true;
+        worldGlobals_.count3DFDC0=0;worldGlobals_.count3DFDC8=0;worldGlobalsWritten_=true;limitedCountsWritten_=true;
     }
     const CollisionWorldQueryGlobals50JA* completedWorldGlobals()const noexcept {
         return worldGlobalsWritten_?&worldGlobals_:nullptr;
@@ -52,7 +58,7 @@ public:
     }
 private:
     CollisionWorldQueryGlobals50JA worldGlobals_{};
-    bool worldGlobalsWritten_=false;
+    bool worldGlobalsWritten_=false,limitedCountsWritten_=false;
     std::uint32_t value_=0; // unread until written_, not a source initializer
     bool written_=false;
 };

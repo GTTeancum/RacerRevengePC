@@ -6,6 +6,10 @@
 namespace rr::game {
 inline bool OriginalRaceConstructor50LA::retireNativeWorldAndGroups(std::uint32_t& pc,const char*& gate)noexcept {
     pc=0;
+    //Native lexical HUD custody must revoke before Camera/world teardown.
+    //This is not an original1A6840 HUD-null store or destructor receipt.
+    gate="race native HUD borrow revocation";
+    if(!endHud_.expired())return false;
     // The scheduler must actually detach this owner first. Only the exact
     // represented six-child chain is admitted; unknown children are not skipped.
     gate="race detached identity/flags/children";
@@ -15,7 +19,7 @@ inline bool OriginalRaceConstructor50LA::retireNativeWorldAndGroups(std::uint32_
        !application_->entityAuthority_.canRetire(entity_)||raceGroupCount_>6||
        raceGroupsAttached_>raceGroupCount_||
        entity_.firstChild18!=(raceGroupsAttached_?raceGroups_[0]:nullptr))return false;
-    if(raceAudio_&&(raceGroupCount_||raceAudio_->coldStarted_||world74_)){
+    if(raceAudio_&&(raceGroupCount_||raceAudio_->coldStarted_||world74_||gcWorld74_||gaWorld74_||maWorld74_||saWorld74_)){
         auto& audio=*raceAudio_;
         gate="race audio canonical identity/epoch/thread";
         if(audio.coldApplication_!=application_||audio.coldSession_!=entity_.sessionGeneration||
@@ -37,17 +41,34 @@ inline bool OriginalRaceConstructor50LA::retireNativeWorldAndGroups(std::uint32_
         // provider preparation is handled by the same actual membership ledger.
         gate="native stopped voice membership retirement";
         if(audio.mixer_&&!audio.retireNativeVoiceBindings())return false;
-    }else if(raceGroupCount_||world74_||taWorld74_){gate="missing audio owner with acquired race children";return false;}
+    }else if(raceGroupCount_||world74_||taWorld74_||gcWorld74_||gaWorld74_||maWorld74_||saWorld74_){gate="missing audio owner with acquired race children";return false;}
     if(world74_){
         // Actual aggregate borrows, renderer publication, runtime topology and
         // resource gates remain authoritative. Failure retains this same owner.
         gate="actual aggregate native loaded-world retirement";
+        nativeWater70Domain_.reset();nativeWater70Object_.reset();nativeWater70State_=NativeWater70State::withdrawn;
         if(!world74_->closeNativeLoadedWorld())return false;
         world74_.reset();
     }
     if(taWorld74_||taWorldCounted_){
         gate="actual TA counted world-prefix retirement";
         if(!retireNativeTaWorldPrefix(pc))return false;
+    }
+    if(gcWorld74_||gcWorldCounted_){
+        gate="actual GC counted world-prefix retirement";
+        if(!retireNativeGcWorldPrefix(pc))return false;
+    }
+    if(maWorld74_||maWorldCounted_){
+        gate="actual MA counted world-prefix retirement";
+        if(!retireNativeMaWorldPrefix(pc))return false;
+    }
+    if(saWorld74_||saWorldCounted_){
+        gate="actual SA counted world-prefix retirement";
+        if(!retireNativeSaWorldPrefix(pc))return false;
+    }
+    if(gaWorld74_||gaWorldCounted_){
+        gate="actual GA counted world-prefix retirement";
+        if(!retireNativeGaWorldPrefix(pc))return false;
     }
     // This existing native unwind kernel performs exact canonical detach and
     // actual acquired empty-group release, with retryable partial progress.
@@ -60,7 +81,18 @@ inline bool Application::closeNativeConsumedRace(rr::game::OriginalRaceConstruct
     rr::assets::OriginalStandardMaterialDiagnostic50LA& d)const noexcept {
     using S=rr::assets::OriginalStandardMaterialStatus50LA;
     d={};
+    // Immutable affinity precedes every mutable Application/Race slot read.
+    if(garageAudioOwnerThread_!=std::this_thread::get_id()){
+        d.status=S::phase;d.field="consumed race actual Application thread";return false;
+    }
     // Keep the actual slot-backed owner alive even if the caller borrowed it.
+    // A real pending Results input owns this Application's Race/Camera/Video
+    // transaction. Its closeWindow path cancels the backend and releases it
+    // first. Refuse alternate close attempts BEFORE any detach/F8/UI effects;
+    // the actual Results unique_ptr may not die beneath its retained issuer.
+    if(resultsInputContinuation50LA_){
+        d.status=S::phase;d.field="actual Results input/fade must cancel before Race retirement";return false;
+    }
     const auto publishedOwner=sourceRace28COwner_;
     if((publishedOwner&&publishedOwner.get()!=&owner)||
        raceConstructorColdOwner50LA_.lock().get()!=&owner||owner.application_!=entitiesOwner_){
@@ -74,8 +106,30 @@ inline bool Application::closeNativeConsumedRace(rr::game::OriginalRaceConstruct
        (owner.loadDisplay_&&!owner.loadDisplay_->ownerThread())){d.status=S::phase;d.field="consumed race profile/display thread";return false;}
     std::uint32_t pc=0;
     const char* gate=nullptr;
+    // Human native publication must detach its actual Race head (including
+    //a sibling-only failed append prefix) BEFORE child F8 retirement. The
+    //spectator path is unchanged; UI siblings remain for their later cleanup.
+    if(!owner.detachNativeHumanResultsRoot50LA(gate)){d.status=S::phase;d.field=gate;return false;}
+    //F8 is a Race CHILD, so its known cold child release precedes the
+    //derived Race's explicit Pause100/Results104 sibling cleanup. This does
+    //not certify full142590 over unrepresented original children.
+    if(!owner.retireF8Cold(gate)){d.status=S::phase;d.field=gate;return false;}
     if(!owner.retireNativePauseParent(gate)){d.status=S::phase;d.field=gate;return false;}
+    // The same lexical provider scope must revoke before its borrowed state
+    // or the counted music manager retires. Native cleanup, not1A3AF0 IO.
+    if(!retireConsumedRaMusicNative10C(owner,pc)){
+        d.status=S::phase;d.sourcePC=pc;d.field="actual counted music10C native retirement";return false;
+    }
+    //Detached B4 count only: no stale manager reset or original array frees.
+    if(!owner.retireNativeTimingB4(pc)){
+        d.status=S::phase;d.sourcePC=pc;d.field="actual counted B4 native retirement";return false;
+    }
     if(!owner.retireNativeWorldAndGroups(pc,gate)){d.status=S::phase;d.sourcePC=pc;d.field=gate;return false;}
+    // World close has revoked the actual native Camera adapter. Retire its
+    // counted, unselected source prefix before releasing Display/FIFO custody.
+    if(!retireConsumedRaCameraNative34(owner,pc)){
+        d.status=S::phase;d.sourcePC=pc;d.field="counted Race34 native camera retirement";return false;
+    }
     // Reuse real FIFO retirement and backing release. These kernels are native
     // ownership cleanup; this entry does not certify original1A6840 callbacks.
     if(!rollbackNativeRaceLoadPrefix(owner,d)){

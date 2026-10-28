@@ -7,7 +7,9 @@
 #include <exception>
 #include <memory>
 #include <string>
+#include <vector>
 
+namespace rr::game { class OriginalResults10450LA; class OriginalRaceF850LA; }
 namespace original_main_entry50KG { struct Application; }
 namespace rr::platform { class OriginalUiGarageScreenText50KG; }
 namespace rr::assets {
@@ -30,12 +32,16 @@ struct OriginalApplicationFontDiagnostic50LA {
 class OriginalApplicationFonts50LA final {
     friend struct original_main_entry50KG::Application;
     friend class rr::game::OriginalPauseStorage50LA;
+    friend class rr::game::OriginalResults10450LA;
+    friend class rr::game::OriginalRaceF850LA;
     friend class rr::platform::OriginalUiGarageScreenText50KG;
 public:
-    enum class Name : std::uint8_t { eurostile13=0, denmark16=1, eurostileItalic26=2, frontendDenmrk16=3, frontendVenus16=4, frontendDenmrk14=5 };
+    enum class Name : std::uint8_t { eurostile13=0, denmark16=1, eurostileItalic26=2, frontendDenmrk16=3, frontendVenus16=4, frontendDenmrk14=5, frontendVenus14=6, frontendDenmrk12=7, frontendAlaska13=8, frontendSwhutt44=9, frontendHelvcondblack14=10, frontendDenmrk20=11, frontendVenus20=12, frontendDenmrk18=13, frontendDenmrk14credits=14 };
     class Entry final {
         friend class OriginalApplicationFonts50LA;
         friend class rr::game::OriginalPauseStorage50LA;
+    friend class rr::game::OriginalResults10450LA;
+    friend class rr::game::OriginalRaceF850LA;
     friend class rr::platform::OriginalUiGarageScreenText50KG;
         std::shared_ptr<OriginalStandardMaterialDomain50LA> domain_;
         std::shared_ptr<const OriginalStandardMaterialContext50LA> context_;
@@ -62,16 +68,26 @@ public:
 private:
     std::shared_ptr<OriginalStandardMaterialDomain50LA> domain_;
     std::shared_ptr<const OriginalStandardMaterialContext50LA> context_;
-    // Six represented proven names, NOT an original registry/GPU capacity.
+    // Proven in-game names and all twelve original1B740C frontend names.
+    // Represented identities are NOT an original registry/GPU capacity.
     // Keep in-game denmark16 distinct from frontend denmrk16.
     struct Specification {const char* basename;OriginalUiArchiveId50KG archive;};
-    static constexpr std::array<Specification,6> specifications_{{
+    static constexpr std::array<Specification,15> specifications_{{
         {"eurostileboldbold13ingame",OriginalUiArchiveId50KG::overlays},
         {"denmarkbold16ingame",OriginalUiArchiveId50KG::overlays},
         {"eurostileboldbolditalic26ingame",OriginalUiArchiveId50KG::overlays},
         {"denmrk16",OriginalUiArchiveId50KG::fonts},
         {"venus16",OriginalUiArchiveId50KG::fonts},
-        {"denmrk14",OriginalUiArchiveId50KG::fonts}}};
+        {"denmrk14",OriginalUiArchiveId50KG::fonts},
+        {"venus14",OriginalUiArchiveId50KG::fonts},
+        {"denmrk12",OriginalUiArchiveId50KG::fonts},
+        {"alaska13",OriginalUiArchiveId50KG::fonts},
+        {"swhutt44",OriginalUiArchiveId50KG::fonts},
+        {"helvcondblack14",OriginalUiArchiveId50KG::fonts},
+        {"denmrk20",OriginalUiArchiveId50KG::fonts},
+        {"venus20",OriginalUiArchiveId50KG::fonts},
+        {"denmrk18",OriginalUiArchiveId50KG::fonts},
+        {"denmrk14credits",OriginalUiArchiveId50KG::fonts}}};
     std::array<std::shared_ptr<const Entry>,specifications_.size()> entries_{};
     std::array<std::size_t,specifications_.size()> publicationOrder_{};
     std::size_t publicationCount_=0;
@@ -168,6 +184,22 @@ private:
         OriginalApplicationFontDiagnostic50LA& d)noexcept {
         return loadNames282430<1>(std::move(archive),actualDirectory36B970,fontDirectory36B420,
             {{Name::denmark16}},0x1BA3E4,d);
+    }
+    // Results1BEF20 consumes actual382C80 in THIS order, count2/reload0.
+    // Retains the same Application328 entries, not TimeStats' reversed list.
+    bool loadResultsDerived1BEF20(std::shared_ptr<const OriginalUiArchive50KG> archive,
+        std::string& actualDirectory36B970,const std::string& fontDirectory36B420,
+        OriginalApplicationFontDiagnostic50LA& d)noexcept {
+        return loadNames282430<2>(std::move(archive),actualDirectory36B970,fontDirectory36B420,
+            {{Name::denmark16,Name::eurostile13}},0x1BEF20,d);
+    }
+    //198798 reads actual382C28 -> denmarkbold16ingame, count1/reload0.
+    //The connected F8 caller follows complete Results on this SAME registry.
+    bool loadRaceF8198798(std::shared_ptr<const OriginalUiArchive50KG> archive,
+        std::string& actualDirectory36B970,const std::string& fontDirectory36B420,
+        OriginalApplicationFontDiagnostic50LA& d)noexcept {
+        return loadNames282430<1>(std::move(archive),actualDirectory36B970,fontDirectory36B420,
+            {{Name::denmark16}},0x198798,d);
     }
     // Actual382C08 pair at18A99C: italic26, then existing13, reload0.
     bool loadSpeedBoost18A99C(std::shared_ptr<const OriginalUiArchive50KG> archive,
@@ -288,6 +320,18 @@ private:
                 pending_->cel_=cel;pending_->pst_=pst;
                 if(!decodeOriginalUiCel50KG(cel.data,cel.size,pending_->metrics_,d.cel))
                     return stop(S::font,0x2817D0);
+                // The reached Results382C80 list may introduce eurostile13
+                // after Pause loaded only denmark16. Admit ONLY this missing
+                // Entry's authentic PST, after its actual CEL decode and before
+                // its real texture reference. Reload0 rows skip this entirely.
+                if(sourceCaller==0x1BEF20){
+                    OriginalStandardMaterialDiagnostic50LA admitted;
+                    const std::vector<OriginalStandardTextureSourceInput50LA> input{{
+                        pst.identity->name,std::vector<std::uint8_t>(pst.data,pst.data+pst.size)}};
+                    if(!domain_->appendOriginalSources({},input,admitted)){
+                        d.texture=admitted.texture;return stop(S::texture,0x281F14);
+                    }
+                }
                 //281EC0..281F44 scopes the real application directory only
                 //after CEL decoding. Native early returns also restore it.
                 struct DirectoryScope {

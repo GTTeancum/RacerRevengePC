@@ -7,14 +7,18 @@
 #include "original_ui_material50kg.h"
 #include "original_garage_screen_fallback50kg.h"
 #include "original_memory_card_screen_fallback50kg.h"
+#include "original_results_screen_fallback50la.h"
 #include "original_standard_material_native_binding50kg.h"
 #include <array>
 #include <optional>
 
 namespace rr::game { class OriginalApplicationAnimationClockView50KG; }
+namespace original_main_entry50KG { class NativeF8BarPrefix50LA; }
 namespace rr::platform { class OriginalUiGarageDrawContribution50KG; class OriginalUiGarageCanonicalSubmission50KG; }
 namespace rr::assets {
 class OriginalStandardMaterialTable50LA;
+class OriginalStandardMaterialCollectorReceipt50LA;
+struct OriginalStandardMaterialMapBindingView50LA;
 class OriginalStandardMaterialAnimation50LA;
 class OriginalStandardMaterialTextureAnimation50LA;
 struct OriginalStandardMaterialDiagnostic50LA;
@@ -107,11 +111,18 @@ public:
     const OriginalStandardTextureTable50LA* textures383400() const noexcept;
 private:
     friend class OriginalStandardMaterialTable50LA;
+    friend class OriginalResultsPrimitiveReferences50LA;
     friend class rr::platform::OriginalUiGarageDrawContribution50KG;
     friend class rr::platform::OriginalUiGarageCanonicalSubmission50KG;
+    friend class ::original_main_entry50KG::NativeF8BarPrefix50LA;
     // Private synchronous existing-object observation; not queue/population
     // authority and not a stored capability detached from its occurrence.
     void captureOverlayConstruction29B628(const OriginalStandardMaterialPopulationInput50LA&)noexcept;
+    void captureResultsAuthoredConstruction29B628(const OriginalStandardMaterialPopulationInput50LA&)noexcept;
+    // The actual Results ledger fences the immutable owner thread and pins
+    // the current registry. This reads first authored construction only.
+    bool borrowResultsAuthored247110(const OriginalUiArchive50KG&,OriginalUiMaterial50KG&,
+        OriginalStandardMaterialDiagnostic50LA&)const noexcept;
     bool preflightCapturedOverlayBinding(std::int32_t,
         const std::shared_ptr<const OriginalStandardMaterialContext50LA>&,
         const std::shared_ptr<OriginalStandardTextureTable50LA>&,
@@ -140,6 +151,32 @@ private:
         const OriginalStandardTextureResource50LA&,const OriginalUiArchive50KG&,
         const OriginalUiMemberView50KG&,const Texture48E&,OriginalUiMaterial50KG&,
         OriginalUiNativeMaterial50KG&,OriginalStandardMaterialDiagnostic50LA&) const noexcept;
+    // Read the actual retained first construction; no fallback rebinding or
+    // renderer authority. Existing F8 admission remains unchanged.
+    bool borrowResultsScreenFallback2475C0(const OriginalStandardTextureResource50LA&,
+        OriginalUiMaterial50KG&,OriginalStandardMaterialDiagnostic50LA&)const noexcept;
+    bool prepareResultsScreenFallback2475C0(const OriginalStandardMaterialTable50LA&,
+        const OriginalStandardMaterialCollectorReceipt50LA&,
+        const OriginalStandardMaterialMapBindingView50LA&,
+        const OriginalUiScreenAssets50KG&,std::uint32_t image,
+        OriginalUiMaterial50KG&,OriginalUiNativeMaterial50KG&,
+        OriginalStandardMaterialDiagnostic50LA&)const noexcept;
+    // Private F8 native consumer only. These read existing owners; they never
+    // create/relabel a fallback, retain a source reference, or submit a draw.
+    // Caller fences the actual Application thread before any mutable lookup.
+    bool borrowF8ScreenFallbackTexture2475C0(const OriginalStandardTextureResource50LA&,
+        std::shared_ptr<const OriginalUiArchive50KG>&,OriginalUiMemberView50KG&,
+        OriginalStandardMaterialDiagnostic50LA&)const noexcept;
+    bool borrowF8ScreenFallback2475C0(const OriginalStandardTextureResource50LA&,
+        OriginalUiMaterial50KG&,OriginalStandardMaterialDiagnostic50LA&)const noexcept;
+    // Called on the FINAL representative. Reacquires the current map from
+    // its real table/seal and lowers contextAfter249610, not origin state.
+    bool prepareF8ScreenFallback2475C0(const OriginalStandardMaterialTable50LA&,
+        const OriginalStandardMaterialCollectorReceipt50LA&,
+        const OriginalStandardMaterialMapBindingView50LA&,
+        const OriginalUiScreenAssets50KG&,std::uint32_t image,
+        OriginalUiMaterial50KG&,OriginalUiNativeMaterial50KG&,
+        OriginalStandardMaterialDiagnostic50LA&)const noexcept;
     void commitNativeUntexturedState249BA0(std::size_t,const OriginalStandardMaterialStateContext50LA&)noexcept;
     void commitNativeBinding249610(std::size_t pass,std::size_t map,
         const OriginalStandardMaterialStateContext50LA&,
@@ -189,6 +226,7 @@ private:
         std::shared_ptr<const OriginalUiArchive50KG> pauseBackdropMissingPsm,
         std::shared_ptr<const OriginalGarageScreenFallback50KG> garageFallback,
         std::shared_ptr<const OriginalMemoryCardScreenFallback50KG> memoryCardFallback,
+        std::shared_ptr<const OriginalResultsScreenFallback50LA> resultsFallback,
         OriginalStandardMaterialDiagnostic50LA&) noexcept;
     // Source24A430. Only the canonical manager supplies its one persistent
     // lazy application state. Surface values come from the retained PSG;

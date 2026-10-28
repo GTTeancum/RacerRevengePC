@@ -30,6 +30,16 @@ bool direction49U(const SceneGraph49P&, SceneNodeIndex49P node,
     const VisualVector49R&, SceneVectorContext49U&, VisualVector49R&) noexcept;
 bool inverseDirection49U(const SceneGraph49P&, SceneNodeIndex49P node,
     const VisualVector49R&, SceneVectorContext49U&, VisualVector49R&) noexcept;
+//Pure numerical direction leaf only: caller authenticates the actual clean
+//scene owner and source getter cut. No graph refresh or getter receipt.
+bool cleanMatrixDirectionPrefix49U(const BodyMatrix48G&,const VisualVector49R&,
+    SceneVectorContext49U&,VisualVector49R&)noexcept;
+//Pure28BAB0 point arithmetic for an authenticated clean owner; W becomes1.
+bool cleanMatrixPointPrefix49U(const BodyMatrix48G&,const VisualVector49R&,
+    SceneVectorContext49U&,VisualVector49R&)noexcept;
+//Pure numerical inverse-direction counterpart; same caller-owned clean cut.
+bool cleanMatrixInverseDirectionPrefix49U(const BodyMatrix48G&,const VisualVector49R&,
+    SceneVectorContext49U&,VisualVector49R&)noexcept;
 // 28B550 uses relative.parent's world, never relative.world. A parentless
 // relative causes a full16-word copy of node.world, with no arithmetic.
 bool relativeMatrix49U(const SceneGraph49P&, SceneNodeIndex49P node,

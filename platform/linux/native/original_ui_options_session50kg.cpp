@@ -343,6 +343,9 @@ struct OriginalUiOptionsSession50KG::Storage {
             game::OriginalUiControllerPopupPlan50KG plan;
             if(game::OriginalUiControllerPopup50KG::startController2(s.cold.application->controllerPopupState,plan)!=
                game::OriginalUiControllerPopupStatus50KG::ok)return false;
+            if(const auto shared=s.cold.application->sharedDialogs){OriginalUiSharedDialogs50KG::Diagnostic sd;
+                if(!shared->writeController47CLabels2060A0(plan.state,sd)){
+                    s.fault(Status::unsupportedState,sd.sourcePC);return false;}}
             s.cold.application->controllerPopupState=plan.state;
             s.cold.profile->savedSlot6E4=2;
             if(!s.audioEffect(1))return false;

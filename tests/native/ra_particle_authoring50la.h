@@ -2,6 +2,13 @@
 #include "ra_cold_sources50la.h"
 #include "../../src/game/original_gc_fire_emission50kg.h"
 #include "../../src/game/original_application_entities50la.h"
+#include "../../src/assets/original_standard_archive_provider50la.h"
+#include "../../src/game/original_racer_model_scene50la.h"
+#include <optional>
+#include <cfenv>
+#include <cmath>
+#include <cstring>
+#include <algorithm>
 #include <array>
 #include <exception>
 #include <memory>
@@ -9,11 +16,13 @@
 #include <stdexcept>
 #include <utility>
 
+namespace ra_cold_aggregate50LA {class Owner;}
 namespace ra_particle_authoring50LA {
 namespace a=rr::assets;namespace g=rr::game;
-// Authenticated source closure plus four detached represented constructor
-// prefixes. This is NOT completion of27D7A0/15DEF0, attachment or emission.
+// Authenticated source closure plus four existing counted identities. The
+// private reached loader adds same-owner cold fields; runtime emission stays unjoined.
 class Owner final {
+    friend class ::ra_cold_aggregate50LA::Owner;
 public:
     struct AttachmentSource {
         std::string soulTree;
@@ -40,8 +49,30 @@ private:
         // Source15DE48,15DE44; these are distinct per-emitter mutable fields.
         float fractional224=0;
         std::uint32_t field228=1;
-        // No actual manager+70 or SoulTree+74 has yet been installed.
+        // Reached15DEF0 raw borrows; no source retain or manager registration.
+        g::OriginalWreckComponent50LA* manager70=nullptr;
+        g::OriginalGcParticleManager50KG* numericManager70=nullptr;
+        const g::OriginalRacerSceneObject50LA* attachment74=nullptr;
+        std::array<float,3> offset50XYZ{};
+        std::optional<std::uint32_t> sourceOffsetW;
+        std::string filename78; // Only reached bytes through NUL; not ctor-zero.
+        Definition liveDefinition{}; // Only loaderPC-proven lanes are source-known.
+        std::optional<float> inverseFrames1C0,delay1DC;
+        std::optional<std::int32_t> currentFrame190;
+        bool loaderAttempted=false,loaderComplete=false;
+        bool enrolled=false,retired=false; // Native custody; no source field claim.
+        std::uint32_t loaderPC=0;
+        // Source range200/210 W is constructorVF0.W1, unlike offset50 W.
+        // No new constructor/reset receipt for existing controls or224/228.
     };
+    class NativeEmitterConfig157320;
+    bool loadEmitter15DEF0(std::size_t,g::OriginalGcParticleManager50KG&,
+        g::OriginalWreckComponent50LA&,const g::OriginalRacerSceneObject50LA&,
+        std::shared_ptr<a::OriginalStandardArchiveProvider50LA>,const std::string&,
+        const std::string&,const std::array<float,3>&,std::optional<std::uint32_t>,
+        Diagnostic&,std::uint32_t&)noexcept;
+    bool readLiveEmitter15E6D0(Emitter&,NativeEmitterConfig157320&,Diagnostic&,
+        std::uint32_t&)noexcept;
     std::shared_ptr<const ra_cold_sources50LA::Owner> source_;
     std::shared_ptr<g::OriginalApplicationEntities50LA> application_;
     std::array<std::vector<std::uint8_t>,5> bytes_{};
@@ -198,13 +229,33 @@ public:
     bool close() noexcept {
         if(closed_)return true;
         if(constructed_&&(!application_||application_->attachmentLock423F58()))return false;
-        for(std::size_t i=0;i<constructed_;++i){const auto& c=emitters_[i].entity;
-            if(c.reference00!=1||c.sessionGeneration!=generation_||c.objectKey!=key(&c)||c.parent1C||c.firstChild18||
-               c.previous10||c.next14||c.mask20||c.descendants24)return false;}
-        // Detached no-loader subset:1C4 stays null, so15DE98..A8 owns no
-        // forced-set allocation. Each reached1413E0 decrements actual counter.
-        for(std::size_t i=0;i<constructed_;++i){--emitters_[i].entity.reference00;--application_->objectCount423F60();}
+        std::size_t live=0;
+        for(std::size_t i=0;i<constructed_;++i){const auto& owner=emitters_[i];const auto& c=owner.entity;
+            if(owner.enrolled||c.sessionGeneration!=generation_||c.objectKey!=key(&c)||
+               c.kind!=g::OriginalWreckComponentKind50LA::effect15DE00||c.parent1C||c.firstChild18||
+               c.previous10||c.next14||c.descendants24)return false;
+            if(owner.retired){
+                if(c.reference00||owner.manager70||owner.numericManager70||owner.attachment74)return false;
+            }else {
+                if(c.reference00!=1||c.mask20)return false;
+                ++live;
+            }
+        }
+        if(live&&application_->objectCount423F60()<live)return false;
+        // Actual list children were already finally released by142590 before
+        // the List metadata destructor. Unenrolled detached/failed prefixes
+        // remain THIS owner's responsibility; never decrement either twice.
+        for(std::size_t i=0;i<constructed_;++i){auto& owner=emitters_[i];
+            if(owner.retired)continue;
+            // Native raw-borrow withdrawal before the real manager/model dies;
+            // source15DE60 does not retain/release either70 or74. Actual EMT
+            // forcedSets0 has no owned1C4 resource or RNG/service registration.
+            owner.manager70=nullptr;owner.numericManager70=nullptr;owner.attachment74=nullptr;
+            --owner.entity.reference00;--application_->objectCount423F60();owner.retired=true;
+        }
         closed_=true;return true;
     }
 };
 }
+
+#include "ra_particle_loader50la.inl"

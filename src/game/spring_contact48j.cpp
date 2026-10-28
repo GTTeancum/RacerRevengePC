@@ -27,6 +27,23 @@ struct Math {
     }
 };
 }
+bool prepareSpringTorqueDelta48J(const BodyMatrix48G& scene,
+    const SpringPointForceParameters48J& parameters,const V& force,const V& point,
+    V& output)noexcept {
+    const auto& center=parameters.useCustomCenter?parameters.customLocalCenter:parameters.primaryLocalCenter;
+    if(!affine(scene)||!finite(force)||!finite(point)||!finite(center)||
+       !std::isfinite(parameters.torqueScale))return false;
+    Math math;const auto localForce=math.inverse(scene,force,false);
+    auto arm=math.inverse(scene,point,true);
+    for(unsigned i=0;i<3;++i)arm.v[i]=math.sub(arm.v[i],center.v[i]);
+    V cross{},result{};
+    for(unsigned i=0;i<3;++i)cross.v[i]=math.sub(
+        math.mul(arm.v[(i+1)%3],localForce.v[(i+2)%3]),
+        math.mul(localForce.v[(i+1)%3],arm.v[(i+2)%3]));
+    if(parameters.yawTorqueOnly){cross.v[0]=0;cross.v[2]=0;}
+    for(unsigned i=0;i<3;++i)result.v[i]=math.mul(parameters.torqueScale,cross.v[i]);
+    if(!math.valid)return false;output=result;return true;
+}
 bool addSpringPointForce48J(const BodyMatrix48G& scene,const BodyLoads48C& input,
     const SpringPointForceParameters48J& parameters,const V& force,const V& point,
     BodyLoads48C& output) noexcept {
@@ -48,10 +65,9 @@ bool addSpringPointForce48J(const BodyMatrix48G& scene,const BodyLoads48C& input
     if(!math.valid)return false;
     output=out;return true;
 }
-bool applySpringFriction48J(const V& normal,const V& point,const V& velocity,float coefficient,
-    const SpringPointForceParameters48J& parameters,const SpringFrictionBody48J& primary,
-    const SpringFrictionBody48J* other,SpringFrictionResult48J& output) noexcept {
-    if(!finite(normal)||!finite(velocity)||!std::isfinite(coefficient)||!std::isfinite(primary.mass))return false;
+bool prepareSpringFrictionVector48J(const V& normal,const V& velocity,
+    float coefficient,float primaryMass,V& output)noexcept {
+    if(!finite(normal)||!finite(velocity)||!std::isfinite(coefficient)||!std::isfinite(primaryMass))return false;
     Math math;const float projection=math.dot(velocity,normal);V tangent{},direction{};
     for(unsigned i=0;i<3;++i)tangent.v[i]=math.sub(velocity.v[i],math.mul(projection,normal.v[i]));
     const float square=math.dot(tangent,tangent);
@@ -62,10 +78,17 @@ bool applySpringFriction48J(const V& normal,const V& point,const V& velocity,flo
     float length=0;
     if(square!=0) {volatile float scalarReciprocal=static_cast<float>(1.0/std::sqrt(static_cast<double>(square)));length=math.divide(1,scalarReciprocal);}
     const float scale=math.mul(.1f,length);
-    const float magnitude=math.mul(32.2f,math.mul(primary.mass,math.mul(scale<1?scale:1,coefficient)));
+    const float magnitude=math.mul(32.2f,math.mul(primaryMass,math.mul(scale<1?scale:1,coefficient)));
+    V result{};
+    for(unsigned i=0;i<3;++i)result.v[i]=math.mul(magnitude,direction.v[i]);
+    if(!math.valid)return false;output=result;return true;
+}
+bool applySpringFriction48J(const V& normal,const V& point,const V& velocity,float coefficient,
+    const SpringPointForceParameters48J& parameters,const SpringFrictionBody48J& primary,
+    const SpringFrictionBody48J* other,SpringFrictionResult48J& output) noexcept {
     SpringFrictionResult48J result{};
-    for(unsigned i=0;i<3;++i)result.worldForce.v[i]=math.mul(magnitude,direction.v[i]);
-    if(!math.valid||!addSpringPointForce48J(primary.scene,primary.loads,parameters,result.worldForce,point,result.primary))return false;
+    if(!prepareSpringFrictionVector48J(normal,velocity,coefficient,primary.mass,result.worldForce))return false;
+    if(!addSpringPointForce48J(primary.scene,primary.loads,parameters,result.worldForce,point,result.primary))return false;
     if(other) {
         V opposite{};for(unsigned i=0;i<3;++i)opposite.v[i]=-result.worldForce.v[i];
         if(!addSpringPointForce48J(other->scene,other->loads,parameters,opposite,point,result.other))return false;

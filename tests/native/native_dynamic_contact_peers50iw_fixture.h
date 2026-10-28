@@ -7,6 +7,9 @@
 #include "original_all8_two_phase_schedule.h"
 #include "../../src/game/dynamic_impact50iw.h"
 #include "../../src/game/vehicle_frame49w.h"
+#include "../../src/game/native_secondary_contact_owner50la.h"
+#include "../../src/game/native_racer_terrain_owner50la.h"
+#include <memory>
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -80,6 +83,80 @@ struct Snapshot {
     }
 };
 class Registry {
+    friend class ::ra_source_camera50LA::OwnershipBridge;
+    using NativeSecondary=rr::game::NativeSecondaryContactOwner50LA;
+    // Separate native allocator domain under this same retained registry.
+    // No guest address, main340 alias, or source manager row is fabricated.
+    bool prepareNativeSecondary(const std::shared_ptr<NativeSecondary>* owners,
+        std::size_t count)noexcept {
+        if(!ready_||secondaryPrepared_||!owners||count!=count_)return false;
+        std::uint32_t largest=0;
+        for(std::size_t i=0;i<count_;++i)
+            if(bindings_[i].mainBody340.value>largest)largest=bindings_[i].mainBody340.value;
+        if(count_>std::numeric_limits<std::uint32_t>::max()-largest)return false;
+        for(std::size_t slot=0;slot<count_;++slot){
+            const auto& owner=owners[slot];
+            if(!owner||owner->revoked_||owner->slot_!=slot||!owner->frame_||
+               !owner->parameters_||!owner->generation_)return false;
+            for(std::size_t prior=0;prior<slot;++prior)
+                if(owners[prior].get()==owner.get()||
+                   owners[prior]->generation_!=owner->generation_)return false;
+        }
+        for(std::size_t slot=0;slot<count_;++slot){
+            secondaryOwners_[slot]=owners[slot];
+            secondaryIdentities_[slot]={largest+static_cast<std::uint32_t>(slot)+1u};
+        }
+        secondaryPrepared_=true;return true;
+    }
+    BodyContactIdentity48R nativeSecondaryIdentity(std::size_t slot,
+        const NativeSecondary& expected)const noexcept {
+        if(!secondaryPrepared_||slot>=count_)return {};
+        const auto owner=secondaryOwners_[slot].lock();
+        return owner&&owner.get()==&expected&&!owner->revoked_?
+            secondaryIdentities_[slot]:BodyContactIdentity48R{};
+    }
+    using RacerTerrainOwner=rr::game::NativeRacerTerrainOwner50LA;
+    using RacerTerrainIdentity=rr::game::NativeRacerTerrainIdentity50LA;
+    bool prepareRacerTerrainOwners(const std::shared_ptr<RacerTerrainOwner>* owners,
+        std::size_t count)noexcept {
+        if(!ready_||!secondaryPrepared_||racerTerrainPrepared_||!owners||count!=count_)return false;
+        std::uint32_t largest=0;
+        for(std::size_t i=0;i<count_;++i){
+            if(bindings_[i].mainBody340.value>largest)largest=bindings_[i].mainBody340.value;
+            if(secondaryIdentities_[i].value>largest)largest=secondaryIdentities_[i].value;
+        }
+        if(count_>std::numeric_limits<std::uint32_t>::max()-largest)return false;
+        for(std::size_t slot=0;slot<count_;++slot){
+            const auto& owner=owners[slot];
+            if(!owner||!owner->published_||owner->revoked_||owner->slot_!=slot||
+               !owner->bank_||!owner->frame_||!owner->model_||!owner->racer_||
+               !owner->racerKey_||!owner->generation_)return false;
+            for(std::size_t prior=0;prior<slot;++prior)
+                if(owners[prior].get()==owner.get()||owners[prior]->racer_==owner->racer_||
+                   owners[prior]->racerKey_==owner->racerKey_||
+                   owners[prior]->generation_!=owner->generation_||owners[prior]->bank_!=owner->bank_)return false;
+        }
+        //Distinct typed native allocations after the actual immutable body
+        //tokens. Never insert them into body/manager or impact lookup tables.
+        for(std::size_t slot=0;slot<count_;++slot){
+            racerTerrainOwners_[slot]=owners[slot];
+            racerTerrainIdentities_[slot]={largest+static_cast<std::uint32_t>(slot)+1u};
+        }
+        racerTerrainPrepared_=true;return true;
+    }
+    RacerTerrainIdentity racerTerrainIdentity(std::size_t slot,
+        const RacerTerrainOwner& expected)const noexcept {
+        if(!racerTerrainPrepared_||slot>=count_)return {};
+        const auto owner=racerTerrainOwners_[slot].lock();
+        return owner&&owner.get()==&expected&&owner->published_&&!owner->revoked_?
+            racerTerrainIdentities_[slot]:RacerTerrainIdentity{};
+    }
+    std::array<std::weak_ptr<RacerTerrainOwner>,maximumRacers> racerTerrainOwners_{};
+    std::array<RacerTerrainIdentity,maximumRacers> racerTerrainIdentities_{};
+    bool racerTerrainPrepared_=false;
+    std::array<std::weak_ptr<NativeSecondary>,maximumRacers> secondaryOwners_{};
+    std::array<BodyContactIdentity48R,maximumRacers> secondaryIdentities_{};
+    bool secondaryPrepared_=false;
 public:
     Registry()=default;
     Registry(const Registry&)=delete;

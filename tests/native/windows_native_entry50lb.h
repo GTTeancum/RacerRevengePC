@@ -173,6 +173,14 @@ template<class Entry> int run(Entry entry,int argc,char** argv,bool automatic) {
                _putenv_s("RR_ORIGINAL_RIDER_PRESENTATION","allow-native-pc-deadline60hz")!=0)
                 throw std::runtime_error("Cannot set normal Rider presentation policy");
         }
+#if defined(RR_WINDOWS_EMBEDDED_ICON)
+        // SDL reads these native resource IDs before creating its one window.
+        // The same compiled ICO also serves Explorer's executable icon.
+        if(_putenv_s("SDL_WINDOWS_INTRESOURCE_ICON","101")!=0||
+           _putenv_s("SDL_WINDOWS_INTRESOURCE_ICON_SMALL","101")!=0)
+            throw std::runtime_error("Cannot select embedded application icon");
+        std::cerr<<"native_application_icon_resource=101 embedded=true\n";
+#endif
         std::cerr<<"rider_presentation="<<std::getenv("RR_ORIGINAL_RIDER_PRESENTATION")<<'\n';
         // Exact wide directory only, never cwd/PATH search or fallback assets.
         // ASCII relative roots avoid the legacy narrow argv/environment seam.

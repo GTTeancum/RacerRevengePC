@@ -4,10 +4,13 @@
 #include "../../src/game/lap_event6_subscriber50id.h"
 #include "../../platform/linux/native/announcer_episode50ic.h"
 
+namespace rr::game { class OriginalRaceMusicManager50LA; }
 namespace source_announcer50IE {
 class Owner final {
+    friend class rr::platform::OriginalApplicationAural50KG;
+    friend class rr::game::OriginalRaceMusicManager50LA;
 public:
-    Owner()=default;~Owner()noexcept{reset();}
+    Owner()=default;~Owner()noexcept;
     Owner(const Owner&)=delete;Owner&operator=(const Owner&)=delete;
     Owner(Owner&&)=delete;Owner&operator=(Owner&&)=delete;
     bool prepare(const std::filesystem::path&discRoot,const std::filesystem::path&audioRoot,
@@ -136,6 +139,19 @@ public:
     const rr::game::AnnouncerCursor50IE&lastRequest()const noexcept{return cursor_;}
     const rr::game::AnnouncerResult50IE&lastResult()const noexcept{return last_;}
 private:
+    bool canStopResultsNative26D070(const rr::platform::AudioMixer50HD& mixer,
+        const rr::platform::RaceAudioGroups50IC& groups)const noexcept {
+        bool active=false;
+        return mixer_==&mixer&&groups_==&groups&&current()&&
+            anyActive2C4E70(active); //Exact active episode/revision/cue PCM; false activity is genuine.
+    }
+    std::size_t resultsStopVoice26D070()const noexcept {return episode_->slot();}
+    void stopResultsNativePreflighted26D070()noexcept {
+        // Hardware command0B stops the actual source voice, NOT sourceEnd.
+        // Preserve episode_, queued source state, playback token and ducking;
+        // original later activity/update owns the actual end callback.
+        mixer_->stop(episode_->slot());
+    }
     bool current()const noexcept {
         return prepared_&&mixer_&&groups_->uses(*mixer_)&&episode_->uses(*mixer_)&&episode_->originalPolicy50IE();
     }

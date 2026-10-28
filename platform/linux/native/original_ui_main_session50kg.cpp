@@ -294,7 +294,7 @@ Status OriginalUiMainSession50KG::input(const OriginalUiMainSessionInput50KG& in
             in.controller,in.originalInput,true,plan)!=game::OriginalUiControllerPopupStatus50KG::ok)
             return result(d,Status::unsupportedState,0x2062D0);
         if(plan.accepted){
-            if(s->cold.application->transportE00!=-1||plan.soundId!=1)return result(d,Status::unsupportedState,0x267BE0);
+            if(s->cold.application->transportE00!=-1||(plan.soundId!=1&&plan.soundId!=5))return result(d,Status::unsupportedState,0x267BE0);
             if(plan.soundRequested&&s->cold.audioMode==OriginalUiMainAudioMode50KG::enabled&&
                (!s->cold.audio||!s->cold.audio->canPlayMenuEffect(plan.soundId)))return result(d,Status::audio,plan.soundPC);
             s->cold.application->controllerPopupState=plan.state;
@@ -333,6 +333,10 @@ Status OriginalUiMainSession50KG::input(const OriginalUiMainSessionInput50KG& in
                     if(game::OriginalUiControllerPopup50KG::startController2(s->cold.application->controllerPopupState,plan)!=
                        game::OriginalUiControllerPopupStatus50KG::ok)s->fault(Status::unsupportedState,0x1E60DC);
                     else {
+                        if(const auto shared=s->cold.application->sharedDialogs){OriginalUiSharedDialogs50KG::Diagnostic sd;
+                            if(!shared->writeController47CLabels2060A0(plan.state,sd)){
+                                s->fault(Status::unsupportedState,sd.sourcePC);s->inOperation=false;
+                                receipt.status=Status::unsupportedState;return result(d,Status::unsupportedState,sd.sourcePC);}}
                         s->cold.application->controllerPopupState=plan.state; //1E60DC
                         s->cold.profile->savedSlot6E0=s->manager().navigation(1)->groups[1].selectedSlot; //1E6184 reread ->1E61A4
                         if(s->audioEffect(1)){receipt.popupChanged=true;receipt.popupSourcePC=0x1E60DC;status=Status::ok;}

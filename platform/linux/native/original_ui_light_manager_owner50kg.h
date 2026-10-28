@@ -1,8 +1,11 @@
+namespace ra_pod_scene50LA {class Owner;}
 #pragma once
 #include "original_ui_search_list_cold50kg.h"
 #include "../../../src/game/original_racer_light_selection50km.h"
 #include "../../../src/game/original_ui_light_manager_lifetime50kg.h"
 #include "../../../src/game/original_application_animation_clock50kg.h"
+namespace ra_cold_aggregate50LA {class Owner;}
+namespace rr::game::original_gc_gameplay_lighting_candidate {class Owner;}
 namespace rr::platform {
 class OriginalApplicationAural50KG;
 class OriginalUiGarageVisibility50KG;
@@ -16,6 +19,7 @@ class OriginalUiGaragePodScene50KG;
 // they never manufacture source Light rows or spatial membership.
 class OriginalUiLightManagerOwner50KG final {
     friend struct ::original_main_entry50KG::Application;
+    friend class ::ra_cold_aggregate50LA::Owner;
     friend class OriginalUiGarageSession50KG;
     friend class OriginalUiGarageUiLights50KG;
     friend class OriginalUiGarageSceneLighting50KG;
@@ -50,6 +54,7 @@ public:
     bool sourceMutationAvailable()const noexcept;
     Observation inspect()const noexcept;
 private:
+    friend class ::ra_pod_scene50LA::Owner;
     struct ParticleLight149310 {
         std::array<float,3> ambient50{},diffuse3C{};
         std::array<float,4> positionA0{};
@@ -82,9 +87,66 @@ private:
     bool constructed_=false,retired_=false,zonesAttempted_=false,zonesComplete_=false;
     bool listPublished_=false,ambientKnown_=false,defaultsKnown_=false;
     bool directional44Known_=false,directional40Live_=false,registryFailed_=false;
+    //Private concrete RA source-zone custody, distinct from native canonical
+    //lighting's authored render rows. No second singleton or scalar reset.
+    struct RaPortalLink27F3B0 {
+        RaPortalLink27F3B0* next00=nullptr;
+        const C* neighbor04=nullptr;const C* portal08=nullptr;
+        std::uint32_t field0C=0,field10=0x7f7fffff;
+        bool distanceWritten=false; //Only actual231150 overlap publishes both.
+    };
+    struct RaZones148B60 {
+        const ::ra_cold_aggregate50LA::Owner* world=nullptr;
+        std::shared_ptr<game::original_gc_gameplay_lighting_candidate::Owner> canonical;
+        std::uint64_t gameplayGeneration=0;
+        std::array<std::unique_ptr<Zone>,10> zones;
+        std::array<std::unique_ptr<L>,10> lists;
+        std::array<bool,10> listPublished{},ambientKnown{};
+        std::size_t next=0;
+        //Actual node30 owns each source-ordered uncounted Portal link record;
+        //these unique_ptrs provide private partial-allocation custody, not a
+        //second registry/render-list. Both pointers are unretained borrows.
+        std::array<const C*,10> portals{};const C* portalParent=nullptr;
+        std::array<std::unique_ptr<RaPortalLink27F3B0>,20> portalLinks;
+        std::size_t portalLinksPublished=0;
+        const C* firstAmbient=nullptr; //Actual RA registry slot0; no separate registry.
+        const C* firstDirectional=nullptr; //Actual next registry slot1.
+        std::array<const C*,183> localRegistered{}; //Actual9C rows2..184, independent borrows.
+        std::array<const C*,183> localPrimary{}; //Actual primary List membership per owner.
+        std::size_t localRegisteredCount()const noexcept {std::size_t n=0;for(auto* p:localRegistered)n+=bool(p);return n;}
+    };
+    std::unique_ptr<RaZones148B60> raZones_;
+    bool raZonesScopeCurrent()const noexcept;
+    bool raZonesReleasePreflight()const noexcept;
+    static bool bindRaWorldZones272A48(const ::original_main_entry50KG::Application&,
+        const ::ra_cold_aggregate50LA::Owner&,
+        const std::shared_ptr<game::original_gc_gameplay_lighting_candidate::Owner>&,
+        std::shared_ptr<OriginalUiLightManagerOwner50KG>&,Diagnostic&)noexcept;
+    bool setupRaZones148B60(Diagnostic&)noexcept;
+    bool linkRaPortal148D00(const ::ra_cold_aggregate50LA::Owner&,std::size_t ordinal,
+        const C& portal,const C& actualParent,std::uint32_t zoneA,std::uint32_t zoneB,Diagnostic&)noexcept;
+    bool localMembershipsCurrent()const noexcept;
+    bool continueRaLocalPortals280BF0(const ::ra_cold_aggregate50LA::Owner&,const C&,Diagnostic&)noexcept;
+    bool appendRaLocal148F30(const ::ra_cold_aggregate50LA::Owner&,const C&,Diagnostic&)noexcept;
+    bool incrementRaLocal149300(const ::ra_cold_aggregate50LA::Owner&,const C&,std::uint32_t,Diagnostic&)noexcept;
+    bool bindRaLocalPrimary2809C0(const ::ra_cold_aggregate50LA::Owner&,const C&,Diagnostic&)noexcept;
+    bool removeRaLocalPrimary1491F0(const ::ra_cold_aggregate50LA::Owner&,const C&,Diagnostic&)noexcept;
+    bool applyRaDirectionalColor1498A0(const ::ra_cold_aggregate50LA::Owner&,std::size_t,Diagnostic&)noexcept;
+    bool growRaRegistry149194(Diagnostic&)noexcept;
+    bool incrementRaLaterAmbient149300(const ::ra_cold_aggregate50LA::Owner&,const C&,Diagnostic&)noexcept;
+    bool appendRaLaterAmbient148F30(const ::ra_cold_aggregate50LA::Owner&,const C&,Diagnostic&)noexcept;
+    bool incrementRaDirectional149300(const ::ra_cold_aggregate50LA::Owner&,const C&,std::uint32_t,Diagnostic&)noexcept;
+    bool appendRaDirectional148F30(const ::ra_cold_aggregate50LA::Owner&,const C&,Diagnostic&)noexcept;
+    bool removeRaDirectional1491F0(const ::ra_cold_aggregate50LA::Owner&,const C&,Diagnostic&)noexcept;
+    bool incrementRaAmbient149300(const ::ra_cold_aggregate50LA::Owner&,const C&,Diagnostic&)noexcept;
+    bool appendRaAmbient148F30(const ::ra_cold_aggregate50LA::Owner&,const C&,Diagnostic&)noexcept;
+    bool removeRaAmbient1491F0(const ::ra_cold_aggregate50LA::Owner&,const C&,Diagnostic&)noexcept;
+    bool releaseRaZones148110(const ::ra_cold_aggregate50LA::Owner&,Diagnostic&)noexcept;
+
     const OriginalUiGarageUiLights50KG* uiLightsOwner_=nullptr;
     OriginalUiGarageSceneLighting50KG* sceneLightsOwner_=nullptr;
-    std::array<const C*,4> registryPublished_{};std::size_t registryWritten_=0;
+    bool raRegistryGrowthFailed_=false; //Native retained old allocation on terminal realloc failure.
+    std::array<const C*,190> registryPublished_{};std::size_t registryWritten_=0;
     // Native receipts, not guest Light fields. UI generations survive release;
     // ordinary projection writes never substitute for source148B60/148F30.
     const assets::OriginalUiArchiveIdentity50KG* nativeProjectionUi_=nullptr;

@@ -190,6 +190,33 @@ OriginalCameraStartResult requestOriginalCameraExitFade2AED60(std::int32_t a8,
     //25A9C0 invokes blocking260850 at25AA4C;25B5D0 is not its consumer.
     return requestOriginalVideoFade260320(video,clock,appMode,duration,false,false);
 }
+OriginalCameraStartResult OriginalResultsBlockingFade2AED60::advance(std::int32_t a8,
+    std::int32_t appMode,OriginalVideoFadeState& video,HostMonotonicClock50ID& clock,
+    OriginalVideoBlockingBackend* backend) {
+    if(requested_&&(video_!=&video||clock_!=&clock||backend_!=backend))
+        return result(S::owner,0x2aee48);
+    if(finished_)return result(S::alreadyComplete,0x2aee60);
+    if(!requested_){
+        // Seal the actual borrowed identities BEFORE the request. Failed
+        // requests are terminal here: never repeat a source call/clock sample
+        // on a later poll. The owning transaction must cancel on failure.
+        video_=&video;clock_=&clock;backend_=backend;requested_=true;
+        // This shares ONLY the exact request arithmetic/260320(false,false).
+        // Unlike Camera exit's T0=0 caller, Results T0=1 immediately waits.
+        requestResult_=requestOriginalCameraExitFade2AED60(a8,appMode,video,clock);
+        if(requestResult_.status!=S::complete)return requestResult_;
+        if(requestResult_.sourcePC==0x2aee60||requestResult_.sourcePC==0x2aee00){
+            finished_=true;return requestResult_;
+        }
+    }
+    if(requestResult_.status!=S::complete)return requestResult_;
+    // No flag-only or elapsed-time-only completion. The existing concrete
+    //260850 cursor captures the accepted image, presents each real sample,
+    //then requires restoreAndComplete before it can return complete.
+    const auto r=fade_.advance(video,clock,backend);
+    if(r.status==S::complete)finished_=true;
+    return r;
+}
 OriginalCameraStartResult advanceOriginalVideoFade25B5D0(OriginalVideoFadeState& video,
     HostMonotonicClock50ID& clock,std::int32_t view,std::int32_t count,OriginalVideoFadeDraw& draw) noexcept {
     //25B5D0 reaches rendering only on the last actual camera view.

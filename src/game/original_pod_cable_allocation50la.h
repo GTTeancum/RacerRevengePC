@@ -1,3 +1,5 @@
+namespace ra_pod_scene50LA {class Owner;}
+namespace original_local_flare50LA {class Emission;}
 #pragma once
 namespace original_main_entry50KG {class NativeCollectorFifo50LA;}
 namespace original_cable_selection50LA { class Binding; }
@@ -27,6 +29,7 @@ struct OriginalPodCableAllocationResult50LA {
 // Actual Entity identity/counter and150320 fields survive partial setup.
 // Material30 and native attributes are acquired only at the reached setup.
 class OriginalPodCableStripCold50LA final {
+    friend class ::original_local_flare50LA::Emission;
 public:
     OriginalPodCableStripCold50LA()=default;
     OriginalPodCableStripCold50LA(const OriginalPodCableStripCold50LA&)=delete;
@@ -37,6 +40,7 @@ public:
     const OriginalCableStripAttributes50LA& attributes()const noexcept{return attributes_;}
 private:
     friend class OriginalPodCableAllocation50LA;
+    friend class ::ra_pod_scene50LA::Owner; //Concrete14AB30 and1B3BB0 World strip services; no racer-owner substitution.
     friend class ::original_main_entry50KG::NativeCollectorFifo50LA;
     friend class ::original_cable_selection50LA::Binding;
     friend class OriginalRacerStripOwners50LA;

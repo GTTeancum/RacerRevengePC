@@ -63,8 +63,8 @@ struct OriginalUiSharedDialogMaterialHistory50KG::Storage {
     OriginalUiOptionsVideoOwner50KG video;
     assets::OriginalUiMaterialRuntime50KG runtime;
     std::array<Key,6> keys;
-    std::array<assets::OriginalUiMemberView50KG,3> canonicalSources{};
-    std::array<const assets::OriginalUiMemberIdentity50KG*,3> canonicalTemplates{};
+    std::array<assets::OriginalUiMemberView50KG,6> canonicalSources{};
+    std::array<const assets::OriginalUiMemberIdentity50KG*,6> canonicalTemplates{};
     std::array<History,6> history;
     const OriginalUiSharedDialogs50KG* prospectiveOwner=nullptr;
     const OriginalUiSharedDialogs50KG* attachedOwner=nullptr;
@@ -73,9 +73,9 @@ struct OriginalUiSharedDialogMaterialHistory50KG::Storage {
     std::uint64_t revision=0;
     Phase phase=Phase::prepared;
     bool poisoned=false,transferred=false;
-    std::array<const assets::OriginalStandardMaterialObject50LA*,3> canonical{};
-    std::array<const assets::OriginalStandardMaterialState50LA*,3> canonicalState{};
-    std::array<const std::array<assets::OriginalStandardMaterialNativeBinding50KG,2>*,3> canonicalBindings{};
+    std::array<const assets::OriginalStandardMaterialObject50LA*,6> canonical{};
+    std::array<const assets::OriginalStandardMaterialState50LA*,6> canonicalState{};
+    std::array<const std::array<assets::OriginalStandardMaterialNativeBinding50KG,2>*,6> canonicalBindings{};
     bool canonicalAttached=false,menuStaged=false,menuPending=false;
     std::array<History,6> stagedHistory;
     assets::OriginalStandardMaterialTable50LA::UiSharedHistoryReceipt menuReceipt;
@@ -160,7 +160,7 @@ bool OriginalUiSharedDialogMaterialHistory50KG::bootstrapInitial(OriginalUiShare
                 found->material.identity!=psm.identity||found->material.passes.size()!=1||found->images.size()!=(i?1u:0u))
                 return fail(d,E::identity,0x247110);
             const auto& pass=found->material.passes[0];
-            if(i<3){s.canonicalSources[i]=psm;s.canonicalTemplates[i]=pass.inheritedTemplate;}
+            {s.canonicalSources[i]=psm;s.canonicalTemplates[i]=pass.inheritedTemplate;}
             if(pass.identity!=psm.identity||pass.pass!=1||pass.provenance.archive!=in.controllerPopup->identity()||
                 pass.provenance.origin!=assets::OriginalUiMaterialOrigin50KG::authoredPsm||pass.shaderPassGroup!="popup"||
                 pass.microprogram!="ScreenObject"||pass.textureCount!=(i?1u:0u)||(i&&pass.textureName!=textures[i]))
@@ -246,7 +246,7 @@ bool OriginalUiSharedDialogMaterialHistory50KG::finishAfter470(OriginalUiSharedD
     storage_->phase=Phase::retired;storage_->attachedOwner=nullptr;storage_.reset();return true;
 }
 bool OriginalUiSharedDialogs50KG::sharedHistoryCanonicalOwnersCurrent(
-    std::array<const assets::OriginalStandardMaterialObject50LA*,3>& out)const noexcept {
+    std::array<const assets::OriginalStandardMaterialObject50LA*,6>& out)const noexcept {
     if(!loadedCurrent()||!inputs_.domain||!inputs_.context||!inputs_.context->live()||
        inputs_.context->videoIdentity()!=inputs_.video.get()||!dialog470_.dim160||
        !dialog470_.dim160->primitives30||dialog470_.dim160->count34<=0||
@@ -266,15 +266,20 @@ bool OriginalUiSharedDialogs50KG::sharedHistoryCanonicalOwnersCurrent(
             if(!text->primitives4_[i]||!text->primitives4_[i]->materialStored||
                !text->primitives4_[i]->materialRetained||text->primitives4_[i]->material00!=3230)return false;
     }
+    // The actual retained47C primitives own the remaining three roles.
+    // A registered token alone is not proof of construction or source custody.
+    std::array<const assets::OriginalStandardMaterialObject50LA*,3> popup{};
+    if(!canonical47COwnersCurrent(popup))return false;
     for(std::size_t i=0;i<out.size();++i){assets::OriginalStandardMaterialRowView50LA row;
         if(!table->row(static_cast<std::int32_t>(3228+i),row)||!row.object04||!row.references08||
            *row.references08<=0||!row.object04->constructed29B550())return false;
+        if(i>=3&&row.object04!=popup[i-3])return false;
         out[i]=row.object04;
     }
     return true;
 }
 bool OriginalUiSharedDialogMaterialHistory50KG::bindInitialCanonical(D& d)noexcept {
-    auto& s=*storage_;std::array<const assets::OriginalStandardMaterialObject50LA*,3> objects{};
+    auto& s=*storage_;std::array<const assets::OriginalStandardMaterialObject50LA*,6> objects{};
     if(!s.prospectiveOwner||!s.prospectiveOwner->sharedHistoryCanonicalOwnersCurrent(objects))return fail(d,E::identity,0x298E60);
     for(std::size_t i=0;i<objects.size();++i){const auto* object=objects[i];
         const auto* source=object->source();const auto* bytes=source?source->originalBytes():nullptr;
@@ -307,7 +312,7 @@ bool OriginalUiSharedDialogMaterialHistory50KG::bindInitialCanonical(D& d)noexce
 bool OriginalUiSharedDialogMaterialHistory50KG::sameCanonicalHistory(std::size_t role,const History& h,
     const assets::OriginalStandardMaterialStateContext50LA& context,
     const assets::OriginalStandardMaterialNativeBinding50KG& native)const noexcept {
-    if(role>=3||!h.initialized_||!h.effective_.prepared_||h.bound_!=native.bound()||
+    if(role>=6||!h.initialized_||!h.effective_.prepared_||h.bound_!=native.bound()||
        assets::compareOriginalUiMaterialEquivalence50KG(h.construction_,storage_->keys[role])!=assets::OriginalUiMaterialEquivalence50KG::equivalent)
         return false;
     for(std::size_t i=0;i<h.effective_.state_.size();++i)if(context.fields[i].value!=h.effective_.state_[i])return false;
@@ -324,7 +329,7 @@ bool OriginalUiSharedDialogMaterialHistory50KG::canonicalCurrent()const noexcept
        storage_->poisoned||!storage_->context||!storage_->context->live()||
        storage_->attachedOwner->sharedMaterialHistory_.get()!=this||
        !storage_->domain->materials382B38()->nativeBindingHistoryUsable())return false;
-    auto& s=*storage_;std::array<const assets::OriginalStandardMaterialObject50LA*,3> objects{};
+    auto& s=*storage_;std::array<const assets::OriginalStandardMaterialObject50LA*,6> objects{};
     if(!s.attachedOwner->sharedHistoryCanonicalOwnersCurrent(objects))return false;
     for(std::size_t i=0;i<objects.size();++i){assets::OriginalStandardMaterialPassView50LA pass;
         if(objects[i]!=s.canonical[i]||!objects[i]->pass4C(0,pass)||pass.state30!=s.canonicalState[i]||
@@ -380,7 +385,7 @@ bool OriginalUiSharedDialogMaterialHistory50KG::copyHistory(const OriginalUiSour
 bool OriginalUiSharedDialogMaterialHistory50KG::authenticateImage(std::size_t role,
     const assets::OriginalUiImageBank50KG& bank,std::uint32_t index,const History& h,
     assets::OriginalStandardMaterialNativeBinding50KG& history,D& d)const noexcept {
-    if(role==0||role>=3||!storage_)return fail(d,E::identity,0x249610);
+    if(role==0||role>=6||!storage_)return fail(d,E::identity,0x249610);
     assets::OriginalStandardMaterialPassView50LA pass;assets::OriginalStandardTextureRowView50LA row;
     if(!storage_->canonical[role]->pass4C(0,pass)||!pass.texture1A||
        !storage_->domain->textures383400()->row((*pass.texture1A)[0],row)||!row.object04||
@@ -476,14 +481,14 @@ bool OriginalUiSharedDialogMaterialHistory50KG::stageMenu(const OriginalUiSource
     if(!images||!images->textures()||!draw.textures||!draw.textures->matchesSourceBank(*images->textures(),draw.texturePublication)||
        !draw.spans||!frame.native_->states||draw.spanCount!=frame.native_->stateCount)return fail(d,E::identity,0x24B26C);
     try {
-        auto expected=s.history;std::array<bool,3> touched{};std::array<std::uint32_t,3> imageIndex{};
+        auto expected=s.history;std::array<bool,6> touched{};std::array<std::uint32_t,6> imageIndex{};
         std::uint32_t last=0;bool haveLast=false;
         for(const auto& use:uses){
             if(use.spanIndex>=draw.spanCount||(haveLast&&use.spanIndex<=last))return fail(d,E::identity,0x29C490);
             last=use.spanIndex;haveLast=true;const auto& span=draw.spans[use.spanIndex];
             if(!span.quadCount||use.imageIndex!=span.textureIndex)return fail(d,E::identity,0x24B26C);
-            const bool originCanonical=use.originToken>=3228&&use.originToken<=3230;
-            const bool finalCanonical=use.representativeToken>=3228&&use.representativeToken<=3230;
+            const bool originCanonical=use.originToken>=3228&&use.originToken<=3233;
+            const bool finalCanonical=use.representativeToken>=3228&&use.representativeToken<=3233;
             // No origin alias receives its final leaf's accepted history. An
             // unrepresented counterpart cannot be bridged by token equality.
             if(originCanonical&&!finalCanonical)return fail(d,E::canonicalBridgePending,0x29C150);
@@ -505,7 +510,7 @@ bool OriginalUiSharedDialogMaterialHistory50KG::stageMenu(const OriginalUiSource
         const auto table=s.domain->materials382B38();
         if(!table->beginUiSharedHistory(this,s.context.get(),s.menuReceipt,s.menuSlots))return fail(d,E::busy,0x249BA0);
         bool okay=true;
-        for(std::size_t i=0;i<3&&okay;++i){auto& slot=s.menuSlots[i];
+        for(std::size_t i=0;i<6&&okay;++i){auto& slot=s.menuSlots[i];
             if(slot.object!=s.canonical[i]||slot.state30!=s.canonicalState[i]||slot.nativeBindings!=s.canonicalBindings[i]||
                !sameCanonicalHistory(i,s.history[i],slot.beforeContext,slot.beforeNativeBindings[0])){okay=false;break;}
             slot.write=touched[i];if(!slot.write)continue;
@@ -586,8 +591,8 @@ bool OriginalUiSharedDialogMaterialHistory50KG::stageGarage(OriginalUiGarageCano
     OriginalUiGarageDrawContribution50KG& draw,D& d)noexcept {
     d={};bool touches=false;
     for(const auto& map:tx.maps_){const auto origin=map.origin.materialRow,rep=map.representative.materialRow;
-        if(origin>=3228&&origin<=3230&&!(rep>=3228&&rep<=3230))return fail(d,E::canonicalBridgePending,0x29C150);
-        touches|=rep>=3228&&rep<=3230;
+        if(origin>=3228&&origin<=3233&&!(rep>=3228&&rep<=3233))return fail(d,E::canonicalBridgePending,0x29C150);
+        touches|=rep>=3228&&rep<=3233;
     }
     if(!touches)return true;
     if(!draw.issuer_||!draw.issuer_->state||!draw.issuer_->state->sharedDialogs||tx.owner_!=&draw||
@@ -601,7 +606,7 @@ bool OriginalUiSharedDialogMaterialHistory50KG::stageGarage(OriginalUiGarageCano
     try {
         auto candidate=s.history;
         for(std::size_t i=0;i<tx.maps_.size();++i){const auto& map=tx.maps_[i];const auto row=map.representative.materialRow;
-            if(row<3228||row>3230)continue;const auto role=static_cast<std::size_t>(row-3228);
+            if(row<3228||row>3233)continue;const auto role=static_cast<std::size_t>(row-3228);
             if(map.representative.material!=s.canonical[role]||map.representative.pass!=0||map.map||
                !tx.contributions_[i].screenReceiver)return fail(d,E::identity,0x249610);
             if(role==0){if(!map.nativeUntexturedRoute||tx.images_[i].bound())return fail(d,E::identity,0x249BA0);}

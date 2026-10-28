@@ -30,7 +30,7 @@ bool OriginalUiGarageDroidAudio50GN::prepareColdTransport(const std::filesystem:
  if(attempted_){error="Garage droid audio requires fresh lifetime";return false;}attempted_=true;
  try{
   if(mixer.count()!=requiredFrontendVoices||!mixer.sampleRate()||mixer.mixedFrames()||mixer.requiresVoiceGroupGains50IC()||mixer.masterGain()!=1.f||
-     !mixer.originalSoundMode50KG()||!mixer.originalSoundMode50KG()->ready()){error="Garage droid subgroup requires the actual cold53-voice frontend mixer";return false;}
+     !mixer.originalSoundMode50KG()||!mixer.originalSoundMode50KG()->ready()){error="Garage droid subgroup requires the actual cold55-voice frontend mixer";return false;}
   for(std::size_t i=0;i<soundCount;++i)if(mixer.active(firstVoice+i)||mixer.hasVoiceGroupGain50IC(firstVoice+i)||mixer.playbackRevision(firstVoice+i)){error="Garage droid subgroup is not cold";return false;}
   std::vector<assets::AudioRequest50HC> requests;for(const auto& d:definitions)requests.push_back({d.path,false,false,false});
   auto next=std::make_unique<assets::AudioBank50HC>();

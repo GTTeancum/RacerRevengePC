@@ -183,7 +183,7 @@ inline bool validControls(float gain,float pitch)noexcept {
 // files reach SDL's callback. No hot allocation, decoding or shared RNG use.
 class Owner final {
 public:
-    Owner()=default;~Owner()noexcept{close();}
+    Owner()=default;~Owner()noexcept;
     Owner(const Owner&)=delete;Owner&operator=(const Owner&)=delete;
     Owner(Owner&&)=delete;Owner&operator=(Owner&&)=delete;
 

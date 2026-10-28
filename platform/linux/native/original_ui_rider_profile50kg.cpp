@@ -1,11 +1,14 @@
 // New reconstruction after rollback; source-only, unverified.
 #include "original_ui_rider_profile50kg.h"
+#include "../../../src/game/original_course_descriptor50kg.h"
 #include "original_save_profile_owner50kg.h"
 #include "original_save_native_read_stage50kg.h"
 #include "original_ui_main_audio50kg.h"
 #include "original_sound_mode50kg.h"
+#include "../../../src/game/original_ui_garage_state50kg.h"
 #include "../../../src/game/original_ui_controls_controller50kg.h"
 #include "../../../src/game/original_course_load_selection50kg.h"
+#include "../../../src/game/original_hall_record_queries50kg.h"
 #include <cmath>
 #include <algorithm>
 #include <limits>
@@ -60,6 +63,8 @@ constexpr std::array<std::int32_t,27> sourceRacerNames3C{{
 struct TrackTextRow {
     std::int32_t title1127C=-1;
     std::int8_t planet11281=-1;
+    std::int8_t rival11280=-1;
+    std::array<char,3> name11278{}; //Original two bytes plus copied terminator.
 };
 // Direct constructor stores, in actual track-ID order (stride12). Planet
 // bytes are localization IDs consumed by signed LB1EF3F0, not planet indices.
@@ -123,9 +128,18 @@ struct OriginalUiRiderProfileOwner50KG::Storage {
     std::array<OriginalUiCourseProfileColors50KG,6> planetColors{};
     std::array<std::uint8_t,13> courseOrder100C4{};
     TournamentCourseRecordSnapshot firstTournamentCourseRecord{};
+    // Actual constructor-owned metadata, not a visual PAR guess. These
+    // arrays are assigned at the same fresh-profile construction as100C4.
+    std::array<std::int32_t,13> resultsPar100E8{};
+    std::array<std::array<std::int32_t,7>,13> resultsKillPercent100CC{};
+    std::array<std::int32_t,8> resultsPlacePercent102D0{};
     std::array<std::int32_t,27> racerNames3C{};
     std::array<TrackTextRow,13> trackText{};
     game::OriginalUiHallRecords50KG hallRecords{};
+    // Unknown until the genuine1AC440 store leaf executes. Single-human
+    // writes11260/64/68 only; no synthetic zeroes for second-human ranks.
+    std::optional<game::OriginalRaceRecordInsertionStage50KG::Ranks> hallRanks11260;
+    std::shared_ptr<const game::OriginalHallProfileIdentity50KG> hallProfileIdentity;
     bool hallRecordsInitialized=false;
     std::uint32_t rememberedHall6EC=1; //186674, shared fresh-profile reset.
     std::uint64_t generation=1;
@@ -138,6 +152,15 @@ struct OriginalUiRiderProfileOwner50KG::Storage {
 };
 OriginalUiRiderProfileOwner50KG::OriginalUiRiderProfileOwner50KG() noexcept=default;
 OriginalUiRiderProfileOwner50KG::~OriginalUiRiderProfileOwner50KG()=default;
+bool OriginalUiRiderProfileOwner50KG::selectedTrackName187330(
+    std::array<char,3>& out)const noexcept {
+    if(!storage_||!storage_->readable())return false;
+    const auto& s=*storage_;const auto index=std::uint32_t(s.packed1125F&15u);
+    if(index>=s.trackText.size())return false; //Native supported-table bound.
+    const auto& name=s.trackText[index].name11278;
+    if(!name[0]||!name[1]||name[2])return false;
+    out=name;return true;
+}
 bool OriginalUiRiderProfileOwner50KG::beginPodRace1A66CC(
     const OriginalUiMainProfile50KG& actualCommon)noexcept {
     if(!storage_||storage_->common.get()!=&actualCommon||!actualCommon.known||
@@ -248,6 +271,8 @@ bool OriginalUiRiderProfileOwner50KG::initializeStartupProfile(
         return fail(d,Error::archive,0x1870FC);
     try {
         auto next=std::make_unique<Storage>();next->common=std::move(common);next->archive=std::move(archive);
+        next->hallProfileIdentity=std::shared_ptr<const game::OriginalHallProfileIdentity50KG>(
+            new game::OriginalHallProfileIdentity50KG());
         //187124..18728C iterates1..26. Missing5/6/13 leave the constructor's
         // initialized slots unchanged; those absent pods have no Rider controls.
         // Here they remain explicitly unavailable instead of publishing stats.
@@ -338,7 +363,26 @@ bool OriginalUiRiderProfileOwner50KG::initializeStartupProfile(
         next->comparison100C0=0xffffffffu; //17E17C
         // saveProfile owns constructor-known100BC bits0/1; no duplicate bool.
         next->courseOrder100C4={{0,11,4,8,7,1,5,9,12,6,10,3,2}};
+        //17EF14/17F30C write2; the other eleven +E8+40*i words use
+        //unchanged V1=3 from17E7B0 through17F6FC (no intervening call).
+        next->resultsPar100E8={{2,3,3,3,3,3,2,3,3,3,3,3,3}};
+        for(std::size_t i=0;i<13;++i)next->resultsKillPercent100CC[i]=
+            (i==0||i==6)?std::array<std::int32_t,7>{{30,50,60,70,80,90,100}}:
+                         std::array<std::int32_t,7>{{20,30,50,60,70,80,100}};
+        //17F77C..17F7F4: place1..8.102CC is separate mutable state,
+        //not the zero-th percentage; unsupported place0 never indexes it.
+        next->resultsPlacePercent102D0={{100,70,50,30,20,10,5,0}};
         next->racerNames3C=sourceRacerNames3C;next->trackText=sourceTrackText;
+        //Actual constructor-owned byte11280+12*track. The same source seeds
+        //also serve cold AI selection; no second rival table or player proxy.
+        for(std::size_t track=0;track<next->trackText.size();++track){
+            const auto& seed=game::originalFreshCourseDescriptors50KG[track];
+            next->trackText[track].rival11280=seed.rival11280;
+            //17E9F0..17EED0 copies lowercase source names, whereas the
+            //shared cold-loader descriptor spells its identifiers uppercase.
+            next->trackText[track].name11278={{static_cast<char>(seed.first-'A'+'a'),
+                static_cast<char>(seed.second-'A'+'a'),'\0'}};
+        }
         //17E7D8..17E880 ->17F800..17F884; stride12, primary+79C/secondary+7A0.
         next->planetColors={{{0xc2a684,0x80674a},{0x8cc46e,0x628036},{0xc0b5a5,0x8c8479},
             {0xf4f1a2,0xa8a66f},{0xce766d,0xffbab2},{0xb26a36,0xe5a373}}};
@@ -372,13 +416,216 @@ bool OriginalUiRiderProfileOwner50KG::initializeHallRecordsAtApplicationStartup(
     game::OriginalUiHallRecords50KG next;game::OriginalUiHallRecordsDiagnostic50KG records;
     if(!game::initializeOriginalUiHallRecords50KG(english,next,records))
         return fail(d,records.error==game::OriginalUiHallRecordsDiagnostic50KG::Error::localization?Error::archive:Error::range,records.sourcePC);
-    storage_->hallRecords=next;storage_->saveProfile.recordFreshHall(next);
+    if(!storage_->saveProfile.recordFreshHall(next))return fail(d,Error::allocation,0x1801D0);
+    storage_->hallRecords=next;
     storage_->hallRecordsInitialized=true;++storage_->generation;
     loadNativeBetaProgressAtStartup();return true;
 }
 bool OriginalUiRiderProfileOwner50KG::hallRecordsReady() const noexcept {
     return storage_&&storage_->common&&storage_->common->known&&storage_->hallRecordsInitialized&&
-        storage_->saveProfile.hallRecordsCurrent(storage_->hallRecords);
+        storage_->saveProfile.hallRecordsCurrent(storage_->hallRecords,
+            storage_->hallProfileIdentity,storage_->generation);
+}
+bool OriginalUiRiderProfileOwner50KG::prepareSingleHumanRecordInsertion1AC440(
+    const game::OriginalRaceRecordRacerObservation50KG& row0,std::uint8_t race1B0,
+    std::optional<game::OriginalRaceRecordInsertionStage50KG>& out,
+    game::OriginalRaceRecordInsertionStage50KG::Diagnostic& d)const noexcept {
+    using Stage=game::OriginalRaceRecordInsertionStage50KG;
+    d={Stage::Status::profile,0x1ac440u};
+    if(!hallRecordsReady()||!storage_->readable()||
+       (storage_->common->mode34!=0u&&storage_->common->mode34!=2u))return false;
+    const auto& s=*storage_;
+    OriginalPersistedProfileName50KG first,second;
+    //1AC49C uses career219D ONLY for mode2; otherwise1AC4B8 uses player0.
+    //1AC4D8 copies player1 even for the single-human path. These are retained
+    // profile names, never rider localization or native Results text input.
+    if(!s.saveProfile.persistedName(s.common->mode34==2u,
+           s.common->mode34==2u?s.comparison100C0:0u,first)){
+        d={Stage::Status::name,s.common->mode34==2u?0x1ac49cu:0x1ac4b8u};return false;
+    }
+    if(!s.saveProfile.persistedName(false,1u,second)){
+        d={Stage::Status::name,0x1ac4d8u};return false;
+    }
+    std::array<char,21> name{};
+    //Only the known C-string prefix is read. A fresh persisted name has an
+    //unknown saved-field tail; strncpy20 does not need or fabricate that tail.
+    for(std::size_t i=0;i<name.size();++i){
+        name[i]=first.c_str()[i];if(name[i]==0)break;
+    }
+    const auto packed=static_cast<std::uint16_t>(s.common->playerBits1125C|
+        (std::uint16_t(s.packed1125D)<<8));
+    return Stage::prepareSingleHuman(s.hallRecords,s.subtype11258,
+        s.common->playerBits1125C,packed,s.packed1125F,race1B0,row0,name,
+        s.hallProfileIdentity,s.generation,s.common->mode34,out,d);
+}
+bool OriginalUiRiderProfileOwner50KG::prepareTwoHumanRecordInsertion1AC440(
+    const std::array<game::OriginalRaceRecordRacerObservation50KG,2>& rows,
+    std::uint8_t race1B0,std::optional<game::OriginalRaceRecordInsertionStage50KG>& out,
+    game::OriginalRaceRecordInsertionStage50KG::Diagnostic& d)const noexcept {
+    using Stage=game::OriginalRaceRecordInsertionStage50KG;
+    d={Stage::Status::profile,0x1ac440u};
+    //Pure preparation can observe all existing readable modes0..2, including
+    //mode1's two-player profile. This does not enable any launch or result path.
+    if(!hallRecordsReady()||!storage_->readable())return false;
+    const auto& s=*storage_;
+    std::array<OriginalPersistedProfileName50KG,2> names;
+    if(!s.saveProfile.persistedName(s.common->mode34==2u,
+           s.common->mode34==2u?s.comparison100C0:0u,names[0])){
+        d={Stage::Status::name,s.common->mode34==2u?0x1ac49cu:0x1ac4b8u};return false;
+    }
+    if(!s.saveProfile.persistedName(false,1u,names[1])){
+        d={Stage::Status::name,0x1ac4d8u};return false;
+    }
+    std::array<std::array<char,21>,2> copiedNames{};
+    for(std::size_t player=0;player<names.size();++player){
+        //Read each known C-string prefix only; no claim about unknown saved
+        //tail bytes. The downstream strncpy20 effect supplies its own padding.
+        for(std::size_t i=0;i<copiedNames[player].size();++i){
+            copiedNames[player][i]=names[player].c_str()[i];
+            if(copiedNames[player][i]==0)break;
+        }
+    }
+    const auto packed=static_cast<std::uint16_t>(s.common->playerBits1125C|
+        (std::uint16_t(s.packed1125D)<<8));
+    return Stage::prepareTwoHumans(s.hallRecords,s.subtype11258,
+        s.common->playerBits1125C,packed,s.packed1125F,race1B0,rows,copiedNames,
+        s.hallProfileIdentity,s.generation,s.common->mode34,out,d);
+}
+bool OriginalUiRiderProfileOwner50KG::prepareRaceRecordQualification1ABFC0(
+    std::uint32_t selectorA1,std::optional<std::uint8_t> race1B0Low2,
+    const game::OriginalRaceRecordQualificationRacerObservation50KG* rows,
+    std::size_t rowCount,std::optional<game::OriginalRaceRecordQualification50KG>& out,
+    game::OriginalRaceRecordQualification50KG::Diagnostic& d)const noexcept {
+    using Query=game::OriginalRaceRecordQualification50KG;
+    d={Query::Status::profile,0x1abfc0u,0,0};
+    if(!storage_||!storage_->readable())return false;
+    const auto& s=*storage_;
+    //A genuine early exclusion does not consume Hall data or racer facts.
+    //Otherwise retain the SAME fresh/import/native-beta Hall provenance gate;
+    //neither qualification nor ordinary observations can bypass that owner.
+    if(s.subtype11258!=2u&&!s.unlock10FAC[0]&&!s.unlock10FAC[5]&&
+       !s.unlock10FAC[13]&&!hallRecordsReady())return false;
+    const game::LapRecordConfig50ID config{s.subtype11258,s.common->playerBits1125C,
+        static_cast<std::uint16_t>(s.common->playerBits1125C|
+            (std::uint16_t(s.packed1125D)<<8))};
+    return Query::prepare(config,s.hallRecords,s.unlock10FAC,s.packed1125F,race1B0Low2,
+        selectorA1,rows,rowCount,s.generation,out,d);
+}
+bool OriginalUiRiderProfileOwner50KG::prepareRaceRivalQualification1ABE70(
+    const game::OriginalRaceRivalRacerObservation50KG* rows,std::size_t availableRows,
+    std::int32_t actualManagerCount30,
+    std::optional<game::OriginalRaceRivalQualification50KG>& out,
+    game::OriginalRaceRivalQualification50KG::Diagnostic& d)const noexcept {
+    using Query=game::OriginalRaceRivalQualification50KG;
+    d={Query::Status::profile,0x1abe70u,0};
+    if(!storage_||!storage_->readable())return false;
+    const auto& s=*storage_;const auto course=std::uint32_t(s.packed1125F&15u);
+    //1ABED4 reads signed11280 before either row0 getter. Selection is the
+    //actual packed low nibble, not tournament order or a caller-selected pod.
+    if(course>=s.trackText.size()){
+        d={Query::Status::course,0x1abed4u,0};return false;
+    }
+    return Query::prepare(course,s.trackText[course].rival11280,s.unlock10FAC,
+        rows,availableRows,actualManagerCount30,s.generation,out,d);
+}
+bool OriginalUiRiderProfileOwner50KG::storeEndRecordBit1AB598(
+    const game::OriginalRaceRecordQualification50KG& query,
+    OriginalUiRiderProfileStamp50KG expected,OriginalUiRiderProfileStamp50KG& after)noexcept {
+    if(!storage_||!storage_->readable())return false;
+    auto& s=*storage_;
+    const bool value=(query.originalV0()&1u)!=0;
+    const bool changed=s.bit0_7E4!=value;
+    if(s.subtype11258!=1u||expected.generation!=s.generation||expected.mode34!=s.common->mode34||
+       query.profileGeneration()!=s.generation||query.selectorA1()!=0u||
+       query.course()!=std::uint32_t(s.packed1125F&15u)||
+       (changed&&s.generation==std::numeric_limits<std::uint64_t>::max()))return false;
+    //1AB578 masksV0 bit0;1AB598 is the DELAY SLOT before1ABE70 starts.
+    //Only this represented bit changes. Opaque upper7E4 bits stay untouched.
+    s.bit0_7E4=value; //The source store occurs even when its value is unchanged.
+    if(changed)++s.generation; //Native mutation version, never a guest store counter.
+    after={s.generation,s.common->mode34};return true;
+}
+bool OriginalUiRiderProfileOwner50KG::storeEndRivalWord1AB5A8(
+    const game::OriginalRaceRivalQualification50KG& query,
+    OriginalUiRiderProfileStamp50KG expected,OriginalUiRiderProfileStamp50KG& after)noexcept {
+    if(!storage_||!storage_->readable())return false;
+    auto& s=*storage_;const auto course=std::uint32_t(s.packed1125F&15u);
+    const auto value=query.originalV0();const bool changed=s.word7E8!=value;
+    if(s.subtype11258!=1u||expected.generation!=s.generation||expected.mode34!=s.common->mode34||
+       query.profileGeneration()!=s.generation||query.course()!=course||course>=s.trackText.size()||
+       query.rival11280()!=s.trackText[course].rival11280||
+       (changed&&s.generation==std::numeric_limits<std::uint64_t>::max()))return false;
+    s.word7E8=value; //Full source word store, even when unchanged, AFTER1ABE70.
+    if(changed)++s.generation;
+    after={s.generation,s.common->mode34};return true;
+}
+bool OriginalUiRiderProfileOwner50KG::recordInsertionIdentityCurrent(
+    const game::OriginalRaceRecordInsertionStage50KG& stage)const noexcept {
+    if(!hallRecordsReady()||!storage_->readable())return false;
+    const auto& s=*storage_;
+    return stage.profileIdentity_&&stage.profileIdentity_.get()==s.hallProfileIdentity.get()&&
+        stage.profileGeneration()==s.generation&&stage.profileMode34()==s.common->mode34&&
+        stage.course()==std::uint32_t(s.packed1125F&15u)&&
+        s.generation!=std::numeric_limits<std::uint64_t>::max()&&
+        !s.testRider&&!s.gasganoScTest&&!s.tzidikTcTest&&!s.scorchRcTest&&
+        !s.sebulbaTbTest&&!s.kraidGbTest&&!s.youngAnakinMcTest;
+}
+bool OriginalUiRiderProfileOwner50KG::prepareHallRecordProvenance1AC440(
+    const game::OriginalRaceRecordInsertionStage50KG& stage,
+    std::unique_ptr<OriginalSaveProfileOwner50KG>& out)const noexcept {
+    if(!recordInsertionIdentityCurrent(stage))return false;
+    const auto& s=*storage_;
+    std::unique_ptr<OriginalSaveProfileOwner50KG> prepared;
+    if(!s.saveProfile.prepareHallRecordDescendant(s.hallRecords,stage,
+        s.hallProfileIdentity,s.generation,prepared))return false;
+    // Allocation happened only in detached metadata. Revalidate actual owner,
+    // generation, root and preimage before publishing even this preparation.
+    if(!hallRecordProvenancePreparationCurrent1AC440(stage,*prepared))return false;
+    out=std::move(prepared);return true;
+}
+bool OriginalUiRiderProfileOwner50KG::hallRecordProvenancePreparationCurrent1AC440(
+    const game::OriginalRaceRecordInsertionStage50KG& stage,
+    const OriginalSaveProfileOwner50KG& prepared)const noexcept {
+    if(!recordInsertionIdentityCurrent(stage))return false;
+    const auto& s=*storage_;
+    return s.saveProfile.hallRecordPreparationMatches(prepared,s.hallRecords,stage,
+        s.hallProfileIdentity,s.generation);
+}
+bool OriginalUiRiderProfileOwner50KG::commitSingleHumanHallRecords1AC440(
+    const game::OriginalRaceRecordInsertionStage50KG& stage,
+    OriginalSaveProfileOwner50KG& prepared,OriginalUiRiderProfileStamp50KG expected,
+    OriginalUiRiderProfileStamp50KG& after)noexcept {
+    if(!storage_||&prepared==&storage_->saveProfile||stage.secondHumanRanks()||
+       expected.generation!=storage_->generation||expected.mode34!=stage.profileMode34()||
+       !hallRecordProvenancePreparationCurrent1AC440(stage,prepared))return false;
+    auto& s=*storage_;auto& course=s.hallRecords.courses[stage.course()];
+    const auto& next=stage.after();
+    // All allocation/identity/preimage checks precede this interval. Assign
+    // original category effects then immediate rank stores, in source order.
+    // The reviewed stage represents skipped leaf effects as unchanged data,
+    // not as an invented successful record. Rank zero is still a real store.
+    if(!s.hallRanks11260)s.hallRanks11260.emplace();
+    course.lap102F0=next.lap102F0;course.lapNames102FC=next.lapNames102FC;
+    s.hallRanks11260->lap11260=stage.ranks().lap11260; //1AC540
+    course.race1033C=next.race1033C;course.raceNames10348=next.raceNames10348;
+    s.hallRanks11260->race11264=stage.ranks().race11264; //1AC578
+    course.knockouts10388=next.knockouts10388;course.knockoutNames10394=next.knockoutNames10394;
+    s.hallRanks11260->knockouts11268=stage.ranks().knockouts11268; //1AC5AC
+    s.saveProfile.hallRecordDescendant_.swap(prepared.hallRecordDescendant_);
+    ++s.generation; // Preflight rejects MAX; consumes this exact stage once.
+    after={s.generation,s.common->mode34};
+    return true;
+}
+bool OriginalUiRiderProfileOwner50KG::markResultsHallDirty1CA6E4(
+    OriginalUiRiderProfileStamp50KG expected)noexcept {
+    if(!storage_||!storage_->readable()||expected.mode34!=0u||
+       storage_->common->mode34!=expected.mode34||storage_->generation!=expected.generation||
+       storage_->generation==std::numeric_limits<std::uint64_t>::max())return false;
+    // Shared actual save-image owner preserves every unrelated/unknown bit.
+    // This sets the dirty bit only; no file write, persisted receipt or award.
+    storage_->saveProfile.markDirty1AB648();
+    ++storage_->generation;
+    return true;
 }
 bool OriginalUiRiderProfileOwner50KG::hallSnapshotForMode(std::uint32_t mode,
     game::OriginalUiHallProfile50KG& out) const noexcept {
@@ -580,6 +827,60 @@ bool OriginalUiRiderProfileOwner50KG::commitRiderConfirmToTournament(const game:
     storage_->comparison100C0=d.selectedRider;++storage_->generation;
     if(storage_->betaSettings&&(storage_->betaSettings->flags11050&1u))(void)saveNativeBetaProgress();return true;
 }
+bool OriginalUiRiderProfileOwner50KG::resultsSubtype11258(std::uint32_t& out)const noexcept {
+    if(!storage_||!storage_->readable())return false;
+    out=storage_->subtype11258;return true;
+}
+bool OriginalUiRiderProfileOwner50KG::resultsRecordBit7E4(bool& out)const noexcept {
+    if(!storage_||!storage_->readable())return false;
+    out=storage_->bit0_7E4;return true; // Actual represented bit only; no upper-byte inference.
+}
+bool OriginalUiRiderProfileOwner50KG::resultsCareerPageFields1C4CD8(
+    ResultsCareerPageFields& out)const noexcept {
+    if(!storage_||!storage_->readable())return false;
+    const auto& s=*storage_;const auto career=s.comparison100C0;
+    const auto selected=std::uint32_t(s.packed1125F&15u);
+    if(career>=s.tournament.careers.size()||!s.authored[career].present||selected>=s.trackText.size())return false;
+    ResultsCareerPageFields next;
+    //187B10's unmatched scan returns0. Do not use progress or quietly clamp
+    //the selected source track into a different course-order row.
+    for(std::size_t i=0;i<s.courseOrder100C4.size();++i)
+        if(s.courseOrder100C4[i]==selected){next.order=static_cast<std::uint32_t>(i);break;}
+    const auto& diagonal=s.tournament.careers[career].pods[career];
+    next.priorMedal1938=diagonal.medals1938[next.order];
+    next.remaining1946=diagonal.remainingPrizes1946[next.order];
+    next.title1127C=s.trackText[selected].title1127C;
+    next.par100E8=s.resultsPar100E8[next.order];
+    next.placePercent102D0=s.resultsPlacePercent102D0;
+    // Native bounded8 backing: index0 is not source100C8 and is never read.
+    for(std::size_t i=0;i<7;++i)next.killPercent100CC[i+1]=s.resultsKillPercent100CC[next.order][i];
+    next.stamp=stamp();if(next.title1127C<0)return false;
+    out=next;return true;
+}
+bool OriginalUiRiderProfileOwner50KG::resultsCareerProgress219C(std::uint8_t& out)const noexcept {
+    if(!storage_||!storage_->readable())return false;
+    const auto& s=*storage_;const auto career=s.comparison100C0;
+    if(career>=s.tournament.careers.size()||!s.authored[career].present)return false;
+    out=s.tournament.careers[career].progress219C&31u;return true;
+}
+bool OriginalUiRiderProfileOwner50KG::resultsSelectedOrder187B10(std::uint32_t& out)const noexcept {
+    if(!storage_||!storage_->readable())return false;
+    const auto& s=*storage_;const auto selected=std::uint32_t(s.packed1125F&15u);
+    std::uint32_t order=0; //Original unmatched13-entry scan returns0.
+    for(std::size_t i=0;i<s.courseOrder100C4.size();++i)
+        if(s.courseOrder100C4[i]==selected){order=static_cast<std::uint32_t>(i);break;}
+    out=order;return true;
+}
+bool OriginalUiRiderProfileOwner50KG::resultsNextCourseTitle187480(std::int32_t& out)const noexcept {
+    std::uint8_t progress=0;if(!resultsCareerProgress219C(progress))return false;
+    const auto& s=*storage_;const auto next=std::size_t(progress)+1;
+    //Original returns null for next>=13. Do not replace it with current title
+    //or invent a string for the source's unsupported null-formatting domain.
+    if(next>=s.courseOrder100C4.size())return false;
+    const auto selected=s.courseOrder100C4[next];
+    if(selected>=s.trackText.size()||s.trackText[selected].title1127C<0)return false;
+    out=s.trackText[selected].title1127C;return true;
+}
 bool OriginalUiRiderProfileOwner50KG::tournamentCareerSnapshot(std::uint32_t index,TournamentCareerSnapshot& out)const noexcept{
     if(!storage_||!storage_->readable()||index>=27||!storage_->authored[index].present)return false;
     const auto& c=storage_->tournament.careers[index];TournamentCareerSnapshot p;
@@ -606,6 +907,62 @@ bool OriginalUiRiderProfileOwner50KG::selectedGarageProfileSnapshot(GarageProfil
     if(next.career.stamp.generation!=before.generation||next.career.stamp.mode34!=before.mode34||
        after.generation!=before.generation||after.mode34!=before.mode34)return false;
     out=next;return true;
+}
+bool OriginalUiRiderProfileOwner50KG::canApplyGaragePurchase1FEB90(
+    const GarageProfileSnapshot& expected,const game::OriginalUiGarageState50KG& page)const noexcept {
+    if(!storage_||storage_->tournamentResultArmed||!page.known||page.selected4E4>=6||page.available34B0<0||
+       storage_->generation==std::numeric_limits<std::uint64_t>::max())return false;
+    GarageProfileSnapshot actual;
+    if(!selectedGarageProfileSnapshot(actual)||actual.career.career100C0==0||
+       actual.career.career100C0!=expected.career.career100C0||
+       actual.career.stamp.generation!=expected.career.stamp.generation||
+       actual.career.stamp.mode34!=expected.career.stamp.mode34||
+       actual.career.unspent2194!=expected.career.unspent2194||
+       actual.career.earned2190!=expected.career.earned2190||
+       actual.career.kills2198!=expected.career.kills2198||
+       actual.career.progress219C!=expected.career.progress219C||
+       actual.career.cardFlag100BC!=expected.career.cardFlag100BC||
+       actual.base0180!=expected.base0180||actual.maximum0408!=expected.maximum0408||
+       std::memcmp(actual.current1920.data(),expected.current1920.data(),sizeof(actual.current1920)))return false;
+    std::int64_t cost=0;bool changed=false;
+    for(std::size_t row=0;row<6;++row){
+        std::int32_t base=0,current=0,maximum=0;
+        if(!game::convertOriginalUiGarageStat50KG(actual.base0180[row],base)||
+           !game::convertOriginalUiGarageStat50KG(actual.current1920[row],current)||
+           !game::convertOriginalUiGarageStat50KG(actual.maximum0408[row],maximum)||
+           page.base[row]!=base||page.current4E8[row]!=current||page.maximum[row]!=maximum||
+           base<0||current<base||maximum<current||maximum>20||page.delta500[row]<base-current||
+           page.delta500[row]>maximum-current)return false;
+        for(std::int32_t n=1;n<=page.delta500[row];++n)cost+=50*(current+n)+300;
+        //1FE374: each sold owned notch refunds half its current full price.
+        // Summation across all rows admits mixed buys/sales but no free credits.
+        for(std::int32_t n=0;n>page.delta500[row];--n)cost-=(50*(current+n)+300)/2;
+        changed=changed||page.delta500[row]!=0;
+    }
+    return changed&&std::int64_t(actual.career.unspent2194)-cost==page.available34B0;
+}
+bool OriginalUiRiderProfileOwner50KG::applyGaragePurchase1FEB90(
+    const GarageProfileSnapshot& expected,const game::OriginalUiGarageState50KG& page,
+    GarageProfileSnapshot& after) noexcept {
+    if(!canApplyGaragePurchase1FEB90(expected,page))return false;
+    auto next=expected;
+    // Exact188E40 conversion: binary32(integer notch)*0x3d4ccccd.
+    // 1FEB90 writes all six diagonal lanes, even ones with zero pending delta.
+    for(std::size_t row=0;row<6;++row){
+        volatile float count=static_cast<float>(page.current4E8[row]+page.delta500[row]);
+        volatile float ability=0.05f*count;next.current1920[row]=ability;
+    }
+    next.career.unspent2194=static_cast<std::uint32_t>(page.available34B0);
+    next.career.cardFlag100BC=true;++next.career.stamp.generation;
+    auto& s=*storage_;auto& career=s.tournament.careers[next.career.career100C0];
+    career.pods[next.career.career100C0].abilities1920=next.current1920; //1FEBF0
+    career.unspent2194=next.career.unspent2194;                       //1FEC30
+    s.saveProfile.markDirty1AB648();                                //1FEC58 bit0
+    ++s.generation;after=next;return true;
+}
+void OriginalUiRiderProfileOwner50KG::autosaveGaragePurchase() noexcept {
+    if(storage_&&storage_->betaSettings&&(storage_->betaSettings->flags11050&1u))
+        (void)saveNativeBetaProgress();
 }
 bool OriginalUiRiderProfileOwner50KG::selectedTournamentCourseSnapshot(
     TournamentCareerSnapshot& career,game::OriginalUiCourseRememberedProfile50KG& course) const noexcept {
@@ -646,12 +1003,65 @@ bool OriginalUiRiderProfileOwner50KG::tournamentTextMetadataSnapshot(std::uint32
     if(!storage_||!storage_->readable()||career>=storage_->authored.size()||
        !storage_->authored[career].present)return false;
     const auto& s=*storage_;const auto progress=std::uint8_t(s.tournament.careers[career].progress219C&31u);
-    if(progress>=s.courseOrder100C4.size()||s.racerNames3C[career]<0)return false;
-    const auto course=s.courseOrder100C4[progress];if(course>=s.trackText.size())return false;
+    if(progress>s.courseOrder100C4.size()||s.racerNames3C[career]<0)return false;
+    // Original1EF230..244 retains progress13 for the completed text branch,
+    // but clamps its local course-order index to12. Never read a 14th course.
+    const auto order=progress==13?12u:unsigned(progress);
+    const auto course=s.courseOrder100C4[order];if(course>=s.trackText.size())return false;
     const auto& text=s.trackText[course];if(text.title1127C<0||text.planet11281<0)return false;
     TournamentTextMetadataSnapshot next;next.career100C0=career;next.racerName3C=s.racerNames3C[career];
     next.courseTitle1127C=text.title1127C;next.planetTitle11281=text.planet11281;
     next.progressIndex=progress;next.course100C4=course;next.stamp=stamp();out=next;return true;
+}
+bool OriginalUiRiderProfileOwner50KG::resultsRacerName3C(std::uint32_t racer,
+    std::int32_t& name)const noexcept {
+    if(!storage_||!storage_->readable()||racer>=storage_->racerNames3C.size()||
+       storage_->racerNames3C[racer]<0)return false;
+    name=storage_->racerNames3C[racer];return true;
+}
+bool OriginalUiRiderProfileOwner50KG::resultsNameCourse1C9C80(std::uint32_t& course)const noexcept {
+    if(!storage_||!storage_->readable())return false;
+    course=storage_->packed1125F&15u;return true;
+}
+bool OriginalUiRiderProfileOwner50KG::resultsFirstName1C9CA4(
+    OriginalPersistedProfileName50KG& out)const noexcept {
+    if(!storage_||!storage_->readable())return false;
+    // Source1C9CAC: mode2 uses actual career100C0/219D; other modes use
+    // player0's10F68. Existing owned-name readers preserve known NUL prefix.
+    return storage_->common->mode34==2u?careerName219D(storage_->comparison100C0,out):
+        playerName10F68(0,out);
+}
+game::LapRecordQueryResult50ID OriginalUiRiderProfileOwner50KG::resultsLapQuery1861A0(
+    std::uint32_t course,float seconds)const noexcept {
+    using S=game::LapRecordQueryStatus50ID;
+    if(!storage_||!storage_->readable()||!hallRecordsReady())return {S::Storage,0,0x1861a0u};
+    const auto& s=*storage_;
+    const game::LapRecordConfig50ID config{s.subtype11258,s.common->playerBits1125C,
+        static_cast<std::uint16_t>(s.common->playerBits1125C|(std::uint16_t(s.packed1125D)<<8))};
+    return game::queryLapRecord50ID(config,
+        game::LapRecordTableView50ID<game::OriginalUiHallCourseRecords50KG>{s.hallRecords.courses.data(),s.hallRecords.courses.size()},
+        course,seconds);
+}
+game::LapRecordQueryResult50ID OriginalUiRiderProfileOwner50KG::resultsRaceQuery186280(
+    std::uint32_t course,float seconds)const noexcept {
+    using S=game::LapRecordQueryStatus50ID;
+    if(!storage_||!storage_->readable()||!hallRecordsReady())return {S::Storage,0,0x186280u};
+    const auto& s=*storage_;
+    const game::LapRecordConfig50ID config{s.subtype11258,s.common->playerBits1125C,
+        static_cast<std::uint16_t>(s.common->playerBits1125C|(std::uint16_t(s.packed1125D)<<8))};
+    return game::queryRaceRecord50ID(config,
+        game::LapRecordTableView50ID<game::OriginalUiHallCourseRecords50KG>{s.hallRecords.courses.data(),s.hallRecords.courses.size()},
+        course,seconds);
+}
+game::LapRecordQueryResult50ID OriginalUiRiderProfileOwner50KG::resultsKnockoutQuery1863B0(
+    std::uint32_t course,std::uint32_t observedTimingCD0)const noexcept {
+    using S=game::LapRecordQueryStatus50ID;
+    if(!storage_||!storage_->readable()||!hallRecordsReady())return {S::Storage,0,0x1863b0u};
+    const auto& s=*storage_;
+    const game::LapRecordConfig50ID config{s.subtype11258,s.common->playerBits1125C,
+        static_cast<std::uint16_t>(s.common->playerBits1125C|(std::uint16_t(s.packed1125D)<<8))};
+    // Read-only qualification of an observed value, never earned CD0 custody.
+    return game::queryOriginalHallKnockoutRecord50KG(config,s.hallRecords,course,observedTimingCD0);
 }
 bool OriginalUiRiderProfileOwner50KG::armTournamentResultForCommittedRace(const CourseRaceSelection& selection,OriginalUiRiderProfileStamp50KG expected,
     const game::LapTimingManager50ID& manager,OriginalUiMainApplication50KG& application)noexcept{
@@ -784,16 +1194,23 @@ bool OriginalUiRiderProfileOwner50KG::commitCourseLaunch(const game::OriginalUiR
        !d.admitted||!d.profileProposalComplete||d.blockers||d.action!=game::OriginalUiRouteAction50KG::request||
        d.request.sourceScreen!=6||d.request.sourcePage!=1||d.profileChanges.count!=writes||
        !courseRiderSelectionSnapshot(rider))return false;
-    // Mode2 retains the authenticated clean Career predecessor. It does not
+    // Mode2 retains the authenticated selected Career predecessor. It does not
     // reinterpret mode0, unlock careers, advance progress or touch save data.
     if(source.subtypeSlot14F4<1||source.subtypeSlot14F4>3||
        (tournament&&source.subtypeSlot14F4!=1)||
        ((storage_->common->playerBits1125C>>5)&3)!=1)return false;
     if(tournament){
         TournamentCareerSnapshot career;game::OriginalUiCourseRememberedProfile50KG remembered;
-        if(!selectedTournamentCourseSnapshot(career,remembered)||career.career100C0!=rider.rider||
-           career.progress219C||career.cardFlag100BC||career.earned2190||career.unspent2194||career.kills2198||
-           source.courseSlot14E4!=1||source.selectedControlWord44!=remembered.courseOrder100C4[0]||
+        if(!selectedTournamentCourseSnapshot(career,remembered)||career.career100C0!=rider.rider)return false;
+        const auto progress=std::uint32_t(career.progress219C&31u);
+        // Same next-course mapping as the actual mode2 entry and widgets.
+        // Earnings and unsaved native progress are not fresh-profile gates:
+        // the genuine selected career must be able to launch its next course.
+        // Completed careers remain outside this bounded continuation route.
+        if(progress>=remembered.courseOrder100C4.size()||
+           (career.cardFlag100BC&&!career.nativeBetaStorage)||
+           source.courseSlot14E4!=progress+1u||
+           source.selectedControlWord44!=remembered.courseOrder100C4[progress]||
            source.packed1125C!=std::uint16_t(storage_->common->playerBits1125C|(std::uint16_t(storage_->packed1125D)<<8)))return false;
         for(const auto medal:career.medals1938)if(medal>8)return false;
     }else if(source.laps14EC<1||source.laps14EC>25||source.entrants14F0<1||source.entrants14F0>8)return false;
@@ -841,6 +1258,33 @@ bool OriginalUiRiderProfileOwner50KG::careerName219D(std::uint32_t career,
     return storage_&&storage_->common&&storage_->common->known&&
         storage_->saveProfile.persistedName(true,career,out);
 }
+bool OriginalUiRiderProfileOwner50KG::storeResultsNoTime1CA4DC(
+    OriginalUiRiderProfileStamp50KG expected)noexcept {
+    if(!storage_||!storage_->readable()||expected.generation!=storage_->generation||
+       expected.mode34!=storage_->common->mode34||
+       storage_->generation==std::numeric_limits<std::uint64_t>::max())return false;
+    auto& s=*storage_;
+    //1CA4C4..4DC reads, clears and sets bit0; all other actual bits survive.
+    s.common->flags11054=std::uint8_t((s.common->flags11054&0xfeu)|1u);
+    ++s.generation; // Native observer invalidation, not a persistence receipt.
+    return true;
+}
+bool OriginalUiRiderProfileOwner50KG::storeResultsName1CA528(std::uint32_t mode,
+    std::string_view name,OriginalUiRiderProfileStamp50KG expected)noexcept {
+    if(!storage_||!storage_->readable()||!storage_->saveProfile.namesReady()||
+       (mode!=3u&&mode!=4u)||name.size()>10u||
+       expected.generation!=storage_->generation||expected.mode34!=storage_->common->mode34||
+       storage_->generation==std::numeric_limits<std::uint64_t>::max())return false;
+    auto& s=*storage_;auto& names=s.saveProfile;
+    OriginalPersistedProfileName50KG* target=nullptr;
+    if(mode==3u&&s.common->mode34==2u){
+        if(s.comparison100C0>=names.careerNames_.size())return false;
+        target=&names.careerNames_[s.comparison100C0]; //1CA514..528.
+    }else target=&names.playerNames_[mode==3u?0u:1u]; //1CA544/1CA56C.
+    if(!target->replaceCString(name))return false;
+    ++s.generation; // Native observer invalidation, never a source save receipt.
+    return true;
+}
 bool OriginalUiRiderProfileOwner50KG::playerName10F68(std::uint32_t player,
     OriginalPersistedProfileName50KG& out)const noexcept {
     return storage_&&storage_->common&&storage_->common->known&&
@@ -867,6 +1311,7 @@ bool OriginalUiRiderProfileOwner50KG::installNativeReadOwners(
        !game::sameOriginalUiControlsPresets50KG(controls,stage.controlsBefore())||
        prepared.importedRead_.get()!=read.get()||prepared.payloadRecords_.get()!=stage.retainedEnvelope().get()||
        prepared.hallOrigin_!=OriginalSaveProfileOwner50KG::HallOrigin::originalPayload||
+       prepared.hallRecordDescendant_||prepared.nativeBetaHall_||prepared.freshHall_||
        !prepared.namesReady()||!prepared.identity191C_||
        (prepared.cardFlags_.value&0xfcu)!=(live.cardFlags_.value&0xfcu)||
        (prepared.cardFlags_.knownMask&0xfcu)!=(live.cardFlags_.knownMask&0xfcu))return false;
@@ -904,6 +1349,11 @@ bool OriginalUiRiderProfileOwner50KG::installNativeReadOwners(
     }
     live.hallOrigin_=prepared.hallOrigin_;live.localizedNames_=nullptr;live.localizedText_=nullptr;
     live.payloadRecords_.swap(prepared.payloadRecords_);live.importedRead_.swap(prepared.importedRead_);
+    // New loaded root has no inherited earned descendant. Retain displaced
+    // owners in prepared until the existing exclusion/store interval ends.
+    live.nativeBetaHall_.swap(prepared.nativeBetaHall_);
+    live.freshHall_.swap(prepared.freshHall_);
+    live.hallRecordDescendant_.swap(prepared.hallRecordDescendant_);
     live.cardFlags_=prepared.cardFlags_;                              //186D94..DE0
     // EXACT successful188740 effects: projected fields + sound revision,
     // then Main transport control revision. Existing implementation has no
@@ -1022,6 +1472,13 @@ void OriginalUiRiderProfileOwner50KG::loadNativeBetaProgressAtStartup() noexcept
   s.tournament.careers=careers;s.unlock10FAC=unlock;s.hidden0730=hidden;s.remembered=remembered;s.rememberedCourse=courses;
   s.common->availability11018=static_cast<std::uint8_t>(availability);s.common->savedSlot6E0=mainSlot;
   s.saveProfile.careerNames_=careerNames;s.saveProfile.playerNames_=playerNames;s.saveProfile.namesInitialized_=true;
+  // Keep displaced root/descendant ownership until this synchronous load has
+  // published. No pending old preparation can match the new root/generation.
+  auto displacedHallDescendant=std::move(s.saveProfile.hallRecordDescendant_);
+  auto displacedPayload=std::move(s.saveProfile.payloadRecords_);
+  auto displacedRead=std::move(s.saveProfile.importedRead_);
+  auto displacedBeta=std::move(s.saveProfile.nativeBetaHall_);
+  auto displacedFresh=std::move(s.saveProfile.freshHall_);
   s.hallRecords=*hall;s.saveProfile.nativeBetaHall_=std::move(hall);
   s.saveProfile.hallOrigin_=OriginalSaveProfileOwner50KG::HallOrigin::nativeBeta;
   s.saveProfile.localizedNames_=nullptr;s.saveProfile.localizedText_=nullptr;

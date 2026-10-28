@@ -108,6 +108,10 @@ class OriginalUiGarageDrawContribution50KG final:public OriginalUiSourceOwner50K
     bool shared470ThirdPassInheritedReturned_=false;
     bool shared470ThirdPassReceiverCurrent(const OriginalUiSharedDialogs50KG&)const noexcept;
     bool shared470ThirdPassFailedUnwindCurrent(const OriginalUiSharedDialogs50KG&)const noexcept;
+    std::shared_ptr<OriginalUiSharedDialogs50KG> shared47COwner_;
+    std::uint64_t shared47CEpoch_=0,shared47CDemandPublication_=0;
+    bool shared47CReceiverCurrent(const OriginalUiSharedDialogs50KG&,std::uint32_t)const noexcept;
+    bool shared47CFailedUnwindCurrent(const OriginalUiSharedDialogs50KG&)const noexcept;
     bool shared470FirstPassReceiverCurrent(const OriginalUiSharedDialogs50KG&)const noexcept;
     bool shared470FailedUnwindCurrent(const OriginalUiSharedDialogs50KG&)const noexcept;
     std::uint8_t textRestoreStep_=0;
@@ -120,7 +124,9 @@ class OriginalUiGarageDrawContribution50KG final:public OriginalUiSourceOwner50K
     };
     bool readQuadInputs2DF550(const OriginalUiGarageQuad50KG&,QuadRenderInputs&,std::uint32_t&)const noexcept;
     bool readWarning470QuadInputs2DF550(const OriginalUiSharedDialogs50KG&,const OriginalUiGarageQuad50KG&,QuadRenderInputs&,std::uint32_t&)const noexcept;
+    bool readPopup47CQuadInputs2DF550(const OriginalUiSharedDialogs50KG&,const OriginalUiGarageQuad50KG&,QuadRenderInputs&,std::uint32_t&)const noexcept;
     bool collectWarning470Quad246760(OriginalUiSharedDialogs50KG&,OriginalUiGarageQuad50KG&,assets::OriginalStandardMaterialDiagnostic50LA&)noexcept;
+    bool collectPopup47CQuad246760(OriginalUiSharedDialogs50KG&,OriginalUiGarageQuad50KG&,assets::OriginalStandardMaterialDiagnostic50LA&)noexcept;
     bool quadInvocation2DF550Current(const OriginalUiGarageQuad50KG&)const noexcept;
     bool collectQuadPrimitive246760(OriginalUiGarageQuad50KG&,assets::OriginalStandardMaterialDiagnostic50LA&)noexcept;
     bool renderReturned140230Current(const Application&)const noexcept;
@@ -164,6 +170,7 @@ class OriginalUiGarageDrawContribution50KG final:public OriginalUiSourceOwner50K
     bool warning470DrainReceiverCurrent(const void*,std::int32_t,std::int32_t)const noexcept;
     bool warning470DrainBindingCurrent(const void*,std::int32_t,std::int32_t)const noexcept;
     bool prepareDrainWarning470DimPolicy24B130(const OriginalUiSharedDialogs50KG&,assets::OriginalStandardMaterialDiagnostic50LA&)noexcept;
+    bool prepareDrainPopup47CDimPolicy24B130(const OriginalUiSharedDialogs50KG&,assets::OriginalStandardMaterialDiagnostic50LA&)noexcept;
     bool prepareDrainAperturePolicy24B130(std::size_t,assets::OriginalStandardMaterialDiagnostic50LA&)noexcept;
     bool prepareDrainScreenPolicies24B130(assets::OriginalStandardMaterialDiagnostic50LA&)noexcept;
     bool lowerAndBindQueuedScreen24B26C(std::size_t,assets::OriginalStandardMaterialDiagnostic50LA&)noexcept;
@@ -188,8 +195,11 @@ class OriginalUiGarageDrawContribution50KG final:public OriginalUiSourceOwner50K
     bool readApertureInputs2E21D0(const OriginalUiGaragePageOwner50KG&,std::size_t,ApertureRenderInputs&,std::uint32_t&)const noexcept;
     bool collectAperturePrimitive246760(OriginalUiGaragePageOwner50KG&,std::size_t,assets::OriginalStandardMaterialDiagnostic50LA&)noexcept;
     bool readWarning470DimInputs2E21D0(const OriginalUiSharedDialogs50KG&,ApertureRenderInputs&,std::uint32_t&)const noexcept;
+    bool readPopup47CDimInputs2E21D0(const OriginalUiSharedDialogs50KG&,ApertureRenderInputs&,std::uint32_t&)const noexcept;
     bool readWarning470TextInputs2E0170(const OriginalUiSharedDialogs50KG&,const OriginalUiGarageScreenText50KG&,TextRenderInputs&,std::uint32_t&)const noexcept;
+    bool readPopup47CTextInputs2E0170(const OriginalUiSharedDialogs50KG&,const OriginalUiGarageScreenText50KG&,TextRenderInputs&,std::uint32_t&)const noexcept;
     bool collectWarning470Text246760(OriginalUiSharedDialogs50KG&,OriginalUiGarageScreenText50KG&,std::size_t,OriginalUiGarageScreenTextDiagnostic50KG&)noexcept;
+    bool collectPopup47CText246760(OriginalUiSharedDialogs50KG&,OriginalUiGarageScreenText50KG&,std::size_t,OriginalUiGarageScreenTextDiagnostic50KG&)noexcept;
     bool readPageTextInputs2E0170(const OriginalUiGarageScreenText50KG&,TextRenderInputs&,std::uint32_t&)const noexcept;
     bool readTextInputs29D3F0(const OriginalUiGarageTextOverlay50KG&,TextRenderInputs&,std::uint32_t&)const noexcept;
     bool textInvocation29D3F0Current(const OriginalUiGarageTextOverlay50KG&)const noexcept;

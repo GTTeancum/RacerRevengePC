@@ -1,6 +1,7 @@
 #pragma once
 #include "authored_parameters49n.h"
 #include "track_navigation50eu.h"
+#include "original_course_descriptor50kg.h"
 #include <cstddef>
 #include <cstdint>
 
@@ -63,21 +64,16 @@ inline bool bindFreshAiCreateSelection50IU(const char* trackCode,
     // pods are constructor data, independent of human rider and native world
     // readiness. MC:17EDBC..17EDD8 name at112C0;17EDF8/17EE00 record8
     // at112C8. The remaining rows retain their authenticated constructor data.
-    struct Descriptor { char first,second; std::int32_t recordPod; };
-    constexpr Descriptor descriptors[]{
-        {'T','A',19},{'T','B',7},{'T','C',18},{'R','C',24},
-        {'M','A',20},{'M','B',22},{'M','C',8},{'R','A',9},
-        {'G','A',10},{'G','B',23},{'G','C',17},{'S','A',12},
-        {'S','C',16}};
+    const auto& descriptors=originalFreshCourseDescriptors50KG;
     const auto upper=[](char c) noexcept {
         return c>='a'&&c<='z'?static_cast<char>(c-'a'+'A'):c;
     };
     AiFreshCreateSelection50IU next{};
-    for(std::size_t id=0;id<sizeof(descriptors)/sizeof(descriptors[0]);++id){
+    for(std::size_t id=0;id<descriptors.size();++id){
         const auto& row=descriptors[id];
         if(upper(trackCode[0])==row.first&&upper(trackCode[1])==row.second){
             next.selectedTrackId1125F=static_cast<std::uint8_t>(id);
-            next.freshCourseRecordPod11280=row.recordPod;
+            next.freshCourseRecordPod11280=row.rival11280;
             break;
         }
     }
@@ -105,7 +101,7 @@ struct AiGcCreateSelection50IU {
     std::uint8_t selectedTrackId1125F=10;
     std::int32_t selectedOrder187B10=10;
     AuthoredClass49N actualRaceClass=AuthoredClass49N::C;
-    std::int32_t freshCourseRecordPod11280=17;
+    std::int32_t freshCourseRecordPod11280=originalFreshCourseDescriptors50KG[10].rival11280;
 };
 inline bool bindFreshGcAiCreateSelection50IU(const char* trackCode,
     std::size_t bytes,AiGcCreateSelection50IU& out) noexcept {

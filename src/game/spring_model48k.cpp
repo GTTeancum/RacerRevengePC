@@ -52,6 +52,14 @@ V velocity(Math& m,const V& point,const V& center,const SpringImpactBody48K& pri
     return m.minus(first,second);
 }
 }
+bool prepareSpringRecordGeometry48K(const BodyMatrix48G& scene,const Vector3_48C& local,
+    const Vector3_48C& normal,const Vector3_48C& surface,SpringRecordGeometryPrefix48K& output)noexcept {
+    if(!affine(scene)||!finite(local)||!finite(normal)||!finite(surface))return false;
+    Math math;SpringRecordGeometryPrefix48K result;
+    result.worldPoint=math.transform(scene,local,true);
+    result.depth=math.dot(math.minus(surface,result.worldPoint),normal);
+    if(!math.valid)return false;output=result;return true;
+}
 SpringGeneratedStatus48K updateSpringContacts48L(
     const SpringGeneratedParameters48K& parameters,const SpringResponseParameters48L& response,const SpringGeneratedState48K& state,
     const SpringModelBody48K* bodies,std::size_t bodyCount,const SpringPointRecord48L* pointRecords,std::size_t pointCount,

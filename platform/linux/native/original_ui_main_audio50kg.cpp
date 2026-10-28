@@ -96,14 +96,16 @@ inline std::string sha256(const Bytes& input) {
 }
 
 struct OriginalFile { const char* path; std::size_t bytes; const char* sha; std::uint32_t frames; };
-constexpr std::array<OriginalFile,7> originals{{
+constexpr std::array<OriginalFile,9> originals{{
     {"MUSIC/UI/SCREENS/UI_MAIN.VAG",441024,"50617b8f8029f3fa80744a9de62d7c1987ea0e2d4b35487b8ce7ffd34401934a",384104},
     {"SFX/UI/SELECT.VAG",19424,"6688b65b124428d51cc1e3b531426c417be1bc066a8d560ffe0e7384b48d389a",33880},
     {"SFX/UI/LEFT.VAG",736,"b351f9789f73e8a1d41c954d0238d9b7fb93e257a55fea13b798ec60abb9c8eb",1176},
     {"SFX/UI/RIGHT.VAG",608,"6f515380394424ca812087219c7dad6928c535a68dfce1fd7cbccbb0683fe206",952},
     {"SFX/UI/BADCALL.VAG",6240,"f7d9fa2932f0354a472412c8f3ceea6cf7215f702a5d2ef6abb19590170ac385",10808},
     {"SFX/UI/BACK.VAG",11568,"3306a9ef40ab752a26a645f28f96ab61d2a7bb91b7a83c989496bd22e7a24b18",20132},
-    {"SFX/UI/ADVANCE.VAG",2864,"e49eedb1fdfdc1c1ecf13d2d34f0357a5be77835f5293b295f4811050cd077ec",4900}
+    {"SFX/UI/ADVANCE.VAG",2864,"e49eedb1fdfdc1c1ecf13d2d34f0357a5be77835f5293b295f4811050cd077ec",4900},
+    {"SFX/UI/CLICKL.VAG",1312,"b70b6cb241bb71d0cc51fe155ff3358cdd79ebabc16991d2cc9fc1fe786b7ff9",2184},
+    {"SFX/UI/CLICKR.VAG",384,"add5ade8916dc6d6b8f14bc5445a911dedc41e411078967d8298f552d788f4de",560}
 }};
 constexpr OriginalFile riderOriginal{
     "MUSIC/UI/SCREENS/UI_PEOPL.VAG",709504,
@@ -370,7 +372,7 @@ bool OriginalUiMainAudio50KG::silentGarageVoiceRangesCurrent()const noexcept {
     if(!mixer_||mixer_->count()!=garageSceneRequiredVoices||mixer_->groupEpoch50IC()!=mixerEpoch_)return false;
     // Deliberately range-local: ordinary music, effects, Confirm and the
     // persistent mixer clock may already be live. Garage playback is NOT.
-    for(std::size_t slot=courseRequiredVoices;slot<garageSceneRequiredVoices;++slot){
+    for(std::size_t slot=courseRequiredVoices;slot<garageSceneVoiceEnd;++slot){
         AudioVoiceObservation50HD v;
         if(!mixer_->inspectVoice(slot,v)||v.playbackRevision||v.voice.active||
            v.voice.clip.samples||v.voice.clip.frames||v.voice.clip.sampleRate||v.voice.clip.channels||
@@ -426,7 +428,10 @@ bool OriginalUiMainAudio50KG::ordinaryVoiceOwnershipCurrent()const noexcept {
         if(fading_&&(!std::isfinite(fadeElapsed_)||fadeElapsed_<0.f||!std::isfinite(fadeStartGain_)||
            fadeStartGain_<0.f||fadeStartGain_>0.4f||fadeDuration_!=1.f||fadeRetireAt_!=1.35f))return false;
     }
-    for(std::size_t i=0;i<effectVoiceCount;++i){const auto& v=voices[firstEffectVoice+i];const auto clip=i+1;
+    for(std::size_t i=0;i<availableEffectVoiceCount();++i){
+        const auto clip=i+1;AudioVoiceObservation50HD v;
+        if(!mixer_->inspectVoice(effectVoiceForClip(clip),v)||v.groupKnown||v.groupGain!=1.f||v.groupPaused||
+           v.originalLeft!=1.f||v.originalRight!=1.f||!std::isfinite(v.voice.sourceFrame)||v.voice.sourceFrame<0.0)return false;
         if(v.playbackRevision!=effectPlaybackRevisions_[i]||(v.voice.active&&!ownsEffect_[i]))return false;
         if(!v.playbackRevision){if(ownsEffect_[i]||!pristine(v))return false;continue;}
         if(!preparedClipMatches(clips_[clip],pcm_[clip],originals[clip],1)||!sameClip(v.voice.clip,clips_[clip])||
@@ -494,7 +499,7 @@ bool OriginalUiMainAudio50KG::terminalUnresolvedSceneRowsCurrent()const noexcept
        !garageAudio_.nativeSampleLeasesEmpty()||!garageDroidAudio_.nativeSampleLeasesEmpty()||
        !silentGarageVoiceRangesCurrent()||mixer_->nativeWattoRouting_.command||mixer_->nativeSceneRouting_.command)return false;
     for(const auto& command:nativeGroupControls_)if(command)return false;
-    for(std::size_t slot=courseRequiredVoices;slot<garageSceneRequiredVoices;++slot)
+    for(std::size_t slot=courseRequiredVoices;slot<garageSceneVoiceEnd;++slot)
         if(mixer_->nativeSourceVoiceRoutes_[slot].count)return false;
     return true;
 }
@@ -566,7 +571,7 @@ bool OriginalUiMainAudio50KG::canRetireOrdinaryFrontendOutput()const noexcept {
          garageSourceLifetime_==GarageSourceLifetime::actorSampleEntryRetired||
          garageSourceLifetime_==GarageSourceLifetime::unsealedRenderEntryRetired)&&
         !nativeGroupControlCount_&&((garageDroidAudio_.nativeSampleLeasesEmpty()&&garageAudio_.nativeSampleLeasesEmpty())||ownedStoppedGarageClipHistoryCurrent())&&
-        canRecordControlChange()&&mixer_->canRecordControlChanges(courseRequiredVoices);
+        canRecordControlChange()&&mixer_->canRecordControlChanges(garageOrdinaryVoiceCount);
 }
 bool OriginalUiMainAudio50KG::retiredOrdinaryFrontendOutputCurrent()const noexcept {
     if(finalNativePcmRetired_)return finalNativePcmRetirementCurrent();
@@ -586,11 +591,12 @@ bool OriginalUiMainAudio50KG::retiredOrdinaryFrontendOutputCurrent()const noexce
 }
 bool OriginalUiMainAudio50KG::retireOrdinaryFrontendOutputAfterDeviceClose()noexcept {
     if(!canRetireOrdinaryFrontendOutput())return false;
-    // All eight real voices were authenticated by exact owned revisions and
+    // All ten ordinary voices were authenticated by exact owned revisions and
     // PCM above. Stop only these ordinary slots after the device callback has
     // joined. Stop leaves clip, cursor and playback history intact; Main keeps
     // every PCM allocation until actual root reclamation after source release.
-    for(std::size_t slot=0;slot<courseRequiredVoices;++slot)mixer_->stop(slot);
+    for(std::size_t ordinal=0;ordinal<garageOrdinaryVoiceCount;++ordinal)
+        mixer_->stop(garageOrdinaryVoice(ordinal));
     ownsMusic_=false;ownsEffect_.fill(false);ownsRiderConfirm_=false;
     musicSong_=0;musicGain_=0.f;fading_=false;
     ordinaryOutputRetired_=true;noteControlChange();return true;
@@ -714,7 +720,7 @@ bool OriginalUiMainAudio50KG::emptyGarageEntryFailureCurrent(
        !(silentGarageVoiceRangesCurrent()||ownedStoppedGarageClipHistoryCurrent())||
        !canRecordControlChange())return false;
     for(const auto& command:nativeGroupControls_)if(command)return false;
-    for(std::size_t slot=courseRequiredVoices;slot<garageSceneRequiredVoices;++slot)
+    for(std::size_t slot=courseRequiredVoices;slot<garageSceneVoiceEnd;++slot)
         if(mixer_->active(slot)||mixer_->nativeSourceVoiceRoutes_[slot].count)return false;
     const auto owned=garageEntryCustody_.lock();const auto backing=garagePersistentBacking_.lock();
     if(!owned||owned!=entry||owned.owner_before(entry)||entry.owner_before(owned)||
@@ -767,7 +773,7 @@ bool OriginalUiMainAudio50KG::unresolvedLateBorrowActorAudioCurrent(
        command->scene.owner_before(entry->page_)||entry->page_.owner_before(command->scene)||
        !queuedGroupIdentityCurrent(*command)||!queuedGroupRoutingCurrent(*command)||
        !queuedGroupHistoryCurrent(*command))return false;
-    for(std::size_t slot=courseRequiredVoices;slot<garageSceneRequiredVoices;++slot)
+    for(std::size_t slot=courseRequiredVoices;slot<garageSceneVoiceEnd;++slot)
         if(mixer_->nativeSourceVoiceRoutes_[slot].count)return false;
     return true;
 }
@@ -795,7 +801,7 @@ bool OriginalUiMainAudio50KG::unresolvedLoadedPageActorAudioCurrent(
        command->scene.owner_before(entry->page_)||entry->page_.owner_before(command->scene)||
        !queuedGroupIdentityCurrent(*command)||!queuedGroupRoutingCurrent(*command)||
        !queuedGroupHistoryCurrent(*command))return false;
-    for(std::size_t slot=courseRequiredVoices;slot<garageSceneRequiredVoices;++slot)
+    for(std::size_t slot=courseRequiredVoices;slot<garageSceneVoiceEnd;++slot)
         if(mixer_->nativeSourceVoiceRoutes_[slot].count)return false;
     return true;
 }
@@ -823,7 +829,7 @@ bool OriginalUiMainAudio50KG::unresolvedWattoBindingActorAudioCurrent(
        command->scene.owner_before(entry->page_)||entry->page_.owner_before(command->scene)||
        !queuedGroupIdentityCurrent(*command)||!queuedGroupRoutingCurrent(*command)||
        !queuedGroupHistoryCurrent(*command))return false;
-    for(std::size_t slot=courseRequiredVoices;slot<garageSceneRequiredVoices;++slot)
+    for(std::size_t slot=courseRequiredVoices;slot<garageSceneVoiceEnd;++slot)
         if(mixer_->nativeSourceVoiceRoutes_[slot].count)return false;
     return true;
 }
@@ -851,7 +857,7 @@ bool OriginalUiMainAudio50KG::unresolvedSceneEntryFailureCurrent(
     const std::uint64_t pending=command->routingApplied?0u:1u;
     if(!canRecordControlChange(pending)||!mixer_->canRecordControlChanges(pending))return false;
     // Never turn a completed/played source row into an unresolved cancellation.
-    for(std::size_t slot=courseRequiredVoices;slot<garageSceneRequiredVoices;++slot)
+    for(std::size_t slot=courseRequiredVoices;slot<garageSceneVoiceEnd;++slot)
         if(mixer_->active(slot)||mixer_->playbackRevision(slot)||
            mixer_->nativeSourceVoiceRoutes_[slot].count)return false;
     return true;
@@ -880,7 +886,7 @@ bool OriginalUiMainAudio50KG::unresolvedLateBorrowEntryFailureCurrent(
     const std::uint64_t pending=command->routingApplied?0u:1u;
     if(!canRecordControlChange(pending)||!mixer_->canRecordControlChanges(pending))return false;
     // Never turn a completed/played source row into an unresolved cancellation.
-    for(std::size_t slot=courseRequiredVoices;slot<garageSceneRequiredVoices;++slot)
+    for(std::size_t slot=courseRequiredVoices;slot<garageSceneVoiceEnd;++slot)
         if(mixer_->active(slot)||mixer_->playbackRevision(slot)||
            mixer_->nativeSourceVoiceRoutes_[slot].count)return false;
     return true;
@@ -909,7 +915,7 @@ bool OriginalUiMainAudio50KG::unresolvedLoadedPageEntryFailureCurrent(
     const std::uint64_t pending=command->routingApplied?0u:1u;
     if(!canRecordControlChange(pending)||!mixer_->canRecordControlChanges(pending))return false;
     // Never turn a completed/played source row into an unresolved cancellation.
-    for(std::size_t slot=courseRequiredVoices;slot<garageSceneRequiredVoices;++slot)
+    for(std::size_t slot=courseRequiredVoices;slot<garageSceneVoiceEnd;++slot)
         if(mixer_->active(slot)||mixer_->playbackRevision(slot)||
            mixer_->nativeSourceVoiceRoutes_[slot].count)return false;
     return true;
@@ -938,7 +944,7 @@ bool OriginalUiMainAudio50KG::unresolvedWattoBindingEntryFailureCurrent(
     const std::uint64_t pending=command->routingApplied?0u:1u;
     if(!canRecordControlChange(pending)||!mixer_->canRecordControlChanges(pending))return false;
     // Never turn a completed/played source row into an unresolved cancellation.
-    for(std::size_t slot=courseRequiredVoices;slot<garageSceneRequiredVoices;++slot)
+    for(std::size_t slot=courseRequiredVoices;slot<garageSceneVoiceEnd;++slot)
         if(mixer_->active(slot)||mixer_->playbackRevision(slot)||
            mixer_->nativeSourceVoiceRoutes_[slot].count)return false;
     return true;
@@ -953,7 +959,7 @@ bool OriginalUiMainAudio50KG::sharedPageEntryFailureCurrent(
        !garageDroidAudio_.coldConstructionCurrent()||garageDroidAudio_.sourceSceneGroup_||
        garageDroidAudio_.sourceSceneGroupReleased_||!garageAudio_.current()||
        !silentGarageVoiceRangesCurrent()||!canRecordControlChange(managerRetired?1u:2u))return false;
-    for(std::size_t slot=courseRequiredVoices;slot<garageSceneRequiredVoices;++slot)
+    for(std::size_t slot=courseRequiredVoices;slot<garageSceneVoiceEnd;++slot)
         if(mixer_->nativeSourceVoiceRoutes_[slot].count)return false;
     const auto owned=garageEntryCustody_.lock();const auto backing=garagePersistentBacking_.lock();
     if(!owned||owned!=entry||owned.owner_before(entry)||entry.owner_before(owned)||
@@ -1013,7 +1019,7 @@ bool OriginalUiMainAudio50KG::unresolvedEntryFailureCurrent(
        !garageColdPending_||garageColdFinishAttempted_||garagePrepared_||garageScenePrepared_||
        !silentGarageVoiceRangesCurrent()||!canRecordControlChange(managerRetired?2u:4u)||
        !mixer_->canRecordControlChanges(mixerBudget))return false;
-    for(std::size_t slot=courseRequiredVoices;slot<garageSceneRequiredVoices;++slot)
+    for(std::size_t slot=courseRequiredVoices;slot<garageSceneVoiceEnd;++slot)
         if(mixer_->nativeSourceVoiceRoutes_[slot].count)return false;
     const auto owned=garageEntryCustody_.lock();const auto backing=garagePersistentBacking_.lock();
     if(!owned||owned!=entry||owned.owner_before(entry)||entry.owner_before(owned)||
@@ -1261,15 +1267,16 @@ bool OriginalUiMainAudio50KG::prepareImpl(const std::filesystem::path& audioRoot
             need(metadata&&metadata->prepared(),"Feature source voices require authenticated APPSTART stream metadata");
             nativeSourceMetadata_=metadata;
         }
-        std::array<assets::AudioPcm50HC,7> next;
+        std::array<assets::AudioPcm50HC,9> next;
         for (std::size_t i=0; i<originals.size(); ++i) {
+            if(i>effectVoiceCount&&!garage)continue; // Garage-only retained slider PCM.
             const auto& def=originals[i]; const auto bytes=authenticatedRead(audioRoot,def.path,def.bytes,def.sha);
             if (i==0) next[i]=decodeMenuStereo(bytes,def,219504);
             else {
                 if(garage){
                     //2332F0/268930 -> PS2SOUND encoded-header producer ->26C200.
                     // This is NOT decoded PCM length, and these are not guest IDs.
-                    static constexpr std::array<std::uint32_t,6> events{{1,3,4,7,5,2}};
+                    static constexpr std::array<std::uint32_t,8> events{{1,3,4,7,5,2,9,10}};
                     const auto payload=be32(bytes.data()+12),rate=be32(bytes.data()+16);
                     need(bytes.size()>=48&&payload==bytes.size()-48&&rate==22050,
                         "Original effect encoded source metadata differs");
@@ -1289,6 +1296,7 @@ bool OriginalUiMainAudio50KG::prepareImpl(const std::filesystem::path& audioRoot
         }
         pcm_=std::move(next);
         for (std::size_t i=0; i<clips_.size(); ++i) {
+            if(i>effectVoiceCount&&!garage)continue;
             const auto& p=pcm_[i]; clips_[i]={p.samples.data(),p.frames,p.sampleRate,p.channels,0,0};
             need(AudioMixer50HD::validClip(clips_[i]), "Original Main PCM rejected by native mixer");
         }
@@ -2048,7 +2056,7 @@ bool OriginalUiMainAudio50KG::advanceGarageNativeMusicControl(
 }
 bool OriginalUiMainAudio50KG::canPlayGaragePageEffect1FDE70(
     const OriginalUiGaragePageOwner50KG& page,std::uint32_t event)const noexcept {
-    const std::size_t clip=event==1u?1u:event==3u?2u:event==4u?3u:event==7u?4u:event==5u?5u:0u;
+    const std::size_t clip=event==1u?1u:event==3u?2u:event==4u?3u:event==7u?4u:event==5u?5u:event==9u?7u:event==10u?8u:0u;
     if(!clip||!nativeGaragePageInputAudioCurrent(page)||
        nativeEffectSources_[clip-1].event!=event||!canRecordControlChange()||
        !mixer_->canRecordControlChanges(2u)||!mixer_->canReserveNativeSourceMonoVoices(1u))return false;
@@ -2057,7 +2065,7 @@ bool OriginalUiMainAudio50KG::canPlayGaragePageEffect1FDE70(
 bool OriginalUiMainAudio50KG::playGaragePageEffect1FDE70(
     const OriginalUiGaragePageOwner50KG& page,std::uint32_t event)noexcept {
     if(!canPlayGaragePageEffect1FDE70(page,event))return false;
-    const std::size_t clip=event==1u?1u:event==3u?2u:event==4u?3u:event==7u?4u:5u;
+    const std::size_t clip=event==1u?1u:event==3u?2u:event==4u?3u:event==7u?4u:event==5u?5u:event==9u?7u:8u;
     // Same real Main-owned dry effect Sound/PCM and typed Aural publication.
     // Actual292360(...,1,0) uses this233410 stop-before-play/restart policy.
     // No Options route, guest group number or unrelated clip is substituted.
@@ -2929,11 +2937,11 @@ const assets::OriginalStreamMetadataRow50KZ* OriginalUiMainAudio50KG::nativeRide
 }
 bool OriginalUiMainAudio50KG::nativeEffectSourceCurrent(std::size_t index,const AudioClip50HD& clip,
     AudioMixer50HD::NativeSourceSampleStart50KG& out)const noexcept {
-    if(!prepared_||!nativeSourceMetadata_||index<1||index>nativeEffectSources_.size()||
+    if(!prepared_||!nativeSourceMetadata_||index<1||index>nativeEffectSources_.size()||index>availableEffectVoiceCount()||
        !sameClip(clips_[index],clip)||!preparedClipMatches(clips_[index],pcm_[index],originals[index],1))return false;
-    static constexpr std::array<std::uint32_t,6> events{{1,3,4,7,5,2}};
-    static constexpr std::array<std::uint32_t,6> milliseconds{{1538,54,44,491,914,223}};
-    static constexpr std::array<std::uint32_t,6> durationBits{{0x3fc4dd2f,0x3d5d2f1b,0x3d343958,0x3efb645a,0x3f69fbe7,0x3e645a1d}};
+    static constexpr std::array<std::uint32_t,8> events{{1,3,4,7,5,2,9,10}};
+    static constexpr std::array<std::uint32_t,8> milliseconds{{1538,54,44,491,914,223,100,26}};
+    static constexpr std::array<std::uint32_t,8> durationBits{{0x3fc4dd2f,0x3d5d2f1b,0x3d343958,0x3efb645a,0x3f69fbe7,0x3e645a1d,0x3dcccccd,0x3cd4fdf4}};
     const auto& source=nativeEffectSources_[index-1];
     if(source.event!=events[index-1]||source.payloadBytes!=originals[index].bytes-48||
        source.headerRate!=22050||source.durationMs!=milliseconds[index-1]||source.pitch!=1881||
@@ -3004,6 +3012,11 @@ bool OriginalUiMainAudio50KG::inspectSteadyRiderTransport(SteadyTransportObserva
         if(observed.groupKnown||observed.groupGain!=1.f)
             return reject(SteadyRiderError::unsupportedGainLayer,"Rider foreign per-voice group gain layer",voice);
     }
+    for(std::size_t i=effectVoiceCount;i<availableEffectVoiceCount();++i){
+        const auto voice=effectVoiceForClip(i+1);auto& observed=out.effects[i];
+        if(!mixer_->inspectVoice(voice,observed)||observed.groupKnown||observed.groupGain!=1.f)
+            return reject(SteadyRiderError::foreignEffect,"Garage slider effect ownership differs",voice);
+    }
     if(out.voiceCount==courseRequiredVoices||retainedGarageOrdinaryCurrent()||garageGroupCurrent()){
         AudioVoiceObservation50HD speech;
         if(!mixer_->inspectVoice(riderConfirmVoice,speech)||speech.groupKnown||speech.groupGain!=1.f||
@@ -3018,12 +3031,12 @@ bool OriginalUiMainAudio50KG::inspectSteadyRiderTransport(SteadyTransportObserva
         return reject(SteadyRiderError::invalidMusicClip,"Rider authenticated Song7 PCM identity/metadata differs",musicVoice);
     if(!fixedVoiceMatches(out.music,riderClip_,musicPlaybackRevision_,0.4f,true))
         return reject(SteadyRiderError::musicVoiceChanged,"Rider Song7 live playback identity/controls/routing differs",musicVoice);
-    for(std::size_t i=0;i<effectVoiceCount;++i){
+    for(std::size_t i=0;i<availableEffectVoiceCount();++i){
         const auto& observed=out.effects[i];
         // The actual mixer ends one-shots. Bookkeeping may await a real page
         // update; inspecting or servicing PCM must not clear/restart them.
         if(!observed.voice.active)continue;
-        const auto voice=firstEffectVoice+i,clip=i+1;
+        const auto clip=i+1,voice=effectVoiceForClip(clip);
         if(!ownsEffect_[i]||observed.playbackRevision!=effectPlaybackRevisions_[i])
             return reject(SteadyRiderError::foreignEffect,"Rider active effect is not this transport's playback",voice);
         if(!preparedClipMatches(clips_[clip],pcm_[clip],originals[clip],1))
@@ -3073,12 +3086,12 @@ bool OriginalUiMainAudio50KG::fadeMain(float seconds) noexcept {
 }
 bool OriginalUiMainAudio50KG::canPlayMenuEffect(std::uint32_t originalId) const noexcept {
     if(!current()||paused_)return false;
-    const std::size_t clip=originalId==1?1:originalId==3?2:originalId==4?3:originalId==7?4:clips_.size();
+    const std::size_t clip=originalId==1?1:originalId==3?2:originalId==4?3:originalId==7?4:originalId==5?5:clips_.size();
     return canPlayEffectClip(clip);
 }
 bool OriginalUiMainAudio50KG::playMenuEffect(std::uint32_t originalId) noexcept {
     if (!current() || paused_) return false;
-    const std::size_t clip = originalId==1?1 : originalId==3?2 : originalId==4?3 : originalId==7?4 : clips_.size();
+    const std::size_t clip = originalId==1?1 : originalId==3?2 : originalId==4?3 : originalId==7?4 : originalId==5?5 : clips_.size();
     return playEffectClip(clip);
 }
 bool OriginalUiMainAudio50KG::canPlayOptionsEffect(std::uint32_t originalId) const noexcept {
@@ -3106,10 +3119,10 @@ bool OriginalUiMainAudio50KG::playControlsEffect(std::uint32_t originalId) noexc
         originalId==4?3:originalId==5?5:clips_.size();return playEffectClip(clip);
 }
 bool OriginalUiMainAudio50KG::canPlayEffectClip(std::size_t clip) const noexcept {
-    if (!current() || paused_ || !clip || clip>=clips_.size()) return false;
+    if (!current() || paused_ || !clip || clip>availableEffectVoiceCount() || clip>=clips_.size()) return false;
     if(nativeWetOwner_){AudioMixer50HD::NativeSourceSampleStart50KG source;
         if(!nativeWetPlayEffect_||!nativeEffectSourceCurrent(clip,clips_[clip],source))return false;}
-    const auto voice=firstEffectVoice+clip-1;
+    const auto voice=effectVoiceForClip(clip);
     if (voice>=mixer_->count() || !AudioMixer50HD::validClip(clips_[clip]) ||
         (!ownsEffect_[clip-1] && mixer_->active(voice))) return false;
     if(const auto* mode=mixer_->originalSoundMode50KG()){
@@ -3127,7 +3140,7 @@ bool OriginalUiMainAudio50KG::canPlayEffectClip(std::size_t clip) const noexcept
 }
 bool OriginalUiMainAudio50KG::playEffectClip(std::size_t clip) noexcept {
     if(!canPlayEffectClip(clip))return false;
-    const auto voice=firstEffectVoice+clip-1;
+    const auto voice=effectVoiceForClip(clip);
     const auto revision=mixer_->controlRevision();
     // Source233458..233488 performs stop-before-play for flags1, not overlap
     // or suppression of a repeated event. AudioMixer::play restarts at frame0.
@@ -3162,9 +3175,10 @@ bool OriginalUiMainAudio50KG::update(float seconds) noexcept {
         if(!canRecordControlChange(transportChanges)||!mixer_->canRecordControlChanges(mixerChanges))return false;
     }
     if (!ownsMusic_ && mixer_->active(musicVoice)) return false;
-    for (std::size_t i=0; i<effectVoiceCount; ++i) {
-        if (!ownsEffect_[i] && mixer_->active(firstEffectVoice+i)) return false;
-        if (ownsEffect_[i] && !mixer_->active(firstEffectVoice+i)) ownsEffect_[i]=false;
+    for (std::size_t i=0; i<availableEffectVoiceCount(); ++i) {
+        const auto voice=effectVoiceForClip(i+1);
+        if (!ownsEffect_[i] && mixer_->active(voice)) return false;
+        if (ownsEffect_[i] && !mixer_->active(voice)) ownsEffect_[i]=false;
     }
     if((mixerCount_==courseRequiredVoices||garagePrepared_||garageSourceLifetime_!=GarageSourceLifetime::unbound)&&mixer_->active(riderConfirmVoice)&&
        (!ownsRiderConfirm_||mixer_->playbackRevision(riderConfirmVoice)!=riderConfirmPlaybackRevision_))return false;
@@ -3225,8 +3239,10 @@ void OriginalUiMainAudio50KG::reset() noexcept {
     const bool changed=garagePrepared_||prepared_||riderPrepared_||coursePrepared_||creditsPrepared_||hallOfFamePrepared_||mixer_||ownsMusic_||ownsRiderConfirm_||fading_||paused_||musicSong_;
     if (prepared_&&mixer_&&mixer_->groupEpoch50IC()==mixerEpoch_&&mixer_->count()==mixerCount_) {
         if (ownsMusic_&&mixer_->playbackRevision(musicVoice)==musicPlaybackRevision_) mixer_->stop(musicVoice);
-        for (std::size_t i=0; i<effectVoiceCount; ++i)
-            if (ownsEffect_[i]&&mixer_->playbackRevision(firstEffectVoice+i)==effectPlaybackRevisions_[i]) mixer_->stop(firstEffectVoice+i);
+        for (std::size_t i=0; i<availableEffectVoiceCount(); ++i){
+            const auto voice=effectVoiceForClip(i+1);
+            if (ownsEffect_[i]&&mixer_->playbackRevision(voice)==effectPlaybackRevisions_[i]) mixer_->stop(voice);
+        }
         if(ownsRiderConfirm_&&mixer_->playbackRevision(riderConfirmVoice)==riderConfirmPlaybackRevision_)
             mixer_->stop(riderConfirmVoice);
     }

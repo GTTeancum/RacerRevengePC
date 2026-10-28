@@ -1,47 +1,8 @@
 #pragma once
 #include "original_race_pause_parent50la.h"
 #include "../../src/game/original_pause_native_draw50la.h"
+#include "original_pause_cold_owner50la.h"
 
-namespace original_pause_cold50LA {
-class Owner final {
-    friend struct original_main_entry50KG::Application;
-    const original_main_entry50KG::Application* application_=nullptr;
-    std::shared_ptr<rr::assets::OriginalStandardMaterialDomain50LA> domain_;
-    std::shared_ptr<const rr::assets::OriginalStandardMaterialContext50LA> context_;
-    std::shared_ptr<const rr::assets::OriginalUiArchive50KG> overlays_;
-    std::shared_ptr<rr::assets::OriginalPauseSourceData50LA> data_;
-    rr::assets::OriginalPausePrimitiveReferences50LA prewarm_;
-    std::shared_ptr<rr::game::OriginalPauseStorage50LA> storage_;
-    std::shared_ptr<rr::game::OriginalPauseNativeDraw50LA> drawing_;
-    bool attempted_=false,prewarmed_=false,loaded_=false,drawAttempted_=false,closed_=false;
-public:
-    rr::assets::OriginalPauseSourceDiagnostic50LA source;
-    rr::assets::OriginalStandardArchiveProvider50LA::Diagnostic provider;
-    rr::assets::OriginalUiPageDiagnostic50KG parse;
-    rr::assets::OriginalStandardMaterialDiagnostic50LA material;
-    rr::assets::OriginalApplicationFontDiagnostic50LA font;
-    rr::game::OriginalPauseStorage50LA::Diagnostic storageDiagnostic;
-    rr::game::OriginalPauseNativeResources50LA::Diagnostic nativeDiagnostic;
-    Owner()=default;Owner(const Owner&)=delete;Owner& operator=(const Owner&)=delete;
-    ~Owner(){if(!close())std::terminate();}
-    const std::shared_ptr<rr::game::OriginalPauseStorage50LA>& storage()const noexcept{return storage_;}
-    const std::shared_ptr<rr::game::OriginalPauseNativeDraw50LA>& drawing()const noexcept{return drawing_;}
-    // Renderer owns drawing_ strongly until its real GPU retirement completes.
-    bool retireDrawing()noexcept {
-        if(drawing_&&drawing_.use_count()!=1)return false;
-        drawing_.reset();return true;
-    }
-    bool close()noexcept {
-        if(closed_)return true;
-        if(!retireDrawing())return false;
-        storage_.reset(); // Actual counted race retains its Pause until graph cleanup.
-        for(std::size_t i=rr::assets::OriginalPausePrimitiveReferences50LA::count;i;--i)
-            prewarm_.release299AC0(i-1);
-        data_.reset();overlays_.reset();context_.reset();domain_.reset();
-        closed_=true;return true;
-    }
-};
-}
 namespace original_main_entry50KG {
 inline bool Application::prewarmPauseCold50LA(original_pause_cold50LA::Owner& out)const noexcept {
     namespace a=rr::assets;
@@ -101,34 +62,11 @@ inline bool Application::prewarmPauseCold50LA(original_pause_cold50LA::Owner& ou
 }
 inline bool Application::loadConsumedPauseCold50LA(rr::game::OriginalRaceConstructor50LA& race,
     original_pause_cold50LA::Owner& out)const noexcept {
-    if(out.application_!=this||!out.prewarmed_||out.closed_||out.storage_||out.loaded_||
-       out.domain_!=standardMaterialDomainOwner_||out.context_!=materialContextOwner_||
-       !out.context_||!out.context_->live()||!videoOwner_)return false;
-    try {
-        const auto table=out.domain_->materials382B38();
-        const auto seal=out.domain_->coldCollector14D440();
-        const auto provider=out.domain_->archiveProvider3E1A70();
-        if(!table||!provider||!provider->sealed()||!table->coldCollectorCurrent(seal))return false;
-        const auto revision=provider->revision();
-        out.storage_=constructConsumedRacePause1A8AB0(race);
-        if(!out.storage_)return false;
-        struct DirectoryScope {
-            std::string& actual;std::string saved;
-            explicit DirectoryScope(std::string& value):actual(value),saved(value){actual="ui\\textures\\";}
-            ~DirectoryScope(){actual.swap(saved);}
-        } directory(materialDirectory36B970_); //Actual1A8A6C/1A8AA0, restore1A90CC.
-        const auto maximum=static_cast<std::uint32_t>(videoOwner_->packetZMaximum);
-        if(!out.storage_->loadBaseBackdrops1B8810(out.domain_,out.context_,out.data_,
-               materialDirectory36B970_,maximum,out.storageDiagnostic)||
-           !out.storage_->loadBasePolygons1B8DB0(materialDirectory36B970_,out.storageDiagnostic)||
-           !out.storage_->loadBaseText1B8B9C(fonts328(),materialDirectory36B970_,fontDirectory36B420_,out.storageDiagnostic)||
-           !out.storage_->loadDerived1BA390(materialDirectory36B970_,fontDirectory36B420_,
-               static_cast<std::int32_t>(race.launchSelection_.subtype),maximum,out.storageDiagnostic)||
-           !finishPauseEntityCold1A8ADC(*out.storage_))return false;
-        if(provider->revision()!=revision||!table->coldCollectorCurrent(seal))return false;
-        out.loaded_=true;return true;
-    }catch(...){return false;}
+    return loadConsumedPauseSourceCold50LA(race,out,false);
 }
+// Only the private connected RA Results caller can select pre-collector staging.
+// Legacy callers still require the same current collector before and after load.
+// The existing pre-/post-collector loader has one out-of-line definition.
 inline bool Application::finishPauseDrawCold50LA(original_pause_cold50LA::Owner& out)const noexcept {
     if(out.application_!=this||!out.loaded_||out.closed_||out.drawAttempted_||!out.storage_||
        out.domain_!=standardMaterialDomainOwner_||out.context_!=materialContextOwner_)return false;

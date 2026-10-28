@@ -37,11 +37,16 @@ bool retirementRejected(const char* branch,D& d,S status,std::uint32_t pc)noexce
     fail(d,status,pc);return retirementRejected(branch,d);
 }
 bool responseMotionName1D5320(std::uint32_t argument,std::int32_t side,int seconds,char(&name)[12])noexcept {
-    if((argument!=1u&&argument!=3u)||(side!=0&&side!=1))return false;
-    if(argument==3u){if(seconds<3)seconds=3;}
-    else if(seconds==5)seconds=4;
+    if(argument>3u||(side!=0&&side!=1))return false;
+    const bool departing=argument==0u||argument==3u;
+    if(departing){
+        // Purchase1D58D4 first changes zero to one; both departure paths
+        // then clamp below three before formatting the actual wp motion.
+        if(argument==0u&&seconds==0)seconds=1;
+        if(seconds<3)seconds=3;
+    }else if(seconds==5)seconds=4;
     if(seconds<0||seconds>9)return false;
-    unsigned n=0;name[n++]='w';if(argument==3u)name[n++]='p';name[n++]='_';
+    unsigned n=0;name[n++]='w';if(departing)name[n++]='p';name[n++]='_';
     name[n++]=side?'r':'l';name[n++]='t';name[n++]='_';
     name[n++]=static_cast<char>('0'+seconds);name[n++]='s';name[n]=0;return true;
 }
@@ -985,9 +990,10 @@ bool OriginalUiGarageWattoOwner50KG::canRespondPage1D5320(
     game::OriginalUiGarageWattoLifecycleDiagnostic50KG& d)const noexcept {
     using E=game::OriginalUiGarageWattoLifecycleError50KG;
     d={};auto reject=[&](E error,std::uint32_t pc)noexcept {d.error=error;d.sourcePC=pc;return false;};
-    // Purchase0 and successful increment2 require actual retained transaction
-    // producers. Neither is admitted by this no-delta/zero-cash endpoint.
-    if(argument!=1u&&argument!=3u)return reject(E::input,0x1D5320);
+    // Only the retained Page transaction can call this private receiver:
+    // purchase0, no-money1, slider2, and no-purchase3 are source arguments,
+    // never a caller-selected sound ID or a separate native sound group.
+    if(argument>3u)return reject(E::input,0x1D5320);
     if(!storage_)return reject(E::unprepared,0x1D5320);const auto& s=*storage_;
     if(s.responseFailed){d=s.responseDiagnostic;return false;}
     if(s.failed||s.closed||s.normalManagerRetirement||s.stage!=Stage::entered||
@@ -995,9 +1001,9 @@ bool OriginalUiGarageWattoOwner50KG::canRespondPage1D5320(
        !s.inputs->issuer_||!s.inputs->application_->known||!subtreeCurrent(false)||
        !page.wattoEntryBindingCurrent1FAC08(*this)||!s.visibility||!s.visibility->current()||
        s.group->main_.get()!=s.inputs->audio_.get())return reject(E::preflight,0x1D5320);
-    // Actual1D5584 no-op is earlier than any range draw/audio/duration or
-    // playback preflight. Do not turn a not-ready refusal into a voice request.
-    if(argument==1u&&!s.constructorFields.readyA4)return true;
+    // Actual1D5374/1D5584 no-op is earlier than any range draw/audio/duration
+    // or playback preflight. Purchase/NoPurchase are NOT readyA4 gated.
+    if((argument==1u||argument==2u)&&!s.constructorFields.readyA4)return true;
     const auto& fields=s.constructorFields;const auto& base=s.base.fields_;
     if(std::fegetround()!=FE_TONEAREST||!s.inputs->application_->clock101A50||
        !s.inputs->motions_||!s.current64||!s.descriptor(s.current64)||
@@ -1009,15 +1015,17 @@ bool OriginalUiGarageWattoOwner50KG::canRespondPage1D5320(
        !std::isfinite(s.capture.time34)||s.capture.time34<0.f||
        !std::isfinite(s.capture.oldTime38)||!std::isfinite(s.capture.time34+1.f)||
        (fields.sideA8!=0&&fields.sideA8!=1)||s.motionNameBC.capacity()<12||
-       !s.group->audio_->canExecute(1u,argument==3u))return reject(E::preflight,0x1D5320);
+       !s.group->audio_->canExecute(1u,argument==0u||argument==3u))return reject(E::preflight,0x1D5320);
     for(std::size_t n=0;n<s.motionDescriptors.size();++n){
         const auto* motion=s.motions.at(n);const auto& descriptor=s.motionDescriptors[n];
         if(!motion||!s.inputs->motions_->owns(motion)||descriptor.motion!=&motion->motion()||
            descriptor.looping!=(motion->fields().loopingB4!=0))return reject(E::motion,0x1523F0);
     }
-    const std::size_t category=argument==1u?3u:2u;
+    constexpr std::array<std::size_t,4> categories{{1u,3u,0u,2u}};
+    const std::size_t category=categories[argument];
     const std::uint32_t count=s.responseCountE0[category],first=s.responseStartE6[category];
-    if(count!=(argument==1u?2u:1u)||first!=(argument==1u?17u:16u))return reject(E::input,0x1D5320);
+    constexpr std::array<std::uint32_t,4> counts{{13u,2u,2u,1u}},starts{{3u,17u,1u,16u}};
+    if(count!=counts[argument]||first!=starts[argument])return reject(E::input,0x1D5320);
     for(std::uint32_t event=first;event<first+count;++event){
         int seconds=0;char name[12]{};
         if(!responseDuration1D5320(event,seconds)||
@@ -1035,7 +1043,7 @@ bool OriginalUiGarageWattoOwner50KG::respondPage1D5320(
     using E=game::OriginalUiGarageWattoLifecycleError50KG;
     r={};d={};if(!canRespondPage1D5320(page,argument,d))return false;
     auto& s=*storage_;auto& fields=s.constructorFields;
-    if(argument==1u&&!fields.readyA4)return true;
+    if((argument==1u||argument==2u)&&!fields.readyA4)return true;
     auto& application=*s.inputs->application_;auto& random=application.sharedRandomSelectors;
     r.effectsStarted=true;r.eligible=true;
     auto stop=[&](E error,std::uint32_t pc)noexcept {
@@ -1052,14 +1060,15 @@ bool OriginalUiGarageWattoOwner50KG::respondPage1D5320(
         random.seed.seed3D6B30=timestamp;game::seedOriginalSharedRng50IU(application.sharedNoise308030,timestamp);
         r.seeded=true;
     }
-    const std::size_t category=argument==1u?3u:2u;
+    constexpr std::array<std::size_t,4> categories{{1u,3u,0u,2u}};
+    const std::size_t category=categories[argument];
     const std::uint32_t count=s.responseCountE0[category],first=s.responseStartE6[category];
     const auto raw=game::drawOriginalSharedRng50IU(application.sharedNoise308030);++r.draws308030;
     const auto selected=static_cast<std::uint32_t>((std::uint64_t{positiveFloatInteger(raw)}*count)>>31);
     if(!random.range.lazy80AC){random.range.rangeCheck3D6B38=1;random.range.lazy80AC=true;}
     if(selected>=count)return stop(E::range,0x1D5320);
     const std::uint32_t event=first+selected;r.event=event;
-    if(argument==1u){
+    if(argument==1u||argument==2u){
         const auto chance=game::drawOriginalSharedRng50IU(application.sharedNoise308030);++r.draws308030;
         const float unit=static_cast<float>(positiveFloatInteger(chance))*0x1p-31f;
         // Exact float-to-double widening at311038; source compares to0.25.
@@ -1067,10 +1076,10 @@ bool OriginalUiGarageWattoOwner50KG::respondPage1D5320(
         if(!(static_cast<double>(unit)<0.25))return true;
     }
     int seconds=0;
-    if(argument==3u){
+    if(argument==0u||argument==3u){
         if(!s.group->audio_->stopAllResponses())return stop(E::audio,0x2924A0);
         if(!s.group->audio_->playResponse(event,0,0))return stop(E::audio,0x292360);
-        //292510/Sound+20 occurs AFTER the real play for case3.
+        //292510/Sound+20 occurs AFTER the real play for purchase0 and case3.
         if(!responseDuration1D5320(event,seconds))return stop(E::audio,0x292510);
     }else{
         if(!responseDuration1D5320(event,seconds))return stop(E::audio,0x292510);
@@ -1079,7 +1088,7 @@ bool OriginalUiGarageWattoOwner50KG::respondPage1D5320(
     char name[12]{};
     if(!responseMotionName1D5320(argument,fields.sideA8,seconds,name))return stop(E::motion,0x1D5320);
     s.motionNameBC=name;fields.idleCooldownF4=2.f;fields.readyA4=false;
-    if(argument==3u)fields.exitA0=true;
+    if(argument==0u||argument==3u)fields.exitA0=true;
     s.current64=s.inputs->motions_->find1523F0(s.motionNameBC);
     const auto* descriptor=s.descriptor(s.current64);
     if(!s.current64||!descriptor)return stop(E::motion,0x1523F0);

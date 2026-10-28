@@ -17,6 +17,7 @@ namespace live_audio50HF { class Owner; }
 namespace rr::game { class OriginalRaceConstructor50LA; class OriginalGcIntroExitOwner; }
 namespace rr::platform {
 class RaceAudioGroups50IC final {
+    friend class OriginalApplicationAural50KG;
     friend class ::ra_pod_scene50LA::Owner;
     friend class ::live_audio50HF::Owner;
     friend class rr::game::OriginalRaceConstructor50LA;
@@ -287,7 +288,7 @@ private:
         std::array<std::unique_ptr<ColdSound>,3> taIntroSounds;
         std::shared_ptr<const assets::OriginalTaIntroAuthoringCandidate> taIntroAuthoring;
         std::shared_ptr<const OriginalApplicationAural50KG> taIntroManager;
-        bool taIntroStarted=false,taIntroConstructed=false; // Historical begun vs all-three-complete.
+        bool taIntroStarted=false,taIntroConstructed=false; // Historical begun vs all-authored-events-complete.
     };
     // Native holding storage, NOT source Sound-group ownership. The counted
     // Entity starts detached, then attaches to the actual controller generic

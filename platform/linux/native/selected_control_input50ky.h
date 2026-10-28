@@ -10,9 +10,13 @@ namespace rr::platform {
 struct SelectedControlInput50KY {
     KeyboardPacketMapping50DR keyboard{};
     game::SelectedControlPreset49D selected{};
+    //Canonical selected row retained independently of optional owner binding:
+    //an intentionally unmapped descriptor is not a mapped-but-missing action.
+    game::ControlActionRow49D sourceActions{};
     std::uint32_t preset=0;
     bool twinEngine=false,cameraCycleBound=false,manualResetBound=false;
     std::int32_t cameraCycleCode=-1,manualResetCode=-1;
+    std::int32_t temporaryLookCodes[2]={-1,-1};
 };
 inline bool bindSelectedControlInput50KY(const game::ControlPresets49D& preferences,
     std::uint32_t actionSlot,std::uint32_t configurationSlot,SelectedControlInput50KY& out) noexcept {
@@ -30,6 +34,7 @@ inline bool bindSelectedControlInput50KY(const game::ControlPresets49D& preferen
        a.action6B0!=b.action6B0||a.flag6B4!=b.flag6B4||configuration!=(slot.preset11048>=4?1u:0u))return false;
     SelectedControlInput50KY result{};
     if(!game::resolveControlPreset49D(preferences,actionSlot,configurationSlot,result.selected))return false;
+    result.sourceActions=a;
     result.preset=slot.preset11048;result.twinEngine=result.selected.configurationEntryNonzero;
     for(auto& axis:result.keyboard.axes)axis.source=KeyboardAxisSource50DR::Centered;
     for(auto& button:result.keyboard.buttons)button.source=KeyboardButtonSource50DR::Released;
@@ -67,7 +72,10 @@ inline bool bindSelectedCameraCycle50KY(const game::ControlPresets49D& preferenc
     if(code<0||code>=static_cast<std::int32_t>(game::dualShockActiveButtons48Y)||
        current.keyboard.buttons[static_cast<std::size_t>(code)].source!=KeyboardButtonSource50DR::Released)return false;
     current.keyboard.buttons[static_cast<std::size_t>(code)]={KeyboardButtonSource50DR::Key,6}; // Native C.
-    current.cameraCycleCode=code;current.cameraCycleBound=true;binding=current;return true;
+    current.cameraCycleCode=code;
+    current.temporaryLookCodes[0]=preferences.slots[slot].actions.action6A8;
+    current.temporaryLookCodes[1]=preferences.slots[slot].actions.action6B0;
+    current.cameraCycleBound=true;binding=current;return true;
 }
 // Bound only after genuine1A16F0 ->2255B0, physical owners and camera exist.
 // Native T is transport policy; descriptor8 remains the original SELECT input.
@@ -155,19 +163,33 @@ inline bool composeSelectedControllerPacket50KY(const SelectedControlInput50KY& 
     // never by an invented original pause callback. Keep it out of gameplay.
     values[9]=0;
     // Driving/steering and actually bound camera/reset calls are owned here.
-    // Other look child routes remain guarded. Reject a reached missing action explicitly;
-    // do not suppress it, substitute a HOST action, or fabricate callback success.
+    // Both temporary-look actions retain their original selected descriptors.
+    //48Z routes every descriptor edge;49A/176DF0 then query held actions,
+    //not the edge's code. Preserve unmapped buttons in the original packet:
+    //they must not drop throttle, pause, or invent a driving action. In
+    //particular an extra edge still queries an already-held mapped action,
+    //matching source dispatch rather than silently filtering that edge.
+    //Only a MAPPED action missing its owner releases the whole packet and
+    //disarms until neutral, with an explicit unsupportedOriginalAction receipt.
     const auto& actions=binding.selected.actions;
+    const auto& row=binding.sourceActions;
+    const std::int32_t mappedCodes[]={row.action690,row.action694,row.flag698,
+        row.flag69C,row.action6A0,row.action6A4,row.action6A8,row.action6AC,
+        row.action6B0,row.flag6B4,13,15};
     for(unsigned code=0;code<16;++code){
         if(values[code]<26)continue;
         const auto signedCode=static_cast<std::int32_t>(code);
+        bool mapped=false;
+        for(const auto mappedCode:mappedCodes)if(signedCode==mappedCode){mapped=true;break;}
+        if(!mapped)continue; //Keep its pressure/digital bit and genuine event.
         const bool supported=code==13||code==15||signedCode==actions.flag698||
             signedCode==actions.flag69C||signedCode==actions.flag6B4||
             signedCode==actions.action694||signedCode==actions.action690||
-            (binding.cameraCycleBound&&signedCode==binding.cameraCycleCode)||
+            (binding.cameraCycleBound&&(signedCode==binding.cameraCycleCode||
+                signedCode==binding.temporaryLookCodes[0]||signedCode==binding.temporaryLookCodes[1]))||
             (binding.manualResetBound&&signedCode==binding.manualResetCode);
         if(!supported){receipt.status=SelectedControllerStatus50KY::unsupportedOriginalAction;
-            receipt.unsupportedCode=signedCode;return false;}
+            receipt.unsupportedCode=signedCode;latch.armed=false;out=packet;return true;}
     }
     packet.bytes[4]=controllerStickByte50KY(input.axes[2]);packet.bytes[5]=controllerStickByte50KY(input.axes[3]);
     packet.bytes[6]=controllerStickByte50KY(input.axes[0]);packet.bytes[7]=controllerStickByte50KY(input.axes[1]);

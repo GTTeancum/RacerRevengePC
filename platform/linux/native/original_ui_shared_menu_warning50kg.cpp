@@ -482,7 +482,7 @@ bool OriginalUiSharedDialogs50KG::menuWarning470PacketImageCurrent(
     const OriginalUiMenuWarningPacket50KG& receipt,const assets::OriginalUiMemberView50KG& member)const noexcept {
     if(!menuWarning470PacketCurrent(receipt)||!member.identity||!member.data||
        member.size!=member.identity->bytes||(receipt.materialToken_!=3229&&receipt.materialToken_!=3230))return false;
-    std::array<const assets::OriginalStandardMaterialObject50LA*,3> canonical{};
+    std::array<const assets::OriginalStandardMaterialObject50LA*,6> canonical{};
     if(!sharedHistoryCanonicalOwnersCurrent(canonical))return false;
     const auto* object=canonical[static_cast<std::size_t>(receipt.materialToken_-3228)];
     assets::OriginalStandardMaterialPassView50LA pass;
@@ -547,7 +547,7 @@ bool OriginalUiSharedDialogs50KG::admitMenuWarningCollection(
     if(!runtime.callbackOverrideKnown||runtime.callbackOverride435678)return stop(0x24A674);
     const auto& retainedRuntime=inputs_.context->materialRuntime();
     if(!retainedRuntime.callbackOverrideKnown||retainedRuntime.callbackOverride435678)return stop(0x24A674);
-    std::array<const assets::OriginalStandardMaterialObject50LA*,3> canonical{};
+    std::array<const assets::OriginalStandardMaterialObject50LA*,6> canonical{};
     const auto table=inputs_.domain->materials382B38();
     const assets::OriginalStandardMaterialObject50LA* material=nullptr;
     assets::OriginalStandardMaterialDiagnostic50LA materialDiagnostic;

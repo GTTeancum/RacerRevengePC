@@ -35,7 +35,9 @@ public:
            !application_.populateConsumedRaceResources1AA5A0(*race_,d)||
            !race_->constructRaceGroups1A6B5C(*groups,*mixer,pc)||
            !application_.constructConsumedRaceWorld1A6BC0(*race_,world,pc))return false;
-        // Only this reached prefix. No complete slot30 load or App10 attachment.
+        // Actual World/reset/low2 and counted1A9240 Camera34 prefix reached.
+        // Native renderer initialization resumes at the actual retained Session;
+        // this bounded prefix is not full2361C0/slot30 or App10 attachment.
         return true;
     }
     const std::shared_ptr<rr::game::OriginalRaceConstructor50LA>& race()const noexcept {return race_;}

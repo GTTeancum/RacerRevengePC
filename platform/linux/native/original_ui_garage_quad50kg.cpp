@@ -656,3 +656,22 @@ bool OriginalUiGarageQuad50KG::lowerMenuWarningPacket(const OriginalUiSharedDial
     }catch(...){d.status=Status::allocation;d.sourcePC=0x328378u;return false;}
 }
 }
+
+namespace rr::platform {
+bool OriginalUiGarageQuad50KG::drawPopup47C2DF550(OriginalUiGarageDrawContribution50KG& draw,
+    OriginalUiSharedDialogs50KG& shared,Diagnostic& d)noexcept {
+    d={};const auto stop=[&](Status status,std::uint32_t pc){d.status=status;d.sourcePC=pc;pendingPC_=pc;return false;};
+    initializeDrawAssertion2DF550();
+    if(!shared.popup47CQuadCurrent(draw,*this))return stop(Status::phase,0x2df5b4u);
+    OriginalUiGarageDrawContribution50KG::QuadRenderInputs input;std::uint32_t pc=0;
+    if(!draw.readPopup47CQuadInputs2DF550(shared,*this,input,pc))return stop(Status::phase,pc?pc:0x2df5e8u);
+    // The same source process word, not warning visibility or a page exception.
+    if(!input.sourceQuadEnabled383678){d.sourcePC=0x2df87cu;return true;}
+    if(!regeneratePacket2DF550(input.viewportWidth1E8,input.viewportHeight1EC,d))return false;
+    if(!draw.collectPopup47CQuad246760(shared,*this,d.material)){
+        d.sourceEffectsCommitted|=d.material.sourceEffectsCommitted;
+        return stop(Status::material,d.material.sourcePC?d.material.sourcePC:0x2df874u);
+    }
+    pendingPC_=0;d.sourcePC=0x2df87cu;return true;
+}
+}

@@ -73,6 +73,8 @@ bool OriginalUiControllerPopupGeometry50KG::prepare(const assets::OriginalUiEngl
         return fail(d,Error::localization,0x1F97E4);
     const auto* message=english.at(OriginalUiControllerPopup50KG::controller2TextId);
     const auto* confirm=english.at(OriginalUiControllerPopup50KG::confirmTextId);
+    const auto* purchase=english.at(217);const auto* yes=english.at(9);const auto* no=english.at(10);
+    if(!purchase||!yes||!no||purchase->text.empty()||yes->text.empty()||no->text.empty())return fail(d,Error::localization,0x2060A0);
     if(!message||!confirm||message->text.empty()||confirm->text.empty())return fail(d,Error::localization,0x1F97E4);
     if(!images.loaded()||!images.textures())return fail(d,Error::resource,0x2057E8);
     const assets::Texture48B *atlas=nullptr,*cross=nullptr,*triangle=nullptr,*overlay=nullptr;
@@ -92,14 +94,14 @@ bool OriginalUiControllerPopupGeometry50KG::prepare(const assets::OriginalUiEngl
     }
     if(!overlay)return fail(d,Error::resource,0x205B4C);
     try {
-        std::array<OriginalUiControllerPopupText50KG,3> next{};
-        // 382E80 -> string3B0548 "venus14"; material3B0550 "venus14popup".
-        // Three genuine ScreenText allocations, not fabricated Widgets DAT.
-        // 205810/205968/205A40 pass capacities60/40/40 to2DFD90.
-        if(!text(next[0],message->text,60,0x270,320,204,3,*font,*atlas,d)||
-            !text(next[1],confirm->text,40,0x2E0,312,257,0,*font,*atlas,d)||
-            !text(next[2],std::string{},40,0x350,0,0,0,*font,*atlas,d))return false;
-        texts_=std::move(next);
+        std::array<std::array<OriginalUiControllerPopupText50KG,3>,3> next{};
+        for(std::size_t variant=0;variant<next.size();++variant){
+            const bool dual=variant!=0;
+            if(!text(next[variant][0],variant==1?purchase->text:message->text,60,0x270,320,204,3,*font,*atlas,d)||
+               !text(next[variant][1],variant==1?yes->text:confirm->text,40,0x2E0,dual?412:312,257,0,*font,*atlas,d)||
+               !text(next[variant][2],dual?no->text:std::string{},40,0x350,dual?232:0,dual?257:0,0,*font,*atlas,d))return false;
+        }
+        textVariants_=std::move(next);selectedTexts_=0;
         crossWidth_=float(cross->width);crossHeight_=float(cross->height);
         triangleWidth_=float(triangle->width);triangleHeight_=float(triangle->height);
         overlayReciprocalWidth_=rounded(1.f/float(overlay->width));
@@ -109,13 +111,11 @@ bool OriginalUiControllerPopupGeometry50KG::prepare(const assets::OriginalUiEngl
 }
 bool OriginalUiControllerPopupGeometry50KG::project(const OriginalUiControllerPopupRender50KG& render,Diagnostic& d) noexcept {
     d={};if(!prepared_)return fail(d,Error::notPrepared,0x2064C0);
-    // Only Options Controller2's authentic message88 / OK90 route is admitted.
-    // Null cancel does not clear stale source flags; refuse that unowned branch
-    // rather than inventing a Cancel label or silently dropping its icon.
-    if(render.drawCancel)return fail(d,Error::unsupportedRoute,0x2072BC,0x350);
     if(render.sourcePC!=0x2064C0||!OriginalUiControllerPopup50KG::valid(render.state)||
         render.drawDim!=render.drawStrips||(render.drawMessage&&!render.drawDim)||
-        (render.drawConfirm&&(!render.drawMessage||!render.state.hasConfirm3D0)))
+        (render.drawConfirm&&(!render.drawMessage||!render.state.hasConfirm3D0))||
+        (render.drawCancel&&(!render.drawMessage||!render.state.hasCancel3D4))||
+        (render.state.garagePurchaseText&&(!render.state.hasConfirm3D0||!render.state.hasCancel3D4)))
         return fail(d,Error::invalidRender,0x2064C0);
     for(std::size_t i=0;i<render.strips.size();++i) {
         const auto& a=render.strips[i];const auto& b=render.state.strips[i];
@@ -123,12 +123,14 @@ bool OriginalUiControllerPopupGeometry50KG::project(const OriginalUiControllerPo
             a.x!=b.x||a.y!=b.y||a.width!=b.width||a.height!=b.height)
             return fail(d,Error::invalidRender,0x206538,static_cast<std::uint16_t>(0x40+0x60*i));
     }
+    const bool dual=render.state.hasConfirm3D0&&render.state.hasCancel3D4;
+    selectedTexts_=render.state.garagePurchaseText?1:dual?2:0;
     std::array<OriginalUiOverlayQuad50KG,6> next{};
     // 205764 writes alpha79 directly; 2057AC calls133F20(0x191919), whose
     // byte>>1 conversion yields12/12/12. Do not convert alpha79 a second time.
     next[0]=quad("ui/textures/dimpopup",0,0,640,448,0,0,0,0,{{12,12,12,79}},0x206DCC);
-    next[1]=quad("ui/textures/icon_x_popup",280,247,crossWidth_,crossHeight_,0,0,1,1,{{127,127,127,63}},0x2072AC);
-    next[2]=quad("ui/textures/icon_tri_popup",280,247,triangleWidth_,triangleHeight_,0,0,1,1,{{127,127,127,63}},0x2072C8);
+    next[1]=quad("ui/textures/icon_x_popup",dual?380:280,247,crossWidth_,crossHeight_,0,0,1,1,{{127,127,127,63}},0x2072AC);
+    next[2]=quad("ui/textures/icon_tri_popup",dual?200:280,247,triangleWidth_,triangleHeight_,0,0,1,1,{{127,127,127,63}},0x2072C8);
     const float u32=rounded(32.f*overlayReciprocalWidth_),v32=rounded(32.f*overlayReciprocalHeight_);
     const float v18=rounded(18.f*overlayReciprocalHeight_);
     for(std::size_t i=0;i<3;++i) {
@@ -149,7 +151,7 @@ bool OriginalUiControllerPopupGeometry50KG::project(const OriginalUiControllerPo
         p.material=material;p.sourcePC=quads_[q].sourcePC;p.objectOffset=offset;p.packetDepth=packetDepth;
     };
     const auto addText=[&](std::size_t index,std::uint32_t pc) {
-        auto& textOwner=texts_[index];textOwner.activePackets5E=static_cast<std::uint8_t>((textOwner.characterCount5C+35u)/36u);
+        auto& textOwner=textVariants_[selectedTexts_][index];textOwner.activePackets5E=static_cast<std::uint8_t>((textOwner.characterCount5C+35u)/36u);
         auto& p=packets_[packetCount_++];p.text=&textOwner.glyphs;
         p.packetColor=originalUiTextPacketColor50KG(textOwner.color54,textOwner.alpha58);
         p.material=Material::font;p.sourcePC=pc;p.objectOffset=textOwner.objectOffset;p.packetDepth=packetDepth;
@@ -158,6 +160,7 @@ bool OriginalUiControllerPopupGeometry50KG::project(const OriginalUiControllerPo
     if(render.drawDim)addQuad(0,Material::dim,0x220);
     if(render.drawMessage)addText(0,0x206DFC);
     if(render.drawConfirm){addQuad(1,Material::cross,0x160);addText(1,0x2072B4);}
+    if(render.drawCancel){addQuad(2,Material::triangle,0x1C0);addText(2,0x2072D0);}
     if(render.drawStrips)for(std::size_t i=0;i<3;++i)addQuad(3+i,Material::overlay,static_cast<std::uint16_t>(0x40+0x60*i));
     return true;
 }

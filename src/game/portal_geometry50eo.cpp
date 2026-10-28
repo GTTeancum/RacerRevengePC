@@ -123,6 +123,22 @@ PortalGeometryStatus50EO preparePortalGeometry50EO(
     return Status::Complete;
 }
 
+PortalGeometryStatus50EO portalMaximumDiagonal230580_50EO(
+    const PortalGeometry50EO& portal, float& output) noexcept {
+    const Status status=admit(portal);
+    if(status!=Status::Complete)return status;
+    Arithmetic f;
+    const V first=f.sub(portal.vertices[2],portal.vertices[0]);
+    const V second=f.sub(portal.vertices[3],portal.vertices[1]);
+    const float a=f.dot(first,first),b=f.dot(second,second);
+    if(!f.valid||a<0.0f||b<0.0f)return Status::InvalidInput;
+    //230634/230664 SQRT.S, then230674 MAX.S (46000A28).
+    volatile float rootA=std::sqrt(a),rootB=std::sqrt(b);
+    const float x=f.keep(rootA),y=f.keep(rootB);
+    if(!f.valid)return Status::InvalidInput;
+    output=x>y?x:y;return Status::Complete;
+}
+
 PortalGeometryStatus50EO crossPortal230BD0_50EO(
     const PortalGeometry50EO& portal, const Vector3_48C& oldCenter,
     const Vector3_48C& newCenter, bool& crossed) noexcept {

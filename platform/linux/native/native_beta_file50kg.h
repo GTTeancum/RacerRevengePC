@@ -59,11 +59,17 @@ inline Result readFile(const std::filesystem::path& path,Bytes& out) noexcept {
  try {
     Fd fd(::open(path.c_str(),O_RDONLY|O_CLOEXEC|O_NOFOLLOW|O_NONBLOCK));
     if(fd.value<0)return errno==ENOENT?Result::missing:Result::ioError;
-    struct stat st{};if(::fstat(fd.value,&st)||!S_ISREG(st.st_mode)||st.st_size<0||st.st_size>1024*1024)return Result::invalid;
+    struct stat st{};
+    if(::fstat(fd.value,&st))return Result::ioError;
+    if(!S_ISREG(st.st_mode)||st.st_size<0||st.st_size>1024*1024)return Result::invalid;
     Bytes next(static_cast<std::size_t>(st.st_size));std::size_t at=0;
     while(at<next.size()){auto n=::read(fd.value,next.data()+at,next.size()-at);if(n<0&&errno==EINTR)continue;if(n<=0)return Result::ioError;at+=static_cast<std::size_t>(n);}
     std::uint8_t extra;ssize_t n;do{n=::read(fd.value,&extra,1);}while(n<0&&errno==EINTR);
-    if(n!=0)return Result::invalid;
+    // A failed EOF probe says nothing about file validity. Keep transient
+    // device/filesystem errors distinct from observed trailing data, matching
+    // the Windows reader and the caller's readError versus invalid status.
+    if(n<0)return Result::ioError;
+    if(n>0)return Result::invalid;
     out.swap(next);return Result::ok;
  }catch(...){return Result::ioError;}
 }
@@ -191,12 +197,20 @@ public:
             FILE_SHARE_READ|FILE_SHARE_WRITE,nullptr,OPEN_ALWAYS,FILE_FLAG_OPEN_REPARSE_POINT,nullptr);
         if(file_==INVALID_HANDLE_VALUE)return Result::ioError;
         OVERLAPPED offset{};
-        if(!regularFile(file_)||!::LockFileEx(file_,LOCKFILE_EXCLUSIVE_LOCK|LOCKFILE_FAIL_IMMEDIATELY,0,1,0,&offset))return Result::unavailable;
+        if(!regularFile(file_)||!::LockFileEx(file_,LOCKFILE_EXCLUSIVE_LOCK|LOCKFILE_FAIL_IMMEDIATELY,0,1,0,&offset)){
+            // A failed acquisition owns no lock. Do not pin a stale rejected
+            // file across an explicit retry after the user corrects storage.
+            ::CloseHandle(file_);file_=INVALID_HANDLE_VALUE;
+            return Result::unavailable;
+        }
 #else
         if(file_<0)file_=::open(path.c_str(),O_RDWR|O_CREAT|O_CLOEXEC|O_NOFOLLOW|O_NONBLOCK,0600);
         if(file_<0)return Result::ioError;
         struct stat info{};
-        if(::fstat(file_,&info)||!S_ISREG(info.st_mode)||::flock(file_,LOCK_EX|LOCK_NB))return Result::unavailable;
+        if(::fstat(file_,&info)||!S_ISREG(info.st_mode)||::flock(file_,LOCK_EX|LOCK_NB)){
+            ::close(file_);file_=-1;
+            return Result::unavailable;
+        }
 #endif
         held_=true;return Result::ok;
     }

@@ -83,7 +83,12 @@ bool Owner::releaseRaStaticOwner(const ::ra_static_model_cold50LA::Owner* owner)
     for(const auto* model:storage_->staticModels)if(model)return false;
     storage_->staticAccess=false;storage_->staticRegistrationComplete=false;
     storage_->staticOwner=nullptr;storage_->staticApplication=nullptr;storage_->staticMaterials=nullptr;
-    for(auto& method:storage_->selectedMethods)method={};return true;
+    //Native static-owner lease can end before reached source node/array
+    //aliases. SAME actual selection payload stays with its source lifetime;
+    //no copied array/registry. Final source release performs deferred reset.
+    for(auto& method:storage_->selectedMethods)
+        if(!method.sourceList.reference00_)method.resetNativeSelection();
+    return true;
 }
 //2741C0 precedes the SAME zone's27B930 wrapper/observer callback. This
 //private call receives the retained parent's zone, never a camera/racer hint.
@@ -98,6 +103,18 @@ bool Owner::publishRaStaticZone2741C0(const ::ra_static_model_cold50LA::Owner* o
     row.environmentVisible44=storage_->renderAuthoring[actualZone-1u].environmentNodeVisible?1u:0u;
     row.environment44Published=true;
     return true;
+}
+// Late World+11C adopts the SAME already-produced zone44 value. Never
+// replay publishRaStaticZone2741C0 or overwrite live projection/selection.
+bool Owner::nativeStaticZone2741C0Current(const ::ra_pod_scene50LA::Owner* world,
+    const ::ra_static_model_cold50LA::Owner* models,const assets::World48F& source,
+    const CollectionZone50BX* rows,std::size_t zone,std::uint32_t& pc)const noexcept {
+    if(!nativeSceneRoles270900Current(world,source,rows,pc)||!raStaticOwnerIdle(models)||
+       zone>=10u||!storage_->renderAuthoringReady||storage_->renderAuthoring.size()<=zone||
+       storage_->zoneProjection.size()<=zone)return false;
+    const auto& authored=storage_->renderAuthoring[zone];
+    const auto& actual=storage_->zoneProjection[zone];pc=0x2741c0;
+    return authored.environmentNodeVisible&&actual.environment44Published&&actual.environmentVisible44==1u;
 }
 bool Owner::commitRaStaticOwner(const ::ra_static_model_cold50LA::Owner* owner)noexcept {
     if(!raStaticVisibility(owner))return false;

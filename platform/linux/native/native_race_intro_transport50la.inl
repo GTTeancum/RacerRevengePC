@@ -1,6 +1,7 @@
 // Included by the production Aural TU. No extra clock, output or DSP pass.
 #include <climits>
 #include <cstring>
+#include "../../../src/assets/original_race_intro_pcm_identity50la.h"
 namespace rr::platform {
 std::shared_ptr<const assets::OriginalStreamMetadata50KZ>
 OriginalApplicationAural50KG::retainedStreamMetadata()const noexcept {
@@ -11,28 +12,26 @@ inline bool sameClip(const AudioClip50HD& a,const AudioClip50HD& b)noexcept {
     return a.samples==b.samples&&a.frames==b.frames&&a.sampleRate==b.sampleRate&&
         a.channels==b.channels&&a.loopStart==b.loopStart&&a.loopEnd==b.loopEnd;
 }
-inline constexpr float pitch=static_cast<float>((1881.0*48000.0/4096.0)/22050.0);
-inline constexpr std::array<const char*,3> hashes{{
-    "5796e1a4874411ceaf65d4a1a846ca05f1da881446e135722e5718a8387f079e",
-    "6c7eb6c9e64aec42ee5a23c351e99515d2e8e9d6b97afad45aa2a3427035fde7",
-    "2275e85c776d830edaaaea3a6bcd88c58e955c2c79c7d6fe4595c6438584cf5f"}};
-inline constexpr std::array<std::uint64_t,3> encoded{{188208,62608,62240}};
+inline float pitch(const assets::OriginalStreamMetadataRow50KZ& row)noexcept {
+    return static_cast<float>((double(row.originalPitch)*48000.0/4096.0)/double(row.originalSampleRate));
+}
 }
 const assets::OriginalStreamMetadataRow50KZ*
 NativeRaceIntroTransport50LA::Assets::source(unsigned id,const AudioClip50HD& clip)const noexcept {
     namespace d=native_race_intro_detail50LA;
-    if(!authoring||!bank||id<1||id>3)return nullptr;
+    if(!authoring||!bank||id<1||id>authoring->eventCount()||authoring->eventCount()>pcm.size())return nullptr;
     const auto index=id-1;const auto* event=authoring->event(id);const auto* p=pcm[index];
-    if(!event||!event->metadata||!event->isStream||event->isStereo||event->isLoop||event->factoryFlags!=2||
-       !p||p->state!=assets::AudioAssetState50HC::ready||!p->request.stream||p->request.stereo||p->request.loop||
-       p->sourceSha256!=d::hashes[index]||p->pcm.sourceSha256!=d::hashes[index]||
-       p->sourceBytes!=d::encoded[index]||p->pcm.sampleRate!=22050||p->pcm.channels!=1||
+    const auto* identity=event?assets::originalRaceIntroPcmIdentity50LA(event->filename):nullptr;
+    if(!identity||!event||!event->metadata||!event->isStream||event->isStereo||event->isLoop||event->factoryFlags!=2||
+       !p||p->request.name!=event->filename||p->state!=assets::AudioAssetState50HC::ready||!p->request.stream||p->request.stereo||p->request.loop||
+       p->sourceSha256!=identity->sha256||p->pcm.sourceSha256!=identity->sha256||
+       p->sourceBytes!=identity->bytes||p->pcm.sampleRate!=identity->sampleRate||p->pcm.channels!=1||
        !p->pcm.frames||p->pcm.samples.size()!=p->pcm.frames||
-       p->pcm.frames>(d::encoded[index]-48)/16*28||
-       clip.samples!=p->pcm.samples.data()||clip.frames!=p->pcm.frames||clip.sampleRate!=22050||
+       p->pcm.frames>(identity->bytes-48)/16*28||
+       clip.samples!=p->pcm.samples.data()||clip.frames!=p->pcm.frames||clip.sampleRate!=identity->sampleRate||
        clip.channels!=1||clip.loopStart||clip.loopEnd||!d::sameClip(clip,clips[index])||
-       !AudioMixer50HD::validClip(clip)||event->metadata->originalPitch!=1881||
-       event->metadata->originalSampleRate!=22050||event->metadata->originalSize+48!=d::encoded[index]||
+       !AudioMixer50HD::validClip(clip)||!event->metadata->originalPitch||event->metadata->originalPitch>=16384u||
+       event->metadata->originalSampleRate!=identity->sampleRate||event->metadata->originalSize+48!=identity->bytes||
        !(event->metadata->admittedDurationSeconds>0.f)||
        authoring->metadataOwner()->findForStreamRequest(true,event->filename)!=event->metadata)return nullptr;
     return event->metadata;
@@ -87,14 +86,15 @@ std::unique_ptr<NativeRaceIntroTransport50LA> NativeRaceIntroTransport50LA::crea
     std::size_t first,std::size_t count,
     std::shared_ptr<const assets::OriginalTaIntroAuthoringCandidate> authoring,
     std::shared_ptr<const assets::AudioBank50HC> bank)noexcept {
-    if(!aural||!authoring||!bank||first!=originalTaIntroFirstVoice50HD||count!=originalTaIntroVoices50HD||
+    if(!aural||!authoring||!authoring->eventCount()||authoring->eventCount()>3||(authoring->trackId()!="TA"&&authoring->trackId()!="RA"&&authoring->trackId()!="GC"&&authoring->trackId()!="SA"&&authoring->trackId()!="MA"&&authoring->trackId()!="GA")||!bank||
+       bank->clips.size()!=authoring->eventCount()||bank->ready!=authoring->eventCount()||bank->missing||bank->invalid||bank->unsupported||first!=originalTaIntroFirstVoice50HD||count!=originalTaIntroVoices50HD||
        first>=mixer.count()||count>mixer.count()-first||
        !mixer.requiresVoiceGroupGains50IC()||mixer.nativeRaceIntroTransport_||mixer.nativeSourceWetProcessor_||
        mixer.auralMasterOwner_||!mixer.originalSoundMode50KG()||!mixer.canRecordControlChanges())return {};
     try {
         auto t=std::unique_ptr<NativeRaceIntroTransport50LA>(new NativeRaceIntroTransport50LA);
         auto a=std::make_shared<Assets>();a->authoring=std::move(authoring);a->bank=std::move(bank);
-        for(unsigned id=1;id<=3;++id){const auto* event=a->authoring->event(id);if(!event)return {};
+        for(unsigned id=1;id<=a->authoring->eventCount();++id){const auto* event=a->authoring->event(id);if(!event)return {};
             const auto* p=a->bank->find(std::string(event->filename));if(!p)return {};
             a->pcm[id-1]=p;a->clips[id-1]={p->pcm.samples.data(),p->pcm.frames,p->pcm.sampleRate,p->pcm.channels,0,0};
             if(!a->source(id,a->clips[id-1]))return {};
@@ -131,16 +131,16 @@ bool NativeRaceIntroTransport50LA::currentWithMixerPause(bool mixerPause)const n
     for(const auto& cell:pool.cells_)
         if(!std::isfinite(cell.elapsed)||cell.elapsed<0.f||cell.generation>500)return false;
     std::array<bool,48> claimed{};
-    for(unsigned id=1;id<=3;++id)if(!assets_->source(id,assets_->clips[id-1]))return false;
+    for(unsigned id=1;id<=assets_->authoring->eventCount();++id)if(!assets_->source(id,assets_->clips[id-1]))return false;
     for(std::size_t n=0;n<count_;++n){const auto slot=first_+n;const auto& in=instances_[n];
         if(!mixer_->hasVoiceGroupGain50IC(slot)||mixer_->groupPaused50IC_[slot]!=mixerPause||
            mixer_->nativeSourceVoiceRoutes_[slot].count)return false;
         if(!in.playback.serial){if(mixer_->active(slot)||mixer_->playbackRevision(slot)||in.route.count)return false;continue;}
         const auto& v=mixer_->voices_[slot];
-        if(in.playback.voice!=slot||in.playback.serial>nextSerial_||!in.eventId||in.eventId>3||
+        if(in.playback.voice!=slot||in.playback.serial>nextSerial_||!in.eventId||in.eventId>assets_->authoring->eventCount()||
            mixer_->playbackRevision(slot)!=in.playback.revision||
            !native_race_intro_detail50LA::sameClip(v.clip,assets_->clips[in.eventId-1])||
-           v.gain!=1.f||v.pitch!=native_race_intro_detail50LA::pitch||v.pan!=0.f||v.loop||
+           v.gain!=1.f||v.pitch!=native_race_intro_detail50LA::pitch(*assets_->authoring->event(in.eventId)->metadata)||v.pan!=0.f||v.loop||
            !std::isfinite(v.sourceFrame)||v.sourceFrame<0.0||
            (v.active&&v.sourceFrame>=static_cast<double>(v.clip.frames))||
            (in.route.count&&!pool.current(in.route)))return false;
@@ -161,7 +161,7 @@ bool NativeRaceIntroTransport50LA::renderCurrent(const void* owner,std::size_t s
         (**t->aural_->interfaceA0_).mixer->nativeSourceRoutes_.current(in.route);
 }
 bool NativeRaceIntroTransport50LA::canPlay(unsigned event)const noexcept {
-    if(!current()||event<1||event>3||nextSerial_>=INT_MAX||!mixer_->canRecordControlChanges(1))return false;
+    if(!current()||event<1||event>assets_->authoring->eventCount()||nextSerial_>=INT_MAX||!mixer_->canRecordControlChanges(1))return false;
     float left=0,right=0;if(!mixer_->originalRouting50KG(0,left,right,100))return false;
     for(std::size_t n=0;n<count_;++n)
         if(!instances_[n].route.count&&!mixer_->active(first_+n))return true;
@@ -197,7 +197,7 @@ NativeRaceIntroTransport50LA::Dispatch NativeRaceIntroTransport50LA::play(unsign
     // All potentially failing/native allocation checks precede publication.
     i.mixer->nativeSourceRoutes_=pool;aural_->commitNativeStreamSlots(slots);
     mixer_->noteControlChange();mixer_->playbackRevisions_[voice]=mixer_->controlRevision_;
-    mixer_->voices_[voice]={clip,0.0,1.f,native_race_intro_detail50LA::pitch,0.f,true,false};
+    mixer_->voices_[voice]={clip,0.0,1.f,native_race_intro_detail50LA::pitch(*metadata),0.f,true,false};
     mixer_->originalLeft50KG_[voice]=left;mixer_->originalRight50KG_[voice]=right;
     out={voice,mixer_->playbackRevisions_[voice],++nextSerial_};
     instances_[native]={out,route,event};lastSourceResult_=1;return Dispatch::sourceTrue;

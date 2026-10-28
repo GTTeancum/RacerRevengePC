@@ -1,5 +1,6 @@
 #pragma once
 #include "original_camera_start_effects.h"
+#include "original_session_f8_intro50la.h"
 #include "original_wreck_components50la.h"
 #include "../../platform/linux/native/race_audio_groups50ic.h"
 #include "original_attached_camera_controller.h"
@@ -267,6 +268,9 @@ struct OriginalGcIntroExitBindings {
     //0 natural mode7 completion;1 genuine mode7 skip;2 no7C skip;3 no7C exhaustion.
     unsigned taExitReason=0;
     bool (*introMusicFadeRequest)(void*,float)=nullptr;
+    // Optional concrete Session owner; legacy standalone callers keep their
+    // existing numeric projection. This is not a generic callback or receipt.
+    const OriginalSessionF8Intro50LA* sessionF8Intro=nullptr;
 };
 //1AFD80 returns from1A9750 before types2/3 call1AD3C0. The one
 //308030 draw is retained even if the actual music consumer cannot yet finish.
@@ -336,7 +340,11 @@ public:
         case 2:r=beginOriginalRaceCountdown1AFD80(b.countdown,b.actualManager,b.actualApplication33C,b.actualLaunch11258,b.startActions);break;
         case 3:r=viewport_.advance(false,b.display,b.scene,renderer,diagnostic);break;
         case 4:r=music_.advance(b);break;
-        case 5:revealOriginalRaceUi199770(b.actualUiFlags1E4);break;
+        case 5:
+            if(b.sessionF8Intro){
+                if(!b.sessionF8Intro->reveal176330(b.actualUiFlags1E4))return {S::owner,0x176330};
+            }else revealOriginalRaceUi199770(b.actualUiFlags1E4);
+            break;
         default:complete_=true;return {S::complete,0x176728};
         }if(r.status!=S::complete)return r;++phase_;}
     }
@@ -412,7 +420,17 @@ public:
             case 7:r=viewportCall_.advance(false,b.display,b.scene,renderer,d);break;
             case 8:
                 r=music_.advance(b);if(r.status!=S::complete)return r;
-                revealOriginalRaceUi199770(b.actualUiFlags1E4);break;
+                // On rejection retain this cut, including completed music;
+                // do not run cooldown/flags/emitter stop or replay earlier work.
+                if(b.sessionF8Intro){
+                    // The existing reason selects the represented original
+                    // natural/skip/no7C call site, never a new source phase.
+                    const std::uint32_t call=b.taExitReason==0?0x1766ecu:
+                        b.taExitReason==1?0x1765d8u:b.taExitReason==2?0x17652cu:
+                        b.taExitReason==3?0x175d30u:0x176664u;
+                    if(!b.sessionF8Intro->revealIntroExit(b.actualUiFlags1E4))return {S::owner,call};
+                }else revealOriginalRaceUi199770(b.actualUiFlags1E4);
+                break;
             case 9:if(!b.taExitReason)b.controller.cooldown8C=1;break;
             case 10:if(!b.taExitReason)b.controller.flags63Low5|=1u;break;
             case 11:

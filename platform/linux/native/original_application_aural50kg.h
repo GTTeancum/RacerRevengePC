@@ -8,6 +8,13 @@
 #include <optional>
 #include <thread>
 namespace original_main_entry50KG {struct Application;}
+namespace rr::game {class OriginalResults10450LA;}
+namespace race_music50IE {class Owner;}
+namespace original_camera_cycle_audio50KX {class Owner;}
+namespace source_announcer50IE {class Owner;}
+namespace live_audio50HF {class Owner;}
+namespace native_original_ai_audio {class Owner;}
+namespace race_audio50HQ {class Owner;}
 namespace rr::assets {struct OriginalStreamMetadataRow50KZ;
 class OriginalStreamMetadata50KZ;class OriginalStandardArchiveProvider50LA;}
 namespace rr::platform {
@@ -28,11 +35,12 @@ class OriginalApplicationAural50KG final {
     friend class OriginalUiGaragePageOwner50KG;
     friend class RaceAudioGroups50IC;
     friend class NativeRaceIntroTransport50LA;
+    friend class rr::game::OriginalResults10450LA;
     using Application=::original_main_entry50KG::Application;
     using E=game::OriginalApplicationEntities50LA;
     using C=game::OriginalWreckComponent50LA;
 public:
-    enum class Status : std::uint8_t {complete,owner,affinity,phase,topology,allocation,backend,registeredEmitter};
+    enum class Status : std::uint8_t {complete,owner,affinity,phase,topology,allocation,backend,registeredEmitter,unsupportedNativeReset};
     struct Diagnostic {Status status=Status::complete;std::uint32_t sourcePC=0;};
     struct ListObservation {
         std::uint32_t count=0,growth=0,capacity=0;
@@ -109,7 +117,7 @@ private:
         };
         std::array<StreamSlot,8> streamSlots{};
         std::uint64_t streamGeneration=0;
-        const NativeRaceIntroTransport50LA* raceIntroLease=nullptr;
+        NativeRaceIntroTransport50LA* raceIntroLease=nullptr; // Actual mutable unique-owned transport borrower.
         bool streamRetirementAuthorized=false;
         // Native synchronous submission-boundary observations, NOT guest E00,
         // RPC packet indexes, source channel ages or a hardware-complete flag.
@@ -183,6 +191,12 @@ private:
     // master publications are synchronous; finish any genuinely pending typed
     // group controls at this SAME sample boundary, without mixing or aging.
     bool finishNativeControls267BE0(Diagnostic&)noexcept;
+    // Explicit synchronous native command0B adaptation, not guest E00/20/21.
+    bool stopResultsNative26D070(const Application&,const RaceAudioGroups50IC&,
+        ::race_music50IE::Owner&,::original_camera_cycle_audio50KX::Owner&,
+        ::source_announcer50IE::Owner&,::live_audio50HF::Owner&,
+        ::native_original_ai_audio::Owner&,::race_audio50HQ::Owner*,std::uint64_t,Diagnostic&)noexcept;
+    bool finishResultsNative267BE0(const Application&,const RaceAudioGroups50IC&,Diagnostic&)noexcept;
     // Same transport endpoint at actual Page input call sites, not a render
     // return. Retail267BE0 does not read Application22C; Root's distinct
     // wrapper above still requires its actual completed-render mode0.
@@ -190,6 +204,13 @@ private:
     bool finishGaragePageInput267BE0(const OriginalUiGaragePageOwner50KG&,
         std::uint64_t& completedBoundary,Diagnostic&)noexcept;
     bool submitNativeControls267BE0(Diagnostic&)noexcept;
+    // Exact Application-owned native replacement of reached268300. No public
+    // reset/receipt and no source caller is admitted by this leaf. Active PCM,
+    // residual cache leases and intro transport remain outside its supported
+    // domain; enrolled Group/list registrations are preserved, not cleared.
+    // Rejection precedes every mutation. RPC35 is the
+    // recovered IOP ClearMemory, NOT StopAllVoices or a wet/output reset.
+    bool resetNativeMemory268300(const Application&,Diagnostic&)noexcept;
     bool clear103DD0(Diagnostic&)noexcept;
     bool releaseRegistered103D00(C&,Diagnostic&)noexcept;
     // Native partial-prefix cleanup is separate from the source102CD0 suffix.

@@ -104,7 +104,10 @@ enum class OriginalUiMaterialOrigin50KG : std::uint8_t {
     // Only the private canonical Object conversion admits this provenance.
     // The public recipe converter continues to reject it without that owner.
     garageCanonicalScreenMissingPsmFallback,
-    memoryCardCanonicalScreenMissingPsmFallback
+    memoryCardCanonicalScreenMissingPsmFallback,
+    // Existing actual Results first-construction history, not an F8 caller
+    // recipe and not the distinct Race HUD1A8DD4 font provenance.
+    resultsCanonicalScreenMissingPsmFallback
 };
 struct OriginalUiMaterialProvenance50KG {
     OriginalUiMaterialOrigin50KG origin = OriginalUiMaterialOrigin50KG::authoredPsm;

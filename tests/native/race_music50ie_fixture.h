@@ -13,6 +13,7 @@
 #include <string>
 #include <vector>
 
+namespace rr::game { class OriginalRaceMusicManager50LA; }
 namespace race_music50IE {
 inline constexpr std::size_t voice=117,clipCount=6,contactClipCount=6,totalClipCount=12;
 inline constexpr std::size_t practiceClipCount=2,taIntroClipCount=1,taIntroClipIndex=totalClipCount+practiceClipCount,
@@ -180,8 +181,25 @@ struct Counters {
 //117 is exclusive; no second music writer is admitted. No hot file access,
 //decode, allocation, wall timer, extra RNG, guessed voice, or Dax operation.
 class Owner final {
+    friend class rr::game::OriginalRaceMusicManager50LA;
+    friend class rr::platform::OriginalApplicationAural50KG;
+    bool canStopResultsNative26D070(const rr::platform::AudioMixer50HD& mixer,
+        const rr::platform::RaceAudioGroups50IC& groups)const noexcept {
+        if(mixer_!=&mixer||groups_!=&groups||!transportIdentity()||playPending_||fadePending_||
+           nativeFade_.phase==NativeFadePhase50IW::Fading||
+           nativeFade_.phase==NativeFadePhase50IW::SilentRetirement)return false;
+        rr::platform::AudioVoiceObservation50HD observed;
+        return !owned_||ownedMusicIdentity(observed);
+    }
+    void stopResultsNativePreflighted26D070()noexcept {
+        // Stop only this real playback. Retain owned_, exact revision, PCM,
+        // song and all128/12C/130 lanes: original26D070 does not call1A4AB0.
+        // The existing activity/fade consumer observes the actual inactive
+        // same-revision voice; no fabricated stream handle/owner reset.
+        if(owned_)mixer_->stop(voice);
+    }
 public:
-    Owner()=default;~Owner()noexcept{reset();}
+    Owner()=default;~Owner()noexcept;
     Owner(const Owner&)=delete;Owner&operator=(const Owner&)=delete;
     Owner(Owner&&)=delete;Owner&operator=(Owner&&)=delete;
     bool prepare(const std::filesystem::path& discRoot,const std::filesystem::path& audioRoot,

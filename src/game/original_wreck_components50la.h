@@ -19,7 +19,10 @@ enum class OriginalWreckComponentKind50LA : std::uint8_t {
     camera236180, // Cold typed ownership only; no live camera dispatch.
     character11A750,uiDispatcher1B7140,uiGarageManager1D1860,toyList2D9B40,animationManager101330,wattoWidget1D4320,soundGroup2350D0,wattoEmitter2921C0,lightManager147ED0,light146720,fog13E6B0,fogOff13F850,fogOn13F980,uiOverlayText2A8F00,uiTextOverlay29C850,uiMovementControl2AAF40,uiGaragePage1F9FF0,uiRouter2A6FD0,uiControl1D5D10,uiControlGroup2A4B70,sceneEmitter15F100,sceneEmitter15DE00,sceneEmitter15B860,sceneEmitter15E800,loopSoundList2795E0,auralScape102BE0, // Exact Garage constructor identities; no dispatch admission.
     cameraController174A30, // Same Session-owned controller; cold ownership, no dispatch.
-    uiOptionsManager1D0470 // Appended identity; unpublished constructor prefix only.
+    uiOptionsManager1D0470, // Appended identity; unpublished constructor prefix only.
+    triggerList2DC320,trigger2A0290, // RA native lifetime identities, no new dispatch.
+    applicationRequest2C6C20, // Actual late native Results request owner, not early boot history.
+    lightFlare14AA10 //Actual counted local flare; update/draw dispatch unjoined.
 };
 struct OriginalWreckComponent50LA final {
     //1048F0 base constructor owns the actual64-bit reference at source00.
@@ -36,6 +39,12 @@ struct OriginalWreckComponent50LA final {
     OriginalWreckComponent50LA* parent1C=nullptr;
     std::uint32_t mask20=0,descendants24=0;
     std::uint8_t category28=0,flags29=0;
+    // Optional read authority for an already-live native backend. When bound,
+    // raw flags29 records ONLY the constructor prefix; it is not a second
+    // mutable scheduling state. No generic mutator/constructor may overwrite
+    // the backend through this observation binding. Owner revokes before death.
+    const std::uint8_t* nativeFlags29=nullptr;
+    std::uint8_t flags29Value()const noexcept{return nativeFlags29?*nativeFlags29:flags29;}
     OriginalWreckComponent50LA() noexcept=default;
     OriginalWreckComponent50LA(const OriginalWreckComponent50LA&)=delete;
     OriginalWreckComponent50LA& operator=(const OriginalWreckComponent50LA&)=delete;
@@ -97,7 +106,7 @@ inline OriginalWreckComponentResult50LA notification(const D& d,const C& root,
         if(!left--)return {S::capacity,enabling?0x1414d8u:0x141478u};
         if(!contains(d,p)||p->parent1C!=&root||p->previous10!=previous)
             return {S::topology,enabling?0x1414d8u:0x141478u};
-        if(!(p->flags29&8u)){
+        if(!(p->flags29Value()&8u)){
             if(!baseNotification(p->kind))return {S::notificationMethod,enabling?0x1414f4u:0x141494u};
             const auto r=notification(d,*p,enabling,left);
             if(r.status!=S::complete)return r;
@@ -119,7 +128,7 @@ inline OriginalWreckComponentResult50LA initializeOriginalWreckComponent50LA(
     std::uint32_t& actualObjectCount423F60) noexcept {
     using S=OriginalWreckComponentStatus50LA;
     if(!session||!key||kind==OriginalWreckComponentKind50LA::unbound||
-       c.kind!=OriginalWreckComponentKind50LA::unbound||c.reference00||c.objectKey||
+       c.nativeFlags29||c.kind!=OriginalWreckComponentKind50LA::unbound||c.reference00||c.objectKey||
        c.previous10||c.next14||c.firstChild18||c.parent1C)return {S::owner,0x141300u};
     c.reference00=1; //141314->1048F0, before the Entity-specific stores.
     c.sessionGeneration=session;c.objectKey=key;c.kind=kind;
@@ -178,7 +187,7 @@ inline OriginalWreckComponentResult50LA setOriginalWreckBaseActivity50LA(
     bool active) noexcept {
     using namespace original_wreck_component_detail50LA;
     using S=OriginalWreckComponentStatus50LA;
-    if(!domain(d)||!contains(d,&c))return {S::owner,active?0x141560u:0x141520u};
+    if(c.nativeFlags29||!domain(d)||!contains(d,&c))return {S::owner,active?0x141560u:0x141520u};
     std::size_t left=d.count;
     const auto r=notification(d,c,active,left);
     if(r.status!=S::complete)return r;
@@ -192,7 +201,7 @@ inline OriginalWreckComponentResult50LA activateOriginalWreckPiece50LA(
     float& actualContactTime12C) noexcept {
     using namespace original_wreck_component_detail50LA;
     using S=OriginalWreckComponentStatus50LA;
-    if(!domain(d)||!contains(d,&piece)||piece.kind!=OriginalWreckComponentKind50LA::piece2CB4B0)
+    if(piece.nativeFlags29||!domain(d)||!contains(d,&piece)||piece.kind!=OriginalWreckComponentKind50LA::piece2CB4B0)
         return {S::owner,0x2cbfb0u};
     std::size_t left=d.count;
     const auto r=notification(d,piece,true,left);
@@ -206,7 +215,7 @@ inline OriginalWreckComponentResult50LA activateOriginalWreckPiece50LA(
 // This predicate is not a dispatch or a success receipt. Do not substitute
 // descendants24 for a child's mask20, or body.enabled204 for activity29.
 inline bool originalWreckChildEligible50LA(const OriginalWreckComponent50LA& child) noexcept {
-    const auto flags=child.flags29;
+    const auto flags=child.flags29Value();
     return (flags&1u)&&!(flags&4u)&&!(flags&8u)&&(child.mask20&2u);
 }
 }

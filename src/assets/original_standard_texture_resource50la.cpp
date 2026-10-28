@@ -1,4 +1,5 @@
 #include "original_standard_texture_resource50la.h"
+#include "material_texture_assets50ea.h"
 #include "original_texture_candidate50tc.h"
 #include "original_standard_model_resource50la.h"
 #include "../game/original_racer_animation_cold50la.h"
@@ -17,6 +18,7 @@
 #include <exception>
 #include <limits>
 #include <utility>
+#include <string_view>
 #include <zlib.h>
 #include "original_appstart_template_cache50kg.h"
 
@@ -1528,6 +1530,57 @@ bool OriginalStandardTextureResolver50LA::validateGarageBankRows12EAA0(
     }
     return true;
 }
+bool OriginalStandardTextureResolver50LA::retireNativeRaceMounts1316A0(
+    NativeRaceMountLease50LA& lease,D& d)noexcept {
+    d={};
+    if(lease.closed_)return true;
+    if(lease.thread_!=std::this_thread::get_id()||!lease.provider_||
+       !freshFileCapacity_||freshFileCapacity_->provider.get()!=lease.provider_.get()||
+       (storage_&&storage_->provider&&storage_->provider.get()!=lease.provider_.get())||
+       (storage_&&!storage_->provider&&!storage_->files.empty())||
+       lease.count_>lease.entries_.size())return fail(d,E::source,0x1316a0);
+    auto& provider=*lease.provider_;
+    if(!provider.retainedSourcesAccessible()||
+       lease.count_>std::numeric_limits<std::uint64_t>::max()-provider.revision_)
+        return fail(d,E::source,0x1316a0);
+    for(std::size_t i=0;i<lease.count_;++i){const auto& entry=lease.entries_[i];
+        if(entry.slot>=provider.mounts_.size())return fail(d,E::source,0x1316a0);
+        const auto& mount=*provider.mounts_[entry.slot];
+        if(entry.identity!=&mount||!mount.active||mount.generation!=entry.generation||
+           mount.ui||mount.rcSource||mount.tbSource||mount.gbSource||mount.mcSource||mount.taEncoded)
+            return fail(d,E::source,0x1316a0);
+        for(std::size_t j=0;j<i;++j)if(lease.entries_[j].slot==entry.slot)
+            return fail(d,E::source,0x1316a0);
+        // Existing validator is generic complete-directory/provenance logic:
+        // matching names with unknown bank origin are NOT silently skipped.
+        if(storage_&&storage_->provider&&!validateGarageBankRows12EAA0(entry.slot,entry.generation,d))return false;
+        // Check ALL generations, including foreign retained borrowers from a
+        // prior inactive mount. A reactivation never grants their ownership.
+        if(storage_)for(const auto& file:storage_->files)if(file->bank==entry.slot){
+            if(file->pstBorrowers||!file->cached.expired()||file->animation||
+               !file->geometry.expired()||!file->payloadGeometry.expired()||
+               !file->collision.expired()||!file->ipumImages.expired()||file->garageIpum)
+                return fail(d,E::source,0x1316a0);
+            if(!file->retired&&file->bankGeneration!=entry.generation)
+                return fail(d,E::source,0x1316a0);
+        }
+    }
+    // No allocations or callbacks after whole-set preflight. Stable backing
+    // stays owned by provider; no caller file ID or encoded bytes are reused.
+    for(std::size_t i=0;i<lease.count_;++i){const auto& entry=lease.entries_[i];
+        if(storage_)for(auto& file:storage_->files)if(file->bank==entry.slot&&
+            file->bankGeneration==entry.generation&&!file->retired){
+            file->cached.reset();file->cacheIdentity=nullptr;file->animation=nullptr;
+            file->geometry.reset();file->geometryIdentity=nullptr;
+            file->collision.reset();file->collisionIdentity=nullptr;file->ipumImages.reset();
+            file->retired=true;
+        }
+        provider.mounts_[entry.slot]->active=false;
+        provider.mounts_[entry.slot]->admittedUi.reset();++provider.revision_;
+    }
+    lease.closed_=true;lease.count_=0;lease.provider_.reset();
+    d.sourceEffectsCommitted=true;return true;
+}
 bool OriginalStandardTextureResolver50LA::retireGarageBank12E5E0(GarageBankLease50LA& lease,D& d) noexcept {
     if(!canRetireGarageBank12E5E0(lease,d))return false;
     //12E6D0(force1)->12EAA0 removes row associations even while canonical
@@ -1967,6 +2020,29 @@ bool OriginalStandardTextureResolver50LA::bind(
     }else {storage_->construction=context;storage_->bound=true;}
     return true;
 }
+namespace {
+// Exact images used by the retained Results ledger. This is first resolver
+// selection evidence only, NOT permission to render an arbitrary named asset.
+bool resultsNativePstName50LA(const std::string& name)noexcept {
+    using P=OriginalStandardArchiveProvider50LA;
+    for(const char* fixed:{R"(ui\textures\results1.pst)",R"(ui\textures\results2.pst)",
+        R"(ui\textures\dmgradar.pst)",R"(font\eurostileboldbold13ingame.pst)"})
+        if(P::sameName(name,fixed))return true;
+    constexpr const char prefix[]=R"(ui\textures\)";
+    if(name.size()!=sizeof(prefix)-1+10)return false;
+    if(!P::sameName(std::string_view(name).substr(0,sizeof(prefix)-1),prefix))return false;
+    const auto at=sizeof(prefix)-1;
+    if(name[at]<'0'||name[at]>'9'||name[at+1]<'0'||name[at+1]>'9'||
+       !P::sameName(std::string_view(name).substr(at+2),"_fsm.pst"))return false;
+    const unsigned racer=unsigned(name[at]-'0')*10u+unsigned(name[at+1]-'0');
+    return racer>=1&&racer<=26&&racer!=5&&racer!=6&&racer!=13;
+}
+bool resultsNativeAtmName50LA(const std::string& name)noexcept {
+    using P=OriginalStandardArchiveProvider50LA;
+    return P::sameName(name,R"(ui\textures\medasmgld.atm)")||
+        P::sameName(name,R"(ui\textures\medasmslv.atm)")||P::sameName(name,R"(ui\textures\medasmbrz.atm)");
+}
+}
 bool OriginalStandardTextureResolver50LA::resolve24DADC(
     const std::string& requested,std::size_t& index,std::string& resolvedName,D& d,UiSelection* capture) const noexcept {
     if(capture)*capture=UiSelection{};
@@ -1989,26 +2065,62 @@ bool OriginalStandardTextureResolver50LA::resolve24DADC(
                    view->size!=entry.file->bytes.size()||view->revision!=revision||
                    !std::equal(entry.file->bytes.begin(),entry.file->bytes.end(),view->data)))
                     return fail(d,E::source,pc);
-                // Freeze the ordinary shared icons and authored overlay1
-                // image at their real resolver lookup. No retrospective query,
-                // authored-material authority or containing-page grant.
-                if(capture&&view&&provider&&entry.file->format==OriginalStandardTextureSourceFormat50LA::pstIndexed&&
+                // Freeze only these concrete UI images at their actual first
+                // positive resolver lookup. Denmark16 can first be constructed
+                // by Application328/Pause, before Results constructs its font
+                // MATERIAL; those two histories must remain independent.
+                // No retrospective lookup, resource backfill or material grant.
+                const bool denmark16=Provider::sameName(name,"font\\denmarkbold16ingame.pst");
+                const bool resultsPst=resultsNativePstName50LA(name)&&
+                    entry.file->format==OriginalStandardTextureSourceFormat50LA::pstIndexed;
+                const bool resultsAtm=resultsNativeAtmName50LA(name)&&
+                    entry.file->format==OriginalStandardTextureSourceFormat50LA::atmPstFrames;
+                if(capture&&view&&provider&&
+                   (entry.file->format==OriginalStandardTextureSourceFormat50LA::pstIndexed||resultsAtm)&&
                    (Provider::sameName(name,"ui\\textures\\icon_x.pst")||Provider::sameName(name,"ui\\textures\\icon_tri.pst")||
                     Provider::sameName(name,"ui\\textures\\icon_sqr.pst")||Provider::sameName(name,"ui\\textures\\icon_cir.pst")||
-                    Provider::sameName(name,"ui\\textures\\overlay1.pst"))&&
+                    Provider::sameName(name,"ui\\textures\\overlay1.pst")||denmark16||resultsPst||resultsAtm)&&
                    view->mount<provider->mounts_.size()){
                     const auto& bank=*provider->mounts_[view->mount];
                     if(bank.active&&bank.ui&&bank.ui->loaded()&&bank.generation==view->bankGeneration&&
                        view->ordinal<bank.rows.size()&&provider->sealed()&&provider->revision()==revision){
                         const auto member=bank.ui->member(view->ordinal);
                         const auto& row=bank.rows[view->ordinal];
-                        if(member.identity&&member.data==view->data&&member.size==view->size&&
+                        const bool exactResultsSource=!(denmark16||resultsPst||resultsAtm)||
+                            (bank.ui->identity()==originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::overlays)&&
+                             member.identity==originalUiMemberIdentity50KG(OriginalUiArchiveId50KG::overlays,view->ordinal)&&
+                             member.identity&&Provider::sameName(member.identity->name,name));
+                        if(exactResultsSource&&member.identity&&member.data==view->data&&member.size==view->size&&
                            row.data==view->data&&row.size==view->size&&same(row.name,*view->member)){
                             UiSelection selected;selected.resolver=this;selected.providerIdentity=provider.get();
                             selected.archive=bank.ui;selected.member=member.identity;selected.data=member.data;
                             selected.bytes=member.size;selected.sourceIndex=i;selected.mount=view->mount;
                             selected.ordinal=view->ordinal;selected.providerRevision=revision;
                             selected.bankGeneration=view->bankGeneration;*capture=std::move(selected);
+                        }
+                    }
+                }
+                // Freeze the actual first positive raw-RES flare lookup only.
+                // It cannot obtain an OriginalUiArchive identity, and no later
+                // callback may backfill this from mutable File.bank history.
+                if(capture&&view&&provider&&Provider::sameName(name,"textures\\flare1.pst")&&
+                   entry.file->format==OriginalStandardTextureSourceFormat50LA::pstIndexed&&
+                   view->mount<provider->mounts_.size()){
+                    const auto& bank=*provider->mounts_[view->mount];
+                    if(bank.active&&!bank.ui&&bank.backing&&bank.generation==view->bankGeneration&&
+                       Provider::sameName(bank.name,"TRACKS/RA.RES")&&bank.archiveBytes==4604561u&&
+                       bank.digest=="1e8e504383da884d1a8436402cbbc2a3ff7cdc9390d19d97b3398c3dd51f84d2"&&
+                       view->ordinal<bank.rows.size()&&provider->sealed()&&provider->revision()==revision){
+                        const auto& row=bank.rows[view->ordinal];
+                        if(row.offset<=bank.backing->size()&&row.size<=bank.backing->size()-row.offset&&
+                           row.data==bank.backing->data()+row.offset&&row.data==view->data&&
+                           row.size==view->size&&same(row.name,*view->member)){
+                            UiSelection selected;selected.resolver=this;selected.providerIdentity=provider.get();
+                            selected.data=row.data;selected.bytes=row.size;selected.sourceIndex=i;
+                            selected.mount=view->mount;selected.ordinal=view->ordinal;
+                            selected.providerRevision=revision;selected.bankGeneration=view->bankGeneration;
+                            selected.nativeFlare={bank.backing,&row.name,&bank,row.offset};
+                            *capture=std::move(selected);
                         }
                     }
                 }
@@ -2222,6 +2334,190 @@ void OriginalStandardTextureResolver50LA::finishPstSourceBorrow29C7A0(
     file.finalPstRelease={};
     // Retain indices, bank history and shared immutable decoded IPUM leases.
 }
+bool OriginalStandardTextureResource50LA::cubSourceCurrent1295B0()const noexcept {
+    if(!cub_||!construction_||!construction_->live()||references00_!=1)return false;
+    const auto& c=cub_->source;
+    if(!c.sourcePin||!c.provider||!c.member||!c.memberData||!c.authenticatedMemberData||
+       c.memberBytes!=161825u||!c.imageOwner||!c.bank||!c.image||c.tileOrdinal>=48u||
+       !c.bank->loaded()||c.bank->textureCount()!=48u||c.bank->slotCount()!=48u||
+       c.bank->texture(static_cast<std::uint32_t>(c.tileOrdinal))!=c.image||
+       c.image->identity!=c.tileOrdinal||c.image->texture.width!=128u||
+       c.image->texture.height!=128u||c.image->texture.rgba.size()!=65536u)return false;
+    const auto nameEquals=[](const std::string& actual,std::string_view expected)noexcept{
+        if(actual.size()!=expected.size())return false;
+        for(std::size_t i=0;i<actual.size();++i)if(fold(static_cast<unsigned char>(actual[i]))!=
+            fold(static_cast<unsigned char>(expected[i])))return false;
+        return true;
+    };
+    if(!nameEquals(*c.member,"skies\\ra.cub"))return false;
+    OriginalStandardArchiveProvider50LA::MemberView current;
+    if(c.provider->lookup132820(*c.member,current)!=OriginalStandardArchiveProvider50LA::Lookup::present||
+       current.member!=c.member||current.data!=c.memberData||current.size!=c.memberBytes||
+       current.mount!=c.mount||current.ordinal!=c.ordinal||current.revision!=c.providerRevision||
+       current.bankGeneration!=c.bankGeneration)return false;
+    OriginalStandardArchiveProvider50LA::MountView mount;
+    if(!c.provider->mount(c.mount,mount)||!mount.archiveName||!mount.archiveSha256||
+       !nameEquals(*mount.archiveName,"TRACKS/RA.RES")||mount.archiveBytes!=4604561u||
+       *mount.archiveSha256!="1e8e504383da884d1a8436402cbbc2a3ff7cdc9390d19d97b3398c3dd51f84d2"||
+       mount.memberCount!=1010u)return false;
+    if(registered_&&lifetimeLink_.owner_!=construction_->textureLifetime_.get())return false;
+    if(cub_->loadComplete24F2C0){
+        if(!cub_->constructed24E1B0||!registered_||constructed_||cub_->source.palette||
+           width14_!=128||height18_!=128||levelCountB0_!=1||formatAC_!=1555||bitsPerPixelE8_!=16||
+           flagsF8KnownMask_!=0x0fu||(flagsF8_&0x0fu)!=1u||cub_->fieldA8!=16||
+           cub_->finalCursor!=c.tileOffset+c.tileBytes||cub_->orderedReadBytes!=c.tileBytes-24u||
+           !cub_->bufferFC||cub_->bufferFC!=cub_->bufferFCOwner.get())return false;
+        const auto& buffer=*cub_->bufferFC;
+        if(!buffer.backing||buffer.first00!=buffer.backing.get()||buffer.current04!=buffer.first00||
+           buffer.capacity08!=16u||reinterpret_cast<std::uintptr_t>(buffer.first00)%64u||buffer.field0C||buffer.field10||buffer.field14||buffer.field18||buffer.field1C)return false;
+        std::size_t total=0;
+        for(std::size_t slot=0;slot<4u;++slot){const auto& mip=cub_->mips[slot];const auto dimension=128u>>slot;
+            if(!mip.allocation||!mip.payloadRead||mip.allocationBytes<25u||
+               reinterpret_cast<std::uintptr_t>(mip.allocation.get())%64u||
+               mip.pointer100!=mip.allocation.get()||mip.codec118!=mip.pointer100+16u||
+               mip.bytes11C!=static_cast<std::int32_t>(mip.allocationBytes-16u)||
+               mip.width104!=static_cast<std::int32_t>(dimension)||mip.height110!=mip.width104||
+               mip.width124!=dimension||mip.blocks108!=(dimension<128u?1:2)||
+               mip.logWidth10C!=static_cast<std::int32_t>(7u-slot)||mip.logHeight114!=mip.logWidth10C||
+               mip.width12C!=mip.width104||mip.height128!=mip.height110||mip.flags130KnownMask!=3u||
+               (mip.flags130&3u)||
+               mip.sourcePayloadOffset!=mip.sourceLengthOffset+4u||mip.sourcePayloadOffset>c.memberBytes||
+               mip.allocationBytes>c.memberBytes-mip.sourcePayloadOffset||
+               std::memcmp(mip.pointer100,c.memberData+mip.sourcePayloadOffset,mip.allocationBytes))return false;
+            total+=mip.allocationBytes;
+        }
+        if(total!=cub_->compressedAllocationBytes||cub_->mips[4].allocation)return false;
+        for(auto word:cub_->offsetWords)if(word)return false;
+    }
+    return true;
+}
+bool OriginalStandardTextureResource50LA::constructCub24E1B0(const CubSource1295B0& source,
+    std::shared_ptr<const OriginalStandardMaterialContext50LA> context,D& d)noexcept {
+    d={};
+    if(cub_||constructed_||registered_||resolver_||construction_||references00_!=1||
+       !context||!context->live()||!context->cubCanRetire2544F0())return fail(d,E::phase,0x24e1b0);
+    if(!source.sourcePin||!source.provider||!source.member||!source.memberData||
+       !source.authenticatedMemberData||!source.palette||!source.imageOwner||
+       !source.bank||!source.image||source.memberBytes!=161825u||source.tileOrdinal>=48u||
+       source.descriptorWord0||source.tileOffset<99180u||source.tileOffset>source.memberBytes||
+       source.tileBytes<44u||source.tileBytes>source.memberBytes-source.tileOffset||
+       source.face!=(source.tileOrdinal<32u?source.tileOrdinal/8u:4u)||
+       source.tile!=(source.tileOrdinal<32u?source.tileOrdinal%8u:source.tileOrdinal-32u))
+        return fail(d,E::source,0x24e1b0);
+    try {
+        cub_=std::make_unique<CubFacet1295B0>();cub_->source=source;construction_=std::move(context);
+        if(!cubSourceCurrent1295B0()||std::memcmp(source.memberData,source.authenticatedMemberData,source.memberBytes)!=0)
+            return fail(d,E::source,0x24e1b0);
+        // SAME actual1048F0 ref1 and443870 intrusive registration, no Entity
+        // count, resolver cache, texture-table row or second native manager.
+        cub_->lastPC=0x29c780;
+        if(!construction_->registerTexture29C780(lifetimeLink_))return fail(d,E::video,0x29c780);
+        registered_=true;d.sourceEffectsCommitted=true;
+        // Only direct24E1B0's proven low nibble is known. Upper bits remain
+        // unclaimed. Existing generic constructed24DA30 admission stays false.
+        flagsF8_=0;flagsF8KnownMask_=0x0f;bitsPerPixelE8_=-1;
+        cub_->constructed24E1B0=true;cub_->lastPC=0x24e360;d.sourcePC=0x24e360;return true;
+    }catch(...){return fail(d,E::allocation,cub_?cub_->lastPC:0x24e1b0);}
+}
+bool OriginalStandardTextureResource50LA::loadCub24F2C0(std::size_t& cursor,
+    const std::array<std::uint32_t,5>& descriptor,D& d)noexcept {
+    d={};
+    if(!cub_||!cub_->constructed24E1B0||cub_->loadAttempted||!registered_||
+       !cub_->source.palette||!cubSourceCurrent1295B0())return fail(d,E::phase,0x24f2c0);
+    auto& c=*cub_;const auto& source=c.source;c.loadAttempted=true;c.loadActive=true;
+    struct EndActive {bool& active;~EndActive(){active=false;}} endActive{c.loadActive};
+    const auto reject=[&](E e,std::uint32_t pc){c.lastPC=pc;d.sourceEffectsCommitted=registered_;return fail(d,e,pc,cursor);};
+    const auto word=[](const std::uint8_t* p){return std::uint32_t(p[0])|(std::uint32_t(p[1])<<8u)|
+        (std::uint32_t(p[2])<<16u)|(std::uint32_t(p[3])<<24u);};
+    const auto end=source.tileOffset+source.tileBytes;
+    if(cursor!=source.tileOffset+24u||word(source.memberData+source.tileOffset)!=source.descriptorWord0)
+        return reject(E::source,0x24f2c0);
+    for(std::size_t i=0;i<5u;++i)if(descriptor[i]!=word(source.memberData+source.tileOffset+4u+i*4u))
+        return reject(E::source,0x24f2c0);
+    // Caller already performed128E4C/128EE0..F50 in exact order. No reread
+    // advances this bound actual file cursor; comparisons only authenticate.
+    if(descriptor!=std::array<std::uint32_t,5>{{32u,0u,16u,4096u,4u}})
+        return reject(E::unsupported,0x24f2c0);
+    const auto read=[&](void* destination,std::size_t bytes,std::uint32_t pc){
+        c.lastPC=pc;if(!cubSourceCurrent1295B0()||cursor>end||bytes>end-cursor)return false;
+        std::memcpy(destination,source.memberData+cursor,bytes);cursor+=bytes;c.orderedReadBytes+=bytes;return true;
+    };
+    flagsF8_=static_cast<std::uint8_t>((flagsF8_&0xfeu)|1u); //24F3A8, source format32→34.
+    bitsPerPixelE8_=16; //24F400 actual29E910(0x613).
+    width14_=height18_=128;c.fieldA8=16; //24F568/570/574.
+    levelCountB0_=0;
+    for(std::size_t i=0;i<5u;++i){std::uint8_t raw[4];
+        if(!read(raw,4u,i<4u?0x24f5d8:0x24f678))return reject(E::source,c.lastPC);
+        c.offsetWords[i]=word(raw);
+        if(c.offsetWords[i])return reject(E::unsupported,c.lastPC);
+        // Source compressed path overwrites each temporary offset with zero.
+        if(i<4u)++levelCountB0_; //24F640 successful-prefix count, before forced1.
+    }
+    levelCountB0_=1; //24F6EC flags argument0; distinct from four actual allocations.
+    for(std::size_t input=0;input<4u;++input){const auto slot=3u-input;auto& mip=c.mips[slot];
+        std::uint8_t raw[4];mip.sourceLengthOffset=cursor;
+        if(!read(raw,4u,0x24f784))return reject(E::source,c.lastPC);
+        const auto bytes=word(raw);mip.bytes11C=static_cast<std::int32_t>(bytes); //24F7B0 before allocation.
+        if(bytes<25u||bytes>65536u||cursor>end||bytes>end-cursor)return reject(E::range,0x24f7b0);
+        c.lastPC=0x24f7b8;
+        auto* allocation=static_cast<std::uint8_t*>(::operator new(bytes,std::align_val_t(64),std::nothrow));
+        if(!allocation)return reject(E::allocation,c.lastPC);
+        mip.allocation.reset(allocation);mip.allocationBytes=bytes;c.compressedAllocationBytes+=bytes;
+        mip.codec118=allocation; //24F7EC publication BEFORE actual read; partial owner retained.
+        mip.sourcePayloadOffset=cursor;
+        if(!read(allocation,bytes,0x24f814))return reject(E::source,c.lastPC);
+        mip.payloadRead=true;
+        const std::uint32_t dimension=16u<<input;
+        if(std::memcmp(allocation,"ipum",4u)||word(allocation+4u)!=bytes-8u||
+           (std::uint32_t(allocation[8])|(std::uint32_t(allocation[9])<<8u))!=dimension||
+           (std::uint32_t(allocation[10])|(std::uint32_t(allocation[11])<<8u))!=dimension||
+           word(allocation+12u)!=1u)return reject(E::malformed,0x24f82c);
+        mip.width104=mip.height110=static_cast<std::int32_t>(dimension);
+        mip.width124=static_cast<std::uint16_t>(dimension);
+        mip.blocks108=dimension<128u?1:2;
+        // Explicit bounded native numeric adaptation for EXACT powers16/32/64/128.
+        // No claim of universal original log/div/int helper/FCSR equivalence.
+        mip.logWidth10C=mip.logHeight114=static_cast<std::int32_t>(4u+input);
+        mip.width12C=mip.width104;mip.height128=mip.height110;
+        mip.bytes11C=static_cast<std::int32_t>(bytes-16u);
+        mip.pointer100=allocation;mip.codec118=allocation+16u; //24F914..92C.
+    }
+    if(cursor!=end||!cubSourceCurrent1295B0())return reject(E::source,0x24fc00);
+    levelCountB0_=1;formatAC_=1555;
+    //24FC18 ->257750(FC,10). Real CPU owner/backing, NOT a second GPU
+    // texture or decoded image. Retain pending object on partial ctor failure.
+    c.lastPC=0x2577d8;
+    c.bufferFCOwner.reset(new(std::nothrow) CubBuffer257750());
+    if(!c.bufferFCOwner)return reject(E::allocation,c.lastPC);
+    c.lastPC=0x2592d0;auto& buffer=*c.bufferFCOwner;
+    auto* bytes=static_cast<std::uint8_t*>(::operator new(256u,std::align_val_t(64),std::nothrow));
+    if(!bytes)return reject(E::allocation,c.lastPC);
+    buffer.backing.reset(bytes);buffer.first00=bytes;
+    std::memset(bytes,0,256u); //259348 actual clear, not initialized packet data.
+    buffer.capacity08=16u;buffer.current04=buffer.first00;buffer.field0C=buffer.field10=buffer.field14=buffer.field18=buffer.field1C=0;
+    c.bufferFC=&buffer; //2577F8 after actual successful constructor.
+    c.finalCursor=cursor;c.source.palette=nullptr;
+    c.loadComplete24F2C0=true;c.lastPC=0x25000c;d.sourcePC=0x25000c;d.sourceEffectsCommitted=true;return true;
+}
+bool OriginalStandardTextureResource50LA::finishCub2516F0(std::uint32_t a1,std::uint32_t a2,
+    std::uint32_t a3,D& d)noexcept {
+    d={};if(!cub_||!cub_->loadComplete24F2C0||cub_->loadActive||!cubSourceCurrent1295B0()||
+       a1!=1u||a2||a3)return fail(d,E::phase,0x2516f0);
+    //2516F0 is literal jr ra with return1. No hidden allocation/UV/state call.
+    cub_->finished2516F0=true;cub_->lastPC=0x129050;d.sourcePC=0x129050;return true;
+}
+bool OriginalStandardTextureResource50LA::canRetireCub24E370()const noexcept {
+    if(!cub_)return references00_==1&&!registered_&&!constructed_&&!resolver_&&!construction_;
+    // Provider revision/context liveness need NOT survive completed/failed
+    // source resource teardown. Only actual owned reference/list custody does.
+    return references00_==1&&!cub_->loadActive&&(!registered_||
+        (construction_&&construction_->cubCanRetire2544F0()&&
+         lifetimeLink_.owner_==construction_->textureLifetime_.get()));
+}
+bool OriginalStandardTextureResource50LA::withdrawCubPaletteBorrow()noexcept {
+    if(!canRetireCub24E370())return false;if(cub_)cub_->source.palette=nullptr;return true;
+}
+
 OriginalStandardTextureResource50LA::OriginalStandardTextureResource50LA(AllocationKey) noexcept
     :lifetimeLink_(*this) {}
 std::shared_ptr<OriginalStandardTextureResource50LA> OriginalStandardTextureResource50LA::allocate() {
@@ -2229,6 +2525,19 @@ std::shared_ptr<OriginalStandardTextureResource50LA> OriginalStandardTextureReso
 }
 OriginalStandardTextureResource50LA::~OriginalStandardTextureResource50LA() {
     if(references00_!=0)std::terminate();
+    if(cub_){
+        if(cub_->loadActive||cub_->source.palette||
+           (registered_&&(!construction_||!construction_->cubCanRetire2544F0())))std::terminate();
+        //24E3A8 walks physical slots0..4. Failed native reads also retain
+        // pre-publication allocation custody, explicitly safe partial cleanup.
+        for(auto& mip:cub_->mips){mip.pointer100=mip.codec118=nullptr;mip.allocation.reset();}
+        //2544F0 is the proven SAME-manager null13C no-effect branch above.
+        //257820/259380 frees actual FC backing then its owned object.
+        cub_->bufferFC=nullptr;
+        if(cub_->bufferFCOwner)cub_->bufferFCOwner->backing.reset();
+        cub_->bufferFCOwner.reset();
+        cub_.reset(); //Withdraw actual image/source/provider borrows before manager unlink.
+    }
     //1021A0 retires the actually constructed prefix in ascending array order,
     //before102144 clears the aggregate cache. No fake ordinary-list entry.
     for(auto& frame:frames24_){
@@ -2258,12 +2567,31 @@ OriginalStandardTextureResource50LA::~OriginalStandardTextureResource50LA() {
         resolver_->finishPstSourceBorrow29C7A0(*this);
     }
 }
+bool OriginalStandardTextureResolver50LA::nativeFlareSourceCurrent(const UiSelection& source)const noexcept {
+    if(!storage_||source.resolver!=this||!source.nativeFlare.backing||!source.nativeFlare.member||
+       source.archive||source.member||source.sourceIndex>=storage_->entries.size()||!source.providerRevision||
+       !source.bankGeneration||!storage_->provider||source.providerIdentity!=storage_->provider.get()||
+       source.mount>=storage_->provider->mounts_.size())return false;
+    const auto& bank=*storage_->provider->mounts_[source.mount];
+    if(!bank.active||&bank!=source.nativeFlare.mountIdentity||bank.ui||bank.backing!=source.nativeFlare.backing||
+       !OriginalStandardArchiveProvider50LA::sameName(bank.name,"TRACKS/RA.RES")||bank.archiveBytes!=4604561u||
+       bank.digest!="1e8e504383da884d1a8436402cbbc2a3ff7cdc9390d19d97b3398c3dd51f84d2"||
+       bank.generation!=source.bankGeneration||source.ordinal>=bank.rows.size())return false;
+    const auto& row=bank.rows[source.ordinal];const auto& file=*storage_->entries[source.sourceIndex].file;
+    return !file.retired&&file.format==OriginalStandardTextureSourceFormat50LA::pstIndexed&&
+        OriginalStandardArchiveProvider50LA::sameName(file.member,"textures\\flare1.pst")&&
+        source.nativeFlare.member==&row.name&&source.nativeFlare.offset==row.offset&&
+        row.offset<=bank.backing->size()&&row.size<=bank.backing->size()-row.offset&&
+        row.data==bank.backing->data()+row.offset&&source.data==row.data&&source.bytes==row.size&&
+        OriginalStandardArchiveProvider50LA::sameName(file.member,row.name)&&file.bytes.size()==row.size&&
+        std::equal(file.bytes.begin(),file.bytes.end(),row.data);
+}
 bool OriginalStandardTextureResource50LA::construct24DA30(
     std::shared_ptr<OriginalStandardTextureResolver50LA> resolver,std::size_t index,
     const std::string& resolvedName,
     std::shared_ptr<const OriginalStandardMaterialContext50LA> context,D& d,std::size_t frame,
     OriginalStandardTextureResolver50LA::UiSelection* selection) noexcept {
-    if(resolver_||construction_||constructed_||registered_||firstUiSource_.archive)return fail(d,E::phase,0x24DEF8);
+    if(resolver_||construction_||constructed_||registered_||firstUiSource_.archive||firstUiSource_.nativeFlare.backing)return fail(d,E::phase,0x24DEF8);
     if(!resolver||!resolver->storage_||index>=resolver->storage_->entries.size())
         return fail(d,E::source,0x24DAF8);
     if(!context||!context->live())return fail(d,E::video,0x29C768);
@@ -2274,6 +2602,12 @@ bool OriginalStandardTextureResource50LA::construct24DA30(
     if(child&&(root.file->format!=OriginalStandardTextureSourceFormat50LA::atmPstFrames||
         frame>=root.frames.size()))return fail(d,E::source,0x10237C);
     const auto& entry=child?root.frames[frame]:root;
+    if(selection&&selection->nativeFlare.backing){
+        if(child||selection->sourceIndex!=index||!resolver->nativeFlareSourceCurrent(*selection)||
+           root.file->format!=OriginalStandardTextureSourceFormat50LA::pstIndexed||entry.pstOffset||
+           entry.pstBytes!=selection->bytes)return fail(d,E::source,0x24DAF8);
+        firstUiSource_=std::move(*selection); //Actual original-positive lookup, before construction effects.
+    }
     if(selection&&selection->archive){
         const auto member=selection->archive->member(selection->ordinal);
         if(child||selection->resolver!=resolver.get()||selection->sourceIndex!=index||
@@ -2283,8 +2617,10 @@ bool OriginalStandardTextureResource50LA::construct24DA30(
            !member.identity||!member.data||!OriginalStandardArchiveProvider50LA::sameName(member.identity->name,root.file->member)||
            member.size!=root.file->bytes.size()||
            !std::equal(root.file->bytes.begin(),root.file->bytes.end(),member.data)||
-           root.file->format!=OriginalStandardTextureSourceFormat50LA::pstIndexed||
-           entry.pstOffset||entry.pstBytes!=member.size)
+           !((root.file->format==OriginalStandardTextureSourceFormat50LA::pstIndexed&&
+              !entry.pstOffset&&entry.pstBytes==member.size)||
+             (root.file->format==OriginalStandardTextureSourceFormat50LA::atmPstFrames&&
+              resultsNativeAtmName50LA(root.file->member)&&!entry.frames.empty())))
             return fail(d,E::source,0x24DAF8);
         // Retain before any actual resource/list effects. Construction failure
         // keeps this owner with the existing partial resource until cleanup.
@@ -2533,6 +2869,51 @@ bool OriginalStandardTextureResource50LA::firstUiSourceCurrent()const noexcept {
         name&&OriginalStandardArchiveProvider50LA::sameName(*name,source.member->name)&&bytes&&bytes->size()==source.bytes&&
         std::equal(bytes->begin(),bytes->end(),source.data);
 }
+bool OriginalStandardTextureResource50LA::borrowLocalFlarePstImage50LA(
+    std::shared_ptr<const std::vector<std::uint8_t>>& backing,const std::string*& member,
+    const std::uint8_t*& data,std::size_t& bytes)const noexcept {
+    if(!constructed_||aggregate_||atmChild_||references00_<=0||!construction_||!construction_->live()||
+       !resolver_||sourceFormat_!=OriginalStandardTextureSourceFormat50LA::pstIndexed||
+       sourceIndex_!=firstUiSource_.sourceIndex||pstOffset_||pstBytes_!=firstUiSource_.bytes||
+       !resolver_->nativeFlareSourceCurrent(firstUiSource_))return false;
+    backing=firstUiSource_.nativeFlare.backing;member=firstUiSource_.nativeFlare.member;
+    data=firstUiSource_.data;bytes=firstUiSource_.bytes;return true;
+}
+bool OriginalStandardTextureResource50LA::borrowResultsUiPstImage50LA(
+    const OriginalStandardTextureResource50LA& selected,
+    std::shared_ptr<const OriginalUiArchive50KG>& archive,OriginalUiMemberView50KG& member,
+    std::size_t& offset,std::size_t& extent)const noexcept {
+    // The aggregate alone retains its real first132820 archive. Children do
+    // not receive a relabeled copy or a later provider winner as provenance.
+    const auto& source=firstUiSource_;
+    if(!constructed_||atmChild_||references00_<=0||!construction_||!construction_->live()||
+       !resolver_||source.resolver!=resolver_.get()||source.sourceIndex!=sourceIndex_||
+       !source.archive||!source.archive->loaded()||!source.member||!source.data||!source.bytes||
+       !source.providerIdentity||!source.providerRevision||!source.bankGeneration)return false;
+    const auto actual=source.archive->member(source.ordinal);
+    const auto* bytes=originalBytes();const auto* name=sourceMember();
+    if(actual.identity!=source.member||actual.data!=source.data||actual.size!=source.bytes||
+       !name||!OriginalStandardArchiveProvider50LA::sameName(*name,source.member->name)||
+       !bytes||bytes->size()!=source.bytes||!std::equal(bytes->begin(),bytes->end(),source.data))return false;
+    std::size_t begin=0,length=0;
+    if(aggregate_){
+        if(sourceFormat_!=OriginalStandardTextureSourceFormat50LA::atmPstFrames||
+           !resultsNativeAtmName50LA(*name)||
+           source.archive->identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::overlays)||
+           frameCount20_<=0||frames24_.size()!=static_cast<std::size_t>(frameCount20_))return false;
+        const auto child=std::find_if(frames24_.begin(),frames24_.end(),
+            [&](const auto& held){return held.get()==&selected;});
+        if(child==frames24_.end()||!selected.constructed_||!selected.atmChild_||selected.aggregate_||
+           selected.references00_<=0||selected.construction_!=construction_||selected.resolver_!=resolver_||
+           selected.sourceIndex_!=sourceIndex_||!selected.pstExtent24E880(begin,length))return false;
+        const auto ordinal=static_cast<std::size_t>(child-frames24_.begin());
+        const auto& root=resolver_->storage_->entries[sourceIndex_];
+        if(ordinal>=root.frames.size()||begin!=root.frames[ordinal].pstOffset||length!=root.frames[ordinal].pstBytes)
+            return false;
+    }else if(&selected!=this||!firstUiSourceCurrent()||!pstExtent24E880(begin,length))return false;
+    if(!length||begin>actual.size||length>actual.size-begin)return false;
+    archive=source.archive;member=actual;offset=begin;extent=length;return true;
+}
 const std::string* OriginalStandardTextureResource50LA::sourceMember() const noexcept {
     return constructed_?&resolver_->storage_->entries[sourceIndex_].file->member:nullptr;
 }
@@ -2683,6 +3064,36 @@ bool OriginalStandardTextureResource50LA::demandPause1BAE00(
         return fail(d,E::number,storePC);
     if(!(10.f<=demand10_)){demand10_=10.f;written=true;}
     return true;
+}
+bool OriginalStandardTextureResource50LA::demandRaceF8199350(
+    std::uint32_t storePC,bool& written,D& d) noexcept {
+    written=false;
+    if(storePC!=0x199414u&&storePC!=0x199454u&&storePC!=0x199494u)
+        return fail(d,E::unsupported,storePC);
+    if(aggregate_||!constructed_||references00_<=0||!construction_||!construction_->live())
+        return fail(d,E::phase,storePC);
+    using Math=detail::StandardTextureDemandMath50LA;
+    if(!Math::supported()||!Math::ordinary(demand10_)||demand10_<0.f)
+        return fail(d,E::number,storePC);
+    // C.LE.S(10,current) skips the literal store. No projected-size104A00,
+    // image-bank replacement, selected animated frame, reset, or GPU receipt.
+    if(!(10.f<=demand10_)){demand10_=10.f;written=true;d.sourceEffectsCommitted=true;}
+    d.sourcePC=storePC;return true;
+}
+bool OriginalStandardTextureResource50LA::demandResults1C15B0(
+    std::uint32_t storePC,bool& written,D& d) noexcept {
+    written=false;
+    if(storePC!=0x1c1658u&&storePC!=0x1c168cu&&storePC!=0x1c16d8u&&storePC!=0x1c175cu)
+        return fail(d,E::unsupported,storePC);
+    if(aggregate_||!constructed_||references00_<=0||!construction_||!construction_->live())
+        return fail(d,E::phase,storePC);
+    using Math=detail::StandardTextureDemandMath50LA;
+    if(!Math::supported()||!Math::ordinary(demand10_)||demand10_<0.f)
+        return fail(d,E::number,storePC);
+    // All four source C.LE.S forms skip when10 <= current. No reset,
+    // projected-size104A00, animation service or GPU completion follows.
+    if(!(10.f<=demand10_)){demand10_=10.f;written=true;d.sourceEffectsCommitted=true;}
+    d.sourcePC=storePC;return true;
 }
 bool OriginalStandardTextureResource50LA::demandPositionStats191AF0(
     std::uint32_t storePC,bool& written,D& d) noexcept {

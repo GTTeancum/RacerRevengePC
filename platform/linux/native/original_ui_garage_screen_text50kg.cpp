@@ -41,6 +41,9 @@ bool textInputs(assets::OriginalApplicationFonts50LA::Name font,std::string_view
  if(font==N::frontendVenus16&&material=="venus16popup"&&capacity==40){
   out={"font\\venus16popup.psm","font\\venus16.cel","font\\venus16.pst","venus16popup",assets::OriginalUiArchiveId50KG::controllerPopup};return true;
  }
+ if(font==N::frontendVenus14&&material=="venus14popup"&&(capacity==60||capacity==40)){
+  out={"font\\venus14popup.psm","font\\venus14.cel","font\\venus14.pst","venus14popup",assets::OriginalUiArchiveId50KG::controllerPopup};return true;
+ }
  // Only the authored Garage text rows. These are concrete input
  // identities, not a changed source capacity limit or a renderer budget.
  if(font==N::frontendDenmrk16&&material=="denmrk16Top"&&
@@ -193,7 +196,7 @@ bool OriginalUiGarageScreenText50KG::loadColdSource2DFD90(
    //A fresh Popup constructor owns a new archive allocation, not new contents.
    //Admit only this exact Popup PSM with its real canonical mount provenance;
    //ordinary Garage materials and the retained font atlas still require identity.
-   if(materialName!="venus16popup"||*mounted.member!=material.identity->name)return false;
+   if((materialName!="venus16popup"&&materialName!="venus14popup")||*mounted.member!=material.identity->name)return false;
    assets::OriginalStandardArchiveProvider50LA::MountView mount;
    const auto* expected=assets::originalUiArchiveIdentity50KG(assets::OriginalUiArchiveId50KG::controllerPopup);
    return expected&&provider->mount(mounted.mount,mount)&&mount.archiveName&&mount.archiveSha256&&
@@ -829,5 +832,23 @@ bool OriginalUiGarageScreenText50KG::borrowMenuWarningFontAtlas(const OriginalUi
   d.status=Status::authority;d.sourcePC=0x281F90;return false;
  }
  return borrowRetainedFontAtlasBody(out,d);
+}
+}
+
+namespace rr::platform {
+bool OriginalUiGarageScreenText50KG::drawPopup47C2E0170(OriginalUiGarageDrawContribution50KG& draw,
+ OriginalUiSharedDialogs50KG& shared,Diagnostic& d)noexcept {
+ d={};
+ if(!shared.popup47CTextCurrent(draw,*this)||!coldInputsCurrent())return stop(d,Status::authority,0x2E01C0);
+ if(!authority_->screenTextEnabled383688_)return true;
+ OriginalUiGarageDrawContribution50KG::TextRenderInputs input;std::uint32_t pc=0;
+ if(!draw.readPopup47CTextInputs2E0170(shared,*this,input,pc))return stop(d,Status::authority,pc);
+ if(!regenerate2E0F50(input.viewportWidth1E8,input.viewportHeight1EC,input.videoDepthMaximum60,d))return false;
+ bool effects=d.sourceEffectsCommitted;
+ for(std::size_t p=0;p<active5E_;++p){
+  if(!draw.collectPopup47CText246760(shared,*this,p,d)){d.sourceEffectsCommitted|=effects;return false;}
+  effects|=d.sourceEffectsCommitted;
+ }
+ d.sourceEffectsCommitted=effects;return true;
 }
 }

@@ -11,6 +11,8 @@
 #include <exception>
 #include <new>
 #include <utility>
+#include <string_view>
+#include <initializer_list>
 
 namespace rr::assets {
 namespace {
@@ -319,6 +321,9 @@ struct OriginalStandardMaterialObject50LA::Storage {
     // First actual positive construction only. Never filled by a loaded-row
     // consumer, and never labeled with a later MemoryCard occurrence/caller.
     std::optional<PositiveOverlayConstruction> overlayConstruction;
+    // Reuses only the owned receipt representation. It is independent of
+    // overlay1top and never grants its Garage/MemoryCard provenance.
+    std::optional<PositiveOverlayConstruction> resultsAuthoredConstruction;
     std::shared_ptr<const OriginalUiArchive50KG> tournamentMissingPsm;
     std::unique_ptr<OriginalUiMaterial50KG> tournamentFallback;
     std::shared_ptr<const OriginalUiArchive50KG> speedBoostMissingPsm;
@@ -327,6 +332,7 @@ struct OriginalStandardMaterialObject50LA::Storage {
     std::unique_ptr<OriginalUiMaterial50KG> damageFallback;
     std::shared_ptr<const OriginalUiArchive50KG> pauseBackdropMissingPsm;
     std::shared_ptr<const OriginalGarageScreenFallback50KG> garageFallback;
+    std::shared_ptr<const OriginalResultsScreenFallback50LA> resultsFallback;
     OriginalGarageScreenFallback50KG::ConstructionObservation sharedIconConstruction;
     OriginalMemoryCardScreenFallback50KG::Observation memoryCardConstruction;
     std::unique_ptr<OriginalUiMaterial50KG> pauseBackdropFallback;
@@ -427,6 +433,115 @@ bool overlayConstructionMember(const OriginalUiArchiveIdentity50KG* archive,std:
         OriginalStandardArchiveProvider50LA::sameName(member->name,"ui\\textures\\overlay1top.psm")&&
         std::strcmp(member->sha256,"8dcfc7644c8a2d60deb40cf20e2bc8a9b358f0200024da31612563302a9f4230")==0;
 }
+}
+namespace {
+bool resultsAuthoredName50LA(std::string_view name)noexcept {
+    using P=OriginalStandardArchiveProvider50LA;
+    for(const char* item:{R"(ui\textures\letterboxpause.psm)",R"(font\denmarkbold16pause.psm)",
+        R"(font\eurostileboldbold13ingame.psm)",R"(ui\textures\medasmgld.psm)",
+        R"(ui\textures\medasmslv.psm)",R"(ui\textures\medasmbrz.psm)",R"(ui\textures\MenuSeparator.psm)"})
+        if(P::sameName(name,item))return true;
+    return false;
+}
+bool resultsMedalName50LA(std::string_view name)noexcept {
+    using P=OriginalStandardArchiveProvider50LA;
+    return P::sameName(name,R"(ui\textures\medasmgld.psm)")||
+        P::sameName(name,R"(ui\textures\medasmslv.psm)")||P::sameName(name,R"(ui\textures\medasmbrz.psm)");
+}
+}
+void OriginalStandardMaterialObject50LA::captureResultsAuthoredConstruction29B628(
+    const OriginalStandardMaterialPopulationInput50LA& input)noexcept {
+    if(!storage_||storage_->constructed||storage_->resultsAuthoredConstruction)return;
+    auto& s=*storage_;const auto provider=input.positiveConstructionProvider_;
+    if(!resultsAuthoredName50LA(s.name00)||!s.source||!s.source->prepared()||!s.source->member()||
+       !s.source->originalBytes()||!provider||!provider->sealed())return;
+    using P=OriginalStandardArchiveProvider50LA;P::MemberView chosen;
+    const auto revision=provider->revision();const auto& bytes=*s.source->originalBytes();
+    if(!P::sameName(*s.source->member(),s.name00)||
+       provider->lookup132820(s.name00,chosen)!=P::Lookup::present||!chosen.member||!chosen.data||
+       !chosen.bankGeneration||chosen.revision!=revision||!P::sameName(*chosen.member,s.name00)||
+       chosen.size!=bytes.size()||std::memcmp(chosen.data,bytes.data(),bytes.size()))return;
+    OriginalUiEncodedArchiveView50KG archive;
+    if(!provider->encodedUiInput(chosen.mount,archive)||archive.providerIdentity()!=provider.get()||
+       archive.identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::overlays))return;
+    const auto* member=originalUiMemberIdentity50KG(OriginalUiArchiveId50KG::overlays,chosen.ordinal);
+    if(!member||!member->name||!P::sameName(member->name,s.name00)||member->bytes!=chosen.size||
+       !provider->sealed()||provider->revision()!=revision)return;
+    Storage::PositiveOverlayConstruction receipt;
+    receipt.source=s.source;receipt.provider=provider;receipt.archive=std::move(archive);
+    receipt.member=member;receipt.data=chosen.data;receipt.bytes=chosen.size;
+    receipt.mount=chosen.mount;receipt.ordinal=chosen.ordinal;receipt.revision=revision;receipt.generation=chosen.bankGeneration;
+    s.resultsAuthoredConstruction=std::move(receipt);
+    // Observation only at the genuine fresh positive29B628 path. Missing
+    // evidence does not change legacy construction or backfill a loaded row.
+}
+bool OriginalStandardMaterialObject50LA::borrowResultsAuthored247110(
+    const OriginalUiArchive50KG& overlays,OriginalUiMaterial50KG& output,D& d)const noexcept {
+    d={};try {
+    if(!storage_||!storage_->constructed||!storage_->source||!storage_->resultsAuthoredConstruction)
+        return fail(d,E::source,0x29B628,"actual Results authored first construction");
+    const auto& s=*storage_;const auto& receipt=*s.resultsAuthoredConstruction;d.row=s.row40;
+    if(!resultsAuthoredName50LA(s.name00)||s.count48!=1||!s.passes4C[0]||!s.templates||
+       !s.programs||!s.textures||!s.construction||!s.construction->live()||!s.construction->materialApplication()||
+       &s.construction->materialApplication()->templates()!=s.templates.get()||
+       !overlays.loaded()||overlays.identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::overlays)||
+       receipt.archive.identity()!=overlays.identity()||!receipt.provider||
+       receipt.archive.providerIdentity()!=receipt.provider.get()||!receipt.revision||!receipt.generation||
+       receipt.source!=s.source||receipt.source.owner_before(s.source)||s.source.owner_before(receipt.source))
+        return fail(d,E::source,0x29B628,"same actual authored source/template/archive owners");
+    // The actual provider keeps its first mounted archive on an equal-byte
+    // repeat mount. Results independently retains a freshly read OVERLAYS;
+    // those authenticated allocations are not required to share a data pointer.
+    // Revalidate first-construction custody against its OWN retained mount,
+    // then compare the Results member identity/bytes without relabeling either.
+    using Provider=OriginalStandardArchiveProvider50LA;
+    const auto revision=receipt.provider->revision();Provider::MemberView selected;
+    OriginalUiEncodedArchiveView50KG mounted;
+    if(!receipt.provider->sealed()||
+       receipt.provider->lookup132820(s.name00,selected)!=Provider::Lookup::present||
+       !selected.member||!selected.data||!selected.size||!Provider::sameName(*selected.member,s.name00)||
+       selected.mount!=receipt.mount||selected.ordinal!=receipt.ordinal||
+       selected.bankGeneration!=receipt.generation||selected.revision!=revision||
+       selected.data!=receipt.data||selected.size!=receipt.bytes||
+       !receipt.provider->encodedUiInput(receipt.mount,mounted)||
+       mounted.providerIdentity()!=receipt.provider.get()||mounted.identity()!=receipt.archive.identity()||
+       mounted.data()!=receipt.archive.data()||mounted.size()!=receipt.archive.size()||
+       !mounted.data()||!mounted.size()||receipt.provider->revision()!=revision||!receipt.provider->sealed())
+        return fail(d,E::source,0x29B628,"same first authored provider mount/member custody");
+    const auto member=overlays.member(receipt.ordinal);const auto* bytes=s.source->originalBytes();
+    if(!member.identity||member.identity!=receipt.member||!member.data||member.size!=receipt.bytes||
+       !s.source->member()||!Provider::sameName(*s.source->member(),member.identity->name)||
+       !bytes||bytes->size()!=member.size||std::memcmp(bytes->data(),receipt.data,receipt.bytes)||
+       std::memcmp(member.data,receipt.data,receipt.bytes))
+        return fail(d,E::source,0x29B628,"same authenticated authored member in independently retained Results archive");
+    const auto& pass=*s.passes4C[0];OriginalStandardProgramRowView50LA program;
+    if(pass.references04!=1||pass.flags21!=2||pass.mapCount20>1||pass.uv1E[0]||pass.uv1E[1]||
+       pass.constructionTemplate!=s.templates->get(OriginalUiTemplate50KG::screenMt)||
+       !pass.constructionTemplate||pass.parameterMask24||pass.parameterCount28||pass.parameters34||pass.animation10||
+       !pass.state30||pass.state30->contextCount()!=1||!s.programs->row(pass.program18,program)||
+       !program.canonicalName||std::strcmp(program.canonicalName,"ScreenObject"))
+        return fail(d,E::unsupportedPass,0x247110,"actual Results single-context ScreenObject pass");
+    const bool medal=resultsMedalName50LA(s.name00);
+    if(medal?(!pass.textureAnimation10||!pass.textureAnimation10->unique18()||
+              pass.textureAnimation10->materialOwner()!=this||pass.textureAnimation10->passOrdinal()!=0):
+             bool(pass.textureAnimation10))
+        return fail(d,E::unsupportedPass,0x29B950,"actual medal unique prototype identity");
+    OriginalUiMaterial50KG parsed;OriginalUiMaterialDiagnostic50KG numeric;
+    if(!readOriginalUiMaterial50KG(overlays,s.name00,*s.templates,OriginalUiTemplate50KG::screenMt,
+        s.construction->materialRuntime(),parsed,numeric)||parsed.passes.size()!=1){
+        d.document=numeric.document;return fail(d,E::document,numeric.sourcePC?numeric.sourcePC:0x247110,"actual retained Results authored PSM");
+    }
+    const auto& authored=parsed.passes[0];
+    if(authored.textureCount!=pass.mapCount20||authored.enabled!=1||authored.textureCoordinateIndex!=pass.uv1E[0])
+        return fail(d,E::source,0x247214,"authored/canonical map shape");
+    const auto& groups=OriginalShaderPassGroups50LA::instance().names_;
+    const bool group=pass.group22==-1?OriginalStandardArchiveProvider50LA::sameName(authored.shaderPassGroup,"none"):
+        pass.group22==-2?OriginalStandardArchiveProvider50LA::sameName(authored.shaderPassGroup,"unique"):
+        pass.group22>=0&&static_cast<std::size_t>(pass.group22)<groups.size()&&
+            OriginalStandardArchiveProvider50LA::sameName(authored.shaderPassGroup,groups[static_cast<std::size_t>(pass.group22)]);
+    if(!group)return fail(d,E::source,0x2475AC,"actual named/unique group, no replacement token");
+    output=std::move(parsed);return true;
+    }catch(...){return fail(d,E::allocation,0x247110,"Results authored policy observation");}
 }
 void OriginalStandardMaterialObject50LA::captureOverlayConstruction29B628(
     const OriginalStandardMaterialPopulationInput50LA& input)noexcept {
@@ -713,6 +828,233 @@ bool OriginalStandardMaterialObject50LA::borrowGarageScreenFallback2475C0(
         projected.lodL=pass.state30->sampler[4].value;projected.lodK=pass.state30->sampler[5].value;
         output=std::move(next);return true;
     }catch(...){return fail(d,E::allocation,0x2475C0,"retained Garage fallback state projection");}
+}
+bool OriginalStandardMaterialObject50LA::borrowResultsScreenFallback2475C0(
+    const OriginalStandardTextureResource50LA& texture,OriginalUiMaterial50KG& output,D& d)const noexcept {
+    d={};d.pass=0;
+    if(!storage_||!storage_->constructed||storage_->source)return fail(d,E::source,0x2475C0);
+    const auto& s=*storage_;d.row=s.row40;using Provider=OriginalStandardArchiveProvider50LA;
+    // Existing shared icon history stays with its actual first owner. This is
+    // the existing readonly consumer, not a new Garage/Pause readiness grant.
+    if(capturedSharedIconName()&&!s.resultsFallback){
+        std::shared_ptr<const OriginalUiArchive50KG> archive;OriginalUiMemberView50KG member;
+        if(!borrowCapturedSharedIconTexture(texture,archive,member,d))return false;
+        return borrowGarageScreenFallback2475C0(0,texture,*archive,member,output,d);
+    }
+    try {
+        if(!s.construction||!s.construction->live()||!s.construction->materialApplication()||
+           !s.templates||&s.construction->materialApplication()->templates()!=s.templates.get()||
+           !s.textures||!s.programs||s.count48!=1||!s.passes4C[0])
+            return fail(d,E::source,0x2475C0,"actual Results/base fallback owners");
+        const auto& pass=*s.passes4C[0];
+        if(pass.constructionTemplate!=s.templates->get(OriginalUiTemplate50KG::screenMt)||
+           !pass.constructionTemplate||pass.constructionTemplate->microprogram!="ScreenObject"||
+           pass.references04!=1||pass.mapCount20!=1||pass.flags21!=2||pass.uv1E[0]||pass.uv1E[1]||
+           pass.group22!=-1||pass.texture1A[0]<0||pass.texture1A[1]!=-1||pass.parameterMask24||
+           pass.parameterCount28||pass.parameters34||pass.animation10||pass.textureAnimation10||
+           !pass.state30||pass.state30->contextCount()!=1)
+            return fail(d,E::reference,0x2475C0,"actual one-map ScreenMT fallback pass");
+        OriginalStandardProgramRowView50LA program;
+        if(!s.programs->row(pass.program18,program)||!program.canonicalName||
+           std::strcmp(program.canonicalName,"ScreenObject"))return fail(d,E::program,0x247620);
+        OriginalStandardTextureRowView50LA row;OriginalStandardTextureResource50LA* actual=nullptr;
+        if(!s.textures->row(pass.texture1A[0],row)||!row.references08||*row.references08<=0||
+           row.object04!=&texture||!s.textures->resolve298E60(pass.texture1A[0],actual,d.texture)||actual!=&texture||
+           texture.construction_!=s.construction||!texture.resolver_||!texture.firstUiSourceCurrent())
+            return fail(d,E::texture,0x247648,"same actual fallback texture and first-source owner");
+        const auto& imageSource=texture.firstUiSource_;
+        const auto image=imageSource.archive->member(imageSource.ordinal);
+        const auto* bytes=texture.originalBytes();const auto* name=texture.sourceMember();
+        if(!name||!bytes||!image.identity||!image.data||image.size!=bytes->size())
+            return fail(d,E::texture,0x24E880);
+        OriginalUiMaterial50KG next;auto& provenance=next.provenance;
+        if(s.pauseBackdropFallback){
+            // Shared1B8810 base resources already loaded before Results. Keep
+            // that existing first construction, even when Results retained it.
+            const auto& archive=s.pauseBackdropMissingPsm;
+            const auto& held=*s.pauseBackdropFallback;
+            if(s.resultsFallback||s.garageFallback||s.memoryCardConstruction.options||
+               !archive||!archive->loaded()||
+               archive->identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::overlays)||
+               held.passes.size()!=1||held.provenance.origin!=OriginalUiMaterialOrigin50KG::pauseBackdropMissingPsmFallback||
+               held.provenance.archive!=archive->identity()||held.provenance.creationPC!=0x2475C0||
+               !Provider::sameName(held.provenance.attemptedPsmMember,s.name00)||
+               archive->find(s.name00).identity||
+               !((Provider::sameName(s.name00,R"(ui\textures\results1.psm)")&&held.provenance.sourceCallerPC==0x1B8840)||
+                 (Provider::sameName(s.name00,R"(ui\textures\results2.psm)")&&held.provenance.sourceCallerPC==0x1B898C)))
+                return fail(d,E::source,0x1B8810,"actual retained shared-base backdrop construction");
+            const auto original=archive->find(held.provenance.registeredName+".pst");
+            if(imageSource.archive->identity()!=archive->identity()||original.identity!=held.provenance.fallbackTexture||
+               original.identity!=image.identity||!original.data||original.size!=image.size||
+               !Provider::sameName(*name,held.provenance.registeredName+".pst")||
+               std::memcmp(original.data,image.data,image.size))
+                return fail(d,E::texture,0x24E880,"same authenticated shared-base PST across retained allocations");
+            provenance=held.provenance; // Never relabel a pre-existing base row as Results-created.
+        }else {
+            if(!s.resultsFallback||s.garageFallback||s.memoryCardConstruction.options)
+                return fail(d,E::source,0x29B638,"actual Results first occurrence required");
+            const auto& proof=*s.resultsFallback;
+            const bool square=Provider::sameName(s.name00,R"(ui\textures\icon_sqr.psm)");
+            const bool triangle=Provider::sameName(s.name00,R"(ui\textures\icon_tri.psm)");
+            const bool cross=Provider::sameName(s.name00,R"(ui\textures\icon_x.psm)");
+            const bool circle=Provider::sameName(s.name00,R"(ui\textures\icon_cir.psm)");
+            const bool font=Provider::sameName(s.name00,R"(font\denmarkbold16ingame.psm)");
+            const auto racer=proof.racer60_;
+            const bool portrait=racer>=1&&racer<=26&&racer!=5&&racer!=6&&racer!=13&&
+                proof.caller_==0x1BF804&&proof.offset_==0x480&&proof.occurrence_>=21&&
+                Provider::sameName(s.name00,std::string(R"(ui\textures\)")+
+                    (racer<10?"0":"")+std::to_string(racer)+"_fsm.psm");
+            const bool fixedOccurrence=!proof.ordinal_&&!proof.racer60_&&
+                ((square&&proof.caller_==0x1BEF38&&proof.offset_==0x2D0&&proof.occurrence_==7)||
+                 (triangle&&proof.caller_==0x1BEFE8&&proof.offset_==0x270&&proof.occurrence_==8)||
+                 (cross&&proof.caller_==0x1BF0A0&&proof.offset_==0x210&&proof.occurrence_==9)||
+                 (circle&&proof.caller_==0x1BF158&&proof.offset_==0x330&&proof.occurrence_==10)||
+                 (font&&proof.caller_==0x1BF23C&&proof.offset_==0x490&&proof.occurrence_==11));
+            if((!fixedOccurrence&&!portrait)||proof.row_!=s.row40||!proof.provider_||!proof.provider_->sealed()||
+               !proof.revision_||!proof.bankGeneration_||proof.context_!=s.construction||proof.textures_!=s.textures||
+               !proof.overlays_||!proof.overlays_->loaded()||
+               proof.overlays_->identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::overlays)||
+               !Provider::sameName(s.name00,proof.name_+".psm")||proof.pstBytes_.empty()||
+               !Provider::sameName(proof.pstMember_,proof.name_+".pst")||
+               imageSource.providerIdentity!=proof.provider_.get())
+                return fail(d,E::source,0x29B638,"actual first Results occurrence and resource owners");
+            const auto* selectedArchive=proof.selectedArchive_.identity();
+            const bool allowed=selectedArchive==originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::overlays)||
+                ((cross||triangle)&&selectedArchive==originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::controllerPopup))||
+                ((square||circle)&&selectedArchive==originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::garage));
+            const auto* selected=allowed?originalUiMemberIdentity50KG(selectedArchive->id,proof.member_):nullptr;
+            const auto original=proof.overlays_->find(proof.name_+".pst");
+            if(!allowed||proof.selectedArchive_.providerIdentity()!=proof.provider_.get()||
+               !proof.selectedArchive_.data()||proof.selectedArchive_.size()!=selectedArchive->bytes||
+               !selected||!selected->name||!Provider::sameName(selected->name,proof.pstMember_)||
+               selected->bytes!=proof.pstBytes_.size()||proof.overlays_->find(s.name00).identity||
+               !original.identity||!original.data||original.size!=proof.pstBytes_.size()||
+               std::memcmp(original.data,proof.pstBytes_.data(),original.size)||
+               !Provider::sameName(*name,proof.pstMember_)||bytes->size()!=proof.pstBytes_.size()||
+               std::memcmp(bytes->data(),proof.pstBytes_.data(),bytes->size()))
+                return fail(d,E::source,0x29B638,"independent first material/resource selections and authentic PST bytes");
+            provenance.origin=OriginalUiMaterialOrigin50KG::resultsCanonicalScreenMissingPsmFallback;
+            provenance.archive=imageSource.archive->identity();provenance.fallbackTexture=image.identity;
+            provenance.fallbackConstructionArchive=selectedArchive;provenance.fallbackConstructionTexture=selected;
+            provenance.sourceCallerPC=proof.caller_;provenance.registeredName=proof.name_;
+            provenance.attemptedPsmMember=s.name00;provenance.creationPC=0x2475C0;
+        }
+        next.passes.emplace_back();auto& projected=next.passes.back();
+        projected.provenance=provenance;projected.pass=1;projected.microprogram=program.canonicalName;
+        projected.inheritedTemplate=pass.constructionTemplate->identity;
+        projected.textureName=provenance.registeredName.substr(provenance.registeredName.find_last_of('\\')+1);
+        projected.shaderPassGroup="none";projected.enabled=1;projected.textureCount=1;projected.textureCoordinateIndex=0;
+        for(std::size_t i=0;i<projected.gs.fields.size();++i){const auto& field=pass.state30->fields[i];
+            projected.gs.fields[i]={field.value,field.templateMember,field.byteOffset,field.sourcePC};}
+        projected.lodCalculationMethod=pass.state30->sampler[0].value;projected.maximumMipLevel=pass.state30->sampler[1].value;
+        projected.magFilter=pass.state30->sampler[2].value;projected.minFilter=pass.state30->sampler[3].value;
+        projected.lodL=pass.state30->sampler[4].value;projected.lodK=pass.state30->sampler[5].value;
+        output=std::move(next);return true;
+    }catch(...){return fail(d,E::allocation,0x2475C0,"actual Results fallback current-state projection");}
+}
+bool OriginalStandardMaterialObject50LA::borrowF8ScreenFallbackTexture2475C0(
+    const OriginalStandardTextureResource50LA& texture,
+    std::shared_ptr<const OriginalUiArchive50KG>& archive,OriginalUiMemberView50KG& member,D& d)const noexcept {
+    d={};d.pass=0;
+    if(!storage_||!storage_->constructed||storage_->source)return fail(d,E::source,0x2475C0);
+    const auto& s=*storage_;d.row=s.row40;using Provider=OriginalStandardArchiveProvider50LA;
+    const bool cross=Provider::sameName(s.name00,"ui\\textures\\icon_x.psm");
+    const bool square=Provider::sameName(s.name00,"ui\\textures\\icon_sqr.psm");
+    const bool font=Provider::sameName(s.name00,"font\\denmarkbold16ingame.psm");
+    if(!cross&&!square&&!font)return fail(d,E::source,0x2475C0,"F8 exact icon/font names");
+    // An earlier shared-icon owner remains that first owner. In particular,
+    // neither Results nor F8 can replace its Garage/MemoryCard provenance.
+    if(!s.resultsFallback){
+        if(font)return fail(d,E::source,0x29B638,"actual Results font first construction");
+        return borrowCapturedSharedIconTexture(texture,archive,member,d);
+    }
+    const auto& proof=*s.resultsFallback;
+    try {
+        if(s.garageFallback||s.memoryCardConstruction.options||proof.row_!=s.row40||
+           !proof.provider_||!proof.provider_->sealed()||!proof.revision_||!proof.bankGeneration_||
+           !proof.context_||proof.context_!=s.construction||!s.construction||!s.construction->live()||
+           proof.textures_!=s.textures||!s.textures||!s.templates||!s.construction->materialApplication()||
+           &s.construction->materialApplication()->templates()!=s.templates.get()||
+           !proof.overlays_||!proof.overlays_->loaded()||
+           proof.overlays_->identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::overlays)||
+           !Provider::sameName(s.name00,proof.name_+".psm")||proof.pstBytes_.empty()||
+           !Provider::sameName(proof.pstMember_,proof.name_+".pst")||
+           s.count48!=1||!s.passes4C[0])
+            return fail(d,E::source,0x29B638,"retained Results first-construction owner");
+        // These are the first actual occurrences in the complete Results
+        // loader, not later F8 acquisition PCs198810/1988C0/19897C.
+        if(!((cross&&proof.caller_==0x1BF0A0&&proof.offset_==0x210&&proof.occurrence_==9)||
+             (square&&proof.caller_==0x1BEF38&&proof.offset_==0x2D0&&proof.occurrence_==7)||
+             (font&&proof.caller_==0x1BF23C&&proof.offset_==0x490&&proof.occurrence_==11))||
+           proof.ordinal_||proof.racer60_)
+            return fail(d,E::source,0x29B638,"exact first Results icon/font occurrence");
+        const auto* selectedArchive=proof.selectedArchive_.identity();
+        const bool allowed=selectedArchive==originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::overlays)||
+            (cross&&selectedArchive==originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::controllerPopup))||
+            (square&&selectedArchive==originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::garage));
+        const auto* selected=allowed?originalUiMemberIdentity50KG(selectedArchive->id,proof.member_):nullptr;
+        const auto original=proof.overlays_->find(proof.name_+".pst");
+        if(!allowed||proof.selectedArchive_.providerIdentity()!=proof.provider_.get()||
+           !proof.selectedArchive_.data()||proof.selectedArchive_.size()!=selectedArchive->bytes||
+           !selected||!selected->name||!Provider::sameName(selected->name,proof.pstMember_)||
+           selected->bytes!=proof.pstBytes_.size()||proof.overlays_->find(s.name00).identity||
+           !original.identity||!original.data||original.size!=proof.pstBytes_.size()||
+           std::memcmp(original.data,proof.pstBytes_.data(),original.size))
+            return fail(d,E::source,0x29B638,"pinned Results absent-PSM construction evidence");
+        const auto& pass=*s.passes4C[0];
+        if(pass.constructionTemplate!=s.templates->get(OriginalUiTemplate50KG::screenMt)||
+           !pass.constructionTemplate||pass.constructionTemplate->microprogram!="ScreenObject"||
+           pass.references04!=1||pass.mapCount20!=1||pass.flags21!=2||pass.uv1E[0]||pass.uv1E[1]||
+           pass.group22!=-1||pass.texture1A[0]<0||pass.texture1A[1]!=-1||pass.parameterMask24||
+           pass.parameterCount28||pass.parameters34||pass.animation10||pass.textureAnimation10||
+           !pass.state30||pass.state30->contextCount()!=1u)
+            return fail(d,E::reference,0x2475C0,"actual Results one-map ScreenMT pass");
+        OriginalStandardProgramRowView50LA program;
+        if(!s.programs||!s.programs->row(pass.program18,program)||!program.canonicalName||
+           std::strcmp(program.canonicalName,"ScreenObject"))return fail(d,E::program,0x247620);
+        OriginalStandardTextureRowView50LA row;OriginalStandardTextureResource50LA* actual=nullptr;
+        if(!s.textures->row(pass.texture1A[0],row)||!row.references08||*row.references08<=0||
+           row.object04!=&texture||!s.textures->resolve298E60(pass.texture1A[0],actual,d.texture)||actual!=&texture||
+           texture.construction_!=s.construction||!texture.resolver_||
+           texture.firstUiSource_.providerIdentity!=proof.provider_.get()||!texture.firstUiSourceCurrent())
+            return fail(d,E::texture,0x247648,"same actual Results texture first-source owner");
+        const auto* bytes=texture.originalBytes();const auto* name=texture.sourceMember();
+        if(!name||!Provider::sameName(*name,proof.pstMember_)||!bytes||bytes->size()!=proof.pstBytes_.size()||
+           std::memcmp(bytes->data(),proof.pstBytes_.data(),bytes->size()))
+            return fail(d,E::texture,0x24E880,"retained Results material/resource bytes");
+        // Historical material selection and historical texture-cache selection
+        // are independent. No current132820 winner is substituted for either.
+        const auto& source=texture.firstUiSource_;const auto image=source.archive->member(source.ordinal);
+        archive=source.archive;member=image;return true;
+    }catch(...){return fail(d,E::allocation,0x2475C0,"Results fallback observation");}
+}
+bool OriginalStandardMaterialObject50LA::borrowF8ScreenFallback2475C0(
+    const OriginalStandardTextureResource50LA& texture,OriginalUiMaterial50KG& output,D& d)const noexcept {
+    std::shared_ptr<const OriginalUiArchive50KG> archive;OriginalUiMemberView50KG member;
+    if(!borrowF8ScreenFallbackTexture2475C0(texture,archive,member,d))return false;
+    const auto& s=*storage_;
+    if(!s.resultsFallback)return borrowGarageScreenFallback2475C0(0,texture,*archive,member,output,d);
+    try {
+        const auto& proof=*s.resultsFallback;const auto& pass=*s.passes4C[0];
+        OriginalUiMaterial50KG next;auto& provenance=next.provenance;
+        provenance.origin=OriginalUiMaterialOrigin50KG::resultsCanonicalScreenMissingPsmFallback;
+        provenance.archive=archive->identity();provenance.fallbackTexture=member.identity;
+        provenance.fallbackConstructionArchive=proof.selectedArchive_.identity();
+        provenance.fallbackConstructionTexture=originalUiMemberIdentity50KG(provenance.fallbackConstructionArchive->id,proof.member_);
+        provenance.sourceCallerPC=proof.caller_;provenance.registeredName=proof.name_;
+        provenance.attemptedPsmMember=s.name00;provenance.creationPC=0x2475C0;
+        next.passes.emplace_back();auto& projected=next.passes.back();
+        projected.provenance=provenance;projected.pass=1;projected.microprogram="ScreenObject";
+        projected.inheritedTemplate=pass.constructionTemplate->identity;
+        projected.textureName=proof.name_.substr(proof.name_.find_last_of('\\')+1);
+        projected.shaderPassGroup="none";projected.enabled=1;projected.textureCount=1;projected.textureCoordinateIndex=0;
+        for(std::size_t i=0;i<projected.gs.fields.size();++i){const auto& field=pass.state30->fields[i];
+            projected.gs.fields[i]={field.value,field.templateMember,field.byteOffset,field.sourcePC};}
+        projected.lodCalculationMethod=pass.state30->sampler[0].value;projected.maximumMipLevel=pass.state30->sampler[1].value;
+        projected.magFilter=pass.state30->sampler[2].value;projected.minFilter=pass.state30->sampler[3].value;
+        projected.lodL=pass.state30->sampler[4].value;projected.lodK=pass.state30->sampler[5].value;
+        output=std::move(next);return true;
+    }catch(...){return fail(d,E::allocation,0x2475C0,"actual Results current-state projection");}
 }
 bool OriginalStandardMaterialObject50LA::serviceCableBasePrototype29AC90(
     std::size_t slot,D& d) noexcept {
@@ -1104,7 +1446,8 @@ bool OriginalStandardMaterialObject50LA::construct29B550(std::int32_t row,const 
     std::shared_ptr<const OriginalUiArchive50KG> damageMissingPsm,
     std::shared_ptr<const OriginalUiArchive50KG> pauseBackdropMissingPsm,
     std::shared_ptr<const OriginalGarageScreenFallback50KG> garageFallback,
-    std::shared_ptr<const OriginalMemoryCardScreenFallback50KG> memoryCardFallback,D& d) noexcept {
+    std::shared_ptr<const OriginalMemoryCardScreenFallback50KG> memoryCardFallback,
+    std::shared_ptr<const OriginalResultsScreenFallback50LA> resultsFallback,D& d) noexcept {
     try {
         auto& s=*storage_;
         if(s.row40!=-1)return fail(d,E::phase,0x29B550);
@@ -1122,19 +1465,22 @@ bool OriginalStandardMaterialObject50LA::construct29B550(std::int32_t row,const 
             if(s.source)return fail(d,E::source,0x29B628,"ambiguous resolved PSM member");
             s.source=source;
         }
-        if(s.source)captureOverlayConstruction29B628(input);
+        if(s.source){captureOverlayConstruction29B628(input);captureResultsAuthoredConstruction29B628(input);}
         if((tournamentMissingPsm&&speedBoostMissingPsm)||
            (damageMissingPsm&&(tournamentMissingPsm||speedBoostMissingPsm))||
            (pauseBackdropMissingPsm&&(tournamentMissingPsm||speedBoostMissingPsm||damageMissingPsm)))return fail(d,E::source,0x29B638);
-        if(garageFallback||memoryCardFallback){
+        if(garageFallback||memoryCardFallback||resultsFallback){
             if(s.source||tournamentMissingPsm||speedBoostMissingPsm||damageMissingPsm||pauseBackdropMissingPsm||
-               (garageFallback&&memoryCardFallback))return fail(d,E::source,0x29B638,"one actual pending construction family");
+               (garageFallback&&memoryCardFallback)||(resultsFallback&&(garageFallback||memoryCardFallback)))return fail(d,E::source,0x29B638,"one actual pending construction family");
             if(garageFallback&&(garageFallback->row_!=row||
                !garageFallback->current(s.name00,input.construction,input.actualTextures383400,&s.sharedIconConstruction)))
                 return fail(d,E::source,0x29B638,"Garage canonical absent-PSM proof");
             if(memoryCardFallback&&(memoryCardFallback->row_!=row||
                !memoryCardFallback->captureAt29B638(s.name00,input.construction,input.actualTextures383400,input.actualPrograms382B70,s.memoryCardConstruction)))
                 return fail(d,E::source,0x29B638,"actual MemoryCard role-derived absent-PSM construction");
+            if(resultsFallback&&(resultsFallback->row_!=row||
+               !resultsFallback->current(s.name00,input.construction,input.actualTextures383400,input.positiveConstructionProvider_)))
+                return fail(d,E::source,0x29B638,"actual Results occurrence absent-PSM construction");
             if(!templates||association!=templates->get(OriginalUiTemplate50KG::screenMt)||
                !input.construction||!input.construction->live()||
                &input.construction->materialApplication()->templates()!=templates.get())
@@ -1142,6 +1488,7 @@ bool OriginalStandardMaterialObject50LA::construct29B550(std::int32_t row,const 
             s.templates=std::move(templates);s.programs=input.actualPrograms382B70;
             s.textures=input.actualTextures383400;s.construction=input.construction;
             s.garageFallback=std::move(garageFallback);
+            s.resultsFallback=std::move(resultsFallback);
             s.count48=1;s.passes4C[0]=std::make_unique<Storage::Pass>();
             auto& pass=*s.passes4C[0];pass.constructionTemplate=association;
             if(!s.programs||!s.programs->prepared()||
@@ -1149,7 +1496,7 @@ bool OriginalStandardMaterialObject50LA::construct29B550(std::int32_t row,const 
                 return fail(d,E::program,0x247620);
             pass.mapCount20=1; //247630; flags21 remain2 and UV1E remains0.
             if(!s.textures||!s.textures->prepared()||!s.textures->bindMaterialContext(s.construction,d.texture)||
-               !s.textures->acquire299330AndRetain298A30(memoryCardFallback?memoryCardFallback->name_:s.garageFallback->name_,pass.texture1A[0],d.texture))
+               !s.textures->acquire299330AndRetain298A30(memoryCardFallback?memoryCardFallback->name_:(s.resultsFallback?s.resultsFallback->name_:s.garageFallback->name_),pass.texture1A[0],d.texture))
                 return fail(d,E::texture,0x247648);
             const OriginalUiDatSection50KG noAttributes{}; //NULL document at247670, never a fabricated PSM.
             auto state=std::make_unique<OriginalStandardMaterialState50LA>();

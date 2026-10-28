@@ -126,7 +126,7 @@ class OriginalUiMainAudio50KG final : public AudioStereoProducer50HD {
         std::uint32_t event=0,payloadBytes=0,headerRate=0,durationMs=0,pitch=0;
         float duration20=0.f;
     };
-    std::array<NativeEffectSource,6> nativeEffectSources_{};
+    std::array<NativeEffectSource,8> nativeEffectSources_{};
     std::shared_ptr<const assets::OriginalStreamMetadata50KZ> nativeSourceMetadata_;
     const assets::OriginalStreamMetadataRow50KZ* nativeSongSourceCurrent(
         std::uint32_t,const AudioClip50HD&)const noexcept;
@@ -330,6 +330,19 @@ public:
     NativeMasterControlObservation inspectNativeMasterControl()const noexcept;
     static constexpr std::size_t musicVoice = 0, firstEffectVoice = 1;
     static constexpr std::size_t effectVoiceCount = 6, requiredVoices = 7;
+    // Garage slider events append two dry slots without moving music, the
+    // existing effects, rider speech, Watto8..48, or scene sounds49..52.
+    static constexpr std::size_t garageEffectVoiceCount = 8;
+    static constexpr std::size_t garageSceneVoiceEnd = 53, garageOrdinaryVoiceCount = 10;
+    static constexpr std::size_t garageOrdinaryVoice(std::size_t ordinal) noexcept {
+        return ordinal<8u?ordinal:garageSceneVoiceEnd+ordinal-8u;
+    }
+    static constexpr std::size_t effectVoiceForClip(std::size_t clip) noexcept {
+        return clip<=effectVoiceCount?firstEffectVoice+clip-1:53u+clip-7u;
+    }
+    std::size_t availableEffectVoiceCount()const noexcept {
+        return mixerCount_==garageSceneRequiredVoices?garageEffectVoiceCount:effectVoiceCount;
+    }
     static constexpr std::size_t riderConfirmClipCount = 57; // Two additional authored Kraid clips; mixer voice count unchanged.
     // One accepted Rider Confirm per page lifetime. Its UIACCEPT stream
     // borrows a separate native voice; it cannot replace an active utterance.
@@ -356,7 +369,7 @@ public:
         float masterGain = 0.f, musicGain = 0.f;
         bool paused = false, ownsMusic = false, fading = false;
         AudioVoiceObservation50HD music{};
-        std::array<AudioVoiceObservation50HD, effectVoiceCount> effects{};
+        std::array<AudioVoiceObservation50HD, garageEffectVoiceCount> effects{};
         SteadyRiderError error = SteadyRiderError::preparationUnavailable;
         const char* detail = "Rider steady transport not observed";
     };
@@ -598,14 +611,14 @@ private:
     std::uint32_t mixerRate_ = 0;
     const OriginalSoundMode50KG* preparedSoundMode_ = nullptr;
     std::uint64_t controlRevision_ = 0, musicPlaybackRevision_ = 0;
-    std::array<std::uint64_t, effectVoiceCount> effectPlaybackRevisions_{};
+    std::array<std::uint64_t, 8> effectPlaybackRevisions_{};
     bool controlRevisionExhausted_ = false;
     float musicGain_ = 0.4f, fadeStartGain_ = 0.4f, musicPitch_ = 1.f;
     float fadeElapsed_ = 0.f, fadeDuration_ = 0.f, fadeRetireAt_ = 0.f;
     std::uint32_t musicSong_ = 0;
     // Original UI setup1B7944 music40/100 and1B78D0 effects100/100.
-    std::array<assets::AudioPcm50HC, 7> pcm_{};
-    std::array<AudioClip50HD, 7> clips_{};
+    std::array<assets::AudioPcm50HC, 9> pcm_{};
+    std::array<AudioClip50HD, 9> clips_{};
     assets::AudioPcm50HC riderPcm_{};
     AudioClip50HD riderClip_{};
     assets::AudioPcm50HC coursePcm_{};
@@ -618,6 +631,6 @@ private:
     std::array<AudioClip50HD, riderConfirmClipCount> riderConfirmClips_{};
     std::uint64_t riderConfirmPlaybackRevision_ = 0;
     bool ownsRiderConfirm_ = false;
-    std::array<bool, effectVoiceCount> ownsEffect_{};
+    std::array<bool, 8> ownsEffect_{};
 };
 }

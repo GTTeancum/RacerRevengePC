@@ -392,7 +392,7 @@ bool OriginalApplicationAural50KG::canInitializeUiReentryReverb232C70(Diagnostic
         AudioVoiceObservation50HD voice;
         if(!i.mixer->inspectVoice(n,voice)||voice.voice.active)
             return fail(d,Status::phase,0x26A820);
-        if(n<OriginalUiMainAudio50KG::courseRequiredVoices&&
+        if((n<OriginalUiMainAudio50KG::courseRequiredVoices||n>=OriginalUiMainAudio50KG::garageSceneVoiceEnd)&&
            (voice.playbackRevision!=b->frontendClosedPlaybackRevisions_[n]||
             voice.voice.sourceFrame!=b->frontendClosedSourceFramesByVoice_[n]))
             return fail(d,Status::phase,0x26A820);
@@ -583,7 +583,7 @@ bool OriginalApplicationAural50KG::playNativeMainEffect233410(OriginalUiMainAudi
     if(!nativeStreamSlotsCurrent()||(**interfaceA0_).raceIntroLease||(**interfaceA0_).main.get()!=&main)return false;
     AudioMixer50HD::NativeSourceSampleStart50KG start;
     if(!main.nativeEffectSourceCurrent(index,clip,start))return false;
-    auto& i=**interfaceA0_;const auto voice=OriginalUiMainAudio50KG::firstEffectVoice+index-1;
+    auto& i=**interfaceA0_;const auto voice=OriginalUiMainAudio50KG::effectVoiceForClip(index);
     if(gain!=1.f||pitch!=1.f||i.mixer->auralMasterBus_[voice]!=0u||i.mixer->hasVoiceGroupGain50IC(voice))return false;
     return i.mixer->playNativeSourceOrdinarySample(*this,voice,clip,gain,pitch,start);
 }

@@ -42,6 +42,9 @@ struct CameraCallerOwners {
     void* startMusicContext=nullptr;
     bool (*startMusicRequest)(void*,std::int32_t,std::int32_t)=nullptr;
     const original_subtype3_record::Owner* recordManager40=nullptr;
+    rr::platform::RaceAudioGroups50IC* introAudio=nullptr;
+    std::shared_ptr<const rr::assets::OriginalTaIntroAuthoringCandidate> introAuthoring;
+    bool (*introMusicFadeRequest)(void*,float)=nullptr;
 };
 // Same runtime services, without caller-supplied roster arrays. The retained
 // roster handoff obtains model/rig/cable ownership from the actual Bank pin.
@@ -74,5 +77,8 @@ struct CameraRuntimeOwners {
     void* startMusicContext=nullptr;
     bool (*startMusicRequest)(void*,std::int32_t,std::int32_t)=nullptr;
     const original_subtype3_record::Owner* recordManager40=nullptr;
+    rr::platform::RaceAudioGroups50IC* introAudio=nullptr;
+    std::shared_ptr<const rr::assets::OriginalTaIntroAuthoringCandidate> introAuthoring;
+    bool (*introMusicFadeRequest)(void*,float)=nullptr;
 };
 } // namespace ra_source_camera50LA

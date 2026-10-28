@@ -90,6 +90,7 @@ private:
     bool canMutatePacket2DF550()const noexcept;
     bool draw2DF550(OriginalUiGarageDrawContribution50KG&,Diagnostic&)noexcept;
     bool drawWarning4702DF550(OriginalUiGarageDrawContribution50KG&,OriginalUiSharedDialogs50KG&,Diagnostic&)noexcept;
+    bool drawPopup47C2DF550(OriginalUiGarageDrawContribution50KG&,OriginalUiSharedDialogs50KG&,Diagnostic&)noexcept;
     bool drawMenuWarning4702DF550(OriginalUiSharedDialogs50KG&,Diagnostic&)noexcept;
     static void initializeDrawAssertion2DF550()noexcept;
     bool regeneratePacket2DF550(std::uint32_t,std::uint32_t,Diagnostic&)noexcept;

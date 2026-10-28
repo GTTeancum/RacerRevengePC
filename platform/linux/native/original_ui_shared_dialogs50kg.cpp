@@ -1,4 +1,5 @@
 #include "original_ui_shared_dialogs50kg.h"
+#include "../../../src/game/original_ui_controller_popup_geometry50kg.h"
 #include "original_ui_shared_dialog_material_history50kg.h"
 #include "original_ui_main_session50kg.h"
 #include "original_ui_garage_draw_contribution50kg.h"
@@ -16,10 +17,15 @@ namespace rr::platform {
 OriginalUiSharedDialogs50KG::~OriginalUiSharedDialogs50KG()noexcept {
     // Global UI shutdown must perform its actual two child callbacks. Neither
     // Garage Back nor destruction of a resource projection releases these.
-    if(dialog470_.entity.reference00||controller47C_.entity.reference00||firstPass470Draw_||demand470Pending_||thirdPass470Draw_||nativeWarning470FifoPins_||nativeMenuWarning470Pins_||menuMainDraw_||menuOptionsDraw_||menuUpdateFailedOwner_)std::terminate();
+    if(dialog470_.entity.reference00||controller47C_.entity.reference00||popup47CDraw_||nativePopup47CFifoPins_||firstPass470Draw_||demand470Pending_||thirdPass470Draw_||nativeWarning470FifoPins_||nativeMenuWarning470Pins_||menuMainDraw_||menuOptionsDraw_||menuUpdateFailedOwner_)std::terminate();
 }
 bool OriginalUiSharedDialogs50KG::fail(Diagnostic& d,Status s,std::uint32_t pc)noexcept {
     d.status=s;d.sourcePC=pc;d.sourceEffectsCommitted=dialog470_.entity.reference00!=0||dialog470_.vtable!=0;return false;
+}
+bool OriginalUiSharedDialogs50KG::canonical47CQuadPayloadRetired(const Quad& quad)noexcept {
+    // Keep the root retirement receipt's exact predicate inside the actual
+    // canonical primitive owner; Application friendship is not transitive.
+    return !quad.constructed&&!quad.primitiveOwner_&&!quad.packetOwner_;
 }
 bool OriginalUiSharedDialogs50KG::current()const noexcept {
     const auto app=application_.lock();return app&&app->sharedDialogs.get()==this&&scope_&&inputs_.root&&
@@ -33,7 +39,7 @@ bool OriginalUiSharedDialogs50KG::bindInitial1B7BD0(std::shared_ptr<Scope> scope
     // Do not manufacture470's constructor history alongside that live UI.
     const auto& state=app->controllerPopupState;
     if(app->controllerPopupResources||(!successorConstructor_&&(state.delta3C0!=0||state.timer3C4!=0||state.active3CC||
-       state.closing3C8||state.hasConfirm3D0||state.hasCancel3D4||state.result3D8)))
+       state.closing3C8||state.garagePurchaseText||state.hasConfirm3D0||state.hasCancel3D4||state.result3D8)))
         return fail(d,Status::history,0x1B7BD0);
     scope_=std::move(scope);application_=app;inputs_=std::move(inputs);phase_=Phase::bound;
     return construct470203C90(d);
@@ -152,9 +158,31 @@ bool OriginalUiSharedDialogs50KG::loadedCurrent()const noexcept {
 bool OriginalUiSharedDialogs50KG::construct47C2054D0(Diagnostic& d)noexcept {
     if(!current()||phase_!=Phase::dialog470Loaded||!dialog470_.loaded)
         return fail(d,Status::phase,0x2054D0);
+    // These allocations are native storage for embedded, allocation-free
+    // source constructors. Reserve them BEFORE publishing the counted Entity:
+    // bad_alloc must not leave a live47C with no resource/retirement owner.
+    for(const auto& q:controller47C_.strips)if(q.constructed||q.stage_!=Quad::Stage::empty)
+        return fail(d,Status::phase,0x2054D0);
+    for(const auto& q:controller47C_.icons)if(q.constructed||q.stage_!=Quad::Stage::empty)
+        return fail(d,Status::phase,0x2054D0);
+    if(controller47C_.dim220||controller47C_.message270||controller47C_.confirm2E0||controller47C_.cancel350)
+        return fail(d,Status::phase,0x2054D0);
+    std::unique_ptr<Dim> dim;
+    std::unique_ptr<Text> message,confirm,cancel;
+    try {
+        dim=std::make_unique<Dim>();message=std::unique_ptr<Text>(new Text);
+        confirm=std::unique_ptr<Text>(new Text);cancel=std::unique_ptr<Text>(new Text);
+    }catch(...){return fail(d,Status::allocation,0x2054D0);}
     d.entity=scope_->constructControllerPopup2054D0(*this,controller47C_.entity);
     if(!d.entity.okay())return fail(d,Status::owner,d.entity.sourcePC);
     controller47C_.vtable=0x3D0890;
+    // Exact205510/20551C/205528 source order; fixed offsets and empty stages
+    // were proved before publication, so no native allocation can fail here.
+    for(std::size_t i=0;i<3;++i)if(!controller47C_.strips[i].construct2DEF40(0x40+i*0x60))std::terminate();
+    for(std::size_t i=0;i<2;++i)if(!controller47C_.icons[i].construct2DEF40(0x160+i*0x60))std::terminate();
+    controller47C_.dim220=std::move(dim);controller47C_.message270=std::move(message);
+    controller47C_.confirm2E0=std::move(confirm);controller47C_.cancel350=std::move(cancel);
+
     //205564..20559C initializes the NEW 47C instance. A successor is issued
     // only after exact prior object retirement; Root/profile/audio history is
     // not reset. Initial boot keeps its existing constructor/loader projection.
@@ -162,7 +190,7 @@ bool OriginalUiSharedDialogs50KG::construct47C2054D0(Diagnostic& d)noexcept {
         auto app=application_.lock();if(!app)std::terminate();
         auto& q=app->controllerPopupState;
         q.timer3C4=0;q.delta3C0=0;q.closing3C8=false;q.active3CC=false;
-        q.hasConfirm3D0=false;q.hasCancel3D4=false;q.result3D8=0;
+        q.hasConfirm3D0=false;q.hasCancel3D4=false;q.result3D8=0;q.garagePurchaseText=false;
     }
     phase_=Phase::controller47CConstructed;d.sourceEffectsCommitted=true;d.sourcePC=0x2055AC;return true;
 }
@@ -179,10 +207,163 @@ bool OriginalUiSharedDialogs50KG::bindLoaded47C2055B0(
     if(successorConstructor_)app->controllerPopupState.strips=
         game::OriginalUiControllerPopup50KG::initialState().strips;
     app->controllerPopupResources=resources;controller47C_.resources=std::move(resources);
+    if(!loadCanonical47C2055B0(d))return false;
     controller47C_.loaded=true;phase_=Phase::loaded;d.sourceEffectsCommitted=true;d.sourcePC=0x2055B0;return true;
 }
+bool OriginalUiSharedDialogs50KG::loadCanonical47C2055B0(Diagnostic& d)noexcept {
+    if(!current()||phase_!=Phase::controller47CConstructed||controller47C_.canonicalLoaded)
+        return fail(d,Status::phase,0x2055B0);
+    Quad::RootInputs in(inputs_.root,inputs_.domain,inputs_.context,inputs_.video,inputs_.popup,inputs_.materialDirectory);
+    const auto font=inputs_.fonts?inputs_.fonts->find282210(Fonts::Name::frontendVenus14):nullptr;
+    if(!Quad::inputsCurrent(in)||!font||!inputs_.fontDirectory)return fail(d,Status::resourcePending,0x2057E8);
+    try {
+        auto& p=*controller47C_.dim220;p.type0C=1;p.count04=p.count08=4;
+        using Page=OriginalUiGaragePageOwner50KG;
+        const auto firstUse=[](Page::PolygonAssertion& s)noexcept {
+            if(!s.guard.load(std::memory_order_acquire)){s.word.store(1,std::memory_order_relaxed);s.guard.store(1,std::memory_order_release);}
+        };
+        firstUse(Page::polygonCount8F38());firstUse(Page::polygonLimit8F3C());firstUse(Page::polygonQuads8F44());
+        p.vertices00=std::make_unique<Dim::Vertex[]>(4);p.owns38=1;p.dirty3C=1;p.count34=p.count08;
+        p.count48=p.capacity4C=1;p.count34=1;p.packets44=std::make_unique<Dim::Descriptor[]>(1);
+        auto* packet=static_cast<Quad::Qword*>(::operator new[](18*sizeof(Quad::Qword),std::align_val_t{64}));
+        auto& desc=p.packets44[0];desc.allocation00.reset(packet);
+        for(std::size_t i=0;i<18;++i)std::construct_at(packet+i);
+        packet[1].words={0x11000000,0x03000000,0x02000200,0x6C0E8000};desc.vif04=packet+1;
+        packet[2].words={0x8004,0x30064000,0x512,0};desc.gif08=packet+2;desc.tag0C=packet+3;
+        desc.sourcePrimitive=12;desc.sourceVertices=4;std::size_t cursor=4;
+        for(std::size_t i=0;i<4;++i){auto& vertex=p.vertices00[i];firstUse(Page::polygonAliases8F64());
+            const auto slot=vertex.aliases10;vertex.rgba1C[slot]=packet+cursor++;vertex.stq14[slot]=packet+cursor++;
+            packet[cursor].words={0,0,0x3F800000,0};vertex.xyz24[slot]=packet+cursor++;++vertex.aliases10;}
+        packet[cursor].words={0x140000B0,0x10000000,0,0};packet[0].words={0x30000011,0,0,0};
+        desc.dmaData4=packet+1;desc.pointersKnown=true;
+        p.primitives30=std::make_unique<std::unique_ptr<Quad::Primitive>[]>(1);
+        p.primitives30[0]=std::make_unique<Quad::Primitive>();
+        if(!Quad::retainPrimitive2465B0(in,*p.primitives30[0],"dimpopup",d.quad)){
+            phase_=Phase::failed;return fail(d,Status::resourcePending,d.quad.sourcePC);}
+        p.primitives30[0]->packet10=packet;
+        //203DA0..3F6C writes the four real vertices and all published aliases.
+        //Only source RGBA/geometry is retained; no guest DMA is submitted.
+        constexpr std::array<std::array<float,2>,4> xy{{{{0,0}},{{640,0}},{{0,448}},{{640,448}}}};
+        for(std::size_t i=0;i<4;++i){auto& vertex=p.vertices00[i];vertex.authored00[0]=xy[i][0];vertex.authored00[1]=xy[i][1];
+            //203DA8/3DF8/3E48/3E9C load source Vertex+14: POSITION.
+            //The historical xyz24 name is STQ and must retain (0,0,1,0).
+            for(std::size_t a=0;a<vertex.aliases10;++a){for(std::size_t c=0;c<4;++c)
+                vertex.stq14[a]->words[c]=std::bit_cast<std::uint32_t>(vertex.authored00[c]);
+                vertex.rgba1C[a]->words={12,12,12,79};}}
+
+        const std::array<Text*,3> texts{{controller47C_.message270.get(),controller47C_.confirm2E0.get(),controller47C_.cancel350.get()}};
+        for(std::size_t i=0;i<texts.size();++i){auto& t=*texts[i];
+            //205810/205968/205A40: all initial strings are NULL.2060A0 owns later writes.
+            if(!t.loadColdSource2DFD90(*inputs_.root,inputs_.domain,inputs_.context,inputs_.fonts,font,inputs_.popup,
+                *inputs_.materialDirectory,*inputs_.fontDirectory,Fonts::Name::frontendVenus14,"venus14popup",i?40:60,true,d.text))
+                return fail(d,Status::resourcePending,d.text.sourcePC);
+            //205820..2058D4 sets only the message position. Both empty button
+            //texts retain constructor(0,0) until2064C0 chooses single/dual layout.
+            if(!i){t.vector10_[0]=320;t.vector10_[1]=204;}t.justification50_=i?0:3;t.flags5A_|=3;
+            t.color54_=0x00CCCCCC;
+            for(std::size_t g=0;g<t.capacity5B_;++g)for(auto& v:t.glyphsC_[g].vertices)
+                for(std::size_t n=0;n<v.aliases10;++n){auto& rgba=v.rgba1C[n]->words;rgba[0]=rgba[1]=rgba[2]=102;}
+        }
+        for(std::size_t i=0;i<2;++i){auto& q=controller47C_.icons[i];if(!q.load2DF0B0(in,d.quad))return fail(d,Status::resourcePending,d.quad.sourcePC);
+            //205B1C/205B34 pass zero,zero; render owns later button positions.
+        }
+        const auto dimension=[](Quad& q,std::size_t c,float value)noexcept {
+            if(q.uv30[c]!=value){q.uv30[c]=value;q.flags5CValue|=1;q.flags5CKnownMask|=1;
+                if(q.uv30[3]!=0){q.flags5CValue|=2;q.flags5CKnownMask|=2;}}
+        };
+        const auto packetFloat=[](Quad& q,std::size_t n,std::size_t c,float x)noexcept {q.resource58[n].words[c]=std::bit_cast<std::uint32_t>(x);};
+        for(std::size_t i=0;i<3;++i){auto& q=controller47C_.strips[i];
+            if(!q.load2DF0B0(in,d.quad)){phase_=Phase::failed;return fail(d,Status::resourcePending,d.quad.sourcePC);}
+            dimension(q,1,640);dimension(q,2,i==2?14.f:16.f);
+            if(i){volatile float s0=0.f*q.scale4C,s1=32.f*q.scale4C;
+                volatile float t0=(i==1?32.f:18.f)*q.scale50,t1=(i==1?0.f:32.f)*q.scale50;
+                packetFloat(q,12,0,s0);packetFloat(q,6,0,s0);packetFloat(q,15,0,s1);packetFloat(q,9,0,s1);
+                packetFloat(q,9,1,t0);packetFloat(q,6,1,t0);packetFloat(q,15,1,t1);packetFloat(q,12,1,t1);}
+            if(q.color44!=0xFFF2851Bu){for(auto n:{4u,7u,10u,13u}){auto& rgba=q.resource58[n].words;rgba[0]=121;rgba[1]=66;rgba[2]=13;}
+                q.color44=0xFFF2851Bu;}
+
+        }
+        controller47C_.canonicalLoaded=true;d.sourcePC=0x206094;return true;
+    }catch(...){phase_=Phase::failed;return fail(d,Status::allocation,0x2055B0);}
+}
+bool OriginalUiSharedDialogs50KG::canonical47COwnersCurrent(
+    std::array<const assets::OriginalStandardMaterialObject50LA*,3>& out)const noexcept {
+    out={};if(!current()||!controller47C_.canonicalLoaded||!inputs_.domain||!inputs_.context||
+       !inputs_.context->live()||inputs_.context->videoIdentity()!=inputs_.video.get())return false;
+    const auto same=[](const auto& a,const auto& b){return a&&b&&a.get()==b.get()&&!a.owner_before(b)&&!b.owner_before(a);};
+    const auto primitive=[&](const auto* p,std::int32_t row){return p&&p->materialStored&&p->materialRetained&&
+        p->material00==row&&same(p->domain,inputs_.domain)&&same(p->context,inputs_.context);};
+    const auto& c=controller47C_;
+    if(!c.dim220||!c.dim220->primitives30||c.dim220->count34!=1||!primitive(c.dim220->primitives30[0].get(),3228))return false;
+    for(const auto& q:c.strips)if(!primitive(q.material54,3229)||q.material54!=q.primitiveOwner_.get()||
+        !same(q.domain_,inputs_.domain)||!same(q.context_,inputs_.context)||!same(q.video_,inputs_.video))return false;
+    for(std::size_t i=0;i<2;++i){const auto& q=c.icons[i];if(!primitive(q.material54,3232+i)||
+        q.material54!=q.primitiveOwner_.get()||!same(q.domain_,inputs_.domain)||!same(q.context_,inputs_.context)||!same(q.video_,inputs_.video))return false;}
+    for(const auto* t:{c.message270.get(),c.confirm2E0.get(),c.cancel350.get()}){
+        if(!t||!t->coldInputsCurrent()||!same(t->domain_,inputs_.domain)||!same(t->context_,inputs_.context)||
+           t->fontName_!=Fonts::Name::frontendVenus14||t->materialName_!="venus14popup"||!t->primitives4_||!t->publishedPrimitives_)return false;
+        for(std::size_t i=0;i<t->publishedPrimitives_;++i){const auto& q=t->primitives4_[i];
+            if(!q||!q->materialStored||!q->materialRetained||q->material00!=3231)return false;}
+    }
+    const auto table=inputs_.domain->materials382B38();if(!table)return false;
+    for(std::size_t i=0;i<3;++i){assets::OriginalStandardMaterialRowView50LA row;
+        if(!table->row(3231+i,row)||!row.object04||!row.references08||*row.references08<=0||!row.object04->constructed29B550())return false;
+        out[i]=row.object04;}
+    return true;
+}
+
+bool OriginalUiSharedDialogs50KG::canStartGaragePurchase2060A0(const OriginalUiGaragePageOwner50KG& page,Diagnostic& d)const noexcept {
+    d={};d.sourcePC=0x2060A0;const auto app=application_.lock();
+    if(!reorderCompleteFor1B872C(page)||!page.sourceEntryReturned1FAE00()||!page.base_.input268||
+       garagePopupInputFailed_||!app||app->controllerPopupState.active3CC||app->controllerPopupState.result3D8||
+       popup47CDraw_||nativePopup47CFifoPins_||firstPass470Draw_||demand470Pending_||thirdPass470Draw_||nativeWarning470FifoPins_||nativeMenuWarning470Pins_||
+       page.drawPending_||page.runtimeWidgetPending_||page.sharedHookPending_){d.status=Status::phase;return false;}
+    const auto* g=controller47C_.resources->geometry();
+    std::array<const assets::OriginalStandardMaterialObject50LA*,3> canonical{};
+    if(!g||!g->prepared()||!canonical47COwnersCurrent(canonical)){d.status=Status::resourcePending;return false;}
+    const auto& strings=g->garagePurchaseTexts();
+    const std::array<const Text*,3> texts{{controller47C_.message270.get(),controller47C_.confirm2E0.get(),controller47C_.cancel350.get()}};
+    for(std::size_t i=0;i<3;++i){const auto& t=*texts[i];
+        if(t.phase_!=Text::Phase::coldLoaded||!t.coldInputsCurrent()||!t.string8_||t.length5C_>t.capacity5B_||
+           t.string8_[t.length5C_]||t.nativeGarageFifoPins_||t.nativeMenuWarningPins_||
+           t.packetRevision_==std::numeric_limits<std::uint64_t>::max()||strings[i].text.empty()||
+           strings[i].text.size()>t.capacity5B_){d.status=Status::resourcePending;return false;}}
+    return canRenderGaragePurchase47C(page,d);
+}
+bool OriginalUiSharedDialogs50KG::writeController47CLabels2060A0(
+    const game::OriginalUiControllerPopupState50KG& state,Diagnostic& d)noexcept {
+    d={};d.sourcePC=0x2060A0;
+    std::array<const assets::OriginalStandardMaterialObject50LA*,3> canonical{};
+    if(popup47CDraw_||nativePopup47CFifoPins_||!loadedCurrent()||garagePopupInputFailed_||!game::OriginalUiControllerPopup50KG::valid(state)||
+       !state.active3CC||state.result3D8!=1||!state.hasConfirm3D0||
+       (state.garagePurchaseText&&!state.hasCancel3D4)||!canonical47COwnersCurrent(canonical))
+        return fail(d,Status::phase,0x2060A0);
+    const auto* geometry=controller47C_.resources->geometry();
+    if(!geometry||!geometry->prepared())return fail(d,Status::resourcePending,0x2060A0);
+    const auto& strings=geometry->startTexts(state);
+    const std::array<Text*,3> texts{{controller47C_.message270.get(),controller47C_.confirm2E0.get(),controller47C_.cancel350.get()}};
+    // Null a3 in Controller2 does not copy or clear Cancel. Garage's three
+    //nonnull arguments replace all three native strings at their source Start.
+    const std::size_t count=state.garagePurchaseText?3:2;
+    for(std::size_t i=0;i<count;++i){const auto& t=*texts[i];
+        if(t.phase_!=Text::Phase::coldLoaded||!t.coldInputsCurrent()||!t.string8_||t.length5C_>t.capacity5B_||
+           t.string8_[t.length5C_]||t.nativeGarageFifoPins_||t.nativeMenuWarningPins_||
+           t.packetRevision_==std::numeric_limits<std::uint64_t>::max()||strings[i].text.empty()||
+           strings[i].text.size()>t.capacity5B_)return fail(d,Status::resourcePending,0x2060A0);}
+    for(std::size_t i=0;i<count;++i){if(!texts[i]->writeText29D990(strings[i].text,d.text)){
+            garagePopupInputFailed_=true;return fail(d,Status::source,d.text.sourcePC);}}
+    d.sourceEffectsCommitted=true;d.sourcePC=0x2060A0;return true;
+}
+bool OriginalUiSharedDialogs50KG::startGaragePurchase2060A0(const OriginalUiGaragePageOwner50KG& page,Diagnostic& d)noexcept {
+    if(!canStartGaragePurchase2060A0(page,d))return false;
+    auto app=application_.lock();game::OriginalUiControllerPopupPlan50KG plan;
+    if(game::OriginalUiControllerPopup50KG::startGaragePurchase(app->controllerPopupState,plan)!=game::OriginalUiControllerPopupStatus50KG::ok)
+        return fail(d,Status::source,0x2060A0);
+    if(!writeController47CLabels2060A0(plan.state,d))return false;
+    app->controllerPopupState=plan.state;d.sourceEffectsCommitted=true;d.sourcePC=0x2060A0;return true;
+}
 bool OriginalUiSharedDialogs50KG::reappendInitialMain1D7CF4(Diagnostic& d)noexcept {
- d={};if(firstPass470Draw_||demand470Pending_||thirdPass470Draw_||nativeWarning470FifoPins_||nativeMenuWarning470Pins_||menuMainDraw_||menuOptionsDraw_||menuUpdateFailedOwner_||menuUpdateAborted_)return fail(d,Status::phase,0x1D7CF4);
+ d={};if(popup47CDraw_||nativePopup47CFifoPins_||firstPass470Draw_||demand470Pending_||thirdPass470Draw_||nativeWarning470FifoPins_||nativeMenuWarning470Pins_||menuMainDraw_||menuOptionsDraw_||menuUpdateFailedOwner_||menuUpdateAborted_)return fail(d,Status::phase,0x1D7CF4);
  if(initialMainAttached_)return loadedCurrent();
  if(!loadedCurrent()||scope_->managerEpoch_||scope_->managerLive_||completedReorders_||reorderingPage_)
   return fail(d,Status::phase,0x1D7CF4);
@@ -199,7 +380,7 @@ bool OriginalUiSharedDialogs50KG::reappendInitialMain1D7CF4(Diagnostic& d)noexce
  initialMainAttached_=true;initialMainResetPending_=true;++completedReorders_;reorderStep_=0;d.sourceEffectsCommitted=true;d.sourcePC=0x1E5044;return true;
 }
 bool OriginalUiSharedDialogs50KG::reappendNativeMenu1B86D0(Diagnostic& d)noexcept {
- d={};if(firstPass470Draw_||demand470Pending_||thirdPass470Draw_||nativeWarning470FifoPins_||nativeMenuWarning470Pins_||menuMainDraw_||menuOptionsDraw_||menuUpdateFailedOwner_||menuUpdateAborted_)return fail(d,Status::phase,0x1B86D0);
+ d={};if(popup47CDraw_||nativePopup47CFifoPins_||firstPass470Draw_||demand470Pending_||thirdPass470Draw_||nativeWarning470FifoPins_||nativeMenuWarning470Pins_||menuMainDraw_||menuOptionsDraw_||menuUpdateFailedOwner_||menuUpdateAborted_)return fail(d,Status::phase,0x1B86D0);
  if(!loadedCurrent()||!initialMainAttached_||scope_->managerLive_||reorderingPage_||
     completedReorders_==std::numeric_limits<std::uint64_t>::max())return fail(d,Status::phase,0x1B86D0);
  const auto app=application_.lock();
@@ -213,7 +394,7 @@ bool OriginalUiSharedDialogs50KG::reappendNativeMenu1B86D0(Diagnostic& d)noexcep
  d.sourceEffectsCommitted=true;d.sourcePC=0x1B872C;return true;
 }
 bool OriginalUiSharedDialogs50KG::reappendMainEntry1D7CF4(Diagnostic& d)noexcept {
- if(firstPass470Draw_||demand470Pending_||thirdPass470Draw_||nativeWarning470FifoPins_||nativeMenuWarning470Pins_||menuMainDraw_||menuOptionsDraw_||menuUpdateFailedOwner_||menuUpdateAborted_)return fail(d,Status::phase,0x1D7CF4);
+ if(popup47CDraw_||nativePopup47CFifoPins_||firstPass470Draw_||demand470Pending_||thirdPass470Draw_||nativeWarning470FifoPins_||nativeMenuWarning470Pins_||menuMainDraw_||menuOptionsDraw_||menuUpdateFailedOwner_||menuUpdateAborted_)return fail(d,Status::phase,0x1D7CF4);
  if(initialMainResetPending_){d={};if(!loadedCurrent()||!initialMainAttached_)return fail(d,Status::phase,0x1D7CF4);
   initialMainResetPending_=false;d.sourcePC=0x1D7CF4;return true;}
  if(!reappendNativeMenu1B86D0(d))return false;
@@ -229,7 +410,7 @@ bool OriginalUiSharedDialogs50KG::reorderCompleteFor1B872C(const OriginalUiGarag
         scope_->garagePage_==&page.entity_&&page.cameraHandoffPhase_==3;
 }
 bool OriginalUiSharedDialogs50KG::reappend1B86D0(const OriginalUiGaragePageOwner50KG& page,Diagnostic& d)noexcept {
-    d={};if(firstPass470Draw_||demand470Pending_||thirdPass470Draw_||nativeWarning470FifoPins_||nativeMenuWarning470Pins_||menuMainDraw_||menuOptionsDraw_||menuUpdateFailedOwner_||menuUpdateAborted_)return fail(d,Status::phase,0x1B86D0);
+    d={};if(popup47CDraw_||nativePopup47CFifoPins_||firstPass470Draw_||demand470Pending_||thirdPass470Draw_||nativeWarning470FifoPins_||nativeMenuWarning470Pins_||menuMainDraw_||menuOptionsDraw_||menuUpdateFailedOwner_||menuUpdateAborted_)return fail(d,Status::phase,0x1B86D0);
     if(!loadedCurrent()||!page.currentConstructor()||page.issuer_!=inputs_.root||
         scope_->garagePageOwner_!=&page||scope_->garagePage_!=&page.entity_||page.cameraHandoffPhase_!=3)
         return fail(d,Status::owner,0x1B86D0);
@@ -254,7 +435,7 @@ bool OriginalUiSharedDialogs50KG::advance4702048F0(float delta,Diagnostic& d)noe
  return advance470Body2048F0(delta,d);
 }
 bool OriginalUiSharedDialogs50KG::advance470Body2048F0(float delta,Diagnostic& d)noexcept {
- d={};if(firstPass470Draw_||demand470Pending_||thirdPass470Draw_||nativeWarning470FifoPins_||nativeMenuWarning470Pins_||menuMainDraw_||menuOptionsDraw_||menuUpdateFailedOwner_||menuUpdateAborted_)return fail(d,Status::phase,0x2048F0);
+ d={};if(popup47CDraw_||nativePopup47CFifoPins_||firstPass470Draw_||demand470Pending_||thirdPass470Draw_||nativeWarning470FifoPins_||nativeMenuWarning470Pins_||menuMainDraw_||menuOptionsDraw_||menuUpdateFailedOwner_||menuUpdateAborted_)return fail(d,Status::phase,0x2048F0);
  if(!loadedCurrent()||!std::isfinite(delta)||delta<0||
     dialog470_.entity.parent1C!=&scope_->dispatcher_||controller47C_.entity.parent1C!=&scope_->dispatcher_)
   return fail(d,Status::owner,0x2048F0);
@@ -430,11 +611,11 @@ bool OriginalUiSharedDialogs50KG::invisible470204AC0(Diagnostic& d)const noexcep
  d.sourcePC=0x2054A4;return true;
 }
 bool OriginalUiSharedDialogs50KG::nativeMaterialRetirementCurrent()const noexcept {
- Quad::Diagnostic d;return !menu470Owner()&&!nativeMenuWarning470Pins_&&!menuRasterAttempted_&&!nativeWarning470FifoPins_&&!thirdPass470Draw_&&dialog470_.dim160&&!dialog470_.dim160->nativeGarageFifoPins_&&!dialog470_.dim160->nativeMenuWarningPins_&&dialog470_.dim160->primitives30&&
+ Quad::Diagnostic d;return !popup47CDraw_&&!nativePopup47CFifoPins_&&!menu470Owner()&&!nativeMenuWarning470Pins_&&!menuRasterAttempted_&&!nativeWarning470FifoPins_&&!thirdPass470Draw_&&dialog470_.dim160&&!dialog470_.dim160->nativeGarageFifoPins_&&!dialog470_.dim160->nativeMenuWarningPins_&&dialog470_.dim160->primitives30&&
   Quad::preflightPrimitive246260(dialog470_.dim160->primitives30[0],d);
 }
 bool OriginalUiSharedDialogs50KG::controllerRetirementCurrent()const noexcept {
- return current()&&phase_==Phase::retiring&&retiringOrdinal_==1&&
+ return !popup47CDraw_&&!nativePopup47CFifoPins_&&current()&&phase_==Phase::retiring&&retiringOrdinal_==1&&
   scope_->sharedDialogRetirementCurrent(*this,1,controller47C_.entity);
 }
 bool OriginalUiSharedDialogs50KG::drain2DEFE0(Diagnostic& d,std::uint32_t firstPC,std::uint32_t secondPC)noexcept {
@@ -481,11 +662,16 @@ bool OriginalUiSharedDialogs50KG::sharedScopeFinalRetirementComplete()const noex
 }
 bool OriginalUiSharedDialogs50KG::retireAttached142590(Diagnostic& d)noexcept {
  d={};if(phase_==Phase::retired){d.sourcePC=0x1413E0;return true;}
- if(firstPass470Draw_||demand470Pending_||thirdPass470Draw_||nativeWarning470FifoPins_||nativeMenuWarning470Pins_||menuMainDraw_||menuOptionsDraw_||menuUpdateFailedOwner_)return fail(d,Status::retirementPending,0x142590);
+ if(popup47CDraw_||nativePopup47CFifoPins_||firstPass470Draw_||demand470Pending_||thirdPass470Draw_||nativeWarning470FifoPins_||nativeMenuWarning470Pins_||menuMainDraw_||menuOptionsDraw_||menuUpdateFailedOwner_)return fail(d,Status::retirementPending,0x142590);
  if(!current()||reorderStep_)return fail(d,Status::phase,0x142590);
  const auto app=application_.lock();
- if(phase_==Phase::loaded){
-  if(!loadedCurrent()||!controller47C_.resources->preflightSharedRetirement20DF80(*this))
+ if(phase_==Phase::loaded||phase_==Phase::controller47CConstructed||phase_==Phase::failed){
+  // A failed canonical load can own a real prefix, even with canonicalLoaded=false.
+  // Only the already-attached two-Entity topology and genuine loaded470/resource
+  // owners admit retirement. No phase repair or synthetic completion is issued.
+  if(!dialog470_.loaded||!controller47C_.resources||controller47C_.resources!=app->controllerPopupResources||
+     (phase_==Phase::loaded&&!loadedCurrent())||
+     !controller47C_.resources->preflightSharedRetirement20DF80(*this))
    return fail(d,Status::retirementPending,0x20DFAC);
   d.entity=scope_->beginSharedDialogRetirement142590(*this,1,controller47C_.entity);
   if(!d.entity.okay())return fail(d,Status::owner,d.entity.sourcePC);
@@ -496,7 +682,30 @@ bool OriginalUiSharedDialogs50KG::retireAttached142590(Diagnostic& d)noexcept {
   if(!controllerRetirementCurrent())return fail(d,Status::owner,0x20DF80);
   while(retirementPayloadStep_<9){const auto step=retirementPayloadStep_;
    if(!controller47C_.resources->preflightSharedRetirement20DF80(*this))return fail(d,Status::retirementPending,0x20DFAC);
-   if(step>=3&&!drain2DEFE0(d,step==3?0x2E19B4:0x2DF018,step==3?0x2E19CC:0x2DF030))return false;
+   //20DF80 actual embedded destruction order:350,2E0,270,220,1C0,160,100,A0,40.
+   // Native projection storage below is only unpublished at the corresponding
+   // step; it does not own or release these canonical materials a second time.
+   if(step<3){auto& text=step==0?controller47C_.cancel350:
+       (step==1?controller47C_.confirm2E0:controller47C_.message270);
+    if(text){if(!text->retire2E1340(d.text))return fail(d,Status::retirementPending,d.text.sourcePC);text.reset();}
+   }else if(step==3){
+    auto& dim=controller47C_.dim220;
+    if(dim&&(dim->nativeGarageFifoPins_||dim->nativeMenuWarningPins_))return fail(d,Status::retirementPending,0x2E19B4);
+    // Allocation can fail anywhere in the constructor. Preflight/release only
+    // the actual primitive; the remaining packet/vertex arrays have no refs.
+    if(dim&&dim->primitives30&&!Quad::preflightPrimitive246260(dim->primitives30[0],d.quad))
+     return fail(d,Status::retirementPending,d.quad.sourcePC);
+    if(!drain2DEFE0(d,0x2E19B4,0x2E19CC))return false;
+    if(dim){if(dim->primitives30){Quad::releasePrimitive246260(dim->primitives30[0]);dim->primitives30.reset();}
+     if(dim->packets44){dim->packets44[0].allocation00.reset();dim->packets44.reset();}
+     dim->vertices00.reset();dim.reset();}
+   }else {
+    auto& quad=step<6?controller47C_.icons[5-step]:controller47C_.strips[8-step];
+    if(quad.constructed&&!quad.preflightRetirement2DEFE0(d.quad))return fail(d,Status::retirementPending,d.quad.sourcePC);
+    if(!drain2DEFE0(d,0x2DF018,0x2DF030))return false;
+    if(quad.constructed){quad.retirementDrainPhase_=retirementDrainPhase_;
+     if(!quad.retireResources2DF038(d.quad))return fail(d,Status::retirementPending,d.quad.sourcePC);}
+   }
    if(!controller47C_.resources->retireSharedPayloadPart20DF80(*this,step,d.popup))
     return fail(d,Status::retirementPending,d.popup.sourcePC);
    ++retirementPayloadStep_;retirementDrainPhase_=0;
@@ -505,7 +714,7 @@ bool OriginalUiSharedDialogs50KG::retireAttached142590(Diagnostic& d)noexcept {
   d.entity=scope_->finishSharedDialogRetirement1413E0(*this,1,controller47C_.entity);
   if(!d.entity.okay())std::terminate();
   if(app->controllerPopupResources!=controller47C_.resources)std::terminate();
-  app->controllerPopupResources.reset();controller47C_.resources.reset();controller47C_.loaded=false;
+  app->controllerPopupResources.reset();controller47C_.resources.reset();controller47C_.loaded=false;controller47C_.canonicalLoaded=false;
   retiringOrdinal_=0;retirementPayloadStep_=retirementDrainPhase_=0;
  }
  if(!sharedScopeFinalRetirementComplete()){
@@ -611,7 +820,9 @@ OriginalUiEntityScope50KG::Result OriginalUiEntityScope50KG::beginSharedDialogRe
     sharedDialogRetiring_[ordinal]||sharedDialogRetired_[ordinal]||!sharedDialogPrefixCurrent(owner,ordinal,c)||
     c.parent1C!=&dispatcher_||c.next14)return {Status::phase,0x142590};
  if(ordinal==1){
-  if(owner.phase_!=SharedDialogs::Phase::loaded||sharedDialogRetired_[0]||sharedDialogRetiring_[0]||
+  if((owner.phase_!=SharedDialogs::Phase::loaded&&owner.phase_!=SharedDialogs::Phase::controller47CConstructed&&
+      owner.phase_!=SharedDialogs::Phase::failed)||!owner.dialog470_.loaded||!owner.controller47C_.resources||
+     owner.popup47CDraw_||owner.nativePopup47CFifoPins_||sharedDialogRetired_[0]||sharedDialogRetiring_[0]||
      !sharedDialogs_[0]||dispatcher_.firstChild18!=sharedDialogs_[0]||
      sharedDialogs_[0]->parent1C!=&dispatcher_||sharedDialogs_[0]->previous10||
      sharedDialogs_[0]->next14!=&c||c.previous10!=sharedDialogs_[0])return {Status::topology,0x1425B8};
@@ -683,6 +894,13 @@ bool Application::sharedUiRetirementReceiptCurrent17C1D8()const noexcept {
     rejected(old->dialog470_.loaded,"old->dialog470_.loaded")||
     rejected(old->controller47C_.loaded,"old->controller47C_.loaded")||
     rejected(old->controller47C_.resources,"old->controller47C_.resources")||
+    rejected(old->popup47CDraw_,"old->popup47CDraw_")||
+    rejected(old->nativePopup47CFifoPins_,"old->nativePopup47CFifoPins_")||
+    rejected(old->controller47C_.canonicalLoaded,"old->controller47C_.canonicalLoaded")||
+    rejected(old->controller47C_.dim220,"old->controller47C_.dim220")||
+    rejected(old->controller47C_.message270,"old->controller47C_.message270")||
+    rejected(old->controller47C_.confirm2E0,"old->controller47C_.confirm2E0")||
+    rejected(old->controller47C_.cancel350,"old->controller47C_.cancel350")||
     rejected(old->sharedMaterialHistory_,"old->sharedMaterialHistory_")||
     rejected(old->retirementDisplay_,"old->retirementDisplay_")||
     rejected(old->retirementDisplayPinned_,"old->retirementDisplayPinned_")||
@@ -709,6 +927,10 @@ bool Application::sharedUiRetirementReceiptCurrent17C1D8()const noexcept {
     rejected(scope->dispatcher_.sessionGeneration!=scope->scopeGeneration_,"scope->dispatcher_.sessionGeneration!=scope->scopeGeneration_")||
     rejected(scope->dispatcher_.objectKey!=Scope::key(&scope->dispatcher_),"scope->dispatcher_.objectKey!=Scope::key(&scope->dispatcher_)")||
     rejected(!scope->sharedDialogRetiredNodesAbsent(*old),"!scope->sharedDialogRetiredNodesAbsent(*old)"))return false;
+ for(const auto& quad:old->controller47C_.strips)
+  if(rejected(!old->canonical47CQuadPayloadRetired(quad),"old->controller47C_.strips payload"))return false;
+ for(const auto& quad:old->controller47C_.icons)
+  if(rejected(!old->canonical47CQuadPayloadRetired(quad),"old->controller47C_.icons payload"))return false;
  const auto& q=state->controllerPopupState;const auto& saved=retiredControllerPopupState_;
  const auto same=[](float a,float b)noexcept{return std::bit_cast<std::uint32_t>(a)==std::bit_cast<std::uint32_t>(b);};
  if(rejected(!rr::game::OriginalUiControllerPopup50KG::valid(q),"!rr::game::OriginalUiControllerPopup50KG::valid(q)")||
@@ -719,6 +941,7 @@ bool Application::sharedUiRetirementReceiptCurrent17C1D8()const noexcept {
     rejected(q.closing3C8!=saved.closing3C8,"q.closing3C8!=saved.closing3C8")||
     rejected(q.hasConfirm3D0!=saved.hasConfirm3D0,"q.hasConfirm3D0!=saved.hasConfirm3D0")||
     rejected(q.hasCancel3D4!=saved.hasCancel3D4,"q.hasCancel3D4!=saved.hasCancel3D4")||
+    rejected(q.garagePurchaseText!=saved.garagePurchaseText,"q.garagePurchaseText!=saved.garagePurchaseText")||
     rejected(q.result3D8!=saved.result3D8,"q.result3D8!=saved.result3D8"))return false;
  for(std::size_t i=0;i<q.strips.size();++i){const auto& a=q.strips[i];const auto& b=saved.strips[i];
   if(!same(a.x,b.x)||!same(a.y,b.y)||!same(a.width,b.width)||!same(a.height,b.height)){
@@ -767,7 +990,10 @@ Application::SharedUiBootResult Application::prepareSharedDialogsInitial1B7BD0(
   }
   std::vector<std::shared_ptr<const rr::assets::OriginalStandardMaterialSource50LA>> materials;
   rr::assets::OriginalStandardMaterialDiagnostic50LA sourceDiagnostic;
-  for(const char* name:{"ui\\textures\\dimpopup.psm","font\\venus16popup.psm"}){
+  // Both shared text owners retain their actual material rows before the
+  // following Quad triggers global14D370 population. The47C Venus14 row must
+  // resolve from its authenticated Popup PSM just like470's Venus16 row.
+  for(const char* name:{"ui\\textures\\dimpopup.psm","font\\venus16popup.psm","font\\venus14popup.psm"}){
    const auto member=popup->find(name);
    rr::assets::OriginalStandardArchiveProvider50LA::MemberView mounted;
    if(!member.identity||!member.data||!member.size||

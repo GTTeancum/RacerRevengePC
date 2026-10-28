@@ -1,6 +1,7 @@
 #pragma once
 #include "../../../src/game/original_save_profile_stage50kg.h"
 #include "../../../src/game/original_ui_hall_records50kg.h"
+#include "../../../src/game/original_race_record_insertion50kg.h"
 #include "original_persisted_profile_name50kg.h"
 #include <memory>
 #include <optional>
@@ -32,6 +33,9 @@ public:
         std::optional<std::uint32_t> identity191C;
         KnownFlags100BC flags{};
         HallOrigin hallOrigin=HallOrigin::none;
+        // Native latest Hall descendant revision; root/load origin above is
+        // preserved. This observation is not an earned-result receipt.
+        std::uint64_t hallRecordEpoch=0;
     };
     Observation observation() const noexcept;
     bool dirty100BCBit0() const noexcept {return (cardFlags_.value&1u)!=0;}
@@ -51,7 +55,9 @@ private:
     // Only the actual private Rider result commit calls this, after187D80.
     void markDirty1AB648() noexcept;
     // Only the existing authenticated fresh Hall initializer calls this.
-    void recordFreshHall(const game::OriginalUiHallRecords50KG&) noexcept;
+    // Retain an immutable exact initializer root before live publication.
+    // Allocation failure leaves this metadata unchanged.
+    bool recordFreshHall(const game::OriginalUiHallRecords50KG&) noexcept;
     // Private pure preparation for the future full transaction. NOT a complete
     // storage-read receipt: selected slot/seen-card/caches intentionally remain
     // unchanged because their real preceding service observations are missing.
@@ -61,7 +67,42 @@ private:
     bool preparePayloadMetadata(std::shared_ptr<const OriginalSaveNativeReadStage50KG>,
         std::unique_ptr<OriginalSaveProfileOwner50KG>& out) const noexcept;
     // Concrete provenance check for actual current Hall data, not a caller bit.
-    bool hallRecordsCurrent(const game::OriginalUiHallRecords50KG&)const noexcept;
+    bool hallRecordsCurrent(const game::OriginalUiHallRecords50KG&,
+        const std::shared_ptr<const game::OriginalHallProfileIdentity50KG>&,
+        std::uint64_t profileGeneration)const noexcept;
+    // Private metadata preparation ONLY. No current caller installs this into
+    // live state. Same-profile identity is checked by the concrete Rider owner;
+    // generation/currentness and exact preimage are checked again here. Stage
+    // success is NOT earned admission. No dirty/aural/save/rank writes occur.
+    bool prepareHallRecordDescendant(const game::OriginalUiHallRecords50KG&,
+        const game::OriginalRaceRecordInsertionStage50KG&,
+        const std::shared_ptr<const game::OriginalHallProfileIdentity50KG>&,
+        std::uint64_t,std::unique_ptr<OriginalSaveProfileOwner50KG>&)const noexcept;
+    // Revalidate immediately BEFORE a future genuine owner store interval.
+    // This checks data/provenance only, never the missing earned authority.
+    // A future installer must swap ONLY hallRecordDescendant_, not restore the
+    // copied card flags/names/other metadata from the preparation container.
+    bool hallRecordPreparationMatches(const OriginalSaveProfileOwner50KG&,
+        const game::OriginalUiHallRecords50KG&,
+        const game::OriginalRaceRecordInsertionStage50KG&,
+        const std::shared_ptr<const game::OriginalHallProfileIdentity50KG>&,
+        std::uint64_t)const noexcept;
+    bool sameHallRoot(const OriginalSaveProfileOwner50KG&)const noexcept;
+    // BOUNDED audit backing: one latest13-course after-image, never a chain.
+    // The existing original-load/native-beta root owners remain immutable.
+    struct HallRecordDescendant {
+        game::OriginalUiHallRecords50KG records;
+        std::shared_ptr<const game::OriginalHallProfileIdentity50KG> profileIdentity;
+        std::uint64_t epoch=0,generationBefore=0,generationAfter=0;
+        HallOrigin origin=HallOrigin::none;
+        const assets::OriginalUiMemberIdentity50KG* names=nullptr;
+        const assets::OriginalUiMemberIdentity50KG* text=nullptr;
+        std::shared_ptr<const game::OriginalSavePayloadEnvelope50KG> payload;
+        std::shared_ptr<const OriginalSaveNativeReadStage50KG> read;
+        std::shared_ptr<const game::OriginalUiHallRecords50KG> nativeBeta;
+        std::shared_ptr<const game::OriginalUiHallRecords50KG> fresh;
+    };
+    std::shared_ptr<const HallRecordDescendant> hallRecordDescendant_;
     //23AE90: slot99,seen0;17E300/308: caches0. Each is source constructor state,
     // not a present/missing-card answer or result of a native directory probe.
     std::uint32_t selectedServiceSlot_=99,seenCard3C8_=0;
@@ -77,5 +118,6 @@ private:
     std::shared_ptr<const game::OriginalSavePayloadEnvelope50KG> payloadRecords_;
     std::shared_ptr<const OriginalSaveNativeReadStage50KG> importedRead_;
     std::shared_ptr<const game::OriginalUiHallRecords50KG> nativeBetaHall_;
+    std::shared_ptr<const game::OriginalUiHallRecords50KG> freshHall_;
 };
 }

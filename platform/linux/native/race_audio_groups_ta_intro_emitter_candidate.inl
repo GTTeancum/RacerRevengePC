@@ -93,9 +93,9 @@ inline bool RaceAudioGroups50IC::coldTaIntroEmitterIdentity()const noexcept {
        e.group30!=&p||(!taIntroLive_&&e.sound1F0)||e.type1E4!=6||e.flags158!=2||e.flags1D4Low5||
        e.trigger1DCBits!=0x41a00000u||e.chance1E0Bits!=0x42c80000u||
        e.distance1D0Bits||e.word1E8||e.word1EC!=1||e.name54||
-       !e.members204||!e.allocated210||e.growth208!=16||e.count200>3||
+       !e.members204||!e.allocated210||e.growth208!=16||e.count200>p.taIntroAuthoring->eventCount()||
        e.capacity20C!=(e.count200<2?1u:17u)||p.count48<e.count200||p.count48>e.count200+1||
-       p.taIntroConstructed!=(e.count200==3))return false;
+       p.taIntroConstructed!=(e.count200==p.taIntroAuthoring->eventCount()))return false;
     constexpr std::array<std::uint32_t,4> vf0{{0,0,0,0x3f800000u}};
     for(std::size_t n=0;n<4;++n)
         if(e.previous40[n]!=std::bit_cast<std::uint32_t>(coldApplication_->garageEmitterShared_.origin43470[n]))return false;
@@ -121,7 +121,7 @@ inline bool RaceAudioGroups50IC::coldTaIntroEmitterIdentity()const noexcept {
         }else if(e.ownedEvents[n])return false;
     }
     if(e.pendingEvent){
-        if(e.nativeAppendAborted||e.count200==3||e.pendingEvent->id00!=e.count200+1)return false;
+        if(e.nativeAppendAborted||e.count200==p.taIntroAuthoring->eventCount()||e.pendingEvent->id00!=e.count200+1)return false;
         if(e.pendingEvent->sound04){
             if(p.count48!=e.count200+1||!*e.pendingEvent->sound04||
                *e.pendingEvent->sound04!=p.taIntroSounds[e.count200].get())return false;
@@ -136,7 +136,7 @@ RaceAudioGroups50IC::appendNextColdTaIntroEvent292650()noexcept {
        mixer_->count()!=count_||!mixer_->requiresVoiceGroupGains50IC())return ColdTaEmitterAppendResult::ownerRejected;
     auto& e=*coldTaIntroEmitter_;
     auto& p=coldGroups_[static_cast<std::size_t>(game::RaceAudioGroup50IC::Announcer120)];
-    if(e.nativeAppendAborted||e.count200==3||!p.taIntroManager->current())return ColdTaEmitterAppendResult::ownerRejected;
+    if(e.nativeAppendAborted||e.count200==p.taIntroAuthoring->eventCount()||!p.taIntroManager->current())return ColdTaEmitterAppendResult::ownerRejected;
     if(taIntroConstructionAdmission_){
         if(!taIntroExistingBindingsCurrent())return ColdTaEmitterAppendResult::ownerRejected;
     }else for(std::size_t n=0;n<count_;++n)
@@ -171,7 +171,7 @@ RaceAudioGroups50IC::appendNextColdTaIntroEvent292650()noexcept {
     e.members204[index]=wrapper; //294320 pointer first.
     ++e.count200; //29432C count next.
     e.ownedEvents[index]=std::move(e.pendingEvent); //Native ownership only, no Sound ref bump.
-    if(e.count200==3){p.taIntroConstructed=true;return ColdTaEmitterAppendResult::eventsComplete;}
+    if(e.count200==p.taIntroAuthoring->eventCount()){p.taIntroConstructed=true;return ColdTaEmitterAppendResult::eventsComplete;}
     return ColdTaEmitterAppendResult::eventAppended;
 }
 inline bool RaceAudioGroups50IC::abortPendingColdTaIntroEventNative()noexcept {

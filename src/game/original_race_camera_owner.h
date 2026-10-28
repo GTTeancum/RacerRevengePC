@@ -37,6 +37,10 @@ struct OriginalRaceCameraOwner {
     //174A30 constructor fields. Mode4 is the cold intro mode, NOT Follow0.
     std::int32_t mode44 = 4;
     std::uint8_t flags62 = 0;
+    //176DF0 stores signed five-bit prior Follow record INDEX in60[2:6]
+    //and prior camera mode in60[7:11].1774A0 passes that saved index as an
+    //ID to17BD00, exactly as the original (not an invented ID conversion).
+    std::uint16_t temporaryLook60 = 0;
     // Only source63 bits0..4 are represented; constructor leaves its high
     // three bits untouched and this closed slice never reads them.
     std::uint8_t flags63Low5 = 4;

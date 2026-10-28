@@ -1,26 +1,28 @@
-// Included inside Session. Concrete same-Application TA custody and dispatch.
+// Included inside Session. Concrete same-Application TA/RA custody and dispatch.
 // All post-mutation failures latch through Session::fail; no transition replay.
 std::uint32_t taFailurePC_=0;
 bool taReject(std::uint32_t pc)noexcept{taFailurePC_=pc;return false;}
 bool constructTaOwners174FA4()noexcept {
-    if(!coldControllerIdentity174A30()||!nativeTaCutAuthoring_||taCuts_||
+    if(!coldControllerIdentity174A30()||!nativeTaIssuance_||!nativeTaCutAuthoring_||taCuts_||
        !nativeTaCutAuthoring_->authoring||actual_.configuration34!=2||actual_.launchKind11258!=1||
        !actual_.taIntroAuthoring||actual_.taIntroAuthoring->providerIdentity()!=nativeTaIssuance_->provider.get())return false;
-    std::array<rr::assets::OriginalTaCutMemberInputCandidate,4> inputs;
+    std::array<rr::assets::OriginalTaCutMemberInputCandidate,8> inputs;
     const auto& source=*nativeTaCutAuthoring_->authoring;
-    for(unsigned i=0;i<4;++i){
+    if(!source.cutCount()||source.cutCount()>7)return false;
+    for(unsigned i=0;i<=source.cutCount();++i){
         const auto bytes=i?source.originalVubBytes(i):source.originalTobBytes();
         inputs[i]={nativeTaCutAuthoring_->members[i].name,bytes.data,bytes.size};
     }
     rr::assets::OriginalTaCutAuthoringCandidate::Status status;
-    auto copy=rr::assets::OriginalTaCutAuthoringCandidate::create(inputs,status);
-    if(!copy)return false;
+    auto copy=rr::assets::OriginalTaCutAuthoringCandidate::create(source.trackId(),inputs.data(),source.cutCount()+1,status);
+    if(!copy||source.trackId()!=introTrackId(nativeTaIssuance_->course)||
+       actual_.taIntroAuthoring->trackId()!=source.trackId()||!source.cutCount()||source.cutCount()>7)return false;
     OriginalTaCutChildDiagnosticCandidate diagnostic;
     taCuts_=OriginalTaCutChildrenCandidate::construct174FA4(std::move(copy),
         actual_.applicationEntities->cutOrigin443200_,diagnostic);
     if(!taCuts_)return taReject(diagnostic.sourcePC);
     coldController_.children64[4]=taCuts_.get();
-    coldController_.halfA8Value=static_cast<std::uint16_t>((coldController_.halfA8Value&~0x1f0u)|(3u<<4));
+    coldController_.halfA8Value=static_cast<std::uint16_t>((coldController_.halfA8Value&~0x1f0u)|(taCuts_->cutCount()<<4));
     return true;
 }
 bool bindTaIntroEntity()noexcept {
@@ -39,10 +41,11 @@ bool bindTaRegistryBefore7C()noexcept {
         0,actual_.humanCount34?CameraRacerClass::player:CameraRacerClass::ai,
         actual_.humanCount34?CameraBootstrap::original_single_player:CameraBootstrap::native_all_ai};
     if(!bindFreshOriginalRaceCamera(controller_,b)||!taCuts_||!taCuts_->loaded())return false;
-    childOrder_={{key(follow_),key(death_),key(attached_),key(*taCuts_->child(1)),
-        key(*taCuts_->child(2)),key(*taCuts_->child(3)),0}};
+    if(!taCuts_->cutCount()||taCuts_->cutCount()>7)return false;
+    childOrder_.fill(0);childOrder_[0]=key(follow_);childOrder_[1]=key(death_);childOrder_[2]=key(attached_);
+    for(unsigned i=1;i<=taCuts_->cutCount();++i){const auto* child=taCuts_->child(i);if(!child)return false;childOrder_[2+i]=key(*child);}
     if(!bindFreshOriginalCameraChildRegistry(collection_,generation_,key(controller_),key(scene_),
-        childOrder_.data(),6))return false;
+        childOrder_.data(),3+taCuts_->cutCount()))return false;
     coldController_.scene3C=&scene_;coldController_.racer40=&identity_[0];
     coldController_.children64[0]=&follow_;coldController_.children64[1]=&death_;
     coldController_.children64[2]=&attached_;
@@ -77,7 +80,7 @@ bool taReparent(unsigned zone,const OriginalTaCutVector4Candidate& position,
 //283930 exports only defaults/unspecified tail,115060 overwrites actual Scene
 //fields, and283920 consumes nothing. Do not manufacture the unwritten tail.
 bool transitionTaMode4_177AB0(unsigned ordinal)noexcept {
-    if(controller_.mode44!=4||ordinal<2||ordinal>3||controller_.flags62&0x60u)return taReject(0x177ab0);
+    if(controller_.mode44!=4||ordinal<2||ordinal>taCuts_->cutCount()||controller_.flags62&0x60u)return taReject(0x177ab0);
     const auto* previous=taCuts_->child(ordinal-1);const auto* target=taCuts_->child(ordinal);
     if(!previous||!target||!previous->activated())return taReject(0x283930);
     const auto* position=target->position28();if(!position)return taReject(0x17834c);
@@ -90,7 +93,21 @@ bool transitionTaMode4_177AB0(unsigned ordinal)noexcept {
 }
 bool taRestoreStartLane()noexcept {
     GridCenterResult50AC grid;
-    if(!actual_.actualRadarMapB8||!source_grid50IG::prepare(*actual_.actualRadarMapB8,0,grid))return taReject(0x2a2880);
+    if(nativeTaIssuance_&&nativeTaIssuance_->course==OriginalCameraStartCourse::gc&&
+       actual_.actualRadarMapB8!=nativeTaIssuance_->gcMap)return taReject(0x2a2880);
+    if(nativeTaIssuance_&&nativeTaIssuance_->course==OriginalCameraStartCourse::ga&&
+       actual_.actualRadarMapB8!=nativeTaIssuance_->gaMap)return taReject(0x2a2880);
+    if(nativeTaIssuance_&&nativeTaIssuance_->course==OriginalCameraStartCourse::sa&&
+       actual_.actualRadarMapB8!=nativeTaIssuance_->saMap)return taReject(0x2a2880);
+    if(nativeTaIssuance_&&nativeTaIssuance_->course==OriginalCameraStartCourse::ma&&
+       actual_.actualRadarMapB8!=nativeTaIssuance_->maMap)return taReject(0x2a2880);
+    if(!nativeTaIssuance_||(nativeTaIssuance_->course!=OriginalCameraStartCourse::ta&&
+       nativeTaIssuance_->course!=OriginalCameraStartCourse::ra&&
+       nativeTaIssuance_->course!=OriginalCameraStartCourse::gc&&
+       nativeTaIssuance_->course!=OriginalCameraStartCourse::sa&&
+       nativeTaIssuance_->course!=OriginalCameraStartCourse::ma&&
+       nativeTaIssuance_->course!=OriginalCameraStartCourse::ga)||
+       !actual_.actualRadarMapB8||!source_grid50IG::prepare(*actual_.actualRadarMapB8,0,grid))return taReject(0x2a2880);
     OriginalTaCutVector4Candidate point,look;
     for(unsigned i=0;i<4;++i){std::memcpy(&point[i],&grid.position[i],4);std::memcpy(&look[i],&grid.heading[i],4);}
     return taReparent(1,point,&look);
@@ -146,10 +163,10 @@ bool taBeginProcedural(bool skip)noexcept {
     controller_.flags62&=0x7fu;return true;
 }
 bool nextTaCut1756D0()noexcept {
-    if(!taCuts_||!taCuts_->loaded()||taCutCursor_>3)return taReject(0x1756d0);
+    if(!taCuts_||!taCuts_->loaded()||taCutCursor_>taCuts_->cutCount())return taReject(0x1756d0);
     ++taCutCursor_;
     coldController_.word60Value=(coldController_.word60Value&~0x1f000u)|((taCutCursor_&31u)<<12);
-    if(taCutCursor_>3){
+    if(taCutCursor_>taCuts_->cutCount()){
         return taBeginProcedural(false);
     }
     const auto* child=taCuts_->child(taCutCursor_);
@@ -164,9 +181,9 @@ bool nextTaCut1756D0()noexcept {
     const auto activated=taCuts_->activate(taCutCursor_);if(!activated.okay())return taReject(activated.sourcePC);
     // Keep original selection/suppression order: call292360 before counter store.
     auto flags=controller_.flags62;AudioCommand50HE command;std::size_t count=0;
-    if(trackIntroSpeech50HG(actual_.configuration34,taCutCursor_,taLines_.data(),taLines_.size(),
+    if(trackIntroSpeech50HG(actual_.configuration34,taCutCursor_,taLines_.data(),taLineCount_,
         flags,&command,1,count)!=AudioEventStatus50HE::Complete)return taReject(0x175910);
-    if(count&&actual_.taIntroAudio->dispatchTaIntro292360(taCutCursor_,0,0)==
+    if(count&&actual_.taIntroAudio->dispatchTaIntro292360(command.cue.key,0,0)==
         rr::platform::RaceAudioGroups50IC::TaIntroDispatchResult::unavailable)return taReject(0x292360);
     controller_.flags62=flags;
     if(taCutCursor_>1){controller_.cutRemaining90=2.f;requestGameplayBlur(actual_.blur,100,0,0);}
@@ -296,10 +313,18 @@ bool constructTaIntroAudio177750(std::shared_ptr<const rr::assets::AudioBank50HC
         std::move(bank),firstVoice,voiceCount))return false;
     //177750: events292650 precede real5C initialized source rows. Bytes2..7
     // are unrepresented; do not invent content or assert source heap padding.
-    for(unsigned i=1;i<=3;++i){
+    taLineCount_=taCuts_->cutCount();
+    if(!taLineCount_||taLineCount_>taLines_.size()||actual_.taIntroAuthoring->trackId()!=taCuts_->trackId())return false;
+    //1778B8..1778E8 initialize every source cut row, not just voiced cuts.
+    for(std::size_t i=0;i<taLineCount_;++i)taLines_[i]={-1,0};
+    for(unsigned i=1;i<=actual_.taIntroAuthoring->eventCount();++i){
         const auto* row=actual_.taIntroAuthoring->event(i);
-        if(!row||row->cameraNumber!=i||row->eventId!=i||row->span!=0)return false;
-        taLines_[i-1]={static_cast<std::int8_t>(row->eventId),row->span};
+        if(!row||row->eventId!=i)return false;
+        //177988/1779A0: scalar CameraNumber zero or past the cut count is skipped.
+        //Repeated mappings overwrite in source event order. RA's comma strings
+        //use original158B30 decimal-prefix semantics, not a synthesized list.
+        if(!row->cameraNumber||row->cameraNumber>taLineCount_)continue;
+        taLines_[row->cameraNumber-1]={static_cast<std::int8_t>(row->eventId),row->span};
     }
     coldController_.script5C=taLines_.data();
     if(!actual_.taIntroAudio->finishTaIntro177750(coldController_.entity))return false;

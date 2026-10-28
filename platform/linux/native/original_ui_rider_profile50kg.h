@@ -11,10 +11,13 @@
 #include "../../../src/game/original_tournament_result50kg.h"
 #include "../../../src/game/lap_timing50id.h"
 #include "../../../src/game/original_ui_hall_records50kg.h"
+#include "../../../src/game/original_race_record_insertion50kg.h"
+#include "../../../src/game/original_race_record_qualification50kg.h"
+#include "../../../src/game/original_race_rival_qualification50kg.h"
 
 namespace original_main_entry50KG { struct Application; }
 namespace original_racer_manager_entity { class Owner; }
-namespace rr::game { struct ControlPresets49D; struct OriginalUiGameSettingsProfile50KG; }
+namespace rr::game { struct OriginalUiGarageState50KG; struct ControlPresets49D; struct OriginalUiGameSettingsProfile50KG; class OriginalResults10450LA; class OriginalRaceConstructor50LA; struct LapRecordQueryResult50ID; }
 
 namespace rr::platform {
 class OriginalUiFrontend50KG;
@@ -206,8 +209,9 @@ public:
         OriginalUiRiderProfileStamp50KG stamp{};
     };
     // Observes retained constructor localization IDs and actual course order,
-    // not caller-supplied labels. Only the uncompleted0..12 next-course branch
-    // is represented; progress13 has its own source text path and rejects.
+    // not caller-supplied labels. Progress13 preserves its completed identity
+    // while the source-local course-order index clamps to12 (1EF230..244).
+    // The standings owner selects the separate completed localization branch.
     bool tournamentTextMetadataSnapshot(std::uint32_t career,
         TournamentTextMetadataSnapshot&) const noexcept;
     bool armTournamentResultForCommittedRace(const CourseRaceSelection&,OriginalUiRiderProfileStamp50KG,
@@ -219,8 +223,104 @@ public:
     // Restart/leave must call this before destroying its real timing manager.
     void cancelTournamentResultForRace(const game::LapTimingManager50ID&) noexcept;
 private:
+    friend class rr::game::OriginalResults10450LA;
+    // Reached DONE strcpy only. Preserves unknown suffix; no dirty/save/ack.
+    bool storeResultsName1CA528(std::uint32_t resultsMode,std::string_view,
+        OriginalUiRiderProfileStamp50KG expected)noexcept;
+    // Reached literal NO TIME branch only: actual11054 bit0, no save/award.
+    bool storeResultsNoTime1CA4DC(OriginalUiRiderProfileStamp50KG expected)noexcept;
+    // Reached only after Results1C2148 read actual mode34 as zero.
+    bool resultsSubtype11258(std::uint32_t&)const noexcept;
+    bool resultsRecordBit7E4(bool&)const noexcept;
+    friend class rr::game::OriginalRaceConstructor50LA;
+    // Actual live profile3C[vehicle60] read for Results1C3050..3064. No
+    // tournament/selected-career proxy and no caller-provided localization ID.
+    bool resultsRacerName3C(std::uint32_t,std::int32_t&)const noexcept;
+    //187330 reads the ACTUAL constructor-owned11278 descriptor selected by
+    //packed1125F low4. Private synchronous observation, not load admission.
+    bool selectedTrackName187330(std::array<char,3>&)const noexcept;
+    // Private immutable metadata/read snapshot for the actual Results owner.
+    // Selected1125F search187B10, NOT progress219C/next-course selection.
+    // No supplied rank/count, award mutation or career advancement authority.
+    struct ResultsCareerPageFields {
+        std::uint32_t order=0;
+        std::uint8_t priorMedal1938=0;
+        std::int16_t remaining1946=0;
+        std::int32_t title1127C=-1,par100E8=0;
+        std::array<std::int32_t,8> placePercent102D0{},killPercent100CC{};
+        OriginalUiRiderProfileStamp50KG stamp{};
+    };
+    bool resultsCareerPageFields1C4CD8(ResultsCareerPageFields&)const noexcept;
+    // Reached readonly leaves for the career message body, not next-course
+    // menu projections or permission to advance/commit the career.
+    bool resultsCareerProgress219C(std::uint8_t&)const noexcept;
+    bool resultsSelectedOrder187B10(std::uint32_t&)const noexcept;
+    bool resultsNextCourseTitle187480(std::int32_t&)const noexcept;
+    // Concrete1C9B10 reads of THIS retained profile; no public row/Hall input.
+    bool resultsNameCourse1C9C80(std::uint32_t&)const noexcept;
+    bool resultsFirstName1C9CA4(OriginalPersistedProfileName50KG&)const noexcept;
+    game::LapRecordQueryResult50ID resultsLapQuery1861A0(std::uint32_t,float)const noexcept;
+    game::LapRecordQueryResult50ID resultsRaceQuery186280(std::uint32_t,float)const noexcept;
+    game::LapRecordQueryResult50ID resultsKnockoutQuery1863B0(std::uint32_t,std::uint32_t)const noexcept;
     friend struct ::original_main_entry50KG::Application;
     friend class ::original_racer_manager_entity::Owner;
+    // Pure, private preparation from the SAME profile's Hall/config/names.
+    // No current caller. Row0/race1B0 are observations, not authority: a future
+    // once-only1AB520 continuation must establish the actual retained manager,
+    // completed timing and earned-CD0 custody before calling, then preserve
+    // original mutation/dirty/aural/Hall order. This method never commits.
+    bool prepareSingleHumanRecordInsertion1AC440(
+        const game::OriginalRaceRecordRacerObservation50KG& row0,std::uint8_t race1B0,
+        std::optional<game::OriginalRaceRecordInsertionStage50KG>&,
+        game::OriginalRaceRecordInsertionStage50KG::Diagnostic&)const noexcept;
+    //Same preparation-only boundary for actual manager rows0,1, in that order.
+    //No multiplayer launch/result admission is created by accepting two values.
+    bool prepareTwoHumanRecordInsertion1AC440(
+        const std::array<game::OriginalRaceRecordRacerObservation50KG,2>& rows,
+        std::uint8_t race1B0,std::optional<game::OriginalRaceRecordInsertionStage50KG>&,
+        game::OriginalRaceRecordInsertionStage50KG::Diagnostic&)const noexcept;
+    //Readonly1ABFC0 preparation only. Its private1AB520 caller must use
+    //the actual synchronous same-Race manager observation join,
+    //not public snapshots or a copied display row as earned-result authority.
+    bool prepareRaceRecordQualification1ABFC0(std::uint32_t selectorA1,std::optional<std::uint8_t> race1B0Low2,
+        const game::OriginalRaceRecordQualificationRacerObservation50KG* rows,
+        std::size_t rowCount,std::optional<game::OriginalRaceRecordQualification50KG>&,
+        game::OriginalRaceRecordQualification50KG::Diagnostic&)const noexcept;
+    //Readonly1ABE70 using this exact Profile's selected descriptor/unlocks.
+    //No7E8 write here. The private1AB520 continuation preserves preceding
+    //1ABFC0 ->7E4 even if this later operation cannot run; no live trigger.
+    bool prepareRaceRivalQualification1ABE70(
+        const game::OriginalRaceRivalRacerObservation50KG*,std::size_t availableRows,
+        std::int32_t actualManagerCount30,std::optional<game::OriginalRaceRivalQualification50KG>&,
+        game::OriginalRaceRivalQualification50KG::Diagnostic&)const noexcept;
+    //Only the actual Race's private source continuation calls these immediate
+    //query-result stores. They confer no earned credit/Hall/save authority.
+    //Each checks same Profile preimage generation and returns its resulting
+    //native mutation generation (unchanged stores do not bump it), so the
+    //suspended caller cannot replay or reject itself.
+    bool storeEndRecordBit1AB598(const game::OriginalRaceRecordQualification50KG&,
+        OriginalUiRiderProfileStamp50KG,OriginalUiRiderProfileStamp50KG&)noexcept;
+    bool storeEndRivalWord1AB5A8(const game::OriginalRaceRivalQualification50KG&,
+        OriginalUiRiderProfileStamp50KG,OriginalUiRiderProfileStamp50KG&)noexcept;
+    // Bounded Hall ancestry prerequisite. Never installs a row or marks it
+    // earned. No live caller exists; the genuine1AB520 mutation admission is
+    // still required before any future row/rank/provenance store interval.
+    bool prepareHallRecordProvenance1AC440(const game::OriginalRaceRecordInsertionStage50KG&,
+        std::unique_ptr<OriginalSaveProfileOwner50KG>&)const noexcept;
+    bool hallRecordProvenancePreparationCurrent1AC440(
+        const game::OriginalRaceRecordInsertionStage50KG&,
+        const OriginalSaveProfileOwner50KG&)const noexcept;
+    bool recordInsertionIdentityCurrent(const game::OriginalRaceRecordInsertionStage50KG&)const noexcept;
+    // Uncalled private store leaf, NOT admission. Future genuine same-Race
+    // Results/end continuation must establish earned owner/once-only custody
+    // before calling. Native failure-atomic preflight; no dirty/save/route.
+    // The prepared container retains the displaced descendant for release
+    // AFTER the nonfailing store interval; no copied unrelated state installs.
+    bool commitSingleHumanHallRecords1AC440(const game::OriginalRaceRecordInsertionStage50KG&,
+        OriginalSaveProfileOwner50KG& prepared,OriginalUiRiderProfileStamp50KG expected,
+        OriginalUiRiderProfileStamp50KG& after)noexcept;
+    // Actual Results1CA6E4 bit store, not persistence or a save acknowledgement.
+    bool markResultsHallDirty1CA6E4(OriginalUiRiderProfileStamp50KG expected)noexcept;
     bool commitRacerManager1AD520(const CourseRaceSelection& expected,CourseRaceSelection& actual)noexcept;
     // Actual Application2DC owner only. Called at the future admitted race
     // constructor boundary, never on a page proposal or resource prewarm.
@@ -255,6 +355,13 @@ private:
         bool forward,const game::OriginalUiCourseMove50KG&,OriginalUiRiderProfileStamp50KG)noexcept;
     bool commitCourseLaunch(const game::OriginalUiRouteDecision50KG&,const game::OriginalUiCourseContext50KG&,OriginalUiRiderProfileStamp50KG)noexcept;
     bool commitCourseBack(const game::OriginalUiRouteDecision50KG&,const game::OriginalUiCourseContext50KG&,OriginalUiRiderProfileStamp50KG)noexcept;
+    friend class OriginalUiGaragePageOwner50KG;
+    // Private retained Garage confirmation only; no public numeric mutation API.
+    bool canApplyGaragePurchase1FEB90(const GarageProfileSnapshot&,
+        const game::OriginalUiGarageState50KG&) const noexcept;
+    bool applyGaragePurchase1FEB90(const GarageProfileSnapshot&,
+        const game::OriginalUiGarageState50KG&,GarageProfileSnapshot&) noexcept;
+    void autosaveGaragePurchase() noexcept;
     friend class OriginalUiFrontend50KG;
     friend class OriginalUiRiderSession50KG;
     // Read-only cold resource planning from a genuine Main proposal. Main's

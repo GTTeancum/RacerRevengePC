@@ -264,12 +264,14 @@ struct OriginalUiRiderSession50KG::Storage {
     bool confirmReady(game::OriginalUiRiderDynamicDiagnostic50KG& d) const noexcept {
         OriginalUiRiderProfileOwner50KG::RiderSelectionFacts rider;
         const auto mode=cold.prospectiveMode;
-        // Mode2 only proposes the fresh clean branch; the frontend must still
-        // retain every genuine Tournament owner before any writes/audio.
+        // Match the Tournament destination, including completed standings;
+        // earned/unsaved native progress does not require a fresh career.
+        // The frontend still retains every destination owner before writes/audio.
         if(mode==2){
             OriginalUiRiderProfileOwner50KG::TournamentCareerSnapshot career;
             if(!cold.profile->tournamentCareerSnapshot(state.rider4C4,career)||
-               career.cardFlag100BC||(career.progress219C&31u)!=0)return false;
+               (career.cardFlag100BC&&!career.nativeBetaStorage)||
+               (career.progress219C&31u)>13u)return false;
         }
         return confirmAudioReady()&&(mode==0||mode==2)&&
             cold.commonProfile->mode34==mode&&(cold.commonProfile->playerBits1125C&0x60)==0x20&&

@@ -88,7 +88,7 @@ bool OriginalCourseStartActions::prepare(OriginalCameraStartCourse course,const 
     // RA tracks\ra.tob:713 sections; RC tracks\rc.tob:907 sections.
     // CSCameras count bytes at TOB offsets15496/19491 are respectively7/5.
     // MB tracks\mb.tob:135 sections, no321_anims; own CSCameras count5 at3134.
-    // Exact [CSCameras].NumberOfCameras: GC4, GA0, TA3, MA4, SA5, RA7, RC5, MB5.
+    // Exact [CSCameras].NumberOfCameras: GC4, GA5, TA3, MA4, SA5, RA7, RC5, MB5.
     // SC tracks\\sc.tob: 476 sections, no321_anims; own CSCameras count3.
     // TC own tracks\\tc.tob: exact CSCameras3, no321_anims.
     // TB exact original TOB has742 sections, CSCameras5 (zones8/2/4/4/1), no321_anims.
@@ -97,7 +97,7 @@ bool OriginalCourseStartActions::prepare(OriginalCameraStartCourse course,const 
     // MC TOB has1268 sections, no321_anims; four CSCameras at36869, zones23/23/6/15.
     sourceSceneCutCount3E4_=course==OriginalCameraStartCourse::mb?5:(course==OriginalCameraStartCourse::ta||course==OriginalCameraStartCourse::sc||course==OriginalCameraStartCourse::tc)?3:
         (course==OriginalCameraStartCourse::gc||course==OriginalCameraStartCourse::ma||course==OriginalCameraStartCourse::gb||course==OriginalCameraStartCourse::mc)?4:
-        (course==OriginalCameraStartCourse::sa||course==OriginalCameraStartCourse::rc||course==OriginalCameraStartCourse::tb)?5:
+        (course==OriginalCameraStartCourse::ga||course==OriginalCameraStartCourse::sa||course==OriginalCameraStartCourse::rc||course==OriginalCameraStartCourse::tb)?5:
         course==OriginalCameraStartCourse::ra?7:0;
     course_=course;authenticated_=true;return true;
 }

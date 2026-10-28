@@ -39,6 +39,23 @@ bool applyAerodynamics48E(const AeroState48E&, const AeroParameters48E&,
                          const AeroInput48E&, const ReadyBodyBasis48D&,
                          const BodyLoads48C&, float elapsedFactor, AeroResult48E& out) noexcept;
 
+//Distinct pure numerical phases for an owner-authenticated source caller.
+//Neither returns16CD90 nor updates timers, globals, scenes or body loads.
+struct AeroMotionPrefix48E {
+    Vector3_48C velocity;
+    float speed,pitch,factor,signedFactor,speedSquared;
+};
+struct AeroForcePrefix48E {Vector3_48C localForce,directTorque;};
+//After any required real inverse-direction getter, before actual axes28A700.
+//Same finite arithmetic domain; failure leaves output unchanged.
+bool prepareAeroMotionPrefix48E(const AeroInput48E&,const ReadyBodyBasis48D&,
+    AeroMotionPrefix48E&)noexcept;
+//After actual process constants/timer/DC stores. The supplied timer branch
+//booleans are source caller operands, NOT inferred from decremented timers.
+bool calculateAeroForcePrefix48E(const AeroMotionPrefix48E&,const AeroParameters48E&,
+    const AeroInput48E&,const AeroState48E& afterTimers,float up,bool firstTimer,
+    bool secondTimer,bool tilted,AeroForcePrefix48E&)noexcept;
+
 struct VehiclePartialStep48E {
     EngineState48D engine;
     AeroResult48E aero;

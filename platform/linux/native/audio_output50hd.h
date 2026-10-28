@@ -39,6 +39,9 @@ struct AudioOutputInfo50HD {
     std::uint64_t simulationMicroseconds = 0, mixedFrames = 0, capturedFrames = 0;
     std::uint64_t deviceQueuedFrames = 0, deviceConsumedFrames = 0;
     std::uint64_t deviceUnderrunFrames = 0, deviceOverflowFrames = 0;
+    // Device-only lifecycle counters. Discarded queued frames are not WAV or
+    // source-clock loss; reopening never replays old mixed PCM.
+    std::uint64_t deviceDiscardedFrames = 0, deviceOpenAttempts = 0, deviceRecoveries = 0;
 };
 
 // Cold-allocated fixed storage, then a main-thread producer and bounded SDL2
@@ -54,6 +57,10 @@ public:
     AudioOutput50HD& operator=(const AudioOutput50HD&) = delete;
     // Device failure is graceful: open succeeds with deviceStatus=Unavailable,
     // preserving capture/mixing. Check info() before claiming audible output.
+    // A requested unavailable/disconnected device is retried on subsequent
+    // active advancement, at most once per two host seconds. tryDevice=false
+    // and rejected dummy/disk backends never trigger automatic device opens.
+    // Zero voice/group gain does not disable playback-device recovery.
     bool open(const AudioOutputRequest50HD&, AudioOutputDiagnostic50HD&) noexcept;
     // Call exactly once for each successfully committed simulation interval,
     // including quiet intervals. Do not call once per rendered video frame.

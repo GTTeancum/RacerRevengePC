@@ -107,6 +107,46 @@ bool OriginalUiGarageDrawContribution50KG::prepareDrainWarning470DimPolicy24B130
     }
     return true;
 }
+bool OriginalUiGarageDrawContribution50KG::prepareDrainPopup47CDimPolicy24B130(
+    const OriginalUiSharedDialogs50KG& owner,D& d)noexcept {
+    d={};const auto fifo=issuer_?issuer_->nativeCollectorFifoOwner_:nullptr;
+    if(!identityCurrent()||phase_!=Phase::collectorDrain24B7B0||sourcePC_!=0x24B130||!fifo||!fifo->draining_||
+       !issuer_->state||issuer_->state->sharedDialogs.get()!=&owner||owner.inputs_.root!=issuer_||
+       !owner.popup47CDimPacketCurrent2E21D0())
+        return reject(d,S::phase,0x24B130,"actual retained47C Dim220 owner policy");
+    const auto& primitive=*owner.controller47C_.dim220->primitives30[0];const auto context=primitive.context;
+    if(primitive.domain!=issuer_->standardMaterialDomainOwner_||!context||!context->live()||
+       !context->materialApplication()||context->materialApplication()->appStart()!=drainAppStart_)
+        return reject(d,S::reference,0x24B130,"same canonical dimpopup context");
+    const assets::OriginalStandardMaterialObject50LA* materialOwner=nullptr;
+    if(!fifo->table_->resolve298E60(primitive.material00,materialOwner,d)||!materialOwner||
+       !materialOwner->passCount48()||*materialOwner->passCount48()<0)
+        return reject(d,S::reference,0x246798,"actual Dim220 material row");
+    for(std::int32_t i=0;i<*materialOwner->passCount48();++i){
+        assets::OriginalStandardMaterialPassView50LA pass;
+        assets::OriginalStandardMaterialCollectorEntryView50LA origin,final;
+        if(!materialOwner->pass4C(static_cast<std::size_t>(i),pass)||!pass.flags21||
+           !fifo->table_->coldCollectorPass(fifo->registry_,primitive.material00,static_cast<std::size_t>(i),origin)||
+           origin.finalLeaf<0||!fifo->table_->coldCollectorEntry(fifo->registry_,static_cast<std::size_t>(origin.finalLeaf),final)||
+           !final.material||final.pass<0)return reject(d,S::collector,0x24A728,"actual dimpopup origin and final leaf");
+        if(!(*pass.flags21&2u))continue;
+        if(std::any_of(drainScreenPolicies_.begin(),drainScreenPolicies_.end(),[&](const auto& p){return p.registration==origin.finalLeaf;}))continue;
+        const auto* source=final.material->source();const auto provider=primitive.domain->archiveProvider3E1A70();
+        DrainScreenPolicy next;next.registration=origin.finalLeaf;next.untextured=true;assets::OriginalUiMemberView50KG member;
+        if(!source||!source->member()||!source->originalBytes()||!provider||!provider->sealed()||
+           !provider->borrowGarageUiMember132820(*source->member(),next.materialArchive,member)||
+           source->originalBytes()->size()!=member.size||std::memcmp(source->originalBytes()->data(),member.data,member.size))
+            return reject(d,S::source,0x132820,"winning original dimpopup PSM");
+        assets::OriginalUiMaterialDiagnostic50KG material;
+        if(!assets::readOriginalUiMaterial50KG(*next.materialArchive,member.identity->name,context->materialApplication()->templates(),
+           assets::OriginalUiTemplate50KG::screenMt,context->materialRuntime(),next.material,material)||
+           static_cast<std::size_t>(final.pass)>=next.material.passes.size()||
+           !assets::prepareOriginalUiNativeUntexturedMaterial50KG(next.material.passes[static_cast<std::size_t>(final.pass)],next.untexturedPolicy,material))
+            return reject(d,S::unsupportedPass,material.sourcePC?material.sourcePC:0x249BA0,"actual zero-map dimpopup ScreenObject policy");
+        try{drainScreenPolicies_.push_back(std::move(next));}catch(...){return reject(d,S::allocation,0x24B130,"retained dimpopup policy");}
+    }
+    return true;
+}
 
 }
 namespace original_main_entry50KG {

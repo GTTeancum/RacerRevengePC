@@ -65,12 +65,12 @@ Status project(const VehicleFrameState49W& s,const VehicleFrameBindings49W& fram
     output=next;return Status::complete;
 }
 Status shade(const OriginalUiRiderBinderQuad50KG& quad,
-    const std::array<float,4>& ambient,Mesh& output) noexcept {
+    const std::array<float,4>& sourceColor70,Mesh& output) noexcept {
     if(std::fegetround()!=FE_TONEAREST)return Status::arithmetic;
     std::array<std::uint8_t,4> color;
     for(unsigned c=0;c<4;++c){
-        if(!std::isfinite(ambient[c]))return Status::input;
-        float p=add(ambient[c],8388608.f);
+        if(!std::isfinite(sourceColor70[c]))return Status::input;
+        float p=add(sourceColor70[c],8388608.f);
         if(!std::isfinite(p)||p<8388608.f)return Status::arithmetic;
         if(p>8388863.f)p=8388863.f;
         std::uint32_t bits=0;std::memcpy(&bits,&p,4);color[c]=static_cast<std::uint8_t>(bits&255u);

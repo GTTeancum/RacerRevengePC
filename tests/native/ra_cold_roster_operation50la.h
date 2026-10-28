@@ -1,4 +1,6 @@
 #pragma once
+namespace original_results_roster50LA { class Read; }
+namespace rr::game { class OriginalResults10450LA; }
 #include "ra_cold_roster_resources50la.h"
 #include "ra_cold_aggregate50la.h"
 #include "ra_source_camera_factory50la.h"
@@ -22,24 +24,6 @@
 extern thread_local std::uint64_t allocations;
 namespace ra_cold_roster50LA {
 struct Diagnostic {std::size_t slot=0;const char* stage=nullptr;const char* failure=nullptr;std::string detail;};
-// Captures the actual constructor records before initial terrain enable. No
-// setter accepts supplied replacement probe records or a readiness boolean.
-class FreshProbe final {
-    friend class Operation;
-    const g::VehicleFrameState49W* frame_;
-    g::VehicleTerrainProbe50FP terrain_;
-    g::DisabledProbeState49K main_;
-    std::uint32_t domain_;
-    explicit FreshProbe(const g::VehicleFrameState49W& s)
-        :frame_(&s),terrain_(s.terrainProbe),main_(s.bodies.main.components.probe348),domain_(s.bodies.main.domain.probe100){}
-public:
-    static std::shared_ptr<const FreshProbe> capture(const g::VehicleFrameState49W& s){
-        if(s.phase!=g::VehicleFramePhase49W::Ready||s.bodies.main.frameFactor!=0.f||
-           s.terrainProbe.enabled||s.bodies.main.domain.probe100)
-            throw std::runtime_error("actual pre-enable probe constructor records unavailable");
-        return std::shared_ptr<const FreshProbe>(new FreshProbe(s));
-    }
-};
 // Explicit stable arena borrows. This wrapper is never Bank-snapshotted. All
 // persistent referred-to lanes must already be registered, with fixed capacity.
 struct Arena {
@@ -74,15 +58,9 @@ struct Arena {
     g::AuthoredBinding49N* selectedAuthored=nullptr;
     float* selectedSteering=nullptr;
 };
-// Shared native storage is established before Bank registration. Both the
-// driver and retained operation use these exact owners; no model is cloned.
-struct RuntimeOwners final {
-    std::array<std::unique_ptr<native_racer_model50LA::Owner>,8> right,left,bottomRight,bottomLeft,chariot;
-    std::array<std::unique_ptr<native_racer50HW::Visual>,8> visuals;
-    std::array<std::unique_ptr<native_racer50HW::Cables>,8> cables;
-    std::array<native_racer_contact50HW::Binding,8> contacts{};
-};
 class Operation final {
+    friend class ::original_results_roster50LA::Read;
+    friend class rr::game::OriginalResults10450LA;
     friend class ra_cold_aggregate50LA::Owner;
     using Model=native_racer_model50LA::Owner;
     std::shared_ptr<ra_cold_aggregate50LA::Owner> aggregate_;
@@ -127,7 +105,7 @@ class Operation final {
         auto& r=runtime();auto& a=arena_;auto& x=a.live;
         if(!r.cameraBankCurrent()||r.bankIdentity_!=bank_||!r.actual_||&r.actual_->frame!=&x.state||
            !r.actual_->recovery||!r.actual_->movement||!resources_)return false;
-        const ra_source_camera50LA::GridArenaOwners grid{x.bindings,x.parameters,a.ai,a.history,resources_->rigs_,a.humanCount};
+        const ra_source_camera50LA::GridArenaOwners grid{x.bindings,x.parameters,x.selectors,a.ai,a.history,resources_->rigs_,a.humanCount};
         if(!r.gridInputsRegistered(grid))return false;
         auto lane=[&](const auto& value){return r.registeredRange(&value,sizeof value);};
         if(!lane(x.configurationEntryNonzero)||!lane(x.handRecords)||!lane(x.secondaryInputs)||
@@ -148,6 +126,28 @@ class Operation final {
         return main.size()==4u&&secondary.size()==3u&&
             r.registeredRange(main.data(),main.size()*sizeof(main[0]))&&
             r.registeredRange(secondary.data(),secondary.size()*sizeof(secondary[0]));
+    }
+    // Private live read identity, NOT the cold handoff and NOT a B0 receipt.
+    // No completedSteps==0 relaxation is made to the loader's existing Read.
+    bool resultsRuntimeBankCurrent(const native_racer50HN::Bank* bank)const noexcept {
+        if(terminal_||closed_||!aggregate_||!resources_||!bank_||bank_!=bank||
+           aggregate_->terminal_||aggregate_->closed_||!aggregate_->runtimeQueries_)return false;
+        auto& r=runtime();
+        // registered() validates the destruction-bound pin before any Bank
+        // dereference. Holding this Operation is not itself a Bank lease.
+        if(r.terminal_||r.closed_||!registered()||r.rosterResources_!=resources_||
+           !r.rosterRetirementRequired_)return false;
+        const auto pin=std::static_pointer_cast<ra_source_camera50LA::OwnershipBridge::BankPin>(r.bankLifetime_.lock());
+        if(!pin||pin->identity!=bank_||pin->owner.get()!=&r||pin->rosterOperation.get()!=this||
+           bank_->count()!=resources_->racerCount_||nextSlot_!=bank_->count())return false;
+        for(std::size_t i=0;i<bank_->count();++i)
+            if(!completed_[i]||!r.rosterSlotComplete_[i])return false;
+        return true;
+    }
+    bool resultsRacerIdentityCurrent(std::size_t index,std::uint32_t racer60)const noexcept {
+        if(!resources_||index>=resources_->racerCount_||!resources_->rigs_[index])return false;
+        const auto* source=g::original_racer_selection50IJ::findByPodId(resources_->rigs_[index]->podId);
+        return source&&source->racer60==racer60;
     }
     void effects(){
         auto& a=arena_;auto& s=a.live.state;const auto& b=a.live.bindings;
@@ -261,6 +261,10 @@ public:
                     model(bottomLeft_[slot],native_racer50HW::Rig::bottomLeft);
                 }
                 model(chariot_[slot],native_racer50HW::Rig::chariot);
+                // Only the private fresh shared mode admits this new native
+                // lifetime. Legacy/default owners and routing remain unchanged.
+                chariot_[slot]->nativeSecondaryContactsRequested_=
+                    r.storage_.get()->count.sharedRosterCount!=0;
                 right_[slot]->bindSibling(*left_[slot]);
                 chariot_[slot]->bindChariotSiblings(*right_[slot],*left_[slot],bottomRight_[slot].get(),bottomLeft_[slot].get());
                 rig.install(s,x.bindings,x.handRecords,right_[slot].get(),left_[slot].get(),chariot_[slot].get(),
@@ -316,25 +320,45 @@ public:
                 need(reserved.collision==&collision&&reserved.main&&reserved.secondary,"actual native reservation differs");
                 q.main.resource=&collision.main();q.secondary.resource=&collision.secondary();
                 q.mainFilter.identity=reserved.main;q.secondaryFilter.identity=reserved.secondary;
+                need(r.assignSharedColdIdentities(slot),"actual shared cold identity lanes unavailable");
+                auto probeBindings=arena_.terrainBindings;
+                if(r.storage_.get()->count.sharedRosterCount)probeBindings.identity=reserved.terrain;
                 terrain_probe_authoring50fq_fixture::Owner authoredProbe{};std::string error;
                 d.stage="terrain probe authoring";
                 const bool probeAuthored=terrain_probe_authoring50fq_fixture::prepare(authoredProbe,q.main,x.parameters,
-                    rig.phy,arena_.terrainBindings,error,collision);
+                    rig.phy,probeBindings,error,collision);
                 need(probeAuthored,error.empty()?"original probe authoring failed":error.c_str());
                 for(unsigned axis=0;axis<3;++axis)x.parameters.bodies.main.probeLocal140[axis]=authoredProbe.lowerEndpoint140.v[axis];
                 x.parameters.bodies.main.probeLocal140[3]=1.f;
                 d.stage="terrain probe installation";
                 const bool probeInstalled=terrain_probe_authoring50fq_fixture::installProbeCold(q.terrain,q.terrainLive,authoredProbe,error);
                 need(probeInstalled,error.empty()?"original probe installation failed":error.c_str());
+                need(r.constructSharedTerrainResource(slot,authoredProbe),"actual per-row348 resource constructor differs");
                 d.stage="selected recovery construction";
                 const bool recoveryBound=undertrack_owners50ew_fixture::bindSelectedCold(*q.recovery,collision,q.main,q.secondary,
                     x.parameters,rig.phy,error);
                 need(recoveryBound,error.empty()?"original recovery source bind failed":error.c_str());
+                if(r.storage_.get()->count.sharedRosterCount){
+                    need(chariot_[slot]->nativeSecondaryContacts_!=nullptr,
+                        "actual native secondary contact constructor absent");
+                    r.stagedSecondaryContacts_[slot]=chariot_[slot]->nativeSecondaryContacts_;
+                    need(chariot_[slot]->nativeRacerTerrain_!=nullptr,
+                        "actual native racer terrain backing reservation absent");
+                    //Still unpublished: the later Session model call supplies
+                    //the actual racer Entity/key only after its success.
+                    r.stagedRacerTerrain_[slot]=chariot_[slot]->nativeRacerTerrain_;
+                    need(chariot_[slot]->nativeAero_!=nullptr,"native Aero flow constructor absent");
+                    r.stagedAero_[slot]=chariot_[slot]->nativeAero_;
+                }
+                d.stage="retained native694 body A0 binding";
+                need(chariot_[slot]->body340_&&r.stageNativePod694(slot,*chariot_[slot]->body340_,x.parameters),
+                    "actual staged694/body340 ownership differs");
                 const std::uint32_t mainExclusions[]={q.secondaryFilter.identity,q.recovery->podFilter.identity,
                     q.movement->filter.identity,q.terrain.metadata.filter.identity};
                 const std::uint32_t secondaryExclusions[]={q.mainFilter.identity,q.recovery->podFilter.identity,q.movement->filter.identity};
                 std::copy(std::begin(mainExclusions),std::end(mainExclusions),q.mainFilter.identityLists[0].identities.begin());
                 std::copy(std::begin(secondaryExclusions),std::end(secondaryExclusions),q.secondaryFilter.identityLists[0].identities.begin());
+                need(r.bindSharedColdOwners(slot,authoredProbe),"actual shared per-role constructor binding differs");
                 need(native_original_ai_recovery::bindColdModels(s,x.bindings,arena_.rebaseModels,arena_.rebaseCount,
                     arena_.recoveryModels),"actual selected reset models rejected");
             });
@@ -375,6 +399,7 @@ public:
         // Model::close owns its actual Bank visit. Never nest it in one here.
         // Reverse source role order; partial successes remain retained/closed.
         for(std::size_t slot=resources_->racerCount_;slot-->0;){
+            r.revokeNativePod694(slot); //Before any borrowed body/model can retire.
             for(auto* model:{&chariot_[slot],&bottomLeft_[slot],&bottomRight_[slot],&left_[slot],&right_[slot]})
                 if(*model&&!(*model)->close())return false;
         }
@@ -401,11 +426,12 @@ inline bool Owner::mountRetainedRuntimeRosterArchives(
             return fail(d,"roster archive mount cannot mutate a current collector domain");
         const auto& provider=domain->archiveProvider3E1A70();
         if(!provider)return fail(d,"actual Application archive provider missing");
+        nativeRosterMounts_.provider_=provider;nativeRosterMounts_.thread_=std::this_thread::get_id();
         // Mount the same fully authenticated RA source before any world model
         // resolves materials. The roster mounts alone contain no track PSMs.
         const auto* track=source_?source_->sourcesDecoded():nullptr;
         if(!track||!provider->mountAuthenticatedRes("TRACKS/RA.RES",
-            ra_cold_sources50LA::archiveSha,4604561,track->archive,d.rosterMount))
+            ra_cold_sources50LA::archiveSha,4604561,track->archive,d.rosterMount,&nativeRosterMounts_))
             return fail(d,"actual retained RA archive mount rejected");
         for(std::size_t slot=0;slot<runtimeQueries_->rosterResources_->racerCount_;++slot){
             d.rosterSlot=slot;
@@ -415,7 +441,7 @@ inline bool Owner::mountRetainedRuntimeRosterArchives(
             // this retained Rig and mounts complete bytes into the SAME provider.
             // This is native cold namespace staging, not model construction.
             original_racer_animation_setup50LA::Archive archive(*rig);
-            if(!archive.mount(*provider,d.rosterMount))
+            if(!archive.mount(*provider,d.rosterMount,&nativeRosterMounts_))
                 return fail(d,"actual roster archive mount rejected; earlier mounts retained");
         }
         if(!provider->sealNativeMounts(d.rosterMount))return fail(d,"actual roster namespace sealing rejected");
@@ -528,7 +554,7 @@ inline std::shared_ptr<ra_cold_roster50LA::Operation> Owner::retainedRosterForHa
     }
 }
 inline bool Owner::placeRetainedRuntimeGridSlot(native_racer50HN::Bank& bank,
-    std::size_t slot,Diagnostic& d)noexcept {
+    std::size_t slot,Diagnostic& d,bool canonicalTournamentGrid)noexcept {
     d={};d.stage=Stage::runtimeQueryWorldOwners;
     auto op=retainedRosterForHandoff(bank,d);if(!op)return false;
     auto& r=*runtimeQueries_;
@@ -540,10 +566,10 @@ inline bool Owner::placeRetainedRuntimeGridSlot(native_racer50HN::Bank& bank,
     }
     auto& a=op->arena_;
     const ra_source_camera50LA::GridArenaOwners input{
-        a.live.bindings,a.live.parameters,a.ai,a.history,op->resources_->rigs_,a.humanCount};
+        a.live.bindings,a.live.parameters,a.live.selectors,a.ai,a.history,op->resources_->rigs_,a.humanCount};
     // The real algorithm owns its Bank visit and records completion only after
     // actual placement/terrain/query attachment. Never nest another visit.
-    if(!r.placeGrid(bank,slot,input,d.runtimeQueries))
+    if(!r.placeGrid(bank,slot,input,d.runtimeQueries,canonicalTournamentGrid))
         return failRetainedHandoff(d,"retained grid failed; actual partial memberships remain owned");
     return true;
 }
@@ -636,7 +662,8 @@ inline bool Owner::constructRetainedRuntimeSourceCamera(
         actual.humanCount34,actual.race94,actual.humanHeld,
         op->resources_->rigs_,op->cables_,op->right_,op->left_,op->chariot_,
         &op->bottomRight_,&op->bottomLeft_,actual.raceHud,actual.deathDebris,
-        actual.startMusicContext,actual.startMusicRequest,actual.recordManager40};
+        actual.startMusicContext,actual.startMusicRequest,actual.recordManager40,
+        actual.introAudio,actual.introAuthoring,actual.introMusicFadeRequest};
     return constructRuntimeSourceCamera(app,owners,cam,display,d);
 }
 inline bool Owner::prepareRuntimeRosterQueryStorage(
@@ -673,6 +700,45 @@ inline bool Owner::prepareRuntimeRosterQueryStorage(
         runtimeQueries_->rosterAuxiliaryIds_={recoveryGlobals.terrainIdentity348,
             recoveryGlobals.identity[0],recoveryGlobals.identity[1]};
         if(!runtimeQueries_->constructStorage(std::move(app),candidates_,input,d.runtimeQueries))
+            return fail(d,"RA retained roster Storage preparation failed; prefix retained");
+        prefix_.runtimeQueryStorage=true;return true;
+    }catch(...){return fail(d,"RA retained roster reservation exception");}
+}
+// Private fresh-only sibling; no call site is provided by Stage B.
+inline bool Owner::prepareSharedRosterStorage(
+    std::shared_ptr<g::OriginalApplicationEntities50LA> app,
+    std::shared_ptr<const ra_cold_roster50LA::Resources> roster,
+    undertrack_owners50ew_fixture::Owners* recovery,
+    const undertrack_owners50ew_fixture::SourceGlobals& recoveryGlobals,
+    const terrain_probe_authoring50fq_fixture::Owner& terrain,const g::Type3QueryInput48P& movement,
+    const std::vector<ra_source_camera50LA::WreckReservation>& wreck,Diagnostic& d)noexcept {
+    d={};
+    if(!app||!app->application10()||(worldApplication_&&worldApplication_!=app)||
+       (collisionApplication_&&collisionApplication_!=app)||
+       !roster||!recovery||runtimeStorageAttempted_||registryAttempted_||terminal_||closed_)
+        return fail(d,"RA actual roster reservation requires fresh same-source ownership");
+    try {
+        if(!terrain.prepared||!recoveryGlobals.terrainIdentity348||!recoveryGlobals.identity[0]||
+           !recoveryGlobals.identity[1]||terrain.metadata.filter.identity!=recoveryGlobals.terrainIdentity348||
+           movement.filter.identity!=recoveryGlobals.identity[1]||
+           recoveryGlobals.identity[0]==recoveryGlobals.identity[1]||
+           recoveryGlobals.identity[0]==recoveryGlobals.terrainIdentity348||
+           recoveryGlobals.identity[1]==recoveryGlobals.terrainIdentity348)
+            return fail(d,"actual planned recovery/terrain/movement namespace differs");
+        ra_source_camera50LA::RuntimeQueryCapacityInputs input;
+        for(std::size_t i=0;i<roster->racerCount_;++i)input.collisionRoster.push_back(roster->collisions_[i].get());
+        input.recovery=recovery;input.wreck=wreck;input.humanCount=roster->humanCount_;
+        // Retain the exact objects even if Storage preparation has partial effects.
+        // Construct here rather than calling the public raw-borrow route, which
+        // would publish the bridge before its strong roster retention exists.
+        if(!enter(d,Stage::runtimeQueryStorage,runtimeStorageAttempted_,prefix_.staticCandidates))return false;
+        collisionApplication_=app;
+        runtimeQueries_.reset(new ra_source_camera50LA::OwnershipBridge());
+        runtimeQueries_->rosterResources_=std::move(roster);
+        runtimeQueries_->rosterTerrain_=&terrain;runtimeQueries_->rosterMovement_=&movement;
+        runtimeQueries_->rosterAuxiliaryIds_={recoveryGlobals.terrainIdentity348,
+            recoveryGlobals.identity[0],recoveryGlobals.identity[1]};
+        if(!runtimeQueries_->constructSharedRosterStorage(std::move(app),candidates_,input,d.runtimeQueries))
             return fail(d,"RA retained roster Storage preparation failed; prefix retained");
         prefix_.runtimeQueryStorage=true;return true;
     }catch(...){return fail(d,"RA retained roster reservation exception");}

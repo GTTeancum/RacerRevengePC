@@ -1,4 +1,5 @@
 #include "original_ui_garage_session50kg.h"
+#include "original_ui_shared_dialogs50kg.h"
 #include "original_ui_garage_draw_contribution50kg.h"
 #include "../../../tests/native/original_ui_main_entry50kg.h"
 #include "../../../tests/native/original_race_display_lifetime50la.h"
@@ -30,11 +31,36 @@ bool Application::inputGaragePage1FDE70(Frontend& frontend,std::uint32_t input,s
     if(!(page.router_->entity.flags29&1u)||!page.base_.input268){
         out.status=Result::Status::ignored;out.sourcePC=0x1FDE70;return true;
     }
+    // Dispatcher47C precedes the Page. A newly opened dialog cannot consume
+    // the same Confirm edge; a pre-existing one publishes2/3 before Page reads.
+    auto dialogs=state?state->sharedDialogs:nullptr;
+    if(!dialogs||!dialogs->reorderCompleteFor1B872C(page)||dialogs->garagePopupInputFailed_||
+       page.drawPending_||page.runtimeWidgetPending_||page.sharedHookPending_||
+       dialogs->popup47CDraw_||dialogs->nativePopup47CFifoPins_)
+        return failBridge(d,error,0x2062D0,"Garage popup lost its retained input owner or has a failed source prefix");
+    rr::game::OriginalUiControllerPopupPlan50KG popup;
+    if(controller>255u||input>255u||rr::game::OriginalUiControllerPopup50KG::input(state->controllerPopupState,
+        static_cast<std::uint8_t>(controller),static_cast<std::uint8_t>(input),true,popup)!=rr::game::OriginalUiControllerPopupStatus50KG::ok)
+        return failBridge(d,error,0x2062D0,"Garage popup input state is invalid");
+    bool popupCommitted=false;std::uint64_t popupBoundary=0;
+    if(popup.accepted){
+        rr::platform::OriginalApplicationAural50KG::Diagnostic ad;
+        if(!owner->audio_||!sourceAural00Owner_||!owner->audio_->canPlayGaragePageEffect1FDE70(page,popup.soundId)||
+           !sourceAural00Owner_->canFinishGaragePageInput267BE0(page,ad))
+            return failBridge(d,error,popup.soundPC,"Garage popup sound/transport source is not ready");
+        state->controllerPopupState=popup.state;popupCommitted=true;
+        if(!owner->audio_->playGaragePageEffect1FDE70(page,popup.soundId)||
+           !sourceAural00Owner_->finishGaragePageInput267BE0(page,popupBoundary,ad)){
+            dialogs->garagePopupInputFailed_=true;out.status=Result::Status::failed;
+            out.sourceEffectsCommitted=true;d.sourceEffectsCommitted=true;
+            return failBridge(d,error,ad.sourcePC?ad.sourcePC:popup.soundPC,"Garage popup source prefix failed; result cannot be replayed");
+        }
+    }
     Page::InputOutcome actual;Page::Diagnostic pd;
     const bool returned=page.dispatchInput1FDE70(input,controller,actual,pd);
-    out.serial=actual.serial;out.transportBoundary=actual.transportBoundary;
+    out.serial=actual.serial;out.transportBoundary=actual.transportBoundary?actual.transportBoundary:popupBoundary;
     out.sourcePC=actual.sourcePC?actual.sourcePC:pd.sourcePC;out.selectedStat=page.field4E4_;
-    out.sourceEffectsCommitted=actual.sourceEffectsCommitted||pd.sourceEffectsCommitted;
+    out.sourceEffectsCommitted=popupCommitted||actual.sourceEffectsCommitted||pd.sourceEffectsCommitted;
     out.requestWritten=actual.requestWritten;
     switch(actual.status){
     case Page::InputOutcome::Status::ignored:out.status=Result::Status::ignored;break;

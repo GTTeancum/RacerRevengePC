@@ -2,8 +2,10 @@
 #include "native_racer_cables50hw_fixture.h"
 namespace original_main_entry50KG {class NativeCollectorFifo50LA;}
 namespace original_cable_selection50LA { class Binding; }
+namespace rr::game { class OriginalRaceConstructor50LA; }
 #include "ra_static_candidates50la.h"
 #include "native_racer_bank50hn_fixture.h"
+#include "native_dynamic_contact_peers50iw_fixture.h"
 #include "ra_source_camera_inputs50la.h"
 #include "ra_track_fog50la.h"
 #include "ra_static_fog_observation50la.h"
@@ -12,9 +14,21 @@ namespace original_cable_selection50LA { class Binding; }
 #include "native_racer_grid50hn_fixture.h"
 #include "source_grid50ig_fixture.h"
 #include "../../src/game/query_prepare48o.h"
+#include "../../src/game/indexed_type2_contact50cc.h"
+#include "../../src/game/vehicle_contact48r.h"
+#include "../../src/game/chariot_scene49u.h"
+#include "../../src/game/spring_force48l.h"
+#include "../../src/game/type0_bounds50ew.h"
+#include "../../src/game/collision_result_binding50mb.h"
 #include "../../src/game/collection_projection50cf.h"
 #include "../../src/game/pod_live_query50iz.h"
 #include "../../src/game/original_racer_selection50ij.h"
+#include "../../src/game/original_racer_gravity_owner50la.h"
+#include "../../src/game/original_racer_model_scene50la.h"
+#include "../../src/game/boost_controls50fk.h"
+#include <bit>
+#include <functional>
+#include <string_view>
 #include <cstddef>
 #include <algorithm>
 #include <exception>
@@ -22,6 +36,7 @@ namespace original_cable_selection50LA { class Binding; }
 #include <limits>
 #include <vector>
 
+namespace interactive_setup50DU { struct Context; }
 namespace ra_cold_aggregate50LA { class Owner; }
 namespace ra_pod_scene50LA { class Owner; }
 namespace ra_cold_roster50LA { class Resources; class Operation; }
@@ -65,6 +80,7 @@ struct ActualQueryOwners {
 struct GridArenaOwners {
     g::VehicleFrameBindings49W& bindings;
     g::VehicleFrameParameters49W& parameters;
+    g::SubstepSelectionContext49K& selectors; //Actual registered per-racer Fixture lane, not a copied/default37C.
     g::AiRuntimeState50IV& ai;
     g::BasePoseHistoryState50Y& history;
     const std::array<std::unique_ptr<native_racer50HW::Rig>,8>& rigs;
@@ -85,6 +101,550 @@ struct Diagnostic {
 // and Follow/death cold buffers while borrowing the existing body/query arena.
 // No public constructor, mutable Storage, query getter, attach or camera API.
 class OwnershipBridge final {
+    friend class rr::game::OriginalRaceConstructor50LA; //Exact owned Camera34 native adapter identity only.
+    friend struct ::interactive_setup50DU::Context;
+    class SharedTerrainInvocation;
+    struct EndCandidateResult {
+        std::uint32_t stoppedPC=0x219ad4;
+        std::uint64_t projectionRevision=0;
+        std::int32_t firstCount=0,secondCount=0,mergedCount=0;
+        bool firstReturned=false,secondReturned=false,merged=false;
+        bool sharedFirstFlagsPublished=false,sharedSecondFlagsPublished=false;
+        bool nativeDetectorEntered=false,nativeDetectorReset=false,nativeDetectorReturned=false;
+        bool nativeQueryCachePrepared=false,nativeQueryMembershipCommitted=false,nativeQueryPrefixReturned=false;
+        std::uint64_t nativeQueryMembershipRevision=0;
+        bool nativeLimitedInitialized=false,nativeLimitedReturned=false;
+        std::size_t nativeLimitedOrdinal=0;
+        bool nativeSecondaryBodyBound=false,nativeSecondarySkipped=false;
+        bool nativeSecondaryDetectorEntered=false,nativeSecondaryDetectorReset=false,nativeSecondaryDetectorReturned=false;
+        bool nativeSecondaryCachePrepared=false,nativeSecondaryMembershipCommitted=false,nativeSecondaryQueryPrefixReturned=false;
+        std::uint64_t nativeSecondaryMembershipRevision=0;
+        bool nativeSecondaryLimitedInitialized=false,nativeSecondaryLimitedReturned=false;
+        std::size_t nativeSecondaryLimitedOrdinal=0;
+        bool nativeContactStaticsEntered=false,nativeContactScenePrepared=false,nativeContactReturned=false;
+        bool nativeTerrainEntered=false,nativeTerrainSeedPublished=false;
+        std::array<std::uint32_t,3> nativeContactPosition{},nativeContactForward{},nativeContactUp{};
+        std::size_t nativeContactOrdinal=0;
+        std::uint32_t nativeContactMatchedIdentity=0;
+    };
+    //Immutable policy membership producer is installed at fresh Bank
+    //registration. Select only the actual active slot; never mutate Entry.
+    bool selectNativeDetectorMembership(std::size_t slot,bool secondary,
+        g::LiveZoneMembership50EN*& member,std::uint32_t& ref,
+        storage::Storage::SharedRosterObject*& row)noexcept {
+        auto* s=storage_.get();auto* policy=s?s->nativeDetectorPolicy_.get():nullptr;
+        if(!s||!policy||!policy->live_||!policy->registered_)return false;
+        const auto lane=secondary?1u:0u;
+        if(!s->sharedRoster_){
+            if(policy->sharedWorld_||policy->sharedRetired_)return false;
+            member=secondary?&s->secondaryMembership.state:&s->mainMembership.state;
+            ref=secondary?s->count.secondaryQuery:s->count.mainQuery;row=nullptr;
+            return policy->entries_[lane].membership==member&&policy->entries_[lane].ref==ref;
+        }
+        const auto pin=bankLifetime_.lock();const auto* producer=endCandidateProducer_;
+        if(policy->sharedWorld_!=s||policy->sharedRetired_||!pin||!bankIdentity_||
+           pin->identity!=bankIdentity_||!producer||!producer->inCall||!producer->activeSession||
+           producer->activeSlot!=slot||&producer->activeSession->actual_.bank!=bankIdentity_||
+           bankIdentity_->raWorldLifetime_.get()!=pin.get()||bankIdentity_->visitDepth_!=1u||
+           bankIdentity_->currentSlot_!=slot||slot>=policy->sharedCount_||
+           policy->sharedCount_!=s->sharedRoster_->count||s->sharedRoster_->retired||sharedEffectsStopped_)return false;
+        const auto& owned=s->sharedRoster_->objects[slot*storage::Storage::rosterRoles+lane];
+        const auto& selected=policy->sharedMemberships_[slot][lane];
+        if(!owned||!owned->coldBound||!owned->coldFilter||owned->slot!=slot||
+           static_cast<unsigned>(owned->role)!=lane||owned->generation!=producer->activeSession->generation_||
+           selected.owner!=&owned->membership.state||selected.ref!=owned->reservedRef||
+           !owned->reservedRef||owned->reservedRef>s->count.objects||
+           owned->canonicalFilter!=(secondary?&actual_->secondaryFilter:&actual_->mainFilter)||
+           owned->type2Resource!=(secondary?actual_->secondary.resource:actual_->main.resource)||
+           owned->identity!=owned->canonicalFilter->identity||
+           s->objects[owned->reservedRef-1u].identity!=owned->identity||
+           !sameSharedFilterView(s->objects[owned->reservedRef-1u].filter,*owned->coldFilter))return false;
+        member=selected.owner;ref=selected.ref;row=owned.get();return true;
+    }
+    //Clean actual scene190 or positively bound native physical19C route of
+    //11FF60/11FE50, followed by the existing
+    //typed11F680 and attached120230 adapters. No PostWorld phase or general
+    //scene/physics callback is synthesized; dirty scene paths stop explicitly.
+    void prepareNativeQueryPrefix(const original_camera_session50KX::Session& expected,
+        std::size_t slot,EndCandidateResult& out,bool secondary)noexcept {
+        auto& frame=actual_->frame;auto& query=secondary?actual_->secondary:actual_->main;auto& storage=*storage_.get();
+        const auto& racer=expected.racerEntities_[slot];
+        out.stoppedPC=0x11fe50;
+        if(triggerQueryActive_||!query.queryScene.value||
+           !g::validVehicleSceneCount49W(frame,gridArena_->bindings))return;
+        if(secondary){
+            // Actual native coupled-body custody, not an unpublished35C/19C
+            // guest Entity. Its registered root belongs to this SAME rig/Bank.
+            if(!frame.bodies.main.domain.secondBodyPresent||!gridArena_->rigs[slot]||
+               gridArena_->rigs[slot].get()!=gridRigIdentity_[slot]||
+               gridArena_->bindings.lifecycle.physical19C!=gridArena_->rigs[slot]->physical||
+               !registeredRange(&frame.bodies.secondary,sizeof(frame.bodies.secondary)))return;
+        }else if(!racer.body340||!racer.scene190||
+           racer.body340->scene288()!=racer.scene190||!racer.scene190->constructed||racer.scene190->released||
+           !racer.scene190->entity().reference00||
+           racer.scene190->entity().sessionGeneration!=racer.racer.sessionGeneration||
+           racer.scene190->sceneIndex!=gridArena_->bindings.lifecycle.main190||
+           racer.body340->canonicalNumericAddress()!=&frame.bodies.main)return;
+        const auto index=static_cast<int>(secondary?gridArena_->bindings.lifecycle.physical19C:
+            gridArena_->bindings.lifecycle.main190);
+        if(index<0||static_cast<std::size_t>(index)>=frame.sceneNodeCount)return;
+        const auto& node=frame.nodes[index];
+        if(!registeredRange(&node,sizeof(node)))return;
+        out.stoppedPC=0x28b550;
+        //28B59C..5A8 clean bit0 selects only the64-byte world100 copy. The
+        //actual scene owner indexes this SAME canonical graph; no shadow pose.
+        if(!(node.sceneFlags190&1u)||
+           std::memcmp(&node.world100,secondary?&frame.bodies.secondary.root.scene:
+               &frame.bodies.main.components.root.scene,sizeof(node.world100))||
+           (secondary&&(frame.bodies.secondary.sceneFlags190&255u)!=node.sceneFlags190))return;
+        out.stoppedPC=0x11f680;
+        g::LiveZoneMembership50EN* selectedMember=nullptr;std::uint32_t ref=0;
+        storage::Storage::SharedRosterObject* selectedRow=nullptr;
+        if(!selectNativeDetectorMembership(slot,secondary,selectedMember,ref,selectedRow))return;
+        SharedOwnerLease sharedLease;
+        if(selectedRow&&(selectedRow->effectRevision==std::numeric_limits<std::uint64_t>::max()||
+            !beginSharedOwnerLease(sharedLease,out)))return;
+        const auto* resource=query.resource;
+        if(!resource||resource!=(secondary?gridCompletion_[slot].secondaryResource:gridCompletion_[slot].mainResource)||!resource->nodes||
+           !resource->nodeCount||(resource->root&0x8000u)||resource->root>=resource->nodeCount)return;
+        const auto& root=resource->nodes[resource->root];
+        g::QuerySpherePrepareInput48O input{};input.preparedScene=node.world100;
+        input.shapeType=2;input.scenePrepared=true;input.hasPairTree=true;
+        for(unsigned i=0;i<3;++i){input.treeCenter.v[i]=root.center[i];input.treeHalf.v[i]=root.half[i];}
+        g::QuerySpherePrepareOutput48O prepared{};
+        if(g::prepareQuerySphere48O(input,prepared)!=g::QuerySpherePrepareStatus48O::Ready)return;
+        if(query.nativeGatePolicy){
+            //Same existing native Gate history adaptation: retain the actual
+            //previous cache before committing the new source preparation.
+            query.nativeGatePreviousWorld=query.worldMatrix;query.nativeGateHasPrevious=true;
+        }
+        std::memcpy(&query.worldMatrix,&prepared.world,sizeof(query.worldMatrix));
+        for(unsigned i=0;i<3;++i)query.sphere.center.v[i]=prepared.center.v[i];
+        query.sphere.radius=prepared.radius;
+        if(selectedRow){
+            auto& mirror=storage.source[selectedRow->reservedRef-1u];
+            //Actual source cache preparation is visible BEFORE120230; keep
+            //query-written epoch/F8/member fields, not a fresh-state reset.
+            mirror.cachedCenter=prepared.center;mirror.cachedRadius=prepared.radius;
+            ++selectedRow->effectRevision;sharedLease.wrote_=true;
+        }
+        (secondary?out.nativeSecondaryCachePrepared:out.nativeQueryCachePrepared)=true;out.stoppedPC=0x120230;
+        //The native typed query stores XYZ/radius; prepared.W=1 is retained in
+        //the actual bounds below. No full guest cache object is manufactured.
+        auto& membership=*selectedMember;
+        if(!membership.attached||membership.object!=ref||
+           membership.lastShapeTag!=2||membership.lastType2Resource!=resource)return;
+        g::LiveZoneBounds50EN bounds{};bounds.bounds.shapeTag=2;
+        bounds.bounds.shapeWorld=prepared.world;bounds.bounds.cachedCenter=prepared.center;
+        bounds.bounds.cachedRadius=prepared.radius;bounds.type2Resource=resource;
+        const auto before=membership.revision;
+        const auto update=g::updateLiveZoneMembership50EN(storage.lifecycle,storage.world,
+            membership,bounds,storage.membershipWork);
+        //Cache writes precede120230 and stay committed if this later bounded
+        //membership adapter rejects. No all-prefix rollback or reset replay.
+        if(update.status!=g::LiveZoneStatus50EN::Complete)return;
+        (secondary?out.nativeSecondaryMembershipCommitted:out.nativeQueryMembershipCommitted)=true;
+        (secondary?out.nativeSecondaryMembershipRevision:out.nativeQueryMembershipRevision)=membership.revision;
+        if(!membership.attached||membership.object!=ref||membership.lastShapeTag!=2||
+           membership.lastType2Resource!=resource||before==std::numeric_limits<std::uint64_t>::max()||
+           membership.revision!=before+1u||
+           std::memcmp(&membership.lastShapeWorld,&prepared.world,sizeof(prepared.world))||
+           std::memcmp(&membership.bounds.cachedCenter,&prepared.center,sizeof(prepared.center))||
+           std::memcmp(&membership.bounds.cachedRadius,&prepared.radius,sizeof(prepared.radius)))return;
+        out.stoppedPC=0x11ff7c;
+        //Publish only the existing native RA prepared-pose mirrors, exactly as
+        //the ordinary committed live prefix does. No trigger action/service or
+        //geometry callback runs; a missing real observer remains a boundary.
+        Diagnostic diagnostic{};
+        if(!triggerBankCurrent(expected.actual_.bank,slot,true)||!observeTriggerPoses(diagnostic))return;
+        (secondary?out.nativeSecondaryQueryPrefixReturned:out.nativeQueryPrefixReturned)=true;out.stoppedPC=0x2959f4;
+        if(selectedRow){sharedLease.completed_=true;endSharedOwnerLease(sharedLease);}
+        //The actual limited caller takes its own lexical owner borrow; never
+        //nest it inside the prefix's completed membership/cache lease.
+        if(!endCandidateProducer_||!endCandidateProducer_->limited||
+           !endCandidateProducer_->inCall||!endCandidateProducer_->activeRevision||
+           out.projectionRevision!=endCandidateProducer_->activeRevision)return;
+        // Explicit native supplied-list policy, not invented guest70/74 fields.
+        // Generic typed lease machinery is reused; no MB instance/phase is borrowed.
+        const g::SourceQueryIdentity50MB identity{endCandidateProducer_,expected.generation_,
+            out.projectionRevision,slot,secondary?actual_->secondaryFilter.identity:actual_->mainFilter.identity};
+        endCandidateProducer_->limited(secondary,identity,
+            original_follow_query_bridge::QueryBridge::sentinel3E02C0,out);
+    }
+    //Bounded explicit native295630 policy. Invoked only inside the same
+    //candidate lease after actual merge (secondary after main returns); never a later restore or
+    //a generic PostWorld callback. Enabled query enters its exact bounded prefix.
+    void advanceNativeDetectorPrefix(const original_camera_session50KX::Session& expected,
+        std::size_t slot,EndCandidateResult& out,bool secondary)noexcept {
+        using Policy=::native_spring_detector_policy50LA::Owner;
+        auto* s=storage_.get();auto* policy=s?s->nativeDetectorPolicy_.get():nullptr;
+        if(!out.merged||!endCandidateProducer_||!endCandidateProducer_->inCall||
+           !endCandidateProducer_->activeRevision||out.projectionRevision!=endCandidateProducer_->activeRevision||
+           !policy||!policy->live_||!policy->registered_||
+           policy->frame_!=&actual_->frame||policy->bindings_!=&gridArena_->bindings)return;
+        auto& e=policy->entries_[secondary?1u:0u];auto& lanes=policy->lanes_[secondary?1u:0u];
+        auto& query=secondary?actual_->secondary:actual_->main;
+        auto& filter=secondary?actual_->secondaryFilter:actual_->mainFilter;
+        g::LiveZoneMembership50EN* membership=nullptr;std::uint32_t ref=0;
+        storage::Storage::SharedRosterObject* selectedRow=nullptr;
+        if(!selectNativeDetectorMembership(slot,secondary,membership,ref,selectedRow))return;
+        if(e.query!=&query||!e.spring||!e.settings||!membership||!ref||!e.query->resource||e.query->filter!=&filter||
+           e.query->resource!=(secondary?gridCompletion_[slot].secondaryResource:gridCompletion_[slot].mainResource)||
+           !registeredRange(policy->lanes_.data(),sizeof(policy->lanes_))||
+           !registeredRange(e.query,sizeof(*e.query))||!registeredRange(e.spring,sizeof(*e.spring))||
+           !registeredRange(e.settings,sizeof(*e.settings)))return;
+        struct SharedDetectorStop {
+            OwnershipBridge& owner;EndCandidateResult& result;bool secondary,shared;
+            ~SharedDetectorStop(){if(shared&&!(secondary?result.nativeSecondaryDetectorReturned:result.nativeDetectorReturned))
+                owner.sharedEffectsStopped_=true;}
+        } stopped{*this,out,secondary,selectedRow!=nullptr};
+        auto& app=*expected.actual_.applicationEntities;
+        (secondary?out.nativeSecondaryDetectorEntered:out.nativeDetectorEntered)=true;out.stoppedPC=0x295650;
+        if(!app.observeNativeDetectorSentinel50LA(0))return;
+        out.stoppedPC=0x295670;
+        if(lanes.pairs!=Policy::PairPolicy::nativeType2NoPairs)return;
+        //No-pair short circuit: actual native point48 is read BEFORE provider
+        //policy. Unknown/unrepresented enabled providers never become null.
+        if(e.settings->pointContacts48&&lanes.provider!=Policy::ProviderPolicy::nativeAbsent){
+            out.stoppedPC=0x29568c;return;
+        }
+        out.stoppedPC=0x295944;
+        if(!app.observeNativeDetectorSentinel50LA(1))return;
+        //Actual current registered query lane, not the old admission literal.
+        //296490 is the sole mutation here; no scene/cache/query/phase replay.
+        if(e.query->resetRecordsBefore){
+            g::resetSpringRecords48N(e.spring->records);(secondary?out.nativeSecondaryDetectorReset:out.nativeDetectorReset)=true;
+        }
+        if(!lanes.nativeEnabled){
+            (secondary?out.nativeSecondaryDetectorReturned:out.nativeDetectorReturned)=true;
+            out.stoppedPC=secondary?0x219c10:0x219be4;return;
+        }
+        out.stoppedPC=0x2959ec;
+        prepareNativeQueryPrefix(expected,slot,out,secondary); //Same actual candidate lease, after reset only.
+    }
+    bool readNativeContactPodCategory(const g::OriginalApplicationEntities50LA& app,
+        std::uint32_t& value)const noexcept {
+        if(app.nativeOwnerThread_!=std::this_thread::get_id())return false;
+        for(const auto& binding:app.nativeCollisionCategoryBindings_)
+            if(std::string_view(binding.name)=="POD"){
+                if(!binding.bit||!actual_||!actual_->recovery||!actual_->recovery->sourcePrepared||
+                   actual_->recovery->globals.extraPodCategory3B14B0!=binding.bit)return false;
+                value=binding.bit;return true;
+            }
+        return false;
+    }
+    void advanceNativeContactPrefix(const original_camera_session50KX::Session& expected,
+        std::size_t slot,EndCandidateResult& out)noexcept {
+        out.stoppedPC=0x219440;
+        if(!endCandidateProducer_||!endCandidateProducer_->inCall||!out.firstReturned||
+           out.projectionRevision!=endCandidateProducer_->activeRevision||
+           !(out.nativeSecondarySkipped||out.nativeSecondaryDetectorReturned))return;
+        struct SharedContactStop {
+            OwnershipBridge& owner;EndCandidateResult& result;bool shared;
+            ~SharedContactStop(){if(shared&&!result.nativeContactReturned)owner.sharedEffectsStopped_=true;}
+        } stopped{*this,out,bool(storage_.get()->sharedRoster_)};
+        auto& app=*expected.actual_.applicationEntities;
+        if(!app.enterNativeVehicleContacts219420())return;
+        out.nativeContactStaticsEntered=true;out.stoppedPC=0x2194d0;
+        const auto& racer=expected.racerEntities_[slot];
+        const auto* owner=racer.chariotModel1B4;
+        const auto* model=owner?owner->model():nullptr;
+        if(!owner||!owner->constructed2403A0()||owner->released()||!model||
+           !model->constructed||model->released||!model->entity().reference00||
+           model->entity().sessionGeneration!=racer.racer.sessionGeneration||
+           !gridArena_->rigs[slot]||gridArena_->rigs[slot].get()!=gridRigIdentity_[slot]||
+           model->sceneIndex!=gridArena_->bindings.lifecycle.model1B4||
+           model->sceneIndex!=gridArena_->rigs[slot]->roots[native_racer50HW::Rig::chariot])return;
+        auto& frame=actual_->frame;const auto index=static_cast<int>(model->sceneIndex);
+        if(!g::validVehicleSceneCount49W(frame,gridArena_->bindings)||index<0||
+           static_cast<std::size_t>(index)>=frame.sceneNodeCount)return;
+        auto& node=frame.nodes[index];if(!registeredRange(&node,sizeof(node)))return;
+        out.stoppedPC=0x28b1e0;
+        //Exact parentless getter leaf, not generic scene update/observer work.
+        //A clean cache ignores parent, as the actual28B1A0/28A700 do.
+        if(!(node.sceneFlags190&1u)){
+            out.stoppedPC=0x28b1fc;
+            if(node.parent180!=g::SceneNodeIndex49P::none)return;
+            std::memcpy(&node.world100,&node.localC0,sizeof(node.world100));
+            node.sceneFlags190=static_cast<std::uint8_t>((node.sceneFlags190&0xfeu)|1u);
+        }
+        //Getters write XYZ only. Their zeroed caller scratch W is not replaced
+        //by a synthetic1 and no normalization/finiteness rewrite is performed.
+        std::memcpy(out.nativeContactPosition.data(),node.world100.v+12,3*sizeof(float));
+        out.stoppedPC=0x28a760;
+        std::memcpy(out.nativeContactForward.data(),node.world100.v+8,3*sizeof(float));
+        std::memcpy(out.nativeContactUp.data(),node.world100.v+4,3*sizeof(float));
+        out.nativeContactScenePrepared=true;out.stoppedPC=0x2197d0;
+        if(endCandidateProducer_->contact)endCandidateProducer_->contact(app,out);
+    }
+    // Only the actual Setup Context may lend its concrete materializer. This
+    // is NOT collectRegistered/a geometry callback or a public readiness API.
+    // The borrow expires before Context's captures, or is revoked at close.
+    struct EndEngineEnableReader {
+        const void* context=nullptr;
+        bool (*read)(const void*,bool&)noexcept=nullptr;
+        const original_camera_session50KX::Session* session=nullptr;
+        std::optional<std::uint32_t> sourceFactorF20Bits; //Actual Race scheduling capture, not native schedule.
+    };
+    struct EndCandidateProducer {
+        std::weak_ptr<OwnershipBridge> owner;
+        storage::Storage* storage=nullptr;
+        native_dynamic_contact50IW::Registry* bodyRegistry=nullptr;
+        const original_camera_session50KX::Session* activeSession=nullptr;
+        const EndEngineEnableReader* engineEnable=nullptr; //Lexical Race-owned reader only.
+        std::size_t activeSlot=0;
+        std::function<void(EndCandidateResult&)> run,sharedRun;
+        std::function<void(const g::OriginalApplicationEntities50LA&,EndCandidateResult&)> contact;
+        std::function<void(SharedTerrainInvocation&)> terrainLimited;
+        std::function<void(SharedTerrainInvocation&)> springResponse;
+        g::CollisionResultBindingOwner50MB nativeLimitedResultBorrow;
+        std::function<void(bool,const g::SourceQueryIdentity50MB&,const g::SpringVector4_48N&,
+            EndCandidateResult&)> limited;
+        //Private actual direct POD candidate service, called only from shared
+        //typed source selection. Secondary reached-body callbacks still stop;
+        //the fresh shared factory remains uncalled until all consumers join.
+        std::function<bool(bool,std::size_t,const g::SourceQueryIdentity50MB&,
+            const g::SourceOuterResultLease50MB&,EndCandidateResult&)> directPod;
+        std::array<std::uint64_t,2> directPodSerial{};std::array<std::size_t,2> directPodOrdinal{};
+        std::uint64_t serial=0,activeRevision=0;
+        bool inCall=false;
+        ~EndCandidateProducer(){if(auto o=owner.lock();o&&o->endCandidateProducer_==this)
+            o->endCandidateProducer_=nullptr;}
+        bool projected()noexcept {
+            if(serial==std::numeric_limits<std::uint64_t>::max())return false;
+            ++serial;activeRevision=inCall?serial:0;return true;
+        }
+    };
+    EndCandidateProducer* endCandidateProducer_=nullptr;
+    bool runEndFirstCandidateQueries(const original_camera_session50KX::Session& expected,
+        std::size_t slot,EndCandidateResult& output,const EndEngineEnableReader& engineEnable)noexcept {
+        //A prior source-returned first query cannot be reprojected/replayed
+        //after incomplete publication. Refuse BEFORE any Bank/producer work.
+        if(sharedEffectsStopped_||sharedOwnerLease_||sharedRoleViews_)return false;
+        if(!replayRacerIdentityCurrent(expected,slot)||!gridInputsRegistered(*gridArena_)||
+           !endCandidateProducer_||endCandidateProducer_->storage!=storage_.get()||
+           endCandidateProducer_->inCall||endCandidateProducer_->engineEnable||!endCandidateProducer_->run)return false;
+        auto& producer=*endCandidateProducer_;
+        if(producer.owner.lock().get()!=this)return false;
+        //Native identity registration is representation work, before ANY
+        //source projection/query effect or Bank visit. Subsequent invocations
+        //verify the same retained owners/tokens; never reallocate identities.
+        //Failure has no token side effects and is not a new source gate:
+        //static/skip paths do not need secondary callbacks. If one is reached,
+        //its typed owner check below requires actual successful admission.
+        if(storage_.get()->sharedRoster_&&producer.bodyRegistry&&producer.bodyRegistry->prepared()){
+            (void)registerNativeSecondaryContactRegistry(*producer.bodyRegistry);
+            (void)registerNativeRacerTerrainRegistry(expected,*producer.bodyRegistry);
+        }
+        bool entered=false;
+        try {expected.actual_.bank.visit(slot,[&](){
+            auto& arena=*gridArena_;const auto& racer=expected.racerEntities_[slot];
+            if(!arena.rigs[slot]||arena.rigs[slot].get()!=gridRigIdentity_[slot]||
+               actual_->main.resource!=gridCompletion_[slot].mainResource||
+               !racer.body340||racer.body340->canonicalNumericAddress()!=&actual_->frame.bodies.main)return;
+            producer.inCall=true;producer.activeRevision=0;
+            producer.activeSession=&expected;producer.activeSlot=slot;producer.engineEnable=&engineEnable;
+            struct Expire {OwnershipBridge& owner;EndCandidateProducer& p;EndCandidateResult& out;
+                ~Expire(){owner.finishSharedCollectionInvocation(out);p.engineEnable=nullptr;p.activeSession=nullptr;p.activeRevision=0;p.inCall=false;}
+            } expire{*this,producer,output};
+            entered=true;output={};
+            if(storage_.get()->sharedRoster_){if(!producer.sharedRun)return;producer.sharedRun(output);}
+            else producer.run(output);
+            if(output.merged)advanceNativeDetectorPrefix(expected,slot,output,false);
+            if(output.nativeDetectorReturned){
+                output.stoppedPC=0x219be4;
+                auto& frame=actual_->frame;
+                //Positive native35C adaptation: a real coupled secondary root
+                //and current rig are required. False/unpublished is not null.
+                if(!frame.bodies.main.domain.secondBodyPresent||
+                   arena.bindings.lifecycle.physical19C!=arena.rigs[slot]->physical||
+                   actual_->secondary.resource!=gridCompletion_[slot].secondaryResource||
+                   !registeredRange(&frame.bodies.secondary,sizeof(frame.bodies.secondary))||
+                   !registeredRange(&frame.bodies.vehicle838,sizeof(frame.bodies.vehicle838)))return;
+                output.nativeSecondaryBodyBound=true;output.stoppedPC=0x219bf0;
+                if(!frame.bodies.vehicle838){
+                    output.nativeSecondarySkipped=true;output.stoppedPC=0x219c10;
+                }else {
+                    output.stoppedPC=0x219bfc;
+                    advanceNativeDetectorPrefix(expected,slot,output,true);
+                }
+            }
+            if(output.nativeSecondarySkipped||output.nativeSecondaryDetectorReturned)
+                advanceNativeContactPrefix(expected,slot,output);
+            if(output.nativeContactReturned)advanceNativeTerrainPreparePrefix(expected,slot,output);
+            // No compact table publication survives this synchronous lease.
+            // A later rejected query is an explicit stopped invocation, not
+            // authority to refresh, restore another slot and replay query1.
+        });}catch(...){return entered;}
+        return entered;
+    }
+    bool replayRacerIdentityCurrent(const original_camera_session50KX::Session& expected,
+        std::size_t slot)const noexcept {
+        if(terminal_||closed_||cameraPrepareTerminal_||!cameraBankCurrent()||
+           !camera_||!camera_->session||camera_->session.get()!=&expected||
+           !actual_||!gridArena_||!freshLighting_||camera_->lighting!=freshLighting_||
+           slot>=inputs_.collisionRoster.size()||(rosterResources_&&!rosterSlotComplete_[slot])||
+           &actual_->frame!=&expected.actual_.arena||&expected.actual_.bank!=bankIdentity_||
+           expected.closed_||expected.abandoned_||!expected.coldBound_||!expected.readsBound_||
+           expected.generation_!=camera_->generation||!expected.actual_.applicationEntities)return false;
+        const auto& entity=expected.racerEntities_[slot];
+        if(!entity.prepared()||entity.racer.objectKey!=expected.racerKey(slot)||
+           entity.racer.sessionGeneration!=expected.generation_||
+           entity.actualCounter423F60()!=&expected.actual_.applicationEntities->objectCount423F60()||
+           entity.actualLock423F58()!=&expected.actual_.applicationEntities->attachmentLock423F58())return false;
+        try {return expected.identitiesCurrent();}catch(...){return false;}
+    }
+    bool readReplayMode3C229F94(const original_camera_session50KX::Session& expected,
+        std::size_t slot,std::uint32_t& value)const noexcept {
+        return replayRacerIdentityCurrent(expected,slot)&&
+            expected.racerEntities_[slot].readReplayMode3C229F94(value);
+    }
+    bool readEndPhysicsState40(const original_camera_session50KX::Session& expected,
+        std::size_t slot,std::uint32_t& value)const noexcept {
+        if(!replayRacerIdentityCurrent(expected,slot))return false;
+        try {value=expected.actual_.bank.read(slot,expected.reads_.state40);return true;}
+        catch(...){return false;}
+    }
+    bool readEndProbe10421990C(const original_camera_session50KX::Session& expected,
+        std::size_t slot,std::uint32_t& value)const noexcept {
+        if(!replayRacerIdentityCurrent(expected,slot)||!gridInputsRegistered(*gridArena_))return false;
+        try {
+            const auto lane=expected.actual_.bank.bindRead(actual_->frame.bodies.main.components.probe348.field104);
+            value=expected.actual_.bank.read(slot,lane);return true;
+        }catch(...){return false;}
+    }
+    bool readEndAirborne37C219A74(const original_camera_session50KX::Session& expected,
+        std::size_t slot,std::uint32_t& bits)const noexcept {
+        if(!replayRacerIdentityCurrent(expected,slot)||!gridInputsRegistered(*gridArena_))return false;
+        try {
+            //The real Fixture selector is the existing authored/current37C
+            //provider consumed by49W. Bind its actual registered Bank lane;
+            //do not read another slot's live arena or create default gravity.
+            const auto lane=expected.actual_.bank.bindRead(gridArena_->selectors.vehicle37C);
+            bits=std::bit_cast<std::uint32_t>(expected.actual_.bank.read(slot,lane));return true;
+        }catch(...){return false;}
+    }
+    bool storeEndAirborneGravity219A88(const original_camera_session50KX::Session& expected,
+        std::size_t slot,std::uint32_t f12Bits)noexcept {
+        if(!replayRacerIdentityCurrent(expected,slot)||!gridInputsRegistered(*gridArena_))return false;
+        bool stored=false;
+        try {
+            expected.actual_.bank.visit(slot,[&](){
+                auto& arena=*gridArena_;auto& frame=actual_->frame;
+                const auto& racer=expected.racerEntities_[slot];
+                if(!arena.rigs[slot]||arena.rigs[slot].get()!=gridRigIdentity_[slot]||
+                   arena.bindings.lifecycle.main190!=arena.rigs[slot]->main||
+                   arena.bindings.lifecycle.physical19C!=arena.rigs[slot]->physical||
+                   actual_->main.resource!=gridCompletion_[slot].mainResource||
+                   !racer.body340||!racer.gravity344||
+                   racer.body340->canonicalNumericAddress()!=&frame.bodies.main||
+                   racer.gravity344->canonicalAccelerationAddress()!=&frame.bodies.main.selectedGravity||
+                   racer.gravity344->target50()!=racer.body340)return;
+                stored=racer.gravity344->storeEndAcceleration1143E0(
+                    *expected.actual_.applicationEntities,racer.racer,*racer.body340,
+                    frame.bodies.main,f12Bits);
+            });
+        }catch(...){return false;}
+        return stored;
+    }
+    bool readEndNativeBoost64(const original_camera_session50KX::Session& expected,
+        std::size_t slot,std::uint32_t& value)const noexcept {
+        if(!replayRacerIdentityCurrent(expected,slot)||!gridInputsRegistered(*gridArena_)||
+           !registeredRange(&expected.actual_.boost,sizeof(expected.actual_.boost)))return false;
+        try {
+            //Existing actual Session borrow is BoostState, not HandlingTuning's
+            //distinct BoostParameters. Its whole state must be Bank-registered.
+            const auto lane=expected.actual_.bank.bindRead(expected.actual_.boost.vehicle64);
+            value=expected.actual_.bank.read(slot,lane);return true;
+        }catch(...){return false;}
+    }
+    bool readEndNativeFlagsB9C(const original_camera_session50KX::Session& expected,
+        std::size_t slot,std::uint8_t& value)const noexcept {
+        if(!replayRacerIdentityCurrent(expected,slot)||!gridInputsRegistered(*gridArena_))return false;
+        try {
+            const auto lane=expected.actual_.bank.bindRead(actual_->frame.bodies.main.controls.player.flagsB9C);
+            value=expected.actual_.bank.read(slot,lane);return true;
+        }catch(...){return false;}
+    }
+    enum class EndNativeEngineLane:std::uint8_t {engine34,engine38};
+    bool storeEndNativeEngineLane(const original_camera_session50KX::Session& expected,
+        std::size_t slot,EndNativeEngineLane lane,std::uint32_t sourceBoolean)noexcept {
+        if(sourceBoolean>1u||!replayRacerIdentityCurrent(expected,slot)||
+           !gridInputsRegistered(*gridArena_))return false;
+        bool stored=false;
+        try {
+            expected.actual_.bank.visit(slot,[&](){
+                auto& arena=*gridArena_;auto& frame=actual_->frame;
+                const auto& racer=expected.racerEntities_[slot];
+                if(!arena.rigs[slot]||arena.rigs[slot].get()!=gridRigIdentity_[slot]||
+                   arena.bindings.lifecycle.main190!=arena.rigs[slot]->main||
+                   arena.bindings.lifecycle.physical19C!=arena.rigs[slot]->physical||
+                   actual_->main.resource!=gridCompletion_[slot].mainResource||
+                   !racer.body340||racer.body340->canonicalNumericAddress()!=&frame.bodies.main||
+                   racer.body340->entity().parent1C!=&racer.racer||
+                   racer.body340->entity().reference00!=1||
+                   racer.body340->entity().sessionGeneration!=racer.racer.sessionGeneration)return;
+                //EXPLICIT EXISTING NATIVE ENGINE-FIELD ADAPTATION.49W/49K
+                //consumers already map these sole lanes to EngineInput48D
+                //boost(+34)/repair(+38). No guest34C Entity/publication or
+                //virtual side effect is asserted by these exact scalar stores.
+                if(lane==EndNativeEngineLane::engine34)
+                    frame.bodies.main.selectedEngineFlags.engine34=sourceBoolean; //219AB8.
+                else frame.bodies.main.selectedEngineFlags.engine38=sourceBoolean; //219AD0.
+                stored=true;
+            });
+        }catch(...){return false;}
+        return stored;
+    }
+    bool readReplayRetirementCD4(const original_camera_session50KX::Session& expected,
+        std::size_t slot,std::uint32_t& value)const noexcept {
+        if(!replayRacerIdentityCurrent(expected,slot))return false;
+        try {value=expected.actual_.bank.read(slot,expected.reads_.retirementCD4);return true;}
+        catch(...){return false;}
+    }
+    bool readReplayRecordedZoneC38(const original_camera_session50KX::Session& expected,
+        std::size_t slot,std::uint32_t& value)const noexcept {
+        return replayRacerIdentityCurrent(expected,slot)&&
+            freshLighting_->readRecordedZoneC38(static_cast<std::uint32_t>(slot),value);
+    }
+    bool readReplayRecordedCenterC40(const original_camera_session50KX::Session& expected,
+        std::size_t slot,std::array<std::uint32_t,4>& value)const noexcept {
+        return replayRacerIdentityCurrent(expected,slot)&&
+            freshLighting_->readRecordedCenterC40(static_cast<std::uint32_t>(slot),value);
+    }
+    // Private same-world Bank getter/229F20 execution, no supplied racer
+    //pointer or callback. Future complete end admission remains outside this.
+    bool recordEndRacer229F20(const original_camera_session50KX::Session& expected,
+        std::size_t slot,std::uint32_t& pc)noexcept {
+        pc=0x1a8094;
+        if(terminal_||closed_||cameraPrepareTerminal_||!cameraBankCurrent()||
+           !camera_||!camera_->session||camera_->session.get()!=&expected||
+           !actual_||!gridArena_||!freshLighting_||camera_->lighting!=freshLighting_||
+           slot>=inputs_.collisionRoster.size()||(rosterResources_&&!rosterSlotComplete_[slot])||!freshComplete_[slot]||
+           &actual_->frame!=&expected.actual_.arena||
+           &expected.actual_.bank!=bankIdentity_||expected.closed_||expected.abandoned_||
+           !expected.coldBound_||!expected.readsBound_||expected.generation_!=camera_->generation)
+            return false;
+        // Borrowed actual scene/frame/parameters follow the same Bank visit.
+        // No read-only snapshot, fresh-grid proof, or fabricated694 is passed.
+        auto& bank=expected.actual_.bank;
+        bool returned=false;
+        try {
+            bank.visit(slot,[&](){
+                pc=0x229f20;
+                auto& arena=*gridArena_;
+                if(!arena.rigs[slot]||arena.rigs[slot].get()!=gridRigIdentity_[slot]||
+                   arena.bindings.lifecycle.main190!=arena.rigs[slot]->main||
+                   arena.bindings.lifecycle.physical19C!=arena.rigs[slot]->physical||
+                   actual_->main.resource!=gridCompletion_[slot].mainResource)return;
+                g::original_gc_gameplay_lighting_candidate::Diagnostic detail;
+                returned=freshLighting_->recordAttachedEndRacer229F20(static_cast<std::uint32_t>(slot),
+                    actual_->frame,arena.bindings,arena.parameters,detail);
+                pc=detail.sourcePC;
+            });
+        }catch(...){return false;} //Earlier canonical C38 survives any rejection.
+        return returned;
+    }
     friend class ::ra_pod_scene50LA::Owner;
     const ::ra_pod_scene50LA::Owner* sceneOwner_=nullptr;
     friend class ::original_main_entry50KG::NativeCollectorFifo50LA;
@@ -97,9 +657,548 @@ class OwnershipBridge final {
     std::array<std::uint32_t,3> rosterAuxiliaryIds_{}; // terrain,694,7A4
     struct BodyIdentityReservation {
         const native_racer_collision50HW::Owner* collision=nullptr;
-        std::uint32_t main=0,secondary=0;
+        std::uint32_t main=0,secondary=0,terrain=0,pod=0,movement=0;
     };
     std::array<BodyIdentityReservation,8> bodyIdentities_{};
+    // Retained native per-roster694/A0 custody, NOT a guest694 Entity, a
+    // CollectionRef, or a simultaneous World registration. The existing
+    // shared-role membership remains unchanged until its real producer joins.
+    enum class NativePodResponseE8 { unpublished,constructorNull11B350 };
+    struct NativePod694Owner {
+        const native_racer_collision50HW::Owner* collision=nullptr;
+        const g::PodShapeSource49W* shape=nullptr;
+        const g::OriginalRacerMainBodyOwner50LA* bodyA0=nullptr;
+        std::uint64_t generation=0;
+        std::size_t slot=0;
+        NativePodResponseE8 responseE8=NativePodResponseE8::unpublished;
+    };
+    std::array<NativePod694Owner,8> stagedPods694_{};
+    std::array<std::weak_ptr<g::NativeSecondaryContactOwner50LA>,8> stagedSecondaryContacts_{};
+    std::array<std::weak_ptr<g::NativeRacerTerrainOwner50LA>,8> stagedRacerTerrain_{};
+    std::array<std::weak_ptr<g::NativeRacerAeroOwner50LA>,8> stagedAero_{};
+    //Private native identity admission after the real main Registry producer,
+    //before any shared source query invocation. This performs no source body,
+    //scene or geometry callback and does not activate the shared factory.
+    bool registerNativeSecondaryContactRegistry(native_dynamic_contact50IW::Registry& registry)noexcept {
+        const auto pin=bankLifetime_.lock();const auto* producer=endCandidateProducer_;
+        if(!producer||producer->inCall||producer->owner.lock().get()!=this||
+           producer->storage!=storage_.get()||producer->bodyRegistry!=&registry||
+           !registry.prepared()||!pin||!bankIdentity_||pin->identity!=bankIdentity_||terminal_||closed_||
+           !actual_||!storage_.get()||!storage_.get()->sharedRoster_||storage_.get()->sharedRoster_->retired||
+           !bankIdentity_->sealed_||bankIdentity_->retired_||bankIdentity_->visiting_||
+           bankIdentity_->readBlocked_||bankIdentity_->visitDepth_||bankIdentity_->sourceQueryPending()||
+           bankIdentity_->raWorldLifetime_.get()!=pin.get()||
+           registry.count()!=bankIdentity_->count_||
+           registry.count()!=storage_.get()->sharedRoster_->count||
+           !registeredRange(&actual_->frame.bodies.secondary,sizeof(actual_->frame.bodies.secondary))||
+           !registeredRange(actual_->frame.secondaryContactPartners210,
+               sizeof(actual_->frame.secondaryContactPartners210)))return false;
+        std::array<std::shared_ptr<g::NativeSecondaryContactOwner50LA>,8> owners{};
+        for(std::size_t slot=0;slot<registry.count();++slot){
+            owners[slot]=stagedSecondaryContacts_[slot].lock();
+            const auto& owner=owners[slot];
+            if(!rosterSlotComplete_[slot]||!owner||owner->revoked_||owner->slot_!=slot||
+               owner->bank_!=bankIdentity_||owner->frame_!=&actual_->frame||!owner->parameters_||
+               owner->generation_!=stagedPods694_[slot].generation||
+               !registeredRange(owner->parameters_,sizeof(*owner->parameters_)))return false;
+        }
+        if(registry.secondaryPrepared_){
+            for(std::size_t slot=0;slot<registry.count();++slot)
+                if(!registry.nativeSecondaryIdentity(slot,*owners[slot]).value)return false;
+            return true;
+        }
+        return registry.prepareNativeSecondary(owners.data(),registry.count());
+    }
+    bool nativeRacerTerrainCurrent(const original_camera_session50KX::Session& expected,
+        std::size_t slot,const g::NativeRacerTerrainOwner50LA& owner)const noexcept {
+        const auto pin=bankLifetime_.lock();
+        if(!pin||!actual_||!bankIdentity_||pin->identity!=bankIdentity_||&expected.actual_.bank!=bankIdentity_||
+           bankIdentity_->raWorldLifetime_.get()!=pin.get()||bankIdentity_->retired_||terminal_||closed_||
+           !camera_||camera_->session.get()!=&expected||camera_->generation!=expected.generation_||
+           expected.closed_||expected.abandoned_||!expected.coldBound_||
+           !expected.actual_.actualChariotModels||slot>=bankIdentity_->count_||
+           slot>=expected.racerEntities_.size()||!rosterSlotComplete_[slot]||
+           !owner.published_||owner.revoked_||owner.bank_!=bankIdentity_||owner.frame_!=&actual_->frame||
+           owner.slot_!=slot||owner.generation_!=expected.generation_||
+           owner.model_!=(*expected.actual_.actualChariotModels)[slot].get())return false;
+        const auto& racer=expected.racerEntities_[slot];
+        return owner.racer_==&racer&&racer.prepared()&&racer.racer.reference00&&
+            racer.racer.kind==g::OriginalWreckComponentKind50LA::racer27E130&&
+            racer.racer.sessionGeneration==owner.generation_&&racer.racer.objectKey==owner.racerKey_&&
+            owner.racerKey_&&racer.body340==stagedPods694_[slot].bodyA0&&racer.body340&&
+            racer.body340->canonicalNumericAddress()==&actual_->frame.bodies.main&&
+            racer.body340->scene288()==racer.scene190;
+    }
+    bool registerNativeRacerTerrainRegistry(const original_camera_session50KX::Session& expected,
+        native_dynamic_contact50IW::Registry& registry)noexcept {
+        const auto* producer=endCandidateProducer_;
+        if(!producer||producer->inCall||producer->owner.lock().get()!=this||
+           producer->storage!=storage_.get()||producer->bodyRegistry!=&registry||
+           !storage_.get()||!storage_.get()->sharedRoster_||storage_.get()->sharedRoster_->retired||
+           !registry.prepared()||!registry.secondaryPrepared_||!bankIdentity_||
+           !bankIdentity_->sealed_||bankIdentity_->retired_||bankIdentity_->visiting_||bankIdentity_->readBlocked_||
+           bankIdentity_->visitDepth_||bankIdentity_->sourceQueryPending()||
+           registry.count()!=bankIdentity_->count_||registry.count()!=storage_.get()->sharedRoster_->count)return false;
+        std::array<std::shared_ptr<g::NativeRacerTerrainOwner50LA>,8> owners{};
+        for(std::size_t slot=0;slot<registry.count();++slot){
+            owners[slot]=stagedRacerTerrain_[slot].lock();
+            if(!owners[slot]||!nativeRacerTerrainCurrent(expected,slot,*owners[slot]))return false;
+        }
+        if(registry.racerTerrainPrepared_){
+            for(std::size_t slot=0;slot<registry.count();++slot)
+                if(!registry.racerTerrainIdentity(slot,*owners[slot]).value)return false;
+            return true;
+        }
+        return registry.prepareRacerTerrainOwners(owners.data(),registry.count());
+    }
+    bool stageNativePod694(std::size_t slot,const g::OriginalRacerMainBodyOwner50LA& body,
+        const g::VehicleFrameParameters49W& parameters)noexcept {
+        const auto pin=bankLifetime_.lock();
+        if(!pin||pin->identity!=bankIdentity_||!bankIdentity_||
+           bankIdentity_->raWorldLifetime_.get()!=pin.get()||terminal_||closed_||
+           !bankIdentity_->sealed_||bankIdentity_->retired_||bankIdentity_->visitDepth_!=1u||
+           bankIdentity_->currentSlot_!=slot||slot>=inputs_.collisionRoster.size()||
+           stagedPods694_[slot].bodyA0||!actual_||!actual_->recovery||
+           !actual_->recovery->sourcePrepared||
+           !registeredRange(&parameters.shape,sizeof(parameters.shape)))return false;
+        const auto* collision=inputs_.collisionRoster[slot];
+        const auto& entity=body.entity();
+        if(!collision||!collision->prepared()||bodyIdentities_[slot].collision!=collision||
+           actual_->recovery->selectedSource!=collision||
+           actual_->main.resource!=&collision->main()||actual_->secondary.resource!=&collision->secondary()||
+           actual_->mainFilter.identity!=bodyIdentities_[slot].main||
+           actual_->secondaryFilter.identity!=bodyIdentities_[slot].secondary||
+           body.canonicalNumericAddress()!=&actual_->frame.bodies.main||!body.scene288()||
+           !body.scene288()->constructed||body.scene288()->released||!entity.reference00||
+           !entity.objectKey||
+           entity.kind!=g::OriginalWreckComponentKind50LA::body167920||!entity.sessionGeneration||
+           body.scene288()->entity().sessionGeneration!=entity.sessionGeneration||
+           !registeredRange(&actual_->frame.shape,sizeof(actual_->frame.shape))||
+           !registeredRange(&actual_->frame.bodies.main.components.body20C,sizeof(std::uint32_t))||
+           !registeredRange(actual_->frame.mainContactPartners210,sizeof(actual_->frame.mainContactPartners210)))return false;
+        const auto& shape=collision->mainTarget().source;
+        const auto& authored=parameters.shape;
+        if(std::memcmp(shape.local40.v,authored.local40.v,sizeof(shape.local40.v))||
+           std::memcmp(shape.rootCenter.v,authored.rootCenter.v,sizeof(shape.rootCenter.v))||
+           std::memcmp(shape.rootHalf.v,authored.rootHalf.v,sizeof(shape.rootHalf.v)))return false;
+        //The native fresh694 owner now retains the genuine constructor's
+        //response lane:2121F8 calls11B190, whose11B350 stores nullE8.
+        //No mutable response registration is exposed for this native owner.
+        //Unpublished/revoked state is distinct and cannot take the null branch.
+        stagedPods694_[slot]={collision,&shape,&body,entity.sessionGeneration,slot,
+            NativePodResponseE8::constructorNull11B350};return true;
+    }
+    void revokeNativePod694(std::size_t slot)noexcept {
+        revokeSharedColdOwners(slot);
+        if(slot<stagedAero_.size()){
+            if(auto owner=stagedAero_[slot].lock())owner->revoked_=true;
+            stagedAero_[slot].reset();
+        }
+        if(slot<stagedRacerTerrain_.size()){
+            if(auto owner=stagedRacerTerrain_[slot].lock())owner->revoked_=true;
+            stagedRacerTerrain_[slot].reset();
+        }
+        if(slot<stagedPods694_.size()){
+            if(const auto owner=stagedSecondaryContacts_[slot].lock())owner->revoked_=true;
+            stagedSecondaryContacts_[slot].reset();stagedPods694_[slot]={};
+        }
+    }
+    // Shared-mode opaque identities are assigned only at the actual selected
+    // resource constructor cut. Every destination must already belong to the
+    // current sealed Bank; no immutable legacy namespace is changed.
+    bool assignSharedColdIdentities(std::size_t slot)noexcept {
+        auto* s=storage_.get();if(!s||!s->sharedRoster_)return true;
+        const auto pin=bankLifetime_.lock();
+        if(!pin||!bankIdentity_||pin->identity!=bankIdentity_||
+           bankIdentity_->raWorldLifetime_.get()!=pin.get()||!bankIdentity_->sealed_||
+           bankIdentity_->retired_||bankIdentity_->visitDepth_!=1u||bankIdentity_->currentSlot_!=slot||
+           slot>=inputs_.collisionRoster.size()||terminal_||closed_||!actual_||
+           !actual_->recovery||!actual_->movement)return false;
+        auto& q=*actual_;auto& r=*q.recovery;const auto& ids=bodyIdentities_[slot];
+        if(!ids.terrain||!ids.pod||!ids.movement||ids.collision!=inputs_.collisionRoster[slot]||
+           q.main.resource!=&ids.collision->main()||q.secondary.resource!=&ids.collision->secondary()||
+           q.mainFilter.identity!=ids.main||q.secondaryFilter.identity!=ids.secondary||
+           r.sourcePrepared||!r.storagePrepared)return false;
+        for(const auto* lane:{&q.terrain.metadata.filter.identity,&r.globals.terrainIdentity348,
+            &r.globals.identity[0],&r.globals.identity[1],&r.podFilter.identity,&q.movement->filter.identity})
+            if(!registeredRange(lane,sizeof(*lane)))return false;
+        q.terrain.metadata.filter.identity=ids.terrain;r.globals.terrainIdentity348=ids.terrain;
+        r.globals.identity[0]=r.podFilter.identity=ids.pod;
+        r.globals.identity[1]=q.movement->filter.identity=ids.movement;
+        return true;
+    }
+    bool constructSharedTerrainResource(std::size_t slot,
+        const terrain_probe_authoring50fq_fixture::Owner& authored)noexcept {
+        auto* s=storage_.get();if(!s||!s->sharedRoster_)return true;
+        const auto pin=bankLifetime_.lock();
+        if(!pin||!bankIdentity_||pin->identity!=bankIdentity_||
+           bankIdentity_->raWorldLifetime_.get()!=pin.get()||!bankIdentity_->sealed_||
+           bankIdentity_->retired_||bankIdentity_->visitDepth_!=1u||bankIdentity_->currentSlot_!=slot||
+           slot>=inputs_.collisionRoster.size()||terminal_||closed_||!actual_||
+           !authored.prepared||!actual_->terrain.prepared||
+           !registeredRange(&actual_->terrain.initial,sizeof(actual_->terrain.initial))||
+           !live_terrain_probe50fr::matches(actual_->terrainLive,actual_->terrain.initial))return false;
+        auto& row=s->sharedRoster_->objects[slot*storage::Storage::rosterRoles+
+            static_cast<std::size_t>(storage::Storage::RosterRole::terrain348)];
+        const auto& ids=bodyIdentities_[slot];const auto& installed=actual_->terrain.initial.segment;
+        if(!row||row->collision!=ids.collision||row->slot!=slot||row->coldBound||
+           !row->terrainResource||row->terrainResource->initialized||
+           !row->terrainResult90||row->terrainResult90->constructed_||row->terrainResult90->revoked_||
+           actual_->main.resource!=&ids.collision->main()||
+           authored.metadata.filter.identity!=ids.terrain||actual_->terrain.metadata.filter.identity!=ids.terrain||
+           std::memcmp(installed.first.v,authored.initial.segment.first.v,16)||
+           std::memcmp(installed.second.v,authored.initial.segment.second.v,16)||
+           std::memcmp(installed.worldMatrix.v,authored.initial.segment.worldMatrix.v,64))return false;
+        //Genuine immutable resource constructor immediately after the actual
+        //cold348 install, from the still-live authored segment, NOT a saved
+        //frame snapshot. rays points into this retained row's own pair.
+        if(!live_terrain_probe50fr::initialize(*row->terrainResource,authored.initial.segment))return false;
+        //Same actual one-pair cold producer:11C5B4..11C6E4 constructs a
+        //SEPARATE result90, before later11DD00 reset. Retained unbanked per-row
+        //storage is already charged by sizeof to the unchanged native budget.
+        return row->terrainResult90->construct();
+    }
+    std::array<bool,storage::Storage::maximumRoster> sharedFilterAttempted_{};
+    bool constructSharedColdFilters(std::size_t slot,
+        const std::array<storage::Storage::SharedRosterObject*,storage::Storage::rosterRoles>& rows)noexcept {
+        auto& allocation=*storage_.get()->sharedRoster_;
+        if(slot>=allocation.count||sharedFilterAttempted_[slot])return false;
+        //All actual scalar/list schema is still at the same successful cold
+        //constructor cut. This is not a later per-frame snapshot producer.
+        const auto& q=*actual_;const g::CollisionFilter48J* filters[]={&q.mainFilter,&q.secondaryFilter,
+            &q.terrain.metadata.filter,&q.recovery->podFilter,&q.movement->filter};
+        const std::uint32_t expected0[]={q.secondaryFilter.identity,q.recovery->podFilter.identity,
+            q.movement->filter.identity,q.terrain.metadata.filter.identity};
+        const std::uint32_t expected1[]={q.mainFilter.identity,q.recovery->podFilter.identity,q.movement->filter.identity};
+        const std::uint32_t expected3[]={q.mainFilter.identity,q.movement->filter.identity,q.terrain.metadata.filter.identity};
+        const std::uint32_t* expected[]={expected0,expected1,nullptr,expected3,nullptr};
+        const std::size_t sizes[]={4,3,0,3,0};
+        std::size_t payload=0;
+        for(std::size_t i=0;i<rows.size();++i){
+            const auto& f=*filters[i];const auto& first=f.identityLists[0];
+            if(!rows[i]||rows[i]->coldFilter||rows[i]->coldBound||first.identities.size()!=sizes[i]||
+               first.mode!=1||f.identityLists[1].mode!=1||!f.identityLists[1].identities.empty())return false;
+            for(std::size_t n=0;n<sizes[i];++n)if(first.identities[n]!=expected[i][n])return false;
+            std::size_t bytes=sizeof(storage::Storage::SharedColdFilter);
+            for(const auto n:{first.identities.size(),f.identityLists[1].identities.size(),f.categoryMasks.size()}){
+                if(n>static_cast<std::size_t>(std::numeric_limits<std::int32_t>::max())||
+                   n>(std::numeric_limits<std::size_t>::max()-bytes)/sizeof(std::uint32_t))return false;
+                bytes+=n*sizeof(std::uint32_t);
+            }
+            if(bytes>allocation.coldPayloadRemaining||payload>allocation.coldPayloadRemaining-bytes)return false;
+            payload+=bytes;
+        }
+        //Reserve exact actual payload before allocation; partial construction
+        //retains its reservation and terminal attempt, never retries/duplicates.
+        sharedFilterAttempted_[slot]=true;allocation.coldPayloadRemaining-=payload;
+        try {
+            for(std::size_t i=0;i<rows.size();++i)
+                rows[i]->coldFilter=std::make_unique<const storage::Storage::SharedColdFilter>(*filters[i]);
+            return true;
+        }catch(...){return false;}
+    }
+    bool bindSharedColdOwners(std::size_t slot,
+        const terrain_probe_authoring50fq_fixture::Owner& authored)noexcept {
+        auto* s=storage_.get();if(!s||!s->sharedRoster_)return true;
+        const auto pin=bankLifetime_.lock();
+        if(!pin||!bankIdentity_||pin->identity!=bankIdentity_||
+           bankIdentity_->raWorldLifetime_.get()!=pin.get()||!bankIdentity_->sealed_||
+           bankIdentity_->retired_||bankIdentity_->visitDepth_!=1u||bankIdentity_->currentSlot_!=slot||
+           slot>=inputs_.collisionRoster.size()||!actual_||!actual_->recovery||!actual_->movement||
+           terminal_||closed_||s->sharedRoster_->retired||!authored.prepared)return false;
+        auto& q=*actual_;const auto& ids=bodyIdentities_[slot];const auto& staged=stagedPods694_[slot];
+        if(!staged.bodyA0||staged.collision!=ids.collision||!staged.generation||
+           q.recovery->selectedSource!=ids.collision||!q.recovery->sourcePrepared||
+           q.main.resource!=&ids.collision->main()||q.secondary.resource!=&ids.collision->secondary()||
+           !q.terrain.prepared||!live_terrain_probe50fr::matches(q.terrainLive,q.terrain.initial)||
+           std::memcmp(q.terrain.initial.segment.first.v,authored.initial.segment.first.v,16)||
+           std::memcmp(q.terrain.initial.segment.second.v,authored.initial.segment.second.v,16)||
+           std::memcmp(q.terrain.initial.segment.worldMatrix.v,authored.initial.segment.worldMatrix.v,64))return false;
+        const std::uint32_t identities[]={ids.main,ids.secondary,ids.terrain,ids.pod,ids.movement};
+        g::CollisionFilter48J* filters[]={&q.mainFilter,&q.secondaryFilter,&q.terrain.metadata.filter,
+            &q.recovery->podFilter,&q.movement->filter};
+        std::array<storage::Storage::SharedRosterObject*,storage::Storage::rosterRoles> rows{};
+        for(std::size_t i=0;i<rows.size();++i){
+            auto& row=s->sharedRoster_->objects[slot*rows.size()+i];
+            if(!row||row->slot!=slot||static_cast<std::size_t>(row->role)!=i||
+               row->collision!=ids.collision||row->coldBound||row->identity||
+               row->membership.state.attached||row->membership.state.object||
+               !identities[i]||filters[i]->identity!=identities[i])return false;
+            for(std::size_t j=0;j<i;++j)if(identities[i]==identities[j])return false;
+            rows[i]=row.get();
+        }
+        auto& terrain=*rows[static_cast<std::size_t>(storage::Storage::RosterRole::terrain348)];
+        if(!terrain.terrainResource||!terrain.terrainResource->initialized||
+           !terrain.terrainResult90||!terrain.terrainResult90->constructed_||terrain.terrainResult90->revoked_||
+           !live_terrain_probe50fr::matches(*terrain.terrainResource,authored.initial)||
+           authored.metadata.filter.identity!=ids.terrain)return false;
+        if(!constructSharedColdFilters(slot,rows))return false;
+        //Reuse the exact earlier producer's retained identity; never rebase
+        //this to arena.terrainLive or initialize it again during observation.
+        for(std::size_t i=0;i<rows.size();++i){
+            auto& row=*rows[i];row.identity=identities[i];row.canonicalFilter=filters[i];
+            row.generation=staged.generation;row.coldBound=true;
+        }
+        rows[0]->type2Resource=&ids.collision->main();rows[1]->type2Resource=&ids.collision->secondary();
+        terrain.type2Resource=&terrain.terrainResource->resource;
+        //21207C/1B11FC binds348+128 to this genuine main340 owner. Native
+        //cold custody is delayed here, not a replay of Entity construction.
+        //No World3FC/400 auxiliary pointer is inferred from this positive bind.
+        terrain.nativeTerrainBody128=staged.bodyA0;
+        rows[3]->type0Resource=staged.shape;rows[3]->bodyA0=staged.bodyA0;
+        //7A4 endpoints/metadata are a later actual FreshRecovery producer.
+        //No shape, attachment, query publication or revision is invented here.
+        return true;
+    }
+    void revokeSharedColdOwners(std::size_t slot)noexcept {
+        auto* s=storage_.get();if(!s||!s->sharedRoster_||slot>=s->sharedRoster_->count)return;
+        for(std::size_t i=0;i<storage::Storage::rosterRoles;++i){
+            auto& row=s->sharedRoster_->objects[slot*storage::Storage::rosterRoles+i];
+            if(!row)continue;
+            row->canonicalFilter=nullptr;row->bodyA0=nullptr;
+            row->nativeTerrainBody128=nullptr;row->coldBound=false;
+            if(row->terrainResult90)row->terrainResult90->revoke();
+            //Immutable resource backing stays retained until actual World
+            //retirement. No membership removal or live source zeroing occurs.
+        }
+    }
+    //Private Stage C registration seam, still uncalled. It does not issue a
+    //Bank pin or query view; later shared registration must prove all shared
+    //topology/membership spans absent and enroll the remaining real owners.
+    bool sharedAuxiliaryRegistrationAttempted_=false;
+    bool registerSharedAuxiliaryIdentitySpans(native_racer50HN::Bank& bank,
+        const ActualQueryOwners& a)noexcept {
+        auto* s=storage_.get();if(!s||!s->sharedRoster_||s->sharedRoster_->retired||
+           terminal_||closed_||sharedAuxiliaryRegistrationAttempted_||bank.sealed_||bank.retired_||bank.visiting_||bank.readBlocked_||bankIdentity_!=&bank||
+           bankLifetime_.expired()||bank.raWorldLifetime_.get()!=bankLifetime_.lock().get()||!a.recovery||a.recovery!=inputs_.recovery||
+           &a.terrain!=rosterTerrain_||a.movement!=rosterMovement_||!a.movement)return false;
+        sharedAuxiliaryRegistrationAttempted_=true;
+        try {
+            bank.owner(a.terrain.metadata.filter.identity);bank.owner(a.recovery->globals.terrainIdentity348);
+            bank.owner(a.recovery->globals.identity);bank.owner(a.recovery->podFilter.identity);
+            bank.owner(a.movement->filter.identity);return true;
+        }catch(...){terminal_=true;return false;} //Partial real registration is not replayable.
+    }
+
+    enum class NativeBodyListCall { contact98,processedA0,containsA4 };
+    struct NativeBodyEndpoint {
+        const NativePod694Owner* main=nullptr;
+        std::shared_ptr<g::NativeSecondaryContactOwner50LA> secondary;
+        bool typed()const noexcept{return (main!=nullptr)!=static_cast<bool>(secondary);}
+        std::size_t slot()const noexcept{return main?main->slot:secondary->slot_;}
+    };
+    //Two explicit body kinds, never a secondary token interpreted as main340.
+    //Both reuse the original algorithms but keep20C/210 and238/23C separate.
+    //Secondary recipients are only the genuinely active source primary. A
+    //different-slot secondary has no caller here and is deliberately refused.
+    bool callNativeBodyList(const NativeBodyEndpoint& recipient,
+        const NativeBodyEndpoint& other,NativeBodyListCall call,
+        g::BodyContactListStatus48R& status,bool& found)noexcept {
+        if(!recipient.typed()||!other.typed()||(recipient.secondary&&other.secondary))return false;
+        auto* producer=endCandidateProducer_;
+        const auto pin=bankLifetime_.lock();
+        if(!producer||!producer->inCall||!producer->activeRevision||!producer->activeSession||
+           producer->owner.lock().get()!=this||producer->storage!=storage_.get()||
+           !pin||!bankIdentity_||pin->identity!=bankIdentity_||
+           bankIdentity_->raWorldLifetime_.get()!=pin.get()||terminal_||closed_)return false;
+        const auto& session=*producer->activeSession;
+        auto& bank=session.actual_.bank; //Actual mutable owner, not const identity pointer.
+        if(&bank!=bankIdentity_)return false;
+        if(!bank.sealed_||bank.retired_||bank.visitDepth_!=1u||(!bank.visiting_&&!bank.readBlocked_)||
+           producer->activeSlot>=bank.count_||
+           bank.currentSlot_!=producer->activeSlot||bank.count_!=inputs_.collisionRoster.size()||
+           !camera_||camera_->session.get()!=&session||&session.actual_.bank!=&bank||
+           session.closed_||session.abandoned_||!session.coldBound_||!session.readsBound_||
+           !actual_||!gridArena_||&session.actual_.arena!=&actual_->frame||
+           session.generation_!=camera_->generation||!session.actual_.applicationEntities||
+           (recipient.slot()!=producer->activeSlot&&other.slot()!=producer->activeSlot)||
+           !producer->bodyRegistry||!producer->bodyRegistry->prepared()||
+           producer->bodyRegistry->count()!=bank.count_)return false;
+        const auto currentMain=[&](const NativePod694Owner& row){
+            if(row.slot>=bank.count_||&row!=&stagedPods694_[row.slot]||!bank.slots_[row.slot].active||
+               !rosterSlotComplete_[row.slot]||!row.bodyA0||!row.collision||!row.shape||
+               row.collision!=inputs_.collisionRoster[row.slot]||
+               row.collision!=bodyIdentities_[row.slot].collision||
+               row.shape!=&row.collision->mainTarget().source)return false;
+            const auto& racer=session.racerEntities_[row.slot];const auto& entity=row.bodyA0->entity();
+            return racer.prepared()&&racer.body340==row.bodyA0&&racer.scene190==row.bodyA0->scene288()&&
+                racer.racer.objectKey==session.racerKey(row.slot)&&
+                racer.racer.sessionGeneration==session.generation_&&row.generation==session.generation_&&
+                entity.sessionGeneration==row.generation&&entity.reference00&&
+                entity.kind==g::OriginalWreckComponentKind50LA::body167920&&entity.objectKey&&
+                racer.scene190&&racer.scene190->constructed&&!racer.scene190->released&&
+                racer.actualCounter423F60()==&session.actual_.applicationEntities->objectCount423F60()&&
+                racer.actualLock423F58()==&session.actual_.applicationEntities->attachmentLock423F58()&&
+                entity.parent1C==&racer.racer&&entity.mask20==2u&&
+                row.bodyA0->canonicalNumericAddress()==&actual_->frame.bodies.main&&
+                producer->bodyRegistry->bodyIdentityForSlot(row.slot).value;
+        };
+        const auto current=[&](const NativeBodyEndpoint& endpoint){
+            if(endpoint.main)return currentMain(*endpoint.main);
+            const auto& owner=*endpoint.secondary;const auto slot=owner.slot_;
+            const auto retained=slot<stagedSecondaryContacts_.size()?
+                stagedSecondaryContacts_[slot].lock():nullptr;
+            if(!retained||retained.get()!=&owner||owner.revoked_||slot!=producer->activeSlot||
+               !rosterSlotComplete_[slot]||!bank.slots_[slot].active||
+               owner.bank_!=&bank||owner.frame_!=&actual_->frame||
+               owner.generation_!=session.generation_||!owner.parameters_||
+               !registeredRange(owner.parameters_,sizeof(*owner.parameters_))||
+               !registeredRange(&actual_->frame.bodies.secondary,sizeof(actual_->frame.bodies.secondary))||
+               !registeredRange(actual_->frame.secondaryContactPartners210,
+                   sizeof(actual_->frame.secondaryContactPartners210))||
+               !gridArena_->rigs[slot]||gridArena_->rigs[slot].get()!=gridRigIdentity_[slot]||
+               !actual_->frame.bodies.main.domain.secondBodyPresent||
+               owner.physical19C_!=gridArena_->bindings.lifecycle.physical19C||
+               owner.physical19C_!=gridArena_->rigs[slot]->physical||
+               static_cast<std::size_t>(owner.physical19C_)>=actual_->frame.sceneNodeCount||
+               !bodyIdentities_[slot].collision||
+               actual_->secondaryFilter.identity!=bodyIdentities_[slot].secondary||
+               actual_->secondary.resource!=&bodyIdentities_[slot].collision->secondary())return false;
+            return producer->bodyRegistry->nativeSecondaryIdentity(slot,owner).value!=0;
+        };
+        if(!current(recipient)||!current(other)||
+           actual_->mainFilter.identity!=bodyIdentities_[producer->activeSlot].main||
+           actual_->main.resource!=&bodyIdentities_[producer->activeSlot].collision->main())return false;
+        // Source numeric backing is shared only while visiting. A different
+        // slot is the SAME Bank's saved owner span, not the current arena and
+        // not a copied/fresh physics body. Slot0 was saved before nonzero visits.
+        const auto backing=[&](void* address,std::size_t bytes)->unsigned char* {
+            const auto first=reinterpret_cast<std::uintptr_t>(address);
+            for(const auto& span:bank.spans_){
+                const auto begin=reinterpret_cast<std::uintptr_t>(span.address);
+                if(first<begin||first-begin>span.bytes||bytes>span.bytes-(first-begin))continue;
+                if(recipient.slot()==producer->activeSlot)return static_cast<unsigned char*>(address);
+                const auto offset=span.offset+(first-begin);
+                auto& saved=bank.slots_[recipient.slot()].bytes;
+                if(offset>saved.size()||bytes>saved.size()-offset)return nullptr;
+                return saved.data()+offset;
+            }
+            return nullptr;
+        };
+        auto& frame=actual_->frame;
+        auto& root=recipient.secondary?frame.bodies.secondary.root:frame.bodies.main.components.root;
+        auto& contactCount=recipient.secondary?frame.bodies.secondary.body20C:frame.bodies.main.components.body20C;
+        auto* contactSlots=recipient.secondary?frame.secondaryContactPartners210:frame.mainContactPartners210;
+        const bool processed=call!=NativeBodyListCall::contact98;
+        auto* count=backing(processed?static_cast<void*>(&root.callbackState238):
+            static_cast<void*>(&contactCount),sizeof(std::uint32_t));
+        auto* partners=backing(processed?static_cast<void*>(root.processedContactPartners23C):
+            static_cast<void*>(contactSlots),sizeof(frame.mainContactPartners210));
+        if(!count||!partners)return false;
+        g::BodyContactListState48R state;
+        std::memcpy(&state.count20C,count,sizeof(state.count20C));
+        const auto identity=other.secondary?
+            producer->bodyRegistry->nativeSecondaryIdentity(other.slot(),*other.secondary):
+            producer->bodyRegistry->bodyIdentityForSlot(other.slot());
+        if(!identity.value)return false;
+        if(call==NativeBodyListCall::containsA4){
+            //165540 scans every entry for signed count>0 (no early exit).
+            //Negative/zero performs no load. Above ten is not bounded backing.
+            if(state.count20C>static_cast<std::int32_t>(g::BodyContactCapacity48R))return false;
+            bool match=false;
+            for(std::int32_t i=0;i<state.count20C;++i){
+                g::BodyContactIdentity48R item;
+                std::memcpy(&item,partners+static_cast<std::size_t>(i)*sizeof(item),sizeof(item));
+                if(item.value==identity.value)match=true;
+            }
+            found=match;return true;
+        }
+        std::memcpy(state.slots210.data(),partners,sizeof(frame.mainContactPartners210));
+        const auto before=state.count20C;
+        //1654C0 uses the same signed capacity/duplicate/append arithmetic as
+        //165430, but its separately authenticated238/23C lanes above. Reuse
+        //only the numerical append leaf, never the +98 storage or reset.
+        status=g::applyBodyContactList48R(identity,state);
+        if(status==g::BodyContactListStatus48R::InvalidInput)return false;
+        if(status==g::BodyContactListStatus48R::Appended){
+            //165498/165528 write the new slot, then1654A4/165534 count+1. Preserve
+            //all untouched raw slots, including unknown constructor suffixes.
+            std::memcpy(partners+static_cast<std::size_t>(before)*sizeof(g::BodyContactIdentity48R),
+                &state.slots210[static_cast<std::size_t>(before)],sizeof(g::BodyContactIdentity48R));
+            std::memcpy(count,&state.count20C,sizeof(state.count20C));
+        }
+        return true;
+    }
+
+    //Preserve every existing main-only call without widening its source
+    //owner or storage domain. Native endpoint refs have this lexical lifetime.
+    bool callNativeStagedBodyList(const NativePod694Owner& recipient,
+        const NativePod694Owner& other,NativeBodyListCall call,
+        g::BodyContactListStatus48R& status,bool& found)noexcept {
+        return callNativeBodyList({&recipient,{}},{&other,{}},call,status,found);
+    }
+
+    bool applyNativeStagedBodyContact98(const NativePod694Owner& recipient,
+        const NativePod694Owner& other,g::BodyContactListStatus48R& status)noexcept {
+        bool unused=false;
+        return callNativeStagedBodyList(recipient,other,NativeBodyListCall::contact98,status,unused);
+    }
+    // Private reached subphase of294BB0, starting precisely at294C34.
+    // Caller must already publish the actual geometry/hit/copies and earlier
+    // currentCandidate130 effect. This is NOT an E4 completion or geometry
+    // receipt issuer. Incomplete results retain all earlier writes; caller
+    // must stop that invocation, not replay this phase with a new projection.
+    enum class NativeDynamicBodyCut {
+        primaryLookup294C44,otherProcessed294C68,primaryContact294C7C,
+        otherContact294C90,material294D04,pairRecords294DD4
+    };
+    struct NativeDynamicBodyPhase {
+        NativeDynamicBodyCut cut=NativeDynamicBodyCut::primaryLookup294C44;
+        bool suppressPairRecords=false;
+        std::uint32_t material=0;
+    };
+    NativeDynamicBodyPhase applyNativeDynamicBodyPhase(
+        const NativeBodyEndpoint& primary,const NativePod694Owner& other)noexcept {
+        NativeDynamicBodyPhase out;
+        //Query A0 is the actual visited typed body; target remains POD A0/main340.
+        const auto* producer=endCandidateProducer_;
+        if(!producer||!primary.typed()||primary.slot()!=producer->activeSlot)return out;
+        const NativeBodyEndpoint target{&other,{}};
+        g::BodyContactListStatus48R status{};bool found=false;
+        if(!callNativeBodyList(primary,target,NativeBodyListCall::containsA4,status,found))return out;
+        out.suppressPairRecords=found;
+        if(!found){
+            out.cut=NativeDynamicBodyCut::otherProcessed294C68;
+            if(!callNativeBodyList(target,primary,NativeBodyListCall::processedA0,status,found))return out;
+            out.cut=NativeDynamicBodyCut::primaryContact294C7C;
+            if(!callNativeBodyList(primary,target,NativeBodyListCall::contact98,status,found))return out;
+            out.cut=NativeDynamicBodyCut::otherContact294C90;
+            if(!callNativeBodyList(target,primary,NativeBodyListCall::contact98,status,found))return out;
+        }
+        // Original reads OTHER body.scene288, not shape owner9C. Existing
+        // main-body authentication proved this live, constructed scene. No
+        // source-null scene branch is inferred from unpublished state.
+        out.cut=NativeDynamicBodyCut::material294D04;
+        const auto* scene=other.bodyA0->scene288();
+        if(!scene||!scene->constructed||scene->released)return out;
+        const auto& name=scene->name38;
+        std::size_t end=0;
+        while(end<name.size()&&name[end]!='\0'&&name[end]!='.')++end;
+        // Original reads three bytes before first dot/string end. A shorter
+        // owner name reaches an unsafe source read: retain callbacks and stop.
+        if(end<3u)return out;
+        if(name[end-3u]=='f'&&name[end-2u]=='r'){
+            const auto byte=static_cast<unsigned char>(name[end-1u]);
+            const std::int32_t signedByte=byte<128u?byte:static_cast<std::int32_t>(byte)-256;
+            out.material=static_cast<std::uint32_t>(signedByte-48);
+        }
+        out.cut=NativeDynamicBodyCut::pairRecords294DD4;
+        return out; //Actual pair appends/E8 are later, separately ordered calls.
+    }
+
+    NativeDynamicBodyPhase applyNativeDynamicMainBodyPhase(
+        const NativePod694Owner& primary,const NativePod694Owner& other)noexcept {
+        return applyNativeDynamicBodyPhase({&primary,{}},other);
+    }
+    NativeDynamicBodyPhase applyNativeDynamicSecondaryBodyPhase(
+        const NativePod694Owner& other)noexcept {
+        const auto* producer=endCandidateProducer_;
+        if(!producer||producer->activeSlot>=stagedSecondaryContacts_.size())return {};
+        const auto primary=stagedSecondaryContacts_[producer->activeSlot].lock();
+        if(!primary)return {};
+        return applyNativeDynamicBodyPhase({nullptr,primary},other);
+    }
+
     bool rosterRetirementRequired_=false;
     std::array<bool,8> rosterSlotComplete_{};
     bool cameraRetiredForRoster()const noexcept {
@@ -154,6 +1253,75 @@ class OwnershipBridge final {
            now.camera.frame!=nativeStaticDrawIdentity_.camera.frame||
            now.fog!=nativeStaticDrawIdentity_.fog||now.revision!=nativeStaticDrawIdentity_.revision)return nullptr;
         return &nativeStaticDraw_;
+    }
+    // +110 adopts the already-populated native CameraBinding fields. This is
+    // the actual phase1 producer, not a later fog/render publication or a
+    // claim that this native display allocation is guest global442F70.
+    bool readNativeColdFog273C30(const g::OriginalApplicationEntities50LA& application,
+        const ra_cold_sources50LA::Owner& source,std::uint64_t generation,
+        g::OriginalRaceFogFields*& out)const noexcept {
+        if(terminal_||closed_||cameraPrepareTerminal_||nativeFifoPins_||triggerQueryActive_||
+           sharedOwnerLease_||sharedRoleViews_||sharedEffectsStopped_||
+           (endCandidateProducer_&&endCandidateProducer_->inCall)||!cameraBankCurrent()||
+           !camera_||!camera_->session||!camera_->display||!camera_->fog.current()||
+           camera_->fog.source_.get()!=&source||camera_->generation!=generation||
+           camera_->fogAddress!=&camera_->fog.fields_||
+           camera_->display->trackFog3EC!=&camera_->fog.fields_||nativeStaticDrawPrepared_)return false;
+        const auto& s=*camera_->session;
+        if(!generation||s.generation_!=generation||s.closed_||s.abandoned_||s.coldBound_||
+           s.coldPhase_!=1u||!s.coldViewport_.complete()||!s.coldCameraSelected26F940_||
+           s.frameStage_!=original_camera_session50KX::Session::FrameStage::idle||
+           s.publicationCount_||s.fogPreparationRevision_||s.fogPreparation_.owner||
+           s.displayInputs_!=camera_->display||s.display_.actualTrackFog3EC!=&camera_->fog.fields_||
+           s.display_.rendererCurrentScene0!=&s.viewport_||
+           s.actual_.applicationEntities.get()!=&application||application.attachmentLock423F58())return false;
+        const auto& f=camera_->fog.fields_;std::uint32_t nearBits=0;
+        std::memcpy(&nearBits,&f.near54,sizeof(nearBits));
+        if(f.far50!=4000.f||nearBits!=0x44a6a99au||f.minimum58!=64.f||f.dirty60!=1u||
+           s.display_.rendererFogColor28!=f.color30)return false;
+        out=&camera_->fog.fields_;return true;
+    }
+    std::shared_ptr<original_main_entry50KG::RaceDisplayLifetime50LA>
+    nativeColdModelDisplay274160(const g::OriginalApplicationEntities50LA& application,
+        const ra_cold_sources50LA::Owner& source,std::uint64_t generation)const noexcept {
+        g::OriginalRaceFogFields* fog=nullptr;
+        if(!readNativeColdFog273C30(application,source,generation,fog))return {};
+        //Actual selected phase1 owner, not a later frame or fabricated display.
+        return camera_->session->selectedGameplayDisplay_.lock();
+    }
+    bool publishNativeColdFog13E99C(const g::OriginalApplicationEntities50LA& application,
+        const ra_cold_sources50LA::Owner& source,std::uint64_t generation,
+        const g::OriginalRaceFogFields& actual)noexcept {
+        g::OriginalRaceFogFields* current=nullptr;
+        if(!readNativeColdFog273C30(application,source,generation,current)||current!=&actual)return false;
+        // Same real sink already written by coldViewport's fog restoration;
+        // later restoration continues to use it. No retained renderer pointer,
+        // copied fog state, source setter replay or 442F70 allocation assertion.
+        camera_->session->display_.rendererFogColor28=actual.color30;
+        return true;
+    }
+    bool canWithdrawNativeFogBorrow()const noexcept {
+        // Fog metadata has no enabled callback/selection route. Its only live
+        // native value borrow is withdrawn before closeCamera can destroy it.
+        return !nativeFifoPins_&&!triggerQueryActive_&&!sharedOwnerLease_&&!sharedRoleViews_&&
+            !(endCandidateProducer_&&endCandidateProducer_->inCall)&&
+            (!camera_||cameraBankCurrent());
+    }
+    bool readNativeLocalFlareCamera(
+        const g::original_gc_gameplay_lighting_candidate::NativeRaStaticDraw50LA& record,
+        const g::OriginalApplicationEntities50LA& application,g::CameraViewOutput49F& out)const noexcept {
+        const auto* publication=nativeStaticDraw();if(!publication)return false;
+        bool owned=false;for(const auto& row:*publication)if(&row==&record){owned=true;break;}
+        if(!owned||record.kind!=g::original_gc_gameplay_lighting_candidate::NativeRaStaticDraw50LA::Kind::lightFlare||
+           !record.flareIdentity||!camera_||!camera_->session)return false;
+        const auto& session=*camera_->session;
+        if(session.actual_.applicationEntities.get()!=&application||
+           session.display_.rendererCurrentScene0!=&session.viewport_||
+           &session.actual_.visibility!=freshLighting_.get()||!session.spatial_.registration34.attached||
+           !session.spatial_.parent38||session.spatial_.parent38>session.visibilityKeys_.count||
+           record.viewport!=std::array<std::int32_t,4>{{session.viewport_.x1E0,session.viewport_.y1E4,
+               session.viewport_.width1E8,session.viewport_.height1EC}})return false;
+        out=session.matrices_;return true;
     }
     bool prepareNativeStaticDraw(Diagnostic& d)noexcept {
         d={};nativeStaticDrawPrepared_=false;
@@ -292,6 +1460,17 @@ class OwnershipBridge final {
            camera_->display->trackFog3EC!=&camera_->fog.fields_)return false;
         return camera_->session->constructColdController174A30(camera_->generation);
     }
+    bool constructCurrentRaIntro174FA4(const original_main_entry50KG::Application&)noexcept;
+    rr::game::OriginalWreckComponent50LA* currentIntroController174A30()noexcept {
+        if(terminal_||closed_||cameraPrepareTerminal_||!camera_||!camera_->session||!cameraBankCurrent()||
+           camera_->session->closed_||!camera_->session->nativeTaIssuance_||
+           camera_->session->nativeTaIssuance_->course!=g::OriginalCameraStartCourse::ra)return nullptr;
+        return camera_->session->taControllerEntity174A30();
+    }
+    bool constructCurrentIntroAudio177750(std::shared_ptr<const rr::assets::AudioBank50HC> bank,
+        std::size_t firstVoice,std::size_t voiceCount)noexcept {
+        return currentIntroController174A30()&&camera_->session->constructTaIntro177750(std::move(bank),firstVoice,voiceCount);
+    }
     bool cameraAttempted_=false,cameraPrepareTerminal_=false;
     bool storageAttempted_=false,capacitySealed_=false,storageConstructed_=false;
     bool bindAttempted_=false,queriesConstructed_=false,terminal_=false,closed_=false;
@@ -341,6 +1520,7 @@ class OwnershipBridge final {
         }
     };
     bool canRetireBankBacking()const noexcept {
+        if(sharedOwnerLease_||sharedRoleViews_||sharedEffectsStopped_)return false;
         if(nativeFifoPins_||triggerQueryActive_||rosterRetirementRequired_)return false;
         for(const bool pending:freshRetirementRequired_)if(pending)return false;
         for(const bool pending:gridRetirementRequired_)if(pending)return false;
@@ -367,9 +1547,21 @@ class OwnershipBridge final {
         for(const auto& b:*bindings)if(b.candidate->candidate.collision.filter.identity==id)return false;
         return true;
     }
-    bool constructStorage(std::shared_ptr<g::OriginalApplicationEntities50LA> app,
+    // Private fresh-only alternate factory. No existing loader calls this.
+    // Plan points to the actual retained roster during synchronous allocation;
+    // Storage copies typed owner borrows, never a saved numeric World image.
+    bool constructSharedRosterStorage(std::shared_ptr<g::OriginalApplicationEntities50LA> app,
         std::shared_ptr<const ra_static_candidates50LA::Owner> candidates,
         const RuntimeQueryCapacityInputs& input,Diagnostic& d)noexcept {
+        if(!rosterResources_||!input.recovery||bankIdentity_||!bankLifetime_.expired())
+            return fail(d,"shared roster requires fresh retained owners before Bank registration");
+        const storage::Owner::SharedRosterPlan plan{input.collisionRoster.data(),input.collisionRoster.size()};
+        return constructStorage(std::move(app),std::move(candidates),input,d,&plan);
+    }
+    bool constructStorage(std::shared_ptr<g::OriginalApplicationEntities50LA> app,
+        std::shared_ptr<const ra_static_candidates50LA::Owner> candidates,
+        const RuntimeQueryCapacityInputs& input,Diagnostic& d,
+        const storage::Owner::SharedRosterPlan* shared=nullptr)noexcept {
         d={};
         if(storageAttempted_||terminal_||closed_||!app||!app->application10())
             return fail(d,"RA runtime storage requires fresh state and actual Application");
@@ -431,7 +1623,8 @@ class OwnershipBridge final {
             limits_.originalCameraQueries=true;
             limits_.originalRecoveryQueries=inputs_.recovery!=nullptr;
             limits_.wreckPieceQueries=inputs_.wreck.size();
-            const std::size_t base=6u+(inputs_.recovery?2u:0u);
+            const std::size_t base=shared?3u+inputs_.collisionRoster.size()*storage::Storage::rosterRoles:
+                6u+(inputs_.recovery?2u:0u);
             if(inputs_.wreck.size()>(storage::runtimeSearchSlotLimit-base)/3u||
                bindings->size()>storage::runtimeSearchSlotLimit-base-inputs_.wreck.size()*3u)
                 return fail(d,"actual query reservation exceeds one-block registry capacity");
@@ -455,7 +1648,10 @@ class OwnershipBridge final {
             };
             for(std::size_t slot=0;slot<inputs_.collisionRoster.size();++slot){
                 auto& row=bodyIdentities_[slot];row.collision=inputs_.collisionRoster[slot];
-                for(auto* target:{&row.main,&row.secondary}){
+                std::uint32_t* targets[]={&row.main,&row.secondary,&row.terrain,&row.pod,&row.movement};
+                const auto targetCount=shared?5u:2u;
+                for(unsigned targetIndex=0;targetIndex<targetCount;++targetIndex){
+                    auto* target=targets[targetIndex];
                     while(next&&!available(next)){
                         if(next==std::numeric_limits<std::uint32_t>::max())next=0;else ++next;
                     }
@@ -479,8 +1675,12 @@ class OwnershipBridge final {
             if(!lease)return fail(d,"same-source RA live world already leased or invalid");
             const storage::SourceWorldView<ra_cold_sources50LA::CollisionOwner> view{
                 source->world,{source->collisions.data(),source->collisions.size()}};
-            if(!storage_.prepareSource(view,bindings->data(),bindings->size(),limits_,d.storage,
-                &lease->world(),lease,std::move(app)))return fail(d,"RA runtime static/query storage construction failed");
+            const bool prepared=shared?
+                storage_.prepareSharedRosterSource(view,bindings->data(),bindings->size(),limits_,d.storage,
+                    lease->world(),lease,std::move(app),*shared):
+                storage_.prepareSource(view,bindings->data(),bindings->size(),limits_,d.storage,
+                    &lease->world(),lease,std::move(app));
+            if(!prepared)return fail(d,"RA runtime static/query storage construction failed");
             storageConstructed_=true;
             if(candidates_->triggerActions_){auto& s=*storage_.get();
                 for(std::size_t i=0;i<2;++i){
@@ -499,6 +1699,23 @@ class OwnershipBridge final {
     }
     bool bindQueries(const ActualQueryOwners& a,Diagnostic& d)noexcept {
         d={};
+        // Stage B deliberately lends NO legacy role/Follow/reset views. Their
+        // typed shared-owner producers/consumers belong to later reviewed work.
+        if(storage_.get()&&storage_.get()->sharedRoster_)
+            return fail(d,"shared roster query-owner publication is not implemented");
+        return bindQueryArena(a,d,false);
+    }
+    //Private and uncalled: admits only the actual typed arena, NOT Follow,
+    //fixed-role query views, a Bank pin, membership or gameplay readiness.
+    bool bindSharedQueryArena(const ActualQueryOwners& a,Diagnostic& d)noexcept {
+        d={};
+        if(!storage_.get()||!storage_.get()->sharedRoster_)
+            return fail(d,"shared arena requires the actual private fresh factory");
+        return bindQueryArena(a,d,true);
+    }
+    bool bindQueryArena(const ActualQueryOwners& a,Diagnostic& d,bool shared)noexcept {
+        if(!storage_.get()||shared!=bool(storage_.get()->sharedRoster_))
+            return fail(d,"typed arena mode differs from actual fresh allocation");
         if(terminal_||closed_||bindAttempted_||!storageConstructed_||!capacitySealed_)
             return fail(d,"RA actual query binding requires its fresh sealed storage");
         bindAttempted_=true;
@@ -570,15 +1787,56 @@ class OwnershipBridge final {
             // No reset/write to the actual application normal-mode owner. A real
             // completed query, not cold construction, establishes its source word.
             actual_=std::make_unique<ActualQueryOwners>(a);
+            if(shared)return true; //Only actual arena custody; no query constructor claimed.
             follow_.reset(new original_follow_query_bridge::QueryBridge(s,candidates_->decodedSource()->world,
                 a.normalMode,a.main,a.mainFilter,a.secondary,a.secondaryFilter,a.terrain.metadata,
                 a.recovery,a.recovery?&a.frame:nullptr,a.movement,recoveryMeshStack_,wreckMeshStack_));
             queriesConstructed_=true;return true;
         }catch(...){return fail(d,"actual Follow construction failed; storage prefix retained");}
     }
+#include "ra_shared_owner_lease50la.inl"
+#include "ra_shared_role_views50la.inl"
+#include "ra_shared_cold_attachment50la.inl"
+#include "ra_shared_fresh_attachment50la.inl"
+#include "ra_shared_direct_pod50la.inl"
+#include "ra_shared_contact50la.inl"
+#include "ra_shared_terrain_prepare50la.inl"
+#include "ra_shared_terrain_result50la.inl"
+#include "ra_shared_projection50la.inl"
+#include "ra_shared_selection50la.inl"
+#include "ra_shared_terrain_nohit50la.inl"
+#include "ra_shared_engine_gravity50la.inl"
+#include "ra_shared_engine_application50la.inl"
+#include "ra_shared_aero_phases50la.inl"
+#include "ra_shared_spring_response50la.inl"
+#include "ra_shared_terrain_response50la.inl"
+#include "ra_shared_secondary_forces50la.inl"
+    //Uncalled until the terrain POD consumer reaches its real owner9C read.
+    //The typed token names the actual racer, never the separate340 body.
+    bool readNativePodRacerOwner9C(const SharedOwnerLease& lease,std::size_t slot,
+        g::NativeRacerTerrainIdentity50LA& value)const noexcept {
+        if(!sharedLeaseCurrent(lease)||slot>=stagedRacerTerrain_.size()||
+           !lease.producer_->bodyRegistry)return false;
+        const auto owner=stagedRacerTerrain_[slot].lock();
+        if(!owner||!nativeRacerTerrainCurrent(*lease.producer_->activeSession,slot,*owner))return false;
+        const auto& s=*storage_.get();
+        if(slot>=s.sharedRoster_->count)return false;
+        const auto& row=s.sharedRoster_->objects[slot*storage::Storage::rosterRoles+
+            static_cast<std::size_t>(storage::Storage::RosterRole::pod694)];
+        if(!row||!row->coldBound||row->slot!=slot||row->generation!=owner->generation_||
+           row->bodyA0!=stagedPods694_[slot].bodyA0||!row->membership.state.attached||
+           row->membership.state.object!=row->reservedRef)return false;
+        const auto actual=lease.producer_->bodyRegistry->racerTerrainIdentity(slot,*owner);
+        if(!actual.value)return false;value=actual;return true;
+    }
     bool registerWorldOwners(native_racer50HN::Bank& bank,
         const std::shared_ptr<OwnershipBridge>& self,Diagnostic& d)noexcept {
         d={};
+        // This is the legacy candidate-lane/World Bank path. Shared-mode
+        // candidates and their F8/copied lanes must never enter this snapshot.
+        // No shared-mode Bank pin/borrow is issued before Stage C is complete.
+        if(storage_.get()&&storage_.get()->sharedRoster_)
+            return fail(d,"shared roster Bank publication requires typed owner integration");
         if(terminal_||closed_||registrationAttempted_||!queriesConstructed_||
            self.get()!=this||bankIdentity_||bank.raWorldLifetime_||
            bank.retired_||bank.sealed_||bank.visiting_||bank.readBlocked_)
@@ -654,6 +1912,7 @@ class OwnershipBridge final {
         const auto* bytes=reinterpret_cast<const unsigned char*>(&frame);
         return a.humanCount<=1u&&a.humanCount==inputs_.humanCount&&registeredRange(bytes,noise)&&registeredRange(bytes+after,sizeof(frame)-after)&&
             registeredRange(&a.bindings,sizeof(a.bindings))&&registeredRange(&a.parameters,sizeof(a.parameters))&&
+            registeredRange(&a.selectors,sizeof(a.selectors))&&
             registeredRange(&a.ai,sizeof(a.ai))&&registeredRange(&a.history,sizeof(a.history))&&
             registeredRange(&q.main,sizeof(q.main))&&registeredRange(&q.secondary,sizeof(q.secondary))&&
             registeredRange(&q.mainFilter.identity,sizeof(q.mainFilter.identity))&&
@@ -731,19 +1990,34 @@ class OwnershipBridge final {
         }catch(...){return fail(d,"RA pod binding exception; context and saved slot pointer retained");}
     }
     bool placeGrid(native_racer50HN::Bank& bank,std::size_t slot,
-        const GridArenaOwners& input,Diagnostic& d)noexcept {
+        const GridArenaOwners& input,Diagnostic& d,bool canonicalTournamentGrid=false)noexcept {
+        return placeGridMode(bank,slot,input,d,canonicalTournamentGrid,false);
+    }
+    bool placeSharedGrid(native_racer50HN::Bank& bank,std::size_t slot,
+        const GridArenaOwners& input,Diagnostic& d,bool canonicalTournamentGrid=false)noexcept {
+        return placeGridMode(bank,slot,input,d,canonicalTournamentGrid,true);
+    }
+    bool placeGridMode(native_racer50HN::Bank& bank,std::size_t slot,
+        const GridArenaOwners& input,Diagnostic& d,bool canonicalTournamentGrid,bool shared)noexcept {
         d={};
+        if(!storage_.get()||shared!=bool(storage_.get()->sharedRoster_))
+            return fail(d,"cold grid mode differs from actual fresh storage ownership");
+        if(shared&&(sharedEffectsStopped_||sharedOwnerLease_||sharedRoleViews_||nativeFifoPins_||
+           triggerQueryActive_||(endCandidateProducer_&&endCandidateProducer_->inCall)))
+            return fail(d,"shared cold grid has outstanding source/query custody");
         if(terminal_||closed_||cameraAttempted_||!worldOwnersRegistered_||!actual_||
            !cameraBankCurrent()||&bank!=bankIdentity_||slot>=inputs_.collisionRoster.size()||gridAttempted_[slot]||
            inputs_.collisionRoster.size()!=bank.count()||!gridInputsRegistered(input)||
            (rosterResources_&&!rosterSlotComplete_[slot]))
             return fail(d,"RA cold grid requires the same sealed active-roster Bank and registered actual arena");
+        if(canonicalTournamentGrid&&(input.humanCount!=1u||bank.count()!=8u))
+            return fail(d,"Tournament grid requires the actual one-human seven-AI roster");
         if(actual_->recovery&&(!podBindingInstalled_[slot]||podHumanCount_!=input.humanCount||podBindings_!=&input.bindings||podParameters_!=&input.parameters))
             return fail(d,"RA recovery grid requires the actual previously bound pod context");
         try {
             if(gridArena_){
                 const auto& a=*gridArena_;
-                if(&a.bindings!=&input.bindings||&a.parameters!=&input.parameters||&a.ai!=&input.ai||
+                if(&a.bindings!=&input.bindings||&a.parameters!=&input.parameters||&a.selectors!=&input.selectors||&a.ai!=&input.ai||
                    &a.history!=&input.history||&a.rigs!=&input.rigs||a.humanCount!=input.humanCount)
                     return fail(d,"RA grid arena borrows cannot be replaced");
             }else{
@@ -781,9 +2055,26 @@ class OwnershipBridge final {
             bank.visit(slot,[&](){
                 auto& q=*actual_;auto& state=q.frame;auto& a=*gridArena_;const auto& rig=*a.rigs[slot];
                 auto& storage=*storage_.get();
+                std::array<storage::Storage::SharedRosterObject*,storage::Storage::rosterRoles> rows{};
+                if(shared&&!sharedColdRowsCurrent(slot,rows)){
+                    fail(d,"actual shared grid role owners differ");return;}
+                if(shared){
+                    if(!rows[3]->podContext||a.bindings.podLiveQuery50IZ!=&*rows[3]->podContext){
+                        fail(d,"actual saved per-slot POD context differs");return;}
+                    for(unsigned i=0;i<3;++i)if(rows[i]->membership.state.attached||rows[i]->membership.state.object||
+                        storage.objects[rows[i]->reservedRef-1u].identity||
+                        rows[i]->effectRevision==std::numeric_limits<std::uint64_t>::max()){
+                        fail(d,"shared grid requires its genuinely unpublished constructor rows");return;}
+                }
+                auto& mainMember=shared?rows[0]->membership:storage.mainMembership;
+                auto& secondaryMember=shared?rows[1]->membership:storage.secondaryMembership;
+                auto& terrainMember=shared?rows[2]->membership:storage.terrainMembership;
+                const auto mainRef=shared?rows[0]->reservedRef:storage.count.mainQuery;
+                const auto secondaryRef=shared?rows[1]->reservedRef:storage.count.secondaryQuery;
+                const auto terrainRef=shared?rows[2]->reservedRef:storage.count.terrainQuery;
                 const auto main=static_cast<unsigned>(a.bindings.lifecycle.main190);
                 const auto physical=static_cast<unsigned>(a.bindings.lifecycle.physical19C);
-                if(q.recovery&&a.bindings.podLiveQuery50IZ!=podContext_.get()){
+                if(q.recovery&&!shared&&a.bindings.podLiveQuery50IZ!=podContext_.get()){
                     fail(d,"selected slot lost its actual bridge-owned pod context");return;}
                 const native_racer_collision50HW::Owner* collision=nullptr;
                 for(const auto* item:inputs_.collisionRoster)if(q.main.resource==&item->main()&&
@@ -809,7 +2100,10 @@ class OwnershipBridge final {
                     fail(d,"actual Ready racer-role/rig/COL/PHY/query ownership differs at grid slot");return;}
                 constexpr std::uint32_t hostRank[8]={4,0,1,2,3,5,6,7};
                 g::GridCenterResult50AC grid{};
-                if(!source_grid50IG::prepare(candidates_->decodedSource()->map,hostRank[slot],grid)){
+                // Preserve Bank identity; original1AE1D8 /1AE400 select start rank only.
+                const auto rank=canonicalTournamentGrid?
+                    (slot?static_cast<std::uint32_t>(slot-1):7u):hostRank[slot];
+                if(!source_grid50IG::prepare(candidates_->decodedSource()->map,rank,grid)){
                     fail(d,"actual RA M-spline grid geometry rejected");return;}
                 auto requested=state.nodes[main].world100;
                 for(unsigned axis=0;axis<3;++axis){const auto value=std::bit_cast<float>(grid.position[axis]);
@@ -819,7 +2113,7 @@ class OwnershipBridge final {
                     requested,a.parameters.visual.verticalLimit7EC,groundStack_.data(),groundStack_.size(),grounded)){
                     fail(d,"actual RA collision ground probe rejected");return;}
                 gridRetirementRequired_[slot]=true;
-                for(auto* membership:{&storage.mainMembership,&storage.secondaryMembership,&storage.terrainMembership})
+                for(auto* membership:{&mainMember,&secondaryMember,&terrainMember})
                     if(g::removeLiveZoneMembership50EN(storage.lifecycle,storage.world,membership->state,
                         storage.membershipWork).status!=g::LiveZoneStatus50EN::Complete){
                         fail(d,"RA grid detach incomplete; actual partial effects retained");return;}
@@ -830,29 +2124,32 @@ class OwnershipBridge final {
                    !prepareGridQuery(q.secondary,state.nodes[physical].world100,secondaryBounds)){
                     fail(d,"actual grid query cache construction rejected");return;}
                 // Source1AE588/1AE590 ->2169C0 chooses first genuine C34 ref1.
-                if(g::attachLiveZoneMembership50EN(storage.lifecycle,storage.world,storage.mainMembership.state,
-                    storage.mainMembership.storage(),storage.count.mainQuery,1,g::ZoneMethod50CL::Second,0.f,
+                if(g::attachLiveZoneMembership50EN(storage.lifecycle,storage.world,mainMember.state,
+                    mainMember.storage(),mainRef,1,g::ZoneMethod50CL::Second,0.f,
                     mainBounds,storage.membershipWork).status!=g::LiveZoneStatus50EN::Complete||
-                   g::attachLiveZoneMembership50EN(storage.lifecycle,storage.world,storage.secondaryMembership.state,
-                    storage.secondaryMembership.storage(),storage.count.secondaryQuery,1,g::ZoneMethod50CL::Second,0.f,
-                    secondaryBounds,storage.membershipWork).status!=g::LiveZoneStatus50EN::Complete){
+                   (shared&&!publishSharedColdGridRole(*rows[0],mainBounds))||
+                   g::attachLiveZoneMembership50EN(storage.lifecycle,storage.world,secondaryMember.state,
+                    secondaryMember.storage(),secondaryRef,1,g::ZoneMethod50CL::Second,0.f,
+                    secondaryBounds,storage.membershipWork).status!=g::LiveZoneStatus50EN::Complete||
+                   (shared&&!publishSharedColdGridRole(*rows[1],secondaryBounds))){
                     fail(d,"RA grid body attachment incomplete; actual effects retained");return;}
                 g::TerrainPrepareInput48M terrain{};terrain.state=q.terrain.initial;
                 terrain.scene=state.nodes[main].world100;terrain.lowerEndpoint140=q.terrain.lowerEndpoint140;
                 g::TerrainPrepareState48M prepared{};
                 if(g::prepareTerrainSinglePair48M(terrain,prepared)!=g::TerrainPrepareStatus48M::QueryReady){
                     fail(d,"actual grid terrain cache rejected");return;}
-                const auto bounds=live_terrain_probe50fr::bounds(q.terrainLive,prepared);
-                if(g::attachLiveZoneMembership50EN(storage.lifecycle,storage.world,storage.terrainMembership.state,
-                    storage.terrainMembership.storage(),storage.count.terrainQuery,1,g::ZoneMethod50CL::Second,0.f,
-                    bounds,storage.membershipWork).status!=g::LiveZoneStatus50EN::Complete){
+                const auto bounds=live_terrain_probe50fr::bounds(shared?*rows[2]->terrainResource:q.terrainLive,prepared);
+                if(g::attachLiveZoneMembership50EN(storage.lifecycle,storage.world,terrainMember.state,
+                    terrainMember.storage(),terrainRef,1,g::ZoneMethod50CL::Second,0.f,
+                    bounds,storage.membershipWork).status!=g::LiveZoneStatus50EN::Complete||
+                   (shared&&!publishSharedColdGridRole(*rows[2],bounds))){
                     fail(d,"RA grid terrain attachment incomplete; actual effects retained");return;}
                 auto& receipt=gridCompletion_[slot];
                 receipt.main=state.nodes[main].world100;receipt.physical=state.nodes[physical].world100;
                 receipt.mainResource=q.main.resource;receipt.secondaryResource=q.secondary.resource;
-                receipt.mainRevision=storage.mainMembership.state.revision;
-                receipt.secondaryRevision=storage.secondaryMembership.state.revision;
-                receipt.terrainRevision=storage.terrainMembership.state.revision;
+                receipt.mainRevision=mainMember.state.revision;
+                receipt.secondaryRevision=secondaryMember.state.revision;
+                receipt.terrainRevision=terrainMember.state.revision;
                 if(candidates_->triggerActions_&&!observeTriggerPoses(d))return;
                 complete=true;
             });
@@ -860,7 +2157,7 @@ class OwnershipBridge final {
             return complete;
         }catch(...){return fail(d,"RA grid exception; Bank saved actual partial slot effects");}
     }
-    bool recoveryLanesRegistered(const FreshRecoveryArenaOwners& a)const noexcept {
+    bool recoveryLanesRegistered(const FreshRecoveryArenaOwners& a,bool shared=false)const noexcept {
         const auto& r=*actual_->recovery;const auto& m=*actual_->movement;
         if(!registeredRange(a.endpoints,sizeof(a.endpoints))||!registeredRange(a.metadata,sizeof(a.metadata))||
            !registeredRange(&m.copied40,sizeof(m.copied40))||!registeredRange(&m.copied50,sizeof(m.copied50))||
@@ -874,7 +2171,7 @@ class OwnershipBridge final {
            !registeredRange(&r.sourcePrepared,sizeof(r.sourcePrepared)))return false;
         const auto& ids=r.podFilter.identityLists[0].identities;
         if(!ids.empty()&&!registeredRange(ids.data(),ids.size()*sizeof(ids[0])))return false;
-        for(unsigned i=0;i<2;++i)
+        if(!shared)for(unsigned i=0;i<2;++i)
             if(!registeredRange(&r.memberships[i],sizeof(r.memberships[i]))||
                !registeredRange(r.links[i].data(),r.links[i].size()*sizeof(r.links[i][0]))||
                !registeredRange(r.entries[i].data(),r.entries[i].size()*sizeof(r.entries[i][0])))return false;
@@ -894,7 +2191,22 @@ class OwnershipBridge final {
     bool attachFresh(native_racer50HN::Bank& bank,std::size_t slot,
         const std::shared_ptr<g::original_gc_gameplay_lighting_candidate::Owner>& light,
         const FreshRecoveryArenaOwners* recovery,Diagnostic& d)noexcept {
+        return attachFreshMode(bank,slot,light,recovery,d,false);
+    }
+    bool attachSharedFresh(native_racer50HN::Bank& bank,std::size_t slot,
+        const std::shared_ptr<g::original_gc_gameplay_lighting_candidate::Owner>& light,
+        const FreshRecoveryArenaOwners& recovery,Diagnostic& d)noexcept {
+        return attachFreshMode(bank,slot,light,&recovery,d,true);
+    }
+    bool attachFreshMode(native_racer50HN::Bank& bank,std::size_t slot,
+        const std::shared_ptr<g::original_gc_gameplay_lighting_candidate::Owner>& light,
+        const FreshRecoveryArenaOwners* recovery,Diagnostic& d,bool shared)noexcept {
         d={};
+        if(!storage_.get()||shared!=bool(storage_.get()->sharedRoster_))
+            return fail(d,"fresh attachment mode differs from actual World ownership");
+        if(shared&&(!recovery||sharedEffectsStopped_||sharedOwnerLease_||sharedRoleViews_||nativeFifoPins_||
+           triggerQueryActive_||(endCandidateProducer_&&endCandidateProducer_->inCall)))
+            return fail(d,"shared fresh attachment has outstanding source/query custody");
         if(terminal_||closed_||cameraAttempted_||!cameraBankCurrent()||&bank!=bankIdentity_||slot>=inputs_.collisionRoster.size()||
            !actual_||!gridArena_||!gridCompletion_[slot].complete||freshAttempted_[slot]||!light||
            (freshLighting_&&freshLighting_!=light)||bool(recovery)!=bool(actual_->recovery))
@@ -904,7 +2216,7 @@ class OwnershipBridge final {
         if(actual_->recovery&&(!podBindingInstalled_[slot]||podBindings_!=&gridArena_->bindings||
            podParameters_!=&gridArena_->parameters))
             return fail(d,"RA fresh recovery requires its real retained pod context binding");
-        if(recovery&&(!actual_->movement||!recoveryLanesRegistered(*recovery)))
+        if(recovery&&(!actual_->movement||!recoveryLanesRegistered(*recovery,shared)))
             return fail(d,"actual recovery endpoint/source or Bank lanes unavailable");
         if(freshRecovery_&&(&freshRecovery_->endpoints!=&recovery->endpoints||
            &freshRecovery_->metadata!=&recovery->metadata||&freshRecovery_->source!=&recovery->source))
@@ -916,7 +2228,15 @@ class OwnershipBridge final {
             bank.visit(slot,[&](){
                 auto& q=*actual_;auto& a=*gridArena_;auto& s=*storage_.get();auto& f=q.frame;
                 const auto& proof=gridCompletion_[slot];
-                if(q.recovery&&a.bindings.podLiveQuery50IZ!=podContext_.get()){
+                std::array<storage::Storage::SharedRosterObject*,storage::Storage::rosterRoles> sharedRows{};
+                if(shared&&!sharedColdRowsCurrent(slot,sharedRows)){
+                    fail(d,"actual shared fresh role ownership differs");return;}
+                auto& mainMember=shared?sharedRows[0]->membership:s.mainMembership;
+                auto& secondaryMember=shared?sharedRows[1]->membership:s.secondaryMembership;
+                auto& terrainMember=shared?sharedRows[2]->membership:s.terrainMembership;
+                if(shared&&(!sharedRows[3]->podContext||a.bindings.podLiveQuery50IZ!=&*sharedRows[3]->podContext)){
+                    fail(d,"actual per-slot saved POD context differs before visibility");return;}
+                if(q.recovery&&!shared&&a.bindings.podLiveQuery50IZ!=podContext_.get()){
                     fail(d,"actual saved pod context pointer was replaced");return;}
                 const auto main=static_cast<unsigned>(a.bindings.lifecycle.main190);
                 const auto physical=static_cast<unsigned>(a.bindings.lifecycle.physical19C);
@@ -927,9 +2247,9 @@ class OwnershipBridge final {
                    q.main.resource!=proof.mainResource||q.secondary.resource!=proof.secondaryResource||
                    std::memcmp(&proof.main,&f.nodes[main].world100,sizeof(proof.main))||
                    std::memcmp(&proof.physical,&f.nodes[physical].world100,sizeof(proof.physical))||
-                   !s.mainMembership.state.attached||!s.secondaryMembership.state.attached||!s.terrainMembership.state.attached||
-                   s.mainMembership.state.revision!=proof.mainRevision||
-                   s.secondaryMembership.state.revision!=proof.secondaryRevision||s.terrainMembership.state.revision!=proof.terrainRevision){
+                   !mainMember.state.attached||!secondaryMember.state.attached||!terrainMember.state.attached||
+                   mainMember.state.revision!=proof.mainRevision||
+                   secondaryMember.state.revision!=proof.secondaryRevision||terrainMember.state.revision!=proof.terrainRevision){
                     fail(d,"actual final placement changed before fresh attachment");return;}
                 const native_racer_collision50HW::Owner* selected=nullptr;
                 for(const auto* owner:inputs_.collisionRoster)
@@ -945,16 +2265,20 @@ class OwnershipBridge final {
                     fail(d,"actual selected694 authoring differs from source owner");return;}
                 if(recovery){
                     auto& r=*q.recovery;
+                    auto& podMember=shared?sharedRows[3]->membership.state:r.memberships[0];
+                    auto& movementMember=shared?sharedRows[4]->membership.state:r.memberships[1];
+                    const auto podRef=shared?sharedRows[3]->reservedRef:s.count.podQuery;
+                    const auto movementRef=shared?sharedRows[4]->reservedRef:s.count.movementQuery;
                     if(!r.sourcePrepared||!r.selectedSource||!r.selectedSource->prepared()||
                        q.main.resource!=&r.selectedSource->main()||q.secondary.resource!=&r.selectedSource->secondary()||
                        r.selectedSource->binding().archivePath!=a.rigs[slot]->resourceFile.string()||
                        r.globals.collisionTypeTag!=q.main.collisionTypeTag||
                        r.globals.identity[0]!=r.podFilter.identity||r.globals.identity[1]!=q.movement->filter.identity||
                        q.movement->collisionTypeTag!=q.main.collisionTypeTag||
-                       r.memberships[0].attached||r.memberships[1].attached||
-                       !s.count.podQuery||!s.count.movementQuery||s.count.podQuery==s.count.movementQuery||
-                       s.count.podQuery>s.objects.size()||s.count.movementQuery>s.objects.size()||
-                       s.objects[s.count.podQuery-1].identity||s.objects[s.count.movementQuery-1].identity){
+                       podMember.attached||movementMember.attached||
+                       !podRef||!movementRef||podRef==movementRef||
+                       podRef>s.objects.size()||movementRef>s.objects.size()||
+                       s.objects[podRef-1].identity||s.objects[movementRef-1].identity){
                         fail(d,"actual selected recovery or reserved collection rows differ");return;}
                     const auto& source=r.selectedSource->mainTarget().source;
                     if(std::memcmp(source.local40.v,a.parameters.shape.local40.v,sizeof source.local40.v)||
@@ -971,6 +2295,9 @@ class OwnershipBridge final {
                     fail(d,"actual fresh7F0 attachment failed; prefix retained");return;}
                 if(recovery){
                     auto& r=*q.recovery;
+                    if(shared){
+                        if(!attachSharedFreshQueries(sharedRows,slot,d))return;
+                    }else {
                     if(!undertrack_owners50ew_fixture::attachFreshQueries(r,f,a.bindings,a.parameters,recoveryBorrows(),
                         {s.count.podQuery,s.count.movementQuery},s.lifecycle,s.world,s.membershipWork,1,
                         slot<a.humanCount?undertrack_owners50ew_fixture::ColdQueryRole50LH::humanPlayer:
@@ -989,6 +2316,7 @@ class OwnershipBridge final {
                     for(unsigned i=0;i<2;++i){const auto index=refs[i]-1u;s.objects[index]=rows[i]->object;
                         s.source[index].flagsF8=rows[i]->state.flagsF8;s.source[index].cachedCenter=rows[i]->state.cachedCenter;
                         s.source[index].cachedRadius=rows[i]->state.cachedRadius;}
+                    }
                 }
                 complete=true;
             });
@@ -1112,6 +2440,8 @@ class OwnershipBridge final {
             d.camera.status=c::Status::terminal;return d.camera;}
     }
     bool canClose()const noexcept {
+        if(endCandidateProducer_&&endCandidateProducer_->inCall)return false;
+        if(sharedOwnerLease_||sharedRoleViews_||sharedEffectsStopped_)return false;
         if(nativeFifoPins_||triggerQueryActive_)return false;
         if(closed_)return true;
         if(rosterRetirementRequired_)return false;
@@ -1119,7 +2449,8 @@ class OwnershipBridge final {
         // Borrowed arena must still exist. Only real Bank destruction proves
         // no saved slot can restore a pointer after terminal unbinding.
         const bool published=std::find(podBindingInstalled_.begin(),podBindingInstalled_.end(),true)!=podBindingInstalled_.end();
-        if(published&&podBindings_&&podBindings_->podLiveQuery50IZ&&podBindings_->podLiveQuery50IZ!=podContext_.get())return false;
+        if(published&&podBindings_&&podBindings_->podLiveQuery50IZ&&podBindings_->podLiveQuery50IZ!=podContext_.get()&&
+            !sharedPodContextOwned(podBindings_->podLiveQuery50IZ))return false;
         for(const bool pending:freshRetirementRequired_)if(pending)return false;
         for(const bool pending:gridRetirementRequired_)if(pending)return false;
         if(camera_&&camera_->session&&!camera_->session->closed_)return false;
@@ -1128,6 +2459,13 @@ class OwnershipBridge final {
         // outside bank0 merely because the aggregate is being destroyed.
         if(follow_&&follow_->attempted_&&!follow_->closed_)return false;
         const auto* s=storage_.get();
+        if(s&&s->sharedRoster_){
+            // Shared query/Follow borrowers still require later actual retirement;
+            // inspect owners, not a caller-supplied readiness flag. The typed
+            // arena alone may close only after the real Bank pin has expired.
+            if(follow_||camera_||podContext_||endCandidateProducer_||queriesConstructed_||
+               sharedOwnerLease_||sharedEffectsStopped_||!s->sharedRosterCanRetire())return false;
+        }
         if(s&&(s->mainMembership.state.attached||s->secondaryMembership.state.attached||
                s->terrainMembership.state.attached))return false;
         if(storageConstructed_&&inputs_.recovery&&
@@ -1142,6 +2480,17 @@ class OwnershipBridge final {
     }
     bool close()noexcept {
         if(closed_)return true;if(sceneOwner_||!canClose())return false;
+        if(auto* s=storage_.get();s&&s->sharedRoster_){
+            //Only after the real Bank pin and all lexical/source borrowers
+            //have retired. Clear solely an ACTUAL owned row-context pointer.
+            if(podBindings_&&sharedPodContextOwned(podBindings_->podLiveQuery50IZ))
+                podBindings_->podLiveQuery50IZ=nullptr;
+            //Revoke real immutable policy borrows before membership backing
+            //can disappear. A retained Context policy can no longer select it.
+            if(s->nativeDetectorPolicy_&&!s->nativeDetectorPolicy_->revokeShared(*s))return false;
+            if(!s->retireSharedRosterAllocation())return false;
+            actual_.reset(); //No saved Bank or lexical source borrower survives canClose.
+        }
         // Only after ALL bank/camera/scene/registry lifetime gates above pass.
         // A later failure retains Storage; already cancelled borrows stay
         // terminal and are skipped on retry. No successful source retirement
@@ -1151,7 +2500,8 @@ class OwnershipBridge final {
             !w.queries->releaseUnpublishedWorld(s->world))return false;
         if(podBindings_&&podBindings_->podLiveQuery50IZ==podContext_.get())podBindings_->podLiveQuery50IZ=nullptr;
         podContext_.reset();podBindings_=nullptr;podParameters_=nullptr;
-        camera_.reset();follow_.reset();closed_=true;return true;
+        endCandidateProducer_=nullptr; //Revoke Context borrow before owned backing disappears.
+        camera_.reset();follow_.reset();gridArena_.reset();closed_=true;return true;
         // Storage, lease, typed borrows and source die in reverse member order
         // with this owner. No registry is replaced/reused after close.
     }

@@ -69,6 +69,80 @@ bool valid(const TerrainFollowState48G&s,const TerrainFollowParameters48G&p,cons
     return std::isfinite(p.airborneTorque204)&&std::isfinite(p.detachAngle208)&&std::isfinite(p.detachDistance20c)&&std::isfinite(b.angleE8);
 }
 }
+bool prepareTerrainHistoryDistance48G(const V& previous,const V& current,
+    const V& normal,float& output) noexcept {
+    if(!finite(previous)||!finite(current)||!finite(normal))return false;
+    Math f;const float value=f.dot(f.sub(previous,current),normal);
+    if(!f.valid)return false;output=value;return true;
+}
+bool prepareTerrainOrientationPrefix48G(const V& forward,const V& up,
+    const V& previous,const V& current,TerrainOrientationPrefix48G& output) noexcept {
+    if(!finite(forward)||!finite(up)||!finite(previous)||!finite(current))return false;
+    Math f;TerrainOrientationPrefix48G next{};
+    next.side=f.cross(forward,up);const V normalCross=f.cross(previous,current);
+    next.angle=f.angle(f.root(f.squaredScalar(normalCross)));
+    next.normalAxis=f.normalize(normalCross);
+    if(!f.valid)return false;output=next;return true;
+}
+bool prepareTerrainOrientationAlignment48G(const TerrainOrientationPrefix48G& input,
+    float& output) noexcept {
+    if(!finite(input.normalAxis)||!finite(input.side))return false;
+    Math f;const float value=f.dot(input.normalAxis,input.side);
+    if(!f.valid)return false;output=value;return true;
+}
+bool prepareTerrainNormalForce48G(const V& force,const V& normal,V& output) noexcept {
+    if(!finite(force)||!finite(normal))return false;
+    Math f;const float counter=-f.dot(force,normal);const V next=f.scale(normal,counter);
+    if(!f.valid)return false;output=next;return true;
+}
+bool prepareTerrainTranslation48G(const V& surface,const V& offset,const V& normal,
+    float scale,V& output) noexcept {
+    if(!finite(surface)||!finite(offset)||!finite(normal)||!std::isfinite(scale))return false;
+    Math f;const float gap=f.dot(f.sub(surface,offset),normal);const float strength=f.mul(scale,gap);
+    V next;next.v[2]=f.mul(strength,normal.v[2]);next.v[1]=f.mul(strength,normal.v[1]);
+    next.v[0]=f.mul(strength,normal.v[0]);
+    if(!f.valid)return false;output=next;return true;
+}
+bool prepareTerrainVelocityFraction48G(const V& velocity,const V& normal,float& output) noexcept {
+    if(!finite(velocity)||!finite(normal))return false;
+    Math f;const float value=std::fabs(f.dot(f.normalize(velocity),normal));
+    if(!f.valid)return false;output=value;return true;
+}
+bool prepareTerrainSteepNormal48G(const V& velocity,const V& normal,V& output) noexcept {
+    if(!finite(velocity)||!finite(normal))return false;
+    Math f;const float amount=f.dot(velocity,normal);V next;
+    next.v[2]=f.mul(amount,normal.v[2]);next.v[1]=f.mul(amount,normal.v[1]);
+    next.v[0]=f.mul(amount,normal.v[0]);
+    if(!f.valid)return false;output=next;return true;
+}
+bool prepareTerrainTangentVelocity48G(const V& velocity,const V& normal,V& output) noexcept {
+    if(!finite(velocity)||!finite(normal))return false;
+    Math f;const V tangent=f.normalize(f.cross(normal,f.cross(velocity,normal)));
+    const float y=f.mul(velocity.v[1],velocity.v[1]);const float x=f.mul(velocity.v[0],velocity.v[0]);
+    const float speed=f.root(f.add(f.add(x,y),f.mul(velocity.v[2],velocity.v[2])));
+    V next;next.v[2]=f.mul(speed,tangent.v[2]);next.v[1]=f.mul(speed,tangent.v[1]);
+    next.v[0]=f.mul(speed,tangent.v[0]);
+    if(!f.valid)return false;output=next;return true;
+}
+bool prepareTerrainVelocityChange48G(const V& current,const V& previous,const V& largest,
+    V& output,bool& replace) noexcept {
+    if(!finite(current)||!finite(previous)||!finite(largest))return false;
+    Math f;const V change=f.sub(current,previous);
+    const float magnitude=f.root(f.squaredScalar(change));
+    const float oldMagnitude=f.root(f.squaredScalar(largest));
+    if(!f.valid)return false;output=change;replace=!(magnitude<=oldMagnitude);return true;
+}
+bool prepareTerrainForward48G(const V& forward,const V& normal,V& output) noexcept {
+    if(!finite(forward)||!finite(normal))return false;
+    Math f;const V next=f.cross(normal,f.cross(forward,normal));
+    if(!f.valid)return false;output=next;return true;
+}
+bool prepareTerrainBasis48G(const V& forward,const V& up,ReadyBodyBasis48D& output) noexcept {
+    if(!finite(forward)||!finite(up))return false;
+    Math f;ReadyBodyBasis48D next{};next.columns[0]=f.cross(up,forward);
+    next.columns[1]=up;next.columns[2]=forward;
+    if(!f.valid)return false;output=next;return true;
+}
 bool applyTerrainFollowing48G(const TerrainFollowState48G&previous,const TerrainFollowParameters48G&p,
     const TerrainSurface48G&t,const TerrainFollowBody48G&input,TerrainFollowResult48G&out) noexcept {
     if(!valid(previous,p,t,input))return false;

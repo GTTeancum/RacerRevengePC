@@ -1,9 +1,11 @@
 #pragma once
+namespace interactive_cold50DU { struct OwnersContext; }
 #include "ra_cold_roster_operation50la.h"
 #include "ra_track_particle_manager50la.h"
 #include "ra_static_model_factory50la.h"
 #include "track_session_assets50ig_fixture.h"
 #include "original_pause_cold_driver50la.h"
+#include "../../src/game/original_results104_50la.h"
 
 // Concrete synchronous composition of the existing native session owners.
 // The caller keeps Application, the execution arena and Bank alive; this class
@@ -16,8 +18,10 @@ struct Diagnostic {
     const char* failure=nullptr;
     ra_cold_aggregate50LA::Diagnostic aggregate{};
     ra_cold_roster50LA::Diagnostic roster{};
+    g::OriginalResults104Diagnostic50LA results{};
 };
 class Join final {
+    friend struct ::interactive_cold50DU::OwnersContext;
     std::shared_ptr<ra_cold_aggregate50LA::Owner> aggregate_;
     const original_main_entry50KG::Application& application_;
     native_racer50HN::Bank& bank_;
@@ -47,10 +51,38 @@ public:
         const std::array<std::vector<std::uint8_t>,6>& crowdImages,Diagnostic& d,
         std::shared_ptr<ra_cold_roster50LA::RuntimeOwners> owners={},
         g::OriginalRaceConstructor50LA* consumedRace=nullptr,
-        original_pause_cold50LA::Owner* pause=nullptr)noexcept {
+        original_pause_cold50LA::Owner* pause=nullptr,bool canonicalTournamentGrid=false)noexcept {
+        return constructImpl(arena,std::move(constructorProbe),recovery,std::move(context),
+            crowdImages,d,std::move(owners),consumedRace,pause,canonicalTournamentGrid,nullptr);
+    }
+private:
+    // Only the actual synchronous cold Owners caller can supply this existing
+    // session identity borrow. This is not a public arbitrary-ID loader.
+    bool constructHumanTournamentCold(const ra_cold_roster50LA::Arena& arena,
+        std::shared_ptr<const ra_cold_roster50LA::FreshProbe> constructorProbe,
+        const ra_source_camera50LA::FreshRecoveryArenaOwners& recovery,
+        std::shared_ptr<const a::OriginalStandardMaterialContext50LA> context,
+        const std::array<std::vector<std::uint8_t>,6>& crowdImages,Diagnostic& d,
+        std::shared_ptr<ra_cold_roster50LA::RuntimeOwners> owners,
+        g::OriginalRaceConstructor50LA& consumedRace,original_pause_cold50LA::Owner& pause,
+        const std::array<std::uint32_t,8>& actualRacer60)noexcept {
+        d={};
+        if(arena.humanCount!=1u||bank_.count()!=8u)
+            return fail(d,"human Results cold entry requires the actual one-human/eight-slot roster");
+        return constructImpl(arena,std::move(constructorProbe),recovery,std::move(context),
+            crowdImages,d,std::move(owners),&consumedRace,&pause,true,&actualRacer60);
+    }
+    bool constructImpl(const ra_cold_roster50LA::Arena& arena,
+        std::shared_ptr<const ra_cold_roster50LA::FreshProbe> constructorProbe,
+        const ra_source_camera50LA::FreshRecoveryArenaOwners& recovery,
+        std::shared_ptr<const a::OriginalStandardMaterialContext50LA> context,
+        const std::array<std::vector<std::uint8_t>,6>& crowdImages,Diagnostic& d,
+        std::shared_ptr<ra_cold_roster50LA::RuntimeOwners> owners,
+        g::OriginalRaceConstructor50LA* consumedRace,original_pause_cold50LA::Owner* pause,
+        bool canonicalTournamentGrid,const std::array<std::uint32_t,8>* actualHumanRacer60)noexcept {
         d={};
         if(attempted_||retired_||!aggregate_||!generation_||(!bank_.count()||bank_.count()>8u)||
-           bool(consumedRace)!=bool(pause))
+           (pause&&!consumedRace))
             return fail(d,"RA construction requires the same fresh sealed active-roster session");
         attempted_=true;
         try {
@@ -81,7 +113,7 @@ public:
             d.operation="original grid and terrain placement";
             for(std::size_t slot=0;slot<bank_.count();++slot){
                 gridAttempted_[slot]=true;
-                if(!aggregate_->placeRetainedRuntimeGridSlot(bank_,slot,d.aggregate))return false;
+                if(!aggregate_->placeRetainedRuntimeGridSlot(bank_,slot,d.aggregate,canonicalTournamentGrid))return false;
             }
             d.operation="actual visibility and recovery memberships";
             for(std::size_t slot=0;slot<bank_.count();++slot){
@@ -90,19 +122,27 @@ public:
             }
             d.operation="retained racer material resources";
             if(!aggregate_->prepareRetainedRuntimeModelResources(bank_,d.aggregate))return false;
+            // HOST staging adaptation: source Pause100 then Results104 acquire
+            // before the one combined image/collector plan; no second collector.
+            if(pause){
+                d.operation="same counted race Pause100 then Results104 loading";
+                const bool loaded=actualHumanRacer60?
+                    application_.loadHumanTournamentPauseResultsBeforeCollector50LA(
+                        *consumedRace,*pause,roster_,*actualHumanRacer60,d.results):
+                    application_.loadConsumedPauseResultsBeforeCollector50LA(
+                        *consumedRace,*pause,roster_,d.results);
+                if(!loaded)
+                    return fail(d,"same counted race Pause/Results load rejected; actual partial owners retained");
+            }
             d.operation="single combined world image population";
             if(!aggregate_->prepareStaticWorldImages(crowdImages,d.aggregate)||
                !aggregate_->prepareStaticWorldDrawPlan(d.aggregate))return false;
-            if(pause){
-                d.operation="actual original Pause load on the same prewarmed FINAL rows";
-                if(!application_.loadConsumedPauseCold50LA(*consumedRace,*pause))
-                    return fail(d,"same counted race Pause load rejected; actual partial owner retained");
-            }
             // This is a completed cold join, not a running-race receipt. The
             // existing frame/manager/start-gate path still owns activation.
             return true;
         }catch(...){return fail(d,"RA native composition failed; actual partial owners retained for retirement");}
     }
+public:
     bool constructCamera(const ra_source_camera50LA::CameraRuntimeOwners& runtime,
         const std::vector<std::uint8_t>& originalCam,
         original_camera_session50KX::DisplayInputs& display,Diagnostic& d)noexcept {
@@ -111,6 +151,16 @@ public:
             return fail(d,"RA camera requires the actual retained cold roster and Bank");
         cameraAttempted_=true;
         return aggregate_->constructRetainedRuntimeSourceCamera(application_,runtime,originalCam,display,d.aggregate);
+    }
+    rr::game::OriginalWreckComponent50LA* introController174A30(Diagnostic& d)noexcept {
+        d={};d.operation="actual RA intro controller48";
+        return cameraAttempted_&&!retired_&&aggregate_?aggregate_->introController174A30(d.aggregate):nullptr;
+    }
+    bool constructIntroAudio177750(std::shared_ptr<const rr::assets::AudioBank50HC> bank,
+        std::size_t firstVoice,std::size_t voiceCount,Diagnostic& d)noexcept {
+        d={};d.operation="actual RA intro audio80";
+        return cameraAttempted_&&!retired_&&aggregate_&&
+            aggregate_->constructIntroAudio177750(std::move(bank),firstVoice,voiceCount,d.aggregate);
     }
     std::shared_ptr<original_camera_session50KX::Session> prepareAndBorrowCamera(Diagnostic& d)noexcept {
         d={};d.operation="actual source camera preparation";

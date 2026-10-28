@@ -2,6 +2,7 @@
 #include "original_ui_main_entry50kg.h"
 #include "ra_cold_aggregate50la.h"
 #include <cstring>
+#include "../../src/assets/original_track_cut_identity50la.h"
 
 namespace ra_cold_aggregate50LA {
 inline bool Owner::constructRuntimeSourceCamera(
@@ -92,10 +93,82 @@ inline bool Owner::constructRuntimeSourceCamera(
             &source->height.sourceDomain,&actual.actualRightModels,&actual.actualLeftModels,
             &actual.actualChariotModels,actual.actualBottomRightModels,actual.actualBottomLeftModels,
             application.animationClock(),&camera.cables,&source->map,{},{},{},{},{},
-            actual.startMusicContext,actual.startMusicRequest,actual.recordManager40}));
+            actual.startMusicContext,actual.startMusicRequest,actual.recordManager40,
+            actual.introAudio,actual.introAuthoring,actual.introMusicFadeRequest}));
+        if(actual.introAuthoring&&!runtime.constructCurrentRaIntro174FA4(application))
+            return fail(d,"same-owner RA authored intro constructor rejected");
         // No prepare, pose, viewport publication, RNG/clock sampling or
         // source-ready flag. Only an actual retained Session now exists.
         return true;
     }catch(...){return fail(d,"RA camera construction failed; actual private prefix retained for cleanup");}
 }
 } // namespace ra_cold_aggregate50LA
+
+namespace ra_source_camera50LA {
+inline bool OwnershipBridge::constructCurrentRaIntro174FA4(
+    const original_main_entry50KG::Application& application)noexcept {
+    namespace c=original_camera_session50KX;namespace a=rr::assets;
+    // This private method is reached only through this retained RA world's
+    // actual factory. Never adopt an externally constructed or shared TA Session.
+    if(terminal_||closed_||cameraPrepareTerminal_||!camera_||!camera_->session||
+       !cameraBankCurrent()||!camera_->generation||!camera_->display||
+       !freshLighting_||camera_->lighting!=freshLighting_||!camera_->fog.current()||
+       camera_->display->trackFog3EC!=&camera_->fog.fields_)return false;
+    auto& session=*camera_->session;auto& actual=session.actual_;
+    const auto domain=application.standardMaterialDomain();
+    const auto provider=domain?domain->archiveProvider3E1A70():nullptr;
+    const auto* identity=a::originalTrackCutIdentity50LA("RA");
+    if(!identity||identity->cutCount!=7||!provider||!provider->sealed()||
+       session.nativeTaIssuance_||session.nativeTaCutAuthoring_||session.generation_||
+       session.coldBound_||session.closed_||session.coldController_.started||
+       camera_->authored.course!=g::OriginalCameraStartCourse::ra||
+       actual.configuration34!=2||actual.launchKind11258!=1||!actual.taIntroAudio||
+       !actual.taIntroAuthoring||actual.taIntroAuthoring->trackId()!="RA"||
+       actual.taIntroAuthoring->providerIdentity()!=provider.get()||
+       actual.applicationEntities!=application.entities()||
+       actual.applicationMaterials!=domain->materials382B38()||
+       !actual.applicationAnimation.sameOwner(application.animationClock())||
+       !actual.startMusicRequest||!actual.introMusicFadeRequest)return false;
+    try {
+        using P=a::OriginalStandardArchiveProvider50LA;
+        std::array<P::MemberView,8> views{};
+        std::array<a::OriginalTaCutMemberInputCandidate,8> inputs{};
+        for(std::size_t i=0;i<views.size();++i){const auto& expected=identity->members[i];auto& v=views[i];
+            P::MountView mount;
+            if(provider->lookup132820(expected.name,v)!=P::Lookup::present||!v.member||
+               *v.member!=expected.name||!v.data||v.size!=expected.size||v.ordinal!=expected.ordinal||
+               !v.bankGeneration||v.revision!=provider->revision()||!provider->mount(v.mount,mount)||
+               !mount.archiveName||*mount.archiveName!=identity->archiveName||!mount.archiveSha256||
+               *mount.archiveSha256!=identity->archiveSha256||mount.archiveBytes!=identity->archiveBytes||
+               mount.memberCount!=identity->memberCount||
+               (i&&(v.mount!=views[0].mount||v.bankGeneration!=views[0].bankGeneration)))return false;
+            inputs[i]={*v.member,v.data,v.size};
+        }
+        if(views[0].size!=camera_->tob.size()||std::memcmp(views[0].data,camera_->tob.data(),views[0].size))return false;
+        a::OriginalTaCutAuthoringCandidate::Status status;
+        auto authored=a::OriginalTaCutAuthoringCandidate::create("RA",inputs.data(),inputs.size(),status);
+        if(!authored||authored->cutCount()!=7||authored->trackId()!="RA")return false;
+        auto pin=std::make_unique<c::Session::NativeTaIssuance>();
+        pin->issuer=&application;pin->provider=provider;pin->generation=camera_->generation;
+        pin->providerRevision=views[0].revision;pin->bankGeneration=views[0].bankGeneration;
+        pin->mount=views[0].mount;pin->ordinal=views[0].ordinal;pin->course=g::OriginalCameraStartCourse::ra;
+        pin->selectedRig=camera_->selectedRig;pin->particles=camera_->particles.get();pin->selectedPod=actual.racer60[0];
+        pin->cam=camera_->cam;pin->tob=camera_->tob;pin->phy=camera_->phySnapshot;
+        auto custody=std::make_unique<c::Session::NativeTaCutAuthoringCustody>();
+        custody->provider=provider;custody->generation=pin->generation;custody->providerRevision=pin->providerRevision;
+        custody->bankGeneration=pin->bankGeneration;custody->mount=pin->mount;
+        for(std::size_t i=0;i<views.size();++i)custody->members[i]={*views[i].member,views[i].ordinal,views[i].size};
+        custody->authoring=std::move(authored);
+        // Recheck the actual mounted winners after copying, before publishing
+        // custody or performing any174A30 source count/Entity constructor effect.
+        for(std::size_t i=0;i<views.size();++i){P::MemberView current;
+            if(provider->lookup132820(identity->members[i].name,current)!=P::Lookup::present||
+               current.data!=views[i].data||current.size!=views[i].size||current.mount!=pin->mount||
+               current.ordinal!=views[i].ordinal||current.revision!=pin->providerRevision||
+               current.bankGeneration!=pin->bankGeneration)return false;
+        }
+        session.nativeTaIssuance_=std::move(pin);session.nativeTaCutAuthoring_=std::move(custody);
+        return session.constructColdController174A30(camera_->generation)&&session.constructTaOwners174FA4();
+    }catch(...){return false;} // Published source prefixes remain owned for actual close.
+}
+} // namespace ra_source_camera50LA

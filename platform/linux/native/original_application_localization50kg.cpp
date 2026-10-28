@@ -1,3 +1,4 @@
+#include <iostream> // Direct dependency; native frontend declarations no longer include streams.
 #include "../../../src/assets/original_application_localization50kg.h"
 #include "../../../tests/native/original_ui_main_entry50kg.h"
 #include "../../../tests/native/original_race_display_lifetime50la.h"
@@ -512,14 +513,17 @@ bool Application::prepareFrontendLanguageServices(Frontend& frontend,
   if(!completed)return failed("ordered native language completion",servicePC);
   if(!selected)return failed("authenticated English selection",d.sourcePC);
   // Mounting supplies lookup authority, not the canonical texture corpus.
-  // Admit only the three genuine fonts reached by language/shared widgets.
+  // Admit the twelve genuine frontend font sources named by original1B740C.
   // This publishes immutable source bytes, NOT font/texture resource rows;
   // each original font call still performs its own whole-table281F34 scan.
   const auto fontResolver=domain->resolver3E1A70();
   const bool resolverPreparedBefore=fontResolver&&fontResolver->prepared();
   std::vector<rr::assets::OriginalStandardTextureSourceInput50LA> fontSources;
   std::size_t fontSourceBytes=0;
-  for(const char* name:{"font\\venus16.pst","font\\denmrk16.pst","font\\denmrk14.pst"}){
+  for(const char* name:{"font\\denmrk12.pst","font\\denmrk16.pst","font\\venus16.pst",
+      "font\\venus14.pst","font\\alaska13.pst","font\\swhutt44.pst",
+      "font\\helvcondblack14.pst","font\\denmrk20.pst","font\\denmrk14.pst",
+      "font\\venus20.pst","font\\denmrk18.pst","font\\denmrk14credits.pst"}){
    const auto pst=frontendFontsArchive_->find(name);
    rr::assets::OriginalStandardArchiveProvider50LA::MemberView mounted;
    if(!pst.identity||!pst.data||!pst.size||
@@ -541,8 +545,15 @@ bool Application::prepareFrontendLanguageServices(Frontend& frontend,
   if(!fontSourceAdmitted)return failed("canonical frontend font PST admission",
       fontCorpus.sourcePC?fontCorpus.sourcePC:0x281880);
   rr::assets::OriginalApplicationFontDiagnostic50LA font;
-  if(!loadGarageTextFont29CB74(frontendFontsArchive_,Fonts::Name::frontendVenus16,font))
-   return failed("canonical frontend Venus16 font",font.sourcePC);
+  // Original1B7400 sets count12,1B7404 selects the literal382C40 list,
+  // and1B740C calls282430 with reload0. Preserve that exact insertion order.
+  // This happens before shared47C2055B0 asks find282210 for Venus14.
+  if(!fonts328()->loadNames282430<12>(frontendFontsArchive_,materialDirectory36B970_,fontDirectory36B420_,
+      {{Fonts::Name::frontendDenmrk12,Fonts::Name::frontendDenmrk16,Fonts::Name::frontendVenus16,
+        Fonts::Name::frontendVenus14,Fonts::Name::frontendAlaska13,Fonts::Name::frontendSwhutt44,
+        Fonts::Name::frontendHelvcondblack14,Fonts::Name::frontendDenmrk20,Fonts::Name::frontendDenmrk14,
+        Fonts::Name::frontendVenus20,Fonts::Name::frontendDenmrk18,Fonts::Name::frontendDenmrk14credits}},
+      0x1B740C,font))return failed("canonical original frontend twelve-font load",font.sourcePC);
   frontendLanguagePhase_=FrontendLanguagePhase::selected;return true;
  }catch(...){return failed("native language startup allocation/owner failure",0x17DEF4);}
 }

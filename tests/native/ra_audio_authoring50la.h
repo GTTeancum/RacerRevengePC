@@ -6,11 +6,13 @@
 #include <stdexcept>
 #include <utility>
 
+namespace ra_cold_aggregate50LA {class Owner;}
 namespace ra_audio_authoring50LA {
 namespace a=rr::assets;
 // Immutable source closure only.42 ambient rows remain distinct source records;
 // no runtime Sound, audio group, stream, event cursor or manager is invented.
 class Owner final {
+    friend class ::ra_cold_aggregate50LA::Owner;
     std::shared_ptr<const ra_cold_sources50LA::Owner> source_;
     std::array<std::vector<std::uint8_t>,3> bytes_{};
     a::ParameterDocument48F aub_;

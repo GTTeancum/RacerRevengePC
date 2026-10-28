@@ -157,7 +157,9 @@ template<class T>bool aligned(const T* p,std::size_t n) noexcept {return !n||rei
 Status validate(const Type2StaticQuery49X& q,const Type2StaticCandidate49X* candidates,std::size_t ownerCount,const std::size_t* indices,std::size_t count,
     const Type2StaticInitial49X& initial,const Type2StaticWorkspace49X& w,
     const Type2StaticDestination49X& d,Type2StaticResult49X& result,
-    const Type2WorldContinuation50CC* continuation,std::uint32_t* categoryOutput) noexcept {
+    const Type2WorldContinuation50CC* continuation,std::uint32_t* categoryOutput,
+    Type2WorldGeometryReached50CC* geometryPrefix,
+    const Type2BorrowedTargetFilter50CC* borrowedFilter) noexcept {
     Range writes[16]{};unsigned nw=0;
     const auto write=[&](auto* p,std::size_t n) noexcept {
         if(nw==16||!aligned(p,n)||!range(p,n,sizeof(*p),writes[nw]))return false;
@@ -168,7 +170,8 @@ Status validate(const Type2StaticQuery49X& q,const Type2StaticCandidate49X* cand
        !write(w.effects,w.effectCapacity)||!write(w.stack,w.stackCapacity)||!write(w.trace,w.traceCapacity)||
        !write(d.pairs,d.pairCapacity)||!write(d.metadata,d.metadataCapacity)||!write(d.records,d.recordCapacity)||
        !write(d.effects,d.effectCapacity)||!write(&result,1)||
-       (categoryOutput&&!write(categoryOutput,1)))return Status::InvalidInput;
+       (categoryOutput&&!write(categoryOutput,1))||
+       (geometryPrefix&&!write(geometryPrefix,1)))return Status::InvalidInput;
     // Admit one shared GC Gate OR one shared bounded trigger group as a writable
     // track owner before all immutable spans. Mixing these schemas is rejected;
     // duplicate candidate visits may share the same owner.
@@ -226,6 +229,8 @@ Status validate(const Type2StaticQuery49X& q,const Type2StaticCandidate49X* cand
     if(tcOwner&&!nativeTriggerQueryBound50TC(*tcOwner,q.filter->identity))return Status::InvalidInput;
     if(tbOwner&&!nativeTriggerQueryBound50TB(*tbOwner,q.filter->identity))return Status::InvalidInput;
     if(mcOwner&&!nativeTriggerQueryBound50MC(*mcOwner,q.filter->identity))return Status::InvalidInput;
+    if(geometryPrefix&&(!continuation||count!=1u||ownerCount!=1u||candidates[0].shapeType!=0u))
+        return Status::UnsupportedScope;
     if(continuation){
         if(!read(continuation,1)||!categoryOutput||count!=1||ownerCount!=1||
            (continuation->previous&&!read(continuation->previous,1))||
@@ -240,6 +245,20 @@ Status validate(const Type2StaticQuery49X& q,const Type2StaticCandidate49X* cand
     const auto readFilter=[&](const CollisionFilter48J& f) noexcept {
         return readVector(f.categoryMasks)&&readVector(f.identityLists[0].identities)&&readVector(f.identityLists[1].identities);
     };
+    if(borrowedFilter){
+        if(!geometryPrefix||!read(borrowedFilter,1)||!read(borrowedFilter->lists,1)||
+           !borrowedFilter->lists)return Status::InvalidInput;
+        const auto& f=*borrowedFilter->lists;
+        const auto& carrier=candidates[0].candidate.collision.filter;
+        if(carrier.identity!=borrowedFilter->identity||carrier.flagsF8!=borrowedFilter->flagsF8||
+           carrier.categoryA4!=f.categoryA4||carrier.acceptMaskB8!=f.acceptMaskB8||
+           carrier.flags31!=f.flags31||!carrier.identityLists[0].identities.empty()||
+           !carrier.identityLists[1].identities.empty()||!carrier.categoryMasks.empty())return Status::InvalidInput;
+        const CollectionWords50BX* spans[]={&f.identities[0],&f.identities[1],&f.categories};
+        for(const auto* list:spans)
+            if(list->count<0||static_cast<std::size_t>(list->count)>list->capacity||
+               !read(list->values,list->capacity))return Status::InvalidInput;
+    }
     const auto& resource=*q.resource;
     const auto& records=continuation&&continuation->previous?continuation->previous->records:initial.records;
     if(!read(resource.nodes,resource.nodeCount)||!read(resource.rays,resource.rayCount)||!readFilter(*q.filter))return Status::InvalidInput;
@@ -352,16 +371,63 @@ std::uint16_t tag16(std::uint32_t tag) noexcept {
 }
 }
 
+bool evaluateType2CandidateSphere50CC(const CollisionSphere48J& query,
+    const CollisionSphere48J& candidate,bool& overlaps) noexcept {
+    if(std::fegetround()!=FE_TONEAREST||!finite(query)||!finite(candidate))return false;
+    bool value=false;if(!spheres(query,candidate,value))return false;
+    overlaps=value;return true;
+}
+bool passType2CandidateFilter50CC(const CollisionFilter48J& query,
+    const CollisionFilter48J& candidate) noexcept {return filter(query,candidate);}
+
+bool passType2BorrowedCandidateFilter50CC(const CollisionFilter48J& query,
+    const Type2BorrowedTargetFilter50CC& target,bool& pass) noexcept {
+    Range descriptor{},listsRange{},output{};
+    if(!aligned(target.lists,1)||!range(target.lists,1,sizeof(*target.lists),listsRange)||
+       !range(&target,1,sizeof(target),descriptor)||!range(&pass,1,sizeof(pass),output)||
+       overlap(output,descriptor)||overlap(output,listsRange))return false;
+    Range queryRange{};if(!range(&query,1,sizeof(query),queryRange)||overlap(output,queryRange))return false;
+    const auto& f=*target.lists;
+    const CollectionWords50BX* spans[]={&f.identities[0],&f.identities[1],&f.categories};
+    for(const auto* list:spans){Range r{};
+        if(list->count<0||static_cast<std::size_t>(list->count)>list->capacity||
+           !aligned(list->values,list->capacity)||!range(list->values,list->capacity,sizeof(*list->values),r)||
+           overlap(output,r))return false;
+    }
+    const std::vector<std::uint32_t>* queryLists[]={&query.identityLists[0].identities,
+        &query.identityLists[1].identities,&query.categoryMasks};
+    for(const auto* list:queryLists){Range r{};
+        if(!range(list->data(),list->size(),sizeof(std::uint32_t),r)||overlap(output,r))return false;
+    }
+    const auto identityPass=[](const CollectionWords50BX& list,std::uint32_t identity) noexcept {
+        if(!list.count)return true;
+        bool found=false;
+        for(std::int32_t i=0;i<list.count;++i)if(list.values[i]==identity){found=true;break;}
+        return !(found&&list.mode==1)&&!(!found&&list.mode==0);
+    };
+    bool value=query.identity!=target.identity&&(target.flagsF8&4u)&&(f.flags31&1u)&&
+        (f.categoryA4&query.acceptMaskB8);
+    for(unsigned i=0;value&&i<2;++i)
+        value=identitiesPass(query.identityLists[i],target.identity)&&identityPass(f.identities[i],query.identity);
+    if(value){
+        bool found=false;
+        for(std::int32_t i=0;i<f.categories.count;++i)if(f.categories.values[i]&query.categoryA4){found=true;break;}
+        value=categoriesPass(query,f.categoryA4)&&(f.categories.mode==1?!found:found);
+    }
+    pass=value;return true;
+}
+
 static Type2StaticStatus49X runIndexedType2Contacts50CC(const Type2StaticQuery49X& query,
     const Type2StaticCandidate49X* candidates,std::size_t ownerCount,const std::size_t* indices,std::size_t count,const Type2StaticInitial49X& initial,
     const Type2StaticWorkspace49X& w,const Type2StaticDestination49X& d,
     Type2StaticResult49X& output,const Type2WorldContinuation50CC* continuation,
-    std::uint32_t* categoryOutput) noexcept {
-    const auto checked=validate(query,candidates,ownerCount,indices,count,initial,w,d,output,continuation,categoryOutput);
+    std::uint32_t* categoryOutput,Type2WorldGeometryReached50CC* geometryPrefix,
+    const Type2BorrowedTargetFilter50CC* borrowedFilter=nullptr) noexcept {
+    const auto checked=validate(query,candidates,ownerCount,indices,count,initial,w,d,output,continuation,categoryOutput,geometryPrefix,borrowedFilter);
     if(checked!=Status::Complete)return checked;
     if(query.normalMode54!=0u)return Status::UnsupportedScope;
     const auto& resource=*query.resource;
-    Type2StaticResult49X result{};
+    Type2StaticResult49X result{};Type2WorldGeometryReached50CC reached{};
     if(continuation&&continuation->previous){
         std::memcpy(&result,continuation->previous,sizeof(result));
         result.traceUsed=0; // per-visit trace scratch is not a retained slot span
@@ -562,6 +628,13 @@ static Type2StaticStatus49X runIndexedType2Contacts50CC(const Type2StaticQuery49
         ++result.geometryHits;result.hasGeometryHit=true;result.queryFlagsF8=static_cast<std::uint8_t>(result.queryFlagsF8|0x20u);
         std::memcpy(effect.copied40.data(),query.copied40.data(),sizeof(effect.copied40));
         std::memcpy(effect.copied50.data(),query.copied50.data(),sizeof(effect.copied50));
+        if(geometryPrefix){
+            //Explicit122860 boundary after geometry/hit/copied-vector effects.
+            //Never disable a source callback or claim this candidate returned.
+            reached.hit=true;reached.queryE4Pending=query.callbackEnabled;
+            reached.targetE8Pending=c.hasResponseCallbackE8;
+            continue;
+        }
         if(query.callbackEnabled){
             ++result.callbacks;const auto& material=candidate.candidate;
             const SpringStaticCallbackInput48N callback{w.pairs,result.pairCount,c.filter.identity,c.filter.categoryA4,
@@ -612,6 +685,7 @@ static Type2StaticStatus49X runIndexedType2Contacts50CC(const Type2StaticQuery49
     if(count)std::memcpy(d.effects,w.effects,count*sizeof(*d.effects));
     std::memcpy(&output,&result,sizeof(output));
     if(categoryOutput)*categoryOutput=currentCategory;
+    if(geometryPrefix)*geometryPrefix=reached;
     return Status::Complete;
 }
 
@@ -619,7 +693,7 @@ Type2StaticStatus49X produceIndexedStaticType2Contacts50CC(const Type2StaticQuer
     const Type2StaticCandidate49X* candidates,std::size_t ownerCount,const std::size_t* indices,std::size_t count,
     const Type2StaticInitial49X& initial,const Type2StaticWorkspace49X& w,const Type2StaticDestination49X& d,
     Type2StaticResult49X& output) noexcept {
-    return runIndexedType2Contacts50CC(query,candidates,ownerCount,indices,count,initial,w,d,output,nullptr,nullptr);
+    return runIndexedType2Contacts50CC(query,candidates,ownerCount,indices,count,initial,w,d,output,nullptr,nullptr,nullptr);
 }
 
 Type2StaticStatus49X continueType2WorldCandidate50CC(const Type2StaticQuery49X& query,
@@ -628,6 +702,28 @@ Type2StaticStatus49X continueType2WorldCandidate50CC(const Type2StaticQuery49X& 
     const Type2WorldContinuation50CC& continuation,Type2StaticResult49X& output,
     std::uint32_t& currentCategory) noexcept {
     const std::size_t index=0;
-    return runIndexedType2Contacts50CC(query,&candidate,1,&index,1,initial,w,d,output,&continuation,&currentCategory);
+    return runIndexedType2Contacts50CC(query,&candidate,1,&index,1,initial,w,d,output,&continuation,&currentCategory,nullptr);
 }
+Type2WorldGeometryReceipt50CC prepareType2WorldGeometryPrefix50CC(const Type2StaticQuery49X& query,
+    const Type2StaticCandidate49X& candidate,const Type2StaticInitial49X& initial,
+    const Type2StaticWorkspace49X& w,const Type2StaticDestination49X& d,
+    const Type2WorldContinuation50CC& continuation,Type2WorldGeometryOutput50CC& output) noexcept {
+    const std::size_t index=0;
+    const auto status=runIndexedType2Contacts50CC(query,&candidate,1,&index,1,initial,w,d,
+        output.numerical,&continuation,&output.retainedCategory,&output.reached);
+    return {status==Status::Complete?Type2WorldGeometryPhase50CC::GeometryPrefixReady:
+        Type2WorldGeometryPhase50CC::Rejected,status};
+}
+
+Type2WorldGeometryReceipt50CC prepareType2BorrowedWorldGeometryPrefix50CC(const Type2StaticQuery49X& query,
+    const Type2StaticCandidate49X& candidate,const Type2BorrowedTargetFilter50CC& borrowed,
+    const Type2StaticInitial49X& initial,const Type2StaticWorkspace49X& w,const Type2StaticDestination49X& d,
+    const Type2WorldContinuation50CC& continuation,Type2WorldGeometryOutput50CC& output) noexcept {
+    const std::size_t index=0;
+    const auto status=runIndexedType2Contacts50CC(query,&candidate,1,&index,1,initial,w,d,
+        output.numerical,&continuation,&output.retainedCategory,&output.reached,&borrowed);
+    return {status==Status::Complete?Type2WorldGeometryPhase50CC::GeometryPrefixReady:
+        Type2WorldGeometryPhase50CC::Rejected,status};
+}
+
 }

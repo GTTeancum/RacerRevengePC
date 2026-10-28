@@ -182,6 +182,37 @@ bool Owner::prepareSpatialBounds276F3C(Diagnostic& d) noexcept {
 const SpatialBounds* Owner::spatialBounds534() const noexcept {
     return storage_&&storage_->spatialBounds?&*storage_->spatialBounds:nullptr;
 }
+const assets::TrackHeightString50JB* Owner::nativeWaterFile110()noexcept {
+    if(!storage_)return nullptr;
+    assets::TrackHeightDescriptor50JB actual;
+    if(assets::readTrackHeightDescriptor50JB(storage_->world.parameters,actual)!=
+       assets::TrackHeightReadStatus50JB::Complete||!actual.bound)return nullptr;
+    // Actual complete immutable Environment table proves the absent WaterFile
+    // selector and158AD0 default. No missing native field is treated as absence.
+    if(!actual.waterFile110.defaulted||std::strcmp(actual.waterFile110.value.data(),"none"))return nullptr;
+    if(nativeHeightFields_){const auto& old=*nativeHeightFields_;
+        if(!old.bound||old.environmentBlock!=actual.environmentBlock||
+           old.waterFile110.value!=actual.waterFile110.value||!old.waterFile110.defaulted||
+           old.terrainFile0C.value!=actual.terrainFile0C.value)return nullptr;
+    }else nativeHeightFields_=actual;
+    return &nativeHeightFields_->waterFile110;
+}
+const assets::TrackHeightString50JB* Owner::nativeEcosystemFile318()noexcept {
+    if(!storage_)return nullptr;
+    assets::TrackHeightDescriptor50JB checked;
+    if(assets::readTrackHeightDescriptor50JB(storage_->world.parameters,checked)!=
+       assets::TrackHeightReadStatus50JB::Complete||!checked.bound)return nullptr;
+    const auto& doc=storage_->world.parameters;
+    if(checked.environmentBlock>=doc.blocks.size())return nullptr;
+    assets::TrackHeightString50JB actual;
+    if(assets::track_height50jb_detail::readString(doc,doc.blocks[checked.environmentBlock],
+       "ecosystemfile",actual)!=assets::TrackHeightReadStatus50JB::Complete||
+       !actual.defaulted||std::strcmp(actual.value.data(),"none"))return nullptr;
+    if(nativeEcosystemFile_){
+        if(!nativeEcosystemFile_->defaulted||nativeEcosystemFile_->value!=actual.value)return nullptr;
+    }else nativeEcosystemFile_=actual;
+    return &*nativeEcosystemFile_;
+}
 bool Owner::prepared() const noexcept{return bool(storage_);}
 const assets::World48F* Owner::world() const noexcept{return storage_?&storage_->world:nullptr;}
 std::size_t Owner::zoneCount() const noexcept{return storage_?storage_->world.zones.size():0u;}

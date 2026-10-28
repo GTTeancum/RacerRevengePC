@@ -1,8 +1,8 @@
 #pragma once
-// Bounded authored child owner. The consumed TA Session supplies actual
+// Bounded TA/RA authored child owner. The consumed Session supplies actual
 // registry/Scene/audio custody; this numerical owner cannot certify those.
 // No compilation or execution is claimed by this source-only change.
-// Source282860/282CD0/282C20/2829C0, bounded to the actual175510 TA call:
+// Source282860/282CD0/282C20/2829C0, bounded to the actual175510 TA/RA call:
 // mode40=0, loop54=0, one node, null load/activation offsets, and process443200
 // in its source3CAAA0-initialized(+0,+0,+0,1) state. This is NOT a provider of
 // the actual current process global or any inherited camera registration.
@@ -25,7 +25,7 @@
 #include <utility>
 #include <vector>
 #if defined(__FAST_MATH__) || defined(_M_FP_FAST) || (defined(__FINITE_MATH_ONLY__) && __FINITE_MATH_ONLY__ > 0)
-#error "TA cut candidate requires strict independently rounded binary32 arithmetic"
+#error "TA/RA cut candidate requires strict independently rounded binary32 arithmetic"
 #endif
 
 namespace rr::game {
@@ -159,7 +159,7 @@ private:
         using namespace original_ta_cut_numeric_candidate_detail;
         if(arrays_||failed_||std::fegetround()!=FE_TONEAREST)return result(S::phase,0x282CD0);
         const auto count=source.frameCount(ordinal_);
-        if(count==0||count>461)return result(S::input,0x282EBC);
+        if(count==0||count>static_cast<std::uint32_t>(std::numeric_limits<std::int32_t>::max()))return result(S::input,0x282EBC);
         try {
             auto next=std::unique_ptr<Arrays>(new Arrays);
             next->look20.resize(count);next->up24.resize(count);next->position28.resize(count);
@@ -258,7 +258,7 @@ public:
     ~OriginalTaCutChildrenCandidate() noexcept {
         //Caller must retire real manager/registry/Scene borrows BEFORE destruction.
         //No automatic deregistration or unrelated audio retirement is fabricated.
-        for(auto& child:children_)child.reset(); //actual controller74 source order
+        for(unsigned i=0;i<cutCount();++i)children_[i].reset(); //actual controller74 source order
         authoring_.reset();
     }
     // Actual controller74 allocation phase precedes177750. Loading175510 is
@@ -271,7 +271,7 @@ public:
         try {
             auto out=std::unique_ptr<OriginalTaCutChildrenCandidate>(new OriginalTaCutChildrenCandidate);
             out->authoring_=std::move(authoring);
-            for(unsigned i=0;i<3;++i){
+            for(unsigned i=0;i<out->cutCount();++i){
                 out->children_[i].reset(new OriginalTaCutChildCandidate(i+1));
                 for(unsigned k=0;k<4;++k)out->children_[i]->fields_.offset10[k]=
                     original_ta_cut_numeric_candidate_detail::value(actualOrigin[k]);
@@ -283,10 +283,14 @@ public:
     D load175510() noexcept {
         if(loaded_||loadAttempted_)return {S::phase,0x175510,0,0};
         loadAttempted_=true;
-        for(auto& child:children_){auto d=child->load(*authoring_);if(!d.okay())return d;}
+        for(unsigned i=0;i<cutCount();++i){auto d=children_[i]->load(*authoring_);if(!d.okay())return d;}
         loaded_=true;return {S::complete,0x1756BC,0,0};
     }
     bool loaded()const noexcept{return loaded_;}
+    std::string_view trackId()const noexcept{return authoring_?authoring_->trackId():std::string_view{};}
+    unsigned cutCount()const noexcept{return authoring_?authoring_->cutCount():0u;}
+    // Historical entry name retained for source compatibility. The immutable
+    // authoring owner selects exactly TA3 or RA7; there is no TA fallback.
     static std::unique_ptr<OriginalTaCutChildrenCandidate> createInitializedTa(
         std::unique_ptr<const assets::OriginalTaCutAuthoringCandidate> authoring,D& diagnostic) noexcept {
         static_assert(sizeof(float)==4&&std::numeric_limits<float>::is_iec559&&
@@ -298,9 +302,9 @@ public:
             auto next=std::unique_ptr<OriginalTaCutChildrenCandidate>(new OriginalTaCutChildrenCandidate);
             next->authoring_=std::move(authoring);
             //Real distinct stable child allocations; never caller-supplied handles.
-            for(unsigned i=0;i<3;++i)next->children_[i].reset(new OriginalTaCutChildCandidate(i+1));
-            for(auto& child:next->children_){
-                diagnostic=child->load(*next->authoring_);
+            for(unsigned i=0;i<next->cutCount();++i)next->children_[i].reset(new OriginalTaCutChildCandidate(i+1));
+            for(unsigned i=0;i<next->cutCount();++i){
+                diagnostic=next->children_[i]->load(*next->authoring_);
                 if(!diagnostic.okay())return nullptr;
             }
             next->loaded_=next->loadAttempted_=true;
@@ -308,10 +312,10 @@ public:
         }catch(...){diagnostic={S::allocation,0x174FC4,0,0};return nullptr;}
     }
     const OriginalTaCutChildCandidate* child(unsigned ordinal) const noexcept {
-        return ordinal>=1&&ordinal<=3?children_[ordinal-1].get():nullptr;
+        return ordinal>=1&&ordinal<=cutCount()?children_[ordinal-1].get():nullptr;
     }
     D activate(unsigned ordinal) noexcept {
-        if(ordinal<1||ordinal>3)return {S::input,0x282C20,ordinal,0};
+        if(ordinal<1||ordinal>cutCount())return {S::input,0x282C20,ordinal,0};
         return children_[ordinal-1]->activate();
     }
     //Only these real owned children can advance; no sample/state replacement API.
@@ -320,13 +324,13 @@ public:
     //typed vector/scalar aliases are supported; no raw uint32/float aliasing.
     D update(unsigned ordinal,float dt,std::uint32_t& requiredWord,V4* position,
         V4* look,V4* up,float* scalar) noexcept {
-        if(ordinal<1||ordinal>3)return {S::input,0x2829C0,ordinal,0};
+        if(ordinal<1||ordinal>cutCount())return {S::input,0x2829C0,ordinal,0};
         return children_[ordinal-1]->update(dt,requiredWord,position,look,up,scalar);
     }
 private:
     OriginalTaCutChildrenCandidate()=default;
     bool loaded_=false,loadAttempted_=false;
     std::unique_ptr<const assets::OriginalTaCutAuthoringCandidate> authoring_;
-    std::array<std::unique_ptr<OriginalTaCutChildCandidate>,3> children_{};
+    std::array<std::unique_ptr<OriginalTaCutChildCandidate>,7> children_{};
 };
 }

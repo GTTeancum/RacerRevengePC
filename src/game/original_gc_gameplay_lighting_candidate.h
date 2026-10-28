@@ -17,7 +17,7 @@
 
 namespace rr::assets { class OriginalStandardMaterialTable50LA; }
 namespace rr::platform { class VehicleWindowGl50DS; struct VehicleWindowDiagnostic50DS; }
-namespace rr::game { struct OriginalCameraViewportFields; struct OriginalCameraSceneOwner; struct OriginalRendererDispatchFields; }
+namespace rr::game { struct OriginalWreckComponent50LA; struct OriginalCameraViewportFields; struct OriginalCameraSceneOwner; struct OriginalRendererDispatchFields; }
 namespace ra_source_camera50LA { class OwnershipBridge; }
 namespace rr::game::original_world_environment50KG {struct SpatialBounds;}
 namespace ra_pod_scene50LA { class Owner; }
@@ -35,7 +35,7 @@ namespace mc_lighting_authoring50MC { struct Record; }
 namespace original_cable_selection50LA { class Binding; }
 namespace ra_static_lighting50LA { class Binding; }
 namespace ra_static_model_cold50LA { class Owner; }
-namespace rr::game { class OriginalApplicationEntities50LA; class OriginalRacerEntityCold50LA; class OriginalRacerModelSceneOwner50LA; }
+namespace rr::game { class OriginalNativeListMethodCustody50LA; class OriginalApplicationEntities50LA; class OriginalRacerEntityCold50LA; class OriginalRacerModelSceneOwner50LA; }
 namespace rr::game::original_gc_gameplay_lighting_candidate {
 constexpr std::uint32_t maximumRacers=8, gcZones=12, gcPortals=13,
     gaPortals=18, maZones=9, maPortals=10, saZones=25, saPortals=25,
@@ -52,6 +52,27 @@ struct Diagnostic {
     LiveZoneResult50EN membership{};
     ResetVisibilityResult50EY resetVisibility{};
     assets::DecodeError48C decode{};
+};
+//Private producer APIs alone fill these immutable RA light identities. This
+//is not a renderer Light or an authority/registration capability.
+struct RaDirectionalLightInputs {
+    std::array<float,4> positionA0{},lookB0{};
+    std::array<float,3> look78{},attenuation8C{};
+    float range84=0;
+};
+//Read-only source initializer inputs, NOT a renderer Light or a readiness token.
+//Ambient uses colors/type/zone only; pose/cones are not constructor-write authority.
+struct RaRemainingLightInputs {
+    RaDirectionalLightInputs pose;
+    std::array<float,4> diffuse{},specular{},ambient{};
+    std::uint32_t type=0,zone=0,cone98=0,cone9C=0;
+    bool lookRevision=false;
+};
+struct RaAuthoredLightIdentity {
+    const assets::ParameterBlock48F* retainedSource=nullptr;
+    const void* canonicalStorage=nullptr;
+    const void* localPrimitive=nullptr; //Null for ambient/directional: no distinct native Light exists yet.
+    std::uint32_t ordinal=0,effectiveOrdinal=0,type00=0,zone20=0;
 };
 class CameraVisibilityLease;
 class Owner;
@@ -147,6 +168,9 @@ struct NativeRaStaticDraw50LA {
     std::uint32_t sourceLod=0,zone=0;
     std::array<std::uint32_t,4> scissor{}; // inclusive original Xmin,Xmax,Ymin,Ymax
     std::array<std::int32_t,4> viewport{}; // original X,Y,width,height
+    enum class Kind:std::uint8_t {model,lightFlare};
+    Kind kind=Kind::model;
+    const OriginalWreckComponent50LA* flareIdentity=nullptr;
 };
 // Semantic equivalent of229E08..229EF4's temporary component scene+19C
 // borrowing. This is not a generic success Boolean or persistent scene field.
@@ -257,9 +281,58 @@ class Owner final {
     friend class ::gb_cold_visibility50GB::Retirement;
     friend class ::mc_cold_visibility50MC::Retirement;
     friend class ::ra_pod_scene50LA::Owner;
+    //Actual RA source flare identity in the SAME canonical visibility domain.
+    //Private World producer only; no public admission/ready flag.
+    bool bindRaFlareIdentity(const ::ra_pod_scene50LA::Owner*,OriginalWreckComponent50LA&,
+        const std::uint8_t&,const std::uint8_t&,std::uint32_t&,std::uint32_t&)noexcept;
+    bool registerRaFlarePrimary(const ::ra_pod_scene50LA::Owner*,OriginalNativeListMethodCustody50LA*,
+        const OriginalWreckComponent50LA&,std::uint32_t,std::uint32_t&,std::uint32_t&)noexcept;
+    bool raFlareIdentityCurrent(const ::ra_pod_scene50LA::Owner*,const OriginalWreckComponent50LA&,
+        std::uint32_t,const OriginalNativeListMethodCustody50LA*,std::uint32_t)const noexcept;
+    bool releaseRaFlarePrimary(const ::ra_pod_scene50LA::Owner*,const OriginalWreckComponent50LA&,
+        std::uint32_t,std::uint32_t&)noexcept;
+    bool releaseRaFlareIdentity(const ::ra_pod_scene50LA::Owner*,const OriginalWreckComponent50LA&,
+        std::uint32_t,std::uint32_t&)noexcept;
+    bool raFlareDomainIdle(const ::ra_pod_scene50LA::Owner*,const OriginalWreckComponent50LA&)const noexcept;
+    bool nativeRaRemainingInputs(const ::ra_pod_scene50LA::Owner*,const assets::World48F&,
+        const CollectionZone50BX*,std::size_t,RaRemainingLightInputs&,std::uint32_t&)const noexcept;
+    bool nativeRaLocalInputs(const ::ra_pod_scene50LA::Owner*,const assets::World48F&,
+        const CollectionZone50BX*,std::size_t,RaDirectionalLightInputs&,std::uint32_t&)const noexcept;
+    bool nativeRaFirstLocalInputs(const ::ra_pod_scene50LA::Owner*,const assets::World48F&,
+        const CollectionZone50BX*,RaDirectionalLightInputs&,std::uint32_t&)const noexcept;
+    bool nativeRaDirectionalInputs(const ::ra_pod_scene50LA::Owner*,const assets::World48F&,
+        const CollectionZone50BX*,RaDirectionalLightInputs&,std::uint32_t&)const noexcept;
+    bool nativeRaLightIdentity(const ::ra_pod_scene50LA::Owner*,const assets::World48F&,
+        const CollectionZone50BX*,std::size_t,RaAuthoredLightIdentity&,std::uint32_t&)const noexcept;
     const original_world_environment50KG::SpatialBounds* sceneBounds534(const ::ra_pod_scene50LA::Owner*) const noexcept;
     const CollectionZone50BX* retainSceneZones272A78(const ::ra_pod_scene50LA::Owner*,std::size_t&) noexcept;
     bool canReleaseSceneZones272A78(const ::ra_pod_scene50LA::Owner*) const noexcept;
+    // Same retained RA EnvironmentInfo/light/ambient/visibility backend only.
+    // Private actual scene caller; no parallel decoder or collection lease.
+    const char* nativeRaEcosystemSelector1AA410(const ::ra_pod_scene50LA::Owner*,
+        const assets::World48F&,const CollectionZone50BX*,std::uint32_t&)const noexcept;
+    const char* nativeRaWaterSelector274570(const ::ra_pod_scene50LA::Owner*,
+        const assets::World48F&,const CollectionZone50BX*,std::uint32_t&)const noexcept;
+    const std::string* nativeRaSkySelector274AE0(const ::ra_pod_scene50LA::Owner*,
+        const assets::World48F&,const CollectionZone50BX*,std::uint32_t&)const noexcept;
+    const std::string* nativeRaParticleSelector1B4DC0(const ::ra_pod_scene50LA::Owner*,
+        const assets::World48F&,const CollectionZone50BX*,std::uint32_t&)const noexcept;
+    bool nativeSceneRoles270900Current(const ::ra_pod_scene50LA::Owner*,
+        const assets::World48F&,const CollectionZone50BX*,std::uint32_t&)const noexcept;
+    const AuthoredRenderZone* nativeRaZoneExclusions272B08(const ::ra_pod_scene50LA::Owner*,
+        const assets::World48F&,const CollectionZone50BX*,std::size_t,std::uint32_t&)const noexcept;
+    const PortalGeometry50EO* nativeRaPortal230450(const ::ra_pod_scene50LA::Owner*,
+        const assets::World48F&,const CollectionZone50BX*,const OriginalApplicationEntities50LA*,
+        std::size_t,std::uint32_t&)const noexcept;
+    OriginalNativeListMethodCustody50LA* adoptRaVisibilityList(
+        const ::ra_pod_scene50LA::Owner*,const assets::World48F&,const CollectionZone50BX*,
+        const OriginalApplicationEntities50LA*,std::size_t,std::uint32_t&)noexcept;
+    bool raVisibilityListCustodyCurrent(const ::ra_pod_scene50LA::Owner*,
+        const OriginalNativeListMethodCustody50LA*)const noexcept;
+    bool retainRaVisibilityListNode(const ::ra_pod_scene50LA::Owner*,
+        OriginalNativeListMethodCustody50LA*,std::uint32_t&)noexcept;
+    bool releaseRaVisibilityListReference(const ::ra_pod_scene50LA::Owner*,
+        OriginalNativeListMethodCustody50LA*,bool nodeAlias)noexcept;
     bool releaseSceneZones272A78(const ::ra_pod_scene50LA::Owner*) noexcept;
     friend class ::original_cable_selection50LA::Binding;
     // Private114D00 callback lookup: the viewing lease remains unchanged.
@@ -310,6 +383,9 @@ class Owner final {
     void endRaStaticAccess(const ::ra_static_model_cold50LA::Owner*) noexcept;
     bool releaseRaStaticOwner(const ::ra_static_model_cold50LA::Owner*) noexcept;
     bool commitRaStaticOwner(const ::ra_static_model_cold50LA::Owner*) noexcept;
+    bool nativeStaticZone2741C0Current(const ::ra_pod_scene50LA::Owner*,
+        const ::ra_static_model_cold50LA::Owner*,const assets::World48F&,
+        const CollectionZone50BX*,std::size_t,std::uint32_t&)const noexcept;
     bool publishRaStaticZone2741C0(const ::ra_static_model_cold50LA::Owner*,std::uint32_t actualZone) noexcept;
     ResetVisibilityWorld50EY* raStaticVisibility(const ::ra_static_model_cold50LA::Owner*) noexcept;
     LiveZoneWorkspace50EN* raStaticWorkspace(const ::ra_static_model_cold50LA::Owner*) noexcept;
@@ -320,6 +396,12 @@ class Owner final {
     bool releaseRaStaticModel(const ::ra_static_model_cold50LA::Owner*,
         std::size_t,const OriginalRacerModelSceneOwner50LA*) noexcept;
     bool raStaticOwnerIdle(const ::ra_static_model_cold50LA::Owner*) const noexcept;
+    // One private suspended end caller, actual attached7F0 branch only.
+    // No public racer/cache/phase input or fresh-grid attach substitution.
+    bool readRecordedZoneC38(std::uint32_t,std::uint32_t&)const noexcept;
+    bool readRecordedCenterC40(std::uint32_t,std::array<std::uint32_t,4>&)const noexcept;
+    bool recordAttachedEndRacer229F20(std::uint32_t,const VehicleFrameState49W&,
+        const VehicleFrameBindings49W&,const VehicleFrameParameters49W&,Diagnostic&)noexcept;
     friend class ::ra_source_camera50LA::OwnershipBridge;
     // Internal partial source operation, never a selection-ready capability.
     // Only the actual SourceCamera bridge can supply these retained borrows.

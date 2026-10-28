@@ -6,6 +6,11 @@
 #include "../../src/game/type2_resource49x.h"
 #include "../../src/game/trigger_actions50in.h"
 #include <array>
+#include <exception>
+#include <memory>
+#include "../../src/game/original_wreck_components50la.h"
+namespace ra_pod_scene50LA {class Owner;}
+namespace ra_cold_aggregate50LA {class Owner;}
 
 // Two authenticated RA LostAI actions and source trigger lifecycle only.
 // Entry geometry is the RA-only current-segment/sphere policy,
@@ -25,9 +30,28 @@ struct ActionLease {
 struct Counters {std::uint64_t entries=0,exits=0,lostAiWrites=0;};
 enum class Status {Complete,Unprepared,Input,IgnoredPlayer,Entry,Action,Service};
 class Owner final {
+ friend class ::ra_pod_scene50LA::Owner;
+ friend class ::ra_cold_aggregate50LA::Owner;
  const ra_trigger_authoring50LA::Owner* source_=nullptr;
  std::array<RacerIdentities,racers> racers_{};
  g::NativeTriggerGroup50GA group_{};
+ // Added lifetime/accounting on this SAME immovable backend, never a second
+ // trigger/collider/geometry/membership implementation. Flags alias actual bytes.
+ struct NativeEntityPair {
+  g::OriginalWreckComponent50LA trigger,collider;
+  bool triggerCounted=false,colliderCounted=false,attached=false;
+ };
+ std::array<NativeEntityPair,2> nativeEntities_{};
+ //Late native resource adoption around the SAME already-live callbackCount98.
+ //Typed pointer arrays mirror9C/A0 custody; no guest pointer/integer casts.
+ using NativeLostAiCallback=void(*)(Owner&,const g::LostAiAction50IN&,const g::TriggerActionCall50IN&)noexcept;
+ struct NativeCallbackArrays {
+  std::unique_ptr<const g::LostAiAction50IN*[]> data9C;
+  std::unique_ptr<NativeLostAiCallback[]> callbacksA0;
+  std::size_t capacity94=0;
+  bool attempted=false,dataPublished=false,functionPublished=false,joined=false,retired=false;
+ };
+ std::array<NativeCallbackArrays,2> nativeCallbacks_{};
  struct Geometry {const g::Type2ResourceView49X* resource=nullptr;g::BodyMatrix48G world{};bool valid=false;};
  std::array<Geometry,colliders> geometry_{};
  const ActionLease* lease_=nullptr;
@@ -42,20 +66,39 @@ class Owner final {
   if(!ready_||call.triggerCollider<firstTriggerIdentity)return false;
   const auto t=call.triggerCollider-firstTriggerIdentity;
   if(t>=group_.triggers.size()||call.actionIndex>=1u)return false;
-  if(!call.entering)return true; // Original1B27C0 ignores exits.
+  const auto* bound=activeLostAiAction(t);if(!bound)return false;
+  if(!call.entering)return true; //Original1B27C0 ignores exits; validate actualbinding first.
   const auto c=colliderIndex(call.otherCollider);
   if(c==group_.colliders.size()||!lease_||lease_->racerMain690!=racers_[c/2].main690)return false;
-  const auto& action=(*source_->sources())[t].action;
+  const auto& action=*bound;
   return !action.reset&&action.targetNodeIndex<originalAiNodeCount_&&((c&1u)||lease_->nodeC80);
  }
+ //The source1B27C0 target is represented by this exact typed trampoline.
+ //It consumes the owned9C data slot, not an unused shadow descriptor.
+ static void invokeLostAi1B27C0(Owner& owner,const g::LostAiAction50IN& action,
+     const g::TriggerActionCall50IN& call)noexcept {owner.applyLostAi1B27C0(action,call);}
+ const g::LostAiAction50IN* activeLostAiAction(std::size_t i)const noexcept {
+  if(i>=nativeCallbacks_.size()||!source_||!source_->sources())return nullptr;
+  const auto& resource=nativeCallbacks_[i];
+  if(resource.retired)return nullptr;
+  if(!resource.attempted)return &(*source_->sources())[i].action; //Existing live route before+144.
+  if(!nativeLostAiCallbackCurrent(i))return nullptr; //Partial source publication is terminal/failclosed.
+  return resource.data9C[0];
+ }
  void apply(const g::TriggerActionCall50IN& call)noexcept {
+  if(call.triggerCollider<firstTriggerIdentity||call.actionIndex!=0u){actionFailed_=group_.actionsFailed=true;return;}
+  const auto t=call.triggerCollider-firstTriggerIdentity;
+  const auto* action=activeLostAiAction(t);
+  if(!action){actionFailed_=group_.actionsFailed=true;return;}
+  const auto& resource=nativeCallbacks_[t];
+  if(resource.attempted)resource.callbacksA0[0](*this,*action,call);
+  else applyLostAi1B27C0(*action,call); //Preserve earlier live dispatch; no new service receipt.
+ }
+ void applyLostAi1B27C0(const g::LostAiAction50IN& action,const g::TriggerActionCall50IN& call)noexcept {
   if(!call.entering){++counters_.exits;return;}
   ++counters_.entries;
-  const auto t=call.triggerCollider-firstTriggerIdentity;
-  const auto& action=(*source_->sources())[t].action;
-  // Original race traversal matches only racer.main690. A secondary contact
-  // still owns lifecycle membership but never writes any racer's C80.
-  // PLAYER exclusion is identity-based, independent of slot and AI role.
+  //Original race traversal matches only racer.main690. A secondary contact
+  //owns lifecycle membership but never writes a racer'sC80. Same existinglease.
   std::array<g::LostAiRacer50IN,racers> destinations{};
   for(std::size_t i=0;i<racerCount_;++i)destinations[i]={racers_[i].main690,
     racers_[i].main690==lease_->racerMain690?lease_->nodeC80:nullptr};
@@ -64,13 +107,77 @@ class Owner final {
   actionFailed_=actionFailed_||result.status!=g::TriggerActionStatus50IN::Complete;
   group_.actionsFailed=actionFailed_;counters_.lostAiWrites+=result.changedRacers;
  }
+ bool nativeLostAiCallbackCurrent(std::size_t i)const noexcept {
+  if(i>=nativeCallbacks_.size()||!source_||!source_->sources()||!ready_||
+     i>=group_.triggers.size())return false;
+  const auto& r=nativeCallbacks_[i];const auto& action=(*source_->sources())[i].action;
+  return r.attempted&&r.joined&&!r.retired&&r.capacity94==1u&&r.data9C&&r.callbacksA0&&
+      r.dataPublished&&r.functionPublished&&r.data9C[0]==&action&&
+      r.callbacksA0[0]==&Owner::invokeLostAi1B27C0&&group_.triggers[i].callbackCount98==1u&&
+      !action.reset&&action.targetNodeIndex==(i?104u:29u);
+ }
+ bool adoptNativeLostAiCallback1B5AD0(std::size_t i,std::uint32_t& pc)noexcept {
+  pc=0x1b5ad0;
+  if(i>=nativeCallbacks_.size()||!ready_||!source_||!source_->sources()||lease_||
+     actionFailed_||group_.actionsFailed||terminal_!=Status::Complete||
+     i>=group_.triggers.size()||group_.triggers[i].callbackCount98!=1u||
+     !nativeEntities_[i].triggerCounted||!nativeEntities_[i].colliderCounted||!nativeEntities_[i].attached)
+      return false;
+  const auto expected=hooks();
+  if(group_.actions.context!=this||group_.actions.preflight!=expected.preflight||
+     group_.actions.apply!=expected.apply)return false;
+  auto& r=nativeCallbacks_[i];
+  if(r.joined)return nativeLostAiCallbackCurrent(i);
+  if(r.attempted||r.retired)return false;
+  const auto& action=(*source_->sources())[i].action;
+  if(action.reset||action.targetNodeIndex!=(i?104u:29u)||originalAiNodeCount_!=113u)return false;
+  //Existing coldprepare published count1/nativehooks BEFORE this source route.
+  //Add missing actual typed array custody; never reset98 then increment to2,
+  //never replayTrigger constructor or executeLostAI during service.
+  r.attempted=true;
+  try {
+   pc=0x2a0754;r.data9C=std::make_unique<const g::LostAiAction50IN*[]>(1u);
+   pc=0x2a0760;r.callbacksA0=std::make_unique<NativeLostAiCallback[]>(1u);
+   pc=0x2a076c;r.capacity94=1u; //Explicit late native ownership, not earlier guest execution.
+   pc=0x2a0a50;r.data9C[0]=&action;r.dataPublished=true;
+   pc=0x2a0a64;r.callbacksA0[0]=&Owner::invokeLostAi1B27C0;r.functionPublished=true;
+   //2A0A70's effective count1 already belongs to SAME actual group state.
+   //The representation adopts that binding without a second count mutation.
+   r.joined=true;pc=0x1b5af8;return nativeLostAiCallbackCurrent(i);
+  }catch(...){return false;} //Retain any first allocation; terminal until actualcleanup.
+ }
+ bool canRetireNativeLostAiCallbacks()const noexcept {
+  if(lease_)return false;
+  for(std::size_t i=0;i<nativeCallbacks_.size();++i){const auto& r=nativeCallbacks_[i];
+   if(r.retired){if(r.data9C||r.callbacksA0||r.joined)return false;continue;}
+   if(!r.attempted){if(r.data9C||r.callbacksA0||r.capacity94||r.joined||r.dataPublished||r.functionPublished)return false;continue;}
+   if(r.capacity94>1u||(r.callbacksA0&&!r.data9C)||
+      (r.dataPublished&&(!r.data9C||!source_||!source_->sources()||r.data9C[0]!=&(*source_->sources())[i].action))||
+      (r.functionPublished&&(!r.callbacksA0||!r.dataPublished||r.callbacksA0[0]!=&Owner::invokeLostAi1B27C0))||
+      (r.joined&&!nativeLostAiCallbackCurrent(i)))return false;
+  }
+  return true;
+ }
+ bool retireNativeLostAiCallback2A0420(std::size_t i,std::uint32_t& pc)noexcept {
+  pc=0x2a0420;if(i>=nativeCallbacks_.size()||!canRetireNativeLostAiCallbacks())return false;
+  auto& r=nativeCallbacks_[i];if(r.retired)return true;
+  //Stop this actual typed consumer before withdrawing its data/function slots.
+  //Native callbackCount98 remains unchanged until the real trigger owner dies.
+  r.retired=true;r.joined=false;
+  pc=0x2a0454;r.data9C.reset();r.dataPublished=false;
+  pc=0x2a0468;r.callbacksA0.reset();r.functionPublished=false;r.capacity94=0;
+  pc=0x2a0474;return true; //BEFORE caller's actualEntity base/count retirement.
+ }
  g::TriggerActionHooks50IN hooks()noexcept {
   return {this,[](void* p,const g::TriggerActionCall50IN& c)noexcept{return static_cast<Owner*>(p)->preflight(c);},
    [](void* p,const g::TriggerActionCall50IN& c)noexcept{static_cast<Owner*>(p)->apply(c);}};
  }
  Status fail(Status s)noexcept {if(terminal_==Status::Complete)terminal_=s;return terminal_;}
 public:
- Owner()=default;Owner(const Owner&)=delete;Owner&operator=(const Owner&)=delete;
+ Owner()=default;
+ ~Owner(){for(const auto& p:nativeEntities_)if(p.triggerCounted||p.colliderCounted)std::terminate();
+  for(const auto& r:nativeCallbacks_)if(r.data9C||r.callbacksA0||(r.attempted&&!r.retired))std::terminate();}
+ Owner(const Owner&)=delete;Owner&operator=(const Owner&)=delete;
  Owner(Owner&&)=delete;Owner&operator=(Owner&&)=delete;
  bool prepare(const ra_trigger_authoring50LA::Owner& source,
      const std::array<RacerIdentities,racers>& identities,

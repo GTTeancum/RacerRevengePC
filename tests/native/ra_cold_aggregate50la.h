@@ -1,4 +1,8 @@
 #pragma once
+#include "ra_cold_aggregate_prefix50la.h"
+namespace original_results_roster50LA { class Read; }
+namespace rr::platform {class OriginalUiLightManagerOwner50KG;}
+namespace rr::game { class OriginalRacePauseWorldAuthority50LA; }
 #include "ra_static_registry50la.h"
 #include "ra_cold_navigation_lease50la.h"
 #include "original_racer_material_sources50la_fixture.h"
@@ -20,10 +24,14 @@
 #include <exception>
 #include <algorithm>
 #include <memory>
+#include <optional>
+#include <thread>
 #include <string>
 #include <utility>
 
-namespace original_main_entry50KG { struct Application; }
+namespace rr::assets {class OriginalTaCutAuthoringCandidate;}
+namespace original_main_entry50KG { struct Application; class RaceDisplayLifetime50LA; }
+namespace rr::platform {class OriginalUiRiderProfileOwner50KG;}
 
 namespace ra_cold_aggregate50LA {
 namespace a=rr::assets;namespace g=rr::game;
@@ -32,14 +40,6 @@ namespace light=g::original_gc_gameplay_lighting_candidate;
 // Dependency order is explicit; no unproved full retail loader order is implied.
 enum class Stage : std::uint8_t {none,sources,staticCandidates,staticRegistry,
     authoring,lighting,detachedParticles,closed,staticWorld,staticWorldImages,staticWorldDrawPlan,runtimeQueryStorage,runtimeQueryOwners,runtimeQueryWorldOwners,trackParticleManager,sourceCamera};
-struct Prefix {
-    bool sources=false,staticCandidates=false,staticRegistry=false;
-    bool runtimeQueryStorage=false,runtimeQueryOwners=false,runtimeQueryWorldOwners=false;
-    bool triggers=false,sky=false,atm=false,audio=false,particleAuthoring=false;
-    bool staticWorldDrawPlan=false,trackParticleManager=false,staticModelPrefixes=false,staticModelResources=false;
-    bool staticModelObservers=false;
-    bool lighting=false,detachedParticles=false,staticWorld=false,staticWorldImages=false;
-};
 struct MissingLiveJoins {
     // Permanent scope descriptions, never writable readiness/activation flags.
     static constexpr const char* collision=
@@ -75,7 +75,32 @@ struct Diagnostic {
     std::string sky;
 };
 class Owner final : private ra_pod_scene50LA::Owner {
+
+    // Stage B: exclusive fresh shared allocation factory, deliberately private
+    // and UNCALLED. No loader/default route selects this incomplete mode.
+    bool prepareSharedRosterStorage(
+        std::shared_ptr<g::OriginalApplicationEntities50LA>,
+        std::shared_ptr<const ra_cold_roster50LA::Resources>,
+        undertrack_owners50ew_fixture::Owners*,
+        const undertrack_owners50ew_fixture::SourceGlobals&,
+        const terrain_probe_authoring50fq_fixture::Owner&,const g::Type3QueryInput48P&,
+        const std::vector<ra_source_camera50LA::WreckReservation>&,Diagnostic&)noexcept;
+
+    friend class rr::platform::OriginalUiLightManagerOwner50KG;
+    //Private same-World raw-borrow validation, never a public readiness token.
+    bool nativePortalTailCurrent148D00(const g::OriginalWreckComponent50LA* parent,
+        const g::OriginalWreckComponent50LA* portal)const noexcept {
+        if(parent!=&container4BC_||!portal||!canCloseTopology())return false;
+        for(const auto& owned:nativePortals_)
+            if(owned&&owned->attached && &owned->entity==portal)return true;
+        return false;
+    }
+    friend struct ::interactive_setup50DU::Context; //Private concrete projection/water producer lifetime borrows only.
+    native_world_water50LA::Domain::Lease bindNativeWaterContext(const ::interactive_setup50DU::Context&)noexcept;
+    bool nativeWaterDomainMatches(const native_world_water50LA::Domain&)const noexcept;
+    friend class ::original_results_roster50LA::Read;
     friend class rr::game::OriginalRaceConstructor50LA;
+    friend class rr::game::OriginalRacePauseWorldAuthority50LA;
     friend class rr::platform::MaterialTextureGl50EB;
     friend class rr::platform::VehicleWindowGl50DS;
     friend class ra_cold_roster50LA::Operation;
@@ -94,6 +119,284 @@ class Owner final : private ra_pod_scene50LA::Owner {
     // One actual decoded source owner. All child borrows die before it. No
     // external source/registry injection or second source decode is possible.
     std::shared_ptr<ra_cold_sources50LA::Owner> source_;
+    //Windows/Linux replacement for the parser role published at World34 by
+    //1B399C. It aliases this SAME authenticated decoded source; no parser,
+    //geometry, actors, Entity counts or mutable second World are manufactured.
+    //Publication precedes fallible provider/member validation. A failed load
+    //keeps this bounded prefix, but document stays null until validation ends.
+    struct NativeScbReader34 {
+        std::shared_ptr<const ra_cold_sources50LA::Owner> source;
+        std::shared_ptr<a::OriginalStandardArchiveProvider50LA> provider;
+        a::OriginalStandardArchiveProvider50LA::MemberView member{};
+        const a::ParameterDocument48F* document=nullptr;
+    };
+    //Actual per-World immutable construction-thread identity. In particular,
+    //a rejected cross-thread public close must not revoke this native view.
+    const std::thread::id nativeScbThread_=std::this_thread::get_id();
+    std::optional<NativeScbReader34> nativeScb34_;
+    bool nativeScbRevoked_=false;
+    bool nativeTrackArchiveCurrent(const original_main_entry50KG::Application&)const noexcept;
+    bool bindNativeTrackScb34(const original_main_entry50KG::Application&,std::uint32_t&)noexcept;
+    // Immutable native authoring aliases/read results on this SAME World.
+    // Not source live-field shadows:35C may already be1 from actual1B4E20.
+    // The source270900 allocator/callback interval is replaced, never replayed.
+    struct NativeSceneInfo270900 {
+        enum class Read:std::uint8_t {sceneName,portals,zones,environmentNode,roles};
+        const a::ParameterDocument48F* document=nullptr;
+        const a::ParameterBlock48F* sceneInfo=nullptr;
+        const a::ParameterField48F* name244=nullptr;
+        std::int32_t authoredPortals358=0,authoredZones34C=1,authoredUseEnvironment35C=0;
+        Read next=Read::sceneName;
+        const track_runtime_storage50IG::Storage* physicsCollisionBackend=nullptr;
+        const light::Owner* environmentVisibilityBackend=nullptr;
+        bool nativeRolesAccepted=false;
+    };
+    std::optional<NativeSceneInfo270900> nativeSceneInfo270900_;
+    bool continueNativeSceneInfo270900(const original_main_entry50KG::Application&,std::uint32_t&)noexcept;
+    bool nativeSceneInfo270900Current(const original_main_entry50KG::Application&,std::uint32_t&)const noexcept;
+    //The same temporary World34 role is SCB first, then TOB. These optional
+    //native views are mutually exclusive; immutable decoded backing outlives
+    //either role. Neither wrapper is another parsed document or scene.
+    struct NativeTobReader34 {
+        enum class Next:std::uint8_t {load,podDust,podCache,rain,animations,complete};
+        std::shared_ptr<const ra_cold_sources50LA::Owner> source;
+        std::shared_ptr<a::OriginalStandardArchiveProvider50LA> provider;
+        const ra_particle_authoring50LA::Owner* authoring=nullptr;
+        a::OriginalStandardArchiveProvider50LA::MemberView member{};
+        const a::ParameterDocument48F* document=nullptr;
+        Next next=Next::load;
+    };
+    std::optional<NativeTobReader34> nativeTob34_;
+    struct NativeAubReader38 {
+        std::shared_ptr<const ra_cold_sources50LA::Owner> source;
+        std::shared_ptr<a::OriginalStandardArchiveProvider50LA> provider;
+        const ra_audio_authoring50LA::Owner* authoring=nullptr;
+        std::string memberName;
+        a::OriginalStandardArchiveProvider50LA::MemberView member{};
+        const a::ParameterDocument48F* document=nullptr;
+    };
+    std::optional<NativeAubReader38> nativeAub38_;
+    bool withdrawNativeTob34_272800(const original_main_entry50KG::Application&,std::uint32_t&)noexcept;
+    bool bindNativeAub38_1B4720(const original_main_entry50KG::Application&,std::uint32_t&)noexcept;
+    struct NativeEmptyAmbient3B4 {
+        Entity entity;
+        const std::uint32_t sourceVtable08=0x3d2980;
+        std::int32_t count30=0;
+        std::nullptr_t rows34=nullptr;
+    };
+    //Exclusive native first-entry metadata domain, NOT a270550 reset receipt.
+    std::unique_ptr<NativeEmptyAmbient3B4> nativeEmptyAmbient3B4_;
+    bool nativeEmptyAmbient271470Complete_=false;
+    bool loadNativeEmptyAmbient271470(const original_main_entry50KG::Application&,std::uint32_t&)noexcept;
+    struct NativeSoulTreeSoundDescriptor278C00 {
+        const std::uint32_t sourceVtable1C4=0x3d2a60;
+        std::string resource00="none",attach1D0="body";
+        //278750 copies unknown current442F80.158C00 replaces only XYZ,
+        //NOT W; no fabricated zero/one fourth component is introduced.
+        std::optional<std::array<float,3>> position110;
+        std::optional<std::uint32_t> positionW11C;
+        float max120=0,min124=0,oneShotDistance13C=0,randomTriggerPercent140=0;
+        std::int32_t looping128=0,oneShot12C=0,reset130=0,force2D134=0,stereo138=0;
+        //Source memset150..1BF. Entries become unknown only where copied
+        //from unproven global W; all other initialized bytes stay known.
+        std::array<std::optional<std::uint32_t>,28> state150;
+        std::int32_t priority1C0=10;
+        const a::ParameterBlock48F* actualSource=nullptr;
+        bool loaded=false;
+        NativeSoulTreeSoundDescriptor278C00(){for(auto& word:state150)word=0u;}
+    };
+    struct NativeSoulTreeSoundRow278DD0 {
+        const std::uint32_t sourceVtable00=0x3d2a30;
+        std::nullptr_t runtime04=nullptr; //278E80/103E20 has NOT run.
+        std::unique_ptr<NativeSoulTreeSoundDescriptor278C00> descriptor08;
+    };
+    struct NativeSoulTreeSoundList3B8 {
+        Entity entity;bool counted=false,complete=false;
+        const std::uint32_t sourceVtable08=0x3d2880;
+        std::int32_t count30=0;
+        std::unique_ptr<NativeSoulTreeSoundRow278DD0[]> rows34;
+        const ra_audio_authoring50LA::Owner* actualOwner=nullptr;
+        std::size_t loaded=0;
+    };
+    std::unique_ptr<NativeSoulTreeSoundList3B8> nativeSoulTreeSounds3B8_;
+    bool loadNativeSoulTreeSoundDescriptors2714D8(const original_main_entry50KG::Application&,std::uint32_t&)noexcept;
+    bool canRetireNativeSoulTreeSounds3B8()const noexcept;
+    bool retireNativeSoulTreeSounds3B8()noexcept;
+    struct NativeMaterialSoundDescriptor {
+        std::uint32_t sourceVtable1C4=0x3d2a90; //278650 common, drive278950 replaces3D2A80.
+        std::string resource00="none";
+        std::array<std::optional<std::uint32_t>,4> position110{}; //Unknown current442F80, allXYZW.
+        float max120=0,min124=0,oneShotDistance13C=0,randomTriggerPercent140=0;
+        std::int32_t looping128=0,oneShot12C=0,reset130=0,force2D134=0,stereo138=0;
+        std::array<std::optional<std::uint32_t>,28> state150;
+        std::int32_t priority1C0=10;
+        //Reached only for drive rows; source constructor278950 initializes all.
+        std::array<std::int32_t,5> drive1D0{};
+        float slope1E4=0;
+        const a::ParameterBlock48F* actualSource=nullptr;
+        const std::string* actualCatalogName=nullptr; //Existing native .vag mapping, NOT source.wav.
+        const g::MaterialDriveParameters50HI* actualDrive=nullptr;
+        bool loaded=false;
+        NativeMaterialSoundDescriptor(){for(auto& word:state150)word=0u;}
+    };
+    struct NativeMaterialSoundList {
+        Entity entity;bool counted=false,complete=false,drive=false;
+        std::uint32_t sourceVtable08=0x3d2800;
+        std::int32_t count30=0;
+        std::unique_ptr<NativeMaterialSoundDescriptor[]> rows34;
+        const ra_audio_authoring50LA::Owner* actualOwner=nullptr;
+        const a::MaterialAudioCatalog50HI* actualCatalog=nullptr;
+        std::size_t loaded=0;
+    };
+    //Two distinct counted source lists, not a shared/deduplicated Sound owner.
+    std::array<std::unique_ptr<NativeMaterialSoundList>,2> nativeMaterialSounds3BC_;
+    bool loadNativeMaterialSoundDescriptors271530(const original_main_entry50KG::Application&,std::uint32_t&)noexcept;
+    bool canRetireNativeMaterialSounds3BC()const noexcept;
+    bool retireNativeMaterialSounds3BC()noexcept;
+    struct NativeMaterialAssignmentLocals271600 {
+        std::int32_t materialCount284=0,defaultMaterial288=0,objectCount28C=0;
+        bool complete=false;
+    };
+    std::optional<NativeMaterialAssignmentLocals271600> nativeMaterialAssignments271600_;
+    bool completeNativeAudio2728E0(const original_main_entry50KG::Application&,std::uint32_t&)noexcept;
+    bool withdrawNativeAub38_272930(const original_main_entry50KG::Application&,std::uint32_t&)noexcept;
+    bool nativeAubRoleRetired272930_=false; //NOT a sourceWorld38null store.
+    std::shared_ptr<rr::platform::OriginalUiLightManagerOwner50KG> nativeRaLightZones_;
+    bool nativeZoneTopologyPrefix272A48_=false;
+    // Explicit native descriptor adoption at actual+110; not source270B10 replay.
+    struct NativeFogDescriptor3AC {
+        std::shared_ptr<const ra_cold_sources50LA::Owner> source;
+        const rr::assets::ParameterBlock48F* block=nullptr;
+    };
+    std::unique_ptr<NativeFogDescriptor3AC> nativeFogDescriptor3AC_;
+    bool nativeFogLoadAttempted_=false,nativeFogLoadComplete_=false;
+    bool nativeGeometryDirectory1AA1DC_=false;
+    std::size_t nativeStandardZoneNext_=0,nativeStandardSlotNext_=0;
+    std::size_t nativeStandardVisuals_=0,nativeStandardNegativeLoads_=0;
+    bool nativeStandardServiceTerminal_=false,nativeStandardServiceComplete_=false;
+    bool nativeBuoyAttachNoEffect1B3AE0_=false;
+    bool nativeCollisionAnimationDirectory1AA2A0_=false;
+    bool nativeEmptyToyService1B4328Complete_=false;
+    bool continueNativeCollisionObjects2743B0(const original_main_entry50KG::Application&,std::uint32_t&)noexcept;
+    bool continueNativeFinishLine1B3B80(const original_main_entry50KG::Application&,std::uint32_t&)noexcept;
+    bool continueNativeStandardModels274160(const original_main_entry50KG::Application&,std::uint32_t&)noexcept;
+    bool continueNativeInstances1AA194(const original_main_entry50KG::Application&,std::uint32_t&)noexcept;
+    bool continueNativeParticleManager1B4DC0(const original_main_entry50KG::Application&,std::uint32_t&)noexcept;
+    bool continueNativeFog273C30(const original_main_entry50KG::Application&,std::uint32_t&)noexcept;
+    bool continueNativeZoneServices2729E0(const original_main_entry50KG::Application&,std::uint32_t&)noexcept;
+    bool retireNativeRaLightZones148110()noexcept;
+
+
+
+
+
+
+    // Uncounted World3B0 terrain metadata. Native data mirror of eight24-byte
+    // rows; vtable provenance is not a callable guest/host pointer.
+    struct NativeTerrainRow {
+        float friction00=1.f,drag04=1.f,traction08=1.f;
+        std::uint32_t dust0C=1,dirt10=1,sourceVtable14=0x003d2b70;
+    };
+    static_assert(sizeof(NativeTerrainRow)==24,"source terrain row width");
+    struct NativeTerrain3B0 {
+        std::uint32_t count00=0;
+        std::array<NativeTerrainRow,8> rows04{};
+        bool mappingsComplete=false;
+    };
+    std::optional<NativeTerrain3B0> nativeTerrain3B0_;
+    bool nativeEmptyAnimations2713E0Complete_=false;
+    bool nativePhysicsObjects2718C0Complete_=false;
+    struct NativeCsCameraTable3E4 {
+        const original_camera_session50KX::Session* session=nullptr;
+        const rr::assets::OriginalTaCutAuthoringCandidate* authoring=nullptr;
+        std::uint32_t count3E4=0;
+        //Unknown until each genuine read; no manufactured zero/unread zones.
+        std::array<std::optional<std::uint32_t>,7> zones3E8{};
+        std::size_t next=0;
+    };
+    std::optional<NativeCsCameraTable3E4> nativeCsCameraTable3E4_;
+    //Retained native continuation locals, NOT World4A4/4A8 or a flare owner.
+    struct NativeSunFlareRead271DD0 {
+        bool modeA1=false;
+        std::int32_t localCount4B4=0;
+    };
+    std::optional<NativeSunFlareRead271DD0> nativeSunFlareRead271DD0_;
+    std::shared_ptr<original_camera_session50KX::Session> borrowNativeLoadCamera(
+        const std::shared_ptr<Owner>&,const original_camera_session50KX::Session&)noexcept;
+    bool buildNativeSunFlarePacket2E6060(const original_main_entry50KG::Application&,
+        const original_main_entry50KG::RaceDisplayLifetime50LA&,
+        const original_camera_session50KX::Session&,std::uint32_t&)noexcept;
+    struct NativeParticleDescriptor27C430 {
+        const std::uint32_t sourceVtable338=0x3d2588;
+        std::int32_t startingZone00=0,type04=0;
+        std::string attach08="none",emitter210="none";
+        std::optional<std::string> child10C;
+        //Constructor copies global442F80; no invented current global contents.
+        //The reached authored OffsetFromSoultree read replaces it below.
+        std::optional<std::array<float,3>> offset320;
+        //158C00 storesXYZ only;27C5DC copied unknown global442F80W.
+        //Actual native emitter offset50W1 is NOT source descriptor32C evidence.
+        std::optional<std::uint32_t> offsetW32C;
+        std::optional<std::int32_t> instances330,startOn334;
+        const ra_particle_authoring50LA::Owner::AttachmentSource* actualAttachment=nullptr;
+        bool loaded=false;
+    };
+    struct NativeParticleRow27DE00 {
+        const std::uint32_t sourceVtable14=0x3d2570;
+        //27CA44 raw pointer-array custody, borrowing the SAME existing emitter.
+        //No second emitter allocation/count and no array-owned Entity release.
+        std::unique_ptr<Entity*[]> emitterPointers00;
+        bool emitterPublished=false,emitterEnrolled=false,configured=false;
+        bool started=false,enabled=false,attached=false,descriptorRetired=false;
+        const g::OriginalRacerSceneObject50LA* attachment74=nullptr;
+        std::unique_ptr<NativeParticleDescriptor27C430> descriptor04;
+        std::optional<std::uint32_t> unknown08,unknown0C,unknown10;
+    };
+    struct NativeParticleList3D8 {
+        Entity entity;bool counted=false,complete=false;
+        const std::uint32_t sourceVtable08=0x3d24f0;
+        std::int32_t count30=0;
+        std::unique_ptr<NativeParticleRow27DE00*[]> pointers34;
+        std::array<std::unique_ptr<NativeParticleRow27DE00>,4> rows;
+        std::size_t published=0,loaded=0;
+        std::size_t servicesCompleted=0;
+        bool serviceEntered=false,serviceTerminal=false,serviceComplete=false;
+        ra_particle_authoring50LA::Owner* actualOwner=nullptr;
+    };
+    //New native exclusive World3D8 metadata domain; not a270550 reset receipt.
+    std::unique_ptr<NativeParticleList3D8> nativeParticleList3D8_;
+    std::size_t nativeStaticModelParamsNext_=0; //Authored row-order prefix only.
+    bool nativeStaticModelParamEffectsComplete_=false;
+    bool loadNativeStaticModelParams271A00(const original_main_entry50KG::Application&,std::uint32_t&)noexcept;
+    std::optional<std::int32_t> nativeBuoyCount538_; //Unknown until1B50E0 actual default store.
+    bool loadNativeEmptyBuoys1B5090(const original_main_entry50KG::Application&,std::uint32_t&)noexcept;
+    bool loadNativeParticleDescriptors2722F0(const original_main_entry50KG::Application&,std::uint32_t&)noexcept;
+    bool skipNativeEcosystem1AA410(const original_main_entry50KG::Application&,std::uint32_t&)const noexcept;
+    bool continueNativeWater274570(const original_main_entry50KG::Application&,std::uint32_t&)noexcept;
+    bool continueNativeSky274AE0(const original_main_entry50KG::Application&,std::uint32_t&)noexcept;
+    bool continueNativeTriggerServices274E90(const original_main_entry50KG::Application&,std::uint32_t&)noexcept;
+    bool continueNativeParticleServices274370(const original_main_entry50KG::Application&,std::uint32_t&)noexcept;
+    bool canRetireNativeParticleList3D8()const noexcept;
+    bool retireNativeParticleList3D8()noexcept;
+    bool loadNativeSunFlareSaturation2720D0(const original_main_entry50KG::Application&,std::uint32_t&)noexcept;
+    bool loadNativeSunFlareDepth2C5CF0(const original_main_entry50KG::Application&,
+        const original_main_entry50KG::RaceDisplayLifetime50LA&,
+        const original_camera_session50KX::Session&,std::uint32_t&)noexcept;
+    bool loadNativeSunFlareResources2C5C44(const original_main_entry50KG::Application&,std::uint32_t&)noexcept;
+    bool loadNativeSunFlareMaterials2C5A10(const original_main_entry50KG::Application&,std::uint32_t&)noexcept;
+    bool retainNativeSunFlareMaterial245DA0(NativeSunFlareMaterial&,const std::string&,
+        const std::shared_ptr<a::OriginalStandardMaterialTable50LA>&,const std::string&,std::uint32_t&)noexcept;
+    bool continueNativeSunFlareRead1B46E0(const original_main_entry50KG::Application&,
+        const rr::platform::OriginalUiRiderProfileOwner50KG&,std::uint32_t&)noexcept;
+    bool continueNativeCsCameras272380(const original_main_entry50KG::Application&,
+        const original_camera_session50KX::Session&,std::uint32_t&)noexcept;
+    bool continueNativePhysicsObjects2718C0(const original_main_entry50KG::Application&,std::uint32_t&)noexcept;
+    bool continueNativeTriggers1B5000(const original_main_entry50KG::Application&,std::uint32_t&)noexcept;
+    bool continueNativeTerrain271370(const original_main_entry50KG::Application&,std::uint32_t&)noexcept;
+    bool withdrawNativeScb34_271C10(const original_main_entry50KG::Application&,std::uint32_t&)noexcept;
+    bool continueNativeTob1B4330(const original_main_entry50KG::Application&,
+        const rr::platform::OriginalUiRiderProfileOwner50KG&,std::uint32_t&)noexcept;
+
     std::shared_ptr<ra_static_candidates50LA::Owner> candidates_;
     std::unique_ptr<ra_static_registry50LA::ColdStage> registry_;
     std::shared_ptr<ra_trigger_authoring50LA::Owner> triggers_;
@@ -129,12 +432,13 @@ class Owner final : private ra_pod_scene50LA::Owner {
     bool rosterMountAttempted_=false,rosterMountComplete_=false;
     const original_main_entry50KG::Application* rosterMountApplication_=nullptr;
     std::shared_ptr<a::OriginalStandardMaterialDomain50LA> rosterMountDomain_;
+    a::NativeRaceMountLease50LA nativeRosterMounts_;
     // Application-aware definitions beside the retained Operation. Only the
     // actual Bank pin can supply the operation and its stable arena arrays.
     std::shared_ptr<ra_cold_roster50LA::Operation> retainedRosterForHandoff(
         native_racer50HN::Bank&,Diagnostic&)noexcept;
     bool failRetainedHandoff(Diagnostic&,const char*)noexcept;
-    bool fail(Diagnostic& d,const char* why) noexcept {staticFog_.reset();staticLighting_.reset();terminal_=true;d.failure=why;return false;}
+    bool fail(Diagnostic& d,const char* why) noexcept;
     bool enter(Diagnostic& d,Stage stage,bool& attempted,bool dependency) noexcept {
         d={};d.stage=stage;
         if(terminal_||closed_||attempted||!dependency)return fail(d,"RA aggregate stage dependency/lifetime rejected");
@@ -164,7 +468,7 @@ public:
     }
     Owner()=default;Owner(const Owner&)=delete;Owner& operator=(const Owner&)=delete;
     Owner(Owner&&)=delete;Owner& operator=(Owner&&)=delete;
-    ~Owner(){if(!close())std::terminate();}
+    ~Owner();
     // Typed adoption precedes runtime reservation. Definition is isolated in
     // the Application-aware cold roster header; no mutable roster escapes.
     bool prepareRuntimeRosterQueryStorage(
@@ -283,7 +587,8 @@ public:
             return fail(d,"RA actual pod context binding failed; retained partial slot effects");
         return true;
     }
-    bool placeRetainedRuntimeGridSlot(native_racer50HN::Bank&,std::size_t,Diagnostic&)noexcept;
+    bool placeRetainedRuntimeGridSlot(native_racer50HN::Bank&,std::size_t,Diagnostic&,
+        bool canonicalTournamentGrid=false)noexcept;
     bool prepareRetainedRuntimeModelResources(native_racer50HN::Bank&,Diagnostic&)noexcept;
     bool mountRetainedRuntimeRosterArchives(const original_main_entry50KG::Application&,Diagnostic&)noexcept;
     bool attachRetainedRuntimeFreshSlot(native_racer50HN::Bank&,std::size_t,
@@ -399,6 +704,7 @@ public:
             sky50gw_fixture::Request request;
             request.track=track_source_fixture::Track::ra;request.textureRoot=textureRoot;
             request.retainedArchive=&source_->sourcesDecoded()->archive;
+            request.retainedRaSource=source_;
             request.decodeOriginalImages=!runtime_asset_paths50LB::configuredRoot("RR_ORIGINAL_ASSET_ROOT").empty();
             sky50gw_fixture::Diagnostic detail;
             if(!images->load(request,detail)){d.sky=detail.message;return fail(d,"RA original sky image preparation failed");}
@@ -523,6 +829,17 @@ public:
         const ra_source_camera50LA::CameraRuntimeOwners&,
         const std::vector<std::uint8_t>& selectedOriginalCam,
         original_camera_session50KX::DisplayInputs&,Diagnostic&)noexcept;
+    g::OriginalWreckComponent50LA* introController174A30(Diagnostic& d)noexcept {
+        d={};d.stage=Stage::sourceCamera;
+        if(terminal_||closed_||!runtimeQueries_)return nullptr;
+        return runtimeQueries_->currentIntroController174A30();
+    }
+    bool constructIntroAudio177750(std::shared_ptr<const a::AudioBank50HC> bank,
+        std::size_t firstVoice,std::size_t voiceCount,Diagnostic& d)noexcept {
+        d={};d.stage=Stage::sourceCamera;
+        return !terminal_&&!closed_&&runtimeQueries_&&
+            runtimeQueries_->constructCurrentIntroAudio177750(std::move(bank),firstVoice,voiceCount);
+    }
     // A native consumer borrows the actual retained Session. The strong
     // aggregate capture pins every world/query/model dependency. Explicit
     // close/abandon rejects while a borrow survives, so no reset can invalidate
@@ -559,6 +876,11 @@ public:
         if(runtimeCameraBorrows_){d.failure="retire actual native camera borrows before camera destruction";
             d.runtimeQueries.camera.status=original_camera_session50KX::Status::owner;return d.runtimeQueries.camera;}
         if(!runtimeQueries_){d.runtimeQueries.camera.status=original_camera_session50KX::Status::complete;return d.runtimeQueries.camera;}
+        std::uint32_t fogPC=0;
+        if(!runtimeQueries_->canWithdrawNativeFogBorrow()||!retireNativeFogCustody(fogPC)){
+            d.failure="actual Fog custody must retire before CameraBinding destruction";
+            d.runtimeQueries.camera.status=original_camera_session50KX::Status::owner;
+            d.runtimeQueries.camera.sourcePC=fogPC;return d.runtimeQueries.camera;}
         return runtimeQueries_->closeCamera(false,d.runtimeQueries);
     }
     // As on the existing route, root must actually cancel/retire pending fade
@@ -568,6 +890,11 @@ public:
         if(runtimeCameraBorrows_){d.failure="retire actual native camera borrows before camera destruction";
             d.runtimeQueries.camera.status=original_camera_session50KX::Status::owner;return d.runtimeQueries.camera;}
         if(!runtimeQueries_){d.runtimeQueries.camera.status=original_camera_session50KX::Status::complete;return d.runtimeQueries.camera;}
+        std::uint32_t fogPC=0;
+        if(!runtimeQueries_->canWithdrawNativeFogBorrow()||!retireNativeFogCustody(fogPC)){
+            d.failure="actual Fog custody must retire before CameraBinding destruction";
+            d.runtimeQueries.camera.status=original_camera_session50KX::Status::owner;
+            d.runtimeQueries.camera.sourcePC=fogPC;return d.runtimeQueries.camera;}
         return runtimeQueries_->closeCamera(true,d.runtimeQueries);
     }
     // Caller supplies only actual pinned root-produced crowd RRTEX bytes.
@@ -695,8 +1022,35 @@ public:
     bool closeNativeLoadedWorld() noexcept {return closeOwnedNativeResources(true);}
     bool close() noexcept {return closeOwnedNativeResources(false);}
 private:
+    // Only the concrete native renderer (existing friend) may borrow this
+    // same actual strip. Record identity is its address in the current mixed
+    // publication, not a caller-created identity/scissor or readiness flag.
+    template<class Visitor>
+    bool visitNativeLocalFlareEmission(
+        const g::original_gc_gameplay_lighting_candidate::NativeRaStaticDraw50LA& record,
+        Visitor&& visitor,rr::assets::OriginalStandardMaterialDiagnostic50LA& d)noexcept {
+        d={};g::CameraViewOutput49F camera;
+        if(terminal_||closed_||!world_||!world_->drawPlanCurrent()||!runtimeQueries_||!sceneApplication_||
+           !runtimeQueries_->readNativeLocalFlareCamera(record,*sceneApplication_,camera)){
+            d.status=rr::assets::OriginalStandardMaterialStatus50LA::input;d.sourcePC=0x14b2c0;return false;}
+        g::OriginalPodCableStripCold50LA* strip=nullptr;
+        std::shared_ptr<rr::assets::OriginalStandardMaterialTable50LA> table;
+        //After entry, any failure retains partial stores/resources and closes
+        //this actual owner's consumer permanently; no callback replay/reset.
+        const auto stop=[&]()noexcept {const auto index=nativeLocalFlareAuthoredIndex(record.flareIdentity);
+            if(index)nativePoints_[*index-2u].flare->consumerTerminal=true;return false;};
+        if(!prepareNativeLocalFlareStrip(record,camera,strip,table,d))return stop();
+        if(strip){try {if(!visitor(*strip,table,d))return stop();}catch(...){
+            d.status=rr::assets::OriginalStandardMaterialStatus50LA::allocation;return stop();}}
+        g::CameraViewOutput49F after;
+        if(!runtimeQueries_->readNativeLocalFlareCamera(record,*sceneApplication_,after)||
+           !nativeLocalFlareCurrent()){
+            d.status=rr::assets::OriginalStandardMaterialStatus50LA::input;d.sourcePC=0x14b8e0;return stop();}
+        return true;
+    }
     NativeCloseDiagnostic nativeCloseDiagnostic_;
     bool closeOwnedNativeResources(bool retireCountedWorld) noexcept {
+        if(nativeScbThread_!=std::this_thread::get_id())return false;
         if(closed_)return true;
         auto& diagnostic=nativeCloseDiagnostic_;diagnostic={};
         diagnostic.counted=worldColdConstructed_;diagnostic.retireCounted=retireCountedWorld;
@@ -707,16 +1061,29 @@ private:
         diagnostic.worldReferences=worldEntity_.reference00;diagnostic.worldFlags=worldEntity_.flags29;
         diagnostic.worldMask=worldEntity_.mask20;
         const auto reject=[&](const char* gate){diagnostic.gate=gate;return false;};
+        if(worldColdConstructed_&&!retireCountedWorld)
+            return reject("counted world requires explicit retirement");
+        //Revoke native load observation BEFORE any fallible cleanup. This is
+        //not a claim that retail1573B0 ran or World34 was source-null-stored.
+        nativeScbRevoked_=true;nativeAub38_.reset();nativeSunFlareRead271DD0_.reset();nativeCsCameraTable3E4_.reset();nativeScb34_.reset();nativeTob34_.reset();nativeSceneInfo270900_.reset();
         if(worldColdConstructed_){
-            if(!retireCountedWorld)return reject("counted world requires explicit retirement");
             const char* prefix=nullptr;
             if(!canRetireNativeWorldPrefix(&prefix))return reject(prefix?prefix:"world prefix preflight");
         }
         if(runtimeCameraBorrows_||runtimeWorldBorrows_)return reject("live camera/world borrows");
+        std::uint32_t fogPC=0;
+        if((runtimeQueries_&&!runtimeQueries_->canWithdrawNativeFogBorrow())||
+           !retireNativeFogCustody(fogPC))return reject("native Fog custody retirement");
+        nativeFogDescriptor3AC_.reset();
+
         // These aggregate-owned observation bindings each retain the actual
         // runtime bridge. Retire them before counting external runtime owners.
         staticFog_.reset();
         staticLighting_.reset(); // Retire typed camera/world/light borrows before preflight.
+        //Concrete LightManager RA source-zone custody borrows the SAME
+        //canonical owner. Retire this private partial-load domain before normal
+        //canonical-owner use-count preflight and before native gameplay ends.
+        if(!retireNativeRaLightZones148110())return reject("RA LightManager zone retirement");
         diagnostic.runtimeOwners=runtimeQueries_.use_count();
         // This explicit counted-world route must actually destroy its runtime
         // storage below; an external strong pin cannot postpone that teardown.
@@ -725,6 +1092,7 @@ private:
         if(navigationLease_&&navigationLease_.use_count()!=1)return reject("navigation strong owners");
         // Preflight the sole actual Application reference/count owner BEFORE
         // releasing anything. Unexpected live links/refs reject destruction.
+        if(!canRetireNativeInstanceMaster())return reject("actual InstanceMaster custody preflight");
         if(!canCloseTopology())return reject("scene topology preflight");
         if(world_&&!world_->canClose())return reject("static world publication/material preflight");
         if(runtimeQueries_&&!runtimeQueries_->canClose())return reject("runtime query retirement preflight");
@@ -736,24 +1104,66 @@ private:
             if(lighting_.use_count()!=static_cast<long>(expected))return reject("lighting strong owners");
         }
         if(trackParticles_&&trackParticles_.use_count()!=1)return reject("track particle strong owners");
+        if(!canRetireNativeCollisionQueries27B040())return reject("native collision query lifetime preflight");
+        if(!canRetireNativeFinishLine540())return reject("native finishline lifetime preflight");
+        if(!canRetireNativeSunFlare())return reject("native SunFlare lifetime preflight");
+        if(!canRetireNativeSky3F8())return reject("native sky resource prefix preflight");
+        if(!canRetireNativeTriggerList3D0())return reject("native trigger lifetime preflight");
+        if(!canRetireNativeParticleList3D8())return reject("native emitter descriptor preflight");
+        if(!canRetireNativeSoulTreeSounds3B8())return reject("native SoulTreeSound descriptor preflight");
+        if(!canRetireNativeMaterialSounds3BC())return reject("native material sound descriptor preflight");
+        //Unconsumed native descriptors borrow audio_'s immutable full AUB.
+        //Dispose this genuine private metadata ownership before audio_ reset.
+        if(!retireNativeSky3F8())return reject("native sky resource prefix retirement");
+        //Withdraw the immutable Environment+110 borrow before actual lighting/
+        //Environment teardown. This does not touch or infer World400.
+        nativeWaterNone274570_.reset();
+        if(!retireNativeSoulTreeSounds3B8())return reject("native SoulTreeSound descriptor retirement");
+        if(!retireNativeMaterialSounds3BC())return reject("native material sound descriptor retirement");
+        //Descriptors borrow actual immutable attachment rows; retire before that owner.
+        if(!retireNativeParticleList3D8())return reject("native emitter descriptor retirement");
         if(particles_&&!particles_->close())return reject("detached particles close");
         // Detached emitters/real camera borrowers must retire before the
         // source pool/material150/Entity cleanup. Failures retain the owner.
         if(trackParticles_&&!trackParticles_->close())return reject("track particles close");
+        nativeParticleManager4A0_=nullptr;nativeParticleTexture41C_=nullptr;
+
+        //Finishline's dedicated strip/material and copied anchor data retire
+        //before existing model resources. Never leave a borrowed model alias.
+        if(!retireNativeFinishLine540())return reject("native finishline retirement");
+        {std::uint32_t pc=0;if(!detachNativeCollisionQueries27B170(pc)){diagnostic.sourcePC=pc;return reject("collision suffix before model retirement");}}
         if(world_&&!world_->close())return reject("static world close");
         trackParticles_.reset();trackParticleApplication_.reset();trackParticleDomain_.reset();
-        rosterMountDomain_.reset();rosterMountApplication_=nullptr;rosterModelResourcesComplete_=false;
+        rosterModelResourcesComplete_=false; // Mount custody survives fallible later cleanup.
         world_.reset();
         particles_.reset();emitterApplication_.reset();audio_.reset();atm_.reset();
         // World publication preflight above prevents any backing from retiring
         // while its image or future renderer lease is live.
+        if(!retireNativeInstanceMaster())return reject("actual InstanceMaster custody retirement");
+        if(!withdrawNativeTriggerObserverStorage())return reject("trigger observer borrowed topology withdrawal");
         if(!closeTopology())return reject("scene topology close");
         lighting_.reset();skyImages_.reset();sky_.reset();triggers_.reset();
         // Storage drops its exclusive serial world lease before radii/source.
         runtimeQueries_.reset();registry_.reset();
+        {std::uint32_t pc=0;if(!retireNativeCollisionQueries11B4A0(pc)){diagnostic.sourcePC=pc;return reject("collision resources after registry retirement");}}
+        // Actual bank/query/membership gates passed, then Storage retired.
+        // Child collider identities retire before triggers, and list last.
+        if(!retireNativeSunFlare())return reject("native SunFlare lifetime retirement");
+        if(!retireNativeTriggerList3D0())return reject("native trigger lifetime retirement");
+        // Queries are retired above. Revoke candidate-owned metadata aliases.
+        if(candidates_)for(auto& candidate:candidates_->candidates_)candidate.terrainDescriptor180=nullptr;
         if(worldColdConstructed_){std::uint32_t pc=0;
             if(!retireNativeWorldPrefixAfterOwnedCleanup(pc)){diagnostic.sourcePC=pc;return reject("counted world prefix retirement");}}
-        candidates_.reset();navigationLease_.reset();source_.reset();
+        candidates_.reset();nativeTerrain3B0_.reset();navigationLease_.reset();source_.reset();
+        // Actual model/PST/World/query/read owners have retired above. Keep
+        // exact partial mount custody on refusal; no whole-provider reset.
+        if(nativeRosterMounts_.provider_&&!nativeRosterMounts_.closed_){
+            a::OriginalStandardTextureDiagnostic50LA mountDiagnostic;
+            if(!rosterMountDomain_||!rosterMountDomain_->resolver3E1A70()||
+               !rosterMountDomain_->resolver3E1A70()->retireNativeRaceMounts1316A0(nativeRosterMounts_,mountDiagnostic))
+                return reject("actual RA mount consumers still live or custody changed");
+        }
+        rosterMountDomain_.reset();rosterMountApplication_=nullptr;
         collisionApplication_.reset();closed_=true;return true;
     }
 };

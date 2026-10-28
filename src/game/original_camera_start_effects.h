@@ -100,6 +100,30 @@ public:
     OriginalCameraStartResult advance(OriginalVideoFadeState&,HostMonotonicClock50ID&,
         OriginalVideoBlockingBackend*);
 };
+// Numeric continuation of Results1CA778 -> FC2AED60(500,0,0,1), NOT
+// admission to Results input or a receipt for its parent call. The lexical
+// caller must retain Application/Video/clock/backend and its original input
+// batch, hold simulation, and retire/cancel the real backend before releasing
+// those owners. A separate instance is required for every source invocation;
+// the completed initial-Camera cursor is never reused. Currently uncalled.
+class OriginalResultsBlockingFade2AED60 final {
+    OriginalVideoBlockingFade fade_;
+    OriginalVideoFadeState* video_=nullptr;
+    HostMonotonicClock50ID* clock_=nullptr;
+    OriginalVideoBlockingBackend* backend_=nullptr;
+    bool requested_=false,finished_=false;
+    OriginalCameraStartResult requestResult_{};
+public:
+    OriginalResultsBlockingFade2AED60()=default;
+    OriginalResultsBlockingFade2AED60(const OriginalResultsBlockingFade2AED60&)=delete;
+    OriginalResultsBlockingFade2AED60& operator=(const OriginalResultsBlockingFade2AED60&)=delete;
+    // Source A8 suppression/zero adjusted duration really return without
+    //260850. Otherwise complete is possible only after actual restoration.
+    OriginalCameraStartResult advance(std::int32_t actualManagerA8,
+        std::int32_t actualApplicationMode22C,OriginalVideoFadeState&,
+        HostMonotonicClock50ID&,OriginalVideoBlockingBackend*);
+    bool complete()const noexcept{return finished_;}
+};
 // Bounded numeric25B5D0 active-fade update. It owns no renderer draw primitive:
 // actual25E610 color is returned for the same shared video presentation owner.
 struct OriginalVideoFadeDraw {

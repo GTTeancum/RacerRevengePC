@@ -1,4 +1,6 @@
 #pragma once
+#include "ra_cold_roster_storage50la.h"
+namespace original_results_roster50LA { class Read; }
 #include "native_racer_rig50hw_fixture.h"
 #include "native_racer_collision50hw_fixture.h"
 #include "original_player_identity50ik_fixture.h"
@@ -9,16 +11,8 @@
 
 namespace ra_cold_aggregate50LA { class Owner; }
 namespace ra_cold_roster50LA {
-namespace g=rr::game;namespace a=rr::assets;
-class Operation;
-// One-time adoption of the EXISTING active roster objects (capacity eight), before world reservation.
-// Unique-pointer movement changes no Rig/COL address. No public array getter:
-// the private stable array is the future aggregate grid/camera borrow.
-struct SharedOwners final {
-    std::array<std::unique_ptr<native_racer50HW::Rig>,8> rigs;
-    std::array<std::unique_ptr<native_racer_collision50HW::Owner>,8> collisions;
-};
 class Resources final {
+    friend class ::original_results_roster50LA::Read;
     friend class Operation;
     friend class ra_cold_aggregate50LA::Owner;
     std::shared_ptr<SharedOwners> owners_;

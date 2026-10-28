@@ -159,6 +159,10 @@ struct VehicleFrameState49W {
     // Canonical count remains main.components.body20C. Source165420 clears
     // only that count; these ten ordered body-identity slots keep their bits.
     BodyContactIdentity48R mainContactPartners210[BodyContactCapacity48R]{};
+    // Separate native secondary35C contact storage, enrolled by the same
+    // complete-frame Bank span. Actual count is bodies.secondary.body20C.
+    // Native zero initialization is not a claim about unused guest210 words.
+    BodyContactIdentity48R secondaryContactPartners210[BodyContactCapacity48R]{};
     // Native sequencing receipt:223030 dynamic branch/common maxima completed
     // at MainIntegration; the immediately following body integration consumes it.
     bool dynamicImpactRecorded50IW=false;

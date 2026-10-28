@@ -19,6 +19,7 @@
 #include <string>
 #include <vector>
 
+namespace ra_pod_scene50LA {class Owner;}
 namespace rr::platform {
 class OriginalUiControllerPopupResources50KG;
 class OriginalUiSharedDialogs50KG;
@@ -53,6 +54,7 @@ struct OriginalUiMainApplication50KG {
     // This does not certify guest argc or the separate Fire boot branch.
 private:
     friend class OriginalUiGaragePodScene50KG;
+    friend class ::ra_pod_scene50LA::Owner; //Same actual444078 domain; private RA load/retirement only.
     friend class OriginalUiMainSession50KG;
     friend class OriginalUiOptionsSession50KG;
     // Actual startup100018 zero-fill, before any UI owner: gp84C8/84CC

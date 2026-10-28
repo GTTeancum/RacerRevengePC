@@ -1,12 +1,14 @@
 #pragma once
 #include "window_host50dq.h"
+#include "original_results_host_input50la.h"
 #include "offscreen_gl_context50dc.h" // Shared request/diagnostic types; no Windows EGL owner.
 #include <array>
 #include <cstddef>
 #include <cstdint>
 #include <thread>
 
-namespace original_main_entry50KG { class RaceDisplayLifetime50LA; }
+namespace original_main_entry50KG { class RaceDisplayLifetime50LA; struct Application; }
+namespace interactive_loop50DU { struct Context; }
 namespace rr::platform {
 class VehicleWindowGl50DS;
 class OriginalUiSharedDialogs50KG;
@@ -127,6 +129,48 @@ public:
 private:
     friend class ::original_main_entry50KG::RaceDisplayLifetime50LA;
     friend class OriginalUiSharedDialogs50KG;
+    friend struct ::original_main_entry50KG::Application;
+    friend struct ::interactive_loop50DU::Context;
+    friend class rr::game::OriginalResults10450LA;
+    OriginalResultsHostInput50LA resultsInput50LA_;
+    // End the one fresh-poll dispatch window before existing native clients.
+    // Availability remains current; retired edges can never be replayed later.
+    GameHostInput50ER* resultsPollDestination50LA_=nullptr; //Synchronous poll-to-retire borrow only.
+    // Explicit transfer of the producer's SAME events/records storage to a
+    // suspended Results call. No copy is reissued as fresh input. Uncalled
+    // until the complete fade/postfade continuation is integrated.
+    const rr::game::OriginalResults10450LA* retainedResultsPollOwner50LA_=nullptr;
+    std::uint64_t retainedResultsPollRevision50LA_=0;
+    std::size_t retainedResultsPollEvent50LA_=0;
+    // Written only at the actual Results dispatch claim/current-event cuts.
+    // The retain helper cannot choose another issuer or fabricate an ordinal.
+    const rr::game::OriginalResults10450LA* claimedResultsOwner50LA_=nullptr;
+    const rr::game::InputEvent48Z* claimedResultsEvent50LA_=nullptr;
+    bool retainedResultsPollCurrent50LA(const rr::game::OriginalResults10450LA&)const noexcept;
+    bool retainResultsPoll50LA(const rr::game::OriginalResults10450LA&)noexcept;
+    bool releaseResultsPoll50LA(const rr::game::OriginalResults10450LA&)noexcept;
+    bool appendResultsHideSamePoll50LA(const rr::game::OriginalResults10450LA& owner)noexcept {
+        return ownerThread()&&created()&&hasWindow()&&!retainedResultsPollOwner50LA_&&
+            !claimedResultsOwner50LA_&&resultsPollDestination50LA_&&
+            resultsInput50LA_.appendResultsHideSamePoll(owner);
+    }
+    bool retireResultsEdges50LA(GameHostInput50ER& actual)noexcept {
+        if(!ownerThread())return false; //Immutable fence before mutable poll custody.
+        // Handoff already retired these controls from this exact output.
+        // Consume its synchronous pointer once, NOT the retained event batch.
+        if(retainedResultsPollOwner50LA_){
+            if(resultsPollDestination50LA_!=&actual)return false;
+            resultsPollDestination50LA_=nullptr;return true;
+        }
+        if(resultsPollDestination50LA_!=&actual){
+            resultsInput50LA_.edgesOpen_=false;resultsPollDestination50LA_=nullptr;return false;
+        }
+        const bool claimed=resultsInput50LA_.fixedUiCurrent()&&
+            resultsInput50LA_.claimedRevision_==resultsInput50LA_.revision_;
+        resultsInput50LA_.retireClaimedControls(actual.keys);
+        claimedResultsOwner50LA_=nullptr;claimedResultsEvent50LA_=nullptr;
+        resultsPollDestination50LA_=nullptr;return claimed;
+    }
     // Native global UI470 consumes the actual successful input poll, not a
     // caller-supplied controller-presence assertion. This owner is independent
     // of any menu generation; close/failure invalidates the observation.

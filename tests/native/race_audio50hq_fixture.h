@@ -121,8 +121,41 @@ inline bool valid(const S& s)noexcept {return validShared50MB(s);}
 // Own at a stable address and keep the mixer alive longer. Cold PCM vectors are
 // immutable after prepare. Only main/simulation thread calls these methods.
 class Owner final {
+    friend class rr::platform::OriginalApplicationAural50KG;
+    // Only actual prepared RaceSnd's four non-speech transports. Scheduling
+    // remains labeled HOST presentation; this does not reconstruct source
+    // countdown/event admission or include the shared Announcer episode.
+    bool canStopResultsCountdown26D070(const rr::platform::AudioMixer50HD& mixer,
+        const rr::platform::RaceAudioGroups50IC& groups)const noexcept {
+        if(!attempted_||mixer_!=&mixer||groups_!=&groups||!groups.uses(mixer)||
+           epoch_!=mixer.groupEpoch50IC()||!mixer.canRecordControlChanges(4)||
+           !announcer_||!announcer_->uses(mixer)||hostSpeechEnabled_||
+           !announcer_->originalPolicy50IE())return false;
+        for(std::size_t n=0;n<4;++n){const auto slot=firstVoice+n;
+            rr::platform::AudioVoiceObservation50HD v;
+            if(groups.binding(slot)!=rr::game::RaceAudioGroup50IC::Effects110||
+               !mixer.inspectVoice(slot,v)||!v.groupKnown||v.playbackRevision!=revisions_[n])return false;
+            if(!v.playbackRevision){if(v.voice.active)return false;continue;}
+            const auto& a=v.voice.clip;const auto& b=clips_[n];
+            if(availability_[n]!=rr::assets::AudioAssetState50HC::ready||
+               !rr::platform::AudioMixer50HD::validClip(b)||a.samples!=b.samples||
+               a.frames!=b.frames||a.sampleRate!=b.sampleRate||a.channels!=b.channels||
+               a.loopStart!=b.loopStart||a.loopEnd!=b.loopEnd||v.voice.loop||
+               v.voice.gain!=1.f||v.voice.pitch!=1.f||v.voice.pan!=0.f)return false;
+        }
+        return true;
+    }
+    static constexpr std::size_t resultsCountdownStopCount26D070()noexcept{return 4;}
+    std::size_t resultsCountdownStopVoice26D070(std::size_t n)const noexcept {
+        return n<4?firstVoice+n:rr::platform::audioMaximumVoices50HD;
+    }
+    void stopResultsCountdownPreflighted26D070()noexcept {
+        for(std::size_t n=0;n<4;++n)mixer_->stop(firstVoice+n);
+        // Not reset(): preserve observed race phase/variant state and never
+        // call announcer.stop/sourceEnd or restore ducked groups early.
+    }
 public:
-    Owner()=default;~Owner()noexcept{reset();}
+    Owner()=default;~Owner()noexcept;
     Owner(const Owner&)=delete;Owner&operator=(const Owner&)=delete;
     Owner(Owner&&)=delete;Owner&operator=(Owner&&)=delete;
     bool prepare(const std::filesystem::path&discRoot,const std::filesystem::path&audioRoot,
@@ -160,7 +193,8 @@ public:
                 race_audio_groups50IC::ProviderRole::CountdownRaceSnd,firstVoice,4),
                 "50IC countdown group binding rejected");
             d::need(announcer.prepare(mixer,groups,firstVoice+4),"50IC shared Dax episode ownership rejected");
-            announcer_=&announcer;mixer_=&mixer;error.clear();return true;
+            announcer_=&announcer;mixer_=&mixer;groups_=&groups;
+            epoch_=mixer.groupEpoch50IC();error.clear();return true;
         }catch(const std::exception&e){error=e.what();return false;}
     }
     // Observe seeded grid, every unpaused countdown tick and every successful
@@ -262,7 +296,10 @@ private:
             if(result==rr::platform::HostAnnouncerResult50IC::Started){event.result=Result::Started;++counters_.starts;}
             else if(result==rr::platform::HostAnnouncerResult50IC::Busy){event.result=Result::Busy;++counters_.busy;}
             else ++counters_.rejected;
-        }else if(mixer_->play(slot,clips_[index],1.f,1.f,false)){event.result=Result::Started;++counters_.starts;}
+        }else if(mixer_->play(slot,clips_[index],1.f,1.f,false)){
+            revisions_[index]=mixer_->playbackRevision(slot);
+            event.result=Result::Started;++counters_.starts;
+        }
         else ++counters_.rejected;
         r.events[r.eventCount++]=event;
     }
@@ -270,6 +307,9 @@ private:
     std::array<rr::platform::AudioClip50HD,clipCount>clips_{};
     std::array<rr::assets::AudioAssetState50HC,clipCount>availability_{};
     rr::platform::AudioMixer50HD*mixer_=nullptr;
+    rr::platform::RaceAudioGroups50IC*groups_=nullptr;
+    std::uint64_t epoch_=0;
+    std::array<std::uint64_t,4> revisions_{};
     rr::platform::AnnouncerEpisode50IC*announcer_=nullptr;
     detail::State state_{};Counters counters_{};bool attempted_=false,hostSpeechEnabled_=true;
 };

@@ -1,5 +1,7 @@
 #pragma once
 #include "ra_cold_sources50la.h"
+#include "original_world_collision_objects50la.h"
+#include "../../src/game/original_entity_chains50la.h"
 #include "../../src/game/original_racer_model_scene50la.h"
 #include "../../src/game/original_racer_model_packets50la.h"
 #include "../../src/game/original_ui_user_rotate50kg.h"
@@ -8,9 +10,12 @@
 #include "../../src/assets/original_standard_model_resource50la.h"
 #include "../../src/assets/original_standard_material_table50la.h"
 #include <limits>
+#include <optional>
 #include <vector>
 
+namespace ra_pod_scene50LA {class Owner;}
 namespace ra_static_world50LA {class Owner;}
+namespace ra_cold_aggregate50LA {class Owner;}
 namespace ra_static_model_cold50LA {
 namespace g=rr::game;namespace a=rr::assets;
 // This owns real cold construction prefixes. The source calls28E8A0 before
@@ -20,6 +25,8 @@ namespace g=rr::game;namespace a=rr::assets;
 // Explicit continuation owns genuine CPU packets and authored placement.
 class Owner final {
     friend class ra_static_world50LA::Owner;
+    friend class ra_pod_scene50LA::Owner;
+    friend class ra_cold_aggregate50LA::Owner;
     using C=g::OriginalWreckComponent50LA;
     using K=g::OriginalWreckComponentKind50LA;
     using I=g::SceneNodeIndex49P;
@@ -49,13 +56,17 @@ private:
         const a::WorldInstance48F* source=nullptr;
         std::array<float,3> position{},look{},up{};
         bool useDynamicLighting144=false;
+        //Unknown native metadata until genuine271B4C reaches THIS descriptor.
+        std::optional<std::int32_t> allowShadowReceiving148;
         std::string modelName180;
+        std::optional<bool> isSmoker14C; // unknown until actual default/read join
     };
     struct StandardWrapper {
         enum class Dispatch { unbound,standard3D26F0 } dispatch=Dispatch::unbound;
         std::uint32_t type00=0;
         g::OriginalRacerModelSceneOwner50LA* model8=nullptr; // Alias, not a second owner.
         std::unique_ptr<Descriptor> descriptor10;
+        std::optional<C*> smoker0C; // source factory does NOT initialize this lane
     };
     struct Observer {
         g::CollectionRef50BX object=0;
@@ -79,9 +90,18 @@ private:
         bool parentAttached=false;
         g::SceneGraph49P graph()noexcept{return {&node,1};}
     };
+    struct FailedModel {
+        g::SceneNode49P node{};g::OriginalRacerModelSceneOwner50LA scene;
+        bool referenceReleased=false,rowTableFreed=false;
+        g::SceneGraph49P graph()noexcept{return {&node,1};}
+    };
     struct Slot {
         std::size_t worldInstance=0;
         Model* model=nullptr;
+        std::unique_ptr<StandardWrapper> unresolvedWrapper;
+        std::unique_ptr<FailedModel> failedModel;
+        bool sourceDataAttempted=false,sourceDataComplete=false;
+        bool sourceInitStarted=false,sourceInitComplete=false;
         // Null represents an explicitly unconstructed geometry-less prefix,
         // not a successful source loader or a skipped visibility registration.
     };
@@ -103,6 +123,10 @@ private:
     std::shared_ptr<a::OriginalStandardTextureResolver50LA> resolver_;
     std::shared_ptr<g::original_gc_gameplay_lighting_candidate::Owner> visibility_;
     bool observersAttempted_=false,observersComplete_=false;
+    //Synchronous private-domain borrow; World withdraws it before either owner dies.
+    g::OriginalWorldCollisionObjects50LA* nativeCollisionForest_=nullptr;
+    bool nativeCollisionForestRetiring_=false; //Actual detach transaction; never reappend.
+
     Owner()=default;
     static std::uint64_t key(const void* p)noexcept {
         return static_cast<std::uint64_t>(reinterpret_cast<std::uintptr_t>(p));
@@ -232,6 +256,174 @@ private:
     }
 #include "ra_static_model_resources50la.inl"
 #include "ra_static_model_observers50la.inl"
+    StandardWrapper* nativeStandardWrapper(Slot& slot)noexcept {
+        return slot.model?&slot.model->wrapper:slot.unresolvedWrapper.get();
+    }
+    const StandardWrapper* nativeStandardWrapper(const Slot& slot)const noexcept {
+        return slot.model?&slot.model->wrapper:slot.unresolvedWrapper.get();
+    }
+    bool failedModelCold(const FailedModel& f)const noexcept {
+        if(!f.scene.model()||f.scene.released())return true;
+        const auto& v=f.scene.fields();const auto* m=f.scene.model();
+        return m&&f.scene.binding_.sessionGeneration==generation_&&
+            f.scene.binding_.actualObjectCount423F60==&application_->objectCount423F60()&&
+            f.scene.binding_.actualAttachmentLock423F58==&application_->attachmentLock423F58()&&
+            f.scene.binding_.actualTypes383408==&application_->types383408()&&!m->observer19C&&!m->configuration1A4&&!v.geometry1B4&&!v.sourceRows1B8&&
+            !v.materialCount1C0&&!v.materials1C4&&!v.field1C8&&!v.packets1F0&&
+            f.scene.preflightScene2896D0({const_cast<g::SceneNode49P*>(&f.node),1}).okay();
+    }
+    bool releaseFailedModel26E9D4(FailedModel& f,Diagnostic& d)noexcept {
+        if(f.scene.released())return true;
+        if(!failedModelCold(f))return reject(d,"failed-load model acquired foreign resources");
+        const g::OriginalWreckComponentDomain50LA domain{generation_,nullptr,0};
+        if(!f.referenceReleased){
+            d.scene=f.scene.releaseModelReference142590(domain);
+            if(!d.scene.okay())return reject(d,"failed-load actual142590 release rejected");
+            f.referenceReleased=true;
+        }
+        //241920->240450->26E460 see only genuine NULL packets/material/
+        //geometry/config/observer. No resources are fabricated or skipped.
+        if(!f.rowTableFreed){
+            d.scene=f.scene.freeSourceRowTable26E5CC();
+            if(!d.scene.okay())return reject(d,"failed-load null row-table retirement rejected");
+            f.rowTableFreed=true;
+        }
+        d.scene=f.scene.releaseSceneBase2896D0(f.graph());
+        return d.scene.okay()||reject(d,"failed-load actual base Entity retirement rejected");
+    }
+    bool prepareNativeStandardSlot27AB60(std::size_t zone,std::size_t ordinal,Diagnostic& d)noexcept {
+        d={};if(!constructed_||closed_||!resourcesComplete_||!observersComplete_||
+            zone>=parents_.size()||ordinal>=parents_[zone]->entries34.size()||!canClose())
+            return reject(d,"current existing static owner required");
+        auto& slot=parents_[zone]->entries34[ordinal];
+        if(slot.sourceInitStarted||slot.sourceInitComplete||slot.sourceDataAttempted)
+            return reject(d,"source wrapper data already attempted");
+        const auto& world=source_->sourcesDecoded()->world;
+        if(slot.worldInstance>=world.instances.size())return reject(d,"actual authored slot missing");
+        const auto& instance=world.instances[slot.worldInstance];
+        if(instance.parameter_block>=world.parameters.blocks.size()||instance.zone!=zone+1||instance.ordinal!=ordinal+1)
+            return reject(d,"actual authored slot identity differs");
+        const auto& authored=world.parameters.blocks[instance.parameter_block];
+        // Authenticated RA corpus has neither key. Do not broaden other data.
+        for(const auto& field:authored.fields)
+            if(field.name=="statictype"||field.name=="issmoker")
+                return reject(d,"unadmitted explicit type/smoker descriptor");
+        slot.sourceDataAttempted=true;
+        try {
+            if(!slot.model){
+                slot.unresolvedWrapper=std::make_unique<StandardWrapper>();
+                auto& wrapper=*slot.unresolvedWrapper;
+                wrapper.dispatch=StandardWrapper::Dispatch::standard3D26F0;wrapper.type00=1;
+                wrapper.descriptor10=std::make_unique<Descriptor>();
+                auto& descriptor=*wrapper.descriptor10;descriptor.source=&instance;
+                for(unsigned axis=0;axis<3;++axis){
+                    const double values[]={instance.position[axis],instance.look[axis],instance.up[axis]};
+                    float* destinations[]={&descriptor.position[axis],&descriptor.look[axis],&descriptor.up[axis]};
+                    for(unsigned v=0;v<3;++v){const float scalar=static_cast<float>(values[v]);
+                        if(!std::isfinite(scalar)||double(scalar)!=values[v])return reject(d,"descriptor scalar not binary32");
+                        *destinations[v]=scalar;
+                    }
+                }
+                bool slt=false,dynamic=false;
+                for(const auto& field:authored.fields){
+                    if(field.name=="slt"){
+                        if(slt)return reject(d,"duplicate actual SLT");slt=true;
+                        const auto dot=field.value.find('.');
+                        if(dot==std::string::npos||!dot||dot>50)return reject(d,"unsupported actual SLT stem");
+                        descriptor.modelName180=field.value.substr(0,dot)+".slt";
+                    }else if(field.name=="usedynamiclighting"){
+                        if(dynamic||(field.value!="T"&&field.value!="F"))return reject(d,"unsupported actual dynamic lighting");
+                        dynamic=true;descriptor.useDynamicLighting144=field.value=="T";
+                    }
+                }
+                if(!slt)return reject(d,"missing actual SLT");
+            }
+            auto* wrapper=nativeStandardWrapper(slot);
+            if(!wrapper||wrapper->type00!=1||wrapper->dispatch!=StandardWrapper::Dispatch::standard3D26F0||
+               !wrapper->descriptor10||wrapper->descriptor10->source!=&instance)
+                return reject(d,"existing Standard wrapper provenance differs");
+            auto& descriptor=*wrapper->descriptor10;
+            // Newly reached constructor-adoption evidence27A234; preserve ALL
+            // earlier real TOB stores. This does not rewrite earlier seals.
+            if(!descriptor.allowShadowReceiving148)descriptor.allowShadowReceiving148=1;
+            descriptor.isSmoker14C=false; // actual absent-key default27A5F4
+            slot.sourceDataComplete=true;return true;
+        }catch(...){return reject(d,"wrapper/descriptor allocation failed; custody retained");}
+    }
+    // Caller is private actual World owner and has just checked SAME mounted
+    // provider lookup132820 absent AND actual resolver.lookupModel132820
+    // unresolved for the exact supplied geometry member. Original provider+170
+    // fallback/history is unknown: this is a bounded native negative-load path.
+    // Existing visual branch instead requires empty supplied absence name.
+    bool completeNativeStandardSlot27ABC0(std::size_t zone,std::size_t ordinal,
+        const std::string& authenticatedAbsentPsg,Diagnostic& d)noexcept {
+        d={};if(closed_||zone>=parents_.size()||ordinal>=parents_[zone]->entries34.size()||!canClose())
+            return reject(d,"current idle static owner required");
+        auto& parent=*parents_[zone];auto& slot=parent.entries34[ordinal];
+        auto* wrapper=nativeStandardWrapper(slot);
+        if(!slot.sourceDataComplete||slot.sourceInitStarted||!wrapper||!wrapper->descriptor10||
+           wrapper->type00!=1||wrapper->dispatch!=StandardWrapper::Dispatch::standard3D26F0)
+            return reject(d,"actual Standard data continuation required");
+        auto& descriptor=*wrapper->descriptor10;
+        if(!descriptor.source||!descriptor.isSmoker14C||*descriptor.isSmoker14C||
+           !descriptor.allowShadowReceiving148)
+            return reject(d,"source descriptor inputs unknown");
+        if(slot.model){
+            auto& m=*slot.model;
+            if(!authenticatedAbsentPsg.empty()||wrapper->model8!=&m.scene||!m.placed||!m.parentAttached||
+               m.referenceReleased||!m.resourceRetained||!m.geometry||!m.rows||!m.observer||
+               m.scene.model_.observer19C!=m.observer.get()||!m.observer->membership.attached||
+               m.observer->membership.object!=m.observer->object||
+               m.observer->membership.method!=g::ZoneMethod50CL::First||
+               m.scene.fields().geometry1B4!=m.geometry.get()||
+               m.scene.fields().packets1F0!=&m.packets||!parentTopology(parent))
+                return reject(d,"actual model/geometry/observer/parent currentness differs");
+        }else if(authenticatedAbsentPsg.empty()||authenticatedAbsentPsg!=descriptor.source->geometry_member)
+            return reject(d,"same-provider exact missing geometry name required");
+        slot.sourceInitStarted=true;
+        try {
+            if(slot.model){auto& m=*slot.model;
+                // Copy first: allocation failure must not claim descriptor
+                // retirement. Successful prefix uses actual existing model.
+                const auto name=descriptor.modelName180.substr(0,127);
+                auto& fields=m.scene.fields();
+                fields.flags1B3=static_cast<std::uint8_t>((fields.flags1B3&~0x10u)|
+                    ((static_cast<std::uint32_t>(*descriptor.allowShadowReceiving148)&1u)<<4));
+                m.scene.model_.name38=name; //27AD20..44, source .slt spelling
+                // Placement/observer/attachment were genuinely produced early
+                // in this native owner; adopt their identities, NEVER replay.
+            }else {
+                if(application_->objectCount423F60()==std::numeric_limits<std::uint32_t>::max())
+                    return reject(d,"actual Application count cannot admit temporary model");
+                slot.failedModel=std::make_unique<FailedModel>();auto& failed=*slot.failedModel;
+                const I root=static_cast<I>(0);g::OriginalRacerModelSceneBinding50LA binding;
+                binding.sessionGeneration=generation_;binding.actualObjectCount423F60=&application_->objectCount423F60();
+                binding.actualAttachmentLock423F58=&application_->attachmentLock423F58();
+                binding.actualTypes383408=&application_->types383408();binding.modelIndex=root;
+                binding.sourceRowIndices=&root;binding.sourceRowCount=1;
+                // One native graph CAPACITY. No PSG row/table/load is claimed.
+                d.scene=failed.scene.constructDirectRoot2403A0(binding,failed.graph(),true);
+                if(!d.scene.okay())return reject(d,"actual failed-load model constructor rejected");
+                wrapper->model8=&failed.scene; //27AC38 owns no extra reference
+                d.scene=failed.scene.prepareDirectRoot26E934(failed.graph(),authenticatedAbsentPsg);
+                if(!d.scene.okay())return reject(d,"actual missing-model resolved name rejected");
+                if(!releaseFailedModel26E9D4(failed,d))return false;
+                wrapper->model8=nullptr; //27AE48 in admitted native negative-load branch;
+                // no claim unknown original provider+170 fallback returned null.
+                slot.failedModel.reset();
+            }
+            // IsSmoker14C was authenticated false; no0C write/Emitter created.
+            wrapper->descriptor10.reset(); //27AF6C/78 real owned metadata free
+            slot.sourceInitComplete=true;return true;
+        }catch(...){return reject(d,"partial Standard initialization retained for close");}
+    }
+    bool nativeStandardSlotCurrent27ABC0(std::size_t zone,std::size_t ordinal)const noexcept {
+        if(closed_||zone>=parents_.size()||ordinal>=parents_[zone]->entries34.size())return false;
+        const auto& slot=parents_[zone]->entries34[ordinal];const auto* wrapper=nativeStandardWrapper(slot);
+        return slot.sourceInitComplete&&wrapper&&wrapper->type00==1&&
+            wrapper->dispatch==StandardWrapper::Dispatch::standard3D26F0&&!wrapper->descriptor10&&
+            !slot.failedModel&&(!slot.model?!wrapper->model8:wrapper->model8==&slot.model->scene);
+    }
     bool canClose()const noexcept {
         if(closed_)return true;
         if(!application_)return parents_.empty()&&models_.empty();
@@ -260,13 +452,28 @@ private:
             }
             ++counted;
         }
+        for(const auto& p:parents_)if(p)for(const auto& slot:p->entries34)if(slot.failedModel){
+            const auto& f=*slot.failedModel;
+            if(!failedModelCold(f))return false;
+            if(f.scene.model()&&!f.scene.released())++counted;
+        }
         if(!resourcesCanClose())return false;
         return counted<=application_->objectCount423F60();
     }
     bool close()noexcept {
-        if(closed_)return true;if(!canClose())return false;
+        if(closed_)return true;if(!canClose()||nativeCollisionForest_||nativeCollisionSuffixPresent27B170())return false;
         if(visibility_&&!visibility_->beginRaStaticAccess(this,true))return false;
         const auto failClose=[&](){if(visibility_)visibility_->endRaStaticAccess(this);return false;};
+        // Retire any real temporary missing-PSG model before parent resources.
+        // This is partial-load cleanup, not a successful27ABC0 receipt.
+        for(auto& p:parents_)if(p)for(auto& slot:p->entries34)if(slot.failedModel){
+            Diagnostic failure;auto& f=*slot.failedModel;
+            if(f.scene.constructed2403A0()){
+                if(!releaseFailedModel26E9D4(f,failure))return failClose();
+            }else if(f.scene.model()&&!f.scene.closeFreshUnlinked(f.graph()).okay())return failClose();
+            if(slot.unresolvedWrapper)slot.unresolvedWrapper->model8=nullptr;
+            slot.failedModel.reset();
+        }
         // Private incomplete-prefix recovery, not the attached27B650 path.
         // Constructed packets do execute their actual240450 retirement leaf.
         //27AAD0 destroys wrapper metadata, not the model8 alias. This owner

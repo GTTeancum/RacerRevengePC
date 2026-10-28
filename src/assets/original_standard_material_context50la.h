@@ -45,6 +45,12 @@ class OriginalStandardMaterialContext50LA final {
     bool registerTexture29C780(OriginalStandardTextureLifetimeLink50LA& link) const noexcept {
         return live()&&textureLifetime_->register2557E0(link);
     }
+    // Private direct CUB destructor2544F0 leaf: actual published13C only.
+    // Cold staging owner is not a publication; never clear/substitute it.
+    // No current producer assigns published13C after its constructor null.
+    bool cubCanRetire2544F0()const noexcept {
+        return textureLifetime_&&!textureLifetime_->publishedTransfer13C_;
+    }
     bool unregisterTexture29C7E0(OriginalStandardTextureLifetimeLink50LA& link) const noexcept {
         // Closing the display rejects new work, but cleanup still removes the
         // resource from the SAME retained manager after Video ceases to be live.

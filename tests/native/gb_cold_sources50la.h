@@ -1,4 +1,5 @@
 #pragma once
+#include "track_cold_source_services50la.h"
 #include "pod_materials50ed_fixture.h"
 #include "source_grid50ig_fixture.h"
 #include "../../src/assets/indexed_resource48c.h"
@@ -48,17 +49,16 @@ class Owner final : public std::enable_shared_from_this<Owner> {
  const std::thread::id thread_=std::this_thread::get_id();
  bool attempted_=false,ready_=false;Phase phase_=Phase::Empty;
  static void add(std::size_t& n,std::size_t x)noexcept {
-  n=x>std::numeric_limits<std::size_t>::max()-n?std::numeric_limits<std::size_t>::max():n+x;
+  track_cold_source_services50LA::add(n,x);
  }
  template<class T> static void vectorPayload(std::size_t& n,const std::vector<T>& v)noexcept {
-  if(v.capacity()>std::numeric_limits<std::size_t>::max()/sizeof(T))n=std::numeric_limits<std::size_t>::max();
-  else add(n,v.capacity()*sizeof(T));
+  track_cold_source_services50LA::vectorPayload(n,v.capacity(),sizeof(T));
  }
- static void textPayload(std::size_t& n,const std::string& s)noexcept{add(n,s.capacity());add(n,1);}
+ static void textPayload(std::size_t& n,const std::string& s)noexcept {
+  track_cold_source_services50LA::textPayload(n,s);
+ }
  static void parametersPayload(std::size_t& n,const a::ParameterDocument48F& p)noexcept {
-  vectorPayload(n,p.original_bytes);vectorPayload(n,p.blocks);
-  for(const auto& b:p.blocks){textPayload(n,b.name);vectorPayload(n,b.fields);
-   for(const auto& f:b.fields){textPayload(n,f.name);textPayload(n,f.value);}}
+  track_cold_source_services50LA::parametersPayload(n,p);
  }
  void requireThread()const noexcept{if(thread_!=std::this_thread::get_id())std::terminate();}
  bool fail(Diagnostic& d,const char* message){d.phase=phase_;d.message=message;d.retainedPayloadBytes=retainedPayloadBytes();return false;}
@@ -67,12 +67,9 @@ class Owner final : public std::enable_shared_from_this<Owner> {
   d.maximumReservationBytes=std::max(d.maximumReservationBytes,d.phaseReservationBytes);return d.phaseReservationBytes<=limit;
  }
  bool member(std::size_t i,std::vector<std::uint8_t>& out,Diagnostic& d)const {
-  const auto& pin=sources[i];const a::ResourceEntry48C* match=nullptr;
-  for(const auto& e:archive_->entries())if(a::OriginalStandardArchiveProvider50LA::sameName(e.name,pin.name)){
-   if(match)return false;match=&e;}
-  return match&&match->logical_offset==pin.offset&&match->bytes==pin.bytes&&
-   archive_->extractMember(pin.name,out,d.decode,pin.bytes)&&out.size()==pin.bytes&&
-   pod_materials50ed_fixture::detail::sha256(out)==pin.sha;
+  const auto& pin=sources[i];
+  return track_cold_source_services50LA::authenticateMember(
+      *archive_,{pin.name,pin.offset,pin.bytes,pin.sha},out,d.decode);
  }
  static bool vectorField(const a::ParameterBlock48F& block,const char* key,g::Vector3_48C& out){
   const std::string* value=nullptr;for(const auto& f:block.fields)if(f.name==key){if(value)return false;value=&f.value;}

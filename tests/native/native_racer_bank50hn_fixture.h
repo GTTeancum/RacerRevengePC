@@ -76,13 +76,7 @@ public:
     bool sourceQueryPending()const noexcept{return pendingToken_!=nullptr;}
     std::size_t sourceQuerySlot()const noexcept{return pendingToken_?pendingToken_->slot_:maximumRacers;}
     Bank()=default;
-    ~Bank() noexcept {
-        // Check BEFORE snapshots/spans and their externally borrowed owners die.
-        if(nativeFifoPins_||pendingToken_||sourceIssuer_||mcAnimationIssuer_||gbAnimationIssuer_||mcQueryIssuer_||gbQueryIssuer_||mcQueryActive_||gbQueryActive_)std::terminate();
-        // Only the RA-bound route adds a retirement obligation. The private
-        // pin survives all snapshots/spans and checks its actual Follow owner.
-        if(raWorldLifetime_&&(visiting_||readBlocked_))std::terminate();
-    }
+    ~Bank() noexcept;
     Bank(const Bank&)=delete;
     Bank& operator=(const Bank&)=delete;
     // Cold-bound scalar subrange of one registered owner span. No caller may

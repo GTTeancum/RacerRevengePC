@@ -30,6 +30,44 @@ struct TerrainFollowResult48G {
     TerrainFollowBody48G body;
 };
 
+// Pure, separate1B1A30 numeric phases; success is NOT following/scene completion.
+// Caller owns history copies before each phase and the later conditional reads.
+struct TerrainOrientationPrefix48G {
+    Vector3_48C side,normalAxis;
+    float angle;
+};
+bool prepareTerrainHistoryDistance48G(const Vector3_48C& previousPoint,
+    const Vector3_48C& currentPoint,const Vector3_48C& normal,float& distance) noexcept;
+bool prepareTerrainOrientationPrefix48G(const Vector3_48C& forward,const Vector3_48C& up,
+    const Vector3_48C& previousNormal,const Vector3_48C& currentNormal,
+    TerrainOrientationPrefix48G& output) noexcept;
+bool prepareTerrainOrientationAlignment48G(const TerrainOrientationPrefix48G& input,
+    float& alignment) noexcept;
+
+// Separate active1B1A30 numeric scratch, before real stores/getter/translation.
+bool prepareTerrainNormalForce48G(const Vector3_48C& force,
+    const Vector3_48C& normal,Vector3_48C& extra) noexcept;
+bool prepareTerrainTranslation48G(const Vector3_48C& surfacePoint,
+    const Vector3_48C& offsetPoint,const Vector3_48C& normal,
+    float actualScale,Vector3_48C& displacement) noexcept;
+
+//Source1B2014 phases; scratch only, no velocity/history/scene completion.
+bool prepareTerrainVelocityFraction48G(const Vector3_48C& velocity,
+    const Vector3_48C& normal,float& fraction) noexcept;
+bool prepareTerrainSteepNormal48G(const Vector3_48C& velocity,
+    const Vector3_48C& normal,Vector3_48C& amount) noexcept;
+bool prepareTerrainTangentVelocity48G(const Vector3_48C& velocity,
+    const Vector3_48C& normal,Vector3_48C& tangentVelocity) noexcept;
+bool prepareTerrainVelocityChange48G(const Vector3_48C& current,
+    const Vector3_48C& previous,const Vector3_48C& largest,
+    Vector3_48C& change,bool& replace) noexcept;
+
+//Separate source caller cross and reached28A090 unnormalized basis scratch.
+bool prepareTerrainForward48G(const Vector3_48C& forward,
+    const Vector3_48C& normal,Vector3_48C& newForward) noexcept;
+bool prepareTerrainBasis48G(const Vector3_48C& forward,
+    const Vector3_48C& up,ReadyBodyBasis48D& basis) noexcept;
+
 // Original vehicle+348 response 0x1B1A30 and numeric root-scene operations.
 // Runs after aerodynamic/collision loads, before rigid-body scene readback.
 // Surface query/detection, SpringCollisionModel impulses and scene child

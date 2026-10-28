@@ -96,6 +96,29 @@ class Owner final {
         shape.resource124=std::move(resource);
         return resolver_->publishCollision1326A0(row.file,shape.resource124,d);
     }
+    // Exact same-object checks for the reached World loader and its partial
+    // retirement. Never promotes cold prepared() into source11B920 success.
+    bool attemptedBy11B920(std::size_t index,const g::OriginalWreckComponent50LA& query)const noexcept {
+        return index<rows_.size()&&rows_[index].shape.attempted&&rows_[index].shape.query==&query;
+    }
+    bool loadedBy11B920(std::size_t index,const g::OriginalWreckComponent50LA& query)const noexcept {
+        if(!attemptedBy11B920(index,query))return false;
+        const auto& shape=rows_[index].shape;
+        return shape.resource124&&shape.resource124->live()&&
+            shape.resource124->resolver_==resolver_&&
+            // A cached first provider may own a different decoded allocation.
+            // Compare the sealed resolver/file identity, not mesh pointers.
+            shape.resource124->file_.resolver==rows_[index].file.resolver&&
+            shape.resource124->file_.row==rows_[index].file.row;
+    }
+    bool canRelease11B600(std::size_t index,const g::OriginalWreckComponent50LA& query)const noexcept {
+        if(!attemptedBy11B920(index,query))return false;
+        const auto& resource=rows_[index].shape.resource124;
+        return !resource||(resource->live()&&resource->resolver_==resolver_);
+    }
+    bool release11B600(std::size_t index,const g::OriginalWreckComponent50LA& query)noexcept {
+        return canRelease11B600(index,query)&&release11B600(index);
+    }
     bool release11B600(std::size_t index)noexcept {
         if(index>=rows_.size())return false;auto& shape=rows_[index].shape;
         if(!shape.attempted)return false;

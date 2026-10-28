@@ -149,14 +149,19 @@ bool OriginalUiGarageDrawContribution50KG::prepareDrainScreenPolicies24B130(D& d
        return rejectScreen(d,S::phase,0x24B9B0,"same queued screen lifetime");
    if(record.shared470Owner&&!fifo->shared470RecordCurrent(record))
        return rejectScreen(d,S::phase,0x24B130,"same retained470 payload, epoch and source pins");
+   if(record.shared47COwner&&!fifo->shared47CRecordCurrent(record))
+       return rejectScreen(d,S::phase,0x24B130,"same retained47C payload, epoch and source pins");
    if(record.warning470Dim){if(!prepareDrainWarning470DimPolicy24B130(*record.shared470Owner,d))return false;continue;}
+   if(record.popup47CDim){if(!prepareDrainPopup47CDimPolicy24B130(*record.shared47COwner,d))return false;continue;}
    if(record.garageAperturePage){if(!prepareDrainAperturePolicy24B130(currentOrdinal,d))return false;continue;}
-   if(!record.garageText&&!record.garageQuad&&!record.warning470Text&&!record.warning470Quad)continue;
+   if(!record.garageText&&!record.garageQuad&&!record.warning470Text&&!record.warning470Quad&&
+      !record.popup47CText&&!record.popup47CQuad)continue;
    assets::OriginalStandardMaterialCollectorEntryView50LA origin;
    if(record.originRegistration<0||!fifo->table_->coldCollectorEntry(fifo->registry_,static_cast<std::size_t>(record.originRegistration),origin)||
       origin.finalLeaf!=record.finalRegistration)return rejectScreen(d,S::collector,0x24B278,"actual origin registration");
-   if(!preparePolicy(origin,record.warning470Text?record.warning470Text:record.garageText,
-       record.warning470Quad?record.warning470Quad:record.garageQuad,true))return false;
+   const auto* text=record.popup47CText?record.popup47CText:record.warning470Text?record.warning470Text:record.garageText;
+   const auto* quad=record.popup47CQuad?record.popup47CQuad:record.warning470Quad?record.warning470Quad:record.garageQuad;
+   if(!preparePolicy(origin,text,quad,true))return false;
   }
   // First-frame visibility is not a material population boundary. The same
   // Page already owns the prompt Quads and text which its opening hook later
@@ -223,6 +228,20 @@ bool OriginalUiGarageDrawContribution50KG::prepareDrainScreenPolicies24B130(D& d
        return rejectScreen(d,S::source,0x2DF0B0,"actual retained470 strip population");
    if(!preparePrimitive(quad.material54->material00,nullptr,&quad))return false;
   }
+  // Inventory47C independently of visibility and of470. The confirm/cancel
+  // icons and all three text owners must enter the immutable bank before
+  // the first purchase dialog, not be synthesized from Page resources later.
+  const auto& popup=warning->controller47C_;
+  if(!popup.canonicalLoaded||!prepareDrainPopup47CDimPolicy24B130(*warning,d))
+      return rejectScreen(d,S::source,d.sourcePC?d.sourcePC:0x24B130,"same retained47C canonical resource population");
+  if(!prepareText(popup.message270.get())||!prepareText(popup.confirm2E0.get())||!prepareText(popup.cancel350.get()))return false;
+  const auto preparePopupQuad=[&](const OriginalUiGarageQuad50KG& quad)->bool {
+   if(quad.domain_!=domain||quad.context_!=warning->inputs_.context||!quad.packetCurrent2DF550())
+       return rejectScreen(d,S::source,0x2DF0B0,"actual retained47C strip or icon population");
+   return preparePrimitive(quad.material54->material00,nullptr,&quad);
+  };
+  for(const auto& quad:popup.strips)if(!preparePopupQuad(quad))return false;
+  for(const auto& quad:popup.icons)if(!preparePopupQuad(quad))return false;
   return true;
  }catch(...){return rejectScreen(d,S::allocation,0x24B130,"retained screen policy/image owners");}
 }
@@ -232,12 +251,23 @@ bool OriginalUiGarageDrawContribution50KG::warning470DrainReceiverCurrent(
  if(!identityCurrent()||phase_!=Phase::collectorDrain24B7B0||(sourcePC_!=0x24B26C&&sourcePC_!=0x249610&&sourcePC_!=0x249BA0)||!fifo||!fifo->draining_||
     drainActiveRecordOrdinal_>=fifo->records_.size())return false;
  auto it=fifo->records_.begin();for(std::size_t i=0;i<drainActiveRecordOrdinal_;++i)++it;const auto& record=*it;
- if(!record.shared470Owner)return false;
- if(!fifo->shared470RecordCurrent(record)||record.garageDraw.get()!=this||record.garagePublication!=publication_||
+ // Keep the existing canonical staging bridge, but authenticate the
+ // exact record kind. Neither owner can stand in for the other or a Page.
+ if(bool(record.shared470Owner)==bool(record.shared47COwner)||
+    record.garageDraw.get()!=this||record.garagePublication!=publication_||
     record.epoch!=drainEpoch_||record.originRegistration!=origin||record.finalRegistration!=final)return false;
- const void* exact=record.warning470Text?static_cast<const void*>(record.warning470Text):
-    record.warning470Quad?static_cast<const void*>(record.warning470Quad):
-    static_cast<const void*>(record.shared470Owner->dialog470_.dim160.get());
+ const void* exact=nullptr;
+ if(record.shared47COwner){
+  if(!fifo->shared47CRecordCurrent(record))return false;
+  exact=record.popup47CText?static_cast<const void*>(record.popup47CText):
+      record.popup47CQuad?static_cast<const void*>(record.popup47CQuad):
+      static_cast<const void*>(record.shared47COwner->controller47C_.dim220.get());
+ }else{
+  if(!fifo->shared470RecordCurrent(record))return false;
+  exact=record.warning470Text?static_cast<const void*>(record.warning470Text):
+      record.warning470Quad?static_cast<const void*>(record.warning470Quad):
+      static_cast<const void*>(record.shared470Owner->dialog470_.dim160.get());
+ }
  return receiver&&receiver==exact;
 }
 bool OriginalUiGarageDrawContribution50KG::warning470DrainBindingCurrent(
@@ -247,8 +277,10 @@ bool OriginalUiGarageDrawContribution50KG::warning470DrainBindingCurrent(
     drainActiveRecordOrdinal_>=fifo->records_.size())return false;
  auto it=fifo->records_.begin();for(std::size_t i=0;i<drainActiveRecordOrdinal_;++i)++it;const auto& record=*it;
  // Ordinary families keep their independent receiver contracts. This does
- // not make a Page/TextOverlay predicate accept an actual470 payload.
- if(!record.shared470Owner)return !record.warning470Text&&!record.warning470Quad&&!record.warning470Dim;
+ // not make a Page/TextOverlay predicate accept an actual470/47C payload.
+ if(!record.shared470Owner&&!record.shared47COwner)
+  return !record.warning470Text&&!record.warning470Quad&&!record.warning470Dim&&
+      !record.popup47CText&&!record.popup47CQuad&&!record.popup47CDim;
  return warning470DrainReceiverCurrent(receiver,origin,final);
 }
 bool OriginalUiGarageDrawContribution50KG::lowerAndBindQueuedScreen24B26C(std::size_t ordinal,D& d)noexcept {
@@ -257,19 +289,22 @@ bool OriginalUiGarageDrawContribution50KG::lowerAndBindQueuedScreen24B26C(std::s
     ordinal>=fifo->records_.size()||!drainResourcesBound_||drainBatchPending_)return rejectScreen(d,S::phase,0x24B26C,"actual queued screen cursor");
  auto it=fifo->records_.begin();for(std::size_t i=0;i<ordinal;++i)++it;const auto& record=*it;
  if(record.garageDraw.get()!=this||record.garagePublication!=publication_||record.epoch!=drainEpoch_||
-    record.garageModel||(!record.garageText&&!record.garageQuad&&!record.garageAperturePage&&!record.warning470Text&&!record.warning470Quad&&!record.warning470Dim))return rejectScreen(d,S::phase,0x24B26C,"actual ScreenObject record");
+    record.garageModel||(!record.garageText&&!record.garageQuad&&!record.garageAperturePage&&!record.warning470Text&&!record.warning470Quad&&!record.warning470Dim&&
+        !record.popup47CText&&!record.popup47CQuad&&!record.popup47CDim))return rejectScreen(d,S::phase,0x24B26C,"actual ScreenObject record");
  if(record.shared470Owner&&!fifo->shared470RecordCurrent(record))
      return rejectScreen(d,S::phase,0x24B26C,"same retained470 payload, epoch and source pins");
+ if(record.shared47COwner&&!fifo->shared47CRecordCurrent(record))
+     return rejectScreen(d,S::phase,0x24B26C,"same retained47C payload, epoch and source pins");
  try {
   const void* receiver=nullptr;std::uint32_t quads=0;
-  const auto* textOwner=record.warning470Text?record.warning470Text:record.garageText;
-  const auto* quadOwner=record.warning470Quad?record.warning470Quad:record.garageQuad;
+  const auto* textOwner=record.popup47CText?record.popup47CText:record.warning470Text?record.warning470Text:record.garageText;
+  const auto* quadOwner=record.popup47CQuad?record.popup47CQuad:record.warning470Quad?record.warning470Quad:record.garageQuad;
   if(textOwner){OriginalUiGarageScreenText50KG::LoweredPacket next;OriginalUiGarageScreenText50KG::Diagnostic text;
     if(!textOwner->lowerQueuedPacket(record.textPrimitive,sourceXyOffset_,next,text))return rejectScreen(d,S::source,text.sourcePC,"actual ScreenText packet lowering");
     receiver=textOwner;quads=next.quadCount;drainScreenVertices_=std::move(next.vertices);drainScreenStq_=std::move(next.stq);
     drainScreenW_=std::move(next.rasterW);drainScreenFog_=std::move(next.fog);
   }else if(quadOwner){OriginalUiGarageQuad50KG::LoweredPacket327E90 next;OriginalUiGarageQuad50KG::Diagnostic quad;
-    if(!quadOwner->lowerPacket327E90(record.warning470Quad?record.warning470PacketRevision:record.quadPacketRevision,sourceXyOffset_,next,quad))return rejectScreen(d,S::source,quad.sourcePC,"actual Quad packet lowering");
+    if(!quadOwner->lowerPacket327E90(record.popup47CQuad?record.popup47CPacketRevision:record.warning470Quad?record.warning470PacketRevision:record.quadPacketRevision,sourceXyOffset_,next,quad))return rejectScreen(d,S::source,quad.sourcePC,"actual Quad packet lowering");
     receiver=quadOwner;quads=next.quadCount;drainScreenVertices_.assign(next.vertices.begin(),next.vertices.end());
     drainScreenStq_.assign(next.stq.begin(),next.stq.end());drainScreenW_.assign(next.rasterW.begin(),next.rasterW.end());drainScreenFog_.assign(next.fog.begin(),next.fog.end());}
   if(record.garageAperturePage){OriginalUiGarageQuad50KG::LoweredPacket327E90 next;OriginalUiGaragePageOwner50KG::Diagnostic aperture;
@@ -282,6 +317,12 @@ bool OriginalUiGarageDrawContribution50KG::lowerAndBindQueuedScreen24B26C(std::s
     if(!record.shared470Owner->lowerWarning470Dim327E90(record.warning470PacketRevision,sourceXyOffset_,next,dim))
         return rejectScreen(d,S::source,dim.sourcePC?dim.sourcePC:0x327E90,"actual pinned470 Dim160 packet lowering");
     receiver=record.shared470Owner->dialog470_.dim160.get();quads=next.quadCount;
+    drainScreenVertices_.assign(next.vertices.begin(),next.vertices.end());drainScreenStq_.assign(next.stq.begin(),next.stq.end());
+    drainScreenW_.assign(next.rasterW.begin(),next.rasterW.end());drainScreenFog_.assign(next.fog.begin(),next.fog.end());}
+  if(record.popup47CDim){OriginalUiGarageQuad50KG::LoweredPacket327E90 next;OriginalUiSharedDialogs50KG::Diagnostic dim;
+    if(!record.shared47COwner->lowerPopup47CDim327E90(record.popup47CPacketRevision,sourceXyOffset_,next,dim))
+        return rejectScreen(d,S::source,dim.sourcePC?dim.sourcePC:0x327E90,"actual pinned47C Dim220 packet lowering");
+    receiver=record.shared47COwner->controller47C_.dim220.get();quads=next.quadCount;
     drainScreenVertices_.assign(next.vertices.begin(),next.vertices.end());drainScreenStq_.assign(next.stq.begin(),next.stq.end());
     drainScreenW_.assign(next.rasterW.begin(),next.rasterW.end());drainScreenFog_.assign(next.fog.begin(),next.fog.end());}
   if(!quads||quads>originalUiMaximumSourceQuads50KM||
@@ -362,12 +403,12 @@ bool OriginalUiGarageDrawContribution50KG::lowerAndBindQueuedScreen24B26C(std::s
      *originPass.parameterCount28||*originPass.parameterMask24||(record.originParameters&&!record.originParameters->empty()))
       return rejectScreen(d,S::unsupportedPass,0x24B4E4,"originating screen VU overlay or animation");
   if(policy->untextured){sourcePC_=0x249BA0;
-    if(record.warning470Dim){
+    if(record.warning470Dim||record.popup47CDim){
      if(!drainBatchCanonical_->stageWarning470UntexturedScreenPass(*this,origin.materialRow,static_cast<std::uint32_t>(origin.pass),
          receiver,*policy->materialArchive,policy->material,policy->untexturedPolicy,{0,quads,quads},drainActiveSpan_,map,d))return false;
     }else if(!record.garageAperturePage||!drainBatchCanonical_->stageUntexturedScreenPass(origin.materialRow,static_cast<std::uint32_t>(origin.pass),
         receiver,*policy->materialArchive,policy->material,policy->untexturedPolicy,{0,quads,quads},drainActiveSpan_,map,d))return false;
-  }else if(record.shared470Owner){
+  }else if(record.shared470Owner||record.shared47COwner){
     if(!drainBatchCanonical_->stageWarning470ScreenPass(*this,origin.materialRow,static_cast<std::uint32_t>(origin.pass),receiver,
         *policy->materialArchive,policy->material,currentPolicy,binding,drainActiveSpan_,map,d))return false;
   }else if(!drainBatchCanonical_->stageScreenPass(origin.materialRow,static_cast<std::uint32_t>(origin.pass),receiver,*policy->materialArchive,policy->material,currentPolicy,

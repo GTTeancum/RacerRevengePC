@@ -1,3 +1,182 @@
+// Same private model forest, scoped per source zone. No global enrollment,
+// Entity recount, new heap budget, persistent View, or arbitrary extra suffix.
+struct NativeCollisionForestView {
+    static constexpr std::size_t capacity=646u; //1 parent +467 slots +178 queries.
+    std::array<C*,capacity> nodes{};
+    C* const* objects=nodes.data();
+    std::size_t count=0;
+    std::uint64_t generation=0;
+    mutable std::array<unsigned char,capacity> seen{};
+    bool add(C& e)noexcept {
+        if(count==capacity)return false;
+        for(std::size_t i=0;i<count;++i)if(nodes[i]==&e)return false;
+        nodes[count++]=&e;return true;
+    }
+    friend bool domain(const NativeCollisionForestView& v)noexcept {
+        if(!v.generation||!v.count||v.count>v.capacity||v.objects!=v.nodes.data())return false;
+        for(std::size_t i=0;i<v.count;++i){const auto* e=v.objects[i];
+            if(!e||e->sessionGeneration!=v.generation||e->reference00!=1u||
+               e->objectKey!=static_cast<std::uint64_t>(reinterpret_cast<std::uintptr_t>(e))||
+               e->kind==K::unbound)return false;
+            for(std::size_t j=0;j<i;++j)if(v.objects[j]==e)return false;
+        }
+        return true;
+    }
+    friend bool contains(const NativeCollisionForestView& v,const C* e)noexcept {
+        for(std::size_t i=0;i<v.count;++i)if(v.objects[i]==e)return true;
+        return false;
+    }
+    friend unsigned char* entityVisitScratch(const NativeCollisionForestView& v)noexcept {
+        return v.seen.data();
+    }
+};
+bool nativeCollisionOwnerCurrent27B170()const noexcept {
+    if(!nativeCollisionForest_||!source_||!application_||closed_||parents_.size()!=10u||
+       nativeCollisionForest_->source_!=source_||!source_->sourcesDecoded())return false;
+    const auto& decoded=*source_->sourcesDecoded();
+    if(decoded.world.zones.size()!=10u||decoded.world.instances.size()!=1261u||decoded.collisions.size()!=178u)return false;
+    for(std::size_t z=0;z<10u;++z){const auto& p=parents_[z];const auto& zone=nativeCollisionForest_->zones_[z];
+        if(!p||p->zone!=z+1u||p->entries34.size()>467u||zone.entries34.size()!=p->entries34.size())return false;
+        for(std::size_t row=0;row<p->entries34.size();++row){const auto& w=zone.entries34[row];const auto& slot=p->entries34[row];
+            if(slot.worldInstance>=decoded.world.instances.size()||
+               w.source!=&decoded.world.instances[slot.worldInstance]||w.source->zone!=z+1u||w.source->ordinal!=row+1u||
+               w.type00!=1u||(w.descriptor08&&w.descriptor08->source!=w.source)||
+               (w.descriptorRetired&&w.descriptor08))return false;
+            if(!w.nativeQuery){if(w.collision04)return false;continue;}
+            const auto& q=*w.nativeQuery;
+            if(q.retired){if(q.counted||w.collision04||q.entity.reference00||q.appended||q.registered)return false;continue;}
+            if(!q.counted){if(q.appended||q.registered||w.collision04||q.entity.reference00)return false;continue;}
+            if(!nativeCollisionForest_->nativeQueryCurrent27B040(w)||q.application!=application_.get()||
+               q.entity.sessionGeneration!=generation_||q.source!=w.source||q.member!=w.source->collision_member)return false;
+            if(q.candidate){
+                if(q.resourceIndex>=decoded.collisions.size()||w.decodedCollision!=&decoded.collisions[q.resourceIndex]||
+                   w.decodedCollision->zone!=z+1u||w.decodedCollision->ordinal!=row+1u||
+                   w.decodedCollision->member!=w.source->collision_member||
+                   q.candidate->candidate.collision.geometry.mesh!=&w.decodedCollision->mesh)return false;
+            }
+            if(q.appended&&(!q.loaded||!q.resourceStarted||q.resourceWithdrawn||q.terminal||
+               !q.typed||!q.flagsApplied||!q.candidate||w.collision04!=&q.entity))return false;
+            if(!q.appended&&(q.entity.parent1C||q.entity.previous10||q.entity.next14))return false;
+        }
+    }
+    return true;
+}
+bool nativeCollisionSuffixPresent27B170()const noexcept {
+    if(!nativeCollisionForest_)return false;
+    for(const auto& zone:nativeCollisionForest_->zones_)for(const auto& w:zone.entries34)
+        if(w.nativeQuery&&(w.nativeQuery->appended||w.nativeQuery->entity.parent1C||
+            w.nativeQuery->entity.previous10||w.nativeQuery->entity.next14))return true;
+    return false;
+}
+bool nativeCollisionSuffixTopology27B170(const Parent& p,const C*& previous,const C*& cursor)const noexcept {
+    if(!nativeCollisionForest_)return cursor==nullptr;
+    if(!nativeCollisionOwnerCurrent27B170()||!p.zone||p.zone>10u||parents_[p.zone-1u].get()!=&p)return false;
+    const auto& zone=nativeCollisionForest_->zones_[p.zone-1u];
+    for(const auto& w:zone.entries34){if(!w.nativeQuery||!w.nativeQuery->appended)continue;
+        const auto& e=w.nativeQuery->entity;
+        //Compare ownership-derived address BEFORE dereferencing any cursor.
+        if(cursor!=&e||e.parent1C!=&p.entity||e.previous10!=previous||e.firstChild18||
+           e.reference00!=1u||e.mask20||e.descendants24)return false;
+        previous=&e;cursor=e.next14;
+    }
+    return cursor==nullptr;
+}
+bool nativeCollisionView27B170(std::size_t zone,NativeCollisionForestView& view)const noexcept {
+    if(zone>=parents_.size()||!nativeCollisionOwnerCurrent27B170())return false;
+    const auto& p=*parents_[zone];
+    if(!p.constructed||p.released||p.entity.kind!=K::staticModels27B610||
+       p.entity.parent1C||p.entity.previous10||p.entity.next14||p.entity.mask20||p.entity.descendants24||
+       !parentTopology(p)||!view.add(const_cast<C&>(p.entity)))return false;
+    view.generation=generation_;
+    for(const auto& slot:p.entries34){const auto* m=slot.model;
+        if(!m||m->referenceReleased)continue;
+        if(m->parent!=zone||m->source.worldInstance!=slot.worldInstance||
+           !m->parentAttached||!m->scene.model()||m->scene.released()||
+           m->scene.model_.entity8.kind!=K::model2403A0||
+           !view.add(const_cast<C&>(m->scene.model_.entity8)))return false;
+    }
+    std::size_t queries=0;
+    for(const auto& w:nativeCollisionForest_->zones_[zone].entries34){
+        if(!w.nativeQuery||!w.nativeQuery->counted||w.nativeQuery->retired)continue;
+        if(++queries>178u||!view.add(w.nativeQuery->entity))return false;
+    }
+    return domain(view)&&g::original_entity_chain_detail50LA::forest(view);
+}
+bool nativeCollisionForestCurrent27B170()const noexcept {
+    if(!nativeCollisionForest_)return true;
+    if(!nativeCollisionOwnerCurrent27B170()||application_->attachmentLock423F58()||
+       (visibility_&&!visibility_->raStaticOwnerIdle(this)))return false;
+    for(std::size_t z=0;z<10u;++z){NativeCollisionForestView view;
+        if(!nativeCollisionView27B170(z,view))return false;
+    }
+    return true;
+}
+bool bindNativeCollisionForest27B170(g::OriginalWorldCollisionObjects50LA& owner,std::uint32_t& pc)noexcept {
+    pc=0x27b170;
+    if(nativeCollisionForest_)return nativeCollisionForest_==&owner&&nativeCollisionForestCurrent27B170();
+    if(nativeCollisionForestRetiring_||!constructed_||!resourcesComplete_||!observersComplete_||
+       models_.size()!=1085u||parents_.size()!=10u||!canClose()||owner.source_!=source_)return false;
+    nativeCollisionForest_=&owner;
+    if(!nativeCollisionForestCurrent27B170()){nativeCollisionForest_=nullptr;return false;}
+    return true;
+}
+bool appendNativeCollision27B170(std::size_t zone,std::size_t row,std::uint32_t& pc)noexcept {
+    pc=0x27b170;
+    if(nativeCollisionForestRetiring_||!nativeCollisionForestCurrent27B170()||!nativeCollisionForest_||
+       zone>=10u||row>=nativeCollisionForest_->zones_[zone].entries34.size())return false;
+    auto& w=nativeCollisionForest_->zones_[zone].entries34[row];
+    if(!w.nativeQuery)return false;auto& q=*w.nativeQuery;
+    if(q.appended){pc=0x141a58;return true;}
+    if(q.retired||q.terminal||!q.loaded||!q.resourceStarted||q.resourceWithdrawn||q.registered||
+       !q.typed||!q.flagsApplied||!q.candidate||w.collision04!=&q.entity)return false;
+    //Source-order successful suffix, not sorted candidate order. Earlier rows
+    //must have genuinely completed their positive or negative wrapper path.
+    for(std::size_t z=0;z<=zone;++z){const auto& entries=nativeCollisionForest_->zones_[z].entries34;
+        const auto end=z==zone?row:entries.size();
+        for(std::size_t i=0;i<end;++i){const auto& prior=entries[i];
+            if(!prior.nativeQuery||!prior.nativeAttempted||!prior.descriptorRetired||prior.descriptor08)return false;
+            const auto& p=*prior.nativeQuery;
+            if(prior.decodedCollision){if(!p.loaded||!p.appended||!p.registered||p.retired)return false;}
+            else if(!p.negativeLoadReturned||!p.retired||p.counted||prior.collision04)return false;
+        }
+    }
+    NativeCollisionForestView view;if(!nativeCollisionView27B170(zone,view))return false;
+    const auto result=g::original_entity_chain_detail50LA::attachOriginalWreckChildChain14196050LA(
+        view,parents_[zone]->entity,q.entity,0u,application_->attachmentLock423F58());
+    pc=result.sourcePC;if(result.status!=g::OriginalWreckComponentStatus50LA::complete)return false;
+    q.appended=true;return true; //Publish ONLY after actual source splice.
+}
+bool detachNativeCollisionSuffix27B170(std::uint32_t& pc)noexcept {
+    pc=0x141a70;
+    if(!nativeCollisionForest_)return true;
+    if(!nativeCollisionForestCurrent27B170())return false;
+    //Caller first withdraws real runtime registration/observer borrowers.
+    //This helper has no authority to clear those flags or replay their service.
+    for(const auto& zone:nativeCollisionForest_->zones_)for(const auto& w:zone.entries34)
+        if(w.nativeQuery&&w.nativeQuery->registered)return false;
+    nativeCollisionForestRetiring_=true;
+    for(std::size_t z=10u;z;){--z;auto& entries=nativeCollisionForest_->zones_[z].entries34;
+        for(std::size_t row=entries.size();row;){auto& w=entries[--row];
+            if(!w.nativeQuery||!w.nativeQuery->appended)continue;
+            NativeCollisionForestView view;if(!nativeCollisionView27B170(z,view))return false;
+            auto& q=*w.nativeQuery;
+            const auto result=g::original_entity_chain_detail50LA::detachOriginalWreckComponent141A7050LA(
+                view,q.entity,application_->attachmentLock423F58());
+            pc=result.sourcePC;if(result.status!=g::OriginalWreckComponentStatus50LA::complete)return false;
+            q.appended=false; //Actual detached owner survives subsequent resource failure.
+        }
+    }
+    return !nativeCollisionSuffixPresent27B170();
+}
+bool releaseNativeCollisionForest27B170(std::uint32_t& pc)noexcept {
+    pc=0x141b88;
+    if(!nativeCollisionForest_)return true;
+    if(!nativeCollisionForestCurrent27B170()||nativeCollisionSuffixPresent27B170())return false;
+    for(const auto& zone:nativeCollisionForest_->zones_)for(const auto& w:zone.entries34)
+        if(w.nativeQuery&&w.nativeQuery->registered)return false;
+    nativeCollisionForest_=nullptr;nativeCollisionForestRetiring_=true;return true;
+}
+
 // Included inside the private static model Owner. All inputs originate from
 // retained source placements and the actual Application-bound canonical model.
 bool parentTopology(const Parent& p)const noexcept {
@@ -9,7 +188,7 @@ bool parentTopology(const Parent& p)const noexcept {
            e.reference00!=1||e.mask20||e.descendants24)return false;
         previous=&e;cursor=e.next14;
     }
-    return cursor==nullptr;
+    return nativeCollisionSuffixTopology27B170(p,previous,cursor);
 }
 bool staticBounds(Model& m,g::LiveZoneBounds50EN& out)noexcept {
     auto& root=m.scene.model_;auto graph=m.graph();

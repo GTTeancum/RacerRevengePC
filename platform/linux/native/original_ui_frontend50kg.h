@@ -282,6 +282,15 @@ public:
 private:
     friend struct ::original_main_entry50KG::Frontend;
     friend struct ::original_main_entry50KG::Application;
+    // Uncalled native reverse-route receiver. Future exact Results flags6
+    // transfer must establish origin/whole-poll completion/retirement first.
+    // No Main construction history or source1B7BD0 receipt is synthesized.
+    OriginalUiFrontendStatus50KG prepareNativeResultsHall(
+        const OriginalUiFrontendCold50KG&,const ::original_main_entry50KG::Application&,
+        OriginalUiFrontendDiagnostic50KG&)noexcept;
+    OriginalUiFrontendStatus50KG prepareInitialNative(
+        const OriginalUiFrontendCold50KG&,const ::original_main_entry50KG::Application*,
+        OriginalUiFrontendDiagnostic50KG&)noexcept;
     friend class OriginalUiGarageSession50KG;
     bool queueGarageScreen17DE10(const OriginalUiGarageSession50KG&,std::int32_t,std::int32_t)noexcept;
     friend class OriginalUiGarageDrawContribution50KG;

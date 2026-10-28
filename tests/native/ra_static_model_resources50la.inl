@@ -125,6 +125,7 @@ bool resourcesCanClose()const noexcept {
     return true;
 }
 bool closeResources(Model& m)noexcept {
+    if(nativeCollisionSuffixPresent27B170())return false; //No model may release ahead of ANY owned collision suffix.
     if(m.scene.released()||!m.scene.model())return true;
     if(!m.referenceReleased){
         C* outside[2]{};std::size_t count=0;

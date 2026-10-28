@@ -41,8 +41,10 @@ public:
             if (startAtMenu) page_ = Page::Pause;
         }
     }
-    void setHumanControls(std::uint32_t preset,bool twinEngine,bool physical) noexcept {
-        humanPreset_=preset;humanTwinEngine_=twinEngine;humanPhysical_=physical;++revision_;
+    void setHumanControls(std::uint32_t preset,bool twinEngine,bool physical,
+        bool manualResetBound=false) noexcept {
+        humanPreset_=preset;humanTwinEngine_=twinEngine;humanPhysical_=physical;
+        humanManualResetBound_=manualResetBound;++revision_;
     }
     bool open() const noexcept { return page_ != Page::Closed; }
     Page page() const noexcept { return page_; }
@@ -85,6 +87,14 @@ public:
     // Called only for a focused, fully drained input snapshot. Escape/Enter
     // and row movement use fresh edges, never held keys or auto-repeat.
     Result poll(const GameHostInput50ER& input, bool canResume) noexcept {
+        // Final focus alone is insufficient: one drained batch can contain a
+        // key press, focus loss, and focus regain. Never let that interrupted
+        // edge confirm Restart/Leave/Exit or resume the world. Drop the pad
+        // edges too, so an inactive poll cannot defer an action until later.
+        if(!input.keys.focused||input.keys.minimized||input.keys.activityLost||
+           input.keys.eventBudgetExhausted||input.keys.quitRequested){
+            controllerEdges_={};return Result::None;
+        }
         // Merge into a menu-local copy, never input.keys or a driving sample.
         auto key = input.keys.pressed;
         constexpr unsigned scancodes[]={82,81,80,79,40,41};
@@ -351,7 +361,9 @@ public:
                     race_ ? "BACKSPACE  RESTART ENTIRE RACE" : "BACKSPACE  RETURN TO CHECKPOINT";
             if(humanPhysical_)out.rows[6]=nativeHumanRace_?(humanPreset_%4u==1u?
                 "SQUARE / X     CYCLE CAMERA":"TRIANGLE / Y   CYCLE CAMERA"):"OTHER ORIGINAL PAD ACTIONS UNJOINED";
-            out.rows[7] = "F5         RESTART FROM GRID";
+            out.rows[7] = humanManualResetBound_ ? (humanPhysical_ ?
+                "BACK RESET TO TRACK; F5 RESTART RACE" : "T RESET TO TRACK; F5 RESTART RACE") :
+                "F5         RESTART FROM GRID";
             out.rows[8] = humanPhysical_?"START / ESC  NATIVE PAUSE / RESUME":"ESC        PAUSE / RESUME";
             out.rows[9] = "BACK"; out.rowCount = 10; out.selectedRow = 9;
             out.footer = humanPhysical_ ? "A OR Y RETURNS TO THE MENU" : "ENTER OR ESC RETURNS TO THE MENU";
@@ -377,7 +389,7 @@ private:
     HostTrackAdmission50IM trackAdmission_{};
     bool nativeAllAiRestart_=false,returnOriginalMain_=false,nativeHumanRace_=false;
     std::uint32_t humanPreset_=4;
-    bool humanTwinEngine_=true,humanPhysical_=false;
+    bool humanTwinEngine_=true,humanPhysical_=false,humanManualResetBound_=false;
     std::array<bool,7> controllerEdges_{};
     std::int32_t controllerInstance_=-1;
     bool controllerArmed_=false;

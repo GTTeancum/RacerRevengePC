@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <cstdint>
 
+namespace original_race_hud_scope50LA { class Registration; }
 namespace rr::game {
 // Actual B4->3C manager records, in the same human-first B0->44 order used
 // by1AF330. These are observations of real racer owners after1AFF50/1B0920;
@@ -85,7 +86,8 @@ struct OriginalHumanEndClock50KG {
 };
 enum class OriginalHumanEndClockStatus50KG : std::uint8_t {
     unchanged,advanced,needMusicFade1A4AB0,needFade2AED60,
-    needOriginalEndDispatch1A7DD0,callerBoundary,numeric
+    needOriginalEndDispatch1A7DD0,callerBoundary,numeric,
+    needMusicActivity1A4AD0,needMusicFading1A65A0,needAnnouncerActivity2C4E70
 };
 struct OriginalHumanEndClockResult50KG {
     OriginalHumanEndClockStatus50KG status=OriginalHumanEndClockStatus50KG::callerBoundary;
@@ -126,36 +128,31 @@ inline OriginalCameraStartResult requestOriginalHumanEndFade2AED60(
 //only after genuine timer/audio/fade completion; it must not label1AD230 as
 //retail Results or claim retail profile/save/progression side effects.
 class OriginalHumanEndClockCursor50KG final {
-    enum class Phase : std::uint8_t { idle,music,fade };
+    friend class ::original_race_hud_scope50LA::Registration;
+    // The same existing cursor, with the actual source read cuts exposed only
+    // to its concrete owner. Legacy wrappers below keep their existing API.
+    enum class Phase : std::uint8_t { idle,musicActivity,musicFading,music,
+        countdownMusic,announcer,fade };
     Phase phase_=Phase::idle;
     OriginalHumanEndClock50KG* clock_=nullptr;
     float* race94_=nullptr;
     std::uint8_t* flags1B0_=nullptr;
     float delta_=0.f;
-    OriginalHumanEndClockResult50KG continueCountdown(bool musicActive,
-        bool announcerActive,bool fadeManagerPresent) noexcept {
+    bool fadeManagerPresent_=false;
+    OriginalHumanEndClockResult50KG continueCountdown() noexcept {
         using S=OriginalHumanEndClockStatus50KG;
         volatile float next=*race94_-delta_;
         if(!lap_timing_detail50ID::ordinary(next))return {S::numeric,0x1a7e9cu,0};
         *race94_=next;
         if(next<=.5f&&!(*flags1B0_&4u)){
-            if(musicActive||announcerActive){*race94_=.5f;phase_=Phase::idle;return {S::advanced,0x1a7ef0u,0};}
-            if(fadeManagerPresent){
-                volatile float milliseconds=850.f*next;
-                if(!lap_timing_detail50ID::ordinary(milliseconds)||milliseconds<-2147483648.f||
-                   milliseconds>=2147483648.f)return {S::numeric,0x1a7f1cu,0};
-                phase_=Phase::fade;
-                return {S::needFade2AED60,0x1a7f24u,static_cast<std::int32_t>(milliseconds)};
-            }
+            phase_=Phase::countdownMusic;
+            return {S::needMusicActivity1A4AD0,0x1a7ec4u,0};
         }
         phase_=Phase::idle;return {S::advanced,0x1a7f54u,0};
     }
-public:
-    bool pending()const noexcept{return phase_!=Phase::idle;}
-    OriginalHumanEndClockResult50KG begin(OriginalHumanEndClock50KG& clock,
+    OriginalHumanEndClockResult50KG beginSource1A7DA0(OriginalHumanEndClock50KG& clock,
         float& race94,std::uint8_t& raceFlags1B0,std::uint8_t managerFlags58,
-        float delta,bool musicActive,bool musicFading,bool announcerActive,
-        bool fadeManagerPresent) noexcept {
+        float delta,bool fadeManagerPresent) noexcept {
         using S=OriginalHumanEndClockStatus50KG;
         if(pending())return {S::callerBoundary,0x1a7da0u,0};
         if(!(managerFlags58&1u))return {S::unchanged,0x1a7dacu,0};
@@ -167,18 +164,71 @@ public:
         if(!lap_timing_detail50ID::ordinary(next))return {S::numeric,0x1a7e48u,0};
         clock.musicDelay98=next;
         clock_=&clock;race94_=&race94;flags1B0_=&raceFlags1B0;delta_=delta;
-        if(next<=0.f&&musicActive&&!musicFading){
-            phase_=Phase::music;return {S::needMusicFade1A4AB0,0x1a7e84u,1000};
+        fadeManagerPresent_=fadeManagerPresent;
+        if(next<=0.f){
+            phase_=Phase::musicActivity;return {S::needMusicActivity1A4AD0,0x1a7e5cu,0};
         }
-        return continueCountdown(musicActive,announcerActive,fadeManagerPresent);
+        return continueCountdown();
+    }
+    OriginalHumanEndClockResult50KG afterMusicActivity1A4AD0(bool active) noexcept {
+        using S=OriginalHumanEndClockStatus50KG;
+        if(phase_==Phase::musicActivity){
+            if(!active)return continueCountdown();
+            phase_=Phase::musicFading;return {S::needMusicFading1A65A0,0x1a7e6cu,0};
+        }
+        if(phase_!=Phase::countdownMusic)return {S::callerBoundary,0x1a7ec4u,0};
+        if(active){*race94_=.5f;phase_=Phase::idle;return {S::advanced,0x1a7ef0u,0};}
+        phase_=Phase::announcer;return {S::needAnnouncerActivity2C4E70,0x1a7ed8u,0};
+    }
+    OriginalHumanEndClockResult50KG afterMusicFading1A65A0(bool fading) noexcept {
+        using S=OriginalHumanEndClockStatus50KG;
+        if(phase_!=Phase::musicFading)return {S::callerBoundary,0x1a7e6cu,0};
+        if(fading)return continueCountdown();
+        phase_=Phase::music;return {S::needMusicFade1A4AB0,0x1a7e84u,1000};
+    }
+    OriginalHumanEndClockResult50KG afterActualMusicFade1A4AB0() noexcept {
+        if(phase_!=Phase::music||!clock_||!race94_||!flags1B0_)
+            return {OriginalHumanEndClockStatus50KG::callerBoundary,0x1a7e84u,0};
+        return continueCountdown();
+    }
+    OriginalHumanEndClockResult50KG afterAnnouncerActivity2C4E70(bool active) noexcept {
+        using S=OriginalHumanEndClockStatus50KG;
+        if(phase_!=Phase::announcer)return {S::callerBoundary,0x1a7ed8u,0};
+        if(active){*race94_=.5f;phase_=Phase::idle;return {S::advanced,0x1a7ef0u,0};}
+        if(fadeManagerPresent_){
+            volatile float milliseconds=850.f * *race94_;
+            if(!lap_timing_detail50ID::ordinary(milliseconds)||milliseconds<-2147483648.f||
+               milliseconds>=2147483648.f)return {S::numeric,0x1a7f1cu,0};
+            phase_=Phase::fade;
+            return {S::needFade2AED60,0x1a7f24u,static_cast<std::int32_t>(milliseconds)};
+        }
+        phase_=Phase::idle;return {S::advanced,0x1a7f54u,0};
+    }
+    OriginalHumanEndClockResult50KG useLegacyObservations(OriginalHumanEndClockResult50KG r,
+        bool musicActive,bool musicFading,bool announcerActive)noexcept {
+        using S=OriginalHumanEndClockStatus50KG;
+        for(;;)switch(r.status){
+        case S::needMusicActivity1A4AD0:r=afterMusicActivity1A4AD0(musicActive);break;
+        case S::needMusicFading1A65A0:r=afterMusicFading1A65A0(musicFading);break;
+        case S::needAnnouncerActivity2C4E70:r=afterAnnouncerActivity2C4E70(announcerActive);break;
+        default:return r;
+        }
+    }
+public:
+    bool pending()const noexcept{return phase_!=Phase::idle;}
+    OriginalHumanEndClockResult50KG begin(OriginalHumanEndClock50KG& clock,
+        float& race94,std::uint8_t& raceFlags1B0,std::uint8_t managerFlags58,
+        float delta,bool musicActive,bool musicFading,bool announcerActive,
+        bool fadeManagerPresent) noexcept {
+        return useLegacyObservations(beginSource1A7DA0(clock,race94,raceFlags1B0,
+            managerFlags58,delta,fadeManagerPresent),musicActive,musicFading,announcerActive);
     }
     // The synchronous1A4AB0 call has returned. Reread actual activity: do not
     //substitute false just because a fade request was accepted.
     OriginalHumanEndClockResult50KG afterMusicFade(bool musicActive,
         bool announcerActive,bool fadeManagerPresent) noexcept {
-        if(phase_!=Phase::music||!clock_||!race94_||!flags1B0_)
-            return {OriginalHumanEndClockStatus50KG::callerBoundary,0x1a7e84u,0};
-        return continueCountdown(musicActive,announcerActive,fadeManagerPresent);
+        fadeManagerPresent_=fadeManagerPresent;
+        return useLegacyObservations(afterActualMusicFade1A4AB0(),musicActive,false,announcerActive);
     }
     OriginalHumanEndClockResult50KG afterVideoFadeRequest() noexcept {
         if(phase_!=Phase::fade||!flags1B0_)

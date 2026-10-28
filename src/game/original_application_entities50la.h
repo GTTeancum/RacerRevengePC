@@ -1,4 +1,5 @@
 #pragma once
+namespace ra_source_camera50LA {class OwnershipBridge;}
 namespace original_racer_manager_entity { class Owner; }
 namespace original_camera_session50KX { class Session; }
 namespace original_main_entry50KG {struct Application;}
@@ -154,6 +155,75 @@ class OriginalApplicationEntities50LA final {
     // direct load162D64 and no direct writer.254AF0 writes442BC8 instead.
     // This is shared source state, not per-Scene empty/render readiness.
     std::uint32_t particleRenderEnabled382BC8_=1;
+    // EXPLICIT NATIVE PROFILING ADAPTATION. These are native label identities,
+    // never guest382B20 rows, guest434728/434108 indices, or source guards.
+    // The existing process Application owner survives Race/session replacement.
+    //Native once observations for295650/295944. These are NOT guest443590/
+    //443598 indices or their guard bytes. Direct source consumers are only
+    //initialization stores; no exhaustive indirect-alias claim is made.
+    // Sole production native219420 lazy state, retained by the real process
+    // Application across Race lifetimes. Native first-use, NOT a claim that
+    // guest434718/720 or gp876C/8770 had no earlier guest history.
+    struct NativeVehicleContactStatics50LA {
+        std::array<bool,2> initialized{};
+        std::array<std::uint32_t,2> words{}; //Unread before corresponding init.
+    } nativeVehicleContactStatics_;
+    bool enterNativeVehicleContacts219420()noexcept {
+        if(nativeOwnerThread_!=std::this_thread::get_id())return false;
+        auto& s=nativeVehicleContactStatics_;
+        if(!s.initialized[0]){s.words[0]=0x3f000000u;s.initialized[0]=true;} //219454/45C
+        if(!s.initialized[1]){s.words[1]=0x3f800000u;s.initialized[1]=true;} //219474/47C
+        return true;
+    }
+    struct NativeDetectorSentinel50LA {bool observed=false;std::int32_t sentinel=0;};
+    std::array<NativeDetectorSentinel50LA,2> nativeDetectorSentinels_{};
+    bool observeNativeDetectorSentinel50LA(std::size_t site)noexcept {
+        if(nativeOwnerThread_!=std::this_thread::get_id()||site>=nativeDetectorSentinels_.size())return false;
+        auto& lane=nativeDetectorSentinels_[site];
+        if(!lane.observed){lane.sentinel=-1;lane.observed=true;}
+        return true;
+    }
+    enum class NativeSourceProfileSite50LA:std::uint8_t {runSimulation,processQueuedEvents};
+    struct NativeSourceProfileRecord50LA {
+        std::string_view authoredName;
+        std::uint64_t nativeIdentity=0;
+    };
+    std::array<NativeSourceProfileRecord50LA,2> nativeSourceProfileRecords_{};
+    std::size_t nativeSourceProfileCount_=0;
+    std::optional<std::uint64_t> nativeSourceProfileSelected_;
+    std::array<std::optional<std::uint64_t>,2> nativeSourceProfileLazy_{};
+    bool observeNativeSourceProfile50LA(NativeSourceProfileSite50LA site)noexcept {
+        if(nativeOwnerThread_!=std::this_thread::get_id())return false;
+        const auto ordinal=static_cast<std::size_t>(site);
+        if(ordinal>=nativeSourceProfileLazy_.size())return false;
+        auto& lazy=nativeSourceProfileLazy_[ordinal];
+        if(lazy)return true; //Original already-set guard skips lookup/selection.
+        const std::string_view name=site==NativeSourceProfileSite50LA::runSimulation?
+            "PodVehicle::RunSimulation":"PodRaceAudioManager::ProcessQueuedEvents";
+        for(std::size_t i=0;i<nativeSourceProfileCount_;++i){
+            const auto& record=nativeSourceProfileRecords_[i];
+            if(record.authoredName==name){
+                nativeSourceProfileSelected_=record.nativeIdentity;
+                lazy=record.nativeIdentity;return true;
+            }
+        }
+        if(nativeSourceProfileCount_==nativeSourceProfileRecords_.size())return false;
+        // Native full authored label (not guest strncpy31 truncation). Stable
+        // monotonic nonzero handles retain identity across races; no guest
+        // historical count/index or profiling Entity is manufactured.
+        auto& record=nativeSourceProfileRecords_[nativeSourceProfileCount_];
+        record={name,std::uint64_t(nativeSourceProfileCount_)+1u};
+        nativeSourceProfileSelected_=record.nativeIdentity;
+        ++nativeSourceProfileCount_;
+        lazy=record.nativeIdentity;return true;
+    }
+    // Actual process BSS state for1A82E0..1A837C.100008 clears these
+    //words and gp-relative guards before main; GP=3DD970, guards8610..1C
+    //lie at3D5F80..8C. Shared across races on this existing process owner.
+    std::int32_t raceUpdateProfile434178_=0,raceUpdateProfile434180_=0;
+    std::uint32_t raceUpdateScale434188_=0,raceUpdateReciprocal434190_=0;
+    std::uint8_t raceUpdateGuard8610_=0,raceUpdateGuard8614_=0,
+        raceUpdateGuard8618_=0,raceUpdateGuard861C_=0;
     // Actual process BSS words433A08/10/18/20, with their four source-local
     // lazy guards gp84F0/84F4/84F8/84FC. Reached only on a positive162D30.
     std::array<std::int32_t,4> particleDrawProfile433A08_{};
@@ -167,13 +237,30 @@ class OriginalApplicationEntities50LA final {
     std::uint32_t lightUpdateGeometry426F78_=0;
     std::uint8_t lightManagerGuard83A8_=0;
     std::uint32_t lightManagerAssertion426F88_=0;
+    //Same actual Application process initializer3C8A30, not a borrowed cable
+    //constant or a source constructor replay at first flare creation.
+    // Fresh native Application-owned LightFlare control domain. Values follow
+    // ELF initialized382B28/zero-fill427040, not an observation of retained
+    // retail frontend globals or proof that source initialization executed.
+    // No native selector currently writes these controls; distance globals
+    // remain unknown and no lazy distance producer is synthesized.
+    const std::uint32_t nativeFlareEnabled382B28_=1u;
+    const std::uint32_t nativeFlareDistance427040_=0u;
+    const std::array<std::uint32_t,4> flarePosition427000_{{0,0,0,0x3f800000u}}; //3C8A8C.
+    const std::array<std::uint32_t,4> flareTriple427020_{{0,0x3f800000u,0,0x3f800000u}}; //3C8A9C.
     const std::array<std::uint32_t,4> lightVector426F10_{{0,0,0,0x3f800000u}}; //3C8A0C
     // Native affinity of this actual shared owner, not a source field.
     // Other owners retain their existing serialized-operation contract.
     const std::thread::id nativeOwnerThread_=std::this_thread::get_id();
     friend class OriginalPauseStorage50LA;
+    friend class OriginalResults10450LA;
+    friend class OriginalRaceF850LA;
+    friend class OriginalSimpleVCR50LA;
+    friend class OriginalRaceMusicManager50LA;
+    friend class OriginalRaceTimingManager50LA;
     friend class OriginalTunnelTrack50LA;
     friend class OriginalRaceConstructor50LA;
+    friend class ::ra_source_camera50LA::OwnershipBridge;
     friend class ::original_camera_session50KX::Session;
     friend class ::original_racer_manager_entity::Owner;
     friend class rr::platform::RaceAudioGroups50IC;
@@ -209,6 +296,18 @@ class OriginalApplicationEntities50LA final {
     //3CA94C/3CA96C publish these exact float4 defaults once at startup.
     const std::array<float,4> worldOrigin442F80_{{0.f,0.f,0.f,1.f}};
     const std::array<float,4> worldForward442FB0_{{0.f,0.f,1.f,1.f}};
+    // Fresh native source-sky process domain. Unknown until reached129280/
+    //12A100/12A110 stores; never a receipt that existing renderer state reset.
+    //Actual startup3C8570 ->3C85CC process vector, copied by128880.
+    const std::array<std::uint32_t,4> skyOrigin3E0900_{{0u,0u,0u,0x3f800000u}};
+    std::optional<std::array<std::array<std::uint32_t,3>,96>> skyTable3E09A0_;
+    std::optional<std::uint32_t> skyPolicy3E0990_,skyPolicy36C0F0_;
+    // Explicit fresh native process domain initialized from file-backed words.
+    // Not proof of unchanged guest globals after an unrepresented frontend.
+    const std::uint32_t skySubdivisionsX36C0D8_=3,skySubdivisionsY36C0E0_=2;
+    // Reached12A8A0 stores only: normal W remains unknown, positions W is1.
+    std::array<std::optional<std::array<std::uint32_t,3>>,6> skyNormals3E0E20_;
+    std::array<std::optional<std::array<std::uint32_t,4>>,150> skyPositions3E0E80_;
     OriginalApplicationEntityAuthority50LA entityAuthority_;
     friend class ::ra_pod_scene50LA::Owner;
     friend struct ::track_runtime_storage50IG::Storage;
@@ -253,9 +352,32 @@ class OriginalApplicationEntities50LA final {
     const std::array<std::uint32_t,4> cutAxisY443220_{{0,0x3f800000u,0,0x3f800000u}};
     const std::array<std::uint32_t,4> cutAxisZ443230_{{0,0,0x3f800000u,0x3f800000u}};
     // Original static3CAA20 ->3CAA7C; shared SelectiveGravityModel vector.
+    //Explicit process-owned native lazy433C10/18/20 adaptation. No guest
+    //guard/history equivalence; actual source caller initializes each on reach.
+    std::array<std::optional<std::uint32_t>,3> nativeAeroLazyWords_{};
+    //Actual process initializer3CAF20..3CAF7C, not BSS/null inference.
+    const std::array<std::uint32_t,4> springZero4435A0_{{0,0,0,0x3f800000u}};
+    //Distinct2965B0/29686C native process sentinel slots; no guest guard history.
+    std::array<std::optional<std::uint32_t>,2> nativeSpringSentinelWords_{};
+    //Actual process initializer3C7BA0..3C7BFC, copied by10037C toAero40.
+    const std::array<std::uint32_t,4> aeroFlowOrigin3D6B40_{{0,0,0,0x3f800000u}};
     const std::array<std::uint32_t,4> gravityOrigin4431C0_{{0,0,0,0x3f800000u}};
     // Source startup3C9190/3C9290 and file382B60, shared once per Application.
     const std::array<std::uint32_t,4> bodyOrigin433AD0_{{0,0,0,0x3f800000u}};
+    //Actual startup table3CC52C ->3C9B90, SQ3C9BFC. Distinct process
+    //identity from bodyOrigin433AD0 despite equal words. Direct-access scan
+    //finds no later same-global writer; not an indirect-alias proof.
+    const std::array<std::uint32_t,4> terrainClear434260_{{0,0,0,0x3f800000u}};
+    //Same actual3C9B90 initializer, distinct SQ3C9C1C process vector.
+    const std::array<std::uint32_t,4> terrainAxis434290_{{0,0,0x3f800000u,0x3f800000u}};
+    //Native process first-use adaptation of1B1A58/1B23B4, not guest guard history.
+    std::array<std::optional<std::uint32_t>,2> nativeTerrainResponseLazyWords_{};
+    //Actual reached1B1F7C native process first-use; not guest guard history.
+    std::optional<std::uint32_t> nativeTerrainTranslationScale_;
+    //Actual reached28A0B8 first-use, distinct native process identity.
+    std::optional<std::uint32_t> nativeSceneAxesSentinel4433D8_;
+    //Reached2188B0 native process first-use words4346C8..434708, not guest guards.
+    std::array<std::optional<std::uint32_t>,9> nativeSecondaryForceLazyWords_{};
     const std::array<std::uint32_t,4> bodyReset433B80_{{0,0,0,0x3f800000u}};
     const std::array<std::uint32_t,4> bodyQuaternion382B60_{{0,0,0,0}};
     friend class OriginalCableStripAttributes50LA;

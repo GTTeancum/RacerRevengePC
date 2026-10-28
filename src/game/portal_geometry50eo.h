@@ -23,6 +23,13 @@ enum class PortalGeometryStatus50EO : std::uint8_t {
 PortalGeometryStatus50EO preparePortalGeometry50EO(
     const Vector3_48C (&vertices)[4], PortalGeometry50EO& output) noexcept;
 
+//230580: maximum of the two diagonal lengths, not a radius. Uses the
+//existing finite strict-binary32 native arithmetic contract, FE_TONEAREST;
+//original FCSR/VU exceptional equivalence is not asserted. No geometry rewrite.
+//Failure leaves output unchanged; consumes XYZ only (source W is unknown).
+PortalGeometryStatus50EO portalMaximumDiagonal230580_50EO(
+    const PortalGeometry50EO& portal, float& output) noexcept;
+
 // Original230BD0, with its unused optional intersection-point output omitted.
 // Preserves the signed raw-word XOR admission, [0,1] segment fraction, and
 // raw sign-bit edge predicates (including their distinction between +/-0).

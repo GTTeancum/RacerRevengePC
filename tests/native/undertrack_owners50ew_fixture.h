@@ -17,6 +17,7 @@
 #include <string_view>
 #include <vector>
 
+namespace ra_source_camera50LA { class OwnershipBridge; }
 namespace undertrack_owners50ew_fixture {
 using namespace rr::game;
 namespace assets=rr::assets;
@@ -82,17 +83,44 @@ struct Owners {
     // Call before sealing the racer bank. Vector objects and immutable filters
     // are never copied. These are the exact mutable elements/lanes, disjoint
     // from the caller's existing main/secondary/terrain/movement registrations.
-    template<class Bank> void registerMutableOwners(Bank& bank) {
+private:
+    friend class ::ra_source_camera50LA::OwnershipBridge;
+    // Explicit future shared-mode partition. These remain the actual Banked
+    // numeric/filter owners; the per-roster World owns its own memberships.
+    // Shared mode cannot reach this in Stage B: Bridge withholds query/Bank publication.
+    template<class Bank> void registerSharedNumericOwners(Bank& bank) {
         bank.owner(podFilter.flagsF8);bank.owner(podCopied40);bank.owner(podCopied50);
         bank.contents(podFilter.identityLists[0].identities);
         bank.owner(movementTag);bank.owner(movementSphere);
         bank.owner(receipt);bank.owner(selectedSource);bank.owner(sourcePrepared);
+    }
+public:
+    template<class Bank> void registerMutableOwners(Bank& bank) {
+        registerSharedNumericOwners(bank);
         for(unsigned i=0;i<2;++i){bank.owner(memberships[i]);
             bank.elements(links[i].data(),links[i].size());
             bank.elements(entries[i].data(),entries[i].size());}
     }
     UndertrackQueryOwners50EW binding(const BorrowedQueries& q,
         const std::array<CollectionRef50BX,2>& addedRefs) noexcept {
+        return bindingMembers(q,addedRefs,{&memberships[0],&memberships[1]},
+            {storage(0),storage(1)});
+    }
+private:
+    //Shared native World lends its actual typed per-roster memberships through
+    //the existing friend Bridge; legacy callers retain exactly their own pair.
+    UndertrackQueryOwners50EW bindingSharedMembers(const BorrowedQueries& q,
+        const std::array<CollectionRef50BX,2>& addedRefs,
+        const std::array<LiveZoneMembership50EN*,2>& added,
+        const std::array<LiveZoneStorage50EN,2>& backing) noexcept {
+        for(unsigned i=0;i<2;++i)
+            if(!added[i]||!backing[i].links||!backing[i].entries||!backing[i].capacity)return {};
+        return bindingMembers(q,addedRefs,added,backing);
+    }
+    UndertrackQueryOwners50EW bindingMembers(const BorrowedQueries& q,
+        const std::array<CollectionRef50BX,2>& addedRefs,
+        const std::array<LiveZoneMembership50EN*,2>& added,
+        const std::array<LiveZoneStorage50EN,2>& backing) noexcept {
         UndertrackQueryOwners50EW out{};
         if(!storagePrepared||!sourcePrepared||!selectedSource||!selectedSource->prepared()||
            !q.main690||q.main690->resource!=&selectedSource->main()||!q.mainMembership||
@@ -110,7 +138,7 @@ struct Owners {
            q.terrainMetadata->filter.identity==globals.identity[1]||
            q.terrainMetadata->collisionTypeTag!=globals.collisionTypeTag)return out;
         const CollectionRef50BX refs[]={q.mainRef,addedRefs[0],addedRefs[1],q.terrainRef};
-        LiveZoneMembership50EN* const members[]={q.mainMembership,&memberships[0],&memberships[1],q.terrainMembership};
+        LiveZoneMembership50EN* const members[]={q.mainMembership,added[0],added[1],q.terrainMembership};
         for(unsigned i=0;i<4;++i){if(!refs[i])return out;
             for(unsigned j=0;j<i;++j)if(refs[i]==refs[j]||members[i]==members[j])return out;}
         // Verify that the live348 query uses its same resource endpoint XYZ.
@@ -123,8 +151,8 @@ struct Owners {
                std::bit_cast<std::uint32_t>(q.terrain348->segment.second.v[axis]))return out;
         }
         out.query[0]={q.mainMembership,q.mainStorage,q.mainRef,q.main690};
-        out.query[1]={&memberships[0],storage(0),addedRefs[0]};
-        out.query[2]={&memberships[1],storage(1),addedRefs[1],nullptr,
+        out.query[1]={added[0],backing[0],addedRefs[0]};
+        out.query[2]={added[1],backing[1],addedRefs[1],nullptr,
             q.movementEndpoints,q.movementMetadata,&movementTag,&movementSphere};
         auto& terrain=out.query[3];terrain.membership=q.terrainMembership;
         terrain.storage=q.terrainStorage;terrain.object=q.terrainRef;
@@ -262,9 +290,9 @@ inline bool prepare(Owners& out,const native_racer_collision50HW::Owner& selecte
 // retain their own source owners. This is cold native owner assembly, never a
 // live reset, phase spoof, frame advance or claim that a player reset ran.
 namespace undertrack_owners50ew_fixture {
-inline bool attachFreshQueries(Owners& owner,VehicleFrameState49W& frame,
+inline bool attachFreshQueriesBound(Owners& owner,VehicleFrameState49W& frame,
     const VehicleFrameBindings49W& bindings,const VehicleFrameParameters49W& parameters,
-    const BorrowedQueries& borrowed,const std::array<CollectionRef50BX,2>& refs,
+    const BorrowedQueries& borrowed,const UndertrackQueryOwners50EW& queries,
     ZoneLifecycle50CL& life,LiveZoneWorld50EN& world,LiveZoneWorkspace50EN& workspace,
     CollectionRef50BX actualInitialC34,
     ColdQueryRole50LH role=ColdQueryRole50LH::originalAi) noexcept {
@@ -275,10 +303,16 @@ inline bool attachFreshQueries(Owners& owner,VehicleFrameState49W& frame,
        !coldQueryRoleMatches50LH(role,frame.fields.vehicle58,frame.fields.nativeAiOwnersBound50IV)||
        frame.bodies.main.frameFactor!=0.f||
        frame.shape.registrationE0||!actualInitialC34||actualInitialC34>life.zoneCount||
-       !owner.sourcePrepared||owner.memberships[0].attached||owner.memberships[1].attached)return false;
-    const auto queries=owner.binding(borrowed,refs);
+       !owner.sourcePrepared||!queries.query[1].membership||!queries.query[2].membership||
+       queries.query[1].membership->attached||queries.query[2].membership->attached)return false;
     if(!queries.query[0].membership||!queries.query[0].membership->attached||
        !queries.query[3].membership||!queries.query[3].membership->attached)return false;
+    if(queries.query[0].type2!=borrowed.main690||queries.query[3].terrain!=borrowed.terrain348||
+       queries.query[3].terrainResource!=borrowed.terrainResource||
+       !borrowed.movementEndpoints||!borrowed.movementMetadata||
+       queries.query[2].endpoints!=borrowed.movementEndpoints||
+       queries.query[2].metadata!=borrowed.movementMetadata||
+       queries.query[2].shapeTag!=&owner.movementTag||queries.query[2].segmentSphere!=&owner.movementSphere)return false;
     const auto main=static_cast<std::int32_t>(bindings.lifecycle.main190);
     if(main<0||static_cast<std::uint32_t>(main)>=frame.sceneNodeCount||
        !(frame.nodes[main].sceneFlags190&1u))return false;
@@ -296,18 +330,34 @@ inline bool attachFreshQueries(Owners& owner,VehicleFrameState49W& frame,
     LiveZoneBounds50EN movement{};movement.bounds.shapeTag=3;movement.bounds.pairCount=1;
     movement.bounds.endpoints=pair;movement.bounds.endpointCount=2;
     movement.bounds.endpointScenes=metadata;movement.bounds.endpointSceneCount=2;
-    if(attachLiveZoneMembership50EN(life,world,owner.memberships[1],owner.storage(1),refs[1],
+    if(attachLiveZoneMembership50EN(life,world,*queries.query[2].membership,queries.query[2].storage,queries.query[2].object,
         actualInitialC34,ZoneMethod50CL::Second,0.f,movement,workspace).status!=LiveZoneStatus50EN::Complete)return false;
     std::memcpy(borrowed.movementEndpoints,pair,sizeof pair);
     std::memcpy(borrowed.movementMetadata,metadata,sizeof metadata);owner.movementTag=3;
-    for(unsigned axis=0;axis<3;++axis)owner.movementSphere.center.v[axis]=owner.memberships[1].bounds.cachedCenter.v[axis];
-    owner.movementSphere.radius=owner.memberships[1].bounds.cachedRadius;
+    for(unsigned axis=0;axis<3;++axis)owner.movementSphere.center.v[axis]=queries.query[2].membership->bounds.cachedCenter.v[axis];
+    owner.movementSphere.radius=queries.query[2].membership->bounds.cachedRadius;
     PodShapeState49W prepared=frame.shape;
     if(!transformPodShape49W(parameters.shape,matrix,prepared))return false;
     LiveZoneBounds50EN pod{};pod.bounds.shapeTag=0;pod.bounds.shapeWorld=prepared.composed00;
     pod.bounds.cachedCenter=prepared.center60;pod.bounds.cachedRadius=prepared.radius80;pod.type0Resource=&parameters.shape;
-    if(attachLiveZoneMembership50EN(life,world,owner.memberships[0],owner.storage(0),refs[0],
+    if(attachLiveZoneMembership50EN(life,world,*queries.query[1].membership,queries.query[1].storage,queries.query[1].object,
         actualInitialC34,ZoneMethod50CL::Second,0.f,pod,workspace).status!=LiveZoneStatus50EN::Complete)return false;
-    prepared.registrationE0=refs[0];frame.shape=prepared;return true;
+    prepared.registrationE0=queries.query[1].object;frame.shape=prepared;return true;
+}
+inline bool attachFreshQueries(Owners& owner,VehicleFrameState49W& frame,
+    const VehicleFrameBindings49W& bindings,const VehicleFrameParameters49W& parameters,
+    const BorrowedQueries& borrowed,const std::array<CollectionRef50BX,2>& refs,
+    ZoneLifecycle50CL& life,LiveZoneWorld50EN& world,LiveZoneWorkspace50EN& workspace,
+    CollectionRef50BX actualInitialC34,
+    ColdQueryRole50LH role=ColdQueryRole50LH::originalAi) noexcept {
+    //Legacy route preserves the original preflight and its own memberships.
+    if(frame.phase!=VehicleFramePhase49W::Ready||
+       !coldQueryRoleMatches50LH(role,frame.fields.vehicle58,frame.fields.nativeAiOwnersBound50IV)||
+       frame.bodies.main.frameFactor!=0.f||frame.shape.registrationE0||
+       !actualInitialC34||actualInitialC34>life.zoneCount||!owner.sourcePrepared||
+       owner.memberships[0].attached||owner.memberships[1].attached)return false;
+    const auto queries=owner.binding(borrowed,refs);
+    return attachFreshQueriesBound(owner,frame,bindings,parameters,borrowed,queries,
+        life,world,workspace,actualInitialC34,role);
 }
 }

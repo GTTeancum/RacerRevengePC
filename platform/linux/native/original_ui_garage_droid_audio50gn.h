@@ -21,7 +21,7 @@ class OriginalUiGaragePageOwner50KG;
 // this reached Sound vtable updates elapsed time only, not233AE0 spatial audio.
 class OriginalUiGarageDroidAudio50GN final {
 public:
- static constexpr std::size_t soundCount=4,firstVoice=49,requiredFrontendVoices=53;
+ static constexpr std::size_t soundCount=4,firstVoice=49,requiredFrontendVoices=55;
  struct Observation {
   const OriginalUiGarageDroidAudio50GN* owner=nullptr;const AudioMixer50HD* mixer=nullptr;
   std::uint64_t revision=0,mixerEpoch=0,mixedFrames=0;

@@ -1,5 +1,6 @@
 #include "vehicle_contact48r.h"
 #include <cmath>
+#include <cfenv>
 #include <cstring>
 #include <limits>
 #include <type_traits>
@@ -214,4 +215,47 @@ Status runVehicleContacts48R(const VehicleContactInput48R& input,
     copy(destination.records,scratch.records,source.recordCount);
     output=result;return Status::Complete;
 }
+bool prepareVehicleContactGeometry48R(const VehicleContactGeometryInput48R& input,
+    VehicleContactGeometryPrefix48R& output) noexcept {
+    Span in{},out{};
+    if(!span(&input,1,in)||!span(&output,1,out)||overlaps(in,out)||
+       std::fegetround()!=FE_TONEAREST)return false;
+    Arithmetic math;Vec half{{input.boundsHalf.v[0],0.f,input.boundsHalf.v[2],1.f}};
+    //21952C clears Y after1202E0; no candidate cachedRadius read occurs.
+    const float radius=math.mul(fromBits(input.radiusScaleWord),math.root(math.square(half)));
+    Vec lateral{{0,0,0,1}};
+    for(unsigned i=0;i<3;++i)lateral.v[i]=math.sub(input.position.v[i],input.cachedCenter.v[i]);
+    const float projection=math.dot(lateral,input.up);
+    for(unsigned i=0;i<3;++i)lateral.v[i]=math.sub(lateral.v[i],math.mul(projection,input.up.v[i]));
+    const float distance=math.root(math.square(lateral));
+    const float threshold=math.add(input.vehicleRadius,radius);
+    if(!math.valid)return false;
+    VehicleContactGeometryPrefix48R result{};result.candidateRadius=radius;
+    result.hit=distance<threshold;
+    if(result.hit){
+        result.normal=math.normal(lateral);result.vehicleSurface={{0,0,0,1}};
+        for(unsigned i=0;i<3;++i)
+            result.vehicleSurface.v[i]=math.sub(input.position.v[i],math.mul(input.vehicleRadius,result.normal.v[i]));
+        if(!math.valid)return false;
+    }
+    output=result;return true;
+}
+bool prepareVehicleContactLocalPoint48R(const BodyMatrix48G& world,
+    const SpringVector4_48N& point,SpringVector4_48N& output) noexcept {
+    Span matrix{},in{},out{};
+    if(!span(&world,1,matrix)||!span(&point,1,in)||!span(&output,1,out)||
+       overlaps(matrix,out)||overlaps(in,out)||std::fegetround()!=FE_TONEAREST)return false;
+    Arithmetic math;const auto result=math.inversePoint(world,point);
+    if(!math.valid)return false;output=result;return true;
+}
+bool prepareVehicleContactCandidateSurface48R(const SpringVector4_48N& center,
+    const SpringVector4_48N& normal,float radius,SpringVector4_48N& output) noexcept {
+    Span first{},second{},out{};
+    if(!span(&center,1,first)||!span(&normal,1,second)||!span(&output,1,out)||
+       overlaps(first,out)||overlaps(second,out)||std::fegetround()!=FE_TONEAREST)return false;
+    Arithmetic math;SpringVector4_48N result{{0,0,0,1}};
+    for(unsigned i=0;i<3;++i)result.v[i]=math.add(center.v[i],math.mul(radius,normal.v[i]));
+    if(!math.valid)return false;output=result;return true;
+}
+
 }

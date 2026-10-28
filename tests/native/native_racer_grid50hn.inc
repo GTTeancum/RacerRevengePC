@@ -1,6 +1,8 @@
 // Include after racerBank.seal(raceRacerCount). Defines a cold-only placement
 // lambda. Slot zero may refresh an alternate human's own lift/query owners.
-// Seven opponents occupy two explicit HOST rows ahead of the retained
+// Tournament uses source AI ordinal / human ordinal+AI count ranks.
+// Other routes retain their explicit HOST policy. Seven opponents occupy
+// two explicit HOST rows ahead of the retained
 // rank-four center player pose. These are not claimed original lateral ranks.
 // Native ground probes validate every start using each racer's authored lift.
 // Four front starts and three back starts retain at least42 lateral or
@@ -13,13 +15,16 @@ auto placeOpponentAtGrid50HN=[&](std::size_t racer){
   constexpr float lateral[maxHostRaceRacers50HT]={0.f,-63.f,-21.f,21.f,63.f,-42.f,0.f,42.f};
   constexpr float forward[maxHostRaceRacers50HT]={0.f,80.f,80.f,80.f,80.f,40.f,40.f,40.f};
   BodyMatrix48G requested=s.nodes[static_cast<unsigned>(x.bindings.lifecycle.main190)].world100;
-  if(trackSession->originalStaticCandidates){
+  if(trackSession->originalStaticCandidates||canonicalTournamentGrid){
    // Every position is original2A2880 geometry over this track's real M spline.
-   // HOST roster rank assignment preserves the existing human rank4 and uses
-   // every other source rank once. It is not an invented lateral grid layout.
+   //1AE1C8..1AE1E0: human rank=human ordinal+AI count (7 here).
+   //1AE3FC/1AE400: AI rank=AI ordinal (manager slot minus one here).
+   // Non-Tournament routes preserve the previous HOST human-rank4 policy.
    constexpr std::uint32_t nativeRank[maxHostRaceRacers50HT]={4,0,1,2,3,5,6,7};
    GridCenterResult50AC authoredGrid{};
-   require50DU(selectedGridNavigation.prepare(nativeRank[racer],authoredGrid),
+   const auto rank=canonicalTournamentGrid?
+       (racer?static_cast<std::uint32_t>(racer-1):raceOpponentCount):nativeRank[racer];
+   require50DU(selectedGridNavigation.prepare(rank,authoredGrid),
        "original complete starting-grid geometry unavailable");
    for(unsigned axis=0;axis<3;++axis){
     const float at=std::bit_cast<float>(authoredGrid.position[axis]);

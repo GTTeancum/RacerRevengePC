@@ -6,6 +6,10 @@
 #include <cmath>
 #include <string>
 
+namespace live_audio50HF { class Owner; }
+namespace native_original_ai_audio { class Owner; }
+namespace rr::platform { class RaceAudioGroups50IC; }
+
 namespace gameplay_audio50HE {
 using namespace rr::game;
 struct CueDefinition {AudioBank50HE bank;std::uint32_t key;const char* filename;bool authoredLoop,stream;};
@@ -94,7 +98,8 @@ public:
             }
             ready[n]=true;++loaded;
         }
-        clips_=prepared;ready_=ready;authored_=authored;loaded_=loaded;voiceSlots_=voiceSlots;mixer_=&mixer;error.clear();return true;
+        clips_=prepared;ready_=ready;authored_=authored;loaded_=loaded;voiceSlots_=voiceSlots;
+        mixer_=&mixer;epoch_=mixer.groupEpoch50IC();error.clear();return true;
     }
     // Hot, ordered, allocation-free. Return values report actual mixer action;
     // registration, an emitted command, or missing bytes are never playback.
@@ -116,6 +121,7 @@ public:
         }
         if(command.operation!=AudioOperation50HE::Start)return ApplyResult::InvalidCommand;
         if(!mixer_->play(slot,clips_[index],command.gain,command.pitch,command.loop))return ApplyResult::PlaybackRejected;
+        revisions_[index]=mixer_->playbackRevision(slot);
         ++starts_;return ApplyResult::Started;
     }
     void stopAll() noexcept {
@@ -134,6 +140,14 @@ public:
     std::uint64_t controls()const noexcept{return controls_;}
     std::uint64_t unavailable()const noexcept{return unavailable_;}
 private:
+    friend class ::live_audio50HF::Owner;
+    friend class ::native_original_ai_audio::Owner;
+    bool canStopResultsNative26D070(const rr::platform::AudioMixer50HD&,
+        const rr::platform::RaceAudioGroups50IC&)const noexcept;
+    bool resultsStopVoice26D070(std::size_t,std::size_t&)const noexcept;
+    void stopResultsNativePreflighted26D070()noexcept;
+    std::uint64_t epoch_=0;
+    std::array<std::uint64_t,cueCount> revisions_{};
     rr::platform::AudioMixer50HD* mixer_=nullptr;
     std::array<rr::platform::AudioClip50HD,cueCount> clips_{};
     std::array<bool,cueCount> ready_{},authored_{};

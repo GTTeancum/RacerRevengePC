@@ -29,6 +29,13 @@ struct TerrainPrepareInput48M {
     // must outlive the call and remain disjoint from writable output storage.
     const TerrainWaterBinding50JC* water124=nullptr;
 };
+// Pure1B1850..1B1888 point preparation only, AFTER caller's actual resets.
+// Does not admit/execute120,124,query100, scene updates or whole1B1800.
+// Finite affine/FE_TONEAREST domain; output unchanged on failure. XYZ uses
+// the same source operation order as the existing single-pair preparation;
+// caller publishes source point150.W=1 separately with the full vector store.
+bool prepareTerrainSeedPoint48M(const BodyMatrix48G&,const Vector3_48C&,
+    Vector3_48C&) noexcept;
 enum class TerrainPrepareStatus48M {
     QueryReady,QueryDisabled,NoBody,UnsupportedScope,InvalidInput
 };

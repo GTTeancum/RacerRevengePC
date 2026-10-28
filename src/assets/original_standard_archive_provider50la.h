@@ -9,16 +9,36 @@
 #include <memory>
 #include <utility>
 #include <string_view>
+#include <array>
 
 namespace original_main_entry50KG { struct Application; }
 namespace rc_cold_sources50LA { class Owner; }
 namespace tb_cold_sources50LA { class Owner; }
 namespace gb_cold_sources50LA { class Owner; }
 namespace mc_cold_sources50LA { class Owner; }
+namespace ra_cold_aggregate50LA { class Owner; }
 namespace rr::platform {class OriginalUiGarageDrawContribution50KG; class OriginalUiFrontend50KG;}
 namespace rr::assets {
 class OriginalArchiveStagedReader50LA;
 class OriginalStandardTextureResolver50LA;
+class OriginalStandardArchiveProvider50LA;
+// Actual synchronous RA producer custody. Only newly committed/reactivated
+// mounts are owned; already-active serial frontend/APPSTART banks are not.
+class NativeRaceMountLease50LA final {
+    friend class OriginalStandardArchiveProvider50LA;
+    friend class OriginalStandardTextureResolver50LA;
+    friend class ::ra_cold_aggregate50LA::Owner;
+    struct Entry {std::size_t slot=0;std::uint64_t generation=0;const void* identity=nullptr;};
+    std::shared_ptr<OriginalStandardArchiveProvider50LA> provider_;
+    std::array<Entry,64> entries_{};
+    std::size_t count_=0;
+    std::thread::id thread_{};
+    bool closed_=false;
+    NativeRaceMountLease50LA()noexcept=default;
+public:
+    NativeRaceMountLease50LA(const NativeRaceMountLease50LA&)=delete;
+    NativeRaceMountLease50LA& operator=(const NativeRaceMountLease50LA&)=delete;
+};
 // The actual bounded NATIVE Application mount set. This is not a claim that
 // retail3E1A70's complete mount chronology/priority has been reconstructed.
 // A mount always contains an entire authenticated archive directory, never a
@@ -53,7 +73,8 @@ public:
     // mutation or negative-result declaration occurs here. Complete immutable
     // decoded bytes and original directory order are retained by this owner.
     bool mountAuthenticatedRes(const std::string& archiveName,const std::string& archiveSha256,
-        std::size_t archiveBytes,const ResArchive48C& archive,Diagnostic& d) noexcept {
+        std::size_t archiveBytes,const ResArchive48C& archive,Diagnostic& d,
+        NativeRaceMountLease50LA* nativeRace=nullptr) noexcept {
         d={};
         if(!nameOkay(archiveName)||!digestOkay(archiveSha256)||!archiveBytes||
            archive.entries.empty()||archive.blocks.empty()||archive.decoded.empty())
@@ -73,7 +94,7 @@ public:
                 next->rows.push_back({row.name,next->backing->data()+row.logical_offset,
                     row.bytes,row.logical_offset});
             }
-            return commit(std::move(next),d);
+            return commit(std::move(next),d,nativeRace);
         }catch(...){return fail(d,Status::allocation);}
     }
     // Enumerates ALL authenticated members, not find()'s slash-normalizing
@@ -403,7 +424,10 @@ private:
             (m->mcSource&&m->mcThread!=std::this_thread::get_id()))return false;
         return true;
     }
-    bool commit(std::unique_ptr<Mount> next,Diagnostic& d) {
+    bool commit(std::unique_ptr<Mount> next,Diagnostic& d,NativeRaceMountLease50LA* nativeRace=nullptr) {
+        if(nativeRace&&(nativeRace->provider_.get()!=this||nativeRace->closed_||
+           nativeRace->thread_!=std::this_thread::get_id()||nativeRace->count_>=nativeRace->entries_.size()))
+            return fail(d,Status::identity);
         if(!retainedSourcesAccessible())return fail(d,Status::identity);
         for(std::size_t m=0;m<mounts_.size();++m)if(sameName(mounts_[m]->name,next->name)){
             d.mount=m;const auto& old=*mounts_[m];
@@ -414,11 +438,17 @@ private:
                    !equalBytes(old.rows[i],next->rows[i]))return fail(d,Status::identity);
             }
             if(!old.active){
+                // A RES caller cannot acquire retirement authority over a
+                // different typed backing on reactivation, even if bytes match.
+                // Reject BEFORE active/generation/revision mutation.
+                if(nativeRace&&(old.ui||old.rcSource||old.tbSource||old.gbSource||old.mcSource||old.taEncoded))
+                    return fail(d,Status::identity);
                 if(revision_==std::numeric_limits<std::uint64_t>::max()||
                    old.generation==std::numeric_limits<std::uint64_t>::max())
                     return fail(d,Status::capacity);
                 old.admittedUi=next->ui;
                 ++old.generation;old.active=true;++revision_;sealed_=false;
+                if(nativeRace)nativeRace->entries_[nativeRace->count_++]={m,old.generation,&old};
             }
             d={};return true; // Active repeat is idempotent; retired repeat is genuine reentry.
         }
@@ -430,6 +460,8 @@ private:
         // mount order never substitutes for unrecovered retail priority.
         const auto entries=next->rows.size(),bytes=next->retainedBytes;
         mounts_.push_back(std::move(next));entryCount_+=entries;retainedBytes_+=bytes;
+        if(nativeRace){const auto slot=mounts_.size()-1;
+            nativeRace->entries_[nativeRace->count_++]={slot,mounts_[slot]->generation,mounts_[slot].get()};}
         ++revision_;sealed_=false;d={};return true;
     }
     std::vector<std::unique_ptr<const Mount>> mounts_;

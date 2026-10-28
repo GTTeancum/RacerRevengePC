@@ -1,5 +1,6 @@
 #include "terrain_prepare48m.h"
 #include <cmath>
+#include <cfenv>
 
 namespace rr::game {
 namespace {
@@ -28,6 +29,13 @@ struct Math {
         return r;
     }
 };
+}
+bool prepareTerrainSeedPoint48M(const BodyMatrix48G& scene,const Vector3_48C& local,
+    Vector3_48C& output) noexcept {
+    if(std::fegetround()!=FE_TONEAREST||!affine(scene)||!finite(local))return false;
+    Math math;const auto point=math.point(scene,local);
+    if(!math.valid)return false;
+    output=point;return true;
 }
 TerrainPrepareStatus48M prepareTerrainSinglePair48M(
     const TerrainPrepareInput48M& input,TerrainPrepareState48M& output,

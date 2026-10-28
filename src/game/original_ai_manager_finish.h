@@ -22,17 +22,13 @@ struct OriginalAiRetirementList {
 enum class OriginalAiFinishStatus : std::uint8_t {
     Complete, Storage, Numeric, CallerBoundary
 };
-// Source1AF7F0 constructor,1A7750/58 ->1AF960 create, and the scalar/list
-// portion of1AFC70 reset. The caller must have completed each racer's genuine
-// cold/reset owner first. Only actual mode11258==1 enables finish sealing.
-inline OriginalAiFinishStatus initializeOriginalAiManager(
-    LapTimingManager50ID& manager,OriginalAiFinishList& finished,
-    OriginalAiRetirementList& retired,std::size_t count,std::uint32_t mode11258,
+// Pure scalar1AFB98..1AFC48 MAP calculation shared by the existing legacy
+// initializer and the actual counted B4 native adapter. No lifecycle stores.
+inline OriginalAiFinishStatus calculateOriginalAiTrackLength38(
     float node1Distance60,const float* node0Position,const float* node1Position,
     float& trackLength38) noexcept {
     using S=OriginalAiFinishStatus;
-    if(!count||count>finished.managerRows.size()||!node0Position||!node1Position)
-        return S::Storage;
+    if(!node0Position||!node1Position)return S::Storage;
     if(std::fegetround()!=FE_TONEAREST||!lap_timing_detail50ID::ordinary(node1Distance60))return S::Numeric;
     float delta[3];
     for(unsigned axis=0;axis<3;++axis){
@@ -45,6 +41,21 @@ inline OriginalAiFinishStatus initializeOriginalAiManager(
     volatile float distance=static_cast<float>(std::sqrt(static_cast<double>(square)));
     volatile float length=node1Distance60+distance; //1AFC44/48, actual MAP B8
     if(!lap_timing_detail50ID::ordinary(length)||length<=0.f)return S::Numeric;
+    trackLength38=length;return S::Complete;
+}
+// Legacy native source-number/list projection. The counted consumed-RA B4
+// producer uses the SAME scalar helper, not this resetting convenience entry.
+inline OriginalAiFinishStatus initializeOriginalAiManager(
+    LapTimingManager50ID& manager,OriginalAiFinishList& finished,
+    OriginalAiRetirementList& retired,std::size_t count,std::uint32_t mode11258,
+    float node1Distance60,const float* node0Position,const float* node1Position,
+    float& trackLength38) noexcept {
+    using S=OriginalAiFinishStatus;
+    if(!count||count>finished.managerRows.size()||!node0Position||!node1Position)
+        return S::Storage;
+    float length=0.f;
+    const auto computed=calculateOriginalAiTrackLength38(node1Distance60,node0Position,node1Position,length);
+    if(computed!=S::Complete)return computed;
     manager.time30=0.f;
     manager.flags58=static_cast<std::uint8_t>(0x40u|(mode11258==1u?0x20u:0u));
     finished={};retired={};retired.activeCount50=static_cast<std::uint32_t>(count);retired.bound=true;

@@ -56,6 +56,50 @@ Vector3_48C inverseDirection(const ReadyBodyBasis48D& b,const Vector3_48C& v,Ari
         t.columns[c].v[r]=c==r ? f.add(b.columns[r].v[c],zero):f.add(0,b.columns[r].v[c]);
     return transform(t,v,f);
 }
+void calculateForce(Arithmetic& f,const AeroMotionPrefix48E& motion,
+    const AeroParameters48E& p,const AeroInput48E& in,const AeroState48E& state,
+    float up,bool firstTimer,bool secondTimer,bool tilted,AeroForcePrefix48E& out) noexcept {
+    const auto& v=motion.velocity;const float speed=motion.speed,pitch=motion.pitch;
+    const float factor=motion.factor,signedFactor=motion.signedFactor,speed2=motion.speedSquared;
+    const float steeringScale=in.fullSteeringE0 ? 1.0f:.5f;
+    float yaw=0,steering=0,extraSteering=0,extraDrag=0,lateral=0;
+    if(state.lowSpeedDc) {
+        float scale=f.add(1.5f,f.div(f.mul(f.sub(speed,25),-1.5f),25));
+        if(scale<0)scale=0;else if(!(scale<=1.5f))scale=1.5f;
+        steering=f.mul(p.steering100,scale);lateral=p.lateral90;
+    } else if(firstTimer) {yaw=p.timerYawB8;lateral=p.lateral90;}
+    else if(secondTimer) {
+        steering=p.steering100;
+        lateral=interpolate(state.timer144,0,4,p.lateral90,p.timerLateral10c,f);
+        extraSteering=interpolate(state.timer144,0,4,0,p.timerYaw110,f);
+        extraDrag=interpolate(state.timer144,0,4,0,f.mul(p.timerDrag114,std::fabs(v.v[0])),f);
+    } else if(tilted) {
+        lateral=interpolate(up,.5f,0,p.lateral90,p.tiltedLateral118,f);
+        yaw=p.tiltedYaw120;
+    } else {steering=p.steering100;lateral=p.lateral90;}
+    auto& force=out.localForce;auto& torque=out.directTorque;
+    force.v[0]=f.add(f.mul(factor,f.mul(p.velocityDamping130.v[0],v.v[0])),f.mul(lateral,v.v[0]));
+    force.v[1]=f.add(f.mul(speed2,f.mul(p.lift6c,pitch)),f.mul(factor,f.mul(p.velocityDamping130.v[1],v.v[1])));
+    float z=f.add(extraDrag,f.mul(factor,f.mul(p.velocityDamping130.v[2],v.v[2])));
+    z=f.sub(z,f.mul(signedFactor,f.mul(p.driveDragF8,f.add(in.driveE4,in.driveE8))));
+    z=f.sub(z,f.mul(signedFactor,f.mul(p.brakeDragFc,in.brakeEc)));
+    force.v[2]=f.sub(z,f.mul(f.mul(p.drag78,speed2),v.v[2]<0 ? -1.0f:1.0f));
+    torque.v[0]=f.add(f.mul(p.pitchDamping88,in.angularVelocity.v[0]),
+        f.mul(f.mul(p.pitch84,f.add(pitch,p.offset68)),maximum(signedFactor,0)));
+    torque.v[1]=f.add(f.mul(p.yawDampingC8,in.angularVelocity.v[1]),f.mul(yaw,v.v[0]));
+    torque.v[2]=f.mul(p.rollDampingB0,in.angularVelocity.v[2]);
+    if(state.lowSpeedDc)torque.v[1]=f.add(torque.v[1],f.mul(steering,f.sub(in.driveE4,in.driveE8)));
+    else {
+        const float ramp=minimum(f.mul(p.steeringRamp104,speed2),1);
+        if(firstTimer) force.v[0]=f.add(force.v[0],f.mul(f.mul(f.mul(steeringScale,p.timerSteering108),f.sub(in.driveE4,in.driveE8)),ramp));
+        else if(secondTimer)torque.v[1]=f.add(torque.v[1],f.mul(f.mul(f.mul(steeringScale,f.add(p.steering100,extraSteering)),f.sub(in.driveE4,in.driveE8)),ramp));
+        else if(tilted) {
+            // Original maps up 0..-1 from tiltedSteering to zero, then clamps.
+            const float scale=interpolate(up,0,-1,p.tiltedSteering11c,0,f);
+            force.v[0]=f.add(force.v[0],f.mul(f.mul(f.mul(steeringScale,scale),f.sub(in.driveE4,in.driveE8)),ramp));
+        } else torque.v[1]=f.add(torque.v[1],f.mul(f.mul(f.mul(steeringScale,f.add(p.steering100,extraSteering)),f.sub(in.driveE4,in.driveE8)),ramp));
+    }
+ }
 }
 bool applyAerodynamics48E(const AeroState48E& previous,const AeroParameters48E& p,
                           const AeroInput48E& in,const ReadyBodyBasis48D& basis,
@@ -89,49 +133,47 @@ bool applyAerodynamics48E(const AeroState48E& previous,const AeroParameters48E& 
     const bool secondTimer=!(result.state.timer144<=0);
     if(secondTimer)result.state.timer144=f.sub(result.state.timer144,dt);
     result.state.lowSpeedDc=speed<50;
-    const float steeringScale=in.fullSteeringE0 ? 1.0f:.5f;
-    float yaw=0,steering=0,extraSteering=0,extraDrag=0,lateral=0;
-    if(result.state.lowSpeedDc) {
-        float scale=f.add(1.5f,f.div(f.mul(f.sub(speed,25),-1.5f),25));
-        if(scale<0)scale=0;else if(!(scale<=1.5f))scale=1.5f;
-        steering=f.mul(p.steering100,scale);lateral=p.lateral90;
-    } else if(firstTimer) {yaw=p.timerYawB8;lateral=p.lateral90;}
-    else if(secondTimer) {
-        steering=p.steering100;
-        lateral=interpolate(result.state.timer144,0,4,p.lateral90,p.timerLateral10c,f);
-        extraSteering=interpolate(result.state.timer144,0,4,0,p.timerYaw110,f);
-        extraDrag=interpolate(result.state.timer144,0,4,0,f.mul(p.timerDrag114,std::fabs(v.v[0])),f);
-    } else if(tilted) {
-        lateral=interpolate(up,.5f,0,p.lateral90,p.tiltedLateral118,f);
-        yaw=p.tiltedYaw120;
-    } else {steering=p.steering100;lateral=p.lateral90;}
-    auto& force=result.localForce;auto& torque=result.directTorque;
-    force.v[0]=f.add(f.mul(factor,f.mul(p.velocityDamping130.v[0],v.v[0])),f.mul(lateral,v.v[0]));
-    force.v[1]=f.add(f.mul(speed2,f.mul(p.lift6c,pitch)),f.mul(factor,f.mul(p.velocityDamping130.v[1],v.v[1])));
-    float z=f.add(extraDrag,f.mul(factor,f.mul(p.velocityDamping130.v[2],v.v[2])));
-    z=f.sub(z,f.mul(signedFactor,f.mul(p.driveDragF8,f.add(in.driveE4,in.driveE8))));
-    z=f.sub(z,f.mul(signedFactor,f.mul(p.brakeDragFc,in.brakeEc)));
-    force.v[2]=f.sub(z,f.mul(f.mul(p.drag78,speed2),v.v[2]<0 ? -1.0f:1.0f));
-    torque.v[0]=f.add(f.mul(p.pitchDamping88,in.angularVelocity.v[0]),
-        f.mul(f.mul(p.pitch84,f.add(pitch,p.offset68)),maximum(signedFactor,0)));
-    torque.v[1]=f.add(f.mul(p.yawDampingC8,in.angularVelocity.v[1]),f.mul(yaw,v.v[0]));
-    torque.v[2]=f.mul(p.rollDampingB0,in.angularVelocity.v[2]);
-    if(result.state.lowSpeedDc)torque.v[1]=f.add(torque.v[1],f.mul(steering,f.sub(in.driveE4,in.driveE8)));
-    else {
-        const float ramp=minimum(f.mul(p.steeringRamp104,speed2),1);
-        if(firstTimer) force.v[0]=f.add(force.v[0],f.mul(f.mul(f.mul(steeringScale,p.timerSteering108),f.sub(in.driveE4,in.driveE8)),ramp));
-        else if(secondTimer)torque.v[1]=f.add(torque.v[1],f.mul(f.mul(f.mul(steeringScale,f.add(p.steering100,extraSteering)),f.sub(in.driveE4,in.driveE8)),ramp));
-        else if(tilted) {
-            // Original maps up 0..-1 from tiltedSteering to zero, then clamps.
-            const float scale=interpolate(up,0,-1,p.tiltedSteering11c,0,f);
-            force.v[0]=f.add(force.v[0],f.mul(f.mul(f.mul(steeringScale,scale),f.sub(in.driveE4,in.driveE8)),ramp));
-        } else torque.v[1]=f.add(torque.v[1],f.mul(f.mul(f.mul(steeringScale,f.add(p.steering100,extraSteering)),f.sub(in.driveE4,in.driveE8)),ramp));
-    }
+    AeroForcePrefix48E forces{};
+    calculateForce(f,{v,speed,pitch,factor,signedFactor,speed2},p,in,result.state,
+        up,firstTimer,secondTimer,tilted,forces);
+    result.localForce=forces.localForce;result.directTorque=forces.directTorque;
+    const auto& force=result.localForce;const auto& torque=result.directTorque;
     const auto worldForce=transform(basis,force,f);
     for(unsigned i=0;i<3;++i) {
         result.accumulatedLoads.force.v[i]=f.add(loads.force.v[i],worldForce.v[i]);
         result.accumulatedLoads.torque.v[i]=f.add(loads.torque.v[i],torque.v[i]);
     }
+    if(!f.valid)return false;out=result;return true;
+}
+bool prepareAeroMotionPrefix48E(const AeroInput48E& in,const ReadyBodyBasis48D& basis,
+    AeroMotionPrefix48E& out)noexcept {
+    if(!finite(in.bodyLocalVelocity)||!std::isfinite(in.bodyAngleE0))return false;
+    Arithmetic f;auto v=in.bodyLocalVelocity;
+    if(in.subtractWorldFlow){
+        if(!finite(in.worldFlow40))return false;
+        for(const auto& column:basis.columns)if(!finite(column))return false;
+        const auto flow=inverseDirection(basis,in.worldFlow40,f);
+        for(unsigned k=0;k<3;++k)v.v[k]=f.sub(v.v[k],flow.v[k]);
+    }
+    const float speed=f.root(f.add(f.add(f.mul(v.v[0],v.v[0]),f.mul(v.v[1],v.v[1])),f.mul(v.v[2],v.v[2])));
+    const float pitch=v.v[2]<=20?in.bodyAngleE0:angle(f.div(-v.v[1],v.v[2]),f);
+    const float factor=minimum(f.mul(fp(0x3ca3d70au),speed),1);
+    const float signedFactor=v.v[2]<0?f.mul(factor,-1):factor;
+    const float speed2=f.mul(speed,speed);
+    if(!f.valid)return false;out={v,speed,pitch,factor,signedFactor,speed2};return true;
+}
+bool calculateAeroForcePrefix48E(const AeroMotionPrefix48E& motion,const AeroParameters48E& p,
+    const AeroInput48E& in,const AeroState48E& state,float up,bool firstTimer,bool secondTimer,
+    bool tilted,AeroForcePrefix48E& out)noexcept {
+    if(!finite(motion.velocity)||!finite(in.angularVelocity)||!finite(p.velocityDamping130))return false;
+    const float values[]={motion.speed,motion.pitch,motion.factor,motion.signedFactor,motion.speedSquared,
+        state.timer140,state.timer144,up,in.driveE4,in.driveE8,in.brakeEc,p.offset68,p.lift6c,p.drag78,
+        p.pitch84,p.pitchDamping88,p.lateral90,p.rollDampingB0,p.timerYawB8,p.yawDampingC8,
+        p.driveDragF8,p.brakeDragFc,p.steering100,p.steeringRamp104,p.timerSteering108,p.timerLateral10c,
+        p.timerYaw110,p.timerDrag114,p.tiltedLateral118,p.tiltedSteering11c,p.tiltedYaw120};
+    for(float value:values)if(!std::isfinite(value))return false;
+    Arithmetic f;AeroForcePrefix48E result{};
+    calculateForce(f,motion,p,in,state,up,firstTimer,secondTimer,tilted,result);
     if(!f.valid)return false;out=result;return true;
 }
 bool stepEngineAeroBody48E(const BodyState48C& body,const BodyParameters48C& bp,const BodyLoads48C& prior,

@@ -4,6 +4,7 @@
 #include <atomic>
 #include <bit>
 #include <cerrno>
+#include <chrono>
 #include <cstddef>
 #include <cstdio>
 #include <cstring>
@@ -150,6 +151,9 @@ struct AudioOutput50HD::State {
     std::uint32_t device = 0;
     int capture = -1;
     bool subsystemOwned = false, started = false, failed = false;
+    // Retain only device configuration, never the caller's borrowed WAV path.
+    AudioOutputRequest50HD deviceRequest{};
+    std::chrono::steady_clock::time_point nextDeviceAttempt{};
     std::uint16_t prebuffer = 1536;
     std::array<std::int16_t, queueFrames * 2> ring{};
     std::array<std::int16_t, blockFrames * 2> mixed{};
@@ -186,6 +190,7 @@ struct AudioOutput50HD::State {
         // SDL_CloseAudioDevice joins its callback before storage/library go away.
         if (device && closeDevice) closeDevice(device);
         device = 0; started = false;
+        discardDeviceQueue();
         if (subsystemOwned && quitSubsystem) quitSubsystem(sdlAudioInit);
         subsystemOwned = false;
         if (library) {
@@ -194,11 +199,21 @@ struct AudioOutput50HD::State {
         }
         library = nullptr;
     }
+    // Call only while the callback is joined or the device lock is held.
+    // Keep cumulative consumed/underrun observations across reopen and pause.
+    void discardDeviceQueue() noexcept {
+        info.deviceDiscardedFrames += write.load(std::memory_order_relaxed) -
+            read.load(std::memory_order_relaxed);
+        read.store(0, std::memory_order_relaxed);
+        write.store(0, std::memory_order_relaxed);
+    }
     void deviceFailure(const char* detail,
                        AudioDeviceStatus50HD status = AudioDeviceStatus50HD::Unavailable) noexcept {
         info.deviceStatus = status; copyText(info.deviceDetail, detail); releaseDevice();
+        nextDeviceAttempt = std::chrono::steady_clock::now() + std::chrono::seconds(2);
     }
     void prepareDevice(const AudioOutputRequest50HD& request) noexcept {
+        ++info.deviceOpenAttempts;
         info.deviceStatus = AudioDeviceStatus50HD::Unavailable;
         char loaderDetail[256]{};
         library = native_library50win::openSdl2(loaderDetail);
@@ -245,13 +260,27 @@ struct AudioOutput50HD::State {
             deviceFailure("SDL did not preserve requested PCM16 stereo sample format"); return;
         }
         info.deviceStatus = AudioDeviceStatus50HD::Ready;
+        if (info.deviceOpenAttempts > 1) ++info.deviceRecoveries;
         copyText(info.deviceDetail, "SDL playback device opened; output audibility is not independently verified");
     }
-    void submit(std::size_t frames, AudioOutputDiagnostic50HD& d) noexcept {
-        if (!device || info.paused) return;
-        if (started && deviceStatus(device) == 0) {
-            deviceFailure("SDL playback device stopped or disconnected; WAV capture continues"); return;
+    void serviceDevice() noexcept {
+        if (!deviceRequest.tryDevice || info.paused ||
+            info.deviceStatus == AudioDeviceStatus50HD::RejectedNonPlayback) return;
+        if (device) {
+            // SDL_AUDIO_STOPPED also identifies loss during initial prebuffer
+            // or pause/resume, not only an already-started callback.
+            if (deviceStatus(device) == 0)
+                deviceFailure("SDL playback device stopped or disconnected; mixing/capture continue while awaiting device recovery");
+            return;
         }
+        if (std::chrono::steady_clock::now() < nextDeviceAttempt) return;
+        prepareDevice(deviceRequest);
+        // prepareDevice either opens a fresh paused device, or records the
+        // failure and next retry deadline. It never resets source/WAV clocks.
+    }
+    void submit(std::size_t frames, AudioOutputDiagnostic50HD& d) noexcept {
+        serviceDevice();
+        if (!device || info.paused) return;
         const auto writer = write.load(std::memory_order_relaxed);
         const auto reader = read.load(std::memory_order_acquire);
         if (frames > queueFrames - (writer - reader)) {
@@ -283,6 +312,7 @@ bool AudioOutput50HD::open(const AudioOutputRequest50HD& request,
     state_ = new (std::nothrow) State;
     if (!state_) return fail(d, AudioOutputError50HD::Allocation, "audio.open/storage");
     auto& s = *state_;
+    s.deviceRequest = request; s.deviceRequest.wavPath = nullptr;
     s.info.sampleRate = request.sampleRate; s.prebuffer = request.prebufferFrames;
     s.clock.initialize(request.sampleRate);
     if (request.wavPath) {
@@ -358,8 +388,7 @@ void AudioOutput50HD::pauseDevice(bool paused) noexcept {
     if (!s.device) return;
     s.pauseDevice(s.device, 1);
     s.lockDevice(s.device);
-    s.read.store(0, std::memory_order_relaxed);
-    s.write.store(0, std::memory_order_relaxed);
+    s.discardDeviceQueue();
     s.unlockDevice(s.device);
     s.started = false;
     // Resume is delayed until fresh mixed data satisfies the prebuffer again.

@@ -370,7 +370,7 @@ bool OriginalUiGaragePageOwner50KG::continueSharedCameraConstructor2361C0(Diagno
         if(display.sourceWidth4_!=static_cast<std::int32_t>(f.fullWidth204)||
            display.sourceHeight8_!=static_cast<std::int32_t>(f.fullHeight208))
             return fail(d,Status::sharedLoaderPending,0x26F978); //Real resize not represented.
-        display.sourceSelectedCamera0_=sharedCamera_; //26F98C/998 actual retained Camera selection.
+        display.selectFrontendCamera26F940(sharedCamera_); //26F98C/998 actual retained Camera selection.
         camera.phase_=Camera::Phase::selectedBeforeBounds236214;
     }
     if(camera.phase_!=Camera::Phase::selectedBeforeBounds236214||
@@ -1522,7 +1522,7 @@ bool OriginalUiGaragePageOwner50KG::continueEntryCamera1156E0(Diagnostic& d)noex
         entryCameraStep_=2;
     }
     if(entryCameraStep_==2){
-        pendingPC_=0x26F948;display.sourceSelectedCamera0_=sharedCamera_;
+        pendingPC_=0x26F948;display.selectFrontendCamera26F940(sharedCamera_);
         entryCameraStep_=3;
     }
     if(entryCameraStep_==3){

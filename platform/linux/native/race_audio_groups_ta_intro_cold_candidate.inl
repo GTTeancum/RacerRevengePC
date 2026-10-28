@@ -11,7 +11,7 @@ inline bool RaceAudioGroups50IC::coldTaIntroGroupIdentity()const noexcept {
     const auto& p=coldGroups_[static_cast<std::size_t>(game::RaceAudioGroup50IC::Announcer120)];
     const auto& e=p.entity;
     if(!p.constructed||!p.loaded||!p.enabled30||!p.allocated58||!p.logicalMembers4C||
-       p.capacity54!=8||p.growth50!=16||p.count48>3||e.reference00!=1||
+       p.capacity54!=8||p.growth50!=16||p.count48>p.taIntroSounds.size()||e.reference00!=1||
        e.firstChild18||e.descendants24||e.sessionGeneration!=coldSession_||
        e.objectKey!=static_cast<std::uint64_t>(reinterpret_cast<std::uintptr_t>(&e))||
        p.slot40<0||static_cast<std::size_t>(p.slot40)>=coldApplication_->soundGroups434A10_.size()||
@@ -21,7 +21,7 @@ inline bool RaceAudioGroups50IC::coldTaIntroGroupIdentity()const noexcept {
 }
 inline bool RaceAudioGroups50IC::coldTaIntroSoundIdentity(std::size_t n)const noexcept {
     const auto& p=coldGroups_[static_cast<std::size_t>(game::RaceAudioGroup50IC::Announcer120)];
-    if(n>=3||n>=p.count48||!p.taIntroStarted||!p.taIntroAuthoring||!p.taIntroManager||
+    if(n>=p.taIntroSounds.size()||n>=p.count48||!p.taIntroStarted||!p.taIntroAuthoring||!p.taIntroManager||
        !p.taIntroSounds[n]||p.logicalMembers4C[n]!=p.taIntroSounds[n].get())return false;
     const auto& s=*p.taIntroSounds[n];const auto* event=p.taIntroAuthoring->event(static_cast<unsigned>(n+1));
     const auto observation=p.taIntroManager->inspect();
@@ -52,7 +52,7 @@ inline bool RaceAudioGroups50IC::prepareColdTaIntroConstruction(
     const std::shared_ptr<const assets::OriginalTaIntroAuthoringCandidate>& authoring,
     std::shared_ptr<const OriginalApplicationAural50KG>& manager)const noexcept {
     if(!current()||!groups_.initialized||!coldTaIntroGroupIdentity()||
-       coldNext_!=game::raceAudioGroupCount50IC||!authoring||
+       coldNext_!=game::raceAudioGroupCount50IC||!authoring||!authoring->eventCount()||authoring->eventCount()>3||(authoring->trackId()!="TA"&&authoring->trackId()!="RA"&&authoring->trackId()!="GC"&&authoring->trackId()!="SA"&&authoring->trackId()!="MA"&&authoring->trackId()!="GA")||
        !authoring->providerOwner()||!authoring->metadataOwner()||
        !authoring->providerOwner()->sealed()||
        authoring->providerOwner()->revision()!=authoring->capturedProviderRevision())return false;
@@ -71,7 +71,7 @@ inline bool RaceAudioGroups50IC::prepareColdTaIntroConstruction(
     if(!retained)return false;
     const auto observation=retained->inspect();
     if(!observation.interfaceA0||observation.entity!=coldApplication_->aural00_)return false;
-    for(unsigned id=1;id<=3;++id){
+    for(unsigned id=1;id<=authoring->eventCount();++id){
         const auto* event=authoring->event(id);
         if(!event||event->eventId!=id||event->factoryFlags!=2||!event->isStream||
            event->isStereo||event->isLoop||!event->metadata||event->filename.empty()||
@@ -140,16 +140,16 @@ inline bool RaceAudioGroups50IC::constructColdTaIntroSounds232ED0(
     std::shared_ptr<const OriginalApplicationAural50KG> manager;
     if(!prepareColdTaIntroConstruction(authoring,manager))return false;
     std::array<std::unique_ptr<ColdSound>,3> reserved;
-    try{for(auto& sound:reserved)sound=std::make_unique<ColdSound>();}catch(...){return false;}
+    try{for(std::size_t n=0;n<authoring->eventCount();++n)reserved[n]=std::make_unique<ColdSound>();}catch(...){return false;}
     auto& p=coldGroups_[static_cast<std::size_t>(game::RaceAudioGroup50IC::Announcer120)];
     p.taIntroAuthoring=std::move(authoring);p.taIntroManager=std::move(manager);p.taIntroStarted=true;
-    for(auto& sound:reserved)appendPreparedColdTaIntroSound232ED0(std::move(sound));
+    for(std::size_t n=0;n<p.taIntroAuthoring->eventCount();++n)appendPreparedColdTaIntroSound232ED0(std::move(reserved[n]));
     p.taIntroConstructed=true;return true;
 }
 inline bool RaceAudioGroups50IC::clearColdTaIntroSounds2353D0()noexcept {
     if(coldTaIntroEmitter_||!coldTaIntroGroupIdentity())return false;
     auto& p=coldGroups_[static_cast<std::size_t>(game::RaceAudioGroup50IC::Announcer120)];
-    if(!p.taIntroStarted||!p.taIntroAuthoring||!p.taIntroManager||p.count48>3)return false;
+    if(!p.taIntroStarted||!p.taIntroAuthoring||!p.taIntroManager||p.count48>p.taIntroSounds.size())return false;
     for(std::size_t n=0;n<p.count48;++n)if(!coldTaIntroSoundIdentity(n))return false;
     std::unique_ptr<ColdSound*[]> snapshot;
     try{if(p.count48)snapshot=std::make_unique<ColdSound*[]>(p.count48);}catch(...){return false;}

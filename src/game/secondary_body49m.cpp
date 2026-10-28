@@ -75,6 +75,18 @@ void makeSecondarySphereBody49M(const SecondaryBodyState49M&s,const SecondaryBod
     b.worldForce=vec(s.root.loads.force,s.force180W);b.localTorque=vec(s.root.loads.torque,s.torque190W);
     b.localCenter=vec(p.centerOffset,p.centerOffsetW);out=b;
 }
+bool prepareSecondaryDampingPrefix49M(float speed,float low,float high,
+    const Vector3_48C& angular,Vector3_48C& output) noexcept {
+    if(!nearest()||!std::isfinite(speed)||!std::isfinite(low)||!std::isfinite(high))return false;
+    for(float lane:angular.v)if(!std::isfinite(lane))return false;
+    Math f;const float range=f.sub(high,low),position=f.sub(speed,fp(0x422fffcc));
+    const float product=f.mul(position,range),scaled=f.div(product,fp(0x41eaaa64));
+    float damping=f.add(low,scaled);
+    if(high<=low){if(damping<high)damping=high;else if(!(damping<=low))damping=low;}
+    else{if(!(damping<=high))damping=high;else if(damping<low)damping=low;}
+    const V torque=f.scale(f.neg(damping),vec(angular));
+    if(!f.valid)return false;std::memcpy(output.v,torque.v,sizeof(output.v));return true;
+}
 bool produceSecondaryForces49M(const SecondaryBodyState49M&in,const SecondaryBodyParameters49M&p,
     const SecondaryForceContext49M&c,float dt,GradientNoiseState49M&noise,std::uint32_t&random,
     SecondaryBodyState49M&out) noexcept {

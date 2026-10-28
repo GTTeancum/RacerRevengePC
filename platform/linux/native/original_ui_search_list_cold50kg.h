@@ -3,6 +3,7 @@
 #include "../../../src/game/original_application_entities50la.h"
 #include "../../../src/game/search_cold50bu.h"
 #include <memory>
+#include <array>
 #include <new>
 #include <exception>
 namespace original_main_entry50KG { struct Application; }
@@ -39,6 +40,16 @@ class OriginalUiSearchListCold50KG final {
     const std::uint32_t* managerBlockPointers_[1]{};
     const std::uint32_t* const* managerTable3C_=nullptr;
     const game::OriginalWreckComponent50LA* managerCamera_=nullptr;
+    //Same existing List storage30/34/38/3C, private typed RA Light identity.
+    //Exact authored Light cohort typed per-slot borrows; no second registry, selected array or collider.
+    std::array<const game::OriginalWreckComponent50LA*,1024> lightMembers_{};
+    std::array<std::uint32_t,1024> lightTokens_{};
+    bool lightMembersEmpty()const noexcept { for(auto* p:lightMembers_)if(p)return false;return true; }
+    bool lightMemberAt(const game::OriginalWreckComponent50LA* p,std::uint32_t slot)const noexcept {
+        return slot&&slot<=storage_.lastUsed&&lightMembers_[slot-1]==p;
+    }
+    const std::uint32_t* lightBlockPointers_[1]{};
+    const std::uint32_t* const* lightTable3C_=nullptr;
     // Token4 is a private native identity for the one typed Camera binding,
     // never a truncated guest/host pointer. It is not exposed as a guest address.
     static constexpr std::uint32_t cameraToken_=4;
@@ -216,6 +227,55 @@ class OriginalUiSearchListCold50KG final {
             (derivedConstructed_?(storage_.perBlock==0x400&&storage_.lastUsed==0x400):
                                  (!storage_.perBlock&&!storage_.lastUsed));
     }
+    bool lightHistoryCurrent(const OriginalUiLightManagerOwner50KG* owner,
+        const original_main_entry50KG::Application* creator,
+        const std::shared_ptr<game::OriginalApplicationEntities50LA>& app)const noexcept {
+        if(!storage_.blockCount)return lightEmptyCurrent(owner,creator,app)&&lightMembersEmpty()&&
+            !lightTable3C_&&!lightBlockPointers_[0];
+        if(!owner||owner!=lightManagerOwner_||managerOwner_||!same(creator,app)||!attempted_||released_||
+           !complete_||!derivedConstructed_||!selected1C_||selectedCount18_||selectedGrowth20_!=30u||
+           selectedCapacity24_!=30u||!selectedOwned28Bit0_||lightAliases_>2u||lightReleasedAliases_>lightAliases_||
+           reference00_!=1u+lightAliases_-lightReleasedAliases_||usage10_!=lightAliases_||
+           storage_.perBlock!=1024u||storage_.blockCount!=1u||!storage_.lastUsed||storage_.lastUsed>1024u||
+           lightTable3C_!=lightBlockPointers_||lightBlockPointers_[0]!=storage_.words)return false;
+        std::array<bool,1024> freed{};auto next=storage_.freeHead;
+        while(next){if(next>storage_.lastUsed||freed[next-1]||lightMembers_[next-1]||
+            (storage_.words[next-1]&3u)!=2u)return false;
+            freed[next-1]=true;next=storage_.words[next-1]>>2;}
+        for(std::size_t i=0;i<1024u;++i){
+            if(i>=storage_.lastUsed){if(lightMembers_[i]||lightTokens_[i])return false;continue;}
+            if(lightMembers_[i]){if(freed[i]||!lightTokens_[i]||(lightTokens_[i]&3u)||storage_.words[i]!=lightTokens_[i])return false;}
+            else if(!freed[i])return false;
+        }
+        return true;
+    }
+    bool insertRaFirstLight(const OriginalUiLightManagerOwner50KG* owner,
+        const original_main_entry50KG::Application* creator,
+        const std::shared_ptr<game::OriginalApplicationEntities50LA>& app,
+        const game::OriginalWreckComponent50LA& light,std::uint32_t token,std::uint32_t& slot,D& d)noexcept {
+        d={};if(!lightHistoryCurrent(owner,creator,app)||lightAliases_!=2u||
+           lightReleasedAliases_||reference00_!=3u||token<12u||token>740u||(token&3u))return fail(d,S::phase,0x27e3b0);
+        auto next=storage_;std::uint32_t selected=0;
+        const auto result=next.blockCount?game::selectSearchSlot50BS(next,0,selected):
+            game::adoptFirstSearchBlock50BU(next,selected);
+        if(result!=game::SearchStorageStatus50BS::Complete||!selected||selected>1024u||
+           game::insertSearchSlot50BS(next,selected,token)!=game::SearchStorageStatus50BS::Complete)
+            return fail(d,S::phase,0x27e570);
+        // Token4*(source ordinal+1) names the same actual Light+30 facet;
+        // native typed per-slot borrows preserve duplicates, not a second List.
+        storage_=next;lightBlockPointers_[0]=storage_.words;lightTable3C_=lightBlockPointers_;
+        lightMembers_[selected-1]=&light;lightTokens_[selected-1]=token;
+        slot=selected;d={S::complete,0x27e5a8,true};return true;
+    }
+    bool removeRaFirstLight(const OriginalUiLightManagerOwner50KG* owner,
+        const original_main_entry50KG::Application* creator,
+        const std::shared_ptr<game::OriginalApplicationEntities50LA>& app,
+        const game::OriginalWreckComponent50LA& light,std::uint32_t slot,D& d)noexcept {
+        d={};if(!lightHistoryCurrent(owner,creator,app)||!lightMemberAt(&light,slot))return fail(d,S::identity,0x27e5b0);
+        if(game::removeSearchSlot50BS(storage_,slot,lightTokens_[slot-1])!=game::SearchStorageStatus50BS::Complete)
+            return fail(d,S::phase,0x27e5b0);
+        lightMembers_[slot-1]=nullptr;d={S::complete,0x27e5b0,true};return true;
+    }
     bool assignLightAlias(const OriginalUiLightManagerOwner50KG* owner,
         const original_main_entry50KG::Application* creator,
         const std::shared_ptr<game::OriginalApplicationEntities50LA>& application,
@@ -229,16 +289,16 @@ class OriginalUiSearchListCold50KG final {
         const original_main_entry50KG::Application* creator,
         const std::shared_ptr<game::OriginalApplicationEntities50LA>& application,
         std::uint8_t ordinal,const OriginalUiSearchListCold50KG* field,D& d)noexcept {
-        d={};if(!lightEmptyCurrent(owner,creator,application)||field!=this||ordinal!=lightReleasedAliases_+1||
+        d={};if(!lightHistoryCurrent(owner,creator,application)||!lightMembersEmpty()||field!=this||ordinal!=lightReleasedAliases_+1||
             ordinal>lightAliases_||reference00_<2)return fail(d,S::phase,0x27F200);
         --reference00_;++lightReleasedAliases_;d={S::complete,ordinal==1?0x27F200u:0x27F21Cu,true};return true;
     }
     bool releaseLightPayload(const OriginalUiLightManagerOwner50KG* owner,
         const original_main_entry50KG::Application* creator,
         const std::shared_ptr<game::OriginalApplicationEntities50LA>& application,D& d)noexcept {
-        d={};if(!lightEmptyCurrent(owner,creator,application)||reference00_!=1||
+        d={};if(!lightHistoryCurrent(owner,creator,application)||!lightMembersEmpty()||reference00_!=1||
             lightAliases_!=lightReleasedAliases_)return fail(d,S::phase,0x1481A8);
-        --reference00_;selected1C_.reset();released_=true;complete_=false;d={S::complete,0x1481A8,true};return true;
+        --reference00_;lightTable3C_=nullptr;lightBlockPointers_[0]=nullptr;selected1C_.reset();released_=true;complete_=false;d={S::complete,0x1481A8,true};return true;
     }
 public:
     struct Snapshot {

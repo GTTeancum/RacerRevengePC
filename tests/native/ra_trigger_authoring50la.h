@@ -6,6 +6,7 @@
 #include <stdexcept>
 #include <utility>
 
+namespace ra_cold_aggregate50LA {class Owner;}
 namespace ra_trigger_authoring50LA {
 namespace a=rr::assets;namespace g=rr::game;
 inline constexpr std::size_t count=2,tobBytes=95558;
@@ -21,6 +22,7 @@ struct Source {
 // Authenticated authoring only. No Entry event, collider identity, PLAYER
 // resolution, action destination, zone membership or query policy is invented.
 class Owner final {
+    friend class ::ra_cold_aggregate50LA::Owner;
     std::shared_ptr<const ra_cold_sources50LA::Owner> source_;
     std::vector<std::uint8_t> tob_;
     a::ParameterDocument48F parameters_;

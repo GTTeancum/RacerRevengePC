@@ -1,10 +1,13 @@
 #pragma once
 #include "../assets/import_world48f.h"
+#include "../assets/track_height_descriptor50jb.h"
+#include <optional>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <string>
 
+namespace rr::game::original_gc_gameplay_lighting_candidate {class Owner;}
 namespace rr::game::original_world_environment50KG {
 enum class Status : std::uint8_t {
     complete, unprepared, alreadyPrepared, sourceShape, missingEnvironment,
@@ -66,6 +69,13 @@ public:
     bool selectCameraZone48(std::uint32_t actualCameraZone48,
         SkySelection&,Diagnostic&) const noexcept;
 private:
+    friend class ::rr::game::original_gc_gameplay_lighting_candidate::Owner;
+    // Same EnvironmentInfo owner: bounded native metadata adoption at actual
+    // water call, never a receipt that earlier276C00 was replayed.
+    const assets::TrackHeightString50JB* nativeWaterFile110()noexcept;
+    const assets::TrackHeightString50JB* nativeEcosystemFile318()noexcept;
+    std::optional<assets::TrackHeightString50JB> nativeEcosystemFile_;
+    std::optional<assets::TrackHeightDescriptor50JB> nativeHeightFields_;
     struct Storage;
     std::unique_ptr<Storage> storage_;
 };

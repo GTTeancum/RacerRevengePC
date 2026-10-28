@@ -20,6 +20,10 @@ class OriginalAudioSampleCache50KG final {
  struct Backing;
  friend class OriginalAudioPendingWaves50KG;
  friend class OriginalUiMainAudio50KG;
+ // Narrow private actual-Aural268300 native replacement: invalidate the same
+ // cache generation, then release backing only after every PCM borrow is gone.
+ // This does not turn this cache into a guest988C/DF0 or numeric sample table.
+ friend class OriginalApplicationAural50KG;
 public:
  struct Observation {
   const assets::OriginalAudioDirectory50KX* directory=nullptr;

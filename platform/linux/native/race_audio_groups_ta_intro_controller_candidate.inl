@@ -21,7 +21,8 @@ inline bool RaceAudioGroups50IC::taIntroExistingBindingsCurrent()const noexcept 
 inline RaceAudioGroups50IC::TaIntroConstructionResult
 RaceAudioGroups50IC::constructTaIntroEvents177750(
     std::shared_ptr<const assets::OriginalTaIntroAuthoringCandidate> authoring)noexcept {
-    if(!authoring)return TaIntroConstructionResult::rejected;
+    if(!authoring||!authoring->eventCount()||authoring->eventCount()>3||(authoring->trackId()!="TA"&&authoring->trackId()!="RA"&&authoring->trackId()!="GC"&&authoring->trackId()!="SA"&&authoring->trackId()!="MA"&&authoring->trackId()!="GA"))return TaIntroConstructionResult::rejected;
+    const auto events=authoring->eventCount();
     if(!coldTaIntroEmitter_){
         if(!constructDetachedColdTaIntroEmitter177750(std::move(authoring)))
             return TaIntroConstructionResult::rejected;
@@ -32,8 +33,8 @@ RaceAudioGroups50IC::constructTaIntroEvents177750(
             return TaIntroConstructionResult::rejected;
     }
     // A retained allocation prefix may continue. A completed call is not replayed.
-    if(coldTaIntroEmitter_->count200==3)return TaIntroConstructionResult::rejected;
-    while(coldTaIntroEmitter_->count200<3){
+    if(coldTaIntroEmitter_->count200==events)return TaIntroConstructionResult::rejected;
+    while(coldTaIntroEmitter_->count200<events){
         const auto result=appendNextColdTaIntroEvent292650();
         if(result==ColdTaEmitterAppendResult::allocationPending)
             return TaIntroConstructionResult::allocationPending;
@@ -44,7 +45,7 @@ RaceAudioGroups50IC::constructTaIntroEvents177750(
 }
 inline bool RaceAudioGroups50IC::attachTaIntro141960(
     game::OriginalWreckComponent50LA& controller)noexcept {
-    if(!coldTaIntroEmitterIdentity()||coldTaIntroEmitter_->count200!=3||
+    if(!coldTaIntroEmitterIdentity()||coldTaIntroEmitter_->count200!=coldTaIntroEmitter_->group30->taIntroAuthoring->eventCount()||
        coldTaIntroEmitter_->pendingEvent||coldTaIntroEmitter_->everAttached||
        controller.kind!=game::OriginalWreckComponentKind50LA::cameraController174A30||
        controller.sessionGeneration!=coldSession_||controller.reference00!=1||

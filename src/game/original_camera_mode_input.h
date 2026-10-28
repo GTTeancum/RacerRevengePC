@@ -60,11 +60,12 @@ inline bool followBound(const OriginalFollowCamera& follow,
 }
 //176DF0..177450 before actual177AB0/cycle calls. On query failure the already
 //written flags62 prefix remains, matching source order; no rollback is claimed.
-// Temporary look actions6A8/6B0 have priority. They are an explicit unsupported
-// cut here, never quietly ignored and never converted into cycle presses.
+// Temporary look actions6A8/6B0 have priority. The supplied owner executes
+//them in source order; an inspect-only caller retains the explicit cut.
+template<class TemporaryLook>
 inline OriginalCameraModeInputResult inspectOriginalCameraCyclePress176DF0(
     OriginalRaceCameraOwner& controller,const OriginalFollowCamera& follow,
-    const OriginalCameraModeInputEnvironment& env) noexcept {
+    const OriginalCameraModeInputEnvironment& env,TemporaryLook&& temporaryLook) noexcept {
     using S=OriginalCameraModeInputStatus;using O=OriginalCameraCycleOperation;
     OriginalCameraModeInputResult result;
     if(!controller.bound)return result;
@@ -105,12 +106,14 @@ inline OriginalCameraModeInputResult inspectOriginalCameraCyclePress176DF0(
     result.sourcePC=0x177008u;
     if(!held(actions.action6A8,result.inputSlot,hit))return result;
     if(hit&&!(controller.flags62&0x60u)){
-        result.status=S::requiresTemporaryLookPress;result.sourcePC=0x17703cu;return result;
+        result.status=S::requiresTemporaryLookPress;result.sourcePC=0x17703cu;
+        if(!temporaryLook(3,0x40u,result))return result;
     }
     result.sourcePC=0x177164u;
     if(!held(actions.action6B0,result.inputSlot,hit))return result;
     if(hit&&!(controller.flags62&0x60u)){
-        result.status=S::requiresTemporaryLookPress;result.sourcePC=0x177198u;return result;
+        result.status=S::requiresTemporaryLookPress;result.sourcePC=0x177198u;
+        if(!temporaryLook(1,0x20u,result))return result;
     }
     result.sourcePC=0x1772c0u;
     if(!held(actions.action6A4,result.inputSlot,hit))return result;
@@ -135,6 +138,14 @@ inline OriginalCameraModeInputResult inspectOriginalCameraCyclePress176DF0(
         }
     }
     result.status=S::readyForNumericChange;return result;
+}
+//Read-only numeric inspection retains an explicit boundary for callers that
+//have not supplied the genuine temporary-look owners.
+inline OriginalCameraModeInputResult inspectOriginalCameraCyclePress176DF0(
+    OriginalRaceCameraOwner& controller,const OriginalFollowCamera& follow,
+    const OriginalCameraModeInputEnvironment& env) noexcept {
+    return inspectOriginalCameraCyclePress176DF0(controller,follow,env,
+        [](std::int32_t,std::uint8_t,OriginalCameraModeInputResult&) noexcept {return false;});
 }
 //17BDA0->2843E0->285580: cycle by ordered record INDEX, not incrementing ID.
 //There is no offset save/restore. Exactly one record is selected even if its
@@ -186,7 +197,34 @@ inline OriginalCameraModeInputResult advanceOriginalCameraCyclePress176DF0(
     OriginalCameraModeInputOwners owners,const OriginalCameraModeInputEnvironment& env,
     const OriginalFollowSceneTransitionInput& sceneInput) noexcept {
     using S=OriginalCameraModeInputStatus;using O=OriginalCameraCycleOperation;
-    auto result=inspectOriginalCameraCyclePress176DF0(owners.controller,owners.follow,env);
+    auto temporaryLook=[&](std::int32_t preset,std::uint8_t bit,
+        OriginalCameraModeInputResult& result) noexcept {
+        auto& c=owners.controller;auto& f=owners.follow;
+        const auto oldMode=c.mode44;
+        if(oldMode==0||oldMode==5){
+            if(!original_camera_mode_input_detail::followBound(f,c)){
+                result.status=S::owner;return false;
+            }
+            if(oldMode==5){
+                result.transition=transitionOriginalFollow177AB0(c,f,owners.scene,
+                    owners.followChildren,owners.visibility,owners.spatial,owners.zones,
+                    owners.workspace,0,nullptr,sceneInput);
+                if(result.transition.status!=OriginalFollowControllerStatus::complete){
+                    result.status=S::transitionUnavailable;result.sourcePC=result.transition.sourcePC;return false;
+                }
+            }
+            //2842F0 returns the OLD record INDEX, not its authored ID.
+            const auto oldIndex=static_cast<std::uint16_t>(f.current100&31u);
+            if(selectOriginalFollowPreset(f,preset,true,false).status!=OriginalFollowStatus::ok){
+                result.status=S::owner;result.sourcePC=0x17bd00u;return false;
+            }
+            c.temporaryLook60=static_cast<std::uint16_t>((c.temporaryLook60&~0xffcu)|
+                (oldIndex<<2)|(static_cast<std::uint16_t>(oldMode&31)<<7));
+        }
+        c.flags62=static_cast<std::uint8_t>(c.flags62|bit);
+        return true;
+    };
+    auto result=inspectOriginalCameraCyclePress176DF0(owners.controller,owners.follow,env,temporaryLook);
     if(result.status!=S::readyForNumericChange)return result;
     if(result.operation==O::cycleFollowRecord){
         result.status=cycleOriginalFollowPreset17BDA0(owners.follow,owners.controller);
@@ -212,6 +250,43 @@ inline OriginalCameraModeInputResult advanceOriginalCameraCyclePress176DF0(
         result.status=S::owner;result.sourcePC=0x1773a0u;return result;
     }
     result.status=S::needsCycleAudio1A4B90;result.sourcePC=0x177454u;return result;
+}
+//1774A0 release queries CURRENT held actions, not the event descriptor.
+//An unrelated release must not restore a look still held. Simultaneous looks
+//keep6A8 priority on press and restore only the corresponding active flag.
+inline OriginalCameraModeInputResult advanceOriginalCameraLookRelease1774A0(
+    OriginalCameraModeInputOwners o,const OriginalCameraModeInputEnvironment& env,
+    const OriginalFollowSceneTransitionInput& in) noexcept {
+    using S=OriginalCameraModeInputStatus;OriginalCameraModeInputResult r;
+    if(!o.controller.bound)return r;
+    const auto slot=env.racerClass58==0?original_camera_mode_input_detail::signedView(env.cameraViewA8):0;
+    if(slot<0||slot>=8){r.status=S::inputSlot;r.sourcePC=0x1774d4u;return r;}
+    r.inputSlot=static_cast<std::uint32_t>(slot);
+    r.status=S::needsChildRoute142350;r.sourcePC=0x1776ecu; //Release child is1422A0.
+    if((env.raceFlags29&4u)||(env.raceStateFlags58&1u))return r;
+    if(!env.raceViewState44||r.inputSlot>=env.raceViewStateCount){
+        r.status=S::inputSlot;r.sourcePC=0x17751cu;return r;
+    }
+    if(env.raceViewState44[r.inputSlot]||!(env.raceStateFlags58&6u)||
+       o.controller.mode44==2||o.controller.mode44==4||o.controller.mode44==7)return r;
+    if(r.inputSlot>=controlPresetSlots49D){r.status=S::inputSlot;r.sourcePC=0x1775a0u;return r;}
+    const auto& a=env.preferences.slots[r.inputSlot].actions;
+    const std::int32_t codes[]={a.action6A8,a.action6B0};
+    const std::uint8_t bits[]={0x40u,0x20u};
+    for(unsigned i=0;i<2;++i){
+        const auto q=queryManagerHeld49A(env.held,codes[i],2,0x3fu,r.inputSlot);
+        r.queryStatus=q.status;
+        if(q.status!=ManagerHeldStatus49A::Complete){r.status=S::queryUnavailable;r.sourcePC=i?0x17765cu:0x1775acu;return r;}
+        ++r.queriesCompleted;
+        if(!q.matched&&(o.controller.flags62&bits[i])){
+            r.transition=restoreOriginalTemporaryLook1775D0(o.controller,o.follow,o.attached,o.scene,
+                o.attachedChildren,o.visibility,o.spatial,o.zones,o.workspace,in,bits[i]);
+            if(r.transition.status!=OriginalFollowControllerStatus::complete){
+                r.status=S::transitionUnavailable;r.sourcePC=r.transition.sourcePC;return r;
+            }
+        }
+    }
+    return r;
 }
 //Closed178670 leaf. Invoke in source order AFTER actual1A4B90(race10C,4)
 //returns, then continue actual142350. This function does not certify or supply

@@ -44,6 +44,10 @@ bool refreshSecondaryFrameCache49M(const SecondaryBodyState49M&,
 // Copies canonical fields into the original49L full-lane view. No arithmetic.
 void makeSecondarySphereBody49M(const SecondaryBodyState49M&,
     const SecondaryBodyParameters49M&, PodSphereBody49L&) noexcept;
+//Pure218B28 speed-conditioned angular damping scratch only. No body,
+//source-global, phase or constraint completion is supplied by this leaf.
+bool prepareSecondaryDampingPrefix49M(float cachedSpeed,float actualLow,
+    float actualHigh,const Vector3_48C& angularVelocity,Vector3_48C& torque) noexcept;
 // 218A3C..2190A0: gravity, speed-conditioned angular damping, restoration;
 // state0 damping/alignment, or original gradient-noise route. Ready scenes only.
 // Noise/RNG are untouched in state0 and are atomically committed otherwise.

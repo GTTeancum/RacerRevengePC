@@ -1,6 +1,7 @@
 #pragma once
+namespace original_local_flare50LA {class Emission;}
 #include "original_memory_card_screen_fallback50kg.h"
-namespace original_main_entry50KG {class NativeCollectorFifo50LA;}
+namespace original_main_entry50KG {class NativeCollectorFifo50LA;class NativeF8BarPrefix50LA;}
 namespace original_cable_selection50LA { class Binding; }
 namespace original_position_stats_prestage50LA { class Owner; }
 #include "original_standard_model_resource50la.h"
@@ -9,7 +10,9 @@ namespace original_position_stats_prestage50LA { class Owner; }
 #include <vector>
 
 namespace ra_static_world50LA {class Owner;}
-namespace rr::game {class OriginalPositionStatsResources50LA;class OriginalPauseMaterialAdmission50LA;}
+namespace ra_pod_scene50LA {class Owner;}
+namespace ra_cold_aggregate50LA {class Owner;}
+namespace rr::game {class OriginalRaceF850LA; class OriginalResults10450LA; class OriginalPositionStatsResources50LA;class OriginalPauseMaterialAdmission50LA;}
 namespace rr::platform { class OriginalUiSharedDialogMaterialHistory50KG; class OriginalUiTournamentPodReferences50KG; class OriginalUiSharedDialogs50KG; }
 namespace rr::platform {class OriginalUiMemoryCardConstructor50KG;class OriginalUiGarageModelResource50KG;class OriginalUiGarageScreenText50KG;class OriginalUiGarageQuad50KG;class OriginalUiGaragePageOwner50KG;}
 namespace rr::platform { class OriginalUiGarageCanonicalSubmission50KG; class OriginalUiGarageDrawContribution50KG; }
@@ -23,6 +26,7 @@ class OriginalUiScreenMaterialReference50KG;
 class OriginalStandardMaterialReferences50LA;
 class OriginalStandardScreenMaterialReference50LA;
 class OriginalPausePrimitiveReferences50LA;
+class OriginalResultsPrimitiveReferences50LA;
 class OriginalStandardMaterialTable50LA;
 class OriginalStandardMaterialDomain50LA;
 class OriginalStandardMaterialAnimationInstance50LA;
@@ -73,6 +77,7 @@ struct OriginalStandardMaterialMapBindingView50LA {
 // acquires the actual display pin before native attribute inspection. This
 // object cannot escape in the callback result.
 class OriginalCableEmissionBinding50LA final {
+    friend class ::original_local_flare50LA::Emission;
     friend class ::original_main_entry50KG::NativeCollectorFifo50LA;
     friend class OriginalStandardMaterialTable50LA;
     friend class ::original_cable_selection50LA::Binding;
@@ -120,7 +125,8 @@ struct OriginalStandardMaterialRowView50LA {
 // Borrowed staging observations only. Constructing/copying these values gives
 // no mutation authority. Only the actual common history owner may hold the
 // table's private lease and publish an accepted UI transaction. Fixed order is
-// 3228/dim, 3229/overlay1, 3230/venus16; all are their own actual pass0.
+// 3228/dim, 3229/overlay1, 3230/venus16, 3231/venus14, 3232/icon_x,
+// 3233/icon_tri; all are their own actual pass0.
 enum class OriginalStandardMaterialUiSharedHistoryWrite50LA : std::uint8_t {untextured,bound};
 struct OriginalStandardMaterialUiSharedHistorySlot50LA {
     std::int32_t row=-1;
@@ -243,7 +249,7 @@ private:
         OriginalStandardMaterialDiagnostic50LA&) noexcept;
     friend class rr::platform::OriginalUiSharedDialogMaterialHistory50KG;
     using UiSharedHistoryOwner=rr::platform::OriginalUiSharedDialogMaterialHistory50KG;
-    using UiSharedHistorySlots=std::array<OriginalStandardMaterialUiSharedHistorySlot50LA,3>;
+    using UiSharedHistorySlots=std::array<OriginalStandardMaterialUiSharedHistorySlot50LA,6>;
     // Not a collector seal or FIFO receipt. There is no public constructor,
     // copy, move, setter, ready flag, registration or producer outside the
     // actual common owner and this table. Storage pins the receipt address as
@@ -260,8 +266,8 @@ private:
         const OriginalStandardMaterialContext50LA* context_=nullptr;
         std::uint64_t leaseRevision_=0,bindingRevision_=0;
         UiSharedHistorySlots snapshots_{};
-        std::array<OriginalStandardMaterialPassView50LA,3> passViews_{};
-        std::array<std::int32_t,3> retainedReferences_{};
+        std::array<OriginalStandardMaterialPassView50LA,6> passViews_{};
+        std::array<std::int32_t,6> retainedReferences_{};
     };
     bool beginUiSharedHistory(const UiSharedHistoryOwner*,const OriginalStandardMaterialContext50LA*,
         UiSharedHistoryReceipt&,UiSharedHistorySlots&)noexcept;
@@ -296,6 +302,7 @@ private:
         const std::vector<OriginalStandardMaterialNativeBinding50KG>&)noexcept;
     void poisonGarageNativeBindings()noexcept;
     friend class ::original_main_entry50KG::NativeCollectorFifo50LA;
+    friend class ::original_main_entry50KG::NativeF8BarPrefix50LA;
     friend class rr::game::OriginalPauseMaterialAdmission50LA;
     bool serviceRetainedScreenPrototype24A740(const OriginalStandardMaterialCollectorReceipt50LA&,
         std::int32_t,std::size_t,OriginalStandardMaterialDiagnostic50LA&) noexcept;
@@ -358,6 +365,16 @@ private:
     friend class OriginalSpeedBoostMaterialReference50LA;
     friend class OriginalDamageMaterialReference50LA;
     friend class OriginalPausePrimitiveReferences50LA;
+    friend class OriginalResultsPrimitiveReferences50LA;
+    friend class rr::game::OriginalRaceF850LA;
+    friend class rr::game::OriginalResults10450LA;
+    bool bindResultsPendingAfterRetain(std::int32_t,
+        std::shared_ptr<const OriginalResultsScreenFallback50LA>,OriginalStandardMaterialDiagnostic50LA&)noexcept;
+
+    bool bindResultsBaseBackdropAfterRetain(std::int32_t,std::shared_ptr<const OriginalUiArchive50KG>,
+        std::shared_ptr<OriginalStandardTextureTable50LA>,OriginalStandardMaterialDiagnostic50LA&)noexcept;
+    bool pauseBackdropFallback14D590(std::int32_t,std::shared_ptr<const OriginalUiArchive50KG>,
+        std::shared_ptr<OriginalStandardTextureTable50LA>,bool retain,OriginalStandardMaterialDiagnostic50LA&)noexcept;
     bool retainPauseBackdropFallback14D590(std::int32_t,std::shared_ptr<const OriginalUiArchive50KG>,
         std::shared_ptr<OriginalStandardTextureTable50LA>,OriginalStandardMaterialDiagnostic50LA&) noexcept;
     bool retainDamageFallback14D590(std::int32_t,std::shared_ptr<const OriginalUiArchive50KG>,
@@ -366,6 +383,11 @@ private:
         std::shared_ptr<OriginalStandardTextureTable50LA>,OriginalStandardMaterialDiagnostic50LA&) noexcept;
     friend class OriginalStandardParticleMaterialReference50LA;
     friend class OriginalStandardCableMaterialReference50LA;
+    friend class ::ra_pod_scene50LA::Owner; //Concrete World SunFlare primitive retirement.
+    friend class ::ra_cold_aggregate50LA::Owner; //Concrete World SunFlare retain and application checks.
+    friend class ::original_local_flare50LA::Emission;
+    bool inspectLocalFlareEmission24B9B0(std::int32_t,
+        OriginalCableEmissionBinding50LA&,OriginalStandardMaterialDiagnostic50LA&) const noexcept;
     friend class ::original_cable_selection50LA::Binding;
     bool selectRacerMaterial29BFF0(std::int32_t,OriginalStandardMaterialDiagnostic50LA&) noexcept;
     bool inspectCableEmission24B9B0(std::int32_t,std::size_t,
@@ -397,6 +419,9 @@ private:
     bool retainScreen14D590(std::int32_t,OriginalStandardMaterialDiagnostic50LA&) noexcept;
     bool bindGarageScreenFallbackAfterRetain(std::int32_t,
         std::shared_ptr<const OriginalGarageScreenFallback50KG>,OriginalStandardMaterialDiagnostic50LA&)noexcept;
+    //Non-mutating exact14D500 eligibility; allows bounded concrete owners to
+    //preflight BEFORE disposing dependent resources. No admission/population.
+    bool canRelease14D500(std::int32_t) const noexcept;
     bool release14D500(std::int32_t) noexcept;
     struct Storage;
     // Every existing consumer uses storage_ as its template-ready boundary.

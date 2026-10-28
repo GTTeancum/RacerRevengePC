@@ -12,6 +12,7 @@
 #include <thread>
 #include "../../../src/game/original_application_entities50la.h"
 namespace original_main_entry50KG { struct Application; class NativeCollectorFifo50LA; }
+namespace ra_cold_aggregate50LA {class Owner;}
 namespace rr::platform {
 class OriginalUiGarageDrawContribution50KG;
 class OriginalUiSharedDialogs50KG;
@@ -33,6 +34,7 @@ struct OriginalUiGarageScreenTextDiagnostic50KG {
 // real selected32C borrow; dynamic rows retain their actual empty-string path.
 // The separate legacy root probe remains closed and is not an issuance route.
 class OriginalUiGarageScreenText50KG final {
+ friend class ::ra_cold_aggregate50LA::Owner; //Same299BE0 process guard for real SunFlare handles.
  friend class OriginalUiGarageDrawContribution50KG;
     friend class OriginalUiSharedDialogs50KG;
  friend struct ::original_main_entry50KG::Application;
@@ -102,6 +104,7 @@ class OriginalUiGarageScreenText50KG final {
  bool draw2E0170(OriginalUiGarageDrawContribution50KG&,const OriginalUiGarageTextOverlay50KG&,Diagnostic&)noexcept;
  bool draw2E0170(OriginalUiGarageDrawContribution50KG&,Diagnostic&)noexcept;
  bool drawWarning4702E0170(OriginalUiGarageDrawContribution50KG&,OriginalUiSharedDialogs50KG&,Diagnostic&)noexcept;
+ bool drawPopup47C2E0170(OriginalUiGarageDrawContribution50KG&,OriginalUiSharedDialogs50KG&,Diagnostic&)noexcept;
  bool drawMenuWarning4702E0170(OriginalUiSharedDialogs50KG&,Diagnostic&)noexcept;
  struct LoweredPacket {
   std::vector<assets::Vertex48B> vertices;

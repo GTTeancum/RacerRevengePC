@@ -39,7 +39,7 @@ public:
     Owner()=default;
     Owner(const Owner&)=delete;Owner& operator=(const Owner&)=delete;
     Owner(Owner&&)=delete;Owner& operator=(Owner&&)=delete;
-    ~Owner(){if(!close())std::terminate();}
+    ~Owner();
     // originalRankZeroPose must come from this course's2A2880 rank0 and
     //its existing cold-placement owner. Never pass the player's rank4 pose.
     // The only live-arena borrow is the process-shared animation lane, not

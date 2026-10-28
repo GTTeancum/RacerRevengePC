@@ -211,7 +211,7 @@ public:
   mc_trigger_actions50MC::Owner* actions()const noexcept{return *this?owner_->actions_.get():nullptr;}
  };
  Owner()=default;Owner(const Owner&)=delete;Owner&operator=(const Owner&)=delete;Owner(Owner&&)=delete;Owner&operator=(Owner&&)=delete;
- ~Owner(){if(!thread()||!retire())std::terminate();}
+ ~Owner();
  static std::size_t requiredPreStoragePayloadBytes(const mc_cold_sources50LA::Owner& source,std::size_t external)noexcept {
   try{std::size_t n=source.retainedPayloadBytes();add(n,external);add(n,sizeof(Owner)+sizeof(rt::Owner));add(n,mc_runtime_ground50LA::Owner::maximumDescriptorPayloadBytes(source));
    addElements<g::Type2StaticCandidate49X>(n,totalCandidates);addElements<rt::Binding>(n,totalCandidates);addElements<track_static_candidates50IG::Radii>(n,sourceCandidates);

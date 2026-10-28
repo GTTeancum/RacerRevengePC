@@ -21,7 +21,18 @@ def main():
         'vehicle_offscreen_gl50dd.cpp', 'vehicle_offscreen_present50de.cpp')}
     command = [new_main if item == old_main else item for item in command if item not in remove]
     command[command.index('-lz'):command.index('-lz')] = [str(ROOT / name) for name in (
+        # Renderer headers share these native out-of-line helper owners.
+        'tests/native/material_alpha50gx_fixture.cpp',
+        'tests/native/original_racer_visual50hw_fixture.cpp',
+        'tests/native/native_racer_model_lifetime50la_fixture.cpp',
+        'tests/native/original_ui_main_entry50kg.cpp',
         'platform/linux/native/vehicle_window_gl50ds.cpp',
+        'platform/linux/native/vehicle_window_gl50ds_storage.cpp',
+        'platform/linux/native/vehicle_window_gl50ds_draw.cpp',
+        'platform/linux/native/vehicle_window_gl50ds_ui.cpp',
+        'platform/linux/native/vehicle_window_gl50ds_world.cpp',
+        'platform/linux/native/vehicle_window_gl50ds_hud.cpp',
+        'platform/linux/native/vehicle_window_gl50ds_validation.cpp',
         'platform/linux/native/native_camera_view50dx.cpp',
         'platform/linux/native/material_texture_gl50eb.cpp',
         'src/assets/material_texture_assets50ea.cpp')]

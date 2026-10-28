@@ -1,3 +1,5 @@
+namespace ra_pod_scene50LA {class Owner;}
+namespace original_local_flare50LA {class Emission;}
 #pragma once
 namespace rr::game {class OriginalRacerStripOwners50LA;}
 namespace original_cable_selection50LA { class Binding; }
@@ -10,6 +12,7 @@ namespace rr::assets {
 // This is one numeric reference in the canonical Application table, separate
 // from the immutable decoded texture bank and from the AIDamage ScreenMT path.
 class OriginalStandardCableMaterialReference50LA final {
+    friend class ::original_local_flare50LA::Emission;
 public:
     OriginalStandardCableMaterialReference50LA()=default;
     ~OriginalStandardCableMaterialReference50LA(){release299AC0();}
@@ -21,6 +24,22 @@ public:
     }
 private:
     friend class rr::game::OriginalRacerStripOwners50LA;
+    friend class ::ra_pod_scene50LA::Owner; //Concrete14AB30 and1B3BB0 World strip services; no racer-owner substitution.
+    // Concrete LightFlare14B894/14B89C uses this retained strip's handle.
+    // The existing table leaf is the common298E60/29BFF0 operation despite
+    // its historical Racer name; no Racer state or selected-frame authority
+    // is borrowed. Failure preserves actual texture-demand partial effects.
+    bool selectLocalFlare29BFF0(const OriginalStandardMaterialTable50LA& actualTable,
+        OriginalStandardMaterialDiagnostic50LA& d)noexcept {
+        d={};
+        if(!retained_||released_||!table_||table_.get()!=&actualTable){
+            d.status=OriginalStandardMaterialStatus50LA::reference;d.sourcePC=0x14b894u;return false;
+        }
+        return table_->selectRacerMaterial29BFF0(material00_,d);
+    }
+    bool canRelease299AC0()const noexcept {
+        return !retained_||(table_&&table_->canRelease14D500(material00_));
+    }
     bool acquireNamed299BE0(std::shared_ptr<OriginalStandardMaterialTable50LA> table,
         const std::string& actualDirectory36B970,const std::string& sourceName,
         OriginalStandardMaterialDiagnostic50LA& d)noexcept {

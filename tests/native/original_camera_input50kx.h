@@ -29,7 +29,7 @@ class Owner final {
         rr::game::InputEvent48Z& event,rr::game::DeviceButtonRecord48Y& record) noexcept {
         auto* self=static_cast<Owner*>(opaque);
         if(!self||index||!self->session_)return {false,0};
-        return press?self->session_->press(self->held_,event,record):self->session_->release(event,record);
+        return press?self->session_->press(self->held_,event,record):self->session_->release(self->held_,event,record);
     }
 public:
     Owner(){

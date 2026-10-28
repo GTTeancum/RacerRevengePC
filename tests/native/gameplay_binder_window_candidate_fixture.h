@@ -54,16 +54,17 @@ public:
     // the harness's explicit last-complete geometry policy, not retail parity.
     bool stageRacer(std::uint32_t slot,const g::VehicleFrameState49W& state,
         const g::VehicleFrameBindings49W& frame,const g::Vector3_48C& cameraBackward,
-        const g::original_gc_gameplay_lighting_candidate::Owner& lights)noexcept {
+        const g::original_gc_gameplay_lighting_candidate::Owner&)noexcept {
         if(slot>=8||!source_.bindings(slot))return false;
-        std::array<float,4> ambient;
-        if(!lights.currentSourceGlobalAmbient50(ambient))return false;
+        // Keep the existing call boundary, but ordinary Binder field40=1
+        // selects its own source-owned PHY color70 rather than scene lights.
+        const auto* color=source_.color70(slot);if(!color)return false;
         const std::array<float,3> camera{{cameraBackward.v[0],cameraBackward.v[1],cameraBackward.v[2]}};
         std::array<core::Mesh,2> next{};
         for(unsigned pair=0;pair<source_.bindingCount(slot);++pair){
             g::OriginalUiRiderBinderQuad50KG quad;
             if(core::project(state,frame,*source_.bindings(slot,pair),camera,quad,workspace_)!=core::Status::complete||
-                core::shade(quad,ambient,next[pair])!=core::Status::complete)return false;
+                core::shade(quad,*color,next[pair])!=core::Status::complete)return false;
         }
         meshes_[slot]=next;ready_[slot]=true;return true;
     }

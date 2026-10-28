@@ -14,10 +14,14 @@ struct LapRecordRow50ID {
     float lap102F0[3];
     float race1033C[3];
 };
-struct LapRecordTables50ID {
-    const LapRecordRow50ID* rows;
+// Borrowed, zero-copy table shape. In addition to the original compact rows,
+// this admits actual Hall-owned rows with the SAME named three-value lanes.
+// It does not grant lifetime/currentness or earned-result authority.
+template<class Row> struct LapRecordTableView50ID {
+    const Row* rows;
     std::size_t rowCount;
 };
+using LapRecordTables50ID=LapRecordTableView50ID<LapRecordRow50ID>;
 struct LapRecordConfig50ID {
     // Original helpers read mode/lap count from CURRENT global->2DC, but the
     // record table and participant counts from the actual a0 configuration.
@@ -42,14 +46,15 @@ inline bool ordinary(float x) noexcept {
 }
 inline LapRecordQueryResult50ID result(LapRecordQueryStatus50ID status,
     std::uint32_t value,std::uint32_t pc) noexcept {return {status,value,pc};}
-inline LapRecordQueryResult50ID compare(const LapRecordTables50ID& tables,
+template<class Row>
+inline LapRecordQueryResult50ID compare(const LapRecordTableView50ID<Row>& tables,
     std::uint32_t selection,float seconds,bool race) noexcept {
     using S=LapRecordQueryStatus50ID;
     const auto firstPC=race?0x18633cu:0x186204u;
     if(!tables.rows||selection>=tables.rowCount)
         return result(S::Storage,0,firstPC);
     const auto& row=tables.rows[selection];
-    const float* values=race?row.race1033C:row.lap102F0;
+    const float* values=race?&row.race1033C[0]:&row.lap102F0[0];
     const std::uint32_t pcsLap[3]{0x186204u,0x186228u,0x18624cu};
     const std::uint32_t pcsRace[3]{0x18633cu,0x186360u,0x186384u};
     // Source is an ordered first-match search, not a minimum/sortedness test.
@@ -65,8 +70,9 @@ inline LapRecordQueryResult50ID compare(const LapRecordTables50ID& tables,
 }
 // 50GG masks selection1125F to 15 before calling. The helper does not mask
 // its own a1. Invalid/missing backing is an error, never a false query result.
+template<class Row>
 inline LapRecordQueryResult50ID queryLapRecord50ID(
-    const LapRecordConfig50ID& config,const LapRecordTables50ID& tables,
+    const LapRecordConfig50ID& config,const LapRecordTableView50ID<Row>& tables,
     std::uint32_t selection,float seconds) noexcept {
     using S=LapRecordQueryStatus50ID;
     using namespace lap_record_detail50ID;
@@ -75,8 +81,9 @@ inline LapRecordQueryResult50ID queryLapRecord50ID(
     if(seconds<=0.0f)return result(S::Complete,0,0x18626cu);
     return compare(tables,selection,seconds,false);
 }
+template<class Row>
 inline LapRecordQueryResult50ID queryRaceRecord50ID(
-    const LapRecordConfig50ID& config,const LapRecordTables50ID& tables,
+    const LapRecordConfig50ID& config,const LapRecordTableView50ID<Row>& tables,
     std::uint32_t selection,float seconds) noexcept {
     using S=LapRecordQueryStatus50ID;
     using namespace lap_record_detail50ID;

@@ -40,7 +40,15 @@ OriginalUiControllerPopupStatus50KG OriginalUiControllerPopup50KG::optionsEntryR
 }
 OriginalUiControllerPopupStatus50KG OriginalUiControllerPopup50KG::startController2(const OriginalUiControllerPopupState50KG& s,OriginalUiControllerPopupPlan50KG& p) noexcept {
     const auto status=begin(s,p,0x2060A0);if(status!=OriginalUiControllerPopupStatus50KG::ok)return status;
+    p.state.garagePurchaseText=false;
     p.state.hasConfirm3D0=true; // Nonnull a2. Null a3 does NOT clear stale 3D4.
+    p.state.timer3C4=.125f;p.state.closing3C8=false;p.state.active3CC=true;p.state.result3D8=1;p.accepted=true;
+    return status;
+}
+OriginalUiControllerPopupStatus50KG OriginalUiControllerPopup50KG::startGaragePurchase(const OriginalUiControllerPopupState50KG& s,OriginalUiControllerPopupPlan50KG& p) noexcept {
+    const auto status=begin(s,p,0x2060A0);if(status!=OriginalUiControllerPopupStatus50KG::ok)return status;
+    // Garage1FDE70 supplies217,9,10: both argument pointers are nonnull.
+    p.state.garagePurchaseText=true;p.state.hasConfirm3D0=true;p.state.hasCancel3D4=true;
     p.state.timer3C4=.125f;p.state.closing3C8=false;p.state.active3CC=true;p.state.result3D8=1;p.accepted=true;
     return status;
 }

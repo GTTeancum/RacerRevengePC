@@ -1,0 +1,2 @@
+// Supply a caller-owned ICO at build time; no asset download happens at runtime.
+101 ICON "@RR_WINDOWS_ICON_FILE@"

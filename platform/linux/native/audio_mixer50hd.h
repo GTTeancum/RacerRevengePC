@@ -57,6 +57,8 @@ struct AudioVoice50HD {
 struct AudioVoiceObservation50HD {
     AudioVoice50HD voice{};
     std::uint64_t playbackRevision = 0;
+    // Source-surround polarity lives only in originalLeft/originalRight;
+    // groupGain and the voice's ordinary gain remain nonnegative magnitudes.
     float groupGain = 1.0f, originalLeft = 1.0f, originalRight = 1.0f;
     bool groupKnown = false;
     bool groupPaused = false;
@@ -102,7 +104,10 @@ public:
     OriginalSoundMode50KG* originalSoundMode50KG() noexcept {return soundMode50KG_.get();}
     const OriginalSoundMode50KG* originalSoundMode50KG() const noexcept {return soundMode50KG_.get();}
     // Explicit engine-angle controls26CBA0. Source233950 orientation is a
-    // separate projection. Unknown native phase selectors reject atomically.
+    // separate projection. Original receiver markers0/1 preserve polarity;
+    //76/82 invert the left/right native coefficient. This keeps the existing
+    // normalized-percent magnitude policy, not IOP ramp/DAC quantization.
+    // Unknown native phase selectors reject atomically.
     bool playOriginalAngle50KG(std::size_t slot,const AudioClip50HD&,float gain,
         float pitch,bool loop,std::int32_t engineAngle) noexcept;
     bool controlsOriginalAngle50KG(std::size_t slot,float gain,float pitch,
@@ -204,6 +209,13 @@ private:
     bool canReserveNativeSourceMonoVoices(std::size_t count)const noexcept;
     bool nativeSourceStreamReferences267CB0(const OriginalApplicationAural50KG&,float,
         bool afterService,std::array<std::uint64_t,8>&)const noexcept;
+    // Same retained Aural only. Quiescent native-domain admission is separate
+    // from source268300, which itself has no active-voice guard. Never stops a
+    // voice or clears persistent routing/DSP state to make admission succeed.
+    bool canResetNativeSourceMemory268300(const OriginalApplicationAural50KG&)const noexcept;
+    void resetNativeSourceMemoryPreflighted268300()noexcept;
+    bool canStopNativeSource26D070(const OriginalApplicationAural50KG&,bool introOwnsPool)const noexcept;
+    void stopNativeSourcePreflighted26D070()noexcept;
     // Exact source-owner caller only; public play methods remain closed for
     // claimed ranges. Typed cache/PCM proof stays with the actual Sound owner.
     bool playNativeSourceSampleVolume(const void* command,std::size_t slot,

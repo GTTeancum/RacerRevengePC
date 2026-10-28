@@ -30,7 +30,7 @@ bool OriginalUiSharedDialogs50KG::controls2MenuResourcesCurrent(
     !draw.sharedMenuBoundCurrent(*this,session)||
     !session.sharedMenuLifetimeCurrent(*this,draw)||!sharedMaterialHistory_||
     !sharedMaterialHistory_->canonicalCurrent()||!inputs_.context||!inputs_.context->textureLifetime_||
-    firstPass470Draw_||thirdPass470Draw_||nativeWarning470FifoPins_||nativeMenuWarning470Pins_||
+    popup47CDraw_||nativePopup47CFifoPins_||firstPass470Draw_||thirdPass470Draw_||nativeWarning470FifoPins_||nativeMenuWarning470Pins_||
     menuRasterAttempted_||menuRasterFailed_||menuUpdateFailedOwner_||
     menuWarningPhase_!=MenuWarningPhase::idle||menuWarningIssued_||menuWarningAppended_||
     !warning470DimPacketCurrent2E21D0()||dialog470_.dim160->nativeGarageFifoPins_||
@@ -48,7 +48,7 @@ bool OriginalUiSharedDialogs50KG::controls2MenuResourcesCurrent(
  const auto& retainedRuntime=inputs_.context->materialRuntime();
  if(!runtime.callbackOverrideKnown||runtime.callbackOverride435678||
     !retainedRuntime.callbackOverrideKnown||retainedRuntime.callbackOverride435678)return false;
- std::array<const assets::OriginalStandardMaterialObject50LA*,3> canonical{};
+ std::array<const assets::OriginalStandardMaterialObject50LA*,6> canonical{};
  const auto table=inputs_.domain->materials382B38();
  if(!table||!sharedHistoryCanonicalOwnersCurrent(canonical))return false;
  for(std::int32_t token=3228;token<=3230;++token){
@@ -150,14 +150,14 @@ bool OriginalUiSharedDialogs50KG::walkMenu470Inherited(std::uint32_t mask,std::u
 }
 bool OriginalUiSharedDialogs50KG::beginMenu470(OriginalUiMainSession50KG& session,OriginalUiMainDraw50KG& draw,
  std::uint64_t invocation,Diagnostic& d)noexcept {
- d={};if(menu470Owner()||menuUpdateFailedOwner_||!invocation||!draw.sharedMenuBoundCurrent(*this,session)||
+ d={};if(popup47CDraw_||nativePopup47CFifoPins_||menu470Owner()||menuUpdateFailedOwner_||!invocation||!draw.sharedMenuBoundCurrent(*this,session)||
     !session.sharedMenuRenderCurrent(*this,draw))return fail(d,Status::owner,0x204A00);
  menuMainSession_=&session;menuMainDraw_=&draw;menu470Invocation_=invocation;
  return beginMenu470Body(d);
 }
 bool OriginalUiSharedDialogs50KG::beginMenu470(OriginalUiOptionsSession50KG& session,OriginalUiOptionsDrawContribution50KG& draw,
  std::uint64_t invocation,Diagnostic& d)noexcept {
- d={};if(menu470Owner()||menuUpdateFailedOwner_||!invocation||!draw.sharedMenuBoundCurrent(*this,session)||
+ d={};if(popup47CDraw_||nativePopup47CFifoPins_||menu470Owner()||menuUpdateFailedOwner_||!invocation||!draw.sharedMenuBoundCurrent(*this,session)||
     !session.sharedMenuRenderCurrent(*this,draw))return fail(d,Status::owner,0x204A00);
  menuOptionsSession_=&session;menuOptionsDraw_=&draw;menu470Invocation_=invocation;
  return beginMenu470Body(d);
@@ -167,7 +167,7 @@ bool OriginalUiSharedDialogs50KG::beginMenu470Body(Diagnostic& d)noexcept {
   menuMainSession_=nullptr;menuOptionsSession_=nullptr;menuMainDraw_=nullptr;menuOptionsDraw_=nullptr;menu470Invocation_=0;
   return fail(d,status,pc);
  };
- if(menu470Phase_!=Menu470Phase::idle||firstPass470Draw_||thirdPass470Draw_||nativeWarning470FifoPins_||nativeMenuWarning470Pins_||menuRasterAttempted_||
+ if(popup47CDraw_||nativePopup47CFifoPins_||menu470Phase_!=Menu470Phase::idle||firstPass470Draw_||thirdPass470Draw_||nativeWarning470FifoPins_||nativeMenuWarning470Pins_||menuRasterAttempted_||
     demand470Pending_||update470Pending_||!menuTopologyCurrent()||
     menu470Epoch_==std::numeric_limits<std::uint64_t>::max()||!inputs_.context||!inputs_.context->textureLifetime_)
   return rejectUnissued(Status::phase,0x204A00);
@@ -358,7 +358,7 @@ bool OriginalUiSharedDialogs50KG::advanceMenu470(OriginalUiOptionsSession50KG& s
  return okay;
 }
 bool OriginalUiSharedDialogs50KG::advanceMenu470Body(const OriginalUiSourceOwner50KM& owner,float delta,Diagnostic& d)noexcept {
- d={};if(menu470Owner()||menuUpdateFailedOwner_||!menuTopologyCurrent()||
+ d={};if(popup47CDraw_||nativePopup47CFifoPins_||menu470Owner()||menuUpdateFailedOwner_||!menuTopologyCurrent()||
     menuUpdateEpoch_==std::numeric_limits<std::uint64_t>::max())return fail(d,Status::phase,0x2048F0);
  const auto display=inputs_.root->raceDisplayOwner50LA_.lock();
  if(!display||display->application_!=inputs_.root||display->video_!=inputs_.video||

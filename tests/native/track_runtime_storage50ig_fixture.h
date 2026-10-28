@@ -1,12 +1,20 @@
 #pragma once
 #include "../../src/game/original_application_entities50la.h"
+#include "../../src/game/original_native_list_method_custody50la.h"
+#include <optional>
+#include <new>
 #include "authored_runtime_ground50cp_fixture.h"
 #include "live_terrain_probe50fr_fixture.h"
+#include "native_terrain_result_owner50la.h"
+#include "../../src/game/native_racer_terrain_owner50la.h"
+#include "../../src/game/native_racer_aero_owner50la.h"
+#include "../../src/game/pod_live_query50iz.h"
 #include "candidate_handles50cb.h"
 #include "tb_door_runtime50tb.h"
 #include "static_type2_producer49x.h"
 #include "collection_projection50cf.h"
 #include "vehicle_candidates50ca.h"
+#include "native_spring_detector_policy50la.h"
 #include "zone_registration_events50cq.h"
 #include "type3_query48p.h"
 #include "../../src/assets/material_audio50hi.h"
@@ -24,8 +32,11 @@
 // or authoring: every candidate must point at one actual loaded COL owner.
 // No geometry, filters, opaque identities, spawn, route or query state is made
 // up here. The caller constructs those owners before preparing this layer.
+namespace ra_pod_scene50LA {class Owner;}
 namespace ra_static_registry50LA { class ColdStage; }
 namespace ra_source_camera50LA { class OwnershipBridge; }
+namespace native_racer_collision50HW { class Owner; }
+namespace rr::game { class OriginalRacerMainBodyOwner50LA; }
 namespace track_runtime_storage50IG {
 using namespace rr::game;
 namespace a=rr::assets;
@@ -80,6 +91,7 @@ struct Counts {
     CollectionRef50BX cameraSphere=0,cameraRay=0,cameraDeath=0;
     CollectionRef50BX podQuery=0,movementQuery=0;
     std::size_t recoveryReferences=0;
+    std::size_t sharedRosterCount=0; //Fresh typed allocation only; no active objects implied.
     CollectionRef50BX wreckFirstQuery=0;
     std::size_t wreckReferences=0;
 };
@@ -123,9 +135,151 @@ struct Membership {
 class Owner;
 struct Storage {
 private:
+    friend class ::ra_pod_scene50LA::Owner;
+    struct RaSourceListMethod {
+        OriginalNativeListMethodCustody50LA custody;
+        //Missing source per-method selected18 service, NOT terrainSelected or
+        //another registry. Slots remain unknown while actual count18 is0.
+        std::unique_ptr<const OriginalWreckComponent50LA*[]> selected1C;
+        std::uint32_t count18=0,growth20=0,capacity24=0;
+        bool owned28Bit0=false,complete=false,published=false,typeLookupFailed=false,constructorAttempted=false,retired=false;
+        std::optional<std::uint8_t> type2C,type2D;
+    };
+    struct RaSourceListDomain {
+        const ::ra_pod_scene50LA::Owner* world=nullptr;
+        std::array<RaSourceListMethod,20> methods; //Actual ten nodes, two distinct methods each.
+    };
+    std::unique_ptr<RaSourceListDomain> raSourceLists_;
+    friend struct ::interactive_setup50DU::Context;
+    friend class ::ra_source_camera50LA::OwnershipBridge;
+
+    enum class RosterRole : std::uint8_t { main690,secondary364,terrain348,pod694,movement7A4 };
+    static constexpr std::size_t rosterRoles=5,maximumRoster=8;
+    //Native immutable filter/list owner constructed at the actual per-racer
+    //cold exclusion producer. Never a pointer into Bank-restored vector data.
+    //F8 remains the separately authenticated mutable canonical Bank lane.
+    struct SharedColdFilter {
+        const std::uint32_t identity;
+        FixedBuffer<std::uint32_t> first,second,categories;
+        CollectionFilter50BX view{};
+        explicit SharedColdFilter(const CollisionFilter48J& source):identity(source.identity),
+            first(source.identityLists[0].identities.size()),
+            second(source.identityLists[1].identities.size()),categories(source.categoryMasks.size()) {
+            for(std::size_t i=0;i<first.size();++i)first[i]=source.identityLists[0].identities[i];
+            for(std::size_t i=0;i<second.size();++i)second[i]=source.identityLists[1].identities[i];
+            for(std::size_t i=0;i<categories.size();++i)categories[i]=source.categoryMasks[i];
+            view.categoryA4=source.categoryA4;view.acceptMaskB8=source.acceptMaskB8;view.flags31=source.flags31;
+            view.identities[0]={first.data(),first.size(),static_cast<std::int32_t>(first.size()),source.identityLists[0].mode};
+            view.identities[1]={second.data(),second.size(),static_cast<std::int32_t>(second.size()),source.identityLists[1].mode};
+            view.categories={categories.data(),categories.size(),static_cast<std::int32_t>(categories.size()),source.categoryModeD4};
+        }
+        bool matches(const CollisionFilter48J& source)const noexcept {
+            if(identity!=source.identity||view.categoryA4!=source.categoryA4||
+               view.acceptMaskB8!=source.acceptMaskB8||view.flags31!=source.flags31||
+               view.categories.mode!=source.categoryModeD4)return false;
+            const FixedBuffer<std::uint32_t>* words[]={&first,&second,&categories};
+            const std::vector<std::uint32_t>* actual[]={&source.identityLists[0].identities,
+                &source.identityLists[1].identities,&source.categoryMasks};
+            for(unsigned i=0;i<3;++i){
+                if(words[i]->size()!=actual[i]->size())return false;
+                for(std::size_t n=0;n<words[i]->size();++n)if((*words[i])[n]!=(*actual[i])[n])return false;
+            }
+            return view.identities[0].mode==source.identityLists[0].mode&&
+                view.identities[1].mode==source.identityLists[1].mode;
+        }
+    };
+    struct SharedRosterObject {
+        const native_racer_collision50HW::Owner* const collision;
+        const std::size_t slot;
+        const RosterRole role;
+        const CollectionRef50BX reservedRef; //Capacity identity, never published E0.
+        Membership membership;
+        //Actual cold producer custody, not shared candidate publication. The
+        //filter pointer is a logical Bank lane; never read another slot from it.
+        CollisionFilter48J* canonicalFilter=nullptr;
+        const Type2ResourceView49X* type2Resource=nullptr;
+        const PodShapeSource49W* type0Resource=nullptr;
+        const OriginalRacerMainBodyOwner50LA* bodyA0=nullptr;
+        //Positive native348 linked-body custody from the actual cold source
+        //setup. Not a guest348 Entity or auxiliary120/124/null publication.
+        const OriginalRacerMainBodyOwner50LA* nativeTerrainBody128=nullptr;
+        std::unique_ptr<live_terrain_probe50fr::Owner> terrainResource;
+        std::unique_ptr<native_terrain_result50LA::Owner> terrainResult90;
+        std::unique_ptr<const SharedColdFilter> coldFilter;
+        std::optional<PodLiveQueryContext50IZ> podContext; //Actual saved per-slot binding; included in row budget.
+        std::uint32_t identity=0;
+        std::uint64_t generation=0,effectRevision=0; //Native actual owner writes only; not guest history.
+        bool coldBound=false;
+        SharedRosterObject(const native_racer_collision50HW::Owner& owner,std::size_t slot_,
+            RosterRole role_,CollectionRef50BX ref,std::size_t capacity)
+            :collision(&owner),slot(slot_),role(role_),reservedRef(ref),membership(capacity){}
+    };
+    struct SharedRosterAllocation {
+        std::array<std::unique_ptr<SharedRosterObject>,maximumRoster*rosterRoles> objects;
+        std::size_t count=0;
+        std::size_t coldPayloadRemaining=0; //Actual unused fixed native budget, never widened.
+        bool retired=false;
+    };
+    //Actual span inventory for fresh shared admission. The caller tests these
+    //addresses against its REAL registered Bank spans before lending a pin.
+    template<class Check> bool sharedSpansAbsent(Check&& absent)const noexcept {
+        if(!sharedRoster_||sharedRoster_->retired)return false;
+        const auto array=[&](const auto& a){return absent(a.data(),a.size()*sizeof(*a.data()));};
+        if(!absent(&lifecycle,sizeof(lifecycle))||!array(registries)||!array(registrations)||
+           !array(blocks)||!array(trees)||!array(zones)||!absent(&queue,sizeof(queue))||!array(events)||
+           !absent(world.portalHeads,world.zoneCount*sizeof(*world.portalHeads))||
+           !absent(world.portalLinks,world.portalLinkCount*sizeof(*world.portalLinks))||
+           !absent(world.portals,world.portalCount*sizeof(*world.portals))||
+           !array(objects)||!array(source)||!array(treeSource))return false;
+        const auto membership=[&](const Membership& m){return absent(&m.state,sizeof(m.state))&&
+            absent(m.links.data(),m.links.size()*sizeof(*m.links.data()))&&
+            absent(m.entries.data(),m.entries.size()*sizeof(*m.entries.data()));};
+        for(const auto* m:{&mainMembership,&secondaryMembership,&terrainMembership})
+            if(!membership(*m))return false;
+        for(std::size_t i=0;i<movement.size();++i){const auto& c=movement[i].collision;
+            if(!absent(&c.filter.flagsF8,sizeof(c.filter.flagsF8))||
+               !absent(&c.copied40,sizeof(c.copied40))||!absent(&c.copied50,sizeof(c.copied50)))return false;
+        }
+        for(const auto& row:sharedRoster_->objects)if(row){
+            if(!absent(row.get(),sizeof(*row))||!membership(row->membership)||
+               (row->terrainResource&&!absent(row->terrainResource.get(),sizeof(*row->terrainResource)))||
+               (row->terrainResult90&&!absent(row->terrainResult90.get(),sizeof(*row->terrainResult90))))return false;
+            if(row->coldFilter&&(!absent(row->coldFilter.get(),sizeof(*row->coldFilter))||
+               !array(row->coldFilter->first)||!array(row->coldFilter->second)||!array(row->coldFilter->categories)))return false;
+        }
+        return true;
+    }
+    bool sharedRosterCanRetire()const noexcept {
+        if(!sharedRoster_)return true;
+        if(queue.count||collectionInput.objectCount!=count.terrain||collectionInput.query||
+           collectionInput.zoneHead||collectionInput.initialActiveTree)return false;
+        // Stage B has no query/Follow/reset borrow API. Refuse all actually
+        // published row state rather than assuming allocated means detached.
+        for(const auto& p:sharedRoster_->objects)if(p){
+            if(p->coldBound||p->canonicalFilter||p->bodyA0||
+               p->membership.state.attached||p->membership.state.object||
+               !p->reservedRef||p->reservedRef>count.objects)return false;
+            const auto index=p->reservedRef-1u;
+            const auto& r=registrations[index];
+            if(r.owner||r.slot||r.encodedObject||objects[index].identity||
+               source[index].epoch||source[index].flagsF8)return false;
+            for(const auto& e:p->membership.entries)
+                if(e.used||e.registration.owner||e.registration.slot||e.registration.encodedObject)return false;
+        }
+        return true;
+    }
+    bool retireSharedRosterAllocation()noexcept {
+        if(!sharedRoster_)return true;
+        if(!sharedRosterCanRetire())return false;
+        // No fabricated removal: every row must still be truly unpublished.
+        for(auto& p:sharedRoster_->objects)p.reset();
+        sharedRoster_->retired=true;return true;
+    }
+
     // Declared before the byte reference and every query field. All escaped
     // query-byte borrows are protected by this actual process-owner retain.
     const std::shared_ptr<OriginalApplicationEntities50LA> application_;
+    std::shared_ptr<native_spring_detector_policy50LA::Owner> nativeDetectorPolicy_;
     static std::shared_ptr<OriginalApplicationEntities50LA> requireApplication(
         std::shared_ptr<OriginalApplicationEntities50LA> app) {
         if(!app||!app->application10())throw std::invalid_argument("actual live Application collision authority required");
@@ -135,6 +289,10 @@ public:
     // Keep borrowed source backing and the exclusive
     // serial world lease alive until every registry/scratch member is retired.
     const std::shared_ptr<void> borrowedWorldLease;
+private:
+    //Destroy row backing before the exclusive actual World lease.
+    std::unique_ptr<SharedRosterAllocation> sharedRoster_;
+public:
     const Counts count;
     FixedBuffer<Type2StaticCandidate49X*> candidates;
     FixedBuffer<std::uint32_t> candidateZones;
@@ -185,7 +343,7 @@ private:
     friend class Owner;
     // Only Owner's private authenticated borrowed route can select a lease.
     explicit Storage(Counts n,const LiveZoneWorld50EN* borrowed,
-        std::shared_ptr<void> lease,std::shared_ptr<OriginalApplicationEntities50LA> app)
+        std::shared_ptr<void> lease,std::shared_ptr<OriginalApplicationEntities50LA> app,bool sharedFresh=false)
         :application_(requireApplication(std::move(app))),borrowedWorldLease(std::move(lease)),count(n),candidates(n.terrain),candidateZones(n.terrain),candidateMethods(n.terrain),
         contactMaterials(n.terrain),handles(n.terrain),movement(n.terrain),
         registeredMovement(n.terrain),terrainTargets(n.terrain),terrainSelected(n.selected),
@@ -204,11 +362,13 @@ private:
         mergeScratch(sourceSelectionCapacity),mergedIds(sourceSelectionCapacity){
         // This facade points at the same cache/topology owner used for RA's
         // two navigation bindings. It never creates a second cache owner.
+        if(n.sharedRosterCount&&!sharedFresh)throw std::invalid_argument("shared roster allocation requires private fresh factory");
         if(borrowed)world=*borrowed;
     }
 public:
     explicit Storage(Counts n,std::shared_ptr<OriginalApplicationEntities50LA> app)
         :Storage(n,nullptr,{},std::move(app)){}
+    ~Storage()=default; //Bridge gates any published lifetime before releasing Storage.
     Storage(const Storage&)=delete;
     Storage& operator=(const Storage&)=delete;
     Storage(Storage&&)=delete;
@@ -231,6 +391,9 @@ public:
         w.second=collectionBuffer(second.data(),treeSecond.data(),secondIds.data());
         w.mergeScratch={mergeScratch.data(),mergeScratch.size()};
         w.merged={mergedIds.data(),mergedIds.size()};return w;
+    }
+    const native_spring_detector_policy50LA::Owner* nativeDetectorPolicy()const noexcept {
+        return nativeDetectorPolicy_.get();
     }
     // Mirrors the current late movement registry iteration without assigning
     // vector-owning candidate objects (which could allocate after cold setup).
@@ -256,7 +419,18 @@ public:
     // any std::vector object itself. External candidate owner lanes and the
     // actual vehicle/query state remain the caller's existing registrations.
     template<class Bank> void registerMutableOwners(Bank& bank) {
+        if(nativeDetectorPolicy_)nativeDetectorPolicy_->registerMutableOwners(bank);
         auto elements=[&](auto& a){bank.elements(a.data(),a.size());};
+        if(sharedRoster_){
+            if(sharedRoster_->retired)throw std::runtime_error("retired shared roster storage");
+            // Actual source descriptors/cursors below are per-invocation or
+            // per-racer outputs. Shared topology, method state, object effects,
+            // static movement mirrors and all memberships MUST NOT be banked.
+            bank.owner(collectionInput);
+            elements(registeredIndices);bank.owner(registeredCount);
+            elements(probeIndices);bank.owner(probeCount);
+            return;
+        }
         for(auto& c:movement){bank.owner(c.collision.filter.flagsF8);
             bank.owner(c.collision.copied40);bank.owner(c.collision.copied50);}
         bank.owner(lifecycle);elements(registries);elements(registrations);
@@ -358,10 +532,22 @@ public:
         return prepareSource(source,bindings,count,limits,diagnostic,nullptr,{},std::move(app));
     }
 private:
+    struct SharedRosterPlan {
+        const native_racer_collision50HW::Owner* const* owners=nullptr;
+        std::size_t count=0;
+    };
+    template<class CollisionOwner>
+    bool prepareSharedRosterSource(const SourceWorldView<CollisionOwner>& ground,const Binding* bindings,
+        std::size_t count,const Limits& limits,Diagnostic& diagnostic,const LiveZoneWorld50EN& borrowed,
+        std::shared_ptr<void> lease,std::shared_ptr<OriginalApplicationEntities50LA> app,
+        const SharedRosterPlan& roster)noexcept {
+        return prepareSource(ground,bindings,count,limits,diagnostic,&borrowed,std::move(lease),std::move(app),&roster);
+    }
     template<class CollisionOwner>
     bool prepareSource(const SourceWorldView<CollisionOwner>& ground,const Binding* bindings,std::size_t count,
         const Limits& limits,Diagnostic& diagnostic,const LiveZoneWorld50EN* borrowed,
-        std::shared_ptr<void> lease,std::shared_ptr<OriginalApplicationEntities50LA> app) noexcept {
+        std::shared_ptr<void> lease,std::shared_ptr<OriginalApplicationEntities50LA> app,
+        const SharedRosterPlan* shared=nullptr) noexcept {
         using namespace detail;
         try {
             diagnostic={};need(!storage_,"track storage already prepared");
@@ -372,12 +558,22 @@ private:
                 "track storage limits may only reduce hard ceilings");
             need((!ground.owners.size()||ground.owners.values)&&bindings&&count&&count>=ground.owners.size()&&count<=limits.terrainOwners,
                 "track storage requires every original loaded COL owner exactly once");
-            Counts n{};n.terrain=count;n.zones=ground.world.zones.size();n.portals=ground.world.portals.size();
+            if(shared){
+                need(borrowed&&lease&&shared->owners&&shared->count&&shared->count<=Storage::maximumRoster&&
+                    limits.originalRecoveryQueries,"shared roster requires actual exclusive borrowed World and retained roster");
+                for(std::size_t i=0;i<shared->count;++i){
+                    need(shared->owners[i],"missing retained collision owner");
+                    for(std::size_t j=0;j<i;++j)need(shared->owners[j]!=shared->owners[i],"duplicate retained collision owner");
+                }
+            }
+            Counts n{};n.sharedRosterCount=shared?shared->count:0;n.terrain=count;n.zones=ground.world.zones.size();n.portals=ground.world.portals.size();
             need(n.zones&&n.zones<=limits.zones&&n.portals<=limits.portals,"original world exceeds storage bounds");
             n.methods=n.zones*2;n.blocks=n.zones*4;
             n.recoveryReferences=limits.originalRecoveryQueries?runtimeRecoveryReferenceReserve:0u;
             const std::size_t cameraReferences=limits.originalCameraQueries?3u:0u;
-            const std::size_t existingReferences=runtimeDynamicReferenceReserve+cameraReferences+n.recoveryReferences;
+            const std::size_t roleReferences=shared?shared->count*Storage::rosterRoles:
+                runtimeDynamicReferenceReserve+n.recoveryReferences;
+            const std::size_t existingReferences=roleReferences+cameraReferences;
             need(limits.wreckPieceQueries<=(runtimeSearchSlotLimit-existingReferences)/3u,
                 "actual wreck query references exceed the one-block SearchList ceiling");
             n.wreckReferences=limits.wreckPieceQueries*3u;
@@ -391,16 +587,38 @@ private:
             n.mainQuery=static_cast<CollectionRef50BX>(count+1);
             n.secondaryQuery=static_cast<CollectionRef50BX>(count+2);
             n.terrainQuery=static_cast<CollectionRef50BX>(count+3);
-            if(limits.originalCameraQueries){
+            if(!shared&&limits.originalCameraQueries){
                 n.cameraSphere=static_cast<CollectionRef50BX>(count+4+n.recoveryReferences);
                 n.cameraRay=static_cast<CollectionRef50BX>(count+5+n.recoveryReferences);
                 n.cameraDeath=static_cast<CollectionRef50BX>(count+6+n.recoveryReferences);
             }
-            if(limits.originalRecoveryQueries){
+            if(!shared&&limits.originalRecoveryQueries){
                 n.podQuery=static_cast<CollectionRef50BX>(count+runtimeDynamicReferenceReserve+1u);
                 n.movementQuery=static_cast<CollectionRef50BX>(count+runtimeDynamicReferenceReserve+2u);
             }
+            if(shared){
+                // Legacy fixed-role consumers cannot mistake reservation for
+                // publication. Real per-row refs live only in typed custody.
+                n.mainQuery=n.secondaryQuery=n.terrainQuery=0;
+                if(limits.originalCameraQueries){
+                    n.cameraSphere=static_cast<CollectionRef50BX>(count+roleReferences+1u);
+                    n.cameraRay=static_cast<CollectionRef50BX>(count+roleReferences+2u);
+                    n.cameraDeath=static_cast<CollectionRef50BX>(count+roleReferences+3u);
+                }
+            }
             Budget budget{limits.coldPayloadBytes};account(budget,n,borrowed!=nullptr);
+            if(shared){
+                budget.add<Storage::SharedRosterAllocation>(1);
+                budget.add<Storage::SharedRosterObject>(roleReferences);
+                budget.add<live_terrain_probe50fr::Owner>(shared->count);
+                budget.add<native_terrain_result50LA::Owner>(shared->count);
+                //One actual retained chariot allocation per shared racer.
+                //Reservation only; later model publication supplies Entity9C.
+                budget.add<NativeRacerTerrainOwner50LA>(shared->count);
+                budget.add<NativeRacerAeroOwner50LA>(shared->count);
+                budget.add<CollectionZoneLink50BX>(n.membership,roleReferences);
+                budget.add<LiveZoneEntry50EN>(n.membership,roleReferences);
+            }
             std::array<std::size_t,3> filterMaximum{};
             for(std::size_t z=0;z<n.zones;++z){
                 diagnostic.zone=z;const auto choice=a::readZoneSearchSelection50CN(ground.world,z);
@@ -528,7 +746,24 @@ private:
                 borrowed->portalLinkCount==n.portalLinks&&borrowed->portalHeads&&
                 (!n.portalLinks||borrowed->portalLinks)&&(!n.portals||borrowed->portals),
                 "borrowed source portal world extent mismatch");
-            auto next=std::unique_ptr<Storage>(new Storage(n,borrowed,std::move(lease),std::move(app)));
+            auto next=std::unique_ptr<Storage>(new Storage(n,borrowed,std::move(lease),std::move(app),shared!=nullptr));
+            if(shared){
+                next->collectionInput.objectCount=n.terrain;
+                next->sharedRoster_=std::make_unique<Storage::SharedRosterAllocation>();
+                next->sharedRoster_->count=shared->count;
+                next->sharedRoster_->coldPayloadRemaining=budget.capacity-budget.used;
+                for(std::size_t slot=0;slot<shared->count;++slot)
+                    for(std::size_t role=0;role<Storage::rosterRoles;++role){
+                        const auto index=slot*Storage::rosterRoles+role;
+                        next->sharedRoster_->objects[index]=std::make_unique<Storage::SharedRosterObject>(
+                            *shared->owners[slot],slot,static_cast<Storage::RosterRole>(role),
+                            static_cast<CollectionRef50BX>(count+index+1u),n.membership);
+                        if(role==static_cast<std::size_t>(Storage::RosterRole::terrain348)){
+                            next->sharedRoster_->objects[index]->terrainResource=std::make_unique<live_terrain_probe50fr::Owner>();
+                            next->sharedRoster_->objects[index]->terrainResult90=std::make_unique<native_terrain_result50LA::Owner>();
+                        }
+                    }
+            }
             for(std::size_t i=0;i<count;++i){
                 diagnostic.candidate=i;auto& c=*bindings[i].candidate;
                 const auto& binding=bindings[i];
@@ -600,7 +835,9 @@ private:
             // vehicle owners. None may be queried before all cold bindings
             // publish actual records. The camera expands this BANKED active
             // extent only in bank0 after its own trailing pair is published.
-            input.objectCount=n.terrain+runtimeDynamicReferenceReserve+n.recoveryReferences;
+            input.objectCount=shared?n.terrain:n.terrain+runtimeDynamicReferenceReserve+n.recoveryReferences;
+            // Shared reserved rows are not active, described, attached, or
+            // visible merely because storage exists. Stage C owns publication.
             input.trees=next->trees.data();input.treeCount=n.methods;input.zones=next->zones.data();input.zoneCount=n.zones;
             // Query owner, bounds, actual E0 membership and type tags remain
             // explicitly unbound until the caller has prepared each real query.

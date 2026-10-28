@@ -48,6 +48,10 @@ struct Type2StaticQuery49X {
 };
 struct Type2StaticCandidate49X {
     SpringStaticCandidate48N candidate;
+    // Optional alias to the RA candidate-owned descriptor180 metadata, not a physics
+    // response or a default for other/trigger candidates. Owner revokes before
+    // metadata retirement. No consumer interprets this metadata yet.
+    const std::uint32_t* terrainDescriptor180=nullptr;
     const float* nodeRadii=nullptr;
     std::size_t nodeRadiusCount=0,maxDepth=0;
     // Prepared by prepareStaticTargetRadii49X; mesh and radii remain immutable.

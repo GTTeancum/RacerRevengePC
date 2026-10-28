@@ -18,6 +18,12 @@ struct SpringGeneratedRecord48K {
     std::uint32_t otherBodyIdentity44,material4C;
     std::uint8_t flags50;
 };
+//Pure296884..296974 prefix only. No contact flags,296F10, responses or
+//whole2964C0 completion. Caller authenticates actual record/scene owner first.
+struct SpringRecordGeometryPrefix48K {Vector3_48C worldPoint;float depth;};
+bool prepareSpringRecordGeometry48K(const BodyMatrix48G&,const Vector3_48C& localPoint,
+    const Vector3_48C& normal,const Vector3_48C& surfacePoint,
+    SpringRecordGeometryPrefix48K&)noexcept;
 struct SpringModelBody48K {std::uint32_t identity;SpringImpactBody48K body;};
 // Caller-owned storage, normally reserved once per simulation world. The
 // coordinator never allocates, resizes, frees or retains these buffers.

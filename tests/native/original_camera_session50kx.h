@@ -3,6 +3,7 @@
 #include "../../src/game/original_ta_cut_resource_candidate.h"
 #include <optional>
 #include "source_grid50ig_fixture.h"
+#include <string_view>
 #include "../../platform/linux/native/race_audio_groups50ic.h"
 #include "../../src/assets/original_ta_intro_authoring_candidate.h"
 #include "../../src/game/pod_speech50hg.h"
@@ -13,9 +14,13 @@
 #include "track_navigation_view50mc.h"
 namespace original_subtype3_record { class Owner; }
 namespace original_cable_selection50LA { class Binding; }
+namespace original_race_hud_scope50LA { class Registration; }
+namespace race_music50IE { class Owner; }
+namespace source_announcer50IE { class Owner; }
 namespace gb_particle_render50GB {class Owner;}
 namespace mc_particle_render50MC {class Owner;}
-namespace rr::game { class OriginalDamageObservation50LA; }
+namespace rr::game { class OriginalDamageObservation50LA; struct OriginalRaceF8Diagnostic50LA; }
+namespace rr::platform { struct VehicleWindowFrame50DS; }
 // Concrete original-AI / one-Player native session adapter. Intended install: tests/native.
 // All camera/scene/selector state stays OUTSIDE the sealed50HN racer bank.
 // This is an explicit native root policy, not recovered retail root scheduling.
@@ -54,12 +59,26 @@ namespace rr::game { class OriginalDamageObservation50LA; }
 #include <string>
 
 namespace ra_source_camera50LA { class OwnershipBridge; }
+namespace gc_original_world50LM { class Owner; }
+namespace ga_original_world50LH { class Owner; }
+namespace sa_original_world50LM { class Owner; }
+namespace ma_original_world50LM { class Owner; }
+namespace rr::game { class OriginalRaceConstructor50LA; }
 namespace original_time_stats_adapter50LA { class Owner; }
 namespace original_speed_boost_adapter50LA { class Owner; }
 namespace original_position_stats_adapter50LA { class Owner; }
 namespace original_pause_observation50LA { class Owner; }
-namespace original_main_entry50KG { struct Application; }
+namespace original_main_entry50KG { struct Application; class RaceDisplayLifetime50LA; class NativeF8BarPrefix50LA; }
 namespace original_camera_session50KX {
+// Explicit source course identity, never a TA default for an unknown route.
+inline std::string_view introTrackId(rr::game::OriginalCameraStartCourse course)noexcept {
+ using C=rr::game::OriginalCameraStartCourse;
+ switch(course){
+ case C::ta:return "TA";case C::ra:return "RA";case C::gc:return "GC";case C::ga:return "GA";case C::sa:return "SA";case C::ma:return "MA";default:return {};
+
+ }
+}
+
 using namespace rr::game;
 using Bank=native_racer50HN::Bank;
 using Phase=VehicleFramePhase49W;
@@ -213,7 +232,10 @@ struct Result {
 };
 
 class Session final {
+    friend class rr::game::OriginalSessionF8Intro50LA;
+    friend class ::original_race_hud_scope50LA::Registration;
     friend struct ::original_main_entry50KG::Application;
+    friend class ::original_main_entry50KG::RaceDisplayLifetime50LA;
     friend class ::gb_particle_render50GB::Owner;
     friend class ::mc_particle_render50MC::Owner;
     friend class ::original_cable_selection50LA::Binding;
@@ -275,6 +297,12 @@ class Session final {
         stableMatrix,published,failed
     } frameStage_=FrameStage::idle;
     ActualOwners actual_;
+    // Native typed borrower of this Session, never a source state initializer.
+    OriginalSessionF8Intro50LA f8Intro_{*this};
+    // Keep the actual F8 owner identity private; existing friends need only this check.
+    bool onOwnerThread()const noexcept {
+        return f8Intro_.ownerThread_==std::this_thread::get_id();
+    }
     // Stable per-racer Entity extensions live outside the multiplexed bank.
     // The bank still owns every existing handling/body/rig field. These cold
     // constructors do not certify its missing full20F390/210770 history.
@@ -283,6 +311,11 @@ class Session final {
     OriginalAIDamageRaceContext50LA aiDamageRace_;
     std::array<OriginalRacerEntityCold50LA,8> racerEntities_{};
     DisplayInputs* displayInputs_=nullptr;
+    // Native observation of the SAME Display0 selector, not a second camera
+    // or a strong cycle. No original Camera reference/destructor is inferred.
+    std::weak_ptr<original_main_entry50KG::RaceDisplayLifetime50LA> selectedGameplayDisplay_;
+    void observeSelectedGameplayCamera26F940()noexcept;
+    void invalidateSelectedGameplayCamera50LA()noexcept;
     std::uint64_t generation_=0,frameNumber_=0,completedFrame_=0,publicationCount_=0;
     std::array<Identity,8> identity_{};
     unsigned coldPhase_=0,authoredPhase_=0;
@@ -292,7 +325,9 @@ class Session final {
     // Additional represented race/UI fields owned by this native race session.
     // One real registered camera establishes low2=1. This is RACE1B0, not
     // APPLICATION1B0's unrelated modal/event gate. UI1E4 is a native HUD gate:
-    // hidden during intro, revealed by the actual199770 numeric write.
+    // hidden during intro. Genuine issued RA intro reads canonical199770's
+    // resulting low5 here; unsupported legacy routes retain their numeric write.
+    // This projection is never authoritative canonical Race/F8 state or time.
     std::uint8_t raceFlags1B0_=1,uiFlags1E4_=1,sceneFlags29_=3;
     std::uint8_t raceEntityFlags29_=1; //Enabled native race entity, distinct from scene flags29.
     OriginalRaceHudBlink50LA raceHudBlink_; //Actual race D8/E8, no separate clock.
@@ -307,6 +342,21 @@ class Session final {
         const native_racer50HW::Rig* selectedRig=nullptr;
         OriginalTrackParticleCold50LA* particles=nullptr;
         std::uint32_t selectedPod=0;
+        OriginalCameraStartCourse course=OriginalCameraStartCourse::unspecified;
+        // GC issuance records the actual consumed race/world and root-owned map.
+        // Comparison-only: the root closes Session before releasing these owners.
+        const OriginalRaceConstructor50LA* gcRace=nullptr;
+        const gc_original_world50LM::Owner* gcWorld=nullptr;
+        const TrackNavigation50EU* gcMap=nullptr;
+        const OriginalRaceConstructor50LA* saRace=nullptr;
+        const sa_original_world50LM::Owner* saWorld=nullptr;
+        const TrackNavigation50EU* saMap=nullptr;
+        const OriginalRaceConstructor50LA* maRace=nullptr;
+        const ma_original_world50LM::Owner* maWorld=nullptr;
+        const TrackNavigation50EU* maMap=nullptr;
+        const OriginalRaceConstructor50LA* gaRace=nullptr;
+        const ga_original_world50LH::Owner* gaWorld=nullptr;
+        const TrackNavigation50EU* gaMap=nullptr;
         std::vector<std::uint8_t> cam,tob,phy;
     };
     std::unique_ptr<const NativeTaIssuance> nativeTaIssuance_;
@@ -321,7 +371,7 @@ class Session final {
         std::shared_ptr<const rr::assets::OriginalStandardArchiveProvider50LA> provider;
         std::uint64_t generation=0,providerRevision=0,bankGeneration=0;
         std::size_t mount=0;
-        std::array<Member,4> members;
+        std::array<Member,8> members; // Authenticated TOB plus at most seven authored cuts.
         std::unique_ptr<const rr::assets::OriginalTaCutAuthoringCandidate> authoring;
     };
     std::unique_ptr<const NativeTaCutAuthoringCustody> nativeTaCutAuthoring_;
@@ -469,7 +519,8 @@ class Session final {
     std::unique_ptr<OriginalTaCutChildrenCandidate> taCuts_;
     unsigned taCutCursor_=0;
     bool taPositive_=false,taFirstSelected_=false;
-    std::array<TrackIntroLine50HG,3> taLines_{};
+    std::array<TrackIntroLine50HG,7> taLines_{};
+    std::size_t taLineCount_=0; // Actual script span, not storage capacity.
     OriginalRaceCameraOwner controller_;
     // ONE noncopyable Entity counterpart for this existing copyable numeric
     // payload. No second controller, borrowed parent, or additional authority.
@@ -505,7 +556,7 @@ class Session final {
     RaceStartPreparationReceipt preparation_;
     std::array<std::uint32_t,16> seedSamples_{};std::size_t seedCount_=0;
     OriginalCameraChildRegistry collection_;
-    std::array<std::uint64_t,7> childOrder_{};
+    std::array<std::uint64_t,11> childOrder_{}; // Three fixed children, up to seven authored cuts, actual7C.
     OriginalStartChildBinding introChild_;
     OriginalAttachedChildRegistry attachedChild_;
     OriginalFollowChildRegistry followChild_;
@@ -519,6 +570,12 @@ class Session final {
     CameraSceneState49F scene_;
     OriginalCameraSceneTick tick_;
     OriginalCameraViewportFields viewport_;
+    bool coldCameraSelected26F940_=false;
+    bool bindCountedRaceCameraNative34()noexcept;
+    bool completeCountedRaceCameraNative34()noexcept;
+    bool completeCountedRaceMusicNative10C(std::uint32_t&)noexcept;
+    bool completeCountedRaceWorldNativePrefix1A9EE0(std::uint32_t&)noexcept;
+    bool revokeCountedRaceCameraNative34()noexcept;
     TVCameraUpdateOutput49F pose_{};
     CameraViewOutput49F matrices_;
     OriginalRaceCameraDisplayFields display_;
@@ -542,6 +599,8 @@ class Session final {
     } humanResetCamera_;
     OriginalHumanEndClock50KG endingClock_;
     OriginalHumanEndClockCursor50KG endingClockCursor_;
+    OriginalHumanEndClockResult50KG advanceCanonicalHumanEndRoot()noexcept;
+    Result advanceCanonicalRaceFadeInPrefix()noexcept;
     bool fadeInRequested_=false,endingFadeRequested_=false,taSkipFadeInRequested_=false;
     Result result_;
     OriginalCameraModeInputResult lastInput_{};
@@ -563,7 +622,10 @@ class Session final {
             result_.entityCold.sourcePC=0x1a9240u;return false;}
         // Source1A6C80/88 passes the actual one-view1B0 low bits to1A9240;
         //1A9284 writes numeric race8C=0. Zero is not an absent scene pointer.
-        raceMode8C_=0;aiDamageRace_={generation_,key(*this),&raceMode8C_};
+        if(!nativeTaIssuance_||nativeTaIssuance_->course!=OriginalCameraStartCourse::ra)raceMode8C_=0;
+        // Issued RA binds its actual canonical8C before entering this native
+        // racer-prefix adapter; never invent its mode from one-view appearance.
+        aiDamageRace_={generation_,key(*this),&raceMode8C_};
         if(!aiDamageMaterial_.prepared()){
             rr::assets::OriginalStandardMaterialDiagnostic50LA diagnostic;
             if(!aiDamageMaterial_.bindApplication(actual_.applicationMaterials,diagnostic)){
@@ -843,8 +905,8 @@ class Session final {
             static_cast<std::int32_t>(preference.field11030),static_cast<std::int32_t>(preference.field11038),
             taPositive_&&actual_.taIntroAudio->taIntroEntity80()?key(*actual_.taIntroAudio->taIntroEntity80()):0,
             static_cast<std::int32_t>(actual_.bank.read(0,reads_.state40)),
-            &actual_.arena.noiseOwner(),actual_.startMusicContext,actual_.startMusicRequest,actual_.taIntroAudio,taExitReason_,actual_.introMusicFadeRequest};
-        // Effective zero-cut paths retain actual80=null. Positive TA passes
+            &actual_.arena.noiseOwner(),actual_.startMusicContext,actual_.startMusicRequest,actual_.taIntroAudio,taExitReason_,actual_.introMusicFadeRequest,&f8Intro_};
+        // Effective zero-cut paths retain actual80=null. Positive TA/RA passes
         // the real retained emitter and stops it at the ordered2924A0 stage;
         // stop does not retire its Entity or race-owned Sounds.
         result_.start=directStartPending_?directStart_.advance(bindings,app.renderer,app.diagnostic):
@@ -867,7 +929,7 @@ class Session final {
     }
 #include "original_ta_camera_lifecycle.inl"
 public:
-    explicit Session(ActualOwners actual) noexcept:actual_(actual){}
+    explicit Session(ActualOwners actual) noexcept;
     OriginalWreckComponent50LA* taControllerEntity174A30()noexcept {
         return coldController_.started&&!coldController_.released&&!closed_?&coldController_.entity:nullptr;
     }
@@ -878,11 +940,7 @@ public:
     const rr::assets::OriginalTaCutAuthoringCandidate* taCutAuthoring()const noexcept {
         return nativeTaCutAuthoring_?nativeTaCutAuthoring_->authoring.get():nullptr;
     }
-    ~Session(){
-        if(coldController_.entity.reference00)std::terminate();
-        if(nativeTaCutChildPhase_==NativeTaCutChildPhase::constructed&&
-           !abortUnpublishedTaCutChildNative())std::terminate();
-    }
+    ~Session();
     Session(const Session&)=delete;Session& operator=(const Session&)=delete;
     Session(Session&&)=delete;Session& operator=(Session&&)=delete;
     const Result& diagnostic()const noexcept{return result_;}
@@ -1077,6 +1135,12 @@ public:
     const TVCameraUpdateOutput49F& pose()const noexcept{return pose_;}
     bool nativeHudVisible()const noexcept{return !(uiFlags1E4_&1u);}
     bool hasView()const noexcept{return publicationCount_!=0;}
+    // Concrete native presentation join for the consumed human RA route only.
+    // Rejects unissued/foreign Sessions; no fallback success or source callback
+    // acknowledgment. Frame must outlive output and its synchronous submit.
+    bool prepareNativeF8Frame50LA(rr::platform::VehicleWindowFrame50DS&,
+        std::unique_ptr<original_main_entry50KG::NativeF8BarPrefix50LA>&,
+        rr::game::OriginalRaceF8Diagnostic50LA&)const noexcept;
     // Exact camera scene38 parent, projected to the original zero-based zone48.
     // This is never a racer collision zone, AI map node or visible-zone guess.
     bool readCameraPrimaryZone48(std::uint32_t& out) noexcept {
@@ -1127,8 +1191,9 @@ public:
     //authored, app and every borrowed owner/backing must outlive this Session.
     //generation is the native race lifetime key; it does not assert a guest ID.
     Result prepare(std::uint64_t generation,const AuthoredInputs& authored,DisplayInputs& app){
+        if(f8Intro_.ownerThread_!=std::this_thread::get_id())return {Status::owner,0x1a93b0};
         invalidateFogPreparation();
-        // The consumed TA constructor has one retained, generation-bound
+        // The consumed TA/RA constructor has one retained, generation-bound
         // real74 collection. Other unpublished constructor experiments do not
         // admit this source lifecycle, and retired owners cannot be reused.
         if(coldController_.started&&(!taCuts_||coldController_.released||
@@ -1136,7 +1201,7 @@ public:
         // Unpublished constructor staging is a different private lifetime,
         // not evidence for the existing reduced native prepare chronology.
         if(nativeTaCutChildPhase_!=NativeTaCutChildPhase::empty)return set(Status::sourcePath,0x282860u);
-        if(nativeTaIssuance_&&generation!=nativeTaIssuance_->generation)return set(Status::owner);
+        if(nativeTaIssuance_&&(generation!=nativeTaIssuance_->generation||authored.course!=nativeTaIssuance_->course))return set(Status::owner);
         if(coldBound_||closed_)return set(Status::order);
         if(frameStage_==FrameStage::failed)return set(Status::terminal);
         const bool mc=authored.course==OriginalCameraStartCourse::mc;
@@ -1166,6 +1231,7 @@ public:
         // At this native cold caller, genuinely construct the represented
         // racer27E130/7F8/240 prefix, then concrete7FC/model lifetime below.
         // No physics/collection or outer manager attachment is inferred.
+        if(!bindCountedRaceCameraNative34())return set(Status::owner,0x1a93b0);
         if(!constructRacerEntityPrefixes())return fail(Status::sourcePath,result_.entityCold.sourcePC);
         if(!constructRacerModelPrefixes())return fail(Status::sourcePath,result_.entityCold.sourcePC);
         for(;;){
@@ -1189,8 +1255,27 @@ public:
                     result_.start=coldViewport_.advance(true,display_,sceneBorrow(),app.renderer,app.diagnostic);
                     if(result_.start.status!=OriginalCameraStartStatus::complete)return set(Status::renderer,result_.start.sourcePC);
                 }
-                result_.start=selectOriginalRaceScene26F940(display_,viewport_,app.rendererWidth4,app.rendererHeight8);
-                if(result_.start.status!=OriginalCameraStartStatus::complete)return set(Status::sourcePath,result_.start.sourcePC);
+                if(!coldCameraSelected26F940_){
+                    result_.start=selectOriginalRaceScene26F940(display_,viewport_,app.rendererWidth4,app.rendererHeight8);
+                    //26F948 precedes the dimension branch. Only the completed
+                    //equal-dimension path can publish its actual observation.
+                    observeSelectedGameplayCamera26F940();
+                    if(result_.start.status!=OriginalCameraStartStatus::complete)return set(Status::sourcePath,result_.start.sourcePC);
+                    coldCameraSelected26F940_=true;
+                }
+                // Actual renderer work and selection precede this bounded
+                // native adapter acceptance; numeric preparation alone cannot.
+                if(!completeCountedRaceCameraNative34())return set(Status::owner,0x1a93b0);
+                {
+                    std::uint32_t musicPC=0;
+                    if(!completeCountedRaceMusicNative10C(musicPC))return set(Status::owner,musicPC);
+                }
+                {
+                    std::uint32_t worldPC=0;
+                    if(!completeCountedRaceWorldNativePrefix1A9EE0(worldPC))return set(Status::owner,worldPC);
+                    //Bounded native scene/TOB prefix only; never1A9EE0/full-load or
+                    //permission for the original1A6D88/1A95B0 successor.
+                }
                 ++coldPhase_;break;
             case 2:{
                 if(authoredPhase_==0){
@@ -1203,8 +1288,11 @@ public:
                 // A source-positive count reaches the real74 cut collection.
                 // Never substitute the procedural7C path for those children.
                 if(startPrelude_.controllerCutCountA8()!=0){
-                    if(startPrelude_.controllerCutCountA8()!=3||!taCuts_||!coldController_.started||
-                       !actual_.taIntroAudio||!actual_.taIntroAuthoring||!actual_.actualRadarMapB8||
+                    if(!taCuts_||startPrelude_.controllerCutCountA8()!=taCuts_->cutCount()||!coldController_.started||
+                       !nativeTaIssuance_||nativeTaIssuance_->course!=authored.course||
+                       taCuts_->trackId()!=introTrackId(authored.course)||
+                       !actual_.taIntroAudio||!actual_.taIntroAuthoring||
+                       actual_.taIntroAuthoring->trackId()!=introTrackId(authored.course)||
                        !actual_.startMusicRequest||!actual_.introMusicFadeRequest)
                         return fail(Status::sourcePath,0x174fa4);
                     taPositive_=true;
@@ -1287,7 +1375,7 @@ public:
                 //count/ordinals are not retail parity. No dummy success owners.
                 if(taPositive_){
                     //1753CC follows the real first1756D0. Append actual7C only now.
-                    childOrder_[6]=key(start_);collection_.count30=7;
+                    childOrder_[3+taCuts_->cutCount()]=key(start_);collection_.count30=4+taCuts_->cutCount();
                     coldController_.children64[6]=&start_;
                 }else{
                     childOrder_={{key(follow_),key(death_),key(attached_),key(start_),0,0,0}};
@@ -1630,8 +1718,8 @@ public:
     // Native camera-only device press. Root dispatches real237DF0 transitions
     // through12815C/application routing before the next fixed simulation step.
     // This does not route driving input or sample a Player device for ALL8.
-    EventCallbackResult48Z press(const ManagerHeldSources49A& held,
-        InputEvent48Z& event,DeviceButtonRecord48Y& record) noexcept {
+    EventCallbackResult48Z cameraInput(const ManagerHeldSources49A& held,
+        InputEvent48Z& event,DeviceButtonRecord48Y& record,bool pressed) noexcept {
         invalidateFogPreparation();
         if(!coldBound_||abandoned_||pendingDisplayWork()||
            (frameStage_!=FrameStage::idle&&frameStage_!=FrameStage::published))return {false,0};
@@ -1649,8 +1737,12 @@ public:
         if(!actual_.bank.visit(0,[&](){return readOriginalFollowSceneTransitionInput(identity,key(scene_),
             {actual_.arena.nodes,actual_.arena.sceneNodeCount},actual_.bindings.animation.bodyScene288,
             actual_.collisionWorld,actual_.mainMembership690,zones,transition);}))return {false,0};
-        lastInput_=advanceOriginalCameraCyclePress176DF0({controller_,follow_,attached_,sceneBinding_,followChild_,
-            attachedChild_,*world,spatial_,zones,*work},environment,transition);
+        const auto oldMode=controller_.mode44;
+        OriginalCameraModeInputOwners owners{controller_,follow_,attached_,sceneBinding_,followChild_,
+            attachedChild_,*world,spatial_,zones,*work};
+        lastInput_=pressed?advanceOriginalCameraCyclePress176DF0(owners,environment,transition):
+            advanceOriginalCameraLookRelease1774A0(owners,environment,transition);
+        if(oldMode!=controller_.mode44)pose_.position=sceneBinding_.position180;
         if(lastInput_.status==OriginalCameraModeInputStatus::needsCycleAudio1A4B90){
             pose_.position=sceneBinding_.position180; //Actual177AB0 scene180 write.
             const auto sound=actual_.cycleAudio.dispatchEvent4();
@@ -1660,16 +1752,27 @@ public:
         }else if(lastInput_.status!=OriginalCameraModeInputStatus::needsChildRoute142350)return {false,0};
         // Generic Entity18 is distinct from camera collection38. Positive TA
         // traverses the real emitter; zero-cut paths retain empty Entity lists.
-        if(objectChildren_.controllerChild18)return routeTaEntityInput(event,record,true);
+        if(objectChildren_.controllerChild18)return routeTaEntityInput(event,record,pressed);
         const EventChildRouter48Z children{0x600u,noEventChild48Z,nullptr,0};
-        const auto routed=routeChildInputEvent48Z(children,true,event,record,nullptr,nullptr,0);
+        const auto routed=routeChildInputEvent48Z(children,pressed,event,record,nullptr,nullptr,0);
         return {routed.status==EventRouteStatus48Z::Complete,routed.handled?1u:0u};
     }
-    EventCallbackResult48Z release(InputEvent48Z& event,DeviceButtonRecord48Y& record) noexcept {
-        if(objectChildren_.controllerChild18)return routeTaEntityInput(event,record,false);
-        const EventChildRouter48Z children{0x600u,noEventChild48Z,nullptr,0};
-        const auto routed=routeChildInputEvent48Z(children,false,event,record,nullptr,nullptr,0);
-        return {routed.status==EventRouteStatus48Z::Complete,routed.handled?1u:0u};
+    EventCallbackResult48Z press(const ManagerHeldSources49A& held,
+        InputEvent48Z& event,DeviceButtonRecord48Y& record) noexcept {
+        return cameraInput(held,event,record,true);
+    }
+    EventCallbackResult48Z release(const ManagerHeldSources49A& held,
+        InputEvent48Z& event,DeviceButtonRecord48Y& record) noexcept {
+        //With neither temporary flag set,1774A0's held queries cannot write
+        //camera state. Preserve the existing effect-free release route even
+        //during intro/display work, which must not acquire a scene lease.
+        if(!(controller_.flags62&0x60u)){
+            if(objectChildren_.controllerChild18)return routeTaEntityInput(event,record,false);
+            const EventChildRouter48Z children{0x600u,noEventChild48Z,nullptr,0};
+            const auto routed=routeChildInputEvent48Z(children,false,event,record,nullptr,nullptr,0);
+            return {routed.status==EventRouteStatus48Z::Complete,routed.handled?1u:0u};
+        }
+        return cameraInput(held,event,record,false);
     }
     const OriginalCameraModeInputResult& lastInput()const noexcept{return lastInput_;}
     bool taSkipVideoPending()const noexcept{return frameStage_==FrameStage::taSkipVideo&&!taSkipBlockingFade_.complete();}
@@ -1715,8 +1818,11 @@ public:
     //restored camera base image. Root owns that real renderer publication, not this
     //numeric camera counter. The backend will capture/validate the image.
     Result advanceRaceFadeInPrefix(){
+        if(f8Intro_.ownerThread_!=std::this_thread::get_id())return {Status::owner,0x1a7bd0};
         if(abandoned_)return set(Status::abandoned);
         if(!coldBound_||!displayInputs_||(!exit_.complete()&&!directStart_.complete()&&!taSkipFadeFinished_)||!hasView())return set(Status::owner);
+        if(nativeTaIssuance_&&nativeTaIssuance_->course==OriginalCameraStartCourse::ra)
+            return advanceCanonicalRaceFadeInPrefix();
         auto& app=*displayInputs_;auto& video=app.video;
         if((video.flags404Low6&3u)&&!(video.flags404Low6&4u))return set(Status::videoPending);
         if(raceFlags1B0_&8u){
@@ -1741,18 +1847,30 @@ public:
     }
     // Genuine human root1A7DA0 precedes the racer child/physics schedule.
     // The same clock94/flags1B0 then reach this Session's ending camera.
+    OriginalHumanEndClockResult50KG advanceHumanEndRootWithOwners(float legacyDelta,
+        race_music50IE::Owner*,source_announcer50IE::Owner*)noexcept;
     OriginalHumanEndClockResult50KG advanceHumanEndRoot(float delta,bool musicActive,
         bool musicFading,bool announcerActive) noexcept {
+        if(f8Intro_.ownerThread_!=std::this_thread::get_id())
+            return {OriginalHumanEndClockStatus50KG::callerBoundary,0x1a7da0u,0};
         if(!actual_.humanCount34||!coldBound_||abandoned_||pendingDisplayWork()||
            (frameStage_!=FrameStage::idle&&frameStage_!=FrameStage::published))
             return {OriginalHumanEndClockStatus50KG::callerBoundary,0x1a7da0u,0};
+        if(nativeTaIssuance_&&nativeTaIssuance_->course==OriginalCameraStartCourse::ra)
+            return advanceCanonicalHumanEndRoot(); //Actual Root/audio, never these supplied observations.
         return endingClockCursor_.begin(endingClock_,actual_.race94,raceFlags1B0_,actual_.all8Manager.flags58,
             delta,musicActive,musicFading,announcerActive,true);
     }
     OriginalHumanEndClockResult50KG resumeHumanEndMusic(bool musicActive,bool announcerActive) noexcept {
+        if(f8Intro_.ownerThread_!=std::this_thread::get_id()||
+           (nativeTaIssuance_&&nativeTaIssuance_->course==OriginalCameraStartCourse::ra))
+            return {OriginalHumanEndClockStatus50KG::callerBoundary,0x1a7e84u,0};
         return endingClockCursor_.afterMusicFade(musicActive,announcerActive,true);
     }
     Result requestHumanEndFade(std::int32_t milliseconds) noexcept {
+        if(f8Intro_.ownerThread_!=std::this_thread::get_id())return {Status::owner,0x1a7f24};
+        if(nativeTaIssuance_&&nativeTaIssuance_->course==OriginalCameraStartCourse::ra)
+            return set(Status::sourcePath,0x1a7f24); //Canonical request is consumed by its exact owner.
         if(!actual_.humanCount34||!displayInputs_||!endingClockCursor_.pending())return set(Status::owner);
         auto& app=*displayInputs_;
         result_.start=requestOriginalHumanEndFade2AED60(app.video,app.fadeManagerA8,app.fadeDuration98,milliseconds);
@@ -1813,9 +1931,11 @@ public:
         if(pendingDisplayWork())return set(Status::videoPending);
         if(frameStage_!=FrameStage::idle&&frameStage_!=FrameStage::published&&
            frameStage_!=FrameStage::failed)return set(Status::order);
+        if(!revokeCountedRaceCameraNative34())return set(Status::owner,0x1a93b0);
         // Once source ownership starts retiring, a partial failure can only
         // resume cleanup. It must not re-enter normal simulation/constructor work.
         coldBound_=false;frameStage_=FrameStage::failed;
+        invalidateSelectedGameplayCamera50LA();
         // Unpublished native custody closes independently of fresh issuer
         // admission; root borrows may already be terminal during abandonment.
         if(nativeTaCutChildPhase_!=NativeTaCutChildPhase::empty&&
@@ -1841,7 +1961,9 @@ public:
     //flags, countdown, RNG and racer history remain exactly as abandoned.
     Result abandonAndCloseSpatial(){
         invalidateFogPreparation();
+        if(!revokeCountedRaceCameraNative34())return set(Status::owner,0x1a93b0);
         abandoned_=true;coldBound_=false;frameStage_=FrameStage::failed;
+        invalidateSelectedGameplayCamera50LA();
         if(closed_)return set(Status::abandoned);
         // Unpublished native custody closes independently of fresh issuer
         // admission; root borrows may already be terminal during abandonment.

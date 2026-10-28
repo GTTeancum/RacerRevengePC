@@ -6,7 +6,7 @@
 #include <utility>
 
 namespace ra_static_world50LA {class Owner;}
-namespace rr::game { class OriginalRaceConstructor50LA; class OriginalPauseStorage50LA; class OriginalTimeStats50LA; class OriginalSpeedBoost50LA; class OriginalDamage50LA; class OriginalPositionStatsResources50LA; }
+namespace rr::game {class OriginalRaceF850LA;  class OriginalResults10450LA; class OriginalRaceConstructor50LA; class OriginalPauseStorage50LA; class OriginalTimeStats50LA; class OriginalSpeedBoost50LA; class OriginalDamage50LA; class OriginalPositionStatsResources50LA; }
 namespace rr::platform {class OriginalUiGarageQuad50KG;class OriginalUiMemoryCardConstructor50KG;}
 namespace rr::assets {
 // The one Application-owned canonical382B38/382B70/383400 domain. Its tables
@@ -29,6 +29,9 @@ class OriginalStandardMaterialDomain50LA final {
     friend class rr::game::OriginalTimeStats50LA;
     friend class rr::game::OriginalPositionStatsResources50LA;
     friend class rr::game::OriginalPauseStorage50LA;
+    friend class rr::game::OriginalResults10450LA;
+    friend class OriginalResultsPrimitiveReferences50LA;
+    friend class rr::game::OriginalRaceF850LA;
     friend class rr::game::OriginalRaceConstructor50LA;
     std::shared_ptr<const OriginalUiMaterialApplication50LA> application_;
     std::shared_ptr<OriginalStandardProgramTable50LA> programs_;

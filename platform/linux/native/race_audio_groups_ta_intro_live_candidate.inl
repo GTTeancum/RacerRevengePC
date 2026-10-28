@@ -30,16 +30,16 @@ inline bool RaceAudioGroups50IC::finishTaIntro177750(game::OriginalWreckComponen
     // its actual cue-map5C. No claimed callback result is consumed as proof.
     if(taIntroExpectedController_!=&controller||taIntroLive_||!taIntroTransport_||
        !taIntroTransport_->current()||!coldTaIntroEmitterIdentity()||
-       coldTaIntroEmitter_->count200!=3||!attachTaIntro141960(controller))return false;
+       coldTaIntroEmitter_->count200!=coldTaIntroEmitter_->group30->taIntroAuthoring->eventCount()||!attachTaIntro141960(controller))return false;
     taIntroLive_=true;return taIntroReady();
 }
 inline bool RaceAudioGroups50IC::taIntroReady()const noexcept {
     if(!taIntroLive_||!taIntroTransport_||!taIntroTransport_->current()||
        coldRetiring_||nativeBindingsRetired_||!coldTaIntroEmitterIdentity())return false;
     const auto& emitter=*coldTaIntroEmitter_;
-    if(!emitter.controllerParent||!emitter.everAttached||emitter.count200!=3||emitter.pendingEvent)return false;
+    if(!emitter.controllerParent||!emitter.everAttached||emitter.count200!=emitter.group30->taIntroAuthoring->eventCount()||emitter.pendingEvent)return false;
     bool selectedSoundKnown=emitter.sound1F0==nullptr;
-    for(std::size_t n=0;n<3;++n){
+    for(std::size_t n=0;n<emitter.count200;++n){
         const auto& sound=*emitter.ownedEvents[n]->sound04.value();
         selectedSoundKnown=selectedSoundKnown||emitter.sound1F0==&sound;
         if(sound.channel2C>=0&&sound.channel2C!=static_cast<std::int32_t>(taIntroLatest_[n].serial))return false;

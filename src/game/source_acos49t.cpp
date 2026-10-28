@@ -212,6 +212,23 @@ bool SourceUiLightMath50KG::luminance146E60(std::uint32_t r,std::uint32_t g,std:
     output=to_float(add(red,sum));return true;
 }
 
+bool SourceUiLightMath50KG::luminanceRaRemaining146E60(std::uint32_t r,std::uint32_t g,std::uint32_t b,
+    std::uint32_t& output)noexcept {
+    //Exact admitted half-RGB triples from retained RA source rows18..185:
+    //(-80),(-8),(-50),(-60),(200),(150), and(186,186,165), each /2.
+    //No positivity clamp or broader UI/parser admission. False preserves out.
+    const bool gray=r==g&&g==b&&(r==0xc2200000u||r==0xc0800000u||r==0xc1c80000u||
+        r==0xc1f00000u||r==0x42c80000u||r==0x42960000u);
+    if(!gray&&!(r==0x42ba0000u&&g==0x42ba0000u&&b==0x42a50000u))return false;
+    //Same signed source software-double widen/multiply/add/narrow operations
+    //and original146E60 order/constants as the existing nonnegative caller.
+    const D blue=mul(0x3fbd2f1a9fbe76c9ull,from_float(b));
+    const D green=mul(0x3fe2c8b439581062ull,from_float(g));
+    const D sum=add(blue,green);
+    const D red=mul(0x3fd322d0e5604189ull,from_float(r));
+    output=to_float(add(red,sum));return true;
+}
+
 #ifdef RR_SOURCE_ACOS49T_TEST_API
 namespace source_acos49t_test {
 std::uint64_t arithmetic(Operation op, std::uint64_t a, std::uint64_t b) noexcept {

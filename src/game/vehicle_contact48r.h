@@ -94,4 +94,33 @@ enum class VehicleContactStatus48R {
 VehicleContactStatus48R runVehicleContacts48R(const VehicleContactInput48R&,
     const VehicleContactSource48R&,const VehicleContactBuffers48R& scratch,
     const VehicleContactBuffers48R& destination,VehicleContactResult48R&) noexcept;
+//Separate pure source phases for an ALREADY computed actual1202E0 half.
+//No shape-tag fiction, scene getter, body callback, record/reset or prologue.
+//These do not assert any source caller returned. Caller must obtain the half
+//from its genuine type0/type1/etc resource owner and authenticate the process
+//scale word and current vehicle364 radius. Every failure preserves output.
+struct VehicleContactGeometryInput48R {
+    SpringVector4_48N position,up,cachedCenter;
+    Vector3_48C boundsHalf;
+    float vehicleRadius=0;
+    std::uint32_t radiusScaleWord=0;
+};
+struct VehicleContactGeometryPrefix48R {
+    bool hit=false;
+    float candidateRadius=0;
+    SpringVector4_48N normal,vehicleSurface;
+};
+//21952C..2196E8, ending BEFORE the first actual scene190/28BD50 call.
+//Miss is successful hit=false. On hit the two later local-scene operations
+//and final candidate-surface computation remain distinct ordered phases.
+bool prepareVehicleContactGeometry48R(const VehicleContactGeometryInput48R&,
+    VehicleContactGeometryPrefix48R&) noexcept;
+//Pure28BD50 inverse-point arithmetic, AFTER caller's real scene cache getter.
+//Call twice in source order, with the actual getter effects retained separately.
+bool prepareVehicleContactLocalPoint48R(const BodyMatrix48G&,
+    const SpringVector4_48N&,SpringVector4_48N&) noexcept;
+//219710..219774, AFTER both actual local-scene calls, BEFORE body+98 calls.
+bool prepareVehicleContactCandidateSurface48R(const SpringVector4_48N& cachedCenter,
+    const SpringVector4_48N& normal,float candidateRadius,SpringVector4_48N&) noexcept;
+
 }

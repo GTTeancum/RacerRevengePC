@@ -58,13 +58,20 @@ public:
     bool prepare(const assets::OriginalUiEnglish50KG&,const assets::OriginalUiScreenAssets50KG&,
         std::uint32_t fontImage,std::uint32_t iconXImage,std::uint32_t iconTriImage,Diagnostic&) noexcept;
     bool project(const OriginalUiControllerPopupRender50KG&,Diagnostic&) noexcept;
+    const std::array<OriginalUiControllerPopupText50KG,3>& garagePurchaseTexts()const noexcept{return textVariants_[1];}
+    const std::array<OriginalUiControllerPopupText50KG,3>& startTexts(const OriginalUiControllerPopupState50KG& state)const noexcept {
+        return textVariants_[state.garagePurchaseText?1:state.hasConfirm3D0&&state.hasCancel3D4?2:0];
+    }
     bool prepared()const noexcept{return prepared_;}
     std::size_t packetCount()const noexcept{return packetCount_;}
     const std::array<OriginalUiControllerPopupPacket50KG,maximumPackets>& packets()const noexcept{return packets_;}
-    const std::array<OriginalUiControllerPopupText50KG,3>& screenTexts()const noexcept{return texts_;}
+    const std::array<OriginalUiControllerPopupText50KG,3>& screenTexts()const noexcept{return textVariants_[selectedTexts_];}
 private:
     bool prepared_=false;
-    std::array<OriginalUiControllerPopupText50KG,3> texts_{};
+    // Cold-prepared original strings: Controller2, Garage, Controller2 after
+    // Garage (null a3 retains the original No label and hasCancel flag).
+    std::array<std::array<OriginalUiControllerPopupText50KG,3>,3> textVariants_{};
+    std::size_t selectedTexts_=0;
     std::array<OriginalUiOverlayQuad50KG,6> quads_{}; // dim, cross, triangle, three strips.
     std::array<OriginalUiControllerPopupPacket50KG,maximumPackets> packets_{};
     std::size_t packetCount_=0;

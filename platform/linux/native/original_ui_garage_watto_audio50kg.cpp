@@ -102,7 +102,7 @@ bool OriginalUiGarageWattoAudio50KG::prepare(const std::filesystem::path& root,
   if(sceneAudio){OriginalUiGarageDroidAudio50GN::Observation observed;
    need(sceneAudio->inspect(observed)&&observed.mixer==&mixer&&sceneAudio->transportValid(),"Watto requires the actual retained Droid transport range, not later Scene construction");}
   need(mixer.count()==frontendVoices&&mixer.sampleRate()&&!mixer.mixedFrames()&&!mixer.requiresVoiceGroupGains50IC()&&mixer.masterGain()==1.f,
-   "Watto requires the explicit cold49 or authenticated aggregate53 frontend transport");
+   "Watto requires the explicit cold49 or authenticated aggregate55 frontend transport");
   need(mixer.originalSoundMode50KG()&&mixer.originalSoundMode50KG()->ready(),"Watto requires the real application sound-mode owner");
   for(std::size_t i=0;i<instanceCount;++i)need(!mixer.active(firstVoice+i)&&!mixer.hasVoiceGroupGain50IC(firstVoice+i),"Watto subgroup already occupied or bound");
   authenticatedRead(root,"UIWATTO.INI",3075,"47a83b53b2bf076eb12e6a82a866137bf03c3e215905366611dcfa9ca8c220c5");

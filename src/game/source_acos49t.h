@@ -1,3 +1,4 @@
+namespace ra_pod_scene50LA {class Owner;}
 #pragma once
 #include <cstdint>
 
@@ -42,11 +43,15 @@ bool sourceSinePositiveReduced50IG(std::uint32_t inputBits,std::uint32_t& output
 // Concrete reached146898/146E60 use of the SAME source software-double
 // operations. Private finite nonnegative RGB envelope, not a parser policy.
 class SourceUiLightMath50KG final {
+    friend class ::ra_pod_scene50LA::Owner; //Reached RA146720/146E60 only.
     friend class ::rr::platform::OriginalUiGarageUiLights50KG;
     friend class ::rr::platform::OriginalUiGarageSceneLighting50KG;
     static std::uint32_t range146898()noexcept;
     static bool luminance146E60(std::uint32_t r,std::uint32_t g,std::uint32_t b,
         std::uint32_t& output)noexcept;
+    //Actual RA remainder signed diffuse cohort only; UI envelope unchanged.
+    static bool luminanceRaRemaining146E60(std::uint32_t,std::uint32_t,std::uint32_t,
+        std::uint32_t&)noexcept;
 };
 
 #ifdef RR_SOURCE_ACOS49T_TEST_API

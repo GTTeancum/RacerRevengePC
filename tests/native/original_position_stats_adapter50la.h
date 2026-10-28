@@ -1,6 +1,7 @@
 #pragma once
 // Actual packed-racer view0 numeric observation. No scheduling or drawing is implied.
 namespace original_main_entry50KG { struct Application; }
+namespace rr::game { class OriginalResults10450LA; class OriginalRaceConstructor50LA; }
 #include "original_camera_session50kx.h"
 #include "original_subtype3_record_owner50la.h"
 #include "native_ai_session50iv_fixture.h"
@@ -10,6 +11,8 @@ namespace original_main_entry50KG { struct Application; }
 namespace original_position_stats_adapter50LA {
 class Owner final {
     friend struct original_main_entry50KG::Application;
+    friend class rr::game::OriginalResults10450LA;
+    friend class rr::game::OriginalRaceConstructor50LA;
     using Camera=original_camera_session50KX::Session;
     // Source camera preparation constructs these two exact view0 identities.
     // Human count alone cannot authorize an AI/player reinterpretation.
@@ -109,6 +112,61 @@ public:
         }catch(...){d.status=Status::read;return false;}
     }
 private:
+    // Private synchronous Results CPU read; not an original managerB0
+    // construction receipt, live renderer lease, or public snapshot input.
+    // Only the concrete Results owner can request/consume these actual rows.
+    struct ResultsRows {
+        struct Row {
+            std::uint32_t vehicle58=0,racer60=0,retirementCD4=0;
+            std::int32_t placeCCC=0,lapCC8=0;
+            std::uint8_t flagsCD8=0;
+            float timeCB8=0,valueCBC=0,remainingCC4=0;
+        };
+        std::array<Row,8> rows{};
+        std::size_t count=0;
+        const Bank* bank=nullptr;
+        float trackLength38=0;
+        std::uint64_t generation=0,publication=0;
+    };
+    // Separate selected-row borrow for1C9B10; no extra roster display reads.
+    struct ResultsRecordIdentity {
+        const Bank* bank=nullptr;
+        const rr::game::OriginalApplicationEntities50LA* application=nullptr;
+        const rr::assets::OriginalStandardMaterialTable50LA* materials=nullptr;
+        std::uint64_t generation=0,publication=0;
+        std::size_t managerIndex=0;
+        std::uint32_t vehicle58=0,racer60=0;
+    };
+    bool captureResultsRecordIdentity(const rr::game::OriginalApplicationEntities50LA*,
+        const rr::assets::OriginalStandardMaterialTable50LA*,std::uint64_t generation,
+        std::size_t managerIndex,ResultsRecordIdentity&,Diagnostic&)const noexcept;
+    bool resultsRecordIdentityCurrent(const ResultsRecordIdentity&)const noexcept;
+    bool readResultsBestLapCB4(const ResultsRecordIdentity&,float&,Diagnostic&)const noexcept;
+    bool readResultsRaceTimeCB8(const ResultsRecordIdentity&,float&,Diagnostic&)const noexcept;
+    //Only the three actual lap-array reads reached by1C8430..843C.
+    bool readResultsLapCC0(const ResultsRecordIdentity&,std::size_t,float&,Diagnostic&)const noexcept;
+    // Actual current lane only: never a credited-destruction certificate.
+    bool readResultsObservedTimingCD0(const ResultsRecordIdentity&,std::uint32_t&,Diagnostic&)const noexcept;
+    const Bank* resultsBankIdentity()const noexcept {
+        return camera_?&camera_->actual_.bank:nullptr; //No Bank dereference.
+    }
+    bool captureResultsRows(const rr::game::OriginalApplicationEntities50LA*,
+        const rr::assets::OriginalStandardMaterialTable50LA*,std::uint64_t,
+        ResultsRows&,Diagnostic&)const noexcept;
+    bool resultsRowsCurrent(const rr::game::OriginalApplicationEntities50LA*,
+        const rr::assets::OriginalStandardMaterialTable50LA*,std::uint64_t,
+        std::uint64_t)const noexcept;
+    //Private exact end-query facets; reuse selected-row identity/timing reads,
+    //not the display roster's sorting or positive-place restrictions.
+    struct EndObservation {
+        std::uint64_t publication=0;
+        std::int32_t managerCount30=0;
+    };
+    bool captureEndObservation1AB520(const rr::game::OriginalApplicationEntities50LA*,
+        const rr::assets::OriginalStandardMaterialTable50LA*,std::uint64_t,
+        EndObservation&,Diagnostic&)const noexcept;
+    bool readEndRetirementCD4(const ResultsRecordIdentity&,std::uint32_t&,Diagnostic&)const noexcept;
+    bool readEndPlaceCCC(const ResultsRecordIdentity&,std::int32_t&,Diagnostic&)const noexcept;
     struct RadarObservation {
         const rr::game::TrackNavigation50EU* map=nullptr;
         rr::game::TrackNavigationView50EU mbMap{};

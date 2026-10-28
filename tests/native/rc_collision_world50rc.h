@@ -142,7 +142,7 @@ public:
  };
  Owner()=default;Owner(const Owner&)=delete;Owner&operator=(const Owner&)=delete;
  Owner(Owner&&)=delete;Owner&operator=(Owner&&)=delete;
- ~Owner(){if(!thread()||!retire())std::terminate();}
+ ~Owner();
  bool prepareGround(std::shared_ptr<const rc_cold_sources50LA::Owner> source,
      rr::assets::TrackCollisionMasks50AN masks,const std::vector<std::uint8_t>& actualPhy,
      unsigned actualGridRank,std::string& error) {

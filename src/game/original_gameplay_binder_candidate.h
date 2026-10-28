@@ -37,10 +37,11 @@ enum class Status : std::uint8_t {
 Status project(const VehicleFrameState49W&,const VehicleFrameBindings49W&,
     const Bindings&,const std::array<float,3>& cameraColumn,
     OriginalUiRiderBinderQuad50KG&,Workspace&) noexcept;
-//23CB20's Diffuse quad overrides light directions with identity, directional
-// colors with zero, and copies CURRENT LightManager+50 into color row27.
-// All four packed lanes use323E68..323ED8's +2^23 then upper-clamp operation.
-// Caller supplies a source-owned +50 observation; no white/zone fallback.
+//23CB20's Diffuse quad overrides light directions with identity and zeros
+// directional color rows. Ordinary213A40/150450 selects field40=1, so23CA50
+// copies the strip's color70 (PHY Binder/VertexColor via23D750) into row27.
+// The LightManager+50 branch belongs only to field40=0 and is NOT the ordinary
+// gameplay Binder. All four lanes retain323E68..323ED8's source packing.
 Status shade(const OriginalUiRiderBinderQuad50KG&,
-    const std::array<float,4>& currentAmbient50,Mesh&) noexcept;
+    const std::array<float,4>& sourceColor70,Mesh&) noexcept;
 }

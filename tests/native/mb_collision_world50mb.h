@@ -31,7 +31,7 @@ class Owner final : public std::enable_shared_from_this<Owner> {
  bool attempted_=false,groundReady_=false,storageAttempted_=false,ready_=false;
  static constexpr std::uint32_t triggerIdentity=0x36000000u;
 public:
- ~Owner(){if(actionOwner_||std::this_thread::get_id()!=ownerThread_)std::terminate();}
+ ~Owner();
  Owner()=default;Owner(const Owner&)=delete;Owner&operator=(const Owner&)=delete;
  Owner(Owner&&)=delete;Owner&operator=(Owner&&)=delete;
  bool prepareGround(const authored_runtime_ground50cp_fixture::Request& request,

@@ -1,12 +1,14 @@
 #pragma once
-// PRIVATE, UNACTIVATED SOURCE CANDIDATE. Not compiled or executed.
-// Exact original TA authoring bytes only. This is not child282860, a Camera,
+// Bounded immutable TA/RA authoring. This source-only change is untested.
+// Exact original authoring bytes only. This is not child282860, a Camera,
 // a live resource mount, an Entity, a readiness receipt or VU-normalized arrays.
-// No I/O, runtime registration, native asset packing, fixtures or integration.
+// No I/O, runtime registration, native asset packing or fabricated fixtures.
+#include "original_track_cut_identity50la.h"
 #include <array>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <limits>
 #include <memory>
 #include <string_view>
 #include <vector>
@@ -79,6 +81,20 @@ inline std::uint32_t word(const std::uint8_t* p) noexcept {
     return std::uint32_t(p[0]) | (std::uint32_t(p[1]) << 8) |
         (std::uint32_t(p[2]) << 16) | (std::uint32_t(p[3]) << 24);
 }
+inline bool decimalValue(const std::vector<std::uint8_t>& bytes,std::size_t at,
+    std::uint32_t& output) noexcept {
+    if(at>=bytes.size()||bytes[at]<'0'||bytes[at]>'9')return false;
+    std::uint32_t value=0;
+    for(unsigned digits=0;digits<10&&at<bytes.size();++digits,++at){
+        const auto c=bytes[at];
+        if(c<'0'||c>'9')return false;
+        const auto digit=static_cast<std::uint32_t>(c-'0');
+        if(value>(std::numeric_limits<std::uint32_t>::max()-digit)/10u)return false;
+        value=value*10u+digit;
+        if(at+1<bytes.size()&&bytes[at+1]==0){output=value;return true;}
+    }
+    return false;
+}
 }
 
 namespace rr::assets {
@@ -112,50 +128,60 @@ public:
     OriginalTaCutAuthoringCandidate& operator=(OriginalTaCutAuthoringCandidate&&) = delete;
     ~OriginalTaCutAuthoringCandidate() = default;
 
-    // Atomically return immutable owned source authoring only. Expected order:
-    // exact TA.tob, TA01.vub, TA02.vub, TA03.vub resolved from original TA.RES.
-    // This independently checks member bytes, NOT a live archive provider.
+    // Compatibility entry: the historical four-member overload remains TA.
     static std::unique_ptr<const OriginalTaCutAuthoringCandidate> create(
         const std::array<Input,4>& input, Status& status) noexcept {
+        return create("TA",input.data(),input.size(),status);
+    }
+    // Atomically return immutable owned original authoring only. The order is
+    // the selected track's TOB followed by its exact numbered VUB members.
+    // This checks owned bytes independently; it does not certify a live mount.
+    static std::unique_ptr<const OriginalTaCutAuthoringCandidate> create(
+        std::string_view trackId,const Input* input,std::size_t memberCount,Status& status) noexcept {
         using namespace ta_cut_authoring_candidate_detail;
         status = Status::input;
-        for (std::size_t i=0; i<4; ++i) {
-            if (!input[i].bytes || input[i].size != sizes_[i] ||
-                input[i].originalMember != members_[i]) return nullptr;
+        if(!input||(trackId!="TA"&&trackId!="RA"&&trackId!="GC"&&trackId!="SA"&&trackId!="MA"&&trackId!="GA"))return nullptr;
+        const auto* identity=originalTrackCutIdentity50LA(trackId);
+        if(!identity||identity->cutCount!=(trackId=="TA"?3u:trackId=="RA"?7u:(trackId=="SA"||trackId=="GA")?5u:4u)||
+           memberCount!=static_cast<std::size_t>(identity->cutCount)+1u)return nullptr;
+        for (std::size_t i=0; i<memberCount; ++i) {
+            const auto& member=identity->members[i];
+            if (!input[i].bytes || input[i].size != member.size ||
+                input[i].originalMember != member.name) return nullptr;
         }
         try {
             auto next = std::unique_ptr<OriginalTaCutAuthoringCandidate>(
-                new OriginalTaCutAuthoringCandidate);
-            for (std::size_t i=0; i<4; ++i) {
+                new OriginalTaCutAuthoringCandidate(*identity));
+            for (std::size_t i=0; i<memberCount; ++i) {
                 next->bytes_[i].assign(input[i].bytes,input[i].bytes+input[i].size);
                 const auto& owned = next->bytes_[i];
-                if (!hashMatches(owned.data(),owned.size(),digests_[i])) {
+                if (!hashMatches(owned.data(),owned.size(),identity->members[i].sha256)) {
                     status = Status::identity; return nullptr;
                 }
             }
-            // TOB is exact-hash pinned; offsets are original serialized value
-            // locations, not copied scene state or an invented fallback zone.
-            const auto& tob = next->bytes_[0];
-            if (tob[3256] != '3' || tob[3257] != 0) {
+            // Exact-hash-pinned TOB offsets are serialized source values,
+            // not copied Scene state or an invented fallback initial zone.
+            const auto& tob = next->bytes_[0];std::uint32_t cuts=0;
+            if (!decimalValue(tob,identity->cutCountOffset,cuts)||cuts!=identity->cutCount) {
                 status = Status::layout; return nullptr;
             }
-            for (std::size_t cut=0; cut<3; ++cut) {
+            for (std::size_t cut=0; cut<identity->cutCount; ++cut) {
                 const auto& owned = next->bytes_[cut+1]; const auto* p = owned.data();
-                const auto frames = frameCounts_[cut];
-                if (word(p)!=1 || word(p+4)!=frames || word(p+8)!=1 ||
+                const auto frames = identity->frames[cut];std::uint32_t zone=0;
+                if (!frames||owned.size()<12u||word(p)!=1 || word(p+4)!=frames || word(p+8)!=1 ||
                     owned.size()!=12u+std::size_t(frames)*116u ||
-                    tob[zoneOffsets_[cut]]!=zoneAscii_[cut] ||
-                    tob[zoneOffsets_[cut]+1]!=0) {
+                    !decimalValue(tob,identity->zoneOffsets[cut],zone)||zone!=identity->zones[cut]) {
                     status = Status::layout; return nullptr;
                 }
+                next->initialZones_[cut]=zone;
                 for (std::uint32_t frame=0; frame<frames; ++frame) {
                     const auto* row=p+12u+std::size_t(frame)*116u;
                     if (word(row)!=frame || word(row+4)!=1 || word(row+8)!=0 ||
                         std::memcmp(row+12,"camera",7)!=0) {
                         status = Status::layout; return nullptr;
                     }
-                    // Raw exact byte identities already authenticate the
-                    // nonzero name tails. Never discard or interpret them.
+                    // Raw identities authenticate all64 name bytes, including
+                    // nonzero tails. Never discard or reinterpret those bytes.
                     for (std::size_t lane=0; lane<10; ++lane) {
                         if ((word(row+76+lane*4)&0x7f800000u)==0x7f800000u) {
                             status = Status::layout; return nullptr;
@@ -167,11 +193,13 @@ public:
             return std::unique_ptr<const OriginalTaCutAuthoringCandidate>(next.release());
         } catch (...) { status = Status::allocation; return nullptr; }
     }
-    // All public cut ordinals are original1..3; source frame indices are0-based.
+    std::string_view trackId() const noexcept {return identity_->trackId;}
+    unsigned cutCount() const noexcept {return identity_->cutCount;}
+    // Cut ordinals are original1..cutCount(); source frame indices are0-based.
     bool frameBits(unsigned cutOrdinal, std::uint32_t frame,
         OriginalTaCutFrameBitsCandidate& output) const noexcept {
         using ta_cut_authoring_candidate_detail::word;
-        if (cutOrdinal<1 || cutOrdinal>3 || frame>=frameCounts_[cutOrdinal-1])
+        if (cutOrdinal<1 || cutOrdinal>cutCount() || frame>=identity_->frames[cutOrdinal-1])
             return false;
         const auto* row=bytes_[cutOrdinal].data()+12u+std::size_t(frame)*116u;
         OriginalTaCutFrameBitsCandidate next;
@@ -181,31 +209,23 @@ public:
         output=next; return true;
     }
     std::uint32_t frameCount(unsigned cutOrdinal) const noexcept {
-        return cutOrdinal>=1 && cutOrdinal<=3 ? frameCounts_[cutOrdinal-1] : 0;
+        return cutOrdinal>=1 && cutOrdinal<=cutCount() ? identity_->frames[cutOrdinal-1] : 0;
     }
     bool initialZone(unsigned cutOrdinal, std::uint32_t& output) const noexcept {
-        if (cutOrdinal<1 || cutOrdinal>3) return false;
-        output=std::uint32_t(bytes_[0][zoneOffsets_[cutOrdinal-1]]-'0');
+        if (cutOrdinal<1 || cutOrdinal>cutCount()) return false;
+        output=initialZones_[cutOrdinal-1];
         return true;
     }
     Bytes originalTobBytes() const noexcept {return {bytes_[0].data(),bytes_[0].size()};}
     Bytes originalVubBytes(unsigned cutOrdinal) const noexcept {
-        if (cutOrdinal<1 || cutOrdinal>3) return {};
+        if (cutOrdinal<1 || cutOrdinal>cutCount()) return {};
         const auto& b=bytes_[cutOrdinal]; return {b.data(),b.size()};
     }
 private:
-    OriginalTaCutAuthoringCandidate() = default;
-    std::array<std::vector<std::uint8_t>,4> bytes_;
-    inline static constexpr std::array<const char*,4> members_{{
-        "tracks\\ta.tob","tracks\\ta01.vub","tracks\\ta02.vub","tracks\\ta03.vub"}};
-    inline static constexpr std::array<std::size_t,4> sizes_{{13887,53488,17528,17528}};
-    inline static constexpr std::array<const char*,4> digests_{{
-        "11e4c4909bf866fee626977c970d9907d4f191c29eeff32bddd162f173916f6b",
-        "ad0a75b4e37e7e21f3fa29162c00dc4bc482b2f2d04066e5255edbd49a41147c",
-        "ba15e426727250fdf7d25a0c7378d5323624a7504eb79cd9792eadd85f079e05",
-        "fe7f6b12b3ddcb695f39b47d0a4e9cb89847e9639461d0b8ca03d4c05ed78456"}};
-    inline static constexpr std::array<std::uint32_t,3> frameCounts_{{461,151,151}};
-    inline static constexpr std::array<std::size_t,3> zoneOffsets_{{3109,3158,3207}};
-    inline static constexpr std::array<std::uint8_t,3> zoneAscii_{{'9','5','6'}};
+    explicit OriginalTaCutAuthoringCandidate(const OriginalTrackCutIdentity50LA& identity) noexcept
+        :identity_(&identity){}
+    const OriginalTrackCutIdentity50LA* const identity_;
+    std::array<std::vector<std::uint8_t>,8> bytes_;
+    std::array<std::uint32_t,7> initialZones_{};
 };
 }

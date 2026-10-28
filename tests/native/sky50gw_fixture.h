@@ -4,6 +4,7 @@
 #include "mb_original_world50lm.h"
 #include "tc_original_world50lm.h"
 #include "rc_cold_sources50la.h"
+#include "ra_cold_sources50la.h"
 #include "tb_cold_sources50la.h"
 #include "gb_cold_sources50la.h"
 #include "../../src/assets/import_decode48c.h"
@@ -13,6 +14,8 @@
 // Cold authenticated bridge for original TA/GC/GA/MA/SA/RA/MB/TC sky members. Cube geometry is the direct
 // 12A8A0 source constructor, not an invented enclosing mesh. Only authored
 // face/tile mask bits produce geometry. Images are genuine decoded IPUM bytes.
+namespace ra_pod_scene50LA {class Owner;}
+namespace ra_cold_aggregate50LA {class Owner;}
 namespace sky50gw_fixture {
 namespace a = rr::assets;
 constexpr std::uint32_t tileCount = 48, vertexCount = 192, indexCount = 288;
@@ -37,6 +40,10 @@ struct Request {
     // Appended typed synchronous borrow from TB's authentic indexed source.
     const tb_cold_sources50LA::Owner* retainedTbSource = nullptr;
     std::shared_ptr<const gb_cold_sources50LA::Owner> retainedGbSource; // Seven internal GB cubes, same retained source.
+    // Appended typed pin for the actual RA aggregate's original cold producer.
+    // When supplied it MUST name the same archive as retainedArchive. This
+    // captures native provenance now, never retrospectively from loaded().
+    std::shared_ptr<const ra_cold_sources50LA::Owner> retainedRaSource;
 };
 struct Span {
     std::uint32_t indexStart = 0, indexCount = 0, vertexStart = 0, vertexCount = 0;
@@ -243,11 +250,37 @@ inline a::Vertex48B vertex(std::uint32_t face, std::uint32_t x,
 } // namespace detail
 
 class Owner final {
+    friend class ::ra_pod_scene50LA::Owner;
+    friend class ::ra_cold_aggregate50LA::Owner;
+    struct NativeRaSourceProof {
+        enum class DecodeRoute { originalIpuLargestMip, authenticatedPredecoded };
+        struct Tile {
+            std::uint32_t face=0,tile=0,offset=0,bytes=0;
+            const char* sourceSha256=nullptr;
+            const char* imageSha256=nullptr;
+            const a::MaterialTextureAsset50EA* image=nullptr;
+        };
+        std::shared_ptr<const ra_cold_sources50LA::Owner> source;
+        const a::ResArchive48C* archive=nullptr;
+        const std::string* member=nullptr;
+        const std::uint8_t* memberData=nullptr;
+        std::size_t memberOrdinal=0,memberOffset=0,memberBytes=0;
+        const char* memberSha256=nullptr;
+        DecodeRoute decodeRoute=DecodeRoute::authenticatedPredecoded;
+        std::array<Tile,tileCount> tiles{};
+        std::size_t consumedTiles=0;
+        const a::Mesh48B* mesh=nullptr;
+        const a::MaterialTextureAssets50EA* bank=nullptr;
+        const std::vector<Span>* spans=nullptr;
+        // Native original-producer proof only: no FileManager first-provider,
+        // guest file handle, all-mip decode, source texture refs or GPU receipt.
+    };
     struct Storage {
         a::Mesh48B mesh;
         a::MaterialTextureAssets50EA bank;
         std::vector<Span> spans;
         std::array<float,4> clearRgba{};
+        std::unique_ptr<NativeRaSourceProof> nativeRaProof;
     };
     std::unique_ptr<Storage> storage_;
     std::shared_ptr<const gb_cold_sources50LA::Owner> gbSource_;
@@ -271,6 +304,10 @@ public:
     // owner through all dependent GPU uploads. The mesh already includesY+1024.
     bool load(const Request& request, Diagnostic& d) noexcept {
         using namespace detail;
+        if(request.retainedRaSource&&request.track!=track_source_fixture::Track::ra){
+            try { d.message="Typed RA sky source cannot supply another track"; } catch (...) {}
+            return false;
+        }
         if(request.track==track_source_fixture::Track::gb)return loadGb(request,d);
         if(request.retainedGbSource){d.message="GB source cannot supply another track sky";return false;}
         try {
@@ -282,6 +319,11 @@ public:
                 unsigned(bool(request.retainedTbSource))<=1u, "Ambiguous retained sky owners");
             need(!request.retainedArchive || request.track == track_source_fixture::Track::ra, "Retained sky archive requires explicit RA identity");
             const a::ResArchive48C* retainedArchive=request.retainedArchive;
+            if(request.retainedRaSource){
+                const auto* ra=request.retainedRaSource->sourcesDecoded();
+                need(ra&&retainedArchive==&ra->archive,
+                    "Typed RA sky source differs from actual retained archive");
+            }
             if(request.retainedMbWorld){
                 need(request.track==track_source_fixture::Track::mb && request.retainedMbWorld->loaded() &&
                     request.retainedMbWorld->archive(), "Retained MB sky requires the actual loaded MB world owner");
@@ -347,6 +389,36 @@ public:
                 need(f32(header+44+i*4) == sourcePose[i], "CUB authored origin/look/up");
 
             auto next = std::make_unique<Storage>();
+            if(request.retainedRaSource){
+                auto proof=std::make_unique<NativeRaSourceProof>();
+                proof->source=request.retainedRaSource;proof->archive=&archive;
+                proof->decodeRoute=request.decodeOriginalImages?
+                    NativeRaSourceProof::DecodeRoute::originalIpuLargestMip:
+                    NativeRaSourceProof::DecodeRoute::authenticatedPredecoded;
+                const auto equalAscii=[](const std::string& left,const char* right){
+                    const auto n=std::strlen(right);if(left.size()!=n)return false;
+                    for(std::size_t i=0;i<n;++i){auto x=static_cast<unsigned char>(left[i]);
+                        auto y=static_cast<unsigned char>(right[i]);
+                        if(x>='A'&&x<='Z')x=static_cast<unsigned char>(x-'A'+'a');
+                        if(y>='A'&&y<='Z')y=static_cast<unsigned char>(y-'A'+'a');
+                        if(x!=y)return false;
+                    }return true;
+                };
+                bool found=false;
+                for(std::size_t i=0;i<archive.entries.size();++i){const auto& member=archive.entries[i];
+                    if(!equalAscii(member.name,selected.cubMember))continue;
+                    need(!found,"RA sky source member ambiguous");found=true;
+                    need(member.logical_offset<=archive.decoded.size()&&
+                        member.bytes<=archive.decoded.size()-member.logical_offset&&
+                        member.bytes==cub.size()&&std::memcmp(archive.decoded.data()+member.logical_offset,
+                            cub.data(),cub.size())==0,"RA sky retained member extent/bytes differ");
+                    proof->member=&member.name;proof->memberOrdinal=i;
+                    proof->memberData=archive.decoded.data()+member.logical_offset;
+                    proof->memberOffset=member.logical_offset;proof->memberBytes=member.bytes;
+                }
+                need(found,"RA sky actual retained source member absent");
+                proof->memberSha256=selected.cubSha;next->nativeRaProof=std::move(proof);
+            }
             Bytes extractedSceneParameters;
             if(!request.retainedRcSource&&!request.retainedTbSource)need(a::extractResMember48C(archive, selected.sceneMember,
                 extractedSceneParameters,error,selected.sceneBytes),
@@ -432,6 +504,12 @@ public:
                     std::memcmp(images[index].data(), "RRTEX001", 8) == 0 &&
                     u32(images[index].data()+8) == 128 && u32(images[index].data()+12) == 128,
                     "Genuine decoded sky image identity/dimensions");
+                if(next->nativeRaProof){
+                    auto& proof=*next->nativeRaProof;
+                    need(proof.consumedTiles==index,"RA sky proof tile publication order");
+                    proof.tiles[index]={e.face,e.tile,e.offset,e.bytes,e.sourceSha256,e.imageSha256,nullptr};
+                    ++proof.consumedTiles;
+                }
                 textures[index] = {index, &images[index]};
                 slots[index] = {{0, index, 1, 1}, index, a::MaterialTextureRequirement50EA::required};
                 const auto v = static_cast<std::uint32_t>(next->mesh.vertices.size());
@@ -460,6 +538,17 @@ public:
             const a::MaterialTextureAssetsInput50EA bankInput{textures.data(), tileCount, slots.data(), tileCount,
                 {tileCount,tileCount,3146496,3145728,128}};
             need(next->bank.load(bankInput, d.bank), "Sky texture bank: " + d.bank.parserMessage);
+            if(next->nativeRaProof){auto& proof=*next->nativeRaProof;
+                need(proof.consumedTiles==tileCount&&next->bank.textureCount()==tileCount&&
+                    next->bank.slotCount()==tileCount&&next->mesh.vertices.size()==vertexCount&&
+                    next->mesh.indices.size()==indexCount&&next->spans.size()==tileCount,
+                    "RA sky actual published owner extents");
+                for(std::uint32_t i=0;i<tileCount;++i){const auto* image=next->bank.texture(i);
+                    need(image&&image->identity==i,"RA sky actual bank image identity");
+                    proof.tiles[i].image=image;
+                }
+                proof.mesh=&next->mesh;proof.bank=&next->bank;proof.spans=&next->spans;
+            }
             storage_ = std::move(next); return true;
         } catch (const std::exception& e) { try { d.message = e.what(); } catch (...) {} return false; }
         catch (...) { try { d.message = "Unexpected cold sky load failure"; } catch (...) {} return false; }

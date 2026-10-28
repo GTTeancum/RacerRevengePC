@@ -105,6 +105,11 @@ bool optionsPageShape(const game::OriginalUiRouteDecision50KG& d) noexcept {
 }
 }
 struct OriginalUiFrontend50KG::Storage {
+    // Same actual outer Application owns this receiver lifetime. This is an
+    // initial-route identity, not proof of Results origin or a guest queue.
+    const ::original_main_entry50KG::Application* nativeHallRoot=nullptr;
+    OriginalUiMainProfile50KG nativeHallPreimage{};
+    OriginalUiRiderProfileStamp50KG nativeHallStamp{};
     struct Manager {
         Storage* owner=nullptr;
         // Cold screen identity, never used as a replacement for the manager's
@@ -206,7 +211,7 @@ struct OriginalUiFrontend50KG::Storage {
                     if(!viewportReservation->release(&video->host))return false;
                     // The exact selected owner was preflighted. cameraStorage
                     // retains it across removal; no source refcount is invented.
-                    if(viewportSelected){viewportDisplay->sourceSelectedCamera0_.reset();viewportSelectionRetired=true;}
+                    if(viewportSelected){viewportDisplay->selectFrontendCamera26F940({});viewportSelectionRetired=true;}
                     viewportDisplay->unpin();retiredViewport=std::move(viewportDisplay);viewportReservation.reset();
                     // Keep the old Display alive outside the entire native store interval.
                 }
@@ -570,7 +575,9 @@ struct OriginalUiFrontend50KG::Storage {
            (cold.audioMode==OriginalUiMainAudioMode50KG::enabled&&!cold.audio->courseMenuReady()))return false;
         OriginalUiRiderProfileOwner50KG::TournamentCareerSnapshot career;
         return cold.riderProfile->tournamentCareerSnapshot(selected,career)&&
-            (!career.cardFlag100BC||career.nativeBetaStorage)&&(career.progress219C&31u)<13u;
+            // Standings has a genuine completed-career branch. This does not
+            // widen courseInputsReady(): no next race is invented at progress13.
+            (!career.cardFlag100BC||career.nativeBetaStorage)&&(career.progress219C&31u)<=13u;
     }
     bool garageActive()const noexcept {return active&&active->garage&&same(active->initialRoute,{13,1});}
     bool garageBankCurrent()const noexcept {
@@ -888,6 +895,7 @@ struct OriginalUiFrontend50KG::Storage {
     }
     bool build(std::unique_ptr<Manager>& out,Route route,Diagnostic& d,std::uint32_t prospectiveMode=0) noexcept {
         if(out){result(d,Status::invalidInput);return false;}
+        const bool initialNativeHall=nativeHallRoot && &out==&active && !active&&!activated&&!renderer;
         try {
             out=std::make_unique<Manager>();auto& m=*out;m.owner=this;m.initialRoute=route;
             m.transition=std::make_shared<game::OriginalUiTransitionOwner50KG>();
@@ -916,7 +924,8 @@ struct OriginalUiFrontend50KG::Storage {
                 if(!m.optionsResources->load(input,d.optionsResources)){result(d,Status::resource);return false;}
                 samplers=m.optionsResources->samplers();
             }else if(same(route,{11,1})){
-                if(!hallInputsReady()||prospectiveMode!=5||!renderer||!renderer->originalUiSourceRgbaAvailable()){
+                if(!hallInputsReady()||prospectiveMode!=5||
+                   (!initialNativeHall&&(!renderer||!renderer->originalUiSourceRgbaAvailable()))){
                     result(d,Status::unavailableDestination);return false;}
                 OriginalUiHallColdInput50KG input;input.appStart=cold.appStart;input.hall=cold.hall;input.fonts=cold.fonts;
                 input.controllerPopup=cold.controllerPopup;input.overlays=cold.overlays;input.english=&english;input.runtime=cold.runtime;
@@ -1317,6 +1326,23 @@ OriginalUiFrontend50KG::~OriginalUiFrontend50KG() noexcept {
         }
 }
 Status OriginalUiFrontend50KG::prepare(const OriginalUiFrontendCold50KG& cold,Diagnostic& d) noexcept {
+    return prepareInitialNative(cold,nullptr,d);
+}
+Status OriginalUiFrontend50KG::prepareNativeResultsHall(const OriginalUiFrontendCold50KG& cold,
+    const ::original_main_entry50KG::Application& root,Diagnostic& d)noexcept {
+    // No arbitrary public destination selection. This private receiver still
+    // needs the separately missing actual queued Results origin caller.
+    if(root.garageAudioOwnerThread_!=std::this_thread::get_id()||root.sourceRace28COwner_||
+       root.resultsInputContinuation50LA_||cold.profile!=root.profile||cold.application!=root.state||
+       !cold.riderProfile||!cold.riderProfile->initialized()||cold.riderProfile!=root.riderProfile||
+       cold.riderProfile->commonProfile()!=cold.profile.get()||cold.lightManager!=root.lightManager||!root.videoOwner_||
+       cold.video.lifetime.get()!=root.videoOwner_.get()||!root.videoOwner_->originalMain||
+       !root.videoOwner_->host.created()||!cold.profile||cold.profile->mode34!=0u)
+        return result(d,Status::invalidInput);
+    return prepareInitialNative(cold,&root,d);
+}
+Status OriginalUiFrontend50KG::prepareInitialNative(const OriginalUiFrontendCold50KG& cold,
+    const ::original_main_entry50KG::Application* nativeHall,Diagnostic& d)noexcept {
     d={};if(storage_)return result(d,Status::alreadyPrepared);
     using Id=assets::OriginalUiArchiveId50KG;
     if(!archive(cold.appStart,Id::appStart)||!archive(cold.mainMenu,Id::mainMenu)||!archive(cold.options,Id::options)||
@@ -1360,8 +1386,14 @@ Status OriginalUiFrontend50KG::prepare(const OriginalUiFrontendCold50KG& cold,Di
     try {
         storage_=std::make_unique<Storage>();auto& s=*storage_;Operation operation(s.inOperation);s.cold=cold;
         if(!s.processReady())return s.fault(d,Status::invalidInput);
+        if(nativeHall){
+            s.nativeHallRoot=nativeHall;s.nativeHallPreimage=*cold.profile;
+            s.nativeHallStamp=cold.riderProfile->stamp();
+        }
         if(!assets::readOriginalUiEnglish50KG(*cold.localization,s.english,d.localization))return s.fault(d,Status::localization);
-        if(!s.build(s.active,{4,1},d))return s.fault(d,d.status);
+        if(!s.build(s.active,nativeHall?Route{11,1}:Route{4,1},d,nativeHall?5u:0u))return s.fault(d,d.status);
+        if(nativeHall&&(!sameProfile(s.nativeHallPreimage,*cold.profile)||
+           cold.riderProfile->stamp().generation!=s.nativeHallStamp.generation))return s.fault(d,Status::invalidInput);
         s.prepared=true;return result(d,Status::ok);
     }catch(const std::bad_alloc&){if(storage_)return storage_->fault(d,Status::allocation);return result(d,Status::allocation);}
     catch(...){if(storage_)return storage_->fault(d,Status::resource);return result(d,Status::resource);}
@@ -1594,11 +1626,32 @@ Status OriginalUiFrontend50KG::activate(VehicleWindowGl50DS& renderer,Diagnostic
     if(s->inOperation||s->garageTextureDraw)return result(d,Status::busy);if(s->faulted){d=s->failure;return d.status;}
     if(!s->prepared)return result(d,Status::notPrepared);
     if(s->activated||s->renderer||s->closing||s->quit)return result(d,Status::busy);
-    Operation operation(s->inOperation);s->renderer=&renderer;
+    Operation operation(s->inOperation);
+    if(s->nativeHallRoot){
+        const auto& root=*s->nativeHallRoot;
+        if(root.garageAudioOwnerThread_!=std::this_thread::get_id())return s->fault(d,Status::invalidInput);
+        const auto display=root.raceDisplayOwner50LA_.lock();
+        if(root.sourceRace28COwner_||!root.videoOwner_||
+           s->cold.video.lifetime.get()!=root.videoOwner_.get()||s->cold.lightManager!=root.lightManager||
+           root.resultsInputContinuation50LA_||root.profile!=s->cold.profile||root.state!=s->cold.application||
+           root.riderProfile!=s->cold.riderProfile||!sameProfile(s->nativeHallPreimage,*s->cold.profile)||
+           s->cold.riderProfile->stamp().generation!=s->nativeHallStamp.generation||
+           !s->active->hall||!display||!display->frontendOwnerCurrent50KG()||&display->renderer_!=&renderer)
+            return s->fault(d,Status::invalidInput);
+    }
+    s->renderer=&renderer; // Native Hall custody is proven before retaining this cleanup target.
     if(!s->active->prepared()||!renderer.originalUiSourceRgbaAvailable()||!renderer.bindOriginalUiTextures(*s->active->textures(),*s->active->gpu,d.renderer))return s->fault(d,Status::renderer);
-    if(!s->enterLightManager(*s->cold.mainMenu,d))return s->fault(d,Status::session,d.lightManager.sourcePC);
+    if(!s->enterLightManager(*(s->nativeHallRoot?s->cold.hall:s->cold.mainMenu),d))return s->fault(d,Status::session,d.lightManager.sourcePC);
+    if(s->nativeHallRoot){
+        // Same existing Hall entry commit: previous mode then5, never a
+        // synthetic generation refresh, Options selection or Main setup.
+        auto& common=*s->cold.profile;
+        if(common.mode34!=5){common.previousMode38=common.mode34;common.mode34=5;}
+        if(!s->active->hall->acceptEntryProfileCommit())return s->fault(d,Status::session);
+    }
     s->bank=s->active.get();s->activating=s->active.get();
-    d.transition=s->active->transition->bindInitialPage(4,1,s->callbacks(*s->active));s->activating=nullptr;
+    const auto initial=s->nativeHallRoot?Route{11,1}:Route{4,1};
+    d.transition=s->active->transition->bindInitialPage(initial.screen,initial.page,s->callbacks(*s->active));s->activating=nullptr;
     if(d.transition!=Transition::ok||s->faulted)return s->fault(d,Status::transition,0x2A3C10);
     s->activated=true;return result(d,Status::ok);
 }
@@ -2544,7 +2597,7 @@ bool OriginalUiFrontend50KG::continueOptionsCameraSuffix2361C0(
            !display.optionsViewportAdvanceCurrent50KG(*n.viewportReservation))return false;
         //26F948 selects before its dimension comparison. The reservation owns
         // genuine prior-null selection, not a copied or equality-restored owner.
-        display.sourceSelectedCamera0_=n.cameraStorage;n.viewportSelected=true;
+        display.selectFrontendCamera26F940(n.cameraStorage);n.viewportSelected=true;
         camera.phase_=Camera::Phase::selectedBeforeBounds236214;
     }
     if(camera.phase_!=Camera::Phase::selectedBeforeBounds236214||

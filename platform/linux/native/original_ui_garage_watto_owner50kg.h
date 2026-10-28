@@ -71,8 +71,10 @@ private:
     bool activatePageWidget90(const OriginalUiGaragePageOwner50KG&,
         const OriginalUiGarageWidget1Owner50KG&,D&)noexcept;
     bool enterPage1FAC1C(const OriginalUiGaragePageOwner50KG&,D&)noexcept;
-    // Only the real Page input producer may issue source1D5320 arguments1/3.
-    // Preflight is before Page virtualA0; case3 execution is AFTER its return.
+    // Only the real retained Page transaction may issue source1D5320:
+    //0 purchase,1 no-money,2 slider,3 no-purchase. Read-only preflight precedes
+    // page mutations;0/3 execute after the actual transition request returns,
+    // and2 executes before the slider delta/cash stores. No private audio clock.
     // Native bool reports a completed source call, not the source scratch v0
     // or a chosen response. The receipt distinguishes no-op/probability refusal.
     bool canRespondPage1D5320(const OriginalUiGaragePageOwner50KG&,std::uint32_t,

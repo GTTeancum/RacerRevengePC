@@ -49,6 +49,13 @@ class NativeCollectorFifo50LA final {
         rr::platform::OriginalUiGarageQuad50KG* warning470Quad=nullptr;
         bool warning470Dim=false;
         std::uint64_t warning470Epoch=0,warning470PacketRevision=0;
+        // UI47C has its own invocation epoch and exact canonical popup
+        // payload. It never masquerades as470, a Page Quad or an Aperture.
+        std::shared_ptr<rr::platform::OriginalUiSharedDialogs50KG> shared47COwner;
+        rr::platform::OriginalUiGarageScreenText50KG* popup47CText=nullptr;
+        rr::platform::OriginalUiGarageQuad50KG* popup47CQuad=nullptr;
+        bool popup47CDim=false;
+        std::uint64_t popup47CEpoch=0,popup47CPacketRevision=0;
         rr::platform::OriginalUiGarageSceneParticles50KG* garageParticles=nullptr;
         std::uint64_t particlePacketRevision=0;
         std::shared_ptr<rr::platform::OriginalUiGaragePageOwner50KG> garageAperturePage;
@@ -111,6 +118,15 @@ class NativeCollectorFifo50LA final {
     bool collectShared470Dim246760(rr::platform::OriginalUiGarageDrawContribution50KG&,
         rr::platform::OriginalUiSharedDialogs50KG&,rr::assets::OriginalStandardMaterialDiagnostic50LA&)noexcept;
     bool shared470RecordCurrent(const Record&)const noexcept;
+    bool collectShared47CText246760(rr::platform::OriginalUiGarageDrawContribution50KG&,
+        rr::platform::OriginalUiSharedDialogs50KG&,rr::platform::OriginalUiGarageScreenText50KG&,
+        std::size_t,rr::assets::OriginalStandardMaterialDiagnostic50LA&)noexcept;
+    bool collectShared47CQuad246760(rr::platform::OriginalUiGarageDrawContribution50KG&,
+        rr::platform::OriginalUiSharedDialogs50KG&,rr::platform::OriginalUiGarageQuad50KG&,
+        rr::assets::OriginalStandardMaterialDiagnostic50LA&)noexcept;
+    bool collectShared47CDim246760(rr::platform::OriginalUiGarageDrawContribution50KG&,
+        rr::platform::OriginalUiSharedDialogs50KG&,rr::assets::OriginalStandardMaterialDiagnostic50LA&)noexcept;
+    bool shared47CRecordCurrent(const Record&)const noexcept;
     bool publishGarageScissor280118(rr::platform::OriginalUiGarageDrawContribution50KG&,
         rr::platform::OriginalUiGarageVisibility50KG&,std::shared_ptr<rr::game::OriginalZoneScissor50LA>,
         rr::assets::OriginalStandardMaterialDiagnostic50LA&)noexcept;

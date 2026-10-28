@@ -1,6 +1,7 @@
 #include "../../src/game/original_options_mutation_interlock50kg.h"
 #pragma once
 namespace original_cable_selection50LA { class Binding; }
+namespace ra_cold_aggregate50LA {class Owner;}
 #include "original_ui_main_entry50kg.h"
 #include "../../src/assets/original_native_texture_upload50la.h"
 #include "../../src/game/original_camera_start_native.h"
@@ -21,6 +22,10 @@ class PositionStatsTextureLease50LA;
 // borrow these same members. No PositionStats resources are activated here.
 class RaceDisplayLifetime50LA final : public std::enable_shared_from_this<RaceDisplayLifetime50LA> {
     friend struct Application;
+    friend class ::ra_cold_aggregate50LA::Owner; //Actual phase1 SunFlare viewport reader.
+    friend class RaceF8RendererLease50LA;
+    friend class ResultsRendererLease50LA;
+    friend class ::original_camera_session50KX::Session;
     friend class rr::platform::OriginalUiFrontend50KG;
     friend struct Frontend;
     friend class rr::platform::OriginalUiGaragePageOwner50KG;
@@ -99,6 +104,47 @@ class RaceDisplayLifetime50LA final : public std::enable_shared_from_this<RaceDi
     std::shared_ptr<rr::game::OriginalFrontendCameraCold50LA> sourceSelectedCamera0_;
     std::int32_t sourceWidth4_=0,sourceHeight8_=0; //243E1C/28 after native init.
     bool sourceCurrentCamera0Known_=true;
+    // One global selection observation, owned by THIS actual Display. It is
+    // installed at the reached gameplay26F940, not reconstructed from ready().
+    // The Session weak backlink invalidates on close/abandon/destruction;
+    // every represented frontend selector/clear and Display retirement below
+    // also supersedes it. Raw identity is never dereferenced without the
+    // actual RA aggregate's counted Camera borrow. No extra source reference.
+    original_camera_session50KX::Session* selectedGameplayCamera0_=nullptr;
+    std::uint64_t gameplaySelectionRevision_=0;
+    void invalidateGameplayCameraObservation50LA()noexcept {
+        selectedGameplayCamera0_=nullptr;
+        if(gameplaySelectionRevision_!=std::numeric_limits<std::uint64_t>::max())
+            ++gameplaySelectionRevision_;
+    }
+    void selectFrontendCamera26F940(
+        std::shared_ptr<rr::game::OriginalFrontendCameraCold50LA> camera)noexcept {
+        invalidateGameplayCameraObservation50LA();
+        sourceSelectedCamera0_=std::move(camera);
+    }
+    static void observeGameplayCamera26F940(original_camera_session50KX::Session&)noexcept;
+    bool gameplayDisplayIdentityCurrent50LA()const noexcept;
+    bool resultsPinnedDisplayIdentity50LA()const noexcept {
+        return ownerThread()&&created_&&!frontendCreated_&&video_&&video_->originalMain&&
+            video_->host.created()&&video_->host.current()&&renderer_.initialized()&&
+            renderer_.sessionDisplayOwner50LA_==this&&video_->host.sessionDisplayRenderer50LA_==&renderer_&&
+            renderer_.sessionDependentPins50LA_&&video_->host.sessionDependentPins50LA_;
+    }
+    // Existing F8 pin identity remains usable during actual retirement; this
+    // checks no frontend/Pause frame, queue completion or submission receipt.
+    bool f8PinnedDisplayIdentity50LA()const noexcept {
+        return ownerThread()&&created_&&!frontendCreated_&&video_&&video_->originalMain&&
+            video_->host.created()&&video_->host.current()&&renderer_.initialized()&&
+            renderer_.sessionDisplayOwner50LA_==this&&video_->host.sessionDisplayRenderer50LA_==&renderer_&&
+            renderer_.sessionDependentPins50LA_&&video_->host.sessionDependentPins50LA_;
+    }
+    bool readGameplayViewport115990(const original_camera_session50KX::Session&,
+        std::array<std::int32_t,4>&,std::uint64_t&)const noexcept;
+    //Only reached World-load phase1; ordinary gameplay115990 stays post-bind.
+    bool readColdGameplayViewport115990(const original_camera_session50KX::Session&,
+        std::array<std::int32_t,4>&,std::uint64_t&)const noexcept;
+    bool nativeSkyMetadataCurrent129280(const original_camera_session50KX::Session&,
+        const rr::assets::Mesh48B&,const rr::assets::MaterialTextureAssets50EA&)const noexcept;
     bool optionsViewportPinnedCurrent50KG(
         const std::shared_ptr<rr::game::OriginalFrontendCameraCold50LA>& selected={})const noexcept {
         return ownerThread()&&video_&&video_->host.sessionDisplayRenderer50LA_==&renderer_&&
@@ -166,7 +212,7 @@ class RaceDisplayLifetime50LA final : public std::enable_shared_from_this<RaceDi
            camera.failedLoaderRetirementStep_!=4)return false;
         //115684 compares the same Display field;115690 ->26F948 clears it
         //only on an exact match. No renderer/context/buffer owner is retired.
-        if(sourceSelectedCamera0_.get()==&camera)sourceSelectedCamera0_.reset();
+        if(sourceSelectedCamera0_.get()==&camera)selectFrontendCamera26F940({});
         return true;
     }
     bool retireSelectedCamera115690(const rr::game::OriginalFrontendCameraCold50LA& camera)noexcept {
@@ -178,7 +224,7 @@ class RaceDisplayLifetime50LA final : public std::enable_shared_from_this<RaceDi
            camera.enrolled_||camera.entity_.reference00)return false;
         //115684 compares actual Display0. Only the identity-match branch calls
         //26F940(nullptr), whose26F948 store reestablishes known-null for reentry.
-        if(sourceSelectedCamera0_.get()==&camera)sourceSelectedCamera0_.reset();
+        if(sourceSelectedCamera0_.get()==&camera)selectFrontendCamera26F940({});
         return true;
     }
     //26F870/243A80 do NOT initialize28. Native backing is unreadable as
@@ -248,6 +294,7 @@ class RaceDisplayLifetime50LA final : public std::enable_shared_from_this<RaceDi
     bool beginPositionStatsTextureRetirement()noexcept {
         if(!ownerThread())return false;
         retiring_=true; //No new leases; existing primitive drain retries remain valid.
+        invalidateGameplayCameraObservation50LA();
         //The independent16-primitive lease must already have retired. Observe
         //actual backing pins, not a caller's assertion of primitive completion.
         return positionStatsTextureLeaseActive_&&renderer_.sessionDependentPins50LA_==1&&
@@ -313,6 +360,7 @@ public:
     RaceDisplayLifetime50LA& operator=(const RaceDisplayLifetime50LA&)=delete;
     ~RaceDisplayLifetime50LA()noexcept {
         if(!ownerThread()||renderer_.sessionDependentPins50LA_||localizationServiceActive_)std::terminate();
+        invalidateGameplayCameraObservation50LA();
         rr::platform::VehicleWindowDiagnostic50DS d;
         renderer_.close(d);
         if(d.cleanupIncomplete||renderer_.ownsResources())std::terminate();
@@ -386,6 +434,7 @@ public:
         }
         attempted_=true;
         sourceCurrentCamera0Known_=false;
+        invalidateGameplayCameraObservation50LA();
         renderer_.sessionDisplayCreate50LA_=true;
         created_=renderer_.create(request,assets,d); // Real creation, same callbacks/banks.
         renderer_.sessionDisplayCreate50LA_=false;
@@ -448,6 +497,7 @@ public:
     bool beginCloseAfterDependents()noexcept {
         if(!ownerThread()||localizationServiceActive_)return false;
         retiring_=true;
+        invalidateGameplayCameraObservation50LA();
         return renderer_.sessionDependentPins50LA_==0&&video_->host.sessionDependentPins50LA_==0;
     }
 };

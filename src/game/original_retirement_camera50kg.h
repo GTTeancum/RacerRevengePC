@@ -33,7 +33,7 @@ struct OriginalRetirementCameraResult50KG {
 inline OriginalRetirementCameraResult50KG transitionOriginalDeath177AB0(
     OriginalRaceCameraOwner& controller,OriginalDeathCamera50KG& death,
     OriginalFollowSceneBinding& scene,OriginalDeathChildRegistry50KG& children,
-    const OriginalFollowChildRegistry& followChildren,const OriginalAttachedChildRegistry& attachedChildren,
+    OriginalFollowChildRegistry& followChildren,OriginalAttachedChildRegistry& attachedChildren,
     OriginalDeathCameraQueryOwner& query,const OriginalDeathCameraSubject50KG& subject,
     const ZoneLifecycle50CL& racerCollision,const LiveZoneMembership50EN& racer690,
     ResetVisibilityWorld50EY& visibility,OriginalCameraSceneOwner& spatial,
@@ -48,8 +48,17 @@ inline OriginalRetirementCameraResult50KG transitionOriginalDeath177AB0(
        scene.sceneKey!=b.sceneKey)return r;
     //177B00 nonzero same-mode return precedes collection and subject reads.
     if(controller.mode44==1){r.status=S::complete;r.sourcePC=0x17864cu;return r;}
-    if((controller.mode44!=0&&controller.mode44!=5)||(controller.flags62&0x60u)){
+    if(controller.mode44!=0&&controller.mode44!=5){
         r.status=S::sourcePath;r.sourcePC=0x177b48u;return r;
+    }
+    if(controller.flags62&0x60u){
+        if(!followChildren.follow64||!attachedChildren.attached6C)return r;
+        const auto restored=restoreOriginalTemporaryLook1775D0(controller,*followChildren.follow64,
+            *attachedChildren.attached6C,scene,attachedChildren,visibility,spatial,zones,workspace,in,
+            (controller.flags62&0x40u)?0x40u:0x20u);
+        if(restored.status!=OriginalFollowControllerStatus::complete){
+            r.status=S::sourcePath;r.sourcePC=restored.sourcePC;return r;
+        }
     }
     if(!children.collection||!children.collection->bound)return r;
     auto& collection=*children.collection;

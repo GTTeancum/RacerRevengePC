@@ -54,8 +54,15 @@ class OriginalUiGarageAudioBacking50KG final {
     std::uint64_t frontendOutputSerial_=0;
     bool frontendOutputAccountingFailed_=false;
     std::uint64_t frontendClosedSourceFrames_=0,frontendClosedMainRevision_=0,frontendClosedMixerRevision_=0;
-    std::array<std::uint64_t,OriginalUiMainAudio50KG::courseRequiredVoices> frontendClosedPlaybackRevisions_{};
-    std::array<double,OriginalUiMainAudio50KG::courseRequiredVoices> frontendClosedSourceFramesByVoice_{};
+    // Bounded latest actual268300 descendant of THIS closed output, not a
+    // replacement device-close receipt. Original close revisions/frame/voice
+    // history above survive. Cleared only by a genuine subsequent close.
+    std::uint64_t frontendClosedReset268300MainRevision_=0,frontendClosedReset268300MixerRevision_=0;
+    // Same-Aural synchronous stop descendant only; original close history
+    // is retained, never a device-close replay or a generic revision waiver.
+    std::uint64_t frontendClosedStop26D070MainRevision_=0,frontendClosedStop26D070MixerRevision_=0;
+    std::array<std::uint64_t,OriginalUiMainAudio50KG::garageSceneRequiredVoices> frontendClosedPlaybackRevisions_{};
+    std::array<double,OriginalUiMainAudio50KG::garageSceneRequiredVoices> frontendClosedSourceFramesByVoice_{};
 public:
     ~OriginalUiGarageAudioBacking50KG()noexcept;
     OriginalUiGarageAudioBacking50KG(const OriginalUiGarageAudioBacking50KG&)=delete;

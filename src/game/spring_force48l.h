@@ -10,6 +10,11 @@ struct SpringForceParameters48L {
     float stiffness9C, dampingA0, impactStiffnessA4, impactDampingA8;
     bool impact54, otherSpring58;
 };
+//Pure297190..297314 scalar/world-force prefix, not either296C10 call
+//or a whole297190 return. No body/state mutation. Same finite source arithmetic.
+bool prepareSpringWorldForcePrefix48L(const Vector3_48C&,float penetration,
+    const SpringForceParameters48L&,const BodyParameters48C& primary,
+    const BodyParameters48C* other,Vector3_48C&)noexcept;
 // Original297190, including both original296C10 point-force calls. The cached
 // relative contact velocity is consumed directly, without recomputing bodies.
 // Impact coefficients are selected iff impact54 && (!other || !otherSpring58).
@@ -26,6 +31,10 @@ struct SpringForceParameters48L {
 bool applySpringForce48L(const Vector3_48C& normal,const Vector3_48C& point,
     float penetration,const SpringForceParameters48L&,const SpringImpactBody48K& primary,
     const SpringImpactBody48K* other,SpringFrictionResult48J&) noexcept;
+//Pure2983C0..298438 normal correction delta, not velocity stores or
+//whole response completion. Actual current velocity belongs to the caller.
+bool prepareSpringInwardDelta48L(const Vector3_48C& normal,
+    const Vector3_48C& cachedContactVelocity,Vector3_48C&)noexcept;
 // Original2983C0: remove the inward cached normal-speed component from the
 // primary velocity only. Does not update torque, correction accumulators or
 // any other body. Finite consumed arithmetic, transactional output.

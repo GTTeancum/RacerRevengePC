@@ -4,6 +4,8 @@
 #include <cstdint>
 #include <limits>
 
+namespace native_original_ai_audio { class Owner; }
+
 namespace rr::platform {
 class OriginalUiGarageDroidAudio50GN;
 // Native replacement for the source channel backend. Tokens are deliberately
@@ -129,6 +131,13 @@ public:
     }
 private:
     friend class OriginalUiGarageDroidAudio50GN;
+    friend class ::native_original_ai_audio::Owner;
+    bool canStopResultsNative26D070(const AudioMixer50HD&)const noexcept;
+    std::size_t resultsStopCount26D070()const noexcept{return count_;}
+    std::size_t resultsStopVoice26D070(std::size_t n)const noexcept {
+        return n<count_?sounds_[n].slot:audioMaximumVoices50HD;
+    }
+    void stopResultsNativePreflighted26D070()noexcept;
     // The concrete Droid source owner alone may reuse its CLOSED, never-played
     // logical allocation after actual Scene/Group/Sound destruction. No token
     // is recycled and no active/foreign clip is stopped by this operation.
@@ -139,7 +148,7 @@ private:
         return true;
     }
     bool rebindRetiredDroidCold(AudioMixer50HD& mixer)noexcept {
-        if(!canRebindRetiredDroidCold()||mixer.count()!=53||mixer.groupEpoch50IC()!=epoch_)return false;
+        if(!canRebindRetiredDroidCold()||mixer.count()!=55||mixer.groupEpoch50IC()!=epoch_)return false;
         for(std::size_t i=49;i<53;++i){AudioVoiceObservation50HD v;
             if(!mixer.inspectVoice(i,v)||v.voice.active||v.playbackRevision||
                v.voice.clip.samples||v.voice.clip.frames)return false;

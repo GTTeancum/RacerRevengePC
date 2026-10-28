@@ -22,6 +22,7 @@
 #include <memory>
 
 namespace ra_cold_aggregate50LA { class Owner; }
+namespace rr::game { class OriginalResults10450LA; }
 namespace rc_crystal50RC { class Owner; }
 namespace tb_original_world50LM { class Owner; }
 namespace rc_particle_visual50RC { class Window; }
@@ -30,7 +31,7 @@ namespace gb_particle_visual50GB { class Window; }
 namespace mc_particle_visual50MC { class Window; }
 namespace gb_particle_render50GB { class Owner; }
 namespace mc_particle_render50MC { class Owner; }
-namespace original_main_entry50KG { class RaceDisplayLifetime50LA; }
+namespace original_main_entry50KG { struct Application; class RaceDisplayLifetime50LA; class NativeF8BarPrefix50LA; class ResultsRendererLease50LA; class NativeResultsFrame50LA; }
 namespace ra_static_fire_visual50LA {class Owner;class CompletedDrawReceipt;}
 namespace rr::game { struct CameraViewOutput49F; class OriginalRaceHud50KG; class OriginalTimeStats50LA; class OriginalDamage50LA; class OriginalPauseNativeDraw50LA; class OriginalPositionStatsNativeOwner50LA; class OriginalSpeedBoost50LA; struct PodCableMesh50FD; namespace original_gameplay_binder_candidate { struct Mesh; } }
 namespace rr::game { class OriginalRacerModelPackets50LA; class OriginalRacerModelRenderGlobals50LA; struct OriginalRaceFogFields; }
@@ -731,6 +732,11 @@ struct VehicleWindowFrame50DS {
     std::shared_ptr<rc_particle_render50RC::Owner> rcParticles;
     std::shared_ptr<gb_particle_render50GB::Owner> gbParticles;
     std::shared_ptr<mc_particle_render50MC::Owner> mcParticles;
+    // Optional synchronous native F8 bars/icon/text borrow. Only its actual private
+    // Application factory issues this batch. No140230/199500/FIFO completion
+    // or live end-flow admission follows from a successful native submission.
+    const ::original_main_entry50KG::NativeF8BarPrefix50LA* nativeF8BarPrefix = nullptr;
+    const ::original_main_entry50KG::NativeResultsFrame50LA* nativeResults = nullptr;
 };
 enum class VehicleWindowError50DS : std::uint8_t {
     none, alreadyOwned, request, assets, allocation, entryPoint, context,
@@ -786,6 +792,10 @@ struct VehicleWindowDiagnostic50DS {
     std::uint32_t gameplayBinderDraws = 0;
     std::uint32_t gcParticleDraws = 0,gcParticleAlphaDraws = 0,gcParticleQuads = 0;
     std::uint32_t gameplayBlurDraws = 0;
+    // Checked native bar commands only; require batchAccepted for publication.
+    // Icon/text native commands also do not complete a source callback.
+    std::uint32_t nativeF8BarQuads = 0,nativeF8SuffixQuads = 0,nativeF8SuffixPackets = 0;
+    bool nativeF8BarSuffixPending = false;
     std::uint8_t gameplayBlurFixed = 0;
     bool gameplayBlurRequestConsumed = false;
     // Actual successful native swap submission or completed headless frame,
@@ -1316,6 +1326,17 @@ public:
     // completion receipt. Same owner-thread/no-reentrancy contract as close.
     bool hasSessionDependents50LA() const noexcept { return sessionDependentPins50LA_!=0; }
 private:
+    friend struct ::original_main_entry50KG::Application;
+    friend class ::original_main_entry50KG::ResultsRendererLease50LA;
+    bool retireNativeResultsResources50LA(VehicleWindowDiagnostic50DS&)noexcept;
+    // Uncalled native copied-image upload only; no Frame/draw admission.
+    bool prepareNativeResultsResources50LA(const game::OriginalResults10450LA&,
+        VehicleWindowDiagnostic50DS&)noexcept;
+    // Actual native scratch allocation only, still uncalled by Application.
+    bool prepareNativeResultsDrawResources50LA(VehicleWindowDiagnostic50DS&)noexcept;
+    bool prepareNativeF8BarResources50LA(VehicleWindowDiagnostic50DS&)noexcept;
+    bool prepareNativeF8SuffixResources50LA(const ::original_main_entry50KG::NativeF8BarPrefix50LA&,
+        VehicleWindowDiagnostic50DS&)noexcept;
     friend class OriginalUiSharedDialogs50KG;
     bool applyMenuRasterPrelude50KG(OriginalUiSharedDialogs50KG&,VehicleWindowDiagnostic50DS&)noexcept;
     bool menuRasterPreludeCurrent50KG(const OriginalUiSharedDialogs50KG&)const noexcept;
@@ -1346,6 +1367,10 @@ private:
     bool commitRiderTextures(const OriginalUiRiderResidencyDemand50KG&,
         OriginalUiRiderTextureValidation50KG&,VehicleWindowDiagnostic50DS&) noexcept;
     friend class ::original_main_entry50KG::RaceDisplayLifetime50LA;
+    // Private original-producer observation, not a new render/upload path.
+    bool raSkySourceCurrent129280(const assets::Mesh48B&,
+        const assets::MaterialTextureAssets50EA&,const void* actualDisplay,
+        VehicleWindowDiagnostic50DS&)const noexcept;
     // Actual session owner alone admits the source reset between submissions.
     bool idleForRaceReset50LA(VehicleWindowDiagnostic50DS&) const noexcept;
     // First canonical frontend Camera only. Ordinary sealed RGBA submission

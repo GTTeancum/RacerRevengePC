@@ -76,6 +76,34 @@ inline OriginalFollowTransitionResult transitionOriginalAttached177AB0(
     scene.parentZoneKey=in.racerZoneKey;scene.parentMethod=2;scene.registrationKey=spatial.allocationSerial;
     result.status=OriginalFollowControllerStatus::complete;result.sourcePC=0x178648u;return result;
 }
+//1775D0/177680 and177B48: clear the active temporary-look bit BEFORE
+//17BD00(saved60[2:6],0,1), then restore nonzero saved mode via177AB0.
+//The caller decides whether release/transition gates reach this source leaf.
+//No preference write or camera-cycle sound occurs on temporary look/restore.
+inline OriginalFollowTransitionResult restoreOriginalTemporaryLook1775D0(
+    OriginalRaceCameraOwner& controller,OriginalFollowCamera& follow,
+    OriginalAttachedCamera& attached,OriginalFollowSceneBinding& scene,
+    OriginalAttachedChildRegistry& attachedChildren,ResetVisibilityWorld50EY& visibility,
+    OriginalCameraSceneOwner& spatial,const OriginalFollowVisibilityZones& zones,
+    LiveZoneWorkspace50EN& workspace,const OriginalFollowSceneTransitionInput& in,
+    std::uint8_t activeBit) noexcept {
+    OriginalFollowTransitionResult r;
+    if((activeBit!=0x40u&&activeBit!=0x20u)||!(controller.flags62&activeBit))return r;
+    controller.flags62=static_cast<std::uint8_t>(controller.flags62&~activeBit);
+    const auto signed5=[](std::uint16_t value) noexcept {
+        const auto n=static_cast<std::int32_t>(value&31u);return n<16?n:n-32;
+    };
+    const auto preset=signed5(controller.temporaryLook60>>2);
+    if(selectOriginalFollowPreset(follow,preset,false,true).status!=OriginalFollowStatus::ok){
+        r.sourcePC=0x177604u;return r;
+    }
+    const auto mode=signed5(controller.temporaryLook60>>7);
+    if(mode==0){r.status=OriginalFollowControllerStatus::complete;r.sourcePC=0x177634u;return r;}
+    //The only saved nonzero mode in the admitted Follow/Attached press path.
+    if(mode!=5){r.status=OriginalFollowControllerStatus::requiresOtherMode;r.sourcePC=0x17762cu;return r;}
+    return transitionOriginalAttached177AB0(controller,attached,scene,attachedChildren,
+        visibility,spatial,zones,workspace,mode,in);
+}
 //The body-local/690 source reads are identical for mode0 and mode5; model1B4
 //world is intentionally NOT read by this transition helper, only by13DF00.
 inline bool readOriginalAttachedSceneTransitionInput(const OriginalAttachedBinding& b,

@@ -5,6 +5,7 @@
 // then complete177750/175510/1752D0; immutable custody alone is not admission.
 #include "original_ui_main_entry50kg.h"
 #include "original_camera_assets50kx.h"
+#include "original_race_constructor50la.h"
 #include "../../src/assets/original_ta_cut_authoring_candidate.h"
 #include <cstring>
 #include <memory>
@@ -26,19 +27,26 @@ inline bool camIdentity(std::uint32_t pod,const std::vector<std::uint8_t>& bytes
     return false;
 }
 using Provider=rr::assets::OriginalStandardArchiveProvider50LA;
-inline bool taMember(const Provider& provider,Provider::MemberView& out)noexcept {
+inline bool trackMember(const Provider& provider,rr::game::OriginalCameraStartCourse course,
+    Provider::MemberView& out)noexcept {
+    const auto* identity=rr::assets::originalTrackCutIdentity50LA(original_camera_session50KX::introTrackId(course));
+    if(!identity)return false;
+    const auto& expected=identity->members[0];
     try {
-    Provider::MountView mount;
-    return provider.sealed()&&provider.lookup132820("tracks\\ta.tob",out)==Provider::Lookup::present&&
-        out.member&&*out.member=="tracks\\ta.tob"&&out.data&&out.size==13887u&&
-        out.revision==provider.revision()&&out.bankGeneration&&provider.mount(out.mount,mount)&&
-        mount.archiveName&&*mount.archiveName=="TRACKS/TA.RES"&&mount.archiveSha256&&
-        *mount.archiveSha256=="b491e34bf6cbd27869d5b9dc8db394b101ebaf4ac7f5e0d44fcca33a00d41ab8"&&
-        mount.archiveBytes==3334562u&&mount.memberCount==383u&&
-        rr::assets::ta_cut_authoring_candidate_detail::hashMatches(out.data,out.size,
-            "11e4c4909bf866fee626977c970d9907d4f191c29eeff32bddd162f173916f6b");
-    }catch(...){return false;} // std::string lookup argument allocation is native-only.
+        Provider::MountView mount;
+        return provider.sealed()&&provider.lookup132820(expected.name,out)==Provider::Lookup::present&&
+            out.member&&*out.member==expected.name&&out.data&&out.size==expected.size&&out.ordinal==expected.ordinal&&
+            out.revision==provider.revision()&&out.bankGeneration&&provider.mount(out.mount,mount)&&
+            mount.archiveName&&*mount.archiveName==identity->archiveName&&mount.archiveSha256&&
+            *mount.archiveSha256==identity->archiveSha256&&mount.archiveBytes==identity->archiveBytes&&
+            mount.memberCount==identity->memberCount&&
+            rr::assets::ta_cut_authoring_candidate_detail::hashMatches(out.data,out.size,expected.sha256);
+    }catch(...){return false;}
 }
+inline bool taMember(const Provider& provider,Provider::MemberView& out)noexcept {
+    return trackMember(provider,rr::game::OriginalCameraStartCourse::ta,out);
+}
+
 }
 namespace original_main_entry50KG {
 inline std::shared_ptr<original_camera_session50KX::Session> Application::createNativeTaCameraSession50LA(
@@ -87,7 +95,263 @@ inline std::shared_ptr<original_camera_session50KX::Session> Application::create
         pin->issuer=this;pin->provider=provider;pin->generation=particles.generation_;
         pin->providerRevision=member.revision;pin->bankGeneration=member.bankGeneration;
         pin->mount=member.mount;pin->ordinal=member.ordinal;
-        pin->selectedRig=&rig;pin->particles=actual.actualTrackParticles4A0;pin->selectedPod=pod->racer60;
+        pin->selectedRig=&rig;pin->particles=actual.actualTrackParticles4A0;pin->selectedPod=pod->racer60;pin->course=rr::game::OriginalCameraStartCourse::ta;
+        pin->cam=authored.cam;pin->tob=authored.tob;pin->phy=rig.phy;
+        auto session=std::make_shared<c::Session>(actual);
+        session->nativeTaIssuance_=std::move(pin);
+        // Publication only after all fallible native allocation. Weak ownership
+        // cannot extend root Rig/particle lifetime or create an Application cycle.
+        nativeTaCameraSession50LA_=session;
+        return session;
+    }catch(...){return {};}
+}
+inline std::shared_ptr<original_camera_session50KX::Session> Application::createNativeGcCameraSession50LA(
+    original_camera_session50KX::ActualOwners actual,
+    const original_camera_session50KX::AuthoredStorage& authored)const noexcept {
+    namespace c=original_camera_session50KX;
+    namespace d=ta_camera_issuer_detail;
+    const auto* race=race28C();
+    if(!race||!race->nativeGcWorldBacking()||!race->nativeIntroRaceEntity()||!race->nativeIntroWorldEntity()||
+       !actual.actualRadarMapB8||!actual.actualRadarMapB8->gatesPrepared||!actual.actualRadarMapB8->indicesPrepared||
+       actual.actualRadarMapMb.gatesPrepared()||actual.actualRadarMapTc.gatesPrepared()||
+       actual.actualRadarMapTb.gatesPrepared()||actual.actualRadarMapGb.gatesPrepared()||actual.actualRadarMapMc.gatesPrepared())return {};
+    // No lazy domain creation: only the actual already-retained Application
+    // domain/provider used by this root's selected GC preparation is eligible.
+    if(garageAudioOwnerThread_!=std::this_thread::get_id()||!nativeTaCameraSession50LA_.expired()||
+       !enabled||!entitiesOwner_||!entitiesOwner_->application10()||
+       !standardMaterialDomainOwner_||!standardMaterialDomainOwner_->prepared()||
+       !d::sameOwner(actual.applicationEntities,entitiesOwner_)||
+       !d::sameOwner(actual.applicationMaterials,standardMaterialDomainOwner_->materials382B38())||
+       actual.actualMaterialDirectory36B970!=&materialDirectory36B970_||materialDirectory36B970_!="textures\\"||
+       !actual.applicationAnimation.sameOwner(animationClock())||
+       &actual.applicationClock!=animationClockBackend_.get()||
+       !actual.actualRigs||!(*actual.actualRigs)[0]||!actual.actualTrackParticles4A0||
+       actual.bank.count()!=8||!actual.hostRace.runtimeValid()||
+       authored.inputs.course!=rr::game::OriginalCameraStartCourse::gc||authored.inputs.mcSourceIdentity||
+       authored.cam.empty()||authored.tob.empty()||authored.inputs.cam!=authored.cam.data()||
+       authored.inputs.camBytes!=authored.cam.size()||authored.inputs.tob!=authored.tob.data()||
+       authored.inputs.tobBytes!=authored.tob.size())return {};
+    const auto& particles=*actual.actualTrackParticles4A0;
+    const auto& rig=*(*actual.actualRigs)[0];
+    const auto* pod=original_player_identity50IK::find(rig.podId);
+    const auto& table=standardMaterialDomainOwner_->materials382B38();
+    const auto provider=standardMaterialDomainOwner_->archiveProvider3E1A70();
+    d::Provider::MemberView member;
+    if(!particles.prepared()||!particles.generation_||!particles.entityConstructed_||
+       race->nativeIntroRaceEntity()->sessionGeneration!=particles.generation_||
+       race->nativeIntroWorldEntity()->sessionGeneration!=particles.generation_||
+       !d::sameOwner(particles.application_,entitiesOwner_)||!d::sameOwner(particles.table_,table)||
+       particles.component_.reference00!=1||particles.component_.sessionGeneration!=particles.generation_||
+       particles.component_.kind!=rr::game::OriginalWreckComponentKind50LA::particleManager160B10||
+       table->populationTerminal()||table->demandTerminal()||!provider||!d::trackMember(*provider,rr::game::OriginalCameraStartCourse::gc,member)||
+       member.size!=authored.tob.size()||std::memcmp(member.data,authored.tob.data(),member.size)||
+       !pod||pod->racer60!=actual.racer60[0]||rig.phy.empty()||rig.phy.size()>1024u*1024u||
+       authored.inputs.phy!=reinterpret_cast<const char*>(rig.phy.data())||
+       authored.inputs.phyBytes!=rig.phy.size()||authored.inputs.phyIdentity!=
+            static_cast<std::uint64_t>(reinterpret_cast<std::uintptr_t>(&rig.phy))||
+       !d::camIdentity(pod->racer60,authored.cam)||
+       !rr::assets::ta_cut_authoring_candidate_detail::hashMatches(rig.phy.data(),rig.phy.size(),pod->phySha256))return {};
+    try {
+        // Reserve/copy immutable input custody before allocating the ONE Session.
+        // No source constructor, registry, counter, RNG or renderer effect occurs.
+        auto pin=std::make_unique<c::Session::NativeTaIssuance>();
+        pin->issuer=this;pin->provider=provider;pin->generation=particles.generation_;
+        pin->providerRevision=member.revision;pin->bankGeneration=member.bankGeneration;
+        pin->mount=member.mount;pin->ordinal=member.ordinal;
+        pin->selectedRig=&rig;pin->particles=actual.actualTrackParticles4A0;pin->selectedPod=pod->racer60;pin->course=rr::game::OriginalCameraStartCourse::gc;
+        pin->gcRace=race;pin->gcWorld=race->nativeGcWorldBacking();pin->gcMap=actual.actualRadarMapB8;
+        pin->cam=authored.cam;pin->tob=authored.tob;pin->phy=rig.phy;
+        auto session=std::make_shared<c::Session>(actual);
+        session->nativeTaIssuance_=std::move(pin);
+        // Publication only after all fallible native allocation. Weak ownership
+        // cannot extend root Rig/particle lifetime or create an Application cycle.
+        nativeTaCameraSession50LA_=session;
+        return session;
+    }catch(...){return {};}
+}
+inline std::shared_ptr<original_camera_session50KX::Session> Application::createNativeGaCameraSession50LA(
+    original_camera_session50KX::ActualOwners actual,
+    const original_camera_session50KX::AuthoredStorage& authored)const noexcept {
+    namespace c=original_camera_session50KX;
+    namespace d=ta_camera_issuer_detail;
+    const auto* race=race28C();
+    if(!race||!race->nativeGaWorldBacking()||!race->nativeIntroRaceEntity()||!race->nativeIntroWorldEntity()||
+       !actual.actualRadarMapB8||!actual.actualRadarMapB8->gatesPrepared||!actual.actualRadarMapB8->indicesPrepared||
+       actual.actualRadarMapMb.gatesPrepared()||actual.actualRadarMapTc.gatesPrepared()||
+       actual.actualRadarMapTb.gatesPrepared()||actual.actualRadarMapGb.gatesPrepared()||actual.actualRadarMapMc.gatesPrepared())return {};
+    // No lazy domain creation: only the actual already-retained Application
+    // domain/provider used by this root's selected GA preparation is eligible.
+    if(garageAudioOwnerThread_!=std::this_thread::get_id()||!nativeTaCameraSession50LA_.expired()||
+       !enabled||!entitiesOwner_||!entitiesOwner_->application10()||
+       !standardMaterialDomainOwner_||!standardMaterialDomainOwner_->prepared()||
+       !d::sameOwner(actual.applicationEntities,entitiesOwner_)||
+       !d::sameOwner(actual.applicationMaterials,standardMaterialDomainOwner_->materials382B38())||
+       actual.actualMaterialDirectory36B970!=&materialDirectory36B970_||materialDirectory36B970_!="textures\\"||
+       !actual.applicationAnimation.sameOwner(animationClock())||
+       &actual.applicationClock!=animationClockBackend_.get()||
+       !actual.actualRigs||!(*actual.actualRigs)[0]||!actual.actualTrackParticles4A0||
+       actual.bank.count()!=8||!actual.hostRace.runtimeValid()||
+       authored.inputs.course!=rr::game::OriginalCameraStartCourse::ga||authored.inputs.mcSourceIdentity||
+       authored.cam.empty()||authored.tob.empty()||authored.inputs.cam!=authored.cam.data()||
+       authored.inputs.camBytes!=authored.cam.size()||authored.inputs.tob!=authored.tob.data()||
+       authored.inputs.tobBytes!=authored.tob.size())return {};
+    const auto& particles=*actual.actualTrackParticles4A0;
+    const auto& rig=*(*actual.actualRigs)[0];
+    const auto* pod=original_player_identity50IK::find(rig.podId);
+    const auto& table=standardMaterialDomainOwner_->materials382B38();
+    const auto provider=standardMaterialDomainOwner_->archiveProvider3E1A70();
+    d::Provider::MemberView member;
+    if(!particles.prepared()||!particles.generation_||!particles.entityConstructed_||
+       race->nativeIntroRaceEntity()->sessionGeneration!=particles.generation_||
+       race->nativeIntroWorldEntity()->sessionGeneration!=particles.generation_||
+       !d::sameOwner(particles.application_,entitiesOwner_)||!d::sameOwner(particles.table_,table)||
+       particles.component_.reference00!=1||particles.component_.sessionGeneration!=particles.generation_||
+       particles.component_.kind!=rr::game::OriginalWreckComponentKind50LA::particleManager160B10||
+       table->populationTerminal()||table->demandTerminal()||!provider||!d::trackMember(*provider,rr::game::OriginalCameraStartCourse::ga,member)||
+       member.size!=authored.tob.size()||std::memcmp(member.data,authored.tob.data(),member.size)||
+       !pod||pod->racer60!=actual.racer60[0]||rig.phy.empty()||rig.phy.size()>1024u*1024u||
+       authored.inputs.phy!=reinterpret_cast<const char*>(rig.phy.data())||
+       authored.inputs.phyBytes!=rig.phy.size()||authored.inputs.phyIdentity!=
+            static_cast<std::uint64_t>(reinterpret_cast<std::uintptr_t>(&rig.phy))||
+       !d::camIdentity(pod->racer60,authored.cam)||
+       !rr::assets::ta_cut_authoring_candidate_detail::hashMatches(rig.phy.data(),rig.phy.size(),pod->phySha256))return {};
+    try {
+        // Reserve/copy immutable input custody before allocating the ONE Session.
+        // No source constructor, registry, counter, RNG or renderer effect occurs.
+        auto pin=std::make_unique<c::Session::NativeTaIssuance>();
+        pin->issuer=this;pin->provider=provider;pin->generation=particles.generation_;
+        pin->providerRevision=member.revision;pin->bankGeneration=member.bankGeneration;
+        pin->mount=member.mount;pin->ordinal=member.ordinal;
+        pin->selectedRig=&rig;pin->particles=actual.actualTrackParticles4A0;pin->selectedPod=pod->racer60;pin->course=rr::game::OriginalCameraStartCourse::ga;
+        pin->gaRace=race;pin->gaWorld=race->nativeGaWorldBacking();pin->gaMap=actual.actualRadarMapB8;
+        pin->cam=authored.cam;pin->tob=authored.tob;pin->phy=rig.phy;
+        auto session=std::make_shared<c::Session>(actual);
+        session->nativeTaIssuance_=std::move(pin);
+        // Publication only after all fallible native allocation. Weak ownership
+        // cannot extend root Rig/particle lifetime or create an Application cycle.
+        nativeTaCameraSession50LA_=session;
+        return session;
+    }catch(...){return {};}
+}
+inline std::shared_ptr<original_camera_session50KX::Session> Application::createNativeSaCameraSession50LA(
+    original_camera_session50KX::ActualOwners actual,
+    const original_camera_session50KX::AuthoredStorage& authored)const noexcept {
+    namespace c=original_camera_session50KX;
+    namespace d=ta_camera_issuer_detail;
+    const auto* race=race28C();
+    if(!race||!race->nativeSaWorldBacking()||!race->nativeIntroRaceEntity()||!race->nativeIntroWorldEntity()||
+       !actual.actualRadarMapB8||!actual.actualRadarMapB8->gatesPrepared||!actual.actualRadarMapB8->indicesPrepared||
+       actual.actualRadarMapMb.gatesPrepared()||actual.actualRadarMapTc.gatesPrepared()||
+       actual.actualRadarMapTb.gatesPrepared()||actual.actualRadarMapGb.gatesPrepared()||actual.actualRadarMapMc.gatesPrepared())return {};
+    // No lazy domain creation: only the actual already-retained Application
+    // domain/provider used by this root's selected SA preparation is eligible.
+    if(garageAudioOwnerThread_!=std::this_thread::get_id()||!nativeTaCameraSession50LA_.expired()||
+       !enabled||!entitiesOwner_||!entitiesOwner_->application10()||
+       !standardMaterialDomainOwner_||!standardMaterialDomainOwner_->prepared()||
+       !d::sameOwner(actual.applicationEntities,entitiesOwner_)||
+       !d::sameOwner(actual.applicationMaterials,standardMaterialDomainOwner_->materials382B38())||
+       actual.actualMaterialDirectory36B970!=&materialDirectory36B970_||materialDirectory36B970_!="textures\\"||
+       !actual.applicationAnimation.sameOwner(animationClock())||
+       &actual.applicationClock!=animationClockBackend_.get()||
+       !actual.actualRigs||!(*actual.actualRigs)[0]||!actual.actualTrackParticles4A0||
+       actual.bank.count()!=8||!actual.hostRace.runtimeValid()||
+       authored.inputs.course!=rr::game::OriginalCameraStartCourse::sa||authored.inputs.mcSourceIdentity||
+       authored.cam.empty()||authored.tob.empty()||authored.inputs.cam!=authored.cam.data()||
+       authored.inputs.camBytes!=authored.cam.size()||authored.inputs.tob!=authored.tob.data()||
+       authored.inputs.tobBytes!=authored.tob.size())return {};
+    const auto& particles=*actual.actualTrackParticles4A0;
+    const auto& rig=*(*actual.actualRigs)[0];
+    const auto* pod=original_player_identity50IK::find(rig.podId);
+    const auto& table=standardMaterialDomainOwner_->materials382B38();
+    const auto provider=standardMaterialDomainOwner_->archiveProvider3E1A70();
+    d::Provider::MemberView member;
+    if(!particles.prepared()||!particles.generation_||!particles.entityConstructed_||
+       race->nativeIntroRaceEntity()->sessionGeneration!=particles.generation_||
+       race->nativeIntroWorldEntity()->sessionGeneration!=particles.generation_||
+       !d::sameOwner(particles.application_,entitiesOwner_)||!d::sameOwner(particles.table_,table)||
+       particles.component_.reference00!=1||particles.component_.sessionGeneration!=particles.generation_||
+       particles.component_.kind!=rr::game::OriginalWreckComponentKind50LA::particleManager160B10||
+       table->populationTerminal()||table->demandTerminal()||!provider||!d::trackMember(*provider,rr::game::OriginalCameraStartCourse::sa,member)||
+       member.size!=authored.tob.size()||std::memcmp(member.data,authored.tob.data(),member.size)||
+       !pod||pod->racer60!=actual.racer60[0]||rig.phy.empty()||rig.phy.size()>1024u*1024u||
+       authored.inputs.phy!=reinterpret_cast<const char*>(rig.phy.data())||
+       authored.inputs.phyBytes!=rig.phy.size()||authored.inputs.phyIdentity!=
+            static_cast<std::uint64_t>(reinterpret_cast<std::uintptr_t>(&rig.phy))||
+       !d::camIdentity(pod->racer60,authored.cam)||
+       !rr::assets::ta_cut_authoring_candidate_detail::hashMatches(rig.phy.data(),rig.phy.size(),pod->phySha256))return {};
+    try {
+        // Reserve/copy immutable input custody before allocating the ONE Session.
+        // No source constructor, registry, counter, RNG or renderer effect occurs.
+        auto pin=std::make_unique<c::Session::NativeTaIssuance>();
+        pin->issuer=this;pin->provider=provider;pin->generation=particles.generation_;
+        pin->providerRevision=member.revision;pin->bankGeneration=member.bankGeneration;
+        pin->mount=member.mount;pin->ordinal=member.ordinal;
+        pin->selectedRig=&rig;pin->particles=actual.actualTrackParticles4A0;pin->selectedPod=pod->racer60;pin->course=rr::game::OriginalCameraStartCourse::sa;
+        pin->saRace=race;pin->saWorld=race->nativeSaWorldBacking();pin->saMap=actual.actualRadarMapB8;
+        pin->cam=authored.cam;pin->tob=authored.tob;pin->phy=rig.phy;
+        auto session=std::make_shared<c::Session>(actual);
+        session->nativeTaIssuance_=std::move(pin);
+        // Publication only after all fallible native allocation. Weak ownership
+        // cannot extend root Rig/particle lifetime or create an Application cycle.
+        nativeTaCameraSession50LA_=session;
+        return session;
+    }catch(...){return {};}
+}
+inline std::shared_ptr<original_camera_session50KX::Session> Application::createNativeMaCameraSession50LA(
+    original_camera_session50KX::ActualOwners actual,
+    const original_camera_session50KX::AuthoredStorage& authored)const noexcept {
+    namespace c=original_camera_session50KX;
+    namespace d=ta_camera_issuer_detail;
+    const auto* race=race28C();
+    if(!race||!race->nativeMaWorldBacking()||!race->nativeIntroRaceEntity()||!race->nativeIntroWorldEntity()||
+       !actual.actualRadarMapB8||!actual.actualRadarMapB8->gatesPrepared||!actual.actualRadarMapB8->indicesPrepared||
+       actual.actualRadarMapMb.gatesPrepared()||actual.actualRadarMapTc.gatesPrepared()||
+       actual.actualRadarMapTb.gatesPrepared()||actual.actualRadarMapGb.gatesPrepared()||actual.actualRadarMapMc.gatesPrepared())return {};
+    // No lazy domain creation: only the actual already-retained Application
+    // domain/provider used by this root's selected MA preparation is eligible.
+    if(garageAudioOwnerThread_!=std::this_thread::get_id()||!nativeTaCameraSession50LA_.expired()||
+       !enabled||!entitiesOwner_||!entitiesOwner_->application10()||
+       !standardMaterialDomainOwner_||!standardMaterialDomainOwner_->prepared()||
+       !d::sameOwner(actual.applicationEntities,entitiesOwner_)||
+       !d::sameOwner(actual.applicationMaterials,standardMaterialDomainOwner_->materials382B38())||
+       actual.actualMaterialDirectory36B970!=&materialDirectory36B970_||materialDirectory36B970_!="textures\\"||
+       !actual.applicationAnimation.sameOwner(animationClock())||
+       &actual.applicationClock!=animationClockBackend_.get()||
+       !actual.actualRigs||!(*actual.actualRigs)[0]||!actual.actualTrackParticles4A0||
+       actual.bank.count()!=8||!actual.hostRace.runtimeValid()||
+       authored.inputs.course!=rr::game::OriginalCameraStartCourse::ma||authored.inputs.mcSourceIdentity||
+       authored.cam.empty()||authored.tob.empty()||authored.inputs.cam!=authored.cam.data()||
+       authored.inputs.camBytes!=authored.cam.size()||authored.inputs.tob!=authored.tob.data()||
+       authored.inputs.tobBytes!=authored.tob.size())return {};
+    const auto& particles=*actual.actualTrackParticles4A0;
+    const auto& rig=*(*actual.actualRigs)[0];
+    const auto* pod=original_player_identity50IK::find(rig.podId);
+    const auto& table=standardMaterialDomainOwner_->materials382B38();
+    const auto provider=standardMaterialDomainOwner_->archiveProvider3E1A70();
+    d::Provider::MemberView member;
+    if(!particles.prepared()||!particles.generation_||!particles.entityConstructed_||
+       race->nativeIntroRaceEntity()->sessionGeneration!=particles.generation_||
+       race->nativeIntroWorldEntity()->sessionGeneration!=particles.generation_||
+       !d::sameOwner(particles.application_,entitiesOwner_)||!d::sameOwner(particles.table_,table)||
+       particles.component_.reference00!=1||particles.component_.sessionGeneration!=particles.generation_||
+       particles.component_.kind!=rr::game::OriginalWreckComponentKind50LA::particleManager160B10||
+       table->populationTerminal()||table->demandTerminal()||!provider||!d::trackMember(*provider,rr::game::OriginalCameraStartCourse::ma,member)||
+       member.size!=authored.tob.size()||std::memcmp(member.data,authored.tob.data(),member.size)||
+       !pod||pod->racer60!=actual.racer60[0]||rig.phy.empty()||rig.phy.size()>1024u*1024u||
+       authored.inputs.phy!=reinterpret_cast<const char*>(rig.phy.data())||
+       authored.inputs.phyBytes!=rig.phy.size()||authored.inputs.phyIdentity!=
+            static_cast<std::uint64_t>(reinterpret_cast<std::uintptr_t>(&rig.phy))||
+       !d::camIdentity(pod->racer60,authored.cam)||
+       !rr::assets::ta_cut_authoring_candidate_detail::hashMatches(rig.phy.data(),rig.phy.size(),pod->phySha256))return {};
+    try {
+        // Reserve/copy immutable input custody before allocating the ONE Session.
+        // No source constructor, registry, counter, RNG or renderer effect occurs.
+        auto pin=std::make_unique<c::Session::NativeTaIssuance>();
+        pin->issuer=this;pin->provider=provider;pin->generation=particles.generation_;
+        pin->providerRevision=member.revision;pin->bankGeneration=member.bankGeneration;
+        pin->mount=member.mount;pin->ordinal=member.ordinal;
+        pin->selectedRig=&rig;pin->particles=actual.actualTrackParticles4A0;pin->selectedPod=pod->racer60;pin->course=rr::game::OriginalCameraStartCourse::ma;
+        pin->maRace=race;pin->maWorld=race->nativeMaWorldBacking();pin->maMap=actual.actualRadarMapB8;
         pin->cam=authored.cam;pin->tob=authored.tob;pin->phy=rig.phy;
         auto session=std::make_shared<c::Session>(actual);
         session->nativeTaIssuance_=std::move(pin);
@@ -111,6 +375,30 @@ inline std::shared_ptr<original_camera_session50KX::Session> Application::freshN
        session->frameStage_!=original_camera_session50KX::Session::FrameStage::idle||
        !session->nativeTaIssuance_)return {};
     const auto& pin=*session->nativeTaIssuance_;const auto& actual=session->actual_;
+    if(pin.course==rr::game::OriginalCameraStartCourse::gc){
+        const auto* race=race28C();
+        if(!race||race!=pin.gcRace||!pin.gcWorld||race->nativeGcWorldBacking()!=pin.gcWorld||
+           !race->nativeIntroRaceEntity()||!race->nativeIntroWorldEntity()||
+           !pin.gcMap||actual.actualRadarMapB8!=pin.gcMap)return {};
+    }
+    if(pin.course==rr::game::OriginalCameraStartCourse::ga){
+        const auto* race=race28C();
+        if(!race||race!=pin.gaRace||!pin.gaWorld||race->nativeGaWorldBacking()!=pin.gaWorld||
+           !race->nativeIntroRaceEntity()||!race->nativeIntroWorldEntity()||
+           !pin.gaMap||actual.actualRadarMapB8!=pin.gaMap)return {};
+    }
+    if(pin.course==rr::game::OriginalCameraStartCourse::sa){
+        const auto* race=race28C();
+        if(!race||race!=pin.saRace||!pin.saWorld||race->nativeSaWorldBacking()!=pin.saWorld||
+           !race->nativeIntroRaceEntity()||!race->nativeIntroWorldEntity()||
+           !pin.saMap||actual.actualRadarMapB8!=pin.saMap)return {};
+    }
+    if(pin.course==rr::game::OriginalCameraStartCourse::ma){
+        const auto* race=race28C();
+        if(!race||race!=pin.maRace||!pin.maWorld||race->nativeMaWorldBacking()!=pin.maWorld||
+           !race->nativeIntroRaceEntity()||!race->nativeIntroWorldEntity()||
+           !pin.maMap||actual.actualRadarMapB8!=pin.maMap)return {};
+    }
     if(pin.issuer!=this||!pin.generation||!standardMaterialDomainOwner_||
        !standardMaterialDomainOwner_->prepared()||!d::sameOwner(actual.applicationEntities,entitiesOwner_)||
        !d::sameOwner(actual.applicationMaterials,standardMaterialDomainOwner_->materials382B38())||
@@ -128,7 +416,7 @@ inline std::shared_ptr<original_camera_session50KX::Session> Application::freshN
        !d::sameOwner(particles.application_,entitiesOwner_)||
        !d::sameOwner(particles.table_,standardMaterialDomainOwner_->materials382B38())||
        !pod||pod->racer60!=pin.selectedPod||actual.racer60[0]!=pin.selectedPod||rig.phy!=pin.phy||
-       !d::taMember(*pin.provider,member)||member.revision!=pin.providerRevision||
+       !d::trackMember(*pin.provider,pin.course,member)||member.revision!=pin.providerRevision||
        member.bankGeneration!=pin.bankGeneration||member.mount!=pin.mount||member.ordinal!=pin.ordinal||
        member.size!=pin.tob.size()||std::memcmp(member.data,pin.tob.data(),member.size))return {};
     return session;
@@ -152,6 +440,15 @@ inline std::shared_ptr<original_camera_session50KX::Session> Application::resour
        session->frameStage_!=original_camera_session50KX::Session::FrameStage::idle||
        !session->nativeTaIssuance_)return {};
     const auto& pin=*session->nativeTaIssuance_;const auto& actual=session->actual_;
+    // This optional historical probe owns only TA01's461-frame reservation.
+    // Production GC uses its distinct dynamic four-child175510 owner instead.
+    if(pin.course!=rr::game::OriginalCameraStartCourse::ta)return {};
+    if(pin.course==rr::game::OriginalCameraStartCourse::gc){
+        const auto* race=race28C();
+        if(!race||race!=pin.gcRace||!pin.gcWorld||race->nativeGcWorldBacking()!=pin.gcWorld||
+           !race->nativeIntroRaceEntity()||!race->nativeIntroWorldEntity()||
+           !pin.gcMap||actual.actualRadarMapB8!=pin.gcMap)return {};
+    }
     if(pin.issuer!=this||!pin.generation||!standardMaterialDomainOwner_||
        !standardMaterialDomainOwner_->prepared()||!d::sameOwner(actual.applicationEntities,entitiesOwner_)||
        !d::sameOwner(actual.applicationMaterials,standardMaterialDomainOwner_->materials382B38())||
@@ -169,7 +466,7 @@ inline std::shared_ptr<original_camera_session50KX::Session> Application::resour
        !d::sameOwner(particles.application_,entitiesOwner_)||
        !d::sameOwner(particles.table_,standardMaterialDomainOwner_->materials382B38())||
        !pod||pod->racer60!=pin.selectedPod||actual.racer60[0]!=pin.selectedPod||rig.phy!=pin.phy||
-       !d::taMember(*pin.provider,member)||member.revision!=pin.providerRevision||
+       !d::trackMember(*pin.provider,pin.course,member)||member.revision!=pin.providerRevision||
        member.bankGeneration!=pin.bankGeneration||member.mount!=pin.mount||member.ordinal!=pin.ordinal||
        member.size!=pin.tob.size()||std::memcmp(member.data,pin.tob.data(),member.size))return {};
     const auto& custody=*session->nativeTaCutAuthoring_;
@@ -177,21 +474,20 @@ inline std::shared_ptr<original_camera_session50KX::Session> Application::resour
        custody.providerRevision!=pin.providerRevision||custody.bankGeneration!=pin.bankGeneration||
        custody.mount!=pin.mount)return {};
     // Retained exact bytes alone are not a current mount/epoch certificate.
-    constexpr std::array<const char*,4> names{{
-        "tracks\\ta.tob","tracks\\ta01.vub","tracks\\ta02.vub","tracks\\ta03.vub"}};
-    constexpr std::array<std::size_t,4> ordinals{{0,376,377,378}};
-    constexpr std::array<std::size_t,4> sizes{{13887,53488,17528,17528}};
+    const auto* identity=rr::assets::originalTrackCutIdentity50LA(original_camera_session50KX::introTrackId(pin.course));
+    if(!identity||!identity->cutCount||identity->cutCount>7)return {};
+    const auto memberCount=static_cast<std::size_t>(identity->cutCount)+1u;
     try {
-        for(std::size_t i=0;i<names.size();++i){
+        for(std::size_t i=0;i<memberCount;++i){
             const auto& retained=custody.members[i];
             const auto bytes=i?custody.authoring->originalVubBytes(static_cast<unsigned>(i)):
                 custody.authoring->originalTobBytes();
             d::Provider::MemberView current;
-            if(retained.name!=names[i]||retained.ordinal!=ordinals[i]||retained.bytes!=sizes[i]||
-               !bytes.data||bytes.size!=sizes[i]||
-               custody.provider->lookup132820(names[i],current)!=d::Provider::Lookup::present||
-               !current.member||*current.member!=names[i]||!current.data||current.size!=sizes[i]||
-               current.ordinal!=ordinals[i]||current.mount!=pin.mount||
+            if(retained.name!=identity->members[i].name||retained.ordinal!=identity->members[i].ordinal||retained.bytes!=identity->members[i].size||
+               !bytes.data||bytes.size!=identity->members[i].size||
+               custody.provider->lookup132820(identity->members[i].name,current)!=d::Provider::Lookup::present||
+               !current.member||*current.member!=identity->members[i].name||!current.data||current.size!=identity->members[i].size||
+               current.ordinal!=identity->members[i].ordinal||current.mount!=pin.mount||
                current.revision!=pin.providerRevision||current.bankGeneration!=pin.bankGeneration||
                std::memcmp(current.data,bytes.data,bytes.size))return {};
         }
@@ -212,19 +508,18 @@ inline bool Application::retainNativeTaCutAuthoring50LA()const noexcept {
     const auto session=freshNativeTaCameraSession50LA();
     if(!session||session->nativeTaCutAuthoring_)return false;
     const auto& pin=*session->nativeTaIssuance_;
-    // Exact original TA directory order, not caller-selected members/handles.
-    constexpr std::array<const char*,4> names{{
-        "tracks\\ta.tob","tracks\\ta01.vub","tracks\\ta02.vub","tracks\\ta03.vub"}};
-    constexpr std::array<std::size_t,4> ordinals{{0,376,377,378}};
-    constexpr std::array<std::size_t,4> sizes{{13887,53488,17528,17528}};
+    // Exact selected-track directory order, not caller-selected members/handles.
+    const auto* identity=rr::assets::originalTrackCutIdentity50LA(original_camera_session50KX::introTrackId(pin.course));
+    if(!identity||!identity->cutCount||identity->cutCount>7)return false;
+    const auto memberCount=static_cast<std::size_t>(identity->cutCount)+1u;
     try {
-        std::array<d::Provider::MemberView,4> views{};
-        std::array<a::OriginalTaCutMemberInputCandidate,4> inputs{};
-        for(std::size_t i=0;i<views.size();++i){
+        std::array<d::Provider::MemberView,8> views{};
+        std::array<a::OriginalTaCutMemberInputCandidate,8> inputs{};
+        for(std::size_t i=0;i<memberCount;++i){
             auto& v=views[i];
-            if(pin.provider->lookup132820(names[i],v)!=d::Provider::Lookup::present||
-               !v.member||*v.member!=names[i]||!v.data||v.size!=sizes[i]||
-               v.ordinal!=ordinals[i]||v.mount!=pin.mount||
+            if(pin.provider->lookup132820(identity->members[i].name,v)!=d::Provider::Lookup::present||
+               !v.member||*v.member!=identity->members[i].name||!v.data||v.size!=identity->members[i].size||
+               v.ordinal!=identity->members[i].ordinal||v.mount!=pin.mount||
                v.revision!=pin.providerRevision||v.bankGeneration!=pin.bankGeneration)return false;
             inputs[i]={*v.member,v.data,v.size};
         }
@@ -233,13 +528,13 @@ inline bool Application::retainNativeTaCutAuthoring50LA()const noexcept {
         // All copied bytes are independently hashed by the existing immutable
         // owner. This performs no V2 floating-point load or process-global read.
         a::OriginalTaCutAuthoringCandidate::Status status;
-        auto authoring=a::OriginalTaCutAuthoringCandidate::create(inputs,status);
+        auto authoring=a::OriginalTaCutAuthoringCandidate::create(identity->trackId,inputs.data(),memberCount,status);
         if(!authoring)return false;
         auto next=std::make_unique<Session::NativeTaCutAuthoringCustody>();
         next->provider=pin.provider;next->generation=pin.generation;
         next->providerRevision=pin.providerRevision;next->bankGeneration=pin.bankGeneration;
         next->mount=pin.mount;
-        for(std::size_t i=0;i<views.size();++i)
+        for(std::size_t i=0;i<memberCount;++i)
             next->members[i]={*views[i].member,views[i].ordinal,views[i].size};
         next->authoring=std::move(authoring);
         // Retained bytes do not prove a still-active mount. Revalidate the
@@ -247,12 +542,12 @@ inline bool Application::retainNativeTaCutAuthoring50LA()const noexcept {
         // allocation/copying, before the sole custody publication.
         const auto current=freshNativeTaCameraSession50LA();
         if(!d::sameOwner(current,session)||session->nativeTaCutAuthoring_)return false;
-        for(std::size_t i=0;i<views.size();++i){
+        for(std::size_t i=0;i<memberCount;++i){
             d::Provider::MemberView currentMember;
-            if(pin.provider->lookup132820(names[i],currentMember)!=d::Provider::Lookup::present||
-               !currentMember.member||*currentMember.member!=names[i]||
+            if(pin.provider->lookup132820(identity->members[i].name,currentMember)!=d::Provider::Lookup::present||
+               !currentMember.member||*currentMember.member!=identity->members[i].name||
                currentMember.data!=views[i].data||currentMember.size!=views[i].size||
-               currentMember.mount!=pin.mount||currentMember.ordinal!=ordinals[i]||
+               currentMember.mount!=pin.mount||currentMember.ordinal!=identity->members[i].ordinal||
                currentMember.revision!=pin.providerRevision||
                currentMember.bankGeneration!=pin.bankGeneration)return false;
         }
@@ -264,7 +559,8 @@ inline bool Application::constructUnpublishedNativeTaCutChild282860()const noexc
     // Authentic same-Application fresh Session admission, before touching the
     // actual process owner. Unloaded282860 consumes no VUB or numeric receipt.
     const auto session=freshNativeTaCameraSession50LA();
-    return session&&session->constructUnpublishedTaCutChild282860();
+    return session&&session->nativeTaIssuance_->course==rr::game::OriginalCameraStartCourse::ta&&
+        session->constructUnpublishedTaCutChild282860();
 }
 inline bool Application::deriveUnpublishedNativeTa01Resources()const noexcept {
     namespace d=ta_camera_issuer_detail;

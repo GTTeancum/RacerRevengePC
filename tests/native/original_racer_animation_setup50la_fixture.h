@@ -67,8 +67,9 @@ public:
     }
     const std::string& digest()const noexcept{return digest_;}
     bool mount(a::OriginalStandardArchiveProvider50LA& provider,
-        a::OriginalStandardArchiveProvider50LA::Diagnostic& d)const noexcept {
-        return provider.mountAuthenticatedRes(originalPath_,digest_,encodedBytes_,archive_,d);
+        a::OriginalStandardArchiveProvider50LA::Diagnostic& d,
+        a::NativeRaceMountLease50LA* nativeRace=nullptr)const noexcept {
+        return provider.mountAuthenticatedRes(originalPath_,digest_,encodedBytes_,archive_,d,nativeRace);
     }
 };
 // Produces table INPUT only. Call Setup::prepareTables154140 after actual model

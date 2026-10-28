@@ -147,6 +147,7 @@ struct OriginalStandardMaterialTable50LA::Storage {
         std::shared_ptr<OriginalStandardTextureTable50LA> pauseBackdropTextures;
         std::shared_ptr<const OriginalGarageScreenFallback50KG> garageFallback;
         std::shared_ptr<const OriginalMemoryCardScreenFallback50KG> memoryCardPending;
+        std::shared_ptr<const OriginalResultsScreenFallback50LA> resultsPending;
     };
     std::shared_ptr<const OriginalUiArchive50KG> appStart;
     std::shared_ptr<const OriginalUiMaterialTemplates50KG> templates;
@@ -663,6 +664,28 @@ bool OriginalStandardMaterialTable50LA::inspectCableEmission24B9B0(
     }
     d.sourcePC=0x24b9dcu;return true; // Inspection only;29C150 is not invoked.
 }
+bool OriginalStandardMaterialTable50LA::inspectLocalFlareEmission24B9B0(
+    std::int32_t index,OriginalCableEmissionBinding50LA& out,D& d) const noexcept {
+    // Same actual23CA50 null-key strip callback and24B9B0 operands. This
+    // observation contains no racer, cable geometry, Display pin or FIFO
+    // authority. Keep the existing racer-specific callers unchanged.
+    if(!inspectCableEmission24B9B0(index,0,out,d))return false;
+    const auto& origin=out.originatingPass_;const auto& final=out.effectivePass_;
+    const auto admits=[&](const OriginalStandardMaterialObject50LA* material,
+        const OriginalStandardMaterialPassView50LA& pass)noexcept {
+        OriginalStandardProgramRowView50LA program;
+        return material&&material->passCount48()&&*material->passCount48()==1&&
+            pass.program18&&storage_->programs->row(*pass.program18,program)&&program.canonicalName&&
+            !std::strcmp(program.canonicalName,"StripOptFogCode")&&
+            pass.mapCount20&&*pass.mapCount20==1&&pass.uv1E&&(*pass.uv1E)[0]==0&&
+            !pass.animation10&&!pass.textureAnimation10;
+    };
+    if(out.origin_.pass!=0||out.representative_.pass!=0||out.mapCount_!=1||
+       !admits(out.origin_.material,origin)||!admits(out.representative_.material,final)||
+       out.maps_[0].preparation!=OriginalStandardMaterialMapPreparation50LA::ready||
+       !out.maps_[0].texture)return fail(d,S::unsupportedPass,0x24b9b0u);
+    return true; //Prospective FINAL input only, never249610/FIFO completion.
+}
 OriginalCableMaterialCallbackStage50LA OriginalStandardMaterialTable50LA::serviceCableNullKey24A620(
     std::int32_t index,D& d) noexcept {
     using Stage=OriginalCableMaterialCallbackStage50LA;
@@ -939,7 +962,7 @@ bool OriginalStandardMaterialTable50LA::uiSharedHistoryQuiescent()const noexcept
     if(!s.populationBound||!s.construction||!s.construction->live()||!s.programs||!s.textures||
        !s.templates||s.nativeBindingPoisoned||s.nativeFifoPins||s.populationActive||s.populationTerminal||
        s.demandActive||s.collectorActive||demandTerminal()||s.partial)return false;
-    // No material or texture population is skipped to borrow the three rows.
+    // No material or texture population is skipped to borrow the six rows.
     // A pending foreign row is a pending real source operation, not a UI-only
     // manager. All subsequent table mutations are excluded by this lease.
     for(const auto& row:s.rows)if(row.references08>0&&!row.object04)return false;
@@ -954,10 +977,10 @@ bool OriginalStandardMaterialTable50LA::uiSharedHistoryQuiescent()const noexcept
 bool OriginalStandardMaterialTable50LA::captureUiSharedHistorySlot(std::size_t index,
     OriginalStandardMaterialUiSharedHistorySlot50LA& out,
     OriginalStandardMaterialPassView50LA& pass,std::int32_t& references)const noexcept {
-    static constexpr const char* names[]={"ui/textures/dimpopup","ui/textures/overlay1popup","font/venus16popup"};
-    static constexpr const char* sources[]={"ui/textures/dimpopup.psm","ui/textures/overlay1popup.psm","font/venus16popup.psm"};
-    static constexpr std::uint32_t offsets[]={70804,70826,70853};
-    if(!storage_||index>=3||storage_->rows.size()!=tableRows||!storage_->construction||!storage_->templates||
+    static constexpr const char* names[]={"ui/textures/dimpopup","ui/textures/overlay1popup","font/venus16popup","font/venus14popup","ui/textures/icon_x_popup","ui/textures/icon_tri_popup"};
+    static constexpr const char* sources[]={"ui/textures/dimpopup.psm","ui/textures/overlay1popup.psm","font/venus16popup.psm","font/venus14popup.psm","ui/textures/icon_x_popup.psm","ui/textures/icon_tri_popup.psm"};
+    static constexpr std::uint32_t offsets[]={70804,70826,70853,70872,70891,70917};
+    if(!storage_||index>=6||storage_->rows.size()!=tableRows||!storage_->construction||!storage_->templates||
        !storage_->programs||!storage_->textures)return false;
     const auto& s=*storage_;const auto number=static_cast<std::int32_t>(3228+index);
     const auto& row=s.rows[static_cast<std::size_t>(number)];
@@ -1000,8 +1023,8 @@ bool OriginalStandardMaterialTable50LA::beginUiSharedHistory(const UiSharedHisto
        storage_->uiSharedHistoryLeaseRevision==std::numeric_limits<std::uint64_t>::max()||
        storage_->nativeBindingRevision==std::numeric_limits<std::uint64_t>::max())return false;
     UiSharedHistorySlots slots;
-    std::array<OriginalStandardMaterialPassView50LA,3> views;
-    std::array<std::int32_t,3> references;
+    std::array<OriginalStandardMaterialPassView50LA,6> views;
+    std::array<std::int32_t,6> references;
     for(std::size_t i=0;i<slots.size();++i)
         if(!captureUiSharedHistorySlot(i,slots[i],views[i],references[i]))return false;
     // Complete preflight before issuing the address-pinned private receipt.
@@ -1048,7 +1071,7 @@ bool OriginalStandardMaterialTable50LA::commitUiSharedHistory(const UiSharedHist
        storage_->nativeBindingRevision==std::numeric_limits<std::uint64_t>::max())return false;
     // Source ordering/accepted callback/history synchronization are the common
     // owner's responsibility. This primitive cannot create their authority.
-    // Every check for all three slots precedes the first nonthrowing store.
+    // Every check for all six slots precedes the first nonthrowing store.
     for(std::size_t i=0;i<slots.size();++i){
         const auto& slot=slots[i];const auto& before=receipt.snapshots_[i];
         if(!sameUiSlotBefore(slot,before)||slot.writeKind!=before.writeKind)return false;
@@ -1078,8 +1101,13 @@ bool OriginalStandardMaterialTable50LA::commitUiSharedHistory(const UiSharedHist
            !flags||!known||!(*known&1u)||!texture.originalBytes()||!texture.sourceMember()||
            !texture.sourceKind()||!texture.levelCountB0()||*texture.levelCountB0()<=0||
            image.pstOffset_||image.pstBytes_!=texture.originalBytes()->size()||image.kind_!=*texture.sourceKind())return false;
-        const auto archive=i==1?OriginalUiArchiveId50KG::controllerPopup:OriginalUiArchiveId50KG::fonts;
-        const char* name=i==1?"ui/textures/overlay1.pst":"font/venus16.pst";
+        // The six registry roles share one transaction, not one texture.
+        // Only the two font roles resolve in FONTS; both icons and overlay1
+        // retain their exact CONTPOP members (never an identical UI alias).
+        static constexpr const char* images[]={nullptr,"ui/textures/overlay1.pst",
+            "font/venus16.pst","font/venus14.pst","ui/textures/icon_x.pst","ui/textures/icon_tri.pst"};
+        const auto archive=(i==2||i==3)?OriginalUiArchiveId50KG::fonts:OriginalUiArchiveId50KG::controllerPopup;
+        const char* name=images[i];
         const auto* identity=originalUiArchiveIdentity50KG(archive);bool exactMember=false;
         if(!identity)return false;
         for(std::size_t member=0;member<identity->memberCount;++member){
@@ -1261,7 +1289,7 @@ bool OriginalStandardMaterialTable50LA::populate14D370(
             if(row.tournamentMissingPsm&&row.tournamentTextures!=input.actualTextures383400){
                 fail(d,S::texture,0x247638);return terminal();
             }
-            if(!s.partial->construct29B550(canonical,row.name00,s.templates,row.associated30,input,row.tournamentMissingPsm,row.speedBoostMissingPsm,row.damageMissingPsm,row.pauseBackdropMissingPsm,row.garageFallback,row.memoryCardPending,d))return terminal();
+            if(!s.partial->construct29B550(canonical,row.name00,s.templates,row.associated30,input,row.tournamentMissingPsm,row.speedBoostMissingPsm,row.damageMissingPsm,row.pauseBackdropMissingPsm,row.garageFallback,row.memoryCardPending,row.resultsPending,d))return terminal();
             if(!s.partial->constructed29B550()){
                 fail(d,S::phase,0x29B854);return terminal();
             }
@@ -1271,6 +1299,7 @@ bool OriginalStandardMaterialTable50LA::populate14D370(
             s.invalidateCollector(); //A newly published pass set requires a complete rebuild.
             row.object04=std::move(s.partial); //29B854 real loaded owner publication.
             row.memoryCardPending.reset(); //Consumed capability; history is now object-owned.
+            row.resultsPending.reset();
             //14D3FC repeats298F80 with the identical object and row. It creates
             //no second ownership reference and does not rebuild collector14D440.
             ++d.populationPublished;
@@ -1352,6 +1381,7 @@ bool OriginalStandardMaterialTable50LA::bindGarageScreenFallbackAfterRetain(std:
        rejected(bool(row.tournamentMissingPsm),"tournament_owner")||rejected(bool(row.speedBoostMissingPsm),"speedboost_owner")||
        rejected(bool(row.damageMissingPsm),"damage_owner")||rejected(bool(row.pauseBackdropMissingPsm),"pause_owner")||
        rejected(bool(row.memoryCardPending),"memorycard_pending")||
+       rejected(bool(row.resultsPending),"results_pending")||
        rejected(row.object04&&!row.garageFallback,"object_without_garage_proof")||
        rejected(!proof->current(row.name00+".psm",proof->context_,proof->textures_),"new_proof_current"))
         return fail(d,S::phase,0x29B638);
@@ -1398,6 +1428,16 @@ bool OriginalStandardMaterialTable50LA::retainDamageFallback14D590(
 bool OriginalStandardMaterialTable50LA::retainPauseBackdropFallback14D590(
     std::int32_t index,std::shared_ptr<const OriginalUiArchive50KG> archive,
     std::shared_ptr<OriginalStandardTextureTable50LA> textures,D& d) noexcept {
+    return pauseBackdropFallback14D590(index,std::move(archive),std::move(textures),true,d);
+}
+bool OriginalStandardMaterialTable50LA::bindResultsBaseBackdropAfterRetain(
+    std::int32_t index,std::shared_ptr<const OriginalUiArchive50KG> archive,
+    std::shared_ptr<OriginalStandardTextureTable50LA> textures,D& d) noexcept {
+    return pauseBackdropFallback14D590(index,std::move(archive),std::move(textures),false,d);
+}
+bool OriginalStandardMaterialTable50LA::pauseBackdropFallback14D590(
+    std::int32_t index,std::shared_ptr<const OriginalUiArchive50KG> archive,
+    std::shared_ptr<OriginalStandardTextureTable50LA> textures,bool retain,D& d) noexcept {
     if(!storage_||index<0||static_cast<std::size_t>(index)>=storage_->rows.size()||!archive||
         !archive->loaded()||archive->identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::overlays))
         return fail(d,S::source,0x29B638);
@@ -1424,10 +1464,34 @@ bool OriginalStandardMaterialTable50LA::retainPauseBackdropFallback14D590(
                 return fail(d,S::source,0x29B638);
         }
     }
-    if(!retainScreen14D590(index,d))return false;
+    if(retain){if(!retainScreen14D590(index,d))return false;}
+    else if(row.references08<=0||!storage_->templates||
+        row.associated30!=storage_->templates->get(OriginalUiTemplate50KG::screenMt))
+        return fail(d,S::phase,0x14D590);
     if(!row.pauseBackdropMissingPsm)row.pauseBackdropMissingPsm=std::move(archive);
     if(!row.pauseBackdropTextures)row.pauseBackdropTextures=std::move(textures);
     return true;
+}
+bool OriginalStandardMaterialTable50LA::bindResultsPendingAfterRetain(std::int32_t index,
+    std::shared_ptr<const OriginalResultsScreenFallback50LA> proof,D& d)noexcept {
+    try {
+    if(!storage_||index<0||static_cast<std::size_t>(index)>=storage_->rows.size()||
+       !proof||proof->row_!=index)return fail(d,S::source,0x29B638);
+    auto& row=storage_->rows[static_cast<std::size_t>(index)];
+    if(row.references08<=0||!storage_->templates||
+       row.associated30!=storage_->templates->get(OriginalUiTemplate50KG::screenMt)||
+       !proof->current(row.name00+".psm",proof->context_,proof->textures_,proof->provider_))
+        return fail(d,S::source,0x29B638);
+    //14D370 skips an actual loaded row. Never replace its object or first
+    //construction history, nor steal an earlier pending caller's authority.
+    if(row.object04||row.garageFallback||row.memoryCardPending||row.tournamentMissingPsm||
+       row.speedBoostMissingPsm||row.damageMissingPsm||row.pauseBackdropMissingPsm)return true;
+    if(row.resultsPending){
+        if(!row.resultsPending->current(row.name00+".psm",proof->context_,proof->textures_,proof->provider_))
+            return fail(d,S::source,0x29B638);
+    }else row.resultsPending=std::move(proof);
+    return true;
+    }catch(...){return fail(d,S::allocation,0x29B638);}
 }
 bool OriginalStandardMaterialTable50LA::bindMemoryCardPendingAfterRetain(
     const rr::platform::OriginalUiMemoryCardConstructor50KG& owner,
@@ -1442,7 +1506,7 @@ bool OriginalStandardMaterialTable50LA::bindMemoryCardPendingAfterRetain(
     if(row.references08<=0||row.object04||!storage_->templates||
        row.associated30!=storage_->templates->get(OriginalUiTemplate50KG::screenMt)||
        !OriginalStandardArchiveProvider50LA::sameName(row.name00,proof->name_)||
-       row.garageFallback||row.tournamentMissingPsm||row.speedBoostMissingPsm||row.damageMissingPsm||row.pauseBackdropMissingPsm)
+       row.resultsPending||row.garageFallback||row.tournamentMissingPsm||row.speedBoostMissingPsm||row.damageMissingPsm||row.pauseBackdropMissingPsm)
         return fail(d,S::source,0x29B638);
     if(row.memoryCardPending){
         if(row.memoryCardPending->issuer_.lock().get()!=&owner||!row.memoryCardPending->occurrenceCurrent()||
@@ -1553,7 +1617,7 @@ bool OriginalStandardMaterialTable50LA::preflightMemoryCardPopulation(
     for(std::size_t i=0;i<storage_->rows.size();++i){const auto& row=storage_->rows[i];
         if(row.references08<=0||row.object04)continue;d.row=static_cast<std::int32_t>(i);
         if(row.associated30!=storage_->templates->get(OriginalUiTemplate50KG::screenMt)||
-           row.garageFallback||row.tournamentMissingPsm||row.speedBoostMissingPsm||row.damageMissingPsm||row.pauseBackdropMissingPsm)
+           row.resultsPending||row.garageFallback||row.tournamentMissingPsm||row.speedBoostMissingPsm||row.damageMissingPsm||row.pauseBackdropMissingPsm)
             return fail(d,S::source,0x29B638);
         if(static_cast<std::int32_t>(i)==first){
             if(row.memoryCardPending&&(!row.memoryCardPending->occurrenceCurrent()||
@@ -1609,7 +1673,7 @@ bool OriginalStandardMaterialTable50LA::preflightMemoryCardStripPopulation(
     for(std::size_t i=0;i<storage_->rows.size();++i){const auto& row=storage_->rows[i];
         if(row.references08<=0||row.object04)continue;d.row=static_cast<std::int32_t>(i);
         if(row.associated30!=storage_->templates->get(OriginalUiTemplate50KG::screenMt)||
-           row.garageFallback||row.tournamentMissingPsm||row.speedBoostMissingPsm||row.damageMissingPsm||row.pauseBackdropMissingPsm)
+           row.resultsPending||row.garageFallback||row.tournamentMissingPsm||row.speedBoostMissingPsm||row.damageMissingPsm||row.pauseBackdropMissingPsm)
             return fail(d,S::source,0x29B628);
         if(row.memoryCardPending)return fail(d,S::source,0x29B628);
         if(static_cast<std::int32_t>(i)==first){
@@ -1684,6 +1748,12 @@ bool OriginalStandardMaterialTable50LA::retain14D590(std::int32_t index,
     r.associated30=storage_->templates->get(associated); //14D5C0, even if already loaded.
     return true;
 }
+bool OriginalStandardMaterialTable50LA::canRelease14D500(std::int32_t index) const noexcept {
+    return storage_&&index>=0&&static_cast<std::size_t>(index)<storage_->rows.size()&&
+        storage_->rows[static_cast<std::size_t>(index)].references08>0&&
+        !storage_->uiSharedHistoryOwner&&!storage_->nativeFifoPins&&!storage_->populationActive&&
+        !storage_->demandActive&&!storage_->collectorActive;
+}
 bool OriginalStandardMaterialTable50LA::release14D500(std::int32_t index) noexcept {
     if(!storage_||index<0||static_cast<std::size_t>(index)>=storage_->rows.size())return false;
     auto& r=storage_->rows[static_cast<std::size_t>(index)];
@@ -1697,6 +1767,7 @@ bool OriginalStandardMaterialTable50LA::release14D500(std::int32_t index) noexce
     }
     if(r.references08==0){
         r.memoryCardPending.reset();
+        r.resultsPending.reset();
         // Native construction-family admission cannot govern a later fresh
         // null-row lifetime. Loaded-object history was destroyed above.
         r.garageFallback.reset();

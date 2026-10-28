@@ -2,15 +2,172 @@
 #include "original_ui_main_entry50kg.h"
 #include "original_course_race_targets50kx.h"
 #include "../../src/game/original_race_hud_blink50la.h"
+#include "../../src/game/original_results104_50la.h"
+#include "../../src/game/original_race_f8_50la.h"
+#include "../../src/game/original_race_end_entry50la.h"
+#include "../../src/game/original_simple_vcr50la.h"
+#include "../../src/game/original_race_music_manager50la.h"
+#include "../../src/game/original_race_timing_manager50la.h"
+#include "../../src/game/original_human_finish50kg.h"
 #include <limits>
+#include <optional>
+#include <string_view>
+#include <thread>
 #include "../../platform/linux/native/race_audio_groups50ic.h"
 
+namespace original_results_feedback50LA { class Registration; class Scope; }
+namespace original_race_hud_scope50LA { class Registration; class Scope; }
+namespace interactive_continuation50DU { struct Context; }
+namespace native_world_water50LA {class Domain;}
 namespace rr::game {
+struct OriginalRaceHudText50KG;
 // Actual counted1A65C0 prefix, admitted only by consumed Course ownership.
 // Application28C publication is a separate same-owner facet; full load remains gated.
 class OriginalRaceConstructor50LA final {
+    // Only the existing lexical human-RA continuation binds its94 reference;
+    // no public timer/finished setter or ownership receipt is exposed.
+    friend struct ::interactive_continuation50DU::Context;
     friend struct ::original_main_entry50KG::Application;
+    friend class rr::platform::OriginalUiLightManagerOwner50KG;
     friend class ::original_pause_observation50LA::Owner;
+    friend class ::original_results_roster50LA::Read;
+    friend class OriginalResults10450LA;
+    friend class OriginalSimpleVCR50LA;
+    friend class OriginalRaceMusicManager50LA;
+    friend class OriginalRaceTimingManager50LA;
+    friend class ::original_results_feedback50LA::Registration;
+    friend class ::original_results_feedback50LA::Scope;
+    friend class ::original_race_hud_scope50LA::Registration;
+    friend class ::original_race_hud_scope50LA::Scope;
+    // Immutable entry fence: reject a foreign Results setter thread BEFORE
+    // touching source fields or the mutable weak registration below.
+    const std::thread::id resultsFeedbackThread_=std::this_thread::get_id();
+    // Native same-session feedback borrow only. Weak registration cannot
+    // extend the actual Continuation/setup device lifetime or own this Race.
+    std::weak_ptr<::original_results_feedback50LA::Registration> resultsFeedback_;
+    std::weak_ptr<::original_race_hud_scope50LA::Registration> endHud_;
+    // Native position inside ONE suspended source invocation, not a source
+    // finish/phase flag. No production caller or reset/replay API exists.
+    enum class EndEntryStep:std::uint8_t {subtype,f8,results,hud,dispatch,recordBit,rivalWord,
+        ackRead,waitingBit,waitingModeScalar,waitingPlaces};
+    EndEntryStep endEntryStep_=EndEntryStep::subtype;
+    std::optional<platform::OriginalUiRiderProfileStamp50KG> endEntryProfile_;
+    std::uint32_t endEntrySubtype_=0;
+    //Identity markers only: compare against the actual owned slots before
+    //dereferencing; never extend F8/Results teardown lifetime.
+    const OriginalRaceF850LA* endEntryF8_=nullptr;
+    const OriginalResults10450LA* endEntryResults_=nullptr;
+    void continueEndEntryPrefix1A7DD0(OriginalRaceEndEntryDiagnostic50LA&)noexcept;
+    //Same single suspended invocation, not once-per-race or earned authority.
+    std::optional<std::uint64_t> endDispatchPublication_;
+    std::optional<std::uint32_t> endAcknowledgement20C_;
+    // The callee may reach its actual epilogue while1A7B40 remains stopped
+    // before its later78 read. No repeat/reset policy is authorized by this.
+    bool endDispatchReturned_=false;
+    // Native saved program counter/locals of the SAME caller invocation.
+    // Unpublished78 is unknown, never the source null branch.
+    enum class EndCallerCut:std::uint8_t {owner78,manager58,subtype,associationHead,recordLoopCount,recordRacerGetter,recordAfterLoop,recordVcrStart,
+        vcrBit5,replayRacers,replayRacerMode,replayRacerRetirement,replayRacerZone,
+        replayRacerCenter,replayRacerWorld,replayWorldTail,rootTail,rootEntity,rootRenderer,rootAfterEntity,rootPhysics,physicsCount,physicsGetter,physicsCall,physicsBody,physicsGrounded,physicsAirborneRead,physicsGravityStore,physicsEngineFlags,physicsEngine34Store,physicsB9CRead,physicsEngine38Store,physicsWorldPreparation,physicsCandidatesStopped,physicsProfile,physicsGhost,physicsMusic,physicsMusicBody,musicRaceFlags,musicCount,musicDispatch,musicClear,callerReturn};
+    EndCallerCut endCallerCut_=EndCallerCut::owner78;
+    const OriginalSimpleVCR50LA* endCallerVcr_=nullptr;
+    std::uint8_t endCallerMode_=0;
+    std::optional<std::int32_t> endCallerIndexS1_; //Reached1A8090 or1A8174 initializes0.
+    // Actual229F80 saved register operands, not new canonical recording lanes.
+    std::optional<std::uint32_t> endReplayZoneC38_;
+    std::optional<std::array<std::uint32_t,4>> endReplayCenterC40_;
+    void continueEndCaller1A7E40(OriginalRaceEndEntryDiagnostic50LA&)noexcept;
+    // Saved argument of the exact Root publication that reached1A7DD0.
+    // Not latest-frame delta, an elapsed timer, or end admission authority.
+    std::optional<std::uint32_t> endEntrySourceF20_;
+    bool endRootChildrenRead_=false;
+    std::uint64_t endRootEnrollmentSerial_=0;
+    const OriginalWreckComponent50LA* endRootChildS0_=nullptr;
+    std::optional<std::uint32_t> endRootReturnS4_;
+    const OriginalRaceMusicManager50LA* endMusicSource10C_=nullptr; //Saved1A847C target identity.
+    std::optional<std::uint32_t> endMusicQueueCount150_;
+    std::optional<std::uint32_t> endCallerReturnV0_; //Only actual1A8480 after all reached calls returned.
+    std::uint32_t endPhysicsCandidateStopPC_=0x219ad4;
+    std::uint64_t endPhysicsProjectionRevision_=0; //Expired synchronous materializer identity; never readiness.
+    std::int32_t endPhysicsFirstCandidateCount_=0,endPhysicsSecondCandidateCount_=0,endPhysicsMergedCount_=0;
+    bool endPhysicsFirstQueryReturned_=false,endPhysicsSecondQueryReturned_=false,endPhysicsCandidatesMerged_=false;
+    bool endNativeDetectorEntered_=false,endNativeDetectorReset_=false,endNativeDetectorReturned_=false;
+    bool endNativeQueryCachePrepared_=false,endNativeQueryMembershipCommitted_=false,endNativeQueryPrefixReturned_=false;
+    std::uint64_t endNativeQueryMembershipRevision_=0;
+    bool endNativeLimitedInitialized_=false,endNativeLimitedReturned_=false;
+    std::size_t endNativeLimitedOrdinal_=0;
+    bool endNativeSecondaryBodyBound_=false,endNativeSecondarySkipped_=false;
+    bool endNativeSecondaryDetectorEntered_=false,endNativeSecondaryDetectorReset_=false,endNativeSecondaryDetectorReturned_=false;
+    bool endNativeSecondaryCachePrepared_=false,endNativeSecondaryMembershipCommitted_=false,endNativeSecondaryQueryPrefixReturned_=false;
+    std::uint64_t endNativeSecondaryMembershipRevision_=0;
+    bool endNativeSecondaryLimitedInitialized_=false,endNativeSecondaryLimitedReturned_=false;
+    std::size_t endNativeSecondaryLimitedOrdinal_=0;
+    bool endNativeContactStaticsEntered_=false,endNativeContactScenePrepared_=false,endNativeContactReturned_=false;
+    std::array<std::uint32_t,3> endNativeContactPosition_{},endNativeContactForward_{},endNativeContactUp_{};
+    std::size_t endNativeContactOrdinal_=0;
+    std::uint32_t endNativeContactMatchedIdentity_=0;
+    std::optional<std::uint32_t> endPhysicsEngine34_,endPhysicsEngine38_; //Reached source operands, not a new engine owner.
+    std::optional<std::uint32_t> endPhysicsGravityF12_; //Reached219A74 source read, not a default/second gravity owner.
+    std::optional<std::uint32_t> endPhysicsFactorF20_;
+    std::uint32_t endPhysicsCountS2_=0,endPhysicsPassS5_=0;
+    bool endPhysicsFirstS3_=true;
+    std::int32_t endPhysicsIndexS1_=0;
+    void continueEndPhysics1A8390(OriginalRaceEndEntryDiagnostic50LA&)noexcept;
+    void continueEndCommonRoot1A82E0(OriginalRaceEndEntryDiagnostic50LA&)noexcept;
+
+
+    // Source locals initialized only after1AB948's complete feedback tail
+    // returns:1AB950 s1=12,1AB958 s0=0. No low2/count or CCC is invented.
+    struct EndWaitingPlaceScan {
+        enum class Cut:std::uint8_t {minimumLow2,minimumGetter,selectionLow2,
+            selectionGetter,selectedGetter,controllerLow2,controllerSlot,owner78};
+        Cut cut=Cut::minimumLow2;
+        //Actual live registers, not a sorted Results row or inferred winner.
+        //S1 is overwritten with-1 at1AB99C; S2 first exists at1AB9A0.
+        std::int32_t valueS1=12,indexS0=0;
+        std::optional<std::int32_t> minimumS2;
+    };
+    std::optional<EndWaitingPlaceScan> endWaitingPlaceScan_;
+    // Constructor1A65EC establishes a null78 slot. Native absence is NOT
+    // loaded-null78. Only the private original load leaf below publishes it.
+    std::unique_ptr<OriginalSimpleVCR50LA> vcr78Owner_;
+    OriginalSimpleVCR50LA* vcr78Source_=nullptr;
+    // Native position in a dormant1A6DF4..1A6EA0 leaf, not readiness or a
+    // predecessor receipt. NO caller until original1A6DEC and earlier loaders
+    // return; native world/camera equivalents do not establish that edge.
+    enum class VcrLoadCut:std::uint8_t {subtype,allocate,setup,publish,register90,
+        afterRegistration,allocationRejected,setupRejected,registrationRejected,retired};
+    VcrLoadCut vcrLoadCut_=VcrLoadCut::subtype;
+    std::optional<platform::OriginalUiRiderProfileStamp50KG> vcrLoadProfile_;
+    std::uint32_t vcrLoadSubtype_=0;
+    bool constructVcr78At1A6DF4(OriginalSimpleVCRDiagnostic50LA&)noexcept;
+    // Only partial/future detached native cancellation, NOT source teardown
+    //1A6840, attachment1AB1A8, or permission to retire a live replay owner.
+    bool retireNativeVcr78Detached(OriginalSimpleVCRDiagnostic50LA&)noexcept;
+    // Actual1A6CAC publication owns the counted manager BEFORE its load.
+    // Empty native custody is not a source constructor-null10C assertion.
+    std::unique_ptr<OriginalRaceMusicManager50LA> music10C_;
+    //Actual counted1AF7F0 object, published before1AF960. Native time30/flags58
+    //and lists remain the ONE existing Setup manager, never copied here.
+    std::unique_ptr<OriginalRaceTimingManager50LA> timingB4_;
+    bool initializeNativeTimingB4(::interactive_continuation50DU::Context&,
+        ::native_racer50HN::Bank&,std::uint32_t&)noexcept;
+    bool retireNativeTimingB4(std::uint32_t&)noexcept;
+    bool readResultsManagerFlags58(const ::original_camera_session50KX::Session&,
+        std::uint8_t&,OriginalResults104Diagnostic50LA&)const noexcept;
+    void continuePreAck1AB520(const ::original_position_stats_adapter50LA::Owner&,
+        OriginalRaceEndEntryDiagnostic50LA&)noexcept;
+    bool resultsInputPredecessorTopology50LA(OriginalResults104Diagnostic50LA&)const noexcept;
+    // Only the synchronous Results name-only mutation may advance the
+    // retained end stamp. Foreign Profile changes still reject, never refresh.
+    bool storeResultsNameAndReconcile1CA528(std::uint32_t,std::string_view,bool& committed)noexcept;
+    bool storeResultsNoTimeAndReconcile1CA4DC(bool& committed)noexcept;
+    //Private readonly1A87A0 branches through the genuine preceding Race and
+    //its concrete142350 children, then actual inactive Pause sibling. Only
+    //the owned fixed native UI mapping is admitted; sourceCBC remains absent.
+    bool passResultsInputPredecessors1A87A0(const ::original_position_stats_adapter50LA::Owner&,
+        const InputEvent48Z&,const platform::OriginalResultsHostInput50LA&,
+        OriginalResults104Diagnostic50LA&)const noexcept;
     std::shared_ptr<OriginalApplicationEntities50LA> application_;
     std::shared_ptr<platform::OriginalUiRiderProfileOwner50KG> profile_;
     OriginalWreckComponent50LA entity_;
@@ -20,18 +177,47 @@ class OriginalRaceConstructor50LA final {
     // pointer slots acquire only explicitly reached native children below.
     // B8/BC/C0 are not represented as null because1A65C0 never writes them.
     float field94_=4.f;
+    // Same constructor-zero98 lane, now consumed by the existing real ending
+    // cursor. Native progress retains one actual Root invocation, not a timer.
+    OriginalHumanEndClock50KG endClock98_;
+    std::uint64_t endClockRootPublication_=0;
+    std::optional<OriginalHumanEndClockResult50KG> endClockProgress_;
     std::uint32_t field30_=0,field44_=0,field58_=0,field6C_=0,field70_=0;
-    std::uint32_t field8C_=0,field90_=0,field98_=0,field9C_=0,fieldA0_=0,fieldA4_=0,fieldA8_=0;
-    std::array<std::uint32_t,4> fields34_{},fields48_{};
+    std::uint32_t field8C_=0,field90_=0,field9C_=0,fieldA0_=0,fieldA4_=0,fieldA8_=0;
+    // Actual first source Camera34, not a guest integer or a second Session.
+    std::shared_ptr<OriginalFrontendCameraCold50LA> camera34_;
+    std::array<std::uint32_t,3> fields38_{}; //Other constructor-null view slots.
+    std::array<std::uint32_t,4> fields48_{};
+    enum class CameraInitStep:std::uint8_t {unreached,pause,construct,viewportPrefix,
+        nativePending,nativeReady,nativeRetiring,retired};
+    CameraInitStep cameraInitStep_=CameraInitStep::unreached;
+    // Comparison only; the actual world owns this Session. Close revokes before
+    // fallible retirement. This does not own a second viewport or renderer.
+    const ::original_camera_session50KX::Session* cameraNativeAdapter34_=nullptr;
+    bool ownsNativeCameraAdapter34(const ::original_camera_session50KX::Session&)const noexcept;
+    bool nativeCameraAdapter34LifetimeCurrent(const ::original_camera_session50KX::Session&)const noexcept;
     std::uint32_t field128_=3;
-    std::array<std::array<std::uint32_t,7>,2> fields12C_{};
-    std::array<std::uint32_t,2> fields164_{},fields17C_{},fields184_{},fields18C_{},fields194_{};
-    std::array<std::array<std::uint32_t,2>,2> fields16C_{};
+    //Actual HUD pointer slots, constructor-null then published only by the
+    //reached1A8CC4 producer. Optional reset means native borrow unavailable,
+    //never a fabricated original write of null during lexical revocation.
+    struct HudTextSlots {
+        std::array<std::array<const OriginalRaceHudText50KG*,7>,2> records12C{};
+        std::array<const OriginalRaceHudText50KG*,2> time164{},status17C{};
+        std::array<std::array<const OriginalRaceHudText50KG*,2>,2> explosions16C{};
+    };
+    std::optional<HudTextSlots> hudTextSlots_{std::in_place};
+    //All three gleam pointer families are constructor-null initially. The
+    //native HUD combines representations; publication withdraws this fact,
+    //never invents guest addresses or aliases distinct original objects.
+    bool hudGleamConstructorNullKnown_=true;
     std::int32_t field1A4_=-1;
     std::uint32_t field1A8_=0,field1AC_=0;
     // Constructor writes bits2..7 of1B0 and bits0..1 of1B1 only.
     // Unknown lanes are deliberately inaccessible, not zero-filled flags.
-    const std::uint8_t flags1B0KnownMask_=0xfcu,flags1B0KnownValue_=0x08u;
+    std::uint8_t flags1B0KnownMask_=0xfcu;
+    // Canonical represented lanes:1AB93C may set known bit5. Low2 remain
+    // unknown until reached1A6C10/1A6C50; no Session projection is copied.
+    std::uint8_t flags1B0KnownValue_=0x08u;
     const std::uint8_t flags1B1KnownMask_=0x03u,flags1B1KnownValue_=0;
     bool counted_=false,constructorSuffix_=false,rolledBack_=false;
     platform::RaceAudioGroups50IC* raceAudio_=nullptr; //Actual caller retains through rollback.
@@ -46,6 +232,29 @@ class OriginalRaceConstructor50LA final {
     bool loadPrefixAttempted_=false,loadPrefixReached_=false;
     std::shared_ptr<ra_cold_aggregate50LA::Owner> world74_;
     bool worldAttempted_=false;
+    enum class NativeWater70State:std::uint8_t {unreached,published,withdrawn};
+    NativeWater70State nativeWater70State_=NativeWater70State::unreached;
+    // Actual native absent-water copy, NOT guest pointer bits. World owns the
+    // constructor domain; this weak identity cannot postpone its retirement.
+    std::weak_ptr<const native_world_water50LA::Domain> nativeWater70Domain_;
+    std::optional<std::nullptr_t> nativeWater70Object_;
+    bool continueNativeTrackAfterWater(const ::original_main_entry50KG::Application&,std::uint32_t&)noexcept;
+    // Native resumable position in THIS World constructor suffix, not source
+    // finish/phase authority. Unreached until actual World74 publication.
+    // Reset/default-low2 stores cannot replay after a later native rejection.
+    enum class WorldInitStep:std::uint8_t {unreached,soundReset,defaultLow2,profileLow2,camera};
+    WorldInitStep worldInitStep_=WorldInitStep::unreached;
+    //Native loading progress, NOT Application330 or a source loader return.
+    //The real retained world owns its SCB reader/backing below; no second scene.
+    enum class NativeTrackLoadStep:std::uint8_t {unreached,archive,savedDirectory,scb,sceneInfo,scbRetired,tob,nativeAdaptedA4,tobRetired,aub,aubRetired,nativeAdaptedReturn};
+    NativeTrackLoadStep nativeTrackLoadStep_=NativeTrackLoadStep::unreached;
+    std::array<char,3> nativeTrackName_{};
+    std::array<char,260> savedModelDirectory1A9EE0_{};
+    bool nativeTrackArchiveCurrent(const ::original_main_entry50KG::Application&)const noexcept;
+    bool bindNativeTrackScb34(const ::original_main_entry50KG::Application&,std::uint32_t&)noexcept;
+    bool continueNativeTrackAfterTob(const ::original_main_entry50KG::Application&,std::uint32_t&)noexcept;
+    bool continueNativeTrackAfterScb(const ::original_main_entry50KG::Application&,std::uint32_t&)noexcept;
+    bool worldResetPredecessor1A6BF0Current()const noexcept;
     // Distinct TA source backing and counted World prefix. No RA cast/alias,
     // no fabricated full-world load, physics-index or runtime topology owner.
     std::shared_ptr<ta_original_world50LE::Owner> taWorld74_;
@@ -58,8 +267,73 @@ class OriginalRaceConstructor50LA final {
     bool constructTaWorld1A6BC0(const original_main_entry50KG::Application&,
         std::shared_ptr<ta_original_world50LE::Owner>,std::uint32_t&)noexcept;
     bool retireNativeTaWorldPrefix(std::uint32_t&)noexcept;
+    // Independently typed GC static backing and actual counted1B2870 prefix.
+    // Runtime query/water owners remain their real caller-owned objects; this
+    // prefix does not claim slot30 load or fabricate collision topology.
+    std::shared_ptr<gc_original_world50LM::Owner> gcWorld74_;
+    OriginalWreckComponent50LA gcWorldEntity_;
+    bool gcWorldCounted_=false,gcWorldPrefixComplete_=false;
+    std::uint32_t gcWorldMode30_=0,gcUseEnvironment35C_=0,gcWorldMode524_=0;
+    std::unique_ptr<OriginalWreckComponent50LA*[]> gcWorldList500_;
+    std::uint32_t gcWorldListCapacity504_=0,gcWorldListGrowth508_=0,gcWorldListCount50C_=0;
+    bool constructGcWorld1A6BC0(const original_main_entry50KG::Application&,
+        std::shared_ptr<gc_original_world50LM::Owner>,std::uint32_t&)noexcept;
+    bool retireNativeGcWorldPrefix(std::uint32_t&)noexcept;
+    // Independently typed MA static backing and actual counted1B2870 prefix.
+    // Runtime query/water owners remain their real caller-owned objects; this
+    // prefix does not claim slot30 load or fabricate collision topology.
+    std::shared_ptr<ma_original_world50LM::Owner> maWorld74_;
+    OriginalWreckComponent50LA maWorldEntity_;
+    bool maWorldCounted_=false,maWorldPrefixComplete_=false;
+    std::uint32_t maWorldMode30_=0,maUseEnvironment35C_=0,maWorldMode524_=0;
+    std::unique_ptr<OriginalWreckComponent50LA*[]> maWorldList500_;
+    std::uint32_t maWorldListCapacity504_=0,maWorldListGrowth508_=0,maWorldListCount50C_=0;
+    bool constructMaWorld1A6BC0(const original_main_entry50KG::Application&,
+        std::shared_ptr<ma_original_world50LM::Owner>,std::uint32_t&)noexcept;
+    bool retireNativeMaWorldPrefix(std::uint32_t&)noexcept;
+    // Independently typed SA static backing and actual counted1B2870 prefix.
+    // Runtime query/water owners remain their real caller-owned objects; this
+    // prefix does not claim slot30 load or fabricate collision topology.
+    std::shared_ptr<sa_original_world50LM::Owner> saWorld74_;
+    OriginalWreckComponent50LA saWorldEntity_;
+    bool saWorldCounted_=false,saWorldPrefixComplete_=false;
+    std::uint32_t saWorldMode30_=0,saUseEnvironment35C_=0,saWorldMode524_=0;
+    std::unique_ptr<OriginalWreckComponent50LA*[]> saWorldList500_;
+    std::uint32_t saWorldListCapacity504_=0,saWorldListGrowth508_=0,saWorldListCount50C_=0;
+    bool constructSaWorld1A6BC0(const original_main_entry50KG::Application&,
+        std::shared_ptr<sa_original_world50LM::Owner>,std::uint32_t&)noexcept;
+    bool retireNativeSaWorldPrefix(std::uint32_t&)noexcept;
+    // Independently typed GA static backing and actual counted1B2870 prefix.
+    // Runtime query/water owners remain their real caller-owned objects; this
+    // prefix does not claim slot30 load or fabricate collision topology.
+    std::shared_ptr<ga_original_world50LH::Owner> gaWorld74_;
+    OriginalWreckComponent50LA gaWorldEntity_;
+    bool gaWorldCounted_=false,gaWorldPrefixComplete_=false;
+    std::uint32_t gaWorldMode30_=0,gaUseEnvironment35C_=0,gaWorldMode524_=0;
+    std::unique_ptr<OriginalWreckComponent50LA*[]> gaWorldList500_;
+    std::uint32_t gaWorldListCapacity504_=0,gaWorldListGrowth508_=0,gaWorldListCount50C_=0;
+    bool constructGaWorld1A6BC0(const original_main_entry50KG::Application&,
+        std::shared_ptr<ga_original_world50LH::Owner>,std::uint32_t&)noexcept;
+    bool retireNativeGaWorldPrefix(std::uint32_t&)noexcept;
     std::shared_ptr<OriginalPauseStorage50LA> pause100_;
+    // Native custody exists only after actual1A8B00 publication, never a
+    // fabricated null source slot or a completed full Race-load receipt.
+    std::unique_ptr<OriginalResults10450LA> results104_;
+    // One pending/loaded native custody envelope. Actual F8 source slot is
+    // constructor-null1A679C until the loader-return publication1A9144 below;
+    // acquiring native backing is NOT that source pointer store.
+    std::unique_ptr<OriginalRaceF850LA> f8Owner_;
+    OriginalRaceF850LA* f8Source_=nullptr;
+    bool f8Attached_=false;
+    bool attachF8Cold1AAF54()noexcept;
+    bool retireF8Cold(const char*&)noexcept;
     bool nativeRootAttached_=false,nativeRootMaskReached_=false;
+    // Distinct native accepted-world publication, NEVER original slot30 or
+    //17D6A0 completion. Records only reached custody for exact partial unwind.
+    enum class NativeHumanRootStep:std::uint8_t {unreached,appending,published,detached};
+    NativeHumanRootStep nativeHumanRootStep_=NativeHumanRootStep::unreached;
+    bool attachNativeHumanResultsRoot50LA()noexcept;
+    bool detachNativeHumanResultsRoot50LA(const char*&)noexcept;
     bool canRetainPause100()const noexcept;
     bool attachNativePauseParent()noexcept;
     bool retireNativePauseParent(const char*&)noexcept;
@@ -147,6 +421,24 @@ public:
     const OriginalWreckComponent50LA* nativeTaRaceEntity()const noexcept {
         return counted_&&!rolledBack_&&taWorldCounted_&&taWorldPrefixComplete_?&entity_:nullptr;
     }
+    // Intro custody is selected by the actual consumed Course identity and
+    // distinct typed world owner. Definitions follow the complete world types.
+    const OriginalWreckComponent50LA* nativeIntroRaceEntity()const noexcept;
+    const OriginalWreckComponent50LA* nativeIntroWorldEntity()const noexcept;
+    const OriginalWreckComponent50LA* nativeIntroControllerSlot48()const noexcept {
+        return nativeIntroRaceEntity()?nativeTaController48_:nullptr;
+    }
+    bool retainNativeIntroControllerSlot48(OriginalWreckComponent50LA& controller)noexcept {
+        if(!nativeIntroRaceEntity()||nativeTaController48_||!application_||
+           application_->attachmentLock423F58()||controller.kind!=OriginalWreckComponentKind50LA::cameraController174A30||
+           controller.reference00!=1||controller.sessionGeneration!=entity_.sessionGeneration||
+           controller.parent1C||controller.previous10||controller.next14||controller.mask20||
+           !application_->entityAuthority_.canRetire(controller))return false;
+        nativeTaController48_=&controller;return true;
+    }
+    bool clearNativeIntroControllerSlot48(const OriginalWreckComponent50LA& controller)noexcept {
+        return clearNativeTaControllerSlot48(controller);
+    }
     // Actual1A95DC slot48 publication. This is a pointer store, NOT141960:
     // the inspected original caller/174DF0 path does not attach a parent edge.
     bool retainNativeTaControllerSlot48(OriginalWreckComponent50LA& controller)noexcept {
@@ -171,11 +463,23 @@ public:
     const ta_original_world50LE::Owner* nativeTaWorldBacking()const noexcept {
         return nativeTaRaceEntity()?taWorld74_.get():nullptr;
     }
+    const gc_original_world50LM::Owner* nativeGcWorldBacking()const noexcept {
+        return nativeIntroWorldEntity()==&gcWorldEntity_?gcWorld74_.get():nullptr;
+    }
+    const ma_original_world50LM::Owner* nativeMaWorldBacking()const noexcept {
+        return nativeIntroWorldEntity()==&maWorldEntity_?maWorld74_.get():nullptr;
+    }
+    const sa_original_world50LM::Owner* nativeSaWorldBacking()const noexcept {
+        return nativeIntroWorldEntity()==&saWorldEntity_?saWorld74_.get():nullptr;
+    }
+    const ga_original_world50LH::Owner* nativeGaWorldBacking()const noexcept {
+        return nativeIntroWorldEntity()==&gaWorldEntity_?gaWorld74_.get():nullptr;
+    }
     // Reverse native construction-failure cleanup. If world construction has
     // acquired its seventh group, its own explicit rollback must run first.
     bool rollbackNativeRaceGroupsFailure(std::uint32_t& sourcePC)noexcept {
         sourcePC=0x1a6b5c;
-        if(world74_||taWorld74_||taWorldCounted_||nativeTaController48_)return false;
+        if(world74_||taWorld74_||taWorldCounted_||gcWorld74_||gcWorldCounted_||maWorld74_||maWorldCounted_||saWorld74_||saWorldCounted_||gaWorld74_||gaWorldCounted_||nativeTaController48_)return false;
         if(!raceAudio_)return raceGroupCount_==0;
         auto& audio=*raceAudio_;
         if(!counted_||rolledBack_||application_->attachmentLock423F58()||
@@ -216,7 +520,7 @@ public:
         sourcePC=0x1a65cc;
         if(rolledBack_)return true;
         if(!counted_){rolledBack_=true;return true;}
-        if(pause100_||nativeRootAttached_||world74_||taWorld74_||taWorldCounted_||nativeTaController48_||loadDisplay_||loadFifo_||raceAudio_||raceGroupCount_||!detachedPrefix()||application_->attachmentLock423F58()||
+        if(camera34_||cameraNativeAdapter34_||!endHud_.expired()||pause100_||results104_||f8Owner_||f8Attached_||vcr78Owner_||vcr78Source_||music10C_||timingB4_||nativeRootAttached_||world74_||taWorld74_||taWorldCounted_||gcWorld74_||gcWorldCounted_||maWorld74_||maWorldCounted_||saWorld74_||saWorldCounted_||gaWorld74_||gaWorldCounted_||nativeTaController48_||loadDisplay_||loadFifo_||raceAudio_||raceGroupCount_||!detachedPrefix()||application_->attachmentLock423F58()||
            !application_->objectCount423F60()||!application_->entityAuthority_.retire(entity_))return false;
         --entity_.reference00;--application_->objectCount423F60();
         rolledBack_=true;profile_.reset();resourceContext_.reset();resourceDomain_.reset();return true;

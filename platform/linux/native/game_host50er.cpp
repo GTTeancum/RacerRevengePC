@@ -268,15 +268,57 @@ void GameHost50ER::retainSharedDialogPoll50KG(const GameHostInput50ER& input)noe
     sharedDialogSecondPresence50KG_=input.keys.secondControllerPresence;
     sharedDialogPollCurrent50KG_=true;
 }
+bool GameHost50ER::retainedResultsPollCurrent50LA(const rr::game::OriginalResults10450LA& owner)const noexcept {
+    return ownerThread()&&created()&&hasWindow()&&retainedResultsPollOwner50LA_==&owner&&
+        retainedResultsPollRevision50LA_&&resultsInput50LA_.fixedUiCurrent()&&
+        resultsInput50LA_.revision_==retainedResultsPollRevision50LA_&&
+        resultsInput50LA_.claimedRevision_==retainedResultsPollRevision50LA_&&
+        retainedResultsPollEvent50LA_<resultsInput50LA_.count_&&
+        claimedResultsOwner50LA_==&owner&&
+        claimedResultsEvent50LA_==&resultsInput50LA_.events_[retainedResultsPollEvent50LA_].event;
+}
+bool GameHost50ER::retainResultsPoll50LA(const rr::game::OriginalResults10450LA& owner)noexcept {
+    if(!ownerThread()||!created()||!hasWindow()||retainedResultsPollOwner50LA_||
+       !resultsPollDestination50LA_||!resultsInput50LA_.fixedUiCurrent()||
+       resultsInput50LA_.edgesOpen_||resultsInput50LA_.claimedRevision_!=resultsInput50LA_.revision_||
+       claimedResultsOwner50LA_!=&owner||!claimedResultsEvent50LA_)return false;
+    std::size_t event=0;
+    while(event<resultsInput50LA_.count_&&
+          &resultsInput50LA_.events_[event].event!=claimedResultsEvent50LA_)++event;
+    if(event==resultsInput50LA_.count_)return false;
+    // Claim was issued by the real synchronous Results dispatcher. Retire
+    // only its native UI controls now; events and records remain in place.
+    resultsInput50LA_.retireClaimedControls(resultsPollDestination50LA_->keys);
+    retainedResultsPollOwner50LA_=&owner;
+    retainedResultsPollRevision50LA_=resultsInput50LA_.revision_;
+    retainedResultsPollEvent50LA_=event;return true;
+}
+bool GameHost50ER::releaseResultsPoll50LA(const rr::game::OriginalResults10450LA& owner)noexcept {
+    if(!ownerThread()||retainedResultsPollOwner50LA_!=&owner)return false;
+    // Completion OR explicit whole-call cancellation only. The lexical
+    // caller must first retire the real fade backend and its borrowed owners.
+    // Releasing never claims that source effects completed or rolled back.
+    retainedResultsPollOwner50LA_=nullptr;retainedResultsPollRevision50LA_=0;
+    retainedResultsPollEvent50LA_=0;resultsPollDestination50LA_=nullptr;
+    claimedResultsOwner50LA_=nullptr;claimedResultsEvent50LA_=nullptr;
+    resultsInput50LA_.interrupt();loadingInputBarrier50DU_=true;return true;
+}
 bool GameHost50ER::poll(GameHostInput50ER& input, GameHostDiagnostic50ER& d) noexcept {
     d = {};
     if (!ownerThread()) return fail(d, GameHostError50ER::WrongThread, "poll");
     if (!created()) return fail(d, GameHostError50ER::NotCreated, "poll");
+    if(retainedResultsPollOwner50LA_)
+        return fail(d,GameHostError50ER::AlreadyOwned,"Results retained source poll pending");
     sharedDialogPollCurrent50KG_=false;
+    resultsInput50LA_.invalidate();resultsPollDestination50LA_=nullptr;
+    claimedResultsOwner50LA_=nullptr;claimedResultsEvent50LA_=nullptr;
     input = {};
     if (mode_ == GameHostMode50ER::Window) {
-        if (!window_.poll(input.keys, d.window))
+        if (!window_.poll(input.keys, d.window)) {
+            resultsInput50LA_.interrupt();resultsPollDestination50LA_=nullptr;
             return fail(d, GameHostError50ER::Window, "WindowHost50DQ::poll");
+        }
+        const bool resultsLoadingBarrier=loadingInputBarrier50DU_;
         if(loadingInputBarrier50DU_){
             bool held=input.keys.eventBudgetExhausted;
             for(const auto key:input.keys.down)held=held||key!=0;
@@ -300,6 +342,8 @@ bool GameHost50ER::poll(GameHostInput50ER& input, GameHostDiagnostic50ER& d) noe
             !input.keys.quitRequested && !input.keys.pressed[41] && !input.keys.down[41];
         refreshInfo();
         retainSharedDialogPoll50KG(input);
+        resultsInput50LA_.observeWindow(input.keys,info_.inputConnected,resultsLoadingBarrier);
+        resultsPollDestination50LA_=&input;
         return true;
     }
 #if defined(__linux__)
@@ -368,7 +412,13 @@ bool GameHost50ER::pollLoading50DU(bool& quitRequested,GameHostDiagnostic50ER& d
     if(!ownerThread())return fail(d,GameHostError50ER::WrongThread,"pollLoading");
     if(!created())return fail(d,GameHostError50ER::NotCreated,"pollLoading");
     if(!hasWindow())return fail(d,GameHostError50ER::NotWindow,"pollLoading");
+    if(retainedResultsPollOwner50LA_&&resultsPollDestination50LA_)
+        return fail(d,GameHostError50ER::AlreadyOwned,"Results handoff requires synchronous output retirement first");
     sharedDialogPollCurrent50KG_=false;
+    if(!retainedResultsPollOwner50LA_){
+        resultsInput50LA_.interrupt();claimedResultsOwner50LA_=nullptr;claimedResultsEvent50LA_=nullptr;
+    }
+    resultsPollDestination50LA_=nullptr;
     WindowInput50DQ discarded;
     if(!window_.poll(discarded,d.window))
         return fail(d,GameHostError50ER::Window,"WindowHost50DQ::pollLoading");
@@ -414,6 +464,12 @@ bool GameHost50ER::close(GameHostDiagnostic50ER& d) noexcept {
     return closeOwned(d);
 }
 bool GameHost50ER::closeOwned(GameHostDiagnostic50ER& d) noexcept {
+    if(retainedResultsPollOwner50LA_)
+        return fail(d,GameHostError50ER::AlreadyOwned,"Results retained poll requires explicit continuation cancellation");
+    //Also revoke native input custody before ANY close attempt, including
+    //a renderer-pinned rejection; this does not invalidate that GL context.
+    resultsInput50LA_.interrupt();resultsPollDestination50LA_=nullptr;
+    claimedResultsOwner50LA_=nullptr;claimedResultsEvent50LA_=nullptr;
     // Also reached directly by the destructor: never invalidate a retained context.
     if(sessionDisplayBlocksClose50LA())return fail(d,GameHostError50ER::AlreadyOwned,"session renderer/context still retained");
     ready_ = false;

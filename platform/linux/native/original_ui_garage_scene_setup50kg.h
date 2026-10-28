@@ -8,11 +8,13 @@
 #include <memory>
 #include <optional>
 #include <string>
+namespace ra_pod_scene50LA {class Owner;}
 namespace rr::platform {
 class OriginalUiGaragePodScene50KG;
 struct OriginalUiMainApplication50KG;
 class OriginalUiGarageInstanceMaster50KG final {
     friend class OriginalUiGaragePodScene50KG;
+    friend class ::ra_pod_scene50LA::Owner; //Same actual444078 domain; private RA load/retirement only.
     OriginalUiGarageInstanceMaster50KG();
     //2BFEA0 allocates RAW capacity, not ten constructed Instance records.
     std::unique_ptr<std::uint8_t[]> records00_;

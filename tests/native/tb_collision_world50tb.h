@@ -179,7 +179,7 @@ public:
  };
  Owner()=default;Owner(const Owner&)=delete;Owner&operator=(const Owner&)=delete;
  Owner(Owner&&)=delete;Owner&operator=(Owner&&)=delete;
- ~Owner(){if(!thread()||!retire())std::terminate();}
+ ~Owner();
  // Caller reserves source and all external door/trigger/light/Binding owners
  // before allocation. This returns the complete conservative pre-Storage sum;
  // externalReserved is included once and stays charged through final close.

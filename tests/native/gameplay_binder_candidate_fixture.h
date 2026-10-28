@@ -24,6 +24,9 @@ class Owner final {
         std::array<std::array<core::Bindings,2>,8> bindings{};
         std::array<std::uint32_t,8> bindingCount{};
         std::array<bool,8> bound{};
+        // Ordinary Binder150450 receives a9=1: draw23CA50 selects the
+        // strip's authored color70, not LightManager+50 (the field40=0 path).
+        std::array<std::array<float,4>,8> color70{};
         //213C20 ->298C80 and229B24 ->298E60 resolve the same canonical
         // textures\\binder material. 29B950 leaves named animation+18 clear;
         //29AAA0/29B1D0 therefore share its base controller across all quads.
@@ -40,6 +43,9 @@ public:
     const core::Bindings* bindings(std::uint32_t slot,std::uint32_t pair=0)const noexcept {
         return storage_&&slot<8&&storage_->bound[slot]&&pair<storage_->bindingCount[slot]?
             &storage_->bindings[slot][pair]:nullptr;
+    }
+    const std::array<float,4>* color70(std::uint32_t slot)const noexcept {
+        return storage_&&slot<8&&storage_->bound[slot]?&storage_->color70[slot]:nullptr;
     }
     std::uint32_t bindingCount(std::uint32_t slot)const noexcept {
         return storage_&&slot<8&&storage_->bound[slot]?storage_->bindingCount[slot]:0;
@@ -101,6 +107,31 @@ public:
             const auto section=phy.find("binder");
             need(section==phy.end()||!section->second.count("bindermeshhalfheight"),
                 "Unadmitted BinderMeshHalfHeight override");
+            //215C08..215C98 reads this selected PHY's Binder/VertexColor,
+            // default00FFFFFF. 213A40/150450 sets field40=1, then23D750
+            // publishes each integer RGB channel >>1 and alpha64 at color70.
+            //23CA50 uses that row when field40 is nonzero, not scene ambient.
+            std::array<std::uint32_t,3> rgb{{255u,255u,255u}};
+            if(section!=phy.end()){
+                const auto authored=section->second.find("vertexcolor");
+                if(authored!=section->second.end()){
+                    const auto& text=authored->second;std::size_t pos=0;
+                    for(unsigned channel=0;channel<3;++channel){
+                        while(pos<text.size()&&(text[pos]==' '||text[pos]=='\t'))++pos;
+                        need(pos<text.size()&&text[pos]>='0'&&text[pos]<='9',"Binder VertexColor requires three decimal bytes");
+                        unsigned value=0;
+                        while(pos<text.size()&&text[pos]>='0'&&text[pos]<='9'){
+                            value=value*10u+unsigned(text[pos++]-'0');
+                            need(value<=255u,"Binder VertexColor channel exceeds byte domain");
+                        }
+                        rgb[channel]=value;
+                        while(pos<text.size()&&(text[pos]==' '||text[pos]=='\t'||text[pos]=='\r'))++pos;
+                        if(channel<2)need(pos<text.size()&&text[pos++]==',',"Binder VertexColor comma missing");
+                        else need(pos==text.size(),"Binder VertexColor suffix unsupported");
+                    }
+                }
+            }
+            const std::array<float,4> color70{{float(rgb[0]>>1),float(rgb[1]>>1),float(rgb[2]>>1),64.f}};
             // The selected PHY must omit it;215BC8 supplies float2.25.
             for(auto& pair:binding)pair.halfHeight25C=2.25f;
             const auto* identity=original_player_identity50IK::find(rig.podId);
@@ -137,8 +168,8 @@ public:
                 need(next->bank.load(input,d.bank),"Binder immutable ten-frame bank");
                 g::OriginalUiTextureAnimationConfig50KG config;config.framesPerSecond=16.f;config.loopOnEndToFrame=0;
                 need(g::initializeOriginalUiTextureAnimation50KG(next->animation,config,10),"Binder original animation defaults");
-                next->bindings[slot]=binding;next->bindingCount[slot]=pairCount;next->bound[slot]=true;storage_=std::move(next);
-            }else{storage_->bindings[slot]=binding;storage_->bindingCount[slot]=pairCount;storage_->bound[slot]=true;}
+                next->color70[slot]=color70;next->bindings[slot]=binding;next->bindingCount[slot]=pairCount;next->bound[slot]=true;storage_=std::move(next);
+            }else{storage_->color70[slot]=color70;storage_->bindings[slot]=binding;storage_->bindingCount[slot]=pairCount;storage_->bound[slot]=true;}
             return true;
         }catch(const std::exception& e){d.message=e.what();return false;}
         catch(...){d.message="Binder cold owner failure";return false;}

@@ -178,7 +178,7 @@ AudioEventStatus50HE trackIntroSpeech50HG(std::uint32_t config34,std::uint32_t c
     const TrackIntroLine50HG* lines,std::size_t lineCount,std::uint8_t& flags62,
     AudioCommand50HE* commands,std::size_t capacity,std::size_t& count) noexcept {
     if(config34!=2u||(!lines&&!lineCount)){count=0;return AudioEventStatus50HE::Complete;}
-    if(!lines||lineCount!=3u)return AudioEventStatus50HE::Input;
+    if(!lines||(lineCount!=3u&&lineCount!=4u&&lineCount!=5u&&lineCount!=7u))return AudioEventStatus50HE::Input;
     int span=(flags62>>1)&15;if(span&8)span-=16;
     if(span>0) {
         flags62=static_cast<std::uint8_t>((flags62&0xe1u)|((static_cast<unsigned>(span-1)&15u)<<1));

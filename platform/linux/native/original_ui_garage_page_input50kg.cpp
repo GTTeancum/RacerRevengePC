@@ -28,9 +28,10 @@ bool OriginalUiGarageSession50KG::requestPage1D6130(
     written=false;
     if(!canRequestPage1D6130(page)||
        page.inputPhase_!=OriginalUiGaragePageOwner50KG::InputPhase::request||
-       !page.inputSerial_||page.inputController_||
-       !((page.inputSource_==4u&&page.inputPlan_.requestCallPC==0x1FE0F4u)||
-         (page.inputSource_==6u&&page.inputPlan_.requestCallPC==0x1FE158u)))return false;
+       !page.inputSerial_||
+       !((!page.inputController_&&page.inputSource_==4u&&page.inputPlan_.requestCallPC==0x1FE0F4u)||
+         (!page.inputController_&&page.inputSource_==6u&&page.inputPlan_.requestCallPC==0x1FE158u)||
+         (page.purchaseCommitted_&&page.inputPlan_.requestCallPC==0x1FE70Cu)))return false;
     // The source virtualA0 call occurs even in this case; it simply performs
     // no request writes. Its caller still invokes Watto, effect and267BE0.
     if(managerTransition170_==2u)return true;
@@ -114,11 +115,11 @@ bool OriginalUiGaragePageOwner50KG::dispatchInput1FDE70(
     if((inputPhase_!=InputPhase::idle&&inputPhase_!=InputPhase::returned)||
        inputSerial_==std::numeric_limits<std::uint64_t>::max()||!issuer_||
        !sourceEntryReturned1FAE00()||!entryProfileCurrent()||!base_.input268||
-       runtimeWidgetPending_||sharedHookPending_||!information4DC_||!issuer_->state||!issuer_->state->known||
+       drawPending_||runtimeWidgetPending_||sharedHookPending_||!information4DC_||!issuer_->state||!issuer_->state->known||
        !issuer_->state->sharedDialogs||!issuer_->state->sharedDialogs->loadedCurrent())
         return unavailable(0x1FDE70);
     const auto session=issuer_->garageCustodyOwner_;
-    const auto& dialogs=*issuer_->state->sharedDialogs;
+    auto& dialogs=*issuer_->state->sharedDialogs;
     if(!session||session->page_.get()!=this||session->issuer_!=issuer_||
        dialogs.application_.lock()!=issuer_->state||dialogs.scope_!=session->scope_||
        !session->canRequestPage1D6130(*this))return unavailable(0x1FDEC4);
@@ -131,8 +132,8 @@ bool OriginalUiGaragePageOwner50KG::dispatchInput1FDE70(
     // Modal testing and source controller/no-event rejection precede numeric
     // state reads. A fresh temporary popup state never confers this branch.
     auto plan=game::planOriginalUiGarageFreshInput50KG(state,context);
-    if(plan.status==game::OriginalUiGarageInputStatus50KG::unavailableModal)
-        return unavailable(plan.branchPC);
+    if(purchaseCommitted_&&!context.informationOverlay4DC){out.status=InputOutcome::Status::ignored;out.sourcePC=0x1FE7AC;return true;}
+    if(context.dialogChoice3D8>=2&&!purchaseConfirmationPending_)return unavailable(0x1FE6D4);
     if(plan.status==game::OriginalUiGarageInputStatus50KG::ignored){
         ++inputSerial_;inputSource_=sourceInput;inputController_=controller;inputPlan_=plan;
         inputPhase_=InputPhase::returned;inputEffectsCommitted_=false;inputRequestWritten_=false;
@@ -162,6 +163,7 @@ bool OriginalUiGaragePageOwner50KG::dispatchInput1FDE70(
     state.selected4E4=field4E4_;state.available34B0=*available34B0_;
     for(std::size_t row=0;row<6;++row){
         if(!current4E8_[row]||!delta500_[row]||
+           pairFirst_[row]!=50||pairSecond_[row]!=300||
            !game::convertOriginalUiGarageStat50KG(profile.base0180[row],state.base[row])||
            !game::convertOriginalUiGarageStat50KG(profile.maximum0408[row],state.maximum[row]))
             return unavailable(0x1FDF18);
@@ -169,67 +171,118 @@ bool OriginalUiGaragePageOwner50KG::dispatchInput1FDE70(
     }
     state.known=true;plan=game::planOriginalUiGarageFreshInput50KG(state,context);
     if(plan.status!=game::OriginalUiGarageInputStatus50KG::proposed)return unavailable(plan.branchPC);
+    using Intent=game::OriginalUiGarageInputIntent50KG;
+    const bool applying=plan.intent==Intent::confirmPurchase;
+    const bool asking=plan.intent==Intent::requestPurchase;
+    const bool canceling=plan.intent==Intent::cancelPurchase;
+    // Never open a modal whose confirmed transaction is already inadmissible.
+    // This is read-only; Yes reauthenticates the same original snapshot/cash
+    // again immediately before apply. No source profile writes move earlier.
+    if((asking||applying)&&!entryProfile_->owner->canApplyGaragePurchase1FEB90(profile,state))
+        return unavailable(0x1FEB90);
+    OriginalUiSharedDialogs50KG::Diagnostic popupDiagnostic;
+    if(asking&&!dialogs.canStartGaragePurchase2060A0(*this,popupDiagnostic))
+        return unavailable(popupDiagnostic.sourcePC?popupDiagnostic.sourcePC:0x2060A0);
+    if(applying&&(!purchaseConfirmationPending_||purchaseCommitted_))return unavailable(0x1FEB90);
     if(!session->audio_||!issuer_->sourceAural00Owner_)return unavailable(plan.soundPC);
     auto& main=*session->audio_;auto& aural=*issuer_->sourceAural00Owner_;
     OriginalApplicationAural50KG::Diagnostic audioDiagnostic;
-    if(!main.canPlayGaragePageEffect1FDE70(*this,plan.sound)||
-       !aural.canFinishGaragePageInput267BE0(*this,audioDiagnostic))return unavailable(plan.soundPC);
-    const auto direction=plan.intent==game::OriginalUiGarageInputIntent50KG::previousStat?-1:1;
+    if(plan.soundPC&&(!main.canPlayGaragePageEffect1FDE70(*this,plan.sound)||
+       !aural.canFinishGaragePageInput267BE0(*this,audioDiagnostic)))return unavailable(plan.soundPC);
+    const auto direction=plan.intent==Intent::previousStat?-1:1;
     if(plan.selectionGroupCallPC&&!inputGroupStepCurrent(direction))return unavailable(plan.selectionGroupCallPC);
     game::OriginalUiGarageWattoLifecycleDiagnostic50KG wattoDiagnostic;
     if(plan.hasWattoAction&&(!watto33B0_||
        !watto33B0_->canRespondPage1D5320(*this,plan.wattoAction,wattoDiagnostic)))
         return unavailable(wattoDiagnostic.sourcePC?wattoDiagnostic.sourcePC:plan.wattoPC);
-    // Publish one non-replayable invocation only after read-only owner checks.
     ++inputSerial_;inputSource_=sourceInput;inputController_=controller;inputPlan_=plan;
     inputEffectsCommitted_=false;inputRequestWritten_=false;inputTransportBoundary_=0;
     inputWattoReceipt_={};inputWattoDiagnostic_={};inputPhase_=InputPhase::planned;
     auto failed=[&](std::uint32_t pc)noexcept {
         inputEffectsCommitted_=inputEffectsCommitted_||d.sourceEffectsCommitted||inputWattoReceipt_.effectsStarted;
         inputPhase_=InputPhase::failed;inputFailurePC_=pc;
+        // A later route/voice failure cannot undo an already committed purchase.
+        // Preserve its actual dirty state and honor the live native autosave flag.
+        if(purchaseCommitted_&&entryProfile_)entryProfile_->owner->autosaveGaragePurchase();
         out.status=InputOutcome::Status::failed;out.serial=inputSerial_;
         out.requestWritten=inputRequestWritten_;if(inputRequestWritten_)out.request=inputPlan_.request;
         out.sourceEffectsCommitted=inputEffectsCommitted_;out.sourcePC=pc;
         d.sourceEffectsCommitted=inputEffectsCommitted_;return fail(d,Status::runtimePending,pc);
     };
+    auto respond=[&]()noexcept {
+        inputPhase_=InputPhase::watto;
+        if(!watto33B0_->respondPage1D5320(*this,plan.wattoAction,inputWattoReceipt_,inputWattoDiagnostic_))
+            return failed(inputWattoDiagnostic_.sourcePC?inputWattoDiagnostic_.sourcePC:plan.wattoPC);
+        inputEffectsCommitted_=inputEffectsCommitted_||inputWattoReceipt_.effectsStarted;return true;
+    };
+    // Source increment speaks BEFORE its delta and money writes1FE660/69C.
+    if(plan.intent==Intent::incrementPending&&!respond())return false;
     if(plan.stateWritePC){
         inputPhase_=InputPhase::stateWrite;
-        if(plan.intent==game::OriginalUiGarageInputIntent50KG::previousStat){
-            --field4E4_; //1FE1B4, unsigned arithmetic defines source word wrap.
-            if(field4E4_==std::numeric_limits<std::uint32_t>::max())field4E4_=5; //1FE1C8
-        }else if(plan.intent==game::OriginalUiGarageInputIntent50KG::nextStat){
-            ++field4E4_; //1FE224
-            if(field4E4_==6u)field4E4_=0; //1FE238
-        }else delta500_[field4E4_]=plan.next.delta500[field4E4_];
+        if(plan.intent==Intent::previousStat||plan.intent==Intent::nextStat)
+            field4E4_=plan.next.selected4E4;
+        else if(plan.intent==Intent::decrementPending)
+            available34B0_=plan.next.available34B0; // Delta decrements AFTER267BE0.
+        else{
+            delta500_[field4E4_]=plan.next.delta500[field4E4_];
+            if(plan.intent==Intent::incrementPending||plan.intent==Intent::restoreOwnedPending)
+                available34B0_=plan.next.available34B0; //1FE57C follows restore delta1FE524.
+        }
         inputEffectsCommitted_=true;d.sourceEffectsCommitted=true;
     }
     if(plan.selectionGroupCallPC){
         inputPhase_=InputPhase::group;
         if(!inputGroupStep2A50F0(direction,d))return failed(d.sourcePC);
     }
+    if(asking){
+        inputPhase_=InputPhase::confirmation;
+        if(!dialogs.startGaragePurchase2060A0(*this,popupDiagnostic)){
+            d.sourceEffectsCommitted=d.sourceEffectsCommitted||popupDiagnostic.sourceEffectsCommitted;
+            return failed(popupDiagnostic.sourcePC?popupDiagnostic.sourcePC:0x2060A0);
+        }
+        purchaseConfirmationPending_=true;inputEffectsCommitted_=true;
+    }
+    if(applying){
+        inputPhase_=InputPhase::apply;
+        OriginalUiRiderProfileOwner50KG::GarageProfileSnapshot after;
+        if(!entryProfile_->owner->applyGaragePurchase1FEB90(profile,state,after))return failed(0x1FEB90);
+        purchaseCommitted_=true;inputEffectsCommitted_=true;d.sourceEffectsCommitted=true;
+        // Keep the genuine same-Page profile borrow current through its closing
+        // animation. Page baseline counts/deltas remain source-owned unchanged.
+        entryProfile_->generation=after.career.stamp.generation;
+        entryProfile_->current1920=after.current1920;
+        entryProfile_->unspent2194=after.career.unspent2194;
+    }
     if(plan.requestCallPC){
         inputPhase_=InputPhase::request;
         if(!session->requestPage1D6130(*this,inputRequestWritten_))return failed(plan.requestCallPC);
         inputEffectsCommitted_=inputEffectsCommitted_||inputRequestWritten_;
     }
-    if(plan.hasWattoAction){
-        inputPhase_=InputPhase::watto;
-        if(!watto33B0_->respondPage1D5320(*this,plan.wattoAction,inputWattoReceipt_,inputWattoDiagnostic_))
-            return failed(inputWattoDiagnostic_.sourcePC?inputWattoDiagnostic_.sourcePC:plan.wattoPC);
-        inputEffectsCommitted_=inputEffectsCommitted_||inputWattoReceipt_.effectsStarted;
+    if(plan.hasWattoAction&&plan.intent!=Intent::incrementPending&&!respond())return false;
+    if(applying||canceling){
+        issuer_->state->controllerPopupState.result3D8=0;
+        purchaseConfirmationPending_=false;inputEffectsCommitted_=true;
     }
-    inputPhase_=InputPhase::effect;const auto revision=main.controlRevision_;
-    const bool played=main.playGaragePageEffect1FDE70(*this,plan.sound);
-    inputEffectsCommitted_=inputEffectsCommitted_||revision!=main.controlRevision_;
-    if(!played)return failed(plan.soundPC);
-    inputPhase_=InputPhase::transport;
-    if(!aural.finishGaragePageInput267BE0(*this,inputTransportBoundary_,audioDiagnostic))
-        return failed(audioDiagnostic.sourcePC?audioDiagnostic.sourcePC:plan.transportPC);
-    inputEffectsCommitted_=true;inputPhase_=InputPhase::returned;
+    if(plan.soundPC){
+        inputPhase_=InputPhase::effect;const auto revision=main.controlRevision_;
+        const bool played=main.playGaragePageEffect1FDE70(*this,plan.sound);
+        inputEffectsCommitted_=inputEffectsCommitted_||revision!=main.controlRevision_;
+        if(!played)return failed(plan.soundPC);
+        inputPhase_=InputPhase::transport;
+        if(!aural.finishGaragePageInput267BE0(*this,inputTransportBoundary_,audioDiagnostic))
+            return failed(audioDiagnostic.sourcePC?audioDiagnostic.sourcePC:plan.transportPC);
+        inputEffectsCommitted_=true;
+    }
+    if(plan.intent==Intent::decrementPending){
+        delta500_[field4E4_]=plan.next.delta500[field4E4_]; //1FE400, after transport.
+        inputEffectsCommitted_=true;
+    }
+    inputPhase_=InputPhase::returned;
+    if(applying)entryProfile_->owner->autosaveGaragePurchase();
     out.status=InputOutcome::Status::completed;out.serial=inputSerial_;
     out.transportBoundary=inputTransportBoundary_;out.requestWritten=inputRequestWritten_;
     if(inputRequestWritten_)out.request=inputPlan_.request;
-    out.sourceEffectsCommitted=true;out.sourcePC=0x1FE7AC;
-    d.sourceEffectsCommitted=true;d.sourcePC=0x1FE7AC;return true;
+    out.sourceEffectsCommitted=inputEffectsCommitted_;out.sourcePC=0x1FE7AC;
+    d.sourceEffectsCommitted=inputEffectsCommitted_;d.sourcePC=0x1FE7AC;return true;
 }
 } // namespace rr::platform

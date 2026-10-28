@@ -15,6 +15,9 @@
 #include <cmath>
 #include <cstdio>
 #include <exception>
+#include <limits>
+#include "../../../src/assets/original_standard_texture_lifetime50la.h"
+#include "../../../src/assets/original_standard_archive_provider50la.h"
 namespace rr::platform {namespace {
 template<std::size_t N>std::array<float,N> floats(const std::array<std::uint32_t,N>& words)noexcept {
     std::array<float,N> out{};for(std::size_t i=0;i<N;++i)out[i]=std::bit_cast<float>(words[i]);return out;
@@ -31,7 +34,7 @@ OriginalUiGarageDrawContribution50KG::OriginalUiGarageDrawContribution50KG(const
 OriginalUiGarageDrawContribution50KG::~OriginalUiGarageDrawContribution50KG()noexcept {
     //No incomplete frame is ever published. A future sealed owner must first
     //discharge the renderer's actual SourceOwner lifetime before destruction.
-    if(shared470FirstPassOwner_||shared470FirstPassEpoch_||shared470ThirdPassOwner_||shared470ThirdPassEpoch_||frame_.owner_||textureCoordinator_||(drainGpu_&&drainGpu_->ownsResources())||
+    if(shared47COwner_||shared47CEpoch_||shared470FirstPassOwner_||shared470FirstPassEpoch_||shared470ThirdPassOwner_||shared470ThirdPassEpoch_||frame_.owner_||textureCoordinator_||(drainGpu_&&drainGpu_->ownsResources())||
        (renderer_&&renderer_->ownsRenderPrelude(*this,publication_)))std::terminate();
 }
 bool OriginalUiGarageDrawContribution50KG::identityCurrent()const noexcept {
@@ -129,10 +132,19 @@ bool OriginalUiGarageDrawContribution50KG::invokeSharedDialogRender(
         sourcePC_=controller?(slot==0x40?0x206430u:0x2064C0u):
             (slot==0x40?0x204A00u:0x204AC0u);
         if(controller){
-            //Actual206448 and2064D4 zero3CC branches skip no required
-            //primitive. Positive controller47C Popup remains unsupported.
-            if(issuer_->state->controllerPopupState.active3CC)
-                return fail(d,slot==0x40?0x206458u:0x2064DCu);
+            if(issuer_->state->controllerPopupState.active3CC){
+                OriginalUiSharedDialogs50KG::Diagnostic sd;
+                if(!shared->begin47CCallback(*this,slot,sd))return fail(d,sd.sourcePC);
+                if(slot==0x40){
+                    if(!shared->demand47C206430(*this,sd))return fail(d,sd.sourcePC);
+                    sourcePC_=0x2064A0;if(!walk141C30(node,d))return false;
+                }else{
+                    if(!shared->draw47C2064C0(*this,sd))return fail(d,sd.sourcePC);
+                    sourcePC_=0x207310;if(!walk141D70(node,d))return false;
+                }
+                if(!shared->complete47CCallback(*this,slot,sd))return fail(d,sd.sourcePC);
+                return true;
+            }
         }else{
             OriginalUiSharedDialogs50KG::Diagnostic sharedDiagnostic;
             if(slot==0x40){
@@ -508,7 +520,7 @@ bool OriginalUiGarageDrawContribution50KG::select26F940(Diagnostic& d)noexcept {
     if(!identityCurrent())return fail(d,0x26F940);
     auto& display=*renderer_->display_;
     if(!display.sourceCurrentCamera0Known_)return fail(d,0x26F940);
-    display.sourceSelectedCamera0_=camera_; //Actual selection precedes target-dimension comparison.
+    display.selectFrontendCamera26F940(camera_); //Actual selection precedes target-dimension comparison.
     if(!display.sourceBufferCount0CInitialized_||display.sourceWidth4_<=0||display.sourceHeight8_<=0||
        static_cast<std::uint32_t>(display.sourceWidth4_)!=camera_->fields_.fullWidth204||
        static_cast<std::uint32_t>(display.sourceHeight8_)!=camera_->fields_.fullHeight208)return fail(d,0x26F978);
@@ -754,6 +766,10 @@ bool OriginalUiGarageDrawContribution50KG::releaseUnsealedBeforeRetirement()noex
         const auto shared=shared470ThirdPassOwner_;OriginalUiSharedDialogs50KG::Diagnostic sharedDiagnostic;
         if(!shared->abort470ThirdPassAfterNativeRelease(*this,sharedDiagnostic))return false;
     }
+    if(shared47COwner_){
+        const auto shared=shared47COwner_;OriginalUiSharedDialogs50KG::Diagnostic sd;
+        if(!shared->abort47CAfterNativeRelease(*this,sd))return false;
+    }
     // The Window has retired this exact native target lease; published pixels
     // remain available until the next real image. No Source field/count or
     // Page child has been retired by this native resource cleanup.
@@ -811,5 +827,223 @@ bool OriginalUiGarageDrawContribution50KG::collectWarning470Text246760(OriginalU
   d.sourceEffectsCommitted|=d.material.sourceEffectsCommitted;return false;
  }
  d.sourceEffectsCommitted|=d.material.sourceEffectsCommitted;return true;
+}
+}
+
+namespace rr::platform {
+bool OriginalUiGarageDrawContribution50KG::readPopup47CQuadInputs2DF550(
+ const OriginalUiSharedDialogs50KG& shared,const OriginalUiGarageQuad50KG& quad,
+ QuadRenderInputs& out,std::uint32_t& pc)const noexcept {
+ pc=0x2DF550;if(!shared.popup47CQuadCurrent(*this,quad))return false;
+ QuadRenderInputs next;next.publication=publication_;
+ next.sourceQuadEnabled383678=issuer_->entities()->screenQuadEnabled383678_!=0;
+ if(!next.sourceQuadEnabled383678){out=next;pc=0x2DF8CC;return true;}
+ if(!cameraFrame_.current()){pc=0x2DF608;return false;}
+ next.viewportWidth1E8=camera_->fields_.viewport1E0[2];next.viewportHeight1EC=camera_->fields_.viewport1E0[3];
+ if(!next.viewportWidth1E8||!next.viewportHeight1EC){pc=0x2DF608;return false;}
+ out=next;pc=0;return true;
+}
+bool OriginalUiGarageDrawContribution50KG::collectPopup47CQuad246760(OriginalUiSharedDialogs50KG& shared,
+ OriginalUiGarageQuad50KG& quad,assets::OriginalStandardMaterialDiagnostic50LA& d)noexcept {
+ if(!shared.popup47CQuadCurrent(*this,quad)||!issuer_->nativeCollectorFifoOwner_){
+  d.status=assets::OriginalStandardMaterialStatus50LA::phase;d.sourcePC=0x246760;return false;
+ }
+ return issuer_->nativeCollectorFifoOwner_->collectShared47CQuad246760(*this,shared,quad,d);
+}
+bool OriginalUiGarageDrawContribution50KG::readPopup47CTextInputs2E0170(
+ const OriginalUiSharedDialogs50KG& shared,const OriginalUiGarageScreenText50KG& text,
+ TextRenderInputs& out,std::uint32_t& pc)const noexcept {
+ pc=0x2E0F50;
+ if(!shared.popup47CTextCurrent(*this,text)||!cameraFrame_.current()||!camera_->fields_.coreKnown||
+    !renderer_->display_->video_||renderer_->display_->video_.get()!=shared.inputs_.video.get()||
+    !renderer_->display_->video_->host.current())return false;
+ const auto& f=camera_->fields_;const auto depth=renderer_->display_->video_->packetZMaximum;
+ if(!f.viewport1E0[2]||!f.viewport1E0[3]||depth<0)return false;
+ TextRenderInputs next;next.viewportWidth1E8=f.viewport1E0[2];next.viewportHeight1EC=f.viewport1E0[3];
+ next.videoDepthMaximum60=static_cast<float>(depth);next.publication=publication_;out=next;pc=0;return true;
+}
+bool OriginalUiGarageDrawContribution50KG::collectPopup47CText246760(OriginalUiSharedDialogs50KG& shared,
+ OriginalUiGarageScreenText50KG& text,std::size_t primitive,OriginalUiGarageScreenTextDiagnostic50KG& d)noexcept {
+ if(!shared.popup47CTextCurrent(*this,text)||!issuer_->nativeCollectorFifoOwner_){
+  d.status=OriginalUiGarageScreenTextStatus50KG::authority;d.sourcePC=0x246760;return false;
+ }
+ if(!issuer_->nativeCollectorFifoOwner_->collectShared47CText246760(*this,shared,text,primitive,d.material)){
+  d.status=OriginalUiGarageScreenTextStatus50KG::material;d.sourcePC=d.material.sourcePC;
+  d.sourceEffectsCommitted|=d.material.sourceEffectsCommitted;return false;
+ }
+ d.sourceEffectsCommitted|=d.material.sourceEffectsCommitted;return true;
+}
+}
+
+namespace rr::platform {
+bool OriginalUiGarageDrawContribution50KG::shared47CReceiverCurrent(const OriginalUiSharedDialogs50KG& shared,std::uint32_t slot)const noexcept {
+ const auto session=session_.lock();const auto& node=shared.controller47C_.entity;
+ return identityCurrent()&&issuer_&&issuer_->state&&session&&callback_==&node&&
+  ((slot==0x40&&phase_==Phase::firstPass&&issuer_->sourceApplicationMode22C_==3)||
+   (slot==0x48&&phase_==Phase::thirdPass&&issuer_->sourceApplicationMode22C_==5))&&
+  issuer_->state->sharedDialogs.get()==&shared&&shared.application_.lock()==issuer_->state&&
+  shared.inputs_.root==issuer_&&shared.scope_==session->scope_&&shared.loadedCurrent()&&
+  shared.reorderCompleteFor1B872C(*page_)&&shared.reorderedGrant_.lock()==session->grant_&&
+  node.parent1C==dispatcher_&&shared.dialog470_.manager30==dispatcher_&&node.reference00==1&&
+  node.kind==game::OriginalWreckComponentKind50LA::entity141300&&node.mask20==0xffffffffu&&
+  (node.flags29&9u)==1u&&!node.firstChild18&&shared.controller47C_.vtable==0x3D0890u&&
+  !activeText_&&!activePageQuad_&&!activePageCostText_;
+}
+bool OriginalUiGarageDrawContribution50KG::shared47CFailedUnwindCurrent(const OriginalUiSharedDialogs50KG& shared)const noexcept {
+ const auto session=session_.lock();
+ return nativeRetirementPhase_==NativeRetirementPhase::preludeReleased&&nativeRetirementOwnerCurrent()&&
+  phase_==Phase::unavailable&&attempted_&&issuer_&&issuer_->state&&session&&
+  issuer_->state->sharedDialogs.get()==&shared&&shared.inputs_.root==issuer_&&shared.loadedCurrent()&&
+  callback_==&shared.controller47C_.entity&&shared47COwner_.get()==&shared&&
+  session->unsealedRenderFailureHistoryCurrent(*issuer_)&&!frame_.owner_&&!frame_.native_&&
+  !drainBatchPending_&&!drainBatchFailed_&&!textureCoordinator_&&!drainGpu_&&!drainImageBank_&&
+  !drainBatchCanonical_&&renderer_&&!renderer_->ownsRenderPrelude(*this,publication_);
+}
+bool OriginalUiSharedDialogs50KG::canRenderGaragePurchase47C(const OriginalUiGaragePageOwner50KG& page,Diagnostic& d)const noexcept {
+ d={};d.sourcePC=0x206458;
+ std::array<const assets::OriginalStandardMaterialObject50LA*,3> owners{};
+ const auto fifo=inputs_.root?inputs_.root->nativeCollectorFifoOwner_:nullptr;
+ if(!loadedCurrent()||!reorderCompleteFor1B872C(page)||popup47CDraw_||nativePopup47CFifoPins_||
+    !canonical47COwnersCurrent(owners)||!popup47CDimPacketCurrent2E21D0()||
+    !fifo||fifo->application_!=inputs_.root||fifo->closed_||fifo->draining_||
+    fifo->ownerThread_!=std::this_thread::get_id()||!inputs_.context||!inputs_.context->textureLifetime_||
+    inputs_.context->textureLifetime_->nativeWarningDemandOwner_||
+    inputs_.context->textureLifetime_->nativeWarningDemandEpoch_){d.status=Status::resourcePending;return false;}
+ for(const auto& q:controller47C_.strips)if(!q.canMutatePacket2DF550()){d.status=Status::resourcePending;return false;}
+ for(const auto& q:controller47C_.icons)if(!q.canMutatePacket2DF550()){d.status=Status::resourcePending;return false;}
+ for(const auto* t:{controller47C_.message270.get(),controller47C_.confirm2E0.get(),controller47C_.cancel350.get()})
+  if(!t||!t->coldInputsCurrent()||t->nativeGarageFifoPins_||t->nativeMenuWarningPins_||
+     t->packetRevision_==std::numeric_limits<std::uint64_t>::max()){d.status=Status::resourcePending;return false;}
+ if(controller47C_.dim220->nativeGarageFifoPins_||controller47C_.dim220->nativeMenuWarningPins_||
+    controller47C_.dim220->packetRevision_==std::numeric_limits<std::uint64_t>::max()){
+  d.status=Status::resourcePending;return false;}
+ d.sourcePC=0;return true;
+}
+bool OriginalUiSharedDialogs50KG::begin47CCallback(OriginalUiGarageDrawContribution50KG& draw,std::uint32_t slot,Diagnostic& d)noexcept {
+ d={};
+ if(!draw.shared47CReceiverCurrent(*this,slot)||!draw.page_||
+    !canRenderGaragePurchase47C(*draw.page_,d)||popup47CPhase_!=Popup47CPhase::idle||
+    popup47CEpoch_==std::numeric_limits<std::uint64_t>::max()||draw.shared47COwner_||draw.shared47CEpoch_||
+    (slot==0x48&&draw.shared47CDemandPublication_!=draw.publication_))return fail(d,Status::phase,slot==0x40?0x206430:0x2064C0);
+ ++popup47CEpoch_;popup47CDraw_=&draw;popup47CPhase_=slot==0x40?Popup47CPhase::first:Popup47CPhase::body;
+ popup47COperation_=0;draw.shared47COwner_=application_.lock()->sharedDialogs;draw.shared47CEpoch_=popup47CEpoch_;
+ auto& lifetime=*inputs_.context->textureLifetime_;
+ lifetime.nativeWarningDemandOwner_=this;lifetime.nativeWarningDemandEpoch_=popup47CEpoch_;
+ return true;
+}
+bool OriginalUiSharedDialogs50KG::demand47C206430(OriginalUiGarageDrawContribution50KG& draw,Diagnostic& d)noexcept {
+ d={};if(popup47CDraw_!=&draw||popup47CPhase_!=Popup47CPhase::first||
+  !draw.shared47CReceiverCurrent(*this,0x40)||draw.shared47CEpoch_!=popup47CEpoch_)return fail(d,Status::owner,0x206458);
+ assets::OriginalUiMemberView50KG psm,pst;
+ for(std::size_t i=0;i<inputs_.popup->memberCount();++i){const auto m=inputs_.popup->member(i);
+  if(!m.identity||!m.identity->name)continue;
+  if(assets::OriginalStandardArchiveProvider50LA::sameName(m.identity->name,"ui\\textures\\overlay1popup.psm"))psm=m;
+  if(assets::OriginalStandardArchiveProvider50LA::sameName(m.identity->name,"ui\\textures\\overlay1.pst"))pst=m;
+ }
+ const auto table=inputs_.domain->materials382B38();const auto textures=inputs_.domain->textures383400();
+ if(!table||!textures||!psm.data||!pst.data)return fail(d,Status::resourcePending,0x206458);
+ bool effects=false;
+ //206458..20649C: two genuine2DF8A0 calls, including the null-texture branch.
+ for(;popup47COperation_<2;++popup47COperation_){auto& q=controller47C_.strips[popup47COperation_];
+  if(!q.packetCurrent2DF550()||q.offset!=0x40+popup47COperation_*0x60||
+     q.domain_!=inputs_.domain||q.context_!=inputs_.context||q.garage_!=inputs_.popup||
+     !table->demandSharedWarning2DF8A0(q.material54->material00,*textures,psm,pst,d.quad.material)){
+   d.sourceEffectsCommitted=effects||d.quad.material.sourceEffectsCommitted;
+   d.status=Status::resourcePending;d.sourcePC=d.quad.material.sourcePC?d.quad.material.sourcePC:0x206458;return false;}
+  effects|=d.quad.material.sourceEffectsCommitted;
+ }
+ popup47CPhase_=Popup47CPhase::inherited;d.sourceEffectsCommitted=effects;d.sourcePC=0x2064A0;return true;
+}
+bool OriginalUiSharedDialogs50KG::popup47CDimCurrent(const OriginalUiGarageDrawContribution50KG& draw)const noexcept {
+ return popup47CDraw_==&draw&&popup47CPhase_==Popup47CPhase::body&&popup47COperation_==0x220&&
+  inputs_.context&&inputs_.context->textureLifetime_&&
+  inputs_.context->textureLifetime_->nativeWarningDemandOwner_==this&&
+  inputs_.context->textureLifetime_->nativeWarningDemandEpoch_==popup47CEpoch_&&
+  draw.shared47COwner_.get()==this&&draw.shared47CEpoch_==popup47CEpoch_&&
+  draw.shared47CReceiverCurrent(*this,0x48)&&draw.sourcePC_==0x206DCC;
+}
+bool OriginalUiSharedDialogs50KG::popup47CTextCurrent(const OriginalUiGarageDrawContribution50KG& draw,const Text& text)const noexcept {
+ if(popup47CDraw_!=&draw||popup47CPhase_!=Popup47CPhase::body||draw.shared47COwner_.get()!=this||
+  draw.shared47CEpoch_!=popup47CEpoch_||!draw.shared47CReceiverCurrent(*this,0x48)||
+  !inputs_.context||!inputs_.context->textureLifetime_||
+  inputs_.context->textureLifetime_->nativeWarningDemandOwner_!=this||
+  inputs_.context->textureLifetime_->nativeWarningDemandEpoch_!=popup47CEpoch_)return false;
+ return (popup47COperation_==0x270&&controller47C_.message270.get()==&text&&draw.sourcePC_==0x206DFC)||
+  (popup47COperation_==0x2E0&&controller47C_.confirm2E0.get()==&text&&draw.sourcePC_==0x2072B4)||
+  (popup47COperation_==0x350&&controller47C_.cancel350.get()==&text&&draw.sourcePC_==0x2072D0);
+}
+bool OriginalUiSharedDialogs50KG::popup47CQuadCurrent(const OriginalUiGarageDrawContribution50KG& draw,const Quad& q)const noexcept {
+ if(popup47CDraw_!=&draw||popup47CPhase_!=Popup47CPhase::body||draw.shared47COwner_.get()!=this||
+  draw.shared47CEpoch_!=popup47CEpoch_||!draw.shared47CReceiverCurrent(*this,0x48)||
+  !inputs_.context||!inputs_.context->textureLifetime_||
+  inputs_.context->textureLifetime_->nativeWarningDemandOwner_!=this||
+  inputs_.context->textureLifetime_->nativeWarningDemandEpoch_!=popup47CEpoch_)return false;
+ for(std::size_t i=0;i<3;++i)if(&controller47C_.strips[i]==&q)return popup47COperation_==0x40+i*0x60&&draw.sourcePC_==0x2072F4;
+ for(std::size_t i=0;i<2;++i)if(&controller47C_.icons[i]==&q)return popup47COperation_==0x160+i*0x60&&draw.sourcePC_==(i?0x2072C8u:0x2072ACu);
+ return false;
+}
+bool OriginalUiSharedDialogs50KG::draw47C2064C0(OriginalUiGarageDrawContribution50KG& draw,Diagnostic& d)noexcept {
+ d={};if(popup47CDraw_!=&draw||popup47CPhase_!=Popup47CPhase::body||
+  !draw.shared47CReceiverCurrent(*this,0x48))return fail(d,Status::owner,0x2064C0);
+ const auto app=application_.lock();game::OriginalUiControllerPopupRender50KG plan;
+ if(!app||game::OriginalUiControllerPopup50KG::render(app->controllerPopupState,plan)!=game::OriginalUiControllerPopupStatus50KG::ok)
+  return fail(d,Status::source,0x2064DC);
+ const auto position=[](Quad& q,float x,float y)noexcept {
+  if(q.position10[0]!=x||q.position10[1]!=y){q.position10[0]=x;q.position10[1]=y;q.flags5CValue|=1;q.flags5CKnownMask|=1;
+   if(q.uv30[3]!=0){q.flags5CValue|=2;q.flags5CKnownMask|=2;}}
+ };
+ for(std::size_t i=0;i<3;++i){auto& q=controller47C_.strips[i];const auto& v=plan.strips[i];
+  position(q,v.x,v.y);
+  if(q.uv30[2]!=v.height){q.uv30[2]=v.height;q.flags5CValue|=1;q.flags5CKnownMask|=1;
+   if(q.uv30[3]!=0){q.flags5CValue|=2;q.flags5CKnownMask|=2;}}
+ }
+ // Preserve the actual source prefix if a later real packet/collector call fails.
+ app->controllerPopupState=plan.state;d.sourceEffectsCommitted=true;
+ popup47COperation_=0x220;draw.sourcePC_=0x206DCC;
+ if(!drawPopup47CDim2E21D0(draw,d))return false;
+ const auto textCall=[&](Text& text,std::uint32_t offset,std::uint32_t pc)noexcept {
+  popup47COperation_=offset;draw.sourcePC_=pc;
+  if(!text.drawPopup47C2E0170(draw,*this,d.text)){d.status=Status::resourcePending;d.sourcePC=d.text.sourcePC;return false;}return true;
+ };
+ const auto quadCall=[&](Quad& q,std::uint32_t offset,std::uint32_t pc)noexcept {
+  popup47COperation_=offset;draw.sourcePC_=pc;
+  if(!q.drawPopup47C2DF550(draw,*this,d.quad)){d.status=Status::resourcePending;d.sourcePC=d.quad.sourcePC;return false;}return true;
+ };
+ if(plan.drawMessage){
+  if(!textCall(*controller47C_.message270,0x270,0x206DFC))return false;
+  // Original dual/single placements follow the message call, before buttons.
+  const bool dual=plan.drawConfirm&&plan.drawCancel;
+  for(std::size_t i=0;i<2;++i){const float x=dual?(i?200.f:380.f):280.f;
+   position(controller47C_.icons[i],x,247.f);
+   auto& text=i?*controller47C_.cancel350:*controller47C_.confirm2E0;
+   if(text.vector10_[0]!=x+32.f||text.vector10_[1]!=257.f){text.vector10_[0]=x+32.f;text.vector10_[1]=257.f;text.flags5A_|=3;}
+  }
+  if(plan.drawConfirm&&(!quadCall(controller47C_.icons[0],0x160,0x2072AC)||!textCall(*controller47C_.confirm2E0,0x2E0,0x2072B4)))return false;
+  if(plan.drawCancel&&(!quadCall(controller47C_.icons[1],0x1C0,0x2072C8)||!textCall(*controller47C_.cancel350,0x350,0x2072D0)))return false;
+ }
+ for(std::size_t i=0;i<3;++i)if(!quadCall(controller47C_.strips[i],0x40+i*0x60,0x2072F4))return false;
+ popup47COperation_=0;popup47CPhase_=Popup47CPhase::inherited;d.sourceEffectsCommitted=true;d.sourcePC=0x207310;return true;
+}
+void OriginalUiSharedDialogs50KG::release47CQueueFenceIfQuiescent()noexcept {
+ if(popup47CDraw_||nativePopup47CFifoPins_)return;
+ if(!inputs_.context||!inputs_.context->textureLifetime_)std::terminate();
+ auto& lifetime=*inputs_.context->textureLifetime_;
+ if(lifetime.nativeWarningDemandOwner_!=this||lifetime.nativeWarningDemandEpoch_!=popup47CEpoch_)std::terminate();
+ lifetime.nativeWarningDemandOwner_=nullptr;lifetime.nativeWarningDemandEpoch_=0;
+}
+bool OriginalUiSharedDialogs50KG::complete47CCallback(OriginalUiGarageDrawContribution50KG& draw,std::uint32_t slot,Diagnostic& d)noexcept {
+ if(popup47CDraw_!=&draw||popup47CPhase_!=Popup47CPhase::inherited||
+    draw.shared47COwner_.get()!=this||draw.shared47CEpoch_!=popup47CEpoch_||
+    !draw.shared47CReceiverCurrent(*this,slot)||controller47C_.entity.firstChild18||
+    !scope_->sharedDialogPrefixCurrent(*this,1,controller47C_.entity))return fail(d,Status::owner,slot==0x40?0x2064A0:0x207310);
+ if(slot==0x40)draw.shared47CDemandPublication_=draw.publication_;
+ popup47CDraw_=nullptr;popup47CPhase_=Popup47CPhase::idle;popup47COperation_=0;
+ draw.shared47CEpoch_=0;draw.shared47COwner_.reset();release47CQueueFenceIfQuiescent();return true;
+}
+bool OriginalUiSharedDialogs50KG::abort47CAfterNativeRelease(OriginalUiGarageDrawContribution50KG& draw,Diagnostic& d)noexcept {
+ d={};if(popup47CDraw_!=&draw||nativePopup47CFifoPins_||draw.shared47COwner_.get()!=this||
+    draw.shared47CEpoch_!=popup47CEpoch_||!draw.shared47CFailedUnwindCurrent(*this))return fail(d,Status::retirementPending,0x2064C0);
+ popup47CDraw_=nullptr;popup47CPhase_=Popup47CPhase::idle;popup47COperation_=0;
+ draw.shared47CEpoch_=0;draw.shared47COwner_.reset();release47CQueueFenceIfQuiescent();return true;
 }
 }

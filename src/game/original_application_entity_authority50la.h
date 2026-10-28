@@ -25,6 +25,11 @@ class OriginalApplicationEntityAuthority50LA final {
     friend class OriginalFrontendCameraCold50LA;
     friend class OriginalUiEntityScope50KG;
     friend class OriginalPauseStorage50LA;
+    friend class OriginalResults10450LA;
+    friend class OriginalRaceF850LA;
+    friend class OriginalSimpleVCR50LA;
+    friend class OriginalRaceMusicManager50LA;
+    friend class OriginalRaceTimingManager50LA;
     friend class OriginalTunnelTrack50LA;
     friend class OriginalRaceConstructor50LA;
     friend class ::original_camera_session50KX::Session;

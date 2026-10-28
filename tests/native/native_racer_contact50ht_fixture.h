@@ -1,5 +1,6 @@
 #pragma once
 #include "runtime_asset_paths50lb.h"
+#include "native_racer_contact_status50du.h"
 // UNVERIFIED reconstruction from worker conversation after workspace rollback.
 // HOST-ORDERED native main-body contact adapter, not original world scheduling.
 // Actual Pod01 podboxm rays -> actual podboxf triangles; no bumper primitive.
@@ -43,7 +44,6 @@ struct Receipt {
     std::array<BodyContactListState48R,maxRacers> contacts{};
     CollisionNormalModeWrite50JA normalModeWrite{};
 };
-enum class Status {Complete,Unprepared,InvalidInput,GeometryRejected,ResponseRejected};
 // Original3CE000+A0 ->1654C0 has the same bounded append/search algorithm as
 // +98 ->165430, with count238/slots23C instead of20C/210. +A4 ->165540 searches
 // every active slot. Native 0..10 admission avoids original out-of-bounds states.

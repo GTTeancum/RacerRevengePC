@@ -22,8 +22,10 @@ struct OriginalUiGarageState50KG {
 // truncation toward zero, then upper cap20. No invented lower clamp. Returns
 // false only outside finite, representable conversion domain; leaves out alone.
 bool convertOriginalUiGarageStat50KG(float,std::int32_t& out) noexcept;
-// Bounded fresh-state admission is deliberately SEPARATE from conversion:
-// nonnegative authored values, current exactly base, cash0 and coherent ranges.
+// Bounded unchanged-state admission is deliberately SEPARATE from conversion:
+// nonnegative authored values/cash and base <= current <= maximum notch counts.
+// Prior earned upgrades are retained. Entry initializes zero pending deltas;
+// the legacy Fresh-named row/input helpers also support staged purchases.
 // Does not write profile/cash/progression or reset the retained selected row.
 bool enterOriginalUiGarageFreshState50KG(const OriginalUiGarageProfileNumbers50KG&,
     OriginalUiGarageState50KG&) noexcept;
@@ -39,7 +41,8 @@ enum class OriginalUiGarageInputStatus50KG : std::uint8_t {
 };
 enum class OriginalUiGarageInputIntent50KG : std::uint8_t {
     none,previousStat,nextStat,minimumRejected,maximumRejected,
-    insufficientFunds,acceptUnchanged,back,shortenClosingWait
+    insufficientFunds,acceptUnchanged,back,shortenClosingWait,
+    incrementPending,decrementPending,restoreOwnedPending,requestPurchase,confirmPurchase,cancelPurchase
 };
 struct OriginalUiGarageInputContext50KG {
     std::uint32_t controller=0,event=0,managerState170=0;
@@ -62,8 +65,10 @@ struct OriginalUiGarageInputPlan50KG {
     // required real owner operation; this leaf never synthesizes a widget.
     std::uint32_t selectionGroupCallPC=0,selectionGroupFunction=0;
 };
-// No external effects and no profile-change list. Nonzero deltas cannot enter
-// the apply path1FEB90; a modal choice2 is likewise unavailable before writes.
+// No external effects or profile writes. Pending purchases use full prices;
+// pending sales of owned notches use the original half-price refund/restore.
+// Edits stay within base..maximum and the nonnegative native cash domain. Modal result2 proposes the private retained apply owner;
+// result3 only clears the dialog, preserving edits. Caller authenticates ownership.
 // All plans are proposals requiring the concrete source/destination owners.
 OriginalUiGarageInputPlan50KG planOriginalUiGarageFreshInput50KG(
     const OriginalUiGarageState50KG&,const OriginalUiGarageInputContext50KG&) noexcept;

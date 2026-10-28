@@ -83,7 +83,7 @@ bool OriginalUiControllerPopupResources50KG::retireSharedPayloadPart20DF80(Origi
   !owner.controllerRetirementCurrent())return fail(d,E::busy,0x20DFAC);
  auto& g=storage_->geometry;
  if(!step){storage_->retiring=true;g.prepared_=false;g.packets_={};g.packetCount_=0;}
- if(step<3){auto& text=g.texts_[2-step];std::string{}.swap(text.text);text.glyphs.atlas=nullptr;text.glyphs.count=0;}
+ if(step<3){for(auto& variant:g.textVariants_){auto& text=variant[2-step];std::string{}.swap(text.text);text.glyphs.atlas=nullptr;text.glyphs.count=0;}}
  else {
   // These are fixed native arrays, not nine guest allocation placeholders.
   // Actual packet/atlas borrows were unpublished at ref0. The caller has

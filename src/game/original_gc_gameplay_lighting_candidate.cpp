@@ -1,3 +1,5 @@
+#include "original_native_list_method_custody50la.h"
+#include "../../tests/native/ra_pod_scene50la.h"
 #include <thread>
 #include "../../tests/native/mc_cold_sources50la.h"
 #include "../../tests/native/mc_lighting_authoring50mc.h"
@@ -252,10 +254,14 @@ struct Owner::Storage {
         bool placeAtInfinity=true;
     };
     struct SelectedMethod {
+        OriginalNativeListMethodCustody50LA sourceList;
         std::vector<const OriginalWreckComponent50LA*> selected18;
         std::size_t count00=0,capacity0C=0;
         std::uint8_t type2C=0xffu,type2D=0xffu;
         bool constructed=false,complete=false;
+        void resetNativeSelection()noexcept {
+            decltype(selected18) empty;selected18.swap(empty);count00=capacity0C=0;type2C=type2D=0xffu;constructed=complete=false;
+        }
     };
     struct ZoneProjection {
         //27F158 initializes the actual SearchNode44 to zero. Authoring is
@@ -409,7 +415,25 @@ struct Owner::Storage {
     bool staticBusy()const noexcept{return activeMcParticleLight||(gbTimed&&gbTimed->activeGbParticleLight)||staticAccess||(staticOwner&&!staticRegistrationComplete)||
         tcGateAccess||(tcGateOwner&&!tcGateComplete)||tbDoor.access||(tbDoor.owner&&!tbDoor.complete)||
         (mcAnimations&&mcAnimations->busy())||(gbAnimations&&gbAnimations->busy());}
-    std::size_t identityCount()const noexcept{return racerCount+1u+staticModels.size()+((scene==Scene::tc||scene==Scene::tb)?1u:scene==Scene::gb?4u:scene==Scene::mc?14u:0u);}
+    struct RaFlareIdentity {
+        const ::ra_pod_scene50LA::Owner* world=nullptr;
+        const OriginalWreckComponent50LA* entity=nullptr;
+        const std::uint8_t* type32=nullptr;const std::uint8_t* flags33=nullptr;
+        std::uint32_t object=0;
+    } raFlare; //First metadata/Entity identity remains at the original address.
+    std::array<RaFlareIdentity,14> raFlareTail{};
+    std::size_t raFlareCount=0; //Actual owned source-order domain, at most15.
+    RaFlareIdentity& raFlareAt(std::size_t i)noexcept{return i?raFlareTail[i-1u]:raFlare;}
+    const RaFlareIdentity& raFlareAt(std::size_t i)const noexcept{return i?raFlareTail[i-1u]:raFlare;}
+    const RaFlareIdentity* findRaFlare(std::uint32_t object)const noexcept {
+        for(std::size_t i=0;i<raFlareCount;++i)if(raFlareAt(i).object==object)return &raFlareAt(i);
+        return nullptr;
+    }
+    const RaFlareIdentity* findRaFlare(const OriginalWreckComponent50LA* entity)const noexcept {
+        for(std::size_t i=0;i<raFlareCount;++i)if(raFlareAt(i).entity==entity)return &raFlareAt(i);
+        return nullptr;
+    }
+    std::size_t identityCount()const noexcept{return racerCount+1u+staticModels.size()+raFlareCount+((scene==Scene::tc||scene==Scene::tb)?1u:scene==Scene::gb?4u:scene==Scene::mc?14u:0u);}
     bool disjointStaticBacking(const std::uint32_t* field)const noexcept {
         if(mcAnimations&&!disjointResetField(field,mcAnimations.get(),sizeof(*mcAnimations)))return false;
         if(mcTopology&&!disjointResetField(field,mcTopology.get(),sizeof(*mcTopology)))return false;
@@ -453,6 +477,13 @@ struct Owner::Storage {
         // This owns the existing7F0 throughout its lifetime. Never copy an
         // attached membership into a temporary reset adapter.
         ResetVisibilityOwner50EY resetOwner{};
+        // Sole native representation of this racer's source C38/C40 recording
+        //cache. Unknown before actual229F20 stores; never membership.bounds.
+        std::optional<std::uint32_t> recordZoneC38;
+        std::optional<SpringVector4_48N> recordCenterC40;
+        enum class EndRecordCut:std::uint8_t {zone,bounds,returned};
+        EndRecordCut endRecordCut=EndRecordCut::zone;
+
         std::span<CollectionZoneLink50BX> links{};
         std::span<LiveZoneEntry50EN> entries{};
         PodShapeSource49W source{};
@@ -1017,7 +1048,7 @@ Owner::~Owner(){
     if(storage_&&storage_->gbTimed&&storage_->gbTimed->activeGbParticleLight)std::terminate();
     if(storage_)for(std::uint32_t slot=0;slot<storage_->racerCount;++slot)
         if(storage_->vehicles[slot].sourceResetBound)std::terminate();
-    if(storage_&&(storage_->staticOwner||storage_->sceneOwner||storage_->tcGateOwner||storage_->tbDoor.owner||
+    if(storage_&&(storage_->raFlareCount||storage_->staticOwner||storage_->sceneOwner||storage_->tcGateOwner||storage_->tbDoor.owner||
         (storage_->mcAnimations&&storage_->mcAnimations->claimed())||(storage_->gbAnimations&&storage_->gbAnimations->claimed())))std::terminate();
     if(storage_&&storage_->activeLease)endDraw(*const_cast<DrawLease*>(storage_->activeLease));
     if(storage_&&storage_->activeCamera)endCameraVisibility(*const_cast<CameraVisibilityLease*>(storage_->activeCamera));
@@ -1289,6 +1320,63 @@ bool Owner::attachFreshVehicle(std::uint32_t slot,VehicleFrameState49W& s,
     if(d.membership.status!=LiveZoneStatus50EN::Complete)
         return fail(d,Status::registration,0x21688c);
     v.attached=true;v.pendingInitial=false;return true;
+}
+bool Owner::readRecordedZoneC38(std::uint32_t slot,std::uint32_t& value)const noexcept {
+    if(!storage_||invalidated_||storage_->scene!=Scene::ra||slot>=storage_->racerCount||
+       !storage_->resetBound(slot))return false;
+    const auto& v=storage_->vehicles[slot];
+    if(v.raColdRetired||v.sourceTerminalRetired||!v.recordZoneC38)return false;
+    value=*v.recordZoneC38;return true;
+}
+bool Owner::readRecordedCenterC40(std::uint32_t slot,std::array<std::uint32_t,4>& value)const noexcept {
+    if(!storage_||invalidated_||storage_->scene!=Scene::ra||slot>=storage_->racerCount||
+       !storage_->resetBound(slot))return false;
+    const auto& v=storage_->vehicles[slot];
+    if(v.raColdRetired||v.sourceTerminalRetired||!v.recordCenterC40)return false;
+    std::memcpy(value.data(),v.recordCenterC40->v,16);return true;
+}
+bool Owner::recordAttachedEndRacer229F20(std::uint32_t slot,const VehicleFrameState49W& frame,
+    const VehicleFrameBindings49W& bindings,const VehicleFrameParameters49W& parameters,
+    Diagnostic& d)noexcept {
+    d={};d.racer=slot;
+    if(!storage_||invalidated_||storage_->scene!=Scene::ra)
+        return fail(d,Status::identity,0x229f20);
+    auto& o=*storage_;
+    if(o.staticBusy()||o.activeLease||o.activeCamera||o.activeReset||o.resetPending())
+        return fail(d,Status::activeDraw,0x229f20);
+    if(slot>=o.racerCount||!frameBinding(frame,bindings)||!o.resetBound(slot))
+        return fail(d,Status::identity,0x229f38);
+    auto& v=o.vehicles[slot];
+    if(v.raColdRetired||v.sourceTerminalRetired||!o.bound(slot))
+        // Native missing/retired membership is not proof of source-null7F0.
+        // The original2167A0 null branch remains unsupported, never simulated.
+        return fail(d,Status::registration,0x229f38);
+    using Cut=Storage::Vehicle::EndRecordCut;
+    if(v.endRecordCut==Cut::zone){
+        // Source7F0->4 is the ACTUAL primary zone (links[0]); authenticated
+        //272AD4/AE4 assign zone+48 its zero-based authored ordinal. No nearest
+        //zone, collision C34, static draw selection or cached bounds is used.
+        v.recordZoneC38=v.links[0].zone-1u; //229F5C commits BEFORE bounds.
+        v.endRecordCut=Cut::bounds;
+    }
+    if(v.endRecordCut==Cut::bounds){
+        //694 is already live. Do NOT recompute11FE50, attach/update membership,
+        //reset the frame, or use the previous membership.bounds snapshot.
+        if(frame.shape.type88||std::memcmp(&v.source,&parameters.shape,sizeof(v.source)))
+            return fail(d,Status::sourceShape,0x229f60);
+        Type0BoundsInput50EW input;
+        input.resource=&v.source;input.composed00=frame.shape.composed00;
+        std::memcpy(input.cachedCenterWords,frame.shape.center60.v,16);
+        std::memcpy(&input.cachedRadiusWord,&frame.shape.radius80,4);
+        CollectionBoundsResult48S bounds;
+        if(prepareType0Bounds50EW(input,bounds)!=CollectionBoundsStatus48S::Complete)
+            return fail(d,Status::bounds,0x1202e0);
+        //120CD4 writes full center vector to A1=C40. HalfXYZ go only to
+        //229F34's zeroed stack20 temporary; half.W is untouched/discarded.
+        v.recordCenterC40=bounds.center;
+        v.endRecordCut=Cut::returned;
+    }
+    d.status=Status::complete;d.sourcePC=0x229f74;return true;
 }
 bool Owner::matchesRaFreshRoster(std::uint32_t count) const noexcept {
     if(!storage_||invalidated_||storage_->scene!=Scene::ra||storage_->racerCount!=count)return false;
@@ -2119,7 +2207,7 @@ bool Owner::canReleaseSceneZones272A78(const ::ra_pod_scene50LA::Owner* owner)co
        !storage_->activeCamera&&!storage_->activeReset&&!storage_->resetPending();
 }
 bool Owner::releaseSceneZones272A78(const ::ra_pod_scene50LA::Owner* owner)noexcept {
-    if(!canReleaseSceneZones272A78(owner))return false;
+    if(!canReleaseSceneZones272A78(owner)||storage_->raFlareCount)return false;
     storage_->sceneOwner=nullptr;return true;
 }
 }
@@ -2479,3 +2567,5 @@ void Owner::endMcParticleLightBorrow(McParticleLightLease& lease)noexcept{
  storage_->activeMcParticleLight=nullptr;lease.revision_=0;auto keepAlive=std::move(lease.owner_);
 }
 }
+
+#include "original_ra_scene_roles270900.inl"

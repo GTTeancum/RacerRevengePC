@@ -56,6 +56,7 @@ public:
     const VehicleWindowDiagnostic50DS& rendererDiagnostic() const noexcept {return diagnostic_;}
     const GameHostDiagnostic50ER& hostDiagnostic() const noexcept {return hostDiagnostic_;}
 private:
+    friend struct ::original_main_entry50KG::Application; // Exact retained Results renderer/context binding only.
     bool ownersCurrent() noexcept;
     bool retire(bool cancelled) noexcept;
     game::OriginalCameraStartResult failure(std::uint32_t) const noexcept;

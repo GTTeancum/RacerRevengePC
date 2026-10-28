@@ -80,8 +80,21 @@ private:
         // Resource payload is the genuine retained native47C owner, not copied
         // bank indices or replacement material history. State stays in app.
         std::shared_ptr<OriginalUiControllerPopupResources50KG> resources;
+        std::array<Quad,3> strips;
+        std::array<Quad,2> icons;
+        std::unique_ptr<Dim> dim220;
+        std::unique_ptr<Text> message270,confirm2E0,cancel350;
+        bool canonicalLoaded=false;
         bool loaded=false;
     } controller47C_;
+    bool loadCanonical47C2055B0(Diagnostic&)noexcept;
+    static bool canonical47CQuadPayloadRetired(const Quad&)noexcept;
+    bool canonical47COwnersCurrent(std::array<const assets::OriginalStandardMaterialObject50LA*,3>&)const noexcept;
+    bool canRenderGaragePurchase47C(const OriginalUiGaragePageOwner50KG&,Diagnostic&)const noexcept;
+    bool canStartGaragePurchase2060A0(const OriginalUiGaragePageOwner50KG&,Diagnostic&)const noexcept;
+    bool writeController47CLabels2060A0(const game::OriginalUiControllerPopupState50KG&,Diagnostic&)noexcept;
+    bool startGaragePurchase2060A0(const OriginalUiGaragePageOwner50KG&,Diagnostic&)noexcept;
+    bool garagePopupInputFailed_=false;
     std::shared_ptr<Scope> scope_;
     std::weak_ptr<OriginalUiMainApplication50KG> application_;
     // Root boot transfers the exact initial five47C histories into the six-role
@@ -92,7 +105,7 @@ private:
     // A retry of pending history cleanup must never replay completed1413E0.
     bool sharedScopeFinalRetirementComplete()const noexcept;
     bool bootstrapInitialHistoryFromMain(const OriginalUiMainDrawResources50KG&,Diagnostic&)noexcept;
-    bool sharedHistoryCanonicalOwnersCurrent(std::array<const assets::OriginalStandardMaterialObject50LA*,3>&)const noexcept;
+    bool sharedHistoryCanonicalOwnersCurrent(std::array<const assets::OriginalStandardMaterialObject50LA*,6>&)const noexcept;
     Phase phase_=Phase::empty;
     bool successorConstructor_=false; // Only Application issues after exact retired-predecessor proof.
     std::size_t constructed470Quads_=0,loaded470Texts_=0,loaded470Quads_=0;
@@ -141,6 +154,26 @@ private:
     void release470FirstPass(OriginalUiGarageDrawContribution50KG&)noexcept;
     // Own470 +48 invocation. Numeric transcript is not receiver authority:
     // each actual mutation/call rechecks this live callback and exact payload.
+    // Actual47C callback custody. FIFO pins outlive the inherited tail.
+    enum class Popup47CPhase:std::uint8_t {idle,first,body,inherited};
+    Popup47CPhase popup47CPhase_=Popup47CPhase::idle;
+    OriginalUiGarageDrawContribution50KG* popup47CDraw_=nullptr;
+    std::uint64_t popup47CEpoch_=0;
+    std::uint32_t nativePopup47CFifoPins_=0,popup47COperation_=0;
+    bool begin47CCallback(OriginalUiGarageDrawContribution50KG&,std::uint32_t,Diagnostic&)noexcept;
+    bool demand47C206430(OriginalUiGarageDrawContribution50KG&,Diagnostic&)noexcept;
+    bool draw47C2064C0(OriginalUiGarageDrawContribution50KG&,Diagnostic&)noexcept;
+    bool complete47CCallback(OriginalUiGarageDrawContribution50KG&,std::uint32_t,Diagnostic&)noexcept;
+    bool abort47CAfterNativeRelease(OriginalUiGarageDrawContribution50KG&,Diagnostic&)noexcept;
+    void release47CQueueFenceIfQuiescent()noexcept;
+    bool popup47CTextCurrent(const OriginalUiGarageDrawContribution50KG&,const Text&)const noexcept;
+    bool popup47CQuadCurrent(const OriginalUiGarageDrawContribution50KG&,const Quad&)const noexcept;
+    bool popup47CDimCurrent(const OriginalUiGarageDrawContribution50KG&)const noexcept;
+    bool popup47CDimPacketCurrent2E21D0()const noexcept;
+    bool drawPopup47CDim2E21D0(OriginalUiGarageDrawContribution50KG&,Diagnostic&)noexcept;
+    bool regeneratePopup47CDimPacket2E21D0(std::uint32_t,std::uint32_t,std::int32_t,Diagnostic&)noexcept;
+    bool lowerPopup47CDim327E90(std::uint64_t,const std::array<std::uint32_t,2>&,Quad::LoweredPacket327E90&,Diagnostic&)const noexcept;
+    bool lowerPopup47CDimPacketBody327E90(std::uint64_t,const std::array<std::uint32_t,2>&,Quad::LoweredPacket327E90&,Diagnostic&)const noexcept;
     enum class ThirdPass470Phase:std::uint8_t {idle,body,inheritedPending};
     ThirdPass470Phase thirdPass470Phase_=ThirdPass470Phase::idle;
     OriginalUiGarageDrawContribution50KG* thirdPass470Draw_=nullptr;

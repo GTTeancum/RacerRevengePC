@@ -104,7 +104,8 @@ bool Application::prepareFrontendAudioOutput(Frontend& frontend,
         if(backing->mixer_.mixedFrames()||main.garageSourceLifetime_!=Main::GarageSourceLifetime::initialPrefix||
            !main.canRetireOrdinaryFrontendOutput())
             return garageBackingFailure(error,"First retained output cannot adopt an already-used Main transport");
-        for(std::size_t slot=0;slot<Main::courseRequiredVoices;++slot){
+        for(std::size_t ordinal=0;ordinal<Main::garageOrdinaryVoiceCount;++ordinal){
+            const auto slot=Main::garageOrdinaryVoice(ordinal);
             rr::platform::AudioVoiceObservation50HD v;
             if(!backing->mixer_.inspectVoice(slot,v)||v.voice.active||v.playbackRevision)
                 return garageBackingFailure(error,"First retained output cannot adopt an already-used ordinary voice");
@@ -149,13 +150,29 @@ bool Application::prepareFrontendMenuAudio(Frontend& frontend,
     error.clear();return true;
 }
 bool Application::frontendAudioClosedReceiptCurrent()const noexcept {
+    if(garageAudioOwnerThread_!=std::this_thread::get_id())return false;
     const auto& b=garageAudioBackingOwner_;
     if(!b||!b->inputsCurrent(*this)||b->failed_||!b->frontendOutputAttempted_||!b->frontendOutputClosed_||
        b->frontendOutputOwner_||b->frontendOutputCloseFailed_||!b->frontendOutputSerial_||
        !b->transport_.retiredOrdinaryFrontendOutputCurrent()||
-       b->transport_.controlRevision_!=b->frontendClosedMainRevision_||
-       b->mixer_.controlRevision()!=b->frontendClosedMixerRevision_||b->mixer_.mixedFrames()!=b->frontendClosedSourceFrames_)return false;
-    for(std::size_t slot=0;slot<rr::platform::OriginalUiMainAudio50KG::courseRequiredVoices;++slot){
+       b->mixer_.mixedFrames()!=b->frontendClosedSourceFrames_)return false;
+    const bool resetDescendant=b->frontendClosedReset268300MainRevision_||
+        b->frontendClosedReset268300MixerRevision_;
+    if(resetDescendant&&
+       (b->frontendClosedReset268300MainRevision_<=b->frontendClosedMainRevision_||
+        b->frontendClosedReset268300MixerRevision_<=b->frontendClosedMixerRevision_))return false;
+    // Only same-Aural268300 can publish these two descendant identities,
+    // after validating this exact prior close/current descendant. Staging or
+    // unrelated control edits cannot make the historical close current.
+    const auto priorMain=resetDescendant?b->frontendClosedReset268300MainRevision_:b->frontendClosedMainRevision_;
+    const auto priorMixer=resetDescendant?b->frontendClosedReset268300MixerRevision_:b->frontendClosedMixerRevision_;
+    const bool stopDescendant=b->frontendClosedStop26D070MainRevision_||b->frontendClosedStop26D070MixerRevision_;
+    if(stopDescendant&&(b->frontendClosedStop26D070MainRevision_<=priorMain||
+        b->frontendClosedStop26D070MixerRevision_<=priorMixer))return false;
+    if(b->transport_.controlRevision_!=(stopDescendant?b->frontendClosedStop26D070MainRevision_:priorMain)||
+       b->mixer_.controlRevision()!=(stopDescendant?b->frontendClosedStop26D070MixerRevision_:priorMixer))return false;
+    for(std::size_t ordinal=0;ordinal<rr::platform::OriginalUiMainAudio50KG::garageOrdinaryVoiceCount;++ordinal){
+        const auto slot=rr::platform::OriginalUiMainAudio50KG::garageOrdinaryVoice(ordinal);
         rr::platform::AudioVoiceObservation50HD v;
         if(!b->mixer_.inspectVoice(slot,v)||v.voice.active||
            v.playbackRevision!=b->frontendClosedPlaybackRevisions_[slot]||
@@ -239,7 +256,12 @@ bool Application::closeFrontendAudioOutput(AudioOutput& output,
     backing->frontendClosedSourceFrames_=backing->mixer_.mixedFrames();
     backing->frontendClosedMainRevision_=main.controlRevision_;
     backing->frontendClosedMixerRevision_=backing->mixer_.controlRevision();
-    for(std::size_t slot=0;slot<rr::platform::OriginalUiMainAudio50KG::courseRequiredVoices;++slot){
+    backing->frontendClosedReset268300MainRevision_=0;
+    backing->frontendClosedReset268300MixerRevision_=0;
+    backing->frontendClosedStop26D070MainRevision_=0;
+    backing->frontendClosedStop26D070MixerRevision_=0;
+    for(std::size_t ordinal=0;ordinal<rr::platform::OriginalUiMainAudio50KG::garageOrdinaryVoiceCount;++ordinal){
+        const auto slot=rr::platform::OriginalUiMainAudio50KG::garageOrdinaryVoice(ordinal);
         rr::platform::AudioVoiceObservation50HD v;
         if(!backing->mixer_.inspectVoice(slot,v)||v.voice.active)std::terminate();
         backing->frontendClosedPlaybackRevisions_[slot]=v.playbackRevision;
@@ -279,6 +301,10 @@ bool Application::finishNativeFrontendAudio(std::string& error)const noexcept {
        (sharedUiScopeOwner_&&!sharedUiScopeOwner_->closed_)||
        (lightManager&&(lightManager->activeUiIdentity()||lightManager->nativeGameplayGeneration())))
         return garageBackingFailure(error,"Terminal Root services require actual UI/race/dispatcher and Garage owner closure");
+    // Terminal failure/quit can abandon an already-consumed Hall transfer,
+    // but never while a live Race/input/renderer owner remains above.
+    if(!cancelNativeResultsHallTransfer50LA())
+        return garageBackingFailure(error,"Terminal Results Hall request retirement incomplete");
     const auto& backing=garageAudioBackingOwner_;
     if(frontendAudioShutdownComplete_){
         if(backing||sourceAural00Owner_||sourceLightManager426F60Owner_||
@@ -490,7 +516,8 @@ bool Application::retireGarageAudioBackingCold(std::string& error)const noexcept
     if(main.garageSourceLifetime_!=rr::platform::OriginalUiMainAudio50KG::GarageSourceLifetime::unbound){
         if(backing->mixer_.mixedFrames()||main.ownsMusic_||main.fading_||main.ownsRiderConfirm_)
             return garageBackingFailure(error,"Cold Garage backing retirement cannot consume a used retained ordinary transport");
-        for(std::size_t slot=0;slot<rr::platform::OriginalUiMainAudio50KG::courseRequiredVoices;++slot){
+        for(std::size_t ordinal=0;ordinal<rr::platform::OriginalUiMainAudio50KG::garageOrdinaryVoiceCount;++ordinal){
+            const auto slot=rr::platform::OriginalUiMainAudio50KG::garageOrdinaryVoice(ordinal);
             rr::platform::AudioVoiceObservation50HD voice;
             if(!backing->mixer_.inspectVoice(slot,voice)||voice.voice.active||voice.playbackRevision)
                 return garageBackingFailure(error,"Cold Garage backing retirement cannot erase ordinary voice history");

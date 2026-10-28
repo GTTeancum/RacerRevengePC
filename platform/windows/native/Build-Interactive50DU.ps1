@@ -54,6 +54,11 @@ $linkerPath = ExistingFile $Linker
 $zlibInclude = ExistingDirectory (Join-Path $root 'third_party/native-zlib')
 $null = ExistingFile (Join-Path $zlibInclude 'zlib.h')
 $null = ExistingFile (Join-Path $zlibInclude 'zconf.h')
+# Existing pinned FFmpeg headers support the actual IPU decoder source owner.
+$ffmpegInclude = ExistingDirectory (Join-Path $root 'third_party/ffmpeg-7.1.5/include')
+$null = ExistingFile (Join-Path $ffmpegInclude 'libavcodec/avcodec.h')
+$null = ExistingFile (Join-Path $ffmpegInclude 'libavutil/cpu.h')
+$ffmpegProvenance = ExistingFile (Join-Path $root 'third_party/ffmpeg-7.1.5/UPSTREAM.json')
 $sdlInclude = ExistingDirectory $SDL2IncludeDirectory
 foreach ($header in @('SDL_audio.h', 'SDL_events.h', 'SDL_version.h')) {
     $null = ExistingFile (Join-Path $sdlInclude $header)
@@ -67,7 +72,7 @@ if ($SDL2RuntimeDll) {
 }
 $manifestPath = ExistingFile (Join-Path $PSScriptRoot 'interactive50du.sources.json')
 $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
-if ($manifest.schema -ne 1 -or $manifest.sources.Count -ne 352 -or $manifest.nativeDependencySources.Count -ne 6) { throw 'Review changed source manifest before changing this gate.' }
+if ($manifest.schema -ne 1 -or $manifest.sources.Count -ne 606 -or $manifest.nativeDependencySources.Count -ne 6) { throw 'Review changed source manifest before changing this gate.' }
 foreach ($entry in (@($manifest.sourceListProvenance.PSObject.Properties) + @($manifest.nativeDependencySourceProvenance.PSObject.Properties))) {
     $actual = (Get-FileHash -LiteralPath (Join-Path $root $entry.Name) -Algorithm SHA256).Hash
     if ($actual -ine $entry.Value) { throw "Generator source changed; reconcile manifest first: $($entry.Name)" }
@@ -80,14 +85,14 @@ foreach ($relative in (@($manifest.sources) + @($manifest.nativeDependencySource
     $seen[$relative] = $true
     $sources += ExistingFile (Join-Path $root $relative)
 }
-$includes = @((Join-Path $root 'src/assets'), (Join-Path $root 'src/game'), (Join-Path $root 'third_party/native-json'), $zlibInclude, $sdlInclude)
+$includes = @((Join-Path $root 'src/assets'), (Join-Path $root 'src/game'), (Join-Path $root 'third_party/native-json'), $zlibInclude, $ffmpegInclude, $sdlInclude)
 foreach ($inc in $includes) { $null = ExistingDirectory $inc }
 $null = ExistingFile (Join-Path $root 'platform/linux/native/native_dynamic_library50win.h')
 $out = [IO.Path]::GetFullPath($BuildDirectory)
 if (Test-Path -LiteralPath $out) { throw 'BuildDirectory must be new; existing outputs are never reused or deleted.' }
 # Capture source and header inputs, including local retained fixture headers.
-$inputFiles = @($sources) + @($manifestPath, $PSCommandPath, $compilerPath, $linkerPath) + $runtimeDlls
-foreach ($dir in @('src', 'tests/native', 'platform/linux/native', 'platform/windows/native', 'third_party/native-json', 'third_party/native-zlib')) {
+$inputFiles = @($sources) + @($manifestPath, $PSCommandPath, $compilerPath, $linkerPath, $ffmpegProvenance) + $runtimeDlls
+foreach ($dir in @('src', 'tests/native', 'platform/linux/native', 'platform/windows/native', 'third_party/native-json', 'third_party/native-zlib', 'third_party/ffmpeg-7.1.5/include')) {
     $inputFiles += Get-ChildItem -LiteralPath (Join-Path $root $dir) -Recurse -File | Where-Object { $_.Extension -in '.h', '.hpp', '.inc', '.inl' } | ForEach-Object { $_.FullName }
 }
 $inputFiles += Get-ChildItem -LiteralPath $sdlInclude -Recurse -File | Where-Object { $_.Extension -in '.h', '.hpp', '.inc', '.inl' } | ForEach-Object { $_.FullName }
@@ -107,6 +112,8 @@ $receipt = [ordered]@{
     distributionReady = $false; crtPrerequisite = 'Approved x64 Visual C++ /MD runtime; not installed or verified'
     packagingEntry = 'Package-Interactive50DU.ps1; separate approved inventory required'
     sdlRuntimeStaged = ($runtimeDlls.Count -gt 0); zlib = 'six vendored inflate C sources, same /MD runtime'
+    ffmpegHeaders = 'existing vendored FFmpeg 7.1.5 include tree and UPSTREAM.json, hashed as inputs'
+    ffmpegRuntimeStaged = $false
 }
 $receipt | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $receiptPath -Encoding UTF8
 $guard = Join-Path $out 'native-x64-guard.h'

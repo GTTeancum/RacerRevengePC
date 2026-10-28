@@ -10,7 +10,7 @@ inline bool RaceAudioGroups50IC::coldTaIntroSettersCurrent(unsigned eventId)cons
        mixer_->groupEpoch50IC()!=epoch_||mixer_->count()!=count_||
        !mixer_->requiresVoiceGroupGains50IC())return false;
     const auto& p=coldGroups_[static_cast<std::size_t>(game::RaceAudioGroup50IC::Announcer120)];
-    if(!p.taIntroConstructed||p.count48!=3||!p.taIntroManager||!p.taIntroManager->current())return false;
+    if(!p.taIntroAuthoring||eventId>p.taIntroAuthoring->eventCount()||!p.taIntroConstructed||p.count48!=p.taIntroAuthoring->eventCount()||!p.taIntroManager||!p.taIntroManager->current())return false;
     // Preserve the genuinely never-started, unbound native phase. This is not
     // the ordinary current() gate, which intentionally remains closed here.
     for(std::size_t n=0;n<count_;++n)

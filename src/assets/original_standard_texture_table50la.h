@@ -4,7 +4,7 @@
 #include <memory>
 #include <string>
 
-namespace rr::game { class OriginalTimeStats50LA; class OriginalSpeedBoost50LA; class OriginalDamage50LA; class OriginalPositionStatsHud50LA; class OriginalPauseStorage50LA; }
+namespace rr::game { class OriginalTimeStats50LA; class OriginalSpeedBoost50LA; class OriginalDamage50LA; class OriginalPositionStatsHud50LA; class OriginalPauseStorage50LA; class OriginalRaceF850LA; class OriginalResults10450LA; }
 namespace rr::assets {
 class OriginalStandardMaterialObject50LA;
 class OriginalStandardMaterialTable50LA;
@@ -76,6 +76,8 @@ private:
     friend class rr::game::OriginalDamage50LA;
     friend class rr::game::OriginalPositionStatsHud50LA;
     friend class rr::game::OriginalPauseStorage50LA;
+    friend class rr::game::OriginalRaceF850LA;
+    friend class rr::game::OriginalResults10450LA;
     //Host ownership admission only. The SAME context that constructs material
     //map references must later construct their texture resources.
     bool bindMaterialContext(std::shared_ptr<const OriginalStandardMaterialContext50LA>,

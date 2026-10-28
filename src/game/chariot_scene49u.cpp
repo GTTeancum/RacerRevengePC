@@ -149,6 +149,21 @@ bool inverseDirection49U(const SceneGraph49P& g, I i, const V& in,
     out = vector(m, in, false, c, f);
     return f.valid;
 }
+bool cleanMatrixDirectionPrefix49U(const BodyMatrix48G& matrix,const V& input,
+    SceneVectorContext49U& context,V& output)noexcept {
+    if(std::fegetround()!=FE_TONEAREST)return false;
+    Math f;output=vector(matrix,input,false,context,f);return f.valid;
+}
+bool cleanMatrixPointPrefix49U(const BodyMatrix48G& matrix,const V& input,
+    SceneVectorContext49U& context,V& output)noexcept {
+    if(std::fegetround()!=FE_TONEAREST)return false;
+    Math f;output=vector(matrix,input,true,context,f);return f.valid;
+}
+bool cleanMatrixInverseDirectionPrefix49U(const BodyMatrix48G& matrix,const V& input,
+    SceneVectorContext49U& context,V& output)noexcept {
+    if(std::fegetround()!=FE_TONEAREST)return false;
+    Math f;const M m=inverse(matrix,f);output=vector(m,input,false,context,f);return f.valid;
+}
 bool relativeMatrix49U(const SceneGraph49P& g, I i, I relative,
     SceneVectorContext49U& c, M& out) noexcept {
     if (!admit(g, i) || !index(g, relative) || i == relative) return false;

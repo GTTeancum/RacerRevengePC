@@ -39,14 +39,16 @@ bool OriginalUiGaragePageOwner50KG::draw1FBE10(
         return fail(d,Status::entryProfilePending,0x1FC014);
     std::array<std::int32_t,6> maximum{},base{};
     for(std::size_t row=0;row<6;++row){
-        if(!current4E8_[row]||!delta500_[row]||*delta500_[row]!=0||
+        if(!current4E8_[row]||!delta500_[row]||
            !game::convertOriginalUiGarageStat50KG(profile.base0180[row],base[row])||
            !game::convertOriginalUiGarageStat50KG(profile.maximum0408[row],maximum[row])||
-           *current4E8_[row]!=base[row]||base[row]<0||maximum[row]<base[row]||maximum[row]>20)
+           *current4E8_[row]<base[row]||base[row]<0||maximum[row]<*current4E8_[row]||maximum[row]>20||
+           *delta500_[row]<base[row]-*current4E8_[row]||
+           *delta500_[row]>maximum[row]-*current4E8_[row])
             return fail(d,Status::entryProfilePending,0x1FC2C4);
     }
-    // Native bounded unchanged-upgrade envelope. This does not change profile,
-    // cash, unlocks or deltas, and does not manufacture nonzero-purchase paths.
+    // Bounded actual page preview: pending buys/sales are not profile writes
+    // until the real confirmation/apply transaction commits them.
     if(!available34B0_||*available34B0_<0)return fail(d,Status::entryProfilePending,0x1FD864);
     auto quad=[&](std::uint32_t offset)->Quad*{
         for(std::size_t i=0;i<quadCount_;++i)if(quads_[i].offset==offset)return &quads_[i];
@@ -105,11 +107,26 @@ bool OriginalUiGaragePageOwner50KG::draw1FBE10(
         volatile float colDistance=7.f*static_cast<float>(col);
         volatile float x=190.f+colDistance;position(q,x,y);
     }
-    for(std::size_t row=0;row<6;++row)for(std::int32_t col=0;col<*current4E8_[row];++col){
+    for(std::size_t row=0;row<6;++row)for(std::int32_t col=0;
+        col<*current4E8_[row]+(*delta500_[row]<0?*delta500_[row]:0);++col){
         auto& q=*quad(0x640u+static_cast<std::uint32_t>(row*1920u+static_cast<std::size_t>(col)*96u));
         alpha(q,255);color(q,entryProfile_->primaryColor);
         if(row==field4E4_)color(q,0x00CCCCCCu); // Actual selected-row second write1FC428.
     }
+    //1FC5E4..6F4: removed owned notches use source alpha70 and CA6060.
+    // Source iterates backwards from current-1 through current+delta.
+    for(std::size_t row=0;row<6;++row)if(*delta500_[row]<0)
+        for(std::int32_t col=*current4E8_[row]-1;col>=*current4E8_[row]+*delta500_[row];--col){
+            auto& q=*quad(0x640u+static_cast<std::uint32_t>(row*1920u+static_cast<std::size_t>(col)*96u));
+            alpha(q,70);color(q,0x00CA6060u);
+        }
+    //1FC92C..1FCA3C: pending positive notches are opaque yellow, after
+    // the original current filled range and before the max-bounded submits.
+    for(std::size_t row=0;row<6;++row)
+        for(std::int32_t col=*current4E8_[row];col<*current4E8_[row]+*delta500_[row];++col){
+            auto& q=*quad(0x640u+static_cast<std::uint32_t>(row*1920u+static_cast<std::size_t>(col)*96u));
+            alpha(q,255);color(q,0x00DCDC66u);
+        }
     for(std::size_t row=0;row<6;++row)for(std::int32_t col=0;col<maximum[row];++col){
         auto& q=*quad(0x640u+static_cast<std::uint32_t>(row*1920u+static_cast<std::size_t>(col)*96u));
         if(!submit(q,0x1FCA98))return false;

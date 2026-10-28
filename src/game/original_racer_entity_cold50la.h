@@ -14,6 +14,7 @@
 #include <string>
 #include <utility>
 
+namespace ra_source_camera50LA { class OwnershipBridge; }
 namespace native_racer50HW { class Cables; }
 namespace native_racer_model50LA {class Owner;}
 namespace rr::game {
@@ -305,6 +306,13 @@ struct OriginalRacerEntityColdBinding50LA {
 // that new storage completed all20F390 fields, native vehicle physics, racer
 // model constructors, outer manager ancestry, or199BC0/199AC0 runtime/draw.
 class OriginalRacerEntityCold50LA final {
+    friend class ::ra_source_camera50LA::OwnershipBridge;
+    bool readReplayMode3C229F94(std::uint32_t& value)const noexcept {
+        if(!prepared()||racer.kind!=OriginalWreckComponentKind50LA::racer27E130||
+           racer.sessionGeneration!=binding_.sessionGeneration||racer.objectKey!=binding_.racerKey)
+            return false;
+        value=mode3C_;return true; //Actual20F660-owned field, never a supplied ghost flag.
+    }
     friend class ::native_racer50HW::Cables;
     friend class ::native_racer_model50LA::Owner;
     friend class ::original_cable_selection50LA::Binding;

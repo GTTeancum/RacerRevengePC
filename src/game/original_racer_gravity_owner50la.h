@@ -1,15 +1,19 @@
 #pragma once
 #include "original_racer_main_body_owner50la.h"
 #include <memory>
+#include <cfenv>
+#include <cmath>
 
+namespace ra_source_camera50LA {class OwnershipBridge;}
 namespace rr::game {
 // Concrete344 Entity plus the separately allocated282750 target array.
 // Acceleration38 and force40.X/Z borrow the existing canonical numerical
 // fields; no duplicate gravity scalar, force model, or physical body exists.
-// The native2827D0 leaf does not retain its transient40.Y cache. That lane
-// stays explicitly unrepresented here, rather than becoming stale owner data.
+// The retained per-instance force44.Y cache is now initialized at the real
+// constructor and written by the private actual-target2827D0 service.
 class OriginalRacerGravityOwner50LA final {
     friend class ::native_racer_model50LA::Owner;
+    friend class ::ra_source_camera50LA::OwnershipBridge;
     using C=OriginalWreckComponent50LA;
     using K=OriginalWreckComponentKind50LA;
     using S=OriginalWreckComponentStatus50LA;
@@ -22,6 +26,7 @@ class OriginalRacerGravityOwner50LA final {
     MainBodyParameters49K* parameters_=nullptr;
     std::unique_ptr<Target[]> targets50_;
     std::uint32_t count30_=0,capacity34_=0;
+    mutable float force44Y_=0.f; //Real per-owner cache, not another Bank body lane.
     float force4CW_=0.f; //Unchanged by2827D0; separate from body force180.W.
     Stage stage_=Stage::allocated;
     static std::uint64_t key(const void* p)noexcept {
@@ -40,6 +45,7 @@ class OriginalRacerGravityOwner50LA final {
         std::memcpy(&main.selectedGravity,&acceleration,4);
         const auto& source=app.gravityOrigin4431C0_;
         std::memcpy(&parameters.gravityForceX,source.data(),4);
+        std::memcpy(&force44Y_,source.data()+1,4);
         std::memcpy(&parameters.gravityForceZ,source.data()+2,4);
         std::memcpy(&force4CW_,source.data()+3,4);
         targets50_.reset(); //2826BC, null array pointer before282750.
@@ -70,6 +76,51 @@ class OriginalRacerGravityOwner50LA final {
             return {S::owner,0x212048u};
         targets50_[count30_]=&body;++count30_; //2827B0/B4/B8/BC; no body retain.
         stage_=Stage::targetBound;return {S::complete,0x212048u};
+    }
+    bool storeEndAcceleration1143E0(OriginalApplicationEntities50LA& application,
+        const C& racer,const OriginalRacerMainBodyOwner50LA& body,
+        MainBodyState49K& current,std::uint32_t f12Bits)const noexcept {
+        if(stage_!=Stage::targetBound||application_!=&application||numeric_!=&current||
+           entity_.reference00!=1||entity_.kind!=K::gravity282670||
+           entity_.sessionGeneration!=racer.sessionGeneration||entity_.parent1C!=&racer||
+           body.entity().parent1C!=&racer||body.entity().sessionGeneration!=racer.sessionGeneration||
+           body.entity().reference00!=1||body.canonicalNumericAddress()!=&current||
+           target50()!=&body||application.attachmentLock423F58())return false;
+        //Actual table3D2E60+7C=1143E0. JR delay-slot SWC1 f12,+38;
+        //no arithmetic, force accumulation, callback or49W phase transition.
+        std::memcpy(&numeric_->selectedGravity,&f12Bits,4);return true;
+    }
+    //Private same-Bank-visit body of2827D0 for the actual single target
+    //constructed by212048. No scheduler, scene resolution or engine application.
+    bool accumulateTarget2827D0(OriginalApplicationEntities50LA& application,
+        const C& racer,const OriginalRacerMainBodyOwner50LA& body,
+        MainBodyState49K& current,MainBodyParameters49K& parameters,
+        std::uint32_t& sourcePC)const noexcept {
+        sourcePC=0x2827d0;
+        if(stage_!=Stage::targetBound||application_!=&application||numeric_!=&current||
+           parameters_!=&parameters||target50()!=&body||count30_!=1||capacity34_!=1||
+           entity_.reference00!=1||entity_.kind!=K::gravity282670||
+           entity_.sessionGeneration!=racer.sessionGeneration||entity_.parent1C!=&racer||
+           body.entity().parent1C!=&racer||body.entity().sessionGeneration!=racer.sessionGeneration||
+           body.entity().reference00!=1||body.canonicalNumericAddress()!=&current||
+           application.attachmentLock423F58()||std::fegetround()!=FE_TONEAREST)return false;
+        sourcePC=0x2827f0;
+        if(!std::isfinite(parameters.body.mass)||!std::isfinite(current.selectedGravity))return false;
+        volatile float negativeMass=-parameters.body.mass;
+        volatile float y=negativeMass*current.selectedGravity;
+        if(!std::isfinite(y))return false;
+        sourcePC=0x2827fc;force44Y_=y; //Before any target force store.
+        const float force[]={parameters.gravityForceX,force44Y_,parameters.gravityForceZ};
+        auto& loads=current.components.root.loads.force;
+        constexpr std::uint32_t stores[]={0x28281cu,0x28282cu,0x28283cu};
+        for(unsigned k=0;k<3;++k){
+            sourcePC=stores[k];
+            if(!std::isfinite(force[k])||!std::isfinite(loads.v[k]))return false;
+            volatile float sum=loads.v[k]+force[k];
+            if(!std::isfinite(sum))return false;
+            loads.v[k]=sum; //Earlier cache/XYZ stores survive a later rejection.
+        }
+        sourcePC=0x282858;return true;
     }
     bool appended()const noexcept{return stage_==Stage::appended||stage_==Stage::targetBound;}
     C* liveEntity()noexcept{return entity_.reference00&&stage_!=Stage::released?&entity_:nullptr;}

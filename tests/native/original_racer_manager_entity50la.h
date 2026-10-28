@@ -35,7 +35,7 @@ class Owner final {
     }
 public:
     Owner()=default;Owner(const Owner&)=delete;Owner& operator=(const Owner&)=delete;
-    ~Owner(){if(!close())std::terminate();}
+    ~Owner();
 private:
     bool constructEntity(std::shared_ptr<g::OriginalApplicationEntities50LA> application,
         std::uint64_t generation,std::string& error)noexcept {

@@ -1201,7 +1201,9 @@ static bool prepareOriginalUiOneMapMaterial50KM(const OriginalUiMaterialPass50KG
     const OriginalUiGarageModelMaterials50KG* authenticatedGaragePrelit = nullptr,
     const OriginalUiGarageModelMaterials50KG* authenticatedGarageLit = nullptr,
     bool authenticatedGarageAa1 = false,
-    const OriginalStandardMaterialObject50LA* authenticatedGarageScreen = nullptr) noexcept {
+    const OriginalStandardMaterialObject50LA* authenticatedGarageScreen = nullptr,
+    const OriginalStandardMaterialObject50LA* authenticatedF8Screen = nullptr,
+    const OriginalStandardMaterialObject50LA* authenticatedResultsScreen = nullptr) noexcept {
     d = {}; d.pass = pass.pass;
     try {
         if (pass.textureCount == 0)
@@ -1223,7 +1225,26 @@ static bool prepareOriginalUiOneMapMaterial50KM(const OriginalUiMaterialPass50KG
              pass.provenance.origin==OriginalUiMaterialOrigin50KG::memoryCardCanonicalScreenMissingPsmFallback) &&
             !pass.identity && pass.pass==1 && pass.provenance.creationPC==0x2475C0 &&
             pass.authored.values.empty() && pass.authored.name.empty();
-        if ((!sourceIdentityKnown(pass) && !canonicalGarageScreen) || !pass.inheritedTemplate || !programMatches ||
+        // Separate private actual-object consumer. Results remains Results;
+        // earlier shared icons retain their Garage/MemoryCard first history.
+        // No public parsed recipe gains this alternative authentication.
+        const bool canonicalF8Screen=authenticatedF8Screen && !litProgram &&
+            authenticatedF8Screen->constructed29B550() && !authenticatedF8Screen->source() &&
+            (pass.provenance.origin==OriginalUiMaterialOrigin50KG::resultsCanonicalScreenMissingPsmFallback ||
+             pass.provenance.origin==OriginalUiMaterialOrigin50KG::garageCanonicalScreenMissingPsmFallback ||
+             pass.provenance.origin==OriginalUiMaterialOrigin50KG::memoryCardCanonicalScreenMissingPsmFallback) &&
+            !pass.identity && pass.pass==1 && pass.provenance.creationPC==0x2475C0 &&
+            pass.authored.values.empty() && pass.authored.name.empty();
+        // Results has its own private actual-object issuer. A public parsed
+        // recipe cannot grant this alternative or borrow F8 authentication.
+        const bool canonicalResultsScreen=authenticatedResultsScreen && !litProgram &&
+            authenticatedResultsScreen->constructed29B550() && !authenticatedResultsScreen->source() &&
+            (pass.provenance.origin==OriginalUiMaterialOrigin50KG::resultsCanonicalScreenMissingPsmFallback ||
+             pass.provenance.origin==OriginalUiMaterialOrigin50KG::garageCanonicalScreenMissingPsmFallback ||
+             pass.provenance.origin==OriginalUiMaterialOrigin50KG::memoryCardCanonicalScreenMissingPsmFallback) &&
+            !pass.identity && pass.pass==1 && pass.provenance.creationPC==0x2475C0 &&
+            pass.authored.values.empty() && pass.authored.name.empty();
+        if ((!sourceIdentityKnown(pass) && !canonicalGarageScreen && !canonicalF8Screen && !canonicalResultsScreen) || !pass.inheritedTemplate || !programMatches ||
             pass.enabled != 1 || pass.textureCount != 1 || pass.textureCoordinateIndex != 0)
             return fail(d, Error::profile, authenticatedGaragePrelit ? "authored Garage DefaultMT PreLitCompressed" :
                 litProgram ? "authored DefaultMT Diffuse/Compressed" :
@@ -1367,6 +1388,142 @@ bool OriginalStandardMaterialObject50LA::prepareGarageScreenFallback2475C0(
         d.document=numeric.document;d.field="actual Garage fallback GS/texture policy";return false;
     }
     material=std::move(actual);output=policy;return true;
+}
+bool OriginalStandardMaterialObject50LA::prepareF8ScreenFallback2475C0(
+    const OriginalStandardMaterialTable50LA& table,const OriginalStandardMaterialCollectorReceipt50LA& receipt,
+    const OriginalStandardMaterialMapBindingView50LA& expected,const OriginalUiScreenAssets50KG& images,
+    std::uint32_t image,OriginalUiMaterial50KG& material,OriginalUiNativeMaterial50KG& output,
+    OriginalStandardMaterialDiagnostic50LA& d)const noexcept {
+    d={};d.row=expected.origin.materialRow;d.pass=0;d.map=0;
+    const auto reject=[&](OriginalStandardMaterialStatus50LA status,std::uint32_t pc,const char* field)noexcept {
+        d.status=status;d.sourcePC=pc;d.field=field;return false;
+    };
+    try {
+        if(expected.origin.pass<0||expected.representative.material!=this||expected.representative.pass!=0||
+           expected.preparation!=OriginalStandardMaterialMapPreparation50LA::ready||expected.map||
+           !expected.nativeScreenPrototypeRoute||expected.nativeUntexturedRoute||expected.nativeParticleRoute||!expected.texture)
+            return reject(OriginalStandardMaterialStatus50LA::reference,0x24B278,"actual F8 FINAL ScreenObject map");
+        OriginalStandardMaterialMapBindingView50LA now;
+        if(!table.prepareColdScreenPrototypeMap249610(receipt,expected.origin.materialRow,
+            static_cast<std::size_t>(expected.origin.pass),0,now,d))return false;
+        const auto sameEntry=[](const auto& a,const auto& b)noexcept {
+            return a.materialRow==b.materialRow&&a.pass==b.pass&&a.registration==b.registration&&
+                a.redirect18==b.redirect18&&a.limit1C==b.limit1C&&a.finalLeaf==b.finalLeaf&&a.material==b.material;
+        };
+        const auto sameInteger=[](const auto& a,const auto& b)noexcept {
+            return a.value==b.value&&a.origin==b.origin&&a.templateMember==b.templateMember&&
+                a.byteOffset==b.byteOffset&&a.sourcePC==b.sourcePC;
+        };
+        const auto sameContext=[&](const auto& a,const auto& b)noexcept {
+            if(a.videoDepthBase2E0!=b.videoDepthBase2E0||a.videoDepthFormat5C!=b.videoDepthFormat5C||
+               a.runtime435670!=b.runtime435670)return false;
+            for(std::size_t i=0;i<a.fields.size();++i)if(!sameInteger(a.fields[i],b.fields[i]))return false;
+            for(std::size_t i=0;i<a.sampler.size();++i)if(!sameInteger(a.sampler[i],b.sampler[i]))return false;
+            return true;
+        };
+        if(!sameEntry(now.origin,expected.origin)||!sameEntry(now.representative,expected.representative)||
+           now.preparation!=expected.preparation||now.map!=expected.map||now.texture!=expected.texture||
+           now.textureToken!=expected.textureToken||now.nativeScreenPrototypeRoute!=expected.nativeScreenPrototypeRoute||
+           now.nativeUntexturedRoute!=expected.nativeUntexturedRoute||now.nativeParticleRoute!=expected.nativeParticleRoute||
+           !sameContext(now.contextAfter249610,expected.contextAfter249610))
+            return reject(OriginalStandardMaterialStatus50LA::collector,0x249610,"unchanged originating/FINAL map observation");
+        OriginalUiMaterial50KG actual;
+        if(!borrowF8ScreenFallback2475C0(*now.texture,actual,d))return false;
+        const auto* imageSource=images.sourceProvenance(image);const auto* decoded=images.decodedTexture(image);
+        std::size_t offset=0,extent=0;
+        if(actual.passes.size()!=1||!actual.provenance.fallbackTexture||!imageSource||!decoded||
+           imageSource->memberIdentity!=actual.provenance.fallbackTexture||imageSource->pstOffset||
+           imageSource->pstBytes!=actual.provenance.fallbackTexture->bytes||
+           !now.texture->pstExtent24E880(offset,extent)||offset||extent!=imageSource->pstBytes||
+           !now.texture->sourceWidth14()||!now.texture->sourceHeight18()||decoded->mips.empty()||
+           decoded->mips.back().width!=static_cast<std::uint32_t>(*now.texture->sourceWidth14())||
+           decoded->mips.back().height!=static_cast<std::uint32_t>(*now.texture->sourceHeight18()))
+            return reject(OriginalStandardMaterialStatus50LA::texture,0x24E880,"same immutable F8 decoded first-source image");
+        // First-construction provenance above stays intact. Only the effective
+        // FINAL context is projected here, including the real249610 TEXA rule.
+        // This prospective native policy does not commit pass history or bind.
+        auto& projected=actual.passes[0];const auto& context=now.contextAfter249610;
+        for(std::size_t i=0;i<projected.gs.fields.size();++i){const auto& field=context.fields[i];
+            projected.gs.fields[i]={field.value,field.templateMember,field.byteOffset,field.sourcePC};}
+        projected.lodCalculationMethod=context.sampler[0].value;projected.maximumMipLevel=context.sampler[1].value;
+        projected.magFilter=context.sampler[2].value;projected.minFilter=context.sampler[3].value;
+        projected.lodL=context.sampler[4].value;projected.lodK=context.sampler[5].value;
+        OriginalUiNativeMaterial50KG policy;OriginalUiMaterialDiagnostic50KG numeric;bool fog=false,alphaTest=false;
+        if(!prepareOriginalUiOneMapMaterial50KM(projected,*decoded,policy,numeric,false,fog,alphaTest,
+            false,false,false,false,false,false,false,false,false,false,false,false,nullptr,nullptr,false,nullptr,this)){
+            d.document=numeric.document;
+            return reject(OriginalStandardMaterialStatus50LA::unsupportedPass,numeric.sourcePC,"actual F8 FINAL fallback GS/texture policy");
+        }
+        material=std::move(actual);output=policy;return true;
+    }catch(...){return reject(OriginalStandardMaterialStatus50LA::allocation,0x2475C0,"F8 FINAL fallback policy projection");}
+}
+bool OriginalStandardMaterialObject50LA::prepareResultsScreenFallback2475C0(
+    const OriginalStandardMaterialTable50LA& table,const OriginalStandardMaterialCollectorReceipt50LA& receipt,
+    const OriginalStandardMaterialMapBindingView50LA& expected,const OriginalUiScreenAssets50KG& images,
+    std::uint32_t image,OriginalUiMaterial50KG& material,OriginalUiNativeMaterial50KG& output,
+    OriginalStandardMaterialDiagnostic50LA& d)const noexcept {
+    d={};d.row=expected.origin.materialRow;d.pass=0;d.map=0;
+    const auto reject=[&](OriginalStandardMaterialStatus50LA status,std::uint32_t pc,const char* field)noexcept {
+        d.status=status;d.sourcePC=pc;d.field=field;return false;
+    };
+    try {
+        if(expected.origin.pass<0||expected.representative.material!=this||expected.representative.pass!=0||
+           expected.preparation!=OriginalStandardMaterialMapPreparation50LA::ready||expected.map||
+           !expected.nativeScreenPrototypeRoute||expected.nativeUntexturedRoute||expected.nativeParticleRoute||!expected.texture)
+            return reject(OriginalStandardMaterialStatus50LA::reference,0x24B278,"actual Results FINAL ScreenObject map");
+        OriginalStandardMaterialMapBindingView50LA now;
+        if(!table.prepareColdScreenPrototypeMap249610(receipt,expected.origin.materialRow,
+            static_cast<std::size_t>(expected.origin.pass),0,now,d))return false;
+        const auto sameEntry=[](const auto& a,const auto& b)noexcept {
+            return a.materialRow==b.materialRow&&a.pass==b.pass&&a.registration==b.registration&&
+                a.redirect18==b.redirect18&&a.limit1C==b.limit1C&&a.finalLeaf==b.finalLeaf&&a.material==b.material;
+        };
+        const auto sameInteger=[](const auto& a,const auto& b)noexcept {
+            return a.value==b.value&&a.origin==b.origin&&a.templateMember==b.templateMember&&
+                a.byteOffset==b.byteOffset&&a.sourcePC==b.sourcePC;
+        };
+        const auto sameContext=[&](const auto& a,const auto& b)noexcept {
+            if(a.videoDepthBase2E0!=b.videoDepthBase2E0||a.videoDepthFormat5C!=b.videoDepthFormat5C||
+               a.runtime435670!=b.runtime435670)return false;
+            for(std::size_t i=0;i<a.fields.size();++i)if(!sameInteger(a.fields[i],b.fields[i]))return false;
+            for(std::size_t i=0;i<a.sampler.size();++i)if(!sameInteger(a.sampler[i],b.sampler[i]))return false;
+            return true;
+        };
+        if(!sameEntry(now.origin,expected.origin)||!sameEntry(now.representative,expected.representative)||
+           now.preparation!=expected.preparation||now.map!=expected.map||now.texture!=expected.texture||
+           now.textureToken!=expected.textureToken||now.nativeScreenPrototypeRoute!=expected.nativeScreenPrototypeRoute||
+           now.nativeUntexturedRoute!=expected.nativeUntexturedRoute||now.nativeParticleRoute!=expected.nativeParticleRoute||
+           !sameContext(now.contextAfter249610,expected.contextAfter249610))
+            return reject(OriginalStandardMaterialStatus50LA::collector,0x249610,"unchanged originating/FINAL map observation");
+        OriginalUiMaterial50KG actual;
+        if(!borrowResultsScreenFallback2475C0(*now.texture,actual,d))return false;
+        const auto* imageSource=images.sourceProvenance(image);const auto* decoded=images.decodedTexture(image);
+        std::size_t offset=0,extent=0;
+        if(actual.passes.size()!=1||!actual.provenance.fallbackTexture||!imageSource||!decoded||
+           imageSource->memberIdentity!=actual.provenance.fallbackTexture||imageSource->pstOffset||
+           imageSource->pstBytes!=actual.provenance.fallbackTexture->bytes||
+           !now.texture->pstExtent24E880(offset,extent)||offset||extent!=imageSource->pstBytes||
+           !now.texture->sourceWidth14()||!now.texture->sourceHeight18()||decoded->mips.empty()||
+           decoded->mips.back().width!=static_cast<std::uint32_t>(*now.texture->sourceWidth14())||
+           decoded->mips.back().height!=static_cast<std::uint32_t>(*now.texture->sourceHeight18()))
+            return reject(OriginalStandardMaterialStatus50LA::texture,0x24E880,"same immutable Results decoded first-source image");
+        // First-construction provenance above stays intact. Only the effective
+        // FINAL context is projected here, including the real249610 TEXA rule.
+        // This prospective native policy does not commit pass history or bind.
+        auto& projected=actual.passes[0];const auto& context=now.contextAfter249610;
+        for(std::size_t i=0;i<projected.gs.fields.size();++i){const auto& field=context.fields[i];
+            projected.gs.fields[i]={field.value,field.templateMember,field.byteOffset,field.sourcePC};}
+        projected.lodCalculationMethod=context.sampler[0].value;projected.maximumMipLevel=context.sampler[1].value;
+        projected.magFilter=context.sampler[2].value;projected.minFilter=context.sampler[3].value;
+        projected.lodL=context.sampler[4].value;projected.lodK=context.sampler[5].value;
+        OriginalUiNativeMaterial50KG policy;OriginalUiMaterialDiagnostic50KG numeric;bool fog=false,alphaTest=false;
+        if(!prepareOriginalUiOneMapMaterial50KM(projected,*decoded,policy,numeric,false,fog,alphaTest,
+            false,false,false,false,false,false,false,false,false,false,false,false,nullptr,nullptr,false,nullptr,nullptr,this)){
+            d.document=numeric.document;
+            return reject(OriginalStandardMaterialStatus50LA::unsupportedPass,numeric.sourcePC,"actual Results FINAL fallback GS/texture policy");
+        }
+        material=std::move(actual);output=policy;return true;
+    }catch(...){return reject(OriginalStandardMaterialStatus50LA::allocation,0x2475C0,"Results FINAL fallback policy projection");}
 }
 bool prepareOriginalUiNativeMaterial50KG(const OriginalUiMaterialPass50KG& pass,
     const Texture48E& texture, OriginalUiNativeMaterial50KG& output,
