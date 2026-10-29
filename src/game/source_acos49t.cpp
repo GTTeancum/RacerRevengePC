@@ -229,6 +229,18 @@ bool SourceUiLightMath50KG::luminanceRaRemaining146E60(std::uint32_t r,std::uint
     output=to_float(add(red,sum));return true;
 }
 
+bool SourceTerrainSetupMath50LA::damping1B12FC(std::uint32_t product,
+    std::uint32_t twiceDamping,std::uint32_t& output)noexcept {
+    const auto exponent=(product>>23)&255u;
+    const auto dampingExponent=(twiceDamping>>23)&255u;
+    if((product>>31)||!exponent||exponent==255u||dampingExponent==255u||
+       (!dampingExponent&&(twiceDamping&0x7fffffu)))return false;
+    const auto root=sqrt(from_float(product));
+    const auto result=to_float(mul(from_float(twiceDamping),root));
+    if(((result>>23)&255u)==255u)return false;
+    output=result;return true;
+}
+
 #ifdef RR_SOURCE_ACOS49T_TEST_API
 namespace source_acos49t_test {
 std::uint64_t arithmetic(Operation op, std::uint64_t a, std::uint64_t b) noexcept {

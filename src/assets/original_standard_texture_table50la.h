@@ -6,6 +6,7 @@
 
 namespace rr::game { class OriginalTimeStats50LA; class OriginalSpeedBoost50LA; class OriginalDamage50LA; class OriginalPositionStatsHud50LA; class OriginalPauseStorage50LA; class OriginalRaceF850LA; class OriginalResults10450LA; }
 namespace rr::assets {
+class OriginalLoadingFontSource50LA;
 class OriginalStandardMaterialObject50LA;
 class OriginalStandardMaterialTable50LA;
 class OriginalStandardArchiveProvider50LA;
@@ -71,6 +72,11 @@ private:
         const std::shared_ptr<const OriginalStandardArchiveProvider50LA>&,
         OriginalStandardTextureDiagnostic50LA&)const noexcept;
     friend class OriginalApplicationFonts50LA;
+    bool lookupLoading299330(const std::string&,std::int16_t&,OriginalStandardTextureDiagnostic50LA&)noexcept;
+    bool retainLoading298A30(std::int16_t,OriginalStandardTextureDiagnostic50LA&)noexcept;
+    bool abortLoadingPstNative(const std::shared_ptr<OriginalLoadingFontSource50LA>&,
+        OriginalStandardTextureDiagnostic50LA&)noexcept;
+
     friend class rr::game::OriginalTimeStats50LA;
     friend class rr::game::OriginalSpeedBoost50LA;
     friend class rr::game::OriginalDamage50LA;

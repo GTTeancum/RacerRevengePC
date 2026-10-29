@@ -68,10 +68,10 @@ void firstUse(std::atomic<std::uint8_t>& guard,std::atomic<std::int32_t>& assert
 }
 }
 // Actual process records. Native atomics do not claim original synchronization.
-std::atomic<std::uint8_t>& OriginalUiGarageWidget1Owner50KG::hashGuard8098()noexcept {static std::atomic<std::uint8_t> v{0};return v;}
-std::atomic<std::int32_t>& OriginalUiGarageWidget1Owner50KG::hashAssertion3D6B10()noexcept {static std::atomic<std::int32_t> v{0};return v;}
-std::atomic<std::uint8_t>& OriginalUiGarageWidget1Owner50KG::idGuard809C()noexcept {static std::atomic<std::uint8_t> v{0};return v;}
-std::atomic<std::int32_t>& OriginalUiGarageWidget1Owner50KG::idAssertion3D6B18()noexcept {static std::atomic<std::int32_t> v{0};return v;}
+std::atomic<std::uint8_t>& OriginalUiGarageWidget1Owner50KG::hashGuard8098()noexcept {return OriginalUiTextHashGuards50KG::hashGuard8098();}
+std::atomic<std::int32_t>& OriginalUiGarageWidget1Owner50KG::hashAssertion3D6B10()noexcept {return OriginalUiTextHashGuards50KG::hashAssertion3D6B10();}
+std::atomic<std::uint8_t>& OriginalUiGarageWidget1Owner50KG::idGuard809C()noexcept {return OriginalUiTextHashGuards50KG::idGuard809C();}
+std::atomic<std::int32_t>& OriginalUiGarageWidget1Owner50KG::idAssertion3D6B18()noexcept {return OriginalUiTextHashGuards50KG::idAssertion3D6B18();}
 OriginalUiGarageWidget1Owner50KG::~OriginalUiGarageWidget1Owner50KG()noexcept {
     if((bound_&&!tableReleased_)||(grant_&&grant_->stillBorrowingGarageWidget1Owner(this)))std::terminate();
 }

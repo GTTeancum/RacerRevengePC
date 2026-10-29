@@ -11,8 +11,11 @@ namespace rr::game {
 // The complete noise owner is process-wide:14EFD0's tables/readiness and
 //4332A8 scratch cell are shared too. All represented308030 consumers use this
 // one stable arena address; it is deliberately EXCLUDED from racer snapshots.
-inline void initializeOriginalSharedNoise50IU(CoupledNoiseContext49M& shared) noexcept {
-    shared={};shared.sharedRandomState=1u;
+inline bool initializeOriginalSharedNoise50IU(CoupledNoiseContext49M& shared) noexcept {
+    //Fresh-only reset must never erase a reached partial initializer. Raw-only
+    //source reseeding below does not clear this native admission guard.
+    if(shared.noise.initializationIncomplete49M)return false;
+    shared={};shared.sharedRandomState=1u;return true;
 }
 inline void seedOriginalSharedRng50IU(CoupledNoiseContext49M& shared,
     std::uint32_t seed) noexcept {shared.sharedRandomState=seed;}

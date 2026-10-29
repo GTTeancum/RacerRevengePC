@@ -24,6 +24,7 @@
 #include <vector>
 #include <type_traits>
 
+namespace ra_cold_roster50LA { class FreshExecutionArena; }
 namespace runtime_startup50fl {
 using namespace rr::game;
 using U=std::uint32_t;
@@ -77,6 +78,11 @@ struct Assets {
     Graph graph()const;
 };
 struct Fixture {
+private:
+    friend class ::ra_cold_roster50LA::FreshExecutionArena;
+    struct SourceFreshStorageOnly {};
+    Fixture(SourceFreshStorageOnly,const std::filesystem::path& root);
+public:
     Assets assets;
     ChariotIkPair49T handRecords{};
     State state{};

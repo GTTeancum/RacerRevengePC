@@ -1,6 +1,12 @@
 // Non-template native frontend implementation. Keep ownership and layout in
 // the shared declaration header; each body below has one program definition.
 #include "original_ui_main_entry50kg.h"
+#include "../../src/game/original_loading_manager33050la.h"
+#include "original_race_display_lifetime50la.h"
+#include "../../src/game/original_loading_screen40_mode050la.inl"
+#include "original_course_loading_prefix50la.inl"
+#include "../../platform/linux/native/original_ui_course_owned_lifecycle50kg.h"
+#include "../../platform/linux/native/original_ui_course_page_payload50kg.inl"
 #include "../../src/assets/original_standard_texture_transfer_cold50la.h"
 #include "../../src/assets/original_archive_staged_reader50la.h"
 #include <fstream>
@@ -224,6 +230,13 @@ void Application::saveAcceptedSettings() const noexcept {
     }
 
 Application::~Application() {
+        // Actual native teardown hook: revoke pad transport and source-input
+        // use before shared Player borrowers can outlive this Application.
+        // Deferred input backing exists only for native partial cancellation.
+        if(!closeSourceInput04Native())std::terminate();
+        if(courseLoadingPrefix50LA_.frontend)std::terminate();
+        // Checked native partial-prefix unwind, not complete17BF00 or screen closure.
+        if(!retireNativeLoading330Prefix())std::terminate();
         if(!nativeTaCameraSession50LA_.expired())std::terminate();
         if(memoryCardConstructorOwner_||(state&&state->sharedDialogs)||(sharedUiScopeOwner_&&!sharedUiScopeOwner_->closed_))std::terminate();
         // A live source slot may still own renderer/context and counted state.
@@ -557,6 +570,30 @@ Application::Application(std::shared_ptr<rr::game::HostMonotonicClock50ID> clock
             "Supported human Course selections use the typed whole-world cold-load boundary, including unchanged selections, and the real selected-track owners. Native beta profile/settings persistence is separate from original memory-card format; original boot/save parity and full racer/course runtime verification are not claimed.\n";
     }
 
+bool Video::acquireCourseMode2A3A90(const Application& root,const std::shared_ptr<Video>& retained,
+        rr::game::OriginalUiEntityScope50KG::CourseConstruction& construction,
+        const rr::platform::OriginalUiFrontend50KG* frontend,const void* manager,
+        std::unique_ptr<CourseModeEffect>& output)noexcept {
+        using Construction=rr::game::OriginalUiEntityScope50KG::CourseConstruction;
+        if(output||retained.get()!=this||root.videoOwner_!=retained||
+           root.videoOwner_.owner_before(retained)||retained.owner_before(root.videoOwner_)||
+           !originalMain||courseModeEffect_||optionsModeEffect_||!construction.issuedBy(&root,root.sharedUiScopeOwner_)||
+           !construction.current(frontend,manager)||construction.videoEffect_||
+           construction.phase_!=Construction::Phase::beforeVideo2A3A90)return false;
+        std::unique_ptr<CourseModeEffect> next;
+        try {next.reset(new CourseModeEffect(retained,construction,root,frontend,manager));}
+        catch(...){return false;}
+        if(optionsModeEffect_||courseModeEffect_||root.videoOwner_!=retained||
+           !construction.issuedBy(&root,root.sharedUiScopeOwner_)||
+           !construction.current(frontend,manager)||construction.videoEffect_||
+           construction.phase_!=Construction::Phase::beforeVideo2A3A90)return false;
+        next->before_=sourceMode44_;
+        // All allocation/owner validation precedes this callback-free interval.
+        courseModeEffect_=next.get();construction.videoEffect_=next.get();
+        sourceMode44_=1; // Actual2A3A90 only; no race-display companion effect.
+        construction.phase_=Construction::Phase::afterVideo2A3A90;
+        next->acquired_=true;output=std::move(next);return true;
+    }
 bool Video::acquireOptionsMode2A3A90(const Application& root,const std::shared_ptr<Video>& retained,
         rr::game::OriginalUiEntityScope50KG::OptionsConstruction& construction,
         const rr::platform::OriginalUiFrontend50KG* frontend,const void* manager,
@@ -564,13 +601,13 @@ bool Video::acquireOptionsMode2A3A90(const Application& root,const std::shared_p
         using Construction=rr::game::OriginalUiEntityScope50KG::OptionsConstruction;
         if(output||retained.get()!=this||root.videoOwner_!=retained||
            root.videoOwner_.owner_before(retained)||retained.owner_before(root.videoOwner_)||
-           !originalMain||optionsModeEffect_||!construction.issuedBy(&root,root.sharedUiScopeOwner_)||
+           !originalMain||courseModeEffect_||optionsModeEffect_||!construction.issuedBy(&root,root.sharedUiScopeOwner_)||
            !construction.current(frontend,manager)||construction.videoEffect_||
            construction.phase_!=Construction::Phase::beforeVideo2A3A90)return false;
         std::unique_ptr<OptionsModeEffect> next;
         try {next.reset(new OptionsModeEffect(retained,construction,root,frontend,manager));}
         catch(...){return false;}
-        if(optionsModeEffect_||root.videoOwner_!=retained||
+        if(courseModeEffect_||optionsModeEffect_||root.videoOwner_!=retained||
            !construction.issuedBy(&root,root.sharedUiScopeOwner_)||
            !construction.current(frontend,manager)||construction.videoEffect_||
            construction.phase_!=Construction::Phase::beforeVideo2A3A90)return false;
@@ -1517,11 +1554,17 @@ void Frontend::commitDeferred(rr::platform::VehicleWindowGl50DS& renderer) {
         else if(status!=Status::noChange)fail("deferred activation");
     }
 
+bool Frontend::advanceCourseRaLoadingPrefix50LA(std::uint32_t& pc)noexcept {
+        pc=0x17d7a0;
+        return materialApplicationOwner&&materialApplicationOwner->advanceCourseRaLoadingPrefix50LA(*this,pc);
+    }
+
 bool Frontend::closeUi() noexcept {
         if(uploadLifetime_&&(uploadLifetime_->active_||
             uploadLifetime_->thread_!=std::this_thread::get_id()))return false;
         const auto status=coordinator.close(diagnostic);
         if(status!=Status::ok&&status!=Status::noChange)return false;
+        if(materialApplicationOwner&&!materialApplicationOwner->withdrawCourseRaLoadingPrefix50LA(*this))return false;
         if(nativeResultsHallEntry_&&materialApplicationOwner&&
            !materialApplicationOwner->cancelNativeResultsHallTransfer50LA())return false;
         if(uploadLifetime_){uploadLifetime_->retired_=true;uploadLifetime_.reset();}
@@ -2301,3 +2344,218 @@ void Application::showBetaPersistenceStatus(const char* normalTitle) const noexc
 }
 
 } // namespace original_main_entry50KG
+
+namespace original_main_entry50KG {
+bool Application::stageNativeLoading330Prefix(std::uint32_t& pc)const noexcept {
+    pc=0x17cde4;
+    if(garageAudioOwnerThread_!=std::this_thread::get_id()||!entitiesOwner_||
+       entitiesOwner_->nativeOwnerThread_!=std::this_thread::get_id()||!entitiesOwner_->application10())return false;
+    if(nativeLoading330Attempted_){
+        pc=sourceLoading330Owner_?sourceLoading330Owner_->stopPC_:0x17cde4u;
+        return sourceLoading330Owner_&&sourceLoading330Owner_->prefixRetained(); //No replay.
+    }
+    if(sourceLoading330Owner_)return false;
+    nativeLoading330Attempted_=true;
+    try {sourceLoading330Owner_=std::shared_ptr<rr::game::OriginalLoadingManager33050LA>(
+        new rr::game::OriginalLoadingManager33050LA(this,entitiesOwner_));}
+    catch(...){return false;}
+    auto& owner=*sourceLoading330Owner_;
+    if(!owner.construct17CDF8())return false;
+    owner.slot330Published_=true; //17CE0C actual counted owner, before init.
+    return owner.prepare17BF90(pc);
+}
+bool Application::retireNativeLoading330Prefix()const noexcept {
+    if(garageAudioOwnerThread_!=std::this_thread::get_id())return false;
+    if(!sourceLoading330Owner_)return true;
+    auto& owner=*sourceLoading330Owner_;
+    if(owner.camera_){
+        const auto display=owner.viewportDisplay_.lock();
+        const bool selected=display&&display->sourceSelectedCamera0_==owner.camera_;
+        // A Page/Options prior borrow must retire before this process owner.
+        // Never invalidate a live dependent or substitute a new Display.
+        if(owner.camera_.use_count()!=(selected?2:1))return false;
+        if(selected){
+            if(display->application_!=this||!display->ownerThread()||!display->sourceCurrentCamera0Known_)return false;
+            display->selectFrontendCamera26F940({}); //Explicit native shutdown withdrawal.
+        }
+    }
+    if(!sourceLoading330Owner_->retireNativePrefix())return false;
+    sourceLoading330Owner_.reset();return true; //Native withdrawal, never source330 null proof.
+}
+}
+
+
+namespace original_main_entry50KG {
+bool Application::prepareFrontendLoading330Viewport(
+    const std::shared_ptr<RaceDisplayLifetime50LA>& display,
+    rr::platform::VehicleWindowDiagnostic50DS& diagnostic,std::uint32_t& pc)const noexcept {
+    pc=0x114a00;
+    if(garageAudioOwnerThread_!=std::this_thread::get_id())return false;
+    // Same actual Application-issued Display, not an arbitrary native window
+    // or copied buffer-count receipt. Gameplay create has unknown Camera0 and
+    // no243CB4 completion, and cannot pass this existing initialized predicate.
+    if(!display||display!=raceDisplayOwner50LA_.lock()||display->application_!=this||
+       !display->garageFirstViewportCurrent50KG(diagnostic))return false;
+    if(!stageNativeLoading330Prefix(pc))return false;
+    auto& owner=*sourceLoading330Owner_;
+    if(owner.viewportAttempted_){
+        pc=owner.stopPC_;
+        // A serial frontend recreation does not repeat a process constructor
+        // or its old renderer invocation. No callback may consume that older
+        // Display merely because this new one has equivalent dimensions.
+        return owner.viewportCompleted_&&owner.prefixRetained();
+    }
+    auto& camera=*owner.camera_;
+    if(!owner.prefixRetained()||camera.issuer_!=this||camera.entities_!=entitiesOwner_||
+       !camera.coldRetirementPreflight().okay())return false;
+    // Pin exact same renderer/video for this synchronous invocation only.
+    // No retained GPU work or callback is produced; the later closed
+    //constructor suffix may select the exact330 Camera before attachments.
+    display->pin();
+    owner.viewportAttempted_=true;owner.boundary114A00_=false;
+    owner.viewportDisplay_=display;
+    const bool completed=[&]()noexcept {
+        const std::uint32_t count=display->sourceBufferCount0C_+std::uint32_t{1};
+        camera.fields_.count210=count; //114A24, BEFORE20C.
+        camera.fields_.count20C=count; //114A28.
+        camera.phase_=rr::game::OriginalFrontendCameraCold50LA::Phase::insideViewport114A00;
+        owner.stopPC_=pc=0x245900;
+        std::int32_t returned=0;
+        const auto service=rr::game::serviceOriginalRenderer244D60(display->dispatch_,true,
+            display->renderer_,diagnostic,returned,rr::game::OriginalCameraDrainPolicy::initializedContext);
+        if(service.status!=rr::game::OriginalCameraStartStatus::complete){
+            owner.stopPC_=pc=service.sourcePC;return false;
+        }
+        owner.viewportServicePhase_=1;owner.stopPC_=pc=0x245910;
+        if(!display->renderer_.finishInitializedContextWork(diagnostic)||!diagnostic.contextWorkCompleted)return false;
+        owner.viewportServicePhase_=2;
+        //245918/91C reads this actual known-null Camera0, skipping directly
+        //to245C68. Neither zoom writes nor packet/scissor branch is reached.
+        camera.phase_=rr::game::OriginalFrontendCameraCold50LA::Phase::afterViewport114A00;
+        owner.viewportCompleted_=true;owner.stopPC_=pc=0x1149e0;
+        owner.suffixAttempted_=true;
+        using Camera=rr::game::OriginalFrontendCameraCold50LA;
+        auto& f=camera.fields_;
+        const auto fp=[](std::uint32_t bits)noexcept{return Camera::floatFromBits(bits);};
+        const auto words=[](const std::array<float,16>& input)noexcept {
+            Camera::Words16 result{};
+            for(std::size_t i=0;i<16;++i)result[i]=Camera::floatBits(input[i]);
+            return result;
+        };
+        const auto vector=[&](const Camera::Words4& v)noexcept {
+            return rr::assets::TVCameraVector49E{fp(v[0]),fp(v[1]),fp(v[2]),fp(v[3])};
+        };
+        rr::game::CameraSceneState49F scene;
+        scene.look=vector(f.look190);scene.up=vector(f.up1A0);scene.fovDegrees=fp(f.fov1D0);
+        scene.rollRadians=fp(f.roll1D4);scene.aspect1F8=fp(f.aspect1F8);
+        scene.nearPlane=fp(f.near1FC);scene.farPlane=fp(f.far200);
+        while(owner.constructorCallbacks_<2){
+            owner.stopPC_=pc=owner.constructorCallbacks_?0x11471c:0x1149e0;
+            rr::game::CameraViewOutput49F core;float focal=0,angle=0;
+            const auto rebuilt=rr::game::rebuildOriginalSceneCore115350(scene,vector(f.position180),
+                static_cast<std::int32_t>(f.viewport1E0[2]),core,focal);
+            if(rebuilt.status!=rr::game::OriginalCameraStartStatus::complete){owner.stopPC_=pc=rebuilt.sourcePC;return false;}
+            const auto guarded=rr::game::computeOriginalGuardAngle2371D0(focal,angle);
+            if(guarded.status!=rr::game::OriginalCameraStartStatus::complete){owner.stopPC_=pc=guarded.sourcePC;return false;}
+            f.viewC0=words(core.view);f.projection80=words(core.projection);
+            f.combined100=words(core.combined);f.focal1D8=Camera::floatBits(focal);f.coreKnown=true;
+            //Same bounded constructor treatment as real Page/Options: early
+            //source bounds are unwritten; dependent caches remain UNKNOWN.
+            f.screen140Known=false;f.combinedScreen250Known=false;
+            f.guardProjection290Known=false;f.guardCombined2D0Known=false;
+            f.guardAngle330=Camera::floatBits(angle);++owner.constructorCallbacks_;
+        }
+        owner.stopPC_=pc=0x26f940;
+        if(!display->garageFirstViewportCurrent50KG(diagnostic)||display->sourceSelectedCamera0_||
+           !(camera.entity_.flags29&1u))return false;
+        display->selectFrontendCamera26F940(owner.camera_); //26F948 BEFORE dimension comparison.
+        camera.phase_=Camera::Phase::selectedBeforeBounds236214;
+        if(display->sourceWidth4_!=static_cast<std::int32_t>(f.fullWidth204)||
+           display->sourceHeight8_!=static_cast<std::int32_t>(f.fullHeight208))return false;
+        rr::game::OriginalCameraViewportFields numeric;
+        const auto prepared=rr::game::prepareOriginalRaceViewport2361C0(numeric,camera.generation_,camera.key_,scene);
+        if(prepared.status!=rr::game::OriginalCameraStartStatus::complete){owner.stopPC_=pc=prepared.sourcePC;return false;}
+        f.depth310=Camera::floatBits(numeric.depth310);f.depth314=Camera::floatBits(numeric.depth314);
+        f.left318=Camera::floatBits(numeric.left318);f.right31C=Camera::floatBits(numeric.right31C);
+        f.top320=Camera::floatBits(numeric.top320);f.bottom324=Camera::floatBits(numeric.bottom324);
+        f.aspect1F8=Camera::floatBits(scene.aspect1F8);f.matrix140=words(numeric.screen140);f.screen140Known=true;
+        f.combinedScreen250=words(numeric.combinedScreen250);f.combinedScreen250Known=true;
+        f.guardCombined2D0=words(numeric.guardCombined2D0);f.guardCombined2D0Known=true;
+        f.guardX334=Camera::floatBits(numeric.guardX334);f.guardY338=Camera::floatBits(numeric.guardY338);
+        camera.phase_=Camera::Phase::viewportInitialized2361C0; //290 remains unknown.
+        owner.stopPC_=pc=0x17c06c;
+        const auto attached=entitiesOwner_->entityAuthority_.attachChildren(owner.manager_,camera.entity_,
+            0xffffffffu,entitiesOwner_->attachmentLock423F58());
+        if(attached.status!=rr::game::OriginalWreckComponentStatus50LA::complete)return false;
+        owner.cameraAttached_=true;
+        //17C07C table+1C=1415A0, then actual node and Camera+1C=1415A0.
+        //Exact freshly constructed two-child tree; bit3 skip is genuinely clear.
+        if(owner.manager_.firstChild18!=&owner.node_||owner.node_.next14!=&camera.entity_||
+           camera.entity_.next14||owner.node_.firstChild18||camera.entity_.firstChild18||
+           (owner.node_.flags29&8u)||(camera.entity_.flags29&8u))return false;
+        owner.manager_.flags29&=static_cast<std::uint8_t>(~3u);
+        owner.node_.flags29&=static_cast<std::uint8_t>(~3u);
+        camera.entity_.flags29&=static_cast<std::uint8_t>(~3u);
+        //1415A0 changes activity only; NEVER clears selected Display0.
+        owner.stopPC_=pc=0x17ce2c;
+        const auto parented=entitiesOwner_->entityAuthority_.attachChildren(*entitiesOwner_->application10(),
+            owner.manager_,0xffffffffu,entitiesOwner_->attachmentLock423F58());
+        if(parented.status!=rr::game::OriginalWreckComponentStatus50LA::complete)return false;
+        owner.managerAttached_=true;owner.managerInitialized_=true;
+        owner.stopPC_=pc=0x17ce34;
+        return true; //Only actual330 manager; screen40/1CC900 remain unimplemented.
+    }();
+    // Both services are synchronous. Failure records its reached prefix and
+    // never retries GL work; no new queue submission or callback is retained.
+    display->unpin();
+    return completed;
+}
+}
+
+
+namespace original_main_entry50KG {
+bool RaceDisplayLifetime50LA::frontendLoadingCameraLifetime50LA(
+    const std::shared_ptr<rr::game::OriginalFrontendCameraCold50LA>& camera)const noexcept {
+    if(!camera)return true; //No prior borrow; current-null is checked separately.
+    if(!ownerThread()||!application_||!sourceCurrentCamera0Known_)return false;
+    const auto& owner=application_->sourceLoading330Owner_;
+    if(!owner||!owner->managerInitialized_||!owner->prefixRetained()||owner->camera_!=camera||
+       owner->camera_.owner_before(camera)||camera.owner_before(owner->camera_)||
+       owner->viewportDisplay_.lock().get()!=this||camera->issuer_!=application_||
+       camera->entities_!=application_->entitiesOwner_||!camera->enrolled_||camera->entity_.reference00!=1||
+       camera->fields_.registration34||camera->fields_.parent38||camera->fields_.resource224)return false;
+    return true; //Inactive is authentic17C07C, not a reason to fabricate null.
+}
+std::shared_ptr<rr::game::OriginalFrontendCameraCold50LA>
+RaceDisplayLifetime50LA::loadingPriorViewportCamera50LA()const noexcept {
+    return frontendLoadingCameraLifetime50LA(sourceSelectedCamera0_)?sourceSelectedCamera0_:
+        std::shared_ptr<rr::game::OriginalFrontendCameraCold50LA>{};
+}
+bool RaceDisplayLifetime50LA::frontendPriorViewportCurrent50LA(
+    const std::shared_ptr<rr::game::OriginalFrontendCameraCold50LA>& prior)const noexcept {
+    return ownerThread()&&sourceCurrentCamera0Known_&&sourceSelectedCamera0_==prior&&
+        !sourceSelectedCamera0_.owner_before(prior)&&!prior.owner_before(sourceSelectedCamera0_)&&
+        frontendLoadingCameraLifetime50LA(prior);
+}
+bool RaceDisplayLifetime50LA::applyLoadingPriorViewportZoom2458C0(
+    const rr::game::OriginalFrontendCameraCold50LA& supplied,
+    const std::shared_ptr<rr::game::OriginalFrontendCameraCold50LA>& prior)noexcept {
+    using Camera=rr::game::OriginalFrontendCameraCold50LA;
+    if(!frontendPriorViewportCurrent50LA(prior)||supplied.issuer_!=application_||
+       !supplied.onAffinity()||!supplied.actualEntitiesAlive()||
+       supplied.phase_!=Camera::Phase::insideViewport114A00||!supplied.scalarPrefixStateValid(true))return false;
+    if(!prior)return true; //24591C authentic null branch, no zoom writes.
+    rr::game::OriginalCameraViewportFields input,current;
+    input.prepared=true;current.prepared=true;
+    input.width1E8=static_cast<std::int32_t>(supplied.fields_.viewport1E0[2]);
+    input.height1EC=static_cast<std::int32_t>(supplied.fields_.viewport1E0[3]);
+    auto& f=prior->fields_;
+    current.left318=Camera::floatFromBits(f.left318);current.right31C=Camera::floatFromBits(f.right31C);
+    current.top320=Camera::floatFromBits(f.top320);current.bottom324=Camera::floatFromBits(f.bottom324);
+    const auto computed=rr::game::updateOriginalViewportZoom2458C0(input,current);
+    if(computed.status!=rr::game::OriginalCameraStartStatus::complete)return false;
+    f.zoom328=Camera::floatBits(current.zoom328); //245AD4 then245AD8.
+    f.zoom32C=Camera::floatBits(current.zoom32C);
+    return true; //Actual a2=0 skips packet/scissor245B14..C64; no renderer receipt.
+}
+}

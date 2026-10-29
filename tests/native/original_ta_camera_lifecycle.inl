@@ -6,6 +6,9 @@ bool constructTaOwners174FA4()noexcept {
     if(!coldControllerIdentity174A30()||!nativeTaIssuance_||!nativeTaCutAuthoring_||taCuts_||
        !nativeTaCutAuthoring_->authoring||actual_.configuration34!=2||actual_.launchKind11258!=1||
        !actual_.taIntroAuthoring||actual_.taIntroAuthoring->providerIdentity()!=nativeTaIssuance_->provider.get())return false;
+    // Native staging of the same controller: source70 precedes74. If any
+    // later cut allocation rejects, keep this real70 for explicit retirement.
+    if(!constructNativeRaCinematographer70())return false;
     std::array<rr::assets::OriginalTaCutMemberInputCandidate,8> inputs;
     const auto& source=*nativeTaCutAuthoring_->authoring;
     if(!source.cutCount()||source.cutCount()>7)return false;
@@ -21,11 +24,15 @@ bool constructTaOwners174FA4()noexcept {
     taCuts_=OriginalTaCutChildrenCandidate::construct174FA4(std::move(copy),
         actual_.applicationEntities->cutOrigin443200_,diagnostic);
     if(!taCuts_)return taReject(diagnostic.sourcePC);
-    coldController_.children64[4]=taCuts_.get();
+    //RA backing remains unpublished until the actual signed A8 load branch.
+    //Other courses retain their existing standalone construction API.
+    if(nativeTaIssuance_->course!=OriginalCameraStartCourse::ra)
+        coldController_.children64[4]=taCuts_.get();
     coldController_.halfA8Value=static_cast<std::uint16_t>((coldController_.halfA8Value&~0x1f0u)|(taCuts_->cutCount()<<4));
     return true;
 }
 bool bindTaIntroEntity()noexcept {
+    if(!nativeIntroSourceCurrent())return false;
     if(!actual_.taIntroAudio||!actual_.taIntroAuthoring||!actual_.taIntroAudio->taIntroReady())return false;
     auto* e=actual_.taIntroAudio->taIntroEntity80();auto& c=coldController_.entity;
     if(!e||e!=c.firstChild18||e->parent1C!=&c||e->previous10||e->next14||e->firstChild18||
@@ -37,6 +44,7 @@ bool bindTaIntroEntity()noexcept {
     return true;
 }
 bool bindTaRegistryBefore7C()noexcept {
+    if(!nativeCamera74ConsumersCurrent()||!nativeIntroSourceCurrent())return false;
     const RaceCameraBinding b{generation_,key(scene_),key(identity_[0].racerTag),key(identity_[0].mainBodyTag),
         0,actual_.humanCount34?CameraRacerClass::player:CameraRacerClass::ai,
         actual_.humanCount34?CameraBootstrap::original_single_player:CameraBootstrap::native_all_ai};
@@ -181,6 +189,7 @@ bool nextTaCut1756D0()noexcept {
     const auto activated=taCuts_->activate(taCutCursor_);if(!activated.okay())return taReject(activated.sourcePC);
     // Keep original selection/suppression order: call292360 before counter store.
     auto flags=controller_.flags62;AudioCommand50HE command;std::size_t count=0;
+    if(!nativeIntroSourceCurrent())return taReject(0x175910);
     if(trackIntroSpeech50HG(actual_.configuration34,taCutCursor_,taLines_.data(),taLineCount_,
         flags,&command,1,count)!=AudioEventStatus50HE::Complete)return taReject(0x175910);
     if(count&&actual_.taIntroAudio->dispatchTaIntro292360(command.cue.key,0,0)==
@@ -237,16 +246,33 @@ bool advanceTaCut175D70()noexcept {
     scene_=projected.sceneAfter;matrices_=projected;return true;
 }
 bool retireTaController()noexcept {
+    if(!onOwnerThread())return false;
+    //Revoke public intro permission before ANY fallible child cleanup. Keep
+    //reached source aliases/stores until their identity-checked withdrawal.
+    if(actual_.taIntroAudio&&actual_.taIntroAudio->taIntroNativeReserved_)
+        actual_.taIntroAudio->taIntroNativeWithdrawn_=true;
+    //Actual174C50..74 destroys64 then68 BEFORE all later owned children.
+    //Unadopted standalone/native courses preserve their existing lifecycle.
+    if(!retireNativeCamera6468()||!retireNativeAttached6C())return false;
     if(taCuts_){
         if(spatial_.registration34.attached)return false;
+        if(!withdrawNativeIntroSource())return false;
         if(actual_.taIntroAudio&&!actual_.taIntroAudio->retireTaIntro142590())return false;
         if(coldController_.entity.firstChild18)return false;
         // Retire every borrowed registry/display edge BEFORE real74 arrays.
         display_.controllers48[0]=nullptr;controllerEntity_={};objectChildren_={};
         introChild_={};followChild_={};attachedChild_={};deathChild_={};collection_={};childOrder_.fill(0);
-        taCuts_.reset();coldController_.children64.fill(nullptr);coldController_.script5C=nullptr;
-        coldController_.scene3C=nullptr;coldController_.racer40=nullptr;
     }
+    // Source174C98 destroys70 before the74 list, then174D2C destroys78.
+    // Also runs after a74 construction failure, when taCuts_ is still null.
+    // Repeated partial cleanup never recreates or double-deletes either child.
+    if(!retireNativeCinematographer70())return false;
+    if(!withdrawNativeCamera74())return false;
+    taCuts_.reset();
+    if(!retireNativeTv78())return false;
+    if(!retireNativeRaStart7C())return false; //174D34..54, AFTER78 and BEFORE queries.
+    coldController_.children64.fill(nullptr);coldController_.script5C=nullptr;
+    coldController_.scene3C=nullptr;coldController_.racer40=nullptr;
     return releaseColdController174C20();
 }
 
@@ -311,6 +337,13 @@ bool constructTaIntroAudio177750(std::shared_ptr<const rr::assets::AudioBank50HC
     taAudioConstructionAttempted_=true;
     if(!actual_.taIntroAudio->beginTaIntro177750(actual_.taIntroAuthoring,coldController_.entity,
         std::move(bank),firstVoice,voiceCount))return false;
+    if(nativeTaIssuance_&&nativeTaIssuance_->course==OriginalCameraStartCourse::ra){
+        //Prewarm the SAME real attachment once, but withhold80/5C and rows.
+        //This is not source177750 completion. Dispatch/service is reserved
+        //until the later ordered native source adoption, with no reattachment.
+        if(!actual_.taIntroAudio->finishTaIntro177750(coldController_.entity))return false;
+        return actual_.taIntroAudio->reserveNativeTaIntro177750(coldController_.entity);
+    }
     //177750: events292650 precede real5C initialized source rows. Bytes2..7
     // are unrepresented; do not invent content or assert source heap padding.
     taLineCount_=taCuts_->cutCount();

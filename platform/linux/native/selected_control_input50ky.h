@@ -68,13 +68,41 @@ inline bool bindSelectedCameraCycle50KY(const game::ControlPresets49D& preferenc
     SelectedControlInput50KY current;
     if(!bindSelectedControlInput50KY(preferences,slot,slot,current)||
        current.preset!=binding.preset||current.twinEngine!=binding.twinEngine)return false;
+    //Revalidate source selection above, but preserve the caller's actual PC
+    //transport and any already-owned manual reset instead of regenerating it.
+    current.keyboard=binding.keyboard;
+    current.manualResetBound=binding.manualResetBound;
+    current.manualResetCode=binding.manualResetCode;
     const auto code=preferences.slots[slot].actions.action6A4;
     if(code<0||code>=static_cast<std::int32_t>(game::dualShockActiveButtons48Y)||
        current.keyboard.buttons[static_cast<std::size_t>(code)].source!=KeyboardButtonSource50DR::Released)return false;
+    for(const auto& button:binding.keyboard.buttons)
+        if(button.source==KeyboardButtonSource50DR::Key&&button.scancode==6)return false;
+    for(const auto& axis:binding.keyboard.axes)
+        if(axis.source==KeyboardAxisSource50DR::KeyPair&&
+           (axis.negativeScancode==6||axis.positiveScancode==6))return false;
     current.keyboard.buttons[static_cast<std::size_t>(code)]={KeyboardButtonSource50DR::Key,6}; // Native C.
     current.cameraCycleCode=code;
     current.temporaryLookCodes[0]=preferences.slots[slot].actions.action6A8;
     current.temporaryLookCodes[1]=preferences.slots[slot].actions.action6B0;
+    //Native PC adaptation only: held Q/E reach the SAME original temporary
+    //view actions already owned by this prepared camera. The camera's actual
+    //176DF0/1774A0 handlers own priority, offsets and release restoration.
+    constexpr std::uint16_t lookKeys[]={20,8}; //SDL scancodes Q/E.
+    for(unsigned i=0;i<2;++i){
+        const auto look=current.temporaryLookCodes[i];
+        if(look<0||look>=static_cast<std::int32_t>(game::dualShockActiveButtons48Y)||
+           current.keyboard.buttons[static_cast<std::size_t>(look)].source!=KeyboardButtonSource50DR::Released||
+           binding.keyboard.buttons[static_cast<std::size_t>(look)].source!=KeyboardButtonSource50DR::Released)return false;
+        //Do not steal a caller's explicit PC mapping. Canonical bindings use
+        //neither key; any conflicting custom mapping keeps binding unchanged.
+        for(const auto& button:binding.keyboard.buttons)
+            if(button.source==KeyboardButtonSource50DR::Key&&button.scancode==lookKeys[i])return false;
+        for(const auto& axis:binding.keyboard.axes)
+            if(axis.source==KeyboardAxisSource50DR::KeyPair&&
+               (axis.negativeScancode==lookKeys[i]||axis.positiveScancode==lookKeys[i]))return false;
+        current.keyboard.buttons[static_cast<std::size_t>(look)]={KeyboardButtonSource50DR::Key,lookKeys[i]};
+    }
     current.cameraCycleBound=true;binding=current;return true;
 }
 // Bound only after genuine1A16F0 ->2255B0, physical owners and camera exist.
@@ -88,21 +116,48 @@ inline bool bindSelectedManualReset50LC(const game::ControlPresets49D& preferenc
     const auto code=preferences.slots[slot].actions.action6AC;
     if(code<0||code>=static_cast<std::int32_t>(game::dualShockActiveButtons48Y)||
        binding.keyboard.buttons[static_cast<std::size_t>(code)].source!=KeyboardButtonSource50DR::Released)return false;
+    //Native T may not steal another already-configured PC action/axis.
+    //Stage no mutation before all conflict checks; camera bindings survive.
+    for(const auto& button:binding.keyboard.buttons)
+        if(button.source==KeyboardButtonSource50DR::Key&&button.scancode==23)return false;
+    for(const auto& axis:binding.keyboard.axes)
+        if(axis.source==KeyboardAxisSource50DR::KeyPair&&
+           (axis.negativeScancode==23||axis.positiveScancode==23))return false;
     binding.keyboard.buttons[static_cast<std::size_t>(code)]={KeyboardButtonSource50DR::Key,23};
     binding.manualResetCode=code;binding.manualResetBound=true;return true;
 }
-inline bool selectedKeyboardHeld50KY(const WindowInput50DQ& input,bool cameraCycleBound=false,
-    bool manualResetBound=false) noexcept {
-    constexpr std::uint16_t keys[]={26,22,82,81,80,79,44,21,225};
-    for(auto key:keys)if(input.down[key])return true;
-    return (cameraCycleBound&&input.down[6])||(manualResetBound&&input.down[23]);
+//Observe the SAME mapping consumed by50DR, including genuine optional-owner
+//bindings and explicit PC customizations. No source action or key is inferred
+//from a camera/reset Boolean. Invalid mapped scancodes fail neutral admission
+//closed; packet composition retains its existing full validation/diagnostics.
+inline bool selectedKeyboardHeld50KY(const WindowInput50DQ& input,
+    const SelectedControlInput50KY& binding) noexcept {
+    const auto held=[&](std::uint16_t key)noexcept {
+        return key==0||key>=input.down.size()||input.down[key]!=0;
+    };
+    for(const auto& button:binding.keyboard.buttons){
+        if(button.source==KeyboardButtonSource50DR::Released)continue;
+        if(button.source!=KeyboardButtonSource50DR::Key||held(button.scancode))return true;
+    }
+    for(const auto& axis:binding.keyboard.axes){
+        if(axis.source==KeyboardAxisSource50DR::Centered)continue;
+        if(axis.source!=KeyboardAxisSource50DR::KeyPair||
+           held(axis.negativeScancode)||held(axis.positiveScancode))return true;
+    }
+    return false;
 }
-inline void releaseSelectedKeyboard50KY(WindowInput50DQ& input,bool cameraCycleBound=false,
-    bool manualResetBound=false) noexcept {
-    constexpr std::uint16_t keys[]={26,22,82,81,80,79,44,21,225};
-    for(auto key:keys)input.down[key]=input.pressed[key]=0;
-    if(cameraCycleBound)input.down[6]=input.pressed[6]=0;
-    if(manualResetBound)input.down[23]=input.pressed[23]=0;
+inline void releaseSelectedKeyboard50KY(WindowInput50DQ& input,
+    const SelectedControlInput50KY& binding) noexcept {
+    const auto release=[&](std::uint16_t key)noexcept {
+        if(key&&key<input.down.size()&&key<input.pressed.size())input.down[key]=input.pressed[key]=0;
+    };
+    for(const auto& button:binding.keyboard.buttons)
+        if(button.source==KeyboardButtonSource50DR::Key)release(button.scancode);
+    for(const auto& axis:binding.keyboard.axes)if(axis.source==KeyboardAxisSource50DR::KeyPair){
+        release(axis.negativeScancode);release(axis.positiveScancode);
+    }
+    //Repeated mappings clear idempotently. Unrelated keys and the actual
+    //released-edge observations remain untouched, as in the prior policy.
 }
 // SDL's existing controller mapping database supplies logical controls. This
 // explicit positional native policy targets the original48Y descriptors:

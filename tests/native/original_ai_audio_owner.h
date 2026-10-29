@@ -11,6 +11,11 @@
 #include <iostream>
 #include "original_material_input_diagnostics50ln.h"
 
+namespace interactive_continuation50DU { struct Context; }
+namespace original_race_hud_scope50LA { class Registration; class Scope; }
+namespace original_main_entry50KG { struct Application; }
+namespace native_racer50HN { class Bank; }
+
 namespace native_original_ai_audio {
 // Actual native-owned D40/D48/sound/resource instances for each admitted AI
 // bank row:0..7 for ALL8,1..7 beside the existing human owner for Course.
@@ -20,6 +25,60 @@ namespace native_original_ai_audio {
 // the accepted world-audio boundary. Full retail child chronology is unclaimed.
 class Owner final {
     friend class rr::platform::OriginalApplicationAural50KG;
+    friend struct ::interactive_continuation50DU::Context;
+    friend class ::original_race_hud_scope50LA::Registration;
+    friend class ::original_race_hud_scope50LA::Scope;
+    // Native producer receipt only: Context captures immediately after the
+    // actual successful initializeSpeech call. It consumes no additional draw
+    // and claims neither retail allocation chronology nor numeric validation.
+    bool captureNativeSpeechReceipt(const original_main_entry50KG::Application& app,
+        const native_racer50HN::Bank& bank,std::uint64_t generation,
+        std::uint32_t& sharedRaw,std::size_t activeRacerCount)noexcept {
+        if(nativeSpeechReceiptCaptured_||!prepared_||!speechPrepared_||
+           !speechInitialized_||!generation||activeRacerCount!=racerCount_)return false;
+        nativeSpeechReceiptCaptured_=true;
+        nativeSpeechApplication_=&app;nativeSpeechBank_=&bank;
+        nativeSpeechGeneration_=generation;nativeSpeechRaw_=&sharedRaw;
+        nativeSpeechRacerCount_=activeRacerCount;return true;
+    }
+    bool nativeSpeechReceiptCurrent(const original_main_entry50KG::Application& app,
+        const native_racer50HN::Bank& bank,std::uint64_t generation,
+        const std::uint32_t& sharedRaw,std::size_t activeRacerCount)const noexcept {
+        return nativeSpeechReceiptCaptured_&&prepared_&&speechPrepared_&&speechInitialized_&&
+            nativeSpeechApplication_==&app&&nativeSpeechBank_==&bank&&
+            nativeSpeechGeneration_==generation&&generation!=0&&
+            nativeSpeechRaw_==&sharedRaw&&nativeSpeechRacerCount_==activeRacerCount&&
+            activeRacerCount==racerCount_;
+    }
+    bool nativeSpeechOwner(const original_main_entry50KG::Application& app,
+        const native_racer50HN::Bank& bank,std::uint64_t generation,
+        const std::uint32_t& sharedRaw,std::size_t activeRacerCount,
+        std::size_t slot,std::uint32_t actualRacer60,
+        const rr::game::PodSpeechCounts50HG*& counts,
+        rr::game::PodSpeechState50HG*& state)noexcept {
+        counts=nullptr;state=nullptr;
+        return nativeSpeechReceiptCurrent(app,bank,generation,sharedRaw,activeRacerCount)&&
+            speechOwner(slot,actualRacer60,counts,state);
+    }
+    bool applyNativeSpeech(const original_main_entry50KG::Application& app,
+        const native_racer50HN::Bank& bank,std::uint64_t generation,
+        const std::uint32_t& sharedRaw,std::size_t activeRacerCount,
+        std::size_t slot,std::uint32_t actualRacer60,
+        const rr::game::AudioCommand50HE& command)noexcept {
+        return nativeSpeechReceiptCurrent(app,bank,generation,sharedRaw,activeRacerCount)&&
+            applySpeech(slot,actualRacer60,command);
+    }
+    void revokeNativeSpeechReceipt()noexcept {
+        nativeSpeechApplication_=nullptr;nativeSpeechBank_=nullptr;
+        nativeSpeechGeneration_=0;nativeSpeechRaw_=nullptr;nativeSpeechRacerCount_=0;
+        // Never clear the one-shot captured bit or any source speech numbers.
+    }
+    const original_main_entry50KG::Application* nativeSpeechApplication_=nullptr;
+    const native_racer50HN::Bank* nativeSpeechBank_=nullptr;
+    const std::uint32_t* nativeSpeechRaw_=nullptr;
+    std::uint64_t nativeSpeechGeneration_=0;
+    std::size_t nativeSpeechRacerCount_=0;
+    bool nativeSpeechReceiptCaptured_=false;
     // Additional SAME-owner original PCM: D40 wreck sounds, all roster D44
     // arrays (including actual human row0), and each AI D48 speech provider.
     // Private uncalled leaves until Aural adds aggregate claims/capacity.
@@ -431,6 +490,7 @@ public:
         if(!field24C)return false;flags22C=&r.engine.flags22CLow4;return true;
     }
     void close()noexcept {
+        revokeNativeSpeechReceipt(); // Before any provider/borrowed-owner teardown.
         // Close every public update admission before any borrowed sound is
         // retired. Preserve the reached speech preparation for actual voice stops.
         // A failed prepare may already have registered a subset of emitters.

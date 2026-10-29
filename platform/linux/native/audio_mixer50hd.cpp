@@ -428,11 +428,16 @@ bool AudioMixer50HD::nativeSourceWetProcessorCurrent(const OriginalApplicationAu
         nativeSourceWetEpoch_==groupEpoch50IC_&&nativeWetPreflight_&&nativeWetProcess_&&rate_==48000&&processor.configured()&&
         processor.nextFrame()==mixedFrames_;
 }
-bool AudioMixer50HD::releaseNativeSourceWetProcessor(const OriginalApplicationAural50KG& owner,
-    NativeSourceReverb50KG& processor) noexcept {
+bool AudioMixer50HD::canReleaseNativeSourceWetProcessor(const OriginalApplicationAural50KG& owner,
+    const NativeSourceReverb50KG& processor)const noexcept {
     if(!nativeSourceWetProcessorCurrent(owner,processor)||nativeWattoRouting_.command||nativeSceneRouting_.command)return false;
     for(std::size_t i=0;i<count_;++i)if(voices_[i].active||nativeSourceVoiceRoutes_[i].count)return false;
     for(const auto& c:nativeSourceRoutes_.cells_)if(c.reserved)return false;
+    return true;
+}
+bool AudioMixer50HD::releaseNativeSourceWetProcessor(const OriginalApplicationAural50KG& owner,
+    NativeSourceReverb50KG& processor) noexcept {
+    if(!canReleaseNativeSourceWetProcessor(owner,processor))return false;
     // No master write, work clear or invented drain. The owner destroys its
     // retained history only after this exact borrow has been retired.
     nativeSourceWetProcessor_=nullptr;nativeWetPreflight_=nullptr;nativeWetProcess_=nullptr;nativeSourceWetEpoch_=0;return true;

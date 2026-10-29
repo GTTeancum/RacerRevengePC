@@ -1,6 +1,38 @@
 // Included only after this actual lighting Owner's private Storage definition.
 // No new EnvironmentInfo, light registry, topology, or decoded World is built.
 namespace rr::game::original_gc_gameplay_lighting_candidate {
+bool Owner::publishNativeEnvironment3A4(::ra_pod_scene50LA::Owner& owner,
+    const assets::World48F& source,std::uint32_t& pc)noexcept {
+    pc=0x270a70;
+    if(!podApplication(owner)||podApplication(owner)->nativeOwnerThread_!=std::this_thread::get_id()||
+       !podColdConstructed(owner)||podTopologyClosed(owner)||podLighting(owner).get()!=this||
+       podApplication(owner)->attachmentLock423F58()||!podEnvironment3A4(owner)||
+       !storage_||invalidated_||storage_->scene!=Scene::ra||
+       (storage_->sceneOwner&&storage_->sceneOwner!=&owner)||storage_->staticBusy()||
+       storage_->activeLease||storage_->activeCamera||storage_->activeReset||storage_->resetPending())return false;
+    auto& s=*storage_;
+    if(!s.environment3A4||!s.environment3A4->prepared()||!s.environment3A4->world()||
+       source.parameters.original_bytes!=s.world.parameters.original_bytes||
+       s.environment3A4->world()->parameters.original_bytes!=source.parameters.original_bytes||
+       source.zones.size()!=10u||s.environment3A4->zoneCount()!=10u||
+       !s.environment3A4->spatialBounds534())return false;
+    //A same-owner repeat observes a prior publication; it does not reconstruct
+    //or reset the backing, nor manufacture276950/276F3C source receipts.
+    if(*podEnvironment3A4(owner))return *podEnvironment3A4(owner)==s.environment3A4.get();
+    podEnvironment3A4(owner)=s.environment3A4.get();
+    return true;
+}
+bool Owner::withdrawNativeEnvironment3A4(::ra_pod_scene50LA::Owner& owner)noexcept {
+    if(!podEnvironment3A4(owner))return false;
+    if(!*podEnvironment3A4(owner))return true;
+    if(!storage_||podLighting(owner).get()!=this||
+       (storage_->sceneOwner&&storage_->sceneOwner!=&owner)||storage_->activeLease||
+       storage_->activeCamera||storage_->activeReset||storage_->resetPending()||
+       *podEnvironment3A4(owner)!=storage_->environment3A4.get())return false;
+    //Native borrower withdrawal, NOT destruction/replacement of EnvironmentInfo.
+    podEnvironment3A4(owner)=nullptr;return true;
+}
+
 bool Owner::nativeSceneRoles270900Current(const ::ra_pod_scene50LA::Owner* owner,
     const assets::World48F& source,const CollectionZone50BX* actualRows,std::uint32_t& pc)const noexcept {
     pc=0x270a50;
@@ -14,7 +46,8 @@ bool Owner::nativeSceneRoles270900Current(const ::ra_pod_scene50LA::Owner* owner
        s.visibility.lifecycle.storage.views.zones!=actualRows||s.visibility.lifecycle.zoneCount!=10u)
         return false;
     pc=0x270a70; //Existing native EnvironmentInfo3A4, not276950 construction.
-    if(!s.environment3A4||!s.environment3A4->prepared()||!s.environment3A4->world()||
+    if(!podEnvironment3A4(*owner)||*podEnvironment3A4(*owner)!=s.environment3A4.get()||
+       !s.environment3A4||!s.environment3A4->prepared()||!s.environment3A4->world()||
        s.environment3A4->world()->parameters.original_bytes!=source.parameters.original_bytes||
        s.environment3A4->zoneCount()!=10u||!s.environment3A4->spatialBounds534())return false;
     pc=0x270ac4; //Existing actual per-zone light/ambient source rows.
@@ -261,15 +294,15 @@ bool Owner::raFlareDomainIdle(const ::ra_pod_scene50LA::Owner* owner,
        !storage_->staticOwner||!storage_->staticApplication||!storage_->staticRegistrationComplete||
        storage_->staticBusy()||storage_->staticAccess||storage_->activeLease||storage_->activeCamera||
        storage_->activeReset||storage_->resetPending()||storage_->zoneProjectionLease||
-       !owner->nativeLocalFlareIdentityCurrent(&entity))return false;
+       !podFlareIdentityCurrent(*owner,&entity))return false;
     const auto& s=*storage_;const auto& life=s.visibility.lifecycle;
     if(s.raFlareCount>15u)return false;
     const auto first=s.racerCount+2u+s.staticModels.size();
     for(std::size_t i=0;i<s.raFlareCount;++i){const auto& f=s.raFlareAt(i);
         if(f.world!=owner||!f.entity||!f.type32||!f.flags33||f.object!=first+i||
-           !owner->nativeLocalFlareIdentityCurrent(f.entity)||
-           owner->nativeLocalFlareAuthoredIndex(f.entity)!=std::optional<std::size_t>(i+2u)||
-           owner->nativeLocalFlareZoneIndex(f.entity)!=std::optional<std::size_t>(i<5u?1u:7u))return false;
+           !podFlareIdentityCurrent(*owner,f.entity)||
+           podFlareAuthoredIndex(*owner,f.entity)!=std::optional<std::size_t>(i+2u)||
+           podFlareZoneIndex(*owner,f.entity)!=std::optional<std::size_t>(i<5u?1u:7u))return false;
     }
     return !s.registrations.useTc&&!s.registrations.ra.empty()&&
         life.storage.registrations==s.registrations.data()&&
@@ -290,9 +323,9 @@ bool Owner::bindRaFlareIdentity(const ::ra_pod_scene50LA::Owner* owner,
         if(f->world!=owner||f->type32!=&type32||f->flags33!=&flags33||(identity&&identity!=f->object))return false;
         identity=f->object;return true;
     }
-    const auto zone=owner->nativeLocalFlareZoneIndex(&entity);
+    const auto zone=podFlareZoneIndex(*owner,&entity);
     if(identity||s.raFlareCount>=15u||!zone||*zone!=(s.raFlareCount<5u?1u:7u)||
-       owner->nativeLocalFlareAuthoredIndex(&entity)!=std::optional<std::size_t>(2u+s.raFlareCount)||
+       podFlareAuthoredIndex(*owner,&entity)!=std::optional<std::size_t>(2u+s.raFlareCount)||
        s.identityCount()>=(std::numeric_limits<std::uint32_t>::max()>>2u)||
        s.selectedMethods[*zone*2u].type2D!=type32)return false;
     auto& f=s.raFlareAt(s.raFlareCount);
@@ -315,7 +348,7 @@ bool Owner::raFlareIdentityCurrent(const ::ra_pod_scene50LA::Owner* owner,
     const OriginalNativeListMethodCustody50LA* method,std::uint32_t slot)const noexcept {
     if(!raFlareDomainIdle(owner,entity))return false;
     const auto& s=*storage_;const auto* f=s.findRaFlare(identity);
-    const auto zone=owner->nativeLocalFlareZoneIndex(&entity);
+    const auto zone=podFlareZoneIndex(*owner,&entity);
     if(!f||f->world!=owner||f->entity!=&entity||!f->type32||!f->flags33||*f->type32==0xffu||
        (*f->flags33&7u)!=3u||!zone||(*zone!=1u&&*zone!=7u)||!identity||identity>s.identityCount())return false;
     const auto ordinal=*zone*2u;const auto& registration=s.registrations[identity-1u];
@@ -340,7 +373,7 @@ bool Owner::registerRaFlarePrimary(const ::ra_pod_scene50LA::Owner* owner,
     std::uint32_t identity,std::uint32_t& slot,std::uint32_t& pc)noexcept {
     pc=0x27e3b0;
     if(!raFlareDomainIdle(owner,entity)||!method)return false;
-    const auto zone=owner->nativeLocalFlareZoneIndex(&entity);
+    const auto zone=podFlareZoneIndex(*owner,&entity);
     if(!zone||(*zone!=1u&&*zone!=7u))return false;
     const auto ordinal=*zone*2u;
     if(method!=&storage_->selectedMethods[ordinal].sourceList||
@@ -366,7 +399,7 @@ bool Owner::releaseRaFlarePrimary(const ::ra_pod_scene50LA::Owner* owner,
     pc=0x281524;
     if(!raFlareDomainIdle(owner,entity))return false;
     auto& s=*storage_;const auto* f=s.findRaFlare(identity);
-    const auto zone=owner->nativeLocalFlareZoneIndex(&entity);
+    const auto zone=podFlareZoneIndex(*owner,&entity);
     if(!f||f->world!=owner||f->entity!=&entity||!identity||identity>s.identityCount()||
        !zone||(*zone!=1u&&*zone!=7u))return false;
     const auto& record=s.registrations[identity-1u];
@@ -488,7 +521,7 @@ const std::string* Owner::nativeRaParticleSelector1B4DC0(const ::ra_pod_scene50L
     if(!nativeSceneRoles270900Current(owner,source,rows,pc))return nullptr;
     // Actual existing EnvironmentInfo3A4 owns this immutable deep copy. This
     // native41C alias does not claim earlier276C00 ran or allocate a new Env.
-    const auto& doc=storage_->environment3A4->world()->parameters;
+    const auto& doc=(*podEnvironment3A4(*owner))->world()->parameters;
     const assets::ParameterBlock48F* environment=nullptr;
     for(const auto& candidate:doc.blocks)if(candidate.name=="environment"){
         if(environment)return nullptr;environment=&candidate;
@@ -505,7 +538,7 @@ const std::string* Owner::nativeRaParticleSelector1B4DC0(const ::ra_pod_scene50L
 const std::string* Owner::nativeRaSkySelector274AE0(const ::ra_pod_scene50LA::Owner* owner,
     const assets::World48F& source,const CollectionZone50BX* rows,std::uint32_t& pc)const noexcept {
     if(!nativeSceneRoles270900Current(owner,source,rows,pc))return nullptr;
-    const auto& actual=*storage_->environment3A4;pc=0x274b0c;
+    const auto& actual=**podEnvironment3A4(*owner);pc=0x274b0c;
     if(!actual.prepared()||actual.cubeCount()!=1u||actual.zoneCount()!=10u)return nullptr;
     const auto* name=actual.cubeFile(0);if(!name||*name!="ra.cub")return nullptr;
     for(std::size_t i=0;i<10u;++i){const auto* index=actual.zoneCubeIndex(static_cast<std::uint32_t>(i));
@@ -523,7 +556,7 @@ namespace rr::game::original_gc_gameplay_lighting_candidate {
 const char* Owner::nativeRaWaterSelector274570(const ::ra_pod_scene50LA::Owner* owner,
     const assets::World48F& source,const CollectionZone50BX* rows,std::uint32_t& pc)const noexcept {
     if(!nativeSceneRoles270900Current(owner,source,rows,pc))return nullptr;
-    auto& actual=*storage_->environment3A4;
+    auto& actual=**podEnvironment3A4(*owner);
     if(!actual.prepared()||!actual.world())return nullptr;
     const auto* field=actual.nativeWaterFile110();pc=0x2745b0;
     if(!field||!field->defaulted||std::strcmp(field->value.data(),"none"))return nullptr;
@@ -535,7 +568,7 @@ namespace rr::game::original_gc_gameplay_lighting_candidate {
 const char* Owner::nativeRaEcosystemSelector1AA410(const ::ra_pod_scene50LA::Owner* owner,
     const assets::World48F& source,const CollectionZone50BX* rows,std::uint32_t& pc)const noexcept {
     if(!nativeSceneRoles270900Current(owner,source,rows,pc))return nullptr;
-    auto& actual=*storage_->environment3A4;
+    auto& actual=**podEnvironment3A4(*owner);
     if(!actual.prepared()||!actual.world())return nullptr;
     const auto* field=actual.nativeEcosystemFile318();pc=0x1aa410;
     if(!field||!field->defaulted||std::strcmp(field->value.data(),"none"))return nullptr;

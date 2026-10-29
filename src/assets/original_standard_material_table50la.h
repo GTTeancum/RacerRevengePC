@@ -1,6 +1,8 @@
 #pragma once
 namespace original_local_flare50LA {class Emission;}
 #include "original_memory_card_screen_fallback50kg.h"
+#include "original_loading_screen_fallback50la.h"
+#include "original_course_screen_fallback50kg.h"
 namespace original_main_entry50KG {class NativeCollectorFifo50LA;class NativeF8BarPrefix50LA;}
 namespace original_cable_selection50LA { class Binding; }
 namespace original_position_stats_prestage50LA { class Owner; }
@@ -16,6 +18,7 @@ namespace rr::game {class OriginalRaceF850LA; class OriginalResults10450LA; clas
 namespace rr::platform { class OriginalUiSharedDialogMaterialHistory50KG; class OriginalUiTournamentPodReferences50KG; class OriginalUiSharedDialogs50KG; }
 namespace rr::platform {class OriginalUiMemoryCardConstructor50KG;class OriginalUiGarageModelResource50KG;class OriginalUiGarageScreenText50KG;class OriginalUiGarageQuad50KG;class OriginalUiGaragePageOwner50KG;}
 namespace rr::platform { class OriginalUiGarageCanonicalSubmission50KG; class OriginalUiGarageDrawContribution50KG; }
+namespace rr::platform {class OriginalUiCoursePopupPayload50KG;}
 namespace rr::assets {
 // A partial CPU callback outcome, never a renderer capability. The first
 // enabled pass cannot return until24B9B0; subsequent passes remain untouched.
@@ -150,6 +153,8 @@ class OriginalStandardMaterialTable50LA final {
     friend class rr::platform::OriginalUiGarageModelResource50KG;
     friend class rr::platform::OriginalUiGarageScreenText50KG;
     friend class rr::platform::OriginalUiGarageQuad50KG;
+    friend class rr::platform::OriginalUiCourseOwnedLifecycle50KG;
+    friend class rr::platform::OriginalUiCoursePopupPayload50KG;
     friend class rr::platform::OriginalUiGaragePageOwner50KG;
     friend class rr::platform::OriginalUiSharedDialogs50KG;
 public:
@@ -247,6 +252,9 @@ private:
     // Promotes the SAME Storage/rows, without another parse or table copy.
     bool attachAppStartTemplates(std::shared_ptr<const OriginalUiMaterialApplication50LA>,
         OriginalStandardMaterialDiagnostic50LA&) noexcept;
+    // Native provenance only: same Storage completed the actual17CAD4 read/parse
+    // and was later attached. Legacy prepareFresh never grants this custody.
+    bool sourceNames17CAD4Current() const noexcept;
     friend class rr::platform::OriginalUiSharedDialogMaterialHistory50KG;
     using UiSharedHistoryOwner=rr::platform::OriginalUiSharedDialogMaterialHistory50KG;
     using UiSharedHistorySlots=std::array<OriginalStandardMaterialUiSharedHistorySlot50LA,6>;
@@ -417,6 +425,15 @@ private:
         OriginalStandardMaterialDiagnostic50LA&)const noexcept;
     bool preflightRetain14D590(std::int32_t,OriginalStandardMaterialDiagnostic50LA&)const noexcept;
     bool retainScreen14D590(std::int32_t,OriginalStandardMaterialDiagnostic50LA&) noexcept;
+    bool preflightCourseLoadedWidget(std::int32_t,
+        const std::shared_ptr<const OriginalStandardMaterialContext50LA>&,
+        const std::shared_ptr<OriginalStandardTextureTable50LA>&,OriginalStandardMaterialDiagnostic50LA&)const noexcept;
+    bool bindCourseScreenAuthoredAfterRetain(std::int32_t,
+        std::shared_ptr<const OriginalCourseScreenAuthored50KG>,OriginalStandardMaterialDiagnostic50LA&)noexcept;
+    bool bindCourseScreenFallbackAfterRetain(std::int32_t,
+        std::shared_ptr<const OriginalCourseScreenFallback50KG>,OriginalStandardMaterialDiagnostic50LA&)noexcept;
+    bool bindLoadingScreenFallbackAfterRetain(std::int32_t,
+        std::shared_ptr<const OriginalLoadingScreenFallback50LA>,OriginalStandardMaterialDiagnostic50LA&)noexcept;
     bool bindGarageScreenFallbackAfterRetain(std::int32_t,
         std::shared_ptr<const OriginalGarageScreenFallback50KG>,OriginalStandardMaterialDiagnostic50LA&)noexcept;
     //Non-mutating exact14D500 eligibility; allows bounded concrete owners to

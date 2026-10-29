@@ -2,6 +2,8 @@
 // Isolated, unactivated RA source decoder bundle. No SessionAssets, world
 // registration, roster, course capability, generated visuals or gameplay receipt.
 #include "pod_materials50ed_fixture.h"
+#include "../../src/assets/original_ui_archive50kg.h"
+namespace ra_cold_aggregate50LA {class Owner;}
 #include "track_height_cold50jb_fixture.h"
 #include "../../src/assets/import_collision48g.h"
 #include "../../src/assets/import_world48f.h"
@@ -81,6 +83,18 @@ struct DecodedSources {
  a::FinalImpactAuthoring49Y finalImpact{};
 };
 class Owner final {
+ friend class ::ra_cold_aggregate50LA::Owner;
+ // Opt-in native source-input custody. Legacy decode never creates this.
+ std::shared_ptr<const a::OriginalUiArchive50KG> sourceTrackInput_;
+ bool retainTrackInputBeforeDecode(const std::vector<std::uint8_t>& original)noexcept {
+  if(attempted_||data_||sourceTrackInput_)return false;
+  try {
+   auto archive=std::make_shared<a::OriginalUiArchive50KG>();
+   a::OriginalUiArchiveDiagnostic50KG diagnostic;
+   if(!archive->load(a::OriginalUiArchiveId50KG::trackRa,original,diagnostic))return false;
+   sourceTrackInput_=std::move(archive);return true;
+  }catch(...){return false;}
+ }
  friend class ra_static_registry50LA::ColdStage;
  friend class ra_source_camera50LA::OwnershipBridge;
  std::unique_ptr<DecodedSources> data_;

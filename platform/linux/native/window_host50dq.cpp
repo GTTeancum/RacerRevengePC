@@ -111,6 +111,7 @@ struct WindowHost50DQ::State {
     UInt windowId = 0;
     bool initAttempted = false, ready = false, quitRequested = false;
     std::array<std::uint8_t, windowScancodeCount50DQ> down{};
+    std::weak_ptr<OriginalSourcePadHostLease50LA> sourcePadLease;
     bool controllersEnabled=false;
     SdlGameController* controllers[2]{};
     Int controllerIds[2]={-1,-1};
@@ -186,6 +187,12 @@ struct WindowHost50DQ::State {
         input.gameControllersEnabled=controllersEnabled;
         input.secondControllerPresence=WindowControllerPresence50DQ::Unknown;
         if(!controllersEnabled)return true;
+        const auto lease=sourcePadLease.lock();
+        //Invalidate copied bindings BEFORE enumeration: a mid-poll failure
+        //must not leave a previous connected instance looking current.
+        if(lease&&lease->live_){
+            if(lease->observation_==UINT64_MAX){lease->revoke();}
+            else {++lease->observation_;for(unsigned i=0;i<2;++i)lease->observe(i,false,-1,false);}}
         bool complete=true;
         for(unsigned slot=0;slot<2;++slot)if(controllers[slot]&&!controllerAttached(controllers[slot])){
             closeController(controllers[slot]);controllers[slot]=nullptr;controllerIds[slot]=-1;controllerRumbling[slot]=false;
@@ -221,6 +228,8 @@ struct WindowHost50DQ::State {
         input.secondControllerPresence=input.controllers[1].connected?
             WindowControllerPresence50DQ::Present:complete?
             WindowControllerPresence50DQ::Absent:WindowControllerPresence50DQ::Unknown;
+        if(lease&&lease->live_)for(unsigned i=0;i<2;++i)
+            lease->observe(i,input.controllers[i].connected,input.controllers[i].instanceId,complete);
         return true;
     }
 
@@ -570,6 +579,8 @@ bool WindowHost50DQ::poll(WindowInput50DQ& input, WindowHostDiagnostic50DQ& d) n
     if (!ownerThread()) return fail(d, WindowHostError50DQ::WrongThread, "poll");
     if (!created()) return fail(d, WindowHostError50DQ::NotCreated, "poll");
     auto& s = *state_;
+    if(auto lease=sourcePadLease_.lock())if(lease->live_)
+        for(unsigned i=0;i<2;++i)lease->observe(i,false,-1,false);
     SdlEvent events[windowEventBudget50DQ]{};
     s.pumpEvents();
     const Int count = s.peepEvents(events, static_cast<Int>(windowEventBudget50DQ), 2, 0, 0xffff);
@@ -644,7 +655,11 @@ bool WindowHost50DQ::poll(WindowInput50DQ& input, WindowHostDiagnostic50DQ& d) n
     if(input.activityLost||input.quitRequested)for(unsigned slot=0;slot<2;++slot)
         if(s.controllers[slot]&&s.controllerRumbling[slot]){
             ControllerRumbleReceipt50KZ stopped{};
-            if(!rumbleController50KZ(slot,s.controllerIds[slot],0,0,stopped,d))return false;
+            if(!rumbleController50KZ(slot,s.controllerIds[slot],0,0,stopped,d)){
+                if(auto lease=sourcePadLease_.lock())if(lease->live_)
+                    for(unsigned i=0;i<2;++i)lease->observe(i,false,-1,false);
+                return false;
+            }
         }
     // Preserve a real Start tap even when press and release share this poll.
     // Edges are accepted only for the actually opened, still-attached instance.
@@ -715,12 +730,27 @@ bool WindowHost50DQ::rumbleController50KZ(std::uint32_t slot,std::int32_t expect
     receipt.status=ControllerRumbleStatus50KZ::Submitted;
     receipt.smallMotor=small;receipt.largeMotor=large;return true;
 }
+std::shared_ptr<OriginalSourcePadHostLease50LA> WindowHost50DQ::bindSourcePadNative(
+    const original_main_entry50KG::Application& app,const rr::game::OriginalApplicationInput04Source50LA& source,
+    const GameHost50ER& host)noexcept {
+    if(!ownerThread()||!state_||!state_->ready||!state_->controllersEnabled)return {};
+    if(const auto prior=sourcePadLease_.lock())return {}; //Never steal another live/retained binding.
+    try {auto lease=std::shared_ptr<OriginalSourcePadHostLease50LA>(new OriginalSourcePadHostLease50LA);
+        lease->app_=&app;lease->source_=&source;lease->host_=&host;lease->window_=this;lease->state_=state_;
+        lease->prepare();lease->live_=true;sourcePadLease_=lease;state_->sourcePadLease=lease;return lease;
+    }catch(...){return {};}
+}
+void WindowHost50DQ::revokeSourcePadNative()noexcept {
+    if(auto lease=sourcePadLease_.lock())lease->revoke();
+    sourcePadLease_.reset();if(state_)state_->sourcePadLease.reset();
+}
 bool WindowHost50DQ::close(WindowHostDiagnostic50DQ& d) noexcept {
     d = {};
     if (!ownerThread()) return fail(d, WindowHostError50DQ::WrongThread, "close");
     return closeOwned(d);
 }
 bool WindowHost50DQ::closeOwned(WindowHostDiagnostic50DQ& d) noexcept {
+    revokeSourcePadNative();
     if (!state_) return true;
     auto& s = *state_;
     s.ready = false;

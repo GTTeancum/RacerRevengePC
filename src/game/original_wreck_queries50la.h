@@ -1,5 +1,9 @@
 #pragma once
 #include "original_wreck_assets50la.h"
+#include "original_racer_model_scene50la.h"
+#include "original_wreck_query_prepare50la.h"
+#include "original_wreck_type0_prepare50la.h"
+#include "original_application_entities50la.h"
 #include "original_wreck_physical50la.h"
 #include "body_wrapper48h.h"
 #include "live_zone_membership50en.h"
@@ -17,6 +21,7 @@
 #include "original_wreck_piece_query_owner50la.h"
 #include "original_wreck_contact50la.h"
 #include <array>
+#include <optional>
 #include <algorithm>
 #include <cstring>
 #include <limits>
@@ -293,12 +298,13 @@ private:
     }
 public:
     OriginalWreckQueryResult50LA prepareInitialModelQueries11F570()noexcept {
+        if(freshE0Backing())return {};
         using S=OriginalWreckQueryStatus50LA;
         if(!storage_||storage_->e0ConstructorReached||storage_->initialShapesAttempted||storage_->initialShapesReady||!storage_->piece->coherent()||
            storage_->published[0]||storage_->published[1]||storage_->published[2])return {S::binding,0x11f570u};
         storage_->initialShapesAttempted=true;return stageInitialModelShapes(*storage_);
     }
-    bool prepared()const noexcept{return bool(storage_);}
+    bool prepared()const noexcept{return storage_&&!storage_->freshE0Backing;}
     bool initialModelQueriesPrepared()const noexcept{return storage_&&storage_->initialShapesReady;}
     bool hasFullE0PublicationHistory()const noexcept{return storage_&&storage_->e0FullPublication;}
     // Terminal native cancellation BEFORE the first source11B190 publication.
@@ -313,7 +319,7 @@ public:
     }
 private:
     bool canReleaseWorldBacking(const LiveZoneWorld50EN& actualWorld,bool sourceRetired)const noexcept {
-        if(!storage_||retired_||storage_->world.world!=&actualWorld||
+        if(!storage_||storage_->freshE0Backing||retired_||storage_->world.world!=&actualWorld||
            storage_->contactBound||storage_->mutualBound||storage_->derivedBound||
            (storage_->collectionFilterApplied&&!storage_->fullCollectionAttempted))return false;
         if(sourceRetired){
@@ -373,7 +379,7 @@ public:
     }
     bool retired()const noexcept{return retired_;}
     bool constructed()const noexcept {
-        return storage_&&storage_->published[0]&&storage_->published[1]&&storage_->published[2]&&
+        return storage_&&!storage_->freshE0Backing&&storage_->published[0]&&storage_->published[1]&&storage_->published[2]&&
             storage_->contactBound&&storage_->mutualBound&&storage_->derivedBound;
     }
     // Source165E90 constructor publication. Component141300 has already run
@@ -382,7 +388,7 @@ public:
     OriginalWreckQueryResult50LA publishColdQuery(unsigned i,OriginalWreckComponent50LA& component,
         OriginalWreckComponent50LA& actualModel,SpringSceneId48N actualModelIdentity) noexcept {
         using S=OriginalWreckQueryStatus50LA;
-        if(!storage_||storage_->e0ConstructorReached||i>2||storage_->published[i]||!storage_->initialShapesReady||!storage_->piece->coherent()||
+        if(!storage_||storage_->freshE0Backing||storage_->e0ConstructorReached||i>2||storage_->published[i]||!storage_->initialShapesReady||!storage_->piece->coherent()||
            storage_->plannedModel!=&actualModel||storage_->plannedQueries[i]!=&component||
            component.kind!=OriginalWreckComponentKind50LA::collision11B190||
            !component.objectKey||!component.sessionGeneration||
@@ -479,16 +485,16 @@ public:
         out.status=out.callback.status==OriginalWreckContactStatus50LA::complete?S::complete:S::continuation;
         return out;
     }
-    Query& query(unsigned i) noexcept{return storage_->queries[i];}
-    const Query& query(unsigned i)const noexcept{return storage_->queries[i];}
-    CollectionObject50BX& object(unsigned i) noexcept{return storage_->world.objects[storage_->world.refs[i]-1u];}
-    const CollectionObject50BX& object(unsigned i)const noexcept{return storage_->world.objects[storage_->world.refs[i]-1u];}
-    CollectionObjectState50BX& state(unsigned i) noexcept{return storage_->world.states[storage_->world.refs[i]-1u];}
-    const CollectionObjectState50BX& state(unsigned i)const noexcept{return storage_->world.states[storage_->world.refs[i]-1u];}
-    CollectionRef50BX ref(unsigned i)const noexcept{return storage_->world.refs[i];}
-    OriginalCameraWorldObjectCopies& copies(unsigned i) noexcept{return storage_->world.copies[ref(i)-1u];}
-    const OriginalCameraWorldObjectCopies& copies(unsigned i)const noexcept{return storage_->world.copies[ref(i)-1u];}
-    const OriginalWreckQueryWorld50LA& worldBinding()const noexcept{return storage_->world;}
+    Query& query(unsigned i) noexcept{if(freshE0Backing())std::terminate();return storage_->queries[i];}
+    const Query& query(unsigned i)const noexcept{if(freshE0Backing())std::terminate();return storage_->queries[i];}
+    CollectionObject50BX& object(unsigned i) noexcept{if(freshE0Backing())std::terminate();return storage_->world.objects[storage_->world.refs[i]-1u];}
+    const CollectionObject50BX& object(unsigned i)const noexcept{if(freshE0Backing())std::terminate();return storage_->world.objects[storage_->world.refs[i]-1u];}
+    CollectionObjectState50BX& state(unsigned i) noexcept{if(freshE0Backing())std::terminate();return storage_->world.states[storage_->world.refs[i]-1u];}
+    const CollectionObjectState50BX& state(unsigned i)const noexcept{if(freshE0Backing())std::terminate();return storage_->world.states[storage_->world.refs[i]-1u];}
+    CollectionRef50BX ref(unsigned i)const noexcept{if(freshE0Backing())std::terminate();return storage_->world.refs[i];}
+    OriginalCameraWorldObjectCopies& copies(unsigned i) noexcept{if(freshE0Backing())std::terminate();return storage_->world.copies[ref(i)-1u];}
+    const OriginalCameraWorldObjectCopies& copies(unsigned i)const noexcept{if(freshE0Backing())std::terminate();return storage_->world.copies[ref(i)-1u];}
+    const OriginalWreckQueryWorld50LA& worldBinding()const noexcept{if(freshE0Backing())std::terminate();return storage_->world;}
 
     //22C214..22C258 adds the actual named WATER bit4342A8 to E0 and E8
     //category exclusions after2CB5A0 completes.124170 preserves first-match
@@ -588,7 +594,7 @@ public:
         return result;
     }
     bool coherent(unsigned i)const noexcept {
-        if(!storage_||i>2||!storage_->published[i]||!storage_->initialShapesReady||!storage_->piece->coherent()||
+        if(!storage_||storage_->freshE0Backing||i>2||!storage_->published[i]||!storage_->initialShapesReady||!storage_->piece->coherent()||
            (i==0&&!modelSceneIdentity().value))return false;
         const auto& w=storage_->world;const auto& q=query(i);
         if(object(i).identity!=w.identities[i]||object(i).shapeTag!=(i==0?2u:i==1?0u:3u)||
@@ -618,6 +624,57 @@ public:
     }
 private:
     struct Storage {
+        // Fresh166018 prefix uses the SAME Query/numeric storage, but has no
+        // future-shape allocations or model-domain publication. Absent-only
+        // lanes below do not duplicate the canonical definition/body fields.
+        bool freshE0Backing=false,freshE0Started=false,freshE0Counted=false,freshE0Withdrawn=false;
+        std::uint32_t freshE0PC=0;
+        bool freshLoadAttempted=false,freshLoadComplete=false;
+        bool freshPrepareAttempted=false,freshPrepareComplete=false,freshAppended=false;
+        Query** freshDetectorQueryField38=nullptr; //Native borrow of the actual detector source38 lane.
+        std::optional<const void*> freshShape8C,freshResult90;
+        const OriginalRacerSceneObject50LA* freshModel44=nullptr;
+        std::optional<rr::assets::OriginalStandardModelFileId50LA> freshFileIdentityB0;
+
+        std::optional<std::uint8_t> freshA8,freshA9;
+        std::uint8_t freshFlags03KnownMask=0;
+        std::uint8_t freshFlags03=0; //Native fresh opaque byte; source changes only low three bits.
+        std::optional<std::int64_t> freshFileB0;
+        std::optional<std::uint32_t> freshMethodFC,freshMethod10,freshEC,freshF0,freshF4,fresh98;
+        //Absent-only E4 source lanes; canonical Query/definition/state[1]
+        //remain the sole receiver/filter/vector/epoch storage.
+        struct FreshE4 {
+            bool started=false,counted=false,loadAttempted=false,loadComplete=false,retired=false,prepareAttempted=false,prepareComplete=false,appended=false;
+            std::uint32_t pc=0;
+            std::uint8_t flags03=0,flags03KnownMask=0;
+            std::optional<std::uint8_t> a8,a9;
+            std::optional<std::int64_t> fileB0;
+            std::optional<std::uint32_t> methodFC,method10,ec,f0,f4,word98;
+            std::optional<const void*> shape8C,result90;
+            std::optional<rr::assets::OriginalStandardModelFileId50LA> fileIdentityB0;
+            const OriginalRacerSceneObject50LA* model110=nullptr;
+            const std::optional<OriginalWreckComponent50LA*>* publicationField=nullptr;
+        } freshE4;
+        struct FreshE8 {
+            bool started=false,counted=false,appended=false,loadAttempted=false,loadComplete=false,
+                categorySelected=false,categoryComplete=false,retired=false;
+            std::uint32_t pc=0;
+            std::uint8_t flags03=0,flags03KnownMask=0;
+            std::optional<std::uint8_t> a8,a9;
+            std::optional<std::int64_t> fileB0;
+            std::optional<std::uint32_t> methodFC,method10,ec,f0,f4,word98;
+            std::optional<const void*> shape8C,result90;
+            const std::optional<OriginalWreckComponent50LA*>* publicationField=nullptr;
+        } freshE8;
+        bool freshMutualAttempted=false,freshMutualComplete=false,freshDerivedBound=false;
+        bool freshCollectionAttempted=false,freshCollectionE0Selected=false;
+        std::size_t freshCollectionCursor=0;
+        const std::uint32_t* freshNamedWaterBit=nullptr; //Exact same App native namespace field, not guest mask bytes.
+        std::uint32_t freshCollectionPC=0;
+        std::array<bool,2> freshIdentitySelected{};
+        std::size_t freshMutualCursor=0;
+        std::uint32_t freshMutualPC=0;
+
         OriginalWreckComponent50LA* plannedModel=nullptr;
         std::array<OriginalWreckComponent50LA*,3> plannedQueries{};
         OriginalWreckSceneDomain50LA localScenes;
@@ -646,6 +703,8 @@ private:
         bool e4CallbacksBound=false,e4Prepared=false,e4FullPublication=false;
         bool e8ConstructorReached=false,e8ConstructorRetired=false,e8OwnerBound=false,e8FullPublication=false;
         std::array<OriginalWreckCategoryList50LA,2> sourceCategoryD8; //E0,E8
+        bool nativeRacerPodAttempted=false,nativeRacerPodCommitted=false;
+        std::uint32_t nativeRacerPod694Identity=0;
         bool fullCollectionAttempted=false;
         std::size_t fullCollectionCursor=0;
         std::uint32_t fullCollectionWater=0;
@@ -660,8 +719,742 @@ private:
     // Full-owner-only source prefix. These are the SAME reserved E0 fields,
     // still private until actual11BBC0 model/shape publication. Legacy cold
     // staging remains separate and cannot consume this unfinished constructor.
+    // Native load22CEBC/D0/E4 calls120290 BEFORE later shape updates.
+    // Admit only the genuine constructor-null E0 membership branch. Never
+    // set initialShapesReady, clear a registration, or borrow another query.
+    bool removeNativeConstructorNull120290(unsigned i)noexcept {
+        if(!storage_||i>2u||!storage_->published[i]||!storage_->components[i]||
+           storage_->components[i]->reference00!=1u||!storage_->e0FullPublication||
+           !storage_->e4FullPublication||!storage_->e8FullPublication||
+           storage_->e0ConstructorRetired||storage_->e4ConstructorRetired||storage_->e8ConstructorRetired||
+           storage_->initialShapesReady||!storage_->fullCollectionAttempted||
+           !storage_->collectionFilterApplied||!fullCategoryOwnership()||!fullMutualOwnership())return false;
+        auto& s=*storage_;auto& w=s.world;auto& q=s.queries[i];
+        if(!w.lifecycle||!w.world||!w.workspace||!w.refs[i]||w.refs[i]>w.objectCount||
+           q.membership.attached||q.membership.object||q.membership.revision||q.type0.registrationE0||
+           q.membership.storage.links!=q.links.get()||q.membership.storage.entries!=q.entries.get()||
+           q.membership.storage.capacity!=s.capacity||object(i).identity!=w.identities[i])return false;
+        const auto& r=w.lifecycle->storage.registrations[w.refs[i]-1u];
+        if(r.owner||r.slot||r.encodedObject)return false;
+        for(std::size_t n=0;n<s.capacity;++n){const auto& e=q.entries[n];
+            if(e.used||e.registration.owner||e.registration.slot||e.registration.encodedObject)return false;}
+        return removeLiveZoneMembership50EN(*w.lifecycle,*w.world,q.membership,*w.workspace).status==LiveZoneStatus50EN::Complete;
+    }
+    bool freshE0Backing()const noexcept{return storage_&&storage_->freshE0Backing;}
+    bool reserveFreshE0Backing(OriginalWreckPieceQueryOwner50LA& piece,
+        const OriginalWreckQueryWorld50LA& w,OriginalWreckComponent50LA& model,
+        const std::array<OriginalWreckComponent50LA*,3>& slots)noexcept {
+        //copies/geometry belong to later Follow; neither is consumed at this cut.
+        if(retired_||storage_||!piece.coherent()||!w.world||!w.lifecycle||!w.objects||!w.states||
+           !w.objectCount||w.objectCount!=w.lifecycle->objectCount||
+           !w.lifecycle->storage.registrations||w.lifecycle->storage.registrationCapacity<w.objectCount||
+           !w.physicsBodyCategory3E0718||!*w.physicsBodyCategory3E0718||!w.sentinel3E02C0||
+           !w.globalValid3E0730||w.modelScenes)return false;
+        for(unsigned i=0;i<3;++i){
+            if(!slots[i]||slots[i]==&model||!w.refs[i]||w.refs[i]>w.objectCount||!w.identities[i])return false;
+            const auto& r=w.lifecycle->storage.registrations[w.refs[i]-1u];
+            if(r.owner||r.slot||r.encodedObject)return false;
+            for(unsigned j=0;j<i;++j)if(slots[i]==slots[j]||w.refs[i]==w.refs[j]||w.identities[i]==w.identities[j])return false;
+            for(std::size_t j=0;j<w.objectCount;++j)if(w.objects[j].identity==w.identities[i])return false;
+        }
+        try {
+            auto next=std::make_unique<Storage>();next->freshE0Backing=true;
+            next->piece=&piece;next->assets=&piece.assets();next->physical=&piece.physical();
+            next->world=w;next->plannedModel=&model;next->plannedQueries=slots;
+            // Retain native unwritten scalar lanes, without publishing source rows.
+            for(unsigned i=0;i<3;++i){next->coldDefinitions[i]=w.objects[w.refs[i]-1u];next->coldStates[i]=w.states[w.refs[i]-1u];}
+            storage_=std::move(next);return true;
+        }catch(...){return false;}
+    }
+    void beginFreshE0Header11B190()noexcept {
+        auto& s=*storage_;auto& d=s.coldDefinitions[0];
+        s.freshE0Started=true;s.freshE0PC=0x11b208u;
+        s.coldStates[0].epoch=0;d.typeTag=0xffu; //11B1AC: canonical source00.
+        s.freshFlags03=std::uint8_t(s.freshFlags03&~1u);s.freshFlags03KnownMask|=1u;
+        s.freshFlags03=std::uint8_t(s.freshFlags03&~2u);s.freshFlags03KnownMask|=2u;
+        s.freshFlags03=std::uint8_t(s.freshFlags03&~4u);s.freshFlags03KnownMask|=4u;
+    }
+    OriginalWreckQueryResult50LA continueFreshE0Counted11B210(OriginalWreckComponent50LA& e,
+        OriginalEntityTypeRegistry50LA& types,std::optional<OriginalWreckComponent50LA*>& publication)noexcept {
+        using S=OriginalWreckQueryStatus50LA;
+        auto& s=*storage_;auto& d=s.coldDefinitions[0];auto& st=s.coldStates[0];auto& q=s.queries[0];
+        s.freshE0Counted=true;s.components[0]=&e;
+        d.filter.flags31=e.flags29; //Same counted +8 Entity flags, not header03.
+        s.freshMethodFC=0x3ccd00u;s.freshMethod10=0x3ccd08u;
+        const SpringVector4_48N vf0{{0.f,0.f,0.f,1.f}};
+        q.constructorCopied40=vf0;q.constructorCopied50=vf0;st.cachedCenter=vf0;q.previousCenter70=vf0;
+        s.freshFileB0=-1;s.freshE0PC=0x11b270u;
+        const auto t=types.collisionObject11B270();
+        if(!t.okay()){s.freshE0PC=t.sourcePC;return {S::binding,t.sourcePC};}
+        d.typeTag=t.type;d.hasShape=false;d.shapeTag=0;
+        s.freshShape8C=nullptr;s.freshResult90=nullptr; //11B310/328, after actual88 store.
+        //88/8C/90 are genuine null source owners, not preloaded geometry.
+        st.flagsF8=std::uint8_t(st.flagsF8&~0x20u);
+        q.queryE4=QueryCallback::none;q.responseE8=ResponseCallback::none;s.freshEC=0;s.freshF0=0;
+        st.flagsF8=std::uint8_t(st.flagsF8&~1u);
+        st.flagsF8=std::uint8_t((st.flagsF8&~2u)|2u);
+        st.flagsF8=std::uint8_t((st.flagsF8&~4u)|4u);
+        d.filter.acceptMaskB8=0xffffffffu;
+        d.filter.identities[0].mode=1;d.filter.identities[1].mode=1;d.filter.categories.mode=1;
+        d.filter.identities[0].values=nullptr;d.filter.identities[1].values=nullptr;
+        d.filter.identities[0].count=0;d.filter.identities[1].count=0;
+        d.filter.categories.values=nullptr;d.filter.categories.count=0;
+        //Native capacities are bookkeeping, not extra source stores.
+        d.filter.identities[0].capacity=0;d.filter.identities[1].capacity=0;d.filter.categories.capacity=0;
+        q.currentIdentity94=0;s.fresh98=0;q.owner9C=nullptr;q.bodyA0=nullptr;d.filter.categoryA4=0;s.freshA8=0;s.freshA9=0;
+        st.flagsF8=std::uint8_t(st.flagsF8&~0x10u);s.freshF4=0;
+        q.constructorCopied40=*s.world.sentinel3E02C0;q.constructorCopied50=*s.world.sentinel3E02C0;
+        q.distance84=0;q.previousCenter70={{0.f,-10000.f,0.f,1.f}};q.type0.registrationE0=0;
+        s.e0ConstructorReached=true;s.freshE0PC=0x166034u;publication=&e;
+        //Actual11B570(3), then166054/5C/68; no shape/load/preparation.
+        st.flagsF8=std::uint8_t(st.flagsF8&~8u); //11B594
+        st.flagsF8=std::uint8_t(st.flagsF8|2u); //11B5C0
+        st.flagsF8=std::uint8_t(st.flagsF8&~4u); //11B5E4
+        *s.world.globalValid3E0730=0; //11B5F4, same actual name-buffer byte0.
+        d.filter.categoryA4=*s.world.physicsBodyCategory3E0718;
+        q.owner9C=s.piece;q.bodyA0=&s.physical->body.root;
+        s.freshE0PC=0x166074u;return {S::complete,0x166074u};
+    }
+    //Original3C9B90 calls11AE30("WATER") and stores4342A8 at3C9C40.
+    //The caller supplies the SAME App's named native category bit: explicit
+    //namespace adaptation, never a claim that host bit32 equals guest chronology.
+    OriginalWreckQueryResult50LA constructFreshCollectionFilters22C21C(
+        const std::uint32_t& actualWater4342A8)noexcept {
+        using S=OriginalWreckQueryStatus50LA;
+        if(!freshE0Backing()||retired_||storage_->freshE0Withdrawn||storage_->e0ConstructorRetired||
+           storage_->freshCollectionAttempted||!actualWater4342A8||
+           !storage_->freshMutualComplete||!storage_->freshDerivedBound||!storage_->freshAppended||
+           !storage_->freshE4.appended||!storage_->freshE8.appended||!storage_->freshE8.categoryComplete||
+           !storage_->piece->coherent()||!storage_->components[0]||!storage_->components[2])return {};
+        auto& s=*storage_;auto& e0=*s.components[0];auto& e8=*s.components[2];
+        if(e0.reference00!=1u||e8.reference00!=1u||&e0!=s.plannedQueries[0]||
+           &e8!=s.plannedQueries[2]||e0.parent1C!=&s.piece->component()||
+           e8.parent1C!=e0.parent1C||e0.kind!=OriginalWreckComponentKind50LA::collision11B190||
+           !canRetireFreshE8(e8)||!s.sourceCategoryD8[1].matchesFreshCollection(e8,s.coldDefinitions[2].filter.categories))return {};
+        auto& c0=s.coldDefinitions[0].filter.categories;auto& c8=s.coldDefinitions[2].filter.categories;
+        if(c0.values||c0.count||c0.capacity||c0.mode!=1||
+           c8.count!=1||!c8.values||c8.values[0]!=*s.world.physicsBodyCategory3E0718)return {};
+        s.freshCollectionAttempted=true;s.freshNamedWaterBit=&actualWater4342A8;s.freshCollectionPC=0x22c21cu;
+        if(!s.sourceCategoryD8[0].selectFreshCollectionMode1124160(e0,c0))return {S::binding,s.freshCollectionPC};
+        s.freshCollectionE0Selected=true;s.freshCollectionPC=0x22c238u;
+        if(!s.sourceCategoryD8[0].appendFreshCollection124170(c0,actualWater4342A8))return {S::allocation,s.freshCollectionPC};
+        s.freshCollectionCursor=1u;s.freshCollectionPC=0x22c254u;
+        if(!s.sourceCategoryD8[1].appendFreshCollection124170(c8,actualWater4342A8))return {S::allocation,s.freshCollectionPC};
+        s.freshCollectionCursor=2u;s.freshCollectionPC=0x22c25cu;
+        return {S::complete,s.freshCollectionPC}; //Before actual s2/s0 increments, not all pieces ready.
+    }
+    bool freshCollectionCategoryCurrent(unsigned slot,const OriginalWreckComponent50LA& component)const noexcept {
+        if(!freshE0Backing()||slot>1u)return false;
+        const auto& s=*storage_;
+        if(!s.freshCollectionAttempted)return slot!=0u||!s.freshCollectionE0Selected;
+        if(!s.freshNamedWaterBit||!*s.freshNamedWaterBit||s.freshCollectionCursor>2u)return false;
+        if(slot==0u&&!s.freshCollectionE0Selected)return s.freshCollectionCursor==0u;
+        const auto& view=s.coldDefinitions[slot?2u:0u].filter.categories;
+        if(!s.sourceCategoryD8[slot].matchesFreshCollection(component,view))return false;
+        const auto expected=slot?(1u+((s.freshCollectionCursor==2u&&
+            *s.freshNamedWaterBit!=*s.world.physicsBodyCategory3E0718)?1u:0u)):(s.freshCollectionCursor?1u:0u);
+        if(view.count!=static_cast<std::int32_t>(expected)||view.capacity!=expected)return false;
+        if(expected&&view.values[0]!=(slot?*s.world.physicsBodyCategory3E0718:*s.freshNamedWaterBit))return false;
+        return expected!=2u||view.values[1]==*s.freshNamedWaterBit;
+    }
+    OriginalWreckQueryResult50LA constructFreshMutualAndDerived166390()noexcept {
+        using S=OriginalWreckQueryStatus50LA;
+        if(!freshE0Backing()||retired_||storage_->freshMutualAttempted||
+           !storage_->freshE8.categoryComplete||storage_->freshE8.pc!=0x166390u||
+           !storage_->freshE8.appended||!storage_->freshE4.appended||!storage_->freshAppended||
+           !storage_->piece->coherent())return {};
+        auto& s=*storage_;
+        //Native identity encoding: each real Query/component keeps its SAME
+        //reserved ID. This does not publish collector rows or truncate pointers.
+        for(unsigned i=0;i<3u;++i){
+            const auto* e=s.components[i];const auto ref=s.world.refs[i];const auto id=s.world.identities[i];
+            if(!e||e!=s.plannedQueries[i]||e->reference00!=1u||e->kind!=OriginalWreckComponentKind50LA::collision11B190||
+               e->parent1C!=&s.piece->component()||e->sessionGeneration!=s.piece->component().sessionGeneration||
+               !ref||ref>s.world.objectCount||!id||s.published[i]||
+               s.world.objects[ref-1u].identity!=s.coldDefinitions[i].identity)return {};
+            const auto& registration=s.world.lifecycle->storage.registrations[ref-1u];
+            if(registration.owner||registration.slot||registration.encodedObject)return {};
+            for(unsigned j=0;j<i;++j)if(s.components[j]==e||s.world.refs[j]==ref||s.world.identities[j]==id)return {};
+        }
+        if(s.queries[1].responseE8!=ResponseCallback::physics165920)return {};
+        s.freshMutualAttempted=true;
+        const std::uint32_t modePC[2]={0x166394u,0x1663a0u};
+        for(unsigned i=0;i<2u;++i){
+            s.freshMutualPC=modePC[i];
+            if(!s.sourceIdentityC0[i].selectFreshCollectionMode1123EA0(*s.components[i],s.coldDefinitions[i].filter.identities[0]))
+                return {S::binding,s.freshMutualPC};
+            s.freshIdentitySelected[i]=true;
+        }
+        const unsigned owner[4]={0,0,1,1},target[4]={1,2,0,2};
+        const std::uint32_t callPC[4]={0x1663acu,0x1663b8u,0x1663c4u,0x1663d0u};
+        for(unsigned i=0;i<4u;++i){
+            s.freshMutualPC=callPC[i];
+            if(!s.sourceIdentityC0[owner[i]].appendFreshCollection123EB0(s.coldDefinitions[owner[i]].filter.identities[0],
+                *s.components[target[i]],s.world.identities[target[i]]))return {S::allocation,s.freshMutualPC};
+            ++s.freshMutualCursor;
+        }
+        s.freshMutualComplete=true;s.freshMutualPC=0x1663d8u;
+        //Return through165C30 to the actual derived callback store2CB610.
+        s.queries[1].responseE8=ResponseCallback::wreck2CB420;
+        s.freshDerivedBound=true;s.freshMutualPC=0x2cb614u;
+        return {S::complete,s.freshMutualPC};
+    }
+    void beginFreshE8Header11B190(const std::optional<OriginalWreckComponent50LA*>& publication)noexcept {
+        auto& s=*storage_;auto& d=s.coldDefinitions[2];
+        s.freshE8.publicationField=&publication;s.freshE8.started=true;s.freshE8.pc=0x11b208u;
+        s.coldStates[2].epoch=0;d.typeTag=0xffu; //11B1AC: canonical source00.
+        s.freshE8.flags03=std::uint8_t(s.freshE8.flags03&~1u);s.freshE8.flags03KnownMask|=1u;
+        s.freshE8.flags03=std::uint8_t(s.freshE8.flags03&~2u);s.freshE8.flags03KnownMask|=2u;
+        s.freshE8.flags03=std::uint8_t(s.freshE8.flags03&~4u);s.freshE8.flags03KnownMask|=4u;
+    }
+    OriginalWreckQueryResult50LA continueFreshE8Counted11B210(OriginalWreckComponent50LA& e,
+        OriginalEntityTypeRegistry50LA& types,std::optional<OriginalWreckComponent50LA*>& publication)noexcept {
+        using S=OriginalWreckQueryStatus50LA;
+        auto& s=*storage_;auto& d=s.coldDefinitions[2];auto& st=s.coldStates[2];auto& q=s.queries[2];
+        s.freshE8.counted=true;s.components[2]=&e;
+        d.filter.flags31=e.flags29; //Same counted +8 Entity flags, not header03.
+        s.freshE8.methodFC=0x3ccd00u;s.freshE8.method10=0x3ccd08u;
+        const SpringVector4_48N vf0{{0.f,0.f,0.f,1.f}};
+        q.constructorCopied40=vf0;q.constructorCopied50=vf0;st.cachedCenter=vf0;q.previousCenter70=vf0;
+        s.freshE8.fileB0=-1;s.freshE8.pc=0x11b270u;
+        const auto t=types.collisionObject11B270();
+        if(!t.okay()){s.freshE8.pc=t.sourcePC;return {S::binding,t.sourcePC};}
+        d.typeTag=t.type;d.hasShape=false;d.shapeTag=0;
+        s.freshE8.shape8C=nullptr;s.freshE8.result90=nullptr; //11B310/328, after actual88 store.
+        //88/8C/90 are genuine null source owners, not preloaded geometry.
+        st.flagsF8=std::uint8_t(st.flagsF8&~0x20u);
+        q.queryE4=QueryCallback::none;q.responseE8=ResponseCallback::none;s.freshE8.ec=0;s.freshE8.f0=0;
+        st.flagsF8=std::uint8_t(st.flagsF8&~1u);
+        st.flagsF8=std::uint8_t((st.flagsF8&~2u)|2u);
+        st.flagsF8=std::uint8_t((st.flagsF8&~4u)|4u);
+        d.filter.acceptMaskB8=0xffffffffu;
+        d.filter.identities[0].mode=1;d.filter.identities[1].mode=1;d.filter.categories.mode=1;
+        d.filter.identities[0].values=nullptr;d.filter.identities[1].values=nullptr;
+        d.filter.identities[0].count=0;d.filter.identities[1].count=0;
+        d.filter.categories.values=nullptr;d.filter.categories.count=0;
+        //Native capacities are bookkeeping, not extra source stores.
+        d.filter.identities[0].capacity=0;d.filter.identities[1].capacity=0;d.filter.categories.capacity=0;
+        q.currentIdentity94=0;s.freshE8.word98=0;q.owner9C=nullptr;q.bodyA0=nullptr;d.filter.categoryA4=0;s.freshE8.a8=0;s.freshE8.a9=0;
+        st.flagsF8=std::uint8_t(st.flagsF8&~0x10u);s.freshE8.f4=0;
+        q.constructorCopied40=*s.world.sentinel3E02C0;q.constructorCopied50=*s.world.sentinel3E02C0;
+        q.distance84=0;q.previousCenter70={{0.f,-10000.f,0.f,1.f}};q.type0.registrationE0=0;
+        s.e8ConstructorReached=true;s.freshE8.pc=0x166300u;publication=&e;
+        //Actual11B570(3); source append166324 comes BEFORE owner/category/payload.
+        st.flagsF8=std::uint8_t(st.flagsF8&~8u); //11B594
+        st.flagsF8=std::uint8_t(st.flagsF8|2u); //11B5C0 mode3
+        st.flagsF8=std::uint8_t(st.flagsF8&~4u); //11B5E4 mode3
+        *s.world.globalValid3E0730=0; //11B5F4, same actual name-buffer byte0.
+        s.freshE8.pc=0x166310u;return {S::complete,0x166310u};
+    }
+    void noteFreshE8Appended166324()noexcept {
+        storage_->freshE8.appended=true;storage_->freshE8.pc=0x16632cu;
+    }
+    OriginalWreckQueryResult50LA loadFreshE8Type3To166390()noexcept {
+        using S=OriginalWreckQueryStatus50LA;
+        if(!freshE0Backing()||retired_||!storage_->e8ConstructorReached||!storage_->freshE8.appended||
+           storage_->freshE8.loadAttempted||storage_->freshE8.pc!=0x16632cu||!storage_->piece->coherent())return {};
+        auto& s=*storage_;auto& f=s.freshE8;auto& q=s.queries[2];auto& d=s.coldDefinitions[2];
+        auto* e=s.components[2];auto* previous=s.components[1];
+        if(!e||!previous||!s.freshE4.appended||e->reference00!=1u||e->parent1C!=&s.piece->component()||
+           e->previous10!=previous||e->next14||previous->next14!=e||q.type3Owners.attempted())return {};
+        f.loadAttempted=true;q.owner9C=s.piece;f.pc=0x16633cu;
+        d.filter.categoryA4=*s.world.physicsBodyCategory3E0718;f.pc=0x166348u;
+        if(!q.type3Owners.allocateFreshWreck11C710(*s.world.sentinel3E02C0,f.shape8C,d.shapeTag,f.result90,*e)){
+            if(f.shape8C&&*f.shape8C)d.hasShape=true;
+            f.pc=q.type3Owners.sourceBoundary();return {S::allocation,f.pc};
+        }
+        d.hasShape=true;f.loadComplete=true;f.pc=0x166358u;
+        auto& categories=s.sourceCategoryD8[1];
+        if(!categories.selectFreshCollectionMode1124160(*e,d.filter.categories)){f.pc=0x124164u;return {S::binding,f.pc};}
+        f.categorySelected=true;f.pc=0x124170u;
+        if(!categories.appendFreshCollection124170(d.filter.categories,*s.world.physicsBodyCategory3E0718)){
+            f.pc=0x124214u;return {S::allocation,f.pc};
+        }
+        f.categoryComplete=true;
+        s.coldStates[2].flagsF8=std::uint8_t((s.coldStates[2].flagsF8&~1u)|1u); //16638C
+        f.pc=0x166390u;return {S::complete,f.pc};
+    }
+    bool canRetireFreshE8(const OriginalWreckComponent50LA& e)const noexcept {
+        if(!freshE0Backing())return false;
+        const auto& s=*storage_;const auto& f=s.freshE8;const auto& q=s.queries[2];
+        if(!f.started)return !q.type3Owners.attempted()&&!e.reference00&&e.kind==OriginalWreckComponentKind50LA::unbound;
+        if(f.retired||s.e8FullPublication||s.published[2]||s.plannedQueries[2]!=&e||!f.publicationField||
+           e.next14||e.firstChild18||q.membership.attached||q.membership.object||q.membership.revision)return false;
+        const auto* parent=f.appended?&s.piece->component():nullptr;
+        const auto* previous=f.appended?s.components[1]:nullptr;
+        if(e.parent1C!=parent||e.previous10!=previous||
+           (f.appended&&(!s.freshE4.appended||!parent->reference00||!previous||previous->reference00!=1u||
+            previous->kind!=OriginalWreckComponentKind50LA::collision11B190||previous->parent1C!=parent||
+            previous->next14!=&e||previous->sessionGeneration!=e.sessionGeneration)))return false;
+        if(f.counted){if(s.components[2]!=&e||e.reference00!=1u||e.kind!=OriginalWreckComponentKind50LA::collision11B190)return false;}
+        else if(s.components[2]||e.reference00||e.kind!=OriginalWreckComponentKind50LA::unbound)return false;
+        if(s.e8ConstructorReached?(!*f.publicationField||**f.publicationField!=&e):bool(*f.publicationField))return false;
+        if(s.e8ConstructorReached&&(q.owner9C!=(f.loadAttempted?s.piece:nullptr)||q.contactOwner9C||q.bodyA0||
+           q.queryE4!=QueryCallback::none||q.responseE8!=ResponseCallback::none||
+           s.coldDefinitions[2].filter.categoryA4!=(f.loadAttempted?*s.world.physicsBodyCategory3E0718:0u)))return false;
+        if(q.type3Owners.attempted()&&!q.type3Owners.preflightFreshWreckPayload(
+            e,f.shape8C,s.coldDefinitions[2].shapeTag,f.result90,parent,previous))return false;
+        if(f.categorySelected&&!s.sourceCategoryD8[1].matchesFreshCollection(e,s.coldDefinitions[2].filter.categories))return false;
+        if(s.freshCollectionAttempted&&!freshCollectionCategoryCurrent(1u,e))return false;
+        return true;
+    }
+    void retireFreshE8(OriginalWreckComponent50LA& e,std::uint32_t& count)noexcept {
+        auto& s=*storage_;auto& f=s.freshE8;auto& q=s.queries[2];
+        const auto* parent=f.appended?&s.piece->component():nullptr;auto* previous=f.appended?e.previous10:nullptr;
+        if(f.appended)previous->next14=nullptr; //1424E0, keep dying source links.
+        if(f.counted){--e.reference00;
+            if(f.categorySelected&&!s.sourceCategoryD8[1].releaseFreshCollectionAfterReferenceDrop11B51C(
+                e,s.coldDefinitions[2].filter.categories))std::terminate();
+            if(q.type3Owners.attempted()&&!q.type3Owners.releaseFreshWreckPayloadAfterReferenceDrop(
+                e,f.shape8C,s.coldDefinitions[2].shapeTag,f.result90,parent,previous))std::terminate();
+            e.kind=OriginalWreckComponentKind50LA::entity141300;--count;
+        }
+        f.retired=true;s.e8ConstructorRetired=true;
+    }
+    void beginFreshE4Header11B190(const std::optional<OriginalWreckComponent50LA*>& publication)noexcept {
+        auto& s=*storage_;auto& d=s.coldDefinitions[1];
+        s.freshE4.publicationField=&publication;s.freshE4.started=true;s.freshE4.pc=0x11b208u;
+        s.coldStates[1].epoch=0;d.typeTag=0xffu; //11B1AC: canonical source00.
+        s.freshE4.flags03=std::uint8_t(s.freshE4.flags03&~1u);s.freshE4.flags03KnownMask|=1u;
+        s.freshE4.flags03=std::uint8_t(s.freshE4.flags03&~2u);s.freshE4.flags03KnownMask|=2u;
+        s.freshE4.flags03=std::uint8_t(s.freshE4.flags03&~4u);s.freshE4.flags03KnownMask|=4u;
+    }
+    OriginalWreckQueryResult50LA continueFreshE4Counted11B210(OriginalWreckComponent50LA& e,
+        OriginalEntityTypeRegistry50LA& types,std::optional<OriginalWreckComponent50LA*>& publication)noexcept {
+        using S=OriginalWreckQueryStatus50LA;
+        auto& s=*storage_;auto& d=s.coldDefinitions[1];auto& st=s.coldStates[1];auto& q=s.queries[1];
+        s.freshE4.counted=true;s.components[1]=&e;
+        d.filter.flags31=e.flags29; //Same counted +8 Entity flags, not header03.
+        s.freshE4.methodFC=0x3ccd00u;s.freshE4.method10=0x3ccd08u;
+        const SpringVector4_48N vf0{{0.f,0.f,0.f,1.f}};
+        q.constructorCopied40=vf0;q.constructorCopied50=vf0;st.cachedCenter=vf0;q.previousCenter70=vf0;
+        s.freshE4.fileB0=-1;s.freshE4.pc=0x11b270u;
+        const auto t=types.collisionObject11B270();
+        if(!t.okay()){s.freshE4.pc=t.sourcePC;return {S::binding,t.sourcePC};}
+        d.typeTag=t.type;d.hasShape=false;d.shapeTag=0;
+        s.freshE4.shape8C=nullptr;s.freshE4.result90=nullptr; //11B310/328, after actual88 store.
+        //88/8C/90 are genuine null source owners, not preloaded geometry.
+        st.flagsF8=std::uint8_t(st.flagsF8&~0x20u);
+        q.queryE4=QueryCallback::none;q.responseE8=ResponseCallback::none;s.freshE4.ec=0;s.freshE4.f0=0;
+        st.flagsF8=std::uint8_t(st.flagsF8&~1u);
+        st.flagsF8=std::uint8_t((st.flagsF8&~2u)|2u);
+        st.flagsF8=std::uint8_t((st.flagsF8&~4u)|4u);
+        d.filter.acceptMaskB8=0xffffffffu;
+        d.filter.identities[0].mode=1;d.filter.identities[1].mode=1;d.filter.categories.mode=1;
+        d.filter.identities[0].values=nullptr;d.filter.identities[1].values=nullptr;
+        d.filter.identities[0].count=0;d.filter.identities[1].count=0;
+        d.filter.categories.values=nullptr;d.filter.categories.count=0;
+        //Native capacities are bookkeeping, not extra source stores.
+        d.filter.identities[0].capacity=0;d.filter.identities[1].capacity=0;d.filter.categories.capacity=0;
+        q.currentIdentity94=0;s.freshE4.word98=0;q.owner9C=nullptr;q.bodyA0=nullptr;d.filter.categoryA4=0;s.freshE4.a8=0;s.freshE4.a9=0;
+        st.flagsF8=std::uint8_t(st.flagsF8&~0x10u);s.freshE4.f4=0;
+        q.constructorCopied40=*s.world.sentinel3E02C0;q.constructorCopied50=*s.world.sentinel3E02C0;
+        q.distance84=0;q.previousCenter70={{0.f,-10000.f,0.f,1.f}};q.type0.registrationE0=0;
+        s.e4ConstructorReached=true;s.freshE4.pc=0x16626cu;publication=&e;
+        //Actual11B570(5), then166288; no owner/body/response binding yet.
+        st.flagsF8=std::uint8_t(st.flagsF8&~8u); //11B594
+        st.flagsF8=std::uint8_t(st.flagsF8&~2u); //11B5C0 mode5
+        st.flagsF8=std::uint8_t(st.flagsF8|4u); //11B5E4 mode5
+        *s.world.globalValid3E0730=0; //11B5F4, same actual name-buffer byte0.
+        d.filter.categoryA4=*s.world.physicsBodyCategory3E0718;
+        s.freshE4.pc=0x166294u;return {S::complete,0x166294u};
+    }
+    OriginalWreckQueryResult50LA loadFreshE4Type0NativeTransport(
+        const OriginalRacerSceneObject50LA& actualModel,const std::string& actualRequest,
+        const std::shared_ptr<rr::assets::OriginalStandardTextureResolver50LA>& resolver,
+        const std::string& directory,std::array<std::uint8_t,256>& name,
+        rr::assets::OriginalStandardTextureDiagnostic50LA& diagnostic)noexcept {
+        using S=OriginalWreckQueryStatus50LA;
+        if(!freshE0Backing()||retired_||!storage_->e4ConstructorReached||storage_->freshE4.loadAttempted||
+           storage_->freshE4.pc!=0x166294u||!storage_->piece->coherent()||
+           !actualModel.constructed||actualModel.released||&actualModel.entity()!=storage_->plannedModel||
+           !actualModel.entity().reference00||!resolver||
+           storage_->world.globalValid3E0730!=&name.front())return {};
+        auto& s=*storage_;auto& f=s.freshE4;auto& q=s.queries[1];
+        f.loadAttempted=true;f.model110=&actualModel;
+        auto fail=[&](S status,std::uint32_t pc){f.pc=pc;return OriginalWreckQueryResult50LA{status,pc};};
+        try {
+            const auto expected=s.assets->targetFileIdentity();
+            if(!directory.empty()||actualRequest!=s.assets->receipt().targetMember||
+               actualRequest.size()>=name.size()||actualRequest.find('\0')!=std::string::npos)
+                return fail(S::binding,0x11b920u);
+            f.pc=0x11b9fcu;std::memcpy(name.data(),actualRequest.c_str(),actualRequest.size()+1u);
+            rr::assets::OriginalStandardModelFileView50LA file;f.pc=0x11ba2cu;
+            if(!resolver->lookupModel132820(actualRequest,rr::assets::OriginalStandardModelFileKind50LA::colType0,file,diagnostic)||
+               file.id.resolver!=expected.resolver||file.id.row!=expected.row||!file.bytes||
+               *file.bytes!=s.assets->originalMembers()[3]||file.animation1536F0||file.geometry240110)
+                return fail(S::binding,0x11ba2cu);
+            //Warm1254A0 bypasses the11BB84 fileB0 store. Only the cold branch
+            //publishes this typed native file alternative, never a fake handle.
+            if(!file.collision125014){f.fileIdentityB0=file.id;f.fileB0.reset();}
+            const auto& target=s.assets->targetE4();
+            s.coldDefinitions[1].shapeTag=0;
+            const bool done=q.type0Owners.loadFreshWreck11B920(file,s.assets->originalMembers()[3],
+                target.mesh,target.radii,actualModel,resolver,f.shape8C,f.result90,*s.components[1],q.fullType0Source.local40,diagnostic);
+            if(f.shape8C&&*f.shape8C)s.coldDefinitions[1].hasShape=true;
+            if(!done)return fail(S::allocation,q.type0Owners.sourceBoundary()?q.type0Owners.sourceBoundary():0x11b920u);
+            f.loadComplete=true;f.pc=0x16629cu;return {S::complete,0x16629cu};
+        }catch(...){return fail(S::allocation,f.pc?f.pc:0x166294u);}
+    }
+    bool canRetireFreshE4(const OriginalWreckComponent50LA& e)const noexcept {
+        if(!freshE0Backing())return false;
+        const auto& s=*storage_;const auto& f=s.freshE4;const auto& q=s.queries[1];
+        if(!f.started)return !q.type0Owners.attempted()&&!e.reference00&&e.kind==OriginalWreckComponentKind50LA::unbound;
+        const auto* next=s.freshE8.appended?s.components[2]:nullptr;
+        if(f.retired||s.e4FullPublication||s.published[1]||s.e4Prepared||
+           s.plannedQueries[1]!=&e||!f.publicationField||e.next14!=next||e.firstChild18||
+           q.membership.attached||q.membership.object||q.membership.revision||q.type0.registrationE0)return false;
+        const auto* parent=f.appended?&s.piece->component():nullptr;
+        const auto* previous=f.appended?s.fullDetectorComponent:nullptr;
+        if(e.parent1C!=parent||e.previous10!=previous||
+           (f.appended&&(!f.prepareComplete||!parent->reference00||!previous||previous->reference00!=1u||
+            previous->kind!=OriginalWreckComponentKind50LA::detector295290||previous->parent1C!=parent||
+            previous->next14!=&e||previous->sessionGeneration!=e.sessionGeneration)))return false;
+        if(s.freshE8.started&&(!s.plannedQueries[2]||!canRetireFreshE8(*s.plannedQueries[2])))return false;
+        if(next&&(!f.appended||next->parent1C!=parent||next->previous10!=&e||next->reference00!=1u||next->next14))return false;
+        if(s.freshIdentitySelected[1]&&!s.sourceIdentityC0[1].matchesFreshCollection(e,s.coldDefinitions[1].filter.identities[0]))return false;
+        if(s.freshDerivedBound&&q.responseE8!=ResponseCallback::wreck2CB420)return false;
+        if(f.counted){if(s.components[1]!=&e||e.reference00!=1u||e.kind!=OriginalWreckComponentKind50LA::collision11B190)return false;}
+        else if(s.components[1]||e.reference00||e.kind!=OriginalWreckComponentKind50LA::unbound)return false;
+        if(s.e4ConstructorReached?(!*f.publicationField||**f.publicationField!=&e):bool(*f.publicationField))return false;
+        if(q.type0Owners.attempted()){
+            if(!f.model110||!f.model110->constructed||f.model110->released||
+               &f.model110->entity()!=s.plannedModel||!f.model110->entity().reference00||
+               !q.type0Owners.preflightFreshWreckPayload(*f.model110,e,f.shape8C,f.result90,parent,previous,next))return false;
+        }
+        return true;
+    }
+    void retireFreshE4(OriginalWreckComponent50LA& e,std::uint32_t& count)noexcept {
+        auto& s=*storage_;auto& f=s.freshE4;auto& q=s.queries[1];
+        if(s.freshE8.started&&!s.freshE8.retired)std::terminate();
+        const auto* parent=f.appended?&s.piece->component():nullptr;
+        auto* previous=f.appended?e.previous10:nullptr;
+        if(f.appended)previous->next14=nullptr; //1424E0; retain dying E4 parent/previous history.
+        if(f.counted){--e.reference00;
+            if(s.freshIdentitySelected[1]&&!s.sourceIdentityC0[1].releaseFreshCollectionAfterReferenceDrop11B4F4(
+                e,s.coldDefinitions[1].filter.identities[0]))std::terminate();
+
+            if(q.type0Owners.attempted()&&!q.type0Owners.releaseFreshWreckPayloadAfterReferenceDrop(
+                *f.model110,e,f.shape8C,f.result90,parent,previous))std::terminate();
+            e.kind=OriginalWreckComponentKind50LA::entity141300;--count;
+        }
+        f.retired=true;s.e4ConstructorRetired=true; //Source/numeric history retained through withdrawal.
+    }
+    OriginalWreckQueryResult50LA loadFreshE0Type2NativeTransport(
+        const OriginalRacerSceneObject50LA& actualModel,const std::string& actualRequest,
+        const std::shared_ptr<rr::assets::OriginalStandardTextureResolver50LA>& resolver,
+        const std::string& actualDirectory36B0F0,std::array<std::uint8_t,256>& actualName3E0730,
+        rr::assets::OriginalStandardTextureDiagnostic50LA& diagnostic)noexcept {
+        using S=OriginalWreckQueryStatus50LA;
+        if(!freshE0Backing()||retired_||!storage_->e0ConstructorReached||storage_->freshLoadAttempted||
+           storage_->freshE0PC!=0x166074u||!resolver||!storage_->piece->coherent())return {};
+        auto& s=*storage_;auto& q=s.queries[0];auto& definition=s.coldDefinitions[0];
+        if(!actualModel.constructed||actualModel.released||&actualModel.entity()!=s.plannedModel||
+           !actualModel.entity().reference00||!s.components[0]||s.components[0]->reference00!=1u||
+           actualModel.entity().sessionGeneration!=s.components[0]->sessionGeneration||q.type2||
+           !s.freshShape8C||*s.freshShape8C||!s.freshResult90||*s.freshResult90||
+           s.world.globalValid3E0730!=&actualName3E0730.front())return {};
+        s.freshLoadAttempted=true;s.freshModel44=&actualModel;
+        auto fail=[&](S status,std::uint32_t pc){s.freshE0PC=pc;return OriginalWreckQueryResult50LA{status,pc};};
+        try {
+            //Native metadata only. No future result banks, scene-domain IDs,
+            //collector copies/geometry, or query-prepared state are fabricated.
+            q.type2=std::make_unique<OriginalWreckType2Storage50LA>();
+            const auto expected=s.assets->queryFileIdentity();
+            if(!actualDirectory36B0F0.empty()||actualRequest!=s.assets->receipt().queryMember||
+               actualRequest.empty()||actualRequest.size()>=actualName3E0730.size()||
+               actualRequest.find('\0')!=std::string::npos)return fail(S::binding,0x11b920u);
+            //Bounded empty-directory/already-.col branch. Preserve original
+            //request bytes, not a newly normalized stem or immutable receipt.
+            s.freshE0PC=0x11b9fcu;
+            std::memcpy(actualName3E0730.data(),actualRequest.c_str(),actualRequest.size()+1u);
+            rr::assets::OriginalStandardModelFileView50LA file;s.freshE0PC=0x11ba2cu;
+            if(!resolver->lookupModel132820(actualRequest,rr::assets::OriginalStandardModelFileKind50LA::colType2,file,diagnostic)||
+               file.id.resolver!=expected.resolver||file.id.row!=expected.row||!file.bytes||
+               *file.bytes!=s.assets->originalMembers()[2]||file.collision125014||file.animation1536F0||file.geometry240110)
+                return fail(S::binding,0x11ba2cu);
+            //Explicit existing native decoded-COL transport; NOT recovered
+            //numeric FileManager handle/read/close or warm cache chronology.
+            s.freshFileIdentityB0=file.id;s.freshFileB0.reset(); //Typed11BB84 alternative.
+            definition.shapeTag=2u; //124FB8 before1253DC allocation.
+            auto& payload=q.type2->sourceOwners;
+            if(!payload.allocateFreshWreckShape1253DC(actualModel,s.freshShape8C,*s.components[0]))
+                return fail(S::allocation,payload.sourceBoundary());
+            definition.hasShape=true;
+            if(!payload.loadFreshWreckShape126640(s.assets->queryE0())||
+               !payload.allocateFreshWreckResult11BBE8(0u,s.freshResult90))
+                return fail(S::allocation,payload.sourceBoundary());
+            s.freshLoadComplete=true;s.freshE0PC=0x16607cu;
+            return {S::complete,0x16607cu}; //Before actual11F570; no preparation.
+        }catch(...){return fail(S::allocation,s.freshE0PC);}
+    }
+    OriginalWreckQueryResult50LA prepareFreshE411F570(const OriginalRacerSceneObject50LA& actualModel,
+        const SceneGraph49P& graph)noexcept {
+        using S=OriginalWreckQueryStatus50LA;
+        if(!freshE0Backing()||retired_||!storage_->freshE4.loadComplete||storage_->freshE4.prepareAttempted||
+           storage_->freshE4.pc!=0x16629cu||storage_->freshE4.model110!=&actualModel||
+           !storage_->piece->coherent())return {};
+        auto& s=*storage_;auto& f=s.freshE4;auto& q=s.queries[1];
+        const auto* resource=q.type0Owners.resource();
+        if(!actualModel.constructed||actualModel.released||&actualModel.entity()!=s.plannedModel||
+           !actualModel.entity().reference00||!s.components[1]||s.components[1]->reference00!=1u||
+           s.components[1]->parent1C||s.components[1]->previous10||s.components[1]->next14||
+           !q.type0Owners.freshShape40Current(q.fullType0Source.local40)||!resource||!resource->live()||
+           resource->root1C()!=0u||resource->mesh().nodes.empty()||
+           !f.shape8C||*f.shape8C!=q.type0Owners.shape8C_.get()||!f.result90||*f.result90||
+           q.type0Owners.shape8C_->racerModel110!=&actualModel||!validateSceneGraph49P(graph)||
+           graph.nodes!=s.assets->modelGraphIdentity()||graph.count!=s.assets->modelGraphNodeCount()||
+           actualModel.sceneIndex!=s.assets->model14C())return {};
+        const auto index=static_cast<std::int32_t>(actualModel.sceneIndex);
+        if(index<0||static_cast<std::uint32_t>(index)>=graph.count)return {};
+        f.prepareAttempted=true;
+        q.responseE8=ResponseCallback::physics165920;f.pc=0x1662a8u;
+        q.owner9C=s.piece;f.pc=0x1662b0u;
+        q.bodyA0=&s.physical->body.root;f.pc=0x1662bcu;
+        f.pc=0x28b550u;
+        auto& node=graph.nodes[index];
+        //Exact bounded fresh Model root. Do not substitute a copied Scene or
+        //transactionally recompute an unrepresented parent chain.
+        if(node.parent180!=SceneNodeIndex49P::none){f.pc=0x28b5b8u;return {S::graph,f.pc};}
+        if(!(node.sceneFlags190&1u)){
+            for(unsigned i=0;i<16;i+=2){std::uint32_t words[2];
+                std::memcpy(words,node.localC0.v+i,sizeof words);
+                std::memcpy(node.world100.v+i,words,sizeof words); //28B5F4/5F8
+            }
+            node.sceneFlags190=static_cast<std::uint8_t>((node.sceneFlags190&~1u)|1u); //28B61C
+        }
+        BodyMatrix48G stack20;
+        for(unsigned i=0;i<16;i+=2){std::uint32_t words[2];
+            std::memcpy(words,node.world100.v+i,sizeof words);
+            std::memcpy(stack20.v+i,words,sizeof words); //28B638/63C
+        }
+        auto& state=s.coldStates[1];
+        if(!OriginalWreckSourceType0Prepare50LA::pass(false,stack20,q.fullType0Source.local40,
+            resource->mesh().nodes[0],q.type0.composed00,q.type0.world80,q.type0.previousC0,
+            state.cachedCenter,state.cachedRadius,f.pc))return {S::preparation,f.pc};
+        //11EF24 invokes the distinct11F680 type0 pass on the SAME live matrices.
+        if(!OriginalWreckSourceType0Prepare50LA::pass(true,stack20,q.fullType0Source.local40,
+            resource->mesh().nodes[0],q.type0.composed00,q.type0.world80,q.type0.previousC0,
+            state.cachedCenter,state.cachedRadius,f.pc))return {S::preparation,f.pc};
+        f.prepareComplete=true;f.pc=0x1662c8u;return {S::complete,f.pc};
+    }
+    void noteFreshE4Appended1662DC()noexcept {
+        storage_->freshE4.appended=true;storage_->freshE4.pc=0x1662e4u;
+    }
+    OriginalWreckQueryResult50LA prepareFreshE011F570(const OriginalRacerSceneObject50LA& actualModel,
+        const SceneGraph49P& graph)noexcept {
+        using S=OriginalWreckQueryStatus50LA;
+        if(!freshE0Backing()||retired_||!storage_->freshLoadComplete||storage_->freshPrepareAttempted||
+           storage_->freshE0PC!=0x16607cu||storage_->freshModel44!=&actualModel||
+           !storage_->piece->coherent()||!storage_->queries[0].type2)return {};
+        auto& s=*storage_;auto& payload=s.queries[0].type2->sourceOwners;
+        if(!actualModel.constructed||actualModel.released||&actualModel.entity()!=s.plannedModel||
+           !actualModel.entity().reference00||!s.components[0]||s.components[0]->reference00!=1u||
+           s.components[0]->parent1C||s.components[0]->previous10||s.components[0]->next14||
+           !payload.loaded()||!s.freshShape8C||*s.freshShape8C!=payload.shape8C_.get()||
+           !s.freshResult90||*s.freshResult90!=payload.result90_.get()||
+           payload.shape8C_->racerModel44!=&actualModel||!payload.shape8C_->nodes4C||!payload.shape8C_->nodeCount||
+           payload.shape8C_->root40||!validateSceneGraph49P(graph)||
+           graph.nodes!=s.assets->modelGraphIdentity()||graph.count!=s.assets->modelGraphNodeCount()||
+           actualModel.sceneIndex!=s.assets->model14C())return {};
+        const auto index=static_cast<std::int32_t>(actualModel.sceneIndex);
+        if(index<0||static_cast<std::uint32_t>(index)>=graph.count)return {};
+        s.freshPrepareAttempted=true;s.freshE0PC=0x28b550u;
+        auto& node=graph.nodes[index];
+        //Exact bounded fresh Model root. Do not substitute a copied Scene or
+        //transactionally recompute an unrepresented parent chain.
+        if(node.parent180!=SceneNodeIndex49P::none){s.freshE0PC=0x28b5b8u;return {S::graph,s.freshE0PC};}
+        if(!(node.sceneFlags190&1u)){
+            for(unsigned i=0;i<16;i+=2){std::uint32_t words[2];
+                std::memcpy(words,node.localC0.v+i,sizeof words);
+                std::memcpy(node.world100.v+i,words,sizeof words); //28B5F4/5F8
+            }
+            node.sceneFlags190=static_cast<std::uint8_t>((node.sceneFlags190&~1u)|1u); //28B61C
+        }
+        BodyMatrix48G stackA0;
+        for(unsigned i=0;i<16;i+=2){std::uint32_t words[2];
+            std::memcpy(words,node.world100.v+i,sizeof words);
+            std::memcpy(stackA0.v+i,words,sizeof words); //28B638/63C
+        }
+        auto& state=s.coldStates[0];
+        if(!OriginalWreckSourceType2Prepare50LA::pass(false,stackA0,payload.shape8C_->nodes4C[0],
+            payload.shape8C_->matrix00,state.cachedCenter,state.cachedRadius,s.freshE0PC))
+            return {S::preparation,s.freshE0PC};
+        //Actual11F1FC invokes11F680: second real pass, not output replay.
+        if(!OriginalWreckSourceType2Prepare50LA::pass(true,stackA0,payload.shape8C_->nodes4C[0],
+            payload.shape8C_->matrix00,state.cachedCenter,state.cachedRadius,s.freshE0PC))
+            return {S::preparation,s.freshE0PC};
+        s.freshPrepareComplete=true;s.freshE0PC=0x166084u;
+        return {S::complete,0x166084u}; //No source append or world registration yet.
+    }
+    void noteFreshE0Appended166098()noexcept {
+        storage_->freshAppended=true;storage_->freshE0PC=0x1660a0u;
+    }
+    bool borrowFreshE0PointResource(const OriginalRacerSceneObject50LA& actualModel,
+        const OriginalWreckComponent50LA& actualE0,Type2ResourceView49X& out)const noexcept {
+        if(!freshE0Backing()||retired_||!storage_->freshLoadComplete||!storage_->freshPrepareComplete||
+           !storage_->piece->coherent()||storage_->queries[0].owner9C!=storage_->piece||
+           storage_->queries[0].bodyA0!=&storage_->physical->body.root||
+           !storage_->freshAppended||storage_->freshE0PC!=0x1660a0u||storage_->freshE0Withdrawn||storage_->freshModel44!=&actualModel||
+           !actualModel.constructed||actualModel.released||&actualModel.entity()!=storage_->plannedModel||
+           !actualModel.entity().reference00||storage_->components[0]!=&actualE0||actualE0.reference00!=1u||
+           actualE0.parent1C!=&storage_->piece->component()||actualE0.next14||actualE0.firstChild18||
+           !actualE0.previous10||actualE0.previous10->next14!=&actualE0||
+           actualE0.previous10->kind!=OriginalWreckComponentKind50LA::gravity282670||
+           actualE0.previous10->parent1C!=actualE0.parent1C||!storage_->queries[0].type2)return false;
+        const auto& p=storage_->queries[0].type2->sourceOwners;
+        if(!p.loaded()||!storage_->freshShape8C||*storage_->freshShape8C!=p.shape8C_.get()||
+           !storage_->freshResult90||*storage_->freshResult90!=p.result90_.get()||
+           p.shape8C_->racerModel44!=&actualModel)return false;
+        out=p.resource();return true; //Borrow of actual owned arrays; no prepared/SceneId grant.
+    }
+    bool bindFreshContact2955F0(const OriginalWreckComponent50LA& contact,
+        const OriginalWreckComponent50LA& detector,Query*& actualDetector38)noexcept {
+        if(!freshE0Backing()||retired_||!storage_->freshAppended||!storage_->freshPrepareComplete||
+           storage_->contactBound||storage_->e0ConstructorRetired||actualDetector38||
+           !storage_->physical->contactConstructorFieldsApplied||
+           storage_->physical->contactBody30!=&storage_->physical->body)return false;
+        auto& s=*storage_;auto& q=s.queries[0];const auto* e0=s.components[0];
+        const auto* root=&s.piece->component();
+        if(!s.piece->coherent()||!e0||e0->reference00!=1u||e0->parent1C!=root||e0->next14!=&contact||
+           contact.reference00!=1u||contact.kind!=OriginalWreckComponentKind50LA::contact295A40||
+           contact.parent1C!=root||contact.previous10!=e0||contact.next14||contact.firstChild18||
+           detector.reference00!=1u||detector.kind!=OriginalWreckComponentKind50LA::detector295290||
+           detector.parent1C||detector.previous10||detector.next14||detector.firstChild18||
+           contact.sessionGeneration!=root->sessionGeneration||detector.sessionGeneration!=root->sessionGeneration||
+           q.owner9C!=s.piece||q.contactOwner9C||q.bodyA0!=&s.physical->body.root||q.queryE4!=QueryCallback::none)return false;
+        s.freshDetectorQueryField38=&actualDetector38; //Native lifetime identity, not source alias store.
+        actualDetector38=&q; //2955F0 source detector38 FIRST.
+        q.owner9C=nullptr;q.contactOwner9C=s.physical; //same source9C typed alternative.
+        q.bodyA0=&s.physical->body.root;q.queryE4=QueryCallback::contact294BB0;
+        s.coldDefinitions[0].filter.identities[0].mode=1; //123EA0 sourceBC.
+        s.fullContactComponent=&contact;s.fullDetectorComponent=&detector;s.contactBound=true;
+        return true; //No callback execution/table registration or prepared grant.
+    }
+    bool canRetireFreshE0(const OriginalWreckComponent50LA& e,
+        const std::optional<OriginalWreckComponent50LA*>& publication,
+        const OriginalWreckComponent50LA* parent=nullptr,const OriginalWreckComponent50LA* previous=nullptr,
+        const OriginalWreckComponent50LA* expectedNext=nullptr,
+        const OriginalWreckComponent50LA* expectedAfterNext=nullptr,
+        const OriginalWreckComponent50LA* expectedAfterDetectorE4=nullptr,
+        const OriginalWreckComponent50LA* expectedAfterE4E8=nullptr)const noexcept {
+        if(!freshE0Backing())return false;
+        const auto& s=*storage_;
+        if(bool(parent)!=bool(previous)||bool(parent)!=s.freshAppended||
+           (parent&&(parent!=&s.piece->component()||!s.freshPrepareComplete||
+             previous->kind!=OriginalWreckComponentKind50LA::gravity282670||previous->parent1C!=parent||
+             previous->next14!=&e)))return false;
+        if(expectedNext&&(!parent||expectedNext->reference00!=1u||
+           expectedNext->kind!=OriginalWreckComponentKind50LA::contact295A40||
+           expectedNext->parent1C!=parent||expectedNext->previous10!=&e||expectedNext->next14!=expectedAfterNext||
+           expectedNext->sessionGeneration!=e.sessionGeneration))return false;
+        if(expectedAfterNext&&(!expectedNext||expectedAfterNext->reference00!=1u||
+           expectedAfterNext->kind!=OriginalWreckComponentKind50LA::detector295290||
+           expectedAfterNext->parent1C!=parent||expectedAfterNext->previous10!=expectedNext||expectedAfterNext->next14!=expectedAfterDetectorE4||
+           expectedAfterNext->sessionGeneration!=e.sessionGeneration))return false;
+        if(expectedAfterDetectorE4&&(!expectedAfterNext||!s.freshE4.appended||!s.freshE4.prepareComplete||
+           s.components[1]!=expectedAfterDetectorE4||expectedAfterDetectorE4->reference00!=1u||
+           expectedAfterDetectorE4->kind!=OriginalWreckComponentKind50LA::collision11B190||
+           expectedAfterDetectorE4->parent1C!=parent||expectedAfterDetectorE4->previous10!=expectedAfterNext||
+           expectedAfterDetectorE4->next14!=expectedAfterE4E8||expectedAfterDetectorE4->firstChild18||
+           expectedAfterDetectorE4->sessionGeneration!=e.sessionGeneration))return false;
+        if(s.freshE4.appended&&!expectedAfterDetectorE4)return false;
+        if(expectedAfterE4E8&&(!expectedAfterDetectorE4||!s.freshE8.appended||s.components[2]!=expectedAfterE4E8||
+           expectedAfterE4E8->reference00!=1u||expectedAfterE4E8->kind!=OriginalWreckComponentKind50LA::collision11B190||
+           expectedAfterE4E8->parent1C!=parent||expectedAfterE4E8->previous10!=expectedAfterDetectorE4||
+           expectedAfterE4E8->next14||expectedAfterE4E8->firstChild18||
+           expectedAfterE4E8->sessionGeneration!=e.sessionGeneration))return false;
+        if(s.freshE8.appended&&!expectedAfterE4E8)return false;
+
+        if(s.contactBound){
+            if(!s.fullContactComponent||!s.fullDetectorComponent||!s.freshDetectorQueryField38||
+               *s.freshDetectorQueryField38!=&s.queries[0]||s.fullContactComponent!=expectedNext||
+               s.fullContactComponent->reference00!=1u||s.fullDetectorComponent->reference00!=1u||
+               s.fullDetectorComponent->kind!=OriginalWreckComponentKind50LA::detector295290||
+               s.fullDetectorComponent->sessionGeneration!=e.sessionGeneration||
+               (expectedAfterNext?s.fullDetectorComponent!=expectedAfterNext:
+                 (s.fullDetectorComponent->parent1C||s.fullDetectorComponent->previous10||s.fullDetectorComponent->next14))||
+               s.coldDefinitions[0].filter.identities[0].mode!=1||
+               s.queries[0].owner9C||s.queries[0].contactOwner9C!=s.physical||
+               s.queries[0].bodyA0!=&s.physical->body.root||s.queries[0].queryE4!=QueryCallback::contact294BB0)return false;
+        }
+        if(s.e0FullPublication||s.e0Prepared||s.initialShapesAttempted||s.initialShapesReady||
+           s.e0ConstructorRetired||s.published[0]||s.published[1]||s.published[2]||s.sceneDomain)return false;
+        for(unsigned i=0;i<3;++i){const auto& q=s.queries[i];
+            const auto& r=s.world.lifecycle->storage.registrations[s.world.refs[i]-1u];
+            if(r.owner||r.slot||r.encodedObject||s.world.objects[s.world.refs[i]-1u].identity!=s.coldDefinitions[i].identity||
+               q.membership.attached||q.membership.object||q.membership.revision||(i&&q.type2)||(q.type0Owners.attempted()&&!(i==1u&&s.freshE4.started))||(q.type3Owners.attempted()&&!(i==2u&&s.freshE8.started)))return false;
+        }
+        if(s.freshE4.started&&(!s.plannedQueries[1]||!canRetireFreshE4(*s.plannedQueries[1])))return false;
+        if(s.freshE8.started&&(!s.plannedQueries[2]||!canRetireFreshE8(*s.plannedQueries[2])))return false;
+        if(s.freshIdentitySelected[0]&&!s.sourceIdentityC0[0].matchesFreshCollection(e,s.coldDefinitions[0].filter.identities[0]))return false;
+        if(s.freshCollectionAttempted&&!freshCollectionCategoryCurrent(0u,e))return false;
+        if(s.queries[0].type2){
+            if(!s.freshLoadAttempted||!s.freshModel44||&s.freshModel44->entity()!=s.plannedModel||
+               !s.freshModel44->constructed||s.freshModel44->released)return false;
+            const auto& payload=s.queries[0].type2->sourceOwners;
+            if(payload.attempted()){
+                if(!payload.preflightFreshWreckPayload(*s.freshModel44,e,s.freshShape8C,s.freshResult90,parent,previous,expectedNext,expectedAfterNext,expectedAfterDetectorE4,expectedAfterE4E8))return false;
+            }else if(!s.freshShape8C||*s.freshShape8C||!s.freshResult90||*s.freshResult90)return false;
+        }else if(s.freshLoadComplete)return false;
+        if(s.freshE0Counted){
+            if(e.reference00!=1u||e.kind!=OriginalWreckComponentKind50LA::collision11B190||s.components[0]!=&e)return false;
+        }else if(e.reference00||e.kind!=OriginalWreckComponentKind50LA::unbound||s.components[0])return false;
+        return e.parent1C==parent&&e.previous10==previous&&e.next14==expectedNext&&!e.firstChild18&&
+            (s.e0ConstructorReached?(publication&&*publication==&e):!publication);
+    }
+    void retireFreshE0(OriginalWreckComponent50LA& e,std::uint32_t& count,
+        const OriginalWreckComponent50LA* parent=nullptr,const OriginalWreckComponent50LA* previous=nullptr)noexcept {
+        auto& s=*storage_;
+        if(s.freshE4.started&&!s.freshE4.retired)std::terminate();
+        if(s.freshE8.started&&!s.freshE8.retired)std::terminate();
+        if(s.contactBound&&(!s.fullContactComponent||!s.fullDetectorComponent||
+           s.fullContactComponent->reference00||s.fullDetectorComponent->reference00||
+           s.fullContactComponent->kind!=OriginalWreckComponentKind50LA::entity141300||
+           s.fullDetectorComponent->kind!=OriginalWreckComponentKind50LA::entity141300))std::terminate();
+        // Before11B2FC a registry failure has no complete query destructor.
+        // Cancel only the actual counted Entity prefix; no fake11B4A0 return.
+        if(s.freshE0Counted){
+            --e.reference00;
+            if(s.freshIdentitySelected[0]&&!s.sourceIdentityC0[0].releaseFreshCollectionAfterReferenceDrop11B4F4(
+                e,s.coldDefinitions[0].filter.identities[0]))std::terminate();
+            //11B51C releases actual D8 after C0/C8 and before payload11B600.
+            //Retain source pointer/count/mode as history through native withdrawal.
+            if(s.freshCollectionE0Selected&&!s.sourceCategoryD8[0].releaseFreshCollectionAfterReferenceDrop11B51C(
+                e,s.coldDefinitions[0].filter.categories))std::terminate();
+ //Actual142590 reference drop before payload lifetime.
+            if(s.queries[0].type2&&s.queries[0].type2->sourceOwners.attempted()){
+                if(!s.queries[0].type2->sourceOwners.releaseFreshWreckPayloadAfterReferenceDrop(
+                    *s.freshModel44,e,s.freshShape8C,s.freshResult90,parent,previous))std::terminate();
+            }
+            e.kind=OriginalWreckComponentKind50LA::entity141300;--count;
+        }
+        //No-load failures take the knownNULL payload branch. Reached shape
+        //prefixes use their exact source release or explicit native cancellation
+        //above. Registry failure cancels only its counted Entity prefix.
+        s.e0ConstructorRetired=true;retired_=true;
+        //Keep canonical fields and source aliases as history through withdrawal.
+    }
+    bool canWithdrawFreshE0()const noexcept {
+        if(!freshE0Backing())return true;
+        const auto& s=*storage_;
+        if(s.freshE4.started&&(!s.freshE4.retired||(s.queries[1].type0Owners.attempted()&&!s.queries[1].type0Owners.retired())))return false;
+        if(s.freshE8.started&&(!s.freshE8.retired||(s.queries[2].type3Owners.attempted()&&!s.queries[2].type3Owners.retired())))return false;
+        if(!s.e0ConstructorRetired||!retired_||s.e0FullPublication||s.e0Prepared)return false;
+        if(s.freshCollectionE0Selected&&!s.sourceCategoryD8[0].retired())return false;
+        if(s.freshE8.categorySelected&&!s.sourceCategoryD8[1].retired())return false;
+        if(s.queries[0].type2&&s.queries[0].type2->sourceOwners.attempted()&&!s.queries[0].type2->sourceOwners.retired())return false;
+        return !s.freshE0Counted||(s.components[0]&&!s.components[0]->reference00&&
+            s.components[0]->kind==OriginalWreckComponentKind50LA::entity141300);
+    }
+    void withdrawFreshE0()noexcept {
+        if(!freshE0Backing()||storage_->freshE0Withdrawn)return;
+        //End only native namespace borrows after whole-owner preflight. Retain
+        //the source field history until the actual owning backing is released.
+        storage_->world={};storage_->freshE0Withdrawn=true;
+    }
     bool canConstructE0Prefix11B190()const noexcept {
-        if(!storage_||storage_->e0ConstructorReached||storage_->initialShapesReady||
+        if(!storage_||storage_->freshE0Backing||storage_->e0ConstructorReached||storage_->initialShapesReady||
            storage_->initialShapesAttempted||!storage_->piece->coherent()||
            storage_->components[0]||storage_->published[0]||storage_->published[1]||storage_->published[2])return false;
         const auto& w=storage_->world;const auto& q=storage_->queries[0];
@@ -671,7 +1464,9 @@ private:
             w.groupTypeGp8014&&*w.groupTypeGp8014!=0xffu&&
             w.physicsBodyCategory3E0718&&*w.physicsBodyCategory3E0718&&w.globalValid3E0730;
     }
-    bool constructE0Prefix11B190(OriginalWreckComponent50LA& component)noexcept {
+    bool constructE0Prefix11B190(OriginalWreckComponent50LA& component,
+        std::optional<OriginalWreckComponent50LA*>* nativePublication=nullptr)noexcept {
+        if(nativePublication&&nativePublication->has_value())return false;
         if(!canConstructE0Prefix11B190()||storage_->plannedQueries[0]!=&component||
            component.kind!=OriginalWreckComponentKind50LA::collision11B190||component.reference00!=1u)return false;
         auto& s=*storage_;auto& definition=s.coldDefinitions[0];auto& state=s.coldStates[0];
@@ -686,6 +1481,7 @@ private:
         query.constructorCopied40=*s.world.sentinel3E02C0;query.constructorCopied50=*s.world.sentinel3E02C0;
         query.previousCenter70={{0.f,-10000.f,0.f,1.f}};
         query.distance84=0.f;query.currentIdentity94=0;
+        if(nativePublication)*nativePublication=&component; //166034 AFTER actual11B190 defaults.
         //16603C ->11B570(3): clear bit3 and select bits1/2=1/0.
         state.flagsF8=static_cast<std::uint8_t>((state.flagsF8&~0x0eu)|2u);
         *s.world.globalValid3E0730=0;
@@ -693,7 +1489,16 @@ private:
         query.owner9C=s.piece;query.bodyA0=&s.physical->body.root; //166058/166068
         s.components[0]=&component;s.e0ConstructorReached=true;return true;
     }
+    SpringSceneId48N nativeModelIdentityForPublication()const noexcept {
+        if(freshE0Backing())return {};
+        if(!storage_||!storage_->e0ConstructorReached||storage_->e0ConstructorRetired||
+           storage_->e0FullPublication||!storage_->components[0]||!storage_->plannedModel)return {};
+        const auto& s=*storage_;
+        return s.sceneDomain->nativeIdentityForPublication(*s.assets,*s.physical,*s.plannedModel,
+            *s.components[0],s.world.identities[0]);
+    }
     OriginalWreckQueryResult50LA publishFullE0Type2(SpringSceneId48N actualModel)noexcept {
+        if(freshE0Backing())return {};
         using S=OriginalWreckQueryStatus50LA;
         if(!storage_||!storage_->e0ConstructorReached||storage_->e0ConstructorRetired||
            storage_->published[0]||storage_->e0FullPublication||!storage_->piece->coherent())return {S::binding,0x166074u};
@@ -718,6 +1523,7 @@ private:
         return {S::complete,0x16607cu};
     }
     OriginalWreckQueryResult50LA prepareFullE011F570()noexcept {
+        if(freshE0Backing())return {};
         using S=OriginalWreckQueryStatus50LA;
         if(!storage_||!storage_->e0FullPublication||storage_->e0Prepared||
            storage_->e0ConstructorRetired||!modelSceneIdentity().value)return {S::binding,0x11f570u};
@@ -742,7 +1548,9 @@ private:
             !q.membership.revision&&!q.type0Owners.attempted()&&s.fullDetectorComponent&&
             s.fullDetectorComponent->reference00==1u&&s.fullContactComponent&&s.fullContactComponent->reference00==1u;
     }
-    bool constructE4Prefix11B190(OriginalWreckComponent50LA& component)noexcept {
+    bool constructE4Prefix11B190(OriginalWreckComponent50LA& component,
+        std::optional<OriginalWreckComponent50LA*>* nativePublication=nullptr)noexcept {
+        if(nativePublication&&nativePublication->has_value())return false;
         if(!canConstructE4Prefix11B190()||storage_->plannedQueries[1]!=&component||
            component.kind!=OriginalWreckComponentKind50LA::collision11B190||component.reference00!=1u)return false;
         auto& s=*storage_;auto& definition=s.coldDefinitions[1];auto& state=s.coldStates[1];auto& q=s.queries[1];
@@ -752,6 +1560,7 @@ private:
         q.queryE4=QueryCallback::none;q.responseE8=ResponseCallback::none;
         q.constructorCopied40=*s.world.sentinel3E02C0;q.constructorCopied50=*s.world.sentinel3E02C0;
         q.previousCenter70={{0.f,-10000.f,0.f,1.f}};q.distance84=0.f;q.currentIdentity94=0;
+        if(nativePublication)*nativePublication=&component; //16626C AFTER actual11B190 defaults.
         //166274 ->11B570(5); actual category follows at166288.
         state.flagsF8=static_cast<std::uint8_t>((state.flagsF8&~0x0eu)|4u);*s.world.globalValid3E0730=0;
         definition.filter.categoryA4=*s.world.physicsBodyCategory3E0718;
@@ -835,18 +1644,33 @@ private:
         s.fullCollectionCursor=2;s.collectionFilterApplied=true;
         return {S::complete,0x22c25cu};
     }
+    bool appendNativeOwnPod694123EB0(std::uint32_t actualPod694,std::uint32_t& actualE4)noexcept {
+        actualE4=0;
+        if(!storage_||storage_->nativeRacerPodAttempted||!actualPod694||
+           !storage_->collectionFilterApplied||!fullCategoryOwnership()||!fullMutualOwnership()||
+           !storage_->e0FullPublication||!storage_->e4FullPublication||storage_->e0ConstructorRetired||
+           storage_->e4ConstructorRetired||!storage_->components[0]||!storage_->components[1]||
+           storage_->components[0]->reference00!=1u||storage_->components[1]->reference00!=1u)return false;
+        auto& s=*storage_;for(const auto id:s.world.identities)if(id==actualPod694)return false;
+        s.nativeRacerPodAttempted=true;s.nativeRacerPod694Identity=actualPod694;
+        if(!s.sourceIdentityC0[0].appendNativeRacer123EB0(object(0).filter.identities[0],actualPod694))return false;
+        s.nativeRacerPodCommitted=true;actualE4=s.world.identities[1];return true;
+    }
     bool fullMutualOwnership()const noexcept {
         if(!storage_||!storage_->fullMutualAttempted)return false;
         const auto& s=*storage_;if(s.fullMutualCursor>4u)return false;
         for(std::size_t i=0;i<2;++i){const auto& owned=s.sourceIdentityC0[i];const auto& view=object(i).filter.identities[0];
-            const auto n=i==0?(s.fullMutualCursor<2u?s.fullMutualCursor:2u):(s.fullMutualCursor>2u?s.fullMutualCursor-2u:0u);
+            const auto n=i==0?(s.fullMutualCursor<2u?s.fullMutualCursor:2u)+(s.nativeRacerPodCommitted?1u:0u):
+                (s.fullMutualCursor>2u?s.fullMutualCursor-2u:0u);
             if(owned.extent()!=n)return false;
             if(owned.retired()){
                 if((i==0?!s.e0ConstructorRetired:!s.e4ConstructorRetired)||view.values||view.capacity!=n||view.mode!=1||view.count!=static_cast<std::int32_t>(n))return false;
             }else{
                 if(!owned.matches(view))return false;
                 if(n&&view.values[0]!=s.world.identities[i==0?1u:0u])return false;
-                if(n==2u&&view.values[1]!=s.world.identities[2])return false;
+                if(n>=2u&&view.values[1]!=s.world.identities[2])return false;
+                if(n==3u&&(!s.nativeRacerPodAttempted||!s.nativeRacerPod694Identity||
+                   view.values[2]!=s.nativeRacerPod694Identity))return false;
             }
         }
         return true;
@@ -886,7 +1710,9 @@ private:
         const auto& s=*storage_;const auto& q=s.queries[2];const auto& r=s.world.lifecycle->storage.registrations[s.world.refs[2]-1u];
         return !r.owner&&!r.slot&&!r.encodedObject&&!q.membership.attached&&!q.membership.object&&!q.membership.revision;
     }
-    bool constructE8Prefix11B190(OriginalWreckComponent50LA& component)noexcept {
+    bool constructE8Prefix11B190(OriginalWreckComponent50LA& component,
+        std::optional<OriginalWreckComponent50LA*>* nativePublication=nullptr)noexcept {
+        if(nativePublication&&nativePublication->has_value())return false;
         if(!canConstructE8Prefix11B190()||storage_->plannedQueries[2]!=&component||component.reference00!=1u||
            component.kind!=OriginalWreckComponentKind50LA::collision11B190)return false;
         auto& s=*storage_;auto& q=s.queries[2];auto& d=s.coldDefinitions[2];auto& state=s.coldStates[2];
@@ -895,7 +1721,9 @@ private:
         q.owner9C=nullptr;q.contactOwner9C=nullptr;q.bodyA0=nullptr;q.queryE4=QueryCallback::none;q.responseE8=ResponseCallback::none;
         q.constructorCopied40=*s.world.sentinel3E02C0;q.constructorCopied50=*s.world.sentinel3E02C0;
         q.previousCenter70={{0.f,-10000.f,0.f,1.f}};q.distance84=0.f;q.currentIdentity94=0;
-        state.flagsF8=static_cast<std::uint8_t>((state.flagsF8&0xc0u)|2u); //11B190 then11B570(3)
+        state.flagsF8=static_cast<std::uint8_t>((state.flagsF8&0xc0u)|6u);
+        if(nativePublication)*nativePublication=&component; //166300 AFTER actual11B190 defaults.
+        state.flagsF8=static_cast<std::uint8_t>((state.flagsF8&~0x0eu)|2u); //11B570(3)
         *s.world.globalValid3E0730=0;s.components[2]=&component;s.e8ConstructorReached=true;return true;
     }
     OriginalWreckQueryResult50LA loadPublishFullE811C710()noexcept {

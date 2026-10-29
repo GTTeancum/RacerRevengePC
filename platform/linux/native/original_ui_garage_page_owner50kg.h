@@ -26,6 +26,7 @@ class OriginalUiGarageSharedPageDrawOwner50KG;
 class OriginalUiSharedDialogs50KG;
 class OriginalUiRiderProfileOwner50KG;
 class OriginalUiGaragePageOwner50KG final {
+    friend class OriginalUiCoursePagePayload50KG;
     friend class OriginalUiGarageDrawContribution50KG;
     friend class ::original_main_entry50KG::NativeCollectorFifo50LA;
     friend class OriginalUiGarageCameraFrame50KG;
@@ -219,6 +220,8 @@ private:
     std::shared_ptr<original_main_entry50KG::RaceDisplayLifetime50LA> sharedCameraDisplay_;
     bool sharedCameraDisplayPinned_=false;
     std::uint8_t sharedViewportDrainPhase_=0,sharedCameraCallbackCount_=0;
+    std::shared_ptr<game::OriginalFrontendCameraCold50LA> sharedViewportPriorCamera_;
+    bool sharedViewportZoomApplied_=false;
     struct TextStorage {alignas(Text) std::array<std::byte,sizeof(Text)> bytes;Text* value=nullptr;};
     struct RouterNode {
         C* widget0=nullptr;std::uint32_t enabled4=0;

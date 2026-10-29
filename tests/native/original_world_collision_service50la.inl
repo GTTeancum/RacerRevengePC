@@ -8,7 +8,7 @@ bool Owner::beginNativeCollisionPrefix2743B0(ra_static_model_cold50LA::Owner& mo
     if(nativeCollisionPrefixEntered_&&!nativeCollisionServiceComplete_&&nativeCollisionPrefixPC_!=0x27b174){
         pc=nativeCollisionPrefixPC_;return false;}
 
-    if(!worldApplication_||!worldCollisionObjects3CC_||!worldCollisionResources_||!runtimeQueries_||
+    if(!worldApplication_||!worldCollisionObjects3CC_||worldCollisionObjects3CC_->sourceMode_||!worldCollisionResources_||!runtimeQueries_||
        !runtimeQueries_->actual_||!runtimeQueries_->actual_->recovery||
        !runtimeQueries_->storage_.get()||!models.canClose()||
        candidates.source_!=worldCollisionObjects3CC_->source_||
@@ -121,6 +121,7 @@ bool Owner::beginNativeCollisionPrefix2743B0(ra_static_model_cold50LA::Owner& mo
 bool Owner::canRetireNativeCollisionQueries27B040()const noexcept {
     if(!worldCollisionObjects3CC_)return !nativeCollisionModelBorrow_;
     const auto& objects=*worldCollisionObjects3CC_;
+    if(objects.sourceMode_)return !nativeCollisionModelBorrow_&&!worldCollisionResources_;
     if(nativeCollisionModelBorrow_&&!nativeCollisionModelBorrow_->nativeCollisionForestCurrent27B170())return false;
     for(const auto& zone:objects.zones_)for(const auto& w:zone.entries34){
         if(!w.nativeQuery){if(w.collision04)return false;continue;}

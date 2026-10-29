@@ -1,5 +1,6 @@
 #pragma once
 #include "ra_source_camera_ownership50la.h"
+#include "../../src/game/original_world_trigger_instance50la.h"
 #include "original_world_physics_index50la.h"
 #include "../../src/game/original_native_list_method_custody50la.h"
 #include "original_world_collision_objects50la.h"
@@ -15,6 +16,7 @@
 #include <limits>
 #include <memory>
 #include <optional>
+#include <thread>
 #include "../../src/game/original_pod_cable_allocation50la.h"
 #include "../../src/game/original_light_flare_numeric50la.h"
 #include "../../platform/linux/native/race_audio_groups50ic.h"
@@ -33,11 +35,30 @@ namespace g=rr::game;
 // steps; these are not copies, replacement registries or alternate query worlds.
 class Owner {
     friend class ::ra_cold_aggregate50LA::Owner;
+    friend class ::ra_source_camera50LA::OwnershipBridge;
     friend class rr::platform::OriginalUiLightManagerOwner50KG;
     friend class g::original_gc_gameplay_lighting_candidate::Owner;
     friend class rr::game::OriginalRaceConstructor50LA;
     friend class rr::game::OriginalRacePauseWorldAuthority50LA;
 protected:
+// Inside ra_pod_scene50LA::Owner protected area; existing Application friend.
+// Copies the SAME genuine startup-owned vectors, no new constant owner.
+bool copySourceWorldStartDefaults(std::array<std::uint32_t,4>& origin,
+    std::array<std::uint32_t,4>& forward)const noexcept {
+    if(!worldColdConstructed_||!worldApplication_||
+       worldEntity_.reference00!=1)return false;
+    static_assert(sizeof(float)==sizeof(std::uint32_t));
+    std::memcpy(origin.data(),worldApplication_->worldOrigin442F80_.data(),sizeof(origin));
+    std::memcpy(forward.data(),worldApplication_->worldForward442FB0_.data(),sizeof(forward));
+    return true;
+}
+
+bool copySourceWorldUpDefault(std::array<std::uint32_t,4>& up)const noexcept {
+    if(!worldColdConstructed_||!worldApplication_||worldEntity_.reference00!=1)return false;
+    static_assert(sizeof(float)==sizeof(std::uint32_t));
+    std::memcpy(up.data(),worldApplication_->worldUp442FA0_.data(),sizeof(up));return true;
+}
+
     using Entity=g::OriginalWreckComponent50LA;
     std::shared_ptr<g::original_gc_gameplay_lighting_candidate::Owner> lighting_;
     std::shared_ptr<ra_source_camera50LA::OwnershipBridge> runtimeQueries_;
@@ -81,6 +102,21 @@ private:
     bool retireNativeFogCustody(std::uint32_t&)noexcept;
     // Actual World4A0 role aliases the already counted/pinned native owner.
     g::OriginalTrackParticleCold50LA* nativeParticleManager4A0_=nullptr;
+    //Authoritative World3C4: actual pointer-array metadata borrowing the SAME
+    //prewarmed counted StaticModels Parent.entity identities. No reinterpret
+    //of vector<unique_ptr<Parent>>, copied rows or duplicate model owner.
+    std::optional<Entity**> sourceModels3C4_;
+    std::unique_ptr<Entity*[]> sourceModelParents3C4_;
+    ra_static_model_cold50LA::Owner* sourceModelOwner3C4_=nullptr;
+    std::size_t sourceModelParentsPublished3C4_=0;
+    bool modelParents3C4Attempted_=false,modelParents3C4Complete_=false;
+    std::uint32_t modelParents3C4PC_=0x271124;
+    bool initializeModels3C42705A8()noexcept {
+        if(sourceModels3C4_||sourceModelParents3C4_||sourceModelOwner3C4_||modelParents3C4Attempted_)return false;
+        sourceModels3C4_=nullptr;return true;
+    }
+    bool modelParents3C4Current(const ra_static_model_cold50LA::Owner*,bool complete=true)const noexcept;
+    bool withdrawModelParents3C4()noexcept;
     const std::string* nativeParticleTexture41C_=nullptr; //Actual EnvironmentInfo immutable value.
     bool nativeParticleManagerAttempted_=false,nativeParticleManagerComplete_=false;
     bool completeNativeParticleManager1B4DC0(const ra_cold_sources50LA::Owner&,
@@ -88,6 +124,19 @@ private:
     // Only the existing derived aggregate's sound-list constructor/retirement
     // cuts use these private base-owned authority leaves. No authority escapes.
     bool reserveNativeSoundListCustody()noexcept;
+    bool reserveSourceAmbientListNative()noexcept;
+    bool reserveSourceSoulTreeSoundListNative()noexcept;
+    bool reserveSourceMaterialSoundListNative()noexcept;
+    bool constructSourceMaterialSoundList279AA0(Entity&,bool drive,bool&,bool&,std::uint32_t&)noexcept;
+    bool preflightSourceMaterialSoundListCountNative(const Entity&,bool,bool)const noexcept;
+    bool releaseSourceMaterialSoundListCountNative(Entity&,bool&,bool&)noexcept;
+    bool constructSourceSoulTreeSoundList279850(Entity&,bool&,bool&,std::uint32_t&)noexcept;
+    bool preflightSourceSoulTreeSoundListCountNative(const Entity&,bool,bool)const noexcept;
+    bool releaseSourceSoulTreeSoundListCountNative(Entity&,bool&,bool&)noexcept;
+    bool constructSourceAmbientList2792E0(Entity&,bool&,bool&,std::uint32_t&)noexcept;
+    bool preflightSourceAmbientListCountNative(const Entity&,bool,bool)const noexcept;
+    bool releaseSourceAmbientListCountNative(Entity&,bool&,bool&)noexcept;
+    bool destroySourceEmptyAmbient279320(Entity&,bool&,bool&,std::optional<std::uint32_t>&,std::uint32_t&)noexcept;
     bool canEnrollNativeSoundListCustody(const Entity&)const noexcept;
     void constructNativeSoundListCustody(Entity&)noexcept;
     bool canRetireNativeSoundListCustody(const Entity&)const noexcept;
@@ -103,10 +152,18 @@ private:
     struct NativeEmptyInstances3DC {
         std::shared_ptr<rr::platform::OriginalUiMainApplication50KG> application;
         std::shared_ptr<rr::platform::OriginalUiGarageInstanceMaster50KG> master;
-        const void* descriptors3DC=nullptr; //Fresh native no-allocation role, not270550 receipt.
-        std::int32_t count3E0=0;
         bool published=false,complete=false;
+        //Exclusive actual270FD0 route; legacy completed metadata is not adopted.
+        bool sourceMode=false,sourceOuterReturned=false,sourceConstructorPublished=false;
+        bool sourceCallerPublished=false;
+        const Entity* sourceWorld=nullptr;
+        std::uint64_t sourceGeneration=0;
+        std::thread::id sourceThread;
     };
+    //Authoritative source lanes, unknown until fresh2705B4/B8. Resource
+    //domain construction must not silently stand in for these World stores.
+    std::optional<const void*> nativeInstanceDescriptors3DC_;
+    std::optional<std::int32_t> nativeInstanceCount3E0_;
     std::optional<NativeEmptyInstances3DC> nativeEmptyInstances3DC_;
     struct NativeFinishLine540 {
         std::unique_ptr<g::OriginalPodCableStripCold50LA> strip;
@@ -131,8 +188,27 @@ private:
     bool retireNativeInstanceMaster()noexcept;
     // Constructor-only prefix on this SAME concrete scene. No second world.
     std::unique_ptr<g::OriginalWorldPhysicsIndex50LA> worldPhysics3D4_;
+    bool livePhysicsIndexAttempted_=false,livePhysicsIndexComplete_=false;
+    std::uint32_t livePhysicsIndexPC_=0x270cc4;
+    bool constructLivePhysicsIndex270CDC(std::shared_ptr<const ra_cold_sources50LA::Owner>,std::uint32_t&)noexcept;
+    bool restartWorldPhysicsAttempted_=false;
+    std::uint32_t restartWorldPhysicsPC_=0x27030c;
+    std::optional<std::uint32_t> restartTriggerCount30_;
+    std::uint32_t restartTriggerIndexS3_=0,restartTriggerOffsetS1_=0;
+    std::uint32_t restartActionIndexS4_=0,restartActionOffsetS0_=0;
+    struct NativeTriggerDescriptor;
+    const NativeTriggerDescriptor* restartTriggerDescriptor_=nullptr;
+    std::optional<std::int32_t> restartActionCount04_,restartActionType00_;
+    bool restartWorldPhysicsReturned_=false;
+    bool resetLiveWorldPhysics2702E0(const std::shared_ptr<g::OriginalApplicationEntities50LA>&,
+        std::uint64_t,std::uint32_t&)noexcept;
     bool prepareWorldPhysicsIndex270CDC(std::shared_ptr<const ra_cold_sources50LA::Owner>,std::uint32_t&)noexcept;
     std::unique_ptr<g::OriginalWorldCollisionObjects50LA> worldCollisionObjects3CC_;
+    //270550 does not write3CC. Only actual1B4EFC publishes this lane.
+    std::optional<Entity**> sourceCollisionObjects3CC_;
+    bool sourceCollisionObjectsAttempted_=false; //Sticky source/native-mode exclusion.
+    bool reserveSourceCollisionAuthorityNative()noexcept;
+    bool constructSourceCollisionGroup27BB40(std::size_t,std::uint32_t&)noexcept;
     bool prepareWorldCollisionObjects271230(std::shared_ptr<const ra_cold_sources50LA::Owner>,std::uint32_t&)noexcept;
     bool canReleaseWorldCollisionObjects27BB80(std::uint32_t&)const noexcept;
     bool releaseWorldCollisionObjects27BB80(std::uint32_t&)noexcept;
@@ -159,10 +235,20 @@ private:
         std::shared_ptr<rr::assets::OriginalStandardTextureResolver50LA>,rr::assets::OriginalStandardTextureDiagnostic50LA&)noexcept;
     // Actual transient World3C8 ToyList on the authenticated RA no-Animations
     // branch. No toy records, pointer array, manager or surrogate count owner.
+// Replace NativeEmptyToyList3C8 declaration, retaining its single unique_ptr holder.
     struct NativeEmptyToyList3C8 {
         Entity entity;
-        std::uint32_t count30=0; //2D9B60; source34 remains null on this branch.
+        std::uint32_t count30=0;
+        bool sourceMode=false,sourceCounted=false,sourceEnrolled=false;
+        bool sourceVtableKnown=false,sourceCountKnown=false,sourceArrayKnown=false;
+        std::uint32_t sourceVtable08=0;
+        const void* sourceArray34=nullptr;
     };
+    bool sourceToyAttempted_=false; //Sticky source/legacy exclusion, no guest readiness.
+    bool reserveSourceToyAuthorityNative()noexcept;
+    bool constructSourceToy2D9B40(std::uint32_t&)noexcept;
+    bool canRetireSourceToyNative()const noexcept;
+    bool retireSourceToyCountNative(std::uint32_t&,bool sourceDestructor=false)noexcept;
     std::unique_ptr<NativeEmptyToyList3C8> nativeEmptyToyList3C8_;
     bool loadNativeEmptyAnimations2713E0(const rr::assets::ParameterDocument48F&,std::uint32_t&)noexcept;
     struct NativeSkyInner128930 {
@@ -278,7 +364,59 @@ private:
         bool persistentConstructed=false,complete=false,retiring=false;
         std::uint32_t failurePC=0;
     };
+    // Real load-issued descriptor metadata; no second trigger or action engine.
+    using NativeActionDescriptor=ra_trigger_actions50LA::Owner::NativeActionDescriptor;
+// Base protected actual-global copier, next to existing World vector copiers.
+    bool copySourceTriggerOrigin(std::array<std::uint32_t,4>& out)const noexcept {
+        if(!worldColdConstructed_||!worldApplication_||worldEntity_.reference00!=1)return false;
+        std::memcpy(out.data(),worldApplication_->triggerOrigin444560_.data(),sizeof(out));return true;
+    }
+// Add before NativeTriggerDescriptor; genuine source geometry64 plain80B backing.
+    struct SourceTriggerGeometry2DBEB4 {
+        std::array<std::uint32_t,4> position00,box10,look20,up30;
+        std::uint32_t yaw40,pitch44,roll48,radius4C;
+    };
+    static_assert(sizeof(SourceTriggerGeometry2DBEB4)==80,"source trigger geometry width");
+    struct SourceTriggerDescriptor2DC578 {
+        std::int32_t zone08=0,enabled0C=0,random10=0;
+        std::array<char,40> name14,ignore3C;
+        std::uint32_t vtable6C=0,known=0;
+        std::unique_ptr<SourceTriggerGeometry2DBEB4> geometry64; //Native backing custody.
+        std::optional<SourceTriggerGeometry2DBEB4*> sourceGeometry64; //Actual descriptor64 lane.
+        bool geometryAllocationReturned=false,geometryPublished=false,geometryConstructed=false;
+        bool nameKnown=false,ignoreKnown=false;
+    };
+    struct NativeTriggerDescriptor {
+    bool sourceActionLogAttempted=false,sourceActionLogError=false,sourceDescriptorReturned=false;
+    std::size_t sourceActionLogBytes=0;
+
+    bool sourceActionAttempted=false,sourceActionsAllocated=false,sourceActionAllocated=false;
+    bool sourceActionTypeWritten=false,sourceActionReaderComplete=false,sourceActionNativeWithdrawn=false;
+
+    std::unique_ptr<g::OriginalWorldTriggerInstance50LA> sourceInstance;
+    bool sourceInstanceAttempted=false,sourceInstancePublished=false;
+    //Retained native representation of the actual callee stack50/60/70/80;
+    //not additional source descriptor fields.
+    std::optional<std::array<std::array<std::uint32_t,4>,4>> sourceInstanceStackVectors;
+    bool sourceInstanceNoOpReturned=false;
+
+        std::optional<SourceTriggerDescriptor2DC578> sourceFields;
+        Entity* trigger00=nullptr;
+        std::int32_t actionCount04=0;
+        const ra_trigger_authoring50LA::Source* authoring=nullptr;
+        std::unique_ptr<NativeActionDescriptor*[]> actions68;
+        std::unique_ptr<NativeActionDescriptor> action;
+        std::size_t actionSlotsPublished=0;
+        bool complete=false;
+    };
     struct NativeTriggerList3D0 {
+    std::array<bool,2> sourceDescriptorNativeRetired{};
+
+    bool sourceMode=false,sourceEnrolled=false,sourceCountKnown=false,sourceArrayKnown=false;
+    bool sourceArrayAllocationReturned=false;
+    std::uint32_t sourceVtable08=0;
+    bool sourceVtableKnown=false;
+
         Entity entity;
         bool counted=false;
         std::uint32_t count30=0;
@@ -286,13 +424,44 @@ private:
         std::shared_ptr<ra_static_candidates50LA::Owner> candidates;
         std::shared_ptr<const ra_trigger_authoring50LA::Owner> authoring;
         std::shared_ptr<ra_trigger_actions50LA::Owner> actions;
-        std::array<const ra_trigger_authoring50LA::Source*,2> descriptors34{};
+        std::unique_ptr<NativeTriggerDescriptor*[]> descriptors34;
+        std::array<std::unique_ptr<NativeTriggerDescriptor>,2> descriptorOwners;
+        std::size_t descriptorSlotsPublished=0;
+        bool readerEntered=false,descriptorsRetired=false;
+        std::uint32_t readerPC=0x2dc430;
         std::array<std::unique_ptr<NativeTriggerObserver>,2> observers;
         std::array<bool,2> parented{},geometryRoleConsumed{};
         std::size_t servicesCompleted=0;
         bool serviceEntered=false,serviceTerminal=false,serviceComplete=false;
         bool complete=false;
     };
+    bool sourceTriggerAttempted_=false;
+    bool reserveSourceTriggerAuthorityNative()noexcept;
+    bool constructSourceTriggerList2DC320(std::uint32_t&)noexcept;
+    bool canRetireSourceTriggerNative()const noexcept;
+    bool retireSourceTriggerCountNative(std::uint32_t&)noexcept;
+    bool copySourceTriggerInstanceOrigin(std::array<std::uint32_t,4>& out)const noexcept {
+        if(!worldColdConstructed_||!worldApplication_||worldEntity_.reference00!=1)return false;
+        std::memcpy(out.data(),worldApplication_->triggerInstanceOrigin4438D0_.data(),sizeof(out));return true;
+    }
+    bool reserveSourceTriggerInstanceNative()noexcept;
+    bool constructSourceTriggerInstance2DBFE0(NativeTriggerDescriptor&,const std::array<std::uint32_t,4>&,std::uint32_t&)noexcept;
+    bool setupSourceTriggerInstance2DC01C(NativeTriggerDescriptor&,const std::array<std::uint32_t,4>&,std::uint32_t,std::uint32_t&)noexcept;
+    std::size_t sourceTriggerInstanceCountNative()const noexcept;
+    bool preflightSourceTriggerInstanceNative(const NativeTriggerDescriptor&)const noexcept;
+    bool retireSourceTriggerInstanceNative(NativeTriggerDescriptor&)noexcept;
+
+    bool copySourceTriggerCollisionDefaults(std::array<std::uint32_t,4>& sentinel,
+        std::uint32_t& category)const noexcept {
+        if(!worldColdConstructed_||!worldApplication_||worldEntity_.reference00!=1)return false;
+        const auto& startup=worldApplication_->collisionStartup3C81A0_;
+        sentinel=startup.vectors3E02C0[0];category=startup.globals3E0708[4];return true;
+    }
+    bool sourceTriggerOneTime2DC060(NativeTriggerDescriptor&,std::int32_t)noexcept;
+    bool sourceTriggerParent2DC068(NativeTriggerDescriptor&,const char*,std::size_t)noexcept;
+    bool preflightSourceTriggerActionNative(const NativeTriggerDescriptor&)const noexcept;
+    bool retireSourceTriggerActionNative(NativeTriggerDescriptor&)noexcept;
+
     std::unique_ptr<NativeTriggerList3D0> nativeTriggerList3D0_;
     bool createNativeTriggerList2DC320(std::shared_ptr<ra_static_candidates50LA::Owner>,
         std::shared_ptr<const ra_trigger_authoring50LA::Owner>,std::uint32_t&)noexcept;
@@ -303,11 +472,21 @@ private:
     bool withdrawNativeTriggerObserverStorage()noexcept;
     bool retireNativeTriggerObserver2A0420(std::size_t,std::uint32_t&)noexcept;
     bool completeNativeTriggerServices2DCB30(std::uint32_t&)noexcept;
+    bool nativeTriggerDescriptorCurrent(std::size_t)const noexcept;
+    bool canRetireNativeTriggerDescriptors()const noexcept;
     bool canRetireNativeTriggerList3D0()const noexcept;
     // Private actual2DCC70 leaf only. No World2702E0/restart1AC8E0 caller
     // or reset completion is inferred; collider membership stays untouched.
     bool resetNativeTriggerList2DCC70(const std::shared_ptr<g::OriginalApplicationEntities50LA>&,
         std::uint64_t generation,std::uint32_t& sourcePC)noexcept;
+    struct RestartParticleReset {
+        bool attempted=false,returned=false;
+        std::uint32_t stoppedPC=0x1ac96c;
+        std::optional<std::uint32_t> auxiliaryGate18;
+        std::optional<std::uint32_t> auxiliaryIndexA2,auxiliaryOffsetA3,auxiliaryFillA1;
+    } restartParticleReset_;
+    bool resetNativeParticles161F60(const std::shared_ptr<g::OriginalApplicationEntities50LA>&,
+        std::uint64_t,std::uint32_t&)noexcept;
     bool retireNativeTriggerList3D0()noexcept;
     struct NativeSunFlareInputs {
         //Actual retained reader inputs; not sprite/material/backend resources.
@@ -320,9 +499,17 @@ private:
     struct alignas(64) NativeSunFlarePacket {std::array<std::uint32_t,128> words;};
     static_assert(sizeof(NativeSunFlarePacket)==512,"134000 capacity128 DWORDs");
     struct NativeSunFlare;
-    struct NativeSunFlareCallback {std::uint32_t sourceFunction=0x2c5610;NativeSunFlare* self=nullptr;};
+    struct NativeSunFlareCallback {bool sourceMode=false;std::uint8_t sourceKnownMask=0;std::uint32_t sourceFunction=0x2c5610;NativeSunFlare* self=nullptr;};
     struct alignas(64) NativeSunFlareReadback {std::array<std::uint8_t,1024> bytes;};
     struct NativeSunFlareParameters {
+        bool sourcePacketAttempted=false,sourceBufferPublished=false;
+        std::optional<std::uint32_t*> sourceBuffer20;
+        std::array<bool,128> sourcePacketWordKnown{};
+        std::uint32_t sourceHeaderKnownMask=0;
+        std::uint64_t sourcePacketHistorySerial=0;
+        bool sourcePacketHistoryWithdrawn=false;
+        bool sourceMode=false;
+        std::uint32_t sourceKnownMask=0;
         std::array<std::optional<std::uint32_t>,8> unknown00To1C{};
         std::unique_ptr<NativeSunFlarePacket> packet;
         const std::uint32_t* nativePayload04=nullptr;
@@ -333,6 +520,12 @@ private:
         std::uint32_t count24=0,count28=0;std::int32_t field2C=-1;
     };
     struct NativeSunFlarePrimitive {
+        bool sourceMode=false;
+        std::uint32_t sourceKnownMask=0;
+        std::optional<std::uint32_t> sourceVtable08;
+        std::optional<NativeSunFlareParameters*> sourceParameters10;
+        const std::string* sourceRowName=nullptr;
+        bool sourceReferenceReleased=false;
         std::int32_t material00=-1;
         std::unique_ptr<NativeSunFlareCallback> optional04;
         std::nullptr_t optional14=nullptr;
@@ -345,10 +538,31 @@ private:
         std::string requested;
     };
     struct NativeSunFlareMaterial {
+        bool sourceCallbackAttempted=false,sourceCallbackPublished=false;
+        std::optional<NativeSunFlareCallback*> sourceCallback04;
+        NativeSunFlare* sourceCallbackOwner=nullptr;
+        bool sourcePacketNativeWithdrawn=false;
+        std::optional<std::uint32_t> sourcePacketRetiredCount,sourcePacketRetiredCapacity,sourcePacketRetiredHeaderMask;
+        std::optional<std::uint64_t> sourcePacketRetiredSerial;
+        bool sourceMode=false,sourceNativeClosed=false;
+        bool sourceParametersAttempted=false,sourceParametersPublished=false;
+        bool sourcePrimitiveAttempted=false,sourcePrimitivePublished=false;
+        std::optional<NativeSunFlareParameters*> sourceParameters08;
+        std::optional<NativeSunFlarePrimitive*> sourcePrimitive04;
+        std::shared_ptr<rr::assets::OriginalStandardMaterialTable50LA> sourceTable;
+        std::shared_ptr<const rr::assets::OriginalUiMaterialApplication50LA> sourceApplication;
+        std::array<char,256> sourcePath40{};
+        bool sourcePathKnown=false;
+        std::string sourceRequested;
         std::unique_ptr<NativeSunFlarePrimitive> primitive04;
         std::unique_ptr<NativeSunFlareParameters> parameters08;
     };
     struct NativeSunFlareSprite {
+        std::uint32_t sourceSetterMask=0;
+        bool sourceMode=false;
+        std::optional<std::uint32_t> sourceVtable00;
+        std::uint32_t sourceKnownMask=0;
+
         NativeSunFlareMaterial material;
         std::optional<std::int32_t> x0C,y10; //Unwritten by2E5E60.
         std::uint32_t width14=0,height18=0;
@@ -358,6 +572,23 @@ private:
         std::uint8_t alpha48=255;
     };
     struct NativeSunFlare {
+bool sourceCallbackSelfStored=false;
+bool sourceColors44Attempted=false,sourceColors44Published=false;
+bool sourceColors48Attempted=false,sourceColors48Published=false;
+bool sourceReadbackAttempted=false,sourceReadbackPublished=false;
+std::optional<std::array<float,4>*> sourceColors44,sourceColors48;
+std::optional<NativeSunFlareReadback*> sourceReadback78;
+std::optional<std::uint32_t> sourceColors44Count,sourceColors48Count;
+bool sourceDepthStored=false;
+
+std::array<std::uint8_t,10> sourceSaturation44Known{},sourceSaturation48Known{};
+        bool sourceMode=false,sourceEnrolled=false;
+        std::uint32_t sourceConstructorMask=0;
+        bool sourceConstructorReturned=false,sourceZonesStored=false;
+        bool sourceDirectionStored=false,sourceMinStored=false,sourceMaxStored=false;
+        bool sourceModeStored=false,sourceSpriteAttempted=false,sourceSpritePublished=false;
+        std::optional<NativeSunFlareSprite*> sourceSprite64;
+
         Entity entity;
         bool counted=false;
         const std::uint32_t sourceVtable08=0x003d4d90;
@@ -385,16 +616,32 @@ private:
         NativeSunFlareInputs inputs;
     };
     struct NativeSunFlareDomain {
+        bool sourceMode=false,sourceNativeClosed=false;
+        bool sourcePointerPublished=false,sourceOwnerAttempted=false,sourceSlotPublished=false;
+        const g::OriginalApplicationEntities50LA* sourceApplication=nullptr;
+        std::thread::id sourceThread;
+
         //A NEW native exclusive domain, NOT a receipt that2705F0 ran.
         //No prior native flare service exists, and this cannot reset another.
         std::uint64_t generation=0;
         std::optional<std::uint32_t> count4A8;
-        std::unique_ptr<NativeSunFlare*[]> pointers4A4;
+        std::unique_ptr<NativeSunFlare*[]> pointerBacking;
+        bool pointerAllocationAttempted=false;
         std::unique_ptr<NativeSunFlare> owner;
     };
+    //World4A4 publication, separate from its sole owned pointer backing.
+    //Fresh2705F0 writes null;270550 NEVER writes count4A8.
+    std::optional<NativeSunFlare**> nativeSunFlarePointers4A4_;
     std::optional<NativeSunFlareDomain> nativeSunFlares_;
+    bool reserveSourceSunFlareNative()noexcept;
+    bool constructSourceSunFlare2C5730(std::uint32_t&)noexcept;
+    bool constructSourceSunFlareSprite2E5E60(std::uint32_t,std::uint32_t&)noexcept;
+    bool canRetireSourceSunFlareNative()const noexcept;
+    bool retireSourceSunFlareNative()noexcept;
     bool beginNativeSunFlareDomain271E5C(std::uint32_t&)noexcept;
     bool constructNativeSunFlare2C5730(NativeSunFlareInputs,std::uint32_t&)noexcept;
+    static bool canRetireSourceSunFlareMaterialNative(const NativeSunFlareMaterial&)noexcept;
+    static bool retireSourceSunFlareMaterialNative(NativeSunFlareMaterial&)noexcept;
     static bool canRetireNativeSunFlareMaterial(const NativeSunFlareMaterial&)noexcept;
     static void retireNativeSunFlareMaterial(NativeSunFlareMaterial&)noexcept;
     bool canRetireNativeSunFlare()const noexcept;
@@ -403,6 +650,26 @@ private:
     // guarded countedWorld constructor. Historical guest400/3FC remain unknown.
     std::shared_ptr<native_world_water50LA::Domain> nativeWaterDomain_;
     const native_world_water50LA::Domain* readNativeAbsentWater400(std::uint32_t&)const noexcept;
+    //Canonical source publications missing from earlier native adaptations.
+    //No historical zero ledger: load writers/readers use these same lanes.
+    std::array<std::optional<std::uint8_t>,260> worldText3C_,worldText140_,worldText244_;
+    std::optional<const void*> worldBoundary348_,worldZoneInfo350_;
+    std::optional<std::uint32_t> worldZones34C_,worldPortals358_;
+    std::uint8_t world390KnownValue_=0,world390KnownMask_=0;
+    std::uint8_t world4F0KnownValue_=0,world4F0KnownMask_=0;
+    std::optional<g::original_world_environment50KG::Owner*> nativeEnvironment3A4_;
+    //No positive owner/producer is admitted for these source roles yet.
+    //Unknown before270550; null only after its actual fresh ordered store.
+    std::optional<const void*> worldWater3FC_,worldWater400_,worldWater404_,worldEcosystem408_;
+    struct UnjoinedToyManager101330;
+    std::optional<UnjoinedToyManager101330*> worldToyManager49C_;
+    std::optional<const void*> worldPhysicsObjectPointers4B4_,worldRole4B8_;
+    std::optional<std::uint32_t> worldPhysicsObjectCount4B0_;
+    std::array<std::optional<const void*>,5> worldRoles4DCTo4EC_;
+    bool worldReset270550Attempted_=false,worldReset270550Complete_=false;
+    std::uint32_t worldReset270550PC_=0x270550;
+    // Native read-through Racer leases pin these actual World source lanes.
+    std::size_t constructorRacerWorldBorrows_=0;
     Entity worldEntity_;
     std::shared_ptr<g::OriginalApplicationEntities50LA> worldApplication_;
     // Native collision storage can precede the counted world prefix. Retain
@@ -418,13 +685,40 @@ private:
     bool worldColdConstructed_=false,worldColdAttempted_=false;
     bool constructWorldColdPrefix(std::shared_ptr<g::OriginalApplicationEntities50LA>,
         rr::platform::RaceAudioGroups50IC&,rr::platform::AudioMixer50HD&,std::uint64_t,
-        const track_height_cold50JB::Owner&,std::uint32_t&)noexcept;
+        const track_height_cold50JB::Owner&,std::uint32_t&,ra_cold_aggregate50LA::Owner&)noexcept;
     bool rollbackNativeWorldConstructionFailure(std::uint32_t&)noexcept;
-    bool canRetireNativeWorldPrefix(const char** gate=nullptr)const noexcept;
+// Protected base Owner declarations. Exact same World/Application authority;
+// no sceneApplication_/native-emitter adoption.
+bool reserveSourceParticleListNative()noexcept;
+bool constructSourceParticleList27DC90(Entity&,bool& counted,bool& enrolled,std::uint32_t&)noexcept;
+bool preflightSourceParticleListCountNative(const Entity&,bool counted,bool enrolled)const noexcept;
+bool releaseSourceParticleListCountNative(Entity&,bool& counted,bool& enrolled)noexcept;
+
+    bool canRetireNativeWorldPrefix(const char** gate=nullptr,std::size_t extraSourceOwnedCount=0)const noexcept;
     bool retireNativeWorldPrefixAfterOwnedCleanup(std::uint32_t&)noexcept;
     //New source Entity custody on the existing canonical portal geometry;
     //not a second portal geometry/visibility collection. Exact source-order
     //ten-Portal prefix, each actual owner retained before its fallible loader.
+//Insert immediately before SAME NativePortal230370 declaration.
+struct SourcePortal230450State {
+    using Words=std::array<std::uint32_t,4>;
+    std::optional<std::uint32_t> vtable08;
+    std::array<Words,4> vertices30,edges80;
+    Words normal70;
+    std::uint8_t constructorVertices=0,constructorEdges=0,copiedVertices=0,normalKnown=0;
+    std::array<std::uint8_t,4> edgeKnown{};
+    std::array<bool,4> edgeCrossStored{},edgeNormalized{};
+    bool normalCrossStored=false,normalNormalized=false,normalConstructor=false;
+    bool constructorReturned=false,enrolled=false,loadReturned=false;
+    bool quadCopied=false,quadReturned=false,diagonalReturned=false;
+    std::array<std::optional<std::uint32_t>,24> loaderStack;
+    std::array<std::optional<std::uint32_t>,8> reorderStack;
+    std::optional<std::uint32_t> quadAreaA,quadAreaB;
+    std::array<std::optional<std::uint32_t>,20> diagonalStack,normalStack;
+    std::optional<std::uint32_t> connectA,connectB; //Actual zero-based caller copies, parent stores at272BA8/AC.
+    std::size_t worldLinksProduced=0;
+};
+
     struct NativePortal230370 {
         Entity entity;
         const std::uint32_t vtable08=0x003d18f0;
@@ -437,17 +731,37 @@ private:
         std::optional<float> maximumDiagonalC0;
         bool counted=false,loaded=false,attached=false,lightLinksComplete=false;
         std::size_t worldLinksPublished=0;
+//Append inside SAME NativePortal230370; existing fields unchanged.
+        bool sourceMode=false;
+        SourcePortal230450State source;
+
     };
     std::array<std::unique_ptr<NativePortal230370>,10> nativePortals_;
     std::size_t nativePortalNext_=0;
+    // Genuine plain276590 parameter rows. NOT counted Portal230450 objects.
+    struct SourcePortalParameter276590 {
+        std::array<std::array<std::uint32_t,4>,4> vertices00;
+        std::int32_t connect40,connect44;
+        std::uint32_t vtable48;
+        // Original4C..4F padding has no source producer/knowledge here.
+    };
     struct NativePortalParameterRole3A0 {
         //Explicit native immutable-authoring borrower role, NOT retail
         //270C64 array allocation or destructive270550 reset execution.
         const rr::assets::WorldPortal48F* rows=nullptr;
         std::size_t count=0;
         bool retired=false;
+        // Exclusive source-array custody. Above legacy metadata stays empty.
+        bool sourceMode=false,sourcePublished=false,sourceReleased=false;
+        std::unique_ptr<SourcePortalParameter276590[]> sourceArray;
+        const g::OriginalApplicationEntities50LA* sourceApplication=nullptr;
+        std::uint64_t sourceGeneration=0;
+        std::thread::id sourceThread;
+        // Native preadmitted immutable actual App442F80 words, not source fields.
+        std::array<std::uint32_t,4> sourceOrigin;
     };
     std::optional<NativePortalParameterRole3A0> nativePortalParameters3A0_;
+    std::optional<SourcePortalParameter276590*> sourcePortal3A0_;
     using NativeListMethodCustody=g::OriginalNativeListMethodCustody50LA;
     std::unique_ptr<NativeListMethodCustody*[]> nativeMethods4C8_,nativeMethods4CC_,nativeMethods4D0_,nativeMethods4D4_;
     std::size_t nativeMethodRowsInitialized_=0,nativeMethodZoneNext_=0;
@@ -487,6 +801,82 @@ private:
         bool exclusionsComplete=false;
         bool constructed=false,attached=false;
     };
+//Insert after SearchNode (NativePortalLink27F3B0 and NativePortal230370 complete).
+struct SourcePortalAttempt272B3C {
+    bool attempted=false,loadAttempted=false,withdrawn=false;
+    std::optional<SourcePortal230450State::Words> lastParameterLoad;
+    std::uint8_t parameterLoads=0;
+    std::uint32_t pc=0;
+};
+struct SourcePortalWorldLink27F3B0 {
+    std::unique_ptr<NativePortalLink27F3B0> pending;
+    NativePortalLink27F3B0* published=nullptr;
+    const NativePortalLink27F3B0* sourceNext=nullptr;
+    SearchNode* from=nullptr;SearchNode* to=nullptr;
+    bool attempted=false,withdrawn=false;
+    std::uint8_t knownMask=0;
+};
+std::array<SourcePortalAttempt272B3C,10> sourcePortalFrames_;
+std::array<std::array<SourcePortalWorldLink27F3B0,4>,10> sourcePortalWorldLinks_;
+bool sourcePortalCohortAdmitted_=false;
+std::uint8_t sourcePortalViewportKnown_=0;
+bool reserveSourcePortalCohortNative()noexcept;
+bool allocateSourcePortal230370(std::size_t,std::uint32_t&)noexcept;
+bool loadSourcePortal230450(std::size_t,std::uint32_t&)noexcept;
+bool attachSourcePortal141960(std::size_t,Entity*,std::uint32_t&)noexcept;
+bool linkSourcePortalWorld27F3B0(std::size_t,std::size_t,std::uint32_t,std::uint32_t,std::uint32_t&)noexcept;
+bool preflightSourcePortalOwnersNative(const Entity*)const noexcept;
+bool sourcePortalOwnersCounted(std::size_t&)const noexcept;
+bool sourcePortalWorldLinksCurrent(const SearchNode&,bool,std::size_t)const noexcept;
+bool preflightSourcePortalContainerNative(const Entity&,bool,bool)const noexcept;
+bool withdrawSourcePortalWorldLinksNative(std::uint32_t&)noexcept;
+bool retireSourcePortalsNative(Entity*,std::uint32_t&)noexcept;
+
+// Protected base Owner additions beside SearchNode. Same actual node type/backing.
+struct SourceSearchNode27F120 {
+    std::unique_ptr<SearchNode> owner;
+    bool attempted=false,counted=false,enrolled=false,published=false,ordinalKnown=false,withdrawn=false;
+    std::uint16_t constructorMask=0;
+    std::optional<std::uint32_t> vtable08;
+    std::optional<const void*> pointer3C,pointer44,pointerA0;
+    bool exclusionAttempted=false,exclusionAllocationReturned=false,exclusionReturned=false;
+    std::size_t exclusionProduced=0;
+};
+//Protected base additions after complete SearchNode; parent merges only.
+struct SourceListMethodAttempt {
+    std::unique_ptr<NativeListMethodCustody> owner;
+    SearchNode* aliasNode=nullptr;
+    bool attempted=false,returned=false,arrayPublished=false,aliasAttempted=false,aliasPublished=false,aliasRetained=false,withdrawn=false;
+    std::uint32_t pc=0;
+};
+std::array<std::array<SourceListMethodAttempt,10>,4> sourceListMethods_;
+bool allocateSourceListMethod27E260(std::size_t,std::size_t,std::uint32_t&)noexcept;
+bool sourceListMethodReturned(std::size_t,std::size_t,NativeListMethodCustody*&)const noexcept;
+bool sourceListMethodArrayCurrent(std::size_t,std::size_t,const NativeListMethodCustody*)const noexcept;
+bool aliasSourceListMethod27F420(std::size_t,std::size_t,SearchNode*,std::uint32_t&)noexcept;
+bool preflightSourceListMethodsNative()const noexcept;
+bool sourceListMethodAliasesCurrent(const SearchNode&,bool,std::size_t)const noexcept;
+bool retireSourceListMethodsNative(std::uint32_t&)noexcept;
+
+//Insert after SourceSearchNode27F120 definition, protected base Owner.
+struct SourceMethodNodeAttachment141960 {
+    SearchNode* identity=nullptr; //Historical after withdrawal; never dereference then.
+    bool attempted=false,returned=false,withdrawn=false;
+};
+std::array<SourceMethodNodeAttachment141960,20> sourceMethodNodeAttachments_;
+std::size_t sourceMethodNodeNext_=0;
+bool sourceMethodNodesDetaching_=false;
+bool attachSourceMethodNode141960(SourceSearchNode27F120&,bool,std::size_t,Entity*,std::uint32_t&)noexcept;
+bool sourceMethodNodeAttachmentCurrent(const SearchNode&,bool,std::size_t)const noexcept;
+bool preflightSourceMethodNodeForestNative(const Entity&,const Entity*&,const Entity*&,std::uint32_t&)const noexcept;
+bool preflightSourceMethodNodeAttachmentsNative(const Entity*)const noexcept;
+bool detachSourceMethodNodesNative(Entity*,std::uint32_t&)noexcept;
+
+bool reserveSourceSearchNodesNative()noexcept;
+bool constructSourceSearchNode27F120(SourceSearchNode27F120&,std::uint32_t&)noexcept;
+bool preflightSourceSearchNodeNative(const SourceSearchNode27F120&,std::size_t,bool collision=false)const noexcept;
+bool releaseSourceSearchNodeNative(SourceSearchNode27F120&)noexcept;
+
     // RA's authenticated ten zones; capacity is not a caller-provided count.
     std::array<SearchNode,10> visibility4C0_,collision4C4_;
     std::size_t nativeZoneExclusionsNext_=0;
@@ -495,6 +885,58 @@ private:
         const ra_static_model_cold50LA::Owner*,std::size_t,std::uint32_t&)noexcept;
     bool continueNativeZoneExclusions272A58(const ra_cold_sources50LA::Owner&,std::uint32_t&)noexcept;
     Entity container4BC_;
+    //Actual nullable World publications, separate from stable inline native
+    //backing.4C0/4C4 are pointer ARRAYS, not SearchNode object arrays.
+    std::optional<Entity*> sourceContainer4BC_;
+    std::optional<SearchNode**> sourceVisibility4C0_,sourceCollision4C4_;
+    std::unique_ptr<SearchNode*[]> sourceVisibilitySlots4C0_,sourceCollisionSlots4C4_;
+    std::size_t sourceVisibilityPublished_=0,sourceCollisionPublished_=0;
+    bool sourceTopologyWithdrawn_=false;
+    bool sourceTopologyMode_=false; //Exclusive actual2729E0 custody, never legacy topology readiness.
+    bool constructSourceTopologyContainer141300(Entity&,bool&,bool&,std::uint32_t&)noexcept;
+    // Native lifetime pin of the ACTUAL two published row-zero SearchNodes.
+    // Raw borrower identity avoids World -> bridge -> World ownership cycles.
+    const ra_source_camera50LA::OwnershipBridge* nativeWreckZoneBorrower_=nullptr;
+    const SearchNode* nativeWreckVisibilityNode_=nullptr;
+    const SearchNode* nativeWreckCollisionNode_=nullptr;
+    bool retainNativeWreckFirstZones(ra_source_camera50LA::OwnershipBridge*,std::uint64_t,
+        g::OriginalWreckSetupZones50LA&,g::CollectionRef50BX&,g::CollectionRef50BX&)noexcept;
+    bool releaseNativeWreckFirstZones(ra_source_camera50LA::OwnershipBridge*)noexcept;
+    bool retainNativeWreckParticles(ra_source_camera50LA::OwnershipBridge*,
+        g::OriginalTrackParticleCold50LA*)noexcept;
+    //Fresh270550 only; core constructor invokes these individually in order.
+    bool initializeTopology4BC270600()noexcept {
+        if(sourceTopologyMode_||topologyAttempted_||sourceContainer4BC_||container4BC_.reference00)return false;
+        sourceContainer4BC_=nullptr;return true;
+    }
+    bool initializeTopology4C0270604()noexcept {
+        if(sourceTopologyMode_||topologyAttempted_||sourceVisibility4C0_||sourceVisibilitySlots4C0_)return false;
+        sourceVisibility4C0_=nullptr;return true;
+    }
+    bool initializeTopology4C4270608()noexcept {
+        if(sourceTopologyMode_||topologyAttempted_||sourceCollision4C4_||sourceCollisionSlots4C4_)return false;
+        sourceCollision4C4_=nullptr;return true;
+    }
+    bool sourceTopologyCurrent(bool complete)const noexcept {
+        if(sourceTopologyMode_||sourceTopologyWithdrawn_||!sourceContainer4BC_||!sourceVisibility4C0_||!sourceCollision4C4_||
+           *sourceContainer4BC_!=(container4BC_.reference00?&container4BC_:nullptr)||
+           *sourceVisibility4C0_!=sourceVisibilitySlots4C0_.get()||
+           *sourceCollision4C4_!=sourceCollisionSlots4C4_.get()||
+           sourceVisibilityPublished_>10u||sourceCollisionPublished_>sourceVisibilityPublished_)return false;
+        for(std::size_t z=0;z<sourceVisibilityPublished_;++z)
+            if(!sourceVisibilitySlots4C0_||sourceVisibilitySlots4C0_[z]!=&visibility4C0_[z]||!visibility4C0_[z].constructed)return false;
+        for(std::size_t z=0;z<sourceCollisionPublished_;++z)
+            if(!sourceCollisionSlots4C4_||sourceCollisionSlots4C4_[z]!=&collision4C4_[z]||!collision4C4_[z].constructed)return false;
+        return !complete||(sourceVisibilityPublished_==10u&&sourceCollisionPublished_==10u&&
+            *sourceContainer4BC_==&container4BC_);
+    }
+    void withdrawSourceTopologyAliases()noexcept {
+        if(sourceTopologyMode_)return; //Dedicated source abort owns unknown withdrawal, never legacy NULL.
+        //Native cleanup revocation BEFORE any source object payload retires.
+        //Not a retail26FD80 completion or loaded-world reset.
+        sourceContainer4BC_=nullptr;sourceVisibility4C0_=nullptr;sourceCollision4C4_=nullptr;
+        sourceTopologyWithdrawn_=true;
+    }
     SearchNode environment443108_;
     std::unique_ptr<g::OriginalVisibilityQuadTree50LA> environmentMethod_;
     bool method34Retained_=false,method38Retained_=false,constructorReferenceReleased_=false;
@@ -724,11 +1166,42 @@ private:
         rr::platform::OriginalUiLightManagerOwner50KG&,std::uint32_t&)noexcept;
     bool retireNativeAmbientLight(const ::ra_cold_aggregate50LA::Owner&,
         rr::platform::OriginalUiLightManagerOwner50KG&)noexcept;
+struct SourceLightDescriptor277220 {
+    std::uint32_t type00;
+    std::array<std::uint32_t,4> color04;
+    std::unique_ptr<std::array<std::uint32_t,4>> position14,look18,attenuation1C;
+    std::int32_t zone20;std::uint32_t range24;
+    std::uint8_t flags28=0,knownFlags28=0; //Bit7 never inferred.
+    std::optional<std::uint32_t> inner2C,outer30;
+    std::array<std::uint8_t,5> lensLayers34;
+    std::array<std::uint32_t,4> lensColor3C;
+    std::uint32_t lensBrightness4C;
+    std::array<char,64> lensTexture50;
+    std::size_t lensTextureKnown=0;
+    std::array<std::uint32_t,4> flareColor90;
+    std::uint32_t flareSizeA0;
+    std::array<char,64> flareTextureA4;
+    std::size_t flareTextureKnown=0;
+    std::int32_t flareTurningE4,flashPatternE8;
+    std::uint32_t flashPeriodEC,flashFilterF0,vtableF4;
+    bool constructed=false,loaded=false;
+};
+
     struct NativeLightWrapper277C10 {
         Entity* live00=nullptr; //277D80/146720 still unjoined.
         std::optional<g::original_gc_gameplay_lighting_candidate::RaAuthoredLightIdentity> descriptor04;
+        std::unique_ptr<SourceLightDescriptor277220> sourceDescriptor04;
+        bool sourceConstructed=false,sourceDescriptorPublished=false;
     };
     struct NativeLightList3A8 {
+        bool sourceMode=false,sourceConstructorReturned=false,sourcePublished=false;
+        bool sourceReferenceReleased=false,sourcePayloadReleased=false,sourceEntityRetired=false;
+        bool sourceZoneAllocationReturned=false,sourceArrayAllocationReturned=false;
+        std::size_t sourceWrappersConstructed=0;
+        std::uint32_t sourcePC=0;
+        const std::thread::id sourceThread=std::this_thread::get_id();
+        bool sourceAuthorityEnrolled=false;
+
         Entity entity;bool counted=false;
         const g::original_gc_gameplay_lighting_candidate::Owner* canonical=nullptr;
         std::uint32_t count30=0;
@@ -739,9 +1212,40 @@ private:
         std::size_t loaded=0,colorsLoaded=0;
     };
     std::unique_ptr<NativeLightList3A8> nativeLightList3A8_;
+    //Separate source custody, never adopted legacy nativeAmbientLight_.
+    std::unique_ptr<NativeRaLight146720> sourceFirstLight_;
+    bool sourceFirstLightOuterReached_=false,sourceFirstLightCounted_=false,sourceFirstLightEnrolled_=false;
+    bool sourceFirstLightDefaults_=false,sourceFirstLightReturned_=false,sourceFirstLightPublished_=false;
+    bool sourceFirstLightNativeDetached_=false;
+    bool attachSourceFirstLight141960(std::uint32_t&)noexcept;
+    bool detachSourceFirstLightNative(std::uint32_t&)noexcept;
+    std::optional<std::uint32_t> sourceFirstLightVtable08_;
+    bool preflightSourceFirstLightNative()const noexcept;
+    bool constructSourceFirstLight146720(std::uint32_t&)noexcept;
+    bool sourceFirstLightLuminance146E60(std::uint32_t&)const noexcept;
+    bool abortSourceFirstLightNative()noexcept;
+    std::unique_ptr<NativeRaLight146720> sourceSecondLight_;
+    bool sourceSecondLightOuterReached_=false,sourceSecondLightCounted_=false,sourceSecondLightEnrolled_=false;
+    bool sourceSecondLightDefaults_=false,sourceSecondLightReturned_=false,sourceSecondLightPublished_=false;
+    std::optional<std::uint32_t> sourceSecondLightVtable08_;
+    std::optional<std::uint32_t> sourceSecondLuminance_;
+    std::optional<std::array<std::uint32_t,4>> sourceSecondPositionWords_,sourceSecondLookInputWords_,sourceSecondNormalizedWords_;
+    bool sourceSecondPositionCompared_=false,sourceSecondLookCompared_=false;
+    bool sourceSecondLightLuminance146E60(std::uint32_t&)const noexcept;
+    bool preflightSourceSecondLightNative()const noexcept;
+    bool constructSourceSecondLight146720(std::uint32_t&)noexcept;
+    bool abortSourceSecondLightNative()noexcept;
+
+    std::optional<NativeLightList3A8*> sourceLight3A8_; // Unknown until actual27059C.
+    bool allocateSourceLightList270AA8(std::uint32_t&)noexcept;
+    bool preflightSourceLightListNative()const noexcept;
+    bool abortSourceLightListNative(std::uint32_t&)noexcept;
+    bool retireSourceLightList142590(std::uint32_t&)noexcept;
+
     bool adoptNativeLightWrappers273AA0(const ra_cold_sources50LA::Owner&,std::uint32_t&)noexcept;
     bool canRetireNativeLightWrappers()const noexcept {
         if(!nativeLightList3A8_)return true;
+        if(nativeLightList3A8_->sourceMode)return false;
         if(!sceneApplication_||sceneApplication_->attachmentLock423F58()||!lighting_)return false;
         const auto& l=*nativeLightList3A8_;const auto& e=l.entity;
         if(!l.counted||l.canonical!=lighting_.get()||l.loaded>185u||l.colorsLoaded>10u||
@@ -861,7 +1365,7 @@ private:
     // not reset/recreate topology, overwrite35C, or grant a source return.
     bool nativeSceneRoles270900Current(const ra_cold_sources50LA::Owner&,std::uint32_t&)const noexcept;
     bool identitiesCurrent()const noexcept {
-        if(!lighting_||!runtimeQueries_||!sceneApplication_||!sceneApplication_->application10()||
+        if(!sourceTopologyCurrent(true)||!lighting_||!runtimeQueries_||!sceneApplication_||!sceneApplication_->application10()||
            runtimeQueries_->sceneOwner_!=this||!runtimeQueries_->storage_.get())return false;
         const auto& s=*runtimeQueries_->storage_.get();
         return s.zones.data()==collisionRows_&&s.zones.size()==10u&&
@@ -870,7 +1374,7 @@ private:
     bool constructTopology(std::shared_ptr<g::OriginalApplicationEntities50LA> application,
         std::uint64_t generation,std::uint32_t& pc)noexcept {
         pc=0;
-        if(topologyAttempted_||topologyClosed_)return fail(pc,0x2729e0);
+        if(sourceTopologyMode_||topologyAttempted_||topologyClosed_||!worldReset270550Complete_)return fail(pc,0x2729e0);
         if(worldColdConstructed_&&(application!=worldApplication_||generation!=worldEntity_.sessionGeneration))
             return fail(pc,0x2729e0);
         if(!application||!generation||!application->application10()||
@@ -892,10 +1396,13 @@ private:
         if(application->objectCount423F60()>std::numeric_limits<std::uint32_t>::max()-22u)
             return fail(pc,0x1413b8);
         topologyAttempted_=true;sceneApplication_=std::move(application);sceneGeneration_=generation;
-        std::size_t count=0;
-        visibilityRows_=lighting_->retainSceneZones272A78(this,count);
-        if(!visibilityRows_||count!=10u)return fail(pc,0x272a78);
-        collisionRows_=collision.zones.data();runtimeQueries_->sceneOwner_=this;
+        //Existing native topology replaces original Boundary272970 and
+        //ZoneInfo270B78 producers. Their source pointers are not represented;
+        //withdraw constructor-null knowledge, never substitute loaded null.
+        worldBoundary348_.reset();worldZoneInfo350_.reset();
+        worldRole4B8_.reset();for(auto& role:worldRoles4DCTo4EC_)role.reset();
+        world390KnownMask_=0;world4F0KnownMask_=0; //Unjoined native LOAD writes are not known unchanged.
+        if(!lighting_->publishNativeEnvironment3A4(*this,source,pc))return false;
         auto construct=[&](Entity& entity,g::OriginalWreckComponentKind50LA kind)->bool {
             const auto result=g::initializeOriginalWreckComponent50LA(entity,kind,generation,key(&entity),true,
                 sceneApplication_->objectCount423F60());
@@ -903,15 +1410,31 @@ private:
             domain_[domainCount_++]=&entity;return true;
         };
         if(!construct(container4BC_,g::OriginalWreckComponentKind50LA::entity141300))return false;
+        sourceContainer4BC_=&container4BC_; //272A1C after actual141300.
+        //Two real native pointer-array allocations/publications, NOT aliases
+        //to object arrays. Failure of the first does not skip the second call.
+        try{sourceVisibilitySlots4C0_.reset(new SearchNode*[10]);}catch(...){sourceVisibilitySlots4C0_.reset();}
+        sourceVisibility4C0_=sourceVisibilitySlots4C0_.get(); //272A2C.
+        try{sourceCollisionSlots4C4_.reset(new SearchNode*[10]);}catch(...){sourceCollisionSlots4C4_.reset();}
+        sourceCollision4C4_=sourceCollisionSlots4C4_.get(); //272A3C.
+        std::size_t count=0;
+        visibilityRows_=lighting_->retainSceneZones272A78(this,count);
+        if(!visibilityRows_||count!=10u)return fail(pc,0x272a48);
+        collisionRows_=collision.zones.data();runtimeQueries_->sceneOwner_=this;
         //272A58..272AE4: visibility constructor, collision constructor, then
         //both ordinal stores, in authored order. No existing row is rewritten.
         for(std::size_t z=0;z<10u;++z){
             auto& v=visibility4C0_[z];auto& c=collision4C4_[z];
             if(!construct(v.entity,g::OriginalWreckComponentKind50LA::searchNode27F120))return false;
             v.constructed=true;v.collectionBacking=&visibilityRows_[z];
+            if(!sourceVisibilitySlots4C0_)return fail(pc,0x272a8c);
+            sourceVisibilitySlots4C0_[z]=&v;++sourceVisibilityPublished_; //272A8C delay store.
             if(!construct(c.entity,g::OriginalWreckComponentKind50LA::searchNode27F120))return false;
             c.constructed=true;c.collectionBacking=&collisionRows_[z];
-            v.ordinal48=c.ordinal48=static_cast<std::uint32_t>(z);
+            if(!sourceCollisionSlots4C4_)return fail(pc,0x272ac0);
+            sourceCollisionSlots4C4_[z]=&c;++sourceCollisionPublished_; //272AC0.
+            v.ordinal48=static_cast<std::uint32_t>(z); //272AD4, AFTER both publications.
+            c.ordinal48=static_cast<std::uint32_t>(z); //272AE4.
         }
         const g::OriginalWreckComponentDomain50LA domain{generation,domain_.data(),domainCount_};
         for(std::size_t z=0;z<10u;++z){
@@ -964,7 +1487,12 @@ private:
         pc=0;return true;
     }
     bool canCloseTopology()const noexcept {
+        if(sourceTopologyMode_)return sourceTopologyWithdrawn_;
+        if(nativeWreckZoneBorrower_||constructorRacerWorldBorrows_)return false;
         if(topologyClosed_||!topologyAttempted_)return true;
+        if(!sourceTopologyWithdrawn_){if(!sourceTopologyCurrent(false))return false;}
+        else if(!sourceContainer4BC_||*sourceContainer4BC_||!sourceVisibility4C0_||*sourceVisibility4C0_||
+            !sourceCollision4C4_||*sourceCollision4C4_)return false;
         if(!sceneApplication_||sceneApplication_->attachmentLock423F58()||!canRetireNativePortals()||
            !nativeMethodArraysCurrent()||!nativeDefaultObserverCurrent()||!canRetireNativeLightWrappers())return false;
         if(visibilityRows_&&(!lighting_||!lighting_->canReleaseSceneZones272A78(this)))return false;
@@ -1019,6 +1547,7 @@ private:
         return !child;
     }
     bool closeTopology()noexcept {
+        if(sourceTopologyMode_)return sourceTopologyWithdrawn_; //No legacy arrays/history rewrite.
         if(topologyClosed_)return true;
         if(!canCloseTopology())return false;
         //Native adopted topology precedes the newly appended portal. Thus its
@@ -1044,6 +1573,7 @@ private:
         //Method arrays survive node alias retirement below. Only known rows
         //can be read; existing canonical Storage retains actual payloads.
         if(visibilityRows_&&!lighting_->releaseSceneZones272A78(this))return false;
+        withdrawSourceTopologyAliases();
         //Canonical zone methods remain with their original owners. The
         //fallback node releases its real34 then38 references (27F1EC/27F208).
         //142590 ->1424E0 visits linked children tail-to-head, then4BC.
@@ -1122,8 +1652,13 @@ private:
             container4BC_.reference00=0;--sceneApplication_->objectCount423F60();
         }
         nativeTopologyAuthorityEnrolled_=0;
+        //No consumer can reach these arrays after root publication revocation;
+        //release pointer metadata only after existing backing payload cleanup.
+        sourceVisibilitySlots4C0_.reset();sourceCollisionSlots4C4_.reset();
+        sourceVisibilityPublished_=sourceCollisionPublished_=0;
         container4BC_.descendants24=0;
         if(runtimeQueries_&&runtimeQueries_->sceneOwner_==this)runtimeQueries_->sceneOwner_=nullptr;
+        if(lighting_&&!lighting_->withdrawNativeEnvironment3A4(*this))return false;
         visibilityRows_=collisionRows_=nullptr;sceneApplication_.reset();topologyClosed_=true;return true;
     }
 protected:

@@ -28,6 +28,16 @@ OriginalGcSprayStatus50KG readOriginalWreckSplashDefinition50LA(
     const std::vector<std::uint8_t>& originalEmt,OriginalWreckSplashDefinition50LA&,
     assets::OriginalUiPageDiagnostic50KG&) noexcept;
 
+// Immutable authenticated transport metadata, not a second live field bank.
+struct OriginalWreckSplashSourceMetadata50LA {
+    float rawAgeAtBirth=0;
+    bool velocityPresent=false,minRangePresent=false,maxRangePresent=false,positionOffsetPresent=false;
+    std::int32_t forcedCount=0;
+};
+OriginalGcSprayStatus50KG readOriginalWreckSplashSourceDefinition50LA(
+    const std::vector<std::uint8_t>&,OriginalWreckSplashDefinition50LA&,
+    OriginalWreckSplashSourceMetadata50LA&,assets::OriginalUiPageDiagnostic50KG&) noexcept;
+
 // Native extension of the real canonical50BE owner, not another control bank.
 // +204 fractional demand aliases canonicalOwner.state.intensity204. Actual
 //2CB898 args a3/t0/t1 are null: optional side250, attachment74 and offset are

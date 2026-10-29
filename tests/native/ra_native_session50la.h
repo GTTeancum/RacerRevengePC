@@ -56,6 +56,50 @@ public:
             crowdImages,d,std::move(owners),consumedRace,pause,canonicalTournamentGrid,nullptr);
     }
 private:
+    // Distinct private native-constructor composition. The typed arena owns
+    // this Bank; no legacy execution arena or prepared query is adopted.
+    bool constructConstructorOnly(const std::shared_ptr<ra_cold_roster50LA::FreshExecutionArena>& fresh,
+        std::shared_ptr<const a::OriginalStandardMaterialContext50LA> context,Diagnostic& d,
+        std::shared_ptr<ra_cold_roster50LA::RuntimeOwners> owners={})noexcept {
+        d={};
+        if(attempted_||retired_||!fresh||!fresh->currentNative()||&fresh->bank_!=&bank_||
+           !aggregate_||!generation_)return fail(d,"distinct constructor session identity refused");
+        attempted_=true;
+        try {
+            const auto prefix=aggregate_->completedPrefixes();
+            if(!prefix.sources||!prefix.staticCandidates||!prefix.particleAuthoring||
+               !prefix.runtimeQueryWorldOwners||prefix.staticWorld||prefix.trackParticleManager)
+                return fail(d,"source constructor world prerequisites differ");
+            d.operation="actual constructor lighting/world/particles";
+            if(!prefix.lighting&&!aggregate_->prepareLighting(static_cast<std::uint32_t>(bank_.count()),d.aggregate))return false;
+            const a::OriginalStandardMaterialPath50LA path{&application_.materialDirectory36B970()};
+            if(!aggregate_->prepareStaticWorld(application_.standardMaterialDomain(),std::move(context),path,d.aggregate)||
+               !aggregate_->constructRuntimeTrackParticleManager(application_,generation_,d.aggregate)||
+               !aggregate_->constructStaticModelPrefixes(application_,d.aggregate)||
+               !aggregate_->completeStaticModelResourcesAndPlacement(d.aggregate)||
+               !aggregate_->registerStaticModelObserversAndParents(d.aggregate))return false;
+            d.operation="source constructor retained roster";
+            roster_=ra_cold_roster50LA::Operation::bindConstructorOnly(aggregate_,application_,fresh,d.roster,std::move(owners));
+            if(!roster_)return false;
+            for(std::size_t slot=0;slot<bank_.count();++slot)
+                if(!roster_->constructConstructorSlot(bank_,slot,d.roster))return false;
+            d.operation="actual constructor model resources";
+            if(!roster_->completeConstructorModelResources(d.roster))return false;
+            // Native producer admission only: no grid/fresh membership, image
+            // collector, complete Racer2146, source Race return or activation.
+            return true;
+        }catch(...){return fail(d,"constructor composition stopped; partial owners retained");}
+    }
+    bool constructConstructorCamera(const ra_source_camera50LA::CameraRuntimeOwners& runtime,
+        const std::vector<std::uint8_t>& cam,original_camera_session50KX::DisplayInputs& display,
+        const std::shared_ptr<ra_cold_roster50LA::FreshExecutionArena>& fresh,Diagnostic& d)noexcept {
+        d={};d.operation="same constructor-only Session";
+        if(!fresh||!roster_||retired_||cameraAttempted_||&runtime.bank!=&bank_||
+           !roster_->constructorSlotsCurrent(*fresh)||!roster_->constructorResourcesComplete_)
+            return fail(d,"constructor-only camera owner differs");
+        cameraAttempted_=true;
+        return aggregate_->constructRetainedRuntimeSourceCamera(application_,runtime,cam,display,fresh,d.aggregate);
+    }
     // Only the actual synchronous cold Owners caller can supply this existing
     // session identity borrow. This is not a public arbitrary-ID loader.
     bool constructHumanTournamentCold(const ra_cold_roster50LA::Arena& arena,

@@ -1,5 +1,6 @@
 #include "original_standard_texture_table50la.h"
 #include "original_standard_texture_resource50la.h"
+#include "original_loading_pst_file50la.h"
 #include "original_standard_material_context50la.h"
 #include <exception>
 #include <limits>
@@ -36,11 +37,15 @@ struct OriginalStandardTextureTable50LA::Storage {
     std::shared_ptr<OriginalStandardTextureResolver50LA> resolver;
     std::shared_ptr<const OriginalStandardMaterialContext50LA> construction;
     std::shared_ptr<OriginalStandardTextureResource50LA> partial;
+    // Native pending load-attempt exists before original Resource allocation.
+    std::shared_ptr<OriginalLoadingPstFile50LA> loadingPstPending;
     D terminalDiagnostic{};
     bool populationBound=false,populationActive=false,populationTerminal=false;
 };
 OriginalStandardTextureTable50LA::OriginalStandardTextureTable50LA() noexcept=default;
 OriginalStandardTextureTable50LA::~OriginalStandardTextureTable50LA() {
+    // Exact pending source files require explicit fallible native abort first.
+    if(storage_&&storage_->loadingPstPending)std::terminate();
     if(storage_)for(const auto& row:storage_->rows)
         if(row.references08!=0||row.object04)std::terminate();
     if(storage_&&storage_->partial){
@@ -113,6 +118,51 @@ bool OriginalStandardTextureTable50LA::acquire299330AndRetain298A30(
         storage_->rows.push_back(std::move(row));
         index=static_cast<std::int16_t>(next);return true;
     }catch(...){return fail(d,E::allocation,0x2993bc);}
+}
+// Loading Font stores its actual408 between299330 and298A30. Keep that
+// source interval distinct from the existing native combined helper.
+bool OriginalStandardTextureTable50LA::lookupLoading299330(const std::string& name,std::int16_t& index,D& d)noexcept {
+    d={};index=-1;
+    if(!storage_||storage_->populationActive||storage_->populationTerminal||!cString(name))return fail(d,E::phase,0x299330);
+    if(find(name,index))return true;
+    const auto next=storage_->rows.size();
+    if(next>static_cast<std::size_t>(std::numeric_limits<std::int16_t>::max()))return fail(d,E::range,0x299330);
+    try{Storage::Row row;row.name00=name;storage_->rows.push_back(std::move(row));
+        index=static_cast<std::int16_t>(next);return true;
+    }catch(...){return fail(d,E::allocation,0x2993BC);}
+}
+bool OriginalStandardTextureTable50LA::retainLoading298A30(std::int16_t index,D& d)noexcept {
+    d={};if(!storage_||storage_->populationActive||storage_->populationTerminal||index<0||
+       static_cast<std::size_t>(index)>=storage_->rows.size())return fail(d,E::phase,0x298A30,index);
+    auto& row=storage_->rows[static_cast<std::size_t>(index)];
+    if(row.references08<0)return fail(d,E::reference,0x298A30,index);
+    if(row.references08==std::numeric_limits<std::int32_t>::max())return fail(d,E::overflow,0x298AE8,index);
+    ++row.references08;return true;
+}
+bool OriginalStandardTextureTable50LA::abortLoadingPstNative(
+    const std::shared_ptr<OriginalLoadingFontSource50LA>& root,D& d)noexcept {
+    d={};if(!storage_||!storage_->loadingPstPending)return true;
+    auto& s=*storage_;auto& p=*s.loadingPstPending;
+    if(!root||s.populationActive||!s.populationTerminal||!s.resolver||p.root_!=root)
+        return fail(d,E::phase,0);
+    if(s.partial){
+        if(s.partial->references00_!=1)return fail(d,E::reference,0);
+        if(s.partial->loadingPstFile_){
+            if(s.partial->loadingPstFile_!=s.loadingPstPending||!s.partial->preflightLoadingPstNative())
+                return fail(d,E::phase,0);
+        }else if(p.boundResource_||s.partial->registered_||s.partial->resolver_||s.partial->construction_)
+            return fail(d,E::phase,0);
+    }else if(p.boundResource_)return fail(d,E::phase,0);
+    // Every reference/backing refusal is checked before closing the exact file.
+    // Closing this native partial never certifies24E880/24E0A4 completion.
+    if(!s.resolver->closeLoadingPst131040(p,true,d))return false;
+    if(s.partial){
+        if(s.partial->loadingPstFile_&&!s.partial->closeLoadingPstNative(d))return false;
+        if(!s.partial->release104970())return fail(d,E::reference,0);
+        s.partial.reset();
+    }
+    s.loadingPstPending.reset();d={};
+    return true; // Terminal diagnostic/history intentionally remain sticky.
 }
 bool OriginalStandardTextureTable50LA::release29E400(std::int16_t index) noexcept {
     if(!storage_||index<0||static_cast<std::size_t>(index)>=storage_->rows.size())return false;
@@ -187,7 +237,11 @@ bool OriginalStandardTextureTable50LA::populate29E340(
             OriginalStandardTextureResolver50LA::UiSelection selected;
             if(!s.resolver->resolve24DADC(row.name00,source,resolvedName,d,&selected))return terminal();
             std::shared_ptr<OriginalStandardTextureResource50LA> cached;
-            if(!s.resolver->cached132820(source,cached,d))return terminal();
+            const bool loadingPst=bool(s.resolver->loadingPstFontEntry_);
+            if(loadingPst){
+                if(!s.resolver->captureLoadingPst132820(resolvedName,source,s.loadingPstPending,d))return terminal();
+                if(s.loadingPstPending->hitReturned_)cached=s.loadingPstPending->hit_.lock();
+            }else if(!s.resolver->cached132820(source,cached,d))return terminal();
             if(cached){
                 // Preserve the resource's actual first-source receipt. This
                 // later lookup grants neither replacement nor backfilling.
@@ -201,12 +255,20 @@ bool OriginalStandardTextureTable50LA::populate29E340(
                 //is cleaned without pretending to have registered/published.
                 s.partial=OriginalStandardTextureResource50LA::allocate();
                 d.sourceEffectsCommitted=true;
+                if(loadingPst){
+                    if(!s.resolver->bindLoadingPstResource(*s.loadingPstPending,*s.partial,d))return terminal();
+                    s.partial->loadingPstFile_=s.loadingPstPending;
+                }
                 if(!s.partial->construct24DA30(s.resolver,source,resolvedName,s.construction,d,static_cast<std::size_t>(-1),&selected))return terminal();
-                if(!s.resolver->cache1326A0(source,s.partial)){
+                if(loadingPst){
+                    if(!s.resolver->associateLoadingPst1326A0(*s.loadingPstPending,s.partial,d)||
+                       !s.resolver->closeLoadingPst131040(*s.loadingPstPending,false,d))return terminal();
+                }else if(!s.resolver->cache1326A0(source,s.partial)){
                     fail(d,E::phase,0x1326A0,d.row);return terminal();
                 }
                 row.object04=std::move(s.partial); //29E3C0 only after actual load.
             }
+            if(loadingPst)s.loadingPstPending.reset(); // Actual row now owns resource; no pending handle survives.
             ++d.populationPublished;
         }
         d.status=E::complete;return true;

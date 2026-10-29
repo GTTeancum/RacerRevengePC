@@ -1,5 +1,7 @@
 #pragma once
 namespace original_results_roster50LA { class Read; }
+namespace ra_native_session50LA { class Join; }
+namespace ra_cold_roster50LA { class FreshExecutionArena; }
 namespace rr::game { class OriginalResults10450LA; }
 #include "ra_cold_roster_resources50la.h"
 #include "ra_cold_aggregate50la.h"
@@ -19,46 +21,15 @@ namespace rr::game { class OriginalResults10450LA; }
 #include <exception>
 #include <stdexcept>
 #include <utility>
+#include "ra_cold_roster_arena50la.h"
 
 // Existing main-TU instrumentation; no second allocator or counter is defined.
 extern thread_local std::uint64_t allocations;
 namespace ra_cold_roster50LA {
 struct Diagnostic {std::size_t slot=0;const char* stage=nullptr;const char* failure=nullptr;std::string detail;};
-// Explicit stable arena borrows. This wrapper is never Bank-snapshotted. All
-// persistent referred-to lanes must already be registered, with fixed capacity.
-struct Arena {
-    runtime_startup50fl::Fixture& live;
-    native_racer50HW::HandlingTuning tuning;
-    const g::AuthoredSelectionContext49N& selection;
-    g::AiRuntimeState50IV& ai;
-    native_ai50IV::Session& aiSession;
-    g::TrackNavigationProgress50EU& navigation;
-    lap_drive50GJ::Continuity& lap;
-    g::BasePoseHistoryState50Y& history;
-    g::PodSceneRebaseModel50FB (&rebaseModels)[5];
-    unsigned& rebaseCount;
-    g::PodSceneRebaseWorkspace50FB& rebaseWorkspace;
-    g::ModelBoundsResult49O (&rebaseBounds)[5];
-    g::PodSceneRebaseDiagnostic50FB& rebaseDiagnostic;
-    a::EffectNames50BL& effectNames;
-    g::EffectOwner50BE (&effects)[14];
-    std::size_t& effectCount;
-    g::ResetEffectBindings50BK& resetBindings;
-    g::ResetEffectState50BK& resetState;
-    g::ResetEffectWorkspace50BK& resetWorkspace;
-    native_original_ai_recovery::Models& recoveryModels;
-    const terrain_probe_authoring50fq_fixture::SourceBindings& terrainBindings;
-    a::PodFlameOwners50W& flame;
-    // Real application launch kind, not a caller's invented race phase.
-    const std::uint32_t& launchKind11258;
-    // Actual application role split: zero for legacy ALL8, one for normal Course.
-    // Capture it once, outside the per-racer Bank. Human preset configuration
-    // and native AI ownership remain separate from this source roster prefix.
-    std::uint32_t humanCount=0;
-    g::AuthoredBinding49N* selectedAuthored=nullptr;
-    float* selectedSteering=nullptr;
-};
 class Operation final {
+    friend class FreshExecutionArena;
+    friend class ::ra_native_session50LA::Join;
     friend class ::original_results_roster50LA::Read;
     friend class rr::game::OriginalResults10450LA;
     friend class ra_cold_aggregate50LA::Owner;
@@ -90,6 +61,23 @@ class Operation final {
     original_racer_material_sources50LA::Materials modelMaterials_;
     original_racer_material_sources50LA::Textures modelTextures_;
     bool terminal_=false,closed_=false;
+    // A distinct native allocation lifetime, never a claim that an existing
+    // warm execution arena was reset into a source constructor.
+    std::weak_ptr<FreshExecutionArena> constructorArena_;
+    bool constructorOnly_=false;
+    std::array<bool,8> constructorSlotComplete_{};
+    bool constructorResourcesAttempted_=false,constructorResourcesComplete_=false;
+    bool completeConstructorModelResources(Diagnostic&)noexcept;
+    bool constructorArenaCurrent()const noexcept;
+    bool releaseConstructorArenaNative(FreshExecutionArena&)noexcept;
+    static std::shared_ptr<Operation> bindConstructorOnly(
+        std::shared_ptr<ra_cold_aggregate50LA::Owner>,
+        const original_main_entry50KG::Application&,
+        const std::shared_ptr<FreshExecutionArena>&,
+        Diagnostic&,std::shared_ptr<RuntimeOwners> ={})noexcept;
+    bool constructConstructorSlot(native_racer50HN::Bank&,std::size_t,Diagnostic&)noexcept;
+    bool constructorSlotsCurrent(const FreshExecutionArena&)const noexcept;
+
     Operation(std::shared_ptr<ra_cold_aggregate50LA::Owner> owner,
         const original_main_entry50KG::Application& app,native_racer50HN::Bank& bank,
         const Arena& arena,std::shared_ptr<const FreshProbe> probe,std::shared_ptr<RuntimeOwners> owners)
@@ -102,6 +90,7 @@ class Operation final {
     static void need(bool v,const char* why){if(!v)throw std::runtime_error(why);}
     auto& runtime()const noexcept{return *aggregate_->runtimeQueries_;}
     bool registered()const noexcept {
+        if(constructorOnly_&&!constructorArenaCurrent())return false;
         auto& r=runtime();auto& a=arena_;auto& x=a.live;
         if(!r.cameraBankCurrent()||r.bankIdentity_!=bank_||!r.actual_||&r.actual_->frame!=&x.state||
            !r.actual_->recovery||!r.actual_->movement||!resources_)return false;
@@ -178,6 +167,13 @@ public:
         const original_main_entry50KG::Application& app,native_racer50HN::Bank& bank,
         const Arena& arena,std::shared_ptr<const FreshProbe> probe,Diagnostic& d,
         std::shared_ptr<RuntimeOwners> owners={})noexcept {
+        return bindImpl(std::move(aggregate),app,bank,arena,std::move(probe),d,std::move(owners),{});
+    }
+private:
+    static std::shared_ptr<Operation> bindImpl(std::shared_ptr<ra_cold_aggregate50LA::Owner> aggregate,
+        const original_main_entry50KG::Application& app,native_racer50HN::Bank& bank,
+        const Arena& arena,std::shared_ptr<const FreshProbe> probe,Diagnostic& d,
+        std::shared_ptr<RuntimeOwners> owners,const std::shared_ptr<FreshExecutionArena>& fresh)noexcept {
         d={};d.stage="retained cold binding";
         try {
             need(arena.humanCount<=1u&&bool(arena.selectedAuthored)==bool(arena.selectedSteering)&&
@@ -191,7 +187,7 @@ public:
                 aggregate->trackParticleHostApplication_==&app&&
                 aggregate->trackParticleDomain_==app.standardMaterialDomain()&&
                 aggregate->trackParticleApplication_==app.entities()&&aggregate->trackParticleGeneration_&&
-                probe&&probe->frame_==&arena.live.state,"actual aggregate/Application/cold probe ownership differs");
+                ((probe&&probe->frame_==&arena.live.state)||fresh),"actual aggregate/Application/cold probe ownership differs");
             auto& r=*aggregate->runtimeQueries_;
             need(r.rosterResources_&&r.rosterResources_->humanCount_==arena.humanCount&&r.rosterResources_->racerCount_==bank.count()&&r.cameraBankCurrent()&&r.bankIdentity_==&bank&&!r.cameraAttempted_&&
                 !r.terminal_&&!r.closed_,"actual sealed Bank/roster binding absent");
@@ -206,7 +202,7 @@ public:
                 "native roster constructor cannot replace existing owners");
             auto out=std::shared_ptr<Operation>(new Operation(aggregate,app,bank,arena,std::move(probe),std::move(owners)));
             // No model or arena effects yet; rejected binding must be destroyable.
-            out->closed_=true;
+            out->closed_=true;out->constructorOnly_=bool(fresh);out->constructorArena_=fresh;
             need(out->registered(),"actual cold constructor lanes are not registered");
             need(out->domain_&&out->domain_->prepared()&&out->motions_&&
                 !out->domain_->materials382B38()->coldCollectorCurrent(out->domain_->coldCollector14D440()),
@@ -225,13 +221,24 @@ public:
             for(std::size_t i=0;i<bank.count();++i)need(r.inputs_.collisionRoster[i]==out->resources_->collisions_[i].get()&&
                 bank.completedSteps(i)==0,
                 "reserved collision roster differs from retained owners");
+            //Bind the actual existing process noise owner only at this private
+            //same-Application producer. Never accept an arbitrary frame pointer
+            //as proof, register the tables in Bank, seed, or copy their values.
+            need(app.state&&app.state->known&&out->entities_&&
+                arena.live.state.borrowedNoise50KG==&app.state->sharedNoise308030&&
+                !r.sharedSecondaryNoiseOwner_&&!r.sharedSecondaryNoiseEntities_.lock(),
+                "actual Application shared noise binding differs");
+            r.sharedSecondaryNoiseOwner_=std::shared_ptr<g::CoupledNoiseContext49M>(
+                app.state,&app.state->sharedNoise308030);
+            r.sharedSecondaryNoiseEntities_=out->entities_;
             pin->rosterOperation=out;out->closed_=false;r.rosterRetirementRequired_=true;return out;
         }catch(const std::exception& e){d.failure="cold roster binding failed";try{d.detail=e.what();}catch(...){}return {};}
         catch(...){d.failure="cold roster binding exception";return {};}
     }
+public:
     bool constructSlot(native_racer50HN::Bank& actualBank,std::size_t slot,Diagnostic& d)noexcept {
         d={};d.slot=slot;d.stage="constructor entry";
-        if(terminal_||closed_||&actualBank!=bank_||slot>=resources_->racerCount_||slot!=nextSlot_||attempted_[slot]||!registered()){
+        if(constructorOnly_||terminal_||closed_||&actualBank!=bank_||slot>=resources_->racerCount_||slot!=nextSlot_||attempted_[slot]||!registered()){
             terminal_=true;if(aggregate_&&aggregate_->runtimeQueries_)runtime().rosterSlotComplete_.fill(false);
             d.failure="cold roster operation is terminal, replaced or not registered";return false;}
         auto& r=runtime();
@@ -393,6 +400,7 @@ public:
     // A later camera/grid/fresh stage must retire through its own real API.
     bool close()noexcept {
         if(closed_)return true;
+        if(constructorOnly_&&!constructorArenaCurrent())return false;
         auto& r=runtime();if(!r.cameraBankCurrent()||r.bankIdentity_!=bank_)return false;
         if(!r.cameraRetiredForRoster())return false;
         for(unsigned i=0;i<8;++i)if(r.gridRetirementRequired_[i]||r.freshRetirementRequired_[i])return false;
@@ -405,6 +413,10 @@ public:
         }
         // Visual/flame source views can remain in Bank snapshots. Retain all
         // backing through pin destruction; only mark actual model retirement.
+        if(constructorOnly_){
+            const auto fresh=constructorArena_.lock();
+            if(!fresh||!releaseConstructorArenaNative(*fresh))return false;
+        }
         r.rosterSlotComplete_.fill(false);r.rosterRetirementRequired_=false;closed_=true;return true;
     }
 };
@@ -445,6 +457,12 @@ inline bool Owner::mountRetainedRuntimeRosterArchives(
                 return fail(d,"actual roster archive mount rejected; earlier mounts retained");
         }
         if(!provider->sealNativeMounts(d.rosterMount))return fail(d,"actual roster namespace sealing rejected");
+        // Bind SAME retained inventories only after the actual archive mounts
+        // and seal. Earlier capacity reservation deliberately lacked this proof.
+        std::string wreckError;
+        const auto& wreckBacking=runtimeQueries_->rosterResources_->wreckBacking_;
+        if(!wreckBacking||!wreckBacking->bindMountedSources(app.entities(),domain,wreckError))
+            return fail(d,"wreck mounted model-source binding rejected; prefix retained");
         rosterMountComplete_=true;return true;
     }catch(...){return fail(d,"roster archive exception; actual partial provider retained");}
 }
@@ -696,6 +714,16 @@ inline bool Owner::prepareRuntimeRosterQueryStorage(
         collisionApplication_=app;
         runtimeQueries_.reset(new ra_source_camera50LA::OwnershipBridge());
         runtimeQueries_->rosterResources_=std::move(roster);
+        const auto& retained=*runtimeQueries_->rosterResources_;
+        std::string wreckError;
+        if(!retained.wreckBacking_||!retained.wreckBacking_->prepare(app,{},
+            retained.rigs_,retained.rawRes_,retained.racerCount_,wreckError))
+            return fail(d,"wreck retained cold backing rejected; partial owners retained");
+        const auto* reservations=retained.wreckBacking_->reservations();
+        if(!reservations)return fail(d,"wreck stable reservations unavailable");
+        for(const auto& row:*reservations)
+            input.wreck.push_back({row.queries,row.assets,row.identities});
+
         runtimeQueries_->rosterTerrain_=&terrain;runtimeQueries_->rosterMovement_=&movement;
         runtimeQueries_->rosterAuxiliaryIds_={recoveryGlobals.terrainIdentity348,
             recoveryGlobals.identity[0],recoveryGlobals.identity[1]};
@@ -735,6 +763,16 @@ inline bool Owner::prepareSharedRosterStorage(
         collisionApplication_=app;
         runtimeQueries_.reset(new ra_source_camera50LA::OwnershipBridge());
         runtimeQueries_->rosterResources_=std::move(roster);
+        const auto& retained=*runtimeQueries_->rosterResources_;
+        std::string wreckError;
+        if(!retained.wreckBacking_||!retained.wreckBacking_->prepare(app,{},
+            retained.rigs_,retained.rawRes_,retained.racerCount_,wreckError))
+            return fail(d,"wreck retained cold backing rejected; partial owners retained");
+        const auto* reservations=retained.wreckBacking_->reservations();
+        if(!reservations)return fail(d,"wreck stable reservations unavailable");
+        for(const auto& row:*reservations)
+            input.wreck.push_back({row.queries,row.assets,row.identities});
+
         runtimeQueries_->rosterTerrain_=&terrain;runtimeQueries_->rosterMovement_=&movement;
         runtimeQueries_->rosterAuxiliaryIds_={recoveryGlobals.terrainIdentity348,
             recoveryGlobals.identity[0],recoveryGlobals.identity[1]};
@@ -744,3 +782,6 @@ inline bool Owner::prepareSharedRosterStorage(
     }catch(...){return fail(d,"RA retained roster reservation exception");}
 }
 } // namespace ra_cold_aggregate50LA
+
+#include "ra_fresh_execution_arena50la.h"
+#include "ra_fresh_roster_operation50la.inl"

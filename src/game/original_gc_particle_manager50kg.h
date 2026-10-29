@@ -9,6 +9,7 @@
 #include <string>
 #include <vector>
 
+namespace ra_pod_scene50LA {class Owner;}
 namespace rr::platform {class OriginalUiGarageDrawContribution50KG;class OriginalUiGarageSceneParticles50KG;}
 namespace rr::game {
 constexpr std::size_t originalGcParticleCapacity50KG=5000;
@@ -156,6 +157,16 @@ private:
     bool readGaragePoolSlot162448(const OriginalGcParticle50KG*,std::size_t&)const noexcept;
     bool publishGarageProjection162A24(std::size_t activeIndex,const OriginalGcParticle50KG* expected,
         float quantizedDepth,std::size_t& actualPoolSlot)const noexcept;
+    friend class ::ra_pod_scene50LA::Owner;
+    // Reached161F60 only; no public clear/reset or replacement pool.
+    struct RestartRemoval161F60 {
+        bool attempted=false,returned=false;
+        std::uint32_t pc=0x161f60,indexA2=0,offsetA3=0,countT1=0;
+        std::uint32_t flagsV1=0;
+        OriginalGcParticle50KG* reachedT0=nullptr;
+        OriginalGcParticle50KG* tailV1=nullptr;
+    } restartRemoval_;
+    bool removeRestartParticles161F60(std::uint32_t&)noexcept;
     struct Storage;
     std::unique_ptr<Storage> storage_;
 };

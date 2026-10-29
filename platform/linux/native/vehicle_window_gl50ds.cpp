@@ -1363,7 +1363,7 @@ bool VehicleWindowGl50DS::idleForRaceReset50LA(VehicleWindowDiagnostic50DS& d) c
     return true;
 }
 
-bool VehicleWindowGl50DS::garageFirstCameraViewportIdle50KG(VehicleWindowDiagnostic50DS& d) const noexcept {
+bool VehicleWindowGl50DS::frontendCameraViewportIdle50KG(VehicleWindowDiagnostic50DS& d) const noexcept {
     OriginalOptionsMutationInterlock50KG::Operation optionsMutation;
     if(!optionsMutation.admitted()){return fail(d,VehicleWindowError50DS::frame,"Options viewport owns native mutation until cancellation");}
 
@@ -1373,8 +1373,12 @@ bool VehicleWindowGl50DS::garageFirstCameraViewportIdle50KG(VehicleWindowDiagnos
     // They do not execute26F940 and must not invalidate canonical selection.
     // Gameplay uses a different creation path and is not admitted here.
     if(!s.frontendOnly||s.nativeGlFaultObserved50KG||s.frameSet)
-        return fail(d,VehicleWindowError50DS::frame,"Garage first Camera requires untouched native frontend scene selection");
+        return fail(d,VehicleWindowError50DS::frame,"First Camera requires untouched native frontend scene selection");
     return true;
+}
+
+bool VehicleWindowGl50DS::garageFirstCameraViewportIdle50KG(VehicleWindowDiagnostic50DS& d) const noexcept {
+    return frontendCameraViewportIdle50KG(d); // Same historical Garage predicate.
 }
 
 bool VehicleWindowGl50DS::frontendLocalizationIdle50KG(VehicleWindowDiagnostic50DS& d) const noexcept {

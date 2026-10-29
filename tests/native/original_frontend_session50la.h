@@ -175,6 +175,15 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
   if(!sourceDisplayLifetime->createOriginalFrontend(rendererRequest,rendererDiagnostic)){
    reportRenderer50DU(rendererDiagnostic);throw std::runtime_error("dedicated original frontend renderer creation failed");
   }
+  // Genuine243CB4/known-null Camera0 exists now, before any Page camera.
+  // This process-owned prefix remains unselected/unattached and does not
+  // replace the Main coordinator or authorize loading-screen progress.
+  std::uint32_t loading330PC=0;
+  if(!originalMainApplication.prepareFrontendLoading330Viewport(sourceDisplayLifetime,rendererDiagnostic,loading330PC)){
+   reportRenderer50DU(rendererDiagnostic);
+   std::cerr<<"loading330 viewport prefix stopped source="<<loading330PC<<'\n';
+   throw std::runtime_error("original loading-manager viewport prefix rejected");
+  }
   originalMain.activate(renderer);
   windows_capture50LD::Session windowCapture;
   windowCapture.prepare(captureRun,sessionIndex,maximumWidth,maximumHeight,"frontend");
@@ -578,6 +587,12 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
         selected.rider==7&&selected.course==11&&selected.planet==4&&selected.laps==3&&selected.entrants==8,
         "Gasgano/SA capture rejected a mismatched original Course handoff");
     const auto* target=courseTargets.admits(selected);
+    if(target&&target->track==original_course_targets50KX::Track::RA){
+     std::uint32_t sourcePC=0;
+     const bool complete=originalMain.advanceCourseRaLoadingPrefix50LA(sourcePC);
+     if(!complete)std::cerr<<"original_course_loading_prefix_stopped source="<<sourcePC<<'\n';
+     require50DU(complete,"original RA Course loading prefix stopped before pending activation");
+    }
     require50DU(target&&(target->track==original_course_targets50KX::Track::RA||
        directHumanTargetSupported(target->track)||courseCorpusPresent)&&
         courseTargetModeSupported(target->track)&&(!allAiEnabled||selected.laps==3)&&

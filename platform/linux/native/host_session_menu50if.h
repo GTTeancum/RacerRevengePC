@@ -357,7 +357,7 @@ public:
                 out.rows[3]="SPACE      BOOST";out.rows[4]="R          HOLD TO REPAIR";
                 out.rows[5]="LEFT SHIFT POWERSLIDE";
             }
-            out.rows[6] = nativeHumanRace_ ? "C          CYCLE ORIGINAL CAMERA" :
+            out.rows[6] = nativeHumanRace_ ? "C CYCLE; HOLD Q/E TEMPORARY VIEW" :
                     race_ ? "BACKSPACE  RESTART ENTIRE RACE" : "BACKSPACE  RETURN TO CHECKPOINT";
             if(humanPhysical_)out.rows[6]=nativeHumanRace_?(humanPreset_%4u==1u?
                 "SQUARE / X     CYCLE CAMERA":"TRIANGLE / Y   CYCLE CAMERA"):"OTHER ORIGINAL PAD ACTIONS UNJOINED";

@@ -2,6 +2,10 @@
 #include <cstddef>
 #include <cstdint>
 #include <exception>
+#include <array>
+#include <memory>
+#include <optional>
+#include "original_selected_array_guards27ed40.h"
 namespace ra_pod_scene50LA {class Owner;}
 namespace rr::game {
 struct CollectionTree50BX;struct SearchStorage50BS;class OriginalApplicationEntities50LA;
@@ -19,6 +23,18 @@ class OriginalNativeListMethodCustody50LA final {
     std::size_t ordinal_=0;
     std::uint64_t reference00_=0;
     std::uint32_t usage10_=0;
+    //Exclusive genuine source List prefix; old native selected geometry remains absent.
+    struct SourceState {
+        std::optional<std::uint32_t> vtable08,count18,growth20,capacity24,perBlock30,blockCount34,lastUsed38,field40;
+        std::optional<std::uint8_t> type2C,type2D;
+        std::unique_ptr<const void*[]> selected1C;
+        std::optional<const void**> pointer1C;
+        std::optional<const void*> pointer3C;
+        bool referenceKnown=false,constructorReference=false,usageKnown=false,ownedBitKnown=false,ownedBit=false;
+        bool selectedAllocationReturned=false,constructorReturned=false;
+        selected_array_guards27ED40::History guards;
+    } source_;
+    bool sourceMode_=false;
     bool arrayReference_=false,nodeReference_=false,begun_=false,nodeAliasWasAcquired_=false;
 public:
     OriginalNativeListMethodCustody50LA()noexcept=default;

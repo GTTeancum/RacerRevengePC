@@ -1,3 +1,4 @@
+#include <functional>
 // Complete original lexical suffix; caller prefix outlives every owner below.
 #include "terrain_interactive_continuation50du.h"
 #include "../../src/game/original_human_reset_timers50lc.h"
@@ -2350,10 +2351,28 @@ SessionExit50DU Context::run() {
        "native post-prefix/pre-lap scheduling and completed-track-span fire visibility. "
        "NativeUndefinedCarryPolicy enabled; actual dust/smoke, spark and fire children share the scene pool.\n";
   }
+  const auto retainActualSpeechOwners=[&](){
+   if(!audioEnabled||!originalUiStarted||!humanCourseEnabled||!consumedRaStage.race())return;
+   const auto& actualRace=consumedRaStage.race();
+   //This is the actual successful native speech producer, not Scope capture
+   //or a future event's claim. All initialization draws already happened once.
+   require50DU(originalMainApplication.race28C()==actualRace.get()&&originalMainApplication.state&&
+       &s.noiseOwner()==&originalMainApplication.state->sharedNoise308030&&
+       liveAudio->retainNativeHumanSpeechInitialization(originalMainApplication,racerBank,
+           actualRace->entity_.sessionGeneration,playerRacer60,speechCounts,speechState,
+           originalMainApplication.state->rawRandom308030),
+       "actual human speech initializer/provider/App/Bank identity unavailable");
+   if(originalAiAudioEnabled)require50DU(originalAiAudio->captureNativeSpeechReceipt(
+       originalMainApplication,racerBank,actualRace->entity_.sessionGeneration,
+       originalMainApplication.state->rawRandom308030,racerBank.count()),
+       "actual AI speech initializer/provider/App/Bank identity unavailable");
+  };
   if(originalAiAudioEnabled){
-   if(originalUiStarted)require50DU(originalAiAudio->initializeSpeech(s.noiseOwner().sharedRandomState,
+   if(originalUiStarted){require50DU(originalAiAudio->initializeSpeech(s.noiseOwner().sharedRandomState,
        humanCourseEnabled?&speechCounts:nullptr,humanCourseEnabled?&speechState:nullptr),
        "actual all-eight D48 shared-RNG initialization failed");
+    retainActualSpeechOwners();
+   }
    rr::game::OriginalAiAudioListener listener{};rr::game::BodyMatrix48G orientation;
    require50DU(rr::game::quaternionToMatrix48G(m.components.root.body.orientation,orientation),
        "cold AI listener orientation unavailable");
@@ -2363,9 +2382,12 @@ SessionExit50DU Context::run() {
    require50DU(originalAiAudio->setListener(listener)&&originalAiAudio->activate(),
        "AI source audio lifecycle activation rejected");
   }
-  if(originalUiStarted&&audioEnabled&&!originalAiAudioEnabled)require50DU(initializePodSpeech50HG(speechCounts,
+  if(originalUiStarted&&audioEnabled&&!originalAiAudioEnabled){
+   require50DU(initializePodSpeech50HG(speechCounts,
       s.noiseOwner().sharedRandomState,speechState)==PodSpeechStatus50HG::Complete,
       "selected original speech cursor initialization failed");
+   retainActualSpeechOwners();
+  }
   // One neutral, unscored native setup tick establishes actual graphics/ground
   // before countdown rendering. After this all physics freezes until GO.
   const platform::WindowInput50DQ noKeys{};
@@ -2524,9 +2546,10 @@ SessionExit50DU Context::run() {
   }
  }
 
+ std::function<bool(std::uint64_t,bool,std::uint32_t&)> advanceOwnedListener;
  // HOST audio/world scheduling: once after each actual common16ms mix,
  // including countdown. Never rendered-frame, paused or per-racer updates.
- auto advanceSourceAudioWorld=[&](std::uint64_t beforeMix){
+ auto advanceSourceAudioWorld=[&](std::uint64_t beforeMix,bool heldSourceScene){
   if(!mode1Enabled&&!dynamicContactEnabled)return;
   // Dynamic update performs its own source activity read after the timer.
   // Legacy category6-only mode keeps the existing explicit completion poll.
@@ -2542,6 +2565,9 @@ SessionExit50DU Context::run() {
    //234440/235060 supplies the real target/duration. The explicitly selected
    // native envelope advances by shared-mixer consumed frames, separately
    // from original call acceptance; neither a wall timer nor a second mix.
+   std::uint32_t listenerPC=0;
+   if(!advanceOwnedListener||!advanceOwnedListener(beforeMix,heldSourceScene,listenerPC))
+    dynamicBoundary(listenerPC,"actual native listener consumed-step prefix is terminal");
    const auto musicUpdate=raceMusic->update(.016f);
    if(!musicUpdate.completed())dynamicBoundary(musicUpdate.sourcePC,
        "collision music source/native transport continuation pending");
@@ -3258,6 +3284,14 @@ SessionExit50DU Context::run() {
  auto& sourceCameraAssets=isGbTrack?*gbSourceCameraAssets:isTbTrack?*tbSourceCameraAssets:isRcTrack?*rcSourceCameraAssets:legacySourceCameraAssets;
  std::unique_ptr<sourceCamera::DisplayInputs> sourceCameraDisplay;
  std::shared_ptr<sourceCamera::Session> sourceCameraSession;
+ bool ownedListenerCameraObserved=false;
+ advanceOwnedListener=[&](std::uint64_t before,bool held,std::uint32_t& pc){
+  // Preserve original lexical Camera/assets destruction order. This closure
+  // supplies no pose/provider: it calls the retained actual Session directly.
+  if(!sourceCameraSession)return !ownedListenerCameraObserved; //No fallback after actual owner.
+  ownedListenerCameraObserved=true;
+  return sourceCameraSession->advanceNativeMusicListenerConsumedStep(before,held,pc);
+ };
  sourceCamera::Session::GameplayFogRenderPhase sourceFogRenderPhase;
  std::array<native_racer50HW::Cables*,8> sourceCameraCables{};
  original_speed_boost_adapter50LA::Owner sourceSpeedBoostAdapter;
@@ -3909,7 +3943,7 @@ SessionExit50DU Context::run() {
    .advanceNativeGcWaterCall=interactive_frame50DU::BorrowedCall<void()>{advanceNativeGcWater},
    .advanceOriginalAiManagerCall=interactive_frame50DU::BorrowedCall<void(float,const original_all8_frame::Schedule*)>{advanceOriginalAiManager},
    .advanceRcTrackParticlesCall=interactive_frame50DU::BorrowedCall<void()>{advanceRcTrackParticles},
-   .advanceSourceAudioWorldCall=interactive_frame50DU::BorrowedCall<void(std::uint64_t)>{advanceSourceAudioWorld},
+   .advanceSourceAudioWorldCall=interactive_frame50DU::BorrowedCall<void(std::uint64_t,bool)>{advanceSourceAudioWorld},
    .advanceTbTrackParticlesCall=interactive_frame50DU::BorrowedCall<void()>{advanceTbTrackParticles},
    .advanceWorldAnimationsCall=interactive_frame50DU::BorrowedCall<void()>{advanceWorldAnimations},
    .allAiControllerSamples=allAiControllerSamples,

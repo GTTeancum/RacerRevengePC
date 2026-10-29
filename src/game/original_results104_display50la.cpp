@@ -1,15 +1,12 @@
 #include "original_results104_storage50la.h"
+#include "../../tests/native/original_results_live_owner_read50la.h"
 #include "original_ui_text50kg.h"
 #include "original_ui_text_position50kg.h"
-#include "../../tests/native/original_race_constructor50la.h"
-#include "../../tests/native/original_ui_main_entry50kg.h"
 #include "../assets/original_standard_material_domain50la.h"
 #include "../assets/original_standard_material_table50la.h"
 #include "../assets/original_standard_material_object50la.h"
 #include "../assets/original_application_localization50kg.h"
 #include "../assets/original_standard_texture_resource50la.h"
-#include "../../tests/native/original_position_stats_adapter50la.h"
-#include "../../tests/native/ra_cold_roster_operation50la.h"
 #include <cmath>
 
 namespace rr::game {
@@ -33,23 +30,26 @@ bool OriginalResults10450LA::demandNativeFinalCamera1C15B0(
     const ::original_main_entry50KG::Application& root,const OriginalRaceConstructor50LA& race,
     const ::original_camera_session50KX::Session& camera,
     const ::original_position_stats_adapter50LA::Owner& observer,OriginalResults104Diagnostic50LA& d)noexcept {
+    using Read=::original_results_roster50LA::Read;
+    const auto liveRace=Read::raceAccess(race);
+    const auto liveRoot=Read::rootAccess(root);
     d={};
-    if(root.garageAudioOwnerThread_!=std::this_thread::get_id()||
-       race.resultsFeedbackThread_!=std::this_thread::get_id()||!impl_||
+    if(liveRoot.garageAudioOwnerThread_!=std::this_thread::get_id()||
+       liveRace.resultsFeedbackThread_!=std::this_thread::get_id()||!impl_||
        impl_->nativeCaptureThread!=std::this_thread::get_id()){
         d.status=Impl::S::owner;d.sourcePC=0x1c15b0;return false;
     }
     auto& p=*impl_;
     const auto stop=[&](std::uint32_t pc,const char* why){return p.stop(d,Impl::S::owner,pc,why);};
-    if(race.results104_.get()!=this||race.application_!=p.application||root.entitiesOwner_!=p.application||
-       race.entity_.sessionGeneration!=p.component.sessionGeneration||!constructed()||!p.loadComplete||
+    if(liveRace.results104_.get()!=this||liveRace.application_!=p.application||liveRoot.entitiesOwner_!=p.application||
+       liveRace.entity_.sessionGeneration!=p.component.sessionGeneration||!constructed()||!p.loadComplete||
        !retirementCurrent()||p.nativeFrameBorrows||!p.context||!p.context->live()||!p.domain||
-       p.domain!=root.standardMaterialDomainOwner_||!p.fonts||p.fonts!=root.fonts328Owner_||
+       p.domain!=liveRoot.standardMaterialDomainOwner_||!p.fonts||p.fonts!=liveRoot.fonts328Owner_||
        p.fonts->domain_!=p.domain||p.fonts->context_!=p.context||!p.backdropsA0||!p.icons210||
-       !(p.component.flags29&1u)||observer.camera_!=&camera)
+       !(p.component.flags29&1u)||!demandObserverCameraMatches1C15B0(observer,camera))
         return stop(0x1c15b0,"Results slot40 exact same loaded source owners absent");
     original_ui_source_timing50LH::Sample sample;std::uint64_t publication=0;
-    if(!root.nativeTaRootTiming_.readPrepared(sample,publication)||publication!=root.nativeTaRootPublication_||
+    if(!liveRoot.nativeTaRootTiming_.readPrepared(sample,publication)||publication!=liveRoot.nativeTaRootPublication_||
        !p.updateCpu||publication!=p.updateCpu->publication||
        p.updateCpu->prefix!=UpdateCpuPrefix::baseReturned||p.updateCpu->nextSourcePC!=0x1c8c1c||
        publication<=p.lastNativeDemandAttemptPublication)
@@ -61,7 +61,7 @@ bool OriginalResults10450LA::demandNativeFinalCamera1C15B0(
     // Actual source first compares App0C against264-1 BEFORE reading B4.
     // This bounded native adapter supports only the actual final single-human
     // selected Camera. It never writes those absent PS2 lanes or assertsmode3.
-    if(!root.nativeResultsFinalCameraCurrent50LA(race,camera))
+    if(!liveRoot.finalCameraCurrent(race,camera))
         return stop(0x1c15e4,"Results supported final native Camera observation absent");
     p.lastNativeDemandAttemptPublication=publication;
     const auto demand=[&](std::int16_t token,const assets::OriginalStandardTextureResource50LA* expected,
@@ -91,7 +91,7 @@ bool OriginalResults10450LA::demandNativeFinalCamera1C15B0(
     std::uint8_t flags=0;
     // Existing counted B4 accessor certifies ONLY bit0 and reads the current
     // actual manager byte once. No Profile fallback belongs to this slot40.
-    if(!race.readResultsManagerFlags58(camera,flags,d)){d.sourcePC=0x1c15f4;return false;}
+    if(!liveRace.managerFlags(camera,flags,d)){d.sourcePC=0x1c15f4;return false;}
     if(flags&1u){
         //1C160C name at3AC9B0 (signed lowhalfC9B0):denmarkbold16ingame.
         //A genuinely absent named entry skips ONLY the font demand.
@@ -104,19 +104,16 @@ bool OriginalResults10450LA::demandNativeFinalCamera1C15B0(
         //Exactly three icons210/270/2D0, not fourth Circle330. Repeated shared
         //texture aliases remain separate reached2DF8A0/demand occurrences.
         for(std::size_t i=0;i<3;++i){d.object=0x210+0x60*i;if(!texture((*p.icons210)[i],0x1c168c))return false;}
-        const auto operation=p.loadedRosterOperation.lock();const auto* bank=observer.resultsBankIdentity();
-        const auto rosterCurrent=[&](){return operation&&operation->aggregate_==race.world74_&&
-            operation->entities_==p.application&&operation->domain_==p.domain&&
-            operation->generation_==p.component.sessionGeneration&&observer.identityCurrent()&&
-            operation->resultsRuntimeBankCurrent(bank);};
+        const auto operation=p.loadedRosterOperation.lock();const auto* bank=demandObserverBankIdentity1C16F8(observer);
         // Native same-Operation current Bank bound, not a full source B0
         // constructor receipt. Read the actual count at EACH reached loop
         // condition1C16F8, never use portraitsCount alone as a live count.
         std::size_t i=0;
         for(;;){
-            if(!rosterCurrent()||!bank)
+            std::size_t count=0;
+            if(!demandRosterCountCurrent1C16F8(race,observer,operation,bank,count))
                 return stop(0x1c16f8,"Results slot40 actual loaded roster/live Bank count changed");
-            const auto count=bank->count(); //Actual reached loop-condition count, once here.
+            //Actual reached loop-condition count read once by the private out-of-line helper.
             if(count!=p.portraitsCount||!p.published480||!p.portraits480)
                 return stop(0x1c16f8,"Results slot40 current count exceeds/differs from owned portrait extent");
             if(i>=count)break;
@@ -127,7 +124,7 @@ bool OriginalResults10450LA::demandNativeFinalCamera1C15B0(
     }
     //Independent second last-camera test1C1708..1724, including B4 bit0
     //clear. Do not move these two backdrop demands under the first branch.
-    if(!root.nativeResultsFinalCameraCurrent50LA(race,camera))
+    if(!liveRoot.finalCameraCurrent(race,camera))
         return stop(0x1c1724,"Results final native Camera changed before independent backdrop demand");
     for(std::size_t i=0;i<2;++i){d.object=0xa0+0x60*i;if(!texture((*p.backdropsA0)[i],0x1c175c))return false;}
     //141C30 sees genuinely empty Results Entity children (retirementCurrent).
@@ -140,9 +137,12 @@ bool OriginalResults10450LA::demandNativeFinalCamera1C15B0(
 OriginalResults10450LA::DisplayCpuPrefix OriginalResults10450LA::captureNativeSingleHumanBaseCpu1B9220(
     const ::original_main_entry50KG::Application& root,const OriginalRaceConstructor50LA& race,
     const ::original_position_stats_adapter50LA::Owner& observer,OriginalResults104Diagnostic50LA& d)noexcept {
+    using Read=::original_results_roster50LA::Read;
+    const auto liveRace=Read::raceAccess(race);
+    const auto liveRoot=Read::rootAccess(root);
     d={};
-    if(root.garageAudioOwnerThread_!=std::this_thread::get_id()||
-       race.resultsFeedbackThread_!=std::this_thread::get_id()||!impl_||
+    if(liveRoot.garageAudioOwnerThread_!=std::this_thread::get_id()||
+       liveRace.resultsFeedbackThread_!=std::this_thread::get_id()||!impl_||
        impl_->nativeCaptureThread!=std::this_thread::get_id()){
         d.status=Impl::S::owner;d.sourcePC=0x1b9220;d.operation="Results shared capture immutable owner threads";
         return DisplayCpuPrefix::none;
@@ -153,22 +153,22 @@ OriginalResults10450LA::DisplayCpuPrefix OriginalResults10450LA::captureNativeSi
     };
     // Completed native Root, not a still-entered or abandoned callback chain.
     // Source mode5/last-camera/B4 are NOT inferred from this native idle cut.
-    if(root.sourceRace28COwner_.get()!=&race||root.entitiesOwner_!=p.application||
-       root.riderProfile!=race.profile_||root.nativeTaRootRace_!=&race||
-       root.nativeTaRootGeneration_!=p.component.sessionGeneration||root.nativeTaRootEntered_||
-       root.nativeTaRootAborted_||root.sourceApplicationMode22C_!=0||root.sourceUpdateRenderBypass228Bit3_||
-       race.results104_.get()!=this||race.application_!=p.application||!race.counted_||race.rolledBack_||
-       race.entity_.sessionGeneration!=p.component.sessionGeneration||!constructed()||!p.loadComplete||
+    if(liveRoot.sourceRace28COwner_.get()!=&race||liveRoot.entitiesOwner_!=p.application||
+       liveRoot.riderProfile!=liveRace.profile_||liveRoot.nativeTaRootRace_!=&race||
+       liveRoot.nativeTaRootGeneration_!=p.component.sessionGeneration||liveRoot.nativeTaRootEntered_||
+       liveRoot.nativeTaRootAborted_||liveRoot.sourceApplicationMode22C_!=0||liveRoot.sourceUpdateRenderBypass228Bit3_||
+       liveRace.results104_.get()!=this||liveRace.application_!=p.application||!liveRace.counted_||liveRace.rolledBack_||
+       liveRace.entity_.sessionGeneration!=p.component.sessionGeneration||!constructed()||!p.loadComplete||
        !p.application||!p.base||!p.derived||!p.mode1F0||!p.base180||!p.center40||!p.backdropsA0||
        !p.icons210||!p.titles490||!p.polygons[0]||!p.polygons[1]||!p.domain||!p.context||!p.context->live()||
-       root.standardMaterialDomainOwner_!=p.domain||!root.videoOwner_||p.context->videoIdentity()!=root.videoOwner_.get()||
+       liveRoot.standardMaterialDomainOwner_!=p.domain||!liveRoot.videoOwner_||p.context->videoIdentity()!=liveRoot.videoOwner_.get()||
        !p.fonts||p.fonts->terminal()||!p.sourceData||!p.sourceData->sourceLoaded()||p.depth!=0xffffffu||
-       !retirementCurrent()||!race.profile_||!race.profile_->initialized())
+       !retirementCurrent()||!liveRace.profile_||!Read::profileInitialized(race))
         return reject(Impl::S::owner,0x1b9220,"Results shared capture exact completed Root/Race/resources");
-    if(!root.resultsPublishedRoot50LA(race,d))return DisplayCpuPrefix::none;
-    const auto* profile=race.profile_->commonProfile();
-    if(!profile||!profile->known)return reject(Impl::S::owner,0x1b9d98,"Results actual Profile1125C unavailable");
-    const auto humans=(profile->playerBits1125C>>5)&3u;
+    if(!liveRoot.publishedRoot(race,d))return DisplayCpuPrefix::none;
+    const auto* profile=Read::commonProfile(race);
+    if(!profile||!Read::profileKnown(*profile))return reject(Impl::S::owner,0x1b9d98,"Results actual Profile1125C unavailable");
+    const auto humans=(Read::profilePlayerBits(*profile)>>5)&3u;
     // >=2 runs a distinct115A60 viewport scope and polygon38 BEFORE slots78/74.
     // Never collapse that route into this single-human order, or invent count1.
     if(humans!=1u)return reject(Impl::S::incomplete,0x1b9da4,
@@ -178,15 +178,15 @@ OriginalResults10450LA::DisplayCpuPrefix OriginalResults10450LA::captureNativeSi
     // require THIS completed update to have taken the bit3-clear producer,
     // not merely a retained native backing value or skipped stale base call.
     if(!p.updateCpu||p.updateCpu->prefix!=UpdateCpuPrefix::baseReturned||
-       p.updateCpu->nextSourcePC!=0x1c8c1c||!(race.flags1B0KnownMask_&8u)||(race.flags1B0KnownValue_&8u))
+       p.updateCpu->nextSourcePC!=0x1c8c1c||!(liveRace.flags1B0KnownMask_&8u)||(liveRace.flags1B0KnownValue_&8u))
         return reject(Impl::S::incomplete,0x1ba01c,"Results current completed base mode1F0 producer absent");
-    const auto timing=root.nativeTaRootTiming_;original_ui_source_timing50LH::Sample sample;std::uint64_t publication=0;
-    if(!timing.readPrepared(sample,publication)||publication!=root.nativeTaRootPublication_||
-       publication!=p.updateCpu->publication||!root.sourceApplicationElapsed23C_||
-       std::bit_cast<std::uint32_t>(sample.updateSeconds)!=std::bit_cast<std::uint32_t>(*root.sourceApplicationElapsed23C_)||
+    const auto timing=liveRoot.nativeTaRootTiming_;original_ui_source_timing50LH::Sample sample;std::uint64_t publication=0;
+    if(!timing.readPrepared(sample,publication)||publication!=liveRoot.nativeTaRootPublication_||
+       publication!=p.updateCpu->publication||!liveRoot.sourceApplicationElapsed23C_||
+       std::bit_cast<std::uint32_t>(sample.updateSeconds)!=std::bit_cast<std::uint32_t>(*liveRoot.sourceApplicationElapsed23C_)||
        !std::isfinite(sample.raw250)||sample.raw250<0.f||publication<=p.lastNativeSharedAttemptPublication)
         return reject(Impl::S::phase,0x1b9324,"Results exact unreplayed same-Root raw250 publication absent");
-    const auto stamp=race.profile_->stamp();const auto playerBits=profile->playerBits1125C;
+    const auto stamp=Read::profileStamp(race);const auto playerBits=Read::profilePlayerBits(*profile);
     using Dictionary=assets::OriginalApplicationLocalization50KG;
     std::shared_ptr<Dictionary> dictionary;
     std::shared_ptr<const Dictionary::SelectedText> selectedController;
@@ -195,25 +195,25 @@ OriginalResults10450LA::DisplayCpuPrefix OriginalResults10450LA::captureNativeSi
     std::uint32_t controllerDevice=0;
     const auto current=[&]()noexcept {
         original_ui_source_timing50LH::Sample now;std::uint64_t serial=0;
-        const auto next=race.profile_->stamp();const auto* currentProfile=race.profile_->commonProfile();
+        const auto next=Read::profileStamp(race);const auto* currentProfile=Read::commonProfile(race);
         if(!p.mode1F0||*p.mode1F0!=controllerMode)return false;
         if(selectedController){std::string_view text;
-            if(!dictionary||root.sourceLocalization32COwner_!=dictionary||!p.device1F4||*p.device1F4!=controllerDevice||
+            if(!dictionary||liveRoot.sourceLocalization32COwner_!=dictionary||!p.device1F4||*p.device1F4!=controllerDevice||
                !Dictionary::SelectedText::BorrowReader::readCurrent(selectedController,root,*dictionary,controllerOrdinal,text)||
                text.data()!=selectedBytes.data()||text.size()!=selectedBytes.size())return false;
         }
-        return root.sourceRace28COwner_.get()==&race&&!root.nativeTaRootEntered_&&!root.nativeTaRootAborted_&&
-            root.entitiesOwner_==p.application&&root.riderProfile==race.profile_&&
-            root.standardMaterialDomainOwner_==p.domain&&p.context->videoIdentity()==root.videoOwner_.get()&&
-            root.nativeTaRootRace_==&race&&root.nativeTaRootGeneration_==p.component.sessionGeneration&&
-            !root.sourceUpdateRenderBypass228Bit3_&&
-            root.sourceApplicationMode22C_==0&&root.nativeTaRootPublication_==publication&&
-            timing.sameOwner(root.nativeTaRootTiming_)&&timing.readPrepared(now,serial)&&serial==publication&&
+        return liveRoot.sourceRace28COwner_.get()==&race&&!liveRoot.nativeTaRootEntered_&&!liveRoot.nativeTaRootAborted_&&
+            liveRoot.entitiesOwner_==p.application&&liveRoot.riderProfile==liveRace.profile_&&
+            liveRoot.standardMaterialDomainOwner_==p.domain&&p.context->videoIdentity()==liveRoot.videoOwner_.get()&&
+            liveRoot.nativeTaRootRace_==&race&&liveRoot.nativeTaRootGeneration_==p.component.sessionGeneration&&
+            !liveRoot.sourceUpdateRenderBypass228Bit3_&&
+            liveRoot.sourceApplicationMode22C_==0&&liveRoot.nativeTaRootPublication_==publication&&
+            timing.sameOwner(liveRoot.nativeTaRootTiming_)&&timing.readPrepared(now,serial)&&serial==publication&&
             now.timestamp==sample.timestamp&&now.deltaMilliseconds==sample.deltaMilliseconds&&
             std::bit_cast<std::uint32_t>(now.raw250)==std::bit_cast<std::uint32_t>(sample.raw250)&&
             std::bit_cast<std::uint32_t>(now.updateSeconds)==std::bit_cast<std::uint32_t>(sample.updateSeconds)&&
-            next.generation==stamp.generation&&next.mode34==stamp.mode34&&currentProfile&&currentProfile->known&&
-            currentProfile->playerBits1125C==playerBits&&p.context->live()&&retirementCurrent();
+            next.generation==stamp.generation&&next.mode34==stamp.mode34&&currentProfile&&Read::profileKnown(*currentProfile)&&
+            Read::profilePlayerBits(*currentProfile)==playerBits&&p.context->live()&&retirementCurrent();
     };
     if(!current())return reject(Impl::S::owner,0x1b9324,"Results shared Root observation changed before effects");
     // Native at-most-once attempt: partial source arithmetic cannot be replayed
@@ -226,10 +226,10 @@ OriginalResults10450LA::DisplayCpuPrefix OriginalResults10450LA::captureNativeSi
     if(controllerMode){
         if(!p.device1F4)return reject(Impl::S::incomplete,0x1b9c30,"Results controller device1F4 has no reached producer");
         controllerDevice=*p.device1F4;controllerOrdinal=controllerDevice?88:87;
-        dictionary=root.sourceLocalization32COwner_;
+        dictionary=liveRoot.sourceLocalization32COwner_;
         assets::OriginalApplicationLocalizationDiagnostic50KG localized;
         if(!dictionary||p.application->localization32CNativeOwner_!=dictionary.get()||
-           !root.borrowLocalizationText18AC60(*dictionary,controllerOrdinal,selectedController,localized)||
+           !liveRoot.borrowLocalizationText(*dictionary,controllerOrdinal,selectedController,localized)||
            !Dictionary::SelectedText::BorrowReader::readCurrent(selectedController,root,*dictionary,controllerOrdinal,selectedBytes))
             return reject(Impl::S::incomplete,controllerDevice?0x1b9c48:0x1b9cec,
                 "Results actual selected Application32C controller text borrow unavailable");
@@ -353,26 +353,28 @@ bool OriginalResults10450LA::Impl::copyNativePolygon2E21D0(std::size_t index,
 OriginalResults10450LA::DisplayCpuPrefix OriginalResults10450LA::captureNativeDerivedCpu1C21B0(
     const OriginalRaceConstructor50LA& race,const ::original_position_stats_adapter50LA::Owner& observer,
     OriginalResults104Diagnostic50LA& d)noexcept {
+    using Read=::original_results_roster50LA::Read;
+    const auto liveRace=Read::raceAccess(race);
     d={};
     // Immutable owner threads FIRST, including the first-ever invocation.
     // No capture reset, source field mutation or collector rebuild on rejection.
-    if(race.resultsFeedbackThread_!=std::this_thread::get_id()||!impl_||
+    if(liveRace.resultsFeedbackThread_!=std::this_thread::get_id()||!impl_||
        impl_->nativeCaptureThread!=std::this_thread::get_id()){
         d.status=Impl::S::owner;d.sourcePC=0x1c21b0;
         d.operation="Results native capture immutable owner thread";return DisplayCpuPrefix::none;}
     auto& p=*impl_;
-    if(race.results104_.get()!=this||!race.counted_||race.rolledBack_||
-       race.application_!=p.application||race.entity_.sessionGeneration!=p.component.sessionGeneration||
-       !p.application||!p.application->entityAuthority_.canRetire(race.entity_)||
+    if(liveRace.results104_.get()!=this||!liveRace.counted_||liveRace.rolledBack_||
+       liveRace.application_!=p.application||liveRace.entity_.sessionGeneration!=p.component.sessionGeneration||
+       !p.application||!liveResultsRaceAuthorityCurrent(race,p.application)||
        !constructed()||!p.loadComplete||!p.base||!p.derived||!p.mode1F0||
        !p.icons210||!p.backdropsA0||!p.center40||!p.titles490||
        !p.domain||!p.context||!p.context->live()||!p.fonts||p.fonts->terminal()||
        !p.sourceData||!p.sourceData->sourceLoaded()||p.depth!=0xffffffu||!retirementCurrent()||
-       !race.profile_||!race.profile_->initialized()){
+       !liveRace.profile_||!Read::profileInitialized(race)){
         p.stop(d,Impl::S::owner,0x1c21b0,"Results native capture exact Race/Application/session/resources");
         return DisplayCpuPrefix::none;}
-    const auto* profile=race.profile_->commonProfile();
-    if(!profile||!profile->known||!std::isfinite(p.base->opening30)||!std::isfinite(p.base->transition164)){
+    const auto* profile=Read::commonProfile(race);
+    if(!profile||!Read::profileKnown(*profile)||!std::isfinite(p.base->opening30)||!std::isfinite(p.base->transition164)){
         p.stop(d,Impl::S::source,0x1c21b0,"Results native capture current Profile/layout");return DisplayCpuPrefix::none;}
     p.nativeDisplay.reset();
     const auto table=p.domain->materials382B38();
@@ -620,34 +622,36 @@ bool OriginalResults10450LA::Impl::prepareTitlePrefixCpu1C2698(
 
 OriginalResults10450LA::DisplayCpuPrefix OriginalResults10450LA::prepareDisplayCpuPrefix(
     const OriginalRaceConstructor50LA& race,OriginalResults104Diagnostic50LA& d)noexcept {
+    using Read=::original_results_roster50LA::Read;
+    const auto liveRace=Read::raceAccess(race);
     d={};if(!impl_)return DisplayCpuPrefix::none;auto& p=*impl_;p.displayCpu.reset();
     if(!constructed()||!p.loadComplete||!p.base||!p.derived||!p.mode1F0||
        !p.icons210||!p.backdropsA0||!p.center40||!p.titles490||!p.context||!p.context->live()||
        !p.domain||!p.fonts||p.fonts->terminal()||!p.sourceData||!p.sourceData->sourceLoaded()||
-       p.depth!=0xffffffu||!retirementCurrent()||race.results104_.get()!=this||
-       !race.counted_||race.rolledBack_||race.application_!=p.application||
-       race.entity_.sessionGeneration!=p.component.sessionGeneration||
-       !p.application->entityAuthority_.canRetire(race.entity_)||
-       !race.profile_||!race.profile_->initialized()){
+       p.depth!=0xffffffu||!retirementCurrent()||liveRace.results104_.get()!=this||
+       !liveRace.counted_||liveRace.rolledBack_||liveRace.application_!=p.application||
+       liveRace.entity_.sessionGeneration!=p.component.sessionGeneration||
+       !liveResultsRaceAuthorityCurrent(race,p.application)||
+       !liveRace.profile_||!Read::profileInitialized(race)){
         p.stop(d,Impl::S::owner,0x1c21b0,"Results CPU preparation requires its exact retained Race104/Profile/resources");
         return DisplayCpuPrefix::none;
     }
-    const auto* profile=race.profile_->commonProfile();
-    if(!profile||!profile->known||!std::isfinite(p.base->opening30)||!std::isfinite(p.base->transition164)){
+    const auto* profile=Read::commonProfile(race);
+    if(!profile||!Read::profileKnown(*profile)||!std::isfinite(p.base->opening30)||!std::isfinite(p.base->transition164)){
         p.stop(d,Impl::S::source,0x1c21b0,"Results current profile or finite layout fields absent");
         return DisplayCpuPrefix::none;
     }
-    const auto before=race.profile_->stamp();
+    const auto before=Read::profileStamp(race);
     p.displayCpu.emplace();auto& out=*p.displayCpu;
-    out.race=&race;out.raceEntity=&race.entity_;out.session=p.component.sessionGeneration;
+    out.race=&race;out.raceEntity=&liveRace.entity_;out.session=p.component.sessionGeneration;
     // No208 read/clear occurs here.1C17A0 uses208 ONLY for dirty layout;
     //even208==0 reaches1C2108,AE0/1C9B10 and the independent submission gate.
     // No claim is made that1C17A0 or shared1B9220 has run before this private
     //CPU proposal. There is deliberately no production caller yet.
-    if(!p.prepareTexturesCpu1C21B0(race.entity_.flags29,profile->mode34,d)||
+    if(!p.prepareTexturesCpu1C21B0(liveRace.entity_.flags29,Read::profileMode(*profile),d)||
        !p.transitionCpu1C2358(d)||
-       !p.prepareTitlePrefixCpu1C2698(race.entity_.flags29,profile->mode34,d))return out.prefix;
-    const auto after=race.profile_->stamp();
+       !p.prepareTitlePrefixCpu1C2698(liveRace.entity_.flags29,Read::profileMode(*profile),d))return out.prefix;
+    const auto after=Read::profileStamp(race);
     if(before.generation!=after.generation||before.mode34!=after.mode34||!p.context->live()){
         p.stop(d,Impl::S::owner,0x1c28c8,"Results owners changed during CPU preparation");
         p.displayCpu.reset();return DisplayCpuPrefix::none;

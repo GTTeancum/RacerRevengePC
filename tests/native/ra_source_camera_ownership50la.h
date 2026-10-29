@@ -1,4 +1,5 @@
 #pragma once
+#include "ra_cold_roster_resources50la.h"
 #include "native_racer_cables50hw_fixture.h"
 namespace original_main_entry50KG {class NativeCollectorFifo50LA;}
 namespace original_cable_selection50LA { class Binding; }
@@ -11,9 +12,13 @@ namespace rr::game { class OriginalRaceConstructor50LA; }
 #include "ra_static_fog_observation50la.h"
 #include "original_follow_query_bridge50kx.h"
 #include "terrain_probe_authoring50fq_fixture.h"
+#include "original_racer_terrain_query_owner50la.h"
+#include "original_racer_query690_owner50la.h"
+#include "original_racer_secondary_body_owner50la.h"
 #include "native_racer_grid50hn_fixture.h"
 #include "source_grid50ig_fixture.h"
 #include "../../src/game/query_prepare48o.h"
+#include "../../src/game/reset_visibility50ey.h"
 #include "../../src/game/indexed_type2_contact50cc.h"
 #include "../../src/game/vehicle_contact48r.h"
 #include "../../src/game/chariot_scene49u.h"
@@ -24,6 +29,7 @@ namespace rr::game { class OriginalRaceConstructor50LA; }
 #include "../../src/game/pod_live_query50iz.h"
 #include "../../src/game/original_racer_selection50ij.h"
 #include "../../src/game/original_racer_gravity_owner50la.h"
+#include "../../src/game/original_pod_sphere_owner50la.h"
 #include "../../src/game/original_racer_model_scene50la.h"
 #include "../../src/game/boost_controls50fk.h"
 #include <bit>
@@ -39,7 +45,8 @@ namespace rr::game { class OriginalRaceConstructor50LA; }
 namespace interactive_setup50DU { struct Context; }
 namespace ra_cold_aggregate50LA { class Owner; }
 namespace ra_pod_scene50LA { class Owner; }
-namespace ra_cold_roster50LA { class Resources; class Operation; }
+namespace native_racer_model50LA { class Owner; }
+namespace ra_cold_roster50LA { class Resources; class Operation; class FreshExecutionArena; }
 namespace ra_static_lighting50LA { class Binding; }
 namespace ra_static_fog50LA { class Binding; }
 namespace ra_source_camera50LA {
@@ -513,6 +520,133 @@ class OwnershipBridge final {
             value=expected.actual_.bank.read(slot,lane);return true;
         }catch(...){return false;}
     }
+    bool readEndGroundedBrake219924(const original_camera_session50KX::Session& expected,
+        std::size_t slot,std::uint32_t& bits)const noexcept {
+        if(!replayRacerIdentityCurrent(expected,slot)||!gridInputsRegistered(*gridArena_)||
+           slot>=stagedAero_.size()||slot>=stagedPods694_.size()||
+           !expected.actual_.actualChariotModels||
+           slot>=expected.actual_.actualChariotModels->size())return false;
+        const auto retained=stagedAero_[slot].lock();const auto& racer=expected.racerEntities_[slot];
+        if(!retained||!retained->published_||retained->revoked_||
+           retained->bank_!=&expected.actual_.bank||retained->frame_!=&actual_->frame||
+           retained->parameters_!=&gridArena_->parameters.bodies.main||
+           retained->application_!=expected.actual_.applicationEntities.get()||
+           retained->application_->nativeOwnerThread_!=std::this_thread::get_id()||
+           retained->slot_!=slot||retained->generation_!=expected.generation_||
+           retained->model_!=(*expected.actual_.actualChariotModels)[slot].get()||
+           retained->racer_!=&racer||!retained->racerKey_||
+           racer.racer.objectKey!=retained->racerKey_||
+           !racer.body340||retained->body_!=racer.body340||
+           racer.body340!=stagedPods694_[slot].bodyA0||
+           racer.body340->canonicalNumericAddress()!=&actual_->frame.bodies.main||
+           racer.body340->scene288()!=racer.scene190)return false;
+        try {
+            //Same existing native Aero350+EC adaptation as advanceSharedAero.
+            //Read the actual selected Bank lane, not another live slot, copied
+            //PostWorld input, a supplied brake, or a fabricated guest350 Entity.
+            const auto lane=expected.actual_.bank.bindRead(actual_->frame.bodies.main.components.bindings.aeroBrakeEC);
+            bits=std::bit_cast<std::uint32_t>(expected.actual_.bank.read(slot,lane));return true;
+        }catch(...){return false;}
+    }
+    bool readEndGroundedSpeed219948(const original_camera_session50KX::Session& expected,
+        std::size_t slot,std::uint32_t& bits)const noexcept {
+        if(!replayRacerIdentityCurrent(expected,slot)||!gridInputsRegistered(*gridArena_)||
+           slot>=stagedPods694_.size())return false;
+        const auto& racer=expected.racerEntities_[slot];
+        if(!racer.body340||racer.body340!=stagedPods694_[slot].bodyA0||
+           racer.body340->canonicalNumericAddress()!=&actual_->frame.bodies.main||
+           !racer.body340->entity().reference00||
+           racer.body340->entity().parent1C!=&racer.racer||
+           racer.body340->entity().sessionGeneration!=expected.generation_)return false;
+        try {
+            //Exact cached340+34 reload. Never recompute speed from velocity.
+            const auto lane=expected.actual_.bank.bindRead(actual_->frame.bodies.main.cachedSpeed34);
+            bits=std::bit_cast<std::uint32_t>(expected.actual_.bank.read(slot,lane));return true;
+        }catch(...){return false;}
+    }
+    bool readEndGroundedAxes2199B8(const original_camera_session50KX::Session& expected,
+        std::size_t slot,std::array<std::uint32_t,4>& forward,
+        std::array<std::uint32_t,4>& up,std::uint32_t& pc)noexcept {
+        pc=0x2199b4;
+        if(!replayRacerIdentityCurrent(expected,slot)||!gridInputsRegistered(*gridArena_))return false;
+        bool copied=false;
+        try {expected.actual_.bank.visit(slot,[&](){
+            const auto& racer=expected.racerEntities_[slot];const auto* scene=racer.scene190;
+            auto& frame=actual_->frame;
+            if(!scene||!scene->constructed||scene->released||!scene->entity().reference00||
+               scene->entity().sessionGeneration!=expected.generation_||
+               !gridArena_->rigs[slot]||gridArena_->rigs[slot].get()!=gridRigIdentity_[slot]||
+               scene->sceneIndex!=gridArena_->rigs[slot]->main||
+               scene->sceneIndex!=gridArena_->bindings.lifecycle.main190||
+               !g::validVehicleSceneCount49W(frame,gridArena_->bindings))return;
+            const auto index=static_cast<int>(scene->sceneIndex);
+            if(index<0||static_cast<std::size_t>(index)>=frame.sceneNodeCount)return;
+            auto& node=frame.nodes[index];pc=0x28a760;
+            if(!registeredRange(&node,sizeof(node)))return;
+            if(!(node.sceneFlags190&1u)){
+                pc=0x28a770;
+                if(node.parent180!=g::SceneNodeIndex49P::none){
+                    pc=0x28a77c;return; //Before ancestor2897B0/product289940.
+                }
+                pc=0x28a7a4;
+                //Same logical main190 cache and native body mirrors as the
+                //actual retained340 owner. Never replace another slot's scene.
+                auto& numericScene=frame.bodies.main.components.root.scene;
+                auto& numericFlags=frame.bodies.mainSphere.sceneFlags190;
+                if(slot>=stagedPods694_.size()||!racer.body340||
+                   racer.body340!=stagedPods694_[slot].bodyA0||
+                   racer.body340->canonicalNumericAddress()!=&frame.bodies.main||
+                   racer.body340->scene288()!=scene||
+                   !racer.body340->entity().reference00||
+                   racer.body340->entity().parent1C!=&racer.racer||
+                   racer.body340->entity().sessionGeneration!=expected.generation_||
+                   !registeredRange(&numericScene,sizeof(numericScene))||
+                   !registeredRange(&numericFlags,sizeof(numericFlags)))return;
+                //Eight source two-word iterations, not a staged whole matrix.
+                //Both loads precede either store. No finiteness admission:
+                //NaN/signzero payloads are copied exactly, including dead W.
+                for(unsigned pair=0;pair<8u;++pair){
+                    const unsigned lane=2u*pair;std::uint32_t firstWord,secondWord;
+                    pc=0x28a7ac;std::memcpy(&firstWord,node.localC0.v+lane,4);
+                    pc=0x28a7b0;std::memcpy(&secondWord,node.localC0.v+lane+1u,4);
+                    pc=0x28a7b8;
+                    std::memcpy(node.world100.v+lane,&firstWord,4);
+                    std::memcpy(numericScene.v+lane,&firstWord,4);
+                    pc=0x28a7bc;
+                    std::memcpy(node.world100.v+lane+1u,&secondWord,4);
+                    std::memcpy(numericScene.v+lane+1u,&secondWord,4);
+                }
+                pc=0x28a7cc; //Reload flags AFTER all sixteen world writes.
+                const auto flags=static_cast<std::uint8_t>((node.sceneFlags190&0xfeu)|1u);
+                pc=0x28a7e0;node.sceneFlags190=flags;
+                numericFlags=(numericFlags&0xffffff00u)|flags;
+                //Native mirrors are the same logical stores. Bank::visit saves
+                //the selected slot even on later rejection; caller already set
+                //its terminal prefix cut before entering this getter. No retry.
+            }
+            if(std::memcmp(&node.world100,&frame.bodies.main.components.root.scene,
+                           sizeof(node.world100)))return;
+            //Positive Scene190 and literal relative=null. Clean branch ignores
+            //parent; source28A7EC..820 copies XYZ payloads without arithmetic.
+            //No VF30 or inherited VU lane is read on this admitted leaf.
+            for(unsigned i=0;i<3;++i){
+                pc=0x28a7f0+8*i;std::memcpy(&forward[i],node.world100.v+8+i,4);
+            }
+            for(unsigned i=0;i<3;++i){
+                pc=0x28a810+8*i;std::memcpy(&up[i],node.world100.v+4+i,4);
+            }
+            pc=0x2199c0;copied=true;
+        });}catch(...){return false;}
+        return copied;
+    }
+    bool readEndGrounded3782199E4(const original_camera_session50KX::Session& expected,
+        std::size_t slot,std::uint32_t& bits)const noexcept {
+        if(!replayRacerIdentityCurrent(expected,slot)||!gridInputsRegistered(*gridArena_))return false;
+        try {
+            const auto lane=expected.actual_.bank.bindRead(gridArena_->selectors.vehicle378);
+            bits=std::bit_cast<std::uint32_t>(expected.actual_.bank.read(slot,lane));return true;
+        }catch(...){return false;}
+    }
     bool readEndAirborne37C219A74(const original_camera_session50KX::Session& expected,
         std::size_t slot,std::uint32_t& bits)const noexcept {
         if(!replayRacerIdentityCurrent(expected,slot)||!gridInputsRegistered(*gridArena_))return false;
@@ -646,11 +780,14 @@ class OwnershipBridge final {
         return returned;
     }
     friend class ::ra_pod_scene50LA::Owner;
+    friend class ::native_racer_model50LA::Owner; //Actual source348 caller only.
     const ::ra_pod_scene50LA::Owner* sceneOwner_=nullptr;
     friend class ::original_main_entry50KG::NativeCollectorFifo50LA;
     friend class ::original_cable_selection50LA::Binding;
     friend class ra_cold_aggregate50LA::Owner;
     friend class ra_cold_roster50LA::Operation;
+    friend class ra_cold_roster50LA::FreshExecutionArena;
+    friend class original_camera_session50KX::Session;
     std::shared_ptr<const ra_cold_roster50LA::Resources> rosterResources_;
     const terrain_probe_authoring50fq_fixture::Owner* rosterTerrain_=nullptr;
     const g::Type3QueryInput48P* rosterMovement_=nullptr;
@@ -660,6 +797,185 @@ class OwnershipBridge final {
         std::uint32_t main=0,secondary=0,terrain=0,pod=0,movement=0;
     };
     std::array<BodyIdentityReservation,8> bodyIdentities_{};
+    //Private, unconnected source-mode prerequisite. These slots retain only
+    //immutable authoring and actual arena addresses; no Bank snapshot or
+    //prepared/coldBound/Session completion is substituted for source setup.
+    std::array<terrain_probe_authoring50fq_fixture::SourceStage348,8> source348Stages_{};
+    std::array<g::OriginalRacerTerrainQueryOwner50LA*,8> source348CountedOwners_{};
+    bool source348Arena_=false;
+    bool allocateSource348NamespaceBeforeBank(terrain_probe_authoring50fq_fixture::Owner& owner,
+        live_terrain_probe50fr::Owner& live,
+        const terrain_probe_authoring50fq_fixture::Bindings& binding,std::string& error){
+        if(source348Arena_||bindAttempted_||actual_||bankIdentity_||!bankLifetime_.expired()||
+           worldOwnersRegistered_||live.initialized||owner.prepared)return false;
+        if(!terrain_probe_authoring50fq_fixture::SourceStage348::allocateNamespace(owner,binding,error))return false;
+        source348Arena_=true;return true;
+    }
+    bool reserveSource348InActualSlot(std::size_t slot,
+        const g::VehicleFrameParameters49W& parameters,const std::vector<std::uint8_t>& phy,
+        const terrain_probe_authoring50fq_fixture::Bindings& binding,std::string& error){
+        auto* s=storage_.get();const auto pin=bankLifetime_.lock();
+        if(!source348Arena_||!s||!s->sharedRoster_||!actual_||terminal_||closed_||!pin||
+           !bankIdentity_||pin->identity!=bankIdentity_||bankIdentity_->raWorldLifetime_.get()!=pin.get()||
+           !bankIdentity_->sealed_||bankIdentity_->retired_||bankIdentity_->visitDepth_!=1u||
+           bankIdentity_->currentSlot_!=slot||slot>=inputs_.collisionRoster.size()||slot>=source348Stages_.size()||
+           !registeredRange(&parameters,sizeof(parameters))||
+           !registeredRange(&actual_->terrain.initial,sizeof(actual_->terrain.initial)))return false;
+        const auto& ids=bodyIdentities_[slot];const auto* collision=inputs_.collisionRoster[slot];
+        auto& row=s->sharedRoster_->objects[slot*storage::Storage::rosterRoles+
+            static_cast<std::size_t>(storage::Storage::RosterRole::terrain348)];
+        if(!collision||ids.collision!=collision||binding.identity!=ids.terrain||
+           actual_->main.resource!=&collision->main()||!row||row->slot!=slot||
+           row->collision!=collision||row->coldBound||!row->terrainResource||row->terrainResource->initialized||
+           row->membership.state.attached||row->membership.state.object)return false;
+        //No canonical numeric field/query shape is published; body mass and
+        //7EC are not read. Future constructor-only Session custody is separate.
+        return source348Stages_[slot].reserve(actual_->terrain,actual_->terrainLive,
+            actual_->main,*collision,parameters,phy,binding,error);
+    }
+    terrain_probe_authoring50fq_fixture::SourceStage348* admitSource348CountedConstructor212060(std::size_t slot,
+        const g::OriginalRacerMainBodyOwner50LA& body)noexcept {
+        auto* s=storage_.get();const auto pin=bankLifetime_.lock();
+        if(!source348Arena_||!s||!s->sharedRoster_||!actual_||terminal_||closed_||!pin||
+           !bankIdentity_||pin->identity!=bankIdentity_||bankIdentity_->raWorldLifetime_.get()!=pin.get()||
+           !bankIdentity_->sealed_||bankIdentity_->retired_||bankIdentity_->visitDepth_!=1u||
+           bankIdentity_->currentSlot_!=slot||slot>=source348Stages_.size()||slot>=s->sharedRoster_->count||
+           body.canonicalNumericAddress()!=&actual_->frame.bodies.main||body.entity().reference00!=1u||
+           !body.entity().sessionGeneration||!body.scene288()||!body.scene288()->constructed||body.scene288()->released)return nullptr;
+        auto& row=s->sharedRoster_->objects[slot*storage::Storage::rosterRoles+
+            static_cast<std::size_t>(storage::Storage::RosterRole::terrain348)];
+        if(!row||row->coldBound||row->nativeTerrainBody128||row->generation||
+           row->membership.state.attached||row->membership.state.object)return nullptr;
+        //Admission only. The actual counted1B0EE0 owner performs ordered stores.
+        return &source348Stages_[slot];
+    }
+    bool publishSource348Body128(std::size_t slot,g::OriginalRacerTerrainQueryOwner50LA& query,
+        const g::OriginalRacerMainBodyOwner50LA& body)noexcept {
+        auto* stage=admitSource348CountedConstructor212060(slot,body);
+        if(!stage||query.stage_!=stage||query.slot_!=slot||!query.setupComplete_||query.retired_||
+           !query.body128_||*query.body128_!=&body||query.base_.entity_.reference00!=1u||
+           query.base_.entity_.sessionGeneration!=body.entity().sessionGeneration||source348CountedOwners_[slot])return false;
+        auto& row=storage_.get()->sharedRoster_->objects[slot*storage::Storage::rosterRoles+
+            static_cast<std::size_t>(storage::Storage::RosterRole::terrain348)];
+        row->nativeTerrainBody128=&body;row->generation=body.entity().sessionGeneration;
+        source348CountedOwners_[slot]=&query; //Native borrow only; no coldBound/shape/prepared.
+        return true;
+    }
+    bool withdrawSource348Body128(std::size_t slot,g::OriginalRacerTerrainQueryOwner50LA& query)noexcept {
+        const auto pin=bankLifetime_.lock();auto* s=storage_.get();
+        if(!pin||!bankIdentity_||pin->identity!=bankIdentity_||!s||!s->sharedRoster_||
+           slot>=source348CountedOwners_.size()||slot>=s->sharedRoster_->count)return false;
+        if(!source348CountedOwners_[slot])return true;
+        auto& row=s->sharedRoster_->objects[slot*storage::Storage::rosterRoles+
+            static_cast<std::size_t>(storage::Storage::RosterRole::terrain348)];
+        if(source348CountedOwners_[slot]!=&query||!row||row->coldBound||
+           !query.body128_||row->nativeTerrainBody128!=*query.body128_)return false;
+        row->nativeTerrainBody128=nullptr; //Native borrowed projection, not source128 store.
+        source348CountedOwners_[slot]=nullptr;return true;
+    }
+    bool writeSource348ScalarBefore21494C(std::size_t slot,
+        const g::OriginalRacerEntityCold50LA& racer,float actualSourceValue)noexcept {
+        auto* s=storage_.get();const auto pin=bankLifetime_.lock();
+        if(!source348Arena_||!s||!s->sharedRoster_||!actual_||terminal_||closed_||!pin||
+           !bankIdentity_||pin->identity!=bankIdentity_||bankIdentity_->raWorldLifetime_.get()!=pin.get()||
+           !bankIdentity_->sealed_||bankIdentity_->retired_||bankIdentity_->visitDepth_!=1u||
+           bankIdentity_->currentSlot_!=slot||slot>=source348Stages_.size()||slot>=s->sharedRoster_->count||
+           !racer.prepared()||!racer.body340||racer.body340->canonicalNumericAddress()!=&actual_->frame.bodies.main)return false;
+        const auto& row=s->sharedRoster_->objects[slot*storage::Storage::rosterRoles+
+            static_cast<std::size_t>(storage::Storage::RosterRole::terrain348)];
+        if(!row||row->coldBound||row->nativeTerrainBody128!=racer.body340||
+           row->generation!=racer.racer.sessionGeneration)return false;
+        const auto* counted=source348CountedOwners_[slot];
+        if(!counted||!counted->appended()||counted->retired_||counted->stage_!=&source348Stages_[slot]||
+           !racer.sourceTerrain348_||*racer.sourceTerrain348_!=counted||
+           counted->base_.entity_.parent1C!=&racer.racer)return false;
+        //Caller supplies its actual158A70 output or actual Racer378 lane,
+        //respectively. The source PC is the retained Racer cursor, not input.
+        if(racer.nativePostEmberPC_==0x2148f0u)return source348Stages_[slot].writeSideForce2148F0(actualSourceValue);
+        if(racer.nativePostEmberPC_==0x214918u)return source348Stages_[slot].writeGravity214918(actualSourceValue);
+        return false;
+    }
+    bool applySource348Setup21494C(std::size_t slot,
+        g::OriginalRacerEntityCold50LA& racer,g::VehicleFrameParameters49W& parameters,
+        float actual324,float actualLift7EC,float actualSpring,float actualDamping,
+        float actualOrientationSpring,std::string& error){
+        auto* s=storage_.get();const auto pin=bankLifetime_.lock();
+        if(!source348Arena_||!s||!s->sharedRoster_||!actual_||terminal_||closed_||!pin||
+           !bankIdentity_||pin->identity!=bankIdentity_||bankIdentity_->raWorldLifetime_.get()!=pin.get()||
+           !bankIdentity_->sealed_||bankIdentity_->retired_||bankIdentity_->visitDepth_!=1u||
+           bankIdentity_->currentSlot_!=slot||slot>=source348Stages_.size()||slot>=s->sharedRoster_->count||
+           !registeredRange(&parameters,sizeof(parameters))||
+           !racer.prepared()||racer.nativePostEmberPC_!=0x21494cu||!racer.body340||
+           racer.body340->canonicalNumericAddress()!=&actual_->frame.bodies.main)return false;
+        auto& row=s->sharedRoster_->objects[slot*storage::Storage::rosterRoles+
+            static_cast<std::size_t>(storage::Storage::RosterRole::terrain348)];
+        if(!row||row->coldBound||row->membership.state.attached||row->membership.state.object||
+           row->nativeTerrainBody128!=racer.body340||row->generation!=racer.racer.sessionGeneration||
+           !row->terrainResource||row->terrainResource->initialized||!row->terrainResult90||
+           row->terrainResult90->constructed_||row->terrainResult90->revoked_)return false;
+        auto* counted=source348CountedOwners_[slot];
+        if(!counted||!counted->appended()||counted->retired_||counted->stage_!=&source348Stages_[slot]||
+           !racer.sourceTerrain348_||*racer.sourceTerrain348_!=counted||
+           counted->base_.entity_.parent1C!=&racer.racer)return false;
+        auto shape=[&](const g::LocalSegment48I&)noexcept {
+            //The counted348 owner now exists. Its actual11C3F0 shape/result
+            //publication and retirement are not joined in the2120B4 interval.
+            //Do not run the former numerical-only initializer and falsely
+            //complete this actual owner. Prior1B1240 scalar/endpoint writes
+            //remain visible; this is a reached failure, never a no-op success.
+            return false;
+        };
+        if(!source348Stages_[slot].applySetup21494C(actual_->terrain,actual_->terrainLive,
+            actual_->main,parameters,actual324,actualLift7EC,actualSpring,actualDamping,
+            actualOrientationSpring,shape,error))return false;
+        //Only the actual348 setter is now complete in this native component.
+        //Recovery/role filters/Session/World membership remain separate joins.
+        //The caller owns source loader cursor advancement, never this bridge.
+        return true;
+    }
+
+    bool publishSource690Bounds2121C8(std::size_t slot,
+        g::OriginalRacerEntityCold50LA& racer,g::OriginalRacerQuery690Owner50LA& query)noexcept {
+        auto* s=storage_.get();const auto pin=bankLifetime_.lock();
+        if(!s||!s->sharedRoster_||!actual_||terminal_||closed_||!pin||!bankIdentity_||
+           pin->identity!=bankIdentity_||bankIdentity_->raWorldLifetime_.get()!=pin.get()||
+           !bankIdentity_->sealed_||bankIdentity_->retired_||bankIdentity_->visitDepth_!=1u||
+           bankIdentity_->currentSlot_!=slot||slot>=inputs_.collisionRoster.size()||
+           slot>=s->sharedRoster_->count||!racer.prepared()||!racer.sourceQuery690_||
+           *racer.sourceQuery690_!=&query||query.collision_!=inputs_.collisionRoster[slot]||
+           actual_->main.resource!=&query.collision_->main()||
+           query.scene190_!=racer.scene190||!racer.scene190||racer.scene190->released||
+           query.base_.entity_.sessionGeneration!=racer.racer.sessionGeneration||
+           query.base_.entity_.parent1C!=&racer.racer||query.base_.entity_.mask20!=0x402u||
+           query.boundary_!=0x2121c0u)return false;
+        const auto& row=s->sharedRoster_->objects[slot*storage::Storage::rosterRoles+
+            static_cast<std::size_t>(storage::Storage::RosterRole::main690)];
+        if(!row||row->slot!=slot||row->collision!=query.collision_||row->coldBound||
+           row->membership.state.attached||row->membership.state.object)return false;
+        return query.publishBounds2121C8(racer.sourceCollisionCenter310_,racer.sourceCollisionHalf320_);
+    }
+
+    std::weak_ptr<ra_cold_roster50LA::FreshExecutionArena> constructorArena_;
+    bool registerConstructorWorldOwners(
+        const std::shared_ptr<ra_cold_roster50LA::FreshExecutionArena>&,
+        const std::shared_ptr<OwnershipBridge>&,Diagnostic&)noexcept;
+    bool bindConstructorActual(const std::shared_ptr<ra_cold_roster50LA::FreshExecutionArena>&,
+        Diagnostic&)noexcept;
+    bool stageConstructorPod694(std::size_t,const g::OriginalRacerMainBodyOwner50LA&,
+        const g::VehicleFrameParameters49W&)noexcept;
+    bool sourceContact354Lanes212278(std::size_t,const g::OriginalRacerMainBodyOwner50LA&,
+        g::SpringGeneratedParameters48K*&,g::SpringResponseParameters48L*&)noexcept;
+    bool sourceContact368Lanes2127C8(std::size_t,const g::OriginalRacerSecondaryBodyOwner50LA&,
+        const g::OriginalRacerEntityCold50LA&,g::SpringGeneratedParameters48K*&,g::SpringResponseParameters48L*&)noexcept;
+    //Native one-way custody: real source7A4 allocations must never fall back
+    //to the unrelated fixed Fresh recovery arrays, even after partial failure.
+    std::array<bool,8> sourceAuxiliaryAdopted_{};
+    bool adoptSourceAuxiliaryQueries2123C8(std::size_t,const g::OriginalRacerMainBodyOwner50LA&)noexcept;
+    bool fixedRecoveryRouteAllowed()const noexcept {
+        for(bool adopted:sourceAuxiliaryAdopted_)if(adopted)return false;
+        return true;
+    }
+
     // Retained native per-roster694/A0 custody, NOT a guest694 Entity, a
     // CollectionRef, or a simultaneous World registration. The existing
     // shared-role membership remains unchanged until its real producer joins.
@@ -1427,6 +1743,11 @@ class OwnershipBridge final {
     ra_trigger_actions50LA::ActionLease triggerLease_{};
     bool triggerQueryActive_=false;
     std::unique_ptr<ActualQueryOwners> actual_;
+    //Only the same-Application private cold roster producer binds these.
+    //Aliasing shared ownership pins the existing process context, not a copy
+    //or a Bank lane. It survives every serial racer visit and partial stop.
+    std::shared_ptr<g::CoupledNoiseContext49M> sharedSecondaryNoiseOwner_;
+    std::weak_ptr<g::OriginalApplicationEntities50LA> sharedSecondaryNoiseEntities_;
     std::unique_ptr<original_follow_query_bridge::QueryBridge> follow_;
     struct CameraBinding final {
         // Factory-owned lifetime pins for the existing persistent collection.
@@ -1474,6 +1795,90 @@ class OwnershipBridge final {
     bool cameraAttempted_=false,cameraPrepareTerminal_=false;
     bool storageAttempted_=false,capacitySealed_=false,storageConstructed_=false;
     bool bindAttempted_=false,queriesConstructed_=false,terminal_=false,closed_=false;
+    bool nativeWreckAttempted_=false,nativeWreckPrepared_=false,nativeWreckRetired_=false;
+    bool sourceIncomingZonesAttempted_=false,sourceIncomingZonesReady_=false,sourceIncomingZonesWithdrawing_=false,sourceIncomingZonesWithdrawn_=false;
+    const void* sourceIncomingVisibility_=nullptr;
+    const void* sourceIncomingCollision_=nullptr;
+    g::ResetVisibilityWorld50EY* sourceIncomingVisibilityWorld_=nullptr;
+    g::LiveZoneWorld50EN* sourceIncomingCollisionWorld_=nullptr;
+    g::ZoneLifecycle50CL* sourceIncomingCollisionLifecycle_=nullptr;
+    std::uint32_t sourceIncomingVisibilityOrdinal_=0,sourceIncomingCollisionOrdinal_=0;
+    bool bindFreshSourceIncomingZones(original_camera_session50KX::Session&)noexcept;
+    bool withdrawFreshSourceIncomingZones(original_camera_session50KX::Session&)noexcept;
+    bool retireFreshSourceIncomingZones(original_camera_session50KX::Session&)noexcept;
+    bool loadFreshSourceWreckSecondBody165E90(std::size_t,g::OriginalRacerEntityCold50LA&,std::uint32_t&)noexcept;
+    bool loadFreshSourceWreckBody165E90(std::size_t,g::OriginalRacerEntityCold50LA&,std::uint32_t&)noexcept;
+    bool loadFreshSourceWreckSecondE0166018(std::size_t,g::OriginalRacerEntityCold50LA&,std::uint32_t&)noexcept;
+    bool loadFreshSourceWreckE0166018(std::size_t,g::OriginalRacerEntityCold50LA&,std::uint32_t&)noexcept;
+    bool loadFreshSourceWreckSecondE0Shape166074(std::size_t,g::OriginalRacerEntityCold50LA&,std::uint32_t&)noexcept;
+    bool loadFreshSourceWreckE0Shape166074(std::size_t,g::OriginalRacerEntityCold50LA&,std::uint32_t&)noexcept;
+    bool prepareAppendFreshSourceWreckSecondE016607C(std::size_t,g::OriginalRacerEntityCold50LA&,std::uint32_t&)noexcept;
+    bool prepareAppendFreshSourceWreckE016607C(std::size_t,g::OriginalRacerEntityCold50LA&,std::uint32_t&)noexcept;
+    bool constructFreshSourceWreckSecondDC1660A0(std::size_t,g::OriginalRacerEntityCold50LA&,std::uint32_t&)noexcept;
+    bool constructFreshSourceWreckDC1660A0(std::size_t,g::OriginalRacerEntityCold50LA&,std::uint32_t&)noexcept;
+    bool constructFreshSourceWreckSecondD816616C(std::size_t,g::OriginalRacerEntityCold50LA&,std::uint32_t&)noexcept;
+    bool constructFreshSourceWreckD816616C(std::size_t,g::OriginalRacerEntityCold50LA&,std::uint32_t&)noexcept;
+    bool constructLoadFreshSourceWreckSecondE41661D8(std::size_t,g::OriginalRacerEntityCold50LA&,std::uint32_t&)noexcept;
+    bool constructLoadFreshSourceWreckE41661D8(std::size_t,g::OriginalRacerEntityCold50LA&,std::uint32_t&)noexcept;
+    bool prepareAppendFreshSourceWreckSecondE416629C(std::size_t,g::OriginalRacerEntityCold50LA&,std::uint32_t&)noexcept;
+    bool prepareAppendFreshSourceWreckE416629C(std::size_t,g::OriginalRacerEntityCold50LA&,std::uint32_t&)noexcept;
+    bool bindFreshSourceWreckSecondEffectInputs2CB618(std::size_t,g::OriginalRacerEntityCold50LA&,std::uint32_t&)noexcept;
+    bool constructFreshSourceWreckSecondMutual166390(std::size_t,g::OriginalRacerEntityCold50LA&,std::uint32_t&)noexcept;
+    bool constructFreshSourceWreckSecondE81662E4(std::size_t,g::OriginalRacerEntityCold50LA&,std::uint32_t&)noexcept;
+    bool constructFreshSourceWreckE81662E4(std::size_t,g::OriginalRacerEntityCold50LA&,std::uint32_t&)noexcept;
+    bool stopFreshSourceWreckSecondFirstPair2CB778(std::size_t,g::OriginalRacerEntityCold50LA&,std::uint32_t&)noexcept;
+    bool stopFreshSourceWreckFirstPair2CB778(std::size_t,g::OriginalRacerEntityCold50LA&,std::uint32_t&)noexcept;
+    bool loadFreshSourceWreckSecondPiece22C0A0(std::size_t,g::OriginalRacerEntityCold50LA&,std::uint32_t&)noexcept;
+    bool advanceFreshSourceWreckSecondPieceCursor22C25C(std::size_t,g::OriginalRacerEntityCold50LA&,std::uint32_t&)noexcept;
+    bool bindFreshSourceWreckGroupPrimary22C298(std::size_t,g::OriginalRacerEntityCold50LA&,std::uint32_t&)noexcept;
+    bool consumeFreshSourceWreckGroupContext2CC088(std::size_t,g::OriginalRacerEntityCold50LA&,std::uint32_t&)noexcept;
+    bool constructFreshSourceWreckGroupSparks2CC0B4(std::size_t,g::OriginalRacerEntityCold50LA&,std::uint32_t&)noexcept;
+    bool setupFreshSourceWreckGroupSparks2CC0D4(std::size_t,g::OriginalRacerEntityCold50LA&,std::uint32_t&)noexcept;
+    bool beginFreshSourceWreckGroupSparksConfig15F2F0(std::size_t,g::OriginalRacerEntityCold50LA&,std::uint32_t&)noexcept;
+    bool constructFreshSourceWreckGroup22C278(std::size_t,g::OriginalRacerEntityCold50LA&,std::uint32_t&)noexcept;
+    bool advanceFreshSourceWreckPieceCursor22C25C(std::size_t,g::OriginalRacerEntityCold50LA&,std::uint32_t&)noexcept;
+    bool applyFreshSourceWreckSecondWater22C21C(std::size_t,g::OriginalRacerEntityCold50LA&,std::uint32_t&)noexcept;
+    bool applyFreshSourceWreckWater22C21C(std::size_t,g::OriginalRacerEntityCold50LA&,std::uint32_t&)noexcept;
+    bool appendFreshSourceWreckSecondPiece22C1B8(std::size_t,g::OriginalRacerEntityCold50LA&,std::uint32_t&)noexcept;
+    bool appendFreshSourceWreckPiece22C1B8(std::size_t,g::OriginalRacerEntityCold50LA&,std::uint32_t&)noexcept;
+    bool readStopAppendFreshSourceWreckSplash19DDC8(std::size_t,g::OriginalRacerEntityCold50LA&,std::uint32_t&)noexcept;
+    bool readStopAppendFreshSourceWreckDust19A7D0(std::size_t,g::OriginalRacerEntityCold50LA&,std::uint32_t&)noexcept;
+    bool readAppendFreshSourceWreckFire15E024(std::size_t,g::OriginalRacerEntityCold50LA&,std::uint32_t&)noexcept;
+    bool completeFreshSourceWreckSecondInitialChild19A7F8(std::size_t,g::OriginalRacerEntityCold50LA&,std::uint32_t&)noexcept;
+    bool completeFreshSourceWreckSecondSuccessorChild(std::size_t,g::OriginalRacerEntityCold50LA&,std::uint32_t&)noexcept;
+    bool readFreshSourceWreckSecondSuccessorChild(std::size_t,g::OriginalRacerEntityCold50LA&,std::uint32_t&)noexcept;
+    bool readStopAppendFreshSourceWreckSecondPositiveDust19A7D0(std::size_t,g::OriginalRacerEntityCold50LA&,std::uint32_t&)noexcept;
+    bool readStopAppendFreshSourceWreckSecondPositiveSplash19DDC8(std::size_t,g::OriginalRacerEntityCold50LA&,std::uint32_t&)noexcept;
+    bool readFreshSourceWreckSecondInitialChild19A7D0(std::size_t,g::OriginalRacerEntityCold50LA&,std::uint32_t&)noexcept;
+    bool readAppendFreshSourceWreckSmoke19A7D0(std::size_t,g::OriginalRacerEntityCold50LA&,std::uint32_t&)noexcept;
+    bool continueFreshSourceWreckSecondPairs2CB6CC(std::size_t,g::OriginalRacerEntityCold50LA&,std::uint32_t&)noexcept;
+    bool continueFreshSourceWreckPairs2CB6CC(std::size_t,g::OriginalRacerEntityCold50LA&,std::uint32_t&)noexcept;
+    bool constructFreshSourceWreckFire2CB720(std::size_t,g::OriginalRacerEntityCold50LA&,std::uint32_t&)noexcept;
+    bool constructFreshSourceWreckSplash2CB854(std::size_t,g::OriginalRacerEntityCold50LA&,std::uint32_t&)noexcept;
+    bool constructFreshSourceWreckSecondPositiveSplash(std::size_t,g::OriginalRacerEntityCold50LA&,std::uint32_t&)noexcept;
+    bool constructFreshSourceWreckSecondSuccessorChild(std::size_t,g::OriginalRacerEntityCold50LA&,std::uint32_t&)noexcept;
+    bool constructFreshSourceWreckSecondPositiveDust(std::size_t,g::OriginalRacerEntityCold50LA&,std::uint32_t&)noexcept;
+    bool constructFreshSourceWreckSecondInitialChild(std::size_t,g::OriginalRacerEntityCold50LA&,std::uint32_t&)noexcept;
+    bool constructFreshSourceWreckDust2CB7E0(std::size_t,g::OriginalRacerEntityCold50LA&,std::uint32_t&)noexcept;
+    bool constructFreshSourceWreckSmoke2CB6CC(std::size_t,g::OriginalRacerEntityCold50LA&,std::uint32_t&)noexcept;
+    bool constructFreshSourceWreckSecondArrays2CB628(std::size_t,g::OriginalRacerEntityCold50LA&,std::uint32_t&)noexcept;
+    bool constructFreshSourceWreckArrays2CB628(std::size_t,g::OriginalRacerEntityCold50LA&,std::uint32_t&)noexcept;
+    bool constructFreshSourceWreckMutual166390(std::size_t,g::OriginalRacerEntityCold50LA&,std::uint32_t&)noexcept;
+    bool sourceWreckConstructorAttempted_=false,sourceWreckConstructorWithdrawing_=false,sourceWreckConstructorRetired_=false;
+    bool loadFreshSourceWreckPiece212A50(std::size_t,g::OriginalRacerEntityCold50LA&,
+        std::uint32_t&)noexcept;
+    bool loadFreshSourceWreckConfig2129A4(std::size_t,g::OriginalRacerEntityCold50LA&,
+        const std::vector<std::uint8_t>&,std::uint32_t&)noexcept;
+    bool retireFreshSourceWreckConstructors(original_camera_session50KX::Session&)noexcept;
+
+    bool stageNativeRetainedWreckCold(original_camera_session50KX::Session&)noexcept;
+    ::ra_pod_scene50LA::Owner* nativeWreckZoneOwner_=nullptr;
+    g::OriginalTrackParticleCold50LA* nativeWreckParticles_=nullptr;
+    bool stageNativeFirstWreckLoad(original_camera_session50KX::Session&,
+        ::ra_pod_scene50LA::Owner&,const g::UndertrackPhysicsDomain50EW&,const std::string&,const std::string&,const void*,std::uint32_t&,std::uint32_t&)noexcept;
+
+    bool retireNativeRetainedWreckCold(original_camera_session50KX::Session&)noexcept;
+
     std::uint32_t nativeFifoPins_=0; // Queued actual camera/allocation borrow, not source state.
     bool registrationAttempted_=false,worldOwnersRegistered_=false;
     std::unique_ptr<GridArenaOwners> gridArena_;
@@ -1811,6 +2216,7 @@ class OwnershipBridge final {
 #include "ra_shared_spring_response50la.inl"
 #include "ra_shared_terrain_response50la.inl"
 #include "ra_shared_secondary_forces50la.inl"
+#include "ra_shared_secondary_joint_prefix50la.inl"
     //Uncalled until the terrain POD consumer reaches its real owner9C read.
     //The typed token names the actual racer, never the separate340 body.
     bool readNativePodRacerOwner9C(const SharedOwnerLease& lease,std::size_t slot,
@@ -2000,6 +2406,8 @@ class OwnershipBridge final {
     bool placeGridMode(native_racer50HN::Bank& bank,std::size_t slot,
         const GridArenaOwners& input,Diagnostic& d,bool canonicalTournamentGrid,bool shared)noexcept {
         d={};
+        if(!fixedRecoveryRouteAllowed())
+            return fail(d,"actual source auxiliary queries cannot adopt fixed native recovery arrays");
         if(!storage_.get()||shared!=bool(storage_.get()->sharedRoster_))
             return fail(d,"cold grid mode differs from actual fresh storage ownership");
         if(shared&&(sharedEffectsStopped_||sharedOwnerLease_||sharedRoleViews_||nativeFifoPins_||
@@ -2158,6 +2566,7 @@ class OwnershipBridge final {
         }catch(...){return fail(d,"RA grid exception; Bank saved actual partial slot effects");}
     }
     bool recoveryLanesRegistered(const FreshRecoveryArenaOwners& a,bool shared=false)const noexcept {
+        if(!fixedRecoveryRouteAllowed())return false;
         const auto& r=*actual_->recovery;const auto& m=*actual_->movement;
         if(!registeredRange(a.endpoints,sizeof(a.endpoints))||!registeredRange(a.metadata,sizeof(a.metadata))||
            !registeredRange(&m.copied40,sizeof(m.copied40))||!registeredRange(&m.copied50,sizeof(m.copied50))||
@@ -2202,6 +2611,8 @@ class OwnershipBridge final {
         const std::shared_ptr<g::original_gc_gameplay_lighting_candidate::Owner>& light,
         const FreshRecoveryArenaOwners* recovery,Diagnostic& d,bool shared)noexcept {
         d={};
+        if(!fixedRecoveryRouteAllowed())
+            return fail(d,"actual source auxiliary queries cannot adopt fixed native recovery arrays");
         if(!storage_.get()||shared!=bool(storage_.get()->sharedRoster_))
             return fail(d,"fresh attachment mode differs from actual World ownership");
         if(shared&&(!recovery||sharedEffectsStopped_||sharedOwnerLease_||sharedRoleViews_||nativeFifoPins_||
@@ -2440,6 +2851,7 @@ class OwnershipBridge final {
             d.camera.status=c::Status::terminal;return d.camera;}
     }
     bool canClose()const noexcept {
+        if(sourceIncomingZonesAttempted_&&!sourceIncomingZonesWithdrawn_)return false;
         if(endCandidateProducer_&&endCandidateProducer_->inCall)return false;
         if(sharedOwnerLease_||sharedRoleViews_||sharedEffectsStopped_)return false;
         if(nativeFifoPins_||triggerQueryActive_)return false;
@@ -2498,6 +2910,11 @@ class OwnershipBridge final {
         if(auto* s=storage_.get())for(const auto& w:inputs_.wreck)if(w.queries&&w.queries->prepared()&&
             w.queries->worldBinding().world==&s->world&&
             !w.queries->releaseUnpublishedWorld(s->world))return false;
+        // Native unbound cold backing has no source pieces to destruct. Only
+        // after every actual query withdrawal may its stable reservations die.
+        if(rosterResources_&&rosterResources_->wreckBacking_&&
+           !rosterResources_->wreckBacking_->releaseUnboundColdReservations())return false;
+        inputs_.wreck.clear(); // No dangling query aliases survive native release.
         if(podBindings_&&podBindings_->podLiveQuery50IZ==podContext_.get())podBindings_->podLiveQuery50IZ=nullptr;
         podContext_.reset();podBindings_=nullptr;podParameters_=nullptr;
         endCandidateProducer_=nullptr; //Revoke Context borrow before owned backing disappears.

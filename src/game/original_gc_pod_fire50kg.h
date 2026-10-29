@@ -22,6 +22,15 @@ using OriginalGcPodFireReceipt50KG=OriginalGcFireEmissionReceipt50KG;
 OriginalGcSprayStatus50KG readOriginalGcPodFireDefinition50KG(
     const std::vector<std::uint8_t>& originalPodFireEmt,OriginalGcPodFireDefinition50KG&,
     assets::OriginalUiPageDiagnostic50KG&) noexcept;
+// Immutable native transport metadata, not a second live Fire state.
+struct OriginalGcPodFireSourceMetadata50KG {
+    float rawAgeAtBirth=0,delayTime=0;
+    std::int32_t mode=0,forcedCount=0;
+    bool velocityPresent=false,minRangePresent=false,maxRangePresent=false;
+};
+OriginalGcSprayStatus50KG readOriginalGcPodFireSourceDefinition50KG(
+    const std::vector<std::uint8_t>&,OriginalGcPodFireDefinition50KG&,
+    OriginalGcPodFireSourceMetadata50KG&,assets::OriginalUiPageDiagnostic50KG&) noexcept;
 // Call alongside the actual freshly constructed/loaded/stopped Fire15DE00
 // child, in source registration order. Does not start/stop or reset that child.
 OriginalGcPodFireReceipt50KG bindOriginalGcPodFire50KG(

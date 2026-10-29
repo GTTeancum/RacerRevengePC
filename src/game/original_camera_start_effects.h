@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <optional>
 
+namespace original_main_entry50KG { struct Application; }
 namespace rr::game {
 // These are additional fields of the ACTUAL application/video/race owners.
 // Borrow them across camera calls; do not construct private shadow copies.
@@ -47,6 +48,16 @@ OriginalCameraStartResult requestOriginalCameraExitFade2AED60(
 enum class OriginalVideoFadeDirection : std::uint8_t { out260850,in261630 };
 // The two real video virtual request methods. They do not execute a fade or
 // manufacture an alpha value. Unknown constructor3E8 remains explicit.
+// Exact17C5C8 zero-duration/nonasync/no-redraw prefix. Preserves source
+// stores and the real400 clock sample before the unresolved3E8 read. Never
+// certifies the request's return or invents initial alpha/interval arithmetic.
+class OriginalLoadingFadePrefix17C5C8 final {
+    friend struct ::original_main_entry50KG::Application;
+    // Only a retained one-shot Application continuation may use this helper.
+    // It is currently uncalled: the flags9 UI retirement remains unresolved.
+    static OriginalCameraStartResult advance(
+        OriginalVideoFadeState&,HostMonotonicClock50ID&,std::int32_t applicationMode22C)noexcept;
+};
 OriginalCameraStartResult requestOriginalVideoFade260320(
     OriginalVideoFadeState&,HostMonotonicClock50ID&,std::int32_t applicationMode22C,
     std::int32_t durationMilliseconds,bool asynchronous,bool redrawSource);

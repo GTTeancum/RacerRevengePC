@@ -316,6 +316,8 @@ private:
         decltype(&NativeSourceReverb50KG::process)) noexcept;
     bool nativeSourceWetProcessorCurrent(const OriginalApplicationAural50KG&,
         const NativeSourceReverb50KG&) const noexcept;
+    bool canReleaseNativeSourceWetProcessor(const OriginalApplicationAural50KG&,
+        const NativeSourceReverb50KG&)const noexcept;
     bool releaseNativeSourceWetProcessor(const OriginalApplicationAural50KG&,
         NativeSourceReverb50KG&) noexcept;
     bool canServiceNativeSourceVoices267CB0(const OriginalApplicationAural50KG&,float)const noexcept;

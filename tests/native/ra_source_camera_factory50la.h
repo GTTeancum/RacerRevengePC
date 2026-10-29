@@ -10,19 +10,51 @@ inline bool Owner::constructRuntimeSourceCamera(
     const ra_source_camera50LA::CameraCallerOwners& actual,
     const std::vector<std::uint8_t>& selectedOriginalCam,
     original_camera_session50KX::DisplayInputs& display,Diagnostic& d)noexcept {
+    return constructRuntimeSourceCameraImpl(application,actual,selectedOriginalCam,display,{},{},d);
+}
+inline bool Owner::constructRuntimeSourceCamera(
+    const original_main_entry50KG::Application& application,
+    const ra_source_camera50LA::CameraCallerOwners& actual,
+    const std::vector<std::uint8_t>& selectedOriginalCam,
+    original_camera_session50KX::DisplayInputs& display,
+    const std::shared_ptr<ra_cold_roster50LA::FreshExecutionArena>& fresh,
+    const std::shared_ptr<const g::OriginalRacerWorldBorrow50LA>& world,Diagnostic& d)noexcept {
+    d={};d.stage=Stage::sourceCamera;
+    // Native admission only: unknown original World fields are not a reached
+    //2107FC failure or an inferred NULL/height-provider receipt.
+    if(!fresh||!world||!world->current()||world->generation()!=trackParticleGeneration_)
+        return fail(d,"constructor-only native admission lacks its current actual source World lease");
+    return constructRuntimeSourceCameraImpl(application,actual,selectedOriginalCam,display,fresh,world,d);
+}
+inline bool Owner::constructRuntimeSourceCameraImpl(
+    const original_main_entry50KG::Application& application,
+    const ra_source_camera50LA::CameraCallerOwners& actual,
+    const std::vector<std::uint8_t>& selectedOriginalCam,
+    original_camera_session50KX::DisplayInputs& display,
+    const std::shared_ptr<ra_cold_roster50LA::FreshExecutionArena>& fresh,
+    const std::shared_ptr<const g::OriginalRacerWorldBorrow50LA>& world,Diagnostic& d)noexcept {
     namespace c=original_camera_session50KX;
     d={};d.stage=Stage::sourceCamera;
+    if(bool(fresh)!=bool(world))return fail(d,"constructor-only World and arena custody must be paired");
     if(terminal_||closed_||!prefix_.runtimeQueryWorldOwners||!prefix_.lighting||
-       !prefix_.trackParticleManager||!prefix_.staticWorldImages||!runtimeQueries_||
+       !prefix_.trackParticleManager||!runtimeQueries_||
+       (fresh?(!prefix_.staticWorld||prefix_.staticWorldImages||worldImagesAttempted_):!prefix_.staticWorldImages)||
        runtimeQueries_->cameraAttempted_)
         return fail(d,"RA camera requires its existing registered runtime/light/particle/image owners");
     auto& runtime=*runtimeQueries_;
+    if(fresh&&!c::Session::constructorArenaMatches(fresh,actual.bank,actual.arena,
+       actual.bindings,actual.ai,actual.poseHistory,actual.actualRigs))
+        return fail(d,"constructor-only camera cannot adopt a different or warmed execution arena");
+    if(fresh)for(const auto& cables:actual.actualCables)
+        if(cables)return fail(d,"constructor-only prefix cannot adopt a later Cables allocation");
     runtime.cameraAttempted_=true;
     try {
         const auto domain=application.standardMaterialDomain();
         const auto entities=application.entities();
         const auto* source=source_?source_->sourcesDecoded():nullptr;
-        if(runtime.terminal_||!runtime.queriesConstructed_||!runtime.worldOwnersRegistered_||
+        if(runtime.terminal_||!runtime.worldOwnersRegistered_||
+           (fresh?(runtime.queriesConstructed_||runtime.follow_||!runtime.storage_.get()||
+               !runtime.storage_.get()->count.sharedRosterCount):(!runtime.queriesConstructed_||!runtime.follow_))||
            &actual.bank!=runtime.bankIdentity_||!runtime.cameraBankCurrent()||
            !runtime.actual_||&actual.arena!=&runtime.actual_->frame||
            (runtime.gridArena_&&(&actual.bindings!=&runtime.gridArena_->bindings||
@@ -35,14 +67,15 @@ inline bool Owner::constructRuntimeSourceCamera(
            !domain||domain!=world_->domain_||!entities||!world_->context_||!world_->context_->live()||
            world_->context_->materialApplication()!=application.materialApplication||
            trackParticles_->material150()->table382B38()!=domain->materials382B38().get()||
-           !domain->materials382B38()->coldCollectorCurrent(world_->imageCollector_)||
+           (fresh?domain->materials382B38()->coldCollectorCurrent(world_->imageCollector_):
+               !domain->materials382B38()->coldCollectorCurrent(world_->imageCollector_))||
            domain->archiveProvider3E1A70()->revision()!=world_->providerRevision_||
            display.trackFog3EC||selectedOriginalCam.empty()||!actual.actualRigs[0]||actual.actualRigs[0]->phy.empty()||
            bool(actual.actualBottomRightModels)!=bool(actual.actualBottomLeftModels))
             return fail(d,"RA camera Bank/Application/context/manager or selected rig ownership differs");
         for(std::size_t i=0;i<actual.bank.count();++i){
             const auto* rig=actual.actualRigs[i].get();
-            if(!rig||!actual.actualCables[i]||actual.actualCables[i]->sourceRig_!=rig||!actual.actualRightModels[i]||!actual.actualLeftModels[i]||!actual.actualChariotModels[i]||
+            if(!rig||(!fresh&&(!actual.actualCables[i]||actual.actualCables[i]->sourceRig_!=rig))||!actual.actualRightModels[i]||!actual.actualLeftModels[i]||!actual.actualChariotModels[i]||
                rig->podId.size()!=5u||rig->podId.compare(0,3,"POD")||
                rig->podId[3]<'0'||rig->podId[3]>'9'||rig->podId[4]<'0'||rig->podId[4]>'9'||
                static_cast<std::uint32_t>((rig->podId[3]-'0')*10+rig->podId[4]-'0')!=actual.racer60[i])
@@ -66,7 +99,9 @@ inline bool Owner::constructRuntimeSourceCamera(
         runtime.camera_.reset(new ra_source_camera50LA::OwnershipBridge::CameraBinding());
         auto& camera=*runtime.camera_;
         camera.lighting=lighting_;camera.particles=trackParticles_;
-        for(std::size_t i=0;i<actual.bank.count();++i){
+        // This earlier source interval has not constructed Cables. Native
+        // empty backing is not a source allocation/NULL-publication receipt.
+        if(!fresh)for(std::size_t i=0;i<actual.bank.count();++i){
             camera.cablePins[i]=actual.actualCables[i]->retainSourceCamera(*actual.actualRigs[i]);
             if(!camera.cablePins[i])return fail(d,"actual persistent Cables camera lifetime unavailable");
             camera.cables[i]=actual.actualCables[i].get();
@@ -82,19 +117,31 @@ inline bool Owner::constructRuntimeSourceCamera(
             static_cast<std::uint64_t>(reinterpret_cast<std::uintptr_t>(&phy)),
             camera.tob.data(),camera.tob.size(),g::OriginalCameraStartCourse::ra};
         auto& storage=*runtime.storage_.get();
-        camera.session.reset(new c::Session(c::ActualOwners{
+        c::ActualOwners sessionOwners{
             actual.bank,actual.arena,actual.bindings,actual.baseTail,actual.ai,actual.racerTiming,
             actual.all8Manager,actual.hostRace,actual.sharedRandom,actual.attachedGlobals,actual.applicationClock,
             actual.preferences,actual.launchKind11258,actual.configuration34,actual.application350,
-            *camera.lighting,storage.lifecycle,storage.mainMembership.state,actual.blur,*runtime.follow_,
+            *camera.lighting,storage.lifecycle,storage.mainMembership.state,actual.blur,(fresh?c::NativeFollowBorrow{}:c::NativeFollowBorrow{*runtime.follow_}),
             actual.poseHistory,actual.boost,actual.cycleAudio,actual.racer60,actual.humanCount34,actual.race94,
             actual.humanHeld,actual.raceHud,actual.deathDebris,entities,domain->materials382B38(),
             &application.materialDirectory36B970(),&actual.actualRigs,camera.particles.get(),
             &source->height.sourceDomain,&actual.actualRightModels,&actual.actualLeftModels,
             &actual.actualChariotModels,actual.actualBottomRightModels,actual.actualBottomLeftModels,
-            application.animationClock(),&camera.cables,&source->map,{},{},{},{},{},
+            application.animationClock(),fresh?nullptr:&camera.cables,&source->map,{},{},{},{},{},
             actual.startMusicContext,actual.startMusicRequest,actual.recordManager40,
-            actual.introAudio,actual.introAuthoring,actual.introMusicFadeRequest}));
+            actual.introAudio,actual.introAuthoring,actual.introMusicFadeRequest};
+        camera.session.reset(fresh?new c::Session(sessionOwners,fresh,world):new c::Session(sessionOwners));
+        // Exact same retained bridge; no unowned callback or supplied key.
+        camera.session->nativeWreckOwner_=&runtime;
+        if(fresh){
+            if(!camera.session->admitConstructorOnly(fresh,camera.generation,display)||
+               !camera.session->constructConstructorOnlyPrefixes()){
+                d.runtimeQueries.camera=camera.session->result_;
+                return fail(d,"constructor-only actual Entity/model prefix stopped; same owners retained");
+            }
+            d.runtimeQueries.camera=camera.session->result_;
+            return true; //No camera/controller/Follow/readiness publication.
+        }
         if(actual.introAuthoring&&!runtime.constructCurrentRaIntro174FA4(application))
             return fail(d,"same-owner RA authored intro constructor rejected");
         // No prepare, pose, viewport publication, RNG/clock sampling or

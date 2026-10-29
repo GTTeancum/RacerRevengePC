@@ -1,78 +1,8 @@
 #include "original_results104_storage50la.h"
 #include "original_time_stats_state50la.h"
-#include "../../tests/native/original_position_stats_adapter50la.h"
-#include "../../tests/native/original_race_constructor50la.h"
-#include "../../tests/native/ra_cold_roster_operation50la.h"
+#include "../../tests/native/original_results_roster_read50la.h"
 #include <cmath>
 
-namespace original_position_stats_adapter50LA {
-bool Owner::resultsRowsCurrent(const rr::game::OriginalApplicationEntities50LA* application,
-    const rr::assets::OriginalStandardMaterialTable50LA* materials,std::uint64_t generation,
-    std::uint64_t publication)const noexcept {
-    if(!camera_||!manager_||!application||!materials||!generation||!publication)return false;
-    try {
-        const auto& c=*camera_;
-        return identityCurrent()&&c.actual_.applicationEntities.get()==application&&
-            c.actual_.applicationMaterials.get()==materials&&c.generation_==generation&&
-            c.frameStage_==Camera::FrameStage::published&&c.completedFrame_&&
-            c.publicationCount_==publication&&c.viewport_.prepared&&c.viewport_.matricesReady&&
-            c.viewport_.sessionGeneration==generation;
-    }catch(...){return false;}
-}
-
-bool Owner::captureResultsRows(const rr::game::OriginalApplicationEntities50LA* application,
-    const rr::assets::OriginalStandardMaterialTable50LA* materials,std::uint64_t generation,
-    ResultsRows& output,Diagnostic& d)const noexcept {
-    d={};if(!camera_||!manager_)return false;
-    try {
-        const auto& c=*camera_;const auto& m=*manager_;const auto& bank=c.actual_.bank;
-        const auto publication=c.publicationCount_;
-        if(!resultsRowsCurrent(application,materials,generation,publication)){
-            d.status=Status::identity;return false;
-        }
-        // bindRead rejects active/blocked Bank leases. These exact values are
-        // native source-lane owners, NOT HOST standings/elapsed race seconds.
-        const auto time=bank.bindRead(c.actual_.racerTiming.timeCB8);
-        const auto gap=bank.bindRead(c.actual_.racerTiming.valueCBC);
-        const auto flags=bank.bindRead(c.actual_.arena.fields.impactFlagsCD8);
-        ResultsRows next;next.count=bank.count();next.trackLength38=m.trackLength38;
-        next.generation=generation;next.publication=publication;next.bank=&bank;
-        std::array<bool,8> places{};
-        for(std::size_t i=0;i<next.count;++i){
-            const auto& observed=m.observed[i];const auto& fields=m.fields[i];
-            const auto& rank=m.rank[i];const auto& input=m.rankInput[i];
-            // The existing manager publishes these actual rank/observation
-            // lanes together. Publication here is a native scheduling guard,
-            // never proof of original Application phase5 or managerB0 load.
-            if(!bank.active(i)||bank.read(i,c.reads_.phase)!=rr::game::VehicleFramePhase49W::Ready||
-               !observed.bound||observed.managerIndex!=i||!fields.bound||
-               fields.placeCCC!=rank.placeCCC||observed.placeCCC!=rank.placeCCC||
-               fields.remainingCC4!=rank.remainingCC4||observed.progressCC4!=rank.remainingCC4||
-               observed.lapCC8!=input.lapCC8||rank.placeCCC<1||
-               static_cast<std::size_t>(rank.placeCCC)>next.count||places[std::size_t(rank.placeCCC-1)]){
-                d.status=Status::identity;return false;
-            }
-            places[std::size_t(rank.placeCCC-1)]=true;
-            auto& row=next.rows[i];
-            row.vehicle58=bank.read(i,c.reads_.class58);
-            // Actual identity array is checked by identitiesCurrent; never
-            // read uninitialized AI racer60 for the genuine human prefix.
-            row.racer60=c.actual_.racer60[i];row.retirementCD4=bank.read(i,c.reads_.retirementCD4);
-            row.flagsCD8=bank.read(i,flags);row.timeCB8=bank.read(i,time);row.valueCBC=bank.read(i,gap);
-            row.placeCCC=rank.placeCCC;row.remainingCC4=rank.remainingCC4;row.lapCC8=observed.lapCC8;
-            if(row.vehicle58!=observed.vehicle58||row.retirementCD4!=rank.retirementCD4){
-                d.status=Status::identity;return false;
-            }
-        }
-        if(!resultsRowsCurrent(application,materials,generation,publication)){
-            d.status=Status::phase;return false;
-        }
-        // Every field of every active row was read above. Default storage
-        // outside count is never a known original row and is never consumed.
-        output=next;d.status=Status::complete;return true;
-    }catch(...){d.status=Status::read;return false;}
-}
-}
 
 namespace rr::game {
 namespace {
@@ -122,9 +52,8 @@ OriginalResults10450LA::DisplayCpuPrefix OriginalResults10450LA::prepareRosterPa
     if(!text((*p.labels3A0)[1],out.rosterHeaders[1],0x1c2a5c))return out.prefix;
     ++out.rosterHeaderCount;
 
-    using Observation=::original_position_stats_adapter50LA::Owner;
-    Observation::ResultsRows rows;
-    Observation::Diagnostic observation;
+    using Read=::original_results_roster50LA::Read;
+    Read::Rows rows;
     const auto* materials=p.domain->materials382B38().get();
     const auto generation=p.component.sessionGeneration;
     // Exact successful-load identity, never merely same Application/count.
@@ -132,25 +61,24 @@ OriginalResults10450LA::DisplayCpuPrefix OriginalResults10450LA::prepareRosterPa
     // is weak and cannot extend World74 or partial-load cleanup lifetime.
     const auto operation=p.loadedRosterOperation.lock();
     const auto operationCurrent=[&](){
-        return operation&&operation->aggregate_==race.world74_&&
-            operation->entities_==p.application&&operation->domain_==p.domain&&
-            operation->generation_==generation&&
-            operation->resultsRuntimeBankCurrent(observer.resultsBankIdentity());
+        return ::original_results_roster50LA::Read::loadedOperationOwnerFieldsCurrent(
+            operation,::original_results_roster50LA::Read::raceWorldIdentity(race),p.application,p.domain,generation)&&
+            ::original_results_roster50LA::Read::loadedOperationBankCurrent(operation,::original_results_roster50LA::Read::observerBankIdentity(observer));
     };
     if(!operationCurrent()||
-       !observer.captureResultsRows(p.application.get(),materials,generation,rows,observation)||
-       rows.bank!=observer.resultsBankIdentity()||!operationCurrent()||
+       !Read::captureRows(observer,p.application.get(),materials,generation,rows)||
+       rows.bank!=::original_results_roster50LA::Read::observerBankIdentity(observer)||!operationCurrent()||
        rows.count!=p.extent||rows.count>out.rosterRows.size()){
         p.stop(d,Impl::S::owner,0x1c3a60,"Results current published same-owner manager/Bank rows absent");
         return out.prefix;
     }
     out.rosterPublication=rows.publication;
-    const auto before=race.profile_->stamp();const auto* profile=race.profile_->commonProfile();
-    if(!profile||!profile->known){p.stop(d,Impl::S::owner,0x1c3058,"Results current Profile absent");return out.prefix;}
+    const auto before=::original_results_roster50LA::Read::profileStamp(race);const auto* profile=::original_results_roster50LA::Read::commonProfile(race);
+    if(!profile||!::original_results_roster50LA::Read::profileKnown(*profile)){p.stop(d,Impl::S::owner,0x1c3058,"Results current Profile absent");return out.prefix;}
     const auto current=[&](){
-        const auto stamp=race.profile_->stamp();
+        const auto stamp=::original_results_roster50LA::Read::profileStamp(race);
         return operationCurrent()&&stamp.generation==before.generation&&stamp.mode34==before.mode34&&
-            observer.resultsRowsCurrent(p.application.get(),materials,generation,rows.publication)&&
+            Read::rowsCurrent(observer,p.application.get(),materials,generation,rows.publication)&&
             p.context->live();
     };
     // This implements actual1B0BB0 arithmetic, NOT a PositionStats display
@@ -172,7 +100,7 @@ OriginalResults10450LA::DisplayCpuPrefix OriginalResults10450LA::prepareRosterPa
             const float completed=pageMul(float(first.lapCC8),length);
             const float partial=pageSub(length,first.remainingCC4);
             const float distance=pageAdd(completed,partial);
-            const float total=pageMul(length,float(profile->playerBits1125C&31u));
+            const float total=pageMul(length,float(::original_results_roster50LA::Read::profilePlayerBits(*profile)&31u));
             if(!std::isfinite(distance)||!std::isfinite(total)||total==0.f)
                 return p.stop(d,Impl::S::source,0x1b0c78,"Results projected race distance finite domain");
             const float fraction=pageDiv(distance,total);
@@ -196,7 +124,7 @@ OriginalResults10450LA::DisplayCpuPrefix OriginalResults10450LA::prepareRosterPa
         for(;manager<rows.count;++manager)if(rows.rows[manager].placeCCC==std::int32_t(rank+1))break;
         if(manager==rows.count){p.stop(d,Impl::S::source,0x1c2a94,"Results rank has no real manager row");return out.prefix;}
         const auto& row=rows.rows[manager];
-        if(!operation->resultsRacerIdentityCurrent(manager,row.racer60)){
+        if(!::original_results_roster50LA::Read::loadedOperationRacerCurrent(operation,manager,row.racer60)){
             p.stop(d,Impl::S::owner,0x1c2ac0,"Results current racer differs from loaded portrait rig identity");
             return out.prefix;
         }
@@ -216,7 +144,7 @@ OriginalResults10450LA::DisplayCpuPrefix OriginalResults10450LA::prepareRosterPa
         if(!texture(portrait,calls.portrait,0x1c2e80))return out.prefix;
         p.position(name,pageAdd(148.f,offset),y);p.color(name,color);
         std::int32_t nameId=-1;
-        if(!race.profile_->resultsRacerName3C(row.racer60,nameId)||
+        if(!::original_results_roster50LA::Read::profileRacerName(race,row.racer60,nameId)||
            !p.localized(name,static_cast<std::size_t>(nameId),d)){
             if(nameId<0)p.stop(d,Impl::S::source,0x1c3064,"Results real Profile3C racer name unavailable");
             return out.prefix;
@@ -256,5 +184,30 @@ OriginalResults10450LA::DisplayCpuPrefix OriginalResults10450LA::prepareRosterPa
     if(!current()){p.stop(d,Impl::S::owner,0x1c3a68,"Results final publication/Profile changed");return out.prefix;}
     out.prefix=DisplayCpuPrefix::roster;
     return incomplete(0x1c3a74,"Results roster CPU page only; following pages and real renderer join absent");
+}
+}
+
+//Keep opaque observer/Operation/Bank implementation dependencies in this
+//existing roster TU. The Display caller retains its lexical Operation pin.
+namespace rr::game {
+bool OriginalResults10450LA::demandObserverCameraMatches1C15B0(
+    const ::original_position_stats_adapter50LA::Owner& observer,
+    const ::original_camera_session50KX::Session& camera)noexcept {
+    return ::original_results_roster50LA::Read::observerCameraMatches(observer,camera);
+}
+const ::native_racer50HN::Bank* OriginalResults10450LA::demandObserverBankIdentity1C16F8(
+    const ::original_position_stats_adapter50LA::Owner& observer)noexcept {
+    return ::original_results_roster50LA::Read::observerBankIdentity(observer);
+}
+bool OriginalResults10450LA::demandRosterCountCurrent1C16F8(
+    const OriginalRaceConstructor50LA& race,const ::original_position_stats_adapter50LA::Owner& observer,
+    const std::shared_ptr<::ra_cold_roster50LA::Operation>& operation,
+    const ::native_racer50HN::Bank* bank,std::size_t& count)const {
+    const auto& p=*impl_; //Same already-admitted caller; no allocation or new weak lock.
+    if(!(::original_results_roster50LA::Read::loadedOperationOwnerFieldsCurrent(
+        operation,::original_results_roster50LA::Read::raceWorldIdentity(race),p.application,p.domain,p.component.sessionGeneration)&&::original_results_roster50LA::Read::observerCurrent(observer)&&
+        ::original_results_roster50LA::Read::loadedOperationBankCurrent(operation,bank))||!bank)return false;
+    count=::original_results_roster50LA::Read::bankCount(*bank); //Exactly once at EACH reached1C16F8 condition, after all original tests.
+    return true;
 }
 }

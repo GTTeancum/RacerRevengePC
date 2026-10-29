@@ -1,4 +1,5 @@
 #pragma once
+#include "original_wreck_constructor_vectors50la.h"
 // Cold native geometry/query assets for one actual authored piece. Legacy
 // prepare selects the unique one-piece chariot; the full inventory friend loads
 // each original occurrence. Neither route constructs runtime wreck owners.
@@ -45,31 +46,17 @@ struct OriginalWreckCollectionAuthoring50LA {
     std::uint32_t maxNumberOfDamageEmitters=0;
     OriginalWreckTuning50LA tuning;
     std::vector<OriginalWreckPieceAuthoring50LA> pieces;
+    std::uint32_t sourceNumberOfParts=0; //Exact retained PHY count, not live array state.
 };
 struct OriginalWreckAuthoring50LA {
     std::vector<OriginalWreckCollectionAuthoring50LA> collections;
     std::size_t selectedCollection=0; // Zero-based selection; inventory uses count if no unique chariot.
     std::string chariotStem;
     float gravity=0,gravityAcceleration=0;
+    std::uint32_t sourceNumberOfParts=0; //Exact [Wreckage]158920 input.
 };
 // Actual22C148/22C158/22C194 constructor globals and165CF8 zero sentinel.
 // The caller supplies their initialized source state; absence is not identity.
-struct OriginalWreckConstructorVectors50LA {
-    std::array<float,4> position434830{},look434860{},up434850{},zero433B10{};
-};
-// Actual file-backed static initializers, not reconstructed from zeroed BSS:
-//3CA020..3CA09C builds four stack vectors and SQ stores434830/40/50/60;
-//3C9210..3C928C independently builds/stores the zero sentinel433B10.
-// All nonzero words are explicitly raw3F800000 and all zeros are SW zero.
-// Return by value so the application owns this initialized source projection.
-inline OriginalWreckConstructorVectors50LA initializedOriginalWreckAssetVectors50LA()noexcept {
-    OriginalWreckConstructorVectors50LA out;
-    out.position434830={{0.f,0.f,0.f,1.f}};
-    out.look434860={{0.f,0.f,1.f,1.f}};
-    out.up434850={{0.f,1.f,0.f,1.f}};
-    out.zero433B10={{0.f,0.f,0.f,1.f}};
-    return out;
-}
 struct OriginalWreckAssetBinding50LA {
     std::string archivePath;
     std::string memberPrefix; // Exact archive prefix, e.g. Pods\\Pod02\\.
@@ -158,6 +145,7 @@ public:
     }
     rr::assets::OriginalStandardModelFileId50LA modelFileIdentity()const noexcept{return storage_->modelFile;}
     rr::assets::OriginalStandardModelFileId50LA targetFileIdentity()const noexcept{return storage_->targetFile;}
+    rr::assets::OriginalStandardModelFileId50LA queryFileIdentity()const noexcept{return storage_->queryFile;}
     const rr::assets::PsgHierarchyView49O& hierarchy()const noexcept{return storage_->hierarchy;}
     const OriginalWreckAssetReceipt50LA& receipt()const noexcept{return storage_->receipt;}
     const std::array<std::vector<std::uint8_t>,4>& originalMembers()const noexcept{return storage_->raw;}
@@ -178,7 +166,7 @@ private:
         OriginalWreckTarget50LA target;
         rr::assets::PsgHierarchyView49O hierarchy{};
         std::shared_ptr<const rr::assets::OriginalStandardModelResource50LA> standardModel;
-        rr::assets::OriginalStandardModelFileId50LA modelFile{},targetFile{};
+        rr::assets::OriginalStandardModelFileId50LA modelFile{},targetFile{},queryFile{};
         std::vector<SceneNode49P> nodes;
         std::vector<rr::assets::PsgNode49O> sourceNodes;
         ModelBoundsResult49O bounds{};
@@ -278,6 +266,7 @@ private:
         const std::uint32_t gravityWord=0x4200cccdu;float scale;std::memcpy(&scale,&gravityWord,4);
         volatile float acceleration=out.gravity*scale;out.gravityAcceleration=acceleration;
         if(!std::isfinite(out.gravityAcceleration))return fail(error,"original wreck gravity overflow");
+        out.sourceNumberOfParts=collectionCount;
         out.collections.reserve(collectionCount);std::size_t allPieces=0,matches=0;
         for(std::uint32_t c=1;c<=collectionCount;++c){
             const auto* section=value(doc,"Wreckage","Part"+std::to_string(c));
@@ -286,6 +275,7 @@ private:
             std::uint32_t pieceCount=0;
             if(!count(doc,*section,"NumberOfParts",pieceCount,512)||!pieceCount||allPieces+pieceCount>512)
                 return fail(error,"original wreck collection piece count unsupported");
+            collection.sourceNumberOfParts=pieceCount;
             allPieces+=pieceCount;
             // The original22C05C default is4; it is not inferred from smoke flags.
             collection.maxNumberOfDamageEmitters=4;

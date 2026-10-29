@@ -1,4 +1,5 @@
 #include "original_ui_garage_scene_setup50kg.h"
+#include "../../../src/game/original_world_environment_history50la.h"
 #include "original_ui_garage_pod_scene50kg.h"
 #include "original_ui_main_session50kg.h"
 #include <cerrno>
@@ -66,6 +67,16 @@ OriginalUiGarageSceneSetup50KG::Environment::Environment(){terrain0C.set("none")
 OriginalUiGarageSceneSetup50KG::Zone::Zone(){name04.set("StaticModels");}
 OriginalUiGarageInstanceMaster50KG::OriginalUiGarageInstanceMaster50KG()
     :records00_(new std::uint8_t[10u*0x108u]){}
+OriginalUiGarageInstanceMaster50KG::OriginalUiGarageInstanceMaster50KG(SourceTag)noexcept {
+    sourceMode_=true;
+    //Actual2BFEA0. No constructed Instance records, callbacks or Entity count.
+    capacity04_=10; //2BFEAC
+    growth08_=100000; //2BFEB0
+    used0C_=0; //2BFEB4
+    try{records00_.reset(new std::uint8_t[10u*0x108u]);}catch(...){records00_.reset();}
+    sourceArrayReturned_=true; //2BFED8 publishes raw00, includingNULL.
+    //Enclosing caller still owes global2BFD24 THEN count10 store2BFD28.
+}
 void OriginalUiGarageInstanceMaster50KG::close2BFD40()noexcept{records00_.reset();}
 OriginalUiGarageSceneSetup50KG::~OriginalUiGarageSceneSetup50KG()noexcept{
     //Normal Page/Scene Lights retirement is NOT established by this owner.
@@ -100,7 +111,9 @@ bool OriginalUiGarageSceneSetup50KG::readEnvironment276C00(const Dat& file,std::
             e.cubeFiles04[i]=std::unique_ptr<char[]>(new char[260]);
             std::memcpy(e.cubeFiles04[i].get(),name.c_str(),name.size()+1);
         }
-        if(zones>0){e.zoneCube08=std::make_unique<std::int32_t[]>(static_cast<std::size_t>(zones));
+        if(zones>0){
+            rr::game::original_world_environment50KG::EnvironmentHistory50LA::invalidateCubeNative();
+            e.zoneCube08=std::make_unique<std::int32_t[]>(static_cast<std::size_t>(zones));
             for(std::int32_t i=0;i<zones;++i){std::int32_t cube=1;
                 if(!integer(*s,"CubeFileForZone"+std::to_string(i+1),1,cube,d,0x276DDC)||cube<1||cube>e.cubeCount00)
                     return failure(d,S::source,0x276DDC);
@@ -129,6 +142,7 @@ bool OriginalUiGarageSceneSetup50KG::readEnvironment276C00(const Dat& file,std::
        !number(*s,"Zmin",-e.border530,e.zmin53C,d,0x277034)||
        !number(*s,"Zmax",zmax,e.zmax540,d,0x277070))return false;
     const float dx=e.xmax538-e.xmin534,dz=e.zmax540-e.zmin53C;
+    rr::game::original_world_environment50KG::EnvironmentHistory50LA::invalidateBoundsNative();
     if(!std::isfinite(dx)||!std::isfinite(dz)||std::fabs(dx)<1.f||std::fabs(dz)<1.f)
         return failure(d,S::source,0x27708C);
     float distance=0;if(!number(*s,"EcoDistance2D",180,distance,d,0x277198))return false;e.ecoDistance2D544=distance;

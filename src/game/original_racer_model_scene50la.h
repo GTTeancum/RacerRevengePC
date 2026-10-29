@@ -1,6 +1,6 @@
 #pragma once
 namespace native_racer_model50LA {class Owner;}
-namespace rr::platform {class OriginalUiGarageStaticModels50KG; class OriginalUiGarageSelectedModel50KG; class OriginalUiGarageModelResource50KG; class OriginalUiGarageVisibility50KG;}
+namespace rr::platform {class OriginalUiCourseOwnedLifecycle50KG; class OriginalUiGarageStaticModels50KG; class OriginalUiGarageSelectedModel50KG; class OriginalUiGarageModelResource50KG; class OriginalUiGarageVisibility50KG;}
 #include "model_bounds49o.h"
 #include "original_application_entities50la.h"
 #include "scene_graph49p.h"
@@ -51,6 +51,7 @@ private:
     friend class original_gc_gameplay_lighting_candidate::Owner;
     friend class OriginalRacerModelSceneOwner50LA;
     friend class OriginalRacerColdScenes50LA;
+    friend class OriginalUiEntityScope50KG; // Same counted Course construction/retirement authority.
     OriginalWreckComponent50LA entity8;
 public:
     const OriginalWreckComponent50LA& entity()const noexcept{return entity8;}
@@ -113,6 +114,7 @@ class OriginalRacerModelSceneOwner50LA final {
     friend class rr::platform::OriginalUiGarageVisibility50KG;
     friend class rr::platform::OriginalUiGarageStaticModels50KG;
     friend class rr::platform::OriginalUiGarageModelResource50KG;
+    friend class rr::platform::OriginalUiCourseOwnedLifecycle50KG;
     friend class OriginalUiEntityScope50KG;
     using S=OriginalRacerModelSceneStatus50LA;
     using R=OriginalRacerModelSceneResult50LA;
@@ -781,9 +783,68 @@ public:
     // not a new original error branch or a loaded-model destructor claim.
     // All genuine constructed Entities receive their concrete destruction;
     // unconstructed preflight backing never contributes to423F60.
-    R closeFreshUnlinked(const SceneGraph49P& graph)noexcept {
+private:
+    // Native cancellation of a genuine private model prefix, not an original
+    // error branch. Storage separately admits Entity links and concrete payload
+    // owners before releaseModelReference142590. Unlike closeFreshUnlinked this
+    // permits acquired payloads and the actual piece->model Entity attachment;
+    // neither attachment nor payload completion is inferred from scene rows.
+    R preflightNativePartialScene2896D0(const SceneGraph49P& graph)const noexcept {
+        if(released_||!model_.constructed||model_.released||publishedToAnimation_||
+           model_.observer19C||model_.configuration1A4||fields_.field1C8)
+            return {S::phase,0x2896d0u};
+        const auto& c=model_.entity8;
+        if(c.reference00!=(referenceReleased_?0u:1u)||c.firstChild18||
+           c.kind!=K::model2403A0||c.sessionGeneration!=binding_.sessionGeneration)
+            return {S::entity,0x142590u};
+        if(!binding_.actualObjectCount423F60||!binding_.actualAttachmentLock423F58||
+           !validateSceneGraph49P(graph)||!inRange(graph,model_.sceneIndex)||
+           at(graph,model_.sceneIndex).parent180!=none||
+           at(graph,model_.sceneIndex).nextSibling188!=none||model_.previous18C!=none)
+            return {S::binding,0x289704u};
+        if(*binding_.actualAttachmentLock423F58)return {S::attachmentLocked,0x1425a8u};
+        std::size_t count=1;
+        // rows_ contains only separately allocated rows; direct row0 is model_.
+        // Construction can stop before the hierarchy-link pass or row table.
+        for(const auto& row:rows_)if(row&&row->constructed){
+            const auto& entity=row->entity8;
+            if(row->released||entity.reference00!=1u||entity.kind!=K::scene2893A0||
+               entity.sessionGeneration!=binding_.sessionGeneration||entity.parent1C||
+               entity.previous10||entity.next14||entity.firstChild18||row->observer19C||
+               row->configuration1A4||!inRange(graph,row->sceneIndex))return {S::entity,0x28972cu};
+            ++count;
+        }
+        if(*binding_.actualObjectCount423F60<count)return {S::reference,0x1413e0u};
+        std::size_t seen=0;
+        if(!admitSceneSubtree(graph,model_,seen,count))return {S::graph,0x289744u};
+        for(const auto& row:rows_)if(row&&row->constructed&&
+            at(graph,row->sceneIndex).parent180==none){
+            if(row->previous18C!=none||at(graph,row->sceneIndex).nextSibling188!=none||
+               !admitSceneSubtree(graph,*row,seen,count))return {S::graph,0x289744u};
+        }
+        if(seen!=count)return {S::graph,0x289744u};
+        return {S::complete,0x2896d0u};
+    }
+    // Only after the real142590 last-reference drop,240450/26E460 payload
+    // disposal,26E5CC row-table free and26E5EC material-array free. Native
+    // backing owners enforce those payload phases; stale source aliases remain.
+    R releaseNativePartialSceneBase2896D0(const SceneGraph49P& graph)noexcept {
+        if(!referenceReleased_||rowTable_||!rowTableFreed_)return {S::phase,0x2896d0u};
+        const auto admitted=preflightNativePartialScene2896D0(graph);
+        if(!admitted.okay())return admitted;
+        // Detached constructed rows never entered the model's184 forest.
+        // Retire each genuine root once, retaining2896D0 order within it.
+        for(auto& row:rows_)if(row&&row->constructed&&!row->released&&
+            at(graph,row->sceneIndex).parent180==none){
+            --row->entity8.reference00;destroyScene2896D0(graph,*row);
+        }
+        destroyScene2896D0(graph,model_);released_=true;
+        return {S::complete,0x2897acu};
+    }
+
+    R preflightFreshUnlinkedNative(const SceneGraph49P& graph)const noexcept {
         if(released_||!model_.constructed)return {S::complete,0};
-        auto& c=model_.entity8;
+        const auto& c=model_.entity8;
         if(publishedToAnimation_||fields_.geometry1B4||fields_.materials1C4||fields_.packets1F0||
            fields_.field1C8||model_.observer19C||
            c.parent1C||c.previous10||c.next14||c.firstChild18||referenceReleased_||c.reference00!=1u)
@@ -812,6 +873,13 @@ public:
                !admitSceneSubtree(graph,*row,seen,count))return {S::graph,0x289744u};
         }
         if(seen!=count)return {S::graph,0x289744u};
+        return {S::complete,0};
+    }
+public:
+    R closeFreshUnlinked(const SceneGraph49P& graph)noexcept {
+        const auto admitted=preflightFreshUnlinkedNative(graph);if(!admitted.okay())return admitted;
+        if(released_||!model_.constructed)return {S::complete,0};
+        auto& c=model_.entity8;
         // A registry failure during row construction can leave a counted
         // row outside184, before the subsequent source hierarchy-link pass.
         for(auto& row:rows_)if(row&&row->constructed&&!row->released&&
@@ -941,6 +1009,70 @@ private:
         std::memcpy(model_.bounds170.data(),output.halfExtent170,sizeof output.halfExtent170);
         model_.radius198=output.radius198;root.sceneFlags190=output.rootSceneFlags190;
         return {S::complete,0x26f844u};
+    }
+private:
+    //Actual direct Model virtual90=26F4B0, NOT the enclosing28E110 dirty
+    //dispatch gate. Native adapter explicitly omits profiling-only gp-74A0 /
+    //442F68 writes (and refuses the distinct bit10 sphere branch). It does
+    //not claim those source globals are NULL/initialized or replay wrapper
+    //effects. Finite current-transform projection admission is read-only.
+    R publishDirectBox26F4B0NativeProfileAdapter(const SceneGraph49P& graph)noexcept {
+        if(!constructed2403A0()||!rowsLoaded_||referenceReleased_||rootMode_!=RootMode::separate||
+           warmChildlessRows_||!validateSceneGraph49P(graph)||!inRange(graph,model_.sceneIndex)||
+           !rowTable_||fields_.sourceRows1B8!=rowTable_.get()||model_.nodeCount1A0!=binding_.sourceRowCount||
+           !model_.nodeCount1A0||model_.nodeCount1A0>maxModelBoundsNodes49O||
+           at(graph,model_.sceneIndex).sceneFlags190&0x10u)return {S::phase,0x26f4c0u};
+        std::array<SceneNode49P,maxSceneNodes49P> admittedNodes{};
+        for(std::uint32_t i=0;i<graph.count;++i)admittedNodes[i]=graph.nodes[i];
+        SceneGraph49P admitted{admittedNodes.data(),graph.count};
+        if(!refreshSceneWorld49P(admitted,model_.sceneIndex))return {S::graph,0x26f608u};
+        std::array<ModelBoundsNode49O,maxModelBoundsNodes49O> rows{};
+        ModelBoundsContext49O context{};const auto& root=at(admitted,model_.sceneIndex);
+        context.rootWorld100=root.world100;context.rootSceneFlags190=root.sceneFlags190;
+        for(unsigned k=0;k<3;++k){context.rootCenter140.v[k]=model_.bounds140[k];
+            context.rootHalfExtent150.v[k]=model_.bounds150[k];}
+        for(std::uint32_t i=0;i<model_.nodeCount1A0;++i){
+            const auto* row=sourceRowObject(i);
+            if(!row||rowTable_[i]!=row||!row->constructed||row->released||!inRange(graph,row->sceneIndex))
+                return {S::sourceRowTable,0x26f6e0u};
+            const auto parent=sourceParents_[i];
+            if(parent < -1)return {S::hierarchy,0x28daf0u};
+            const auto expected=parent<0?model_.sceneIndex:
+                (parent<static_cast<std::int32_t>(i)?sourceRowObject(std::uint32_t(parent))->sceneIndex:none);
+            auto& node=at(admitted,row->sceneIndex);
+            if(expected==none||node.parent180!=expected)return {S::hierarchy,0x28daf0u};
+            rows[i].local=node.localC0;rows[i].parent=parent;rows[i].sceneFlags190=node.sceneFlags190;
+            for(unsigned k=0;k<3;++k){rows[i].center140.v[k]=row->bounds140[k];
+                rows[i].halfExtent150.v[k]=row->bounds150[k];}
+            //28DAF0's flag04-false return has no scene-cache writes.
+            if((node.sceneFlags190&4u)&&!refreshSceneWorld49P(admitted,row->sceneIndex))
+                return {S::graph,0x28db9cu};
+        }
+        ModelBoundsWorkspace49O workspace{};ModelBoundsResult49O output{};
+        if(!computeModelBounds49O(rows.data(),model_.nodeCount1A0,context,workspace,output))
+            return {S::graph,0x28daf0u};
+        //The reused numerical adapter regenerates row worlds. Prove those
+        //are the SAME actual lazy-cache results, not permission to replace a
+        //different independently-ready world100 with a new transform.
+        for(std::uint32_t i=0;i<model_.nodeCount1A0;++i)if(rows[i].sceneFlags190&4u){
+            if(std::memcmp(workspace.world[i].v,at(admitted,sourceRowObject(i)->sceneIndex).world100.v,
+                sizeof workspace.world[i].v))return {S::graph,0x28daf0u};
+        }
+        //Only now admit the represented direct source call on actual storage.
+        //Its profiler adapter has no gameplay callback. Root refresh precedes
+        //the real source1B8 traversal; eligible rows execute their point and
+        //three axis refreshes in original order. No28E110 dirty skip exists.
+        if(!refreshSceneWorld49P(graph,model_.sceneIndex))return {S::graph,0x26f608u};
+        for(std::uint32_t i=0;i<model_.nodeCount1A0;++i)if(rows[i].sceneFlags190&4u){
+            for(unsigned getter=0;getter<4;++getter)
+                if(!refreshSceneWorld49P(graph,sourceRowObject(i)->sceneIndex))return {S::graph,0x28db9cu};
+        }
+        std::memcpy(model_.bounds160.data(),output.center160,sizeof output.center160); //26F780
+        std::memcpy(model_.bounds170.data(),output.halfExtent170,sizeof output.halfExtent170); //26F7E8
+        model_.radius198=output.radius198; //26F828 delay store, even forzero.
+        if(output.radius198>0.f)at(graph,model_.sceneIndex).sceneFlags190=
+            static_cast<std::uint8_t>((at(graph,model_.sceneIndex).sceneFlags190&~0x40u)|0x40u); //26F840
+        return {S::complete,0x26f854u};
     }
 private:
     OriginalRacerModelSceneBinding50LA binding_{};

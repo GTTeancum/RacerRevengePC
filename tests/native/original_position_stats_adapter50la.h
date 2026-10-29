@@ -1,5 +1,6 @@
 #pragma once
 // Actual packed-racer view0 numeric observation. No scheduling or drawing is implied.
+namespace original_results_roster50LA { class Read; }
 namespace original_main_entry50KG { struct Application; }
 namespace rr::game { class OriginalResults10450LA; class OriginalRaceConstructor50LA; }
 #include "original_camera_session50kx.h"
@@ -12,6 +13,7 @@ namespace original_position_stats_adapter50LA {
 class Owner final {
     friend struct original_main_entry50KG::Application;
     friend class rr::game::OriginalResults10450LA;
+    friend class original_results_roster50LA::Read;
     friend class rr::game::OriginalRaceConstructor50LA;
     using Camera=original_camera_session50KX::Session;
     // Source camera preparation constructs these two exact view0 identities.

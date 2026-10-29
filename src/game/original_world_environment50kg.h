@@ -7,6 +7,9 @@
 #include <memory>
 #include <string>
 
+namespace ra_cold_aggregate50LA {class Owner;}
+namespace rr::platform {class OriginalWorldSourceConfig50LA;}
+namespace rr::game {struct OriginalWreckComponent50LA;}
 namespace rr::game::original_gc_gameplay_lighting_candidate {class Owner;}
 namespace rr::game::original_world_environment50KG {
 enum class Status : std::uint8_t {
@@ -70,6 +73,24 @@ public:
         SkySelection&,Diagnostic&) const noexcept;
 private:
     friend class ::rr::game::original_gc_gameplay_lighting_candidate::Owner;
+    friend class ::ra_cold_aggregate50LA::Owner;
+    struct Source;
+    std::unique_ptr<Source> source_;
+    bool sourceMode_=false,sourceLoadAttempted_=false,sourceClosed_=false;
+    const OriginalWreckComponent50LA* sourceWorld_=nullptr;
+    const rr::platform::OriginalWorldSourceConfig50LA* sourceConfig_=nullptr;
+    std::uint64_t sourceGeneration_=0;
+    struct SourceTag {};
+    Owner(SourceTag,std::unique_ptr<Source>,const OriginalWreckComponent50LA&,
+        const rr::platform::OriginalWorldSourceConfig50LA&)noexcept;
+    static bool allocateSource270A58(const OriginalWreckComponent50LA&,
+        const rr::platform::OriginalWorldSourceConfig50LA&,std::unique_ptr<Owner>&,Diagnostic&)noexcept;
+    bool loadSource276C00(const OriginalWreckComponent50LA&,
+        rr::platform::OriginalWorldSourceConfig50LA&,std::int32_t zones,
+        bool& sourceReturned,Diagnostic&)noexcept;
+    bool retireSource276B30(std::int32_t deleting,Diagnostic&)noexcept;
+    bool preflightSourceNative()const noexcept;
+    bool abortSourceNative(Diagnostic&)noexcept;
     // Same EnvironmentInfo owner: bounded native metadata adoption at actual
     // water call, never a receipt that earlier276C00 was replayed.
     const assets::TrackHeightString50JB* nativeWaterFile110()noexcept;

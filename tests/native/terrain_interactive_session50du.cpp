@@ -556,6 +556,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   s.borrowedNoise50KG=&originalMainApplication.state->sharedNoise308030;
  }
  native_ai50IV::NoiseLifetime originalNoiseLifetime(s.noiseOwner(),originalAiEnabled&&!originalUiStarted);
+ require50DU(originalNoiseLifetime.admitted,"Application noise has a terminal incomplete initialization prefix");
  AiRuntimeState50IV originalAi{};AiRuntimeReceipt50IV originalAiReceipt{};
  native_ai50IV::Session originalAiSession{};
  // The exact genuine mode-2 race owns its arm until commit or session teardown.

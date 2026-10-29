@@ -1,10 +1,13 @@
 #pragma once
+#include "original_racer_world_borrow50la.h"
 #include "original_application_entities50la.h"
 #include "chariot_ik49t.h"
 #include "original_camera_start_native.h"
 #include "original_gc_particle_manager50kg.h"
 #include "undertrack_reset50ew.h"
 #include "../assets/original_standard_screen_material_reference50la.h"
+#include "../assets/pod_physics49n.h"
+#include <string_view>
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -18,9 +21,26 @@ namespace ra_source_camera50LA { class OwnershipBridge; }
 namespace native_racer50HW { class Cables; }
 namespace native_racer_model50LA {class Owner;}
 namespace rr::game {
+class OriginalPlayerConstructorPrefix50LA;
+class OriginalRaceConstructor50LA;
 class OriginalPodSphereOwner50LA;
+class OriginalWreckCollectionStorage50LA;
+struct OriginalWreckTerrainProvider50LA;
 class OriginalRacerMainBodyOwner50LA;
 class OriginalRacerGravityOwner50LA;
+class OriginalRacerTerrainQueryOwner50LA;
+class OriginalRacerEngine34COwner50LA;
+class OriginalRacerAero350Owner50LA;
+class OriginalRacerQuery690Owner50LA;
+class OriginalRacerQuery694Owner50LA;
+class OriginalRacerContact354Owner50LA;
+class OriginalRacerDetector358Owner50LA;
+class OriginalRacerQuery7A4Owner50LA;
+class OriginalRacerQuery79COwner50LA;
+class OriginalRacerQuery364Owner50LA;
+class OriginalRacerContact368Owner50LA;
+class OriginalRacerDetector36COwner50LA;
+class OriginalRacerSecondaryBodyOwner50LA;
 class OriginalRacerStripOwners50LA;
 class OriginalRacerModelSceneOwner50LA;
 struct OriginalRacerSceneObject50LA;
@@ -226,6 +246,32 @@ struct OriginalAIDamageRaceContext50LA {
     const std::int32_t* actualMode8C=nullptr;
 };
 class OriginalPodAIDamageOverlay50LA final {
+    friend class OriginalPlayerConstructorPrefix50LA;
+    bool constructorAttempted_=false,sourceMode_=false,sourceMode40Known_=false;
+    const OriginalRaceConstructor50LA* sourceRace3C_=nullptr;
+    std::uint32_t sourceDispatch08_=0;
+    bool construct199840(std::uint64_t generation,std::uint64_t componentKey,
+        std::uint32_t& actualCounter423F60)noexcept {
+        if(constructorAttempted_||component.reference00)return false;
+        constructorAttempted_=true;
+        const auto r=initializeOriginalWreckComponent50LA(component,
+            OriginalWreckComponentKind50LA::overlay199840,generation,componentKey,true,actualCounter423F60);
+        if(r.status!=OriginalWreckComponentStatus50LA::complete)return false;
+        sourceDispatch08_=0x3ce620;
+        position50={{0.f,0.f,0.f,1.f}};position60={{0.f,0.f,0.f,1.f}};
+        racer38=nullptr;race3C=nullptr;sourceRace3C_=nullptr;
+        enabled70=1;visible74=0;array30=nullptr;array34=nullptr;
+        return true; //199898 return:40/44..4F/78..7F not source-written here.
+    }
+    bool bindSource199950(OriginalWreckComponent50LA& racer,
+        const OriginalRaceConstructor50LA& race)noexcept {
+        if(!constructorAttempted_||!component.reference00||attempted_||sourceMode_||array30||array34)return false;
+        sourceMode_=true;sourceRace3C_=&race;racer38=&racer;
+        //141C20 identity-return then199978/19997C.40 remains unknown until
+        //the actual subsequent Race8C read and19998C store. No native
+        //Session RaceContext facade and no primitive/material acquisition.
+        return true;
+    }
 public:
     OriginalWreckComponent50LA component;
     std::array<OriginalAIDamagePrimitiveArray50LA,2> arrays;
@@ -251,9 +297,7 @@ public:
         if(attempted_||!racer.sessionGeneration||race.sessionGeneration!=racer.sessionGeneration||
            !race.raceKey||!race.actualMode8C||!componentKey)return false;
         attempted_=true;
-        const auto r=initializeOriginalWreckComponent50LA(component,
-            OriginalWreckComponentKind50LA::overlay199840,racer.sessionGeneration,componentKey,true,actualCounter423F60);
-        if(r.status!=OriginalWreckComponentStatus50LA::complete)return false;
+        if(!construct199840(racer.sessionGeneration,componentKey,actualCounter423F60))return false;
         racer38=&racer;race3C=&race;mode40=*race.actualMode8C;
         //1999A8 publishes each real primitive-array pointer before setup;
         // a later material failure retains that exact initialized prefix.
@@ -300,18 +344,136 @@ struct OriginalRacerEntityColdBinding50LA {
     const OriginalRendererDispatchFields* renderer442F70=nullptr;
     platform::VehicleWindowGl50DS* actualRenderer=nullptr;
     platform::VehicleWindowDiagnostic50DS* rendererDiagnostic=nullptr;
+    //Default keeps the old explicit native adapter. Source mode never derives
+    //World330/334 from height authoring or defaults; absence stops2107FC.
+    bool sourceConstructorOnly=false;
+    const OriginalRacerWorldBorrow50LA* actualWorld2107FC=nullptr;
+    //Actual210770 incoming t3/stack0, retained before constructor entry.
+    //Not pieceB4/B8 stores and not host zone indices.
+    const void* actualIncomingVisibility4C0=nullptr;
+    const void* actualIncomingCollision4C4=nullptr;
+    const std::array<std::uint32_t,4>* actualAnchorOrigin434630=nullptr; //Same App, source-only300 stores.
+    const std::uint32_t* actualLoadPod60=nullptr; //Same native210770 argument, not authored filename.
 };
 // Canonical COMPONENT extension of an existing native Session racer. This
 // owns represented27E130,7F8/240 and the separately reached arrays/7FC. It does not claim
 // that new storage completed all20F390 fields, native vehicle physics, racer
 // model constructors, outer manager ancestry, or199BC0/199AC0 runtime/draw.
 class OriginalRacerEntityCold50LA final {
+    friend class ::ra_cold_roster50LA::WreckBacking;
+    friend class OriginalRacerQuery364Owner50LA;
+    friend class OriginalRacerContact368Owner50LA;
+    // Native source-load aliases. Unknown until the exact same-world producer;
+    // cold storage never publishes its planned members here.
+    bool nativeWreckLoadAttempted_=false,nativeWreckWithdrawn_=false;
+    std::optional<OriginalWreckComponent50LA*> sourceRacerExplosion814_,sourceRacerSparks810_; //Unknown until212B78/212BEC.
+    std::optional<OriginalWreckComponent50LA*> sourceParticle7FC_; //Unknown before actual210A0C.
+    std::optional<OriginalRacerTerrainQueryOwner50LA*> sourceTerrain348_;
+    std::optional<OriginalRacerEngine34COwner50LA*> sourceEngine34C_; //Unknown until2120D0.
+    std::optional<OriginalRacerAero350Owner50LA*> sourceAero350_;
+    std::optional<OriginalRacerQuery690Owner50LA*> sourceQuery690_;
+    std::optional<OriginalRacerQuery694Owner50LA*> sourceQuery694_;
+    std::optional<OriginalRacerContact354Owner50LA*> sourceContact354_; //Unknown until212294.
+    std::optional<OriginalRacerDetector358Owner50LA*> sourceDetector358_; //Unknown until212364.
+    std::optional<OriginalRacerQuery7A4Owner50LA*> sourceQuery7A4_; //Unknown until2123E4.
+    std::optional<OriginalRacerQuery79COwner50LA*> sourceQuery79C_; //Unknown until212484.
+    std::optional<OriginalRacerQuery364Owner50LA*> sourceQuery364_; //Unknown until212750.
+    std::optional<OriginalRacerContact368Owner50LA*> sourceContact368_; //Unknown until2127E4.
+    std::optional<OriginalRacerDetector36COwner50LA*> sourceDetector36C_; //Unknown until2128B0.
+    std::optional<OriginalRacerSceneObject50LA*> sourceScene19C_; //Unknown until212504.
+    std::optional<OriginalRacerSecondaryBodyOwner50LA*> sourceBody35C_; //Unknown until212554.
+    std::optional<std::array<std::uint32_t,4>> sourceAnchor300_; //Actual source-owned vector, not authored geometry.
+    std::optional<std::uint32_t> sourceCount384_;
+    std::optional<const void*> sourceCandidate388_; //Unknown first inline-array word/address anchor only; no extent.
+    std::optional<std::uint32_t> sourcePod60_; //Actual21081C store.
+    //Retained source stack1E0 formatter output, not a new Racer field.
+    std::optional<std::array<char,6>> sourcePodName1E0_;
+    std::optional<const void*> sourceList488_; //20FA44 NULL, later producer not joined.
+    std::optional<std::uint32_t> sourceCount48C_; //Unknown: address borrow is not a count read.
+    std::optional<const OriginalWreckTerrainProvider50LA*> sourceTerrain330_;
+    std::optional<const WaterHeightProvider50JC*> sourceWater334_;
+    std::optional<std::uint32_t> sourceWreckCount370_;
+    OriginalWreckCollectionStorage50LA* const* sourceWreck374_=nullptr;
+    bool sourceWreck374Published_=false;
+    std::size_t sourceWreck374Slots_=0;
     friend class ::ra_source_camera50LA::OwnershipBridge;
     bool readReplayMode3C229F94(std::uint32_t& value)const noexcept {
         if(!prepared()||racer.kind!=OriginalWreckComponentKind50LA::racer27E130||
            racer.sessionGeneration!=binding_.sessionGeneration||racer.objectKey!=binding_.racerKey)
             return false;
         value=mode3C_;return true; //Actual20F660-owned field, never a supplied ghost flag.
+    }
+    // Source20F3D4 concrete dispatch identity, not a synthetic runtime vtable.
+    bool nativeDispatch20F390Known_=false,nativePostEmberAttempted_=false;
+    std::uint32_t nativePostEmberPC_=0x212dc8u;
+    std::optional<float> engineMotionAB0_; //unknown before actual21003C
+    // Canonical source lanes. Legacy native handling remains a separate
+    // projection, never proof that these later source stores occurred.
+    std::optional<float> sourceGravity378_,sourceAirborneGravity37C_,sourceLift7EC_;
+    //Unknown until actual690/1202E0 producer, not a cold planned bounds receipt.
+    std::optional<std::array<float,3>> sourceCollisionCenter310_,sourceCollisionHalf320_;
+    static bool sourceFloat158A70(const std::vector<std::uint8_t>& phy,
+        std::string_view section,std::string_view key,std::optional<float>& written)noexcept{
+        if(phy.empty()||phy.size()>rr::assets::maxPodPhysicsBytes49N)return false;
+        auto trim=[](std::string_view text){
+            while(!text.empty()&&(text.front()==' '||text.front()=='\t'||text.front()=='\r'))text.remove_prefix(1);
+            while(!text.empty()&&(text.back()==' '||text.back()=='\t'||text.back()=='\r'))text.remove_suffix(1);
+            return text;
+        };
+        auto equal=[](std::string_view a,std::string_view b){
+            if(a.size()!=b.size())return false;
+            auto lower=[](char c){return c>='A'&&c<='Z'?char(c+32):c;};
+            for(std::size_t i=0;i<a.size();++i)if(lower(a[i])!=lower(b[i]))return false;return true;
+        };
+        const std::string_view text(reinterpret_cast<const char*>(phy.data()),phy.size());
+        bool selected=false,foundSection=false;
+        for(std::size_t at=0;at<text.size();){
+            const auto start=at;auto end=text.find('\n',at);if(end==std::string_view::npos)end=text.size();at=end+1;
+            if(end-start>rr::assets::maxPodPhysicsLine49N)return false;
+            auto line=trim(text.substr(start,end-start));
+            for(const auto c:line)if((static_cast<unsigned char>(c)<32&&c!='\t')||static_cast<unsigned char>(c)>126)return false;
+            if(line.empty()||line.front()==';')continue;
+            if(line.front()=='['){
+                if(line.size()<3||line.back()!=']')return false;
+                // Source first-selected block/first-present key. No authored
+                // fallback values or translation of unrelated key aliases.
+                if(selected)return true;
+                selected=!foundSection&&equal(trim(line.substr(1,line.size()-2)),section);
+                foundSection|=selected;continue;
+            }
+            if(!selected)continue;const auto split=line.find('=');
+            if(split==std::string_view::npos||!equal(trim(line.substr(0,split)),key))continue;
+            const auto token=trim(line.substr(split+1));
+            if(token.empty())return false; //Empty-token forms are outside this native lexical admission.
+            float value=0;
+            if(!rr::assets::parsePodPhysicsNumber49N(token.data(),token.size(),value))return false;
+            written=value;return true;
+        }
+        return true; //Missing section/key skips its store, preserving the actual destination.
+    }
+    static bool engineMotionSource158A70(const std::vector<std::uint8_t>& phy,
+        std::optional<float>& written)noexcept {
+        return sourceFloat158A70(phy,"Pod Setup","EngineMotion",written);
+    }
+    bool beginNativeHandling2146(const std::vector<std::uint8_t>& retainedPhy,std::uint32_t& pc)noexcept{
+        pc=nativePostEmberPC_;
+        if(nativePostEmberAttempted_||nativeWreckWithdrawn_||!nativeWreckLoadAttempted_||
+           !prepared()||!postOverlayConstructed210A20()||nativeSource818Published_!=10u||
+           !nativeDispatch20F390Known_||!engineMotionAB0_||mode3C_!=0u||
+           racer.kind!=OriginalWreckComponentKind50LA::racer27E130||
+           racer.sessionGeneration!=binding_.sessionGeneration||racer.objectKey!=binding_.racerKey)return false;
+        nativePostEmberAttempted_=true;
+        pc=nativePostEmberPC_=0x212ddcu;
+        //20F3D4 installs3D1790; actual+A0=212EC0 is JR RA/NOP. This
+        //concrete owner proves that call, not a generic virtual no-op policy.
+        pc=nativePostEmberPC_=0x214708u;
+        std::optional<float> value;
+        if(!engineMotionSource158A70(retainedPhy,value))return false;
+        if(value)engineMotionAB0_=*value; //actual158AAC reached from214708
+        pc=nativePostEmberPC_=0x214710u;
+        //The separate physical-properties/source340 producer split remains
+        //required. No reapplication/adoption of earlier cold49N writes here.
+        return true;
     }
     friend class ::native_racer50HW::Cables;
     friend class ::native_racer_model50LA::Owner;
@@ -380,6 +542,13 @@ public:
            !b.renderer442F70||!b.actualRenderer||!b.rendererDiagnostic||
            !b.actualAIDamageMaterial->acceptsDirectory(b.actualMaterialDirectory36B970,b.materialDirectoryCapacity))
             return result(S::binding,0x210878u);
+        if(b.sourceConstructorOnly){
+            const void* visibility=nullptr;const void* collision=nullptr;
+            if(!b.actualWorld2107FC||!b.actualWorld2107FC->readIncoming210770(b.sessionGeneration,
+                b.actualObjectCount423F60,visibility,collision)||
+               visibility!=b.actualIncomingVisibility4C0||collision!=b.actualIncomingCollision4C4)
+                return result(S::binding,0x210770u);
+        }
         attempted_=true;binding_=b;
         selectionMaterial244_=-1;selectionMaterial26C_=-1;mode3C_=0; //20F894/89C and20F660
         selectionMaterialTable_=b.actualAIDamageMaterial->table382B38();
@@ -394,6 +563,24 @@ public:
         if(!type.okay())return result(S::entityType,type.sourcePC);
         entityType32=type.type;
         entityFlags33=std::uint8_t((entityFlags33&~7u)|1u); //27E1F8/214..240
+        nativeDispatch20F390Known_=true; //actual20F3D4, after base27E130 returned
+        if(b.sourceConstructorOnly){
+            sourceAnchor300_=std::array<std::uint32_t,4>{{0,0,0,0x3f800000u}}; //20F440 VF0.
+            if(!b.actualAnchorOrigin434630)return result(S::binding,0x20f990u);
+            sourceAnchor300_=*b.actualAnchorOrigin434630; //20F99C, before query690 NULL.
+        }
+        //Original20FA24/2C precede20FAD4, which precedes21003C.
+        float gravityUnit;const std::uint32_t gravityWord=0x4200cccdu;
+        std::memcpy(&gravityUnit,&gravityWord,4);
+        sourceQuery690_=nullptr; //20F9E4, before actual348/350 stores.
+        sourceQuery694_=nullptr; //20F9EC, before actual348/350 stores.
+        sourceTerrain348_=nullptr; //20FA04, before gravity20FA24/2C.
+        sourceAero350_=nullptr; //20FA0C, not inferred absent ownership.
+        sourceGravity378_=gravityUnit;sourceAirborneGravity37C_=gravityUnit;
+        sourceCount384_=0u; //Actual20FA3C.388 remains unknown, not a fabricated array.
+        sourceList488_=nullptr; //20FA44;48C is not written by this prefix.
+        sourceLift7EC_=10.f;
+        engineMotionAB0_=0.f; //actual21003C, before selected-bit210414 store
         // The enclosing racer20F390 constructor then sets selected bit1 at
         //210414..210430, before the represented210770/210878 cold prefix.
         // This is an actual racer write, not model191, clipping, a draw receipt,
@@ -403,6 +590,21 @@ public:
             b.sessionGeneration,b.detached7F8Key,true,*b.actualObjectCount423F60);
         if(r.status!=OriginalWreckComponentStatus50LA::complete)return result(S::component,r.sourcePC);
         ++count_;
+        if(b.sourceConstructorOnly){
+            const void* terrain=nullptr;const void* water=nullptr;
+            if(!b.actualWorld2107FC||!b.actualWorld2107FC->read2107FC(b.sessionGeneration,
+                b.actualObjectCount423F60,terrain,water))return result(S::binding,0x2107fcu);
+            sourceTerrain330_.emplace(static_cast<const OriginalWreckTerrainProvider50LA*>(terrain)); //2107FC.
+            sourceWater334_.emplace(static_cast<const WaterHeightProvider50JC*>(water)); //210804.
+            if(!b.actualLoadPod60)return result(S::binding,0x21081cu);
+            sourcePod60_=*b.actualLoadPod60; //Actual argument copy, before210824 formatter.
+            //Bounded native308C90 formatting for the admitted Pod01..Pod99
+            //slice. The actual21081C store survives an unsupported value.
+            if(*sourcePod60_==0u||*sourcePod60_>=100u)return result(S::binding,0x210824u);
+            sourcePodName1E0_=std::array<char,6>{{'P','o','d',
+                static_cast<char>('0'+*sourcePod60_/10u),static_cast<char>('0'+*sourcePod60_%10u),'\0'}};
+
+        }
         if(!overlay240.construct199840And199950(racer,*b.actualRace28C,b.overlay240Key,
            *b.actualObjectCount423F60,*b.actualAIDamageMaterial,b.actualMaterialDirectory36B970,
            b.materialDirectoryCapacity))return result(S::material,0x210878u);
@@ -451,6 +653,7 @@ public:
             particleKey,true,*binding_.actualObjectCount423F60);
         if(initialized.status!=OriginalWreckComponentStatus50LA::complete)
             return result(S::component,initialized.sourcePC);
+        sourceParticle7FC_=&particle7FC; //210A0C, AFTER141300 and BEFORE141960.
         pointers_[3]=&particle7FC;domain_.count=4;
         const auto attached=appendOriginalWreckComponent50LA(domain_,racer,particle7FC,
             0x0402u,*binding_.actualAttachmentLock423F58);
@@ -459,9 +662,11 @@ public:
         postOverlayConstructed_=true;return result(S::complete,0x210a20u);
     }
     bool postOverlayConstructed210A20()const noexcept {
-        return !cleanupPhase_&&!released_&&postOverlayConstructed_;
+        return !cleanupPhase_&&!released_&&postOverlayConstructed_&&sourceParticle7FC_&&
+            *sourceParticle7FC_==&particle7FC&&particle7FC.reference00==1u;
     }
-    bool prepared()const noexcept{return !cleanupPhase_&&!released_&&prepared_&&overlay240.prepared();}
+    bool prepared()const noexcept{return !cleanupPhase_&&!released_&&prepared_&&overlay240.prepared()&&
+        (!binding_.sourceConstructorOnly||(binding_.actualWorld2107FC&&binding_.actualWorld2107FC->current()));}
     bool atParticleParentColdCut210A18()const noexcept {
         return prepared()&&!racer.parent1C&&!racer.previous10&&!racer.next14&&
             racer.firstChild18==&overlay240.component&&overlay240.component.parent1C==&racer&&
@@ -484,6 +689,8 @@ public:
         // The concrete partial cable owner must close first. Never erase its
         // live254 alias while releasing the containing racer.
         if(cables254||lateStrips_)return {S::topology,0x2104d0u};
+        if(nativeWreckLoadAttempted_&&!nativeWreckWithdrawn_)return {S::topology,0x2129c0u};
+
         if(!binding_.actualObjectCount423F60||!binding_.actualAttachmentLock423F58)
             return {S::binding,0x1425a4u};
         if(*binding_.actualAttachmentLock423F58)return {S::attachmentLocked,0x1425a8u};
@@ -548,6 +755,8 @@ private:
     std::unique_ptr<Slots4> slots800_,slots804_,slots80C_;
     std::unique_ptr<Slots2> slots808_,slots81C_;
     std::unique_ptr<Slots10> slots818_;
+    std::size_t nativeSource818Published_=0; // actual212C74/212CFC writes, not authored count
+
     OriginalGcParticleManager50KG* particles4A0_=nullptr;
     std::uint64_t particleKey_=0;
     bool postOverlayAttempted_=false,postOverlayConstructed_=false;
@@ -580,7 +789,7 @@ private:
         if(!owned(particle7FC,K::entity141300,particleKey_,hasParticle)||
            particle7FC.firstChild18||particle7FC.next14)return false;
         if(hasParticle){
-            if(!hasOverlay||!particles4A0_)return false;
+            if(!hasOverlay||!particles4A0_||!sourceParticle7FC_||*sourceParticle7FC_!=&particle7FC)return false;
             const bool linked=particle7FC.parent1C==&racer&&
                 particle7FC.previous10==&overlay&&overlay.next14==&particle7FC&&particle7FC.mask20==0x0402u;
             const bool unattached=!particle7FC.parent1C&&!particle7FC.previous10&&

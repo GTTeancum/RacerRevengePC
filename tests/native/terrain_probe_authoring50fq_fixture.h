@@ -9,6 +9,7 @@
 #include "../../src/game/static_type2_producer49x.h"
 #include "../../src/game/type2_bounds50by.h"
 #include "../../src/game/terrain_prepare48m.h"
+#include "../../src/game/source_acos49t.h"
 #include "../../src/assets/import_decode48c.h"
 #include "../../src/assets/pod_physics49n.h"
 #include <bit>
@@ -16,12 +17,15 @@
 #include <cmath>
 #include <cstring>
 #include <fstream>
+#include <optional>
 #include <iterator>
 #include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
 
+namespace rr::game {class OriginalRacerTerrainQueryOwner50LA;}
+namespace ra_source_camera50LA { class OwnershipBridge; }
 namespace terrain_probe_authoring50fq_fixture {
 using namespace rr::game;
 namespace assets=rr::assets;
@@ -50,6 +54,10 @@ struct Owner {
     // Canonical348+1F0 from the admitted1B1240 setup, distinct from the
     // vehicle7EC parameter and from the cold authoring receipt.
     float lift1F0=0;
+    //Distinct actual348 source lanes, unknown for the legacy projected owner.
+    //Only the private staged1B0EE0/1B1240 path supplies known constructor/setup
+    //values. Existing native callers and consumers are unchanged.
+    std::optional<float> spring1F4,damping1F8,gravity1FC,sideForce200;
     TerrainQuery48J metadata{};
     Receipt receipt{};
     bool prepared=false;
@@ -235,5 +243,202 @@ inline bool installProbeCold(Owner& arena,live_terrain_probe50fr::Owner& live,
     live={};live_terrain_probe50fr::initialize(live,arena.initial.segment);
     error.clear();return true;
 }
+
+// Source-staged native path only. Immutable reservation is NOT1B1240, a
+// constructed collision shape, or a prepared numeric probe. The legacy public
+// prepare/install API above is unchanged. Only the same-world bridge can use
+// this prerequisite; it does not confer Session/grid/query readiness.
+class SourceStage348 final {
+    friend class ::rr::game::OriginalRacerTerrainQueryOwner50LA;
+    friend class ::ra_source_camera50LA::OwnershipBridge;
+    Owner* owner_=nullptr;
+    live_terrain_probe50fr::Owner* live_=nullptr;
+    const Type2StaticQuery49X* main_=nullptr;
+    const native_racer_collision50HW::Owner* collision_=nullptr;
+    const VehicleFrameParameters49W* parameters_=nullptr; //address only until21494C
+    Bindings binding_{};
+    Receipt immutable_{};
+    const std::vector<std::uint8_t>* phy_=nullptr; //retained immutable roster authoring
+    float authoredSpring_=0,authoredDamping_=0,authoredSideForce_=0;
+    bool reserved_=false,constructorKnown_=false,sideWritten_=false,gravityWritten_=false;
+    bool withdrawn_=false; //One-way counted owner retirement; no numeric fallback.
+    bool setupAttempted_=false,setupApplied_=false;
+    static bool authoredSetup(const std::vector<std::uint8_t>& phy,float& spring,float& damping,
+        float& side,std::string& error){
+        const std::string_view text(reinterpret_cast<const char*>(phy.data()),phy.size());
+        bool repulsor=false;unsigned seen=0;
+        for(std::size_t at=0;at<text.size();){auto end=text.find('\n',at);if(end==std::string_view::npos)end=text.size();
+            auto line=detail::trim(text.substr(at,end-at));at=end+1;
+            if(line.empty()||line.front()==';')continue;
+            if(line.front()=='['){repulsor=line.size()>2&&line.back()==']'&&
+                detail::equal(detail::trim(line.substr(1,line.size()-2)),"Repulsor");continue;}
+            const auto split=line.find('=');if(!repulsor||split==std::string_view::npos)continue;
+            const auto key=detail::trim(line.substr(0,split));float* value=nullptr;unsigned bit=0;
+            if(detail::equal(key,"Spring")){value=&spring;bit=1;}
+            if(detail::equal(key,"Damping")){value=&damping;bit=2;}
+            if(detail::equal(key,"SideForceCoefficient")){value=&side;bit=4;}
+            if(!bit)continue;const auto token=detail::trim(line.substr(split+1));
+            if((seen&bit)||!assets::parsePodPhysicsNumber49N(token.data(),token.size(),*value))
+                return detail::fail(error,"invalid/duplicate source Repulsor setup lane");
+            seen|=bit;
+        }
+        return seen==7||detail::fail(error,"source Repulsor setup lanes absent");
+    }
+
+    static bool validNamespace(const Bindings& b)noexcept {
+        if(!b.identity||b.collisionTypeTag==b.groupTypeTag)return false;
+        const std::uint32_t masks[]={b.physicsBodyCategory,b.staticObjectCategory,b.floorCategory,b.tubeCategory};
+        for(unsigned i=0;i<4;++i){if(!detail::oneBit(masks[i]))return false;
+            for(unsigned j=0;j<i;++j)if(masks[i]==masks[j])return false;}
+        return true;
+    }
+    static bool namespaceCurrent(const Owner& owner,const Bindings& b)noexcept {
+        const auto& q=owner.metadata;const auto& f=q.filter;
+        return f.identity==b.identity&&f.categoryA4==0&&f.acceptMaskB8==0xffffffffu&&
+            f.flags31==static_cast<std::uint8_t>((b.flags31&0xf0u)|3u)&&
+            f.flagsF8==static_cast<std::uint8_t>((b.preservedFlagsF8&0xc0u)|6u)&&
+            f.identityLists[0].mode==1&&f.identityLists[1].mode==1&&
+            f.identityLists[0].identities.empty()&&f.identityLists[1].identities.empty()&&
+            f.categoryModeD4==0&&f.categoryMasks.size()==1&&f.categoryMasks[0]==b.floorCategory&&
+            q.callbackMasks.collect==b.staticObjectCategory&&q.callbackMasks.forceAngle==b.tubeCategory&&
+            q.callbackMasks.excludeOwner==b.physicsBodyCategory&&q.collisionTypeTag==b.collisionTypeTag&&
+            q.groupTypeTag==b.groupTypeTag&&q.terrainCallbackEnabled&&
+            q.copied40==std::array<float,4>{{0,0,0,1}}&&q.copied50==std::array<float,4>{{0,0,0,1}};
+    }
+    // Fresh source-arena factory ONLY, before Bank registration. Allocate the
+    // immutable namespace/list schema without publishing numeric setup or54.
+    // These planned lanes cannot be consumed: prepared remains false.
+    static bool allocateNamespace(Owner& out,const Bindings& b,std::string& error){
+        if(!validNamespace(b)||out.prepared||out.receipt.archiveBytes||out.metadata.filter.identity||
+           out.metadata.normalMode54Bound||!out.metadata.filter.categoryMasks.empty()||
+           !out.metadata.filter.identityLists[0].identities.empty()||
+           !out.metadata.filter.identityLists[1].identities.empty())
+            return detail::fail(error,"source348 requires a genuinely fresh pre-Bank arena");
+        TerrainQuery48J q{};
+        q.filter.identity=b.identity;q.filter.categoryA4=0;q.filter.acceptMaskB8=0xffffffffu;
+        q.filter.flags31=static_cast<std::uint8_t>((b.flags31&0xf0u)|3u);
+        q.filter.flagsF8=static_cast<std::uint8_t>((b.preservedFlagsF8&0xc0u)|6u);
+        q.filter.identityLists[0].mode=q.filter.identityLists[1].mode=1;
+        q.filter.categoryModeD4=0;q.filter.categoryMasks.push_back(b.floorCategory);
+        q.callbackMasks={b.staticObjectCategory,b.tubeCategory,b.physicsBodyCategory};
+        q.copied40=q.copied50={{0,0,0,1}};
+        q.collisionTypeTag=b.collisionTypeTag;q.groupTypeTag=b.groupTypeTag;q.terrainCallbackEnabled=true;
+        out.metadata=std::move(q);error.clear();return true;
+    }
+    bool reserve(Owner& owner,live_terrain_probe50fr::Owner& live,
+        const Type2StaticQuery49X& main,const native_racer_collision50HW::Owner& collision,
+        const VehicleFrameParameters49W& parameters,const std::vector<std::uint8_t>& phy,
+        const Bindings& binding,std::string& error){
+        if(reserved_||owner.prepared||owner.receipt.archiveBytes||live.initialized||
+           owner.metadata.normalMode54Bound||!namespaceCurrent(owner,binding)||
+           !validNamespace(binding)||!collision.prepared()||main.resource!=&collision.main()||
+           !main.queryScene.value||!main.filter||main.filter->identity==binding.identity)
+            return detail::fail(error,"source348 reservation differs from fresh same-owner query allocation");
+        Receipt immutable;
+        float spring=0,damping=0,side=0;
+        if(!detail::authored(phy,immutable,error)||!authoredSetup(phy,spring,damping,side,error))return false;
+        Type2BoundsInput50BY input{};input.resource=&collision.main();input.preparedWorld=detail::identity();
+        CollectionBoundsResult48S bounds{};
+        if(prepareType2Bounds50BY(input,bounds)!=CollectionBoundsStatus48S::Complete)
+            return detail::fail(error,"source348 immutable podboxm bounds rejected");
+        immutable.vehicle324=bounds.half.v[1];
+        immutable.archiveBytes=collision.receipt().archiveBytes;immutable.podBoxMBytes=collision.receipt().memberBytes[0];
+        if(!immutable.archiveBytes||!immutable.podBoxMBytes)return detail::fail(error,"source348 asset receipt absent");
+        //No parameter value, body mass,7EC, or endpoint is read here.
+        authoredSpring_=spring;authoredDamping_=damping;authoredSideForce_=side;
+        phy_=&phy;binding_=binding;immutable_=immutable;owner_=&owner;live_=&live;
+        main_=&main;collision_=&collision;parameters_=&parameters;reserved_=true;
+        error.clear();return true;
+    }
+    //Actual counted OriginalRacerTerrainQueryOwner50LA now writes these
+    //constructor lanes at their original positions. No numerical-only shortcut.
+    bool writeSideForce2148F0(float value)noexcept {
+        if(withdrawn_||!constructorKnown_||sideWritten_||setupAttempted_||!std::isfinite(value)||
+           std::bit_cast<std::uint32_t>(value)!=std::bit_cast<std::uint32_t>(authoredSideForce_))return false;
+        owner_->sideForce200=value;sideWritten_=true;return true;
+    }
+    bool writeGravity214918(float actual378)noexcept {
+        if(withdrawn_||!constructorKnown_||!sideWritten_||gravityWritten_||setupAttempted_||!std::isfinite(actual378))return false;
+        owner_->gravity1FC=actual378;gravityWritten_=true;return true;
+    }
+    //Source-ordered1B1240 positive-body path. ShapePublication is the bridge's
+    //concrete same-row11C3F0 resource/result owner, not a readiness callback.
+    //Immutable/schema admission precedes the first setter store. Arithmetic
+    //and shape failures retain the reached actual store prefix unready.
+    template<class ShapePublication>
+    bool applySetup21494C(Owner& owner,live_terrain_probe50fr::Owner& live,
+        const Type2StaticQuery49X& main,const VehicleFrameParameters49W& parameters,
+        float actual324,float actualLift7EC,float sourceSpring,float sourceDamping,float sourceOrientation,
+        ShapePublication&& publishShape,std::string& error){
+        if(withdrawn_||!reserved_||!constructorKnown_||!sideWritten_||!gravityWritten_||setupAttempted_||setupApplied_||
+           owner_!=&owner||live_!=&live||main_!=&main||parameters_!=&parameters||!collision_||
+           main.resource!=&collision_->main()||owner.prepared||live.initialized||
+           owner.metadata.normalMode54Bound||!namespaceCurrent(owner,binding_)||
+           std::bit_cast<std::uint32_t>(actual324)!=std::bit_cast<std::uint32_t>(immutable_.vehicle324)||
+           std::bit_cast<std::uint32_t>(actualLift7EC)!=std::bit_cast<std::uint32_t>(parameters.visual.verticalLimit7EC)||
+           std::bit_cast<std::uint32_t>(actualLift7EC)!=std::bit_cast<std::uint32_t>(immutable_.authoredLift)||
+           std::bit_cast<std::uint32_t>(sourceSpring)!=std::bit_cast<std::uint32_t>(authoredSpring_)||
+           std::bit_cast<std::uint32_t>(sourceDamping)!=std::bit_cast<std::uint32_t>(authoredDamping_)||
+           std::bit_cast<std::uint32_t>(sourceOrientation)!=std::bit_cast<std::uint32_t>(immutable_.authoredOrientationSpring))
+            return detail::fail(error,"source348 setup requires untouched same-owner and actual source argument lanes");
+        //Complete-authored-input slice only: absent PHY keys are rejected by
+        //reserve, not replaced with projected defaults or the ctor10 fallback.
+        if(std::fegetround()!=FE_TONEAREST)return detail::fail(error,"source348 rounding mode unsupported");
+        const auto conversion=std::bit_cast<float>(0x4200cccdu);
+        if(std::bit_cast<std::uint32_t>(parameters.bodies.main.body.mass)!=
+           std::bit_cast<std::uint32_t>(detail::div(immutable_.authoredWeight,conversion)))
+            return detail::fail(error,"source348 actual mass differs from retained source input");
+        setupAttempted_=true; //No replay after any actual setter prefix.
+        owner.lift1F0=actualLift7EC;                           //1B1270
+        const float mass=parameters.bodies.main.body.mass;
+        const float spring=std::fabs(detail::mul(conversion,detail::mul(sourceSpring,mass)));
+        if(!std::isfinite(spring))return detail::fail(error,"source348 spring prefix retained");
+        owner.spring1F4=spring;                              //1B12A4
+        const float torque=std::fabs(detail::mul(conversion,detail::mul(sourceOrientation,mass)));
+        if(!std::isfinite(torque))return detail::fail(error,"source348 torque prefix retained");
+        owner.follow.airborneTorque204=torque;                //1B12CC
+        float damping=0.f;
+        if(mass>0.f&&spring>0.f){
+            const float product=detail::mul(mass,spring);
+            const float twice=detail::mul(2.f,sourceDamping);std::uint32_t result=0;
+            if(!SourceTerrainSetupMath50LA::damping1B12FC(std::bit_cast<std::uint32_t>(product),
+                std::bit_cast<std::uint32_t>(twice),result))return detail::fail(error,"source348 damping prefix retained");
+            damping=std::bit_cast<float>(result);
+        }
+        owner.damping1F8=damping;                            //1B1338/3C
+        const float offset[3]={0,actual324,0},up[3]={0,1,0};
+        SpringVector4_48N first{},second{},local{};
+        for(unsigned i=0;i<3;++i){
+            first.v[i]=detail::add(parameters.bodies.main.centerOffset.v[i],offset[i]);
+            if(!std::isfinite(first.v[i]))return detail::fail(error,"source348 first endpoint prefix retained");
+        }
+        first.v[3]=1;owner.receipt.probe130=first;              //1B1390
+        const float fiveLift=detail::mul(5.f,actualLift7EC);
+        for(unsigned i=0;i<3;++i){
+            const float base=detail::sub(first.v[i],detail::mul(2.f,offset[i]));
+            second.v[i]=detail::sub(base,detail::mul(fiveLift,up[i]));
+            if(!std::isfinite(second.v[i]))return detail::fail(error,"source348 second endpoint prefix retained");
+        }
+        second.v[3]=1;owner.receipt.probe140=second;            //1B145C
+        for(unsigned i=0;i<3;++i)owner.lowerEndpoint140.v[i]=second.v[i];
+        owner.initial.segment.first=detail::identityPoint(first);
+        owner.initial.segment.second=detail::identityPoint(second);
+        owner.initial.segment.worldMatrix=detail::identity();
+        if(!publishShape(owner.initial.segment))return detail::fail(error,"source348 actual11C3F0 prefix retained");
+        owner.metadata.normalMode54=1u;owner.metadata.normalMode54Bound=true;
+        owner.metadata.terrainCallbackEnabled=true;           //1B1478/7C represented typed self callback
+        for(unsigned i=0;i<3;++i){
+            const float base=detail::sub(first.v[i],detail::mul(2.f,offset[i]));
+            local.v[i]=detail::sub(base,detail::mul(actualLift7EC,up[i]));
+            if(!std::isfinite(local.v[i]))return detail::fail(error,"source348 local offset prefix retained");
+        }
+        local.v[3]=1;
+        for(unsigned i=0;i<3;++i)owner.follow.localOffset1c0.v[i]=local.v[i]; //1B1540
+        owner.receipt=immutable_; //Native diagnostic only, retain actual endpoints.
+        owner.receipt.bodyMass=mass;owner.receipt.probe130=first;
+        owner.receipt.probe140=second;owner.receipt.localOffset1C0=local;
+        owner.prepared=true;setupApplied_=true;error.clear();return true;
+    }
+};
 
 }

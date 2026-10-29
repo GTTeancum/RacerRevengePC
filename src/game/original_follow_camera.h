@@ -7,6 +7,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <optional>
+#include <limits>
 
 namespace rr::game {
 using OriginalFollowVector = assets::TVCameraVector49E;
@@ -37,7 +38,14 @@ struct OriginalFollowPresetBank {
     std::int32_t pod60=0,layout118=0;
     const OriginalFollowPreset* records=nullptr;std::size_t count=0;
 };
-struct OriginalFollowFilter {float value=0,tau=0,blend=1;};
+// Actual five-lane scalar-filter storage. Existing numeric consumers read
+//0/4/8; original constructors also own bounds0C/10. Three-value standalone
+//initializers retain the same unbounded defaults and arithmetic semantics.
+struct OriginalFollowFilter {
+    float value=0,tau=0,blend=1;
+    float upper0C=std::numeric_limits<float>::max();
+    float lower10=-std::numeric_limits<float>::max();
+};
 struct OriginalFollowCamera {
     std::uint64_t sessionGeneration=0,racerKey=0,mainBodyKey=0,containerKey=0,revision=0;
     OriginalFollowPresetBank bank{};

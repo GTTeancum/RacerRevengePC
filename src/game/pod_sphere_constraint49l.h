@@ -27,6 +27,30 @@ struct PodSphereJoint49L {
     PodSphereVector49L centripetalC0, separationD0, directionE0, preparedForceF0;
     PodSphereMatrix49L cached100, cached140, inverse180;
 };
+// Source-ordered numeric construction/setup; unlike legacy transactional APIs,
+// these retain all earlier stores on false. stoppedPC is the reached source
+// phase/store admission boundary, not a guest CPU cursor. No base constructor,
+// dispatch/owner identity, allocation, append, scene getter, or readiness proof.
+struct PodSphereSourcePresenceHooks49L {
+    void* context=nullptr;
+    void (*publish)(void* context,bool isBodyB,bool present) noexcept=nullptr;
+};
+// Optional non-failing hooks publish only the matching typed owner alias just
+// after44/48 numeric stores. They must not mutate joint/inputs/global words or
+// reenter. ActualA must be non-null and proven by caller before setupA entry.
+// Inputs are stable, distinct from joint storage. Actual434390 points to four
+// source words, or null to stop at its first load after initialVF0/flag stores.
+// Word copies admit arbitrary payloads; only consumed arithmetic is restricted
+// to finite FE_TONEAREST binary32, with no fast math/FMA. No rollback/resume.
+bool initializePodSphereSourceOrdered49L(PodSphereJoint49L&,
+    const std::uint32_t* actual434390Words,std::uint32_t& stoppedPC,
+    const PodSphereSourcePresenceHooks49L* hooks=nullptr) noexcept;
+bool setupPodSphereASourceOrdered49L(PodSphereJoint49L&,float inverseMass270,
+    const PodSphereMatrix49L& inverseInertia140,const PodSphereVector49L& anchor,
+    std::uint32_t& stoppedPC,const PodSphereSourcePresenceHooks49L* hooks=nullptr) noexcept;
+bool setupPodSphereBSourceOrdered49L(PodSphereJoint49L&,bool bodyBPresent,
+    const PodSphereVector49L& anchor,float length,std::uint32_t& stoppedPC,
+    const PodSphereSourcePresenceHooks49L* hooks=nullptr) noexcept;
 // Represented numeric constructor-suffix writes1B6214..1B6468, after the
 // excluded base initializer1276E0. This is not full object construction.
 // Caller initializes excluded base-owned state and the incoming native object.
@@ -48,8 +72,21 @@ bool preparePodSphere49L(PodSphereJoint49L&, const PodSphereBody49L* bodyA,
 bool correctPodSphere49L(PodSphereJoint49L&, PodSphereBody49L* bodyA,
                         const PodSphereBody49L* bodyB, float& magnitude) noexcept;
 bool applyPodSphere49L(const PodSphereJoint49L&, PodSphereBody49L* bodyA) noexcept;
-// All functions require FE_TONEAREST and strict binary32/no fast math/FMA.
-// Each function is serial, fixed-size, allocation-free, and atomic on false.
+//Pure1B6784..1B67F0 scratch for the retained source-ordered caller. This
+//neither mutates a joint/body nor attests a getter or slot74 completion.
+//False preserves numeric outputs; stoppedPC identifies the reached phase.
+//lastPointVf6W is the actual last point getter's sceneWorld100[11], NOT its
+//constant point-result W. Zero distance is admitted here: the source reaches
+//C0 before its later reciprocal. Same finite FE_TONEAREST domain as below.
+//angularVelocityXYZ references three stable floats; numeric outputs are
+//distinct scratch storage. It is not an owner/scene or body-presence receipt.
+bool preparePodSphereCentripetalPrefix49L(const PodSphereVector49L& separation,
+    const float* angularVelocityXYZ,const PodSphereVector49L& localAnchor,
+    float lastPointVf6W,float& distanceSquared,PodSphereVector49L& tangential,
+    PodSphereVector49L& centripetal,std::uint32_t& stoppedPC) noexcept;
+// Legacy functions and the centripetal prefix require FE_TONEAREST and strict binary32/no fast math/FMA.
+// Each function is serial, fixed-size, allocation-free, and preserves numeric
+// outputs on false. The prefix helper's diagnostic stoppedPC still advances.
 // Stages with enabled38==0 do nothing; correction returns +0 while preserving
 // suppressed40. Enabled stages require A and its scene ready (190 bit0); B,
 // when present, requires a ready scene in preparation. Pointer presence must

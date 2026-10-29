@@ -103,13 +103,18 @@ bool releaseColdController174C20()noexcept {
        e.objectKey!=key(controller_)||e.sessionGeneration!=p.issuerGeneration||
        e.firstChild18||e.parent1C||e.previous10||e.next14||e.descendants24||
        collection_.registered38||collection_.bound||display_.controllers48[0]||taCuts_||
+       nativeCinematographer70_||nativeTv78_||
+       (nativeStart7C_.constructed&&!nativeStart7C_.retired)||
+       p.nativeScene3COwner||p.race88||
        !app->entityAuthority_.canRetire(e)||!original_entity_chain_detail50LA::forest(app->entityAuthority_.view()))return false;
     for(const auto* child:p.children64)if(child)return false;
     auto& authority=actual_.applicationEntities->entityAuthority_;
     if(!authority.retire(p.entity))std::terminate();
     --p.entity.reference00; //142590->104970 last reference, before subclass destructor.
-    // Generic child18 is authentically empty.174C20's64/68/6C/70,5C,74,
-    //78,7C and48..54 branches are also genuinely empty, not skipped callbacks.
+    // Generic child18 is authentically empty. Any owned RA70/78 already
+    // retired in source relative order around74 in retireTaController;
+    // withdrawn native borrows are not source-null destructor assertions.
+    // Remaining reduced native64/68/6C/5C/7C/query backing retired above.
     p.vtable08=0x3ce310u;
     p.vtable08=0x3ccab0u; //115BB0; actual registered38 is null, so no list free.
     p.vtable08=0x3cd240u; //141404, Entity base destructor.

@@ -228,8 +228,8 @@ bool Owner::prepareNativeRaStaticDraw(const CameraVisibilityLease& lease,
                     if(const auto* flareEntry=s.findRaFlare(ref)){
                         const auto& flare=*flareEntry;
                         if(!flare.world||flare.world!=s.sceneOwner||!flare.entity||!flare.type32||!flare.flags33||
-                           !flare.world->nativeLocalFlareIdentityCurrent(flare.entity)||
-                           flare.world->nativeLocalFlareZoneIndex(flare.entity)!=std::optional<std::size_t>(zone)||
+                           !podFlareIdentityCurrent(*flare.world,flare.entity)||
+                           podFlareZoneIndex(*flare.world,flare.entity)!=std::optional<std::size_t>(zone)||
                            *flare.type32!=s.selectedMethods[zone*2u].type2D)
                             return fail(d,Status::identity,0x27ec18u);
                         // Distinct native typed projection of the real SearchableGameObject.

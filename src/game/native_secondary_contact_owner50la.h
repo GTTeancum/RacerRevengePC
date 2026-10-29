@@ -19,14 +19,15 @@ class NativeSecondaryContactOwner50LA final {
     const ::native_racer50HN::Bank* bank_=nullptr;
     VehicleFrameState49W* frame_=nullptr;
     SecondaryBodyParameters49M* parameters_=nullptr;
+    const PodSphereVector49L* targetRelative2F0_=nullptr; //Actual current Banked Fixture field, not copied geometry.
     std::uint64_t generation_=0;
     std::size_t slot_=0;
     SceneNodeIndex49P physical19C_{};
     bool revoked_=false;
     NativeSecondaryContactOwner50LA(const ::native_racer50HN::Bank& bank,VehicleFrameState49W& frame,
-        SecondaryBodyParameters49M& parameters,std::uint64_t generation,
+        SecondaryBodyParameters49M& parameters,const PodSphereVector49L& target,std::uint64_t generation,
         std::size_t slot,SceneNodeIndex49P physical)noexcept:
-        bank_(&bank),frame_(&frame),parameters_(&parameters),generation_(generation),slot_(slot),
+        bank_(&bank),frame_(&frame),parameters_(&parameters),targetRelative2F0_(&target),generation_(generation),slot_(slot),
         physical19C_(physical){}
 public:
     NativeSecondaryContactOwner50LA(const NativeSecondaryContactOwner50LA&)=delete;

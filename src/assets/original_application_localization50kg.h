@@ -9,7 +9,7 @@
 #include <thread>
 #include <vector>
 namespace original_main_entry50KG { struct Application; }
-namespace rr::platform { class OriginalLocalizationRendererLease50KG; class OriginalUiGarageWidget1Owner50KG; class OriginalUiGaragePageOwner50KG; class OriginalUiSharedDialogs50KG; }
+namespace rr::platform { class OriginalUiCourseOwnedLifecycle50KG; class OriginalLocalizationRendererLease50KG; class OriginalUiGarageWidget1Owner50KG; class OriginalUiGaragePageOwner50KG; class OriginalUiSharedDialogs50KG; }
 namespace rr::game { class OriginalApplicationEntities50LA; class OriginalResults10450LA; }
 namespace rr::assets {
 class OriginalStandardArchiveProvider50LA;
@@ -138,6 +138,7 @@ public:
   class BorrowReader final {
    friend class rr::game::OriginalResults10450LA;
    friend class rr::platform::OriginalUiGarageWidget1Owner50KG;
+   friend class rr::platform::OriginalUiCourseOwnedLifecycle50KG;
    friend class rr::platform::OriginalUiGaragePageOwner50KG;
    friend class rr::platform::OriginalUiSharedDialogs50KG;
    static bool readCurrent(const std::shared_ptr<const SelectedText>& token,

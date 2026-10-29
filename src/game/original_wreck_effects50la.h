@@ -31,6 +31,8 @@ struct OriginalWreckEffectResourceContext50LA {
     OriginalWreckExplosionGlobals50LA* explosionGlobals=nullptr;
     const std::vector<std::uint8_t>* podWreckSmokeEmt=nullptr; //actual POD archive member
     const std::vector<std::uint8_t>* podFireEmt=nullptr;
+    const std::vector<std::uint8_t>* podExplWreckExplosionEmt=nullptr;
+    const std::vector<std::uint8_t>* podExplWreckSparksEmt=nullptr;
 };
 enum class OriginalWreckEffectSlot50LA : std::uint8_t {dust168,splash16C,sparksC0,explosionC4};
 struct OriginalWreckEffectComponentBinding50LA {

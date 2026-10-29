@@ -13,10 +13,13 @@
 #include "../../../src/game/original_application_entities50la.h"
 namespace original_main_entry50KG { struct Application; class NativeCollectorFifo50LA; }
 namespace ra_cold_aggregate50LA {class Owner;}
+namespace rr::game {class OriginalLoadingScreen40Mode0LA;}
 namespace rr::platform {
 class OriginalUiGarageDrawContribution50KG;
 class OriginalUiSharedDialogs50KG;
 class OriginalUiGarageTextOverlay50KG;
+class OriginalUiCourseOwnedLifecycle50KG;
+class OriginalUiCoursePopupPayload50KG;
 enum class OriginalUiGarageScreenTextStatus50KG : std::uint8_t {
  complete, phase, authority, source, allocation, material, assertion, selectedTextPending
 };
@@ -34,7 +37,11 @@ struct OriginalUiGarageScreenTextDiagnostic50KG {
 // real selected32C borrow; dynamic rows retain their actual empty-string path.
 // The separate legacy root probe remains closed and is not an issuance route.
 class OriginalUiGarageScreenText50KG final {
+ friend class rr::game::OriginalLoadingScreen40Mode0LA;
  friend class ::ra_cold_aggregate50LA::Owner; //Same299BE0 process guard for real SunFlare handles.
+ friend class OriginalUiCoursePagePayload50KG;
+ friend class OriginalUiCourseOwnedLifecycle50KG;
+ friend class OriginalUiCoursePopupPayload50KG;
  friend class OriginalUiGarageDrawContribution50KG;
     friend class OriginalUiSharedDialogs50KG;
  friend struct ::original_main_entry50KG::Application;
@@ -77,6 +84,16 @@ class OriginalUiGarageScreenText50KG final {
  };
  enum class Phase : std::uint8_t {constructed,loading,coldLoaded,failed,retired};
  OriginalUiGarageScreenText50KG()noexcept=default;
+ const OriginalUiCourseOwnedLifecycle50KG* courseOwner_=nullptr;
+ const OriginalUiCoursePopupPayload50KG* coursePopupOwner_=nullptr;
+ const OriginalUiCourseOwnedLifecycle50KG* coursePage440Owner_=nullptr;
+ bool loadCoursePageText4402DFD90(OriginalUiCourseOwnedLifecycle50KG&,std::string_view actualText,Diagnostic&)noexcept;
+ bool loadCoursePopupClone2DFD90(OriginalUiCoursePopupPayload50KG&,Diagnostic&)noexcept;
+ std::size_t courseOrdinal_=0;
+ bool loadCourseSource2DFD90(OriginalUiCourseOwnedLifecycle50KG&,std::size_t,Diagnostic&)noexcept;
+ bool loadingRole_=false;
+ std::shared_ptr<const int> loadingOccurrence_;
+ bool loadLoadingSource2DFD90(game::OriginalLoadingScreen40Mode0LA&,std::size_t,Diagnostic&)noexcept;
  // Lower, independently testable source body only. Inputs must be the genuine
  // same328 font Entry and canonical namespace. No caller text/language/ready
  // token is accepted. The focused private aperture supplies authenticated
@@ -96,7 +113,11 @@ class OriginalUiGarageScreenText50KG final {
    std::string& actualDirectory36B970,const std::string& fontDirectory36B420,Diagnostic&)noexcept;
  bool loadColdSource2DFD90(const Application&,std::shared_ptr<Domain>,std::shared_ptr<const Context>,
    std::shared_ptr<Fonts>,std::shared_ptr<const Fonts::Entry>,std::shared_ptr<const Archive>,
-   std::string&,const std::string&,Fonts::Name,std::string_view,std::int32_t,bool initialNull,Diagnostic&,std::string_view initialText={})noexcept;
+   std::string&,const std::string&,Fonts::Name,std::string_view,std::int32_t,bool initialNull,Diagnostic&,std::string_view initialText={},
+   game::OriginalLoadingScreen40Mode0LA* loadingOwner=nullptr,std::size_t loadingOrdinal=0,
+   OriginalUiCourseOwnedLifecycle50KG* courseOwner=nullptr,std::size_t courseOrdinal=0,
+   OriginalUiCoursePopupPayload50KG* coursePopupOwner=nullptr,
+   OriginalUiCourseOwnedLifecycle50KG* coursePage440Owner=nullptr)noexcept;
  bool buildPacket2E03F0(Packet&,std::size_t firstGlyph,Diagnostic&)noexcept;
  bool loadPrimitive2465B0(Primitive&,const std::string&,Diagnostic&)noexcept;
  bool coldInputsCurrent()const noexcept;

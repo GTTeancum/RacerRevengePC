@@ -18,6 +18,7 @@
 #include <utility>
 #include <vector>
 
+namespace rr::platform {class OriginalUiCourseOwnedLifecycle50KG;}
 namespace rr::game {
 using OriginalMotionSection50LA=std::map<std::string,std::string>;
 using OriginalMotionConfiguration50LA=std::map<std::string,OriginalMotionSection50LA>;
@@ -81,6 +82,7 @@ private:
     std::uint32_t publishedSlotReferences_=0;
     friend class OriginalMotionLibrary50LA;
     friend class OriginalModelMotionSet50LA;
+    friend class rr::platform::OriginalUiCourseOwnedLifecycle50KG;
 };
 
 namespace original_motion_detail50LA {
@@ -300,6 +302,7 @@ private:
     std::uint32_t allocationCounter04_=0,field08_=0,field0C_=0,releaseLock10_=0,field14_=1;
     std::size_t slotOwners_=0;
     friend class OriginalModelMotionSet50LA;
+    friend class rr::platform::OriginalUiCourseOwnedLifecycle50KG;
 };
 
 // One real animation's153610 retain set and153FF4..154044 release set. The

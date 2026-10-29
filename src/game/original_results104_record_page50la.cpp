@@ -1,8 +1,6 @@
 #include "original_results104_storage50la.h"
 #include "original_time_stats_state50la.h"
-#include "../../tests/native/original_position_stats_adapter50la.h"
-#include "../../tests/native/original_race_constructor50la.h"
-#include "../../tests/native/ra_cold_roster_operation50la.h"
+#include "../../tests/native/original_results_roster_read50la.h"
 #include <bit>
 #include <charconv>
 #include <cmath>
@@ -60,22 +58,21 @@ OriginalResults10450LA::DisplayCpuPrefix OriginalResults10450LA::prepareRecordSu
     }
     if(manager!=0)
         return stop(Impl::S::incomplete,managerPC,"Results record page requires unjoined actual second-human row1");
-    using Observation=::original_position_stats_adapter50LA::Owner;
-    Observation::ResultsRecordIdentity row;Observation::Diagnostic observation;
+    using Read=::original_results_roster50LA::Read;
+    Read::Record row;
     const auto* materials=p.domain->materials382B38().get();const auto generation=p.component.sessionGeneration;
-    const auto operation=p.loadedRosterOperation.lock();const auto before=race.profile_->stamp();
-    const auto current=[&](){const auto now=race.profile_->stamp();
-        return operation&&operation->aggregate_==race.world74_&&operation->entities_==p.application&&
-            operation->domain_==p.domain&&operation->generation_==generation&&
-            operation->resultsRuntimeBankCurrent(observer.resultsBankIdentity())&&
+    const auto operation=p.loadedRosterOperation.lock();const auto before=Read::profileStamp(race);
+    const auto current=[&](){const auto now=Read::profileStamp(race);
+        return Read::loadedOperationOwnerFieldsCurrent(operation,Read::raceWorldIdentity(race),p.application,p.domain,generation)&&
+            Read::loadedOperationBankCurrent(operation,Read::observerBankIdentity(observer))&&
             now.generation==before.generation&&now.mode34==before.mode34&&p.context->live();
     };
-    if(!current()||!observer.captureResultsRecordIdentity(p.application.get(),materials,generation,manager,row,observation)||
-       row.bank!=observer.resultsBankIdentity()||row.vehicle58!=0u||
-       !operation->resultsRacerIdentityCurrent(manager,row.racer60)||!current())
+    if(!current()||!Read::captureRecord(observer,p.application.get(),materials,generation,manager,row)||
+       row.bank!=Read::observerBankIdentity(observer)||row.vehicle58!=0u||
+       !Read::loadedOperationRacerCurrent(operation,manager,row.racer60)||!current())
         return stop(Impl::S::owner,managerPC,"Results actual first-human loaded Bank/rig/publication absent");
     calls.managerIndex=manager;calls.publication=row.publication;
-    const auto samePublication=[&](){return current()&&observer.resultsRecordIdentityCurrent(row);};
+    const auto samePublication=[&](){return current()&&Read::recordCurrent(observer,row);};
     //1C3C10 BC1TL executes MOV.S F31,F0 only if stackD4<=640. The outer
     //window gate does NOT add a lower-bound test to this particular overwrite.
     if(entering<=640.f)out.transition.offsetF31=offset=entering;
@@ -108,7 +105,7 @@ OriginalResults10450LA::DisplayCpuPrefix OriginalResults10450LA::prepareRecordSu
         p.position(*p.text7F0,recordAdd(320.f,offset),100.f);
         if(!text(*p.text7F0,calls.lapLabel,0x1c3e7c))return out.prefix;
         float bestLap=0;
-        if(!samePublication()||!observer.readResultsBestLapCB4(row,bestLap,observation))
+        if(!samePublication()||!Read::readBestLap(observer,row,bestLap))
             return stop(Impl::S::owner,0x1c3e84,"Results actual current CB4 read absent");
         if(!timeValue(*p.text940,bestLap,100.f,calls.lapValue,0x1c3e88,0x1c3f88))return out.prefix;
     }
@@ -120,7 +117,7 @@ OriginalResults10450LA::DisplayCpuPrefix OriginalResults10450LA::prepareRecordSu
         p.position(*p.text860,recordAdd(320.f,offset),120.f);
         if(!text(*p.text860,calls.raceLabel,0x1c4124))return out.prefix;
         float raceSeconds=0;
-        if(!samePublication()||!observer.readResultsRaceTimeCB8(row,raceSeconds,observation))
+        if(!samePublication()||!Read::readRaceTime(observer,row,raceSeconds))
             return stop(Impl::S::owner,0x1c412c,"Results actual current CB8 read absent");
         if(!timeValue(*p.text9B0,raceSeconds,120.f,calls.raceValue,0x1c4130,0x1c4230))return out.prefix;
     }
@@ -132,7 +129,7 @@ OriginalResults10450LA::DisplayCpuPrefix OriginalResults10450LA::prepareRecordSu
         p.position(*p.text8D0,recordAdd(320.f,offset),140.f);
         if(!text(*p.text8D0,calls.knockoutLabel,0x1c43cc))return out.prefix;
         std::uint32_t count=0;
-        if(!samePublication()||!observer.readResultsObservedTimingCD0(row,count,observation))
+        if(!samePublication()||!Read::readObservedTiming(observer,row,count))
             return stop(Impl::S::owner,0x1c43d4,"Results actual current timing CD0 read absent");
         // Source3ACE10 is signed%d. Preserve its signed32 interpretation and
         //the actual TextA20 capacity2 truncation; do not invent a cap7 count.

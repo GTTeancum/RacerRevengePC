@@ -9,6 +9,7 @@ namespace rr::game {
 // Real group2CC060 child+C4: 15E800 / 15E8F0 / reader15EF70.
 // Defaults describe the source reader; only the authenticated original member
 // can publish a parsed definition. Controls belong to the canonical50BE owner.
+enum class OriginalWreckExplosionMember50LA : std::uint8_t {groupExplosion,racerExplWreckExplosion};
 struct OriginalWreckExplosionDefinition50LA {
     std::array<float,3> minRange{},maxRange{},velocity{};
     OriginalGcCommonEmitterTiming50KG timing{};
@@ -18,6 +19,7 @@ struct OriginalWreckExplosionDefinition50LA {
     float gravity=3,groundLevel=0,restitution=.55f,spreadVelocityScale220=0;
     std::uint32_t flags=0;
     bool applySpreadToVelocity=true,mirrorX=false,mirrorY=false,parsed=false;
+    OriginalWreckExplosionMember50LA member=OriginalWreckExplosionMember50LA::groupExplosion;
 };
 // Actual process BSS84CC/433978. Share one record across EVERY explosion
 // emitter and retain it across owner reuse. Increment occurs after capacity
@@ -44,6 +46,9 @@ struct OriginalWreckExplosionRuntime50LA {
 };
 OriginalGcSprayStatus50KG readOriginalWreckExplosionDefinition50LA(
     const std::vector<std::uint8_t>& actualPodExplosionEmt,
+    OriginalWreckExplosionDefinition50LA&,assets::OriginalUiPageDiagnostic50KG&) noexcept;
+OriginalGcSprayStatus50KG readOriginalWreckExplosionDefinition50LA(
+    const std::vector<std::uint8_t>&,OriginalWreckExplosionMember50LA,
     OriginalWreckExplosionDefinition50LA&,assets::OriginalUiPageDiagnostic50KG&) noexcept;
 OriginalGcSprayReceipt50KG bindOriginalWreckExplosion50LA(
     OriginalWreckExplosionRuntime50LA&,const OriginalWreckExplosionDefinition50LA&,

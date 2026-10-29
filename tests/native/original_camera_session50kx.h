@@ -1,4 +1,5 @@
 #pragma once
+#include <bit>
 #include "../../src/assets/original_ta_cut_authoring_candidate.h"
 #include "../../src/game/original_ta_cut_resource_candidate.h"
 #include <optional>
@@ -51,6 +52,7 @@ namespace rr::platform { struct VehicleWindowFrame50DS; }
 #include "../../src/game/undertrack_reposition50et.h"
 #include "../../src/game/track_navigation50eu.h"
 #include "../../src/game/original_racer_entity_cold50la.h"
+#include "../../src/game/original_racer_world_borrow50la.h"
 #include "../../src/game/original_racer_animation_cold50la.h"
 #include "../../src/game/original_track_particle_cold50la.h"
 #include <array>
@@ -59,11 +61,13 @@ namespace rr::platform { struct VehicleWindowFrame50DS; }
 #include <string>
 
 namespace ra_source_camera50LA { class OwnershipBridge; }
+namespace ra_cold_roster50LA { class FreshExecutionArena; }
+namespace ra_cold_aggregate50LA { class Owner; }
 namespace gc_original_world50LM { class Owner; }
 namespace ga_original_world50LH { class Owner; }
 namespace sa_original_world50LM { class Owner; }
 namespace ma_original_world50LM { class Owner; }
-namespace rr::game { class OriginalRaceConstructor50LA; }
+namespace rr::game { class OriginalRaceConstructor50LA; class OriginalFrontendCameraCold50LA; }
 namespace original_time_stats_adapter50LA { class Owner; }
 namespace original_speed_boost_adapter50LA { class Owner; }
 namespace original_position_stats_adapter50LA { class Owner; }
@@ -129,6 +133,16 @@ inline bool initializeFreshNativeCameraVideoAlpha0(OriginalVideoFadeState& video
        video.blueSlope3FC||video.lastMilliseconds400)return false;
     video.alpha3E8=0;return true;
 }
+// Legacy inputs can only borrow an actual Follow owner. The absent variant
+// is private to the distinct fresh constructor-only factory, not a readiness flag.
+class NativeFollowBorrow final {
+    friend class ra_cold_aggregate50LA::Owner;
+    original_follow_query_bridge::QueryBridge* owner_=nullptr;
+    NativeFollowBorrow() noexcept=default;
+public:
+    NativeFollowBorrow(original_follow_query_bridge::QueryBridge& owner) noexcept:owner_(&owner){}
+    original_follow_query_bridge::QueryBridge* get() const noexcept{return owner_;}
+};
 // All references are the existing50DU objects. The packed human prefix and
 // the AI peers share their real manager, RNG, event tree and original bodies.
 struct ActualOwners {
@@ -151,7 +165,7 @@ struct ActualOwners {
     const ZoneLifecycle50CL& collisionWorld;
     LiveZoneMembership50EN& mainMembership690;
     GameplayBlurPending& blur;
-    original_follow_query_bridge::QueryBridge& followQueries;
+    NativeFollowBorrow followQueries;
     BasePoseHistoryState50Y& poseHistory;
     const BoostState50FK& boost;
     original_camera_cycle_audio50KX::Owner& cycleAudio;
@@ -181,7 +195,9 @@ struct ActualOwners {
     const std::array<std::unique_ptr<native_racer_model50LA::Owner>,8>* actualBottomRightModels=nullptr;
     const std::array<std::unique_ptr<native_racer_model50LA::Owner>,8>* actualBottomLeftModels=nullptr;
     OriginalApplicationAnimationClockView50KG applicationAnimation; //Same Application pause11C owner.
-    const std::array<native_racer50HW::Cables*,8>* actualCables=nullptr; // RA factory pins every concrete owner.
+    // Legacy RA factory pins every concrete owner. The private earlier
+    // constructor-only route requires absence, not an array of NULL owners.
+    const std::array<native_racer50HW::Cables*,8>* actualCables=nullptr;
     const TrackNavigation50EU* actualRadarMapB8=nullptr; // Borrow of the same retained authored map; RA factory only.
     TrackNavigationView50EU actualRadarMapMb{};
     TrackNavigationView50TC actualRadarMapTc{};
@@ -241,6 +257,7 @@ class Session final {
     friend class ::original_cable_selection50LA::Binding;
     // Private same-RA factory verifies actual retirement, never a caller flag.
     friend class ra_source_camera50LA::OwnershipBridge;
+    friend class ra_cold_aggregate50LA::Owner;
     // Read-only coherent TimeStats projection; no public gate setters or
     // mutable camera/Entity access are added by this narrow native adapter.
     friend class original_time_stats_adapter50LA::Owner;
@@ -310,6 +327,11 @@ class Session final {
     std::int32_t raceMode8C_=0;
     OriginalAIDamageRaceContext50LA aiDamageRace_;
     std::array<OriginalRacerEntityCold50LA,8> racerEntities_{};
+    // Private actual RA owner hook. Never installed for standalone sessions.
+    ra_source_camera50LA::OwnershipBridge* nativeWreckOwner_=nullptr;
+    bool stageNativeRetainedWreckCold()noexcept;
+    bool retireNativeRetainedWreckCold()noexcept;
+
     DisplayInputs* displayInputs_=nullptr;
     // Native observation of the SAME Display0 selector, not a second camera
     // or a strong cycle. No original Camera reference/destructor is inferred.
@@ -319,6 +341,27 @@ class Session final {
     std::uint64_t generation_=0,frameNumber_=0,completedFrame_=0,publicationCount_=0;
     std::array<Identity,8> identity_{};
     unsigned coldPhase_=0,authoredPhase_=0;
+    // One native-only owned preparation interval, not a source Race-load
+    // return or a source30-null assertion. Only the actual Application can
+    // open it after its retained RA loader tail. It NEVER grants coldBound.
+    // Kept after every partial failure/close: a second prepare cannot replay
+    // the already reached cut-data/Follow/Death/Attached preparation effects.
+    // Separate native constructor admission, never camera or prepared348 readiness.
+    std::weak_ptr<ra_cold_roster50LA::FreshExecutionArena> constructorArena_;
+    std::shared_ptr<const OriginalRacerWorldBorrow50LA> constructorWorld_;
+    bool constructorOnly_=false,constructorPrefixAttempted_=false,constructorPrefixComplete_=false;
+    Session(ActualOwners,const std::shared_ptr<ra_cold_roster50LA::FreshExecutionArena>&,
+        std::shared_ptr<const OriginalRacerWorldBorrow50LA>) noexcept;
+    static bool constructorArenaMatches(
+        const std::shared_ptr<ra_cold_roster50LA::FreshExecutionArena>&,
+        const Bank&,const VehicleFrameState49W&,const VehicleFrameBindings49W&,
+        const AiRuntimeState50IV&,const BasePoseHistoryState50Y&,
+        const std::array<std::unique_ptr<native_racer50HW::Rig>,8>&) noexcept;
+    bool admitConstructorOnly(const std::shared_ptr<ra_cold_roster50LA::FreshExecutionArena>&,
+        std::uint64_t,DisplayInputs&) noexcept;
+    bool constructConstructorOnlyPrefixes() noexcept;
+    Result closeConstructorOnlyNative(bool abandon) noexcept;
+    bool nativeRaOwnedPreparationAttempted_=false;
     bool coldBound_=false,readsBound_=false,countdownInstalled_=false,goPublished_=false,closed_=false,abandoned_=false;
     Cut cut_=Cut::heldBeforeStart;
     float frameDelta_=0;
@@ -530,14 +573,23 @@ class Session final {
         bool started=false,released=false;
         std::uint32_t vtable08=0;
         const void* scene3C=nullptr;
+        // Actual retained loading operands, published only by the same
+        // Application/Race/Camera34 native preparation handoff. scene3C is
+        // its existing Session projection, not authority for another camera.
+        const OriginalFrontendCameraCold50LA* nativeScene3COwner=nullptr;
+        const OriginalRaceConstructor50LA* race88=nullptr;
+        bool nativeLoadOperandsPublished=false,nativeLoadOperandsRevoked=false;
+        bool nativeLoadPrefixEntered=false,nativeLoadPrefixComplete=false;
+        std::uint32_t nativeLoadPrefixPC=0x174df0;
         const void* racer40=nullptr;
         std::array<const void*,4> queries48{}; //48,4C,50,54.
         std::uint32_t word58=0; //Constructor zero; no pointer/ownership meaning inferred.
         const void* script5C=nullptr;
         std::array<const void*,8> children64{}; //64..80, including intro emitter80.
         std::uint32_t mode84=0; //174DF0 later receives the actual race8C integer.
-        // Constructor-unwritten88 is deliberately absent. Native safe backing
-        // is not source knowledge: only these masks become established.
+        // Constructor does NOT establish88; only the published actual loading
+        // operands above may establish its native borrow. Unknown masks below
+        // are never filled from safe native backing.
         std::uint32_t word60Value=0,word60Known=0;
         std::uint16_t halfA8Value=0,halfA8Known=0;
     } coldController_;
@@ -610,6 +662,11 @@ class Session final {
     }
     static bool same(float a,float b) noexcept{return std::memcmp(&a,&b,sizeof a)==0;}
     #include "original_camera_controller_cold_candidate.inl"
+    #include "original_camera_unused_children50la.inl"
+    #include "original_camera_follow_death_cold50la.inl"
+#include "original_camera_attached_cold50la.inl"
+    #include "original_camera_intro_source50la.inl"
+    #include "original_camera_racer_binding50la.inl"
     #include "original_camera_fog_publication50la.inl"
     rr::game::OriginalRacerDiffuseCamera50LA racerDiffuseCamera_;
     Result set(Status s,std::uint32_t pc=0) noexcept {result_.status=s;result_.sourcePC=pc;return result_;}
@@ -650,6 +707,20 @@ class Session final {
             binding.renderer442F70=&displayInputs_->rendererDispatch;
             binding.actualRenderer=&displayInputs_->renderer;
             binding.rendererDiagnostic=&displayInputs_->diagnostic;
+            if(constructorOnly_){
+                // This strong Session lease outlives every retained Racer. The
+                // actual constructor reads it at2107FC, AFTER earlier effects.
+                binding.sourceConstructorOnly=true;
+                binding.actualWorld2107FC=constructorWorld_.get();
+                if(!constructorWorld_||!constructorWorld_->readIncoming210770(generation_,
+                    binding.actualObjectCount423F60,binding.actualIncomingVisibility4C0,
+                    binding.actualIncomingCollision4C4)){
+                    result_.entityCold.status=OriginalRacerEntityColdStatus50LA::binding;
+                    result_.entityCold.sourcePC=0x210770u;return false;
+                }
+                binding.actualLoadPod60=&actual_.racer60[i];
+                binding.actualAnchorOrigin434630=&application.detectorFrame434630_;
+            }
             result_.entityCold=owner.constructBeforeParticleParent210A18(binding);
             if(!result_.entityCold.okay())return false;
         }
@@ -737,8 +808,207 @@ class Session final {
                     // bounded Entity projection. finish1538B0 now reaches each
                     // actual213380 material pass; the following nullcg/physics/
                     // effect sequence is still not declared completed.
-                    if(!model->finishedFor(entity))
+                    if(!model->finishedFor(entity)&&
+                       !(constructorOnly_&&model->sourceModelPrefixFor(entity)))
                         model->finish1538B0(entity,*actual_.actualMaterialDirectory36B970);
+                    if(constructorOnly_&&role==chariot){
+                        if(!model->sourceModelPrefixFor(entity)){
+                            result_.entityCold.status=OriginalRacerEntityColdStatus50LA::binding;
+                            result_.entityCold.sourcePC=model->failurePC()?model->failurePC():0x21204cu;
+                            return false;
+                        }
+                        if(!nativeWreckOwner_||model->sourceTerrainWithdrawn_){
+                            result_.entityCold.status=OriginalRacerEntityColdStatus50LA::binding;
+                            result_.entityCold.sourcePC=0x21204cu;return false;
+                        }
+                        if(!model->sourceTerrainComplete_)model->finishSourceTerrain21204C(*nativeWreckOwner_);
+                        if(model->sourceEngineQueryWithdrawn_){
+                            result_.entityCold.status=OriginalRacerEntityColdStatus50LA::binding;
+                            result_.entityCold.sourcePC=0x2120b4u;return false;
+                        }
+                        if(!model->sourceEngineQueryComplete_)model->finishSourceEngineQuery2120B4(*nativeWreckOwner_);
+                        if(model->sourceQuery694Withdrawn_||model->sourceContact354Withdrawn_){
+                            result_.entityCold.status=OriginalRacerEntityColdStatus50LA::binding;
+                            result_.entityCold.sourcePC=model->failurePC()?model->failurePC():0x2121d0u;return false;
+                        }
+                        if(!model->sourceQuery694Complete_)model->finishSourceQuery6942121D0(*nativeWreckOwner_);
+                        if(!model->sourceContact354Complete_)model->finishSourceContact354212278(*nativeWreckOwner_);
+                        if(model->sourceDetector358Withdrawn_){
+                            result_.entityCold.status=OriginalRacerEntityColdStatus50LA::binding;
+                            result_.entityCold.sourcePC=model->failurePC()?model->failurePC():0x212348u;return false;
+                        }
+                        if(!model->sourceDetector358Complete_)model->finishSourceDetector358212348(*nativeWreckOwner_);
+                        if(model->sourceAuxiliaryWithdrawn_){
+                            result_.entityCold.status=OriginalRacerEntityColdStatus50LA::binding;
+                            result_.entityCold.sourcePC=model->failurePC()?model->failurePC():0x2123c8u;return false;
+                        }
+                        if(!model->sourceAuxiliaryComplete_)model->finishSourceAuxiliary2123C8(*nativeWreckOwner_);
+                        if(model->sourceSecondaryWithdrawn_){
+                            result_.entityCold.status=OriginalRacerEntityColdStatus50LA::binding;
+                            result_.entityCold.sourcePC=model->failurePC()?model->failurePC():0x2124dcu;return false;
+                        }
+                        if(!model->sourceSecondaryComplete_)model->finishSourceSecondary2124DC();
+                        if(model->sourceSecondarySetupWithdrawn_){
+                            result_.entityCold.status=OriginalRacerEntityColdStatus50LA::binding;
+                            result_.entityCold.sourcePC=model->failurePC()?model->failurePC():0x2125c4u;return false;
+                        }
+                        if(!model->sourceSecondarySetupComplete_)model->finishSourceSecondarySetup2125C4();
+                        if(model->sourceSecondaryContactsWithdrawn_){
+                            result_.entityCold.status=OriginalRacerEntityColdStatus50LA::binding;
+                            result_.entityCold.sourcePC=model->failurePC()?model->failurePC():0x212720u;return false;
+                        }
+                        if(!model->sourceSecondaryContactsComplete_)model->finishSourceSecondaryContacts212720(*nativeWreckOwner_);
+                        if(!model->sourceWreckConfigComplete_)model->finishSourceWreckConfig2129A4(*nativeWreckOwner_);
+                        if(!model->sourceWreckPieceComplete_)model->finishSourceWreckPiece212A50(*nativeWreckOwner_);
+                        if(!model->sourceWreckBodyComplete_)model->finishSourceWreckBody165E90(*nativeWreckOwner_);
+                        if(!model->sourceWreckE0Complete_)model->finishSourceWreckE0166018(*nativeWreckOwner_);
+                        if(!model->sourceWreckE0LoadComplete_)model->finishSourceWreckE0Shape166074(*nativeWreckOwner_);
+                        if(!model->sourceWreckE0PrepareComplete_)model->finishSourceWreckE0Prepare16607C(*nativeWreckOwner_);
+                        if(!model->sourceWreckDCComplete_)model->finishSourceWreckDC1660A0(*nativeWreckOwner_);
+                        if(!model->sourceWreckD8Complete_)model->finishSourceWreckD816616C(*nativeWreckOwner_);
+                        if(!model->sourceWreckE4Complete_)model->finishSourceWreckE41661D8(*nativeWreckOwner_);
+                        if(!model->sourceWreckE4PrepareComplete_)model->finishSourceWreckE4Prepare16629C(*nativeWreckOwner_);
+                        if(!model->sourceWreckE8Complete_)model->finishSourceWreckE81662E4(*nativeWreckOwner_);
+                        if(!model->sourceWreckMutualComplete_)model->finishSourceWreckMutual166390(*nativeWreckOwner_);
+                        if(!model->sourceWreckArraysComplete_)model->finishSourceWreckArrays2CB628(*nativeWreckOwner_);
+                        if(model->sourceConstructorPC_==0x2cb6ccu&&!model->sourceWreckSmokeComplete_)
+                            model->finishSourceWreckSmoke2CB6CC(*nativeWreckOwner_);
+                        if(model->sourceWreckSmokeComplete_&&model->sourceConstructorPC_==0x19a7d0u&&!model->sourceWreckSmokeReadComplete_)
+                            model->finishSourceWreckSmokeRead19A7D0(*nativeWreckOwner_);
+                        if(model->sourceConstructorPC_==0x2cb720u&&!model->sourceWreckFireComplete_)
+                            model->finishSourceWreckFire2CB720(*nativeWreckOwner_);
+                        if(model->sourceConstructorPC_==0x15e024u&&!model->sourceWreckFireReadComplete_)
+                            model->finishSourceWreckFireRead15E024(*nativeWreckOwner_);
+                        if(model->sourceConstructorPC_==0x2cb778u&&!model->sourceWreckFirstPairComplete_)
+                            model->finishSourceWreckFirstPair2CB778(*nativeWreckOwner_);
+                        if(model->sourceConstructorPC_==0x2cb6ccu&&model->sourceWreckFirstPairComplete_&&
+                           !model->sourceWreckRemainingPairsComplete_)
+                            model->finishSourceWreckRemainingPairs2CB6CC(*nativeWreckOwner_);
+                        if((model->sourceConstructorPC_==0x2cb7e0u||model->sourceConstructorPC_==0x2cb7e4u)&&
+                           !model->sourceWreckDustComplete_)
+                            model->finishSourceWreckDust2CB7E0(*nativeWreckOwner_);
+                        if(model->sourceWreckDustComplete_&&model->sourceConstructorPC_==0x19a7d0u&&
+                           !model->sourceWreckDustReadComplete_)
+                            model->finishSourceWreckDustRead19A7D0(*nativeWreckOwner_);
+                        if(model->sourceConstructorPC_==0x2cb854u&&!model->sourceWreckSplashComplete_)
+                            model->finishSourceWreckSplash2CB854(*nativeWreckOwner_);
+                        if(model->sourceWreckSplashComplete_&&model->sourceConstructorPC_==0x19ddc8u&&
+                           !model->sourceWreckSplashReadComplete_)
+                            model->finishSourceWreckSplashRead19DDC8(*nativeWreckOwner_);
+                        if(model->sourceConstructorPC_==0x2cb8c4u&&!model->sourceWreckPieceAppendComplete_)
+                            model->finishSourceWreckPieceAppend22C1B8(*nativeWreckOwner_);
+                        if(model->sourceConstructorPC_==0x22c21cu&&!model->sourceWreckWaterComplete_)
+                            model->finishSourceWreckWater22C21C(*nativeWreckOwner_);
+                        if(model->sourceConstructorPC_==0x22c25cu&&!model->sourceWreckPieceCursorComplete_)
+                            model->finishSourceWreckPieceCursor22C25C(*nativeWreckOwner_);
+                        if(model->sourceConstructorPC_==0x22c0a0u&&model->sourceWreckPieceCursorComplete_&&
+                           !model->sourceWreckSecondPieceComplete_)
+                            model->finishSourceWreckSecondPiece22C0A0(*nativeWreckOwner_);
+                        if(model->sourceConstructorPC_==0x165e90u&&model->sourceWreckSecondPieceComplete_&&
+                           !model->sourceWreckSecondBodyComplete_)
+                            model->finishSourceWreckSecondBody165E90(*nativeWreckOwner_);
+                        if(model->sourceConstructorPC_==0x166018u&&model->sourceWreckSecondBodyComplete_&&
+                           !model->sourceWreckSecondE0Complete_)
+                            model->finishSourceWreckSecondE0166018(*nativeWreckOwner_);
+                        if(model->sourceConstructorPC_==0x166074u&&model->sourceWreckSecondE0Complete_&&
+                           !model->sourceWreckSecondE0LoadComplete_)
+                            model->finishSourceWreckSecondE0Shape166074(*nativeWreckOwner_);
+                        if(model->sourceConstructorPC_==0x16607cu&&model->sourceWreckSecondE0LoadComplete_&&
+                           !model->sourceWreckSecondE0PrepareComplete_)
+                            model->finishSourceWreckSecondE0Prepare16607C(*nativeWreckOwner_);
+                        if(model->sourceConstructorPC_==0x1660a0u&&model->sourceWreckSecondE0PrepareComplete_&&
+                           !model->sourceWreckSecondDCComplete_)
+                            model->finishSourceWreckSecondDC1660A0(*nativeWreckOwner_);
+                        if(model->sourceConstructorPC_==0x16616cu&&model->sourceWreckSecondDCComplete_&&
+                           !model->sourceWreckSecondD8Complete_)
+                            model->finishSourceWreckSecondD816616C(*nativeWreckOwner_);
+                        if(model->sourceConstructorPC_==0x1661d8u&&model->sourceWreckSecondD8Complete_&&
+                           !model->sourceWreckSecondE4Complete_)
+                            model->finishSourceWreckSecondE41661D8(*nativeWreckOwner_);
+                        if(model->sourceConstructorPC_==0x16629cu&&model->sourceWreckSecondE4Complete_&&
+                           !model->sourceWreckSecondE4PrepareComplete_)
+                            model->finishSourceWreckSecondE4Prepare16629C(*nativeWreckOwner_);
+                        if(model->sourceConstructorPC_==0x1662e4u&&model->sourceWreckSecondE4PrepareComplete_&&
+                           !model->sourceWreckSecondE8Complete_)
+                            model->finishSourceWreckSecondE81662E4(*nativeWreckOwner_);
+                        if(model->sourceConstructorPC_==0x166390u&&model->sourceWreckSecondE8Complete_&&
+                           !model->sourceWreckSecondMutualComplete_)
+                            model->finishSourceWreckSecondMutual166390(*nativeWreckOwner_);
+                        if(model->sourceConstructorPC_==0x2cb618u&&model->sourceWreckSecondMutualComplete_&&
+                           !model->sourceWreckSecondEffectInputsComplete_)
+                            model->bindSourceWreckSecondEffectInputs2CB618(*nativeWreckOwner_);
+                        if(model->sourceConstructorPC_==0x2cb628u&&model->sourceWreckSecondEffectInputsComplete_&&
+                           !model->sourceWreckSecondArraysComplete_)
+                            model->finishSourceWreckSecondArrays2CB628(*nativeWreckOwner_);
+                        if((model->sourceConstructorPC_==0x2cb6ccu||model->sourceConstructorPC_==0x2cb7e4u)&&
+                           model->sourceWreckSecondArraysComplete_&&!model->sourceWreckSecondInitialChildComplete_)
+                            model->constructSourceWreckSecondInitialChild(*nativeWreckOwner_);
+                        if(model->sourceConstructorPC_==0x19a7d0u&&model->sourceWreckSecondInitialChildComplete_&&
+                           !model->sourceWreckSecondInitialReaderComplete_)
+                            model->readSourceWreckSecondInitialChild19A7D0(*nativeWreckOwner_);
+                        if(model->sourceConstructorPC_==0x19a7f8u&&model->sourceWreckSecondInitialReaderComplete_&&
+                           !model->sourceWreckSecondInitialCallerComplete_)
+                            model->completeSourceWreckSecondInitialChild19A7F8(*nativeWreckOwner_);
+                        if((model->sourceConstructorPC_==0x2cb720u||model->sourceConstructorPC_==0x2cb854u)&&
+                           model->sourceWreckSecondInitialCallerComplete_&&!model->sourceWreckSecondSuccessorComplete_)
+                            model->constructSourceWreckSecondSuccessorChild(*nativeWreckOwner_);
+                        if((model->sourceConstructorPC_==0x15e024u||model->sourceConstructorPC_==0x19ddc8u)&&
+                           model->sourceWreckSecondSuccessorComplete_&&!model->sourceWreckSecondSuccessorReaderComplete_)
+                            model->readSourceWreckSecondSuccessorChild(*nativeWreckOwner_);
+                        if((model->sourceConstructorPC_==0x15e0b0u||model->sourceConstructorPC_==0x19de7cu)&&
+                           model->sourceWreckSecondSuccessorReaderComplete_&&!model->sourceWreckSecondSuccessorCallerComplete_)
+                            model->completeSourceWreckSecondSuccessorChild(*nativeWreckOwner_);
+                        if(model->sourceConstructorPC_==0x2cb778u&&model->sourceWreckSecondSuccessorCallerComplete_&&
+                           !model->sourceWreckSecondFirstPairComplete_)
+                            model->finishSourceWreckSecondFirstPair2CB778(*nativeWreckOwner_);
+                        if(model->sourceConstructorPC_==0x2cb6ccu&&model->sourceWreckSecondFirstPairComplete_&&
+                           !model->sourceWreckSecondRemainingPairsComplete_)
+                            model->finishSourceWreckSecondRemainingPairs2CB6CC(*nativeWreckOwner_);
+                        if(model->sourceConstructorPC_==0x2cb7e0u&&model->sourceWreckSecondFirstPairComplete_&&
+                           !model->sourceWreckSecondPositiveDustComplete_)
+                            model->constructSourceWreckSecondPositiveDust(*nativeWreckOwner_);
+                        if(model->sourceConstructorPC_==0x19a7d0u&&model->sourceWreckSecondPositiveDustComplete_&&
+                           !model->sourceWreckSecondPositiveDustReaderComplete_)
+                            model->finishSourceWreckSecondPositiveDustRead19A7D0(*nativeWreckOwner_);
+                        if(model->sourceConstructorPC_==0x2cb854u&&model->sourceWreckSecondPositiveDustReaderComplete_&&
+                           !model->sourceWreckSecondPositiveSplashComplete_)
+                            model->constructSourceWreckSecondPositiveSplash(*nativeWreckOwner_);
+                        if(model->sourceConstructorPC_==0x19ddc8u&&model->sourceWreckSecondPositiveSplashComplete_&&
+                           !model->sourceWreckSecondPositiveSplashReaderComplete_)
+                            model->finishSourceWreckSecondPositiveSplashRead19DDC8(*nativeWreckOwner_);
+                        if(model->sourceConstructorPC_==0x2cb8c4u&&model->sourceWreckPieceCursorComplete_&&
+                           (model->sourceWreckSecondPositiveSplashReaderComplete_||model->sourceWreckSecondSuccessorCallerComplete_)&&
+                           !model->sourceWreckSecondPieceAppendComplete_)
+                            model->finishSourceWreckSecondPieceAppend22C1B8(*nativeWreckOwner_);
+                        if(model->sourceConstructorPC_==0x22c21cu&&model->sourceWreckSecondPieceAppendComplete_&&
+                           !model->sourceWreckSecondWaterComplete_)
+                            model->finishSourceWreckSecondWater22C21C(*nativeWreckOwner_);
+                        if(model->sourceConstructorPC_==0x22c25cu&&model->sourceWreckSecondWaterComplete_&&
+                           !model->sourceWreckSecondPieceCursorComplete_)
+                            model->finishSourceWreckSecondPieceCursor22C25C(*nativeWreckOwner_);
+                        if(model->sourceConstructorPC_==0x22c278u&&model->sourceWreckPieceCursorComplete_&&
+                           !model->sourceWreckGroupConstructorComplete_)
+                            model->constructSourceWreckGroup22C278(*nativeWreckOwner_);
+                        if(model->sourceConstructorPC_==0x22c298u&&model->sourceWreckGroupConstructorComplete_&&
+                           !model->sourceWreckGroupPrimaryComplete_)
+                            model->bindSourceWreckGroupPrimary22C298(*nativeWreckOwner_);
+                        if(model->sourceConstructorPC_==0x2cc088u&&model->sourceWreckGroupPrimaryComplete_&&
+                           !model->sourceWreckGroupContextComplete_)
+                            model->consumeSourceWreckGroupContext2CC088(*nativeWreckOwner_);
+                        if(model->sourceConstructorPC_==0x2cc0b4u&&model->sourceWreckGroupContextComplete_&&
+                           !model->sourceWreckGroupSparksComplete_)
+                            model->constructSourceWreckGroupSparks2CC0B4(*nativeWreckOwner_);
+                        if(model->sourceConstructorPC_==0x2cc0d4u&&model->sourceWreckGroupSparksComplete_&&
+                           !model->sourceWreckGroupSparksSetupComplete_)
+                            model->setupSourceWreckGroupSparks2CC0D4(*nativeWreckOwner_);
+                        if(model->sourceConstructorPC_==0x15f2f0u&&model->sourceWreckGroupSparksSetupComplete_&&
+                           !model->sourceWreckGroupSparksConfigComplete_)
+                            model->beginSourceWreckGroupSparksConfig15F2F0(*nativeWreckOwner_);
+                        //KnownNULL remains2CC124; nonnull stackConfig ctor stops15AE2C beforeload.
+                        //No FileManager open/read, emitter reader, Stop/append or readiness grant.
+                        result_.animationCold={OriginalRacerAnimationColdStatus50LA::complete,model->sourceConstructorPC_};
+                        continue;
+                    }
                     result_.animationCold={OriginalRacerAnimationColdStatus50LA::complete,
                         role==right?0x210cbcu:role==left?0x210f80u:
                         role==bottomRight?0x211284u:role==bottomLeft?0x211580u:0x2119b0u};
@@ -752,6 +1022,26 @@ class Session final {
         return true;
     }
     bool releaseRacerEntityPrefixes()noexcept {
+        if(!onOwnerThread())return false;
+
+        //No public intro work may survive a failed dependent-owner cleanup.
+        if(actual_.taIntroAudio&&actual_.taIntroAudio->taIntroNativeReserved_)
+            actual_.taIntroAudio->taIntroNativeWithdrawn_=true;
+        if(!retireNativeRetainedWreckCold()){
+            result_.entityCleanup={OriginalRacerEntityColdCleanupStatus50LA::topology,0x22ce10u};
+            return false;
+        }
+        if(!revokeNativeRacerCameraBindings()){
+            result_.entityCleanup={OriginalRacerEntityColdCleanupStatus50LA::topology,nativeRacerCamera1750A0_.pc};
+            return false;
+        }
+        // The TV20 source association is a borrow of an actual retained340.
+        // Withdraw it BEFORE the first chariot/model can retire that body,
+        // including failure/abandonment and a later repeated cleanup.
+        if(!revokeNativeRaTvBody20()){
+            result_.entityCleanup={OriginalRacerEntityColdCleanupStatus50LA::topology,0x2d209cu};
+            return false;
+        }
         // Native storage lifetime releases only the represented cold prefixes.
         // No manager/race/root Entity list has been invented for these racers.
         for(std::size_t i=actual_.bank.count();i>0;--i){
@@ -828,6 +1118,7 @@ class Session final {
         return true;
     }
     bool stableFrame(StableRaceCameraFrame& frame) const {
+        if(!nativeRacerCameraBindingsCurrent())return false;
         if(!identitiesCurrent()||((actual_.all8Manager.flags58&1u)&&!actual_.humanCount34))return false;
         const auto state=actual_.bank.read(0,reads_.state40),retirement=actual_.bank.read(0,reads_.retirementCD4);
         if(state>static_cast<std::uint32_t>(std::numeric_limits<std::int32_t>::max())||
@@ -840,6 +1131,7 @@ class Session final {
         return true;
     }
     OriginalAttachedFrame attachedFrame() const {
+        if(!nativeRacerCameraBindingsCurrent())return {}; //Invalid identity, never fallback.
         return {generation_,key(identity_[0].racerTag),key(identity_[0].mainBodyTag),key(identity_[0].modelTag),
             actual_.bank.read(0,reads_.a4),actual_.bank.read(0,reads_.velocityY),frameDelta_};
     }
@@ -982,7 +1274,7 @@ public:
         const UndertrackPlacement50ET& placed,std::uint64_t serial,bool input) noexcept {
         invalidateFogPreparation();
         using Stage=HumanResetCamera::Stage;
-        if(!coldBound_||closed_||abandoned_||pendingDisplayWork()||!serial||
+        if(!actual_.followQueries.get()||!coldBound_||closed_||abandoned_||pendingDisplayWork()||!serial||
            actual_.humanCount34!=1u||actual_.arena.fields.vehicle58!=0u||
            actual_.arena.phase!=(input?Phase::Ready:Phase::PostPackedBytes50S)||
            (frameStage_!=FrameStage::idle&&frameStage_!=FrameStage::published)||
@@ -1008,7 +1300,7 @@ public:
         if(!world||!workspace||!cursor.visibilityZone||cursor.visibilityZone>lease.zoneCount()||
            !cursor.collisionZone||cursor.collisionZone>actual_.collisionWorld.zoneCount)
             return set(Status::owner,0x1788a8u);
-        const auto& zero=actual_.followQueries.sharedZero433DB0();
+        const auto& zero=actual_.followQueries.get()->sharedZero433DB0();
         for(;;)switch(cursor.stage){
         case Stage::motion:
         case Stage::finalMotion:
@@ -1037,12 +1329,12 @@ public:
                 return set(Status::owner,0x1788a8u);
             cursor.stage=Stage::queries;break;
         case Stage::queries:{
-            if(!actual_.followQueries.sync())return set(Status::owner,0x179a80u);
+            if(!actual_.followQueries.get()->sync())return set(Status::owner,0x179a80u);
             OriginalCameraPairResult result;
-            const auto status=resetOriginalCameraQueryPair179A80(actual_.followQueries.pairOwner(),
+            const auto status=resetOriginalCameraQueryPair179A80(actual_.followQueries.get()->pairOwner(),
                 cursor.collisionZone,cursor.anchor,follow_.queryRadius178,cursor.queries,result);
             // Publish actual successful registry prefixes even after rejection.
-            const bool committed=actual_.followQueries.commit();
+            const bool committed=actual_.followQueries.get()->commit();
             if(!committed)return set(Status::owner,0x179a80u);
             if(status!=OriginalCameraPairStatus::Complete)return set(Status::sourcePath,result.sourcePC);
             cursor.stage=Stage::finalMotion;break;}
@@ -1102,7 +1394,7 @@ public:
         }
     };
     bool bindGameplayFogRenderPhase(GameplayFogRenderPhase& phase)noexcept {
-        if(phase.bound()||!coldBound_||closed_||abandoned_||!generation_||!displayInputs_||
+        if(phase.bound()||!actual_.followQueries.get()||!coldBound_||closed_||abandoned_||!generation_||!displayInputs_||
            !displayInputs_->trackFog3EC||display_.actualTrackFog3EC!=displayInputs_->trackFog3EC)return false;
         phase.owner_=this;phase.fog_=displayInputs_->trackFog3EC;phase.generation_=generation_;return true;
     }
@@ -1112,7 +1404,7 @@ public:
     // not dispatch a child, tick visibility, sample RNG or publish a new pose.
     Result prepareGameplayFogRender() noexcept {
         invalidateFogPreparation();
-        if(!coldBound_||closed_||abandoned_||!hasView()||!displayInputs_||
+        if(!actual_.followQueries.get()||!coldBound_||closed_||abandoned_||!hasView()||!displayInputs_||
            !displayInputs_->trackFog3EC||frameStage_!=FrameStage::published)
             return set(Status::phase,0x13ea30);
         if(fogPreparationRevision_==std::numeric_limits<std::uint64_t>::max())
@@ -1135,6 +1427,11 @@ public:
     const TVCameraUpdateOutput49F& pose()const noexcept{return pose_;}
     bool nativeHudVisible()const noexcept{return !(uiFlags1E4_&1u);}
     bool hasView()const noexcept{return publicationCount_!=0;}
+    // Explicit shared-mixer consumed-step listener adaptation, not the omitted
+    // retail music-update prefix/suffix. Never a render or End callback.
+    bool advanceNativeMusicListenerConsumedStep(std::uint64_t beforeMix,
+        bool heldSourceScene,std::uint32_t& sourcePC)const noexcept;
+
     // Concrete native presentation join for the consumed human RA route only.
     // Rejects unissued/foreign Sessions; no fallback success or source callback
     // acknowledgment. Frame must outlive output and its synchronous submit.
@@ -1144,7 +1441,7 @@ public:
     // Exact camera scene38 parent, projected to the original zero-based zone48.
     // This is never a racer collision zone, AI map node or visible-zone guess.
     bool readCameraPrimaryZone48(std::uint32_t& out) noexcept {
-        if(!coldBound_||closed_||abandoned_||!hasView()||!spatial_.registration34.attached||
+        if(!actual_.followQueries.get()||!coldBound_||closed_||abandoned_||!hasView()||!spatial_.registration34.attached||
            !spatial_.parent38||spatial_.parent38>visibilityKeys_.count)return false;
         lighting::CameraVisibilityLease lease;lighting::Diagnostic diagnostic;
         if(!actual_.visibility.beginCameraVisibility(0,lease,diagnostic)||
@@ -1181,7 +1478,7 @@ public:
     //from speed/contact or elapsed camera time. Same original camera0 owner.
     bool applyAuthoredShakeEnter(bool entering,const OriginalCameraShakeAction& action) noexcept {
         invalidateFogPreparation();
-        if(!coldBound_||(frameStage_!=FrameStage::idle&&frameStage_!=FrameStage::published&&
+        if(!actual_.followQueries.get()||!coldBound_||(frameStage_!=FrameStage::idle&&frameStage_!=FrameStage::published&&
             frameStage_!=FrameStage::cameraReady))return false;
         return applyOriginalCameraShakeEnter(entering,action,&controller_,1);
     }
@@ -1192,6 +1489,7 @@ public:
     //generation is the native race lifetime key; it does not assert a guest ID.
     Result prepare(std::uint64_t generation,const AuthoredInputs& authored,DisplayInputs& app){
         if(f8Intro_.ownerThread_!=std::this_thread::get_id())return {Status::owner,0x1a93b0};
+        if(!actual_.followQueries.get()||constructorOnly_||nativeRaOwnedPreparationAttempted_)return set(Status::terminal,0x1a6d98);
         invalidateFogPreparation();
         // The consumed TA/RA constructor has one retained, generation-bound
         // real74 collection. Other unpublished constructor experiments do not
@@ -1233,6 +1531,10 @@ public:
         // No physics/collection or outer manager attachment is inferred.
         if(!bindCountedRaceCameraNative34())return set(Status::owner,0x1a93b0);
         if(!constructRacerEntityPrefixes())return fail(Status::sourcePath,result_.entityCold.sourcePC);
+        // Native cold query backing follows the genuine racer identities and
+        // prior QueryBridge admission, but precedes any Follow prepare.
+        if(!stageNativeRetainedWreckCold())return fail(Status::owner,0x2129c0u);
+
         if(!constructRacerModelPrefixes())return fail(Status::sourcePath,result_.entityCold.sourcePC);
         for(;;){
             switch(coldPhase_){
@@ -1273,21 +1575,43 @@ public:
                 {
                     std::uint32_t worldPC=0;
                     if(!completeCountedRaceWorldNativePrefix1A9EE0(worldPC))return set(Status::owner,worldPC);
-                    //Bounded native scene/TOB prefix only; never1A9EE0/full-load or
-                    //permission for the original1A6D88/1A95B0 successor.
+                    // A prepared RA loader may open native OWNED preparation
+                    // below, never the original30 branch or1A95B0 return.
+                    // Its mandatory final barrier precedes coldBound below.
                 }
                 ++coldPhase_;break;
             case 2:{
+                if(!nativeRaOwnedPreparationAttempted_&&!publishNeverAdoptedNativeIntro())
+                    return fail(Status::owner,0x177750);
+                //Only never-adopted native preparation may use legacy staging.
+                //After source adoption starts, no fallback can publish aliases.
+                if(!nativeRaOwnedPreparationAttempted_&&nativeCinematographer70_&&
+                   !nativeCinematographer70Retired_&&!nativeCinematographer70Published_){
+                    if(coldController_.children64[3]||coldController_.children64[4])
+                        return fail(Status::owner,0x174f84);
+                    coldController_.children64[3]=nativeCinematographer70_.get();
+                    nativeCinematographer70Published_=true;
+                    coldController_.children64[4]=taCuts_.get();
+                }
                 if(authoredPhase_==0){
                     if(!startActions_.prepare(authored.course,authored.tob,authored.tobBytes))return set(Status::authoring,0x1ad330);
                     authoredPhase_=1;
                 }else if(startActions_.course()!=authored.course)return set(Status::authoring,0x1ad330);
-                if(!startPrelude_.prepared()&&!startPrelude_.prepare174DF0(startActions_,
+                if(nativeRaOwnedPreparationAttempted_){
+                    //The real World3E4 producer already wrote the SAME counted
+                    //controllerA8. Authoring remains corroboration, not authority.
+                    if(!coldController_.nativeLoadPrefixComplete||
+                       coldController_.nativeLoadOperandsRevoked||!startPrelude_.prepared()||
+                       !startPrelude_.currentControllerA8(coldController_.halfA8Value,coldController_.halfA8Known)||
+                       startActions_.sourceSceneCutCount3E4()!=startPrelude_.sourceSceneCutCount3E4())
+                        return set(Status::owner,coldController_.nativeLoadPrefixPC);
+                }else if(!startPrelude_.prepared()&&!startPrelude_.prepare174DF0(startActions_,
                     actual_.launchKind11258,actual_.configuration34,actual_.application350))
                     return set(Status::authoring,0x174e48);
                 // A source-positive count reaches the real74 cut collection.
                 // Never substitute the procedural7C path for those children.
                 if(startPrelude_.controllerCutCountA8()!=0){
+                    if(!nativeCamera74ConsumersCurrent())return fail(Status::owner,nativeAttached6C_.pc);
                     if(!taCuts_||startPrelude_.controllerCutCountA8()!=taCuts_->cutCount()||!coldController_.started||
                        !nativeTaIssuance_||nativeTaIssuance_->course!=authored.course||
                        taCuts_->trackId()!=introTrackId(authored.course)||
@@ -1304,6 +1628,11 @@ public:
                         const auto loaded=taCuts_->load175510();
                         if(!loaded.okay())return fail(Status::authoring,loaded.sourcePC);
                     }
+                    // Existing native staging already owns controller/audio.
+                    // Complete its uncounted RA78 only after actual74 load;
+                    // no live registry, selector or phase5 activation follows.
+                    if(!constructNativeRaTv78())return fail(Status::owner,taFailurePC_);
+                    if(!constructNativeRaStart7C())return fail(Status::owner,taFailurePC_);
                 }
                 const auto pod=identity_[0].pod60;
                 if(pod>static_cast<std::uint32_t>(std::numeric_limits<std::int32_t>::max()))return set(Status::owner);
@@ -1320,15 +1649,21 @@ public:
                 }
                 ++coldPhase_;break;}
             case 3:{
+                //A source-adopted64 must eventually use a split179580 loader,
+                //not the old standalone composite which repeats its ctor.
+                if(nativeCamera6468_.attempted)return fail(Status::sourcePath,
+                    nativeAttached6C_.attempted?nativeAttached6C_.pc:0x174f50);
                 const auto& i=identity_[0];
                 const OriginalFollowIdentity f{generation_,key(i.racerTag),key(i.mainBodyTag),key(i.containerTag),
                     static_cast<std::int32_t>(i.pod60)};
                 result_.follow=prepareOriginalFollowCamera(follow_,f,presetBank_);
                 if(result_.follow.status!=OriginalFollowStatus::ok)return set(Status::numeric,result_.follow.sourcePC);
-                if(!actual_.bank.visit(0,[&](){return actual_.followQueries.prepare(follow_.queryRadius178);}))
+                if(!actual_.bank.visit(0,[&](){return actual_.followQueries.get()->prepare(follow_.queryRadius178);}))
                     return fail(Status::owner,0x179a80);
                 ++coldPhase_;break;}
             case 4:{
+                if(nativeCamera6468_.attempted)return fail(Status::sourcePath,
+                    nativeAttached6C_.attempted?nativeAttached6C_.pc:0x174f50);
                 const auto& i=identity_[0];
                 const OriginalAttachedBinding b{generation_,key(i.racerTag),key(i.mainBodyTag),key(i.modelTag),
                     actual_.bank.read(0,reads_.body288),actual_.bank.read(0,reads_.model1B4),static_cast<std::int32_t>(i.pod60)};
@@ -1338,9 +1673,17 @@ public:
                     key(death_),actual_.bank.read(0,reads_.body288)};
                 result_.death=prepareOriginalDeathCamera50KG(death_,deathIdentity,deathGlobals_);
                 if(result_.death.status!=OriginalDeathCameraStatus50KG::complete)return set(Status::numeric,result_.death.sourcePC);
-                if(!actual_.followQueries.bindDeathChild(key(death_)))return set(Status::owner,0x1752d0u);
+                if(!actual_.followQueries.get()->bindDeathChild(key(death_)))return set(Status::owner,0x1752d0u);
+                if(nativeRaOwnedPreparationAttempted_&&!bindNativeRaTvBody1752A0())
+                    return fail(Status::owner,taFailurePC_);
                 ++coldPhase_;break;}
             case 5:{
+                // First-cut selection below reparents visibility, activates
+                // the child and dispatches speech/music. The bounded native
+                // loader preparation must stop BEFORE any of those effects,
+                // not merely before eventual coldBound/gameplay publication.
+                if(nativeRaOwnedPreparationAttempted_)
+                    return fail(Status::sourcePath,0x1a6d98);
                 if(taPositive_&&!taFirstSelected_){
                     if(!bindTaRegistryBefore7C())return fail(Status::owner,0x1752d0);
                     result_.visibilityJoin=attachFreshSelectedOriginalCamera0Visibility50SC(actual_.visibility,generation_,key(scene_),
@@ -1371,7 +1714,7 @@ public:
                     actual_.humanCount34?CameraBootstrap::original_single_player:CameraBootstrap::native_all_ai};
                 if(!controller_.bound&&!bindFreshOriginalRaceCamera(controller_,b))return set(Status::owner);
                 //Explicit reduced NATIVE registry: actual fully owned children
-                //in source relative order. Source unused70/78 are omitted;
+                //in source relative order. Cold-only70/78 are NOT registered;
                 //count/ordinals are not retail parity. No dummy success owners.
                 if(taPositive_){
                     //1753CC follows the real first1756D0. Append actual7C only now.
@@ -1403,7 +1746,10 @@ public:
                 }
                 pose_.position=sceneBinding_.position180;
                 ++coldPhase_;break;
-            default:coldBound_=true;return set(Status::complete,0x1752c0);
+            default:
+                if(nativeRaOwnedPreparationAttempted_)
+                    return fail(Status::sourcePath,0x1a6d98);
+                coldBound_=true;return set(Status::complete,0x1752c0);
             }
         }
     }
@@ -1413,7 +1759,7 @@ public:
     //A successful return is only this child, never the complete application.
     Result advanceSceneChild(std::uint64_t frame,Cut cut,float actualRootPreparedDelta){
         invalidateFogPreparation();
-        if(!coldBound_||!displayInputs_)return set(Status::owner);
+        if(!actual_.followQueries.get()||!coldBound_||!displayInputs_)return set(Status::owner);
         if(frameStage_==FrameStage::failed)return set(Status::terminal);
         if(frameStage_==FrameStage::idle||frameStage_==FrameStage::published){
             if(pendingDisplayWork())return set(Status::videoPending);
@@ -1463,7 +1809,7 @@ public:
         result_.cameraFrameMatches=false;result_.cameraCutMatches=false;result_.cameraCutAccepted=false;
         result_.cameraChildStage=static_cast<std::uint32_t>(frameStage_);
         invalidateFogPreparation();
-        if(!coldBound_||!displayInputs_)return set(Status::owner);
+        if(!actual_.followQueries.get()||!coldBound_||!displayInputs_)return set(Status::owner);
         if(frameStage_==FrameStage::failed)return set(Status::terminal);
         result_.cameraFrameMatches=frame==frameNumber_;result_.cameraCutMatches=cut==cut_;
         if(!result_.cameraFrameMatches||!result_.cameraCutMatches)return set(Status::order);
@@ -1539,7 +1885,7 @@ public:
                     const auto zones=visibilityKeys_.view();
                     result_.retirement=actual_.bank.visit(0,[&](){
                         OriginalRetirementCameraResult50KG failed;
-                        if(!actual_.followQueries.sync())return failed;
+                        if(!actual_.followQueries.get()->sync())return failed;
                         const SceneGraph49P graph{actual_.arena.nodes,actual_.arena.sceneNodeCount};
                         const auto& velocity=actual_.arena.bodies.main.components.root.body.velocity.v;
                         const OriginalDeathCameraSubject50KG subject{death_.identity,&graph,current.racerState40,
@@ -1550,13 +1896,13 @@ public:
                         OriginalFollowSceneTransitionInput transition;
                         if(!readOriginalFollowSceneTransitionInput(identity,key(scene_),graph,
                             actual_.bindings.animation.bodyScene288,actual_.collisionWorld,actual_.mainMembership690,zones,transition)){
-                            actual_.followQueries.commit();return failed;
+                            actual_.followQueries.get()->commit();return failed;
                         }
                         auto result=transitionOriginalDeath177AB0(controller_,death_,sceneBinding_,deathChild_,
-                            followChild_,attachedChild_,actual_.followQueries.deathOwner(),subject,
+                            followChild_,attachedChild_,actual_.followQueries.get()->deathOwner(),subject,
                             actual_.collisionWorld,actual_.mainMembership690,*world,spatial_,zones,*work,transition,
-                            &actual_.followQueries.deathColdOwner());
-                        if(!actual_.followQueries.commit())result.status=OriginalRetirementCameraStatus50KG::owner;
+                            &actual_.followQueries.get()->deathColdOwner());
+                        if(!actual_.followQueries.get()->commit())result.status=OriginalRetirementCameraStatus50KG::owner;
                         return result;
                     });
                     if(result_.retirement.status!=OriginalRetirementCameraStatus50KG::complete)
@@ -1579,7 +1925,7 @@ public:
                 auto zones=visibilityKeys_.view();
                 const auto r=actual_.bank.visit(0,[&](){
                     OriginalFollowRaceFrameResult failed;
-                    if(!actual_.followQueries.sync())return failed;
+                    if(!actual_.followQueries.get()->sync())return failed;
                     const auto& velocity=actual_.arena.bodies.main.components.root.body.velocity.v;
                     const OriginalFollowIdentity identity{generation_,key(identity_[0].racerTag),
                         key(identity_[0].mainBodyTag),key(identity_[0].containerTag),static_cast<std::int32_t>(identity_[0].pod60)};
@@ -1592,12 +1938,12 @@ public:
                     if(subjectResult.status!=OriginalFollowStatus::ok)return failed;
                     const OriginalFollowCollisionSources sources{&graph,actual_.bindings.lifecycle.main190,&actual_.poseHistory};
                     auto result=advanceOriginalStableFollowRaceFrame(controller_,follow_,attached_,followChild_,objectChildren_,
-                        current,subject,graph,sources,actual_.followQueries.pairOwner(),actual_.arena.noiseOwner(),
+                        current,subject,graph,sources,actual_.followQueries.get()->pairOwner(),actual_.arena.noiseOwner(),
                         actual_.blur,scene_,pose_,matrices_,tick_,*world,spatial_,zones,sceneBinding_,*work,
                         displayInputs_->rootFlags228,sceneFlags29_);
                     // Publish every completed world-query prefix to its actual
                     // banked filter/copy aliases, even when a later pose fails.
-                    if(!actual_.followQueries.commit())result.status=OriginalFollowRaceFrameStatus::owner;
+                    if(!actual_.followQueries.get()->commit())result.status=OriginalFollowRaceFrameStatus::owner;
                     return result;
                 });
                 result_.stableFollow=r;result_.stableFollowAttempted=true;
@@ -1640,7 +1986,7 @@ public:
             if((displayInputs_->rootFlags228&4u)||(sceneFlags29_&4u))return fail(Status::sourcePath,0x115cb0u);
             result_.death=actual_.bank.visit(0,[&](){
                 OriginalDeathCameraResult50KG failed;failed.status=OriginalDeathCameraStatus50KG::owner;
-                if(!actual_.followQueries.sync())return failed;
+                if(!actual_.followQueries.get()->sync())return failed;
                 const SceneGraph49P graph{actual_.arena.nodes,actual_.arena.sceneNodeCount};
                 const auto& velocity=actual_.arena.bodies.main.components.root.body.velocity.v;
                 const OriginalDeathCameraSubject50KG subject{death_.identity,&graph,
@@ -1648,8 +1994,8 @@ public:
                     actual_.arena.bodies.main.components.probe348.field118,
                     {velocity[0],velocity[1],velocity[2],1.f}};
                 auto result=advanceOriginalDeathCamera22DC90(death_,subject,*actual_.deathDebris,
-                    frameDelta_,deathGlobals_,actual_.followQueries.deathOwner(),pose_);
-                if(!actual_.followQueries.commit())result.status=OriginalDeathCameraStatus50KG::owner;
+                    frameDelta_,deathGlobals_,actual_.followQueries.get()->deathOwner(),pose_);
+                if(!actual_.followQueries.get()->commit())result.status=OriginalDeathCameraStatus50KG::owner;
                 return result;
             });
             if(result_.death.status!=OriginalDeathCameraStatus50KG::complete)return fail(Status::numeric,result_.death.sourcePC);
@@ -1665,7 +2011,7 @@ public:
             if(controller_.mode44==0){
                 result_.follow=actual_.bank.visit(0,[&](){
                     OriginalFollowResult result{OriginalFollowStatus::owner,0x17a870,0};
-                    if(!actual_.followQueries.sync())return result;
+                    if(!actual_.followQueries.get()->sync())return result;
                     const auto& velocity=actual_.arena.bodies.main.components.root.body.velocity.v;
                     const OriginalFollowIdentity identity{generation_,key(identity_[0].racerTag),
                         key(identity_[0].mainBodyTag),key(identity_[0].containerTag),static_cast<std::int32_t>(identity_[0].pod60)};
@@ -1678,9 +2024,9 @@ public:
                     const OriginalFollowCollisionSources sources{&graph,actual_.bindings.lifecycle.main190,&actual_.poseHistory};
                     OriginalFollowCollisionResult collision;
                     result=advanceOriginalFollowCameraView(follow_,subject,frameDelta_,raceFlags1B0_,sources,
-                        actual_.followQueries.pairOwner(),actual_.arena.noiseOwner(),pose_,scene_,matrices_,collision,
+                        actual_.followQueries.get()->pairOwner(),actual_.arena.noiseOwner(),pose_,scene_,matrices_,collision,
                         displayInputs_->rootFlags228,sceneFlags29_);
-                    if(!actual_.followQueries.commit())return OriginalFollowResult{OriginalFollowStatus::owner,0x17a870,0};
+                    if(!actual_.followQueries.get()->commit())return OriginalFollowResult{OriginalFollowStatus::owner,0x17a870,0};
                     return result;
                 });
                 if(result_.follow.status!=OriginalFollowStatus::ok)return fail(Status::numeric,result_.follow.sourcePC);
@@ -1721,7 +2067,7 @@ public:
     EventCallbackResult48Z cameraInput(const ManagerHeldSources49A& held,
         InputEvent48Z& event,DeviceButtonRecord48Y& record,bool pressed) noexcept {
         invalidateFogPreparation();
-        if(!coldBound_||abandoned_||pendingDisplayWork()||
+        if(!actual_.followQueries.get()||!coldBound_||abandoned_||pendingDisplayWork()||
            (frameStage_!=FrameStage::idle&&frameStage_!=FrameStage::published))return {false,0};
         std::array<std::uint32_t,8> viewState{};
         for(std::size_t i=0;i<actual_.bank.count();++i)viewState[i]=actual_.bank.read(i,reads_.retirementCD4);
@@ -1784,7 +2130,7 @@ public:
     //does not consume it. Its crossing-zero hold and subsequent GO edge retain
     //the existing native schedule; no source1AFE30 event/sound parity is claimed.
     Result advanceNativeStartGate(float actualPreparedSeconds){
-        if(!coldBound_||frameStage_==FrameStage::failed)return set(Status::owner);
+        if(!actual_.followQueries.get()||!coldBound_||frameStage_==FrameStage::failed)return set(Status::owner);
         if(pendingDisplayWork())return set(Status::videoPending);
         if(!countdownInstalled_)return set(Status::startHeld);
         if(!actual_.hostRace.advanceCountdown(static_cast<double>(actualPreparedSeconds))){
@@ -1803,7 +2149,7 @@ public:
     //backend performs actual retained-image samples/retirement. Null blocks.
     Result advanceBlockingVideo(OriginalVideoBlockingBackend* backend){
         if(abandoned_)return set(Status::abandoned);
-        if(!coldBound_||!displayInputs_)return set(Status::owner);
+        if(!actual_.followQueries.get()||!coldBound_||!displayInputs_)return set(Status::owner);
         auto& v=displayInputs_->video;
         if(!(v.flags404Low6&3u))return set(Status::complete);
         if(v.flags404Low6&4u)return set(Status::sourcePath,0x25aa38);
@@ -1820,7 +2166,7 @@ public:
     Result advanceRaceFadeInPrefix(){
         if(f8Intro_.ownerThread_!=std::this_thread::get_id())return {Status::owner,0x1a7bd0};
         if(abandoned_)return set(Status::abandoned);
-        if(!coldBound_||!displayInputs_||(!exit_.complete()&&!directStart_.complete()&&!taSkipFadeFinished_)||!hasView())return set(Status::owner);
+        if(!actual_.followQueries.get()||!coldBound_||!displayInputs_||(!exit_.complete()&&!directStart_.complete()&&!taSkipFadeFinished_)||!hasView())return set(Status::owner);
         if(nativeTaIssuance_&&nativeTaIssuance_->course==OriginalCameraStartCourse::ra)
             return advanceCanonicalRaceFadeInPrefix();
         auto& app=*displayInputs_;auto& video=app.video;
@@ -1853,7 +2199,7 @@ public:
         bool musicFading,bool announcerActive) noexcept {
         if(f8Intro_.ownerThread_!=std::this_thread::get_id())
             return {OriginalHumanEndClockStatus50KG::callerBoundary,0x1a7da0u,0};
-        if(!actual_.humanCount34||!coldBound_||abandoned_||pendingDisplayWork()||
+        if(!actual_.humanCount34||!actual_.followQueries.get()||!coldBound_||abandoned_||pendingDisplayWork()||
            (frameStage_!=FrameStage::idle&&frameStage_!=FrameStage::published))
             return {OriginalHumanEndClockStatus50KG::callerBoundary,0x1a7da0u,0};
         if(nativeTaIssuance_&&nativeTaIssuance_->course==OriginalCameraStartCourse::ra)
@@ -1891,7 +2237,7 @@ public:
     // Service real2AE7D0 after the last completed gameplay image. Source7
     // starts asynchronous OUT; source4 clears only the actual covered result.
     Result advanceHumanEndFadeManager() noexcept {
-        if(!actual_.humanCount34||!coldBound_||!displayInputs_)return set(Status::owner);
+        if(!actual_.humanCount34||!actual_.followQueries.get()||!coldBound_||!displayInputs_)return set(Status::owner);
         auto& app=*displayInputs_;
         if(app.fadeManagerA8==7){
             result_.start=requestOriginalVideoFade260320(app.video,actual_.applicationClock,
@@ -1909,7 +2255,7 @@ public:
     //manufactured overlay or guessed source-clock milliseconds exist here.
     Result advanceAsyncVideo(OriginalVideoBlockingBackend* backend){
         if(abandoned_)return set(Status::abandoned);
-        if(!coldBound_||!displayInputs_)return set(Status::owner);
+        if(!actual_.followQueries.get()||!coldBound_||!displayInputs_)return set(Status::owner);
         if(endingVideoPending())result_.start=endingFade_.advance(displayInputs_->video,actual_.applicationClock,
             publicationCount_,backend,OriginalVideoFadeDirection::out260850);
         else if(taSkipFadeInRequested_&&!taSkipAsyncFade_.complete())result_.start=taSkipAsyncFade_.advance(
@@ -1926,12 +2272,14 @@ public:
     //If the whole application world is destroyed together, its owner must
     //still outlive this Session and must never traverse these records again.
     Result close(){
+        if(constructorOnly_)return closeConstructorOnlyNative(false);
+        if(!actual_.followQueries.get())return set(Status::owner);
         invalidateFogPreparation();
         if(closed_)return set(Status::complete);
         if(pendingDisplayWork())return set(Status::videoPending);
         if(frameStage_!=FrameStage::idle&&frameStage_!=FrameStage::published&&
            frameStage_!=FrameStage::failed)return set(Status::order);
-        if(!revokeCountedRaceCameraNative34())return set(Status::owner,0x1a93b0);
+        if(!withdrawNativeRaLoadingOperands()||!revokeCountedRaceCameraNative34())return set(Status::owner,0x1a93b0);
         // Once source ownership starts retiring, a partial failure can only
         // resume cleanup. It must not re-enter normal simulation/constructor work.
         coldBound_=false;frameStage_=FrameStage::failed;
@@ -1942,7 +2290,7 @@ public:
            !abortUnpublishedTaCutChildNative())return set(Status::owner,0x2828f0u);
 
         if(!releaseRacerEntityPrefixes())return set(Status::renderer,result_.entityCleanup.sourcePC);
-        if(!actual_.bank.visit(0,[&](){return actual_.followQueries.close();}))return set(Status::owner,0x120290);
+        if(!actual_.bank.visit(0,[&](){return actual_.followQueries.get()->close();}))return set(Status::owner,0x120290);
         if(spatial_.registration34.attached){
             lighting::CameraVisibilityLease lease;lighting::Diagnostic diagnostic;
             if(!actual_.visibility.beginCameraVisibility(0,lease,diagnostic))return set(Status::visibility);
@@ -1960,8 +2308,10 @@ public:
     //A cleanup failure retains this owner for retry; video flags/alpha, race
     //flags, countdown, RNG and racer history remain exactly as abandoned.
     Result abandonAndCloseSpatial(){
+        if(constructorOnly_)return closeConstructorOnlyNative(true);
+        if(!actual_.followQueries.get())return set(Status::owner);
         invalidateFogPreparation();
-        if(!revokeCountedRaceCameraNative34())return set(Status::owner,0x1a93b0);
+        if(!withdrawNativeRaLoadingOperands()||!revokeCountedRaceCameraNative34())return set(Status::owner,0x1a93b0);
         abandoned_=true;coldBound_=false;frameStage_=FrameStage::failed;
         invalidateSelectedGameplayCamera50LA();
         if(closed_)return set(Status::abandoned);
@@ -1971,7 +2321,7 @@ public:
            !abortUnpublishedTaCutChildNative())return set(Status::owner,0x2828f0u);
 
         if(!releaseRacerEntityPrefixes())return set(Status::renderer,result_.entityCleanup.sourcePC);
-        if(!actual_.bank.visit(0,[&](){return actual_.followQueries.close();}))return set(Status::owner,0x120290);
+        if(!actual_.bank.visit(0,[&](){return actual_.followQueries.get()->close();}))return set(Status::owner,0x120290);
         if(spatial_.registration34.attached){
             lighting::CameraVisibilityLease lease;lighting::Diagnostic diagnostic;
             if(!actual_.visibility.beginCameraVisibility(0,lease,diagnostic))return set(Status::visibility);

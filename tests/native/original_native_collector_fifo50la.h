@@ -18,6 +18,7 @@ namespace original_main_entry50KG {
 //later genuine constructor may create its successor. No synthetic frame/drain.
 class NativeCollectorFifo50LA final {
     friend struct Application;
+    friend class OriginalLoadingCollector50LA;
     friend class ::original_cable_selection50LA::Binding;
     friend class ::ra_source_camera50LA::OwnershipBridge;
     friend class rr::platform::VehicleWindowGl50DS;

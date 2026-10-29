@@ -38,7 +38,7 @@ struct Context final {
     BorrowedCall<void()> advanceNativeGcWaterCall;
     BorrowedCall<void(float,const original_all8_frame::Schedule*)> advanceOriginalAiManagerCall;
     BorrowedCall<void()> advanceRcTrackParticlesCall;
-    BorrowedCall<void(std::uint64_t)> advanceSourceAudioWorldCall;
+    BorrowedCall<void(std::uint64_t,bool)> advanceSourceAudioWorldCall;
     BorrowedCall<void()> advanceTbTrackParticlesCall;
     BorrowedCall<void()> advanceWorldAnimationsCall;
     using allAiControllerSamplesType = std::uint64_t;

@@ -87,11 +87,33 @@ bool prepareSecondaryDampingPrefix49M(float speed,float low,float high,
     const V torque=f.scale(f.neg(damping),vec(angular));
     if(!f.valid)return false;std::memcpy(output.v,torque.v,sizeof(output.v));return true;
 }
+bool prepareSecondaryRestorationError49M(const PodSphereVector49L& target,
+    const Vector3_48C& relative,Vector3_48C& output,float& length) noexcept {
+    if(!nearest())return false;
+    for(unsigned k=0;k<3;++k)if(!std::isfinite(target.v[k])||!std::isfinite(relative.v[k]))return false;
+    Math f;V error{{f.sub(target.v[0],relative.v[0]),f.sub(target.v[1],relative.v[1]),
+        f.sub(target.v[2],relative.v[2]),1.f}};
+    error.v[1]=0.f;const float value=f.scalarRoot(f.squared(error));
+    if(!f.valid)return false;std::memcpy(output.v,error.v,sizeof(output.v));length=value;return true;
+}
+bool prepareSecondaryRestorationDirection49M(const Vector3_48C& error,Vector3_48C& output) noexcept {
+    if(!nearest())return false;for(float lane:error.v)if(!std::isfinite(lane))return false;
+    Math f;const V next=f.normalize(vec(error));
+    if(!f.valid)return false;std::memcpy(output.v,next.v,sizeof(output.v));return true;
+}
+bool prepareSecondaryAlignmentCross49M(const Vector3_48C& physical,const Vector3_48C& main,
+    Vector3_48C& output) noexcept {
+    if(!nearest())return false;
+    for(unsigned k=0;k<3;++k)if(!std::isfinite(physical.v[k])||!std::isfinite(main.v[k]))return false;
+    Math f;const V next=f.cross(vec(physical),vec(main));
+    if(!f.valid)return false;std::memcpy(output.v,next.v,sizeof(output.v));return true;
+}
 bool produceSecondaryForces49M(const SecondaryBodyState49M&in,const SecondaryBodyParameters49M&p,
     const SecondaryForceContext49M&c,float dt,GradientNoiseState49M&noise,std::uint32_t&random,
     SecondaryBodyState49M&out) noexcept {
     if(!nearest()||in.phase!=SecondaryPhase49M::Ready||!std::isfinite(dt)||dt<0.0f||
        !in.scenePresent||!(in.sceneFlags190&1u)||!(c.mainSceneFlags190&1u))return false;
+    if(c.vehicleState40!=0&&noise.initializationIncomplete49M)return false;
     const M secondary=matrix(in.root.scene);
     if(!finiteMatrix(secondary)||!finiteMatrix(c.mainSceneWorld100))return false;
     Math f;auto r=in;
@@ -138,6 +160,7 @@ bool produceSecondaryForces49M(const SecondaryBodyState49M&in,const SecondaryBod
     }
     if(!f.valid)return false;
     r.phase=SecondaryPhase49M::ConstraintPending;
+    if(c.vehicleState40!=0&&(noise.initializationIncomplete49M||nextNoise.initializationIncomplete49M))return false;
     out=r;if(c.vehicleState40!=0){noise=nextNoise;random=nextRandom;}return true;
 }
 bool applySecondaryConstraint49M(const SecondaryBodyState49M&in,const SecondaryBodyParameters49M&p,

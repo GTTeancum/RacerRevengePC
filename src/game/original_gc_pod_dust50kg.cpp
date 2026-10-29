@@ -158,6 +158,12 @@ bool authentic(const std::vector<std::uint8_t>& b,OriginalGcPodDustMember50KG me
 OriginalGcSprayStatus50KG readOriginalGcPodDustDefinition50KG(
     const std::vector<std::uint8_t>& input,OriginalGcPodDustMember50KG member,
     OriginalGcPodDustDefinition50KG& output,D& d) noexcept {
+    OriginalGcPodDustSourceMetadata50KG ignored;
+    return readOriginalGcPodDustSourceDefinition50KG(input,member,output,ignored,d);
+}
+OriginalGcSprayStatus50KG readOriginalGcPodDustSourceDefinition50KG(
+    const std::vector<std::uint8_t>& input,OriginalGcPodDustMember50KG member,
+    OriginalGcPodDustDefinition50KG& output,OriginalGcPodDustSourceMetadata50KG& metadata,D& d) noexcept {
     d={};if(!authentic(input,member))return S::assetIdentity;
     if(std::fegetround()!=FE_TONEAREST)return S::arithmetic;
     try {
@@ -186,6 +192,13 @@ OriginalGcSprayStatus50KG readOriginalGcPodDustDefinition50KG(
            !n(general,"Restitution",bits(0x3f0ccccdu),f.restitution,0x15b0a0))return S::authoredData;
         const auto timing=readOriginalGcCommonEmitterTiming50KG(input,f.timing,d);
         if(timing!=S::complete)return timing;
+        OriginalGcPodDustSourceMetadata50KG source;
+        source.rawAgeAtBirth=f.ageAtBirth1A0;
+        auto present=[&](const char* key){for(const auto& value:general.values)
+            if(same(value.key,key))return value.sourceValuePresent;return false;};
+        source.velocityPresent=present("Velocity");
+        source.minimumNoisePresent=present("MinimumVelocityNoise");
+        source.maximumNoisePresent=present("MaximumVelocityNoise");
         Math m;f.ageAtBirth1A0=m.mul(f.ageAtBirth1A0,f.particleLife17C,0x15aff8);
         if(m.badPC){d.sourcePC=m.badPC;return S::arithmetic;}
         const char* keys[]={"Fades","HasVelocity","Grows","FadeNonLinear","Glows","Additive","Gravity","Lit"};
@@ -205,6 +218,7 @@ OriginalGcSprayStatus50KG readOriginalGcPodDustDefinition50KG(
         if(f.framesPerSet>1)f.particleFlags198|=0x400u;
         std::int32_t forced=0;
         if(!i(animation,"NumberOfForcedSets",0,forced,0x15b4c0))return S::authoredData;
+        source.forcedCount=forced;
         if(forced>0){d.sourcePC=0x15b508;return S::unsupported;}
         // Actual19B060 read order and defaults, rather than the EMT comments.
         if(!n(general,"MinimumPercentLife",.5f,f.minimumPercentLife21C,0x19b0a8)||
@@ -232,7 +246,7 @@ OriginalGcSprayStatus50KG readOriginalGcPodDustDefinition50KG(
            f.lifeToSpeedRatio224<0||f.minimumEmitRate22C<0||f.maximumEmitRate230<0||
            f.particlesToDistanceRatio234<0||f.particlesToSpeedRatio238<0||f.initialPercentAge228<0||
            f.minimumEmissionSpeed23C<0){d.sourcePC=0x19b128;return S::authoredData;}
-        f.parsed=true;output=f;return S::complete;
+        f.parsed=true;output=f;metadata=source;return S::complete;
     }catch(...){return S::allocation;}
 }
 OriginalGcSprayReceipt50KG bindOriginalGcPodDust50KG(

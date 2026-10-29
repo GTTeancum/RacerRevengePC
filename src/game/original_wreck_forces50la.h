@@ -14,14 +14,32 @@ struct OriginalWreckGravity50LA {
     SpringVector4_48N force40{};
     OriginalWreckPhysical50LA* target50=nullptr;
 };
+// Split source constructor and later slot74/78 calls so the native adopted
+// piece can publish its actual D4 between them. Same one-target storage;
+// fixed backing is not an emulation of guest282750 allocation failure.
+inline bool constructOriginalWreckGravity282670(OriginalWreckGravity50LA& g,
+    const OriginalWreckComponent50LA& component,const void* actualVector4431C0) noexcept {
+    if(component.kind!=OriginalWreckComponentKind50LA::gravity282670||
+       !component.objectKey||!actualVector4431C0||g.target50)return false;
+    g.force40={};g.force40.v[3]=1.f; //282694 vf0, then exact source overwrite.
+    g.capacity34=0;g.count30=0;
+    g.acceleration38=original_wreck_physical_detail50LA::word(0x4200cccdu);
+    original_wreck_physical_detail50LA::copy(g.force40,actualVector4431C0);
+    g.target50=nullptr;return true;
+}
+inline bool bindOriginalWreckGravity282750(OriginalWreckGravity50LA& g,
+    OriginalWreckPhysical50LA& p)noexcept {
+    if(!p.bodyConstructorFieldsApplied||g.target50||g.count30||g.capacity34)return false;
+    g.count30=0;g.capacity34=1; //28275C/60; actual one-slot native backing.
+    g.target50=&p;g.count30=1; //282790 stores target before count increment.
+    return true;
+}
 inline bool initializeOriginalWreckGravity50LA(OriginalWreckGravity50LA& g,
     OriginalWreckPhysical50LA& p,const OriginalWreckComponent50LA& component,
     const SpringVector4_48N& actualVector4431C0) noexcept {
-    if(component.kind!=OriginalWreckComponentKind50LA::gravity282670||
-       !component.objectKey||!p.bodyConstructorFieldsApplied||g.target50)return false;
-    g.count30=0;g.capacity34=1;
-    g.acceleration38=original_wreck_physical_detail50LA::word(0x4200cccdu);
-    g.force40=actualVector4431C0;g.target50=&p;g.count30=1;return true;
+    if(!p.bodyConstructorFieldsApplied)return false;
+    return constructOriginalWreckGravity282670(g,component,&actualVector4431C0)&&
+        bindOriginalWreckGravity282750(g,p);
 }
 namespace original_wreck_force_detail50LA {
 using V=Vector3_48C;

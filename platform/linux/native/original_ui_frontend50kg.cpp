@@ -179,6 +179,10 @@ struct OriginalUiFrontend50KG::Storage {
             std::unique_ptr<::original_main_entry50KG::Video::OptionsModeEffect> videoEffect;
             std::unique_ptr<OriginalOptionsMutationInterlock50KG> viewportReservation;
             std::shared_ptr<::original_main_entry50KG::RaceDisplayLifetime50LA> viewportDisplay;
+            // Actual prior selection from this SAME Display/App330, never a
+            // caller-selected Camera or a copied scene. Null remains genuine null.
+            std::shared_ptr<game::OriginalFrontendCameraCold50LA> viewportPriorCamera;
+            bool viewportZoomAttempted=false,viewportZoomCompleted=false;
             std::uint8_t viewportDrainPhase=0,viewportCallbackCount=0;
             bool viewportSelected=false,viewportSelectionRetired=false;
             bool viewportDrainFailed=false;
@@ -186,7 +190,9 @@ struct OriginalUiFrontend50KG::Storage {
             bool viewportReservationCurrent()const noexcept {
                 return viewportReservation&&viewportDisplay&&viewportReservation->current(&video->host)&&
                     viewportDisplay->video_==video&&viewportDisplay->optionsViewportPinnedCurrent50KG(
-                        viewportSelected?cameraStorage:std::shared_ptr<game::OriginalFrontendCameraCold50LA>{});
+                        viewportSelected?cameraStorage:viewportPriorCamera)&&
+                    (!viewportPriorCamera||viewportDisplay->frontendLoadingCameraLifetime50LA(viewportPriorCamera))&&
+                    (viewportSelected||viewportDisplay->frontendPriorViewportCurrent50LA(viewportPriorCamera));
             }
             bool constructionAbortCurrent()const noexcept {
                 if(!overlayStorageAbortCurrent())return false;
@@ -196,7 +202,7 @@ struct OriginalUiFrontend50KG::Storage {
                     construction->camera2B0_!=&cameraStorage->entity_||
                     !cameraStorage->unpublishedAbortCurrent(issuer,entities,viewportSelected)))return false;
                 if(viewportSelected&&!viewportSelectionRetired&&
-                   (!viewportReservation||viewportCallbackCount!=2||viewportDrainPhase!=2))return false;
+                   (!viewportReservation||viewportCallbackCount!=2||viewportDrainPhase!=2||!viewportZoomCompleted))return false;
                 if(videoEffect&&videoEffect->pending())return construction&&
                     construction->registrationCurrent()&&videoEffect->effectCurrent();
                 return !construction||!construction->pending()||construction->acquiredCurrent();
@@ -209,10 +215,12 @@ struct OriginalUiFrontend50KG::Storage {
                     // Native cancellation drops only this reservation/pin. Drain
                     // generations, poison and Camera counters remain history.
                     if(!viewportReservation->release(&video->host))return false;
-                    // The exact selected owner was preflighted. cameraStorage
-                    // retains it across removal; no source refcount is invented.
-                    if(viewportSelected){viewportDisplay->selectFrontendCamera26F940({});viewportSelectionRetired=true;}
+                    // Native rollback restores the exact preflighted App330
+                    // prior owner (or genuine null) only if Options replaced it.
+                    // This is NOT source115690; its reached zoom writes survive.
+                    if(viewportSelected){viewportDisplay->selectFrontendCamera26F940(viewportPriorCamera);viewportSelectionRetired=true;}
                     viewportDisplay->unpin();retiredViewport=std::move(viewportDisplay);viewportReservation.reset();
+                    viewportPriorCamera.reset(); //Restored Display/process330 own it; closed Options keeps no borrower.
                     // Keep the old Display alive outside the entire native store interval.
                 }
                 if(construction&&construction->cameraAcquired_){
@@ -416,6 +424,7 @@ struct OriginalUiFrontend50KG::Storage {
     std::uint64_t garageTexturePublication=0;bool garageTextureBound=false;
     bool queued=false,frameRendered=false,frameSubmitted=false;
     bool courseLaunchReady=false,courseLaunchTaken=false;
+    const std::thread::id courseRetirementThread=std::this_thread::get_id();
     bool riderMoving=false;
     OriginalUiRetainedSource50KN riderOldImage;
     std::int32_t riderWidth=0,riderHeight=0;
@@ -2266,6 +2275,41 @@ Status OriginalUiFrontend50KG::retireGarageBeforeClose(Diagnostic& d) noexcept {
     if(s->garageTextureDraw)return result(d,Status::cleanup,0x105990);
     return result(d,retired?Status::ok:Status::noChange);
 }
+bool OriginalUiFrontend50KG::observeCourseRaHandoff50LA(
+    const ::original_main_entry50KG::Application& root,
+    const ::original_main_entry50KG::Frontend& frontend,
+    OriginalUiRiderProfileOwner50KG::CourseRaceSelection& selected,
+    std::shared_ptr<::original_main_entry50KG::RaceDisplayLifetime50LA>& display)const noexcept {
+    selected={};display.reset();const auto* s=storage_.get();
+    if(!s||s->courseRetirementThread!=std::this_thread::get_id())return false;
+    const auto sameOwner=[](const auto& a,const auto& b)noexcept {
+        return a.get()==b.get()&&!a.owner_before(b)&&!b.owner_before(a);
+    };
+    if(root.garageAudioOwnerThread_!=std::this_thread::get_id()||
+       &frontend.coordinator!=this||frontend.materialApplicationOwner!=&root||
+       s->garageDestinationFrontend!=&frontend||s->cold.application!=root.state||
+       !sameOwner(s->cold.profile,root.profile)||!sameOwner(s->cold.riderProfile,root.riderProfile)||
+       !root.riderProfile||!root.videoOwner_||!root.nativeCollectorFifoOwner_||
+       !sameOwner(s->cold.video.lifetime,root.videoOwner_)||
+       !s->courseLaunchReady||!s->courseLaunchTaken||s->activated||s->faulted||s->quit||
+       s->inOperation||s->pending||s->retiring||s->garageRestoration||s->queued||s->garageTextureDraw||
+       !s->active||!s->active->course||!same(s->active->initialRoute,{6,1})||
+       !s->active->course->snapshot().launchAccepted||s->bank!=s->active.get()||
+       !s->renderer||!s->renderer->initialized()||s->lightManagerEntered||
+       s->closing)return false;
+    OriginalUiRiderProfileOwner50KG::CourseRaceSelection current;
+    if(!root.riderProfile->courseRaceSnapshot(current))return false;
+    const auto& accepted=s->launchSelection;
+    if(accepted.course!=7||accepted.planet!=2||current.course!=accepted.course||
+       current.planet!=accepted.planet||current.rider!=accepted.rider||current.subtype!=accepted.subtype||
+       current.laps!=accepted.laps||current.entrants!=accepted.entrants||
+       current.packed1125C!=accepted.packed1125C||current.mode34!=accepted.mode34)return false;
+    const auto actual=root.raceDisplayOwner50LA_.lock();
+    if(!actual||actual->application_!=&root||actual->video_!=root.videoOwner_||
+       actual->generation_!=root.raceDisplayGeneration50LA_||
+       &actual->renderer_!=s->renderer||!actual->frontendOwnerCurrent50KG()||!actual->canRetain())return false;
+    selected=accepted;display=actual;return true;
+}
 Status OriginalUiFrontend50KG::close(Diagnostic& d) noexcept {
     d={};auto* s=storage_.get();if(!s)return result(d,Status::noChange);
     if(ownsGarageCustody()||(s->active&&same(s->active->initialRoute,{13,1})&&s->active->garageEntryAttempted)){
@@ -2506,31 +2550,35 @@ bool OriginalUiFrontend50KG::continueOptionsViewportDrains50KG(
         if(!display||display->application_!=&root||display->video_!=n.video||
            !display->optionsViewportInitialCurrent50KG(d)||
            n.cameraStorage->phase_!=Camera::Phase::beforeViewport114A00||!n.constructionAbortCurrent())return false;
+        const auto prior=display->loadingPriorViewportCamera50LA();
+        if(!display->frontendPriorViewportCurrent50LA(prior))return false;
         std::unique_ptr<OriginalOptionsMutationInterlock50KG> next(new(std::nothrow) OriginalOptionsMutationInterlock50KG);
-        if(!next||!display->sourceCurrentCamera0Known_||display->sourceSelectedCamera0_||
+        if(!next||!display->frontendPriorViewportCurrent50LA(prior)||
            display->sourceBufferCount0C_!=2u||display->dispatch_.pendingCallbackDC||
            display->dispatch_.count54||display->dispatch_.count60||
            !next->acquire(&n.video->host))return false;
         if(!display->optionsViewportReservedCurrent50KG(*next)||
+           !display->frontendPriorViewportCurrent50LA(prior)||
            display->application_!=&root||display->video_!=n.video||
            !n.videoEffect->current(root,n.video,*n.construction,this,m)||
            n.cameraStorage->phase_!=Camera::Phase::beforeViewport114A00||!n.constructionAbortCurrent()){
             if(!next->release(&n.video->host))std::terminate();return false;
         }
         // No callback/allocation after acquisition and before publication.
-        display->pin();n.viewportDisplay=display;n.viewportReservation=std::move(next);
+        display->pin();n.viewportDisplay=display;n.viewportPriorCamera=prior;n.viewportReservation=std::move(next);
         n.cameraStorage->fields_.count210=display->sourceBufferCount0C_+1u; //114A24
         n.cameraStorage->fields_.count20C=n.cameraStorage->fields_.count210; //114A28
         n.cameraStorage->phase_=Camera::Phase::insideViewport114A00;
     }
     if(!n.viewportReservationCurrent()||n.viewportDrainFailed)return false;
     auto& display=*n.viewportDisplay;
-    if(!display.optionsViewportAdvanceCurrent50KG(*n.viewportReservation))return false;
+    if(!display.optionsViewportAdvanceCurrent50KG(*n.viewportReservation,n.viewportPriorCamera))return false;
     if(display.dispatch_.pendingCallbackDC||display.dispatch_.count54||display.dispatch_.count60)return false;
-    if(n.viewportDrainPhase==2)return n.cameraStorage->phase_==Camera::Phase::afterViewport114A00;
+    if(n.viewportZoomAttempted)return n.viewportZoomCompleted&&
+        n.viewportDrainPhase==2&&n.cameraStorage->phase_==Camera::Phase::afterViewport114A00;
     if(n.cameraStorage->phase_!=Camera::Phase::insideViewport114A00)return false;
     while(n.viewportDrainPhase<2){
-        if(!display.optionsViewportAdvanceCurrent50KG(*n.viewportReservation))return false;
+        if(!display.optionsViewportAdvanceCurrent50KG(*n.viewportReservation,n.viewportPriorCamera))return false;
         //244D60's D8-disabled branch skips its drain, never245910's second.
         if(n.viewportDrainPhase==0&&!(display.dispatch_.flagsD8&1u)){++n.viewportDrainPhase;continue;}
         VehicleWindowDiagnostic50DS d;
@@ -2539,9 +2587,16 @@ bool OriginalUiFrontend50KG::continueOptionsViewportDrains50KG(
         }
         n.viewportDrainGeneration=d.contextDrainGeneration;++n.viewportDrainPhase;
     }
-    // Genuine known-null previous selection excludes245AD4/AD8. No callbacks,
-    // bounds, selection or loader suffix are implemented after this return.
-    if(!display.optionsViewportAdvanceCurrent50KG(*n.viewportReservation))return false;
+    //245918 observes the genuine prior selection after BOTH drains. a2=0
+    // excludes packet/scissor work, but a real App330 prior Camera still owns
+    // the reached zoom328/32C writes. Failed reached work is never replayed.
+    if(!display.optionsViewportAdvanceCurrent50KG(*n.viewportReservation,n.viewportPriorCamera)||
+       !display.frontendPriorViewportCurrent50LA(n.viewportPriorCamera))return false;
+    n.viewportZoomAttempted=true;
+    if(!display.applyLoadingPriorViewportZoom2458C0(*n.cameraStorage,n.viewportPriorCamera)){
+        n.viewportDrainFailed=true;return false;
+    }
+    n.viewportZoomCompleted=true;
     n.cameraStorage->phase_=Camera::Phase::afterViewport114A00;return true;
 }
 bool OriginalUiFrontend50KG::continueOptionsCameraSuffix2361C0(
@@ -2557,11 +2612,11 @@ bool OriginalUiFrontend50KG::continueOptionsCameraSuffix2361C0(
     using Phase=game::OriginalUiEntityScope50KG::OptionsConstruction::Phase;
     if(n.issuer!=&root||!n.construction||!n.videoEffect||!n.cameraStorage||
        !n.videoEffect->current(root,n.video,*n.construction,this,m)||
-       !n.viewportReservationCurrent()||n.viewportDrainFailed||n.viewportDrainPhase!=2||
+       !n.viewportReservationCurrent()||n.viewportDrainFailed||n.viewportDrainPhase!=2||!n.viewportZoomCompleted||
        !n.constructionAbortCurrent())return false;
     auto& display=*n.viewportDisplay;auto& camera=*n.cameraStorage;auto& f=camera.fields_;
     if(!display.optionsViewportAdvanceCurrent50KG(*n.viewportReservation,
-           n.viewportSelected?n.cameraStorage:std::shared_ptr<Camera>{}))return false;
+           n.viewportSelected?n.cameraStorage:n.viewportPriorCamera))return false;
     if(camera.phase_==Camera::Phase::viewportInitialized2361C0)
         return n.viewportSelected&&n.viewportCallbackCount==2&&n.construction->phase_==Phase::cameraViewportComplete2361C0;
     const auto fp=[](std::uint32_t word)noexcept{return Camera::floatFromBits(word);};
@@ -2594,9 +2649,9 @@ bool OriginalUiFrontend50KG::continueOptionsCameraSuffix2361C0(
     }
     if(!n.viewportSelected){
         if(camera.phase_!=Camera::Phase::afterViewport114A00||!(camera.entity_.flags29&1u)||
-           !display.optionsViewportAdvanceCurrent50KG(*n.viewportReservation))return false;
+           !display.optionsViewportAdvanceCurrent50KG(*n.viewportReservation,n.viewportPriorCamera))return false;
         //26F948 selects before its dimension comparison. The reservation owns
-        // genuine prior-null selection, not a copied or equality-restored owner.
+        // the exact retained prior selection, not an arbitrary caller owner.
         display.selectFrontendCamera26F940(n.cameraStorage);n.viewportSelected=true;
         camera.phase_=Camera::Phase::selectedBeforeBounds236214;
     }

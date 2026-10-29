@@ -432,6 +432,21 @@ bool sameBlockingParameters(const OriginalVideoFadeState& a,const OriginalVideoF
         a.lastMilliseconds400==b.lastMilliseconds400;
 }
 }
+OriginalCameraStartResult OriginalLoadingFadePrefix17C5C8::advance(OriginalVideoFadeState& video,
+    HostMonotonicClock50ID& clock,std::int32_t mode)noexcept {
+    if(mode==6)return result(S::sourcePath,0x260354);
+    //26044C..468 precedes even the original bit0 no-op branch.
+    video.flags404Low6=static_cast<std::uint8_t>(video.flags404Low6&~32u);
+    if(video.flags404Low6&1u)return result(S::complete,0x2605e4);
+    video.targetAlpha3EC=static_cast<std::int32_t>((video.toColor3E0>>24u)&255u); //260498.
+    video.flags404Low6=static_cast<std::uint8_t>(video.flags404Low6|1u); //2604B4.
+    video.flags404Low6=static_cast<std::uint8_t>(video.flags404Low6&~2u); //2604C4.
+    // Native numeric admission at the actual sample point, not before stores.
+    if(std::fegetround()!=FE_TONEAREST)return result(S::arithmetic,0x26057c);
+    float now=0;if(!sampledMilliseconds(clock,now))return result(S::clock,0x26057c);
+    video.lastMilliseconds400=now; //26058C BEFORE260594 input read.
+    return result(video.alpha3E8?S::sourcePath:S::unknownVideoAlpha,0x260594);
+}
 OriginalCameraStartResult requestOriginalVideoFade260320(OriginalVideoFadeState& v,HostMonotonicClock50ID& c,
     std::int32_t mode,std::int32_t duration,bool asynchronous,bool redrawSource){
     return videoRequest(v,c,mode,duration,asynchronous,redrawSource,true);

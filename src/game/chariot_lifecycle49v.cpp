@@ -352,6 +352,7 @@ bool updateChariotLifecycle49V(const ChariotLifecycleInput49V& input,
     for(unsigned i=0;i<3;++i)in.bodyVelocity80.v[i]=main.components.root.localVelocity80.v[i];
     in.bodyVelocity80.v[3]=1.0f; // Dead in every represented source output.
     for(unsigned i=0;i<4;++i)in.probeVector1D0.v[i]=main.components.probe348.vector1D0[i];
+    if(noise.noise.initializationIncomplete49M)return fail(d,ChariotLifecycleError49V::noise,0x14eec0);
     std::memcpy(w.nodes,graph.nodes,graph.count*sizeof(SceneNode49P));
     w.state=s;w.shared=shared;w.secondary=secondary;w.supplement=supplement;
     w.noise=noise;w.vehicle838=physical;
@@ -427,6 +428,9 @@ bool updateChariotLifecycle49V(const ChariotLifecycleInput49V& input,
     // projection, including its stale bits after the reverse local setter.
     w.secondary.root.scene=node(g,b.physical19C).world100;
     w.secondary.sceneFlags190=(w.secondary.sceneFlags190&0xffffff00u)|node(g,b.physical19C).sceneFlags190;
+    //Check before ANY visible graph/state copyback, not merely noise assignment.
+    if(noise.noise.initializationIncomplete49M||w.noise.noise.initializationIncomplete49M)
+        return fail(d,ChariotLifecycleError49V::noise,0x14eec0);
     std::memcpy(graph.nodes,w.nodes,graph.count*sizeof(SceneNode49P));
     s=w.state;shared=w.shared;secondary=w.secondary;supplement=w.supplement;
     physical=w.vehicle838;noise=w.noise;d={};return true;

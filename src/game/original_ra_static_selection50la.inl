@@ -201,9 +201,9 @@ bool Owner::selectRaStaticMethod44(CameraVisibilityLease& lease,OriginalApplicat
                 //consumer; this original callback route remains unjoined.
                 const auto& f=*flareEntry;
                 if(!f.world||f.world!=s.sceneOwner||!f.type32||!f.flags33||
-                   !f.world->nativeLocalFlareIdentityCurrent(f.entity))
+                   !podFlareIdentityCurrent(*f.world,f.entity))
                     return fail(d,Status::identity,0x27eb60u);
-                const auto flareZone=f.world->nativeLocalFlareZoneIndex(f.entity);
+                const auto flareZone=podFlareZoneIndex(*f.world,f.entity);
                 if(!flareZone||(*flareZone!=1u&&*flareZone!=7u)||
                    &method!=&s.selectedMethods[*flareZone*2u])return fail(d,Status::identity,0x27eb60u);
                 if(!(*f.flags33&1u)||(*f.flags33&4u))continue;

@@ -1,5 +1,6 @@
 #pragma once
 #include "ra_cold_roster_storage50la.h"
+#include "ra_cold_wreck_backing50la.h"
 namespace original_results_roster50LA { class Read; }
 #include "native_racer_rig50hw_fixture.h"
 #include "native_racer_collision50hw_fixture.h"
@@ -12,13 +13,18 @@ namespace original_results_roster50LA { class Read; }
 namespace ra_cold_aggregate50LA { class Owner; }
 namespace ra_cold_roster50LA {
 class Resources final {
+    friend class FreshExecutionArena;
     friend class ::original_results_roster50LA::Read;
     friend class Operation;
+    friend class ::ra_source_camera50LA::OwnershipBridge;
     friend class ra_cold_aggregate50LA::Owner;
     std::shared_ptr<SharedOwners> owners_;
     const std::array<std::unique_ptr<native_racer50HW::Rig>,8>& rigs_;
     const std::array<std::unique_ptr<native_racer_collision50HW::Owner>,8>& collisions_;
     std::array<std::vector<std::uint8_t>,8> aiSources_;
+    // SAME authenticated full archives, retained without a second reopen.
+    std::array<std::vector<std::uint8_t>,8> rawRes_;
+    std::shared_ptr<WreckBacking> wreckBacking_;
     std::array<std::vector<std::uint8_t>,6> effects_;
     std::uint32_t humanCount_=0;
     std::size_t racerCount_=8;
@@ -32,6 +38,7 @@ public:
             if(!racerCount||racerCount>8u||humanCount>1u||humanCount>racerCount)throw std::runtime_error("RA roster requires zero or one actual human");
             if(!owners)throw std::runtime_error("actual retained roster storage absent");
             auto result=std::shared_ptr<Resources>(new Resources(std::move(owners)));
+            result->wreckBacking_=std::make_shared<WreckBacking>();
             result->humanCount_=humanCount;result->racerCount_=racerCount;
             const auto& rigs=result->rigs_;const auto& collisions=result->collisions_;
             for(std::size_t slot=0;slot<racerCount;++slot){
@@ -43,7 +50,7 @@ public:
                 const auto* selected=g::original_racer_selection50IJ::findByPodId(rig->podId);
                 const auto* pin=selected?original_player_identity50IK::find(selected->racer60):nullptr;
                 if(!pin)throw std::runtime_error("original roster source pin absent");
-                const auto bytes=runtime_startup50fl::readBytes(rig->resourceFile);
+                auto bytes=runtime_startup50fl::readBytes(rig->resourceFile);
                 if(bytes.size()!=pin->archiveBytes||pod_materials50ed_fixture::detail::sha256(bytes)!=pin->archiveSha256||
                    pod_materials50ed_fixture::detail::sha256(rig->phy)!=pin->phySha256||
                    collision->receipt().archiveBytes!=bytes.size())
@@ -66,6 +73,7 @@ public:
                     member!=collision->storage_->raw[i])throw std::runtime_error("retained collision bytes differ from original pod");
                 if(!a::extractResMember48C(archive,prefix+native_racer50HW::rig_detail::lower(rig->podId)+".ai",
                     result->aiSources_[slot],d))throw std::runtime_error("actual selected pod AI source unavailable");
+                result->rawRes_[slot]=std::move(bytes);
             }
             // Existing fixed corpus identities, retained here instead of trusting
             // arbitrary supplied arrays. Reading happens only when adopted.

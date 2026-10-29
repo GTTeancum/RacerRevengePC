@@ -12,6 +12,7 @@
 #include "../assets/import_world48f.h"
 #include <array>
 #include <memory>
+#include <optional>
 #include <utility>
 #include <vector>
 
@@ -19,7 +20,7 @@ namespace rr::assets { class OriginalStandardMaterialTable50LA; }
 namespace rr::platform { class VehicleWindowGl50DS; struct VehicleWindowDiagnostic50DS; }
 namespace rr::game { struct OriginalWreckComponent50LA; struct OriginalCameraViewportFields; struct OriginalCameraSceneOwner; struct OriginalRendererDispatchFields; }
 namespace ra_source_camera50LA { class OwnershipBridge; }
-namespace rr::game::original_world_environment50KG {struct SpatialBounds;}
+namespace rr::game::original_world_environment50KG {struct SpatialBounds;class Owner;}
 namespace ra_pod_scene50LA { class Owner; }
 namespace mb_source_trigger50MB { class Owner; }
 namespace tc_cold_visibility50TC { class Retirement; }
@@ -275,6 +276,18 @@ public:
 // authored lights, and a separate4C0 visibility namespace. It never borrows collision
 //4C4 membership or resets OriginalUiLightManagerLifetime50KG.
 class Owner final {
+    //Out-of-line access to the SAME World fields. Keep its enormous private
+    //definition out of this lighting implementation TU; no snapshot or new gate.
+    static std::optional<original_world_environment50KG::Owner*>& podEnvironment3A4(::ra_pod_scene50LA::Owner&)noexcept;
+    static const std::optional<original_world_environment50KG::Owner*>& podEnvironment3A4(const ::ra_pod_scene50LA::Owner&)noexcept;
+    static const std::shared_ptr<OriginalApplicationEntities50LA>& podApplication(const ::ra_pod_scene50LA::Owner&)noexcept;
+    static bool podColdConstructed(const ::ra_pod_scene50LA::Owner&)noexcept;
+    static bool podTopologyClosed(const ::ra_pod_scene50LA::Owner&)noexcept;
+    static const std::shared_ptr<Owner>& podLighting(const ::ra_pod_scene50LA::Owner&)noexcept;
+    static bool podFlareIdentityCurrent(const ::ra_pod_scene50LA::Owner&,const OriginalWreckComponent50LA*)noexcept;
+    static std::optional<std::size_t> podFlareZoneIndex(const ::ra_pod_scene50LA::Owner&,const OriginalWreckComponent50LA*)noexcept;
+    static std::optional<std::size_t> podFlareAuthoredIndex(const ::ra_pod_scene50LA::Owner&,const OriginalWreckComponent50LA*)noexcept;
+
     friend class ::mb_source_trigger50MB::Owner;
     friend class ::tc_cold_visibility50TC::Retirement;
     friend class ::tb_cold_visibility50TB::Retirement;
@@ -306,6 +319,9 @@ class Owner final {
         const CollectionZone50BX*,std::size_t,RaAuthoredLightIdentity&,std::uint32_t&)const noexcept;
     const original_world_environment50KG::SpatialBounds* sceneBounds534(const ::ra_pod_scene50LA::Owner*) const noexcept;
     const CollectionZone50BX* retainSceneZones272A78(const ::ra_pod_scene50LA::Owner*,std::size_t&) noexcept;
+    // Same canonical namespace under the retained scene owner, not a camera lease.
+    ResetVisibilityWorld50EY* nativeWreckVisibility165E90(const ::ra_pod_scene50LA::Owner*,
+        const CollectionZone50BX*) noexcept;
     bool canReleaseSceneZones272A78(const ::ra_pod_scene50LA::Owner*) const noexcept;
     // Same retained RA EnvironmentInfo/light/ambient/visibility backend only.
     // Private actual scene caller; no parallel decoder or collection lease.
@@ -317,6 +333,11 @@ class Owner final {
         const assets::World48F&,const CollectionZone50BX*,std::uint32_t&)const noexcept;
     const std::string* nativeRaParticleSelector1B4DC0(const ::ra_pod_scene50LA::Owner*,
         const assets::World48F&,const CollectionZone50BX*,std::uint32_t&)const noexcept;
+    //Actual World publication alias to SAME prewarmed environment ownership.
+    //The fresh World constructor must first issue its known-null270598 store.
+    bool publishNativeEnvironment3A4(::ra_pod_scene50LA::Owner&,
+        const assets::World48F&,std::uint32_t&)noexcept;
+    bool withdrawNativeEnvironment3A4(::ra_pod_scene50LA::Owner&)noexcept;
     bool nativeSceneRoles270900Current(const ::ra_pod_scene50LA::Owner*,
         const assets::World48F&,const CollectionZone50BX*,std::uint32_t&)const noexcept;
     const AuthoredRenderZone* nativeRaZoneExclusions272B08(const ::ra_pod_scene50LA::Owner*,

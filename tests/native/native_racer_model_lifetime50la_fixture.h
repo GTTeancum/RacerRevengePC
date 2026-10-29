@@ -1,5 +1,17 @@
 #pragma once
 #include "native_racer_bank50hn_fixture.h"
+#include "original_racer_terrain_query_owner50la.h"
+#include "../../src/game/original_racer_engine_aero_owners50la.h"
+#include "original_racer_query690_owner50la.h"
+#include "original_racer_query694_owner50la.h"
+#include "original_racer_contact354_owner50la.h"
+#include "original_racer_detector358_owner50la.h"
+#include "original_racer_query7a4_owner50la.h"
+#include "original_racer_query79c_owner50la.h"
+#include "original_racer_secondary_body_owner50la.h"
+#include "original_racer_query364_owner50la.h"
+#include "original_racer_contact368_owner50la.h"
+#include "original_racer_detector36c_owner50la.h"
 #include "original_racer_animation_setup50la_fixture.h"
 #include "../../src/game/original_racer_animation_cold50la.h"
 #include "../../src/game/original_racer_model_scene50la.h"
@@ -25,6 +37,7 @@
 #include <optional>
 #include <stdexcept>
 
+namespace original_camera_session50KX {class Session;}
 // Explicit friend declarations keep this owner header independent of caller include order.
 namespace native_racer50HW { class Cables; }
 namespace ra_cold_roster50LA { class Operation; }
@@ -49,6 +62,7 @@ using Rig=native_racer50HW::Rig;
 // order, with concrete190/198/194 between the last engine and chariot.
 // The no-engine combined model194 branch remains unadmitted.
 class Owner final {
+    friend class ::original_camera_session50KX::Session;
     friend class ::ra_cold_roster50LA::Operation; //Actual staged694/A0 cold operand only.
     friend class ::native_racer50HW::Cables;
     friend class ::original_cable_selection50LA::Binding;
@@ -150,6 +164,229 @@ class Owner final {
     g::OriginalRacerColdScenes50LA coldScenes_;
     std::unique_ptr<g::OriginalRacerMainBodyOwner50LA> body340_;
     bool bodyAllocationAttempted_=false;
+    // Mutually exclusive native routes on the SAME retained body. Source mode
+    // can only start while the genuine167920 mass/inertia are still untouched.
+    // Its private entry is intentionally uncalled until fresh query arena and
+    // constructor-only Session admission are joined; no ready flag is widened.
+    enum class HandlingRoute {unselected,legacy,source};
+    HandlingRoute handlingRoute_=HandlingRoute::unselected;
+    bool sourceGeometryAttempted_=false,sourceGeometryReserved_=false,sourceGeometryComplete_=false,sourceModelPrefixComplete_=false;
+    std::unique_ptr<g::OriginalRacerTerrainQueryOwner50LA> sourceTerrain348_;
+    bool sourceTerrainAttempted_=false,sourceTerrainComplete_=false,sourceTerrainWithdrawn_=false;
+    std::unique_ptr<g::OriginalRacerEngine34COwner50LA> sourceEngine34C_;
+    std::unique_ptr<g::OriginalRacerAero350Owner50LA> sourceAero350_;
+    std::unique_ptr<g::OriginalRacerQuery690Owner50LA> sourceQuery690_;
+    bool sourceEngineQueryAttempted_=false,sourceEngineQueryComplete_=false,sourceEngineQueryWithdrawn_=false;
+    std::string sourceStack840_; //Actual212140 formatted request, retains failed setup input.
+    void constructSourceEngineQuery2120B4(runtime_startup50fl::Fixture& actual,
+        ::ra_source_camera50LA::OwnershipBridge& bridge);
+    void finishSourceEngineQuery2120B4(::ra_source_camera50LA::OwnershipBridge& bridge) {
+        need(bank_&&fixture_&&!sourceEngineQueryWithdrawn_,"source engine/query Bank custody missing");
+        bank_->visit(slot_,[&](){constructSourceEngineQuery2120B4(*fixture_,bridge);});
+    }
+    std::unique_ptr<g::OriginalRacerQuery694Owner50LA> sourceQuery694_;
+    bool sourceQuery694Attempted_=false,sourceQuery694Complete_=false,sourceQuery694Withdrawn_=false;
+    void constructSourceQuery6942121D0(runtime_startup50fl::Fixture& actual,
+        ::ra_source_camera50LA::OwnershipBridge& bridge);
+    void finishSourceQuery6942121D0(::ra_source_camera50LA::OwnershipBridge& bridge) {
+        need(bank_&&fixture_&&!sourceQuery694Withdrawn_,"source694 Bank custody missing");
+        bank_->visit(slot_,[&](){constructSourceQuery6942121D0(*fixture_,bridge);});
+    }
+    std::unique_ptr<g::OriginalRacerContact354Owner50LA> sourceContact354_;
+    bool sourceContact354Attempted_=false,sourceContact354Complete_=false,sourceContact354Withdrawn_=false;
+    void constructSourceContact354212278(runtime_startup50fl::Fixture& actual,
+        ::ra_source_camera50LA::OwnershipBridge& bridge);
+    void finishSourceContact354212278(::ra_source_camera50LA::OwnershipBridge& bridge) {
+        need(bank_&&fixture_&&!sourceContact354Withdrawn_,"source354 Bank custody missing");
+        bank_->visit(slot_,[&](){constructSourceContact354212278(*fixture_,bridge);});
+    }
+    std::unique_ptr<g::OriginalRacerDetector358Owner50LA> sourceDetector358_;
+    bool sourceDetector358Attempted_=false,sourceDetector358Complete_=false,sourceDetector358Withdrawn_=false;
+    void constructSourceDetector358212348(runtime_startup50fl::Fixture& actual,
+        ::ra_source_camera50LA::OwnershipBridge& bridge);
+    void finishSourceDetector358212348(::ra_source_camera50LA::OwnershipBridge& bridge) {
+        need(bank_&&fixture_&&!sourceDetector358Withdrawn_,"source358 Bank custody missing");
+        bank_->visit(slot_,[&](){constructSourceDetector358212348(*fixture_,bridge);});
+    }
+    std::unique_ptr<g::OriginalRacerQuery7A4Owner50LA> sourceQuery7A4_;
+    std::unique_ptr<g::OriginalRacerQuery79COwner50LA> sourceQuery79C_;
+    bool sourceAuxiliaryAttempted_=false,sourceAuxiliaryComplete_=false,sourceAuxiliaryWithdrawn_=false;
+    void constructSourceAuxiliary2123C8(runtime_startup50fl::Fixture& actual,
+        ::ra_source_camera50LA::OwnershipBridge& bridge);
+    void finishSourceAuxiliary2123C8(::ra_source_camera50LA::OwnershipBridge& bridge) {
+        need(bank_&&fixture_&&!sourceAuxiliaryWithdrawn_,"source auxiliary query Bank custody missing");
+        bank_->visit(slot_,[&](){constructSourceAuxiliary2123C8(*fixture_,bridge);});
+    }
+    std::unique_ptr<g::OriginalRacerSecondaryBodyOwner50LA> sourceBody35C_;
+    bool sourceSecondaryAttempted_=false,sourceSecondaryComplete_=false,sourceSecondaryWithdrawn_=false;
+    void constructSourceSecondary2124DC(runtime_startup50fl::Fixture& actual);
+    void finishSourceSecondary2124DC() {
+        need(bank_&&fixture_&&!sourceSecondaryWithdrawn_,"source secondary Bank custody missing");
+        bank_->visit(slot_,[&](){constructSourceSecondary2124DC(*fixture_);});
+    }
+    bool sourceSecondarySetupAttempted_=false,sourceSecondarySetupComplete_=false,sourceSecondarySetupWithdrawn_=false;
+    std::optional<float> sourceSecondaryF20_,sourceSecondaryHalfMass_;
+    std::optional<g::BodyMatrix48G> sourceSecondaryInertia0F90_;
+    void constructSourceSecondarySetup2125C4(runtime_startup50fl::Fixture& actual);
+    void finishSourceSecondarySetup2125C4() {
+        need(bank_&&fixture_&&!sourceSecondarySetupWithdrawn_,"source secondary setup Bank custody missing");
+        bank_->visit(slot_,[&](){constructSourceSecondarySetup2125C4(*fixture_);});
+    }
+    std::unique_ptr<g::OriginalRacerQuery364Owner50LA> sourceQuery364_;
+    std::unique_ptr<g::OriginalRacerContact368Owner50LA> sourceContact368_;
+    std::unique_ptr<g::OriginalRacerDetector36COwner50LA> sourceDetector36C_;
+    bool sourceSecondaryContactsAttempted_=false,sourceSecondaryContactsComplete_=false,sourceSecondaryContactsWithdrawn_=false;
+    void constructSourceSecondaryContacts212720(runtime_startup50fl::Fixture& actual,
+        ::ra_source_camera50LA::OwnershipBridge& bridge);
+    void finishSourceSecondaryContacts212720(::ra_source_camera50LA::OwnershipBridge& bridge) {
+        need(bank_&&fixture_&&!sourceSecondaryContactsWithdrawn_,"source secondary contacts Bank custody missing");
+        bank_->visit(slot_,[&](){constructSourceSecondaryContacts212720(*fixture_,bridge);});
+    }
+    bool sourceWreckConfigAttempted_=false,sourceWreckConfigComplete_=false;
+    void finishSourceWreckConfig2129A4(::ra_source_camera50LA::OwnershipBridge& bridge);
+    bool sourceWreckPieceAttempted_=false,sourceWreckPieceComplete_=false;
+    void finishSourceWreckPiece212A50(::ra_source_camera50LA::OwnershipBridge& bridge);
+    bool sourceWreckBodyAttempted_=false,sourceWreckBodyComplete_=false;
+    void finishSourceWreckBody165E90(::ra_source_camera50LA::OwnershipBridge& bridge);
+    bool sourceWreckE0Attempted_=false,sourceWreckE0Complete_=false;
+    void finishSourceWreckE0166018(::ra_source_camera50LA::OwnershipBridge& bridge);
+    bool sourceWreckE0LoadAttempted_=false,sourceWreckE0LoadComplete_=false;
+    void finishSourceWreckE0Shape166074(::ra_source_camera50LA::OwnershipBridge& bridge);
+    bool sourceWreckE0PrepareAttempted_=false,sourceWreckE0PrepareComplete_=false;
+    void finishSourceWreckE0Prepare16607C(::ra_source_camera50LA::OwnershipBridge& bridge);
+    bool sourceWreckDCAttempted_=false,sourceWreckDCComplete_=false;
+    void finishSourceWreckDC1660A0(::ra_source_camera50LA::OwnershipBridge& bridge);
+    bool sourceWreckD8Attempted_=false,sourceWreckD8Complete_=false;
+    void finishSourceWreckD816616C(::ra_source_camera50LA::OwnershipBridge& bridge);
+    bool sourceWreckE4Attempted_=false,sourceWreckE4Complete_=false;
+    void finishSourceWreckE41661D8(::ra_source_camera50LA::OwnershipBridge& bridge);
+    bool sourceWreckE4PrepareAttempted_=false,sourceWreckE4PrepareComplete_=false;
+    void finishSourceWreckE4Prepare16629C(::ra_source_camera50LA::OwnershipBridge& bridge);
+    bool sourceWreckE8Attempted_=false,sourceWreckE8Complete_=false;
+    void finishSourceWreckE81662E4(::ra_source_camera50LA::OwnershipBridge& bridge);
+    bool sourceWreckMutualAttempted_=false,sourceWreckMutualComplete_=false;
+    bool sourceWreckArraysAttempted_=false,sourceWreckArraysComplete_=false;
+    bool sourceWreckSplashAttempted_=false,sourceWreckSplashComplete_=false;
+    void finishSourceWreckSplash2CB854(::ra_source_camera50LA::OwnershipBridge& bridge);
+    bool sourceWreckDustAttempted_=false,sourceWreckDustComplete_=false;
+    void finishSourceWreckDust2CB7E0(::ra_source_camera50LA::OwnershipBridge& bridge);
+    bool sourceWreckSmokeAttempted_=false,sourceWreckSmokeComplete_=false;
+    bool sourceWreckRemainingPairsAttempted_=false,sourceWreckRemainingPairsComplete_=false;
+    void finishSourceWreckRemainingPairs2CB6CC(::ra_source_camera50LA::OwnershipBridge& bridge);
+    bool sourceWreckSecondPositiveSplashReaderAttempted_=false,sourceWreckSecondPositiveSplashReaderComplete_=false;
+    void finishSourceWreckSecondPositiveSplashRead19DDC8(::ra_source_camera50LA::OwnershipBridge& bridge);
+    bool sourceWreckSecondPositiveSplashAttempted_=false,sourceWreckSecondPositiveSplashComplete_=false;
+    void constructSourceWreckSecondPositiveSplash(::ra_source_camera50LA::OwnershipBridge& bridge);
+    bool sourceWreckSecondPositiveDustReaderAttempted_=false,sourceWreckSecondPositiveDustReaderComplete_=false;
+    void finishSourceWreckSecondPositiveDustRead19A7D0(::ra_source_camera50LA::OwnershipBridge& bridge);
+    bool sourceWreckSecondPositiveDustAttempted_=false,sourceWreckSecondPositiveDustComplete_=false;
+    void constructSourceWreckSecondPositiveDust(::ra_source_camera50LA::OwnershipBridge& bridge);
+    bool sourceWreckSecondRemainingPairsAttempted_=false,sourceWreckSecondRemainingPairsComplete_=false;
+    void finishSourceWreckSecondRemainingPairs2CB6CC(::ra_source_camera50LA::OwnershipBridge& bridge);
+    bool sourceWreckSecondFirstPairAttempted_=false,sourceWreckSecondFirstPairComplete_=false;
+    void finishSourceWreckSecondFirstPair2CB778(::ra_source_camera50LA::OwnershipBridge& bridge);
+    bool sourceWreckFirstPairAttempted_=false,sourceWreckFirstPairComplete_=false;
+    void finishSourceWreckFirstPair2CB778(::ra_source_camera50LA::OwnershipBridge& bridge);
+    bool sourceWreckSecondInitialCallerAttempted_=false,sourceWreckSecondInitialCallerComplete_=false;
+    void completeSourceWreckSecondInitialChild19A7F8(::ra_source_camera50LA::OwnershipBridge& bridge);
+    bool sourceWreckSecondInitialReaderAttempted_=false,sourceWreckSecondInitialReaderComplete_=false;
+    void readSourceWreckSecondInitialChild19A7D0(::ra_source_camera50LA::OwnershipBridge& bridge);
+    bool sourceWreckSecondSuccessorCallerAttempted_=false,sourceWreckSecondSuccessorCallerComplete_=false;
+    void completeSourceWreckSecondSuccessorChild(::ra_source_camera50LA::OwnershipBridge& bridge);
+    bool sourceWreckSecondSuccessorReaderAttempted_=false,sourceWreckSecondSuccessorReaderComplete_=false;
+    void readSourceWreckSecondSuccessorChild(::ra_source_camera50LA::OwnershipBridge& bridge);
+    bool sourceWreckSecondSuccessorAttempted_=false,sourceWreckSecondSuccessorComplete_=false;
+    void constructSourceWreckSecondSuccessorChild(::ra_source_camera50LA::OwnershipBridge& bridge);
+    bool sourceWreckSecondInitialChildAttempted_=false,sourceWreckSecondInitialChildComplete_=false;
+    void constructSourceWreckSecondInitialChild(::ra_source_camera50LA::OwnershipBridge& bridge);
+    bool sourceWreckSecondArraysAttempted_=false,sourceWreckSecondArraysComplete_=false;
+    void finishSourceWreckSecondArrays2CB628(::ra_source_camera50LA::OwnershipBridge& bridge);
+    bool sourceWreckSecondEffectInputsAttempted_=false,sourceWreckSecondEffectInputsComplete_=false;
+    void bindSourceWreckSecondEffectInputs2CB618(::ra_source_camera50LA::OwnershipBridge& bridge);
+    bool sourceWreckSecondMutualAttempted_=false,sourceWreckSecondMutualComplete_=false;
+    void finishSourceWreckSecondMutual166390(::ra_source_camera50LA::OwnershipBridge& bridge);
+    bool sourceWreckSecondE8Attempted_=false,sourceWreckSecondE8Complete_=false;
+    void finishSourceWreckSecondE81662E4(::ra_source_camera50LA::OwnershipBridge& bridge);
+    bool sourceWreckSecondE4Attempted_=false,sourceWreckSecondE4Complete_=false;
+    bool sourceWreckSecondE4PrepareAttempted_=false,sourceWreckSecondE4PrepareComplete_=false;
+    void finishSourceWreckSecondE41661D8(::ra_source_camera50LA::OwnershipBridge& bridge);
+    void finishSourceWreckSecondE4Prepare16629C(::ra_source_camera50LA::OwnershipBridge& bridge);
+    bool sourceWreckSecondDCAttempted_=false,sourceWreckSecondDCComplete_=false;
+    bool sourceWreckSecondD8Attempted_=false,sourceWreckSecondD8Complete_=false;
+    void finishSourceWreckSecondDC1660A0(::ra_source_camera50LA::OwnershipBridge& bridge);
+    void finishSourceWreckSecondD816616C(::ra_source_camera50LA::OwnershipBridge& bridge);
+    bool sourceWreckSecondE0LoadAttempted_=false,sourceWreckSecondE0LoadComplete_=false;
+    bool sourceWreckSecondE0PrepareAttempted_=false,sourceWreckSecondE0PrepareComplete_=false;
+    void finishSourceWreckSecondE0Shape166074(::ra_source_camera50LA::OwnershipBridge& bridge);
+    void finishSourceWreckSecondE0Prepare16607C(::ra_source_camera50LA::OwnershipBridge& bridge);
+    bool sourceWreckSecondE0Attempted_=false,sourceWreckSecondE0Complete_=false;
+    void finishSourceWreckSecondE0166018(::ra_source_camera50LA::OwnershipBridge& bridge);
+    bool sourceWreckSecondBodyAttempted_=false,sourceWreckSecondBodyComplete_=false;
+    void finishSourceWreckSecondBody165E90(::ra_source_camera50LA::OwnershipBridge& bridge);
+    bool sourceWreckSecondPieceAttempted_=false,sourceWreckSecondPieceComplete_=false;
+    void finishSourceWreckSecondPiece22C0A0(::ra_source_camera50LA::OwnershipBridge& bridge);
+    bool sourceWreckPieceCursorAttempted_=false,sourceWreckPieceCursorComplete_=false;
+    void finishSourceWreckPieceCursor22C25C(::ra_source_camera50LA::OwnershipBridge& bridge);
+    bool sourceWreckWaterAttempted_=false,sourceWreckWaterComplete_=false;
+    void finishSourceWreckWater22C21C(::ra_source_camera50LA::OwnershipBridge& bridge);
+    bool sourceWreckGroupPrimaryAttempted_=false,sourceWreckGroupPrimaryComplete_=false;
+    bool sourceWreckGroupContextAttempted_=false,sourceWreckGroupContextComplete_=false;
+    bool sourceWreckGroupSparksAttempted_=false,sourceWreckGroupSparksComplete_=false;
+    bool sourceWreckGroupSparksSetupAttempted_=false,sourceWreckGroupSparksSetupComplete_=false;
+    bool sourceWreckGroupSparksConfigAttempted_=false,sourceWreckGroupSparksConfigComplete_=false;
+    void beginSourceWreckGroupSparksConfig15F2F0(::ra_source_camera50LA::OwnershipBridge& bridge);
+    void setupSourceWreckGroupSparks2CC0D4(::ra_source_camera50LA::OwnershipBridge& bridge);
+    void constructSourceWreckGroupSparks2CC0B4(::ra_source_camera50LA::OwnershipBridge& bridge);
+    void consumeSourceWreckGroupContext2CC088(::ra_source_camera50LA::OwnershipBridge& bridge);
+    void bindSourceWreckGroupPrimary22C298(::ra_source_camera50LA::OwnershipBridge& bridge);
+    bool sourceWreckGroupConstructorAttempted_=false,sourceWreckGroupConstructorComplete_=false;
+    void constructSourceWreckGroup22C278(::ra_source_camera50LA::OwnershipBridge& bridge);
+    bool sourceWreckSecondPieceCursorAttempted_=false,sourceWreckSecondPieceCursorComplete_=false;
+    void finishSourceWreckSecondPieceCursor22C25C(::ra_source_camera50LA::OwnershipBridge& bridge);
+    bool sourceWreckSecondWaterAttempted_=false,sourceWreckSecondWaterComplete_=false;
+    void finishSourceWreckSecondWater22C21C(::ra_source_camera50LA::OwnershipBridge& bridge);
+    bool sourceWreckSecondPieceAppendAttempted_=false,sourceWreckSecondPieceAppendComplete_=false;
+    void finishSourceWreckSecondPieceAppend22C1B8(::ra_source_camera50LA::OwnershipBridge& bridge);
+    bool sourceWreckPieceAppendAttempted_=false,sourceWreckPieceAppendComplete_=false;
+    void finishSourceWreckPieceAppend22C1B8(::ra_source_camera50LA::OwnershipBridge& bridge);
+    bool sourceWreckSplashReadAttempted_=false,sourceWreckSplashReadComplete_=false;
+    void finishSourceWreckSplashRead19DDC8(::ra_source_camera50LA::OwnershipBridge& bridge);
+    bool sourceWreckDustReadAttempted_=false,sourceWreckDustReadComplete_=false;
+    void finishSourceWreckDustRead19A7D0(::ra_source_camera50LA::OwnershipBridge& bridge);
+    bool sourceWreckFireReadAttempted_=false,sourceWreckFireReadComplete_=false;
+    void finishSourceWreckFireRead15E024(::ra_source_camera50LA::OwnershipBridge& bridge);
+    bool sourceWreckFireAttempted_=false,sourceWreckFireComplete_=false;
+    void finishSourceWreckFire2CB720(::ra_source_camera50LA::OwnershipBridge& bridge);
+    bool sourceWreckSmokeReadAttempted_=false,sourceWreckSmokeReadComplete_=false;
+    void finishSourceWreckSmokeRead19A7D0(::ra_source_camera50LA::OwnershipBridge& bridge);
+    void finishSourceWreckSmoke2CB6CC(::ra_source_camera50LA::OwnershipBridge& bridge);
+    void finishSourceWreckArrays2CB628(::ra_source_camera50LA::OwnershipBridge& bridge);
+    void finishSourceWreckMutual166390(::ra_source_camera50LA::OwnershipBridge& bridge);
+    ::ra_source_camera50LA::OwnershipBridge* sourceTerrainBridge_=nullptr;
+    std::uint32_t sourceConstructorPC_=0;
+    void constructSourceTerrain21204C(runtime_startup50fl::Fixture& actual,
+        ::ra_source_camera50LA::OwnershipBridge& bridge);
+    void finishSourceTerrain21204C(::ra_source_camera50LA::OwnershipBridge& bridge) {
+        need(bank_&&fixture_&&!sourceTerrainWithdrawn_,"source348 live Bank custody missing");
+        bank_->visit(slot_,[&](){constructSourceTerrain21204C(*fixture_,bridge);});
+    }
+
+    bool sourceMassAttempted_=false,sourceMassComplete_=false,sourceInertiaAttempted_=false;
+    bool sourcePhysicalAttempted_=false,sourceRepulsorAttempted_=false;
+    std::array<std::optional<float>,4> sourceRepulsorStack_;
+    void applySourceRepulsor214894(runtime_startup50fl::Fixture& actual,
+        ::ra_source_camera50LA::OwnershipBridge& bridge);
+    //Actual2146 stack destinations, unknown until their individual158A70
+    //writes. Missing Weight/scales stop at consumption, not at the reader.
+    std::array<std::optional<float>,5> sourcePhysicalStack_;
+    g::BodyMatrix48G sourcePhysicalMatrix_{};
+    void applySourcePhysical214710(runtime_startup50fl::Fixture& actual);
+    std::vector<std::uint8_t> sourceHandlingPhy_; //Immutable authored backing, not live parameters.
+    void reserveSourceHandlingBefore2146(runtime_startup50fl::Fixture& actual);
+    bool sourceHandlingBodyCurrent(const runtime_startup50fl::Fixture& actual)const noexcept;
+    void applySourceMass165300(runtime_startup50fl::Fixture& actual,float mass);
+    void applySourceInertia165340(runtime_startup50fl::Fixture& actual,const g::BodyMatrix48G& input);
+
     bool nativeSecondaryContactsRequested_=false,nativeSecondaryContactsAttempted_=false;
     std::shared_ptr<g::NativeSecondaryContactOwner50LA> nativeSecondaryContacts_;
     std::shared_ptr<g::NativeRacerTerrainOwner50LA> nativeRacerTerrain_;
@@ -189,7 +426,7 @@ class Owner final {
     }
     g::SceneGraph49P graph()const noexcept{return {arena_->nodes,rig_->nodeCount};}
     g::OriginalWreckComponentDomain50LA outside(
-        std::array<g::OriginalWreckComponent50LA*,15>& storage)noexcept;
+        std::array<g::OriginalWreckComponent50LA*,29>& storage)noexcept;
     bool admitAnimationClose()noexcept;
     bool closeOnCurrentGraph()noexcept;
 public:
@@ -231,6 +468,7 @@ public:
     //100 result to this SAME body owner. The no-fail live state/parameter copy
     //immediately follows; a failed handling transaction never reaches here.
     //This does not claim the intervening2146C0 Entity consumers are present.
+    void beginLegacyColdHandling(runtime_startup50fl::Fixture& actual);
     void commitMainInertia21488C(runtime_startup50fl::Fixture& actual,
         const g::AuthoredBinding49N& binding);
     // Handling uses a native working copy, but this exact Fixture and its
@@ -283,6 +521,13 @@ public:
     // Caller is visiting this exact installed racer slot. The stable arena
     // address is retained only so ordered close can clear its banked borrow.
     void bindRendererMaterialFlame(a::PodFlameOwners50W& actualFlame);
+    //Dedicated constructor-only Session read; never broadens finishedFor or
+    //the legacy runtime admission. This exact cut ends BEFORE348 allocation.
+    bool sourceModelPrefixFor(const g::OriginalRacerEntityCold50LA& racer)const noexcept {
+        return !closed_&&handlingRoute_==HandlingRoute::source&&sourceModelPrefixComplete_&&
+            attachedFor(racer)&&racer.body340==body340_.get()&&racer.gravity344==gravity344_.get()&&
+            !racer.joint360;
+    }
     bool finishedFor(const g::OriginalRacerEntityCold50LA& racer)const noexcept {
         return finished1538B0()&&attachedFor(racer);
     }

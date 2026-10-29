@@ -26,14 +26,32 @@ inline bool RaceAudioGroups50IC::beginTaIntro177750(
     return bool(taIntroTransport_);
 }
 inline bool RaceAudioGroups50IC::finishTaIntro177750(game::OriginalWreckComponent50LA& controller)noexcept {
-    // Only the concrete friend Session calls this after publishing and loading
-    // its actual cue-map5C. No claimed callback result is consumed as proof.
+    //Only the concrete friend Session calls this. Legacy routes have already
+    //loaded5C; RA native prewarming immediately reserves dispatch custody and
+    //defers source80/5C publication. Neither path accepts a claimed callback.
     if(taIntroExpectedController_!=&controller||taIntroLive_||!taIntroTransport_||
        !taIntroTransport_->current()||!coldTaIntroEmitterIdentity()||
        coldTaIntroEmitter_->count200!=coldTaIntroEmitter_->group30->taIntroAuthoring->eventCount()||!attachTaIntro141960(controller))return false;
     taIntroLive_=true;return taIntroReady();
 }
 inline bool RaceAudioGroups50IC::taIntroReady()const noexcept {
+    return (!taIntroNativeReserved_||(taIntroNativePublished_&&!taIntroNativeWithdrawn_))&&
+        taIntroBackingCurrent();
+}
+inline bool RaceAudioGroups50IC::reserveNativeTaIntro177750(game::OriginalWreckComponent50LA& controller)noexcept {
+    if(!coldStarted_||coldThread_!=std::this_thread::get_id()||taIntroNativeReserved_||
+       taIntroNativeWithdrawn_||taIntroExpectedController_!=&controller)return false;
+    taIntroNativeReserved_=true; //One-way even if a backing check now rejects.
+    return taIntroBackingCurrent();
+}
+inline bool RaceAudioGroups50IC::publishNativeTaIntro177750(game::OriginalWreckComponent50LA& controller)noexcept {
+    if(!taIntroNativeReserved_||taIntroNativePublished_||taIntroNativeWithdrawn_||
+       taIntroExpectedController_!=&controller||!taIntroBackingCurrent())return false;
+    //Same completed native event owner and same existing141960 attachment.
+    //No constructor/event load/splice or transport creation is replayed.
+    taIntroNativePublished_=true;return true;
+}
+inline bool RaceAudioGroups50IC::taIntroBackingCurrent()const noexcept {
     if(!taIntroLive_||!taIntroTransport_||!taIntroTransport_->current()||
        coldRetiring_||nativeBindingsRetired_||!coldTaIntroEmitterIdentity())return false;
     const auto& emitter=*coldTaIntroEmitter_;
@@ -73,7 +91,10 @@ inline RaceAudioGroups50IC::TaIntroDispatchResult RaceAudioGroups50IC::dispatchT
     return TaIntroDispatchResult::sourceFalse;
 }
 inline bool RaceAudioGroups50IC::stopTaIntro2924A0()noexcept {
-    if(!taIntroReady())return false;
+    return taIntroReady()&&stopTaIntroBacking2924A0();
+}
+inline bool RaceAudioGroups50IC::stopTaIntroBacking2924A0()noexcept {
+    if(!taIntroBackingCurrent())return false;
     auto& emitter=*coldTaIntroEmitter_;
     //2924A0 scans the real wrapper list in order;1F0 survives this operation.
     for(std::size_t n=0;n<emitter.count200;++n){auto& wrapper=*emitter.members204[n];
@@ -113,7 +134,11 @@ inline bool RaceAudioGroups50IC::serviceTaIntro235720(
     return !group.entity.firstChild18&&!group.entity.descendants24;
 }
 inline bool RaceAudioGroups50IC::retireTaIntro142590()noexcept {
-    if(coldTaIntroEmitter_&&taIntroLive_&&!stopTaIntro2924A0())return false;
+    if(coldStarted_&&coldThread_!=std::this_thread::get_id())return false;
+    //One-way revocation precedes every fallible cleanup step. The private
+    //backing stop admits cleanup, not public dispatch/service fallback.
+    if(taIntroNativeReserved_)taIntroNativeWithdrawn_=true;
+    if(coldTaIntroEmitter_&&taIntroLive_&&!stopTaIntroBacking2924A0())return false;
     //Drain every native overlapping instance, not merely the three latest
     //source handles. This is transport memory safety, not retail2924A0.
     if(taIntroTransport_&&!taIntroTransport_->drain())return false;

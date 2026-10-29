@@ -4,21 +4,34 @@
 #include "../../src/game/original_application_entities50la.h"
 #include "ra_static_candidates50la.h"
 #include <limits>
+#include <optional>
 #include <array>
 #include <cmath>
 #include <memory>
 #include <string>
 #include <vector>
+namespace ra_cold_aggregate50LA {class Owner;}
 namespace ra_pod_scene50LA {class Owner;}
 namespace ra_static_model_cold50LA {class Owner;}
 namespace rr::game {
-// Actual271230 per-zone27BB40 owners and the private reached27B040 custody.
-// New source identities borrow existing native candidates; never duplicate or
-// reset their geometry, matrices, filters, sphere, registry or physics state.
+// Same collision collection, exclusive actual1B4EC0 descriptor-source mode
+// or legacy native271230/reached27B040 custody. Source mode owns no decoded
+// candidates, geometry, query entities, registry or physics readiness.
 class OriginalWorldCollisionObjects50LA final {
+    friend class ::ra_cold_aggregate50LA::Owner;
     friend class ::ra_pod_scene50LA::Owner;
     friend class ::ra_static_model_cold50LA::Owner;
+    struct SourceDescriptor {
+        std::array<char,260> name00;std::size_t nameKnown=0;
+        std::array<std::uint32_t,4> position110,look120,up130,smokeOffset150,smokeVelocity160;
+        std::uint32_t vtable170=0,useLighting140=0,dynamic144=0,shadow148=0,smoker14C=0;
+        std::uint32_t field180=0,field184=0;std::uint8_t vectorKnown=0;
+        bool constructed=false,loaded=false;
+        //Native backing initialization is not source knowledge. Unwritten
+        //name tail,174/178/17C/188/18C have no source consumer or value.
+    };
     struct Descriptor {
+        std::optional<SourceDescriptor> sourceFields;
         const assets::WorldInstance48F* source=nullptr;
         std::string name00;
         std::array<float,4> position110{0,0,0,1},look120{0,0,1,1},up130{0,1,0,1};
@@ -61,6 +74,8 @@ class OriginalWorldCollisionObjects50LA final {
         std::uint32_t failurePC=0;
     };
     struct Wrapper {
+        bool sourceMode=false,sourceTypeKnown=false,sourceDescriptorPublished=false;
+        std::uint32_t sourceVtable0C=0;
         std::uint32_t type00=1;
         OriginalWreckComponent50LA* collision04=nullptr;
         std::unique_ptr<Descriptor> descriptor08;
@@ -75,12 +90,27 @@ class OriginalWorldCollisionObjects50LA final {
         std::uint32_t count30=0;
         std::vector<Wrapper> entries34;
         bool counted=false;
+        bool sourceMode=false,sourceEnrolled=false,sourceCountKnown=false,sourceArrayReturned=false;
+        std::uint32_t sourceVtable08=0;
+        std::unique_ptr<Wrapper*[]> sourceEntries34;
+        std::size_t sourceEntriesKnown=0;
     };
+    bool sourceMode_=false;
+    std::array<std::unique_ptr<Zone>,10> sourceZones_;
+    std::array<std::vector<std::unique_ptr<Wrapper>>,10> sourceWrappers_;
+    std::unique_ptr<OriginalWreckComponent50LA*[]> sourceArray3CC_;
+    std::size_t sourceArrayKnown_=0;
+    bool sourceArrayReturned_=false;
+    std::array<bool,10> sourceGroupAllocationReturned_{},sourceLogAttempted_{};
+    std::array<std::size_t,10> sourceLogWritten_{};
+    std::size_t sourceCountedGroups()const noexcept {
+        std::size_t n=0;for(const auto& p:sourceZones_)if(p&&p->counted)++n;return n;
+    }
     std::shared_ptr<const ra_cold_sources50LA::Owner> source_;
     std::array<Zone,10> zones_;
     OriginalWorldCollisionObjects50LA()noexcept=default;
     bool prepareBacking(std::shared_ptr<const ra_cold_sources50LA::Owner> source)noexcept {
-        if(source_||!source||!source->sourcesDecoded())return false;
+        if(sourceMode_||source_||!source||!source->sourcesDecoded())return false;
         const auto& s=*source->sourcesDecoded();const auto& w=s.world;
         if(w.zones.size()!=10||w.instances.size()!=1261)return false;
         try {
@@ -148,7 +178,7 @@ class OriginalWorldCollisionObjects50LA final {
         return static_cast<std::uint64_t>(reinterpret_cast<std::uintptr_t>(p));
     }
     Wrapper* nativeSlot(std::size_t zone,std::size_t row)noexcept {
-        return zone<zones_.size()&&row<zones_[zone].entries34.size()?
+        return !sourceMode_&&zone<zones_.size()&&row<zones_[zone].entries34.size()?
             &zones_[zone].entries34[row]:nullptr;
     }
     // Private caller authenticates actual current directory/category producer
@@ -287,6 +317,7 @@ class OriginalWorldCollisionObjects50LA final {
 
 public:
     ~OriginalWorldCollisionObjects50LA()noexcept {
+        for(const auto& p:sourceZones_)if(p&&p->counted)std::terminate();
         for(const auto& z:zones_){
             if(z.counted)std::terminate();
             for(const auto& w:z.entries34)if(w.collision04||

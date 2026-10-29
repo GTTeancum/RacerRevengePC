@@ -10,6 +10,8 @@ namespace original_camera_cycle_audio50KX { class Owner; }
 namespace rr::platform { class GameHost50ER; class VehicleWindowGl50DS; }
 namespace original_results_roster50LA { class Read; }
 namespace original_position_stats_adapter50LA { class Owner; }
+namespace ra_cold_roster50LA { class Operation; }
+namespace native_racer50HN { class Bank; }
 namespace rr::assets {
 class OriginalStandardMaterialDomain50LA;
 class OriginalStandardMaterialTable50LA;
@@ -39,6 +41,18 @@ class OriginalResults10450LA final {
     friend class OriginalRaceConstructor50LA;
     friend class rr::platform::VehicleWindowGl50DS;
     friend class ::original_race_hud_scope50LA::Registration;
+    static bool nameEntryRaceCurrent1C9B10(const OriginalRaceConstructor50LA&,const OriginalResults10450LA*,
+        const std::shared_ptr<OriginalApplicationEntities50LA>&,const std::uint64_t&)noexcept;
+    static bool liveResultsRaceAuthorityCurrent(const OriginalRaceConstructor50LA&,
+        const std::shared_ptr<OriginalApplicationEntities50LA>&)noexcept;
+    //Implementation-only include isolation; no cached count or new custody.
+    static bool demandObserverCameraMatches1C15B0(const ::original_position_stats_adapter50LA::Owner&,
+        const ::original_camera_session50KX::Session&)noexcept;
+    static const ::native_racer50HN::Bank* demandObserverBankIdentity1C16F8(
+        const ::original_position_stats_adapter50LA::Owner&)noexcept;
+    bool demandRosterCountCurrent1C16F8(const OriginalRaceConstructor50LA&,
+        const ::original_position_stats_adapter50LA::Owner&,const std::shared_ptr<::ra_cold_roster50LA::Operation>&,
+        const ::native_racer50HN::Bank*,std::size_t&)const;
     struct Impl;
     std::unique_ptr<Impl> impl_;
     OriginalResults10450LA(std::shared_ptr<OriginalApplicationEntities50LA>,std::uint64_t);

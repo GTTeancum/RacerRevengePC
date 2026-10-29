@@ -32,6 +32,12 @@ bool authored(const OriginalGcPodFireDefinition50KG& d) noexcept {
 }
 OriginalGcSprayStatus50KG readOriginalGcPodFireDefinition50KG(
     const std::vector<std::uint8_t>& bytes,OriginalGcPodFireDefinition50KG& out,D& d) noexcept {
+    OriginalGcPodFireSourceMetadata50KG ignored;
+    return readOriginalGcPodFireSourceDefinition50KG(bytes,out,ignored,d);
+}
+OriginalGcSprayStatus50KG readOriginalGcPodFireSourceDefinition50KG(
+    const std::vector<std::uint8_t>& bytes,OriginalGcPodFireDefinition50KG& out,
+    OriginalGcPodFireSourceMetadata50KG& metadata,D& d) noexcept {
     d={};if(std::fegetround()!=FE_TONEAREST)return S::arithmetic;
     try {
         std::vector<Section> doc;
@@ -87,7 +93,13 @@ OriginalGcSprayStatus50KG readOriginalGcPodFireDefinition50KG(
         // The concrete GC demoprt registry is also checked at actual binding.
         f.firstFrame=52;f.lastFrame=75;next.parsed=true;
         if(!authored(next)){d.sourcePC=0x15e6d0;return S::unsupported;}
-        out=std::move(next);return S::complete;
+        OriginalGcPodFireSourceMetadata50KG source;
+        source.rawAgeAtBirth=birthFraction;source.delayTime=delay;
+        source.mode=mode;source.forcedCount=forcedSets;
+        auto present=[&](const char* key){const auto* v=general->find(key);return v&&v->sourceValuePresent;};
+        source.velocityPresent=present("Velocity");source.minRangePresent=present("MinRange");
+        source.maxRangePresent=present("MaxRange");
+        out=std::move(next);metadata=source;return S::complete;
     }catch(...){return S::allocation;}
 }
 OriginalGcPodFireReceipt50KG bindOriginalGcPodFire50KG(

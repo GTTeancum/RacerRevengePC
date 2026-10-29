@@ -1,3 +1,7 @@
+#include "../../src/game/original_world_light_assertion273abc.h"
+#include "../../src/game/original_selected_array_guards27ed40.h"
+#include "../../src/game/original_sunflare_saturation_history50la.h"
+#include "../../src/game/original_parameter_packet_history50la.h"
 #include "original_camera_session50kx.h"
 #include "original_race_display_lifetime50la.h"
 #include "original_race_world_join50la.h"
@@ -9,6 +13,7 @@
 #include "../../platform/linux/native/original_ui_light_manager_owner50kg.h"
 #include "../../platform/linux/native/original_ui_main_session50kg.h"
 #include "../../platform/linux/native/original_ui_garage_scene_setup50kg.h"
+#include "original_source_world_cscamera_history50la.h"
 #include <cstring>
 #include <thread>
 
@@ -42,7 +47,7 @@ bool Owner::withdrawNativeScb34_271C10(const original_main_entry50KG::Applicatio
         //Native parser-role destruction/withdrawal corresponding to1573B0
         //then World34 clear at271C34. NOT destruction of the shared decoded
         //World, geometry or SceneInfo roles, and NOT whole-owner close.
-        nativeScb34_.reset();
+        nativeScb34_.reset();worldParser34_=nullptr; //271C34, same publication.
     }
     pc=0x1aa0a0;return true;
 }
@@ -59,11 +64,12 @@ bool Owner::continueNativeTob1B4330(const original_main_entry50KG::Application& 
     pc=0x1b43c4;
     if(!nativeTob34_){
         nativeTob34_.emplace(); //Publish the replacement World34 parser role BEFORE load.
+        worldParser34_=&*nativeTob34_;
         nativeTob34_->source=source_;nativeTob34_->provider=provider;
         nativeTob34_->authoring=particles_.get();
     }
     auto& reader=*nativeTob34_;
-    if(reader.source!=source_||reader.provider!=provider||reader.authoring!=particles_.get())return false;
+    if(!worldParser34_||*worldParser34_!=&reader||reader.source!=source_||reader.provider!=provider||reader.authoring!=particles_.get())return false;
     pc=0x1b43d0;
     a::OriginalStandardArchiveProvider50LA::MemberView member;
     a::OriginalStandardArchiveProvider50LA::MountView mount;
@@ -201,6 +207,8 @@ namespace ra_cold_aggregate50LA {
 bool Owner::continueNativeTerrain271370(const original_main_entry50KG::Application& app,
     std::uint32_t& pc)noexcept {
     pc=0x271cf0;
+    if(sourceTerrainPhase_!=SourceTerrainPhase::unreached||
+       (nativeTerrain3B0_&&nativeTerrain3B0_->sourceMode))return false;
     if(nativeScbThread_!=std::this_thread::get_id()||nativeScbRevoked_||nativeScb34_||
        !nativeTob34_||nativeTob34_->next!=NativeTobReader34::Next::complete||
        !nativeTob34_->document||!nativeSceneInfo270900Current(app,pc))return false;
@@ -315,8 +323,9 @@ namespace ra_cold_aggregate50LA {
 bool Owner::continueNativeTriggers1B5000(const original_main_entry50KG::Application& app,
     std::uint32_t& pc)noexcept {
     pc=0x271d44;
-    if(nativeScbThread_!=std::this_thread::get_id()||nativeScbRevoked_||
-       !nativeEmptyAnimations2713E0Complete_||!nativeTerrain3B0_||!nativeTerrain3B0_->mappingsComplete||
+    if(sourceTriggerAttempted_||nativeScbThread_!=std::this_thread::get_id()||nativeScbRevoked_||
+       !nativeEmptyAnimations2713E0Complete_||sourceTerrainPhase_!=SourceTerrainPhase::unreached||
+       !nativeTerrain3B0_||nativeTerrain3B0_->sourceMode||!nativeTerrain3B0_->mappingsComplete||
        !nativeTob34_||!nativeTob34_->document||!nativeSceneInfo270900Current(app,pc))return false;
     try {
     if(!triggers_||!triggers_->decoded_||triggers_->source_!=source_||!candidates_||
@@ -348,7 +357,14 @@ bool Owner::continueNativeTriggers1B5000(const original_main_entry50KG::Applicat
        !findUniqueField(*block,"numberoftriggers",field)||!field||field->value!="2")return false;
     if(!createNativeTriggerList2DC320(candidates_,triggers_,pc))return false;
     auto& list=*nativeTriggerList3D0_;
-    pc=0x2dc4f4;list.count30=2u; //Actual authored extent; no populated-success default.
+    if(list.readerEntered){pc=list.readerPC;return list.complete;}
+    list.readerEntered=true;
+    if(!actions.beginNativeDescriptorLoad())return false;
+    struct ReaderStop {decltype(list)& owner;std::uint32_t& pc;
+        ~ReaderStop(){owner.readerPC=pc;}} readerStop{list,pc};
+    pc=0x2dc4f4;list.count30=2u; //Actual reader value from authenticated field above.
+    try{list.descriptors34.reset(new NativeTriggerDescriptor*[list.count30]);}catch(...){}
+    pc=0x2dc508; //Actual nullable allocation publication; unwritten rows stay unread.
     for(std::size_t i=0;i<2u;++i){
         pc=0x2dc53c;
         const std::string section="trigger"+std::to_string(i+1u);
@@ -356,10 +372,22 @@ bool Owner::continueNativeTriggers1B5000(const original_main_entry50KG::Applicat
         if(!findUniqueBlock(document,section.c_str(),block)||!block||
            !findUniqueBlock(document,(section+"action1").c_str(),actionBlock)||!actionBlock)return false;
         const auto& authored=triggers_->sources_[i];auto& state=group.triggers[i];
+        pc=0x2dc568;
+        try{list.descriptorOwners[i]=std::make_unique<NativeTriggerDescriptor>();}catch(...){}
+        //Inline descriptor ctor2DC580..598 establishes00/04/68 null/zero.
+        //Geometry64 remains explicit existing native shape adoption, not a new shape.
+        pc=0x2dc5b0;
+        if(!list.descriptors34)return false; //Retain descriptor allocation before bad outer store.
+        list.descriptors34[i]=list.descriptorOwners[i].get();
+        ++list.descriptorSlotsPublished;
+        if(!list.descriptors34[i])return false;
+        auto& descriptor=*list.descriptors34[i];descriptor.authoring=&authored;
         auto& candidate=candidates_->candidates_[178u+i];const auto& collision=candidate.candidate.collision;
         if(!findUniqueField(*block,"name",field)||!field||field->value!=authored.name||
-           !findUniqueField(*block,"numberofactions",field)||!field||field->value!="1"||
-           !findUniqueField(*block,"zone",field)||!field||field->value!="4"||authored.zone!=4u||
+           !findUniqueField(*block,"numberofactions",field)||!field||field->value!="1")return false;
+        //Actual2DBE08 reader destination, not a restart-time authored-count substitute.
+        pc=0x2dbe08;descriptor.actionCount04=1;
+        if(!findUniqueField(*block,"zone",field)||!field||field->value!="4"||authored.zone!=4u||
            !findUniqueField(*actionBlock,"actiontype",field)||!field||field->value!="LostAI"||
            !findUniqueField(*actionBlock,"targetnodeindex",field)||!field||
            field->value!=std::to_string(authored.action.targetNodeIndex)||authored.action.reset)return false;
@@ -389,12 +417,29 @@ bool Owner::continueNativeTriggers1B5000(const original_main_entry50KG::Applicat
         //Adopt immutable descriptor source and SAME native live state. Only
         //missing lifetime Entity identities are added; no flags/contact reset,
         //callback registration, candidate resize, geometry or zone reattachment.
-        if(list.descriptors34[i]&&list.descriptors34[i]!=&authored)return false;
-        list.descriptors34[i]=&authored;
         if(!countNativeTriggerPair2A0290(i,pc))return false;
         if(list.joined<i+1u)list.joined=i+1u;
+        pc=0x2dc0a8;
+        try{descriptor.actions68.reset(new NativeActionDescriptor*[descriptor.actionCount04]);}catch(...){}
+        pc=0x2dc0b0; //Retain nullable publication; factory still runs before slot store.
+        //Authenticated LostAI factory type22. Its owned payload is joined to
+        //the SAME prewarmed callback backend, never a second action behavior.
+        pc=0x1b5db8;
+        try{descriptor.action=std::make_unique<NativeActionDescriptor>();}catch(...){}
+        pc=0x1b5dec;if(!descriptor.actions68)return false;
+        descriptor.actions68[0]=descriptor.action.get();
+        descriptor.actionSlotsPublished=1;
+        if(!actions.beginNativeActionDescriptor(i,descriptor.action.get(),pc)){
+            if(!descriptor.action)pc=0x2dc1ec;return false;
+        }
+        //Same immutable TOB common reader: missing SpecificObject uses empty
+        //158AD0 fallback; never infer this from the old semantic projection.
+        const bool specificObjectAbsent=findUniqueField(*actionBlock,"specificobject",field)&&!field;
+        if(!actions.completeNativeActionDescriptor(i,authored.action,pc,specificObjectAbsent))return false;
+        descriptor.complete=true;
     }
     if(!canRetireNativeTriggerList3D0())return false; //Prove bounded prefix is ownable/retirable.
+    if(!actions.completeNativeDescriptorLoad())return false;
     list.complete=true;
     pc=0x271d54;return true; //BEFORE fourth A4 dispatch/+AC, not full A4 return.
     }catch(...){return false;} //Retain list and every reached counted pair for exact native cleanup.
@@ -426,6 +471,10 @@ bool Owner::continueNativePhysicsObjects2718C0(const original_main_entry50KG::Ap
     //271904 ->2719E8 skips ALL4B0/4B4 stores and27A650 allocations.
     //Do not zero, allocate or replace any physics owner, nor infer preexisting
     //World4B0/4B4 values from this local default. This branch has no Entity work.
+    //Native bounded no-owner admission must agree with authoritative actual
+    //constructor lanes. These are custody checks, NOT added guest reads/stores.
+    if(!worldReset270550Complete_||!worldPhysicsObjectCount4B0_||*worldPhysicsObjectCount4B0_||
+       !worldPhysicsObjectPointers4B4_||*worldPhysicsObjectPointers4B4_)return false;
     nativePhysicsObjects2718C0Complete_=true;
     pc=0x271d64;return true; //BEFORE fifth A4 dispatch/+B8, NOT complete A4.
 }
@@ -435,7 +484,8 @@ namespace ra_cold_aggregate50LA {
 bool Owner::continueNativeCsCameras272380(const original_main_entry50KG::Application& app,
     const original_camera_session50KX::Session& session,std::uint32_t& pc)noexcept {
     pc=0x271d64; //Fifth A4 call/+B8 ->272380: metadata, NOT camera construction.
-    if(nativeScbThread_!=std::this_thread::get_id()||nativeScbRevoked_||
+    if(sourceCsCameraPhase_!=SourceCsCameraPhase::unreached||
+       (nativeCsCameraTable3E4_&&nativeCsCameraTable3E4_->sourceMode)||nativeScbThread_!=std::this_thread::get_id()||nativeScbRevoked_||
        !nativePhysicsObjects2718C0Complete_||!nativeTob34_||!nativeTob34_->document||
        !nativeSceneInfo270900Current(app,pc)||!runtimeQueries_||!runtimeQueries_->camera_||
        runtimeQueries_->camera_->session.get()!=&session||
@@ -454,17 +504,22 @@ bool Owner::continueNativeCsCameras272380(const original_main_entry50KG::Applica
     const Block* block=nullptr;const Field* field=nullptr;
     if(!findUniqueBlock(document,"cscameras",block)||!block||
        !findUniqueField(*block,"numberofcameras",field)||!field||field->value!="7")return false;
-    pc=0x2723fc;
     if(!nativeCsCameraTable3E4_){
+        pc=0x2723cc;
+        if(!nativeCsCameraZones3E8_)return false; //Unknown is not null.
+        if(*nativeCsCameraZones3E8_){pc=0x2723d8;return false;} //Append/realloc path unjoined.
+        pc=0x2723fc;nativeCsCameraCount3E4_=authoring->cutCount(); //BEFORE backing/publication.
         nativeCsCameraTable3E4_.emplace();
         auto& table=*nativeCsCameraTable3E4_;
         table.session=&session;table.authoring=authoring;
-        table.count3E4=authoring->cutCount(); //Actual field7, cross-checked same custody.
-        //Fixed native storage replaces the seven-word3E8 allocation only.
-        //Not another camera owner; unread rows remain explicitly unknown.
+        //Existing fixed native storage policy replaces seven-word allocation,
+        //not another camera owner. Unknown rows remain unknown on publication.
+        pc=0x272414;nativeCsCameraZones3E8_=&table.zones;
     }
     auto& table=*nativeCsCameraTable3E4_;
-    if(table.session!=&session||table.authoring!=authoring||table.count3E4!=7u||table.next>7u||
+    if(table.session!=&session||table.authoring!=authoring||
+       !nativeCsCameraCount3E4_||*nativeCsCameraCount3E4_!=7u||
+       !nativeCsCameraZones3E8_||*nativeCsCameraZones3E8_!=&table.zones||table.next>7u||
        !nativeSceneInfo270900_||nativeSceneInfo270900_->authoredZones34C!=10)return false;
     for(std::size_t i=0;i<7u;++i){
         pc=0x272438;
@@ -475,8 +530,12 @@ bool Owner::continueNativeCsCameras272380(const original_main_entry50KG::Applica
         if(!authoring->initialZone(static_cast<unsigned>(i+1u),zone)||!zone||
            field->value!=std::to_string(zone))return false;
         pc=0x272458;
-        if(table.zones3E8[i]&&*table.zones3E8[i]!=zone)return false;
-        table.zones3E8[i]=zone; //Preserve authored1-based ordinals; NEVER subtract1.
+        auto& reached=(**nativeCsCameraZones3E8_)[i];
+        if(reached&&*reached!=zone)return false;
+        reached=zone; //Preserve authored1-based ordinals; NEVER subtract1.
+        //This native projection omits the genuine shared first-use interval.
+        //Withdraw process history only AFTER the reached row output store.
+        source_world_cscamera50LA::History::invalidateNative();
         pc=0x2724b4;
         if(zone>static_cast<std::uint32_t>(nativeSceneInfo270900_->authoredZones34C))return false;
         if(table.next<i+1u)table.next=i+1u;
@@ -494,7 +553,9 @@ bool Owner::continueNativeSunFlareRead1B46E0(const original_main_entry50KG::Appl
     const rr::platform::OriginalUiRiderProfileOwner50KG& profile,std::uint32_t& pc)noexcept {
     pc=0x271d78; //+C0 is SunFlares; +C4, NOT +C0, owns ParticleEmitters.
     if(nativeScbThread_!=std::this_thread::get_id()||nativeScbRevoked_||
-       !nativeCsCameraTable3E4_||nativeCsCameraTable3E4_->next!=7u||
+       !nativeCsCameraTable3E4_||nativeCsCameraTable3E4_->sourceMode||nativeCsCameraTable3E4_->next!=7u||
+       !nativeCsCameraCount3E4_||*nativeCsCameraCount3E4_!=7u||
+       !nativeCsCameraZones3E8_||*nativeCsCameraZones3E8_!=&nativeCsCameraTable3E4_->zones||
        !nativeTob34_||!nativeTob34_->document||!nativeSceneInfo270900Current(app,pc))return false;
     //The sole caller is the actual Race retained by Application. Its entry
     //guard proves Race.profile_ == Application.riderProfile (+2DC identity).
@@ -626,7 +687,7 @@ bool Owner::retainNativeSunFlareMaterial245DA0(NativeSunFlareMaterial& handle,co
 bool Owner::loadNativeSunFlareMaterials2C5A10(const original_main_entry50KG::Application& app,
     std::uint32_t& pc)noexcept {
     pc=0x2720c8;
-    if(nativeScbThread_!=std::this_thread::get_id()||nativeScbRevoked_||!nativeSunFlares_||
+    if(nativeScbThread_!=std::this_thread::get_id()||nativeScbRevoked_||!nativeSunFlares_||nativeSunFlares_->sourceMode||
        !nativeSunFlares_->owner||!canRetireNativeSunFlare()||!world_||
        world_->domain_!=rosterMountDomain_||!world_->context_||!world_->context_->live()||
        !rosterMountDomain_||app.standardMaterialDomain()!=rosterMountDomain_||
@@ -715,7 +776,7 @@ bool Owner::buildNativeSunFlarePacket2E6060(const original_main_entry50KG::Appli
     const original_camera_session50KX::Session& camera,std::uint32_t& pc)noexcept {
     pc=0x2c5c34;
     if(nativeScbThread_!=std::this_thread::get_id()||nativeScbRevoked_||
-       !nativeSunFlares_||!nativeSunFlares_->owner||!canRetireNativeSunFlare())return false;
+       !nativeSunFlares_||nativeSunFlares_->sourceMode||!nativeSunFlares_->owner||!canRetireNativeSunFlare())return false;
     auto& object=*nativeSunFlares_->owner;
     using Load=NativeSunFlare::Load;
     if(object.nextLoad<Load::spriteConfigured)return false;
@@ -752,6 +813,7 @@ bool Owner::buildNativeSunFlarePacket2E6060(const original_main_entry50KG::Appli
     const auto left=static_cast<std::uint32_t>(x),top=static_cast<std::uint32_t>(y);
     const auto right=left+4096u,bottom=top+4096u;
     pc=0x2e6218; //134000(a1=1,a2=128): SAME actual133F80 helper.
+    rr::game::OriginalParameterPacketHistory50LA::invalidateNative134xxx();
     if(!parameter.packetStarted){
         for(auto& word:parameter.unknown00To1C)word=0;
         parameter.field2C=1;parameter.count24=128;parameter.packetStarted=true;
@@ -799,7 +861,7 @@ namespace ra_cold_aggregate50LA {
 bool Owner::loadNativeSunFlareResources2C5C44(const original_main_entry50KG::Application& app,
     std::uint32_t& pc)noexcept {
     pc=0x2c5c44;
-    if(nativeScbThread_!=std::this_thread::get_id()||nativeScbRevoked_||!nativeSunFlares_||
+    if(nativeScbThread_!=std::this_thread::get_id()||nativeScbRevoked_||!nativeSunFlares_||nativeSunFlares_->sourceMode||
        !nativeSunFlares_->owner||!canRetireNativeSunFlare()||!world_||
        world_->domain_!=rosterMountDomain_||!world_->context_||!world_->context_->live()||
        !rosterMountDomain_||app.standardMaterialDomain()!=rosterMountDomain_)return false;
@@ -818,6 +880,7 @@ bool Owner::loadNativeSunFlareResources2C5C44(const original_main_entry50KG::App
         }
         if(o.nextLoad==Load::retrieveLoaded){
             pc=0x2c5c54;auto& b=*o.material68.parameters08;
+            rr::game::OriginalParameterPacketHistory50LA::invalidateNative134xxx();
             if(!b.packetStarted){
                 for(auto& word:b.unknown00To1C)word=0;
                 b.field2C=1;b.count24=128;b.packetStarted=true;
@@ -864,7 +927,7 @@ bool Owner::loadNativeSunFlareDepth2C5CF0(const original_main_entry50KG::Applica
     const original_main_entry50KG::RaceDisplayLifetime50LA& display,
     const original_camera_session50KX::Session& camera,std::uint32_t& pc)noexcept {
     pc=0x2c5cb4;
-    if(nativeScbThread_!=std::this_thread::get_id()||nativeScbRevoked_||!nativeSunFlares_||
+    if(nativeScbThread_!=std::this_thread::get_id()||nativeScbRevoked_||!nativeSunFlares_||nativeSunFlares_->sourceMode||
        !nativeSunFlares_->owner||!canRetireNativeSunFlare())return false;
     auto& o=*nativeSunFlares_->owner;using Load=NativeSunFlare::Load;
     if(o.nextLoad<Load::readbackAllocated)return false;
@@ -940,7 +1003,7 @@ namespace ra_cold_aggregate50LA {
 bool Owner::loadNativeSunFlareSaturation2720D0(const original_main_entry50KG::Application& app,
     std::uint32_t& pc)noexcept {
     pc=0x2720d0;
-    if(nativeScbThread_!=std::this_thread::get_id()||nativeScbRevoked_||!nativeSunFlares_||
+    if(nativeScbThread_!=std::this_thread::get_id()||nativeScbRevoked_||!nativeSunFlares_||nativeSunFlares_->sourceMode||
        !nativeSunFlares_->owner||!canRetireNativeSunFlare()||!nativeSceneInfo270900Current(app,pc)||
        !nativeTob34_||!nativeTob34_->document)return false;
     auto& o=*nativeSunFlares_->owner;using Load=NativeSunFlare::Load;
@@ -948,7 +1011,9 @@ bool Owner::loadNativeSunFlareSaturation2720D0(const original_main_entry50KG::Ap
     if(o.nextLoad==Load::saturationComplete){pc=0x271d88;return false;}
     if(!o.inputs.saturation||!o.depth40||!o.colors44||!o.colors48||o.zones30!=10||
        !nativeSunFlares_->count4A8||*nativeSunFlares_->count4A8!=1||
-       !nativeSunFlares_->pointers4A4||nativeSunFlares_->pointers4A4[0]!=&o)return false;
+       !nativeSunFlarePointers4A4_||!*nativeSunFlarePointers4A4_||
+       *nativeSunFlarePointers4A4_!=nativeSunFlares_->pointerBacking.get()||
+       (*nativeSunFlarePointers4A4_)[0]!=&o)return false;
     const Block* block=nullptr;const Field* field=nullptr;
     if(!findUniqueBlock(*nativeTob34_->document,"sunflare1",block)||!block)return false;
     pc=0x2720ec;
@@ -978,6 +1043,7 @@ bool Owner::loadNativeSunFlareSaturation2720D0(const original_main_entry50KG::Ap
             pc=0x27229c;
             //2C6008..1C source bounds condition is true for actual row0..9.
             //Private bounded native leaf, no fake shared assertion execution.
+            rr::game::OriginalSunFlareSaturationHistory50LA::invalidateNative2C5F80();
             o.flags98KnownValue=static_cast<std::uint8_t>((o.flags98KnownValue&~2u)|2u); //2C6060.
             for(unsigned lane=0;lane<4;++lane)o.colors44[row][lane]=minColor[lane]; //2C6070..88.
             for(unsigned lane=0;lane<4;++lane)o.colors48[row][lane]=maxColor[lane]; //2C6098..B0.
@@ -993,6 +1059,7 @@ bool Owner::loadNativeSunFlareSaturation2720D0(const original_main_entry50KG::Ap
 
 namespace ra_cold_aggregate50LA {
 bool Owner::canRetireNativeParticleList3D8()const noexcept {
+    if(sourceParticleDescriptorPhase_!=SourceParticleDescriptorPhase::unreached)return preflightSourceWorldParticleCountNative();
     if(!nativeParticleList3D8_)return true;
     if(!worldApplication_||worldApplication_->attachmentLock423F58()||!particles_||particles_->closed_)return false;
     const auto& l=*nativeParticleList3D8_;const auto& e=l.entity;
@@ -1034,6 +1101,7 @@ bool Owner::canRetireNativeParticleList3D8()const noexcept {
         e.firstChild18==first&&(!previous||!previous->next14)&&e.descendants24==(first?0x402u:0u);
 }
 bool Owner::retireNativeParticleList3D8()noexcept {
+    if(sourceParticleDescriptorPhase_!=SourceParticleDescriptorPhase::unreached){std::uint32_t pc=0;return abortSourceWorldParticleDescriptorsNative(pc);}
     if(!canRetireNativeParticleList3D8())return false;
     if(!nativeParticleList3D8_)return true;
     auto& l=*nativeParticleList3D8_;
@@ -1063,9 +1131,10 @@ bool Owner::retireNativeParticleList3D8()noexcept {
 }
 bool Owner::loadNativeParticleDescriptors2722F0(const original_main_entry50KG::Application& app,
     std::uint32_t& pc)noexcept {
+    if(sourceParticleDescriptorPhase_!=SourceParticleDescriptorPhase::unreached)return false;
     pc=0x271d88;
     if(nativeScbThread_!=std::this_thread::get_id()||nativeScbRevoked_||
-       !nativeSunFlares_||!nativeSunFlares_->owner||
+       !nativeSunFlares_||nativeSunFlares_->sourceMode||!nativeSunFlares_->owner||
        nativeSunFlares_->owner->nextLoad!=NativeSunFlare::Load::saturationComplete||
        !nativeTob34_||!nativeTob34_->document||!nativeSceneInfo270900Current(app,pc)||
        !particles_||!particles_->decoded_||particles_->closed_||particles_->source_!=source_||
@@ -1150,9 +1219,10 @@ bool Owner::loadNativeParticleDescriptors2722F0(const original_main_entry50KG::A
 namespace ra_cold_aggregate50LA {
 bool Owner::loadNativeEmptyBuoys1B5090(const original_main_entry50KG::Application& app,
     std::uint32_t& pc)noexcept {
+    if(sourceParticleDescriptorPhase_!=SourceParticleDescriptorPhase::unreached)return false;
     pc=0x271d98;
     if(nativeScbThread_!=std::this_thread::get_id()||nativeScbRevoked_||
-       !nativeParticleList3D8_||!nativeParticleList3D8_->complete||
+       !nativeParticleList3D8_||nativeParticleList3D8_->sourceMode||!nativeParticleList3D8_->complete||
        !nativeTob34_||!nativeTob34_->document||!nativeSceneInfo270900Current(app,pc))return false;
     if(nativeBuoyCount538_){if(*nativeBuoyCount538_!=0)return false;pc=0x271da8;return false;}
     pc=0x1b50c8;
@@ -1172,6 +1242,7 @@ bool Owner::loadNativeEmptyBuoys1B5090(const original_main_entry50KG::Applicatio
 namespace ra_cold_aggregate50LA {
 bool Owner::loadNativeStaticModelParams271A00(const original_main_entry50KG::Application& app,
     std::uint32_t& pc)noexcept {
+    if(sourceStaticModelParamPhase_!=SourceStaticModelParamPhase::unreached)return false;
     pc=0x271da8;
     if(nativeScbThread_!=std::this_thread::get_id()||nativeScbRevoked_||
        !nativeBuoyCount538_||*nativeBuoyCount538_||!nativeTob34_||!nativeTob34_->document||
@@ -1334,14 +1405,14 @@ bool Owner::withdrawNativeTob34_272800(const original_main_entry50KG::Applicatio
            reader.authoring!=particles_.get()||reader.document!=&particles_->tob_)return false;
         //Native reader-role destruction corresponding to1573B0 then272824
         //World34 clear. Shared authenticated TOB/particle/world backing survives.
-        nativeTob34_.reset();
+        nativeTob34_.reset();worldParser34_=nullptr;
     }
     pc=0x1aa0f4;return true;
 }
 bool Owner::bindNativeAub38_1B4720(const original_main_entry50KG::Application& app,
     std::uint32_t& pc)noexcept {
     pc=0x1aa0f4;
-    if(nativeScbThread_!=std::this_thread::get_id()||nativeScbRevoked_||nativeAubRoleRetired272930_||nativeScb34_||nativeTob34_||
+    if(sourceAudioPhase_!=SourceAudioPhase::unreached||nativeScbThread_!=std::this_thread::get_id()||nativeScbRevoked_||nativeAubRoleRetired272930_||nativeScb34_||nativeTob34_||
        !nativeStaticModelParamEffectsComplete_||!nativeSceneInfo270900Current(app,pc)||
        !audio_||!audio_->decoded_||audio_->source_!=source_)return false;
     try {
@@ -1384,7 +1455,7 @@ namespace ra_cold_aggregate50LA {
 bool Owner::loadNativeEmptyAmbient271470(const original_main_entry50KG::Application& app,
     std::uint32_t& pc)noexcept {
     pc=0x1aa114;
-    if(nativeScbThread_!=std::this_thread::get_id()||nativeScbRevoked_||
+    if(sourceAmbientPhase_!=SourceAmbientPhase::unreached||nativeScbThread_!=std::this_thread::get_id()||nativeScbRevoked_||
        !nativeAub38_||!nativeAub38_->document||!audio_||!audio_->decoded_||
        nativeAub38_->authoring!=audio_.get()||nativeAub38_->document!=&audio_->aub_||
        nativeAub38_->source!=source_||!nativeSceneInfo270900Current(app,pc)||
@@ -1457,6 +1528,7 @@ bool raSoundBool(const Block& block,const char* name,std::int32_t& out)noexcept 
 }
 namespace ra_cold_aggregate50LA {
 bool Owner::canRetireNativeSoulTreeSounds3B8()const noexcept {
+    if(nativeSoulTreeSounds3B8_&&nativeSoulTreeSounds3B8_->sourceMode)return preflightSourceWorldSoulTreeSoundsNative();
     if(!nativeSoulTreeSounds3B8_)return true;
     if(!worldApplication_||worldApplication_->attachmentLock423F58()||!audio_||!audio_->decoded_)return false;
     const auto& l=*nativeSoulTreeSounds3B8_;const auto& e=l.entity;
@@ -1476,6 +1548,7 @@ bool Owner::canRetireNativeSoulTreeSounds3B8()const noexcept {
     return true;
 }
 bool Owner::retireNativeSoulTreeSounds3B8()noexcept {
+    if(sourceSoulTreeSoundPhase_!=SourceSoulTreeSoundPhase::unreached){std::uint32_t pc=0;return abortSourceWorldSoulTreeSoundsNative(pc);}
     if(!canRetireNativeSoulTreeSounds3B8())return false;
     if(!nativeSoulTreeSounds3B8_)return true;
     auto& l=*nativeSoulTreeSounds3B8_;
@@ -1491,6 +1564,8 @@ bool Owner::retireNativeSoulTreeSounds3B8()noexcept {
 }
 bool Owner::loadNativeSoulTreeSoundDescriptors2714D8(const original_main_entry50KG::Application& app,
     std::uint32_t& pc)noexcept {
+    if(sourceSoulTreeSoundPhase_!=SourceSoulTreeSoundPhase::unreached||
+       (nativeSoulTreeSounds3B8_&&nativeSoulTreeSounds3B8_->sourceMode))return false;
     pc=0x2714d8;
     if(nativeScbThread_!=std::this_thread::get_id()||nativeScbRevoked_||!nativeEmptyAmbient271470Complete_||
        !nativeAub38_||!audio_||!audio_->decoded_||nativeAub38_->authoring!=audio_.get()||
@@ -1571,6 +1646,7 @@ bool Owner::loadNativeSoulTreeSoundDescriptors2714D8(const original_main_entry50
 
 namespace ra_cold_aggregate50LA {
 bool Owner::canRetireNativeMaterialSounds3BC()const noexcept {
+    if(sourceMaterialSoundPhase_!=SourceMaterialSoundPhase::unreached)return preflightSourceWorldMaterialSoundsNative();
     for(std::size_t kind=0;kind<2;++kind){
         if(!nativeMaterialSounds3BC_[kind])continue;
         if(!worldApplication_||worldApplication_->attachmentLock423F58()||!audio_||!audio_->decoded_)return false;
@@ -1594,6 +1670,7 @@ bool Owner::canRetireNativeMaterialSounds3BC()const noexcept {
     return true;
 }
 bool Owner::retireNativeMaterialSounds3BC()noexcept {
+    if(sourceMaterialSoundPhase_!=SourceMaterialSoundPhase::unreached){std::uint32_t pc=0;return abortSourceWorldMaterialSoundsNative(pc);}
     if(!canRetireNativeMaterialSounds3BC())return false;
     for(auto& owner:nativeMaterialSounds3BC_){if(!owner)continue;auto& l=*owner;
         //279AE0/279DD0 release rowarray then1413E0 then list. Native strings
@@ -1606,6 +1683,11 @@ bool Owner::retireNativeMaterialSounds3BC()noexcept {
 }
 bool Owner::loadNativeMaterialSoundDescriptors271530(const original_main_entry50KG::Application& app,
     std::uint32_t& pc)noexcept {
+    if(sourceMaterialSoundPhase_!=SourceMaterialSoundPhase::unreached||
+       (nativeMaterialSounds3BC_[0]&&nativeMaterialSounds3BC_[0]->sourceMode)||
+       (nativeMaterialSounds3BC_[1]&&nativeMaterialSounds3BC_[1]->sourceMode))return false;
+    if(sourceSoulTreeSoundPhase_!=SourceSoulTreeSoundPhase::unreached||
+       (nativeSoulTreeSounds3B8_&&nativeSoulTreeSounds3B8_->sourceMode))return false;
     pc=0x271530;
     if(nativeScbThread_!=std::this_thread::get_id()||nativeScbRevoked_||
        !nativeSoulTreeSounds3B8_||!nativeSoulTreeSounds3B8_->complete||!nativeAub38_||
@@ -1707,6 +1789,11 @@ bool Owner::loadNativeMaterialSoundDescriptors271530(const original_main_entry50
 namespace ra_cold_aggregate50LA {
 bool Owner::completeNativeAudio2728E0(const original_main_entry50KG::Application& app,
     std::uint32_t& pc)noexcept {
+    if(sourceMaterialSoundPhase_!=SourceMaterialSoundPhase::unreached||
+       (nativeMaterialSounds3BC_[0]&&nativeMaterialSounds3BC_[0]->sourceMode)||
+       (nativeMaterialSounds3BC_[1]&&nativeMaterialSounds3BC_[1]->sourceMode))return false;
+    if(sourceSoulTreeSoundPhase_!=SourceSoulTreeSoundPhase::unreached||
+       (nativeSoulTreeSounds3B8_&&nativeSoulTreeSounds3B8_->sourceMode))return false;
     pc=0x2715e4;
     if(nativeScbThread_!=std::this_thread::get_id()||nativeScbRevoked_||nativeAubRoleRetired272930_||
        !nativeAub38_||!audio_||!audio_->decoded_||nativeAub38_->authoring!=audio_.get()||
@@ -1852,6 +1939,7 @@ bool Owner::continueNativeZoneServices2729E0(const original_main_entry50KG::Appl
 bool Owner::continueNativeFog273C30(const original_main_entry50KG::Application& app,
     std::uint32_t& pc)noexcept {
     pc=0x1aa158;
+    if(nativeFogDescriptor3AC_&&nativeFogDescriptor3AC_->sourceMode)return false;
     if(nativeScbThread_!=std::this_thread::get_id()||nativeScbRevoked_||!source_||
        !nativeSceneInfo270900Current(app,pc)||nativeDirectionalColorNext_!=10u||
        nativeRemainderNext_!=168u||!runtimeQueries_||!worldApplication_||
@@ -2018,6 +2106,7 @@ bool Owner::continueNativeZoneExclusions272A58(const ra_cold_sources50LA::Owner&
 
 namespace ra_pod_scene50LA {
 bool Owner::canRetireNativePortals()const noexcept {
+    if(sourceTopologyMode_)return false; //Dedicated source Portal custody/preflight owns this family.
     if(nativePortalNext_>nativePortals_.size())return false;
     bool gap=false;
     for(std::size_t i=0;i<nativePortals_.size();++i){const auto& owner=nativePortals_[i];
@@ -2040,6 +2129,7 @@ bool Owner::canRetireNativePortals()const noexcept {
 void Owner::retireNativePortal(std::size_t ordinal)noexcept {
     auto& owner=nativePortals_[ordinal];if(!owner)return;
     auto& p=*owner;
+    if(p.sourceMode)std::terminate(); //Never retire source authority through the legacy sceneApplication lane.
     if(p.attached||p.worldLinksPublished||p.entity.parent1C||p.entity.previous10||p.entity.next14||
        !sceneApplication_->entityAuthority_.retire(p.entity))std::terminate();
     --p.entity.reference00;--sceneApplication_->objectCount423F60(); //2303F0->1413E0.
@@ -2047,6 +2137,7 @@ void Owner::retireNativePortal(std::size_t ordinal)noexcept {
 }
 bool Owner::continueNativePortal230450(const ra_cold_sources50LA::Owner& source,
     std::size_t ordinal,std::uint32_t& pc)noexcept {
+    if(sourceTopologyMode_||(nativePortalParameters3A0_&&nativePortalParameters3A0_->sourceMode))return false;
     if(!nativeSceneRoles270900Current(source,pc)||nativeZoneExclusionsNext_!=10u||
        ordinal!=nativePortalNext_||ordinal>=nativePortals_.size()||!canRetireNativePortals())return false;
     const auto* decoded=source.sourcesDecoded();if(!decoded)return false;
@@ -2091,6 +2182,7 @@ bool Owner::continueNativePortal230450(const ra_cold_sources50LA::Owner& source,
     }catch(...){return false;}
 }
 bool Owner::canRetireNativePortalWorldLinks()const noexcept {
+    if(sourceTopologyMode_)return false; //Exact source chain withdrawal has a separate ledger.
     for(const auto& owner:nativePortals_)if(owner){const auto& p=*owner;
         if(p.worldLinksPublished>4u||(p.worldLinksPublished&&(!p.attached||!p.authored)))return false;
         if(p.authored&&(!p.authored->zones[0]||p.authored->zones[0]>10u||
@@ -2178,6 +2270,7 @@ bool Owner::continueNativePortalWorldLinks272B80(std::size_t ordinal,std::uint32
 }
 namespace ra_pod_scene50LA {
 bool Owner::nativeMethodArraysCurrent()const noexcept {
+    if(sourceTopologyMode_||(nativePortalParameters3A0_&&nativePortalParameters3A0_->sourceMode))return false;
     if(nativePortalParameters3A0_){const auto& role=*nativePortalParameters3A0_;
         if(role.count!=10u||bool(role.rows)==role.retired||(role.retired&&nativePortalNext_!=10u))return false;
         if(!role.retired&&nativePortals_[0]&&nativePortals_[0]->authored&&role.rows!=nativePortals_[0]->authored)return false;
@@ -2322,6 +2415,7 @@ bool Owner::continueNativeCollisionList(const ra_cold_sources50LA::Owner& source
         if(m.retired)return false;
         if(!m.constructorAttempted){
             pc=dynamic?0x273890:0x273400;
+            rr::game::selected_array_guards27ED40::invalidateNative();
             c.world_=this;c.application_=sceneApplication_.get();c.method_=&s->trees[index];c.registry_=&s->registries[index];
             c.selectionOwner_=&m;c.ordinal_=index;c.reference00_=1;c.arrayReference_=true;c.begun_=true;m.constructorAttempted=true;
             pc=0x27ee38;m.selected1C.reset(new(std::nothrow) const Entity*[30]);
@@ -2362,6 +2456,7 @@ bool Owner::releaseNativeCollisionListReference(std::size_t index,bool nodeAlias
 namespace ra_pod_scene50LA {
 bool Owner::adoptNativeLightWrappers273AA0(const ra_cold_sources50LA::Owner& source,std::uint32_t& pc)noexcept {
     pc=0x1aa150;
+    if(nativeLightList3A8_&&nativeLightList3A8_->sourceMode)return false;
     if(!nativeDefaultObserver443148_||!nativeDefaultObserver443148_->published||
        !nativeDefaultObserverCurrent()||!nativeSceneRoles270900Current(source,pc)||
        !canCloseTopology())return false;
@@ -2401,6 +2496,9 @@ bool Owner::adoptNativeLightWrappers273AA0(const ra_cold_sources50LA::Owner& sou
         for(;l.loaded<185u;++l.loaded){
             g::original_gc_gameplay_lighting_candidate::RaAuthoredLightIdentity identity;
             if(!lighting_->nativeRaLightIdentity(this,decoded->world,visibilityRows_,l.loaded,identity,pc))return false;
+            //An admitted legacy row bypasses the original per-row guard.
+            //Rejected calls and empty row loops do not taint source history.
+            g::world_light_assertion273ABC::invalidateNative();
             l.wrappers38[l.loaded].descriptor04=identity;
         }
         if(!canRetireNativeLightWrappers())return false;
@@ -3315,7 +3413,8 @@ bool Owner::completeNativeEmptyInstances274080(const ra_cold_sources50LA::Owner&
     std::uint32_t& pc)noexcept {
     pc=0x274080;
     try {
-        if(!application||!nativeSceneRoles270900Current(source,pc))return false;
+        if(!application||(nativeEmptyInstances3DC_&&nativeEmptyInstances3DC_->sourceMode)||
+           !nativeSceneRoles270900Current(source,pc))return false;
         const auto* decoded=source.sourcesDecoded();if(!decoded)return false;
         const auto& document=decoded->world.parameters;
         if(document.original_bytes.size()!=540795u||document.blocks.size()!=1472u)return false;
@@ -3342,17 +3441,22 @@ bool Owner::completeNativeEmptyInstances274080(const ra_cold_sources50LA::Owner&
         //continuation, add its missing REAL resource in the same native global
         //domain. Constructor publishes no callback; native atomic construction
         //initializes count10 before global publication, unlike2BFD24/28.
-        //Neither this order nor fresh null3DC claims a source270550 execution.
+        //This native resource-construction order remains distinct from retail;
+        //the separate World3DC lane must come from fresh270550, not this domain.
         pc=0x270fe8;
         role.master=std::shared_ptr<rr::platform::OriginalUiGarageInstanceMaster50KG>(
             new rr::platform::OriginalUiGarageInstanceMaster50KG());
         const auto previous=application->instanceMaster444078;
         if(previous)application->overwrittenInstanceMasters.push_back(previous);
         pc=0x2bfd24;application->instanceMaster444078=role.master;role.published=true;
-        //No constructed Instance records exist: raw capacity10 is independent
-        //of authored count0. Count3E0 and native no-allocation3DC role are now
-        //known through this actual owned empty domain, not assumed retail-null.
+        //Actual absent158B30 default writes source3E0 AFTER global publication.
+        //No allocation/store3DC occurs on this zero-count load branch: it
+        //must retain the actual earlier fresh2705B4 known-null store.
+        pc=0x271028;nativeInstanceCount3E0_=0;
         pc=0x274110;
+        if(!nativeInstanceCount3E0_||*nativeInstanceCount3E0_)return false;
+        pc=0x274120;
+        if(!nativeInstanceDescriptors3DC_||*nativeInstanceDescriptors3DC_)return false;
         if(!canRetireNativeInstanceMaster())return false;
         //Zero loop skips2C06A0/2C07B0/141960/2BFDA0. Native descriptor role is
         //genuinely empty so274120..13C has no allocation to free or clear.
@@ -3362,7 +3466,29 @@ bool Owner::completeNativeEmptyInstances274080(const ra_cold_sources50LA::Owner&
 bool Owner::canRetireNativeInstanceMaster()const noexcept {
     if(!nativeEmptyInstances3DC_)return true;
     const auto& role=*nativeEmptyInstances3DC_;
-    if(!role.application||role.count3E0||role.descriptors3DC)return false;
+    if(role.sourceMode){
+        //Native preflight only: accepts authentic nullable/partial source
+        //construction, never grants legacy completed-instance readiness.
+        if(!role.application||role.sourceWorld!=&worldEntity_||
+           role.sourceGeneration!=worldEntity_.sessionGeneration||!role.sourceGeneration||
+           role.sourceThread!=std::this_thread::get_id()||
+           !nativeInstanceDescriptors3DC_||*nativeInstanceDescriptors3DC_)return false;
+        if(role.complete&&(!role.sourceCallerPublished||!nativeInstanceCount3E0_||*nativeInstanceCount3E0_))return false;
+        if(!role.master)return !role.sourceConstructorPublished&&
+            (!role.sourceCallerPublished||role.sourceOuterReturned);
+        const auto& m=*role.master;
+        if(!m.sourceMode_||!m.sourceArrayReturned_||m.capacity04_!=10||m.growth08_!=100000||m.used0C_||
+           (m.sourceCount10Known_&&m.count10_)||
+           (role.sourceConstructorPublished&&!m.sourceCount10Known_)||
+           (role.sourceCallerPublished&&!role.sourceConstructorPublished))return false;
+        if(!role.published)return !role.sourceConstructorPublished&&!role.sourceCallerPublished;
+        if(role.application->instanceMaster444078==role.master)return true;
+        std::size_t retained=0;
+        for(const auto& old:role.application->overwrittenInstanceMasters)if(old==role.master)++retained;
+        return retained==1u;
+    }
+    if(!role.application||!nativeInstanceCount3E0_||*nativeInstanceCount3E0_||
+       !nativeInstanceDescriptors3DC_||*nativeInstanceDescriptors3DC_)return false;
     if(!role.master)return !role.published&&!role.complete;
     const auto& master=*role.master;
     if(!master.records00_||master.capacity04_!=10||master.growth08_!=100000||

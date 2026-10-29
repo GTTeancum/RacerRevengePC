@@ -1,8 +1,10 @@
 #include "original_results104_storage50la.h"
+#include "../../platform/linux/native/original_application_aural50kg.h"
 #include "../../tests/native/original_race_constructor50la.h"
 #include "../../tests/native/original_race_hud_scope50la.h"
 #include "../../tests/native/original_position_stats_adapter50la.h"
 #include "../../tests/native/ra_cold_roster_operation50la.h"
+#include "../../tests/native/original_world_cold_prefix50la.h"
 #include <array>
 #include <optional>
 #include <thread>
@@ -334,11 +336,120 @@ void OriginalRaceConstructor50LA::continuePreAck1AB520(
         case Cut::controllerSlot:
             stop(S::incomplete,0x1aba24,
                 "Actual nonzero-index Race34 controller/virtual18 owner remains unrepresented; scans retained");return;
-        case Cut::owner78:
-            //1A65EC's constructor-null is not a live-load proof.1A6E48/7C
-            //publish a real287430/287710 owner, not currently represented.
-            stop(S::incomplete,0x1aba54,
-                "Actual signedCCC scans/controller skips returned; reached Race78 load owner is unrepresented");return;
+        case Cut::owner78: {
+            //Only actual1A6E48/7C publication may select this positive branch.
+            //Constructor-null/native absence is NOT the source loaded-null path.
+            if(!vcr78Owner_||vcr78Source_!=vcr78Owner_.get()||
+               !vcr78Source_->belongsToRace(*this)){
+                stop(S::owner,0x1aba54,"Actual published same-Race78 unavailable; no null fallback");return;
+            }
+            scan.savedVcr=vcr78Source_;scan.indexS0=0; //1ABA68 delay slot.
+            scan.cut=Cut::vcrStopped;scan.stoppedPC=0x1abaa0;
+            OriginalSimpleVCRDiagnostic50LA vd;
+            if(!scan.savedVcr->enableEndChannelsAndBackup1ABA68(*this,scan.indexS0,vd)){
+                scan.stoppedPC=vd.sourcePC;
+                stop(S::incomplete,vd.sourcePC,vd.operation);return;
+            }
+            scan.cut=Cut::vcrFlag;break;
+        }
+        case Cut::vcrStopped:
+        case Cut::worldResetStopped:
+        case Cut::pauseStopped:
+        case Cut::auralStopped:
+        case Cut::musicFadeStopped:
+        case Cut::particleStopped:
+        case Cut::worldRestartStopped:
+            stop(S::incomplete,scan.stoppedPC,
+                "Waiting-results restart prefix stopped; actual writes retained without retry or replay");return;
+        case Cut::vcrFlag:
+            if(vcr78Source_!=scan.savedVcr||!scan.savedVcr||
+               !scan.savedVcr->belongsToRace(*this)){
+                stop(S::owner,0x1ababc,"Saved Race78 replaced after channel stores/backup");return;
+            }
+            //1ABABC read and1ABADC JAL delay store: set only bit4. Preserve
+            //all other represented lanes AND their unknown mask.
+            flags1B0KnownValue_=std::uint8_t(flags1B0KnownValue_|0x10u);
+            flags1B0KnownMask_=std::uint8_t(flags1B0KnownMask_|0x10u);
+            scan.cut=Cut::worldReset;break;
+        case Cut::worldReset: {
+            //Actual1AC8E0(A1=0), first mandatory call: World74+3D0,
+            //TriggerList2DC320 table3D5230 slot80=2DCC70. No generic virtual
+            //return or use of a copied trigger descriptor is admitted.
+            scan.cut=Cut::worldResetStopped;scan.stoppedPC=0x1ac8f8;
+            if(!world74_||world74_->terminal_||world74_->closed_){
+                stop(S::owner,scan.stoppedPC,"Actual same-Race restart World74 unavailable");return;
+            }
+            if(!world74_->resetNativeTriggerList2DCC70(application_,entity_.sessionGeneration,
+                scan.stoppedPC)){
+                stop(S::incomplete,scan.stoppedPC,"Actual World3D0 reset rejected; VCR and Race bit4 retained");return;
+            }
+            scan.cut=Cut::pause;break;
+        }
+        case Cut::pause: {
+            //1AC914..938 reads the SAME App11C owner. Source nonzero becomes
+            //zero; zero performs no store. Existing native pause writer touches
+            //only that shared word, not transport/input/timestamp/single-step.
+            scan.cut=Cut::pauseStopped;scan.stoppedPC=0x1ac920;
+            const auto scope=endHud_.lock();std::uint32_t pause=0;
+            if(!scope||!scope->application_||scope->application_->entities()!=application_||
+               scope->application_->race28C()!=this||
+               !scope->application_->animationClock().readPause11C(pause)){
+                stop(S::owner,scan.stoppedPC,"Actual same-App11C owner unavailable after trigger reset");return;
+            }
+            scan.pause11C=pause;
+            if(pause)scope->application_->setExplicitAnimationPause(false); //1AC938.
+            scan.cut=Cut::auralStop;break;
+        }
+        case Cut::auralStop: {
+            scan.cut=Cut::auralStopped;scan.stoppedPC=0x1ac944;
+            const auto scope=endHud_.lock();
+            if(!scope||!scope->application_||scope->application_->entities()!=application_||
+               scope->application_->race28C()!=this){
+                stop(S::owner,scan.stoppedPC,"Actual same-App restart Aural read unavailable");return;
+            }
+            platform::OriginalApplicationAural50KG::Diagnostic ad;
+            if(!platform::OriginalApplicationAural50KG::restartOwnedList103210(*scope->application_,
+                application_,scan.auralIndexS0,scan.auralCount5C,scan.auralReachedEmitter,ad)){
+                scan.stoppedPC=ad.sourcePC;
+                stop(S::incomplete,scan.stoppedPC,
+                    "Actual Aural103210 owner/positive child boundary; retained iterator and prior restart effects");return;
+            }
+            scan.cut=Cut::musicFade;break;
+        }
+        case Cut::musicFade: {
+            scan.cut=Cut::musicFadeStopped;scan.stoppedPC=0x1ac964;
+            const auto scope=endHud_.lock();OriginalRaceMusicManagerDiagnostic50LA md;
+            if(!scope||!music10C_){
+                stop(S::owner,scan.stoppedPC,"Actual restart music10C owner unavailable");return;
+            }
+            if(!music10C_->restartNativeFade1AC960(*this,*scope,md)){
+                scan.stoppedPC=md.sourcePC;stop(S::incomplete,scan.stoppedPC,md.operation);return;
+            }
+            scan.cut=Cut::particleBoundary;break;
+        }
+        case Cut::particleBoundary:
+            scan.cut=Cut::particleStopped;scan.stoppedPC=0x1ac96c;
+            if(!world74_||world74_->terminal_||world74_->closed_){
+                stop(S::owner,scan.stoppedPC,"Actual restart World4A0 owner unavailable");return;
+            }
+            if(!world74_->resetNativeParticles161F60(application_,entity_.sessionGeneration,scan.stoppedPC)){
+                stop(S::incomplete,scan.stoppedPC,
+                    "Actual particle pointer/auxiliary reset stopped; ordered effects retained without replay");return;
+            }
+            scan.cut=Cut::worldRestartBoundary;break;
+        case Cut::worldRestartBoundary:
+            scan.cut=Cut::worldRestartStopped;scan.stoppedPC=0x1ac98c;
+            if(!world74_||world74_->terminal_||world74_->closed_){
+                stop(S::owner,scan.stoppedPC,"Actual World2702E0 owner unavailable");return;
+            }
+            if(!world74_->resetLiveWorldPhysics2702E0(application_,entity_.sessionGeneration,scan.stoppedPC)){
+                stop(S::incomplete,scan.stoppedPC,
+                    "Actual World restart stopped; ordered owner effects retained without replay");return;
+            }
+            scan.stoppedPC=0x1ac994;field90_=0; //Actual SAME Race scalar after World return.
+            scan.stoppedPC=0x1ac998;
+            stop(S::incomplete,scan.stoppedPC,
+                "World restart returned and Race90 cleared; actual RaceB0 publication/reset1AEA70 remains unjoined");return;
         }
     }
 }

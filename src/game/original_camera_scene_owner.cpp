@@ -1,4 +1,5 @@
 #include "original_camera_scene_owner.h"
+#include "original_camera_observer_assertions50kg.h"
 #include <cmath>
 #include <cstring>
 #include <limits>
@@ -367,7 +368,16 @@ LiveZoneResult50EN attachOriginalCameraScene114770(ResetVisibilityWorld50EY& spa
     if(!preparePoint(position,t.staged,t.result))return t.result;
     work.links[0]={0,zone};work.entries[0].used=true;
     if(!t.move(0,zone)||!t.addOverlaps(0))return t.result;
+    // This adapter's retained backing and scratch transaction are native
+    // preadmission, NOT source malloc-null/partial-prefix equivalence. Preserve
+    // its no-publication failure policy above. Once admitted, the actual
+    //114770 success uses the SAME process assertion records as Page Cameras.
+    if(!OriginalCameraObserverAssertions50KG::allocation1147E4(t.staged.storage.entries!=nullptr)){
+        t.result.status=Status::InvalidTopology;return t.result;
+    }
     t.publish(owner.registration34);owner.position180=position;owner.parent38=zone;++owner.allocationSerial;
+    if(!OriginalCameraObserverAssertions50KG::membership114884(owner.registration34.storage.links[0].zone!=0))
+        t.result.status=Status::InvalidTopology;
     return t.result;
 }
 LiveZoneResult50EN attachOriginalCameraSceneFromRacer175224(ResetVisibilityWorld50EY& space,

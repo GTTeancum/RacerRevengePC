@@ -8,6 +8,9 @@
 #include "original_garage_screen_fallback50kg.h"
 #include "original_memory_card_screen_fallback50kg.h"
 #include "original_results_screen_fallback50la.h"
+#include "original_loading_screen_fallback50la.h"
+#include "original_course_screen_fallback50kg.h"
+#include "original_course_screen_authored50kg.h"
 #include "original_standard_material_native_binding50kg.h"
 #include <array>
 #include <optional>
@@ -216,6 +219,8 @@ private:
     // mappings. Nodes borrow existing passes; these calls own no pass refs.
     void clearCollectors29BEA0() noexcept;
     void setCollector29BED0(std::size_t,std::int32_t) noexcept;
+    bool courseScreenConstructionCurrent(const std::shared_ptr<const OriginalStandardMaterialContext50LA>&,
+        const std::shared_ptr<OriginalStandardTextureTable50LA>&)const noexcept;
     bool construct29B550(std::int32_t canonicalRow,const std::string& canonicalName,
         std::shared_ptr<const OriginalUiMaterialTemplates50KG>,
         const OriginalUiMaterialTemplateState50KG* actualAssociation30,
@@ -227,6 +232,9 @@ private:
         std::shared_ptr<const OriginalGarageScreenFallback50KG> garageFallback,
         std::shared_ptr<const OriginalMemoryCardScreenFallback50KG> memoryCardFallback,
         std::shared_ptr<const OriginalResultsScreenFallback50LA> resultsFallback,
+        std::shared_ptr<const OriginalLoadingScreenFallback50LA> loadingFallback,
+        std::shared_ptr<const OriginalCourseScreenFallback50KG> courseFallback,
+        std::shared_ptr<const OriginalCourseScreenAuthored50KG> courseAuthored,
         OriginalStandardMaterialDiagnostic50LA&) noexcept;
     // Source24A430. Only the canonical manager supplies its one persistent
     // lazy application state. Surface values come from the retained PSG;

@@ -4,8 +4,10 @@ bool Owner::nativeEcosystemNone1AA410(const rr::assets::World48F& source,std::ui
     if(!lighting_||!worldApplication_||worldApplication_->attachmentLock423F58())return false;
     const auto* name=lighting_->nativeRaEcosystemSelector1AA410(this,source,visibilityRows_,pc);
     if(!name||std::strcmp(name,"none"))return false;
-    //1AA418 skips +138 entirely. Calling2748F0 withnone would still allocate
-    //an Ecosystem: that is NOT this branch and no World408 is inferred.
+    //1AA418 skips +138 entirely. No source408 write occurs on this branch.
+    //Native no-Ecosystem admission uses actual fresh-constructor publication,
+    //not a second independent absence authority or inferred loaded-null.
+    if(!worldReset270550Complete_||!worldEcosystem408_||*worldEcosystem408_)return false;
     pc=0x1aa438;return true;
 }
 }
@@ -37,7 +39,8 @@ bool OriginalRaceConstructor50LA::continueNativeTrackAfterWater(
     }else{
         //Explicit native representation of1AA400/404: copy ACTUAL current
         //no-water selection under its constructor+Context authority. This is
-        //NOT a guest400 null read or proof270550 ran on the adopted World.
+        //The same read now also requires actual constructor-known source400
+        //null; no zero is inferred from the independent native domain.
         pc=0x1aa404;nativeWater70Domain_=world74_->nativeWaterDomain_;
         nativeWater70Object_.emplace(nullptr);nativeWater70State_=NativeWater70State::published;
     }

@@ -218,6 +218,7 @@ add_library(rr_native_gameplay50dj STATIC
   "${RR_ROOT}/src/game/original_ui_memory_card50kg.cpp"
   "${RR_ROOT}/src/game/original_ui_memory_card_geometry50kg.cpp"
   "${RR_ROOT}/platform/linux/native/original_ui_memory_card_constructor50kg.cpp"
+  "${RR_ROOT}/platform/linux/native/original_ui_course_popup_payload50kg.cpp"
   "${RR_ROOT}/platform/linux/native/original_ui_memory_card_resources50kg.cpp"
   "${RR_ROOT}/src/game/original_ui_hall_records50kg.cpp"
   "${RR_ROOT}/src/game/original_ui_hall_widgets50kg.cpp"

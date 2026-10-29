@@ -145,6 +145,115 @@ struct Math {
 };
 }
 
+bool preparePodSphereCentripetalPrefix49L(const V& separation,const float* angularXYZ,
+    const V& anchor,float lastPointVf6W,float& squared,V& tangent,V& centripetal,
+    std::uint32_t& stoppedPC) noexcept {
+    stoppedPC=0x1b6784u;if(!nearest())return false;Math f;
+    const float distance=f.dot(separation,separation);if(!f.valid)return false;
+    stoppedPC=0x1b67acu;if(!angularXYZ)return false;
+    V angular{};std::memcpy(angular.v,angularXYZ,3*sizeof(float));
+    //1B67C0 consumes surviving VF6.W, not point-result W=1. No earlier
+    //distance>0 gate: source zero separation still reaches this cross/store.
+    stoppedPC=0x1b67c0u;if(!std::isfinite(lastPointVf6W))return false;
+    stoppedPC=0x1b67c4u;const V t=f.cross(angular,anchor);if(!f.valid)return false;
+    //Finite admitted first cross leaves VF6.W=+0 for1B67E4 self-subtract.
+    stoppedPC=0x1b67e8u;const V c=f.cross(angular,t);if(!f.valid)return false;
+    squared=distance;tangent=t;centripetal=c;stoppedPC=0x1b67f0u;return true;
+}
+
+namespace {
+void publishSourcePresence(const PodSphereSourcePresenceHooks49L* hooks,
+                           bool bodyB,bool present) noexcept {
+    if(hooks && hooks->publish) hooks->publish(hooks->context,bodyB,present);
+}
+}
+
+bool initializePodSphereSourceOrdered49L(J& j,const std::uint32_t* globalWords,
+    std::uint32_t& stoppedPC,const PodSphereSourcePresenceHooks49L* hooks) noexcept {
+    // Numeric suffix only: caller owns1276E0/base and1B6220 dispatch identity.
+    const V vf0{{0,0,0,1}};
+    stoppedPC=0x1b622cu;j.localAnchor60=vf0;
+    stoppedPC=0x1b6238u;j.localAnchor70=vf0;
+    stoppedPC=0x1b6244u;j.worldAnchor80=vf0;
+    stoppedPC=0x1b6250u;j.worldAnchor90=vf0;
+    stoppedPC=0x1b625cu;j.fixedAnchorA0=vf0;
+    stoppedPC=0x1b6268u;j.fieldB0=vf0;
+    stoppedPC=0x1b6274u;j.centripetalC0=vf0;
+    stoppedPC=0x1b6280u;j.separationD0=vf0;
+    stoppedPC=0x1b628cu;j.directionE0=vf0;
+    stoppedPC=0x1b6298u;j.preparedForceF0=vf0;
+    stoppedPC=0x1b62acu;j.enabled38=1;
+    stoppedPC=0x1b62b4u;j.unilateral3C=1;
+    stoppedPC=0x1b62bcu;j.suppressed40=0;
+    stoppedPC=0x1b62c4u;j.bodyAPresent44=false;publishSourcePresence(hooks,false,false);
+    stoppedPC=0x1b62ccu;j.bodyBPresent48=false;publishSourcePresence(hooks,true,false);
+    stoppedPC=0x1b62d4u;j.length4C=0;
+    stoppedPC=0x1b62dcu;j.lengthSquared50=0;
+    stoppedPC=0x1b62e4u;j.speedSquared54=0;
+    stoppedPC=0x1b62e8u;if(!globalWords)return false;
+    // Each original LQ/SQ remains a word copy.70 retains VF0, not434390.
+    stoppedPC=0x1b62f4u;std::memcpy(j.localAnchor60.v,globalWords,16);
+    stoppedPC=0x1b6304u;std::memcpy(j.worldAnchor80.v,globalWords,16);
+    stoppedPC=0x1b6314u;std::memcpy(j.worldAnchor90.v,globalWords,16);
+    stoppedPC=0x1b6324u;std::memcpy(j.fixedAnchorA0.v,globalWords,16);
+    stoppedPC=0x1b6334u;std::memcpy(j.fieldB0.v,globalWords,16);
+    stoppedPC=0x1b6344u;std::memcpy(j.centripetalC0.v,globalWords,16);
+    stoppedPC=0x1b6354u;std::memcpy(j.separationD0.v,globalWords,16);
+    stoppedPC=0x1b6364u;std::memcpy(j.directionE0.v,globalWords,16);
+    stoppedPC=0x1b6374u;std::memcpy(j.preparedForceF0.v,globalWords,16);
+    //14D7F0 constructs all-zero scratch; source copies pairs of scalar words.
+    stoppedPC=0x1b6394u;for(unsigned i=0;i<16;++i)j.cached100.v[i]=0;
+    stoppedPC=0x1b63ccu;for(unsigned i=0;i<16;++i)j.cached140.v[i]=0;
+    stoppedPC=0x1b6404u;for(unsigned i=0;i<16;++i)j.inverse180.v[i]=0;
+    stoppedPC=0x1b6434u;if(!nearest())return false;Math f;
+    const float period=fromBits(0x3d4ccccdu);
+    const float damping=f.div(2.0f,period);if(!f.valid)return false;
+    stoppedPC=0x1b643cu;const float squared=f.mul(period,period);if(!f.valid)return false;
+    stoppedPC=0x1b6440u;j.damping34=damping;
+    stoppedPC=0x1b6450u;const float stiffness=f.div(1.0f,squared);if(!f.valid)return false;
+    stoppedPC=0x1b6454u;j.stiffness30=stiffness;
+    stoppedPC=0x1b6460u;return true;
+}
+bool setupPodSphereASourceOrdered49L(J& j,float mass,const M& inertia,const V& anchor,
+    std::uint32_t& stoppedPC,const PodSphereSourcePresenceHooks49L* hooks) noexcept {
+    //1B64DC loads anchor before44 publication; typed actual A is caller-proven.
+    V saved;std::memcpy(saved.v,anchor.v,16);
+    stoppedPC=0x1b64ecu;j.bodyAPresent44=true;publishSourcePresence(hooks,false,true);
+    stoppedPC=0x1b64f4u;std::memcpy(j.localAnchor60.v,saved.v,16);
+    //14E150 performs word copies, not multiplication: even exceptional mass
+    //payloads are retained until a later consumer's arithmetic admission.
+    M diagonal{};diagonal.v[0]=mass;diagonal.v[5]=mass;diagonal.v[10]=mass;diagonal.v[15]=1;
+    stoppedPC=0x1b6520u;for(unsigned i=0;i<16;++i)j.cached140.v[i]=diagonal.v[i];
+    stoppedPC=0x1b6538u;if(!nearest())return false;Math f;M s{};
+    s.v[1]=f.keep(saved.v[2]);s.v[2]=f.neg(saved.v[1]);
+    s.v[4]=f.neg(saved.v[2]);s.v[6]=f.keep(saved.v[0]);
+    s.v[8]=f.keep(saved.v[1]);s.v[9]=f.neg(saved.v[0]);
+    if(!f.valid)return false;
+    stoppedPC=0x1b658cu;const M t=f.product(inertia,s);if(!f.valid)return false;
+    stoppedPC=0x1b6600u;const M result=f.product(s,t);if(!f.valid)return false;
+    //All four source result columns are computed before the first joint store.
+    stoppedPC=0x1b6648u;std::memcpy(j.cached100.v,result.v,16);
+    stoppedPC=0x1b664cu;std::memcpy(j.cached100.v+4,result.v+4,16);
+    stoppedPC=0x1b6650u;std::memcpy(j.cached100.v+8,result.v+8,16);
+    stoppedPC=0x1b6654u;std::memcpy(j.cached100.v+12,result.v+12,16);
+    stoppedPC=0x1b6660u;return true;
+}
+bool setupPodSphereBSourceOrdered49L(J& j,bool bodyB,const V& anchor,float length,
+    std::uint32_t& stoppedPC,const PodSphereSourcePresenceHooks49L* hooks) noexcept {
+    V saved;std::memcpy(saved.v,anchor.v,16);
+    stoppedPC=0x1b668cu;j.bodyBPresent48=bodyB;publishSourcePresence(hooks,true,bodyB);
+    stoppedPC=0x1b6698u;std::memcpy(j.localAnchor70.v,saved.v,16);
+    stoppedPC=0x1b669cu;if(!nearest() || !std::isfinite(length))return false;
+    const float minimum=fromBits(0x3dcccccdu);
+    const float clamped=length>minimum ? length : minimum;
+    Math f;const float squared=f.mul(clamped,clamped);
+    //MUL precedes4C, but its unsupported result is rejected only at50's store:
+    //the independent finite length store is not rolled back by square overflow.
+    stoppedPC=0x1b66b4u;j.length4C=clamped;
+    stoppedPC=0x1b66c0u;if(!f.valid)return false;j.lengthSquared50=squared;
+    stoppedPC=0x1b66c4u;return true;
+}
+
 bool initializePodSphere49L(J& joint) noexcept {
     if(!nearest()) return false;
     J j=joint; Math f;

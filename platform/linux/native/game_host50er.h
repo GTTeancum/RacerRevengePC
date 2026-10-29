@@ -127,6 +127,8 @@ public:
     std::uint32_t nativeWindowId50DU()const noexcept{return window_.nativeWindowId50DU();}
     const GameHostInfo50ER& info() const noexcept { return info_; }
 private:
+    std::shared_ptr<OriginalSourcePadHostLease50LA> bindSourcePadNative(
+        const original_main_entry50KG::Application&,const rr::game::OriginalApplicationInput04Source50LA&)noexcept;
     friend class ::original_main_entry50KG::RaceDisplayLifetime50LA;
     friend class OriginalUiSharedDialogs50KG;
     friend struct ::original_main_entry50KG::Application;

@@ -20,6 +20,7 @@
 #include <vector>
 
 namespace ra_pod_scene50LA {class Owner;}
+namespace ra_cold_aggregate50LA {class Owner;}
 namespace rr::platform {
 class OriginalUiControllerPopupResources50KG;
 class OriginalUiSharedDialogs50KG;
@@ -54,6 +55,7 @@ struct OriginalUiMainApplication50KG {
     // This does not certify guest argc or the separate Fire boot branch.
 private:
     friend class OriginalUiGaragePodScene50KG;
+    friend class ::ra_cold_aggregate50LA::Owner; //Exact source270FD0 global publication/custody.
     friend class ::ra_pod_scene50LA::Owner; //Same actual444078 domain; private RA load/retirement only.
     friend class OriginalUiMainSession50KG;
     friend class OriginalUiOptionsSession50KG;
@@ -86,6 +88,11 @@ public:
     // seeding does not initialize these caches. Survive every menu page.
     // Course native race entry borrows this exact owner; no destination copy.
     game::SharedRandomOwner50ID sharedRandomSelectors{};
+    // Source GP3DD970 guards in ELF zero-fill, retained for process lifetime.
+    // Listener registration/setter and wrapper init are separate source caches.
+    std::uint8_t listenerGuard80C4=0,listenerGuard80C8=0,listenerGuard8C58=0;
+    std::uint32_t listenerAssertion3DF4C0=0,listenerAssertion3DF4C8=0;
+    std::uint32_t listenerAssertion4344B0=0;
     // Actual process-shared Watto transition assertion lazy guard86B0 and
     // word434510. A valid motion still initializes these at1D4D0C..18.
     // Both addresses are in the authenticated ELF zero-fill range. These

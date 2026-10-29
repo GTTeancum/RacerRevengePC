@@ -1,5 +1,6 @@
 #pragma once
 #include "original_application_entities50la.h"
+#include "../../platform/linux/native/original_ui_search_list_cold50kg.h"
 #include "original_racer_model_scene50la.h"
 #include "original_racer_animation_cold50la.h"
 #include <algorithm>
@@ -20,7 +21,7 @@ class OriginalUiGarageSceneCollision50KG;
 class OriginalUiGarageStaticModels50KG;
 class OriginalUiGaragePageOwner50KG;
 class OriginalUiSharedDialogs50KG;
-class OriginalUiMemoryCardConstructor50KG;
+class OriginalUiMemoryCardConstructor50KG; class OriginalUiCourseOwnedLifecycle50KG;
 class OriginalUiGarageManagerSearch50KG;
 class OriginalUiGarageUiLights50KG;
 class OriginalUiGarageManagerFog50KG;
@@ -41,6 +42,7 @@ class OriginalUiEntityScope50KG final {
     friend class rr::platform::OriginalUiSharedDialogs50KG;
     friend class rr::platform::OriginalUiMemoryCardConstructor50KG;
     friend class rr::platform::OriginalUiFrontend50KG;
+    friend class rr::platform::OriginalUiCourseOwnedLifecycle50KG;
     friend class rr::platform::OriginalUiGarageSession50KG;
     friend class rr::platform::OriginalUiGarageSelectedModel50KG;
 public:
@@ -53,6 +55,8 @@ private:
     std::shared_ptr<OriginalApplicationEntities50LA> application_;
     const ::original_main_entry50KG::Application* issuer_=nullptr;
     C dispatcher_,manager_;
+    class CourseConstruction;
+    CourseConstruction* courseConstruction_=nullptr; // Exclusive real constructor, never an Options capability.
     class OptionsConstruction;
     OptionsConstruction* optionsConstruction_=nullptr; // Exclusive native slot, never Garage authority.
     const rr::platform::OriginalUiGarageSession50KG* managerPageTableOwner_=nullptr;
@@ -260,12 +264,13 @@ private:
     OriginalUiEntityScope50KG(const ::original_main_entry50KG::Application* issuer,
         std::shared_ptr<OriginalApplicationEntities50LA> app)noexcept
         :application_(std::move(app)),issuer_(issuer),scopeGeneration_(key(this)){}
-    Result live(bool allowManagerPayload=false,bool allowOptionsConstruction=false)const noexcept {
+    Result live(bool allowManagerPayload=false,bool allowOptionsConstruction=false,bool allowCourseConstruction=false)const noexcept {
         if(!issuer_||!application_)return {Status::owner,0x17C1D8};
         if(application_->nativeOwnerThread_!=std::this_thread::get_id())return {Status::affinity,0x17C1D8};
         if(!application_->constructed_||application_->released_||closed_)
             return {Status::owner,0x17C1D8};
         if(application_->attachmentLock423F58_)return {Status::locked,0x14197C};
+        if(courseConstruction_&&!allowCourseConstruction)return {Status::phase,0};
         if(optionsConstruction_&&!allowOptionsConstruction)return {Status::phase,0};
         if(dispatcherLive_&&(dispatcher_.kind!=K::uiDispatcher1B7140||
            dispatcher_.sessionGeneration!=scopeGeneration_||dispatcher_.objectKey!=key(&dispatcher_)||
@@ -3222,6 +3227,1160 @@ private:
     }
     // Native unpublished-construction ownership. This is NOT source manager
     // destruction and never reads source-unwritten tables/name/light fields.
+    class CourseConstruction final {
+        friend class OriginalUiEntityScope50KG;
+        friend class rr::platform::OriginalUiCourseOwnedLifecycle50KG;
+        friend struct ::original_main_entry50KG::Video;
+        enum class Phase : std::uint8_t {empty,beforeVideo2A3A90,nativeAborted,
+            afterVideo2A3A90,nativeVideoAborted,derivedComplete1D00BC};
+        const void* videoEffect_=nullptr; // Only actual Video owner may bind it.
+        std::shared_ptr<OriginalUiEntityScope50KG> scope_;
+        const rr::platform::OriginalUiFrontend50KG* frontend_=nullptr;
+        const void* managerOwner_=nullptr;
+        std::uint64_t generation_=0,epoch_=0,priorEpoch_=0;
+        std::uint32_t countBefore_=0; // Observation only; NEVER restored.
+        Phase phase_=Phase::empty;
+        // Actual base constructor writes. Safe backing of the omitted row10
+        // is NOT source knowledge; mask records only rows00,20,30.
+        std::array<std::array<std::uint32_t,16>,4> matrices_{};
+        std::array<std::uint16_t,4> matrixKnown_{};
+        std::uint32_t ancestry8_=0,word17C_=0;
+        std::array<std::uint32_t,8> zeroWords_{}; //34,140,14C,174,15C,160,16C,170.
+        std::int32_t pageCount148_=0; // Constructor0, actual1CEC48 getter owns subsequent live writes.
+        bool basePrefixKnown_=false,derivedKnown_=false;
+        std::array<std::uint32_t,2> derivedZeros_{}; //18C,190; real Fog pointer lanes below.
+        std::uint32_t bank2A8_=0; // Sole current value; source-known only after derivedKnown_.
+        using SearchList=rr::platform::OriginalUiSearchListCold50KG;
+        SearchList* sourceList2A0_=nullptr;
+        C* sourceNode2A4_=nullptr;
+        std::unique_ptr<SearchList> searchList_;
+        const rr::platform::OriginalUiCourseOwnedLifecycle50KG* searchOwner_=nullptr;
+        C searchNode_;
+        bool searchAttempted_=false,searchNodeAcquired_=false,searchNodeAttached_=false;
+        std::uint8_t searchAliases_=0;
+        std::uint32_t searchNodeVtable8_=0;
+        const void* searchNode30_=nullptr;SearchList* searchNode34_=nullptr;SearchList* searchNode38_=nullptr;
+        const void* searchNode48_=nullptr;const void* searchNode3C_=nullptr;
+        const void* searchNode40_=nullptr;const void* searchNode44_=nullptr;const void* searchNodeA0_=nullptr;
+        std::unique_ptr<C> page_;
+        bool pageAllocationAttempted_=false;
+        C* coursePagePopup_=nullptr; // Exact detached1FEC80 owner, not the Options singleton.
+        bool pageAcquired_=false;
+        struct PageCollectionsSource {
+            std::int32_t staticWidgetCount13C=0,controlCount140=0,groupCount148=0,pageNumber138=0;
+            const void* controls144=nullptr;const void* router134=nullptr;
+            const void* groups14C=nullptr;const void* extra150=nullptr;
+        } pageCollections_; // Sole live fields, explicitly written by actual base constructor below.
+        C* coursePageRouter_=nullptr;
+        bool coursePageRouterAttached_=false;
+        std::array<C*,2> coursePageControls_{}; // Exact currently represented Control0/partialControl1.
+        const void* pageBackground154_=nullptr;const void* pageBackground158_=nullptr;
+        std::array<std::uint32_t,2> pageBaseZeros_{}; //260,264 only; no duplicate live collection/background lanes.
+        std::uint8_t pageByte15C_=0;
+        std::uint32_t pageBaseAncestryAtConstruction8_=0,pageInput268_=0; // Base-prefix history; payload owns later vtable/input writes.
+        CourseConstruction(std::shared_ptr<OriginalUiEntityScope50KG> scope,
+            const rr::platform::OriginalUiFrontend50KG* frontend,const void* manager,
+            std::uint64_t generation)noexcept
+            :scope_(std::move(scope)),frontend_(frontend),managerOwner_(manager),generation_(generation){}
+        bool registrationCurrent()const noexcept {
+            if(!scope_||!pending()||!frontend_||!managerOwner_||
+               scope_->courseConstruction_!=this||scope_->managerEpoch_!=epoch_||
+               !scope_->live(false,false,true).okay()||scope_->managerLive_||scope_->managerPublished_||
+               scope_->dispatcherCurrentManager30_||scope_->managerRetiring_||scope_->managerForestRetiring_)
+                return false;
+            const auto& c=scope_->manager_;const auto& app=*scope_->application_;
+            if(pageAcquired_&&(!page_||page_->kind!=K::uiCoursePage1D8D70||page_->sessionGeneration!=generation_||
+               page_->objectKey!=key(page_.get())||page_->reference00!=1||page_->previous10||page_->next14||
+               page_->firstChild18!=(coursePageRouterAttached_?coursePageRouter_:nullptr)||page_->parent1C||page_->mask20||
+               page_->descendants24!=(coursePageRouterAttached_?0xffffffffu:0u)||
+               app.objectCount423F60_<2||!app.entityAuthority_.canRetire(*page_)))return false;
+            if(!coursePageCollectionsCustodyCurrent())return false;
+            if(coursePagePopup_){const auto& popup=*coursePagePopup_;
+                if(!pageAcquired_||popup.kind!=K::entity141300||popup.sessionGeneration!=generation_||
+                   popup.objectKey!=key(&popup)||popup.reference00!=1||popup.previous10||popup.next14||
+                   popup.parent1C||popup.firstChild18||popup.mask20||popup.descendants24||
+                   !app.entityAuthority_.canRetire(popup))return false;
+            }
+            return c.kind==K::uiCourseManager1D0070&&c.sessionGeneration==generation_&&
+                c.objectKey==key(&c)&&c.reference00==1&&!c.previous10&&!c.next14&&
+                !c.parent1C&&!c.mask20&&app.objectCount423F60_&&searchCustodyCurrent()&&courseLightCustodyCurrent()&&courseFogCustodyCurrent()&&courseOverlayCustodyCurrent()&&courseMovementCustodyCurrent()&&courseIconCustodyCurrent()&&courseSelectableCustodyCurrent()&&courseSoultreeCustodyCurrent()&&
+                (searchNodeAttached_?(c.firstChild18==&searchNode_&&c.descendants24==(courseOverlayAttached_[0]?0xffffffffu:2u)):
+                    (!c.firstChild18&&!c.descendants24))&&
+                app.entityAuthority_.canRetire(c);
+        }
+        bool acquiredCurrent()const noexcept {
+            return registrationCurrent()&&!videoEffect_&&!pageAcquired_&&!searchList_&&!searchNodeAcquired_&&
+                (phase_==Phase::beforeVideo2A3A90||phase_==Phase::nativeVideoAborted);
+        }
+        bool issuedBy(const ::original_main_entry50KG::Application* root,
+            const std::shared_ptr<OriginalUiEntityScope50KG>& scope)const noexcept {
+            return root&&scope_==scope&&scope_->issuer_==root;
+        }
+        bool current(const rr::platform::OriginalUiFrontend50KG* frontend,const void* manager)const noexcept {
+            if(frontend_!=frontend||managerOwner_!=manager||!registrationCurrent()||
+               (phase_!=Phase::beforeVideo2A3A90&&phase_!=Phase::afterVideo2A3A90&&
+                phase_!=Phase::derivedComplete1D00BC)||
+               ((phase_!=Phase::beforeVideo2A3A90)!=bool(videoEffect_))||!basePrefixKnown_||word17C_!=1)
+                return false;
+            const bool derived=phase_==Phase::derivedComplete1D00BC;
+            if(derivedKnown_!=derived||ancestry8_!=(derived?0x3cfba0u:0x3d3ab0u))return false;
+            if(derived)for(auto word:derivedZeros_)if(word)return false;
+            for(auto word:zeroWords_)if(word)return false;
+            for(std::size_t m=0;m<4;++m){if(matrixKnown_[m]!=0xff0f)return false;
+                for(std::size_t row:{std::size_t(0),std::size_t(2),std::size_t(3)})
+                    for(std::size_t col=0;col<4;++col)
+                        if(matrices_[m][row*4+col]!=(col==3?0x3f800000u:0u))return false;
+            }
+            return true;
+        }
+        bool videoOwnedPhase()const noexcept {
+            return phase_==Phase::afterVideo2A3A90||phase_==Phase::derivedComplete1D00BC;
+        }
+        bool completeDerived1D0070()noexcept {
+            if(phase_==Phase::derivedComplete1D00BC)
+                return current(frontend_,managerOwner_);
+            if(phase_!=Phase::afterVideo2A3A90||!current(frontend_,managerOwner_))return false;
+            ancestry8_=0x3cfea0; //1D008C: actual common manager vtable.
+            sourceCourseFog_[0]=nullptr;sourceCourseFog_[1]=nullptr;sourceCourseFog_[2]=nullptr; //1D0090/94/98.
+            derivedZeros_[0]=0;derivedZeros_[1]=0; //1D009C/A0:18C/190, not changed by Fog loader.
+            sourceList2A0_=nullptr;sourceNode2A4_=nullptr; //1D00A4/AC.
+            bank2A8_=0; //1D00B4. Loader1CCC58 mutates this same field.
+            ancestry8_=0x3cfba0; //1D00B8: Course vtable.
+            derivedKnown_=true;phase_=Phase::derivedComplete1D00BC;return true;
+        }
+        struct CourseSoultreeRow {
+            C* outer=nullptr;
+            OriginalRacerAnimationCold50LA* animation=nullptr;
+            OriginalRacerModelSceneOwner50LA* model=nullptr;
+            bool attached=false,animationAttached=false,modelAttached=false,modelRetiring=false;
+        };
+        // Native stable custody, not source allocation or permission for future rows.
+        std::array<CourseSoultreeRow,84> courseSoultreeRows_{};
+        inline static constexpr std::array<std::size_t,13> courseSoultreeOrdinals_{{8,9,11,12,13,14,15,19,20,21,22,24,25}};
+        static bool courseSoultreeOrdinalAdmitted(std::size_t i)noexcept {
+            for(auto ordinal:courseSoultreeOrdinals_)if(ordinal==i)return true;
+            return false;
+        }
+        std::size_t previousCourseSoultreeOrdinal(std::size_t i)const noexcept {
+            std::size_t previous=84;
+            for(auto ordinal:courseSoultreeOrdinals_){if(ordinal==i)return previous;previous=ordinal;}
+            return 84;
+        }
+        bool courseSoultreePredecessorAttached(std::size_t i)const noexcept {
+            if(!courseSoultreeOrdinalAdmitted(i)||!courseSelectableAttached_[7])return false;
+            const auto previous=previousCourseSoultreeOrdinal(i);
+            return previous==84||(courseSoultreeRows_[previous].outer&&courseSoultreeRows_[previous].attached);
+        }
+        const C* courseSoultreePrevious(std::size_t i)const noexcept {
+            const auto previous=previousCourseSoultreeOrdinal(i);
+            return previous==84?courseSelectableIcons_[7]:courseSoultreeRows_[previous].outer;
+        }
+        const C* courseSoultreeNextAttached(std::size_t i)const noexcept {
+            for(auto ordinal:courseSoultreeOrdinals_)if(ordinal>i&&courseSoultreeRows_[ordinal].attached)
+                return courseSoultreeRows_[ordinal].outer;
+            return i==25&&courseOverlayAttached_[26]?courseOverlayOuters_[26]:nullptr;
+        }
+        bool courseSoultreeLaterOwned(std::size_t i)const noexcept {
+            if(courseLateOverlayOwned())return true;
+            for(std::size_t later=i+1;later<courseSoultreeRows_.size();++later)
+                if(courseSoultreeRows_[later].outer)return true;
+            return false;
+        }
+        bool courseSoultreesEmpty()const noexcept {
+            for(const auto& row:courseSoultreeRows_)if(row.outer||row.animation||row.model||
+                row.attached||row.animationAttached||row.modelAttached||row.modelRetiring)return false;
+            return true;
+        }
+        bool courseSoultreeCustodyCurrent()const noexcept {
+            for(std::size_t i=0;i<courseSoultreeRows_.size();++i)if(!courseSoultreeRowCurrent(i))return false;
+            return true;
+        }
+        bool courseSoultreeRowCurrent(std::size_t i)const noexcept {
+            const auto& row=courseSoultreeRows_[i];
+            const auto* outer=row.outer;
+            if(!outer)return !row.attached&&!row.animation&&!row.model&&!row.animationAttached&&!row.modelAttached&&!row.modelRetiring;
+            if(!courseSoultreeOrdinalAdmitted(i))return false;
+            const auto& app=*scope_->application_;
+            const auto* animation=row.animation?&row.animation->entity220_:nullptr;
+            const auto* model=row.model?&row.model->model_.entity8:nullptr;
+            if(!courseSoultreePredecessorAttached(i)||outer->kind!=K::uiSoultree2A85F0||
+               outer->sessionGeneration!=generation_||outer->objectKey!=key(outer)||outer->reference00!=1||
+               outer->firstChild18!=(row.animationAttached?animation:nullptr)||
+               outer->descendants24!=(row.animationAttached?0xffffffffu:0u)||
+               !app.entityAuthority_.canRetire(*outer))return false;
+            if(row.attached){
+                const auto* previous=courseSoultreePrevious(i);
+                const auto* next=courseSoultreeNextAttached(i);
+                if(!previous||
+                   outer->parent1C!=&scope_->manager_||outer->previous10!=previous||
+                   previous->next14!=outer||outer->next14!=next||outer->mask20!=0xffffffffu||
+                   !scope_->linked(*outer,&scope_->manager_))return false;
+            }else if(outer->parent1C||outer->previous10||outer->next14||outer->mask20)return false;
+            if(animation){const auto& a=*row.animation;
+                if(!a.constructed_||a.released_||a.character290_||a.fields_.self00!=animation||
+                   a.binding_.actualObjectCount423F60!=&app.objectCount423F60_||
+                   a.binding_.actualAttachmentLock423F58!=&app.attachmentLock423F58_||
+                   a.binding_.sessionGeneration!=generation_||a.binding_.animationKey!=key(animation)||
+                   animation->kind!=K::animation1536F0||animation->sessionGeneration!=generation_||
+                   animation->objectKey!=key(animation)||animation->reference00!=1||animation->previous10||animation->next14||
+                   animation->firstChild18!=((row.modelAttached&&!row.modelRetiring)?model:nullptr)||
+                   animation->descendants24||!app.entityAuthority_.canRetire(*animation))return false;
+                if(row.animationAttached){
+                    if(animation->parent1C!=outer||animation->mask20!=0xffffffffu)return false;
+                }else if(animation->parent1C||animation->mask20)return false;
+            }else if(row.animationAttached||model)return false;
+            if(model){const auto& m=*row.model;
+                if(!scope_->modelUsesApplication(m)||model->kind!=K::model2403A0||
+                   model->sessionGeneration!=generation_||model->objectKey!=key(model)||
+                   model->firstChild18||model->descendants24||model->previous10||model->next14||model->mask20)return false;
+                if(row.modelRetiring){
+                    if(!m.referenceReleased_||model->reference00)return false;
+                    //142590 unlinks parent->firstChild but leaves historical child links.
+                    if(model->parent1C!=(row.modelAttached?animation:nullptr))return false;
+                }else if(m.referenceReleased_||model->reference00!=1||!app.entityAuthority_.canRetire(*model)||
+                         model->parent1C!=(row.modelAttached?animation:nullptr))return false;
+            }else if(row.modelAttached||row.modelRetiring)return false;
+            return true;
+        }
+        Result constructCourseSoultree2A85F0(std::size_t i,C& c)noexcept {
+            if(!courseSoultreeOrdinalAdmitted(i))return {Status::owner,0};
+            auto& row=courseSoultreeRows_[i];
+            if(row.outer||!courseSoultreePredecessorAttached(i)||!current(frontend_,managerOwner_))return {Status::phase,0x2A85F0};
+            auto& app=*scope_->application_;
+            if(app.objectCount423F60_==std::numeric_limits<std::uint32_t>::max()||
+               !app.entityAuthority_.reserveAdditional(1)||!app.entityAuthority_.canEnroll(c,key(&c)))return {Status::allocation,0x2A85F0};
+            const auto r=initializeOriginalWreckComponent50LA(c,K::uiSoultree2A85F0,generation_,key(&c),true,app.objectCount423F60_);
+            if(r.status!=OriginalWreckComponentStatus50LA::complete||!app.entityAuthority_.enroll(c))std::terminate();
+            row.outer=&c;return {Status::complete,0x2A85F0};
+        }
+        Result prepareCourseAnimationBinding1536F0(std::size_t i,OriginalRacerAnimationCold50LA& a,
+            OriginalRacerAnimationColdBinding50LA& binding)noexcept {
+            if(!courseSoultreeOrdinalAdmitted(i))return {Status::owner,0};
+            auto& row=courseSoultreeRows_[i];
+            if(!row.outer||row.animation||a.constructed_||a.released_||
+               !current(frontend_,managerOwner_))return {Status::phase,0x1536F0};
+            auto& app=*scope_->application_;
+            if(!app.entityAuthority_.reserveAdditional(1)||!app.entityAuthority_.canEnroll(a.entity220_,key(&a.entity220_)))
+                return {Status::allocation,0x1536F0};
+            binding={generation_,key(&a.entity220_),&app.objectCount423F60_,&app.attachmentLock423F58_};
+            return {Status::complete,0x1536F0};
+        }
+        Result enrollCourseAnimation1536F0(std::size_t i,OriginalRacerAnimationCold50LA& a)noexcept {
+            if(!courseSoultreeOrdinalAdmitted(i))return {Status::owner,0};
+            auto& row=courseSoultreeRows_[i];
+            if(!row.outer||row.animation||!current(frontend_,managerOwner_))return {Status::phase,0x1536F0};
+            auto& app=*scope_->application_;auto& c=a.entity220_;
+            if(!a.constructed_||a.released_||a.character290_||a.fields_.self00!=&c||
+               a.binding_.actualObjectCount423F60!=&app.objectCount423F60_||a.binding_.actualAttachmentLock423F58!=&app.attachmentLock423F58_||
+               c.kind!=K::animation1536F0||c.sessionGeneration!=generation_||c.objectKey!=key(&c)||c.reference00!=1||
+               c.previous10||c.next14||c.parent1C||c.firstChild18||!app.entityAuthority_.canEnroll(c,key(&c)))return {Status::generation,0x1536F0};
+            if(!app.entityAuthority_.enroll(c))std::terminate();row.animation=&a;return {Status::complete,0x1536F0};
+        }
+        Result prepareCourseModelBinding154140(std::size_t i,const SceneNodeIndex49P* indices,std::uint32_t count,
+            OriginalRacerModelSceneBinding50LA& binding)noexcept {
+            if(!courseSoultreeOrdinalAdmitted(i))return {Status::owner,0};
+            auto& row=courseSoultreeRows_[i];
+            if(!row.animation||row.model||!indices||count!=2||indices[0]!=static_cast<SceneNodeIndex49P>(1)||indices[1]!=static_cast<SceneNodeIndex49P>(2)||
+               !current(frontend_,managerOwner_))return {Status::phase,0x154140};
+            auto& app=*scope_->application_;
+            if(!app.entityAuthority_.reserveAdditional(1))return {Status::allocation,0x154140};
+            binding={generation_,&app.objectCount423F60_,&app.attachmentLock423F58_,&app.types383408_,static_cast<SceneNodeIndex49P>(0),indices,count};
+            return {Status::complete,0x154140};
+        }
+        Result enrollCourseModel2403A0(std::size_t i,OriginalRacerModelSceneOwner50LA& m)noexcept {
+            if(!courseSoultreeOrdinalAdmitted(i))return {Status::owner,0};
+            auto& row=courseSoultreeRows_[i];
+            if(!row.animation||row.model||!current(frontend_,managerOwner_))return {Status::phase,0x2403A0};
+            auto& app=*scope_->application_;auto& c=m.uiScopeModelEntity8();
+            if(!scope_->modelUsesApplication(m)||c.kind!=K::model2403A0||c.sessionGeneration!=generation_||
+               c.objectKey!=key(&c)||c.reference00!=1||c.previous10||c.next14||c.parent1C||c.firstChild18||
+               !app.entityAuthority_.canEnroll(c,key(&c)))return {Status::generation,0x2403A0};
+            if(!app.entityAuthority_.enroll(c))std::terminate();row.model=&m;return {Status::complete,0x2403A0};
+        }
+        Result attachCourseModel154348(std::size_t i,OriginalRacerAnimationCold50LA& a,OriginalRacerModelSceneOwner50LA& m)noexcept {
+            if(!courseSoultreeOrdinalAdmitted(i))return {Status::owner,0};
+            auto& row=courseSoultreeRows_[i];
+            if(row.animation!=&a||row.model!=&m||row.modelAttached||
+               row.modelRetiring||!current(frontend_,managerOwner_))return {Status::phase,0x154348};
+            const auto r=scope_->application_->entityAuthority_.attachChildren(a.entity220_,m.uiScopeModelEntity8(),0,0);
+            if(r.status!=OriginalWreckComponentStatus50LA::complete)return {Status::topology,0x154348};
+            row.modelAttached=true;return {Status::complete,0x154350};
+        }
+        Result attachCourseAnimation2A8B44(std::size_t i,C& outer,OriginalRacerAnimationCold50LA& a)noexcept {
+            if(!courseSoultreeOrdinalAdmitted(i))return {Status::owner,0};
+            auto& row=courseSoultreeRows_[i];
+            if(row.outer!=&outer||row.animation!=&a||row.animationAttached||
+               !current(frontend_,managerOwner_))return {Status::phase,0x2A8B44};
+            const auto r=scope_->application_->entityAuthority_.attachChildren(outer,a.entity220_,0xffffffffu,0);
+            if(r.status!=OriginalWreckComponentStatus50LA::complete)return {Status::topology,0x2A8B44};
+            row.animationAttached=true;return {Status::complete,0x2A8B4C};
+        }
+        Result abortNativeCourseFreshModel(std::size_t i,OriginalRacerModelSceneOwner50LA& m,const SceneGraph49P& graph)noexcept {
+            if(!courseSoultreeOrdinalAdmitted(i))return {Status::owner,0};
+            if(courseSoultreeLaterOwned(i))return {Status::phase,0};
+            auto& row=courseSoultreeRows_[i];
+            if(row.model!=&m||row.modelAttached||row.modelRetiring||
+               m.rowsLoaded_||pageAcquired_||!registrationCurrent())return {Status::phase,0};
+            const auto check=m.preflightFreshUnlinkedNative(graph);if(!check.okay())return {Status::topology,check.sourcePC};
+            auto& app=*scope_->application_;auto& c=m.uiScopeModelEntity8();
+            if(!app.entityAuthority_.canRetire(c))return {Status::phase,0};
+            // Native prefix recovery: authority withdrawal adds NO reference
+            // drop. The proven fresh closer owns root/partial-row references
+            // and counts, including an actual counted orphan after registry refusal.
+            if(!app.entityAuthority_.retire(c))std::terminate();
+            if(!m.closeFreshUnlinked(graph).okay())std::terminate();
+            row.model=nullptr;return {Status::complete,0};
+        }
+        Result retireCourseModel142590(std::size_t i,OriginalRacerModelSceneOwner50LA& m)noexcept {
+            if(!courseSoultreeOrdinalAdmitted(i))return {Status::owner,0};
+            if(courseSoultreeLaterOwned(i))return {Status::phase,0};
+            auto& row=courseSoultreeRows_[i];
+            if(row.model!=&m||pageAcquired_||row.modelRetiring||!registrationCurrent())return {Status::phase,0};
+            auto& app=*scope_->application_;auto& c=m.uiScopeModelEntity8();
+            const auto r=m.preflightModelReference142590InAuthority(app.entityAuthority_.view());
+            if(!r.okay())return {Status::topology,r.sourcePC};
+            if(!app.entityAuthority_.retire(c)||!m.releasePreflightedModelReference142590().okay())std::terminate();
+            row.modelRetiring=true;return {Status::complete,0};
+        }
+        Result finishCourseModelRetirement(std::size_t i,OriginalRacerModelSceneOwner50LA& m)noexcept {
+            if(!courseSoultreeOrdinalAdmitted(i))return {Status::owner,0};
+            if(courseSoultreeLaterOwned(i))return {Status::phase,0};
+            auto& row=courseSoultreeRows_[i];
+            if(row.model!=&m||!row.modelRetiring||!m.released_||!m.referenceReleased_||
+               m.model_.entity8.reference00||!registrationCurrent())return {Status::phase,0};
+            row.model=nullptr;row.modelAttached=false;row.modelRetiring=false;
+            return {Status::complete,0};
+        }
+        bool preflightCourseSoultreeRetirement(std::size_t i,const C& outer)const noexcept {
+            if(!courseSoultreeOrdinalAdmitted(i))return false;
+            const auto& row=courseSoultreeRows_[i];
+            if(row.outer!=&outer||pageAcquired_||!registrationCurrent())return false;
+            if(row.model&&!row.modelRetiring&&
+               !row.model->preflightModelReference142590InAuthority(scope_->application_->entityAuthority_.view()).okay())return false;
+            return true;
+        }
+        Result abortNativeCourseAnimation153F50(std::size_t i,OriginalRacerAnimationCold50LA& a)noexcept {
+            if(!courseSoultreeOrdinalAdmitted(i))return {Status::owner,0};
+            if(courseSoultreeLaterOwned(i))return {Status::phase,0};
+            auto& row=courseSoultreeRows_[i];
+            // Private Course owner calls ONLY after its acquired payload/cache
+            // release ledger completes. Historical source allocation pointers
+            // are not rewritten or accepted as evidence that release occurred.
+            if(row.animation!=&a||row.model||row.modelRetiring||
+               pageAcquired_||!registrationCurrent())return {Status::phase,0};
+            auto& app=*scope_->application_;auto& c=a.entity220_;
+            if(c.firstChild18||c.reference00!=1||!app.entityAuthority_.canRetire(c))return {Status::phase,0};
+            if(row.animationAttached){const auto r=app.entityAuthority_.detach(c,0);
+                if(r.status!=OriginalWreckComponentStatus50LA::complete)return {Status::topology,0};row.animationAttached=false;}
+            if(!app.entityAuthority_.retire(c))std::terminate();
+            --c.reference00;--app.objectCount423F60_;a.released_=true;row.animation=nullptr;
+            return {Status::complete,0}; // Native unwind, not a loaded153F50 return.
+        }
+        Result abortNativeCourseSoultree2A86A0(std::size_t i,C& c)noexcept {
+            if(!courseSoultreeOrdinalAdmitted(i))return {Status::owner,0};
+            auto& row=courseSoultreeRows_[i];
+            if((courseSoultreeLaterOwned(i))||row.outer!=&c||row.animation||row.model||pageAcquired_||
+               !registrationCurrent())return {Status::phase,0};
+            auto& app=*scope_->application_;
+            if(row.attached){const auto r=app.entityAuthority_.detach(c,0);
+                if(r.status!=OriginalWreckComponentStatus50LA::complete)return {Status::topology,0};row.attached=false;}
+            if(!app.entityAuthority_.retire(c))std::terminate();
+            --c.reference00;--app.objectCount423F60_;row.outer=nullptr;return {Status::complete,0};
+        }
+        Result disableCourseSoultree1415A0(std::size_t i,C& outer)noexcept {
+            if(!courseSoultreeOrdinalAdmitted(i))return {Status::owner,0};
+            auto& row=courseSoultreeRows_[i];
+            if(row.outer!=&outer||row.attached||!current(frontend_,managerOwner_))return {Status::phase,0x1CD908};
+            outer.flags29=static_cast<std::uint8_t>(outer.flags29&~3u);
+            if(row.animation){auto& a=row.animation->entity220_;
+                if(row.animationAttached&&!(a.flags29&8u)){
+                    a.flags29=static_cast<std::uint8_t>(a.flags29&~3u);
+                    if(row.model&&row.modelAttached){auto& m=row.model->model_.entity8;
+                        if(!(m.flags29&8u))m.flags29=static_cast<std::uint8_t>(m.flags29&~3u);
+                    }
+                }
+            }
+            return {Status::complete,0x1CD910};
+        }
+        Result attachCourseSoultree1CD9F8(std::size_t i,C& outer)noexcept {
+            if(!courseSoultreeOrdinalAdmitted(i))return {Status::owner,0};
+            auto& row=courseSoultreeRows_[i];
+            if(row.outer!=&outer||row.attached||!current(frontend_,managerOwner_))return {Status::phase,0x1CD9F8};
+            const auto r=scope_->application_->entityAuthority_.attachChildren(scope_->manager_,outer,0xffffffffu,0);
+            if(r.status!=OriginalWreckComponentStatus50LA::complete)return {Status::topology,0x1CD9F8};
+            row.attached=true;return {Status::complete,0x1CDA00};
+        }
+        std::array<C*,84> courseSelectableIcons_{};
+        std::array<bool,84> courseSelectableAttached_{};
+        static bool courseSelectableOrdinalAdmitted(std::size_t i)noexcept {return i==6||i==7||(i>=52&&i<=55);}
+        bool courseLateSelectableOwned()const noexcept {
+            for(std::size_t i=52;i<courseSelectableIcons_.size();++i)if(courseSelectableIcons_[i])return true;
+            return false;
+        }
+        const C* courseSelectablePrevious(std::size_t i)const noexcept {
+            if(i==6)return courseIcons_[5];
+            if(i==7)return courseSelectableIcons_[6];
+            if(i==52)return courseOverlayOuters_[51];
+            return i>52&&i<=55?courseSelectableIcons_[i-1]:nullptr;
+        }
+        bool courseSelectablePredecessorAttached(std::size_t i)const noexcept {
+            if(i==6)return courseIconsAttached_[5];
+            if(i==7)return courseSelectableAttached_[6];
+            if(i==52)return courseOverlayAttached_[51];
+            return i>52&&i<=55&&courseSelectableAttached_[i-1];
+        }
+        const C* courseSelectableNext(std::size_t i)const noexcept {
+            if(i==6)return courseSelectableAttached_[7]?courseSelectableIcons_[7]:nullptr;
+            if(i==7)return courseSoultreeRows_[8].attached?courseSoultreeRows_[8].outer:nullptr;
+            if(i==55)return courseOverlayAttached_[59]?courseOverlayOuters_[59]:nullptr;
+            return i>=52&&i<55&&courseSelectableAttached_[i+1]?courseSelectableIcons_[i+1]:nullptr;
+        }
+        bool courseSelectableCustodyCurrent()const noexcept {
+            for(std::size_t n=0;n<courseSelectableIcons_.size();++n){const auto* c=courseSelectableIcons_[n];
+                if(!c){if(courseSelectableAttached_[n])return false;continue;}
+                if(!courseSelectableOrdinalAdmitted(n)||!courseSelectablePredecessorAttached(n)||c->kind!=K::uiSelectableIcon2ACF00||
+                   c->sessionGeneration!=generation_||c->objectKey!=key(c)||c->reference00!=1||
+                   c->firstChild18||c->descendants24||!scope_->application_->entityAuthority_.canRetire(*c))return false;
+                if(courseSelectableAttached_[n]){
+                    const auto* previous=courseSelectablePrevious(n);
+                    const auto* next=courseSelectableNext(n);
+                    if(!previous||c->parent1C!=&scope_->manager_||c->previous10!=previous||previous->next14!=c||
+                       c->next14!=next||c->mask20!=0xffffffffu||!scope_->linked(*c,&scope_->manager_))return false;
+                }else if(c->parent1C||c->previous10||c->next14||c->mask20)return false;
+            }
+            return true;
+        }
+        Result constructCourseSelectable2ACF00(std::size_t i,C& c)noexcept {
+            if(!courseSelectableOrdinalAdmitted(i))return {Status::owner,0x2ACF00};const auto n=i;
+            if(courseSelectableIcons_[n]||!courseSelectablePredecessorAttached(i)||
+               !current(frontend_,managerOwner_))return {Status::phase,0x2ACF00};
+            auto& app=*scope_->application_;
+            if(app.objectCount423F60_==std::numeric_limits<std::uint32_t>::max()||
+               !app.entityAuthority_.reserveAdditional(1)||!app.entityAuthority_.canEnroll(c,key(&c)))
+                return {Status::allocation,0x2ACF00};
+            const auto r=initializeOriginalWreckComponent50LA(c,K::uiSelectableIcon2ACF00,generation_,key(&c),true,app.objectCount423F60_);
+            if(r.status!=OriginalWreckComponentStatus50LA::complete||!app.entityAuthority_.enroll(c))std::terminate();
+            courseSelectableIcons_[n]=&c;return {Status::complete,0x2ACF00};
+        }
+        Result disableCourseSelectable1415A0(std::size_t i,C& c)noexcept {
+            if(!courseSelectableOrdinalAdmitted(i)||courseSelectableIcons_[i]!=&c||courseSelectableAttached_[i]||
+               !current(frontend_,managerOwner_))return {Status::phase,0x1CD908};
+            c.flags29=static_cast<std::uint8_t>(c.flags29&~3u);return {Status::complete,0x1CD910};
+        }
+        Result attachCourseSelectable1CD9F8(std::size_t i,C& c)noexcept {
+            if(!courseSelectableOrdinalAdmitted(i)||courseSelectableIcons_[i]!=&c||courseSelectableAttached_[i]||
+               !current(frontend_,managerOwner_))return {Status::phase,0x1CD9F8};
+            const auto r=scope_->application_->entityAuthority_.attachChildren(scope_->manager_,c,0xffffffffu,0);
+            if(r.status!=OriginalWreckComponentStatus50LA::complete)return {Status::topology,0x1CD9F8};
+            courseSelectableAttached_[i]=true;return {Status::complete,0x1CDA00};
+        }
+        bool preflightAbortNativeCourseSelectable(std::size_t i,const C& c)const noexcept {
+            if(!courseSelectableOrdinalAdmitted(i)||courseSelectableIcons_[i]!=&c||pageAcquired_||!registrationCurrent())return false;
+            if(courseLateIconsOwned()||(i<8&&(!courseSoultreesEmpty()||courseLateOverlayOwned())))return false;
+            for(std::size_t later=59;later<courseOverlayOuters_.size();++later)
+                if(courseOverlayOuters_[later]||courseTextRowOwned(later))return false;
+            for(std::size_t later=i+1;later<courseSelectableIcons_.size();++later)
+                if(courseSelectableIcons_[later])return false;
+            return true;
+        }
+        Result abortNativeCourseSelectable(std::size_t i,C& c)noexcept {
+            if(!preflightAbortNativeCourseSelectable(i,c))return {Status::phase,0};const auto n=i;
+            auto& app=*scope_->application_;
+            if(courseSelectableAttached_[n]){const auto r=app.entityAuthority_.detach(c,0);
+                if(r.status!=OriginalWreckComponentStatus50LA::complete)return {Status::topology,0};courseSelectableAttached_[n]=false;}
+            if(!app.entityAuthority_.retire(c))std::terminate();
+            --c.reference00;--app.objectCount423F60_;courseSelectableIcons_[n]=nullptr;return {Status::complete,0};
+        }
+        std::array<C*,84> courseIcons_{};
+        std::array<bool,84> courseIconsAttached_{};
+        static bool courseIconOrdinalAdmitted(std::size_t i)noexcept {return i==5||(i>=64&&i<=66)||(i>=81&&i<=83);}
+        bool courseLateIconsOwned()const noexcept {
+            for(std::size_t i=64;i<courseIcons_.size();++i)if(courseIcons_[i])return true;return false;
+        }
+        bool courseFinalIconsOwned()const noexcept {
+            for(std::size_t i=81;i<courseIcons_.size();++i)if(courseIcons_[i])return true;return false;
+        }
+        const C* courseIconPrevious(std::size_t i)const noexcept {
+            if(i==5)return courseMovement_;if(i==64)return courseOverlayOuters_[62];
+            if(i==81)return courseOverlayOuters_[80];
+            return i==65||i==66||i==82||i==83?courseIcons_[i-1]:nullptr;
+        }
+        bool courseIconPredecessorAttached(std::size_t i)const noexcept {
+            if(i==5)return courseMovementAttached_;if(i==64)return courseOverlayAttached_[62];
+            if(i==81)return courseOverlayAttached_[80];
+            return (i==65||i==66||i==82||i==83)&&courseIconsAttached_[i-1];
+        }
+        const C* courseIconNext(std::size_t i)const noexcept {
+            if(i==5)return courseSelectableAttached_[6]?courseSelectableIcons_[6]:nullptr;
+            if(i==66)return courseOverlayAttached_[67]?courseOverlayOuters_[67]:nullptr;
+            if(i==83)return courseFogAttached_[0]?courseFogEntities_[0]:nullptr;
+            return ((i>=64&&i<66)||(i>=81&&i<83))&&courseIconsAttached_[i+1]?courseIcons_[i+1]:nullptr;
+        }
+        bool courseIconCustodyCurrent()const noexcept {
+            for(std::size_t i=0;i<courseIcons_.size();++i){const auto* c=courseIcons_[i];
+                if(!c){if(courseIconsAttached_[i])return false;continue;}
+                if(!courseIconOrdinalAdmitted(i)||!courseIconPredecessorAttached(i)||c->kind!=K::uiIcon2AC4B0||
+                   c->sessionGeneration!=generation_||c->objectKey!=key(c)||c->reference00!=1||
+                   c->firstChild18||c->descendants24||!scope_->application_->entityAuthority_.canRetire(*c))return false;
+                if(courseIconsAttached_[i]){const auto* previous=courseIconPrevious(i);
+                    if(!previous||c->parent1C!=&scope_->manager_||c->previous10!=previous||previous->next14!=c||
+                       c->next14!=courseIconNext(i)||c->mask20!=0xffffffffu||!scope_->linked(*c,&scope_->manager_))return false;
+                }else if(c->parent1C||c->previous10||c->next14||c->mask20)return false;
+            }
+            return true;
+        }
+        Result constructCourseIcon2AC4B0(std::size_t i,C& c)noexcept {
+            if(!courseIconOrdinalAdmitted(i)||courseIcons_[i]||!courseIconPredecessorAttached(i)||!current(frontend_,managerOwner_))return {Status::phase,0x2AC4B0};
+            auto& app=*scope_->application_;
+            if(app.objectCount423F60_==std::numeric_limits<std::uint32_t>::max()||
+               !app.entityAuthority_.reserveAdditional(1)||!app.entityAuthority_.canEnroll(c,key(&c)))
+                return {Status::allocation,0x2AC4B0};
+            const auto r=initializeOriginalWreckComponent50LA(c,K::uiIcon2AC4B0,generation_,key(&c),true,app.objectCount423F60_);
+            if(r.status!=OriginalWreckComponentStatus50LA::complete||!app.entityAuthority_.enroll(c))std::terminate();
+            courseIcons_[i]=&c;return {Status::complete,0x2AC4B0};
+        }
+        Result disableCourseIcon1415A0(std::size_t i,C& c)noexcept {
+            if(!courseIconOrdinalAdmitted(i)||courseIcons_[i]!=&c||courseIconsAttached_[i]||!current(frontend_,managerOwner_))return {Status::phase,0x1CD908};
+            c.flags29=static_cast<std::uint8_t>(c.flags29&~3u);return {Status::complete,0x1CD910};
+        }
+        Result attachCourseIcon1CD9F8(std::size_t i,C& c)noexcept {
+            if(!courseIconOrdinalAdmitted(i)||courseIcons_[i]!=&c||courseIconsAttached_[i]||!current(frontend_,managerOwner_))return {Status::phase,0x1CD9F8};
+            const auto r=scope_->application_->entityAuthority_.attachChildren(scope_->manager_,c,0xffffffffu,0);
+            if(r.status!=OriginalWreckComponentStatus50LA::complete)return {Status::topology,0x1CD9F8};
+            courseIconsAttached_[i]=true;return {Status::complete,0x1CDA00};
+        }
+        bool preflightAbortNativeCourseIcon(std::size_t i,const C& c)const noexcept {
+            if(!courseIconOrdinalAdmitted(i)||courseIcons_[i]!=&c||pageAcquired_||
+               courseFogAttached_[0]||courseFogAttached_[1]||courseFogAttached_[2]||!registrationCurrent())return false;
+            if(i==5&&(courseSelectableIcons_[6]||courseSelectableIcons_[7]||courseLateOverlayOwned()))return false;
+            if(i<81)for(std::size_t later=67;later<courseOverlayOuters_.size();++later)
+                if(courseOverlayOuters_[later]||courseTextRowOwned(later))return false;
+            for(std::size_t later=i+1;later<courseIcons_.size();++later)if(courseIcons_[later])return false;
+            return true;
+        }
+        Result abortNativeCourseIcon(std::size_t i,C& c)noexcept {
+            if(!preflightAbortNativeCourseIcon(i,c))return {Status::phase,0};
+            auto& app=*scope_->application_;
+            if(courseIconsAttached_[i]){const auto r=app.entityAuthority_.detach(c,0);
+                if(r.status!=OriginalWreckComponentStatus50LA::complete)return {Status::topology,0};courseIconsAttached_[i]=false;}
+            if(!app.entityAuthority_.retire(c))std::terminate();
+            --c.reference00;--app.objectCount423F60_;courseIcons_[i]=nullptr;return {Status::complete,0};
+        }
+        C* courseMovement_=nullptr;
+        bool courseMovementAttached_=false;
+        bool courseMovementCustodyCurrent()const noexcept {
+            const auto* c=courseMovement_;if(!c)return !courseMovementAttached_;
+            if(!courseOverlayAttached_[1]||c->kind!=K::uiMovementControl2AAF40||
+               c->sessionGeneration!=generation_||c->objectKey!=key(c)||c->reference00!=1||
+               c->firstChild18||c->descendants24||c->next14!=(courseIconsAttached_[5]?courseIcons_[5]:nullptr)||
+               !scope_->application_->entityAuthority_.canRetire(*c))return false;
+            return courseMovementAttached_?
+                (c->parent1C==&scope_->manager_&&c->previous10==courseOverlayOuters_[1]&&
+                 courseOverlayOuters_[1]->next14==c&&c->mask20==0xffffffffu&&scope_->linked(*c,&scope_->manager_)):
+                (!c->parent1C&&!c->previous10&&!c->mask20);
+        }
+        Result constructCourseMovement2AAF40(C& c)noexcept {
+            if(courseMovement_||!courseOverlayAttached_[1]||!current(frontend_,managerOwner_))return {Status::phase,0x2AAF40};
+            auto& app=*scope_->application_;
+            if(app.objectCount423F60_==std::numeric_limits<std::uint32_t>::max()||
+               !app.entityAuthority_.reserveAdditional(1)||!app.entityAuthority_.canEnroll(c,key(&c)))
+                return {Status::allocation,0x2AAF40};
+            const auto r=initializeOriginalWreckComponent50LA(c,K::uiMovementControl2AAF40,generation_,key(&c),true,app.objectCount423F60_);
+            if(r.status!=OriginalWreckComponentStatus50LA::complete||!app.entityAuthority_.enroll(c))std::terminate();
+            courseMovement_=&c;return {Status::complete,0x2AAF40};
+        }
+        Result disableCourseMovement1415A0(C& c)noexcept {
+            if(courseMovement_!=&c||courseMovementAttached_||!current(frontend_,managerOwner_))return {Status::phase,0x1CD908};
+            c.flags29=static_cast<std::uint8_t>(c.flags29&~3u);return {Status::complete,0x1CD910};
+        }
+        Result attachCourseMovement1CD9F8(C& c)noexcept {
+            if(courseMovement_!=&c||courseMovementAttached_||!current(frontend_,managerOwner_))return {Status::phase,0x1CD9F8};
+            const auto r=scope_->application_->entityAuthority_.attachChildren(scope_->manager_,c,0xffffffffu,0);
+            if(r.status!=OriginalWreckComponentStatus50LA::complete)return {Status::topology,0x1CD9F8};
+            courseMovementAttached_=true;return {Status::complete,0x1CDA00};
+        }
+        Result abortNativeCourseMovement(C& c)noexcept {
+            if(courseMovement_!=&c||courseIcons_[5]||pageAcquired_||!registrationCurrent())return {Status::phase,0};
+            auto& app=*scope_->application_;
+            if(courseMovementAttached_){const auto r=app.entityAuthority_.detach(c,0);
+                if(r.status!=OriginalWreckComponentStatus50LA::complete)return {Status::topology,0};courseMovementAttached_=false;}
+            if(!app.entityAuthority_.retire(c))std::terminate();
+            --c.reference00;--app.objectCount423F60_;courseMovement_=nullptr;return {Status::complete,0};
+        }
+        std::array<C*,84> courseOverlayOuters_{};
+        std::array<std::array<C*,10>,84> courseTextLines_{};
+        std::array<bool,84> courseOverlayAttached_{};
+        std::array<std::array<bool,10>,84> courseTextLineAttached_{};
+        static std::size_t courseTextLineLimit(std::size_t i)noexcept {
+            switch(i){case 61:case 73:case 75:case 79:return 3;case 68:case 76:return 7;
+                case 74:return 10;case 80:return 6;default:return 1;}
+        }
+        bool courseTextRowOwned(std::size_t i)const noexcept {
+            for(const auto* line:courseTextLines_[i])if(line)return true;return false;
+        }
+        inline static constexpr std::array<std::size_t,34> courseOverlayOrdinals_{{0,1,26,27,29,30,31,32,33,37,38,39,40,42,43,51,59,60,61,62,67,68,69,70,71,72,73,74,75,76,77,78,79,80}};
+        static bool courseOverlayOrdinalAdmitted(std::size_t i)noexcept {
+            for(auto ordinal:courseOverlayOrdinals_)if(ordinal==i)return true;
+            return false;
+        }
+        bool courseLateOverlayOwned()const noexcept {
+            for(std::size_t i=26;i<courseOverlayOuters_.size();++i)if(courseOverlayOuters_[i]||courseTextRowOwned(i))return true;
+            return false;
+        }
+        const C* courseOverlayPrevious(std::size_t i)const noexcept {
+            if(i==0)return courseUiLights_[1];
+            if(i==1)return courseOverlayOuters_[0];
+            if(i==26)return courseSoultreeRows_[25].outer;
+            if(i==59)return courseSelectableIcons_[55];
+            if(i==67)return courseIcons_[66];
+            std::size_t previous=84;
+            for(auto ordinal:courseOverlayOrdinals_){if(ordinal==i)return previous==84?nullptr:courseOverlayOuters_[previous];previous=ordinal;}
+            return nullptr;
+        }
+        bool courseOverlayPredecessorAttached(std::size_t i)const noexcept {
+            if(i==0)return courseUiLightsAttached_[1];
+            if(i==1)return courseOverlayAttached_[0];
+            if(i==26)return courseSoultreeRows_[25].attached;
+            if(i==59)return courseSelectableAttached_[55];
+            if(i==67)return courseIconsAttached_[66];
+            std::size_t previous=84;
+            for(auto ordinal:courseOverlayOrdinals_){if(ordinal==i)return previous!=84&&courseOverlayAttached_[previous];previous=ordinal;}
+            return false;
+        }
+        const C* courseOverlayNext(std::size_t i)const noexcept {
+            if(i==51)return courseSelectableAttached_[52]?courseSelectableIcons_[52]:nullptr;
+            if(i==62)return courseIconsAttached_[64]?courseIcons_[64]:nullptr;
+            if(i==80)return courseIconsAttached_[81]?courseIcons_[81]:nullptr;
+            if(i==0)return courseOverlayAttached_[1]?courseOverlayOuters_[1]:nullptr;
+            if(i==1)return courseMovementAttached_?courseMovement_:nullptr;
+            for(auto ordinal:courseOverlayOrdinals_)if(ordinal>i&&courseOverlayAttached_[ordinal])return courseOverlayOuters_[ordinal];
+            return nullptr;
+        }
+        bool courseOverlayRetirementAdmitted(std::size_t i)const noexcept {
+            if(courseFinalIconsOwned()||(i<67&&courseLateIconsOwned())||(i<59&&courseLateSelectableOwned()))return false;
+            if(!courseOverlayOrdinalAdmitted(i))return false;
+            if(i<2&&(courseMovement_||!courseSoultreesEmpty()))return false;
+            for(std::size_t later=i+1;later<courseOverlayOuters_.size();++later)
+                if(courseOverlayOuters_[later]||courseTextRowOwned(later))return false;
+            return true;
+        }
+        bool courseTextLineRetirementAdmitted(std::size_t i,std::size_t j)const noexcept {
+            if(!courseOverlayOrdinalAdmitted(i)||j>=courseTextLineLimit(i)||!courseOverlayRetirementAdmitted(i))return false;
+            for(std::size_t later=j+1;later<courseTextLines_[i].size();++later)if(courseTextLines_[i][later])return false;
+            return true;
+        }
+        bool courseOverlayCustodyCurrent()const noexcept {
+            for(std::size_t i=0;i<courseOverlayOuters_.size();++i){const auto* outer=courseOverlayOuters_[i];
+                if(!outer){if(courseTextRowOwned(i)||courseOverlayAttached_[i])return false;
+                    for(bool attached:courseTextLineAttached_[i])if(attached)return false;continue;}
+                if(!courseOverlayOrdinalAdmitted(i)||!courseOverlayPredecessorAttached(i)||outer->kind!=K::uiOverlayText2A8F00||outer->sessionGeneration!=generation_||outer->objectKey!=key(outer)||
+                   outer->reference00!=1||!scope_->application_->entityAuthority_.canRetire(*outer))return false;
+                const C* first=nullptr;const C* previous=nullptr;
+                for(std::size_t j=0;j<courseTextLines_[i].size();++j){const auto* line=courseTextLines_[i][j];
+                    if(!line){if(courseTextLineAttached_[i][j])return false;continue;}
+                    if(j>=courseTextLineLimit(i)||line->kind!=K::uiTextOverlay29C850||line->sessionGeneration!=generation_||line->objectKey!=key(line)||
+                       line->reference00!=1||line->firstChild18||line->descendants24||
+                       !scope_->application_->entityAuthority_.canRetire(*line))return false;
+                    if(courseTextLineAttached_[i][j]){
+                        if(j&& !courseTextLineAttached_[i][j-1])return false;
+                        if(line->parent1C!=outer||line->mask20!=0xffffffffu||line->previous10!=previous||
+                           (previous&&previous->next14!=line)||!scope_->linked(*line,outer))return false;
+                        if(!first)first=line;previous=line;
+                    }else if(line->parent1C||line->previous10||line->next14||line->mask20)return false;
+                }
+                if(previous&&previous->next14)return false;
+                if(outer->firstChild18!=first||outer->descendants24!=(first?0xffffffffu:0u))return false;
+                if(courseOverlayAttached_[i]){
+                    const auto* prior=courseOverlayPrevious(i);const auto* next=courseOverlayNext(i);
+                    if(!prior||outer->parent1C!=&scope_->manager_||outer->previous10!=prior||prior->next14!=outer||outer->next14!=next||
+                       outer->mask20!=0xffffffffu||!scope_->linked(*outer,&scope_->manager_))return false;
+                }else if(outer->parent1C||outer->previous10||outer->next14||outer->mask20)return false;
+            }
+            return true;
+        }
+        Result constructCourseOverlayText(std::size_t i,C& outer)noexcept {
+            if(!courseOverlayOrdinalAdmitted(i)||courseOverlayOuters_[i]||!courseOverlayPredecessorAttached(i)||!current(frontend_,managerOwner_))return {Status::phase,0x2A8F00};
+            auto& app=*scope_->application_;
+            if(app.objectCount423F60_==std::numeric_limits<std::uint32_t>::max()||
+               !app.entityAuthority_.reserveAdditional(1)||!app.entityAuthority_.canEnroll(outer,key(&outer)))
+                return {Status::allocation,0x2A8F00};
+            const auto result=initializeOriginalWreckComponent50LA(outer,K::uiOverlayText2A8F00,generation_,key(&outer),true,app.objectCount423F60_);
+            if(result.status!=OriginalWreckComponentStatus50LA::complete||!app.entityAuthority_.enroll(outer))std::terminate();
+            courseOverlayOuters_[i]=&outer;return {Status::complete,0x2A8F00};
+        }
+        Result constructCourseTextLine(std::size_t i,std::size_t j,C& outer,C& line)noexcept {
+            if(!courseOverlayOrdinalAdmitted(i)||j>=courseTextLineLimit(i)||courseOverlayOuters_[i]!=&outer||courseTextLines_[i][j]||(j&&!courseTextLineAttached_[i][j-1])||!current(frontend_,managerOwner_))
+                return {Status::phase,0x29C850};
+            auto& app=*scope_->application_;
+            if(app.objectCount423F60_==std::numeric_limits<std::uint32_t>::max()||
+               !app.entityAuthority_.reserveAdditional(1)||!app.entityAuthority_.canEnroll(line,key(&line)))
+                return {Status::allocation,0x29C850};
+            const auto result=initializeOriginalWreckComponent50LA(line,K::uiTextOverlay29C850,generation_,key(&line),true,app.objectCount423F60_);
+            if(result.status!=OriginalWreckComponentStatus50LA::complete||!app.entityAuthority_.enroll(line))std::terminate();
+            courseTextLines_[i][j]=&line;return {Status::complete,0x29C850};
+        }
+        Result attachCourseTextLine(std::size_t i,std::size_t j,C& outer,C& line)noexcept {
+            if(!courseOverlayOrdinalAdmitted(i)||j>=courseTextLineLimit(i)||courseOverlayOuters_[i]!=&outer||courseTextLines_[i][j]!=&line||courseTextLineAttached_[i][j]||
+               !current(frontend_,managerOwner_))return {Status::phase,0x2A9C64};
+            const auto result=scope_->application_->entityAuthority_.attachChildren(outer,line,0xffffffffu,0);
+            if(result.status!=OriginalWreckComponentStatus50LA::complete)return {Status::topology,0x2A9C64};
+            courseTextLineAttached_[i][j]=true;return {Status::complete,0x2A9C6C};
+        }
+        bool courseAllTextLinesAttached(std::size_t i)const noexcept {
+            if(!courseOverlayOrdinalAdmitted(i))return false;
+            for(std::size_t j=0;j<courseTextLineLimit(i);++j)if(!courseTextLineAttached_[i][j])return false;
+            return true;
+        }
+        Result disableCourseOverlay1415A0(std::size_t i,C& outer)noexcept {
+            if(!courseOverlayOrdinalAdmitted(i)||courseOverlayOuters_[i]!=&outer||!courseAllTextLinesAttached(i)||
+               !current(frontend_,managerOwner_))return {Status::phase,0x1CD908};
+            outer.flags29=static_cast<std::uint8_t>(outer.flags29&~3u);
+            for(std::size_t j=0;j<courseTextLineLimit(i);++j){auto& line=*courseTextLines_[i][j];
+                if(!(line.flags29&8u))line.flags29=static_cast<std::uint8_t>(line.flags29&~3u);}
+            return {Status::complete,0x1CD910};
+        }
+        Result attachCourseOverlay1CD9F8(std::size_t i,C& outer)noexcept {
+            if(!courseOverlayOrdinalAdmitted(i)||courseOverlayOuters_[i]!=&outer||courseOverlayAttached_[i]||!courseAllTextLinesAttached(i)||
+               !current(frontend_,managerOwner_))return {Status::phase,0x1CD9F8};
+            const auto result=scope_->application_->entityAuthority_.attachChildren(scope_->manager_,outer,0xffffffffu,0);
+            if(result.status!=OriginalWreckComponentStatus50LA::complete)return {Status::topology,0x1CD9F8};
+            courseOverlayAttached_[i]=true;return {Status::complete,0x1CDA00};
+        }
+        Result abortNativeCourseTextLine(std::size_t i,std::size_t j,C& outer,C& line)noexcept {
+            if(!courseTextLineRetirementAdmitted(i,j)||courseOverlayOuters_[i]!=&outer||courseTextLines_[i][j]!=&line||pageAcquired_||
+               !registrationCurrent())return {Status::phase,0};
+            auto& app=*scope_->application_;
+            if(courseTextLineAttached_[i][j]){const auto r=app.entityAuthority_.detach(line,0);
+                if(r.status!=OriginalWreckComponentStatus50LA::complete)return {Status::topology,0};courseTextLineAttached_[i][j]=false;}
+            if(!app.entityAuthority_.retire(line))std::terminate();
+            --line.reference00;--app.objectCount423F60_;courseTextLines_[i][j]=nullptr;return {Status::complete,0};
+        }
+        Result abortNativeCourseOverlayText(std::size_t i,C& outer)noexcept {
+            if(!courseOverlayOrdinalAdmitted(i)||courseOverlayOuters_[i]!=&outer||courseTextRowOwned(i)||!courseOverlayRetirementAdmitted(i)||
+               pageAcquired_||!registrationCurrent())return {Status::phase,0};
+            auto& app=*scope_->application_;
+            if(courseOverlayAttached_[i]){const auto r=app.entityAuthority_.detach(outer,0);
+                if(r.status!=OriginalWreckComponentStatus50LA::complete)return {Status::topology,0};courseOverlayAttached_[i]=false;}
+            if(!app.entityAuthority_.retire(outer))std::terminate();
+            --outer.reference00;--app.objectCount423F60_;courseOverlayOuters_[i]=nullptr;return {Status::complete,0};
+        }
+        std::array<bool,3> courseFogAttached_{};
+        std::array<C*,3> courseFogEntities_{}; // Native actual counted custody.
+        std::array<C*,3> sourceCourseFog_{}; // Sole live source180,188,184 fields.
+        std::array<bool,3> sourceCourseFogPublished_{}; // Loader publication history, not constructor-null knowledge.
+        bool courseFogCustodyCurrent()const noexcept {
+            for(std::size_t i=0;i<3;++i){const auto* c=courseFogEntities_[i];
+                if(!c){if(courseFogAttached_[i])return false;continue;}
+                const auto kind=i==0?K::fog13E6B0:(i==1?K::fogOff13F850:K::fogOn13F980);
+                if(c->kind!=kind||c->sessionGeneration!=generation_||c->objectKey!=key(c)||c->reference00!=1||
+                   c->firstChild18||c->descendants24||!scope_->application_->entityAuthority_.canRetire(*c))return false;
+                if(sourceCourseFogPublished_[i]&&sourceCourseFog_[i]!=c)return false;
+                if(courseFogAttached_[i]){
+                    const auto* previous=i?courseFogEntities_[i-1]:courseIcons_[83];
+                    const auto* next=i<2&&courseFogAttached_[i+1]?courseFogEntities_[i+1]:nullptr;
+                    if(!sourceCourseFogPublished_[i]||!previous||(i?!courseFogAttached_[i-1]:!courseIconsAttached_[83])||
+                       c->parent1C!=&scope_->manager_||c->previous10!=previous||previous->next14!=c||c->next14!=next||
+                       c->mask20!=0xffffffffu||!scope_->linked(*c,&scope_->manager_))return false;
+                }else if(c->previous10||c->next14||c->parent1C||c->mask20)return false;
+            }
+            return true;
+        }
+        Result attachCourseFog1CD080(std::size_t i,C& c)noexcept {
+            const auto pc=i==0?0x1CD098u:(i==1?0x1CD0D8u:0x1CD118u);
+            if(i>=3||courseFogEntities_[i]!=&c||!sourceCourseFogPublished_[i]||sourceCourseFog_[i]!=&c||
+               courseFogAttached_[i]||(i?!courseFogAttached_[i-1]:!courseIconsAttached_[83])||
+               !current(frontend_,managerOwner_))return {Status::phase,pc};
+            const auto r=scope_->application_->entityAuthority_.attachChildren(scope_->manager_,c,0xffffffffu,0);
+            if(r.status!=OriginalWreckComponentStatus50LA::complete)return {Status::topology,pc};
+            courseFogAttached_[i]=true;return {Status::complete,pc+8};
+        }
+        Result detachNativeCourseFogTail()noexcept {
+            if(pageAcquired_||!registrationCurrent())return {Status::phase,0};
+            for(std::size_t n=3;n>0;--n){const auto i=n-1;if(!courseFogAttached_[i])continue;
+                auto* c=courseFogEntities_[i];
+                if(!c||c->next14)return {Status::topology,0};
+                const auto r=scope_->application_->entityAuthority_.detach(*c,0);
+                if(r.status!=OriginalWreckComponentStatus50LA::complete)return {Status::topology,0};
+                courseFogAttached_[i]=false;
+            }
+            return {Status::complete,0}; // Native detach only; payload/reference/count retained.
+        }
+        Result admitCourseFogCounts()noexcept {
+            if(!current(frontend_,managerOwner_)||!courseUiLightsAttached_[1]||
+               courseFogEntities_[0]||courseFogEntities_[1]||courseFogEntities_[2])return {Status::phase,0x1CCFA0};
+            if(scope_->application_->objectCount423F60_>std::numeric_limits<std::uint32_t>::max()-3||
+               !scope_->application_->entityAuthority_.reserveAdditional(3))return {Status::allocation,0x1CCFA0};
+            return {Status::complete,0x1CCFA0}; // Native registry admission, not a source count or malloc.
+        }
+        Result constructCourseFogEntity(std::size_t i,C& c)noexcept {
+            if(i>=3||courseFogEntities_[i]||!current(frontend_,managerOwner_)||
+               !scope_->application_->entityAuthority_.canEnroll(c,key(&c)))return {Status::phase,0x1CCFA0};
+            auto& app=*scope_->application_;
+            const auto kind=i==0?K::fog13E6B0:(i==1?K::fogOff13F850:K::fogOn13F980);
+            const auto result=initializeOriginalWreckComponent50LA(c,kind,generation_,key(&c),true,app.objectCount423F60_);
+            if(result.status!=OriginalWreckComponentStatus50LA::complete||!app.entityAuthority_.enroll(c))std::terminate();
+            courseFogEntities_[i]=&c;return {Status::complete,i==0?0x13E6B0u:(i==1?0x13F850u:0x13F980u)};
+        }
+        Result publishSourceCourseFogField(std::size_t i,C* c)noexcept {
+            if(i>=3||sourceCourseFogPublished_[i]||c!=courseFogEntities_[i]||!registrationCurrent())
+                return {Status::phase,0x1CCFA0};
+            sourceCourseFog_[i]=c;sourceCourseFogPublished_[i]=true;
+            return {Status::complete,i==0?0x1CE9E0u:(i==1?0x1CD008u:0x1CD04Cu)};
+        }
+        Result abortNativeCourseFogEntity(std::size_t i,C& c)noexcept {
+            if(i>=3||courseFogEntities_[i]!=&c||courseFogAttached_[i]||pageAcquired_||courseOverlayOuters_[0]||courseOverlayOuters_[1]||!registrationCurrent())return {Status::phase,0};
+            for(std::size_t n=i+1;n<3;++n)if(courseFogEntities_[n])return {Status::phase,0};
+            auto& app=*scope_->application_;if(!app.entityAuthority_.retire(c))std::terminate();
+            --c.reference00;--app.objectCount423F60_;courseFogEntities_[i]=nullptr;
+            return {Status::complete,0}; // Native withdrawal, no source Fog destructor completion.
+        }
+        std::array<C*,2> courseUiLights_{};
+        std::array<bool,2> courseUiLightsAttached_{};
+        bool courseLightCustodyCurrent()const noexcept {
+            const C* previous=&searchNode_;
+            for(std::size_t i=0;i<2;++i){const auto* c=courseUiLights_[i];
+                if(!c){if(courseUiLightsAttached_[i])return false;continue;}
+                if(c->kind!=K::light146720||c->sessionGeneration!=generation_||c->objectKey!=key(c)||
+                   c->reference00!=1||c->firstChild18||c->mask20||c->descendants24||
+                   !scope_->application_->entityAuthority_.canRetire(*c))return false;
+                if(courseUiLightsAttached_[i]){
+                    if(!searchNodeAttached_||(i&&!courseUiLightsAttached_[0])||c->parent1C!=&scope_->manager_||
+                       c->previous10!=previous||previous->next14!=c||!scope_->linked(*c,&scope_->manager_))return false;
+                    previous=c;
+                }else if(c->parent1C||c->previous10||c->next14)return false;
+            }
+            return previous->next14==(courseOverlayAttached_[0]?courseOverlayOuters_[0]:nullptr);
+        }
+        Result admitCourseUiLightCounts()noexcept {
+            if(!current(frontend_,managerOwner_)||!searchNodeAttached_||courseUiLights_[0]||courseUiLights_[1])
+                return {Status::phase,0x1CDB10};
+            if(scope_->application_->objectCount423F60_>std::numeric_limits<std::uint32_t>::max()-2||
+               !scope_->application_->entityAuthority_.reserveAdditional(2))return {Status::allocation,0x1CDB10};
+            return {Status::complete,0x1CDB10}; // Native registry admission before source descriptor allocation.
+        }
+        Result constructCourseUiLight146720(std::size_t i,C& c)noexcept {
+            if(i>=2||courseUiLights_[i]||(i&&!courseUiLightsAttached_[0])||
+               !current(frontend_,managerOwner_)||!scope_->application_->entityAuthority_.canEnroll(c,key(&c)))
+                return {Status::phase,0x146720};
+            auto& app=*scope_->application_;
+            const auto initialized=initializeOriginalWreckComponent50LA(c,K::light146720,generation_,key(&c),true,app.objectCount423F60_);
+            if(initialized.status!=OriginalWreckComponentStatus50LA::complete||!app.entityAuthority_.enroll(c))std::terminate();
+            courseUiLights_[i]=&c;return {Status::complete,0x146720};
+        }
+        Result attachCourseUiLight1CDC8C(std::size_t i,C& c)noexcept {
+            if(i>=2||courseUiLights_[i]!=&c||courseUiLightsAttached_[i]||!current(frontend_,managerOwner_))
+                return {Status::phase,0x1CDC8C};
+            const auto step=scope_->application_->entityAuthority_.attachChildren(scope_->manager_,c,0u,0);
+            if(step.status!=OriginalWreckComponentStatus50LA::complete)return {Status::topology,0x1CDC8C};
+            courseUiLightsAttached_[i]=true;return {Status::complete,0x1CDC94};
+        }
+        Result abortNativeCourseUiLight(std::size_t i,C& c)noexcept {
+            if(i>=2||courseUiLights_[i]!=&c||(i==0&&courseUiLights_[1])||pageAcquired_||
+               courseOverlayOuters_[0]||courseOverlayOuters_[1]||!registrationCurrent())
+                return {Status::phase,0};
+            auto& app=*scope_->application_;
+            if(courseUiLightsAttached_[i]){
+                const auto step=app.entityAuthority_.detach(c,0);
+                if(step.status!=OriginalWreckComponentStatus50LA::complete)return {Status::topology,0};
+                courseUiLightsAttached_[i]=false;
+            }
+            if(!app.entityAuthority_.retire(c))std::terminate();
+            --c.reference00;--app.objectCount423F60_;courseUiLights_[i]=nullptr;
+            return {Status::complete,0}; // Native actual count withdrawal, not source destructor return.
+        }
+        bool searchCustodyCurrent()const noexcept {
+            if(!searchList_)return !searchNodeAcquired_&&!searchNodeAttached_&&!searchAliases_;
+            const auto& l=*searchList_;
+            if(!searchOwner_||l.courseManagerOwner_!=searchOwner_||l.managerOwner_||l.lightManagerOwner_||
+               l.loadingManagerOwner_||!l.same(scope_->issuer_,scope_->application_)||l.released_||
+               !l.courseHistoryCurrent(searchOwner_,scope_->issuer_,scope_->application_)||l.selectedCount18_||
+               l.usage10_!=searchAliases_||l.reference00_!=1u+searchAliases_||searchAliases_>2||
+               searchNode34_!=(searchAliases_>=1?searchList_.get():nullptr)||
+               searchNode38_!=(searchAliases_>=2?searchList_.get():nullptr))return false;
+            if(!searchNodeAcquired_)return !searchNodeAttached_&&!searchAliases_;
+            return sourceNode2A4_==&searchNode_&&sourceList2A0_==searchList_.get()&&
+                searchNode_.kind==K::searchNode27F120&&searchNode_.sessionGeneration==generation_&&
+                searchNode_.objectKey==key(&searchNode_)&&searchNode_.reference00==1&&
+                !searchNode_.firstChild18&&!searchNode_.descendants24&&!searchNode_.previous10&&
+                searchNode_.next14==(courseUiLightsAttached_[0]?courseUiLights_[0]:nullptr)&&
+                searchNodeVtable8_==0x3d2dd0u&&!searchNode30_&&!searchNode48_&&!searchNode3C_&&
+                !searchNode40_&&!searchNode44_&&!searchNodeA0_&&
+                scope_->application_->entityAuthority_.canRetire(searchNode_)&&
+                (searchNodeAttached_?(searchNode_.parent1C==&scope_->manager_&&searchNode_.mask20==2u&&
+                    scope_->linked(searchNode_,&scope_->manager_)):
+                    (!searchNode_.parent1C&&!searchNode_.mask20));
+        }
+        OriginalGarageObserverShared50KG* observerSharedForCourse(
+            const rr::platform::OriginalUiCourseOwnedLifecycle50KG* owner)const noexcept {
+            return owner&&searchOwner_==owner&&registrationCurrent()?&scope_->application_->garageObserverShared_:nullptr;
+        }
+        Result constructSearch1CCD14(const rr::platform::OriginalUiCourseOwnedLifecycle50KG* owner)noexcept {
+            if(!owner||searchAttempted_||searchList_||pageAcquired_||sourceList2A0_||sourceNode2A4_||
+               phase_!=Phase::derivedComplete1D00BC||!current(frontend_,managerOwner_))
+                return {Status::phase,0x1CCD14};
+            auto& app=*scope_->application_;auto& authority=app.entityAuthority_;
+            // Native storage admission BEFORE the original allocation interval.
+            // Rejection here is not original malloc-null continuation or a
+            // source2A0 publication. All later source effects are one-shot.
+            if(app.objectCount423F60_==std::numeric_limits<std::uint32_t>::max()||
+               !authority.reserveAdditional(1)||!authority.canEnroll(searchNode_,key(&searchNode_)))
+                return {Status::allocation,0x1CCD14};
+            std::unique_ptr<SearchList> admitted;
+            try {admitted.reset(new SearchList(*scope_->issuer_,scope_->application_));}
+            catch(...){return {Status::allocation,0x1CCD14};}
+            searchList_=std::move(admitted);searchOwner_=owner;searchList_->courseManagerOwner_=owner;
+            searchAttempted_=true;
+            SearchList::D diagnostic;
+            if(!searchList_->construct27E260(scope_->issuer_,scope_->application_,diagnostic)&&
+               !(diagnostic.status==SearchList::S::allocation&&diagnostic.sourcePC==0x27EE38&&
+                 searchList_->attempted_&&searchList_->derivedConstructed_&&!searchList_->complete_&&
+                 !searchList_->released_&&!searchList_->selected1C_&&searchList_->soultreeKnown_&&
+                 searchList_->searchableKnown_&&searchList_->reference00_==1&&!searchList_->usage10_&&
+                 !searchList_->selectedCount18_&&searchList_->selectedGrowth20_==30&&
+                 searchList_->selectedCapacity24_==30&&searchList_->selectedOwned28Bit0_&&
+                 searchList_->storage_.perBlock==0x400&&searchList_->storage_.lastUsed==0x400&&
+                 !searchList_->storage_.blockCount&&!searchList_->storage_.freeHead))
+                return {Status::phase,diagnostic.sourcePC};
+            //27EA14 ignores selected-array allocation failure: registry and
+            // derived stores still return the List. NULL selected backing is
+            // retained, not called usable; neither setter dereferences it.
+            // Registry failure still stops with private partial native custody.
+            // Actual returned List reaches delay-slot publication1CCD38.
+            sourceList2A0_=searchList_.get();
+            const auto initialized=initializeOriginalWreckComponent50LA(searchNode_,K::searchNode27F120,
+                generation_,key(&searchNode_),(scope_->manager_.flags29&1u)!=0,app.objectCount423F60_);
+            if(initialized.status!=OriginalWreckComponentStatus50LA::complete||!authority.enroll(searchNode_))std::terminate();
+            searchNodeAcquired_=true;searchNodeVtable8_=0x3d2dd0u;
+            searchNode30_=nullptr;searchNode34_=nullptr;searchNode38_=nullptr;searchNode48_=nullptr;
+            searchNode3C_=nullptr;searchNode40_=nullptr;searchNode44_=nullptr;searchNodeA0_=nullptr;
+            sourceNode2A4_=&searchNode_; //1CCD54, before141960.
+            const auto attached=authority.attachChildren(scope_->manager_,searchNode_,2u,0);
+            if(attached.status!=OriginalWreckComponentStatus50LA::complete)return {Status::topology,0x1CCD60};
+            searchNodeAttached_=true;
+            // Exact fresh-null27F420/27F490: literal usage1/2, pointer, retain.
+            searchList_->usage10_=1;searchNode34_=searchList_.get();++searchList_->reference00_;++searchAliases_;
+            searchList_->usage10_=2;searchNode38_=searchList_.get();++searchList_->reference00_;++searchAliases_;
+            return {Status::complete,0x1CCD80}; // BEFORE Light148B60, not1CCBA0 return.
+        }
+        Result abortNativeSearch()noexcept {
+            if(!searchList_)return searchNodeAcquired_?Result{Status::phase,0}:Result{Status::complete,0};
+            if(!registrationCurrent()||!searchCustodyCurrent()||pageAcquired_||courseUiLights_[0]||courseUiLights_[1]||
+               courseFogEntities_[0]||courseFogEntities_[1]||courseFogEntities_[2]||!courseSoultreesEmpty()||
+               !searchList_->courseMembersEmpty())return {Status::phase,0};
+            auto& app=*scope_->application_;auto& l=*searchList_;
+            if(searchNodeAcquired_){
+                if(searchNodeAttached_){
+                    const auto detached=app.entityAuthority_.detach(searchNode_,0);
+                    if(detached.status!=OriginalWreckComponentStatus50LA::complete)return {Status::topology,0};
+                    searchNodeAttached_=false;
+                }
+                if(!app.entityAuthority_.retire(searchNode_))std::terminate();
+                --searchNode_.reference00;--app.objectCount423F60_;searchNodeAcquired_=false;
+                // Native acquired aliases only; dying source pointers/usage
+                // remain unchanged. No source27F180/1CCAA0 return is claimed.
+                l.reference00_-=searchAliases_;
+            }
+            if(l.reference00_!=1||l.selectedCount18_||!l.courseMembersEmpty()||!l.retireCourseBlockHistoryNative())std::terminate();
+            // No source-history predicate is read after native block/table disposal.
+            --l.reference00_;l.selected1C_.reset();l.released_=true;l.complete_=false;
+            l.courseManagerOwner_=nullptr;searchList_.reset();
+            searchAliases_=0;searchOwner_=nullptr; // Native custody, NOT source pointer clearing.
+            return {Status::complete,0};
+        }
+        // Private component entry only. The enclosing1D0140/1CCBA0 loader
+        // has not been joined, so no current factory invokes this callback.
+        Result allocatePage1D01A0()noexcept {
+            if(pageAllocationAttempted_||page_||pageAcquired_||phase_!=Phase::derivedComplete1D00BC||
+               !current(frontend_,managerOwner_))return {Status::phase,0x1D01A0};
+            pageAllocationAttempted_=true;
+            page_.reset(new(std::nothrow) C); // Native-width actual nullable Page allocation owner.
+            return page_?Result{Status::complete,0x1D01B4}:Result{Status::allocation,0x1D01BC};
+        }
+        Result constructPageBase2A5C70()noexcept {
+            if(!pageAllocationAttempted_||!page_||pageAcquired_||phase_!=Phase::derivedComplete1D00BC||!current(frontend_,managerOwner_))
+                return {Status::phase,0x1D01B4};
+            auto& app=*scope_->application_;auto& authority=app.entityAuthority_;
+            if(app.objectCount423F60_==std::numeric_limits<std::uint32_t>::max()||
+               !authority.reserveAdditional(1))return {Status::allocation,0x1D01B4};
+            if(!current(frontend_,managerOwner_)||!authority.canEnroll(*page_,key(page_.get())))
+                return {Status::owner,0x1D01B4};
+            const auto initialized=initializeOriginalWreckComponent50LA(*page_,K::uiCoursePage1D8D70,
+                generation_,key(page_.get()),true,app.objectCount423F60_);
+            if(initialized.status!=OriginalWreckComponentStatus50LA::complete||!authority.enroll(*page_))std::terminate();
+            pageAcquired_=true;
+            pageBaseAncestryAtConstruction8_=0x3D3C60; //2A5C8C before actual base zero stores.
+            pageCollections_.staticWidgetCount13C=0;pageCollections_.controlCount140=0;
+            pageCollections_.controls144=nullptr;pageCollections_.router134=nullptr;
+            pageCollections_.groupCount148=0;pageCollections_.groups14C=nullptr;
+            pageCollections_.pageNumber138=0;pageCollections_.extra150=nullptr;
+            pageBackground154_=nullptr;pageBackground158_=nullptr;
+            pageBaseZeros_.fill(0);pageByte15C_=0;pageInput268_=1;
+            return {Status::complete,0x1D5EB4};
+        }
+        bool coursePageCollectionsCustodyCurrent()const noexcept {
+            const auto& app=*scope_->application_;
+            const auto counted=[&](const C& c,K kind)noexcept {
+                return pageAcquired_&&c.kind==kind&&c.sessionGeneration==generation_&&c.objectKey==key(&c)&&
+                    c.reference00==1&&!c.previous10&&!c.next14&&!c.firstChild18&&!c.descendants24&&
+                    app.entityAuthority_.canRetire(c);
+            };
+            if(coursePageRouter_){const auto& r=*coursePageRouter_;
+                if(!counted(r,K::uiRouter2A6FD0)||r.parent1C!=(coursePageRouterAttached_?page_.get():nullptr)||
+                   r.mask20!=(coursePageRouterAttached_?0xffffffffu:0u))return false;
+            }else if(coursePageRouterAttached_)return false;
+            for(std::size_t i=0;i<coursePageControls_.size();++i)if(const auto* c=coursePageControls_[i]){
+                if(!coursePageRouter_||!coursePageRouterAttached_||!counted(*c,K::uiControl1D5D10)||
+                   c->parent1C||c->mask20||(i&&!coursePageControls_[i-1]))return false;
+            }
+            return true;
+        }
+        Result constructCoursePageRouter2A6FD0(C& c)noexcept {
+            if(!pageAcquired_||coursePageRouter_||coursePageRouterAttached_||!current(frontend_,managerOwner_))
+                return {Status::phase,0x2A6FD0};
+            auto& app=*scope_->application_;auto& authority=app.entityAuthority_;
+            if(app.objectCount423F60_==std::numeric_limits<std::uint32_t>::max()||
+               !authority.reserveAdditional(1)||!authority.canEnroll(c,key(&c)))return {Status::allocation,0x2A6FD0};
+            const auto r=initializeOriginalWreckComponent50LA(c,K::uiRouter2A6FD0,generation_,key(&c),true,app.objectCount423F60_);
+            if(r.status!=OriginalWreckComponentStatus50LA::complete||!authority.enroll(c))std::terminate();
+            coursePageRouter_=&c;return {Status::complete,0x2A6FE4};
+        }
+        Result attachCoursePageRouter141960(C& c)noexcept {
+            if(coursePageRouter_!=&c||coursePageRouterAttached_||!pageAcquired_||!registrationCurrent()||
+               page_->firstChild18||page_->descendants24)return {Status::topology,0x1D6DE4};
+            const auto r=scope_->application_->entityAuthority_.attachChildren(*page_,c,0xffffffffu,0);
+            if(r.status!=OriginalWreckComponentStatus50LA::complete)return {Status::topology,r.sourcePC};
+            coursePageRouterAttached_=true;return {Status::complete,0x1D6DE4};
+        }
+        Result constructCoursePageControl1D5DB0(std::size_t i,C& c)noexcept {
+            if(i>=coursePageControls_.size()||coursePageControls_[i]||!coursePageRouterAttached_||
+               (i&&!coursePageControls_[i-1])||!current(frontend_,managerOwner_))return {Status::phase,0x1D5DB0};
+            auto& app=*scope_->application_;auto& authority=app.entityAuthority_;
+            if(app.objectCount423F60_==std::numeric_limits<std::uint32_t>::max()||
+               !authority.reserveAdditional(1)||!authority.canEnroll(c,key(&c)))return {Status::allocation,0x1D5DB0};
+            // Real1D5DB0 ->2A5850 ->141300(active1), not a second base count.
+            const auto r=initializeOriginalWreckComponent50LA(c,K::uiControl1D5D10,generation_,key(&c),true,app.objectCount423F60_);
+            if(r.status!=OriginalWreckComponentStatus50LA::complete||!authority.enroll(c))std::terminate();
+            coursePageControls_[i]=&c;return {Status::complete,0x2A5864};
+        }
+        Result preflightNativeCoursePageControl(std::size_t i,const C& c)const noexcept {
+            if(i>=coursePageControls_.size()||coursePageControls_[i]!=&c||!registrationCurrent())return {Status::phase,0};
+            return {Status::complete,0};
+        }
+        Result abortNativeCoursePageControl(std::size_t i,C& c)noexcept {
+            if(!preflightNativeCoursePageControl(i,c).okay())return {Status::phase,0};
+            for(std::size_t n=i+1;n<coursePageControls_.size();++n)if(coursePageControls_[n])return {Status::phase,0};
+            auto& app=*scope_->application_;
+            if(!app.entityAuthority_.retire(c))return {Status::reference,0};
+            --c.reference00;--app.objectCount423F60_;coursePageControls_[i]=nullptr;return {Status::complete,0};
+        }
+        Result preflightNativeCoursePageRouter(const C& c)const noexcept {
+            if(coursePageRouter_!=&c||!registrationCurrent())return {Status::phase,0};
+            return {Status::complete,0};
+        }
+        Result abortNativeCoursePageRouter(C& c)noexcept {
+            if(!preflightNativeCoursePageRouter(c).okay())return {Status::phase,0};
+            for(const auto* control:coursePageControls_)if(control)return {Status::phase,0};
+            auto& app=*scope_->application_;
+            if(coursePageRouterAttached_){
+                const auto detached=app.entityAuthority_.detach(c,0);
+                if(detached.status!=OriginalWreckComponentStatus50LA::complete)return {Status::topology,detached.sourcePC};
+                coursePageRouterAttached_=false;
+            }
+            if(!app.entityAuthority_.retire(c))return {Status::reference,0};
+            --c.reference00;--app.objectCount423F60_;coursePageRouter_=nullptr;return {Status::complete,0};
+        }
+        Result constructCoursePopup1FEC80(C& c)noexcept {
+            if(!pageAcquired_||coursePagePopup_||!current(frontend_,managerOwner_))return {Status::phase,0x1FEC80};
+            auto& app=*scope_->application_;auto& authority=app.entityAuthority_;
+            if(app.objectCount423F60_==std::numeric_limits<std::uint32_t>::max()||
+               !authority.reserveAdditional(1)||!authority.canEnroll(c,key(&c)))return {Status::allocation,0x1FEC80};
+            const auto r=initializeOriginalWreckComponent50LA(c,K::entity141300,generation_,key(&c),true,app.objectCount423F60_);
+            if(r.status!=OriginalWreckComponentStatus50LA::complete||!authority.enroll(c))std::terminate();
+            coursePagePopup_=&c;return {Status::complete,0x1FEC80};
+        }
+        Result abortNativeCoursePopup(C& c)noexcept {
+            if(coursePagePopup_!=&c||!registrationCurrent())return {Status::phase,0};
+            auto& app=*scope_->application_;
+            if(!app.entityAuthority_.retire(c))return {Status::reference,0};
+            --c.reference00;--app.objectCount423F60_;coursePagePopup_=nullptr;return {Status::complete,0};
+        }
+        Result abortNativePage()noexcept {
+            if(coursePagePopup_||coursePageRouter_||coursePageRouterAttached_)return {Status::phase,0};
+            for(const auto* control:coursePageControls_)if(control)return {Status::phase,0};
+            if(!pageAcquired_){page_.reset();return {Status::complete,0};}
+            if(!registrationCurrent())return {Status::phase,0};
+            auto& app=*scope_->application_;
+            if(!app.entityAuthority_.retire(*page_))return {Status::reference,0};
+            --page_->reference00;--app.objectCount423F60_;pageAcquired_=false;page_.reset();
+            return {Status::complete,0}; // Native acquired count withdrawal only.
+        }
+        bool pending()const noexcept {return phase_!=Phase::empty&&phase_!=Phase::nativeAborted;}
+        Result abortNative()noexcept {
+            if(phase_==Phase::empty||phase_==Phase::nativeAborted)return {Status::complete,0};
+            if(!acquiredCurrent())return {Status::phase,0};
+            auto& app=*scope_->application_;auto& c=scope_->manager_;
+            // Exact detached acquired registration only. No142590/1D00D0,
+            // Video write, source-null invention or historical counter reset.
+            if(!app.entityAuthority_.retire(c))return {Status::reference,0};
+            --c.reference00;--app.objectCount423F60_;
+            scope_->courseConstruction_=nullptr;phase_=Phase::nativeAborted;
+            return {Status::complete,0}; // Native terminal, NOT a source return PC.
+        }
+    public:
+        CourseConstruction(const CourseConstruction&)=delete;
+        CourseConstruction& operator=(const CourseConstruction&)=delete;
+        ~CourseConstruction()noexcept {
+            if(pending()&&!abortNative().okay())std::terminate();
+        }
+    };
+    Result beginCourseConstructorPrefix(const ::original_main_entry50KG::Application* issuer,
+        const std::shared_ptr<OriginalUiEntityScope50KG>& retained,
+        const rr::platform::OriginalUiFrontend50KG* frontend,const void* manager,
+        std::uint64_t generation,std::unique_ptr<CourseConstruction>& output)noexcept {
+        if(output||!issuer||issuer!=issuer_||retained.get()!=this||!frontend||!manager||!generation)
+            return {Status::owner,0};
+        auto result=live();if(!result.okay())return result;
+        if(optionsConstruction_||!dispatcherLive_||managerLive_||managerPublished_||managerRetiring_||managerForestRetiring_||
+           dispatcherCurrentManager30_||manager_.reference00||courseConstruction_||
+           transitionDisplayPinned_||detachedMemoryCardOwner_||managerSearchOwner_||
+           !garageChildren_.empty()||managerEpoch_==std::numeric_limits<std::uint64_t>::max()||
+           application_->objectCount423F60_==std::numeric_limits<std::uint32_t>::max()||
+           !linked(dispatcher_,&application_->root10_))return {Status::phase,0};
+        std::unique_ptr<CourseConstruction> next;
+        try {next.reset(new CourseConstruction(retained,frontend,manager,generation));}
+        catch(...){return {Status::allocation,0};}
+        auto& authority=application_->entityAuthority_;
+        if(!authority.reserveAdditional(1))return {Status::allocation,0};
+        if(!live().okay()||optionsConstruction_||managerLive_||courseConstruction_||manager_.reference00||
+           managerPublished_||managerRetiring_||managerForestRetiring_||dispatcherCurrentManager30_||
+           transitionDisplayPinned_||detachedMemoryCardOwner_||managerSearchOwner_||!garageChildren_.empty()||
+           managerEpoch_==std::numeric_limits<std::uint64_t>::max()||
+           application_->objectCount423F60_==std::numeric_limits<std::uint32_t>::max()||
+           !linked(dispatcher_,&application_->root10_)||!authority.canEnroll(manager_,key(&manager_)))
+            return {Status::phase,0};
+        next->priorEpoch_=managerEpoch_;next->epoch_=managerEpoch_+1;
+        next->countBefore_=application_->objectCount423F60_;
+        // All allocations and registry capacity precede the first source count.
+        manager_.~C();new(&manager_) C;++managerEpoch_;
+        courseConstruction_=next.get();
+        const auto init=initializeOriginalWreckComponent50LA(manager_,K::uiCourseManager1D0070,
+            generation,key(&manager_),true,application_->objectCount423F60_);
+        if(init.status!=OriginalWreckComponentStatus50LA::complete||!authority.enroll(manager_))std::terminate();
+        next->phase_=CourseConstruction::Phase::beforeVideo2A3A90;
+        next->ancestry8_=0x3d3ab0; //2A3A18.
+        for(std::size_t m=0;m<4;++m){ //2A3A2C/2A3AB0: each real vf0 row.
+            for(std::size_t row:{std::size_t(0),std::size_t(2),std::size_t(3)})
+                for(std::size_t col=0;col<4;++col)next->matrices_[m][row*4+col]=col==3?0x3f800000u:0u;
+            next->matrixKnown_[m]=0xff0f;
+        }
+        next->word17C_=1; //2A3A40, before the nine zero stores.
+        for(auto& word:next->zeroWords_)word=0;
+        next->pageCount148_=0; // Actual base constructor source148 zero store; later1CEC48 is live.
+        next->basePrefixKnown_=true;
+        // Stop BEFORE global Video44 at2A3A90 and derived1D0084 fields.
+        // Do not claim completed1D0070, managerLive, name194 or dispatcher30.
+        output=std::move(next);return {Status::complete,0x2A3A90};
+    }
     class OptionsConstruction final {
         friend class OriginalUiEntityScope50KG;
         friend class rr::platform::OriginalUiFrontend50KG;
@@ -3419,7 +4578,7 @@ private:
             dispatcherCurrentManager30_=nullptr;dispatcherCurrentManagerGeneration30_=0;}return r;
     }
     Result close()noexcept {
-        if(optionsConstruction_)return {Status::phase,0};
+        if(optionsConstruction_||courseConstruction_)return {Status::phase,0};
         if(detachedMemoryCardOwner_||detachedMemoryCard_)return {Status::phase,0x1FEE40};
         if(transitionDisplayPinned_)return {Status::phase,0x2A3550};
         if(sharedDialogs_[0]||sharedDialogs_[1])return {Status::phase,0x1425B8};

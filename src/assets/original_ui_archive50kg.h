@@ -19,7 +19,7 @@ enum class OriginalUiArchiveId50KG : std::uint8_t {
     appStart = 0, localization = 1, overlays = 2, fonts = 3, mainMenu = 4,
     backgrounds = 5, controllerPopup = 6, course = 7, rider = 8, options = 9, podTextures = 10, podPhysics = 11, tournament = 12, hallOfFame = 13,
     garage = 14, garagePod19 = 15,
-    garagePod01 = 16, garagePod02 = 17, garagePod03 = 18, garagePod04 = 19, garagePod07 = 20, garagePod08 = 21, garagePod09 = 22, garagePod10 = 23, garagePod11 = 24, garagePod12 = 25, garagePod14 = 26, garagePod15 = 27, garagePod16 = 28, garagePod17 = 29, garagePod18 = 30, garagePod20 = 31, garagePod21 = 32, garagePod22 = 33, garagePod23 = 34, garagePod24 = 35, garagePod25 = 36, garagePod26 = 37
+    garagePod01 = 16, garagePod02 = 17, garagePod03 = 18, garagePod04 = 19, garagePod07 = 20, garagePod08 = 21, garagePod09 = 22, garagePod10 = 23, garagePod11 = 24, garagePod12 = 25, garagePod14 = 26, garagePod15 = 27, garagePod16 = 28, garagePod17 = 29, garagePod18 = 30, garagePod20 = 31, garagePod21 = 32, garagePod22 = 33, garagePod23 = 34, garagePod24 = 35, garagePod25 = 36, garagePod26 = 37, loadingIcon = 38, trackRa = 39, sourcePod01 = 40
 };
 struct OriginalUiArchiveIdentity50KG {
     OriginalUiArchiveId50KG id;

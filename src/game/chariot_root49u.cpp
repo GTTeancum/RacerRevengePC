@@ -316,6 +316,7 @@ bool updateChariotRoot49U(const ChariotRootInput49U& in,const ChariotRootParamet
     if(!std::isfinite(in.frameFactor)||in.frameFactor<0||!std::isfinite(in.cachedBodySpeed34)||
         !std::isfinite(effective))return fail(d,ChariotRootError49U::input,0x21a660);
     if(in.cachedBodySpeed34<effective)return fail(d,ChariotRootError49U::context,0x21bedc);
+    if(noise.noise.initializationIncomplete49M)return fail(d,ChariotRootError49U::noise,0x14eec0);
     std::memcpy(w.nodes,graph.nodes,graph.count*sizeof(SceneNode49P));
     w.state=s;w.shared=shared;w.noise=noise;w.phase864=phase;
     const SceneGraph49P g{w.nodes,graph.count};
@@ -345,6 +346,9 @@ bool updateChariotRoot49U(const ChariotRootInput49U& in,const ChariotRootParamet
     RR_CHARIOT_ROOT49U_STAGE(0x21c0f4u);
     w.state.vehicle840=in.probe10C;
     RR_CHARIOT_ROOT49U_STAGE(0x21c100u);
+    //Check before ANY visible graph/state copyback, not merely noise assignment.
+    if(noise.noise.initializationIncomplete49M||w.noise.noise.initializationIncomplete49M)
+        return fail(d,ChariotRootError49U::noise,0x14eec0);
     std::memcpy(graph.nodes,w.nodes,graph.count*sizeof(SceneNode49P));
     s=w.state;shared=w.shared;noise=w.noise;phase=w.phase864;d={};return true;
 }

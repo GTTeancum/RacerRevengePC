@@ -1,5 +1,7 @@
 #pragma once
 #include "type2_resource49x.h"
+#include "original_wreck_components50la.h"
+#include <optional>
 #include <cstring>
 #include <exception>
 #include <limits>
@@ -7,15 +9,23 @@
 
 namespace rr::game {
 class OriginalWreckQueries50LA;
+class OriginalRacerQuery364Owner50LA;
+class OriginalRacerQuery690Owner50LA;
+struct OriginalRacerSceneObject50LA;
 // Source allocations owned by ONE E0. This is separate from the native
 // transaction banks in OriginalWreckType2Storage50LA. Only the actual query
 // constructor/retirement join may advance these private lifetime methods.
 class OriginalWreckType2Owners50LA final {
     friend class OriginalWreckQueries50LA;
+    friend class OriginalRacerQuery364Owner50LA;
+    friend class OriginalRacerQuery690Owner50LA;
     struct Shape {
         BodyMatrix48G matrix00{};
         std::uint16_t root40=0;
         SpringSceneId48N model44{};
+        //Alternative concrete Racer190/19C or fresh Wreck14C source pointer;
+        //never a fabricated numeric scene ID. Legacy wreck identity unchanged.
+        const OriginalRacerSceneObject50LA* racerModel44=nullptr;
         std::uint32_t count48=0;
         std::unique_ptr<Type2Node49X[]> nodes4C;
         std::unique_ptr<Type2Ray49X[]> rays50;
@@ -42,6 +52,160 @@ class OriginalWreckType2Owners50LA final {
     bool attempted_=false,loaded_=false,retired_=false;
     std::uint32_t boundary_=0;
 
+    enum class FreshWreckRelease : std::uint8_t {
+        none,sourceShapeOnly11B600,sourceFull11B600,nativeIncompleteCancellation
+    };
+    bool freshWreck_=false,freshLoadAttempted_=false,freshResultAttempted_=false;
+    const OriginalWreckComponent50LA* freshE0_=nullptr;
+    const OriginalRacerSceneObject50LA* freshModel14C_=nullptr; //Caller pins SAME Model through release.
+    std::optional<const void*>* freshShapeField8C_=nullptr;
+    std::optional<const void*>* freshResultField90_=nullptr;
+    const void* freshShapeHistory_=nullptr;
+    const void* freshResultHistory_=nullptr;
+    std::uint16_t freshAllocatedMask_=0; //Only actual successful allocations, never source readiness.
+    std::uint32_t freshStoppedPC_=0;
+    FreshWreckRelease freshRelease_=FreshWreckRelease::none;
+    std::uint16_t freshLiveAllocationMask()const noexcept {
+        std::uint16_t m=shape8C_?1u:0u;
+        if(shape8C_){if(shape8C_->nodes4C)m|=2u;if(shape8C_->rays50)m|=4u;}
+        if(result90_){m|=8u;const auto& r=*result90_;
+            if(r.words64)m|=16u;if(r.flags68)m|=32u;if(r.fractions6C)m|=64u;
+            if(r.tags70)m|=128u;if(r.pairs50)m|=256u;if(r.normals54)m|=512u;if(r.points58)m|=1024u;}
+        return m;
+    }
+    void observeFreshWreckAllocationCut()noexcept {
+        freshAllocatedMask_=freshLiveAllocationMask();freshStoppedPC_=boundary_;
+        if(shape8C_)freshShapeHistory_=shape8C_.get();
+        if(result90_)freshResultHistory_=result90_.get();
+    }
+    bool allocateFreshWreckShape1253DC(const OriginalRacerSceneObject50LA& model,
+        std::optional<const void*>& actual8C,const OriginalWreckComponent50LA& actualE0)noexcept {
+        if(attempted_||retired_||freshWreck_||!actual8C||*actual8C||actualE0.reference00!=1u||
+           actualE0.kind!=OriginalWreckComponentKind50LA::collision11B190||actualE0.parent1C||
+           actualE0.previous10||actualE0.next14||actualE0.firstChild18)return false;
+        freshWreck_=true;freshE0_=&actualE0;freshModel14C_=&model;freshShapeField8C_=&actual8C;
+        attempted_=true;boundary_=0x1253dcu;
+        try {shape8C_=std::make_unique<Shape>();}
+        catch(...){observeFreshWreckAllocationCut();return false;}
+        actual8C=shape8C_.get(); //1253E4 BEFORE source Model44 and normalMode54.
+        shape8C_->racerModel44=&model; //1253F0, raw borrow, no extra Model retain.
+        shape8C_->normalMode54=0;boundary_=0x125400u;
+        observeFreshWreckAllocationCut();return true;
+    }
+    bool loadFreshWreckShape126640(const Type2ResourceView49X& retained)noexcept {
+        if(!freshWreck_||freshLoadAttempted_||retired_||boundary_!=0x125400u)return false;
+        freshLoadAttempted_=true;
+        const bool done=loadShape126640(retained);observeFreshWreckAllocationCut();return done;
+    }
+    bool allocateFreshWreckResult11BBE8(std::uint32_t normalMode,
+        std::optional<const void*>& actual90)noexcept {
+        if(!freshWreck_||!freshLoadAttempted_||freshResultAttempted_||retired_||
+           boundary_!=0x11bbe0u||normalMode!=0u||!actual90||*actual90)return false;
+        freshResultAttempted_=true;freshResultField90_=&actual90;
+        const bool done=allocateResult11BBE8(normalMode);
+        if(done)actual90=result90_.get(); //11BD18; failed local allocations never publish90.
+        observeFreshWreckAllocationCut();return done;
+    }
+    bool freshWreckCutCurrent(const OriginalRacerSceneObject50LA& model,
+        const OriginalWreckComponent50LA& e0,const std::optional<const void*>& actual8C,
+        const std::optional<const void*>& actual90,std::uint32_t expectedReference,
+        const OriginalWreckComponent50LA* parent=nullptr,const OriginalWreckComponent50LA* previous=nullptr,
+        const OriginalWreckComponent50LA* expectedNext=nullptr,
+        const OriginalWreckComponent50LA* expectedAfterNext=nullptr,
+        const OriginalWreckComponent50LA* expectedAfterDetectorE4=nullptr,
+        const OriginalWreckComponent50LA* expectedAfterE4E8=nullptr)const noexcept {
+        if(!freshWreck_||!attempted_||retired_||freshRelease_!=FreshWreckRelease::none||
+           freshE0_!=&e0||freshModel14C_!=&model||freshShapeField8C_!=&actual8C||&actual8C==&actual90||
+           (freshResultField90_&&freshResultField90_!=&actual90)||!actual8C||!actual90||
+           e0.reference00!=expectedReference||e0.kind!=OriginalWreckComponentKind50LA::collision11B190||
+           e0.parent1C!=parent||e0.previous10!=previous||e0.next14!=expectedNext||e0.firstChild18||
+           bool(parent)!=bool(previous)||
+           freshStoppedPC_!=boundary_||freshAllocatedMask_!=freshLiveAllocationMask())return false;
+        if(expectedNext&&(!expectedReference||!parent||expectedNext->reference00!=1u||
+           expectedNext->kind!=OriginalWreckComponentKind50LA::contact295A40||
+           expectedNext->parent1C!=parent||expectedNext->previous10!=&e0||expectedNext->next14!=expectedAfterNext||
+           expectedNext->sessionGeneration!=e0.sessionGeneration))return false;
+        if(expectedAfterNext&&(!expectedReference||!expectedNext||expectedAfterNext->reference00!=1u||
+           expectedAfterNext->kind!=OriginalWreckComponentKind50LA::detector295290||
+           expectedAfterNext->parent1C!=parent||expectedAfterNext->previous10!=expectedNext||expectedAfterNext->next14!=expectedAfterDetectorE4||
+           expectedAfterNext->sessionGeneration!=e0.sessionGeneration))return false;
+        if(expectedAfterDetectorE4&&(!expectedReference||!expectedAfterNext||expectedAfterDetectorE4->reference00!=1u||
+           expectedAfterDetectorE4->kind!=OriginalWreckComponentKind50LA::collision11B190||
+           expectedAfterDetectorE4->parent1C!=parent||expectedAfterDetectorE4->previous10!=expectedAfterNext||
+           expectedAfterDetectorE4->next14!=expectedAfterE4E8||expectedAfterDetectorE4->firstChild18||
+           expectedAfterDetectorE4->sessionGeneration!=e0.sessionGeneration))return false;
+        if(expectedAfterE4E8&&(!expectedReference||!expectedAfterDetectorE4||expectedAfterE4E8->reference00!=1u||
+           expectedAfterE4E8->kind!=OriginalWreckComponentKind50LA::collision11B190||
+           expectedAfterE4E8->parent1C!=parent||expectedAfterE4E8->previous10!=expectedAfterDetectorE4||
+           expectedAfterE4E8->next14||expectedAfterE4E8->firstChild18||
+           expectedAfterE4E8->sessionGeneration!=e0.sessionGeneration))return false;
+        if(parent&&(!parent->reference00||!previous->reference00||previous->parent1C!=parent||
+           previous->next14!=(expectedReference?&e0:nullptr)||parent->sessionGeneration!=e0.sessionGeneration||
+           previous->sessionGeneration!=e0.sessionGeneration||
+           parent->kind!=OriginalWreckComponentKind50LA::piece2CB4B0||
+           previous->kind!=OriginalWreckComponentKind50LA::gravity282670))return false;
+        if(*actual8C!=shape8C_.get()||*actual90!=(loaded_?result90_.get():nullptr))return false;
+        if(shape8C_&&(shape8C_->racerModel44!=&model||shape8C_->model44.value))return false;
+        //Each supported failure boundary has exactly the owners that really
+        //precede that allocation. Native zero defaults are not source writes.
+        switch(boundary_){
+        case 0x1253dcu:return freshAllocatedMask_==0u&&!loaded_;
+        case 0x125400u:return freshAllocatedMask_==1u&&!loaded_;
+        case 0x12687cu:return freshAllocatedMask_==1u&&!loaded_;
+        case 0x126d3cu:return freshAllocatedMask_==3u&&!loaded_;
+        case 0x11bbe0u:return freshAllocatedMask_==7u&&!loaded_;
+        case 0x11bbe8u:return freshAllocatedMask_==7u&&!loaded_;
+        case 0x11bc48u:return freshAllocatedMask_==15u&&!loaded_;
+        case 0x11bc58u:return freshAllocatedMask_==31u&&!loaded_;
+        case 0x11bc68u:return freshAllocatedMask_==63u&&!loaded_;
+        case 0x11bc78u:return freshAllocatedMask_==127u&&!loaded_;
+        case 0x11bc90u:return freshAllocatedMask_==255u&&!loaded_;
+        case 0x11bcc0u:return freshAllocatedMask_==511u&&!loaded_;
+        case 0x11bcf0u:return freshAllocatedMask_==1023u&&!loaded_;
+        case 0x11bd18u:return freshAllocatedMask_==2047u&&loaded_&&freshResultField90_;
+        default:return false;
+        }
+    }
+    bool preflightFreshWreckPayload(const OriginalRacerSceneObject50LA& model,
+        const OriginalWreckComponent50LA& e0,const std::optional<const void*>& actual8C,
+        const std::optional<const void*>& actual90,const OriginalWreckComponent50LA* parent=nullptr,
+        const OriginalWreckComponent50LA* previous=nullptr,
+        const OriginalWreckComponent50LA* expectedNext=nullptr,
+        const OriginalWreckComponent50LA* expectedAfterNext=nullptr,
+        const OriginalWreckComponent50LA* expectedAfterDetectorE4=nullptr,
+        const OriginalWreckComponent50LA* expectedAfterE4E8=nullptr)const noexcept {
+        return freshWreckCutCurrent(model,e0,actual8C,actual90,1u,parent,previous,expectedNext,expectedAfterNext,expectedAfterDetectorE4,expectedAfterE4E8);
+    }
+    bool releaseFreshWreckPayloadAfterReferenceDrop(const OriginalRacerSceneObject50LA& model,
+        const OriginalWreckComponent50LA& e0,std::optional<const void*>& actual8C,
+        std::optional<const void*>& actual90,const OriginalWreckComponent50LA* parent=nullptr,
+        const OriginalWreckComponent50LA* previous=nullptr)noexcept {
+        if(!freshWreckCutCurrent(model,e0,actual8C,actual90,0u,parent,previous))return false;
+        if(loaded_){
+            //All source-read pointer/count fields are initialized. Reuse exact
+            //11B600 order, then actual NULL stores11B900/11B904.
+            if(!releaseShapeResult11B600())std::terminate();
+            actual8C=nullptr;actual90=nullptr;freshRelease_=FreshWreckRelease::sourceFull11B600;
+            return true;
+        }
+        const bool sourceShapeOnly=freshAllocatedMask_==7u;
+        //Readable fully loaded shape with source90=NULL uses the actual
+        //11B814/818 null-result branch. Other cuts lack readable guest fields:
+        //bounded NATIVE cancellation frees only tracked actual allocations.
+        if(shape8C_){shape8C_->nodes4C.reset();shape8C_->rays50.reset();}
+        if(result90_){auto& r=*result90_;
+            r.fractions6C.reset();r.pairs50.reset();r.tags70.reset();r.normals54.reset();
+            r.flags68.reset();r.words64.reset();r.points58.reset();}
+        shape8C_.reset();result90_.reset();loaded_=false;retired_=true;
+        if(sourceShapeOnly){actual8C=nullptr;actual90=nullptr;boundary_=0x11b904u;
+            freshRelease_=FreshWreckRelease::sourceShapeOnly11B600;}
+        else {freshRelease_=FreshWreckRelease::nativeIncompleteCancellation;}
+        //Native cancellation preserves actual8C/90 values and stoppedPC;
+        //history pointers/mask never authorize dereferencing retired storage.
+        return true;
+    }
+    FreshWreckRelease freshWreckReleaseKind()const noexcept{return freshRelease_;}
+
     // Called at1253DC only after the caller has admitted the actual model
     // identity and retained COL occurrence. Does not publish a domain token.
     bool allocateShape1253DC(SpringSceneId48N actualModel)noexcept {
@@ -49,6 +213,14 @@ class OriginalWreckType2Owners50LA final {
         attempted_=true;boundary_=0x1253dcu;
         try {shape8C_=std::make_unique<Shape>();}catch(...){return false;}
         shape8C_->model44=actualModel; //1253F0: caller must publish SAME identity
+        shape8C_->normalMode54=0u;boundary_=0x125400u;return true;
+    }
+    //Concrete690 caller has already proved its SAME live Racer190 owner.
+    bool allocateRacerShape1253DC(const OriginalRacerSceneObject50LA& actualModel)noexcept {
+        if(attempted_||retired_)return false;
+        attempted_=true;boundary_=0x1253dcu;
+        try {shape8C_=std::make_unique<Shape>();}catch(...){return false;}
+        shape8C_->racerModel44=&actualModel; //1253F0, no source retain.
         shape8C_->normalMode54=0u;boundary_=0x125400u;return true;
     }
     //126640 is represented using the SAME already decoded/authenticated COL

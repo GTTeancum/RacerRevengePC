@@ -148,7 +148,7 @@ bool OriginalUiGarageQuad50KG::demand1FDD60(Diagnostic& d)noexcept {
     d.sourceEffectsCommitted=d.material.sourceEffectsCommitted;return true;
 }
 bool OriginalUiGarageQuad50KG::load2DF0B0(const RootInputs& in,Diagnostic& d)noexcept {
-    d={};if(memoryCardPrefixOnly_||stage_!=Stage::constructed||!constructed||material54||resource58)
+    d={};if(memoryCardPrefixOnly_||coursePrefixOnly_||stage_!=Stage::constructed||!constructed||material54||resource58)
         return fail(d,Status::phase,0x2DF0B0);
     if(!inputsCurrent(in)||((offset<0x200)!=(in.garage_->identity()==
        assets::originalUiArchiveIdentity50KG(assets::OriginalUiArchiveId50KG::controllerPopup))))

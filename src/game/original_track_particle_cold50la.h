@@ -16,6 +16,7 @@
 #error "Track particle bounded numeric adaptation requires strict floating point"
 #endif
 namespace ra_pod_scene50LA {class Owner;}
+namespace ra_source_camera50LA {class OwnershipBridge;}
 namespace rr::game {
 static_assert(sizeof(float)==4 && std::numeric_limits<float>::is_iec559 &&
     std::numeric_limits<float>::radix==2 && std::numeric_limits<float>::digits==24,
@@ -125,6 +126,7 @@ public:
     //1413E0 decrements the SAME423F60 exactly once while both pins are live.
     bool close() noexcept {
         if(closed_)return true;
+        if(nativeWreckBorrower_)return false;
         if(entityConstructed_){
             if(!application_||application_->attachmentLock423F58()||
                component_.kind!=OriginalWreckComponentKind50LA::particleManager160B10||
@@ -294,6 +296,7 @@ private:
     std::unique_ptr<OriginalGcParticleManager50KG> particles_;
     std::unique_ptr<assets::OriginalStandardParticleMaterialReference50LA> material150_;
     std::uint64_t generation_=0;
+    const ::ra_source_camera50LA::OwnershipBridge* nativeWreckBorrower_=nullptr;
     std::int32_t capacity130_=0,depthBucketCount118_=0;
     bool attempted_=false,entityConstructed_=false,depthGlobalWritten_=false;
     bool prepared_=false,closed_=false;

@@ -1,4 +1,6 @@
 #include "original_race_f8_renderer50la.h"
+#include "original_results_renderer50la.h"
+#include "../../src/game/original_results104_storage50la.h"
 #include "original_native_collector_fifo50la.h"
 #include "original_race_constructor50la.h"
 #include "ra_cold_aggregate50la.h"
@@ -24,6 +26,13 @@ RaceF8RendererLease50LA::~RaceF8RendererLease50LA()noexcept {
     if(pinned_)std::terminate(); //Never discard undrained resource custody.
 }
 bool Application::f8RendererFifoCurrent50LA(const NativeCollectorFifo50LA& fifo)const noexcept {
+    if(garageAudioOwnerThread_!=std::this_thread::get_id())return false;
+    return nativeCollectorFifoOwner_.get()==&fifo&&fifo.application_==this&&
+        fifo.ownerThread_==std::this_thread::get_id()&&!fifo.closed_&&!fifo.draining_&&
+        !fifo.uiConstructor1B73BC_&&fifo.records_.empty()&&standardMaterialDomainOwner_&&
+        fifo.table_==standardMaterialDomainOwner_->materials382B38();
+}
+bool Application::resultsRendererFifoCurrent50LA(const NativeCollectorFifo50LA& fifo)const noexcept {
     if(garageAudioOwnerThread_!=std::this_thread::get_id())return false;
     return nativeCollectorFifoOwner_.get()==&fifo&&fifo.application_==this&&
         fifo.ownerThread_==std::this_thread::get_id()&&!fifo.closed_&&!fifo.draining_&&
@@ -164,5 +173,117 @@ bool OriginalRaceF850LA::retireRendererResources198510(OriginalRaceF8Diagnostic5
     const auto lease=impl_->rendererLease;
     if(!lease->closeResources198510(*this,d))return false;
     impl_->rendererLease.reset();return true;
+}
+}
+
+namespace rr::game {
+bool OriginalResults10450LA::detachedRetirementCurrent(const OriginalRaceConstructor50LA& race)const noexcept {
+    if(race.resultsFeedbackThread_!=std::this_thread::get_id()||!impl_||
+       impl_->nativeCaptureThread!=std::this_thread::get_id())return false;
+    const auto& p=*impl_;const auto& e=p.component;
+    if(!p.retirementStarted||p.closed||!p.counted||p.nativeFrameBorrows||
+       race.results104_.get()!=this||race.application_!=p.application||!race.counted_||race.rolledBack_||
+       race.entity_.sessionGeneration!=e.sessionGeneration||race.pause100_||race.nativeRootAttached_||
+       race.entity_.parent1C||race.entity_.previous10||race.entity_.next14||
+       !p.application||!p.application->application10()||p.application->attachmentLock423F58()||
+       !p.application->objectCount423F60()||e.reference00||
+       e.kind!=OriginalWreckComponentKind50LA::entity141300||!e.sessionGeneration||
+       e.objectKey!=std::uint64_t(reinterpret_cast<std::uintptr_t>(&e))||
+       e.parent1C||e.previous10||e.next14||e.firstChild18||e.descendants24||
+       e.category28!=0xff||e.mask20!=p.mask||(e.flags29&15u)!=(p.disabled?0u:3u)||
+       contains(p.application->entityAuthority_.view(),&e))return false;
+    return !p.rendererLease||p.rendererLease->identityCurrent();
+}
+}
+
+namespace original_main_entry50KG {
+namespace {
+using ResultsD=rr::game::OriginalResults104Diagnostic50LA;
+bool resultsLeaseReject(ResultsD& d,std::uint32_t pc,const char* why)noexcept {
+    d.status=ResultsD::Status::owner;d.sourcePC=pc;d.operation=why;return false;
+}
+}
+ResultsRendererLease50LA::ResultsRendererLease50LA(std::shared_ptr<RaceDisplayLifetime50LA> display,
+    std::shared_ptr<NativeCollectorFifo50LA> fifo,const Application& issuer,
+    rr::game::OriginalResults10450LA& source)noexcept
+    :display_(std::move(display)),fifo_(std::move(fifo)),issuer_(&issuer),source_(&source),
+     displayGeneration_(display_->generation_){}
+ResultsRendererLease50LA::~ResultsRendererLease50LA()noexcept {if(pinned_)std::terminate();}
+bool ResultsRendererLease50LA::identityCurrent()const noexcept {
+    if(!pinned_||!display_||!fifo_||!issuer_||!source_||!display_->ownerThread()||
+       display_->application_!=issuer_||display_->generation_!=displayGeneration_||
+       !display_->resultsPinnedDisplayIdentity50LA())return false;
+    std::uint32_t ignored=0;
+    if(!display_->applicationLifetime_.readPause11C(ignored))return false;
+    const auto issued=issuer_->raceDisplayOwner50LA_.lock();
+    return issued==display_&&issuer_->raceDisplayGeneration50LA_==displayGeneration_&&
+        !issued.owner_before(display_)&&!display_.owner_before(issued)&&
+        issuer_->videoOwner_==display_->video_&&
+        display_->applicationLifetime_.sameOwner(issuer_->animationClock())&&
+        issuer_->resultsRendererFifoCurrent50LA(*fifo_);
+}
+bool ResultsRendererLease50LA::drainResource(std::uint32_t call20,std::uint32_t call24,ResultsD& d)noexcept {
+    if(!identityCurrent()||!source_->impl_||source_->impl_->rendererLease.get()!=this||
+       !source_->impl_->retirementStarted||source_->impl_->nativeFrameBorrows||source_->impl_->component.reference00)
+        return resultsLeaseReject(d,call20,"Results exact post104970 resource custody absent");
+    const auto& dispatch=display_->dispatch_;
+    if(dispatch.pendingCallbackDC||dispatch.count54||dispatch.count60)
+        return resultsLeaseReject(d,drainPhase_?call24:call20,"Results source renderer queue/callback not represented");
+    rr::platform::VehicleWindowDiagnostic50DS renderer;
+    if(!drainPhase_){
+        std::int32_t actualV0=0;
+        const auto r=rr::game::serviceOriginalRenderer244D60(dispatch,true,display_->renderer_,renderer,
+            actualV0,rr::game::OriginalCameraDrainPolicy::initializedContext);
+        if(r.status!=rr::game::OriginalCameraStartStatus::complete)
+            return resultsLeaseReject(d,r.sourcePC,"Results actual renderer20(1) incomplete");
+        drainPhase_=1;
+    }
+    if(drainPhase_==1){
+        if(!display_->renderer_.finishInitializedContextWork(renderer)||!renderer.contextWorkCompleted)
+            return resultsLeaseReject(d,call24,"Results actual unconditional renderer24 incomplete");
+        drainPhase_=2;
+    }
+    return true;
+}
+void ResultsRendererLease50LA::resourceFreed()noexcept {
+    if(drainPhase_!=2)std::terminate();
+    drainPhase_=0;
+}
+bool ResultsRendererLease50LA::releaseAfterResources(ResultsD& d)noexcept {
+    if(!identityCurrent()||drainPhase_||!source_->impl_||source_->impl_->rendererLease.get()!=this||
+       !source_->impl_->retirementStarted||source_->impl_->nativeFrameBorrows||
+       source_->impl_->retirementStep!=21||source_->impl_->component.reference00)
+        return resultsLeaseReject(d,0x1b8730,"Results retained post-resource retirement identity");
+    rr::platform::VehicleWindowDiagnostic50DS renderer;
+    if(!display_->renderer_.retireNativeResultsResources50LA(renderer))
+        return resultsLeaseReject(d,0x1b8730,"Results native owned image/scratch cleanup incomplete");
+    display_->unpin();pinned_=false;display_.reset();fifo_.reset();source_=nullptr;return true;
+}
+bool Application::retainConsumedResultsRenderer50LA(ResultsD& d)const noexcept {
+    d={};
+    if(garageAudioOwnerThread_!=std::this_thread::get_id())
+        return resultsLeaseReject(d,0x1bec40,"Results renderer Application thread");
+    const auto race=sourceRace28COwner_;const auto display=raceDisplayOwner50LA_.lock();
+    const auto fifo=nativeCollectorFifoOwner_;
+    if(!race||race->resultsFeedbackThread_!=std::this_thread::get_id()||race->application_!=entitiesOwner_||
+       !race->counted_||race->rolledBack_||!race->world74_||!race->results104_||
+       !display||race->loadDisplay_!=display||display->application_!=this||
+       display->generation_!=raceDisplayGeneration50LA_||!display->gameplayDisplayIdentityCurrent50LA()||
+       !display->canRetain()||!fifo||race->loadFifo_!=fifo||!resultsRendererFifoCurrent50LA(*fifo))
+        return resultsLeaseReject(d,0x1bec40,"Results actual counted Race/Display/FIFO ownership absent");
+    if(!resultsPublishedRoot50LA(*race,d,false))return false;
+    auto& source=*race->results104_;
+    if(!source.impl_)return resultsLeaseReject(d,0x1bec40,"Results source storage absent");
+    auto& p=*source.impl_;
+    if(p.nativeCaptureThread!=std::this_thread::get_id()||!source.constructed()||!p.loadComplete||
+       !source.retirementCurrent()||p.retirementStarted||p.rendererLease||p.nativeFrameBorrows||
+       !source.belongsTo(entitiesOwner_,race->entity_.sessionGeneration)||p.domain!=standardMaterialDomainOwner_||
+       !p.context||!p.context->live()||p.context->videoIdentity()!=videoOwner_.get())
+        return resultsLeaseReject(d,0x1bec40,"Results actual unbound loaded source resources absent");
+    try {
+        auto lease=std::shared_ptr<ResultsRendererLease50LA>(new ResultsRendererLease50LA(display,fifo,*this,source));
+        if(!display->canRetain())return resultsLeaseReject(d,0x1bec40,"Results Display changed before native pin");
+        display->pin();lease->pinned_=true;p.rendererLease=std::move(lease);return true;
+    }catch(...){return resultsLeaseReject(d,0x1bec40,"Results renderer custody allocation failed");}
 }
 }

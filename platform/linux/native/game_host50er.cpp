@@ -458,12 +458,18 @@ bool GameHost50ER::rumbleController50KZ(std::uint32_t slot,std::int32_t instance
         return fail(d,GameHostError50ER::Window,"WindowHost50DQ::rumbleController50KZ");
     return true;
 }
+std::shared_ptr<OriginalSourcePadHostLease50LA> GameHost50ER::bindSourcePadNative(
+    const original_main_entry50KG::Application& app,const rr::game::OriginalApplicationInput04Source50LA& source)noexcept {
+    if(!ownerThread()||!ready_||mode_!=GameHostMode50ER::Window)return {};
+    return window_.bindSourcePadNative(app,source,*this);
+}
 bool GameHost50ER::close(GameHostDiagnostic50ER& d) noexcept {
     d = {};
     if (!ownerThread()) return fail(d, GameHostError50ER::WrongThread, "close");
     return closeOwned(d);
 }
 bool GameHost50ER::closeOwned(GameHostDiagnostic50ER& d) noexcept {
+    window_.revokeSourcePadNative();
     if(retainedResultsPollOwner50LA_)
         return fail(d,GameHostError50ER::AlreadyOwned,"Results retained poll requires explicit continuation cancellation");
     //Also revoke native input custody before ANY close attempt, including

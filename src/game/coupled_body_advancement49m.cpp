@@ -258,6 +258,7 @@ bool advanceCoupledSecondary49M(const CoupledBodyState49M& in,const CoupledBodyP
     if(!at(in,CoupledBodyPhase49M::AwaitingSecondary))return false;
     auto r=in;
     if(r.vehicle838==0){r.phase=CoupledBodyPhase49M::AwaitingMainIntegration;out=r;return true;}
+    if(shared.noise.initializationIncomplete49M)return false;
     auto nextShared=shared;
     SecondaryForceContext49M context{};
     context.vehicleState40=r.main.vehicleState40;context.probe104=r.main.components.probe348.field104;
@@ -275,6 +276,7 @@ bool advanceCoupledSecondary49M(const CoupledBodyState49M& in,const CoupledBodyP
     PodSphereBody49L main{};mainSphere(r,p,main);
     if(!applySecondaryConstraint49M(r.secondary,p.secondary,main,r.joint,r.secondary,r.joint,
         r.lastConstraintMagnitude))return false;
+    if(shared.noise.initializationIncomplete49M||nextShared.noise.initializationIncomplete49M)return false;
     r.phase=CoupledBodyPhase49M::AwaitingResponse368;shared=nextShared;out=r;return true;
 }
 bool completeCoupledResponse368_49M(const CoupledBodyState49M& in,const CoupledBodyParameters49M& p,

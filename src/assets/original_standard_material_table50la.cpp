@@ -145,10 +145,16 @@ struct OriginalStandardMaterialTable50LA::Storage {
         std::shared_ptr<OriginalStandardTextureTable50LA> damageTextures;
         std::shared_ptr<const OriginalUiArchive50KG> pauseBackdropMissingPsm;
         std::shared_ptr<OriginalStandardTextureTable50LA> pauseBackdropTextures;
+        std::shared_ptr<const OriginalLoadingScreenFallback50LA> loadingPending;
+        std::shared_ptr<const OriginalCourseScreenFallback50KG> coursePending;
+        std::shared_ptr<const OriginalCourseScreenAuthored50KG> courseAuthoredPending;
         std::shared_ptr<const OriginalGarageScreenFallback50KG> garageFallback;
         std::shared_ptr<const OriginalMemoryCardScreenFallback50KG> memoryCardPending;
         std::shared_ptr<const OriginalResultsScreenFallback50LA> resultsPending;
     };
+    // Monotonic native provenance on this exact Storage, not a guest field or
+    // readiness bit. A failed parse never publishes it; attachment moves it.
+    bool sourceNames17CAD4=false;
     std::shared_ptr<const OriginalUiArchive50KG> appStart;
     std::shared_ptr<const OriginalUiMaterialTemplates50KG> templates;
     std::vector<Row> rows;
@@ -264,6 +270,7 @@ bool OriginalStandardMaterialTable50LA::prepareAppStartNames17CAD4(
            std::memcmp(sourceBytes.data(),source.data,source.size)!=0)return fail(d,S::source,0x298724);
         auto next=std::make_unique<Storage>();next->appStart=std::move(app);
         if(!next->loadFreshNames(sourceBytes.data(),sourceBytes.size(),d))return false;
+        next->sourceNames17CAD4=true;
         // Remains publicly unprepared: no references, objects or templates can
         // be observed/mutated through the existing storage_-gated consumers.
         appStartNames_=std::move(next);return true;
@@ -285,6 +292,10 @@ bool OriginalStandardMaterialTable50LA::attachAppStartTemplates(
     // early canonical rows are copied; all null associations remain null.
     appStartNames_->templates=std::shared_ptr<const OriginalUiMaterialTemplates50KG>(application,&templates);
     storage_=std::move(appStartNames_);return true;
+}
+bool OriginalStandardMaterialTable50LA::sourceNames17CAD4Current() const noexcept {
+    return storage_&&storage_->sourceNames17CAD4&&storage_->appStart&&
+        storage_->templates&&storage_->rows.size()==tableRows;
 }
 bool OriginalStandardMaterialTable50LA::prepared() const noexcept {return bool(storage_);}
 std::size_t OriginalStandardMaterialTable50LA::rowCount() const noexcept {return storage_?storage_->rows.size():0;}
@@ -1289,7 +1300,7 @@ bool OriginalStandardMaterialTable50LA::populate14D370(
             if(row.tournamentMissingPsm&&row.tournamentTextures!=input.actualTextures383400){
                 fail(d,S::texture,0x247638);return terminal();
             }
-            if(!s.partial->construct29B550(canonical,row.name00,s.templates,row.associated30,input,row.tournamentMissingPsm,row.speedBoostMissingPsm,row.damageMissingPsm,row.pauseBackdropMissingPsm,row.garageFallback,row.memoryCardPending,row.resultsPending,d))return terminal();
+            if(!s.partial->construct29B550(canonical,row.name00,s.templates,row.associated30,input,row.tournamentMissingPsm,row.speedBoostMissingPsm,row.damageMissingPsm,row.pauseBackdropMissingPsm,row.garageFallback,row.memoryCardPending,row.resultsPending,row.loadingPending,row.coursePending,row.courseAuthoredPending,d))return terminal();
             if(!s.partial->constructed29B550()){
                 fail(d,S::phase,0x29B854);return terminal();
             }
@@ -1300,6 +1311,8 @@ bool OriginalStandardMaterialTable50LA::populate14D370(
             row.object04=std::move(s.partial); //29B854 real loaded owner publication.
             row.memoryCardPending.reset(); //Consumed capability; history is now object-owned.
             row.resultsPending.reset();
+            row.loadingPending.reset();
+            row.coursePending.reset();row.courseAuthoredPending.reset();
             //14D3FC repeats298F80 with the identical object and row. It creates
             //no second ownership reference and does not rebuild collector14D440.
             ++d.populationPublished;
@@ -1329,7 +1342,7 @@ bool OriginalStandardMaterialTable50LA::retainTournamentFallback14D590(
         !archive->loaded()||archive->identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::tournament))
         return fail(d,S::source,0x29B638);
     auto& row=storage_->rows[static_cast<std::size_t>(index)];
-    if(row.pauseBackdropMissingPsm||row.damageMissingPsm||!textures||!textures->prepared()||(row.tournamentTextures&&row.tournamentTextures!=textures)||
+    if(row.loadingPending||row.coursePending||row.courseAuthoredPending||row.pauseBackdropMissingPsm||row.damageMissingPsm||!textures||!textures->prepared()||(row.tournamentTextures&&row.tournamentTextures!=textures)||
         (row.tournamentMissingPsm&&row.tournamentMissingPsm!=archive)||
         (row.object04&&!row.tournamentMissingPsm))return fail(d,S::phase,0x29B638);
     if(!retainScreen14D590(index,d))return false;
@@ -1342,7 +1355,7 @@ bool OriginalStandardMaterialTable50LA::retainSpeedBoostFallback14D590(
         !archive->loaded()||archive->identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::overlays))
         return fail(d,S::source,0x29B638);
     auto& row=storage_->rows[static_cast<std::size_t>(index)];
-    if(row.pauseBackdropMissingPsm||row.tournamentMissingPsm||row.damageMissingPsm||!textures||!textures->prepared()||
+    if(row.loadingPending||row.coursePending||row.courseAuthoredPending||row.pauseBackdropMissingPsm||row.tournamentMissingPsm||row.damageMissingPsm||!textures||!textures->prepared()||
         (row.speedBoostTextures&&row.speedBoostTextures!=textures)||
         (row.object04&&!row.speedBoostMissingPsm))return fail(d,S::phase,0x29B638);
     // Serial host sessions may independently authenticate the SAME original
@@ -1367,6 +1380,81 @@ bool OriginalStandardMaterialTable50LA::retainSpeedBoostFallback14D590(
     if(!row.speedBoostTextures)row.speedBoostTextures=std::move(textures);
     return true;
 }
+bool OriginalStandardMaterialTable50LA::preflightCourseLoadedWidget(std::int32_t index,
+    const std::shared_ptr<const OriginalStandardMaterialContext50LA>& context,
+    const std::shared_ptr<OriginalStandardTextureTable50LA>& textures,D& d)const noexcept {
+    if(!storage_||index<0||static_cast<std::size_t>(index)>=storage_->rows.size())return fail(d,S::source,0x2DF144);
+    const auto& row=storage_->rows[static_cast<std::size_t>(index)];
+    if(row.references08<=0||!row.object04||!row.object04->courseScreenConstructionCurrent(context,textures))
+        return fail(d,S::source,0x2DF144);
+    return true; // Other construction families and expired occurrence remain unjoined.
+}
+bool OriginalStandardMaterialTable50LA::bindCourseScreenAuthoredAfterRetain(std::int32_t index,
+    std::shared_ptr<const OriginalCourseScreenAuthored50KG> proof,D& d)noexcept {
+    try {
+        if(!storage_||storage_->uiSharedHistoryOwner||storage_->populationTerminal||storage_->populationActive||
+           storage_->demandActive||storage_->collectorActive||demandTerminal()||index<0||
+           static_cast<std::size_t>(index)>=storage_->rows.size()||!proof||proof->row_!=index)
+            return fail(d,S::source,0x29B628);
+        auto& row=storage_->rows[static_cast<std::size_t>(index)];
+        if(row.references08<=0||!storage_->templates||
+           row.associated30!=storage_->templates->get(OriginalUiTemplate50KG::screenMt))return fail(d,S::phase,0x29B628);
+        // A loaded row must use its own actual construction receipt. Never
+        // attach a new occurrence or retrospectively label another family.
+        if(row.object04)return preflightCourseLoadedWidget(index,proof->context_,proof->textures_,d);
+        if(row.coursePending||row.garageFallback||row.memoryCardPending||row.resultsPending||row.loadingPending||
+           row.tournamentMissingPsm||row.speedBoostMissingPsm||row.damageMissingPsm||row.pauseBackdropMissingPsm||
+           !proof->current(row.name00+".psm"))return fail(d,S::source,0x29B628);
+        if(row.courseAuthoredPending){
+            if(row.courseAuthoredPending.get()!=proof.get())return fail(d,S::phase,0x29B628);
+        }else row.courseAuthoredPending=std::move(proof);
+        return true; // Pending native custody only; no source pass/receipt yet.
+    }catch(...){return fail(d,S::allocation,0x29B628);}
+}
+bool OriginalStandardMaterialTable50LA::bindCourseScreenFallbackAfterRetain(std::int32_t index,
+    std::shared_ptr<const OriginalCourseScreenFallback50KG> proof,D& d)noexcept {
+    try {
+        if(!storage_||storage_->uiSharedHistoryOwner||index<0||static_cast<std::size_t>(index)>=storage_->rows.size()||
+           !proof||proof->row_!=index)return fail(d,S::source,0x29B638);
+        auto& row=storage_->rows[static_cast<std::size_t>(index)];
+        if(row.references08<=0||!storage_->templates||
+           row.associated30!=storage_->templates->get(OriginalUiTemplate50KG::screenMt)||
+           !OriginalStandardArchiveProvider50LA::sameName(row.name00,proof->name_))return fail(d,S::phase,0x29B638);
+        // Original14D370 skips an already constructed object. Retain it without
+        // relabeling its construction provenance or manufacturing a new proof.
+        if(row.object04)return true;
+        if(row.courseAuthoredPending||row.garageFallback||row.memoryCardPending||row.resultsPending||row.loadingPending||
+           row.tournamentMissingPsm||row.speedBoostMissingPsm||row.damageMissingPsm||row.pauseBackdropMissingPsm||
+           !proof->current(row.name00+".psm",proof->context_,proof->textures_))return fail(d,S::source,0x29B638);
+        if(row.coursePending){
+            if(!row.coursePending->current(row.name00+".psm",proof->context_,proof->textures_))
+                return fail(d,S::source,0x29B638);
+        }else row.coursePending=std::move(proof);
+        return true; // No extra source reference beyond actual2465B0.
+    }catch(...){return fail(d,S::allocation,0x29B638);}
+}
+bool OriginalStandardMaterialTable50LA::bindLoadingScreenFallbackAfterRetain(std::int32_t index,
+    std::shared_ptr<const OriginalLoadingScreenFallback50LA> proof,D& d)noexcept {
+    try {
+    if(!storage_||index<0||static_cast<std::size_t>(index)>=storage_->rows.size()||!proof||proof->row_!=index)
+        return fail(d,S::source,0x29B638);
+    auto& row=storage_->rows[static_cast<std::size_t>(index)];
+    if(row.references08<=0||!storage_->templates||
+       row.associated30!=storage_->templates->get(OriginalUiTemplate50KG::screenMt)||
+       !OriginalStandardArchiveProvider50LA::sameName(row.name00,proof->name_))return fail(d,S::phase,0x29B638);
+    // An already-created actual canonical row is retained, never relabeled as
+    // loading construction. Original14D370 skips it; no new fallback needed.
+    if(row.object04)return true;
+    if(row.coursePending||row.courseAuthoredPending||row.garageFallback||row.memoryCardPending||row.resultsPending||row.tournamentMissingPsm||
+       row.speedBoostMissingPsm||row.damageMissingPsm||row.pauseBackdropMissingPsm||
+       !proof->current(row.name00+".psm",proof->context_,proof->textures_))return fail(d,S::source,0x29B638);
+    if(row.loadingPending){
+        if(!row.loadingPending->current(row.name00+".psm",proof->context_,proof->textures_))
+            return fail(d,S::source,0x29B638);
+    }else row.loadingPending=std::move(proof);
+    return true; //Actual primitive retain occurred once, before this admission.
+    }catch(...){return fail(d,S::allocation,0x29B638);}
+}
 bool OriginalStandardMaterialTable50LA::bindGarageScreenFallbackAfterRetain(std::int32_t index,
     std::shared_ptr<const OriginalGarageScreenFallback50KG> proof,D& d)noexcept {
     if(!storage_||storage_->uiSharedHistoryOwner||index<0||static_cast<std::size_t>(index)>=storage_->rows.size()||!proof||proof->row_!=index)
@@ -1381,7 +1469,7 @@ bool OriginalStandardMaterialTable50LA::bindGarageScreenFallbackAfterRetain(std:
        rejected(bool(row.tournamentMissingPsm),"tournament_owner")||rejected(bool(row.speedBoostMissingPsm),"speedboost_owner")||
        rejected(bool(row.damageMissingPsm),"damage_owner")||rejected(bool(row.pauseBackdropMissingPsm),"pause_owner")||
        rejected(bool(row.memoryCardPending),"memorycard_pending")||
-       rejected(bool(row.resultsPending),"results_pending")||
+       rejected(bool(row.resultsPending),"results_pending")||rejected(bool(row.loadingPending||row.coursePending||row.courseAuthoredPending),"loading_pending")||
        rejected(row.object04&&!row.garageFallback,"object_without_garage_proof")||
        rejected(!proof->current(row.name00+".psm",proof->context_,proof->textures_),"new_proof_current"))
         return fail(d,S::phase,0x29B638);
@@ -1400,7 +1488,7 @@ bool OriginalStandardMaterialTable50LA::retainDamageFallback14D590(
         !archive->loaded()||archive->identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::overlays))
         return fail(d,S::source,0x29B638);
     auto& row=storage_->rows[static_cast<std::size_t>(index)];
-    if(row.pauseBackdropMissingPsm||row.tournamentMissingPsm||row.speedBoostMissingPsm||!textures||!textures->prepared()||
+    if(row.loadingPending||row.coursePending||row.courseAuthoredPending||row.pauseBackdropMissingPsm||row.tournamentMissingPsm||row.speedBoostMissingPsm||!textures||!textures->prepared()||
         (row.damageTextures&&row.damageTextures!=textures)||
         (row.object04&&!row.damageMissingPsm))return fail(d,S::phase,0x29B638);
     // Serial host sessions may independently authenticate the SAME original
@@ -1442,7 +1530,7 @@ bool OriginalStandardMaterialTable50LA::pauseBackdropFallback14D590(
         !archive->loaded()||archive->identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::overlays))
         return fail(d,S::source,0x29B638);
     auto& row=storage_->rows[static_cast<std::size_t>(index)];
-    if(row.tournamentMissingPsm||row.speedBoostMissingPsm||row.damageMissingPsm||!textures||!textures->prepared()||
+    if(row.loadingPending||row.coursePending||row.courseAuthoredPending||row.tournamentMissingPsm||row.speedBoostMissingPsm||row.damageMissingPsm||!textures||!textures->prepared()||
         (row.pauseBackdropTextures&&row.pauseBackdropTextures!=textures)||
         (row.object04&&!row.pauseBackdropMissingPsm))return fail(d,S::phase,0x29B638);
     if(row.name00!="ui\\textures\\results1"&&row.name00!="ui\\textures\\results2")
@@ -1484,7 +1572,7 @@ bool OriginalStandardMaterialTable50LA::bindResultsPendingAfterRetain(std::int32
         return fail(d,S::source,0x29B638);
     //14D370 skips an actual loaded row. Never replace its object or first
     //construction history, nor steal an earlier pending caller's authority.
-    if(row.object04||row.garageFallback||row.memoryCardPending||row.tournamentMissingPsm||
+    if(row.object04||row.loadingPending||row.coursePending||row.courseAuthoredPending||row.garageFallback||row.memoryCardPending||row.tournamentMissingPsm||
        row.speedBoostMissingPsm||row.damageMissingPsm||row.pauseBackdropMissingPsm)return true;
     if(row.resultsPending){
         if(!row.resultsPending->current(row.name00+".psm",proof->context_,proof->textures_,proof->provider_))
@@ -1506,7 +1594,7 @@ bool OriginalStandardMaterialTable50LA::bindMemoryCardPendingAfterRetain(
     if(row.references08<=0||row.object04||!storage_->templates||
        row.associated30!=storage_->templates->get(OriginalUiTemplate50KG::screenMt)||
        !OriginalStandardArchiveProvider50LA::sameName(row.name00,proof->name_)||
-       row.resultsPending||row.garageFallback||row.tournamentMissingPsm||row.speedBoostMissingPsm||row.damageMissingPsm||row.pauseBackdropMissingPsm)
+       row.resultsPending||row.loadingPending||row.coursePending||row.courseAuthoredPending||row.garageFallback||row.tournamentMissingPsm||row.speedBoostMissingPsm||row.damageMissingPsm||row.pauseBackdropMissingPsm)
         return fail(d,S::source,0x29B638);
     if(row.memoryCardPending){
         if(row.memoryCardPending->issuer_.lock().get()!=&owner||!row.memoryCardPending->occurrenceCurrent()||
@@ -1617,7 +1705,7 @@ bool OriginalStandardMaterialTable50LA::preflightMemoryCardPopulation(
     for(std::size_t i=0;i<storage_->rows.size();++i){const auto& row=storage_->rows[i];
         if(row.references08<=0||row.object04)continue;d.row=static_cast<std::int32_t>(i);
         if(row.associated30!=storage_->templates->get(OriginalUiTemplate50KG::screenMt)||
-           row.resultsPending||row.garageFallback||row.tournamentMissingPsm||row.speedBoostMissingPsm||row.damageMissingPsm||row.pauseBackdropMissingPsm)
+           row.resultsPending||row.loadingPending||row.coursePending||row.courseAuthoredPending||row.garageFallback||row.tournamentMissingPsm||row.speedBoostMissingPsm||row.damageMissingPsm||row.pauseBackdropMissingPsm)
             return fail(d,S::source,0x29B638);
         if(static_cast<std::int32_t>(i)==first){
             if(row.memoryCardPending&&(!row.memoryCardPending->occurrenceCurrent()||
@@ -1673,7 +1761,7 @@ bool OriginalStandardMaterialTable50LA::preflightMemoryCardStripPopulation(
     for(std::size_t i=0;i<storage_->rows.size();++i){const auto& row=storage_->rows[i];
         if(row.references08<=0||row.object04)continue;d.row=static_cast<std::int32_t>(i);
         if(row.associated30!=storage_->templates->get(OriginalUiTemplate50KG::screenMt)||
-           row.resultsPending||row.garageFallback||row.tournamentMissingPsm||row.speedBoostMissingPsm||row.damageMissingPsm||row.pauseBackdropMissingPsm)
+           row.resultsPending||row.loadingPending||row.coursePending||row.courseAuthoredPending||row.garageFallback||row.tournamentMissingPsm||row.speedBoostMissingPsm||row.damageMissingPsm||row.pauseBackdropMissingPsm)
             return fail(d,S::source,0x29B628);
         if(row.memoryCardPending)return fail(d,S::source,0x29B628);
         if(static_cast<std::int32_t>(i)==first){
@@ -1768,9 +1856,11 @@ bool OriginalStandardMaterialTable50LA::release14D500(std::int32_t index) noexce
     if(r.references08==0){
         r.memoryCardPending.reset();
         r.resultsPending.reset();
+        r.loadingPending.reset();
         // Native construction-family admission cannot govern a later fresh
         // null-row lifetime. Loaded-object history was destroyed above.
         r.garageFallback.reset();
+        r.coursePending.reset();r.courseAuthoredPending.reset();
     }
     //Zero + pending null still takes14D54C's genuine no-destroy branch.
     //14D500 does NOT clear associated30, even on the final release.

@@ -6,6 +6,8 @@ bool Owner::acceptNativeWaterNone274570(const rr::assets::World48F& source,
        !nativeSky3F8_||!nativeSky3F8_->owner||!nativeSky3F8_->owner->tailComplete||course>15u)return false;
     const auto* name=lighting_->nativeRaWaterSelector274570(this,source,visibilityRows_,pc);
     if(!name||std::strcmp(name,"none"))return false;
+    if(!worldReset270550Complete_||!worldWater3FC_||*worldWater3FC_||
+       !worldWater400_||*worldWater400_)return false;
     NativeWaterNone274570 next;next.environment110=name;next.profile1125C=bits;
     next.course1125FLow4=course;next.argumentA2=(bits>>5u)&3u;
     next.argumentA3=(course==6u&&next.argumentA2==1u)?0u:3u;
@@ -25,6 +27,7 @@ bool Owner::acceptNativeWaterNone2747C0(const rr::assets::World48F& source,
     auto& receipt=*nativeWaterNone274570_;
     const auto* name=lighting_->nativeRaWaterSelector274570(this,source,visibilityRows_,pc);
     if(!name||name!=receipt.environment110||std::strcmp(name,"none")||receipt.returned2745CC!=1u)return false;
+    if(!worldWater400_||*worldWater400_||!worldWater404_||*worldWater404_)return false;
     const auto a2=std::uint32_t((bits>>5u)&3u);
     if(receipt.returned274800){
         if(*receipt.returned274800!=1u||!receipt.profile134_1125C||

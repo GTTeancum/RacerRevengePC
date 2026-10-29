@@ -100,6 +100,7 @@ bool start(S&s,const VehicleFrameBindings49W&b,P phase,VehicleFrameWorkspace49W&
  if(s.phase!=phase||!phases(s))return fail(d,E::Phase,0);
  if(!admit(s,b,d))return false;
  if(phase>=P::SubstepReady&&phase<=P::Query219120){Schedule49K q{};if(!selectSchedule49K(s.bodies.main.frameFactor,s.bodies.main.liveSubstepScale,q)||q.count!=s.bodies.main.schedule.count||bits(q.factorPerSubstep)!=bits(s.bodies.main.schedule.factorPerSubstep)||s.bodies.main.substepIndex>=q.count)return fail(d,E::Phase,0);}
+ if(s.noiseOwner().noise.initializationIncomplete49M)return fail(d,E::Admission,0x14eec0);
  w.next=s;
  // Stage the real shared owner only for this transactional leaf. Failure must
  // preserve application RNG/tables just as it preserves the frame. This is
@@ -107,7 +108,16 @@ bool start(S&s,const VehicleFrameBindings49W&b,P phase,VehicleFrameWorkspace49W&
  w.next.noise=s.noiseOwner();w.next.borrowedNoise50KG=nullptr;return true;
 }
 bool preserving(const PreservingStage49W&x,PreservingCut49W p,VehicleFrameDiagnostic49W&d) noexcept {return (x.point==p&&x.representedStatePreserved&&x.omittedBB0WNotConsumed)||fail(d,E::ExternalCut,0);}
-bool commit(S&s,VehicleFrameWorkspace49W&w,P p) noexcept {
+bool noiseContinuation(const S&live,const S&staged,VehicleFrameDiagnostic49W&d) noexcept {
+ //Native serial/reentrant guard. Previously issued real effects are retained;
+ //only the next dependent effect/callback is blocked after a partial prefix.
+ return (!live.noiseOwner().noise.initializationIncomplete49M&&
+         !staged.noiseOwner().noise.initializationIncomplete49M)||fail(d,E::Admission,0x14eec0);
+}
+bool commit(S&s,VehicleFrameWorkspace49W&w,VehicleFrameDiagnostic49W&d,P p) noexcept {
+ //A live incomplete owner always wins over an earlier clean scratch copy.
+ //This is serial/reentrant admission, not a synchronization mechanism.
+ if(!noiseContinuation(s,w.next,d))return false;
  auto* shared=s.borrowedNoise50KG;w.next.phase=p;
  if(shared)*shared=w.next.noise;
  s=w.next;s.borrowedNoise50KG=shared;return true;
@@ -131,42 +141,43 @@ void mainSphere(const S&s,const VehicleFrameParameters49W&p,PodSphereBody49L&out
 //branch, never ordinary alignment with a missing engine. Whole-frame admission
 //still requires the actual destruction owner before that route is reachable.
 //No persistent49L body mirror exists.
-bool secondaryForces(S&s,const VehicleFrameBindings49W&b,const VehicleFrameParameters49W&p,const SecondaryInputs49M&x) noexcept {
+bool secondaryForces(const S&live,S&s,const VehicleFrameBindings49W&b,const VehicleFrameParameters49W&p,const SecondaryInputs49M&x,VehicleFrameDiagnostic49W&d) noexcept {
+ if(!noiseContinuation(live,s,d))return false;
  auto&z=s.bodies.secondary;const auto&m=s.bodies.main;const auto&par=p.bodies.secondary;
  if(z.phase!=SecondaryPhase49M::Ready)return false;
  Math f;const float g=m.components.probe348.field104?s.fields.gravity378:s.fields.gravity37C;
- RR_VEHICLE_FRAME49W_STAGE(0x218a3c);RR_VEHICLE_FRAME49W_FORCE_CUT(0x218a3c,s,b.lifecycle.physical19C);f.addLoad(z.root.loads.force,{{0,f.mul(f.neg(par.body.mass),g),0,1}});
+ if(!noiseContinuation(live,s,d))return false;RR_VEHICLE_FRAME49W_STAGE(0x218a3c);if(!noiseContinuation(live,s,d))return false;RR_VEHICLE_FRAME49W_FORCE_CUT(0x218a3c,s,b.lifecycle.physical19C);if(!noiseContinuation(live,s,d))return false;f.addLoad(z.root.loads.force,{{0,f.mul(f.neg(par.body.mass),g),0,1}});
  const float lo=x.effective4346D0,hi=x.effective4346D8;
  float damping=f.add(lo,f.div(f.mul(f.sub(z.cachedSpeed34,fp(0x422fffcc)),f.sub(hi,lo)),fp(0x41eaaa64)));
  if(hi<=lo){if(damping<hi)damping=hi;else if(!(damping<=lo))damping=lo;}else{if(!(damping<=hi))damping=hi;else if(damping<lo)damping=lo;}
  f.addLoad(z.root.loads.torque,f.scale(f.neg(damping),vector(z.root.body.angularVelocity)));
  detail::SceneVectorContext49U scratch{0};V relative{},worldError{},upA{},upB{},forward{},torque{};
- RR_VEHICLE_FRAME49W_STAGE(0x218c60);RR_VEHICLE_FRAME49W_FORCE_CUT(0x218c60,s,b.lifecycle.physical19C);
+ if(!noiseContinuation(live,s,d))return false;RR_VEHICLE_FRAME49W_STAGE(0x218c60);if(!noiseContinuation(live,s,d))return false;RR_VEHICLE_FRAME49W_FORCE_CUT(0x218c60,s,b.lifecycle.physical19C);if(!noiseContinuation(live,s,d))return false;
  if(!f.valid||!detail::position49U(graph(s),b.lifecycle.physical19C,b.lifecycle.main190,scratch,relative))return false;
  project(s,b);
  V error{{f.sub(x.targetRelative2F0.v[0],relative.v[0]),f.sub(x.targetRelative2F0.v[1],relative.v[1]),f.sub(x.targetRelative2F0.v[2],relative.v[2]),1}};error.v[1]=0;
  const float length=f.scalarRoot(f.squared(error));
- RR_VEHICLE_FRAME49W_STAGE(0x218ce0);if(!detail::direction49U(graph(s),b.lifecycle.main190,error,scratch,worldError))return false;
+ if(!noiseContinuation(live,s,d))return false;RR_VEHICLE_FRAME49W_STAGE(0x218ce0);if(!noiseContinuation(live,s,d))return false;if(!detail::direction49U(graph(s),b.lifecycle.main190,error,scratch,worldError))return false;
  f.addLoad(z.root.loads.force,f.scale(f.mul(x.effective4346E0,length),f.normalize(worldError)));
- RR_VEHICLE_FRAME49W_STAGE(0x218d90);
+ if(!noiseContinuation(live,s,d))return false;RR_VEHICLE_FRAME49W_STAGE(0x218d90);if(!noiseContinuation(live,s,d))return false;
  if(!m.vehicleState40){
   f.addLoad(z.root.loads.force,f.scale(f.neg(x.effective4346C8),vector(z.root.body.velocity)));
-  RR_VEHICLE_FRAME49W_STAGE(0x218e30);if(!axes(s,b.lifecycle.physical19C,forward,upA))return false;
-  RR_VEHICLE_FRAME49W_STAGE(0x218e44);if(!axes(s,b.lifecycle.main190,forward,upB))return false;
+  if(!noiseContinuation(live,s,d))return false;RR_VEHICLE_FRAME49W_STAGE(0x218e30);if(!noiseContinuation(live,s,d))return false;if(!axes(s,b.lifecycle.physical19C,forward,upA))return false;
+  if(!noiseContinuation(live,s,d))return false;RR_VEHICLE_FRAME49W_STAGE(0x218e44);if(!noiseContinuation(live,s,d))return false;if(!axes(s,b.lifecycle.main190,forward,upB))return false;
   const auto worldTorque=f.scale(x.effective4346E8,f.cross(upA,upB));
-  RR_VEHICLE_FRAME49W_STAGE(0x218eb8);if(!detail::inverseDirection49U(graph(s),b.lifecycle.physical19C,worldTorque,scratch,torque))return false;
+  if(!noiseContinuation(live,s,d))return false;RR_VEHICLE_FRAME49W_STAGE(0x218eb8);if(!noiseContinuation(live,s,d))return false;if(!detail::inverseDirection49U(graph(s),b.lifecycle.physical19C,worldTorque,scratch,torque))return false;
   f.addLoad(z.root.loads.torque,torque);
  }else{
   //218EFC..2190A0. s is this49W leaf's transaction scratch. Its noise is
   //the staged SAME application owner from start(), not a per-racer stream.
   const float coordinate=f.mul(x.effective434708,z.time864);float value=0.f;
-  RR_VEHICLE_FRAME49W_STAGE(0x218f08);
+  if(!noiseContinuation(live,s,d))return false;RR_VEHICLE_FRAME49W_STAGE(0x218f08);if(!noiseContinuation(live,s,d))return false;
   if(!f.valid||!evaluateGradientNoise49M(s.noise.noise,s.noise.sharedRandomState,coordinate,value))return false;
   const float h=f.add(.5f,f.mul(.5f,value));
   f.addLoad(z.root.loads.torque,{{0.f,0.f,f.mul(m.cachedSpeed34,f.mul(h,x.effective4346F8)),1.f}});
   const V localForce{{f.mul(m.cachedSpeed34,f.mul(h,x.effective434700)),0.f,0.f,1.f}};
   z.time864=f.add(z.time864,m.schedule.factorPerSubstep);
-  V worldForce{};RR_VEHICLE_FRAME49W_STAGE(0x218fd8);
+  V worldForce{};if(!noiseContinuation(live,s,d))return false;RR_VEHICLE_FRAME49W_STAGE(0x218fd8);if(!noiseContinuation(live,s,d))return false;
   if(!f.valid||!detail::direction49U(graph(s),b.lifecycle.physical19C,localForce,scratch,worldForce))return false;
   f.addLoad(z.root.loads.force,worldForce);
   f.addLoad(z.root.loads.force,f.scale(f.neg(x.effective4346F0),vector(z.root.body.velocity)));
@@ -174,7 +185,7 @@ bool secondaryForces(S&s,const VehicleFrameBindings49W&b,const VehicleFrameParam
  if(!f.valid)return false;
  project(s,b);z.phase=SecondaryPhase49M::ConstraintPending;
  PodSphereBody49L main{};mainSphere(s,p,main);
- RR_VEHICLE_FRAME49W_STAGE(0x2190ac);
+ if(!noiseContinuation(live,s,d))return false;RR_VEHICLE_FRAME49W_STAGE(0x2190ac);if(!noiseContinuation(live,s,d))return false;
  return applySecondaryConstraint49M(z,par,main,s.bodies.joint,z,s.bodies.joint,s.bodies.lastConstraintMagnitude);
 }
 TerrainFollowState48G terrainFollow50FP(const S& s) noexcept {
@@ -235,7 +246,7 @@ bool readAiVehicleFrame50IV(S&s,const VehicleFrameBindings49W&b,float factor,Veh
  if(!std::isfinite(factor)||factor<0.f||factor>fp(0x3d75c28f))return fail(d,E::Input,0x16e8c0);
  auto&m=w.next.bodies.main;m.frameFactor=factor;m.substepIndex=0;
  m.phase=MainBodyPhase49K::AwaitingPostPlayer;w.next.bodies.phase=CoupledBodyPhase49M::AwaitingPostPlayer;
- return commit(s,w,P::PostPlayer);
+ return commit(s,w,d,P::PostPlayer);
 }
 bool bindAiVehicleFrame50IV(S&s,const VehicleFrameBindings49W&b,const VehicleFrameParameters49W&p,VehicleFrameWorkspace49W&w,VehicleFrameDiagnostic49W&d) noexcept {
  if(s.fields.vehicle58!=1u||!s.fields.nativeAiOwnersBound50IV)return fail(d,E::Admission,0x217de0);
@@ -250,29 +261,29 @@ bool bindAiVehicleFrame50IV(S&s,const VehicleFrameBindings49W&b,const VehicleFra
      m.controls.bound.control.filtered,p.rates,m.frameFactor,context,p.control,m.components.bindings,bound))return fail(d,E::Input,0x217de0);
  m.controls.bound=bound;m.components.bindings=bound.bindings;
  m.phase=MainBodyPhase49K::AwaitingPostBase;w.next.bodies.phase=CoupledBodyPhase49M::AwaitingPostBase;
- return commit(s,w,P::BeforeGraphics);
+ return commit(s,w,d,P::BeforeGraphics);
 }
 bool readVehicleFrame49W(S&s,const VehicleFrameBindings49W&b,const FrameReader49K&x,VehicleFrameWorkspace49W&w,VehicleFrameDiagnostic49W&d) noexcept {
  if(s.fields.vehicle58)return fail(d,E::Admission,0x1a15c0);
  if(!start(s,b,P::Ready,w,d))return false;
  if(!std::isfinite(x.preparedFactor)||x.preparedFactor<0||x.preparedFactor>fp(0x3d75c28f))return fail(d,E::Input,0x1a15c0);
  auto&m=w.next.bodies.main;auto c=x.context;
- c.source7D0=s.fields.damage7D0;c.source7D4=s.fields.damage7D4;c.source7D8=s.fields.damage7D8;c.source7DC=s.fields.damage7DC;c.previousFlagsB9C=s.bodies.main.controls.player.flagsB9C;c.gateByte58=s.fields.applicationByte58;RR_VEHICLE_FRAME49W_STAGE(0x1a15c0);
+ c.source7D0=s.fields.damage7D0;c.source7D4=s.fields.damage7D4;c.source7D8=s.fields.damage7D8;c.source7DC=s.fields.damage7DC;c.previousFlagsB9C=s.bodies.main.controls.player.flagsB9C;c.gateByte58=s.fields.applicationByte58;if(!noiseContinuation(s,w.next,d))return false;RR_VEHICLE_FRAME49W_STAGE(0x1a15c0);if(!noiseContinuation(s,w.next,d))return false;
  if(!conditionDualShockPlayerAxes48X(x.packet,m.controls.components))return fail(d,E::Input,0x1a1a20);c.componentValues=m.controls.components;
  if(!readPlayerInput48X(c,x.codes,x.actions,m.controls.player))return fail(d,E::Input,0x1a1a20);
  m.frameFactor=x.preparedFactor;m.substepIndex=0;m.phase=MainBodyPhase49K::AwaitingPostPlayer;w.next.bodies.phase=CoupledBodyPhase49M::AwaitingPostPlayer;
- return commit(s,w,P::PostPlayer);
+ return commit(s,w,d,P::PostPlayer);
 }
 bool bindVehicleFrame49W(S&s,const VehicleFrameBindings49W&b,const VehicleFrameParameters49W&p,const PreservingStage49W&cut,const PostPlayerAt217DE0_49K&x,VehicleFrameWorkspace49W&w,VehicleFrameDiagnostic49W&d) noexcept {
  if(s.fields.vehicle58)return fail(d,E::Admission,0x217de0);
  if(!start(s,b,P::PostPlayer,w,d)||!preserving(cut,PreservingCut49W::PlayerAndBaseBefore217DE0,d))return false;
  if(!(s.bodies.main.controls.player.flagsB9C&0x80u)||!(x.player.flagsB9C&0x80u)||x.bindingContext.vehicleState40||x.bindingContext.mode58Nonzero)return fail(d,E::Admission,0x217de0);
- auto&m=w.next.bodies.main;auto&c=m.controls.bound.control;RR_VEHICLE_FRAME49W_STAGE(0x217de0);
+ auto&m=w.next.bodies.main;auto&c=m.controls.bound.control;if(!noiseContinuation(s,w.next,d))return false;RR_VEHICLE_FRAME49W_STAGE(0x217de0);if(!noiseContinuation(s,w.next,d))return false;
  if(!shapePlayerControlChannels48X(x.player.raw,c.shaping.smoothedChannel0D28,ControlShapeMode48V::Nonlinear,c.shaping)||!stepControlRateFilter48B(c.shaping.targets,c.filtered,p.rates,m.frameFactor,c.filtered))return fail(d,E::Input,0x217de0);
  auto input=x.bindingContext;input.source7D0=s.fields.damage7D0;input.source7D4=s.fields.damage7D4;input.filtered=c.filtered;input.bodyCachedSpeed34=m.cachedSpeed34;input.actionB7C=x.player.actionB7C;input.actionB80=x.player.actionB80;input.flagsB9C=x.player.flagsB9C;
  if(!bindVehicleControls48W(input,p.control,m.components.bindings,m.components.bindings))return fail(d,E::Input,0x2181c4);
  m.controls.player=x.player;m.controls.bound.bindings=m.components.bindings;m.phase=MainBodyPhase49K::AwaitingPostBase;w.next.bodies.phase=CoupledBodyPhase49M::AwaitingPostBase;
- return commit(s,w,P::BeforeGraphics);
+ return commit(s,w,d,P::BeforeGraphics);
 }
 bool graphicsVehicleFrame49W(S&s,const VehicleFrameBindings49W&b,const VehicleFrameParameters49W&p,const PreservingStage49W&cut,VehicleFrameWorkspace49W&w,VehicleFrameDiagnostic49W&d) noexcept {
  if(!start(s,b,P::BeforeGraphics,w,d)||!preserving(cut,PreservingCut49W::Base2176E0BeforeGraphics,d))return false;
@@ -281,17 +292,17 @@ bool graphicsVehicleFrame49W(S&s,const VehicleFrameBindings49W&b,const VehicleFr
  VehicleAnimationInput49T a{VehicleAnimationPhase49T::beforeAnimation21A000,dt,c.bindings.aeroDrive[0],c.bindings.aeroDrive[1],f.chariot191,f.chariot1B0,f.left191,f.right191,true,true,vector(c.root.body.linearAcceleration,r.mainSupplement.linearAccelerationC0W)};
  a.midRecordsAbsent=!b.animation.mid288&&!b.animation.rightMid294&&!b.animation.leftMid298;
  a.steeringB6C=m.controls.bound.control.filtered.values[0];
- VehicleAnimationDiagnostic49T ad{};RR_VEHICLE_FRAME49W_STAGE(0x21a000);
+ VehicleAnimationDiagnostic49T ad{};if(!noiseContinuation(s,w.next,d))return false;RR_VEHICLE_FRAME49W_STAGE(0x21a000);if(!noiseContinuation(s,w.next,d))return false;
  if(!advanceVehicleAnimation49T(a,b.animation,graph(r),r.animation,r.animationShared,r.visualShared,w.animation,ad))return fail(d,E::Animation,ad.sourceStage);
  project(r,b);
  VehicleVisualInput49R v{};v.phase=VehicleVisualPhase49R::afterAnimationBeforeChariotAndPhysics;v.vehicle834=f.vehicle834;v.vehicle844=f.vehicle844;v.vehicle40=m.vehicleState40;v.applicationByte58=f.applicationByte58;v.probe108=c.probe348.field108;v.aeroD8=std::uint32_t(c.bindings.aeroTriggerD8);v.aeroDC=c.aero.lowSpeedDc;v.vehicleCFC=f.vehicleCFC;v.vehicleD00=f.vehicleD00;v.frameFactor=dt;v.cachedBodySpeed34=m.cachedSpeed34;v.rawB5C=m.controls.player.raw.values[0];v.objectD34_10=f.objectD34_10;v.engine68=c.bindings.engineDrive[0];v.engine6C=c.bindings.engineDrive[1];v.engine70=c.engine.smoothedDrive[0];v.engine74=c.engine.smoothedDrive[1];v.aeroE4=c.bindings.aeroDrive[0];v.aeroE8=c.bindings.aeroDrive[1];v.damage7D0=f.damage7D0;v.damage7D8=f.damage7D8;v.damage7D4=f.damage7D4;v.damage7DC=f.damage7DC;std::memcpy(v.probeVector1D0.v,c.probe348.vector1D0,16);v.impactBA0=f.impactBA0;
- VehicleVisualDiagnostic49R vd{};RR_VEHICLE_FRAME49W_STAGE(0x21c120);
+ VehicleVisualDiagnostic49R vd{};if(!noiseContinuation(s,w.next,d))return false;RR_VEHICLE_FRAME49W_STAGE(0x21c120);if(!noiseContinuation(s,w.next,d))return false;
  if(!updateVehicleVisual49R(v,p.visual,b.visual,graph(r),r.visual,r.visualShared,r.noise,w.visual,vd))return fail(d,E::Visual,vd.sourceStage);
  project(r,b);
  const ChariotLifecycleInput49V l{ChariotLifecyclePhase49V::afterEngineResponseBeforePhysics,f.vehicle58,std::uint32_t(c.bindings.aeroTriggerD8),f.vehicleCFC,f.vehicleD00,dt,f.objectD34_10,f.impactBA0,f.applicationByte58,true};
- ChariotLifecycleDiagnostic49V ld{};RR_VEHICLE_FRAME49W_STAGE(0x21a660);
+ ChariotLifecycleDiagnostic49V ld{};if(!noiseContinuation(s,w.next,d))return false;RR_VEHICLE_FRAME49W_STAGE(0x21a660);if(!noiseContinuation(s,w.next,d))return false;
  if(!updateChariotLifecycle49V(l,p.lifecycle,b.lifecycle,graph(r),m,r.bodies.mainSphere,r.bodies.secondary,r.secondarySupplement,p.activation,r.bodies.vehicle838,r.lifecycle,r.lifecycleShared,r.visualShared.zero434630,r.noise,w.lifecycle,ld))return fail(d,E::Lifecycle,ld.sourceStage);
- project(r,b);return commit(s,w,P::PostGraphics);
+ project(r,b);return commit(s,w,d,P::PostGraphics);
 }
 bool consumeVehicleImpacts49Z(S&s,const VehicleFrameBindings49W&b,const ImpactConsumerInput49Z&input,VehicleImpactEvents49Z&events,VehicleFrameWorkspace49W&w,VehicleFrameDiagnostic49W&d) noexcept {
  if(!start(s,b,P::PostGraphics,w,d))return false;
@@ -313,7 +324,7 @@ bool consumeVehicleImpacts49Z(S&s,const VehicleFrameBindings49W&b,const ImpactCo
  copyFloat(before.partnerTimer08,z.partnerTimer08);copyFloat(before.partnerAmount0C,z.partnerAmount0C);copyFloat(before.partnerDuration10,f.objectD34_10);
  copyFloat(before.environmentalD38,z.environmentalD38);copyFloat(before.environmentalD3C,z.environmentalD3C);
  VehicleImpactEvents49Z next{};
- RR_VEHICLE_FRAME49W_STAGE(0x2288a8);
+ if(!noiseContinuation(s,w.next,d))return false;RR_VEHICLE_FRAME49W_STAGE(0x2288a8);if(!noiseContinuation(s,w.next,d))return false;
  const auto status=consumeImpacts49Z(in,before,after,next.values,2,next.count,
      in.dynamicPartnerEventsBound?&next.partners:nullptr);
  if(status==ImpactConsumerStatus49Z::unsupportedPartner)return fail(d,E::Admission,0x222cec);
@@ -337,12 +348,12 @@ bool consumeVehicleImpacts49Z(S&s,const VehicleFrameBindings49W&b,const ImpactCo
   // This sum was already validated by the prefix and its inputs are unchanged.
   volatile float lateral=f.impactDirectionalD08[6]+f.impactDirectionalD08[7];
   r.pendingImpactLateral50KZ=lateral;r.pendingImpactDuration50KZ=0.f;
-  commit(s,w,P::ImpactFeedbackPending50KZ);events=next;return fail(d,E::ExternalCut,next.values[0].sourcePC);
+  if(!commit(s,w,d,P::ImpactFeedbackPending50KZ))return false;events=next;return fail(d,E::ExternalCut,next.values[0].sourcePC);
  }
  r.impactConsumerPending49Y=0;r.impactConsumersActive49Z=1;
  // The outer manager gate jumps to228B40, beyond repair/effects/transitions.
  // CD8's inner222B20 skip instead returns to2288BC and still reaches repair.
- commit(s,w,(in.managerFlags58&2u)?P::PostImpactConsumers:P::AfterImpactBlock);events=next;return true;
+ if(!commit(s,w,d,(in.managerFlags58&2u)?P::PostImpactConsumers:P::AfterImpactBlock))return false;events=next;return true;
 }
 bool resumeVehicleImpactsWithControllers50KZ(S&s,const VehicleFrameBindings49W&b,
  ControllerFeedbackState50KZ* devices,std::size_t deviceCount,VehicleImpactEvents49Z&events,
@@ -376,10 +387,10 @@ bool resumeVehicleImpactsWithControllers50KZ(S&s,const VehicleFrameBindings49W&b
   }
  }
  if(s.phase==P::ImpactFeedbackPending50KZ){
-  RR_VEHICLE_FRAME49W_STAGE(0x222d8c);
+  if(!noiseContinuation(s,w.next,d))return false;RR_VEHICLE_FRAME49W_STAGE(0x222d8c);if(!noiseContinuation(s,w.next,d))return false;
   clearControllerFeedback50KZ(device,2);
   events={};events.values[0]={0x222d8cu,0x40u,saved.player5C,2u,0u,0.f};events.count=1;
-  commit(s,w,P::ImpactFeedbackClearReturned50KZ);
+  if(!commit(s,w,d,P::ImpactFeedbackClearReturned50KZ))return false;
  }
  if(s.phase==P::ImpactFeedbackClearReturned50KZ){
   if(!start(s,b,P::ImpactFeedbackClearReturned50KZ,w,d))return false;
@@ -389,11 +400,11 @@ bool resumeVehicleImpactsWithControllers50KZ(S&s,const VehicleFrameBindings49W&b
   const auto duration=scaled<0.5f?scaled:0.5f;
   if(!math.valid||((bits(scaled)&0x7f800000u)==0u&&(bits(scaled)&0x7fffffu)!=0u))
    return fail(d,E::Arithmetic,0x222db0u);
-  RR_VEHICLE_FRAME49W_STAGE(0x222dec);
+  if(!noiseContinuation(s,w.next,d))return false;RR_VEHICLE_FRAME49W_STAGE(0x222dec);if(!noiseContinuation(s,w.next,d))return false;
   if(!requestControllerFeedback50KZ(device,2,0u,duration))return fail(d,E::Arithmetic,0x222decu);
   w.next.pendingImpactDuration50KZ=duration;
   events.values[1]={0x222decu,0x44u,s.pendingImpactInput50KZ.player5C,2u,0u,duration};events.count=2;
-  commit(s,w,P::ImpactFeedbackReturned50KZ);
+  if(!commit(s,w,d,P::ImpactFeedbackReturned50KZ))return false;
  }
  if(!start(s,b,P::ImpactFeedbackReturned50KZ,w,d))return false;
  auto&r=w.next;auto&f=r.fields;auto&z=r.impactSupplement;
@@ -410,7 +421,7 @@ bool resumeVehicleImpactsWithControllers50KZ(S&s,const VehicleFrameBindings49W&b
  copyFloat(before.environmentalD38,z.environmentalD38);copyFloat(before.environmentalD3C,z.environmentalD3C);
 
  ImpactPartnerEvents49Z partners{};
- RR_VEHICLE_FRAME49W_STAGE(0x222df4);
+ if(!noiseContinuation(s,w.next,d))return false;RR_VEHICLE_FRAME49W_STAGE(0x222df4);if(!noiseContinuation(s,w.next,d))return false;
  const auto status=resumeImpactsAfterControllerFeedback50KZ(in,before,after,
      in.dynamicPartnerEventsBound?&partners:nullptr);
  if(status==ImpactConsumerStatus49Z::unsupportedPartner)return fail(d,E::Admission,0x222a84u);
@@ -427,8 +438,9 @@ bool resumeVehicleImpactsWithControllers50KZ(S&s,const VehicleFrameBindings49W&b
 
  r.impactConsumerPending49Y=0;r.impactConsumersActive49Z=1;
  r.pendingImpactInput50KZ={};r.pendingImpactLateral50KZ=0.f;r.pendingImpactDuration50KZ=0.f;
+ if(!noiseContinuation(s,w.next,d))return false;
  events.partners=partners;
- return commit(s,w,P::PostImpactConsumers);
+ return commit(s,w,d,P::PostImpactConsumers);
 }
 bool repairVehicleImpacts50A(S&s,const VehicleFrameBindings49W&b,VehicleFrameWorkspace49W&w,VehicleFrameDiagnostic49W&d) noexcept {
  if(!start(s,b,P::PostImpactConsumers,w,d))return false;
@@ -441,42 +453,42 @@ bool repairVehicleImpacts50A(S&s,const VehicleFrameBindings49W&b,VehicleFrameWor
  copyFloat(before.damage7D0[0],f.damage7D0);copyFloat(before.damage7D0[1],f.damage7D4);
  copyFloat(before.damage7D0[2],f.damage7D8);copyFloat(before.damage7D0[3],f.damage7DC);
  copyFloat(before.timer7E4,z.repairTimer7E4);copyFloat(before.environmentalD38,z.environmentalD38);copyFloat(before.environmentalD3C,z.environmentalD3C);
- RR_VEHICLE_FRAME49W_STAGE(0x2288c8);
+ if(!noiseContinuation(s,w.next,d))return false;RR_VEHICLE_FRAME49W_STAGE(0x2288c8);if(!noiseContinuation(s,w.next,d))return false;
  if(repairImpactDamage50A(in,before,after)==ImpactAftermathStatus50A::arithmetic)return fail(d,E::Arithmetic,0x224370);
  copyFloat(f.damage7D0,after.damage7D0[0]);copyFloat(f.damage7D4,after.damage7D0[1]);
  copyFloat(f.damage7D8,after.damage7D0[2]);copyFloat(f.damage7DC,after.damage7D0[3]);
  copyFloat(z.repairTimer7E4,after.timer7E4);copyFloat(z.environmentalD38,after.environmentalD38);copyFloat(z.environmentalD3C,after.environmentalD3C);
- return commit(s,w,P::PostImpactRepair);
+ return commit(s,w,d,P::PostImpactRepair);
 }
 bool refreshMainVehicleFrame49W(S&s,const VehicleFrameBindings49W&b,const PreservingStage49W&cut,VehicleFrameWorkspace49W&w,VehicleFrameDiagnostic49W&d) noexcept {
  if(!start(s,b,P::PostGraphics,w,d)||!preserving(cut,PreservingCut49W::BaseAfterGraphicsThroughBA0ResetBeforeChildren,d))return false;
  //222B20/2228D0 may consume/reset newly owned maxima and change damage/CFC/D00.
  // An old all-preserving assertion is not proof of that source execution.
  if(s.impactConsumerPending49Y||s.impactConsumersActive49Z)return fail(d,E::ExternalCut,0x2288b4);
- auto&r=w.next;auto&m=r.bodies.main;RR_VEHICLE_FRAME49W_STAGE(0x228b8c);r.fields.impactBA0=r.visualShared.zero434630;
- RR_VEHICLE_FRAME49W_STAGE(0x167bb4);
+ auto&r=w.next;auto&m=r.bodies.main;if(!noiseContinuation(s,w.next,d))return false;RR_VEHICLE_FRAME49W_STAGE(0x228b8c);if(!noiseContinuation(s,w.next,d))return false;r.fields.impactBA0=r.visualShared.zero434630;
+ if(!noiseContinuation(s,w.next,d))return false;RR_VEHICLE_FRAME49W_STAGE(0x167bb4);if(!noiseContinuation(s,w.next,d))return false;
  if(!quaternionToAngles48G(m.components.root.body.orientation,m.cachedAnglesE0)||!refreshCachedSpeed48E(m.components.root.body.velocity,m.cachedSpeed34))return fail(d,E::Arithmetic,0x167bb4);
- return commit(s,w,P::BetweenBodyChildren);
+ return commit(s,w,d,P::BetweenBodyChildren);
 }
 bool refreshSecondaryVehicleFrame49W(S&s,const VehicleFrameBindings49W&b,const PreservingStage49W&cut,VehicleFrameWorkspace49W&w,VehicleFrameDiagnostic49W&d) noexcept {
  if(!start(s,b,P::BetweenBodyChildren,w,d)||!preserving(cut,PreservingCut49W::OtherChildrenBetween340And35C,d))return false;
- RR_VEHICLE_FRAME49W_STAGE(0x167bb4);if(!refreshSecondaryFrameCache49M(w.next.bodies.secondary,w.next.bodies.secondary))return fail(d,E::Arithmetic,0x167bb4);
- return commit(s,w,P::AfterBodyChildren);
+ if(!noiseContinuation(s,w.next,d))return false;RR_VEHICLE_FRAME49W_STAGE(0x167bb4);if(!noiseContinuation(s,w.next,d))return false;if(!refreshSecondaryFrameCache49M(w.next.bodies.secondary,w.next.bodies.secondary))return fail(d,E::Arithmetic,0x167bb4);
+ return commit(s,w,d,P::AfterBodyChildren);
 }
 bool scheduleVehicleFrame49W(S&s,const VehicleFrameBindings49W&b,const PreservingStage49W&cut,float scale,VehicleFrameWorkspace49W&w,VehicleFrameDiagnostic49W&d) noexcept {
  if(!start(s,b,P::AfterBodyChildren,w,d)||!preserving(cut,PreservingCut49W::OtherChildrenAfter35C,d))return false;
- auto&m=w.next.bodies.main;RR_VEHICLE_FRAME49W_STAGE(0x1a8390);if(!selectSchedule49K(m.frameFactor,scale,m.schedule))return fail(d,E::Input,0x1a8390);
- m.liveSubstepScale=scale;m.phase=MainBodyPhase49K::SubstepReady;w.next.bodies.phase=CoupledBodyPhase49M::SubstepReady;return commit(s,w,P::SubstepReady);
+ auto&m=w.next.bodies.main;if(!noiseContinuation(s,w.next,d))return false;RR_VEHICLE_FRAME49W_STAGE(0x1a8390);if(!noiseContinuation(s,w.next,d))return false;if(!selectSchedule49K(m.frameFactor,scale,m.schedule))return fail(d,E::Input,0x1a8390);
+ m.liveSubstepScale=scale;m.phase=MainBodyPhase49K::SubstepReady;w.next.bodies.phase=CoupledBodyPhase49M::SubstepReady;return commit(s,w,d,P::SubstepReady);
 }
 bool beginVehicleSubstep49W(S&s,const VehicleFrameBindings49W&b,const SubstepSelectionContext49K&x,VehicleFrameWorkspace49W&w,VehicleFrameDiagnostic49W&d) noexcept {
  if(!start(s,b,P::SubstepReady,w,d))return false;auto&r=w.next;auto&m=r.bodies.main;V forward{},up{};r.fields.gravity378=x.vehicle378;r.fields.gravity37C=x.vehicle37C;
- RR_VEHICLE_FRAME49W_STAGE(0x21990c);
+ if(!noiseContinuation(s,w.next,d))return false;RR_VEHICLE_FRAME49W_STAGE(0x21990c);if(!noiseContinuation(s,w.next,d))return false;
  const bool getter=m.components.probe348.field104&&!(m.components.bindings.aeroBrakeEC>0&&m.cachedSpeed34<fp(0x4212aa7f));
- if(getter){RR_VEHICLE_FRAME49W_STAGE(0x2199b8);if(!axes(r,b.lifecycle.main190,forward,up))return fail(d,E::Arithmetic,0x2199b8);project(r,b);}
+ if(getter){if(!noiseContinuation(s,w.next,d))return false;RR_VEHICLE_FRAME49W_STAGE(0x2199b8);if(!noiseContinuation(s,w.next,d))return false;if(!axes(r,b.lifecycle.main190,forward,up))return fail(d,E::Arithmetic,0x2199b8);project(r,b);}
  const GravitySelection49K g{m.components.probe348.field104,m.components.bindings.aeroBrakeEC,m.cachedSpeed34,getter?up.v[1]:0,r.fields.gravity378,r.fields.gravity37C,x.effective434730,x.effective434738};
  if(!selectGravity49K(g,m.selectedGravity))return fail(d,E::Input,0x21990c);m.selectedEngineFlags=selectEngineFlags49K(x.vehicle64,m.controls.player.flagsB9C);
  if(r.terrainProbe.enabled)r.terrainProbe.stage=0;
- m.phase=MainBodyPhase49K::AwaitingWorldPreparation;r.bodies.phase=CoupledBodyPhase49M::AwaitingWorldPreparation;return commit(s,w,P::PostWorld);
+ m.phase=MainBodyPhase49K::AwaitingWorldPreparation;r.bodies.phase=CoupledBodyPhase49M::AwaitingWorldPreparation;return commit(s,w,d,P::PostWorld);
 }
 bool enableVehicleTerrain50FP(S& s,const VehicleFrameBindings49W& b,
  const TerrainPrepareState48M& initial,const TerrainFollowParameters48G& parameters,
@@ -503,7 +515,7 @@ bool enableVehicleTerrain50FP(S& s,const VehicleFrameBindings49W& b,
  std::memcpy(probe.vector1D0,initial.follow.largestVelocityChange1d0.v,12);
  r.terrainProbe.previousPoint180=initial.follow.previousPoint180;r.terrainProbe.previousNormal190=initial.follow.previousNormal190;
  std::memcpy(r.terrainProbe.waterPoint160.v,initial.auxiliaryPoint160,16);
- r.bodies.main.domain.probe100=1u;return commit(s,w,P::Ready);
+ r.bodies.main.domain.probe100=1u;return commit(s,w,d,P::Ready);
 }
 bool bindVehicleTerrainWater50JC(S& s,VehicleFrameBindings49W& b,
  const TerrainWaterBinding50JC& water,VehicleFrameDiagnostic49W& d) noexcept {
@@ -543,7 +555,7 @@ bool prepareVehicleTerrain50FP(S& s,const VehicleFrameBindings49W& b,const Vehic
  input.scene=node(s,b.lifecycle.main190).world100;
  std::memcpy(input.lowerEndpoint140.v,parameters.bodies.main.probeLocal140,12);
  TerrainPrepareState48M prepared{};
- RR_VEHICLE_FRAME49W_STAGE(0x1b1800);
+ if(!noiseContinuation(s,w.next,d))return false;RR_VEHICLE_FRAME49W_STAGE(0x1b1800);if(!noiseContinuation(s,w.next,d))return false;
  WaterHeightResult50JC waterDiagnostic{};
  if(prepareTerrainSinglePair48M(input,prepared,&waterDiagnostic)!=TerrainPrepareStatus48M::QueryReady)
   return fail(d,E::Query,waterDiagnostic.sourcePC?waterDiagnostic.sourcePC:0x1b1800);
@@ -551,7 +563,7 @@ bool prepareVehicleTerrain50FP(S& s,const VehicleFrameBindings49W& b,const Vehic
  installTerrainSurface50FP(r,prepared.terrain);probe.point150[3]=1.f;
  probe.field118=prepared.auxiliaryAbove118;std::memcpy(probe.vector1D0,clear,16);
  std::memcpy(r.terrainProbe.waterPoint160.v,prepared.auxiliaryPoint160,16);
- r.terrainProbe.stage=1;commit(s,w,P::PostWorld);output=prepared;return true;
+ r.terrainProbe.stage=1;if(!commit(s,w,d,P::PostWorld))return false;output=prepared;return true;
 }
 bool commitVehicleTerrainQuery50FP(S& s,const VehicleFrameBindings49W& b,const TerrainQueryResult48M& query,
  VehicleFrameWorkspace49W& w,VehicleFrameDiagnostic49W& d) noexcept {
@@ -562,8 +574,8 @@ bool commitVehicleTerrainQuery50FP(S& s,const VehicleFrameBindings49W& b,const T
  if(query.terrain.collectedCount>16u)return fail(d,E::Query,0x1b19b4);
  for(float value:query.terrain.surface.point150.v)if(!std::isfinite(value))return fail(d,E::Input,0x1b19b4);
  for(float value:query.terrain.surface.normal170.v)if(!std::isfinite(value))return fail(d,E::Input,0x1b19b4);
- RR_VEHICLE_FRAME49W_STAGE(0x1b19b4);installTerrainSurface50FP(w.next,query.terrain);
- w.next.terrainProbe.stage=2;return commit(s,w,P::PostWorld);
+ if(!noiseContinuation(s,w.next,d))return false;RR_VEHICLE_FRAME49W_STAGE(0x1b19b4);if(!noiseContinuation(s,w.next,d))return false;installTerrainSurface50FP(w.next,query.terrain);
+ w.next.terrainProbe.stage=2;return commit(s,w,d,P::PostWorld);
 }
 bool produceVehicleForces49W(S&s,const VehicleFrameBindings49W&b,const VehicleFrameParameters49W&p,const PostWorld49W&x,VehicleFrameWorkspace49W&w,VehicleFrameDiagnostic49W&d) noexcept {
  if(!start(s,b,P::PostWorld,w,d))return false;auto&r=w.next;auto&m=r.bodies.main;
@@ -572,33 +584,36 @@ bool produceVehicleForces49W(S&s,const VehicleFrameBindings49W&b,const VehicleFr
  if(expected==WorldCut49W::LaterSkipped){const auto before=contactEffects49W(s);if(!sameEffects(before,x.effects))return fail(d,E::ExternalCut,0x219c78);}
  install(r,x.effects);r.fields.applicationByte58=x.applicationGateByte58;auto&c=m.components;const auto&par=p.bodies.main;
  if(r.terrainProbe.enabled){if(r.terrainProbe.stage!=2u)return fail(d,E::Query,0x1b1800);}
- else{RR_VEHICLE_FRAME49W_STAGE(0x1b1800);if(!prepareDisabledProbe49K(c.probe348,par.probeLocal140,node(r,b.lifecycle.main190).world100,par.effective434260,c.probe348))return fail(d,E::Arithmetic,0x1b1800);}
+ else{if(!noiseContinuation(s,w.next,d))return false;RR_VEHICLE_FRAME49W_STAGE(0x1b1800);if(!noiseContinuation(s,w.next,d))return false;if(!prepareDisabledProbe49K(c.probe348,par.probeLocal140,node(r,b.lifecycle.main190).world100,par.effective434260,c.probe348))return fail(d,E::Arithmetic,0x1b1800);}
  EngineInput48D en{};AeroInput48E ai{};en.bodySpeed=m.cachedSpeed34;en.boost=m.selectedEngineFlags.engine34!=0;en.repair=m.selectedEngineFlags.engine38!=0;en.fullTorque=c.feedback.engine3C!=0;ai.bodyLocalVelocity=c.root.localVelocity80;ai.angularVelocity=c.root.body.angularVelocity;ai.bodyAngleE0=m.cachedAnglesE0.v[0];ai.subtractWorldFlow=x.aeroSubtractWorldFlow;ai.worldFlow40=x.aeroWorldFlow40;ai.triggerD0=c.feedback.aeroD0!=0;ai.fullSteeringE0=c.feedback.aeroE0!=0;
  if(!applyControlModelBindings48W(c.bindings,en,ai,en,ai))return fail(d,E::Input,0x219c84);
- RR_VEHICLE_FRAME49W_STAGE(0x2e7720);if(!updateEngine48D(c.engine,par.engine,en,c.engine))return fail(d,E::Arithmetic,0x2e7720);
- RR_VEHICLE_FRAME49W_STAGE(0x2827d0);if(!accumulateEngineGravity48D(c.root.loads,c.engine,basis(node(r,b.lifecycle.main190).world100),{m.selectedGravity,par.gravityForceX,par.gravityForceZ},par.body.mass,false,true,c.root.loads))return fail(d,E::Arithmetic,0x2827d0);
+ if(!noiseContinuation(s,w.next,d))return false;RR_VEHICLE_FRAME49W_STAGE(0x2e7720);if(!noiseContinuation(s,w.next,d))return false;if(!updateEngine48D(c.engine,par.engine,en,c.engine))return fail(d,E::Arithmetic,0x2e7720);
+ if(!noiseContinuation(s,w.next,d))return false;RR_VEHICLE_FRAME49W_STAGE(0x2827d0);if(!noiseContinuation(s,w.next,d))return false;if(!accumulateEngineGravity48D(c.root.loads,c.engine,basis(node(r,b.lifecycle.main190).world100),{m.selectedGravity,par.gravityForceX,par.gravityForceZ},par.body.mass,false,true,c.root.loads))return fail(d,E::Arithmetic,0x2827d0);
  Math f;detail::SceneVectorContext49U scratch{0};V v{};
- if(x.applicationGateByte58&2u){for(unsigned k=0;k<2;++k){RR_VEHICLE_FRAME49W_STAGE(k?0x2e7c98:0x2e7c3c);if(!detail::direction49U(graph(r),b.lifecycle.main190,vector(c.engine.localThrust[k]),scratch,v))return fail(d,E::Arithmetic,0x2e7c10);f.addLoad(c.root.loads.force,v);}for(const auto&t:c.engine.torque)f.addLoad(c.root.loads.torque,vector(t));}
- V forward{},up{};if(ai.subtractWorldFlow){RR_VEHICLE_FRAME49W_STAGE(0x16ce10);if(!detail::inverseDirection49U(graph(r),b.lifecycle.main190,vector(ai.worldFlow40),scratch,v))return fail(d,E::Arithmetic,0x16ce10);}
- RR_VEHICLE_FRAME49W_STAGE(0x16cf58);if(!axes(r,b.lifecycle.main190,forward,up))return fail(d,E::Arithmetic,0x16cf58);
+ if(x.applicationGateByte58&2u){for(unsigned k=0;k<2;++k){if(!noiseContinuation(s,w.next,d))return false;RR_VEHICLE_FRAME49W_STAGE(k?0x2e7c98:0x2e7c3c);if(!noiseContinuation(s,w.next,d))return false;if(!detail::direction49U(graph(r),b.lifecycle.main190,vector(c.engine.localThrust[k]),scratch,v))return fail(d,E::Arithmetic,0x2e7c10);f.addLoad(c.root.loads.force,v);}for(const auto&t:c.engine.torque)f.addLoad(c.root.loads.torque,vector(t));}
+ V forward{},up{};if(ai.subtractWorldFlow){if(!noiseContinuation(s,w.next,d))return false;RR_VEHICLE_FRAME49W_STAGE(0x16ce10);if(!noiseContinuation(s,w.next,d))return false;if(!detail::inverseDirection49U(graph(r),b.lifecycle.main190,vector(ai.worldFlow40),scratch,v))return fail(d,E::Arithmetic,0x16ce10);}
+ if(!noiseContinuation(s,w.next,d))return false;RR_VEHICLE_FRAME49W_STAGE(0x16cf58);if(!noiseContinuation(s,w.next,d))return false;if(!axes(r,b.lifecycle.main190,forward,up))return fail(d,E::Arithmetic,0x16cf58);
  AeroResult48E result{};if(!applyAerodynamics48E(c.aero,par.aero,ai,basis(node(r,b.lifecycle.main190).world100),c.root.loads,m.schedule.factorPerSubstep,result))return fail(d,E::Arithmetic,0x16cd90);
- RR_VEHICLE_FRAME49W_STAGE(0x16d7c0);if(!detail::direction49U(graph(r),b.lifecycle.main190,vector(result.localForce),scratch,v)||!f.valid)return fail(d,E::Arithmetic,0x16d7c0);
- c.aero=result.state;c.root.loads=result.accumulatedLoads;project(r,b);m.phase=MainBodyPhase49K::AwaitingResponse354;r.bodies.phase=CoupledBodyPhase49M::AwaitingResponse354;return commit(s,w,P::Post354);
+ if(!noiseContinuation(s,w.next,d))return false;RR_VEHICLE_FRAME49W_STAGE(0x16d7c0);if(!noiseContinuation(s,w.next,d))return false;if(!detail::direction49U(graph(r),b.lifecycle.main190,vector(result.localForce),scratch,v)||!f.valid)return fail(d,E::Arithmetic,0x16d7c0);
+ c.aero=result.state;c.root.loads=result.accumulatedLoads;project(r,b);m.phase=MainBodyPhase49K::AwaitingResponse354;r.bodies.phase=CoupledBodyPhase49M::AwaitingResponse354;return commit(s,w,d,P::Post354);
 }
 bool respondVehicle354_49W(S&s,const VehicleFrameBindings49W&b,const VehicleFrameParameters49W&p,const Post354_49W&x,const SecondaryInputs49M&secondary,VehicleFrameWorkspace49W&w,VehicleFrameDiagnostic49W&d) noexcept {
  if(!start(s,b,P::Post354,w,d))return false;auto&r=w.next;install(r,x.effects);auto&m=r.bodies.main;auto&c=m.components;DisabledProbeResponse49K response{};const auto&par=p.bodies.main;
- RR_VEHICLE_FRAME49W_STAGE(0x1b1a30);
+ if(!noiseContinuation(s,w.next,d))return false;RR_VEHICLE_FRAME49W_STAGE(0x1b1a30);if(!noiseContinuation(s,w.next,d))return false;
  if(r.terrainProbe.enabled){if(!respondEnabledTerrain50FP(r,b))return fail(d,E::Arithmetic,0x1b1a30);}
  else{if(!respondDisabledProbe49K(c.probe348,m.cachedAnglesE0.v[2],par.probe204,par.effective4342C8,par.effective434290,c.root.loads.torque,response))return fail(d,E::Arithmetic,0x1b1a30);c.probe348=response.state;c.root.loads.torque=response.torque190;}
  m.response354_3C=x.response3C;m.response354_44=x.response44;r.bodies.vehicle838=x.vehicle838;
- if(x.vehicle838){if(!secondaryForces(r,b,p,secondary))return fail(d,E::Arithmetic,0x2188b0);r.bodies.phase=CoupledBodyPhase49M::AwaitingResponse368;return commit(s,w,P::Post368);}
- r.bodies.phase=CoupledBodyPhase49M::AwaitingMainIntegration;return commit(s,w,P::MainIntegration);
+ if(x.vehicle838){if(!secondaryForces(s,r,b,p,secondary,d)){
+   if(d.error!=E::None)return false;
+   return fail(d,E::Arithmetic,0x2188b0);
+  }r.bodies.phase=CoupledBodyPhase49M::AwaitingResponse368;return commit(s,w,d,P::Post368);}
+ r.bodies.phase=CoupledBodyPhase49M::AwaitingMainIntegration;return commit(s,w,d,P::MainIntegration);
 }
 bool respondVehicle368_49W(S&s,const VehicleFrameBindings49W&b,const VehicleFrameParameters49W&p,const ContactEffects49W&x,VehicleFrameWorkspace49W&w,VehicleFrameDiagnostic49W&d) noexcept {
  if(!start(s,b,P::Post368,w,d))return false;auto&r=w.next;install(r,x);auto&z=r.bodies.secondary;const auto&par=p.bodies.secondary;
  if(z.phase!=SecondaryPhase49M::Response368Pending)return fail(d,E::Phase,0x2190fc);
- RR_VEHICLE_FRAME49W_STAGE(0x2190fc);if(!advanceGraphBody49W(z.root,r.secondarySupplement,r.secondaryExtra,{z.velocity70W,z.angularVelocityB0W,z.force180W,z.torque190W},z.sceneFlags190,par.body,par.centerOffset,b.lifecycle.physical19C,z.enabled,b.secondaryDomain,r.bodies.main.schedule.factorPerSubstep,graph(r),w.body,d.body))return fail(d,E::Body,0x2190fc);
- z.phase=SecondaryPhase49M::Ready;r.bodies.phase=CoupledBodyPhase49M::AwaitingMainIntegration;project(r,b);return commit(s,w,P::MainIntegration);
+ if(!noiseContinuation(s,w.next,d))return false;RR_VEHICLE_FRAME49W_STAGE(0x2190fc);if(!noiseContinuation(s,w.next,d))return false;if(!advanceGraphBody49W(z.root,r.secondarySupplement,r.secondaryExtra,{z.velocity70W,z.angularVelocityB0W,z.force180W,z.torque190W},z.sceneFlags190,par.body,par.centerOffset,b.lifecycle.physical19C,z.enabled,b.secondaryDomain,r.bodies.main.schedule.factorPerSubstep,graph(r),w.body,d.body))return fail(d,E::Body,0x2190fc);
+ z.phase=SecondaryPhase49M::Ready;r.bodies.phase=CoupledBodyPhase49M::AwaitingMainIntegration;project(r,b);return commit(s,w,d,P::MainIntegration);
 }
 
 namespace {
@@ -697,7 +712,7 @@ bool integrateVehicleMain49W(S&s,const VehicleFrameBindings49W&b,const VehicleFr
   if(c.root.accumulator1c0.v[i]!=r.visualShared.zero434630.v[i]){impact=true;break;}
  }
  if(impact){
-  RR_VEHICLE_FRAME49W_STAGE(0x219d98);
+  if(!noiseContinuation(s,w.next,d))return false;RR_VEHICLE_FRAME49W_STAGE(0x219d98);if(!noiseContinuation(s,w.next,d))return false;
   if(r.dynamicImpactRecorded50IW){
    if(!r.fields.dynamicOwnersBound50IW)return fail(d,E::Admission,0x223110);
    r.dynamicImpactRecorded50IW=false;
@@ -732,46 +747,49 @@ bool integrateVehicleMain49W(S&s,const VehicleFrameBindings49W&b,const VehicleFr
   }
  }
  if(r.dynamicImpactRecorded50IW)return fail(d,E::Phase,0x219d98);
- RR_VEHICLE_FRAME49W_STAGE(0x219e80);if(!advanceGraphBody49W(c.root,r.mainSupplement,r.mainExtra,{lanes.velocity70W,lanes.angularVelocityB0W,lanes.force180W,lanes.torque190W},lanes.sceneFlags190,par.body,par.centerOffset,b.lifecycle.main190,m.domain.bodyEnabled,b.mainDomain,m.schedule.factorPerSubstep,graph(r),w.body,d.body))return fail(d,E::Body,0x219e80);
- RR_VEHICLE_FRAME49W_STAGE(0x219e94);clearMainBodyPost20C49K(c.body20C);
+ if(!noiseContinuation(s,w.next,d))return false;RR_VEHICLE_FRAME49W_STAGE(0x219e80);if(!noiseContinuation(s,w.next,d))return false;if(!advanceGraphBody49W(c.root,r.mainSupplement,r.mainExtra,{lanes.velocity70W,lanes.angularVelocityB0W,lanes.force180W,lanes.torque190W},lanes.sceneFlags190,par.body,par.centerOffset,b.lifecycle.main190,m.domain.bodyEnabled,b.mainDomain,m.schedule.factorPerSubstep,graph(r),w.body,d.body))return fail(d,E::Body,0x219e80);
+ if(!noiseContinuation(s,w.next,d))return false;RR_VEHICLE_FRAME49W_STAGE(0x219e94);if(!noiseContinuation(s,w.next,d))return false;clearMainBodyPost20C49K(c.body20C);
  //28B1A0(null) writes XYZ only.7CC survives, including copy-only payloads.
- RR_VEHICLE_FRAME49W_STAGE(0x219170);if(!refreshSceneWorld49P(graph(r),b.lifecycle.main190))return fail(d,E::Graph,0x219170);
+ if(!noiseContinuation(s,w.next,d))return false;RR_VEHICLE_FRAME49W_STAGE(0x219170);if(!noiseContinuation(s,w.next,d))return false;if(!refreshSceneWorld49P(graph(r),b.lifecycle.main190))return fail(d,E::Graph,0x219170);
  for(unsigned i=0;i<3;++i)m.currentPoint7C0[i]=node(r,b.lifecycle.main190).world100.v[12+i];
  if(m.priorPoint7B0[0]==r.visualShared.zero434630.v[0]&&m.priorPoint7B0[1]==r.visualShared.zero434630.v[1]&&m.priorPoint7B0[2]==r.visualShared.zero434630.v[2])std::memcpy(m.priorPoint7B0,m.currentPoint7C0,16);
- project(r,b);m.phase=MainBodyPhase49K::AwaitingQuery219120;r.bodies.phase=CoupledBodyPhase49M::AwaitingQuery219120;return commit(s,w,P::Query219120);
+ project(r,b);m.phase=MainBodyPhase49K::AwaitingQuery219120;r.bodies.phase=CoupledBodyPhase49M::AwaitingQuery219120;return commit(s,w,d,P::Query219120);
 }
 static bool finishMovementTail50M(S&s,const VehicleFrameBindings49W&b,const VehicleFrameParameters49W&p,VehicleFrameWorkspace49W&w,VehicleFrameDiagnostic49W&d) noexcept {
  auto&r=w.next;auto&m=r.bodies.main;m.vehicle380=selectVehicle38049K(m.response354_44);
  // Only XYZ is represented/consumed in this admission. The scratch W seed is
  // immaterial to XYZ; no outputW claim or invented BB0.W=1 is made.
- detail::SceneVectorContext49U scratch{0};V inverse{};RR_VEHICLE_FRAME49W_STAGE(0x219f80);
+ detail::SceneVectorContext49U scratch{0};V inverse{};if(!noiseContinuation(s,w.next,d))return false;RR_VEHICLE_FRAME49W_STAGE(0x219f80);if(!noiseContinuation(s,w.next,d))return false;
  if(!detail::inverseDirection49U(graph(r),b.lifecycle.main190,r.fields.impactBA0,scratch,inverse))return fail(d,E::Arithmetic,0x219f80);
  for(unsigned i=0;i<3;++i)r.fields.inverseImpactBB0XYZ.v[i]=inverse.v[i];
- RR_VEHICLE_FRAME49W_STAGE(0x219f90);m.components.feedback=selectLateFeedback49K(m.components.probe348.field104,m.response354_3C,m.response354_44);
- RR_VEHICLE_FRAME49W_STAGE(0x219fd8);
+ if(!noiseContinuation(s,w.next,d))return false;RR_VEHICLE_FRAME49W_STAGE(0x219f90);if(!noiseContinuation(s,w.next,d))return false;m.components.feedback=selectLateFeedback49K(m.components.probe348.field104,m.response354_3C,m.response354_44);
+ if(!noiseContinuation(s,w.next,d))return false;RR_VEHICLE_FRAME49W_STAGE(0x219fd8);if(!noiseContinuation(s,w.next,d))return false;
  if(r.shape.registrationE0){
   // Actual typed694 owner, after original movement/feedback prefix. The shape
   // numeric preparation and live registry have distinct source commits.
   if(!b.podLiveQuery50IZ||b.podLiveQuery50IZ->source!=&p.shape){
-   project(r,b);r.phase=P::PodLivePending50IZ;s=r;return fail(d,E::Admission,0x219fd8u);
+   project(r,b);
+   if(!commit(s,w,d,P::PodLivePending50IZ))return false;
+   return fail(d,E::Admission,0x219fd8u);
   }
   const auto updated=updateRegisteredPodShape50IZ(r.shape,
       node(r,b.lifecycle.main190).world100,*b.podLiveQuery50IZ);
   if(updated.status!=PodLiveQueryStatus50IZ::Complete){
    // Retain completed source-prefix work in an explicit pending phase. There
    // is no represented resume yet: a full movement-tail replay is rejected.
-   project(r,b);r.phase=P::PodLivePending50IZ;s=r;
+   project(r,b);
+   if(!commit(s,w,d,P::PodLivePending50IZ))return false;
    return fail(d,E::Shape,updated.sourcePC?updated.sourcePC:0x219fd8u);
   }
  }else if(!transformPodShape49W(p.shape,node(r,b.lifecycle.main190).world100,r.shape))
   return fail(d,E::Shape,0x219fd8);
  project(r,b);++m.substepIndex;const bool done=m.substepIndex==m.schedule.count;
- m.phase=done?MainBodyPhase49K::FrameReady:MainBodyPhase49K::SubstepReady;r.bodies.phase=done?CoupledBodyPhase49M::FrameReady:CoupledBodyPhase49M::SubstepReady;return commit(s,w,done?P::Ready:P::SubstepReady);
+ m.phase=done?MainBodyPhase49K::FrameReady:MainBodyPhase49K::SubstepReady;r.bodies.phase=done?CoupledBodyPhase49M::FrameReady:CoupledBodyPhase49M::SubstepReady;return commit(s,w,d,done?P::Ready:P::SubstepReady);
 }
 bool finishVehicleQuery49W(S&s,const VehicleFrameBindings49W&b,const VehicleFrameParameters49W&p,const NoHitQuery49W&x,VehicleFrameWorkspace49W&w,VehicleFrameDiagnostic49W&d) noexcept {
  if(!start(s,b,P::Query219120,w,d))return false;
  if((x.resultFlagsF8&0x20u)||!x.representedStatePreserved||!x.omittedBB0WNotConsumed)return fail(d,E::Query,0x219228);
- auto&m=w.next.bodies.main;RR_VEHICLE_FRAME49W_STAGE(0x219400);std::memcpy(m.priorPoint7B0,m.currentPoint7C0,16);
+ auto&m=w.next.bodies.main;if(!noiseContinuation(s,w.next,d))return false;RR_VEHICLE_FRAME49W_STAGE(0x219400);if(!noiseContinuation(s,w.next,d))return false;std::memcpy(m.priorPoint7B0,m.currentPoint7C0,16);
  return finishMovementTail50M(s,b,p,w,d);
 }
 bool finishVehicleMovementQuery50M(S&s,const VehicleFrameBindings49W&b,const VehicleFrameParameters49W&p,const MovementQueryCompletion50M&x,VehicleFrameWorkspace49W&w,VehicleFrameDiagnostic49W&d) noexcept {
@@ -781,18 +799,18 @@ bool finishVehicleMovementQuery50M(S&s,const VehicleFrameBindings49W&b,const Veh
  auto&r=w.next;auto&m=r.bodies.main;
  if(x.resultFlagsF8&0x20u){
   SpringVector4_48N current{},selected{},corrected{};std::memcpy(&current,m.currentPoint7C0,16);std::memcpy(&selected,&x.selectedPoint,16);
-  RR_VEHICLE_FRAME49W_STAGE(0x219230);
+  if(!noiseContinuation(s,w.next,d))return false;RR_VEHICLE_FRAME49W_STAGE(0x219230);if(!noiseContinuation(s,w.next,d))return false;
   if(!computeMovementHitPoint50M(current,selected,x.pushDistance434710,corrected))return fail(d,E::Arithmetic,0x2192a4);
   auto local=node(r,b.lifecycle.main190).localC0;for(unsigned i=0;i<3;++i)local.v[12+i]=corrected.v[i];
-  RR_VEHICLE_FRAME49W_STAGE(0x219344);
+  if(!noiseContinuation(s,w.next,d))return false;RR_VEHICLE_FRAME49W_STAGE(0x219344);if(!noiseContinuation(s,w.next,d))return false;
   if(!setLocalMatrix49P(graph(r),b.lifecycle.main190,local))return fail(d,E::Graph,0x219344);
   // The existing frame admission proves parentless main190 and null19C observer.
   // The original28ADD0 writes XYZ only, with the same mark/invalidation order;
   // all copied basis and W words above retain their exact old representations.
-  RR_VEHICLE_FRAME49W_STAGE(0x219350); // actual28EA20 null-observer branch
-  RR_VEHICLE_FRAME49W_STAGE(0x2193fc);std::memcpy(m.priorPoint7B0,&corrected,16);
+  if(!noiseContinuation(s,w.next,d))return false;RR_VEHICLE_FRAME49W_STAGE(0x219350);if(!noiseContinuation(s,w.next,d))return false; // actual28EA20 null-observer branch
+  if(!noiseContinuation(s,w.next,d))return false;RR_VEHICLE_FRAME49W_STAGE(0x2193fc);if(!noiseContinuation(s,w.next,d))return false;std::memcpy(m.priorPoint7B0,&corrected,16);
   // The original returned distance ratio is not consumed by219EA4 onward.
- }else {RR_VEHICLE_FRAME49W_STAGE(0x219400);std::memcpy(m.priorPoint7B0,m.currentPoint7C0,16);}
+ }else {if(!noiseContinuation(s,w.next,d))return false;RR_VEHICLE_FRAME49W_STAGE(0x219400);if(!noiseContinuation(s,w.next,d))return false;std::memcpy(m.priorPoint7B0,m.currentPoint7C0,16);}
  return finishMovementTail50M(s,b,p,w,d);
 }
 bool effectsVehicleImpacts50O(S&s,const VehicleFrameBindings49W&b,const ImpactEffectsInput50B&owners,
@@ -829,10 +847,10 @@ bool effectsVehicleImpacts50O(S&s,const VehicleFrameBindings49W&b,const ImpactEf
  const float*damage[]={&r.fields.damage7D0,&r.fields.damage7D4,&r.fields.damage7D8,&r.fields.damage7DC};for(unsigned i=0;i<4;++i)std::memcpy(&input.damage7D0[i],damage[i],4);
  std::memcpy(input.timers820,r.impactSupplement.timers820,sizeof input.timers820);
  std::memcpy(input.bodyVelocity70,r.bodies.main.components.root.body.velocity.v,12);std::memcpy(input.bodyVelocity70+3,&r.bodies.mainSphere.velocity70W,4);
- RR_VEHICLE_FRAME49W_STAGE(0x2288d8);
+ if(!noiseContinuation(s,w.next,d))return false;RR_VEHICLE_FRAME49W_STAGE(0x2288d8);if(!noiseContinuation(s,w.next,d))return false;
  const auto status=updateImpactEffects50B(graph(r),input,r.noise.sharedRandomState,effectsWorkspace,events,capacity,count);
  if(status!=ImpactEffectsStatus50B::applied)return fail(d,status==ImpactEffectsStatus50B::arithmetic?E::Arithmetic:status==ImpactEffectsStatus50B::graph?E::Graph:status==ImpactEffectsStatus50B::binding?E::Admission:E::Storage,0x223540);
- project(r,b);return commit(s,w,P::PostImpactEffects50O);
+ project(r,b);return commit(s,w,d,P::PostImpactEffects50O);
 }
 
 bool optionalProbeVehicleImpacts50P(S&s,const VehicleFrameBindings49W&b,const OptionalProbeOwners50P&owners,
@@ -840,10 +858,10 @@ bool optionalProbeVehicleImpacts50P(S&s,const VehicleFrameBindings49W&b,const Op
  if(overlap(&output,sizeof output,&s,sizeof s)||overlap(&output,sizeof output,&w,sizeof w)||overlap(&output,sizeof output,&d,sizeof d)||overlap(&output,sizeof output,&b,sizeof b)||overlap(&output,sizeof output,&owners,sizeof owners)||overlap(&owners,sizeof owners,&s,sizeof s)||overlap(&owners,sizeof owners,&w,sizeof w)||overlap(&owners,sizeof owners,&d,sizeof d))return false;
  if(!start(s,b,P::PostImpactEffects50O,w,d))return false;
  const auto&main=w.next.bodies.main;const auto&probe=main.components.probe348;
- RR_VEHICLE_FRAME49W_STAGE(0x2288e4);
+ if(!noiseContinuation(s,w.next,d))return false;RR_VEHICLE_FRAME49W_STAGE(0x2288e4);if(!noiseContinuation(s,w.next,d))return false;
  const auto result=inspectOptionalProbeEffects50P(owners,probe.field104,probe.field118,main.components.root.localVelocity80.v[2]);
  if(result.status!=OptionalProbeStatus50P::Complete)return fail(d,result.status==OptionalProbeStatus50P::Arithmetic?E::Arithmetic:result.status==OptionalProbeStatus50P::Binding?E::Admission:E::ExternalCut,result.sourcePC);
- commit(s,w,P::PostOptionalProbeEffects50P);output=result;return true;
+ if(!commit(s,w,d,P::PostOptionalProbeEffects50P))return false;output=result;return true;
 }
 bool decideVehicleImpacts50P(S&s,const VehicleFrameBindings49W&b,std::uint32_t thresholdBits,
  ImpactTransitionResult50C&decision,VehicleFrameWorkspace49W&w,VehicleFrameDiagnostic49W&d) noexcept {
@@ -854,19 +872,19 @@ bool decideVehicleImpacts50P(S&s,const VehicleFrameBindings49W&b,std::uint32_t t
  std::memcpy(&input.impactBA8,&r.fields.impactBA0.v[2],4);std::memcpy(&input.threshold50,&thresholdBits,4);
  //225CF8 consumes bit0 only: this is a bit representative, not a raw B9D byte.
  input.flagsB9D=static_cast<std::uint32_t>(r.fields.flagB9D0);
- RR_VEHICLE_FRAME49W_STAGE(0x228904);decision=inspectImpactTransition50C(input);
+ if(!noiseContinuation(s,w.next,d))return false;RR_VEHICLE_FRAME49W_STAGE(0x228904);if(!noiseContinuation(s,w.next,d))return false;decision=inspectImpactTransition50C(input);
  if(decision.status!=ImpactTransitionStatus50C::noTransition)return fail(d,decision.status==ImpactTransitionStatus50C::arithmetic?E::Arithmetic:E::ExternalCut,decision.sourcePC);
- return commit(s,w,P::AfterImpactBlock);
+ return commit(s,w,d,P::AfterImpactBlock);
 }
 
 bool plainEffectsVehicleTail50Q(S&s,const VehicleFrameBindings49W&b,const PlainEffectOwners50Q&owners,
  PlainEffectResult50Q&output,VehicleFrameWorkspace49W&w,VehicleFrameDiagnostic49W&d) noexcept {
  if(overlap(&output,sizeof output,&s,sizeof s)||overlap(&output,sizeof output,&w,sizeof w)||overlap(&output,sizeof output,&d,sizeof d)||overlap(&output,sizeof output,&b,sizeof b)||overlap(&output,sizeof output,&owners,sizeof owners)||overlap(&owners,sizeof owners,&s,sizeof s)||overlap(&owners,sizeof owners,&w,sizeof w)||overlap(&owners,sizeof owners,&d,sizeof d))return false;
  if(!start(s,b,P::AfterImpactBlock,w,d))return false;
- RR_VEHICLE_FRAME49W_STAGE(0x228b40);
+ if(!noiseContinuation(s,w.next,d))return false;RR_VEHICLE_FRAME49W_STAGE(0x228b40);if(!noiseContinuation(s,w.next,d))return false;
  const auto result=inspectPlainEffectTail50Q(owners);
  if(result.status!=PlainEffectStatus50Q::Complete)return fail(d,result.status==PlainEffectStatus50Q::UnsupportedAttached?E::ExternalCut:E::Admission,result.status==PlainEffectStatus50Q::UnsupportedAttached?0x228b50:0x228390);
- commit(s,w,P::PostPlainEffects50Q);output=result;return true;
+ if(!commit(s,w,d,P::PostPlainEffects50Q))return false;output=result;return true;
 }
 
 bool packVehicleFrame50S(S&s,const VehicleFrameBindings49W&b,bool configurationEntryNonzero,
@@ -877,8 +895,8 @@ bool packVehicleFrame50S(S&s,const VehicleFrameBindings49W&b,bool configurationE
  in.drive[0]=c.engine.smoothedDrive[0];in.drive[1]=c.engine.smoothedDrive[1];in.drive[2]=c.bindings.aeroDrive[0];in.drive[3]=c.bindings.aeroDrive[1];
  std::memcpy(in.impactBA0,f.impactBA0.v,12);in.damage7D0[0]=f.damage7D0;in.damage7D0[1]=f.damage7D4;in.damage7D0[2]=f.damage7D8;in.damage7D0[3]=f.damage7DC;
  in.filteredB70=main.controls.bound.control.filtered.values[1];in.filteredB78=main.controls.bound.control.filtered.values[3];in.actionB80=main.controls.player.actionB80;in.flagsB9C=main.controls.player.flagsB9C;in.state40=static_cast<std::uint8_t>(main.vehicleState40);in.vehicle58=f.vehicle58;in.configurationEntryNonzero=configurationEntryNonzero;
- RR_VEHICLE_FRAME49W_STAGE(0x228b78);const auto result=packVehicleTail50R(in);if(!result.complete)return fail(d,E::Arithmetic,0x2291d0);
- std::memcpy(w.next.packedC00,result.bytesC00,7);return commit(s,w,P::PostPackedBytes50S);
+ if(!noiseContinuation(s,w.next,d))return false;RR_VEHICLE_FRAME49W_STAGE(0x228b78);if(!noiseContinuation(s,w.next,d))return false;const auto result=packVehicleTail50R(in);if(!result.complete)return fail(d,E::Arithmetic,0x2291d0);
+ std::memcpy(w.next.packedC00,result.bytesC00,7);return commit(s,w,d,P::PostPackedBytes50S);
 }
 
 BaseTailState50X coldBaseTailState50X(std::uint32_t leftW,std::uint32_t rightW) noexcept {
@@ -920,16 +938,17 @@ static bool advanceVehicleBaseThroughEngineImpl50X(S&s,const VehicleFrameBinding
  scratch.next=tail;scratch.globals=globals;scratch.flame=flame;auto&r=w.next;auto&m=r.bodies.main;
  V position{{0,0,0,1}};
  if(resuming){
-  RR_VEHICLE_FRAME49W_STAGE(0x228bc4);std::memcpy(position.v,undertrack->position,16);
+  if(!noiseContinuation(s,w.next,d))return false;RR_VEHICLE_FRAME49W_STAGE(0x228bc4);if(!noiseContinuation(s,w.next,d))return false;std::memcpy(position.v,undertrack->position,16);
  }else{
-  RR_VEHICLE_FRAME49W_STAGE(0x228b8c);r.fields.impactBA0=r.visualShared.zero434630;
+  if(!noiseContinuation(s,w.next,d))return false;RR_VEHICLE_FRAME49W_STAGE(0x228b8c);if(!noiseContinuation(s,w.next,d))return false;r.fields.impactBA0=r.visualShared.zero434630;
   // Original28B180 copies local F0/F4/F8 only; no world refresh occurs here.
-  RR_VEHICLE_FRAME49W_STAGE(0x228b98);std::memcpy(position.v,node(r,b.lifecycle.main190).localC0.v+12,12);
+  if(!noiseContinuation(s,w.next,d))return false;RR_VEHICLE_FRAME49W_STAGE(0x228b98);if(!noiseContinuation(s,w.next,d))return false;std::memcpy(position.v,node(r,b.lifecycle.main190).localC0.v+12,12);
   if(!std::isfinite(position.v[1]))return fail(d,E::Arithmetic,0x228bac);
   if(position.v[1]<0.f){
    if(undertrack){
     if(s.fields.vehicle58!=0u||undertrack->serial==std::numeric_limits<std::uint64_t>::max())
      return fail(d,E::Admission,0x228bbc);
+    if(!noiseContinuation(s,w.next,d))return false;
     ++undertrack->serial;undertrack->frame=&s;undertrack->bindings=&b;undertrack->frameFactor=s.bodies.main.frameFactor;
     std::memcpy(undertrack->position,position.v,16);undertrack->pending=true;
     // This represented source store precedes the real2255B0 call. It must
@@ -957,7 +976,7 @@ static bool advanceVehicleBaseThroughEngineImpl50X(S&s,const VehicleFrameBinding
  EngineTailState50T engine{};auto&t=scratch.next;engine.flagsACC=t.flagsACC;engine.flagsAD0=t.flagsAD0;for(unsigned i=0;i<2;++i){engine.countAD4[i]=t.countAD4[i];engine.timerADC[i]=t.timerADC[i];std::memcpy(engine.thrustA0[i],m.components.engine.localThrust[i].v,12);engine.thrustA0[i][3]=t.engineThrustW[i];}
  engine.timerAE4=t.timerAE4;engine.activeAE8=t.activeAE8;engine.field844=r.fields.vehicle844;engine.sharedRandomState=r.noise.sharedRandomState;
  EngineTailInput50T input{};input.flagsB9C=flags;input.application58=r.fields.applicationByte58;input.state40=m.vehicleState40;std::memcpy(&input.frameFactorBits,&clock.lastDispatched23C,4);input.probe128Present=binding.probe128!=Probe128Binding50X::Null;
- RR_VEHICLE_FRAME49W_STAGE(0x228c0c);const auto result=advanceEngineTail50T(engine,input);
+ if(!noiseContinuation(s,w.next,d))return false;RR_VEHICLE_FRAME49W_STAGE(0x228c0c);if(!noiseContinuation(s,w.next,d))return false;const auto result=advanceEngineTail50T(engine,input);
  if(result.status!=EngineTailStatus50T::Complete)return fail(d,result.status==EngineTailStatus50T::Arithmetic?E::Arithmetic:E::ExternalCut,result.status==EngineTailStatus50T::NeedsProbeReset?0x1b1560:0x2208a0);
  const auto&next=result.state;t.flagsACC=next.flagsACC;t.flagsAD0=next.flagsAD0;for(unsigned i=0;i<2;++i){t.countAD4[i]=next.countAD4[i];t.timerADC[i]=next.timerADC[i];std::memcpy(m.components.engine.localThrust[i].v,next.thrustA0[i],12);t.engineThrustW[i]=next.thrustA0[i][3];}t.timerAE4=next.timerAE4;t.activeAE8=next.activeAE8;r.fields.vehicle844=next.field844;r.noise.sharedRandomState=next.sharedRandomState;
  // The source binder above writes scratch records transactionally. Do not
@@ -977,12 +996,14 @@ static bool advanceVehicleBaseThroughEngineImpl50X(S&s,const VehicleFrameBinding
   }else if(instance->callback00()!=record.words[0]||instance->callbackOwner04()!=record.words[1])
    return fail(d,E::Admission,0x29BDE4);
  }
- commit(s,w,P::PostEngineBase50X);tail=scratch.next;globals=scratch.globals;flame=scratch.flame;
+ if(!commit(s,w,d,P::PostEngineBase50X))return false;tail=scratch.next;globals=scratch.globals;flame=scratch.flame;
  if(flameBindingPrepared)for(unsigned model=0;model<flame.modelCount;++model)
   if(auto* instance=flame.canonicalInstances50LA[model]){
    const auto& record=flame.records[model+2];
+   if(!noiseContinuation(s,w.next,d))return false;
    if(!instance->bindEngine29BD80(record.words[0],record.words[1]))std::terminate();
   }
+ if(!noiseContinuation(s,w.next,d))return false;
  if(resuming){const auto serial=undertrack->serial;*undertrack={};undertrack->serial=serial;}return true;
 }
 bool advanceVehicleBaseThroughEngine50X(S&s,const VehicleFrameBindings49W&b,const FrameTimingState49I&clock,
@@ -1006,11 +1027,11 @@ bool finishVehicleBaseAndMainCache50Y(S&s,const VehicleFrameBindings49W&b,const 
  if(s.impactConsumerPending49Y)return fail(d,E::ExternalCut,0x2288b4);
  auto&r=w.next;auto&m=r.bodies.main;BasePoseHistoryInput50Y input{};input.readyWorld100=node(r,b.lifecycle.main190).world100;input.worldReady=(node(r,b.lifecycle.main190).sceneFlags190&1u)!=0;input.diagnosticsAbsent=diagnosticsAbsent;
  std::memcpy(input.velocity70,m.components.root.body.velocity.v,12);std::memcpy(input.velocity70+3,&r.bodies.mainSphere.velocity70W,4);std::memcpy(input.positionAt228B98,tail.positionAt228B98,16);std::memcpy(&input.outerDeltaBits,&m.frameFactor,4);
- RR_VEHICLE_FRAME49W_STAGE(0x228c14);const auto result=advanceBasePoseHistory50Y(history,input);
+ if(!noiseContinuation(s,w.next,d))return false;RR_VEHICLE_FRAME49W_STAGE(0x228c14);if(!noiseContinuation(s,w.next,d))return false;const auto result=advanceBasePoseHistory50Y(history,input);
  if(result.status!=BasePoseHistoryStatus50Y::Complete)return fail(d,result.status==BasePoseHistoryStatus50Y::Arithmetic?E::Arithmetic:E::ExternalCut,result.status==BasePoseHistoryStatus50Y::NeedsDiagnostics?0x228c28:0x228d68);
- RR_VEHICLE_FRAME49W_STAGE(0x228f04);RR_VEHICLE_FRAME49W_STAGE(0x167bb4);
+ if(!noiseContinuation(s,w.next,d))return false;RR_VEHICLE_FRAME49W_STAGE(0x228f04);if(!noiseContinuation(s,w.next,d))return false;RR_VEHICLE_FRAME49W_STAGE(0x167bb4);if(!noiseContinuation(s,w.next,d))return false;
  if(!quaternionToAngles48G(m.components.root.body.orientation,m.cachedAnglesE0)||!refreshCachedSpeed48E(m.components.root.body.velocity,m.cachedSpeed34))return fail(d,E::Arithmetic,0x167bb4);
- commit(s,w,P::BetweenBodyChildren);history=result.state;return true;
+ if(!commit(s,w,d,P::BetweenBodyChildren))return false;history=result.state;return true;
 }
 
 }

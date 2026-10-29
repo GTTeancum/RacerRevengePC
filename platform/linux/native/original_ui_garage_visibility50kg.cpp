@@ -1,3 +1,5 @@
+#include "../../../src/game/original_selected_array_guards27ed40.h"
+#include "../../../src/game/original_camera_observer_assertions50kg.h"
 #include "original_ui_garage_visibility50kg.h"
 #include "original_ui_garage_draw_contribution50kg.h"
 #include "../../../src/game/original_ui_garage_model_view50kg.h"
@@ -972,6 +974,8 @@ bool OriginalUiGarageVisibility50KG::registerPageCamera1FB608(
         if(!shared->construct280890(&o))return R::fail(d,S::allocation,0x280890);
         o.sharedConstructed=true;s.camera->fields_.registration34=&o; //1147A8.
     }
+    if(!g::OriginalCameraObserverAssertions50KG::allocation1147E4(s.camera->fields_.registration34!=nullptr))
+        return R::fail(d,S::phase,0x1147E4);
     if(!shared->owns(&o)||s.camera->fields_.registration34!=&o||o.next00||o.zero0C||o.zero10)
         return R::fail(d,S::phase,0x114818);
     //1148D0 left the old manager38 unchanged. This source store legitimately
@@ -988,6 +992,8 @@ bool OriginalUiGarageVisibility50KG::registerPageCamera1FB608(
     //No portals are authored and the actual zone's link head is null. The
     //source280BF0 continuation therefore allocates no secondary observers.
     o.complete=true;
+    if(!g::OriginalCameraObserverAssertions50KG::membership114884(o.child04!=nullptr))
+        return R::fail(d,S::phase,0x114884);
     if(!pageCameraRegistrationCurrent(page,*s.camera))return R::fail(d,S::phase,0x1148B4);
     return true;
 }
@@ -1565,6 +1571,7 @@ bool OriginalUiGarageVisibility50KG::prepare2729E0(std::shared_ptr<Grant> grant,
     //2731D8 primary34,273400 secondary34,273668 primary38,273890 secondary38.
     for(unsigned method=0;method<2;++method)for(auto* domain:{&s.primary4C0,&s.secondary4C4}){
         auto& list=domain->lists[method];
+        rr::game::selected_array_guards27ED40::invalidateNative();
         list.reference00=1;list.sceneReference=true; //1048F0, not Entity141300.
         try{list.selected18.resize(30,nullptr);}catch(...){return R::fail(d,S::allocation,0x27ED40);}
         auto app=s.grant->application();if(!app)return R::fail(d,S::phase,0x27EA20);

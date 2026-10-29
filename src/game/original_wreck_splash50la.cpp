@@ -29,6 +29,12 @@ float squareRoot(float x,Math& m,std::uint32_t pc) noexcept {
 } // namespace
 OriginalGcSprayStatus50KG readOriginalWreckSplashDefinition50LA(
     const std::vector<std::uint8_t>& bytes,OriginalWreckSplashDefinition50LA& output,D& d) noexcept {
+    OriginalWreckSplashSourceMetadata50LA ignored;
+    return readOriginalWreckSplashSourceDefinition50LA(bytes,output,ignored,d);
+}
+OriginalGcSprayStatus50KG readOriginalWreckSplashSourceDefinition50LA(
+    const std::vector<std::uint8_t>& bytes,OriginalWreckSplashDefinition50LA& output,
+    OriginalWreckSplashSourceMetadata50LA& metadata,D& d) noexcept {
     d={};if(std::fegetround()!=FE_TONEAREST)return S::arithmetic;
     try {
         std::vector<Section> doc;
@@ -64,6 +70,7 @@ OriginalGcSprayStatus50KG readOriginalWreckSplashDefinition50LA(
            !n(*general,"EmitRate",500,f.emitRate188,0x15afc0)||
            !n(*general,"AgeAtBirth",0,f.ageAtBirth1A0,0x15afd8)||
            !v("Velocity",f.velocity60,0x15b004))return S::authoredData;
+        const float rawAge=f.ageAtBirth1A0;
         f.ageAtBirth1A0=m.mul(f.ageAtBirth1A0,f.particleLife17C,0x15aff8);
         const auto timing=readOriginalGcCommonEmitterTiming50KG(bytes,f.timing,d);
         if(timing!=S::complete)return timing;
@@ -92,7 +99,12 @@ OriginalGcSprayStatus50KG readOriginalWreckSplashDefinition50LA(
         if(f.timing.mode1D8!=1||f.timing.delayTime1E0!=0||f.timing.maxTimeOn1EC!=.25f||
            f.ageAtBirth1A0!=0||f.framesPerSet!=1||f.particleGroup1B8!=6){
             d.sourcePC=0x19e9f0;return S::unsupported;}
-        f.parsed=true;output=f;return S::complete;
+        OriginalWreckSplashSourceMetadata50LA source;
+        source.rawAgeAtBirth=rawAge;source.forcedCount=forced;
+        auto present=[&](const char* key){const auto* value=general->find(key);return value&&value->sourceValuePresent;};
+        source.velocityPresent=present("Velocity");source.minRangePresent=present("MinRange");
+        source.maxRangePresent=present("MaxRange");source.positionOffsetPresent=present("InitialPositionOffset");
+        f.parsed=true;output=f;metadata=source;return S::complete;
     }catch(...){return S::allocation;}
 }
 OriginalGcSprayReceipt50KG bindOriginalWreckSplash50LA(

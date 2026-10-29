@@ -601,6 +601,44 @@ OriginalGcParticleReceipt50KG OriginalGcParticleManager50KG::populateColdFog(std
     }
     s.fogPopulated=true;result.status=Status::complete;return result;
 }
+bool OriginalGcParticleManager50KG::removeRestartParticles161F60(std::uint32_t& pc)noexcept {
+    auto& r=restartRemoval_;
+    if(r.attempted){pc=r.pc;return false;} // One reached invocation, no replay.
+    r.attempted=true;pc=r.pc=0x161f60;
+    if(!storage_)return false;
+    auto& s=*storage_;
+    r.indexA2=0;r.offsetA3=0; //161F68/70, before count128 read.
+    for(;;){
+        pc=r.pc=0x161fd8;
+        if(s.count>s.order.size())return false;
+        r.countT1=static_cast<std::uint32_t>(s.count);
+        if(r.indexA2>=r.countT1)break; //signed source words within native5000 extent.
+        pc=r.pc=0x161f7c;r.reachedT0=s.order[r.indexA2];
+        // Native pointer identity at the reached dereference; no other particle data.
+        const auto owns=[&s](const OriginalGcParticle50KG* q){
+            for(const auto& slot:s.pool)if(q==&slot)return true;
+            return false;
+        };
+        pc=r.pc=0x161f80;if(!owns(r.reachedT0))return false;
+        r.flagsV1=r.reachedT0->flags;
+        if(r.flagsV1&0x80u){
+            r.offsetA3+=4; //BNEZL161F88 taken delay161F8C.
+        }else{
+            pc=r.pc=0x161f98;r.tailV1=s.order[r.countT1-1u];
+            // Read pointer value only. No particle data/owner/age prevalidation.
+            s.order[r.indexA2]=r.tailV1; //161F9C first pointer store.
+            pc=r.pc=0x161fa0;
+            if(!s.count||s.count>s.order.size())return false;
+            s.order[s.count-1u]=r.reachedT0; //161FB0 second pointer store.
+            --s.count; //161FBC count128 store, AFTER both pointer stores.
+            pc=r.pc=0x161fc0;
+            if(r.indexA2==s.count)break;
+            r.offsetA3+=4; //161FD0. Swapped-in particle is NOT revisited.
+        }
+        ++r.indexA2; //161FD4, even after removal.
+    }
+    pc=r.pc=0x161fe8;r.returned=true;return true; //Auxiliary still required.
+}
 OriginalGcParticleReceipt50KG OriginalGcParticleManager50KG::advance(float dt,bool paused) noexcept {
     OriginalGcParticleReceipt50KG result{};if(!storage_)return result;
     // Original pause precedes atlas/material resolution and every age update.

@@ -32,6 +32,10 @@ class OriginalSimpleVCR50LA final {
         OriginalSimpleVCRDiagnostic50LA&)const noexcept;
     bool startRecord1A80C8(const OriginalRaceConstructor50LA&,
         OriginalSimpleVCRDiagnostic50LA&)noexcept;
+    // Actual zero-ACK1AB520 caller only; direct channel stores precede the
+    // real288630 backup. No public channel list or caller-supplied count.
+    bool enableEndChannelsAndBackup1ABA68(const OriginalRaceConstructor50LA&,
+        std::int32_t& indexS0,OriginalSimpleVCRDiagnostic50LA&)noexcept;
     bool reset287BE0(OriginalSimpleVCRDiagnostic50LA&)noexcept;
     bool copyBackup288630(OriginalSimpleVCRDiagnostic50LA&)noexcept;
     bool closeDetached2875A0(OriginalSimpleVCRDiagnostic50LA&)noexcept;

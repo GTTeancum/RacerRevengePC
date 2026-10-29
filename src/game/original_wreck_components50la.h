@@ -22,7 +22,8 @@ enum class OriginalWreckComponentKind50LA : std::uint8_t {
     uiOptionsManager1D0470, // Appended identity; unpublished constructor prefix only.
     triggerList2DC320,trigger2A0290, // RA native lifetime identities, no new dispatch.
     applicationRequest2C6C20, // Actual late native Results request owner, not early boot history.
-    lightFlare14AA10 //Actual counted local flare; update/draw dispatch unjoined.
+    lightFlare14AA10, //Actual counted local flare; update/draw dispatch unjoined.
+    uiCourseManager1D0070,uiCoursePage1D8D70,uiIcon2AC4B0,uiSelectableIcon2ACF00,uiSoultree2A85F0,effect15B860,terrain1B0EE0,engine2E7510,aeroBase100330,aero16CCD0 // Distinct detached Course constructors; no dispatch claim.
 };
 struct OriginalWreckComponent50LA final {
     //1048F0 base constructor owns the actual64-bit reference at source00.
@@ -71,7 +72,7 @@ inline bool effectControlIdentityBound(const C& c) noexcept {
     switch(c.kind){
     case K::effect19A5E0:case K::effect19DBE0:case K::effect15F100:
     case K::effect15E800:case K::effect15DE00:case K::effect19CC50:
-    case K::effect19BA50:return c.nativeEffectControlId&&*c.nativeEffectControlId;
+    case K::effect19BA50:case K::effect15B860:return c.nativeEffectControlId&&*c.nativeEffectControlId;
     default:return true;
     }
 }

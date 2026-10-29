@@ -1,4 +1,5 @@
 #pragma once
+#include "original_source_pad_host_lease50la.h"
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -132,6 +133,12 @@ public:
     WindowGlProc50DQ procAddress(const char* name) const noexcept;
     const WindowHostInfo50DQ& info() const noexcept { return info_; }
 private:
+    friend class GameHost50ER;
+    std::weak_ptr<OriginalSourcePadHostLease50LA> sourcePadLease_;
+    std::shared_ptr<OriginalSourcePadHostLease50LA> bindSourcePadNative(
+        const original_main_entry50KG::Application&,const rr::game::OriginalApplicationInput04Source50LA&,
+        const GameHost50ER&)noexcept;
+    void revokeSourcePadNative()noexcept;
     struct State;
     bool ownerThread() const noexcept;
     bool closeOwned(WindowHostDiagnostic50DQ&) noexcept;

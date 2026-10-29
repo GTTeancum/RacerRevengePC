@@ -1,5 +1,4 @@
 #include "original_native_list_method_custody50la.h"
-#include "../../tests/native/ra_pod_scene50la.h"
 #include <thread>
 #include "../../tests/native/mc_cold_sources50la.h"
 #include "../../tests/native/mc_lighting_authoring50mc.h"
@@ -16,6 +15,7 @@
 #include "../assets/original_standard_model_resource50la.h"
 #include "../assets/original_standard_material_table50la.h"
 #include <optional>
+#include <type_traits>
 #include <span>
 #include <algorithm>
 #include "../assets/track_start50ad.h"
@@ -2202,6 +2202,13 @@ const CollectionZone50BX* Owner::retainSceneZones272A78(const ::ra_pod_scene50LA
     if(s.visibility.lifecycle.storage.views.zones!=s.zones.data())return nullptr;
     s.sceneOwner=owner;count=s.world.zones.size();return s.zones.data();
 }
+ResetVisibilityWorld50EY* Owner::nativeWreckVisibility165E90(const ::ra_pod_scene50LA::Owner* owner,
+    const CollectionZone50BX* rows)noexcept {
+    if(!owner||!storage_||invalidated_||storage_->scene!=Scene::ra||storage_->sceneOwner!=owner||
+       rows!=storage_->zones.data()||storage_->visibility.lifecycle.storage.views.zones!=rows||
+       storage_->activeLease||storage_->activeCamera||storage_->activeReset||storage_->resetPending())return nullptr;
+    return &storage_->visibility;
+}
 bool Owner::canReleaseSceneZones272A78(const ::ra_pod_scene50LA::Owner* owner)const noexcept {
     return storage_&&owner&&storage_->sceneOwner==owner&&!storage_->activeLease&&
        !storage_->activeCamera&&!storage_->activeReset&&!storage_->resetPending();
@@ -2214,8 +2221,9 @@ bool Owner::releaseSceneZones272A78(const ::ra_pod_scene50LA::Owner* owner)noexc
 
 namespace rr::game::original_gc_gameplay_lighting_candidate {
 const original_world_environment50KG::SpatialBounds* Owner::sceneBounds534(const ::ra_pod_scene50LA::Owner* owner)const noexcept {
-    return storage_&&owner&&storage_->sceneOwner==owner&&storage_->environment3A4?
-        storage_->environment3A4->spatialBounds534():nullptr;
+    return storage_&&owner&&storage_->sceneOwner==owner&&storage_->environment3A4&&
+        podEnvironment3A4(*owner)&&*podEnvironment3A4(*owner)==storage_->environment3A4.get()?
+        (*podEnvironment3A4(*owner))->spatialBounds534():nullptr;
 }
 }
 

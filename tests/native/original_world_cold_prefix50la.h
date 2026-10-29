@@ -1,6 +1,11 @@
 #pragma once
 #include "original_ui_main_entry50kg.h"
 #include "ra_cold_aggregate50la.h"
+#include "original_source_world_trigger_instance_custody50la.inl"
+#include "original_source_world_trigger_action_custody50la.inl"
+#include "original_source_world_trigger_custody50la.inl"
+#include "original_source_world_toy_custody50la.inl"
+#include "original_source_world_sunflare_custody50la.inl"
 #include <limits>
 namespace ra_pod_scene50LA {
 inline bool Owner::prepareWorldPhysicsIndex270CDC(
@@ -14,10 +19,30 @@ inline bool Owner::prepareWorldPhysicsIndex270CDC(
     worldPhysics3D4_=std::move(index);return true;
 }
 
+inline bool Owner::reserveSourceCollisionAuthorityNative()noexcept {
+    return worldApplication_&&worldApplication_->application10()&&!worldApplication_->attachmentLock423F58()&&
+        worldApplication_->objectCount423F60()<=std::numeric_limits<std::uint32_t>::max()-10u&&
+        worldApplication_->entityAuthority_.reserveAdditional(10);
+}
+inline bool Owner::constructSourceCollisionGroup27BB40(std::size_t i,std::uint32_t& pc)noexcept {
+    pc=0x27bb4c;if(!worldCollisionObjects3CC_||!worldCollisionObjects3CC_->sourceMode_||i>=10||
+       !worldCollisionObjects3CC_->sourceZones_[i]||!worldApplication_)return false;
+    auto& z=*worldCollisionObjects3CC_->sourceZones_[i];auto& a=worldApplication_->entityAuthority_;
+    if(z.counted||z.sourceEnrolled||!a.canEnroll(z.entity,key(&z.entity)))return false;
+    const auto r=g::initializeOriginalWreckComponent50LA(z.entity,g::OriginalWreckComponentKind50LA::collisionObjects27BB40,
+        worldEntity_.sessionGeneration,key(&z.entity),true,worldApplication_->objectCount423F60());
+    if(r.status!=g::OriginalWreckComponentStatus50LA::complete){pc=r.sourcePC;return false;}
+    z.counted=true; //Reached reference/count survives any later native refusal.
+    if(!a.enroll(z.entity)){pc=0x27bb54;return false;}z.sourceEnrolled=true;
+    pc=0x27bb5c;z.sourceVtable08=0x3d25b0;
+    pc=0x27bb60;z.count30=0;z.sourceCountKnown=true;
+    pc=0x27bb64;z.sourceEntries34.reset();return true;
+}
+
 inline bool Owner::prepareWorldCollisionObjects271230(
     std::shared_ptr<const ra_cold_sources50LA::Owner> source,std::uint32_t& pc)noexcept {
     pc=0;
-    if(!worldColdConstructed_||!worldList500_||!worldPhysics3D4_||worldCollisionObjects3CC_||
+    if(!worldColdConstructed_||!worldList500_||!worldPhysics3D4_||worldCollisionObjects3CC_||sourceCollisionObjectsAttempted_||
        topologyAttempted_||!worldApplication_||worldApplication_->attachmentLock423F58()||
        !worldAudio_||worldAudio_->coldThread_!=std::this_thread::get_id())return fail(pc,0x271230);
     auto& authority=worldApplication_->entityAuthority_;
@@ -46,6 +71,41 @@ inline bool Owner::canReleaseWorldCollisionObjects27BB80(std::uint32_t& pc)const
     if(!worldApplication_||worldApplication_->attachmentLock423F58())return fail(pc,0x27bb80);
     auto& objects=*worldCollisionObjects3CC_;
     if(!canRetireNativeCollisionQueries27B040())return fail(pc,0x27bbf4);
+    if(objects.sourceMode_){
+        if(objects.source_||worldCollisionResources_||nativeCollisionModelBorrow_||
+           objects.sourceArrayKnown_>10)return fail(pc,0x27bb80);
+        for(const auto& legacy:objects.zones_)if(legacy.counted||!legacy.entries34.empty())return fail(pc,0x27bb80);
+        if(objects.sourceArrayReturned_){if(!sourceCollisionObjects3CC_||*sourceCollisionObjects3CC_!=objects.sourceArray3CC_.get())return fail(pc,0x1b4efc);}
+        else if(sourceCollisionObjects3CC_)return fail(pc,0x1b4ef4);
+        if(!objects.sourceArray3CC_&&objects.sourceArrayKnown_)return fail(pc,0x1b4f3c);
+        std::size_t counted=0;
+        for(std::size_t i=0;i<10;++i){const auto& p=objects.sourceZones_[i];
+            if(i<objects.sourceArrayKnown_&&objects.sourceArray3CC_[i]!=(p?&p->entity:nullptr))return fail(pc,0x1b4f3c);
+            if(!p){for(const auto& w:objects.sourceWrappers_[i])if(w)return fail(pc,0x27bb80);continue;}
+            const auto& z=*p;const auto& e=z.entity;
+            if(!z.sourceMode||!z.entries34.empty()||z.sourceEntriesKnown>objects.sourceWrappers_[i].size()||
+               (!z.sourceEntries34&&z.sourceEntriesKnown)||
+               (z.sourceArrayReturned&&(!z.sourceCountKnown||z.count30!=objects.sourceWrappers_[i].size()))||
+               (z.sourceEntries34&&!z.sourceArrayReturned))return fail(pc,0x27bb80);
+            if(z.counted){
+                if(e.reference00!=1||e.previous10||e.next14||e.parent1C||e.firstChild18||e.mask20||e.descendants24||
+                   e.objectKey!=key(&e)||e.sessionGeneration!=worldEntity_.sessionGeneration)return fail(pc,0x1413e0);
+                if(z.sourceEnrolled){if(!worldApplication_->entityAuthority_.canRetire(e))return fail(pc,0x1413e0);}
+                else { //Only exact failed native enrollment; never retire an unacquired row.
+                    for(std::size_t n=0;n<worldApplication_->entityAuthority_.count_;++n)
+                        if(worldApplication_->entityAuthority_.entries_[n].node==&e)return fail(pc,0x1413e0);
+                }
+                ++counted;
+            }else if(z.sourceEnrolled||e.reference00)return fail(pc,0x1413e0);
+            for(std::size_t n=0;n<objects.sourceWrappers_[i].size();++n){const auto& w=objects.sourceWrappers_[i][n];
+                if(n<z.sourceEntriesKnown&&z.sourceEntries34[n]!=w.get())return fail(pc,0x27bbf4);
+                if(w&&(!w->sourceMode||w->collision04||w->nativeQuery||w->decodedCollision||w->source||
+                    w->descriptorRetired||(w->descriptor08&&!w->descriptor08->sourceFields)))return fail(pc,0x27bbf4);
+            }
+        }
+        if(worldApplication_->objectCount423F60()<counted)return fail(pc,0x1413e0);
+        return true;
+    }
     std::size_t counted=0;
     for(const auto& zone:objects.zones_){const auto& e=zone.entity;
         if(!zone.counted||e.reference00!=1||e.previous10||e.next14||e.parent1C||e.firstChild18||
@@ -67,6 +127,23 @@ inline bool Owner::releaseWorldCollisionObjects27BB80(std::uint32_t& pc)noexcept
     if(!canReleaseWorldCollisionObjects27BB80(pc))return false;
     if(!worldCollisionObjects3CC_)return true;
     auto& objects=*worldCollisionObjects3CC_;
+    if(objects.sourceMode_){
+        //Read-only preflight above closes every refusal gate. No callbacks or
+        //source destructor replay follow: raw unknown tails are never read.
+        sourceCollisionObjects3CC_.reset(); //Native withdrawal, not guestNULL.
+        for(std::size_t i=10;i-->0;){auto& p=objects.sourceZones_[i];
+            for(std::size_t n=objects.sourceWrappers_[i].size();n-->0;)objects.sourceWrappers_[i][n].reset();
+            if(!p)continue;p->sourceEntries34.reset();
+            if(p->counted){
+                if(p->sourceEnrolled&&!worldApplication_->entityAuthority_.retire(p->entity))std::terminate();
+                p->sourceEnrolled=false;--p->entity.reference00;
+                --worldApplication_->objectCount423F60();p->counted=false;
+            }
+            p.reset();
+        }
+        objects.sourceArray3CC_.reset();worldCollisionObjects3CC_.reset();return true;
+    }
+
     for(const auto& zone:objects.zones_)for(const auto& w:zone.entries34)
         if(w.collision04||(w.nativeQuery&&!w.nativeQuery->retired))return fail(pc,0x27bbf4);
     for(auto& zone:objects.zones_){
@@ -84,7 +161,7 @@ inline bool Owner::releaseWorldCollisionObjects27BB80(std::uint32_t& pc)noexcept
 inline bool Owner::prepareWorldCollisionResources(std::shared_ptr<ra_static_candidates50LA::Owner> candidates,
     std::shared_ptr<rr::assets::OriginalStandardTextureResolver50LA> resolver,
     rr::assets::OriginalStandardTextureDiagnostic50LA& d)noexcept {
-    if(!worldColdConstructed_||!worldCollisionObjects3CC_||worldCollisionResources_||topologyAttempted_||
+    if(!worldColdConstructed_||!worldCollisionObjects3CC_||worldCollisionObjects3CC_->sourceMode_||worldCollisionResources_||topologyAttempted_||
        !worldAudio_||worldAudio_->coldThread_!=std::this_thread::get_id())return false;
     // Join the actual3CC wrappers to the SAME retained decoded source. Matching
     // filenames/counts from another aggregate cannot authorize these shapes.
@@ -110,9 +187,11 @@ inline bool Owner::prepareWorldCollisionResources(std::shared_ptr<ra_static_cand
 }
 inline bool Owner::constructWorldColdPrefix(std::shared_ptr<g::OriginalApplicationEntities50LA> app,
     rr::platform::RaceAudioGroups50IC& audio,rr::platform::AudioMixer50HD& mixer,
-    std::uint64_t generation,const track_height_cold50JB::Owner& height,std::uint32_t& pc)noexcept {
+    std::uint64_t generation,const track_height_cold50JB::Owner& height,std::uint32_t& pc,
+    ra_cold_aggregate50LA::Owner& concrete)noexcept {
     pc=0;
-    if(worldColdAttempted_||nativeWaterDomain_||topologyAttempted_||topologyClosed_||!app||!app->application10()||
+    if(static_cast<ra_pod_scene50LA::Owner*>(&concrete)!=this||
+       worldColdAttempted_||nativeWaterDomain_||topologyAttempted_||topologyClosed_||!app||!app->application10()||
        !generation||(collisionApplication_&&collisionApplication_!=app)||
        app->attachmentLock423F58()||!audio.coldStarted_||audio.coldRetiring_||
        audio.coldNext_!=6||audio.coldApplication_!=app||audio.coldSession_!=generation||
@@ -125,7 +204,6 @@ inline bool Owner::constructWorldColdPrefix(std::shared_ptr<g::OriginalApplicati
     if(!app->entityAuthority_.canEnroll(worldEntity_,worldKey)||
        app->objectCount423F60()==std::numeric_limits<std::uint32_t>::max())return fail(pc,0x141300);
     std::unique_ptr<Entity*[]> list;
-    try {list.reset(new Entity*[10]);}catch(...){return fail(pc,0x1b5f64);}
     worldColdAttempted_=true;worldApplication_=std::move(app);worldAudio_=&audio;
     const auto r=g::initializeOriginalWreckComponent50LA(worldEntity_,
         g::OriginalWreckComponentKind50LA::entity141300,generation,worldKey,true,
@@ -133,11 +211,14 @@ inline bool Owner::constructWorldColdPrefix(std::shared_ptr<g::OriginalApplicati
     if(r.status!=g::OriginalWreckComponentStatus50LA::complete)std::terminate();
     if(!worldApplication_->entityAuthority_.enroll(worldEntity_))std::terminate();
     worldColdConstructed_=true;worldMode30_=1; //26FCBC before actual270550 reset.
-    // The same scene has not reached any loader/topology. Its native owners
-    // are genuinely absent; do not invent values for uninitialized3CC/3D4.
-    useEnvironment35C_=0;
+    //26FCCC actual base-vtable78=270550, ONLY during fresh construction.
+    //No loaded-world reset;3CC/3D4/4D8 are NOT written by this helper.
+    if(!concrete.resetFreshWorld270550(pc))return false;
     if(!audio.constructNextCold2350D0(mixer,worldApplication_,generation,g::RaceAudioGroup50IC::World4D8))
         return fail(pc,0x26fcf8); //Retain world prefix; explicit native rollback below.
+    //1B28A4 list allocation follows actual270550 and World4D8 construction.
+    //Failure must retain those counted/source prefixes, not preflight them away.
+    try {list.reset(new Entity*[10]);}catch(...){return fail(pc,0x1b5f64);}
     worldList500_=std::move(list);worldListCapacity504_=10;worldListGrowth508_=100000;
     worldListCount50C_=0;
     worldApplication_->worldRegistration434320_=0; //1B28D0, real shared word.
@@ -153,8 +234,9 @@ inline bool Owner::constructWorldColdPrefix(std::shared_ptr<g::OriginalApplicati
 // Explicit native ownership retirement, not a26FD80 dispatch or substitute
 // for unrepresented LightManager/context callbacks. The aggregate calls the
 // second leaf only after its actual runtime/GPU/static owners have closed.
-inline bool Owner::canRetireNativeWorldPrefix(const char** gate)const noexcept {
+inline bool Owner::canRetireNativeWorldPrefix(const char** gate,std::size_t extraSourceOwnedCount)const noexcept {
     const auto reject=[&](const char* text){if(gate)*gate=text;return false;};
+    if(constructorRacerWorldBorrows_)return reject("live constructor Racer World source borrow");
     if(!worldColdConstructed_||!worldApplication_||!worldAudio_||
        worldApplication_->attachmentLock423F58())return reject("world prefix actual owner/lock");
     const auto& e=worldEntity_;const auto& audio=*worldAudio_;
@@ -163,6 +245,9 @@ inline bool Owner::canRetireNativeWorldPrefix(const char** gate)const noexcept {
        audio.coldSession_!=e.sessionGeneration||audio.coldThread_!=std::this_thread::get_id()||
        !audio.coldMixer_||audio.coldEpoch_!=audio.coldMixer_->groupEpoch50IC())return reject("world prefix Entity/audio identity");
     if(!worldApplication_->entityAuthority_.canRetire(e))return reject("world prefix Entity authority");
+    if(sourceToyAttempted_&&!canRetireSourceToyNative())return reject("source Toy3C8 counted custody");
+    if(sourceTriggerAttempted_&&!canRetireSourceTriggerNative())return reject("source Trigger3D0 counted custody");
+    if(nativeSunFlares_&&nativeSunFlares_->sourceMode&&!canRetireSourceSunFlareNative())return reject("source SunFlare4A4 counted custody");
     if(nativeWaterDomain_&&!nativeWaterDomain_->canRetire(*worldApplication_,e,e.sessionGeneration))
         return reject("native water constructor domain identity");
     if(worldList500_&&worldListCount50C_)return reject("world prefix nonempty list500");
@@ -171,14 +256,20 @@ inline bool Owner::canRetireNativeWorldPrefix(const char** gate)const noexcept {
     if(worldPhysics3D4_&&!worldPhysics3D4_->canRelease27C030())return reject("world physics index references");
     const auto& group=audio.coldGroups_[static_cast<std::size_t>(g::RaceAudioGroup50IC::World4D8)];
     if(group.constructed&&!audio.canReleaseEmptyCold142590(g::RaceAudioGroup50IC::World4D8))return reject("world seventh audio group retirement");
-    const std::size_t required=1u+std::size_t(group.constructed)+
-        (worldCollisionObjects3CC_?worldCollisionObjects3CC_->zones_.size():0u);
-    if(worldApplication_->objectCount423F60()<required)return reject("world prefix Application count");
+    const std::size_t required=1u+std::size_t(group.constructed)+sourceTriggerInstanceCountNative()+
+        (nativeSunFlares_&&nativeSunFlares_->sourceMode&&nativeSunFlares_->owner&&nativeSunFlares_->owner->counted?1u:0u)+
+        (nativeTriggerList3D0_&&nativeTriggerList3D0_->sourceMode&&nativeTriggerList3D0_->counted?1u:0u)+
+        (nativeEmptyToyList3C8_&&nativeEmptyToyList3C8_->sourceMode&&nativeEmptyToyList3C8_->sourceCounted?1u:0u)+
+        (worldCollisionObjects3CC_?(worldCollisionObjects3CC_->sourceMode_?worldCollisionObjects3CC_->sourceCountedGroups():worldCollisionObjects3CC_->zones_.size()):0u);
+    if(extraSourceOwnedCount>std::numeric_limits<std::size_t>::max()-required||
+       worldApplication_->objectCount423F60()<required+extraSourceOwnedCount)return reject("world prefix Application count");
     return true;
 }
 inline bool Owner::retireNativeWorldPrefixAfterOwnedCleanup(std::uint32_t& pc)noexcept {
     pc=0;
-    if(!canRetireNativeWorldPrefix()||runtimeQueries_||trackParticles_||environmentMethod_||
+    if((sourceTopologyMode_&&!sourceTopologyWithdrawn_)||
+       (nativeSunFlares_&&nativeSunFlares_->sourceMode&&!nativeSunFlares_->sourceNativeClosed)||
+       !canRetireNativeWorldPrefix()||(sourceTriggerAttempted_&&nativeTriggerList3D0_)||(sourceToyAttempted_&&nativeEmptyToyList3C8_)||runtimeQueries_||trackParticles_||environmentMethod_||
        (topologyAttempted_&&!topologyClosed_))return fail(pc,0x1b2870);
     if(worldCollisionResources_&&!worldCollisionResources_->closeUnloadedBacking())return fail(pc,0x11b600);
     worldCollisionResources_.reset();
@@ -196,6 +287,7 @@ inline bool Owner::retireNativeWorldPrefixAfterOwnedCleanup(std::uint32_t& pc)no
 }
 inline bool Owner::rollbackNativeWorldConstructionFailure(std::uint32_t& pc)noexcept {
     pc=0;
+    if(nativeSunFlares_&&nativeSunFlares_->sourceMode&&!nativeSunFlares_->sourceNativeClosed)return fail(pc,0x1b2870);
     if(!worldColdConstructed_||!worldApplication_||!worldAudio_||topologyAttempted_||
        topologyConstructed_||trackParticles_||environmentMethod_||worldListCount50C_||
        worldApplication_->attachmentLock423F58())return fail(pc,0x1b2870);
@@ -228,7 +320,7 @@ inline bool Owner::rollbackNativeWorldConstructionFailure(std::uint32_t& pc)noex
 namespace ra_cold_aggregate50LA {
 inline bool Owner::prepareWorldCollisionResources(const original_main_entry50KG::Application& app,
     rr::assets::OriginalStandardTextureDiagnostic50LA& d)noexcept {
-    if(closed_||terminal_||!candidates_||!worldColdConstructed_||app.entities()!=worldApplication_||
+    if(sourceTrackNativeAttempted_||closed_||terminal_||!candidates_||!worldColdConstructed_||app.entities()!=worldApplication_||
        runtimeCameraBorrows_||runtimeWorldBorrows_)return false;
     try {
         const auto domain=app.standardMaterialDomain();
@@ -236,6 +328,206 @@ inline bool Owner::prepareWorldCollisionResources(const original_main_entry50KG:
         return ra_pod_scene50LA::Owner::prepareWorldCollisionResources(candidates_,domain->resolver3E1A70(),d);
     }catch(...){return false;}
 }
+inline bool Owner::resetFreshWorld270550(std::uint32_t& pc)noexcept {
+    pc=worldReset270550PC_;
+    if(nativeScbThread_!=std::this_thread::get_id())return false;
+    if(worldReset270550Attempted_)return false; //Never replay on loaded/failed World.
+    if(!worldColdConstructed_||!worldApplication_||!worldAudio_||worldMode30_!=1||
+       topologyAttempted_||topologyClosed_||nativeWaterDomain_||
+       worldApplication_->attachmentLock423F58()||worldEntity_.reference00!=1||
+       !worldApplication_->entityAuthority_.canRetire(worldEntity_)||
+       nativeScb34_||nativeTob34_||nativeAub38_||sourceWorldAudioConfig_||sourceAudioPhase_!=SourceAudioPhase::unreached||sourceAmbientPhase_!=SourceAmbientPhase::unreached||sourceSoulTreeSoundPhase_!=SourceSoulTreeSoundPhase::unreached||sourceMaterialSoundPhase_!=SourceMaterialSoundPhase::unreached||nativePortalParameters3A0_||
+       sourceToy3C8_||sourceTerrain3B0_||sourcePortal3A0_||sourceLight3A8_||sourceFog3AC_||nativeLightList3A8_||nativeFogDescriptor3AC_||nativeTerrain3B0_||nativeEmptyToyList3C8_||
+       nativeParticleList3D8_||nativeEmptyInstances3DC_||nativeFog3EC_||nativeFogOn3F0_||
+       nativeFogOff3F4_||nativeSky3F8_||nativeParticleManager4A0_||nativeTriggerList3D0_||
+       nativeCsCameraTable3E4_||nativeSunFlares_||nativeMethods4C8_||nativeMethods4CC_||
+       nativeMethods4D0_||nativeMethods4D4_||nativeEmptyAmbient3B4_||nativeSoulTreeSounds3B8_||
+       nativeMaterialSounds3BC_[0]||nativeMaterialSounds3BC_[1])return false;
+    worldReset270550Attempted_=true;
+    const auto at=[&](std::uint32_t site){pc=worldReset270550PC_=site;};
+    //All writes touch authoritative source publications or their existing
+    //actual owners. Immutable/prewarmed backing is NEVER destroyed here.
+    at(0x270550);nativeScb34_.reset();nativeTob34_.reset();worldParser34_=nullptr;
+    at(0x270554);nativeAub38_.reset();sourceAudioParser38_=nullptr;
+    at(0x270558);worldText3C_[0]=0;
+    at(0x27055c);worldText140_[0]=0;
+    at(0x270560);worldText244_[0]=0;
+    at(0x270564);worldBoundary348_=nullptr;
+    at(0x270568);worldZones34C_=0;
+    at(0x27056c);worldZoneInfo350_=nullptr;
+    at(0x270570);nativeModelZone354_=0;
+    at(0x270574);worldPortals358_=0;
+    at(0x270578);useEnvironment35C_=0;
+    at(0x270590);world390KnownValue_&=0xfeu;world390KnownMask_|=1u;
+    at(0x270594);nativePortalParameters3A0_.reset();sourcePortal3A0_=nullptr;
+    at(0x270598);nativeEnvironment3A4_=nullptr;
+    at(0x27059c);nativeLightList3A8_.reset();sourceLight3A8_=nullptr;
+    at(0x2705a0);nativeFogDescriptor3AC_.reset();sourceFog3AC_=nullptr;
+    at(0x2705a4);nativeTerrain3B0_.reset();sourceTerrain3B0_=nullptr;
+    at(0x2705a8);if(!initializeModels3C42705A8())return false;
+    at(0x2705ac);nativeEmptyToyList3C8_.reset();sourceToy3C8_=nullptr;
+    at(0x2705b0);nativeParticleList3D8_.reset();sourceParticleList3D8_=nullptr;
+    at(0x2705b4);nativeInstanceDescriptors3DC_=nullptr;
+    at(0x2705b8);nativeInstanceCount3E0_=0;
+    at(0x2705bc);nativeFog3EC_.reset();
+    at(0x2705c0);nativeFogOn3F0_.reset();
+    at(0x2705c4);nativeFogOff3F4_.reset();
+    at(0x2705c8);nativeSky3F8_.reset();
+    at(0x2705cc);worldWater3FC_=nullptr;
+    at(0x2705d0);worldWater400_=nullptr;
+    at(0x2705d4);worldWater404_=nullptr;
+    at(0x2705d8);worldEcosystem408_=nullptr;
+    at(0x2705dc);nativeParticleManager4A0_=nullptr;
+    at(0x2705e0);worldToyManager49C_=nullptr;
+    at(0x2705e4);nativeTriggerList3D0_.reset();
+    at(0x2705e8);nativeCsCameraCount3E4_=0;
+    at(0x2705ec);nativeCsCameraZones3E8_=nullptr;
+    at(0x2705f0);nativeSunFlarePointers4A4_=nullptr; //4A8 untouched/unknown.
+    at(0x2705f4);worldPhysicsObjectCount4B0_=0;
+    at(0x2705f8);worldPhysicsObjectPointers4B4_=nullptr;
+    at(0x2705fc);worldRole4B8_=nullptr;
+    at(0x270600);if(!initializeTopology4BC270600())return false;
+    at(0x270604);if(!initializeTopology4C0270604())return false;
+    at(0x270608);if(!initializeTopology4C4270608())return false;
+    at(0x27060c);nativeMethods4C8_.reset();
+    at(0x270610);nativeMethods4CC_.reset();
+    at(0x270614);nativeMethods4D0_.reset();
+    at(0x270618);nativeMethods4D4_.reset();
+    at(0x27061c);worldRoles4DCTo4EC_[0]=nullptr;
+    at(0x270620);worldRoles4DCTo4EC_[1]=nullptr;
+    at(0x270624);worldRoles4DCTo4EC_[2]=nullptr;
+    at(0x270628);worldRoles4DCTo4EC_[3]=nullptr;
+    at(0x27062c);worldRoles4DCTo4EC_[4]=nullptr;
+    at(0x27063c);world4F0KnownValue_&=0xfeu;world4F0KnownMask_|=1u;
+    at(0x270640);nativeEmptyAmbient3B4_.reset();sourceAmbient3B4_=nullptr;
+    at(0x270644);nativeSoulTreeSounds3B8_.reset();sourceSoulTreeSounds3B8_=nullptr;
+    at(0x270648);nativeMaterialSounds3BC_[0].reset();sourceMaterialSounds3BC_[0]=nullptr;
+    at(0x270650);nativeMaterialSounds3BC_[1].reset();sourceMaterialSounds3BC_[1]=nullptr; //JR27064C delay-slot store.
+    worldReset270550Complete_=true;return true;
+}
+
+inline bool Owner::resetColdLoadWorld270550(std::uint32_t& pc)noexcept {
+    using Phase=SourceLoadReset270550Phase;
+    pc=sourceLoadReset270550PC_;
+    // Private caller-issued invocation, not constructor reset replay. Predicate
+    // is defined beside the actual complete Race type and verifies same owner.
+    if(nativeScbThread_!=std::this_thread::get_id()||
+       sourceLoadReset270550Phase_!=Phase::invoked1AA040||!sourceLoadRace_||!sourceLoadApplication_||
+       !sourceWorldLoadInvocationCurrent()||closed_||terminal_)return false;
+    if(!worldColdConstructed_||!worldReset270550Attempted_||!worldReset270550Complete_||
+       !worldApplication_||!worldAudio_||worldMode30_!=1||
+       worldApplication_->attachmentLock423F58()||worldEntity_.reference00!=1||
+       worldEntity_.objectKey!=key(&worldEntity_)||!worldEntity_.sessionGeneration||
+       !worldApplication_->entityAuthority_.canRetire(worldEntity_)||
+       worldEntity_.parent1C||worldEntity_.previous10||worldEntity_.next14||worldEntity_.firstChild18||
+       constructorRacerWorldBorrows_||runtimeCameraBorrows_||runtimeWorldBorrows_||
+       sourceTopologyMode_||topologyAttempted_||topologyConstructed_||topologyClosed_||sourceTopologyWithdrawn_||
+       sourceVisibilityPublished_||sourceCollisionPublished_||domainCount_||nativeTopologyAuthorityEnrolled_||
+       worldPhysics3D4_||worldCollisionObjects3CC_||worldCollisionResources_||livePhysicsIndexAttempted_||
+       restartWorldPhysicsAttempted_||nativeCollisionPrefixEntered_||nativeCollisionModelBorrow_||
+       modelPrefixesAttempted_||modelParents3C4Attempted_||sourceModelParentsPublished3C4_||
+       sourceModelParents3C4_||sourceModelOwner3C4_||trackParticleAttempted_||particlePredecessorAttempted_||
+       particlesAttempted_||worldAttempted_||worldImagesAttempted_||worldDrawPlanAttempted_||
+       nativeScbRevoked_||nativeScb34_||nativeTob34_||nativeAub38_||sourceWorldAudioConfig_||sourceAudioPhase_!=SourceAudioPhase::unreached||sourceAmbientPhase_!=SourceAmbientPhase::unreached||sourceSoulTreeSoundPhase_!=SourceSoulTreeSoundPhase::unreached||sourceMaterialSoundPhase_!=SourceMaterialSoundPhase::unreached||nativeSceneInfo270900_||
+       nativePortalParameters3A0_||nativeLightList3A8_||nativeFogDescriptor3AC_||nativeTerrain3B0_||
+       nativeEmptyToyList3C8_||nativeParticleList3D8_||nativeEmptyInstances3DC_||
+       nativeFog3EC_||nativeFogOn3F0_||nativeFogOff3F4_||nativeFogAttempted_||nativeSky3F8_||
+       nativeWaterNone274570_||nativeParticleManager4A0_||nativeTriggerList3D0_||
+       nativeCsCameraTable3E4_||nativeSunFlares_||nativeFinishLine540_||
+       nativeMethods4C8_||nativeMethods4CC_||nativeMethods4D0_||nativeMethods4D4_||
+       nativeEmptyAmbient3B4_||nativeSoulTreeSounds3B8_||nativeMaterialSounds3BC_[0]||nativeMaterialSounds3BC_[1]||
+       environmentMethod_||environment443108_.constructed||method34Retained_||method38Retained_||
+       nativeWreckZoneBorrower_||sourceVisibilitySlots4C0_||sourceCollisionSlots4C4_||container4BC_.reference00)
+        return false;
+    // The genuine constructor append-list remains allocated and empty. Never
+    // inspect uninitialized unused pointer slots or clear/free its backing.
+    if(!worldList500_||worldListCount50C_||worldListCapacity504_!=10u||worldListGrowth508_!=100000u)return false;
+    for(const auto& portal:nativePortals_)if(portal)return false;
+    for(const auto& node:visibility4C0_)if(node.constructed||node.attached||node.entity.reference00||node.exclusions3C)return false;
+    for(const auto& node:collision4C4_)if(node.constructed||node.attached||node.entity.reference00||node.exclusions3C)return false;
+    // Unlike the constructor's pre-domain call, an actual never-bound native
+    // WaterDomain already exists. It is NOT source400 and must not be recreated,
+    // revoked or re-labelled by this source reset.
+    if(!nativeWaterDomain_||!nativeWaterDomain_->identity(*worldApplication_,worldEntity_,worldEntity_.sessionGeneration)||
+       nativeWaterDomain_->everBound_||nativeWaterDomain_->context_||nativeWaterDomain_->predicate_||
+       nativeWaterDomain_->reading_||nativeWaterDomain_->currentnessLost_||nativeWaterDomain_->epoch_)return false;
+    const auto empty=[](const auto& value)noexcept{return value.has_value()&&*value==nullptr;};
+    if(!empty(sourceMaterialSounds3BC_[0])||!empty(sourceMaterialSounds3BC_[1])||!empty(sourceSoulTreeSounds3B8_)||!empty(sourceAmbient3B4_)||!empty(sourceAudioParser38_)||!empty(worldParser34_)||!empty(worldBoundary348_)||!empty(worldZoneInfo350_)||
+       !empty(sourceParticleList3D8_)||!empty(sourceToy3C8_)||!empty(sourceTerrain3B0_)||!empty(sourcePortal3A0_)||!empty(nativeEnvironment3A4_)||!empty(sourceLight3A8_)||!empty(sourceFog3AC_)||!empty(sourceModels3C4_)||!empty(nativeInstanceDescriptors3DC_)||
+       !empty(worldWater3FC_)||!empty(worldWater400_)||!empty(worldWater404_)||!empty(worldEcosystem408_)||
+       !empty(worldToyManager49C_)||!empty(nativeCsCameraZones3E8_)||!empty(nativeSunFlarePointers4A4_)||
+       !empty(worldPhysicsObjectPointers4B4_)||!empty(worldRole4B8_)||!empty(sourceContainer4BC_)||
+       !empty(sourceVisibility4C0_)||!empty(sourceCollision4C4_))return false;
+    for(const auto& role:worldRoles4DCTo4EC_)if(!empty(role))return false;
+    sourceLoadReset270550Phase_=Phase::entered;
+    const auto at=[&](std::uint32_t site)noexcept {pc=sourceLoadReset270550PC_=site;};
+    // Distinct exact-empty repeat stores. The strict fresh constructor helpers
+    // remain unchanged and continue rejecting already-engaged optional lanes.
+    const auto repeatNull=[&](auto& lane,std::uint32_t site)noexcept {
+        at(site);if(!empty(lane)){sourceLoadReset270550Phase_=Phase::failed;return false;}
+        lane=nullptr;return true;
+    };
+    // The exact original reset stores repeat only already-empty publications.
+    // Native immutable owners and the existing WaterDomain remain untouched.
+    at(0x270550);nativeScb34_.reset();nativeTob34_.reset();worldParser34_=nullptr;
+    at(0x270554);nativeAub38_.reset();sourceAudioParser38_=nullptr;
+    at(0x270558);worldText3C_[0]=0;
+    at(0x27055c);worldText140_[0]=0;
+    at(0x270560);worldText244_[0]=0;
+    at(0x270564);worldBoundary348_=nullptr;
+    at(0x270568);worldZones34C_=0;
+    at(0x27056c);worldZoneInfo350_=nullptr;
+    at(0x270570);nativeModelZone354_=0;
+    at(0x270574);worldPortals358_=0;
+    at(0x270578);useEnvironment35C_=0;
+    at(0x270590);world390KnownValue_&=0xfeu;world390KnownMask_|=1u;
+    at(0x270594);nativePortalParameters3A0_.reset();sourcePortal3A0_=nullptr;
+    at(0x270598);nativeEnvironment3A4_=nullptr;
+    at(0x27059c);nativeLightList3A8_.reset();sourceLight3A8_=nullptr;
+    at(0x2705a0);nativeFogDescriptor3AC_.reset();sourceFog3AC_=nullptr;
+    at(0x2705a4);nativeTerrain3B0_.reset();sourceTerrain3B0_=nullptr;
+    if(!repeatNull(sourceModels3C4_,0x2705a8))return false;
+    at(0x2705ac);nativeEmptyToyList3C8_.reset();sourceToy3C8_=nullptr;
+    at(0x2705b0);nativeParticleList3D8_.reset();sourceParticleList3D8_=nullptr;
+    at(0x2705b4);nativeInstanceDescriptors3DC_=nullptr;
+    at(0x2705b8);nativeInstanceCount3E0_=0;
+    at(0x2705bc);nativeFog3EC_.reset();
+    at(0x2705c0);nativeFogOn3F0_.reset();
+    at(0x2705c4);nativeFogOff3F4_.reset();
+    at(0x2705c8);nativeSky3F8_.reset();
+    at(0x2705cc);worldWater3FC_=nullptr;
+    at(0x2705d0);worldWater400_=nullptr;
+    at(0x2705d4);worldWater404_=nullptr;
+    at(0x2705d8);worldEcosystem408_=nullptr;
+    at(0x2705dc);nativeParticleManager4A0_=nullptr;
+    at(0x2705e0);worldToyManager49C_=nullptr;
+    at(0x2705e4);nativeTriggerList3D0_.reset();
+    at(0x2705e8);nativeCsCameraCount3E4_=0;
+    at(0x2705ec);nativeCsCameraZones3E8_=nullptr;
+    at(0x2705f0);nativeSunFlarePointers4A4_=nullptr; //4A8 untouched/unknown.
+    at(0x2705f4);worldPhysicsObjectCount4B0_=0;
+    at(0x2705f8);worldPhysicsObjectPointers4B4_=nullptr;
+    at(0x2705fc);worldRole4B8_=nullptr;
+    if(!repeatNull(sourceContainer4BC_,0x270600))return false;
+    if(!repeatNull(sourceVisibility4C0_,0x270604))return false;
+    if(!repeatNull(sourceCollision4C4_,0x270608))return false;
+    at(0x27060c);nativeMethods4C8_.reset();
+    at(0x270610);nativeMethods4CC_.reset();
+    at(0x270614);nativeMethods4D0_.reset();
+    at(0x270618);nativeMethods4D4_.reset();
+    at(0x27061c);worldRoles4DCTo4EC_[0]=nullptr;
+    at(0x270620);worldRoles4DCTo4EC_[1]=nullptr;
+    at(0x270624);worldRoles4DCTo4EC_[2]=nullptr;
+    at(0x270628);worldRoles4DCTo4EC_[3]=nullptr;
+    at(0x27062c);worldRoles4DCTo4EC_[4]=nullptr;
+    at(0x27063c);world4F0KnownValue_&=0xfeu;world4F0KnownMask_|=1u;
+    at(0x270640);nativeEmptyAmbient3B4_.reset();sourceAmbient3B4_=nullptr;
+    at(0x270644);nativeSoulTreeSounds3B8_.reset();sourceSoulTreeSounds3B8_=nullptr;
+    at(0x270648);nativeMaterialSounds3BC_[0].reset();sourceMaterialSounds3BC_[0]=nullptr;
+    at(0x270650);nativeMaterialSounds3BC_[1].reset();sourceMaterialSounds3BC_[1]=nullptr; //JR27064C delay-slot store.
+    sourceLoadReset270550Phase_=Phase::returned;return true;
+}
+
 inline bool Owner::constructWorldCold1B2870(const original_main_entry50KG::Application& app,
     rr::platform::RaceAudioGroups50IC& audio,rr::platform::AudioMixer50HD& mixer,
     std::uint64_t generation,std::uint32_t& pc)noexcept {
@@ -248,7 +540,7 @@ inline bool Owner::constructWorldCold1B2870(const original_main_entry50KG::Appli
     }
     if(!source_->sourcesDecoded()){pc=0x1a6bd4;return false;}
     return constructWorldColdPrefix(app.entities(),audio,mixer,generation,
-        source_->sourcesDecoded()->height,pc);
+        source_->sourcesDecoded()->height,pc,*this);
 }
 }
 
@@ -258,7 +550,7 @@ inline bool Owner::loadNativeEmptyAnimations2713E0(
     pc=0x271d34;
     if(!worldColdConstructed_||!worldApplication_||!worldAudio_||
        worldAudio_->coldThread_!=std::this_thread::get_id()||
-       worldApplication_->attachmentLock423F58()||nativeEmptyToyList3C8_)return false;
+       worldApplication_->attachmentLock423F58()||sourceToyAttempted_||nativeEmptyToyList3C8_)return false;
     //Native bounded-path admission from the WHOLE authenticated RA document,
     //not the source157D00 call yet. A present section needs real toy ownership
     //and is deliberately unsupported. Do not create then abandon a counted list.
@@ -301,6 +593,7 @@ inline bool Owner::createNativeTriggerList2DC320(
     std::shared_ptr<ra_static_candidates50LA::Owner> candidates,
     std::shared_ptr<const ra_trigger_authoring50LA::Owner> authoring,std::uint32_t& pc)noexcept {
     pc=0x1b5010;
+    if(sourceTriggerAttempted_)return false;
     if(nativeTriggerList3D0_)return nativeTriggerList3D0_->candidates==candidates&&
         nativeTriggerList3D0_->authoring==authoring;
     if(!worldColdConstructed_||!worldApplication_||!worldAudio_||
@@ -329,7 +622,7 @@ inline bool Owner::createNativeTriggerList2DC320(
 
 inline bool Owner::countNativeTriggerPair2A0290(std::size_t i,std::uint32_t& pc)noexcept {
     pc=0x2dbff4;
-    if(!nativeTriggerList3D0_||i>=2u||!worldApplication_||worldApplication_->attachmentLock423F58())return false;
+    if(!nativeTriggerList3D0_||nativeTriggerList3D0_->sourceMode||i>=2u||!worldApplication_||worldApplication_->attachmentLock423F58())return false;
     auto& list=*nativeTriggerList3D0_;auto& actions=*list.actions;auto& pair=actions.nativeEntities_[i];
     auto& candidate=list.candidates->candidates_[178u+i];auto& state=actions.group_.triggers[i];
     auto& authority=worldApplication_->entityAuthority_;auto& count=worldApplication_->objectCount423F60();
@@ -345,6 +638,11 @@ inline bool Owner::countNativeTriggerPair2A0290(std::size_t i,std::uint32_t& pc)
            g::OriginalWreckComponentStatus50LA::complete||!authority.enroll(pair.trigger))std::terminate();
         pair.triggerCounted=true;pair.trigger.nativeFlags29=&state.flags29;
     }
+    //Actual descriptor00 publication occurs AFTER trigger constructor and
+    //BEFORE collider/configuration2A04B0. No second trigger allocation.
+    pc=0x2dbffc;
+    if(!list.descriptors34||i>=list.descriptorSlotsPublished||!list.descriptors34[i])return false;
+    list.descriptors34[i]->trigger00=&pair.trigger;
     pc=0x2a0534;
     if(!pair.colliderCounted){
         if(count==std::numeric_limits<std::uint32_t>::max()||!authority.reserveAdditional(1)||
@@ -366,14 +664,48 @@ inline bool Owner::countNativeTriggerPair2A0290(std::size_t i,std::uint32_t& pc)
     return true;
 }
 
+inline bool Owner::nativeTriggerDescriptorCurrent(std::size_t i)const noexcept {
+    if(!nativeTriggerList3D0_||nativeTriggerList3D0_->sourceMode)return false;const auto& list=*nativeTriggerList3D0_;
+    if(list.descriptorsRetired||i>=list.descriptorSlotsPublished||i>=2u||!list.descriptors34||
+       !list.authoring||!list.authoring->sources()||!list.actions)return false;
+    const auto* d=list.descriptors34[i];
+    return d&&d==list.descriptorOwners[i].get()&&d->complete&&
+        d->authoring==&(*list.authoring->sources())[i]&&d->trigger00==&list.actions->nativeEntities_[i].trigger&&
+        d->actionCount04==1&&d->actions68&&d->actionSlotsPublished==1&&
+        d->action&&d->actions68[0]==d->action.get()&&list.actions->nativeActionDescriptorCurrent(i,d->action.get());
+}
+inline bool Owner::canRetireNativeTriggerDescriptors()const noexcept {
+    if(!nativeTriggerList3D0_)return true;const auto& list=*nativeTriggerList3D0_;
+    if(list.sourceMode)return canRetireSourceTriggerNative();
+    if(list.descriptorSlotsPublished>2u||!list.actions)return false;
+    if(list.descriptorsRetired)return !list.descriptors34&&!list.descriptorOwners[0]&&!list.descriptorOwners[1];
+    if(!list.descriptors34&&list.descriptorSlotsPublished)return false;
+    for(std::size_t i=0;i<2u;++i){
+        const auto* d=list.descriptorOwners[i].get();
+        if(i>=list.descriptorSlotsPublished){
+            //Native custody of the allocation preceding an unavailable34 store.
+            if(d&&(i!=list.descriptorSlotsPublished||list.descriptors34||d->authoring||
+               d->trigger00||d->actionCount04||d->actions68||d->action))return false;
+            continue;
+        }
+        if(list.descriptors34[i]!=d)return false;if(!d)continue;
+        if(d->actionCount04<0||d->actionCount04>1||d->actionSlotsPublished>1||
+           (!d->actions68&&d->actionSlotsPublished)||
+           (d->actionSlotsPublished&&d->actions68[0]!=d->action.get())||
+           (!d->actionSlotsPublished&&d->action&&d->actions68)||
+           (d->complete&&!nativeTriggerDescriptorCurrent(i)))return false;
+    }return true;
+}
 inline bool Owner::canRetireNativeTriggerList3D0()const noexcept {
     if(!nativeTriggerList3D0_)return true;
+    if(nativeTriggerList3D0_->sourceMode)return canRetireSourceTriggerNative();
     if(!worldApplication_||worldApplication_->attachmentLock423F58())return false;
     const auto& list=*nativeTriggerList3D0_;
     if(!list.counted||!list.candidates||!list.authoring||!list.actions||list.joined>2u||list.count30>2u||
        list.actions!=list.candidates->triggerActions_||list.authoring!=list.candidates->triggerSource_||
        list.actions->lease_||list.servicesCompleted>2u||(list.serviceComplete&&list.servicesCompleted!=2u)||
-       !list.actions->canRetireNativeLostAiCallbacks()||!canRetireNativeTriggerObservers())return false;
+       !list.actions->canRetireNativeLostAiCallbacks()||!canRetireNativeTriggerObservers()||
+       !canRetireNativeTriggerDescriptors())return false;
     const auto& authority=worldApplication_->entityAuthority_;
     const auto base=[&](const Entity& e,g::OriginalWreckComponentKind50LA kind){
         return e.kind==kind&&e.reference00==1u&&e.objectKey==key(&e)&&
@@ -434,7 +766,7 @@ inline bool Owner::resetNativeTriggerList2DCC70(
        list.actions->group_.triggers.size()!=list.count30)return false;
     for(std::size_t i=0;i<list.count30;++i){
         const auto& pair=list.actions->nativeEntities_[i];
-        if(list.descriptors34[i]!=&(*list.authoring->sources())[i]||
+        if(!nativeTriggerDescriptorCurrent(i)||
            !pair.triggerCounted||!pair.colliderCounted||!pair.attached||
            pair.trigger.nativeFlags29!=&list.actions->group_.triggers[i].flags29)return false;
     }
@@ -449,13 +781,64 @@ inline bool Owner::resetNativeTriggerList2DCC70(
     pc=0x2dccc0;return true; // This leaf returned, NOT World/Race restart.
 }
 
+inline bool Owner::resetNativeParticles161F60(
+    const std::shared_ptr<g::OriginalApplicationEntities50LA>& expected,
+    std::uint64_t generation,std::uint32_t& pc)noexcept {
+    pc=0x1ac96c;
+    if(!expected||expected->nativeOwnerThread_!=std::this_thread::get_id())return false;
+    auto& r=restartParticleReset_;
+    if(r.attempted){pc=r.stoppedPC;return false;}
+    r.attempted=true;r.stoppedPC=pc;
+    if(worldApplication_!=expected||sceneApplication_!=expected||!generation||
+       sceneGeneration_!=generation||!worldColdConstructed_||topologyClosed_||
+       worldEntity_.sessionGeneration!=generation||worldEntity_.reference00!=1||
+       expected->attachmentLock423F58()||!expected->entityAuthority_.canRetire(worldEntity_)||
+       !nativeParticleManagerComplete_||!trackParticles_||
+       nativeParticleManager4A0_!=trackParticles_.get())return false;
+    auto& actual=*trackParticles_;
+    // Counted real World4A0; do not preflight unrelated atlas/auxiliary fields
+    // before161F60's active-pointer prefix, nor infer source-null from absence.
+    if(actual.application_!=expected||actual.generation_!=generation||actual.closed_||
+       !actual.entityConstructed_||!actual.particles_||
+       actual.component_.kind!=g::OriginalWreckComponentKind50LA::particleManager160B10||
+       actual.component_.reference00!=1||actual.component_.sessionGeneration!=generation||
+       actual.component_.objectKey!=key(&actual.component_))return false;
+    if(!actual.particles_->removeRestartParticles161F60(pc)){r.stoppedPC=pc;return false;}
+    pc=r.stoppedPC=0x161fe8;
+    // This successfully constructed actual162E70 owner is NOT a null branch.
+    const auto* numeric=actual.particles_->auxiliaryChild();
+    if(!actual.auxiliary1C0_||actual.auxiliary1C0_->reference00!=1||
+       !numeric||!numeric->constructed||actual.auxiliary1C0_->numericChild!=numeric)return false;
+    pc=r.stoppedPC=0x1634f0;r.auxiliaryGate18=numeric->enabled18;
+    if(*r.auxiliaryGate18){
+        //1634FC..50C scratch setup precedes signed count80 at163540.
+        //That count/arrays are not represented by dormant cold resources.
+        r.auxiliaryIndexA2=0;r.auxiliaryOffsetA3=0;r.auxiliaryFillA1=0x47c35000u;
+        pc=r.stoppedPC=0x163540;return false;
+    }
+    pc=r.stoppedPC=0x162000;r.returned=true;return true;
+}
+
 inline bool Owner::retireNativeTriggerList3D0()noexcept {
     if(!nativeTriggerList3D0_)return true;
+    if(nativeTriggerList3D0_->sourceMode)return false;
     // Actual Storage alone retires registration/membership. Source-owner
     // raw borrows were withdrawn before topology/storage destruction.
     if(runtimeQueries_||!canRetireNativeTriggerList3D0())return false;
     auto& list=*nativeTriggerList3D0_;auto& authority=worldApplication_->entityAuthority_;
     auto& count=worldApplication_->objectCount423F60();
+    //2DC360 destroys descriptors FORWARD before1413E0 retires the Trigger
+    //tree. Revoke action dispatch first; callback-array cleanup later uses only
+    //retained pointer identity, never a dereference of retired action data.
+    for(std::size_t i=0;i<2u;++i){
+        auto& d=list.descriptorOwners[i];if(!d)continue;
+        if(!list.actions->withdrawNativeActionDescriptor(i))std::terminate();
+        //Geometry64 was native-adopted/consumed, not a guest allocation.
+        d->action.reset();
+        if(d->actionSlotsPublished)d->actions68[0]=nullptr;
+        d->actions68.reset();d.reset();
+    }
+    list.descriptors34.reset();list.descriptorsRetired=true; //2DC3E0/E8.
     for(std::size_t n=2u;n>0u;--n){const auto i=n-1u;auto& pair=list.actions->nativeEntities_[i];
         std::uint32_t pc=0;
         //142590 child-first: collider11B390 owns its actual E0 observer, not
@@ -479,7 +862,7 @@ inline bool Owner::retireNativeTriggerList3D0()noexcept {
             pair.trigger.nativeFlags29=nullptr;--pair.trigger.reference00;--count;pair.triggerCounted=false;
             pair.trigger.parent1C=pair.trigger.previous10=nullptr;list.parented[i]=false;
         }
-        list.descriptors34[i]=nullptr;
+        //Descriptor lifetime already ended before this Trigger tree release.
     }
     //Descriptor destruction does not own another Trigger reference. Existing
     //immutable authoring remains alive; consumed native geometry role is not a
@@ -493,10 +876,13 @@ inline bool Owner::retireNativeTriggerList3D0()noexcept {
 
 namespace ra_pod_scene50LA {
 inline bool Owner::beginNativeSunFlareDomain271E5C(std::uint32_t& pc)noexcept {
+    if(nativeSunFlares_&&nativeSunFlares_->sourceMode)return false;
     pc=0x271e5c;
     if(!worldColdConstructed_||!worldApplication_||!worldAudio_||
        worldAudio_->coldThread_!=std::this_thread::get_id()||
        worldApplication_->attachmentLock423F58()||!worldEntity_.sessionGeneration)return false;
+    if(!nativeSunFlarePointers4A4_)return false; //Actual271E5C read, unknown is not null.
+    if(!nativeSunFlares_&&*nativeSunFlarePointers4A4_){pc=0x271e84;return false;}
     if(!nativeSunFlares_){
         //Explicit native join: this newly implemented private domain has never
         //owned a flare. No source270550 reset, existing-state clear or adoption
@@ -504,23 +890,32 @@ inline bool Owner::beginNativeSunFlareDomain271E5C(std::uint32_t& pc)noexcept {
         nativeSunFlares_.emplace();nativeSunFlares_->generation=worldEntity_.sessionGeneration;
     }
     auto& d=*nativeSunFlares_;
-    if(d.generation!=worldEntity_.sessionGeneration)return false;
+    if(d.generation!=worldEntity_.sessionGeneration||!nativeSunFlarePointers4A4_)return false;
     if(d.count4A8&&*d.count4A8!=1u)return false;
-    pc=0x271e68;d.count4A8=1u; //Source store before allocation; retained on failure.
-    pc=0x271e74;
-    if(!d.pointers4A4){
-        if(d.owner)return false;
-        try {d.pointers4A4=std::make_unique<NativeSunFlare*[]>(1);}catch(...){return false;}
-        //Native null entry marks unconstructed ownership; source array element
-        //is not claimed initialized until27209C publishes its real object.
+    if(*nativeSunFlarePointers4A4_){
+        //Retained SAME invocation only, not source append/new flare batch.
+        return d.pointerBacking&&*nativeSunFlarePointers4A4_==d.pointerBacking.get()&&
+            d.count4A8&&*d.count4A8==1u;
     }
+    if(d.pointerBacking||d.owner)return false;
+    if(d.pointerAllocationAttempted){pc=0x271e80;return false;}
+    pc=0x271e68;d.count4A8=1u; //Source store before allocation; retained on failure.
+    pc=0x271e74;d.pointerAllocationAttempted=true;
+    try {d.pointerBacking=std::make_unique<NativeSunFlare*[]>(1);}catch(...){d.pointerBacking.reset();}
+    pc=0x271e80;nativeSunFlarePointers4A4_=d.pointerBacking.get();
+    if(!d.pointerBacking)return false; //Retain count and source-null allocation result publication.
+    //Native null entry marks unconstructed ownership; source array element
+    //is not claimed initialized until27209C publishes its real object.
     return true;
 }
 inline bool Owner::constructNativeSunFlare2C5730(NativeSunFlareInputs inputs,std::uint32_t& pc)noexcept {
+    if(nativeSunFlares_&&nativeSunFlares_->sourceMode)return false;
     pc=0x27206c;
     if(!nativeSunFlares_||!worldApplication_||worldApplication_->attachmentLock423F58())return false;
     auto& d=*nativeSunFlares_;
-    if(d.generation!=worldEntity_.sessionGeneration||!d.count4A8||*d.count4A8!=1||!d.pointers4A4)return false;
+    if(d.generation!=worldEntity_.sessionGeneration||!d.count4A8||*d.count4A8!=1||
+       !d.pointerBacking||!nativeSunFlarePointers4A4_||
+       *nativeSunFlarePointers4A4_!=d.pointerBacking.get())return false;
     if(d.owner){
         const auto& old=d.owner->inputs;
         return canRetireNativeSunFlare()&&old.texture==inputs.texture&&old.retrieveMaterial==inputs.retrieveMaterial&&
@@ -528,7 +923,7 @@ inline bool Owner::constructNativeSunFlare2C5730(NativeSunFlareInputs inputs,std
             old.maxScale==inputs.maxScale&&old.width==inputs.width&&old.height==inputs.height&&
             old.vertexColor==inputs.vertexColor&&old.direction==inputs.direction;
     }
-    if(d.pointers4A4[0])return false;
+    if((*nativeSunFlarePointers4A4_)[0])return false;
     auto& authority=worldApplication_->entityAuthority_;auto& count=worldApplication_->objectCount423F60();
     if(count==std::numeric_limits<std::uint32_t>::max()||!authority.reserveAdditional(1))return false;
     std::unique_ptr<NativeSunFlare> object;
@@ -543,7 +938,7 @@ inline bool Owner::constructNativeSunFlare2C5730(NativeSunFlareInputs inputs,std
     //2C5730 constructor writes represented above;245CF0 is an uncounted,
     //empty embedded material handle, not a new Entity or live material lease.
     d.owner=std::move(object);
-    pc=0x27209c;d.pointers4A4[0]=d.owner.get(); //Publication BEFORE2C5A10.
+    pc=0x27209c;(*nativeSunFlarePointers4A4_)[0]=d.owner.get(); //Publication BEFORE2C5A10.
     return true;
 }
 inline bool Owner::canRetireNativeSunFlareMaterial(const NativeSunFlareMaterial& h)noexcept {
@@ -590,11 +985,13 @@ inline void Owner::retireNativeSunFlareMaterial(NativeSunFlareMaterial& h)noexce
     h.primitive04.reset();h.parameters08.reset(); //133FA0 frees actual aligned buffer20 if reached.
 }
 inline bool Owner::canRetireNativeSunFlare()const noexcept {
+    if(nativeSunFlares_&&nativeSunFlares_->sourceMode)return canRetireSourceSunFlareNative();
     if(!nativeSunFlares_)return true;
     const auto& d=*nativeSunFlares_;
+    if(!nativeSunFlarePointers4A4_||*nativeSunFlarePointers4A4_!=d.pointerBacking.get())return false;
     if(!worldApplication_||worldApplication_->attachmentLock423F58()||
        d.generation!=worldEntity_.sessionGeneration||!d.count4A8||*d.count4A8!=1)return false;
-    if(!d.owner)return !d.pointers4A4||!d.pointers4A4[0];
+    if(!d.owner)return !*nativeSunFlarePointers4A4_||!(*nativeSunFlarePointers4A4_)[0];
     const auto& o=*d.owner;const auto& e=o.entity;
     if((o.sprite64&&!canRetireNativeSunFlareMaterial(o.sprite64->material))||
        !canRetireNativeSunFlareMaterial(o.material68)||(o.callback74&&o.callback74!=&o))return false;
@@ -604,7 +1001,7 @@ inline bool Owner::canRetireNativeSunFlare()const noexcept {
     if((o.colors44||o.colors48||o.buffer78)&&o.zones30!=10)return false;
     if(o.colorRowsInitialized>10||o.colorsInitialized!=(o.colorRowsInitialized==10)||
        (o.colorRowsInitialized&&(!o.colors44||!o.colors48||!o.depth40||!(o.flags98KnownValue&2u))))return false;
-    return d.pointers4A4&&d.pointers4A4[0]==&o&&o.counted&&
+    return *nativeSunFlarePointers4A4_&&(*nativeSunFlarePointers4A4_)[0]==&o&&o.counted&&
         e.reference00==1&&e.kind==g::OriginalWreckComponentKind50LA::entity141300&&
         e.objectKey==key(&e)&&e.sessionGeneration==d.generation&&e.category28==0xff&&
         (e.flags29&15u)==3u&&!e.nativeFlags29&&!e.parent1C&&!e.firstChild18&&!e.previous10&&!e.next14&&
@@ -612,6 +1009,7 @@ inline bool Owner::canRetireNativeSunFlare()const noexcept {
         worldApplication_->entityAuthority_.canRetire(e);
 }
 inline bool Owner::retireNativeSunFlare()noexcept {
+    if(nativeSunFlares_&&nativeSunFlares_->sourceMode)return retireSourceSunFlareNative();
     if(!canRetireNativeSunFlare())return false;
     if(!nativeSunFlares_)return true;
     auto& d=*nativeSunFlares_;
@@ -627,27 +1025,28 @@ inline bool Owner::retireNativeSunFlare()noexcept {
         //that a full retail World destructor or invent a missing parent.
         if(!worldApplication_->entityAuthority_.retire(o.entity))std::terminate();
         --o.entity.reference00;--worldApplication_->objectCount423F60();o.counted=false;
-        d.pointers4A4[0]=nullptr;d.owner.reset();
+        (*nativeSunFlarePointers4A4_)[0]=nullptr;d.owner.reset();
     }
-    d.pointers4A4.reset();nativeSunFlares_.reset();return true;
+    nativeSunFlarePointers4A4_=nullptr;d.pointerBacking.reset();nativeSunFlares_.reset();return true;
 }
 }
 
 namespace ra_pod_scene50LA {
 inline const native_world_water50LA::Domain* Owner::readNativeAbsentWater400(std::uint32_t& pc)const noexcept {
     pc=0x1aa400;
-    if(!nativeWaterDomain_||!worldColdConstructed_||!worldApplication_||
+    if(!worldWater400_||*worldWater400_||!nativeWaterDomain_||!worldColdConstructed_||!worldApplication_||
        worldApplication_->attachmentLock423F58()||worldEntity_.objectKey!=key(&worldEntity_)||
        worldEntity_.reference00!=1u||!worldEntity_.sessionGeneration||
        !nativeWaterDomain_->readAbsent(*worldApplication_,worldEntity_,worldEntity_.sessionGeneration))return nullptr;
-    //Typed domain identity, NOT a Water object pointer or guest400 bit pattern.
-    //No caller copy/publication is enabled by this private observation leaf.
+    //Actual source400 is known null from2705D0 and unchanged by both
+    //authenticated none branches. Typed capability remains the same owned
+    //native domain; it cannot establish source-null independently anymore.
     return nativeWaterDomain_.get();
 }
 }
 namespace ra_cold_aggregate50LA {
 inline bool Owner::nativeWaterDomainMatches(const native_world_water50LA::Domain& domain)const noexcept {
-    return !closed_&&!terminal_&&worldColdConstructed_&&worldApplication_&&source_&&
+    return !closed_&&!terminal_&&worldColdConstructed_&&worldWater400_&&!*worldWater400_&&worldApplication_&&source_&&
         source_->sourcesDecoded()&&nativeWaterDomain_.get()==&domain&&
         !worldApplication_->attachmentLock423F58()&&worldEntity_.reference00==1u&&
         worldEntity_.objectKey==key(&worldEntity_)&&worldEntity_.sessionGeneration&&

@@ -62,6 +62,9 @@ bool evaluateReady(const GradientNoiseState49M& state,float shifted,
 }
 bool evaluateGradientNoise49M(GradientNoiseState49M& state,
     std::uint32_t& sharedRawRandomState,float coordinate,float& output) noexcept {
+    //An original flag clear does not certify completed tables after a direct
+    //native partial stop. Preserve that shared prefix, never atomic-retry it.
+    if(state.initializationIncomplete49M)return false;
     if(!finite(coordinate))return false;
     const float shifted=add(4096.0f,coordinate);
     if(!finite(shifted)||shifted< -0x1p31f||shifted>=0x1p31f)return false;

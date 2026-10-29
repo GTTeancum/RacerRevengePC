@@ -1,3 +1,4 @@
+#include "../../../src/game/original_parameter_packet_history50la.h"
 #include "original_ui_garage_draw_contribution50kg.h"
 #include "original_ui_garage_page_owner50kg.h"
 #include "original_ui_garage_pod_scene50kg.h"
@@ -28,6 +29,7 @@ bool OriginalUiGarageDrawContribution50KG::buildParticlePacket162010(
     };
     auto& primitive=pool.primitive160;
     if(primitive.released133FA0)return terminal(0x134000);
+    rr::game::OriginalParameterPacketHistory50LA::invalidateNative134xxx();
     for(auto& w:primitive.unwritten00To1C)w=0; //Actual134000 first32-byte clear.
     primitive.nativePayload04=nullptr;primitive.field2C=1;
     if(!primitive.buffer20){

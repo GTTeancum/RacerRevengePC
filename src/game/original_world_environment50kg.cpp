@@ -1,4 +1,10 @@
 #include "original_world_environment50kg.h"
+#include "original_world_environment_history50la.h"
+#include "original_wreck_components50la.h"
+#include "../../platform/linux/native/original_world_source_config50la.h"
+#include <thread>
+#include <cstring>
+#include <exception>
 #include "../assets/track_start50ad.h"
 #include <cmath>
 #include <cfenv>
@@ -59,11 +65,13 @@ struct Owner::Storage {
     std::vector<std::int32_t> zoneIndices;
     std::optional<SpatialBounds> spatialBounds;
 };
+// Actual source-mode storage and methods remain separate from native metadata.
+#include "original_world_environment_source50la.inl"
 Owner::Owner() noexcept=default;
-Owner::~Owner()=default;
+Owner::~Owner(){if(sourceMode_&&!sourceClosed_)std::terminate();}
 bool Owner::prepare(const assets::World48F& source,Diagnostic& d) noexcept {
     d={};
-    if(storage_)return fail(d,Status::alreadyPrepared,0x270a68);
+    if(storage_||sourceMode_)return fail(d,Status::alreadyPrepared,0x270a68);
     try {
         auto next=std::make_unique<Storage>();
         next->world=source;
@@ -105,6 +113,7 @@ bool Owner::prepare(const assets::World48F& source,Diagnostic& d) noexcept {
                     return fail(d,Status::storageLimit,0x276c7c,f?f->value_offset:environment->offset);
                 next->cubeFiles.push_back(name);
             }
+            EnvironmentHistory50LA::invalidateCubeNative();
             next->zoneIndices.reserve(w.zones.size());
             for(std::size_t i=0;i<w.zones.size();++i){
                 const auto key="cubefileforzone"+std::to_string(i+1u);
@@ -168,6 +177,7 @@ bool Owner::prepareSpatialBounds276F3C(Diagnostic& d) noexcept {
     }
     volatile float width=next.xMax538-next.xMin534;
     volatile float breadth=next.zMax540-next.zMin53C;
+    EnvironmentHistory50LA::invalidateBoundsNative();
     //2770D4/27714C convert each extent to signed integer for diagnostics.
     //Admit only ordinary positive, safely representable extents. No clamping,
     //fallback box, suppressed assertion, or native spatial-tree claim.

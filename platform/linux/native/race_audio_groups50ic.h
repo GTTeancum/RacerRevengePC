@@ -50,10 +50,10 @@ public:
         if(coldStarted_&&coldThread_!=std::this_thread::get_id())return false;
         // Populated source Sounds are admitted only through the concrete TA
         // source transport, member/service and lifetime checks below.
-        if(coldTaIntroEmitter_&&!taIntroReady())return false;
+        if(coldTaIntroEmitter_&&!taIntroBackingCurrent())return false;
         for(std::size_t n=0;n<coldGroups_.size();++n){const auto& p=coldGroups_[n];
             if((p.count48||p.taIntroAuthoring||p.taIntroManager)&&
-               (n!=static_cast<std::size_t>(game::RaceAudioGroup50IC::Announcer120)||!taIntroReady()))return false;
+               (n!=static_cast<std::size_t>(game::RaceAudioGroup50IC::Announcer120)||!taIntroBackingCurrent()))return false;
         }
         return (!coldStarted_||coldThread_==std::this_thread::get_id())&&
             !coldRetiring_&&!nativeBindingsRetired_&&mixer_&&mixer_->groupEpoch50IC()==epoch_&&mixer_->count()==count_&&
@@ -70,7 +70,7 @@ public:
         if(coldStarted_){
             const auto& p=coldGroups_[static_cast<std::size_t>(group)];
             if(coldThread_!=std::this_thread::get_id()||coldMixer_!=mixer_||coldEpoch_!=epoch_||
-               !coldApplication_||!p.constructed||!p.loaded||(p.count48&&(!taIntroReady()||group!=game::RaceAudioGroup50IC::Announcer120))||
+               !coldApplication_||!p.constructed||!p.loaded||(p.count48&&(!taIntroBackingCurrent()||group!=game::RaceAudioGroup50IC::Announcer120))||
                p.slot40<0||static_cast<std::size_t>(p.slot40)>=coldApplication_->soundGroups434A10_.size()||
                coldApplication_->soundGroups434A10_[p.slot40]!=&p.entity)return false;
         }
@@ -167,6 +167,13 @@ private:
         game::OriginalWreckComponent50LA&,std::shared_ptr<const assets::AudioBank50HC>,
         std::size_t firstVoice,std::size_t voiceCount)noexcept;
     bool finishTaIntro177750(game::OriginalWreckComponent50LA&)noexcept;
+    //Native prewarming custody: backing identity is separate from permission
+    //to dispatch/service the source-published intro. Never resets after failure.
+    bool taIntroBackingCurrent()const noexcept;
+    bool reserveNativeTaIntro177750(game::OriginalWreckComponent50LA&)noexcept;
+    bool publishNativeTaIntro177750(game::OriginalWreckComponent50LA&)noexcept;
+    bool stopTaIntroBacking2924A0()noexcept;
+    bool taIntroNativeReserved_=false,taIntroNativePublished_=false,taIntroNativeWithdrawn_=false;
     game::OriginalWreckComponent50LA* taIntroExpectedController_=nullptr;
     // Camera Session is the sole caller. These are reached source construction
     // and never-started generic-child closure, not playback capabilities.

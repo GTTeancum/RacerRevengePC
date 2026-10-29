@@ -8,6 +8,7 @@ namespace ra_cold_aggregate50LA {class Owner;}
 namespace rr::game::original_gc_gameplay_lighting_candidate {class Owner;}
 namespace rr::platform {
 class OriginalApplicationAural50KG;
+class OriginalUiCourseOwnedLifecycle50KG;
 class OriginalUiGarageVisibility50KG;
 class OriginalUiGarageDrawContribution50KG;
 class OriginalUiGarageModelResource50KG;
@@ -21,6 +22,7 @@ class OriginalUiLightManagerOwner50KG final {
     friend struct ::original_main_entry50KG::Application;
     friend class ::ra_cold_aggregate50LA::Owner;
     friend class OriginalUiGarageSession50KG;
+    friend class OriginalUiCourseOwnedLifecycle50KG;
     friend class OriginalUiGarageUiLights50KG;
     friend class OriginalUiGarageSceneLighting50KG;
     friend class OriginalUiGaragePodScene50KG;
@@ -96,6 +98,18 @@ private:
         bool distanceWritten=false; //Only actual231150 overlap publishes both.
     };
     struct RaZones148B60 {
+        bool sourceMode=false,sourceEntered=false,sourcePredecessorReturned=false;
+        bool sourceReturned=false,sourceNativeClosed=false;
+        const void* sourceWorldIdentity=nullptr; //Historical identity, never dereferenced.
+        std::uint8_t sourceArrayMask=0,sourceArrayWithdrawnMask=0;
+        std::array<std::optional<const void*>,5> sourceArrayPublications;
+        std::array<bool,10> sourceNodeCounted{},sourceNodeEnrolled{},sourceNodeSlotKnown{},sourceListSlotKnown{};
+        std::array<bool,10> sourceNodeAttempted{},sourceListAttempted{},sourceListReturned{},sourceIndexKnown{},sourceAmbient80Known{};
+        std::array<bool,10> sourceNodeWithdrawn{},sourceListWithdrawn{};
+        std::array<std::uint16_t,10> sourceNodeConstructorMask{};
+        std::array<std::optional<std::uint32_t>,10> sourceNodeVtable;
+        std::optional<std::uint32_t> sourceS0,sourceS1,sourceS2;
+        std::uint32_t sourcePC=0;
         const ::ra_cold_aggregate50LA::Owner* world=nullptr;
         std::shared_ptr<game::original_gc_gameplay_lighting_candidate::Owner> canonical;
         std::uint64_t gameplayGeneration=0;
@@ -109,6 +123,20 @@ private:
         std::array<const C*,10> portals{};const C* portalParent=nullptr;
         std::array<std::unique_ptr<RaPortalLink27F3B0>,20> portalLinks;
         std::size_t portalLinksPublished=0;
+        // Source-only histories. Withdrawn borrows are not guest headNULL stores.
+        std::array<bool,10> sourcePortalEntered{},sourcePortalReturned{};
+        std::array<std::array<std::uint32_t,2>,10> sourcePortalIndices{};
+        std::array<std::uint8_t,10> sourceGuardReadMask{},sourceGuardStoreMask{},sourceAssertMask{};
+        std::array<std::array<std::uint8_t,3>,10> sourceGuardReadValues{},sourceEnabledReadValues{};
+        std::array<bool,20> sourceLinkAttempted{},sourceLinkOldHeadKnown{};
+        std::array<const void*,20> sourceLinkOldHeads{};
+        std::array<std::uint8_t,20> sourceLinkStoreMask{};
+        bool sourcePortalLinksWithdrawn=false;
+        std::optional<std::uint32_t> sourceAmbientRevisionBefore;
+        std::array<std::optional<std::uint32_t>,3> sourceSecondRevisionBefore; //Color, position, look; retained native-unwind history.
+        const C* sourceAmbient=nullptr;
+        bool sourceAmbientAttempted=false,sourceAmbientColors=false,sourceAmbientAllocation=false;
+        bool sourceAmbientPublished=false,sourceAmbientRegistered=false,sourceAmbientWithdrawn=false;
         const C* firstAmbient=nullptr; //Actual RA registry slot0; no separate registry.
         const C* firstDirectional=nullptr; //Actual next registry slot1.
         std::array<const C*,183> localRegistered{}; //Actual9C rows2..184, independent borrows.
@@ -123,6 +151,17 @@ private:
         const std::shared_ptr<game::original_gc_gameplay_lighting_candidate::Owner>&,
         std::shared_ptr<OriginalUiLightManagerOwner50KG>&,Diagnostic&)noexcept;
     bool setupRaZones148B60(Diagnostic&)noexcept;
+    static bool bindSourceRaWorldZones272A48(const ::original_main_entry50KG::Application&,
+        ::ra_cold_aggregate50LA::Owner&,std::shared_ptr<OriginalUiLightManagerOwner50KG>&,Diagnostic&)noexcept;
+    bool setupSourceRaZones148B60(::ra_cold_aggregate50LA::Owner&,Diagnostic&)noexcept;
+    bool preflightSourceRaZonesNative(const ::ra_cold_aggregate50LA::Owner&)const noexcept;
+    bool sourceRaZonesCounted(const ::ra_cold_aggregate50LA::Owner&,std::size_t&)const noexcept;
+    bool abortSourceRaZonesNative(const ::ra_cold_aggregate50LA::Owner&,Diagnostic&)noexcept;
+
+    bool linkSourceRaPortal148D00(const ::ra_cold_aggregate50LA::Owner&,std::size_t,
+        const C&,const C&,std::uint32_t,std::uint32_t,Diagnostic&)noexcept;
+    bool preflightSourceRaPortalLinksNative(const ::ra_cold_aggregate50LA::Owner&)const noexcept;
+    bool withdrawSourceRaPortalLinksNative(const ::ra_cold_aggregate50LA::Owner&,Diagnostic&)noexcept;
     bool linkRaPortal148D00(const ::ra_cold_aggregate50LA::Owner&,std::size_t ordinal,
         const C& portal,const C& actualParent,std::uint32_t zoneA,std::uint32_t zoneB,Diagnostic&)noexcept;
     bool localMembershipsCurrent()const noexcept;
@@ -138,11 +177,25 @@ private:
     bool incrementRaDirectional149300(const ::ra_cold_aggregate50LA::Owner&,const C&,std::uint32_t,Diagnostic&)noexcept;
     bool appendRaDirectional148F30(const ::ra_cold_aggregate50LA::Owner&,const C&,Diagnostic&)noexcept;
     bool removeRaDirectional1491F0(const ::ra_cold_aggregate50LA::Owner&,const C&,Diagnostic&)noexcept;
+    bool incrementSourceSecond149300(::ra_cold_aggregate50LA::Owner&,unsigned,Diagnostic&)noexcept;
+    bool incrementSourceAmbient149300(::ra_cold_aggregate50LA::Owner&,Diagnostic&)noexcept;
+    bool appendSourceAmbient148F30(::ra_cold_aggregate50LA::Owner&,Diagnostic&)noexcept;
+    bool withdrawSourceAmbientNative(::ra_cold_aggregate50LA::Owner&,Diagnostic&)noexcept;
     bool incrementRaAmbient149300(const ::ra_cold_aggregate50LA::Owner&,const C&,Diagnostic&)noexcept;
     bool appendRaAmbient148F30(const ::ra_cold_aggregate50LA::Owner&,const C&,Diagnostic&)noexcept;
     bool removeRaAmbient1491F0(const ::ra_cold_aggregate50LA::Owner&,const C&,Diagnostic&)noexcept;
     bool releaseRaZones148110(const ::ra_cold_aggregate50LA::Owner&,Diagnostic&)noexcept;
 
+    // Exclusive source Course zone custody, never a scalar/native-UI grant.
+    const OriginalUiCourseOwnedLifecycle50KG* courseZoneOwner_=nullptr;
+    bool courseNodeSlotKnown_=false,courseListSlotKnown_=false,courseAmbient80Known_=false;
+    bool beginCourseZone148B60(const ::original_main_entry50KG::Application&,
+        const OriginalUiCourseOwnedLifecycle50KG&,Diagnostic&)noexcept;
+    bool courseZoneReleasePreflight(const OriginalUiCourseOwnedLifecycle50KG&)const noexcept;
+    bool abortCourseZoneNative(const OriginalUiCourseOwnedLifecycle50KG&,Diagnostic&)noexcept;
+    bool incrementCourseRevision149300(OriginalUiCourseOwnedLifecycle50KG&,Diagnostic&)noexcept;
+    bool appendCourseLight148F30(OriginalUiCourseOwnedLifecycle50KG&,C&,Diagnostic&)noexcept;
+    bool removeCourseLight1491F0(OriginalUiCourseOwnedLifecycle50KG&,C&,Diagnostic&)noexcept;
     const OriginalUiGarageUiLights50KG* uiLightsOwner_=nullptr;
     OriginalUiGarageSceneLighting50KG* sceneLightsOwner_=nullptr;
     bool raRegistryGrowthFailed_=false; //Native retained old allocation on terminal realloc failure.

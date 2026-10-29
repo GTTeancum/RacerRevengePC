@@ -159,6 +159,11 @@ bool cleanMatrixPointPrefix49U(const BodyMatrix48G& matrix,const V& input,
     if(std::fegetround()!=FE_TONEAREST)return false;
     Math f;output=vector(matrix,input,true,context,f);return f.valid;
 }
+bool cleanMatrixInversePointPrefix49U(const BodyMatrix48G& matrix,const V& input,
+    SceneVectorContext49U& context,V& output)noexcept {
+    if(std::fegetround()!=FE_TONEAREST)return false;
+    Math f;const M m=inverse(matrix,f);output=vector(m,input,true,context,f);return f.valid;
+}
 bool cleanMatrixInverseDirectionPrefix49U(const BodyMatrix48G& matrix,const V& input,
     SceneVectorContext49U& context,V& output)noexcept {
     if(std::fegetround()!=FE_TONEAREST)return false;

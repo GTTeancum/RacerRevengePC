@@ -43,6 +43,7 @@ public:
 // No GPU allocator, residency, upload, or complete254AD0/254B20 is represented.
 // Serial/nonreentrant, as is the source list and its shared cursor.
 class OriginalStandardTextureLifetime50LA final {
+    friend class OriginalStandardTextureResource50LA; // Exact typed PST cleanup preflight, no public list access.
     friend struct original_main_entry50KG::Application;
     friend class OriginalStandardMaterialContext50LA;
     friend class OriginalNativeTextureUploadScope50LA;

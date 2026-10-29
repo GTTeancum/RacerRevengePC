@@ -294,6 +294,9 @@ bool OriginalUiGaragePageOwner50KG::continueSharedCameraViewport114A00(Diagnosti
             return fail(d,Status::sharedLoaderPending,0x114A0C);
         if(camera.phase_!=Camera::Phase::beforeViewport114A00||!camera.coldRetirementPreflight().okay())
             return fail(d,Status::phase,0x114A00);
+        const auto prior=live->loadingPriorViewportCamera50LA();
+        if(!live->frontendPriorViewportCurrent50LA(prior))return fail(d,Status::sharedLoaderPending,0x245918);
+        sharedViewportPriorCamera_=prior;
         sharedCameraDisplay_=live;live->pin();sharedCameraDisplayPinned_=true;
         //114A10..1C read the actual initialized Display field exactly once.
         const auto count=live->sourceBufferCount0C_+std::uint32_t{1};
@@ -302,11 +305,12 @@ bool OriginalUiGaragePageOwner50KG::continueSharedCameraViewport114A00(Diagnosti
     }
     auto& display=*sharedCameraDisplay_;
     if(!sharedCameraDisplayPinned_||!display.garageFirstViewportCurrent50KG(d.renderer)||
+       !display.frontendPriorViewportCurrent50LA(sharedViewportPriorCamera_)||
        camera.phase_!=Camera::Phase::insideViewport114A00)
         return fail(d,Status::sharedLoaderPending,0x114A38);
     //Actual2458C0 is two ordered drains. Page's source a2=0 excludes the
-    //packet/scissor branch245B14..C64. Known-null source Scene0 excludes the
-    //zoom328/32C stores; a prior/unknown selection is never treated as null.
+    //packet/scissor branch245B14..C64. A genuine prior330 selection
+    //receives its zoom stores below; unknown selection is never treated as null.
     if(sharedViewportDrainPhase_==0){
         std::int32_t returned=0;
         const auto serviced=game::serviceOriginalRenderer244D60(display.dispatch_,true,
@@ -319,6 +323,11 @@ bool OriginalUiGaragePageOwner50KG::continueSharedCameraViewport114A00(Diagnosti
         if(!display.renderer_.finishInitializedContextWork(d.renderer)||!d.renderer.contextWorkCompleted)
             return fail(d,Status::sharedLoaderPending,0x245910);
         sharedViewportDrainPhase_=2;
+    }
+    if(!sharedViewportZoomApplied_){
+        if(!display.applyLoadingPriorViewportZoom2458C0(camera,sharedViewportPriorCamera_))
+            return fail(d,Status::sharedLoaderPending,0x245918);
+        sharedViewportZoomApplied_=true;
     }
     camera.phase_=Camera::Phase::afterViewport114A00;
     stage_=Stage::sharedCameraCallbackPending;pendingPC_=0x1149E0;
@@ -365,12 +374,14 @@ bool OriginalUiGaragePageOwner50KG::continueSharedCameraConstructor2361C0(Diagno
         f.guardAngle330=Camera::floatBits(angle);++sharedCameraCallbackCount_;
     }
     if(camera.phase_==Camera::Phase::afterViewport114A00){
-        if(!(camera.entity_.flags29&1u)||!display.garageFirstViewportCurrent50KG(d.renderer))
+        if(!(camera.entity_.flags29&1u)||!display.garageFirstViewportCurrent50KG(d.renderer)||
+           !display.frontendPriorViewportCurrent50LA(sharedViewportPriorCamera_))
             return fail(d,Status::sharedLoaderPending,0x11473C);
         if(display.sourceWidth4_!=static_cast<std::int32_t>(f.fullWidth204)||
            display.sourceHeight8_!=static_cast<std::int32_t>(f.fullHeight208))
             return fail(d,Status::sharedLoaderPending,0x26F978); //Real resize not represented.
         display.selectFrontendCamera26F940(sharedCamera_); //26F98C/998 actual retained Camera selection.
+        sharedViewportPriorCamera_.reset(); //No restoration on genuine Page115690 retirement.
         camera.phase_=Camera::Phase::selectedBeforeBounds236214;
     }
     if(camera.phase_!=Camera::Phase::selectedBeforeBounds236214||
@@ -2178,6 +2189,7 @@ bool OriginalUiGaragePageOwner50KG::continueBaseRetirement2A5CF0(Diagnostic& d)n
     //The Display retains its own selected-Camera identity, even if retired.
     sharedCamera_.reset();managerSearch_.reset();sharedText32C_.reset();sharedDraw_.reset();sharedMetadata_.reset();
     if(sharedCameraDisplayPinned_){sharedCameraDisplay_->unpin();sharedCameraDisplayPinned_=false;}
+    sharedViewportPriorCamera_.reset(); //Terminal cleanup releases only this native borrow.
     sharedCameraDisplay_.reset();
     if(failedSceneRetirement_==FailedSceneRetirement::payloadRetiring){
         if(!grant_->failedPartialGaragePageRetired1413E0(*this))std::terminate();
@@ -2736,6 +2748,7 @@ bool OriginalUiGaragePageOwner50KG::finishFailedSharedBase2A5CF0(Diagnostic& d)n
     entityCountReleased_=true;entityLive_=false;stage_=Stage::pagePayloadRetired;pendingPC_=0;
     sharedCamera_.reset();managerSearch_.reset();sharedText32C_.reset();sharedDraw_.reset();sharedMetadata_.reset();
     if(sharedCameraDisplayPinned_){sharedCameraDisplay_->unpin();sharedCameraDisplayPinned_=false;}
+    sharedViewportPriorCamera_.reset(); //Terminal cleanup releases only this native borrow.
     sharedCameraDisplay_.reset();failedSharedRetirement_=FailedSharedRetirement::returned;
     d.sourcePC=0x1FA2AC;d.sourceEffectsCommitted=true;return true;
 }

@@ -52,8 +52,71 @@ class OriginalRacerColdScenes50LA final {
         node(graph,*objects_[2]).parent180=objects_[0]->sceneIndex;
         parented_=true;return {S::complete,0x211a38u};
     }
+    // Separate actual2124E8 allocation. Native allocation refusal stops rather
+    // than claiming the guest NULL/dereference branch. Upper flag bits are
+    // opaque backing; only the constructor's low03 bits are source-known.
+    std::unique_ptr<O> secondary19C_;
+    bool secondaryAttempted_=false,secondaryComplete_=false,secondaryAppended_=false;
+    std::uint8_t secondaryFlags03Known_=0,secondaryFlags191Known_=0;
+    R constructSecondary2124E8(const SceneGraph49P& graph,I index)noexcept {
+        if(secondaryAttempted_||closed_||initialized_!=3||!binding_.sessionGeneration||
+           !binding_.actualObjectCount423F60||!binding_.actualTypes383408||
+           !binding_.actualAttachmentLock423F58||!validateSceneGraph49P(graph)||
+           !OriginalRacerModelSceneOwner50LA::freshNode(graph,index))return {S::binding,0x2124e8u};
+        for(const auto& o:objects_)if(o&&o->sceneIndex==index)return {S::graph,0x2124e8u};
+        secondaryAttempted_=true;
+        try{secondary19C_=std::make_unique<O>();}catch(...){return {S::allocation,0x2124e8u};}
+        const auto result=OriginalRacerModelSceneOwner50LA::constructStandaloneScene2893A0(
+            binding_,*secondary19C_,index,graph,true,OriginalWreckComponentKind50LA::scene2893A0);
+        secondaryFlags03Known_=7u;
+        if(!result.okay())return result;
+        secondaryFlags191Known_=3u; //Other backing bits are not source-known.
+        secondaryComplete_=true;return {S::complete,0x212504u};
+    }
+    C* secondaryLiveEntity()noexcept {
+        return secondary19C_&&secondary19C_->constructed&&!secondary19C_->released?&secondary19C_->entity8:nullptr;
+    }
+    R initializeSecondary212514()noexcept {
+        if(!secondaryComplete_||!secondaryLiveEntity())return {S::phase,0x212514u};
+        //Actual3D3198+30=141C20 returns this Entity8 without other effects.
+        if(initialize141C20(secondary19C_->entity8)!=&secondary19C_->entity8)return {S::entity,0x212514u};
+        return {S::complete,0x21251cu};
+    }
+    R appendSecondary212530(const OriginalWreckComponentDomain50LA& domain,C& racer)noexcept {
+        if(!secondaryComplete_||secondaryAppended_||!secondaryLiveEntity())return {S::phase,0x212530u};
+        const auto r=appendOriginalWreckComponent50LA(domain,racer,secondary19C_->entity8,2u,
+            *binding_.actualAttachmentLock423F58);
+        if(r.status!=OriginalWreckComponentStatus50LA::complete)return {S::entity,r.sourcePC};
+        secondaryAppended_=true;return {S::complete,0x212538u};
+    }
+    bool preflightSecondary142590(const SceneGraph49P& graph,const C* parent,
+        const C* previous,const C* next)const noexcept {
+        if(!secondary19C_||!secondary19C_->constructed||secondary19C_->released)return true;
+        const auto& o=*secondary19C_;const auto& c=o.entity8;
+        if(!binding_.actualObjectCount423F60||!*binding_.actualObjectCount423F60||
+           !binding_.actualAttachmentLock423F58||*binding_.actualAttachmentLock423F58||
+           !validateSceneGraph49P(graph)||!OriginalRacerModelSceneOwner50LA::freshNode(graph,o.sceneIndex)||
+           o.previous18C!=I::none||o.observer19C||c.reference00!=1||c.firstChild18||
+           c.sessionGeneration!=binding_.sessionGeneration||c.kind!=OriginalWreckComponentKind50LA::scene2893A0)
+            return false;
+        if(secondaryAppended_)return parent&&previous&&c.parent1C==parent&&c.previous10==previous&&
+            previous->next14==&c&&c.next14==next&&(!next||next->previous10==&c);
+        return !parent&&!previous&&!next&&!c.parent1C&&!c.previous10&&!c.next14;
+    }
+    R closeSecondary142590(const SceneGraph49P& graph,C* parent,C* previous)noexcept {
+        if(!secondaryLiveEntity())return {S::complete,0};
+        if(!preflightSecondary142590(graph,parent,previous,nullptr))return {S::entity,0x142590u};
+        auto& o=*secondary19C_;auto& c=o.entity8;
+        if(secondaryAppended_){previous->next14=nullptr;if(parent->firstChild18==&c)parent->firstChild18=nullptr;}
+        --c.reference00;
+        //Exact childless/observer-null2896D0 cut; no source links are cleared.
+        o.dispatch1A8=OriginalWreckComponentKind50LA::scene2893A0;
+        --*binding_.actualObjectCount423F60;o.released=true;
+        return {S::complete,0x2897acu};
+    }
     void addDomain(C** storage,std::size_t& count)noexcept {
         for(auto& o:objects_)if(o&&o->constructed&&!o->released)storage[count++]=&o->entity8;
+        if(auto* secondary=secondaryLiveEntity())storage[count++]=secondary;
     }
     C* lastEntity()noexcept{return objects_[2]?&objects_[2]->entity8:nullptr;}
     R append(const OriginalWreckComponentDomain50LA& domain,C& racer)noexcept {
@@ -70,6 +133,7 @@ class OriginalRacerColdScenes50LA final {
     // Source stale Entity parent/previous pointers stay stale after142590.
     // Extra graph descendants/observers must close through their own owners.
     R close(const SceneGraph49P& graph)noexcept {
+        if(secondaryLiveEntity())return {S::phase,0x2896d0u};
         if(closed_||!attempted_){closed_=true;return {S::complete,0};}
         if(*binding_.actualAttachmentLock423F58)return {S::attachmentLocked,0x1425a8u};
         if(!validateSceneGraph49P(graph))return {S::graph,0x289710u};
@@ -109,6 +173,6 @@ public:
     OriginalRacerColdScenes50LA()=default;
     OriginalRacerColdScenes50LA(const OriginalRacerColdScenes50LA&)=delete;
     OriginalRacerColdScenes50LA& operator=(const OriginalRacerColdScenes50LA&)=delete;
-    ~OriginalRacerColdScenes50LA(){for(const auto& o:objects_)if(o&&o->constructed&&!o->released)std::terminate();}
+    ~OriginalRacerColdScenes50LA(){if(secondaryLiveEntity())std::terminate();for(const auto& o:objects_)if(o&&o->constructed&&!o->released)std::terminate();}
 };
 } //namespace rr::game

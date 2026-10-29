@@ -1,3 +1,4 @@
+#include "../../../src/game/original_parameter_packet_history50la.h"
 #include "../../../src/game/original_options_mutation_interlock50kg.h"
 #include "original_ui_garage_draw_contribution50kg.h"
 #include "original_ui_garage_session50kg.h"
@@ -459,6 +460,7 @@ bool OriginalUiGarageDrawContribution50KG::fog13EA10(C& node,Diagnostic& d)noexc
             display.sourceFogRangeKnown_=true;
             if(fog.dirty60){
                 if(fog.dirty60!=1||!helper.current(color))return fail(d,0x13EAC8);
+                rr::game::OriginalParameterPacketHistory50LA::invalidateNative134xxx();
                 if(!helper.packet){
                     //1340BC..CC actual retained128-DWORD allocation. Native
                     //renderer consumes only its genuine GSFOGCOL3D effect.

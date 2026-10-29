@@ -8,6 +8,9 @@ namespace original_main_entry50KG {struct Video;class NativeCollectorFifo50LA;}
 namespace rr::platform {
 class OriginalUiGaragePageOwner50KG;
 class OriginalUiMemoryCardConstructor50KG;
+class OriginalUiCoursePagePayload50KG;
+class OriginalUiCourseOwnedLifecycle50KG;
+class OriginalUiCoursePopupPayload50KG;
 // Canonical embedded2DEF40, real2461E0 material reference and aligned2DF0B0
 // packet backing. No counted Entity, native collector or draw-ready claim.
 class OriginalUiGarageQuad50KG final {
@@ -15,6 +18,9 @@ class OriginalUiGarageQuad50KG final {
     friend class OriginalUiSharedDialogs50KG;
     friend class rr::assets::OriginalStandardMaterialTable50LA;
     friend class OriginalUiMemoryCardConstructor50KG;
+    friend class OriginalUiCoursePagePayload50KG;
+    friend class OriginalUiCourseOwnedLifecycle50KG;
+    friend class OriginalUiCoursePopupPayload50KG;
     friend class OriginalUiGaragePageOwner50KG;
     friend class OriginalUiGarageDrawContribution50KG;
     using Root=::original_main_entry50KG::Application;
@@ -74,6 +80,10 @@ private:
     bool retainMemoryCardRole2465B0(OriginalUiMemoryCardConstructor50KG&,std::size_t,Diagnostic&)noexcept;
     bool retainMemoryCardFirstIcon2465B0(OriginalUiMemoryCardConstructor50KG&,Diagnostic&)noexcept;
     bool memoryCardPrefixOnly_=false;
+    // No Course cold embedded instance can borrow Garage loading authority.
+    bool coursePrefixOnly_=false;
+    static bool loadCourseAperturePrimitive2E20F0(OriginalUiCoursePagePayload50KG&,
+        std::size_t,std::unique_ptr<Primitive>&,Diagnostic&)noexcept;
     bool load2DF0B0(const RootInputs&,Diagnostic&)noexcept;
     // Owner-neutral zero-coordinate numeric/packet mechanics. Callers retain
     // their separate source authority; this function grants none by itself.

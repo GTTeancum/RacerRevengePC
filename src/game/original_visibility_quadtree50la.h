@@ -1,4 +1,5 @@
 #pragma once
+#include "original_selected_array_guards27ed40.h"
 #if defined(__FAST_MATH__)
 #error "Visibility tree bounds require strict binary32 arithmetic"
 #endif
@@ -80,6 +81,7 @@ class OriginalVisibilityQuadTree50LA final {
         pc=0;
         if(reference00_||app.visibility443A98_||app.environment443108_||
            !app.application10()||std::fegetround()!=FE_TONEAREST){pc=0x272fd4;return false;}
+        selected_array_guards27ED40::invalidateNative();
         application_=&app;reference00_=1; //27E9D0 ->1048F0.
         try {
             selected18_.reset(new OriginalVisibilityMembership50LA*[30]);

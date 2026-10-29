@@ -9,13 +9,19 @@
 #include <optional>
 #include <string>
 namespace ra_pod_scene50LA {class Owner;}
+namespace ra_cold_aggregate50LA {class Owner;}
 namespace rr::platform {
 class OriginalUiGaragePodScene50KG;
 struct OriginalUiMainApplication50KG;
 class OriginalUiGarageInstanceMaster50KG final {
     friend class OriginalUiGaragePodScene50KG;
     friend class ::ra_pod_scene50LA::Owner; //Same actual444078 domain; private RA load/retirement only.
+    friend class ::ra_cold_aggregate50LA::Owner;
     OriginalUiGarageInstanceMaster50KG();
+    struct SourceTag {};
+    explicit OriginalUiGarageInstanceMaster50KG(SourceTag)noexcept;
+    bool sourceMode_=false,sourceArrayReturned_=false,sourceCount10Known_=false;
+    //Native zero backing is not a source count10 store before2BFD28.
     //2BFEA0 allocates RAW capacity, not ten constructed Instance records.
     std::unique_ptr<std::uint8_t[]> records00_;
     std::int32_t capacity04_=10,growth08_=100000,used0C_=0,count10_=0;

@@ -33,6 +33,17 @@ OriginalGcSprayStatus50KG readOriginalGcPodDustDefinition50KG(
     const std::vector<std::uint8_t>& originalEmt,OriginalGcPodDustMember50KG,
     OriginalGcPodDustDefinition50KG&,assets::OriginalUiPageDiagnostic50KG&) noexcept;
 
+// Immutable transport metadata only; never a second live emitter field owner.
+struct OriginalGcPodDustSourceMetadata50KG {
+    float rawAgeAtBirth=0;
+    bool velocityPresent=false,minimumNoisePresent=false,maximumNoisePresent=false;
+    std::int32_t forcedCount=0;
+};
+OriginalGcSprayStatus50KG readOriginalGcPodDustSourceDefinition50KG(
+    const std::vector<std::uint8_t>&,OriginalGcPodDustMember50KG,
+    OriginalGcPodDustDefinition50KG&,OriginalGcPodDustSourceMetadata50KG&,
+    assets::OriginalUiPageDiagnostic50KG&) noexcept;
+
 // POD native extension of the EXISTING EffectOwner50BE. The real controls,
 // delay and duration are not copied here. Keep one runtime per actual dust or
 // smoke owner in the same racer bank; keep immutable authoring outside it.

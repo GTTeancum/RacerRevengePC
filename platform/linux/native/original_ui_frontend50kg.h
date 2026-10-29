@@ -15,7 +15,7 @@
 #include <chrono>
 #include <memory>
 
-namespace original_main_entry50KG { struct Application; struct Frontend; }
+namespace original_main_entry50KG { struct Application; struct Frontend; class RaceDisplayLifetime50LA; }
 namespace rr::platform {
 class OriginalUiMemoryCardConstructor50KG;
 class OriginalSaveNativeReadStage50KG;
@@ -282,6 +282,12 @@ public:
 private:
     friend struct ::original_main_entry50KG::Frontend;
     friend struct ::original_main_entry50KG::Application;
+    // Read-only admission of the actual taken Course request. This does not
+    // certify dispatcher destruction, source retirement or loading readiness.
+    bool observeCourseRaHandoff50LA(const ::original_main_entry50KG::Application&,
+        const ::original_main_entry50KG::Frontend&,
+        OriginalUiRiderProfileOwner50KG::CourseRaceSelection&,
+        std::shared_ptr<::original_main_entry50KG::RaceDisplayLifetime50LA>&)const noexcept;
     // Uncalled native reverse-route receiver. Future exact Results flags6
     // transfer must establish origin/whole-poll completion/retirement first.
     // No Main construction history or source1B7BD0 receipt is synthesized.

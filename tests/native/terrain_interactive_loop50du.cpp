@@ -364,6 +364,12 @@ void Context::run() {
      const auto* target=courseTargets.admits(selected);
      require50DU(courseRaceCold&&!courseRaceLaunched&&target&&(selected.laps==3||humanCourseEnabled),
          "Course queue selected an unavailable native destination");
+     if(target&&target->track==original_course_targets50KX::Track::RA){
+      std::uint32_t sourcePC=0;
+      const bool complete=originalMain.advanceCourseRaLoadingPrefix50LA(sourcePC);
+      if(!complete)std::cerr<<"original_course_loading_prefix_stopped source="<<sourcePC<<'\n';
+      require50DU(complete,"original RA Course loading prefix stopped before pending activation");
+     }
      // Even an unchanged track/rider must rebuild: this retained UI path
      // prepared its race groups before any new Options Accept. Never retune
      // those live groups or reuse their stale ducking restore configuration.
@@ -575,10 +581,10 @@ void Context::run() {
      break;
     }
    }
-   if((humanCourseEnabled||allAiEnabled||!isGaTrack)&&humanResultsReady&&!sessionMenu.open()){
+   if(!allAiEnabled&&(humanCourseEnabled||!isGaTrack)&&humanResultsReady&&!sessionMenu.open()){
     // These keys belong to Results navigation. Native finish controls retain
     // sole ownership; UI arrows/Space never count as attempted manual driving.
-    platform::releaseSelectedKeyboard50KY(input,humanControlInput.cameraCycleBound,humanControlInput.manualResetBound);
+    platform::releaseSelectedKeyboard50KY(input,humanControlInput);
    }
    const bool menuWasOpen=sessionMenu.open();
    const auto menuRevision=sessionMenu.revision();
@@ -708,12 +714,15 @@ void Context::run() {
    // focus/menu interruption. Otherwise a resize back to a supported size
    // recreates held throttle, boost, reset or camera presses immediately.
    // Observe the actual keys below BEFORE clearing this poll's local copy.
-   if(paused)suppressResumeKeys=true;
+   //ALL8 has no human keyboard binding. Its independent sourceCameraInput
+   //owner already retains the actual C-only release-to-arm latch.
+   if(allAiEnabled)suppressResumeKeys=false;
+   else if(paused)suppressResumeKeys=true;
    if(suppressResumeKeys){
-    suppressResumeKeys=platform::selectedKeyboardHeld50KY(input,humanControlInput.cameraCycleBound,humanControlInput.manualResetBound);
+    suppressResumeKeys=platform::selectedKeyboardHeld50KY(input,humanControlInput);
     // Re-arm keyboard only after all mapped controls are released. The
     // physical pad has its own actual-instance/neutral latch below.
-    platform::releaseSelectedKeyboard50KY(input,humanControlInput.cameraCycleBound,humanControlInput.manualResetBound);
+    platform::releaseSelectedKeyboard50KY(input,humanControlInput);
    }
    composePacket(!paused&&humanControlsPermitted,input);
    // Native device-loss/reconnect policy holds the existing world clock. It
@@ -767,7 +776,7 @@ void Context::run() {
       phase_timing50GK::Scope audioTiming(phaseTiming,phase_timing50GK::Phase::AudioCommit);
       const auto beforeMix=liveAudio->mixedFrames();
       const bool mixed=liveAudio->committedStep(audioDiagnostic);
-      advanceSourceAudioWorld(beforeMix);
+      advanceSourceAudioWorld(beforeMix,true); //Actual completed-scene held route.
       require50DU(mixed,"native completed-scene audio service failed");
      }
      continue;
@@ -842,7 +851,7 @@ void Context::run() {
        phase_timing50GK::Scope audioTiming(phaseTiming,phase_timing50GK::Phase::AudioCommit);
        const auto beforeMix=liveAudio->mixedFrames();
        const bool mixed=liveAudio->committedStep(audioDiagnostic);
-       advanceSourceAudioWorld(beforeMix);
+       advanceSourceAudioWorld(beforeMix,true); //Actual countdown held route.
        require50DU(mixed,"native countdown/result audio step failed");
       }
      }
@@ -877,8 +886,8 @@ void Context::run() {
     const bool playerAdvancing=!raceEnabled||withRace([&](auto& actualRace){return race_session50HM::simulationAllowed(actualRace,0);});
     const bool playerControls=!raceEnabled||withRace([&](auto& actualRace){return race_session50HM::controlsAllowed(actualRace,0);});
     const bool playerFinishDriver=humanResultsActive&&(s.fields.impactFlagsCD8&1u);
-    const bool manualRaceInputHeld=usePhysicalGameController?
-        platform::selectedControllerHeld50KY(input.controllers[0]):platform::selectedKeyboardHeld50KY(input,humanControlInput.cameraCycleBound,humanControlInput.manualResetBound);
+    const bool manualRaceInputHeld=!allAiEnabled&&(usePhysicalGameController?
+        platform::selectedControllerHeld50KY(input.controllers[0]):platform::selectedKeyboardHeld50KY(input,humanControlInput));
     if(audioEnabled){liveAudio->pause(false);if(mode1Enabled||dynamicContactEnabled)raceMusic->pause(false);}
     // Recompose at GO so held race input enters this exact native frame.
     // After the human finish, the recovered source driver owns controls while
@@ -1124,6 +1133,8 @@ void Context::run() {
     if(dynamicContactEnabled){
      // Declared accepted-world flush: all actual frames and the source manager
      // rank pass completed. Read actors afresh, not enqueue-time snapshots.
+     if(dynamicEvents.endFlushPending50LA())
+      dynamicBoundary(0x1a4c9cu,"actual End owns pending FIFO; no ordinary capture/flush replay");
      captureDynamicBeforeFrame(0);
      const auto began=beginRaceEventFlush50ID(dynamicEvents,originalAiSession.manager.flags58,0u);
      if(began!=RaceEventStatus50ID::FlushSuppressed){
@@ -1264,7 +1275,7 @@ void Context::run() {
      phase_timing50GK::Scope audioTiming(phaseTiming,phase_timing50GK::Phase::AudioCommit);
      const auto beforeMix=liveAudio->mixedFrames();
      const bool mixed=liveAudio->committedStep(audioDiagnostic);
-     advanceSourceAudioWorld(beforeMix);
+     advanceSourceAudioWorld(beforeMix,false); //Actual completed new world/camera.
      require50DU(mixed,"native mixed audio world step failed");
     }
     if(sourceCameraSession){

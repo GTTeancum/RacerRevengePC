@@ -1,7 +1,5 @@
 #include "original_results104_storage50la.h"
-#include "../../tests/native/original_position_stats_adapter50la.h"
-#include "../../tests/native/original_race_constructor50la.h"
-#include "../../tests/native/ra_cold_roster_operation50la.h"
+#include "../../tests/native/original_results_live_owner_read50la.h"
 #include "../../tests/native/original_results_feedback_scope50la.h"
 
 namespace rr::game {
@@ -9,19 +7,21 @@ OriginalResults10450LA::ModeCpuPrefix OriginalResults10450LA::setModeCpuPrefix1C
     const OriginalRaceConstructor50LA& race,
     const ::original_position_stats_adapter50LA::Owner& observer,
     std::uint32_t modeA1,std::uint32_t animateA2,OriginalResults104Diagnostic50LA& d)noexcept {
+    using Read=::original_results_roster50LA::Read;
+    const auto liveRace=Read::raceAccess(race);
     using P=ModeCpuPrefix;
     d={};
     // Native affinity fence, before touching Impl or the mutable weak
     // registration. Its lifetime is lexical, not a cross-thread device lease.
-    if(race.resultsFeedbackThread_!=std::this_thread::get_id()){
+    if(liveRace.resultsFeedbackThread_!=std::this_thread::get_id()){
         d.status=Impl::S::owner;d.sourcePC=0x1ca8e0;return P::none;
     }
     if(!impl_){d.status=Impl::S::owner;d.sourcePC=0x1ca8e0;return P::none;}
     auto& p=*impl_;
-    if(!constructed()||!p.loadComplete||!p.derived||race.results104_.get()!=this||
-       !race.counted_||race.rolledBack_||race.application_!=p.application||
-       race.entity_.sessionGeneration!=p.component.sessionGeneration||!retirementCurrent()||
-       !p.application->entityAuthority_.canRetire(race.entity_)){
+    if(!constructed()||!p.loadComplete||!p.derived||liveRace.results104_.get()!=this||
+       !liveRace.counted_||liveRace.rolledBack_||liveRace.application_!=p.application||
+       liveRace.entity_.sessionGeneration!=p.component.sessionGeneration||!retirementCurrent()||
+       !liveResultsRaceAuthorityCurrent(race,p.application)){
         p.stop(d,Impl::S::owner,0x1ca8e0,"Results mode prefix requires its actual retained Race owner");return P::none;
     }
     p.modeCpu.reset();p.modeCpu.emplace();auto& out=*p.modeCpu;
@@ -51,17 +51,19 @@ OriginalResults10450LA::ModeCpuPrefix OriginalResults10450LA::continueModeFeedba
     const OriginalRaceConstructor50LA& race,
     const ::original_position_stats_adapter50LA::Owner& observer,
     OriginalResults104Diagnostic50LA& d)noexcept {
+    using Read=::original_results_roster50LA::Read;
+    const auto liveRace=Read::raceAccess(race);
     using P=ModeCpuPrefix;
     d={};
-    if(race.resultsFeedbackThread_!=std::this_thread::get_id()){
+    if(liveRace.resultsFeedbackThread_!=std::this_thread::get_id()){
         d.status=Impl::S::owner;d.sourcePC=0x1af770;return P::none;
     }
     if(!impl_){d.status=Impl::S::owner;d.sourcePC=0x1af770;return P::none;}
     auto& p=*impl_;
-    if(!constructed()||!p.loadComplete||!p.derived||race.results104_.get()!=this||
-       !race.counted_||race.rolledBack_||race.application_!=p.application||
-       race.entity_.sessionGeneration!=p.component.sessionGeneration||!retirementCurrent()||
-       !p.application->entityAuthority_.canRetire(race.entity_)||!p.modeCpu||
+    if(!constructed()||!p.loadComplete||!p.derived||liveRace.results104_.get()!=this||
+       !liveRace.counted_||liveRace.rolledBack_||liveRace.application_!=p.application||
+       liveRace.entity_.sessionGeneration!=p.component.sessionGeneration||!retirementCurrent()||
+       !liveResultsRaceAuthorityCurrent(race,p.application)||!p.modeCpu||
        p.modeCpu->prefix==P::none){
         p.stop(d,Impl::S::owner,0x1af770,"Results same-owner suspended mode invocation absent");return P::none;
     }
@@ -73,20 +75,19 @@ OriginalResults10450LA::ModeCpuPrefix OriginalResults10450LA::continueModeFeedba
         return out.prefix;
     }
     const auto operation=p.loadedRosterOperation.lock();
-    if(!operation||operation->aggregate_!=race.world74_||operation->entities_!=p.application||
-       operation->domain_!=p.domain||operation->generation_!=p.component.sessionGeneration||
-       !operation->resultsRuntimeBankCurrent(observer.resultsBankIdentity())){
+    if(!Read::loadedOperationOwnerFieldsCurrent(operation,Read::raceWorldIdentity(race),p.application,p.domain,p.component.sessionGeneration)||
+       !Read::loadedOperationBankCurrent(operation,Read::observerBankIdentity(observer))){
         p.stop(d,Impl::S::owner,0x1af770,"Results actual manager human-count/feedback ownership absent");return out.prefix;
     }
     // A missing device borrow stops AFTER the first manager34 loop read.
     // Keep that consumed value across retry instead of restarting the setter.
     if(!out.humanCountKnown){
-        out.actualHumanCount=operation->arena_.humanCount;out.humanCountKnown=true;
+        out.actualHumanCount=Read::operationHumanCount(operation);out.humanCountKnown=true;
     }
     if(out.actualHumanCount){
         out.nextSourcePC=0x1af7a4;
-        const auto feedback=race.resultsFeedback_.lock();
-        if(!feedback||!feedback->clearHumans1AF770(race,observer.resultsBankIdentity(),out.actualHumanCount)){
+        const auto feedback=liveRace.resultsFeedback_.lock();
+        if(!feedback||!feedback->clearHumans1AF770(race,Read::observerBankIdentity(observer),out.actualHumanCount)){
             p.stop(d,Impl::S::owner,0x1af7a4,"Results same-thread actual feedback device borrow absent or retired");
             return out.prefix;
         }

@@ -110,6 +110,8 @@ inline HandlingReceipt bindColdHandling(
         live.state.phase==VehicleFramePhase49W::Ready&&
         live.state.bodies.main.frameFactor==0.f,
         "racer handling requires fresh state and explicit no-profile selection");
+    if constexpr(!std::is_same_v<ColdOwner,std::nullptr_t>)
+        if(retained)retained->beginLegacyColdHandling(live);
     const auto* text=reinterpret_cast<const char*>(phy.data());
     const auto bytes=phy.size();
     auto parameters=live.parameters;

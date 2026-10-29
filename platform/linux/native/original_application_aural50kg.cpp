@@ -2,8 +2,11 @@
 #include "original_ui_garage_audio_backing50kg.h"
 #include "original_ui_light_manager_owner50kg.h"
 #include "native_source_reverb50kg.h"
+#include "original_ui_main_session50kg.h"
 #include "../../../tests/native/original_ui_main_entry50kg.h"
 #include <bit>
+#include <cfenv>
+#include "../../../src/game/body_scene48g.h"
 #include <cmath>
 #include <limits>
 namespace rr::platform {
@@ -54,10 +57,294 @@ bool OriginalApplicationAural50KG::sourceIdentity()const noexcept {
         entity_.sessionGeneration==generation_&&entity_.objectKey==key(&entity_)&&entity_.reference00==1&&
         contains(entities_->entityAuthority_.view(),&entity_);
 }
-bool OriginalApplicationAural50KG::current()const noexcept {
-    if(!sourceIdentity()||entities_->attachmentLock423F58_)return false;
+bool OriginalApplicationAural50KG::currentIncludingIncompleteListener()const noexcept {
+    if(!sourceIdentity()||entities_->attachmentLock423F58_||!listenerCustodyCurrent(true))return false;
     for(const auto& list:lists_)if(!list.valid())return false;
     return game::original_entity_chain_detail50LA::forest(entities_->entityAuthority_.view());
+}
+bool OriginalApplicationAural50KG::listenerTerminalCleanupCurrent()const noexcept {
+    // A failed reservation remains poisoned, but after its real manager has
+    // withdrawn no listener can be serviced or retried. Permit ONLY actual
+    // output/Pending/final-Aural retirement through this private predicate.
+    return currentIncludingIncompleteListener()&&
+        nativeListenerPhase_==NativeListenerPhase::failed&&!nativeListenerIssuer_;
+}
+bool OriginalApplicationAural50KG::current()const noexcept {
+    return currentIncludingIncompleteListener()&&listenerCustodyCurrent(false);
+}
+bool OriginalApplicationAural50KG::listenerCustodyCurrent(bool allowIncomplete)const noexcept {
+    if(nativeListenerPhase_==NativeListenerPhase::retiring)return false;
+    for(std::size_t n=0;n<listeners4C_.size();++n){
+        if(listeners4C_[n]!=nativeListenerOwners_[n].get())return false;
+        if(n&&listeners4C_[n])return false; //Only genuine one-view registration joined.
+    }
+    switch(nativeListenerPhase_){
+    case NativeListenerPhase::empty:
+        return !nativeListenerIssuer_&&!word34_&&!word48_&&!listeners4C_[0];
+    case NativeListenerPhase::ready:
+        return nativeListenerIssuer_&&word34_==1u&&word48_==1u&&
+            listeners4C_[0]&&listeners4C_[0]->current(*this);
+    case NativeListenerPhase::constructing:
+        return allowIncomplete&&nativeListenerIssuer_&&word34_<=1u&&!word48_&&
+            (!listeners4C_[0]||!listeners4C_[0]->hasBackend04()||listeners4C_[0]->current(*this));
+    case NativeListenerPhase::failed:
+        //Failed102F10 destroys/nulls any wrapper but does not undo102EF0.
+        return allowIncomplete&&word34_<=1u&&!word48_&&!listeners4C_[0];
+    default:return false;
+    }
+}
+bool OriginalApplicationAural50KG::listenerCurrent(const ListenerManager& manager)const noexcept {
+    return current()&&nativeListenerPhase_==NativeListenerPhase::ready&&nativeListenerIssuer_==&manager;
+}
+bool OriginalApplicationAural50KG::beginSingleRaceListener1A4620(
+    const ListenerManager& manager,Diagnostic& d)noexcept {
+    d={};
+    //Private actual-manager caller proves source38==1 and same App/Race.
+    //These are native ownership gates, not invented guest branch results.
+    if(!current()||nativeListenerPhase_!=NativeListenerPhase::empty||
+       !issuer_->state||!nativeInitialized_||!backendCurrent()||!canActivateUiInitializer1B7340(d))
+        return fail(d,Status::owner,0x1a4620);
+    //141560 activation is BEFORE any listener reservation. Its real childless
+    //source owner was checked above; do not replace it with clear103DD0.
+    if(!activateUiInitializer1B7340(d)){
+        //Any already-issued activation prefix is terminal, even before34.
+        nativeListenerIssuer_=&manager;nativeListenerPhase_=NativeListenerPhase::failed;return false;
+    }
+    nativeListenerIssuer_=&manager;nativeListenerPhase_=NativeListenerPhase::constructing;
+    flags9CBit0_=true; //1A4678, preserve other bits in the existing projection.
+    ++word34_; //102EF0: reserve actual index0 BEFORE allocation/assertion stores.
+    auto& app=*issuer_->state;
+    if(!app.listenerGuard80C4){
+        app.listenerAssertion3DF4C0=1u;app.listenerGuard80C4=1u; //102F48/4C.
+    }
+    //Actual index0 makes the represented133660(index<4) return0, with no
+    //assertion callback on either existing diagnostic-enable branch.
+    NativeListener290A90* wrapper=nullptr;
+    try{wrapper=new NativeListener290A90;}catch(...){wrapper=nullptr;}
+    nativeListenerOwners_[0].reset(wrapper);
+    listeners4C_[0]=wrapper; //102FC0 includes the genuine allocation-null result.
+    if(!wrapper){
+        listeners4C_[0]=nullptr; //103004 after genuine null290AA0 no-op.
+        nativeListenerPhase_=NativeListenerPhase::failed;return fail(d,Status::allocation,0x102fc8);
+    }
+    if(!app.listenerGuard8C58){
+        app.listenerAssertion4344B0=1u;app.listenerGuard8C58=1u; //290B48/4C.
+    }
+    //Actual same Aural is nonnull;133660 at290B6C has no callback here.
+    wrapper->bindAural290BAC(*this);
+    NativeListenerBackend2357A0* backend=nullptr;
+    //232D50 is actual interface28-bit0 gated. No device/RPC factory substitute.
+    if((**interfaceA0_).initialized28Bit0){
+        try{backend=new NativeListenerBackend2357A0;}catch(...){backend=nullptr;}
+    }
+    wrapper->installBackend290BBC(backend); //Publish even null, before return test.
+    if(!backend){
+        nativeListenerOwners_[0].reset(); //102FF4 ->290AA0 BEFORE null slot store.
+        listeners4C_[0]=nullptr;nativeListenerPhase_=NativeListenerPhase::failed;
+        return fail(d,Status::allocation,0x290bc4);
+    }
+    //Four exact PS2 backend leaves return1 without stores/callbacks/hardware.
+    (void)wrapper->initialize290CF0(0x40400000u);
+    (void)wrapper->initialize290D30(0x3f800000u);
+    (void)wrapper->initialize290CB0(0x3e9c0ebfu);
+    (void)wrapper->update290C70();
+    ++word48_; //10301C only after actual successful290B10.
+    nativeListenerPhase_=NativeListenerPhase::ready;
+    d={Status::complete,0x1a46dc};return true;
+}
+bool OriginalApplicationAural50KG::removeSingleRaceListener103040(
+    const ListenerManager& manager,Diagnostic& d)noexcept {
+    d={};
+    if(!currentIncludingIncompleteListener())return fail(d,Status::owner,0x103040);
+    if(!nativeListenerIssuer_){d={Status::complete,0x1a4618};return true;} //Never began/already withdrawn.
+    if(nativeListenerIssuer_!=&manager)return fail(d,Status::owner,0x103040);
+    if(listeners4C_[0]){
+        if(nativeListenerPhase_!=NativeListenerPhase::ready||!listeners4C_[0]->current(*this))
+            return fail(d,Status::owner,0x103068);
+        nativeListenerOwners_[0].reset(); //290AA0 complete BEFORE source slot-null.
+        listeners4C_[0]=nullptr; //103070.
+        --word48_; //103080.
+        --word34_; //103090.
+        nativeListenerPhase_=NativeListenerPhase::empty;
+    }
+    //Original enclosing1A45C0 ignores103040's null-slot false. It never repairs
+    //reserved34 on a failed constructor. Withdraw native issuer, keep poison.
+    nativeListenerIssuer_=nullptr;
+    d={Status::complete,0x1a4618};return true;
+}
+bool OriginalApplicationAural50KG::readSingleRaceListener290E10(
+    const ListenerManager& manager,ListenerXYZ& out,Diagnostic& d)const noexcept {
+    d={};if(!listenerCurrent(manager))return fail(d,Status::owner,0x290e10);
+    if(!listeners4C_[0]->readPosition290E10(out))return fail(d,Status::backend,0x290e14);
+    d={Status::complete,0x290e40};return true;
+}
+bool OriginalApplicationAural50KG::writeSingleRaceListener1030B0(
+    const ListenerManager& manager,const std::array<const float*,9>& actualCameraXYZ,
+    const ListenerXYZ& velocity,Diagnostic& d)noexcept {
+    d={};if(!listenerCurrent(manager)||!issuer_->state)return fail(d,Status::owner,0x1030b0);
+    //Private manager/Registration proves these exact live source member lanes.
+    //Validate native addresses only; no source float is read before lazy stores.
+    for(const auto* lane:actualCameraXYZ)if(!lane)return fail(d,Status::owner,0x1030b0);
+    auto& app=*issuer_->state;
+    if(!app.listenerGuard80C8){app.listenerAssertion3DF4C8=1u;app.listenerGuard80C8=1u;}
+    //Index0 assertion is true and does not call assertion/logging callbacks.
+    //Direct per-lane read/store chronology290E50 then290DC0 then290ED0;
+    //do not copy all camera values before reached position stores.
+    auto& backend=*listeners4C_[0]->backend04_;
+    backend.position10_[0]=std::bit_cast<std::uint32_t>(*actualCameraXYZ[0]);
+    backend.position10_[1]=std::bit_cast<std::uint32_t>(*actualCameraXYZ[1]);
+    backend.position10_[2]=std::bit_cast<std::uint32_t>(*actualCameraXYZ[2]);
+    backend.look20_[0]=std::bit_cast<std::uint32_t>(*actualCameraXYZ[3]);
+    backend.look20_[1]=std::bit_cast<std::uint32_t>(*actualCameraXYZ[4]);
+    backend.look20_[2]=std::bit_cast<std::uint32_t>(*actualCameraXYZ[5]);
+    backend.up30_[0]=std::bit_cast<std::uint32_t>(*actualCameraXYZ[6]);
+    backend.up30_[1]=std::bit_cast<std::uint32_t>(*actualCameraXYZ[7]);
+    backend.up30_[2]=std::bit_cast<std::uint32_t>(*actualCameraXYZ[8]);
+    backend.velocity40_[0]=velocity[0];backend.velocity40_[1]=velocity[1];backend.velocity40_[2]=velocity[2];
+    d={Status::complete,0x1031d4};return true;
+}
+bool OriginalApplicationAural50KG::observeSingleRaceSpeech104140(
+    const ListenerManager& manager,const std::array<std::uint32_t,3>& actualLocalXYZ,
+    const std::array<std::uint32_t,4>& actualMain70,std::array<std::uint32_t,128>& scratch,
+    std::array<bool,128>& known,bool& audible,Diagnostic& d)const noexcept {
+    d={};
+    if(!listenerCurrent(manager))return fail(d,Status::owner,0x104140);
+    if(std::fegetround()!=FE_TONEAREST)return fail(d,Status::phase,0x104140);
+    //Native knownness, not guest zero stores. First80 words are104140's frame;
+    //next48 are102950's. Unrepresented saved registers are NEVER made known.
+    known.fill(false);
+    const auto store=[&](std::size_t index,std::uint32_t bits)noexcept {scratch[index]=bits;known[index]=true;};
+    const auto fp=[](std::uint32_t bits)noexcept {return std::bit_cast<float>(bits);};
+    const auto word=[](float value)noexcept {return std::bit_cast<std::uint32_t>(value);};
+    const auto vector=[&](std::size_t at)noexcept {
+        store(at,0);store(at+1,0);store(at+2,0);store(at+3,0x3f800000u);
+    };
+    const auto copy=[&](std::size_t to,std::size_t from)noexcept {
+        for(std::size_t lane=0;lane<4;++lane)store(to+lane,scratch[from+lane]);
+    };
+    const auto normalOrZero=[](float v)noexcept {
+        const auto exp=std::bit_cast<std::uint32_t>(v)&0x7f800000u;
+        return exp!=0x7f800000u&&(exp!=0u||v==0.f);
+    };
+    //Bounded existing native binary32 convention: separate rounded operations,
+    //no FMA/hypot, NaN/overflow/denormal emulation, or unchecked integer casts.
+    const auto binary=[&](std::uint32_t pc,char op,float a,float b,float& out)noexcept {
+        if(!normalOrZero(a)||!normalOrZero(b)||(op=='/'&&b==0.f))return fail(d,Status::phase,pc);
+        double exact=0;volatile float rounded=0;
+        switch(op){
+        case '+':exact=double(a)+double(b);rounded=a+b;break;
+        case '-':exact=double(a)-double(b);rounded=a-b;break;
+        case '*':exact=double(a)*double(b);rounded=a*b;break;
+        default:exact=double(a)/double(b);rounded=a/b;break;
+        }
+        if(!normalOrZero(rounded)||(rounded==0.f&&exact!=0.))return fail(d,Status::phase,pc);
+        out=rounded;return true;
+    };
+    const auto root=[&](std::uint32_t pc,float value,float& out)noexcept {
+        if(!normalOrZero(value)||value<0.f)return fail(d,Status::phase,pc);
+        volatile float rounded=static_cast<float>(std::sqrt(double(value)));
+        if(!normalOrZero(rounded))return fail(d,Status::phase,pc);
+        out=rounded;return true;
+    };
+    const auto signedWord=[&](std::uint32_t pc,float value,std::int32_t& out)noexcept {
+        if(!normalOrZero(value)||double(value)<-2147483648.||double(value)>=2147483648.)
+            return fail(d,Status::phase,pc);
+        out=static_cast<std::int32_t>(value);return true; //Retained EE signed truncation contract.
+    };
+    for(std::size_t at=0x80/4;at<=0x100/4;at+=4)vector(at);
+    //Only exact actual48==1 admitted.104140's unrelated zero/multiview paths
+    //are not synthesized when an authentic listener cannot be established.
+    const auto& backend=*listeners4C_[0]->backend04_;
+    for(unsigned lane=0;lane<3;++lane)store(0xf0/4+lane,backend.position10_[lane]); //290E10 XYZ.
+    float dx=0,dz=0,acc=0,zz=0,sum=0,distance=0;
+    if(!binary(0x104210,'-',fp(scratch[0xf0/4]),fp(actualLocalXYZ[0]),dx))return false;
+    dx=std::fabs(dx);store(0x134/4,word(dx));
+    if(!binary(0x10422c,'-',fp(scratch[0xf8/4]),fp(actualLocalXYZ[2]),dz))return false;
+    if(!binary(0x104230,'*',dx,dx,acc))return false; //MULA.S ACC before ABS.Z store.
+    dz=std::fabs(dz);store(0x138/4,word(dz));
+    if(!binary(0x104244,'*',dz,dz,zz)||!binary(0x104244,'+',acc,zz,sum)||
+       !root(0x104248,sum,distance))return false;
+    store(0x13c/4,word(distance));store(0x120/4,word(distance));
+    copy(0x80/4,0xf0/4); //104278/28C; self-comparison distance[0]<itself is false.
+    for(unsigned lane=0;lane<3;++lane)store(0x90/4+lane,backend.look20_[lane]); //290D70 first XYZ.
+    for(unsigned lane=0;lane<3;++lane)store(0xa0/4+lane,backend.up30_[lane]); //Reached despite later dead use.
+    for(unsigned lane=0;lane<3;++lane)store(0xe0/4+lane,backend.velocity40_[lane]); //290E90.
+    copy(0xc0/4,0x80/4);
+    for(unsigned lane=0;lane<3;++lane)store(0xd0/4+lane,actualLocalXYZ[lane]);
+    store(0xdc/4,0x3f800000u); //Actual2C205C/22A180 position W survives XYZ copy.
+    float displacement[3]{};
+    if(!binary(0x104358,'-',fp(scratch[0xd0/4]),fp(scratch[0xc0/4]),displacement[0])||
+       !binary(0x104360,'-',fp(scratch[0xd4/4]),fp(scratch[0xc4/4]),displacement[1]))return false;
+    store(0xb0/4,word(displacement[0]));
+    if(!binary(0x104368,'-',fp(scratch[0xd8/4]),fp(scratch[0xc8/4]),displacement[2]))return false;
+    store(0xb4/4,word(displacement[1]));store(0xb8/4,word(displacement[2]));
+    //102950 entry compare precedes stack copies; no callback/global effects.
+    const bool inRange=distance<200.f;
+    copy(80+0x60/4,0xe0/4);
+    for(unsigned lane=0;lane<4;++lane)store(80+0x70/4+lane,actualMain70[lane]);
+    store(0x12c/4,0xc51c4000u); //1029A0 sentinel.
+    store(0x118/4,0);store(0x11c/4,0); //1029A4 signed64 pan.
+    store(0x130/4,0); //1029AC branch delay Doppler.
+    if(!inRange){store(0x12c/4,0);audible=false;d={Status::complete,0x1043d0};return true;}
+    const bool atNear=distance<=0.f;
+    float beyond=0;if(!binary(0x1029c8,'-',distance,0.f,beyond))return false; //Delay executes both branches.
+    if(atNear)store(0x12c/4,0x42c80000u);
+    else {
+        float span=0,fraction=0,scaled=0,attenuation=0;
+        if(!binary(0x1029e0,'-',200.f,0.f,span)||!binary(0x1029e4,'/',beyond,span,fraction)||
+           !binary(0x1029f0,'*',100.f,fraction,scaled)||!binary(0x1029f4,'-',100.f,scaled,attenuation))return false;
+        store(0x12c/4,word(attenuation));
+    }
+    //Existing exact13C1F0 finite quadrant/polynomial convention, NOT atan2.
+    //It has only private scalar scratch, no globals, callbacks, errno, or RNG.
+    float firstAngle=0,secondAngle=0,degrees=0;std::int32_t first=0,second=0;
+    if(!normalOrZero(fp(scratch[0x90/4]))||!normalOrZero(fp(scratch[0x98/4]))||
+       !game::originalAngle48G(fp(scratch[0x98/4]),fp(scratch[0x90/4]),firstAngle))
+        return fail(d,Status::phase,0x102a00);
+    if(!binary(0x102a18,'*',fp(0x42652ee1u),firstAngle,degrees)||!signedWord(0x102a20,degrees,first))return false;
+    if(!game::originalAngle48G(displacement[2],displacement[0],secondAngle))return fail(d,Status::phase,0x102a28);
+    if(!binary(0x102a40,'*',fp(0x42652ee1u),secondAngle,degrees)||!signedWord(0x102a44,degrees,second))return false;
+    const std::int64_t wide=std::int64_t(second)-first;
+    if(wide<-2147483648LL||wide>2147483647LL)return fail(d,Status::phase,0x102a50);
+    std::int32_t pan=static_cast<std::int32_t>(wide);
+    if(pan>180)pan-=359;else if(pan< -180)pan+=359;
+    const auto pan64=static_cast<std::uint64_t>(static_cast<std::int64_t>(pan));
+    store(0x118/4,static_cast<std::uint32_t>(pan64));store(0x11c/4,static_cast<std::uint32_t>(pan64>>32));
+    float direction[3]{};
+    if(!binary(0x102aa8,'-',fp(scratch[0x90/4]),displacement[0],direction[0])||
+       !binary(0x102ab0,'-',fp(scratch[0x94/4]),displacement[1],direction[1]))return false;
+    store(80+0xa0/4,word(direction[0]));
+    if(!binary(0x102ab8,'-',fp(scratch[0x98/4]),displacement[2],direction[2]))return false;
+    store(80+0xa4/4,word(direction[1]));store(80+0xa8/4,word(direction[2]));store(80+0xac/4,0x3f800000u);
+    copy(80+0x80/4,80+0xa0/4);
+    float squared[3]{},xy=0,zTerm=0,length2=0,length=0,q=0,normalized[3]{};
+    for(unsigned lane=0;lane<3;++lane)
+        if(!binary(0x102ad4,'*',direction[lane],direction[lane],squared[lane]))return false;
+    if(!binary(0x102adc,'+',squared[0],squared[1],xy)||
+       !binary(0x102ae0,'*',1.f,squared[2],zTerm)||!binary(0x102ae0,'+',xy,zTerm,length2))return false;
+    if(length2==0.f)q=fp(0x7f7fffffu); //Existing recovered VRSQRT zero-length finite-Q convention.
+    else if(!root(0x102ae4,length2,length)||!binary(0x102ae4,'/',1.f,length,q))return false;
+    //VWAITQ; VF6.w=VF4.w+VF0.x (known1+0); all used VF/ACC lanes were written.
+    for(unsigned lane=0;lane<3;++lane)
+        if(!binary(0x102af0,'*',direction[lane],q,normalized[lane]))return false;
+    for(unsigned lane=0;lane<3;++lane)store(80+0x80/4+lane,word(normalized[lane]));
+    store(80+0x8c/4,0x3f800000u);
+    float relative[3]{};
+    if(!binary(0x102b14,'-',fp(scratch[80+0x70/4]),fp(scratch[80+0x60/4]),relative[0])||
+       !binary(0x102b18,'-',fp(scratch[80+0x74/4]),fp(scratch[80+0x64/4]),relative[1]))return false;
+    store(80+0xb0/4,word(relative[0]));
+    if(!binary(0x102b20,'-',fp(scratch[80+0x78/4]),fp(scratch[80+0x68/4]),relative[2]))return false;
+    store(80+0xb4/4,word(relative[1]));store(80+0xb8/4,word(relative[2]));store(80+0xbc/4,0x3f800000u);
+    copy(80+0x90/4,80+0xb0/4);store(80+0x94/4,0);relative[1]=0.f; //102B38 AFTER Y subtraction.
+    float product[3]{},dot=0;
+    for(unsigned lane=0;lane<3;++lane)
+        if(!binary(0x102b44,'*',normalized[lane],relative[lane],product[lane]))return false;
+    if(!binary(0x102b4c,'+',product[0],product[1],xy)||
+       !binary(0x102b50,'*',1.f,product[2],zTerm)||!binary(0x102b50,'+',xy,zTerm,dot))return false;
+    std::int32_t doppler=0;if(!signedWord(0x102b60,dot,doppler))return false;
+    store(0x130/4,std::bit_cast<std::uint32_t>(doppler)); //102B70.
+    //Actual A1=null skips233AE0 only now, after the complete scalar/VU leaf.
+    audible=true;d={Status::complete,0x1043d0};return true;
 }
 std::shared_ptr<const OriginalApplicationAural50KG>
 OriginalApplicationAural50KG::retainColdStreamManager232DB0(
@@ -119,7 +406,7 @@ bool OriginalApplicationAural50KG::nativeOutputSourceQuiescent()const noexcept {
     // Also used before device-close stops owned ordinary voices. Validate
     // their exact stream custody here, but leave final stopped-slot discharge
     // exclusively to retireNativeOrEmpty102CD0 after real output retirement.
-    if(!current()||!backendCurrent()||!nativeStreamSlotsCurrent())return false;
+    if((!current()&&!listenerTerminalCleanupCurrent())||!backendCurrent()||!nativeStreamSlotsCurrent())return false;
     const auto& interface=**interfaceA0_;std::array<std::uint64_t,8> references{};
     if(!interface.mixer->nativeSourceStreamReferences267CB0(*this,0.f,false,references))return false;
     for(std::size_t n=0;n<references.size();++n)
@@ -130,7 +417,7 @@ bool OriginalApplicationAural50KG::nativeOutputSourceQuiescent()const noexcept {
     return true;
 }
 std::shared_ptr<OriginalAudioPendingWaves50KG> OriginalApplicationAural50KG::nativeOutputPendingNamespace()const noexcept {
-    return current()?entities_->pendingWaves98A4_:nullptr;
+    return (current()||listenerTerminalCleanupCurrent())?entities_->pendingWaves98A4_:nullptr;
 }
 bool OriginalApplicationAural50KG::nativeOutputSourceRetired(const Application& root,const C* historical)noexcept {
     const auto entities=root.entities();
@@ -272,6 +559,29 @@ bool OriginalApplicationAural50KG::releaseRegistered103D00(C& emitter,Diagnostic
     // a registration without its actual virtual10 destructor. A future typed
     // producer must add its concrete preflight/release branch here first.
     (void)emitter;return fail(d,Status::registeredEmitter,0x103DA8);
+}
+bool OriginalApplicationAural50KG::restartOwnedList103210(const Application& root,
+    const std::shared_ptr<E>& expected,std::optional<std::int32_t>& indexS0,
+    std::optional<std::uint32_t>& count5C,const C*& reachedEmitter,Diagnostic& d)noexcept {
+    d={};
+    if(!expected||expected->nativeOwnerThread_!=std::this_thread::get_id())
+        return fail(d,Status::affinity,0x1ac944);
+    //Read the actual App00 owner, never infer null from missing native audio.
+    const auto held=root.sourceAural00Owner_;
+    if(root.entities()!=expected||!held||held->issuer_!=&root||held->entities_!=expected||
+       !held->sourceIdentity()||expected->attachmentLock423F58_||
+       !held->lists_[0].constructed)
+        return fail(d,Status::owner,0x1ac944);
+    indexS0=0; //103228 branch delay slot, BEFORE the first actual5C count read.
+    count5C=held->lists_[0].count; //103250. No cache/storage/child scan first.
+    if(*indexS0>=std::bit_cast<std::int32_t>(*count5C)){
+        d={Status::complete,0x10326c};return true;
+    }
+    //Only a reached positive list requires indexed backing. Preserve the
+    //actual iterator/count/entry even though no typed child callback exists.
+    if(!held->lists_[0].valid())return fail(d,Status::topology,0x104750);
+    reachedEmitter=held->lists_[0].at104750(static_cast<std::uint32_t>(*indexS0));
+    return fail(d,reachedEmitter?Status::registeredEmitter:Status::topology,0x103238);
 }
 bool OriginalApplicationAural50KG::clear103DD0(Diagnostic& d)noexcept {
     d={};if(!current()||clearCalls_==std::numeric_limits<std::uint64_t>::max())return fail(d,Status::owner,0x103DD0);
@@ -518,6 +828,9 @@ bool OriginalApplicationAural50KG::nativeStreamFinalRetirementCurrent()const noe
     if(!i.mixer->nativeSourceStreamReferences267CB0(*this,0.f,false,references))return false;
     for(std::size_t n=0;n<references.size();++n)
         if(references[n]&&(!i.streamSlots[n].occupied||references[n]!=i.streamSlots[n].generation))return false;
+    // Exact no-effects release preconditions before listener destructor prefix.
+    // No callback/yield occurs between this proof and release after destruction.
+    if(!i.wetProcessor||!i.mixer->canReleaseNativeSourceWetProcessor(*this,*i.wetProcessor))return false;
     // Mixer release independently checks every reserved pool cell and claim.
     // Unreserved stream-bit cells/occupied slots may persist until this actual
     // interface dies; neither its final guard nor this observation ages them.
@@ -664,11 +977,13 @@ bool OriginalApplicationAural50KG::canUpdate103720(float factor,Diagnostic& d)co
         return fail(d,Status::phase,0x103758);
     // Preflight the whole supported body before its first source effect.
     // No invented listener/emitter traversal, capacity/eviction or debug draw.
-    if(word30_||word34_||word38_||word3C_!=48||word40_||word44_||word48_||
-       word98_!=-1||entities_->diagnostic14_||entity_.firstChild18||entity_.descendants24)
+    if(word30_||word38_||word3C_!=48||word40_||word44_||
+       !listenerCustodyCurrent(false)||word98_!=-1||entities_->diagnostic14_||
+       entity_.firstChild18||entity_.descendants24)
         return fail(d,Status::phase,0x103280);
     for(const auto& list:lists_)if(list.count)return fail(d,Status::registeredEmitter,0x103280);
-    for(const auto* listener:listeners4C_)if(listener)return fail(d,Status::phase,0x103790);
+    for(std::uint32_t n=0;n<word48_;++n)
+        if(!listeners4C_[n]||!listeners4C_[n]->current(*this))return fail(d,Status::phase,0x103790);
     const auto& i=**interfaceA0_;
     std::array<NativeInterface::StreamSlot,8> next;
     if(!i.mixer->canServiceNativeSourceVoices267CB0(*this,factor)||!previewNativeStreamSuffix(factor,next))
@@ -685,18 +1000,26 @@ bool OriginalApplicationAural50KG::update103720(float factor,Diagnostic& d)noexc
     //103760 ->103280: empty5C skips both passes. Actual1047C0 writes the
     // two empty list counts without discarding allocated backing/capacity.
     lists_[1].count=0;lists_[2].count=0; //1032E8/1032F0
-    // Exact0+48-0 capacity admits no eviction; empty84, zero48, null14 and
-    // childless inherited141ED0 take their real empty paths. This is not a
+    // Exact0+48-0 capacity admits no eviction. Source103780 reaches each
+    // typed listener's290C70 ->235890 literal return1 after the list stores.
+    for(std::uint32_t n=0;n<word48_;++n)
+        if(!listeners4C_[n]->update290C70())return fail(d,Status::phase,0x103780);
+    // Empty84, null14 and childless inherited141ED0 take their real paths. This is not a
     // general active-source service or playback-readiness receipt.
     d={Status::complete,0x103B04};return true;
 }
 bool OriginalApplicationAural50KG::retireNativeOrEmpty102CD0(Diagnostic& d)noexcept {
     d={};if(thread_!=std::this_thread::get_id())return fail(d,Status::affinity,0x102CD0);
     if(retired_)return true;
-    if(!current()||entity_.firstChild18||entity_.next14||!entities_->entityAuthority_.canRetire(entity_))return fail(d,Status::phase,0x102CD0);
+    //Actual manager removal must withdraw its native issuer before App teardown.
+    //Never destroy a listener still borrowed by a live same-source manager.
+    if(nativeListenerIssuer_||!currentIncludingIncompleteListener()||entity_.firstChild18||entity_.next14||!entities_->entityAuthority_.canRetire(entity_))return fail(d,Status::phase,0x102CD0);
     if(attached_?(entity_.parent1C!=&entities_->root10_):(entity_.parent1C||entity_.previous10))
         return fail(d,Status::topology,0x142590);
-    for(const auto* listener:listeners4C_)if(listener)return fail(d,Status::phase,0x102D14);
+    // Final102CD0 owns every actually published typed slot, including partial
+    // initialization; unlike103040 it does NOT decrement34/48 or null-store4C.
+    // Preflight backend retirement below before this irreversible prefix.
+    if(!listenerCustodyCurrent(true))return fail(d,Status::phase,0x102D14);
     for(const auto& list:lists_)if(list.count)return fail(d,Status::registeredEmitter,0x102D60);
     if(interfaceA0_&&*interfaceA0_){auto& i=**interfaceA0_;
         if(i.mastersApplied){
@@ -709,8 +1032,11 @@ bool OriginalApplicationAural50KG::retireNativeOrEmpty102CD0(Diagnostic& d)noexc
             // identity, interface and strong processor owner are still alive.
             // Mixer release independently requires all voice/route claims gone.
             // A rejection changes neither master ownership nor stored history.
-            if(!i.wetProcessor||!i.wetProcessorBound||
-               !i.mixer->releaseNativeSourceWetProcessor(*this,*i.wetProcessor))
+            if(!i.wetProcessor||!i.wetProcessorBound)return fail(d,Status::backend,0x232A38);
+            nativeListenerPhase_=NativeListenerPhase::retiring;
+            for(auto& listener:nativeListenerOwners_)listener.reset(); //102D08..2C beforeA0.
+            // Source4C values remain historical identities, never dereferenced.
+            if(!i.mixer->releaseNativeSourceWetProcessor(*this,*i.wetProcessor))
                 return fail(d,Status::backend,0x232A38);
             i.wetProcessorBound=false;i.streamRetirementAuthorized=true;
             // Withdraw the Main control borrow after Mixer has stopped using
@@ -729,7 +1055,15 @@ bool OriginalApplicationAural50KG::retireNativeOrEmpty102CD0(Diagnostic& d)noexc
         // Main while another source owner still pins it. This is the actual
         // interface retirement where retained wet history is finally destroyed.
         // Root retires the separately owned backing later.
+        if(nativeListenerPhase_!=NativeListenerPhase::retiring){
+            nativeListenerPhase_=NativeListenerPhase::retiring;
+            for(auto& listener:nativeListenerOwners_)listener.reset();
+        }
         interfaceA0_->reset();
+    }
+    if(nativeListenerPhase_!=NativeListenerPhase::retiring){
+        nativeListenerPhase_=NativeListenerPhase::retiring;
+        for(auto& listener:nativeListenerOwners_)listener.reset();
     }
     for(std::size_t n=3;n;--n)lists_[n-1].storage.reset(); //102D60/74/88 order.
     if(attached_){

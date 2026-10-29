@@ -27,11 +27,12 @@ OriginalGcSprayStatus50KG readOriginalGcPodSparksDefinition50KG(const std::vecto
     d={};try {
         std::vector<Section> doc;
         const auto ordinal=static_cast<unsigned>(member);
-        constexpr std::size_t sizes[]={1075,1369};
+        constexpr std::size_t sizes[]={1075,1369,1386};
         constexpr const char* hashes[]={
             "0a8e6c18e9f98992770f7046eea11a7541f286c387977aedcbbf277026d180d8",
-            "036894066d5a9a50df9da7a4eb596bc35d9528097245de6d62cf61b07e99ac78"};
-        if(ordinal>=2||!readOriginalGcParticleText50KG(bytes,sizes[ordinal],hashes[ordinal],doc))return Status::assetIdentity;
+            "036894066d5a9a50df9da7a4eb596bc35d9528097245de6d62cf61b07e99ac78",
+            "0f7bd127076073b0d2d282614a4f5b23721d1d2368119182e08f8b0f143d1d46"};
+        if(ordinal>=3||!readOriginalGcParticleText50KG(bytes,sizes[ordinal],hashes[ordinal],doc))return Status::assetIdentity;
         const Section empty{};const auto& g=section(doc,"General Info",empty);
         const auto& p=section(doc,"Properties",empty);const auto& a=section(doc,"Animation",empty);
         OriginalGcPodSparksDefinition50KG f;f.member=member;f.groundLevel=std::numeric_limits<float>::max();
@@ -96,7 +97,7 @@ Receipt bindOriginalGcPodSparks50KG(OriginalGcPodSparksRuntime50KG& state,
     state.manager=&manager;state.ownerId=id;state.canonicalOwnerId=owner.id;
     state.firstFrame=state.currentFrame=group->first;state.lastFrame=group->last;
     state.member=f.member;
-    state.carriedSize18C=f.member==OriginalGcPodSparksMember50KG::wreckSparks?0.f:f.size;
+    state.carriedSize18C=f.member!=OriginalGcPodSparksMember50KG::podSparks?0.f:f.size;
     state.bound=true;return result(Status::complete,0x15fdb4);
 }
 Receipt advanceOriginalGcPodSparksAfterCommon50KG(OriginalGcPodSparksRuntime50KG& state,
@@ -104,6 +105,9 @@ Receipt advanceOriginalGcPodSparksAfterCommon50KG(OriginalGcPodSparksRuntime50KG
     EffectOwner50BE& owner,float dt,std::uint32_t& raw,OriginalGcPodSparksGlobals50KG& globals,
     const OriginalGcPodSparksAttachmentGate50KG* attachment) noexcept {
     if(state.failed)return state.stoppedAt;
+    //The actual Racer810 member is admitted for load/Stop/base-disable only.
+    //Its later common/virtual20 ownership is not granted by reader reuse.
+    if(f.member==OriginalGcPodSparksMember50KG::racerExplWreckSparks)return result(Status::unsupported,0x15f380);
     if(!state.bound||state.manager!=&manager||!state.ownerId||!f.parsed||
        owner.id!=state.canonicalOwnerId||owner.profile!=EffectProfile50BE::Ordinary15F100||state.member!=f.member)
         return result(Status::unprepared,0x15f3c0);

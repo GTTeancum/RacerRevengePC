@@ -331,6 +331,9 @@ struct OriginalStandardMaterialObject50LA::Storage {
     std::shared_ptr<const OriginalUiArchive50KG> damageMissingPsm;
     std::unique_ptr<OriginalUiMaterial50KG> damageFallback;
     std::shared_ptr<const OriginalUiArchive50KG> pauseBackdropMissingPsm;
+    std::shared_ptr<const OriginalLoadingScreenFallback50LA> loadingFallback;
+    std::shared_ptr<const OriginalCourseScreenFallback50KG> courseFallback;
+    std::optional<OriginalCourseScreenAuthored50KG::Construction> courseAuthoredConstruction;
     std::shared_ptr<const OriginalGarageScreenFallback50KG> garageFallback;
     std::shared_ptr<const OriginalResultsScreenFallback50LA> resultsFallback;
     OriginalGarageScreenFallback50KG::ConstructionObservation sharedIconConstruction;
@@ -1437,6 +1440,29 @@ bool OriginalStandardMaterialObject50LA::demand24A430(const float* sizes,std::ui
     }
     return true;
 }
+bool OriginalStandardMaterialObject50LA::courseScreenConstructionCurrent(
+    const std::shared_ptr<const OriginalStandardMaterialContext50LA>& context,
+    const std::shared_ptr<OriginalStandardTextureTable50LA>& textures)const noexcept {
+    if(!storage_||!storage_->constructed)return false;
+    const auto& s=*storage_;
+    if(s.courseFallback)return !s.courseAuthoredConstruction&&s.courseFallback->current(s.name00,context,textures);
+    if(!s.courseAuthoredConstruction||s.source!=s.courseAuthoredConstruction->source||
+       s.construction!=context||s.textures!=textures||s.count48!=1||!s.passes4C[0]||!s.templates||
+       !s.courseAuthoredConstruction->current(s.name00,s.row40,context,textures))return false;
+    const auto& pass=*s.passes4C[0];
+    if(pass.references04!=1||pass.constructionTemplate!=s.templates->get(OriginalUiTemplate50KG::screenMt)||
+       pass.mapCount20!=1||!pass.state30||pass.animation10||pass.parameters34||pass.parameterCount28)return false;
+    const auto& receipt=*s.courseAuthoredConstruction;
+    using Kind=OriginalCourseScreenAuthored50KG::PassKind;
+    const auto kind=receipt.popup?Kind::staticOverlay:
+        OriginalCourseScreenAuthored50KG::authoredPassKind(receipt.ordinal,receipt.slot);
+    // Exact authored overlay1 has no TextureAnimation key. This construction
+    // branch owns no prototype; it is not permission to drop arrow controllers
+    // or to treat either kind as a draw/service completion receipt.
+    if(kind==Kind::staticOverlay)return !pass.textureAnimation10;
+    return kind==Kind::uniqueTexture&&pass.textureAnimation10&&pass.textureAnimation10->unique18()&&
+        pass.textureAnimation10->materialOwner()==this&&pass.textureAnimation10->passOrdinal()==0;
+}
 bool OriginalStandardMaterialObject50LA::construct29B550(std::int32_t row,const std::string& canonical,
     std::shared_ptr<const OriginalUiMaterialTemplates50KG> templates,
     const OriginalUiMaterialTemplateState50KG* association,
@@ -1447,7 +1473,10 @@ bool OriginalStandardMaterialObject50LA::construct29B550(std::int32_t row,const 
     std::shared_ptr<const OriginalUiArchive50KG> pauseBackdropMissingPsm,
     std::shared_ptr<const OriginalGarageScreenFallback50KG> garageFallback,
     std::shared_ptr<const OriginalMemoryCardScreenFallback50KG> memoryCardFallback,
-    std::shared_ptr<const OriginalResultsScreenFallback50LA> resultsFallback,D& d) noexcept {
+    std::shared_ptr<const OriginalResultsScreenFallback50LA> resultsFallback,
+    std::shared_ptr<const OriginalLoadingScreenFallback50LA> loadingFallback,
+    std::shared_ptr<const OriginalCourseScreenFallback50KG> courseFallback,
+    std::shared_ptr<const OriginalCourseScreenAuthored50KG> courseAuthored,D& d) noexcept {
     try {
         auto& s=*storage_;
         if(s.row40!=-1)return fail(d,E::phase,0x29B550);
@@ -1465,13 +1494,26 @@ bool OriginalStandardMaterialObject50LA::construct29B550(std::int32_t row,const 
             if(s.source)return fail(d,E::source,0x29B628,"ambiguous resolved PSM member");
             s.source=source;
         }
+        if(courseAuthored){
+            // Native pending admission is not a construction receipt. Capture
+            // only now, at the actual resolved positive29B628 predecessor.
+            if(!s.source||garageFallback||memoryCardFallback||resultsFallback||loadingFallback||courseFallback||
+               tournamentMissingPsm||speedBoostMissingPsm||damageMissingPsm||pauseBackdropMissingPsm)
+                return fail(d,E::source,0x29B628,"exclusive Course authored construction");
+            OriginalCourseScreenAuthored50KG::Construction receipt;
+            if(!courseAuthored->capture(s.name00,row,s.source,input.construction,input.actualTextures383400,receipt))
+                return fail(d,E::source,0x29B628,"actual Course positive selected source");
+            s.courseAuthoredConstruction=std::move(receipt);
+        }
         if(s.source){captureOverlayConstruction29B628(input);captureResultsAuthoredConstruction29B628(input);}
         if((tournamentMissingPsm&&speedBoostMissingPsm)||
            (damageMissingPsm&&(tournamentMissingPsm||speedBoostMissingPsm))||
            (pauseBackdropMissingPsm&&(tournamentMissingPsm||speedBoostMissingPsm||damageMissingPsm)))return fail(d,E::source,0x29B638);
-        if(garageFallback||memoryCardFallback||resultsFallback){
+        if(garageFallback||memoryCardFallback||resultsFallback||loadingFallback||courseFallback){
             if(s.source||tournamentMissingPsm||speedBoostMissingPsm||damageMissingPsm||pauseBackdropMissingPsm||
-               (garageFallback&&memoryCardFallback)||(resultsFallback&&(garageFallback||memoryCardFallback)))return fail(d,E::source,0x29B638,"one actual pending construction family");
+               (garageFallback&&memoryCardFallback)||(resultsFallback&&(garageFallback||memoryCardFallback))||
+               (loadingFallback&&(garageFallback||memoryCardFallback||resultsFallback))||
+               (courseFallback&&(garageFallback||memoryCardFallback||resultsFallback||loadingFallback)))return fail(d,E::source,0x29B638,"one actual pending construction family");
             if(garageFallback&&(garageFallback->row_!=row||
                !garageFallback->current(s.name00,input.construction,input.actualTextures383400,&s.sharedIconConstruction)))
                 return fail(d,E::source,0x29B638,"Garage canonical absent-PSM proof");
@@ -1481,6 +1523,12 @@ bool OriginalStandardMaterialObject50LA::construct29B550(std::int32_t row,const 
             if(resultsFallback&&(resultsFallback->row_!=row||
                !resultsFallback->current(s.name00,input.construction,input.actualTextures383400,input.positiveConstructionProvider_)))
                 return fail(d,E::source,0x29B638,"actual Results occurrence absent-PSM construction");
+            if(loadingFallback&&(loadingFallback->row_!=row||
+               !loadingFallback->current(s.name00,input.construction,input.actualTextures383400)))
+                return fail(d,E::source,0x29B638,"actual Loading Text absent-PSM construction");
+            if(courseFallback&&(courseFallback->row_!=row||
+               !courseFallback->current(s.name00,input.construction,input.actualTextures383400)))
+                return fail(d,E::source,0x29B638,"actual Course Icon occurrence absent-PSM construction");
             if(!templates||association!=templates->get(OriginalUiTemplate50KG::screenMt)||
                !input.construction||!input.construction->live()||
                &input.construction->materialApplication()->templates()!=templates.get())
@@ -1489,6 +1537,8 @@ bool OriginalStandardMaterialObject50LA::construct29B550(std::int32_t row,const 
             s.textures=input.actualTextures383400;s.construction=input.construction;
             s.garageFallback=std::move(garageFallback);
             s.resultsFallback=std::move(resultsFallback);
+            s.loadingFallback=std::move(loadingFallback);
+            s.courseFallback=std::move(courseFallback);
             s.count48=1;s.passes4C[0]=std::make_unique<Storage::Pass>();
             auto& pass=*s.passes4C[0];pass.constructionTemplate=association;
             if(!s.programs||!s.programs->prepared()||
@@ -1496,7 +1546,7 @@ bool OriginalStandardMaterialObject50LA::construct29B550(std::int32_t row,const 
                 return fail(d,E::program,0x247620);
             pass.mapCount20=1; //247630; flags21 remain2 and UV1E remains0.
             if(!s.textures||!s.textures->prepared()||!s.textures->bindMaterialContext(s.construction,d.texture)||
-               !s.textures->acquire299330AndRetain298A30(memoryCardFallback?memoryCardFallback->name_:(s.resultsFallback?s.resultsFallback->name_:s.garageFallback->name_),pass.texture1A[0],d.texture))
+               !s.textures->acquire299330AndRetain298A30(memoryCardFallback?memoryCardFallback->name_:(s.resultsFallback?s.resultsFallback->name_:(s.loadingFallback?s.loadingFallback->name_:(s.courseFallback?s.courseFallback->name_:s.garageFallback->name_))),pass.texture1A[0],d.texture))
                 return fail(d,E::texture,0x247648);
             const OriginalUiDatSection50KG noAttributes{}; //NULL document at247670, never a fabricated PSM.
             auto state=std::make_unique<OriginalStandardMaterialState50LA>();

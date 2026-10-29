@@ -7,6 +7,7 @@
 #include <limits>
 
 namespace rr::game {
+class OriginalRaceMusicManager50LA;
 // Native identities resolve the actual racer through its existing bank. Never
 // store the multiplexed execution-arena pointer as an opponent's identity.
 using RaceActorId50ID=std::uint32_t; //0 is source null; actual actors are nonzero.
@@ -46,6 +47,15 @@ template<std::size_t Reserved=128> struct RaceEventQueue50ID {
     std::uint64_t lastTicket=0;
     bool flushing=false;
     std::uint8_t dispatchGate58=0,dispatchGate1B0=0;
+private:
+    friend class OriginalRaceMusicManager50LA;
+    //Exclusive native End consumer custody, not a guest field or queue reset.
+    //Only the real counted manager may claim/release it. Producers may append
+    //while it is pending; other consumers cannot clear/replay its prefix.
+    const OriginalRaceMusicManager50LA* endFlushOwner50LA_=nullptr;
+public:
+    bool endFlushPending50LA()const noexcept{return endFlushOwner50LA_!=nullptr;}
+
 };
 template<std::size_t N> inline RaceEventAppend50ID appendRaceEvent50ID(
     RaceEventQueue50ID<N>& queue,const RaceEvent50ID& event,
@@ -78,7 +88,7 @@ template<std::size_t N> inline RaceEventStatus50ID beginRaceEventFlush50ID(
     RaceEventQueue50ID<N>& queue,std::uint8_t raceManager58,
     std::uint8_t application1B0) noexcept {
     using S=RaceEventStatus50ID;
-    if(queue.flushing)return S::AlreadyFlushing;
+    if(queue.endFlushPending50LA()||queue.flushing)return S::AlreadyFlushing;
     if(queue.count150>=queue.capacity154||queue.capacity154>N)return S::Storage;
     //1A4C9C..1A4CC0;1A5C40 then clears count even when dispatch was gated.
     if(!(raceManager58&2u)||(application1B0&16u)){
@@ -90,7 +100,7 @@ template<std::size_t N> inline RaceEventStatus50ID beginRaceEventFlush50ID(
 }
 template<std::size_t N> inline const RaceEventEntry50ID* frontRaceEvent50ID(
     const RaceEventQueue50ID<N>& queue) noexcept {
-    return queue.flushing&&queue.dispatchIndex<queue.count150?
+    return !queue.endFlushPending50LA()&&queue.flushing&&queue.dispatchIndex<queue.count150?
         &queue.entries[queue.dispatchIndex]:nullptr;
 }
 // Acknowledge only after this exact event's complete native subscriber chain
@@ -103,7 +113,7 @@ template<std::size_t N> inline RaceEventStatus50ID acceptRaceEventReturn50ID(
 }
 template<std::size_t N> inline RaceEventStatus50ID finishRaceEventFlush50ID(
     RaceEventQueue50ID<N>& queue) noexcept {
-    if(!queue.flushing||queue.dispatchIndex!=queue.count150)
+    if(queue.endFlushPending50LA()||!queue.flushing||queue.dispatchIndex!=queue.count150)
         return RaceEventStatus50ID::WrongReturn;
     queue.count150=0;queue.dispatchIndex=0;queue.flushing=false;
     return RaceEventStatus50ID::Complete;

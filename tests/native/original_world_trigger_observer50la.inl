@@ -12,7 +12,7 @@ static_assert(sizeof(float)==4&&std::numeric_limits<float>::is_iec559&&
               std::numeric_limits<float>::digits==24,"RA trigger observer binary32");
 namespace ra_pod_scene50LA {
 bool Owner::nativeTriggerObserverCurrent(std::size_t i)const noexcept {
-    if(!nativeTriggerList3D0_||i>=2u)return false;
+    if(!nativeTriggerList3D0_||nativeTriggerList3D0_->sourceMode||i>=2u)return false;
     const auto& list=*nativeTriggerList3D0_;const auto* o=list.observers[i].get();
     if(!o||o->retiring||!runtimeQueries_||runtimeQueries_->sceneOwner_!=this||
        !sceneApplication_||sceneApplication_!=worldApplication_||!list.actions||
@@ -97,7 +97,7 @@ bool Owner::nativeTriggerObserverCurrent(std::size_t i)const noexcept {
 
 bool Owner::configureNativeTriggerObserver2A0A80(std::size_t i,std::uint32_t& pc)noexcept {
     pc=0x2a0b00;
-    if(!nativeTriggerList3D0_||i>=2u||!runtimeQueries_||!sceneApplication_||
+    if(!nativeTriggerList3D0_||nativeTriggerList3D0_->sourceMode||i>=2u||!runtimeQueries_||!sceneApplication_||
        runtimeQueries_->sceneOwner_!=this||runtimeQueries_->closed_||runtimeQueries_->terminal_||
        runtimeQueries_->nativeFifoPins_||runtimeQueries_->triggerQueryActive_||
        runtimeQueries_->sharedOwnerLease_||runtimeQueries_->sharedRoleViews_||
@@ -201,6 +201,7 @@ bool Owner::configureNativeTriggerObserver2A0A80(std::size_t i,std::uint32_t& pc
 
 bool Owner::canRetireNativeTriggerObservers()const noexcept {
     if(!nativeTriggerList3D0_)return true;
+    if(nativeTriggerList3D0_->sourceMode)return canRetireSourceTriggerNative();
     if(!worldApplication_||worldApplication_->attachmentLock423F58()||!nativeTriggerList3D0_->actions||
        nativeTriggerList3D0_->actions->lease_)return false;
     if(runtimeQueries_&&(runtimeQueries_->nativeFifoPins_||runtimeQueries_->triggerQueryActive_||
@@ -241,7 +242,7 @@ bool Owner::withdrawNativeTriggerObserverStorage()noexcept {
     return true;
 }
 bool Owner::retireNativeTriggerObserver2A0420(std::size_t i,std::uint32_t& pc)noexcept {
-    pc=0x2a0420;if(!nativeTriggerList3D0_||i>=2u)return false;
+    pc=0x2a0420;if(!nativeTriggerList3D0_||nativeTriggerList3D0_->sourceMode||i>=2u)return false;
     auto& owned=nativeTriggerList3D0_->observers[i];if(!owned)return true;
     // No dereference of Storage/registries or zone methods after withdrawal.
     // Exact original281490 unregister is NOT claimed; native Storage already

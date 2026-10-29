@@ -1,4 +1,12 @@
+#include "original_pod_source_bank50la.h"
+#include "original_ra_track_source_file50la.h"
 #include "original_standard_texture_resource50la.h"
+#include "original_loading_pst_file50la.h"
+#include "original_loading_ra_file50la.h"
+#include "original_loading_texture_fc50la.h"
+#include "original_loading_pst_native50la.h"
+#include "original_loading_texture_source50la.h"
+#include "original_loading_font_source50la.h"
 #include "material_texture_assets50ea.h"
 #include "original_texture_candidate50tc.h"
 #include "original_standard_model_resource50la.h"
@@ -13,6 +21,7 @@
 #include "original_standard_ipum_framing50la.h"
 #include "original_standard_ipum_image_lease50la.h"
 #include <cstring>
+#include <atomic>
 #include <new>
 #include <algorithm>
 #include <exception>
@@ -28,6 +37,78 @@ using D=OriginalStandardTextureDiagnostic50LA;
 using E=OriginalStandardTextureStatus50LA;
 bool fail(D& d,E status,std::uint32_t pc,std::size_t at=0) noexcept {
     d.status=status;d.sourcePC=pc;d.byteOffset=at;return false;
+}
+bool courseSourceName308F00(std::string_view a,std::string_view b)noexcept {
+    if(a.size()!=b.size())return false;
+    for(std::size_t n=0;n<a.size();++n){auto x=static_cast<unsigned char>(a[n]),y=static_cast<unsigned char>(b[n]);
+        if(x>='A'&&x<='Z')x+=32;if(y>='A'&&y<='Z')y+=32;if(x!=y)return false;}
+    return true; //308F00 folds case only; '/' and '\\' are not aliases.
+}
+struct CourseFileAssertions12F290 {
+    std::atomic<std::uint32_t> assertion3E1B00{0},assertion3E1B08{0};
+    std::atomic<std::uint8_t> guard8228{0},guard822C{0};
+};
+CourseFileAssertions12F290& courseFileAssertions12F290()noexcept {
+    static CourseFileAssertions12F290 state;return state;
+}
+bool fileAssertions12F290(std::int32_t handle,std::int32_t count,D& d)noexcept {
+    auto& a=courseFileAssertions12F290();
+    if(!a.guard8228.load(std::memory_order_relaxed)){a.assertion3E1B00.store(1,std::memory_order_relaxed);a.guard8228.store(1,std::memory_order_relaxed);}
+    if(a.assertion3E1B00.load(std::memory_order_relaxed)&&handle<0)return fail(d,E::source,0x12F2E0);
+    if(!a.guard822C.load(std::memory_order_relaxed)){a.assertion3E1B08.store(1,std::memory_order_relaxed);a.guard822C.store(1,std::memory_order_relaxed);}
+    if(a.assertion3E1B08.load(std::memory_order_relaxed)&&handle>=count)return fail(d,E::source,0x12F350);
+    return true;
+}
+struct FileRegistrationAssertions {
+    std::atomic<std::uint32_t> word3E1AD0{0},word3E1A98{0},word3E1AA0{0};
+    std::atomic<std::uint8_t> guard8210{0},guard81F4{0},guard81F8{0};
+};
+FileRegistrationAssertions& fileRegistrationAssertions()noexcept {static FileRegistrationAssertions s;return s;}
+bool memberNameAssertion12E4E8(const char* name,D& d)noexcept {
+    auto& s=fileRegistrationAssertions();
+    if(!s.guard8210.load(std::memory_order_relaxed)){s.word3E1AD0.store(1,std::memory_order_relaxed);s.guard8210.store(1,std::memory_order_relaxed);}
+    return !s.word3E1AD0.load(std::memory_order_relaxed)||!name||fail(d,E::source,0x12E528);
+}
+bool deviceAssertions12DAFC(const char* name,std::uint32_t flags,D& d)noexcept {
+    auto& s=fileRegistrationAssertions();
+    if(!s.guard81F4.load(std::memory_order_relaxed)){s.word3E1A98.store(1,std::memory_order_relaxed);s.guard81F4.store(1,std::memory_order_relaxed);}
+    if(s.word3E1A98.load(std::memory_order_relaxed)&&name)return fail(d,E::source,0x12DB3C);
+    if(!s.guard81F8.load(std::memory_order_relaxed)){s.word3E1AA0.store(1,std::memory_order_relaxed);s.guard81F8.store(1,std::memory_order_relaxed);}
+    return !s.word3E1AA0.load(std::memory_order_relaxed)||(flags&1)||fail(d,E::source,0x12DBA4);
+}
+struct FileIoAssertion {
+    std::atomic<std::uint32_t> word{0};std::atomic<std::uint8_t> guard{0};
+    bool reach(bool condition,D& d,std::uint32_t pc)noexcept {
+        if(!guard.load(std::memory_order_relaxed)){word.store(1,std::memory_order_relaxed);guard.store(1,std::memory_order_relaxed);}
+        return !word.load(std::memory_order_relaxed)||condition||fail(d,E::source,pc);
+    }
+};
+struct FileIoAssertions {
+    FileIoAssertion active8214_3E1AD8,line8220_3E1AF0,line8224_3E1AF8;
+    FileIoAssertion reuse81E8_3E1A80,reuseNext81EC_3E1A88;
+    FileIoAssertion eof8230_3E1B10,eof8234_3E1B18;
+    FileIoAssertion tell8238_3E1B20,tell823C_3E1B28,seek8240_3E1B30,seek8244_3E1B38;
+    FileIoAssertion read8250_3E1B50,read8254_3E1B58,read8258_3E1B60;
+    FileIoAssertion read825C_3E1B68,read8260_3E1B70,read8264_3E1B78;
+    FileIoAssertion cache827C_3E1BA8,cache8280_3E1BB0;
+    FileIoAssertion looseName8208_3E1AC0,looseFree820C_3E1AC8;
+    FileIoAssertion close8268_3E1B80,close826C_3E1B88,open8270_3E1B90;
+};
+FileIoAssertions& fileIoAssertions()noexcept {static FileIoAssertions s;return s;}
+bool lineAssertions12EE90(std::int32_t id,std::int32_t count,D& d)noexcept {
+    auto& g=fileIoAssertions();return g.line8220_3E1AF0.reach(id>=0,d,0x12EEFC)&&g.line8224_3E1AF8.reach(id<count,d,0x12EF64);
+}
+bool readAssertions12FB30(std::int32_t id,std::int32_t count,std::uint32_t flags,D& d)noexcept {
+    auto& g=fileIoAssertions();return g.read8250_3E1B50.reach(id>=0,d,0x12FBA4)&&g.read8254_3E1B58.reach(id<count,d,0x12FC10)&&g.read8258_3E1B60.reach(flags&4,d,0x12FC94);
+}
+bool seekAssertions12F640(std::int32_t id,std::int32_t count,D& d)noexcept {
+    auto& g=fileIoAssertions();return g.seek8240_3E1B30.reach(id>=0,d,0x12F6A0)&&g.seek8244_3E1B38.reach(id<count,d,0x12F70C);
+}
+bool tellAssertions12F520(std::int32_t id,std::int32_t count,D& d)noexcept {
+    auto& g=fileIoAssertions();return g.tell8238_3E1B20.reach(id>=0,d,0x12F570)&&g.tell823C_3E1B28.reach(id<count,d,0x12F5DC);
+}
+bool closeAssertions131040(std::int32_t id,std::int32_t count,D& d)noexcept {
+    auto& g=fileIoAssertions();return g.close8268_3E1B80.reach(id>=0,d,0x131098)&&g.close826C_3E1B88.reach(id<count,d,0x131104);
 }
 unsigned char fold(unsigned char c) noexcept {
     return c>='A'&&c<='Z'?static_cast<unsigned char>(c+('a'-'A')):c;
@@ -163,7 +244,7 @@ struct OriginalStandardTextureResolver50LA::Storage {
     // Allocation identity is pinned by opaque leases; resolver address reuse
     // cannot revive a capability issued by a destroyed manager.
     const std::shared_ptr<const int> managerIdentity=std::make_shared<const int>(0);
-    enum class FileKind : std::uint8_t { pst,tga,atm,mcf,psg,colType0 };
+    enum class FileKind : std::uint8_t { pst,tga,atm,mcf,psg,colType0,colType2 };
     struct File {
         bool retired=false;
         std::size_t bank=static_cast<std::size_t>(-1),bankOrdinal=static_cast<std::size_t>(-1);
@@ -174,6 +255,7 @@ struct OriginalStandardTextureResolver50LA::Storage {
         OriginalStandardTextureSourceFormat50LA format=OriginalStandardTextureSourceFormat50LA::pstIndexed;
         // Actual source-pointer borrows, including partial constructed PSTs.
         // Unlike cached/cacheIdentity, bank12E5E0 cannot clear this authority.
+        std::shared_ptr<const OriginalLoadingTextureSource50LA> loadingRa;
         std::size_t pstBorrowers=0;
         std::uint64_t pstPublication=0;
         struct FinalPstRelease {
@@ -241,7 +323,7 @@ struct OriginalStandardTextureResolver50LA::Storage {
     // including selected ordinal and exact bytes, never a filename prefix/list.
     static bool matchBank(const File& file,const OriginalStandardArchiveProvider50LA& provider,
         OriginalStandardArchiveProvider50LA::MemberView& view) noexcept {
-        return provider.lookup132820(file.member,view)==OriginalStandardArchiveProvider50LA::Lookup::present&&
+        return !file.loadingRa&&provider.lookup132820(file.member,view)==OriginalStandardArchiveProvider50LA::Lookup::present&&
             view.member&&same(*view.member,file.member)&&view.data&&view.size==file.bytes.size()&&
             view.bankGeneration&&view.revision==provider.revision()&&
             std::equal(file.bytes.begin(),file.bytes.end(),view.data);
@@ -404,6 +486,7 @@ struct OriginalStandardTextureResolver50LA::Scratch {
         std::uint8_t* pointer00=nullptr;
         std::int64_t status08=-2; //12C920/944: actual constructor store.
         std::int32_t offset10=-0x6000; //12C924/958.
+        std::optional<std::uint32_t> nativeRawValidBytes; // Safety bound, NOT a source slot14 store.
     };
     Scratch()=default;
     Scratch(const Scratch&)=delete;Scratch& operator=(const Scratch&)=delete;
@@ -466,17 +549,25 @@ struct OriginalStandardTextureResolver50LA::FreshFileCapacity {
     // The actual fresh domain provider, retained before its first native mount.
     // Merely retaining this provider does not establish source history.
     // No provider-to-resolver back edge or second file/association ledger exists.
-    std::shared_ptr<const OriginalStandardArchiveProvider50LA> provider;
+    // Retain the actual mutable producer owner: owned native mount retirement
+    // mutates this same provider revision, never a const view or copied namespace.
+    std::shared_ptr<OriginalStandardArchiveProvider50LA> provider;
     // Native13C980/13D0F0/13D8F0/13D9F0 adapter over the SAME authenticated
     // immutable encoded input. It is not a decoded-member reader or OS file.
     struct Handle {
         OriginalUiEncodedArchiveView50KG input;
         std::size_t cursor=0;
+        std::shared_ptr<const OriginalLoadingTextureSource50LA> looseOwner;
+        const std::uint8_t* looseData=nullptr;std::size_t looseBytes=0;
+        Handle(std::shared_ptr<const OriginalLoadingTextureSource50LA> owner,const std::uint8_t* data,std::size_t bytes)noexcept
+            :looseOwner(std::move(owner)),looseData(data),looseBytes(bytes){}
+        const std::uint8_t* data()const noexcept{return looseOwner?looseData:input.data();}
+        std::size_t size()const noexcept{return looseOwner?looseBytes:input.size();}
         explicit Handle(OriginalUiEncodedArchiveView50KG value)noexcept:input(std::move(value)){}
-        bool seek(std::size_t at)noexcept {if(at>input.size())return false;cursor=at;return true;}
+        bool seek(std::size_t at)noexcept {if(at>size())return false;cursor=at;return true;}
         bool read(void* output,std::size_t bytes)noexcept {
-            if(cursor>input.size()||bytes>input.size()-cursor)return false;
-            if(bytes)std::memcpy(output,input.data()+cursor,bytes);cursor+=bytes;return true;
+            if(cursor>size()||bytes>size()-cursor)return false;
+            if(bytes)std::memcpy(output,data()+cursor,bytes);cursor+=bytes;return true;
         }
         bool word(std::uint32_t& out)noexcept {
             std::uint8_t b[4];if(!read(b,4))return false;
@@ -506,6 +597,8 @@ struct OriginalStandardTextureResolver50LA::FreshFileCapacity {
         const OriginalUiMemberIdentity50KG* originalMember=nullptr;
         const std::string* canonicalName=nullptr;
         const std::uint8_t* canonicalData=nullptr;
+        const OriginalLoadingRaFile50LA* loadingRaOwner=nullptr;
+        const void* courseConfigOwner=nullptr; // Exact private native occurrence, never a source handle ID.
         void initialize()noexcept {
             flags18=1;filename08=nullptr;deviceID00=0;logicalStart0C=0;
             cursor10=0;length14=0;auxiliarySlot04=0;associatedObject1C=nullptr;
@@ -534,6 +627,43 @@ struct OriginalStandardTextureResolver50LA::FreshFileCapacity {
     bool namesReadAttempted=false; // Terminal native prefix guard, not source readiness.
     std::int32_t templateStage=0,templateMember=-1;
     bool templateFailed=false;
+    enum class CourseStage {none,attempted,registered,joined,failed,retired};
+    CourseStage courseStage=CourseStage::none;
+    SourceBankFamily sourceBankFamily=SourceBankFamily::course;
+    bool loadingFontsSourceRetired=false,loadingIconSourceRetired=false; // Only genuine source12E5E0 produces these predecessors.
+    OriginalLoadingRaFile50LA* loadingRaOwner=nullptr; // Distinct simultaneous loose owner, never a bank root.
+    struct TrackBank {
+        OriginalRaTrackSourceFile50LA* root=nullptr;
+        std::shared_ptr<const OriginalUiArchive50KG> archive;
+        std::int32_t device=-1,pendingMember=-1,registrationSlot=-1;
+        std::unique_ptr<Handle> registrationInput;
+        bool attempted=false,registered=false,joined=false,failed=false,cacheAttempted=false,cacheReturned=false;
+        std::size_t mount=static_cast<std::size_t>(-1);
+        std::uint64_t generation=0;
+    } track;
+    struct PodBank {
+        OriginalPodSourceBank50LA* root=nullptr;
+        std::shared_ptr<const OriginalUiArchive50KG> archive;
+        std::int32_t device=-1,pendingMember=-1,registrationSlot=-1;
+        std::unique_ptr<Handle> registrationInput;
+        bool attempted=false,registered=false,joined=false,failed=false,cacheAttempted=false,cacheReturned=false;
+        std::size_t mount=static_cast<std::size_t>(-1);
+        std::uint64_t generation=0;
+    } pod;
+    const void* courseRootOwner=nullptr;
+    std::size_t courseNativeBorrowers=0,courseWindowBytes=0;
+    std::size_t courseMount=static_cast<std::size_t>(-1);std::uint64_t courseGeneration=0;
+    bool courseOwnsNativeMount=false;
+    std::uint32_t sourceOpenFlags158=0; //12C858 actual FileManager constructor; no joined setter changes it.
+    std::uint32_t sourceFileMode170=1; // Actual12C844 ->12C8C0 constructor.
+    bool courseArchiveOnlyCallReached=false; // Native call-history guard, NOT a duplicate source field.
+    std::shared_ptr<const OriginalUiArchive50KG> courseArchive;
+    std::int32_t courseDevice=-1,coursePendingMember=-1,courseRegistrationSlot=-1;
+    std::unique_ptr<Handle> courseRegistrationInput;
+    // Source realloc NULL loses its public pointer, but native final disposal
+    // retains the previous allocation instead of leaking/dereferencing NULL.
+    Device* failedCourseDevices=nullptr;std::int32_t failedCourseDeviceCapacity=0;
+    Member* failedCourseMembers=nullptr;std::int32_t failedCourseMemberCapacity=0;
     static constexpr std::size_t inputBytes=0x100000/8,alignment=64;
     FreshFileCapacity()noexcept {active.fill(-1);} //12CBA0 -> cold12CA10/131670.
     FreshFileCapacity(const FreshFileCapacity&)=delete;
@@ -579,15 +709,19 @@ struct OriginalStandardTextureResolver50LA::FreshFileCapacity {
             if(slot.status08==i){slot.status08=-1;scratchOwner->selected148=row.auxiliarySlot04;}
         }
         delete[] row.filename08;row.filename08=nullptr;
-        row.originalMember=nullptr;row.canonicalName=nullptr;row.canonicalData=nullptr;
+        row.originalMember=nullptr;row.canonicalName=nullptr;row.canonicalData=nullptr;row.courseConfigOwner=nullptr;row.loadingRaOwner=nullptr;
         row.auxiliarySlot04=0;row.cursor10=0;row.deviceID00=0;
         row.flags18=1;row.associatedObject1C=nullptr;row.length14=0;row.logicalStart0C=0;
         freeMember14C=i;
     }
     void retireDevice12EB60(Device& row)noexcept {
-        // Bounded sole activated APPSTART: source12EB60 removes its head.
-        // No generalized recency-list eviction/promotion is admitted here.
-        for(auto& id:active)if(id==row.id00)id=-1;
+        //12EB60 fills the removed active-list hole with the rightmost live entry.
+        // This preserves the real APPSTART/Course two-device recency state.
+        for(std::size_t at=0;at<active.size();++at)if(active[at]==row.id00){
+            for(std::size_t donor=active.size();donor>0;--donor)if(active[donor-1]!=-1){
+                active[at]=active[donor-1];active[donor-1]=-1;break;}
+            break;
+        }
         if(current74==row.id00){
             // Native immutable-input backend has no outstanding asynchronous
             // work;132CD0 synchronization completes before invalidation/close.
@@ -600,6 +734,8 @@ struct OriginalStandardTextureResolver50LA::FreshFileCapacity {
         row.payload18=0;row.tableBytes20=0;row.tableOffset1C=0;row.byte24=0;
     }
     ~FreshFileCapacity(){
+        if(!devices14&&failedCourseDevices){devices14=failedCourseDevices;deviceCount18=failedCourseDeviceCapacity;failedCourseDevices=nullptr;}
+        if(!members150&&failedCourseMembers){members150=failedCourseMembers;memberCount154=failedCourseMemberCapacity;failedCourseMembers=nullptr;}
         // Bounded one-device12CA10 order, including reached first-file activation.
         //12E7E0 force visits even empty devices; matching empty members retire.
         if(devices14&&members150){
@@ -612,9 +748,9 @@ struct OriginalStandardTextureResolver50LA::FreshFileCapacity {
             active.fill(-1);
         }
         active.fill(-1);
-        for(std::int32_t i=0;i<deviceCount18;++i)retireDevice12EB60(devices14[i]);
+        if(devices14)for(std::int32_t i=0;i<deviceCount18;++i)retireDevice12EB60(devices14[i]);
         delete[] devices14;devices14=nullptr;
-        for(std::int32_t i=0;i<memberCount154;++i)retireMember12EAA0(i);
+        if(members150)for(std::int32_t i=0;i<memberCount154;++i)retireMember12EAA0(i);
         delete[] members150;members150=nullptr;
         // Device retirement above invalidated current/window before handle close.
         for(auto& input:inputs){
@@ -627,7 +763,7 @@ struct OriginalStandardTextureResolver50LA::FreshFileCapacity {
     }
 };
 bool OriginalStandardTextureResolver50LA::bootstrapFreshFileCapacity12CBA0(
-    std::shared_ptr<const OriginalStandardArchiveProvider50LA> provider,D& d)noexcept {
+    std::shared_ptr<OriginalStandardArchiveProvider50LA> provider,D& d)noexcept {
     d={};
     // Reject ANY previous native corpus/provider/storage, not merely a warm
     // texture flag. Never clear/reconstruct canonical associations to get here.
@@ -779,7 +915,7 @@ bool OriginalStandardTextureResolver50LA::registerAppStart17CAB8(
             if(state.members150[next].flags18&1){state.freeMember14C=next;break;}
         }
         auto& row=state.members150[index];row.flags18=0;
-        if(row.filename08)return abort(E::phase,0x12E554);
+        if(!memberNameAssertion12E4E8(row.filename08,d))return abort(E::source,d.sourcePC);
         row.filename08=new(std::nothrow) char[std::size_t(nameBytes)+1];
         // Source would copy through null here. Native safe failure is explicit.
         if(!row.filename08){inserted=false;continue;}
@@ -790,7 +926,9 @@ bool OriginalStandardTextureResolver50LA::registerAppStart17CAB8(
     if(at!=directoryBytes)return abort(E::source,0x12DAB0);
     if(!inserted)return abort(E::allocation,0x12E2B0);
     closeInput(); // Temporary parser handle is NEVER persistent device.handle10.
-    auto& device=state.devices14[0];device.flags0C=flags|2;device.handle10=nullptr;
+    auto& device=state.devices14[0];
+    if(!deviceAssertions12DAFC(device.name04,device.flags0C,d))return abort(E::source,d.sourcePC);
+    device.flags0C=flags|2;device.handle10=nullptr;
     constexpr char sourceName[]="appstart.res";
     device.name04=new(std::nothrow) char[sizeof(sourceName)];
     if(!device.name04)return abort(E::allocation,0x12DBE4);
@@ -859,23 +997,26 @@ bool OriginalStandardTextureResolver50LA::readAppStartNames17CAD4(
             return fail(d,E::phase,0x130560);
     state.namesReadAttempted=true;d.sourceEffectsCommitted=true;
     ++state.cursor168; //1315B0 first compare matches row0; cursor160 unchanged.
+    if(!fileIoAssertions().open8270_3E1B90.reach(!(member.flags18&4),d,0x1313F4))return false;
     member.flags18|=4;member.cursor10=0; //131380 before scratch selection.
     member.auxiliarySlot04=chosen;
     auto& slot=scratch_->slots[chosen];slot.status08=0;slot.offset10=-0x6000;
     scratch_->selected148=-1;
     const auto close=[&]()noexcept {
+        if(!closeAssertions131040(0,state.memberCount154,d))return false;
         //131040: archive member close is NOT device/name/cache retirement.
         member.cursor10=0;member.flags18&=~4u;
-        if(slot.status08==0)scratch_->selected148=chosen;
+        if(slot.status08==0)scratch_->selected148=chosen;return true;
     };
     const auto abort=[&](E error,std::uint32_t pc,std::size_t at=0)noexcept {
-        close();return fail(d,error,pc,at);
+        if(!close())return false;return fail(d,error,pc,at);
     };
     try {bytes.resize(std::size_t(member.length14)+1);} //2986D4 size+terminator storage.
     catch(...){return abort(E::allocation,0x2986D4);}
     bytes[member.length14]=0;
     //12FB30 inline activation, before request clamp. One actual fresh device,
     // no fabricated promotion/eviction history or generalized warm admission.
+    if(!readAssertions12FB30(0,state.memberCount154,member.flags18,d)||!fileIoAssertions().active8214_3E1AD8.reach(true,d,0x12E908))return false;
     state.active[0]=device.id00;
     state.window7C=-1;state.window80=-1;state.current74=device.id00; //132CD0.
     device.handle10=new(std::nothrow) Capacity::Handle(
@@ -965,7 +1106,7 @@ bool OriginalStandardTextureResolver50LA::readAppStartNames17CAD4(
     member.cursor10+=static_cast<std::uint32_t>(copied); //12FB30 after130560 return.
     // Exactly one full requested item. Source2985B0 ignores this count; native
     // consumer rejects short/failed reads rather than parsing invented bytes.
-    close(); //298714 before lowercase/tokenization/publication.
+    if(!close())return false; //298714 before lowercase/tokenization/publication.
     bytes.resize(member.length14);return true;
 }
 bool OriginalStandardTextureResolver50LA::beginAppStartTemplate24AA10(
@@ -1004,12 +1145,14 @@ bool OriginalStandardTextureResolver50LA::beginAppStartTemplate24AA10(
         if(state.members150[i].flags18&4)return fail(d,E::phase,0x131380);
     // Actual next1315B0 match, not a lookup receipt minted from a native mount.
     ++state.cursor168;state.templateMember=index;d.sourceEffectsCommitted=true;
+    if(!fileIoAssertions().open8270_3E1B90.reach(!(member.flags18&4),d,0x1313F4))return false;
     member.flags18|=4;member.cursor10=0;member.auxiliarySlot04=selected;
     slot.status08=index;slot.offset10=-0x6000;scratch_->selected148=-1;
     cache.identity=member.originalMember;
     // Supported warm12FB30/12EE90/130560 branch: same head device, handle and
     // complete resident APPSTART window. No eviction/refill/general warm API.
     const auto readSpan=[&](char* destination,std::size_t count)noexcept {
+        if(!fileIoAssertions().active8214_3E1AD8.reach(true,d,0x12E908))return false;
         if(!(member.flags18&4)||member.cursor10>member.length14||count>member.length14-member.cursor10)
             return fail(d,E::phase,0x12FB30);
         device.cursor08=member.logicalStart0C+member.cursor10; // Inline activation repositions.
@@ -1045,6 +1188,7 @@ bool OriginalStandardTextureResolver50LA::beginAppStartTemplate24AA10(
     };
     const auto readLine=[&](OriginalAppStartTemplateCache50KG::Line& line,bool& present) {
         line={};present=false;
+        if(!lineAssertions12EE90(index,state.memberCount154,d))return false;
         if(member.cursor10>=member.length14)return true; //12EE90 EOF: no activation.
         const auto start=member.cursor10;
         const auto count=std::min<std::size_t>(member.length14-start,1022);
@@ -1067,9 +1211,10 @@ bool OriginalStandardTextureResolver50LA::beginAppStartTemplate24AA10(
         //1577D0 reads exactly one 7-byte probe, overwrites byte6, then compares
         //BINARY. It does not read the whole file or close before field getters.
         std::array<char,7> probe{};
-        if(!readSpan(probe.data(),probe.size()))return false;
+        if(!readAssertions12FB30(index,state.memberCount154,member.flags18,d)||!readSpan(probe.data(),probe.size()))return false;
         member.cursor10+=7;probe[6]=0;
         if(!std::strcmp(probe.data(),"BINARY"))return fail(d,E::source,0x157914);
+        if(!seekAssertions12F640(index,state.memberCount154,d))return false;
         member.cursor10=0; //12F640 SEEK_SET; device/cache remain reached.
         std::size_t physicalLine=0,lastHeader=0;
         for(;;){OriginalAppStartTemplateCache50KG::Line line;bool present=false;
@@ -1083,6 +1228,7 @@ bool OriginalStandardTextureResolver50LA::beginAppStartTemplate24AA10(
                 for(const auto& old:cache.sections)
                     if(OriginalStandardArchiveProvider50LA::sameName(old.name,name))return fail(d,E::source,0x157AF0);
                 if(!cache.sections.empty())cache.sections.back().physicalLines=physicalLine-lastHeader-1;
+                if(!tellAssertions12F520(index,state.memberCount154,d))return false;
                 cache.sections.push_back({name,member.cursor10,0});lastHeader=physicalLine;
             }
             ++physicalLine;
@@ -1097,6 +1243,7 @@ bool OriginalStandardTextureResolver50LA::beginAppStartTemplate24AA10(
         //possible. No fabricated section or input-read success is inserted.
         if(!selectedSection)return true;
         cache.sectionFound=true;
+        if(!seekAssertions12F640(index,state.memberCount154,d))return false;
         member.cursor10=static_cast<std::uint32_t>(selectedSection->bodyOffset);
         std::size_t retained=0;
         for(std::size_t i=0;i<selectedSection->physicalLines;++i){
@@ -1106,6 +1253,7 @@ bool OriginalStandardTextureResolver50LA::beginAppStartTemplate24AA10(
             if(!line.text.empty()&&line.text[0]!=';')++retained;
         }
         cache.lines.reserve(retained);
+        if(!seekAssertions12F640(index,state.memberCount154,d))return false;
         member.cursor10=static_cast<std::uint32_t>(selectedSection->bodyOffset);
         for(std::size_t i=0;i<selectedSection->physicalLines;++i){
             OriginalAppStartTemplateCache50KG::Line line;bool present=false;
@@ -1126,6 +1274,7 @@ bool OriginalStandardTextureResolver50LA::closeAppStartTemplate1573B0(bool succe
     if(!(member.flags18&4)||member.auxiliarySlot04<0||
        static_cast<std::size_t>(member.auxiliarySlot04)>=scratch_->slots.size())
         return fail(d,E::phase,0x131040);
+    if(!fileAssertions12F290(index,state.memberCount154,d)||!closeAssertions131040(index,state.memberCount154,d))return false;
     //12F290 calls handle13D9E0, whose recovered body is a no-op return0.
     //131040 closes the virtual member, retaining persistent handle/cache state.
     member.cursor10=0;member.flags18&=~4u;
@@ -1254,11 +1403,11 @@ bool OriginalStandardTextureResolver50LA::appendSources(
                 tga?Storage::FileKind::tga:Storage::FileKind::pst;
             bool duplicate=false;
             for(const auto& file:next->files)if(!file->retired&&same(file->member,source.member)){
-                if(file->kind!=fileKind||file->bytes!=bytes)return fail(d,E::duplicateSource,0x132820);
+                if(file->loadingRa||file->kind!=fileKind||file->bytes!=bytes)return fail(d,E::duplicateSource,0x132820);
                 duplicate=true;break;
             }
             if(storage_)for(const auto& file:storage_->files)if(!file->retired&&same(file->member,source.member)){
-                if(file->kind!=fileKind||file->bytes!=bytes)return fail(d,E::duplicateSource,0x132820);
+                if(file->loadingRa||file->kind!=fileKind||file->bytes!=bytes)return fail(d,E::duplicateSource,0x132820);
                 duplicate=true;break;
             }
             if(duplicate)continue;
@@ -1449,6 +1598,26 @@ bool OriginalStandardTextureResolver50LA::bindProvider3E1A70(
         return validateProviderCache(d);
     }catch(...){return fail(d,E::allocation,0x132820);}
 }
+bool OriginalStandardTextureResolver50LA::issueLoadingFontsBank1CAAE4(
+    const std::shared_ptr<OriginalStandardArchiveProvider50LA>& provider,
+    const std::shared_ptr<const OriginalUiArchive50KG>& source,LoadingFontsBankLease& lease,D& d)noexcept {
+    //12CEA0 may return an existing canonical mount. A freshly authenticated
+    //equal-byte read is not that mount's admitted identity; retain the real
+    //active acquisition instead of relabeling its bank/generation.
+    if(!source||!source->loaded()||source->identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::fonts)||
+       !storage_||!provider||provider!=storage_->provider||!provider->sealed_)return fail(d,E::source,0x12cea0);
+    std::shared_ptr<const OriginalUiArchive50KG> actual;
+    const auto* id=source->identity();
+    for(const auto& slot:provider->mounts_){const auto& bank=*slot;
+        if(!bank.active||!bank.ui||bank.ui->identity()!=id)continue;
+        if(actual||bank.name!=id->discPath||bank.digest!=id->sha256||bank.archiveBytes!=id->bytes||
+           bank.rows.size()!=id->memberCount)return fail(d,E::source,0x12cea0);
+        actual=bank.admittedUi.lock();
+        if(!actual||!actual->loaded()||actual->identity()!=id)return fail(d,E::source,0x12cea0);
+    }
+    if(!actual)return fail(d,E::unresolved,0x12cea0);
+    return issueGarageBank(provider,actual,lease.bank_,false,d,true);
+}
 bool OriginalStandardTextureResolver50LA::issueGarageBank12E5E0(
     const std::shared_ptr<OriginalStandardArchiveProvider50LA>& provider,
     const std::shared_ptr<const OriginalUiArchive50KG>& archive,GarageBankLease50LA& lease,D& d) noexcept {
@@ -1462,12 +1631,13 @@ bool OriginalStandardTextureResolver50LA::issueGarageSelectedBank1D1D68(
 bool OriginalStandardTextureResolver50LA::issueGarageBank(
     const std::shared_ptr<OriginalStandardArchiveProvider50LA>& provider,
     const std::shared_ptr<const OriginalUiArchive50KG>& archive,GarageBankLease50LA& lease,
-    bool selected19E,D& d) noexcept {
+    bool selected19E,D& d,bool loadingFonts) noexcept {
     d={};
     // selected19E is the historical selected-pod lease kind, not a racer ID.
     if(lease.resolver_||!storage_||!provider||storage_->provider!=provider||!provider->sealed_||
        !provider->retainedSourcesAccessible()||!archive||!archive->loaded()||!archive->identity()||
-       (selected19E?originalUiGaragePodCareer50KG(archive->identity()->id)<0:
+       (loadingFonts?selected19E||archive->identity()->id!=OriginalUiArchiveId50KG::fonts:
+        selected19E?originalUiGaragePodCareer50KG(archive->identity()->id)<0:
         archive->identity()->id!=OriginalUiArchiveId50KG::garage))
         return fail(d,E::phase,0x12E5E0);
     std::size_t bank=static_cast<std::size_t>(-1);
@@ -1481,7 +1651,7 @@ bool OriginalStandardTextureResolver50LA::issueGarageBank(
     lease.closedBacking_={}; // A new real capability cannot reuse old closure history.
     lease.provider_=provider;lease.archive_=archive;lease.managerIdentity_=storage_->managerIdentity;
     lease.resolver_=this;lease.mount_=bank;
-    lease.generation_=provider->mounts_[bank]->generation;lease.selected19E_=selected19E;
+    lease.generation_=provider->mounts_[bank]->generation;lease.selected19E_=selected19E;lease.loadingFonts_=loadingFonts;
     lease.thread_=std::this_thread::get_id();
     return true;
 }
@@ -1497,7 +1667,8 @@ bool OriginalStandardTextureResolver50LA::canRetireGarageBank12E5E0(
     const auto& bank=*provider->mounts_[lease.mount_];
     if(!bank.active||bank.generation!=lease.generation_||bank.admittedUi.lock()!=lease.archive_||
        !lease.archive_||!bank.ui||!bank.ui->identity()||
-       (lease.selected19E_?originalUiGaragePodCareer50KG(bank.ui->identity()->id)<0:
+       (lease.loadingFonts_?lease.selected19E_||bank.ui->identity()->id!=OriginalUiArchiveId50KG::fonts:
+        lease.selected19E_?originalUiGaragePodCareer50KG(bank.ui->identity()->id)<0:
             bank.ui->identity()->id!=OriginalUiArchiveId50KG::garage))return fail(d,E::phase,0x12E6D0);
     return validateGarageBankRows12EAA0(lease.mount_,lease.generation_,d);
 }
@@ -1614,7 +1785,7 @@ bool OriginalStandardTextureResolver50LA::bindModelMember(const std::string& nam
     d={};out={};
     const char* extension=kind==OriginalStandardModelFileKind50LA::mcf?".mcf":
         kind==OriginalStandardModelFileKind50LA::psg?".psg":
-        kind==OriginalStandardModelFileKind50LA::colType0?".col":nullptr;
+        (kind==OriginalStandardModelFileKind50LA::colType0||kind==OriginalStandardModelFileKind50LA::colType2)?".col":nullptr;
     if(!extension||name.empty()||name.size()>259||name.size()<4||bytes.empty())
         return fail(d,E::input,0x132820);
     for(unsigned char c:name)if(c<32||c>=127)return fail(d,E::input,0x132820);
@@ -1625,7 +1796,7 @@ bool OriginalStandardTextureResolver50LA::bindModelMember(const std::string& nam
         try {storage_=std::make_unique<Storage>();}
         catch(...){return fail(d,E::allocation,0x132820);}
     }
-    if(kind==OriginalStandardModelFileKind50LA::colType0){
+    if(kind==OriginalStandardModelFileKind50LA::colType0||kind==OriginalStandardModelFileKind50LA::colType2){
         using Provider=OriginalStandardArchiveProvider50LA;Provider::MemberView actual;
         if(!storage_->provider||!storage_->provider->sealed()||
            storage_->provider->lookup132820(name,actual)!=Provider::Lookup::present)
@@ -1636,7 +1807,8 @@ bool OriginalStandardTextureResolver50LA::bindModelMember(const std::string& nam
     }
     const auto fileKind=kind==OriginalStandardModelFileKind50LA::mcf?
         Storage::FileKind::mcf:kind==OriginalStandardModelFileKind50LA::psg?
-        Storage::FileKind::psg:Storage::FileKind::colType0;
+        Storage::FileKind::psg:kind==OriginalStandardModelFileKind50LA::colType0?
+        Storage::FileKind::colType0:Storage::FileKind::colType2;
     for(std::size_t i=0;i<storage_->files.size();++i){const auto& file=*storage_->files[i];
         if(file.retired||!same(file.member,name))continue;
         if(file.kind!=fileKind||file.bytes!=bytes)return fail(d,E::duplicateSource,0x132820);
@@ -1669,9 +1841,9 @@ bool OriginalStandardTextureResolver50LA::modelFile(OriginalStandardModelFileId5
     // survives reclamation but cannot become a new positive file view.
     if(file.retired&&(file.kind==Storage::FileKind::psg||file.kind==Storage::FileKind::mcf)&&file.bytes.empty())
         return fail(d,E::unresolved,0x1329A0);
-    if((file.kind!=Storage::FileKind::mcf&&file.kind!=Storage::FileKind::psg&&file.kind!=Storage::FileKind::colType0)||file.cacheIdentity||!file.cached.expired())
+    if((file.kind!=Storage::FileKind::mcf&&file.kind!=Storage::FileKind::psg&&file.kind!=Storage::FileKind::colType0&&file.kind!=Storage::FileKind::colType2)||file.cacheIdentity||!file.cached.expired())
         return fail(d,E::phase,0x1329A0);
-    if(!file.retired&&file.kind==Storage::FileKind::colType0){
+    if(!file.retired&&(file.kind==Storage::FileKind::colType0||file.kind==Storage::FileKind::colType2)){
         using Provider=OriginalStandardArchiveProvider50LA;Provider::MemberView actual;
         if(!storage_->provider||!storage_->provider->sealed()||
            storage_->provider->lookup132820(file.member,actual)!=Provider::Lookup::present)
@@ -1684,7 +1856,7 @@ bool OriginalStandardTextureResolver50LA::modelFile(OriginalStandardModelFileId5
     const auto collision=file.collision.lock();
     if(file.collisionIdentity!=collision.get()||
        (file.kind!=Storage::FileKind::colType0&&collision)||
-       (file.kind==Storage::FileKind::colType0&&(geometry||file.animation)))return fail(d,E::phase,0x1329A0);
+       ((file.kind==Storage::FileKind::colType0||file.kind==Storage::FileKind::colType2)&&(geometry||file.animation)))return fail(d,E::phase,0x1329A0);
     if(collision&&(!collision->live()||collision->fileId().resolver!=this||
        collision->fileId().row!=id.row))return fail(d,E::phase,0x1329A0);
     if(file.geometryIdentity!=geometry.get())return fail(d,E::phase,0x1329A0);
@@ -1695,7 +1867,8 @@ bool OriginalStandardTextureResolver50LA::modelFile(OriginalStandardModelFileId5
         return fail(d,E::phase,0x1329A0);
     out.id=id;out.kind=file.kind==Storage::FileKind::mcf?
         OriginalStandardModelFileKind50LA::mcf:file.kind==Storage::FileKind::psg?
-        OriginalStandardModelFileKind50LA::psg:OriginalStandardModelFileKind50LA::colType0;
+        OriginalStandardModelFileKind50LA::psg:file.kind==Storage::FileKind::colType0?
+        OriginalStandardModelFileKind50LA::colType0:OriginalStandardModelFileKind50LA::colType2;
     out.member=&file.member;out.bytes=&file.bytes;
     out.animation1536F0=file.animation;out.geometry240110=geometry;out.collision125014=collision;return true;
 }
@@ -1910,7 +2083,7 @@ bool OriginalStandardTextureResolver50LA::reclaimGaragePsgBackingAfterManagerRet
             }
         }
         if(file.kind==Storage::FileKind::mcf||file.kind==Storage::FileKind::psg||
-           file.kind==Storage::FileKind::colType0){
+           (file.kind==Storage::FileKind::colType0||file.kind==Storage::FileKind::colType2)){
             if(file.bytes.size()>std::numeric_limits<std::size_t>::max()-residentBytes)
                 return fail(d,E::range,0x26E5C8);
             residentBytes+=file.bytes.size();
@@ -2060,7 +2233,7 @@ bool OriginalStandardTextureResolver50LA::resolve24DADC(
             const Provider::MemberView* view) {
             for(std::size_t i=0;i<storage_->entries.size();++i){
                 const auto& entry=storage_->entries[i];
-                if(entry.file->retired||!same(name,entry.file->member))continue;
+                if(entry.file->retired||entry.file->loadingRa||!same(name,entry.file->member))continue;
                 if(view&&(!view->member||!same(*view->member,entry.file->member)||!view->data||
                    view->size!=entry.file->bytes.size()||view->revision!=revision||
                    !std::equal(entry.file->bytes.begin(),entry.file->bytes.end(),view->data)))
@@ -2165,6 +2338,10 @@ bool OriginalStandardTextureResolver50LA::validateProviderCache(D& d) const noex
         if(resource.get()!=file.cacheIdentity)return fail(d,E::phase,0x1329A0);
         if(!resource)continue;
         if(!resource->constructed24DA30())return fail(d,E::phase,0x1329A0);
+        if(file.loadingRa){
+            if(!loadingRaSourceCurrent(resource->firstUiSource_))return fail(d,E::source,0x132820);
+            continue; //Distinct authenticated loose-file owner, never archive lookup.
+        }
         std::size_t resolved=static_cast<std::size_t>(-1);std::string name;
         if(!resolve24DADC(resource->name20_,resolved,name,d))return false;
         //A newly mounted prior-priority PST/IPU or conflicting TGA cannot
@@ -2413,6 +2590,7 @@ bool OriginalStandardTextureResource50LA::constructCub24E1B0(const CubSource1295
         cub_->lastPC=0x29c780;
         if(!construction_->registerTexture29C780(lifetimeLink_))return fail(d,E::video,0x29c780);
         registered_=true;d.sourceEffectsCommitted=true;
+
         // Only direct24E1B0's proven low nibble is known. Upper bits remain
         // unclaimed. Existing generic constructed24DA30 admission stays false.
         flagsF8_=0;flagsF8KnownMask_=0x0f;bitsPerPixelE8_=-1;
@@ -2486,6 +2664,8 @@ bool OriginalStandardTextureResource50LA::loadCub24F2C0(std::size_t& cursor,
     levelCountB0_=1;formatAC_=1555;
     //24FC18 ->257750(FC,10). Real CPU owner/backing, NOT a second GPU
     // texture or decoded image. Retain pending object on partial ctor failure.
+    if(!OriginalTextureBufferAssertions50LA::historyCurrent())return fail(d,E::phase,0x257750);
+    if(!OriginalTextureBufferAssertions50LA::reach257750(c.bufferFC==nullptr))return fail(d,E::source,0x2577A4);
     c.lastPC=0x2577d8;
     c.bufferFCOwner.reset(new(std::nothrow) CubBuffer257750());
     if(!c.bufferFCOwner)return reject(E::allocation,c.lastPC);
@@ -2518,6 +2698,8 @@ bool OriginalStandardTextureResource50LA::withdrawCubPaletteBorrow()noexcept {
     if(!canRetireCub24E370())return false;if(cub_)cub_->source.palette=nullptr;return true;
 }
 
+#include "original_loading_pst_native50la.inl"
+
 OriginalStandardTextureResource50LA::OriginalStandardTextureResource50LA(AllocationKey) noexcept
     :lifetimeLink_(*this) {}
 std::shared_ptr<OriginalStandardTextureResource50LA> OriginalStandardTextureResource50LA::allocate() {
@@ -2525,6 +2707,12 @@ std::shared_ptr<OriginalStandardTextureResource50LA> OriginalStandardTextureReso
 }
 OriginalStandardTextureResource50LA::~OriginalStandardTextureResource50LA() {
     if(references00_!=0)std::terminate();
+    if(loadingPstFile_){
+        // Numeric file custody is explicitly closed before reference disposal.
+        if(loadingPstFile_->handle_!=-1)std::terminate();
+        D nativeClose;if(!closeLoadingPstNative(nativeClose))std::terminate();
+    }
+
     if(cub_){
         if(cub_->loadActive||cub_->source.palette||
            (registered_&&(!construction_||!construction_->cubCanRetire2544F0())))std::terminate();
@@ -2563,9 +2751,65 @@ OriginalStandardTextureResource50LA::~OriginalStandardTextureResource50LA() {
         std::terminate();
     registered_=false;
     if(resolver_){
+        if(loadingPstFile_&&loadingPstFile_->associated_&&!loadingPstFile_->nativeAssociationWithdrawn_){
+            D cleared;if(!resolver_->clearLoadingPst1327D0(*loadingPstFile_,*this,cleared))std::terminate();
+        }
         resolver_->clear1327D0(this);
         resolver_->finishPstSourceBorrow29C7A0(*this);
     }
+}
+bool OriginalStandardTextureResolver50LA::acquireLoadingRa24DA30(
+    std::shared_ptr<const OriginalLoadingTextureSource50LA> source,std::size_t& index,
+    UiSelection& capture,D& d)noexcept {
+    const bool okay=admitLoadingRaCanonicalNative(std::move(source),index,capture,d);
+    if(okay)unjoinedLoadingRaFileHistory_=true;
+    return okay;
+}
+bool OriginalStandardTextureResolver50LA::admitLoadingRaCanonicalNative(
+    std::shared_ptr<const OriginalLoadingTextureSource50LA> source,std::size_t& index,
+    UiSelection& capture,D& d)noexcept {
+    index=static_cast<std::size_t>(-1);capture=UiSelection{};d={};
+    if(!source||!storage_||!storage_->provider||!storage_->provider->sealed()||
+       source->bytes_.size()!=287772u)return fail(d,E::source,0x24DAF8);
+    try {
+    const std::string name=R"(UI\Textures\LD_RA.PST)";
+    OriginalStandardArchiveProvider50LA::MemberView conflicting;
+    if(storage_->provider->lookup132820(name,conflicting)!=OriginalStandardArchiveProvider50LA::Lookup::absent)
+        return fail(d,E::source,0x24DAF8); //Do not replace an actual archive winner.
+        for(const auto& file:storage_->files)if(!file->retired&&same(file->member,name))
+            return fail(d,E::duplicateSource,0x132820); //One-shot Screen staging, no alias admission.
+        const auto& bytes=source->bytes_;
+        if(u32(bytes,0)!=1||u32(bytes,4)!=1||u32(bytes,8)!=1||
+           u32(bytes,0x40c)!=448||u32(bytes,0x410)!=640||u32(bytes,0x414)||u32(bytes,0x418))
+            return fail(d,E::source,0x24E880);
+        if(storage_->files.size()>=32768||bytes.size()>8u*1024u*1024u||
+           storage_->textureBytes>256u*1024u*1024u-bytes.size())return fail(d,E::range,0x24E880);
+        auto file=std::make_unique<Storage::File>();
+        file->member=name;file->bytes=bytes;file->loadingRa=std::move(source);
+        Storage::Entry entry;entry.file=file.get();entry.count=1;entry.kind=1;
+        entry.pstBytes=bytes.size();entry.levels[0]={640,448,0x40c,0x41c,640u*448u};
+        storage_->files.reserve(storage_->files.size()+1);storage_->entries.reserve(storage_->entries.size()+1);
+        const auto row=storage_->entries.size();
+        capture.resolver=this;capture.providerIdentity=storage_->provider.get();
+        capture.sourceIndex=row;capture.data=file->bytes.data();capture.bytes=file->bytes.size();
+        capture.loadingRa=file->loadingRa;
+        storage_->files.push_back(std::move(file));storage_->entries.push_back(std::move(entry));
+        storage_->textureBytes+=capture.bytes;storage_->texturesPrepared=true;index=row;
+        return true;
+    }catch(...){capture=UiSelection{};return fail(d,E::allocation,0x24E880);}
+}
+bool OriginalStandardTextureResolver50LA::loadingRaSourceCurrent(const UiSelection& selected)const noexcept {
+    if(!storage_||selected.resolver!=this||!selected.loadingRa||selected.archive||
+       selected.member||selected.nativeFlare.backing||!storage_->provider||
+       selected.providerIdentity!=storage_->provider.get()||!storage_->provider->sealed()||
+       selected.sourceIndex>=storage_->entries.size())return false;
+    const auto& file=*storage_->entries[selected.sourceIndex].file;
+    OriginalStandardArchiveProvider50LA::MemberView conflicting;
+    return !file.retired&&file.loadingRa==selected.loadingRa&&file.bankGeneration==0&&
+        file.format==OriginalStandardTextureSourceFormat50LA::pstIndexed&&
+        OriginalStandardArchiveProvider50LA::sameName(file.member,R"(UI\Textures\LD_RA.PST)")&&file.bytes==selected.loadingRa->bytes_&&
+        selected.data==file.bytes.data()&&selected.bytes==file.bytes.size()&&
+        storage_->provider->lookup132820(file.member,conflicting)==OriginalStandardArchiveProvider50LA::Lookup::absent;
 }
 bool OriginalStandardTextureResolver50LA::nativeFlareSourceCurrent(const UiSelection& source)const noexcept {
     if(!storage_||source.resolver!=this||!source.nativeFlare.backing||!source.nativeFlare.member||
@@ -2591,7 +2835,7 @@ bool OriginalStandardTextureResource50LA::construct24DA30(
     const std::string& resolvedName,
     std::shared_ptr<const OriginalStandardMaterialContext50LA> context,D& d,std::size_t frame,
     OriginalStandardTextureResolver50LA::UiSelection* selection) noexcept {
-    if(resolver_||construction_||constructed_||registered_||firstUiSource_.archive||firstUiSource_.nativeFlare.backing)return fail(d,E::phase,0x24DEF8);
+    if(resolver_||construction_||constructed_||registered_||firstUiSource_.archive||firstUiSource_.nativeFlare.backing||firstUiSource_.loadingRa)return fail(d,E::phase,0x24DEF8);
     if(!resolver||!resolver->storage_||index>=resolver->storage_->entries.size())
         return fail(d,E::source,0x24DAF8);
     if(!context||!context->live())return fail(d,E::video,0x29C768);
@@ -2602,6 +2846,12 @@ bool OriginalStandardTextureResource50LA::construct24DA30(
     if(child&&(root.file->format!=OriginalStandardTextureSourceFormat50LA::atmPstFrames||
         frame>=root.frames.size()))return fail(d,E::source,0x10237C);
     const auto& entry=child?root.frames[frame]:root;
+    if(root.file->loadingRa){
+        if(child||!selection||selection->sourceIndex!=index||
+           !resolver->loadingRaSourceCurrent(*selection)||entry.kind!=1||entry.count!=1||
+           entry.pstOffset||entry.pstBytes!=287772u||!same(resolvedName,root.file->member))return fail(d,E::source,0x24DAF8);
+        firstUiSource_=std::move(*selection);
+    }else if(selection&&selection->loadingRa)return fail(d,E::source,0x24DAF8);
     if(selection&&selection->nativeFlare.backing){
         if(child||selection->sourceIndex!=index||!resolver->nativeFlareSourceCurrent(*selection)||
            root.file->format!=OriginalStandardTextureSourceFormat50LA::pstIndexed||entry.pstOffset||
@@ -2647,6 +2897,12 @@ bool OriginalStandardTextureResource50LA::construct24DA30(
        child||root.file->format!=OriginalStandardTextureSourceFormat50LA::pstIpum||
        entry.count<1||static_cast<std::size_t>(entry.count)!=garageImage->texture->mips.size()))
         return fail(d,E::source,0x24F148);
+    if(loadingPstFile_){
+        if(child||entry.kind!=(loadingPstFile_->raRoot_?1:0)||entry.count!=1||root.file->format!=OriginalStandardTextureSourceFormat50LA::pstIndexed||
+           loadingPstFile_->boundResource_!=this||!resolver->loadingPstFileCurrent(*loadingPstFile_,true))
+            return fail(d,E::phase,0x24DEF8);
+        if(!admitLoadingPstNative(d))return false;
+    }
     std::uint32_t allocationPC=0x29EB00;
     std::size_t allocationAt=0;
     try {
@@ -2674,6 +2930,7 @@ bool OriginalStandardTextureResource50LA::construct24DA30(
         const bool tga32=entry.file->format==OriginalStandardTextureSourceFormat50LA::tgaBgra32;
         const bool tga=tga32||entry.file->format==OriginalStandardTextureSourceFormat50LA::tgaBgr24;
         const auto tgaWidth=static_cast<std::size_t>(entry.levels[0].width);
+
         if(tga){
             //Original29F770 completes its temporary image before24E1B0's
             //base/resource registration. Failure here creates no list member.
@@ -2687,10 +2944,14 @@ bool OriginalStandardTextureResource50LA::construct24DA30(
         if(!resolver_->beginPstSourceBorrow24E1B0(*this,d))return false;
         if(!construction_->registerTexture29C780(lifetimeLink_))return fail(d,E::video,0x29C780);
         registered_=true;d.sourceEffectsCommitted=true;
+        if(loadingPstFile_&&(!loadingPstFc_||!loadingPstFc_->publishNull257740()))
+            return fail(d,E::phase,0x24E1D8);
+        if(loadingPstFile_&&!initializeLoadingPstFields24E1E0(d))return false;
+
         //24E310..24E320 clears the binding-policy bit. Neither admitted PST0/1 nor
         //TGA construction takes kind2's24EA40 bit-setting path. Other bits
         //remain unknown; native zero storage is not evidence for their value.
-        flagsF8_=0;flagsF8KnownMask_=1;
+        if(!loadingPstFile_){flagsF8_=0;flagsF8KnownMask_=1;}
         tgaReaderScratch_=std::move(tgaRgb);
         allocationPC=0x24DF10;allocationAt=0;
         //24DF10 retains the first request's actual rewritten path spelling,
@@ -2701,6 +2962,8 @@ bool OriginalStandardTextureResource50LA::construct24DA30(
             OriginalStandardTextureSourceFormat50LA::pstIndexed):entry.file->format;
         sourceKind_=entry.kind;
         if(tga){
+            OriginalTextureAllocationHistory50LA::invalidateCounterNativeProjection();
+            OriginalTextureBufferAssertions50LA::invalidateNativeProjection();
             //250F10/14,251038/40: dimensions and actual format before allocation.
             width14_=height18_=static_cast<std::int32_t>(tgaWidth);
             // Both250F7C..98 (1555) and250F9C..B8 (8888) preserve
@@ -2749,6 +3012,11 @@ bool OriginalStandardTextureResource50LA::construct24DA30(
             //same resolver actually publishes this resource association.
             if(!construction_->live())return fail(d,E::video,0x24DFD8);
             constructed_=true;return true;
+        }
+        if(!loadingPstFile_){
+            OriginalTextureAllocationHistory50LA::invalidateCounterNativeProjection();
+            OriginalTextureAllocationHistory50LA::invalidateVersionNativeProjection();
+            OriginalTextureBufferAssertions50LA::invalidateNativeProjection();
         }
         if(entry.kind==2&&garageImage&&!child){
             // Static table loader uses flags2: every actual authored mip is
@@ -2799,6 +3067,7 @@ bool OriginalStandardTextureResource50LA::construct24DA30(
             if(!construction_->live())return fail(d,E::video,0x24E090);
             constructed_=true;return true; // CPU-only; no GPU submission route added.
         }
+        if(loadingPstFile_)return constructLoadingPst24E880(d);
         formatAC_=entry.kind==0?4:8; //24E960/968 ->29E790.
         bitsPerPixelE8_=entry.kind==0?4:8; //24E96C/974 ->29E6D0.
         //Ordinary table flags2 fills descending native slots in file order.
@@ -2817,7 +3086,14 @@ bool OriginalStandardTextureResource50LA::construct24DA30(
             destination.sourceMipOrdinal=static_cast<std::uint32_t>(i);
             destination.storage=entry.kind==0?OriginalStandardTextureLevelStorage50LA::pstPacked4:
                 OriginalStandardTextureLevelStorage50LA::pstTransfer8;
-            if(entry.kind==1&&uploadConversion382FC8_!=0){
+            if(entry.file->loadingRa){
+                // Actual24EE50..24EF1C rejects width640 from the conversion
+                // set;24F128..144 clears bit2. No padding or transfer buffer.
+                // Unrepresented250580 GS log metadata remains unknown.
+                destination.storage=OriginalStandardTextureLevelStorage50LA::pstLoadingLinear8;
+                destination.flags30=static_cast<std::uint8_t>(destination.flags30&~4u);
+                destination.flags30KnownMask=static_cast<std::uint8_t>(destination.flags30KnownMask|4u);
+            }else if(entry.kind==1&&uploadConversion382FC8_!=0){
                 //24EE44 sees original cold initial382FC8=1. Every admitted
                 //width belongs to24EE50..24EF1C's accepted width set. Do not
                 //borrow a water caller's temporary zero to skip this branch.
@@ -2939,9 +3215,15 @@ const std::uint32_t* OriginalStandardTextureResource50LA::uploadConversion382FC8
     return constructed_&&sourceFormat_==OriginalStandardTextureSourceFormat50LA::pstIndexed?&uploadConversion382FC8_:nullptr;
 }
 const std::uint8_t* OriginalStandardTextureResource50LA::palette204() const noexcept {
+    if(loadingPstFile_)return sourceKind_==0&&constructed_&&loadingPstNative_&&loadingPstNative_->paletteRead&&
+        !loadingPstNative_->nativeClosed&&loadingPstNative_->pendingPalette?
+        loadingPstNative_->pendingPalette->data08.get():nullptr;
     return sourceKind()&&sourceKind_==0?resolver_->storage_->entries[sourceIndex_].file->bytes.data()+pstOffset_+12:nullptr;
 }
 const std::uint8_t* OriginalStandardTextureResource50LA::palette208() const noexcept {
+    if(loadingPstFile_)return sourceKind_==1&&constructed_&&loadingPstNative_&&loadingPstNative_->paletteRead&&
+        !loadingPstNative_->nativeClosed&&loadingPstNative_->pendingPalette&&
+        loadingPstNative_->source208==loadingPstNative_->pendingPalette.get()?loadingPstNative_->pendingPalette->data08.get():nullptr;
     return sourceKind()&&sourceKind_==1?resolver_->storage_->entries[sourceIndex_].file->bytes.data()+pstOffset_+12:nullptr;
 }
 bool OriginalStandardTextureResource50LA::level100(std::size_t i,OriginalStandardTextureLevelView50LA& out) const noexcept {
@@ -3182,4 +3464,825 @@ bool OriginalStandardTextureLifetime50LA::resetDemand14D180() noexcept {
         cursor08_->resource_->resetDemand14D1A8();
     return true;
 }
+bool OriginalStandardTextureResolver50LA::registerSourceBank12CEA0(
+    std::shared_ptr<const OriginalUiArchive50KG> archive,const OriginalStandardArchiveProvider50LA* expectedProvider,const void* owner,SourceBankFamily family,bool& acquired,D& d)noexcept {
+    d={};acquired=false;using Capacity=FreshFileCapacity;
+    const auto identity=family==SourceBankFamily::course?OriginalUiArchiveId50KG::course:
+        family==SourceBankFamily::loadingFonts?OriginalUiArchiveId50KG::fonts:OriginalUiArchiveId50KG::loadingIcon;
+    if(!freshFileCapacity_||!scratch_||!owner||!archive||!archive->loaded()||
+       archive->identity()!=originalUiArchiveIdentity50KG(identity))return fail(d,E::source,0x12CEA0);
+    auto& state=*freshFileCapacity_;
+    const bool retainedRa=loadingRaRetainedCurrent();
+    const bool ordinaryFirst=!state.loadingRaOwner&&state.deviceCount18==1;
+    const bool afterRa=family==SourceBankFamily::loadingFonts&&retainedRa&&state.deviceCount18==2;
+    const bool first=state.courseStage==Capacity::CourseStage::none&&(ordinaryFirst||afterRa)&&state.freeDevice10==-1;
+    const bool reused=state.courseStage==Capacity::CourseStage::retired&&
+        state.deviceCount18==(retainedRa?3:2)&&state.freeDevice10==state.courseDevice&&
+        state.freeDevice10>=0&&state.freeDevice10<state.deviceCount18&&!state.courseNativeBorrowers&&
+        ((family==SourceBankFamily::loadingIcon&&state.loadingFontsSourceRetired)||
+         (family==SourceBankFamily::course&&state.loadingIconSourceRetired));
+    if((family==SourceBankFamily::loadingFonts&&!first)||(family==SourceBankFamily::loadingIcon&&!reused)||
+       (family==SourceBankFamily::course&&!first&&!reused))return fail(d,E::phase,0x12CEA0);
+    if(!expectedProvider||state.provider.get()!=expectedProvider||(!first&&!reused)||state.registration!=Capacity::Registration::complete||
+       state.templateStage!=2||state.templateMember!=-1||state.templateFailed||!state.namesReadAttempted||
+       !state.provider||!state.devices14||
+       !state.members150||state.memberCount154<=0||state.devices14[0].id00||
+       !state.devices14[0].name04||state.devices14[0].flags0C!=0x342||state.read174)
+        return fail(d,E::phase,0x12CEA0);
+    for(std::int32_t n=0;n<state.memberCount154;++n)if(state.members150[n].flags18&4)return fail(d,E::phase,0x12CEA0);
+    // Native exact-occurrence custody BEFORE entering the source call. A mount
+    // or its ordinal cannot manufacture this actual source device/member ID.
+    state.sourceBankFamily=family;state.courseRootOwner=owner;state.courseArchive=archive;state.courseNativeBorrowers=1;acquired=true;
+    state.courseStage=Capacity::CourseStage::attempted;
+    state.courseDevice=-1;state.coursePendingMember=-1;state.courseRegistrationSlot=-1;
+    state.courseMount=static_cast<std::size_t>(-1);state.courseGeneration=0;state.courseOwnsNativeMount=false;
+    // With count18==2 the only live original row is AppStart; the requested
+    // fixed LoadingIcon/Course name differs. Do not turn native namespace
+    // presence into an original duplicate-bank result.
+    if(reused){const auto& free=state.devices14[state.freeDevice10];
+        if(free.id00!=state.freeDevice10||free.flags0C!=1||free.name04||free.handle10||free.cursor08||free.length14)
+            return fail(d,E::phase,0x12CF20);
+    }
+    auto selected=scratch_->selected148;
+    if(selected!=-1){
+        if(selected<0||std::size_t(selected)>=scratch_->slots.size()||!scratch_->slots[selected].pointer00)
+            return fail(d,E::phase,0x12CF98);
+        auto& slot=scratch_->slots[selected];slot.status08=-1;slot.offset10=-0x6000;scratch_->selected148=-1;
+    }else{
+        for(std::size_t n=0;n<scratch_->slots.size();++n){auto& slot=scratch_->slots[n];
+            if(slot.status08==-2)continue;
+            if(!slot.pointer00)return fail(d,E::phase,0x12D004);
+            if(slot.status08!=-1){if(slot.status08<0||slot.status08>=state.memberCount154)return fail(d,E::phase,0x12D01C);
+                if(state.members150[slot.status08].flags18&4)continue;}
+            slot.offset10=-0x6000;slot.status08=-1;selected=static_cast<std::int32_t>(n);break;
+        }
+        if(selected==-1)return fail(d,E::unsupported,0x12D080); // Preserve reached failed scratch reservation; no source return claimed.
+    }
+    state.courseRegistrationSlot=selected;
+    std::int32_t deviceID=-1;
+    if(state.freeDevice10==-1){
+        const auto oldCount=state.deviceCount18;++state.deviceCount18; //12D098 BEFORE realloc14.
+        auto* grown=new(std::nothrow) Capacity::Device[state.deviceCount18];
+        if(!grown){state.failedCourseDevices=state.devices14;state.failedCourseDeviceCapacity=oldCount;state.devices14=nullptr;
+            state.courseStage=Capacity::CourseStage::failed;d.sourceEffectsCommitted=true;return fail(d,E::allocation,0x12D0C4);}
+        std::memcpy(grown,state.devices14,std::size_t(oldCount)*sizeof(Capacity::Device));delete[] state.devices14;state.devices14=grown;
+        deviceID=state.deviceCount18-1;state.freeDevice10=-1;
+        auto& made=state.devices14[deviceID];
+        made.flags0C=1;made.handle10=nullptr;made.id00=deviceID;made.name04=nullptr;made.cursor08=0;made.length14=0;made.byte24=0;
+        // New-row constructor does NOT write payload18/table1C/table20.
+    }else{
+        if(!fileIoAssertions().reuse81E8_3E1A80.reach(state.freeDevice10<state.deviceCount18,d,0x12D1BC))return false;
+        if(state.freeDevice10<0||state.freeDevice10>=state.deviceCount18)return fail(d,E::phase,0x12D1E8);
+        deviceID=state.freeDevice10;state.freeDevice10=-1; //12D1E8/F0.
+        for(std::int32_t n=1;n<state.deviceCount18;++n){const auto next=(deviceID+n)%state.deviceCount18;
+            if(state.devices14[next].flags0C&1){state.freeDevice10=next;break;}}
+        if(!fileIoAssertions().reuseNext81EC_3E1A88.reach(state.freeDevice10<state.deviceCount18,d,0x12D2A8))return false;
+    }
+    state.courseDevice=deviceID;auto& device=state.devices14[deviceID];
+    d.sourceEffectsCommitted=true;
+    state.courseRegistrationInput.reset(new(std::nothrow) Capacity::Handle(OriginalUiEncodedArchiveView50KG(state.provider.get(),archive)));
+    auto& input=state.courseRegistrationInput;
+    const auto closeInput=[&]()noexcept{if(input){input->seek(input->input.size());input.reset();}scratch_->selected148=selected;state.courseRegistrationSlot=-1;};
+    bool memberWork=false;
+    const auto abort=[&](E error,std::uint32_t pc)noexcept{
+        if(memberWork&&state.members150)for(std::int32_t n=0;n<state.memberCount154;++n)
+            if(state.members150[n].deviceID00==deviceID)state.retireMember12EAA0(n);
+        closeInput();state.retireDevice12EB60(device);state.freeDevice10=deviceID;
+        state.courseStage=Capacity::CourseStage::failed;return fail(d,error,pc);
+    };
+    if(!input)return abort(E::allocation,0x13C980);
+    std::uint32_t version=0,meta=0,flags=0,user=0,tableBytes=0,count=0,directoryBytes=0;
+    if(!input->seek(0)||!input->word(version)||!input->word(meta))return abort(E::source,0x12D318);
+    if(version!=3||!input->word(flags)||!input->word(user)||flags!=0x340||user||
+       !input->word(tableBytes)||tableBytes<2||(tableBytes&1)||
+       std::uint64_t(tableBytes)+20!=std::uint64_t(meta)+8||!input->seek(std::size_t(tableBytes)+20)||
+       !input->word(count)||!input->word(directoryBytes)||count!=archive->memberCount()||!count||
+       directoryBytes>=Scratch::bytes||directoryBytes>input->input.size()-input->cursor)return abort(E::source,0x12D51C);
+    const auto payload=static_cast<std::uint32_t>(input->cursor+directoryBytes),fileLength=static_cast<std::uint32_t>(input->input.size());
+    auto& scratch=scratch_->slots[selected];if(!input->read(scratch.pointer00,directoryBytes))return abort(E::source,0x12D58C);
+    std::size_t at=0;const auto word=[&](std::uint32_t& value)noexcept{
+        if(at>directoryBytes||directoryBytes-at<4)return false;const auto* b=scratch.pointer00+at;at+=4;
+        value=std::uint32_t(b[0])|(std::uint32_t(b[1])<<8)|(std::uint32_t(b[2])<<16)|(std::uint32_t(b[3])<<24);return true;};
+    for(std::uint32_t ordinal=0;ordinal<count;++ordinal){
+        std::uint32_t nameBytes=0,offset=0,length=0;
+        if(!word(nameBytes)||!nameBytes||nameBytes>1024||at>directoryBytes||nameBytes>directoryBytes-at)return abort(E::source,0x12E2B0);
+        const auto* name=reinterpret_cast<const char*>(scratch.pointer00+at);at+=nameBytes;
+        if(!word(offset)||!word(length))return abort(E::source,0x12E2B0);
+        const auto original=archive->member(ordinal);
+        if(!original.identity||std::strlen(original.identity->name)!=nameBytes||std::memcmp(original.identity->name,name,nameBytes)||
+           original.identity->logicalOffset!=offset||original.size!=length)return abort(E::source,0x12E2B0);
+        bool duplicate=false;for(std::int32_t n=0;n<state.memberCount154;++n)
+            if(state.members150[n].filename08&&courseSourceName308F00(std::string_view(name,nameBytes),state.members150[n].filename08)){duplicate=true;break;}
+        if(duplicate)continue;
+        memberWork=true;
+        if(state.freeMember14C==-1){
+            const auto old=state.memberCount154;const auto growth=static_cast<std::int32_t>(count-ordinal);
+            auto* members=new(std::nothrow) Capacity::Member[std::size_t(old)+growth];
+            if(!members){state.failedCourseMembers=state.members150;state.failedCourseMemberCapacity=old;state.members150=nullptr;
+                state.courseStage=Capacity::CourseStage::failed;return fail(d,E::allocation,0x12D6F0);}
+            std::memcpy(members,state.members150,std::size_t(old)*sizeof(Capacity::Member));delete[] state.members150;state.members150=members;state.freeMember14C=old;
+            for(std::int32_t n=old;n<old+growth;++n){members[n].initialize();++state.memberCount154;}
+        }
+        const auto index=state.freeMember14C;state.freeMember14C=-1;
+        if(index<0||index>=state.memberCount154)return abort(E::phase,0x12E2B0);
+        for(std::int32_t n=1;n<state.memberCount154;++n){const auto next=(index+n)%state.memberCount154;
+            if(state.members150[next].flags18&1){state.freeMember14C=next;break;}}
+        auto& row=state.members150[index];row.flags18=0;state.coursePendingMember=index;
+        if(!memberNameAssertion12E4E8(row.filename08,d))return false;
+        row.filename08=new(std::nothrow) char[std::size_t(nameBytes)+1];
+        if(!row.filename08){state.courseStage=Capacity::CourseStage::failed;return fail(d,E::allocation,0x12E578);}
+        std::memcpy(row.filename08,name,nameBytes);row.filename08[nameBytes]=0;
+        row.deviceID00=deviceID;row.logicalStart0C=offset;row.cursor10=0;row.length14=length;
+        row.auxiliarySlot04=0;row.associatedObject1C=nullptr;row.originalMember=original.identity;state.coursePendingMember=-1;
+    }
+    if(at!=directoryBytes)return abort(E::source,0x12DAB0);
+    closeInput();
+    if(!deviceAssertions12DAFC(device.name04,device.flags0C,d))return false;
+    device.flags0C=flags|2;device.handle10=nullptr;
+    const char* sourceName=family==SourceBankFamily::course?"UI\\UICourse\\UICourse.res":
+        family==SourceBankFamily::loadingFonts?"ui\\uifonts.res":"UI\\Textures\\ld_icon.lsi";
+    const auto sourceNameBytes=std::strlen(sourceName)+1;
+    device.name04=new(std::nothrow) char[sourceNameBytes];
+    if(!device.name04){state.courseStage=Capacity::CourseStage::failed;return fail(d,E::allocation,0x12DBF4);}
+    std::memcpy(device.name04,sourceName,sourceNameBytes);device.cursor08=0;device.length14=fileLength;
+    device.payload18=payload;device.tableBytes20=tableBytes;device.tableOffset1C=20;device.byte24=0;
+    state.courseStage=Capacity::CourseStage::registered;
+    // Actual Course a2=1: activation and initial compressed-window read occur
+    // here BEFORE12CEA0 return/bank2A8. Source ignores both return values;
+    // safe native rejection is additional and keeps all reached side effects.
+    if(family!=SourceBankFamily::course)return true; // Actual Fonts/LSI a2=0; no eager activation/refill.
+    const bool activated=activateCourseDevice12E8B0(deviceID,0,d);
+    if(!activated)return false; // Do not call a reader through authentic NULL handle.
+    return refillCourseWindow130340(deviceID,0,d);
+}
+
+bool OriginalStandardTextureResolver50LA::activateCourseDevice12E8B0(std::int32_t id,std::uint32_t position,D& d)noexcept {
+    if(!freshFileCapacity_||!scratch_)return fail(d,E::phase,0x12E8B0);
+    auto& s=*freshFileCapacity_;if(!s.devices14||id<0||id>=s.deviceCount18)return fail(d,E::phase,0x12E8B0);
+    auto& device=s.devices14[id];
+    if(!fileIoAssertions().active8214_3E1AD8.reach(true,d,0x12E908))return false;
+    if(s.active[0]!=id){
+        std::size_t found=s.active.size();for(std::size_t i=1;i<s.active.size();++i)if(s.active[i]==id){found=i;break;}
+        if(found==s.active.size()){
+            const auto tail=s.active.back();if(tail!=-1){if(tail<0||tail>=s.deviceCount18)return fail(d,E::phase,0x12E8B0);
+                auto& old=s.devices14[tail];if(!(old.flags0C&0x10)&&old.handle10){delete old.handle10;old.handle10=nullptr;}}
+            found=s.active.size()-1;
+        }
+        for(std::size_t i=found;i>0;--i)s.active[i]=s.active[i-1];s.active[0]=id;
+        if((device.flags0C&0x100)&&s.current74!=id){
+            //13D840 synchronizes the previous immutable-input handle. There is
+            // no outstanding native asynchronous operation to invent/complete.
+            s.current74=id;s.window7C=s.window80=-1;
+        }
+    }
+    if(!device.handle10){
+        if(s.loadingRaOwner&&id==s.loadingRaOwner->device_){
+            const auto& owner=*s.loadingRaOwner;
+            if(!owner.registered_||owner.nativeClosed_||!owner.source_||!device.name04)return fail(d,E::source,0x13C980);
+            device.handle10=new(std::nothrow) FreshFileCapacity::Handle(owner.source_,owner.source_->bytes_.data(),owner.source_->bytes_.size());
+        }else{
+            const auto archive=s.pod.root&&id==s.pod.device?s.pod.archive:
+                s.track.root&&id==s.track.device?s.track.archive:
+                id==s.courseDevice?s.courseArchive:id==0?s.appStart:nullptr;
+            if(!archive||!device.name04)return fail(d,E::source,0x13C980);
+            device.handle10=new(std::nothrow) FreshFileCapacity::Handle(OriginalUiEncodedArchiveView50KG(s.provider.get(),archive));
+        }
+        if(!device.handle10)return fail(d,E::allocation,0x13C980); // Published NULL; active/current/window prefix remains.
+    }
+    device.cursor08=position;d.sourceEffectsCommitted=true;return true;
+}
+bool OriginalStandardTextureResolver50LA::refillCourseWindow130340(std::int32_t id,std::size_t block,D& d)noexcept {
+    if(!freshFileCapacity_||!scratch_)return fail(d,E::phase,0x130340);auto& s=*freshFileCapacity_;
+    if(!s.devices14||id<0||id>=s.deviceCount18||s.current74!=id)return fail(d,E::phase,0x130340);
+    auto& device=s.devices14[id];if(!device.handle10||(device.flags0C&0x340)!=0x340)return fail(d,E::source,0x130340);
+    if(s.window7C==-1){
+        delete[] s.lengthTable84;s.lengthTable84=nullptr;
+        s.lengthTable84=new(std::nothrow) std::uint32_t[(std::size_t(device.tableBytes20)+3)/4];
+        if(!s.lengthTable84)return fail(d,E::allocation,0x130340); // Stop before source read through NULL.
+        if(!device.handle10->seek(device.tableOffset1C)||!device.handle10->read(s.lengthTable84,device.tableBytes20))return fail(d,E::source,0x130340);
+    }
+    if(!s.lengthTable84||device.tableBytes20<2||(device.tableBytes20&1))return fail(d,E::source,0x130340);
+    const auto* table=reinterpret_cast<const std::uint8_t*>(s.lengthTable84);
+    const auto count=std::size_t(device.tableBytes20)/2;
+    const auto length=[&](std::size_t n)noexcept{return std::uint32_t(table[2*n])|(std::uint32_t(table[2*n+1])<<8);};
+    if(block+1>=count||!length(block))return fail(d,E::source,0x130340);
+    const std::size_t marker=(device.flags0C&0x200)?1:0;std::size_t offset=device.payload18;
+    for(std::size_t n=0;n<block;++n){if(!length(n))return fail(d,E::source,0x130340);offset+=length(n)+marker;}
+    if(offset>device.length14)return fail(d,E::source,0x130340);
+    if(marker)for(auto& input:s.inputs)if(input.pointer){
+        if(!input.lengthWritten)return fail(d,E::phase,0x133230);std::memset(input.pointer,0,input.length);}
+    if(!device.handle10->seek(offset))return fail(d,E::source,0x130340);
+    const auto requested=std::min<std::size_t>(device.length14-offset,s.total78);
+    if(marker)s.read174=1; //133290 actual marker/async-read mode; backend itself is synchronous.
+    std::size_t actual=0;
+    for(auto& input:s.inputs){if(!input.pointer)continue;if(!input.lengthWritten)return fail(d,E::phase,0x133290);
+        const auto amount=std::min<std::size_t>(requested-actual,input.length);
+        if(amount&&!device.handle10->read(input.pointer,amount))return fail(d,E::source,0x133290,actual);
+        actual+=amount;if(actual==requested)break;
+    }
+    s.courseWindowBytes=actual;s.window7C=static_cast<std::int32_t>(block);s.window80=static_cast<std::int32_t>(block);
+    std::int64_t remaining=static_cast<std::int64_t>(actual);std::size_t current=block;
+    do {
+        if(current+1>=count||!length(current))return fail(d,E::source,0x130340);
+        remaining-=std::int64_t(length(current)+marker);++current;
+        if(std::int64_t(length(current))<remaining)++s.window80;
+    }while(remaining>0);
+    // Negative residual is authentic for the last partially resident block.
+    // It does not make that partial block readable: window80 excludes it.
+    d.sourceEffectsCommitted=true;return true;
+}
+bool OriginalStandardTextureResolver50LA::adoptSourceBankNativeMount(const void* root,bool owns,D& d)noexcept {
+    d={};if(!freshFileCapacity_)return fail(d,E::phase,0);auto& s=*freshFileCapacity_;
+    if(!root||s.courseRootOwner!=root||s.courseStage!=FreshFileCapacity::CourseStage::registered||!s.provider||!s.courseArchive)
+        return fail(d,E::phase,0);
+    std::size_t match=static_cast<std::size_t>(-1);
+    for(std::size_t n=0;n<s.provider->mounts_.size();++n){const auto& bank=*s.provider->mounts_[n];
+        if(!bank.active||bank.admittedUi.lock()!=s.courseArchive)continue;
+        if(match!=static_cast<std::size_t>(-1))return fail(d,E::source,0);match=n;
+    }
+    if(match==static_cast<std::size_t>(-1))return fail(d,E::source,0);
+    s.courseMount=match;s.courseGeneration=s.provider->mounts_[match]->generation;s.courseOwnsNativeMount=owns;return true;
+}
+bool OriginalStandardTextureResolver50LA::joinSourceBankCanonical(const void* root,bool ownsNativeMount,D& d)noexcept {
+    d={};if(!freshFileCapacity_)return fail(d,E::phase,0x12CEA0);auto& s=*freshFileCapacity_;
+    if(!root||s.courseRootOwner!=root||s.courseStage!=FreshFileCapacity::CourseStage::registered||!s.provider||!s.provider->sealed()||!s.members150)
+        return fail(d,E::phase,0x12CEA0);
+    try {for(std::int32_t n=0;n<s.memberCount154;++n){auto& member=s.members150[n];if(member.deviceID00!=s.courseDevice||!member.filename08)continue;
+        const std::string requested(member.filename08);
+        OriginalStandardArchiveProvider50LA::MemberView canonical;
+        if(s.provider->lookup132820(requested,canonical)!=OriginalStandardArchiveProvider50LA::Lookup::present||
+           !canonical.member||!canonical.data||!member.originalMember||canonical.size!=member.length14)return fail(d,E::source,0x132820);
+        const auto actual=s.courseArchive->find(requested);
+        if(actual.identity!=member.originalMember||!actual.data||actual.size!=canonical.size||std::memcmp(actual.data,canonical.data,canonical.size))return fail(d,E::source,0x132820);
+        if(s.courseMount==static_cast<std::size_t>(-1)){s.courseMount=canonical.mount;s.courseGeneration=canonical.bankGeneration;s.courseOwnsNativeMount=ownsNativeMount;}
+        else if(s.courseMount!=canonical.mount||s.courseGeneration!=canonical.bankGeneration)return fail(d,E::source,0x132820);
+        member.canonicalName=canonical.member;member.canonicalData=canonical.data;
+    }
+    }catch(...){return fail(d,E::allocation,0);}
+    s.courseStage=FreshFileCapacity::CourseStage::joined;return true;
+}
+bool OriginalStandardTextureResolver50LA::enterCourseArchiveOnly132A20(const void* root,D& d)noexcept {
+    d={};if(!freshFileCapacity_||!root||freshFileCapacity_->courseRootOwner!=root||
+       freshFileCapacity_->courseStage!=FreshFileCapacity::CourseStage::joined||
+       freshFileCapacity_->sourceBankFamily!=SourceBankFamily::course)return fail(d,E::phase,0x132A20);
+    freshFileCapacity_->sourceFileMode170=0;freshFileCapacity_->courseArchiveOnlyCallReached=true;d.sourceEffectsCommitted=true;return true;
+}
+bool OriginalStandardTextureResolver50LA::borrowSourceBankConfigNative(const void* root,bool acquire,D& d)noexcept {
+    d={};if(!freshFileCapacity_)return fail(d,E::phase,0);auto& s=*freshFileCapacity_;
+    if(!root||s.courseRootOwner!=root||s.courseStage!=FreshFileCapacity::CourseStage::joined||!s.courseNativeBorrowers)return fail(d,E::phase,0);
+    if(acquire){if(s.courseNativeBorrowers==std::numeric_limits<std::size_t>::max())return fail(d,E::allocation,0);++s.courseNativeBorrowers;}
+    else {if(s.courseNativeBorrowers<=1)return fail(d,E::phase,0);--s.courseNativeBorrowers;}
+    return true;
+}
+bool OriginalStandardTextureResolver50LA::openSourceBankMember131230(const void* root,const void* occurrence,
+    const std::string& name,std::int32_t& handle,D& d)noexcept {
+    d={};if(!freshFileCapacity_||!scratch_||!root||!occurrence||handle!=-1)return fail(d,E::phase,0x131230);auto& s=*freshFileCapacity_;
+    if(!((s.courseRootOwner==root&&s.courseStage==FreshFileCapacity::CourseStage::joined)||
+         (s.track.root==root&&s.track.joined))||!s.members150||
+       s.memberCount154<=0||s.cursor168< -1||s.cursor168>=s.memberCount154)return fail(d,E::phase,0x1315B0);
+    ++s.cursor168;if(s.cursor168==s.memberCount154)s.cursor168=0;
+    auto index=static_cast<std::int32_t>(s.cursor168);const auto start=index;bool found=false;
+    do {const auto& row=s.members150[index];if(row.filename08&&courseSourceName308F00(name,row.filename08)){found=true;break;}
+        if(++index==s.memberCount154)index=0;
+    }while(index!=start);
+    d.sourceEffectsCommitted=true;if(!found)return fail(d,E::unresolved,0x1315B0);
+    s.cursor168=index;return openSourceBankMember131380(root,occurrence,index,handle,d);
+}
+// Factor only the numeric body out of openSourceBankMember131230.
+// Its search tail becomes: s.cursor168=index; return openSourceBankMember131380(root,occurrence,index,handle,d);
+bool OriginalStandardTextureResolver50LA::openSourceBankMember131380(const void* root,const void* occurrence,
+    std::int32_t index,std::int32_t& handle,D& d)noexcept {
+    if(!freshFileCapacity_||!scratch_||!root||!occurrence||handle!=-1)return fail(d,E::phase,0x131380);
+    auto& s=*freshFileCapacity_;
+    if(!((s.courseRootOwner==root&&s.courseStage==FreshFileCapacity::CourseStage::joined)||
+         (s.track.root==root&&s.track.joined))||!s.members150||
+       index<0||index>=s.memberCount154)return fail(d,E::phase,0x131380);
+    if(s.members150[index].deviceID00!=(s.track.root==root?s.track.device:s.courseDevice)||!s.members150[index].originalMember)
+        return fail(d,E::phase,0x131380);
+    return openExactSourceMember131380(occurrence,index,handle,d);
+}
+bool OriginalStandardTextureResolver50LA::openExactSourceMember131380(const void* occurrence,
+    std::int32_t index,std::int32_t& handle,D& d)noexcept {
+    if(!freshFileCapacity_||!scratch_||!occurrence||handle!=-1)return fail(d,E::phase,0x131380);
+    auto& s=*freshFileCapacity_;
+    if(!s.members150||index<0||index>=s.memberCount154)return fail(d,E::phase,0x131380);
+    auto& member=s.members150[index];
+    if(!fileIoAssertions().open8270_3E1B90.reach(!(member.flags18&4),d,0x1313F4))return false;
+    if(member.courseConfigOwner||member.flags18&4||(!member.originalMember&&!member.loadingRaOwner)||!member.canonicalData)
+        return fail(d,E::phase,0x131380);
+    member.flags18|=4;member.cursor10=0;
+    member.courseConfigOwner=occurrence;handle=index;
+    const auto finishOpen=[&]()noexcept{if(s.sourceOpenFlags158)member.flags18|=8;return true;}; //131578 after scratch selection.
+    auto selected=member.auxiliarySlot04;
+    if(selected>=0&&std::size_t(selected)<scratch_->slots.size()&&scratch_->slots[selected].status08==index){
+        if(scratch_->selected148==selected)scratch_->selected148=-1;return finishOpen();
+    }
+    selected=scratch_->selected148;
+    if(selected!=-1){
+        if(selected<0||std::size_t(selected)>=scratch_->slots.size()||!scratch_->slots[selected].pointer00)return fail(d,E::phase,0x131380);
+    }else{
+        for(std::size_t n=0;n<scratch_->slots.size();++n){const auto& slot=scratch_->slots[n];if(slot.status08==-2)continue;
+            if(!slot.pointer00)return fail(d,E::phase,0x131380);
+            if(slot.status08!=-1){if(slot.status08<0||slot.status08>=s.memberCount154)return fail(d,E::phase,0x131380);
+                if(s.members150[slot.status08].flags18&4)continue;}
+            selected=static_cast<std::int32_t>(n);break;
+        }
+    }
+    member.auxiliarySlot04=selected;
+    if(selected==-1)return finishOpen(); // Source open returns handle even with no auxiliary slot; reader bounds temporary-scratch branch.
+    auto& slot=scratch_->slots[selected];slot.status08=index;slot.offset10=-0x6000;scratch_->selected148=-1;return finishOpen();
+}
+bool OriginalStandardTextureResolver50LA::sourceBankMemberCurrent(const void* root,const void* occurrence,std::int32_t handle)const noexcept {
+    if(!freshFileCapacity_||!scratch_||!root||!occurrence)return false;const auto& s=*freshFileCapacity_;
+    if(!((s.courseRootOwner==root&&s.courseStage==FreshFileCapacity::CourseStage::joined)||
+         (s.track.root==root&&s.track.joined))||!s.members150||handle<0||handle>=s.memberCount154)return false;
+    if(s.track.root==root){
+        if(!s.provider||s.track.mount>=s.provider->mounts_.size())return false;
+        const auto& bank=*s.provider->mounts_[s.track.mount];
+        if(!bank.active||bank.generation!=s.track.generation)return false;
+    }
+    const auto& member=s.members150[handle];return member.courseConfigOwner==occurrence&&member.deviceID00==(s.track.root==root?s.track.device:s.courseDevice)&&
+        (member.flags18&4)&&member.cursor10<=member.length14&&member.originalMember&&member.filename08;
+}
+bool OriginalStandardTextureResolver50LA::readSourceBankMember130560(const void* root,const void* occurrence,std::int32_t handle,
+    void* output,std::size_t requested,std::size_t& copied,bool advance,D& d)noexcept {
+    d={};copied=0;if(!sourceBankMemberCurrent(root,occurrence,handle)||(!output&&requested))return fail(d,E::phase,0x12FB30);
+    auto& s=*freshFileCapacity_;auto& member=s.members150[handle];const auto amount=std::min<std::size_t>(requested,member.length14-member.cursor10);
+    if(!activateCourseDevice12E8B0(member.deviceID00,member.logicalStart0C+member.cursor10,d))return false;
+    auto& device=s.devices14[member.deviceID00];
+    if(member.auxiliarySlot04<0)return fail(d,E::unsupported,0x130560); // Actual temporary-scratch allocation branch not joined.
+    if(std::size_t(member.auxiliarySlot04)>=scratch_->slots.size())return fail(d,E::phase,0x130560);
+    auto& slot=scratch_->slots[member.auxiliarySlot04];if(!slot.pointer00||slot.status08!=handle)return fail(d,E::phase,0x130560);
+    auto* destination=static_cast<std::uint8_t*>(output);
+    while(copied<amount){const auto block=std::size_t(device.cursor08)/Scratch::bytes;const auto blockStart=block*Scratch::bytes;
+        if(device.cursor08<std::uint32_t(slot.offset10)||std::uint64_t(device.cursor08)-std::int64_t(slot.offset10)>=Scratch::bytes){
+            if(s.window7C<0||block<std::size_t(s.window7C)||block>std::size_t(s.window80))
+                if(!refillCourseWindow130340(member.deviceID00,block,d))return false;
+            const auto* table=reinterpret_cast<const std::uint8_t*>(s.lengthTable84);const auto count=std::size_t(device.tableBytes20)/2;
+            if(!table||block+1>=count)return fail(d,E::source,0x130560,copied);
+            const auto length=[&](std::size_t n)noexcept{return std::uint32_t(table[2*n])|(std::uint32_t(table[2*n+1])<<8);};
+            const std::size_t marker=(device.flags0C&0x200)?1:0;std::size_t relative=0;
+            for(std::size_t n=std::size_t(s.window7C);n<block;++n)relative+=length(n)+marker;
+            const auto encodedLength=length(block);if(!encodedLength||encodedLength>Scratch::bytes||
+               relative>s.courseWindowBytes||encodedLength+marker>s.courseWindowBytes-relative)return fail(d,E::source,0x133330,copied);
+            //130B54..130BA8 checks the outstanding read before the marker.
+            //13D880 returns native device completion and writes error/progress.
+            // Our immutable synchronous encoded-input backend has completed
+            // the actual requested bytes: completion0,error0, no retry fiction.
+            if(marker&&s.read174)s.read174=0;
+            std::array<std::uint8_t,Scratch::bytes+1> encoded{};std::size_t skip=relative,got=0;
+            for(const auto& input:s.inputs){if(!input.pointer)continue;if(!input.lengthWritten)return fail(d,E::phase,0x133330,copied);
+                if(skip>=input.length){skip-=input.length;continue;}
+                const auto n=std::min<std::size_t>(encodedLength+marker-got,input.length-skip);
+                std::memcpy(encoded.data()+got,input.pointer+skip,n);got+=n;skip=0;if(got==encodedLength+marker)break;}
+            if(got!=encodedLength+marker||(marker&&encoded[encodedLength]!=0xff))return fail(d,E::source,0x133580,copied);
+            std::size_t absolute=device.payload18;for(std::size_t n=0;n<block;++n)absolute+=length(n)+marker;
+            ResourceBlock48C actual;if(!device.handle10->input.block(block,actual)||actual.compressed_bytes!=encodedLength||actual.compressed_offset!=absolute)return fail(d,E::source,0x133330,copied);
+            slot.offset10=static_cast<std::int32_t>(blockStart); // Authentic pre-codec stamp; failure retains it and partial bytes.
+            if(encodedLength==Scratch::bytes)std::memcpy(slot.pointer00,encoded.data(),Scratch::bytes);
+            else {z_stream z{};const auto setup=inflateInit(&z);if(setup!=Z_OK)return fail(d,E::allocation,0x2B0780,copied);
+                z.next_in=encoded.data();z.avail_in=encodedLength;z.next_out=slot.pointer00;z.avail_out=Scratch::bytes;
+                const auto result=inflate(&z,Z_FINISH);const bool okay=result==Z_STREAM_END&&z.total_in==encodedLength&&z.total_out==Scratch::bytes&&z.avail_in==0;inflateEnd(&z);
+                if(!okay)return fail(d,result==Z_MEM_ERROR?E::allocation:E::source,0x2B0780,copied);}
+        }
+        const auto within=std::size_t(device.cursor08)-blockStart;const auto n=std::min<std::size_t>(amount-copied,Scratch::bytes-within);
+        std::memcpy(destination+copied,slot.pointer00+within,n);copied+=n;device.cursor08+=static_cast<std::uint32_t>(n);
+    }
+    if(advance)member.cursor10+=static_cast<std::uint32_t>(copied);d.sourceEffectsCommitted=true;return true;
+}
+bool OriginalStandardTextureResolver50LA::readSourceBankMember12FB30(const void* root,const void* occurrence,std::int32_t handle,
+    void* output,std::size_t requested,std::size_t& done,D& d)noexcept {
+    if(!sourceBankMemberCurrent(root,occurrence,handle))return fail(d,E::phase,0x12FB30);
+    if(!readAssertions12FB30(handle,freshFileCapacity_->memberCount154,freshFileCapacity_->members150[handle].flags18,d))return false;
+    return readSourceBankMember130560(root,occurrence,handle,output,requested,done,true,d);
+}
+bool OriginalStandardTextureResolver50LA::readSourceBankLine12EE90(const void* root,const void* occurrence,std::int32_t handle,
+    std::array<char,1024>& output,bool& present,std::size_t& position,D& d)noexcept {
+    d={};present=false;position=0;if(!sourceBankMemberCurrent(root,occurrence,handle))return fail(d,E::phase,0x12EE90);
+    if(!lineAssertions12EE90(handle,freshFileCapacity_->memberCount154,d))return false;
+    auto& member=freshFileCapacity_->members150[handle];const auto amount=std::min<std::size_t>(member.length14-member.cursor10,output.size()-2);
+    if(!amount){output[0]=0;position=member.cursor10;return true;}
+    std::size_t done=0;if(!readSourceBankMember130560(root,occurrence,handle,output.data(),amount,done,false,d))return false;
+    if(done!=amount)return fail(d,E::source,0x12EE90);output[amount]=0;std::size_t end=0;while(end<amount&&output[end]&&output[end]!='\n')++end;
+    if(end<amount&&output[end]=='\n'){member.cursor10+=static_cast<std::uint32_t>(end+1);
+        if(end&&output[end-1]=='\r'){output[end-1]='\n';output[end]=0;}else output[end+1]=0;
+    }else member.cursor10+=static_cast<std::uint32_t>(amount);
+    present=true;position=member.cursor10;return true;
+}
+bool OriginalStandardTextureResolver50LA::tellSourceBankMember12F520(const void* root,const void* occurrence,std::int32_t handle,std::size_t& position,D& d)noexcept {
+    d={};if(!sourceBankMemberCurrent(root,occurrence,handle))return fail(d,E::phase,0x12F520);
+    if(!tellAssertions12F520(handle,freshFileCapacity_->memberCount154,d))return false;
+    position=freshFileCapacity_->members150[handle].cursor10;return true;
+}
+bool OriginalStandardTextureResolver50LA::seekSourceBankMember12F640(const void* root,const void* occurrence,std::int32_t handle,std::size_t position,D& d)noexcept {
+    d={};if(!sourceBankMemberCurrent(root,occurrence,handle)||position>freshFileCapacity_->members150[handle].length14)return fail(d,E::phase,0x12F640);
+    if(!seekAssertions12F640(handle,freshFileCapacity_->memberCount154,d))return false;
+    freshFileCapacity_->members150[handle].cursor10=static_cast<std::uint32_t>(position);d.sourceEffectsCommitted=true;return true;
+}
+
+bool OriginalStandardTextureResolver50LA::closeSourceBankMember131040(const void* root,const void* occurrence,
+    std::int32_t handle,bool flush,D& d)noexcept {
+    d={};if(!freshFileCapacity_||!scratch_||!root||!occurrence)return fail(d,E::phase,0x131040);
+    auto& s=*freshFileCapacity_;
+    if(flush&&!fileAssertions12F290(handle,s.memberCount154,d))return false;
+    if(!closeAssertions131040(handle,s.memberCount154,d))return false;
+    if(!sourceBankMemberCurrent(root,occurrence,handle))return fail(d,E::phase,0x131040);
+    auto& member=s.members150[handle];
+    if(!s.devices14||member.deviceID00<0||member.deviceID00>=s.deviceCount18)return fail(d,E::phase,0x1311A0);
+    auto& device=s.devices14[member.deviceID00];
+    if(!(device.flags0C&2))return fail(d,E::unsupported,0x1311BC);
+    //13D9E0 reached by12F290 is the literal no-op returning zero. The actual
+    //131040 archive close below does NOT retire the bank handle or its window.
+    member.cursor10=0;member.flags18&=~std::uint32_t(4);
+    if(member.auxiliarySlot04>=0&&std::size_t(member.auxiliarySlot04)<scratch_->slots.size()&&
+       scratch_->slots[member.auxiliarySlot04].status08==handle)scratch_->selected148=member.auxiliarySlot04;
+    member.courseConfigOwner=nullptr;d.sourceEffectsCommitted=true;return true;
+}
+bool OriginalStandardTextureResolver50LA::retireSourceBankNative(const void* root,D& d)noexcept {
+    d={};if(!freshFileCapacity_||!root)return fail(d,E::phase,0);
+    auto& s=*freshFileCapacity_;if(s.courseStage==FreshFileCapacity::CourseStage::none&&!s.courseRootOwner)return true;
+    if(s.courseRootOwner!=root)return fail(d,E::phase,0);
+    if(s.courseStage==FreshFileCapacity::CourseStage::retired)return true;
+    if(s.courseNativeBorrowers!=1)return fail(d,E::phase,0);
+    // Native abort admission, not an original forced-bank destructor receipt.
+    // Prove actual canonical resources gone, including prior generations. A
+    // zero Fresh associatedObject lane alone is NOT a resource-owner proof.
+    if(s.courseMount!=static_cast<std::size_t>(-1)){
+        if(!s.provider||s.courseMount>=s.provider->mounts_.size())return fail(d,E::source,0);
+        const auto& bank=*s.provider->mounts_[s.courseMount];
+        if(!bank.active||bank.generation!=s.courseGeneration||bank.admittedUi.lock()!=s.courseArchive)return fail(d,E::source,0);
+        if(storage_&&storage_->provider){
+            if(storage_->provider.get()!=s.provider.get()||!validateGarageBankRows12EAA0(s.courseMount,s.courseGeneration,d))return false;
+            for(const auto& file:storage_->files)if(file->bank==s.courseMount){
+                if(file->pstBorrowers||!file->cached.expired()||file->animation||!file->geometry.expired()||
+                   !file->payloadGeometry.expired()||!file->collision.expired()||!file->ipumImages.expired()||file->garageIpum)
+                    return fail(d,E::phase,0x12EAA0);
+                if(!file->retired&&file->bankGeneration!=s.courseGeneration)return fail(d,E::source,0x12EAA0);
+            }
+        }else if(storage_&&!storage_->files.empty())return fail(d,E::source,0);
+        if(s.courseOwnsNativeMount&&s.provider->revision_==std::numeric_limits<std::uint64_t>::max())return fail(d,E::phase,0);
+    }
+    auto* members=s.members150?s.members150:s.failedCourseMembers;
+    const auto memberCount=s.members150?s.memberCount154:s.failedCourseMemberCapacity;
+    if(!members&&memberCount)return fail(d,E::phase,0);
+    for(std::int32_t n=0;n<memberCount;++n)if((s.courseDevice>=0&&members[n].deviceID00==s.courseDevice)||n==s.coursePendingMember){
+        if(members[n].courseConfigOwner||(members[n].flags18&4)||members[n].associatedObject1C)return fail(d,E::phase,0x12EAA0);
+    }
+    // All refusal gates precede withdrawal. No source allocation or callback is
+    // fabricated here; failed source realloc pointers remain NULL historically.
+    if(storage_&&s.courseMount!=static_cast<std::size_t>(-1))for(auto& file:storage_->files)if(file->bank==s.courseMount&&file->bankGeneration==s.courseGeneration&&!file->retired){
+        file->cached.reset();file->cacheIdentity=nullptr;file->animation=nullptr;
+        file->geometry.reset();file->geometryIdentity=nullptr;file->collision.reset();file->collisionIdentity=nullptr;
+        file->ipumImages.reset();file->retired=true;
+    }
+    for(std::int32_t n=0;n<memberCount;++n)if((s.courseDevice>=0&&members[n].deviceID00==s.courseDevice)||n==s.coursePendingMember){
+        if(s.members150)s.retireMember12EAA0(n);
+        else { // Unpublished old native allocation retained after realloc NULL.
+            auto& row=members[n];
+            if(row.auxiliarySlot04>=0&&std::size_t(row.auxiliarySlot04)<scratch_->slots.size()&&scratch_->slots[row.auxiliarySlot04].status08==n){
+                scratch_->slots[row.auxiliarySlot04].status08=-1;scratch_->selected148=row.auxiliarySlot04;}
+            delete[] row.filename08;row.filename08=nullptr;row.originalMember=nullptr;row.canonicalName=nullptr;row.canonicalData=nullptr;
+            row.flags18=1;row.deviceID00=0;row.courseConfigOwner=nullptr;
+        }
+    }
+    if(s.courseRegistrationInput){s.courseRegistrationInput->seek(s.courseRegistrationInput->input.size());s.courseRegistrationInput.reset();}
+    if(s.courseRegistrationSlot>=0){scratch_->selected148=s.courseRegistrationSlot;s.courseRegistrationSlot=-1;}
+    if(s.courseDevice>=0&&s.devices14&&s.courseDevice<s.deviceCount18)s.retireDevice12EB60(s.devices14[s.courseDevice]);
+    if(s.courseMount!=static_cast<std::size_t>(-1)&&s.courseOwnsNativeMount){
+        s.provider->mounts_[s.courseMount]->active=false;s.provider->mounts_[s.courseMount]->admittedUi.reset();++s.provider->revision_;
+    }
+    s.coursePendingMember=-1;s.courseNativeBorrowers=0;s.courseStage=FreshFileCapacity::CourseStage::retired;
+    s.courseArchive.reset();return true; // Native abort only, not retail12E5E0 completion.
+}
+
+bool OriginalStandardTextureResolver50LA::sourceBankFamilyCurrent(const void* root,SourceBankFamily family)const noexcept {
+    return freshFileCapacity_&&root&&freshFileCapacity_->courseRootOwner==root&&freshFileCapacity_->sourceBankFamily==family;
+}
+bool OriginalStandardTextureResolver50LA::registerCourseBank12CEA0(std::shared_ptr<const OriginalUiArchive50KG> archive,
+    const OriginalStandardArchiveProvider50LA* provider,const void* owner,bool& acquired,D& d)noexcept {
+    return registerSourceBank12CEA0(std::move(archive),provider,owner,SourceBankFamily::course,acquired,d);
+}
+bool OriginalStandardTextureResolver50LA::adoptCourseNativeMount(const void* root,bool owns,D& d)noexcept {
+    d={};if(!sourceBankFamilyCurrent(root,SourceBankFamily::course))return fail(d,E::phase,0);
+    return adoptSourceBankNativeMount(root,owns,d);
+}
+bool OriginalStandardTextureResolver50LA::joinCourseBankCanonical(const void* root,bool ownsNativeMount,D& d)noexcept {
+    d={};if(!sourceBankFamilyCurrent(root,SourceBankFamily::course))return fail(d,E::phase,0);
+    return joinSourceBankCanonical(root,ownsNativeMount,d);
+}
+bool OriginalStandardTextureResolver50LA::borrowCourseConfigNative(const void* root,bool acquire,D& d)noexcept {
+    d={};if(!sourceBankFamilyCurrent(root,SourceBankFamily::course))return fail(d,E::phase,0);
+    return borrowSourceBankConfigNative(root,acquire,d);
+}
+bool OriginalStandardTextureResolver50LA::openCourseConfig131230(const void* root,const void* occurrence,
+    const std::string& name,std::int32_t& handle,D& d)noexcept {
+    d={};if(!sourceBankFamilyCurrent(root,SourceBankFamily::course))return fail(d,E::phase,0);
+    return freshFileCapacity_->courseArchiveOnlyCallReached&&freshFileCapacity_->sourceFileMode170==0&&openSourceBankMember131230(root,occurrence,name,handle,d);
+}
+bool OriginalStandardTextureResolver50LA::courseConfigFileCurrent(const void* root,const void* occurrence,std::int32_t handle)const noexcept {
+    return sourceBankFamilyCurrent(root,SourceBankFamily::course)&&sourceBankMemberCurrent(root,occurrence,handle);
+}
+bool OriginalStandardTextureResolver50LA::readCourseConfig12FB30(const void* root,const void* occurrence,std::int32_t handle,
+    void* output,std::size_t requested,std::size_t& done,D& d)noexcept {
+    done=0;d={};if(!sourceBankFamilyCurrent(root,SourceBankFamily::course))return fail(d,E::phase,0);
+    return readSourceBankMember12FB30(root,occurrence,handle,output,requested,done,d);
+}
+bool OriginalStandardTextureResolver50LA::readCourseConfig130560(const void* root,const void* occurrence,std::int32_t handle,
+    void* output,std::size_t requested,std::size_t& copied,bool advance,D& d)noexcept {
+    copied=0;d={};if(!sourceBankFamilyCurrent(root,SourceBankFamily::course))return fail(d,E::phase,0);
+    return readSourceBankMember130560(root,occurrence,handle,output,requested,copied,advance,d);
+}
+bool OriginalStandardTextureResolver50LA::readCourseConfigLine12EE90(const void* root,const void* occurrence,std::int32_t handle,
+    std::array<char,1024>& output,bool& present,std::size_t& position,D& d)noexcept {
+    d={};if(!sourceBankFamilyCurrent(root,SourceBankFamily::course))return fail(d,E::phase,0);
+    return readSourceBankLine12EE90(root,occurrence,handle,output,present,position,d);
+}
+bool OriginalStandardTextureResolver50LA::tellCourseConfig12F520(const void* root,const void* occurrence,std::int32_t handle,std::size_t& position,D& d)noexcept {
+    d={};if(!sourceBankFamilyCurrent(root,SourceBankFamily::course))return fail(d,E::phase,0);
+    return tellSourceBankMember12F520(root,occurrence,handle,position,d);
+}
+bool OriginalStandardTextureResolver50LA::seekCourseConfig12F640(const void* root,const void* occurrence,std::int32_t handle,std::size_t position,D& d)noexcept {
+    d={};if(!sourceBankFamilyCurrent(root,SourceBankFamily::course))return fail(d,E::phase,0);
+    return seekSourceBankMember12F640(root,occurrence,handle,position,d);
+}
+bool OriginalStandardTextureResolver50LA::closeCourseConfig131040(const void* root,const void* occurrence,
+    std::int32_t handle,bool flush,D& d)noexcept {
+    d={};if(!sourceBankFamilyCurrent(root,SourceBankFamily::course))return fail(d,E::phase,0);
+    return closeSourceBankMember131040(root,occurrence,handle,flush,d);
+}
+bool OriginalStandardTextureResolver50LA::retireCourseBankNative(const void* root,D& d)noexcept {
+    d={};if(!sourceBankFamilyCurrent(root,SourceBankFamily::course))return fail(d,E::phase,0);
+    return retireSourceBankNative(root,d);
+}
+
+OriginalLoadingFontSource50LA::~OriginalLoadingFontSource50LA()noexcept {
+    if(acquired_&&!sourceRetired_&&!nativeClosed_)std::terminate();
+}
+bool OriginalLoadingFontSource50LA::mount1CAAE4(std::shared_ptr<OriginalStandardTextureResolver50LA> resolver,
+    std::shared_ptr<OriginalStandardArchiveProvider50LA> provider,std::shared_ptr<const OriginalUiArchive50KG> archive,
+    OriginalStandardTextureResolver50LA::LoadingFontsBankLease& lease,D& d)noexcept {
+    d={};if(thread_!=std::this_thread::get_id()||attempted_||!resolver||!provider||!archive)return fail(d,E::phase,0x1CAAE4);
+    resolver_=std::move(resolver);provider_=std::move(provider);archive_=std::move(archive);attempted_=true;
+    return resolver_->mountLoadingFontSource1CAAE4(*this,lease,d);
+}
+bool OriginalStandardTextureResolver50LA::mountLoadingFontSource1CAAE4(OriginalLoadingFontSource50LA& owner,
+    LoadingFontsBankLease& lease,D& d)noexcept {
+    d={};if(owner.resolver_.get()!=this||owner.thread_!=std::this_thread::get_id()||!owner.attempted_||owner.acquired_)
+        return fail(d,E::phase,0x12CEA0);
+    // Native namespace acquisition retains its real admitted identity. This
+    // lease neither manufactures a FileManager device nor means12CEA0 returned.
+    if(!issueLoadingFontsBank1CAAE4(owner.provider_,owner.archive_,lease,d))return false;
+    owner.archive_=lease.bank_.archive_;
+    // Actual preceding loose LD_RA keeps its device/member after successful
+    // cache association and1311DC close. Native-only LD_RA projection cannot
+    // certify the untouched one-device APPSTART predecessor for Fonts.
+    if(unjoinedLoadingRaFileHistory_)return fail(d,E::phase,0x12CEA0);
+    if(!registerSourceBank12CEA0(owner.archive_,owner.provider_.get(),&owner,SourceBankFamily::loadingFonts,owner.acquired_,d))return false;
+    if(!adoptSourceBankNativeMount(&owner,false,d)||!joinSourceBankCanonical(&owner,false,d))return false;
+    owner.joined_=true;return true;
+}
+bool OriginalLoadingFontSource50LA::currentCel(const void* occurrence)const noexcept {
+    return thread_==std::this_thread::get_id()&&joined_&&!sourceRetired_&&!nativeClosed_&&occurrence&&
+        celOccurrence_==occurrence&&resolver_&&resolver_->sourceBankFamilyCurrent(this,OriginalStandardTextureResolver50LA::SourceBankFamily::loadingFonts)&&
+        resolver_->sourceBankMemberCurrent(this,occurrence,handle_);
+}
+bool OriginalLoadingFontSource50LA::beginCel281890(const void* occurrence,const std::string& name,
+    OriginalUiMemberView50KG expected,D& d)noexcept {
+    d={};if(thread_!=std::this_thread::get_id()||!joined_||nativeClosed_||sourceRetired_||!occurrence||celOccurrence_||handle_!=-1||
+       !archive_||!provider_||!resolver_||!resolver_->sourceBankFamilyCurrent(this,OriginalStandardTextureResolver50LA::SourceBankFamily::loadingFonts))
+        return fail(d,E::phase,0x281890);
+    if(!courseSourceName308F00(name,"font\\denmrk16.cel")&&!courseSourceName308F00(name,"font\\venus16.cel"))return fail(d,E::source,0x281890);
+    const auto actual=archive_->find(name);OriginalStandardArchiveProvider50LA::MemberView found;
+    if(!actual.identity||actual.identity!=expected.identity||actual.data!=expected.data||actual.size!=expected.size||
+       provider_->lookup132820(name,found)!=OriginalStandardArchiveProvider50LA::Lookup::present||!found.data||
+       found.size!=expected.size||std::memcmp(found.data,expected.data,found.size))return fail(d,E::source,0x281890);
+    cel_=expected;celOccurrence_=occurrence;coldCelAttempted_=true;
+    // On a retained partial open the genuine handle remains available to native
+    // abort. A not-found original return keeps handle=-1, never a fabricated ID.
+    return resolver_->openSourceBankMember131230(this,occurrence,name,handle_,d);
+}
+bool OriginalLoadingFontSource50LA::readCel12FB30(const void* occurrence,void* output,std::size_t requested,std::size_t& done,D& d)noexcept {
+    done=0;d={};if(!currentCel(occurrence))return fail(d,E::phase,0x12FB30);
+    return resolver_->readSourceBankMember12FB30(this,occurrence,handle_,output,requested,done,d);
+}
+bool OriginalLoadingFontSource50LA::eofCel12F3E0(const void* occurrence,bool& atEnd,D& d)noexcept {
+    atEnd=false;d={};if(!currentCel(occurrence))return fail(d,E::phase,0x12F3E0);
+    const auto& state=*resolver_->freshFileCapacity_;
+    if(!fileIoAssertions().eof8230_3E1B10.reach(handle_>=0,d,0x12F430)||
+       !fileIoAssertions().eof8234_3E1B18.reach(handle_<state.memberCount154,d,0x12F49C))return false;
+    const auto& row=state.members150[handle_];atEnd=row.cursor10>=row.length14;return true;
+}
+bool OriginalLoadingFontSource50LA::closeCel131040(const void* occurrence,D& d)noexcept {
+    d={};if(!currentCel(occurrence))return fail(d,E::phase,0x131040);
+    const auto ordinal=cel_.identity&&courseSourceName308F00(cel_.identity->name,"font\\denmrk16.cel")?0u:
+        cel_.identity&&courseSourceName308F00(cel_.identity->name,"font\\venus16.cel")?1u:2u;
+    if(ordinal>=2||sourceClosedCelEntries_[ordinal])return fail(d,E::phase,0x131040);
+    if(!resolver_->closeSourceBankMember131040(this,occurrence,handle_,false,d))return false;
+    sourceClosedCelEntries_[ordinal]=occurrence;sourceClosedCels_[ordinal]=cel_;
+    handle_=-1;celOccurrence_=nullptr;cel_={};return true;
+}
+bool OriginalLoadingFontSource50LA::abortCelNative(const void* occurrence,D& d)noexcept {
+    d={};if(thread_!=std::this_thread::get_id()||!occurrence||celOccurrence_!=occurrence)return fail(d,E::phase,0);
+    if(handle_!=-1&&!resolver_->closeSourceBankMember131040(this,occurrence,handle_,false,d))return false;
+    handle_=-1;celOccurrence_=nullptr;cel_={};d.sourcePC=0;return true;
+}
+bool OriginalLoadingFontSource50LA::recordRegistryHit2822F0(const std::shared_ptr<const void>& occurrence,const std::string& name,
+    OriginalUiMemberView50KG expected,D& d)noexcept {
+    d={};if(thread_!=std::this_thread::get_id()||!joined_||sourceRetired_||nativeClosed_||!occurrence||celOccurrence_||handle_!=-1||!archive_||!provider_)
+        return fail(d,E::phase,0x2822F0);
+    const auto ordinal=courseSourceName308F00(name,"font\\denmrk16.cel")?0u:
+        courseSourceName308F00(name,"font\\venus16.cel")?1u:2u;
+    if(ordinal>=2||registryReceipts_[ordinal].kind!=Completion::unknown||(ordinal&&registryReceipts_[0].entry.expired()))return fail(d,E::phase,0x2822F0);
+    const auto actual=archive_->find(name);OriginalStandardArchiveProvider50LA::MemberView found;
+    // A retained registry Entry may come from an earlier authenticated archive
+    // allocation, so require exact catalog identity and bytes, not allocation equivalence.
+    if(!actual.identity||actual.identity!=expected.identity||!expected.data||actual.size!=expected.size||
+       std::memcmp(actual.data,expected.data,actual.size)||provider_->lookup132820(name,found)!=OriginalStandardArchiveProvider50LA::Lookup::present||
+       !found.data||found.size!=actual.size||std::memcmp(found.data,actual.data,actual.size))return fail(d,E::source,0x2822F0);
+    registryReceipts_[ordinal].kind=Completion::registryHit;registryReceipts_[ordinal].entry=occurrence;return true; // No original file call on reload0 hit.
+}
+bool OriginalLoadingFontSource50LA::recordColdRegistry2823EC(const std::shared_ptr<const void>& entry,
+    OriginalUiMemberView50KG cel,OriginalUiMemberView50KG pst,const OriginalStandardTextureResource50LA* resource,D& d)noexcept {
+    if(!resolver_)return fail(d,E::phase,0x2823EC);
+    return resolver_->recordLoadingFontColdRegistry2823EC(*this,entry,cel,pst,resource,d);
+}
+bool OriginalStandardTextureResolver50LA::recordLoadingFontColdRegistry2823EC(OriginalLoadingFontSource50LA& owner,
+    const std::shared_ptr<const void>& entry,OriginalUiMemberView50KG cel,OriginalUiMemberView50KG pst,
+    const OriginalStandardTextureResource50LA* resource,D& d)noexcept {
+    d={};using Completion=OriginalLoadingFontSource50LA::Completion;
+    if(owner.resolver_.get()!=this||owner.thread_!=std::this_thread::get_id()||!entry||!resource||
+       !owner.joined_||owner.sourceRetired_||owner.nativeClosed_||owner.celOccurrence_||owner.handle_!=-1||
+       !sourceBankFamilyCurrent(&owner,SourceBankFamily::loadingFonts)||!cel.identity||!pst.identity)
+        return fail(d,E::phase,0x2823EC);
+    const auto ordinal=courseSourceName308F00(cel.identity->name,"font\\denmrk16.cel")?0u:
+        courseSourceName308F00(cel.identity->name,"font\\venus16.cel")?1u:2u;
+    if(ordinal>=2||owner.registryReceipts_[ordinal].kind!=Completion::unknown||
+       (ordinal&&owner.registryReceipts_[0].entry.expired())||owner.sourceClosedCelEntries_[ordinal]!=entry.get())
+        return fail(d,E::phase,0x2823EC);
+    const auto& closed=owner.sourceClosedCels_[ordinal];
+    if(closed.identity!=cel.identity||closed.data!=cel.data||closed.size!=cel.size||
+       !courseSourceName308F00(pst.identity->name,ordinal?"font\\venus16.pst":"font\\denmrk16.pst"))
+        return fail(d,E::source,0x2823EC);
+    const auto& attempt=resource->loadingPstFile_;
+    if(!attempt||attempt->root_.get()!=&owner||attempt->raRoot_||attempt->fontEntry_!=entry.get()||
+       attempt->boundResource_!=resource||!attempt->associated_||!attempt->closed_||attempt->nativeAborted_||
+       attempt->associationCleared_||attempt->sourceBankRetiredAssociation_||attempt->handle_!=-1||
+       attempt->expected_.identity!=pst.identity||attempt->expected_.data!=pst.data||attempt->expected_.size!=pst.size||
+       !loadingPstFileCurrent(*attempt,false)||!resource->constructed24DA30()||
+       resource->resolver_.get()!=this||resource->sourceIndex_!=attempt->sourceIndex_)
+        return fail(d,E::phase,0x2823EC);
+    const auto& row=freshFileCapacity_->members150[attempt->row_];
+    const auto& file=*storage_->entries[attempt->sourceIndex_].file;
+    const auto cached=file.cached.lock();
+    if(row.associatedObject1C!=resource||(row.flags18&4)||row.courseConfigOwner||
+       !cached||cached.get()!=resource||file.cacheIdentity!=resource)return fail(d,E::phase,0x2823EC);
+    auto& receipt=owner.registryReceipts_[ordinal];receipt.entry=entry;receipt.resource=cached;
+    receipt.kind=Completion::coldReturned;return true;
+}
+bool OriginalLoadingFontSource50LA::retireBank1CAD94(OriginalStandardTextureResolver50LA::LoadingFontsBankLease& lease,D& d)noexcept {
+    if(sourceRetired_){d={};return true;}if(!resolver_)return fail(d,E::phase,0x1CAD94);
+    return resolver_->retireLoadingFontSource1CAD94(*this,lease,d);
+}
+bool OriginalStandardTextureResolver50LA::retireLoadingFontSource1CAD94(OriginalLoadingFontSource50LA& owner,
+    LoadingFontsBankLease& lease,D& d)noexcept {
+    d={};if(!sourceBankFamilyCurrent(&owner,SourceBankFamily::loadingFonts)||!owner.joined_||owner.nativeClosed_||owner.sourceRetired_||
+       owner.thread_!=std::this_thread::get_id()||owner.celOccurrence_||owner.handle_!=-1||
+       owner.registryReceipts_[0].entry.expired()||owner.registryReceipts_[1].entry.expired())return fail(d,E::phase,0x1CAD94);
+    auto& s=*freshFileCapacity_;
+    if(s.courseStage!=FreshFileCapacity::CourseStage::joined||s.courseNativeBorrowers!=1||!s.members150||!s.devices14||
+       s.courseDevice<1||s.courseDevice>=s.deviceCount18||
+       (s.loadingRaOwner?!loadingRaRetainedCurrent():s.deviceCount18!=2)||lease.bank_.archive_!=owner.archive_||
+       lease.bank_.mount_!=s.courseMount||lease.bank_.generation_!=s.courseGeneration||!lease.bank_.loadingFonts_)
+        return fail(d,E::phase,0x12E5E0);
+    // Pin exact published Entries and their cold resources throughout force1.
+    // Hit receipts authorize no new positive SourceFile1C whatsoever.
+    std::array<std::shared_ptr<const void>,2> entries;
+    std::array<std::shared_ptr<OriginalStandardTextureResource50LA>,2> resources;
+    for(std::size_t i=0;i<2;++i){
+        auto& receipt=owner.registryReceipts_[i];entries[i]=receipt.entry.lock();
+        if(!entries[i]||receipt.kind==OriginalLoadingFontSource50LA::Completion::unknown)return fail(d,E::phase,0x1CAD94);
+        if(receipt.kind==OriginalLoadingFontSource50LA::Completion::coldReturned){
+            resources[i]=receipt.resource.lock();if(!resources[i])return fail(d,E::phase,0x1CAD94);
+            const auto& p=resources[i]->loadingPstFile_;
+            if(!p||p->root_.get()!=&owner||p->fontEntry_!=entries[i].get()||p->boundResource_!=resources[i].get()||
+               !p->associated_||!p->closed_||p->nativeAborted_||p->associationCleared_||p->sourceBankRetiredAssociation_||
+               !loadingPstFileCurrent(*p,false)||s.members150[p->row_].associatedObject1C!=resources[i].get())
+                return fail(d,E::phase,0x12EAA0);
+            const auto& file=*storage_->entries[p->sourceIndex_].file;
+            if(file.cached.lock()!=resources[i]||file.cacheIdentity!=resources[i].get())return fail(d,E::phase,0x12EAA0);
+        }
+    }
+    for(std::int32_t n=0;n<s.memberCount154;++n)if(s.members150[n].deviceID00==s.courseDevice){
+        const auto& row=s.members150[n];if(row.courseConfigOwner||(row.flags18&4))return fail(d,E::phase,0x12EAA0);
+        if(row.associatedObject1C){bool matched=false;
+            for(const auto& resource:resources)if(resource&&resource.get()==row.associatedObject1C&&resource->loadingPstFile_->row_==n)matched=true;
+            if(!matched)return fail(d,E::phase,0x12EAA0);
+        }
+    }
+    if(!canRetireGarageBank12E5E0(lease.bank_,d))return false;
+    // Actual force1 clears associated pointers without releasing Resources.
+    // Native exact receipts are preflight only, never substitute source effects.
+    s.devices14[s.courseDevice].flags0C|=0x20; // Actual12E710 before forced member scan.
+    if(!retireLoadingFontsBank1CAD94(lease,d))return false;
+    for(std::int32_t n=0;n<s.memberCount154;++n)if(s.members150[n].deviceID00==s.courseDevice){
+        s.retireMember12EAA0(n);
+        for(const auto& resource:resources)if(resource&&resource->loadingPstFile_->row_==n)
+            resource->loadingPstFile_->sourceBankRetiredAssociation_=true;
+    }
+    s.retireDevice12EB60(s.devices14[s.courseDevice]);
+    s.courseNativeBorrowers=0;s.courseStage=FreshFileCapacity::CourseStage::retired;s.loadingFontsSourceRetired=true;
+    s.courseArchive.reset();owner.sourceRetired_=true;owner.joined_=false;d.sourceEffectsCommitted=true;return true;
+}
+bool OriginalLoadingFontSource50LA::closeNative(OriginalStandardTextureResolver50LA::LoadingFontsBankLease& lease,D& d)noexcept {
+    d={};if(thread_!=std::this_thread::get_id()||handle_!=-1||celOccurrence_)return fail(d,E::phase,0);
+    if(nativeClosed_)return true;
+    if(resolver_&&!resolver_->closeLoadingFontSourceNative(*this,lease,d))return false;
+    if(!resolver_&&acquired_)return fail(d,E::phase,0);
+    nativeClosed_=true;joined_=false;
+    // Published textures retain their exact retired bank root/attempt. Keep its
+    // resolver identity for later1327D0 tombstone admission, without reopening.
+    if(!sourceRetired_){archive_.reset();provider_.reset();resolver_.reset();}
+    return true;
+}
+bool OriginalStandardTextureResolver50LA::closeLoadingFontSourceNative(OriginalLoadingFontSource50LA& owner,
+    LoadingFontsBankLease& lease,D& d)noexcept {
+    d={};if(owner.resolver_.get()!=this||owner.thread_!=std::this_thread::get_id()||owner.handle_!=-1||owner.celOccurrence_||
+       (loadingPstFontEntry_&&loadingPstRoot_.lock().get()==&owner))return fail(d,E::phase,0);
+    auto& bank=lease.bank_;
+    // The namespace lease is a borrowed native capability, not an owned mount.
+    // Validate it BEFORE any Fresh withdrawal. A failed source registration may
+    // still own this capability even though it acquired no Fresh root.
+    if(bank.resolver_){
+        if(owner.sourceRetired_||bank.resolver_!=this||!bank.loadingFonts_||bank.selected19E_||
+           bank.thread_!=std::this_thread::get_id()||bank.provider_!=owner.provider_||bank.archive_!=owner.archive_||
+           !storage_||bank.managerIdentity_!=storage_->managerIdentity||!bank.provider_||
+           bank.mount_>=bank.provider_->mounts_.size())return fail(d,E::phase,0);
+        const auto& mounted=*bank.provider_->mounts_[bank.mount_];
+        if(!mounted.active||mounted.generation!=bank.generation_||mounted.admittedUi.lock()!=bank.archive_)
+            return fail(d,E::source,0);
+    }else if(owner.joined_&&!owner.sourceRetired_)return fail(d,E::phase,0);
+    // Retained preexisting resources remain a refusal, not a blanket cache
+    // waiver. Screen retains this owner and the lease when that gate rejects.
+    if(owner.acquired_&&!owner.sourceRetired_&&!retireSourceBankNative(&owner,d))return false;
+    if(bank.resolver_){
+        bank.resolver_=nullptr;bank.generation_=0;bank.archive_.reset();bank.provider_.reset();bank.managerIdentity_.reset();
+        // Do not mint closedBacking_: no source bank destructor was called.
+    }
+    d={};return true;
+}
+
+bool OriginalStandardTextureResolver50LA::adoptLoadingIconNativeMount(const void* root,bool owns,D& d)noexcept {
+    d={};if(!sourceBankFamilyCurrent(root,SourceBankFamily::loadingIcon))return fail(d,E::phase,0);
+    return adoptSourceBankNativeMount(root,owns,d);
+}
+bool OriginalStandardTextureResolver50LA::joinLoadingIconBankCanonical(const void* root,bool ownsNativeMount,D& d)noexcept {
+    d={};if(!sourceBankFamilyCurrent(root,SourceBankFamily::loadingIcon))return fail(d,E::phase,0);
+    return joinSourceBankCanonical(root,ownsNativeMount,d);
+}
+bool OriginalStandardTextureResolver50LA::openLoadingLsi131230(const void* root,const void* occurrence,
+    const std::string& name,std::int32_t& handle,D& d)noexcept {
+    d={};if(!sourceBankFamilyCurrent(root,SourceBankFamily::loadingIcon))return fail(d,E::phase,0);
+    return openSourceBankMember131230(root,occurrence,name,handle,d);
+}
+bool OriginalStandardTextureResolver50LA::loadingLsiFileCurrent(const void* root,const void* occurrence,std::int32_t handle)const noexcept {
+    return sourceBankFamilyCurrent(root,SourceBankFamily::loadingIcon)&&sourceBankMemberCurrent(root,occurrence,handle);
+}
+bool OriginalStandardTextureResolver50LA::readLoadingLsi12FB30(const void* root,const void* occurrence,std::int32_t handle,
+    void* output,std::size_t requested,std::size_t& done,D& d)noexcept {
+    done=0;d={};if(!sourceBankFamilyCurrent(root,SourceBankFamily::loadingIcon))return fail(d,E::phase,0);
+    return readSourceBankMember12FB30(root,occurrence,handle,output,requested,done,d);
+}
+bool OriginalStandardTextureResolver50LA::readLoadingLsiLine12EE90(const void* root,const void* occurrence,std::int32_t handle,
+    std::array<char,1024>& output,bool& present,std::size_t& position,D& d)noexcept {
+    d={};if(!sourceBankFamilyCurrent(root,SourceBankFamily::loadingIcon))return fail(d,E::phase,0);
+    return readSourceBankLine12EE90(root,occurrence,handle,output,present,position,d);
+}
+bool OriginalStandardTextureResolver50LA::tellLoadingLsi12F520(const void* root,const void* occurrence,std::int32_t handle,std::size_t& position,D& d)noexcept {
+    d={};if(!sourceBankFamilyCurrent(root,SourceBankFamily::loadingIcon))return fail(d,E::phase,0);
+    return tellSourceBankMember12F520(root,occurrence,handle,position,d);
+}
+bool OriginalStandardTextureResolver50LA::seekLoadingLsi12F640(const void* root,const void* occurrence,std::int32_t handle,std::size_t position,D& d)noexcept {
+    d={};if(!sourceBankFamilyCurrent(root,SourceBankFamily::loadingIcon))return fail(d,E::phase,0);
+    return seekSourceBankMember12F640(root,occurrence,handle,position,d);
+}
+bool OriginalStandardTextureResolver50LA::closeLoadingLsi131040(const void* root,const void* occurrence,
+    std::int32_t handle,bool flush,D& d)noexcept {
+    d={};if(!sourceBankFamilyCurrent(root,SourceBankFamily::loadingIcon))return fail(d,E::phase,0);
+    return closeSourceBankMember131040(root,occurrence,handle,flush,d);
+}
+bool OriginalStandardTextureResolver50LA::retireLoadingIconBankNative(const void* root,D& d)noexcept {
+    d={};if(!sourceBankFamilyCurrent(root,SourceBankFamily::loadingIcon))return fail(d,E::phase,0);
+    return retireSourceBankNative(root,d);
+}
+bool OriginalStandardTextureResolver50LA::registerLoadingIconBank12CEA0(std::shared_ptr<const OriginalUiArchive50KG> archive,
+    const OriginalStandardArchiveProvider50LA* provider,const void* owner,bool& acquired,D& d)noexcept {
+    return registerSourceBank12CEA0(std::move(archive),provider,owner,SourceBankFamily::loadingIcon,acquired,d);
+}
+
+#include "original_loading_pst_file50la.inl"
+
+#include "original_loading_ra_file50la.inl"
+
+#include "original_ra_track_source_file50la.inl"
+#include "original_pod_source_bank50la.inl"
 }

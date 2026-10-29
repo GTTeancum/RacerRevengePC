@@ -220,11 +220,23 @@ struct ApplicationNoise {
 inline ApplicationNoise& applicationNoise() {static ApplicationNoise owner;return owner;}
 struct NoiseLifetime {
     CoupledNoiseContext49M* live=nullptr;
+    bool admitted=false;
     explicit NoiseLifetime(CoupledNoiseContext49M&noise,bool enabled) noexcept {
-        if(!enabled)return;auto&owner=applicationNoise();
-        if(!owner.initialized){initializeOriginalSharedNoise50IU(owner.state);owner.initialized=true;}
-        noise=owner.state;live=&noise;
+        if(noise.noise.initializationIncomplete49M)return;
+        if(!enabled){admitted=true;return;}
+        auto&owner=applicationNoise();
+        if(owner.state.noise.initializationIncomplete49M)return;
+        if(!owner.initialized){
+            if(!initializeOriginalSharedNoise50IU(owner.state))return;
+            owner.initialized=true;
+        }
+        noise=owner.state;live=&noise;admitted=true;
     }
-    ~NoiseLifetime(){if(live)applicationNoise().state=*live;}
+    ~NoiseLifetime(){
+        if(!live)return;auto& retained=applicationNoise().state;
+        //A newly partial live prefix must survive session teardown. Conversely,
+        //never overwrite an already partial Application with an older snapshot.
+        if(!retained.noise.initializationIncomplete49M)retained=*live;
+    }
 };
 } //namespace native_ai50IV

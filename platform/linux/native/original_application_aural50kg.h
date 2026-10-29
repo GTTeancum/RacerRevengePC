@@ -8,7 +8,7 @@
 #include <optional>
 #include <thread>
 namespace original_main_entry50KG {struct Application;}
-namespace rr::game {class OriginalResults10450LA;}
+namespace rr::game {class OriginalResults10450LA;class OriginalRaceMusicManager50LA;class OriginalRaceConstructor50LA;}
 namespace race_music50IE {class Owner;}
 namespace original_camera_cycle_audio50KX {class Owner;}
 namespace source_announcer50IE {class Owner;}
@@ -36,6 +36,8 @@ class OriginalApplicationAural50KG final {
     friend class RaceAudioGroups50IC;
     friend class NativeRaceIntroTransport50LA;
     friend class rr::game::OriginalResults10450LA;
+    friend class rr::game::OriginalRaceMusicManager50LA;
+    friend class rr::game::OriginalRaceConstructor50LA;
     using Application=::original_main_entry50KG::Application;
     using E=game::OriginalApplicationEntities50LA;
     using C=game::OriginalWreckComponent50LA;
@@ -82,6 +84,11 @@ private:
         const AudioClip50HD&,float,float)const noexcept;
     bool playNativeWattoStream233410(OriginalUiMainAudio50KG&,const void*,std::size_t,std::size_t,
         const AudioClip50HD&,std::int32_t,float,std::int32_t)const noexcept;
+    //Reached restart1AC950 only. Actual owned5C signed-empty return; any
+    //positive entry stops before its unrepresented virtual74 callback.
+    static bool restartOwnedList103210(const Application&,const std::shared_ptr<E>&,
+        std::optional<std::int32_t>& indexS0,std::optional<std::uint32_t>& count5C,
+        const C*& reachedEmitter,Diagnostic&)noexcept;
     static bool firstStartupInputsCurrent(const Application&)noexcept;
     bool boundedSourceBodyCurrent()const noexcept;
     bool canPublishNativeGarageVoices(const OriginalUiMainAudio50KG&,std::size_t)const noexcept;
@@ -143,7 +150,31 @@ private:
     std::thread::id thread_=std::this_thread::get_id();
     C entity_;std::uint64_t generation_=0;
     std::array<List,3> lists_;
-    std::array<const void*,4> listeners4C_{};
+    // Typed source ownership; no public listener factory or arbitrary provider.
+#include "original_application_listener50kg.inl"
+    using ListenerManager=game::OriginalRaceMusicManager50LA;
+    using ListenerXYZ=std::array<std::uint32_t,3>;
+    enum class NativeListenerPhase:std::uint8_t {empty,constructing,ready,failed,retiring};
+    NativeListenerPhase nativeListenerPhase_=NativeListenerPhase::empty;
+    const ListenerManager* nativeListenerIssuer_=nullptr; // Identity only, never dereferenced.
+    std::array<NativeListener290A90*,4> listeners4C_{};
+    std::array<std::unique_ptr<NativeListener290A90>,4> nativeListenerOwners_{};
+    bool listenerCustodyCurrent(bool allowIncomplete)const noexcept;
+    bool currentIncludingIncompleteListener()const noexcept;
+    bool listenerTerminalCleanupCurrent()const noexcept;
+    bool beginSingleRaceListener1A4620(const ListenerManager&,Diagnostic&)noexcept;
+    bool removeSingleRaceListener103040(const ListenerManager&,Diagnostic&)noexcept;
+    bool listenerCurrent(const ListenerManager&)const noexcept;
+    //Private actual-manager/Registration lane borrow; neither a public spatial
+    //provider nor proof that an original D48 constructor/resource loader ran.
+    bool observeSingleRaceSpeech104140(const ListenerManager&,
+        const std::array<std::uint32_t,3>& actualLocalXYZ,
+        const std::array<std::uint32_t,4>& actualMain70,
+        std::array<std::uint32_t,128>& retainedScratch,
+        std::array<bool,128>& scratchKnown,bool& actualAudible,Diagnostic&)const noexcept;
+    bool readSingleRaceListener290E10(const ListenerManager&,ListenerXYZ&,Diagnostic&)const noexcept;
+    bool writeSingleRaceListener1030B0(const ListenerManager&,const std::array<const float*,9>&,
+        const ListenerXYZ&,Diagnostic&)noexcept;
     std::uint32_t word30_=0,word34_=0,word38_=0,word3C_=0,word40_=0,word44_=0,word48_=0;
     std::int32_t word98_=-1;
     bool flags9CBit0_=true,constructed_=false,retired_=false,attached_=false;

@@ -204,7 +204,8 @@ bool Application::closeFrontendAudioOutput(AudioOutput& output,
        output.transport_.owner_before(backing)||backing.owner_before(output.transport_)||
        output.sourceMixer_!=&backing->mixer_||!sourceAural00Owner_||
        backing->frontendOutputAuralEntity_!=&sourceAural00Owner_->entity_||
-       !sourceAural00Owner_->current()||!sourceAural00Owner_->backendCurrent()||
+       (!sourceAural00Owner_->current()&&!sourceAural00Owner_->listenerTerminalCleanupCurrent())||
+       !sourceAural00Owner_->backendCurrent()||
        !backing->transport_.canRetireOrdinaryFrontendOutput())
         return reject("Retained output close requires exact idle source owners, Aural, epoch and ordinary revisions");
     // Exactly Root, output's Main alias, actual Aural interface Main alias,

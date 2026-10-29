@@ -11,6 +11,10 @@
         Cut cut_=Cut::beforeAuxiliary120;
         bool entered_=false,limitedEntered_=false,forcesEntered_=false,engineAppliedEntered_=false,aeroEntered_=false,springEntered_=false,terrainResponseEntered_=false,secondaryForcesEntered_=false;
         std::optional<std::uint32_t> secondaryFactorF20Bits_;
+        bool secondaryJointPrefixEntered_=false;
+        //Private same-invocation F0 after real ready14EEC0 returns. No public
+        //resume token; secondaryForcesEntered_ still prevents replay.
+        std::optional<std::uint32_t> secondaryNoiseF0Bits_;
         std::size_t ordinal_=0;
         SharedTerrainInvocation(SharedOwnerLease& lease,EndCandidateResult& result,
             storage::Storage::SharedRosterObject& row,const g::BodyMatrix48G& scene,

@@ -1,4 +1,5 @@
 #pragma once
+namespace rr::game { class OriginalLoadingManager33050LA; }
 #include "original_application_entities50la.h"
 #include <array>
 #include <cfenv>
@@ -12,7 +13,7 @@
 #include <utility>
 
 namespace original_main_entry50KG { struct Application; class RaceDisplayLifetime50LA; }
-namespace rr::platform { class OriginalUiFrontend50KG; class OriginalUiGarageDrawContribution50KG; class OriginalUiGarageCameraFrame50KG; class OriginalUiGaragePageOwner50KG; class OriginalUiGarageManagerSearch50KG; class OriginalUiGarageVisibility50KG; class OriginalUiGarageRendererLease50KG; }
+namespace rr::platform { class OriginalUiCourseOwnedLifecycle50KG; class OriginalUiFrontend50KG; class OriginalUiGarageDrawContribution50KG; class OriginalUiGarageCameraFrame50KG; class OriginalUiGaragePageOwner50KG; class OriginalUiGarageManagerSearch50KG; class OriginalUiGarageVisibility50KG; class OriginalUiGarageRendererLease50KG; }
 namespace rr::game {
 class OriginalUiEntityScope50KG;
 
@@ -24,6 +25,8 @@ class OriginalUiEntityScope50KG;
 // operation; this owner does not pretend to retrofit a universal registry lock.
 class OriginalFrontendCameraCold50LA final {
     friend struct ::original_main_entry50KG::Application;
+    friend class OriginalLoadingManager33050LA;
+    friend class rr::platform::OriginalUiCourseOwnedLifecycle50KG;
     friend class rr::platform::OriginalUiFrontend50KG;
     friend class rr::platform::OriginalUiGarageDrawContribution50KG;
     friend class rr::platform::OriginalUiGarageCameraFrame50KG;
@@ -486,6 +489,37 @@ private:
         if(!issuer||issuer_!=issuer||entities_!=entities||!onAffinity())return {Status::identity,0};
         if(phase_==Phase::nativeUnpublishedAborted)return {Status::complete,0};
         if(!unpublishedAbortCurrent(issuer,entities,nativeSelected))return {Status::phase,0};
+        if(!entities_->entityAuthority_.retire(entity_))return {Status::identity,0};
+        enrolled_=false;--entity_.reference00;--entities_->objectCount423F60_;
+        phase_=Phase::nativeUnpublishedAborted;return {Status::complete,0};
+    }
+    // Exact private Course Page invocation custody. Not a generic cold phase
+    // relaxation, source destructor receipt, or permission to clear parent38.
+    const rr::platform::OriginalUiCourseOwnedLifecycle50KG* courseNativeOwner_=nullptr;
+    bool preflightCourseNativeDisposal(const rr::platform::OriginalUiCourseOwnedLifecycle50KG* owner,
+        const void* actualParent,const void* actualRegistration)const noexcept {
+        if(!owner||courseNativeOwner_!=owner||!onAffinity()||!actualEntitiesAlive()||
+           !entityConstructed_||!fieldsComplete_||!enrolled_||entity_.reference00!=1||
+           entity_.kind!=Kind::camera236180||entity_.objectKey!=key_||key_!=nativeKey(&entity_)||
+           entity_.sessionGeneration!=generation_||entity_.previous10||entity_.next14||entity_.firstChild18||
+           entity_.parent1C||entity_.mask20||entity_.descendants24||entity_.nativeEffectControlId||
+           entity_.category28!=0xffu||(entity_.flags29&0x0fu)!=3u||fields_.searchable30||fields_.type32!=0xffu||(fields_.flags33&7u)||
+           ancestryTable_!=0x3D1C10||fields_.resource224||fields_.parent38!=actualParent||
+           fields_.registration34!=actualRegistration||entities_->attachmentLock423F58_||
+           !entities_->objectCount423F60_||!entities_->entityAuthority_.canRetire(entity_))return false;
+        switch(phase_){
+        case Phase::constructedCold:case Phase::beforeViewport114A00:case Phase::insideViewport114A00:
+        case Phase::afterViewport114A00:case Phase::selectedBeforeBounds236214:
+        case Phase::viewportInitialized2361C0:case Phase::poseSet114F90:break;
+        default:return false;
+        }
+        std::array<Component*,4> slots;if(!entities_->snapshotCameras140200(slots))return false;
+        for(const auto* c:slots)if(c==&entity_)return false; // No activation/slot writer admitted.
+        return true;
+    }
+    Result disposeCourseNative(const rr::platform::OriginalUiCourseOwnedLifecycle50KG* owner,
+        const void* actualParent)noexcept {
+        if(!preflightCourseNativeDisposal(owner,actualParent,nullptr))return {Status::phase,0};
         if(!entities_->entityAuthority_.retire(entity_))return {Status::identity,0};
         enrolled_=false;--entity_.reference00;--entities_->objectCount423F60_;
         phase_=Phase::nativeUnpublishedAborted;return {Status::complete,0};

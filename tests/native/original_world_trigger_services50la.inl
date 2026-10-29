@@ -2,7 +2,7 @@
 namespace ra_pod_scene50LA {
 bool Owner::completeNativeTriggerServices2DCB30(std::uint32_t& pc)noexcept {
     pc=0x2dcb30;
-    if(!nativeTriggerList3D0_||!worldApplication_||worldApplication_->attachmentLock423F58()||
+    if(!nativeTriggerList3D0_||nativeTriggerList3D0_->sourceMode||!worldApplication_||worldApplication_->attachmentLock423F58()||
        !canRetireNativeTriggerList3D0())return false;
     auto& list=*nativeTriggerList3D0_;
     if(!list.complete||list.count30!=2u||list.joined!=2u||list.serviceTerminal||
@@ -11,7 +11,7 @@ bool Owner::completeNativeTriggerServices2DCB30(std::uint32_t& pc)noexcept {
         return false;
     for(std::size_t i=0;i<2u;++i){const auto& source=(*list.authoring->sources())[i];
         const auto& pair=list.actions->nativeEntities_[i];
-        if(list.descriptors34[i]!=&source||source.zone!=4u||!source.startEnabled||source.oneTimeOnly||
+        if(!nativeTriggerDescriptorCurrent(i)||source.zone!=4u||!source.startEnabled||source.oneTimeOnly||
            !source.ignorePlayer||source.randomTriggerPercent90!=100||source.action.reset||
            source.action.targetNodeIndex!=(i?104u:29u)||!pair.triggerCounted||!pair.colliderCounted||
            !pair.attached||pair.trigger.nativeFlags29!=&list.actions->group_.triggers[i].flags29)return false;
@@ -46,9 +46,10 @@ bool Owner::completeNativeTriggerServices2DCB30(std::uint32_t& pc)noexcept {
 namespace ra_cold_aggregate50LA {
 bool Owner::continueNativeTriggerServices274E90(const original_main_entry50KG::Application& app,
     std::uint32_t& pc)noexcept {
+    if(sourceParticleDescriptorPhase_!=SourceParticleDescriptorPhase::unreached)return false;
     pc=0x1aa2d8;
     if(nativeScbThread_!=std::this_thread::get_id()||nativeScbRevoked_||
-       !nativeParticleList3D8_||!nativeParticleList3D8_->serviceComplete||
+       !nativeParticleList3D8_||nativeParticleList3D8_->sourceMode||!nativeParticleList3D8_->serviceComplete||
        nativeParticleList3D8_->serviceTerminal||!nativeSceneInfo270900Current(app,pc)||
        !world_||!world_->modelPrefixes_||!world_->domain_||!world_->imagePublication_||
        !runtimeQueries_||runtimeCameraBorrows_||runtimeWorldBorrows_||!worldApplication_||

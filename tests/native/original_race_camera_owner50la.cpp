@@ -4,6 +4,7 @@
 #include "ra_cold_aggregate50la.h"
 #include <thread>
 #include <utility>
+#include <cfenv>
 
 namespace rr::game {
 bool OriginalRaceConstructor50LA::nativeCameraAdapter34LifetimeCurrent(
@@ -166,6 +167,7 @@ bool Application::retireConsumedRaCameraNative34(
        race.resultsFeedbackThread_!=std::this_thread::get_id())return false;
     if(raceConstructorColdOwner50LA_.lock().get()!=&race||race.application_!=entitiesOwner_||
        race.world74_||race.cameraNativeAdapter34_)return false;
+    if(race.loadingCamera34_.entered)return abortConsumedRaLoadingCameraNative34(race,pc);
     if(!race.camera34_)return true;
     // Actual world/session cleanup must already have invalidated the native
     // selection. Do not erase a live global selection to force count retirement.
@@ -208,3 +210,5 @@ bool Session::revokeCountedRaceCameraNative34()noexcept {
         nativeTaIssuance_->issuer->revokeConsumedRaCameraNative34(*this);
 }
 }
+
+#include "original_race_loading_camera50la.inl"

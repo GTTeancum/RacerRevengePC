@@ -153,6 +153,8 @@ bool OriginalUiGarageManagerSearch50KG::registerCamera114770(
         o.sharedConstructed=true;
         camera_->fields_.registration34=&o; //1147A8, only after actual constructor.
     }
+    if(!game::OriginalCameraObserverAssertions50KG::allocation1147E4(camera_->fields_.registration34!=nullptr))
+        return fail(d,Status::phase,0x1147E4);
     if(!shared->owns(&o)||camera_->fields_.registration34!=&o||o.next00||o.zero0C||o.zero10)
         return fail(d,Status::phase,0x114818);
     if(camera_->fields_.parent38&&camera_->fields_.parent38!=&node_)return fail(d,Status::phase,0x11481C);
@@ -170,6 +172,8 @@ bool OriginalUiGarageManagerSearch50KG::registerCamera114770(
     // portal-link allocations or secondary observer records in this owner.
     if(field30_)return fail(d,Status::phase,0x280C34);
     o.complete=true;
+    if(!game::OriginalCameraObserverAssertions50KG::membership114884(o.child04!=nullptr))
+        return fail(d,Status::phase,0x114884);
     if(!cameraRegistrationCurrent())return fail(d,Status::phase,0x1148B4);
     d={Status::complete,0x1148B4};return true;
 }

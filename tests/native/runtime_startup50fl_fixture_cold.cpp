@@ -70,6 +70,12 @@ Graph Assets::graph()const{
         return graph;
     }
 
+// Separate native storage admission. The in-class native backing defaults are
+// NOT guest constructor receipts. In particular this does not call graph(),
+// animation/IK, PHY binders, body/joint setup, projection or FrameReady setters.
+Fixture::Fixture(SourceFreshStorageOnly,const std::filesystem::path& root)
+    :assets(root,AssetInput::OriginalDisc) {}
+
 Fixture::Fixture(float initialSpeed,const std::filesystem::path& root,
     AssetInput input):assets(root,input){
         require(std::fegetround()==FE_TONEAREST&&std::isfinite(initialSpeed),"native startup numeric context");

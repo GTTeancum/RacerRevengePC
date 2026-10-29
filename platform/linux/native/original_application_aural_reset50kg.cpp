@@ -290,11 +290,9 @@ bool OriginalApplicationAural50KG::resetNativeMemory268300(
         if(!entry||!contains(authority,entry)||!entry->reference00)
             return fail(d,Status::owner,0x268300);
     }
-    // Existing listeners4C is opaque and has no represented nonnull producer.
-    // A future typed listener lifetime join is needed; never clear the pointer
-    // or pretend that a void* value proves its owner remains valid.
-    for(const auto* listener:listeners4C_)if(listener)
-        return fail(d,Status::unsupportedNativeReset,0x268300);
+    //268300 preserves exact ready typed listeners and their source counters.
+    // Incomplete construction remains terminal and cannot be repaired by reset.
+    if(!listenerCustodyCurrent(false))return fail(d,Status::unsupportedNativeReset,0x268300);
     std::array<std::uint64_t,8> references{};
     if(!i.mixer->nativeSourceStreamReferences267CB0(*this,0.f,false,references))
         return fail(d,Status::owner,0x268300);

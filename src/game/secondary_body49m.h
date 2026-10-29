@@ -48,6 +48,14 @@ void makeSecondarySphereBody49M(const SecondaryBodyState49M&,
 //source-global, phase or constraint completion is supplied by this leaf.
 bool prepareSecondaryDampingPrefix49M(float cachedSpeed,float actualLow,
     float actualHigh,const Vector3_48C& angularVelocity,Vector3_48C& torque) noexcept;
+//Separate218C68 error/length and218CF8 normalization scratch phases.
+bool prepareSecondaryRestorationError49M(const PodSphereVector49L& target,
+    const Vector3_48C& relative,Vector3_48C& error,float& length) noexcept;
+bool prepareSecondaryRestorationDirection49M(const Vector3_48C& worldError,
+    Vector3_48C& direction) noexcept;
+//Pure reached218E58 cross scratch only, before actual process scale/getter.
+bool prepareSecondaryAlignmentCross49M(const Vector3_48C& physicalUp,
+    const Vector3_48C& mainUp,Vector3_48C& alignment) noexcept;
 // 218A3C..2190A0: gravity, speed-conditioned angular damping, restoration;
 // state0 damping/alignment, or original gradient-noise route. Ready scenes only.
 // Noise/RNG are untouched in state0 and are atomically committed otherwise.

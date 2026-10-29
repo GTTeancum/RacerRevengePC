@@ -2,6 +2,7 @@
 #include "original_application_entities50la.h"
 #include "../../tests/native/original_race_constructor50la.h"
 #include <cstring>
+#include <bit>
 #include <exception>
 #include <limits>
 #include <new>
@@ -181,6 +182,29 @@ bool OriginalSimpleVCR50LA::startRecord1A80C8(const OriginalRaceConstructor50LA&
     p.flagsB0Value=std::uint8_t(p.flagsB0Value|2u);
     p.flagsB0Known=std::uint8_t(p.flagsB0Known|2u);
     d.sourcePC=0x1a8158;return true;
+}
+bool OriginalSimpleVCR50LA::enableEndChannelsAndBackup1ABA68(
+    const OriginalRaceConstructor50LA& race,std::int32_t& indexS0,
+    OriginalSimpleVCRDiagnostic50LA& d)noexcept {
+    d={};
+    if(!belongsToRace(race))
+        return Impl::stop(d,0x1abaa0,"Actual saved Race78 channel owner unavailable");
+    auto& p=*impl_;
+    //1ABAA4/AA8 reload count80 and compare SIGNED each iteration. The inner
+    //1ABA74/78 reload is UNSIGNED. No cached capacity replaces either read.
+    while(indexS0<std::bit_cast<std::int32_t>(p.count80)){
+        if(indexS0>=0&&static_cast<std::uint32_t>(indexS0)<p.count80){
+            //Native backing fence at the reached90 access, not a prevalidation
+            //of untouched channels. Any earlier stores/index remain retained.
+            if(!p.enabled90||static_cast<std::uint32_t>(indexS0)>=p.capacity78)
+                return Impl::stop(d,0x1aba84,"Reached actual VCR90 channel backing unavailable");
+            p.enabled90[static_cast<std::uint32_t>(indexS0)]=1u; //1ABA90.
+        }
+        ++indexS0; //1ABA80 likely delay or1ABA98; signed loop bounds prevent overflow.
+    }
+    //No callback/yield in the loop. The exact existing copy leaf retains its
+    //real bit0-clear no-copy branch; no cursor/count/record flags are reset.
+    return copyBackup288630(d);
 }
 bool OriginalSimpleVCR50LA::reset287BE0(OriginalSimpleVCRDiagnostic50LA& d)noexcept {
     d={};if(!impl_||!impl_->current()||!impl_->setupComplete)

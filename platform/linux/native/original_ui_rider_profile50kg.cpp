@@ -152,6 +152,11 @@ struct OriginalUiRiderProfileOwner50KG::Storage {
 };
 OriginalUiRiderProfileOwner50KG::OriginalUiRiderProfileOwner50KG() noexcept=default;
 OriginalUiRiderProfileOwner50KG::~OriginalUiRiderProfileOwner50KG()=default;
+bool OriginalUiRiderProfileOwner50KG::readWorldProfileByte1B44E8(
+    const OriginalUiMainProfile50KG& actualCommon,std::uint8_t& out)const noexcept {
+    if(!storage_||!storage_->readable()||storage_->common.get()!=&actualCommon)return false;
+    out=storage_->common->playerBits1125C;return true;
+}
 bool OriginalUiRiderProfileOwner50KG::selectedTrackName187330(
     std::array<char,3>& out)const noexcept {
     if(!storage_||!storage_->readable())return false;
@@ -1517,5 +1522,14 @@ bool OriginalUiRiderProfileOwner50KG::saveNativeBetaProgress() noexcept {
   if(result==R::ok){s.betaStatus=BetaPersistenceStatus::saved;s.saveProfile.cardFlags_.value&=static_cast<std::uint8_t>(~1u);return true;}
   s.betaStatus=result==R::durabilityUnknown?BetaPersistenceStatus::durabilityUnknown:BetaPersistenceStatus::writeError;return false;
  }catch(...){s.betaStatus=BetaPersistenceStatus::writeError;return false;}
+}
+}
+
+namespace rr::platform {
+bool OriginalUiRiderProfileOwner50KG::readHumanPodSelection1ADFF4(
+    const OriginalUiMainProfile50KG& actualCommon,std::uint32_t humanIndex,std::uint32_t& selected)const noexcept {
+    if(!storage_||!storage_->readable()||storage_->common.get()!=&actualCommon||humanIndex>1)return false;
+    selected=humanIndex==0?std::uint32_t(storage_->packed1125D>>3):std::uint32_t(storage_->packed1125E&31u);
+    return true;
 }
 }

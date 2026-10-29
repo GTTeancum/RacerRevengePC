@@ -1,4 +1,5 @@
 #include "original_ui_light_manager_owner50kg.h"
+#include "original_ui_course_owned_lifecycle50kg.h"
 #include "original_application_aural50kg.h"
 #include "original_ui_garage_ui_lights50kg.h"
 #include "original_ui_garage_scene_lighting50kg.h"
@@ -12,6 +13,7 @@
 #include "../../../src/game/original_gc_gameplay_lighting_candidate.h"
 #include <limits>
 #include <initializer_list>
+#include "original_ui_light_manager_source_portal_guards50la.h"
 namespace rr::platform {
 using K=game::OriginalWreckComponentKind50LA;
 //24BD7C consumes these renderer-global rows once from the actual singleton.
@@ -156,13 +158,13 @@ bool OriginalUiLightManagerOwner50KG::current()const noexcept {
     return contains(view,&entity_)&&game::original_entity_chain_detail50LA::forest(view);
 }
 bool OriginalUiLightManagerOwner50KG::sourceMutationAvailable()const noexcept {
-    return current()&&!nativeProjectionUi_&&!nativeProjectionGameplayGeneration_&&!raZones_;
+    return current()&&!nativeProjectionUi_&&!nativeProjectionGameplayGeneration_&&!raZones_&&!courseZoneOwner_;
 }
 bool OriginalUiLightManagerOwner50KG::nativeProjectionInputsEmpty()const noexcept {
     // Root custody excludes even a Garage prefix before its first Light row.
     // Dead registry identities/defaults may persist after real source teardown.
     // No scalar projection mutates them or fabricates their source destruction.
-    return issuer_&&!issuer_->garageCustodyOwner_&&!raZones_&&
+    return issuer_&&!issuer_->garageCustodyOwner_&&!courseZoneOwner_&&!raZones_&&
         !zonesAttempted_&&!zonesComplete_&&!count90_&&!nodes88_&&!lists8C_&&
         !ambient60_&&!ambient80_&&!directional44_&&!zone_&&!list_&&!listPublished_&&
         !uiLightsOwner_&&!sceneLightsOwner_&&!count94_&&!directional40Live_&&!registryFailed_;
@@ -286,7 +288,7 @@ bool OriginalUiLightManagerOwner50KG::constructAfterAuralNative140074(const ::or
     output=std::move(next);d={Status::complete,0x140094};return true;
 }
 bool OriginalUiLightManagerOwner50KG::zoneReleasePreflight()const noexcept {
-    if(sceneLightsOwner_||!sourceMutationAvailable()||count90_!=(zonesAttempted_?1u:0u))return false;
+    if(courseZoneOwner_||sceneLightsOwner_||!sourceMutationAvailable()||count90_!=(zonesAttempted_?1u:0u))return false;
     if(!zonesAttempted_)return !nodes88_&&!lists8C_&&!ambient60_&&!ambient80_&&!directional44_&&!zone_&&!list_;
     if(zone_){
         const auto& z=*zone_;const auto& c=z.entity;
@@ -408,6 +410,14 @@ bool OriginalUiLightManagerOwner50KG::registryCurrent()const noexcept {
     else if(bool(registry9C_)!=(capacity98_!=0))return false;
     for(std::size_t i=0;i<registryWritten_;++i)
         if(!registry9C_||registry9C_[i]!=registryPublished_[i])return false;
+    if(raZones_&&raZones_->sourceMode&&raZones_->sourceAmbientRegistered&&!raZones_->sourceAmbientWithdrawn){
+        const auto& r=*raZones_;
+        return r.world&&r.sourceAmbient&&count94_==1&&capacity98_==10&&registryWritten_==1&&
+            registry9C_&&registry9C_[0]==r.sourceAmbient&&registryPublished_[0]==r.sourceAmbient&&
+            !r.firstAmbient&&!r.firstDirectional&&!directional40Live_&&!uiLightsOwner_&&!sceneLightsOwner_&&
+            r.world->sourceFirstLight_&&&r.world->sourceFirstLight_->entity==r.sourceAmbient&&
+            r.world->sourceFirstLight_->registered&&r.world->preflightSourceFirstLightNative();
+    }
     if(raZones_&&raZones_->firstAmbient){
         const auto& r=*raZones_;const auto* c=r.firstAmbient;
         if(uiLightsOwner_||sceneLightsOwner_||count94_!=(1u+bool(r.firstDirectional)+r.localRegisteredCount())||
@@ -419,6 +429,20 @@ bool OriginalUiLightManagerOwner50KG::registryCurrent()const noexcept {
             if(!light){gap=true;continue;}
             if(gap||!r.firstDirectional||registry9C_[i+2]!=light||!r.world->nativeLocalLightCurrent(light))return false;}
         return true;
+    }
+    if(courseZoneOwner_){
+        const auto& owner=*courseZoneOwner_;
+        if(uiLightsOwner_||sceneLightsOwner_||raZones_||owner.issuer_!=issuer_||
+           owner.courseLight_.get()!=this||count94_>2)return false;
+        bool directional=false;
+        for(std::size_t i=0;i<count94_;++i){
+            const auto& p=owner.courseUiLights_[i];
+            if(!p||!owner.courseLightEntityCurrent(p->entity,i)||!p->constructed||!p->typed||
+               !p->configured||!p->registered||p->retired||p->type34!=(i?2u:4u)||
+               p->observerD0||p->fieldD8||!registry9C_||registry9C_[i]!=&p->entity)return false;
+            if(p->type34==2&&field40_==&p->entity)directional=true;
+        }
+        return directional40Live_==directional;
     }
     if(!uiLightsOwner_)return !count94_&&!directional40Live_&&!sceneLightsOwner_;
     const auto& ui=*uiLightsOwner_;
@@ -661,7 +685,7 @@ bool OriginalUiLightManagerOwner50KG::serviceSceneLightShared147A00(
 
 namespace rr::platform {
 bool OriginalUiLightManagerOwner50KG::raZonesScopeCurrent()const noexcept {
-    if(!raZones_||!sourceIdentity()||!nativeProjectionGameplayGeneration_||nativeProjectionUi_||
+    if(!raZones_||raZones_->sourceMode||!sourceIdentity()||!nativeProjectionGameplayGeneration_||nativeProjectionUi_||
        issuer_->garageCustodyOwner_||raZones_->gameplayGeneration!=nativeProjectionGameplayGeneration_||
        !raZones_->world||!raZones_->canonical)return false;
     const auto& race=issuer_->sourceRace28COwner_;
@@ -867,6 +891,9 @@ bool OriginalUiLightManagerOwner50KG::linkRaPortal148D00(
         if(r.portals[ordinal]!=&portal)return fail(d,Status::identity,0x148d00);
         d={Status::complete,0x148f20};return true;
     }
+    // Genuine admitted legacy invocation begins here. It bypasses original
+    //148D18 guard reads; invalidate shared history before its first effects.
+    source_portal_guards50LA::invalidateNative();
     r.portals[ordinal]=&portal;r.portalParent=&parent;
     //Native bounds/non-null admission, no fabricated debug-global writes.
     try{
@@ -1268,3 +1295,214 @@ bool OriginalUiLightManagerOwner50KG::applyRaDirectionalColor1498A0(
     d.sourcePC=0x1498f4;return true;
 }
 }
+
+namespace rr::platform {
+bool OriginalUiLightManagerOwner50KG::beginCourseZone148B60(
+    const ::original_main_entry50KG::Application& issuer,
+    const OriginalUiCourseOwnedLifecycle50KG& owner,Diagnostic& d)noexcept {
+    d={};
+    if(issuer_!=&issuer||owner.issuer_!=&issuer||!owner.lightBoundaryCurrent148B60()||
+       owner.courseLight_.get()!=this||!sourceMutationAvailable()||
+       !nativeProjectionInputsEmpty()||!zoneReleasePreflight())
+        return fail(d,Status::identity,0x1CCD88);
+    // Native global count/table capacity admission precedes the source interval;
+    // this is NOT a substitute success for any source heap allocation below.
+    if(entities_->objectCount423F60_==std::numeric_limits<std::uint32_t>::max()||
+       !entities_->entityAuthority_.reserveAdditional(1))return fail(d,Status::allocation,0x148B60);
+    constexpr Words defaults{{0x42480000u,0x42480000u,0x42480000u,0x42800000u}};
+    default70_=defaults;default50_=defaults;defaultsKnown_=true; //148BA0/A8.
+    if(!releaseZones148110(d))std::terminate(); // Authenticated actually-empty source call.
+    courseZoneOwner_=&owner;
+    zonesAttempted_=true;count90_=1; //148BB8 before allocation return88 publication.
+    // NULL is a published source allocation result, not an early C++ exception.
+    // All five allocation calls and stores precede the first slot dereference.
+    nodes88_.reset(new(std::nothrow) Zone*[1]); //148BB4/BC.
+    lists8C_.reset(new(std::nothrow) L*[1]); //148BC0/CC.
+    ambient60_.reset(new(std::nothrow) Words[1]); //148BD0/D8.
+    ambient80_.reset(new(std::nothrow) Words[1]); //148BDC/E4.
+    directional44_.reset(new(std::nothrow) Words[1]); //148BE8/F4; contents UNKNOWN.
+    zone_.reset(new(std::nothrow) Zone); //148C08; NULL skips27F120.
+    if(zone_){
+        auto& z=*zone_;
+        if(!entities_->entityAuthority_.canEnroll(z.entity,key(&z.entity)))std::terminate();
+        const auto init=game::initializeOriginalWreckComponent50LA(z.entity,K::searchNode27F120,
+            generation_,key(&z.entity),true,entities_->objectCount423F60_);
+        if(init.status!=game::OriginalWreckComponentStatus50LA::complete||
+           !entities_->entityAuthority_.enroll(z.entity))std::terminate();
+        z.constructed=true;
+    }
+    // The node slot store is the delay slot of the next allocator call.
+    // If88 is NULL, the list allocator has not run yet.
+    if(!nodes88_)return fail(d,Status::allocation,0x148C38);
+    nodes88_[0]=zone_.get();courseNodeSlotKnown_=true;
+    if(zone_)zone_->published=true;
+    list_=std::unique_ptr<L>(new(std::nothrow) L(*issuer_,entities_)); //148C34 after delay-slot store.
+    if(list_){
+        list_->lightManagerOwner_=this;L::D ld;
+        if(!list_->construct27E260(issuer_,entities_,ld)&&
+           !(ld.status==L::S::allocation&&ld.sourcePC==0x27EE38&&
+             list_->lightEmptyCurrent(this,issuer_,entities_)&&list_->derivedConstructed_&&
+             !list_->complete_&&!list_->selected1C_&&list_->soultreeKnown_&&list_->searchableKnown_))
+            return fail(d,Status::list,ld.sourcePC);
+        //27EA14 ignores selected-allocation NULL; actual constructor still
+        // returns. Slot publication and alias setters do not read selected1C.
+    }
+    if(!lists8C_)return fail(d,Status::allocation,0x148C58);
+    lists8C_[0]=list_.get();courseListSlotKnown_=true;listPublished_=bool(list_);
+    if(!zone_)return fail(d,Status::allocation,0x27F434); // First receiver34 load.
+    if(!list_)return fail(d,Status::allocation,0x27F454); // After actual old34=NULL branch.
+    auto& z=*zone_;
+    if(!list_->lightEmptyCurrent(this,issuer_,entities_)||!list_->derivedConstructed_||
+       z.first34||z.second38||list_->lightAliases_)return fail(d,Status::phase,0x27F420);
+    // Actual setters write List usage then Node alias and retain. Neither
+    // dereferences selected1C, so its genuine NULL result is preserved.
+    list_->usage10_=1;z.first34=list_.get();++list_->reference00_;++list_->lightAliases_;
+    list_->usage10_=2;z.second38=list_.get();++list_->reference00_;++list_->lightAliases_;
+    z.index48=0; //148CA4.
+    if(!ambient80_)return fail(d,Status::allocation,0x148CBC);
+    ambient80_[0]=defaults;courseAmbient80Known_=true; // Survives a later NULL60 stop.
+    if(!ambient60_)return fail(d,Status::allocation,0x148CD0);
+    ambient60_[0]=defaults;ambientKnown_=true;
+    //44 may legally be NULL:148B60 does not dereference it in this interval.
+    zonesComplete_=true;d={Status::complete,0x1CCD90};return true;
+}
+bool OriginalUiLightManagerOwner50KG::courseZoneReleasePreflight(
+    const OriginalUiCourseOwnedLifecycle50KG& owner)const noexcept {
+    if(courseZoneOwner_!=&owner||owner.issuer_!=issuer_||owner.courseLight_.get()!=this||!current()||
+       nativeProjectionUi_||nativeProjectionGameplayGeneration_||raZones_||
+       uiLightsOwner_||sceneLightsOwner_||count94_||directional40Live_||
+       !zonesAttempted_||count90_!=1)return false;
+    if(courseNodeSlotKnown_&&(!nodes88_||nodes88_[0]!=zone_.get()))return false;
+    if(courseListSlotKnown_&&(!lists8C_||lists8C_[0]!=list_.get()))return false;
+    if(listPublished_!=(courseListSlotKnown_&&bool(list_)))return false;
+    if(zone_){
+        const auto& z=*zone_;const auto& c=z.entity;
+        if(!z.constructed||z.published!=courseNodeSlotKnown_||
+           c.kind!=K::searchNode27F120||c.objectKey!=key(&c)||c.sessionGeneration!=generation_||
+           c.reference00!=1||c.previous10||c.next14||c.firstChild18||c.parent1C||c.mask20||
+           !entities_->entityAuthority_.canRetire(c)||z.field30||z.field3C||z.field40||z.field44||z.fieldA0||z.index48)
+            return false;
+        if(z.first34!=(list_&&list_->lightAliases_>=1?list_.get():nullptr)||
+           z.second38!=(list_&&list_->lightAliases_>=2?list_.get():nullptr))return false;
+    }else if(list_&&list_->lightAliases_)return false;
+    return !list_||(list_->lightEmptyCurrent(this,issuer_,entities_)&&!list_->lightReleasedAliases_);
+}
+bool OriginalUiLightManagerOwner50KG::abortCourseZoneNative(
+    const OriginalUiCourseOwnedLifecycle50KG& owner,Diagnostic& d)noexcept {
+    d={};
+    // A retained candidate may have rejected admission while another Course
+    // owns the singleton. That never-acquired borrow has nothing to release.
+    if(courseZoneOwner_!=&owner)return issuer_==owner.issuer_&&owner.courseLight_.get()==this;
+    if(!courseZoneReleasePreflight(owner))return fail(d,Status::phase,0x148110);
+    // Native partial unwind, NOT a certificate that Course manager teardown
+    // has run. Retire actual constructed objects even if a NULL array stopped
+    // before their source publication. Never read an unwritten array slot.
+    if(zone_){auto& z=*zone_;auto& c=z.entity;
+        if(!entities_->entityAuthority_.retire(c))std::terminate();
+        --c.reference00;L::D ld;
+        if(z.first34&&!list_->releaseLightAlias(this,issuer_,entities_,1,z.first34,ld))std::terminate();
+        if(z.second38&&!list_->releaseLightAlias(this,issuer_,entities_,2,z.second38,ld))std::terminate();
+        --entities_->objectCount423F60_;z.constructed=false;zone_.reset();
+    }
+    nodes88_.reset();
+    if(list_){L::D ld;if(!list_->releaseLightPayload(this,issuer_,entities_,ld))std::terminate();list_.reset();}
+    lists8C_.reset();listPublished_=false;count90_=0;
+    ambient60_.reset();ambient80_.reset();directional44_.reset();
+    zonesAttempted_=false;zonesComplete_=false;ambientKnown_=false;directional44Known_=false;
+    courseNodeSlotKnown_=false;courseListSlotKnown_=false;courseAmbient80Known_=false;courseZoneOwner_=nullptr;
+    // Defaults50/70, registry94/98/9C, absent cacheA4 and singleton retained.
+    d={Status::complete,0};return true; // Native unwind, no source148110 return receipt.
+}
+}
+
+namespace rr::platform {
+bool OriginalUiLightManagerOwner50KG::incrementCourseRevision149300(
+    OriginalUiCourseOwnedLifecycle50KG& owner,Diagnostic& d)noexcept {
+    d={};
+    if(courseZoneOwner_!=&owner||owner.issuer_!=issuer_||owner.courseLight_.get()!=this||
+       !current()||!zonesComplete_||count90_!=1)return fail(d,Status::identity,0x149300);
+    ++field84_; //149304/addiu and14930C store: real unsigned32 wrap.
+    d={Status::complete,0x149310};return true;
+}
+bool OriginalUiLightManagerOwner50KG::appendCourseLight148F30(
+    OriginalUiCourseOwnedLifecycle50KG& owner,C& entity,Diagnostic& d)noexcept {
+    d={};
+    if(courseZoneOwner_!=&owner||owner.issuer_!=issuer_||owner.courseLight_.get()!=this||
+       !current()||!zonesComplete_||count90_!=1||registryFailed_||count94_>=2)
+        return fail(d,Status::phase,0x148F30);
+    const std::size_t ordinal=count94_;
+    auto& p=owner.courseUiLights_[ordinal];
+    if(!p||&p->entity!=&entity||!owner.courseLightEntityCurrent(entity,ordinal)||
+       !p->constructed||!p->typed||!p->configured||p->registered||p->retired||
+       entity.reference00!=1||entity.parent1C||entity.previous10||entity.next14||
+       p->type34!=(ordinal?2u:4u)||p->observerD0||p->fieldD8)
+        return fail(d,Status::identity,0x148F30);
+    auto& l=*p;
+    const auto word=[](float f)noexcept {std::uint32_t u;std::memcpy(&u,&f,4);return u;};
+    if(l.type34==4){
+        // Source148F50 skips Ambient copy if60 is NULL. A completed one-zone
+        // Course setup proves both arrays exist, but retain the real branch.
+        if(ambient60_){
+            if(!ambient80_)return fail(d,Status::phase,0x148F7C);
+            for(std::size_t i=0;i<3;++i){const auto value=word(l.ambient5C[i]);
+                ambient80_[0][i]=value;ambient60_[0][i]=value;
+                default70_[i]=value;default50_[i]=value;
+            }
+            ambient80_[0][3]=0x42800000u;ambient60_[0][3]=0x42800000u;
+            default70_[3]=0x42800000u;default50_[3]=0x42800000u;
+            ambient60_[0]=default50_;ambient80_[0]=default50_; //14900C..40 zone0 loop.
+            ambientKnown_=true;courseAmbient80Known_=true;defaultsKnown_=true;
+        }
+    }else {
+        vector30_={{word(l.diffuse3C[0]),word(l.diffuse3C[1]),word(l.diffuse3C[2]),0}};
+        field40_=&entity; //1490D0; historical pointer survives later native release.
+        if(directional44_){directional44_[0]=vector30_;directional44Known_=true;}
+        // NULL44 is explicitly checked1490D8 and is not a failure or zero row.
+    }
+    if(capacity98_<count94_+1){
+        // Only the first row can grow in this bounded two-light cohort. Any
+        // retained existing registry has capacity>=10 and is reused in place.
+        if(count94_||capacity98_||registry9C_)std::terminate();
+        capacity98_=count94_+10; //149198 before realloc call.
+        registry9C_.reset(new(std::nothrow) const C*[capacity98_]); //1491AC publishes even NULL.
+        if(!registry9C_){registryFailed_=true;return fail(d,Status::allocation,0x1491C0);}
+    }
+    registry9C_[count94_]=&entity;registryPublished_[count94_]=&entity; //1491C0.
+    ++count94_;if(registryWritten_<count94_)registryWritten_=count94_;
+    l.registered=true;if(l.type34==2)directional40Live_=true;
+    d={Status::complete,0x1491E8};return true;
+}
+bool OriginalUiLightManagerOwner50KG::removeCourseLight1491F0(
+    OriginalUiCourseOwnedLifecycle50KG& owner,C& entity,Diagnostic& d)noexcept {
+    d={};
+    if(courseZoneOwner_!=&owner||owner.issuer_!=issuer_||owner.courseLight_.get()!=this||!current())
+        return fail(d,Status::identity,0x1491F0);
+    std::size_t ordinal=2;
+    for(std::size_t i=0;i<2;++i)if(owner.courseUiLights_[i] && &owner.courseUiLights_[i]->entity==&entity)ordinal=i;
+    if(ordinal==2||!owner.courseLightEntityCurrent(entity,ordinal))return fail(d,Status::identity,0x1491F0);
+    auto& l=*owner.courseUiLights_[ordinal];
+    if(!l.constructed||l.retired||l.observerD0||l.fieldD8||l.fieldC0||l.fieldC4||
+       (l.type34!=0&&l.type34!=(ordinal?2u:4u)))return fail(d,Status::phase,0x1491F0);
+    // Native teardown invokes the actual function with its still-counted row;
+    //1491F0 does not inspect Entity reference00. No146980 completion implied.
+    if(l.registered){
+        if(count94_!=ordinal+1||!registry9C_||registry9C_[ordinal]!=&entity)
+            return fail(d,Status::phase,0x1491F0);
+    }else {
+        if(count94_>ordinal)return fail(d,Status::phase,0x1491F0);
+        for(std::size_t i=0;i<count94_;++i)if(registry9C_[i]==&entity)
+            return fail(d,Status::identity,0x1491F0);
+    }
+    for(std::size_t i=0;i<count94_;++i)if(registry9C_[i]==&entity)--count94_;
+    l.registered=false;if(field40_==&entity)directional40Live_=false;
+    fieldA0_=0;
+    for(std::size_t i=0;i<count94_;++i)if(owner.courseUiLights_[i]->type34==2){fieldA0_=1;break;}
+    // Neither stale source9C slots nor40 are cleared by1491F0.
+    d={Status::complete,0x1492F8};return true;
+}
+}
+
+#include "original_ui_light_manager_source_world_zones50la.inl"
+#include "original_ui_light_manager_source_ambient50la.inl"
+
+#include "original_ui_light_manager_source_portals50la.inl"

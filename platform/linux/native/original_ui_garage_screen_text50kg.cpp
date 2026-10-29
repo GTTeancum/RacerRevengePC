@@ -1,7 +1,10 @@
 #include "original_ui_garage_screen_text50kg.h"
+#include "original_ui_course_owned_lifecycle50kg.h"
+#include "original_ui_course_popup_payload50kg.h"
 #include "original_ui_garage_draw_contribution50kg.h"
 #include "original_ui_shared_dialogs50kg.h"
 #include "../../../tests/native/original_ui_main_entry50kg.h"
+#include "../../../src/game/original_loading_screen40_mode050la.h"
 #include <algorithm>
 #include <bit>
 #include <cmath>
@@ -62,6 +65,64 @@ bool textInputs(assets::OriginalApplicationFonts50LA::Name font,std::string_view
  }
  return false;
 }
+// Exact typed Course occurrences, separate from every generic Garage tuple.
+bool courseTextInputs(std::size_t ordinal,std::size_t line,TextInputs& out,std::int32_t& capacity,
+ assets::OriginalApplicationFonts50LA::Name& name)noexcept {
+ using N=assets::OriginalApplicationFonts50LA::Name;
+ // These are exact actual per-line occurrences, not aggregate localization
+ // lengths or a capacity whitelist. The owner supplies line from this object's
+ // retained source slot; callers cannot alias a mutable "current line".
+ if(ordinal>=59&&ordinal<=62){
+  if(ordinal==61){constexpr std::array<std::int32_t,3> capacities{{26,30,25}};
+   if(line>=capacities.size())return false;capacity=capacities[line];
+  }else{if(line!=0)return false;capacity=ordinal==62?60:40;}
+  name=N::frontendDenmrk14;
+  out={"font\\denmrk14.psm","font\\denmrk14.cel","font\\denmrk14.pst","denmrk14",assets::OriginalUiArchiveId50KG::course};return true;
+ }
+ // Exact retained memory-card/confirmation Text lines. Capacity is each
+ // source delimiter span, never the aggregate localization maximum.
+ if(ordinal>=67&&ordinal<=80){
+  struct LateTextRow{std::size_t lines;std::array<std::int32_t,10> capacities;};
+  constexpr std::array<LateTextRow,14> lateRows{{
+   {1,{{2}}}, // Widget68, lookup90
+   {7,{{13,1,31,44,1,25,21}}}, // Widget69, lookup95
+   {1,{{18}}}, // Widget70, lookup93
+   {1,{{14}}}, // Widget71, lookup94
+   {1,{{3}}}, // Widget72, lookup0
+   {1,{{2}}}, // Widget73, lookup1
+   {3,{{41,37,25}}}, // Widget74, lookup92
+   {10,{{29,42,1,45,38,10,1,49,62,51}}}, // Widget75, lookup98
+   {3,{{39,59,50}}}, // Widget76, lookup100
+   {7,{{19,1,31,44,1,25,21}}}, // Widget77, lookup55
+   {1,{{26}}}, // Widget78, lookup56
+   {1,{{22}}}, // Widget79, lookup57
+   {3,{{29,35,29}}}, // Widget80, lookup54
+   {6,{{36,60,1,29,35,29}}}, // Widget81, lookup91
+  }};
+  const auto& row=lateRows[ordinal-67];if(line>=row.lines)return false;
+  capacity=row.capacities[line];name=N::frontendDenmrk16;
+  out={"font\\denmrk16Top.psm","font\\denmrk16.cel","font\\denmrk16.pst","denmrk16Top",assets::OriginalUiArchiveId50KG::course};return true;
+ }
+ if(line!=0)return false;
+ if(ordinal<2){capacity=4;name=N::frontendDenmrk16;
+  out={"font\\denmrk16Top.psm","font\\denmrk16.cel","font\\denmrk16.pst","denmrk16Top",assets::OriginalUiArchiveId50KG::course};return true;}
+ struct Row{std::size_t ordinal;std::int32_t capacity;};
+ constexpr std::array<Row,14> rows{{{26,17},{27,14},{29,15},{30,18},{31,12},{32,12},{33,24},
+  {37,19},{38,18},{39,11},{40,14},{42,14},{43,15},{51,12}}};
+ for(const auto& row:rows)if(row.ordinal==ordinal){capacity=row.capacity;name=N::frontendVenus16;
+  out={"font\\venus16Top.psm","font\\venus16.cel","font\\venus16.pst","venus16Top",assets::OriginalUiArchiveId50KG::course};return true;}
+ return false;
+}
+bool loadingTextInputs(std::size_t ordinal,TextInputs& out,std::int32_t& capacity,
+ assets::OriginalApplicationFonts50LA::Name& name)noexcept {
+ constexpr std::array<std::int32_t,11> capacities{{60,60,15,10,21,19,10,21,19,10,21}};
+ if(ordinal>=capacities.size())return false;
+ capacity=capacities[ordinal];
+ name=ordinal?assets::OriginalApplicationFonts50LA::Name::frontendDenmrk16:assets::OriginalApplicationFonts50LA::Name::frontendVenus16;
+ out=ordinal?TextInputs{"font\\denmrk16.psm","font\\denmrk16.cel","font\\denmrk16.pst","denmrk16",assets::OriginalUiArchiveId50KG::fonts}:
+  TextInputs{"font\\venus16.psm","font\\venus16.cel","font\\venus16.pst","venus16",assets::OriginalUiArchiveId50KG::fonts};
+ return true;
+}
 bool retainedTextMaterial(const assets::OriginalUiArchive50KG& archive,
  const assets::OriginalUiMemberIdentity50KG* identity,const char* expected)noexcept {
  if(!identity||!expected)return false;
@@ -102,12 +163,31 @@ bool OriginalUiGarageScreenText50KG::authorityThread(const std::shared_ptr<Autho
  return authority&&authority->nativeOwnerThread_==std::this_thread::get_id();
 }
 bool OriginalUiGarageScreenText50KG::coldInputsCurrent()const noexcept {
+ // Loading resource staging is not a Garage/Menu draw or mutation grant.
+ if(loadingRole_)return false;
  if(ownerThread_!=std::this_thread::get_id()||!authorityThread(authority_))return false;
  // Revalidate the exact immutable tuple admitted by loadColdSource2DFD90.
  // The two real470 Venus16Popup texts retain Popup, not Garage. This is not
  // permission for ordinary Garage text to adopt an arbitrary second archive.
  TextInputs inputs{};
- if(!textInputs(fontName_,materialName_,capacity5B_,inputs))return false;
+ if(coursePage440Owner_){
+  if(!coursePage440Owner_->ownsCoursePageText440(*this)||capacity5B_!=10||
+     fontName_!=Fonts::Name::frontendDenmrk16||materialName_!="denmrk16Top"||
+     !sameOwner(garage_,coursePage440Owner_->coursePageTextArchive()))return false;
+  inputs={"font\\denmrk16Top.psm","font\\denmrk16.cel","font\\denmrk16.pst","denmrk16Top",assets::OriginalUiArchiveId50KG::course};
+ }else if(coursePopupOwner_){
+  std::int32_t expectedCapacity=0;std::shared_ptr<const Fonts::Entry> expectedFont;
+  if(!coursePopupOwner_->cloneInputs(this,expectedCapacity,expectedFont)||capacity5B_!=expectedCapacity||
+     !sameOwner(font4C_,expectedFont)||fontName_!=Fonts::Name::frontendDenmrk16||materialName_!="denmrk16Top")return false;
+  inputs={"font\\denmrk16Top.psm","font\\denmrk16.cel","font\\denmrk16.pst","denmrk16Top",assets::OriginalUiArchiveId50KG::course};
+ }else if(courseOwner_){
+  std::int32_t expectedCapacity=0;Fonts::Name expectedName{};
+  if(!courseTextInputs(courseOrdinal_,courseOwner_->courseScreenTextLineOrdinal(this,courseOrdinal_),inputs,expectedCapacity,expectedName)||
+     !courseOwner_->ownsCourseScreenTextOccurrence(this,courseOrdinal_)||
+     courseOwner_->courseScreenTextCapacity(this,courseOrdinal_)!=expectedCapacity||capacity5B_!=expectedCapacity||
+     courseOwner_->courseScreenTextFontName(courseOrdinal_)!=expectedName||fontName_!=expectedName||
+     courseOwner_->courseScreenTextMaterialName(courseOrdinal_)!=inputs.basename||materialName_!=inputs.basename)return false;
+ }else if(!textInputs(fontName_,materialName_,capacity5B_,inputs))return false;
  std::uint32_t pause=0;
  if(!lifetime_.readPause11C(pause)||!issuer_||!sameOwner(authority_,issuer_->entities())||
     !authority_->constructed_||authority_->released_)return false;
@@ -124,6 +204,52 @@ bool OriginalUiGarageScreenText50KG::coldInputsCurrent()const noexcept {
   garage_&&garage_->loaded()&&garage_->identity()==
     assets::originalUiArchiveIdentity50KG(inputs.archive)&&
   retainedTextMaterial(*garage_,materialIdentity_,inputs.material);
+}
+bool OriginalUiGarageScreenText50KG::loadCourseSource2DFD90(
+ OriginalUiCourseOwnedLifecycle50KG& owner,std::size_t ordinal,Diagnostic& d)noexcept {
+ if(!owner.ownsCourseScreenTextOccurrence(this,ordinal)||!owner.issuer_||!owner.loaderConfig_)
+  return stop(d,Status::authority,0x2DFD90);
+ const auto& root=*owner.issuer_;const auto fonts=root.fonts328Owner_;
+ if(!fonts)return stop(d,Status::authority,0x2DFD90);
+ TextInputs inputs;std::int32_t capacity=0;Fonts::Name name{};
+ if(!courseTextInputs(ordinal,owner.courseScreenTextLineOrdinal(this,ordinal),inputs,capacity,name)||owner.courseScreenTextCapacity(this,ordinal)!=capacity||
+    owner.courseScreenTextFontName(ordinal)!=name||owner.courseScreenTextMaterialName(ordinal)!=inputs.basename)
+  return stop(d,Status::authority,0x2DFD90);
+ return loadColdSource2DFD90(root,root.standardMaterialDomainOwner_,root.materialContextOwner_,fonts,
+  fonts->find282210(name),owner.courseTextArchive(),root.materialDirectory36B970_,root.fontDirectory36B420_,
+  name,inputs.basename,capacity,false,d,{},nullptr,0,&owner,ordinal);
+}
+bool OriginalUiGarageScreenText50KG::loadCoursePopupClone2DFD90(
+ OriginalUiCoursePopupPayload50KG& owner,Diagnostic& d)noexcept {
+ std::int32_t capacity=0;std::shared_ptr<const Fonts::Entry> font;
+ if(!owner.cloneInputs(this,capacity,font)||!owner.root_||!owner.course_)
+  return stop(d,Status::authority,0x2DFD90);
+ const auto& root=*owner.root_;
+ return loadColdSource2DFD90(root,root.standardMaterialDomainOwner_,root.materialContextOwner_,root.fonts328Owner_,
+  std::move(font),owner.course_,root.materialDirectory36B970_,root.fontDirectory36B420_,
+  Fonts::Name::frontendDenmrk16,"denmrk16Top",capacity,true,d,{},nullptr,0,nullptr,0,&owner);
+}
+bool OriginalUiGarageScreenText50KG::loadCoursePageText4402DFD90(
+ OriginalUiCourseOwnedLifecycle50KG& owner,std::string_view actualText,Diagnostic& d)noexcept {
+ if(!owner.issuer_||!owner.ownsCoursePageText440(*this)||
+    !actualText.data()||!owner.coursePageText440InitialCurrent(*this,actualText))
+  return stop(d,Status::authority,0x2DFD90);
+ const auto& root=*owner.issuer_;const auto fonts=root.fonts328Owner_;
+ if(!fonts)return stop(d,Status::authority,0x2DFD90);
+ return loadColdSource2DFD90(root,root.standardMaterialDomainOwner_,root.materialContextOwner_,fonts,
+  fonts->find282210(Fonts::Name::frontendDenmrk16),owner.coursePageTextArchive(),
+  root.materialDirectory36B970_,root.fontDirectory36B420_,Fonts::Name::frontendDenmrk16,
+  "denmrk16Top",10,false,d,actualText,nullptr,0,nullptr,0,nullptr,&owner);
+}
+bool OriginalUiGarageScreenText50KG::loadLoadingSource2DFD90(
+ game::OriginalLoadingScreen40Mode0LA& owner,std::size_t ordinal,Diagnostic& d)noexcept {
+ TextInputs inputs;std::int32_t capacity=0;Fonts::Name name{};
+ if(!owner.ownsLoadingTextOccurrence(this,ordinal)||!owner.fonts_||!owner.fontArchive_||
+    !loadingTextInputs(ordinal,inputs,capacity,name))
+  return stop(d,Status::authority,0x2DFD90);
+ return loadColdSource2DFD90(*owner.issuer_,owner.domain_,owner.context_,owner.fonts_,
+  owner.fonts_->find282210(name),owner.fontArchive_,owner.actualMaterialDirectory(),
+  owner.actualFontDirectory(),name,inputs.basename,capacity,true,d,{},&owner,ordinal);
 }
 bool OriginalUiGarageScreenText50KG::loadCold2DFD90(
  const Application& root,std::shared_ptr<Domain> domain,std::shared_ptr<const Context> context,
@@ -151,7 +277,11 @@ bool OriginalUiGarageScreenText50KG::loadColdSource2DFD90(
  const Application& root,std::shared_ptr<Domain> domain,std::shared_ptr<const Context> context,
  std::shared_ptr<Fonts> fonts,std::shared_ptr<const Fonts::Entry> font,std::shared_ptr<const Archive> garage,
  std::string& actualDirectory,const std::string& actualFontDirectory,Fonts::Name fontName,
- std::string_view materialName,std::int32_t capacity,bool initialNull,Diagnostic& d,std::string_view initialText)noexcept {
+ std::string_view materialName,std::int32_t capacity,bool initialNull,Diagnostic& d,std::string_view initialText,
+ game::OriginalLoadingScreen40Mode0LA* loadingOwner,std::size_t loadingOrdinal,
+ OriginalUiCourseOwnedLifecycle50KG* courseOwner,std::size_t courseOrdinal,
+ OriginalUiCoursePopupPayload50KG* coursePopupOwner,
+ OriginalUiCourseOwnedLifecycle50KG* coursePage440Owner)noexcept {
  d={};
  if(ownerThread_!=std::this_thread::get_id()||!authorityThread(root.entities())){
   d.status=Status::authority;d.sourcePC=0x2DFD90;return false;
@@ -164,7 +294,35 @@ bool OriginalUiGarageScreenText50KG::loadColdSource2DFD90(
     initialText.size()>static_cast<std::size_t>(capacity)||initialText.size()>255)
   return stop(d,Status::authority,0x2DFD90);
  TextInputs inputs{};
- if(!textInputs(fontName,materialName,capacity,inputs)||
+ bool tuple=false;
+ if(loadingOwner){
+  std::int32_t expectedCapacity=0;Fonts::Name expectedName{};
+  tuple=loadingOwner->issuer_==&root&&loadingOwner->ownsLoadingTextOccurrence(this,loadingOrdinal)&&
+   loadingTextInputs(loadingOrdinal,inputs,expectedCapacity,expectedName)&&
+   expectedCapacity==capacity&&expectedName==fontName&&inputs.basename==materialName&&initialNull&&initialText.empty();
+ }else if(coursePage440Owner){
+  tuple=coursePage440Owner->issuer_==&root&&coursePage440Owner->ownsCoursePageText440(*this)&&
+   coursePage440Owner->coursePageText440InitialCurrent(*this,initialText)&&
+   sameOwner(garage,coursePage440Owner->coursePageTextArchive())&&capacity==10&&
+   fontName==Fonts::Name::frontendDenmrk16&&materialName=="denmrk16Top"&&
+   !initialNull&&initialText.data()!=nullptr;
+  inputs={"font\\denmrk16Top.psm","font\\denmrk16.cel","font\\denmrk16.pst","denmrk16Top",assets::OriginalUiArchiveId50KG::course};
+ }else if(coursePopupOwner){
+  std::int32_t expectedCapacity=0;std::shared_ptr<const Fonts::Entry> expectedFont;
+  tuple=coursePopupOwner->root_==&root&&coursePopupOwner->cloneInputs(this,expectedCapacity,expectedFont)&&
+   sameOwner(font,expectedFont)&&capacity==expectedCapacity&&fontName==Fonts::Name::frontendDenmrk16&&
+   materialName=="denmrk16Top"&&initialNull&&initialText.empty();
+  inputs={"font\\denmrk16Top.psm","font\\denmrk16.cel","font\\denmrk16.pst","denmrk16Top",assets::OriginalUiArchiveId50KG::course};
+ }else if(courseOwner){
+  std::int32_t expectedCapacity=0;Fonts::Name expectedName{};
+  tuple=courseTextInputs(courseOrdinal,courseOwner->courseScreenTextLineOrdinal(this,courseOrdinal),inputs,expectedCapacity,expectedName)&&
+   courseOwner->issuer_==&root&&courseOwner->ownsCourseScreenTextOccurrence(this,courseOrdinal)&&
+   courseOwner->courseScreenTextCapacity(this,courseOrdinal)==expectedCapacity&&capacity==expectedCapacity&&
+   courseOwner->courseScreenTextFontName(courseOrdinal)==expectedName&&fontName==expectedName&&
+   courseOwner->courseScreenTextMaterialName(courseOrdinal)==inputs.basename&&
+   materialName==inputs.basename&&!initialNull&&initialText.empty();
+ }else tuple=textInputs(fontName,materialName,capacity,inputs);
+ if(!tuple||
     !fontDirectory(actualFontDirectory)||!domain||!context||!fonts||!font||!garage)
   return stop(d,Status::authority,0x2DFD90);
  try {
@@ -188,17 +346,26 @@ bool OriginalUiGarageScreenText50KG::loadColdSource2DFD90(
   assets::OriginalStandardArchiveProvider50LA::MemberView mounted;
   using Lookup=assets::OriginalStandardArchiveProvider50LA::Lookup;
   const auto materialSourceCurrent=[&]()noexcept {
+   if(loadingOwner){
+    // This role has no positive-PSM prerequisite. Preserve actual299BE0
+    // lookup/assertion order AFTER text allocations; a missing canonical
+    // row is not fabricated or rejected before those source partial effects.
+    return true;
+   }
    if(!material.identity||!material.data||material.size!=material.identity->bytes||
       provider->lookup132820(material.identity->name,mounted)!=Lookup::present||
       !mounted.member||!mounted.data||mounted.size!=material.size)return false;
    if(mounted.data==material.data)return true;
    //132820 retains the original authenticated mount on an equal-byte repeat.
    //A fresh Popup constructor owns a new archive allocation, not new contents.
-   //Admit only this exact Popup PSM with its real canonical mount provenance;
-   //ordinary Garage materials and the retained font atlas still require identity.
-   if((materialName!="venus16popup"&&materialName!="venus14popup")||*mounted.member!=material.identity->name)return false;
+   //Admit only this exact Popup or typed Course PSM with its real complete
+   //canonical mount provenance. Course's actual Config mount may retain an
+   //earlier equal-byte allocation; no CPU resource receipt is adopted here.
+   //Ordinary Garage materials and the retained font atlas still require identity.
+   if((!courseOwner&&!coursePopupOwner&&!coursePage440Owner&&materialName!="venus16popup"&&materialName!="venus14popup")||
+      *mounted.member!=material.identity->name)return false;
    assets::OriginalStandardArchiveProvider50LA::MountView mount;
-   const auto* expected=assets::originalUiArchiveIdentity50KG(assets::OriginalUiArchiveId50KG::controllerPopup);
+   const auto* expected=assets::originalUiArchiveIdentity50KG((courseOwner||coursePopupOwner||coursePage440Owner)?assets::OriginalUiArchiveId50KG::course:assets::OriginalUiArchiveId50KG::controllerPopup);
    return expected&&provider->mount(mounted.mount,mount)&&mount.archiveName&&mount.archiveSha256&&
     *mount.archiveName==expected->discPath&&*mount.archiveSha256==expected->sha256&&
     mount.archiveBytes==expected->bytes&&mount.memberCount==expected->memberCount&&
@@ -240,6 +407,8 @@ bool OriginalUiGarageScreenText50KG::loadColdSource2DFD90(
   }
   if(domain->materials382B38()->populationTerminal()||domain->materials382B38()->demandTerminal()||
      !domain->textures383400()||domain->textures383400()->populationTerminal())return stop(d,Status::phase,0x14D590);
+  if(loadingOwner)loadingOccurrence_=std::make_shared<const int>(0);
+  loadingRole_=loadingOwner!=nullptr;courseOwner_=courseOwner;courseOrdinal_=courseOrdinal;coursePopupOwner_=coursePopupOwner;coursePage440Owner_=coursePage440Owner;
   issuer_=&root;authority_=root.entities();lifetime_=root.animationClock();
   domain_=std::move(domain);context_=std::move(context);fonts_=std::move(fonts);
   garage_=std::move(garage);materialIdentity_=material.identity;
@@ -349,6 +518,22 @@ bool OriginalUiGarageScreenText50KG::loadPrimitive2465B0(Primitive& primitive,co
   if(!found)return stop(d,Status::material,d.material.sourcePC);
   if(!table->retainScreen14D590(row,d.material))return stop(d,Status::material,d.material.sourcePC);
   primitive.materialRetained=true;
+  if(loadingRole_){
+   auto proof=std::shared_ptr<assets::OriginalLoadingScreenFallback50LA>(new assets::OriginalLoadingScreenFallback50LA);
+   proof->occurrence_=loadingOccurrence_;proof->row_=row;proof->name_=requested;
+   proof->fonts_=font4C_->archive_;proof->provider_=domain_->archiveProvider3E1A70();
+   proof->context_=context_;proof->textures_=domain_->textures383400();
+   assets::OriginalStandardArchiveProvider50LA::MemberView materialSource;
+   const auto source=proof->provider_->lookup132820(requested+".psm",materialSource);
+   if(source==assets::OriginalStandardArchiveProvider50LA::Lookup::absent){
+    if(!table->bindLoadingScreenFallbackAfterRetain(row,std::move(proof),d.material))
+     return stop(d,Status::material,d.material.sourcePC);
+   }else if(source!=assets::OriginalStandardArchiveProvider50LA::Lookup::present)
+    return stop(d,Status::source,0x29B628);
+   // Positive PSM follows unchanged canonical population. No absence grant,
+   // source replacement or successful material-load claim is manufactured.
+
+  }
   primitive.type0C=15; //2465CC, AFTER299BE0 returns.
   return true;
  }catch(...){return stop(d,Status::allocation,0x299BE0);}
@@ -604,6 +789,9 @@ bool OriginalUiGarageScreenText50KG::preflightRetirement2E1340(Diagnostic& d)con
 bool OriginalUiGarageScreenText50KG::retire2E1340(Diagnostic& d)noexcept {
  if(!preflightRetirement2E1340(d))return false;
  if(phase_==Phase::retired)return true;
+ // Exact Page occurrence callback is withdrawn before any dependent backing
+ // is released. Retirement preflight itself does not invoke this callback.
+ coursePage440Owner_=nullptr;
  string8_.reset(); //2DFC84/8C.
  glyphsC_.reset(); //2DFCA0/A8.
  for(std::size_t i=0;i<publishedPrimitives_;++i)releasePrimitive246260(primitives4_[i]);
@@ -614,6 +802,7 @@ bool OriginalUiGarageScreenText50KG::retire2E1340(Diagnostic& d)noexcept {
  //Source4 stays stale after array free; source4Observation_ records it without
  //ever dereferencing freed storage. The C++owner's reset is NOT a source clear.
  if(packets64_){for(std::size_t i=0;i<allocatedPackets_;++i)packets64_[i].buffer00.reset();packets64_.reset();}
+ loadingOccurrence_.reset();courseOwner_=nullptr;coursePopupOwner_=nullptr;
  font4C_.reset();fonts_.reset();context_.reset();garage_.reset();domain_.reset();
  phase_=Phase::retired;d.sourceEffectsCommitted=true;return true;
 }

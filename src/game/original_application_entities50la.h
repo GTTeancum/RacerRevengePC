@@ -1,4 +1,7 @@
 #pragma once
+namespace ra_cold_roster50LA { class WreckBacking; }
+#include "original_wreck_constructor_vectors50la.h"
+namespace rr::game { class OriginalLoadingManager33050LA; }
 namespace ra_source_camera50LA {class OwnershipBridge;}
 namespace original_racer_manager_entity { class Owner; }
 namespace original_camera_session50KX { class Session; }
@@ -8,6 +11,7 @@ namespace track_runtime_storage50IG {struct Storage;}
 namespace rr::assets {class OriginalApplicationLocalization50KG;}
 namespace rr::platform {class OriginalApplicationAural50KG;class OriginalUiGarageSceneCollision50KG;class OriginalAudioPendingWaves50KG;class OriginalUiLightManagerOwner50KG;class OriginalUiGarageScreenText50KG;class OriginalLocalizationRendererLease50KG;class OriginalUiGarageWidget1Owner50KG;}
 namespace ra_pod_scene50LA { class Owner; }
+namespace ra_cold_aggregate50LA { class Owner; }
 namespace original_cable_selection50LA { class Binding; }
 namespace native_racer_model50LA { class Owner; }
 #include "original_wreck_components50la.h"
@@ -129,7 +133,13 @@ private:
 // and retains it across serial native race lifetimes. It is NOT a complete
 // retail application forest or a substitute race/manager ancestor chain.
 class OriginalApplicationEntities50LA final {
+    friend class ::ra_cold_roster50LA::WreckBacking;
+    //One actual application lifetime for the file-backed source static vectors.
+    const OriginalWreckConstructorVectors50LA wreckAssetVectors_=initializedOriginalWreckAssetVectors50LA();
+
     friend struct ::original_main_entry50KG::Application;
+    friend class OriginalLoadingManager33050LA;
+    friend class OriginalLoadingScreen40Mode0LA;
     friend class rr::platform::OriginalUiGarageDrawContribution50KG;
     friend class rr::platform::OriginalUiSharedDialogs50KG;
     friend class rr::platform::OriginalUiGarageCameraFrame50KG;
@@ -175,6 +185,14 @@ class OriginalApplicationEntities50LA final {
         if(!s.initialized[1]){s.words[1]=0x3f800000u;s.initialized[1]=true;} //219474/47C
         return true;
     }
+    // Native first-use219964/219984 state, owned by this actual process App.
+    // NOT recovered historical guest gp8778/877C or caller49K snapshots.
+    // Private admitted End path is the sole source-path consumer/writer;
+    // generic49K callers retain their separately supplied effective inputs.
+    struct NativeGroundedGravityStatics50LA {
+        std::array<bool,2> initialized{};
+        std::array<std::uint32_t,2> words{};
+    } nativeGroundedGravityStatics_;
     struct NativeDetectorSentinel50LA {bool observed=false;std::int32_t sentinel=0;};
     std::array<NativeDetectorSentinel50LA,2> nativeDetectorSentinels_{};
     bool observeNativeDetectorSentinel50LA(std::size_t site)noexcept {
@@ -295,6 +313,15 @@ class OriginalApplicationEntities50LA final {
     //239C54 dispatches static constructor3CA8F0 via table entry3CC588;
     //3CA94C/3CA96C publish these exact float4 defaults once at startup.
     const std::array<float,4> worldOrigin442F80_{{0.f,0.f,0.f,1.f}};
+    //Same startup3CA8F0: stack20=(0,1,0,1), actual3CA95C publication.
+    const std::array<float,4> worldUp442FA0_{{0.f,1.f,0.f,1.f}};
+    //Main static initializer table3CC634 ->3CC060; full vector store3CC0BC.
+    //Distinct actual444560 owner, not an alias/substitution of World442F80.
+    const std::array<float,4> triggerOrigin444560_{{0.f,0.f,0.f,1.f}};
+    //Main static initializer table3CC5C8 ->3CB040. Actual stack00=(0,0,0,1)
+    //loaded3CB088 and stored4438D0 at3CB09C; not a BSS-zero/native default.
+    const std::array<float,4> triggerInstanceOrigin4438D0_{{0.f,0.f,0.f,1.f}};
+
     const std::array<float,4> worldForward442FB0_{{0.f,0.f,1.f,1.f}};
     // Fresh native source-sky process domain. Unknown until reached129280/
     //12A100/12A110 stores; never a receipt that existing renderer state reset.
@@ -310,17 +337,20 @@ class OriginalApplicationEntities50LA final {
     std::array<std::optional<std::array<std::uint32_t,4>>,150> skyPositions3E0E80_;
     OriginalApplicationEntityAuthority50LA entityAuthority_;
     friend class ::ra_pod_scene50LA::Owner;
+    friend class OriginalPlayerConstructorPrefix50LA;
+    friend class ::ra_cold_aggregate50LA::Owner;
     friend struct ::track_runtime_storage50IG::Storage;
     // Process BSS3E0730. Storage borrows this byte; allocating another world
     // does not reset it. Only reached original query methods write it.
     // Native process-lifetime namespace, initialized from actual file-backed
     //zero data at36B0F0, not reset on menu/Scene entry.
     std::string collisionDirectory36B0F0_;
+#include "original_source_collision_category_startup50la.inl"
     // Borrow the exact immutable HOST namespace used by native track/query
     //consumers. This is not a recovered guest category registry or its values.
     const std::array<OriginalNativeCollisionCategories::NamedBinding,8>&
         nativeCollisionCategoryBindings_=OriginalNativeCollisionCategories::bindings;
-    //11B570 clears byte0;11B920 copies the actual lowercased stem here.
+    //11B570 clears byte0;11B9FC copies the actual original request here.
     //Existing byte consumers retain their exact stable byte0 alias.
     std::array<std::uint8_t,256> collisionName3E0730_{};
     std::uint8_t& collisionGlobalValid3E0730_=collisionName3E0730_.front();
@@ -351,15 +381,38 @@ class OriginalApplicationEntities50LA final {
     const std::array<std::uint32_t,4> cutAxisX443210_{{0x3f800000u,0,0,0x3f800000u}};
     const std::array<std::uint32_t,4> cutAxisY443220_{{0,0x3f800000u,0,0x3f800000u}};
     const std::array<std::uint32_t,4> cutAxisZ443230_{{0,0,0x3f800000u,0x3f800000u}};
+    // Actual startup table3CC620 ->3CBE30, stack vector at3CBE34..48,
+    // SQ3CBE8C. Distinct immutable process owner consumed by2D1FD4;
+    // not BSS-zero inference or a child-supplied constructor default.
+    const std::array<std::uint32_t,4> tvCameraOrigin444400_{{0,0,0,0x3f800000u}};
     // Original static3CAA20 ->3CAA7C; shared SelectiveGravityModel vector.
     //Explicit process-owned native lazy433C10/18/20 adaptation. No guest
     //guard/history equivalence; actual source caller initializes each on reach.
     std::array<std::optional<std::uint32_t>,3> nativeAeroLazyWords_{};
+    //Distinct startup table3CC5B8 ->3CAEA0, stack lanes3CAEA4..3CAEB8,
+    //Actual startup100018 SQzero BSS loop3D5A00..44F600 includes433F50.
+    //Cold process projection; direct-read audit is not an arbitrary indirect-write proof.
+    const std::array<std::uint32_t,4> particleDefault433F50_{{0,0,0,0}};
+    //SQ3CAEFC writes443550. Same numeric lanes as4435A0, NOT the same owner.
+    const std::array<std::uint32_t,4> detectorOrigin443550_{{0,0,0,0x3f800000u}};
+    //Distinct3C9CF0 initializer: SQ3C9D4C owns source434390.
+    const std::array<std::uint32_t,4> jointOrigin434390_{{0,0,0,0x3f800000u}};
+    const std::array<std::uint32_t,4> detectorFrame434630_{{0,0,0,0x3f800000u}}; //Distinct3C9FDC static store.
+    //Actual loaded ELF data382B50..382B5F; distinct quaternion source,
+    //not a reordered434630 vector or per-Player synthetic default.
+    const std::array<std::uint32_t,4> racerQuaternion382B50_{{0x3f800000u,0,0,0}};
+    //Startup table3CC610 ->3CBC30; LQ3CBC78/SQ3CBC8C writes4441F0.
+    //Distinct process owner; never substitute another numerically equal lane.
+    const std::array<std::uint32_t,4> groupOrigin4441F0_{{0,0,0,0x3f800000u}};
     //Actual process initializer3CAF20..3CAF7C, not BSS/null inference.
     const std::array<std::uint32_t,4> springZero4435A0_{{0,0,0,0x3f800000u}};
     //Distinct2965B0/29686C native process sentinel slots; no guest guard history.
     std::array<std::optional<std::uint32_t>,2> nativeSpringSentinelWords_{};
     //Actual process initializer3C7BA0..3C7BFC, copied by10037C toAero40.
+    //Distinct actual startup3CC350/SQ3CC3AC source engine origin.
+    const std::array<std::uint32_t,4> engineOrigin446800_{{0,0,0,0x3f800000u}};
+    //Distinct actual startup3C9310/SQ3C936C source Aero damping origin.
+    const std::array<std::uint32_t,4> aeroDampingOrigin433BD0_{{0,0,0,0x3f800000u}};
     const std::array<std::uint32_t,4> aeroFlowOrigin3D6B40_{{0,0,0,0x3f800000u}};
     const std::array<std::uint32_t,4> gravityOrigin4431C0_{{0,0,0,0x3f800000u}};
     // Source startup3C9190/3C9290 and file382B60, shared once per Application.
@@ -368,6 +421,8 @@ class OriginalApplicationEntities50LA final {
     //identity from bodyOrigin433AD0 despite equal words. Direct-access scan
     //finds no later same-global writer; not an indirect-alias proof.
     const std::array<std::uint32_t,4> terrainClear434260_{{0,0,0,0x3f800000u}};
+    //Same actual startup3C9B90, distinct SQ3C9C0C up vector.
+    const std::array<std::uint32_t,4> terrainUp434280_{{0,0x3f800000u,0,0x3f800000u}};
     //Same actual3C9B90 initializer, distinct SQ3C9C1C process vector.
     const std::array<std::uint32_t,4> terrainAxis434290_{{0,0,0x3f800000u,0x3f800000u}};
     //Native process first-use adaptation of1B1A58/1B23B4, not guest guard history.

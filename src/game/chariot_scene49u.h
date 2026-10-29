@@ -37,6 +37,9 @@ bool cleanMatrixDirectionPrefix49U(const BodyMatrix48G&,const VisualVector49R&,
 //Pure28BAB0 point arithmetic for an authenticated clean owner; W becomes1.
 bool cleanMatrixPointPrefix49U(const BodyMatrix48G&,const VisualVector49R&,
     SceneVectorContext49U&,VisualVector49R&)noexcept;
+//Pure28BD50 arithmetic after actual owner refresh; output pointW becomes1.
+bool cleanMatrixInversePointPrefix49U(const BodyMatrix48G&,const VisualVector49R&,
+    SceneVectorContext49U&,VisualVector49R&)noexcept;
 //Pure numerical inverse-direction counterpart; same caller-owned clean cut.
 bool cleanMatrixInverseDirectionPrefix49U(const BodyMatrix48G&,const VisualVector49R&,
     SceneVectorContext49U&,VisualVector49R&)noexcept;

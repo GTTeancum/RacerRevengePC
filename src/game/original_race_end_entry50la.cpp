@@ -492,8 +492,79 @@ void OriginalRaceConstructor50LA::continueEndPhysics1A8390(
             }
             endCallerCut_=Cut::physicsBody;
         }
-        if(endCallerCut_==Cut::physicsGrounded){
-            stop(S::incomplete,0x21991c,"Actual nonzero348+104 branch requires aero/cache/scene getter; no probe reread");return;
+        if(endCallerCut_==Cut::physicsGroundedSlopeStopped){
+            stop(S::incomplete,endGroundedSlopeStopPC_,
+                "Grounded slope prefix retained; unsupported owner/getter/scalar cut is terminal for this invocation");return;
+        }
+        if(endCallerCut_==Cut::physicsGroundedSlope){
+            const auto scope=endHud_.lock();
+            if(endPhysicsIndexS1_<0||!scope||!scope->camera_||
+               !scope->endStateCurrent(*this,*scope->camera_)||!application_||
+               application_->nativeOwnerThread_!=std::this_thread::get_id()||!world74_||
+               world74_->terminal_||world74_->closed_||!world74_->runtimeQueries_){
+                stop(S::owner,0x219964,"Actual same-App grounded slope owner unavailable");return;
+            }
+            auto& runtime=*world74_->runtimeQueries_;const auto slot=static_cast<std::size_t>(endPhysicsIndexS1_);
+            if(!runtime.replayRacerIdentityCurrent(*scope->camera_,slot)){
+                stop(S::owner,0x219964,"Actual indexed slope racer unavailable");return;
+            }
+            //One-shot after owner admission. All lazy/scratch/read prefixes
+            //survive a later rejection; no repaired world or numeric replay.
+            endCallerCut_=Cut::physicsGroundedSlopeStopped;
+            endGroundedSlopeStopPC_=0x219964;
+            auto& lazy=application_->nativeGroundedGravityStatics_;
+            if(!lazy.initialized[0]){
+                lazy.words[0]=0x43c13334u; //219978 before guard219980.
+                lazy.initialized[0]=true;
+            }
+            if(!lazy.initialized[1]){
+                lazy.words[1]=0x3f34fdf4u; //21999C before guard2199A4.
+                lazy.initialized[1]=true;
+            }
+            endGroundedForward60_={0u,0u,0u,0x3f800000u}; //2199A8 SQ VF0.
+            endGroundedUp70_={0u,0u,0u,0x3f800000u}; //2199B0 SQ VF0.
+            if(!runtime.readEndGroundedAxes2199B8(*scope->camera_,slot,
+                endGroundedForward60_,endGroundedUp70_,endGroundedSlopeStopPC_))continue;
+            endGroundedF4_=lazy.words[0]; //2199C4 actual native process lane.
+            const float up=std::bit_cast<float>(endGroundedUp70_[1]); //2199C8.
+            endPhysicsGravityF12_=0u; //2199CC MTC1 zero.
+            endGroundedF1_=lazy.words[1]; //2199D4.
+            const float threshold=std::bit_cast<float>(*endGroundedF1_);
+            endGroundedSlopeStopPC_=0x2199d8;
+            if(std::fegetround()!=FE_TONEAREST||!std::isfinite(threshold))continue;
+            const bool zeroThreshold=threshold==0.f; //2199D8; up not yet consumed.
+            std::uint32_t vehicle=0;endGroundedSlopeStopPC_=0x2199e4;
+            //Delay-slot load executes even when the zero-threshold branch wins.
+            if(!runtime.readEndGrounded3782199E4(*scope->camera_,slot,vehicle))continue;
+            endGroundedF3_=vehicle;
+            if(zeroThreshold){endCallerCut_=Cut::physicsGravityStore;continue;}
+            const float limit=std::bit_cast<float>(*endGroundedF4_);
+            const float base=std::bit_cast<float>(*endGroundedF3_);
+            endGroundedSlopeStopPC_=0x2199e8;
+            if(!std::isfinite(up))continue;
+            volatile float delta=up-threshold;if(!std::isfinite(delta))continue;
+            endGroundedSlopeStopPC_=0x2199ec;
+            volatile float denominator=0.f-threshold;if(!std::isfinite(denominator))continue;
+            endGroundedSlopeStopPC_=0x2199f0;
+            if(!std::isfinite(limit)||!std::isfinite(base))continue;
+            volatile float span=limit-base;if(!std::isfinite(span))continue;
+            endGroundedSlopeStopPC_=0x2199f4;
+            volatile float numerator=delta*span;if(!std::isfinite(numerator))continue;
+            endGroundedSlopeStopPC_=0x2199f8;
+            volatile float quotient=numerator/denominator;if(!std::isfinite(quotient))continue;
+            const bool descending=limit<=base; //2199FC, before delay-slot ADD.
+            endGroundedSlopeStopPC_=0x219a0c;
+            volatile float sum=base+quotient;if(!std::isfinite(sum))continue;
+            float value=sum;
+            if(descending){
+                if(value<limit)value=limit; //219A40..54.
+                else if(!(value<=base))value=base; //219A58..68.
+            }else{
+                if(!(value<=limit))value=limit; //219A10..24.
+                else if(value<base)value=base; //219A28..3C.
+            }
+            endPhysicsGravityF12_=std::bit_cast<std::uint32_t>(value);
+            endCallerCut_=Cut::physicsGravityStore;continue;
         }
         if(endCallerCut_==Cut::physicsCandidatesStopped){
             const char* reason=endNativeContactReturned_?
@@ -636,13 +707,14 @@ void OriginalRaceConstructor50LA::continueEndPhysics1A8390(
             }
             endCallerCut_=Cut::physicsWorldPreparation;continue;
         }
-        if(endCallerCut_==Cut::physicsBody||endCallerCut_==Cut::physicsAirborneRead||
+        if(endCallerCut_==Cut::physicsBody||endCallerCut_==Cut::physicsGrounded||
+           endCallerCut_==Cut::physicsGroundedSpeed||endCallerCut_==Cut::physicsAirborneRead||
            endCallerCut_==Cut::physicsGravityStore){
             const auto scope=endHud_.lock();
             if(endPhysicsIndexS1_<0||!scope||!scope->camera_||
                !scope->endStateCurrent(*this,*scope->camera_)||!world74_||
                world74_->terminal_||world74_->closed_||!world74_->runtimeQueries_){
-                stop(S::owner,0x21990c,"Actual same-world airborne-gravity owner unavailable");return;
+                stop(S::owner,0x21990c,"Actual same-world gravity owner unavailable");return;
             }
             auto& runtime=*world74_->runtimeQueries_;const auto slot=static_cast<std::size_t>(endPhysicsIndexS1_);
             if(endCallerCut_==Cut::physicsBody){
@@ -651,7 +723,48 @@ void OriginalRaceConstructor50LA::continueEndPhysics1A8390(
                     stop(S::owner,0x21990c,"Actual current registered348+104 unavailable");return;
                 }
                 endCallerCut_=probe?Cut::physicsGrounded:Cut::physicsAirborneRead;
-                if(probe)continue;
+                if(probe){
+                    endGroundedBrakeF0_.reset();endGroundedSpeedF1_.reset();
+                    continue;
+                }
+            }
+            if(endCallerCut_==Cut::physicsGrounded){
+                //219920 authors the actual F12 register +zero BEFORE the EC
+                //read. This is not a guessed gravity value or probe decision.
+                endPhysicsGravityF12_=0u;
+                if(!endGroundedBrakeF0_){
+                    std::uint32_t bits=0;
+                    if(!runtime.readEndGroundedBrake219924(*scope->camera_,slot,bits)){
+                        stop(S::owner,0x219924,"Actual same-racer native Aero EC lane unavailable");return;
+                    }
+                    endGroundedBrakeF0_=bits; //Actual read survives later admission failure.
+                }
+                const float brake=std::bit_cast<float>(*endGroundedBrakeF0_);
+                if(!std::isfinite(brake)){
+                    stop(S::source,0x219928,"Grounded EC comparison outside finite scalar domain");return;
+                }
+                //C.LE.S brake,+0: speed is not consumed on the taken branch.
+                endCallerCut_=brake<=0.f?Cut::physicsGroundedSlope:Cut::physicsGroundedSpeed;
+                continue;
+            }
+            if(endCallerCut_==Cut::physicsGroundedSpeed){
+                if(!endGroundedSpeedF1_){
+                    std::uint32_t bits=0;
+                    if(!runtime.readEndGroundedSpeed219948(*scope->camera_,slot,bits)){
+                        stop(S::owner,0x219948,"Actual same-racer cached340+34 lane unavailable; EC decision retained");return;
+                    }
+                    endGroundedSpeedF1_=bits;
+                }
+                const float speed=std::bit_cast<float>(*endGroundedSpeedF1_);
+                if(!std::isfinite(speed)){
+                    stop(S::source,0x21994c,"Grounded speed comparison outside finite scalar domain");return;
+                }
+                if(!(speed<std::bit_cast<float>(std::uint32_t{0x4212aa7f}))){
+                    endCallerCut_=Cut::physicsGroundedSlope;continue;
+                }
+                //21995C jumps to219A80 with the previously authored F12=+0.
+                //The exact existing gravity344 target store still executes.
+                endCallerCut_=Cut::physicsGravityStore;
             }
             if(endCallerCut_==Cut::physicsAirborneRead){
                 std::uint32_t bits=0;
@@ -711,12 +824,24 @@ void OriginalRaceConstructor50LA::continueEndPhysics1A8390(
             endCallerCut_=count?Cut::musicDispatch:Cut::musicClear;
         }
         if(endCallerCut_==Cut::musicDispatch){
-            //No event-loop producer coverage is fabricated. Save this actual
-            //count read; retries cannot replace a pending event with zero.
-            const bool negative=endMusicQueueCount150_&&
-                std::bit_cast<std::int32_t>(*endMusicQueueCount150_)<0;
-            stop(S::incomplete,negative?0x1a4cf4:0x1a4cd4,
-                "Actual nonzero queue150 retained; signed-negative domain/event158 ownership and dispatch unsupported");return;
+            //Initial source S0=0 at1A4CC8.1A4CF4 is signed SLT S0,count,
+            //not an unsigned/nonzero queue test. Consume the SAVED actual150
+            //read; a suspended positive count must never be reread as empty.
+            if(!endMusicQueueCount150_){
+                stop(S::source,0x1a4cf4,"Saved actual queue150 operand absent; no event or clear claimed");return;
+            }
+            if(std::bit_cast<std::int32_t>(*endMusicQueueCount150_)<=0){
+                endCallerCut_=Cut::musicClear;continue;
+            }
+            const auto scope=endHud_.lock();OriginalRaceMusicManagerDiagnostic50LA dispatched;
+            if(!scope||!music10C_||!music10C_->dispatchNativeQueuedEvent3_1A4D30(
+                *this,*scope,*endMusicQueueCount150_,dispatched)){
+                stop(S::incomplete,dispatched.sourcePC?dispatched.sourcePC:0x1a4cd4,
+                    dispatched.operation?dispatched.operation:"Actual same-manager positive FIFO lifetime unavailable");return;
+            }
+            //Only genuine supported3/6 and bounded1/5 returns advance this saved loop.
+            //Unsupported payloads remain owned/pending, never silently dropped.
+            endCallerCut_=Cut::musicClear;continue;
         }
         if(endCallerCut_==Cut::musicClear){
             const auto scope=endHud_.lock();
@@ -724,7 +849,7 @@ void OriginalRaceConstructor50LA::continueEndPhysics1A8390(
                 stop(S::owner,0x1a4d04,"Actual10C queue-clear target lifetime unavailable");return;
             }
             //1A5C40 returned, then1A4D0C..D24 restore registers and return.
-            //Reached only by actual source flag-skip or current count==0.
+            //Reached by actual flag-skip, saved count<=0, or all owned subscriber returns.
             endCallerCut_=Cut::callerReturn;
         }
         if(endCallerCut_==Cut::callerReturn){

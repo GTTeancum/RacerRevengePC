@@ -75,6 +75,17 @@ class OriginalWreckSceneDomain50LA final {
         out.queryIdentity=queryIdentity;out.nodes=assets.modelGraphIdentity();out.nodeCount=assets.modelGraphNodeCount();
         out.model=assets.model14C();return true;
     }
+    // Opaque native handle allocated only for this actual model/query pair at
+    // the1253F0 publication attempt. Never a truncated guest/host pointer or
+    // cold planned component identity. Existing public caller IDs unchanged.
+    SpringSceneId48N nativeIdentityForPublication(OriginalWreckAssets50LA& assets,
+        OriginalWreckPhysical50LA& physical,const OriginalWreckComponent50LA& model,
+        const OriginalWreckComponent50LA& query,std::uint32_t queryIdentity)const noexcept {
+        if(!prepared()||used_>=capacity_)return {};
+        const SpringSceneId48N id{static_cast<std::uint32_t>(used_+1u)};
+        Entry checked;
+        return preparePublication(id,assets,physical,model,query,queryIdentity,checked)?id:SpringSceneId48N{};
+    }
     Handle publish1253F0(Entry entry,const CollectionObject50BX& canonicalQuery)noexcept {
         // Called serially ONLY after preparePublication and canonical E0 store.
         entry.queryObject=&canonicalQuery;entry.live=true;entry.physical->modelSceneDomain=this;

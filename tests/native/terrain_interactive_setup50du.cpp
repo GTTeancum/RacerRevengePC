@@ -2750,7 +2750,7 @@ SessionExit50DU Context::run() {
   if(allAiEnabled)return;
   const bool physicalHuman=usePhysicalGameController&&actualRacerSlot==0;
   const bool manualHeld=physicalHuman?platform::selectedControllerHeld50KY(input.controllers[0]):
-      platform::selectedKeyboardHeld50KY(input,humanControlInput.cameraCycleBound,humanControlInput.manualResetBound);
+      platform::selectedKeyboardHeld50KY(input,humanControlInput);
   if(live&&autoDriveEnabled&&manualHeld){
    autoDriveEnabled=false;courseState={};courseOutput={};
    std::cerr<<"Host course driver disabled by actual manual driving input.\n";

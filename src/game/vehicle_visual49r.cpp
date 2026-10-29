@@ -82,6 +82,8 @@ bool updateVehicleVisual49R(const VehicleVisualInput49R& input,
     // store-only warm globals must remain unconsumed on their source paths.
     if (!std::isfinite(input.frameFactor) || input.frameFactor < 0.0f)
         return reject(diagnostic, VehicleVisualError49R::input, 0x21c120);
+    if (noise.noise.initializationIncomplete49M)
+        return reject(diagnostic, VehicleVisualError49R::noise, 0x14eec0);
     std::memcpy(workspace.nodes, graph.nodes, graph.count * sizeof(SceneNode49P));
     workspace.state = state;
     workspace.shared = shared;
@@ -92,6 +94,10 @@ bool updateVehicleVisual49R(const VehicleVisualInput49R& input,
             workspace.state, workspace.shared, frame, diagnostic)) return false;
     if (!detail::updateVisualResponses49R(input, parameters, bindings, frame, stagedGraph,
             workspace.state, workspace.shared, workspace.noise, diagnostic)) return false;
+    //A reentrant source-stage observer may have poisoned the live owner.
+    //Never erase that prefix with this earlier staged snapshot.
+    if (noise.noise.initializationIncomplete49M || workspace.noise.noise.initializationIncomplete49M)
+        return reject(diagnostic, VehicleVisualError49R::noise, 0x14eec0);
     std::memcpy(graph.nodes, workspace.nodes, graph.count * sizeof(SceneNode49P));
     state = workspace.state;
     shared = workspace.shared;

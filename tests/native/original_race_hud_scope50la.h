@@ -1,5 +1,8 @@
 #pragma once
 #include <cstdint>
+#include <array>
+#include <optional>
+#include <cstddef>
 #include <memory>
 #include <thread>
 namespace interactive_continuation50DU { struct Context; }
@@ -14,7 +17,7 @@ namespace native_racer50HN { class Bank; }
 namespace native_ai50IV { struct Session; }
 namespace original_main_entry50KG { struct Application; }
 namespace rr::platform { class GameHost50ER; }
-namespace rr::game {class OriginalResults10450LA;}
+namespace rr::game {class OriginalResults10450LA; template<std::size_t> struct RaceEventQueue50ID; struct DynamicContactEventBindings50IW; struct DynamicContactEventCursor50IW; struct RaceEvent50ID; struct LapEventCursor50ID; struct LapEventRequest50ID; struct LapEventResult50ID;struct PodSpeechCounts50HG;struct PodSpeechState50HG;}
 namespace rr::game { class OriginalRaceMusicManager50LA; struct OriginalResults104Diagnostic50LA; class OriginalRaceConstructor50LA;class OriginalRaceHud50KG;struct OriginalRaceEndEntryDiagnostic50LA;struct OriginalHumanEndClockResult50KG; }
 
 namespace original_race_hud_scope50LA {
@@ -49,6 +52,44 @@ class Registration final {
         const native_racer50HN::Bank&,const native_ai50IV::Session&,rr::game::OriginalRaceHud50KG&,
         race_music50IE::Owner*,source_announcer50IE::Owner*,
         live_audio50HF::Owner*,native_original_ai_audio::Owner*,race_audio50HQ::Owner*)noexcept;
+    rr::game::RaceEventQueue50ID<128>* events_=nullptr;
+    const rr::game::DynamicContactEventBindings50IW* eventBindings_=nullptr;
+    const std::uint32_t* lapCC8_=nullptr; //Actual registered Context lane, not actor snapshot.
+    bool readNativeListenerScene(const rr::game::OriginalRaceConstructor50LA&,
+        const original_camera_session50KX::Session&,bool heldSourceScene,
+        std::uint64_t previousPublication,std::uint64_t& publication,
+        std::array<const float*,9>& actualXYZ)const noexcept;
+    bool prepareNativeContactEvent1(const rr::game::OriginalRaceConstructor50LA&,
+        const rr::game::RaceEvent50ID&,rr::game::DynamicContactEventCursor50IW&,
+        std::array<std::optional<std::uint32_t>,18>&,rr::game::LapEventRequest50ID&,
+        bool&,bool&,bool&,std::uint32_t&,std::uint32_t&)const noexcept;
+    bool finishNativeContactEvent1(const rr::game::OriginalRaceConstructor50LA&,
+        rr::game::DynamicContactEventCursor50IW&,
+        std::array<std::optional<std::uint32_t>,18>&,rr::game::LapEventRequest50ID&,
+        bool&,std::uint32_t&)const noexcept;
+    bool readNativePodSpeechOwner(const rr::game::OriginalRaceConstructor50LA&,std::uint32_t actor,
+        const rr::game::PodSpeechCounts50HG*&,rr::game::PodSpeechState50HG*&,
+        std::array<std::uint32_t,3>&,std::array<std::uint32_t,4>&,
+        std::array<std::optional<std::uint32_t>,16>&,std::uint32_t&)const noexcept;
+    bool playNativePodSpeech(const rr::game::OriginalRaceConstructor50LA&,std::uint32_t actor,
+        bool taunt,std::uint32_t selectedOrdinal,std::uint32_t&)const noexcept;
+    bool readNativeDamageSpeech5Owner(const rr::game::OriginalRaceConstructor50LA&,
+        const rr::game::RaceEvent50ID&,const rr::game::PodSpeechCounts50HG*&,
+        rr::game::PodSpeechState50HG*&,std::array<std::uint32_t,3>&,
+        std::array<std::uint32_t,4>&,std::array<std::optional<std::uint32_t>,16>&,
+        std::uint32_t&)const noexcept;
+    bool playNativeDamageSpeech5(const rr::game::OriginalRaceConstructor50LA&,
+        std::uint32_t selectedOrdinal,std::uint32_t&)const noexcept;
+    bool prepareNativeDamageEvent5(const rr::game::OriginalRaceConstructor50LA&,
+        const rr::game::RaceEvent50ID&,std::array<std::optional<std::uint32_t>,7>&,
+        rr::game::LapEventRequest50ID&,bool&,bool&,std::uint32_t&)const noexcept;
+    bool beginNativeLapEvent6(const rr::game::OriginalRaceConstructor50LA&,std::uint32_t,
+        rr::game::LapEventCursor50ID&,std::uint32_t&)const noexcept;
+    rr::game::LapEventResult50ID advanceNativeLapEvent6(const rr::game::OriginalRaceConstructor50LA&,
+        rr::game::LapEventCursor50ID&,std::uint32_t&)const noexcept;
+    bool invokeNativeLapEvent6(const rr::game::OriginalRaceConstructor50LA&,
+        const rr::game::LapEventRequest50ID&,std::uint32_t&)const noexcept;
+
     race_audio50HQ::Owner* countdown_=nullptr; // Exact lexical Context.raceAudio, revoked before close.
     bool endStateCurrent(const rr::game::OriginalRaceConstructor50LA&,
         const original_camera_session50KX::Session&)const noexcept;

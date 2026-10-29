@@ -7,6 +7,8 @@ namespace native_racer_model50LA {class Owner;}
 namespace ra_source_camera50LA {class OwnershipBridge;}
 namespace rr::game {
 class OriginalRacerEntityCold50LA;
+class OriginalRacerEngine34COwner50LA;
+class OriginalRacerAero350Owner50LA;
 class OriginalRacerMainBodyOwner50LA;
 class OriginalApplicationEntities50LA;
 struct VehicleFrameState49W;
@@ -16,6 +18,8 @@ struct MainBodyParameters49K;
 //Existing coefficients/timers/control lanes remain in their actual Bank owner.
 class NativeRacerAeroOwner50LA final {
     friend class ::native_racer_model50LA::Owner;
+    friend class OriginalRacerEngine34COwner50LA;
+    friend class OriginalRacerAero350Owner50LA;
     friend class ::ra_source_camera50LA::OwnershipBridge;
     const ::native_racer50HN::Bank* bank_;
     VehicleFrameState49W* frame_;
@@ -27,9 +31,24 @@ class NativeRacerAeroOwner50LA final {
     const std::size_t slot_;
     const OriginalRacerEntityCold50LA* racer_=nullptr;
     std::uint64_t racerKey_=0;
-    std::uint32_t flowEnabled34_=0; //Actual native constructor, source100370.
+    //Legacy constructor owns this numeric100370 initialization. In the
+    //FreshSourceTag branch zero is only initialized host backing, not a
+    //known source word until the actual100330/16CCD0 owner writes it.
+    std::uint32_t flowEnabled34_=0;
     std::array<std::uint32_t,4> flow40Words_; //Actual App3D6B40 initializer copy.
     bool published_=false,revoked_=false;
+    //Legacy current-state ctor remains unchanged. Fresh source reservation
+    //has no claimed100330/16CCD0 numeric writes or runtime read authority.
+    struct FreshSourceTag final {};
+    bool sourceFresh_=false,sourceConstructorStarted_=false,sourceConstructorComplete_=true;
+    NativeRacerAeroOwner50LA(FreshSourceTag,const ::native_racer50HN::Bank& bank,
+        VehicleFrameState49W& frame,MainBodyParameters49K& parameters,
+        const OriginalRacerMainBodyOwner50LA& body,const OriginalApplicationEntities50LA& app,
+        const void* model,std::uint64_t generation,std::size_t slot)noexcept
+        :bank_(&bank),frame_(&frame),parameters_(&parameters),body_(&body),application_(&app),
+         model_(model),generation_(generation),slot_(slot),flow40Words_{},
+         sourceFresh_(true),sourceConstructorComplete_(false){}
+
     NativeRacerAeroOwner50LA(const ::native_racer50HN::Bank& bank,VehicleFrameState49W& frame,
         MainBodyParameters49K& parameters,const OriginalRacerMainBodyOwner50LA& body,
         const OriginalApplicationEntities50LA& app,const void* model,std::uint64_t generation,

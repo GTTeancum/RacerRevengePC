@@ -1,3 +1,4 @@
+#include "../../../src/game/original_world_light_assertion273abc.h"
 #include "original_ui_garage_scene_lighting50kg.h"
 #include "original_ui_garage_pod_scene50kg.h"
 #include "original_ui_garage_page_owner50kg.h"
@@ -141,6 +142,9 @@ bool OriginalUiGaragePodScene50KG::populateLights273AA0(std::shared_ptr<Original
         OriginalUiLightManagerOwner50KG::Diagnostic md;
         if(!out.manager_->bindSceneLights(out,md))return stop(d,S::phase,md.sourcePC);
         for(std::size_t i=0;i<2;++i){auto& wrapper=source.lights38[i];
+            //This admitted Garage row bypasses the shared 273ABC assertion guard.
+            //Preserve unknown prior history before the native zone check.
+            rr::game::world_light_assertion273ABC::invalidateNative();
             if(!wrapper.temp04||wrapper.liveLight00||wrapper.temp04->zone20<0||wrapper.temp04->zone20>=numZones34C_)
                 return stop(d,S::source,0x273B14);
             out.lights_[i]=std::make_unique<OriginalUiGarageSceneLighting50KG::Light>();auto& light=*out.lights_[i];

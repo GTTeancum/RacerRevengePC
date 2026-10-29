@@ -1,9 +1,13 @@
+#include "../../src/game/original_application_input04_source50la.h"
 #pragma once
+#include "../../src/game/original_player_race_music_borrow50la.h"
 #include "../../platform/linux/native/native_beta_settings50kg.h"
 #include "../../src/game/original_camera_start_effects.h"
 #include "../../platform/linux/native/original_application_aural50kg.h"
+namespace rr::platform {class OriginalUiCoursePopupPayload50KG;class OriginalUiCoursePagePayload50KG;}
+namespace original_main_entry50KG { class OriginalLoadingCollector50LA; }
 namespace original_pause_observation50LA { class Owner; }
-namespace rr::game {class OriginalSessionF8Intro50LA;}
+namespace rr::game { class OriginalLoadingScreen40Mode0LA; class OriginalSessionF8Intro50LA;class OriginalLoadingManager33050LA;}
 namespace original_results_roster50LA { class Read; }
 namespace interactive_publication50DU { struct Context; }
 namespace ra_cold_roster50LA { class Operation; }
@@ -187,6 +191,7 @@ struct DamageColdResult50LA {
     std::string failure;
 };
 struct Application {
+    friend class ::ra_cold_aggregate50LA::Owner; //Read-only same-App material domain admission; no lazy prepare.
     friend class ::original_camera_session50KX::Session;
     friend class rr::game::OriginalSessionF8Intro50LA;
     friend class RaceDisplayLifetime50LA;
@@ -201,10 +206,14 @@ struct Application {
     friend class rr::platform::OriginalUiGarageFogColorLease50KG;
     friend class rr::platform::OriginalUiGarageTextOverlay50KG;
     friend class rr::platform::OriginalUiGaragePageOwner50KG;
+    friend class rr::platform::OriginalUiCoursePagePayload50KG;
+    friend class rr::platform::OriginalUiCoursePopupPayload50KG;
     friend class rr::platform::OriginalUiGarageSession50KG;
     friend class rr::platform::OriginalUiSharedDialogs50KG;
     friend class rr::platform::OriginalUiMemoryCardConstructor50KG;
     friend class rr::platform::OriginalUiFrontend50KG;
+    friend class rr::game::OriginalLoadingScreen40Mode0LA;
+    friend class OriginalLoadingCollector50LA;
     bool enabled=false;
     // Host-only device choice from an accepted Course Confirm, not save/profile
     // data. A new SDL window must authenticate and neutral-arm its own device;
@@ -360,11 +369,51 @@ private:
     friend class rr::platform::OriginalApplicationAural50KG;
     friend struct Video;
     friend struct Frontend;
+    friend class rr::platform::OriginalUiCourseOwnedLifecycle50KG;
+    enum class CourseLoadingPhase50LA : std::uint8_t {
+        absent,uiRetirement,audioRetirement,audioReset,pendingClear,activity,videoRequest,terminal
+    };
+    struct CourseLoadingPrefix50LA {
+        bool attempted=false;
+        CourseLoadingPhase50LA phase=CourseLoadingPhase50LA::absent;
+        Frontend* frontend=nullptr;
+        std::shared_ptr<RaceDisplayLifetime50LA> display;
+        std::shared_ptr<Video> video;
+        std::shared_ptr<const rr::platform::OriginalUiRiderProfileOwner50KG> profile;
+        rr::platform::OriginalUiRiderProfileOwner50KG::CourseRaceSelection selection{};
+        std::uint32_t stopPC=0x17d7a0;
+    };
+    mutable CourseLoadingPrefix50LA courseLoadingPrefix50LA_;
+    bool advanceCourseRaLoadingPrefix50LA(Frontend&,std::uint32_t&)const noexcept;
+    bool withdrawCourseRaLoadingPrefix50LA(Frontend&)const noexcept;
+
     friend class NativeCollectorFifo50LA;
     // Opaque original process word3E1C10, included in entry100008..30 BSS
     // zeroing. Its gameplay meaning/nonzero producer is not established.
     // Retain actual storage once with Application, never per race/session.
     std::uint32_t sourceProcessWord3E1C10_=0;
+    // Actual source startup13FD40 owner. Separate from native SDL/presentation
+    // input and uncalled until its true startup dispatcher predecessor joins.
+    friend class rr::game::OriginalPlayerConstructorPrefix50LA;
+    mutable std::shared_ptr<rr::game::OriginalApplicationInput04Source50LA> sourceInput04_;
+    bool constructSourceInput04_13FD40()const noexcept {
+        if(sourceInput04_||!enabled||!entities())return false;
+        try{sourceInput04_.reset(new(std::nothrow) rr::game::OriginalApplicationInput04Source50LA);}
+        catch(...){return false;}
+        return sourceInput04_&&sourceInput04_->begin13FD40(*this);
+    }
+    mutable std::shared_ptr<rr::platform::OriginalSourcePadHostLease50LA> sourcePadHostLease_;
+    bool bindSourceInput04NativeTransport()const noexcept;
+    bool continueSourceInput04NativeActivation()const noexcept;
+    bool readSourcePlayerRaceMode199980(const rr::game::OriginalRaceConstructor50LA*,std::int32_t&)const noexcept;
+    std::shared_ptr<const rr::game::OriginalPlayerRaceMusicBorrow50LA> borrowSourcePlayerMusic210810(
+        const rr::game::OriginalRaceConstructor50LA*)const noexcept;
+    bool sourceInput04NativeBorrowCurrent(const rr::game::OriginalApplicationInput04Source50LA* input)const noexcept;
+    bool closeSourceInput04Native()const noexcept {
+        if(sourcePadHostLease_)sourcePadHostLease_->revoke();
+        sourcePadHostLease_.reset();
+        return !sourceInput04_||sourceInput04_->closeNative(*this);
+    }
     mutable std::int32_t sourceApplicationMode22C_=1; //13FDBC genuine constructor store.
     // Source23C is not constructor-written here. Only the actual140CE4
     // continuation publishes its passed/capped factor, never raw250.
@@ -452,16 +501,26 @@ private:
     bool bindConsumedRaCameraNative34(original_camera_session50KX::Session&)const noexcept;
     bool completeConsumedRaCameraNative34(original_camera_session50KX::Session&)const noexcept;
     bool completeConsumedRaMusicNative10C(original_camera_session50KX::Session&,std::uint32_t&)const noexcept;
+    bool advanceConsumedRaMusicListenerNative(const original_camera_session50KX::Session&,
+        std::uint64_t beforeMix,bool heldSourceScene,std::uint32_t&)const noexcept;
     bool consumedRaMusicNative10CCurrent(const original_camera_session50KX::Session&)const noexcept;
     bool consumedRaMusicNativeOnlyNoPreparation(const original_camera_session50KX::Session&)const noexcept;
     //Explicit native progress/archive/scene/TOB prefix: pc1AA0C0 stops BEFORE
     //World slotA4/271CF0. pc1A6CC8 preserves the never-prepared native-only
     //audio route without ANY new effects. Neither is full1A9EE0 completion.
+    // Private conditional source segment; no caller joins the missing music1A3C00 interval.
+    bool loadRetainedSourceTrackSegment1A6CF4(std::uint32_t&)const noexcept;
     bool completeConsumedRaWorldNativePrefix1A9EE0(
         original_camera_session50KX::Session&,std::uint32_t&)const noexcept;
     bool retireConsumedRaMusicNative10C(rr::game::OriginalRaceConstructor50LA&,std::uint32_t&)const noexcept;
     bool revokeConsumedRaCameraNative34(original_camera_session50KX::Session&)const noexcept;
     bool retireConsumedRaCameraNative34(rr::game::OriginalRaceConstructor50LA&,std::uint32_t&)const noexcept;
+    // Explicit private source-backed Display route; does not bind a Session or
+    // grant nativeWorld images, metadata, or the remainder of1A9240.
+    bool initializeConsumedRaLoadingCamera2361C0(rr::game::OriginalRaceConstructor50LA&,std::uint32_t&)const noexcept;
+    bool abortConsumedRaLoadingCameraNative34(rr::game::OriginalRaceConstructor50LA&,std::uint32_t&)const noexcept;
+    bool finishConsumedRaLoadingCamera1A9750(rr::game::OriginalRaceConstructor50LA&,std::uint32_t&)const noexcept;
+
     bool continueConsumedRaWorldInit1A6BE0(rr::game::OriginalRaceConstructor50LA&,
         std::uint32_t&)const noexcept;
     // Native-only creator affinity and one cold allocation. Ordinary8 remains
@@ -729,6 +788,9 @@ private:
     // Retain the exact construction capability, not just equivalent fields.
     // Its dependencies pin Video/templates/runtime/list, never Application,
     // so these two application-owned handles do not form a reference cycle.
+    //17C6F4/6FC and17C7F0..804 copy exact literal3A85D8. Separate
+    //actual process directory from mutable normal-material36B970.
+    const std::string loadingTextureDirectory36BCA0_="UI\\Textures\\";
     mutable std::shared_ptr<const rr::assets::OriginalStandardMaterialContext50LA> materialContextOwner_;
     // Created by this Application before original APPSTART/material loading.
     // Canonical tables remain lazy; the same service pair is never replaced.
@@ -736,6 +798,11 @@ private:
     // Native identity of each actual detached Tournament construction attempt.
     // No source clock/profile/result meaning. Never reset on page return.
     mutable std::uint64_t tournamentPodConstructionGeneration_=0;
+    // Explicit native late staging of actual330; never a replacement overlay.
+    mutable std::shared_ptr<rr::game::OriginalLoadingManager33050LA> sourceLoading330Owner_;
+    mutable bool nativeLoading330Attempted_=false;
+    bool stageNativeLoading330Prefix(std::uint32_t&)const noexcept;
+    bool retireNativeLoading330Prefix()const noexcept;
     // First bounded Application328 registry. Declared after its canonical
     // domain/context so owned fonts release their texture leases first.
     // Scene teardown must retire every ScreenText/renderer Entry borrow;
@@ -787,6 +854,11 @@ private:
     //17CA98/AC copies the exact eight bytes3A8648;1A9FD0/1AA010 later
     //selects tracks again. Not derived from native asset-root/CLI paths.
     mutable std::string trackDirectory36B640_="tracks\\";
+    // Unrepresented startup contents stay unknown; genuine1B8330 selection
+    // below owns the first represented writes to these SAME process strings.
+    mutable std::optional<std::string> uiResourceDirectory36BB90_;
+    mutable std::optional<std::string> animationDirectory36AED0_;
+
     //17C710/764/808..814 copies3A85E8's exact particle-directory string.
     const std::string particleDirectory36B530_="particle\\";
     // Startup17C724/734/818..82C copies3A85F8's seven bytes. Native
@@ -850,6 +922,10 @@ public:
     // retire. Requires the exact consumed request; never selects a route.
     bool finishNativeResultsHallDeparture50LA()const noexcept;
     std::shared_ptr<RaceDisplayLifetime50LA> raceDisplayForSession50LA() const;
+    // Exact frontend create successor only; success is a bounded114A00 leaf,
+    // never loading-manager initialization or gameplay readiness.
+    bool prepareFrontendLoading330Viewport(const std::shared_ptr<RaceDisplayLifetime50LA>&,
+        rr::platform::VehicleWindowDiagnostic50DS&,std::uint32_t&)const noexcept;
     bool stagePositionStatsPrimitives50LA(const std::filesystem::path& originalRoot,
         PositionStatsPrimitiveResult50LA&) const noexcept;
     bool stagePositionStatsResources50LA(const std::filesystem::path& originalRoot,
@@ -1054,6 +1130,7 @@ public:
 // source Z format0x31 is the admitted original24-bit packet representation.
 struct Video {
     friend struct Application;
+    friend class rr::game::OriginalLoadingScreen40Mode0LA;
     friend class rr::platform::OriginalUiFrontend50KG;
     friend class rr::platform::OriginalLocalizationRendererLease50KG;
     friend class rr::game::OriginalVideoPreFlipList50KG;
@@ -1070,13 +1147,16 @@ private:
     // Actual Video443A60 scalar, initialized by259F58. It is not a
     // resource pointer, renderer queue44, or a claim that race load ran.
     std::uint32_t sourceMode44_=0;
+    friend class rr::platform::OriginalUiCourseOwnedLifecycle50KG;
+    class CourseModeEffect;
+    CourseModeEffect* courseModeEffect_=nullptr;
     class OptionsModeEffect;
     OptionsModeEffect* optionsModeEffect_=nullptr; // Exclusive actual scalar producer.
     // The ordinary RA aggregate still owns its separate recovered effect
     // continuation. Do not pretend its writes transferred back into these
     // same-Video frontend fields after a real race display use.
     bool beginRaceDisplay1A7658() noexcept {
-        if(optionsModeEffect_)return false;
+        if(optionsModeEffect_||courseModeEffect_)return false;
         sourceMode44_=1;sourceFrontendEndEffectsKnown_=false;return true;
     }
     struct EndView25B110 {
@@ -1090,11 +1170,74 @@ private:
     bool sourceFrontendEndEffectsKnown_=true;
 
     bool clearRaceDisplay1A6870() noexcept {
-        if(optionsModeEffect_)return false;
+        if(optionsModeEffect_||courseModeEffect_)return false;
         sourceMode44_=0;return true;
     }
     // Actual2A3A90 ownership, not a scalar-equality readiness test. This
     // private native effect is separate from source manager completion.
+    class CourseModeEffect final {
+        friend struct Video;
+        friend class rr::platform::OriginalUiCourseOwnedLifecycle50KG;
+        using Construction=rr::game::OriginalUiEntityScope50KG::CourseConstruction;
+        std::shared_ptr<Video> video_;
+        std::shared_ptr<rr::game::OriginalUiEntityScope50KG> scope_;
+        Construction* construction_=nullptr;
+        const Application* issuer_=nullptr;
+        const rr::platform::OriginalUiFrontend50KG* frontend_=nullptr;
+        const void* manager_=nullptr;
+        std::thread::id thread_;
+        std::uint32_t before_=0;
+        bool acquired_=false,nativeAborted_=false;
+        CourseModeEffect(std::shared_ptr<Video> video,Construction& construction,
+            const Application& issuer,const rr::platform::OriginalUiFrontend50KG* frontend,
+            const void* manager)noexcept
+            :video_(std::move(video)),scope_(construction.scope_),construction_(&construction),issuer_(&issuer),
+             frontend_(frontend),manager_(manager),thread_(std::this_thread::get_id()){}
+        bool pending()const noexcept {return acquired_&&!nativeAborted_;}
+        bool effectCurrent()const noexcept {
+            // No issuer dereference or live host/clock requirement on native
+            // cancellation. The exact retained Video and registration survive.
+            return pending()&&std::this_thread::get_id()==thread_&&video_&&construction_&&
+                scope_==construction_->scope_&&video_->courseModeEffect_==this&&construction_->videoEffect_==this&&
+                construction_->videoOwnedPhase()&&
+                construction_->frontend_==frontend_&&construction_->managerOwner_==manager_&&
+                construction_->registrationCurrent();
+        }
+        bool abortCurrent()const noexcept {
+            return effectCurrent()&&!construction_->pageAcquired_&&!construction_->searchList_&&
+                !construction_->searchNodeAcquired_;
+        }
+        bool current(const Application& root,const std::shared_ptr<Video>& video,
+            Construction& construction,const rr::platform::OriginalUiFrontend50KG* frontend,
+            const void* manager)const noexcept {
+            return issuer_==&root&&video_==video&&!video_.owner_before(video)&&!video.owner_before(video_)&&
+                construction_==&construction&&frontend_==frontend&&manager_==manager&&effectCurrent()&&
+                construction.current(frontend,manager);
+        }
+        bool abortNative()noexcept {
+            if(!acquired_||nativeAborted_)return true;
+            if(!abortCurrent())return false;
+            // Exclusive producer custody, NOT equality with1, proves which
+            // write is being undone. Restore only actual observed Video44.
+            video_->sourceMode44_=before_;
+            video_->courseModeEffect_=nullptr;
+            construction_->videoEffect_=nullptr;
+            construction_->phase_=Construction::Phase::nativeVideoAborted;
+            nativeAborted_=true;return true;
+        }
+    public:
+        CourseModeEffect(const CourseModeEffect&)=delete;
+        CourseModeEffect& operator=(const CourseModeEffect&)=delete;
+        ~CourseModeEffect()noexcept {
+            // Even terminal effects release retained native Video/Scope pins.
+            if(std::this_thread::get_id()!=thread_)std::terminate();
+            if(pending()&&!abortNative())std::terminate();
+        }
+    };
+    bool acquireCourseMode2A3A90(const Application& root,const std::shared_ptr<Video>& retained,
+        rr::game::OriginalUiEntityScope50KG::CourseConstruction& construction,
+        const rr::platform::OriginalUiFrontend50KG* frontend,const void* manager,
+        std::unique_ptr<CourseModeEffect>& output)noexcept;
     class OptionsModeEffect final {
         friend struct Video;
         friend class rr::platform::OriginalUiFrontend50KG;
@@ -1180,6 +1323,54 @@ public:
     rr::platform::OriginalUiMainVideoOwner50KG publication(
         const std::shared_ptr<Video>& owner) const;
 };
+
+inline bool Application::bindSourceInput04NativeTransport()const noexcept {
+    if(sourcePadHostLease_||!sourceInput04_||!enabled||!videoOwner_||
+       sourceInput04_->pc_!=0x2374bc||sourceInput04_->completedControllers_!=8||sourceInput04_->nativeClosed_)return false;
+    //No caller GameHost parameter: borrow ONLY this App's already-published
+    //canonical Video owner. Binding never invokes videoForSession/factory.
+    const auto retained=videoOwner_;
+    auto lease=retained->host.bindSourcePadNative(*this,*sourceInput04_);
+    if(!lease)return false;
+    lease->video_=retained;sourcePadHostLease_=std::move(lease);return true;
+    //Native transport contract only; source313000/237430 remains pending.
+}
+
+
+inline bool Application::sourceInput04NativeBorrowCurrent(
+    const rr::game::OriginalApplicationInput04Source50LA* input)const noexcept {
+    const auto& lease=sourcePadHostLease_;
+    return enabled&&input&&sourceInput04_.get()==input&&!input->nativeClosed_&&
+        input->application_==this&&input->thread_==std::this_thread::get_id()&&
+        input->startupReturnedWithNativeTransport_&&lease&&lease->live_&&
+        lease->thread_==std::this_thread::get_id()&&lease->app_==this&&lease->source_==input&&
+        videoOwner_&&lease->video_==videoOwner_&&lease->host_==&videoOwner_->host&&
+        lease->window_&&lease->state_&&lease->nativeCallsReturned_==8;
+    // No connected-device requirement. Revoked Window/GameHost epoch is
+    // nevertheless unusable for issuing any NEW logical-controller borrower.
+}
+
+inline bool Application::continueSourceInput04NativeActivation()const noexcept {
+    if(!enabled||!sourceInput04_||sourceInput04_->nativeClosed_||
+       sourceInput04_->application_!=this||sourceInput04_->thread_!=std::this_thread::get_id()||
+       sourceInput04_->pc_!=0x2374bc||sourceInput04_->completedControllers_!=8)return false;
+    // Disabled/headless/no-Video backends remain pending. Never turn on
+    // gameControllers or open devices to satisfy this source continuation.
+    if(!sourcePadHostLease_&&!bindSourceInput04NativeTransport())return false;
+    const auto& lease=sourcePadHostLease_;
+    if(!lease||!lease->live_||lease->thread_!=std::this_thread::get_id()||
+       lease->app_!=this||lease->source_!=sourceInput04_.get()||!videoOwner_||
+       lease->video_!=videoOwner_||lease->host_!=&videoOwner_->host||!lease->window_||!lease->state_||
+       lease->nativeCallsReturned_!=0)return false;
+    static constexpr std::uint32_t calls[8]={0x2374bc,0x2374d0,0x2374e4,0x2374f8,
+        0x23750c,0x237520,0x237534,0x237548};
+    for(unsigned i=0;i<8;++i){sourceInput04_->pc_=calls[i];
+        if(!lease->returnNativeOpen(i,calls[i]))return false;}
+    sourceInput04_->pc_=0x237550;
+    return sourceInput04_->finishNativePadActivation(*this);
+    // Conditional adapted 13FD40 return ONLY. No outer App startup/Race
+    // admission, Player FF0 borrow, sampled-input bridge or gameplay claim.
+}
 
 struct Frontend : rr::platform::OriginalUiRiderPresentationHost50KG {
 private:
@@ -1353,6 +1544,9 @@ public:
         rr::platform::VehicleWindowGl50DS& renderer,std::int32_t width,std::int32_t height);
     void commitDeferred(rr::platform::VehicleWindowGl50DS& renderer);
     void requestQuit() noexcept {coordinator.requestQuit();}
+    // Actual taken Course route only. This bounded source prefix never
+    //publishes a native cold-load request or claims loading/Screen completion.
+    bool advanceCourseRaLoadingPrefix50LA(std::uint32_t& sourcePC)noexcept;
     bool closeUi() noexcept;
     bool closeAudio() noexcept;
     const rr::game::OriginalUiNavigation50KG* navigation() const noexcept;

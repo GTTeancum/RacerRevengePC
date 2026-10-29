@@ -2,6 +2,7 @@
 #include "original_wreck_assets50la.h"
 #include "../assets/original_standard_material_domain50la.h"
 
+namespace ra_cold_roster50LA {class WreckBacking;}
 namespace rr::game {
 // The opaque endpoint words belong to the actual source owner, not the COL.
 // Include BOTH authored ordinals: repeated stems/PartN ordinals across distinct
@@ -34,6 +35,7 @@ struct OriginalWreckInventoryResult50LA {
 // Native loading is strictly sequential. Unsupported original bytes stop at
 // the exact occurrence; earlier genuine assets and full inventory stay retained.
 class OriginalWreckAssetInventory50LA final {
+    friend class ::ra_cold_roster50LA::WreckBacking;
     using Assets=OriginalWreckAssets50LA;
     struct Storage {
         OriginalWreckAssetBinding50LA binding;
@@ -50,6 +52,7 @@ class OriginalWreckAssetInventory50LA final {
         bool modelBindingAttempted=false,modelSourcesBound=false;
     };
     std::unique_ptr<Storage> storage_;
+    const std::vector<std::uint8_t>* retainedSourcePhy()const noexcept {return storage_?&storage_->phy:nullptr;}
     struct Endpoints {
         const OriginalWreckInventoryEndpointPolicy50LA* policy=nullptr;
         const OriginalWreckCollectionAuthoring50LA* collection=nullptr;
@@ -171,6 +174,11 @@ public:
                 if(!storage_->modelResolver->bindModelMember(asset.storage_->receipt.targetMember,
                     rr::assets::OriginalStandardModelFileKind50LA::colType0,asset.storage_->raw[3],
                     asset.storage_->targetFile,diagnostic))return {S::piece,c+1u,p+1u,bound};
+                //Native retained-file admission only; no11B920 request/cache
+                //or source fileB0/shape field is written by this cold binding.
+                if(!storage_->modelResolver->bindModelMember(asset.storage_->receipt.queryMember,
+                    rr::assets::OriginalStandardModelFileKind50LA::colType2,asset.storage_->raw[2],
+                    asset.storage_->queryFile,diagnostic))return {S::piece,c+1u,p+1u,bound};
                 ++bound;
             }
         storage_->modelSourcesBound=true;return {S::modelSourcesBound,0,0,bound};

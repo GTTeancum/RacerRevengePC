@@ -1375,6 +1375,7 @@ private:
     bool idleForRaceReset50LA(VehicleWindowDiagnostic50DS&) const noexcept;
     // First canonical frontend Camera only. Ordinary sealed RGBA submission
     // does not execute source26F940 or select a canonical Scene.
+    bool frontendCameraViewportIdle50KG(VehicleWindowDiagnostic50DS&) const noexcept;
     bool garageFirstCameraViewportIdle50KG(VehicleWindowDiagnostic50DS&) const noexcept;
     // Private session authority: callers cannot mint a pin or authorize creation.
     const void* sessionDisplayOwner50LA_=nullptr;

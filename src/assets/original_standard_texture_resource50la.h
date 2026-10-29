@@ -1,6 +1,7 @@
 #pragma once
 namespace original_local_flare50LA {class Emission;}
 #include "original_standard_texture_table50la.h"
+#include "original_ui_archive50kg.h"
 #include "original_standard_texture_lifetime50la.h"
 #include <array>
 #include <vector>
@@ -17,9 +18,16 @@ namespace original_main_entry50KG { struct Application; }
 namespace ra_crowd_image50LA { class Verifier; }
 namespace ra_tga_source50LA { class Verifier; }
 namespace ra_cold_aggregate50LA { class Owner; }
-namespace rr::platform { class OriginalUiGarageSession50KG; class OriginalUiGarageActors50GN; class OriginalUiGarageWattoOwner50KG; }
-namespace rr::game { class OriginalRacerAnimationCold50LA; class OriginalTimeStats50LA; class OriginalSpeedBoost50LA; class OriginalDamage50LA; class OriginalPositionStatsHud50LA; class OriginalPauseStorage50LA; class OriginalRaceF850LA; class OriginalResults10450LA; }
+namespace rr::platform { class OriginalLoadingLsiConfig50LA; class OriginalUiCourseManagerConfig50KG; class OriginalUiGarageSession50KG; class OriginalUiGarageActors50GN; class OriginalUiGarageWattoOwner50KG; }
+namespace rr::game { class OriginalLoadingScreen40Mode0LA; class OriginalRacerAnimationCold50LA; class OriginalTimeStats50LA; class OriginalSpeedBoost50LA; class OriginalDamage50LA; class OriginalPositionStatsHud50LA; class OriginalPauseStorage50LA; class OriginalRaceF850LA; class OriginalResults10450LA; }
 namespace rr::assets {
+class OriginalPodSourceBank50LA;
+class OriginalApplicationFonts50LA;
+class OriginalLoadingFontSource50LA;
+class OriginalLoadingPstFile50LA;
+class OriginalLoadingRaFile50LA;
+class OriginalRaTrackSourceFile50LA;
+class OriginalLoadingTextureFc50LA;
 class MaterialTextureAssets50EA;
 struct MaterialTextureAsset50EA;
 class OriginalResultsPrimitiveReferences50LA;
@@ -38,13 +46,14 @@ struct OriginalUiMemberView50KG;
 class OriginalUiIpumTextureCache50KG;
 struct OriginalUiIpumProvenance50KG;
 class OriginalStandardGarageIpumLease50KG;
+class OriginalLoadingTextureSource50LA;
 class OriginalStandardIpumCompressedFrames50LA;
 // Private fixed-source image leases/sets are minted only by the concrete
 // native verifier. Resource ownership and GPU publication remain separate.
 class OriginalStandardIpumImageLease50LA;
 class OriginalStandardIpumImageSet50LA;
 
-enum class OriginalStandardModelFileKind50LA : std::uint8_t { mcf,psg,colType0 };
+enum class OriginalStandardModelFileKind50LA : std::uint8_t { mcf,psg,colType0,colType2 };
 // Explicit sealed-namespace absence is distinct from an unresolved native row.
 enum class OriginalStandardCollisionLookup50LA : std::uint8_t { rejected,absent,present };
 //Native stable row identity, not an original archive offset or retail index.
@@ -75,11 +84,12 @@ struct OriginalStandardTextureSourceInput50LA {
 };
 enum class OriginalStandardTextureSourceFormat50LA : std::uint8_t { pstIndexed,tgaBgr24,atmPstFrames,tgaBgra32,pstIpum };
 enum class OriginalStandardTextureLevelStorage50LA : std::uint8_t {
-    pstPacked4,pstTransfer8,tgaConverted1555,tgaGenerated1555,tgaConverted8888,tgaGenerated8888,ipumCompressed1555,garageIpumCompressed1555
+    pstPacked4,pstTransfer8,tgaConverted1555,tgaGenerated1555,tgaConverted8888,tgaGenerated8888,ipumCompressed1555,garageIpumCompressed1555,pstLoadingLinear8
 };
 struct OriginalStandardTextureLevelView50LA {
-    //Actual final100 storage: kind0's retained packed4 source, or kind1's
-    //owned24D6F0 transfer bytes after24F024. Never native RGBA coordinates.
+    //Actual final100 storage: kind0 packed4, ordinary kind1 owned24D6F0
+    //transfer bytes, or distinct authenticated loading linear8 with conversion
+    //bypassed at24F128. Never native RGBA coordinates.
     const std::uint8_t* packedIndices100=nullptr;
     std::size_t packedBytes=0,sourceHeaderOffset=0,sourceIndicesOffset=0;
     std::int32_t width104=-1,height110=-1;
@@ -123,6 +133,7 @@ struct OriginalStandardTextureLevelView50LA {
 // requires the same actual mounted provider's explicit PST/IPU absence;
 // missing input in this corpus remains unresolved. IPU and nonzero ATM storage remain closed.
 class OriginalStandardTextureResolver50LA final {
+    struct UiSelection;
 public:
     // Opaque one-bank capability; only the actual Application can issue/use it.
     // Destruction never unloads anything. A stale copy cannot replay retirement.
@@ -134,6 +145,7 @@ public:
         const OriginalStandardTextureResolver50LA* resolver_=nullptr;
         std::size_t mount_=static_cast<std::size_t>(-1);
         std::uint64_t generation_=0;
+        bool loadingFonts_=false; //Only private distinct LoadingFontsBankLease may receive this role.
         bool selected19E_=false; //Exact separate1D1D68 bank issuer, never a caller-selected archive.
         std::thread::id thread_{};
         // Historical native closure proof, NOT an active bank capability.
@@ -289,7 +301,7 @@ private:
         OriginalStandardTextureDiagnostic50LA&) noexcept;
     bool issueGarageBank(const std::shared_ptr<OriginalStandardArchiveProvider50LA>&,
         const std::shared_ptr<const OriginalUiArchive50KG>&,GarageBankLease50LA&,bool selected19E,
-        OriginalStandardTextureDiagnostic50LA&) noexcept;
+        OriginalStandardTextureDiagnostic50LA&,bool loadingFonts=false) noexcept;
     bool canRetireGarageBank12E5E0(const GarageBankLease50LA&,
         OriginalStandardTextureDiagnostic50LA&) const noexcept;
     bool retireGarageBank12E5E0(GarageBankLease50LA&,
@@ -298,7 +310,7 @@ private:
     // Private one-shot native construction prerequisite, before any provider bind
     // or corpus. Not source13FB6C publication, registration, open/read or readiness.
     bool bootstrapFreshFileCapacity12CBA0(
-        std::shared_ptr<const OriginalStandardArchiveProvider50LA>,
+        std::shared_ptr<OriginalStandardArchiveProvider50LA>,
         OriginalStandardTextureDiagnostic50LA&)noexcept;
     // Actual Application-only, bounded first source17CAB8 call. No general
     // registration API, mount-derived history, activation or readiness token.
@@ -316,6 +328,92 @@ private:
         OriginalStandardTextureDiagnostic50LA&)noexcept;
     bool closeAppStartTemplate1573B0(bool success,
         OriginalStandardTextureDiagnostic50LA&)noexcept;
+    friend class ::rr::platform::OriginalUiCourseManagerConfig50KG;
+    friend class ::rr::platform::OriginalLoadingLsiConfig50LA;
+    friend class OriginalLoadingFontSource50LA;
+    friend class OriginalLoadingRaFile50LA;
+    friend class OriginalApplicationFonts50LA; // Exact private Loading PST population interval only.
+    friend class OriginalPodSourceBank50LA;
+    bool registerPodBank12CEA0(OriginalPodSourceBank50LA&,OriginalStandardTextureDiagnostic50LA&)noexcept;
+    bool closePodBankNative(OriginalPodSourceBank50LA&,OriginalStandardTextureDiagnostic50LA&)noexcept;
+    friend class OriginalRaTrackSourceFile50LA;
+    bool registerTrackBank12CEA0(OriginalRaTrackSourceFile50LA&,OriginalStandardTextureDiagnostic50LA&)noexcept;
+    bool resizeTrackCache132E40(OriginalRaTrackSourceFile50LA&,OriginalStandardTextureDiagnostic50LA&)noexcept;
+    bool closeTrackBankNative(OriginalRaTrackSourceFile50LA&,OriginalStandardTextureDiagnostic50LA&)noexcept;
+    enum class SourceBankFamily : std::uint8_t {course,loadingFonts,loadingIcon};
+    bool sourceBankFamilyCurrent(const void*,SourceBankFamily)const noexcept;
+    bool registerSourceBank12CEA0(std::shared_ptr<const OriginalUiArchive50KG>,const OriginalStandardArchiveProvider50LA*,const void*,SourceBankFamily,bool&,OriginalStandardTextureDiagnostic50LA&)noexcept;
+    // Same real FileManager tables as APPSTART. Only the actual Course manager
+    // may acquire this second-bank owner; native namespace lookup grants no ID.
+    bool registerCourseBank12CEA0(std::shared_ptr<const OriginalUiArchive50KG>,const OriginalStandardArchiveProvider50LA*,const void*,bool&,OriginalStandardTextureDiagnostic50LA&)noexcept;
+    bool adoptCourseNativeMount(const void*,bool,OriginalStandardTextureDiagnostic50LA&)noexcept;
+    bool joinCourseBankCanonical(const void*,bool,OriginalStandardTextureDiagnostic50LA&)noexcept;
+    bool enterCourseArchiveOnly132A20(const void*,OriginalStandardTextureDiagnostic50LA&)noexcept;
+    bool borrowCourseConfigNative(const void*,bool,OriginalStandardTextureDiagnostic50LA&)noexcept;
+    bool openCourseConfig131230(const void*,const void*,const std::string&,std::int32_t&,OriginalStandardTextureDiagnostic50LA&)noexcept;
+    bool courseConfigFileCurrent(const void*,const void*,std::int32_t)const noexcept;
+    bool readCourseConfig12FB30(const void*,const void*,std::int32_t,void*,std::size_t,std::size_t&,OriginalStandardTextureDiagnostic50LA&)noexcept;
+    bool readCourseConfig130560(const void*,const void*,std::int32_t,void*,std::size_t,std::size_t&,bool,OriginalStandardTextureDiagnostic50LA&)noexcept;
+    bool readCourseConfigLine12EE90(const void*,const void*,std::int32_t,std::array<char,1024>&,bool&,std::size_t&,OriginalStandardTextureDiagnostic50LA&)noexcept;
+    bool tellCourseConfig12F520(const void*,const void*,std::int32_t,std::size_t&,OriginalStandardTextureDiagnostic50LA&)noexcept;
+    bool seekCourseConfig12F640(const void*,const void*,std::int32_t,std::size_t,OriginalStandardTextureDiagnostic50LA&)noexcept;
+    bool closeCourseConfig131040(const void*,const void*,std::int32_t,bool,OriginalStandardTextureDiagnostic50LA&)noexcept;
+    bool retireCourseBankNative(const void*,OriginalStandardTextureDiagnostic50LA&)noexcept;
+    bool activateCourseDevice12E8B0(std::int32_t,std::uint32_t,OriginalStandardTextureDiagnostic50LA&)noexcept;
+    bool refillCourseWindow130340(std::int32_t,std::size_t,OriginalStandardTextureDiagnostic50LA&)noexcept;
+    bool adoptSourceBankNativeMount(const void*,bool,OriginalStandardTextureDiagnostic50LA&)noexcept;
+    bool joinSourceBankCanonical(const void*,bool,OriginalStandardTextureDiagnostic50LA&)noexcept;
+    bool borrowSourceBankConfigNative(const void*,bool,OriginalStandardTextureDiagnostic50LA&)noexcept;
+ bool beginLoadingFontPstPopulation(std::shared_ptr<OriginalLoadingFontSource50LA>,const void*,OriginalUiMemberView50KG,OriginalStandardTextureDiagnostic50LA&)noexcept;
+ bool endLoadingFontPstPopulation(const OriginalLoadingFontSource50LA&,const void*,OriginalStandardTextureDiagnostic50LA&)noexcept;
+ bool captureLoadingPst132820(const std::string&,std::size_t,std::shared_ptr<OriginalLoadingPstFile50LA>&,OriginalStandardTextureDiagnostic50LA&)noexcept;
+ bool loadingPstFileCurrent(const OriginalLoadingPstFile50LA&,bool requireOpen)const noexcept;
+ bool bindLoadingPstResource(OriginalLoadingPstFile50LA&,OriginalStandardTextureResource50LA&,OriginalStandardTextureDiagnostic50LA&)noexcept;
+ bool readLoadingPst12FB30(OriginalLoadingPstFile50LA&,void*,std::size_t,std::size_t&,OriginalStandardTextureDiagnostic50LA&)noexcept;
+ bool readLoadingPst12FF70(OriginalLoadingPstFile50LA&,void*,std::size_t,std::size_t&,OriginalStandardTextureDiagnostic50LA&)noexcept;
+ bool associateLoadingPst1326A0(OriginalLoadingPstFile50LA&,const std::shared_ptr<OriginalStandardTextureResource50LA>&,OriginalStandardTextureDiagnostic50LA&)noexcept;
+ bool closeLoadingPst131040(OriginalLoadingPstFile50LA&,bool nativeAbort,OriginalStandardTextureDiagnostic50LA&)noexcept;
+ bool canClearLoadingPst1327D0(const OriginalLoadingPstFile50LA&,const OriginalStandardTextureResource50LA&)const noexcept;
+ bool clearLoadingPst1327D0(OriginalLoadingPstFile50LA&,const OriginalStandardTextureResource50LA&,OriginalStandardTextureDiagnostic50LA&)noexcept;
+    // Sticky native projection history, NOT a fabricated FileManager device.
+    // Actual loose source132820/12DCB0/cache lifetime must replace this path.
+    bool unjoinedLoadingRaFileHistory_=false;
+    bool admitLoadingRaCanonicalNative(std::shared_ptr<const OriginalLoadingTextureSource50LA>,std::size_t&,UiSelection&,OriginalStandardTextureDiagnostic50LA&)noexcept;
+    bool openExactSourceMember131380(const void*,std::int32_t,std::int32_t&,OriginalStandardTextureDiagnostic50LA&)noexcept;
+    bool beginLoadingRa132820(OriginalLoadingRaFile50LA&,std::size_t&,UiSelection&,std::shared_ptr<OriginalLoadingPstFile50LA>&,
+        std::shared_ptr<OriginalStandardTextureResource50LA>&,OriginalStandardTextureDiagnostic50LA&)noexcept;
+    bool loadingRaFileCurrent(const OriginalLoadingPstFile50LA&,bool)const noexcept;
+    bool loadingRaRetainedCurrent()const noexcept;
+    bool canWithdrawLoadingRaAssociationNative(const OriginalLoadingPstFile50LA&,const OriginalStandardTextureResource50LA&)const noexcept;
+    bool withdrawLoadingRaAssociationNative(OriginalLoadingPstFile50LA&,const OriginalStandardTextureResource50LA&,OriginalStandardTextureDiagnostic50LA&)noexcept;
+    bool readLoadingRa130560(OriginalLoadingPstFile50LA&,void*,std::size_t,std::size_t&,OriginalStandardTextureDiagnostic50LA&)noexcept;
+    bool closeLoadingRa131040(OriginalLoadingPstFile50LA&,bool,OriginalStandardTextureDiagnostic50LA&)noexcept;
+    bool closeLoadingRaNative(OriginalLoadingRaFile50LA&,OriginalStandardTextureDiagnostic50LA&)noexcept;
+
+    std::weak_ptr<OriginalLoadingFontSource50LA> loadingPstRoot_;
+    const void* loadingPstFontEntry_=nullptr;
+    OriginalUiMemberView50KG loadingPstExpected_{};
+    bool openSourceBankMember131380(const void*,const void*,std::int32_t,std::int32_t&,OriginalStandardTextureDiagnostic50LA&)noexcept;
+    bool openSourceBankMember131230(const void*,const void*,const std::string&,std::int32_t&,OriginalStandardTextureDiagnostic50LA&)noexcept;
+    bool sourceBankMemberCurrent(const void*,const void*,std::int32_t)const noexcept;
+    bool readSourceBankMember12FB30(const void*,const void*,std::int32_t,void*,std::size_t,std::size_t&,OriginalStandardTextureDiagnostic50LA&)noexcept;
+    bool readSourceBankMember130560(const void*,const void*,std::int32_t,void*,std::size_t,std::size_t&,bool,OriginalStandardTextureDiagnostic50LA&)noexcept;
+    bool readSourceBankLine12EE90(const void*,const void*,std::int32_t,std::array<char,1024>&,bool&,std::size_t&,OriginalStandardTextureDiagnostic50LA&)noexcept;
+    bool tellSourceBankMember12F520(const void*,const void*,std::int32_t,std::size_t&,OriginalStandardTextureDiagnostic50LA&)noexcept;
+    bool seekSourceBankMember12F640(const void*,const void*,std::int32_t,std::size_t,OriginalStandardTextureDiagnostic50LA&)noexcept;
+    bool closeSourceBankMember131040(const void*,const void*,std::int32_t,bool,OriginalStandardTextureDiagnostic50LA&)noexcept;
+    bool retireSourceBankNative(const void*,OriginalStandardTextureDiagnostic50LA&)noexcept;
+    bool adoptLoadingIconNativeMount(const void*,bool,OriginalStandardTextureDiagnostic50LA&)noexcept;
+    bool joinLoadingIconBankCanonical(const void*,bool,OriginalStandardTextureDiagnostic50LA&)noexcept;
+    bool openLoadingLsi131230(const void*,const void*,const std::string&,std::int32_t&,OriginalStandardTextureDiagnostic50LA&)noexcept;
+    bool loadingLsiFileCurrent(const void*,const void*,std::int32_t)const noexcept;
+    bool readLoadingLsi12FB30(const void*,const void*,std::int32_t,void*,std::size_t,std::size_t&,OriginalStandardTextureDiagnostic50LA&)noexcept;
+    bool readLoadingLsiLine12EE90(const void*,const void*,std::int32_t,std::array<char,1024>&,bool&,std::size_t&,OriginalStandardTextureDiagnostic50LA&)noexcept;
+    bool tellLoadingLsi12F520(const void*,const void*,std::int32_t,std::size_t&,OriginalStandardTextureDiagnostic50LA&)noexcept;
+    bool seekLoadingLsi12F640(const void*,const void*,std::int32_t,std::size_t,OriginalStandardTextureDiagnostic50LA&)noexcept;
+    bool closeLoadingLsi131040(const void*,const void*,std::int32_t,bool,OriginalStandardTextureDiagnostic50LA&)noexcept;
+    bool retireLoadingIconBankNative(const void*,OriginalStandardTextureDiagnostic50LA&)noexcept;
+    bool registerLoadingIconBank12CEA0(std::shared_ptr<const OriginalUiArchive50KG>,const OriginalStandardArchiveProvider50LA*,const void*,bool&,OriginalStandardTextureDiagnostic50LA&)noexcept;
     struct FreshFileCapacity;
     std::unique_ptr<FreshFileCapacity> freshFileCapacity_;
     // Actual resolver-owned native scratch backing. Initialization is reached
@@ -366,7 +464,35 @@ private:
             const void* mountIdentity=nullptr;
             std::size_t offset=0;
         } nativeFlare;
+        std::shared_ptr<const OriginalLoadingTextureSource50LA> loadingRa;
     };
+    friend class rr::game::OriginalLoadingScreen40Mode0LA;
+    class LoadingFontsBankLease final {
+        friend class OriginalStandardTextureResolver50LA;
+        friend class OriginalLoadingFontSource50LA;
+        GarageBankLease50LA bank_;
+    public:
+        LoadingFontsBankLease()=default;
+        LoadingFontsBankLease(const LoadingFontsBankLease&)=delete;
+        LoadingFontsBankLease& operator=(const LoadingFontsBankLease&)=delete;
+    };
+    bool mountLoadingFontSource1CAAE4(OriginalLoadingFontSource50LA&,LoadingFontsBankLease&,OriginalStandardTextureDiagnostic50LA&)noexcept;
+    bool recordLoadingFontColdRegistry2823EC(OriginalLoadingFontSource50LA&,
+        const std::shared_ptr<const void>&,OriginalUiMemberView50KG,OriginalUiMemberView50KG,
+        const OriginalStandardTextureResource50LA*,OriginalStandardTextureDiagnostic50LA&)noexcept;
+    bool retireLoadingFontSource1CAD94(OriginalLoadingFontSource50LA&,LoadingFontsBankLease&,OriginalStandardTextureDiagnostic50LA&)noexcept;
+    bool closeLoadingFontSourceNative(OriginalLoadingFontSource50LA&,LoadingFontsBankLease&,OriginalStandardTextureDiagnostic50LA&)noexcept;
+    bool issueLoadingFontsBank1CAAE4(const std::shared_ptr<OriginalStandardArchiveProvider50LA>& provider,
+        const std::shared_ptr<const OriginalUiArchive50KG>& archive,LoadingFontsBankLease& lease,
+        OriginalStandardTextureDiagnostic50LA& d)noexcept;
+    bool retireLoadingFontsBank1CAD94(LoadingFontsBankLease& lease,
+        OriginalStandardTextureDiagnostic50LA& d)noexcept {
+        return lease.bank_.loadingFonts_&&retireGarageBank12E5E0(lease.bank_,d);
+    }
+    // Exact loose LD_RA.PST path only. This is not generic source admission.
+    bool acquireLoadingRa24DA30(std::shared_ptr<const OriginalLoadingTextureSource50LA>,
+        std::size_t&,UiSelection&,OriginalStandardTextureDiagnostic50LA&)noexcept;
+    bool loadingRaSourceCurrent(const UiSelection&)const noexcept;
     bool nativeFlareSourceCurrent(const UiSelection&)const noexcept;
     bool resolve24DADC(const std::string&,std::size_t&,std::string& resolvedName,
         OriginalStandardTextureDiagnostic50LA&,UiSelection* capture=nullptr) const noexcept;
@@ -483,6 +609,7 @@ private:
     friend class OriginalStandardTextureResolver50LA;
     friend class OriginalStandardMaterialObject50LA;
     friend class OriginalStandardTextureLifetime50LA;
+    friend class rr::game::OriginalLoadingScreen40Mode0LA;
     friend class OriginalResultsPrimitiveReferences50LA;
     friend class rr::game::OriginalTimeStats50LA;
     friend class rr::game::OriginalSpeedBoost50LA;
@@ -543,6 +670,17 @@ private:
         bool loadComplete24F2C0=false,finished2516F0=false;
     };
     std::unique_ptr<CubFacet1295B0> cub_;
+    std::shared_ptr<OriginalLoadingPstFile50LA> loadingPstFile_;
+    struct LoadingPstNative50LA;
+    std::unique_ptr<LoadingPstNative50LA> loadingPstNative_;
+    std::unique_ptr<OriginalLoadingTextureFc50LA> loadingPstFc_;
+    bool admitLoadingPstNative(OriginalStandardTextureDiagnostic50LA&)noexcept;
+    bool initializeLoadingPstFields24E1E0(OriginalStandardTextureDiagnostic50LA&)noexcept;
+    bool constructLoadingPst24E880(OriginalStandardTextureDiagnostic50LA&)noexcept;
+    bool preflightLoadingPstNative()const noexcept;
+    bool closeLoadingPstNative(OriginalStandardTextureDiagnostic50LA&)noexcept;
+
+
     bool constructCub24E1B0(const CubSource1295B0&,
         std::shared_ptr<const OriginalStandardMaterialContext50LA>,OriginalStandardTextureDiagnostic50LA&)noexcept;
     bool loadCub24F2C0(std::size_t&,const std::array<std::uint32_t,5>&,

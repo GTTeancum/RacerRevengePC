@@ -1,8 +1,21 @@
 #pragma once
 #include "../../../src/game/original_wreck_components50la.h"
 #include <array>
+#include <atomic>
 #include <cstdint>
 namespace rr::platform {
+class OriginalUiGarageWidget1Owner50KG;
+class OriginalUiCourseOwnedLifecycle50KG;
+// The actual process8098/809C guards shared by every source2A9000 caller.
+// Owner-neutral storage grants no Widget/renderer/resource authority.
+class OriginalUiTextHashGuards50KG final {
+ friend class OriginalUiGarageWidget1Owner50KG;
+ friend class OriginalUiCourseOwnedLifecycle50KG;
+ static std::atomic<std::uint8_t>& hashGuard8098()noexcept {static std::atomic<std::uint8_t> v{0};return v;}
+ static std::atomic<std::int32_t>& hashAssertion3D6B10()noexcept {static std::atomic<std::int32_t> v{0};return v;}
+ static std::atomic<std::uint8_t>& idGuard809C()noexcept {static std::atomic<std::uint8_t> v{0};return v;}
+ static std::atomic<std::int32_t>& idAssertion3D6B18()noexcept {static std::atomic<std::int32_t> v{0};return v;}
+};
 // Owner-neutral native backing of the actual source objects. Default storage
 // is NOT a source constructor, source null, reference, readiness or publication.
 // The typed owner alone records source field knowledge and acquisition.

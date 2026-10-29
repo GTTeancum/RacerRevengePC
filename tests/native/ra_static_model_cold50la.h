@@ -12,6 +12,7 @@
 #include <limits>
 #include <optional>
 #include <vector>
+#include <thread>
 
 namespace ra_pod_scene50LA {class Owner;}
 namespace ra_static_world50LA {class Owner;}
@@ -52,7 +53,17 @@ private:
         std::shared_ptr<const a::OriginalStandardModelResource50LA> payload;
         a::OriginalStandardMaterialReferences50LA* materials=nullptr;
     };
+    struct SourceDescriptor27A100 {
+        std::array<char,260> name00,name180;
+        std::size_t name00Known=0,name180Known=0;
+        std::array<std::uint32_t,4> position110,look120,up130,smokeOffset150,smokeVelocity160;
+        std::uint32_t vtable170=0;
+        std::optional<std::int32_t> useLighting140,dynamic144,shadow148,smoker14C;
+        std::uint32_t vectorKnown=0;bool constructed=false,loaded=false;
+    };
     struct Descriptor {
+        //Exclusive actual descriptor owner; legacy decoded fields below are NOT readiness.
+        std::optional<SourceDescriptor27A100> sourceFields;
         const a::WorldInstance48F* source=nullptr;
         std::array<float,3> position{},look{},up{};
         bool useDynamicLighting144=false;
@@ -63,6 +74,8 @@ private:
     };
     struct StandardWrapper {
         enum class Dispatch { unbound,standard3D26F0 } dispatch=Dispatch::unbound;
+        bool sourceMode=false,sourceTypeKnown=false,sourceDescriptorAllocationReturned=false,sourceDescriptorPublished=false;
+        std::uint32_t sourceVtable04=0;
         std::uint32_t type00=0;
         g::OriginalRacerModelSceneOwner50LA* model8=nullptr; // Alias, not a second owner.
         std::unique_ptr<Descriptor> descriptor10;
@@ -110,11 +123,27 @@ private:
         std::uint32_t zone=0,count30=0;
         std::vector<Slot> entries34;
         bool constructed=false,released=false;
+        //Source34 is RAW uninitialized pointers, not value-initialized slots.
+        bool sourceMode=false,sourceCountKnown=false,sourceArrayReturned=false;
+        std::uint32_t sourceVtable08=0;
+        std::unique_ptr<StandardWrapper*[]> sourceEntries34;
+        std::size_t sourceEntriesKnown=0;
+        std::unique_ptr<StandardWrapper> sourceFirstWrapper;
+        std::unique_ptr<Descriptor> sourcePendingDescriptor; //Before actual27AB90 publication.
     };
+    bool sourceMode_=false,sourceOuterReturned_=false,sourceFirstDescriptorReturned_=false;
+    bool sourceLedgerAttempted_=false,sourceLedgerPrepared_=false,sourceFirstTransferred_=false,sourceAllDescriptorsReturned_=false;
+    std::array<std::vector<std::unique_ptr<StandardWrapper>>,10> sourceWrapperLedger_;
+    std::array<std::uint32_t,10> sourceZoneCounts_{}; //Native allocation admission, not guestcount30 stores.
+    std::array<bool,10> sourceGroupOuterReturned_{};
+    std::array<bool,10> sourceLogAttempted_{};
+    std::array<std::size_t,10> sourceLogWritten_{};
+    std::thread::id sourceThread_;
     std::shared_ptr<const ra_cold_sources50LA::Owner> source_;
     std::shared_ptr<g::OriginalApplicationEntities50LA> application_;
     std::shared_ptr<a::OriginalStandardMaterialTable50LA> materials_;
     std::vector<std::unique_ptr<Parent>> parents_;
+    const ra_pod_scene50LA::Owner* sourceWorld3C4Borrower_=nullptr;
     std::vector<std::unique_ptr<Model>> models_;
     std::uint64_t generation_=0;
     std::size_t unresolved_=0;
@@ -132,11 +161,12 @@ private:
         return static_cast<std::uint64_t>(reinterpret_cast<std::uintptr_t>(p));
     }
     static bool reject(Diagnostic& d,const char* why)noexcept{d.failure=why;return false;}
+#include "ra_static_model_source_lifetime50la.inl"
     bool prepare(std::shared_ptr<const ra_cold_sources50LA::Owner> source,
         std::shared_ptr<g::OriginalApplicationEntities50LA> application,
         std::shared_ptr<a::OriginalStandardMaterialTable50LA> materials,
         std::uint64_t generation,const std::vector<Input>& inputs,Diagnostic& d)noexcept {
-        d={};if(attempted_||closed_)return reject(d,"static model prefix already attempted");
+        d={};if(sourceMode_||attempted_||closed_)return reject(d,"static model prefix already attempted");
         attempted_=true;
         if(!source||!source->sourcesDecoded()||!application||!application->application10()||
            !materials||!generation||application->attachmentLock423F58())
@@ -425,6 +455,7 @@ private:
             !slot.failedModel&&(!slot.model?!wrapper->model8:wrapper->model8==&slot.model->scene);
     }
     bool canClose()const noexcept {
+        if(sourceMode_)return canCloseSourceNative();
         if(closed_)return true;
         if(!application_)return parents_.empty()&&models_.empty();
         if(application_->attachmentLock423F58())return false;
@@ -461,7 +492,8 @@ private:
         return counted<=application_->objectCount423F60();
     }
     bool close()noexcept {
-        if(closed_)return true;if(!canClose()||nativeCollisionForest_||nativeCollisionSuffixPresent27B170())return false;
+        if(sourceMode_)return closeSourceNative();
+        if(closed_)return true;if(sourceWorld3C4Borrower_||!canClose()||nativeCollisionForest_||nativeCollisionSuffixPresent27B170())return false;
         if(visibility_&&!visibility_->beginRaStaticAccess(this,true))return false;
         const auto failClose=[&](){if(visibility_)visibility_->endRaStaticAccess(this);return false;};
         // Retire any real temporary missing-PSG model before parent resources.

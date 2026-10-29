@@ -66,7 +66,7 @@ void admission(){
 void noiseStateComparison() {
  GradientNoiseState49M a{}, b{};
  auto* raw=reinterpret_cast<unsigned char*>(&b);
- for(std::size_t i=offsetof(GradientNoiseState49M,initialized)+sizeof(bool);i<sizeof b;++i)raw[i]=0xa5;
+ for(std::size_t i=offsetof(GradientNoiseState49M,initializationIncomplete49M)+sizeof(std::uint8_t);i<sizeof b;++i)raw[i]=0xa5;
  require(rr::test::equalNoiseState49W(a,b),"noise comparison interpreted padding");
  b.permutation[255]=1;require(!rr::test::equalNoiseState49W(a,b),"noise comparison lost permutation");b.permutation[255]=0;
  const std::uint32_t minusZero=0x80000000u;std::memcpy(&b.gradient1D[255],&minusZero,4);

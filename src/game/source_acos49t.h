@@ -1,8 +1,9 @@
 namespace ra_pod_scene50LA {class Owner;}
+namespace terrain_probe_authoring50fq_fixture {class SourceStage348;}
 #pragma once
 #include <cstdint>
 
-namespace rr::platform {class OriginalUiGarageUiLights50KG;class OriginalUiGarageSceneLighting50KG;}
+namespace rr::platform {class OriginalUiGarageUiLights50KG;class OriginalUiGarageSceneLighting50KG;class OriginalUiCourseOwnedLifecycle50KG;}
 namespace rr::game {
 struct SourceLibmState49T {
     std::int32_t mode = 1;
@@ -45,6 +46,7 @@ bool sourceSinePositiveReduced50IG(std::uint32_t inputBits,std::uint32_t& output
 class SourceUiLightMath50KG final {
     friend class ::ra_pod_scene50LA::Owner; //Reached RA146720/146E60 only.
     friend class ::rr::platform::OriginalUiGarageUiLights50KG;
+    friend class ::rr::platform::OriginalUiCourseOwnedLifecycle50KG; // Same reached Course146720/146E60.
     friend class ::rr::platform::OriginalUiGarageSceneLighting50KG;
     static std::uint32_t range146898()noexcept;
     static bool luminance146E60(std::uint32_t r,std::uint32_t g,std::uint32_t b,
@@ -52,6 +54,15 @@ class SourceUiLightMath50KG final {
     //Actual RA remainder signed diffuse cohort only; UI envelope unchanged.
     static bool luminanceRaRemaining146E60(std::uint32_t,std::uint32_t,std::uint32_t,
         std::uint32_t&)noexcept;
+};
+
+// Reached1B12FC..1B1338 only: binary32 products are supplied after the
+// actual mul.s steps; software-double sqrt/multiply/narrow preserve source
+// order. Finite positive product, finite signed damping multiplier only.
+class SourceTerrainSetupMath50LA final {
+    friend class ::terrain_probe_authoring50fq_fixture::SourceStage348;
+    static bool damping1B12FC(std::uint32_t massSpringProduct,
+        std::uint32_t twiceDamping,std::uint32_t& output)noexcept;
 };
 
 #ifdef RR_SOURCE_ACOS49T_TEST_API

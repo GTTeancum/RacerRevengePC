@@ -1,3 +1,4 @@
+#include "original_selected_array_guards27ed40.h"
 // Private implementation beside the one lighting/visibility Storage definition.
 namespace rr::game::original_gc_gameplay_lighting_candidate {
 bool Owner::bindRaStaticOwner(const ::ra_static_model_cold50LA::Owner* owner,
@@ -26,6 +27,7 @@ bool Owner::bindRaStaticOwner(const ::ra_static_model_cold50LA::Owner* owner,
     // retail integer constants or a copied selection registry.
     try {
         for(std::size_t i=0;i<s.world.zones.size()*2u;++i){auto& m=s.selectedMethods[i];
+            selected_array_guards27ED40::invalidateNative();
             m.selected18.resize(30,nullptr);m.capacity0C=30; //27ED40(30,30)
             const auto a=app->types383408_.findOrAppend2A31E0("SoultreeObject");
             if(!a.okay())return false;m.type2C=a.type;

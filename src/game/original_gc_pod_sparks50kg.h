@@ -5,7 +5,7 @@
 #include <cstdint>
 #include <vector>
 namespace rr::game {
-enum class OriginalGcPodSparksMember50KG : std::uint8_t {podSparks,wreckSparks};
+enum class OriginalGcPodSparksMember50KG : std::uint8_t {podSparks,wreckSparks,racerExplWreckSparks};
 struct OriginalGcPodSparksDefinition50KG {
     OriginalGcPodSparksMember50KG member=OriginalGcPodSparksMember50KG::podSparks;
     std::array<float,3> minRange{},maxRange{},velocity{};

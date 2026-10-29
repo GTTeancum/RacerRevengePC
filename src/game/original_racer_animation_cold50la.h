@@ -6,7 +6,7 @@
 #include <string>
 
 namespace native_racer_model50LA { class Owner; }
-namespace rr::platform { class OriginalUiGarageActors50GN; class OriginalUiGarageWattoOwner50KG; }
+namespace rr::platform { class OriginalUiCourseOwnedLifecycle50KG; class OriginalUiGarageActors50GN; class OriginalUiGarageWattoOwner50KG; }
 namespace rr::game {
 enum class OriginalRacerAnimationColdStatus50LA : std::uint8_t {
     complete,binding,alreadyConstructed,component,attachmentLocked,topology,allocationState
@@ -67,6 +67,7 @@ class OriginalRacerAnimationCold50LA final {
     friend class rr::platform::OriginalUiGarageActors50GN;
     friend class rr::platform::OriginalUiGarageWattoOwner50KG;
     friend class OriginalUiEntityScope50KG;
+    friend class rr::platform::OriginalUiCourseOwnedLifecycle50KG;
 public:
     OriginalRacerAnimationCold50LA()=default;
     OriginalRacerAnimationCold50LA(const OriginalRacerAnimationCold50LA&)=delete;

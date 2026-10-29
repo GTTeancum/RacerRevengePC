@@ -6,7 +6,15 @@
 #include "../../tests/native/race_music50ie_fixture.h"
 #include "../../tests/native/source_announcer50ie_fixture.h"
 #include "../../platform/linux/native/original_application_aural50kg.h"
+#include "race_event_queue50id.h"
+#include "lap_event6_subscriber50id.h"
+#include "../../platform/linux/native/original_ui_main_session50kg.h"
+#include "dynamic_impact_events50iw.h"
+#include "../../tests/native/live_audio50hf_fixture.h"
 #include <array>
+#include <bit>
+#include <cfenv>
+#include <cmath>
 #include <exception>
 #include <limits>
 #include <optional>
@@ -24,6 +32,33 @@ struct OriginalRaceMusicManager50LA::Impl final {
     source_announcer50IE::Owner* announcer=nullptr;
     RaceMusicState50IE* live128_12C_130=nullptr; //The ONE existing state, never copied.
     const AnnouncerState50IE* nativeAnnouncerState=nullptr;
+    RaceEventQueue50ID<128>* nativeEvents=nullptr; //Same lexical Session owner, not copied.
+    std::optional<std::uint32_t> endQueueInitialCount;
+    std::optional<RaceEventEntry50ID> endQueuePending; //Native retained descriptor, not manufactured payload.
+    LapEventCursor50ID endLapCursor{};
+    bool endLapStarted=false;
+    std::uint32_t endLapSelectedIndex=0; //Reached1A585C, retained on terminal range cut.
+    std::array<std::optional<std::uint32_t>,7> endDamageWords{}; //40,58,draw,138,repeat,60,fraction.
+    LapEventRequest50ID endDamageRequest{};
+    bool endDamageStarted=false,endDamageNeedsAnnouncer=false;
+    bool endDamageNeedsSpeech=false;
+    std::array<std::optional<std::uint32_t>,16> endDamageSpeechWords{};
+    std::array<std::uint32_t,128> endDamageSpeechScratch{};
+    std::array<bool,128> endDamageSpeechScratchKnown{};
+    DynamicContactEventCursor50IW endContactCursor{};
+    std::array<std::optional<std::uint32_t>,18> endContactWords{};
+    LapEventRequest50ID endContactRequest{};
+    bool endContactStarted=false,endContactNeedsAnnouncer=false;
+    bool endContactNeedsSpeech=false,endContactSpeechTaunt=false;
+    std::uint32_t endContactSpeechActor=0;
+    std::array<std::optional<std::uint32_t>,16> endContactSpeechWords{};
+    std::array<std::optional<std::uint32_t>,3> endContactSpeechOffsets{};
+    std::array<std::uint32_t,128> endContactSpeechScratch{};
+    std::array<bool,128> endContactSpeechScratchKnown{};
+    std::optional<race_music50IE::UpdateReceipt50IW> restartFadeReceipt;
+    bool endQueueStopped=false;
+    std::uint32_t endQueueStopPC=0x1a4cd4;
+
     bool counted=false,constructed=false,closed=false;
     struct Fields {
         std::array<std::uint32_t,4> quad60{},quad70{},quad90{};
@@ -34,13 +69,18 @@ struct OriginalRaceMusicManager50LA::Impl final {
         float scalar138=.5f,scalar13C=.25f,scalar140=.5f,scalar144=.5f,scalar148=.5f,scalar14C=.5f;
         std::array<std::array<std::uint32_t,2>,7> pairsF0{};
         std::uint32_t word134=0,word150=0;
-        std::optional<const void*> events158;
+        std::optional<const void*> events158; //Guest address stays unknown; nativeEvents is the explicit adapter.
     } fields;
     enum class LoadCut:std::uint8_t {count38,aural44,nativeChildren,nativeReady};
     LoadCut loadCut=LoadCut::count38;
     // Source44's owner is the actual retained Aural interface. This native
     // identity is not a fabricated guest+40 address or new mixer instance.
-    std::shared_ptr<const platform::OriginalApplicationAural50KG> aural;
+    std::shared_ptr<platform::OriginalApplicationAural50KG> aural;
+    bool listenerAttempted=false,listenerRetired=false,listenerStepStopped=false;
+    std::optional<std::uint64_t> listenerMixCursor;
+    std::uint64_t listenerCameraPublication=0;
+    // Retain reached read/scratch prefixes on a terminal native consumed-step.
+    std::array<std::optional<std::uint32_t>,14> listenerWords{};
     const void* nativeInterface44=nullptr;
     static bool stop(OriginalRaceMusicManagerDiagnostic50LA& d,std::uint32_t pc,const char* why)noexcept {
         d.sourcePC=pc;d.operation=why;return false;
@@ -120,7 +160,7 @@ bool OriginalRaceMusicManager50LA::noNativePreparation(
         !scope.music_->mixer_&&!scope.announcer_->prepared_&&!scope.announcer_->mixer_;
 }
 bool OriginalRaceMusicManager50LA::acceptNativeChildren(OriginalRaceConstructor50LA& race,
-    const std::shared_ptr<const platform::OriginalApplicationAural50KG>& actualAural,
+    const std::shared_ptr<platform::OriginalApplicationAural50KG>& actualAural,
     OriginalRaceMusicManagerDiagnostic50LA& d)noexcept {
     d={};if(!impl_)return Impl::stop(d,0x1a3c00,"Counted music manager absent");auto& p=*impl_;
     if(p.thread!=std::this_thread::get_id())
@@ -166,6 +206,30 @@ bool OriginalRaceMusicManager50LA::acceptNativeChildren(OriginalRaceConstructor5
         // Unrepresented original child constructor/load/attach effects are
         // UNKNOWN, not fabricated null children, counts or successful calls.
         // Native transports keep their OWN already-prepared PCM and state.
+        // Explicit native load join for the exact1A4620 listener subgraph.
+        // Other platform child IO remains the documented native adapter.
+        if(p.fields.count38!=1u||!scope->gameplay_)
+            return Impl::stop(d,0x1a4620,"Only the actual single-view native listener owner is represented");
+        platform::OriginalApplicationAural50KG::Diagnostic listener;
+        const bool registered=p.aural->beginSingleRaceListener1A4620(*this,listener);
+        // Native custody, NOT readiness: only this actual issuer owns cleanup.
+        // A pre-admission rejection must not acquire/remove another manager's listener.
+        p.listenerAttempted=p.aural->nativeListenerIssuer_==this;
+        if(!registered)
+            return Impl::stop(d,listener.sourcePC,"Actual listener registration retained its source prefix");
+        if(!p.listenerMixCursor)p.listenerMixCursor=scope->gameplay_->mixedFrames();
+        if(scope->events_){
+            const auto& q=*scope->events_;
+            if(!scope->eventBindings_||!scope->eventBindings_->eventOwner33CBound||
+               q.count150||q.lastTicket||q.dispatchIndex||q.flushing||q.endFlushPending50LA()||
+               q.capacity154!=32u)
+                return Impl::stop(d,0x1a3c84,"Actual native Session FIFO is not fresh; no reset/adoption of used events");
+            //Native allocation adapter: real fixed128 reservation, original
+            //logical initial32. Does NOT claim source305700 returned or grant
+            //ownership to arbitrary events. Existing producers already share
+            //this exact Session FIFO;21080C..818 identifies their33C as10C.
+            p.nativeEvents=scope->events_;
+        }
         p.fields.child164.reset();p.fields.child168.reset();
         for(auto& child:p.fields.childrenC0)child.reset();p.fields.events158.reset();
         p.loadCut=Impl::LoadCut::nativeReady;
@@ -177,8 +241,11 @@ bool OriginalRaceMusicManager50LA::acceptNativeChildren(OriginalRaceConstructor5
 bool OriginalRaceMusicManager50LA::nativeBackendCurrent(
     const ::original_race_hud_scope50LA::Registration& scope)const noexcept {
     if(!impl_)return false;const auto& p=*impl_;
-    if(!p.componentCurrent()||p.loadCut!=Impl::LoadCut::nativeReady||!p.providersCurrent(scope)||
-       !p.aural||!p.aural->current()||!p.music->current()||!p.announcer->current())return false;
+    if(!p.componentCurrent()||p.loadCut!=Impl::LoadCut::nativeReady||p.listenerStepStopped||!p.providersCurrent(scope)||
+       !p.aural||!p.aural->current()||!p.aural->listenerCurrent(*this)||
+       !p.music->current()||!p.announcer->current()||
+       p.nativeEvents!=scope.events_||
+       (p.nativeEvents&&(!scope.eventBindings_||!scope.eventBindings_->eventOwner33CBound)))return false;
     const auto view=p.aural->inspect();const auto race=scope.race_.lock();
     return race&&race->music10C_.get()==this&&view.interfaceKnown&&view.nativeInitialized&&
         view.interfaceA0==p.nativeInterface44&&view.mixer&&
@@ -186,34 +253,405 @@ bool OriginalRaceMusicManager50LA::nativeBackendCurrent(
         p.application->aural00_==view.entity&&p.music->mixer_==p.announcer->mixer_&&
         p.music->groups_==race->raceAudio_&&p.announcer->groups_==race->raceAudio_;
 }
+bool OriginalRaceMusicManager50LA::restartNativeFade1AC960(
+    const OriginalRaceConstructor50LA& race,const Impl::Registration& scope,
+    OriginalRaceMusicManagerDiagnostic50LA& d)noexcept {
+    d={};
+    //Authenticate only the canonical component and lexical state borrow here.
+    //Transport readiness, pending work and fade arithmetic belong AFTER the
+    //unconditional source130/12C stores, not in nativeBackendCurrent preflight.
+    if(!impl_||!impl_->componentCurrent()||!impl_->providersCurrent(scope)||
+       impl_->loadCut!=Impl::LoadCut::nativeReady||race.music10C_.get()!=this)
+        return Impl::stop(d,0x1ac964,"Actual same-Race10C/native state owner unavailable");
+    auto& p=*impl_;
+    if(p.restartFadeReceipt)
+        return Impl::stop(d,p.restartFadeReceipt->helperPC?p.restartFadeReceipt->helperPC:
+            p.restartFadeReceipt->sourcePC,"Restart music invocation already attempted; no replay");
+    //1AC958/95C constructs actual F12=1.0 before JAL1A4AB0. Source helper
+    //writes130 then12C, leaving128 unchanged, before loading child164.
+    p.music->writeRestartFadePrefix1A4AB0();
+    p.restartFadeReceipt=p.music->requestRestartFadeTail234440();
+    const auto& result=*p.restartFadeReceipt;
+    if(!result.completed())
+        return Impl::stop(d,result.helperPC?result.helperPC:result.sourcePC,
+            "Actual native234440 transport continuation stopped; source music prefix and reached fade effects retained");
+    d.sourcePC=0x1ac968;return true; //Native transport adaptation, not guest IOP/logging completion.
+}
+bool OriginalRaceMusicManager50LA::advanceNativeListenerConsumedStep(
+    const OriginalRaceConstructor50LA& race,const Impl::Registration& scope,
+    const ::original_camera_session50KX::Session& camera,std::uint64_t beforeMix,
+    bool heldSourceScene,OriginalRaceMusicManagerDiagnostic50LA& d)noexcept {
+    d={};if(!nativeBackendCurrent(scope)||race.music10C_.get()!=this||!scope.gameplay_)
+        return Impl::stop(d,0x1a4440,"Actual same-Race listener/mix owner unavailable");
+    auto& p=*impl_;
+    if(p.listenerStepStopped||!p.listenerMixCursor)
+        return Impl::stop(d,0x1a4440,"Prior consumed listener step remains terminal");
+    const auto afterMix=scope.gameplay_->mixedFrames();
+    if(beforeMix!=*p.listenerMixCursor||afterMix<beforeMix||afterMix-beforeMix!=live_audio50HF::stepFrames)
+        return Impl::stop(d,0x1a4440,"Listener requires the next actual shared-mixer consumption");
+    // One native consumed-step token, claimed BEFORE any source-dependent read.
+    // No repair/re-read/replay after any failure, including absent camera pose.
+    p.listenerMixCursor=afterMix;p.listenerStepStopped=true;p.listenerWords={};
+    std::array<std::uint32_t,3> old{},velocity{};
+    std::array<const float*,9> actualXYZ{};
+    std::uint64_t publication=0;
+    if(!scope.readNativeListenerScene(race,camera,heldSourceScene,p.listenerCameraPublication,
+            publication,actualXYZ))
+        return Impl::stop(d,0x1a4474,"Actual same-Race camera34 publication/held route unavailable");
+    // Native scheduling adaptation: actual consumed768/48000, NOT a claim
+    // that original music update's F20 or omitted prefix/suffix ran.
+    if(std::fegetround()!=FE_TONEAREST)
+        return Impl::stop(d,0x1a44b0,"Native consumed listener delta rounding unsupported");
+    volatile float delta=static_cast<float>(afterMix-beforeMix)/static_cast<float>(live_audio50HF::sampleRate);
+    p.listenerWords[0]=std::bit_cast<std::uint32_t>(static_cast<float>(delta));
+    platform::OriginalApplicationAural50KG::Diagnostic listener;
+    if(!p.aural->readSingleRaceListener290E10(*this,old,listener))
+        return Impl::stop(d,listener.sourcePC,"Actual preceding listener position unavailable");
+    //1A44D8..4508 actual old/new XYZ;106790 creates scratch with W=1.
+    for(std::size_t k=0;k<3;++k)p.listenerWords[1+k]=old[k];
+    for(std::size_t k=0;k<3;++k)p.listenerWords[4+k]=std::bit_cast<std::uint32_t>(*actualXYZ[k]);
+    for(std::size_t k=0;k<3;++k){
+        volatile float difference=std::bit_cast<float>(*p.listenerWords[4+k])-std::bit_cast<float>(old[k]);
+        p.listenerWords[7+k]=std::bit_cast<std::uint32_t>(static_cast<float>(difference));
+    }
+    volatile float inverse=1.f/delta;
+    p.listenerWords[10]=std::bit_cast<std::uint32_t>(static_cast<float>(inverse));
+    // Source multiplication order Y, X, Z; scratch stores X then Y then Z.
+    volatile float y=std::bit_cast<float>(*p.listenerWords[8])*inverse;
+    volatile float x=std::bit_cast<float>(*p.listenerWords[7])*inverse;
+    velocity[0]=std::bit_cast<std::uint32_t>(static_cast<float>(x));
+    volatile float z=std::bit_cast<float>(*p.listenerWords[9])*inverse;
+    velocity[1]=std::bit_cast<std::uint32_t>(static_cast<float>(y));
+    velocity[2]=std::bit_cast<std::uint32_t>(static_cast<float>(z));
+    for(std::size_t k=0;k<3;++k)p.listenerWords[11+k]=velocity[k];
+    // Native finite projection rejects before external XYZ writes. Scratch
+    // above and consumed token remain retained; it is never retried/staged back.
+    if(!std::isfinite(x)||!std::isfinite(y)||!std::isfinite(z))
+        return Impl::stop(d,0x1a4558,"Listener velocity numeric domain unsupported");
+    if(!p.aural->writeSingleRaceListener1030B0(*this,actualXYZ,velocity,listener))
+        return Impl::stop(d,listener.sourcePC,"Listener source setter prefix retained");
+    p.listenerCameraPublication=publication;p.listenerStepStopped=false;
+    d.sourcePC=0x1a45a8;return true;
+}
+bool OriginalRaceMusicManager50LA::invokeNativeContactSpeech1(
+    const OriginalRaceConstructor50LA& race,const Impl::Registration& scope,
+    OriginalRaceMusicManagerDiagnostic50LA& d)noexcept {
+    auto& p=*impl_;auto& words=p.endContactSpeechWords;auto& offsets=p.endContactSpeechOffsets;
+    const bool taunt=p.endContactSpeechTaunt;const auto actor=p.endContactSpeechActor;
+    std::uint32_t pc=taunt?0x1a5aa4u:0x1a5ab8u;const auto& c=p.endContactCursor;
+    if(!p.endQueuePending||!scope.camera_||!nativeBackendCurrent(scope)||!scope.gameplay_||
+       !p.listenerCameraPublication||!p.listenerMixCursor||
+       scope.gameplay_->mixedFrames()!=*p.listenerMixCursor||
+       scope.camera_->publicationCount()<p.listenerCameraPublication||
+       (taunt?(!c.partnerSpeech||c.selfSpeech||actor!=c.event.actor0C||c.phase!=DynamicContactEventPhase50IW::PartnerSpeech):
+              (!c.selfSpeech||c.partnerSpeech||actor!=c.event.actor10||c.phase!=DynamicContactEventPhase50IW::SelfSpeech)))
+        return Impl::stop(d,pc,"Selected contact speech owner/request/prior listener history unavailable");
+    const PodSpeechCounts50HG* counts=nullptr;PodSpeechState50HG* speech=nullptr;
+    std::array<std::uint32_t,3> local{};std::array<std::uint32_t,4> main70{};
+    if(!scope.readNativePodSpeechOwner(race,actor,counts,speech,local,main70,words,pc))
+        return Impl::stop(d,pc,"Actual selected actor initialized native D48/body/scene owner unavailable");
+    bool audible=false;platform::OriginalApplicationAural50KG::Diagnostic aural;
+    if(!p.aural->observeSingleRaceSpeech104140(*this,local,main70,p.endContactSpeechScratch,
+        p.endContactSpeechScratchKnown,audible,aural))
+        return Impl::stop(d,aural.sourcePC,"Contact audibility prefix retained; no retry");
+    words[14]=audible?1u:0u;
+    if(!audible){d.sourcePC=taunt?0x2c1cc8u:0x2c1be0u;return true;}
+    words[7]=std::bit_cast<std::uint32_t>(speech->cooldown224);
+    const float cooldown=std::bit_cast<float>(*words[7]);
+    if(!std::isfinite(cooldown))return Impl::stop(d,taunt?0x2c1c34u:0x2c1ac4u,
+        "Reached contact cooldown numeric domain unsupported");
+    if(!(cooldown<=0.f)){d.sourcePC=taunt?0x2c1cc8u:0x2c1be0u;return true;}
+    const std::size_t cursor=taunt?5u:3u;
+    words[8]=speech->cursors[cursor]; //222 at2C1C84, or220 at2C1B8C.
+    words[9]=taunt?counts->attacking:counts->attacked; //219 /217, only reached category.
+    std::uint32_t selected=*words[8]+1u;words[10]=selected;
+    if(!*words[9])return Impl::stop(d,taunt?0x2c1c90u:0x2c1b98u,
+        "Reached contact category zero divisor unsupported");
+    speech->cursors[cursor]=static_cast<std::uint8_t>(selected%*words[9]); //1CA0 /1BA8 immediateSB.
+    words[11]=speech->cursors[cursor];
+    //Bank offset reads occur AFTER cursor store; add to unmodded old+1,
+    //never the stored remainder. No unrelated category is prevalidated.
+    if(taunt){offsets[0]=counts->passing;selected+=*offsets[0];} //1CA4/1CA8.
+    else{
+        offsets[0]=counts->lowDamage;offsets[1]=counts->wallHit;offsets[2]=counts->passed;
+        selected+=*offsets[0];selected+=*offsets[1];selected+=*offsets[2]; //1BB8/BC/C0.
+    }
+    words[10]=selected; //Reached source A1 request, retained even if provider rejects.
+    if(!scope.playNativePodSpeech(race,actor,taunt,selected,pc))
+        return Impl::stop(d,pc,"Actual selected actor play did not return; cursor/provider prefix retained");
+    words[12]=1u; //Native completed-helper custody, NOT guessed guest V0.
+    speech->cooldown224=std::bit_cast<float>(std::uint32_t{0x40a00000}); //1CC4 /1BDC AFTER actual return.
+    words[13]=0x40a00000u;d.sourcePC=taunt?0x2c1cc8u:0x2c1be0u;return true;
+}
+bool OriginalRaceMusicManager50LA::invokeNativeLowDamageSpeech5(
+    const OriginalRaceConstructor50LA& race,const Impl::Registration& scope,
+    OriginalRaceMusicManagerDiagnostic50LA& d)noexcept {
+    auto& p=*impl_;auto& words=p.endDamageSpeechWords;std::uint32_t pc=0x1a532c;
+    if(!p.endQueuePending||!scope.camera_||!nativeBackendCurrent(scope)||!scope.gameplay_||
+       !p.listenerCameraPublication||!p.listenerMixCursor||
+       scope.gameplay_->mixedFrames()!=*p.listenerMixCursor||
+       scope.camera_->publicationCount()<p.listenerCameraPublication)
+        return Impl::stop(d,pc,"Selected speech requires actual initialized prior listener history; no future mix pose");
+    const PodSpeechCounts50HG* counts=nullptr;PodSpeechState50HG* speech=nullptr;
+    std::array<std::uint32_t,3> local{};std::array<std::uint32_t,4> main70{};
+    if(!scope.readNativeDamageSpeech5Owner(race,p.endQueuePending->event,counts,speech,local,main70,words,pc))
+        return Impl::stop(d,pc,"Selected native D48 initializer/actor/body/local scene owner unavailable");
+    bool audible=false;platform::OriginalApplicationAural50KG::Diagnostic aural;
+    if(!p.aural->observeSingleRaceSpeech104140(*this,local,main70,p.endDamageSpeechScratch,
+            p.endDamageSpeechScratchKnown,audible,aural))
+        return Impl::stop(d,aural.sourcePC,"Actual audibility scratch/numeric prefix retained; no retry");
+    words[14]=audible?1u:0u;
+    if(!audible){d.sourcePC=0x2c1be0;return true;} //No cooldown/count/cursor reads.
+    pc=0x2c1ab8;words[7]=std::bit_cast<std::uint32_t>(speech->cooldown224);
+    const float cooldown=std::bit_cast<float>(*words[7]);
+    if(!std::isfinite(cooldown))return Impl::stop(d,0x2c1ac4,"Reached speech cooldown numeric domain unsupported");
+    if(!(cooldown<=0.f)){d.sourcePC=0x2c1be0;return true;}
+    //Actual type3 branch: no other category/count is prevalidated or read.
+    words[8]=speech->cursors[0]; //2C1B08 LBU21D.
+    words[9]=counts->lowDamage; //2C1B0C LBU214.
+    const std::uint32_t selected=*words[8]+1u;words[10]=selected;
+    if(!*words[9])return Impl::stop(d,0x2c1b14,"Reached zero original category divisor unsupported");
+    speech->cursors[0]=static_cast<std::uint8_t>(selected%*words[9]); //2C1B28 directSB BEFORE play.
+    words[11]=speech->cursors[0];
+    if(!scope.playNativeDamageSpeech5(race,selected,pc))
+        return Impl::stop(d,pc,"Actual play provider did not return; cursor/effects retained, no cooldown or replay");
+    words[12]=1u; //Native actual helper-return custody, not a fabricated guest V0.
+    speech->cooldown224=std::bit_cast<float>(std::uint32_t{0x40a00000}); //2C1BDC AFTER helper return.
+    words[13]=0x40a00000u;d.sourcePC=0x2c1be0;return true;
+}
 bool OriginalRaceMusicManager50LA::readQueuedCount150(const OriginalRaceConstructor50LA& race,
     const ::original_race_hud_scope50LA::Registration& scope,std::uint32_t& count)const noexcept {
     if(race.music10C_.get()!=this||!nativeBackendCurrent(scope)||
        impl_->application!=race.application_||impl_->component.sessionGeneration!=race.entity_.sessionGeneration)
         return false;
-    //Actual mutable counted manager lane, initialized1A3AD4 and retained by
-    //the explicit native backend adapter. Never an inferred constant/empty
-    //queue receipt. The158 payload remains unknown and is NOT dereferenced.
-    count=impl_->fields.word150;return true;
+    //Native FIFO adoption reads the actual shared producer count. Without
+    //that adoption, keep the constructor-owned150 lane; unknown guest158 is
+    //never cast/dereferenced or replaced by an invented payload pointer.
+    auto& p=*impl_;
+    if(!p.nativeEvents){count=p.fields.word150;return true;}
+    if(!scope.camera_||!scope.endStateCurrent(race,*scope.camera_))return false;
+    auto& q=*p.nativeEvents;
+    if(q.count150>=q.capacity154||q.capacity154>q.entries.size())return false;
+    if(q.endFlushOwner50LA_!=this){
+        if(q.endFlushOwner50LA_||q.flushing||q.dispatchIndex)return false;
+        q.endFlushOwner50LA_=this;q.flushing=true; //Native exclusive consumer custody.
+        q.dispatchIndex=0; //Source S0=0 before initial count read.
+        p.endQueueInitialCount=q.count150;
+    }
+    if(!p.endQueueInitialCount||p.endQueueStopped)return false;
+    count=*p.endQueueInitialCount;return true; //Never repair a saved first read.
+
+}
+bool OriginalRaceMusicManager50LA::dispatchNativeQueuedEvent3_1A4D30(
+    const OriginalRaceConstructor50LA& race,const ::original_race_hud_scope50LA::Registration& scope,
+    std::uint32_t savedInitialCount,OriginalRaceMusicManagerDiagnostic50LA& d)noexcept {
+    d={};if(race.music10C_.get()!=this||!nativeBackendCurrent(scope)||!impl_->nativeEvents||
+       impl_->application!=race.application_||impl_->component.sessionGeneration!=race.entity_.sessionGeneration)
+        return Impl::stop(d,0x1a4cd4,"Actual same-manager native FIFO/payload owner unavailable");
+    if(!scope.camera_||!scope.endStateCurrent(race,*scope.camera_))
+        return Impl::stop(d,0x1a4cd4,"Exact same App/Bank/manager/current Camera join unavailable");
+    auto& p=*impl_;auto& q=*p.nativeEvents;
+    if(q.endFlushOwner50LA_!=this||!q.flushing||!p.endQueueInitialCount||
+       *p.endQueueInitialCount!=savedInitialCount)
+        return Impl::stop(d,0x1a4cd4,"Saved End count/cursor does not own this native FIFO");
+    if(p.endQueueStopped)return Impl::stop(d,p.endQueueStopPC,
+        "Saved unsupported event and consumed prefix retained; no payload reread, replay or clear");
+    //Event3 is JR/NOP. Supported1/5/6 paths use only this same Registration's
+    //real source-ordered actors and held native helpers; other cuts remain stopped.
+    std::uint32_t count=savedInitialCount;
+    for(;;){
+        if(q.dispatchIndex>=count){d.sourcePC=0x1a4d04;return true;}
+        p.endQueueStopPC=0x1a4cd4;
+        if(q.dispatchIndex>=q.entries.size()||q.dispatchIndex>=q.count150){
+            p.endQueueStopped=true;return Impl::stop(d,p.endQueueStopPC,"Actual indexed native event158 unavailable");
+        }
+        p.endQueuePending=q.entries[q.dispatchIndex]; //Retain actual descriptor/ticket, not externally supplied event.
+        p.endQueueStopPC=0x1a4d38;
+        if(!p.endQueuePending->ticket){
+            p.endQueueStopped=true;return Impl::stop(d,p.endQueueStopPC,"Actual event native ticket unavailable");
+        }
+        const auto type=p.endQueuePending->event.type4;
+        if(type==1u){
+            if(!p.endContactStarted){
+                p.endContactStarted=true;p.endContactCursor.lastTicket=p.endQueuePending->ticket;
+                if(!scope.prepareNativeContactEvent1(race,p.endQueuePending->event,
+                    p.endContactCursor,p.endContactWords,p.endContactRequest,
+                    p.endContactNeedsAnnouncer,p.endContactNeedsSpeech,p.endContactSpeechTaunt,
+                    p.endContactSpeechActor,p.endQueueStopPC)){
+                    p.endQueueStopped=true;return Impl::stop(d,p.endQueueStopPC,
+                        "Actual contact prefix retained; selected D48/actor/chance boundary remains unsupported");
+                }
+            }
+            if(p.endContactNeedsSpeech){
+                if(!invokeNativeContactSpeech1(race,scope,d)){
+                    p.endQueueStopped=true;p.endQueueStopPC=d.sourcePC;return false;
+                }
+                p.endContactNeedsSpeech=false; //AFTER actual helper return, never a synthetic ack.
+                //Source selected flags are mutually exclusive; after partner
+                //return1A5AB0 tests false S4, or self returns at1A5AC4.
+                if(!scope.finishNativeContactEvent1(race,p.endContactCursor,p.endContactWords,
+                    p.endContactRequest,p.endContactNeedsAnnouncer,p.endQueueStopPC)){
+                    p.endQueueStopped=true;return Impl::stop(d,p.endQueueStopPC,
+                        "Post-speech source contact tail retained; no helper/draw replay");
+                }
+            }
+            if(p.endContactNeedsAnnouncer){
+                const auto state=scope.application_->state;
+                if(!state||!state->clock101A50||!p.announcer||
+                   p.announcer->raw_!=&state->rawRandom308030||
+                   p.announcer->lazy_!=&state->sharedRandomSelectors.seed||
+                   p.announcer->providers_.sharedRange!=&state->sharedRandomSelectors.range||
+                   p.announcer->clock_!=state->clock101A50.get()){
+                    p.endQueueStopped=true;return Impl::stop(d,p.endQueueStopPC,
+                        "Actual contact Announcer shared raw/lazy/range/clock owner unavailable");
+                }
+                std::uint32_t ignoredV0=0;
+                if(!scope.invokeNativeLapEvent6(race,p.endContactRequest,ignoredV0)){
+                    p.endQueueStopped=true;return Impl::stop(d,p.endQueueStopPC,
+                        "Actual Announcer1/2 did not return; contact request/draws retained without retry");
+                }
+                p.endContactCursor.phase=DynamicContactEventPhase50IW::Complete;
+            }
+        }else if(type==5u){
+            //3AA284 ->1A4D84 ->1A52B0. Preserve exact pending payload and
+            //every reached raw/read prefix; do not invoke atomic50HG dispatch.
+            if(!p.endDamageStarted){
+                p.endDamageStarted=true;
+                if(!scope.prepareNativeDamageEvent5(race,p.endQueuePending->event,
+                    p.endDamageWords,p.endDamageRequest,p.endDamageNeedsAnnouncer,p.endDamageNeedsSpeech,p.endQueueStopPC)){
+                    p.endQueueStopped=true;return Impl::stop(d,p.endQueueStopPC,
+                        "Damage source prefix retained; selected D48 speech/owner/scalar boundary remains unsupported");
+                }
+            }
+            if(p.endDamageNeedsSpeech){
+                if(!invokeNativeLowDamageSpeech5(race,scope,d)){
+                    p.endQueueStopped=true;p.endQueueStopPC=d.sourcePC;return false;
+                }
+                //1A5338 is reached even after selected speech; only AFTER the
+                //real2C1A90 return. S2 remains true, so no Announcer fallback.
+                p.endQueueStopPC=0x1a5338;p.endDamageWords[4]=p.endQueuePending->event.word8;
+            }
+            if(p.endDamageNeedsAnnouncer){
+                const auto state=scope.application_->state;
+                if(!state||!state->clock101A50||!p.announcer||
+                   p.announcer->raw_!=&state->rawRandom308030||
+                   p.announcer->lazy_!=&state->sharedRandomSelectors.seed||
+                   p.announcer->providers_.sharedRange!=&state->sharedRandomSelectors.range||
+                   p.announcer->clock_!=state->clock101A50.get()){
+                    p.endQueueStopped=true;return Impl::stop(d,p.endQueueStopPC,
+                        "Actual damage Announcer shared raw/lazy/range/clock owner unavailable");
+                }
+                std::uint32_t ignoredV0=0;
+                //Same already-authenticated native helper adapter used by6.
+                //False is terminal; no repaired request or prior draw replay.
+                if(!scope.invokeNativeLapEvent6(race,p.endDamageRequest,ignoredV0)){
+                    p.endQueueStopped=true;return Impl::stop(d,p.endQueueStopPC,
+                        "Actual Announcer12 did not return; damage request/payload/effects retained without retry");
+                }
+            }
+        }else if(type==6u){
+            //3AA288 ->1A4D64 ->1A55F0. Never use Loop's actor snapshot or
+            //ordinary front/ack API to bypass this manager's exclusive guard.
+            if(!p.endLapStarted){
+                p.endLapStarted=true;
+                if(!scope.beginNativeLapEvent6(race,p.endQueuePending->event.actor0C,
+                    p.endLapCursor,p.endQueueStopPC)){
+                    p.endQueueStopped=true;return Impl::stop(d,p.endQueueStopPC,
+                        "Actual source-ordered lap actor prefix unavailable; saved event/reads retained");
+                }
+            }
+            for(;;){
+                const auto step=scope.advanceNativeLapEvent6(race,p.endLapCursor,p.endLapSelectedIndex);
+                p.endQueueStopPC=step.sourcePC;
+                if(step.status==LapEventStatus50ID::Complete)break;
+                if(step.status!=LapEventStatus50ID::NeedHelper){
+                    p.endQueueStopped=true;return Impl::stop(d,p.endQueueStopPC,
+                        "Lap source scalar/static boundary; earlier helper/RNG effects retained");
+                }
+                if(step.request.kind==LapEventCall50ID::Announcer2C2C20){
+                    const auto state=scope.application_->state;
+                    if(!state||!state->clock101A50||!p.announcer||
+                       p.announcer->raw_!=&state->rawRandom308030||
+                       p.announcer->lazy_!=&state->sharedRandomSelectors.seed||
+                       p.announcer->providers_.sharedRange!=&state->sharedRandomSelectors.range||
+                       p.announcer->clock_!=state->clock101A50.get()){
+                        p.endQueueStopped=true;return Impl::stop(d,p.endQueueStopPC,
+                            "Actual Announcer shared raw/lazy/clock is not the same Application owner");
+                    }
+                }
+                std::uint32_t actualV0=0;
+                if(!scope.invokeNativeLapEvent6(race,step.request,actualV0)){
+                    p.endQueueStopped=true;return Impl::stop(d,p.endQueueStopPC,
+                        "Actual lap provider did not return; held request/payload and effects retained without retry");
+                }
+                if(!acceptLapEventHelperReturn50ID(p.endLapCursor,step.request.sequence,
+                    step.request.kind,actualV0)){
+                    p.endQueueStopped=true;return Impl::stop(d,p.endQueueStopPC,
+                        "Returned actual lap helper acknowledgement rejected; no helper replay");
+                }
+            }
+        }else if(type!=3u){
+            p.endQueueStopped=true;return Impl::stop(d,p.endQueueStopPC,
+                "Actual event retained; only source subscribers3/6 and bounded1/5 branches are joined here");
+        }
+        //1/5:source suppression/Announcer;3:JR/NOP;6:owned1A55F0 continuation.
+        //No added word0/shape checks; each path consumes only reached source fields.
+        ++q.dispatchIndex; //1A4CE8 only after actual subscriber return (CE4 advances byte offset20).
+        p.endQueuePending.reset();p.endLapCursor={};p.endLapStarted=false;p.endLapSelectedIndex=0;
+        p.endDamageWords={};p.endDamageRequest={};p.endDamageStarted=false;p.endDamageNeedsAnnouncer=false;
+        p.endDamageNeedsSpeech=false;p.endDamageSpeechWords={};
+        p.endDamageSpeechScratch={};p.endDamageSpeechScratchKnown={};
+        p.endContactCursor={};p.endContactWords={};p.endContactRequest={};
+        p.endContactStarted=false;p.endContactNeedsAnnouncer=false;
+        p.endContactNeedsSpeech=false;p.endContactSpeechTaunt=false;p.endContactSpeechActor=0;
+        p.endContactSpeechWords={};p.endContactSpeechOffsets={};
+        p.endContactSpeechScratch={};p.endContactSpeechScratchKnown={};
+        count=q.count150; //1A4CF0 reload live count AFTER each returned subscriber.
+        if(count>=q.capacity154||q.capacity154>q.entries.size()){
+            p.endQueueStopPC=0x1a4cf0;p.endQueueStopped=true;
+            return Impl::stop(d,p.endQueueStopPC,"Native queue reservation invalid after returned prefix");
+        }
+    }
 }
 bool OriginalRaceMusicManager50LA::clearQueuedCount1A5C40(const OriginalRaceConstructor50LA& race,
     const ::original_race_hud_scope50LA::Registration& scope)noexcept {
     if(race.music10C_.get()!=this||!nativeBackendCurrent(scope)||
        impl_->application!=race.application_||impl_->component.sessionGeneration!=race.entity_.sessionGeneration)
         return false;
-    impl_->fields.word150=0; //1A5C44, JR delay slot; payload158 untouched.
+    auto& p=*impl_;
+    if(p.nativeEvents){
+        if(!scope.camera_||!scope.endStateCurrent(race,*scope.camera_))return false;
+        auto& q=*p.nativeEvents;
+        if(q.endFlushOwner50LA_){
+            if(q.endFlushOwner50LA_!=this||!q.flushing||p.endQueueStopped||
+               !p.endQueueInitialCount||q.dispatchIndex!=q.count150)return false;
+        }else if(q.flushing||q.dispatchIndex)return false; //Never clear another consumer's live prefix.
+        q.count150=0; //Actual shared150 store1A5C44; entries158 remain untouched.
+        q.dispatchIndex=0;q.flushing=false;q.endFlushOwner50LA_=nullptr;
+        p.endQueueInitialCount.reset();p.endQueuePending.reset(); //Native custody release AFTER source clear.
+    }else p.fields.word150=0; //Existing genuinely unjoined native queue path.
     return true;
 }
 void OriginalRaceMusicManager50LA::revokeNativeProviders(
     const ::original_race_hud_scope50LA::Registration& scope)noexcept {
     if(!impl_||impl_->thread!=std::this_thread::get_id()||impl_->registration.lock().get()!=&scope)return;
     impl_->music=nullptr;impl_->announcer=nullptr;impl_->live128_12C_130=nullptr;
-    impl_->nativeAnnouncerState=nullptr;impl_->registration.reset();
+    impl_->nativeAnnouncerState=nullptr;
+    //Do not clear a suspended queue. Session lifetime closes its backing only
+    //after this registration revokes; private guard remains a nondereferenced
+    //identity so other consumers cannot mistake abandonment for completion.
+    impl_->nativeEvents=nullptr;impl_->registration.reset();
 }
 bool OriginalRaceMusicManager50LA::retireNativeDetached(OriginalRaceMusicManagerDiagnostic50LA& d)noexcept {
     d={};if(!impl_)return true;auto& p=*impl_;
     if(p.thread!=std::this_thread::get_id())return Impl::stop(d,0x1a3af0,"Music manager retirement thread mismatch");
     if(p.closed)return true;
+    if(p.listenerAttempted&&!p.listenerRetired){
+        platform::OriginalApplicationAural50KG::Diagnostic listener;
+        if(!p.aural||!p.aural->removeSingleRaceListener103040(*this,listener))
+            return Impl::stop(d,listener.sourcePC,"Actual listener removal must precede manager retirement");
+        p.listenerRetired=true; // Native receipt AFTER1A45C0's ignored-return removal.
+    }
     if(p.counted){
         if(!p.componentCurrent()||!p.application->objectCount423F60()||
            !p.application->entityAuthority_.retire(p.component))
@@ -254,6 +692,18 @@ bool Application::completeConsumedRaMusicNative10C(original_camera_session50KX::
     const bool accepted=race->music10C_->acceptNativeChildren(*race,sourceAural00Owner_,d);
     pc=d.sourcePC;return accepted;
 }
+bool Application::advanceConsumedRaMusicListenerNative(
+    const original_camera_session50KX::Session& session,std::uint64_t beforeMix,
+    bool heldSourceScene,std::uint32_t& pc)const noexcept {
+    pc=0x1a4440;
+    if(!consumedRaMusicNative10CCurrent(session))return false;
+    const auto race=sourceRace28COwner_;const auto scope=race->endHud_.lock();
+    if(!scope||scope->application_!=this||scope->camera_!=&session)return false;
+    rr::game::OriginalRaceMusicManagerDiagnostic50LA d;
+    const bool okay=race->music10C_->advanceNativeListenerConsumedStep(*race,*scope,session,
+        beforeMix,heldSourceScene,d);
+    pc=d.sourcePC;return okay;
+}
 bool Application::consumedRaMusicNative10CCurrent(const original_camera_session50KX::Session& session)const noexcept {
     if(garageAudioOwnerThread_!=std::this_thread::get_id()||
        !session.onOwnerThread())return false;
@@ -286,6 +736,7 @@ bool Application::retireConsumedRaMusicNative10C(rr::game::OriginalRaceConstruct
        race.resultsFeedbackThread_!=std::this_thread::get_id()||
        raceConstructorColdOwner50LA_.lock().get()!=&race||race.application_!=entitiesOwner_||
        !race.endHud_.expired())return false;
+    if(race.sourcePlayerMusicBorrows_)return false;
     if(!race.music10C_)return true;
     rr::game::OriginalRaceMusicManagerDiagnostic50LA d;
     if(!race.music10C_->retireNativeDetached(d)){pc=d.sourcePC;return false;}
@@ -293,6 +744,15 @@ bool Application::retireConsumedRaMusicNative10C(rr::game::OriginalRaceConstruct
 }
 }
 namespace original_camera_session50KX {
+bool Session::advanceNativeMusicListenerConsumedStep(std::uint64_t beforeMix,
+    bool heldSourceScene,std::uint32_t& pc)const noexcept {
+    pc=0x1a4440;
+    if(!onOwnerThread())return false;
+    // Other courses have no joined counted RA10C route. Do not fabricate one.
+    if(!nativeTaIssuance_||nativeTaIssuance_->course!=rr::game::OriginalCameraStartCourse::ra)return true;
+    if(!nativeTaIssuance_->issuer)return false;
+    return nativeTaIssuance_->issuer->advanceConsumedRaMusicListenerNative(*this,beforeMix,heldSourceScene,pc);
+}
 bool Session::completeCountedRaceMusicNative10C(std::uint32_t& pc)noexcept {
     pc=0x1a6c90;
     if(f8Intro_.ownerThread_!=std::this_thread::get_id())return false;
@@ -300,5 +760,39 @@ bool Session::completeCountedRaceMusicNative10C(std::uint32_t& pc)noexcept {
     std::uint32_t pause=0;
     if(!nativeTaIssuance_->issuer||!actual_.applicationAnimation.readPause11C(pause))return false;
     return nativeTaIssuance_->issuer->completeConsumedRaMusicNative10C(*this,pc);
+}
+}
+
+namespace original_main_entry50KG {
+std::shared_ptr<const rr::game::OriginalPlayerRaceMusicBorrow50LA>
+Application::borrowSourcePlayerMusic210810(const rr::game::OriginalRaceConstructor50LA* expected)const noexcept {
+    const auto race=sourceRace28COwner_;
+    if(!enabled||!expected||!race||race.get()!=expected||raceConstructorColdOwner50LA_.lock()!=race||
+       garageAudioOwnerThread_!=std::this_thread::get_id()||race->resultsFeedbackThread_!=std::this_thread::get_id()||
+       race->application_!=entitiesOwner_||race->profile_!=riderProfile||!race->counted_||race->rolledBack_||
+       race->entity_.reference00!=1||!race->entity_.sessionGeneration||!race->music10C_||
+       !race->music10C_->constructed()||race->sourcePlayerMusicBorrows_==std::numeric_limits<std::size_t>::max())return {};
+    //Only an existing canonical1A6CAC publication is read. NEVER invoke its
+    //native preparation path or fabricate source-knownNULL from absent custody.
+    try{return std::shared_ptr<const rr::game::OriginalPlayerRaceMusicBorrow50LA>(
+        new rr::game::OriginalPlayerRaceMusicBorrow50LA(race,race->music10C_.get(),race->sourcePlayerMusicBorrows_));}
+    catch(...){return {};}
+}
+}
+
+namespace original_main_entry50KG {
+bool Application::readSourcePlayerRaceMode199980(const rr::game::OriginalRaceConstructor50LA* expected,
+    std::int32_t& mode)const noexcept {
+    using Step=rr::game::OriginalRaceConstructor50LA::CameraInitStep;
+    const auto& race=sourceRace28COwner_;
+    if(!enabled||!race||race.get()!=expected||raceConstructorColdOwner50LA_.lock()!=race||
+       garageAudioOwnerThread_!=std::this_thread::get_id()||race->resultsFeedbackThread_!=std::this_thread::get_id()||
+       race->application_!=entitiesOwner_||race->profile_!=riderProfile||!race->counted_||race->rolledBack_||
+       race->cameraInitStep_==Step::unreached||race->cameraInitStep_==Step::nativeRetiring||
+       race->cameraInitStep_==Step::retired)return false;
+    //Current canonical producer:1A9284 writes0 before advancing to pause.
+    //The C++ field initializer alone is NOT provenance. No camera method is
+    //invoked here, and no native Session copy supplies this word.
+    mode=std::bit_cast<std::int32_t>(race->field8C_);return true;
 }
 }

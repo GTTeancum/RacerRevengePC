@@ -1,3 +1,4 @@
+#include "../../src/game/original_parameter_packet_history50la.h"
 #pragma once
 // Included only by the private Commands header. Native binary32 admission is
 // deliberately narrower than universal EE/FCSR semantics; no target execution.
@@ -32,6 +33,7 @@ inline bool Commands::buildGeometry12ACD0Or12B0D0(Plain133F80& p,
     };
     if(!match(in.topLeft,grid(in.column,in.row))||!match(in.right,grid(in.column+1,in.row))||
        !match(in.below,grid(in.column,in.row+1))||!match(in.diagonal,grid(in.column+1,in.row+1)))return false;
+    rr::game::OriginalParameterPacketHistory50LA::invalidateNative134xxx();
     p.geometryAttempted=true;p.geometryActive=true;p.geometryPolicy=in.policy36C0F0;
     const auto fail=[&](std::uint32_t at) noexcept {
         pc=at;p.failurePC=at;p.geometryActive=false;return false;

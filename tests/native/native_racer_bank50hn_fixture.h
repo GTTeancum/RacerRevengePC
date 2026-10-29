@@ -41,6 +41,7 @@ namespace mc_cold_visibility50MC { class Retirement; }
 namespace ra_source_camera50LA { class OwnershipBridge; }
 namespace original_main_entry50KG {class NativeCollectorFifo50LA;}
 
+namespace native_racer_model50LA {class Owner;}
 namespace native_racer50HN {class Bank;}
 namespace mb_source_trigger50MB {
 class Owner;
@@ -369,6 +370,7 @@ private:
         }
     }
     friend class ra_source_camera50LA::OwnershipBridge;
+    friend class ::native_racer_model50LA::Owner; //Private source handling requires exact live slot.
     friend class ::original_main_entry50KG::NativeCollectorFifo50LA;
     std::uint32_t nativeFifoPins_=0;
     // Only the concrete RA bridge can construct/install the derived pin. No

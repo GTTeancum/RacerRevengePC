@@ -17,6 +17,10 @@
 #include <thread>
 #include <vector>
 
+namespace interactive_continuation50DU {struct Context;}
+namespace original_race_hud_scope50LA {class Registration;class Scope;}
+namespace original_main_entry50KG {struct Application;}
+namespace native_racer50HN {class Bank;}
 namespace live_audio50HF {
 // Existing0..219 reservations remain fixed; original D44 arrays own the
 // separate220..571 suffix and share this SAME sample clock/mixer.
@@ -54,6 +58,48 @@ inline constexpr std::size_t unsupportedTriggerCues() noexcept{return gameplay_a
 // only consume the output's separately owned PCM ring.
 class Owner final {
     friend class rr::platform::OriginalApplicationAural50KG;
+    friend struct ::interactive_continuation50DU::Context;
+    friend class ::original_race_hud_scope50LA::Registration;
+    friend class ::original_race_hud_scope50LA::Scope;
+    // Actual native successful-initializer receipt. These borrow the ONE
+    // Setup/Context human D48 numerical fields; never instantiate a second
+    // state or claim source22A210 allocation/attachment already happened.
+    const ::original_main_entry50KG::Application* speechApplication_=nullptr;
+    const ::native_racer50HN::Bank* speechBankOwner_=nullptr;
+    std::uint64_t speechGeneration_=0;
+    std::uint32_t preparedRacer60_=0xffffffffu;
+    rr::game::PodSpeechCounts50HG* humanSpeechCounts_=nullptr;
+    rr::game::PodSpeechState50HG* humanSpeechState_=nullptr;
+    std::uint32_t* humanSpeechRaw_=nullptr;
+    bool retainNativeHumanSpeechInitialization(const ::original_main_entry50KG::Application& app,
+        const ::native_racer50HN::Bank& bank,std::uint64_t generation,std::uint32_t racer60,
+        rr::game::PodSpeechCounts50HG& counts,rr::game::PodSpeechState50HG& state,
+        std::uint32_t& actualRaw)noexcept {
+        //Called ONLY immediately after actual successful initializeSpeech in
+        //Context's real activation. No RNG, timer, cursor or guest D48 store.
+        if(!prepared_||closed_||speechApplication_||!generation||preparedRacer60_!=racer60||!state.initialized)return false;
+        const auto& c=selected_.speech;
+        if(counts.lowDamage!=c.lowDamage||counts.wallHit!=c.wallHit||counts.passed!=c.passed||
+           counts.attacked!=c.attacked||counts.passing!=c.passing||counts.attacking!=c.attacking||
+           counts.death!=c.death||counts.win!=c.win||counts.lose!=c.lose)return false;
+        speechApplication_=&app;speechBankOwner_=&bank;speechGeneration_=generation;
+        humanSpeechCounts_=&counts;humanSpeechState_=&state;humanSpeechRaw_=&actualRaw;return true;
+    }
+    bool nativeHumanSpeechOwner(const ::original_main_entry50KG::Application& app,
+        const ::native_racer50HN::Bank& bank,std::uint64_t generation,std::uint32_t actualRacer60,
+        std::uint32_t& actualRaw,rr::game::PodSpeechCounts50HG*& counts,
+        rr::game::PodSpeechState50HG*& state)noexcept {
+        counts=nullptr;state=nullptr;
+        if(!prepared_||closed_||speechApplication_!=&app||speechBankOwner_!=&bank||
+           speechGeneration_!=generation||preparedRacer60_!=actualRacer60||
+           humanSpeechRaw_!=&actualRaw||!humanSpeechCounts_||!humanSpeechState_||!humanSpeechState_->initialized)return false;
+        counts=humanSpeechCounts_;state=humanSpeechState_;return true;
+    }
+    void revokeNativeHumanSpeech()noexcept {
+        speechApplication_=nullptr;speechBankOwner_=nullptr;speechGeneration_=0;
+        humanSpeechCounts_=nullptr;humanSpeechState_=nullptr;humanSpeechRaw_=nullptr;
+    }
+
     bool canStopResultsGameplay26D070(const rr::platform::AudioMixer50HD&,
         const rr::platform::RaceAudioGroups50IC&,std::uint64_t)const noexcept;
     bool resultsGameplayStopVoice26D070(std::size_t n,std::size_t& slot)const noexcept {
@@ -177,7 +223,7 @@ public:
                !pod_audio50HE::prepareFromPod01(lap_,mixer_,bank_,lapFirstVoice,lapVoiceCount,
                    error,original_player_identity50IK::archivePath(discRoot,*identity),
                    playerRacer60))return false;
-            prepared_=true;error.clear();return true;
+            preparedRacer60_=playerRacer60;prepared_=true;error.clear();return true;
         }catch(const std::exception& e){error=e.what();return false;}
         catch(...){error="50HF audio preparation failed";return false;}
     }
@@ -321,6 +367,7 @@ public:
     // Destructor is only a fallback; host construction order remains important.
     bool close(rr::platform::AudioOutputDiagnostic50HD& diagnostic)noexcept {
         if(closeComplete_){diagnostic={};return true;}
+        revokeNativeHumanSpeech(); //Native borrows end BEFORE provider/output teardown.
         const bool restored=announcer_.stop();
         mixer_.stopAll();
         const bool result=output_.close(diagnostic);

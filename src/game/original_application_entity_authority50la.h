@@ -1,4 +1,5 @@
 #pragma once
+namespace rr::game { class OriginalLoadingManager33050LA; }
 namespace original_racer_manager_entity { class Owner; }
 namespace original_camera_session50KX { class Session; }
 namespace original_main_entry50KG { struct Application; }
@@ -22,6 +23,8 @@ class OriginalPauseStorage50LA;
 class OriginalApplicationEntityAuthority50LA final {
     friend class OriginalApplicationEntities50LA;
     friend struct ::original_main_entry50KG::Application;
+    friend class OriginalLoadingManager33050LA;
+    friend class OriginalLoadingScreen40Mode0LA;
     friend class OriginalFrontendCameraCold50LA;
     friend class OriginalUiEntityScope50KG;
     friend class OriginalPauseStorage50LA;
@@ -38,6 +41,7 @@ class OriginalApplicationEntityAuthority50LA final {
     friend class rr::platform::OriginalUiLightManagerOwner50KG;
     friend class rr::platform::OriginalApplicationAural50KG;
     friend class ::ra_pod_scene50LA::Owner;
+    friend class OriginalPlayerConstructorPrefix50LA;
     using C=OriginalWreckComponent50LA;
     struct Entry { C* node=nullptr;std::uint64_t generation=0,key=0; };
     // Keep original allocation-free64-node construction. Only an actual cold

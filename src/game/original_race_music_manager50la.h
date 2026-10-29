@@ -1,6 +1,7 @@
 #pragma once
 #include <cstdint>
 #include <memory>
+namespace original_camera_session50KX { class Session; }
 namespace original_main_entry50KG { struct Application; }
 namespace original_race_hud_scope50LA { class Registration; class Scope; }
 namespace rr::platform { class OriginalApplicationAural50KG; }
@@ -26,11 +27,24 @@ class OriginalRaceMusicManager50LA final {
     bool constructed()const noexcept;
     static bool noNativePreparation(const ::original_race_hud_scope50LA::Registration&)noexcept;
     bool acceptNativeChildren(OriginalRaceConstructor50LA&,
-        const std::shared_ptr<const platform::OriginalApplicationAural50KG>&,
+        const std::shared_ptr<platform::OriginalApplicationAural50KG>&,
         OriginalRaceMusicManagerDiagnostic50LA&)noexcept;
+    bool advanceNativeListenerConsumedStep(const OriginalRaceConstructor50LA&,
+        const ::original_race_hud_scope50LA::Registration&,
+        const ::original_camera_session50KX::Session&,std::uint64_t beforeMix,
+        bool heldSourceScene,OriginalRaceMusicManagerDiagnostic50LA&)noexcept;
     bool nativeBackendCurrent(const ::original_race_hud_scope50LA::Registration&)const noexcept;
+    bool invokeNativeContactSpeech1(const OriginalRaceConstructor50LA&,
+        const ::original_race_hud_scope50LA::Registration&,OriginalRaceMusicManagerDiagnostic50LA&)noexcept;
+    bool invokeNativeLowDamageSpeech5(const OriginalRaceConstructor50LA&,
+        const ::original_race_hud_scope50LA::Registration&,OriginalRaceMusicManagerDiagnostic50LA&)noexcept;
+    bool restartNativeFade1AC960(const OriginalRaceConstructor50LA&,
+        const ::original_race_hud_scope50LA::Registration&,OriginalRaceMusicManagerDiagnostic50LA&)noexcept;
     bool readQueuedCount150(const OriginalRaceConstructor50LA&,
         const ::original_race_hud_scope50LA::Registration&,std::uint32_t&)const noexcept;
+    bool dispatchNativeQueuedEvent3_1A4D30(const OriginalRaceConstructor50LA&,
+        const ::original_race_hud_scope50LA::Registration&,std::uint32_t savedInitialCount,
+        OriginalRaceMusicManagerDiagnostic50LA&)noexcept;
     bool clearQueuedCount1A5C40(const OriginalRaceConstructor50LA&,
         const ::original_race_hud_scope50LA::Registration&)noexcept;
     void revokeNativeProviders(const ::original_race_hud_scope50LA::Registration&)noexcept;

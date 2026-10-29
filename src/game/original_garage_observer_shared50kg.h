@@ -1,13 +1,16 @@
 #pragma once
 #include <array>
+#include <atomic>
 #include <cstdint>
 #include <limits>
 #include <memory>
 #include <optional>
 #include <vector>
 #include <exception>
+#include <new>
+namespace ra_cold_aggregate50LA {class Owner;}
 namespace ra_pod_scene50LA {class Owner;}
-namespace rr::platform {class OriginalUiGarageVisibility50KG;class OriginalUiGarageManagerSearch50KG;class OriginalUiLightManagerOwner50KG;class OriginalUiSearchListCold50KG;}
+namespace rr::platform {class OriginalUiCourseOwnedLifecycle50KG;class OriginalUiGarageVisibility50KG;class OriginalUiGarageManagerSearch50KG;class OriginalUiLightManagerOwner50KG;class OriginalUiSearchListCold50KG;}
 namespace rr::game {
 struct OriginalWreckComponent50LA;
 class OriginalNativeListMethodCustody50LA;
@@ -18,10 +21,26 @@ class OriginalNativeListMethodCustody50LA;
 // 169-item accounting is represented explicitly, not as guest-pointer storage.
 class OriginalGarageObserverShared50KG final {
     friend class rr::platform::OriginalUiGarageVisibility50KG;
+    friend class rr::platform::OriginalUiCourseOwnedLifecycle50KG;
     friend class rr::platform::OriginalUiGarageManagerSearch50KG;
     friend class OriginalApplicationEntities50LA;
     friend class rr::platform::OriginalUiLightManagerOwner50KG;
     friend class ::ra_pod_scene50LA::Owner;
+    friend class ::ra_cold_aggregate50LA::Owner;
+    // Owner-neutral actual process assertion records reached by model28E8A0
+    // and Observer2809C0/281490. No separate per-Course copy or readiness flag.
+    struct AssertionRecords {
+        std::array<std::atomic<std::uint8_t>,6> guards{};
+        std::array<std::atomic<std::int32_t>,6> words{};
+    };
+    static AssertionRecords& assertions()noexcept {static AssertionRecords records;return records;}
+    static bool assertion(std::size_t i,bool condition)noexcept {
+        if(i>=6)return false;auto& a=assertions();
+        if(!a.guards[i].load(std::memory_order_acquire)){
+            a.words[i].store(1,std::memory_order_relaxed);a.guards[i].store(1,std::memory_order_release);
+        }
+        return !a.words[i].load(std::memory_order_relaxed)||condition;
+    }
     struct Link105720 {
         Link105720* next00=nullptr;
         const OriginalWreckComponent50LA* child04=nullptr;
@@ -73,8 +92,16 @@ class OriginalGarageObserverShared50KG final {
         }
         return false;
     }
-    bool coherent()const noexcept {
-        if(observers443140_!=owners_.size()||bool(allocator443138_)!=bool(observers443140_))return false;
+    //Exclusive native custody for one executing fresh280890 frame. These are
+    //not duplicate guest globals. The existing443138/443140/owners remain sole authority.
+    const void* sourceObserver280890_=nullptr;
+    std::uint32_t sourceObserverBaselineCount_=0;
+    const Allocator105620* sourceObserverBaselineAllocator_=nullptr;
+    bool sourceObserverAllocatorReached_=false,sourceObserverCountStored_=false;
+    bool coherent()const noexcept {return !sourceObserver280890_&&coherentState(false);}
+    bool coherentState(bool sourceFrame)const noexcept {
+        if(observers443140_!=owners_.size()||
+           (!sourceFrame&&bool(allocator443138_)!=bool(observers443140_)))return false;
         for(std::size_t i=0;i<owners_.size();++i){if(!owners_[i])return false;
             for(std::size_t j=0;j<i;++j)if(owners_[i]==owners_[j])return false;}
         if(!allocator443138_)return true;
@@ -103,6 +130,56 @@ class OriginalGarageObserverShared50KG final {
             if(++freeTotal>usedTotal||!allocatedRecord(record)||record->nativeBorrower)return false;
         }
         return freeTotal+liveTotal==usedTotal;
+    }
+    bool beginSourceObserver280890(const void* owner)noexcept {
+        //Native bookkeeping reserve occurs before any represented280890 instruction.
+        //Failure is a native admission refusal, never a guest allocation return.
+        if(!owner||!coherent()||ownerRecorded(owner)||
+           observers443140_==std::numeric_limits<std::uint32_t>::max())return false;
+        try{owners_.reserve(owners_.size()+1u);}catch(...){return false;}
+        sourceObserver280890_=owner;sourceObserverBaselineCount_=observers443140_;
+        sourceObserverBaselineAllocator_=allocator443138_.get();
+        sourceObserverAllocatorReached_=sourceObserverCountStored_=false;return true;
+    }
+    bool sourceObserverCurrent280890(const void* owner)const noexcept {
+        if(!owner||sourceObserver280890_!=owner||!coherentState(true)||
+           observers443140_!=sourceObserverBaselineCount_+(sourceObserverCountStored_?1u:0u)||
+           (sourceObserverBaselineAllocator_&&allocator443138_.get()!=sourceObserverBaselineAllocator_))return false;
+        if(!sourceObserverAllocatorReached_&&allocator443138_.get()!=sourceObserverBaselineAllocator_)return false;
+        if(sourceObserverCountStored_)
+            return !owners_.empty()&&owners_.back()==owner&&ownerRecorded(owner);
+        return !ownerRecorded(owner);
+    }
+    bool sourceObserverAllocator2808AC(const void* owner,std::uint32_t& pc)noexcept {
+        pc=0x2808acu;
+        if(!sourceObserverCurrent280890(owner)||sourceObserverAllocatorReached_)return false;
+        if(!allocator443138_){
+            pc=0x2808b8u;
+            //Typed host size differs from guest38. The actual allocation is nullable.
+            //105620/1048F0's represented stores are supplied by this same pool type;
+            //its untouched34 remains unknown. No blocks or links are allocated.
+            std::unique_ptr<Allocator105620> returned(new(std::nothrow) Allocator105620);
+            pc=0x2808dcu;allocator443138_=std::move(returned); //Includes genuine NULL.
+        }
+        sourceObserverAllocatorReached_=true;pc=0x2808e0u;return true;
+    }
+    bool sourceObserverIncrement28090C(const void* owner,std::uint32_t& pc)noexcept {
+        pc=0x2808fcu;
+        if(!sourceObserverCurrent280890(owner)||!sourceObserverAllocatorReached_||sourceObserverCountStored_)return false;
+        //Capacity was reserved before the source frame; pointer insertion cannot allocate.
+        owners_.push_back(owner);
+        pc=0x28090cu;++observers443140_;sourceObserverCountStored_=true;
+        pc=0x280918u;return true; //NULL443138 does not suppress the source count or return.
+    }
+    bool abortSourceObserver280890(const void* owner)noexcept {
+        if(!sourceObserverCurrent280890(owner)||ownerHasLinks(owner))return false;
+        if(sourceObserverCountStored_){owners_.pop_back();--observers443140_;}
+        //Native-only unwind of this invocation. Existing pool/chunks/links and
+        //other owners are untouched. No guest280920 completion is claimed.
+        if(!sourceObserverBaselineAllocator_)allocator443138_.reset();
+        sourceObserver280890_=nullptr;sourceObserverBaselineAllocator_=nullptr;
+        sourceObserverBaselineCount_=0;sourceObserverAllocatorReached_=sourceObserverCountStored_=false;
+        return coherent();
     }
     bool idleForApplicationRelease()const noexcept {
         return coherent()&&!observers443140_&&!allocator443138_&&owners_.empty();
@@ -175,7 +252,7 @@ class OriginalGarageObserverShared50KG final {
     }
 public:
     OriginalGarageObserverShared50KG()=default;
-    ~OriginalGarageObserverShared50KG(){if(observers443140_||allocator443138_)std::terminate();}
+    ~OriginalGarageObserverShared50KG(){if(sourceObserver280890_||observers443140_||allocator443138_)std::terminate();}
     OriginalGarageObserverShared50KG(const OriginalGarageObserverShared50KG&)=delete;
     OriginalGarageObserverShared50KG& operator=(const OriginalGarageObserverShared50KG&)=delete;
 };

@@ -15,8 +15,10 @@
 #include "../../../src/game/original_race_record_qualification50kg.h"
 #include "../../../src/game/original_race_rival_qualification50kg.h"
 
+namespace original_results_roster50LA { class Read; }
 namespace original_main_entry50KG { struct Application; }
 namespace original_racer_manager_entity { class Owner; }
+namespace ra_cold_aggregate50LA { class Owner; }
 namespace rr::game { struct OriginalUiGarageState50KG; struct ControlPresets49D; struct OriginalUiGameSettingsProfile50KG; class OriginalResults10450LA; class OriginalRaceConstructor50LA; struct LapRecordQueryResult50ID; }
 
 namespace rr::platform {
@@ -223,7 +225,12 @@ public:
     // Restart/leave must call this before destroying its real timing manager.
     void cancelTournamentResultForRace(const game::LapTimingManager50ID&) noexcept;
 private:
+    friend class ::ra_cold_aggregate50LA::Owner;
+    //Actual1B44E8 synchronous byte read from THIS profile's same common owner.
+    //No snapshot/route readiness, mutation, reset or caller-provided source bits.
+    bool readWorldProfileByte1B44E8(const OriginalUiMainProfile50KG&,std::uint8_t&)const noexcept;
     friend class rr::game::OriginalResults10450LA;
+    friend class ::original_results_roster50LA::Read;
     // Reached DONE strcpy only. Preserves unknown suffix; no dirty/save/ack.
     bool storeResultsName1CA528(std::uint32_t resultsMode,std::string_view,
         OriginalUiRiderProfileStamp50KG expected)noexcept;
@@ -322,6 +329,11 @@ private:
     // Actual Results1CA6E4 bit store, not persistence or a save acknowledgement.
     bool markResultsHallDirty1CA6E4(OriginalUiRiderProfileStamp50KG expected)noexcept;
     bool commitRacerManager1AD520(const CourseRaceSelection& expected,CourseRaceSelection& actual)noexcept;
+    //Private current1ADF80 Profile2DC read. No snapshot/selected-ID receipt.
+    //Human0 reads1125D>>3;human1 reads1125E&31;others are uninitialized
+    //in original s1 and must not receive a fabricated value.
+    bool readHumanPodSelection1ADFF4(const OriginalUiMainProfile50KG& actualCommon,
+        std::uint32_t humanIndex,std::uint32_t& selected)const noexcept;
     // Actual Application2DC owner only. Called at the future admitted race
     // constructor boundary, never on a page proposal or resource prewarm.
     // Represents only proven7E4 bit0; upper seven bits stay unrepresented.

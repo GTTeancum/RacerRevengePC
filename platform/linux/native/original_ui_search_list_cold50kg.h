@@ -1,7 +1,10 @@
 #pragma once
+namespace rr::game { class OriginalLoadingManager33050LA; class OriginalUiEntityScope50KG; }
 // Cold constructor plus private exact manager Camera membership. No public member or draw API.
 #include "../../../src/game/original_application_entities50la.h"
 #include "../../../src/game/search_cold50bu.h"
+#include "../../../src/game/original_selected_array_guards27ed40.h"
+#include "../../../src/game/original_camera_observer_assertions50kg.h"
 #include <memory>
 #include <array>
 #include <new>
@@ -10,6 +13,7 @@ namespace original_main_entry50KG { struct Application; }
 namespace rr::platform {
 class OriginalUiGarageManagerSearch50KG;
 class OriginalUiLightManagerOwner50KG;
+class OriginalUiCourseOwnedLifecycle50KG;
 enum class OriginalUiSearchListColdStatus50KG : std::uint8_t {
     complete,input,identity,alreadyStarted,allocation,registry,phase
 };
@@ -20,7 +24,10 @@ struct OriginalUiSearchListColdDiagnostic50KG {
 };
 class OriginalUiSearchListCold50KG final {
     friend struct ::original_main_entry50KG::Application;
+    friend class rr::game::OriginalLoadingManager33050LA;
+    friend class rr::game::OriginalUiEntityScope50KG;
     friend class OriginalUiGarageManagerSearch50KG;
+    friend class OriginalUiCourseOwnedLifecycle50KG;
     friend class OriginalUiLightManagerOwner50KG;
     using D=OriginalUiSearchListColdDiagnostic50KG;
     using S=OriginalUiSearchListColdStatus50KG;
@@ -54,12 +61,211 @@ class OriginalUiSearchListCold50KG final {
     // never a truncated guest/host pointer. It is not exposed as a guest address.
     static constexpr std::uint32_t cameraToken_=4;
 
+    // Native adaptation: this List's fixed inline words/pointer slot were
+    // admitted with its wrapper, before source membership. Lazy first-block
+    // adoption publishes that retained backing; it does NOT emulate original
+    // malloc-null timing, issue a malloc-success receipt, or increase capacity.
+    // Typed Course model identities in the SAME source30/34/38/3C List.
+    // No selected-buffer writes or collection receipt accompanies membership.
+    std::array<const game::OriginalWreckComponent50LA*,84> courseMembers_{};
+    std::array<std::uint32_t,84> courseSlots_{};
+    // Separate typed Page camera in this SAME List block history. Token340
+    // cannot alias any of the84 model-ordinal tokens; no guest pointer cast.
+    const game::OriginalWreckComponent50LA* courseCameraMember_=nullptr;
+    const game::OriginalWreckComponent50LA* courseCameraPendingMember_=nullptr;
+    std::uint32_t courseCameraSlot_=0,courseCameraPendingSlot_=0;
+    static constexpr std::uint32_t courseCameraToken_=85u*4u;
+    std::size_t coursePendingOrdinal_=84;std::uint32_t coursePendingSlot_=0;
+    const std::uint32_t* courseBlockPointers_[1]{};
+    const std::uint32_t* const* courseTable3C_=nullptr;
+    bool courseMembersEmpty()const noexcept {
+        if(courseCameraMember_||courseCameraSlot_)return false;
+        for(std::size_t i=0;i<courseMembers_.size();++i)if(courseMembers_[i]||courseSlots_[i])return false;
+        return true;
+    }
+    bool courseStorageCurrent()const noexcept {
+        if((coursePendingOrdinal_==84)!=(!coursePendingSlot_)||coursePendingOrdinal_>84||
+           bool(courseCameraPendingMember_)!=bool(courseCameraPendingSlot_)||
+           (coursePendingSlot_&&courseCameraPendingSlot_)||bool(courseCameraMember_)!=bool(courseCameraSlot_))return false;
+        if(managerCamera_||managerTable3C_||managerBlockPointers_[0]||!lightMembersEmpty()||lightTable3C_)return false;
+        if(!storage_.blockCount)return !courseTable3C_&&!courseBlockPointers_[0]&&courseMembersEmpty()&&
+            !storage_.freeHead&&(derivedConstructed_?(storage_.perBlock==1024&&storage_.lastUsed==1024):
+                (!storage_.perBlock&&!storage_.lastUsed));
+        if(!derivedConstructed_||storage_.perBlock!=1024||storage_.blockCount!=1||
+           storage_.lastUsed>85||courseTable3C_!=courseBlockPointers_||courseBlockPointers_[0]!=storage_.words)return false;
+        std::array<bool,85> occupied{};std::size_t live=0;
+        for(std::size_t i=0;i<courseMembers_.size();++i){
+            const auto slot=courseSlots_[i];const auto* member=courseMembers_[i];
+            if(bool(slot)!=bool(member))return false;if(!member)continue;
+            if(!slot||slot>storage_.lastUsed||occupied[slot-1]||storage_.words[slot-1]!=(i+1u)*4u)return false;
+            for(std::size_t j=0;j<i;++j)if(courseMembers_[j]==member)return false;
+            occupied[slot-1]=true;++live;
+        }
+        if(courseCameraMember_){
+            if(!courseCameraSlot_||courseCameraSlot_>storage_.lastUsed||occupied[courseCameraSlot_-1]||
+               storage_.words[courseCameraSlot_-1]!=courseCameraToken_)return false;
+            for(auto* model:courseMembers_)if(model==courseCameraMember_)return false;
+            occupied[courseCameraSlot_-1]=true;++live;
+        }
+        std::size_t free=0;
+        for(auto slot=storage_.freeHead;slot;){
+            if(slot>storage_.lastUsed||occupied[slot-1]||++free>storage_.lastUsed)return false;
+            occupied[slot-1]=true;const auto word=storage_.words[slot-1];
+            if((word&3u)!=2u)return false;slot=word>>2;
+        }
+        return live+free==storage_.lastUsed;
+    }
+    bool courseHistoryCurrent(const OriginalUiCourseOwnedLifecycle50KG* owner,
+        const original_main_entry50KG::Application* issuer,
+        const std::shared_ptr<game::OriginalApplicationEntities50LA>& app)const noexcept {
+        return owner&&courseManagerOwner_==owner&&!managerOwner_&&!lightManagerOwner_&&!loadingManagerOwner_&&
+            same(issuer,app)&&attempted_&&!released_&&!selectedCount18_&&selectedGrowth20_==30&&selectedCapacity24_==30&&
+            selectedOwned28Bit0_&&usage10_<=2&&reference00_==1u+usage10_&&courseStorageCurrent();
+    }
+    bool selectCourseModelSlot(const OriginalUiCourseOwnedLifecycle50KG* owner,
+        const original_main_entry50KG::Application* issuer,
+        const std::shared_ptr<game::OriginalApplicationEntities50LA>& app,
+        std::size_t ordinal,const game::OriginalWreckComponent50LA& model,std::uint32_t& slot,D& d)noexcept {
+        d={};if(!courseHistoryCurrent(owner,issuer,app)||ordinal<8||ordinal>=courseMembers_.size()||
+           courseMembers_[ordinal]||courseSlots_[ordinal]||coursePendingSlot_||courseCameraPendingSlot_||usage10_!=2||reference00_!=3||!derivedConstructed_||
+           !soultreeKnown_||!searchableKnown_)return fail(d,S::phase,0x27E3B0);
+        if(courseCameraMember_==&model)return fail(d,S::identity,0x27E3B0);
+        for(const auto* p:courseMembers_)if(p==&model)return fail(d,S::identity,0x27E3B0);
+        auto next=storage_;std::uint32_t selected=0;
+        const auto result=next.blockCount?game::selectSearchSlot50BS(next,0,selected):game::adoptFirstSearchBlock50BU(next,selected);
+        if(result!=game::SearchStorageStatus50BS::Complete||!selected||selected>85)
+            return fail(d,S::phase,0x27E3B0);
+        // v20 selection publishes first block/table before caller assertion;
+        // existing free/tail selection has no source reservation write.
+        storage_.blockCount=next.blockCount;storage_.lastUsed=next.lastUsed;
+        courseBlockPointers_[0]=storage_.words;courseTable3C_=courseBlockPointers_;
+        coursePendingOrdinal_=ordinal;coursePendingSlot_=slot=selected;
+        d={S::complete,0x27E570,true};return true;
+    }
+    bool insertCourseModelSelected(const OriginalUiCourseOwnedLifecycle50KG* owner,
+        const original_main_entry50KG::Application* issuer,
+        const std::shared_ptr<game::OriginalApplicationEntities50LA>& app,
+        std::size_t ordinal,const game::OriginalWreckComponent50LA& model,std::uint32_t slot,D& d)noexcept {
+        d={};if(!courseHistoryCurrent(owner,issuer,app)||ordinal>=84||coursePendingOrdinal_!=ordinal||
+            coursePendingSlot_!=slot||!slot||courseMembers_[ordinal]||courseSlots_[ordinal]||usage10_!=2)
+            return fail(d,S::phase,0x27E570);
+        auto next=storage_;
+        if(game::insertSearchSlot50BS(next,slot,std::uint32_t(ordinal+1u)*4u)!=game::SearchStorageStatus50BS::Complete)
+            return fail(d,S::phase,0x27E578);
+        storage_.lastUsed=next.lastUsed;storage_.freeHead=next.freeHead;storage_.words[slot-1]=next.words[slot-1];
+        courseMembers_[ordinal]=&model;courseSlots_[ordinal]=slot;coursePendingOrdinal_=84;coursePendingSlot_=0;
+        d={S::complete,0x27E5A8,true};return true;
+    }
+    bool cancelCourseSelectionNative(std::size_t ordinal,std::uint32_t slot)noexcept {
+        if(coursePendingOrdinal_!=ordinal||coursePendingSlot_!=slot||!slot||!courseStorageCurrent())return false;
+        coursePendingOrdinal_=84;coursePendingSlot_=0;return true;
+    }
+    bool courseModelCurrent(const OriginalUiCourseOwnedLifecycle50KG* owner,
+        const original_main_entry50KG::Application* issuer,
+        const std::shared_ptr<game::OriginalApplicationEntities50LA>& app,
+        std::size_t ordinal,const game::OriginalWreckComponent50LA& model,std::uint32_t slot)const noexcept {
+        return courseHistoryCurrent(owner,issuer,app)&&ordinal<courseMembers_.size()&&
+            courseMembers_[ordinal]==&model&&courseSlots_[ordinal]==slot&&slot&&usage10_==2&&reference00_==3;
+    }
+    bool removeCourseModel(const OriginalUiCourseOwnedLifecycle50KG* owner,
+        const original_main_entry50KG::Application* issuer,
+        const std::shared_ptr<game::OriginalApplicationEntities50LA>& app,
+        std::size_t ordinal,const game::OriginalWreckComponent50LA& model,std::uint32_t slot,D& d)noexcept {
+        d={};if(!courseModelCurrent(owner,issuer,app,ordinal,model,slot))return fail(d,S::identity,0x27E5B0);
+        auto next=storage_;
+        if(game::removeSearchSlot50BS(next,slot,std::uint32_t(ordinal+1u)*4u)!=game::SearchStorageStatus50BS::Complete)
+            return fail(d,S::phase,0x27E5B0);
+        storage_.freeHead=next.freeHead;storage_.words[slot-1]=next.words[slot-1];
+        courseMembers_[ordinal]=nullptr;courseSlots_[ordinal]=0; // Native identities, not source block zeroing.
+        d={S::complete,0x27E5B0,true};return true;
+    }
+    bool selectCourseCameraSlot(const OriginalUiCourseOwnedLifecycle50KG* owner,
+        const original_main_entry50KG::Application* issuer,
+        const std::shared_ptr<game::OriginalApplicationEntities50LA>& app,
+        const game::OriginalWreckComponent50LA& camera,std::uint32_t& slot,D& d)noexcept {
+        d={};if(!courseHistoryCurrent(owner,issuer,app)||courseCameraMember_||courseCameraSlot_||
+           courseCameraPendingSlot_||coursePendingSlot_||usage10_!=2||reference00_!=3||!derivedConstructed_||
+           !soultreeKnown_||!searchableKnown_||camera.kind!=game::OriginalWreckComponentKind50LA::camera236180)
+            return fail(d,S::phase,0x27E3B0);
+        for(auto* model:courseMembers_)if(model==&camera)return fail(d,S::identity,0x27E3B0);
+        auto next=storage_;std::uint32_t selected=0;
+        const auto result=next.blockCount?game::selectSearchSlot50BS(next,0,selected):game::adoptFirstSearchBlock50BU(next,selected);
+        if(result!=game::SearchStorageStatus50BS::Complete||!selected||selected>85)return fail(d,S::phase,0x27E3B0);
+        storage_.blockCount=next.blockCount;storage_.lastUsed=next.lastUsed;
+        courseBlockPointers_[0]=storage_.words;courseTable3C_=courseBlockPointers_;
+        courseCameraPendingMember_=&camera;courseCameraPendingSlot_=slot=selected;
+        d={S::complete,0x27E570,true};return true;
+    }
+    bool insertCourseCameraSelected(const OriginalUiCourseOwnedLifecycle50KG* owner,
+        const original_main_entry50KG::Application* issuer,
+        const std::shared_ptr<game::OriginalApplicationEntities50LA>& app,
+        const game::OriginalWreckComponent50LA& camera,std::uint32_t slot,D& d)noexcept {
+        d={};if(!courseHistoryCurrent(owner,issuer,app)||courseCameraPendingMember_!=&camera||
+           courseCameraPendingSlot_!=slot||!slot||courseCameraMember_||courseCameraSlot_||usage10_!=2)
+            return fail(d,S::phase,0x27E570);
+        auto next=storage_;
+        if(game::insertSearchSlot50BS(next,slot,courseCameraToken_)!=game::SearchStorageStatus50BS::Complete)
+            return fail(d,S::phase,0x27E578);
+        storage_.lastUsed=next.lastUsed;storage_.freeHead=next.freeHead;storage_.words[slot-1]=next.words[slot-1];
+        courseCameraMember_=&camera;courseCameraSlot_=slot;courseCameraPendingMember_=nullptr;courseCameraPendingSlot_=0;
+        d={S::complete,0x27E5A8,true};return true;
+    }
+    bool courseCameraCurrent(const OriginalUiCourseOwnedLifecycle50KG* owner,
+        const original_main_entry50KG::Application* issuer,
+        const std::shared_ptr<game::OriginalApplicationEntities50LA>& app,
+        const game::OriginalWreckComponent50LA& camera,std::uint32_t slot)const noexcept {
+        return courseHistoryCurrent(owner,issuer,app)&&courseCameraMember_==&camera&&courseCameraSlot_==slot&&
+            slot&&usage10_==2&&reference00_==3;
+    }
+    bool cancelCourseCameraSelectionNative(const game::OriginalWreckComponent50LA& camera,std::uint32_t slot)noexcept {
+        if(courseCameraPendingMember_!=&camera||courseCameraPendingSlot_!=slot||!slot||!courseStorageCurrent())return false;
+        courseCameraPendingMember_=nullptr;courseCameraPendingSlot_=0;return true;
+    }
+    bool removeCourseCamera(const OriginalUiCourseOwnedLifecycle50KG* owner,
+        const original_main_entry50KG::Application* issuer,
+        const std::shared_ptr<game::OriginalApplicationEntities50LA>& app,
+        const game::OriginalWreckComponent50LA& camera,std::uint32_t slot,D& d)noexcept {
+        d={};if(!courseCameraCurrent(owner,issuer,app,camera,slot))return fail(d,S::identity,0x27E5B0);
+        auto next=storage_;
+        if(game::removeSearchSlot50BS(next,slot,courseCameraToken_)!=game::SearchStorageStatus50BS::Complete)
+            return fail(d,S::phase,0x27E5B0);
+        storage_.freeHead=next.freeHead;storage_.words[slot-1]=next.words[slot-1];
+        courseCameraMember_=nullptr;courseCameraSlot_=0;d={S::complete,0x27E5B0,true};return true;
+    }
+    bool retireCourseBlockHistoryNative()noexcept {
+        if(!courseStorageCurrent()||!courseMembersEmpty()||coursePendingSlot_||courseCameraPendingSlot_||selectedCount18_)return false;
+        courseTable3C_=nullptr;courseBlockPointers_[0]=nullptr;
+        // Actual native backing ceases with List disposal; never reset the
+        // reached source lastUsed/freeHead/blockCount to a fake cold state.
+        return true;
+    }
     bool attempted_=false,derivedConstructed_=false,complete_=false,released_=false;
+    bool sourceSelectedGuards_=false,selectedAllocationAttempted_=false;
+    game::selected_array_guards27ED40::History selectedGuardHistory_;
+    bool sourceSelectedGuardCutCurrent()const noexcept {
+        return sourceSelectedGuards_&&attempted_&&!released_&&!selectedAllocationAttempted_&&
+            game::selected_array_guards27ED40::preflight(selectedGuardHistory_)&&
+            selectedGuardHistory_.entered&&!selectedGuardHistory_.returned&&
+            reference00_==1&&!usage10_&&!selected1C_&&!selectedCount18_&&!selectedGrowth20_&&
+            !selectedCapacity24_&&!selectedOwned28Bit0_&&!soultreeKnown_&&!searchableKnown_&&
+            !derivedConstructed_&&!complete_&&!managerAliases_&&!managerReleasedAliases_&&
+            !lightAliases_&&!lightReleasedAliases_&&!storage_.perBlock&&!storage_.blockCount&&
+            !storage_.lastUsed&&!storage_.freeHead;
+    }
+    bool selectedConstructionCurrent()const noexcept {
+        if(sourceSelectedGuards_&&(!game::selected_array_guards27ED40::preflight(selectedGuardHistory_)||
+            !selectedGuardHistory_.entered))return false;
+        if(sourceSelectedGuards_&&!selectedGuardHistory_.returned)return sourceSelectedGuardCutCurrent();
+        return selectedAllocationAttempted_&&!selectedCount18_&&selectedGrowth20_==30&&
+            selectedCapacity24_==30&&selectedOwned28Bit0_;
+    }
     // Manager2A0 is ONE list, aliased by the same node's34/38. This native
     // authority is distinct from the four independent Scene search lists.
     const OriginalUiGarageManagerSearch50KG* managerOwner_=nullptr;
     std::uint8_t managerAliases_=0,managerReleasedAliases_=0;
     const OriginalUiLightManagerOwner50KG* lightManagerOwner_=nullptr;
+    const rr::game::OriginalLoadingManager33050LA* loadingManagerOwner_=nullptr;
+    const OriginalUiCourseOwnedLifecycle50KG* courseManagerOwner_=nullptr;
     std::uint8_t lightAliases_=0,lightReleasedAliases_=0;
     OriginalUiSearchListCold50KG(const original_main_entry50KG::Application& creator,
         std::shared_ptr<game::OriginalApplicationEntities50LA> application)noexcept
@@ -72,18 +278,25 @@ class OriginalUiSearchListCold50KG final {
         return creator==creator_&&application&&application==application_;
     }
     bool construct27E260(const original_main_entry50KG::Application* creator,
-        const std::shared_ptr<game::OriginalApplicationEntities50LA>& application,D& d)noexcept {
+        const std::shared_ptr<game::OriginalApplicationEntities50LA>& application,D& d,
+        bool sourceSelectedGuards=false)noexcept {
         d={};if(!same(creator,application))return fail(d,S::identity,0x27E260);
         if(attempted_||released_)return fail(d,S::alreadyStarted,0x27E260);
         if(!application_->application10())return fail(d,S::input,0x27E260);
-        attempted_=true;
+        // Only admitted legacy invocations invalidate; rejected inputs do not.
+        if(!sourceSelectedGuards)game::selected_array_guards27ED40::invalidateNative();
+        sourceSelectedGuards_=sourceSelectedGuards;attempted_=true;
         reference00_=1; //27E9DC ->1048F0. SearchList is NOT Entity141300.
         //27ED10 initializes selected-array scalars and clears owned bit0.
         selectedCount18_=0;selectedGrowth20_=0;selectedCapacity24_=0;
         selectedOwned28Bit0_=false;
         usage10_=0; //27EA0C, before27ED40.
+        if(sourceSelectedGuards_){std::uint32_t guardPC=0;
+            if(!game::selected_array_guards27ED40::runFresh30(selectedGuardHistory_,guardPC))
+                return fail(d,S::phase,guardPC);}
         //27ED40(30,30): cold fresh positive-capacity branch. Unused elements
         // remain unread/uninitialized; no synthetic selected Entity is stored.
+        selectedAllocationAttempted_=true;
         selected1C_.reset(new(std::nothrow) const game::OriginalWreckComponent50LA*[30]);
         selectedGrowth20_=30;selectedCapacity24_=30;selectedOwned28Bit0_=true;
         //27E9D0 ignores allocation return: actual registry history still runs.
@@ -103,21 +316,21 @@ class OriginalUiSearchListCold50KG final {
     bool releaseCold(const original_main_entry50KG::Application* creator,
         const std::shared_ptr<game::OriginalApplicationEntities50LA>& application,D& d)noexcept {
         d={};if(!same(creator,application))return fail(d,S::identity,0x104970);
-        if(managerOwner_||lightManagerOwner_)return fail(d,S::phase,0x104970);
+        if(managerOwner_||lightManagerOwner_||loadingManagerOwner_||courseManagerOwner_)return fail(d,S::phase,0x104970);
         if(released_)return true;
         if(!attempted_){released_=true;return true;}
         // No retain, member insertion, zone or observer API exists. Fail closed
         // if a future extension changes that invariant without joining teardown.
-        if(reference00_!=1||usage10_||selectedCount18_||selectedGrowth20_!=30||selectedCapacity24_!=30||
-           !selectedOwned28Bit0_||storage_.blockCount||storage_.freeHead||
+        if(reference00_!=1||usage10_||!selectedConstructionCurrent()||storage_.blockCount||storage_.freeHead||
            (derivedConstructed_?(storage_.perBlock!=0x400||storage_.lastUsed!=0x400):
                                 (storage_.perBlock!=0||storage_.lastUsed!=0)))
             return fail(d,S::phase,0x27E2C0);
-        --reference00_; //104970 last release dispatches actual derived/base teardown.
+        const bool guardCut=sourceSelectedGuardCutCurrent();
+        --reference00_; //Native withdrawal for an unreturned source guard cut; otherwise104970.
         //27E2C0's block loop/table free is absent for this real zero-block state.
         //27EA70 -> free selected array ->104910. No Entity counter decrement.
         selected1C_.reset();
-        released_=true;complete_=false;d={S::complete,derivedConstructed_?0x27E384u:0x27EAE0u,true};return true;
+        released_=true;complete_=false;d={S::complete,guardCut?0u:(derivedConstructed_?0x27E384u:0x27EAE0u),true};return true;
     }
     bool managerHistoryCurrent(const OriginalUiGarageManagerSearch50KG* owner,
         const original_main_entry50KG::Application* creator,
@@ -222,7 +435,7 @@ class OriginalUiSearchListCold50KG final {
         return owner&&owner==lightManagerOwner_&&!managerOwner_&&same(creator,application)&&attempted_&&!released_&&
             lightAliases_<=2&&lightReleasedAliases_<=lightAliases_&&
             reference00_==1u+lightAliases_-lightReleasedAliases_&&usage10_==lightAliases_&&
-            !selectedCount18_&&selectedGrowth20_==30&&selectedCapacity24_==30&&selectedOwned28Bit0_&&
+            selectedConstructionCurrent()&&
             !storage_.blockCount&&!storage_.freeHead&&
             (derivedConstructed_?(storage_.perBlock==0x400&&storage_.lastUsed==0x400):
                                  (!storage_.perBlock&&!storage_.lastUsed));
@@ -298,7 +511,9 @@ class OriginalUiSearchListCold50KG final {
         const std::shared_ptr<game::OriginalApplicationEntities50LA>& application,D& d)noexcept {
         d={};if(!lightHistoryCurrent(owner,creator,application)||!lightMembersEmpty()||reference00_!=1||
             lightAliases_!=lightReleasedAliases_)return fail(d,S::phase,0x1481A8);
-        --reference00_;lightTable3C_=nullptr;lightBlockPointers_[0]=nullptr;selected1C_.reset();released_=true;complete_=false;d={S::complete,0x1481A8,true};return true;
+        const bool guardCut=sourceSelectedGuardCutCurrent();
+        --reference00_;lightTable3C_=nullptr;lightBlockPointers_[0]=nullptr;selected1C_.reset();released_=true;complete_=false;
+        d={S::complete,guardCut?0u:0x1481A8u,true};return true;
     }
 public:
     struct Snapshot {

@@ -3,6 +3,7 @@
 namespace ra_cold_aggregate50LA {
 bool Owner::continueNativeParticleServices274370(const original_main_entry50KG::Application& app,
     std::uint32_t& pc)noexcept {
+    if(sourceParticleDescriptorPhase_!=SourceParticleDescriptorPhase::unreached)return false;
     pc=0x1aa2c4;
     if(nativeScbThread_!=std::this_thread::get_id()||nativeScbRevoked_||
        !nativeEmptyToyService1B4328Complete_||!nativeCollisionServiceComplete_||
@@ -17,7 +18,7 @@ bool Owner::continueNativeParticleServices274370(const original_main_entry50KG::
        particles_->generation_!=worldEntity_.sessionGeneration||particles_->constructed_!=4u||
        !nativeParticleList3D8_)return false;
     auto& list=*nativeParticleList3D8_;
-    if(list.serviceTerminal||!list.complete||!list.counted||list.count30!=4||
+    if(list.sourceMode||list.serviceTerminal||!list.complete||!list.counted||list.count30!=4||
        list.published!=4u||list.loaded!=4u||!list.pointers34||
        list.actualOwner!=particles_.get()||list.servicesCompleted>4u||
        list.entity.reference00!=1||list.entity.objectKey!=key(&list.entity)||

@@ -21,16 +21,25 @@ const Section& section(const std::vector<Section>& document,const char* name,con
 OriginalGcSprayStatus50KG readOriginalWreckExplosionDefinition50LA(
     const std::vector<std::uint8_t>& bytes,OriginalWreckExplosionDefinition50LA& out,
     assets::OriginalUiPageDiagnostic50KG& d) noexcept {
+    return readOriginalWreckExplosionDefinition50LA(bytes,OriginalWreckExplosionMember50LA::groupExplosion,out,d);
+}
+OriginalGcSprayStatus50KG readOriginalWreckExplosionDefinition50LA(
+    const std::vector<std::uint8_t>& bytes,OriginalWreckExplosionMember50LA member,
+    OriginalWreckExplosionDefinition50LA& out,assets::OriginalUiPageDiagnostic50KG& d) noexcept {
     d={};try {
         std::vector<Section> document;
-        if(!readOriginalGcParticleText50KG(bytes,1169,
-           "69e5c5fa4c1394c15162580853149abbe4659e4a673f8100dfa512c20ddf69c4",document))
+        const auto ordinal=static_cast<unsigned>(member);
+        constexpr std::size_t sizes[]={1169,1170};
+        constexpr const char* hashes[]={
+            "69e5c5fa4c1394c15162580853149abbe4659e4a673f8100dfa512c20ddf69c4",
+            "09cf8a479d95e48a2346fbe40bafa1d99117dcd92bba489495806f2844f68e5b"};
+        if(ordinal>=2||!readOriginalGcParticleText50KG(bytes,sizes[ordinal],hashes[ordinal],document))
             return Status::assetIdentity;
         if(std::fegetround()!=FE_TONEAREST){d.sourcePC=0x15ef70;return Status::arithmetic;}
         const Section absent{};const auto& general=section(document,"General Info",absent);
         const auto& properties=section(document,"Properties",absent);
         const auto& animation=section(document,"Animation",absent);
-        OriginalWreckExplosionDefinition50LA f;f.groundLevel=std::numeric_limits<float>::max();
+        OriginalWreckExplosionDefinition50LA f;f.member=member;f.groundLevel=std::numeric_limits<float>::max();
         auto number=[&](const Section& s,const char* key,float fallback,float& value,std::uint32_t pc){
             return assets::originalUiNumber50KG(s,key,fallback,value,d,pc);};
         if(!assets::originalUiTriple50KG(general,"MinRange",{},f.minRange,d,0x15efb0)||
@@ -94,6 +103,8 @@ Receipt advanceOriginalWreckExplosionAfterCommon50LA(OriginalWreckExplosionRunti
     EffectOwner50BE& owner,float dt,std::uint32_t& raw,OriginalWreckExplosionGlobals50LA& globals,
     const OriginalWreckExplosionAttachmentGate50LA& attachment) noexcept {
     if(state.failed)return state.stoppedAt;
+    //New Racer814 member grants load/Stop/base-disable, not later simulation.
+    if(f.member!=OriginalWreckExplosionMember50LA::groupExplosion)return result(Status::unsupported,0x15ead0);
     if(!state.bound||state.manager!=&manager||!state.ownerId||!f.parsed||
        owner.id!=state.canonicalOwnerId||owner.profile!=EffectProfile50BE::Deferred15E800)
         return result(Status::unprepared,0x15eb08);

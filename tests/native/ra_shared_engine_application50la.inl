@@ -84,7 +84,7 @@
            !session.actual_.actualChariotModels||slot>=session.racerEntities_.size())return false;
         const auto retained=stagedAero_[slot].lock();
         const auto& racer=session.racerEntities_[slot];
-        if(!retained||!retained->published_||retained->revoked_||
+        if(!retained||!retained->published_||retained->revoked_||!retained->sourceConstructorComplete_||
            retained->bank_!=lease.bank_||retained->frame_!=&actual_->frame||
            retained->parameters_!=&gridArena_->parameters.bodies.main||
            retained->application_!=session.actual_.applicationEntities.get()||

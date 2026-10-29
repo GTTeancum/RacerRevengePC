@@ -41,7 +41,7 @@ struct OriginalWreckPhysical50LA final {
     SpringGeneratedParameters48K generated{};
     // Full source DC110/120 caches; the existing48K parameters hold XYZ.
     //2964C0 and296F10 write W=1 independently of every D0 fourth lane.
-    float worldCenter110W=0.f,contactVelocity120W=0.f;
+    float customLocalCenter100W=0.f,worldCenter110W=0.f,contactVelocity120W=0.f;
     SpringResponseParameters48L response{};
     float normalVelocityScaleAC=0.f;
     SecondaryBodyState49M* contactBody30=nullptr;
@@ -71,6 +71,15 @@ struct OriginalWreckConstructorGlobals50LA {
     std::uint32_t bodyVector433AD0[4],pieceVector433B10[4];
     SecondaryActivationGlobals49V reset;
 };
+// Borrowed immutable source lanes, never a duplicate Application authority.
+struct OriginalWreckConstructorGlobalViews50LA {
+    const void* bodyVector433AD0=nullptr;
+    const void* pieceVector433B10=nullptr;
+    struct Reset {const void* vector433B80=nullptr;const void* quaternion382B60=nullptr;} reset;
+    bool current()const noexcept {
+        return bodyVector433AD0&&pieceVector433B10&&reset.vector433B80&&reset.quaternion382B60;
+    }
+};
 // Source static initializers3C9190/3C9210/3C9290 and file382B60. Writes a
 //caller-owned application-global projection; construction consumes that same
 //actual projection rather than inventing per-piece mutable globals.
@@ -83,10 +92,10 @@ inline void initializedOriginalWreckConstructorGlobals50LA(
 }
 namespace original_wreck_physical_detail50LA {
 inline float word(std::uint32_t u) noexcept {float f;std::memcpy(&f,&u,4);return f;}
-inline void copy(Vector3_48C& xyz,float& w,const std::uint32_t (&v)[4]) noexcept {
-    std::memcpy(xyz.v,v,12);std::memcpy(&w,v+3,4);
+inline void copy(Vector3_48C& xyz,float& w,const void* v) noexcept {
+    std::memcpy(xyz.v,v,12);std::memcpy(&w,static_cast<const char*>(v)+12,4);
 }
-inline void copy(SpringVector4_48N& to,const std::uint32_t (&v)[4]) noexcept {
+inline void copy(SpringVector4_48N& to,const void* v) noexcept {
     std::memcpy(to.v,v,16);
 }
 inline BodyMatrix48G identity() noexcept {
@@ -98,9 +107,10 @@ inline BodyMatrix48G identity() noexcept {
 //component141300 subobject was initialized. Does not attach the model, tune
 //mass/inertia, allocate a query, set body320=1, or claim live activation.
 //Copy-only globals retain their exact words in all rounding modes.
-inline bool initializeOriginalWreckBody50LA(OriginalWreckPhysical50LA& p,
+template<class Globals>
+inline bool initializeOriginalWreckBodyFromGlobals50LA(OriginalWreckPhysical50LA& p,
     const OriginalWreckComponent50LA& bodyComponent,
-    const OriginalWreckConstructorGlobals50LA& g) noexcept {
+    const Globals& g) noexcept {
     using namespace original_wreck_physical_detail50LA;
     if(bodyComponent.kind!=OriginalWreckComponentKind50LA::body167920||
        !bodyComponent.objectKey||!bodyComponent.sessionGeneration||p.bodyConstructorFieldsApplied)return false;
@@ -135,7 +145,11 @@ inline bool initializeOriginalWreckBody50LA(OriginalWreckPhysical50LA& p,
     b.body20C=0;r.callbackState238=0;
     for(unsigned i=0;i<3;++i){q.body.translationEnabled[i]=true;q.body.rotationEnabled[i]=true;}
     //167920 calls its genuine slotAC167A50, including167AD0 histories.
-    resetSecondaryActivation49V(b,p.supplement,g.reset);
+    // Transient copy-only reset argument, never retained global authority.
+    SecondaryActivationGlobals49V reset;
+    std::memcpy(reset.vector433B80,g.reset.vector433B80,16);
+    std::memcpy(reset.quaternion382B60,g.reset.quaternion382B60,16);
+    resetSecondaryActivation49V(b,p.supplement,reset);
     p.body320=0;p.bodyConstructorFieldsApplied=true;return true;
 }
 
@@ -155,8 +169,9 @@ inline bool bindOriginalWreckBodyModel50LA(OriginalWreckPhysical50LA& p,
     p.body320=1;p.body.enabled=false;return true;
 }
 
-inline void initializeOriginalWreckPieceFields50LA(OriginalWreckPieceFields50LA& p,
-    const OriginalWreckConstructorGlobals50LA& g) noexcept {
+template<class Globals>
+inline void initializeOriginalWreckPieceFieldsFromGlobals50LA(OriginalWreckPieceFields50LA& p,
+    const Globals& g) noexcept {
     using namespace original_wreck_physical_detail50LA;
     p.wake30=1;p.flight34=0;p.flight38=0;p.water3C=0;p.water40=0;
     copy(p.authored50,g.pieceVector433B10);copy(p.look60,g.pieceVector433B10);
@@ -178,6 +193,37 @@ inline void initializeOriginalWreckPieceFields50LA(OriginalWreckPieceFields50LA&
 //binding and165E90 overrides are later phases; no record payload is valid.
 //DC30 must be bound to this same body by the owner; detector/query/scene links
 //are separate concrete owners. Authored166400/22C310 tuning follows later.
+// Fresh source constructor only: ordered stores on the SAME numeric owner.
+// Source80/8C pointer aliases are published by the enclosing Storage owner.
+inline void initializeFreshWreckContact295A40_50LA(OriginalWreckPhysical50LA& p,
+    const std::array<std::uint32_t,4>& actual4435A0,
+    const SpringRecord48N*& source80,const SpringRecord48N*& source8C) noexcept {
+    auto& g=p.generated;auto& a=g.impact;auto& s=p.spring;auto& r=p.response;
+    a.customLocalCenter100={{0,0,0}};p.customLocalCenter100W=1.f; //295A64
+    a.worldCenter110={{0,0,0}};p.worldCenter110W=1.f; //295A6C
+    a.contactVelocity120={{0,0,0}};p.contactVelocity120W=1.f; //295A74
+    s.pointCount7C=0;s.generatedCount84=0;s.generatedCapacity88=0;
+    p.contactBody30=nullptr; //295A84
+    source80=nullptr;source8C=nullptr; //295A88/8C
+    s.currentCandidate130=0;p.contactMode34=0;s.contact3C=0;s.pending38=0;
+    a.customCenter70=false;g.pointContacts48=true;g.springForce4C=true;g.impact54=true;g.friction50=true;
+    a.disableLeverArms5C=false;g.otherSpring58=false;r.secondaryAtLimit60=false;
+    a.correctPenetration64=false;g.secondary68=false;a.yawOnly6C=false;
+    s.point74=0;s.generated78=0;s.upward40=0;s.other44=0;
+    r.maxPenetration90=0;r.maxSpeed94=original_wreck_physical_detail50LA::word(0x461c4000u);
+    r.stiffness9C=0;r.dampingA0=0;r.impactStiffnessA4=0;r.impactDampingA8=0;
+    p.normalVelocityScaleAC=1;a.angularImpulseScaleB0=1;a.forceTorqueScaleB4=1;g.frictionTorqueScaleC4=1;
+    a.positionCorrectionScaleCC=original_wreck_physical_detail50LA::word(0x3d4ccccdu);
+    a.angularCorrectionScaleD0=0;a.normalForceScale98=1;
+    std::memcpy(a.customLocalCenter100.v,actual4435A0.data(),12);
+    std::memcpy(&p.customLocalCenter100W,actual4435A0.data()+3,4); //295B34
+    std::memcpy(a.contactVelocity120.v,actual4435A0.data(),12);
+    std::memcpy(&p.contactVelocity120W,actual4435A0.data()+3,4); //295B44
+    for(auto& f:g.frictionByMaterial)f=0; //295B54 ten actual stores
+    s.lastMaterialD4=0;a.restitutionB8=0;a.restitutionC0=0;a.restitutionBC=0;
+    p.contactConstructorFieldsApplied=true;
+}
+
 inline bool initializeOriginalWreckContactConstructor295A40_50LA(OriginalWreckPhysical50LA& p,
     const OriginalWreckComponent50LA& contactComponent,
     const SpringVector4_48N& actualVector4435A0) noexcept {
@@ -258,4 +304,21 @@ inline OriginalWreckBodyControlStatus50LA refreshOriginalWreckBodyFrame50LA(
     p.body.cachedAnglesE0=angles;p.cachedAnglesE0W=1.f;p.body.cachedSpeed34=speed;
     return S::complete;
 }
+inline bool initializeOriginalWreckBody50LA(OriginalWreckPhysical50LA& p,
+    const OriginalWreckComponent50LA& body,const OriginalWreckConstructorGlobals50LA& globals)noexcept {
+    return initializeOriginalWreckBodyFromGlobals50LA(p,body,globals);
+}
+inline bool initializeOriginalWreckBody50LA(OriginalWreckPhysical50LA& p,
+    const OriginalWreckComponent50LA& body,const OriginalWreckConstructorGlobalViews50LA& globals)noexcept {
+    return globals.current()&&initializeOriginalWreckBodyFromGlobals50LA(p,body,globals);
+}
+inline void initializeOriginalWreckPieceFields50LA(OriginalWreckPieceFields50LA& p,
+    const OriginalWreckConstructorGlobals50LA& globals)noexcept {
+    initializeOriginalWreckPieceFieldsFromGlobals50LA(p,globals);
+}
+inline void initializeOriginalWreckPieceFields50LA(OriginalWreckPieceFields50LA& p,
+    const OriginalWreckConstructorGlobalViews50LA& globals)noexcept {
+    if(globals.current())initializeOriginalWreckPieceFieldsFromGlobals50LA(p,globals);
+}
+
 }

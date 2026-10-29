@@ -8,6 +8,7 @@
 #include <array>
 #include <exception>
 #include <memory>
+#include <optional>
 #include "../../src/game/original_wreck_components50la.h"
 namespace ra_pod_scene50LA {class Owner;}
 namespace ra_cold_aggregate50LA {class Owner;}
@@ -32,6 +33,80 @@ enum class Status {Complete,Unprepared,Input,IgnoredPlayer,Entry,Action,Service}
 class Owner final {
  friend class ::ra_pod_scene50LA::Owner;
  friend class ::ra_cold_aggregate50LA::Owner;
+ // Native typed action allocation, not an emulated guest layout. Only the
+ // source-written string prefix is known; never zero-fill its unknown tail.
+ struct NativeActionDescriptor {
+  std::uint32_t type00;
+  std::array<std::optional<char>,0x104> text04{};
+  std::uint32_t vtable108;
+  g::LostAiAction50IN payload10C;
+  NativeActionDescriptor()noexcept {
+   vtable108=0x3d5380;type00=0;text04[0]='\0'; //2DA098..A0
+   vtable108=0x3cf0b0;payload10C.targetNodeIndex=0;payload10C.reset=false; //1B5DDC..E4
+  }
+ };
+ struct NativeActionBinding {
+  NativeActionDescriptor* descriptor=nullptr;
+  const g::LostAiAction50IN* payloadIdentity=nullptr;
+  bool attempted=false,readerAttempted=false,readerComplete=false,retired=false;
+ };
+ std::array<NativeActionBinding,2> nativeActions_{};
+ bool nativeDescriptorLoadEntered_=false,nativeDescriptorLoadComplete_=false;
+ bool beginNativeDescriptorLoad()noexcept {
+  if(nativeDescriptorLoadEntered_||lease_||!ready_)return false;
+  nativeDescriptorLoadEntered_=true;return true;
+ }
+ bool completeNativeDescriptorLoad()noexcept {
+  if(!nativeDescriptorLoadEntered_||nativeDescriptorLoadComplete_||lease_)return false;
+  for(std::size_t i=0;i<nativeActions_.size();++i)
+   if(!nativeActionDescriptorCurrent(i,nativeActions_[i].descriptor))return false;
+  nativeDescriptorLoadComplete_=true;return true;
+ }
+ bool beginNativeActionDescriptor(std::size_t i,NativeActionDescriptor* action,std::uint32_t& pc)noexcept {
+  pc=0x1b5dec;if(i>=nativeActions_.size()||lease_||!ready_)return false;
+  auto& b=nativeActions_[i];if(b.attempted||b.retired||nativeCallbacks_[i].attempted)return false;
+  b.attempted=true;b.descriptor=action;b.payloadIdentity=action?&action->payload10C:nullptr;
+  return action!=nullptr; //A null factory publication remains terminal custody.
+ }
+ bool completeNativeActionDescriptor(std::size_t i,const g::LostAiAction50IN& authored,
+     std::uint32_t& pc,bool specificObjectAbsent)noexcept {
+  pc=0x2dc1ec;if(i>=nativeActions_.size()||lease_||!source_||!source_->sources())return false;
+  auto& b=nativeActions_[i];if(!b.attempted||b.retired||b.readerAttempted||!b.descriptor)return false;
+  b.readerAttempted=true;auto& a=*b.descriptor;a.type00=22;
+  pc=0x1b5a88;a.payload10C.targetNodeIndex=authored.targetNodeIndex;
+  pc=0x1b5aa0;a.payload10C.reset=authored.reset;
+  //Caller must authenticate common-reader default from the SAME immutable TOB.
+  //No forged full reader return from the earlier semantic action projection.
+  pc=0x2da0d0;if(!specificObjectAbsent)return false;
+  a.text04[0]='\0';
+  if(authored.reset||authored.targetNodeIndex!=(i?104u:29u)||
+     authored.targetNodeIndex!=(*source_->sources())[i].action.targetNodeIndex)return false;
+  b.readerComplete=true;pc=0x2da0e0;return nativeActionDescriptorCurrent(i,&a);
+ }
+ bool nativeActionDescriptorCurrent(std::size_t i,const NativeActionDescriptor* action)const noexcept {
+  if(i>=nativeActions_.size())return false;const auto& b=nativeActions_[i];
+  return b.attempted&&!b.retired&&b.readerComplete&&action&&b.descriptor==action&&
+    b.payloadIdentity==&action->payload10C&&action->type00==22&&action->vtable108==0x3cf0b0&&
+    action->text04[0]&&*action->text04[0]=='\0'&&!action->payload10C.reset&&
+    action->payload10C.targetNodeIndex==(i?104u:29u);
+ }
+ bool withdrawNativeActionDescriptor(std::size_t i)noexcept {
+  if(i>=nativeActions_.size()||lease_)return false;auto& b=nativeActions_[i];
+  if(!b.attempted||b.retired)return true;
+  //Revoke before descriptor free. Retain only pointer identity for callback
+  //array cleanup; no later path dereferences the destroyed action payload.
+  b.retired=true;b.readerComplete=false;b.descriptor=nullptr;return true;
+ }
+ const g::LostAiAction50IN* nativeActionPayload(std::size_t i)const noexcept {
+  if(i>=nativeActions_.size()||!source_||!source_->sources())return nullptr;
+  const auto& b=nativeActions_[i];
+  //Once real descriptor loading starts, ALL rows lose semantic fallback.
+  //Any partial outer/descriptor/action allocation or reader failure is terminal
+  //for this live backend, even before a per-action publication was reached.
+  if(nativeDescriptorLoadEntered_&&!nativeDescriptorLoadComplete_)return nullptr;
+  if(!b.attempted)return nativeDescriptorLoadEntered_?nullptr:&(*source_->sources())[i].action; //Dormant standalone API only.
+  return nativeActionDescriptorCurrent(i,b.descriptor)?b.payloadIdentity:nullptr;
+ }
  const ra_trigger_authoring50LA::Owner* source_=nullptr;
  std::array<RacerIdentities,racers> racers_{};
  g::NativeTriggerGroup50GA group_{};
@@ -81,7 +156,7 @@ class Owner final {
   if(i>=nativeCallbacks_.size()||!source_||!source_->sources())return nullptr;
   const auto& resource=nativeCallbacks_[i];
   if(resource.retired)return nullptr;
-  if(!resource.attempted)return &(*source_->sources())[i].action; //Existing live route before+144.
+  if(!resource.attempted)return nativeActionPayload(i); //Existing live route before+144.
   if(!nativeLostAiCallbackCurrent(i))return nullptr; //Partial source publication is terminal/failclosed.
   return resource.data9C[0];
  }
@@ -110,11 +185,12 @@ class Owner final {
  bool nativeLostAiCallbackCurrent(std::size_t i)const noexcept {
   if(i>=nativeCallbacks_.size()||!source_||!source_->sources()||!ready_||
      i>=group_.triggers.size())return false;
-  const auto& r=nativeCallbacks_[i];const auto& action=(*source_->sources())[i].action;
+  const auto& r=nativeCallbacks_[i];const auto* action=nativeActionPayload(i);
+  if(!action)return false;
   return r.attempted&&r.joined&&!r.retired&&r.capacity94==1u&&r.data9C&&r.callbacksA0&&
-      r.dataPublished&&r.functionPublished&&r.data9C[0]==&action&&
+      r.dataPublished&&r.functionPublished&&r.data9C[0]==action&&
       r.callbacksA0[0]==&Owner::invokeLostAi1B27C0&&group_.triggers[i].callbackCount98==1u&&
-      !action.reset&&action.targetNodeIndex==(i?104u:29u);
+      !action->reset&&action->targetNodeIndex==(i?104u:29u);
  }
  bool adoptNativeLostAiCallback1B5AD0(std::size_t i,std::uint32_t& pc)noexcept {
   pc=0x1b5ad0;
@@ -129,8 +205,8 @@ class Owner final {
   auto& r=nativeCallbacks_[i];
   if(r.joined)return nativeLostAiCallbackCurrent(i);
   if(r.attempted||r.retired)return false;
-  const auto& action=(*source_->sources())[i].action;
-  if(action.reset||action.targetNodeIndex!=(i?104u:29u)||originalAiNodeCount_!=113u)return false;
+  const auto* action=nativeActionPayload(i);
+  if(!action||action->reset||action->targetNodeIndex!=(i?104u:29u)||originalAiNodeCount_!=113u)return false;
   //Existing coldprepare published count1/nativehooks BEFORE this source route.
   //Add missing actual typed array custody; never reset98 then increment to2,
   //never replayTrigger constructor or executeLostAI during service.
@@ -139,7 +215,7 @@ class Owner final {
    pc=0x2a0754;r.data9C=std::make_unique<const g::LostAiAction50IN*[]>(1u);
    pc=0x2a0760;r.callbacksA0=std::make_unique<NativeLostAiCallback[]>(1u);
    pc=0x2a076c;r.capacity94=1u; //Explicit late native ownership, not earlier guest execution.
-   pc=0x2a0a50;r.data9C[0]=&action;r.dataPublished=true;
+   pc=0x2a0a50;r.data9C[0]=action;r.dataPublished=true;
    pc=0x2a0a64;r.callbacksA0[0]=&Owner::invokeLostAi1B27C0;r.functionPublished=true;
    //2A0A70's effective count1 already belongs to SAME actual group state.
    //The representation adopts that binding without a second count mutation.
@@ -152,9 +228,9 @@ class Owner final {
    if(r.retired){if(r.data9C||r.callbacksA0||r.joined)return false;continue;}
    if(!r.attempted){if(r.data9C||r.callbacksA0||r.capacity94||r.joined||r.dataPublished||r.functionPublished)return false;continue;}
    if(r.capacity94>1u||(r.callbacksA0&&!r.data9C)||
-      (r.dataPublished&&(!r.data9C||!source_||!source_->sources()||r.data9C[0]!=&(*source_->sources())[i].action))||
+      (r.dataPublished&&(!r.data9C||!source_||!source_->sources()||r.data9C[0]!=(nativeActions_[i].attempted?nativeActions_[i].payloadIdentity:&(*source_->sources())[i].action)))||
       (r.functionPublished&&(!r.callbacksA0||!r.dataPublished||r.callbacksA0[0]!=&Owner::invokeLostAi1B27C0))||
-      (r.joined&&!nativeLostAiCallbackCurrent(i)))return false;
+      (r.joined&&!nativeActions_[i].retired&&!nativeLostAiCallbackCurrent(i)))return false;
   }
   return true;
  }
@@ -175,7 +251,8 @@ class Owner final {
  Status fail(Status s)noexcept {if(terminal_==Status::Complete)terminal_=s;return terminal_;}
 public:
  Owner()=default;
- ~Owner(){for(const auto& p:nativeEntities_)if(p.triggerCounted||p.colliderCounted)std::terminate();
+ ~Owner(){for(const auto& b:nativeActions_)if(b.attempted&&!b.retired)std::terminate();
+  for(const auto& p:nativeEntities_)if(p.triggerCounted||p.colliderCounted)std::terminate();
   for(const auto& r:nativeCallbacks_)if(r.data9C||r.callbacksA0||(r.attempted&&!r.retired))std::terminate();}
  Owner(const Owner&)=delete;Owner&operator=(const Owner&)=delete;
  Owner(Owner&&)=delete;Owner&operator=(Owner&&)=delete;
