@@ -1,5 +1,6 @@
 #pragma once
-// SOURCE PROPOSAL: only the authentic second RA Directional caller is joined.
+// SOURCE ADAPTATION: authentic second RA Directional and private particle
+// constructor inline callers reuse this numerical leaf.
 // This numeric adapter itself grants no source-owner authority.
 // Explicit native adaptation of106EA0, NOT an EE/VU numerical emulator.
 #include <array>

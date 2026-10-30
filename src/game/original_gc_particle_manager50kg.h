@@ -68,6 +68,17 @@ struct OriginalGcParticleReceipt50KG {
 // renderer scratch or outer scene attachment. Those remain their actual
 // callers' obligations. Never substitute atlas readiness for those constructors.
 class OriginalGcParticleManager50KG final {
+    friend class OriginalTrackParticleCold50LA;
+    enum class PoolMode {empty,nativePrepared,sourcePending};
+    PoolMode poolMode_=PoolMode::empty;
+    struct SourcePool;
+    std::unique_ptr<SourcePool> sourcePool_;
+    // Private original160F08/160F1C allocation order. This mode NEVER makes
+    // prepared() true. Future source atlas/load must adopt these exact records,
+    // not copy them into the separate legacy native contiguous representation.
+    bool allocateSourcePointers160F08(std::uint32_t&)noexcept;
+    const void* sourcePointerPublication138()const noexcept;
+    bool constructSourceRecords160F1C(std::uint32_t&)noexcept;
     friend class OriginalUiGarageParticles50KG;
     OriginalGcParticleStatus50KG normalizeGarageAtlas161234(float,float) noexcept;
 public:

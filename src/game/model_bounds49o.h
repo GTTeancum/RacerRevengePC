@@ -62,4 +62,20 @@ bool computeModelBounds49O(const ModelBoundsNode49O* nodes, std::size_t count,
 bool computeDirectRootModelBounds50KG(const ModelBoundsNode49O* sourceRows,
     std::size_t count, const ModelBoundsContext49O& context,
     ModelBoundsWorkspace49O& workspace, ModelBoundsResult49O& output) noexcept;
+//Pure numeric stages of28D670/28DAF0. These consume actual current world
+//caches; no regeneration, radius, flags or scene publication is performed.
+//FE_TONEAREST and finite operands/intermediates are an explicit native bound.
+struct SourceLocalBoundsState49O {
+    float minimum[4]{0,0,0,1},maximum[4]{0,0,0,1};
+    bool seeded=false;
+};
+bool seedLocalBounds28D670(const Vector3_48C&,const Vector3_48C&,bool eligible,
+    SourceLocalBoundsState49O&)noexcept;
+struct SourceLocalBoundsProjection49O {Vector3_48C centerWorld{},axesWorld[3]{};};
+bool captureLocalBounds28DAF0(const BodyMatrix48G& currentWorld,const Vector3_48C& center,
+    const Vector3_48C& half,unsigned getter,SourceLocalBoundsProjection49O&)noexcept;
+bool mergeLocalBounds28DAF0(const SourceLocalBoundsProjection49O&,const BodyMatrix48G& rootWorld,
+    SourceLocalBoundsState49O&)noexcept;
+bool finishLocalBounds28D670(const SourceLocalBoundsState49O&,bool half,float output[4])noexcept;
+
 }

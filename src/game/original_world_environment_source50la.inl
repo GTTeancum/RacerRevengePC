@@ -161,3 +161,25 @@ bool Owner::retireSource276B30(std::int32_t deleting,Diagnostic& d)noexcept {
     d.status=Status::complete;d.sourcePC=0x276be4;return true;
     //Parent drops SAME actualOwner backing at source276BD8 then NULL3A4 at270AA0.
 }
+
+// Borrow only the explicit source getter's known NUL-terminated prefix.
+// Never expose a native Environment selector or constructor-unknown bytes.
+bool Owner::readSourceParticleName2771F4(const OriginalWreckComponent50LA& world,
+    const rr::platform::OriginalWorldSourceConfig50LA& config,const char*& text,std::size_t& length)const noexcept {
+    if(!sourceMode_||sourceClosed_||!source_||sourceWorld_!=&world||sourceConfig_!=&config||
+       sourceGeneration_!=world.sessionGeneration||source_->thread!=std::this_thread::get_id()||
+       source_->phase!=Source::Phase::returnedOne)return false;
+    const auto known=source_->stringKnown[4];
+    if(!known||known>source_->particle41C.size()||source_->particle41C[known-1]!=0)return false;
+    for(std::size_t i=0;i+1<known;++i)if(source_->particle41C[i]==0)return false;
+    text=source_->particle41C.data();length=known-1;return true;
+}
+
+//Same completed source Environment occurrence, never native spatialBounds534().
+bool Owner::readSourceVisibilityBounds273028(const OriginalWreckComponent50LA& world,
+    const rr::platform::OriginalWorldSourceConfig50LA& config,std::array<std::uint32_t,4>& words)const noexcept {
+    if(!sourceMode_||sourceClosed_||!source_||sourceWorld_!=&world||sourceConfig_!=&config||
+       sourceGeneration_!=world.sessionGeneration||source_->thread!=std::this_thread::get_id()||
+       source_->phase!=Source::Phase::returnedOne||(source_->scalarKnown&0x1e0u)!=0x1e0u)return false;
+    words={{source_->scalar520[5],source_->scalar520[6],source_->scalar520[7],source_->scalar520[8]}};return true;
+}

@@ -32,7 +32,7 @@ bool Owner::preflightSourceMethodNodeForestNative(const Entity& parent,const Ent
         if(child!=&c||c.parent1C!=&parent||c.previous10!=previous)return false;
         descendants|=c.mask20|c.descendants24;previous=&c;child=c.next14;
     }
-    return true;
+    return preflightSourceVisibilityEnvironmentForestNative(parent,child,previous);
 }
 bool Owner::preflightSourceMethodNodeAttachmentsNative(const Entity* parent)const noexcept {
     bool live=false;for(const auto& f:sourceMethodNodeAttachments_)if(f.attempted&&!f.withdrawn)live=true;

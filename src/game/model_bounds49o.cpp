@@ -110,4 +110,45 @@ bool computeDirectRootModelBounds50KG(const ModelBoundsNode49O* sourceRows,
     ModelBoundsWorkspace49O& workspace,ModelBoundsResult49O& output) noexcept {
     return computeBounds(sourceRows,count,context,workspace,output,true);
 }
+bool seedLocalBounds28D670(const Vector3_48C& center,const Vector3_48C& half,bool eligible,
+    SourceLocalBoundsState49O& output)noexcept {
+    SourceLocalBoundsState49O next;
+    if(eligible){
+        if(std::fegetround()!=FE_TONEAREST)return false;
+        for(unsigned j=0;j<3;++j)if(!std::isfinite(center.v[j])||!std::isfinite(half.v[j]))return false;
+        Math m;for(unsigned j=0;j<3;++j){next.minimum[j]=m.sub(center.v[j],half.v[j]);next.maximum[j]=m.add(center.v[j],half.v[j]);}
+        if(!m.valid)return false;next.seeded=true;
+    }
+    output=next;return true;
+}
+bool captureLocalBounds28DAF0(const BodyMatrix48G& world,const Vector3_48C& center,
+    const Vector3_48C& half,unsigned getter,SourceLocalBoundsProjection49O& output)noexcept {
+    if(std::fegetround()!=FE_TONEAREST||getter>3)return false;
+    for(float lane:world.v)if(!std::isfinite(lane))return false;
+    Math m;Vector3_48C value{};
+    if(!getter){for(float lane:center.v)if(!std::isfinite(lane))return false;value=m.point(center,world);}
+    else {if(!std::isfinite(half.v[getter-1]))return false;Vector3_48C axis{};axis.v[getter-1]=half.v[getter-1];value=m.direction(axis,world);}
+    if(!m.valid)return false;if(!getter)output.centerWorld=value;else output.axesWorld[getter-1]=value;return true;
+}
+bool mergeLocalBounds28DAF0(const SourceLocalBoundsProjection49O& input,const BodyMatrix48G& root,
+    SourceLocalBoundsState49O& output)noexcept {
+    if(std::fegetround()!=FE_TONEAREST)return false;
+    for(float lane:root.v)if(!std::isfinite(lane))return false;
+    Math m;ModelBoundsResult49O o{};o.seeded=output.seeded;
+    std::memcpy(o.minimum,output.minimum,16);std::memcpy(o.maximum,output.maximum,16);
+    const auto center=m.toRoot(input.centerWorld,root,true);
+    Vector3_48C axes[3]{},extent{};
+    for(unsigned axis=0;axis<3;++axis)axes[axis]=m.toRoot(input.axesWorld[axis],root,false);
+    for(unsigned j=0;j<3;++j)extent.v[j]=m.add(std::fabs(axes[2].v[j]),m.add(std::fabs(axes[0].v[j]),std::fabs(axes[1].v[j])));
+    merge(m,o,center,extent);if(!m.valid)return false;
+    std::memcpy(output.minimum,o.minimum,16);std::memcpy(output.maximum,o.maximum,16);output.seeded=o.seeded;return true;
+}
+bool finishLocalBounds28D670(const SourceLocalBoundsState49O& input,bool half,float output[4])noexcept {
+    if(std::fegetround()!=FE_TONEAREST||!output)return false;
+    Math m;float next[4]{0,0,0,1};
+    for(unsigned j=0;j<3;++j){if(!std::isfinite(input.minimum[j])||!std::isfinite(input.maximum[j]))return false;
+        next[j]=m.mul(.5f,half?m.sub(input.maximum[j],input.minimum[j]):m.add(input.minimum[j],input.maximum[j]));}
+    if(!m.valid)return false;std::memcpy(output,next,16);return true;
+}
+
 }

@@ -2,6 +2,7 @@
 #include "../assets/import_world48f.h"
 #include "../assets/track_height_descriptor50jb.h"
 #include <optional>
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
@@ -74,6 +75,10 @@ public:
 private:
     friend class ::rr::game::original_gc_gameplay_lighting_candidate::Owner;
     friend class ::ra_cold_aggregate50LA::Owner;
+    bool readSourceParticleName2771F4(const OriginalWreckComponent50LA&,
+        const rr::platform::OriginalWorldSourceConfig50LA&,const char*&,std::size_t&)const noexcept;
+    bool readSourceVisibilityBounds273028(const OriginalWreckComponent50LA&,
+        const rr::platform::OriginalWorldSourceConfig50LA&,std::array<std::uint32_t,4>&)const noexcept;
     struct Source;
     std::unique_ptr<Source> source_;
     bool sourceMode_=false,sourceLoadAttempted_=false,sourceClosed_=false;

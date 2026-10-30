@@ -9,30 +9,36 @@
 
 namespace rr::game {
 class OriginalWreckQueries50LA;
+class OriginalWreckType0Owners50LA;
 // Actual type0 branches of11ED60 and its nested11F680. Caller authenticates
 // SAME retained shape40, owned first node, stack20 and canonical matrix/sphere
 // lanes. Finite nearest separate binary32 is an explicit native adaptation,
 // not exact EE/VU arithmetic. Refusal preserves every preceding source store.
 class OriginalWreckSourceType0Prepare50LA final {
     friend class OriginalWreckQueries50LA;
-    static bool pass(bool second,const BodyMatrix48G& incoming,
+    friend class OriginalWreckType0Owners50LA;
+    enum class Store {previousWord,worldWord,composedQuad,centerLane,centerQuad,radius};
+    //Same bounded arithmetic body; legacy callbacks below are no-ops.
+    template<class MatrixRead,class RootRead,class StoreReached>
+    static bool passSource(bool second,const BodyMatrix48G& incoming,
         const BodyMatrix48G& actual40,const rr::assets::CollisionMeshNode48I& actualRoot,
         BodyMatrix48G& composed00,BodyMatrix48G& world80,BodyMatrix48G& previousC0,
-        SpringVector4_48N& canonicalCenter,float& canonicalRadius,std::uint32_t& pc)noexcept {
+        SpringVector4_48N& canonicalCenter,float& canonicalRadius,std::uint32_t& pc,
+        MatrixRead&& matrixRead,RootRead&& rootRead,StoreReached&& storeReached)noexcept {
         //First11ED60 creates both histories from incoming. Second11F680
         //copies the real previous world80 first. Raw stores precede arithmetic.
         const auto& old=second?world80:incoming;
         for(unsigned pair=0;pair<8u;++pair){
             pc=second?0x11f6e4u:0x11edc4u;
-            std::memcpy(&previousC0.v[2u*pair],&old.v[2u*pair],4);
+            std::memcpy(&previousC0.v[2u*pair],&old.v[2u*pair],4);storeReached(Store::previousWord,2u*pair,pc);
             pc=second?0x11f6e8u:0x11edc8u;
-            std::memcpy(&previousC0.v[2u*pair+1u],&old.v[2u*pair+1u],4);
+            std::memcpy(&previousC0.v[2u*pair+1u],&old.v[2u*pair+1u],4);storeReached(Store::previousWord,2u*pair+1u,pc);
         }
         for(unsigned pair=0;pair<8u;++pair){
             pc=second?0x11f714u:0x11edf4u;
-            std::memcpy(&world80.v[2u*pair],&incoming.v[2u*pair],4);
+            std::memcpy(&world80.v[2u*pair],&incoming.v[2u*pair],4);storeReached(Store::worldWord,2u*pair,pc);
             pc=second?0x11f718u:0x11edf8u;
-            std::memcpy(&world80.v[2u*pair+1u],&incoming.v[2u*pair+1u],4);
+            std::memcpy(&world80.v[2u*pair+1u],&incoming.v[2u*pair+1u],4);storeReached(Store::worldWord,2u*pair+1u,pc);
         }
         //All four VU output vectors are computed BEFORE the first SQ.
         //Do not expose a partly composed matrix after native arithmetic refusal.
@@ -41,12 +47,14 @@ class OriginalWreckSourceType0Prepare50LA final {
         constexpr std::uint32_t secondPC[4]={0x11f748u,0x11f75cu,0x11f770u,0x11f780u};
         for(unsigned row=0;row<4u;++row)for(unsigned lane=0;lane<4u;++lane){
             const auto base=second?secondPC[row]:firstPC[row];pc=base;
+            if(!matrixRead(row,lane,0u,pc))return false;
             if(std::fegetround()!=FE_TONEAREST||!std::isfinite(incoming.v[lane])||
                !std::isfinite(actual40.v[4u*row]))return false;
             volatile float value=incoming.v[lane]*actual40.v[4u*row];
             if(!std::isfinite(value))return false;
             for(unsigned term=1;term<4u;++term){
                 pc=base+4u*term;
+                if(!matrixRead(row,lane,term,pc))return false;
                 if(!std::isfinite(incoming.v[4u*term+lane])||!std::isfinite(actual40.v[4u*row+term]))return false;
                 volatile float product=incoming.v[4u*term+lane]*actual40.v[4u*row+term];
                 if(!std::isfinite(product))return false;
@@ -57,22 +65,26 @@ class OriginalWreckSourceType0Prepare50LA final {
         }
         for(unsigned row=0;row<4u;++row){
             pc=(second?0x11f790u:0x11ee70u)+4u*row;
-            std::memcpy(&composed00.v[4u*row],&result.v[4u*row],16);
+            std::memcpy(&composed00.v[4u*row],&result.v[4u*row],16);storeReached(Store::composedQuad,row,pc);
         }
         if(second){
             for(unsigned axis=0;axis<3u;++axis){
+                pc=0x11f7b0u+8u*axis;if(!rootRead(true,axis,pc))return false;
                 pc=0x11f7b4u+8u*axis;
-                std::memcpy(&canonicalCenter.v[axis],&actualRoot.center[axis],4);
+                std::memcpy(&canonicalCenter.v[axis],&actualRoot.center[axis],4);storeReached(Store::centerLane,axis,pc);
             }
-            pc=0x11f7c8u;canonicalCenter.v[3]=1.f;
+            pc=0x11f7c8u;canonicalCenter.v[3]=1.f;storeReached(Store::centerLane,3u,pc);
         }else{
             //14EBB0(a2=3) copies incoming translation XYZ with VF0.W=1;
             //11EE9C stores this vector, NOT the tree center used in pass two.
             SpringVector4_48N translation{{0.f,0.f,0.f,1.f}};
             for(unsigned axis=0;axis<3u;++axis)
                 std::memcpy(&translation.v[axis],&incoming.v[12u+axis],4);
-            pc=0x11ee9cu;std::memcpy(&canonicalCenter,&translation,sizeof translation);
+            pc=0x11ee9cu;std::memcpy(&canonicalCenter,&translation,sizeof translation);storeReached(Store::centerQuad,0u,pc);
         }
+        //Actual root half loads follow the preceding matrix/center effects.
+        for(unsigned axis=0;axis<3u;++axis){pc=(second?0x11f7d4u:0x11eea8u)+8u*axis;
+            if(!rootRead(false,axis,pc))return false;}
         //The just-written local center is consumed only AFTER the radius store.
         pc=second?0x11f7fcu:0x11eed0u;
         if(!std::isfinite(actualRoot.half[0]))return false;
@@ -88,7 +100,7 @@ class OriginalWreckSourceType0Prepare50LA final {
         volatile float sum=xy+zz;if(!std::isfinite(sum))return false;
         pc=second?0x11f80cu:0x11eee0u;
         volatile float radius=std::sqrt(static_cast<float>(sum));if(!std::isfinite(radius))return false;
-        pc=second?0x11f81cu:0x11eef0u;canonicalRadius=radius;
+        pc=second?0x11f81cu:0x11eef0u;canonicalRadius=radius;storeReached(Store::radius,0u,pc);
         SpringVector4_48N transformed{{0.f,0.f,0.f,1.f}};
         for(unsigned axis=0;axis<3u;++axis){
             pc=second?0x11f838u:0x11ef0cu;
@@ -110,8 +122,18 @@ class OriginalWreckSourceType0Prepare50LA final {
             transformed.v[axis]=value;
         }
         pc=second?0x11f84cu:0x11ef1cu;
-        std::memcpy(&canonicalCenter,&transformed,sizeof transformed);
+        std::memcpy(&canonicalCenter,&transformed,sizeof transformed);storeReached(Store::centerQuad,1u,pc);
         pc=second?0x11fe28u:0x11ef24u;return true;
+    }
+    static bool pass(bool second,const BodyMatrix48G& incoming,
+        const BodyMatrix48G& actual40,const rr::assets::CollisionMeshNode48I& actualRoot,
+        BodyMatrix48G& composed00,BodyMatrix48G& world80,BodyMatrix48G& previousC0,
+        SpringVector4_48N& canonicalCenter,float& canonicalRadius,std::uint32_t& pc)noexcept {
+        const auto known=[](unsigned,unsigned,unsigned,std::uint32_t)noexcept{return true;};
+        const auto root=[](bool,unsigned,std::uint32_t)noexcept{return true;};
+        const auto store=[](Store,unsigned,std::uint32_t)noexcept{};
+        return passSource(second,incoming,actual40,actualRoot,composed00,world80,previousC0,
+            canonicalCenter,canonicalRadius,pc,known,root,store);
     }
 };
 } //namespace rr::game

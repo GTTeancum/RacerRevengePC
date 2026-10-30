@@ -38,8 +38,7 @@ inline bool Owner::preflightSourceLightListNative()const noexcept {
     if(e.reference00!=(l.sourceReferenceReleased?0u:1u)||e.kind!=g::OriginalWreckComponentKind50LA::entity141300||
        e.sessionGeneration!=worldEntity_.sessionGeneration||e.objectKey!=key(&e)||
        e.parent1C||e.previous10||e.next14||
-       e.firstChild18!=((sourceFirstLight_&&sourceFirstLight_->attached)?&sourceFirstLight_->entity:nullptr)||e.mask20||
-       e.descendants24!=((sourceFirstLight_&&sourceFirstLight_->attached)?2u:0u)||
+       !preflightSourceLightSiblingLinksNative()||e.mask20||
        !worldApplication_->objectCount423F60())return false;
     if(l.sourceAuthorityEnrolled){if(!worldApplication_->entityAuthority_.canRetire(e))return false;}
     else if(l.sourcePublished||l.sourceConstructorReturned)return false;
@@ -48,6 +47,11 @@ inline bool Owner::preflightSourceLightListNative()const noexcept {
     if(l.wrappers38){for(std::size_t i=0;i<l.sourceWrappersConstructed;++i){const auto& w=l.wrappers38[i];
         const auto* sourceLive=(i==0&&sourceFirstLightPublished_&&sourceFirstLight_)?&sourceFirstLight_->entity:
             (i==1&&sourceSecondLightPublished_&&sourceSecondLight_)?&sourceSecondLight_->entity:nullptr;
+        if(i>=2&&i-2<sourceTypedLights_.size()){
+            const auto& typed=sourceTypedLights_[i-2];
+            if(!typed||typed->ordinal!=i)return false;
+            if(!typed->nativeClosed&&typed->published&&typed->light)sourceLive=&typed->light->entity;
+        }
         if(!w.sourceConstructed||w.live00!=sourceLive||w.descriptor04||
            (w.sourceDescriptor04&&!w.sourceDescriptorPublished))return false;
     }}
@@ -55,6 +59,7 @@ inline bool Owner::preflightSourceLightListNative()const noexcept {
 }
 inline bool Owner::abortSourceLightListNative(std::uint32_t& pc)noexcept {
     pc=0;if(!preflightSourceLightListNative()||sourceFirstLight_||sourceFirstLightPublished_||sourceSecondLight_||sourceSecondLightPublished_)return false;
+    for(const auto& typed:sourceTypedLights_)if(!typed||!typed->nativeClosed||typed->light||typed->wrapper||typed->descriptor)return false;
     // Withdraw actual pointer knowledge BEFORE freeing actual backing; this is
     //native cleanup, not270B0C or a completed source142590/destructor receipt.
     sourceLight3A8_.reset();

@@ -245,6 +245,56 @@ static_assert(std::is_nothrow_copy_constructible<OriginalGcParticleEmitterState5
     std::is_nothrow_move_constructible<OriginalGcParticleEmitterState50KG>::value,
     "registry reservation does not add a throwing element migration");
 }
+// Exclusive pending backing inside the SAME numeric authority. No native
+// contiguous Storage is created in this mode, and no record address is moved.
+struct OriginalGcParticleManager50KG::SourcePool {
+    std::unique_ptr<OriginalGcParticle50KG*[]> pointers;
+    std::unique_ptr<OriginalGcParticle50KG> unpublishedRecord;
+    std::size_t allocationAttempts=0,published=0;
+    bool pointersPublished=false,loopAttempted=false,loopReturned=false;
+    // Every nonNULL published/unpublished record has ONLY position00 and
+    // velocity10 (two VF0 vectors) source-known. Other host-initialized lanes
+    // are never read through this pending mode or interpreted as source data.
+    static constexpr std::size_t knownRecordPrefixBytes=0x20;
+    ~SourcePool()noexcept {
+        for(std::size_t i=0;i<published;++i)delete pointers[i];
+        //unique_ptr retains the attempted record when138 wasNULL at160F48.
+        //No source particle fields/unknown pointer-array slots are observed.
+    }
+};
+bool OriginalGcParticleManager50KG::allocateSourcePointers160F08(std::uint32_t& pc)noexcept {
+    pc=0x160f08;
+    if(poolMode_!=PoolMode::empty||storage_||sourcePool_)return false;
+    sourcePool_.reset(new(std::nothrow) SourcePool);
+    if(!sourcePool_)return false; //Native metadata capacity, before source allocation.
+    poolMode_=PoolMode::sourcePending;
+    sourcePool_->pointers.reset(new(std::nothrow) OriginalGcParticle50KG*[originalGcParticleCapacity50KG]);
+    sourcePool_->pointersPublished=true;pc=0x160f10;return true; //NULL is a real publication.
+}
+const void* OriginalGcParticleManager50KG::sourcePointerPublication138()const noexcept {
+    return poolMode_==PoolMode::sourcePending&&sourcePool_&&sourcePool_->pointersPublished?
+        sourcePool_->pointers.get():nullptr;
+}
+bool OriginalGcParticleManager50KG::constructSourceRecords160F1C(std::uint32_t& pc)noexcept {
+    pc=0x160f1c;
+    if(poolMode_!=PoolMode::sourcePending||storage_||!sourcePool_||
+       !sourcePool_->pointersPublished||sourcePool_->loopAttempted)return false;
+    auto& pool=*sourcePool_;pool.loopAttempted=true;
+    while(pool.allocationAttempts<originalGcParticleCapacity50KG){
+        std::unique_ptr<OriginalGcParticle50KG> record(new(std::nothrow) OriginalGcParticle50KG);
+        ++pool.allocationAttempts;
+        if(record){
+            record->position={{0,0,0}};record->positionW=1;
+            record->velocity={{0,0,0}};record->velocityW=1;
+        }
+        //Original still allocates record0 if the pointer-array malloc failed.
+        //Store its exact attempted prefix safely, then stop before NULL SW.
+        pc=0x160f48;
+        if(!pool.pointers){pool.unpublishedRecord=std::move(record);return false;}
+        pool.pointers[pool.published++]=record.release(); //Publish evenNULL, then continue.
+    }
+    pool.loopReturned=true;pc=0x160f60;return true;
+}
 struct OriginalGcParticleManager50KG::Storage {
     std::array<OriginalGcParticle50KG,originalGcParticleCapacity50KG> pool{};
     // Source active/free pointer permutation survives removals; swapping whole
@@ -314,7 +364,7 @@ OriginalGcParticleManager50KG::OriginalGcParticleManager50KG() noexcept=default;
 OriginalGcParticleManager50KG::~OriginalGcParticleManager50KG()=default;
 OriginalGcParticleStatus50KG OriginalGcParticleManager50KG::prepare(const Bytes& prt,
     const Bytes& emt,const Bytes& tob) noexcept {
-    if(storage_)return Status::alreadyPrepared;
+    if(poolMode_!=PoolMode::empty||storage_||sourcePool_)return Status::alreadyPrepared;
     if(std::fegetround()!=FE_TONEAREST)return Status::arithmetic;
     if(prt.size()!=9210||emt.size()!=1298||tob.size()!=9623||
        !hashMatches(prt.data(),prt.size(),"d4604f2cfd8f40b9704fb63527fdb7574323cbebc9ac34b255b166e9f6be0a5f")||
@@ -365,12 +415,12 @@ OriginalGcParticleStatus50KG OriginalGcParticleManager50KG::prepare(const Bytes&
                section->find("attachtosoultree")||!triple(section,"position",s->fogPositions[i]))return Status::authoredData;
             s->fogCurrentFrames[i]=s->groups[0].first;
         }
-        s->gcFogAuthoring=true;storage_=std::move(s);return Status::complete;
+        s->gcFogAuthoring=true;storage_=std::move(s);poolMode_=PoolMode::nativePrepared;return Status::complete;
     }catch(...){return Status::allocation;}
 }
 OriginalGcParticleStatus50KG OriginalGcParticleManager50KG::prepareTrackAtlas160E00(
     const Bytes& prt) noexcept {
-    if(storage_)return Status::alreadyPrepared;
+    if(poolMode_!=PoolMode::empty||storage_||sourcePool_)return Status::alreadyPrepared;
     if(std::fegetround()!=FE_TONEAREST)return Status::arithmetic;
     if(prt.empty()||prt.size()>assets::originalUiDatByteLimit50KG)return Status::authoredData;
     try {
@@ -413,10 +463,12 @@ OriginalGcParticleStatus50KG OriginalGcParticleManager50KG::prepareTrackAtlas160
         }
         // Storage establishes the same5000 stable particle slots/free order.
         // No fog/fire provider, emitter or particle is manufactured here.
-        storage_=std::move(next);return Status::complete;
+        storage_=std::move(next);poolMode_=PoolMode::nativePrepared;return Status::complete;
     }catch(...){return Status::allocation;}
 }
-bool OriginalGcParticleManager50KG::prepared() const noexcept{return bool(storage_);}
+bool OriginalGcParticleManager50KG::prepared() const noexcept {
+    return poolMode_==PoolMode::nativePrepared&&storage_&&!sourcePool_;
+}
 bool OriginalGcParticleManager50KG::gcFogAuthoringPrepared() const noexcept {
     return storage_&&storage_->gcFogAuthoring;
 }

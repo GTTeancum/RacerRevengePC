@@ -76,7 +76,7 @@ bool Owner::sourcePortalWorldLinksCurrent(const SearchNode& node,bool collision,
         if(bool((stage-1)&1u)!=collision||!nativePortals_[i-1]->sourceMode||
            r.knownMask!=31||r.pending||!r.to||!link||link!=r.published||
            link->neighbor04!=&r.to->entity||link->portal08!=&nativePortals_[i-1]->entity||
-           link->field0C||link->field10!=0x7f7fffff||link->next00.get()!=r.sourceNext)return false;
+           link->field0C!=r.distance0C.value_or(0)||link->field10!=r.distance10.value_or(0x7f7fffff)||link->next00.get()!=r.sourceNext)return false;
         link=link->next00.get();
     }
     return !link;
@@ -126,6 +126,8 @@ bool Owner::preflightSourcePortalOwnersNative(const Entity* parent)const noexcep
         for(std::size_t stage=0;stage<4;++stage){const auto& r=sourcePortalWorldLinks_[i][stage];
             if(r.withdrawn){if(r.pending)return false;continue;}
             if(r.knownMask&~31u)return false;
+            if((r.distance0C||r.distance10)&&(!r.published||r.knownMask!=31))return false;
+            if(r.distance0C&&!r.distance10)return false;
             if(r.attempted){
                 if(!s.connectA||!s.connectB||*s.connectA>=10||*s.connectB>=10)return false;
                 const auto from=stage<2?*s.connectA:*s.connectB,to=stage<2?*s.connectB:*s.connectA;
@@ -149,6 +151,8 @@ bool Owner::sourcePortalOwnersCounted(std::size_t& count)const noexcept {
 }
 bool Owner::withdrawSourcePortalWorldLinksNative(std::uint32_t& pc)noexcept {
     pc=0x27f180;
+    for(const auto& f:sourceModelObservers_)if(f&&!f->withdrawn)return false;
+    for(const auto& f:sourceTypedLights_)if(f&&f->flareObserverEntered&&!f->flareObserverWithdrawn)return false;
     //Caller has preflighted the whole graph/count floor and withdrawn manager raw borrows.
     for(std::size_t z=0;z<10;++z)for(bool collision:{false,true}){auto* slots=collision?sourceCollisionSlots4C4_.get():sourceVisibilitySlots4C0_.get();
         if(slots&&slots[z]&&!sourcePortalWorldLinksCurrent(*slots[z],collision,z))return false;}
@@ -160,6 +164,7 @@ bool Owner::withdrawSourcePortalWorldLinksNative(std::uint32_t& pc)noexcept {
 }
 bool Owner::retireSourcePortalsNative(Entity* parent,std::uint32_t& pc)noexcept {
     pc=0x2303f0;if(!preflightSourcePortalOwnersNative(parent))return false;
+    for(const auto& f:sourceTypedLights_)if(f&&f->flareObserverEntered&&!f->flareObserverWithdrawn)return false;
     for(const auto& f:sourceMethodNodeAttachments_)if(f.attempted&&!f.withdrawn)return false;
     for(const auto& rows:sourcePortalWorldLinks_)for(const auto& r:rows)if(r.attempted&&!r.withdrawn)return false;
     for(std::size_t i=10;i>0;--i){auto& owned=nativePortals_[i-1];auto& f=sourcePortalFrames_[i-1];if(f.withdrawn)continue;

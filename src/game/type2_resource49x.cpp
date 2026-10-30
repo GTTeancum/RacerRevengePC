@@ -199,4 +199,33 @@ Status prepareStaticTargetRadii49X(const assets::CollisionMesh48I& mesh,float* r
     maxDepth=depth;
     return Status::Complete;
 }
+bool SourceCollisionPayloadMath50LA::radius1261B0(
+    const std::array<std::uint32_t,3>& input,std::uint32_t& output)noexcept {
+    if(std::fegetround()!=FE_TONEAREST)return false;
+    std::array<float,3> halves;
+    for(unsigned i=0;i<3;++i){
+        const auto magnitude=input[i]&0x7fffffffu;
+        const auto exponent=magnitude&0x7f800000u;
+        if(exponent==0x7f800000u||(!exponent&&magnitude))return false;
+        halves[i]=fp(input[i]);
+    }
+    float result;
+    if(!radius(halves.data(),result))return false;
+    output=bits(result);return true;
+}
+bool SourceCollisionPayloadMath50LA::faceLane126320(
+    std::uint32_t input,std::uint16_t& output)noexcept {
+    if(std::fegetround()!=FE_TONEAREST)return false;
+    const auto magnitude=input&0x7fffffffu;
+    const auto exponent=magnitude&0x7f800000u;
+    if(exponent==0x7f800000u||(!exponent&&magnitude))return false;
+    //One source lane only: keep prior D0/D2 temporaries on a later refusal.
+    const float scaled=mul(32767.f,fp(input));
+    const float biased=add(.5f,scaled);
+    if(!std::isfinite(biased))return false;
+    const auto integer=biased>=2147483648.f?std::numeric_limits<std::int32_t>::max():
+        biased<=-2147483648.f?std::numeric_limits<std::int32_t>::min():static_cast<std::int32_t>(biased);
+    output=static_cast<std::uint16_t>(static_cast<std::uint32_t>(integer)&0xffffu);return true;
+}
+
 }

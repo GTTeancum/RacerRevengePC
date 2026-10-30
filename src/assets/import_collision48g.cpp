@@ -1,4 +1,5 @@
 #include "import_collision48g.h"
+#include "original_source_contact_point_math50la.h"
 #include <algorithm>
 #include <cmath>
 #include <cfenv>
@@ -303,5 +304,22 @@ bool collisionWorldMatrix48G(const Collision48G& c, const std::array<double,16>&
         for(unsigned i=0;i<4;++i)for(unsigned j=0;j<4;++j){double sum=double(c.matrix[i*4])*placement[j];sum+=double(c.matrix[i*4+1])*placement[4+j];sum+=double(c.matrix[i*4+2])*placement[8+j];sum+=double(c.matrix[i*4+3])*placement[12+j];m[i*4+j]=sum;}
         need(matrixFinite(m),"col.composition_nonfinite");output=m;return true;
     }catch(const Failure& f){error=message(f);}return false;
+}
+bool OriginalSourceContactPointMath50LA::packed296244(std::uint16_t word,std::uint32_t& outputBits)noexcept {
+    //Exact existing private adapter body and decoder callers are unchanged.
+    //This source path independently supplies its native rounding admission.
+    if(std::fegetround()!=FE_TONEAREST)return false;
+    const float value=quantizedPosition(word);
+    std::memcpy(&outputBits,&value,4);return true;
+}
+bool OriginalSourceContactPointMath50LA::equal295E54(std::uint32_t left,std::uint32_t right,bool& equal)noexcept {
+    const auto supported=[](std::uint32_t bits)noexcept {
+        const auto magnitude=bits&0x7fffffffu,exponent=magnitude&0x7f800000u;
+        return exponent!=0x7f800000u&&(exponent||!magnitude);
+    };
+    //Normal finite values and signed zero have exact equality from their
+    //binary32 encodings. Exceptional/subnormal source policy is not invented.
+    if(!supported(left)||!supported(right))return false;
+    equal=left==right||(!(left&0x7fffffffu)&&!(right&0x7fffffffu));return true;
 }
 } }

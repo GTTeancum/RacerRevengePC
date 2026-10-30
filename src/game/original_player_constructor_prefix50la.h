@@ -3,6 +3,7 @@
 #include "original_application_input04_source50la.h"
 #include "original_source_world_rows_borrow50la.h"
 #include "original_player_race_music_borrow50la.h"
+#include "original_player_overlay_renderer_lease50la.h"
 #include "original_racer_entity_cold50la.h"
 #include <array>
 #include <memory>
@@ -69,6 +70,15 @@ class OriginalPlayerConstructorPrefix50LA final {
     std::uint32_t loadPC_=0;
     std::unique_ptr<C> source7F8_;
     std::unique_ptr<OriginalPodAIDamageOverlay50LA> sourceOverlay240_;
+    std::shared_ptr<OriginalPlayerOverlayRendererLease50LA> sourceOverlayRenderer_;
+    struct SourcePointerArray {
+        std::unique_ptr<const void*[]> values;
+        std::uint32_t extent=0,initialized=0;
+        bool published=false;
+    };
+    // Native typed pointer storage, never guest addresses or default-known0.
+    std::array<SourcePointerArray,6> sourcePointerArrays_; //800,804,808,81C,80C,818.
+    bool pointerArraysAttempted_=false,overlayAttached_=false,overlayMask12Written_=false;
     bool overlayAttempted_=false,overlayCounted_=false,overlayEnrolled_=false;
     bool baseLoadAttempted_=false,source7F8Counted_=false,source7F8Enrolled_=false;
     const void *sourceTerrain330_=nullptr,*sourceWater334_=nullptr,*sourceWorld338_=nullptr;
@@ -416,21 +426,103 @@ class OriginalPlayerConstructorPrefix50LA final {
         //Before first0x50 primitive allocation/setup2E1AE0. Actual same-source
         //renderer/drain custody is NOT established by Video material context.
     }
+    template<class Application> bool continueOverlayArrays199990(const Application& actual,
+        const std::shared_ptr<const OriginalSourceWorldRowsBorrow50LA>& world,std::uint32_t& pc)noexcept {
+        static_assert(std::is_same_v<Application,original_main_entry50KG::Application>);
+        pc=loadPC_;
+        if(loadPC_!=0x199990||!sourceOverlay240_||!sourceOverlay240_->sourceMode40Known_||
+           !world||!sourceMusic33C_||thread_!=std::this_thread::get_id()||actual.entities()!=app_||
+           !sourceInput_||!actual.sourceInput04NativeBorrowCurrent(sourceInput_.get()))return false;
+        const void *terrain=nullptr,*water=nullptr;const OriginalRaceConstructor50LA* race=nullptr;
+        if(!world->read2107FC(actual,terrain,water,race)||race!=sourceMusic33C_->race_.get()||
+           sourceOverlay240_->sourceRace3C_!=race)return false;
+        if(!sourceOverlayRenderer_)sourceOverlayRenderer_=actual.borrowSourcePlayerOverlayRenderer199990(race);
+        if(!sourceOverlayRenderer_)return false;
+        const bool returned=sourceOverlayRenderer_->constructArrays(*sourceOverlay240_,pc);
+        loadPC_=pc;if(!returned)return false;
+        pc=loadPC_=0x210880;return false; //199950 returned; before141960 attachment.
+    }
+    template<class Application> bool continuePointerArrays210880(const Application& actual,
+        const std::shared_ptr<const OriginalSourceWorldRowsBorrow50LA>& world,std::uint32_t& pc)noexcept {
+        static_assert(std::is_same_v<Application,original_main_entry50KG::Application>);
+        pc=loadPC_;
+        if(loadPC_!=0x210880||pointerArraysAttempted_||!sourceOverlay240_||!sourceOverlayRenderer_||
+           !sourceOverlayRenderer_->current(true)||!sourceOverlay240_->prepared_||!world||!sourceMusic33C_||
+           thread_!=std::this_thread::get_id()||actual.entities()!=app_||!allocation_||
+           !sourceInput_||!actual.sourceInput04NativeBorrowCurrent(sourceInput_.get()))return false;
+        const void *terrain=nullptr,*water=nullptr;const OriginalRaceConstructor50LA* race=nullptr;
+        if(!world->read2107FC(actual,terrain,water,race)||race!=sourceMusic33C_->race_.get()||
+           terrain!=sourceTerrain330_||water!=sourceWater334_)return false;
+        auto& authority=app_->entityAuthority_;auto& parent=allocation_->entity;
+        auto& child=sourceOverlay240_->component;
+        if(app_->attachmentLock423F58()||parent.firstChild18||parent.descendants24||
+           !authority.canRetire(parent)||!authority.canRetire(child)||child.parent1C||child.mask20)return false;
+        pc=loadPC_=0x141960;
+        const auto attached=authority.attachChildren(parent,child,0xcu,app_->attachmentLock423F58());
+        if(attached.status!=OriginalWreckComponentStatus50LA::complete){pc=loadPC_=attached.sourcePC;return false;}
+        overlayAttached_=true;overlayMask12Written_=true;
+        //a2=12 is mask20, NOT a category28 write. Reference00 is unchanged.
+        pointerArraysAttempted_=true;
+        constexpr std::size_t offsets[]={0x800,0x804,0x808,0x81c,0x80c,0x818};
+        constexpr std::uint32_t counts[]={4,4,2,2,4,10};
+        constexpr std::uint32_t faultPC[]={0x2108a4,0x2108d0,0x2108f8,0x210920,0x210944,0x21096c};
+        for(unsigned i=0;i<6;++i){
+            if(i==3&&!water)continue; //Actual retained World334, not a NONE receipt.
+            auto& array=sourcePointerArrays_[i];array.extent=counts[i];
+            array.values.reset(new(std::nothrow) const void*[array.extent]);
+            array.published=true;
+            for(unsigned b=0;b<4;++b)allocation_->known[offsets[i]+b]=0;
+            pc=loadPC_=faultPC[i];if(!array.values)return false; //PublishedNULL, before first SW.
+            //The tenth818 zero is2109B8, delay slot of the unresolved World4A0
+            //branch. Preserve it UNKNOWN until that authentic argument joins.
+            const auto stores=i==5?9u:array.extent;
+            while(array.initialized<stores)array.values[array.initialized++]=nullptr;
+        }
+        pc=loadPC_=0x2109b4;return false;
+        //Need captured actual World4A0 from1AA57C; resetNULL or prewarmed
+        //nativeParticleManager4A0 cannot select this branch. No7FC publication.
+    }
+    bool cancelPointerArraysNative()noexcept {
+        if(!pointerArraysAttempted_)return true;
+        if(!app_||thread_!=std::this_thread::get_id())return false;
+        for(const auto& array:sourcePointerArrays_){
+            if(array.initialized>array.extent||(!array.values&&array.initialized))return false;
+            for(std::uint32_t i=0;i<array.initialized;++i)if(array.values[i])return false;
+            //Unwritten slots (notably818[9]) are not read or released as objects.
+        }
+        //Source210538..2105AC array-storage release order, with no claim that
+        //the remaining full2104D0 destructor has run on this partial Player.
+        constexpr unsigned order[]={0,1,2,4,5,3};
+        for(auto i:order){auto& array=sourcePointerArrays_[i];array.values.reset();array.initialized=0;}
+        return true;
+    }
     bool cancelOverlayNative()noexcept {
+        if(!cancelPointerArraysNative())return false;
         if(sourceOverlay240_){auto& overlay=*sourceOverlay240_;auto& e=overlay.component;
-            //No arrays/materials were acquired by this source-only prefix.
-            //Existing real renderer/drain cleanup remains mandatory once they are.
+            if(overlayAttached_){
+                if(!app_||!allocation_||thread_!=std::this_thread::get_id()||app_->attachmentLock423F58()||
+                   e.parent1C!=&allocation_->entity||e.previous10||e.next14||e.firstChild18||
+                   allocation_->entity.firstChild18!=&e||e.mask20!=0xcu||e.descendants24)return false;
+                const auto detached=app_->entityAuthority_.detach(e,app_->attachmentLock423F58());
+                if(detached.status!=OriginalWreckComponentStatus50LA::complete)return false;
+                overlayAttached_=false;
+            }
+            // Real ordered array cleanup precedes counted Entity retirement.
+            // Failure retains both the partial arrays and exact renderer pin.
+            if(overlay.sourceArraysAttempted_&&(!sourceOverlayRenderer_||
+               !sourceOverlayRenderer_->cancelArrays(overlay)))return false;
             if(overlay.array30||overlay.array34||overlay.attempted_)return false;
             if(overlayCounted_){
                 if(!app_||thread_!=std::this_thread::get_id()||app_->attachmentLock423F58()||
                    !app_->objectCount423F60()||e.reference00!=1||e.sessionGeneration!=generation_||e.objectKey!=key(e)||
                    e.kind!=OriginalWreckComponentKind50LA::overlay199840||e.parent1C||e.previous10||e.next14||e.firstChild18||
-                   e.mask20||e.descendants24||e.category28!=0xff||(e.flags29&15)!=3||e.nativeFlags29)return false;
+                   e.mask20!=(overlayMask12Written_?0xcu:0u)||e.descendants24||e.category28!=0xff||(e.flags29&15)!=3||e.nativeFlags29)return false;
                 if(overlayEnrolled_&&!app_->entityAuthority_.canRetire(e))return false;
                 if(overlayEnrolled_&&!app_->entityAuthority_.retire(e))return false;
                 overlayEnrolled_=false;--e.reference00;--app_->objectCount423F60();overlayCounted_=false;
             }
             overlay.racer38=nullptr;overlay.sourceRace3C_=nullptr;sourceOverlay240_.reset();
+            sourceOverlayRenderer_.reset();
         }
         return true; //Native unlinked prefix cleanup, not1998A0/2104D0.
     }

@@ -1,3 +1,5 @@
+#include "../../tests/native/original_race_display_lifetime50la.h"
+#include "original_player_overlay_renderer_lease50la.h"
 #include "original_race_music_manager50la.h"
 #include "original_application_entities50la.h"
 #include "../../tests/native/original_race_constructor50la.h"
@@ -794,5 +796,86 @@ bool Application::readSourcePlayerRaceMode199980(const rr::game::OriginalRaceCon
     //The C++ field initializer alone is NOT provenance. No camera method is
     //invoked here, and no native Session copy supplies this word.
     mode=std::bit_cast<std::int32_t>(race->field8C_);return true;
+}
+}
+
+namespace rr::game {
+OriginalPlayerOverlayRendererLease50LA::OriginalPlayerOverlayRendererLease50LA(
+    std::shared_ptr<::original_main_entry50KG::RaceDisplayLifetime50LA> display,
+    const ::original_main_entry50KG::Application* issuer)noexcept
+    :display_(std::move(display)),issuer_(issuer),generation_(display_->generation_),
+     applicationLifetime_(issuer->animationClock()){display_->pin();}
+OriginalPlayerOverlayRendererLease50LA::~OriginalPlayerOverlayRendererLease50LA()noexcept {
+    if(display_)display_->unpin();
+}
+bool OriginalPlayerOverlayRendererLease50LA::current(bool acquiring)const noexcept {
+    std::uint32_t pause=0;
+    if(!display_||!applicationLifetime_.readPause11C(pause)||!issuer_||
+       !display_->ownerThread()||display_->application_!=issuer_||display_->generation_!=generation_||
+       !generation_||display_->video_!=issuer_->videoOwner_||
+       issuer_->raceDisplayOwner50LA_.lock()!=display_)return false;
+    if(acquiring&&display_->retiring_)return false;
+    // Held-pin native cancellation remains legal during retirement and at
+    // pin capacity. Never resurrect a destroyed/replaced host/context.
+    return display_->localizationServiceIdentityCurrent50KG()&&display_->created_&&
+        display_->video_->originalMain&&display_->video_->host.created()&&
+        display_->video_->host.current()&&display_->renderer_.initialized();
+}
+bool OriginalPlayerOverlayRendererLease50LA::bindMaterial(OriginalAIDamageMaterialRow50LA& row)const noexcept {
+    if(!current(true)||!issuer_->standardMaterialDomainOwner_)return false;
+    rr::assets::OriginalStandardMaterialDiagnostic50LA d;
+    return row.bindApplication(issuer_->standardMaterialDomainOwner_->materials382B38(),d);
+}
+bool OriginalPlayerOverlayRendererLease50LA::constructArrays(OriginalPodAIDamageOverlay50LA& overlay,
+    std::uint32_t& pc)noexcept {
+    pc=0x199990;
+    if(!current(true)||!overlay.sourceMode_||!overlay.sourceMode40Known_||
+       overlay.sourceArraysAttempted_||overlay.array30||overlay.array34)return false;
+    OriginalAIDamageMaterialRow50LA material;
+    if(!bindMaterial(material))return false;
+    // No directory copy/override and no row population is fabricated here.
+    const auto& directory=issuer_->materialDirectory36B970_;
+    if(!material.acceptsDirectory(directory.c_str(),directory.size()+1u))return false;
+    overlay.sourceArraysAttempted_=true;
+    for(unsigned i=0;i<2;++i){
+        overlay.sourceArrays_[i].reset(new(std::nothrow) OriginalAIDamagePrimitiveArray50LA);
+        auto*& slot=i==0?overlay.array30:overlay.array34;
+        slot=overlay.sourceArrays_[i].get(); //1999A8 publishes even NULL.
+        pc=0x2e1ae0;
+        if(!slot)return false; //Before original null receiver dereference.
+        if(!slot->construct199950(material,directory.c_str(),directory.size()+1u)){
+            pc=slot->materialDiagnostic().sourcePC;
+            if(!pc)pc=0x2e1ae0;return false;
+        }
+    }
+    //133F20 on array30 only, after both original setup returns.
+    overlay.array30->primaryColor199A7C();overlay.prepared_=true;
+    pc=0x199ab0;return true;
+}
+bool OriginalPlayerOverlayRendererLease50LA::cancelArrays(OriginalPodAIDamageOverlay50LA& overlay)noexcept {
+    if(!current(false))return false;
+    // Both obligations are retained:244D60(1), then unconditional245090.
+    // Callbacks and ANY nonempty source queue remain unimplemented owners;
+    // completing this native context cannot discharge them.
+    if(display_->dispatch_.pendingCallbackDC||display_->dispatch_.count54||display_->dispatch_.count60)return false;
+    rr::platform::VehicleWindowDiagnostic50DS d;
+    const auto result=overlay.releaseArrays1998A0(display_->dispatch_,display_->renderer_,d);
+    if(!result.okay())return false;
+    for(auto& array:overlay.sourceArrays_)array.reset();
+    overlay.sourceArraysAttempted_=false;return true;
+}
+}
+namespace original_main_entry50KG {
+std::shared_ptr<rr::game::OriginalPlayerOverlayRendererLease50LA>
+Application::borrowSourcePlayerOverlayRenderer199990(const rr::game::OriginalRaceConstructor50LA* expected)const noexcept {
+    std::int32_t mode=0;
+    if(!readSourcePlayerRaceMode199980(expected,mode)||!standardMaterialDomainOwner_||!videoOwner_)return {};
+    const auto display=raceDisplayOwner50LA_.lock();
+    if(!display||display->application_!=this||display->video_!=videoOwner_||!display->generation_||
+       !display->canRetain())return {};
+    std::uint32_t pause=0;if(!animationClock().readPause11C(pause))return {};
+    try{return std::shared_ptr<rr::game::OriginalPlayerOverlayRendererLease50LA>(
+        new rr::game::OriginalPlayerOverlayRendererLease50LA(display,this));}
+    catch(...){return {};}
 }
 }

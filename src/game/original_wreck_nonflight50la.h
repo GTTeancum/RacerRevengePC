@@ -93,6 +93,7 @@ inline OriginalWreckNonflightMovementResult50LA moveOriginalWreck166C60_50LA(
             corrected.v[i]=m.add(hit.selectedPoint.v[i],m.mul(g.movementSeparation433B60,p.normalA0.v[i]));
         if(!m.valid)return fail(S::arithmetic,0x166dacu);
         if(!flightGlobals)return fail(S::binding,0x166e04u);
+        OriginalStandardPlacementGlobals50LA::positionNativeRouteUnknown();
         sentinel(flightGlobals->positionSentinel4433E8);
         auto local=graph.nodes[static_cast<std::int32_t>(model)].localC0;std::memcpy(local.v+12,corrected.v,12);
         if(!setLocalMatrix49P(graph,model,local))return fail(S::graph,0x166e04u);

@@ -9,7 +9,7 @@ bool Owner::preflightSourceWorldSearchNodesNative()const noexcept {
            sourceSearchHelperA2_||sourceSearchHelperA3_||sourceSearchHelperSourceOffset_||sourceSearchLoadedWord_||sourceSearchStorePending_)return false;
         for(const auto& rows:sourceSearchNodes_)for(const auto& n:rows)
             if(n.owner||n.attempted||n.counted||n.enrolled||n.published||n.ordinalKnown||n.withdrawn||n.constructorMask||n.vtable08||
-               n.pointer3C||n.pointer44||n.pointerA0||n.exclusionAttempted||n.exclusionAllocationReturned||n.exclusionReturned||n.exclusionProduced)return false;
+               n.pointer3C||n.pointer44||n.pointerA0||n.zoneVisibility44||n.exclusionAttempted||n.exclusionAllocationReturned||n.exclusionReturned||n.exclusionProduced)return false;
         return true; //No access to a legacy or unrelated topology's slots.
     }
     if(!sourceSearchNodeS0_||*sourceSearchNodeS0_>10||!sourceSearchZonesIdentity_)return false;

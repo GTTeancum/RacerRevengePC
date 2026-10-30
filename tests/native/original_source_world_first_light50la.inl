@@ -15,7 +15,8 @@ bool Owner::preflightSourceFirstLightNative()const noexcept {
     if(sourceFirstLightCounted_){
         if(e.reference00!=1||e.kind!=g::OriginalWreckComponentKind50LA::light146720||e.objectKey!=key(&e)||
            e.sessionGeneration!=worldEntity_.sessionGeneration||e.category28!=0xff||(e.flags29&15u)!=3u||
-           e.nativeFlags29||e.parent1C!=(l.attached?&nativeLightList3A8_->entity:nullptr)||e.firstChild18||e.previous10||e.next14||
+           e.nativeFlags29||e.parent1C!=(l.attached?&nativeLightList3A8_->entity:nullptr)||e.firstChild18||e.previous10||
+           !preflightSourceLightSiblingLinksNative()||
            e.mask20!=((l.attached||sourceFirstLightNativeDetached_)?2u:0u)||e.descendants24||
            !worldApplication_->objectCount423F60())return false;
     }else if(e.reference00)return false;
@@ -35,8 +36,11 @@ bool Owner::preflightSourceFirstLightNative()const noexcept {
     if((l.colorsWritten&&!sourceFirstLightPublished_)||(l.revisionWritten&&!l.colorsWritten)||
        (l.configured&&!l.revisionWritten)||(l.registered&&!l.configured)||
        (l.attached&&(!l.registered||sourceFirstLightNativeDetached_))||l.retiring||l.observerOwner)return false;
-    const auto& parent=nativeLightList3A8_->entity;
-    if(parent.firstChild18!=(l.attached?&e:nullptr)||parent.descendants24!=(l.attached?2u:0u))return false;
+    if(sourceSecondLight_&&sourceSecondLight_->attached){
+        const auto& second=sourceSecondLight_->entity;
+        if(!l.attached||second.previous10!=&e||second.parent1C!=&nativeLightList3A8_->entity||second.mask20!=2)return false;
+    }
+    if(!preflightSourceLightSiblingLinksNative())return false;
     if(sourceFirstLightReturned_!=l.typed||l.constructed!=sourceFirstLightReturned_||
        (!l.typed&&l.query32!=0xff)||(l.typed&&l.query32==0xff))return false;
     if(sourceFirstLightPublished_&&(!sourceFirstLightReturned_||nativeLightList3A8_->wrappers38[0].live00!=&e))return false;
@@ -95,6 +99,7 @@ bool Owner::attachSourceFirstLight141960(std::uint32_t& pc)noexcept {
 bool Owner::detachSourceFirstLightNative(std::uint32_t& pc)noexcept {
     if(!preflightSourceFirstLightNative())return false;
     if(!sourceFirstLight_||!sourceFirstLight_->attached)return true;
+    if(sourceSecondLight_&&sourceSecondLight_->attached)return false; //Native unwind removes second tail first.
     const auto detached=worldApplication_->entityAuthority_.detach(sourceFirstLight_->entity,
         worldApplication_->attachmentLock423F58());
     if(detached.status!=g::OriginalWreckComponentStatus50LA::complete){pc=detached.sourcePC;return false;}

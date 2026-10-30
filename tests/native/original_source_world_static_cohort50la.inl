@@ -62,8 +62,15 @@ inline bool Owner::continueSourceWorldStaticModels27B89C(std::uint32_t& pc)noexc
                 pc=d.sourcePC?d.sourcePC:config.sourcePC_;return false;}return true;};
         source_world_light50LA::Reader<decltype(fetch)> read{fetch,pc};std::array<char,260> type;
         pc=0x27b844;if(!read.text("statictype","Standard",type.data(),type.size(),returned))return false;
-        pc=0x27bae0;if(std::strcmp(type.data(),"Standard")!=0){pc=0x27bb10;return false;}
-        sourceStaticResolvedType_=1; //27BB0C then actual27B860 stack store.
+        pc=0x27bae0;
+        if(std::strcmp(type.data(),"Standard")==0){pc=0x27bb0c;sourceStaticResolvedType_=1;}
+        else {pc=0x27bb18;if(std::strcmp(type.data(),"PhysicsObject")!=0){pc=0x27bb2c;return false;}
+            pc=0x27bb2c;sourceStaticResolvedType_=2;}
+        pc=0x27b860; //Actual resolved type stack lane, not yet wrapper00.
+        if(*sourceStaticResolvedType_==2){
+            if(!constructSourcePhysicsWrapper27BA3C(zi,mi,pc)||!loadSourcePhysicsDescriptor27B370(zi,mi,pc))return false;
+            pc=0x27b89c;return true;
+        }
         auto& owned=owner.sourceWrapperLedger_[zi][mi];
         pc=0x27b9f4;if(owned)return false;
         pc=0x27b9f4;try{owned.reset(new Wrapper);}catch(...){owned.reset();}
@@ -79,9 +86,14 @@ inline bool Owner::continueSourceWorldStaticModels27B89C(std::uint32_t& pc)noexc
     };
     for(;;){
         auto& p=*owner.parents_[sourceStaticZoneIndex_];const auto& zone=sourceZones350_[sourceStaticZoneIndex_];
-        pc=0x27b89c;if(!sourceStaticResolvedType_||*sourceStaticResolvedType_!=1)return stop(pc);
-        //Actual type==2 comparison is false for this genuinely resolved row;
-        //no PhysicsObject count increment or27C1D0 registration is fabricated.
+        pc=0x27b89c;if(!sourceStaticResolvedType_||(*sourceStaticResolvedType_!=1&&*sourceStaticResolvedType_!=2))return stop(pc);
+        if(*sourceStaticResolvedType_==2){
+            auto& w=owner.sourceWrapperLedger_[sourceStaticZoneIndex_][sourceStaticModelIndex_];
+            if(!w||!owner.sourcePhysicsWrapperCurrentNative(*w)||!w->sourcePhysics.descriptorReadReturned||
+               w->sourcePhysics.countedInParent||sourceStaticPhysicsCount_>=p.count30)return stop(0x27b8ac);
+            pc=0x27b8ac;++sourceStaticPhysicsCount_;++owner.sourcePhysicsCounts_[sourceStaticZoneIndex_];
+            w->sourcePhysics.countedInParent=true; //Integer S1 count only, no Entity retain/count.
+        }
         pc=0x27b8b0;sourceStaticSlotByteOffset_+=4;
         pc=0x27b8b4;++sourceStaticModelIndex_;
         pc=0x27b8b8;
@@ -103,7 +115,17 @@ inline bool Owner::continueSourceWorldStaticModels27B89C(std::uint32_t& pc)noexc
         pc=0x27b8d4;if(owner.sourceLogAttempted_[zi])return stop(pc);
         owner.sourceLogAttempted_[zi]=true;
         owner.sourceLogWritten_[zi]=std::fwrite(message.data(),1,length,stdout);
-        pc=0x27b8dc;if(sourceStaticPhysicsCount_!=0)return stop(pc); //Before unsupported27C1D0.
+        pc=0x27b8dc;
+        if(sourceStaticPhysicsCount_){
+            if(!worldPhysics3D4_||!sourcePhysics3D4_||*sourcePhysics3D4_!=worldPhysics3D4_.get()||
+               sourceStaticPhysicsArg_!=worldPhysics3D4_.get()||zone.index00!=static_cast<std::int32_t>(zi))return stop(0x27b8ec);
+            bool returned=false;std::uint32_t ignoredV0=0;pc=0x27b8ec;
+            if(!worldPhysics3D4_->reserveSource27C1D0(worldEntity_,static_cast<std::uint32_t>(zone.index00),
+                static_cast<std::int32_t>(sourceStaticPhysicsCount_),returned,ignoredV0,pc)||!returned)return stop(pc);
+            //Original ignores27C1D0 V0, including actual0. A native refusal
+            //above does not fabricate either that return or parent success.
+            pc=0x27b8f4;
+        }
         //True27B740 return1, then actual outer branch-delay success increment.
         pc=0x27119c;++sourceStaticSucceededZones_;
         pc=0x2711d0;sourceStaticZonePointerOffset_+=4;
@@ -133,7 +155,7 @@ inline bool Owner::continueSourceWorldStaticModels27B89C(std::uint32_t& pc)noexc
         pc=0x271194;sourceStaticZoneArg_=&sourceZones350_[next];sourceStaticZoneArgIndex_=next;
         auto& parent=*owner.parents_[next];pc=0x27b780;parent.count30=static_cast<std::uint32_t>(sourceZones350_[next].staticCount108);
         if(parent.count30!=owner.sourceZoneCounts_[next])return stop(0x27b784);
-        pc=0x27b78c;sourceStaticPhysicsCount_=0;
+        pc=0x27b78c;sourceStaticPhysicsCount_=0;sourceStaticPhysicsCountZone_=next;
         pc=0x27b79c;try{parent.sourceEntries34.reset(new Wrapper*[parent.count30]);}catch(...){parent.sourceEntries34.reset();}
         pc=0x27b7a4;parent.sourceArrayReturned=true;
         pc=0x27b7a8;sourceStaticModelIndex_=0;sourceStaticSlotByteOffset_=0;

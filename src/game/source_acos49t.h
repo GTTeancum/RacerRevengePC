@@ -65,6 +65,15 @@ class SourceTerrainSetupMath50LA final {
         std::uint32_t twiceDamping,std::uint32_t& output)noexcept;
 };
 
+// Reached type0 collision float-normal guards only. These are raw source
+// conversion/classification operations, independent of acos and libm state.
+// Classifier returns exactly 0/1; infinity is not classified as NaN.
+class SourceCollisionMath50LA final {
+    friend class OriginalWreckType0Owners50LA;
+    static std::uint64_t widen311038(std::uint32_t inputBits)noexcept;
+    static std::uint32_t classify3022D0(std::uint64_t inputBits)noexcept;
+};
+
 #ifdef RR_SOURCE_ACOS49T_TEST_API
 // Test-only access to the elementary source operations and conversions.
 // These symbols are omitted from ordinary production builds.

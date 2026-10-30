@@ -13,6 +13,20 @@ inline bool Owner::preflightSourceWorldStaticModelsNative()const noexcept {
        (sourceStaticConfigArg_&&sourceStaticConfigArg_!=sourceWorldConfig_.get())||
        (sourceStaticZoneArg_&&(!sourceZones350_||sourceStaticZoneArgIndex_>=10||
            sourceStaticZoneArg_!=&sourceZones350_[sourceStaticZoneArgIndex_])))return false;
+    if(sourceStaticOwner_->sourceLedgerPrepared_){
+        if(sourceStaticPhysicsCountZone_>=10||sourceStaticPhysicsCountZone_>sourceStaticZoneIndex_)return false;
+        for(std::size_t z=0;z<10;++z){
+            const auto count=sourceStaticOwner_->sourcePhysicsCounts_[z];
+            if(count>sourceStaticOwner_->sourceZoneCounts_[z])return false;
+            if(z==sourceStaticPhysicsCountZone_&&count!=sourceStaticPhysicsCount_)return false;
+            if(z>sourceStaticZoneIndex_&&count)return false;
+            if(worldPhysics3D4_){const auto& h=worldPhysics3D4_->sourceCapacity_[z];
+                if(h.entered&&(!count||h.requested!=static_cast<std::int32_t>(count)||
+                   !sourceStaticOwner_->sourceLogAttempted_[z]))return false;
+                if(z<sourceStaticZoneIndex_&&count&&(!h.entered||!h.returned))return false;
+            }else if(count)return false;
+        }
+    }
     if(sourceStaticPhase_==SourceStaticPhase::nativeAdmitted)
         return !sourceModelOwner3C4_&&!sourceModelParents3C4_&&!modelParents3C4Attempted_;
     return sourceModelOwner3C4_==sourceStaticOwner_.get()&&modelParents3C4Current(sourceStaticOwner_.get(),false);
@@ -20,6 +34,7 @@ inline bool Owner::preflightSourceWorldStaticModelsNative()const noexcept {
 inline bool Owner::abortSourceWorldStaticModelsNative(std::uint32_t& pc)noexcept {
     //A later actual271A00 frame retains typed native stack identities. Its
     //withdrawal must precede any raw group/descriptor owner destruction.
+    if(sourcePostParticleModelsPhase_!=SourcePostParticleModelsPhase::unreached&&sourcePostParticleModelsPhase_!=SourcePostParticleModelsPhase::nativeClosed){pc=0;return false;}
     if(sourceStaticModelParamPhase_!=SourceStaticModelParamPhase::unreached&&
        sourceStaticModelParamPhase_!=SourceStaticModelParamPhase::nativeClosed){pc=0;return false;}
     pc=0;if(!preflightSourceWorldStaticModelsNative())return false;

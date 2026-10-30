@@ -241,6 +241,18 @@ bool SourceTerrainSetupMath50LA::damping1B12FC(std::uint32_t product,
     output=result;return true;
 }
 
+std::uint64_t SourceCollisionMath50LA::widen311038(std::uint32_t inputBits)noexcept {
+    return from_float(inputBits); //Same original311038 software conversion.
+}
+std::uint32_t SourceCollisionMath50LA::classify3022D0(std::uint64_t inputBits)noexcept {
+    const auto low=static_cast<std::uint32_t>(inputBits);
+    const auto high=static_cast<std::uint32_t>(inputBits>>32);
+    //3022E0..3022F4 fold nonzero low bits into the sign-cleared high word.
+    const std::uint32_t folded=(high&0x7fffffffu)|static_cast<std::uint32_t>(low!=0);
+    //Unsigned low32 subtraction and final JR delay-slot302304 logical shift.
+    return (std::uint32_t{0x7ff00000u}-folded)>>31;
+}
+
 #ifdef RR_SOURCE_ACOS49T_TEST_API
 namespace source_acos49t_test {
 std::uint64_t arithmetic(Operation op, std::uint64_t a, std::uint64_t b) noexcept {

@@ -24,7 +24,11 @@ bool Owner::preflightSourceWorldStaticModelParamsNative()const noexcept {
         if(!f.descriptorZone||!f.descriptorSlot||*f.descriptorZone>=10||
            *f.descriptorSlot>=owner.sourceWrapperLedger_[*f.descriptorZone].size())return false;
         const auto& w=owner.sourceWrapperLedger_[*f.descriptorZone][*f.descriptorSlot];
-        if(!w||f.descriptorA0!=w->descriptor10.get())return false;
+        if(!w)return false;
+        if(f.descriptorBorrowWithdrawn){
+            if(sourceStaticModelParamPhase_!=SourceStaticModelParamPhase::returned||f.descriptorA0||
+               !w->sourceDescriptorDisposed||w->descriptor10)return false;
+        }else if(f.descriptorA0!=w->descriptor10.get())return false;
     }else if(f.descriptorA0)return false;
     if(f.sltKnown&&(!f.sltBytes||*f.sltBytes>=f.slt1A0.size()||f.slt1A0[*f.sltBytes]))return false;
     return true; //No shadow==constructor1 gate; every reached overwrite persists.

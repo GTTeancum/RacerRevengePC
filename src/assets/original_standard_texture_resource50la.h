@@ -19,7 +19,7 @@ namespace ra_crowd_image50LA { class Verifier; }
 namespace ra_tga_source50LA { class Verifier; }
 namespace ra_cold_aggregate50LA { class Owner; }
 namespace rr::platform { class OriginalLoadingLsiConfig50LA; class OriginalUiCourseManagerConfig50KG; class OriginalUiGarageSession50KG; class OriginalUiGarageActors50GN; class OriginalUiGarageWattoOwner50KG; }
-namespace rr::game { class OriginalLoadingScreen40Mode0LA; class OriginalRacerAnimationCold50LA; class OriginalTimeStats50LA; class OriginalSpeedBoost50LA; class OriginalDamage50LA; class OriginalPositionStatsHud50LA; class OriginalPauseStorage50LA; class OriginalRaceF850LA; class OriginalResults10450LA; }
+namespace rr::game { class OriginalRacerModelSceneOwner50LA; class OriginalLoadingScreen40Mode0LA; class OriginalRacerAnimationCold50LA; class OriginalTimeStats50LA; class OriginalSpeedBoost50LA; class OriginalDamage50LA; class OriginalPositionStatsHud50LA; class OriginalPauseStorage50LA; class OriginalRaceF850LA; class OriginalResults10450LA; }
 namespace rr::assets {
 class OriginalPodSourceBank50LA;
 class OriginalApplicationFonts50LA;
@@ -27,6 +27,9 @@ class OriginalLoadingFontSource50LA;
 class OriginalLoadingPstFile50LA;
 class OriginalLoadingRaFile50LA;
 class OriginalRaTrackSourceFile50LA;
+class OriginalSourcePsgFile50LA;
+class OriginalSourceCollisionFile50LA;
+class OriginalSourcePsgMissingLookup50LA;
 class OriginalLoadingTextureFc50LA;
 class MaterialTextureAssets50EA;
 struct MaterialTextureAsset50EA;
@@ -328,6 +331,7 @@ private:
         OriginalStandardTextureDiagnostic50LA&)noexcept;
     bool closeAppStartTemplate1573B0(bool success,
         OriginalStandardTextureDiagnostic50LA&)noexcept;
+    friend class OriginalParticleSourceConfig50LA;
     friend class ::rr::platform::OriginalUiCourseManagerConfig50KG;
     friend class ::rr::platform::OriginalLoadingLsiConfig50LA;
     friend class OriginalLoadingFontSource50LA;
@@ -337,6 +341,36 @@ private:
     bool registerPodBank12CEA0(OriginalPodSourceBank50LA&,OriginalStandardTextureDiagnostic50LA&)noexcept;
     bool closePodBankNative(OriginalPodSourceBank50LA&,OriginalStandardTextureDiagnostic50LA&)noexcept;
     friend class OriginalRaTrackSourceFile50LA;
+    friend class OriginalSourcePsgFile50LA;
+    friend class OriginalSourceCollisionFile50LA;
+    bool continueSourceCollisionFound132988(std::shared_ptr<OriginalSourcePsgMissingLookup50LA>,const void*,
+        std::shared_ptr<OriginalSourceCollisionFile50LA>&,OriginalStandardTextureDiagnostic50LA&)noexcept;
+    bool sourceCollisionFileCurrentNative(const OriginalSourceCollisionFile50LA&,bool active)const noexcept;
+    friend class OriginalSourcePsgMissingLookup50LA;
+    bool captureSourcePsgMissing132820(std::shared_ptr<OriginalRaTrackSourceFile50LA>,const std::string&,
+        std::shared_ptr<OriginalSourcePsgMissingLookup50LA>&,OriginalStandardTextureDiagnostic50LA&)noexcept;
+    bool sourcePsgMissingCurrentNative(const OriginalSourcePsgMissingLookup50LA&)const noexcept;
+    bool closeSourcePsgMissingNative(OriginalSourcePsgMissingLookup50LA&,OriginalStandardTextureDiagnostic50LA&)noexcept;
+    bool captureSourcePsg132820(std::shared_ptr<OriginalRaTrackSourceFile50LA>,const std::string&,OriginalStandardModelFileId50LA,std::shared_ptr<OriginalSourcePsgFile50LA>&,OriginalStandardTextureDiagnostic50LA&,
+        std::shared_ptr<OriginalSourcePsgFile50LA> warmCreatorFile={},const OriginalStandardModelGeometry50LA* warmGeometry=nullptr,
+        const rr::game::OriginalRacerModelSceneOwner50LA* warmCreator=nullptr)noexcept;
+    bool continueSourcePsgFound132988(std::shared_ptr<OriginalSourcePsgMissingLookup50LA>,OriginalStandardModelFileId50LA,
+        std::shared_ptr<OriginalSourcePsgFile50LA>&,OriginalStandardTextureDiagnostic50LA&,
+        std::shared_ptr<OriginalSourcePsgFile50LA>,const OriginalStandardModelGeometry50LA*,
+        const rr::game::OriginalRacerModelSceneOwner50LA*)noexcept;
+    bool sourcePsgFoundPredecessorCurrentNative(const OriginalSourcePsgFile50LA&)const noexcept;
+    bool withdrawSourcePsgFoundNative(OriginalSourcePsgFile50LA&,OriginalStandardTextureDiagnostic50LA&)noexcept;
+    bool sourcePsgWarmCurrent(const OriginalSourcePsgFile50LA&,const OriginalStandardModelGeometry50LA*,
+        const rr::game::OriginalRacerModelSceneOwner50LA*)const noexcept;
+    bool sourcePsgFileCurrent(const OriginalSourcePsgFile50LA&)const noexcept;
+    bool sourcePsgFrameCurrentNative(const OriginalSourcePsgFile50LA&)const noexcept;
+    bool associateSourcePsgGeometry1326A0(OriginalSourcePsgFile50LA&,const std::shared_ptr<OriginalStandardModelGeometry50LA>&,
+        const rr::game::OriginalRacerModelSceneOwner50LA*,OriginalStandardTextureDiagnostic50LA&)noexcept;
+    bool sourcePsgGeometryCurrent(const OriginalSourcePsgFile50LA&,const OriginalStandardModelGeometry50LA*,
+        const rr::game::OriginalRacerModelSceneOwner50LA*)const noexcept;
+    bool withdrawSourcePsgGeometryNative(OriginalSourcePsgFile50LA&,const OriginalStandardModelGeometry50LA*,
+        const rr::game::OriginalRacerModelSceneOwner50LA*,OriginalStandardTextureDiagnostic50LA&)noexcept;
+    bool sourcePsgCursorNative(const OriginalSourcePsgFile50LA&,std::size_t&,OriginalStandardTextureDiagnostic50LA&)const noexcept;
     bool registerTrackBank12CEA0(OriginalRaTrackSourceFile50LA&,OriginalStandardTextureDiagnostic50LA&)noexcept;
     bool resizeTrackCache132E40(OriginalRaTrackSourceFile50LA&,OriginalStandardTextureDiagnostic50LA&)noexcept;
     bool closeTrackBankNative(OriginalRaTrackSourceFile50LA&,OriginalStandardTextureDiagnostic50LA&)noexcept;

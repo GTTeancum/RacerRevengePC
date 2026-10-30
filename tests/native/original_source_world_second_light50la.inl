@@ -3,13 +3,18 @@
 #include "../../src/game/original_world_light_assertion273abc.h"
 #include "../../src/game/source_acos49t.h"
 #include "../../src/game/native_directional_normalize106ea0_proposal.h"
+#include "../../src/game/native_directional_attenuation147268_proposal.h"
 namespace ra_pod_scene50LA {
 bool Owner::preflightSourceSecondLightNative()const noexcept {
+    if(sourceSecondDescriptorFreeMask_!=0&&sourceSecondDescriptorFreeMask_!=1&&sourceSecondDescriptorFreeMask_!=3&&
+       sourceSecondDescriptorFreeMask_!=7&&sourceSecondDescriptorFreeMask_!=15)return false;
     if(!sourceSecondLight_){
         return !sourceSecondLightCounted_&&!sourceSecondLightEnrolled_&&!sourceSecondLightDefaults_&&
             !sourceSecondLightReturned_&&!sourceSecondLightVtable08_&&!sourceSecondLuminance_&&
             !sourceSecondPositionWords_&&!sourceSecondLookInputWords_&&!sourceSecondNormalizedWords_&&
-            !sourceSecondPositionCompared_&&!sourceSecondLookCompared_&&
+            !sourceSecondPositionCompared_&&!sourceSecondLookCompared_&&!sourceSecondAttenuationWords_&&
+            !sourceSecondAttenuationRange_&&!sourceSecondConfigReturned_&&!sourceSecondLightNativeDetached_&&
+            (sourceSecondDescriptorFreeMask_==0||sourceSecondDescriptorFreeMask_==15)&&
             (!sourceSecondLightPublished_||(sourceSecondLightOuterReached_&&nativeLightList3A8_&&
              nativeLightList3A8_->wrappers38&&!nativeLightList3A8_->wrappers38[1].live00));
     }
@@ -20,7 +25,9 @@ bool Owner::preflightSourceSecondLightNative()const noexcept {
     if(sourceSecondLightCounted_){
         if(e.reference00!=1||e.kind!=g::OriginalWreckComponentKind50LA::light146720||e.objectKey!=key(&e)||
            e.sessionGeneration!=worldEntity_.sessionGeneration||e.category28!=0xff||(e.flags29&15u)!=3u||
-           e.nativeFlags29||e.parent1C||e.firstChild18||e.previous10||e.next14||e.mask20||e.descendants24||
+           e.nativeFlags29||e.parent1C!=(l.attached?&nativeLightList3A8_->entity:nullptr)||e.firstChild18||
+           !preflightSourceLightSiblingLinksNative()||
+           e.mask20!=((l.attached||sourceSecondLightNativeDetached_)?2u:0u)||e.descendants24||
            !worldApplication_->objectCount423F60())return false;
     }else if(e.reference00)return false;
     if(sourceSecondLightEnrolled_){if(!sourceSecondLightCounted_||!authority.canRetire(e))return false;}
@@ -28,16 +35,28 @@ bool Owner::preflightSourceSecondLightNative()const noexcept {
     const auto xyz=[](const std::array<std::uint32_t,4>& v){return std::array<float,3>{{
         g::directional_native_proposal::detail::fromWord(v[0]),g::directional_native_proposal::detail::fromWord(v[1]),
         g::directional_native_proposal::detail::fromWord(v[2])}};};
-    if(sourceSecondPositionWords_){
-        const auto& d=nativeLightList3A8_->wrappers38[1].sourceDescriptor04;
-        if(!d||!d->position14||*d->position14!=*sourceSecondPositionWords_)return false;
+    const auto& descriptor=nativeLightList3A8_->wrappers38[1].sourceDescriptor04;
+    if(sourceSecondDescriptorFreeMask_&8u){if(sourceSecondDescriptorFreeMask_!=15||descriptor)return false;}
+    if(sourceSecondPositionWords_&&!(sourceSecondDescriptorFreeMask_&8u)){
+        if(!descriptor)return false;
+        if(sourceSecondDescriptorFreeMask_&1u){if(descriptor->position14)return false;}
+        else if(!descriptor->position14||*descriptor->position14!=*sourceSecondPositionWords_)return false;
     }
-    if(sourceSecondLookInputWords_){
-        const auto& d=nativeLightList3A8_->wrappers38[1].sourceDescriptor04;
-        if(!d||!d->look18||*d->look18!=*sourceSecondLookInputWords_)return false;
+    if(sourceSecondLookInputWords_&&!(sourceSecondDescriptorFreeMask_&8u)){
+        if(!descriptor)return false;
+        if(sourceSecondDescriptorFreeMask_&2u){if(descriptor->look18)return false;}
+        else if(!descriptor->look18||*descriptor->look18!=*sourceSecondLookInputWords_)return false;
     }
+    if(sourceSecondAttenuationWords_&&!(sourceSecondDescriptorFreeMask_&8u)){
+        if(!descriptor)return false;
+        if(sourceSecondDescriptorFreeMask_&4u){if(descriptor->attenuation1C)return false;}
+        else if(!descriptor->attenuation1C||*descriptor->attenuation1C!=*sourceSecondAttenuationWords_)return false;
+    }
+    if(sourceSecondDescriptorFreeMask_&&(!sourceSecondConfigReturned_||!sourceSecondPositionWords_||
+       !sourceSecondLookInputWords_||!sourceSecondAttenuationWords_))return false;
     if(l.positionWritten!=bool(sourceSecondPositionWords_)||l.lookWritten!=bool(sourceSecondNormalizedWords_)||
        bool(sourceSecondNormalizedWords_)!=bool(sourceSecondLookInputWords_))return false;
+    if(l.rangeWritten&&!sourceSecondAttenuationRange_)return false;
     if(sourceSecondLightDefaults_){
         if(!sourceSecondLightCounted_||!sourceSecondLightEnrolled_||!sourceSecondLightVtable08_||*sourceSecondLightVtable08_!=0x3cd600||
            l.query30||l.flags33||l.knownFlags33!=7||l.type34!=(l.colorsWritten?2u:0u)||l.mode38!=3||
@@ -45,8 +64,8 @@ bool Owner::preflightSourceSecondLightNative()const noexcept {
            l.specular4C!=l.diffuse3C||l.ambient5C!=(l.colorsWritten?std::array<float,4>{}:l.diffuse3C)||
            l.position6C!=(l.positionWritten?xyz(*sourceSecondPositionWords_):std::array<float,3>{})||
            l.look78!=(l.lookWritten?xyz(*sourceSecondNormalizedWords_):std::array<float,3>{{1,0,0}})||
-           l.range84!=g::SourceUiLightMath50KG::range146898()||l.field88!=0x3f800000||
-           l.attenuation8C!=std::array<float,3>{{1,0,0}}||l.cone98!=0x3f490fdb||l.cone9C!=0x3fc90fdb||
+           l.range84!=(l.rangeWritten?*sourceSecondAttenuationRange_:g::SourceUiLightMath50KG::range146898())||l.field88!=0x3f800000||
+           l.attenuation8C!=(sourceSecondAttenuationWords_?xyz(*sourceSecondAttenuationWords_):std::array<float,3>{{1,0,0}})||l.cone98!=0x3f490fdb||l.cone9C!=0x3fc90fdb||
            l.positionA0!=(l.positionWritten?*sourceSecondPositionWords_:worldApplication_->lightVector426F10_)||
            l.lookB0!=(l.lookWritten?*sourceSecondNormalizedWords_:std::array<std::uint32_t,4>{{0,0,0,0x3f800000}})||
            l.fieldC0||l.fieldC4||l.ordinalC8!=(l.colorsWritten?1:-1)||
@@ -56,8 +75,14 @@ bool Owner::preflightSourceSecondLightNative()const noexcept {
        (sourceSecondLuminance_&&!l.revisionWritten)||(sourceSecondPositionCompared_&&!sourceSecondLuminance_)||
        (l.positionWritten&&!sourceSecondPositionCompared_)||(l.positionRevision&&!l.positionWritten)||
        (sourceSecondLookCompared_&&(!sourceSecondPositionCompared_||(l.positionWritten&&!l.positionRevision)))||
-       (l.lookWritten&&!sourceSecondLookCompared_)||(l.lookRevision&&!l.lookWritten)||l.rangeWritten||l.rangeRevision||
-       l.configured||l.registered||l.attached||l.retiring||l.observerOwner)return false;
+       (l.lookWritten&&!sourceSecondLookCompared_)||(l.lookRevision&&!l.lookWritten)||
+       (sourceSecondAttenuationWords_&&(!sourceSecondLookCompared_||(l.lookWritten&&!l.lookRevision)))||
+       (sourceSecondAttenuationRange_&&!sourceSecondAttenuationWords_)||(l.rangeRevision&&!l.rangeWritten)||
+       l.configured!=sourceSecondConfigReturned_||(l.configured&&(!sourceSecondAttenuationRange_||(l.rangeWritten&&!l.rangeRevision)))||
+       (l.registered&&!l.configured)||(l.attached&&(!l.registered||sourceSecondLightNativeDetached_||sourceSecondDescriptorFreeMask_!=15))||
+       l.retiring||l.observerOwner)return false;
+    if(l.attached&&(sourceFirstLight_->entity.next14!=&e||nativeLightList3A8_->entity.firstChild18!=&sourceFirstLight_->entity||
+       nativeLightList3A8_->entity.descendants24!=2u))return false;
     if(sourceSecondLightReturned_!=l.typed||l.constructed!=sourceSecondLightReturned_||
        (!l.typed&&l.query32!=0xff)||(l.typed&&l.query32==0xff))return false;
     if(sourceSecondLightPublished_&&(!sourceSecondLightReturned_||nativeLightList3A8_->wrappers38[1].live00!=&e))return false;
@@ -67,7 +92,7 @@ bool Owner::constructSourceSecondLight146720(std::uint32_t& pc)noexcept {
     //Native admission and ledger reserve precede nullable guest allocation.
     //An admission failure is NOT a source allocationNULL or constructor return.
     if(!preflightSourceFirstLightNative()||!sourceFirstLight_||!sourceFirstLight_->attached||!sourceFirstLight_->registered||
-       !preflightSourceSecondLightNative()||sourceSecondLightOuterReached_||!worldApplication_||
+       !preflightSourceSecondLightNative()||sourceSecondLightOuterReached_||sourceSecondDescriptorFreeMask_||!worldApplication_||
        !nativeLightList3A8_||!nativeLightList3A8_->sourceMode||!nativeLightList3A8_->wrappers38||
        nativeLightList3A8_->wrappers38[1].live00||!reserveSourceAmbientListNative())return false;
     auto& authority=worldApplication_->entityAuthority_;
@@ -102,8 +127,37 @@ bool Owner::sourceSecondLightLuminance146E60(std::uint32_t& out)const noexcept {
     //not the native normalization adapter and not a guessed output constant.
     return g::SourceUiLightMath50KG::luminance146E60(0x42ce0000u,0x42ce0000u,0x42b90000u,out);
 }
+bool Owner::sourceSecondAttenuation147268(std::uint32_t& out)const noexcept {
+    if(!preflightSourceSecondLightNative()||!sourceSecondLight_||!sourceSecondAttenuationWords_||sourceSecondAttenuationRange_)
+        return false;
+    //Same reached source sqrt/narrow limit as1472E8/1472F0, via existing
+    //private pod Owner math authority. Actual EE-FPU expression is explicit
+    //strict-native adaptation; no original expected result word is asserted.
+    return g::directional_native_proposal::range147268(*sourceSecondAttenuationWords_,
+        g::SourceUiLightMath50KG::range146898(),out)==g::directional_native_proposal::Status::complete;
+}
+bool Owner::attachSourceSecondLight141960(std::uint32_t& pc)noexcept {
+    pc=0x273b98;
+    if(!preflightSourceFirstLightNative()||!preflightSourceSecondLightNative()||!sourceSecondLight_||
+       !sourceSecondLightPublished_||!sourceSecondLight_->registered||sourceSecondLight_->attached||
+       sourceSecondLightNativeDetached_||sourceSecondDescriptorFreeMask_!=15||
+       !nativeLightList3A8_||!nativeLightList3A8_->sourceAuthorityEnrolled||nativeLightList3A8_->wrappers38[1].sourceDescriptor04)
+        return false;
+    const auto attached=worldApplication_->entityAuthority_.attachChildren(nativeLightList3A8_->entity,sourceSecondLight_->entity,2u,
+        worldApplication_->attachmentLock423F58());
+    if(attached.status!=g::OriginalWreckComponentStatus50LA::complete){pc=attached.sourcePC;return false;}
+    sourceSecondLight_->attached=true;pc=0x273ba0;return true;
+}
+bool Owner::detachSourceSecondLightNative(std::uint32_t& pc)noexcept {
+    if(!preflightSourceFirstLightNative()||!preflightSourceSecondLightNative())return false;
+    if(!sourceSecondLight_||!sourceSecondLight_->attached)return true;
+    const auto detached=worldApplication_->entityAuthority_.detach(sourceSecondLight_->entity,worldApplication_->attachmentLock423F58());
+    if(detached.status!=g::OriginalWreckComponentStatus50LA::complete){pc=detached.sourcePC;return false;}
+    sourceSecondLight_->attached=false;sourceSecondLightNativeDetached_=true;
+    return true; //Native splice only, not a guest destructor or mask reset.
+}
 bool Owner::abortSourceSecondLightNative()noexcept {
-    if(!preflightSourceSecondLightNative())return false;
+    if(!preflightSourceSecondLightNative()||(sourceSecondLight_&&(sourceSecondLight_->registered||sourceSecondLight_->attached)))return false;
     if(sourceSecondLight_){auto& e=sourceSecondLight_->entity;
         if(sourceSecondLightEnrolled_&&!worldApplication_->entityAuthority_.retire(e))return false;
         sourceSecondLightEnrolled_=false;
@@ -114,6 +168,8 @@ bool Owner::abortSourceSecondLightNative()noexcept {
     sourceSecondLightReturned_=false;sourceSecondLightPublished_=false;sourceSecondLightVtable08_.reset();
     sourceSecondLuminance_.reset();sourceSecondPositionWords_.reset();sourceSecondLookInputWords_.reset();sourceSecondNormalizedWords_.reset();
     sourceSecondPositionCompared_=sourceSecondLookCompared_=false;
+    sourceSecondAttenuationWords_.reset();sourceSecondAttenuationRange_.reset();sourceSecondConfigReturned_=false;
+    sourceSecondLightNativeDetached_=false; //Keep descriptor free history; no fabricated restoration.
     return true; //Native withdrawal only; no146980/manager-removal guest call invented.
 }
 }
@@ -123,22 +179,35 @@ bool Owner::preflightSourceSecondLightFrameNative()const noexcept {
     if(!preflightSourceSecondLightNative())return false;
     if(sourceSecondLightPhase_==SourceSecondLightPhase::unreached)
         return !sourceSecondLightWrapper_&&!sourceSecondLightDescriptor_&&!sourceSecondLightOuterReached_&&!sourceSecondGuardMask_&&
-            !sourceSecondLensStack00_&&!sourceSecondOrdinalStack08_&&!sourceSecondArgumentsBorrowed_;
+            !sourceSecondLensStack00_&&!sourceSecondOrdinalStack08_&&!sourceSecondArgumentsBorrowed_&&
+            !sourceSecondDescriptorDisposed_&&!sourceSecondWrapperReturned_&&!sourceSecondWrapperV0_;
     if(sourceSecondLightPhase_==SourceSecondLightPhase::nativeClosed)
         return !sourceSecondLightWrapper_&&!sourceSecondLightDescriptor_&&!sourceSecondLight_&&!sourceSecondLightPublished_&&
             !sourceSecondLensStack00_&&!sourceSecondOrdinalStack08_&&!sourceSecondArgumentsBorrowed_;
-    if(!sourceFirstWrapperReturned_||!sourceFirstDescriptorDisposed_||!sourceLightPopulationS0_||*sourceLightPopulationS0_!=1||
+    if(!sourceFirstWrapperReturned_||!sourceFirstDescriptorDisposed_||!sourceLightPopulationS0_||
+       (sourceLightPopulationItemsEnd_.value_or(*sourceLightPopulationS0_)<1||sourceLightPopulationItemsEnd_.value_or(*sourceLightPopulationS0_)>185)||
        !sourceFirstLight_||!sourceFirstLight_->attached||!sourceFirstLight_->registered||!nativeLightList3A8_||
        !sourceLight3A8_||*sourceLight3A8_!=nativeLightList3A8_.get()||!nativeLightList3A8_->wrappers38||
        sourceSecondGuard_>1||sourceSecondEnabled_>1||(sourceSecondGuardMask_&~3u))return false;
     if(sourceSecondLightWrapper_&&sourceSecondLightWrapper_!=&nativeLightList3A8_->wrappers38[1])return false;
     if(sourceSecondLightDescriptor_&&(!sourceSecondLightWrapper_||sourceSecondLightDescriptor_!=sourceSecondLightWrapper_->sourceDescriptor04.get()))return false;
-    if(sourceSecondLightZone_&&(!sourceSecondLightDescriptor_||*sourceSecondLightZone_!=sourceSecondLightDescriptor_->zone20))return false;
+    if(sourceSecondLightZone_){
+        if(sourceSecondDescriptorDisposed_){if(*sourceSecondLightZone_!=0)return false;}
+        else if(!sourceSecondLightDescriptor_||*sourceSecondLightZone_!=sourceSecondLightDescriptor_->zone20)return false;
+    }
+    if(sourceSecondDescriptorDisposed_){
+        if(sourceSecondDescriptorFreeMask_!=15||sourceSecondLightDescriptor_||!sourceSecondLightWrapper_||
+           sourceSecondLightWrapper_->sourceDescriptor04||sourceSecondLensStack00_||sourceSecondOrdinalStack08_||
+           sourceSecondArgumentsBorrowed_||!sourceSecondWrapperV0_||*sourceSecondWrapperV0_!=1)return false;
+    }else if(sourceSecondWrapperReturned_||sourceSecondWrapperV0_)return false;
+    if(sourceSecondWrapperReturned_&&!sourceSecondDescriptorDisposed_)return false;
+    if(sourceLightPopulationItemsEnd_.value_or(*sourceLightPopulationS0_)>=2&&(!sourceSecondWrapperReturned_||!sourceSecondLight_||
+       (!sourceSecondLight_->attached&&!sourceSecondLightNativeDetached_)))return false;
     if(sourceSecondOrdinalStack08_&&(!sourceSecondLightPublished_||!sourceSecondLightDescriptor_||
        *sourceSecondOrdinalStack08_!=1||sourceSecondLensStack00_!=((sourceSecondLightDescriptor_->flags28&8u)?
            sourceSecondLightDescriptor_->lensTexture50.data():nullptr)))return false;
     if(sourceSecondArgumentsBorrowed_&&(!sourceSecondOrdinalStack08_||!sourceSecondLightPublished_))return false;
-    if(sourceSecondLight_&&sourceSecondLight_->colorsWritten&&!sourceSecondArgumentsBorrowed_)return false;
+    if(sourceSecondLight_&&sourceSecondLight_->colorsWritten&&!sourceSecondArgumentsBorrowed_&&!sourceSecondDescriptorDisposed_)return false;
     if((sourceSecondGuardMask_&2u)&&(!(sourceSecondGuardMask_&1u)||sourceSecondGuard_!=1))return false;
     if(sourceSecondAssertionPassed_&&(!(sourceSecondGuardMask_&2u)||!sourceSecondEnabled_||!sourceSecondLightZone_))return false;
     return sourceSecondLightPhase_!=SourceSecondLightPhase::published||
@@ -147,6 +216,10 @@ bool Owner::preflightSourceSecondLightFrameNative()const noexcept {
 bool Owner::abortSourceSecondLightFrameNative()noexcept {
     if(!preflightSourceSecondLightFrameNative())return false;
     if(sourceSecondLightPhase_==SourceSecondLightPhase::unreached||sourceSecondLightPhase_==SourceSecondLightPhase::nativeClosed)return true;
+    std::uint32_t nativePC=0;
+    if(!detachSourceSecondLightNative(nativePC))return false;
+    if(sourceTopologyLightManager_){rr::platform::OriginalUiLightManagerOwner50KG::Diagnostic d;
+        if(!sourceTopologyLightManager_->withdrawSourceSecondNative(*this,d))return false;}
     if(!abortSourceSecondLightNative())return false;
     sourceSecondLensStack00_=nullptr;sourceSecondOrdinalStack08_.reset();sourceSecondArgumentsBorrowed_=false;
     sourceSecondLightWrapper_=nullptr;sourceSecondLightDescriptor_=nullptr;sourceSecondLightPhase_=SourceSecondLightPhase::nativeClosed;
@@ -249,6 +322,53 @@ bool Owner::continueSourceSecondLight273BA8(std::uint32_t& pc)noexcept {
         at(0x147230);if(!sourceTopologyLightManager_->incrementSourceSecond149300(*this,2,md))return stop(md.sourcePC);
         light.lookRevision=true;
     }
-    return stop(0x147238); //Before attenuation/config tail, registration, descriptor disposal or wrapper return.
+    at(0x147238);
+    if(!descriptor.attenuation1C||*descriptor.attenuation1C!=std::array<std::uint32_t,4>{{0x3cf5c28fu,0x3b03126fu,0x3a83126fu,0x3f800000u}})
+        return stop(pc); //Only actual second Directional default coefficients.
+    at(0x147248);light.attenuation8C[0]=g::directional_native_proposal::detail::fromWord((*descriptor.attenuation1C)[0]);
+    at(0x147250);light.attenuation8C[1]=g::directional_native_proposal::detail::fromWord((*descriptor.attenuation1C)[1]);
+    at(0x147264);light.attenuation8C[2]=g::directional_native_proposal::detail::fromWord((*descriptor.attenuation1C)[2]);
+    sourceSecondAttenuationWords_=*descriptor.attenuation1C;
+    at(0x147268);std::uint32_t range=0;
+    if(!sourceSecondAttenuation147268(range))return stop(pc); //Native refusal retains prior source stores/revisions.
+    at(0x14732c);sourceSecondAttenuationRange_=range;
+    if(g::directional_native_proposal::detail::fromWord(range)!=g::directional_native_proposal::detail::fromWord(light.range84)){
+        at(0x147340);light.range84=range;light.rangeWritten=true;
+        at(0x147354);if(!sourceTopologyLightManager_->incrementSourceSecond149300(*this,3,md))return stop(md.sourcePC);
+        light.rangeRevision=true;
+    }
+    at(0x14746c);light.mode38=3; //Actual type2 branch, not t2/t3 or a generic mode policy.
+    at(0x147494);light.configured=true;sourceSecondConfigReturned_=true; //146F60 returns the same owner.
+    at(0x277f98); //NonNULL return; type2 skips Spotlight-only146F30 cone setter.
+    if(sourceSecondLightDescriptor_!=actual.sourceDescriptor04.get()||actual.live00!=&light.entity)return stop(pc);
+    at(0x277fcc);if(!sourceTopologyLightManager_->appendSourceSecond148F30(*this,md))return stop(md.sourcePC);
+    at(0x277fd4);
+    if(sourceSecondLightDescriptor_!=actual.sourceDescriptor04.get()||!actual.sourceDescriptor04||
+       descriptor.knownFlags28!=0x7f||(descriptor.flags28&0x7f)!=0x0f||!descriptor.position14||!descriptor.look18||
+       !descriptor.attenuation1C||!preflightSourceSecondLightNative())return stop(pc);
+    at(0x277fe4); //Actual bit4 false: no flare owner allocation/attachment.
+    at(0x2780bc); //Actual bit5 false: no flasher146B10 call.
+    //All native admissions above are read-only. Below, typed array/POD frees
+    //have no callback/failure boundary; exact source order/NULL stores retained.
+    at(0x2780ec);descriptor.vtableF4=0x3d2b40;
+    at(0x2780fc);descriptor.position14.reset();
+    at(0x278104);sourceSecondDescriptorFreeMask_|=1u;
+    at(0x278114);descriptor.look18.reset();
+    at(0x27811c);sourceSecondDescriptorFreeMask_|=2u;
+    at(0x27812c);descriptor.attenuation1C.reset();
+    at(0x278134);sourceSecondDescriptorFreeMask_|=4u;
+    //Withdraw native LIVE borrowers before outerfree. Source stack residue is
+    //not dereferenced after its last use; scalar ordinal already copied to C8.
+    sourceSecondLensStack00_=nullptr;sourceSecondOrdinalStack08_.reset();sourceSecondArgumentsBorrowed_=false;
+    at(0x27813c);sourceSecondLightDescriptor_=nullptr;actual.sourceDescriptor04.reset();sourceSecondDescriptorFreeMask_|=8u;
+    at(0x278144);sourceSecondWrapperV0_=1;
+    at(0x278148);sourceSecondDescriptorDisposed_=true; //Original wrapper04=NULL publication.
+    at(0x27815c);sourceSecondWrapperReturned_=true;
+    at(0x273b7c);if(*sourceLight3A8_!=nativeLightList3A8_.get())return stop(pc);
+    at(0x273b94);if(actual.live00!=&light.entity)return stop(pc);
+    if(!attachSourceSecondLight141960(pc))return stop(pc);
+    at(0x273ba0);++*sourceLightPopulationS0_;
+    at(0x273ba8);sourceSecondLightPhase_=SourceSecondLightPhase::bounded;
+    return continueSourceTypedLight273BA8(2,pc); //Same actual next ordinal; no loop/readiness shortcut.
 }
 }

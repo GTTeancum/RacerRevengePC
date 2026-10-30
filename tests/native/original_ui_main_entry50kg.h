@@ -1,3 +1,4 @@
+#include "../../src/game/original_player_overlay_renderer_lease50la.h"
 #include "../../src/game/original_application_input04_source50la.h"
 #pragma once
 #include "../../src/game/original_player_race_music_borrow50la.h"
@@ -191,7 +192,7 @@ struct DamageColdResult50LA {
     std::string failure;
 };
 struct Application {
-    friend class ::ra_cold_aggregate50LA::Owner; //Read-only same-App material domain admission; no lazy prepare.
+    friend class ::ra_cold_aggregate50LA::Owner; //Same-App material admission and actual ordered source directory stores; no lazy prepare.
     friend class ::original_camera_session50KX::Session;
     friend class rr::game::OriginalSessionF8Intro50LA;
     friend class RaceDisplayLifetime50LA;
@@ -405,6 +406,9 @@ private:
     mutable std::shared_ptr<rr::platform::OriginalSourcePadHostLease50LA> sourcePadHostLease_;
     bool bindSourceInput04NativeTransport()const noexcept;
     bool continueSourceInput04NativeActivation()const noexcept;
+    friend class rr::game::OriginalPlayerOverlayRendererLease50LA;
+    std::shared_ptr<rr::game::OriginalPlayerOverlayRendererLease50LA> borrowSourcePlayerOverlayRenderer199990(
+        const rr::game::OriginalRaceConstructor50LA*)const noexcept;
     bool readSourcePlayerRaceMode199980(const rr::game::OriginalRaceConstructor50LA*,std::int32_t&)const noexcept;
     std::shared_ptr<const rr::game::OriginalPlayerRaceMusicBorrow50LA> borrowSourcePlayerMusic210810(
         const rr::game::OriginalRaceConstructor50LA*)const noexcept;

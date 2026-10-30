@@ -4,7 +4,16 @@
 #include "../../src/game/original_entity_chains50la.h"
 #include "../../src/game/original_racer_model_scene50la.h"
 #include "../../src/game/original_racer_model_packets50la.h"
+#include "../../src/game/original_source_standard_smoker50la.h"
+#include "../../src/game/original_source_physics_object50la.h"
+#include "../../src/game/original_source_physics_model50la.h"
+#include "../../src/game/original_source_physics_body50la.h"
+#include "../../src/game/original_source_physics_collision50la.h"
+#include "../../src/game/original_source_physics_contact50la.h"
+#include "../../src/game/original_source_physics_detector50la.h"
+#include "../../src/assets/original_source_psg_missing50la.h"
 #include "../../src/game/original_ui_user_rotate50kg.h"
+#include "../../src/game/original_standard_placement_globals50la.h"
 #include "../../src/game/original_gc_gameplay_lighting_candidate.h"
 #include "../../src/game/model_bounds49o.h"
 #include "../../src/assets/original_standard_model_resource50la.h"
@@ -14,6 +23,7 @@
 #include <vector>
 #include <thread>
 
+namespace rr::game {class OriginalTrackParticleCold50LA;}
 namespace ra_pod_scene50LA {class Owner;}
 namespace ra_static_world50LA {class Owner;}
 namespace ra_cold_aggregate50LA {class Owner;}
@@ -72,13 +82,268 @@ private:
         std::string modelName180;
         std::optional<bool> isSmoker14C; // unknown until actual default/read join
     };
+    //Sole typed backing for the actual nullable210 allocation. Capacity64 is
+    //native storage only: source graph begins with just the constructed root.
+    struct SourceStandardPlacement {
+        bool entered=false,shadowStored=false,nameStored=false,parentChecked=false,parentNotSelf=false;
+        bool positionReturned=false,orientationEntered=false,orientationReturned=false;
+        std::optional<std::int32_t> shadow148;
+        std::uint8_t priorFlags1B3=0;
+        std::array<char,128> copiedName{};std::size_t nameLength=0;
+        std::array<std::uint32_t,4> position{},look{},up{};
+        g::BodyMatrix48G oriented{};
+        g::OriginalStandardPlacementGlobals50LA::History parentGuard,orientationGuard;
+    };
+    struct SourceModelFrame {
+        std::array<g::SceneNode49P,a::maxModelNodes49O> nodes{};
+        std::uint32_t graphCount=1;
+        std::shared_ptr<a::OriginalSourcePsgFile50LA> sourceFile;
+        bool sourceFileNativeClosed=false;
+        SourceStandardPlacement placement;
+        const void* sourceObserverOccurrence=nullptr;const void* sourceObserver19C=nullptr; //Exact source root-owned occurrence/publication borrow.
+        bool parentAttachEntered=false,parentAttachReturned=false,parentAttached=false,parentDetachedNative=false;
+        std::optional<std::uint32_t> parentAttachLock;
+        std::uint32_t parentAttachZone=0;
+        C* parentAttachBorrow=nullptr;
+        g::OriginalRacerModelSceneOwner50LA scene;
+        g::OriginalRacerModelPackets50LA sourcePackets; //Owner exists even when original1F0 remainsNULL.
+        bool packetCallEntered=false,packetCallReturned=false;
+        bool warmLookupAttempted=false,warmAcquireEntered=false;
+        bool warmRowsEntered=false,warmRowsReturned=false,warmMaterialsEntered=false,warmMaterialsReturned=false;
+        bool warmParametersEntered=false,warmParametersReturned=false,warmRowTableEntered=false,warmRowTableReturned=false;
+        SourceModelFrame* warmCreator=nullptr; //Same actual earlier cold prototype owner, never native metadata.
+        const a::OriginalStandardModelGeometry50LA* warmGeometryHistory=nullptr;
+        g::OriginalSourceStandardSmoker50LA sourceSmoker;
+        bool smokerCallEntered=false,smokerEnrolled=false,emitterEnrolled=false;
+        bool smokerConfigurationReturned=false,smokerManagerBound=false;
+        g::OriginalTrackParticleCold50LA* smokerManagerBorrow=nullptr;
+        const void* smokerManagerHistory=nullptr;
+        bool counted=false,enrolled=false,nativeRetired=false,nativeAliasWithdrawn=false,nameStored=false;
+        bool lookupEntered=false,providerResolved=false,resolverResolved=false;
+        bool rowsCallEntered=false,rowsCallReturned=false;
+        bool materialCallEntered=false,materialCallReturned=false,quantizationCallEntered=false,quantizationCallReturned=false;
+            bool geometryCallEntered=false,geometryLoadCallEntered=false;
+        bool geometryPaletteCallEntered=false,geometryPaletteCallReturned=false;
+        bool geometryPrototypeCallEntered=false,geometryPrototypeCallReturned=false;
+        bool sourceCacheCallEntered=false,sourceCacheCallReturned=false;
+        bool sourceCloseCallEntered=false,sourceCloseCallReturned=false;
+        bool rowTableCallEntered=false,rowTableCallReturned=false;
+        const C* renderableReturnedEntity=nullptr;
+        std::shared_ptr<a::OriginalStandardMaterialTable50LA> materialTable;
+        const std::string* materialPrefix=nullptr;
+        std::array<C*,a::maxModelNodes49O> warmCloneEnrolled{}; //Stable physical identity; never enumeration ordinal.
+        bool warmCloneEntered=false,warmCloneReturned=false,warmEnumerationEntered=false;
+        std::array<bool,a::maxModelNodes49O> rowEnrolled{}; //Row0 uses counted/enrolled above.
+        std::optional<std::uint32_t> rowsReturnV0;
+        std::optional<bool> lookupReturn;
+        bool absentLogAttempted=false,sourceReferenceDropped=false,sourceSceneReleased=false,sourceOuterDeleted=false;
+        std::size_t absentLogWritten=0;
+        std::optional<std::uint32_t> releaseLock423F58,releaseReturnV0,loaderReturnV0;
+        const C* loaderReturnedEntity=nullptr; //Actual nonzero240740 V0 identity, not literal1 or guest address bits.
+        std::uint32_t destructorStoreMask=0,destructorVtable1A8=0,destructorVtable10=0;
+        std::uint8_t destructorNullSkips=0;
+        std::optional<std::int32_t> dynamicArgument;
+        std::string requestedPsg;
+        std::shared_ptr<a::OriginalStandardArchiveProvider50LA> provider;
+        std::shared_ptr<a::OriginalStandardTextureResolver50LA> resolver;
+        a::OriginalStandardArchiveProvider50LA::MemberView member{};
+        a::OriginalStandardModelFileView50LA file{};
+        g::SceneGraph49P graph()noexcept{return {nodes.data(),graphCount};}
+        g::SceneGraph49P graph()const noexcept{return {const_cast<g::SceneNode49P*>(nodes.data()),graphCount};}
+    };
+    //Native tagged shell preserves the existing actual parent34 identity.
+    //The type2 guest allocation is16 bytes, not Standard's20 bytes. Descriptor
+    //0C and body8 have separate typed lanes; never reinterpret smoker0C/model+8.
+    struct SourcePhysicsDescriptor27A650 {
+        SourceDescriptor27A100 common;
+        std::array<std::uint32_t,11> scalar284;
+        std::uint16_t scalarKnown=0;
+        std::array<std::uint32_t,4> vector2B0;
+        bool vectorKnown=false;
+    };
+    struct SourcePhysicsWrapper27BA3C {
+        std::optional<C*> body8; //1659C0 Entity is at BASE, distinct from Model Entity+8.
+        std::unique_ptr<g::OriginalSourcePhysicsObject50LA> bodyOwner;
+        std::unique_ptr<g::OriginalSourcePhysicsModel50LA> nestedModel;
+        std::unique_ptr<g::OriginalSourcePhysicsBody50LA> sourceBodyD0;
+        std::unique_ptr<g::OriginalSourcePhysicsGravity50LA> sourceGravityD4;
+        std::unique_ptr<g::OriginalSourcePhysicsCollision50LA> sourceCollisionE0;
+        std::unique_ptr<g::OriginalSourcePhysicsCollision50LA> sourceCollisionE4;
+        std::unique_ptr<g::OriginalSourcePhysicsCollision50LA> sourceCollisionE8;
+        bool sourceProceduralCollisionCallEntered=false,sourceProceduralCollisionCallReturned=false,sourceProceduralCollisionEnrolled=false;
+        bool sourceProceduralCollisionConfigEntered=false,sourceProceduralCollisionConfigReturned=false;
+        bool sourceProceduralCollisionAttachEntered=false,sourceProceduralCollisionAttachReturned=false;
+        bool sourceProceduralCollisionLateEntered=false,sourceProceduralCollisionLateReturned=false;
+        bool sourceProceduralCollisionShapeEntered=false;
+        bool sourceProceduralCollisionResultEntered=false,sourceProceduralCollisionResultReturned=false;
+        std::uint16_t sourceLocalFilterEntered=0;
+        std::array<std::optional<g::OriginalSourcePhysicsCollision50LA::Result>,9> sourceLocalFilterCalls;
+        bool sourceSetup165E90Returned=false,sourceSetup165C30Returned=false,sourceSetupPositive27B470=false;
+        C* sourceSetupReturnedBase=nullptr; //Typed original self return, not guest pointer bits or boolean1.
+        struct SourceConfigure166400 {
+            bool entered=false,argumentsPrepared=false,calleeEntered=false,scratchReturned=false,scratchCopied=false,boundsCallReached=false;
+            bool boundsEntered=false,boundsReturned=false;
+            bool dimensionsEntered=false,dimensionsReturned=false;
+            bool inertiaEntered=false,inertiaReturned=false;
+            bool contactEntered=false,contactReturned=false,frictionEntered=false,frictionReturned=false;
+            bool tailEntered=false,returned74=false;
+            bool updateEntered=false,descriptorQuadLoaded=false,bodyQuadEntered=false,bodyQuadReturned=false,updateCallReached=false;
+            std::array<std::uint32_t,4> descriptorQuad{};
+            C* quadBodyD0=nullptr;
+            std::uint32_t updateDispatch08=0,updateTarget78=0,updatePC=0;
+            std::uint8_t nullMembershipEntered=0,nullMembershipReturned=0;
+            std::array<std::optional<g::OriginalSourcePhysicsCollision50LA::Result>,2> nullMembershipResults;
+            bool nullObserverEntered=false,nullObserverReturned=false;
+            bool positionEntered=false,positionReturned=false;
+            std::optional<g::OriginalSourcePhysicsModel50LA::Result> positionResult;
+            std::optional<g::OriginalSourcePhysicsModel50LA::Result> nullObserverResult;
+            std::optional<g::OriginalSourcePhysicsBody50LA::Result> bodyQuadResult;
+            std::array<std::uint32_t,8> contactArguments{};
+            std::optional<g::OriginalSourcePhysicsContact50LA::Result> contactResult,frictionResult;
+            std::optional<g::OriginalSourcePhysicsObject50LA::Result> tailResult;
+            std::optional<g::OriginalSourcePhysicsBody50LA::Result> inertiaResult;
+            std::optional<g::OriginalSourcePhysicsBody50LA::Result> dimensionsResult;
+            std::optional<g::OriginalSourcePhysicsModel50LA::Result> boundsResult; //Native call result, distinct from source166400 return.
+            const SourcePhysicsDescriptor27A650* descriptor=nullptr;
+            C* receiver=nullptr;
+            const g::OriginalSourcePhysicsModel50LA* nestedOwner=nullptr;
+            const void* model14C=nullptr;
+            std::uint32_t dispatch08=0,target74=0,pc=0;
+            std::array<std::uint32_t,12> callerStack{}; //Only offsets0,8,10,18,20,28 low32 are written.
+            std::uint16_t callerStackKnown=0;
+            std::array<std::uint32_t,8> argumentFpu{},calleeFpu{};
+            std::uint8_t argumentFpuKnown=0,calleeFpuKnown=0;
+            std::uint8_t savedOldFpuStores=0,savedOldFpuKnown=0; //Reached saves, unavailable caller-old bits remain unknown.
+            std::array<std::uint32_t,4> center40{},half50{};
+            std::uint8_t centerKnown=0,halfKnown=0;
+            std::array<std::uint32_t,16> scratchA0{},working60{};
+            std::uint16_t scratchKnown=0,workingKnown=0;
+        } configure166400;
+        std::optional<g::OriginalSourcePhysicsCollision50LA::Result> sourceProceduralCollisionResultCall;
+        std::optional<g::OriginalSourcePhysicsCollision50LA::Result> sourceProceduralCollisionShapeResult; //Native call result, never source11C710 return.
+        std::array<char,256> directCollisionSetupName{};
+        std::size_t directCollisionSetupNameLength=0;
+        std::optional<std::size_t> directCollisionSetupDot;
+        bool directCollisionNameEntered=false,directCollisionNameCopied=false,directCollisionDotSearched=false,directCollisionNameReturned=false;
+        bool sourceDirectCollisionCallEntered=false,sourceDirectCollisionCallReturned=false,sourceDirectCollisionEnrolled=false;
+        bool sourceDirectCollisionConfigEntered=false,sourceDirectCollisionConfigReturned=false;
+        bool sourceDirectCollisionPathEntered=false,sourceDirectCollisionPathReturned=false;
+        bool sourceDirectCollisionSearchEntered=false,sourceDirectCollisionSearchAccepted=false,sourceDirectCollisionMissingEntered=false;
+        bool sourceDirectCollisionLoaderReturned=false;
+        bool sourceDirectCollisionFoundEntered=false,sourceDirectCollisionHeaderReturned=false;
+        bool sourceDirectCollisionType0Entered=false,sourceDirectCollisionArraysEntered=false;
+        bool sourceDirectCollisionNodesEntered=false,sourceDirectCollisionImportReturned=false;
+        bool sourceDirectCollisionResourceEntered=false,sourceDirectCollisionPayloadReturned=false;
+        bool sourceDirectCollisionCloseEntered=false,sourceDirectCollisionCloseReturned=false;
+        bool sourceDirectCollisionFoundTransformEntered=false,sourceDirectCollisionWorldCallReached=false;
+        bool sourceDirectCollisionMatrixEntered=false,sourceDirectCollisionMatrixReturned=false;
+        bool sourceDirectCollisionAttachEntered=false,sourceDirectCollisionAttachReturned=false;
+        bool sourceDirectCollisionLateEntered=false,sourceDirectCollisionLateReturned=false;
+        bool sourceDirectCollisionTransformEntered=false,sourceDirectCollisionNullModelBound=false;
+        std::shared_ptr<a::OriginalSourcePsgMissingLookup50LA> directCollisionSearch;
+        std::unique_ptr<g::OriginalSourcePhysicsContact50LA> sourceContactDC;
+        std::unique_ptr<g::OriginalSourcePhysicsDetector50LA> sourceDetectorD8;
+        bool terrainZero27B42C=false,terrainSaved165C50=false,terrainForwarded165D98=false,terrainSaved165EAC=false;
+        bool sourceDetectorCallEntered=false,sourceDetectorCallReturned=false,sourceDetectorEnrolled=false;
+        bool sourceDetectorConfigEntered=false,sourceDetectorConfigReturned=false;
+        bool sourceDetectorEnableEntered=false,sourceDetectorEnableReturned=false;
+        bool sourceDetectorBindingEntered=false,sourceDetectorBindingReturned=false;
+        bool sourceDetectorAttachEntered=false,sourceDetectorAttachReturned=false;
+        bool sourceContactCallEntered=false,sourceContactCallReturned=false,sourceContactEnrolled=false;
+        bool sourceContactCapacityEntered=false,sourceContactCapacityReturned=false;
+        bool sourceContactBodyEntered=false,sourceContactBodyReturned=false;
+        bool sourceContactPointsEntered=false,sourceContactPointsReturned=false;
+        bool sourceContactScalarsEntered=false,sourceContactScalarsReturned=false;
+        bool sourceContactAttachEntered=false,sourceContactAttachReturned=false;
+        std::shared_ptr<a::OriginalSourcePsgMissingLookup50LA> collisionSearch;
+        bool sourceBodyAttachEntered=false,sourceBodyAttachReturned=false;
+        bool sourceGravityCallEntered=false,sourceGravityCallReturned=false,sourceGravityEnrolled=false;
+        bool sourceGravityTargetEntered=false,sourceGravityTargetReturned=false;
+        bool sourceGravityAttachEntered=false,sourceGravityAttachReturned=false;
+        std::array<char,256> collisionSetupName{}; //Native bounded scratch, not original buffer-size authority.
+        std::size_t collisionSetupNameLength=0;
+        std::optional<std::size_t> collisionSetupDot;
+        bool collisionNameEntered=false,collisionNameCopied=false,collisionDotSearched=false,collisionNameReturned=false;
+        bool sourceCollisionCallEntered=false,sourceCollisionCallReturned=false,sourceCollisionEnrolled=false;
+        bool sourceCollisionConfigEntered=false,sourceCollisionConfigReturned=false;
+        bool sourceCollisionNameEntered=false,sourceCollisionNameReturned=false;
+        bool sourceCollisionSearchEntered=false,sourceCollisionSearchAccepted=false,sourceCollisionMissingEntered=false;
+        bool sourceCollisionFoundEntered=false,sourceCollisionFoundHeaderReturned=false;
+        bool sourceCollisionType0Entered=false;
+        bool sourceCollisionArraysEntered=false;
+        bool sourceCollisionNodesEntered=false,sourceCollisionImportReturned=false;
+        bool sourceCollisionResourceEntered=false,sourceCollisionPayloadReturned=false;
+        bool sourceCollisionCloseEntered=false,sourceCollisionLoaderReturned=false;
+        bool sourceCollisionResultEntered=false,sourceCollisionResultReturned=false;
+        bool sourceCollisionTransformEntered=false,sourceCollisionTransformReturned=false;
+        bool sourceCollisionAttachEntered=false,sourceCollisionAttachReturned=false;
+        bool nestedCallEntered=false,nestedCallReturned=false,nestedModelEnrolled=false;
+        bool nestedNameEntered=false,nestedNameReturned=false;
+        std::shared_ptr<a::OriginalSourcePsgMissingLookup50LA> missingLookup;
+        std::shared_ptr<a::OriginalSourcePsgFile50LA> foundFile;
+        std::shared_ptr<a::OriginalStandardArchiveProvider50LA> foundProvider;
+        std::shared_ptr<a::OriginalStandardTextureResolver50LA> foundResolver;
+        a::OriginalStandardArchiveProvider50LA::MemberView foundMember;
+        a::OriginalStandardModelFileView50LA foundNativeFile;
+        const a::OriginalStandardModelGeometry50LA* foundGeometryHistory=nullptr;
+        bool foundEntered=false,foundProviderResolved=false,foundNativeResolved=false;
+        bool foundCaptureEntered=false,foundCaptureReturned=false,foundNativeWithdrawn=false;
+        std::optional<std::int64_t> foundHandle678;
+        std::optional<const a::OriginalStandardModelGeometry50LA*> foundResource684;
+        bool nestedLookupEntered=false,nestedLookupReturned=false;
+        bool nestedReleaseEntered=false,nestedLoaderReturned=false;
+        bool nestedRowsEntered=false,nestedRowsReturned=false;
+        bool nestedMaterialEntered=false,nestedMaterialReturned=false;
+        bool nestedQuantizationEntered=false,nestedQuantizationReturned=false;
+        bool nestedGeometryEntered=false,nestedGeometryAllocated=false;
+        bool nestedGeometryLoadEntered=false,nestedGeometryLodsReturned=false;
+        bool nestedGeometryPaletteEntered=false,nestedGeometryReturned=false;
+        bool nestedPrototypeEntered=false,nestedPrototypeReturned=false;
+        bool nestedCacheEntered=false,nestedCacheReturned=false;
+        bool nestedCloseEntered=false,nestedCloseReturned=false;
+        bool nestedRowTableEntered=false,nestedRowTableReturned=false;
+        const C* nestedRenderableEntity=nullptr; //Actual26E820 Entity+8, not final240740 return.
+        bool nestedPacketsEntered=false,nestedPacketsReturned=false;
+        bool nestedAttachEntered=false,nestedAttachReturned=false;
+        bool nestedPlacementEntered=false,nestedPlacementReturned=false;
+        bool setup165E90Entered=false,setupNoOpReturned=false;
+        bool visibilityB4Stored=false,collisionB8Stored=false;
+        bool sourceBodyCallEntered=false,sourceBodyCallReturned=false,sourceBodyEnrolled=false;
+        bool sourceBodyConfigEntered=false,sourceBodyConfigReturned=false;
+        const C* nestedLoaderEntity=nullptr; //Actual final240740 Entity+8, never a numeric pointer tag.
+        std::optional<std::uint32_t> nestedRowsReturnV0;
+        std::array<C*,a::maxModelNodes49O> nestedRowEnrolled{};
+        std::optional<std::uint32_t> nestedLoaderReturnV0;
+        std::optional<std::int32_t> sourceLookupReturnV0;
+        bool callbackEntered=false,nameFormatted=false,bodyCallEntered=false,bodyCallReturned=false;
+        bool bodyEnrolled=false,setupEntered=false;
+        std::array<char,256> setupName{};std::size_t setupNameLength=0;
+        std::optional<std::uint32_t> collisionZone,visibilityZone;
+        const void* collisionNode=nullptr;const void* visibilityNode=nullptr;
+        bool collisionRead=false,visibilityRead=false;
+        std::unique_ptr<SourcePhysicsDescriptor27A650> descriptor0C;
+        bool factoryReturned=false,descriptorLaneKnown=false;
+        bool descriptorAttempted=false,descriptorAllocationReturned=false,descriptorPublished=false;
+        bool descriptorReadEntered=false,descriptorReadReturned=false,countedInParent=false;
+        std::optional<std::uint32_t> descriptorReturnV0;
+    };
     struct StandardWrapper {
-        enum class Dispatch { unbound,standard3D26F0 } dispatch=Dispatch::unbound;
+        enum class Dispatch { unbound,standard3D26F0,physics3D26C0 } dispatch=Dispatch::unbound;
         bool sourceMode=false,sourceTypeKnown=false,sourceDescriptorAllocationReturned=false,sourceDescriptorPublished=false;
         std::uint32_t sourceVtable04=0;
         std::uint32_t type00=0;
         g::OriginalRacerModelSceneOwner50LA* model8=nullptr; // Alias, not a second owner.
         std::unique_ptr<Descriptor> descriptor10;
+        std::unique_ptr<SourceModelFrame> sourceModel;
+        bool sourceModelAllocationAttempted=false,sourceModelAllocationReturned=false,sourceModelPublished=false;
+        bool sourceModelNameFormatted=false,sourceModelCallbackEntered=false;
+        bool sourceNoneLogAttempted=false,sourceModelCleared=false,sourceDescriptorDisposed=false,sourceDescriptorNullStored=false;
+        std::size_t sourceNoneLogWritten=0;
+        std::optional<std::int32_t> sourceSmokerRead;
+        bool sourceSmokerManagerRead=false;
+        const void* sourceSmokerManager4A0=nullptr; //Raw source branch input; no manager retain.
+        std::optional<std::uint32_t> sourceCallbackReturnV0;
+        SourcePhysicsWrapper27BA3C sourcePhysics;
         std::optional<C*> smoker0C; // source factory does NOT initialize this lane
     };
     struct Observer {
@@ -124,7 +389,7 @@ private:
         std::vector<Slot> entries34;
         bool constructed=false,released=false;
         //Source34 is RAW uninitialized pointers, not value-initialized slots.
-        bool sourceMode=false,sourceCountKnown=false,sourceArrayReturned=false;
+        bool sourceMode=false,sourceCountKnown=false,sourceArrayReturned=false,sourceAuthorityEnrolled=false;
         std::uint32_t sourceVtable08=0;
         std::unique_ptr<StandardWrapper*[]> sourceEntries34;
         std::size_t sourceEntriesKnown=0;
@@ -134,6 +399,7 @@ private:
     bool sourceMode_=false,sourceOuterReturned_=false,sourceFirstDescriptorReturned_=false;
     bool sourceLedgerAttempted_=false,sourceLedgerPrepared_=false,sourceFirstTransferred_=false,sourceAllDescriptorsReturned_=false;
     std::array<std::vector<std::unique_ptr<StandardWrapper>>,10> sourceWrapperLedger_;
+    std::array<std::uint32_t,10> sourcePhysicsCounts_{}; //Actual27B8AC increments, not Entity counts.
     std::array<std::uint32_t,10> sourceZoneCounts_{}; //Native allocation admission, not guestcount30 stores.
     std::array<bool,10> sourceGroupOuterReturned_{};
     std::array<bool,10> sourceLogAttempted_{};

@@ -16,7 +16,8 @@ inline bool Owner::preflightSourceWorldFogNative()const noexcept {
         !nativeFog3EC_&&!nativeFogOff3F4_&&!nativeFogOn3F0_;
 }
 inline bool Owner::abortSourceWorldFogNative(std::uint32_t& pc)noexcept {
-    pc=0;if(!preflightSourceWorldFogNative())return false;
+    pc=0;if(sourceFogTransferBorrowers_||(sourceFogTransfer_&&!sourceFogTransfer_->nativeCancelled)||
+        !preflightSourceWorldFogNative())return false;
     if(sourceFogPhase_==SourceFogPhase::unreached)return true; //Legacy backing untouched.
     //No Entity, external descriptor borrower or dynamic suballocation exists.
     //Withdraw source-pointer knowledge before freeing, NOT270B54 NULLstore.

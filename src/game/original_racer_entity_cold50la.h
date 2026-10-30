@@ -22,6 +22,7 @@ namespace native_racer50HW { class Cables; }
 namespace native_racer_model50LA {class Owner;}
 namespace rr::game {
 class OriginalPlayerConstructorPrefix50LA;
+class OriginalPlayerOverlayRendererLease50LA;
 class OriginalRaceConstructor50LA;
 class OriginalPodSphereOwner50LA;
 class OriginalWreckCollectionStorage50LA;
@@ -247,6 +248,11 @@ struct OriginalAIDamageRaceContext50LA {
 };
 class OriginalPodAIDamageOverlay50LA final {
     friend class OriginalPlayerConstructorPrefix50LA;
+    friend class OriginalPlayerOverlayRendererLease50LA;
+    // Distinct nullable source0x50 allocations; inner vertex/packet storage
+    // keeps the existing explicitly native embedded adaptation.
+    std::array<std::unique_ptr<OriginalAIDamagePrimitiveArray50LA>,2> sourceArrays_;
+    bool sourceArraysAttempted_=false;
     bool constructorAttempted_=false,sourceMode_=false,sourceMode40Known_=false;
     const OriginalRaceConstructor50LA* sourceRace3C_=nullptr;
     std::uint32_t sourceDispatch08_=0;
@@ -324,9 +330,11 @@ private:
         //1998D8..1998FC: array30 completes and its owner slot is cleared
         // before array34 begins. Resume a blocked call at the retained prefix.
         if(array30){const auto r=array30->releaseCold2E1980(fields,renderer,diagnostic);
-            if(!r.okay())return r;array30=nullptr;}
+            if(!r.okay())return r;array30=nullptr;
+            if(sourceMode_)sourceArrays_[0].reset();}
         if(array34){const auto r=array34->releaseCold2E1980(fields,renderer,diagnostic);
-            if(!r.okay())return r;array34=nullptr;}
+            if(!r.okay())return r;array34=nullptr;
+            if(sourceMode_)sourceArrays_[1].reset();}
         prepared_=false;return {S::complete,0x199904u};
     }
     bool attempted_=false,prepared_=false;

@@ -106,9 +106,24 @@ bool OriginalUiLightManagerOwner50KG::preflightSourceRaPortalLinksNative(
         const auto from=r.sourcePortalIndices[o][i%2],to=r.sourcePortalIndices[o][1-i%2];
         if(!r.sourcePortalLinksWithdrawn){
             if(r.sourceLinkOldHeads[i]!=heads[from])return false;
-            if(link){if(mask!=63||link->next00!=heads[from]||!r.zones[to]||
-                link->neighbor04!=&r.zones[to]->entity||link->portal08!=r.portals[o]||
-                link->field0C||link->field10!=0x7f7fffff||link->distanceWritten)return false;}
+            if(link){
+                std::uint32_t expected0C=0,expected10=0x7f7fffff;bool distanceWritten=false;
+                //Latest authentic overlap stores win. Keep these receipts after native
+                //light withdrawal; do not restore constructor distances or recompute geometry.
+                for(const auto& typed:world.sourceTypedLights_)if(typed){
+                    if(typed->secondaryCount>20)return false;
+                    for(std::size_t k=0;k<typed->secondaryCount;++k){const auto& step=typed->secondary[k];
+                        if(step.edgeIndex!=i||!step.edgeDistanceMask)continue;
+                        if(!step.entered||step.edgeDistanceMask>3||!step.overlap.returned||!step.overlap.hit||!step.overlap.outputDistance)return false;
+                        if(step.edgeDistanceMask&1)expected10=*step.overlap.outputDistance;
+                        if(step.edgeDistanceMask&2)expected0C=*step.overlap.outputDistance;
+                        if(step.edgeDistanceMask==3)distanceWritten=true;
+                    }
+                }
+                if(mask!=63||link->next00!=heads[from]||!r.zones[to]||
+                   link->neighbor04!=&r.zones[to]->entity||link->portal08!=r.portals[o]||
+                   link->field0C!=expected0C||link->field10!=expected10||link->distanceWritten!=distanceWritten)return false;
+            }
             else if(mask)return false;
         }else if(link)return false;
         if(i<r.portalLinksPublished){if(mask!=63)return false;heads[from]=link;}
@@ -122,6 +137,8 @@ bool OriginalUiLightManagerOwner50KG::withdrawSourceRaPortalLinksNative(
     d={};if(!preflightSourceRaZonesNative(world))return fail(d,Status::phase,0x148110);
     if(!raZones_||!raZones_->sourceMode||raZones_->sourceWorldIdentity!=&world)return true;
     auto& r=*raZones_;if(r.sourcePortalLinksWithdrawn)return true;
+    for(const auto& typed:world.sourceTypedLights_)if(typed&&typed->observerEntered&&!typed->observerWithdrawn)
+        return fail(d,Status::phase,0x148110); //Active observer cursor/membership borrows portal nodes.
     // Native withdrawal, not execution of guest node30=NULL or shared-guard reset.
     for(auto& node:r.zones)if(node)node->field30=nullptr;
     for(auto& link:r.portalLinks)link.reset();

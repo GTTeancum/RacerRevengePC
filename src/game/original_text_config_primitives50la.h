@@ -8,12 +8,14 @@
 #include <new>
 #include <utility>
 
+namespace rr::assets {class OriginalParticleSourceConfig50LA;}
 namespace rr::platform {class OriginalWorldSourceConfig50LA;}
 namespace rr::game {
 class OriginalWreckSparksConfig50LA;
 // Private, UNJOINED primitives. No FileManager handle, open/read completion,
 // allocator receipt or Config parse success is manufactured by this class.
 class OriginalTextConfigPrimitives50LA final {
+    friend class rr::assets::OriginalParticleSourceConfig50LA;
     friend class OriginalWreckSparksConfig50LA;
     friend class rr::platform::OriginalWorldSourceConfig50LA;
     enum class Stop { complete, unknownByte, unknownCtype, nativeBounds, nativeStorage, needsAllocation,

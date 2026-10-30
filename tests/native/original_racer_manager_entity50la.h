@@ -201,6 +201,28 @@ class Owner final {
         const bool returned=sourceHumanPlayer_->continueOverlay210848(actual,sourceWorldRows_,pc);
         sourceHumansPC_=pc;return returned; //No outer issuer/full Player return.
     }
+    template<class Application> bool continueSourcePlayerOverlayArrays199990(const Application& actual,std::uint32_t& pc)noexcept {
+        static_assert(std::is_same_v<Application,original_main_entry50KG::Application>);
+        pc=sourceHumansPC_;
+        if(!live()||!selectionCurrentForSourceHuman()||sourceHumansThread_!=std::this_thread::get_id()||
+           sourceHumansPC_!=0x199990||!sourcePlayerLoadAttempted_||!sourceHumanPlayer_||!sourceWorldRows_||
+           !sourceHumanBank_||sourceHumanBank_->nativeClosed_||!sourceHumanBank_->joined_||
+           sourceHumanBank_->occurrence_!=this||actual.entities()!=application_||actual.riderProfile!=boundProfile_||
+           actual.profile!=sourceHumanCommon_)return false;
+        const bool returned=sourceHumanPlayer_->continueOverlayArrays199990(actual,sourceWorldRows_,pc);
+        sourceHumansPC_=pc;return returned; //No outer issuer/full Player return.
+    }
+    template<class Application> bool continueSourcePlayerPointerArrays210880(const Application& actual,std::uint32_t& pc)noexcept {
+        static_assert(std::is_same_v<Application,original_main_entry50KG::Application>);
+        pc=sourceHumansPC_;
+        if(!live()||!selectionCurrentForSourceHuman()||sourceHumansThread_!=std::this_thread::get_id()||
+           sourceHumansPC_!=0x210880||!sourcePlayerLoadAttempted_||!sourceHumanPlayer_||!sourceWorldRows_||
+           !sourceHumanBank_||sourceHumanBank_->nativeClosed_||!sourceHumanBank_->joined_||
+           sourceHumanBank_->occurrence_!=this||actual.entities()!=application_||actual.riderProfile!=boundProfile_||
+           actual.profile!=sourceHumanCommon_)return false;
+        const bool returned=sourceHumanPlayer_->continuePointerArrays210880(actual,sourceWorldRows_,pc);
+        sourceHumansPC_=pc;return returned; //No outer issuer/full Player return.
+    }
     bool cancelSourceHumansNative()noexcept {
         if(!sourceHumansAttempted_)return true;
         if(std::this_thread::get_id()!=sourceHumansThread_)return false;

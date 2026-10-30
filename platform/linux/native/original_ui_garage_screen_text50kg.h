@@ -13,6 +13,7 @@
 #include "../../../src/game/original_application_entities50la.h"
 namespace original_main_entry50KG { struct Application; class NativeCollectorFifo50LA; }
 namespace ra_cold_aggregate50LA {class Owner;}
+namespace ra_pod_scene50LA {class Owner;}
 namespace rr::game {class OriginalLoadingScreen40Mode0LA;}
 namespace rr::platform {
 class OriginalUiGarageDrawContribution50KG;
@@ -39,6 +40,7 @@ struct OriginalUiGarageScreenTextDiagnostic50KG {
 class OriginalUiGarageScreenText50KG final {
  friend class rr::game::OriginalLoadingScreen40Mode0LA;
  friend class ::ra_cold_aggregate50LA::Owner; //Same299BE0 process guard for real SunFlare handles.
+ friend class ::ra_pod_scene50LA::Owner; //Same299BE0 guard, real source LightFlare strip handle.
  friend class OriginalUiCoursePagePayload50KG;
  friend class OriginalUiCourseOwnedLifecycle50KG;
  friend class OriginalUiCoursePopupPayload50KG;

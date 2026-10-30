@@ -486,6 +486,25 @@ public:
     const std::int32_t* allocationBase1C4() const noexcept;
     const OriginalStandardMaterialTable50LA* table382B38() const noexcept;
 private:
+    friend class rr::game::OriginalRacerModelSceneOwner50LA;
+    struct SourceWarmReceipt {
+        bool begun=false,allocationAttempted=false,allocationReturned=false;
+        bool copyAttempted=false,copied=false,retainFailed=false,finished=false;
+        std::size_t retained=0;
+    };
+    const SourceWarmReceipt* sourceWarmReceipt()const noexcept;
+    bool preflightSourceWarmNative()const noexcept;
+    bool beginSourceWarm26EB44(const OriginalStandardMaterialReferences50LA&,
+        OriginalStandardMaterialDiagnostic50LA&)noexcept;
+    bool allocateSourceWarm26EB4C(OriginalStandardMaterialDiagnostic50LA&)noexcept;
+    bool copySourceWarm26EB64(const OriginalStandardMaterialReferences50LA&,
+        OriginalStandardMaterialDiagnostic50LA&)noexcept;
+    bool retainSourceWarm26EB90(OriginalStandardMaterialDiagnostic50LA&)noexcept;
+    bool finishSourceWarm26EBA8()noexcept;
+    bool beginSource26E670(std::uint32_t,std::shared_ptr<OriginalStandardMaterialTable50LA>,
+        OriginalStandardMaterialDiagnostic50LA&)noexcept;
+    bool storeSource26E7C8(std::int32_t,OriginalStandardMaterialDiagnostic50LA&)noexcept;
+    bool finishSource26E810()noexcept;
     struct Storage;
     std::unique_ptr<Storage> storage_;
 };

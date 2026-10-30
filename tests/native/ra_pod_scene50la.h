@@ -1,3 +1,4 @@
+#include "../../src/game/original_source_portal_overlap231150.h"
 #pragma once
 #include "ra_source_camera_ownership50la.h"
 #include "../../src/game/original_world_trigger_instance50la.h"
@@ -23,7 +24,7 @@
 
 namespace rr::platform {class OriginalUiLightManagerOwner50KG;class OriginalUiSearchListCold50KG;
 struct OriginalUiMainApplication50KG;class OriginalUiGarageInstanceMaster50KG;}
-namespace rr::game {class OriginalRaceConstructor50LA;}
+namespace rr::game {class OriginalRaceConstructor50LA;class OriginalRacerModelSceneOwner50LA;struct OriginalRacerSceneObject50LA;}
 namespace rr::game { class OriginalRacePauseWorldAuthority50LA; }
 namespace ra_cold_aggregate50LA {class Owner;}
 namespace ra_static_model_cold50LA {class Owner;}
@@ -789,6 +790,9 @@ struct SourcePortal230450State {
         std::unique_ptr<NativePortalLink27F3B0> portalLinks30;
         NativeListMethodCustody* nativeList34=nullptr;
         NativeListMethodCustody* nativeList38=nullptr; //Ordinary node List alias only; fallback method unchanged.
+        //Distinct typed alternatives for the actual Environment SearchNode only.
+        g::OriginalVisibilityQuadTree50LA* sourceTree34=nullptr;
+        g::OriginalVisibilityQuadTree50LA* sourceTree38=nullptr;
         // Exact stable canonical row. This borrow does NOT claim the source
         //27F420/27F490 reference acquisitions have run for its methods.
         const g::CollectionZone50BX* collectionBacking=nullptr;
@@ -814,6 +818,7 @@ struct SourcePortalWorldLink27F3B0 {
     const NativePortalLink27F3B0* sourceNext=nullptr;
     SearchNode* from=nullptr;SearchNode* to=nullptr;
     bool attempted=false,withdrawn=false;
+    std::optional<std::uint32_t> distance0C,distance10; //Latest actual280C60/64 stores, retained after borrower withdrawal.
     std::uint8_t knownMask=0;
 };
 std::array<SourcePortalAttempt272B3C,10> sourcePortalFrames_;
@@ -838,10 +843,30 @@ struct SourceSearchNode27F120 {
     bool attempted=false,counted=false,enrolled=false,published=false,ordinalKnown=false,withdrawn=false;
     std::uint16_t constructorMask=0;
     std::optional<std::uint32_t> vtable08;
-    std::optional<const void*> pointer3C,pointer44,pointerA0;
+    std::optional<const void*> pointer3C,pointer44,pointerA0; //Constructor NULL history.
+    std::optional<std::uint32_t> zoneVisibility44; //Later actual2741C0 raw word, never a guest pointer.
     bool exclusionAttempted=false,exclusionAllocationReturned=false,exclusionReturned=false;
     std::size_t exclusionProduced=0;
 };
+//Actual fresh272FC0 ownership, separate from the twenty zone method nodes.
+struct SourceVisibilityEnvironment272FC0 {
+    std::unique_ptr<g::OriginalVisibilityQuadTree50LA> tree;
+    SourceSearchNode27F120 node;
+    bool attempted=false,outerReturned=false,treePublished=false,activeNullPublished=false;
+    bool nodeAllocationReturned=false,nodePublished=false,attachEntered=false,attachReturned=false;
+    bool alias34Stored=false,alias34Retained=false,alias38Stored=false,alias38Retained=false;
+    bool constructorReleased=false,returned=false,withdrawn=false;
+    bool nativeNodeDetached=false,nativeAliasesWithdrawn=false,nativeConstructorReleased=false;
+    std::optional<std::uint32_t> attachLock;
+    std::optional<std::array<std::uint32_t,4>> bounds;
+    std::uint32_t pc=0x272fc0;
+};
+SourceVisibilityEnvironment272FC0 sourceVisibilityEnvironment_;
+bool allocateSourceVisibilityTree272FE4(std::uint32_t&)noexcept;
+bool finishSourceVisibilityEnvironment27303C(const std::array<std::uint32_t,4>&,std::uint32_t&)noexcept;
+bool preflightSourceVisibilityEnvironmentOwnerNative()const noexcept;
+bool preflightSourceVisibilityEnvironmentForestNative(const Entity&,const Entity*&,const Entity*&)const noexcept;
+bool retireSourceVisibilityEnvironmentNative(std::uint32_t&)noexcept;
 //Protected base additions after complete SearchNode; parent merges only.
 struct SourceListMethodAttempt {
     std::unique_ptr<NativeListMethodCustody> owner;
@@ -1021,6 +1046,48 @@ bool releaseSourceSearchNodeNative(SourceSearchNode27F120&)noexcept;
     };
     std::unique_ptr<NativeRaLight146720> nativeAmbientLight_;
     std::unique_ptr<NativeRaLight146720> nativeDirectionalLight_;
+    // Dedicated Model-base membership; child04 remains the actual Node Entity.
+    struct SourceModelObserverRecord {
+        const void* next00=nullptr;const Entity* child04=nullptr;
+        NativeListMethodCustody* method08=nullptr;
+        std::uint32_t field0C=0,field10=0,slot14=0;
+        std::array<std::optional<std::uint32_t>,2> unknown18To1C;
+        std::array<std::uint32_t,4> center20{};
+        const NativePortalLink27F3B0* portalCursor=nullptr;
+        NativeListMethodCustody* cursorMethod=nullptr;
+    };
+    struct SourceModelObserverFrame {
+        const void* occurrence=nullptr;const void* wrapper=nullptr;
+        g::OriginalRacerModelSceneOwner50LA* scene=nullptr;
+        const g::OriginalRacerSceneObject50LA* member=nullptr;
+        std::uint32_t zone=0,pc=0;
+        SearchNode* node=nullptr;NativeListMethodCustody* method=nullptr;
+        std::unique_ptr<SourceModelObserverRecord> owner;
+        bool entered=false,outerReturned=false,lease=false,vectorKnown=false,constructorReturned=false,published=false;
+        std::uint8_t scalarMask=0,primaryMask=0;
+        bool boundsEntered=false,boundsReturned=false,selectionPending=false,inserted=false,primaryWithdrawn=false;
+        std::optional<std::uint32_t> slot;
+        std::array<float,4> center{},half{};
+        std::array<std::uint32_t,4> centerWords{},halfWords{};
+        g::OriginalGarageObserverShared50KG::SourceAssertionHistory allocationAssertion,childAssertion,methodAssertion,slotAssertion,returnAssertion;
+        struct Secondary {
+            bool entered=false,complete=false;std::size_t edgeIndex=0;
+            NativePortalLink27F3B0* edge=nullptr;const Entity* neighbor=nullptr;const Entity* portal=nullptr;
+            NativeListMethodCustody* method=nullptr;
+            g::source_portal_overlap231150::History overlap;
+            std::uint8_t edgeDistanceMask=0,linkStoreMask=0;
+            bool methodReturned=false,selectionAttempted=false,selectionPending=false,inserted=false,nativeWithdrawn=false;
+            std::optional<std::uint32_t> slot;
+            bool allocationAttempted=false,allocationReturned=false,headPublished=false,linkReleased=false;
+            g::OriginalGarageObserverShared50KG::Link105720* link=nullptr;
+            const void* oldHead=nullptr;
+        };
+        std::array<Secondary,20> secondary;std::size_t secondaryCount=0;
+        bool secondaryEntered=false,secondaryReturned=false,secondaryWithdrawn=false;
+        bool returned=false,withdrawn=false;
+    };
+    std::vector<std::unique_ptr<SourceModelObserverFrame>> sourceModelObservers_;
+
     struct NativeLocalFlareObserver {
         const void* next00=nullptr;const Entity* child04=nullptr;
         NativeListMethodCustody* method08=nullptr;
@@ -1030,6 +1097,7 @@ bool releaseSourceSearchNodeNative(SourceSearchNode27F120&)noexcept;
         bool sharedConstructed=false,primaryRegistered=false,portalLoopComplete=false;
         const NativePortalLink27F3B0* portalCursor=nullptr;
         bool portalLoopStarted=false;
+        NativeListMethodCustody* cursorMethod=nullptr;
     };
     struct NativeLocalFlare {
         Entity entity;
@@ -1231,6 +1299,200 @@ struct SourceLightDescriptor277220 {
     std::optional<std::uint32_t> sourceSecondLuminance_;
     std::optional<std::array<std::uint32_t,4>> sourceSecondPositionWords_,sourceSecondLookInputWords_,sourceSecondNormalizedWords_;
     bool sourceSecondPositionCompared_=false,sourceSecondLookCompared_=false;
+    std::optional<std::array<std::uint32_t,4>> sourceSecondAttenuationWords_;
+    std::optional<std::uint32_t> sourceSecondAttenuationRange_;
+    bool sourceSecondConfigReturned_=false;
+    std::uint8_t sourceSecondDescriptorFreeMask_=0; //Ordered14/18/1C/outer free receipts; retained after native close.
+    bool sourceSecondLightNativeDetached_=false;
+    //Reusable per-source-descriptor type1 invocation; never a nativePoints_ or
+    //decoded-input projection. Only the actual next ordinal is currently joined.
+    struct SourceTypedLightFrame {
+        std::size_t ordinal=0;std::uint32_t pc=0x273ba8;
+        NativeLightWrapper277C10* wrapper=nullptr;SourceLightDescriptor277220* descriptor=nullptr;
+        struct DescriptorHistory {
+            std::uint32_t type=0;std::int32_t zone=0;std::uint8_t flags=0,knownFlags=0;bool loaded=false;
+            std::optional<std::array<std::uint32_t,4>> position,look,attenuation;
+        };
+        std::optional<DescriptorHistory> retiredDescriptor; //Native proof values, never a retained guest allocation.
+        bool retirementEntered=false,descriptorDisposed=false,wrapperReturned=false;
+        bool populationIncremented=false;
+        std::uint8_t descriptorFreeMask=0;
+        std::optional<std::uint32_t> wrapperV0,attachLock;
+        bool attachCallReturned=false,nativeDetached=false;
+        std::uint32_t descriptorType()const noexcept{return descriptor?descriptor->type00:retiredDescriptor?retiredDescriptor->type:0;}
+        std::int32_t descriptorZone()const noexcept{return descriptor?descriptor->zone20:retiredDescriptor?retiredDescriptor->zone:0;}
+        std::uint8_t descriptorFlags()const noexcept{return descriptor?descriptor->flags28:retiredDescriptor?retiredDescriptor->flags:0;}
+        bool descriptorLoaded()const noexcept{return descriptor?descriptor->loaded:retiredDescriptor&&retiredDescriptor->loaded;}
+        const std::array<std::uint32_t,4>* descriptorPosition()const noexcept{return descriptor?descriptor->position14.get():
+            retiredDescriptor&&retiredDescriptor->position?&*retiredDescriptor->position:nullptr;}
+        const std::array<std::uint32_t,4>* descriptorLook()const noexcept{return descriptor?descriptor->look18.get():
+            retiredDescriptor&&retiredDescriptor->look?&*retiredDescriptor->look:nullptr;}
+        const std::array<std::uint32_t,4>* descriptorAttenuation()const noexcept{return descriptor?descriptor->attenuation1C.get():
+            retiredDescriptor&&retiredDescriptor->attenuation?&*retiredDescriptor->attenuation:nullptr;}
+        std::unique_ptr<NativeRaLight146720> light;
+        bool outerReached=false,counted=false,enrolled=false,defaults=false,returned=false,published=false;
+        bool positionCompared=false,lookCompared=false,configured=false,nativeClosed=false;
+        //Private conditional type3 configuration. No ordinal or loop admission.
+        bool spotlightConfigEntered=false;
+        bool laterAmbientConfigEntered=false,laterAmbientStoresReturned=false;
+        std::optional<std::array<float,4>> spotlightHalfColor;
+        std::optional<std::array<std::uint32_t,4>> spotlightLookWords;
+        std::optional<std::uint32_t> spotlightCone98,spotlightCone9C;
+        std::optional<std::uint32_t> vtable08,luminance,attenuationRange;
+        std::optional<std::array<std::uint32_t,4>> positionWords,attenuationWords;
+        std::uint8_t guard=0,enabled=0,guardMask=0;bool assertionPassed=false;
+        std::optional<std::int32_t> zone,ordinalStack08;
+        const char* lensStack00=nullptr;bool argumentsBorrowed=false;
+        //Suspended1474A0/2809C0 custody; original observer fields remain in light.observerOwner.
+        bool observerEntered=false,observerOuterReached=false,observerLease=false,observerReturned=false;
+        bool observerVectorKnown=false,observerD0Published=false,observerD4Published=false,observerWithdrawn=false;
+        std::uint8_t observerScalarMask=0,primaryStoreMask=0;
+        g::OriginalGarageObserverShared50KG::SourceAssertionHistory observerD0Assertion,observerChildAssertion,
+            observerMethodAssertion,observerSlotAssertion,observerReturnAssertion;
+        rr::platform::OriginalUiLightManagerOwner50KG* observerManager=nullptr; //Borrowed; retained by actual source World.
+        const Entity* primaryNode=nullptr;
+        rr::platform::OriginalUiSearchListCold50KG* primaryList=nullptr;
+        bool primaryMethodReturned=false,primarySelectionAttempted=false,primarySelectionPending=false,primaryInserted=false,primaryNativeWithdrawn=false;
+        std::optional<std::uint32_t> primarySlot;
+        struct SecondaryStep {
+            bool entered=false,complete=false;std::size_t edgeIndex=0;
+            const void* edge=nullptr;const Entity* neighbor=nullptr;const Entity* portal=nullptr;
+            rr::platform::OriginalUiSearchListCold50KG* method=nullptr;
+            g::source_portal_overlap231150::History overlap;
+            std::uint8_t edgeDistanceMask=0,linkStoreMask=0;
+            bool methodReturned=false,selectionAttempted=false,selectionPending=false,inserted=false,nativeWithdrawn=false;
+            std::optional<std::uint32_t> slot;
+            bool allocationAttempted=false,allocationReturned=false,headPublished=false,linkReleased=false;
+            g::OriginalGarageObserverShared50KG::Link105720* link=nullptr;
+            g::OriginalGarageObserverShared50KG::Link105720* oldHead=nullptr;
+        };
+        std::array<SecondaryStep,20> secondary;
+        std::size_t secondaryCount=0;
+        bool secondaryEntered=false,secondaryReturned=false,secondaryNativeWithdrawn=false;
+        bool observerCallReturned=false,registrationEntered=false,registryA0Stored=false;
+        std::optional<std::uint32_t> registryIndex; //Actual source count94 at148F30 append, not a List slot.
+        bool registryGrowthEntered=false,registryGrowthReturned=false;
+        std::uint8_t registryColorMask=0;std::array<std::optional<std::uint32_t>,4> registryColorWords;
+        rr::platform::OriginalUiLightManagerOwner50KG* registryManager=nullptr; //Live registry custody, independent of observer ownership.
+        const Entity* registryOwner=nullptr; //Historical identity after native withdrawal; never dereference.
+        bool registrySlotPublished=false,registryCountStored=false,registrationReturned=false,registryWithdrawn=false;
+        bool flareFlagRead=false,flareSelected=false;
+        //Actual caller stack/constructor custody, separate from nativePoints_.
+        std::array<std::optional<std::uint32_t>,4> flareConversions; //A,R,G,B order.
+        std::optional<std::uint32_t> flarePackedStack6C;
+        bool flareAllocationReached=false,flareAllocationReturned=false,flareCounted=false,flareEnrolled=false;
+        std::unique_ptr<NativeLocalFlare> sourceFlare;
+        std::optional<std::uint32_t> flareVtable08;
+        std::uint8_t flareVectorMask=0;bool flareBaseReturned=false,flareCtorReturned=false,flareArgumentsBorrowed=false,flareNativeWithdrawn=false;
+        const std::array<std::uint32_t,4>* flarePositionBorrow=nullptr;
+        const char* flareTextureBorrow=nullptr;
+        std::optional<std::uint32_t> flareSizeArgument,flareTurningArgument;
+        std::optional<std::uint32_t> flareCountStack7C;
+        bool flare141C20Returned=false;std::uint8_t flareInputMask=0;
+        bool flareStripAllocationReached=false,flareStripCounted=false,flareStripEnrolled=false;
+        bool flareStripPublished=false,flareStripCtorReturned=false,flareStripNativeWithdrawn=false;
+        std::optional<std::uint32_t> flareStripVtable08;
+        std::uint8_t flareStripCtorMask=0;
+        bool flareMaterialAdmitted=false,flareSetupEntered=false,flareGroupsAttempted=false,flareGroupsPublished=false;
+        bool flareGroupWordStored=false,flarePrimitiveAttempted=false,flarePrimitivePublished=false,flarePrimitiveCtorReturned=false;
+        bool flareMaterialEntered=false,flareMaterialReturned=false,flareSetupReturned=false,flareResourcesWithdrawn=false;
+        std::uint8_t flareSetupMask=0;std::string flareMaterialName;
+        std::optional<std::uint32_t> flarePrimitiveVtable08;
+        bool flareAttributesEntered=false,flareAttributeGroupAttempted=false,flareAttributeGroupPublished=false;
+        std::uint16_t flareAttributeDescriptorMask=0;std::optional<std::int32_t> flareAttributeDescriptor10;
+        bool flareCommonAttempted=false,flareCommonPublished=false,flareCommonZeroed=false,flareCommonReturned=false;
+        std::uint16_t flareCommon40Mask=0,flareCommonE0Mask=0;std::uint8_t flareCommon90Mask=0,flareCommon130Mask=0;
+        std::optional<std::uint32_t> flareAttributeCount5C;
+        bool flareAttributeCountsAttempted=false,flareAttributeCountsPublished=false,flareAttributeCountStored=false;
+        std::unique_ptr<NativeSunFlareParameters> flareParameters54;
+        bool flareParameterAttempted=false,flareParameterPublished=false,flareParameterReturned134000=false;
+        std::uint64_t flareParameterHistorySerial=0;bool flareParameterHistoryWithdrawn=false;
+        bool flareAttributesWithdrawn=false;
+        SearchNode* flareVisibilityNode=nullptr;NativeListMethodCustody* flareVisibilityMethod=nullptr;
+        bool flareObserverEntered=false,flareObserverOuter=false,flareObserverLease=false,flareObserverReturned=false;
+        bool flareObserverPublished=false,flareObserverWithdrawn=false,flareObserverVectorKnown=false;
+        std::uint8_t flareObserverScalarMask=0,flarePrimaryStoreMask=0;
+        g::OriginalGarageObserverShared50KG::SourceAssertionHistory flareObserverEntryAssertion,flareObserverChildAssertion,
+            flareObserverMethodAssertion,flareObserverSlotAssertion;
+        bool flareSelectionPending=false,flarePrimaryInserted=false,flarePrimaryWithdrawn=false;
+        std::optional<std::uint32_t> flarePrimarySlot;
+        struct FlareSecondaryStep {
+            bool entered=false,complete=false;std::size_t edgeIndex=0;
+            NativePortalLink27F3B0* edge=nullptr;const Entity* neighbor=nullptr;const Entity* portal=nullptr;
+            NativeListMethodCustody* method=nullptr;
+            g::source_portal_overlap231150::History overlap;
+            std::uint8_t edgeDistanceMask=0,linkStoreMask=0;
+            bool methodReturned=false,selectionAttempted=false,selectionPending=false,inserted=false,nativeWithdrawn=false;
+            std::optional<std::uint32_t> slot;
+            bool allocationAttempted=false,allocationReturned=false,headPublished=false,linkReleased=false;
+            g::OriginalGarageObserverShared50KG::Link105720* link=nullptr;
+            const void* oldHead=nullptr;
+        };
+        std::array<FlareSecondaryStep,20> flareSecondary;
+        std::size_t flareSecondaryCount=0;
+        bool flareSecondaryEntered=false,flareSecondaryReturned=false,flareSecondaryWithdrawn=false;
+        g::OriginalGarageObserverShared50KG::SourceAssertionHistory flareObserverReturnAssertion;
+        bool flareObserverCallReturned=false,flare146AE0Entered=false,flare146AE0Returned=false;
+        bool flareC4Published=false,flareC4Withdrawn=false,flareLightAttachReturned=false,flareLightAttachmentWithdrawn=false;
+        std::optional<std::uint32_t> flareLightAttachLock;
+
+        std::uint8_t flareVectorCalls=0;std::array<std::uint8_t,8> flareVectorStoreMask{};
+        std::array<std::array<std::optional<std::uint32_t>,3>,8> flareVectorReadWords;
+        std::array<std::array<g::OriginalStripStreamHistory23CCA0::Receipt,3>,8> flareVectorAssertions;
+        bool flareReturned14AB30=false;
+        bool flareStripAttachReturned=false,flareStripAttachmentWithdrawn=false;
+        std::optional<std::uint32_t> flareStripAttachLock;
+        std::uint8_t flareUVCalls=0;std::array<std::uint8_t,4> flareUVStoreMask{};
+        std::array<std::array<g::OriginalStripStreamHistory23CCA0::Receipt,3>,4> flareUVAssertions;
+        bool flareHeaderEntered=false,flareHeaderReturned=false,flareAttributesReturned=false;
+        std::uint8_t flareHeaderStoreMask=0,flareHeaderPaddingWords=0,flarePrimitiveStoreMask=0;
+        NativeSunFlareParameters* flarePrimitiveParameters10=nullptr;
+        bool flarePrimitiveParametersWithdrawn=false;
+        bool flarePayloadEntered=false,flarePayloadNativeBacking=false,flareStreamReturned=false;
+        std::array<std::uint32_t,4> flareStackTagD0{};bool flareStackTagKnown=false;
+        std::array<std::optional<std::uint32_t>,4> flarePayloadOffsets;
+        std::array<std::optional<std::uint32_t>,128> flarePayloadWords;
+        std::array<std::uint8_t,4> flarePayloadCopies{};std::uint8_t flarePayloadFinished=0;
+        std::uint32_t flarePayloadCount=0;
+        std::optional<std::uint32_t> flareDescriptorParameterEnd,flareDescriptorParameterSpan;
+        bool flareStreamEntered=false,flareStreamCountStored=false;std::uint8_t flareStreamDescriptorMask=0;
+        std::uint8_t flareStreamArraysAttempted=0,flareStreamArraysPublished=0;
+        bool flareAliasAllocationAttempted=false,flareAliasPublished=false,flareBatchCountStored=false;
+        std::uint8_t flareAliasConstructed=0;std::array<std::uint8_t,4> flareAliasStoreMask{};
+        std::optional<std::uint32_t> flareDescriptorParameterBegin;
+        g::OriginalStripStreamHistory23CCA0::Receipt flareBatchAssertion;
+        std::array<g::OriginalStripStreamHistory23CCA0::Receipt,4> flareAliasAssertions;
+
+
+    };
+    std::vector<std::unique_ptr<SourceTypedLightFrame>> sourceTypedLights_;
+    bool sourceListEntriesCurrent(const NativeListMethodCustody&)const noexcept;
+    bool preflightSourceFlareObserverNative(const SourceTypedLightFrame&)const noexcept;
+    bool withdrawSourceFlareObserverNative(SourceTypedLightFrame&)noexcept;
+    bool continueSourceFlareObserver14BA00(SourceTypedLightFrame&,std::uint32_t&)noexcept;
+    bool preflightSourceFlareSecondaryNative(const SourceTypedLightFrame&)const noexcept;
+    bool withdrawSourceFlareSecondaryNative(SourceTypedLightFrame&)noexcept;
+    bool continueSourceFlareSecondary280BF0(SourceTypedLightFrame&,std::uint32_t&)noexcept;
+    bool finishSourceFlare14BA00And146AE0(SourceTypedLightFrame&,std::uint32_t&)noexcept;
+    bool selectSourceObserverSlot27E3C0(NativeListMethodCustody&,const void*,const void*,std::optional<std::uint32_t>&,bool&,std::uint32_t&)noexcept;
+
+    bool continueSourceTypedFlareVectors14AC74(SourceTypedLightFrame&,std::uint32_t&)noexcept;
+    bool continueSourceTypedFlareUV14ABD8(SourceTypedLightFrame&,std::uint32_t&)noexcept;
+    bool continueSourceTypedFlareHeader23BFBC(SourceTypedLightFrame&,std::uint32_t&)noexcept;
+    bool continueSourceTypedFlarePayload23D088(SourceTypedLightFrame&,std::uint32_t&)noexcept;
+    bool continueSourceTypedFlareStreams23CCA0(SourceTypedLightFrame&,std::uint32_t&)noexcept;
+    bool continueSourceTypedFlareAttributes23BED8(SourceTypedLightFrame&,std::uint32_t&)noexcept;
+    bool continueSourceTypedFlare14AB30(SourceTypedLightFrame&,std::uint32_t&)noexcept;
+    bool continueSourceTypedFlare150450(SourceTypedLightFrame&,
+        const std::shared_ptr<rr::assets::OriginalStandardMaterialTable50LA>&,const std::string&,std::uint32_t&)noexcept;
+    bool preflightSourceTypedLightsNative()const noexcept;
+    bool preflightSourceLightSiblingLinksNative()const noexcept;
+    bool abortSourceTypedLightsNative()noexcept;
+    bool sourceTypedLuminance146E60(const SourceTypedLightFrame&,std::uint32_t&)const noexcept;
+    bool sourceTypedAttenuation147268(const SourceTypedLightFrame&,std::uint32_t&)const noexcept;
+    bool attachSourceSecondLight141960(std::uint32_t&)noexcept;
+    bool detachSourceSecondLightNative(std::uint32_t&)noexcept;
+    bool sourceSecondAttenuation147268(std::uint32_t&)const noexcept;
     bool sourceSecondLightLuminance146E60(std::uint32_t&)const noexcept;
     bool preflightSourceSecondLightNative()const noexcept;
     bool constructSourceSecondLight146720(std::uint32_t&)noexcept;

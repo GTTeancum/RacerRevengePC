@@ -12,6 +12,7 @@ namespace original_main_entry50KG { struct Application; }
 #include <utility>
 
 namespace ra_pod_scene50LA { class Owner; }
+namespace ra_cold_aggregate50LA { class Owner; }
 namespace rr::platform { class RaceAudioGroups50IC;class OriginalApplicationAural50KG;class OriginalUiLightManagerOwner50KG; }
 namespace rr::game {
 class OriginalTunnelTrack50LA;
@@ -31,6 +32,7 @@ class OriginalApplicationEntityAuthority50LA final {
     friend class OriginalResults10450LA;
     friend class OriginalRaceF850LA;
     friend class OriginalSimpleVCR50LA;
+    friend class OriginalTrackParticleCold50LA;
     friend class OriginalRaceMusicManager50LA;
     friend class OriginalRaceTimingManager50LA;
     friend class OriginalTunnelTrack50LA;
@@ -41,6 +43,7 @@ class OriginalApplicationEntityAuthority50LA final {
     friend class rr::platform::OriginalUiLightManagerOwner50KG;
     friend class rr::platform::OriginalApplicationAural50KG;
     friend class ::ra_pod_scene50LA::Owner;
+    friend class ::ra_cold_aggregate50LA::Owner;
     friend class OriginalPlayerConstructorPrefix50LA;
     using C=OriginalWreckComponent50LA;
     struct Entry { C* node=nullptr;std::uint64_t generation=0,key=0; };

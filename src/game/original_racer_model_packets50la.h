@@ -12,6 +12,7 @@
 #include <exception>
 #include <memory>
 #include <optional>
+#include <new>
 #include <vector>
 
 namespace rr::platform {class OriginalUiGarageModelResource50KG; class OriginalUiGarageDrawContribution50KG; class OriginalUiGarageModelLowering50KG; class OriginalUiGarageVisibility50KG;}
@@ -57,7 +58,8 @@ public:
     OriginalRacerModelPackets50LA()=default;
     OriginalRacerModelPackets50LA(const OriginalRacerModelPackets50LA&)=delete;
     OriginalRacerModelPackets50LA& operator=(const OriginalRacerModelPackets50LA&)=delete;
-    ~OriginalRacerModelPackets50LA(){if(constructed_&&!released_)std::terminate();}
+    ~OriginalRacerModelPackets50LA(){if((constructed_&&!released_)||
+        (sourcePackets_.entered&&!sourcePackets_.nativeWithdrawn))std::terminate();}
 
     // The caller has really completed26E820, including resource1B4 and row
     // table1B8. This consumes the actual palette20, not Scene48D's identity
@@ -65,7 +67,7 @@ public:
     // or material acquisition occurs here.
     R construct240740(OriginalRacerModelSceneOwner50LA& model,
         const rr::assets::OriginalStandardModelGeometry50LA& geometry,bool sourceA3)noexcept {
-        if(constructed_||released_||!model.constructed2403A0()||!model.rowsLoaded_||model.released_||
+        if(sourcePackets_.entered||constructed_||released_||!model.constructed2403A0()||!model.rowsLoaded_||model.released_||
            !model.loadedQuantization240570()||
            model.fields().packets1F0||!model.fields().sourceRows1B8)
             return {S::phase,0x240740u};
@@ -427,6 +429,7 @@ private:
         // collector caller, not replaced here with a null1C8 or a ready bit.
         return {S::complete,hasPalette20_?0x2415b4u:0x2416a0u};
     }
+#include "original_racer_source_packets50la.inl"
     std::uint16_t directFlags20_=0;
     OriginalRacerModelSceneOwner50LA* model_=nullptr;
     const rr::assets::OriginalStandardModelGeometry50LA* geometry_=nullptr;

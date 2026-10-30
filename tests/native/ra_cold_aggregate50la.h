@@ -1,5 +1,9 @@
 #pragma once
 #include "ra_cold_aggregate_prefix50la.h"
+#include "../../src/assets/original_particle_source_config50la.h"
+#include "../../src/game/original_world_particle_invocation50la.h"
+#include "../../src/game/original_world_fog_invocation50la.h"
+#include "../../platform/linux/native/original_ui_garage_fog_color_lease50kg.h"
 #include "../../platform/linux/native/original_world_source_config50la.h"
 namespace original_results_roster50LA { class Read; }
 namespace ra_native_session50LA { class Join; }
@@ -159,6 +163,77 @@ enum class SourceLoadReset270550Phase:std::uint8_t {
 SourceLoadReset270550Phase sourceLoadReset270550Phase_=SourceLoadReset270550Phase::unreached;
 std::uint32_t sourceLoadReset270550PC_=0x1aa040;
 const std::string* sourceParticleDirectory36B530(const g::OriginalApplicationEntities50LA*)const noexcept;
+// Private ordered1B4DC0 custody; only the completed same-owner source predecessor may issue it.
+std::size_t sourceParticleInvocationBorrowers_=0;
+std::unique_ptr<a::OriginalParticleSourceConfig50LA> sourceParticleConfig_;
+const g::OriginalWorldParticleInvocation50LA* sourceParticleConfigInvocation_=nullptr;
+bool beginSourceParticleConfig1617A0(const g::OriginalWorldParticleInvocation50LA&,std::uint32_t&)noexcept;
+bool abortSourceParticleConfigNative(std::uint32_t&)noexcept;
+static bool releaseSourceParticleInvocationNative(const void*,const g::OriginalWorldParticleInvocation50LA&)noexcept;
+enum class SourcePostLightPhase:std::uint8_t {unreached,fogEntered,fogReturned,particleEntered,bounded,particleReturned};
+SourcePostLightPhase sourcePostLightPhase_=SourcePostLightPhase::unreached;
+std::uint32_t sourcePostLightPC_=0x1aa158;
+std::optional<std::uint32_t> sourceFogCallReturnV0_,sourceParticleStageReturnV0_;
+std::optional<bool> sourceParticleSelectorNone_,sourceParticleVisibilityWasNull_;
+bool sourceParticleStageLogAttempted_=false,sourceParticleStageLogError_=false;
+std::size_t sourceParticleStageLogWritten_=0;
+bool sourceParticleEnvironment35CWritten_=false,sourceParticlePredecessorEntered_=false;
+bool continueSourceFogAndParticle1AA158(std::uint32_t&)noexcept;
+bool sourceParticlePredecessorReturned_=false;
+std::unique_ptr<g::OriginalTrackParticleCold50LA> sourceParticlePendingAllocation_;
+std::optional<g::OriginalTrackParticleCold50LA*> sourceParticle4A0_;
+std::optional<bool> sourceParticleAllocationNonNull_;
+std::optional<std::int32_t> sourceParticleDepthBefore_,sourceParticleDepthAfter_;
+g::OriginalTrackParticleCold50LA* sourceParticleReturnedSelf_=nullptr; //Historical address after native cancellation.
+bool sourceParticleAllocationAttempted_=false,sourceParticleAllocationReturned_=false,
+     sourceParticleConstructorReturned_=false,sourceParticlePublished4A0_=false,
+     sourceParticleLoadEntered_=false,sourceParticleLoadReturned_=false,
+     sourceParticle4A0NativeWithdrawn_=false,sourceParticleStageNativeClosed_=false;
+std::uint32_t sourceParticleStagePC_=0x1b4e34;
+bool continueSourceParticleManager1B4E34(std::uint32_t&)noexcept;
+bool abortSourceParticleStageNative(std::uint32_t&)noexcept;
+bool sourceParticleStageCountedNative(std::size_t&)const noexcept;
+bool sourceVisibilityEnvironmentReturned_=false;
+std::optional<std::uint32_t> sourceVisibilityEnvironmentReturnV0_;
+bool constructSourceVisibilityEnvironment272FC0(std::uint32_t&)noexcept;
+bool preflightSourceVisibilityEnvironmentNative()const noexcept;
+enum class SourcePostParticleModelsPhase:std::uint8_t {unreached,entered,bounded,nativeClosed};
+SourcePostParticleModelsPhase sourcePostParticleModelsPhase_=SourcePostParticleModelsPhase::unreached;
+std::uint32_t sourcePostParticleModelsPC_=0x1aa194;
+std::optional<std::uint32_t> sourcePostParticleLoadingMode30_,sourceEmptyInstancesReturnV0_;
+std::uint8_t sourceGeometryDirectoryStoreMask_=0;
+std::optional<std::int32_t> sourceEmptyInstancesCounterS1_,sourceEmptyInstancesCountRead_;
+std::optional<const void*> sourceEmptyInstancesPointerRead_;
+std::optional<std::uint32_t> sourceStandardZoneS0_,sourceStandardZoneByteOffsetS1_,sourceStandardZonePointerOffsetS2_;
+std::optional<std::uint32_t> sourceStandardSlotS0_,sourceStandardSlotByteOffsetS1_,sourceStandardWrapperSlot_;
+std::optional<std::uint32_t> sourceStandardTypeSlotS0_,sourceStandardTypeByteOffsetS1_,sourceStandardTypeZoneRead_,sourceStandardTypeCountRead_;
+const void* sourceStandardTypeParentRead_=nullptr;
+std::array<std::uint32_t,10> sourceStandardCompletedCallbacks_{},sourceStandardTypeScanned_{};
+std::array<bool,10> sourceStandardParentReturned_{},sourceStandardTypeReturned_{},sourceStandardDiagnosticAttempted_{};
+std::array<int,10> sourceStandardDiagnosticWritten_{};
+std::uint16_t sourceStandardVisibilityMask_=0;
+std::optional<std::uint32_t> sourceStandardWorldReturnV0_;
+const void* sourceStandardParentS3_=nullptr;
+const void* sourceStandardWrapperA0_=nullptr;
+bool sourceStandardZoneStored_=false,sourceStandardVisibilityStored_=false,sourceStandardCallbackEntered_=false;
+bool continueSourcePostParticleModels1AA194(std::uint32_t&)noexcept;
+bool continueSourceStandardModel27ABC0(std::uint32_t&)noexcept;
+bool continueSourceStandardSuccess27AC64(ra_static_model_cold50LA::Owner::StandardWrapper&,std::uint32_t&)noexcept; //Conditional; caller remains unissued.
+bool finishSourceStandardRenderable24076C(ra_static_model_cold50LA::Owner::StandardWrapper&,std::uint32_t&)noexcept;
+bool continueSourceStandardSmoker27AE68(ra_static_model_cold50LA::Owner::StandardWrapper&,std::uint32_t&)noexcept;
+bool continueSourceStandardAttachment27AE14(ra_static_model_cold50LA::Owner::StandardWrapper&,std::uint32_t&)noexcept; //Requires genuine live observer return.
+bool releaseSourceAbsentModel26E9D4(ra_static_model_cold50LA::Owner::StandardWrapper&,std::uint32_t&)noexcept;
+bool continueSourceStandardObserver28E8A0(ra_static_model_cold50LA::Owner::StandardWrapper&,std::uint32_t&)noexcept;
+bool continueSourceStandardObserverSecondary280BF0(SourceModelObserverFrame&,std::uint32_t&)noexcept;
+bool preflightSourceStandardObserversNative()const noexcept;
+bool preflightSourceStandardObserverSecondaryNative(const SourceModelObserverFrame&)const noexcept;
+bool withdrawSourceStandardObserverSecondaryNative(SourceModelObserverFrame&)noexcept;
+bool retireSourceStandardObserversNative(std::uint32_t&)noexcept;
+bool sourceStandardObserverReturnCurrent(const ra_static_model_cold50LA::Owner::StandardWrapper&)const noexcept;
+bool preflightSourceStandardModelsNative(std::size_t&)const noexcept;
+bool retireSourceStandardModelsNative(std::uint32_t&)noexcept;
+bool preflightSourcePostParticleModelsNative()const noexcept;
+bool abortSourcePostParticleModelsNative(std::uint32_t&)noexcept;
 bool sourceWorldLoadInvocationCurrent()const noexcept; //Parent owns cpp exact token predicate.
 bool resetColdLoadWorld270550(std::uint32_t&)noexcept;
 
@@ -334,6 +409,7 @@ SourceStaticPhase sourceStaticPhase_=SourceStaticPhase::unreached;
 std::uint32_t sourceStaticPC_=0x2710f0;
 //Actual retained first2710F0/27B740 frame lanes. No loop advancement yet.
 std::uint32_t sourceStaticZoneIndex_=0,sourceStaticModelIndex_=0,sourceStaticPhysicsCount_=0;
+std::uint32_t sourceStaticPhysicsCountZone_=0; //Native identity of the actual current/last S1 count frame.
 std::uint32_t sourceStaticSucceededZones_=0,sourceStaticZonePointerOffset_=0,sourceStaticZoneByteOffset_=0,sourceStaticSlotByteOffset_=0;
 g::OriginalWorldPhysicsIndex50LA* sourceStaticPhysicsArg_=nullptr;
 rr::platform::OriginalWorldSourceConfig50LA* sourceStaticConfigArg_=nullptr;
@@ -343,6 +419,8 @@ bool sourceWorldStaticModelsInvocationCurrent()const noexcept; //Parent exact v8
 bool loadSourceWorldStaticModels2710F0(std::uint32_t&)noexcept;
 bool preflightSourceWorldStaticModelsNative()const noexcept;
 bool abortSourceWorldStaticModelsNative(std::uint32_t&)noexcept;
+bool constructSourcePhysicsWrapper27BA3C(std::size_t,std::size_t,std::uint32_t&)noexcept;
+bool loadSourcePhysicsDescriptor27B370(std::size_t,std::size_t,std::uint32_t&)noexcept;
 bool loadSourceFirstStaticDescriptor27AB60(std::uint32_t&)noexcept;
 //Include original_source_world_static_models50la.inl after complete class.
 //Native cleanup sourceStaticOwner before Instance/Physics/Zone/Config/File.
@@ -740,10 +818,11 @@ enum class SourcePortalGraphPhase:std::uint8_t {unreached,entered,bounded,return
     bool sourceDefaultObserverOuterReached_=false,sourceDefaultObserverLease_=false;
     bool sourceDefaultObserverCtorReturned_=false,sourceDefaultObserverPublished_=false;
     bool sourceDefaultObserverChildStored_=false,sourceDefaultObserverMethodStored_=false;
+    std::optional<const g::OriginalVisibilityQuadTree50LA*> sourceDefaultObserverMethodRead_;
     std::optional<std::uint32_t> sourceDefaultEnvironment35C_;
     std::optional<std::uint32_t> sourceTopologyReturnV0_;
     bool sourceTopologyRoutineReturned_=false;
-    enum class SourceLightPopulationPhase {unreached,entered,bounded,wrapperPending,nativeClosed};
+    enum class SourceLightPopulationPhase {unreached,entered,bounded,wrapperPending,returned,nativeClosed};
     SourceLightPopulationPhase sourceLightPopulationPhase_=SourceLightPopulationPhase::unreached;
     std::uint32_t sourceLightPopulationPC_=0x272f94;
     std::optional<std::int32_t> sourceLightPopulationS0_,sourceLightPopulationCount_,sourceLightPopulationZone_;
@@ -751,6 +830,11 @@ enum class SourcePortalGraphPhase:std::uint8_t {unreached,entered,bounded,return
     SourceLightDescriptor277220* sourceLightPopulationDescriptor_=nullptr;
     std::uint8_t sourceLightAssertionGuard_=0,sourceLightAssertionEnabled_=0,sourceLightAssertionMask_=0;
     bool sourceLightAssertionPassed_=false;
+    std::optional<std::int32_t> sourceLightPopulationItemsEnd_; //Historical185 before original S0 is reused for zones.
+    std::uint16_t sourceLightZoneReadMask_=0,sourceLightZoneSkippedMask_=0,sourceLightZoneAppliedMask_=0;
+    std::optional<std::uint32_t> sourceLightPopulationReturnV0_;
+    bool preflightSourceTypedPopulationLoopNative()const noexcept;
+    bool continueSourceTypedLightIteration273BA8(std::size_t,std::uint32_t&)noexcept;
     bool sourceFirstDescriptorDisposed_=false,sourceFirstWrapperReturned_=false;
     std::optional<std::uint32_t> sourceFirstWrapperV0_;
 
@@ -763,8 +847,15 @@ enum class SourcePortalGraphPhase:std::uint8_t {unreached,entered,bounded,return
     const char* sourceSecondLensStack00_=nullptr;
     std::optional<std::int32_t> sourceSecondOrdinalStack08_;
     bool sourceSecondArgumentsBorrowed_=false;
+    bool sourceSecondDescriptorDisposed_=false,sourceSecondWrapperReturned_=false;
+    std::optional<std::uint32_t> sourceSecondWrapperV0_;
     std::uint8_t sourceSecondGuard_=0,sourceSecondEnabled_=0,sourceSecondGuardMask_=0;
     bool sourceSecondAssertionPassed_=false;
+    bool continueSourceTypedLight273BA8(std::size_t,std::uint32_t&)noexcept;
+    bool configureSourceSpotlight146F60(SourceTypedLightFrame&,std::uint32_t&)noexcept;
+    bool registerSourceSpotlight148F30(SourceTypedLightFrame&,std::uint32_t&)noexcept;
+    bool continueSourceLaterAmbient146F60(SourceTypedLightFrame&,std::uint32_t&)noexcept;
+    bool retireAndAttachSourceTypedWrapper2780AC(SourceTypedLightFrame&,std::uint32_t&)noexcept;
     bool continueSourceSecondLight273BA8(std::uint32_t&)noexcept;
     bool preflightSourceSecondLightFrameNative()const noexcept;
     bool abortSourceSecondLightFrameNative()noexcept;
@@ -849,6 +940,35 @@ std::uint32_t sourceVisibility10,sourceHaziness14,sourceVtable18;
     SourceFogPhase sourceFogPhase_=SourceFogPhase::unreached;
     std::uint32_t sourceFogPC_=0x270b14;
 
+    //Fresh source variant, mutually exclusive with native CameraBinding
+    //adoption. These are actual owned output resources, not copied fog values.
+    struct SourceFogObject13E6B0 : NativeFogEntity {
+        std::array<std::optional<std::uint32_t>,14> words30To64;
+        std::unique_ptr<NativeFogBuffer133F80> buffer5C;
+        std::optional<NativeFogBuffer133F80*> published5C;
+        std::uint32_t vtable08=0;bool bufferAttempted=false;
+    };
+    struct SourceFogTransfer273C30 {
+        NativeFogDescriptor3AC* descriptor=nullptr;
+        std::unique_ptr<SourceFogObject13E6B0> fog;
+        std::unique_ptr<NativeFogEntity> off,on;
+        std::optional<SourceFogObject13E6B0*> world3EC;
+        std::optional<NativeFogEntity*> world3F4,world3F0;
+        std::uint32_t offVtable08=0,onVtable08=0;
+        std::optional<std::uint32_t> packedColor;
+        std::shared_ptr<rr::platform::OriginalUiGarageFogColorLease50KG> renderer;
+        std::optional<SourceFogObject13E6B0*> onFog30;
+        bool rendererStored=false,offInitialized=false,onInitialized=false,
+            descriptorFreed=false,descriptorNullStored=false;
+        bool returned=false,nativeCancelled=false;
+        std::uint32_t pc=0x273c30;
+    };
+    std::unique_ptr<SourceFogTransfer273C30> sourceFogTransfer_;
+    const g::OriginalWorldFogInvocation50LA* sourceFogTransferInvocation_=nullptr;
+    std::size_t sourceFogTransferBorrowers_=0;
+    bool beginSourceFog273C30(const g::OriginalWorldFogInvocation50LA&,std::uint32_t&)noexcept;
+    bool abortSourceFogTransferNative(std::uint32_t&,const g::OriginalWorldFogInvocation50LA* = nullptr)noexcept;
+    static bool releaseSourceFogInvocationNative(const void*,const g::OriginalWorldFogInvocation50LA&)noexcept;
     bool nativeFogLoadAttempted_=false,nativeFogLoadComplete_=false;
     bool nativeGeometryDirectory1AA1DC_=false;
     std::size_t nativeStandardZoneNext_=0,nativeStandardSlotNext_=0;
@@ -1152,7 +1272,7 @@ std::uint32_t sourceStaticModelParamPC_=0;
 struct SourceStaticModelParamFrame {
     std::array<char,272> name90;
     std::array<char,260> slt1A0;
-    bool nameKnown=false,sltKnown=false;
+    bool nameKnown=false,sltKnown=false,descriptorBorrowWithdrawn=false;
     std::optional<std::size_t> sltBytes,lastDot;
     std::optional<std::int32_t> count2A8,allow2AC,s7,s0,s1;
     std::optional<std::uint32_t> s5,s4;
@@ -1282,7 +1402,7 @@ public:
         rr::assets::OriginalStandardTextureDiagnostic50LA&)noexcept;
     bool rollbackNativeWorldConstructionFailure(std::uint32_t& pc)noexcept {
         pc=0;
-        if(nativeScbThread_!=std::this_thread::get_id()||constructorRacerWorldBorrows_||
+        if(nativeScbThread_!=std::this_thread::get_id()||constructorRacerWorldBorrows_||sourceParticleInvocationBorrowers_||
            runtimeCameraBorrows_||runtimeWorldBorrows_)return false;
         // The private source loader introduces real Config/transport owners.
         // Never retire their counted World through the earlier constructor-
@@ -1876,7 +1996,7 @@ private:
     }
     NativeCloseDiagnostic nativeCloseDiagnostic_;
     bool closeOwnedNativeResources(bool retireCountedWorld) noexcept {
-        if(nativeScbThread_!=std::this_thread::get_id()||constructorRacerWorldBorrows_)return false;
+        if(nativeScbThread_!=std::this_thread::get_id()||constructorRacerWorldBorrows_||sourceParticleInvocationBorrowers_||sourceFogTransferBorrowers_)return false;
         if(closed_)return true;
         auto& diagnostic=nativeCloseDiagnostic_;diagnostic={};
         diagnostic.counted=worldColdConstructed_;diagnostic.retireCounted=retireCountedWorld;

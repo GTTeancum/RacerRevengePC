@@ -62,4 +62,16 @@ Type2ResourceStatus49X validateType2Resource49X(const Type2ResourceView49X&,
 Type2ResourceStatus49X prepareStaticTargetRadii49X(const assets::CollisionMesh48I&,
     float* radii,std::size_t radiusCapacity,const Type2ResourceWorkspace49X&,
     std::size_t& maxDepth) noexcept;
+// Private reached type0 payload math. This reuses the retained bounded native
+// scalar-EE projection, not whole-mesh validation or a source-data decoder.
+// Requires FE_TONEAREST, separately rounded binary32 (-ffp-contract=off),
+// finite normal-or-zero input words. Signed halves are accepted. Subnormal
+// inputs/nonfinite intermediates are explicit unsupported native boundaries.
+// Outputs remain unchanged on refusal; caller owns input knownness and PCs.
+class SourceCollisionPayloadMath50LA final {
+    friend class OriginalWreckType0Owners50LA;
+    static bool radius1261B0(const std::array<std::uint32_t,3>&,std::uint32_t&)noexcept;
+    static bool faceLane126320(std::uint32_t,std::uint16_t&)noexcept;
+};
+
 }

@@ -111,22 +111,62 @@ bool OriginalUiLightManagerOwner50KG::preflightSourceRaZonesNative(
         return sourceIdentity(); //Only this exact rejected native lexical borrow.
     }
     const auto& r=*raZones_;
+    std::uint32_t typedLiveRegistry=0;std::size_t typedPublishedRegistry=0;
+    Words expectedVector30{{0x42ce0000u,0x42ce0000u,0x42b90000u,0}};std::uint32_t expectedA0=0;std::uint32_t expectedCapacity=10;bool sourceGrowthFailed=false;
+    for(const auto& typed:world.sourceTypedLights_){if(!typed)return false;const auto& f=*typed;
+        if(((f.spotlightConfigEntered||f.laterAmbientConfigEntered)&&f.registryColorMask)||(f.registryIndex&&*f.registryIndex>=190)||f.registryColorMask>15||f.registryA0Stored&&!f.registrationEntered)return false;
+        if(f.registryGrowthEntered){
+            if(!f.registryIndex||*f.registryIndex!=expectedCapacity||!f.registrationEntered||sourceGrowthFailed)return false;
+            expectedCapacity=*f.registryIndex+10u;
+            if(!f.registryGrowthReturned)sourceGrowthFailed=true;
+        }else if(f.registryGrowthReturned)return false;
+        if(f.registrationEntered&&((!f.nativeClosed&&f.registryManager!=this)||(f.nativeClosed&&f.registryManager)||!r.sourceSecondRegistered||(!f.observerCallReturned&&!f.laterAmbientConfigEntered)||!f.registryIndex))return false;
+        for(unsigned k=0;k<4;++k){if(bool(f.registryColorWords[k])!=bool(f.registryColorMask&(1u<<k)))return false;
+            if(f.registryColorWords[k]){std::uint32_t expected=0;
+                if(k<3){if(f.spotlightHalfColor)std::memcpy(&expected,&(*f.spotlightHalfColor)[k],sizeof(expected));else expected=0x42ff0000u;}
+                if(*f.registryColorWords[k]!=expected)return false;expectedVector30[k]=*f.registryColorWords[k];}}
+        if(f.registryA0Stored){if(f.registryColorMask!=15||f.spotlightConfigEntered||f.laterAmbientConfigEntered)return false;expectedA0=1;}
+        if(f.registrySlotPublished){if(!f.registryIndex||*f.registryIndex!=2+typedPublishedRegistry||
+            (!f.spotlightConfigEntered&&!f.laterAmbientConfigEntered&&!f.registryA0Stored)||f.registryColorMask!=((f.spotlightConfigEntered||f.laterAmbientConfigEntered)?0u:15u)||!f.registryOwner||!registry9C_||
+            registry9C_[*f.registryIndex]!=f.registryOwner||registryPublished_[*f.registryIndex]!=f.registryOwner)return false;++typedPublishedRegistry;}
+        else if(f.registryOwner||f.registryCountStored)return false;
+        if(f.registryWithdrawn&&!f.registryCountStored)return false;
+        if(f.registryCountStored&&!f.registryWithdrawn){if(!f.light||f.registryOwner!=&f.light->entity||!f.light->registered)return false;++typedLiveRegistry;}
+    }
+    if((r.sourceAmbientAllocation&&capacity98_!=expectedCapacity)||raRegistryGrowthFailed_!=sourceGrowthFailed||
+       typedPublishedRegistry>183||typedLiveRegistry>typedPublishedRegistry||(r.sourceReturned&&fieldA0_!=expectedA0))return false;
     if(!sourceIdentity()||r.canonical||r.gameplayGeneration||nativeProjectionUi_||nativeProjectionGameplayGeneration_||
        courseZoneOwner_||uiLightsOwner_||sceneLightsOwner_||zone_||list_||listPublished_||
-       count94_!=std::uint32_t(r.sourceAmbientRegistered&&!r.sourceAmbientWithdrawn)||directional40Live_||
+       count94_!=std::uint32_t(r.sourceAmbientRegistered&&!r.sourceAmbientWithdrawn)+
+           std::uint32_t(r.sourceSecondRegistered&&!r.sourceSecondWithdrawn)+typedLiveRegistry||
+       directional40Live_||
        (registryFailed_&&!(r.sourceAmbientAllocation&&r.sourceAmbientPublished&&!r.sourceAmbientRegistered))||
        zonesComplete_||ambientKnown_||directional44Known_||
        r.firstAmbient||r.firstDirectional||r.next>10||
        (r.sourceArrayMask&~31u)||(r.sourceArrayWithdrawnMask&~r.sourceArrayMask))return false;
-    if((r.sourceSecondRevisionBefore[1]||r.sourceSecondRevisionBefore[2])&&!r.sourceSecondRevisionBefore[0])return false;
+    for(std::size_t i=0;i<10;++i)if(r.sourceDirectionalTailRGB[i]){
+        if((i!=1&&i!=2&&i!=8)||!r.sourceSecondRegistered||
+           *r.sourceDirectionalTailRGB[i]!=std::array<std::uint32_t,3>{{0x41a00000u,0x41a00000u,0x41a00000u}})return false;
+        if((i==2&&!r.sourceDirectionalTailRGB[1])||(i==8&&(!r.sourceDirectionalTailRGB[1]||!r.sourceDirectionalTailRGB[2])))return false;
+    }
+    if((r.sourceSecondRevisionBefore[1]||r.sourceSecondRevisionBefore[2]||r.sourceSecondRevisionBefore[3])&&!r.sourceSecondRevisionBefore[0])return false;
     std::uint32_t expectedRevision=r.sourceAmbientRevisionBefore?std::uint32_t(*r.sourceAmbientRevisionBefore+1u):field84_;
     for(const auto& before:r.sourceSecondRevisionBefore){
         if(before){if(!r.sourceAmbientRevisionBefore||*before!=expectedRevision)return false;++expectedRevision;}
     }
+    std::size_t typedOrdinal=1;unsigned typedStage=0;
+    for(const auto& receipt:r.sourceTypedRevisions){
+        if(!r.sourceSecondRegistered||receipt.ordinal<2||receipt.ordinal>=185||receipt.stage>3||
+           receipt.before!=expectedRevision)return false;
+        if(receipt.ordinal!=typedOrdinal){
+            if(receipt.ordinal!=typedOrdinal+1||receipt.stage!=0)return false;
+        }else if(receipt.stage<=typedStage)return false;
+        typedOrdinal=receipt.ordinal;typedStage=receipt.stage;++expectedRevision;
+    }
     if(r.sourceAmbientRevisionBefore&&field84_!=expectedRevision)return false;
     if(r.sourceAmbientAttempted){
         if(!r.sourceAmbientRevisionBefore||!r.sourceAmbientColors||!r.sourceAmbientAllocation||!r.sourceAmbientPublished||
-           capacity98_!=10||registryWritten_!=std::size_t(r.sourceAmbientRegistered))return false;
+           (!capacity98_||capacity98_>190||capacity98_%10)||registryWritten_!=std::size_t(r.sourceAmbientRegistered)+std::size_t(r.sourceSecondRegistered)+typedPublishedRegistry)return false;
         if(r.sourceAmbientRegistered){if(!registry9C_||registryFailed_)return false;}
         else if(registry9C_||!registryFailed_)return false;
     }else if(r.sourceAmbientColors||r.sourceAmbientAllocation||r.sourceAmbientPublished||r.sourceAmbientRegistered||r.sourceAmbient)return false;
@@ -134,6 +174,19 @@ bool OriginalUiLightManagerOwner50KG::preflightSourceRaZonesNative(
         if(!r.sourceAmbient||!world.sourceFirstLight_||r.sourceAmbient!=&world.sourceFirstLight_->entity||
            !world.sourceFirstLight_->registered)return false;
     }else if(r.sourceAmbient)return false;
+    if(r.sourceSecondRegistered){
+        if(!r.sourceAmbientRegistered||!r.sourceSecondRegistryReceipt||!registry9C_||!capacity98_||capacity98_>190||capacity98_%10||
+           registryWritten_!=2+typedPublishedRegistry||registry9C_[1]!=r.sourceSecondRegistryReceipt||registryPublished_[1]!=r.sourceSecondRegistryReceipt||
+           field40_!=r.sourceSecondRegistryReceipt||vector30_!=expectedVector30)return false;
+        if(!r.sourceSecondWithdrawn&&(!world.sourceSecondLight_||r.sourceSecondRegistryReceipt!=&world.sourceSecondLight_->entity||
+           !world.sourceSecondLight_->registered))return false;
+        if(!(r.sourceArrayWithdrawnMask&16u)){
+            if(!directional44_)return false;
+            for(std::size_t i=0;i<10;++i){Words expected{{0x42ce0000u,0x42ce0000u,0x42b90000u,0}};
+                if(r.sourceDirectionalTailRGB[i])for(unsigned k=0;k<3;++k)expected[k]=(*r.sourceDirectionalTailRGB[i])[k];
+                if(directional44_[i]!=expected)return false;}
+        }
+    }else if(r.sourceSecondRegistryReceipt||r.sourceSecondWithdrawn)return false;
     for(std::size_t i=0;i<183;++i)if(r.localRegistered[i]||r.localPrimary[i])return false;
     if(!preflightSourceRaPortalLinksNative(world))return false;
     const void* arrays[]={nodes88_.get(),lists8C_.get(),ambient60_.get(),ambient80_.get(),directional44_.get()};
@@ -152,6 +205,23 @@ bool OriginalUiLightManagerOwner50KG::preflightSourceRaZonesNative(
         return true; //Historical world pointer is never dereferenced.
     }
     if(r.world!=&world||!r.sourceEntered||!current())return false;
+    //Fold actual Ambient history; these values are validation expectations,
+    //not a second manager payload or native restoration of previous colors.
+    Words expectedDefault50= r.sourceAmbientColors?Words{{0x42480000u,0x42480000u,0x42480000u,0x42800000u}}:Words{{0,0,0,0x42800000u}};
+    //Before first Ambient, retain the constructor defaults already owned here.
+    if(!r.sourceAmbientColors)expectedDefault50=default50_;
+    auto expectedDefault70=expectedDefault50;
+    std::array<Words,10> expectedAmbient60,expectedAmbient80;
+    expectedAmbient60.fill(expectedDefault50);expectedAmbient80.fill(expectedDefault70);
+    for(const auto& typed:world.sourceTypedLights_)if(typed&&typed->laterAmbientStoresReturned){
+        if(!typed->laterAmbientConfigEntered||!typed->zone||*typed->zone<0||*typed->zone>=10||!typed->registrationEntered)return false;
+        constexpr Words ambient{{0x41480000u,0x41480000u,0x41480000u,0x42800000u}};
+        expectedDefault50=expectedDefault70=ambient;
+        const auto zone=static_cast<std::size_t>(*typed->zone);
+        expectedAmbient60[zone]=expectedAmbient80[zone]=ambient;
+        if(!zone){expectedAmbient60.fill(ambient);expectedAmbient80.fill(ambient);}
+    }
+    if(r.sourceAmbientColors&&(default50_!=expectedDefault50||default70_!=expectedDefault70))return false;
     std::size_t counted=0;
     for(std::size_t i=0;i<10;++i){const auto& zp=r.zones[i];const auto& lp=r.lists[i];
         if(r.sourceNodeWithdrawn[i]){if(zp||r.sourceNodeCounted[i]||r.sourceNodeEnrolled[i])return false;}
@@ -182,16 +252,16 @@ bool OriginalUiLightManagerOwner50KG::preflightSourceRaZonesNative(
             if(r.listPublished[i]!=(r.sourceListSlotKnown[i]&&bool(lp)))return false;
             if(lp){const auto& l=*lp;
                 if(!r.sourceListAttempted[i]||l.lightManagerOwner_!=this||!l.same(issuer_,entities_)||
-                   l.managerOwner_||l.loadingManagerOwner_||l.courseManagerOwner_||!l.lightMembersEmpty()||l.lightTable3C_||l.lightBlockPointers_[0])return false;
-                if(l.attempted_){if(!l.lightEmptyCurrent(this,issuer_,entities_))return false;}
+                   l.managerOwner_||l.loadingManagerOwner_||l.courseManagerOwner_||l.lightTable3C_||l.lightBlockPointers_[0])return false;
+                if(l.attempted_){if(!l.sourceLightHistoryCurrent(this,issuer_,entities_))return false;}
                 else if(l.reference00_||l.released_||l.derivedConstructed_||l.selected1C_||l.lightAliases_||l.lightReleasedAliases_)return false;
                 if(r.sourceListReturned[i]&&(!l.derivedConstructed_||!l.soultreeKnown_||!l.searchableKnown_))return false;
             }else if(r.sourceListReturned[i])return false;
         }
         if(r.sourceAmbient80Known[i]&&!(r.sourceArrayWithdrawnMask&8u)){
-            if(!ambient80_||ambient80_[i]!=default70_)return false;}
+            if(!ambient80_||ambient80_[i]!=expectedAmbient80[i])return false;}
         if(r.ambientKnown[i]&&!(r.sourceArrayWithdrawnMask&4u)){
-            if(!ambient60_||ambient60_[i]!=default50_)return false;}
+            if(!ambient60_||ambient60_[i]!=expectedAmbient60[i])return false;}
         if(i<r.next&&(!r.sourceListReturned[i]||!r.sourceIndexKnown[i]||!r.sourceAmbient80Known[i]||!r.ambientKnown[i]))return false;
     }
     if(counted>entities_->objectCount423F60_)return false;
@@ -214,9 +284,13 @@ bool OriginalUiLightManagerOwner50KG::abortSourceRaZonesNative(
     if(!raZones_||!raZones_->sourceMode||raZones_->sourceWorldIdentity!=&world||raZones_->sourceNativeClosed)return true;
     if(!world.preflightSourceWorldTopologyCountNative())return fail(d,Status::phase,0x148110);
     auto& r=*raZones_;
+    for(const auto& typed:world.sourceTypedLights_)if(typed&&typed->observerEntered&&!typed->observerWithdrawn)
+        return fail(d,Status::phase,0x148110); //D4/node borrow exists even before List selection.
     // Portal owners must withdraw their raw borrows before manager node retirement.
     for(auto* portal:r.portals)if(portal)return fail(d,Status::phase,0x148110);
     for(const auto& link:r.portalLinks)if(link)return fail(d,Status::phase,0x148110);
+    for(const auto& list:r.lists)if(list&&(!list->lightMembersEmpty()||list->sourceLightOccurrence_))
+        return fail(d,Status::phase,0x148110); //No partial node retirement with live primary/pending borrow.
     //All aliases/nodes precede88 disposal, then all List payloads and8C.
     //Masks permit exact retries without reading stale/unwritten slots.
     for(std::size_t i=0;i<10;++i){if(r.sourceNodeWithdrawn[i])continue;

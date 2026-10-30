@@ -1,5 +1,9 @@
 #pragma once
 #include "original_wreck_assets50la.h"
+#include "source_acos49t.h"
+#include "type2_resource49x.h"
+#include "original_collision_normal_guards50la.h"
+#include "original_wreck_type0_prepare50la.h"
 #include "original_wreck_components50la.h"
 #include <array>
 #include <cstring>
@@ -7,6 +11,7 @@
 #include <limits>
 #include <optional>
 
+namespace rr::assets {class OriginalSourceCollisionFile50LA;}
 namespace rr::game {
 class OriginalWreckQueries50LA;
 class OriginalRacerQuery694Owner50LA;
@@ -15,6 +20,7 @@ struct OriginalRacerSceneObject50LA;
 // remains NULL on the11B920/type0 branch. The existing numeric PodShapeState
 // is kept separately; it does not own or retain shared array storage.
 class OriginalWreckType0Owners50LA final {
+    friend class OriginalSourcePhysicsCollision50LA;
     friend class OriginalWreckQueries50LA;
     friend class OriginalRacerQuery694Owner50LA;
     using Resource=rr::assets::OriginalStandardCollisionType0Resource50LA;
@@ -261,6 +267,17 @@ class OriginalWreckType0Owners50LA final {
             auto& r=*loading_;if(!freshWreck_)r.mesh_.local_matrix=mesh.local_matrix;r.mesh_.reverse_mode=mesh.reverse_mode;
             r.vertexCount04_=word(raw,68);r.packed18_=word(raw,80);r.root1C_=0;
             boundary_=r.packed18_?0x125ac4u:0x125bb0u;r.mesh_.vertices=mesh.vertices;
+            //Legacy cold decoded transport omits original float-normal shared
+            //guards. Inspect actual checked raw presence, including zero-count
+            //input; native empty normals alone cannot prove source absence.
+            if(!r.packed18_){
+                const auto n=word(raw,68);bool omitted=true;
+                if(n<=(std::numeric_limits<std::size_t>::max()-84u)/12u){
+                    const auto flag=84u+std::size_t(n)*12u;
+                    if(flag<=raw.size()&&raw.size()-flag>=4u)omitted=word(raw,flag)!=0;
+                }
+                if(omitted)OriginalCollisionNormalGuards50LA::invalidateNativeFloatNormals125DD8();
+            }
             boundary_=r.packed18_?0x125cd4u:0x125db0u;r.mesh_.vertex_normals=mesh.vertex_normals;
             boundary_=0x126038u;r.mesh_.nodes=mesh.nodes;r.radii_=radii;
             boundary_=0x12625cu;r.mesh_.faces=mesh.faces;
@@ -282,7 +299,7 @@ class OriginalWreckType0Owners50LA final {
         loaded_=true;boundary_=0x1250ecu;return true;
     }
     bool release11B600()noexcept {
-        if(!attempted_||retired_)return false;
+        if(sourcePrefix_.attempted||!attempted_||retired_)return false;
         if(shape8C_&&shape8C_->resource124){
             auto& r=*shape8C_->resource124;if(!r.live()||!r.resolver_)return false;
             r.resolver_->clearCollision1327D0(&r); //11B650, even for nonfinal release
@@ -293,11 +310,18 @@ class OriginalWreckType0Owners50LA final {
         }else if(loading_){freeArrays11AEE0(*loading_);loading_.reset();} //source124 NULL branch
         shape8C_.reset();loaded_=false;retired_=true;boundary_=0x11b918u;return true;
     }
+#include "original_source_collision_type0_prefix50la.inl"
+#include "original_source_collision_type0_arrays50la.inl"
+#include "original_source_collision_type0_nodes50la.inl"
+#include "original_source_collision_type0_resource50la.inl"
+#include "original_source_collision_type0_result_shape50la.inl"
+#include "original_source_collision_type0_transform50la.inl"
+#include "original_source_collision_type0_contact_points50la.inl"
 public:
     OriginalWreckType0Owners50LA()=default;
     OriginalWreckType0Owners50LA(const OriginalWreckType0Owners50LA&)=delete;
     OriginalWreckType0Owners50LA& operator=(const OriginalWreckType0Owners50LA&)=delete;
-    ~OriginalWreckType0Owners50LA(){if(shape8C_||loading_)std::terminate();}
+    ~OriginalWreckType0Owners50LA(){if(shape8C_||loading_||(sourcePrefix_.attempted&&!sourcePrefix_.nativeWithdrawn))std::terminate();}
     bool attempted()const noexcept{return attempted_;}
     bool loaded()const noexcept{return loaded_;}
     bool retired()const noexcept{return retired_;}

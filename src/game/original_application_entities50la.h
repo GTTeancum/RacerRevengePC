@@ -133,6 +133,12 @@ private:
 // and retains it across serial native race lifetimes. It is NOT a complete
 // retail application forest or a substitute race/manager ancestor chain.
 class OriginalApplicationEntities50LA final {
+    friend class OriginalSourcePhysicsObject50LA;
+    friend class OriginalSourcePhysicsBody50LA;
+    friend class OriginalSourcePhysicsGravity50LA;
+    friend class OriginalSourcePhysicsCollision50LA;
+    friend class OriginalSourcePhysicsContact50LA;
+    friend class OriginalSourcePhysicsDetector50LA;
     friend class ::ra_cold_roster50LA::WreckBacking;
     //One actual application lifetime for the file-backed source static vectors.
     const OriginalWreckConstructorVectors50LA wreckAssetVectors_=initializedOriginalWreckAssetVectors50LA();
@@ -262,10 +268,38 @@ class OriginalApplicationEntities50LA final {
     // retail frontend globals or proof that source initialization executed.
     // No native selector currently writes these controls; distance globals
     // remain unknown and no lazy distance producer is synthesized.
+    //Loaded ELF382B30 raw integerword4 survives startup BSS clear. One shared
+    //process lane; no source writer discovered by direct/constant-derived scan.
+    //This is not proof against arbitrary indirect aliases. A discovered writer
+    //must join this same owner, never introduce a per-Application reset.
+    struct ProcessFlareCount382B30 {std::uint32_t bits=4;const std::thread::id thread=std::this_thread::get_id();};
+    static ProcessFlareCount382B30& processFlareCount382B30()noexcept {
+        static ProcessFlareCount382B30 state;return state;
+    }
+    bool readFlareCount382B30(std::uint32_t& bits)const noexcept {
+        auto& state=processFlareCount382B30();
+        if(nativeOwnerThread_!=std::this_thread::get_id()||state.thread!=std::this_thread::get_id())return false;
+        bits=state.bits;return true; //Raw LWC1/SWC1 transfer, no float conversion.
+    }
     const std::uint32_t nativeFlareEnabled382B28_=1u;
     const std::uint32_t nativeFlareDistance427040_=0u;
-    const std::array<std::uint32_t,4> flarePosition427000_{{0,0,0,0x3f800000u}}; //3C8A8C.
-    const std::array<std::uint32_t,4> flareTriple427020_{{0,0x3f800000u,0,0x3f800000u}}; //3C8A9C.
+    //One post-startup process owner:1000A4->239C54->2EADE0/2E91F0,
+    //constructor-table3CC4A8->3C8A30, stores3C8A8C/9C. Native lazy
+    //materialization is not guest constructor execution or per-App replay.
+    //Known14BAC8 indirect use requires owner-specific dispatch evidence; this
+    //service makes no arbitrary-alias/immutable-memory claim. Future writers
+    //must join these same lanes, not introduce a second authoritative copy.
+    struct ProcessFlareVectors {
+        std::array<std::uint32_t,4> position{{0,0,0,0x3f800000u}};
+        std::array<std::uint32_t,4> triple{{0,0x3f800000u,0,0x3f800000u}};
+        const std::thread::id thread=std::this_thread::get_id();
+    };
+    static ProcessFlareVectors& processFlareVectors()noexcept {static ProcessFlareVectors state;return state;}
+    bool readFlareVectorWord(bool triple,unsigned lane,std::uint32_t& bits)const noexcept {
+        auto& state=processFlareVectors();
+        if(lane>=4||nativeOwnerThread_!=std::this_thread::get_id()||state.thread!=std::this_thread::get_id())return false;
+        bits=triple?state.triple[lane]:state.position[lane];return true;
+    }
     const std::array<std::uint32_t,4> lightVector426F10_{{0,0,0,0x3f800000u}}; //3C8A0C
     // Native affinity of this actual shared owner, not a source field.
     // Other owners retain their existing serialized-operation contract.
@@ -487,7 +521,21 @@ class OriginalApplicationEntities50LA final {
     // Source data-image382BD8 starts at500. The reached160E78 stores the
     // signed capacity/2 here. This is shared application state, not a count
     // of constructors, a per-track copy, or a value reset during cleanup.
-    std::int32_t particleDepth382BD8_=500;
+    struct ProcessParticleDepth382BD8 {
+        // Original ELF file-backed382BD8=0x1F4. One process authority,
+        // never restored by a new App or by a particle owner's cleanup.
+        std::int32_t value=500;
+        const std::thread::id thread=std::this_thread::get_id();
+    };
+    static ProcessParticleDepth382BD8& processParticleDepth382BD8()noexcept {
+        static ProcessParticleDepth382BD8 state;return state;
+    }
+    std::int32_t& particleDepth382BD8_=processParticleDepth382BD8().value;
+    bool writeParticleDepth160E78(std::int32_t value,std::int32_t& previous)noexcept {
+        auto& state=processParticleDepth382BD8();
+        if(state.thread!=std::this_thread::get_id())return false;
+        previous=state.value;state.value=value;return true;
+    }
     OriginalEntityTypeRegistry50LA types383408_;
     OriginalGarageCharacterShared50GN garageCharacterShared_; // Original process BSS, never reset on page entry.
     OriginalGarageSphereShared50GN garageSphereShared_;
@@ -547,7 +595,10 @@ public:
     OriginalEntityTypeRegistry50LA& types383408()noexcept{return types383408_;}
     std::uint32_t& objectCount423F60()noexcept{return objectCount423F60_;}
     const std::uint32_t& attachmentLock423F58()const noexcept{return attachmentLock423F58_;}
-    const std::int32_t& particleDepth382BD8()const noexcept{return particleDepth382BD8_;}
+    const std::int32_t& particleDepth382BD8()const noexcept {
+        if(processParticleDepth382BD8().thread!=std::this_thread::get_id())std::terminate();
+        return particleDepth382BD8_;
+    }
     const OriginalWreckComponentDomain50LA& initialRootDomain()const noexcept{return rootDomain_;}
     // Bounded142590/104970/1413E0: exactly these genuine base roots, with no
     // later children or extra references. No blanket subtract-two, fabricated

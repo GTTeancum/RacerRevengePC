@@ -23,6 +23,7 @@ class OriginalRaTrackSourceFile50LA final {
     const rr::platform::OriginalWorldSourceConfig50LA* occurrence_=nullptr;
     std::int64_t handle_=-1;
     bool attempted_=false,acquired_=false,joined_=false,nativeClosed_=false;
+    std::size_t nativeMissingLookupBorrowers_=0; //Typed132820 attempts, not source file opens.
     explicit OriginalRaTrackSourceFile50LA()noexcept=default;
     bool mount12CEA0(std::shared_ptr<OriginalStandardTextureResolver50LA>,
         std::shared_ptr<OriginalStandardArchiveProvider50LA>,

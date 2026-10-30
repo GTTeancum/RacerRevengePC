@@ -2,12 +2,14 @@
 #include "original_frontend_camera_cold50la.h"
 #include "../../platform/linux/native/original_ui_search_list_cold50kg.h"
 
+namespace ra_cold_aggregate50LA {class Owner;}
 namespace rr::game {
 // Actual Application custody. Genuine frontend entry may finish17BF90;
 // native direct gameplay remains at its bounded before114A00 prefix.
 // No live330 dispatch, loading screen40 or ready predicate.
 class OriginalLoadingManager33050LA final {
     friend struct ::original_main_entry50KG::Application;
+    friend class ::ra_cold_aggregate50LA::Owner; //Actual same-App1AA1A0 read only, no loader mutation.
     friend class ::original_main_entry50KG::RaceDisplayLifetime50LA;
     using App=::original_main_entry50KG::Application;
     using Entities=OriginalApplicationEntities50LA;

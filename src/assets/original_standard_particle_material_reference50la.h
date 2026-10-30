@@ -1,6 +1,7 @@
 #pragma once
 #include "original_standard_material_table50la.h"
 #include "original_standard_texture_resource50la.h"
+namespace ra_cold_aggregate50LA {class Owner;}
 namespace rr::platform {class OriginalUiGaragePodScene50KG;class OriginalUiGarageDrawContribution50KG;class OriginalUiGarageSceneParticles50KG;}
 #include <exception>
 #include <new>
@@ -14,6 +15,7 @@ namespace rr::assets {
 // renderer readiness. The private Garage update explicitly performs its
 // actual29BFF0 demand and same-table texture-dimension lookup.
 class OriginalStandardParticleMaterialReference50LA final {
+    friend class ::ra_cold_aggregate50LA::Owner; //Actual World particle299BE0 source guard join.
     friend class rr::platform::OriginalUiGaragePodScene50KG;
     friend class rr::platform::OriginalUiGarageDrawContribution50KG;
     bool bindGarageScratch162E44(const rr::platform::OriginalUiGarageSceneParticles50KG& owner,
@@ -103,6 +105,16 @@ public:
     bool acquireTrack299BE0(std::shared_ptr<OriginalStandardMaterialTable50LA> table,
         const std::string& actualDirectory36B970,const std::string& actualScbParticleTextureMapName,
         OriginalStandardMaterialDiagnostic50LA& d) noexcept {
+        return acquireTrack299BE0Impl(std::move(table),actualDirectory36B970,
+            actualScbParticleTextureMapName,d,[]()noexcept{});
+    }
+private:
+    //Only the authenticated World caller joins shared process guard299CB8.
+    //Existing native consumers keep their prior cold-reference behavior.
+    template<class BeforeRetain> bool acquireTrack299BE0Impl(
+        std::shared_ptr<OriginalStandardMaterialTable50LA> table,
+        const std::string& actualDirectory36B970,const std::string& actualScbParticleTextureMapName,
+        OriginalStandardMaterialDiagnostic50LA& d,BeforeRetain&& beforeRetain,bool sourceCall=false) noexcept {
         using S=OriginalStandardMaterialStatus50LA;
         d={};
         if(started_||released_)return fail(d,S::alreadyPrepared,0x299be0u);
@@ -127,9 +139,13 @@ public:
             table_=std::move(table);started_=true;
             std::int32_t found=-1;
             const bool lookedUp=table_->find298C80(requested,found,d);
+            //A bounded source lookup has NOT returned to299CB4. Native cold
+            //consumers retain their established diagnostic behavior unchanged.
+            if(sourceCall&&!lookedUp)return false;
             material00_=found; //299CB4 precedes the source assertion/retain.
             d.row=material00_;d.storedSlots=1;d.sourceEffectsCommitted=true;
             if(!lookedUp)return false;
+            beforeRetain(); //299CB8..D28 after actual material00 store, before retain.
             //161004 supplies the actual application DefaultMT3833E8.
             // The canonical table selects its retained real template owner.
             if(!table_->retainDefault14D590(material00_,d))return false;
@@ -140,6 +156,7 @@ public:
         }catch(const std::bad_alloc&){return fail(d,S::allocation,0x299be0u);}
         catch(...){return fail(d,S::input,0x299be0u);}
     }
+public:
     bool started() const noexcept{return started_;}
     bool retained() const noexcept{return retained_;}
     const std::int32_t& material00() const noexcept{return material00_;}

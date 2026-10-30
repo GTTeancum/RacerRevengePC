@@ -18,6 +18,7 @@ class OriginalRacerQuery7A4Owner50LA;
 class OriginalWreckType3Owners50LA final {
     friend class OriginalWreckQueries50LA;
     friend class OriginalRacerQuery7A4Owner50LA;
+    friend class OriginalSourcePhysicsCollision50LA;
     struct Shape {
         std::uint32_t count00=1; //Native backing only until sourceCount00Known.
         bool sourceCount00Known=false,sourceNormalMode44Known=false,sourceVectors20_30Known=false;
@@ -263,7 +264,7 @@ class OriginalWreckType3Owners50LA final {
     bool canRelease11B600()const noexcept {
         // Original0x50 constructor initializes20/30, not every pointer. A
         // partial allocation cannot borrow host zeroes as source NULL fields.
-        return attempted_&&!retired_&&(loaded_||(!shape8C_&&!result90_));
+        return !sourceShape_.attempted&&attempted_&&!retired_&&(loaded_||(!shape8C_&&!result90_));
     }
     bool release11B600()noexcept {
         if(!canRelease11B600())return false;
@@ -276,11 +277,13 @@ class OriginalWreckType3Owners50LA final {
         }
         loaded_=false;retired_=true;boundary_=0x11b904u;return true;
     }
+#include "original_source_collision_type3_shape50la.inl"
+#include "original_source_collision_type3_result50la.inl"
 public:
     OriginalWreckType3Owners50LA()=default;
     OriginalWreckType3Owners50LA(const OriginalWreckType3Owners50LA&)=delete;
     OriginalWreckType3Owners50LA& operator=(const OriginalWreckType3Owners50LA&)=delete;
-    ~OriginalWreckType3Owners50LA(){if(shape8C_||result90_)std::terminate();}
+    ~OriginalWreckType3Owners50LA(){if(shape8C_||result90_||(sourceShape_.attempted&&!sourceShape_.nativeWithdrawn))std::terminate();}
     bool producerPrepared()const noexcept{return preparedByProducer_;}
     bool attempted()const noexcept{return attempted_;}
     bool loaded()const noexcept{return loaded_;}

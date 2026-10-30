@@ -14,7 +14,7 @@ bool Owner::constructSourceTopologyContainer141300(Entity& e,bool& counted,bool&
 }
 namespace ra_cold_aggregate50LA {
 bool Owner::preflightSourceWorldTopologyNative()const noexcept {
-    if(nativeScbThread_!=std::this_thread::get_id()||!preflightSourceWorldSearchNodesNative()||!preflightSourceWorldPortalGraphNative()||!preflightSourceWorldMethodArraysNative()||!preflightSourceDefaultObserverNative()||!preflightSourceLightPopulationNative())return false;
+    if(nativeScbThread_!=std::this_thread::get_id()||!preflightSourceWorldSearchNodesNative()||!preflightSourceWorldPortalGraphNative()||!preflightSourceWorldMethodArraysNative()||!preflightSourceDefaultObserverNative()||!preflightSourceLightPopulationNative()||!preflightSourceVisibilityEnvironmentNative()||!preflightSourcePostParticleModelsNative())return false;
     if(sourceTopologyPhase_==SourceTopologyPhase::unreached)
         return !sourceTopologyContainer_&&!sourceTopologyLightManager_&&!sourceTopologyMode_;
     if(sourceTopologyPhase_==SourceTopologyPhase::nativeClosed)
@@ -54,6 +54,7 @@ bool Owner::sourceWorldLightZonesInvocationCurrent(const rr::platform::OriginalU
 bool Owner::abortSourceWorldTopologyNative(std::uint32_t& pc)noexcept {
     if(!preflightSourceWorldTopologyCountNative())return false;
     if(sourceTopologyPhase_==SourceTopologyPhase::unreached||sourceTopologyPhase_==SourceTopologyPhase::nativeClosed)return true;
+    if(!retireSourceVisibilityEnvironmentNative(pc))return false;
     if(!abortSourceLightPopulationNative(pc))return false;
     if(!abortSourceDefaultObserverNative(pc))return false;
     if(!abortSourceWorldMethodArraysNative(pc))return false;

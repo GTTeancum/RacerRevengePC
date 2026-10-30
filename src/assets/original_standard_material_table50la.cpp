@@ -4,6 +4,7 @@
 #include "original_standard_texture_resource50la.h"
 #include "original_standard_material_animation50la.h"
 #include <array>
+#include <atomic>
 #include <cfenv>
 #include <cmath>
 #include <cstring>
@@ -1870,9 +1871,143 @@ struct OriginalStandardMaterialReferences50LA::Storage {
     std::shared_ptr<OriginalStandardMaterialTable50LA> table;
     std::uint32_t count1C0=0;
     std::vector<std::int32_t> handles;
+    //Only the staged source route uses nullable array allocation. Existing
+    //native vector-backed acquisition keeps its original behavior.
+    bool sourceMode=false,sourceAllocationReturned=false;
+    SourceWarmReceipt warm;
+    const OriginalStandardMaterialReferences50LA* warmPrototype=nullptr; // Identity only; never dereferenced. 
+    std::unique_ptr<std::int32_t[]> sourceHandles;
+    std::unique_ptr<std::array<std::uint8_t,4096>> sourceAssertions;
+    std::size_t capacity()const noexcept{return sourceMode?(sourceHandles?count1C0:0u):handles.size();}
+    const std::int32_t* data()const noexcept{return sourceMode?sourceHandles.get():handles.data();}
     std::size_t stored=0,retained=0;
     bool complete=false,released=false,allocationFreed=false;
 };
+namespace {
+//Source26E740: startup-zero byte3D64C0 and enabled442F48. Native
+//acquire is not this history and invalidates it before committing its effects.
+std::atomic<std::uint32_t> sourceMaterialAssertion26E740{0};
+constexpr std::uint32_t sourceMaterialAssertionUnknown=0x80000000u;
+bool sourceMaterialAssertionStore(unsigned bit)noexcept {
+    auto value=sourceMaterialAssertion26E740.load(std::memory_order_acquire);
+    for(;;){if(value&sourceMaterialAssertionUnknown)return false;
+        if(sourceMaterialAssertion26E740.compare_exchange_weak(value,value|(1u<<bit),
+            std::memory_order_acq_rel,std::memory_order_acquire))return true;}
+}
+}
+bool OriginalStandardMaterialReferences50LA::beginSource26E670(std::uint32_t count,
+    std::shared_ptr<OriginalStandardMaterialTable50LA> table,D& d)noexcept {
+    d={};if(storage_)return fail(d,S::alreadyPrepared,0x26E670);
+    if(count>4096||!table||!table->prepared()||table->populationTerminal()||table->demandTerminal())
+        return fail(d,S::input,0x26E67C);
+    try{auto next=std::make_unique<Storage>();next->table=std::move(table);
+        next->count1C0=count;next->sourceMode=true;
+        next->sourceAssertions=std::make_unique<std::array<std::uint8_t,4096>>();storage_=std::move(next);}
+    catch(...){return fail(d,S::allocation,0x26E67C);}
+    //Separate nullable source allocation. A NULL pointer is still published
+    //by the caller26E684; failure is not reported before actual slot use.
+    storage_->sourceHandles.reset(new(std::nothrow) std::int32_t[count]);
+    storage_->sourceAllocationReturned=true;d.sourceEffectsCommitted=true;return true;
+}
+bool OriginalStandardMaterialReferences50LA::storeSource26E7C8(std::int32_t row,D& d)noexcept {
+    d={};if(!storage_||!storage_->sourceMode||storage_->warm.begun||storage_->released||storage_->complete||
+        storage_->stored!=storage_->retained||storage_->stored>=storage_->count1C0)
+        return fail(d,S::phase,0x26E740);
+    auto& s=*storage_;d.slot=s.stored;d.row=row;auto& history=(*s.sourceAssertions)[s.stored];
+    if(history)return fail(d,S::phase,0x26E740);history=1u; //entered
+    auto state=sourceMaterialAssertion26E740.load(std::memory_order_acquire);
+    if(state&sourceMaterialAssertionUnknown)return fail(d,S::phase,0x26E740);
+    if(state&1u)history|=2u;
+    else{
+        if(!sourceMaterialAssertionStore(1))return fail(d,S::phase,0x26E754);history|=4u;
+        if(!sourceMaterialAssertionStore(0))return fail(d,S::phase,0x26E758);history|=8u;
+    }
+    state=sourceMaterialAssertion26E740.load(std::memory_order_acquire);
+    if(state&sourceMaterialAssertionUnknown)return fail(d,S::phase,0x26E764);
+    if(state&2u){history|=16u;if(row==-1)return fail(d,S::missingName,0x26E780);}
+    history|=32u;
+    if(!s.sourceHandles)return fail(d,S::allocation,0x26E7C8);
+    s.sourceHandles[s.stored++]=row;d.storedSlots=s.stored;d.sourceEffectsCommitted=true;
+    if(!s.table->retainDefault14D590(row,d))return false;
+    ++s.retained;d.retainedSlots=s.retained;return true;
+}
+bool OriginalStandardMaterialReferences50LA::finishSource26E810()noexcept {
+    if(!storage_||!storage_->sourceMode||storage_->warm.begun||storage_->released||storage_->complete||
+       storage_->stored!=storage_->count1C0||storage_->retained!=storage_->count1C0)return false;
+    storage_->complete=true;return true;
+}
+
+const OriginalStandardMaterialReferences50LA::SourceWarmReceipt*
+OriginalStandardMaterialReferences50LA::sourceWarmReceipt()const noexcept {
+    return storage_&&storage_->warm.begun?&storage_->warm:nullptr;
+}
+bool OriginalStandardMaterialReferences50LA::preflightSourceWarmNative()const noexcept {
+    if(!storage_||!storage_->sourceMode||!storage_->warm.begun||!storage_->warmPrototype||
+       !storage_->table||!storage_->table->prepared())return false;
+    const auto& s=*storage_;const auto& w=s.warm;
+    if(s.sourceAssertions||!s.handles.empty()||w.allocationReturned!=s.sourceAllocationReturned||
+       (w.allocationReturned&&!w.allocationAttempted)||(w.copyAttempted&&!w.allocationReturned)||
+       (w.copied&&!w.copyAttempted)||(w.retainFailed&&!w.copied)||w.retained>s.count1C0||
+       s.stored!=(w.copied?s.count1C0:0u)||s.retained!=(s.released?0u:w.retained)||
+       s.complete!=w.finished||(w.finished&&(!w.copied||w.retained!=s.count1C0||w.retainFailed)))return false;
+    if(!w.allocationReturned&&s.sourceHandles)return false;
+    if(s.allocationFreed)return s.released&&!s.sourceHandles;
+    return (!s.stored||s.sourceHandles)&&canRelease26E4C0();
+}
+bool OriginalStandardMaterialReferences50LA::beginSourceWarm26EB44(
+    const OriginalStandardMaterialReferences50LA& prototype,D& d)noexcept {
+    d={};if(storage_||&prototype==this)return fail(d,S::alreadyPrepared,0x26EB44);
+    if(!prototype.storage_||!prototype.complete())return fail(d,S::input,0x26EB40);
+    const auto& p=*prototype.storage_;
+    if(!p.table||!p.table->prepared()||p.allocationFreed||p.stored!=p.count1C0||
+       p.retained!=p.count1C0||p.capacity()!=p.count1C0)return fail(d,S::phase,0x26EB40);
+    try{auto next=std::make_unique<Storage>();next->table=p.table;next->count1C0=p.count1C0;
+        next->sourceMode=true;next->warm.begun=true;next->warmPrototype=&prototype;storage_=std::move(next);}
+    catch(...){return fail(d,S::allocation,0x26EB44);}
+    // Native count/table custody only. Caller owns actual Model1C0 store.
+    return true;
+}
+bool OriginalStandardMaterialReferences50LA::allocateSourceWarm26EB4C(D& d)noexcept {
+    d={};if(!preflightSourceWarmNative()||storage_->released||storage_->warm.allocationAttempted)
+        return fail(d,S::phase,0x26EB4C);
+    auto& s=*storage_;s.warm.allocationAttempted=true;
+    // Native supported domain gate AFTER caller's genuine26EB44 count store.
+    if(s.count1C0>4096)return fail(d,S::input,0x26EB4C);
+    s.sourceHandles.reset(new(std::nothrow) std::int32_t[s.count1C0]);
+    s.sourceAllocationReturned=true;s.warm.allocationReturned=true;
+    // NULL is a returned source allocation; caller publishes it at26EB54.
+    d.sourcePC=0x26EB54;return true;
+}
+bool OriginalStandardMaterialReferences50LA::copySourceWarm26EB64(
+    const OriginalStandardMaterialReferences50LA& prototype,D& d)noexcept {
+    d={};if(!preflightSourceWarmNative()||storage_->released||!storage_->warm.allocationReturned||
+       storage_->warm.copyAttempted||storage_->warmPrototype!=&prototype||!prototype.complete()||
+       !prototype.storage_)return fail(d,S::phase,0x26EB64);
+    auto& s=*storage_;const auto& p=*prototype.storage_;
+    if(p.table!=s.table||p.count1C0!=s.count1C0||p.stored!=p.count1C0||
+       p.retained!=p.count1C0||p.allocationFreed)return fail(d,S::phase,0x26EB64);
+    s.warm.copyAttempted=true;
+    if(s.count1C0&&(!s.sourceHandles||!p.data()))return fail(d,S::allocation,0x26EB64);
+    if(s.count1C0)std::memcpy(s.sourceHandles.get(),p.data(),std::size_t(s.count1C0)*4u);
+    s.stored=s.count1C0;s.warm.copied=true;d.storedSlots=s.stored;
+    d.sourceEffectsCommitted=s.count1C0!=0;d.sourcePC=0x26EB6C;return true;
+}
+bool OriginalStandardMaterialReferences50LA::retainSourceWarm26EB90(D& d)noexcept {
+    d={};if(!preflightSourceWarmNative()||storage_->released||!storage_->warm.copied||
+       storage_->warm.retainFailed||storage_->warm.finished||storage_->retained>=storage_->count1C0)
+        return fail(d,S::phase,0x26EB90);
+    auto& s=*storage_;d.slot=s.retained;d.row=s.data()[s.retained];
+    d.storedSlots=s.stored;d.retainedSlots=s.retained;
+    if(!s.table->retainDefault14D590(d.row,d)){s.warm.retainFailed=true;return false;}
+    ++s.retained;s.warm.retained=s.retained;d.retainedSlots=s.retained;
+    d.sourceEffectsCommitted=true;d.sourcePC=0x26EB98;return true;
+}
+bool OriginalStandardMaterialReferences50LA::finishSourceWarm26EBA8()noexcept {
+    if(!preflightSourceWarmNative()||storage_->released||!storage_->warm.copied||
+       storage_->warm.retainFailed||storage_->warm.finished||storage_->retained!=storage_->count1C0)return false;
+    storage_->warm.finished=true;storage_->complete=true;return true;
+}
+
 OriginalStandardMaterialReferences50LA::OriginalStandardMaterialReferences50LA() noexcept=default;
 OriginalStandardMaterialReferences50LA::~OriginalStandardMaterialReferences50LA(){
     D diagnostic;
@@ -1892,6 +2027,7 @@ bool OriginalStandardMaterialReferences50LA::acquire26E640(const OriginalStandar
         auto next=std::make_unique<Storage>();next->table=std::move(table);
         next->count1C0=static_cast<std::uint32_t>(scene->materials.size());
         next->handles.resize(next->count1C0); //Backing only; unwritten slots are never exposed.
+        sourceMaterialAssertion26E740.fetch_or(sourceMaterialAssertionUnknown,std::memory_order_release);
         storage_=std::move(next);d.sourceEffectsCommitted=true; //26E670,26E684.
         auto& s=*storage_;
         for(std::size_t i=0;i<scene->materials.size();++i){
@@ -1920,13 +2056,14 @@ bool OriginalStandardMaterialReferences50LA::clone26EB44(
         return fail(d,S::input,0x26EB44);
     const auto& source=*prototype.storage_;
     if(!source.table||!source.table->prepared()||source.stored!=source.count1C0||
-       source.retained!=source.count1C0||source.handles.size()!=source.count1C0)
+       source.retained!=source.count1C0||source.capacity()!=source.count1C0)
         return fail(d,S::input,0x26EB44);
     if(source.table->populationTerminal()||source.table->demandTerminal())
         return fail(d,S::phase,0x26EB44);
     try {
         auto next=std::make_unique<Storage>();next->table=source.table;
-        next->count1C0=source.count1C0;next->handles=source.handles;
+        next->count1C0=source.count1C0;
+        if(source.count1C0)next->handles.assign(source.data(),source.data()+source.count1C0);
         next->stored=next->handles.size();
         storage_=std::move(next);d.sourceEffectsCommitted=true;
         auto& s=*storage_;d.storedSlots=s.stored; //26EB44/54/64.
@@ -1942,14 +2079,15 @@ bool OriginalStandardMaterialReferences50LA::clone26EB44(
 bool OriginalStandardMaterialReferences50LA::canRelease26E4C0() const noexcept {
     if(!storage_||storage_->released)return true;
     const auto& s=*storage_;
-    if(!s.table||!s.table->storage_||s.retained>s.handles.size())return false;
+    if(!s.table||!s.table->storage_||s.retained>s.capacity())return false;
     const auto& table=*s.table->storage_;
-    if(table.uiSharedHistoryOwner||table.populationActive||table.demandActive||table.collectorActive)return false;
+    if(table.uiSharedHistoryOwner||table.populationActive||table.demandActive||table.collectorActive||
+       (s.sourceMode&&table.nativeFifoPins))return false;
     for(std::size_t i=0;i<s.retained;++i){
-        const auto row=s.handles[i];
+        const auto row=s.data()[i];
         if(row<0||static_cast<std::size_t>(row)>=table.rows.size())return false;
         std::size_t required=0;
-        for(std::size_t j=0;j<s.retained;++j)if(s.handles[j]==row)++required;
+        for(std::size_t j=0;j<s.retained;++j)if(s.data()[j]==row)++required;
         if(table.rows[static_cast<std::size_t>(row)].references08<0||
            static_cast<std::size_t>(table.rows[static_cast<std::size_t>(row)].references08)<required)
             return false;
@@ -1963,8 +2101,8 @@ bool OriginalStandardMaterialReferences50LA::release26E4C0(D& d) noexcept {
     //Original slot order, including repeated handles. The preflight above
     //means this serial loop cannot fail after an earlier row was released.
     for(std::size_t i=0;i<s.retained;++i){
-        d.slot=i;d.row=s.handles[i];
-        if(!s.table->release14D500(s.handles[i]))std::terminate();
+        d.slot=i;d.row=s.data()[i];
+        if(!s.table->release14D500(s.data()[i]))std::terminate();
         d.sourceEffectsCommitted=true;
     }
     s.retained=0;s.released=true;return true;
@@ -1975,17 +2113,17 @@ bool OriginalStandardMaterialReferences50LA::released26E4C0() const noexcept {
 bool OriginalStandardMaterialReferences50LA::freeAllocation26E5EC() noexcept {
     if(!storage_||!storage_->released)return false;
     if(storage_->allocationFreed)return true;
-    std::vector<std::int32_t>().swap(storage_->handles);
+    std::vector<std::int32_t>().swap(storage_->handles);storage_->sourceHandles.reset();
     storage_->allocationFreed=true;return true;
 }
 bool OriginalStandardMaterialReferences50LA::started() const noexcept {return bool(storage_);}
 bool OriginalStandardMaterialReferences50LA::complete() const noexcept {return storage_&&storage_->complete&&!storage_->released;}
 const std::uint32_t* OriginalStandardMaterialReferences50LA::count1C0() const noexcept {return storage_?&storage_->count1C0:nullptr;}
 const std::int32_t* OriginalStandardMaterialReferences50LA::handle1C4(std::size_t ordinal) const noexcept {
-    return storage_&&!storage_->allocationFreed&&ordinal<storage_->stored?&storage_->handles[ordinal]:nullptr;
+    return storage_&&!storage_->allocationFreed&&ordinal<storage_->stored?storage_->data()+ordinal:nullptr;
 }
 const std::int32_t* OriginalStandardMaterialReferences50LA::allocationBase1C4() const noexcept {
-    return storage_&&!storage_->allocationFreed?storage_->handles.data():nullptr;
+    return storage_&&!storage_->allocationFreed?storage_->data():nullptr;
 }
 const OriginalStandardMaterialTable50LA* OriginalStandardMaterialReferences50LA::table382B38() const noexcept {
     return storage_?storage_->table.get():nullptr;

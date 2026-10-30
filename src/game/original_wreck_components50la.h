@@ -23,7 +23,9 @@ enum class OriginalWreckComponentKind50LA : std::uint8_t {
     triggerList2DC320,trigger2A0290, // RA native lifetime identities, no new dispatch.
     applicationRequest2C6C20, // Actual late native Results request owner, not early boot history.
     lightFlare14AA10, //Actual counted local flare; update/draw dispatch unjoined.
-    uiCourseManager1D0070,uiCoursePage1D8D70,uiIcon2AC4B0,uiSelectableIcon2ACF00,uiSoultree2A85F0,effect15B860,terrain1B0EE0,engine2E7510,aeroBase100330,aero16CCD0 // Distinct detached Course constructors; no dispatch claim.
+    uiCourseManager1D0070,uiCoursePage1D8D70,uiIcon2AC4B0,uiSelectableIcon2ACF00,uiSoultree2A85F0,effect15B860,terrain1B0EE0,engine2E7510,aeroBase100330,aero16CCD0, // Distinct detached Course constructors; no dispatch claim.
+    smoker288C30,smokerEmitter288E90, //Appended source smoker identities; no update/emission admission.
+    physicsObject1659C0 //Base PhysicsObject identity; no derived Racer/setup dispatch.
 };
 struct OriginalWreckComponent50LA final {
     //1048F0 base constructor owns the actual64-bit reference at source00.

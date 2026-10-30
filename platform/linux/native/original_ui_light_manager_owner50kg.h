@@ -133,7 +133,12 @@ private:
         std::array<std::uint8_t,20> sourceLinkStoreMask{};
         bool sourcePortalLinksWithdrawn=false;
         std::optional<std::uint32_t> sourceAmbientRevisionBefore;
-        std::array<std::optional<std::uint32_t>,3> sourceSecondRevisionBefore; //Color, position, look; retained native-unwind history.
+        struct SourceTypedRevision {std::size_t ordinal=0;unsigned stage=0;std::uint32_t before=0;};
+        std::vector<SourceTypedRevision> sourceTypedRevisions; //Historical source149300 order; retained on native unwind.
+        std::array<std::optional<std::array<std::uint32_t,3>>,10> sourceDirectionalTailRGB; //Historical1498A0 stores; W is never written.
+        std::array<std::optional<std::uint32_t>,4> sourceSecondRevisionBefore; //Color, position, look, attenuation range; retained native-unwind history.
+        const C* sourceSecondRegistryReceipt=nullptr; //May be a known dead slot after native withdrawal; never dereference.
+        bool sourceSecondRegistered=false,sourceSecondWithdrawn=false;
         const C* sourceAmbient=nullptr;
         bool sourceAmbientAttempted=false,sourceAmbientColors=false,sourceAmbientAllocation=false;
         bool sourceAmbientPublished=false,sourceAmbientRegistered=false,sourceAmbientWithdrawn=false;
@@ -171,15 +176,29 @@ private:
     bool bindRaLocalPrimary2809C0(const ::ra_cold_aggregate50LA::Owner&,const C&,Diagnostic&)noexcept;
     bool removeRaLocalPrimary1491F0(const ::ra_cold_aggregate50LA::Owner&,const C&,Diagnostic&)noexcept;
     bool applyRaDirectionalColor1498A0(const ::ra_cold_aggregate50LA::Owner&,std::size_t,Diagnostic&)noexcept;
+    bool applySourceDirectionalColor1498A0(const ::ra_cold_aggregate50LA::Owner&,std::size_t,Diagnostic&)noexcept;
     bool growRaRegistry149194(Diagnostic&)noexcept;
     bool incrementRaLaterAmbient149300(const ::ra_cold_aggregate50LA::Owner&,const C&,Diagnostic&)noexcept;
     bool appendRaLaterAmbient148F30(const ::ra_cold_aggregate50LA::Owner&,const C&,Diagnostic&)noexcept;
     bool incrementRaDirectional149300(const ::ra_cold_aggregate50LA::Owner&,const C&,std::uint32_t,Diagnostic&)noexcept;
     bool appendRaDirectional148F30(const ::ra_cold_aggregate50LA::Owner&,const C&,Diagnostic&)noexcept;
     bool removeRaDirectional1491F0(const ::ra_cold_aggregate50LA::Owner&,const C&,Diagnostic&)noexcept;
+    bool appendSourceSecond148F30(::ra_cold_aggregate50LA::Owner&,Diagnostic&)noexcept;
+    bool withdrawSourceSecondNative(::ra_cold_aggregate50LA::Owner&,Diagnostic&)noexcept;
+    bool boundSourceTyped148F30(::ra_cold_aggregate50LA::Owner&,std::size_t,Diagnostic&)noexcept;
+    bool bindSourceTypedPrimary1474A0(::ra_cold_aggregate50LA::Owner&,std::size_t,Diagnostic&)noexcept;
+    bool preflightSourceTypedObserverNative(const ::ra_pod_scene50LA::Owner&,std::size_t)const noexcept;
+    bool finishSourceTypedRegistration149088(::ra_cold_aggregate50LA::Owner&,std::size_t,Diagnostic&)noexcept;
+    bool withdrawSourceTypedRegistryNative(::ra_pod_scene50LA::Owner&,std::size_t,Diagnostic&)noexcept;
+    bool continueSourceTypedSecondary280BF0(::ra_cold_aggregate50LA::Owner&,std::size_t,Diagnostic&)noexcept;
+    bool preflightSourceTypedSecondaryNative(const ::ra_pod_scene50LA::Owner&,std::size_t)const noexcept;
+    bool withdrawSourceTypedSecondaryNative(::ra_pod_scene50LA::Owner&,std::size_t,Diagnostic&)noexcept;
+    bool withdrawSourceTypedObserverNative(::ra_pod_scene50LA::Owner&,std::size_t,Diagnostic&)noexcept;
+    bool incrementSourceTyped149300(::ra_cold_aggregate50LA::Owner&,std::size_t,unsigned,Diagnostic&)noexcept;
     bool incrementSourceSecond149300(::ra_cold_aggregate50LA::Owner&,unsigned,Diagnostic&)noexcept;
     bool incrementSourceAmbient149300(::ra_cold_aggregate50LA::Owner&,Diagnostic&)noexcept;
     bool appendSourceAmbient148F30(::ra_cold_aggregate50LA::Owner&,Diagnostic&)noexcept;
+    bool appendSourceLaterAmbient148F30(::ra_cold_aggregate50LA::Owner&,std::size_t,Diagnostic&)noexcept;
     bool withdrawSourceAmbientNative(::ra_cold_aggregate50LA::Owner&,Diagnostic&)noexcept;
     bool incrementRaAmbient149300(const ::ra_cold_aggregate50LA::Owner&,const C&,Diagnostic&)noexcept;
     bool appendRaAmbient148F30(const ::ra_cold_aggregate50LA::Owner&,const C&,Diagnostic&)noexcept;

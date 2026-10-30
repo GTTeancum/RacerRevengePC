@@ -2,10 +2,11 @@
 #include "../../src/game/original_world_light_assertion273abc.h"
 namespace ra_cold_aggregate50LA {
 bool Owner::preflightSourceLightPopulationNative()const noexcept {
-    if(!preflightSourceFirstLightNative()||!preflightSourceSecondLightFrameNative())return false;
+    if(!preflightSourceFirstLightNative()||!preflightSourceSecondLightFrameNative()||!preflightSourceTypedLightsNative())return false;
     if(sourceLightPopulationPhase_==SourceLightPopulationPhase::unreached)
         return !sourceTopologyRoutineReturned_&&!sourceLightPopulationS0_&&!sourceLightPopulationWrapper_&&!sourceLightAssertionMask_;
     if(sourceLightPopulationPhase_==SourceLightPopulationPhase::nativeClosed)return !sourceLightPopulationWrapper_&&!sourceLightPopulationDescriptor_;
+    if(!preflightSourceTypedPopulationLoopNative())return false;
     if(!sourceTopologyRoutineReturned_||!sourceTopologyReturnV0_||*sourceTopologyReturnV0_!=1||
        !sourceDefaultObserverLease_||sourceDefaultObserverPhase_!=SourceDefaultObserverPhase::returned||
        !worldApplication_||!sourceLight3A8_||!nativeLightList3A8_||*sourceLight3A8_!=nativeLightList3A8_.get()||
@@ -13,7 +14,7 @@ bool Owner::preflightSourceLightPopulationNative()const noexcept {
        !preflightSourceLightListNative()||sourceLightAssertionGuard_>1||sourceLightAssertionEnabled_>1||
        (sourceLightAssertionMask_&~15u))return false;
     if(sourceLightPopulationS0_&&*sourceLightPopulationS0_!=0){
-        if(*sourceLightPopulationS0_!=1||!sourceFirstWrapperReturned_||!sourceFirstLight_||
+        if((sourceLightPopulationItemsEnd_.value_or(*sourceLightPopulationS0_)<1||sourceLightPopulationItemsEnd_.value_or(*sourceLightPopulationS0_)>185)||!sourceFirstWrapperReturned_||!sourceFirstLight_||
            (!sourceFirstLight_->attached&&!sourceFirstLightNativeDetached_))return false;
     }
     if(sourceFirstDescriptorDisposed_){
@@ -43,6 +44,7 @@ bool Owner::preflightSourceLightPopulationNative()const noexcept {
 bool Owner::abortSourceLightPopulationNative(std::uint32_t& pc)noexcept {
     if(!preflightSourceLightPopulationNative())return false;
     if(sourceLightPopulationPhase_==SourceLightPopulationPhase::unreached||sourceLightPopulationPhase_==SourceLightPopulationPhase::nativeClosed)return true;
+    if(!abortSourceTypedLightsNative())return false;
     if(!abortSourceSecondLightFrameNative())return false;
     if(!detachSourceFirstLightNative(pc))return false;
     if(sourceTopologyLightManager_){rr::platform::OriginalUiLightManagerOwner50KG::Diagnostic d;
@@ -148,5 +150,46 @@ bool Owner::continueSourceLightPopulation1AA144(std::uint32_t& pc)noexcept {
 
 
 
+}
+}
+
+namespace ra_cold_aggregate50LA {
+bool Owner::preflightSourceTypedPopulationLoopNative()const noexcept {
+    if((sourceLightZoneReadMask_|sourceLightZoneSkippedMask_|sourceLightZoneAppliedMask_)&~0x3ffu)return false;
+    if((sourceLightZoneSkippedMask_|sourceLightZoneAppliedMask_)&~sourceLightZoneReadMask_)return false;
+    if(sourceLightZoneSkippedMask_&sourceLightZoneAppliedMask_)return false;
+    if(!sourceLightPopulationS0_)return sourceTypedLights_.empty()&&!sourceLightPopulationItemsEnd_&&
+        !sourceLightZoneReadMask_&&!sourceLightPopulationReturnV0_;
+    const auto cursor=sourceLightPopulationItemsEnd_.value_or(*sourceLightPopulationS0_);
+    if(cursor<0||cursor>185||sourceTypedLights_.size()>183)return false;
+    if(cursor<2){if(!sourceTypedLights_.empty())return false;}
+    else {
+        const auto before=static_cast<std::size_t>(cursor-2);
+        if(sourceTypedLights_.size()<before||sourceTypedLights_.size()>before+(cursor<185?1u:0u))return false;
+        for(std::size_t i=0;i<sourceTypedLights_.size();++i){const auto& owned=sourceTypedLights_[i];
+            if(!owned||owned->ordinal!=i+2||owned->populationIncremented!=(i<before))return false;
+            if(owned->populationIncremented&&(!owned->wrapperReturned||!owned->wrapperV0||*owned->wrapperV0!=1||
+               !owned->descriptorDisposed||!owned->attachCallReturned||!owned->attachLock))return false;
+        }
+    }
+    if(!sourceLightPopulationItemsEnd_)return !sourceLightZoneReadMask_&&!sourceLightZoneSkippedMask_&&
+        !sourceLightZoneAppliedMask_&&!sourceLightPopulationReturnV0_&&sourceLightPopulationPhase_!=SourceLightPopulationPhase::returned;
+    if(*sourceLightPopulationItemsEnd_!=185||!sourceLightPopulationCount_||*sourceLightPopulationCount_!=185||
+       sourceTypedLights_.size()!=183||*sourceLightPopulationS0_<0||*sourceLightPopulationS0_>10||
+       !worldZones34C_||*worldZones34C_!=10||!nativeLightList3A8_||!nativeLightList3A8_->colors3C||
+       nativeLightList3A8_->colorsLoaded!=10)return false;
+    const auto zone=static_cast<unsigned>(*sourceLightPopulationS0_);
+    for(unsigned i=0;i<10;++i){const auto bit=std::uint16_t(1u<<i);
+        const bool read=(sourceLightZoneReadMask_&bit)!=0,skip=(sourceLightZoneSkippedMask_&bit)!=0,applied=(sourceLightZoneAppliedMask_&bit)!=0;
+        if(i<zone&&(!read||(!skip&&!applied)))return false;
+        if(i>zone&&(read||skip||applied))return false;
+        if(read){const auto& first=nativeLightList3A8_->colors3C[i].lanes[0];if(!first)return false;
+            if(skip&&!(*first<-255.f))return false;if(applied&&*first<-255.f)return false;}
+    }
+    if(sourceLightPopulationReturnV0_){if(*sourceLightPopulationReturnV0_!=1||zone!=10||sourceLightZoneReadMask_!=0x3ff||
+        (sourceLightZoneSkippedMask_|sourceLightZoneAppliedMask_)!=0x3ff||sourceLightPopulationPhase_!=SourceLightPopulationPhase::returned||
+        sourceLightPopulationPC_!=0x273c28)return false;}
+    else if(sourceLightPopulationPhase_==SourceLightPopulationPhase::returned)return false;
+    return true;
 }
 }

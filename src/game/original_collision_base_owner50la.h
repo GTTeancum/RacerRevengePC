@@ -22,6 +22,7 @@ class OriginalRacerTerrainQueryOwner50LA;
 // scene publication, collection membership, or completed derived ctor implied.
 class OriginalCollisionBaseOwner50LA final {
     friend class OriginalWorldTriggerInstance50LA;
+    friend class OriginalSourcePhysicsCollision50LA;
     friend class OriginalRacerQuery364Owner50LA;
     friend class OriginalRacerQuery690Owner50LA;
     friend class OriginalRacerQuery694Owner50LA;
@@ -93,6 +94,13 @@ class OriginalCollisionBaseOwner50LA final {
         flagsF8_=static_cast<std::uint8_t>(flagsF8_|2u); //11B5C0, mode3 has bit2.
         flagsF8_=static_cast<std::uint8_t>(flagsF8_&~4u); //11B5E4, mode3 lacks bit4.
         actualGlobal3E0730=0;return true;
+    }
+    bool setMode5_11B570(std::uint8_t& actualGlobal3E0730)noexcept {
+        if(phase_!=Phase::complete)return false;
+        flagsF8_=static_cast<std::uint8_t>(flagsF8_&~8u); //11B594
+        flagsF8_=static_cast<std::uint8_t>(flagsF8_&~2u); //11B5C0
+        flagsF8_=static_cast<std::uint8_t>(flagsF8_|4u); //11B5E4
+        actualGlobal3E0730=0;return true; //11B5F4 tail identity, no retain.
     }
     bool freshShapeNull()const noexcept {
         return phase_==Phase::complete&&shape88_==0&&shape8C_.has_value()&&!*shape8C_&&

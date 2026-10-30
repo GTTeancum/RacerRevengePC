@@ -154,7 +154,7 @@ bool OriginalStandardTextureResolver50LA::resizeTrackCache132E40(OriginalRaTrack
 bool OriginalStandardTextureResolver50LA::closeTrackBankNative(OriginalRaTrackSourceFile50LA& root,D& d)noexcept {
     d={};if(!freshFileCapacity_||!scratch_)return fail(d,E::phase,0);auto& s=*freshFileCapacity_;auto& t=s.track;
     if(!t.root)return !root.acquired_;
-    if(t.root!=&root||root.occurrence_)return fail(d,E::phase,0);
+    if(t.root!=&root||root.occurrence_||root.nativeMissingLookupBorrowers_||s.particleConfigBorrower)return fail(d,E::phase,0);
     auto* members=s.members150?s.members150:s.failedCourseMembers;const auto memberCount=s.members150?s.memberCount154:s.failedCourseMemberCapacity;
     auto* devices=s.devices14?s.devices14:s.failedCourseDevices;const auto deviceCount=s.devices14?s.deviceCount18:s.failedCourseDeviceCapacity;
     if((t.device>=0&&(!devices||t.device>=deviceCount))||(!members&&t.pendingMember>=0))return fail(d,E::phase,0);
@@ -283,7 +283,7 @@ bool OriginalRaTrackSourceFile50LA::abortOccurrenceNative(const rr::platform::Or
     handle_=-1;occurrence_=nullptr;d={};return true;
 }
 bool OriginalRaTrackSourceFile50LA::closeNative(D& d)noexcept {
-    d={};if(nativeClosed_)return true;if(thread_!=std::this_thread::get_id()||occurrence_)return fail(d,E::phase,0);
+    d={};if(nativeClosed_)return true;if(thread_!=std::this_thread::get_id()||occurrence_||nativeMissingLookupBorrowers_)return fail(d,E::phase,0);
     if(acquired_&&(!resolver_||!resolver_->closeTrackBankNative(*this,d)))return false;
     nativeClosed_=true;archive_.reset();provider_.reset();resolver_.reset();return true;
 }

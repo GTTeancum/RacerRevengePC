@@ -12,7 +12,7 @@ namespace ra_cold_aggregate50LA {class Owner;}
 #include <thread>
 
 namespace rr::platform {class OriginalUiCoursePopupPayload50KG;class OriginalUiCoursePagePayload50KG;class OriginalUiMemoryCardConstructor50KG; class OriginalUiSharedDialogs50KG; class OriginalUiGaragePageOwner50KG;class OriginalUiGarageRendererLease50KG;class OriginalUiGarageFogColorLease50KG;}
-namespace rr::game { class OriginalLoadingScreen40Mode0LA; class OriginalLoadingScreenLayout50LA; class OriginalPositionStatsPrimitiveOwner50LA; class OriginalPositionStatsResources50LA; }
+namespace rr::game { class OriginalPlayerOverlayRendererLease50LA; class OriginalLoadingScreen40Mode0LA; class OriginalLoadingScreenLayout50LA; class OriginalPositionStatsPrimitiveOwner50LA; class OriginalPositionStatsResources50LA; }
 namespace original_main_entry50KG {
 class NativeCollectorFifo50LA;
 class PositionStatsRendererLease50LA;
@@ -22,6 +22,7 @@ class PositionStatsTextureLease50LA;
 // borrow these same members. No PositionStats resources are activated here.
 class RaceDisplayLifetime50LA final : public std::enable_shared_from_this<RaceDisplayLifetime50LA> {
     friend struct Application;
+    friend class rr::game::OriginalPlayerOverlayRendererLease50LA;
     friend class ::ra_cold_aggregate50LA::Owner; //Actual phase1 SunFlare viewport reader.
     friend class RaceF8RendererLease50LA;
     friend class ResultsRendererLease50LA;

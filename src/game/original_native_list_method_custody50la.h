@@ -6,7 +6,9 @@
 #include <memory>
 #include <optional>
 #include "original_selected_array_guards27ed40.h"
+#include "original_search_block_guards27e3c0.h"
 namespace ra_pod_scene50LA {class Owner;}
+namespace ra_cold_aggregate50LA {class Owner;}
 namespace rr::game {
 struct CollectionTree50BX;struct SearchStorage50BS;class OriginalApplicationEntities50LA;
 namespace original_gc_gameplay_lighting_candidate {class Owner;}
@@ -14,6 +16,7 @@ namespace original_gc_gameplay_lighting_candidate {class Owner;}
 //second selected array, registry, geometry, public readiness or dispatch API.
 class OriginalNativeListMethodCustody50LA final {
     friend class ::ra_pod_scene50LA::Owner;
+    friend class ::ra_cold_aggregate50LA::Owner; //Same World source Model membership custody, no public API.
     friend class original_gc_gameplay_lighting_candidate::Owner;
     const ::ra_pod_scene50LA::Owner* world_=nullptr;
     const OriginalApplicationEntities50LA* application_=nullptr;
@@ -34,6 +37,17 @@ class OriginalNativeListMethodCustody50LA final {
         bool selectedAllocationReturned=false,constructorReturned=false;
         selected_array_guards27ED40::History guards;
     } source_;
+    struct SourceEntries {
+        bool entered=false,tableAttempted=false,tablePublished=false,blockAttempted=false,blockPublished=false,ready=false;
+        std::unique_ptr<std::uint32_t*[]> table;std::unique_ptr<std::uint32_t[]> words;
+        search_block_guards27E3C0::History tableGuard,blockGuard;
+        //Occupied source slots contain unknown numeric guest pointers. Native
+        //identity is typed custody, not a fabricated token/address DWORD.
+        std::array<bool,1024> wordKnown{};std::array<std::uint32_t,1024> nativeFreeNext{};
+        std::array<const void*,1024> members{},borrowers{};
+        const void* pending=nullptr;const void* pendingIdentity=nullptr;std::uint32_t pendingSlot=0;
+        bool pendingConsumed=false,terminal=false;std::optional<std::uint32_t> abandonedConsumed;
+    } sourceEntries_;
     bool sourceMode_=false;
     bool arrayReference_=false,nodeReference_=false,begun_=false,nodeAliasWasAcquired_=false;
 public:

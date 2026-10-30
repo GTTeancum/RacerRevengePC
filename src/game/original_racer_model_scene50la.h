@@ -2,23 +2,34 @@
 namespace native_racer_model50LA {class Owner;}
 namespace rr::platform {class OriginalUiCourseOwnedLifecycle50KG; class OriginalUiGarageStaticModels50KG; class OriginalUiGarageSelectedModel50KG; class OriginalUiGarageModelResource50KG; class OriginalUiGarageVisibility50KG;}
 #include "model_bounds49o.h"
+#include "collection_bounds48s.h"
+#include "chariot_scene49u.h"
+#include "original_standard_placement_globals50la.h"
 #include "original_application_entities50la.h"
 #include "scene_graph49p.h"
 #include "../assets/model_geometry49o.h"
 #include "../assets/import_scene48d.h"
+#include "../assets/original_standard_texture_resource50la.h"
+#include "../assets/original_standard_model_resource50la.h"
+#include "../assets/original_source_psg_file50la.h"
+#include <new>
 #include <array>
 #include <cmath>
 #include <cstring>
 #include <exception>
 #include <memory>
+#include <limits>
 #include <optional>
 #include <string>
 
-namespace rr::assets { class OriginalStandardModelGeometry50LA; }
+namespace rr::assets { class OriginalStandardModelGeometry50LA;
+class OriginalStandardMaterialReferences50LA;class OriginalStandardMaterialTable50LA;
+struct OriginalStandardMaterialPath50LA;struct OriginalStandardMaterialDiagnostic50LA; }
 namespace ra_static_model_cold50LA { class Owner; }
 namespace rr::game::original_gc_gameplay_lighting_candidate { class Owner; }
 namespace rr::game {
 class OriginalRacerModelPackets50LA;
+class OriginalSourceStandardSmoker50LA;
 
 enum class OriginalRacerModelSceneStatus50LA : std::uint8_t {
     complete,binding,phase,graph,entity,typeRegistry,hierarchy,allocation,
@@ -104,11 +115,17 @@ struct OriginalRacerModelFields50LA {
 // materials1C4, quantization and packet1F0 belong to their concrete owners.
 // Destruction is deliberately split at the real source call boundaries.
 class OriginalRacerModelSceneOwner50LA final {
+    friend class ::ra_pod_scene50LA::Owner;
+    friend class ::ra_cold_aggregate50LA::Owner;
     friend class OriginalWreckRacerStorage50LA;
     friend class OriginalRacerColdScenes50LA;
     friend class ::ra_static_model_cold50LA::Owner;
     friend class original_gc_gameplay_lighting_candidate::Owner;
     friend class OriginalRacerModelPackets50LA;
+    friend class OriginalSourceStandardSmoker50LA;
+    friend class OriginalSourcePhysicsModel50LA;
+    friend class OriginalSourcePhysicsBody50LA;
+    friend class rr::assets::OriginalSourcePsgFile50LA; //Actual source member1C withdrawal checks same-model observer borrow.
     friend class ::native_racer_model50LA::Owner;
     friend class rr::platform::OriginalUiGarageSelectedModel50KG;
     friend class rr::platform::OriginalUiGarageVisibility50KG;
@@ -124,6 +141,581 @@ class OriginalRacerModelSceneOwner50LA final {
     using O=OriginalRacerSceneObject50LA;
     static constexpr I none=I::none;
     enum class RootMode { separate, direct };
+    // Private source27AC2C entry: one fresh canonical model node, BEFORE the
+    // actual PSG lookup can supply a row map. Tail capacity is not source data.
+    struct SourceConstructor2403A0 {
+        bool attempted=false,entityCounted=false,sceneReturned=false,modelReturned=false;
+        bool rowsBound=false,noOp141C20Returned=false;
+        SceneNode49P* canonicalNodes=nullptr;
+        std::uint32_t pc=0,vtable1A8=0,vtable10=0;
+        std::uint8_t knownFlags03=0,knownFlags191=0,knownFlags1F4=0;
+        bool knownScenePrefix=false,knownConfiguration1A4=false,knownModelFields=false;
+    } sourceConstructor_;
+    R constructSourceDirectRoot2403A0(const OriginalRacerModelSceneBinding50LA& b,
+        const SceneGraph49P& graph,bool sourceA1)noexcept {
+        auto& s=sourceConstructor_;
+        if(s.attempted||model_.constructed||released_)return {S::phase,0x2403a0u};
+        if(!b.sessionGeneration||!b.actualObjectCount423F60||!b.actualAttachmentLock423F58||
+           !b.actualTypes383408||b.sourceRowIndices||b.sourceRowCount||
+           *b.actualObjectCount423F60==std::numeric_limits<std::uint32_t>::max())
+            return {S::binding,0x2403a0u};
+        if(!validateSceneGraph49P(graph)||graph.count!=1||b.modelIndex!=static_cast<I>(0)||
+           !freshNode(graph,b.modelIndex))return {S::graph,0x28947cu};
+        binding_=b;rootMode_=RootMode::direct;s.attempted=true;s.canonicalNodes=graph.nodes;
+        //Shared actual2893A0 writes one embeddedEntity/ref1/count once, then
+        //four vf0 bounds, links, identityC0/zero100 and the SoultreeObject call.
+        //No private authority enrollment is hidden here: the actual caller
+        //enrolls this SAME Entity, including a counted registry-failure prefix.
+        const auto result=constructScene2893A0(model_,b.modelIndex,graph,sourceA1,K::model2403A0);
+        s.pc=result.sourcePC;s.knownFlags03=7u;s.entityCounted=model_.constructed;
+        if(s.entityCounted){s.vtable1A8=0x3d3190;s.vtable10=0x3d3198;s.knownScenePrefix=true;}
+        if(!result.okay())return result; //Do not undo earlier constructor stores/count.
+        s.sceneReturned=true;s.knownFlags191=3u;s.knownConfiguration1A4=true;
+        //26E3A0 does NOT retain the embeddedEntity or initialize distance1BC.
+        s.vtable1A8=0x3d2390;s.vtable10=0x3d2398;
+        model_.flags03=static_cast<std::uint8_t>(model_.flags03|1u); //26E3E4
+        model_.flags03=static_cast<std::uint8_t>(model_.flags03|2u); //26E404
+        fields_.geometry1B4=nullptr;fields_.field1B0=0;
+        model_.flags191=static_cast<std::uint8_t>(model_.flags191&~1u);
+        fields_.sourceRows1B8=nullptr;fields_.flags1B2=0;fields_.flags1B3=0; //SH1B2
+        fields_.materialCount1C0=0;fields_.materials1C4=nullptr;fields_.field1C8=nullptr;
+        fields_.flags1B3=static_cast<std::uint8_t>(fields_.flags1B3|0x10u);
+        s.vtable1A8=0x3d1f40;s.vtable10=0x3d1f48;model_.dispatch1A8=K::model2403A0;
+        fields_.packets1F0=nullptr;fields_.scale1E0={{1.f,1.f,1.f,1.f}};
+        fields_.offset1D0={{0.f,0.f,0.f}};fields_.offsetEnabled1DC=0;
+        fields_.flags1F4=static_cast<std::uint8_t>(fields_.flags1F4&~1u);s.knownFlags1F4=1u;
+        fields_.field1F8=0.f;fields_.field1FC=0.f;fields_.field200=0.f;
+        fields_.flags1F4=static_cast<std::uint8_t>(fields_.flags1F4&~2u);s.knownFlags1F4=3u;
+        fields_.field204=0;s.knownModelFields=true;
+        //Upper03/191/1F4 bits and radius194/198,distance1BC remain unknown.
+        //Their native backing defaults MUST NOT serve as authored values.
+        modelConstructorComplete_=true;s.modelReturned=true;s.pc=0x240444;
+        return {S::complete,s.pc};
+    }
+    //26E848's141C20 is only JR RA/MOVE V0,A0, NOT a reference acquisition.
+    R sourceNoOp141C20()noexcept {
+        auto& s=sourceConstructor_;
+        if(!s.modelReturned||s.noOp141C20Returned||released_||referenceReleased_||
+           !model_.constructed||model_.entity8.reference00!=1u)return {S::phase,0x141c20u};
+        s.noOp141C20Returned=true;return {S::complete,0x141c24u};
+    }
+    //Caller supplies indices ONLY after actual source resource acquisition.
+    //This binds native indices, never constructs/recounts row0 or loads rows.
+    R bindSourceDirectRows28CAC0(const SceneGraph49P& graph,const I* indices,
+        std::uint32_t count)noexcept {
+        auto& s=sourceConstructor_;
+        if(!s.modelReturned||s.rowsBound||released_||referenceReleased_||rowsLoaded_||
+           binding_.sourceRowCount||binding_.sourceRowIndices||graph.nodes!=s.canonicalNodes||
+           !s.noOp141C20Returned||!directRootPrepared_)return {S::phase,0x28cac0u};
+        if(!indices||!count||count>rr::assets::maxModelNodes49O||indices[0]!=model_.sceneIndex||
+           !validateSceneGraph49P(graph)||!freshNode(graph,model_.sceneIndex))return {S::binding,0x28cb0cu};
+        for(std::uint32_t row=0;row<count;++row){
+            if(!freshNode(graph,indices[row]))return {S::graph,0x28cb0cu};
+            for(std::uint32_t prior=0;prior<row;++prior)
+                if(indices[row]==indices[prior])return {S::binding,0x28cb0cu};
+        }
+        for(std::uint32_t row=0;row<count;++row)indices_[row]=indices[row];
+        binding_.sourceRowCount=count;binding_.sourceRowIndices=indices_.data();s.rowsBound=true;
+        return {S::complete,0x28cac0u};
+    }
+
+    // Actual cold26EBCC byte cursor. This is NOT a decoded Scene48D or a
+    // source numeric FileID emulator; the caller pins/authenticates provider
+    // bytes and this exact resolver row before entering this private method.
+    struct SourceDirectRows28CAC0 {
+        std::shared_ptr<rr::assets::OriginalStandardTextureResolver50LA> resolver;
+        std::shared_ptr<rr::assets::OriginalSourcePsgFile50LA> sourceFile;
+        rr::assets::OriginalStandardModelFileId50LA file{};
+        const std::vector<std::uint8_t>* bytes=nullptr;
+        std::size_t cursor=0;
+        bool attempted=false,countStored=false,rowZeroPublished=false;
+        bool parentAllocationReturned=false,parentAllocationNonNull=false;
+        bool returned=false,parentFreed=false,nativeScratchWithdrawn=false;
+        std::optional<std::uint32_t> signature,version,returnCount;
+        std::unique_ptr<std::int32_t[]> parents;
+        std::array<O*,rr::assets::maxModelNodes49O> publishedRows{};
+        std::array<std::array<std::uint8_t,128>,rr::assets::maxModelNodes49O> rawNames{};
+        //name,matrix,minXYZ,maxXYZ,radius,parent source reads; raw name retains
+        //all128 bytes independently of native std::string representation.
+        std::array<std::uint8_t,rr::assets::maxModelNodes49O> readMask{};
+        std::array<bool,rr::assets::maxModelNodes49O> allocationReturned{},published{},linked{};
+        std::uint32_t pc=0,row=0;
+    } sourceDirectRows_;
+    R importSourceDirectRows28CAC0(SceneGraph49P& graph,std::uint32_t backingCapacity,
+        std::shared_ptr<rr::assets::OriginalStandardTextureResolver50LA> resolver,
+        const rr::assets::OriginalStandardModelFileView50LA& file,
+        std::shared_ptr<rr::assets::OriginalSourcePsgFile50LA> sourceFile)noexcept {
+        auto& s=sourceDirectRows_;
+        if(s.attempted||!sourceConstructor_.modelReturned||!sourceConstructor_.noOp141C20Returned||
+           !directRootPrepared_||sourceConstructor_.rowsBound||rowsLoaded_||referenceReleased_||released_||
+           binding_.sourceRowCount||binding_.sourceRowIndices||graph.nodes!=sourceConstructor_.canonicalNodes||
+           graph.count!=1||backingCapacity!=rr::assets::maxModelNodes49O||!validateSceneGraph49P(graph)||
+           !freshNode(graph,model_.sceneIndex))return {S::phase,0x26ebccu};
+        rr::assets::OriginalStandardModelFileView50LA current;
+        rr::assets::OriginalStandardTextureDiagnostic50LA diagnostic;
+        //Resolver rows preserve provider spelling while26E8D8 lowercases
+        //the requested path. Admit only ASCII case differences, not slashes.
+        const auto sameMember=[](const std::string& a,const std::string& b){
+            if(a.size()!=b.size())return false;
+            for(std::size_t i=0;i<a.size();++i){auto x=static_cast<unsigned char>(a[i]);auto y=static_cast<unsigned char>(b[i]);
+                if(x&0x80u||y&0x80u)return false;
+                if(x>='A'&&x<='Z')x=static_cast<unsigned char>(x+0x20u);
+                if(y>='A'&&y<='Z')y=static_cast<unsigned char>(y+0x20u);
+                if(x!=y)return false;}
+            return true;
+        };
+        if(!resolver||file.id.resolver!=resolver.get()||!file.member||!file.bytes||file.geometry240110||
+           file.kind!=rr::assets::OriginalStandardModelFileKind50LA::psg||!sameMember(model_.name38,*file.member)||
+           !resolver->modelFile(file.id,current,diagnostic)||current.member!=file.member||
+           current.bytes!=file.bytes||current.geometry240110||current.kind!=file.kind)
+            return {S::binding,0x26ebccu};
+        if(!sourceFile||!sourceFile->current()||!sourceFile->returnedCold()||
+           sourceFile->resolver()!=resolver.get()||sourceFile->nativeFile().resolver!=file.id.resolver||
+           sourceFile->nativeFile().row!=file.id.row)return {S::binding,0x26ebccu};
+        std::size_t initial=0;if(!sourceFile->cursor12F520(initial,diagnostic)||initial)return {S::binding,0x26ebccu};
+        s.resolver=std::move(resolver);s.sourceFile=std::move(sourceFile);s.file=file.id;s.bytes=file.bytes;s.attempted=true;
+        const auto at=[&](std::uint32_t pc){s.pc=pc;};
+        const auto stop=[&](S status,std::uint32_t pc){at(pc);return R{status,pc};};
+        const auto read=[&](void* output,std::size_t count,std::uint32_t pc){
+            at(pc);rr::assets::OriginalStandardTextureDiagnostic50LA io;
+            const bool okay=s.sourceFile->readExactNative(output,count,s.cursor,io);
+            if(!okay&&io.sourcePC)at(io.sourcePC);return okay;
+        };
+        const auto word=[](const std::uint8_t* p){return std::uint32_t(p[0])|(std::uint32_t(p[1])<<8)|
+            (std::uint32_t(p[2])<<16)|(std::uint32_t(p[3])<<24);};
+        std::array<std::uint8_t,4> scalar{};
+        if(!read(scalar.data(),4,0x26ebe0))return stop(S::sourceRowTable,s.pc);s.signature=word(scalar.data());
+        if(!read(scalar.data(),4,0x26ebfc))return stop(S::sourceRowTable,s.pc);s.version=word(scalar.data());
+        //308F00 folds only ASCII A..Z through the original ctype table.
+        //Keep raw signature receipt; nonASCII signed-table lookup is unjoined.
+        std::uint32_t foldedSignature=0;
+        for(unsigned lane=0;lane<4;++lane){auto byte=static_cast<std::uint8_t>(*s.signature>>(8u*lane));
+            if(byte&0x80u)return stop(S::hierarchy,0x26ec0c);
+            if(byte>='A'&&byte<='Z')byte=static_cast<std::uint8_t>(byte+0x20u);
+            foldedSignature|=std::uint32_t(byte)<<(8u*lane);
+        }
+        const bool instanced=foldedSignature==0x00696770u||foldedSignature==0x00696764u; //pgi/dgi
+        if(instanced){at(0x26ec48);fields_.flags1B3=static_cast<std::uint8_t>(fields_.flags1B3|4u);}
+        const bool ordinary=foldedSignature==0x00677370u||foldedSignature==0x00677864u; //psg/dxg
+        if((!ordinary&&!instanced)||(*s.version&0x80000000u)||*s.version<3u)
+            return stop(S::hierarchy,0x26eca0); //Actual assertion path remains unjoined, not loader0.
+        if(*s.version!=3u)return stop(S::hierarchy,0x26ed14); //Bounded native layout adapter.
+        if(!read(scalar.data(),4,0x28cb04))return stop(S::sourceRowTable,s.pc);
+        model_.nodeCount1A0=word(scalar.data());s.countStored=true;
+        at(0x28cb0c);s.publishedRows[0]=&model_;s.published[0]=true;s.rowZeroPublished=true;
+        const auto count=model_.nodeCount1A0;
+        //Source signed loop/allocation domain is broader; refuse BEFORE its
+        //unrepresented oversized/zero allocation, retaining count and row0.
+        if(!count||count>backingCapacity)return stop(S::sourceRowTable,0x28cb14);
+        //Native index mapping is not a PSG read or child constructor. Storage
+        //was reserved by the caller, and root address/index never changes.
+        for(std::uint32_t row=1;row<count;++row){auto& node=graph.nodes[row];
+            node.parent180=node.firstChild184=node.nextSibling188=none;}
+        graph.count=count;
+        std::array<I,rr::assets::maxModelNodes49O> indices{};
+        for(std::uint32_t row=0;row<count;++row)indices[row]=static_cast<I>(row);
+        const auto bound=bindSourceDirectRows28CAC0(graph,indices.data(),count);if(!bound.okay())return stop(bound.status,bound.sourcePC);
+        directRowsStarted_=true;
+        at(0x28cb14);s.parents.reset(new(std::nothrow) std::int32_t[count]);
+        s.parentAllocationReturned=true;s.parentAllocationNonNull=bool(s.parents);
+        for(std::uint32_t row=0;row<count;++row){s.row=row;
+            if(row){
+                //Native overflow is bounded before the source child allocator.
+                if(*binding_.actualObjectCount423F60==std::numeric_limits<std::uint32_t>::max())
+                    return stop(S::entity,0x28d070);
+                at(0x28d070);rows_[row].reset(new(std::nothrow) O);s.allocationReturned[row]=true;
+                if(rows_[row]){const auto made=constructScene2893A0(*rows_[row],indices_[row],graph,true,K::scene2893A0);
+                    if(!made.okay())return stop(made.status,made.sourcePC);}
+                at(0x28d090);s.publishedRows[row]=rows_[row].get();s.published[row]=true;
+            }
+            auto* target=s.publishedRows[row];if(!target)return stop(S::sourceRowTable,0x28cb50);
+            if(!read(s.rawNames[row].data(),128,0x28cb68))return stop(S::sourceRowTable,s.pc);s.readMask[row]|=1u;
+            std::size_t length=0;while(length<128&&s.rawNames[row][length])++length;
+            if(length==128)return stop(S::sourceRowTable,0x28cb68); //Raw write kept; no fabricated terminator.
+            try{target->name38.assign(reinterpret_cast<const char*>(s.rawNames[row].data()),length);}
+            catch(...){return stop(S::allocation,0x28cb68);}
+            std::array<std::uint8_t,64> matrix{};
+            if(!read(matrix.data(),64,0x28cb88))return stop(S::sourceRowTable,s.pc);
+            for(unsigned lane=0;lane<16;++lane){const auto bits=word(matrix.data()+4*lane);
+                std::memcpy(&atGraphNode(graph,target->sceneIndex).localC0.v[lane],&bits,4);}
+            s.readMask[row]|=2u;
+            at(0x28cbc0);target->flags03=static_cast<std::uint8_t>(target->flags03&~4u);
+            at(0x28cbdc);atGraphNode(graph,target->sceneIndex).sceneFlags190|=0x20u;
+            at(0x28cbf0);atGraphNode(graph,target->sceneIndex).sceneFlags190|=4u;
+            std::array<std::uint8_t,12> vector{};
+            if(!read(vector.data(),12,0x28cbfc))return stop(S::sourceRowTable,s.pc);
+            for(unsigned lane=0;lane<3;++lane){const auto bits=word(vector.data()+4*lane);std::memcpy(&target->bounds140[lane],&bits,4);}s.readMask[row]|=4u;
+            if(!read(vector.data(),12,0x28cc1c))return stop(S::sourceRowTable,s.pc);
+            for(unsigned lane=0;lane<3;++lane){const auto bits=word(vector.data()+4*lane);std::memcpy(&target->bounds150[lane],&bits,4);}s.readMask[row]|=8u;
+            if(!read(scalar.data(),4,0x28cc3c))return stop(S::sourceRowTable,s.pc);
+            {const auto bits=word(scalar.data());float radius;std::memcpy(&radius,&bits,4);target->radius194=radius;}s.readMask[row]|=16u;
+            if(!s.parents)return stop(S::allocation,0x28cc58); //Original NULL destination reached only NOW.
+            if(!read(scalar.data(),4,0x28cc58))return stop(S::sourceRowTable,s.pc);
+            {const auto bits=word(scalar.data());std::memcpy(&s.parents[row],&bits,4);}s.readMask[row]|=32u;
+            sourceParents_[row]=s.parents[row];
+        }
+        for(std::uint32_t row=0;row<count;++row){s.row=row;at(0x28cc90);const auto parent=s.parents[row];
+            if(parent==-1){s.linked[row]=true;continue;}
+            //Bound malformed/cyclic/forward parent cases at the actual lookup,
+            //not before preceding row writes. No native index is a guest ptr.
+            if(!row||parent<0||static_cast<std::uint32_t>(parent)>=row)return stop(S::hierarchy,0x28cca0);
+            appendScene28BEF0(graph,*s.publishedRows[static_cast<std::uint32_t>(parent)],*s.publishedRows[row]);s.linked[row]=true;
+        }
+        at(0x28cd28);s.parents.reset();s.parentFreed=true;
+        rowsLoaded_=true;s.returnCount=count;s.returned=true;at(0x28cd5c);
+        return {S::complete,s.pc}; //Only28CAC0; materials/geometry/cache/fileclose remain caller work.
+    }
+    static SceneNode49P& atGraphNode(const SceneGraph49P& graph,I i)noexcept{return at(graph,i);}
+
+    struct SourceMaterials26E640 {
+        std::shared_ptr<rr::assets::OriginalStandardMaterialReferences50LA> references;
+        const std::string* prefixAddress=nullptr;
+        const std::int32_t* published1C4=nullptr;
+        bool attempted=false,countStored=false,allocationPublished=false,returned=false,nativeWithdrawn=false;
+        std::uint32_t count=0,row=0,namesRead=0,lookupsReturned=0,retainsReturned=0,pc=0;
+        std::array<std::uint8_t,64> rawName{};
+        std::optional<std::int32_t> lookupReturn;
+    } sourceMaterials_;
+    R loadSourceMaterials26E640(std::shared_ptr<rr::assets::OriginalStandardMaterialTable50LA>,
+        const rr::assets::OriginalStandardMaterialPath50LA&,rr::assets::OriginalStandardMaterialDiagnostic50LA&)noexcept;
+    bool preflightSourceMaterialsNative()const noexcept;
+    bool releaseSourceMaterialsNative()noexcept;
+
+    struct SourceQuantization240570 {
+        bool attempted=false,flagStored=false,returned=false;
+        std::uint8_t readMask=0;
+        std::array<std::uint32_t,8> words{};
+        std::optional<bool> xEqualsOne,yEqualsOne;
+        std::uint32_t pc=0;
+    } sourceQuantization_;
+    R loadSourceQuantization240570()noexcept;
+
+    struct SourceBounds28E230 {
+        bool entered=false,recompute=false,rootRefreshed=false,aggregateReturned=false;
+        bool warmZeroCount=false; //Source1A0=0, distinct from actual enumerated1B8 count.
+        bool finalWorldRefreshed=false,centerStored=false,returned=false;
+        std::uint8_t flagsAtEntry=0,aggregateStoreMask=0,halfStoreMask=0;
+        std::uint32_t rowCount=0,row=0,pc=0;
+        OriginalStandardPlacementGlobals50LA::History profileGuard;
+        std::array<std::uint8_t,rr::assets::maxModelNodes49O> rowRefreshes{};
+        std::array<std::uint32_t,4> aggregate160{},aggregate170{},center{};
+        std::array<std::uint32_t,3> half{};
+        std::uint32_t radius198=0,halfWBefore=0;
+    } sourceBounds_;
+    R produceSourceDirectBounds28E230(const SceneGraph49P&,std::array<float,4>& center,
+        std::array<float,4>& half)noexcept;
+    bool preflightSourceBoundsHistoryNative()const noexcept;
+
+    struct SourceGeometry26EE38 {
+        std::unique_ptr<rr::assets::OriginalStandardModelGeometry50LA> pending;
+        std::shared_ptr<rr::assets::OriginalStandardModelGeometry50LA> owner;
+        bool attempted=false,allocationReturned=false,allocationNonNull=false;
+        bool constructorReturned=false,published=false,nativeWithdrawn=false;
+        bool loadAttempted=false,lodsReturned=false;
+        bool paletteAttempted=false,geometryCallReturned=false;
+        bool prototypeAttempted=false,prototypeStored=false;
+        rr::assets::OriginalStandardModelGeometry50LA* published1B4=nullptr;
+        std::uint32_t pc=0;
+    } sourceGeometry_;
+    R allocateSourceGeometry26EE38()noexcept;
+    R loadSourceGeometry26E170()noexcept;
+    R finishSourceGeometry240210()noexcept;
+    R publishSourceGeometryPrototype26EE74()noexcept;
+    bool preflightSourceGeometryNative()const noexcept;
+    bool releaseSourceGeometryNative()noexcept;
+
+    //Native same-occurrence borrow, including partial/NULL observer publication.
+    //Only the actual root observer retirement may clear it; no source field.
+    //Private Standard S3=0 warm26E820 prefix. No cold stream/close receipt,
+    //hierarchy clone, material copy, rowtable or loader return is implied.
+    struct SourceWarmGeometry26E9F0 {
+        bool attempted=false,registered=false,published=false,retained=false;
+        bool prototypeRead=false,nativeLedgerWithdrawn=false,nativeWithdrawn=false;
+        std::uint32_t pc=0;
+        std::shared_ptr<rr::assets::OriginalSourcePsgFile50LA> file;
+        rr::assets::OriginalStandardModelGeometry50LA* geometry=nullptr;
+        const OriginalRacerModelSceneOwner50LA* creator=nullptr;
+        const OriginalRacerModelSceneOwner50LA* prototype=nullptr;
+    } sourceWarmGeometry_;
+    R acquireSourceWarmGeometry26E9F0(std::shared_ptr<rr::assets::OriginalSourcePsgFile50LA>)noexcept;
+    bool preflightSourceWarmGeometryNative()const noexcept;
+    bool withdrawSourceWarmGeometryNative()noexcept;
+    bool sourceWarmPrototypeBorrowedNative()const noexcept {
+        return sourceDirectRows_.sourceFile&&sourceDirectRows_.sourceFile->hasLiveWarmBorrowersNative();
+    }
+    bool sourceWarmLifetimeBorrowedNative()const noexcept {
+        return (sourceWarmGeometry_.attempted&&!sourceWarmGeometry_.nativeWithdrawn)||
+            (sourceWarmReturn_.rowAllocationAttempted&&!sourceWarmReturn_.nativeRowsWithdrawn)||
+            sourceWarmPrototypeBorrowedNative();
+    }
+    struct SourceWarmRows26EA88 {
+        bool entered=false,bitRead=false,childRead=false,cloneParentCleared=false;
+        bool countSeeded=false,rowZeroStored=false,enumerationReturned=false;
+        std::uint8_t bit191=0,copyMask=0,flagStoreMask=0;
+        const O* selectedCloneSource=nullptr;
+        std::uint32_t count=0,pc=0,radius194=0;
+        std::array<std::uint32_t,4> bounds140{},bounds150{};
+        std::uint8_t flagsAfter=0;
+    } sourceWarmRows_;
+    R continueSourceWarmRows26EA88(const SceneGraph49P&,const SceneGraph49P&)noexcept;
+    bool preflightSourceWarmRowsNative()const noexcept;
+    struct SourceWarmMaterials26EB44 {
+        bool entered=false,countStored=false,allocationPublished=false,copyReturned=false;
+        bool returned=false,nativeWithdrawn=false;
+        std::uint32_t count=0,retained=0,pc=0;
+        const std::int32_t* published1C4=nullptr;
+        std::shared_ptr<rr::assets::OriginalStandardMaterialReferences50LA> references;
+    } sourceWarmMaterials_;
+    R copySourceWarmMaterials26EB40()noexcept;
+    bool preflightSourceWarmMaterialsNative()const noexcept;
+    bool withdrawSourceWarmMaterialsNative()noexcept;
+    struct SourceWarmReturn26E820 {
+        bool parametersEntered=false,parametersReturned=false;
+        std::uint16_t parameterStoreMask=0;
+        std::array<std::uint32_t,8> parameterWords{};
+        std::uint8_t flags1B2=0,flags1B3=0;
+        bool rowAllocationAttempted=false,rowAllocationReturned=false,rowPublished=false;
+        bool rowCopied=false,returned=false,nativeRowsWithdrawn=false;
+        std::uint32_t count=0,pc=0;
+        O** published1B8=nullptr;
+        const C* returnedEntity=nullptr;
+    } sourceWarmReturn_;
+    R copySourceWarmParameters2406E0()noexcept;
+    R allocateSourceWarmRowTable26EE9C()noexcept;
+    bool preflightSourceWarmReturnNative()const noexcept;
+    bool withdrawSourceWarmRowTableNative()noexcept;
+    bool preflightSourceWarmRenderable26E820Native()const noexcept;
+    struct SourceWarmClone28E5F0 {
+        struct Row {
+            const O* source=nullptr; //History only after warm native withdrawal.
+            bool allocationEntered=false,allocationNonNull=false,constructorReturned=false;
+            bool incomingPublished=false,nameCopied=false,entered=false,returned=false;
+            std::uint8_t localPairMask=0,flagStoreMask=0,boxStoreMask=0;
+            bool radius194Stored=false,radius198Stored=false;
+            std::optional<std::uint32_t> copiedRadius194,copiedRadius198; //Store receipt separate from value knownness.
+            std::optional<std::uint32_t> siblingSlot,childSlot;
+            bool siblingParentStored=false,siblingPreviousStored=false,childParentStored=false;
+            bool siblingNullStored=false,childNullStored=false;
+        };
+        bool entered=false,returned=false,selectedChild=false,nativeForestDetached=false;
+        std::uint32_t slotCount=0,pc=0;
+        SceneNode49P* canonicalNodes=nullptr;
+        std::array<Row,rr::assets::maxModelNodes49O> rows{};
+    } sourceWarmClone_;
+    R cloneSourceWarmHierarchy28E5F0(SceneGraph49P&,std::uint32_t,const SceneGraph49P&)noexcept;
+    bool preflightSourceWarmCloneNative()const noexcept;
+    bool preflightSourceWarmForestGraphNative(const SceneGraph49P& graph)const noexcept {
+        const auto& h=sourceWarmClone_;
+        if(!h.entered||!h.selectedChild)return validateSceneGraph49P(graph);
+        if(graph.nodes!=h.canonicalNodes||graph.count!=h.slotCount||
+           graph.count>rr::assets::maxModelNodes49O||!preflightSourceWarmCloneNative())return false;
+        //Native admission only. Generic graph operations still reject root
+        //siblings; the actual source graph is neither normalized nor rewritten.
+        std::array<SceneNode49P,rr::assets::maxModelNodes49O> scratch{};
+        for(std::uint32_t i=0;i<graph.count;++i)scratch[i]=graph.nodes[i];
+        std::array<bool,rr::assets::maxModelNodes49O> incoming{};
+        for(std::uint32_t i=0;i<graph.count;++i){const auto& node=graph.nodes[i];
+            if(node.parent180!=none||node.nextSibling188==none)continue;
+            const auto next=static_cast<std::int32_t>(node.nextSibling188);
+            if(next<0||static_cast<std::uint32_t>(next)>=graph.count||incoming[next]||
+               graph.nodes[next].parent180!=none||!h.rows[i].siblingSlot||
+               *h.rows[i].siblingSlot!=static_cast<std::uint32_t>(next)||
+               !h.rows[i].siblingParentStored||!h.rows[i].siblingPreviousStored)return false;
+            const auto* owner=object(node.nextSibling188);
+            if(!owner||owner->previous18C!=static_cast<I>(i))return false;
+            incoming[next]=true;scratch[i].nextSibling188=none;
+        }
+        for(std::uint32_t i=0;i<graph.count;++i)if(graph.nodes[i].parent180==none){
+            const auto* owner=object(static_cast<I>(i));
+            if(owner&&owner->constructed&&(owner->previous18C!=none)!=incoming[i])return false;
+        }
+        return validateSceneGraph49P({scratch.data(),graph.count});
+    }
+    void withdrawSourceWarmForestLinksNative(const SceneGraph49P& graph)noexcept {
+        auto& h=sourceWarmClone_;if(!h.entered||!h.selectedChild||h.nativeForestDetached)return;
+        //Exact validated native cancellation, not source28BFC0 on a NULL parent.
+        //No fallible operation follows admission before all root links clear.
+        for(std::uint32_t i=0;i<graph.count;++i)if(graph.nodes[i].parent180==none){
+            graph.nodes[i].nextSibling188=none;
+            if(auto* owner=object(static_cast<I>(i)))owner->previous18C=none;
+        }
+        h.nativeForestDetached=true;
+    }
+    struct SourceWarmEnumeration28C400 {
+        bool entered=false,returned=false,mapBound=false;
+        std::uint32_t pc=0;
+        std::array<O*,rr::assets::maxModelNodes49O> slots{};
+        std::array<bool,rr::assets::maxModelNodes49O> written{};
+    } sourceWarmEnumeration_;
+    R enumerateSourceWarmRows28C400(const SceneGraph49P&)noexcept;
+    bool preflightSourceWarmEnumerationNative()const noexcept;
+    const void* sourcePacketBorrower_=nullptr; //Exact source packet occurrence, including unpublished/NULL1F0.
+    const void* sourceObserverBorrower_=nullptr;
+    const void* sourcePhysicsBodyBorrower_=nullptr; //Raw same-model source288 borrow.
+    const void* sourceSmokerBorrower_=nullptr; //Actual nullable source model40 borrower; not a guest field.
+    // Actual source28B550(Model,NULL,stack), root-only copy route. Entity
+    // attachment is distinct from SceneObject.parent180 and is not rejected.
+    struct SourceTranslation28ADD0 {
+        const OriginalRacerModelSceneOwner50LA* owner=nullptr;
+        const SceneNode49P* canonicalNodes=nullptr;
+        std::uint32_t count=0,root=0,pc=0;
+        bool entered=false,guardReturned=false,parentRead=false,scratchInitialized=false,inputCopied=false;
+        bool rootMarked=false,rootCleared=false,returned=false;
+        std::uint8_t xyzMask=0,inputKnown=0;
+        OriginalStandardPlacementGlobals50LA::History guard;
+        std::array<std::uint32_t,4> input{},scratch{{0,0,0,0x3f800000u}};
+        std::array<SceneNode49P,maxSceneNodes49P> before{},after{};
+        std::array<std::uint32_t,maxSceneNodes49P> invalidationOrder{};
+        std::uint32_t invalidationCount=0;
+    };
+    R translateSourceNullRelative28ADD0(const SceneGraph49P&,const std::uint32_t* input,
+        const std::uint32_t* known,SourceTranslation28ADD0&)noexcept;
+    bool sourceTranslationHistoryNative(const SceneGraph49P&,const SourceTranslation28ADD0&)const noexcept;
+    struct SourceLocalBounds28D670 {
+        const OriginalRacerModelSceneOwner50LA* owner=nullptr;
+        const SceneNode49P* canonicalNodes=nullptr;
+        std::uint32_t count=0,root=0,visited=0,pc=0;
+        bool entered=false,rootReady=false,seedReturned=false,centerStored=false,halfStored=false,returned=false;
+        std::array<SceneNode49P,maxSceneNodes49P> before{},after{};
+        std::array<const O*,maxSceneNodes49P> objects{};
+        std::array<std::uint32_t,maxSceneNodes49P> order{};
+        std::array<std::uint8_t,maxSceneNodes49P> getterCount{};
+        std::array<bool,maxSceneNodes49P> worldWritten{};
+        std::array<std::array<float,4>,maxSceneNodes49P> center140{},half150{};
+        SourceLocalBoundsState49O aggregate;
+        std::array<SourceLocalBoundsProjection49O,maxSceneNodes49P> projection{};
+        std::array<std::uint8_t,maxSceneNodes49P> projectionMask{};
+        std::array<std::uint32_t,4> center{},half{};
+    };
+    R produceSourceLocalBounds28D670(const SceneGraph49P&,std::array<std::uint32_t,4>& center,
+        std::array<std::uint32_t,4>& half,SourceLocalBounds28D670&)noexcept;
+    bool sourceLocalBoundsHistoryNative(const SceneGraph49P&,const SourceLocalBounds28D670&,
+        const SourceTranslation28ADD0* laterTranslation=nullptr)const noexcept;
+    struct SourceWorld28B550 {
+        const OriginalRacerModelSceneOwner50LA* owner=nullptr;
+        const void* canonicalNodes=nullptr;
+        std::uint32_t graphCount=0,sceneIndex=0;
+        bool entered=false,refreshAttempted=false,worldReady=false,outputStored=false,returned=false;
+        std::uint8_t flags190Before=0,flags190After=0;
+        std::uint16_t refreshWordMask=0,outputWordMask=0;
+        std::uint32_t pc=0;
+        std::array<std::uint32_t,16> localBefore{},worldBefore{},world{};
+    };
+    R copySourceWorld28B550(const SceneGraph49P& graph,
+        std::array<std::uint32_t,16>& output,SourceWorld28B550& h)noexcept {
+        if(h.entered||&output==&h.localBefore||&output==&h.worldBefore||&output==&h.world||
+           !preflightSourceRenderableReturn26E820Native()||
+           graph.nodes!=sourceConstructor_.canonicalNodes||graph.count!=binding_.sourceRowCount||
+           !validateSceneGraph49P(graph)||!inRange(graph,model_.sceneIndex))return {S::phase,0x28b550u};
+        auto& node=at(graph,model_.sceneIndex);
+        // Clean nonroot is outside this private root-only adapter. Dirty
+        // nonroot instead retains the actual reached refresh-call boundary.
+        if(node.parent180!=none&&(node.sceneFlags190&1u))return {S::graph,0x28b550u};
+        h.owner=this;h.canonicalNodes=graph.nodes;h.graphCount=graph.count;
+        h.sceneIndex=static_cast<std::uint32_t>(model_.sceneIndex);h.entered=true;
+        h.pc=0x28b59cu;h.flags190Before=node.sceneFlags190;h.flags190After=node.sceneFlags190;
+        std::memcpy(h.localBefore.data(),node.localC0.v,64);
+        std::memcpy(h.worldBefore.data(),node.world100.v,64);
+        if(!(node.sceneFlags190&1u)){
+            h.refreshAttempted=true;
+            if(node.parent180!=none){h.pc=0x28b5b8u;return {S::graph,h.pc};}
+            for(unsigned pair=0;pair<8u;++pair){
+                for(unsigned lane=0;lane<2u;++lane){
+                    const auto i=2u*pair+lane;h.pc=lane?0x28b5f8u:0x28b5f4u;
+                    std::memcpy(node.world100.v+i,node.localC0.v+i,4);
+                    h.refreshWordMask|=static_cast<std::uint16_t>(1u<<i);
+                }
+            }
+            h.pc=0x28b61cu;
+            node.sceneFlags190=static_cast<std::uint8_t>((node.sceneFlags190&~1u)|1u);
+            h.flags190After=node.sceneFlags190;
+        }
+        h.pc=0x28b624u;std::memcpy(h.world.data(),node.world100.v,64);h.worldReady=true;
+        for(unsigned pair=0;pair<8u;++pair){
+            for(unsigned lane=0;lane<2u;++lane){
+                const auto i=2u*pair+lane;h.pc=lane?0x28b63cu:0x28b638u;
+                std::memcpy(output.data()+i,node.world100.v+i,4);
+                h.outputWordMask|=static_cast<std::uint16_t>(1u<<i);
+            }
+        }
+        h.outputStored=true;h.returned=true;h.pc=0x28b67cu;
+        return {S::complete,h.pc}; //Control receipt only, no invented numericV0.
+    }
+    bool sourceWorldHistoryCurrentNative(const SourceWorld28B550& h)const noexcept {
+        if(!h.entered)return !h.owner&&!h.canonicalNodes&&!h.graphCount&&!h.sceneIndex&&
+            !h.refreshAttempted&&!h.worldReady&&!h.outputStored&&!h.returned&&
+            !h.flags190Before&&!h.flags190After&&!h.refreshWordMask&&!h.outputWordMask&&!h.pc;
+        if(h.owner!=this||!h.canonicalNodes||!h.graphCount||h.sceneIndex>=h.graphCount)return false;
+        if(!h.returned)return h.pc==0x28b5b8u&&h.refreshAttempted&&!(h.flags190Before&1u)&&
+            h.flags190After==h.flags190Before&&!h.refreshWordMask&&!h.outputWordMask&&
+            !h.worldReady&&!h.outputStored;
+        if(h.pc!=0x28b67cu||!h.worldReady||!h.outputStored||h.outputWordMask!=0xffffu)return false;
+        if(h.flags190Before&1u)return !h.refreshAttempted&&!h.refreshWordMask&&
+            h.flags190After==h.flags190Before&&h.world==h.worldBefore;
+        return h.refreshAttempted&&h.refreshWordMask==0xffffu&&
+            h.flags190After==static_cast<std::uint8_t>(h.flags190Before|1u)&&h.world==h.localBefore;
+    }
+
+    struct SourcePoint28BAB0 {
+        const OriginalRacerModelSceneOwner50LA* owner=nullptr;
+        bool entered=false,refreshAttempted=false,worldReady=false,arithmeticReturned=false,outputStored=false,returned=false;
+        std::uint8_t flags190Before=0;std::uint32_t pc=0;
+        std::array<std::uint32_t,4> input{},output{};
+        std::array<std::uint32_t,16> world{};
+    };
+    R transformSourcePoint28BAB0(const SceneGraph49P& graph,const std::array<std::uint32_t,4>& input,
+        std::array<std::uint32_t,4>& output,SourcePoint28BAB0& h)noexcept {
+        if(h.entered||&input==&output||!preflightSourceRenderableReturn26E820Native()||
+           graph.nodes!=sourceConstructor_.canonicalNodes||graph.count!=binding_.sourceRowCount||
+           !validateSceneGraph49P(graph)||!inRange(graph,model_.sceneIndex))return {S::phase,0x28bab0u};
+        h.entered=true;h.owner=this;h.input=input;
+        auto& node=at(graph,model_.sceneIndex);h.pc=0x28bad8;h.flags190Before=node.sceneFlags190;
+        if(!(node.sceneFlags190&1u)){
+            h.refreshAttempted=true;h.pc=node.parent180==none?0x28bb24u:0x28baf4u;
+            //Actual same graph lazy caches, not a prepared world copy. Earlier
+            //ancestor writes survive a later bounded native refresh refusal.
+            if(!refreshSceneWorld49P(graph,model_.sceneIndex))return {S::graph,h.pc};
+        }
+        h.pc=0x28bb60;h.worldReady=true;std::memcpy(h.world.data(),node.world100.v,64);
+        VisualVector49R in{},candidate{};std::memcpy(in.v,input.data(),16);
+        detail::SceneVectorContext49U scratch{};
+        h.pc=0x28bb78;
+        //Existing exact operation-sequence native finite/nearest adapter:
+        //inputW and matrixW lanes are not consumed; source outputW is1.
+        //No claim of EE/VU exceptional behavior or general bit parity.
+        if(!detail::cleanMatrixPointPrefix49U(node.world100,in,scratch,candidate))return {S::graph,h.pc};
+        h.arithmeticReturned=true;std::memcpy(h.output.data(),candidate.v,16);
+        h.pc=0x28bb94;output=h.output;h.outputStored=true;
+        h.pc=0x28bbac;h.returned=true;return {S::complete,h.pc};
+    }
+    bool sourcePointHistoryCurrentNative(const SourcePoint28BAB0& h)const noexcept {
+        if(!h.entered)return !h.owner&&!h.refreshAttempted&&!h.worldReady&&!h.arithmeticReturned&&!h.outputStored&&!h.returned&&!h.pc;
+        if(h.owner!=this||!h.pc||(h.worldReady&&!h.refreshAttempted&&!(h.flags190Before&1u))||
+           (h.arithmeticReturned&&!h.worldReady)||(h.outputStored&&!h.arithmeticReturned))return false;
+        return !h.returned||(h.outputStored&&h.output[3]==0x3f800000u&&h.pc==0x28bbacu);
+    }
+
+    struct SourceRowTable26EE9C {
+        bool attempted=false,allocationReturned=false,published=false,copied=false,returned=false,nativeWithdrawn=false;
+        std::uint32_t count=0,pc=0;
+        const rr::assets::OriginalSourcePsgFile50LA* closedFile=nullptr;
+        std::int32_t ignoredCloseResult=0;
+        O* const* published1B8=nullptr;
+        const C* returnedEntityV0=nullptr;
+    } sourceRowTable_;
+    R allocateClosedSourceRowTable26EE9C()noexcept;
+    bool preflightSourceRowTableNative()const noexcept;
+    bool withdrawSourceRowTableNative()noexcept;
+    bool preflightSourceRenderableReturn26E820Native()const noexcept;
+    const C* sourceRenderableEntity26E820Native()const noexcept;
+    struct SourcePacketPaletteBorrow240210 {
+        const void* descriptor20=nullptr;
+        std::optional<std::uint32_t> count00;
+        const std::uint32_t* sizes04=nullptr;
+    };
+    bool borrowSourcePacketPalette240210Native(const rr::assets::OriginalStandardModelGeometry50LA*,
+        SourcePacketPaletteBorrow240210&)const noexcept;
+
     // Only the allocating wreck owner can capture this stable cold identity.
     // It is not evidence that2403A0 or a PSG row constructor has executed.
     C* wreckModelStorage()noexcept{return &model_.entity8;}
@@ -688,6 +1280,7 @@ private:
     // path; never rewrite ancestors into a single-generation model domain.
     template<class ActualAuthorityView>
     R preflightModelReference142590InAuthority(const ActualAuthorityView& actual)const noexcept {
+        if(sourcePhysicsBodyBorrower_||sourcePacketBorrower_||sourceWarmLifetimeBorrowedNative())return {S::phase,0x142590u};
         if(!model_.constructed||referenceReleased_||released_)return {S::phase,0x142590u};
         if(*binding_.actualAttachmentLock423F58)return {S::attachmentLocked,0x1425a8u};
         const auto& c=model_.entity8;
@@ -705,6 +1298,7 @@ private:
     // Only the scope calls immediately after actual authority preflight and
     // enrollment retirement in the same serial operation. No public token.
     R releasePreflightedModelReference142590()noexcept {
+        if(sourcePhysicsBodyBorrower_||sourcePacketBorrower_||sourceWarmLifetimeBorrowedNative())return {S::phase,0x142590u};
         if(!model_.constructed||referenceReleased_||released_||
            *binding_.actualAttachmentLock423F58||model_.entity8.reference00!=1u)
             return {S::phase,0x142590u};
@@ -722,6 +1316,7 @@ public:
         const OriginalRacerModelSceneOwner50LA* thirdSibling=nullptr,
         const OriginalRacerModelSceneOwner50LA* fourthSibling=nullptr)const noexcept {
         using namespace original_wreck_component_detail50LA;
+        if(sourcePhysicsBodyBorrower_||sourcePacketBorrower_||sourceWarmLifetimeBorrowedNative())return {S::phase,0x142590u};
         if(!model_.constructed||referenceReleased_||released_)return {S::phase,0x142590u};
         if(*binding_.actualAttachmentLock423F58)return {S::attachmentLocked,0x1425a8u};
         std::array<C*,maxOriginalWreckComponents50LA> list{};
@@ -761,6 +1356,8 @@ public:
     }
 
     R freeSourceRowTable26E5CC()noexcept {
+        if(sourcePhysicsBodyBorrower_||sourcePacketBorrower_||sourceWarmLifetimeBorrowedNative())return {S::phase,0x142590u};
+        if(sourceRowTable_.attempted&&!sourceRowTable_.nativeWithdrawn)return {S::phase,0x26e5ccu};
         if(!referenceReleased_||released_||rowTableFreed_)return {S::phase,0x26e5ccu};
         rowTable_.reset();rowTableFreed_=true;
         //26E5D8 does not clear model1B8. Its stale value is not dereferenced
@@ -771,6 +1368,8 @@ public:
     // Only2896D0, after upstream240450 packets and26E460 material/resource
     // release and array frees. This method never claims those owners ran.
     R releaseSceneBase2896D0(const SceneGraph49P& graph)noexcept {
+        if(sourcePhysicsBodyBorrower_||sourcePacketBorrower_||sourceWarmLifetimeBorrowedNative())return {S::phase,0x142590u};
+        if(sourceRowTable_.attempted&&!sourceRowTable_.nativeWithdrawn)return {S::phase,0x26e5ccu};
         if(released_)return {S::complete,0x2897acu};
         if(!referenceReleased_)return {S::phase,0x2896d0u};
         if(rowTable_)return {S::sourceRowTable,0x26e5ccu};
@@ -789,18 +1388,19 @@ private:
     // owners before releaseModelReference142590. Unlike closeFreshUnlinked this
     // permits acquired payloads and the actual piece->model Entity attachment;
     // neither attachment nor payload completion is inferred from scene rows.
-    R preflightNativePartialScene2896D0(const SceneGraph49P& graph)const noexcept {
+    R preflightNativePartialScene2896D0(const SceneGraph49P& graph,const void* expectedObserver=nullptr,
+        const C* expectedSourceChild=nullptr)const noexcept {
         if(released_||!model_.constructed||model_.released||publishedToAnimation_||
-           model_.observer19C||model_.configuration1A4||fields_.field1C8)
+           model_.observer19C!=expectedObserver||model_.configuration1A4||fields_.field1C8)
             return {S::phase,0x2896d0u};
         const auto& c=model_.entity8;
-        if(c.reference00!=(referenceReleased_?0u:1u)||c.firstChild18||
+        if(c.reference00!=(referenceReleased_?0u:1u)||c.firstChild18!=expectedSourceChild||
            c.kind!=K::model2403A0||c.sessionGeneration!=binding_.sessionGeneration)
             return {S::entity,0x142590u};
         if(!binding_.actualObjectCount423F60||!binding_.actualAttachmentLock423F58||
-           !validateSceneGraph49P(graph)||!inRange(graph,model_.sceneIndex)||
+           !preflightSourceWarmForestGraphNative(graph)||!inRange(graph,model_.sceneIndex)||
            at(graph,model_.sceneIndex).parent180!=none||
-           at(graph,model_.sceneIndex).nextSibling188!=none||model_.previous18C!=none)
+           (at(graph,model_.sceneIndex).nextSibling188!=none&&!sourceWarmClone_.selectedChild)||model_.previous18C!=none)
             return {S::binding,0x289704u};
         if(*binding_.actualAttachmentLock423F58)return {S::attachmentLocked,0x1425a8u};
         std::size_t count=1;
@@ -819,7 +1419,7 @@ private:
         if(!admitSceneSubtree(graph,model_,seen,count))return {S::graph,0x289744u};
         for(const auto& row:rows_)if(row&&row->constructed&&
             at(graph,row->sceneIndex).parent180==none){
-            if(row->previous18C!=none||at(graph,row->sceneIndex).nextSibling188!=none||
+            if((!sourceWarmClone_.selectedChild&&(row->previous18C!=none||at(graph,row->sceneIndex).nextSibling188!=none))||
                !admitSceneSubtree(graph,*row,seen,count))return {S::graph,0x289744u};
         }
         if(seen!=count)return {S::graph,0x289744u};
@@ -829,9 +1429,12 @@ private:
     // disposal,26E5CC row-table free and26E5EC material-array free. Native
     // backing owners enforce those payload phases; stale source aliases remain.
     R releaseNativePartialSceneBase2896D0(const SceneGraph49P& graph)noexcept {
+        if(sourcePhysicsBodyBorrower_||sourcePacketBorrower_||sourceWarmLifetimeBorrowedNative())return {S::phase,0x142590u};
+        if(sourceRowTable_.attempted&&!sourceRowTable_.nativeWithdrawn)return {S::phase,0x26e5ccu};
         if(!referenceReleased_||rowTable_||!rowTableFreed_)return {S::phase,0x2896d0u};
         const auto admitted=preflightNativePartialScene2896D0(graph);
         if(!admitted.okay())return admitted;
+        withdrawSourceWarmForestLinksNative(graph);
         // Detached constructed rows never entered the model's184 forest.
         // Retire each genuine root once, retaining2896D0 order within it.
         for(auto& row:rows_)if(row&&row->constructed&&!row->released&&
@@ -843,6 +1446,8 @@ private:
     }
 
     R preflightFreshUnlinkedNative(const SceneGraph49P& graph)const noexcept {
+        if(sourcePhysicsBodyBorrower_||sourcePacketBorrower_||sourceWarmLifetimeBorrowedNative())return {S::phase,0x142590u};
+        if(sourceRowTable_.attempted&&!sourceRowTable_.nativeWithdrawn)return {S::phase,0x26e5ccu};
         if(released_||!model_.constructed)return {S::complete,0};
         const auto& c=model_.entity8;
         if(publishedToAnimation_||fields_.geometry1B4||fields_.materials1C4||fields_.packets1F0||
@@ -850,8 +1455,8 @@ private:
            c.parent1C||c.previous10||c.next14||c.firstChild18||referenceReleased_||c.reference00!=1u)
             return {S::phase,0x240450u};
         if(!binding_.actualObjectCount423F60||!binding_.actualAttachmentLock423F58||
-           !validateSceneGraph49P(graph)||!inRange(graph,model_.sceneIndex)||
-           at(graph,model_.sceneIndex).parent180!=none||at(graph,model_.sceneIndex).nextSibling188!=none)
+           !preflightSourceWarmForestGraphNative(graph)||!inRange(graph,model_.sceneIndex)||
+           at(graph,model_.sceneIndex).parent180!=none||(at(graph,model_.sceneIndex).nextSibling188!=none&&!sourceWarmClone_.selectedChild))
             return {S::binding,0x142590u};
         if(*binding_.actualAttachmentLock423F58)return {S::attachmentLocked,0x1425a8u};
         std::size_t count=1;
@@ -869,7 +1474,7 @@ private:
         if(!admitSceneSubtree(graph,model_,seen,count))return {S::graph,0x289744u};
         for(const auto& row:rows_)if(row&&row->constructed&&!row->released&&
             at(graph,row->sceneIndex).parent180==none){
-            if(row->previous18C!=none||at(graph,row->sceneIndex).nextSibling188!=none||
+            if((!sourceWarmClone_.selectedChild&&(row->previous18C!=none||at(graph,row->sceneIndex).nextSibling188!=none))||
                !admitSceneSubtree(graph,*row,seen,count))return {S::graph,0x289744u};
         }
         if(seen!=count)return {S::graph,0x289744u};
@@ -879,7 +1484,14 @@ public:
     R closeFreshUnlinked(const SceneGraph49P& graph)noexcept {
         const auto admitted=preflightFreshUnlinkedNative(graph);if(!admitted.okay())return admitted;
         if(released_||!model_.constructed)return {S::complete,0};
+        if(sourceDirectRows_.attempted&&!sourceDirectRows_.nativeScratchWithdrawn){
+            //Native cancellation of the synchronous byte adapter, not source
+            //28CD28 or File131040. Historical read/publication receipts survive.
+            sourceDirectRows_.parents.reset();sourceDirectRows_.bytes=nullptr;
+            sourceDirectRows_.resolver.reset();sourceDirectRows_.sourceFile.reset();sourceDirectRows_.nativeScratchWithdrawn=true;
+        }
         auto& c=model_.entity8;
+        withdrawSourceWarmForestLinksNative(graph);
         // A registry failure during row construction can leave a counted
         // row outside184, before the subsequent source hierarchy-link pass.
         for(auto& row:rows_)if(row&&row->constructed&&!row->released&&
@@ -946,6 +1558,7 @@ private:
             if((flags&0x80u)&&!(flags&1u)&&!refreshSceneWorld49P(graph,model_.sceneIndex))return {S::graph,0x2897b0u};
             return model_.radius198?R{S::complete,0x28e218u}:R{S::phase,0x28e1f8u};
         }
+        OriginalStandardPlacementGlobals50LA::boundsNativeRouteUnknown();
         if(!(flags&4u)||!refreshSceneWorld49P(graph,model_.sceneIndex))return {S::graph,0x26f608u};
         ModelBoundsContext49O context{};context.rootWorld100=root.world100;context.rootSceneFlags190=root.sceneFlags190;
         for(unsigned axis=0;axis<3;++axis){context.rootCenter140.v[axis]=model_.bounds140[axis];
@@ -981,6 +1594,7 @@ private:
            fields_.sourceRows1B8!=rowTable_.get()||model_.nodeCount1A0!=binding_.sourceRowCount||
            !model_.nodeCount1A0||model_.nodeCount1A0>maxModelBoundsNodes49O||flags&0x10u)
             return {S::phase,0x26f4c0u}; //Sphere/direct-root route remains distinct.
+        OriginalStandardPlacementGlobals50LA::boundsNativeRouteUnknown();
         if(!refreshSceneWorld49P(graph,model_.sceneIndex))return {S::graph,0x26f608u};
         std::array<ModelBoundsNode49O,maxModelBoundsNodes49O> rows{};
         ModelBoundsContext49O context{};context.rootWorld100=root.world100;
@@ -1022,6 +1636,7 @@ private:
            !rowTable_||fields_.sourceRows1B8!=rowTable_.get()||model_.nodeCount1A0!=binding_.sourceRowCount||
            !model_.nodeCount1A0||model_.nodeCount1A0>maxModelBoundsNodes49O||
            at(graph,model_.sceneIndex).sceneFlags190&0x10u)return {S::phase,0x26f4c0u};
+        OriginalStandardPlacementGlobals50LA::boundsNativeRouteUnknown();
         std::array<SceneNode49P,maxSceneNodes49P> admittedNodes{};
         for(std::uint32_t i=0;i<graph.count;++i)admittedNodes[i]=graph.nodes[i];
         SceneGraph49P admitted{admittedNodes.data(),graph.count};
@@ -1263,3 +1878,9 @@ private:
     }
 };
 } // namespace rr::game
+
+#include "original_racer_source_bounds50la.inl"
+
+#include "original_racer_source_local_bounds50la.inl"
+
+#include "original_racer_source_translation50la.inl"

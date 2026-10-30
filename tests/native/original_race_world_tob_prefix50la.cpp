@@ -1939,7 +1939,11 @@ bool Owner::continueNativeZoneServices2729E0(const original_main_entry50KG::Appl
 bool Owner::continueNativeFog273C30(const original_main_entry50KG::Application& app,
     std::uint32_t& pc)noexcept {
     pc=0x1aa158;
-    if(nativeFogDescriptor3AC_&&nativeFogDescriptor3AC_->sourceMode)return false;
+    //Fresh source fog is a distinct lifetime even after descriptor273F70
+    //retirement, genuine NULL-descriptor return or native cancellation.
+    //Never use a descriptor pointer's disappearance to authorize adoption.
+    if(sourceFogPhase_!=SourceFogPhase::unreached||sourceFogTransfer_||sourceFogTransferBorrowers_||
+       (nativeFogDescriptor3AC_&&nativeFogDescriptor3AC_->sourceMode))return false;
     if(nativeScbThread_!=std::this_thread::get_id()||nativeScbRevoked_||!source_||
        !nativeSceneInfo270900Current(app,pc)||nativeDirectionalColorNext_!=10u||
        nativeRemainderNext_!=168u||!runtimeQueries_||!worldApplication_||
@@ -3012,7 +3016,9 @@ bool Owner::setupNativeLocalFlareStrip(NativeLocalFlare& flare,
         strip.color44_=flare.packedColor;strip.flags48_|=1u;
         strip.color70_=std::array<float,4>{{127.f,127.f,127.f,64.f}};
         //23D750 shifts each integer byte right1 BEFORE float conversion.
-        strip.groups38_[0]=4; //382B30 raw integerword4, copied by1504EC.
+        std::uint32_t rawCount382B30=0;
+        if(!sceneApplication_->readFlareCount382B30(rawCount382B30))return fail();
+        strip.groups38_[0]=rawCount382B30; //Same process lane, raw1504EC copy; no numeric conversion.
         pc=0x1504f0;strip.primitive30_=std::make_unique<Strip::Primitive>();
         rr::assets::OriginalStandardMaterialDiagnostic50LA diagnostic;
         pc=0x299be0;
@@ -3036,10 +3042,12 @@ bool Owner::setupNativeLocalFlareStrip(NativeLocalFlare& flare,
         //setters preserve stripControl; W is not a fourth vertex position lane.
         for(std::uint32_t i=0;i<4u;++i){
             for(std::size_t k=0;k<3u;++k){float value;
-                std::memcpy(&value,&sceneApplication_->flareTriple427020_[k],sizeof value);
+                std::uint32_t bits=0;if(!sceneApplication_->readFlareVectorWord(true,static_cast<unsigned>(k),bits))return fail();
+                std::memcpy(&value,&bits,sizeof value);
                 attributes.vertices_->triples[i].components[k]={value,0xffu};}
             for(std::size_t k=0;k<3u;++k){float value;
-                std::memcpy(&value,&sceneApplication_->flarePosition427000_[k],sizeof value);
+                std::uint32_t bits=0;if(!sceneApplication_->readFlareVectorWord(false,static_cast<unsigned>(k),bits))return fail();
+                std::memcpy(&value,&bits,sizeof value);
                 attributes.vertices_->positions[i].xyz[k]={value,0xffu};}
         }
         flare.setupComplete=true;flare.failurePC=0;pc=0x14ace4;return true;
@@ -3070,6 +3078,7 @@ bool Owner::nativeLocalFlareIdentityCurrent(const Entity* identity)const noexcep
         sceneApplication_->entityAuthority_.canRetire(e);
 }
 bool Owner::continueNativeLocalFlareObserver(std::size_t index,std::uint32_t& pc)noexcept {
+    g::OriginalGarageObserverShared50KG::invalidateNativeFlareAssertions(); //Legacy observer adaptation cannot seed authentic14BA00 guards.
     if(index>=nativePoints_.size())return false;
     auto& point=nativePoints_[index];auto& nativeLocalLight_=point.light;auto& nativeLocalFlare_=point.flare;
     auto& nativeLocalInputs_=point.inputs;auto& retiredLocalFlareIdentity_=point.retiredFlareIdentity;

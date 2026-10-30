@@ -4,6 +4,7 @@
 #include "original_wreck_movement_query50la.h"
 #include "scalar_minmax48o.h"
 #include "vehicle_visual49r.h"
+#include "original_standard_placement_globals50la.h"
 
 namespace rr::game {
 // Application-owned shared lazy globals, never one copy per piece.
@@ -147,6 +148,7 @@ inline OriginalWreckFlightResult50LA advanceOriginalWreckFlight50LA(
         if(!m.valid)return fail(S::arithmetic,0x166b8cu);
         //28ADDC..28ADF8 initializes the actual shared setter sentinel only
         //when this hit reaches28ADD0. No-hit calls leave both words untouched.
+        OriginalStandardPlacementGlobals50LA::positionNativeRouteUnknown();
         if(!globals.positionSentinel4433E8.guard){
             globals.positionSentinel4433E8.word=0xffffffffu;
             globals.positionSentinel4433E8.guard=1;

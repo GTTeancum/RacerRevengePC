@@ -7,6 +7,7 @@
 #include <array>
 #include "../../src/game/original_native_collision_categories.h"
 #include <cstring>
+#include "original_source_particle_config_invocation50la.inl"
 #include <cstdio>
 #include <string>
 #include <thread>
@@ -16,11 +17,21 @@
 #include "original_source_world_light_descriptor50la.inl"
 #include "original_source_world_lights50la.inl"
 #include "original_source_world_fog50la.inl"
+#include "original_source_world_fog_transfer50la.inl"
+#include "original_source_world_visibility_environment50la.inl"
+#include "original_source_world_post_light50la.inl"
+#include "original_source_world_post_particle_models50la.inl"
+#include "original_source_world_standard_model50la.inl"
+#include "original_source_world_standard_success50la.inl"
+#include "original_source_world_model_observer50la.inl"
+#include "original_source_world_standard_attachment50la.inl"
+#include "original_source_particle_manager_suffix50la.inl"
 #include "original_source_world_zone_row50la.inl"
 #include "original_source_world_portals50la.inl"
 #include "original_source_world_physics50la.inl"
 #include "original_source_world_instances50la.inl"
 #include "original_source_world_static_models50la.inl"
+#include "original_source_world_physics_wrapper50la.inl"
 #include "original_source_world_static_cohort50la.inl"
 #include "original_source_world_collision50la.inl"
 #include "original_source_world_controllers50la.inl"
@@ -68,6 +79,12 @@
 #include "original_source_world_method_arrays50la.inl"
 #include "original_source_world_default_observer50la.inl"
 #include "original_source_world_first_light50la.inl"
+#include "original_source_world_typed_light50la.inl"
+#include "original_source_world_spotlight_config50la.inl"
+#include "original_source_world_spotlight_registration50la.inl"
+#include "original_source_world_later_ambient50la.inl"
+#include "original_source_world_directional_tail50la.inl"
+#include "original_source_world_no_flare_wrapper50la.inl"
 #include "original_source_world_second_light50la.inl"
 #include "original_source_world_light_population50la.inl"
 #include "original_source_world_topology50la.inl"
@@ -680,7 +697,11 @@ bool Owner::sourceWorldLoadInvocationCurrent()const noexcept {
 }
 bool Owner::abortSourceTrackNative(std::uint32_t& pc)noexcept {
     pc=sourceTrackPC_;
-    if(nativeScbThread_!=std::this_thread::get_id()||constructorRacerWorldBorrows_||nativeWreckZoneBorrower_)return false;
+    if(nativeScbThread_!=std::this_thread::get_id()||constructorRacerWorldBorrows_||nativeWreckZoneBorrower_||sourceParticleInvocationBorrowers_||sourceFogTransferBorrowers_)return false;
+    //Actual emitter70 borrows World4A0: withdraw all source model/smoker
+    //borrowers before native particle teardown. No source call order changes.
+    if(!abortSourcePostParticleModelsNative(pc))return false;
+    if(!abortSourceParticleConfigNative(pc)||!abortSourceParticleStageNative(pc)||!abortSourceFogTransferNative(pc))return false;
     if(sourceTrackStep_==SourceTrackStep::nativeClosed)return true;
     if(!preflightSourceWorldTopologyNative()||!preflightSourceWorldMaterialAssignmentsNative()||!preflightSourceWorldAudioNative()||!preflightSourceWorldStaticModelParamsNative()||!preflightSourceWorldBuoysNative()||!preflightSourceWorldParticleCountNative()||!preflightSourceWorldSunFlareNative()||!preflightSourceWorldCsCamerasNative()||!preflightSourceWorldBoundaryNative()||
        !abortSourceWorldTopologyNative(pc)||!abortSourceWorldMaterialAssignmentsNative(pc)||!abortSourceWorldMaterialSoundsNative(pc)||!abortSourceWorldSoulTreeSoundsNative(pc)||!abortSourceWorldAmbientNative(pc)||!abortSourceWorldStaticModelParamsNative(pc)||!abortSourceWorldBuoysNative(pc)||!abortSourceWorldParticleDescriptorsNative(pc)||!abortSourceWorldSunFlareNative(pc)||!abortSourceWorldCsCamerasNative(pc)||!abortSourceWorldTriggerNative(pc)||
@@ -1172,9 +1193,14 @@ bool Owner::continueSourceEnvironment270A58(std::uint32_t& pc)noexcept {
     sourceTopologyPhase_=SourceTopologyPhase::observerReturned;
     sourceTrackPC_=sourceTopologyPC_=pc;
     if(!continueSourceLightPopulation1AA144(pc)){sourceTrackPC_=pc;sourceTrackStep_=SourceTrackStep::terminal;return false;}
-    sourceTrackPC_=pc;return true; //Only a represented callee boundary, never whole World readiness.
+    sourceTrackPC_=pc;
+    if(!continueSourceFogAndParticle1AA158(pc)){sourceTrackPC_=pc;sourceTrackStep_=SourceTrackStep::terminal;return false;}
+    sourceTrackPC_=pc;
+    if(!continueSourcePostParticleModels1AA194(pc)){sourceTrackPC_=pc;sourceTrackStep_=SourceTrackStep::terminal;return false;}
+    return true; //Only represented source prefix, never whole World readiness.
 }
 bool Owner::abortSourceEnvironmentNative(std::uint32_t& pc)noexcept {
+    if(sourceParticleInvocationBorrowers_||sourceParticleConfig_||sourceFogTransferBorrowers_)return false;
     if(nativeScbThread_!=std::this_thread::get_id())return false;
     if(sourceEnvironmentPhase_==SourceEnvironmentPhase::nativeClosed)return !sourceEnvironment3A4_;
     if(sourceEnvironmentPhase_==SourceEnvironmentPhase::unreached)return !sourceEnvironment3A4_;
@@ -4307,6 +4333,14 @@ bool Owner::preflightSourceWorldParticleCountNative()const noexcept {
     //authority preflight. Neither local helper calls this combined floor.
     if(!preflightSourceWorldTopologyNative()||!preflightSourceWorldParticleDescriptorsNative()||!preflightSourceWorldAmbientNative()||!preflightSourceWorldSoulTreeSoundsNative()||!preflightSourceWorldMaterialSoundsNative())return false;
     std::size_t extra=0;bool hasSourceOwner=false;
+    std::size_t sourceModels=0;
+    if(!preflightSourceStandardModelsNative(sourceModels))return false;
+    if(sourceModels){hasSourceOwner=true;extra=sourceModels;}
+    std::size_t particleManagerCount=0;
+    if(!sourceParticleStageCountedNative(particleManagerCount))return false;
+    if(sourceParticleAllocationAttempted_){hasSourceOwner=true;
+        if(particleManagerCount>std::numeric_limits<std::size_t>::max()-extra)return false;extra+=particleManagerCount;}
+    if(sourceVisibilityEnvironment_.node.counted){hasSourceOwner=true;++extra;}
     if(sourceFirstLight_){hasSourceOwner=true;if(sourceFirstLightCounted_)++extra;}
     if(sourceSecondLight_){hasSourceOwner=true;if(sourceSecondLightCounted_)++extra;}
 

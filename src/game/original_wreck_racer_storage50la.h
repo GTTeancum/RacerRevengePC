@@ -3478,72 +3478,7 @@ OriginalWreckPrefixRetirementResult50LA retirePieceBeforeE0Core(
     //source lanes absent from that numeric projection live in freshBody_.
     void initializeFreshBody167920(OriginalWreckPieceStorage50LA& piece,
         OriginalWreckComponent50LA& entity)noexcept {
-        using namespace original_wreck_physical_detail50LA;
-        auto& p=piece.physical_;auto& b=p.body;auto& r=b.root;auto& q=p.parameters;
-        auto& source=piece.freshBody_;const SpringVector4_48N vf0{{0.f,0.f,0.f,1.f}};
-        const auto& globals=storage_->nativeGlobals;
-        source.vector40=vf0;source.vector50=vf0;
-        copy(r.body.position,p.extra.position60W,vf0.v);
-        copy(r.body.velocity,b.velocity70W,vf0.v);
-        copy(r.localVelocity80,p.supplement.localVelocity80W,vf0.v);
-        copy(r.previousVelocity90,p.supplement.previousVelocity90W,vf0.v);
-        copy(r.worldAngularVelocityA0,p.extra.worldAngularVelocityA0W,vf0.v);
-        copy(r.body.angularVelocity,b.angularVelocityB0W,vf0.v);
-        copy(r.body.linearAcceleration,p.supplement.linearAccelerationC0W,vf0.v);
-        copy(r.body.angularAcceleration,p.supplement.angularAccelerationD0W,vf0.v);
-        copy(b.cachedAnglesE0,p.cachedAnglesE0W,vf0.v);source.vectorF0=vf0;
-        copy(r.loads.force,b.force180W,vf0.v);copy(r.loads.torque,b.torque190W,vf0.v);
-        copy(r.positionCorrection1a0,p.extra.positionCorrection1A0W,vf0.v);
-        copy(r.rotationCorrection1b0,p.extra.rotationCorrection1B0W,vf0.v);
-        copy(r.accumulator1c0,p.extra.accumulator1C0W,vf0.v);
-        copy(r.accumulator1d0,p.extra.accumulator1D0W,vf0.v);copy(q.centerOffset,q.centerOffsetW,vf0.v);
-        b.enabled=true;p.awake208=0;source.word30=0; //164FEC/165008/165018.
-        SpringVector4_48N sourceVector;copy(sourceVector,globals.bodyVector433AD0);
-        source.vector40=sourceVector;
-        copy(sourceVector,globals.bodyVector433AD0);source.vector50=sourceVector;
-        copy(r.body.position,p.extra.position60W,globals.bodyVector433AD0);
-        copy(r.body.velocity,b.velocity70W,globals.bodyVector433AD0);
-        copy(r.localVelocity80,p.supplement.localVelocity80W,globals.bodyVector433AD0);
-        copy(r.worldAngularVelocityA0,p.extra.worldAngularVelocityA0W,globals.bodyVector433AD0);
-        copy(r.body.angularVelocity,b.angularVelocityB0W,globals.bodyVector433AD0);
-        copy(r.body.linearAcceleration,p.supplement.linearAccelerationC0W,globals.bodyVector433AD0);
-        copy(r.body.angularAcceleration,p.supplement.angularAccelerationD0W,globals.bodyVector433AD0);
-        copy(r.positionCorrection1a0,p.extra.positionCorrection1A0W,globals.bodyVector433AD0);
-        copy(r.rotationCorrection1b0,p.extra.rotationCorrection1B0W,globals.bodyVector433AD0);
-        copy(r.accumulator1c0,p.extra.accumulator1C0W,globals.bodyVector433AD0);
-        copy(r.accumulator1d0,p.extra.accumulator1D0W,globals.bodyVector433AD0);
-        for(unsigned lane=0;lane<4;++lane)
-            std::memcpy(r.body.orientation.v+lane,static_cast<const char*>(globals.reset.quaternion382B60)+4u*lane,4);
-        copy(b.cachedAnglesE0,p.cachedAnglesE0W,globals.bodyVector433AD0);
-        q.body.linearAccelerationLimitSquared=word(0x4963d240u);
-        q.body.angularAccelerationLimitSquared=word(0x48742400u);
-        q.body.linearVelocityLimitSquared=word(0x468e6200u);
-        q.body.angularVelocityLimitSquared=word(0x441c4000u);
-        q.body.mass=0.f;q.body.inverseMass=0.f;b.cachedSpeed34=0.f;source.word284=0;
-        //14D7F0 is ZERO, not identity; copy100 then distinct140 in source order.
-        for(float& value:p.inertia100.v)value=0.f;
-        unsigned extra=0;
-        for(unsigned column=0;column<4;++column)for(unsigned row=0;row<4;++row)
-            if(column<3&&row<3)q.body.inverseInertiaColumns[column].v[row]=0.f;
-            else q.inverseInertiaExtra[extra++]=0.f;
-        copy(sourceVector,globals.bodyVector433AD0);source.vectorF0=sourceVector;
-        source.method290=0x14ee40u; //Actual source function identity, not invocation.
-        copy(q.centerOffset,q.centerOffsetW,globals.bodyVector433AD0);
-        source.count264=0;p.linkedCount268=0;source.allocation28C=nullptr;
-        source.model288=nullptr;p.model288=SceneNodeIndex49P::none;b.scenePresent=false;
-        p.modelGraphNodes=nullptr;p.modelGraphCount=0;p.modelSceneDomain=nullptr;
-        b.body20C=0;r.callbackState238=0;
-        entity.kind=OriginalWreckComponentKind50LA::body167920;source.flags200=0;
-        for(unsigned lane=0;lane<3;++lane)q.body.translationEnabled[lane]=true;
-        for(unsigned lane=0;lane<3;++lane)q.body.rotationEnabled[lane]=true;
-        copy(r.loads.force,b.force180W,globals.reset.vector433B80); //167990.
-        copy(r.loads.torque,b.torque190W,globals.reset.vector433B80); //16799C.
-        SecondaryActivationGlobals49V reset;
-        std::memcpy(reset.vector433B80,globals.reset.vector433B80,16);
-        std::memcpy(reset.quaternion382B60,globals.reset.quaternion382B60,16);
-        resetSecondaryActivation49V(b,p.supplement,reset); //167A50→167AD0, same lanes.
-        p.body320=0; //1679B8 after reset; no scene cache/flags copy.
-        p.bodyConstructorFieldsApplied=true;
+        initializeSourceBody16792050LA(piece.physical_,piece.freshBody_,entity,storage_->nativeGlobals);
     }
     OriginalWreckConstructorPrefixResult50LA setupFreshOccurrenceBody165E90(
         const OriginalWreckSetupZones50LA& zones,const std::string& actualFilename,

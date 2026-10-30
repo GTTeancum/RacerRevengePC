@@ -8,10 +8,19 @@ bool Owner::preflightSourceDefaultObserverNative()const noexcept {
         return !sourceDefaultObserver_&&!sourceDefaultObserverLease_;
     if(!worldApplication_||!sourceTopologyMode_||sourceTopologyWithdrawn_||particlePredecessorAttempted_||
        topologyAttempted_||topologyConstructed_||nativeDefaultObserver443148_||nativeEnvironmentAliases273174_)return false;
-    if(sourceDefaultEnvironment35C_&&*sourceDefaultEnvironment35C_!=useEnvironment35C_)return false;
+    //272F28 is a historical read. A later genuine1B4E20 may write35C=1
+    //without rewriting that completed call's input receipt.
+    if(sourceParticleEnvironment35CWritten_){
+        if(!sourceParticlePredecessorEntered_||!sourceParticleVisibilityWasNull_||!*sourceParticleVisibilityWasNull_||
+           !sourceParticleSelectorNone_||*sourceParticleSelectorNone_||!sourceFogCallReturnV0_||
+           *sourceFogCallReturnV0_!=1||useEnvironment35C_!=1||!sourceDefaultEnvironment35C_||*sourceDefaultEnvironment35C_!=0)return false;
+    }else if(sourceDefaultEnvironment35C_&&*sourceDefaultEnvironment35C_!=useEnvironment35C_)return false;
     if(sourceDefaultObserverPublished_&&worldApplication_->defaultZoneObserver443148_!=sourceDefaultObserver_.get())return false;
     if(sourceDefaultObserverLease_){
-        if(!sourceDefaultObserver_||!worldApplication_->garageObserverShared_.sourceObserverCurrent280890(sourceDefaultObserver_.get()))return false;
+        if(!sourceDefaultObserver_)return false;
+        const auto& shared=worldApplication_->garageObserverShared_;
+        if(sourceDefaultObserverCtorReturned_){if(!shared.ownsReturnedSourceObserver(sourceDefaultObserver_.get()))return false;}
+        else if(!shared.sourceObserverCurrent280890(sourceDefaultObserver_.get()))return false;
     }
     if(!sourceDefaultObserver_)return !sourceDefaultObserverLease_&&!sourceDefaultObserverCtorReturned_&&
         !sourceDefaultObserverChildStored_&&!sourceDefaultObserverMethodStored_;
@@ -28,14 +37,19 @@ bool Owner::preflightSourceDefaultObserverNative()const noexcept {
     if(sourceDefaultObserverChildStored_&&(!sourceTopologyReturnV0_||*sourceTopologyReturnV0_!=1))return false;
     if(sourceDefaultObserverChildStored_&&(!sourceCollision4C4_||!*sourceCollision4C4_||sourceCollisionPublished_<1||!sourceSearchNodes_[1][0].owner||
        o.child04!=&sourceSearchNodes_[1][0].owner->entity))return false;
-    if(sourceDefaultObserverMethodStored_&&o.method08!=worldApplication_->visibility443A98_)return false;
+    if(sourceDefaultObserverMethodStored_&&(!sourceDefaultObserverMethodRead_||o.method08!=*sourceDefaultObserverMethodRead_))return false;
     return true;
 }
 bool Owner::abortSourceDefaultObserverNative(std::uint32_t& pc)noexcept {
+    for(const auto& f:sourceModelObservers_)if(f&&!f->withdrawn)return false;
     if(!preflightSourceDefaultObserverNative())return false;
     if(sourceDefaultObserverPhase_==SourceDefaultObserverPhase::unreached||sourceDefaultObserverPhase_==SourceDefaultObserverPhase::nativeClosed)return true;
     //Native withdrawal before any referenced source nodes retire, not guest destructor replay.
-    if(sourceDefaultObserverLease_&&!worldApplication_->garageObserverShared_.abortSourceObserver280890(sourceDefaultObserver_.get()))return false;
+    if(sourceDefaultObserverLease_){
+        auto& shared=worldApplication_->garageObserverShared_;
+        if(sourceDefaultObserverCtorReturned_){if(!shared.retireReturnedSourceObserverNative(sourceDefaultObserver_.get()))return false;}
+        else if(!shared.abortSourceObserver280890(sourceDefaultObserver_.get()))return false;
+    }
     sourceDefaultObserverLease_=false;
     if(sourceDefaultObserverPublished_)worldApplication_->defaultZoneObserver443148_=nullptr;
     sourceDefaultObserver_.reset();sourceDefaultObserverPhase_=SourceDefaultObserverPhase::nativeClosed;
@@ -74,6 +88,9 @@ bool Owner::continueSourceDefaultObserver272F28(std::uint32_t& pc)noexcept {
         at(0x2808f0);o.field10=0;o.scalarKnownMask|=16u;
         at(0x2808f4);o.field14=0;o.scalarKnownMask|=32u;
         if(!shared.sourceObserverIncrement28090C(&o,pc))return stop(pc);
+        //The exact280918 return completes the constructor frame, not the observer
+        //lifetime. Keep this SAME owner/pool/count alive for later type1 lights.
+        at(0x280918);if(!shared.finishSourceObserver280918(&o))return stop(pc);
         sourceDefaultObserverCtorReturned_=true;
     }
     at(0x272f64);worldApplication_->defaultZoneObserver443148_=sourceDefaultObserver_.get();
@@ -86,7 +103,7 @@ bool Owner::continueSourceDefaultObserver272F28(std::uint32_t& pc)noexcept {
     const auto* child=&collision[0]->entity;
     at(0x272f80);if(!observer||observer!=sourceDefaultObserver_.get())return stop(pc);
     sourceDefaultObserver_->child04=child;sourceDefaultObserverChildStored_=true; //Raw borrowed pointer, no retain.
-    at(0x272f84);const auto* method=worldApplication_->visibility443A98_; //Actual same App global, including NULL.
+    at(0x272f84);const auto* method=worldApplication_->visibility443A98_;sourceDefaultObserverMethodRead_=method; //Actual same App global, including NULL.
     at(0x272f8c);observer=worldApplication_->defaultZoneObserver443148_;
     at(0x272f90);if(!observer||observer!=sourceDefaultObserver_.get())return stop(pc);
     sourceDefaultObserver_->method08=method;sourceDefaultObserverMethodStored_=true;

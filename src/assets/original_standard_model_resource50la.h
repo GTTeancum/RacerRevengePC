@@ -80,6 +80,7 @@ struct OriginalStandardSurface246300_50LA final {
     std::size_t sourceOffset=0;
 };
 
+class OriginalSourcePsgFile50LA;
 class OriginalStandardModelGeometry50LA final {
 public:
     OriginalStandardModelGeometry50LA() noexcept;
@@ -116,6 +117,37 @@ public:
     bool release26E598(const rr::game::OriginalRacerModelSceneOwner50LA*,
         const OriginalStandardMaterialReferences50LA&,OriginalStandardResourceDiagnostic50LA&) noexcept;
 private:
+    friend class rr::game::OriginalRacerModelSceneOwner50LA;
+    friend class OriginalStandardTextureResolver50LA;
+    friend class OriginalSourcePsgFile50LA;
+    bool publishSourcePrototype26EE74(const rr::game::OriginalRacerModelSceneOwner50LA*,
+        const OriginalSourcePsgFile50LA&,OriginalStandardResourceDiagnostic50LA&)noexcept;
+    bool sourceWarmLedgerCurrent()const noexcept;
+    bool registerSourceWarmBorrow(const rr::game::OriginalRacerModelSceneOwner50LA*,
+        const std::shared_ptr<OriginalSourcePsgFile50LA>&,OriginalStandardResourceDiagnostic50LA&)noexcept;
+    bool retainSourceWarm104960(const rr::game::OriginalRacerModelSceneOwner50LA*,
+        const OriginalSourcePsgFile50LA*,OriginalStandardResourceDiagnostic50LA&)noexcept;
+    bool sourceWarmBorrowCurrent(const rr::game::OriginalRacerModelSceneOwner50LA*,
+        const OriginalSourcePsgFile50LA*,bool retained)const noexcept;
+    bool withdrawSourceWarmBorrowNative(const rr::game::OriginalRacerModelSceneOwner50LA*,
+        OriginalSourcePsgFile50LA*)noexcept;
+    bool sourcePrototypeIdentityCurrent(const rr::game::OriginalRacerModelSceneOwner50LA*,
+        const OriginalSourcePsgFile50LA*)const noexcept;
+    bool sourcePrototypeCurrent(const rr::game::OriginalRacerModelSceneOwner50LA*,
+        const OriginalSourcePsgFile50LA*)const noexcept;
+    bool cachePublicationReady1326A0()const noexcept;
+    bool loadSourceOrdinary26E170(const rr::game::OriginalRacerModelSceneOwner50LA*,
+        const std::vector<std::uint8_t>&,std::size_t&,OriginalSourcePsgFile50LA&,OriginalStandardResourceDiagnostic50LA&)noexcept;
+    bool sourceLoadCurrent()const noexcept;
+    bool loadSourcePalette240210(const rr::game::OriginalRacerModelSceneOwner50LA*,
+        const std::vector<std::uint8_t>&,std::size_t&,OriginalSourcePsgFile50LA&,OriginalStandardResourceDiagnostic50LA&)noexcept;
+    bool sourcePaletteCurrent()const noexcept;
+    bool constructSource240110(std::shared_ptr<OriginalStandardTextureResolver50LA>,OriginalStandardModelFileId50LA,
+        const rr::game::OriginalRacerModelSceneOwner50LA*,OriginalStandardResourceDiagnostic50LA&)noexcept;
+    bool sourceConstructorCurrent(const rr::game::OriginalRacerModelSceneOwner50LA*,
+        const OriginalStandardTextureResolver50LA*,OriginalStandardModelFileId50LA)const noexcept;
+    bool cancelSourceConstructorNative(const rr::game::OriginalRacerModelSceneOwner50LA*,
+        const OriginalStandardTextureResolver50LA*,OriginalStandardModelFileId50LA)noexcept;
     struct Storage;
     std::unique_ptr<Storage> storage_;
 };

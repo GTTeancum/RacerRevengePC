@@ -9,6 +9,7 @@
 
 namespace rr::game {
 class OriginalWreckQueries50LA;
+class OriginalSourcePhysicsCollision50LA;
 class OriginalRacerQuery364Owner50LA;
 class OriginalRacerQuery690Owner50LA;
 struct OriginalRacerSceneObject50LA;
@@ -17,6 +18,7 @@ struct OriginalRacerSceneObject50LA;
 // constructor/retirement join may advance these private lifetime methods.
 class OriginalWreckType2Owners50LA final {
     friend class OriginalWreckQueries50LA;
+    friend class OriginalSourcePhysicsCollision50LA;
     friend class OriginalRacerQuery364Owner50LA;
     friend class OriginalRacerQuery690Owner50LA;
     struct Shape {
@@ -286,13 +288,14 @@ class OriginalWreckType2Owners50LA final {
         shape8C_.reset();result90_.reset(); //11B8E0..11B904, in this order
         loaded_=false;retired_=true;boundary_=0x11b904u;return true;
     }
+#include "original_source_collision_result50la.inl"
 public:
     OriginalWreckType2Owners50LA()=default;
     ~OriginalWreckType2Owners50LA(){
         // A native destructor cannot silently substitute for11B600. Untouched
         // cold ownership is disposable; reached source allocation is retained
         // until its matching source release (partial failures remain gated).
-        if(shape8C_||result90_)std::terminate();
+        if(shape8C_||result90_||(sourceResult_.attempted&&!sourceResult_.nativeWithdrawn))std::terminate();
     }
     OriginalWreckType2Owners50LA(const OriginalWreckType2Owners50LA&)=delete;
     OriginalWreckType2Owners50LA& operator=(const OriginalWreckType2Owners50LA&)=delete;

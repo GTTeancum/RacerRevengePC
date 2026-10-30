@@ -2,6 +2,7 @@
 #include "../../../src/game/original_application_animation_clock50kg.h"
 #include <memory>
 #include <cstdint>
+namespace ra_cold_aggregate50LA {class Owner;}
 namespace original_main_entry50KG {struct Application;struct Video;class RaceDisplayLifetime50LA;}
 namespace rr::platform {
 class OriginalUiGarageManagerFog50KG;
@@ -12,6 +13,7 @@ class OriginalUiGaragePodScene50KG;
 // draw, or certify a renderer. The existing244D60 lease is unchanged.
 class OriginalUiGarageFogColorLease50KG final {
     friend struct ::original_main_entry50KG::Application;
+    friend class ::ra_cold_aggregate50LA::Owner; //Actual conditional World13E8A8 scalar store.
     friend class OriginalUiGarageManagerFog50KG;
     friend class OriginalUiGarageSceneLighting50KG;
     friend class OriginalUiGaragePodScene50KG;

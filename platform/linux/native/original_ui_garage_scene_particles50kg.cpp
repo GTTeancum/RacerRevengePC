@@ -62,7 +62,10 @@ bool OriginalUiGaragePodScene50KG::prepareParticleManager1B4DC0(D& d)noexcept {
         auto& auxiliary=*p.auxiliary1C0;auxiliary.field20=fp(0x3C95E9E2u);
         auxiliary.inverseDimensions70={{div32(32767,90),div32(32767,35),div32(32767,90),1}};
         p.depthCount118=p.capacity130/2;p.buckets11C.resize(static_cast<std::size_t>(p.depthCount118));
-        app->particleDepth382BD8_=p.depthCount118;p.depthWritten=true; //160E78, no rollback.
+        std::int32_t previousDepth=0;
+        if(!app->writeParticleDepth160E78(p.depthCount118,previousDepth))return fail(S::phase,0x160E78);
+        p.depthGlobalBefore=previousDepth;p.depthGlobalAfter=p.depthCount118;
+        p.depthWritten=true; //This existing Garage occurrence, never a Racer source-call receipt.
         p.scratchBytes=static_cast<std::size_t>(p.capacity130+p.capacity130/12+1)*64u+16u;
         p.scratch15C.reset(static_cast<std::uint8_t*>(::operator new[](p.scratchBytes,std::align_val_t(64))));
         std::memset(p.scratch15C.get(),0,p.scratchBytes);

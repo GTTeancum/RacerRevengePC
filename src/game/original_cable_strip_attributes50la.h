@@ -3,6 +3,7 @@ namespace original_local_flare50LA {class Emission;}
 #pragma once
 namespace original_cable_selection50LA { class Binding; }
 #include "original_application_entities50la.h"
+#include "original_strip_stream_history23cca0.h"
 #include <array>
 #include <cstdint>
 #include <memory>
@@ -119,6 +120,7 @@ private:
         }
     }
     void setTexcoord23C800(std::uint32_t vertex,float u,float v)noexcept {
+        OriginalStripStreamHistory23CCA0::invalidateNative(); //Legacy view-only writes cannot seed authentic UV process history.
         const auto& copies=group_->aliases[vertex];
         for(std::uint32_t c=0;c<copies.count;++c){
             const auto a=copies.aliases[c];auto& uv=group_->texcoords[a.batch].values[a.ordinal].uv;
@@ -130,6 +132,7 @@ private:
     // then per-group arrays. Command-only builder bookkeeping has no native
     // consumer and is intentionally not reproduced as observable App state.
     void construct23BEB0(std::uint32_t& pc) {
+        OriginalStripStreamHistory23CCA0::invalidateNative(); //Legacy projection cannot seed authentic process guards.
         pc=0x23bef0u;group_=std::make_unique<Group>();
         pc=0x23cb34u;common_=std::make_unique<CommonData>();
         pc=0x23bf30u;groupCounts_.reset(new std::uint32_t[1]);groupCounts_[0]=18;
@@ -160,6 +163,7 @@ private:
     // Same23CCA0 numeric streams for one genuine four-vertex strip.
     // Format15 adds color; source scratch contents remain unknown until written.
     void constructQuad23BEB0(std::uint8_t format,std::uint32_t& pc) {
+        OriginalStripStreamHistory23CCA0::invalidateNative(); //Same unrepresented process path, sticky across cleanup.
         pc=0x23bef0u;group_=std::make_unique<Group>();
         pc=0x23cb34u;common_=std::make_unique<CommonData>();
         pc=0x23bf30u;groupCounts_.reset(new std::uint32_t[1]);groupCounts_[0]=4;

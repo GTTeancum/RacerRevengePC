@@ -410,13 +410,28 @@ bool OriginalUiLightManagerOwner50KG::registryCurrent()const noexcept {
     else if(bool(registry9C_)!=(capacity98_!=0))return false;
     for(std::size_t i=0;i<registryWritten_;++i)
         if(!registry9C_||registry9C_[i]!=registryPublished_[i])return false;
-    if(raZones_&&raZones_->sourceMode&&raZones_->sourceAmbientRegistered&&!raZones_->sourceAmbientWithdrawn){
+    if(raZones_&&raZones_->sourceMode&&raZones_->sourceAmbientRegistered){
         const auto& r=*raZones_;
-        return r.world&&r.sourceAmbient&&count94_==1&&capacity98_==10&&registryWritten_==1&&
-            registry9C_&&registry9C_[0]==r.sourceAmbient&&registryPublished_[0]==r.sourceAmbient&&
-            !r.firstAmbient&&!r.firstDirectional&&!directional40Live_&&!uiLightsOwner_&&!sceneLightsOwner_&&
-            r.world->sourceFirstLight_&&&r.world->sourceFirstLight_->entity==r.sourceAmbient&&
-            r.world->sourceFirstLight_->registered&&r.world->preflightSourceFirstLightNative();
+        const bool ambientLive=!r.sourceAmbientWithdrawn;
+        const bool secondLive=r.sourceSecondRegistered&&!r.sourceSecondWithdrawn;
+        if((!r.world&&(ambientLive||secondLive||!r.sourceNativeClosed))||
+           count94_!=std::uint32_t(ambientLive)+std::uint32_t(secondLive)||capacity98_!=10||
+           registryWritten_!=1u+std::size_t(r.sourceSecondRegistered)||!registry9C_||
+           r.firstAmbient||r.firstDirectional||directional40Live_||directional44Known_||uiLightsOwner_||sceneLightsOwner_)
+            return false;
+        if(ambientLive){
+            if(!r.sourceAmbient||registry9C_[0]!=r.sourceAmbient||registryPublished_[0]!=r.sourceAmbient||
+               !r.world->sourceFirstLight_||&r.world->sourceFirstLight_->entity!=r.sourceAmbient||
+               !r.world->sourceFirstLight_->registered||!r.world->preflightSourceFirstLightNative())return false;
+        }else if(r.sourceAmbient||secondLive)return false;
+        if(r.sourceSecondRegistered){
+            if(!r.sourceSecondRegistryReceipt||registry9C_[1]!=r.sourceSecondRegistryReceipt||
+               registryPublished_[1]!=r.sourceSecondRegistryReceipt||field40_!=r.sourceSecondRegistryReceipt)return false;
+            if(secondLive&&(!r.world->sourceSecondLight_||&r.world->sourceSecondLight_->entity!=r.sourceSecondRegistryReceipt||
+               !r.world->sourceSecondLight_->registered||!r.world->preflightSourceSecondLightNative()))return false;
+            //Withdrawn receipts are address-only history, never dereferenced.
+        }else if(r.sourceSecondRegistryReceipt||r.sourceSecondWithdrawn)return false;
+        return true; //Source registry custody only, not generic renderer readiness.
     }
     if(raZones_&&raZones_->firstAmbient){
         const auto& r=*raZones_;const auto* c=r.firstAmbient;
@@ -1030,6 +1045,7 @@ bool OriginalUiLightManagerOwner50KG::bindRaLocalPrimary2809C0(const ::ra_cold_a
     d={};if(!raZonesReleasePreflight()||raZones_->world!=&world||!registryCurrent()||count94_!=actual->ordinalC8||
        !raZones_->firstDirectional||!world.nativeLocalLightCurrent(&light)||
        !world.nativeLocalLightFor(&light)->configured)return fail(d,Status::phase,0x149080);
+    game::OriginalGarageObserverShared50KG::invalidateNativeLightAssertions();
     auto& l=*world.nativeLocalLightFor(&light);auto& zone=*raZones_->zones[*zoneIndex];auto* list=zone.first34;
     if(!list||list!=zone.second38||list!=raZones_->lists[*zoneIndex].get()||
        !list->lightHistoryCurrent(this,issuer_,entities_))return fail(d,Status::phase,0x27f590);

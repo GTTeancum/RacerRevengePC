@@ -1,0 +1,41 @@
+{
+  "base": "/tmp/racer-canonical-source-20261030-1319/source",
+  "base_manifest_sha256": "214580e639be5cc9289abef162fb86f52617d88e2a785fc2b1a279dd5dfbcec3",
+  "status": "conditional dependency for combined review; no issuer",
+  "files": [
+    {
+      "path": "src/assets/vehicle_visual_authoring49r.cpp",
+      "before_sha256": "75e1ceac61372eca71691d6004f67441ad56886936602c106626b9e3ba905fc0",
+      "after_sha256": "ea50484d099afe6f3809cad9757fef5f8759c66435f6bc55ecaadcc5b4217662",
+      "afterimage": "/tmp/source-basis-guard-proposal-20261030-1320/after/src/assets/vehicle_visual_authoring49r.cpp"
+    },
+    {
+      "path": "src/game/chariot_ik49t.cpp",
+      "before_sha256": "433daae1543a03f1dbc7e138754327f57dd8cfcd68a3d6a89f4c552daaa0cc1c",
+      "after_sha256": "0162660733cac4ac81a9045a5b658c0ba8801e3803bb7b74cdc7233334d7a046",
+      "afterimage": "/tmp/source-basis-guard-proposal-20261030-1320/after/src/game/chariot_ik49t.cpp"
+    },
+    {
+      "path": "src/game/original_standard_placement_globals50la.h",
+      "before_sha256": "0bd8eb91ff83c115dd8bdffbc2f829b4c70ae345b350f3fb66cd36f243b23f17",
+      "after_sha256": "082f6224c6e89f75c5794d6a6c832f398d49e40adc6fc63d74a6f40f1498e940",
+      "afterimage": "/tmp/source-basis-guard-proposal-20261030-1320/after/src/game/original_standard_placement_globals50la.h"
+    },
+    {
+      "path": "src/game/undertrack_reset50ew.cpp",
+      "before_sha256": "7fd0fbb5c0fcbb8c2d5c18adda8ffa30cf987dda43c8bdb887054628e53f7851",
+      "after_sha256": "29a3bd75206deeacbe369f221e5806d185f3378e3ef8797803cb1069771972d3",
+      "afterimage": "/tmp/source-basis-guard-proposal-20261030-1320/after/src/game/undertrack_reset50ew.cpp"
+    },
+    {
+      "path": "src/game/visual_container49r.cpp",
+      "before_sha256": "f00e7817170b5e9394f8ad67687d88368ebb02a6cd372f6cc1e1c89c96219bb2",
+      "after_sha256": "83b47fc8641ee535ffaff40122cf1a7e7e32ed0990eb2b3510b4d0928cf9a0ae",
+      "afterimage": "/tmp/source-basis-guard-proposal-20261030-1320/after/src/game/visual_container49r.cpp"
+    }
+  ],
+  "artifacts": {
+    "NOTES.md": "07d88aab9232674dc0c150233e16f1cb0f4d7c1184087a298a613c7bf0f477c9",
+    "ORIGINAL-WORDS.json": "ab398be96ba17e9c19c00f497afc6f3d0dcb7fa774b7efdfd7843d7a639262fd"
+  }
+}

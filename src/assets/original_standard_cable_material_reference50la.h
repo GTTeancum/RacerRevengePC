@@ -43,6 +43,11 @@ private:
     bool acquireNamed299BE0(std::shared_ptr<OriginalStandardMaterialTable50LA> table,
         const std::string& actualDirectory36B970,const std::string& sourceName,
         OriginalStandardMaterialDiagnostic50LA& d)noexcept {
+        return acquireNamed299BE0Impl(std::move(table),actualDirectory36B970,sourceName,d,[]()noexcept{},false);
+    }
+    template<class BeforeRetain> bool acquireNamed299BE0Impl(std::shared_ptr<OriginalStandardMaterialTable50LA> table,
+        const std::string& actualDirectory36B970,const std::string& sourceName,
+        OriginalStandardMaterialDiagnostic50LA& d,BeforeRetain&& beforeRetain,bool sourceCall)noexcept {
         using S=OriginalStandardMaterialStatus50LA;d={};
         if(started_||released_){d.status=S::alreadyPrepared;d.sourcePC=0x299be0;return false;}
         if(!table||!table->prepared()||table->populationTerminal()||table->demandTerminal()||
@@ -55,9 +60,13 @@ private:
             const auto dot=requested.find_last_of('.');
             if(dot!=std::string::npos)requested.resize(dot); //299C74
             table_=std::move(table);started_=true;
-            const bool found=table_->find298C80(requested,material00_,d);
+            std::int32_t row=-1;const bool found=table_->find298C80(requested,row,d);
+            if(sourceCall&&!found)return false; //No299CB4 until actual lookup returns.
+            material00_=row;
             d.row=material00_;d.storedSlots=1;d.sourceEffectsCommitted=true;
-            if(!found||!table_->retainDefault14D590(material00_,d))return false;
+            if(!found)return false;
+            beforeRetain(); //Same process299CB8 guard, source caller only.
+            if(!table_->retainDefault14D590(material00_,d))return false;
             retained_=true;d.retainedSlots=1;return true;
         }catch(...){d.status=S::allocation;d.sourcePC=0x299be0;return false;}
     }

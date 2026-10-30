@@ -34,6 +34,7 @@ bool Owner::preflightSourceSearchNodeNative(const SourceSearchNode27F120& n,std:
         !n.pointer3C&&!n.pointer44&&!n.pointerA0&&!n.exclusionAttempted&&!n.exclusionAllocationReturned&&!n.exclusionReturned&&!n.exclusionProduced;
     if(!n.attempted||!worldApplication_||worldApplication_->attachmentLock423F58())return false;
     const auto& z=*n.owner;const auto& c=z.entity;const auto& a=worldApplication_->entityAuthority_;
+    if(z.sourceTree34||z.sourceTree38||(n.zoneVisibility44&&(*n.zoneVisibility44>1||collision)))return false;
     if(!sourceMethodNodeAttachmentCurrent(z,collision,index)||!sourceListMethodAliasesCurrent(z,collision,index)||
        !sourcePortalWorldLinksCurrent(z,collision,index)||z.collectionBacking||z.exclusionSource||z.exclusionsComplete)return false;
     if(n.counted){
@@ -63,7 +64,7 @@ bool Owner::releaseSourceSearchNodeNative(SourceSearchNode27F120& n)noexcept {
     //Whole20-node/array/authority preflight and combined count floor precede this helper.
     if(n.withdrawn)return true;
     if(n.owner){auto& z=*n.owner;auto& c=z.entity;
-        if(z.portalLinks30||z.attached||z.nativeList34||z.nativeList38||c.parent1C||c.previous10||c.next14)return false;
+        if(z.portalLinks30||z.attached||z.nativeList34||z.nativeList38||z.sourceTree34||z.sourceTree38||c.parent1C||c.previous10||c.next14)return false;
         //No attachment or raw Portal/neighbor/List borrower may survive authority withdrawal.
         for(const auto& f:sourceMethodNodeAttachments_)if(f.attempted&&!f.withdrawn&&f.identity==&z)return false;
         if(n.enrolled){if(!worldApplication_->entityAuthority_.retire(c))return false;n.enrolled=false;}

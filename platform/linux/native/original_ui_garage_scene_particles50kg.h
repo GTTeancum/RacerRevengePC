@@ -92,6 +92,8 @@ class OriginalUiGarageSceneParticles50KG final {
     std::array<std::array<std::optional<std::uint32_t>,5>,4> quadRemainder;
     Primitive primitive160,primitive190;
     std::int32_t capacity130=0,depthCount118=0;
+    //Valid only when depthWritten. Same process global, no cleanup rollback.
+    std::int32_t depthGlobalBefore=0,depthGlobalAfter=0;
     std::uint32_t used128=0,field12C=0,field134=0,field158=0;
     const void* field14C=nullptr; //Actual same-FIFO native29C0B0 entry, not a material row.
     std::shared_ptr<::original_main_entry50KG::NativeCollectorFifo50LA> leaf14COwner;

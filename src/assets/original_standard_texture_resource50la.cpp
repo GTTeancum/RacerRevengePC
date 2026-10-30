@@ -1,3 +1,7 @@
+#include "original_source_psg_missing50la.h"
+#include "original_source_psg_file50la.h"
+#include "original_source_collision_file50la.h"
+#include "original_particle_source_config50la.h"
 #include "original_pod_source_bank50la.h"
 #include "original_ra_track_source_file50la.h"
 #include "original_standard_texture_resource50la.h"
@@ -546,6 +550,7 @@ bool OriginalStandardTextureResolver50LA::restoreScratch132BD0(D& d)noexcept {
 // Native pointers/layout, not guest rows or a second canonical file namespace.
 // All fields below are private: no mount/lookup can turn capacity into a handle.
 struct OriginalStandardTextureResolver50LA::FreshFileCapacity {
+    const OriginalParticleSourceConfig50LA* particleConfigBorrower=nullptr; //Native lifetime, not guest state.
     // The actual fresh domain provider, retained before its first native mount.
     // Merely retaining this provider does not establish source history.
     // No provider-to-resolver back edge or second file/association ledger exists.
@@ -1941,7 +1946,8 @@ bool OriginalStandardTextureResolver50LA::publishGeometry1326A0(OriginalStandard
     OriginalStandardModelFileView50LA file;
     if(!modelFile(id,file,d))return false;
     if(storage_->files[id.row]->retired)return fail(d,E::phase,0x1326A0);
-    if(!geometry||!geometry->constructed240110()||geometry->fileId().resolver!=this||
+    if(!geometry||!geometry->constructed240110()||!geometry->cachePublicationReady1326A0()||
+       geometry->fileId().resolver!=this||
        geometry->fileId().row!=id.row||file.kind!=OriginalStandardModelFileKind50LA::psg||
        file.animation1536F0||file.geometry240110)return fail(d,E::phase,0x1327B0);
     storage_->files[id.row]->finalGeometryRelease={};
@@ -3900,7 +3906,7 @@ bool OriginalStandardTextureResolver50LA::closeSourceBankMember131040(const void
 }
 bool OriginalStandardTextureResolver50LA::retireSourceBankNative(const void* root,D& d)noexcept {
     d={};if(!freshFileCapacity_||!root)return fail(d,E::phase,0);
-    auto& s=*freshFileCapacity_;if(s.courseStage==FreshFileCapacity::CourseStage::none&&!s.courseRootOwner)return true;
+    auto& s=*freshFileCapacity_;if(s.particleConfigBorrower)return fail(d,E::phase,0);if(s.courseStage==FreshFileCapacity::CourseStage::none&&!s.courseRootOwner)return true;
     if(s.courseRootOwner!=root)return fail(d,E::phase,0);
     if(s.courseStage==FreshFileCapacity::CourseStage::retired)return true;
     if(s.courseNativeBorrowers!=1)return fail(d,E::phase,0);
@@ -4284,5 +4290,9 @@ bool OriginalStandardTextureResolver50LA::registerLoadingIconBank12CEA0(std::sha
 #include "original_loading_ra_file50la.inl"
 
 #include "original_ra_track_source_file50la.inl"
+#include "original_source_psg_file50la.inl"
+#include "original_source_psg_missing50la.inl"
+#include "original_source_collision_file50la.inl"
 #include "original_pod_source_bank50la.inl"
+#include "original_particle_source_config50la.inl"
 }

@@ -35,6 +35,13 @@ class OriginalWorldPhysicsIndex50LA final {
     std::uint64_t sourceWorldGeneration_=0;
     std::thread::id sourceThread_;
     std::size_t sourceModelsProduced_=0,sourceCapacityProduced_=0,sourceUsedProduced_=0;
+    struct SourceCapacity27C1D0 {
+        bool entered=false,capacityStored=false,allocationReturned=false,published=false,returned=false;
+        std::int32_t requested=0;
+        std::uint32_t returnV0=0,indexA0=0,offsetA1=0,zeroed=0,pc=0;
+        std::unique_ptr<Model[]> owner;
+    };
+    std::array<SourceCapacity27C1D0,10> sourceCapacity_;
     std::uint32_t sourcePC_=0x27c010;
     OriginalWorldPhysicsIndex50LA(SourceTag,const OriginalWreckComponent50LA& world)noexcept
         :constructed_(false),sourceMode_(true),sourceWorld_(&world),
@@ -79,6 +86,37 @@ class OriginalWorldPhysicsIndex50LA final {
         //Different private source completion, NOT legacy decoded Standard-only readiness.
         sourcePrepared_=true;returned=true;pc=sourcePC_=0x27c1c4;return true;
     }
+    //Conditional source service, no current type2 cohort issuer. Native
+    //capacity admission is before source writes; never a returned guest0.
+    bool reserveSource27C1D0(const OriginalWreckComponent50LA& world,std::uint32_t zone,
+        std::int32_t count,bool& returned,std::uint32_t& returnV0,std::uint32_t& pc)noexcept {
+        returned=false;pc=0;
+        if(!sourceMode_||closed_||!sourcePrepared_||sourceWorld_!=&world||
+           sourceWorldGeneration_!=world.sessionGeneration||!world.reference00||
+           sourceThread_!=std::this_thread::get_id()||zone>=10||count00_!=10||
+           count>1261||!canReleaseSourceNative())return false;
+        auto& h=sourceCapacity_[zone];if(h.entered)return false; //No unproved repeated-call issuer.
+        h.entered=true;h.requested=count;
+        const auto at=[&](std::uint32_t address){pc=sourcePC_=h.pc=address;};
+        const auto finish=[&](std::uint32_t value){h.returnV0=value;h.returned=true;
+            returnV0=value;returned=true;at(0x27c280);return true;};
+        at(0x27c1e8);if(count<0){at(0x27c20c);return finish(0);}
+        at(0x27c1fc);if(!models0C_)return false;
+        if(models0C_[zone]){at(0x27c20c);return finish(0);}
+        at(0x27c220);if(!capacity04_)return false;
+        capacity04_[zone]=static_cast<std::uint32_t>(count);h.capacityStored=true;
+        at(0x27c21c); //Call's27C220 delay slot above precedes allocator effects.
+        try{h.owner.reset(new Model[static_cast<std::size_t>(count)]);}catch(...){h.owner.reset();}
+        h.allocationReturned=true;at(0x27c238);models0C_[zone]=h.owner.get();h.published=true;
+        h.indexA0=0;h.offsetA1=0;
+        while(h.indexA0<static_cast<std::uint32_t>(count)){
+            at(0x27c244);++h.indexA0;
+            at(0x27c258);h.offsetA1+=4;
+            at(0x27c260);if(!h.owner)return false; //NULL positive-count store, not allocationfailure0.
+            h.owner[h.zeroed]=nullptr;++h.zeroed;
+        }
+        at(0x27c268);return finish(1); //Count0 still publishes allocator result and returns1.
+    }
     bool canReleaseSourceNative()const noexcept {
         if(!sourceMode_||!constructed_||sourceThread_!=std::this_thread::get_id()||
            !sourceWorld_||sourceWorldGeneration_!=sourceWorld_->sessionGeneration||!sourceWorld_->reference00||
@@ -90,10 +128,27 @@ class OriginalWorldPhysicsIndex50LA final {
            (sourceModelsProduced_&&!models0C_)||(sourceCapacityProduced_&&!capacity04_)||
            (sourceUsedProduced_&&!used08_))return false;
         if(sourcePrepared_&&(sourceModelsProduced_!=10||sourceCapacityProduced_!=10||sourceUsedProduced_!=10))return false;
-        //Read ONLY reached slots. No27C1D0 per-zone/model reference producer is
-        //admitted, so all other allocated slots remain unknown, not zero.
-        for(std::size_t i=0;i<sourceModelsProduced_;++i)if(models0C_[i])return false;
-        for(std::size_t i=0;i<sourceCapacityProduced_;++i)if(capacity04_[i])return false;
+        //Read only constructor-reached lanes and27C1D0 zeroed row prefixes.
+        //No27C290 body pointer/used08 producer is yet admitted.
+        for(std::size_t i=0;i<10;++i){const auto& h=sourceCapacity_[i];
+            if(h.entered&&!sourcePrepared_)return false;
+            if(!h.entered&&(h.capacityStored||h.allocationReturned||h.published||h.returned||h.owner))return false;
+            if(h.capacityStored&&(h.requested<0||h.requested>1261))return false;
+            if(h.allocationReturned&&!h.capacityStored)return false;
+            if(h.published&&!h.allocationReturned)return false;
+            if(h.zeroed&&(!h.published||!h.owner))return false;
+            if(h.requested>=0&&h.zeroed>static_cast<std::uint32_t>(h.requested))return false;
+            if(h.indexA0<h.zeroed||h.indexA0-h.zeroed>1||h.offsetA1!=h.indexA0*4u)return false;
+            if(h.returned){
+                if(h.returnV0>1)return false;
+                if(h.returnV0&&(!h.published||h.requested<0||h.zeroed!=static_cast<std::uint32_t>(h.requested)))return false;
+                if(!h.returnV0&&(h.capacityStored||h.published||h.owner||h.zeroed))return false;
+                if(h.pc!=0x27c280)return false;
+            }
+            if(i<sourceModelsProduced_&&models0C_[i]!=(h.published?h.owner.get():nullptr))return false;
+            if(i<sourceCapacityProduced_&&capacity04_[i]!=(h.capacityStored?static_cast<std::uint32_t>(h.requested):0u))return false;
+            for(std::uint32_t slot=0;slot<h.zeroed;++slot)if(h.owner[slot])return false;
+        }
         for(std::size_t i=0;i<sourceUsedProduced_;++i)if(used08_[i])return false;
         return true;
     }
@@ -190,6 +245,9 @@ class OriginalWorldPhysicsIndex50LA final {
         //Normal all-null rows own no model arrays/references. Partial native
         //allocation cleanup releases only allocations, never unread row data;
         //it is not a receipt that faulted guest constructor/destructor returned.
+        //Native cancellation frees exact owned per-zone arrays, including a
+        //NULL/partially-zeroed prefix; no unread slot or model reference touched.
+        if(sourceMode_)for(auto& h:sourceCapacity_)h.owner.reset();
         models0C_.reset();capacity04_.reset();used08_.reset();source_.reset();
         closed_=true;return true;
     }
