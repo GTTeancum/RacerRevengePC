@@ -434,6 +434,7 @@ def main():
         'platform/linux/native/original_ui_rider_draw_contribution50kg.cpp',
         'platform/linux/native/original_ui_rider_session50kg.cpp',
         'platform/linux/native/original_ui_course_draw_contribution50kg.cpp',
+        'platform/linux/native/original_ui_course_popup_payload50kg.cpp',
         'platform/linux/native/original_ui_course_draw_resources50kg.cpp',
         'platform/linux/native/original_ui_course_hologram_draw50kg.cpp',
         'platform/linux/native/original_ui_course_session50kg.cpp',

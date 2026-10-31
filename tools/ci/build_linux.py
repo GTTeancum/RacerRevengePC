@@ -71,8 +71,8 @@ def main():
             if not arg.startswith(('-O','-std=')) and arg not in common:options.append(arg)
         win=json.loads((root/'platform/windows/native/interactive50du.sources.json').read_text())
         for p,pin in win['sourceListProvenance'].items():assert sha(root/p)==pin
-        assert len(units)==607 and len(set(units))==607 and all(x.endswith('.cpp') for x in units)
-        assert len(win['sources'])==606 and len(win['nativeDependencySources'])==6
+        assert len(units)==608 and len(set(units))==608 and all(x.endswith('.cpp') for x in units)
+        assert len(win['sources'])==607 and len(win['nativeDependencySources'])==6
         assert set(win['sources']).issubset(units) and len(set(units)-set(win['sources']))==1
         assert '-lz' in command and '-ldl' in command
         write(out/'source-closure.json',units)

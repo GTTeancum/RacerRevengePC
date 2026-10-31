@@ -607,3 +607,57 @@ bool OriginalResults10450LA::careerRacerCurrentNative(
     return operation->resultsRacerIdentityCurrent(0,racer60);
 }
 }
+
+// Out-of-line bridge methods used by the retained model translation unit.
+// Keep the fresh-arena definition closure in this existing roster owner TU.
+namespace ra_source_camera50LA {
+bool OwnershipBridge::adoptSourceAuxiliaryQueries2123C8(std::size_t slot,
+    const g::OriginalRacerMainBodyOwner50LA& body)noexcept {
+    const auto fresh=constructorArena_.lock();const auto pin=bankLifetime_.lock();
+    if(!fresh||!fresh->currentNative()||!pin||pin->identity!=bankIdentity_||bankIdentity_!=&fresh->bank_||
+       bankIdentity_->raWorldLifetime_.get()!=pin.get()||bankIdentity_->retired_||
+       bankIdentity_->visitDepth_!=1u||bankIdentity_->currentSlot_!=slot||
+       terminal_||closed_||!actual_||&actual_->frame!=&fresh->live_.state||
+       slot>=sourceAuxiliaryAdopted_.size()||sourceAuxiliaryAdopted_[slot]||
+       freshRecovery_||queriesConstructed_||follow_||!actual_->movement||!actual_->recovery||
+       actual_->recovery->sourcePrepared||actual_->recovery->selectedSource||
+       stagedPods694_[slot].bodyA0!=&body||body.canonicalNumericAddress()!=&actual_->frame.bodies.main||
+       body.entity().reference00!=1u||body.entity().sessionGeneration!=stagedPods694_[slot].generation||
+       fresh->movementSource_.endpoints||fresh->movementSource_.sceneMetadata)return false;
+    sourceAuxiliaryAdopted_[slot]=true; //Before source allocation; never erased by failure or retirement.
+    return true;
+}
+bool OwnershipBridge::sourceContact354Lanes212278(std::size_t slot,
+    const g::OriginalRacerMainBodyOwner50LA& body,g::SpringGeneratedParameters48K*& spring,
+    g::SpringResponseParameters48L*& response)noexcept {
+    spring=nullptr;response=nullptr;
+    const auto fresh=constructorArena_.lock();const auto pin=bankLifetime_.lock();
+    if(!fresh||!fresh->currentNative()||!pin||pin->identity!=bankIdentity_||bankIdentity_!=&fresh->bank_||
+       bankIdentity_->raWorldLifetime_.get()!=pin.get()||bankIdentity_->retired_||
+       bankIdentity_->visitDepth_!=1u||bankIdentity_->currentSlot_!=slot||
+       terminal_||closed_||!actual_||&actual_->frame!=&fresh->live_.state||
+       slot>=stagedPods694_.size()||stagedPods694_[slot].bodyA0!=&body||
+       body.canonicalNumericAddress()!=&actual_->frame.bodies.main||!body.entity().reference00||
+       !registeredRange(&fresh->mainSpring_,sizeof(fresh->mainSpring_))||
+       !registeredRange(&fresh->mainResponse_,sizeof(fresh->mainResponse_)))return false;
+    spring=&fresh->mainSpring_;response=&fresh->mainResponse_;return true;
+}
+bool OwnershipBridge::sourceContact368Lanes2127C8(std::size_t slot,
+    const g::OriginalRacerSecondaryBodyOwner50LA& body,const g::OriginalRacerEntityCold50LA& racer,
+    g::SpringGeneratedParameters48K*& spring,g::SpringResponseParameters48L*& response)noexcept {
+    spring=nullptr;response=nullptr;
+    const auto fresh=constructorArena_.lock();const auto pin=bankLifetime_.lock();
+    if(!fresh||!fresh->currentNative()||!pin||pin->identity!=bankIdentity_||bankIdentity_!=&fresh->bank_||
+       bankIdentity_->raWorldLifetime_.get()!=pin.get()||bankIdentity_->retired_||
+       bankIdentity_->visitDepth_!=1u||bankIdentity_->currentSlot_!=slot||
+       terminal_||closed_||!actual_||&actual_->frame!=&fresh->live_.state||
+       slot>=stagedPods694_.size()||stagedPods694_[slot].generation!=racer.racer.sessionGeneration||
+       !racer.sourceBody35C_||*racer.sourceBody35C_!=&body||!racer.sourceScene19C_||!*racer.sourceScene19C_||
+       !body.sceneBindingCurrent(**racer.sourceScene19C_)||body.entity().parent1C!=&racer.racer||
+       body.entity().reference00!=1u||body.entity().sessionGeneration!=racer.racer.sessionGeneration||
+       body.canonicalNumericAddress()!=&actual_->frame.bodies.secondary||
+       !registeredRange(&fresh->secondarySpring_,sizeof(fresh->secondarySpring_))||
+       !registeredRange(&fresh->secondaryResponse_,sizeof(fresh->secondaryResponse_)))return false;
+    spring=&fresh->secondarySpring_;response=&fresh->secondaryResponse_;return true;
+}
+} // namespace ra_source_camera50LA

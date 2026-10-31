@@ -5,7 +5,7 @@
   "sourceListProvenance": {
     "tools/check_terrain_registered_drive50bv.py": "22ac85b024b7639cce293624fc7f1bdebcf86a0c0d363f84560fb173861dd1aa",
     "tools/prepare_offscreen_build50do.py": "050e81276ecc51dab310df4f64b4de527c92626bbc79630857f457a8d86f6833",
-    "tools/prepare_interactive_build50dv.py": "84ef5476fb67084367c8ade18d5be95245fb4011327efc67da5d18eb6eb0288f"
+    "tools/prepare_interactive_build50dv.py": "3b765e856428f900c412c6efd911a78e98969fa235463cf62964de1f956b16ca"
   },
   "excludedPlatformSources": [
     "platform/linux/native/offscreen_gl_context50dc.cpp",
@@ -336,6 +336,7 @@
     "platform/linux/native/original_ui_rider_draw_contribution50kg.cpp",
     "platform/linux/native/original_ui_rider_session50kg.cpp",
     "platform/linux/native/original_ui_course_draw_contribution50kg.cpp",
+    "platform/linux/native/original_ui_course_popup_payload50kg.cpp",
     "platform/linux/native/original_ui_course_draw_resources50kg.cpp",
     "platform/linux/native/original_ui_course_hologram_draw50kg.cpp",
     "platform/linux/native/original_ui_course_session50kg.cpp",

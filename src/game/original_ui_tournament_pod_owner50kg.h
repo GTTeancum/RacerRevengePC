@@ -9,7 +9,7 @@ class OriginalUiTournamentDrawContribution50KG;
 }
 namespace rr::game {
 class OriginalUiTournamentCameraOwner50KG;
-struct OriginalUiTournamentCameraFrame50KG;
+class OriginalUiTournamentCameraFrame50KG;
 struct OriginalUiTournamentPodInput50KG {
     // Aliasing shared_ptr to the actual retained career resource is permitted.
     std::shared_ptr<const assets::OriginalUiRiderPodAssets50KG> pod;
