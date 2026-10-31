@@ -9,13 +9,13 @@ bool Owner::continueSourceStandardSuccess27AC64(ra_static_model_cold50LA::Owner:
        !worldApplication_||!w.sourceModelCallbackEntered||!w.sourceModel||!w.descriptor10||
        !w.descriptor10->sourceFields||w.sourceCallbackReturnV0||w.sourceDescriptorDisposed)return false;
     auto& f=*w.sourceModel;auto& scene=f.scene;auto& p=f.placement;auto& d=*w.descriptor10->sourceFields;
-    if(p.entered||f.loaderReturnV0||f.loaderReturnedEntity!=&scene.model_.entity8||!f.lookupReturn||!*f.lookupReturn||
+    if(p.entered||f.loaderReturnV0||f.loaderReturnedEntity!=&scene.model_.entity()||!f.lookupReturn||!*f.lookupReturn||
        f.nativeRetired||f.nativeAliasWithdrawn||f.sourceOuterDeleted||f.sourceReferenceDropped||
        !f.counted||!f.enrolled||!w.sourceModelPublished||w.sourceModelCleared||w.model8!=&scene||
        !scene.sourceConstructor_.modelReturned||scene.released_||scene.referenceReleased_||
        !scene.rowsLoaded_||!scene.fields_.geometry1B4||!scene.fields_.sourceRows1B8||
        scene.fields_.sourceRows1B8!=scene.rowTable_.get()||!d.loaded||!w.sourceModelNameFormatted||
-       !worldApplication_->entityAuthority_.canRetire(scene.model_.entity8)||!f.graphCount||
+       !worldApplication_->entityAuthority_.canRetire(scene.model_.entity())||!f.graphCount||
        f.graphCount>a::maxModelNodes49O||scene.model_.sceneIndex!=static_cast<g::SceneNodeIndex49P>(0))return false;
     p.entered=true;at(0x27ac74);if(!d.shadow148)return false;p.shadow148=*d.shadow148;
     p.priorFlags1B3=scene.fields_.flags1B3;

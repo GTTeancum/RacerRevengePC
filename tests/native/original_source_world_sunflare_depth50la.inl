@@ -57,11 +57,11 @@ inline bool Owner::continueSourceSunFlareDepth2C5CF0(std::uint32_t& pc)noexcept 
     frame.look190=lookWords;
     constexpr std::uint32_t farPC[]{0x2c5ea0,0x2c5ea4,0x2c5eac};
     constexpr std::uint32_t scalePC[]{0x2c5ec8,0x2c5ed0,0x2c5ed8};
-    std::array<float,3> far,scaled;
-    for(unsigned i=0;i<3;++i){far[i]=math.mul(numeric::bits(0x46c80000),numeric::bits(lookWords[i]),farPC[i]);if(math.badPC)return stop(math.badPC);}
-    for(unsigned i=0;i<3;++i){at(0x106790+4u*i);frame.far120[i]=word(far[i]);}
+    std::array<float,3> farVector,scaled;
+    for(unsigned i=0;i<3;++i){farVector[i]=math.mul(numeric::bits(0x46c80000),numeric::bits(lookWords[i]),farPC[i]);if(math.badPC)return stop(math.badPC);}
+    for(unsigned i=0;i<3;++i){at(0x106790+4u*i);frame.far120[i]=word(farVector[i]);}
     at(0x1067a0);frame.far120[3]=0x3f800000;
-    for(unsigned i=0;i<3;++i){scaled[i]=math.mul(numeric::bits(0x3f3504f3),far[i],scalePC[i]);if(math.badPC)return stop(math.badPC);}
+    for(unsigned i=0;i<3;++i){scaled[i]=math.mul(numeric::bits(0x3f3504f3),farVector[i],scalePC[i]);if(math.badPC)return stop(math.badPC);}
     for(unsigned i=0;i<3;++i){at(0x106790+4u*i);frame.scaled110[i]=word(scaled[i]);}
     at(0x1067a0);frame.scaled110[3]=0x3f800000;
     std::array<std::uint32_t,3> positionWords;at(0x2c5f08);

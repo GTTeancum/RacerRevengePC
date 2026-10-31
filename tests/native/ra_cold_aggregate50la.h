@@ -801,24 +801,6 @@ enum class SourcePortalGraphPhase:std::uint8_t {unreached,entered,bounded,return
     bool continueSourceWorldPortalGraph272B28(std::uint32_t&)noexcept;
 
     enum class SourceTopologyPhase {unreached,entered,bounded,lightZonesReturned,nodesReturned,portalsReturned,methodsReturned,observerReturned,nativeClosed};
-    struct SourceDefaultObserver280890 final {
-        const void* next00=nullptr;
-        const g::OriginalWreckComponent50LA* child04=nullptr;
-        const g::OriginalVisibilityQuadTree50LA* method08=nullptr;
-        std::uint32_t field0C=0,field10=0,field14=0;
-        std::array<std::optional<std::uint32_t>,2> unknown18To1C;
-        std::array<std::uint32_t,4> vector20{};
-        std::uint8_t scalarKnownMask=0;
-        bool vectorKnown=false;
-    };
-    std::unique_ptr<SourceDefaultObserver280890> sourceDefaultObserver_;
-    enum class SourceDefaultObserverPhase {unreached,entered,bounded,returned,nativeClosed};
-    SourceDefaultObserverPhase sourceDefaultObserverPhase_=SourceDefaultObserverPhase::unreached;
-    std::uint32_t sourceDefaultObserverPC_=0x272f28;
-    bool sourceDefaultObserverOuterReached_=false,sourceDefaultObserverLease_=false;
-    bool sourceDefaultObserverCtorReturned_=false,sourceDefaultObserverPublished_=false;
-    bool sourceDefaultObserverChildStored_=false,sourceDefaultObserverMethodStored_=false;
-    std::optional<const g::OriginalVisibilityQuadTree50LA*> sourceDefaultObserverMethodRead_;
     std::optional<std::uint32_t> sourceDefaultEnvironment35C_;
     std::optional<std::uint32_t> sourceTopologyReturnV0_;
     bool sourceTopologyRoutineReturned_=false;
@@ -1364,7 +1346,6 @@ bool abortSourceWorldBuoysNative(std::uint32_t&)noexcept;
     bool staticModelResourcesAttempted_=false;
     bool staticObserversAttempted_=false;
     bool terminal_=false,closed_=false;
-    std::size_t runtimeCameraBorrows_=0,runtimeWorldBorrows_=0;
     bool rosterModelResourcesAttempted_=false,rosterModelResourcesComplete_=false;
     bool rosterMountAttempted_=false,rosterMountComplete_=false;
     const original_main_entry50KG::Application* rosterMountApplication_=nullptr;

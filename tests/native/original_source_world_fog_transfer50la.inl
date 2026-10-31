@@ -153,12 +153,12 @@ inline bool Owner::beginSourceFog273C30(const g::OriginalWorldFogInvocation50LA&
     auto sub=[](float a,float b){volatile float c=a-b;return c;};
     auto mul=[](float a,float b){volatile float c=a*b;return c;};
     at(0x13e874);if(std::fegetround()!=FE_TONEAREST)return false;
-    const float far=read(*f.words30To64[8]),near=read(*f.words30To64[9]);
+    const float farDistance=read(*f.words30To64[8]),nearDistance=read(*f.words30To64[9]);
     const float visibility=read(descriptor.sourceVisibility10),haze=read(descriptor.sourceHaziness14);
     if(!std::isfinite(visibility)||!std::isfinite(haze))return false;
-    const float distance=sub(far,near);if(!std::isfinite(distance))return false;
+    const float distance=sub(farDistance,nearDistance);if(!std::isfinite(distance))return false;
     at(0x13e87c);const float scaled=mul(visibility,distance);if(!std::isfinite(scaled))return false;
-    at(0x13e880);const float end=add(near,scaled);if(!std::isfinite(end))return false;
+    at(0x13e880);const float end=add(nearDistance,scaled);if(!std::isfinite(end))return false;
     at(0x13e884);f.words30To64[2]=word(end);
     at(0x13e890);const float span=sub(end,64.f);if(!std::isfinite(span))return false;
     at(0x13e894);const float remainder=sub(1.f,haze);if(!std::isfinite(remainder))return false;

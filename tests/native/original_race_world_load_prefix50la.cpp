@@ -295,7 +295,7 @@ bool Application::completeConsumedRaWorldNativePrefix1A9EE0(
            !session.nativeCinematographer70_||session.nativeCinematographer70Published_||
            !session.nativeIntroBackingCurrent()||
            !session.actual_.taIntroAuthoring||session.actual_.taIntroAuthoring->trackId()!="RA"||
-           session.actual_.taIntroAudio->taIntroEntity80()!=entity.firstChild18)return false;
+           !session.nativeIntroFirstChildCurrent())return false;
         // Native late custody of process330 constructor/resources only. The
         // prefix ends BEFORE114A00; it cannot satisfy1CC900 or load return.
         if(!stageNativeLoading330Prefix(pc))return false;
@@ -471,8 +471,7 @@ bool OriginalRaceConstructor50LA::stageNativeFirstWreckLoad(
     //authorizes this private210804 alias before the2129C0 load sequence.
     if(!world74_->worldWater3FC_||*world74_->worldWater3FC_||!world74_->nativeWaterNone274570_)return false;
     const auto state=app.state;
-    if(!state||app.entities()!=session.actual_.applicationEntities||
-       session.actual_.arena.borrowedNoise50KG!=&state->sharedNoise308030)return false;
+    if(!state||!bridge.nativeFirstWreckApplicationCurrent(session,app))return false;
     // Synchronous borrow of this SAME live App state. No copied seed/facade,
     // no retained raw pointer, and failure never rolls back consumed draws.
     return bridge.stageNativeFirstWreckLoad(session,*world74_,heights,app.materialDirectory36B970(),
@@ -480,6 +479,13 @@ bool OriginalRaceConstructor50LA::stageNativeFirstWreckLoad(
 }
 }
 namespace ra_source_camera50LA {
+bool OwnershipBridge::nativeFirstWreckApplicationCurrent(
+    const original_camera_session50KX::Session& session,
+    const original_main_entry50KG::Application& app)const noexcept {
+    const auto state=app.state;
+    return state&&app.entities()==session.actual_.applicationEntities&&
+        session.actual_.arena.borrowedNoise50KG==&state->sharedNoise308030;
+}
 bool OwnershipBridge::stageNativeFirstWreckLoad(original_camera_session50KX::Session& session,
     ra_pod_scene50LA::Owner& world,const g::UndertrackPhysicsDomain50EW& heights,const std::string& directory,
     const std::string& actualParticleDirectory36B530,const void* actualWorld3FC,std::uint32_t& actualRawRandom,std::uint32_t& pc)noexcept {

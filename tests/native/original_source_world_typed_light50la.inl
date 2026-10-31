@@ -403,7 +403,7 @@ bool Owner::continueSourceTypedLightIteration273BA8(std::size_t ordinal,std::uin
             worldEntity_.sessionGeneration,key(&e),true,worldApplication_->objectCount423F60());f.counted=e.reference00!=0;
         if(made.status!=g::OriginalWreckComponentStatus50LA::complete)return stop(made.sourcePC);
         if(!authority.enroll(e))return stop(pc);f.enrolled=true;
-        at(0x1467a8);f.vtable08=0x3cd600;at(0x1468c0);l.range84=g::SourceUiLightMath50KG::range146898();
+        at(0x1467a8);f.vtable08=0x3cd600;at(0x1468c0);l.range84=sourceTypedRange146898();
         at(0x146924);l.positionA0=worldApplication_->lightVector426F10_;at(0x146934);f.defaults=true;
         at(0x146938);const auto query=worldApplication_->types383408().lightEmitter146938();if(!query.okay())return stop(query.sourcePC);
         at(0x146964);l.query32=query.type;l.typed=true;at(0x146970);l.constructed=true;f.returned=true;

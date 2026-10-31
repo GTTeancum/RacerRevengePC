@@ -4,7 +4,7 @@ bool Owner::finishSourceStandardRenderable24076C(ra_static_model_cold50LA::Owner
     const auto at=[&](std::uint32_t p){pc=sourceTrackPC_=sourcePostParticleModelsPC_=p;};
     if(!w.sourceModel||!w.descriptor10||w.sourceDescriptorDisposed)return false;
     auto& f=*w.sourceModel;
-    if(f.nativeRetired||f.packetCallEntered||f.renderableReturnedEntity!=&f.scene.model_.entity8||
+    if(f.nativeRetired||f.packetCallEntered||f.renderableReturnedEntity!=&f.scene.model_.entity()||
        (!f.rowTableCallReturned&&!f.warmRowTableReturned)||!f.scene.fields_.geometry1B4||
        !f.scene.preflightSourceRenderableReturn26E820Native())return false;
     //This is26E820's Entity+8, NOT240740's later returned Entity. Original
@@ -17,7 +17,7 @@ bool Owner::finishSourceStandardRenderable24076C(ra_static_model_cold50LA::Owner
     at(packets.sourcePC);if(!packets.okay())return false;
     if(packets.sourcePC!=0x2407d8u||!f.sourcePackets.preflightSourcePacketsNative()||
        !f.sourcePackets.sourcePackets_.returned||
-       f.sourcePackets.sourcePackets_.returnedEntityV0!=&f.scene.model_.entity8)return false;
+       f.sourcePackets.sourcePackets_.returnedEntityV0!=&f.scene.model_.entity())return false;
     f.packetCallReturned=true;f.loaderReturnedEntity=f.sourcePackets.sourcePackets_.returnedEntityV0;
     //Actual27AC5C tests this typed nonNULL Entity+8, not an invented literal1.
     //Only now may the reviewed shadow/name/guard/pose prefix execute.
@@ -185,17 +185,18 @@ bool Owner::preflightSourceStandardModelsNative(std::size_t& count)const noexcep
         }else if(f.smokerManagerBound&&!smoker.nativeWithdrawn_)return false;
         if(f.counted){
             if(count==std::numeric_limits<std::size_t>::max())return false;++count;
-            const auto& e=f.scene.model_.entity8;if(f.enrolled&&!authority.canRetire(e))return false;
+            const auto& e=f.scene.model_.entity();if(f.enrolled&&!authority.canRetire(e))return false;
         }
         for(std::uint32_t row=1;row<f.scene.binding_.sourceRowCount;++row){
             const auto* object=f.scene.sourceRowObject(row);
             if(!object||!object->constructed||object->released)continue;
             if(count==std::numeric_limits<std::size_t>::max())return false;++count;
-            if(f.rowEnrolled[row]&&!authority.canRetire(object->entity8))return false;
+            if(f.rowEnrolled[row]&&!authority.canRetire(object->entity()))return false;
             if(f.scene.sourceWarmClone_.entered){
-                if(object->sceneIndex>=f.warmCloneEnrolled.size())return false;
-                const auto* enrolled=f.warmCloneEnrolled[object->sceneIndex];
-                if(enrolled&&(enrolled!=&object->entity8||!authority.canRetire(*enrolled)))return false;
+                const auto physical=static_cast<std::int32_t>(object->sceneIndex);
+                if(physical<0||static_cast<std::size_t>(physical)>=f.warmCloneEnrolled.size())return false;
+                const auto* enrolled=f.warmCloneEnrolled[static_cast<std::size_t>(physical)];
+                if(enrolled&&(enrolled!=&object->entity()||!authority.canRetire(*enrolled)))return false;
             }
         }
         if(f.sourceFile){
@@ -414,7 +415,7 @@ bool Owner::retireSourceStandardModelsNative(std::uint32_t& pc)noexcept {
     //Native detach is not source141A70 execution; exact receipts keep retries safe.
     for(auto& row:sourceStaticOwner_->sourceWrapperLedger_)for(auto& w:row)if(w&&w->sourceModel){
         auto& f=*w->sourceModel;if(!f.parentAttached||f.parentDetachedNative)continue;
-        const auto r=worldApplication_->entityAuthority_.detach(f.scene.model_.entity8,
+        const auto r=worldApplication_->entityAuthority_.detach(*f.scene.wreckModelStorage(),
             worldApplication_->attachmentLock423F58());
         if(r.status!=g::OriginalWreckComponentStatus50LA::complete){pc=r.sourcePC;return false;}
         f.parentDetachedNative=true;
@@ -522,7 +523,7 @@ bool Owner::releaseSourceAbsentModel26E9D4(ra_static_model_cold50LA::Owner::Stan
         f.releaseReturnV0=0;return true;
     }
     auto& authority=worldApplication_->entityAuthority_;
-    const auto& e=scene.model_.entity8;
+    const auto& e=scene.model_.entity();
     if(e.parent1C||e.firstChild18||e.previous10||e.next14||e.reference00!=1||
        f.graphCount!=1||!scene.preflightModelReference142590InAuthority(authority.view()).okay()||
        !scene.preflightScene2896D0(f.graph()).okay()||!authority.canRetire(e))return false;
@@ -664,7 +665,7 @@ bool Owner::continueSourceStandardModel27ABC0(std::uint32_t& pc)noexcept {
             if(candidate.nativeRetired||candidate.scene.sourceGeometry_.owner.get()!=f.warmGeometryHistory)continue;
             if(f.warmCreator||!previous->sourceCallbackReturnV0||*previous->sourceCallbackReturnV0!=1||
                !previous->sourceDescriptorDisposed||previous->model8!=&candidate.scene||
-               candidate.loaderReturnedEntity!=&candidate.scene.model_.entity8||
+               candidate.loaderReturnedEntity!=&candidate.scene.model_.entity()||
                !candidate.sourceFile||!candidate.sourceCloseCallReturned||
                !candidate.scene.preflightSourceRenderableReturn26E820Native()||
                !candidate.sourceFile->associatedGeometryCurrent(f.warmGeometryHistory,&candidate.scene))return false;
@@ -695,10 +696,11 @@ bool Owner::continueSourceStandardModel27ABC0(std::uint32_t& pc)noexcept {
             //allocation, including a constructor refusal before publication.
             for(std::uint32_t row=1;row<f.scene.binding_.sourceRowCount;++row){
                 auto* object=f.scene.sourceRowObject(row);if(!object||!object->constructed||object->released)continue;
-                const auto physical=object->sceneIndex;
-                if(physical==0||physical>=f.warmCloneEnrolled.size()||f.warmCloneEnrolled[physical])return false;
-                if(!authority.enroll(object->entity8))return false;
-                f.warmCloneEnrolled[physical]=&object->entity8;
+                const auto physical=static_cast<std::int32_t>(object->sceneIndex);
+                if(physical<=0||static_cast<std::size_t>(physical)>=f.warmCloneEnrolled.size()||
+                   f.warmCloneEnrolled[static_cast<std::size_t>(physical)])return false;
+                if(!authority.enroll(*f.scene.wreckRowStorage(row)))return false;
+                f.warmCloneEnrolled[static_cast<std::size_t>(physical)]=f.scene.wreckRowStorage(row);
             }
             const auto cloneReturnPC=f.scene.sourceWarmRows_.bit191?0x26eab0u:0x26eb24u;
             if(!cloned.okay()||cloned.sourcePC!=cloneReturnPC||!f.scene.sourceWarmClone_.returned)return false;
@@ -723,7 +725,7 @@ bool Owner::continueSourceStandardModel27ABC0(std::uint32_t& pc)noexcept {
         if(!warmTable.okay()||warmTable.sourcePC!=0x26eee8u||
            !f.scene.preflightSourceWarmRenderable26E820Native())return false;
         const auto* renderable=f.scene.sourceRenderableEntity26E820Native();
-        if(renderable!=&f.scene.model_.entity8)return false;
+        if(renderable!=&f.scene.model_.entity())return false;
         f.warmRowTableReturned=true;f.renderableReturnedEntity=renderable;
         return finishSourceStandardRenderable24076C(w,pc);
     }
@@ -744,7 +746,7 @@ bool Owner::continueSourceStandardModel27ABC0(std::uint32_t& pc)noexcept {
     //is the already-enrolled Model, never a second Entity/reference/count.
     for(std::uint32_t row=1;row<f.scene.binding_.sourceRowCount;++row){
         auto* object=f.scene.sourceRowObject(row);if(!object||!object->constructed||object->released)continue;
-        if(!authority.enroll(object->entity8)){at(imported.sourcePC);return false;}f.rowEnrolled[row]=true;
+        if(!authority.enroll(*f.scene.wreckRowStorage(row))){at(imported.sourcePC);return false;}f.rowEnrolled[row]=true;
     }
     if(!imported.okay()){at(imported.sourcePC);return false;}
     const auto& rows=f.scene.sourceDirectRows_;
@@ -826,7 +828,7 @@ bool Owner::continueSourceStandardModel27ABC0(std::uint32_t& pc)noexcept {
     at(rowsTable.sourcePC);if(!rowsTable.okay())return false;
     if(rowsTable.sourcePC!=0x26eee8u||!f.scene.preflightSourceRenderableReturn26E820Native())return false;
     const auto* renderable=f.scene.sourceRenderableEntity26E820Native();
-    if(renderable!=&f.scene.model_.entity8)return false;
+    if(renderable!=&f.scene.model_.entity())return false;
     f.rowTableCallReturned=true;f.renderableReturnedEntity=renderable;
     return finishSourceStandardRenderable24076C(w,pc);
 }

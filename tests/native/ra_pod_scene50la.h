@@ -671,6 +671,8 @@ std::array<std::uint8_t,10> sourceSaturation44Known{},sourceSaturation48Known{};
     std::uint32_t worldReset270550PC_=0x270550;
     // Native read-through Racer leases pin these actual World source lanes.
     std::size_t constructorRacerWorldBorrows_=0;
+    // SAME aggregate-issued leases, also read by scene light retirement.
+    std::size_t runtimeCameraBorrows_=0,runtimeWorldBorrows_=0;
     Entity worldEntity_;
     std::shared_ptr<g::OriginalApplicationEntities50LA> worldApplication_;
     // Native collision storage can precede the counted world prefix. Retain
@@ -1008,6 +1010,26 @@ bool releaseSourceSearchNodeNative(SourceSearchNode27F120&)noexcept;
     }
         pc=0x272f48;return true;
     }
+    // SAME source observer custody: the derived aggregate still constructs and
+    // retires it; scene flare leaves consume its actual lease and identity.
+    struct SourceDefaultObserver280890 final {
+        const void* next00=nullptr;
+        const g::OriginalWreckComponent50LA* child04=nullptr;
+        const g::OriginalVisibilityQuadTree50LA* method08=nullptr;
+        std::uint32_t field0C=0,field10=0,field14=0;
+        std::array<std::optional<std::uint32_t>,2> unknown18To1C;
+        std::array<std::uint32_t,4> vector20{};
+        std::uint8_t scalarKnownMask=0;
+        bool vectorKnown=false;
+    };
+    std::unique_ptr<SourceDefaultObserver280890> sourceDefaultObserver_;
+    enum class SourceDefaultObserverPhase {unreached,entered,bounded,returned,nativeClosed};
+    SourceDefaultObserverPhase sourceDefaultObserverPhase_=SourceDefaultObserverPhase::unreached;
+    std::uint32_t sourceDefaultObserverPC_=0x272f28;
+    bool sourceDefaultObserverOuterReached_=false,sourceDefaultObserverLease_=false;
+    bool sourceDefaultObserverCtorReturned_=false,sourceDefaultObserverPublished_=false;
+    bool sourceDefaultObserverChildStored_=false,sourceDefaultObserverMethodStored_=false;
+    std::optional<const g::OriginalVisibilityQuadTree50LA*> sourceDefaultObserverMethodRead_;
     struct NativeDefaultObserver280890 {
         //280890: uncounted observer, NOT Entity141300 or Reference1048F0.
         const void* next00=nullptr;
@@ -1497,6 +1519,9 @@ struct SourceLightDescriptor277220 {
     bool preflightSourceTypedLightsNative()const noexcept;
     bool preflightSourceLightSiblingLinksNative()const noexcept;
     bool abortSourceTypedLightsNative()noexcept;
+    static std::uint32_t sourceTypedRange146898()noexcept {
+        return g::SourceUiLightMath50KG::range146898();
+    }
     bool sourceTypedLuminance146E60(const SourceTypedLightFrame&,std::uint32_t&)const noexcept;
     bool sourceTypedAttenuation147268(const SourceTypedLightFrame&,std::uint32_t&)const noexcept;
     bool attachSourceSecondLight141960(std::uint32_t&)noexcept;

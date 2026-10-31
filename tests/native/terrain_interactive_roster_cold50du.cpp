@@ -1,5 +1,6 @@
 // Authentic original allocation and roster operations; no owner relocation.
 #include "terrain_interactive_roster_cold50du.h"
+#include "original_race_constructor50la.h"
 #include "original_results_roster_read50la.h"
 #include "original_results_live_owner_read50la.h"
 #include "../../src/game/original_results104_50la.h"

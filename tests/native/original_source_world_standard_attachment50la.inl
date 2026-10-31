@@ -10,7 +10,7 @@ bool Owner::continueSourceStandardSmoker27AE68(ra_static_model_cold50LA::Owner::
        !sourceParticleLoadReturned_||sourceParticleReturnedSelf_!=trackParticles_.get())return false;
     auto& f=*w.sourceModel;auto& s=f.sourceSmoker;auto& d=*w.descriptor10->sourceFields;
     if(f.smokerCallEntered||!f.parentAttachReturned||f.nativeRetired||
-       f.loaderReturnedEntity!=&f.scene.model_.entity8||w.model8!=&f.scene||
+       f.loaderReturnedEntity!=&f.scene.model_.entity()||w.model8!=&f.scene||
        !d.loaded||(d.vectorKnown&24u)!=24u)return false;
     auto& authority=worldApplication_->entityAuthority_;
     if(authority.enrollmentSerial_>std::numeric_limits<std::uint64_t>::max()-2u||
@@ -63,7 +63,7 @@ bool Owner::continueSourceStandardAttachment27AE14(ra_static_model_cold50LA::Own
        w.sourceCallbackReturnV0||!nativeModelZone354_||!sourceModelParents3C4_||
        !sourceModels3C4_||*sourceModels3C4_!=sourceModelParents3C4_.get())return false;
     auto& f=*w.sourceModel;const auto z=*nativeModelZone354_;
-    if(f.parentAttachEntered||f.nativeRetired||f.loaderReturnedEntity!=&f.scene.model_.entity8||
+    if(f.parentAttachEntered||f.nativeRetired||f.loaderReturnedEntity!=&f.scene.model_.entity()||
        !f.placement.orientationReturned||w.model8!=&f.scene||z>=sourceStaticOwner_->parents_.size()||
        z>=sourceModelParentsPublished3C4_||!sourceStaticOwner_->parents_[z]||
        sourceModelParents3C4_[z]!=&sourceStaticOwner_->parents_[z]->entity||
@@ -91,7 +91,7 @@ bool Owner::continueSourceStandardAttachment27AE14(ra_static_model_cold50LA::Own
            !authority.enroll(parent.entity))return false;
         parent.sourceAuthorityEnrolled=true;
     }else if(!authority.canRetire(parent.entity))return false;
-    at(0x27ae14);auto& child=f.scene.model_.entity8;
+    at(0x27ae14);auto& child=*f.scene.wreckModelStorage();
     at(0x27ae34);f.parentAttachBorrow=sourceModelParents3C4_[z];f.parentAttachZone=z;
     at(0x27ae38);f.parentAttachEntered=true;at(0x141970);
     f.parentAttachLock=worldApplication_->attachmentLock423F58();

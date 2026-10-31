@@ -16,6 +16,11 @@ bool nativeIntroBackingCurrent()const noexcept {
         nativeTaIssuance_&&
         actual_.taIntroAuthoring->providerIdentity()==nativeTaIssuance_->provider.get();
 }
+// Read-only check inside the existing audio friend; no emitter capability escapes.
+bool nativeIntroFirstChildCurrent()const noexcept {
+    return actual_.taIntroAudio&&
+        actual_.taIntroAudio->taIntroEntity80()==coldController_.entity.firstChild18;
+}
 bool adoptNativeIntro177750(std::uint32_t& pc)noexcept {
     auto& n=nativeIntro177750_;auto& c=coldController_;pc=n.pc;
     if(!onOwnerThread()||n.attempted||!nativeRaOwnedPreparationAttempted_||

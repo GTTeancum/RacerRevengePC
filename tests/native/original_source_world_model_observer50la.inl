@@ -19,7 +19,7 @@ bool Owner::preflightSourceStandardObserversNative()const noexcept {
         if(!model||model->nativeRetired||&model->scene!=f.scene||f.member!=&model->scene.model_||
            !model->packetCallReturned||!model->sourcePackets.sourcePackets_.returned||
            model->sourcePackets.sourcePackets_.nativeWithdrawn||!model->sourcePackets.preflightSourcePacketsNative()||
-           model->loaderReturnedEntity!=&model->scene.model_.entity8||
+           model->loaderReturnedEntity!=&model->scene.model_.entity()||
            !model->placement.orientationReturned||!model->scene.preflightSourceRenderableReturn26E820Native()||
            model->sourceObserverOccurrence!=&f||model->scene.sourceObserverBorrower_!=&f||model->sourceObserver19C!=(f.published?f.owner.get():nullptr)||
            model->scene.model_.observer19C!=model->sourceObserver19C)return false;
@@ -171,7 +171,7 @@ bool Owner::continueSourceStandardObserver28E8A0(ra_static_model_cold50LA::Owner
     auto& model=*w.sourceModel;auto& scene=model.scene;
     if(!model.packetCallReturned||!model.sourcePackets.sourcePackets_.returned||
        model.sourcePackets.sourcePackets_.nativeWithdrawn||!model.sourcePackets.preflightSourcePacketsNative()||
-       model.loaderReturnedEntity!=&scene.model_.entity8||
+       model.loaderReturnedEntity!=&scene.model_.entity()||
        !model.placement.orientationReturned||model.nativeRetired||model.nativeAliasWithdrawn||
        !scene.preflightSourceRenderableReturn26E820Native()||scene.sourceObserverBorrower_||scene.model_.observer19C||
        !preflightSourceStandardObserversNative())return false; //Fresh-only;280920 replacement is not issued.

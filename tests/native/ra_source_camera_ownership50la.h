@@ -1879,6 +1879,8 @@ class OwnershipBridge final {
     bool stageNativeRetainedWreckCold(original_camera_session50KX::Session&)noexcept;
     ::ra_pod_scene50LA::Owner* nativeWreckZoneOwner_=nullptr;
     g::OriginalTrackParticleCold50LA* nativeWreckParticles_=nullptr;
+    bool nativeFirstWreckApplicationCurrent(const original_camera_session50KX::Session&,
+        const original_main_entry50KG::Application&)const noexcept;
     bool stageNativeFirstWreckLoad(original_camera_session50KX::Session&,
         ::ra_pod_scene50LA::Owner&,const g::UndertrackPhysicsDomain50EW&,const std::string&,const std::string&,const void*,std::uint32_t&,std::uint32_t&)noexcept;
 

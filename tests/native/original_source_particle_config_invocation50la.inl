@@ -60,10 +60,10 @@ bool Owner::beginSourceParticleConfig1617A0(const g::OriginalWorldParticleInvoca
         if(prefix+4>=pathExtent)return false;
         filename.resize(prefix);filename.append(".prt");pc=0x161824;
         a::OriginalStandardTextureDiagnostic50LA d;
-        const bool returned=sourceParticleConfig_->begin1617A0(
+        const bool configReturned=sourceParticleConfig_->begin1617A0(
             sourceTrackMountDomain_->resolver3E1A70(),sourceTrackMountDomain_->archiveProvider3E1A70(),filename,d);
         pc=sourceParticleConfig_->sourcePC_;
-        if(!returned||!sourceParticleConfig_->sourceOpenReturned_)return false;
+        if(!configReturned||!sourceParticleConfig_->sourceOpenReturned_)return false;
         const bool sourceTextReturned=*sourceParticleConfig_->sourceOpenReturned_;
         if(!sourceTextReturned){
             pc=0x161ac0;

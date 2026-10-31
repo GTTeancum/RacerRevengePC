@@ -206,6 +206,7 @@ struct Application {
     friend class rr::game::OriginalVideoPreFlipList50KG;
     friend class rr::platform::OriginalUiGarageFogColorLease50KG;
     friend class rr::platform::OriginalUiGarageTextOverlay50KG;
+    friend class rr::platform::OriginalUiGarageScreenText50KG; //Authenticated Course text loaders borrow this App's retained resources and source directories.
     friend class rr::platform::OriginalUiGaragePageOwner50KG;
     friend class rr::platform::OriginalUiCoursePagePayload50KG;
     friend class rr::platform::OriginalUiCoursePopupPayload50KG;
