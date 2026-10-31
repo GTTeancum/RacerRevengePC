@@ -132,9 +132,9 @@ class OriginalApplicationEntityAuthority50LA final {
             row=index[first].row;
             return row<count&&objects[row]==p;
         }
-        friend bool walk(const View& v,const C* first,const C* parent,
-                         unsigned char* seen)noexcept {
-            const C* previous=nullptr;
+        friend bool walk(const View& v,const OriginalWreckComponent50LA* first,
+                         const OriginalWreckComponent50LA* parent,unsigned char* seen)noexcept {
+            const OriginalWreckComponent50LA* previous=nullptr;
             for(auto* p=first;p;p=p->next14){
                 std::size_t i=0;
                 if(!v.visitRow(p,i))return false; // Exact enrolled-pointer membership.
