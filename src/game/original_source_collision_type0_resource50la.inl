@@ -56,7 +56,7 @@
         if(!r.attempted)return !r.allocationAttempted&&!r.published&&!r.storesReturned&&!r.nativeWithdrawn&&!r.pending&&!r.publishedIdentity;
         if(r.nativeWithdrawn)return (!shape8C_||!shape8C_->resource124)&&
             (!r.pending||(r.pending->source_.nativeWithdrawn&&!r.pending->source_.raw&&
-             !r.pending->reference60_&&!r.pending->sourceAssociationBorrower_&&!r.pending->sourceResultBorrower_&&!r.pending->sourceDirectTransformBorrower_));
+             !r.pending->reference60_&&!r.pending->sourceAssociationBorrower_&&!r.pending->sourceResultBorrower_&&!r.pending->sourceDirectTransformBorrower_&&!r.pending->sourceUpdateBorrower_));
         if(!s.attempted||s.nativeWithdrawn||!shape8C_||!s.file||!sourceNodes_.returned125890||
            sourceNodes_.nativeWithdrawn||sourceArrays_.nativeWithdrawn)return false;
         if(!r.pending)return !r.allocationAttempted&&!r.published&&!r.publishedIdentity&&!r.storesReturned&&
@@ -95,7 +95,7 @@
         if((sourceTransform_.attempted&&!sourceTransform_.nativeWithdrawn)||!preflightSourceType0ResourceNative())return false;
         if(r.pending){
             auto& resource=*r.pending;auto& f=resource.source_;
-            if(resource.sourceAssociationBorrower_||resource.sourceResultBorrower_||resource.sourceDirectTransformBorrower_||sourceResult_.live)return false;
+            if(resource.sourceAssociationBorrower_||resource.sourceResultBorrower_||resource.sourceDirectTransformBorrower_||resource.sourceUpdateBorrower_||sourceResult_.live)return false;
             //Explicit native cancellation, NOT source11AEE0/decrement history.
             //Original ref60 bytes and initialized receipt stay historical.
             resource.reference60_=0;f.raw.reset();f.nativeWithdrawn=true;

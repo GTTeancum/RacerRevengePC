@@ -159,7 +159,7 @@ bool OriginalSourceCollisionFile50LA::associateSource1326A0(
 bool OriginalSourceCollisionFile50LA::withdrawAssociationNative(D& d)noexcept {
     d={};if(!preflightNative())return fail(d,E::phase,0);
     if(!associationAttempted_||associationWithdrawn_)return true;
-    if(associatedResource_->sourceResultBorrower_||associatedResource_->sourceDirectTransformBorrower_||associatedResource_->sourceContactBorrower_)return fail(d,E::phase,0);
+    if(associatedResource_->sourceResultBorrower_||associatedResource_->sourceDirectTransformBorrower_||associatedResource_->sourceUpdateBorrower_||associatedResource_->sourceContactBorrower_)return fail(d,E::phase,0);
     //All checks precede mutation. This is native cancellation, not a source
     //1326A0(NULL) call or ref60 decrement. Arrays/Resource remain owned next.
     auto& s=*resolver_->freshFileCapacity_;

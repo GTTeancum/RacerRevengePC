@@ -7,6 +7,7 @@ namespace rr::platform {class OriginalUiCourseOwnedLifecycle50KG; class Original
 #include "original_standard_placement_globals50la.h"
 #include "original_application_entities50la.h"
 #include "scene_graph49p.h"
+#include "vehicle_visual49r_internal.h"
 #include "../assets/model_geometry49o.h"
 #include "../assets/import_scene48d.h"
 #include "../assets/original_standard_texture_resource50la.h"
@@ -406,6 +407,21 @@ class OriginalRacerModelSceneOwner50LA final {
         std::array<float,4>& half)noexcept;
     bool preflightSourceBoundsHistoryNative()const noexcept;
 
+    //Fresh post-pose28E230 invocation. Earlier28B550/28D670 receipts stay
+    //immutable; this occurrence alone owns its new cache/bounds mutations.
+    struct SourceObserverBounds28E230 {
+        const OriginalRacerModelSceneOwner50LA* owner=nullptr;
+        const SceneNode49P* canonicalNodes=nullptr;
+        std::uint32_t count=0,root=0,pc=0;
+        bool entered=false,returned=false;
+        std::array<SceneNode49P,maxSceneNodes49P> before{},after{};
+        std::array<std::uint32_t,4> bounds160Before{},bounds170Before{};
+        std::optional<std::uint32_t> radiusBefore;
+        std::array<std::uint32_t,4> centerBefore{},halfBefore{},centerAfter{},halfAfter{};
+    };
+    R produceSourceObserverBounds28E230(const SceneGraph49P&,std::array<std::uint32_t,4>&,
+        std::array<std::uint32_t,4>&,SourceObserverBounds28E230&)noexcept;
+    bool sourceObserverBoundsHistoryNative(const SceneGraph49P&,const SourceObserverBounds28E230&)const noexcept;
     struct SourceGeometry26EE38 {
         std::unique_ptr<rr::assets::OriginalStandardModelGeometry50LA> pending;
         std::shared_ptr<rr::assets::OriginalStandardModelGeometry50LA> owner;
@@ -555,6 +571,30 @@ class OriginalRacerModelSceneOwner50LA final {
     const void* sourceSmokerBorrower_=nullptr; //Actual nullable source model40 borrower; not a guest field.
     // Actual source28B550(Model,NULL,stack), root-only copy route. Entity
     // attachment is distinct from SceneObject.parent180 and is not rejected.
+    //Exact NULL-relative, t0=0,t1=1,t2=0 branch. Nested owner supplies
+    //actual Base60/70; no public prepared-pose or source completion grant.
+    struct SourcePostPoseWorld28B550;
+    struct SourceOrientation28A090 {
+        const OriginalRacerModelSceneOwner50LA* owner=nullptr;
+        const SceneNode49P* canonicalNodes=nullptr;
+        std::uint32_t count=0,root=0,pc=0;
+        bool entered=false,guardReturned=false,scratchInitialized=false,inputsCopied=false;
+        bool numericReturned=false,parentRead=false,rootMarked=false,rootCleared=false,returned=false;
+        std::uint8_t lookKnown=0,upKnown=0,xyzMask=0;
+        std::uint16_t matrixMask=0;
+        OriginalStandardPlacementGlobals50LA::History guard;
+        std::array<std::uint32_t,4> look{},up{},savedXYZ{{0,0,0,0x3f800000u}};
+        std::array<std::uint32_t,16> scratch{};
+        std::array<SceneNode49P,maxSceneNodes49P> before{},after{};
+        std::array<std::uint32_t,maxSceneNodes49P> invalidationOrder{};
+        std::uint32_t invalidationCount=0;
+    };
+    R orientSourceNullRelative28A090(const SceneGraph49P&,const std::uint32_t* look,
+        const std::uint32_t* lookKnown,const std::uint32_t* up,const std::uint32_t* upKnown,
+        SourceOrientation28A090&)noexcept;
+    bool sourceOrientationHistoryNative(const SceneGraph49P&,const SourceOrientation28A090&,
+        const SourcePostPoseWorld28B550* laterWorld=nullptr,
+        const SourceObserverBounds28E230* laterBounds=nullptr)const noexcept;
     struct SourceTranslation28ADD0 {
         const OriginalRacerModelSceneOwner50LA* owner=nullptr;
         const SceneNode49P* canonicalNodes=nullptr;
@@ -570,7 +610,10 @@ class OriginalRacerModelSceneOwner50LA final {
     };
     R translateSourceNullRelative28ADD0(const SceneGraph49P&,const std::uint32_t* input,
         const std::uint32_t* known,SourceTranslation28ADD0&)noexcept;
-    bool sourceTranslationHistoryNative(const SceneGraph49P&,const SourceTranslation28ADD0&)const noexcept;
+    bool sourceTranslationHistoryNative(const SceneGraph49P&,const SourceTranslation28ADD0&,
+        const SourceOrientation28A090* laterOrientation=nullptr,
+        const SourcePostPoseWorld28B550* laterWorld=nullptr,
+        const SourceObserverBounds28E230* laterBounds=nullptr)const noexcept;
     struct SourceLocalBounds28D670 {
         const OriginalRacerModelSceneOwner50LA* owner=nullptr;
         const SceneNode49P* canonicalNodes=nullptr;
@@ -590,7 +633,10 @@ class OriginalRacerModelSceneOwner50LA final {
     R produceSourceLocalBounds28D670(const SceneGraph49P&,std::array<std::uint32_t,4>& center,
         std::array<std::uint32_t,4>& half,SourceLocalBounds28D670&)noexcept;
     bool sourceLocalBoundsHistoryNative(const SceneGraph49P&,const SourceLocalBounds28D670&,
-        const SourceTranslation28ADD0* laterTranslation=nullptr)const noexcept;
+        const SourceTranslation28ADD0* laterTranslation=nullptr,
+        const SourceOrientation28A090* laterOrientation=nullptr,
+        const SourcePostPoseWorld28B550* laterWorld=nullptr,
+        const SourceObserverBounds28E230* laterBounds=nullptr)const noexcept;
     struct SourceWorld28B550 {
         const OriginalRacerModelSceneOwner50LA* owner=nullptr;
         const void* canonicalNodes=nullptr;
@@ -654,6 +700,59 @@ class OriginalRacerModelSceneOwner50LA final {
             h.flags190After==h.flags190Before&&h.world==h.worldBefore;
         return h.refreshAttempted&&h.refreshWordMask==0xffffu&&
             h.flags190After==static_cast<std::uint8_t>(h.flags190Before|1u)&&h.world==h.localBefore;
+    }
+
+    //One genuine post-orientation28B550 occurrence, independent of earlier
+    //initialization getters. Full graph snapshots pin unchanged child caches.
+    struct SourcePostPoseWorld28B550 {
+        bool entered=false,returned=false;
+        const OriginalRacerModelSceneOwner50LA* owner=nullptr;
+        const SceneNode49P* canonicalNodes=nullptr;
+        std::uint32_t count=0,root=0,pc=0;
+        SourceWorld28B550 getter;
+        std::array<SceneNode49P,maxSceneNodes49P> before{},after{};
+    };
+    R copySourcePostPoseWorld28B550(const SceneGraph49P& graph,
+        std::array<std::uint32_t,16>& output,SourcePostPoseWorld28B550& h)noexcept {
+        if(h.entered||!preflightSourceRenderableReturn26E820Native()||
+           graph.nodes!=sourceConstructor_.canonicalNodes||graph.count!=binding_.sourceRowCount||
+           !graph.count||graph.count>maxSceneNodes49P||!validateSceneGraph49P(graph)||
+           !inRange(graph,model_.sceneIndex)||at(graph,model_.sceneIndex).parent180!=none)
+            return {S::phase,0x28b550u};
+        h.entered=true;h.owner=this;h.canonicalNodes=graph.nodes;h.count=graph.count;
+        h.root=static_cast<std::uint32_t>(model_.sceneIndex);
+        for(std::uint32_t i=0;i<h.count;++i)h.before[i]=h.after[i]=graph.nodes[i];
+        const auto r=copySourceWorld28B550(graph,output,h.getter);h.pc=r.sourcePC;
+        for(std::uint32_t i=0;i<h.count;++i)h.after[i]=graph.nodes[i];
+        h.returned=r.okay();return r;
+    }
+    bool sourcePostPoseWorldHistoryNative(const SceneGraph49P& graph,
+        const SourcePostPoseWorld28B550& h,const SourceObserverBounds28E230* laterBounds=nullptr)const noexcept {
+        if(laterBounds&&(!h.returned||!laterBounds->entered||!sourceObserverBoundsHistoryNative(graph,*laterBounds)))return false;
+        if(!h.entered)return !h.owner&&!h.canonicalNodes&&!h.count&&!h.root&&!h.pc&&!h.returned&&!h.getter.entered;
+        if(h.owner!=this||h.canonicalNodes!=graph.nodes||h.count!=graph.count||!h.count||
+           h.count>maxSceneNodes49P||h.root>=h.count||h.root!=static_cast<std::uint32_t>(model_.sceneIndex)||
+           !validateSceneGraph49P(graph)||h.before[h.root].parent180!=none)return false;
+        const auto& g=h.getter;
+        if(!g.entered){if(h.returned||h.pc!=0x28b550u)return false;}
+        else if(!g.returned||!sourceWorldHistoryCurrentNative(g)||g.owner!=this||g.canonicalNodes!=graph.nodes||
+           g.graphCount!=h.count||g.sceneIndex!=h.root||h.returned!=g.returned||h.pc!=g.pc||
+           g.flags190Before!=h.before[h.root].sceneFlags190||
+           std::memcmp(g.localBefore.data(),h.before[h.root].localC0.v,64)||
+           std::memcmp(g.worldBefore.data(),h.before[h.root].world100.v,64))return false;
+        for(std::uint32_t i=0;i<h.count;++i){
+            const auto& b=h.before[i];const auto& a=h.after[i];const auto& c=laterBounds?laterBounds->before[i]:graph.nodes[i];
+            if(b.parent180!=a.parent180||b.firstChild184!=a.firstChild184||b.nextSibling188!=a.nextSibling188||
+               c.parent180!=a.parent180||c.firstChild184!=a.firstChild184||c.nextSibling188!=a.nextSibling188||
+               std::memcmp(b.localC0.v,a.localC0.v,64)||std::memcmp(c.localC0.v,a.localC0.v,64)||
+               std::memcmp(c.world100.v,a.world100.v,64)||c.sceneFlags190!=a.sceneFlags190)return false;
+            const bool refreshed=i==h.root&&g.entered&&g.returned&&g.refreshAttempted;
+            if(a.sceneFlags190!=(refreshed?std::uint8_t(b.sceneFlags190|1u):b.sceneFlags190)||
+               std::memcmp(a.world100.v,refreshed?b.localC0.v:b.world100.v,64))return false;
+            if(i==h.root&&g.entered&&(g.flags190After!=a.sceneFlags190||
+               (g.worldReady&&std::memcmp(g.world.data(),a.world100.v,64))))return false;
+        }
+        return true;
     }
 
     struct SourcePoint28BAB0 {
@@ -1884,3 +1983,7 @@ private:
 #include "original_racer_source_local_bounds50la.inl"
 
 #include "original_racer_source_translation50la.inl"
+
+#include "original_racer_source_orientation50la.inl"
+
+#include "original_racer_source_observer_bounds50la.inl"

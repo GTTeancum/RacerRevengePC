@@ -1,3 +1,4 @@
+#include "../game/original_standard_placement_globals50la.h"
 #include "vehicle_visual_authoring49r.h"
 #include <cfenv>
 #include <cmath>
@@ -218,6 +219,7 @@ void initializeVehicleVisualConstructorRecords49R(rr::game::VehicleVisualState49
 }
 void initializeVehicleVisualSharedColdRecords49R(rr::game::VisualShared49R& shared) noexcept {
     for(auto& g:shared.globals)g={0,0};
+    rr::game::OriginalStandardPlacementGlobals50LA::basisNativeRouteUnknown();
     shared.orientationSentinel4433D8={0,0}; shared.zero434630={{0,0,0,1}};
 }
 }

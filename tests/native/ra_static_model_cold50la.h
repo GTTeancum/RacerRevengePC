@@ -196,6 +196,24 @@ private:
             bool nullObserverEntered=false,nullObserverReturned=false;
             bool positionEntered=false,positionReturned=false;
             std::optional<g::OriginalSourcePhysicsModel50LA::Result> positionResult;
+            bool orientationEntered=false,orientationReturned=false;
+            std::optional<g::OriginalSourcePhysicsModel50LA::Result> orientationResult;
+            bool directUpdateEntered=false,directUpdateReturned=false;
+            std::optional<g::OriginalSourcePhysicsCollision50LA::Result> directUpdateResult;
+            bool resultUpdateEntered=false,resultUpdateReturned=false;
+            std::optional<g::OriginalSourcePhysicsCollision50LA::Result> resultUpdateResult;
+            bool directMembershipEntered=false,directMembershipReturned=false;
+            std::optional<const void*> directMembershipZone; //Actual typed BaseB8 load; engaged NULL is known.
+            std::uint32_t directMembershipMode=0;
+            std::optional<g::OriginalSourcePhysicsCollision50LA::Result> directMembershipResult;
+            bool resultMembershipEntered=false,resultMembershipReturned=false;
+            std::optional<const void*> resultMembershipZone;
+            std::uint32_t resultMembershipMode=0;
+            std::optional<g::OriginalSourcePhysicsCollision50LA::Result> resultMembershipResult;
+            bool modelObserverEntered=false;
+            std::optional<const void*> modelObserverZone; //Actual BaseB4, not collisionB8.
+            std::uint32_t modelObserverMode=0;
+            std::optional<g::OriginalSourcePhysicsModel50LA::Result> modelObserverResult;
             std::optional<g::OriginalSourcePhysicsModel50LA::Result> nullObserverResult;
             std::optional<g::OriginalSourcePhysicsBody50LA::Result> bodyQuadResult;
             std::array<std::uint32_t,8> contactArguments{};

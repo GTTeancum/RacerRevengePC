@@ -9,7 +9,7 @@
         return sourceResource_.pending->sourceContactBorrower_==sourceContactBorrower_;
     }
     bool pinSourceContactPoints296190(const void* occurrence,const OriginalRacerSceneObject50LA* model)noexcept {
-        if(!occurrence||sourceContactPinAttempted_||sourcePrefix_.nativeWithdrawn||sourceResource_.nativeWithdrawn||
+        if(!occurrence||sourceContactPinAttempted_||sourceUpdate_.leaseAttempted||sourcePrefix_.nativeWithdrawn||sourceResource_.nativeWithdrawn||
            sourceTransform_.nativeWithdrawn||!sourceTransform_.returned||!sourceResult_.live||
            !sourceResource_.pending||sourceResource_.pending->sourceAssociationBorrower_!=sourcePrefix_.file.get()||
            sourcePrefix_.model!=model||!preflightSourceType0PrefixNative())return false;
@@ -55,7 +55,7 @@
     }
     bool unpinSourceContactPointsNative(const void* occurrence)noexcept {
         if(!sourceContactPinAttempted_)return true;
-        if(occurrence!=sourceContactHistory_||!preflightSourceContactLeaseNative())return false;
+        if(occurrence!=sourceContactHistory_||sourceUpdate_.live||!preflightSourceContactLeaseNative())return false;
         if(sourceContactNativeWithdrawn_)return true;
         if(!preflightSourceType0PrefixNative())return false;
         sourceResource_.pending->sourceContactBorrower_=nullptr;sourceContactBorrower_=nullptr;

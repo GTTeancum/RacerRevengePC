@@ -951,7 +951,249 @@ bool Owner::continueSourcePostParticleModels1AA194(std::uint32_t& pc)noexcept {
                                 if(position.status!=g::OriginalSourcePhysicsModel50LA::Status::reached||
                                    position.sourcePC!=0x28af90u||!h.nestedModel->translation_.returned)return stop(position.sourcePC);
                                 config.positionReturned=true;
-                                return stop(0x1666f8u); //Actual28ADD0 return; subsequent orientation and world transforms remain unissued.
+                                at(0x1666f8);
+                                //Actual1666F8..166714: a0=same Model14C,a1=NULL,
+                                //a2=&same Base60,a3=&same Base70,t0=0,t1=1,t2=0.
+                                //The narrow callee owns raw Base reads after its independent
+                                //process guard and saved-translation snapshot, not this caller.
+                                at(0x166710);config.orientationEntered=true;
+                                const auto orientation=h.nestedModel->orientSourceNullRelative28A090(&config);
+                                config.orientationResult=orientation;
+                                if(orientation.status!=g::OriginalSourcePhysicsModel50LA::Status::reached||
+                                   orientation.sourcePC!=0x28a528u||!h.nestedModel->orientation_.returned)return stop(orientation.sourcePC);
+                                config.orientationReturned=true;
+                                at(0x166718);
+                                //Actual16671C delay-slot argument is this BaseE4, not E0/E8.
+                                //11FE50 owns a fresh28B550 getter and one11F680 pass;
+                                //neither initialization getter nor either initialization pass is replayed.
+                                config.directUpdateEntered=true;
+                                const auto directUpdate=h.sourceCollisionE4->updateSourceDirectType0_11FE50(&config,
+                                    [&](const void* updateOccurrence,const void* collisionOccurrence,
+                                        std::array<std::uint32_t,16>& incoming,std::uint16_t& known)noexcept
+                                        ->g::OriginalSourcePhysicsBody50LA::Result {
+                                        const auto world=h.nestedModel->copySourcePostPoseWorld28B550(
+                                            updateOccurrence,collisionOccurrence,incoming,known);
+                                        using ModelStatus=g::OriginalSourcePhysicsModel50LA::Status;
+                                        using BodyStatus=g::OriginalSourcePhysicsBody50LA::Status;
+                                        return {world.status==ModelStatus::reached?BodyStatus::reached:
+                                            world.status==ModelStatus::owner?BodyStatus::owner:BodyStatus::bounded,world.sourcePC};
+                                    });
+                                config.directUpdateResult=directUpdate;
+                                if(directUpdate.status!=g::OriginalSourcePhysicsCollision50LA::Status::reached||
+                                   directUpdate.sourcePC!=0x11ff5cu||!h.sourceCollisionE4->postUpdate_.returned)return stop(directUpdate.sourcePC);
+                                config.directUpdateReturned=true;
+                                at(0x166720);
+                                //Actual166724 delay-slot argument is this BaseE0. This distinct
+                                //result-backed occurrence follows the genuine E4 control return;
+                                //its new28B550 getter may copy the proven clean root, not replay E4.
+                                config.resultUpdateEntered=true;
+                                const auto resultUpdate=h.sourceCollisionE0->updateSourceResultType0_11FE50(
+                                    &config,*h.sourceCollisionE4,
+                                    [&](const void* updateOccurrence,const void* collisionOccurrence,
+                                        std::array<std::uint32_t,16>& incoming,std::uint16_t& known)noexcept
+                                        ->g::OriginalSourcePhysicsBody50LA::Result {
+                                        const auto world=h.nestedModel->copySourcePostE4World28B550(
+                                            updateOccurrence,collisionOccurrence,incoming,known);
+                                        using ModelStatus=g::OriginalSourcePhysicsModel50LA::Status;
+                                        using BodyStatus=g::OriginalSourcePhysicsBody50LA::Status;
+                                        return {world.status==ModelStatus::reached?BodyStatus::reached:
+                                            world.status==ModelStatus::owner?BodyStatus::owner:BodyStatus::bounded,world.sourcePC};
+                                    });
+                                config.resultUpdateResult=resultUpdate;
+                                if(resultUpdate.status!=g::OriginalSourcePhysicsCollision50LA::Status::reached||
+                                   resultUpdate.sourcePC!=0x11ff5cu||!h.sourceCollisionE0->postUpdate_.returned)return stop(resultUpdate.sourcePC);
+                                config.resultUpdateReturned=true;
+                                at(0x166728u);
+                                //Actual E4 pointer reload, then typed BaseB8 at16672C.
+                                //An absent optional is unknown, not sourceNULL; raw Fields
+                                //storage cannot manufacture a guest pointer or this load.
+                                if(!h.bodyOwner->object_||!h.sourceCollisionE4||!h.sourceCollisionE0||
+                                   h.bodyOwner->object_->collisionE4!=std::optional<g::OriginalCollisionBaseOwner50LA*>(
+                                       h.sourceCollisionE4->collision_.get()))return stop(0x166728u);
+                                at(0x16672cu);
+                                if(!h.bodyOwner->object_->collisionB8)return stop(0x16672cu);
+                                config.directMembershipZone=*h.bodyOwner->object_->collisionB8;
+                                //166734 delay slot supplies mode2; the later E0 registration also uses mode2.
+                                config.directMembershipMode=2u;at(0x166730u);
+                                config.directMembershipEntered=true;
+                                const auto makeCollisionMethod=[&](bool resultBacked)noexcept {
+                                    //Only these caller-owned occurrences can authorize callbacks;
+                                    //capture the selected owner by value, never a mutable routing slot.
+                                    auto* const target=resultBacked?h.sourceCollisionE0.get():h.sourceCollisionE4.get();
+                                    return [&,target](const void* actualZone,const void* registrationOccurrence,
+                                    const void* actualCOL,NativeListMethodCustody*& method,std::optional<std::uint32_t>& slot,
+                                    bool& selectionPending,std::uint32_t& methodPC,bool select)noexcept {
+                                    //Native same-world custody proof for the actual27B43C ->165ED0
+                                    //collisionB8 argument. Never resolve it through visibility4C0/B4.
+                                    methodPC=select?0x280afcu:0x27f5b4u;
+                                    if(!h.collisionRead||!h.collisionB8Stored||!h.collisionZone||*h.collisionZone>=10||
+                                       !h.bodyOwner||!h.bodyOwner->object_||!h.bodyOwner->object_->collisionB8||
+                                       actualZone!=*h.bodyOwner->object_->collisionB8||actualZone!=h.collisionNode||
+                                       !target||actualCOL!=target->collision_.get()||
+                                       registrationOccurrence!=&target->membershipRegistration_||
+                                       !sourceTopologyMode_||sourceTopologyWithdrawn_||!sourceCollision4C4_||
+                                       *sourceCollision4C4_!=sourceCollisionSlots4C4_.get()||!sourceCollisionSlots4C4_||
+                                       *h.collisionZone>=sourceCollisionPublished_)return false;
+                                    const auto zone=*h.collisionZone;auto& node=sourceSearchNodes_[1][zone];
+                                    if(node.withdrawn||!node.published||!node.owner||!node.ordinalKnown||
+                                       sourceCollisionSlots4C4_[zone]!=node.owner.get()||actualZone!=node.owner.get()||
+                                       !preflightSourceSearchNodeNative(node,zone,true))return false;
+                                    //Mode2 follows27F5B4, selecting collision dynamic method kind3
+                                    //(World4D4), NOT collision static kind1/World4CC.
+                                    if(!select)method=node.owner->nativeList38;
+                                    if(method!=node.owner->nativeList38||!method||!nativeMethods4D4_||
+                                       nativeMethods4D4_[zone]!=method||!sourceListMethodArrayCurrent(3,zone,method))return false;
+                                    const auto& publication=sourceListMethods_[3][zone];
+                                    if(!publication.arrayPublished||!publication.aliasPublished||!publication.aliasRetained||
+                                       publication.withdrawn||publication.aliasNode!=node.owner.get()||
+                                       !method->sourceMode_||method->world_!=static_cast<const ra_pod_scene50LA::Owner*>(this)||
+                                       method->application_!=worldApplication_.get()||method->ordinal_!=30u+zone||
+                                       method->usage10_!=2||method->reference00_!=2||
+                                       !method->source_.constructorReturned||method->source_.vtable08!=0x3d2d30u||
+                                       !sourceListEntriesCurrent(*method))return false;
+                                    if(!select)return true;
+                                    //Actual3D2D30+20=27E3B0 tailcalls27E3C0 with a3(NULL)
+                                    //as requested slot. +24=27E570 is owned by COL insertion.
+                                    return selectSourceObserverSlot27E3C0(*method,registrationOccurrence,actualCOL,
+                                        slot,selectionPending,methodPC,2u);
+                                };
+                                };
+                                const auto makeCollisionPortal=[&](bool resultBacked)noexcept {
+                                    //Only these caller-owned occurrences can authorize callbacks;
+                                    //capture the selected owner by value, never a mutable routing slot.
+                                    auto* const target=resultBacked?h.sourceCollisionE0.get():h.sourceCollisionE4.get();
+                                    return [&,target](unsigned phase,const void* registration,const void* actualCOL,
+                                    const void* actualZone,const std::array<std::uint32_t,4>& center,const void* cursor,
+                                    auto& edge,std::shared_ptr<const void>& graphPin,std::uint32_t& portalPC)noexcept {
+                                    portalPC=phase==0?0x280c34u:phase==2?0x280c90u:phase==4?0x280cf8u:0x280c40u;
+                                    if(phase>4||!target||registration!=&target->membershipRegistration_||
+                                       actualCOL!=target->collision_.get()||!h.collisionRead||!h.collisionB8Stored||
+                                       !h.collisionZone||*h.collisionZone>=10||!h.bodyOwner||!h.bodyOwner->object_||
+                                       !h.bodyOwner->object_->collisionB8||actualZone!=*h.bodyOwner->object_->collisionB8||
+                                       actualZone!=h.collisionNode||center!=target->membershipRegistration_.center||
+                                       !sourceTopologyMode_||sourceTopologyWithdrawn_||!sourceCollision4C4_||
+                                       *sourceCollision4C4_!=sourceCollisionSlots4C4_.get()||!sourceCollisionSlots4C4_||
+                                       *h.collisionZone>=sourceCollisionPublished_)return false;
+                                    const auto zone=*h.collisionZone;auto& root=sourceSearchNodes_[1][zone];
+                                    if(root.withdrawn||!root.published||!root.owner||actualZone!=root.owner.get()||
+                                       sourceCollisionSlots4C4_[zone]!=root.owner.get()||
+                                       !preflightSourceSearchNodeNative(root,zone,true)||
+                                       !sourcePortalWorldLinksCurrent(*root.owner,true,zone))return false;
+                                    if(phase==0){
+                                        if(graphPin||cursor)return false;
+                                        for(const auto& old:sourceCollisionPortalBorrows_)
+                                            if(old.registration==registration&&!old.token.expired())return false;
+                                        //Allocate native custody before exposing the source head pointer.
+                                        //Weak root records never keep a completed COL borrower alive.
+                                        try{std::shared_ptr<const void> token=std::make_shared<std::uint8_t>(0);
+                                            sourceCollisionPortalBorrows_.push_back({registration,token});graphPin=std::move(token);
+                                        }catch(...){return false;}
+                                        edge.next=root.owner->portalLinks30.get();return true;
+                                    }
+                                    bool pinned=false;
+                                    for(const auto& borrow:sourceCollisionPortalBorrows_)if(borrow.registration==registration){
+                                        const auto live=borrow.token.lock();if(live&&live==graphPin){pinned=true;break;}}
+                                    if(!pinned||!graphPin||!cursor)return false;
+                                    std::size_t index=0;while(index<40&&sourcePortalWorldLinks_[index/4][index%4].published!=cursor)++index;
+                                    //Odd links are collision namespace (stages1/3), never visibility0/2.
+                                    if(index==40||!(index&1u))return false;
+                                    auto& link=sourcePortalWorldLinks_[index/4][index%4];
+                                    if(link.withdrawn||link.knownMask!=31||!link.published||link.from!=root.owner.get()||!link.to)return false;
+                                    auto& raw=*link.published;const auto& portal=nativePortals_[index/4];
+                                    if(!portal||!portal->sourceMode||raw.neighbor04!=&link.to->entity||
+                                       raw.portal08!=&portal->entity||!portal->source.loadReturned||
+                                       portal->source.normalKnown!=7||!portal->source.normalNormalized||portal->source.copiedVertices!=4)return false;
+                                    for(unsigned i=0;i<4;++i)if(portal->source.edgeKnown[i]!=7||!portal->source.edgeNormalized[i])return false;
+                                    if(phase==1){
+                                        edge.entered=true;edge.edge=cursor;edge.edgeIndex=index;
+                                        edge.neighbor=raw.neighbor04;edge.portal=raw.portal08;
+                                        //Actual231150 uses center and f12=+0, not half/radius80.
+                                        portalPC=0x231150u;
+                                        const bool overlapOkay=g::source_portal_overlap231150::run(portal->source.vertices30,portal->source.normal70,
+                                            portal->source.edges80,center,0u,edge.overlap);
+                                        edge.overlapReturned=edge.overlap.returned;edge.hit=edge.overlap.hit;edge.distance=edge.overlap.outputDistance;
+                                        if(!overlapOkay){portalPC=edge.overlap.pc;return false;}
+                                        portalPC=0x280c54u;if(!edge.hit)return true;
+                                        if(!edge.distance)return false;
+                                        portalPC=0x280c60u;raw.field10=*edge.distance;link.distance10=edge.distance;edge.distanceStoreMask|=1u;
+                                        portalPC=0x280c64u;raw.field0C=*edge.distance;link.distance0C=edge.distance;edge.distanceStoreMask|=2u;
+                                    }else if(edge.edge!=cursor||edge.edgeIndex!=index||edge.neighbor!=raw.neighbor04||edge.portal!=raw.portal08||
+                                             !g::source_portal_overlap231150::historyCurrent(edge.overlap))return false;
+                                    if(phase==4){edge.next=raw.next00.get();portalPC=0x280cf8u;return true;}
+                                    if(phase==3&&!edge.hit)return true;
+                                    //The source keeps a method cursor: each hit reads its usage10,
+                                    //then resolves the neighbor method using that same mode2.
+                                    portalPC=phase==1?0x280c6cu:portalPC;
+                                    const auto* prior=edge.previousMethod;
+                                    if(!prior||!prior->sourceMode_||prior->world_!=static_cast<const ra_pod_scene50LA::Owner*>(this)||
+                                       prior->application_!=worldApplication_.get()||prior->usage10_!=2||prior->ordinal_<30||prior->ordinal_>=40||
+                                       !sourceListMethodArrayCurrent(3,prior->ordinal_-30,prior))return false;
+                                    std::size_t neighborZone=0;while(neighborZone<10&&sourceCollisionSlots4C4_[neighborZone]!=link.to)++neighborZone;
+                                    if(neighborZone==10||neighborZone>=sourceCollisionPublished_)return false;
+                                    auto& neighbor=sourceSearchNodes_[1][neighborZone];
+                                    if(neighbor.withdrawn||!neighbor.published||neighbor.owner.get()!=link.to||
+                                       !preflightSourceSearchNodeNative(neighbor,neighborZone,true))return false;
+                                    if(phase==1){portalPC=0x27f5b4u;edge.method=link.to->nativeList38;edge.methodReturned=true;}
+                                    auto* method=edge.method;
+                                    if(!method||method!=link.to->nativeList38||!nativeMethods4D4_||nativeMethods4D4_[neighborZone]!=method||
+                                       !sourceListMethodArrayCurrent(3,neighborZone,method)||method->usage10_!=2||method->reference00_!=2||
+                                       !method->sourceMode_||method->world_!=static_cast<const ra_pod_scene50LA::Owner*>(this)||
+                                       method->application_!=worldApplication_.get()||method->ordinal_!=30u+neighborZone||
+                                       !method->source_.constructorReturned||method->source_.vtable08!=0x3d2d30u||
+                                       !sourceListEntriesCurrent(*method))return false;
+                                    const auto& publication=sourceListMethods_[3][neighborZone];
+                                    if(!publication.arrayPublished||!publication.aliasPublished||!publication.aliasRetained||
+                                       publication.withdrawn||publication.aliasNode!=link.to)return false;
+                                    if(phase==2){portalPC=0x280c90u;
+                                        if(!edge.overlap.returned||!edge.overlap.hit||edge.distanceStoreMask!=3u||!edge.methodReturned)return false;
+                                        return selectSourceObserverSlot27E3C0(*method,&edge,actualCOL,
+                                            edge.slot,edge.selectionPending,portalPC,2u);}
+                                    return phase==1||phase==3;
+                                };
+                                };
+                                const auto membership=h.sourceCollisionE4->registerSourceDirectMembership120070(
+                                    &config,*h.sourceCollisionE0,*config.directMembershipZone,config.directMembershipMode,makeCollisionMethod(false),makeCollisionPortal(false));
+                                config.directMembershipResult=membership;
+                                if(membership.status!=g::OriginalSourcePhysicsCollision50LA::Status::reached||
+                                   membership.sourcePC!=0x120224u||!h.sourceCollisionE4->membershipRegistration_.returned)
+                                    return stop(membership.sourcePC);
+                                config.directMembershipReturned=true;
+                                at(0x166738u);
+                                //Actual E0 reload only after the E4 call genuinely returned120224.
+                                //The result-backed COL has a distinct observer/list/pool occurrence.
+                                if(!h.bodyOwner->object_||!h.sourceCollisionE0||
+                                   h.bodyOwner->object_->collisionE0!=std::optional<g::OriginalCollisionBaseOwner50LA*>(
+                                       h.sourceCollisionE0->collision_.get()))return stop(0x166738u);
+                                at(0x16673cu);
+                                if(!h.bodyOwner->object_->collisionB8)return stop(0x16673cu);
+                                config.resultMembershipZone=*h.bodyOwner->object_->collisionB8;
+                                config.resultMembershipMode=2u;at(0x166740u); //Mode2 in166744 delay slot.
+                                config.resultMembershipEntered=true;
+                                const auto resultMembership=h.sourceCollisionE0->registerSourceResultMembership120070(
+                                    &config,*h.sourceCollisionE4,*config.resultMembershipZone,config.resultMembershipMode,
+                                    makeCollisionMethod(true),makeCollisionPortal(true));
+                                config.resultMembershipResult=resultMembership;
+                                if(resultMembership.status!=g::OriginalSourcePhysicsCollision50LA::Status::reached||
+                                   resultMembership.sourcePC!=0x120224u||!h.sourceCollisionE0->membershipRegistration_.returned)
+                                    return stop(resultMembership.sourcePC);
+                                config.resultMembershipReturned=true;
+                                at(0x166748u);
+                                //Actual ModelBASE14C is distinct from embedded Entity+8.
+                                //Both preceding COL registrations genuinely returned before this call.
+                                if(!config.directMembershipReturned||!h.bodyOwner->object_||!h.nestedModel||
+                                   h.nestedModel->nativeWithdrawn_||!h.nestedModel->model_||
+                                   h.bodyOwner->object_->model14C!=&h.nestedModel->model_->model_)return stop(pc);
+                                at(0x16674cu);
+                                if(!h.bodyOwner->object_->visibilityB4)return stop(pc);
+                                config.modelObserverZone=*h.bodyOwner->object_->visibilityB4;
+                                config.modelObserverMode=2u;at(0x166750u); //166754 delay-slot mode2.
+                                config.modelObserverEntered=true;
+                                const auto modelObserver=h.nestedModel->beginSourceModelObserver28E8A0(
+                                    &config,*config.modelObserverZone,config.modelObserverMode);
+                                config.modelObserverResult=modelObserver;
+                                //The bounded prefix retains publication/constructor/guard effects,
+                                //but fresh28E230 is still unissued. No Model return or Body+AC call.
+                                return stop(modelObserver.sourcePC);
                             }
                             h.sourceDirectCollisionTransformEntered=true;
                             const auto directTransform=h.sourceCollisionE4->continueSourceDirectMissingTransform11F570();

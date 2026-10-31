@@ -4,9 +4,6 @@
 #include "../../tests/native/original_race_constructor50la.h"
 #include "../../tests/native/original_race_hud_scope50la.h"
 #include "../../tests/native/original_camera_session50kx.h"
-#include "../../tests/native/terrain_interactive_continuation50du.h"
-#include "../../tests/native/original_consumed_ra_stage50du.h"
-#include "../../tests/native/ra_cold_aggregate50la.h"
 #include "../../tests/native/native_ai_session50iv_fixture.h"
 #include <exception>
 #include <limits>
@@ -215,34 +212,6 @@ bool OriginalRaceTimingManager50LA::retireNativeDetached(std::uint32_t& pc)noexc
     p.closed=true;return true;
 }
 
-bool OriginalRaceConstructor50LA::initializeNativeTimingB4(
-    ::interactive_continuation50DU::Context& context,::native_racer50HN::Bank& bank,
-    std::uint32_t& pc)noexcept {
-    pc=0x1a7710;
-    if(resultsFeedbackThread_!=std::this_thread::get_id())return false;
-    //This is the actual EXISTING native cold manager producer, not permission
-    //to skip the incomplete original1A6BF0/world/controller/attachment tails.
-    if(!context.isRaTrack||!context.originalAiEnabled||context.consumedRaStage.race().get()!=this||
-       context.originalMainApplication.race28C()!=this||application_!=context.originalMainApplication.entities()||
-       !counted_||rolledBack_||!world74_||world74_!=context.raWorld||
-       world74_->terminal_||world74_->closed_||!world74_->runtimeQueries_||!world74_->source_)return false;
-    const auto& runtime=*world74_->runtimeQueries_;
-    if(runtime.terminal_||runtime.closed_||!runtime.cameraBankCurrent()||runtime.bankIdentity_!=&bank)return false;
-    const auto* source=world74_->source_->sourcesDecoded();
-    if(!source||context.navigationMap!=&source->map||!source->mapMetadata.bound||
-       source->map.track.count<2u||!profile_||
-       profile_!=context.originalMainApplication.riderProfile)return false;
-    try {
-        if(!timingB4_){
-            std::unique_ptr<OriginalRaceTimingManager50LA> next(new OriginalRaceTimingManager50LA(
-                application_,entity_.sessionGeneration,context.originalAiSession,bank));
-            if(!next->constructed()){pc=0x1af7f0;return false;}
-            timingB4_=std::move(next); //Actual1A7730 publication BEFORE subtype/load.
-        }
-        return timingB4_->continueNativeAssociation(*this,context.originalAiSession,bank,
-            source->map,source->mapMetadata,pc);
-    }catch(...){return false;} //Retain published B4/count and any reached effects.
-}
 bool OriginalRaceConstructor50LA::readResultsManagerFlags58(
     const ::original_camera_session50KX::Session& session,std::uint8_t& value,
     OriginalResults104Diagnostic50LA& d)const noexcept {

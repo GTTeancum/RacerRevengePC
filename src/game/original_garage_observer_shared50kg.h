@@ -24,6 +24,8 @@ class OriginalGarageObserverShared50KG final {
     friend class rr::platform::OriginalUiCourseOwnedLifecycle50KG;
     friend class rr::platform::OriginalUiGarageManagerSearch50KG;
     friend class OriginalApplicationEntities50LA;
+    friend class OriginalSourceCollisionObserver50LA;
+    friend class OriginalSourcePhysicsModel50LA;
     friend class rr::platform::OriginalUiLightManagerOwner50KG;
     friend class ::ra_pod_scene50LA::Owner;
     friend class ::ra_cold_aggregate50LA::Owner;

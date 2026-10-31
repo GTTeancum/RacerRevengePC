@@ -1,0 +1,91 @@
+name: Native Linux and Windows compile-only
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+concurrency:
+  group: native-build-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  linux:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Install compiler and link dependency
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends g++-14 zlib1g-dev
+          mkdir -p "$RUNNER_TEMP/toolchain-receipt"
+          dpkg-query -W g++-14 gcc-14 libstdc++-14-dev zlib1g-dev > "$RUNNER_TEMP/toolchain-receipt/packages.txt"
+      - name: Compile and link exact607-source Linux client (never launch)
+        env:
+          CXX: g++-14
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: python3 tools/ci/build_linux.py "$RUNNER_TEMP/native-linux"
+      - name: Preserve Linux diagnostics and binary
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: linux-build-${{ github.sha }}
+          retention-days: 7
+          if-no-files-found: warn
+          path: |
+            ${{ runner.temp }}/native-linux/*.json
+            ${{ runner.temp }}/native-linux/*.log
+            ${{ runner.temp }}/native-linux/*.d
+            ${{ runner.temp }}/native-linux/racer-revenge
+            ${{ runner.temp }}/toolchain-receipt/*
+  windows:
+    runs-on: windows-2022
+    timeout-minutes: 360
+    steps:
+      - name: Preserve manifest-authoritative LF bytes on checkout
+        shell: pwsh
+        run: git config --global core.autocrlf false
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Pinned official SDL2 headers (no binary installation)
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          repository: libsdl-org/SDL
+          ref: 5d249570393f7a37e037abf22cd6012a4cc56a71 # release-2.32.10
+          path: _ci_deps/SDL2
+          persist-credentials: false
+      - name: Native MSVC x64 compile and link only
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $vs = & $vswhere -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          if (-not $vs) { throw 'Hosted x64 MSVC toolchain missing' }
+          $devcmd = Join-Path $vs 'Common7\Tools\VsDevCmd.bat'
+          $cmd = '"' + $devcmd + '" -arch=x64 -host_arch=x64 >nul && set'
+          & $env:ComSpec /s /c $cmd | ForEach-Object {
+            if ($_ -match '^([^=]+)=(.*)$') { [Environment]::SetEnvironmentVariable($matches[1], $matches[2], 'Process') }
+          }
+          if ($LASTEXITCODE -ne 0) { throw 'MSVC developer environment failed' }
+          foreach ($name in @('CL','_CL_','LINK','_LINK_')) { [Environment]::SetEnvironmentVariable($name, $null, 'Process') }
+          & ./platform/windows/native/Build-Interactive50DU.ps1 `
+            -SourceRoot $env:GITHUB_WORKSPACE `
+            -BuildDirectory "$env:RUNNER_TEMP/native-windows" `
+            -Compiler (Get-Command cl.exe).Source -Linker (Get-Command link.exe).Source `
+            -SDL2IncludeDirectory "$env:GITHUB_WORKSPACE/_ci_deps/SDL2/include" `
+            -SourceRevision $env:GITHUB_SHA -MaxCompileJobs 1
+      - name: Preserve Windows diagnostics and binary
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: windows-build-${{ github.sha }}
+          retention-days: 7
+          if-no-files-found: warn
+          path: |
+            ${{ runner.temp }}/native-windows/*.json
+            ${{ runner.temp }}/native-windows/*.log
+            ${{ runner.temp }}/native-windows/*.rsp
+            ${{ runner.temp }}/native-windows/*.exe

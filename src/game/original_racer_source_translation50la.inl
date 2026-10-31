@@ -49,7 +49,10 @@ inline OriginalRacerModelSceneResult50LA OriginalRacerModelSceneOwner50LA::trans
     h.returned=true;h.pc=0x28af90u;return {S::complete,h.pc};
 }
 inline bool OriginalRacerModelSceneOwner50LA::sourceTranslationHistoryNative(
-    const SceneGraph49P& graph,const SourceTranslation28ADD0& h)const noexcept {
+    const SceneGraph49P& graph,const SourceTranslation28ADD0& h,const SourceOrientation28A090* laterOrientation,
+    const SourcePostPoseWorld28B550* laterWorld,const SourceObserverBounds28E230* laterBounds)const noexcept {
+    if((laterWorld&&!laterOrientation)||(laterBounds&&!laterWorld))return false;
+    if(laterOrientation&&(!h.returned||!laterOrientation->entered||!sourceOrientationHistoryNative(graph,*laterOrientation,laterWorld,laterBounds)))return false;
     if(!h.entered)return !h.owner&&!h.canonicalNodes&&!h.count&&!h.pc&&!h.returned&&!h.guard.entered;
     if(h.owner!=this||h.canonicalNodes!=graph.nodes||h.count!=graph.count||!h.count||h.count>maxSceneNodes49P||
        h.root>=h.count||h.root!=static_cast<std::uint32_t>(model_.sceneIndex)||
@@ -86,12 +89,12 @@ inline bool OriginalRacerModelSceneOwner50LA::sourceTranslationHistoryNative(
     //Current topology was authenticated before effects; check it again before
     //walking retained topology, so mutated links cannot make history recurse.
     if(!validateSceneGraph49P(graph))return false;
-    for(std::uint32_t i=0;i<h.count;++i){const auto& b=h.before[i];const auto& a=h.after[i];const auto& c=graph.nodes[i];
+    for(std::uint32_t i=0;i<h.count;++i){const auto& b=h.before[i];const auto& a=h.after[i];const auto& c=laterOrientation?laterOrientation->before[i]:graph.nodes[i];
         if(b.parent180!=a.parent180||b.firstChild184!=a.firstChild184||b.nextSibling188!=a.nextSibling188||
            c.parent180!=b.parent180||c.firstChild184!=b.firstChild184||c.nextSibling188!=b.nextSibling188)return false;}
     if(h.rootCleared)replay(replay,h.before[h.root].firstChild184);
     if(!valid||event!=h.invalidationCount)return false;
-    for(std::uint32_t i=0;i<h.count;++i){const auto& b=h.before[i];const auto& a=h.after[i];const auto& c=graph.nodes[i];
+    for(std::uint32_t i=0;i<h.count;++i){const auto& b=h.before[i];const auto& a=h.after[i];const auto& c=laterOrientation?laterOrientation->before[i]:graph.nodes[i];
         if(std::memcmp(a.world100.v,b.world100.v,64)||std::memcmp(c.world100.v,b.world100.v,64)||
            a.sceneFlags190!=flags[i]||c.sceneFlags190!=flags[i])return false;
         for(unsigned lane=0;lane<16;++lane){std::uint32_t before,after,current;

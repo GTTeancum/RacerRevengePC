@@ -4,6 +4,9 @@
         const void* occurrence=nullptr;
         const void* shapeIdentity=nullptr;
         const void* result90History=nullptr;
+        const rr::assets::OriginalSourceCollisionFile50LA* fileSnapshot=nullptr;
+        const Resource* resourceSnapshot=nullptr;
+        const OriginalRacerSceneObject50LA* modelSnapshot=nullptr;
         bool attempted=false,live=false,nativeWithdrawn=false;
         bool store54Returned=false,read48Attempted=false,read48Known=false,published90=false;
         std::uint32_t argument54=0,value48=0;
@@ -11,9 +14,10 @@
     } sourceResult_;
     bool preflightSourceResultShapeNative()const noexcept {
         const auto& l=sourceResult_;const auto& s=sourcePrefix_;const auto& r=sourceResource_;
-        if(!l.attempted)return !l.occurrence&&!l.shapeIdentity&&!l.result90History&&!l.live&&
+        if(!l.attempted)return !l.occurrence&&!l.shapeIdentity&&!l.result90History&&!l.fileSnapshot&&!l.resourceSnapshot&&!l.modelSnapshot&&!l.live&&
             !l.nativeWithdrawn&&!l.store54Returned&&!l.read48Attempted&&!l.read48Known&&!l.published90;
-        if(!l.occurrence||!l.shapeIdentity||!r.storesReturned||!r.pending||
+        if(!l.occurrence||!l.shapeIdentity||!l.fileSnapshot||!l.resourceSnapshot||!l.modelSnapshot||!r.storesReturned||!r.pending||
+           l.resourceSnapshot!=r.pending.get()||
            l.live==l.nativeWithdrawn||l.argument54||l.read48Known!=(l.read48Attempted&&l.read48.known==15)||
            (l.published90&&(!l.read48Known||!l.result90History))||
            (!l.published90&&l.result90History)||(l.read48Attempted&&!l.store54Returned))return false;
@@ -22,7 +26,7 @@
            (l.read48Known&&l.value48!=l.read48.bits())))return false;
         if(r.pending->sourceResultBorrower_!=(l.live?l.occurrence:nullptr))return false;
         if(s.nativeWithdrawn)return l.nativeWithdrawn&&!l.live;
-        if(l.shapeIdentity!=shape8C_.get()||!s.actual90||!*s.actual90)return false;
+        if(l.shapeIdentity!=shape8C_.get()||l.fileSnapshot!=s.file.get()||l.modelSnapshot!=s.model||!s.actual90||!*s.actual90)return false;
         const void* expected=l.live&&l.published90?l.result90History:nullptr;
         return **s.actual90==expected;
     }
@@ -32,6 +36,7 @@
            !r.pending||r.pending->sourceAssociationBorrower_!=s.file.get()||
            r.pending->sourceResultBorrower_||!preflightSourceType0PrefixNative())return false;
         l.attempted=true;l.live=true;l.occurrence=occurrence;l.shapeIdentity=shape8C_.get();
+        l.fileSnapshot=s.file.get();l.resourceSnapshot=r.pending.get();l.modelSnapshot=s.model;
         l.before54=s.local40[5];r.pending->sourceResultBorrower_=occurrence;
         return true; //Native lease only; no original shape/result store yet.
     }
@@ -62,7 +67,7 @@
     bool unpinSourceResultNative(const void* occurrence)noexcept {
         auto& l=sourceResult_;
         if(!l.attempted)return true;
-        if(l.occurrence!=occurrence)return false;
+        if(l.occurrence!=occurrence||sourceUpdate_.live)return false;
         if(l.nativeWithdrawn)return preflightSourceResultShapeNative();
         if(!preflightSourceType0PrefixNative())return false;
         //COL has retired its native result arrays/backing, including partial

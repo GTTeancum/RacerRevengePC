@@ -1,3 +1,4 @@
+#include "original_standard_placement_globals50la.h"
 #include "undertrack_reset50ew.h"
 #include "chariot_scene49u.h"
 #include "query_prepare48o.h"
@@ -128,6 +129,7 @@ void project(VehicleFrameState49W& s,const VehicleFrameBindings49W& b) noexcept 
     s.bodies.secondary.sceneFlags190=(s.bodies.secondary.sceneFlags190&0xffffff00u)|secondary.sceneFlags190;
 }
 void orientationGlobal(VehicleFrameState49W& s) noexcept {
+    OriginalStandardPlacementGlobals50LA::basisNativeRouteUnknown();
     auto& global=s.visualShared.orientationSentinel4433D8;
     if(!global.guard){global.word=0xffffffffu;global.guard=1;}
 }

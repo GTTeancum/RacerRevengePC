@@ -165,7 +165,7 @@
     bool withdrawSourceType0PrefixNative()noexcept {
         auto& s=sourcePrefix_;
         if(!s.attempted||s.nativeWithdrawn)return true;
-        if(sourceContactBorrower_||sourceResult_.live||sourceDirectTransform_.live||!preflightSourceType0PrefixNative()||!withdrawSourceType0TransformNative()||!withdrawSourceType0ResourceNative()||!withdrawSourceType0NodesNative()||!withdrawSourceType0ArraysNative())return false;
+        if(sourceContactBorrower_||sourceResult_.live||sourceDirectTransform_.live||sourceUpdate_.live||!preflightSourceType0PrefixNative()||!withdrawSourceType0TransformNative()||!withdrawSourceType0ResourceNative()||!withdrawSourceType0NodesNative()||!withdrawSourceType0ArraysNative())return false;
         //Native source-resource compensation (if reached) precedes arrays and
         //shape. This is not original11B600/destructor admission or cacheclear.
         *s.actual8C=nullptr;shape8C_.reset();retired_=true;s.nativeWithdrawn=true;

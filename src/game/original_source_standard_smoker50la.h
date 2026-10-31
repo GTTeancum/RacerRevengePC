@@ -187,8 +187,8 @@ class OriginalSourceStandardSmoker50LA final {
     Result attachModel141960(ActualAttach&& attach)noexcept {
         if(outerAttachEntered_||!configureReturned_||!configurationReturnV0_||!preflightNative()||
            !modelOwner_||!smoker_||configurationReturnV0_!=&smoker_->entity||
-           modelOwner_->model_.entity8.firstChild18)return at(Status::owner,0x27af58);
-        outerParent_=&modelOwner_->model_.entity8;outerAttachEntered_=true;
+           modelOwner_->model_.entity().firstChild18)return at(Status::owner,0x27af58);
+        outerParent_=modelOwner_->wreckModelStorage();outerAttachEntered_=true;
         outerAttachLock_=application_->attachmentLock423F58();
         if(!*outerAttachLock_){
             const auto r=attach(*outerParent_,smoker_->entity,0xffffffffu,*outerAttachLock_);
@@ -316,7 +316,7 @@ class OriginalSourceStandardSmoker50LA final {
            (emitter_->fields.known[0x1d4/4]&2u)!=2u||(emitter_->fields.words[0x1d4/4]&2u)!=2u||
            emitter_->fields.known[0x19c/4]!=0xffffffffu||emitter_->fields.words[0x19c/4]))return false;
         if(configureReturned_&&(!activated_||!smoker_||configurationReturnV0_!=&smoker_->entity))return false;
-        if(outerAttachEntered_&&(!configureReturned_||!modelOwner_||outerParent_!=&modelOwner_->model_.entity8||!outerAttachLock_))return false;
+        if(outerAttachEntered_&&(!configureReturned_||!modelOwner_||outerParent_!=&modelOwner_->model_.entity()||!outerAttachLock_))return false;
         if(outerAttachReturned_&&(!outerAttachEntered_||(*outerAttachLock_?outerAttached_:!outerAttached_)))return false;
         if(outerDetachedNative_&&!outerAttached_)return false;
         if(managerBound_&&(!outerAttachReturned_||!managerIdentity_||!emitter_||

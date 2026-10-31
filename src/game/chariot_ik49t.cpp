@@ -1,3 +1,4 @@
+#include "original_standard_placement_globals50la.h"
 #include "chariot_ik49t.h"
 #include "character_mode0_ik50kg.h"
 #include <cfenv>
@@ -299,6 +300,7 @@ bool wristOrientation(const SceneGraph49P& g, const ChariotIkChainBinding49T& b,
     f.valid = refreshSceneWorld49P(g, b.target) && f.valid;
     const V forward = xyz(node(g, b.target).world100, 8);
     const V up = xyz(node(g, b.target).world100, 4);
+    OriginalStandardPlacementGlobals50LA::basisNativeRouteUnknown();
     lazy(shared.orientationSentinel4433D8);
     const V old = xyz(node(g, b.wrist).localC0, 12);
     V normalUp = f.vuNormalize(up, false, true), normalForward = f.vuNormalize(forward, false, true);

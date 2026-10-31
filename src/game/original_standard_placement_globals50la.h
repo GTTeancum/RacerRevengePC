@@ -6,6 +6,7 @@ namespace rr::game {
 //Source process pairs: GP3DD970+signed8BAC /443050 and
 //GP3DD970+signed8C28 /4433D0; GP-0x74A0 /442F68 bounds profile.
 //GP8C34 /4433E8 is the position setter lane.
+//GP8C2C /4433D8 is the separate28A090 basis setter lane.
 //Startup BSS clearing gives zero guards.
 //No App/World reset, public setter or claim that arbitrary guest aliases are
 //disproved. All source callers must share this owner and serial native domain.
@@ -15,7 +16,7 @@ class OriginalStandardPlacementGlobals50LA final {
     friend class OriginalRacerModelSceneOwner50LA;
     friend class OriginalSourcePhysicsModel50LA;
     struct Pair {std::atomic<std::uint8_t> guard{0};std::atomic<std::int32_t> word{0};};
-    static std::array<Pair,4>& process()noexcept {static std::array<Pair,4> state;return state;}
+    static std::array<Pair,5>& process()noexcept {static std::array<Pair,5> state;return state;}
 public:
     struct History {
         bool entered=false,wordStored=false,guardStored=false;
@@ -78,6 +79,23 @@ public:
         //even if its own projected guard was already warm. Earlier source
         //receipts remain valid historical evidence for refusal/retirement.
         process()[3].guard.store(2,std::memory_order_release);
+    }
+private:
+    //Distinct from orientation289ECC/4433D0: exact28A0A0/gp8C2C/4433D8.
+    static bool enterBasis28A090(History& h)noexcept{return enter(4,-1,h);}
+    static bool basisCurrent(const History& h)noexcept {
+        if(!h.entered)return !h.wordStored&&!h.guardStored;
+        const auto guard=process()[4].guard.load(std::memory_order_acquire);
+        if(guard==2)return h.guardRead<=1&&h.wordStored==!h.guardRead&&
+            h.guardStored==!h.guardRead&&h.wordValue==-1;
+        return current(4,-1,h);
+    }
+public:
+    static void basisNativeRouteUnknown()noexcept {
+        //Native certainty invalidation, never a source guard write. This also
+        //covers native cold-record resets: they cannot replay process startup.
+        //Earlier source receipts remain historical; new source entry refuses2.
+        process()[4].guard.store(2,std::memory_order_release);
     }
     static bool parentCurrent(const History& h)noexcept{return current(0,1,h);}
     static bool orientationCurrent(const History& h)noexcept{return current(1,-1,h);}

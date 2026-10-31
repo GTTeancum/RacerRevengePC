@@ -479,6 +479,9 @@
         if(h.sourceCollisionE0&&h.sourceCollisionE0->nullMembership_.entered&&!(config.nullMembershipEntered&2u))return false;
         if(h.nestedModel&&h.nestedModel->nullObserver_.entered&&!config.nullObserverEntered)return false;
         if(h.nestedModel&&h.nestedModel->translationCallEntered_&&!config.positionEntered)return false;
+        if(h.sourceCollisionE4&&h.sourceCollisionE4->membershipRegistration_.entered&&!config.directMembershipEntered)return false;
+        if(h.sourceCollisionE0&&h.sourceCollisionE0->membershipRegistration_.entered&&!config.resultMembershipEntered)return false;
+        if(h.nestedModel&&h.nestedModel->modelObserver_.entered&&!config.modelObserverEntered)return false;
         if(config.entered){
             if(!h.sourceSetupPositive27B470||!h.sourceSetup165C30Returned||!h.descriptor0C||
                config.descriptor!=h.descriptor0C.get()||config.receiver!=h.sourceSetupReturnedBase||
@@ -642,6 +645,104 @@
             }
             if(config.positionReturned&&(!config.positionResult||!translation.returned||
                 config.positionResult->status!=g::OriginalSourcePhysicsModel50LA::Status::reached||config.positionResult->sourcePC!=0x28af90u))return false;
+            const auto& orientation=h.nestedModel->orientation_;
+            if(config.orientationEntered&&!config.positionReturned)return false;
+            if(h.nestedModel->orientationCallEntered_&&(!config.orientationEntered||
+                h.nestedModel->orientationUpdateOccurrence_!=&config))return false;
+            if(config.orientationResult){const auto& result=*config.orientationResult;
+                if(!config.orientationEntered)return false;
+                if(h.nestedModel->orientationCallEntered_){
+                    if(result.sourcePC!=h.nestedModel->orientationCallPC_||
+                        result.status!=(orientation.returned?g::OriginalSourcePhysicsModel50LA::Status::reached:g::OriginalSourcePhysicsModel50LA::Status::bounded))return false;
+                }else if(result.sourcePC!=0x28a090u||result.status!=g::OriginalSourcePhysicsModel50LA::Status::owner)return false;
+            }
+            if(config.orientationReturned&&(!config.orientationResult||!orientation.returned||
+                config.orientationResult->status!=g::OriginalSourcePhysicsModel50LA::Status::reached||config.orientationResult->sourcePC!=0x28a528u))return false;
+            const auto* directUpdate=h.sourceCollisionE4?&h.sourceCollisionE4->postUpdate_:nullptr;
+            if(config.directUpdateEntered&&(!config.orientationReturned||!directUpdate))return false;
+            if(directUpdate&&directUpdate->attempted&&(!config.directUpdateEntered||
+                directUpdate->updateOccurrence!=&config))return false;
+            if(h.nestedModel->postPoseWorldCallEntered_&&(!config.directUpdateEntered||
+                h.nestedModel->postPoseWorldUpdateOccurrence_!=&config||
+                h.nestedModel->postPoseWorldCollisionOccurrence_!=h.sourceCollisionE4.get()))return false;
+            if(config.directUpdateResult){const auto& result=*config.directUpdateResult;
+                if(!config.directUpdateEntered||!directUpdate)return false;
+                if(directUpdate->attempted){
+                    if(result.sourcePC!=directUpdate->pc||
+                        result.status!=(directUpdate->returned?g::OriginalSourcePhysicsCollision50LA::Status::reached:g::OriginalSourcePhysicsCollision50LA::Status::bounded))return false;
+                }else if(result.sourcePC!=0x11fe50u||result.status!=g::OriginalSourcePhysicsCollision50LA::Status::owner)return false;
+            }
+            if(config.directUpdateReturned&&(!config.directUpdateResult||!directUpdate||!directUpdate->returned||
+                config.directUpdateResult->status!=g::OriginalSourcePhysicsCollision50LA::Status::reached||config.directUpdateResult->sourcePC!=0x11ff5cu))return false;
+            const auto* resultUpdate=h.sourceCollisionE0?&h.sourceCollisionE0->postUpdate_:nullptr;
+            if(config.resultUpdateEntered&&(!config.directUpdateReturned||!resultUpdate))return false;
+            if(resultUpdate&&resultUpdate->attempted&&(!config.resultUpdateEntered||
+                resultUpdate->updateOccurrence!=&config))return false;
+            if(h.nestedModel->postE4WorldCallEntered_&&(!config.resultUpdateEntered||
+                h.nestedModel->postE4WorldUpdateOccurrence_!=&config||
+                h.nestedModel->postE4WorldCollisionOccurrence_!=h.sourceCollisionE0.get()))return false;
+            if(config.resultUpdateResult){const auto& result=*config.resultUpdateResult;
+                if(!config.resultUpdateEntered||!resultUpdate)return false;
+                if(resultUpdate->attempted){
+                    if(result.sourcePC!=resultUpdate->pc||
+                        result.status!=(resultUpdate->returned?g::OriginalSourcePhysicsCollision50LA::Status::reached:g::OriginalSourcePhysicsCollision50LA::Status::bounded))return false;
+                }else if(result.sourcePC!=0x11fe50u||result.status!=g::OriginalSourcePhysicsCollision50LA::Status::owner)return false;
+            }
+            if(config.resultUpdateReturned&&(!config.resultUpdateResult||!resultUpdate||!resultUpdate->returned||
+                config.resultUpdateResult->status!=g::OriginalSourcePhysicsCollision50LA::Status::reached||config.resultUpdateResult->sourcePC!=0x11ff5cu))return false;
+            const auto* membership=h.sourceCollisionE4?&h.sourceCollisionE4->membershipRegistration_:nullptr;
+            if(config.directMembershipZone){
+                if(!config.resultUpdateReturned||config.directMembershipMode!=2u)return false;
+                if(h.bodyOwner->object_&&h.bodyOwner->object_->collisionB8!=config.directMembershipZone)return false;
+            }else if(config.directMembershipMode||config.directMembershipEntered||config.directMembershipReturned||config.directMembershipResult)return false;
+            if(config.directMembershipEntered&&(!config.resultUpdateReturned||!membership||!config.directMembershipZone))return false;
+            if(membership&&membership->entered&&(!config.directMembershipEntered||membership->updateOccurrence!=&config||
+                membership->zone!=*config.directMembershipZone||membership->mode!=config.directMembershipMode))return false;
+            if(config.directMembershipResult){const auto& result=*config.directMembershipResult;
+                if(!config.directMembershipEntered||!membership)return false;
+                if(membership->entered){
+                    if(result.sourcePC!=membership->pc||result.status!=(membership->returned?
+                        g::OriginalSourcePhysicsCollision50LA::Status::reached:g::OriginalSourcePhysicsCollision50LA::Status::bounded))return false;
+                }else if(result.sourcePC!=0x120070u||result.status!=g::OriginalSourcePhysicsCollision50LA::Status::owner)return false;
+            }
+            if(config.directMembershipReturned&&(!config.directMembershipResult||!membership||!membership->returned||
+                config.directMembershipResult->status!=g::OriginalSourcePhysicsCollision50LA::Status::reached||
+                config.directMembershipResult->sourcePC!=0x120224u))return false;
+            const auto* resultMembership=h.sourceCollisionE0?&h.sourceCollisionE0->membershipRegistration_:nullptr;
+            if(config.resultMembershipZone){
+                if(!config.directMembershipReturned||config.resultMembershipMode!=2u)return false;
+                if(h.bodyOwner->object_&&h.bodyOwner->object_->collisionB8!=config.resultMembershipZone)return false;
+            }else if(config.resultMembershipMode||config.resultMembershipEntered||config.resultMembershipReturned||config.resultMembershipResult)return false;
+            if(config.resultMembershipEntered&&(!config.directMembershipReturned||!resultMembership||!config.resultMembershipZone))return false;
+            if(resultMembership&&resultMembership->entered&&(!config.resultMembershipEntered||resultMembership->updateOccurrence!=&config||
+                resultMembership->zone!=*config.resultMembershipZone||resultMembership->mode!=config.resultMembershipMode||
+                !resultMembership->resultBacked||!h.sourceCollisionE4||
+                resultMembership->precedingRegistrationHistory!=&h.sourceCollisionE4->membershipRegistration_||
+                resultMembership->precedingRegistrationPC!=0x120224u))return false;
+            if(config.resultMembershipResult){const auto& result=*config.resultMembershipResult;
+                if(!config.resultMembershipEntered||!resultMembership)return false;
+                if(resultMembership->entered){
+                    if(result.sourcePC!=resultMembership->pc||result.status!=(resultMembership->returned?
+                        g::OriginalSourcePhysicsCollision50LA::Status::reached:g::OriginalSourcePhysicsCollision50LA::Status::bounded))return false;
+                }else if(result.sourcePC!=0x120070u||result.status!=g::OriginalSourcePhysicsCollision50LA::Status::owner)return false;
+            }
+            if(config.resultMembershipReturned&&(!config.resultMembershipResult||!resultMembership||!resultMembership->returned||
+                config.resultMembershipResult->status!=g::OriginalSourcePhysicsCollision50LA::Status::reached||
+                config.resultMembershipResult->sourcePC!=0x120224u))return false;
+            const auto& modelObserver=h.nestedModel->modelObserver_;
+            if(config.modelObserverZone){
+                if(!config.directMembershipReturned||!config.resultMembershipReturned||config.modelObserverMode!=2u)return false;
+                if(h.bodyOwner->object_&&h.bodyOwner->object_->visibilityB4!=config.modelObserverZone)return false;
+            }else if(config.modelObserverMode||config.modelObserverEntered||config.modelObserverResult)return false;
+            if(config.modelObserverEntered&&(!config.resultMembershipReturned||!config.directMembershipReturned||!config.modelObserverZone))return false;
+            if(modelObserver.entered&&(!config.modelObserverEntered||modelObserver.updateOccurrence!=&config||
+                modelObserver.zone!=*config.modelObserverZone||modelObserver.mode!=config.modelObserverMode))return false;
+            if(config.modelObserverResult){const auto& result=*config.modelObserverResult;
+                if(!config.modelObserverEntered)return false;
+                if(modelObserver.entered){
+                    if(result.sourcePC!=modelObserver.pc||result.status!=g::OriginalSourcePhysicsModel50LA::Status::bounded)return false;
+                }else if(result.sourcePC!=0x28e8a0u||result.status!=g::OriginalSourcePhysicsModel50LA::Status::owner)return false;
+            }
             for(unsigned i=0;i<16;++i){
                 if(config.scratchA0[i])return false;
                 const auto expected=inertia&&inertia->zeroCopyMask==15?inertia->workingAfter[i]:0u;
@@ -657,6 +758,14 @@
             config.bodyQuadEntered||config.bodyQuadReturned||config.bodyQuadResult||config.updateCallReached||config.quadBodyD0||
             config.updateDispatch08||config.updateTarget78||config.updatePC||config.nullMembershipEntered||config.nullMembershipReturned||
             config.nullMembershipResults[0]||config.nullMembershipResults[1]||config.nullObserverEntered||config.nullObserverReturned||config.nullObserverResult||config.positionEntered||config.positionReturned||config.positionResult||
+            config.orientationEntered||config.orientationReturned||config.orientationResult||
+            config.directUpdateEntered||config.directUpdateReturned||config.directUpdateResult||
+            config.resultUpdateEntered||config.resultUpdateReturned||config.resultUpdateResult||
+            config.directMembershipEntered||config.directMembershipReturned||config.directMembershipResult||
+            config.directMembershipZone||config.directMembershipMode||
+            config.resultMembershipEntered||config.resultMembershipReturned||config.resultMembershipResult||
+            config.resultMembershipZone||config.resultMembershipMode||
+            config.modelObserverEntered||config.modelObserverResult||config.modelObserverZone||config.modelObserverMode||
             config.descriptor||config.receiver||config.nestedOwner||config.model14C||config.dispatch08||config.target74||config.pc||
             config.callerStackKnown||config.argumentFpuKnown||config.calleeFpuKnown||config.savedOldFpuStores||config.savedOldFpuKnown||
             config.centerKnown||config.halfKnown||config.scratchKnown||config.workingKnown)return false;
@@ -839,11 +948,13 @@
         if(f.scene.sourceWarmEnumeration_.entered&&!f.warmEnumerationEntered)return false;
         for(std::size_t physical=1;physical<f.warmCloneEnrolled.size();++physical){
             const auto* enrolled=f.warmCloneEnrolled[physical];if(!enrolled)continue;
-            if(!clone.entered||physical>=clone.slotCount||f.rowEnrolled[physical])return false;
+            if(!clone.entered||physical>=clone.slotCount||
+               physical>=rr::game::maxSceneNodes49P||f.rowEnrolled[physical])return false;
+            const auto physicalIndex=static_cast<rr::game::SceneNodeIndex49P>(physical);
             bool found=false;
             for(std::uint32_t row=1;row<f.scene.binding_.sourceRowCount;++row){
                 const auto* object=f.scene.sourceRowObject(row);
-                if(object&&object->sceneIndex==physical&& &object->entity8==enrolled&&object->constructed&&!object->released)found=true;
+                if(object&&object->sceneIndex==physicalIndex&& &object->entity()==enrolled&&object->constructed&&!object->released)found=true;
             }
             if(!found)return false;
         }

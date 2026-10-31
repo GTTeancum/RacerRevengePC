@@ -3,8 +3,6 @@
 #include "../../tests/native/original_race_constructor50la.h"
 #include "../../tests/native/original_race_hud_scope50la.h"
 #include "../../tests/native/original_position_stats_adapter50la.h"
-#include "../../tests/native/ra_cold_roster_operation50la.h"
-#include "../../tests/native/original_world_cold_prefix50la.h"
 #include <array>
 #include <optional>
 #include <thread>
@@ -58,21 +56,6 @@ bool Owner::readEndPlaceCCC(const ResultsRecordIdentity& row,
 }
 
 namespace rr::game {
-bool OriginalResults10450LA::endDispatchOwnerCurrent1AB520(const OriginalRaceConstructor50LA& race,
-    const ::original_position_stats_adapter50LA::Owner& observer)const noexcept {
-    if(race.resultsFeedbackThread_!=std::this_thread::get_id()||!impl_)return false;
-    const auto& p=*impl_;
-    if(!constructed()||!p.loadComplete||!p.derived||!p.context||!p.context->live()||!p.domain||
-       race.results104_.get()!=this||!race.counted_||race.rolledBack_||race.application_!=p.application||
-       race.entity_.sessionGeneration!=p.component.sessionGeneration||!retirementCurrent()||
-       !p.application->entityAuthority_.canRetire(race.entity_))return false;
-    //Reuse the exact load-issued marker and its existing destruction-bound
-    //Bank check. This is a native ownership proof, not original B0/phase/finish.
-    const auto operation=p.loadedRosterOperation.lock();
-    return operation&&operation->aggregate_==race.world74_&&operation->entities_==p.application&&
-        operation->domain_==p.domain&&operation->generation_==p.component.sessionGeneration&&
-        operation->resultsRuntimeBankCurrent(observer.resultsBankIdentity());
-}
 
 void OriginalRaceConstructor50LA::continuePreAck1AB520(
     const ::original_position_stats_adapter50LA::Owner& observer,
@@ -376,10 +359,10 @@ void OriginalRaceConstructor50LA::continuePreAck1AB520(
             //TriggerList2DC320 table3D5230 slot80=2DCC70. No generic virtual
             //return or use of a copied trigger descriptor is admitted.
             scan.cut=Cut::worldResetStopped;scan.stoppedPC=0x1ac8f8;
-            if(!world74_||world74_->terminal_||world74_->closed_){
+            if(!endWorldCurrentNative()){
                 stop(S::owner,scan.stoppedPC,"Actual same-Race restart World74 unavailable");return;
             }
-            if(!world74_->resetNativeTriggerList2DCC70(application_,entity_.sessionGeneration,
+            if(!endResetNativeTriggerList2DCC70(
                 scan.stoppedPC)){
                 stop(S::incomplete,scan.stoppedPC,"Actual World3D0 reset rejected; VCR and Race bit4 retained");return;
             }
@@ -429,20 +412,20 @@ void OriginalRaceConstructor50LA::continuePreAck1AB520(
         }
         case Cut::particleBoundary:
             scan.cut=Cut::particleStopped;scan.stoppedPC=0x1ac96c;
-            if(!world74_||world74_->terminal_||world74_->closed_){
+            if(!endWorldCurrentNative()){
                 stop(S::owner,scan.stoppedPC,"Actual restart World4A0 owner unavailable");return;
             }
-            if(!world74_->resetNativeParticles161F60(application_,entity_.sessionGeneration,scan.stoppedPC)){
+            if(!endResetNativeParticles161F60(scan.stoppedPC)){
                 stop(S::incomplete,scan.stoppedPC,
                     "Actual particle pointer/auxiliary reset stopped; ordered effects retained without replay");return;
             }
             scan.cut=Cut::worldRestartBoundary;break;
         case Cut::worldRestartBoundary:
             scan.cut=Cut::worldRestartStopped;scan.stoppedPC=0x1ac98c;
-            if(!world74_||world74_->terminal_||world74_->closed_){
+            if(!endWorldCurrentNative()){
                 stop(S::owner,scan.stoppedPC,"Actual World2702E0 owner unavailable");return;
             }
-            if(!world74_->resetLiveWorldPhysics2702E0(application_,entity_.sessionGeneration,scan.stoppedPC)){
+            if(!endResetLiveWorldPhysics2702E0(scan.stoppedPC)){
                 stop(S::incomplete,scan.stoppedPC,
                     "Actual World restart stopped; ordered owner effects retained without replay");return;
             }
@@ -452,33 +435,5 @@ void OriginalRaceConstructor50LA::continuePreAck1AB520(
                 "World restart returned and Race90 cleared; actual RaceB0 publication/reset1AEA70 remains unjoined");return;
         }
     }
-}
-}
-
-namespace original_race_hud_scope50LA {
-void Registration::continuePreAck1AB520(rr::game::OriginalRaceConstructor50LA& race,
-    rr::game::OriginalRaceEndEntryDiagnostic50LA& d)noexcept {
-    using S=rr::game::OriginalRaceEndEntryDiagnostic50LA::Status;
-    d.status=S::owner;d.sourcePC=0x1ab520;
-    d.operation="Actual same-Race lexical Camera/Bank/manager lifetime unavailable";
-    if(std::this_thread::get_id()!=thread_)return; //Before mutable scope/weak reads.
-    if(!active_||!published_||!hud_||!manager_||!bank_||!camera_)return;
-    const auto retained=race_.lock();
-    if(retained.get()!=&race||application_->race28C()!=&race||application_->entities()!=race.application_||
-       !race.counted_||race.rolledBack_||race.entity_.sessionGeneration!=generation_||
-       race.endHud_.lock().get()!=this||!race.world74_)return;
-    try {
-        const auto world=race.world74_;ra_cold_aggregate50LA::Diagnostic wd;
-        const auto camera=world->borrowRuntimeSourceCamera(world,wd);
-        if(!camera||camera.get()!=camera_||&camera->actual_.bank!=bank_||
-           camera->actual_.raceHud!=hud_||camera->generation_!=generation_||
-           camera->actual_.applicationEntities!=race.application_)return;
-        //No new permanent observer or shadow rows. The same existing private
-        //read facet binds synchronously to these actual lifetime-pinned owners.
-        original_position_stats_adapter50LA::Owner observer;
-        original_position_stats_adapter50LA::Owner::Diagnostic observed;
-        if(!observer.bind(*camera,*manager_,observed))return;
-        race.continuePreAck1AB520(observer,d);
-    }catch(...){/*Borrow/bind failures precede the noexcept source continuation.*/}
 }
 }

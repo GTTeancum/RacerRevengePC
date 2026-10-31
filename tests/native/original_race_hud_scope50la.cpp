@@ -9,6 +9,7 @@
 #include "original_consumed_gc_stage50du.h"
 #include "original_race_constructor50la.h"
 #include "ra_cold_aggregate50la.h"
+#include "original_world_cold_prefix50la.h"
 #include "../../src/game/lap_event6_subscriber50id.h"
 #include "../../src/game/dynamic_impact_events50iw.h"
 #include "../../src/game/lap_host_clock50id.h"
@@ -645,4 +646,26 @@ bool Registration::invokeNativeLapEvent6(const rr::game::OriginalRaceConstructor
     }
     return false;
 }
+}
+
+//Private Race forwarding definitions; actual World remains owned by Race74.
+namespace rr::game {
+bool OriginalRaceConstructor50LA::endWorldCurrentNative()const noexcept {
+    return world74_&&!world74_->terminal_&&!world74_->closed_;
+}
+bool OriginalRaceConstructor50LA::endResetNativeTriggerList2DCC70(std::uint32_t& pc)noexcept {
+    return world74_->resetNativeTriggerList2DCC70(application_,entity_.sessionGeneration,pc);
+}
+bool OriginalRaceConstructor50LA::endResetNativeParticles161F60(std::uint32_t& pc)noexcept {
+    return world74_->resetNativeParticles161F60(application_,entity_.sessionGeneration,pc);
+}
+bool OriginalRaceConstructor50LA::endResetLiveWorldPhysics2702E0(std::uint32_t& pc)noexcept {
+    return world74_->resetLiveWorldPhysics2702E0(application_,entity_.sessionGeneration,pc);
+}
+
+ra_source_camera50LA::OwnershipBridge* OriginalRaceConstructor50LA::borrowEndRuntimeNative()const noexcept {
+    if(!world74_||world74_->terminal_||world74_->closed_||!world74_->runtimeQueries_)return nullptr;
+    return world74_->runtimeQueries_.get();
+}
+
 }

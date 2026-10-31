@@ -1,7 +1,7 @@
 #include "original_results104_storage50la.h"
 #include "../../tests/native/original_race_constructor50la.h"
 #include "../../tests/native/original_race_hud_scope50la.h"
-#include "../../tests/native/ra_cold_aggregate50la.h"
+#include "../../tests/native/ra_source_camera_ownership50la.h"
 #include "advancement_selectors49k.h"
 #include <thread>
 #include <bit>
@@ -193,6 +193,7 @@ void OriginalRaceConstructor50LA::continueEndEntryPrefix1A7DD0(
 
 void OriginalRaceConstructor50LA::continueEndCaller1A7E40(
     OriginalRaceEndEntryDiagnostic50LA& d)noexcept {
+    ra_source_camera50LA::OwnershipBridge* endRuntime=nullptr;
     using S=OriginalRaceEndEntryDiagnostic50LA::Status;
     const auto stop=[&](S status,std::uint32_t pc,const char* why)noexcept {
         d.status=status;d.sourcePC=pc;d.operation=why;
@@ -257,12 +258,11 @@ void OriginalRaceConstructor50LA::continueEndCaller1A7E40(
         }
         const auto scope=endHud_.lock();
         if(!endCallerIndexS1_||*endCallerIndexS1_<0||!scope||!scope->camera_||
-           !scope->endStateCurrent(*this,*scope->camera_)||!world74_||
-           world74_->terminal_||world74_->closed_||!world74_->runtimeQueries_){
+           !scope->endStateCurrent(*this,*scope->camera_)||!(endRuntime=borrowEndRuntimeNative())){
             stop(S::owner,0x1a8094,"Actual same-world indexed racer owner unavailable");return;
         }
         std::uint32_t pc=0x1a8094;
-        if(!world74_->runtimeQueries_->recordEndRacer229F20(*scope->camera_,
+        if(!endRuntime->recordEndRacer229F20(*scope->camera_,
             static_cast<std::size_t>(*endCallerIndexS1_),pc)){
             stop(S::source,pc,"Actual attached229F20 incomplete; reached per-racer C38 retained, index unchanged");return;
         }
@@ -293,8 +293,7 @@ void OriginalRaceConstructor50LA::continueEndCaller1A7E40(
     while(endCallerCut_>=Cut::replayRacers&&endCallerCut_<=Cut::replayRacerWorld){
         const auto scope=endHud_.lock();
         if(!endCallerIndexS1_||*endCallerIndexS1_<0||!scope||!scope->camera_||
-           !scope->endStateCurrent(*this,*scope->camera_)||!world74_||
-           world74_->terminal_||world74_->closed_||!world74_->runtimeQueries_){
+           !scope->endStateCurrent(*this,*scope->camera_)||!(endRuntime=borrowEndRuntimeNative())){
             stop(S::owner,0x1a8190,"Actual replay-loop indexed owner unavailable");return;
         }
         if(endCallerCut_==Cut::replayRacers){
@@ -306,7 +305,7 @@ void OriginalRaceConstructor50LA::continueEndCaller1A7E40(
             endCallerCut_=Cut::replayRacerMode;
         }
         const auto slot=static_cast<std::size_t>(*endCallerIndexS1_);
-        const auto& session=*scope->camera_;auto& runtime=*world74_->runtimeQueries_;
+        const auto& session=*scope->camera_;auto& runtime=*endRuntime;
         const auto returnedRacer=[&]()noexcept {
             ++*endCallerIndexS1_; //1A8188, only after actual22A174 epilogue.
             endReplayZoneC38_.reset();endReplayCenterC40_.reset();
@@ -452,6 +451,7 @@ void OriginalRaceConstructor50LA::continueEndCommonRoot1A82E0(
 
 void OriginalRaceConstructor50LA::continueEndPhysics1A8390(
     OriginalRaceEndEntryDiagnostic50LA& d)noexcept {
+    ra_source_camera50LA::OwnershipBridge* endRuntime=nullptr;
     using S=OriginalRaceEndEntryDiagnostic50LA::Status;using Cut=EndCallerCut;
     const auto stop=[&](S status,std::uint32_t pc,const char* why)noexcept {
         d.status=status;d.sourcePC=pc;d.operation=why;
@@ -478,9 +478,8 @@ void OriginalRaceConstructor50LA::continueEndPhysics1A8390(
         if(endCallerCut_==Cut::physicsCall){
             const auto scope=endHud_.lock();
             if(endPhysicsIndexS1_<0||!scope||!scope->camera_||
-               !scope->endStateCurrent(*this,*scope->camera_)||!world74_||
-               world74_->terminal_||world74_->closed_||!world74_->runtimeQueries_||
-               !world74_->runtimeQueries_->replayRacerIdentityCurrent(*scope->camera_,
+               !scope->endStateCurrent(*this,*scope->camera_)||!(endRuntime=borrowEndRuntimeNative())||
+               !endRuntime->replayRacerIdentityCurrent(*scope->camera_,
                    static_cast<std::size_t>(endPhysicsIndexS1_))){
                 stop(S::owner,0x1a83fc,"Saved indexed219810 target no longer has its actual same-world owner");return;
             }
@@ -500,11 +499,10 @@ void OriginalRaceConstructor50LA::continueEndPhysics1A8390(
             const auto scope=endHud_.lock();
             if(endPhysicsIndexS1_<0||!scope||!scope->camera_||
                !scope->endStateCurrent(*this,*scope->camera_)||!application_||
-               application_->nativeOwnerThread_!=std::this_thread::get_id()||!world74_||
-               world74_->terminal_||world74_->closed_||!world74_->runtimeQueries_){
+               application_->nativeOwnerThread_!=std::this_thread::get_id()||!(endRuntime=borrowEndRuntimeNative())){
                 stop(S::owner,0x219964,"Actual same-App grounded slope owner unavailable");return;
             }
-            auto& runtime=*world74_->runtimeQueries_;const auto slot=static_cast<std::size_t>(endPhysicsIndexS1_);
+            auto& runtime=*endRuntime;const auto slot=static_cast<std::size_t>(endPhysicsIndexS1_);
             if(!runtime.replayRacerIdentityCurrent(*scope->camera_,slot)){
                 stop(S::owner,0x219964,"Actual indexed slope racer unavailable");return;
             }
@@ -595,8 +593,7 @@ void OriginalRaceConstructor50LA::continueEndPhysics1A8390(
             }
             const auto scope=endHud_.lock();
             if(endPhysicsIndexS1_<0||!scope||!scope->camera_||
-               !scope->endStateCurrent(*this,*scope->camera_)||!world74_||
-               world74_->terminal_||world74_->closed_||!world74_->runtimeQueries_){
+               !scope->endStateCurrent(*this,*scope->camera_)||!(endRuntime=borrowEndRuntimeNative())){
                 stop(S::owner,0x219ad4,"Actual same-world scoped candidate owner unavailable");return;
             }
             //One synchronous Bank visit owns actual projection and both query
@@ -626,7 +623,7 @@ void OriginalRaceConstructor50LA::continueEndPhysics1A8390(
                        !race.counted_||race.rolledBack_||!race.timingB4_)return false;
                     return race.timingB4_->readQueuedEventEnable58(race,*c.manager,*c.bank,enabled);
                 },scope->camera_,endPhysicsFactorF20_};
-            const bool entered=world74_->runtimeQueries_->runEndFirstCandidateQueries(
+            const bool entered=endRuntime->runEndFirstCandidateQueries(
                 *scope->camera_,static_cast<std::size_t>(endPhysicsIndexS1_),result,engineEnable);
             endPhysicsCandidateStopPC_=result.stoppedPC;
             endPhysicsProjectionRevision_=result.projectionRevision;
@@ -670,11 +667,10 @@ void OriginalRaceConstructor50LA::continueEndPhysics1A8390(
         if(endCallerCut_>=Cut::physicsEngineFlags&&endCallerCut_<=Cut::physicsEngine38Store){
             const auto scope=endHud_.lock();
             if(endPhysicsIndexS1_<0||!scope||!scope->camera_||
-               !scope->endStateCurrent(*this,*scope->camera_)||!world74_||
-               world74_->terminal_||world74_->closed_||!world74_->runtimeQueries_){
+               !scope->endStateCurrent(*this,*scope->camera_)||!(endRuntime=borrowEndRuntimeNative())){
                 stop(S::owner,0x219a90,"Actual same-world native engine-field owner unavailable");return;
             }
-            auto& runtime=*world74_->runtimeQueries_;const auto slot=static_cast<std::size_t>(endPhysicsIndexS1_);
+            auto& runtime=*endRuntime;const auto slot=static_cast<std::size_t>(endPhysicsIndexS1_);
             using Lane=::ra_source_camera50LA::OwnershipBridge::EndNativeEngineLane;
             if(endCallerCut_==Cut::physicsEngineFlags){
                 std::uint32_t state64=0;
@@ -712,11 +708,10 @@ void OriginalRaceConstructor50LA::continueEndPhysics1A8390(
            endCallerCut_==Cut::physicsGravityStore){
             const auto scope=endHud_.lock();
             if(endPhysicsIndexS1_<0||!scope||!scope->camera_||
-               !scope->endStateCurrent(*this,*scope->camera_)||!world74_||
-               world74_->terminal_||world74_->closed_||!world74_->runtimeQueries_){
+               !scope->endStateCurrent(*this,*scope->camera_)||!(endRuntime=borrowEndRuntimeNative())){
                 stop(S::owner,0x21990c,"Actual same-world gravity owner unavailable");return;
             }
-            auto& runtime=*world74_->runtimeQueries_;const auto slot=static_cast<std::size_t>(endPhysicsIndexS1_);
+            auto& runtime=*endRuntime;const auto slot=static_cast<std::size_t>(endPhysicsIndexS1_);
             if(endCallerCut_==Cut::physicsBody){
                 std::uint32_t probe=0;
                 if(!runtime.readEndProbe10421990C(*scope->camera_,slot,probe)){
@@ -873,9 +868,8 @@ void OriginalRaceConstructor50LA::continueEndPhysics1A8390(
         if(endCallerCut_==Cut::physicsGetter){
             const auto scope=endHud_.lock();std::uint32_t state=0;
             if(endPhysicsIndexS1_<0||!scope||!scope->camera_||
-               !scope->endStateCurrent(*this,*scope->camera_)||!world74_||
-               world74_->terminal_||world74_->closed_||!world74_->runtimeQueries_||
-               !world74_->runtimeQueries_->readEndPhysicsState40(*scope->camera_,
+               !scope->endStateCurrent(*this,*scope->camera_)||!(endRuntime=borrowEndRuntimeNative())||
+               !endRuntime->readEndPhysicsState40(*scope->camera_,
                    static_cast<std::size_t>(endPhysicsIndexS1_),state)){
                 stop(S::owner,0x1a83d0,"Actual same-world indexed racer/state40 unavailable");return;
             }

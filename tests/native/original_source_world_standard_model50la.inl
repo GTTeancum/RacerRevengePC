@@ -266,6 +266,14 @@ bool Owner::retireSourceStandardModelsNative(std::uint32_t& pc)noexcept {
         if(h.sourceCollisionE0&&!h.sourceCollisionE0->withdrawSourceLocalFiltersNative())return false;
         if(h.sourceCollisionE4&&!h.sourceCollisionE4->withdrawSourceLocalFiltersNative())return false;
         if(h.sourceCollisionE8&&!h.sourceCollisionE8->withdrawSourceLocalFiltersNative())return false;
+        //28E8A0 is newer than both COL observers in the same shared cohort.
+        //Withdraw its genuine/partial Model19C publication before E0/E4.
+        if(h.nestedModel&&!h.nestedModel->withdrawSourceModelObserverNative())return false;
+        //120070 constructs E0 membership AFTER E4. Retire that newest shared
+        //observer cohort before older E4, without changing Contact/Body/filter
+        //or counted-COL lifetime order below. This is native cancellation only.
+        if(h.sourceCollisionE0&&!h.sourceCollisionE0->withdrawSourceMembershipNative())return false;
+        if(h.sourceCollisionE4&&!h.sourceCollisionE4->withdrawSourceMembershipNative())return false;
         //E8's exact predecessor pin exists before nullable construction/publication.
         //Retire every successful or partial E8 before E4 detach or payload retirement.
         if(h.sourceCollisionE8){

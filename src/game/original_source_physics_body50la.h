@@ -121,6 +121,7 @@ class OriginalSourcePhysicsBody50LA final {
         if(index<12&&index%4<3)return q.body.inverseInertiaColumns[index/4].v[index%4];
         return q.inverseInertiaExtra[index<12?index/4:index-9];
     }
+    #include "original_source_physics_body_reset50la.inl"
     bool constructorFieldsCurrentNative()const noexcept {
         const auto& p=body_->physical;const auto& b=p.body;const auto& r=b.root;
         const auto& q=p.parameters;const auto& s=body_->source;
@@ -185,9 +186,9 @@ class OriginalSourcePhysicsBody50LA final {
             !n.sourceOuterDeleted_&&n.countedModelEntityNative()&&
             n.model_->sourcePhysicsBodyBorrower_==this&&!n.model_->released_&&
             !n.model_->referenceReleased_&&n.model_->model_.constructed&&!n.model_->model_.released&&
-            n.model_->model_.entity8.reference00==1&&
-            n.model_->model_.entity8.kind==K::model2403A0&&
-            n.model_->model_.entity8.sessionGeneration==base_->generation_&&
+            n.model_->model_.entity().reference00==1&&
+            n.model_->model_.entity().kind==K::model2403A0&&
+            n.model_->model_.entity().sessionGeneration==base_->generation_&&
             n.model_->sourceConstructor_.entityCounted&&n.model_->sourceConstructor_.modelReturned&&
             n.model_->binding_.sessionGeneration==base_->generation_&&
             n.model_->binding_.actualObjectCount423F60==&base_->application_->objectCount423F60()&&
@@ -233,7 +234,7 @@ class OriginalSourcePhysicsBody50LA final {
            !actualNested.countedModelEntityNative()||actualNested.bodyModelBorrower_||
            actualNested.model_->sourcePhysicsBodyBorrower_||actualNested.model_->released_||
            actualNested.model_->referenceReleased_||!actualNested.model_->model_.constructed||
-           actualNested.model_->model_.released||actualNested.model_->model_.entity8.reference00!=1||
+           actualNested.model_->model_.released||actualNested.model_->model_.entity().reference00!=1||
            base_->object_->model14C!=static_cast<const void*>(&actualNested.model_->model_))
             return {Status::owner,0x165ef8};
         //Native custody precedes even the NULLD0 dereference. It is not a
@@ -324,6 +325,7 @@ class OriginalSourcePhysicsBody50LA final {
         return body_&&counted_&&!nativeRetired_?&body_->entity:nullptr;
     }
     bool preflightNative()const noexcept {
+        if(!bodyResetHistoryNative())return false;
         if(!attempted_)return !base_&&!body_&&!counted_&&!published_&&!nativeWithdrawn_;
         if(nativeWithdrawn_)return !base_&&!body_&&!modelBorrow_&&!gravityTargetBorrower_&&!collisionBodyBorrower_&&!directCollisionModelBorrower_&&!contactBodyBorrower_&&(!counted_||nativeRetired_);
         if(!attachmentHistoryNative())return false;
@@ -365,6 +367,7 @@ class OriginalSourcePhysicsBody50LA final {
             modelBorrow_->bodyModelBorrower_=nullptr;modelBorrow_=nullptr;}
         if(published_){base_->object_->bodyD0=nullptr;base_->object_->bodyD0NativeWithdrawn=true;}
         if(base_->sourceInverseExtent118_.occurrence==this)base_->sourceInverseExtent118_.nativeWithdrawn=true;
+        if(bodyReset_.entered)bodyReset_.nativeWithdrawn=true;
         body_.reset();base_->bodyBorrower_=nullptr;base_=nullptr;globals_={};nativeWithdrawn_=true;
         return true; //Native cancellation, never1679D0/source destructor or setup return.
     }

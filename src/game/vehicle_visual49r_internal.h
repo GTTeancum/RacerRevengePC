@@ -1,7 +1,16 @@
 #pragma once
 #include "vehicle_visual49r.h"
+#include <array>
 
 namespace rr::game::detail {
+// Exact t0=0,t1=1,t2=0 numerical basis branch; no Scene or guard effects.
+// On success, rows0..2 contain right/up/look, translation is VF0 placeholder.
+// Caller MUST replace translationXYZ with the saved original scratch30 XYZ
+// before source matrix stores. False is a native numeric-domain bound at
+// refusalPC, not a source check; output remains unchanged on false.
+bool sourceParentlessBasis28A090(const std::array<std::uint32_t,4>& look,
+    const std::array<std::uint32_t,4>& up,
+    std::array<std::uint32_t,16>& scratch,std::uint32_t& refusalPC) noexcept;
 // Internal source-phase stages operate on the wrapper's admitted transaction
 // scratch. They may leave scratch partially updated on false; they are not
 // standalone public atomic transitions. No concurrent or aliased records.

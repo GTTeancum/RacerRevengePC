@@ -2,12 +2,18 @@
 #include "../assets/original_source_collision_file50la.h"
 #include "original_source_physics_gravity50la.h"
 #include "original_collision_base_owner50la.h"
+#include "original_source_collision_observer50la.h"
+#include "original_source_portal_overlap231150.h"
+#include "original_native_list_method_custody50la.h"
+#include "original_collision_membership_guards50la.h"
 #include "original_wreck_type0_owners50la.h"
 #include "original_wreck_type2_owners50la.h"
 #include "original_wreck_type3_owners50la.h"
 #include "../assets/original_source_psg_missing50la.h"
 #include <string_view>
 #include <cstdio>
+#include <cfenv>
+#include <cmath>
 #include <vector>
 namespace rr::game {
 //Isolated source nullable100/11B190. E0 is the outer collision identity;
@@ -137,6 +143,176 @@ class OriginalSourcePhysicsCollision50LA final {
         std::optional<OriginalWreckType0Owners50LA::SourcePrefixStatus> passStatus;
         std::uint32_t worldPC=0,pc=0;
     } directMatrix_;
+    //A distinct post-placement11FE50 occurrence. Frozen initialization pc_,
+    //directMatrix_ and sourceTransform_ histories are never repurposed.
+    struct SourcePostUpdate11FE50 {
+        bool attempted=false,worldCompleted=false,worldReturned=false;
+        bool passEntered=false,passCompleted=false,returned=false,leaseWithdrawn=false;
+        const void* updateOccurrence=nullptr;
+        const void* outerIdentity=nullptr;
+        const void* e4OwnerHistory=nullptr;
+        const void* e4OuterHistory=nullptr;
+        std::uint32_t e4ReturnedPC=0;
+        std::optional<std::uint32_t> type88;
+        std::optional<const void*> shape8C;
+        const OriginalRacerSceneObject50LA* model110=nullptr;
+        std::array<std::uint32_t,16> incoming{};
+        std::uint16_t known=0;
+        std::optional<Body::Status> worldStatus;
+        std::optional<OriginalWreckType0Owners50LA::SourcePrefixStatus> passStatus;
+        std::uint32_t worldPC=0,pc=0;
+    } postUpdate_;
+    template<class ActualWorld>
+    Result updateSourceDirectType0_11FE50(const void* actualUpdateOccurrence,ActualWorld&& world)noexcept {
+        if(!actualUpdateOccurrence||postUpdate_.attempted||!isDirectE4()||nativeWithdrawn_||nativeRetired_||
+           !base_||!base_->object_||!collision_||!directMatrix_.returned||directMatrix_.leaseWithdrawn||
+           !attachReturned_||detachedNative_||!nullMembership_.returned||
+           nullMembership_.updateOccurrence!=actualUpdateOccurrence||
+           base_->object_->collisionE4!=std::optional<B*>(collision_.get())||
+           !directFoundModel110_||!directFoundPayloadLiveNative()||!bodyBorrow_||
+           !directModelPinned_||bodyBorrow_->directCollisionModelBorrower_!=this||
+           !searchBorrowed_||!search_||search_->nativeClosed()||search_->collisionSearchBorrower_!=this||
+           !search_->preflightNative()||!preflightNative())return {Status::owner,0x11fe50u};
+        //A separate update custody pin BEFORE getter effects. Its provenance
+        //uses retained native identity, not a fabricated earlier source load.
+        if(!sourceType0_.pinSourceDirectUpdate11FE50(this,*directFoundModel110_))return {Status::owner,0x11fe50u};
+        auto& h=postUpdate_;h.attempted=true;h.updateOccurrence=actualUpdateOccurrence;
+        h.outerIdentity=collision_.get();h.pc=0x11fe5cu;h.type88=collision_->shape88_;
+        //Only the authenticated Type0 branch is admitted by this service.
+        //Other dispatch entries are not redirected to Type0 numeric behavior.
+        if(h.type88!=0u)return {Status::bounded,h.pc=0x11fe80u};
+        h.pc=0x11fe88u;h.shape8C=*collision_->shape8C_;
+        h.pc=0x11fe90u;
+        if(!h.shape8C||!*h.shape8C||!sourceType0_.shape8C_||
+           sourceType0_.shape8C_.get()!=*h.shape8C)return {Status::bounded,h.pc};
+        h.model110=sourceType0_.shape8C_->racerModel110;
+        if(!h.model110||h.model110!=directFoundModel110_)return {Status::bounded,h.pc};
+        //Actual11FE94/delay11FE98 NULL-relative getter, not initialization's
+        //one-shot getter or a cached world. Callback owner authenticates this
+        //exact collision identity and same completed orientation occurrence.
+        h.pc=0x28b550u;
+        const auto result=world(actualUpdateOccurrence,this,h.incoming,h.known);
+        h.worldCompleted=true;h.worldStatus=result.status;h.worldPC=result.sourcePC;h.pc=result.sourcePC;
+        if(result.status!=Body::Status::reached||result.sourcePC!=0x28b67cu||h.known!=0xffffu)
+            return {Status::bounded,h.pc};
+        h.worldReturned=true;h.passEntered=true;h.pc=0x11f680u;
+        const auto pass=sourceType0_.continueSourceDirectType0Update11F680(this,*h.model110,
+            h.incoming,h.known,collision_->cachedCenter60_,collision_->radius80_);
+        h.passCompleted=true;h.passStatus=pass.status;h.pc=pass.sourcePC;
+        if(pass.status!=OriginalWreckType0Owners50LA::SourcePrefixStatus::reached||
+           !sourceType0_.sourceUpdate_.returned||sourceType0_.sourceUpdate_.pc!=0x11fe44u)
+            return {Status::bounded,h.pc};
+        //Genuine11F680 return then11FEA8 branch,11FF54 JR/delay11FF58.
+        h.returned=true;h.pc=0x11ff5cu;return {Status::reached,h.pc};
+    }
+    template<class ActualWorld>
+    Result updateSourceResultType0_11FE50(const void* actualUpdateOccurrence,
+        const OriginalSourcePhysicsCollision50LA& actualE4,ActualWorld&& world)noexcept {
+        if(!actualUpdateOccurrence||postUpdate_.attempted||occurrence_!=Occurrence::resultE0||
+           nativeWithdrawn_||nativeRetired_||!base_||!base_->object_||!collision_||
+           !transformReturned_||resultWithdrawn_||!resultBorrowed_||!resultCallReturned_||
+           !sourceResultOwner_.sourceResult_.returned||sourceResultOwner_.sourceResult_.nativeWithdrawn||
+           !sourceType0_.sourceResult_.live||!attachReturned_||detachedNative_||!nullMembership_.returned||
+           nullMembership_.updateOccurrence!=actualUpdateOccurrence||
+           base_->object_->collisionE0!=std::optional<B*>(collision_.get())||!type0Model_||!bodyBorrow_||
+           bodyBorrow_->sourceModel288Native()!=type0Model_||!foundFile_||foundFile_->nativeClosed_||
+           !foundFile_->associationReturned_||foundFile_->associationWithdrawn_||
+           !foundFile_->payloadCustodyCurrentNative(&sourceType0_)||!preflightNative())return {Status::owner,0x11fe50u};
+        //166720 is a different outer-COL call and is legal only after this
+        //same Base/config's genuine E4 return. Retain identity/history, not a
+        //new lifetime borrow or a later dereference of the sibling owner.
+        if(&actualE4==this||!actualE4.isDirectE4()||actualE4.base_!=base_||
+           actualE4.bodyBorrow_!=bodyBorrow_||actualE4.nativeWithdrawn_||actualE4.nativeRetired_||
+           !actualE4.postUpdate_.returned||actualE4.postUpdate_.pc!=0x11ff5cu||
+           actualE4.postUpdate_.leaseWithdrawn||actualE4.postUpdate_.updateOccurrence!=actualUpdateOccurrence||
+           actualE4.postUpdate_.model110!=type0Model_||!actualE4.postUpdateHistoryNative()||
+           !actualE4.collision_||base_->object_->collisionE4!=std::optional<B*>(actualE4.collision_.get()))
+            return {Status::owner,0x11fe50u};
+        //Result90/Contact raw-point custody is independent of directE4. Pin
+        //the result-backed newest update without releasing either old lease.
+        if(!sourceType0_.pinSourceResultUpdate11FE50(this,*type0Model_))return {Status::owner,0x11fe50u};
+        auto& h=postUpdate_;h.attempted=true;h.updateOccurrence=actualUpdateOccurrence;
+        h.outerIdentity=collision_.get();h.e4OwnerHistory=&actualE4;
+        h.e4OuterHistory=actualE4.postUpdate_.outerIdentity;h.e4ReturnedPC=actualE4.postUpdate_.pc;
+        h.pc=0x11fe5cu;h.type88=collision_->shape88_;
+        //Only the authenticated Type0 branch is admitted by this service.
+        //Other dispatch entries are not redirected to Type0 numeric behavior.
+        if(h.type88!=0u)return {Status::bounded,h.pc=0x11fe80u};
+        h.pc=0x11fe88u;h.shape8C=*collision_->shape8C_;
+        h.pc=0x11fe90u;
+        if(!h.shape8C||!*h.shape8C||!sourceType0_.shape8C_||
+           sourceType0_.shape8C_.get()!=*h.shape8C)return {Status::bounded,h.pc};
+        h.model110=sourceType0_.shape8C_->racerModel110;
+        if(!h.model110||h.model110!=type0Model_)return {Status::bounded,h.pc};
+        //Actual11FE94/delay11FE98 NULL-relative getter, not initialization's
+        //one-shot getter or a cached world. Callback owner authenticates this
+        //exact collision identity and same completed orientation occurrence.
+        h.pc=0x28b550u;
+        const auto result=world(actualUpdateOccurrence,this,h.incoming,h.known);
+        h.worldCompleted=true;h.worldStatus=result.status;h.worldPC=result.sourcePC;h.pc=result.sourcePC;
+        if(result.status!=Body::Status::reached||result.sourcePC!=0x28b67cu||h.known!=0xffffu)
+            return {Status::bounded,h.pc};
+        h.worldReturned=true;h.passEntered=true;h.pc=0x11f680u;
+        const auto pass=sourceType0_.continueSourceResultType0Update11F680(this,*h.model110,
+            h.incoming,h.known,collision_->cachedCenter60_,collision_->radius80_);
+        h.passCompleted=true;h.passStatus=pass.status;h.pc=pass.sourcePC;
+        if(pass.status!=OriginalWreckType0Owners50LA::SourcePrefixStatus::reached||
+           !sourceType0_.sourceUpdate_.returned||sourceType0_.sourceUpdate_.pc!=0x11fe44u)
+            return {Status::bounded,h.pc};
+        //Genuine11F680 return then11FEA8 branch,11FF54 JR/delay11FF58.
+        h.returned=true;h.pc=0x11ff5cu;return {Status::reached,h.pc};
+    }
+    bool postUpdateHistoryNative()const noexcept {
+        const auto& h=postUpdate_;const auto& u=sourceType0_.sourceUpdate_;
+        if(!h.attempted)return !h.updateOccurrence&&!h.outerIdentity&&!h.type88&&!h.shape8C&&!h.model110&&
+            !h.worldCompleted&&!h.worldReturned&&!h.passEntered&&!h.passCompleted&&!h.returned&&!h.leaseWithdrawn&&
+            !h.known&&!h.worldStatus&&!h.passStatus&&!h.worldPC&&!h.pc&&!h.e4OwnerHistory&&!h.e4OuterHistory&&!h.e4ReturnedPC&&!u.leaseAttempted;
+        if(isProceduralE8()||!h.updateOccurrence||!h.outerIdentity||!nullMembership_.returned||
+           h.updateOccurrence!=nullMembership_.updateOccurrence||h.outerIdentity!=nullMembership_.ownerIdentity||
+           !(isDirectE4()?directMatrix_.returned:transformReturned_)||!u.leaseAttempted||u.occurrence!=this||
+           u.resultBacked==isDirectE4()||u.model!=(isDirectE4()?directFoundModel110_:type0Model_)||h.leaseWithdrawn!=u.nativeWithdrawn||
+           !sourceType0_.preflightSourceType0UpdateNative())return false;
+        if(isDirectE4()){
+            if(h.e4OwnerHistory||h.e4OuterHistory||h.e4ReturnedPC)return false;
+        }else if(!h.e4OwnerHistory||h.e4OwnerHistory==this||!h.e4OuterHistory||
+                 h.e4OuterHistory==h.outerIdentity||h.e4ReturnedPC!=0x11ff5cu)return false;
+        //Completed init authenticates these loads. Later withdrawal keeps
+        //identities opaque, but never discards the exact event/result chain.
+        if(h.type88!=0u||!h.shape8C||!*h.shape8C||*h.shape8C!=u.shape||
+           !h.model110||h.model110!=u.model)return false;
+        if(nativeWithdrawn_){if(!h.leaseWithdrawn||!type0Withdrawn_)return false;}
+        else if(!collision_||collision_.get()!=h.outerIdentity)return false;
+        if(!type0Withdrawn_){
+            if(!collision_||collision_->shape88_!=h.type88||collision_->shape8C_!=h.shape8C||
+               !sourceType0_.shape8C_||sourceType0_.shape8C_.get()!=*h.shape8C||
+               sourceType0_.shape8C_->racerModel110!=h.model110)return false;
+        }
+        if(!h.worldCompleted)return !h.worldReturned&&!h.worldStatus&&!h.worldPC&&!h.known&&
+            !h.passEntered&&!h.passCompleted&&!h.passStatus&&!h.returned&&!u.attempted&&h.pc==0x28b550u;
+        if(!h.worldStatus)return false;
+        if(!h.worldReturned)return !h.passEntered&&!h.passCompleted&&!h.passStatus&&!h.returned&&!u.attempted&&
+            !h.known&&h.pc==h.worldPC&&(*h.worldStatus!=Body::Status::reached||h.worldPC!=0x28b67cu);
+        if(h.worldStatus!=Body::Status::reached||h.worldPC!=0x28b67cu||h.known!=0xffffu||
+           !h.passEntered||!h.passCompleted||!h.passStatus)return false;
+        if(!u.attempted)return !h.returned&&h.passStatus==OriginalWreckType0Owners50LA::SourcePrefixStatus::owner&&h.pc==0x11f680u;
+        if(u.incoming!=h.incoming||u.incomingKnown!=h.known||u.model!=h.model110||
+           (!u.nativeWithdrawn&&(u.center!=&collision_->cachedCenter60_||u.radius!=&collision_->radius80_)))return false;
+        if(!h.returned)return !u.returned&&h.passStatus==OriginalWreckType0Owners50LA::SourcePrefixStatus::bounded&&h.pc==u.pc;
+        return u.returned&&u.pc==0x11fe44u&&h.passStatus==OriginalWreckType0Owners50LA::SourcePrefixStatus::reached&&h.pc==0x11ff5cu;
+    }
+    bool withdrawSourcePostUpdateNative()noexcept {
+        if(!withdrawSourceMembershipNative())return false;
+        auto& h=postUpdate_;if(!h.attempted||h.leaseWithdrawn)return true;
+        if(isDirectE4()&&(hasIncomingFiltersNative()||hasLiveOutgoingFiltersNative()||proceduralSuccessorBorrower_||
+           sourceContactBorrower_||(detectorBinding_.attempted&&!detectorBinding_.nativeWithdrawn)||
+           (attached_&&!detachedNative_)))return false;
+        //E0 Contact retires before COL detachment. Releasing only this newest
+        //output pointer lease here is safe with Contact/result/init custody
+        //still live; requiring absent Contact would create a cancellation cycle.
+        if(!postUpdateHistoryNative()||!(isDirectE4()?sourceType0_.unpinSourceDirectUpdateNative(this):
+            sourceType0_.unpinSourceResultUpdateNative(this)))return false;
+        h.leaseWithdrawn=true;return true;
+    }
     Result continueSourceDirectMatrix11F5B4()noexcept {
         if(directMatrix_.attempted||!isDirectE4()||!directWorldCallReached_||pc_!=0x28b550u||
            nativeWithdrawn_||nativeRetired_||!directFoundPayloadLiveNative()||!bodyBorrow_||
@@ -193,7 +369,7 @@ class OriginalSourcePhysicsCollision50LA final {
         if(proceduralSuccessorBorrower_)return false;
         if(isDirectE4()&&attached_&&!detachedNative_)return false;
         auto& d=directMatrix_;if(!d.attempted||d.leaseWithdrawn)return true;
-        if(!directMatrixHistoryNative()||!sourceType0_.unpinSourceDirectTransformNative(this))return false;
+        if(!withdrawSourcePostUpdateNative()||!directMatrixHistoryNative()||!sourceType0_.unpinSourceDirectTransformNative(this))return false;
         d.leaseWithdrawn=true;return true;
     }
     bool directFoundTransformHistoryNative()const noexcept {
@@ -1206,7 +1382,7 @@ class OriginalSourcePhysicsCollision50LA final {
         if(hasIncomingFiltersNative()||hasLiveOutgoingFiltersNative())return false;
         if(sourceContactBorrower_||(detectorBinding_.attempted&&!detectorBinding_.nativeWithdrawn))return false;
         if(!resultEntered_||resultWithdrawn_)return true;
-        if(!resultHistoryCurrentNative()||!sourceResultOwner_.withdrawSourceResultNative())return false;
+        if(!withdrawSourcePostUpdateNative()||!resultHistoryCurrentNative()||!sourceResultOwner_.withdrawSourceResultNative())return false;
         //The raw backing is gone, but opaque publication history/token remain
         //until this exact unpin succeeds; retries never inspect retired bytes.
         if(!sourceType0_.unpinSourceResultNative(&sourceResultOwner_))return false;
@@ -1310,7 +1486,7 @@ class OriginalSourcePhysicsCollision50LA final {
         if(detectorBinding_.attempted&&!detectorBinding_.nativeWithdrawn)return false;
         if(!sourceContactHistory_)return true;
         if(occurrence!=sourceContactHistory_||!preflightNative())return false;
-        if(!sourceType0_.unpinSourceContactPointsNative(occurrence))return false;
+        if(!withdrawSourcePostUpdateNative()||!sourceType0_.unpinSourceContactPointsNative(occurrence))return false;
         sourceContactBorrower_=nullptr;return true;
     }
     bool type0HistoryCurrentNative()const noexcept {
@@ -1347,7 +1523,8 @@ class OriginalSourcePhysicsCollision50LA final {
         if(sourceContactBorrower_||(detectorBinding_.attempted&&!detectorBinding_.nativeWithdrawn))return false;
         if(attached_&&!detachedNative_)return false;
         if(!type0Entered_||type0Withdrawn_)return true;
-        if(!type0HistoryCurrentNative()||!arrayHistoryCurrentNative()||!nodeHistoryCurrentNative()||
+        if(!postUpdateHistoryNative()||!withdrawSourcePostUpdateNative()||
+           !type0HistoryCurrentNative()||!arrayHistoryCurrentNative()||!nodeHistoryCurrentNative()||
            !resourceHistoryCurrentNative()||!transformHistoryCurrentNative()||!directMatrixHistoryNative()||
            !withdrawSourceResultNative()||!withdrawSourceDirectMatrixNative())return false;
         rr::assets::OriginalStandardTextureDiagnostic50LA d;
@@ -1472,10 +1649,12 @@ class OriginalSourcePhysicsCollision50LA final {
         //After cancellation the retained identities are opaque, never dereferenced.
         if(nativeWithdrawn_)return true;
         return collision_&&h.ownerIdentity==collision_.get()&&collision_->membershipE0_&&
-            (h.observedNull?*collision_->membershipE0_==nullptr:*collision_->membershipE0_!=nullptr);
+            (h.observedNull?(membershipRegistration_.entered?membershipRegistration_.before==nullptr:*collision_->membershipE0_==nullptr):*collision_->membershipE0_!=nullptr);
     }
+    #include "original_source_collision_membership_bounds50la.inl"
+    #include "original_source_collision_membership50la.inl"
     bool preflightNative()const noexcept {
-        if(!nullMembershipHistoryNative())return false;
+        if(!nullMembershipHistoryNative()||!postUpdateHistoryNative()||!membershipRegistrationHistoryNative()||!boundsHistoryNative())return false;
         if(!attempted_)return !base_&&!collision_&&!counted_&&!published_&&!nativeWithdrawn_;
         if(nativeWithdrawn_)return !base_&&!collision_&&!proceduralPredecessor_&&!proceduralSuccessorBorrower_&&!sentinel3E02C0_&&!directPredecessorToken_&&!bodyBorrow_&&!search_&&!searchBorrowed_&&!foundFile_&&(!counted_||nativeRetired_);
         if(!attachmentHistoryNative())return false;
@@ -1510,7 +1689,7 @@ class OriginalSourcePhysicsCollision50LA final {
            *c.result90_!=(isProceduralE8()?proceduralResult90CurrentNative():resultEntered_&&!resultWithdrawn_&&sourceResultOwner_.sourceResult_.published?
                sourceResultOwner_.sourceResult_.outerIdentity:nullptr)||
            !c.owner9C_||*c.owner9C_!=(detectorBinding_.ownerStored&&!detectorBinding_.nativeWithdrawn?detectorBinding_.contact:(ownerStored_?static_cast<const void*>(&base_->object_->entity):nullptr))||
-           !c.bodyA0_||(!bodyStored_&&*c.bodyA0_)||!c.membershipE0_||*c.membershipE0_||
+           !c.bodyA0_||(!bodyStored_&&*c.bodyA0_)||!membershipPointerCurrentNative()||
            c.current94_||c.field98_||c.categoryA4_!=(categoryStored_?category3E0718_:0u)||c.fieldA8_||c.fieldA9_||c.fieldF4_||
            c.acceptB8_!=0xffffffffu||c.modeBC_!=1||c.modeC8_!=1||c.modeD4_!=1||
            c.listCC_||c.countD0_||!sourceLocalListsCurrentNative())return false;

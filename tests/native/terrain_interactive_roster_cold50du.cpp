@@ -590,3 +590,19 @@ bool OriginalResults10450LA::liveResultsRaceAuthorityCurrent(const OriginalRaceC
     return application->entityAuthority_.canRetire(race.entity_);
 }
 }
+
+namespace rr::game {
+bool OriginalResults10450LA::careerRosterCurrentNative(
+    const std::shared_ptr<::ra_cold_roster50LA::Operation>& operation,
+    const OriginalRaceConstructor50LA& race,const std::shared_ptr<OriginalApplicationEntities50LA>& application,
+    const std::shared_ptr<assets::OriginalStandardMaterialDomain50LA>& domain,std::uint64_t generation,
+    const ::original_position_stats_adapter50LA::Owner& observer)noexcept {
+    return operation&&operation->aggregate_==race.world74_&&operation->entities_==application&&
+        operation->domain_==domain&&operation->generation_==generation&&
+        operation->resultsRuntimeBankCurrent(observer.resultsBankIdentity());
+}
+bool OriginalResults10450LA::careerRacerCurrentNative(
+    const std::shared_ptr<::ra_cold_roster50LA::Operation>& operation,std::uint32_t racer60)noexcept {
+    return operation->resultsRacerIdentityCurrent(0,racer60);
+}
+}

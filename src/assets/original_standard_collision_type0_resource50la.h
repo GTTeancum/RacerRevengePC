@@ -52,6 +52,7 @@ class OriginalStandardCollisionType0Resource50LA final {
     const OriginalSourceCollisionFile50LA* sourceAssociationBorrower_=nullptr;
     const void* sourceResultBorrower_=nullptr; //Exact unpublished/published11BBC0 result occurrence.
     const void* sourceDirectTransformBorrower_=nullptr; //Exact E4 getter/transform native lease; no source retain.
+    const void* sourceUpdateBorrower_=nullptr; //Distinct per-COL post-placement E4 or result-backed E0 getter/update custody.
     const void* sourceContactBorrower_=nullptr; //Exact296190 point-reader/record occurrence.
     bool sourceAssociationReady1326A0(const OriginalSourceCollisionFile50LA* file,
         const rr::game::OriginalWreckType0Owners50LA* owner)const noexcept {
@@ -101,7 +102,7 @@ public:
     ~OriginalStandardCollisionType0Resource50LA(){
         // Native cancellation must explicitly compensate a reached source ref
         // only after revoking association, preserving referenceBits60 history.
-        if(reference60_!=0||sourceAssociationBorrower_||sourceResultBorrower_||sourceDirectTransformBorrower_||sourceContactBorrower_||
+        if(reference60_!=0||sourceAssociationBorrower_||sourceResultBorrower_||sourceDirectTransformBorrower_||sourceUpdateBorrower_||sourceContactBorrower_||
            (source_.attempted&&!source_.nativeWithdrawn))std::terminate();
     }
     bool live()const noexcept{return !source_.attempted&&constructed_&&!retired_&&reference60_>0;}

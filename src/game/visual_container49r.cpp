@@ -1,3 +1,4 @@
+#include "original_standard_placement_globals50la.h"
 #include "vehicle_visual49r_internal.h"
 #include <cfenv>
 #include <cmath>
@@ -149,6 +150,55 @@ V readXYZ(const M& matrix, unsigned offset) noexcept {
 }
 }
 
+// Bounded numerical seam only. This does not enter28A090, own its process
+// guard, read a Scene object, or confer a source return/ready occurrence.
+// Callers copy their saved XYZ into scratch[12..14] before the real local
+// row stores, and retain the subsequent explicit XYZ-restoration stores.
+bool sourceParentlessBasis28A090(const std::array<std::uint32_t,4>& look,
+    const std::array<std::uint32_t,4>& suppliedUp,
+    std::array<std::uint32_t,16>& scratch,std::uint32_t& refusalPC) noexcept {
+    // A native-domain bound, not a source conditional. The live caller must
+    // already have retained any preceding guard/input/snapshot effects.
+    refusalPC=0x28a1a8u;
+    if(std::fegetround()!=FE_TONEAREST)return false;
+    V upInput{},lookInput{};
+    std::memcpy(upInput.v,suppliedUp.data(),16);
+    std::memcpy(lookInput.v,look.data(),16);
+    Arithmetic f;
+    //t0=0 skips28A174..1A4; t1=1 does not add orthogonalization.
+    //Preserve separately rounded VU sqrt and division, including Q's
+    //maximum-finite zero-denominator result. Never supply fallback axes.
+    V up=f.normalize(upInput,false);
+    refusalPC=0x28a1c4u;
+    if(!f.valid)return false;
+    V forward=f.normalize(lookInput,false);
+    refusalPC=0x28a1e4u;
+    if(!f.valid)return false;
+    V right=f.cross(up,forward);
+    refusalPC=0x28a1ecu;
+    if(!f.valid)return false;
+    //28A1F0/1F4 zero right.W twice;28A1F8/1FC zero up/forward.W.
+    //The XYZ lanes are not corrected or normalized again.
+    right.v[3]=f.sub(right.v[3],right.v[3]);
+    right.v[3]=f.sub(right.v[3],right.v[3]);
+    up.v[3]=f.sub(up.v[3],up.v[3]);
+    forward.v[3]=f.sub(forward.v[3],forward.v[3]);
+    refusalPC=0x28a1fcu;
+    if(!f.valid)return false;
+    std::array<std::uint32_t,16> result{};
+    for(unsigned lane=0;lane<4;++lane){
+        result[lane]=bits(right.v[lane]);
+        result[4+lane]=bits(up.v[lane]);
+        result[8+lane]=bits(forward.v[lane]);
+    }
+    //Only a translation placeholder: original28A164 loaded savedXYZ from
+    //scratch30, while28A200/204 overwrite only W with zero then VF0.W=1.
+    //Caller must install those exact savedXYZ before copying all16 words.
+    result[15]=0x3f800000u;
+    scratch=result;refusalPC=0;
+    return true;
+}
+
 bool prepareVisualContainer49R(const SceneGraph49P& graph,
     const VisualSceneBindings49R& bindings, std::uint32_t probe108,
     VehicleVisualState49R& state, VisualShared49R& shared,
@@ -200,6 +250,7 @@ bool prepareVisualContainer49R(const SceneGraph49P& graph,
     if (!f.valid)
         return fail(diagnostic, VehicleVisualError49R::arithmetic, 0x21c3f8);
 
+    OriginalStandardPlacementGlobals50LA::basisNativeRouteUnknown();
     if (shared.orientationSentinel4433D8.guard == 0) {
         shared.orientationSentinel4433D8.word = 0xffffffffu;
         shared.orientationSentinel4433D8.guard = 1;

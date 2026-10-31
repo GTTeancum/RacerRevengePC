@@ -78,8 +78,16 @@ inline OriginalRacerModelSceneResult50LA OriginalRacerModelSceneOwner50LA::produ
     h.returned=true;h.pc=0x28d93cu;return {S::complete,h.pc}; //JR/delay completed, control only.
 }
 inline bool OriginalRacerModelSceneOwner50LA::sourceLocalBoundsHistoryNative(
-    const SceneGraph49P& graph,const SourceLocalBounds28D670& h,const SourceTranslation28ADD0* laterTranslation)const noexcept {
-    if(laterTranslation&&(!laterTranslation->entered||!sourceTranslationHistoryNative(graph,*laterTranslation)))return false;
+    const SceneGraph49P& graph,const SourceLocalBounds28D670& h,const SourceTranslation28ADD0* laterTranslation,
+    const SourceOrientation28A090* laterOrientation,
+    const SourcePostPoseWorld28B550* laterWorld,const SourceObserverBounds28E230* laterBounds)const noexcept {
+    //Keep the original28D670 after image; only the authenticated sequence
+    //28D670 -> translation.before/after -> orientation.before/after -> live
+    //may account for later local/flag changes. Only the later getter can
+    //change root world/ready state; its own before/after history proves those.
+    if((laterOrientation&&!laterTranslation)||(laterWorld&&!laterOrientation)||(laterBounds&&!laterWorld))return false;
+    if(laterTranslation&&(!laterTranslation->entered||
+       !sourceTranslationHistoryNative(graph,*laterTranslation,laterOrientation,laterWorld,laterBounds)))return false;
     if(!h.entered)return !h.owner&&!h.canonicalNodes&&!h.count&&!h.pc&&!h.returned;
     if(h.owner!=this||h.canonicalNodes!=graph.nodes||h.count!=graph.count||!h.count||h.count>maxModelBoundsNodes49O||
        h.root>=h.count||h.order[0]!=h.root||h.objects[h.root]!=&model_||h.visited>h.count||!h.rootReady)return false;

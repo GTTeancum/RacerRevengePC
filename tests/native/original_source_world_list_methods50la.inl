@@ -102,9 +102,11 @@ bool Owner::preflightSourceListMethodsNative()const noexcept {
         if(s.pointer1C&&*s.pointer1C!=s.selected1C.get())return false;
         if(s.count18&&*s.count18)return false;
         if(s.type2D&&!s.type2C)return false;
+        if(!s.constructorReturned&&!c.sourceCollisionRegistrationBorrowers_.empty())return false;
         if(s.constructorReturned){if(!r.returned||!s.vtable08||*s.vtable08!=0x3d2d30||!s.type2C||!s.type2D||
             !s.perBlock30||*s.perBlock30!=1024||!s.pointer3C||!s.blockCount34||
-            !s.field40||!s.lastUsed38||!s.selectedAllocationReturned||!sourceListEntriesCurrent(c))return false;}
+            !s.field40||!s.lastUsed38||!s.selectedAllocationReturned||!sourceListEntriesCurrent(c)||
+            !c.sourceCollisionEntriesCurrentNative())return false;}
         if(r.aliasNode&&!sourceListMethodAliasesCurrent(*r.aliasNode,kind&1u,zone))return false;
     }return true;
 }
@@ -114,6 +116,7 @@ bool Owner::retireSourceListMethodsNative(std::uint32_t& pc)noexcept {
     for(const auto& frame:sourceTypedLights_)if(frame&&frame->flareObserverEntered&&!frame->flareObserverWithdrawn)return false;
     //No source List backing may die while a selected/member borrower exists.
     for(const auto& kinds:sourceListMethods_)for(const auto& row:kinds)if(row.owner){
+        if(!row.owner->sourceCollisionRegistrationBorrowers_.empty())return false;
         const auto& entries=row.owner->sourceEntries_;if(entries.pending)return false;
         for(const auto* member:entries.members)if(member)return false;
     }

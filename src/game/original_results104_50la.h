@@ -53,6 +53,13 @@ class OriginalResults10450LA final {
     bool demandRosterCountCurrent1C16F8(const OriginalRaceConstructor50LA&,
         const ::original_position_stats_adapter50LA::Owner&,const std::shared_ptr<::ra_cold_roster50LA::Operation>&,
         const ::native_racer50HN::Bank*,std::size_t&)const;
+    //Private synchronous custody reads; no cached readiness or new ownership.
+    static bool careerRosterCurrentNative(const std::shared_ptr<::ra_cold_roster50LA::Operation>&,
+        const OriginalRaceConstructor50LA&,const std::shared_ptr<OriginalApplicationEntities50LA>&,
+        const std::shared_ptr<assets::OriginalStandardMaterialDomain50LA>&,std::uint64_t,
+        const ::original_position_stats_adapter50LA::Owner&)noexcept;
+    static bool careerRacerCurrentNative(const std::shared_ptr<::ra_cold_roster50LA::Operation>&,
+        std::uint32_t)noexcept;
     struct Impl;
     std::unique_ptr<Impl> impl_;
     OriginalResults10450LA(std::shared_ptr<OriginalApplicationEntities50LA>,std::uint64_t);

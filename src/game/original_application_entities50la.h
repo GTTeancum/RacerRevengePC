@@ -135,6 +135,7 @@ private:
 class OriginalApplicationEntities50LA final {
     friend class OriginalSourcePhysicsObject50LA;
     friend class OriginalSourcePhysicsBody50LA;
+    friend class OriginalSourcePhysicsModel50LA;
     friend class OriginalSourcePhysicsGravity50LA;
     friend class OriginalSourcePhysicsCollision50LA;
     friend class OriginalSourcePhysicsContact50LA;

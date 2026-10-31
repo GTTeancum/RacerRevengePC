@@ -17,6 +17,7 @@
 #include "original_consumed_ra_stage50du.h"
 #include "original_results_feedback_scope50la.h"
 #include "original_race_hud_scope50la.h"
+#include "original_position_stats_adapter50la.h"
 #include "original_consumed_ga_stage50du.h"
 #include "original_consumed_gc_stage50du.h"
 #include "original_consumed_ma_stage50du.h"
@@ -4539,3 +4540,63 @@ SessionExit50DU Context::run() {
      checkpointRequested?SessionExit50DU::Checkpoint:(restartRequested?SessionExit50DU::Restart:SessionExit50DU::Quit);
 }
 } // namespace interactive_continuation50DU
+
+//Definitions stay at the existing lexical Context owner; no new source admission.
+namespace rr::game {
+bool OriginalRaceConstructor50LA::initializeNativeTimingB4(
+    ::interactive_continuation50DU::Context& context,::native_racer50HN::Bank& bank,
+    std::uint32_t& pc)noexcept {
+    pc=0x1a7710;
+    if(resultsFeedbackThread_!=std::this_thread::get_id())return false;
+    //This is the actual EXISTING native cold manager producer, not permission
+    //to skip the incomplete original1A6BF0/world/controller/attachment tails.
+    if(!context.isRaTrack||!context.originalAiEnabled||context.consumedRaStage.race().get()!=this||
+       context.originalMainApplication.race28C()!=this||application_!=context.originalMainApplication.entities()||
+       !counted_||rolledBack_||!world74_||world74_!=context.raWorld||
+       world74_->terminal_||world74_->closed_||!world74_->runtimeQueries_||!world74_->source_)return false;
+    const auto& runtime=*world74_->runtimeQueries_;
+    if(runtime.terminal_||runtime.closed_||!runtime.cameraBankCurrent()||runtime.bankIdentity_!=&bank)return false;
+    const auto* source=world74_->source_->sourcesDecoded();
+    if(!source||context.navigationMap!=&source->map||!source->mapMetadata.bound||
+       source->map.track.count<2u||!profile_||
+       profile_!=context.originalMainApplication.riderProfile)return false;
+    try {
+        if(!timingB4_){
+            std::unique_ptr<OriginalRaceTimingManager50LA> next(new OriginalRaceTimingManager50LA(
+                application_,entity_.sessionGeneration,context.originalAiSession,bank));
+            if(!next->constructed()){pc=0x1af7f0;return false;}
+            timingB4_=std::move(next); //Actual1A7730 publication BEFORE subtype/load.
+        }
+        return timingB4_->continueNativeAssociation(*this,context.originalAiSession,bank,
+            source->map,source->mapMetadata,pc);
+    }catch(...){return false;} //Retain published B4/count and any reached effects.
+}
+}
+
+namespace original_race_hud_scope50LA {
+void Registration::continuePreAck1AB520(rr::game::OriginalRaceConstructor50LA& race,
+    rr::game::OriginalRaceEndEntryDiagnostic50LA& d)noexcept {
+    using S=rr::game::OriginalRaceEndEntryDiagnostic50LA::Status;
+    d.status=S::owner;d.sourcePC=0x1ab520;
+    d.operation="Actual same-Race lexical Camera/Bank/manager lifetime unavailable";
+    if(std::this_thread::get_id()!=thread_)return; //Before mutable scope/weak reads.
+    if(!active_||!published_||!hud_||!manager_||!bank_||!camera_)return;
+    const auto retained=race_.lock();
+    if(retained.get()!=&race||application_->race28C()!=&race||application_->entities()!=race.application_||
+       !race.counted_||race.rolledBack_||race.entity_.sessionGeneration!=generation_||
+       race.endHud_.lock().get()!=this||!race.world74_)return;
+    try {
+        const auto world=race.world74_;ra_cold_aggregate50LA::Diagnostic wd;
+        const auto camera=world->borrowRuntimeSourceCamera(world,wd);
+        if(!camera||camera.get()!=camera_||&camera->actual_.bank!=bank_||
+           camera->actual_.raceHud!=hud_||camera->generation_!=generation_||
+           camera->actual_.applicationEntities!=race.application_)return;
+        //No new permanent observer or shadow rows. The same existing private
+        //read facet binds synchronously to these actual lifetime-pinned owners.
+        original_position_stats_adapter50LA::Owner observer;
+        original_position_stats_adapter50LA::Owner::Diagnostic observed;
+        if(!observer.bind(*camera,*manager_,observed))return;
+        race.continuePreAck1AB520(observer,d);
+    }catch(...){/*Borrow/bind failures precede the noexcept source continuation.*/}
+}
+}

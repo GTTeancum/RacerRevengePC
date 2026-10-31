@@ -1112,10 +1112,13 @@ bool Owner::continueSourceFlareObserver14BA00(SourceTypedLightFrame& f,std::uint
 
 namespace ra_pod_scene50LA {
 bool Owner::selectSourceObserverSlot27E3C0(NativeListMethodCustody& c,const void* occurrence,const void* identity,
-    std::optional<std::uint32_t>& slot,bool& pending,std::uint32_t& pc)noexcept {
+    std::optional<std::uint32_t>& slot,bool& pending,std::uint32_t& pc,std::uint32_t expectedUsage)noexcept {
     auto& e=c.sourceEntries_;auto& s=c.source_;
     if(!occurrence||!identity||!sourceListEntriesCurrent(c)||e.pending||e.terminal||!c.sourceMode_||
-       c.application_!=worldApplication_.get()||c.world_!=this||c.usage10_!=1||c.reference00_!=2)return false;
+       c.application_!=worldApplication_.get()||c.world_!=this||(expectedUsage!=1&&expectedUsage!=2)||
+       c.usage10_!=expectedUsage||c.reference00_!=2)return false;
+    //Existing visibility callers retain default usage1. Only the separately
+    //authenticated actual collisionB8/+38 caller requests usage2.
     e.entered=true;e.pending=occurrence;e.pendingIdentity=identity;pending=true;
     if(!*s.blockCount34){
         pc=0x27e410;e.tableAttempted=true;e.table.reset(new(std::nothrow) std::uint32_t*[1]);

@@ -151,6 +151,7 @@ bool Owner::sourcePortalOwnersCounted(std::size_t& count)const noexcept {
 }
 bool Owner::withdrawSourcePortalWorldLinksNative(std::uint32_t& pc)noexcept {
     pc=0x27f180;
+    if(sourceCollisionPortalBorrowedNative())return false;
     for(const auto& f:sourceModelObservers_)if(f&&!f->withdrawn)return false;
     for(const auto& f:sourceTypedLights_)if(f&&f->flareObserverEntered&&!f->flareObserverWithdrawn)return false;
     //Caller has preflighted the whole graph/count floor and withdrawn manager raw borrows.
@@ -164,6 +165,7 @@ bool Owner::withdrawSourcePortalWorldLinksNative(std::uint32_t& pc)noexcept {
 }
 bool Owner::retireSourcePortalsNative(Entity* parent,std::uint32_t& pc)noexcept {
     pc=0x2303f0;if(!preflightSourcePortalOwnersNative(parent))return false;
+    if(sourceCollisionPortalBorrowedNative())return false;
     for(const auto& f:sourceTypedLights_)if(f&&f->flareObserverEntered&&!f->flareObserverWithdrawn)return false;
     for(const auto& f:sourceMethodNodeAttachments_)if(f.attempted&&!f.withdrawn)return false;
     for(const auto& rows:sourcePortalWorldLinks_)for(const auto& r:rows)if(r.attempted&&!r.withdrawn)return false;

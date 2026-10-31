@@ -2,6 +2,7 @@
 #include "original_source_physics_object50la.h"
 #include "original_racer_model_scene50la.h"
 #include "original_racer_model_packets50la.h"
+#include "original_source_collision_observer50la.h"
 #include <array>
 #include <memory>
 #include <new>
@@ -49,7 +50,7 @@ class OriginalSourcePhysicsModel50LA final {
     std::uint32_t prototypePC_=0;
     bool rowTableEntered_=false,rowTableReturned_=false;
     std::uint32_t rowTablePC_=0;
-    C* renderableReturnedEntity_=nullptr; //Typed26E820 V0, never final240740 return.
+    const C* renderableReturnedEntity_=nullptr; //Typed26E820 V0, never final240740 return.
     OriginalRacerModelPackets50LA sourcePackets_;
     bool packetsEntered_=false,packetsReturned_=false;
     std::uint32_t packetsPC_=0;
@@ -213,7 +214,7 @@ class OriginalSourcePhysicsModel50LA final {
         if(!row||!model_||!rowsEntered_||modelRetired_||sourceSceneReleased_||
            row>=model_->binding_.sourceRowCount)return nullptr;
         auto* child=model_->sourceRowObject(row);
-        return child&&child->constructed&&!child->released?&child->entity8:nullptr;
+        return child&&child->constructed&&!child->released?model_->wreckRowStorage(row):nullptr;
     }
     bool rowsHistoryNative()const noexcept {
         if(graphCount_==0||graphCount_>rr::assets::maxModelNodes49O)return false;
@@ -650,7 +651,175 @@ class OriginalSourcePhysicsModel50LA final {
         if(!translationUpdateOccurrence_||!nullObserver_.returned||
            translationUpdateOccurrence_!=nullObserver_.updateOccurrence||!localBounds_.returned||!model_)return false;
         if(!translation_.entered)return translationCallPC_==0x28add0u;
-        return translationCallPC_==translation_.pc&&model_->sourceTranslationHistoryNative(graph(),translation_);
+        return translationCallPC_==translation_.pc&&model_->sourceTranslationHistoryNative(graph(),translation_,
+            orientation_.entered?&orientation_:nullptr,postPoseWorld_.entered?&postPoseWorld_:nullptr,modelObserverBounds_.entered?&modelObserverBounds_:nullptr);
+    }
+    //Separate166710 occurrence: successful1666F0 translation remains immutable
+    //history. No post-pose11FE50 world/shape getter is represented here.
+    Scene::SourceOrientation28A090 orientation_;
+    const void* orientationUpdateOccurrence_=nullptr;
+    const Base* orientationBaseIdentity_=nullptr;
+    const void* orientationModelIdentity_=nullptr;
+    bool orientationCallEntered_=false;
+    std::uint32_t orientationCallPC_=0;
+    Result orientSourceNullRelative28A090(const void* actualUpdateOccurrence)noexcept {
+        if(orientationCallEntered_||!actualUpdateOccurrence||!translationCallEntered_||
+           !translation_.returned||translationCallPC_!=0x28af90u||
+           translationUpdateOccurrence_!=actualUpdateOccurrence||!nullObserver_.returned||
+           nullObserver_.updateOccurrence!=actualUpdateOccurrence||nativeWithdrawn_||modelRetired_||ledgerWithdrawn_||
+           detachedNative_||sourceSceneReleased_||sourceOuterDeleted_||!base_||!base_->object_||!model_||
+           !bodyModelBorrower_||!packetsReturned_||sourcePackets_.sourcePackets_.nativeWithdrawn||
+           !localBounds_.returned||!preflightNative()||
+           base_->object_->model14C!=static_cast<const void*>(&model_->model_)||
+           !model_->preflightSourceRenderableReturn26E820Native())return {Status::owner,0x28a090u};
+        orientationCallEntered_=true;orientationUpdateOccurrence_=actualUpdateOccurrence;
+        orientationBaseIdentity_=base_;orientationModelIdentity_=&model_->model_;
+        //1666FC/166700 supply actual Base60 look and Base70 up, not prepared
+        //Wreck/reset vectors. The Scene service owns guard-before-read effects
+        //and the exact t0=0,t1=1,t2=0 independent normalize/up-cross-look path.
+        const auto& fields=base_->object_->fields;
+        const auto r=model_->orientSourceNullRelative28A090(graph(),
+            fields.words.data()+0x60/4,fields.known.data()+0x60/4,
+            fields.words.data()+0x70/4,fields.known.data()+0x70/4,orientation_);
+        orientationCallPC_=r.sourcePC;
+        return {r.okay()?Status::reached:Status::bounded,r.sourcePC};
+    }
+    bool orientationHistoryNative()const noexcept {
+        if(!orientationCallEntered_)return !orientationUpdateOccurrence_&&!orientationBaseIdentity_&&
+            !orientationModelIdentity_&&!orientationCallPC_&&!orientation_.entered;
+        if(!orientationUpdateOccurrence_||!base_||!model_||orientationBaseIdentity_!=base_||
+           orientationModelIdentity_!=&model_->model_||!translationCallEntered_||!translation_.returned||
+           translationCallPC_!=0x28af90u||orientationUpdateOccurrence_!=translationUpdateOccurrence_||
+           !nullObserver_.returned||orientationUpdateOccurrence_!=nullObserver_.updateOccurrence||
+           !localBounds_.returned)return false;
+        if(!orientation_.entered)return orientationCallPC_==0x28a090u;
+        if(!base_->object_)return false;
+        const auto& fields=base_->object_->fields;
+        for(unsigned lane=0;lane<4;++lane){
+            if((orientation_.lookKnown&(1u<<lane))&&
+               (fields.known[0x60/4+lane]!=0xffffffffu||orientation_.look[lane]!=fields.words[0x60/4+lane]))return false;
+            if((orientation_.upKnown&(1u<<lane))&&
+               (fields.known[0x70/4+lane]!=0xffffffffu||orientation_.up[lane]!=fields.words[0x70/4+lane]))return false;
+        }
+        return orientationCallPC_==orientation_.pc&&model_->sourceOrientationHistoryNative(graph(),orientation_,
+            postPoseWorld_.entered?&postPoseWorld_:nullptr,modelObserverBounds_.entered?&modelObserverBounds_:nullptr);
+    }
+    Scene::SourcePostPoseWorld28B550 postPoseWorld_;
+    const void* postPoseWorldUpdateOccurrence_=nullptr;
+    const void* postPoseWorldCollisionOccurrence_=nullptr;
+    const void* postPoseWorldBodyIdentity_=nullptr; //Opaque retained Body occurrence; never dereferenced.
+    bool postPoseWorldCallEntered_=false;
+    std::uint32_t postPoseWorldCallPC_=0;
+    Result copySourcePostPoseWorld28B550(const void* actualUpdateOccurrence,
+        const void* actualCollisionOccurrence,std::array<std::uint32_t,16>& output,
+        std::uint16_t& known)noexcept {
+        if(postPoseWorldCallEntered_||!actualUpdateOccurrence||!actualCollisionOccurrence||
+           !orientationCallEntered_||!orientation_.returned||orientationCallPC_!=0x28a528u||
+           orientationUpdateOccurrence_!=actualUpdateOccurrence||!directWorldReturned_||
+           directWorldOccurrence_!=actualCollisionOccurrence||directWorldBody_!=bodyModelBorrower_||
+           !bodyModelBorrower_||nativeWithdrawn_||modelRetired_||ledgerWithdrawn_||detachedNative_||
+           sourceSceneReleased_||sourceOuterDeleted_||!base_||!base_->object_||!model_||
+           !packetsReturned_||sourcePackets_.sourcePackets_.nativeWithdrawn||!preflightNative()||
+           base_->sourceInverseExtent118_.occurrence!=bodyModelBorrower_||
+           !base_->sourceInverseExtent118_.value||base_->sourceInverseExtent118_.nativeWithdrawn||
+           base_->bodyBorrower_!=bodyModelBorrower_||model_->sourcePhysicsBodyBorrower_!=bodyModelBorrower_||
+           base_->object_->bodyD0NativeWithdrawn||
+           base_->object_->model14C!=static_cast<const void*>(&model_->model_)||
+           !model_->preflightSourceRenderableReturn26E820Native())return {Status::owner,0x28b550u};
+        //Collision owner installs its exact update lease before this callback.
+        //This is the E4 occurrence only: its historical init borrower identity
+        //is not interchangeable with E0, or with a caller-supplied ready matrix.
+        postPoseWorldCallEntered_=true;postPoseWorldUpdateOccurrence_=actualUpdateOccurrence;
+        postPoseWorldCollisionOccurrence_=actualCollisionOccurrence;postPoseWorldBodyIdentity_=bodyModelBorrower_;known=0;
+        const auto r=model_->copySourcePostPoseWorld28B550(graph(),output,postPoseWorld_);
+        postPoseWorldCallPC_=r.sourcePC;
+        if(r.okay())known=postPoseWorld_.getter.outputWordMask;
+        return {r.okay()?Status::reached:Status::bounded,r.sourcePC};
+    }
+    bool postPoseWorldHistoryNative()const noexcept {
+        if(!postPoseWorldCallEntered_)return !postPoseWorldUpdateOccurrence_&&!postPoseWorldCollisionOccurrence_&&
+            !postPoseWorldBodyIdentity_&&!postPoseWorldCallPC_&&!postPoseWorld_.entered;
+        if(!base_||!base_->object_||!model_||!postPoseWorldBodyIdentity_||
+           !postPoseWorldUpdateOccurrence_||!postPoseWorldCollisionOccurrence_||
+           !orientationCallEntered_||!orientation_.returned||orientationCallPC_!=0x28a528u||
+           postPoseWorldUpdateOccurrence_!=orientationUpdateOccurrence_||!directWorldReturned_||
+           postPoseWorldCollisionOccurrence_!=directWorldOccurrence_||directWorldBody_!=postPoseWorldBodyIdentity_)return false;
+        //Body withdrawal clears all live borrowers, but retains the exact
+        //Base16652C occurrence tombstone. It cannot erase this getter's
+        //historical Body identity or make a different/null lease sufficient.
+        const auto& extent=base_->sourceInverseExtent118_;
+        if(extent.occurrence!=postPoseWorldBodyIdentity_||!extent.value)return false;
+        if(extent.nativeWithdrawn){
+            if(bodyModelBorrower_||base_->bodyBorrower_||model_->sourcePhysicsBodyBorrower_||
+               !base_->object_->bodyD0NativeWithdrawn||!base_->object_->bodyD0||*base_->object_->bodyD0)return false;
+        }else if(bodyModelBorrower_!=postPoseWorldBodyIdentity_||base_->bodyBorrower_!=postPoseWorldBodyIdentity_||
+                 model_->sourcePhysicsBodyBorrower_!=postPoseWorldBodyIdentity_||base_->object_->bodyD0NativeWithdrawn)return false;
+        if(!postPoseWorld_.entered)return postPoseWorldCallPC_==0x28b550u;
+        return postPoseWorldCallPC_==postPoseWorld_.pc&&
+            model_->sourcePostPoseWorldHistoryNative(graph(),postPoseWorld_,
+                modelObserverBounds_.entered?&modelObserverBounds_:nullptr);
+    }
+    //166720 E0 requests its own28B550 after the E4 getter and shape pass.
+    //The caller/COL owns the intervening shape-return proof; this getter
+    //requires the exact still-current E4 graph and copies a clean root only.
+    Scene::SourceWorld28B550 postE4World_;
+    const void* postE4WorldUpdateOccurrence_=nullptr;
+    const void* postE4WorldCollisionOccurrence_=nullptr;
+    const void* postE4WorldCollisionOuterIdentity_=nullptr; //Historical outer, distinct from occurrence owner.
+    bool postE4WorldCallEntered_=false;
+    std::uint32_t postE4WorldCallPC_=0;
+    Result copySourcePostE4World28B550(const void* actualUpdateOccurrence,
+        const void* actualCollisionOccurrence,std::array<std::uint32_t,16>& output,
+        std::uint16_t& known)noexcept {
+        if(postE4WorldCallEntered_||!actualUpdateOccurrence||!actualCollisionOccurrence||
+           !postPoseWorldCallEntered_||!postPoseWorld_.returned||postPoseWorldCallPC_!=0x28b67cu||
+           postPoseWorldUpdateOccurrence_!=actualUpdateOccurrence||
+           postPoseWorldCollisionOccurrence_==actualCollisionOccurrence||
+           nativeWithdrawn_||modelRetired_||ledgerWithdrawn_||detachedNative_||sourceSceneReleased_||
+           sourceOuterDeleted_||!base_||!base_->object_||!model_||!bodyModelBorrower_||
+           bodyModelBorrower_!=postPoseWorldBodyIdentity_||
+           base_->sourceInverseExtent118_.nativeWithdrawn||base_->object_->bodyD0NativeWithdrawn||
+           base_->collisionBorrower_!=actualCollisionOccurrence||!base_->object_->collisionE0||
+           !*base_->object_->collisionE0||base_->object_->collisionE0NativeWithdrawn||
+           !packetsReturned_||sourcePackets_.sourcePackets_.nativeWithdrawn||!preflightNative()||
+           base_->object_->model14C!=static_cast<const void*>(&model_->model_)||
+           !model_->preflightSourceRenderableReturn26E820Native())return {Status::owner,0x28b550u};
+        const auto root=static_cast<std::uint32_t>(model_->model_.sceneIndex);
+        if(root>=graphCount_||nodes_[root].parent180!=SceneNodeIndex49P::none||
+           !(nodes_[root].sceneFlags190&1u))return {Status::owner,0x28b550u};
+        //Full E4 currentness above pins local/world/flags and every child.
+        //The new occurrence must issue the raw getter, not copy old output
+        //scratch or reset bit0 to manufacture a second world refresh.
+        postE4WorldCallEntered_=true;postE4WorldUpdateOccurrence_=actualUpdateOccurrence;
+        postE4WorldCollisionOccurrence_=actualCollisionOccurrence;
+        postE4WorldCollisionOuterIdentity_=*base_->object_->collisionE0;known=0;
+        const auto r=model_->copySourceWorld28B550(graph(),output,postE4World_);
+        postE4WorldCallPC_=r.sourcePC;
+        if(r.okay())known=postE4World_.outputWordMask;
+        return {r.okay()?Status::reached:Status::bounded,r.sourcePC};
+    }
+    bool postE4WorldHistoryNative()const noexcept {
+        const auto& h=postE4World_;
+        if(!postE4WorldCallEntered_)return !postE4WorldUpdateOccurrence_&&!postE4WorldCollisionOccurrence_&&
+            !postE4WorldCollisionOuterIdentity_&&!postE4WorldCallPC_&&!h.entered;
+        if(!base_||!base_->object_||!model_||!postE4WorldUpdateOccurrence_||!postE4WorldCollisionOccurrence_||
+           !postE4WorldCollisionOuterIdentity_||
+           !postPoseWorldCallEntered_||!postPoseWorld_.returned||postPoseWorldCallPC_!=0x28b67cu||
+           postE4WorldUpdateOccurrence_!=postPoseWorldUpdateOccurrence_||
+           postE4WorldCollisionOccurrence_==postPoseWorldCollisionOccurrence_||!postPoseWorldHistoryNative())return false;
+        //Keep the opaque E0 identity after native cancellation. Only the
+        //actual BaseE0 withdrawal tombstone permits the cleared live lease.
+        if(base_->object_->collisionE0NativeWithdrawn){
+            if(base_->collisionBorrower_||!base_->object_->collisionE0||*base_->object_->collisionE0)return false;
+        }else if(base_->collisionBorrower_!=postE4WorldCollisionOccurrence_||
+                 !base_->object_->collisionE0||*base_->object_->collisionE0!=postE4WorldCollisionOuterIdentity_)return false;
+        if(!h.entered)return postE4WorldCallPC_==0x28b550u;
+        const auto& prior=postPoseWorld_.getter;
+        return model_->sourceWorldHistoryCurrentNative(h)&&h.returned&&postE4WorldCallPC_==0x28b67cu&&
+            h.owner==prior.owner&&h.canonicalNodes==prior.canonicalNodes&&h.graphCount==prior.graphCount&&
+            h.sceneIndex==prior.sceneIndex&&h.localBefore==prior.localBefore&&h.worldBefore==prior.world&&
+            h.world==prior.world&&h.flags190Before==prior.flags190After&&h.flags190After==prior.flags190After&&
+            (h.flags190Before&1u)&&!h.refreshAttempted&&!h.refreshWordMask&&h.outputWordMask==0xffffu;
     }
     Scene::SourceLocalBounds28D670 localBounds_;
     Result produceSourceLocalBounds28D670(V& actualCenter,V& actualHalf)noexcept {
@@ -668,7 +837,8 @@ class OriginalSourcePhysicsModel50LA final {
     bool localBoundsHistoryNative()const noexcept {
         if(!localBounds_.entered)return !localBounds_.owner&&!localBounds_.returned&&!localBounds_.pc;
         if(!model_||!placementReturned_||!resetReturned_||!sourceWorld_.returned||
-           !model_->sourceLocalBoundsHistoryNative(graph(),localBounds_,translation_.entered?&translation_:nullptr))return false;
+           !model_->sourceLocalBoundsHistoryNative(graph(),localBounds_,translation_.entered?&translation_:nullptr,
+               orientation_.entered?&orientation_:nullptr,postPoseWorld_.entered?&postPoseWorld_:nullptr,modelObserverBounds_.entered?&modelObserverBounds_:nullptr))return false;
         const auto& h=localBounds_;const auto root=static_cast<std::uint32_t>(model_->model_.sceneIndex);
         if(h.root!=root||h.worldWritten[root]||h.before[root].sceneFlags190!=sourceWorld_.flags190After||
            std::memcmp(h.before[root].world100.v,sourceWorld_.world.data(),64))return false;
@@ -677,7 +847,7 @@ class OriginalSourcePhysicsModel50LA final {
         return true;
     }
     bool placementHistoryNative()const noexcept {
-        if(!translationHistoryNative()||!directCollisionWorldHistoryNative()||!localBoundsHistoryNative())return false;
+        if(!postE4WorldHistoryNative()||!postPoseWorldHistoryNative()||!orientationHistoryNative()||!translationHistoryNative()||!directCollisionWorldHistoryNative()||!localBoundsHistoryNative())return false;
         if(!placementEntered_)return !sourceWorld_.entered&&!placementReturned_&&!positionCopied_&&!resetEntered_&&!resetReturned_&&
             !placementPC_&&!comparisonReadMask_;
         if(!attachReturned_||!model_||!base_||!base_->object_||pc_!=placementPC_||
@@ -737,7 +907,7 @@ class OriginalSourcePhysicsModel50LA final {
     template<class ActualDetach>
     bool detachSourceModelNative(ActualDetach&& detach)noexcept {
         if(!entered_||nativeWithdrawn_||!modelAttached_||detachedNative_)return true;
-        if(bodyModelBorrower_||!base_||!base_->application_||
+        if((modelObserver_.entered&&!modelObserver_.nativeWithdrawn)||bodyModelBorrower_||!base_||!base_->application_||
            base_->application_->attachmentLock423F58()||!preflightNative())return false;
         const auto result=detach(*model_->wreckModelStorage(),0u);
         if(result.status!=OriginalWreckComponentStatus50LA::complete)return false;
@@ -746,7 +916,7 @@ class OriginalSourcePhysicsModel50LA final {
     bool withdrawSourcePacketsNative()noexcept {
         if(!entered_||nativeWithdrawn_||!sourcePackets_.sourcePackets_.entered||
            sourcePackets_.sourcePackets_.nativeWithdrawn)return true;
-        if(bodyModelBorrower_||(modelAttached_&&!detachedNative_)||
+        if((modelObserver_.entered&&!modelObserver_.nativeWithdrawn)||bodyModelBorrower_||(modelAttached_&&!detachedNative_)||
            (attachEntered_&&base_&&base_->application_->attachmentLock423F58())||!preflightNative())return false;
         //Root MUST detach the exact Entity link, then call before member association/file native withdrawal.
         //Live packet preflight borrows actual returned Model/resource; the
@@ -818,6 +988,7 @@ class OriginalSourcePhysicsModel50LA final {
         return model_&&model_->sourceConstructor_.entityCounted&&!modelRetired_&&!sourceSceneReleased_?
             model_->wreckModelStorage():nullptr;
     }
+    #include "original_source_physics_model_observer50la.inl"
     struct SourceNullObserver28EA80 {
         const void* updateOccurrence=nullptr;
         const void* ownerIdentity=nullptr;
@@ -845,10 +1016,10 @@ class OriginalSourcePhysicsModel50LA final {
         if(h.returned?(!h.observedNull||h.pc!=0x28eac4u):(h.observedNull||h.pc!=0x28ea9cu))return false;
         if(nativeWithdrawn_)return true; //No access to an erased scene or caller occurrence.
         return model_&&h.ownerIdentity==&model_->model_&&
-            (h.observedNull?!model_->model_.observer19C:!!model_->model_.observer19C);
+            (h.observedNull?model_->model_.observer19C==sourceModelObserverCurrentNative():!!model_->model_.observer19C);
     }
     bool preflightNative(bool sourceReleaseAdmission=false)const noexcept {
-        if(!nullObserverHistoryNative())return false;
+        if(!sourceModelObserverHistoryNative()||!nullObserverHistoryNative())return false;
         if(!entered_)return !base_&&!model_&&!nativeWithdrawn_;
         if(nativeWithdrawn_)return !base_&&!model_&&!missing_&&!rowsFile_&&!rowsResolver_&&!bodyModelBorrower_&&!materialTable_;
         if(!base_||base_->nativeWithdrawn_||base_->nestedModelBorrower_!=this||
@@ -881,7 +1052,7 @@ class OriginalSourcePhysicsModel50LA final {
                     if(!model_->released_||!model_->model_.released||!model_->referenceReleased_||
                        model_->wreckModelStorage()->reference00)return false;
                 }else {
-                    const auto current=model_->preflightNativePartialScene2896D0(graph());
+                    const auto current=model_->preflightNativePartialScene2896D0(graph(),sourceModelObserverCurrentNative());
                     if(!current.okay()&&!(current.status==OriginalRacerModelSceneStatus50LA::attachmentLocked&&
                         (sourceReleaseAdmission||(sourceReleaseLock_&&*sourceReleaseLock_)||
                          (attachReturned_&&attachLock_&&*attachLock_&&

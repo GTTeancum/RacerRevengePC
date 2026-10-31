@@ -2,7 +2,6 @@
 #include "original_time_stats_state50la.h"
 #include "../../tests/native/original_position_stats_adapter50la.h"
 #include "../../tests/native/original_race_constructor50la.h"
-#include "../../tests/native/ra_cold_roster_operation50la.h"
 #include <cmath>
 #include <string>
 #include <string_view>
@@ -56,16 +55,14 @@ OriginalResults10450LA::DisplayCpuPrefix OriginalResults10450LA::prepareCareerSu
     using Observation=::original_position_stats_adapter50LA::Owner;
     const auto operation=p.loadedRosterOperation.lock();const auto generation=p.component.sessionGeneration;
     const auto current=[&](){const auto now=race.profile_->stamp();
-        return operation&&operation->aggregate_==race.world74_&&operation->entities_==p.application&&
-            operation->domain_==p.domain&&operation->generation_==generation&&
-            operation->resultsRuntimeBankCurrent(observer.resultsBankIdentity())&&
+        return careerRosterCurrentNative(operation,race,p.application,p.domain,generation,observer)&&
             now.generation==out.career.profileGeneration&&now.mode34==out.career.profileMode34&&p.context->live();
     };
     Observation::ResultsRecordIdentity row;Observation::Diagnostic observed;
     if(!current()||!observer.captureResultsRecordIdentity(p.application.get(),p.domain->materials382B38().get(),
             generation,0,row,observed)||row.publication!=out.career.publication||
        row.bank!=observer.resultsBankIdentity()||row.vehicle58!=0||
-       !operation->resultsRacerIdentityCurrent(0,row.racer60)||!current())
+       !careerRacerCurrentNative(operation,row.racer60)||!current())
         return stop(Impl::S::owner,0x1c6f98,"Results same first-human Profile/Bank/publication no longer current");
     const auto samePublication=[&](){return current()&&observer.resultsRecordIdentityCurrent(row);};
     if(!p.text1770)return stop(Impl::S::owner,0x1c6f98,"Results actual three career-message Text owners absent");
@@ -206,4 +203,21 @@ OriginalResults10450LA::DisplayCpuPrefix OriginalResults10450LA::prepareCareerSu
         return finish();
     }catch(...){return stop(Impl::S::allocation,out.nextSourcePC,"Results summary formatting allocation; reached CPU effects retained");}
 }
+}
+
+namespace rr::game {
+bool OriginalResults10450LA::endDispatchOwnerCurrent1AB520(const OriginalRaceConstructor50LA& race,
+    const ::original_position_stats_adapter50LA::Owner& observer)const noexcept {
+    if(race.resultsFeedbackThread_!=std::this_thread::get_id()||!impl_)return false;
+    const auto& p=*impl_;
+    if(!constructed()||!p.loadComplete||!p.derived||!p.context||!p.context->live()||!p.domain||
+       race.results104_.get()!=this||!race.counted_||race.rolledBack_||race.application_!=p.application||
+       race.entity_.sessionGeneration!=p.component.sessionGeneration||!retirementCurrent()||
+       !p.application->entityAuthority_.canRetire(race.entity_))return false;
+    //Reuse the exact load-issued marker and its existing destruction-bound
+    //Bank check. This is a native ownership proof, not original B0/phase/finish.
+    const auto operation=p.loadedRosterOperation.lock();
+    return careerRosterCurrentNative(operation,race,p.application,p.domain,p.component.sessionGeneration,observer);
+}
+
 }

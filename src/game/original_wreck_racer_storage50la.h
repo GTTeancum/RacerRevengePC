@@ -714,11 +714,11 @@ const OriginalWreckPieceStorage50LA* exactRetiredSecondPiece()const noexcept {
     }
     const auto& model=p.modelOwner_;
     auto sceneRetired=[&](const auto& object){
-        if(!object.constructed)return !object.entity8.reference00;
-        if(!object.released||object.entity8.reference00||
-           object.entity8.sessionGeneration!=storage_->sessionGeneration)return false;
+        if(!object.constructed)return !object.entity().reference00;
+        if(!object.released||object.entity().reference00||
+           object.entity().sessionGeneration!=storage_->sessionGeneration)return false;
         std::size_t matches=0;for(std::size_t j=1;j<=p.sceneCount_;++j)
-            if(p.componentSlots_[j]==&object.entity8)++matches;
+            if(p.componentSlots_[j]==&object.entity())++matches;
         if(matches!=1u)return false;++destroyed;return true;
     };
     if(!sceneRetired(model.model_)||(model.model_.constructed&&!model.released_))return nullptr;
@@ -726,8 +726,8 @@ const OriginalWreckPieceStorage50LA* exactRetiredSecondPiece()const noexcept {
     //Scene Entities retain their original kind:2896D0 marks released rather
     //than rewriting entity8.kind. Every nonnull slot must name its real owner.
     for(std::size_t j=1;j<=p.sceneCount_;++j){const auto* e=p.componentSlots_[j];if(!e)continue;
-        bool owned=e==&model.model_.entity8;
-        for(const auto& row:model.rows_)if(row&&e==&row->entity8)owned=true;
+        bool owned=e==&model.model_.entity();
+        for(const auto& row:model.rows_)if(row&&e==&row->entity())owned=true;
         if(!owned||e->reference00)return nullptr;
     }
     if(destroyed!=r.objectsDestroyed||

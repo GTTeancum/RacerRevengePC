@@ -1,7 +1,6 @@
 #include "original_results104_storage50la.h"
 #include "../../tests/native/original_position_stats_adapter50la.h"
 #include "../../tests/native/original_race_constructor50la.h"
-#include "../../tests/native/ra_cold_roster_operation50la.h"
 #include <bit>
 #include <charconv>
 #include <cfenv>
@@ -66,9 +65,7 @@ OriginalResults10450LA::DisplayCpuPrefix OriginalResults10450LA::prepareCareerWi
     const auto operation=p.loadedRosterOperation.lock();
     const auto before=race.profile_->stamp();const auto generation=p.component.sessionGeneration;
     const auto current=[&](){const auto now=race.profile_->stamp();
-        return operation&&operation->aggregate_==race.world74_&&operation->entities_==p.application&&
-            operation->domain_==p.domain&&operation->generation_==generation&&
-            operation->resultsRuntimeBankCurrent(observer.resultsBankIdentity())&&
+        return careerRosterCurrentNative(operation,race,p.application,p.domain,generation,observer)&&
             now.generation==before.generation&&now.mode34==before.mode34&&p.context->live();
     };
     // A private read-only snapshot of THIS Profile's selected1125F metadata.
@@ -83,7 +80,7 @@ OriginalResults10450LA::DisplayCpuPrefix OriginalResults10450LA::prepareCareerWi
     Observation::ResultsRecordIdentity row;Observation::Diagnostic observed;
     if(!observer.captureResultsRecordIdentity(p.application.get(),p.domain->materials382B38().get(),
             generation,0,row,observed)||row.bank!=observer.resultsBankIdentity()||row.vehicle58!=0||
-       !operation->resultsRacerIdentityCurrent(0,row.racer60)||!current())
+       !careerRacerCurrentNative(operation,row.racer60)||!current())
         return stop(Impl::S::owner,0x1c4d18,"Results same loaded first-human Bank identity absent");
     calls.publication=row.publication;
     const auto samePublication=[&](){return current()&&observer.resultsRecordIdentityCurrent(row);};

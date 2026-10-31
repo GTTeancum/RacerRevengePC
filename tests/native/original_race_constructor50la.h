@@ -78,6 +78,13 @@ class OriginalRaceConstructor50LA final {
     // Actual229F80 saved register operands, not new canonical recording lanes.
     std::optional<std::uint32_t> endReplayZoneC38_;
     std::optional<std::array<std::uint32_t,4>> endReplayCenterC40_;
+    //Synchronous private borrow; same actual World74 native guards, no readiness receipt.
+    ra_source_camera50LA::OwnershipBridge* borrowEndRuntimeNative()const noexcept;
+    bool endWorldCurrentNative()const noexcept;
+    bool endResetNativeTriggerList2DCC70(std::uint32_t&)noexcept;
+    bool endResetNativeParticles161F60(std::uint32_t&)noexcept;
+    bool endResetLiveWorldPhysics2702E0(std::uint32_t&)noexcept;
+
     void continueEndCaller1A7E40(OriginalRaceEndEntryDiagnostic50LA&)noexcept;
     // Saved argument of the exact Root publication that reached1A7DD0.
     // Not latest-frame delta, an elapsed timer, or end admission authority.

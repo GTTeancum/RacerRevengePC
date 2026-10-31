@@ -823,6 +823,15 @@ struct SourcePortalWorldLink27F3B0 {
 };
 std::array<SourcePortalAttempt272B3C,10> sourcePortalFrames_;
 std::array<std::array<SourcePortalWorldLink27F3B0,4>,10> sourcePortalWorldLinks_;
+//Native lifetime only; COL owns each strong token until all secondary raw
+//portal/node pointers and list/pool borrows have been withdrawn. No callback.
+struct SourceCollisionPortalBorrow {const void* registration=nullptr;std::weak_ptr<const void> token;};
+std::vector<SourceCollisionPortalBorrow> sourceCollisionPortalBorrows_;
+bool sourceCollisionPortalBorrowedNative()const noexcept {
+    for(const auto& borrow:sourceCollisionPortalBorrows_)if(!borrow.token.expired())return true;
+    return false;
+}
+
 bool sourcePortalCohortAdmitted_=false;
 std::uint8_t sourcePortalViewportKnown_=0;
 bool reserveSourcePortalCohortNative()noexcept;
@@ -1474,7 +1483,7 @@ struct SourceLightDescriptor277220 {
     bool withdrawSourceFlareSecondaryNative(SourceTypedLightFrame&)noexcept;
     bool continueSourceFlareSecondary280BF0(SourceTypedLightFrame&,std::uint32_t&)noexcept;
     bool finishSourceFlare14BA00And146AE0(SourceTypedLightFrame&,std::uint32_t&)noexcept;
-    bool selectSourceObserverSlot27E3C0(NativeListMethodCustody&,const void*,const void*,std::optional<std::uint32_t>&,bool&,std::uint32_t&)noexcept;
+    bool selectSourceObserverSlot27E3C0(NativeListMethodCustody&,const void*,const void*,std::optional<std::uint32_t>&,bool&,std::uint32_t&,std::uint32_t expectedUsage=1)noexcept;
 
     bool continueSourceTypedFlareVectors14AC74(SourceTypedLightFrame&,std::uint32_t&)noexcept;
     bool continueSourceTypedFlareUV14ABD8(SourceTypedLightFrame&,std::uint32_t&)noexcept;
