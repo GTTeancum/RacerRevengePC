@@ -943,7 +943,7 @@ void Owner::constructSourceTerrain21204C(runtime_startup50fl::Fixture& actual,
     failurePC_=sourceConstructorPC_=0x212064u;
     const auto constructed=sourceTerrain348_->construct1B0EE0(*stage,*application_,slot_,generation_,
         static_cast<std::uint64_t>(reinterpret_cast<std::uintptr_t>(sourceTerrain348_.get())),
-        original_follow_query_bridge::QueryBridge::sentinel3E02C0,clear,up);
+        original_follow_query_bridge::QueryBridge::sharedSentinel3E02C0(),clear,up);
     failurePC_=constructed.sourcePC;
     need(constructed.status==g::OriginalWreckComponentStatus50LA::complete,"actual counted1B0EE0 stopped");
     racer_->sourceTerrain348_=sourceTerrain348_.get(); //21206C, BEFORE setup call.
@@ -1032,7 +1032,7 @@ void Owner::constructSourceEngineQuery2120B4(runtime_startup50fl::Fixture& actua
     failurePC_=sourceConstructorPC_=0x21215cu;
     r=sourceQuery690_->construct21215C(*application_,generation_,
         static_cast<std::uint64_t>(reinterpret_cast<std::uintptr_t>(sourceQuery690_.get())),
-        original_follow_query_bridge::QueryBridge::sentinel3E02C0,
+        original_follow_query_bridge::QueryBridge::sharedSentinel3E02C0(),
         bridge.actual_->mainFilter.flags31,bridge.actual_->mainFilter.flagsF8);
     failurePC_=r.sourcePC;need(r.status==g::OriginalWreckComponentStatus50LA::complete,"actual69011B190 constructor stopped");
     racer_->sourceQuery690_=sourceQuery690_.get(); //212164 BEFORE configuration/setup.
@@ -1089,7 +1089,7 @@ void Owner::constructSourceQuery6942121D0(runtime_startup50fl::Fixture& actual,
     failurePC_=sourceConstructorPC_=0x2121f8u;
     auto r=sourceQuery694_->construct2121F8(*application_,generation_,
         static_cast<std::uint64_t>(reinterpret_cast<std::uintptr_t>(sourceQuery694_.get())),
-        original_follow_query_bridge::QueryBridge::sentinel3E02C0,
+        original_follow_query_bridge::QueryBridge::sharedSentinel3E02C0(),
         bridge.actual_->mainFilter.flags31,bridge.actual_->mainFilter.flagsF8);
     failurePC_=r.sourcePC;need(r.status==g::OriginalWreckComponentStatus50LA::complete,
         "actual69411B190 constructor stopped");
@@ -1219,7 +1219,7 @@ void Owner::constructSourceAuxiliary2123C8(runtime_startup50fl::Fixture& actual,
     failurePC_=sourceConstructorPC_=0x2123dcu;
     auto r=sourceQuery7A4_->construct2123DC(*application_,generation_,
         static_cast<std::uint64_t>(reinterpret_cast<std::uintptr_t>(sourceQuery7A4_.get())),
-        original_follow_query_bridge::QueryBridge::sentinel3E02C0,
+        original_follow_query_bridge::QueryBridge::sharedSentinel3E02C0(),
         bridge.actual_->movement->filter.flags31,bridge.actual_->movement->filter.flagsF8);
     failurePC_=r.sourcePC;need(r.status==g::OriginalWreckComponentStatus50LA::complete,
         "actual7A411B190 constructor stopped");
@@ -1236,7 +1236,7 @@ void Owner::constructSourceAuxiliary2123C8(runtime_startup50fl::Fixture& actual,
     need(std::string_view(physics.name)=="PHYSICSBODY"&&sourceQuery7A4_->bindReceiver212424(*racer_,physics.bit),
         "actual7A4 typed20EE10 receiver/category registration stopped");
     failurePC_=sourceConstructorPC_=0x212444u;
-    const bool shape=sourceQuery7A4_->shape11C710_212444(original_follow_query_bridge::QueryBridge::sentinel3E02C0);
+    const bool shape=sourceQuery7A4_->shape11C710_212444(original_follow_query_bridge::QueryBridge::sharedSentinel3E02C0());
     if(!shape)failurePC_=sourceQuery7A4_->boundary_;
     need(shape,"actual7A4 source type3 allocation stopped");
     failurePC_=sourceConstructorPC_=0x212450u;
@@ -1250,7 +1250,7 @@ void Owner::constructSourceAuxiliary2123C8(runtime_startup50fl::Fixture& actual,
     failurePC_=sourceConstructorPC_=0x21247cu;
     r=sourceQuery79C_->construct21247C(*application_,generation_,
         static_cast<std::uint64_t>(reinterpret_cast<std::uintptr_t>(sourceQuery79C_.get())),
-        original_follow_query_bridge::QueryBridge::sentinel3E02C0,
+        original_follow_query_bridge::QueryBridge::sharedSentinel3E02C0(),
         bridge.actual_->mainFilter.flags31,bridge.actual_->mainFilter.flagsF8);
     failurePC_=r.sourcePC;need(r.status==g::OriginalWreckComponentStatus50LA::complete,
         "actual79C11B190 constructor stopped");
@@ -1349,7 +1349,7 @@ void Owner::constructSourceSecondaryContacts212720(runtime_startup50fl::Fixture&
     failurePC_=sourceConstructorPC_=0x212748u;
     auto result=sourceQuery364_->construct212748(*application_,generation_,
         static_cast<std::uint64_t>(reinterpret_cast<std::uintptr_t>(sourceQuery364_.get())),
-        original_follow_query_bridge::QueryBridge::sentinel3E02C0,
+        original_follow_query_bridge::QueryBridge::sharedSentinel3E02C0(),
         bridge.actual_->secondaryFilter.flags31,bridge.actual_->secondaryFilter.flagsF8);
     failurePC_=result.sourcePC;need(result.status==g::OriginalWreckComponentStatus50LA::complete,"actual364 constructor stopped");
     racer_->sourceQuery364_=sourceQuery364_.get(); //212750 BEFORE mode/setup/category.

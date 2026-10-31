@@ -386,6 +386,11 @@ class QueryBridge {
         deathCold_.geometry120=&geometry_[deathIndex];deathCold_.globalValid3E0730=&storage_.globalValid3E0730;
     }
 public:
+    // Read-only identity of the existing immutable source constant; this grants
+    // no access to a bridge instance, query state, storage or lifetime authority.
+    static constexpr const SpringVector4_48N& sharedSentinel3E02C0()noexcept {
+        return sentinel3E02C0;
+    }
     // Recovery arguments are all-or-none. Its explicit stack capacity is the
     // cold maximum nodes+faces+1 across every selectable original podboxf mesh,
     // computed before Bank::seal; refresh rejects any selected mesh beyond it.
