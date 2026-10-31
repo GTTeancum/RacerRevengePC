@@ -16,17 +16,72 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
-      - name: Install compiler and link dependency
+      - name: Install compiler, link dependency and bounded Linux cache
+        id: cache_setup
+        env:
+          CCACHE_DIR: ${{ runner.temp }}/rr-ccache
+          CCACHE_CONFIGPATH: ${{ runner.temp }}/rr-ccache.conf
+          CCACHE_EXTRAFILES: ${{ runner.temp }}/toolchain-receipt/cache-inputs.txt
         run: |
+          printf '%s\n' "CCACHE_DIR=$CCACHE_DIR" "CCACHE_CONFIGPATH=$CCACHE_CONFIGPATH" "CCACHE_EXTRAFILES=$CCACHE_EXTRAFILES" >> "$GITHUB_ENV"
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends g++-14 zlib1g-dev
+          sudo apt-get install -y --no-install-recommends g++-14 zlib1g-dev ccache
           mkdir -p "$RUNNER_TEMP/toolchain-receipt"
-          dpkg-query -W g++-14 gcc-14 libstdc++-14-dev zlib1g-dev > "$RUNNER_TEMP/toolchain-receipt/packages.txt"
+          # All installed package versions fence backend/SDK/image changes too.
+          dpkg-query -W > "$RUNNER_TEMP/toolchain-receipt/packages.txt"
+          cat > "$CCACHE_CONFIGPATH" <<'CONFIG'
+          compiler_check = content
+          direct_mode = false
+          depend_mode = false
+          sloppiness =
+          hash_dir = true
+          run_second_cpp = true
+          hard_link = false
+          remote_storage =
+          max_size = 2G
+          CONFIG
+          cp "$CCACHE_CONFIGPATH" "$RUNNER_TEMP/toolchain-receipt/ccache.conf"
+          {
+            cat "$RUNNER_TEMP/toolchain-receipt/packages.txt" "$CCACHE_CONFIGPATH"
+            sha256sum "$(command -v g++-14)" "$(command -v ccache)"
+            for name in cc1plus as; do
+              program="$(g++-14 -print-prog-name="$name")"
+              if [[ "$program" != /* ]]; then program="$(command -v "$program")"; fi
+              sha256sum "$program"
+            done
+          } > "$CCACHE_EXTRAFILES"
+          echo "fingerprint=$(sha256sum "$CCACHE_EXTRAFILES" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+      - name: Restore compatible Linux compiler cache
+        id: ccache_restore
+        continue-on-error: true
+        uses: actions/cache/restore@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: rr-linux-ccache-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.cache_setup.outputs.fingerprint }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            rr-linux-ccache-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.cache_setup.outputs.fingerprint }}-
       - name: Compile and link exact607-source Linux client (never launch)
+        id: linux_build
         env:
           CXX: g++-14
+          RR_CXX_LAUNCHER: ccache
           PYTHONDONTWRITEBYTECODE: '1'
-        run: python3 tools/ci/build_linux.py "$RUNNER_TEMP/native-linux"
+        run: |
+          ccache --zero-stats
+          python3 tools/ci/build_linux.py "$RUNNER_TEMP/native-linux"
+      - name: Record cache statistics, including failed builds
+        if: always() && steps.cache_setup.outcome == 'success'
+        continue-on-error: true
+        run: |
+          ccache --show-config > "$RUNNER_TEMP/toolchain-receipt/ccache-effective-config.txt"
+          ccache --show-stats --verbose > "$RUNNER_TEMP/toolchain-receipt/ccache-stats.txt"
+      - name: Save completed object cache entries even after compile failure
+        if: always() && steps.cache_setup.outcome == 'success' && steps.linux_build.outcome != 'skipped'
+        continue-on-error: true
+        uses: actions/cache/save@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: rr-linux-ccache-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.cache_setup.outputs.fingerprint }}-${{ github.run_id }}-${{ github.run_attempt }}
       - name: Preserve Linux diagnostics and binary
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2

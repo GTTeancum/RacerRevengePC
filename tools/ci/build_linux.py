@@ -13,9 +13,20 @@ def write(p,v):
 def main():
     root=Path(__file__).resolve().parents[2];out=Path(sys.argv[1]).resolve();assert not out.exists();out.mkdir(parents=True)
     compiler=shutil.which(os.environ.get('CXX','g++-14'));assert compiler
+    # Keep CXX as the real compiler; the optional launcher is never its identity.
+    launcher_name=os.environ.get('RR_CXX_LAUNCHER','')
+    launcher=None;cache_inputs={}
+    if launcher_name:
+        assert launcher_name=='ccache','Only the explicitly reviewed ccache launcher is supported'
+        launcher=shutil.which(launcher_name);assert launcher
+        for name in ('CCACHE_CONFIGPATH','CCACHE_EXTRAFILES'):
+            path=Path(os.environ[name]).resolve();assert path.is_file()
+            cache_inputs[name]=dict(path=str(path),sha256=sha(path))
+    compile_prefix=([launcher] if launcher else [])+[compiler]
     tracked=subprocess.check_output(['git','ls-files','-z'],cwd=root).decode().split('\0');tracked=[p for p in tracked if p]
     baseline={p:sha(root/p) for p in tracked};write(out/'source-hashes.json',baseline)
     receipt=dict(source_commit=subprocess.check_output(['git','rev-parse','HEAD'],cwd=root,text=True).strip(),compiler=compiler,compiler_sha256=sha(compiler),runtime_executed=False,tests_executed=False,objects=[],pass_=False)
+    receipt['compiler_launcher']=dict(path=launcher,sha256=sha(launcher),inputs=cache_inputs) if launcher else None
     receipt['pass']=receipt.pop('pass_');write(out/'RESULT.json',receipt)
     def run(label,argv):
         assert shutil.disk_usage(out).free>256*1024*1024
@@ -50,13 +61,16 @@ def main():
         for i,unit in enumerate(units):
             heavy=unit.startswith(('tests/native/','platform/linux/native/','src/game/original_results104','src/game/original_race_end_')) or unit in ('src/game/original_race_timing_manager50la.cpp','src/game/original_race_music_manager50la.cpp','src/game/original_gc_gameplay_lighting_candidate.cpp')
             obj=out/('%04d.o'%i);dep=out/('%04d.d'%i)
-            run('%04d'%i,[compiler]+common+['-O0' if heavy else '-O2','-std=c++20']+options+['-MD','-MF',str(dep),'-c',str(root/unit),'-o',str(obj)])
+            run('%04d'%i,compile_prefix+common+['-O0' if heavy else '-O2','-std=c++20']+options+['-MD','-MF',str(dep),'-c',str(root/unit),'-o',str(obj)])
             assert obj.is_file() and dep.is_file();objects.append(str(obj));receipt['objects'].append(dict(unit=unit,sha256=sha(obj),dependencies_sha256=sha(dep)));write(out/'RESULT.json',receipt)
         exe=out/'racer-revenge'
         run('link',[compiler]+objects+['-pthread','-lz','-ldl','-o',str(exe)])
         assert exe.read_bytes()[:4]==b'\x7fELF'
         assert all(sha(root/p)==h for p,h in baseline.items()),'Tracked source changed during build'
         assert sha(compiler)==receipt['compiler_sha256'],'Compiler changed during build'
+        if launcher:
+            assert sha(launcher)==receipt['compiler_launcher']['sha256'],'Cache launcher changed during build'
+            assert all(sha(v['path'])==v['sha256'] for v in cache_inputs.values()),'Cache policy/toolchain receipt changed during build'
         receipt.update(binary_sha256=sha(exe),binary=str(exe));receipt['pass']=True
     except Exception as exc:
         receipt['error']=repr(exc);raise
