@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Serial exact interactive closure compile/link only. Never runs binaries/tests."""
 from pathlib import Path
-import hashlib,json,os,shutil,subprocess,sys,time
+import hashlib,json,os,re,shutil,subprocess,sys,time
 
 def sha(p):
     h=hashlib.sha256()
@@ -10,8 +10,19 @@ def sha(p):
     return h.hexdigest()
 def write(p,v):
     t=p.with_suffix(p.suffix+'.tmp');t.write_text(json.dumps(v,indent=2)+'\n');os.replace(t,p)
+def ordinary_source_failure(returncode,log):
+    # Conservative opt-in: crashes, fatal diagnostics, launch/cache/assembler
+    # errors and unknown output never authorize continuing the build.
+    if returncode!=1 or log.stat().st_size>16*1024*1024:return False
+    text=log.read_text(errors='replace')
+    if re.search(r'(?i)fatal error:|internal compiler error|out of memory|cannot allocate memory|memory exhausted|killed|no space left|disk full|permission denied|ccache: error|assembler messages:',text):return False
+    errors=[line for line in text.splitlines() if re.search(r'\berror:',line)]
+    return bool(errors) and all(re.match(r'^.+:[0-9]+(?::[0-9]+)?: error:',line) for line in errors)
+
 def main():
     root=Path(__file__).resolve().parents[2];out=Path(sys.argv[1]).resolve();assert not out.exists();out.mkdir(parents=True)
+    collect_value=os.environ.get('RR_COLLECT_SOURCE_ERRORS','0');assert collect_value in ('0','1')
+    collect_source_errors=collect_value=='1'
     compiler=shutil.which(os.environ.get('CXX','g++-14'));assert compiler
     # Keep CXX as the real compiler; the optional launcher is never its identity.
     launcher_name=os.environ.get('RR_CXX_LAUNCHER','')
@@ -26,9 +37,10 @@ def main():
     tracked=subprocess.check_output(['git','ls-files','-z'],cwd=root).decode().split('\0');tracked=[p for p in tracked if p]
     baseline={p:sha(root/p) for p in tracked};write(out/'source-hashes.json',baseline)
     receipt=dict(source_commit=subprocess.check_output(['git','rev-parse','HEAD'],cwd=root,text=True).strip(),compiler=compiler,compiler_sha256=sha(compiler),runtime_executed=False,tests_executed=False,objects=[],pass_=False)
+    receipt.update(collect_source_errors=collect_source_errors,source_failures=[],link_attempted=False)
     receipt['compiler_launcher']=dict(path=launcher,sha256=sha(launcher),inputs=cache_inputs) if launcher else None
     receipt['pass']=receipt.pop('pass_');write(out/'RESULT.json',receipt)
-    def run(label,argv):
+    def run(label,argv,source=None):
         assert shutil.disk_usage(out).free>256*1024*1024
         before=Path('/proc/meminfo').read_text();write(out/(label+'.command.json'),dict(argv=argv,memory_before=before))
         started=time.monotonic()
@@ -36,7 +48,14 @@ def main():
             result=subprocess.run(argv,cwd=root,stdout=log,stderr=subprocess.STDOUT,timeout=1800)
         write(out/(label+'.status.json'),dict(exit_code=result.returncode,seconds=time.monotonic()-started,memory_after=Path('/proc/meminfo').read_text()))
         print(label,result.returncode,flush=True)
-        if result.returncode:raise RuntimeError('Command failed: '+label)
+        if result.returncode:
+            ordinary=source is not None and ordinary_source_failure(result.returncode,out/(label+'.log'))
+            if source is not None:
+                receipt['source_failures'].append(dict(unit=source,exit_code=result.returncode,log=str(out/(label+'.log')),ordinary_source_error=ordinary))
+                write(out/'RESULT.json',receipt)
+            if collect_source_errors and ordinary:return False
+            raise RuntimeError('Command failed (fail-fast or non-source failure): '+label)
+        return True
     try:
         command_file=out/'generated-command.json'
         run('inventory',[sys.executable,str(root/'tools/prepare_interactive_build50dv.py'),str(command_file),str(out/'unused-output')])
@@ -61,8 +80,12 @@ def main():
         for i,unit in enumerate(units):
             heavy=unit.startswith(('tests/native/','platform/linux/native/','src/game/original_results104','src/game/original_race_end_')) or unit in ('src/game/original_race_timing_manager50la.cpp','src/game/original_race_music_manager50la.cpp','src/game/original_gc_gameplay_lighting_candidate.cpp')
             obj=out/('%04d.o'%i);dep=out/('%04d.d'%i)
-            run('%04d'%i,compile_prefix+common+['-O0' if heavy else '-O2','-std=c++20']+options+['-MD','-MF',str(dep),'-c',str(root/unit),'-o',str(obj)])
+            if not run('%04d'%i,compile_prefix+common+['-O0' if heavy else '-O2','-std=c++20']+options+['-MD','-MF',str(dep),'-c',str(root/unit),'-o',str(obj)],source=unit):continue
             assert obj.is_file() and dep.is_file();objects.append(str(obj));receipt['objects'].append(dict(unit=unit,sha256=sha(obj),dependencies_sha256=sha(dep)));write(out/'RESULT.json',receipt)
+        if receipt['source_failures']:
+            raise RuntimeError(f"{len(receipt['source_failures'])} source units failed; link explicitly skipped")
+        assert len(objects)==len(units),'Refusing to link incomplete compilation'
+        receipt['link_attempted']=True;write(out/'RESULT.json',receipt)
         exe=out/'racer-revenge'
         run('link',[compiler]+objects+['-pthread','-lz','-ldl','-o',str(exe)])
         assert exe.read_bytes()[:4]==b'\x7fELF'

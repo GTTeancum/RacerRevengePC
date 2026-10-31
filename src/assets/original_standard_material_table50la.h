@@ -18,7 +18,7 @@ namespace rr::game {class OriginalRaceF850LA; class OriginalResults10450LA; clas
 namespace rr::platform { class OriginalUiSharedDialogMaterialHistory50KG; class OriginalUiTournamentPodReferences50KG; class OriginalUiSharedDialogs50KG; }
 namespace rr::platform {class OriginalUiMemoryCardConstructor50KG;class OriginalUiGarageModelResource50KG;class OriginalUiGarageScreenText50KG;class OriginalUiGarageQuad50KG;class OriginalUiGaragePageOwner50KG;}
 namespace rr::platform { class OriginalUiGarageCanonicalSubmission50KG; class OriginalUiGarageDrawContribution50KG; }
-namespace rr::platform {class OriginalUiCoursePopupPayload50KG;}
+namespace rr::platform {class OriginalUiCoursePopupPayload50KG;class OriginalUiCoursePagePayload50KG;}
 namespace rr::assets {
 // A partial CPU callback outcome, never a renderer capability. The first
 // enabled pass cannot return until24B9B0; subsequent passes remain untouched.
@@ -155,6 +155,7 @@ class OriginalStandardMaterialTable50LA final {
     friend class rr::platform::OriginalUiGarageQuad50KG;
     friend class rr::platform::OriginalUiCourseOwnedLifecycle50KG;
     friend class rr::platform::OriginalUiCoursePopupPayload50KG;
+    friend class rr::platform::OriginalUiCoursePagePayload50KG;
     friend class rr::platform::OriginalUiGaragePageOwner50KG;
     friend class rr::platform::OriginalUiSharedDialogs50KG;
 public:

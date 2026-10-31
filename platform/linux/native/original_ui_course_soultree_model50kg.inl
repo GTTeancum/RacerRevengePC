@@ -120,10 +120,10 @@
         if(!m.referenceReleased&&!m.scene->rowsLoaded_&&!m.materials.started()&&!m.resourceHeld&&!m.packets.constructed240740()&&!m.attached)
             return m.scene->preflightFreshUnlinkedNative(m.graph()).okay();
         if(m.scene->released_)return m.scopeRetiring&&m.referenceReleased&&m.scene->referenceReleased_&&
-            m.scene->model_.entity8.reference00==0&&construction_->courseSoultreeRows_[i].model==m.scene.get()&&construction_->courseSoultreeRows_[i].modelRetiring;
+            m.scene->model_.entity().reference00==0&&construction_->courseSoultreeRows_[i].model==m.scene.get()&&construction_->courseSoultreeRows_[i].modelRetiring;
         if(m.childrenRetired){
             if(!m.referenceReleased||!m.scene->referenceReleased_||!m.scene->garageSceneChildrenRetired_||
-               !m.scene->rowTableFreed_||m.scene->rowTable_||m.scene->model_.entity8.reference00||
+               !m.scene->rowTableFreed_||m.scene->rowTable_||m.scene->model_.entity().reference00||
                m.graph().nodes[static_cast<std::size_t>(m.scene->model_.sceneIndex)].firstChild184!=game::SceneNodeIndex49P::none)return false;
         }else if(!m.scene->preflightRetainedScene2896D0(m.graph(),m.scene->model_.observer19C).okay())return false;
         if(!m.materialsReleased&&!m.materials.canRelease26E4C0())return false;

@@ -65,6 +65,8 @@ jobs:
         env:
           CXX: g++-14
           RR_CXX_LAUNCHER: ccache
+          RR_COLLECT_SOURCE_ERRORS: '1'
+          LC_ALL: C
           PYTHONDONTWRITEBYTECODE: '1'
         run: |
           ccache --zero-stats
@@ -116,6 +118,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
+          $env:VSLANG = '1033' # Stable diagnostic classification for opt-in collection.
           $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
           $vs = & $vswhere -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
           if (-not $vs) { throw 'Hosted x64 MSVC toolchain missing' }
@@ -131,7 +134,7 @@ jobs:
             -BuildDirectory "$env:RUNNER_TEMP/native-windows" `
             -Compiler (Get-Command cl.exe).Source -Linker (Get-Command link.exe).Source `
             -SDL2IncludeDirectory "$env:GITHUB_WORKSPACE/_ci_deps/SDL2/include" `
-            -SourceRevision $env:GITHUB_SHA -MaxCompileJobs 1
+            -SourceRevision $env:GITHUB_SHA -MaxCompileJobs 1 -CollectSourceErrors
       - name: Preserve Windows diagnostics and binary
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2

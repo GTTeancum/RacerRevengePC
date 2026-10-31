@@ -282,7 +282,7 @@
         l.scene8C_=nullptr;l.scaleC4_=l.scaleC8_=1;
         l.rectangle38_[0].store(502);l.rectangle38_[1].store(315);l.rectangle38_[2].store(630);l.rectangle38_[3].store(331);
         assets::OriginalApplicationFontDiagnostic50LA fontDiagnostic;
-        if(!issuer_->loadGarageTextFont29CB74(video_->fontArchive,courseScreenTextFontName(i),fontDiagnostic))return fail(fontDiagnostic.sourcePC);
+        if(!issuer_->loadGarageTextFont29CB74(issuer_->frontendFontsArchive_,courseScreenTextFontName(i),fontDiagnostic))return fail(fontDiagnostic.sourcePC);
         if(!issuer_->fonts328Owner_)return fail(0x29CB88);
         l.font34_=issuer_->fonts328Owner_->find282210(courseScreenTextFontName(i));
         l.sourceFont34_=l.font34_.get();

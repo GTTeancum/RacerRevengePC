@@ -18,6 +18,8 @@
 #include "source_announcer50ie_fixture.h"
 #include "live_audio50hf_fixture.h"
 #include "original_ai_audio_owner.h"
+#include "lap_drive50gj_fixture.h"
+#include "native_ai_session50iv_fixture.h"
 #include <bit>
 #include <utility>
 

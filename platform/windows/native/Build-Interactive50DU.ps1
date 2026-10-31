@@ -9,7 +9,8 @@ param(
     [Parameter(Mandatory=$true)][string]$SDL2IncludeDirectory,
     [string]$SDL2RuntimeDll,
     [string]$SourceRevision = 'unverified-working-tree',
-    [ValidateRange(1, 4)][int]$MaxCompileJobs = 1
+    [ValidateRange(1, 4)][int]$MaxCompileJobs = 1,
+    [switch]$CollectSourceErrors
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -108,6 +109,7 @@ $receipt = [ordered]@{
     runtime = '/MD'; stackReserveBytes = 8388608; compiler = $compilerPath; linker = $linkerPath
     inputHashes = $inputHashes; compilerIncludeEnvironment = $env:INCLUDE
     linkerLibraryEnvironment = $env:LIB; sourceCount = $sources.Count
+    collectSourceErrors = [bool]$CollectSourceErrors; compileFailures = @(); linkAttempted = $false
     acceptance = 'not run'; runtimeDependencyClosureVerified = $false
     distributionReady = $false; crtPrerequisite = 'Approved x64 Visual C++ /MD runtime; not installed or verified'
     packagingEntry = 'Package-Interactive50DU.ps1; separate approved inventory required'
@@ -169,6 +171,23 @@ function RecordCompileExit($Work) {
         }
     }
 }
+function TestOrdinarySourceFailure($Work) {
+    # Only source diagnostics are collectable. Fatal/resource/toolchain/unknown
+    # failures remain immediate aborts. Large/undecodable logs fail closed.
+    if ($Work.ExitCode -notin @(1, 2)) { return $false }
+    $text = ''
+    foreach ($path in @($Work.StdoutLog, $Work.StderrLog)) {
+        if ((Get-Item -LiteralPath $path).Length -gt 16MB) { return $false }
+        $text += [IO.File]::ReadAllText($path) + "`n"
+    }
+    if ($text -match '(?i)fatal error|internal compiler error|out of memory|cannot allocate|memory exhausted|disk full|not enough space|permission denied|access is denied|error C3859\b') { return $false }
+    $errors = @($text -split "`r?`n" | Where-Object { $_ -match '(?i)\berror\b' })
+    if ($errors.Count -eq 0) { return $false }
+    foreach ($line in $errors) {
+        if ($line -notmatch '^.+\([0-9]+(?:,[0-9]+)?\)\s*:\s*error C[234][0-9]{3}\s*:') { return $false }
+    }
+    return $true
+}
 function CloseCompileLogs($Work) {
     # Both pipe copies run concurrently into separate files, without buffering
     # an entire compiler's diagnostics or calling PowerShell on worker threads.
@@ -190,8 +209,8 @@ try {
     WriteCompileProgress
     $next = 0
     while ($next -lt $sources.Count -or $active.Count -gt 0) {
-        # Observe every exited compiler before launching another source. A
-        # nonzero exit (or missing object) aborts admission and enters cleanup.
+        # Observe every exited compiler before launching another source. Only
+        # explicitly opted-in ordinary source errors permit later admissions.
         foreach ($work in $active.ToArray()) {
             if (-not $work.Process.HasExited) { continue }
             $work.Process.WaitForExit()
@@ -202,12 +221,21 @@ try {
             $null = $active.Remove($work)
             WriteCompileProgress
             if ($work.State -eq 'failed') {
-                throw "Compilation failed (exit $($work.ExitCode), object required): $($work.Source)"
+                $ordinary = TestOrdinarySourceFailure $work
+                $receipt.compileFailures += [ordered]@{ source = $work.Source; exitCode = $work.ExitCode; ordinarySourceError = $ordinary; stdoutLog = $work.StdoutLog; stderrLog = $work.StderrLog }
+                if (-not $CollectSourceErrors -or -not $ordinary) {
+                    throw "Compilation failed (exit $($work.ExitCode), object required): $($work.Source)"
+                }
+                Write-Warning "Collecting source failure; link will be skipped: $($work.Source)"
             }
         }
         if ($next -ge $sources.Count -or $active.Count -ge $MaxCompileJobs) {
             if ($active.Count -gt 0) { Start-Sleep -Milliseconds 50 }
             continue
+        }
+        if ($CollectSourceErrors) {
+            $drive = [IO.DriveInfo]::new([IO.Path]::GetPathRoot($out))
+            if ($drive.AvailableFreeSpace -lt 256MB) { throw 'Insufficient build disk space; stopping admissions.' }
         }
         $i = $next
         # Unique object names avoid collisions between same-name asset/game owners.
@@ -222,6 +250,7 @@ try {
         $compileArgs | Set-Content -LiteralPath $rsp -Encoding Unicode
         $work = [pscustomobject]@{
             Source = $sources[$i]; Object = $obj; State = 'running'; Started = $false; ExitCode = $null
+            StdoutLog = (Join-Path $out ($stem + '.log')); StderrLog = (Join-Path $out ($stem + '.stderr.log'))
             Process = (New-Object Diagnostics.Process)
             OutputStream = $null; ErrorStream = $null; OutputTask = $null; ErrorTask = $null
         }
@@ -230,8 +259,8 @@ try {
         # never rediscover by name/PID or kill a process tree.
         $workItems.Add($work)
         $active.Add($work)
-        $work.OutputStream = [IO.File]::Open((Join-Path $out ($stem + '.log')), [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::Read)
-        $work.ErrorStream = [IO.File]::Open((Join-Path $out ($stem + '.stderr.log')), [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::Read)
+        $work.OutputStream = [IO.File]::Open($work.StdoutLog, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::Read)
+        $work.ErrorStream = [IO.File]::Open($work.StderrLog, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::Read)
         $work.Process.StartInfo.FileName = $compilerPath
         $work.Process.StartInfo.Arguments = '@' + (RspQuote $rsp)
         $work.Process.StartInfo.UseShellExecute = $false
@@ -261,6 +290,7 @@ try {
     $linkArgs += $objects | ForEach-Object { RspQuote $_ }
     $linkArgs += 'kernel32.lib'
     $linkArgs | Set-Content -LiteralPath $linkRsp -Encoding Unicode
+    $receipt.linkAttempted = $true
     & $linkerPath ('@' + $linkRsp) 2>&1 | Tee-Object -FilePath (Join-Path $out 'link.log')
     if ($LASTEXITCODE -ne 0) { throw "Link failed ($LASTEXITCODE)." }
     RequireAmd64PE $exe
@@ -335,6 +365,9 @@ try {
         $receipt.status = 'failed'
         $receipt['cleanupErrors'] = $cleanupErrors.ToArray()
     }
+    $receipt['compileResults'] = @($workItems | ForEach-Object {
+        [ordered]@{ source = $_.Source; state = $_.State; exitCode = $_.ExitCode; stdoutLog = $_.StdoutLog; stderrLog = $_.StderrLog }
+    })
     try { WriteCompileProgress } finally {
         $receipt | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $receiptPath -Encoding UTF8
     }

@@ -186,7 +186,7 @@ class OriginalLoadingManager33050LA final {
                 nodeAttached_=false;
             }
             if(!entities_->entityAuthority_.retire(node_))std::terminate();
-            --node_.reference00_;nodeVtable_=0x3d2dd0u;
+            --node_.reference00;nodeVtable_=0x3d2dd0u;
             //27F200/21C drops aliases in order; dying source pointers/usage
             //are not reset. Final release frees the actual selected backing.
             while(releasedAliases_<aliases_){--list_->reference00_;++releasedAliases_;}
@@ -208,7 +208,7 @@ class OriginalLoadingManager33050LA final {
             if(manager_.firstChild18||manager_.parent1C||manager_.previous10||manager_.next14||
                !entities_->entityAuthority_.canRetire(manager_))return false;
             if(!entities_->entityAuthority_.retire(manager_))std::terminate();
-            --manager_.reference00_;managerVtable_=0x3cd240u;
+            --manager_.reference00;managerVtable_=0x3cd240u;
             --entities_->objectCount423F60_;managerVtable_=0x3cc980u;
         }
         slot330Published_=false;retired_=true;return true;
