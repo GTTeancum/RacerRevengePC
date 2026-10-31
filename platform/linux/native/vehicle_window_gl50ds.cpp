@@ -768,10 +768,11 @@ bool VehicleWindowGl50DS::submit(const game::VehicleDrawBatch50CO& batch,
     s.frameGameplayBlurEnabled=false;s.frameGameplayBlur={};
     s.frameGameplayBinders=nullptr;s.frameGameplayBinderCount=0;s.frameGameplayBinderImage=0;
     s.frameGcParticles=nullptr;s.frameRcParticles=false;s.frameGbParticles=false;s.frameMcParticles=false;
-    s.framePlayerBatch = game::VehicleDrawBatch50CO{};
+    const game::VehicleDrawBatch50CO emptyVehicleBatch{};
+    s.framePlayerBatch = emptyVehicleBatch;
     s.frameDynamicWorld = {};
     for (U i = 0; i < s.frameOpponentCount; ++i) {
-        s.frameOpponentBatches[i] = game::VehicleDrawBatch50CO{};
+        s.frameOpponentBatches[i] = emptyVehicleBatch;
         s.frameOpponentCables[i] = nullptr;
         s.frameOpponentArchetypes[i] = 0;
     }
