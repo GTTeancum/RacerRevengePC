@@ -42,7 +42,7 @@ inline bool Operation::constructConstructorSlot(native_racer50HN::Bank& actualBa
         d.failure="source constructor arena/slot admission refused";return false;}
     auto& r=runtime();
     if(r.terminal_||r.cameraAttempted_||r.gridAttempted_[slot]||actualBank.completedSteps(slot)||
-       !r.source348Arena_||!r.storage_.get()||!r.storage_.get()->sharedRoster_){
+       !r.source348Arena_||!r.hasSharedRosterAllocation()){
         d.failure="source constructor cannot adopt a later query or camera route";return false;}
     attempted_[slot]=true;r.rosterRetirementRequired_=true;
     try {

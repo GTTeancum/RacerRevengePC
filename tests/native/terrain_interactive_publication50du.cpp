@@ -2626,7 +2626,7 @@ void Context::run() {
    .advanceRcTrackParticles=interactive_frame50DU::BorrowedCall<void()>{advanceRcTrackParticles},
    .advanceTbTrackParticles=interactive_frame50DU::BorrowedCall<void()>{advanceTbTrackParticles},
    .refreshAnimatedCandidates=interactive_frame50DU::BorrowedCall<bool()>{refreshAnimatedCandidates},
-   .advanceSourceAudioWorld=interactive_frame50DU::BorrowedCall<void(std::uint64_t)>{advanceSourceAudioWorld},
+   .advanceSourceAudioWorld=interactive_frame50DU::BorrowedCall<void(std::uint64_t,bool)>{advanceSourceAudioWorld},
    .updateOpponentAudio=interactive_frame50DU::BorrowedCall<void()>{updateOpponentAudio},
    .sampleControllerCall=interactive_frame50DU::BorrowedCall<void(bool)>{sampleController},
    .composePacketCall=interactive_frame50DU::BorrowedCall<void(bool,const rr::platform::WindowInput50DQ&,std::size_t)>{composePacket},

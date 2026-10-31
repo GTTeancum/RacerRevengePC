@@ -803,6 +803,11 @@ class OwnershipBridge final {
     std::array<terrain_probe_authoring50fq_fixture::SourceStage348,8> source348Stages_{};
     std::array<g::OriginalRacerTerrainQueryOwner50LA*,8> source348CountedOwners_{};
     bool source348Arena_=false;
+    // Presence only: keep Storage custody inside its existing bridge friend.
+    // This does not claim that the allocation is live, bound or prepared.
+    bool hasSharedRosterAllocation()const noexcept {
+        const auto* s=storage_.get();return s&&bool(s->sharedRoster_);
+    }
     bool allocateSource348NamespaceBeforeBank(terrain_probe_authoring50fq_fixture::Owner& owner,
         live_terrain_probe50fr::Owner& live,
         const terrain_probe_authoring50fq_fixture::Bindings& binding,std::string& error){

@@ -275,7 +275,7 @@ struct Context final {
     BorrowedCall<void()> advanceRcTrackParticles;
     BorrowedCall<void()> advanceTbTrackParticles;
     BorrowedCall<bool()> refreshAnimatedCandidates;
-    BorrowedCall<void(std::uint64_t)> advanceSourceAudioWorld;
+    BorrowedCall<void(std::uint64_t,bool)> advanceSourceAudioWorld;
     BorrowedCall<void()> updateOpponentAudio;
     BorrowedCall<void(bool)> sampleControllerCall;
     BorrowedCall<void(bool,const rr::platform::WindowInput50DQ&,std::size_t)> composePacketCall;
