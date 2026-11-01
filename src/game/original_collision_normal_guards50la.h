@@ -11,6 +11,7 @@ class OriginalApplicationEntities50LA;
 //known, then call311038 and3022D0. This leaf begins AFTER that classifier.
 class OriginalCollisionNormalGuards50LA final {
     friend class OriginalWreckType0Owners50LA;
+    friend class OriginalSourceCollisionPath50LA; //Actual NULL-model caller; shared process history.
     struct Lane {std::uint8_t guard=0;std::uint32_t enabled=0;};
     struct State {std::array<Lane,3> lanes{};std::thread::id thread;};
     static State& state()noexcept {static State s;return s;}

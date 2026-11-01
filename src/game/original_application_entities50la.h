@@ -344,6 +344,39 @@ class OriginalApplicationEntities50LA final {
     std::uint8_t soundInsertGuard881C_=0;
     std::uint32_t soundInsertAssertion434A88_=0;
     std::uint32_t worldRegistration434320_=0; //BSS startup;1B28D0 clears on actual world construction.
+    // Distinct startup constructor table3CC530 ->3C9C70, reached by
+    //239C54 ->2EADE0 ->2E91F0 before Application construction. This fresh
+    //native Application is the existing process domain; never initialize this
+    //from a World/finishline continuation or borrow an equal-valued sentinel.
+    struct WorldOrigin4342D0Startup {
+        std::array<std::uint32_t,4> words;
+        std::uint32_t publicationPC;
+    };
+    static WorldOrigin4342D0Startup produceWorldOrigin3C9C70()noexcept {
+        //Only the observed stack00 lane producers and LQ/SQ are represented.
+        //Other vectors from the same constructor are not fabricated here.
+        std::array<std::uint32_t,4> stack00;
+        stack00[0]=0;             //3C9C74 SW zero,00(SP)
+        stack00[1]=0;             //3C9C78 SW zero,04(SP)
+        const std::uint32_t v1=0x3f800000u; //3C9C7C LUI
+        stack00[2]=0;             //3C9C80 SW zero,08(SP)
+        stack00[3]=v1;            //3C9C88 SW v1,0C(SP)
+        const auto a2=stack00;    //3C9CB8 LQ a2,00(SP)
+        return {a2,0x3c9cccu};    //3C9CCC SQ a2,4342D0
+    }
+    const WorldOrigin4342D0Startup worldOrigin4342D0_=produceWorldOrigin3C9C70();
+    const std::thread::id worldOrigin4342D0Thread_=std::this_thread::get_id();
+    bool worldOrigin4342D0Unknown_=false;
+    //Read into caller-owned storage only. No reset/replay or writable pointer
+    //escapes. Any future unrepresented producer must poison this domain rather
+    //than presume startup currentness; a direct-access audit is not a universal
+    //indirect-alias proof of the original guest process.
+    bool readWorldOrigin4342D0(std::array<std::uint32_t,4>& words)const noexcept {
+        if(!constructed_||released_||worldOrigin4342D0Unknown_||
+           worldOrigin4342D0Thread_!=std::this_thread::get_id()||
+           worldOrigin4342D0_.publicationPC!=0x3c9cccu)return false;
+        words=worldOrigin4342D0_.words;return true;
+    }
     // Absolute process vectors, not offsets in Application or Scene. Main
     //239C54 dispatches static constructor3CA8F0 via table entry3CC588;
     //3CA94C/3CA96C publish these exact float4 defaults once at startup.
@@ -389,6 +422,7 @@ class OriginalApplicationEntities50LA final {
     //Existing byte consumers retain their exact stable byte0 alias.
     std::array<std::uint8_t,256> collisionName3E0730_{};
     std::uint8_t& collisionGlobalValid3E0730_=collisionName3E0730_.front();
+    friend class OriginalWorldCollisionObjects50LA; //Same-process source1B5590 mode/category custody.
     friend class OriginalVisibilityQuadTree50LA;
     friend class rr::platform::OriginalUiGarageVisibility50KG;
     friend class rr::platform::OriginalUiGaragePodScene50KG;
@@ -519,6 +553,28 @@ class OriginalApplicationEntities50LA final {
     // Source100008..100030 BSS initialization. Every later represented
     //141300/1413E0 contributes directly; never reset on race/menu entry.
     std::uint32_t objectCount423F60_=0,attachmentLock423F58_=0;
+    // Dedicated process BSS lanes, NOT per-World or per-Application defaults.
+    // Startup100008..100030 SQ-zero blocks3D5A00 through44F600 include3D6528
+    // (GP3DD970-7448) and443068. Only represented later writer27C82C..838
+    // performs the lazy assertion initialization. A second App must not reset it.
+    // Native closed-domain authority, not a claim about a retained retail process:
+    // any newly joined indirect/configuration writer must update/poison this owner.
+    struct ProcessParticleAssertion27C820 {
+        //Distinct lazy completion assertion27D680. Same startup-zero domain;
+        //no per-row/reset substitution and no admitted unknown writers.
+        //Trigger-service lazy assertion2DCB6C; same startup BSS owner.
+        std::uint8_t triggerGuard3D686C=0;
+        std::uint32_t triggerAssertion444618=0;
+        std::uint8_t completionGuard3D652C=0;
+        std::uint32_t completionAssertion443070=0;
+        std::uint8_t guard3D6528=0;
+        std::uint32_t assertion443068=0;
+        bool known=true;
+        const std::thread::id thread=std::this_thread::get_id();
+    };
+    static ProcessParticleAssertion27C820& processParticleAssertion27C820()noexcept {
+        static ProcessParticleAssertion27C820 state;return state;
+    }
     // Source data-image382BD8 starts at500. The reached160E78 stores the
     // signed capacity/2 here. This is shared application state, not a count
     // of constructors, a per-track copy, or a value reset during cleanup.

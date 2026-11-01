@@ -43,12 +43,15 @@ bool nextTextToken29FFA0(bool first,std::optional<std::size_t>& returned)noexcep
     }
     sourcePC_=0x2A0078u;returned=start;return true;
 }
-bool textSectionForFieldCurrent()const noexcept {
-    if(!textConfigCurrent()||!textSelectAttempted_||!textSelectionReturned_||textSelectBounded_||
+bool ownedTextSectionForFieldCurrent()const noexcept {
+    if(!ownedTextConfigCurrent()||!textSelectAttempted_||!textSelectionReturned_||textSelectBounded_||
        source_->selected20!=textChildCapacity_||textPointersWritten_!=textChildCapacity_)return false;
     // A genuinely missing section leaves the fresh count0/childNULL untouched.
     // Text158648 still returns missing and writes the empty-string destination.
     return !source_->selected20||bool(textChildTable_);
+}
+bool textSectionForFieldCurrent()const noexcept {
+    return textConfigCurrent()&&ownedTextSectionForFieldCurrent();
 }
 enum class GeneralInfoField {textureMap,numFrames,numGroups,glowScalar,typeID,firstFrame,lastFrame,uvLeft,uvRight,uvTop,uvBottom};
 bool findGeneralInfoField158240(GeneralInfoField field,std::string_view& value,bool& found)noexcept {
@@ -59,8 +62,14 @@ bool findGeneralInfoField158240(GeneralInfoField field,std::string_view& value,b
         field==GeneralInfoField::firstFrame?"FirstFrame":field==GeneralInfoField::lastFrame?"LastFrame":
         field==GeneralInfoField::uvLeft?"UVLeft":field==GeneralInfoField::uvRight?"UVRight":
         field==GeneralInfoField::uvTop?"UVTop":"UVBottom";
-    found=false;value={};sourcePC_=0x158648u;
     if(!textSectionForFieldCurrent())return false;
+    return findOwnedTextField158240(requested,value,found);
+}
+// Shared text lookup only: caller wrappers own occurrence, literal and order.
+// No manager getter completion authorizes an emitter property (or vice versa).
+bool findOwnedTextField158240(const char* requested,std::string_view& value,bool& found)noexcept {
+    found=false;value={};sourcePC_=0x158648u;
+    if(!ownedTextSectionForFieldCurrent())return false;
     //These are trusted exact caller literals, not arbitrary source-file bytes.
     const auto requestLength=std::strlen(requested);
     if(requestLength>=1024)return false;

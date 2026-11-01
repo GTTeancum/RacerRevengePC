@@ -1,23 +1,342 @@
 #pragma once
 namespace ra_cold_aggregate50LA {
 bool Owner::preflightSourcePostParticleModelsNative()const noexcept {
+    if(!preflightSourceFinishLineNative())return false;
+    const auto& anchors=sourceFinishLineAnchors_;
+    if(anchors.entered&&!sourceFinishLineMaterial544_)return false;
+    if(anchors.initialized&&!anchors.entered)return false;
+    if(anchors.scanReturned&&(!anchors.initialized||!anchors.liveCount||
+       anchors.ordinal<*anchors.liveCount))return false;
+    for(const auto& slot:anchors.lastMatchingSlot)
+        if(slot&&(!anchors.initialized||*slot>=anchors.ordinal))return false;
+    const auto& comparison=sourceFinishLineComparison_;
+    if(comparison.entered&&!anchors.scanReturned)return false;
+    for(unsigned i=0;i<2;++i){
+        const auto mask=comparison.readMask[i];
+        if(mask!=0&&mask!=1&&mask!=3&&mask!=7)return false;
+        if(mask&&!comparison.entered)return false;
+        if(comparison.equalsOrigin[i]&&(!mask||(*comparison.equalsOrigin[i]&&mask!=7)))return false;
+    }
+    if(comparison.readMask[1]&&(!comparison.equalsOrigin[0]||*comparison.equalsOrigin[0]))return false;
+    if(comparison.returned){
+        if(!comparison.entered||!comparison.equalsOrigin[0]||!comparison.missingAnchor)return false;
+        if(*comparison.equalsOrigin[0]){
+            if(comparison.readMask[1]||comparison.equalsOrigin[1]||!*comparison.missingAnchor)return false;
+        }else if(!comparison.equalsOrigin[1]||*comparison.missingAnchor!=*comparison.equalsOrigin[1])return false;
+    }else if(comparison.missingAnchor)return false;
+    if(sourceFinishLineGeometry_.entered&&(!comparison.returned||!comparison.missingAnchor||
+       *comparison.missingAnchor))return false;
+    if(sourceFinishLineMissingCleanup_.entered&&
+       (!comparison.returned||comparison.missingAnchor!=true))return false;
+    const auto& finishReturn=sourceFinishLineCallerReturn_;
+    if(finishReturn.restoreMask!=0&&finishReturn.restoreMask!=1&&finishReturn.restoreMask!=3&&
+       finishReturn.restoreMask!=7&&finishReturn.restoreMask!=15)return false;
+    if(finishReturn.restoreMask){
+        if(!comparison.returned||!comparison.missingAnchor)return false;
+        if(*comparison.missingAnchor?!sourceFinishLineMissingCleanup_.returned:
+           !sourceFinishLineGeometry_.returned)return false;
+    }
+    if(finishReturn.stackReleased&&(finishReturn.restoreMask!=15||!finishReturn.v0Preserved))return false;
+    if(finishReturn.returned!=finishReturn.stackReleased)return false;
+    if(finishReturn.v0Preserved&&!finishReturn.restoreMask)return false;
+    if(finishReturn.loadingMode30&&!finishReturn.returned)return false;
+    if(finishReturn.progressSkipped&&(!finishReturn.loadingMode30||*finishReturn.loadingMode30))return false;
+    const auto& afterCollision=sourcePostCollisionCaller_;
+    if(afterCollision.loadingMode30&&!sourceCollisionDispatch128_.worldReturned)return false;
+    if(afterCollision.progressSkipped&&(!afterCollision.loadingMode30||*afterCollision.loadingMode30))return false;
+    if(afterCollision.animationDirectoryStoreMask!=0&&afterCollision.animationDirectoryStoreMask!=1&&
+       afterCollision.animationDirectoryStoreMask!=3)return false;
+    if(afterCollision.animationDirectoryStoreMask&&!afterCollision.progressSkipped)return false;
+    if(afterCollision.worldTable08&&(afterCollision.animationDirectoryStoreMask!=3||
+       *afterCollision.worldTable08!=0x3cf110u))return false;
+    if(afterCollision.target120&&(!afterCollision.worldTable08||*afterCollision.target120!=0x1b40b0u))return false;
+    if(afterCollision.baseToyNullRead&&!afterCollision.target120)return false;
+    if(afterCollision.baseToyReturnV0&&(!afterCollision.baseToyNullRead||*afterCollision.baseToyReturnV0!=1))return false;
+    if(afterCollision.derivedToyNullRead&&!afterCollision.baseToyReturnV0)return false;
+    if(afterCollision.toyReturnV0&&(!afterCollision.derivedToyNullRead||
+       afterCollision.toyReturnV0!=afterCollision.baseToyReturnV0))return false;
+    if(afterCollision.toyReturned!=bool(afterCollision.toyReturnV0))return false;
+    if(afterCollision.target124&&(!afterCollision.toyReturned||*afterCollision.target124!=0x274370u))return false;
+    if(afterCollision.particleDispatched&&!afterCollision.target124)return false;
+    if(afterCollision.particleReturned!=bool(afterCollision.particleReturnV0)||
+       (afterCollision.particleReturnV0&&(!afterCollision.particleDispatched||*afterCollision.particleReturnV0!=1||
+         !sourceParticleNextRows_[3].listReturned)))return false;
+    if(afterCollision.target144&&(!afterCollision.particleReturned||*afterCollision.target144!=0x274e90u))return false;
+    if(!preflightSourceTriggerServiceNative())return false;
+    const auto& postTrigger=sourcePostTriggerCaller_;
+    if((postTrigger.entered&&(!sourceTriggerService274E90_.wrapperReturned||
+         sourceTriggerService274E90_.wrapperReturnV0!=1u))||
+       (postTrigger.applicationRead&&!postTrigger.entered)||(postTrigger.profileRead&&!postTrigger.applicationRead)||
+       (postTrigger.profile1125C&&!postTrigger.profileRead)||
+       (postTrigger.mode&&(!postTrigger.profile1125C||*postTrigger.mode!=((*postTrigger.profile1125C>>5u)&3u)))||
+       (postTrigger.worldRead&&!postTrigger.mode)||
+       (postTrigger.worldTable08&&(!postTrigger.worldRead||*postTrigger.worldTable08!=0x3cf110u))||
+       (postTrigger.target13C&&(!postTrigger.worldTable08||*postTrigger.target13C!=0x274ae0u))||
+       (postTrigger.argumentA1&&(!postTrigger.target13C||!postTrigger.mode||
+         *postTrigger.argumentA1!=(*postTrigger.mode<2u?1u:0u)))||
+       (postTrigger.dispatched&&!postTrigger.argumentA1))return false;
+    const auto& sky=sourceSkySetup274AE0_;
+    if((sky.entered&&!postTrigger.dispatched)||(sky.environmentRead&&!sky.entered)||
+       (sky.environmentNonNull&&!sky.environmentRead)||
+       (sky.argumentS1&&(!sky.environmentRead||sky.argumentS1!=postTrigger.argumentA1))||
+       (sky.count00&&(!sky.argumentS1||!sky.environmentNonNull))||
+       (sky.arrayBytes&&(!sky.count00||*sky.arrayBytes!=(static_cast<std::uint32_t>(*sky.count00)<<2u)))||
+       (sky.returnV0&&(!sky.argumentS1||*sky.returnV0!=1u||
+         (sky.environmentNonNull&&(!sky.count00||*sky.count00!=0)))))return false;
+    if(sky.restoreMask!=0&&sky.restoreMask!=1&&sky.restoreMask!=3&&sky.restoreMask!=7&&sky.restoreMask!=15)return false;
+    if((sky.restoreMask&&!sky.returnV0)||(sky.stackReleased&&sky.restoreMask!=15)||
+       sky.returned!=sky.stackReleased||
+       (sky.callerResumePC&&(!sky.returned||!sky.argumentS1||
+          *sky.callerResumePC!=(*sky.argumentS1?0x1aa33cu:0x1aa320u)))||
+       (sky.callerSkipExecuted&&sky.callerResumePC!=0x1aa320u))return false;
+    if(sky.environmentRead&&sourceEnvironmentPhase_!=SourceEnvironmentPhase::nativeClosed){
+        if(!sourceEnvironmentPublished_||!nativeEnvironment3A4_||
+           *nativeEnvironment3A4_!=sourceEnvironment3A4_.get()||sky.environmentNonNull!=bool(sourceEnvironment3A4_))return false;
+        if(sky.environmentNonNull){
+            if(sourceEnvironmentPhase_!=SourceEnvironmentPhase::returnedOne||!sourceWorldConfig_||
+               !sourceEnvironment3A4_->preflightSourceNative())return false;
+            if(sky.count00){std::int32_t current=0;
+                if(!sourceEnvironment3A4_->readSourceSkyCount274B0C(worldEntity_,*sourceWorldConfig_,current)||
+                   current!=*sky.count00)return false;}
+        }else if(sourceEnvironmentPhase_!=SourceEnvironmentPhase::returnedZero)return false;
+    }
+    if(!preflightSourceSkyArrayNative())return false;
+    const auto& particle=sourceParticleService124_;
+    if(particle.entered&&!afterCollision.particleDispatched)return false;
+    if(particle.listRead&&!particle.entered)return false;
+    if(particle.listNonNull&&!particle.listRead)return false;
+    if(particle.listTable08&&(!particle.listNonNull||*particle.listTable08!=0x3d24f0u))return false;
+    if(particle.listTarget78&&(!particle.listTable08||*particle.listTarget78!=0x27dfd0u))return false;
+    if(particle.listEntered&&!particle.listTarget78)return false;
+    if(particle.rowS0&&(!particle.listEntered||*particle.rowS0!=0))return false;
+    if(particle.offsetS1&&(!particle.rowS0||*particle.offsetS1!=0))return false;
+    if(particle.count30&&(!particle.offsetS1||*particle.count30!=4))return false;
+    if(particle.rowRead&&!particle.count30)return false;
+    if(particle.rowTable14&&(!particle.rowRead||*particle.rowTable14!=0x3d2570u))return false;
+    if(particle.rowTarget0C&&(!particle.rowTable14||*particle.rowTarget0C!=0x27c7b0u))return false;
+    if(particle.rowEntered&&!particle.rowTarget0C)return false;
+    if(particle.descriptorRead&&!particle.rowEntered)return false;
+    if(particle.emitterIsNone&&!particle.descriptorRead)return false;
+    if(particle.descriptorType04&&particle.emitterIsNone!=false)return false;
+    if(particle.rowType08Stored&&!particle.descriptorType04)return false;
+    if(particle.guard3D6528Read&&(!particle.rowType08Stored||*particle.guard3D6528Read>1))return false;
+    if(particle.assertionLazyStored&&(!particle.guard3D6528Read||*particle.guard3D6528Read))return false;
+    if(particle.assertion443068Read&&(!particle.guard3D6528Read||
+       *particle.assertion443068Read!=1||(!*particle.guard3D6528Read&&!particle.assertionLazyStored)))return false;
+    if(particle.manager4A0Read&&!particle.assertion443068Read)return false;
+    if(particle.manager4A0NonNull&&!particle.manager4A0Read)return false;
+    if(particle.assertionReturnV0&&(!particle.manager4A0NonNull||*particle.assertionReturnV0))return false;
+    if(particle.instances330Read&&!particle.assertionReturnV0)return false;
+    if(particle.countPositive&&(!particle.instances330Read||*particle.instances330Read<=0))return false;
+    if(particle.emitterType&&(!particle.countPositive||particle.emitterType!=particle.descriptorType04))return false;
+    if(bool(particle.emitterType)!=bool(particle.emitterAllocationBytes)||
+       bool(particle.emitterType)!=bool(particle.emitterConstructor))return false;
+    if(particle.emitterArrayAttempted&&!particle.emitterType)return false;
+    if(particle.emitterAttempts&&(!particle.emitterArrayAttempted||
+       particle.emitterAttempts>static_cast<std::size_t>(*particle.instances330Read)))return false;
+    if(particle.emitterPublishedSlots>particle.emitterAttempts)return false;
+    if(particle.emitterArrayPublished&&(!particle.emitterArrayAttempted||
+       particle.emitterPublishedSlots!=static_cast<std::size_t>(*particle.instances330Read)))return false;
+    if(particle.rowCount0CStored&&!particle.emitterArrayPublished)return false;
+    if(particle.rowStart10Stored&&!particle.rowCount0CStored)return false;
+    if(particle.attachmentOffsetE0&&!particle.rowStart10Stored)return false;
+    if(particle.attachmentIsNone&&!particle.attachmentOffsetE0)return false;
+    if(particle.attachmentZone&&(particle.attachmentIsNone!=false||*particle.attachmentZone>10))return false;
+    if(particle.attachmentSlot&&!particle.attachmentZone)return false;
+    if(particle.attachmentLiveZones&&(!particle.attachmentZone||*particle.attachmentLiveZones!=10))return false;
+    if(particle.attachmentLiveCount&&!particle.attachmentSlot)return false;
+    if(particle.attachmentMatches!=(particle.matchCountAdvanced?1u:0u))return false;
+    if(particle.matchCountAdvanced&&(particle.attachmentIsNone!=false||!(particle.emitterType==0u?particle.type0LoadEntered:particle.type8LoadEntered)))return false;
+    if(particle.completionGuardRead&&(!particle.matchCountAdvanced||*particle.completionGuardRead>1))return false;
+    if(particle.completionLazyStored&&(!particle.completionGuardRead||*particle.completionGuardRead))return false;
+    if(particle.completionAssertionRead&&(!particle.completionGuardRead||*particle.completionAssertionRead!=1))return false;
+    if(particle.completionAssertionReturned&&!particle.completionAssertionRead)return false;
+    if(particle.descriptorDeleteAdmitted&&(particle.attachmentIsNone==false&&!particle.completionAssertionReturned))return false;
+    if(particle.descriptorFreed&&!particle.descriptorDeleteAdmitted)return false;
+    if(particle.rowServiceReturned&&!particle.descriptorFreed)return false;
+    if(particle.attachmentMatched&&(!particle.attachmentSlot||!particle.attachmentLiveCount||
+       *particle.attachmentSlot>=*particle.attachmentLiveCount))return false;
+    if(particle.attachmentPhysics&&!particle.attachmentMatched)return false;
+    if(particle.childIsNone&&(!particle.attachmentMatched||particle.attachmentPhysics))return false;
+    if(particle.childLookupPending&&particle.childIsNone!=false)return false;
+    if(particle.configEntered&&(!particle.configTarget10||*particle.configTarget10!=0x27d7a0u||
+       !particle.configEmitterIndex||*particle.configEmitterIndex!=0||!particle.attachmentIsNone||
+       (particle.attachmentIsNone==false&&(!particle.attachmentMatched||particle.childIsNone!=true))))return false;
+    if(particle.configModelNonNull&&(!particle.configEntered||!particle.attachmentMatched))return false;
+    if(particle.configEmitterNonNull&&!particle.configEntered)return false;
+    if(particle.configManagerRead&&!particle.configEntered)return false;
+    if(particle.configLoaderTarget&&!particle.configManagerRead)return false;
+    if(particle.type0LoadEntered&&(particle.configLoaderTarget!=0x15b9d0u||particle.emitterType!=0u))return false;
+    if(particle.type0NoOpReturned&&!particle.type0LoadEntered)return false;
+    if(particle.type0ManagerStored&&(!particle.type0NoOpReturned||!particle.configEmitterNonNull))return false;
+    if(particle.type0ModelStored&&(!particle.type0ManagerStored||!particle.configModelNonNull))return false;
+    if(particle.type0OffsetStored&&!particle.type0ModelStored)return false;
+    if(particle.type0DirectoryCopied&&!particle.type0ManagerStored)return false;
+    if(particle.type0FilenameAppended&&!particle.type0DirectoryCopied)return false;
+    if(particle.type1LoadEntered&&(particle.configLoaderTarget!=0x15ce90u||particle.emitterType!=1u))return false;
+    if(particle.type1NoOpReturned&&!particle.type1LoadEntered)return false;
+    if(particle.type1ManagerStored&&(!particle.type1NoOpReturned||!particle.configEmitterNonNull))return false;
+    if(particle.type1ModelStored&&(!particle.type1ManagerStored||!particle.configModelNonNull))return false;
+    if(particle.type1OffsetStored&&!particle.type1ModelStored)return false;
+    if(particle.type1DirectoryCopied&&!particle.type1ManagerStored)return false;
+    if(particle.type1FilenameAppended&&!particle.type1DirectoryCopied)return false;
+    if(particle.type8LoadEntered&&(particle.configLoaderTarget!=0x15def0u||particle.emitterType!=8u))return false;
+    if(particle.type8NoOpReturned&&!particle.type8LoadEntered)return false;
+    if(particle.type8ManagerStored&&(!particle.type8NoOpReturned||!particle.configEmitterNonNull))return false;
+    if(particle.type8ModelStored&&(!particle.type8ManagerStored||!particle.configModelNonNull))return false;
+    if(particle.type8OffsetStored&&!particle.type8ModelStored)return false;
+    if(particle.type8DirectoryCopied&&!particle.type8ManagerStored)return false;
+    if(particle.type8FilenameAppended&&!particle.type8DirectoryCopied)return false;
+    if(particle.emitterConfigConstructAttempted&&!(particle.emitterType==0u?particle.type0FilenameAppended:(particle.emitterType==1u?particle.type1FilenameAppended:particle.type8FilenameAppended)))return false;
+    if(particle.emitterConfigConstructReturned&&!particle.emitterConfigConstructAttempted)return false;
+    if(particle.emitterConfigOpenAttempted&&!particle.emitterConfigConstructReturned)return false;
+    if(particle.emitterConfigOpenReturned&&!particle.emitterConfigOpenAttempted)return false;
+    if(particle.emitterConfigTarget94&&(particle.emitterConfigOpenReturned!=true||*particle.emitterConfigTarget94!=(particle.emitterType==0u?0x15c330u:(particle.emitterType==1u?0x15d560u:0x15e6d0u))))return false;
+    if(particle.toyScanNullRead&&(!particle.attachmentZone||!particle.attachmentLiveZones||
+       *particle.attachmentZone!=*particle.attachmentLiveZones||particle.attachmentMatched))return false;
+    const auto& collision=sourceCollisionDispatch128_;
+    if(collision.stage>10||collision.zoneS0>10||collision.zoneOffsetS1!=4u*collision.zoneS0||
+       collision.slotOffsetS1!=4u*collision.slotS0)return false;
+    if(collision.callbackReturned!=bool(collision.callbackReturnV0)||
+       (collision.callbackReturnV0&&*collision.callbackReturnV0>1u)||
+       (collision.loopCountReloaded&&!collision.callbackReturned))return false;
+    if(collision.stage&&!finishReturn.progressSkipped)return false;
+    if(collision.stage>=1&&collision.worldTable08!=0x3cf110u)return false;
+    if(collision.stage>=2&&collision.target128!=0x2743b0u)return false;
+    if(collision.zone354Stored!=bool(collision.storedZone354)||
+       (collision.storedZone354&&*collision.storedZone354>=10))return false;
+    if(collision.wrapperTable0C&&*collision.wrapperTable0C!=0x3cf0f0u)return false;
+    if(collision.target0C&&*collision.target0C!=0x1b5590u)return false;
+    if(collision.stage>=7&&!collision.wrapperTable0C)return false;
+    if(collision.stage>=8&&!collision.target0C)return false;
+    if(collision.stage>=5&&!collision.groupCount30)return false;
+    if(collision.worldReturned&&(!collision.liveZoneCount34C||
+       static_cast<std::int32_t>(collision.zoneS0)<static_cast<std::int32_t>(*collision.liveZoneCount34C)))return false;
+    if(collision.stage>=6&&collision.zoneS0<10&&
+       collision.callbacksReturned[collision.zoneS0]!=collision.slotS0)return false;
+    for(std::size_t z=0;z<10;++z){
+        if((collision.groupsReturned[z]||collision.emptyGroupsSkipped[z])!=(z<collision.zoneS0)||
+           ((collision.groupsReturned[z]||collision.emptyGroupsSkipped[z])&&!collision.groupLogAttempted[z])||
+           (collision.groupsReturned[z]&&collision.emptyGroupsSkipped[z]))return false;
+        if(collision.groupLogWritten[z]&&!collision.groupLogAttempted[z])return false;
+        if(z>collision.zoneS0&&(collision.callbacksReturned[z]||collision.groupLogAttempted[z]))return false;
+        if(sourcePostParticleModelsPhase_==SourcePostParticleModelsPhase::nativeClosed)continue;
+        if(!worldCollisionObjects3CC_){if(collision.callbacksReturned[z])return false;continue;}
+        const auto& wrappers=worldCollisionObjects3CC_->sourceWrappers_[z];
+        if(collision.emptyGroupsSkipped[z]&&(!wrappers.empty()||collision.callbacksReturned[z]))return false;
+        if(collision.callbacksReturned[z]>wrappers.size()||
+           (collision.groupsReturned[z]&&collision.callbacksReturned[z]!=wrappers.size()))return false;
+        for(std::size_t n=0;n<wrappers.size();++n){
+            if(!wrappers[n]){if(n<collision.callbacksReturned[z])return false;continue;}
+            const auto& c=wrappers[n]->sourceCallback;
+            if(n<collision.callbacksReturned[z]){
+                if(!c.returned||!c.returnV0||*c.returnV0>1u||c.pc!=0x27bee8u)return false;
+            }else if(c.returned|| (c.entered&&(z!=collision.zoneS0||n!=collision.slotS0)))return false;
+        }
+    }
+    if(collision.zone354Stored&&sourcePostParticleModelsPhase_!=SourcePostParticleModelsPhase::nativeClosed&&
+       (!nativeModelZone354_||nativeModelZone354_!=collision.storedZone354))return false;
+    if(sourceFinishLineStripOwner_&&sourceFinishLineSetupEntered_){
+    if(!sourceLoadApplication_||!sourceLoadApplication_->standardMaterialDomainOwner_||
+       sourceLoadApplication_->standardMaterialDomainOwner_!=sourceTrackMountDomain_||
+       sourceLoadApplication_->standardMaterialDomainOwner_->materials382B38()!=sourceFinishLineMaterialTable_||
+       &sourceLoadApplication_->materialDirectory36B970()!=sourceFinishLineDirectory_||
+       !sourceLoadApplication_->materialApplication||!sourceFinishLineMaterialTable_->sourceNames17CAD4Current()||
+       !sourceFinishLineMaterialTable_->screenApplicationMatches(*sourceLoadApplication_->materialApplication))return false;
+    }
+
+    if(sourceFinishLineConstructorEntered_&&!sourceBuoyAttachNoEffect1B3AE0_)return false;
     if(sourcePostParticleModelsPhase_==SourcePostParticleModelsPhase::unreached)
         return !sourcePostParticleLoadingMode30_&&!sourceGeometryDirectoryStoreMask_&&!sourceEmptyInstancesReturnV0_&&
-            !sourceStandardParentS3_&&!sourceStandardWrapperA0_;
+            !sourceStandardParentS3_&&!sourceStandardWrapperA0_&&!sourceBuoyAttachNoEffect1B3AE0_;
     if(sourcePostParticleModelsPhase_==SourcePostParticleModelsPhase::nativeClosed)
-        return !sourceStandardParentS3_&&!sourceStandardWrapperA0_&&!sourceStandardTypeParentRead_;
+        return !sourceStandardParentS3_&&!sourceStandardWrapperA0_&&!sourceStandardTypeParentRead_&&!sourceFinishLineStripOwner_;
     if(!sourceLoadApplication_||!sourceLoadRace_||sourceLoadRace_->nativeIntroWorldEntity()!=&worldEntity_||
        sourceLoadApplication_->entities()!=worldApplication_||sourceGeometryDirectoryStoreMask_>3)return false;
     if(sourceGeometryDirectoryStoreMask_&&(!sourcePostParticleLoadingMode30_||*sourcePostParticleLoadingMode30_))return false;
-    if(sourceGeometryDirectoryStoreMask_==3&&sourceLoadApplication_->modelDirectory36B860_!="geometry\\")return false;
+    //The later1AA29C/2A0 writes the SAME process lane. Earlier geometry
+    //publication is historical after that write, not a second live directory.
+    if(sourceGeometryDirectoryStoreMask_==3){
+        const auto& directory=sourceLoadApplication_->modelDirectory36B860_;
+        if(afterCollision.animationDirectoryStoreMask==0&&directory!="geometry\\")return false;
+        if(afterCollision.animationDirectoryStoreMask==1&&directory!="animetry\\")return false;
+        if(afterCollision.animationDirectoryStoreMask==3&&directory!="anim\\")return false;
+    }
+    if((afterCollision.baseToyNullRead||afterCollision.derivedToyNullRead)&&
+       (sourceToyPhase_!=SourceToyPhase::returned||!sourceToyLoaderReturnedZero_||
+        !sourceToy3C8_||*sourceToy3C8_||nativeEmptyToyList3C8_))return false;
+    if(particle.listRead){
+        if(sourceParticleDescriptorPhase_!=SourceParticleDescriptorPhase::returned||
+           !preflightSourceWorldParticleDescriptorsNative()||!sourceParticleList3D8_||
+           *sourceParticleList3D8_!=nativeParticleList3D8_.get()||
+           particle.listNonNull!=bool(nativeParticleList3D8_))return false;
+        if(particle.rowRead&&(!nativeParticleList3D8_||!nativeParticleList3D8_->sourceSlotPublished[0]||
+           !nativeParticleList3D8_->sourceRowReturned[0]||!nativeParticleList3D8_->pointers34||
+           nativeParticleList3D8_->pointers34[0]!=nativeParticleList3D8_->rows[0].get()))return false;
+        if(particle.rowType08Stored){
+            const auto& row=*nativeParticleList3D8_->rows[0];
+            if(row.unknown08!=particle.descriptorType04)return false;
+            if(row.sourceDescriptorFreed){
+                if(!row.sourceDescriptorHistory||row.sourceDescriptorHistory->type!=*particle.descriptorType04)return false;
+            }else if(!row.descriptor04||!row.descriptor04->sourceLoaded||!(row.descriptor04->sourceKnownMask&128u)||
+                     *particle.descriptorType04!=static_cast<std::uint32_t>(row.descriptor04->type04))return false;
+        }
+    }
+    if(particle.manager4A0Read){
+        std::size_t count=0;
+        if(!sourceParticleStageCountedNative(count)||sourceParticleStageNativeClosed_||
+           sourceParticle4A0NativeWithdrawn_||!sourceParticlePublished4A0_||
+           !sourceParticleLoadReturned_||!sourceParticle4A0_||
+           *sourceParticle4A0_!=trackParticles_.get()||nativeParticleManager4A0_!=*sourceParticle4A0_||
+           particle.manager4A0NonNull!=bool(*sourceParticle4A0_))return false;
+    }
+    if(particle.instances330Read){
+        if(!nativeParticleList3D8_||!nativeParticleList3D8_->rows[0])return false;
+        const auto& row=*nativeParticleList3D8_->rows[0];
+        if(row.sourceDescriptorFreed){
+            if(!row.sourceDescriptorHistory||row.sourceDescriptorHistory->count!=*particle.instances330Read)return false;
+        }else if(!row.descriptor04||!(row.descriptor04->sourceKnownMask&512u)||
+                 row.descriptor04->instances330!=particle.instances330Read)return false;
+    }
+    if(particle.attachmentOffsetE0){
+        if(!nativeParticleList3D8_||!nativeParticleList3D8_->rows[0])return false;
+        const auto& row=*nativeParticleList3D8_->rows[0];
+        if(row.sourceDescriptorFreed){
+            if(!row.sourceDescriptorHistory||row.sourceDescriptorHistory->offset!=*particle.attachmentOffsetE0)return false;
+        }else if(!row.descriptor04||row.descriptor04->sourceOffsetKnown!=15||
+                 row.descriptor04->sourceOffset320!=*particle.attachmentOffsetE0)return false;
+        if(particle.configEntered){
+            if(!particle.configEmitterIndex||*particle.configEmitterIndex>=row.sourceEmitterPublishedSlots||
+               !row.sourceEmitterPointers||particle.configEmitterNonNull!=bool(row.sourceEmitters[*particle.configEmitterIndex])||
+               particle.configModelNonNull!=(particle.attachmentIsNone==false))return false;
+        }
+        if(particle.attachmentMatched){
+            const auto z=*particle.attachmentZone,slot=*particle.attachmentSlot;
+            if(!sourceStaticOwner_||sourceStaticOwner_->closed_||sourceModelOwner3C4_!=sourceStaticOwner_.get()||
+               sourceStaticOwner_->sourceWorld3C4Borrower_!=this||z>=sourceStaticOwner_->parents_.size()||
+               !sourceStaticOwner_->parents_[z]||!sourceModelParents3C4_||!sourceModels3C4_||
+               *sourceModels3C4_!=sourceModelParents3C4_.get())return false;
+            const auto& parent=*sourceStaticOwner_->parents_[z];
+            if(sourceModelParents3C4_[z]!=&parent.entity||slot>=parent.sourceEntriesKnown||!parent.sourceEntries34||
+               z>=sourceStaticOwner_->sourceWrapperLedger_.size()||slot>=sourceStaticOwner_->sourceWrapperLedger_[z].size()||
+               !parent.sourceEntries34[slot]||parent.sourceEntries34[slot]!=sourceStaticOwner_->sourceWrapperLedger_[z][slot].get()||
+               !sourceStaticOwner_->sourceModelCurrentNative(*parent.sourceEntries34[slot]))return false;
+        }
+        if((particle.toyScanNullRead||particle.completionGuardRead)&&
+           (!sourceToy3C8_||*sourceToy3C8_||!preflightSourceWorldToyNative()))return false;
+    }
     if(sourceEmptyInstancesReturnV0_&&(*sourceEmptyInstancesReturnV0_!=1||!sourceEmptyInstancesCounterS1_||
        *sourceEmptyInstancesCounterS1_||!sourceEmptyInstancesCountRead_||*sourceEmptyInstancesCountRead_||
        !sourceEmptyInstancesPointerRead_||*sourceEmptyInstancesPointerRead_))return false;
+    if(collision.previousModelZone354&&(!sourceStandardWorldReturnV0_||
+       *sourceStandardWorldReturnV0_!=1||*collision.previousModelZone354!=9))return false;
+    if(collision.zone354Stored&&!collision.previousModelZone354)return false;
+    const auto& modelReceiptZone354=collision.zone354Stored?collision.previousModelZone354:nativeModelZone354_;
     if(sourceStandardZoneStored_){
-        if(!sourceStandardZoneS0_||*sourceStandardZoneS0_>10||!nativeModelZone354_||*nativeModelZone354_>=10||
+        if(!sourceStandardZoneS0_||*sourceStandardZoneS0_>10||!modelReceiptZone354||*modelReceiptZone354>=10||
            !sourceStandardZoneByteOffsetS1_||*sourceStandardZoneByteOffsetS1_!=0x160u*(*sourceStandardZoneS0_)||
            !sourceStandardZonePointerOffsetS2_||*sourceStandardZonePointerOffsetS2_!=4u*(*sourceStandardZoneS0_)||
-           (*sourceStandardZoneS0_!=*nativeModelZone354_&&*sourceStandardZoneS0_!=*nativeModelZone354_+1u))return false;
+           (*sourceStandardZoneS0_!=*modelReceiptZone354&&*sourceStandardZoneS0_!=*modelReceiptZone354+1u))return false;
     }else if(sourceStandardVisibilityMask_||sourceStandardVisibilityStored_)return false;
     if(sourceStandardVisibilityMask_>0x3ffu||
        (sourceStandardVisibilityMask_&(sourceStandardVisibilityMask_+1u)))return false;
@@ -30,18 +349,29 @@ bool Owner::preflightSourcePostParticleModelsNative()const noexcept {
             }else if(n.zoneVisibility44)return false;
         }
         if(sourceStandardZoneS0_&&z<*sourceStandardZoneS0_&&!sourceStandardTypeReturned_[z])return false;
-        if(nativeModelZone354_&&z>*nativeModelZone354_&&(sourceStandardCompletedCallbacks_[z]||sourceStandardTypeScanned_[z]||
+        if(modelReceiptZone354&&z>*modelReceiptZone354&&(sourceStandardCompletedCallbacks_[z]||sourceStandardTypeScanned_[z]||
            sourceStandardParentReturned_[z]||sourceStandardTypeReturned_[z]||sourceStandardDiagnosticAttempted_[z]))return false;
         const auto completed=sourceStandardCompletedCallbacks_[z],scanned=sourceStandardTypeScanned_[z];
         if(completed||scanned||sourceStandardParentReturned_[z]||sourceStandardTypeReturned_[z]||sourceStandardDiagnosticAttempted_[z]){
             if(!sourceStaticOwner_||z>=sourceStaticOwner_->parents_.size()||!sourceStaticOwner_->parents_[z])return false;
             const auto& parent=*sourceStaticOwner_->parents_[z];
-            if(completed>parent.count30||scanned>parent.count30||completed>sourceStaticOwner_->sourceWrapperLedger_[z].size())return false;
+            if(completed>parent.count30||scanned>parent.count30||completed>sourceStaticOwner_->sourceWrapperLedger_[z].size()||
+               scanned>sourceStaticOwner_->sourceWrapperLedger_[z].size())return false;
             for(std::uint32_t i=0;i<completed;++i){const auto& w=sourceStaticOwner_->sourceWrapperLedger_[z][i];
-                if(!w||!w->sourceModelCallbackEntered||!w->sourceCallbackReturnV0||*w->sourceCallbackReturnV0>1)return false;
+                if(!w||!w->sourceTypeKnown)return false;
+                if(w->type00==2){
+                    //Physics has its own callback receipt, never Standard flags.
+                    const auto& h=w->sourcePhysics;const auto& config=h.configure166400;
+                    if(!sourceStaticOwner_->sourcePhysicsWrapperCurrentNative(*w)||!h.callbackEntered||
+                       !config.wrapperReturnV0||*config.wrapperReturnV0!=1u||
+                       config.wrapperReturnPC!=0x27b5f8u||!config.managerReturned)return false;
+                }else if(w->type00!=1||!w->sourceModelCallbackEntered||
+                    !w->sourceCallbackReturnV0||*w->sourceCallbackReturnV0>1)return false;
             }
             for(std::uint32_t i=0;i<scanned;++i){const auto& w=sourceStaticOwner_->sourceWrapperLedger_[z][i];
-                if(!w||!w->sourceTypeKnown||w->type00==2)return false; //No unimplemented PhysicsObject callback claimed.
+                if(!w||!w->sourceTypeKnown)return false;
+                if(w->type00==2&&(!sourceStaticOwner_->sourcePhysicsWrapperCurrentNative(*w)||
+                   !w->sourcePhysics.secondCallback27B600Returned))return false;
             }
             if(sourceStandardDiagnosticAttempted_[z]&&(!(sourceStandardVisibilityMask_&(1u<<z))||completed!=parent.count30))return false;
             if(sourceStandardParentReturned_[z]&&(!parent.count30||completed!=parent.count30||!sourceStandardDiagnosticAttempted_[z]))return false;
@@ -50,42 +380,70 @@ bool Owner::preflightSourcePostParticleModelsNative()const noexcept {
         }
     }
     if(sourceStandardParentS3_){
-        if(!sourceStaticOwner_||!sourceStaticOwner_->sourceMode_||!nativeModelZone354_||
-           *nativeModelZone354_>=sourceStaticOwner_->parents_.size()||
-           sourceStandardParentS3_!=sourceStaticOwner_->parents_[*nativeModelZone354_].get()||!sourceStandardVisibilityStored_)return false;
+        if(!sourceStaticOwner_||!sourceStaticOwner_->sourceMode_||!modelReceiptZone354||
+           *modelReceiptZone354>=sourceStaticOwner_->parents_.size()||
+           sourceStandardParentS3_!=sourceStaticOwner_->parents_[*modelReceiptZone354].get()||!sourceStandardVisibilityStored_)return false;
     }
     if(sourceStandardWrapperA0_){
         if(!sourceStandardParentS3_||!sourceStandardWrapperSlot_||!sourceStandardSlotS0_||!sourceStandardSlotByteOffsetS1_||
            *sourceStandardSlotByteOffsetS1_!=4u*(*sourceStandardSlotS0_)||
-           !nativeModelZone354_||!sourceStaticOwner_||*nativeModelZone354_>=10)return false;
-        const auto z=*nativeModelZone354_,slot=*sourceStandardWrapperSlot_;
+           !modelReceiptZone354||!sourceStaticOwner_||*modelReceiptZone354>=10)return false;
+        const auto z=*modelReceiptZone354,slot=*sourceStandardWrapperSlot_;
         if(slot>=sourceStaticOwner_->sourceWrapperLedger_[z].size()||
            sourceStandardWrapperA0_!=sourceStaticOwner_->sourceWrapperLedger_[z][slot].get()||
            (*sourceStandardSlotS0_!=slot&&*sourceStandardSlotS0_!=slot+1u)||
            sourceStandardCompletedCallbacks_[z]!=*sourceStandardSlotS0_)return false;
     }
     if(sourceStandardTypeSlotS0_){
-        if(!nativeModelZone354_||!sourceStandardTypeByteOffsetS1_||
+        if(!modelReceiptZone354||!sourceStandardTypeByteOffsetS1_||
            *sourceStandardTypeByteOffsetS1_!=4u*(*sourceStandardTypeSlotS0_)||
-           sourceStandardTypeScanned_[*nativeModelZone354_]!=*sourceStandardTypeSlotS0_)return false;
+           sourceStandardTypeScanned_[*modelReceiptZone354]!=*sourceStandardTypeSlotS0_)return false;
     }
     if(sourceStandardTypeParentRead_||sourceStandardTypeCountRead_||sourceStandardTypeZoneRead_){
-        if(!sourceStandardTypeSlotS0_||!sourceStandardTypeZoneRead_||!nativeModelZone354_||
-           *sourceStandardTypeZoneRead_!=*nativeModelZone354_||!sourceStaticOwner_||
-           *nativeModelZone354_>=sourceStaticOwner_->parents_.size()||!sourceStaticOwner_->parents_[*nativeModelZone354_])return false;
-        const auto& p=*sourceStaticOwner_->parents_[*nativeModelZone354_];
+        if(!sourceStandardTypeSlotS0_||!sourceStandardTypeZoneRead_||!modelReceiptZone354||
+           *sourceStandardTypeZoneRead_!=*modelReceiptZone354||!sourceStaticOwner_||
+           *modelReceiptZone354>=sourceStaticOwner_->parents_.size()||!sourceStaticOwner_->parents_[*modelReceiptZone354])return false;
+        const auto& p=*sourceStaticOwner_->parents_[*modelReceiptZone354];
         if(sourceStandardTypeParentRead_!=&p.entity||!sourceStandardTypeCountRead_||*sourceStandardTypeCountRead_!=p.count30)return false;
     }
     if(sourceStandardWorldReturnV0_){
         if(*sourceStandardWorldReturnV0_!=1||!sourceStandardZoneS0_||*sourceStandardZoneS0_!=10||sourceStandardVisibilityMask_!=0x3ff)return false;
         for(bool returned:sourceStandardTypeReturned_)if(!returned)return false;
     }
+    if(sourceBuoyAttachNoEffect1B3AE0_&&
+       (!sourceStandardWorldReturnV0_||sourceBuoysPhase_!=SourceBuoysPhase::returned||
+        !preflightSourceWorldBuoysNative()||!nativeBuoyCount538_||*nativeBuoyCount538_!=0))return false;
     return !sourceStandardCallbackEntered_||sourceStandardWrapperA0_;
 }
 bool Owner::abortSourcePostParticleModelsNative(std::uint32_t& pc)noexcept {
     if(!preflightSourcePostParticleModelsNative())return false;
     if(sourcePostParticleModelsPhase_==SourcePostParticleModelsPhase::unreached||
        sourcePostParticleModelsPhase_==SourcePostParticleModelsPhase::nativeClosed)return true;
+    //Later3F8 unknown-slot array leaves before the Environment owner/config.
+    if(!withdrawSourceSkyArrayNative())return false;
+    //Latest trigger stack/heap280890 leases leave before older observer cohorts.
+    if(!withdrawSourceTriggerServiceMembershipNative())return false;
+    //Later emitter74/70 raw borrows leave before older model and manager owners.
+    if(!withdrawSourceParticleEmitterBorrowsNative())return false;
+    //Pending trigger-service operands are native reads, not new ownership.
+    //Withdraw their currentness dependence before trigger/topology retirement.
+    if(sourceTriggerService274E90_.entered)sourceTriggerService274E90_.nativeWithdrawn=true;
+    if(!retireSourceFinishLineNative())return false;
+    //Collision callbacks were appended after Standard children; withdraw their
+    //native tail custody before retiring those children or their Parent owner.
+    if(worldCollisionObjects3CC_&&worldCollisionObjects3CC_->sourceMode_){
+        //Source callbacks append in zone/slot order. Withdraw the newest membership
+        //cohort and parent tail first, including an unfinished final callback.
+        auto& rows=worldCollisionObjects3CC_->sourceWrappers_;
+        for(std::size_t z=rows.size();z-->0;)for(std::size_t n=rows[z].size();n-->0;){auto& w=rows[z][n];
+            if(w&&(!g::OriginalWorldCollisionObjects50LA::withdrawSourceCallbackMembershipNative(
+                *w,*worldApplication_,worldEntity_.sessionGeneration)||
+                !g::OriginalWorldCollisionObjects50LA::withdrawSourceCallbackParentNative(
+                *w,*worldApplication_,worldEntity_.sessionGeneration)))return false;
+        }
+    }
+    //The later callback's temporary source cohort owner must leave before
+    //older Standard/default observers. Loader/outer and any unretired descriptor survive.
     if(!retireSourceStandardModelsNative(pc))return false;
     //Borrowed stack identities retire before source parent/descriptor and node
     //owners. Do not restore the process directory or erase reached44/354 stores.
@@ -158,7 +516,14 @@ bool Owner::continueSourcePostParticleModels1AA194(std::uint32_t& pc)noexcept {
             sourceStandardDiagnosticWritten_[z]=std::fprintf(stdout,"Zone%d does not contain any static models.\n",static_cast<int>(z));
         }else{
             at(0x2741f8);at(0x27b950);sourceStandardSlotS0_=0;at(0x27b958);sourceStandardSlotByteOffsetS1_=0;
-            while(*sourceStandardSlotS0_<parent->count30){
+            //27B954 jumps to the live signed count test before the first
+            //callback. Both Standard and Physics returns come back here;
+            //never reuse an entry count captured before a callback.
+            for(;;){
+                at(0x27b980);const auto currentCount=parent->count30;
+                if(currentCount>static_cast<std::uint32_t>(std::numeric_limits<std::int32_t>::max()))return stop(pc);
+                at(0x27b984);const bool another=*sourceStandardSlotS0_<currentCount;
+                at(0x27b988);if(!another)break;
                 const auto slot=*sourceStandardSlotS0_;at(0x27b964);
                 if(!parent->sourceEntries34||slot>=parent->sourceEntriesKnown||
                    slot>=sourceStaticOwner_->sourceWrapperLedger_[z].size())return stop(pc);
@@ -1188,12 +1553,126 @@ bool Owner::continueSourcePostParticleModels1AA194(std::uint32_t& pc)noexcept {
                                 config.modelObserverZone=*h.bodyOwner->object_->visibilityB4;
                                 config.modelObserverMode=2u;at(0x166750u); //166754 delay-slot mode2.
                                 config.modelObserverEntered=true;
-                                const auto modelObserver=h.nestedModel->beginSourceModelObserver28E8A0(
+                                auto modelObserver=h.nestedModel->beginSourceModelObserver28E8A0(
                                     &config,*config.modelObserverZone,config.modelObserverMode);
+                                if(h.nestedModel->modelObserver_.boundsReturned&&
+                                   modelObserver.sourcePC==0x28e96cu){
+                                    const auto primary=withSourcePhysicsModelPrimary2809C0(h,[&](auto& method,auto& portal)noexcept {
+                                        const auto primary=h.nestedModel->continueSourceModelPrimary2809C0(method);
+                                        if(primary.status!=g::OriginalSourcePhysicsModel50LA::Status::bounded||
+                                           primary.sourcePC!=0x280bf0u||!h.nestedModel->modelObserver_.primaryPublished)
+                                            return primary;
+                                        const auto secondary=h.nestedModel->continueSourceModelPortals280BF0(portal);
+                                        return secondary.status==g::OriginalSourcePhysicsModel50LA::Status::owner?primary:secondary;
+                                    });
+                                    if(primary.status!=g::OriginalSourcePhysicsModel50LA::Status::owner)
+                                        modelObserver=primary;
+                                }
+                                if(modelObserver.status==g::OriginalSourcePhysicsModel50LA::Status::bounded&&
+                                   modelObserver.sourcePC==0x280becu&&h.nestedModel->modelPortals_.observerReturned){
+                                    const auto returned=h.nestedModel->continueSourceModelReturn28E98C();
+                                    if(returned.status!=g::OriginalSourcePhysicsModel50LA::Status::owner)modelObserver=returned;
+                                }
                                 config.modelObserverResult=modelObserver;
-                                //The bounded prefix retains publication/constructor/guard effects,
-                                //but fresh28E230 is still unissued. No Model return or Body+AC call.
-                                return stop(modelObserver.sourcePC);
+                                if(modelObserver.status!=g::OriginalSourcePhysicsModel50LA::Status::reached||
+                                   modelObserver.sourcePC!=0x28ea14u||!h.nestedModel->modelObserver_.returned)
+                                    return stop(modelObserver.sourcePC);
+                                config.modelObserverReturned=true;at(0x166758u);
+                                if(!h.bodyOwner->object_->bodyD0||!h.sourceBodyD0)return stop(pc);
+                                config.resetBodyD0=*h.bodyOwner->object_->bodyD0;
+                                if(!config.resetBodyD0||!h.sourceBodyD0->body_||
+                                   config.resetBodyD0!=&h.sourceBodyD0->body_->entity)return stop(0x16675cu);
+                                at(0x16675cu);config.resetDispatch08=h.sourceBodyD0->body_->dispatch08;
+                                if(config.resetDispatch08!=0x3ce000u)return stop(pc);
+                                at(0x166760u);config.resetTargetAC=0x167a50u; //Actual3CE0AC dispatch word.
+                                at(0x166764u);config.bodyResetEntered=true;
+                                const auto reset=h.sourceBodyD0->resetSourceBody167A50(&config,*h.nestedModel);
+                                config.bodyResetResult=reset;
+                                if(reset.status!=g::OriginalSourcePhysicsBody50LA::Status::reached||
+                                   reset.sourcePC!=0x167b7cu||!h.sourceBodyD0->bodyReset_.returned)return stop(reset.sourcePC);
+                                config.bodyResetReturned=true;at(0x16676cu);
+                                //16676C/70 restores,166774 JR with166778 delay. No V0 inferred.
+                                config.updateReturned=true;config.updateReturnPC=0x16677cu;
+                                at(0x27b5b0u);
+                                if(!nativeModelZone354_||*nativeModelZone354_>=10)return stop(pc);
+                                config.parentAttachZone=*nativeModelZone354_;
+                                at(0x27b5b4u);
+                                if(!sourceStaticOwner_||!sourceModelParents3C4_||!sourceModels3C4_||
+                                   *sourceModels3C4_!=sourceModelParents3C4_.get()||
+                                   sourceModelParentsPublished3C4_!=10||*config.parentAttachZone>=sourceStaticOwner_->parents_.size())return stop(pc);
+                                at(0x27b5b8u);
+                                if(!h.body8||*h.body8!=h.bodyOwner->publishedIdentity_||!h.bodyEnrolled||
+                                   !h.bodyOwner->countedEntityNative())return stop(pc);
+                                auto& selectedParent=sourceStaticOwner_->parents_[*config.parentAttachZone];
+                                at(0x27b5c4u);config.parentAttachIdentity=sourceModelParents3C4_[*config.parentAttachZone];
+                                if(!selectedParent||selectedParent->released||!selectedParent->sourceMode||
+                                   !selectedParent->constructed||selectedParent->zone!=*config.parentAttachZone+1u||
+                                   !selectedParent->sourceCountKnown||!selectedParent->sourceArrayReturned||
+                                   selectedParent->sourceVtable08!=0x3d2640u||
+                                   config.parentAttachIdentity!=&selectedParent->entity||
+                                   sourceStaticOwner_->application_!=worldApplication_||
+                                   sourceStaticOwner_->generation_!=worldEntity_.sessionGeneration||
+                                   sourceStandardParentS3_!=selectedParent.get()||!sourceStandardSlotS0_||
+                                   *sourceStandardSlotS0_>=selectedParent->sourceEntriesKnown||!selectedParent->sourceEntries34||
+                                   selectedParent->sourceEntries34[*sourceStandardSlotS0_]!=wrapper||
+                                   *config.parentAttachZone>=sourceStaticOwner_->sourceWrapperLedger_.size()||
+                                   *sourceStandardSlotS0_>=sourceStaticOwner_->sourceWrapperLedger_[*config.parentAttachZone].size()||
+                                   sourceStaticOwner_->sourceWrapperLedger_[*config.parentAttachZone][*sourceStandardSlotS0_].get()!=wrapper||
+                                   !sourceStaticOwner_->preflightSourceModelParentLinksNative()||
+                                   !authority.canRetire(*h.bodyOwner->countedEntityNative()))return stop(pc);
+                                //Same lazy native Parent authority enrollment used by Standard attachment.
+                                //The source Parent is already counted; this adds no guest ref/count.
+                                if(!selectedParent->sourceAuthorityEnrolled){
+                                    if(!authority.reserveAdditional(1)||
+                                       !authority.canEnroll(selectedParent->entity,selectedParent->entity.objectKey)||
+                                       !authority.enroll(selectedParent->entity))return stop(pc);
+                                    selectedParent->sourceAuthorityEnrolled=true;
+                                }else if(!authority.canRetire(selectedParent->entity))return stop(pc);
+                                at(0x27b5c8u);config.parentAttachEntered=true;
+                                const auto parentAttached=h.bodyOwner->attachSourcePhysicsParent27B5C8(
+                                    &config,config.updateReturnPC,selectedParent.get(),selectedParent->entity,
+                                    *config.parentAttachZone,attach); //Mode2 in27B5CC delay slot.
+                                config.parentAttachResult=parentAttached;
+                                if(parentAttached.status!=g::OriginalSourcePhysicsObject50LA::Status::reached||
+                                   parentAttached.sourcePC!=0x27b5d0u||!h.bodyOwner->parentAttachment_.returned)
+                                    return stop(parentAttached.sourcePC);
+                                config.parentAttachReturned=true;
+                                at(0x27b5d0u);
+                                if(!sourcePhysics3D4_)return stop(pc);
+                                config.manager3D4=*sourcePhysics3D4_;
+                                at(0x27b5d4u);
+                                if(!nativeModelZone354_)return stop(pc);
+                                std::int32_t managerZone=0;const std::uint32_t managerZoneBits=*nativeModelZone354_;
+                                std::memcpy(&managerZone,&managerZoneBits,4);config.managerZone=managerZone;
+                                at(0x27b5d8u); //Wrapper08 load in27B5DC delay.
+                                if(!h.body8||!*h.body8||*h.body8!=h.bodyOwner->publishedIdentity_)return stop(pc);
+                                config.managerBase=*h.body8;
+                                if(!*config.manager3D4||!worldPhysics3D4_||*config.manager3D4!=worldPhysics3D4_.get()||
+                                   !worldPhysics3D4_->sourceCurrentNative())return stop(pc);
+                                config.managerCallEntered=true;config.managerPC=0x27c290u;
+                                bool managerReturned=false;std::uint32_t managerV0=0;
+                                const bool managerOkay=worldPhysics3D4_->registerSource27C290(worldEntity_,&config,
+                                    *h.bodyOwner,*config.managerZone,config.managerRegistrationIndex,
+                                    managerReturned,managerV0,config.managerPC);
+                                if(!managerOkay||!managerReturned)return stop(config.managerPC);
+                                config.managerReturned=true;config.managerReturnV0=managerV0;
+                                //Wrapper ignores actual managerV0, including0. No registration-success inference.
+                                at(0x27b5e0u);config.wrapperReturnV0=1u;
+                                //27B5E4..EC restores registers;JR27B5F0/delay27B5F4 returns.
+                                config.wrapperReturnPC=0x27b5f8u;
+                                //27B930 ignores the genuine callback V0, even when
+                                //27C290 returned0. Advance only after the real wrapper
+                                //return; Physics descriptor0C remains owned.
+                                if(!sourceStandardSlotS0_||*sourceStandardSlotS0_!=slot||
+                                   !sourceStandardSlotByteOffsetS1_||*sourceStandardSlotByteOffsetS1_!=4u*slot||
+                                   sourceStandardCompletedCallbacks_[z]!=slot)return stop(config.wrapperReturnPC);
+                                at(0x27b978u);*sourceStandardSlotByteOffsetS1_+=4u;
+                                at(0x27b97cu);++*sourceStandardSlotS0_;
+                                sourceStandardCompletedCallbacks_[z]=*sourceStandardSlotS0_;
+                                //Return to this same parent's live count test.
+                                //The next actual entry chooses its own callback;
+                                //do not replay this Physics wrapper or its receipt.
+                                continue;
                             }
                             h.sourceDirectCollisionTransformEntered=true;
                             const auto directTransform=h.sourceCollisionE4->continueSourceDirectMissingTransform11F570();
@@ -1264,8 +1743,24 @@ bool Owner::continueSourcePostParticleModels1AA194(std::uint32_t& pc)noexcept {
             if(!parent->sourceEntries34||slot>=parent->sourceEntriesKnown||slot>=sourceStaticOwner_->sourceWrapperLedger_[z].size())return stop(pc);
             auto* wrapper=parent->sourceEntries34[slot];
             if(!wrapper||wrapper!=sourceStaticOwner_->sourceWrapperLedger_[z][slot].get()||!wrapper->sourceTypeKnown)return stop(0x274288);
-            if(wrapper->type00==2)return stop(0x274298); //Genuine PhysicsObject +14 dispatch remains unjoined.
-            at(0x27428c);*sourceStandardTypeByteOffsetS1_+=4;
+            if(wrapper->type00==2){
+                //Actual3D26C0+14 is27B600, not Standard's +10 callback.
+                auto& h=wrapper->sourcePhysics;const auto& config=h.configure166400;
+                at(0x274290);
+                if(!sourceStandardParentReturned_[z]||sourceStandardCompletedCallbacks_[z]!=parent->count30||
+                   !sourceStaticOwner_->sourcePhysicsWrapperCurrentNative(*wrapper)||
+                   !h.callbackEntered||!config.wrapperReturnV0||*config.wrapperReturnV0!=1u||
+                   config.wrapperReturnPC!=0x27b5f8u||!config.managerReturned||
+                   h.secondCallback27B600Returned)return stop(pc);
+                at(0x274294);at(0x274298);at(0x27429c);
+                //27B600 JR RA /27B604 NOP returns without producing V0,
+                //mutating the body, or retiring positive descriptor0C.
+                at(0x27b600);at(0x27b604);h.secondCallback27B600Returned=true;
+                at(0x2742a0);*sourceStandardTypeByteOffsetS1_+=4;
+            }else{
+                //BNE-likely skip executes this delay slot only for non-type2.
+                at(0x27428c);*sourceStandardTypeByteOffsetS1_+=4;
+            }
             at(0x2742a4);++*sourceStandardTypeSlotS0_;sourceStandardTypeScanned_[z]=*sourceStandardTypeSlotS0_;
         }
         at(0x2742e0);sourceStandardTypeReturned_[z]=true;
@@ -1274,7 +1769,4386 @@ bool Owner::continueSourcePostParticleModels1AA194(std::uint32_t& pc)noexcept {
         at(0x274218);++*sourceStandardZoneS0_;at(0x274220);
     }
     at(0x274230);sourceStandardWorldReturnV0_=1;at(0x27424c);
-    //Actual next source call1B3AE0 remains separate. No World/player readiness.
-    return stop(0x1aa208);
+    at(0x1aa208);
+    //Actual1B3AE0 consumes World538/53C, not the legacy native model owner.
+    //The genuine source1B50E0 absent NumberOfBuoys producer established538=0.
+    //53C remains UNKNOWN: either null returns at1B3AF8, or nonnull reaches
+    //the signed0<538 test1B3B50..58 before any element read/call2D3E60.
+    //Record only the common no-effect return, never a fabricated pointer,
+    //chosen branch, V0 result, buoy allocation, or attachment publication.
+    if(sourceBuoysPhase_!=SourceBuoysPhase::returned||!preflightSourceWorldBuoysNative()||
+       !nativeBuoyCount538_||*nativeBuoyCount538_!=0||sourceBuoyAttachNoEffect1B3AE0_)
+        return stop(pc);
+    at(0x1aa20c);at(0x1b3ae0);at(0x1b3b70);at(0x1b3b74);
+    sourceBuoyAttachNoEffect1B3AE0_=true;
+    at(0x1aa210);at(0x1b3b80);
+    if(!constructSourceFinishLine1B3B80(pc))return stop(pc);
+    //Loader authority belongs to this derived Owner, not the base strip owner.
+    const auto& finishDomain=sourceLoadApplication_->standardMaterialDomainOwner_;
+    if(!finishDomain||finishDomain!=sourceTrackMountDomain_||!finishDomain->prepared()||
+       !sourceLoadApplication_->materialApplication)return stop(pc);
+    const auto finishTable=finishDomain->materials382B38();
+    if(!finishTable||!finishTable->sourceNames17CAD4Current()||
+       !finishTable->screenApplicationMatches(*sourceLoadApplication_->materialApplication))return stop(pc);
+    if(!setupSourceFinishLine150450(finishTable,sourceLoadApplication_->materialDirectory36B970(),pc))return stop(pc);
+    if(!continueSourceFinishLineAttributes23BED8(pc))return stop(pc);
+    if(!continueSourceFinishLineParameters23BF78(pc))return stop(pc);
+    //Genuine134200 finalization and23BEB0 return completed in the same packet lease.
+    if(!continueSourceFinishLineIndex1B3BFC(pc))return stop(pc);
+    if(!continueSourceFinishLineAnchors1B3C1C(pc))return stop(pc);
+    if(!continueSourceFinishLineComparison1B3CD8(pc))return stop(pc);
+    if(!sourceFinishLineComparison_.missingAnchor||!preflightSourcePostParticleModelsNative())return stop(pc);
+    if(*sourceFinishLineComparison_.missingAnchor){
+        if(!destroySourceMissingFinishLine1B3DC0(pc))return stop(pc);
+    }else{
+        //Only the actual nonmissing branch supplies these authenticated snapshots.
+        if(!continueSourceFinishLineGeometry1B3DDC(sourceFinishLineAnchors_.stackWords[0],
+            sourceFinishLineAnchors_.stackWords[1],pc))return stop(pc);
+    }
+    if(pc!=0x1b4090||sourceFinishLineCallerReturn_.restoreMask||
+       !preflightSourcePostParticleModelsNative())return stop(pc);
+    auto& finishReturn=sourceFinishLineCallerReturn_;
+    //Actual LQ RA,30(SP); S2,20(SP); S1,10(SP); S0,00(SP).
+    //Native lexical caller state already retains these identities; only the
+    //executed restore sequence is recorded, never invented guest register bits.
+    at(0x1b4090);finishReturn.restoreMask|=1;finishReturn.v0Preserved=true;
+    at(0x1b4094);finishReturn.restoreMask|=2;
+    at(0x1b4098);finishReturn.restoreMask|=4;
+    at(0x1b409c);finishReturn.restoreMask|=8;
+    at(0x1b40a0); //JR RA: actual1AA210 JAL produced return address1AA218.
+    at(0x1b40a4);finishReturn.stackReleased=true; //Delay slot ADDIU SP,SP,0xD0.
+    finishReturn.returned=true;
+    at(0x1aa218); //No instruction in this epilogue assigns V0.
+    //1AA21C replaces V0 with the actual Application before its next use;
+    //the branch-dependent, otherwise unknown finishline V0 is not consumed.
+    at(0x1aa21c);
+    if(!sourceLoadApplication_||sourceLoadApplication_->entities()!=worldApplication_)
+        return stop(pc);
+    at(0x1aa220);const auto& finishLoading=sourceLoadApplication_->sourceLoading330Owner_;
+    if(!finishLoading)return stop(0x1aa224); //Unknown/missing producer, not an invented null skip.
+    if(!finishLoading->current()||finishLoading->issuer_!=sourceLoadApplication_||
+       !finishLoading->managerInitialized_||!finishLoading->slot330Published_||
+       finishLoading->retiring_||finishLoading->retired_)return stop(0x1aa224);
+    at(0x1aa224);finishReturn.loadingMode30=finishLoading->mode30_;
+    at(0x1aa228);at(0x1aa22c); //BEQ V0,zero,1AA244 and NOP delay slot.
+    if(*finishReturn.loadingMode30){
+        //1AA230/234 materialize3DCCCCCD;1AA238 moves it toF12.
+        //1AA23C JAL1CC900 (+40 delay-slot receiver) is NOT joined. Do
+        //not borrow the legacy optional-native-progress callback policy.
+        return stop(0x1aa230);
+    }
+    finishReturn.progressSkipped=true;
+    at(0x1aa244);
+    if(!continueSourceCollisionDispatch1AA244(pc))return stop(pc);
+    if(!continueSourcePostCollisionCaller1AA258(pc))return stop(pc);
+    return stop(pc); //No World-load completion is represented by this prefix.
 }
+bool Owner::continueSourcePostCollisionCaller1AA258(std::uint32_t& pc)noexcept {
+    auto& h=sourcePostCollisionCaller_;
+    if(pc!=0x1aa258||h.loadingMode30||!sourceCollisionDispatch128_.worldReturned||
+       !preflightSourcePostParticleModelsNative()||nativeScbThread_!=std::this_thread::get_id()||
+       closed_||terminal_||nativeScbRevoked_||!sourceLoadApplication_||!sourceLoadRace_||
+       sourceLoadRace_->nativeIntroWorldEntity()!=&worldEntity_||!worldColdConstructed_||
+       sourceLoadApplication_->entities()!=worldApplication_||sceneApplication_!=worldApplication_||
+       worldEntity_.reference00!=1)return false;
+    const auto at=[&](std::uint32_t p){pc=sourcePostParticleModelsPC_=p;};
+    at(0x1aa258);at(0x1aa25c); //Original replaces collision V0 with actual Application.
+    at(0x1aa260);const auto& loading=sourceLoadApplication_->sourceLoading330Owner_;
+    if(!loading||!loading->current()||loading->issuer_!=sourceLoadApplication_||
+       !loading->managerInitialized_||!loading->slot330Published_||
+       loading->retiring_||loading->retired_){at(0x1aa264);return false;}
+    at(0x1aa264);h.loadingMode30=loading->mode30_;
+    at(0x1aa268);at(0x1aa26c);
+    if(*h.loadingMode30){at(0x1aa270);return false;} //Actual1CC900 branch remains unjoined.
+    h.progressSkipped=true;
+    at(0x1aa284);at(0x1aa288);at(0x1aa28c);at(0x1aa290);
+    //Sign-extended addresses3AADA8 and36B860, not3BADA8/37B860.
+    //Original LWC1/LH then SWC1/SH copies six bytes including the NUL.
+    //Existing string backing is native storage; no source allocation invented.
+    auto& directory=sourceLoadApplication_->modelDirectory36B860_;
+    if(directory!="geometry\\"||directory.size()<5){at(0x1aa294);return false;}
+    at(0x1aa294);at(0x1aa298);
+    at(0x1aa29c);std::memcpy(directory.data(),"anim",4);h.animationDirectoryStoreMask=1;
+    at(0x1aa2a0);directory[4]='\\';directory.resize(5);h.animationDirectoryStoreMask=3;
+    at(0x1aa2a4);at(0x1aa2a8);h.worldTable08=0x3cf110u;
+    at(0x1aa2ac);h.target120=0x1b40b0u; //Original3CF230.
+    at(0x1aa2b0);at(0x1aa2b4);at(0x1b40b0);
+    //Actual base2742F0 receives the SAME World, not a legacy toy-ready flag.
+    at(0x1b40d4);at(0x1b40d8);at(0x2742f0);at(0x2742fc);
+    if(sourceToyPhase_!=SourceToyPhase::returned||!sourceToyLoaderReturnedZero_||
+       !preflightSourceWorldToyNative()||!sourceToy3C8_)return false;
+    if(*sourceToy3C8_||nativeEmptyToyList3C8_)return false; //Nonnull constructor/service remains bounded.
+    h.baseToyNullRead=true;
+    at(0x274300);at(0x274304);at(0x274308);at(0x27430c);h.baseToyReturnV0=1;
+    at(0x274354);at(0x274358);at(0x27435c);at(0x274360);at(0x1b40dc);
+    at(0x1b40e0);if(!sourceToy3C8_||*sourceToy3C8_)return false;
+    h.derivedToyNullRead=true;at(0x1b40e4);at(0x1b40e8); //Delay copies retained S1 to V0.
+    for(std::uint32_t p=0x1b4304;p<=0x1b4328;p+=4)at(p);
+    h.toyReturnV0=h.baseToyReturnV0;h.toyReturned=true;at(0x1aa2b8);
+    at(0x1aa2bc);at(0x1aa2c0);h.target124=0x274370u; //Original3CF234.
+    at(0x1aa2c4);at(0x1aa2c8);h.particleDispatched=true;at(0x274370);
+    return continueSourceParticleService274370(pc);
+}
+bool Owner::continueSourceParticleService274370(std::uint32_t& pc)noexcept {
+    auto& h=sourceParticleService124_;
+    if(pc!=0x274370||h.entered||!sourcePostCollisionCaller_.particleDispatched||
+       !preflightSourcePostParticleModelsNative()||nativeScbThread_!=std::this_thread::get_id()||
+       closed_||terminal_||nativeScbRevoked_||!sourceLoadRace_||
+       sourceLoadRace_->nativeIntroWorldEntity()!=&worldEntity_||!worldColdConstructed_||
+       worldEntity_.reference00!=1)return false;
+    const auto at=[&](std::uint32_t p){pc=sourcePostParticleModelsPC_=p;};
+    h.entered=true;at(0x274370);at(0x274374);at(0x274378); //A1 is the SAME World.
+    at(0x27437c);
+    if(sourceParticleDescriptorPhase_!=SourceParticleDescriptorPhase::returned||
+       !preflightSourceWorldParticleDescriptorsNative()||!sourceParticleList3D8_||
+       *sourceParticleList3D8_!=nativeParticleList3D8_.get())return false;
+    h.listRead=true;h.listNonNull=bool(*sourceParticleList3D8_);
+    at(0x274380);at(0x274384);
+    //The admitted source2722F0 returned cohort is nonNULL. Do not invent a
+    //NULL-list return from an allocation or native loader refusal.
+    if(!h.listNonNull){at(0x274388);return false;}
+    auto& list=*nativeParticleList3D8_;
+    at(0x274390);h.listTable08=list.sourceVtable08;
+    if(*h.listTable08!=0x3d24f0u)return false;
+    at(0x274394);h.listTarget78=0x27dfd0u; //Original table word3D2568.
+    at(0x274398);at(0x27439c);at(0x27dfd0);h.listEntered=true;
+    //27DFE8 saves list inS3;27DFEC saves actual World argument inS2.
+    at(0x27dff0);h.rowS0=0;at(0x27dff4);at(0x27dff8);h.offsetS1=0;
+    at(0x27e020);h.count30=list.count30;
+    if(*h.count30!=4)return false; //Existing exact source descriptor cohort only.
+    at(0x27e024);at(0x27e028);at(0x27e02c);at(0x27dffc);
+    if(!list.sourceArrayPublished||!list.sourceArray34||
+       *list.sourceArray34!=list.pointers34.get()||!list.pointers34)return false;
+    at(0x27e000);at(0x27e004);
+    if(!list.sourceSlotPublished[0]||!list.sourceRowReturned[0]||!list.rows[0]||
+       list.pointers34[0]!=list.rows[0].get())return false;
+    h.rowRead=true;auto& row=*list.rows[0];
+    at(0x27e008);h.rowTable14=row.sourceVtable14;
+    if(*h.rowTable14!=0x3d2570u)return false;
+    at(0x27e00c);h.rowTarget0C=0x27c7b0u; //Original3D257C.
+    at(0x27e010);at(0x27e014);at(0x27c7b0);h.rowEntered=true;
+    at(0x27c7dc);
+    if(!row.sourceDescriptorPublished||!row.sourceDescriptor04||!row.descriptor04||
+       *row.sourceDescriptor04!=row.descriptor04.get()||!row.descriptor04->sourceLoaded)return false;
+    h.descriptorRead=true;const auto& d=*row.descriptor04;
+    at(0x27c7e0);at(0x27c7e4);at(0x27c7e8);at(0x27c7ec);at(0x27c7f0);at(0x27c7f4);
+    if(!d.sourceEmitterBytes||*d.sourceEmitterBytes>=d.sourceEmitter210.size()||
+       d.sourceEmitter210[*d.sourceEmitterBytes]!=0)return false;
+    //308F00 ASCII case fold, original literal3BB488="NONE". No locale/native
+    //prepared emitter name or legacy decoded attachment is substituted.
+    bool none=*d.sourceEmitterBytes==4;constexpr char target[]="none";
+    for(std::size_t i=0;i<*d.sourceEmitterBytes;++i){
+        auto c=static_cast<unsigned char>(d.sourceEmitter210[i]);
+        if(!c||c>=128)return false;
+        if(c>='A'&&c<='Z')c=static_cast<unsigned char>(c+32);
+        if(i>=4||c!=static_cast<unsigned char>(target[i]))none=false;
+    }
+    h.emitterIsNone=none;at(0x27c7f8);at(0x27c7fc);
+    if(none){at(0x27c800);return false;} //Diagnostic remains unjoined.
+    at(0x27c814); //Reload the SAME source descriptor04, not a prepared emitter.
+    if(!row.sourceMode||!d.sourceMode||!(d.sourceKnownMask&128u)||
+       !row.sourceDescriptor04||*row.sourceDescriptor04!=row.descriptor04.get())return false;
+    at(0x27c818);h.descriptorType04=static_cast<std::uint32_t>(d.type04);
+    at(0x27c81c);if(!continueSourceParticleRowCreation27C81C(0,h,pc))return false;
+    return continueSourceParticleRowAttachment27CC08(0,h,pc);
+}
+bool Owner::continueSourceParticleRowAttachment27CC08(std::size_t rowIndex,SourceParticleService124& h,std::uint32_t& pc)noexcept {
+    if(pc!=0x27cc08||rowIndex>=4||!h.rowStart10Stored||h.attachmentOffsetE0||
+       !nativeParticleList3D8_||!nativeParticleList3D8_->rows[rowIndex]||
+       !preflightSourceWorldParticleDescriptorsNative())return false;
+    if((rowIndex==0&& &h!=&sourceParticleService124_)||(rowIndex>0&& &h!=&sourceParticleLaterRows_[rowIndex-1]))return false;
+    auto& row=*nativeParticleList3D8_->rows[rowIndex];
+    if(!row.descriptor04)return false;const auto& d=*row.descriptor04;
+    const auto at=[&](std::uint32_t p){pc=sourcePostParticleModelsPC_=p;};
+    at(0x27cc08);
+    if(!row.sourceDescriptor04||*row.sourceDescriptor04!=row.descriptor04.get()||d.sourceOffsetKnown!=15)return false;
+    at(0x27cc14);at(0x27cc18);h.attachmentOffsetE0=d.sourceOffset320;at(0x27cc1c);
+    const auto equalAscii=[](std::string_view left,std::string_view right)noexcept {
+        if(left.size()!=right.size())return false;
+        for(std::size_t i=0;i<left.size();++i){
+            auto a=static_cast<unsigned char>(left[i]),b=static_cast<unsigned char>(right[i]);
+            if(a>='A'&&a<='Z')a=static_cast<unsigned char>(a+32);
+            if(b>='A'&&b<='Z')b=static_cast<unsigned char>(b+32);
+            if(a!=b)return false;
+        }return true;
+    };
+    if(!d.sourceAttachBytes||*d.sourceAttachBytes>=d.sourceAttach08.size()||d.sourceAttach08[*d.sourceAttachBytes])return false;
+    const std::string_view attachName(d.sourceAttach08.data(),*d.sourceAttachBytes);
+    at(0x27cc20);at(0x27cc24);at(0x27cc28);
+    h.attachmentIsNone=equalAscii(attachName,"NONE");at(0x27cc2c);at(0x27cc30);
+    //27D7A0 only reads the original call operands here. No emitter manager/
+    //model pointer write, borrowed model lease, load or return is invented.
+    const auto enterConfig=[&](bool modelNonNull,std::uint32_t callPC)noexcept {
+        at(callPC);
+        if(row.sourceVtable14!=0x3d2570u||!row.sourceEmitterArrayPublished||!row.sourceEmitterArray00||
+           *row.sourceEmitterArray00!=row.sourceEmitterPointers.get()||!row.sourceEmitterPointers||
+           h.attachmentMatches>=row.sourceEmitterPublishedSlots)return false;
+        h.configEmitterIndex=h.attachmentMatches;
+        const auto& emitter=row.sourceEmitters[*h.configEmitterIndex];
+        if(row.sourceEmitterPointers[*h.configEmitterIndex]!=(emitter?&emitter->entity:nullptr))return false;
+        h.configEmitterNonNull=bool(emitter);h.configModelNonNull=modelNonNull;
+        h.configTarget10=0x27d7a0u;h.configEntered=true;at(0x27d7a0);at(0x27d7b4);
+        if(row.unknown08!=h.emitterType)return false;
+        struct Load {std::uint32_t type,readPC,callPC,target;};
+        constexpr Load loads[]={ {0,0x27d81c,0x27d828,0x15b9d0},{1,0x27d8bc,0x27d8c8,0x15ce90},
+            {2,0x27d96c,0x27d978,0x15d6d0},{8,0x27da0c,0x27da18,0x15def0},
+            {9,0x27daac,0x27dab8,0x15e8f0},{11,0x27db4c,0x27db58,0x15f1e0},
+            {12,0x27dbec,0x27dbf8,0x15ff10}};
+        for(const auto& load:loads)if(load.type==*row.unknown08){
+            at(load.readPC);std::size_t managerCount=0;
+            if(!sourceParticleStageCountedNative(managerCount)||!sourceParticle4A0_||
+               *sourceParticle4A0_!=trackParticles_.get()||!sourceParticleLoadReturned_||
+               sourceParticleStageNativeClosed_||sourceParticle4A0NativeWithdrawn_)return false;
+            h.configManagerRead=true;
+            if(!row.sourceDescriptor04||*row.sourceDescriptor04!=row.descriptor04.get()||
+               !d.sourceEmitterBytes||d.sourceOffsetKnown!=15)return false;
+            at(load.callPC);h.configLoaderTarget=load.target;
+            //Same source implementation, distinct exact row/emitter occurrence.
+            if(load.type==0||load.type==1||load.type==8)return continueSourceEmitterLoaderPrefixNative(rowIndex,h,pc);
+            return false; //Other subtype loaders remain unjoined.
+        }
+        at(0x27dc5c);return false;
+    };
+    if(*h.attachmentIsNone){at(0x27d700);return enterConfig(false,0x27d718);}
+    at(0x27cc34);h.attachmentMatches=0;at(0x27cc38);at(0x27cc3c);h.attachmentZone=0;
+    if(!sourceStaticOwner_||sourceStaticOwner_->closed_||!sourceStaticOwner_->sourceMode_||
+       sourceModelOwner3C4_!=sourceStaticOwner_.get()||sourceStaticOwner_->sourceWorld3C4Borrower_!=this||
+       sourceStaticOwner_->application_!=worldApplication_||sourceStaticOwner_->generation_!=worldEntity_.sessionGeneration)return false;
+    for(;;){
+        at(0x27cfb0);if(!worldZones34C_)return false;h.attachmentLiveZones=*worldZones34C_;
+        if(*h.attachmentLiveZones>static_cast<std::uint32_t>(std::numeric_limits<std::int32_t>::max()))return false;
+        at(0x27cfb4);at(0x27cfb8);at(0x27cfbc);at(0x27cfc0);
+        if(*h.attachmentZone>=*h.attachmentLiveZones)break;
+        const auto z=*h.attachmentZone;at(0x27cc40);at(0x27cc44);h.attachmentSlot=0;
+        at(0x27cc4c);
+        if(!sourceModels3C4_||!sourceModelParents3C4_||*sourceModels3C4_!=sourceModelParents3C4_.get()||
+           z>=sourceModelParentsPublished3C4_||z>=sourceStaticOwner_->parents_.size()||
+           !sourceStaticOwner_->parents_[z])return false;
+        auto& parent=*sourceStaticOwner_->parents_[z];at(0x27cc54);
+        if(sourceModelParents3C4_[z]!=&parent.entity||parent.released||!parent.sourceMode||!parent.sourceCountKnown)return false;
+        for(;;){
+            at(0x27cf78);at(0x27cf7c);h.attachmentLiveCount=parent.count30;
+            if(*h.attachmentLiveCount>static_cast<std::uint32_t>(std::numeric_limits<std::int32_t>::max()))return false;
+            at(0x27cf80);at(0x27cf84);at(0x27cf88);
+            if(*h.attachmentSlot>=*h.attachmentLiveCount)break;
+            const auto slot=*h.attachmentSlot;at(0x27cc60);at(0x27cc68);
+            if(!parent.sourceEntries34||slot>=parent.sourceEntriesKnown||
+               z>=sourceStaticOwner_->sourceWrapperLedger_.size()||slot>=sourceStaticOwner_->sourceWrapperLedger_[z].size())return false;
+            at(0x27cc70);auto* wrapper=parent.sourceEntries34[slot];
+            if(wrapper!=sourceStaticOwner_->sourceWrapperLedger_[z][slot].get())return false;
+            if(!wrapper){at(0x27cc78);++*h.attachmentSlot;continue;}
+            at(0x27cc7c);if(!sourceStaticOwner_->sourceModelCurrentNative(*wrapper))return false;
+            bool match=false;
+            if(wrapper->dispatch==ra_static_model_cold50LA::Owner::StandardWrapper::Dispatch::physics3D26C0){
+                const auto& physics=wrapper->sourcePhysics;if(!physics.body8)return false;
+                if(*physics.body8){std::uint8_t byte=0;at(0x27cc90);
+                    if(!physics.bodyOwner||!physics.bodyOwner->readSourceInlineName38FirstByteNative(
+                        worldApplication_.get(),worldEntity_.sessionGeneration,*physics.body8,byte)||byte)return false;
+                    //Genuine inline+38 constructor NUL; never the unrelated
+                    //native Standard model8 alias or nested Physics Model14C.
+                    if(attachName.empty()){h.attachmentMatched=true;h.attachmentPhysics=true;at(0x27cca8);return false;}
+                }
+            }else if(wrapper->model8){
+                auto* frame=wrapper->sourceModel.get();
+                if(!frame||wrapper->model8!=&frame->scene||frame->nativeRetired||frame->scene.released())return false;
+                const auto* model=frame->scene.model();if(!model)return false;
+                at(0x27cc88);at(0x27cc90);match=equalAscii(model->name38,attachName);at(0x27cc98);
+            }
+            if(match){
+                h.attachmentMatched=true;at(0x27cca0);at(0x27cca8);
+                if(!d.sourceChildBytes||*d.sourceChildBytes>=d.sourceChild10C.size()||d.sourceChild10C[*d.sourceChildBytes])return false;
+                at(0x27ccb0);h.childIsNone=equalAscii(std::string_view(d.sourceChild10C.data(),*d.sourceChildBytes),"NONE");
+                at(0x27ccb8);at(0x27ccbc);
+                if(!*h.childIsNone){at(0x27ccc8);h.childLookupPending=true;return false;} //28C590 graph lookup still unjoined.
+                at(0x27ccd8);
+                std::uint32_t call=0;switch(*h.emitterType){case 0:call=0x27cd54;break;case 1:call=0x27cda8;break;
+                case 2:call=0x27cdfc;break;case 8:call=0x27ce4c;break;case 9:call=0x27ce98;break;
+                case 11:call=0x27cee4;break;case 12:call=0x27cf30;break;default:return false;}
+                return enterConfig(true,call);
+            }
+            at(0x27cf70);++*h.attachmentSlot;at(0x27cf74);
+        }
+        at(0x27cf90);if(d.instances330!=h.instances330Read)return false;
+        at(0x27cfa4);at(0x27cfa8);++*h.attachmentZone;at(0x27cfac);
+    }
+    at(0x27cfc8);if(!sourceToy3C8_||!preflightSourceWorldToyNative())return false;
+    at(0x27cfcc);at(0x27cfd0);at(0x27cfd4);
+    if(*sourceToy3C8_){at(0x27cfdc);return false;}
+    h.toyScanNullRead=true;at(0x27d680);return false; //Distinct second guard remains unjoined.
+}
+bool Owner::continueSourceParticleRowCreation27C81C(std::size_t rowIndex,SourceParticleService124& h,std::uint32_t& pc)noexcept {
+    if(pc!=0x27c81c||rowIndex>=4||h.rowType08Stored||!h.rowEntered||!h.descriptorRead||
+       h.emitterIsNone!=false||!h.descriptorType04||!nativeParticleList3D8_||
+       !nativeParticleList3D8_->rows[rowIndex]||!preflightSourceWorldParticleDescriptorsNative())return false;
+    if((rowIndex==0&& &h!=&sourceParticleService124_)||(rowIndex>0&& &h!=&sourceParticleLaterRows_[rowIndex-1]))return false;
+    auto& row=*nativeParticleList3D8_->rows[rowIndex];
+    if(!row.descriptor04||!row.sourceDescriptor04||*row.sourceDescriptor04!=row.descriptor04.get())return false;
+    const auto& d=*row.descriptor04;
+    if(!d.sourceLoaded||!(d.sourceKnownMask&128u)||*h.descriptorType04!=static_cast<std::uint32_t>(d.type04))return false;
+    const auto at=[&](std::uint32_t p){pc=sourcePostParticleModelsPC_=p;};
+    at(0x27c81c);row.unknown08=h.descriptorType04;h.rowType08Stored=true;
+    at(0x27c820);
+    if(!worldApplication_||!sourceLoadApplication_||
+       sourceLoadApplication_->entities()!=worldApplication_||sceneApplication_!=worldApplication_||
+       !worldApplication_->constructed_||worldApplication_->released_)return false;
+    auto& shared=g::OriginalApplicationEntities50LA::processParticleAssertion27C820();
+    if(!shared.known||shared.thread!=std::this_thread::get_id()||
+       shared.guard3D6528>1||shared.assertion443068!=shared.guard3D6528)return false;
+    h.guard3D6528Read=shared.guard3D6528;at(0x27c824);at(0x27c828);
+    if(!*h.guard3D6528Read){
+        at(0x27c82c);at(0x27c830);at(0x27c834);shared.assertion443068=1;
+        at(0x27c838);shared.guard3D6528=1;h.assertionLazyStored=true;
+    }
+    at(0x27c83c);at(0x27c840);h.assertion443068Read=shared.assertion443068;
+    at(0x27c844);at(0x27c848);at(0x27c84c);
+    //Read actual World4A0, whose1B4E54 publication and160E00 same-self
+    //return are retained. No legacy render-query/native manager adoption.
+    std::size_t managerCount=0;
+    if(!sourceParticleStageCountedNative(managerCount)||sourceParticleStageNativeClosed_||
+       sourceParticle4A0NativeWithdrawn_||!sourceParticlePublished4A0_||
+       !sourceParticleLoadReturned_||!sourceParticle4A0_||
+       *sourceParticle4A0_!=trackParticles_.get()||nativeParticleManager4A0_!=*sourceParticle4A0_)return false;
+    h.manager4A0Read=true;h.manager4A0NonNull=bool(*sourceParticle4A0_);
+    if(!h.manager4A0NonNull)return false; //NULL assertion/diagnostic path remains bounded.
+    at(0x27c850);at(0x27c854);at(0x27c858);at(0x27c85c);
+    //Actual133660 returns0 for a nonNULL argument on BOTH debug36C100
+    //branches:13367C or133684. No debug-global default or logging is invented.
+    h.assertionReturnV0=0;at(0x27c860);at(0x27c864);at(0x27c888);
+    if(!row.sourceDescriptor04||*row.sourceDescriptor04!=row.descriptor04.get()||
+       !d.sourceLoaded||!(d.sourceKnownMask&512u)||!d.instances330)return false;
+    at(0x27c88c);h.instances330Read=d.instances330;at(0x27c890);
+    at(0x27c894);
+    if(*h.instances330Read<=0){at(0x27cbf4);return false;} //Unjoined diagnostic, not success.
+    h.countPositive=true;at(0x27c898);
+    if(!row.unknown08||row.unknown08!=h.descriptorType04)return false;
+    const auto type=*row.unknown08;
+    struct Branch {std::uint32_t type,bytes,ctor,table,arrayPC,loopPC,allocationPC,storePC,publishPC;};
+    constexpr Branch branches[]={
+        {0,0x260,0x15b860,0x3cdcf0,0x27c8f8,0x27c940,0x27c90c,0x27c938,0x27c95c},
+        {1,0x210,0x15cdc0,0x3cdc50,0x27c964,0x27c9b0,0x27c978,0x27c9a8,0x27c9cc},
+        {2,0x230,0x15d5e0,0x3cdbb0,0x27c9d4,0x27ca20,0x27c9e8,0x27ca18,0x27ca3c},
+        {8,0x230,0x15de00,0x3cdb10,0x27ca44,0x27ca88,0x27ca58,0x27ca84,0x27caa0},
+        {9,0x230,0x15e800,0x3cda70,0x27caa8,0x27cae8,0x27cabc,0x27cae4,0x27cb00},
+        {11,0x240,0x15f100,0x3cd9d0,0x27cb08,0x27cb48,0x27cb1c,0x27cb44,0x27cb60},
+        {12,0x240,0x15fe30,0x3cd930,0x27cb68,0x27cba8,0x27cb7c,0x27cba4,0x27cbc0}};
+    const Branch* branch=nullptr;for(const auto& b:branches)if(b.type==type){branch=&b;break;}
+    if(!branch){at(0x27cbc4);return false;} //Actual unsupported-type diagnostic remains unjoined.
+    h.emitterType=type;h.emitterAllocationBytes=branch->bytes;h.emitterConstructor=branch->ctor;
+    //Host pointer width differs from EE count*4. Refuse wrapping guest byte
+    //counts before allocation; this is a bounded native safety adaptation.
+    const auto count=static_cast<std::uint32_t>(*h.instances330Read);
+    if(count>0x3fffffffu)return false;
+    at(branch->arrayPC);
+    //Owner metadata is allocated before guest effects; failures create no
+    //fabricated guest NULL publication. Actual raw-pointer failure is distinct.
+    try{row.sourceEmitters.resize(count);}catch(...){return false;}
+    row.sourceEmitterArrayAttempted=true;h.emitterArrayAttempted=true;
+    row.sourceEmitterPointers.reset(new(std::nothrow) Entity*[count]);
+    for(std::size_t index=0;;++index){
+        at(branch->loopPC);
+        if(!row.sourceDescriptor04||*row.sourceDescriptor04!=row.descriptor04.get()||
+           !d.instances330||d.instances330!=h.instances330Read)return false;
+        if(index>=static_cast<std::size_t>(*d.instances330))break;
+        at(branch->allocationPC);
+        auto& owner=row.sourceEmitters[index];
+        owner.reset(new(std::nothrow) SourceEmitter27C890);
+        ++row.sourceEmitterAttempts;h.emitterAttempts=row.sourceEmitterAttempts;
+        if(owner){auto& e=*owner;at(branch->ctor);
+            if(!constructSourceEmitterEntity15A5B0(e.entity,e.counted,e.enrolled,pc)){
+                sourcePostParticleModelsPC_=pc;return false;
+            }
+            //Actual15A5B0 constructor stores only. Unknown lanes/upper flag
+            //bits remain unknown; manager70/attachment74/aux1C4 are knownNULL.
+            e.dispatch08=0x3cdd90;
+            for(auto off:{0x30u,0x40u,0x50u,0x60u})e.vector(off);
+            e.words[0x1d4/4]=1;e.known[0x1d4/4]=7;
+            e.word(0x70,0);e.word(0x74,0);e.word(0x17c,0x457a0000);e.word(0x180,0x40c00000);
+            e.word(0x184,0x3f800000);e.word(0x188,0x41200000);e.word(0x18c,0);
+            for(auto off:{0x1ccu,0x1d0u,0x190u,0x198u,0x19cu,0x1a0u,0x1b0u,0x1b4u,0x1c4u})e.word(off,0);
+            e.word(0x194,0x00ffffff);e.word(0x1b8,0xffffffff);
+            for(std::uint32_t off=0x1d8;off<=0x1f4;off+=4)e.word(off,0);
+            e.dispatch08=branch->table;
+            if(type==0){
+                constexpr std::uint32_t values[]={0,0x3f800000,0,0x40a00000,0x3c23d70a,0x43fa0000,
+                    0x455ac000,0x3f000000,0x3f800000,0x40a00000,0,0,0x3f800000,0x3c23d70a,0,0x41c80000};
+                for(std::uint32_t n=0;n<16;++n)e.word(0x200+n*4,values[n]);
+                e.vector(0x240);e.vector(0x250);
+            }else if(type==1){e.word(0x200,0);e.word(0x204,0);}
+            else if(type==2){e.vector(0x210);e.vector(0x220);e.vector(0x40);e.word(0x19c,0);e.word(0x200,0);}
+            else if(type==11){e.vector(0x220);e.vector(0x230);e.vector(0x40);e.word(0x19c,0);}
+            else {e.vector(0x200);e.vector(0x210);e.vector(0x40);e.word(0x19c,0);
+                if(type==8){e.word(0x228,1);e.word(0x224,0);}
+                if(type==9){e.word(0x224,1);e.word(0x1c4,0);}}
+            e.constructorReturned=true;
+        }
+        at(branch->storePC);
+        if(!row.sourceEmitterPointers)return false; //Retain even this unpublishable counted owner.
+        row.sourceEmitterPointers[index]=owner?&owner->entity:nullptr;
+        ++row.sourceEmitterPublishedSlots;h.emitterPublishedSlots=row.sourceEmitterPublishedSlots;
+    }
+    at(branch->publishPC);row.sourceEmitterArray00=row.sourceEmitterPointers.get();
+    row.sourceEmitterArrayPublished=true;h.emitterArrayPublished=true;
+    at(0x27cbd8);at(0x27cbdc);
+    if(!d.instances330||d.instances330!=h.instances330Read)return false;
+    at(0x27cbe0);row.unknown0C=static_cast<std::uint32_t>(*d.instances330);h.rowCount0CStored=true;
+    at(0x27cbe4);at(0x27cbe8);
+    if(!(d.sourceKnownMask&1024u)||!d.startOn334)return false;
+    at(0x27cbec);at(0x27cbf0);row.unknown10=static_cast<std::uint32_t>(*d.startOn334);h.rowStart10Stored=true;
+    at(0x27cc08);return true; //Only source creation/count/start stores; not configuration/row success.
+}
+bool Owner::continueSourceEmitterLoaderPrefixNative(std::size_t rowIndex,SourceParticleService124& h,std::uint32_t& pc)noexcept {
+    if(rowIndex>=4||(rowIndex==0&& &h!=&sourceParticleService124_)||
+       (rowIndex>0&& &h!=&sourceParticleLaterRows_[rowIndex-1]))return false;
+    const bool subtype0=h.emitterType==0u,subtype1=h.emitterType==1u;
+    if((!subtype0&&!subtype1&&h.emitterType!=8u)||pc!=(subtype0?0x27d828u:(subtype1?0x27d8c8u:0x27da18u))||
+       h.configLoaderTarget!=(subtype0?0x15b9d0u:(subtype1?0x15ce90u:0x15def0u))||
+       (subtype0?h.type0LoadEntered:(subtype1?h.type1LoadEntered:h.type8LoadEntered))||!h.configEntered||!h.configManagerRead||!h.configEmitterIndex||
+       !nativeParticleList3D8_||!nativeParticleList3D8_->rows[rowIndex])return false;
+    auto& row=*nativeParticleList3D8_->rows[rowIndex];
+    if(!row.descriptor04||!row.sourceDescriptor04||*row.sourceDescriptor04!=row.descriptor04.get()||
+       *h.configEmitterIndex>=row.sourceEmitterPublishedSlots||!row.sourceEmitterPointers)return false;
+    const auto& d=*row.descriptor04;
+    auto& owner=row.sourceEmitters[*h.configEmitterIndex];
+    if(row.sourceEmitterPointers[*h.configEmitterIndex]!=(owner?&owner->entity:nullptr))return false;
+    const auto at=[&](std::uint32_t p){pc=sourcePostParticleModelsPC_=p;};
+    at(subtype0?0x15b9d0u:(subtype1?0x15ce90u:0x15def0u));(subtype0?h.type0LoadEntered:(subtype1?h.type1LoadEntered:h.type8LoadEntered))=true;
+    at(subtype0?0x15b9fcu:(subtype1?0x15cebcu:0x15df1cu)); //141C20 JR RA, delay copies A0→V0. No retain/disable effects.
+    at(subtype0?0x15ba04u:(subtype1?0x15cec4u:0x15df24u));(subtype0?h.type0NoOpReturned:(subtype1?h.type1NoOpReturned:h.type8NoOpReturned))=true;
+    at(subtype0?0x15ba08u:(subtype1?0x15cec8u:0x15df28u));if(!owner)return false; //Actual first NULL receiver store remains bounded.
+    auto& e=*owner;
+    if(!e.constructorReturned||e.dispatch08!=(subtype0?0x3cdcf0u:(subtype1?0x3cdc50u:0x3cdb10u))||e.managerStored||e.modelStored||e.borrowsWithdrawn||
+       !trackParticles_||!sourceParticle4A0_||*sourceParticle4A0_!=trackParticles_.get()||
+       sourceParticleStageNativeClosed_||sourceParticle4A0NativeWithdrawn_||
+       trackParticles_->sourceParticleEmitterBorrowers_==std::numeric_limits<std::size_t>::max())return false;
+    //A native lease protects the same actual source4A0 while emitter70 exists.
+    //It is NOT an original retain, manager registration, or readiness token.
+    ++trackParticles_->sourceParticleEmitterBorrowers_;e.manager70=trackParticles_.get();
+    e.managerStored=true;e.known[0x70/4]=0;(subtype0?h.type0ManagerStored:(subtype1?h.type1ManagerStored:h.type8ManagerStored))=true;
+    if(h.configModelNonNull){
+        at(subtype0?0x15ba0cu:(subtype1?0x15ceccu:0x15df2cu));
+        if(!h.attachmentZone||!h.attachmentSlot||!sourceStaticOwner_||h.attachmentPhysics||
+           *h.attachmentZone>=sourceStaticOwner_->sourceWrapperLedger_.size()||
+           *h.attachmentSlot>=sourceStaticOwner_->sourceWrapperLedger_[*h.attachmentZone].size())return false;
+        auto& wrapper=sourceStaticOwner_->sourceWrapperLedger_[*h.attachmentZone][*h.attachmentSlot];
+        if(!wrapper||!sourceStaticOwner_->sourceModelCurrentNative(*wrapper)||!wrapper->sourceModel||
+           wrapper->model8!=&wrapper->sourceModel->scene||wrapper->sourceModel->nativeRetired)return false;
+        auto& model=wrapper->sourceModel->scene;
+        if(!model.model()||model.sourceParticleEmitterBorrowers_==std::numeric_limits<std::size_t>::max())return false;
+        at(subtype0?0x15ba10u:(subtype1?0x15ced0u:0x15df30u));++model.sourceParticleEmitterBorrowers_;
+        e.modelOwner=&model;e.model74=model.model();e.modelStored=true;e.known[0x74/4]=0;(subtype0?h.type0ModelStored:(subtype1?h.type1ModelStored:h.type8ModelStored))=true;
+        at(subtype0?0x15ba14u:(subtype1?0x15ced4u:0x15df34u));if(d.sourceOffsetKnown!=15)return false;
+        at(subtype0?0x15ba18u:(subtype1?0x15ced8u:0x15df38u));for(std::size_t i=0;i<4;++i)e.word(0x50+static_cast<std::uint32_t>(i)*4,d.sourceOffset320[i]);
+        e.offsetStored=true;(subtype0?h.type0OffsetStored:(subtype1?h.type1OffsetStored:h.type8OffsetStored))=true;
+    }
+    at(subtype0?0x15ba1cu:(subtype1?0x15cedcu:0x15df3cu));at(subtype0?0x15ba20u:(subtype1?0x15cee0u:0x15df40u)); //Genuine source4A0 is nonNULL, no default-only branch.
+    at(subtype0?0x15ba50u:(subtype1?0x15cf30u:0x15dfd4u));const auto* directory=sourceParticleDirectory36B530(worldApplication_.get());
+    if(!directory||directory->find('\0')!=std::string::npos||directory->size()>=e.filename78.size())return false;
+    at(subtype0?0x15ba5cu:(subtype1?0x15cf3cu:0x15dfe0u)); //Actual309230 strcpy, including terminating NUL.
+    std::memcpy(e.filename78.data(),directory->data(),directory->size());e.filename78[directory->size()]=0;
+    e.filenameBytes=directory->size();e.directoryCopied=true;(subtype0?h.type0DirectoryCopied:(subtype1?h.type1DirectoryCopied:h.type8DirectoryCopied))=true;
+    at(subtype0?0x15ba60u:(subtype1?0x15cf40u:0x15dfe4u)); //Repeated SAME manager70 store in the call delay slot, not a second lease.
+    at(subtype0?0x15ba64u:(subtype1?0x15cf44u:0x15dfe8u));at(subtype0?0x15ba68u:(subtype1?0x15cf48u:0x15dfecu));
+    if(!d.sourceEmitterBytes||*d.sourceEmitterBytes>=d.sourceEmitter210.size()||d.sourceEmitter210[*d.sourceEmitterBytes])return false;
+    for(std::size_t i=0;i<*d.sourceEmitterBytes;++i)if(!d.sourceEmitter210[i])return false;
+    at(subtype0?0x15ba94u:(subtype1?0x15cf74u:0x15e018u));
+    if(*d.sourceEmitterBytes>=e.filename78.size()-*e.filenameBytes)return false; //Native overflow guard, no truncation.
+    std::memcpy(e.filename78.data()+*e.filenameBytes,d.sourceEmitter210.data(),*d.sourceEmitterBytes+1);
+    *e.filenameBytes+=*d.sourceEmitterBytes;e.filenameAppended=true;(subtype0?h.type0FilenameAppended:(subtype1?h.type1FilenameAppended:h.type8FilenameAppended))=true;
+    at(subtype0?0x15ba9cu:(subtype1?0x15cf7cu:0x15e020u));at(subtype0?0x15baa0u:(subtype1?0x15cf80u:0x15e024u));
+    return continueSourceEmitterConfig15AE00(rowIndex,h,pc);
+}
+bool Owner::continueSourceEmitterConfig15AE00(std::size_t rowIndex,SourceParticleService124& h,std::uint32_t& pc)noexcept {
+    if(rowIndex>=4||(rowIndex==0&& &h!=&sourceParticleService124_)||
+       (rowIndex>0&& &h!=&sourceParticleLaterRows_[rowIndex-1]))return false;
+    const bool subtype0=h.emitterType==0u,subtype1=h.emitterType==1u;
+    if((!subtype0&&!subtype1&&h.emitterType!=8u)||pc!=(subtype0?0x15baa0u:(subtype1?0x15cf80u:0x15e024u))||
+       !(subtype0?h.type0FilenameAppended:(subtype1?h.type1FilenameAppended:h.type8FilenameAppended))||h.emitterConfigConstructAttempted||
+       !h.configEmitterIndex||!nativeParticleList3D8_||!nativeParticleList3D8_->rows[rowIndex])return false;
+    auto& row=*nativeParticleList3D8_->rows[rowIndex];
+    if(*h.configEmitterIndex>=row.sourceEmitterPublishedSlots||!row.sourceEmitters[*h.configEmitterIndex])return false;
+    auto& e=*row.sourceEmitters[*h.configEmitterIndex];
+    if(!e.filenameAppended||!e.filenameBytes||e.borrowsWithdrawn||e.config15AE00||
+       !e.managerStored||e.manager70!=trackParticles_.get()||!sourceTrackMountDomain_||
+       !preflightSourceWorldParticleDescriptorsNative())return false;
+    const auto at=[&](std::uint32_t p){pc=sourcePostParticleModelsPC_=p;};
+    at(0x15ae00);at(0x15ae14); //A1 is actual inline filename78, neverNULL.
+    at(0x15ae1c);h.emitterConfigConstructAttempted=true;e.configConstructAttempted=true;
+    try{
+        //Native heap custody for the original stack object; failure is a
+        //host allocation bound, not an invented source nullable new branch.
+        e.config15AE00.reset(new a::OriginalParticleSourceConfig50LA(
+            a::OriginalParticleSourceConfig50LA::Emitter15AE00Tag{},&e.entity));
+    }catch(...){return false;}
+    at(0x1573a4);e.configConstructReturned=true;h.emitterConfigConstructReturned=true;at(0x15ae24);
+    std::string filename;
+    try{filename.assign(e.filename78.data(),*e.filenameBytes);}catch(...){return false;}
+    at(0x15ae2c);e.configOpenAttempted=true;h.emitterConfigOpenAttempted=true;
+    a::OriginalStandardTextureDiagnostic50LA diagnostic;
+    const bool returned=e.config15AE00->beginEmitter15AE00(sourceTrackMountDomain_->resolver3E1A70(),
+        sourceTrackMountDomain_->archiveProvider3E1A70(),filename,&e.entity,diagnostic);
+    at(!returned&&diagnostic.sourcePC?diagnostic.sourcePC:e.config15AE00->sourcePC_);
+    if(!returned||!e.config15AE00->sourceOpenReturned_)return false;
+    e.configOpenReturned=e.config15AE00->sourceOpenReturned_;h.emitterConfigOpenReturned=e.configOpenReturned;
+    at(0x15ae34);at(0x15ae38);
+    if(!*e.configOpenReturned){at(0x15ae64);return false;} //Original diagnostic/close remain unjoined.
+    if(!e.config15AE00->current()||!e.config15AE00->textReturned_||
+       e.dispatch08!=(subtype0?0x3cdcf0u:(subtype1?0x3cdc50u:0x3cdb10u)))return false;
+    at(0x15ae3c);at(0x15ae40);at(0x15ae44);h.emitterConfigTarget94=subtype0?0x15c330u:(subtype1?0x15d560u:0x15e6d0u);
+    at(0x15ae48);
+    auto& config=*e.config15AE00;
+    if(subtype1){
+        const bool returned=config.beginType1Properties15D560(&e.entity,e.words,e.known,diagnostic);
+        at(config.sourcePC_);(void)returned;
+        return false; //Actual15D574 group-tail and subtype return remain unjoined.
+    }
+    if(subtype0){
+        const bool returned=config.beginType0Properties15C330(&e.entity,e.words,e.known,diagnostic);
+        at(config.sourcePC_);(void)returned;
+        if(pc!=0x15cca8||config.type0NoiseReturned_!=2)return false;
+    }else{
+        const bool returned=config.beginType8Properties15E6D0(&e.entity,e.words,e.known,diagnostic);
+        at(config.sourcePC_);(void)returned;
+        if(pc!=0x15e758)return false;
+    }
+    if(!config.commonReturned_||!config.current()||!preflightSourceWorldParticleDescriptorsNative())return false;
+    if(!subtype0){
+        at(0x15e758);if(e.known[0x64/4]!=0xffffffffu)return false;
+        at(0x15e75c);e.word(0x220,e.words[0x64/4]);e.type8VelocityCopied=true;
+    }
+    auto& groupsNonNull=subtype0?e.type0GroupsNonNull:e.type8GroupsNonNull;
+    auto& groupIndex=subtype0?e.type0GroupIndex:e.type8GroupIndex;
+    auto& groupCopyMask=subtype0?e.type0GroupCopyMask:e.type8GroupCopyMask;
+    at(subtype0?0x15cca8u:0x15e760u);auto& manager=*e.manager70;
+    if(manager.closed_||!manager.constructorReturned_||!manager.sourceEntityEnrolled_||
+       !manager.sourceParticleEmitterBorrowers_)return false;
+    at(subtype0?0x15ccacu:0x15e764u);groupsNonNull=manager.sourceGroups13C_!=nullptr;
+    if(*groupsNonNull){
+        at(subtype0?0x15ccbcu:0x15e770u);if(e.known[0x1b8/4]!=0xffffffffu)return false;
+        const auto bits=e.words[0x1b8/4];
+        const auto group=bits<=0x7fffffffu?static_cast<std::int32_t>(bits):static_cast<std::int32_t>(std::int64_t(bits)-0x100000000LL);
+        at(0x161eb0);
+        if(!config.checkEmitterGroupLookup161EA0(group,manager.sourceNumGroups140_)){at(config.sourcePC_);return false;}
+        at(0x161f2c);
+        //Actual assertion does not reject negative indexes. Native pointer
+        //arithmetic is bounded separately; never manufacture a guest pointer.
+        if(group<0){at(0x161f30);return false;}
+        const auto index=static_cast<std::uint32_t>(group);
+        if(!manager.sourceGroupAllocationPublished_||!manager.sourceGroupRows_||
+           manager.sourceGroups13C_!=manager.sourceGroupStorage13C_.get()||index>=manager.sourceGroupCapacity_)return false;
+        groupIndex=index;at(0x161f58);at(subtype0?0x15ccc8u:0x15e780u);
+        const auto& record=manager.sourceGroupRows_[index].lanes;
+        if(!record[2])return false;
+        at(subtype0?0x15ccccu:0x15e784u);e.word(0x1b4,static_cast<std::uint32_t>(*record[2]));groupCopyMask=1;
+        at(subtype0?0x15ccd0u:0x15e788u);if(!record[1])return false;
+        at(subtype0?0x15ccd4u:0x15e78cu);e.word(0x1b0,static_cast<std::uint32_t>(*record[1]));groupCopyMask=3;
+        at(subtype0?0x15ccdcu:0x15e794u);e.word(0x190,e.words[0x1b0/4]);groupCopyMask=7;
+    }else{
+        at(subtype0?0x15cce4u:0x15e79cu);e.word(0x1b4,subtype0?0x1fu:0x40u);groupCopyMask=1;
+        at(subtype0?0x15ccecu:0x15e7a4u);e.word(0x1b0,subtype0?0x10u:0x54u);groupCopyMask=3;
+        at(subtype0?0x15ccf0u:0x15e7a8u);e.word(0x190,subtype0?0x10u:0x54u);groupCopyMask=7;
+    }
+    //These are LastFrame/FirstFrame/current frame, not renderer dimensions.
+    if(subtype0){at(0x15ccf8);at(0x15cd10);e.type0PropertiesReturned=true;config.emitterType0Returned_=true;}
+    else{at(0x15e7b0);at(0x15e7c8);e.type8PropertiesReturned=true;config.emitterType8Returned_=true;}
+    at(0x15ae50);at(0x15ae54);
+    if(!config.closeEmitterStack1573B0(&e.entity,diagnostic)){
+        at(diagnostic.sourcePC?diagnostic.sourcePC:config.sourcePC_);return false;
+    }
+    at(config.sourcePC_); //Actual destructor return1574F4 precedes caller continuation.
+    at(0x15ae60);
+    //Source stack Config has finished destruction. Withdraw its remaining
+    //native singleton custody now, without a second source close, so another
+    //emitter can construct its own fresh Config. Keep all source history.
+    if(!config.abortNative(diagnostic))return false;
+    e.configNativeWithdrawn=true;
+    at(0x15ae9c);e.emitterFileLoadReturned=true; //Actual15AE00 returns1.
+    if(subtype0){
+        //Actual nonzero15AE00 return branches over the fallback15BAB0.
+        //15BAAC delay slot sets V0 to this same emitter; no new retain.
+        at(0x15baa8);at(0x15baac);at(0x15bac8);at(0x15bae4);e.type0LoaderReturned=true;
+        at(0x27d830);
+    }else{
+        at(0x15e02c);at(0x15e030);at(0x15e0b0);at(0x15e0cc);e.type8LoaderReturned=true;
+        at(0x27da20);
+    }
+    //3CDCF0 and3CDB10 have the same actual +80/+84/+20/+18 targets:
+    //15ACE0,15AD00,141560,141520. Each emitter keeps its own route receipts.
+    if(e.dispatch08!=(subtype0?0x3cdcf0u:0x3cdb10u)||
+       !(subtype0?e.type0LoaderReturned:e.type8LoaderReturned))return false;
+    if(!preflightSourceWorldParticleDescriptorsNative()||!row.descriptor04||
+       !row.sourceDescriptor04||*row.sourceDescriptor04!=row.descriptor04.get())return false;
+    if(!h.configModelNonNull){
+        //Original invokes15ACB0 twice. The second copy deliberately makes
+        //previous40 equal current30; do not collapse away either occurrence.
+        for(std::uint32_t call:{subtype0?0x27d840u:0x27da30u,subtype0?0x27d850u:0x27da40u}){
+            at(call);const auto& descriptor=*row.descriptor04;
+            at(0x15acb0);if(descriptor.sourceOffsetKnown!=15)return false;
+            at(0x15acc0);for(std::size_t n=0;n<4;++n)if(e.known[0x30/4+n]!=0xffffffffu)return false;
+            at(0x15acc4);for(std::size_t n=0;n<4;++n)e.word(0x40+static_cast<std::uint32_t>(n)*4,e.words[0x30/4+n]);
+            at(0x15acd4);for(std::size_t n=0;n<4;++n)e.word(0x30+static_cast<std::uint32_t>(n)*4,descriptor.sourceOffset320[n]);
+            ++e.positionCopyCount;
+        }
+    }
+    at(subtype0?0x27d858u:0x27da48u);if(!row.unknown10||!h.rowStart10Stored)return false;
+    e.sourceStartOn=*row.unknown10!=0;
+    //Fresh source emitter has actual child18=NULL. These childless base
+    //notifications cannot activate descendants or invoke a prepared owner.
+    if(e.entity.firstChild18||e.entity.nativeFlags29)return false;
+    if(*e.sourceStartOn){
+        at(subtype0?0x27d86cu:0x27da5cu);at(0x15acf4);
+        e.words[0x1d4/4]|=2u;e.known[0x1d4/4]|=2u; //Only known lowbits; unknown upper bytes preserved.
+        at(0x15acfc);e.word(0x19c,0);e.particleActivationReturned=true;
+        at(subtype0?0x27d87cu:0x27da6cu);at(0x141578);e.entity.flags29=static_cast<std::uint8_t>(e.entity.flags29|1u);
+        at(0x14158c);e.entity.flags29=static_cast<std::uint8_t>(e.entity.flags29|2u);e.entityActivityStored=true;
+        at(0x1414cc);at(0x14151c);e.entityActivityReturned=true;
+    }else{
+        at(subtype0?0x27d894u:0x27da84u);at(0x15ad1c);e.words[0x1d4/4]&=~2u;e.known[0x1d4/4]|=2u;
+        at(0x15ad30);e.words[0x1d4/4]&=~4u;e.known[0x1d4/4]|=4u;
+        at(0x15ad34);for(std::size_t n=0;n<4;++n)if(e.known[0x30/4+n]!=0xffffffffu)return false;
+        at(0x15ad38);for(std::size_t n=0;n<4;++n)e.word(0x40+static_cast<std::uint32_t>(n)*4,e.words[0x30/4+n]);
+        at(0x15ad40);e.word(0x19c,0);e.particleActivationReturned=true;
+        at(subtype0?0x27d8a4u:0x27da94u);at(0x141538);e.entity.flags29=static_cast<std::uint8_t>(e.entity.flags29&~1u);
+        at(0x14154c);e.entity.flags29=static_cast<std::uint8_t>(e.entity.flags29&~2u);e.entityActivityStored=true;
+        at(0x14146c);at(0x1414bc);e.entityActivityReturned=true;
+    }
+    if(subtype0&&*e.sourceStartOn){at(0x27d888);at(0x27dc74);}
+    else at(0x27dc70);
+    at(0x27dc88);e.rowConfigReturned=true;
+    const bool attached=h.configModelNonNull;
+    at(attached?(subtype0?0x27cd5cu:0x27ce54u):0x27d720u);
+    if(!sourceParticleList3D8_||*sourceParticleList3D8_!=nativeParticleList3D8_.get()||
+       row.sourceEmitterPointers[*h.configEmitterIndex]!=&e.entity||!preflightSourceWorldParticleDescriptorsNative())return false;
+    at(attached?(subtype0?0x27cd78u:0x27ce6cu):0x27d734u);
+    auto& list=*nativeParticleList3D8_;
+    const auto registered=worldApplication_->entityAuthority_.attachChildren(list.entity,e.entity,0x402,
+        worldApplication_->attachmentLock423F58());
+    at(registered.sourcePC);
+    if(registered.status!=g::OriginalWreckComponentStatus50LA::complete)return false;
+    e.sourceRegistered=true;
+    at(attached?0x27cf58:0x27d754);
+    if(attached){
+        //Actual S0++ occurs after this configuration/registration, not when
+        //the model name matched. Remaining emitter iterations are not reused.
+        if(!row.descriptor04||!row.descriptor04->instances330||h.attachmentMatches)return false;
+        at(0x27cf5c);++h.attachmentMatches;h.matchCountAdvanced=true;
+        at(0x27cf60);const auto requested=*row.descriptor04->instances330;
+        at(0x27cf68);
+        if(static_cast<std::int32_t>(h.attachmentMatches)<requested){at(0x27cf70);return false;}
+        at(0x27cf90);at(0x27cf94);at(0x27cf98);at(0x27cfc8);
+        //World3C8 is read before the sufficient-count branch. A typed known
+        //NULL receipt already exists in this source world; no toy adoption.
+        if(!sourceToy3C8_||*sourceToy3C8_||!preflightSourceWorldToyNative())return false;
+        at(0x27d680);
+        auto& shared=g::OriginalApplicationEntities50LA::processParticleAssertion27C820();
+        if(!shared.known||shared.thread!=std::this_thread::get_id()||shared.completionGuard3D652C>1||
+           shared.completionAssertion443070!=shared.completionGuard3D652C)return false;
+        h.completionGuardRead=shared.completionGuard3D652C;
+        if(!*h.completionGuardRead){at(0x27d694);shared.completionAssertion443070=1;
+            at(0x27d698);shared.completionGuard3D652C=1;h.completionLazyStored=true;}
+        at(0x27d6a0);h.completionAssertionRead=shared.completionAssertion443070;
+        at(0x27d6c4); //True133660 predicate returns0 regardless of debug mode.
+        if(static_cast<std::int32_t>(h.attachmentMatches)<*row.descriptor04->instances330){at(0x13366c);return false;}
+        at(0x1336a8);h.completionAssertionReturned=true;at(0x27d750);
+    }
+    at(0x27d754);
+    if(!preflightSourceWorldParticleDescriptorsNative()||!row.descriptor04||
+       !row.sourceDescriptor04||*row.sourceDescriptor04!=row.descriptor04.get()||
+       !a::OriginalConfigProcessGlobals50LA::descriptorDelete2E8B00AdmittedNative())return false;
+    const auto& retiring=*row.descriptor04;
+    if(!retiring.sourceLoaded||!retiring.instances330||!retiring.startOn334||retiring.sourceOffsetKnown!=15)return false;
+    //No live pointer is retained in this proof snapshot. Inline strings and
+    //offsets were copied into emitter storage; manager/model pins survive.
+    NativeParticleRow27DE00::DescriptorHistory proof;
+    proof.type=static_cast<std::uint32_t>(retiring.type04);proof.count=*retiring.instances330;
+    proof.start=*retiring.startOn334;proof.offset=retiring.sourceOffset320;
+    h.descriptorDeleteAdmitted=true;row.sourceDescriptorHistory=proof;
+    //The pending row descriptor read is a source borrow, not ownership.
+    //Retire it with its allocation; native cancellation is a distinct event.
+    if(rowIndex>0){sourceParticleNextRows_[rowIndex-1].descriptor=nullptr;
+        sourceParticleNextRows_[rowIndex-1].descriptorSourceRetired=true;}
+    row.descriptor04.reset();row.sourceDescriptorFreed=true;h.descriptorFreed=true;
+    at(0x27d75c);at(0x27d760);row.sourceDescriptor04=nullptr;
+    at(0x27d790);row.sourceRowServiceReturned=true;h.rowServiceReturned=true;
+    at(0x27e018);
+    return continueSourceParticleNextRow27E018(rowIndex+1,pc);
+}
+bool Owner::preflightSourceParticleNextRowNative()const noexcept {
+    for(std::size_t row=1;row<=4;++row)if(!preflightSourceParticleNextRowNative(row))return false;
+    return true;
+}
+bool Owner::preflightSourceParticleNextRowNative(std::size_t rowIndex)const noexcept {
+    if(rowIndex<1||rowIndex>4)return false;
+    const auto& n=sourceParticleNextRows_[rowIndex-1];
+    if(!n.entered)return !n.offsetAdvanced&&!n.rowAdvanced&&!n.countRead&&!n.rowRead&&!n.dispatched&&
+        !n.descriptorRead&&!n.row&&!n.descriptor&&!n.table14&&!n.target0C&&!n.type04&&!n.emitterIsNone&&
+        !n.descriptorSourceRetired&&!n.nativeWithdrawn&&!n.listReturned;
+    const auto& previous=rowIndex==1?sourceParticleService124_:sourceParticleLaterRows_[rowIndex-2];
+    if(!previous.rowServiceReturned||!nativeParticleList3D8_||
+       (rowIndex>1&&(!sourceParticleNextRows_[rowIndex-2].dispatched||
+                    sourceParticleNextRows_[rowIndex-2].rowS0!=rowIndex-1))||
+       n.offsetS1!=4u*(n.offsetAdvanced?rowIndex:rowIndex-1)||n.rowS0!=(n.rowAdvanced?rowIndex:rowIndex-1)||
+       (n.rowAdvanced&&!n.offsetAdvanced)||(n.countRead&&!n.rowAdvanced)||
+       n.countRead!=bool(n.count30)||(n.count30&&*n.count30!=nativeParticleList3D8_->count30)||
+       (n.rowRead&&!n.countRead)||(n.table14&&!n.rowRead)||(n.target0C&&n.table14!=0x3d2570u)||
+       (n.dispatched&&n.target0C!=0x27c7b0u)||(n.descriptorRead&&!n.dispatched)||
+       (n.emitterIsNone&&!n.descriptorRead)||(n.type04&&n.emitterIsNone!=false))return false;
+    if(rowIndex==4){
+        //This is the real terminating parent iteration, not a fifth row.
+        if(n.rowRead||n.dispatched||n.descriptorRead||n.row||n.descriptor||n.table14||n.target0C||n.type04||
+           n.emitterIsNone||n.descriptorSourceRetired)return false;
+        return !n.listReturned||(n.countRead&&n.rowAdvanced&&n.offsetAdvanced&&n.count30&&
+            static_cast<std::int32_t>(n.rowS0)>=*n.count30);
+    }
+    if(n.listReturned)return false;
+    const auto& h=sourceParticleLaterRows_[rowIndex-1];
+    if(h.entered||h.listRead||h.listEntered||h.rowRead)return false;
+    if(h.rowEntered&&(!n.type04||h.descriptorType04!=n.type04||h.emitterIsNone!=false||!h.descriptorRead))return false;
+    if(h.rowType08Stored&&!h.rowEntered)return false;
+    if(h.guard3D6528Read&&(!h.rowType08Stored||*h.guard3D6528Read>1))return false;
+    if(h.assertionLazyStored&&(!h.guard3D6528Read||*h.guard3D6528Read))return false;
+    if(h.assertion443068Read&&(!h.guard3D6528Read||*h.assertion443068Read!=1||
+       (!*h.guard3D6528Read&&!h.assertionLazyStored)))return false;
+    if(h.manager4A0Read&&!h.assertion443068Read)return false;
+    if(h.manager4A0NonNull&&!h.manager4A0Read)return false;
+    if(h.assertionReturnV0&&(!h.manager4A0NonNull||*h.assertionReturnV0))return false;
+    if(h.instances330Read&&!h.assertionReturnV0)return false;
+    if(h.countPositive&&(!h.instances330Read||*h.instances330Read<=0))return false;
+    if(h.emitterType&&(!h.countPositive||h.emitterType!=h.descriptorType04))return false;
+    if(bool(h.emitterType)!=bool(h.emitterAllocationBytes)||bool(h.emitterType)!=bool(h.emitterConstructor))return false;
+    if(h.emitterArrayAttempted&&!h.emitterType)return false;
+    if(h.emitterAttempts&&(!h.emitterArrayAttempted||h.emitterAttempts>static_cast<std::size_t>(*h.instances330Read)))return false;
+    if(h.emitterPublishedSlots>h.emitterAttempts)return false;
+    if(h.emitterArrayPublished&&(!h.emitterArrayAttempted||h.emitterPublishedSlots!=static_cast<std::size_t>(*h.instances330Read)))return false;
+    if(h.rowCount0CStored&&!h.emitterArrayPublished)return false;
+    if(h.rowStart10Stored&&!h.rowCount0CStored)return false;
+    if(h.attachmentOffsetE0&&!h.rowStart10Stored)return false;
+    if(h.attachmentIsNone&&!h.attachmentOffsetE0)return false;
+    if(h.attachmentZone&&(h.attachmentIsNone!=false||*h.attachmentZone>10))return false;
+    if(h.attachmentSlot&&!h.attachmentZone)return false;
+    if(h.attachmentLiveZones&&(!h.attachmentZone||*h.attachmentLiveZones!=10))return false;
+    if(h.attachmentLiveCount&&!h.attachmentSlot)return false;
+    if(h.attachmentMatches!=(h.matchCountAdvanced?1u:0u))return false;
+    if(h.matchCountAdvanced&&(h.attachmentIsNone!=false||!(h.emitterType==0u?h.type0LoadEntered:h.type8LoadEntered)))return false;
+    if(h.completionGuardRead&&(!h.matchCountAdvanced||*h.completionGuardRead>1))return false;
+    if(h.completionLazyStored&&(!h.completionGuardRead||*h.completionGuardRead))return false;
+    if(h.completionAssertionRead&&(!h.completionGuardRead||*h.completionAssertionRead!=1))return false;
+    if(h.completionAssertionReturned&&!h.completionAssertionRead)return false;
+    if(h.descriptorDeleteAdmitted&&(h.attachmentIsNone==false&&!h.completionAssertionReturned))return false;
+    if(h.descriptorFreed&&!h.descriptorDeleteAdmitted)return false;
+    if(h.rowServiceReturned&&!h.descriptorFreed)return false;
+    if(n.descriptorSourceRetired!=h.descriptorFreed)return false;
+    if(h.attachmentMatched&&(!h.attachmentSlot||!h.attachmentLiveCount||*h.attachmentSlot>=*h.attachmentLiveCount))return false;
+    if(h.attachmentPhysics&&!h.attachmentMatched)return false;
+    if(h.childIsNone&&(!h.attachmentMatched||h.attachmentPhysics))return false;
+    if(h.childLookupPending&&h.childIsNone!=false)return false;
+    if(h.configEntered&&(!h.configTarget10||*h.configTarget10!=0x27d7a0u||!h.configEmitterIndex||
+       *h.configEmitterIndex!=0||!h.attachmentIsNone||
+       (h.attachmentIsNone==false&&(!h.attachmentMatched||h.childIsNone!=true))))return false;
+    if(h.configModelNonNull&&(!h.configEntered||!h.attachmentMatched))return false;
+    if(h.configEmitterNonNull&&!h.configEntered)return false;
+    if(h.configManagerRead&&!h.configEntered)return false;
+    if(h.configLoaderTarget&&!h.configManagerRead)return false;
+    if(h.type0LoadEntered&&(h.configLoaderTarget!=0x15b9d0u||h.emitterType!=0u))return false;
+    if(h.type0NoOpReturned&&!h.type0LoadEntered)return false;
+    if(h.type0ManagerStored&&(!h.type0NoOpReturned||!h.configEmitterNonNull))return false;
+    if(h.type0ModelStored&&(!h.type0ManagerStored||!h.configModelNonNull))return false;
+    if(h.type0OffsetStored&&!h.type0ModelStored)return false;
+    if(h.type0DirectoryCopied&&!h.type0ManagerStored)return false;
+    if(h.type0FilenameAppended&&!h.type0DirectoryCopied)return false;
+    if(h.type1LoadEntered&&(h.configLoaderTarget!=0x15ce90u||h.emitterType!=1u))return false;
+    if(h.type1NoOpReturned&&!h.type1LoadEntered)return false;
+    if(h.type1ManagerStored&&(!h.type1NoOpReturned||!h.configEmitterNonNull))return false;
+    if(h.type1ModelStored&&(!h.type1ManagerStored||!h.configModelNonNull))return false;
+    if(h.type1OffsetStored&&!h.type1ModelStored)return false;
+    if(h.type1DirectoryCopied&&!h.type1ManagerStored)return false;
+    if(h.type1FilenameAppended&&!h.type1DirectoryCopied)return false;
+    if(h.type8LoadEntered&&(h.configLoaderTarget!=0x15def0u||h.emitterType!=8u))return false;
+    if(h.type8NoOpReturned&&!h.type8LoadEntered)return false;
+    if(h.type8ManagerStored&&(!h.type8NoOpReturned||!h.configEmitterNonNull))return false;
+    if(h.type8ModelStored&&(!h.type8ManagerStored||!h.configModelNonNull))return false;
+    if(h.type8OffsetStored&&!h.type8ModelStored)return false;
+    if(h.type8DirectoryCopied&&!h.type8ManagerStored)return false;
+    if(h.type8FilenameAppended&&!h.type8DirectoryCopied)return false;
+    if(h.emitterConfigConstructAttempted&&!(h.emitterType==0u?h.type0FilenameAppended:(h.emitterType==1u?h.type1FilenameAppended:h.type8FilenameAppended)))return false;
+    if(h.emitterConfigConstructReturned&&!h.emitterConfigConstructAttempted)return false;
+    if(h.emitterConfigOpenAttempted&&!h.emitterConfigConstructReturned)return false;
+    if(h.emitterConfigOpenReturned&&!h.emitterConfigOpenAttempted)return false;
+    if(h.emitterConfigTarget94&&(h.emitterConfigOpenReturned!=true||*h.emitterConfigTarget94!=(h.emitterType==0u?0x15c330u:(h.emitterType==1u?0x15d560u:0x15e6d0u))))return false;
+    if(h.toyScanNullRead&&(!h.attachmentZone||!h.attachmentLiveZones||
+       *h.attachmentZone!=*h.attachmentLiveZones||h.attachmentMatched))return false;
+    if(n.nativeWithdrawn)return !n.row&&!n.descriptor;
+    const auto& list=*nativeParticleList3D8_;
+    if(n.rowRead){
+        if(n.rowS0>=list.rows.size()||!list.sourceSlotPublished[n.rowS0]||!list.sourceRowReturned[n.rowS0]||
+           !list.pointers34||!list.sourceArray34||*list.sourceArray34!=list.pointers34.get()||
+           !list.rows[n.rowS0]||n.row!=list.rows[n.rowS0].get()||list.pointers34[n.rowS0]!=n.row)return false;
+        if(n.table14&&*n.table14!=n.row->sourceVtable14)return false;
+    }else if(n.row)return false;
+    if(n.descriptorRead){
+        if(!n.row||!n.row->sourceDescriptorPublished||!n.row->sourceDescriptor04)return false;
+        if(n.descriptorSourceRetired){
+            if(n.descriptor||n.row->descriptor04||*n.row->sourceDescriptor04||!n.row->sourceDescriptorFreed||
+               !n.row->sourceDescriptorHistory||!n.type04||n.row->sourceDescriptorHistory->type!=*n.type04||
+               !h.instances330Read||n.row->sourceDescriptorHistory->count!=*h.instances330Read||
+               !h.attachmentOffsetE0||n.row->sourceDescriptorHistory->offset!=*h.attachmentOffsetE0)return false;
+        }else{
+            if(!n.row->descriptor04||n.descriptor!=n.row->descriptor04.get()||*n.row->sourceDescriptor04!=n.descriptor||
+               !n.descriptor->sourceMode||!n.descriptor->sourceLoaded)return false;
+            if(n.type04&&(!(n.descriptor->sourceKnownMask&128u)||*n.type04!=static_cast<std::uint32_t>(n.descriptor->type04)))return false;
+            if(h.instances330Read&&n.descriptor->instances330!=h.instances330Read)return false;
+            if(h.attachmentOffsetE0&&(n.descriptor->sourceOffsetKnown!=15||n.descriptor->sourceOffset320!=*h.attachmentOffsetE0))return false;
+        }
+        if(h.configEntered){
+            if(!h.configEmitterIndex||*h.configEmitterIndex>=n.row->sourceEmitterPublishedSlots||
+               !n.row->sourceEmitterPointers||h.configEmitterNonNull!=bool(n.row->sourceEmitters[*h.configEmitterIndex])||
+               n.row->sourceEmitterPointers[*h.configEmitterIndex]!=(n.row->sourceEmitters[*h.configEmitterIndex]?
+                   &n.row->sourceEmitters[*h.configEmitterIndex]->entity:nullptr)||
+               h.configModelNonNull!=(h.attachmentIsNone==false))return false;
+        }
+        if(h.configManagerRead&&(!sourceParticle4A0_||*sourceParticle4A0_!=trackParticles_.get()||
+           !sourceParticleLoadReturned_||sourceParticleStageNativeClosed_||sourceParticle4A0NativeWithdrawn_))return false;
+        if(h.attachmentMatched){
+            const auto z=*h.attachmentZone,slot=*h.attachmentSlot;
+            if(!sourceStaticOwner_||sourceStaticOwner_->closed_||sourceModelOwner3C4_!=sourceStaticOwner_.get()||
+               sourceStaticOwner_->sourceWorld3C4Borrower_!=this||z>=sourceStaticOwner_->parents_.size()||
+               !sourceStaticOwner_->parents_[z]||!sourceModelParents3C4_||!sourceModels3C4_||
+               *sourceModels3C4_!=sourceModelParents3C4_.get())return false;
+            const auto& parent=*sourceStaticOwner_->parents_[z];
+            if(sourceModelParents3C4_[z]!=&parent.entity||slot>=parent.sourceEntriesKnown||!parent.sourceEntries34||
+               z>=sourceStaticOwner_->sourceWrapperLedger_.size()||slot>=sourceStaticOwner_->sourceWrapperLedger_[z].size()||
+               !parent.sourceEntries34[slot]||parent.sourceEntries34[slot]!=sourceStaticOwner_->sourceWrapperLedger_[z][slot].get()||
+               !sourceStaticOwner_->sourceModelCurrentNative(*parent.sourceEntries34[slot]))return false;
+        }
+        if((h.toyScanNullRead||h.completionGuardRead)&&(!sourceToy3C8_||*sourceToy3C8_||!preflightSourceWorldToyNative()))return false;
+    }else if(n.descriptor)return false;
+    return true;
+}
+bool Owner::continueSourceParticleNextRow27E018(std::size_t rowIndex,std::uint32_t& pc)noexcept {
+    if(rowIndex<1||rowIndex>4)return false;
+    auto& n=sourceParticleNextRows_[rowIndex-1];
+    const auto& previous=rowIndex==1?sourceParticleService124_:sourceParticleLaterRows_[rowIndex-2];
+    if(pc!=0x27e018||n.entered||!previous.rowServiceReturned||
+       !preflightSourcePostParticleModelsNative()||!nativeParticleList3D8_)return false;
+    auto& list=*nativeParticleList3D8_;
+    const auto at=[&](std::uint32_t p){pc=sourcePostParticleModelsPC_=p;};
+    //Copy actual retained parent registers, not a new inferred loop index.
+    if(rowIndex==1){
+        if(!sourceParticleService124_.rowS0||!sourceParticleService124_.offsetS1)return false;
+        n.rowS0=static_cast<std::uint32_t>(*sourceParticleService124_.rowS0);
+        n.offsetS1=*sourceParticleService124_.offsetS1;
+    }else{
+        const auto& prior=sourceParticleNextRows_[rowIndex-2];
+        if(!prior.dispatched||prior.rowS0!=rowIndex-1||prior.offsetS1!=4u*(rowIndex-1))return false;
+        n.rowS0=prior.rowS0;n.offsetS1=prior.offsetS1;
+    }
+    n.entered=true;
+    //Parent ignores row V0; descriptor-load receipts never stand in for it.
+    at(0x27e018);n.offsetS1+=4;n.offsetAdvanced=true;
+    at(0x27e01c);++n.rowS0;n.rowAdvanced=true;
+    at(0x27e020);n.count30=list.count30;n.countRead=true;
+    at(0x27e024);at(0x27e028);
+    if(static_cast<std::int32_t>(n.rowS0)>=*n.count30){
+        if(rowIndex!=4||*n.count30!=4)return false;
+        //Reached only through every preceding real row service return.
+        at(0x27e044);n.listReturned=true;at(0x27e04c);
+        at(0x2743a0);sourcePostCollisionCaller_.particleReturnV0=1;
+        at(0x2743ac);sourcePostCollisionCaller_.particleReturned=true;
+        at(0x1aa2cc);
+        if(!sourceLoadRace_||sourceLoadRace_->nativeIntroWorldEntity()!=&worldEntity_||
+           worldEntity_.reference00!=1||sourcePostCollisionCaller_.worldTable08!=0x3cf110u)return false;
+        at(0x1aa2d0);at(0x1aa2d4);sourcePostCollisionCaller_.target144=0x274e90u;
+        at(0x1aa2d8);at(0x1aa2dc);at(0x274e90);
+        return continueSourceTriggerService274E90(pc);
+    }
+    if(rowIndex>=4)return false;
+    at(0x27dffc);
+    if(!list.sourceArrayPublished||!list.sourceArray34||*list.sourceArray34!=list.pointers34.get()||
+       !list.pointers34||n.rowS0>=list.rows.size()||!list.sourceSlotPublished[n.rowS0]||
+       !list.sourceRowReturned[n.rowS0]||!list.rows[n.rowS0]||list.pointers34[n.rowS0]!=list.rows[n.rowS0].get())return false;
+    at(0x27e004);n.row=list.rows[n.rowS0].get();n.rowRead=true;
+    at(0x27e008);n.table14=n.row->sourceVtable14;if(*n.table14!=0x3d2570u)return false;
+    at(0x27e00c);n.target0C=0x27c7b0u;
+    at(0x27e010);at(0x27e014);at(0x27c7b0);n.dispatched=true;
+    at(0x27c7dc);
+    if(!n.row->sourceDescriptorPublished||!n.row->sourceDescriptor04||!n.row->descriptor04||
+       *n.row->sourceDescriptor04!=n.row->descriptor04.get()||!n.row->descriptor04->sourceLoaded)return false;
+    n.descriptor=n.row->descriptor04.get();n.descriptorRead=true;const auto& d=*n.descriptor;
+    at(0x27c7f0);
+    if(!d.sourceEmitterBytes||*d.sourceEmitterBytes>=d.sourceEmitter210.size()||d.sourceEmitter210[*d.sourceEmitterBytes])return false;
+    bool none=*d.sourceEmitterBytes==4;constexpr char target[]="none";
+    for(std::size_t i=0;i<*d.sourceEmitterBytes;++i){
+        auto c=static_cast<unsigned char>(d.sourceEmitter210[i]);if(!c||c>=128)return false;
+        if(c>='A'&&c<='Z')c=static_cast<unsigned char>(c+32);
+        if(i>=4||c!=static_cast<unsigned char>(target[i]))none=false;
+    }
+    n.emitterIsNone=none;at(0x27c7f8);
+    if(none){at(0x27c800);return false;} //Authentic diagnostic remains bounded.
+    at(0x27c814);if(!(d.sourceKnownMask&128u)||*n.row->sourceDescriptor04!=&d)return false;
+    at(0x27c818);n.type04=static_cast<std::uint32_t>(d.type04);
+    auto& creation=sourceParticleLaterRows_[rowIndex-1];
+    if(creation.rowEntered)return false;
+    creation.rowEntered=true;creation.descriptorRead=true;creation.emitterIsNone=n.emitterIsNone;
+    creation.descriptorType04=n.type04;
+    at(0x27c81c);if(!continueSourceParticleRowCreation27C81C(n.rowS0,creation,pc))return false;
+    return continueSourceParticleRowAttachment27CC08(n.rowS0,creation,pc);
+}
+bool Owner::preflightSourceTriggerServiceNative()const noexcept {
+    const auto& s=sourceTriggerService274E90_;
+    if(!s.entered&&(s.listRead||s.listEntered||s.nativeWithdrawn||s.currentRow||s.freshCount30))return false;
+    if((s.entered&&(sourcePostCollisionCaller_.target144!=0x274e90u||!sourcePostCollisionCaller_.particleReturned))||
+       (s.listNonNull&&!s.listRead)||(s.listTable08&&(!s.listNonNull||*s.listTable08!=0x3d5230u))||
+       (s.listTarget7C&&s.listTable08!=0x3d5230u)||(s.listEntered&&s.listTarget7C!=0x2dcb30u)||
+       (s.currentRow&&(!s.listEntered||*s.currentRow>2u))||(s.freshCount30&&!s.currentRow)||
+       (s.listReturned&&(!s.currentRow||!s.freshCount30||
+           static_cast<std::int32_t>(*s.currentRow)<static_cast<std::int32_t>(*s.freshCount30)))||
+       (s.listReturnV0&&(!s.listReturned||*s.listReturnV0!=1u))||
+       (s.wrapperReturned&&(!s.listReturned||s.listReturnV0!=1u))||
+       (s.wrapperReturnV0&&(!s.wrapperReturned||*s.wrapperReturnV0!=1u)))return false;
+    for(std::size_t i=0;i<s.rows.size();++i){const auto& row=s.rows[i];
+        if(!preflightSourceTriggerServiceRowNative(row,i))return false;
+        if(row.rowIndex&&(!s.currentRow||*s.currentRow<i||(i&&!s.rows[i-1].parentAdvanced)))return false;
+        if(row.parentAdvanced&&(!s.currentRow||*s.currentRow<*row.nextRow))return false;
+        if(s.currentRow&&i<*s.currentRow&&!row.parentAdvanced)return false;
+    }
+    if(!s.nativeWithdrawn&&s.listRead){
+        if(sourceTriggerPhase_!=SourceTriggerPhase::listReturned||!preflightSourceWorldTriggerNative()||
+           !sourceTrigger3D0_||*sourceTrigger3D0_!=nativeTriggerList3D0_.get()||s.listNonNull!=bool(nativeTriggerList3D0_))return false;
+        if(s.listNonNull){const auto& list=*nativeTriggerList3D0_;
+            if(s.listTable08&&(!list.sourceVtableKnown||*s.listTable08!=list.sourceVtable08))return false;
+            if(s.freshCount30&&(!list.sourceCountKnown||*s.freshCount30!=list.count30))return false;}
+    }
+    return true;
+}
+bool Owner::preflightSourceTriggerServiceRowNative(const SourceTriggerServiceRow& h,std::size_t rowIndex)const noexcept {
+    const auto& s=sourceTriggerService274E90_;
+    if((h.rowIndex&&(!s.listEntered||*h.rowIndex!=rowIndex))||(h.count30&&!h.rowIndex)||(h.rowRead&&!h.count30)||
+       (h.rowNonNull&&!h.rowRead)||(h.guard3D686CRead&&(!h.rowNonNull||*h.guard3D686CRead>1))||
+       (h.assertionLazyStored&&(!h.guard3D686CRead||*h.guard3D686CRead))||
+       (h.assertion444618Read&&(!h.guard3D686CRead||*h.assertion444618Read!=1||
+           (!*h.guard3D686CRead&&!h.assertionLazyStored)))||
+       (h.worldZones34CRead&&!h.assertion444618Read)||(h.zone08&&!h.worldZones34CRead)||
+       (h.assertionReturned&&(!h.zone08||!h.worldZones34CRead||
+           static_cast<std::int32_t>(*h.worldZones34CRead)<*h.zone08))||
+       (h.descriptorTable6C&&!h.assertionReturned)||(h.descriptorTarget0C&&h.descriptorTable6C!=0x3d52c0u)||
+       (h.descriptorEntered&&h.descriptorTarget0C!=0x2dc270u)||(h.callbackZone08&&!h.descriptorEntered)||
+       (h.collisionArrayRead&&!h.callbackZone08)||(h.collisionNodeRead&&!h.collisionArrayRead)||
+       (h.trigger00Read&&!h.collisionNodeRead)||(h.geometryReturned&&!h.trigger00Read)||
+       (h.triggerCallbackReturned&&!h.geometryReturned)||(h.actionLoopEntered&&!h.triggerCallbackReturned)||
+       (h.actionIndex&&!h.actionLoopEntered)||(h.actionOffset&&!h.actionIndex)||(h.actionCount&&!h.actionOffset)||
+       (h.actionRead&&!h.actionCount)||(h.actionTable108&&!h.actionRead)||
+       (h.actionTarget0C&&h.actionTable108!=0x3cf0b0u)||(h.actionReturned&&h.actionTarget0C!=0x1b5ad0u)||
+       (h.actionReturnV0&&(!h.actionReturned||*h.actionReturnV0!=1u))||
+       (h.geometrySourceFreed&&(!h.actionLoopEntered||!h.actionIndex||!h.actionCount||
+           static_cast<std::int32_t>(*h.actionIndex)<static_cast<std::int32_t>(*h.actionCount)))||
+       (h.descriptorReturned&&!h.geometrySourceFreed)||
+       (h.descriptorReturnV0&&(!h.descriptorReturned||*h.descriptorReturnV0!=1u))||
+       (h.parentOperandsRead&&!h.descriptorReturned)||(h.registrationReturned&&!h.parentOperandsRead)||
+       (h.parentAdvanced&&(!h.rowIndex||!h.rowRead||(h.rowNonNull&&!h.registrationReturned)))||
+       (h.nextRow.has_value()!=h.parentAdvanced)||(h.nextRow&&*h.nextRow!=rowIndex+1u))return false;
+    if(s.nativeWithdrawn||!h.rowIndex)return true;
+    if(s.listRead){
+        if(sourceTriggerPhase_!=SourceTriggerPhase::listReturned||!preflightSourceWorldTriggerNative()||
+           !sourceTrigger3D0_||*sourceTrigger3D0_!=nativeTriggerList3D0_.get()||
+           s.listNonNull!=bool(nativeTriggerList3D0_))return false;
+        if(s.listNonNull){const auto& list=*nativeTriggerList3D0_;
+            if(s.listTable08&&(!list.sourceVtableKnown||*s.listTable08!=list.sourceVtable08))return false;
+            if(h.count30&&(!list.sourceCountKnown||*h.count30!=list.count30))return false;
+            if(h.rowRead){
+                if(!h.rowIndex||*h.rowIndex>=list.descriptorSlotsPublished||*h.rowIndex>=list.descriptorOwners.size()||
+                   !list.sourceArrayKnown||!list.descriptors34||list.descriptors34[*h.rowIndex]!=list.descriptorOwners[*h.rowIndex].get()||
+                   h.rowNonNull!=bool(list.descriptorOwners[*h.rowIndex]))return false;
+                if(h.rowNonNull){const auto& row=*list.descriptorOwners[*h.rowIndex];
+                    if(!row.sourceFields)return false;const auto& f=*row.sourceFields;
+                    if(h.zone08&&(!(f.known&64u)||*h.zone08!=f.zone08))return false;
+                    if(h.callbackZone08&&(!(f.known&64u)||*h.callbackZone08!=f.zone08))return false;
+                    if(h.descriptorTable6C&&(!(f.known&1u)||*h.descriptorTable6C!=f.vtable6C))return false;
+                    if(h.trigger00Read&&!sourceTriggerGeometryCurrentNative(row,h.geometryReturned))return false;
+                    if(h.triggerCallbackReturned&&!sourceTriggerCallbackReturnedNative(row))return false;
+                    if(h.actionCount&&*h.actionCount!=static_cast<std::uint32_t>(row.actionCount04))return false;
+                    if(h.actionRead&&(!row.action||!row.actions68||row.actionSlotsPublished!=1||row.actions68[0]!=row.action.get()))return false;
+                    if(h.actionTable108&&*h.actionTable108!=row.action->vtable108)return false;
+                    if(h.actionReturned&&!sourceTriggerActionInstalledNative(row))return false;
+                    if(h.registrationReturned&&!sourceTriggerRegistrationCurrentNative(row))return false;
+                    if(h.geometrySourceFreed&&(!f.geometrySourceFreed||!f.geometrySourceNullStored||
+                       !f.geometrySourceHistory||f.geometry64||!f.sourceGeometry64||*f.sourceGeometry64))return false;
+                }
+            }
+        }
+    }
+    if(h.worldZones34CRead&&(!worldZones34C_||*worldZones34C_!=*h.worldZones34CRead))return false;
+    if(h.collisionArrayRead&&(!sourceTopologyMode_||sourceTopologyWithdrawn_||!sourceCollision4C4_||
+       !sourceCollisionSlots4C4_||*sourceCollision4C4_!=sourceCollisionSlots4C4_.get()))return false;
+    if(h.collisionNodeRead){
+        if(!h.callbackZone08||*h.callbackZone08<0||static_cast<std::uint32_t>(*h.callbackZone08)>=sourceCollisionPublished_||
+           static_cast<std::uint32_t>(*h.callbackZone08)>=sourceSearchNodes_[1].size())return false;
+        const auto z=static_cast<std::uint32_t>(*h.callbackZone08);const auto& node=sourceSearchNodes_[1][z];
+        if(!node.owner||node.withdrawn||!node.published||!node.ordinalKnown||
+           sourceCollisionSlots4C4_[z]!=node.owner.get()||!preflightSourceSearchNodeNative(node,z,true))return false;
+    }
+    return true;
+}
+bool Owner::continueSourceTriggerService274E90(std::uint32_t& pc)noexcept {
+    auto& s=sourceTriggerService274E90_;
+    if(pc!=0x274e90||s.entered||sourcePostCollisionCaller_.target144!=0x274e90u||
+       !preflightSourcePostParticleModelsNative())return false;
+    const auto at=[&](std::uint32_t p){pc=sourcePostParticleModelsPC_=p;};
+    at(0x274e90);s.entered=true;at(0x274e9c);
+    if(sourceTriggerPhase_!=SourceTriggerPhase::listReturned||!preflightSourceWorldTriggerNative()||
+       !sourceTrigger3D0_||*sourceTrigger3D0_!=nativeTriggerList3D0_.get())return false;
+    s.listRead=true;s.listNonNull=bool(*sourceTrigger3D0_);
+    if(!s.listNonNull){at(0x274ea8);return false;} //No substituted NULL owner/return.
+    auto& list=*nativeTriggerList3D0_;
+    at(0x274eb0);if(!list.sourceVtableKnown)return false;s.listTable08=list.sourceVtable08;
+    if(*s.listTable08!=0x3d5230u)return false;
+    at(0x274eb4);s.listTarget7C=0x2dcb30u;at(0x274eb8);at(0x2dcb30);s.listEntered=true;
+    at(0x2dcb50);s.currentRow=0;
+    for(;;){
+        at(0x2dcc40);if(!list.sourceCountKnown)return false;s.freshCount30=list.count30;
+        at(0x2dcc44);
+        if(static_cast<std::int32_t>(*s.currentRow)>=static_cast<std::int32_t>(*s.freshCount30)){
+            at(0x2dcc60);s.listReturnV0=1;at(0x2dcc6c);s.listReturned=true;
+            at(0x274ec0);s.wrapperReturnV0=1;at(0x274ed0);s.wrapperReturned=true;
+            at(0x1aa2e0);return continueSourcePostTriggerCaller1AA2E0(pc);
+        }
+        at(0x2dcb54);const auto i=*s.currentRow;
+        if(i>=s.rows.size())return false;
+        auto& h=s.rows[i];if(h.rowIndex)return false;
+        h.rowIndex=i;h.count30=*s.freshCount30;
+        if(!list.sourceArrayKnown||!list.descriptors34||i>=list.descriptorSlotsPublished||i>=list.descriptorOwners.size()||
+           list.descriptors34[i]!=list.descriptorOwners[i].get())return false;
+        at(0x2dcb60);h.rowRead=true;h.rowNonNull=bool(list.descriptorOwners[i]);
+        if(!h.rowNonNull){at(0x2dcb68);++*s.currentRow;h.nextRow=*s.currentRow;h.parentAdvanced=true;continue;}
+        auto& row=*list.descriptorOwners[i];if(!row.sourceFields)return false;const auto& f=*row.sourceFields;
+        at(0x2dcb6c);auto& shared=g::OriginalApplicationEntities50LA::processParticleAssertion27C820();
+        if(!shared.known||shared.thread!=std::this_thread::get_id()||shared.triggerGuard3D686C>1||
+           shared.triggerAssertion444618!=shared.triggerGuard3D686C)return false;
+        h.guard3D686CRead=shared.triggerGuard3D686C;
+        if(!*h.guard3D686CRead){at(0x2dcb80);shared.triggerAssertion444618=1;
+            at(0x2dcb84);shared.triggerGuard3D686C=1;h.assertionLazyStored=true;}
+        at(0x2dcb8c);h.assertion444618Read=shared.triggerAssertion444618;
+        at(0x2dcba4);if(!worldZones34C_)return false;h.worldZones34CRead=*worldZones34C_;
+        at(0x2dcbb8);if(!(f.known&64u))return false;h.zone08=f.zone08;
+        at(0x2dcbc0);if(static_cast<std::int32_t>(*h.worldZones34CRead)<*h.zone08){at(0x13366c);return false;}
+        at(0x1336a8);h.assertionReturned=true;at(0x2dcbf8);
+        at(0x2dcc08);if(!(f.known&1u))return false;h.descriptorTable6C=f.vtable6C;
+        if(*h.descriptorTable6C!=0x3d52c0u)return false;
+        at(0x2dcc0c);h.descriptorTarget0C=0x2dc270u;at(0x2dcc10);at(0x2dc270);h.descriptorEntered=true;
+        at(0x2dc288);h.callbackZone08=f.zone08;
+        at(0x2dc28c);if(!sourceTopologyMode_||sourceTopologyWithdrawn_||!sourceCollision4C4_||
+           !sourceCollisionSlots4C4_||*sourceCollision4C4_!=sourceCollisionSlots4C4_.get())return false;
+        h.collisionArrayRead=true;at(0x2dc298);at(0x2dc2a0);
+        if(*h.callbackZone08<0||static_cast<std::uint32_t>(*h.callbackZone08)>=sourceCollisionPublished_||
+           static_cast<std::uint32_t>(*h.callbackZone08)>=sourceSearchNodes_[1].size())return false;
+        const auto z=static_cast<std::uint32_t>(*h.callbackZone08);const auto& node=sourceSearchNodes_[1][z];
+        if(!node.owner||node.withdrawn||!node.published||!node.ordinalKnown||
+           sourceCollisionSlots4C4_[z]!=node.owner.get()||!preflightSourceSearchNodeNative(node,z,true))return false;
+        h.collisionNodeRead=true;at(0x2dc2a4);
+        at(0x2dc2a8); //Actual delay-slot descriptor.trigger00 read, not a prepared observer.
+        if(!row.trigger00||!row.sourceInstance||!row.sourceInstancePublished||
+           !preflightSourceTriggerInstanceNative(row))return false;
+        h.trigger00Read=true;
+        const bool geometry=refreshSourceTriggerGeometry2A0A80(row,pc);
+        sourcePostParticleModelsPC_=pc;if(!geometry)return false;
+        h.geometryReturned=true;
+        at(0x2a0b14);
+        beginSourceTriggerMembership120070(row,pc);sourcePostParticleModelsPC_=pc;
+        if(pc==0x120188u){
+            const auto actualMethod=[&](const void* occurrence,const void* actualCollider,
+                NativeListMethodCustody*& method,std::optional<std::uint32_t>& slot,
+                bool& pending,std::uint32_t& methodPC,bool select)noexcept {
+                methodPC=select?0x280afcu:0x27f5a0u;
+                if(!sourceTriggerPrimaryInputsNative(row,occurrence,actualCollider)||!h.callbackZone08||*h.callbackZone08<0||
+                   static_cast<std::uint32_t>(*h.callbackZone08)!=z||!preflightSourceSearchNodeNative(node,z,true)||
+                   sourceCollisionSlots4C4_[z]!=node.owner.get())return false;
+                //Fresh actual mode1 node34 / World4CC, not Model354 or mode2 node38.
+                if(!select)method=node.owner->nativeList34;
+                if(method!=node.owner->nativeList34||!method||!nativeMethods4CC_||
+                   nativeMethods4CC_[z]!=method||!sourceListMethodArrayCurrent(1,z,method))return false;
+                const auto& publication=sourceListMethods_[1][z];
+                if(!publication.arrayPublished||!publication.aliasPublished||!publication.aliasRetained||
+                   publication.withdrawn||publication.aliasNode!=node.owner.get()||!method->sourceMode_||
+                   method->world_!=static_cast<const ra_pod_scene50LA::Owner*>(this)||
+                   method->application_!=worldApplication_.get()||method->ordinal_!=10u+z||
+                   method->usage10_!=1||method->reference00_!=2||!method->source_.constructorReturned||
+                   method->source_.vtable08!=0x3d2d30u||!sourceListEntriesCurrent(*method))return false;
+                if(!select)return true;
+                return selectSourceObserverSlot27E3C0(*method,occurrence,actualCollider,slot,pending,methodPC,1u);
+            };
+            continueSourceTriggerPrimary2809C0(row,node.owner.get(),actualMethod,pc);
+            sourcePostParticleModelsPC_=pc;
+        }
+        if(pc==0x280bf0u){
+        const auto actualPortal=[&](unsigned phase,const void* registration,const void* actualCOL,
+            const void* actualZone,const std::array<std::uint32_t,4>& center,const void* cursor,
+            auto& edge,std::shared_ptr<const void>& graphPin,std::uint32_t& portalPC)noexcept {
+            portalPC=phase==0?0x280c34u:phase==2?0x280c90u:phase==4?0x280cf8u:0x280c40u;
+            if(phase>4||!sourceTriggerPrimaryInputsNative(row,registration,actualCOL)||
+               !sourceTriggerPortalCenterNative(row,center)||
+               actualZone!=node.owner.get()||!h.callbackZone08||*h.callbackZone08<0||
+               static_cast<std::uint32_t>(*h.callbackZone08)!=z||!sourceTopologyMode_||sourceTopologyWithdrawn_||
+               !sourceCollision4C4_||!sourceCollisionSlots4C4_||*sourceCollision4C4_!=sourceCollisionSlots4C4_.get()||
+               z>=sourceCollisionPublished_)return false;
+            const auto zone=z;auto& root=sourceSearchNodes_[1][zone];
+            if(root.withdrawn||!root.published||!root.owner||actualZone!=root.owner.get()||
+               sourceCollisionSlots4C4_[zone]!=root.owner.get()||
+               !preflightSourceSearchNodeNative(root,zone,true)||
+               !sourcePortalWorldLinksCurrent(*root.owner,true,zone))return false;
+            if(phase==0){
+                if(graphPin||cursor)return false;
+                for(const auto& old:sourceCollisionPortalBorrows_)
+                    if(old.registration==registration&&!old.token.expired())return false;
+                //Allocate native custody before exposing the source head pointer.
+                //Weak root records never keep a completed COL borrower alive.
+                try{std::shared_ptr<const void> token=std::make_shared<std::uint8_t>(0);
+                    sourceCollisionPortalBorrows_.push_back({registration,token});graphPin=std::move(token);
+                }catch(...){return false;}
+                edge.next=root.owner->portalLinks30.get();return true;
+            }
+            bool pinned=false;
+            for(const auto& borrow:sourceCollisionPortalBorrows_)if(borrow.registration==registration){
+                const auto live=borrow.token.lock();if(live&&live==graphPin){pinned=true;break;}}
+            if(!pinned||!graphPin||!cursor)return false;
+            std::size_t index=0;while(index<40&&sourcePortalWorldLinks_[index/4][index%4].published!=cursor)++index;
+            //Odd links are collision namespace (stages1/3), never visibility0/2.
+            if(index==40||!(index&1u))return false;
+            auto& link=sourcePortalWorldLinks_[index/4][index%4];
+            if(link.withdrawn||link.knownMask!=31||!link.published||link.from!=root.owner.get()||!link.to)return false;
+            auto& raw=*link.published;const auto& portal=nativePortals_[index/4];
+            if(!portal||!portal->sourceMode||raw.neighbor04!=&link.to->entity||
+               raw.portal08!=&portal->entity||!portal->source.loadReturned||
+               portal->source.normalKnown!=7||!portal->source.normalNormalized||portal->source.copiedVertices!=4)return false;
+            for(unsigned i=0;i<4;++i)if(portal->source.edgeKnown[i]!=7||!portal->source.edgeNormalized[i])return false;
+            if(phase==1){
+                edge.entered=true;edge.edge=cursor;edge.edgeIndex=index;
+                edge.neighbor=raw.neighbor04;edge.portal=raw.portal08;
+                //Actual231150 uses center and f12=+0, not half/radius80.
+                portalPC=0x231150u;
+                const bool overlapOkay=g::source_portal_overlap231150::run(portal->source.vertices30,portal->source.normal70,
+                    portal->source.edges80,center,0u,edge.overlap);
+                edge.overlapReturned=edge.overlap.returned;edge.hit=edge.overlap.hit;edge.distance=edge.overlap.outputDistance;
+                if(!overlapOkay){portalPC=edge.overlap.pc;return false;}
+                portalPC=0x280c54u;if(!edge.hit)return true;
+                if(!edge.distance)return false;
+                portalPC=0x280c60u;raw.field10=*edge.distance;link.distance10=edge.distance;edge.distanceStoreMask|=1u;
+                portalPC=0x280c64u;raw.field0C=*edge.distance;link.distance0C=edge.distance;edge.distanceStoreMask|=2u;
+            }else if(edge.edge!=cursor||edge.edgeIndex!=index||edge.neighbor!=raw.neighbor04||edge.portal!=raw.portal08||
+                     !g::source_portal_overlap231150::historyCurrent(edge.overlap))return false;
+            if(phase==4){edge.next=raw.next00.get();portalPC=0x280cf8u;return true;}
+            if(phase==3&&!edge.hit)return true;
+            //The source keeps a method cursor: each hit reads its usage10,
+            //then resolves the neighbor method using that same mode1.
+            portalPC=phase==1?0x280c6cu:portalPC;
+            const auto* prior=edge.previousMethod;
+            if(!prior||!prior->sourceMode_||prior->world_!=static_cast<const ra_pod_scene50LA::Owner*>(this)||
+               prior->application_!=worldApplication_.get()||prior->usage10_!=1||prior->ordinal_<10||prior->ordinal_>=20||
+               !sourceListMethodArrayCurrent(1,prior->ordinal_-10,prior))return false;
+            std::size_t neighborZone=0;while(neighborZone<10&&sourceCollisionSlots4C4_[neighborZone]!=link.to)++neighborZone;
+            if(neighborZone==10||neighborZone>=sourceCollisionPublished_)return false;
+            auto& neighbor=sourceSearchNodes_[1][neighborZone];
+            if(neighbor.withdrawn||!neighbor.published||neighbor.owner.get()!=link.to||
+               !preflightSourceSearchNodeNative(neighbor,neighborZone,true))return false;
+            if(phase==1){portalPC=0x27f5a0u;edge.method=link.to->nativeList34;edge.methodReturned=true;}
+            auto* method=edge.method;
+            if(!method||method!=link.to->nativeList34||!nativeMethods4CC_||nativeMethods4CC_[neighborZone]!=method||
+               !sourceListMethodArrayCurrent(1,neighborZone,method)||method->usage10_!=1||method->reference00_!=2||
+               !method->sourceMode_||method->world_!=static_cast<const ra_pod_scene50LA::Owner*>(this)||
+               method->application_!=worldApplication_.get()||method->ordinal_!=10u+neighborZone||
+               !method->source_.constructorReturned||method->source_.vtable08!=0x3d2d30u||
+               !sourceListEntriesCurrent(*method))return false;
+            const auto& publication=sourceListMethods_[1][neighborZone];
+            if(!publication.arrayPublished||!publication.aliasPublished||!publication.aliasRetained||
+               publication.withdrawn||publication.aliasNode!=link.to)return false;
+            if(phase==2){portalPC=0x280c90u;
+                if(!edge.overlap.returned||!edge.overlap.hit||edge.distanceStoreMask!=3u||!edge.methodReturned)return false;
+                return selectSourceObserverSlot27E3C0(*method,&edge,actualCOL,
+                    edge.slot,edge.selectionPending,portalPC,1u);}
+            return phase==1||phase==3;
+        };
+            continueSourceTriggerPortals280BF0(row,actualPortal,pc);sourcePostParticleModelsPC_=pc;
+        }
+        if(pc==0x280d38u){
+            h.triggerCallbackReturned=finishSourceTriggerMembership120190(row,pc);sourcePostParticleModelsPC_=pc;
+        }
+        if(pc==0x2dc2acu&&h.triggerCallbackReturned){
+            h.actionLoopEntered=true;at(0x2dc2ac);h.actionIndex=0;at(0x2dc2b4);h.actionOffset=0;
+            at(0x2dc2e0);h.actionCount=static_cast<std::uint32_t>(row.actionCount04);
+            at(0x2dc2e4);if(static_cast<std::int32_t>(*h.actionIndex)<row.actionCount04){
+                at(0x2dc2b8);if(!row.actions68||!row.action||row.actionSlotsPublished!=1||*h.actionIndex!=0||*h.actionOffset!=0)return false;
+                at(0x2dc2bc);if(!row.trigger00||!row.sourceInstancePublished)return false;
+                at(0x2dc2c4);if(row.actions68[0]!=row.action.get())return false;h.actionRead=true;
+                at(0x2dc2c8);h.actionTable108=row.action->vtable108;
+                if(*h.actionTable108!=0x3cf0b0u)return false;
+                at(0x2dc2cc);h.actionTarget0C=0x1b5ad0u;at(0x2dc2d0);
+                if(!installSourceTriggerLostAi1B5AD0(row,pc)){sourcePostParticleModelsPC_=pc;return false;}
+                h.actionReturned=true;h.actionReturnV0=1;
+                at(0x2dc2d8);*h.actionOffset+=4u;at(0x2dc2dc);++*h.actionIndex;
+                at(0x2dc2e0);h.actionCount=static_cast<std::uint32_t>(row.actionCount04);
+                at(0x2dc2e4);if(static_cast<std::int32_t>(*h.actionIndex)<row.actionCount04){at(0x2dc2b8);return false;}
+            }
+            at(0x2dc2f0);
+            auto& geometry=*row.sourceFields;at(0x2dc2f4);
+            if(!geometry.sourceGeometry64||!geometry.geometry64||*geometry.sourceGeometry64!=geometry.geometry64.get()||
+               !geometry.geometryPublished||!geometry.geometryConstructed||geometry.geometrySourceFreeEntered||
+               !preflightSourceWorldTriggerNative())return false;
+            //Descriptor plain80B owner only. Instance/shape copied values and
+            //installed action payload are distinct live allocations.
+            geometry.geometrySourceHistory=*geometry.geometry64;geometry.geometrySourceFreeEntered=true;
+            at(0x2e8b00);
+            if(!a::OriginalConfigProcessGlobals50LA::descriptorDelete2E8B00AdmittedNative())return false;
+            //Native allocator adaptation of original free, not guest heap emulation.
+            geometry.geometry64.reset();geometry.geometrySourceFreed=true;
+            at(0x2dc2f8);geometry.sourceGeometry64=nullptr;geometry.geometrySourceNullStored=true;
+            h.geometrySourceFreed=true;at(0x2dc310);h.descriptorReturnV0=1;
+            at(0x2dc31c);h.descriptorReturned=true;at(0x2dcc18);
+            //Fresh caller34 slot/trigger00 loads after descriptor return.
+            at(0x2dcc18);if(!list.sourceArrayKnown||!list.descriptors34||!h.rowIndex||
+               *h.rowIndex>=list.descriptorSlotsPublished||list.descriptors34[*h.rowIndex]!=&row)return false;
+            at(0x2dcc28);at(0x2dcc2c);if(!row.trigger00||!row.sourceInstancePublished)return false;
+            h.parentOperandsRead=true;at(0x2dcc30);
+            if(!registerSourceTrigger141960(row,pc)){sourcePostParticleModelsPC_=pc;return false;}
+            h.registrationReturned=true;at(0x2dcc38);
+            //Next descriptor requires a fresh occurrence, not overwriting this row's receipts.
+
+        }
+        if(h.registrationReturned){
+            at(0x2dcc38);++*s.currentRow;h.nextRow=*s.currentRow;h.parentAdvanced=true;
+            continue; //Fresh count/slot and independent next descriptor occurrence.
+        }
+        return false;
+
+    }
+}
+bool Owner::continueSourcePostTriggerCaller1AA2E0(std::uint32_t& pc)noexcept {
+    auto& h=sourcePostTriggerCaller_;
+    if(pc!=0x1aa2e0u||h.entered||nativeScbThread_!=std::this_thread::get_id()||
+       nativeScbRevoked_||closed_||terminal_||!preflightSourcePostParticleModelsNative()||
+       !sourceTriggerService274E90_.wrapperReturned)return false;
+    const auto at=[&](std::uint32_t p){pc=sourcePostParticleModelsPC_=p;};
+    at(0x1aa2e0);h.entered=true;at(0x1aa2e4);
+    //Original initialized382B80 points at static Application4334A0. The
+    //native source-load binding represents that SAME process owner, not a
+    //guest-global dereference or a claim about arbitrary unrepresented writes.
+    if(!sourceLoadApplication_||!sourceLoadRace_||!worldApplication_||
+       sourceLoadApplication_->entities()!=worldApplication_||
+       sourceLoadRace_->nativeIntroWorldEntity()!=&worldEntity_)return false;
+    h.applicationRead=true;at(0x1aa2e8);
+    const auto& app=*sourceLoadApplication_;
+    if(!app.riderProfile||!app.profile||sourceLoadRace_->profile_!=app.riderProfile)return false;
+    h.profileRead=true;at(0x1aa2ec);at(0x1aa2f0);at(0x1aa2f4);
+    std::uint8_t value=0;
+    if(!app.riderProfile->readWorldProfileByte1AA2F4(*app.profile,value))return false;
+    h.profile1125C=value;at(0x1aa2f8);at(0x1aa2fc);h.mode=(value>>5u)&3u;
+    at(0x1aa300);at(0x1aa304);at(0x1aa308);
+    const bool lessThanTwo=*h.mode<2u;
+    at(lessThanTwo?0x1aa328u:0x1aa30cu);
+    if(sourceLoadRace_->nativeIntroWorldEntity()!=&worldEntity_||worldEntity_.reference00!=1||
+       sourcePostCollisionCaller_.worldTable08!=0x3cf110u)return false;
+    h.worldRead=true;at(lessThanTwo?0x1aa32cu:0x1aa310u);h.worldTable08=0x3cf110u;
+    at(lessThanTwo?0x1aa330u:0x1aa314u);h.target13C=0x274ae0u;
+    at(lessThanTwo?0x1aa334u:0x1aa318u);
+    at(lessThanTwo?0x1aa338u:0x1aa31cu);h.argumentA1=lessThanTwo?1u:0u;
+    at(0x274ae0);h.dispatched=true;
+    at(0x274af4);return continueSourceSkySetup274AF4(pc);
+}
+bool Owner::continueSourceSkySetup274AF4(std::uint32_t& pc)noexcept {
+    auto& h=sourceSkySetup274AE0_;
+    if(pc!=0x274af4u||h.entered||!sourcePostTriggerCaller_.dispatched||
+       !preflightSourcePostParticleModelsNative())return false;
+    const auto at=[&](std::uint32_t p){pc=sourcePostParticleModelsPC_=p;};
+    at(0x274af4);h.entered=true;
+    if(!sourceEnvironmentPublished_||!nativeEnvironment3A4_||
+       *nativeEnvironment3A4_!=sourceEnvironment3A4_.get())return false;
+    const bool present=bool(sourceEnvironment3A4_);
+    if(present){if(sourceEnvironmentPhase_!=SourceEnvironmentPhase::returnedOne||!sourceWorldConfig_||
+       !sourceEnvironment3A4_->preflightSourceNative())return false;}
+    else if(sourceEnvironmentPhase_!=SourceEnvironmentPhase::returnedZero)return false;
+    h.environmentRead=true;h.environmentNonNull=present;
+    at(0x274af8);h.argumentS1=sourcePostTriggerCaller_.argumentA1;
+    at(0x274afc);at(0x274b00);
+    if(!present){at(0x274b04);at(0x274b08);h.returnV0=1;}
+    else{
+        at(0x274b0c);std::int32_t count=0;
+        if(!sourceEnvironment3A4_->readSourceSkyCount274B0C(worldEntity_,*sourceWorldConfig_,count))return false;
+        h.count00=count;at(0x274b10);at(0x274b14);h.arrayBytes=static_cast<std::uint32_t>(count)<<2u;
+        if(count!=0){at(0x274b24);return continueSourceSkyArray274B24(pc);}
+        at(0x274b18);at(0x274b1c);h.returnV0=1;
+    }
+    //Both actual no-sky branches reach the same real epilogue. No heap/3F8 store occurs.
+    at(0x274cb8);h.restoreMask|=1;at(0x274cbc);h.restoreMask|=2;
+    at(0x274cc0);h.restoreMask|=4;at(0x274cc4);h.restoreMask|=8;
+    at(0x274cc8);at(0x274ccc);h.stackReleased=true;h.returned=true;
+    h.callerResumePC=*h.argumentS1?0x1aa33cu:0x1aa320u;
+    at(*h.callerResumePC);
+    if(!*h.argumentS1){at(0x1aa324);h.callerSkipExecuted=true;}
+    at(0x1aa33c);return false; //Next fresh profile/course read is still unjoined.
+}
+bool Owner::preflightSourceSkyArrayNative()const noexcept {
+    const auto& h=sourceSkyArray274B24_;const auto& sky=sourceSkySetup274AE0_;
+    if((h.entered&&(!sky.count00||*sky.count00==0||!sky.arrayBytes))||
+       (h.allocationAttempted&&(!h.entered||h.allocatedCount!=1u))||
+       (h.allocatedCount&&(!h.entered||!sky.count00||*h.allocatedCount!=static_cast<std::uint32_t>(*sky.count00)))||
+       (h.allocationReturned&&!h.allocationAttempted)||(h.allocationNonNull&&!h.allocationReturned)||
+       (h.published&&!h.allocationReturned)||(h.indexS0&&(!h.published||*h.indexS0>1u))||
+       (h.freshCount&&!h.indexS0)||(h.fileIndex&&(!h.freshCount||*h.fileIndex!=0u))||
+       (h.fileRead&&!h.fileIndex)||(h.fileLength&&(!h.fileRead||*h.fileLength>=h.fileName.size()))||
+       (h.equalsNone&&!h.fileLength)||(h.noneSkip&&(h.equalsNone!=true||h.indexS0!=1u)))return false;
+    if(h.fileLength){
+        if(h.fileName[*h.fileLength]!=0)return false;
+        for(std::size_t i=0;i<*h.fileLength;++i)if(h.fileName[i]==0)return false;
+        if(h.equalsNone&&*h.equalsNone!=(*h.fileLength==4&&std::memcmp(h.fileName.data(),"none",4)==0))return false;
+    }
+    const auto& c=sourceSkyConstructor288A50_;
+    if((c.allocationAttempted&&(!h.fileRead||h.equalsNone!=false))||
+       (c.allocationReturned&&!c.allocationAttempted)||(c.allocationNonNull&&!c.allocationReturned)||
+       (c.entered&&!c.allocationNonNull)||(c.countAcquired&&(!c.entered||!c.countBefore))||
+       (c.countBefore&&!c.entered)||(c.countRetiredNative&&(!c.countAcquired||!h.nativeWithdrawn))||
+       (c.query30&&(!c.countAcquired||*c.query30!=0))||(c.type32&&!c.query30)||
+       (c.knownFlags33!=0&&c.knownFlags33!=1&&c.knownFlags33!=3&&c.knownFlags33!=7)||
+       (c.flags33&~c.knownFlags33)||(c.knownFlags33&&!c.type32)||
+       (c.searchableReturned&&(!c.type32||c.knownFlags33!=7))||
+       (c.tableZeroed&&!c.searchableReturned)||(c.triplesWritten&&(!c.tableZeroed||c.triplesWritten>96))||
+       (c.baseReturned&&(!c.tableZeroed||c.triplesWritten!=96))||
+       (c.returned&&(!c.baseReturned||c.vtable08!=(sourceSkyError129960_.baseDestructorEntered?0x3cce60u:0x3d2ff0u)))||
+       (c.slotPublished&&(!c.allocationReturned||(c.allocationNonNull&&!c.returned))))return false;
+    bool missingNull=false;
+    for(const auto& lane:c.nullFields){if(!lane)missingNull=true;
+        else if(missingNull||!c.searchableReturned||*lane!=0)return false;}
+    if(c.tableZeroed&&missingNull)return false;
+    const auto& load=sourceSkyLoad288A90_;
+    if((load.entered&&!c.slotPublished)||(load.policy3E0990Stored&&!load.entered)||
+       (load.argumentA1&&(!load.policy3E0990Stored||load.argumentA1!=sky.argumentS1))||
+       (load.policy36C0F0Stored&&!load.argumentA1)||
+       (load.argumentF12&&(!load.policy36C0F0Stored||*load.argumentF12!=0x44800000u))||
+       (load.environmentRead&&!load.argumentF12)||(load.fileRead&&!load.environmentRead)||
+       (load.fileLength&&(!load.fileRead||*load.fileLength>=load.fileName.size()))||
+       (load.receiverRead&&!load.fileRead)||(load.receiverNonNull&&!load.receiverRead)||
+       (load.wrapperEntered&&!load.receiverRead)||(load.directoryRead&&!load.wrapperEntered)||
+       (load.formatted&&(!load.directoryRead||!load.pathLength))||
+       (load.pathLength&&(!load.formatted||*load.pathLength>=load.path30.size()))||
+       (load.loaderEntered&&!load.formatted)||(load.noOp141C20Returned&&!load.loaderEntered))return false;
+    if(load.fileLength){if(load.fileName[*load.fileLength]!=0)return false;
+        for(std::size_t i=0;i<*load.fileLength;++i)if(!load.fileName[i])return false;}
+    if(load.pathLength){
+        if(!load.fileLength||*load.pathLength!=6u+*load.fileLength||
+           std::memcmp(load.path30.data(),"skies\\",6)!=0||
+           std::memcmp(load.path30.data()+6,load.fileName.data(),*load.fileLength+1)!=0)return false;
+    }
+    const auto& file=sourceSkyFileCaller1295E0_;
+    if((file.entered&&!load.noOp141C20Returned)||(file.resolverRead&&!file.entered)||
+       (file.openAttempted&&!file.resolverRead)||(file.openReturned&&!file.openAttempted)||
+       (file.handleS3.has_value()!=file.openReturned)||
+       (file.readAttempted&&(!file.handleS3||*file.handleS3<0))||
+       (file.readReturned&&!file.readAttempted)||(file.firstReadItems&&(!file.readReturned||*file.firstReadItems>1)))return false;
+    if(sourceSkyFile_&&!sourceSkyFile_->preflightNative())return false;
+    if(!h.nativeWithdrawn){
+        if(file.openAttempted&&!sourceSkyFile_)return false;
+        if(sourceSkyFile_&&(sourceSkyFile_->nativeClosed_||sourceSkyFile_->receiver_!=sourceSkyOwner_.get()))return false;
+        if(sourceSkyFile_&&sourceSkyFile_->attempted_){
+            if(!sourceTrackMountDomain_||!load.pathLength||
+               sourceSkyFile_->resolver_!=sourceTrackMountDomain_->resolver3E1A70()||
+               sourceSkyFile_->provider_!=sourceTrackMountDomain_->archiveProvider3E1A70()||
+               sourceSkyFile_->provider_!=sourceTrackMountLease_.provider_||sourceSkyFile_->root_!=sourceTrackFile_||
+               sourceSkyFile_->name_.size()!=*load.pathLength||
+               std::memcmp(sourceSkyFile_->name_.data(),load.path30.data(),*load.pathLength)!=0)return false;
+        }
+        if(file.openReturned&&(!sourceSkyFile_||sourceSkyFile_->sourceHandle_!=file.handleS3))return false;
+        if(file.firstReadItems&&(!sourceSkyFile_||sourceSkyFile_->read_.items!=file.firstReadItems))return false;
+        if(file.resolverRead&&(!sourceTrackMountDomain_||sourceTrackMountLease_.closed_||!sourceTrackFile_||
+           !sourceTrackMountDomain_->prepared()||!sourceLoadApplication_||
+           sourceLoadApplication_->standardMaterialDomainOwner_!=sourceTrackMountDomain_))return false;
+    }else if(sourceSkyFile_&&!sourceSkyFile_->nativeClosed_)return false;
+    const auto& header=sourceSkyHeader129644_;
+    if((header.entered&&file.firstReadItems!=1u)||(header.resolverRead&&!header.entered)||
+       (header.countReadAttempted&&!header.resolverRead)||(header.countReadReturned&&!header.countReadAttempted)||
+       (header.countReadItems.has_value()!=header.countReadReturned)||header.receiverBytesWritten>4||
+       (header.count7D8.has_value()!=header.countReadAttempted)||
+       (header.indexS2&&(!header.countReadReturned||header.countReadItems!=1u||*header.indexS2!=0))||
+       (header.paletteCount.has_value()!=header.indexS2.has_value())||
+       (header.loopEntered&&(!header.paletteCount||*header.paletteCount==0||*header.paletteCount>=0x80000000u))||
+       (header.offsetReadAttempted&&!header.loopEntered)||(header.offsetReadReturned&&!header.offsetReadAttempted)||
+       (header.tellReturned&&(!header.paletteOffset||!header.resourceStart))||
+       (header.savedS4&&(!header.tellReturned||*header.savedS4!=(*header.resourceStart<=0x7fffffffu?
+           static_cast<std::int64_t>(*header.resourceStart):static_cast<std::int64_t>(*header.resourceStart)-0x100000000ll)))||
+       (header.seekReturned&&(!header.tellReturned||!header.savedS4))||
+       (header.field40Cleared&&(!header.paletteCount||(*header.paletteCount>0&&*header.paletteCount<0x80000000u))))return false;
+    const auto headerWord=[](const std::array<std::uint8_t,4>& bytes){return std::uint32_t(bytes[0])|
+        (std::uint32_t(bytes[1])<<8)|(std::uint32_t(bytes[2])<<16)|(std::uint32_t(bytes[3])<<24);};
+    if(header.paletteCount&&(!sourceSkyFile_||sourceSkyFile_->read_.items!=1u||
+       *header.paletteCount!=headerWord(sourceSkyFile_->read_.bytes)))return false;
+    if(header.paletteOffset&&(!header.offsetReadReturned||!sourceSkyFile_||sourceSkyFile_->paletteOffsetRead_.items!=1u||
+       *header.paletteOffset!=headerWord(sourceSkyFile_->paletteOffsetRead_.bytes)))return false;
+    if(header.resourceStart.has_value()!=header.tellReturned)return false;
+    if(header.countReadAttempted){
+        if(!sourceSkyFile_||sourceSkyFile_->countRead_.copied!=header.receiverBytesWritten||
+           sourceSkyFile_->countRead_.returned!=header.countReadReturned||sourceSkyFile_->countRead_.items!=header.countReadItems)return false;
+        std::uint32_t value=0;for(std::size_t i=0;i<header.receiverBytesWritten;++i)
+            value|=std::uint32_t(sourceSkyFile_->countRead_.bytes[i])<<static_cast<unsigned>(i*8);
+        if(header.count7D8!=value||(!h.nativeWithdrawn&&(!sourceSkyOwner_||sourceSkyOwner_->count7D8!=value)))return false;
+    }
+    if(header.offsetReadAttempted&&(!sourceSkyFile_||sourceSkyFile_->paletteOffsetRead_.attempted!=true||
+       sourceSkyFile_->paletteOffsetRead_.returned!=header.offsetReadReturned))return false;
+    if(header.tellReturned&&(!sourceSkyFile_||sourceSkyFile_->resourceStart_!=header.resourceStart))return false;
+    if(header.seekReturned&&(!sourceSkyFile_||!sourceSkyFile_->seekReturned_||
+       sourceSkyFile_->resourceSeekTarget_!=header.paletteOffset))return false;
+    if(!preflightSourceSkyPaletteNative()||!preflightSourceSkyItemsNative())return false;
+    if(h.nativeWithdrawn)return h.entered&&!sourceSkySlots3F8_&&!sourceSkyPublished3F8_&&!sourceSkyOwner_&&
+        (!c.countAcquired||c.countRetiredNative);
+    if((h.entered&&nativeSky3F8_)||c.countRetiredNative||c.allocationNonNull!=bool(sourceSkyOwner_))return false;
+    if(c.slotPublished&&(!sourceSkySlots3F8_||sourceSkySlots3F8_[0]!=sourceSkyOwner_.get()))return false;
+    if(c.countAcquired){
+        if(!worldApplication_||!sourceSkyOwner_||worldApplication_->attachmentLock423F58())return false;
+        const auto& e=sourceSkyOwner_->entity;
+        if(e.reference00!=(sourceSkyError129960_.referenceStored?0u:1u)||e.sessionGeneration!=worldEntity_.sessionGeneration||e.objectKey!=key(&e)||
+           e.parent1C||e.previous10||e.next14||e.firstChild18||e.mask20||e.descendants24||
+           (sourceSkyError129960_.authorityRetired?contains(worldApplication_->entityAuthority_.view(),&e):!worldApplication_->entityAuthority_.canRetire(e))||
+           worldApplication_->objectCount423F60()<=*c.countBefore)return false;
+    }
+    const auto& error=sourceSkyError129960_;
+    if((error.lockRead&&!error.entered)||(error.unlinkedLeafRead&&!error.lockRead)||
+       (error.authorityRetired&&!error.unlinkedLeafRead)||(error.referenceStored!=error.authorityRetired)||
+       (error.derivedDestructorEntered&&!error.referenceStored)||(error.baseDestructorEntered&&!error.derivedDestructorEntered))return false;
+    if(error.entered){if(error.failedItem>sourceSkyLaterItems_.size())return false;
+        const auto& failed=sourceItemHistory(error.failedItem);
+        if(!failed.failureNullReturned||!failed.slotStored)return false;
+        if(!h.nativeWithdrawn&&c.vtable08!=(error.baseDestructorEntered?0x3cce60u:0x3d2ff0u))return false;}
+    if(load.policy3E0990Stored&&(!worldApplication_||worldApplication_->skyPolicy3E0990_!=1u))return false;
+    if(load.policy36C0F0Stored&&(!worldApplication_||worldApplication_->skyPolicy36C0F0_!=load.argumentA1))return false;
+    if(load.receiverRead&&load.receiverNonNull!=bool(sourceSkyOwner_))return false;
+    if(load.fileRead){const char* name=nullptr;std::size_t bytes=0;
+        if(!sourceEnvironment3A4_||!sourceWorldConfig_||!h.fileIndex||!load.fileLength||
+           !sourceEnvironment3A4_->readSourceSkyFile274B54(worldEntity_,*sourceWorldConfig_,*h.fileIndex,name,bytes)||
+           bytes!=*load.fileLength||std::memcmp(name,load.fileName.data(),bytes+1)!=0)return false;}
+    if(c.tableZeroed){
+        if(!worldApplication_||!worldApplication_->skyTable3E09A0_)return false;
+        const auto& table=*worldApplication_->skyTable3E09A0_;
+        for(std::size_t i=0;i<table.size();++i)
+            if(table[i]!=std::array<std::uint32_t,3>{{i<c.triplesWritten?0x3f800000u:0u,0u,0u}})return false;
+    }
+    if(h.allocationReturned&&h.allocationNonNull!=bool(sourceSkySlots3F8_))return false;
+    if(h.published!=bool(sourceSkyPublished3F8_))return false;
+    if(sourceSkyPublished3F8_&&*sourceSkyPublished3F8_!=sourceSkySlots3F8_.get())return false;
+    if(!h.entered)return !sourceSkySlots3F8_&&!sourceSkyPublished3F8_;
+    if(!sourceEnvironment3A4_||!sourceWorldConfig_||!nativeEnvironment3A4_||
+       *nativeEnvironment3A4_!=sourceEnvironment3A4_.get())return false;
+    if(h.freshCount){std::int32_t current=0;
+        if(!sourceEnvironment3A4_->readSourceSkyCount274B0C(worldEntity_,*sourceWorldConfig_,current)||
+           current!=*h.freshCount)return false;}
+    if(h.fileRead){const char* name=nullptr;std::size_t bytes=0;
+        if(!h.fileLength||!sourceEnvironment3A4_->readSourceSkyFile274B54(worldEntity_,*sourceWorldConfig_,
+           *h.fileIndex,name,bytes)||bytes!=*h.fileLength||std::memcmp(name,h.fileName.data(),bytes+1)!=0)return false;}
+    return true;
+}
+bool Owner::withdrawSourceSkyArrayNative()noexcept {
+    auto& h=sourceSkyArray274B24_;
+    if(!preflightSourceSkyArrayNative())return false;
+    if(!h.entered||h.nativeWithdrawn)return true;
+    //Partial palette owns its own backing and file destination borrow, not a sky
+    //Entity count. Retire it before numeric file/sky receiver custody.
+    if(!withdrawSourceSkyItemsNative())return false;
+    if(!withdrawSourceSkyPaletteNative())return false;
+    //Fresh numeric handle/manager pin leaves before receiver count or array backing.
+    if(sourceSkyFile_){a::OriginalStandardTextureDiagnostic50LA d;
+        if(!sourceSkyFile_->closeNative(d))return false;} //Retain closed scalar search/read history.
+    //Withdraw published aliases first. Unknown slots are never inspected.
+    sourceSkyPublished3F8_.reset();sourceSkySlots3F8_.reset();
+    auto& c=sourceSkyConstructor288A50_;
+    if(c.countAcquired){
+        if(!sourceSkyError129960_.authorityRetired){
+            if(!worldApplication_->entityAuthority_.retire(sourceSkyOwner_->entity))std::terminate();
+            --sourceSkyOwner_->entity.reference00;
+        }
+        //Source142590 already released the reference on this error prefix,
+        //but the unreached base destructor has not retired the object count.
+        --worldApplication_->objectCount423F60();c.countRetiredNative=true;
+    }
+    sourceSkyOwner_.reset();h.nativeWithdrawn=true;
+    //Process table writes persist; never restore an unproved prior value.
+    return true; //Native cancellation only, no World/source destructor or NULL-store receipt.
+}
+bool Owner::continueSourceSkyArray274B24(std::uint32_t& pc)noexcept {
+    auto& h=sourceSkyArray274B24_;const auto& sky=sourceSkySetup274AE0_;
+    if(pc!=0x274b24u||h.entered||!preflightSourcePostParticleModelsNative()||
+       !sky.count00||*sky.count00!=1||sky.arrayBytes!=4u||nativeSky3F8_)return false;
+    const auto at=[&](std::uint32_t p){pc=sourcePostParticleModelsPC_=p;};
+    at(0x274b24);h.entered=true;h.allocatedCount=static_cast<std::uint32_t>(*sky.count00);
+    at(0x274b28);at(0x2e8ca0);h.allocationAttempted=true;
+    //Native allocator adapter to nullable source allocation; preserve NULL publication.
+    //Host pointer width is not a claim that the guest count*4 allocation changed.
+    try{sourceSkySlots3F8_.reset(new SourceSkyOwner*[*h.allocatedCount]);}
+    catch(...){sourceSkySlots3F8_.reset();}
+    h.allocationReturned=true;h.allocationNonNull=bool(sourceSkySlots3F8_);
+    at(0x274b2c);sourceSkyPublished3F8_=sourceSkySlots3F8_.get();h.published=true;
+    at(0x274b30);at(0x274b34);h.indexS0=0;
+    for(;;){
+        at(0x274ca0);
+        if(!nativeEnvironment3A4_||*nativeEnvironment3A4_!=sourceEnvironment3A4_.get()||
+           !sourceEnvironment3A4_||!sourceWorldConfig_)return false;
+        at(0x274ca4);std::int32_t count=0;
+        if(!sourceEnvironment3A4_->readSourceSkyCount274B0C(worldEntity_,*sourceWorldConfig_,count))return false;
+        h.freshCount=count;at(0x274ca8);at(0x274cac);at(0x274cb0);
+        if(static_cast<std::int32_t>(*h.indexS0)>=count){at(0x274cb4);return false;} //Common return join not yet claimed.
+        at(0x274b38);if(h.fileRead||*h.indexS0!=0)return false;
+        at(0x274b3c);at(0x274b40);at(0x274b44);h.fileIndex=*h.indexS0;
+        at(0x274b48);at(0x274b4c);at(0x274b50);at(0x274b54);
+        const char* name=nullptr;std::size_t bytes=0;
+        if(!sourceEnvironment3A4_->readSourceSkyFile274B54(worldEntity_,*sourceWorldConfig_,*h.fileIndex,name,bytes))return false;
+        std::memcpy(h.fileName.data(),name,bytes+1);h.fileLength=bytes;h.fileRead=true;
+        at(0x3090e8);h.equalsNone=(bytes==4&&std::memcmp(name,"none",4)==0);
+        at(0x274b58);
+        if(*h.equalsNone){at(0x274b5c);++*h.indexS0;h.noneSkip=true;at(0x274c9c);continue;}
+        at(0x274b60);return continueSourceSkyConstructor274B60(pc);
+    }
+}
+bool Owner::continueSourceSkyConstructor274B60(std::uint32_t& pc)noexcept {
+    auto& c=sourceSkyConstructor288A50_;
+    if(pc!=0x274b60u||c.allocationAttempted||!preflightSourcePostParticleModelsNative()||
+       !sourceLoadApplication_||sourceLoadApplication_->entities()!=worldApplication_||!worldApplication_||
+       nativeScbThread_!=std::this_thread::get_id()||worldApplication_->attachmentLock423F58())return false;
+    const auto at=[&](std::uint32_t p){pc=sourcePostParticleModelsPC_=p;};
+    at(0x274b60);at(0x274b64);at(0x2e8d90);c.allocationAttempted=true;
+    //Nullable native allocator adaptation of source0xAF0, not a prepared owner.
+    try{sourceSkyOwner_.reset(new SourceSkyOwner);}catch(...){sourceSkyOwner_.reset();}
+    c.allocationReturned=true;c.allocationNonNull=bool(sourceSkyOwner_);
+    at(0x274b68);at(0x274b6c);
+    if(sourceSkyOwner_){
+        at(0x274b70);at(0x274b74);at(0x274b78);at(0x288a50);c.entered=true;
+        at(0x288a5c);at(0x288a60);at(0x129280);at(0x12928c);at(0x129290);at(0x27e130);
+        at(0x27e13c);at(0x27e140);at(0x141300);
+        auto& e=sourceSkyOwner_->entity;auto& authority=worldApplication_->entityAuthority_;
+        auto& count=worldApplication_->objectCount423F60();
+        if(count==std::numeric_limits<std::uint32_t>::max()||!authority.reserveAdditional(1)||
+           !authority.canEnroll(e,key(&e)))return false;
+        c.countBefore=count;
+        if(g::initializeOriginalWreckComponent50LA(e,g::OriginalWreckComponentKind50LA::entity141300,
+           worldEntity_.sessionGeneration,key(&e),true,count).status!=g::OriginalWreckComponentStatus50LA::complete||
+           !authority.enroll(e))std::terminate();
+        at(0x1413c0);c.countAcquired=true;c.vtable08=0x3cd240u;at(0x1413d4);
+        at(0x27e154);c.query30=0;at(0x27e168);c.type32=0xff;
+        at(0x27e188);c.knownFlags33=1;at(0x27e19c);c.knownFlags33=3;
+        at(0x27e1b0);c.knownFlags33=7;at(0x27e1b8);c.vtable08=0x3ccee0u;
+        at(0x27e1bc);const auto type=worldApplication_->types383408_.searchableGameObject27E1BC();
+        if(!type.okay()){at(type.sourcePC);return false;}
+        at(0x27e1f8);c.type32=type.type;at(0x27e218);c.flags33=1;
+        at(0x27e22c);at(0x27e240);at(0x27e250);c.searchableReturned=true;
+        at(0x1292ac);c.vtable08=0x3cce60u;at(0x1292d4);c.flags33=1;
+        at(0x1292e8);c.flags33=3;
+        constexpr std::uint32_t stores[]={0x1292f0,0x1292f8,0x129300,0x129308,0x129310,0x129318,0x129320,0x129328};
+        for(std::size_t i=0;i<8;++i){at(stores[i]);c.nullFields[i]=0;}
+        at(0x129330);at(0x129334);c.nullFields[8]=0;at(0x306478);
+        //SAME process lane as other represented sky callers. New source writes,
+        //not proof about all possible guest aliases or a renderer reset.
+        worldApplication_->skyTable3E09A0_.emplace();
+        for(auto& triple:*worldApplication_->skyTable3E09A0_)triple={{0u,0u,0u}};
+        c.tableZeroed=true;
+        for(std::size_t i=0;i<96;i+=2){
+            at(0x129348);at(0x12934c);(*worldApplication_->skyTable3E09A0_)[i][0]=0x3f800000u;
+            ++c.triplesWritten;at(0x129350);(*worldApplication_->skyTable3E09A0_)[i+1][0]=0x3f800000u;
+            ++c.triplesWritten;at(0x129354);at(0x129358);at(0x12935c);at(0x129360);
+        }
+        at(0x129370);c.baseReturned=true;at(0x288a6c);c.vtable08=0x3d2ff0u;
+        at(0x288a80);c.returned=true;at(0x274b7c);
+    }
+    at(0x274b80);at(0x274b84);at(0x274b88);at(0x274b8c);at(0x274b90);at(0x274b94);at(0x274b98);
+    at(0x274b9c);
+    if(!sourceSkyPublished3F8_||!*sourceSkyPublished3F8_||
+       *sourceSkyPublished3F8_!=sourceSkySlots3F8_.get())return false; //ActualNULL array store cannot be performed.
+    sourceSkySlots3F8_[0]=sourceSkyOwner_.get();c.slotPublished=true;
+    at(0x12a100);return continueSourceSkyLoad12A100(pc);
+}
+bool Owner::continueSourceSkyLoad12A100(std::uint32_t& pc)noexcept {
+    auto& h=sourceSkyLoad288A90_;const auto& array=sourceSkyArray274B24_;
+    if(pc!=0x12a100u||h.entered||!preflightSourcePostParticleModelsNative()||
+       nativeScbThread_!=std::this_thread::get_id()||!sourceLoadApplication_||!worldApplication_||
+       sourceLoadApplication_->entities()!=worldApplication_||!sourceSkyConstructor288A50_.slotPublished)return false;
+    const auto at=[&](std::uint32_t p){pc=sourcePostParticleModelsPC_=p;};
+    at(0x12a100);h.entered=true;at(0x12a104);at(0x12a108);
+    worldApplication_->skyPolicy3E0990_=1u;h.policy3E0990Stored=true;
+    at(0x274ba0);at(0x274ba4);at(0x274ba8);at(0x274bac);h.argumentA1=sourceSkySetup274AE0_.argumentS1;
+    at(0x12a110);at(0x12a114);at(0x12a118);
+    worldApplication_->skyPolicy36C0F0_=*h.argumentA1;h.policy36C0F0Stored=true;
+    at(0x274bb0);at(0x274bb4);h.argumentF12=0x44800000u;
+    at(0x274bb8);
+    if(!sourceSkyPublished3F8_||!*sourceSkyPublished3F8_||
+       *sourceSkyPublished3F8_!=sourceSkySlots3F8_.get())return false;
+    at(0x274bbc);
+    if(!nativeEnvironment3A4_||*nativeEnvironment3A4_!=sourceEnvironment3A4_.get()||
+       !sourceEnvironment3A4_||!sourceWorldConfig_)return false;
+    h.environmentRead=true;at(0x274bc0);at(0x274bc4);at(0x274bc8);at(0x274bcc);at(0x274bd0);
+    const char* name=nullptr;std::size_t bytes=0;
+    if(!array.indexS0||!sourceEnvironment3A4_->readSourceSkyFile274B54(worldEntity_,*sourceWorldConfig_,
+       *array.indexS0,name,bytes))return false;
+    std::memcpy(h.fileName.data(),name,bytes+1);h.fileLength=bytes;h.fileRead=true;
+    at(0x274bd4);at(0x274bd8);
+    if(sourceSkySlots3F8_[0]!=sourceSkyOwner_.get())return false;
+    h.receiverRead=true;h.receiverNonNull=bool(sourceSkySlots3F8_[0]);
+    at(0x288a90);h.wrapperEntered=true;
+    //NULL receiver is not dereferenced by this wrapper prefix or141C20.
+    //Preserve it rather than inventing an early loader failure/destructor.
+    at(0x288a9c);at(0x288aa0);at(0x288aa4);at(0x288aa8);at(0x288aac);at(0x288ab0);
+    at(0x288ab4);at(0x288ab8);at(0x288abc);at(0x288ac0);
+    const auto& directory=sourceLoadApplication_->skyDirectory36B750();
+    if(directory!="skies\\"||directory.size()+bytes+1>h.path30.size())return false;
+    h.directoryRead=true;at(0x308c90);
+    std::memcpy(h.path30.data(),directory.data(),directory.size());
+    std::memcpy(h.path30.data()+directory.size(),name,bytes+1);
+    h.pathLength=directory.size()+bytes;h.formatted=true;
+    at(0x288ac4);at(0x288ac8);at(0x288acc);at(0x1295b0);h.loaderEntered=true;
+    at(0x1295d0);at(0x1295d4);at(0x1295d8);at(0x141c20);at(0x141c24);
+    h.noOp141C20Returned=true; //Identity only: no reference or count acquisition.
+    at(0x1295dc);at(0x1295e0);return continueSourceSkyFile1295E0(pc);
+}
+bool Owner::continueSourceSkyFile1295E0(std::uint32_t& pc)noexcept {
+    auto& h=sourceSkyFileCaller1295E0_;const auto& load=sourceSkyLoad288A90_;
+    if(pc!=0x1295e0u||h.entered||!preflightSourcePostParticleModelsNative()||
+       !sourceTrackMountDomain_||sourceTrackMountLease_.closed_||!sourceTrackMountDomain_->prepared()||
+       !sourceTrackFile_||!sourceLoadApplication_||
+       sourceLoadApplication_->standardMaterialDomainOwner_!=sourceTrackMountDomain_)return false;
+    const auto at=[&](std::uint32_t p){pc=sourcePostParticleModelsPC_=p;};
+    at(0x1295e0);h.entered=true;
+    const auto resolver=sourceTrackMountDomain_->resolver3E1A70();
+    const auto provider=sourceTrackMountDomain_->archiveProvider3E1A70();
+    if(!resolver||!provider||provider!=sourceTrackMountLease_.provider_)return false;
+    h.resolverRead=true;at(0x1295e4);at(0x1295e8); //Actual mode388E60 is rb.
+    try{sourceSkyFile_.reset(new a::OriginalSourceSkyFile50LA(sourceSkyOwner_.get()));}
+    catch(...){return false;} //Native custody failure, not a source open return.
+    at(0x1295ec);at(0x1295f0);h.openAttempted=true;
+    a::OriginalStandardTextureDiagnostic50LA d;
+    std::string name;
+    try{name.assign(load.path30.data(),*load.pathLength);}catch(...){return false;}
+    if(!sourceSkyFile_->begin131230(resolver,provider,sourceTrackFile_,name,d)){
+        at(d.sourcePC?d.sourcePC:sourceSkyFile_->pc_);return false;}
+    h.handleS3=sourceSkyFile_->sourceHandle_;h.openReturned=true;at(0x1295f4);at(0x1295f8);at(0x1295fc);at(0x129600);
+    if(*h.handleS3==-1){at(0x129604);return false;} //Real error receiver deref/destruction not joined.
+    at(0x12961c);at(0x129620);
+    if(sourceTrackMountDomain_->resolver3E1A70()!=resolver)return false;
+    at(0x129624);at(0x129628);at(0x12962c);at(0x129630);at(0x129634);h.readAttempted=true;
+    if(!sourceSkyFile_->readFirst4(d)){at(d.sourcePC?d.sourcePC:sourceSkyFile_->pc_);return false;}
+    h.readReturned=true;h.firstReadItems=sourceSkyFile_->read_.items;
+    at(0x129638);at(0x12963c);at(0x129640);
+    if(*h.firstReadItems!=1){at(0x129960);return false;} //Short-read error branch, no invented success.
+    at(0x129644);return continueSourceSkyHeader129644(pc);
+}
+bool Owner::continueSourceSkyHeader129644(std::uint32_t& pc)noexcept {
+    auto& h=sourceSkyHeader129644_;
+    if(pc!=0x129644u||h.entered||!preflightSourcePostParticleModelsNative()||
+       !sourceSkyFile_||!sourceSkyFile_->current()||sourceSkyFile_->read_.items!=1u)return false;
+    const auto at=[&](std::uint32_t p){pc=sourcePostParticleModelsPC_=p;};
+    const auto resolverCurrent=[&](){return sourceTrackMountDomain_&&
+        sourceTrackMountDomain_->resolver3E1A70()==sourceSkyFile_->resolver_;};
+    const auto word=[](const std::array<std::uint8_t,4>& b){return std::uint32_t(b[0])|
+        (std::uint32_t(b[1])<<8)|(std::uint32_t(b[2])<<16)|(std::uint32_t(b[3])<<24);};
+    h.entered=true;at(0x129644);at(0x129648);if(!resolverCurrent())return false;h.resolverRead=true;
+    at(0x12964c);at(0x129650);at(0x129654);at(0x129658);
+    //The first header went to stack. This second read targets actual receiver7D8;
+    //a NULL receiver cannot supply native storage and is bounded at the real call.
+    if(!sourceSkyOwner_){at(0x129654);return false;}
+    h.countReadAttempted=true;a::OriginalStandardTextureDiagnostic50LA d;
+    const bool returned=sourceSkyFile_->readCount4(d);
+    const auto& count=sourceSkyFile_->countRead_;
+    for(std::size_t i=0;i<count.copied;++i){const auto shift=static_cast<unsigned>(i*8);
+        sourceSkyOwner_->count7D8=(sourceSkyOwner_->count7D8&~(0xffu<<shift))|(std::uint32_t(count.bytes[i])<<shift);}
+    h.receiverBytesWritten=count.copied;h.count7D8=sourceSkyOwner_->count7D8;
+    if(!returned){at(d.sourcePC?d.sourcePC:sourceSkyFile_->pc_);return false;}
+    h.countReadReturned=true;h.countReadItems=count.items;at(0x12965c);at(0x129660);at(0x129664);
+    if(*h.countReadItems!=1){at(0x129960);return false;}
+    at(0x129668);at(0x12966c);h.indexS2=0;at(0x129740);h.paletteCount=word(sourceSkyFile_->read_.bytes);
+    at(0x129744);at(0x129748);at(0x12974c);
+    //Signed SLT against stack7C: this is a palette count, not a validated format version.
+    if(*h.paletteCount==0||*h.paletteCount>=0x80000000u){
+        at(0x129750);h.field40Cleared=true;at(0x129754);
+        at(0x129758);return continueSourceSkyItems129758(pc);
+    }
+    h.loopEntered=true;at(0x129670);at(0x129674);if(!resolverCurrent())return false;
+    at(0x129678);at(0x12967c);at(0x129680);at(0x129684);at(0x129688);h.offsetReadAttempted=true;
+    if(!sourceSkyFile_->readPaletteOffset4(d)){at(d.sourcePC?d.sourcePC:sourceSkyFile_->pc_);return false;}
+    h.offsetReadReturned=true;at(0x12968c);at(0x129690);at(0x129694);
+    if(sourceSkyFile_->paletteOffsetRead_.items!=1u){at(0x129960);return false;}
+    h.paletteOffset=word(sourceSkyFile_->paletteOffsetRead_.bytes);
+    at(0x129698);at(0x12969c);if(!resolverCurrent())return false;at(0x1296a0);at(0x1296a4);
+    if(!sourceSkyFile_->tellResourceStart(d)){at(d.sourcePC?d.sourcePC:0x12f520u);return false;}
+    h.tellReturned=true;h.resourceStart=sourceSkyFile_->resourceStart_;at(0x1296a8);at(0x1296ac);at(0x1296b0);
+    if(!resolverCurrent())return false;at(0x1296b4);
+    h.savedS4=*h.resourceStart<=0x7fffffffu?static_cast<std::int64_t>(*h.resourceStart):
+        static_cast<std::int64_t>(*h.resourceStart)-0x100000000ll;
+    at(0x1296b8);at(0x1296bc);at(0x1296c0);at(0x1296c4);
+    if(!sourceSkyFile_->seekResourceAbsolute(*h.paletteOffset,d)){at(d.sourcePC?d.sourcePC:0x12f640u);return false;}
+    h.seekReturned=true;at(0x1296c8);at(0x1296cc);at(0x1296d0);
+    //Fresh constructor7D0 is known NULL; no prior resource destructor is invented.
+    if(sourceSkyConstructor288A50_.nullFields[7]!=0u)return false;
+    at(0x1296d4);at(0x1296d8);at(0x1296f4);return continueSourceSkyPalette1296F4(pc);
+}
+bool Owner::preflightSourceSkyPaletteNative()const noexcept {
+    const auto& h=sourceSkyPalette2E38C0_;
+    if((h.entered&&!sourceSkyHeader129644_.seekReturned)||(h.allocationAttempted&&!h.entered)||
+       (h.allocationReturned&&!h.allocationAttempted)||(h.allocationNonNull&&!h.allocationReturned)||
+       (h.constructorEntered&&!h.allocationNonNull)||(h.baseReturned&&(!h.constructorEntered||h.reference00!=1u))||
+       (h.derivedVtableStored&&(!h.baseReturned||h.vtable08!=0x3d5650u))||
+       (h.constructorReturned&&!h.constructorEntered)||
+       (h.slotPublished&&(!h.allocationReturned||(h.allocationNonNull&&!h.constructorReturned)))||
+       (h.nativeReferenceWithdrawn&&(!h.baseReturned||!h.nativeWithdrawn||h.sourceReferenceDecremented))||
+       (h.nativeWithdrawn&&!h.entered))return false;
+    for(std::size_t i=0;i<3;++i){
+        if((h.readAttempted[i]&&(!h.derivedVtableStored||(i&&!h.readReturned[i-1])))||
+           (h.readReturned[i]&&!h.readAttempted[i]))return false;
+        if(!h.readAttempted[i])continue;
+        if(!sourceSkyFile_)return false;const auto& row=sourceSkyFile_->paletteHeaderReads_[i];
+        if(!row.attempted||row.returned!=h.readReturned[i])return false;
+        if(i<2){if(h.fieldBytes[i]!=row.copied)return false;
+            if(!h.nativeWithdrawn&&!h.sourceBackingFreed&&(!sourceSkyPaletteOwner_||!sourceSkyPaletteOwner_->storage||
+               std::memcmp(sourceSkyPaletteOwner_->storage.get()+0x10+i*4,row.bytes.data(),row.copied)!=0))return false;}
+    }
+    if(h.compressedFlag){
+        if(!h.readReturned[2]||!sourceSkyFile_||sourceSkyFile_->paletteHeaderReads_[2].items!=1u)return false;
+        const auto& b=sourceSkyFile_->paletteHeaderReads_[2].bytes;
+        if(*h.compressedFlag!=(std::uint32_t(b[0])|(std::uint32_t(b[1])<<8)|(std::uint32_t(b[2])<<16)|(std::uint32_t(b[3])<<24)))return false;
+    }
+    constexpr std::size_t payloadSizes[3]={0x300,0x8000,0x10000};
+    if((h.rawEntered&&h.compressedFlag!=0u)||(h.rawReturned&&!h.rawEntered)||
+       (h.count14Read&&!h.rawReturned)||(h.count14.has_value()!=h.count14Read)||
+       h.convertedColors>256||(h.convertedColors&&h.count14!=256u))return false;
+    for(std::size_t i=0;i<3;++i){
+        if(h.payloadBytes[i]>payloadSizes[i]||
+           (h.payloadAttempted[i]&&(!h.rawEntered||(i&&!h.payloadReturned[i-1])))||
+           (h.payloadReturned[i]&&!h.payloadAttempted[i]))return false;
+        if(!h.payloadAttempted[i]){if(h.payloadBytes[i])return false;continue;}
+        if(!sourceSkyFile_)return false;const auto& row=sourceSkyFile_->rawPaletteReads_[i];
+        if(!row.attempted||h.payloadReturned[i]!=row.returned||h.payloadBytes[i]!=row.copied||
+           (h.rawReturned&&row.items!=1u))return false;
+    }
+    if(h.rawReturned&&(!h.payloadReturned[2]||h.payloadBytes[2]!=0x10000u))return false;
+    if(h.count14Read){
+        if(!sourceSkyFile_||sourceSkyFile_->paletteHeaderReads_[1].items!=1u)return false;
+        const auto& bytes=sourceSkyFile_->paletteHeaderReads_[1].bytes;
+        if(*h.count14!=(std::uint32_t(bytes[0])|(std::uint32_t(bytes[1])<<8)|
+            (std::uint32_t(bytes[2])<<16)|(std::uint32_t(bytes[3])<<24)))return false;
+    }
+    if(!h.nativeWithdrawn&&!h.sourceBackingFreed&&h.convertedColors){
+        if(!sourceSkyPaletteOwner_||!sourceSkyPaletteOwner_->storage)return false;
+        const auto* b=sourceSkyPaletteOwner_->storage.get();
+        for(std::uint32_t i=0;i<h.convertedColors;++i){const auto r=b[0x18+i*3],g=b[0x19+i*3],blue=b[0x1a+i*3];
+            const auto value555=((std::uint32_t(r)>>3)<<10)|((std::uint32_t(g)>>3)<<5)|(std::uint32_t(blue)>>3);
+            const auto value565=((std::uint32_t(r)>>3)<<11)|((std::uint32_t(g)>>2)<<5)|(std::uint32_t(blue)>>3);
+            if(b[0x318+i*2]!=(value555&255u)||b[0x319+i*2]!=(value555>>8)||
+               b[0x518+i*2]!=(value565&255u)||b[0x519+i*2]!=(value565>>8))return false;
+        }
+    }
+    const auto& ret=sourceSkyPaletteReturn129710_;
+    if((ret.entered&&!h.slotPublished)||(ret.restoreAttempted&&!ret.entered)||
+       (ret.restoreReturned&&(!ret.restoreAttempted||!sourceSkyFile_||!sourceSkyFile_->restoreReturned_))||
+       (ret.indexS2&&(!ret.restoreReturned||*ret.indexS2!=1))||
+       (ret.nextEntered&&(!ret.indexS2||!sourceSkyHeader129644_.paletteCount||*sourceSkyHeader129644_.paletteCount<=1u))||
+       (ret.nextOffset&&(!ret.nextEntered||!sourceSkyFile_||sourceSkyFile_->followingPalettes_.empty()))||
+       (ret.nextSavedS4&&!ret.nextOffset)||
+       (ret.field40Cleared&&(!ret.indexS2||sourceSkyHeader129644_.paletteCount!=1u)))return false;
+    if(ret.nextOffset){const auto& step=*sourceSkyFile_->followingPalettes_[0];const auto& bytes=step.offsetRead.bytes;
+        if((step.seekAttempted&&step.target!=ret.nextOffset)||step.offsetRead.items!=1u||*ret.nextOffset!=(std::uint32_t(bytes[0])|(std::uint32_t(bytes[1])<<8)|
+           (std::uint32_t(bytes[2])<<16)|(std::uint32_t(bytes[3])<<24)))return false;
+        if(ret.nextSavedS4&&(!step.tellReturned||!step.start||*ret.nextSavedS4!=(*step.start<=0x7fffffffu?
+           static_cast<std::int64_t>(*step.start):static_cast<std::int64_t>(*step.start)-0x100000000ll)))return false;
+    }
+    if((h.sourceReleaseEntered&&(!ret.nextEntered||!h.slotPublished))||
+       (h.sourceReferenceDecremented&&(!h.sourceReleaseEntered||h.reference00!=1u))||
+       (h.sourceAssociationScanReturned&&(!h.sourceReferenceDecremented||!sourceSkyFile_||!sourceSkyFile_->paletteScanReturned_))||
+       (h.sourceBaseDestructed&&!h.sourceAssociationScanReturned)||
+       (h.sourceFreeAdmitted&&!h.sourceBaseDestructed)||
+       (h.sourceBackingFreed&&(!h.sourceFreeAdmitted||!sourceSkyFile_||!sourceSkyFile_->paletteReleasedSource_))||
+       (h.sourceReleaseReturned&&!h.sourceBackingFreed))return false;
+    const auto& next=sourceSkyNextPaletteHistory_;
+    if(!preflightSourceSkyLaterPalettesNative())return false;
+    if(bool(sourceSkyPalette7D0_)!=bool(sourceSkyPublishedPaletteOccurrence_))return false;
+    if(sourceSkyPublishedPaletteOccurrence_&&(*sourceSkyPublishedPaletteOccurrence_>=sourceSkyLaterPalettes_.size()+2||
+       *sourceSkyPalette7D0_!=sourcePaletteOwner(*sourceSkyPublishedPaletteOccurrence_).get()))return false;
+    if(h.nativeWithdrawn)return (!h.baseReturned||h.sourceReferenceDecremented||h.nativeReferenceWithdrawn)&&!sourceSkyPaletteOwner_&&!sourceSkyPalette7D0_&&
+        (!h.constructorEntered||(sourceSkyFile_&&(sourceSkyFile_->paletteWithdrawn_||sourceSkyFile_->paletteReleasedSource_)))&&
+        !sourceSkyNextPaletteOwner_&&(!next.entered||next.nativeWithdrawn)&&(!next.baseReturned||next.sourceReferenceDecremented||next.nativeReferenceWithdrawn);
+    if(h.allocationNonNull!=bool(sourceSkyPaletteOwner_)||h.slotPublished!=bool(sourceSkyPalette7D0_))return false;
+    
+    if(h.constructorEntered&&(!sourceSkyFile_||!sourceSkyFile_->paletteEntered_||sourceSkyFile_->paletteWithdrawn_||
+       (h.sourceBackingFreed?!sourceSkyFile_->paletteReleasedSource_:
+        sourceSkyFile_->paletteReceiver_!=sourceSkyPaletteOwner_->storage.get())))return false;
+    if(h.baseReturned&&!h.sourceBackingFreed){
+        if(!sourceSkyPaletteOwner_||!sourceSkyPaletteOwner_->storage)return false;
+        const auto* b=sourceSkyPaletteOwner_->storage.get();
+        if(b[0]!=(h.sourceReferenceDecremented?0:1))return false;for(std::size_t i=1;i<8;++i)if(b[i])return false;
+        if(!h.vtable08)return false;const auto table=h.sourceBaseDestructed?0x3cc980u:*h.vtable08;
+        for(std::size_t i=0;i<4;++i)if(b[8+i]!=((table>>(i*8))&0xffu))return false;
+    }
+    return true;
+}
+bool Owner::withdrawSourceSkyPaletteNative()noexcept {
+    auto& first=sourceSkyPalette2E38C0_;if(!preflightSourceSkyPaletteNative())return false;
+    if(!first.entered||first.nativeWithdrawn)return true;
+    //Preflight all association refusals before any alias or owner mutation.
+    if(sourceSkyFile_&&!sourceSkyFile_->withdrawPaletteNative())return false;
+    sourceSkyPalette7D0_.reset();sourceSkyPublishedPaletteOccurrence_.reset();
+    for(std::size_t n=sourceSkyLaterPalettes_.size()+2;n>0;--n){const auto i=n-1;
+        auto& h=sourcePaletteHistory(i);auto& owner=sourcePaletteOwner(i);
+        if(h.baseReturned&&!h.sourceReferenceDecremented){for(std::size_t k=0;k<8;++k)owner->storage[k]=0;h.nativeReferenceWithdrawn=true;}
+        owner.reset();if(h.entered)h.nativeWithdrawn=true;
+    }
+    return true; //Native inverse; source destructor/ref/deallocation receipts remain untouched.
+}
+bool Owner::continueSourceSkyPalette1296F4(std::uint32_t& pc)noexcept {
+    auto& h=sourceSkyPalette2E38C0_;
+    if(pc!=0x1296f4u||h.entered||!preflightSourcePostParticleModelsNative()||!sourceSkyFile_||
+       !sourceSkyFile_->current()||!sourceSkyOwner_||sourceSkyConstructor288A50_.nullFields[7]!=0u)return false;
+    const auto at=[&](std::uint32_t p){pc=sourcePostParticleModelsPC_=p;};
+    h.entered=true;at(0x1296f4);at(0x1296f8);h.allocationAttempted=true;
+    //Native bookkeeping allocation is separate from the nullable source0x18B18 backing.
+    try{sourceSkyPaletteOwner_.reset(new SourceSkyPaletteOwner);}catch(...){return false;}
+    try{sourceSkyPaletteOwner_->storage.reset(new std::uint8_t[0x18b18]);}
+    catch(...){sourceSkyPaletteOwner_.reset();}
+    h.allocationReturned=true;h.allocationNonNull=bool(sourceSkyPaletteOwner_);at(0x1296fc);at(0x129700);
+    if(!h.allocationNonNull){at(0x129710);return continueSourceSkyPaletteReturn129710(pc);}
+    at(0x129704);at(0x129708);at(0x12970c);
+    if(!sourceSkyFile_->beginPalette2E38C0(sourceSkyPaletteOwner_->storage.get()))return false;
+    if(!initializeSourceSkyPaletteBase2E38C0(*sourceSkyPaletteOwner_,h,pc))return false;
+    return continueSourceSkyPaletteHeaders2E38FC(pc,0);
+}
+bool Owner::continueSourceSkyPaletteHeaders2E38FC(std::uint32_t& pc,std::size_t occurrence)noexcept {
+    if(occurrence>=sourceSkyLaterPalettes_.size()+2||pc!=0x2e38fcu||!preflightSourcePostParticleModelsNative()||!sourceSkyFile_||!sourceSkyFile_->current())return false;
+    auto& h=sourcePaletteHistory(occurrence);
+    auto& owner=sourcePaletteOwner(occurrence);
+    if(!owner||!owner->storage||!h.derivedVtableStored||h.readAttempted[0])return false;
+    const auto at=[&](std::uint32_t p){pc=sourcePostParticleModelsPC_=p;};
+    auto* b=owner->storage.get();
+    constexpr std::uint32_t loads[3]={0x2e3900,0x2e3924,0x2e3948};
+    constexpr std::uint32_t calls[3]={0x2e3908,0x2e3930,0x2e3954};
+    constexpr std::uint32_t returns[3]={0x2e3910,0x2e3938,0x2e395c};
+    for(std::size_t i=0;i<3;++i){
+        at(loads[i]);if(!sourceTrackMountDomain_||sourceTrackMountDomain_->resolver3E1A70()!=sourceSkyFile_->resolver_)return false;
+        at(calls[i]);at(calls[i]+4);h.readAttempted[i]=true;a::OriginalStandardTextureDiagnostic50LA d;
+        const bool returned=sourceSkyFile_->readPaletteHeader4(i,d,occurrence);const auto& row=sourceSkyFile_->paletteHeader(occurrence,i);
+        if(i<2){if(row.copied)std::memcpy(b+0x10+i*4,row.bytes.data(),row.copied);h.fieldBytes[i]=row.copied;}
+        if(!returned){at(d.sourcePC?d.sourcePC:sourceSkyFile_->pc_);return false;}
+        h.readReturned[i]=true;at(returns[i]);at(returns[i]+4);at(returns[i]+8);
+        if(row.items!=1u){at(0x2e3d34);return continueSourceSkyPaletteReturnForOccurrence(pc,occurrence);}
+    }
+    const auto& flag=sourceSkyFile_->paletteHeader(occurrence,2).bytes;
+    at(0x2e3968);h.compressedFlag=std::uint32_t(flag[0])|(std::uint32_t(flag[1])<<8)|
+        (std::uint32_t(flag[2])<<16)|(std::uint32_t(flag[3])<<24);
+    at(0x2e396c);at(0x2e3970);at(*h.compressedFlag?0x2e3974u:0x2e3b68u);
+    if(*h.compressedFlag)return false;return continueSourceSkyRawPalette2E3B68(pc,occurrence);
+}
+bool Owner::continueSourceSkyRawPalette2E3B68(std::uint32_t& pc,std::size_t occurrence)noexcept {
+    if(occurrence>=sourceSkyLaterPalettes_.size()+2)return false;
+    auto& h=sourcePaletteHistory(occurrence);
+    auto& owner=sourcePaletteOwner(occurrence);
+    if(pc!=0x2e3b68u||h.rawEntered||h.compressedFlag!=0u||!preflightSourcePostParticleModelsNative()||
+       !sourceSkyFile_||!sourceSkyFile_->current()||!owner||!owner->storage)return false;
+    const auto at=[&](std::uint32_t p){pc=sourcePostParticleModelsPC_=p;};
+    h.rawEntered=true;
+    constexpr std::uint32_t loads[3]={0x2e3b70,0x2e3b98,0x2e3bbc};
+    constexpr std::uint32_t calls[3]={0x2e3b7c,0x2e3ba4,0x2e3bd0};
+    constexpr std::uint32_t resumes[3]={0x2e3b84,0x2e3bac,0x2e3bd8};
+    for(std::size_t i=0;i<3;++i){
+        at(loads[i]);if(!sourceTrackMountDomain_||sourceTrackMountDomain_->resolver3E1A70()!=sourceSkyFile_->resolver_)return false;
+        at(calls[i]);at(calls[i]+4);h.payloadAttempted[i]=true;a::OriginalStandardTextureDiagnostic50LA d;
+        const bool returned=sourceSkyFile_->readRawPaletteBlock(i,d,occurrence);const auto& row=sourceSkyFile_->palettePayload(occurrence,i);
+        h.payloadBytes[i]=row.copied;
+        if(!returned){at(d.sourcePC?d.sourcePC:sourceSkyFile_->pc_);return false;}
+        h.payloadReturned[i]=true;at(resumes[i]);at(resumes[i]+4);at(resumes[i]+8);
+        if(row.items!=1u){at(0x2e3d34);return continueSourceSkyPaletteReturnForOccurrence(pc,occurrence);}
+    }
+    h.rawReturned=true;at(0x2e3be4);at(0x2e3be8);at(0x2e3bec);
+    auto* b=owner->storage.get();
+    h.count14=std::uint32_t(b[0x14])|(std::uint32_t(b[0x15])<<8)|(std::uint32_t(b[0x16])<<16)|(std::uint32_t(b[0x17])<<24);
+    h.count14Read=true;at(0x2e3bf0);at(0x2e3bf4);
+    if(*h.count14!=256u){at(0x2e3bf8);return false;} //Authored insertion/index/wrap effects must be joined separately.
+    at(0x2e3ca0);at(0x2e3ca4);
+    for(std::uint32_t i=0;i<256;++i){
+        at(0x2e3ca8);const auto r=std::uint32_t(b[0x18+i*3]),g=std::uint32_t(b[0x19+i*3]),blue=std::uint32_t(b[0x1a+i*3]);
+        const auto value555=((r>>3)<<10)|((g>>3)<<5)|(blue>>3);
+        at(0x2e3ce4);b[0x318+i*2]=static_cast<std::uint8_t>(value555);b[0x319+i*2]=static_cast<std::uint8_t>(value555>>8);
+        const auto value565=((r>>3)<<11)|((g>>2)<<5)|(blue>>3);
+        at(0x2e3d24);at(0x2e3d28);b[0x518+i*2]=static_cast<std::uint8_t>(value565);b[0x519+i*2]=static_cast<std::uint8_t>(value565>>8);
+        ++h.convertedColors;
+    }
+    at(0x2e3d2c);return continueSourceSkyPaletteReturnForOccurrence(pc,occurrence);
+}
+bool Owner::continueSourceSkyPaletteReturn129710(std::uint32_t& pc)noexcept {
+    auto& ret=sourceSkyPaletteReturn129710_;
+    if(ret.entered||!finishSourceSkyPaletteConstructor(pc,0))return false;
+    const auto at=[&](std::uint32_t p){pc=sourcePostParticleModelsPC_=p;};
+    ret.entered=true;
+    at(0x129714);at(0x129718);
+    if(!sourceTrackMountDomain_||sourceTrackMountDomain_->resolver3E1A70()!=sourceSkyFile_->resolver_)return false;
+    at(0x12971c);at(0x129720);at(0x129724);at(0x129728);at(0x12972c);ret.restoreAttempted=true;
+    a::OriginalStandardTextureDiagnostic50LA d;
+    if(!sourceSkyFile_->restorePaletteStart(d)){at(d.sourcePC?d.sourcePC:0x12f640u);return false;}
+    ret.restoreReturned=true;at(0x129730);at(0x129734);at(0x129738);ret.indexS2=1;at(0x12973c);
+    at(0x129740);at(0x129744);at(0x129748);at(0x12974c);
+    if(!sourceSkyHeader129644_.paletteCount)return false;
+    if(*sourceSkyHeader129644_.paletteCount<=1u){
+        at(0x129750);ret.field40Cleared=true;at(0x129754);at(0x129758);return continueSourceSkyItems129758(pc);
+    }
+    at(0x129670);return continueSourceSkyFollowingPaletteDirectory(pc,ret);
+}
+bool Owner::continueSourceSkyFollowingPaletteDirectory(std::uint32_t& pc,SourceSkyPaletteReturn129710& ret)noexcept {
+    if(pc!=0x129670u||ret.nextEntered||!ret.restoreReturned||!ret.indexS2||*ret.indexS2<1||
+       !preflightSourcePostParticleModelsNative()||!sourceSkyFile_||!sourceSkyFile_->current()||
+       sourceSkyFile_->followingPalettes_.size()+1!=static_cast<std::size_t>(*ret.indexS2))return false;
+    const auto at=[&](std::uint32_t p){pc=sourcePostParticleModelsPC_=p;};
+    a::OriginalStandardTextureDiagnostic50LA d;
+    ret.nextEntered=true;at(0x129670);at(0x129674);
+    if(sourceTrackMountDomain_->resolver3E1A70()!=sourceSkyFile_->resolver_)return false;
+    at(0x129678);at(0x12967c);at(0x129680);at(0x129684);at(0x129688);
+    if(!sourceSkyFile_->readFollowingPaletteOffset(d)){at(d.sourcePC?d.sourcePC:sourceSkyFile_->pc_);return false;}
+    const auto& step=*sourceSkyFile_->followingPalettes_.back();at(0x12968c);at(0x129690);at(0x129694);
+    if(step.offsetRead.items!=1u){at(0x129960);return false;}
+    const auto& b=step.offsetRead.bytes;ret.nextOffset=std::uint32_t(b[0])|(std::uint32_t(b[1])<<8)|
+        (std::uint32_t(b[2])<<16)|(std::uint32_t(b[3])<<24);
+    at(0x129698);at(0x12969c);if(sourceTrackMountDomain_->resolver3E1A70()!=sourceSkyFile_->resolver_)return false;
+    at(0x1296a0);at(0x1296a4);if(!sourceSkyFile_->tellFollowingPaletteStart(d)){at(d.sourcePC?d.sourcePC:0x12f520u);return false;}
+    at(0x1296a8);at(0x1296ac);at(0x1296b0);if(sourceTrackMountDomain_->resolver3E1A70()!=sourceSkyFile_->resolver_)return false;
+    at(0x1296b4);ret.nextSavedS4=*step.start<=0x7fffffffu?static_cast<std::int64_t>(*step.start):static_cast<std::int64_t>(*step.start)-0x100000000ll;
+    at(0x1296b8);at(0x1296bc);at(0x1296c0);at(0x1296c4);
+    if(!sourceSkyFile_->seekFollowingPaletteAbsolute(*ret.nextOffset,d)){at(d.sourcePC?d.sourcePC:0x12f640u);return false;}
+    at(0x1296c8);at(0x1296cc);at(0x1296d0);
+    if(*ret.indexS2==1)return continueSourceSkyOldPalette1296D0(pc);
+    if(sourceSkyLaterDispatcherActive_)return false; //Return one actual directory transition to iterative driver.
+    return continueSourceSkyLaterPalettes(pc,static_cast<std::size_t>(*ret.indexS2));
+}
+bool Owner::initializeSourceSkyPaletteBase2E38C0(SourceSkyPaletteOwner& owner,SourceSkyPalette2E38C0& h,std::uint32_t& pc)noexcept {
+    if(!owner.storage||!h.allocationNonNull||h.constructorEntered)return false;
+    const auto at=[&](std::uint32_t p){pc=sourcePostParticleModelsPC_=p;};
+    h.constructorEntered=true;at(0x2e38c0);at(0x2e38d8);at(0x2e38dc);at(0x1048f0);
+    auto* b=owner.storage.get();
+    const auto store32=[&](std::size_t offset,std::uint32_t value){for(std::size_t i=0;i<4;++i)b[offset+i]=static_cast<std::uint8_t>(value>>(i*8));};
+    at(0x1048f8);h.vtable08=0x3cc980u;store32(8,*h.vtable08);at(0x1048fc);at(0x104900);
+    b[0]=1;for(std::size_t i=1;i<8;++i)b[i]=0;h.reference00=1;
+    at(0x104904);at(0x104908);h.baseReturned=true;
+    at(0x2e38e0);at(0x2e38e4);at(0x2e38e8);at(0x2e38ec);at(0x2e38f0);at(0x2e38f4);
+    at(0x2e38f8);h.vtable08=0x3d5650u;store32(8,*h.vtable08);h.derivedVtableStored=true;
+    at(0x2e38fc);return true;
+}
+bool Owner::continueSourceSkyOldPalette1296D0(std::uint32_t& pc,std::size_t occurrence)noexcept {
+    if(!occurrence||occurrence>=sourceSkyLaterPalettes_.size()+2)return false;
+    auto& old=sourcePaletteHistory(occurrence-1);auto& next=sourcePaletteHistory(occurrence);
+    auto& oldOwner=sourcePaletteOwner(occurrence-1);auto& nextOwner=sourcePaletteOwner(occurrence);
+    if(pc!=0x1296d0u||next.entered||!preflightSourcePostParticleModelsNative()||
+       !sourceSkyFile_||!sourceSkyFile_->current()||!sourceSkyPalette7D0_||sourceSkyPublishedPaletteOccurrence_!=occurrence-1)return false;
+    const auto at=[&](std::uint32_t p){pc=sourcePostParticleModelsPC_=p;};
+    at(0x1296d0);at(0x1296d4);at(0x1296d8);
+    if(*sourceSkyPalette7D0_){
+        if(*sourceSkyPalette7D0_!=oldOwner.get()||!old.constructorReturned||
+           old.sourceReleaseEntered||old.reference00!=1u||!oldOwner->storage)return false;
+        auto* bytes=oldOwner->storage.get();at(0x1296dc);at(0x1296e0);at(0x1296e4);at(0x1296e8);
+        at(0x104970);old.sourceReleaseEntered=true;at(0x104978);at(0x10497c);at(0x104980);
+        for(std::size_t i=0;i<8;++i)bytes[i]=0;old.sourceReferenceDecremented=true;
+        at(0x104984);at(0x104988);at(0x10498c);at(0x104990);at(0x104994);at(0x104998);at(0x10499c);at(0x1049a0);at(0x1049a4);
+        at(0x2e3d50);at(0x2e3d74); //Derived table rewrite is same known3D5650.
+        at(0x2e3d78);at(0x2e3d7c);
+        if(!sourceTrackMountDomain_||sourceTrackMountDomain_->resolver3E1A70()!=sourceSkyFile_->resolver_)return false;
+        at(0x2e3d80);at(0x2e3d84);a::OriginalStandardTextureDiagnostic50LA d;
+        if(!sourceSkyFile_->scanFreshPalette1327D0(d,occurrence-1)){at(d.sourcePC?d.sourcePC:sourceSkyFile_->pc_);return false;}
+        old.sourceAssociationScanReturned=true;at(0x2e3d88);at(0x2e3d8c);at(0x2e3d90);at(0x104910);
+        at(0x104938);at(0x10493c);for(std::size_t i=0;i<4;++i)bytes[8+i]=static_cast<std::uint8_t>(0x3cc980u>>(i*8));
+        old.sourceBaseDestructed=true;at(0x104948);at(0x10494c);at(0x104950);at(0x104954);at(0x104958);
+        at(0x2e3d94);at(0x2e3d98);at(0x2e3d9c);at(0x2e3da0);at(0x2e3da4);at(0x2e3da8);
+        at(0x2e8b00);
+        if(!a::OriginalConfigProcessGlobals50LA::descriptorDelete2E8B00AdmittedNative())return false;
+        old.sourceFreeAdmitted=true;
+        if(!sourceSkyFile_->retirePaletteDestinationSource(occurrence-1))return false;
+        oldOwner->storage.reset();old.sourceBackingFreed=true;
+        //Keep source7D0's stale identity represented by metadata until a later
+        //source publication overwrites it; never dereference freed backing.
+        at(0x2e3dac);at(0x2e3db0);at(0x2e3db4);at(0x2e3db8);at(0x2e3dbc);at(0x2e3dc0);
+        at(0x1049a8);at(0x1049ac);at(0x1049b0);at(0x1049b4);old.sourceReleaseReturned=true;
+        at(0x1296ec);at(0x1296f0);
+    }
+    at(0x1296f4);at(0x1296f8);next.entered=true;next.allocationAttempted=true;
+    try{nextOwner.reset(new SourceSkyPaletteOwner);}catch(...){return false;}
+    try{nextOwner->storage.reset(new std::uint8_t[0x18b18]);}catch(...){nextOwner.reset();}
+    next.allocationReturned=true;next.allocationNonNull=bool(nextOwner);at(0x1296fc);at(0x129700);
+    if(!next.allocationNonNull){at(0x129710);return continueSourceSkyPaletteReturnForOccurrence(pc,occurrence);}
+    at(0x129704);at(0x129708);at(0x12970c);
+    if(!initializeSourceSkyPaletteBase2E38C0(*nextOwner,next,pc))return false;
+    if(!sourceSkyFile_->beginPalette2E38C0(nextOwner->storage.get(),occurrence))return false;
+    return continueSourceSkyPaletteHeaders2E38FC(pc,occurrence);
+}
+bool Owner::continueSourceSkyNextPaletteReturn129710(std::uint32_t& pc)noexcept {
+    if(!finishSourceSkyPaletteConstructor(pc,1))return false;
+    pc=sourcePostParticleModelsPC_=0x129714;return continueSourceSkySecondPaletteRestore129714(pc,1);
+}
+bool Owner::continueSourceSkySecondPaletteRestore129714(std::uint32_t& pc,std::size_t occurrence)noexcept {
+    if(!occurrence||occurrence>=sourceSkyLaterPalettes_.size()+2||occurrence>=0x7fffffffu)return false;
+    auto& ret=sourcePaletteReturn(occurrence);
+    if(pc!=0x129714u||ret.entered||!sourcePaletteHistory(occurrence).slotPublished||
+       !preflightSourcePostParticleModelsNative()||!sourceSkyFile_||!sourceSkyFile_->current()||
+       sourceSkyFile_->followingPalettes_.size()!=occurrence)return false;
+    const auto at=[&](std::uint32_t p){pc=sourcePostParticleModelsPC_=p;};
+    ret.entered=true;at(0x129714);at(0x129718);
+    if(!sourceTrackMountDomain_||sourceTrackMountDomain_->resolver3E1A70()!=sourceSkyFile_->resolver_)return false;
+    at(0x12971c);at(0x129720);at(0x129724);at(0x129728);at(0x12972c);ret.restoreAttempted=true;
+    a::OriginalStandardTextureDiagnostic50LA d;
+    if(!sourceSkyFile_->restoreFollowingPaletteStart(occurrence-1,d)){at(d.sourcePC?d.sourcePC:0x12f640u);return false;}
+    ret.restoreReturned=true;at(0x129730);at(0x129734);at(0x129738);ret.indexS2=static_cast<std::int32_t>(occurrence+1);at(0x12973c);
+    at(0x129740);at(0x129744);at(0x129748);at(0x12974c);
+    if(!sourceSkyHeader129644_.paletteCount)return false;
+    //The admitted original header is positive signed32; both palette returns
+    //were actually reached before this occurrence-qualified signed comparison.
+    if(*sourceSkyHeader129644_.paletteCount<=static_cast<std::uint32_t>(*ret.indexS2)){
+        at(0x129750);ret.field40Cleared=true;at(0x129754);at(0x129758);return continueSourceSkyItems129758(pc);
+    }
+    at(0x129670);return continueSourceSkyFollowingPaletteDirectory(pc,ret);
+}
+bool Owner::preflightSourceSkyLaterPalettesNative()const noexcept {
+    const bool retired=sourceSkyPalette2E38C0_.nativeWithdrawn;
+    const auto retAt=[&](std::size_t i)->const SourceSkyPaletteReturn129710& {
+        return i==0?sourceSkyPaletteReturn129710_:i==1?sourceSkyNextPaletteReturn129710_:sourceSkyLaterPalettes_[i-2]->returned;
+    };
+    const auto word=[](const std::array<std::uint8_t,4>& b){return std::uint32_t(b[0])|(std::uint32_t(b[1])<<8)|
+        (std::uint32_t(b[2])<<16)|(std::uint32_t(b[3])<<24);};
+    constexpr std::size_t sizes[3]={0x300,0x8000,0x10000};
+    for(const auto& row:sourceSkyLaterPalettes_)if(!row)return false;
+    for(std::size_t i=1;i<sourceSkyLaterPalettes_.size()+2;++i){
+        const auto& h=sourcePaletteHistory(i);const auto& owner=sourcePaletteOwner(i);
+        const auto& prev=sourcePaletteHistory(i-1);const auto& previousReturn=retAt(i-1);const auto& ret=retAt(i);
+        if((h.entered&&(!previousReturn.nextEntered||!previousReturn.indexS2||
+              static_cast<std::size_t>(*previousReturn.indexS2)!=i||(prev.allocationNonNull&&!prev.sourceReleaseReturned)))||
+           (h.allocationAttempted&&!h.entered)||(h.allocationReturned&&!h.allocationAttempted)||
+           (h.allocationNonNull&&!h.allocationReturned)||(h.constructorEntered&&!h.allocationNonNull)||
+           (h.baseReturned&&(!h.constructorEntered||h.reference00!=1u))||
+           (h.derivedVtableStored&&(!h.baseReturned||h.vtable08!=0x3d5650u))||
+           (h.constructorReturned&&!h.constructorEntered)||(h.slotPublished&&(!h.allocationReturned||(h.allocationNonNull&&!h.constructorReturned)))||
+           (h.nativeReferenceWithdrawn&&(!h.baseReturned||!h.nativeWithdrawn||h.sourceReferenceDecremented))||
+           (h.nativeWithdrawn&&(!retired||!h.entered))||
+           (h.sourceReleaseEntered&&(!ret.nextEntered||!h.slotPublished))||
+           (h.sourceReferenceDecremented&&(!h.sourceReleaseEntered||h.reference00!=1u))||
+           (h.sourceAssociationScanReturned&&!h.sourceReferenceDecremented)||
+           (h.sourceBaseDestructed&&!h.sourceAssociationScanReturned)||(h.sourceFreeAdmitted&&!h.sourceBaseDestructed)||
+           (h.sourceBackingFreed&&!h.sourceFreeAdmitted)||(h.sourceReleaseReturned&&!h.sourceBackingFreed))return false;
+        if(retired){if(owner||(h.entered&&!h.nativeWithdrawn)||(h.baseReturned&&!h.sourceReferenceDecremented&&!h.nativeReferenceWithdrawn))return false;}
+        else if(h.allocationNonNull!=bool(owner))return false;
+        const a::OriginalSourceSkyFile50LA::PaletteIteration* step=nullptr;
+        if(sourceSkyFile_&&i<=sourceSkyFile_->followingPalettes_.size())step=sourceSkyFile_->followingPalettes_[i-1].get();
+        if(h.entered&&(!step||!step->seekReturned||!sourceSkyHeader129644_.paletteCount||i>=*sourceSkyHeader129644_.paletteCount))return false;
+        if(step){
+            if((step->parserEntered&&!h.derivedVtableStored)||
+               (h.sourceAssociationScanReturned&&!step->scanReturned)||(h.sourceBackingFreed&&!step->parserReleasedSource))return false;
+            if(step->parserEntered){
+                if(retired){if(!step->parserWithdrawn&&!step->parserReleasedSource)return false;}
+                else if(h.sourceBackingFreed){if(!step->parserReleasedSource)return false;}
+                else if(step->parserWithdrawn||step->parserReleasedSource||!owner||!owner->storage||step->parserReceiver!=owner->storage.get())return false;
+            }
+            for(std::size_t j=0;j<3;++j){const auto& read=step->headers[j];const auto& payload=step->payloads[j];
+                if(h.readAttempted[j]!=read.attempted||h.readReturned[j]!=read.returned||
+                   (read.attempted&&(!h.derivedVtableStored||(j&&step->headers[j-1].items!=1u)))||
+                   h.payloadAttempted[j]!=payload.attempted||h.payloadReturned[j]!=payload.returned||h.payloadBytes[j]!=payload.copied||
+                   (payload.attempted&&(!h.rawEntered||(j&&step->payloads[j-1].items!=1u)))||h.payloadBytes[j]>sizes[j])return false;
+                if(j<2&&h.fieldBytes[j]!=read.copied)return false;
+                if(!retired&&!h.sourceBackingFreed&&read.copied&&j<2&&(!owner||!owner->storage||
+                   std::memcmp(owner->storage.get()+0x10+j*4,read.bytes.data(),read.copied)!=0))return false;
+            }
+            if(h.compressedFlag&&(step->headers[2].items!=1u||*h.compressedFlag!=word(step->headers[2].bytes)))return false;
+            if((h.rawEntered&&h.compressedFlag!=0u)||(h.rawReturned&&(!h.rawEntered||step->payloads[0].items!=1u||
+               step->payloads[1].items!=1u||step->payloads[2].items!=1u))||
+               (h.count14Read&&(!h.rawReturned||step->headers[1].items!=1u||h.count14!=word(step->headers[1].bytes)))||
+               (h.count14.has_value()!=h.count14Read)||h.convertedColors>256||(h.convertedColors&&h.count14!=256u))return false;
+        }else if(h.readAttempted[0]||h.sourceReleaseEntered)return false;
+        if(!retired&&h.baseReturned&&!h.sourceBackingFreed){
+            if(!owner||!owner->storage||!h.vtable08)return false;const auto* b=owner->storage.get();
+            if(b[0]!=(h.sourceReferenceDecremented?0:1))return false;for(std::size_t k=1;k<8;++k)if(b[k])return false;
+            const auto table=h.sourceBaseDestructed?0x3cc980u:*h.vtable08;
+            for(std::size_t k=0;k<4;++k)if(b[8+k]!=((table>>(k*8))&255u))return false;
+            for(std::uint32_t c=0;c<h.convertedColors;++c){const auto red=std::uint32_t(b[0x18+c*3]),green=std::uint32_t(b[0x19+c*3]),blue=std::uint32_t(b[0x1a+c*3]);
+                const auto a=((red>>3)<<10)|((green>>3)<<5)|(blue>>3),v=((red>>3)<<11)|((green>>2)<<5)|(blue>>3);
+                if(b[0x318+c*2]!=(a&255u)||b[0x319+c*2]!=(a>>8)||b[0x518+c*2]!=(v&255u)||b[0x519+c*2]!=(v>>8))return false;
+            }
+        }
+        if((ret.entered&&!h.slotPublished)||(ret.restoreAttempted&&!ret.entered)||
+           (ret.restoreReturned&&(!ret.restoreAttempted||!step||!step->restoreReturned))||
+           (ret.indexS2&&(!ret.restoreReturned||*ret.indexS2<1||static_cast<std::size_t>(*ret.indexS2)!=i+1))||
+           (ret.nextEntered&&(!ret.indexS2||!sourceSkyHeader129644_.paletteCount||static_cast<std::uint32_t>(*ret.indexS2)>=*sourceSkyHeader129644_.paletteCount))||
+           (ret.field40Cleared&&(!ret.indexS2||sourceSkyHeader129644_.paletteCount!=static_cast<std::uint32_t>(*ret.indexS2)))||
+           (ret.nextSavedS4&&!ret.nextOffset))return false;
+        if(ret.nextOffset){
+            if(!ret.nextEntered||!sourceSkyFile_||sourceSkyFile_->followingPalettes_.size()<=i)return false;
+            const auto& directory=*sourceSkyFile_->followingPalettes_[i];
+            if(directory.offsetRead.items!=1u||*ret.nextOffset!=word(directory.offsetRead.bytes)||
+               (directory.seekAttempted&&directory.target!=ret.nextOffset))return false;
+            if(ret.nextSavedS4&&(!directory.tellReturned||!directory.start||*ret.nextSavedS4!=(*directory.start<=0x7fffffffu?
+               static_cast<std::int64_t>(*directory.start):static_cast<std::int64_t>(*directory.start)-0x100000000ll)))return false;
+        }
+    }
+    return true;
+}
+bool Owner::finishSourceSkyPaletteConstructor(std::uint32_t& pc,std::size_t occurrence)noexcept {
+    if(occurrence>=sourceSkyLaterPalettes_.size()+2)return false;
+    auto& h=sourcePaletteHistory(occurrence);auto& owner=sourcePaletteOwner(occurrence);
+    if((pc!=0x2e3d2cu&&pc!=0x2e3d34u&&pc!=0x129710u)||h.slotPublished||
+       !preflightSourcePostParticleModelsNative()||!sourceSkyFile_||!sourceSkyFile_->current())return false;
+    const auto at=[&](std::uint32_t p){pc=sourcePostParticleModelsPC_=p;};
+    if(pc!=0x129710u){
+        if(!h.constructorEntered||h.constructorReturned||!owner)return false;
+        if(pc==0x2e3d2cu){if(h.convertedColors!=256u)return false;at(0x2e3d30);}else at(0x2e3d38);
+        at(0x2e3d3c);at(0x2e3d40);at(0x2e3d44);at(0x2e3d48);at(0x2e3d4c);h.constructorReturned=true;
+        at(0x129710);
+    }else if(h.allocationNonNull)return false;
+    sourceSkyPalette7D0_=owner.get();sourceSkyPublishedPaletteOccurrence_=occurrence;h.slotPublished=true;
+    return true; //Actual store/control return only, not resource readiness.
+}
+bool Owner::continueSourceSkyPaletteReturnForOccurrence(std::uint32_t& pc,std::size_t occurrence)noexcept {
+    if(!occurrence)return continueSourceSkyPaletteReturn129710(pc);
+    if(!finishSourceSkyPaletteConstructor(pc,occurrence))return false;
+    pc=sourcePostParticleModelsPC_=0x129714;return continueSourceSkySecondPaletteRestore129714(pc,occurrence);
+}
+bool Owner::continueSourceSkyLaterPalettes(std::uint32_t& pc,std::size_t occurrence)noexcept {
+    if(sourceSkyLaterDispatcherActive_||occurrence<2||pc!=0x1296d0u)return false;
+    struct ActiveScope {bool& active;explicit ActiveScope(bool& b):active(b){active=true;}~ActiveScope(){active=false;}} scope(sourceSkyLaterDispatcherActive_);
+    for(;;){
+        if(!sourceSkyHeader129644_.paletteCount||occurrence>=*sourceSkyHeader129644_.paletteCount||
+           occurrence!=sourceSkyLaterPalettes_.size()+2||!sourceSkyFile_||sourceSkyFile_->followingPalettes_.size()!=occurrence||
+           !sourceSkyFile_->followingPalettes_[occurrence-1]->seekReturned||!preflightSourcePostParticleModelsNative())return false;
+        //Native ledger allocation precedes source release/allocation. Refusal
+        //keeps the prior published owner untouched; never a guest NULL result.
+        try{auto row=std::unique_ptr<SourceSkyLaterPalette>(new SourceSkyLaterPalette);sourceSkyLaterPalettes_.push_back(std::move(row));}
+        catch(...){return false;}
+        (void)continueSourceSkyOldPalette1296D0(pc,occurrence);
+        const auto& done=sourceSkyLaterPalettes_.back()->returned;
+        if(pc!=0x1296d0u||!done.restoreReturned||!done.nextEntered||!done.indexS2||
+           static_cast<std::size_t>(*done.indexS2)!=occurrence+1||sourceSkyFile_->followingPalettes_.size()!=occurrence+1||
+           !sourceSkyFile_->followingPalettes_[occurrence]->seekReturned)return false;
+        ++occurrence; //Iterative source loop; native call stack is independent of authored count.
+    }
+}
+bool Owner::preflightSourceSkyItemsNative()const noexcept {
+    const auto& h=sourceSkyItems129758_;
+    if((h.allocationAttempted&&(!h.entered||!h.count7D8||*h.count7D8>0x3fffffffu))||
+       (h.arrayBytes&&(!h.count7D8||*h.arrayBytes!=*h.count7D8*4u))||
+       (h.allocationReturned&&!h.allocationAttempted)||(h.allocationNonNull&&!h.allocationReturned)||
+       (h.published&&!h.allocationReturned)||(h.indexS4&&(!h.published||*h.indexS4!=0))||
+       (h.offsetS2&&(!h.indexS4||*h.offsetS2!=0))||(h.directoryEntered&&(!h.offsetS2||!h.count7D8||!*h.count7D8))||
+       (h.itemAllocationAttempted&&(!h.directoryEntered||!h.absoluteOffset))||
+       (h.itemAllocationReturned&&!h.itemAllocationAttempted)||(h.itemAllocationNonNull&&!h.itemAllocationReturned)||
+       (h.constructorEntered&&!h.itemAllocationNonNull)||(h.baseReturned&&(!h.constructorEntered||h.reference00!=(h.failureReferenceStored?0u:1u)))||
+       h.callbacks>6||h.defaultGroups>6||(h.constructorReturned&&(!h.baseReturned||h.callbacks!=6||h.defaultGroups!=6||!h.origin3E0900))||
+       (h.parserEntered&&!h.itemAllocationReturned)||(h.handleStored&&(!h.constructorReturned||!h.parserEntered||!h.handle40))||
+       (h.headerAttempted&&!h.handleStored)||(h.headerReturned&&!h.headerAttempted)||h.headerCopied>4||
+       (h.referenceWithdrawnNative&&(!h.nativeWithdrawn||!h.baseReturned))||
+       (h.parserModeA2&&*h.parserModeA2!=0u)||(h.parserEntered&&!h.parserModeA2)||
+       (h.dataPosition650&&(!h.headerReturned||!sourceSkyFile_||!sourceSkyFile_->firstItem_||
+        !sourceSkyFile_->firstItem_->finalTellReturned||!sourceSkyFile_->firstItem_->finalPosition||
+        *h.dataPosition650!=static_cast<std::uint32_t>(*sourceSkyFile_->firstItem_->finalPosition)))||
+       (h.parserReturned&&((!h.dataPosition650&&!h.failureNullReturned)||h.parserModeA2!=0u))||
+       (h.slotStored&&(!h.parserReturned||!h.allocationNonNull))||
+       (h.restoreAttempted&&!h.slotStored)||(h.restoreReturned&&!h.restoreAttempted)||
+       (h.advancedIndexS4&&(!h.restoreReturned||*h.advancedIndexS4!=1u||h.advancedOffsetS2!=4u))||
+       (h.loopCount7D8&&(!h.advancedIndexS4||h.loopCount7D8!=h.count7D8))||
+       (h.nextDirectoryEntered&&(!h.loopCount7D8||*h.loopCount7D8<=1u)))return false;
+    if(h.entered){
+        if(!sourceSkyHeader129644_.count7D8||h.count7D8!=sourceSkyHeader129644_.count7D8)return false;
+        if(!h.nativeWithdrawn&&(!sourceSkyOwner_||sourceSkyOwner_->count7D8!=*h.count7D8))return false;
+    }
+    if(h.directoryEntered){if(!sourceSkyFile_)return false;
+        if(sourceSkyFile_->firstItem_){const auto& item=*sourceSkyFile_->firstItem_;
+            const auto word=[](const std::array<std::uint8_t,4>& b){return std::uint32_t(b[0])|(std::uint32_t(b[1])<<8)|
+                (std::uint32_t(b[2])<<16)|(std::uint32_t(b[3])<<24);};
+            if(h.absoluteOffset&&(item.offsetRead.items!=1u||*h.absoluteOffset!=word(item.offsetRead.bytes)||
+               (item.seekAttempted&&item.target!=h.absoluteOffset)))return false;
+            if(h.savedS5&&(!item.tellReturned||!item.start||*h.savedS5!=(*item.start<=0x7fffffffu?
+               static_cast<std::int64_t>(*item.start):static_cast<std::int64_t>(*item.start)-0x100000000ll)))return false;
+            if(item.header48.attempted!=h.headerAttempted||item.header48.returned!=h.headerReturned||
+               item.header48.copied!=h.headerCopied||item.header48.items!=h.headerItems)return false;
+            if(item.parserEntered&&(!h.handleStored||(!h.nativeWithdrawn&&(!sourceSkyFirstItem_||
+               item.receiver!=sourceSkyFirstItem_->storage.get()||item.nativeWithdrawn))))return false;
+            if(h.nativeWithdrawn&&!item.nativeWithdrawn)return false;
+        }else if(h.absoluteOffset||h.itemAllocationAttempted)return false;
+    }
+    if(!preflightSourceSkyItemOccurrence(0))return false;
+    if(!sourceSkyLaterItems_.empty()&&(!sourceSkyFile_||sourceSkyLaterItems_.size()>sourceSkyFile_->followingItems_.size()))return false;
+    for(std::size_t i=1;i<=sourceSkyLaterItems_.size();++i)if(!sourceSkyLaterItems_[i-1]||!preflightSourceSkyItemOccurrence(i))return false;
+    for(std::size_t i=0;i<=sourceSkyLaterItems_.size();++i){const auto& loop=sourceItemLoop(i);const auto& state=sourceItemHistory(i);
+        const auto* item=sourceSkyFile_?sourceSkyFile_->itemOccurrence(i):nullptr;
+        if((loop.restoreAttempted&&!state.slotStored)||(loop.restoreReturned&&!loop.restoreAttempted)||
+           (loop.advancedIndexS4&&(!loop.restoreReturned||*loop.advancedIndexS4!=i+1u||loop.advancedOffsetS2!=(i+1u)*4u))||
+           (loop.loopCount7D8&&(!loop.advancedIndexS4||loop.loopCount7D8!=h.count7D8))||
+           (loop.nextDirectoryEntered&&(!loop.loopCount7D8||*loop.loopCount7D8<=i+1u)))return false;
+        if(item){if(item->restoreAttempted!=loop.restoreAttempted||item->restoreReturned!=loop.restoreReturned)return false;}
+        else if(loop.restoreAttempted||loop.nextDirectoryEntered)return false;
+        const auto* next=sourceSkyFile_?sourceSkyFile_->itemOccurrence(i+1):nullptr;
+        if(loop.nextDirectoryEntered){
+            if(next){const auto& b=next->offsetRead.bytes;
+                if(loop.nextAbsoluteOffset&&(next->offsetRead.items!=1u||*loop.nextAbsoluteOffset!=(std::uint32_t(b[0])|
+                    (std::uint32_t(b[1])<<8)|(std::uint32_t(b[2])<<16)|(std::uint32_t(b[3])<<24))||
+                    (next->seekAttempted&&next->target!=loop.nextAbsoluteOffset)))return false;
+                if(loop.nextSavedS5&&(!next->tellReturned||!next->start||*loop.nextSavedS5!=(*next->start<=0x7fffffffu?
+                    static_cast<std::int64_t>(*next->start):static_cast<std::int64_t>(*next->start)-0x100000000ll)))return false;
+                if((next->parserEntered&&i+1>sourceSkyLaterItems_.size())||(h.nativeWithdrawn&&!next->nativeWithdrawn))return false;
+            }else if(loop.nextAbsoluteOffset||loop.nextSavedS5)return false;
+        }else if(next)return false;
+    }
+    if(bool(sourceSkySelected38_)!=bool(sourceSkySelectedItemOccurrence_))return false;
+    if(sourceSkyPostItems_.entered){
+        if(!h.count7D8||sourceSkyPostItems_.indexS4>*h.count7D8||sourceSkyPostItems_.offsetS2!=sourceSkyPostItems_.indexS4*4u)return false;
+        if(sourceSkyPostItems_.nativeWithdrawn){if(sourceSkySelected38_||sourceSkySelectedItemOccurrence_)return false;}
+        else if(sourceSkySelectedItemOccurrence_){const auto i=*sourceSkySelectedItemOccurrence_;
+            if(i>sourceSkyLaterItems_.size()||!sourceItemHistory(i).registration.field38Stored||*sourceSkySelected38_!=sourceItemOwner(i).get())return false;}
+    }else if(sourceSkySelected38_||sourceSkySelectedItemOccurrence_)return false;
+    const auto& post=sourceSkyPostItems_;
+    if(post.tailEntered){if(!post.entered||!h.count7D8||post.indexS4!=*h.count7D8)return false;
+        for(std::size_t i=0;i<post.indexS4;++i)if(!sourceItemHistory(i).registration.returned)return false;}
+    if((post.index40Stored&&!post.tailEntered)||(post.firstSlotRead&&!post.index40Stored)||
+       (post.firstSlotSelected&&!post.firstSlotRead)||(post.packetCallEntered&&!post.firstSlotSelected)||
+       (post.packetAllocationAttempted&&!post.packetCallEntered)||(post.packetAllocationReturned&&!post.packetAllocationAttempted)||
+       (post.packetZeroed&&!post.packetAllocationReturned)||(post.packetHeaderStored&&!post.packetZeroed))return false;
+    if(post.packetItemLanesStored>3u||(post.packetItemLanesStored&&!post.packetHeaderStored)||
+       (post.packetMatrixStored&&post.packetItemLanesStored!=3u)||(post.packetTagsStored&&!post.packetMatrixStored))return false;
+    if((post.packetPointerStored&&!post.packetTagsStored)||(post.packetReturned&&!post.packetPointerStored)||
+       (post.packetPublished7E0&&!post.packetReturned))return false;
+    if(post.nativeWithdrawn){if(post.packetBacking||post.packet340||post.packetData04||post.packet7E0||!post.packetNativeWithdrawn)return false;}
+    else {
+        if(post.firstSlotSelected&&(!sourceSkySelectedItemOccurrence_||*sourceSkySelectedItemOccurrence_!=0||!sourceSkySelected38_||*sourceSkySelected38_!=sourceItemOwner(0).get()))return false;
+        if(bool(post.packetBacking)!=bool(post.packet340))return false;
+        if(post.packetPointerStored){if(!post.packet340||post.packetData04!=post.packet340+0x10)return false;}else if(post.packetData04)return false;
+        if(post.packetPublished7E0){if(post.packet7E0!=post.packet340||!sourceSkyOwner_)return false;}else if(post.packet7E0)return false;
+        if(post.packet340){const auto base=reinterpret_cast<std::uintptr_t>(post.packetBacking.get()),address=reinterpret_cast<std::uintptr_t>(post.packet340);
+            if(!post.packetAllocationReturned||address%64||address<base||address-base>63)return false;}
+        if(post.packetZeroed){if(!post.packet340)return false;std::array<std::uint8_t,0x340> expected{};
+            if(post.packetHeaderStored){const auto word=[&](std::size_t off,std::uint32_t value){for(std::size_t k=0;k<4;++k)expected[off+k]=static_cast<std::uint8_t>(value>>(8*k));};
+                word(0x10,0x11000000);word(0x14,0x03000000);word(0x18,0x02000000);word(0x1c,0x6c028320);
+                expected[0x20]=1;expected[0x21]=0x80;expected[0x27]=0x10;expected[0x28]=0x0e;
+                word(0x30,0x0005000c);word(0x38,0x47);word(0x40,0x14000000);word(0x4c,0x6c2a8000);
+                word(0x50,0x3f800000);word(0x64,0x3f800000);word(0x78,0x3f800000);}
+            for(std::size_t lane=0;lane<post.packetItemLanesStored;++lane){
+                const auto* selected=sourceItemOwner(0).get();
+                if(!selected||!selected->storage)return false;
+                for(std::size_t k=0;k<4;++k){const auto value=static_cast<std::uint8_t>(post.packetItemWords[lane]>>(8*k));
+                    if(!selected->known[0x10+4*lane+k]||selected->storage[0x10+4*lane+k]!=value)return false;
+                    expected[0x80+4*lane+k]=value;}
+            }
+            if(post.packetMatrixStored){const auto word=[&](std::size_t off,std::uint32_t value){for(std::size_t k=0;k<4;++k)expected[off+k]=static_cast<std::uint8_t>(value>>(8*k));};
+                for(const auto off:{0x8cu,0x190u,0x1a4u,0x1b8u,0x1ccu})word(off,0x3f800000u);
+                for(const auto off:{0x1e8u,0x1e4u,0x1e0u,0x1f8u,0x1f4u,0x1f0u,0x208u,0x204u,0x200u,0x218u,0x214u,0x210u})word(off,0x42fe0000u);
+            }
+            if(post.packetTagsStored){const auto word=[&](std::size_t off,std::uint32_t value){for(std::size_t k=0;k<4;++k)expected[off+k]=static_cast<std::uint8_t>(value>>(8*k));};
+                expected[0x270]=5;expected[0x271]=0x80;expected[0x275]=0xc0;expected[0x276]=0x0e;expected[0x277]=0x30;expected[0x278]=0x12;expected[0x279]=4;
+                for(const auto off:{0x280u,0x2a0u}){expected[off]=1;expected[off+1]=0x80;expected[off+5]=0x40;expected[off+7]=0x10;expected[off+8]=0x0f;}
+                word(0x29c,0x7f);word(0x2bc,0x7f);word(0x2e0,6);word(0x2fc,0x6c02802b);
+                word(0x320,0x14000010);word(0x324,0x10000000);word(0x328,0x030000b5);word(0x32c,0x02000190);
+                expected[0]=0x33;expected[3]=0x30;
+            }
+            for(std::size_t k=0;k<expected.size();++k){
+                if(post.packetPointerStored&&k>=4&&k<8)continue; //EE address bytes are unknown; typed alias checked above.
+                if(post.packet340[k]!=expected[k])return false;}}
+    }
+    if(post.rowsEntered&&!post.packetPublished7E0)return false;
+    if(post.rowIndexS4>=96u||post.rowOffsetS2!=post.rowIndexS4*4u)return false;
+    for(std::size_t i=0;i<post.rows.size();++i){const auto* row=post.rows[i].get();
+        if(!row){if(post.rows7E8[i])return false;continue;}
+        if(!post.rowsEntered||i>post.rowIndexS4||
+           (row->allocationReturned&&!row->allocationAttempted)||
+           (row->constructorReturned&&!row->allocationReturned)||
+           (row->slot7E8Stored&&!row->allocationReturned)||
+           (row->helper12A510Entered&&(!row->slot7E8Stored||!row->constructorReturned)))return false;
+        if(post.nativeWithdrawn){if(!row->nativeWithdrawn||row->object30||post.rows7E8[i]||row->packetSkyThis||row->packetBacking||row->packetC0)return false;continue;}
+        if(row->nativeWithdrawn)return false;
+        if((row->packetSkyThis&&(!row->helper12A510Entered||row->packetSkyThis!=sourceSkyOwner_.get()))||
+           (row->packetAllocationAttempted&&!row->packetSkyThis)||
+           (row->packetAllocationReturned&&!row->packetAllocationAttempted)||
+           (row->packetZeroed&&!row->packetAllocationReturned)||(row->packetPrefixStored&&!row->packetZeroed))return false;
+        if(bool(row->packetBacking)!=bool(row->packetC0))return false;
+        if(row->packetC0){const auto base=reinterpret_cast<std::uintptr_t>(row->packetBacking.get()),address=reinterpret_cast<std::uintptr_t>(row->packetC0);
+            if(!row->packetAllocationReturned||address%64||address<base||address-base>63)return false;}
+        if(row->packetZeroed){if(!row->packetC0)return false;std::array<std::uint8_t,0xc0> expected{};
+            if(row->packetPrefixStored){const auto word=[&](std::size_t off,std::uint32_t value){for(std::size_t k=0;k<4;++k)expected[off+k]=static_cast<std::uint8_t>(value>>(8*k));};
+                word(0x10,0x11000000);word(0x14,0x03000000);word(0x18,0x02000000);word(0x1c,0x6c038320);
+                expected[0x20]=1;expected[0x21]=0x80;expected[0x27]=0x20;expected[0x28]=0xee;word(0x38,6);}
+            for(std::size_t k=0;k<expected.size();++k)if(row->packetC0[k]!=expected[k])return false;}
+
+        if(row->object30&&!row->allocationReturned)return false;
+        if(row->slot7E8Stored){if(post.rows7E8[i]!=row->object30.get())return false;
+            if(row->object30&&!row->constructorReturned)return false;
+        }else if(post.rows7E8[i])return false;
+        for(std::size_t k=0;k<0x30;++k){const bool expected=row->constructorReturned&&k>=0x20;
+            if(row->known[k]!=expected)return false;
+            if(expected&&(!row->object30||row->object30[k]!=(k>=0x2c?0xff:0)))return false;}
+    }
+    if(h.nativeWithdrawn)return h.entered&&!sourceSkyItemSlots3C_&&!sourceSkyPublishedItems3C_;
+    if(h.allocationNonNull!=bool(sourceSkyItemSlots3C_)||h.published!=bool(sourceSkyPublishedItems3C_)||
+       (sourceSkyPublishedItems3C_&&*sourceSkyPublishedItems3C_!=sourceSkyItemSlots3C_.get()))return false;
+    return true;
+}
+bool Owner::preflightSourceSkyItemOccurrence(std::size_t occurrence)const noexcept {
+    const auto& h=sourceItemHistory(occurrence);const auto& owner=sourceItemOwner(occurrence);
+    const auto* item=sourceSkyFile_?sourceSkyFile_->itemOccurrence(occurrence):nullptr;
+    if((h.itemAllocationAttempted&&(!item||!item->seekReturned))||
+       (h.itemAllocationReturned&&!h.itemAllocationAttempted)||(h.itemAllocationNonNull&&!h.itemAllocationReturned)||
+       (h.constructorEntered&&!h.itemAllocationNonNull)||(h.baseReturned&&(!h.constructorEntered||h.reference00!=(h.failureReferenceStored?0u:1u)))||
+       h.callbacks>6||h.defaultGroups>6||(h.constructorReturned&&(!h.baseReturned||h.callbacks!=6||h.defaultGroups!=6||!h.origin3E0900))||
+       (h.parserEntered&&(!h.itemAllocationReturned||h.parserModeA2!=0u))||
+       (h.handleStored&&(!h.constructorReturned||!h.parserEntered||!h.handle40))||
+       (h.headerAttempted&&!h.handleStored)||(h.headerReturned&&!h.headerAttempted)||h.headerCopied>4||
+       (h.referenceWithdrawnNative&&(!h.nativeWithdrawn||!h.baseReturned))||
+       (h.dataPosition650&&(!item||!item->finalTellReturned||!item->finalPosition||
+        *h.dataPosition650!=static_cast<std::uint32_t>(*item->finalPosition)))||
+       (h.parserReturned&&((!h.dataPosition650&&!h.failureNullReturned)||h.parserModeA2!=0u))||
+       (h.slotStored&&(!h.parserReturned||!sourceSkyItems129758_.allocationNonNull)))return false;
+    if((h.failureReleaseEntered&&(!h.parserEntered||(h.parserReturned&&!h.failureNullReturned)||(h.slotStored&&!h.failureNullReturned)||h.registration.entered))||
+       (h.failureReferenceStored&&!h.failureReleaseEntered)||(h.failureDestructorEntered&&!h.failureReferenceStored)||
+       h.failureNullSlotsRead>96u||(h.failureNullSlotsRead&&!h.failureDestructorEntered)||
+       (h.failureBaseReturned&&h.failureNullSlotsRead!=96u)||
+       (h.failureReferenceStored&&h.referenceWithdrawnNative)||
+       (h.failureSourceDeleted&&(!h.failureBaseReturned||h.failureNullSlotsRead!=96u||h.vtable08!=0x3cc980u||h.reference00!=0u))||
+       (h.failureNullReturned&&(!h.failureSourceDeleted||!h.parserReturned)))return false;
+    if(h.failureReleaseEntered){bool sourceFailure=item&&item->header48.returned&&item->header48.items!=1u;
+        if(item)for(const auto& field:item->fields)if(field.returned&&field.items!=1u)sourceFailure=true;
+        if(!sourceFailure)return false;}
+    if(item){if(item->header48.attempted!=h.headerAttempted||item->header48.returned!=h.headerReturned||
+       item->header48.copied!=h.headerCopied||item->header48.items!=h.headerItems)return false;
+       if(item->parserEntered&&(!h.handleStored||(!h.nativeWithdrawn&&!h.failureSourceDeleted&&(!owner||item->receiver!=owner->storage.get()||item->nativeWithdrawn||item->parserReleasedSource))))return false;
+       if(h.nativeWithdrawn&&!item->nativeWithdrawn)return false;
+       if(item->parserReleasedSource!=h.failureSourceDeleted)return false;}
+    const auto& reg=h.registration;
+    if(reg.completedEntries>96||(reg.entered&&(!h.slotStored||!sourceSkyPostItems_.entered))||
+       (reg.field38Stored&&!reg.entered)||(reg.paletteRead&&!reg.field38Stored)||
+       (reg.seekAttempted&&!reg.paletteRead)||(reg.seekReturned&&!reg.seekAttempted)||
+       (reg.returned&&(!reg.seekReturned||reg.completedEntries!=96||reg.sourceResult!=1u))||
+       (reg.sourceResult&&(!reg.returned||*reg.sourceResult!=1u)))return false;
+    if(reg.paletteRead&&!reg.nativeWithdrawn){
+        if(reg.paletteOccurrence){if(sourceSkyPublishedPaletteOccurrence_!=reg.paletteOccurrence||!sourceSkyPalette7D0_||
+           reg.paletteBorrow!=*sourceSkyPalette7D0_||reg.paletteBorrow!=sourcePaletteOwner(*reg.paletteOccurrence).get())return false;}
+        else if(reg.paletteBorrow||sourceSkyPalette7D0_||sourceSkyConstructor288A50_.nullFields[7]!=0u)return false;
+    }
+    if(reg.nativeWithdrawn&&reg.paletteBorrow)return false;
+    if(reg.seekAttempted){if(!sourceSkyFile_||occurrence>=sourceSkyFile_->itemResourceSeeks_.size()||
+        !sourceSkyFile_->itemResourceSeeks_[occurrence]->attempted||sourceSkyFile_->itemResourceSeeks_[occurrence]->returned!=reg.seekReturned)return false;}
+    if(!preflightSourceSkyResourcePrefix(occurrence))return false;
+    if(h.nativeWithdrawn)return !owner&&(!h.baseReturned||h.referenceWithdrawnNative||h.failureReferenceStored)&&(!reg.entered||reg.nativeWithdrawn);
+    if(reg.entered){if(!owner||!owner->storage)return false;
+        for(std::size_t i=0;i<96;++i){if(i<reg.completedEntries&&!reg.masks[i])return false;
+            if(reg.masks[i]){const auto off=0x54+(i/16)*0x100;
+                if(!reg.seekReturned||!owner->known[off]||!owner->known[off+1]||*reg.masks[i]!=(std::uint16_t(owner->storage[off])|
+                    (std::uint16_t(owner->storage[off+1])<<8)))return false;
+                if(i<reg.completedEntries&&(*reg.masks[i]&(1u<<(i%16)))){
+                    const SourceSkyResourcePrefix* completed=nullptr;
+                    for(const auto& resource:reg.completedResources)if(resource&&resource->group*16+resource->entry==i){if(completed)return false;completed=resource.get();}
+                    if(!completed||!completed->resourceSourceReturned||completed->resourceSourceResult!=1u)return false;
+                }
+            }}
+    }
+    if(h.itemAllocationNonNull!=bool(owner))return false;
+    if(h.slotStored&&(!sourceSkyItemSlots3C_||!sourceSkyItems129758_.count7D8||occurrence>=*sourceSkyItems129758_.count7D8||
+       sourceSkyItemSlots3C_[occurrence]!=(h.failureNullReturned?nullptr:owner.get())))return false;
+    if(h.failureSourceDeleted)return owner&&!owner->storage&&item&&item->parserReleasedSource&&!item->receiver;
+    if(h.baseReturned){if(!owner||!owner->storage||!h.vtable08)return false;
+        const auto* b=owner->storage.get();const auto& known=owner->known;
+        for(std::size_t k=0;k<8;++k)if(!known[k]||b[k]!=(k?0:(h.failureReferenceStored?0:1)))return false;
+        for(std::size_t k=0;k<4;++k)if(!known[8+k]||b[8+k]!=((*h.vtable08>>(k*8))&255u))return false;
+        if(h.handleStored){for(std::size_t k=0;k<8;++k)if(!known[0x40+k]||b[0x40+k]!=((*h.handle40>>(k*8))&255u))return false;}
+        if(h.headerCopied){const auto& read=item->header48;
+            for(std::size_t k=0;k<h.headerCopied;++k)if(!known[0x48+k]||b[0x48+k]!=read.bytes[k])return false;}
+        if(h.origin3E0900){if(!worldApplication_||*h.origin3E0900!=worldApplication_->skyOrigin3E0900_)return false;}
+        if(h.constructorReturned){
+            const auto expect=[&](std::size_t off,std::uint64_t value,std::size_t size){
+                for(std::size_t k=0;k<size;++k){auto byte=static_cast<std::uint8_t>(value>>(k*8));
+                    //Later source reads replace only their copied prefix. Every
+                    //untouched constructor byte (especially vector W) persists.
+                    if(sourceSkyFile_&&item){const auto& fields=item->fields;
+                        for(std::size_t i=1;i<fields.size();++i){const auto spec=rr::assets::OriginalSourceSkyFile50LA::itemFieldSpec(i);
+                            if(off+k>=spec.destination&&off+k-spec.destination<fields[i].copied)byte=fields[i].bytes[off+k-spec.destination];}}
+                    if(!known[off+k]||b[off+k]!=byte)return false;
+                }return true;};
+            if(!expect(0x650,h.dataPosition650.value_or(0),4)||!expect(0x4c,0,2)||!expect(0x4e,0xffff,2))return false;
+            if(!h.handleStored&&!expect(0x40,~std::uint64_t(0),8))return false;
+            for(std::size_t k=h.headerCopied;k<4;++k)if(!known[0x48+k]||b[0x48+k])return false;
+            for(std::size_t j=0;j<3;++j)for(std::size_t k=0;k<4;++k)if(!expect(0x10+j*16+k*4,(*h.origin3E0900)[k],4))return false;
+            for(std::size_t j=0;j<6;++j){const auto off=j*0x100;
+                if(!expect(off+0x50,0,4)||!expect(off+0x54,0,2)||!expect(off+0x56,0,2)||
+                   !expect(off+0x140,0,4)||!expect(off+0x144,0,4)||!expect(off+0x148,0,4)||!expect(off+0x14c,0x3f800000u,4))return false;
+                for(std::size_t k=0;k<16;++k){
+                    const auto* resource=h.registration.pendingResource.get();
+                    if(resource&&(resource->group!=j||resource->entry!=k))resource=nullptr;
+                    for(const auto& completed:h.registration.completedResources)if(completed&&completed->group==j&&completed->entry==k){if(resource)return false;resource=completed.get();}
+                    const bool published=resource&&resource->slot58Stored&&resource->group==j&&resource->entry==k;
+                    if(published&&resource->allocationNonNull){
+                        if(owner->resources58[j*16+k]!=resource->texture.get())return false;
+                        for(std::size_t b=0;b<4;++b)if(known[off+0x58+k*4+b])return false;
+                    }else if(owner->resources58[j*16+k]||!expect(off+0x58+k*4,0,4))return false;
+                    if(!expect(off+0x98+k*4,0,4)||!expect(off+0xd8+k*2,0xffff,2)||!expect(off+0xf8+k*4,0xffffffffu,4))return false;
+                }
+            }
+        }
+    }
+    return true;
+}
+bool Owner::withdrawSourceSkyItemsNative()noexcept {
+    auto& root=sourceSkyItems129758_;if(!preflightSourceSkyItemsNative())return false;
+    if(!root.entered||root.nativeWithdrawn)return true;
+    if(sourceSkyFile_&&!sourceSkyFile_->withdrawFirstItemNative())return false;
+    // Later rows retire in reverse order before their earlier packet owner.
+    // Source133FA0 would free field20 then optionally object30. This admitted
+    // constructor prefix has field20 knownNULL and has created no child buffer;
+    // native disposal does not pretend the guest destructor was called.
+    for(std::size_t n=sourceSkyPostItems_.rows.size();n;){--n;
+        auto* row=sourceSkyPostItems_.rows[n].get();if(!row)continue;
+        //12A510's later independent packet retires before the row30 owner.
+        row->packetSkyThis=nullptr;row->packetC0=nullptr;row->packetBacking.reset();
+        sourceSkyPostItems_.rows7E8[n]=nullptr;row->object30.reset();row->nativeWithdrawn=true;}
+    //12A120 packet custody ends before selected item owners.
+    // Withdraw published base and interior address before freeing their single owner.
+    sourceSkyPostItems_.packet7E0=nullptr;sourceSkyPostItems_.packetData04=nullptr;
+    sourceSkyPostItems_.packet340=nullptr;sourceSkyPostItems_.packetBacking.reset();sourceSkyPostItems_.packetNativeWithdrawn=true;
+    sourceSkySelected38_.reset();sourceSkySelectedItemOccurrence_.reset();if(sourceSkyPostItems_.entered)sourceSkyPostItems_.nativeWithdrawn=true;
+    sourceSkyPublishedItems3C_.reset();sourceSkyItemSlots3C_.reset();
+    for(std::size_t n=sourceSkyLaterItems_.size()+1;n;){--n;auto& h=sourceItemHistory(n);auto& owner=sourceItemOwner(n);
+        for(std::size_t ri=h.registration.completedResources.size()+1;ri;){--ri;
+            auto* resourcePointer=ri==h.registration.completedResources.size()?h.registration.pendingResource.get():h.registration.completedResources[ri].get();
+            if(!resourcePointer)continue;auto& resource=*resourcePointer;
+            // Shared buffer borrows end before manager pin/texture detach; backing
+            // stays with443870 for the next actual texture call.
+            resource.payloadVirtualBorrow=nullptr;
+            if(resource.loaderBufferManager){for(std::size_t slot=2;slot;){--slot;
+                if(!resource.loaderBufferManager->withdrawSourceBufferNative(slot,&resource,resource.loaderBuffers[slot]))return false;}
+                resource.loaderBufferManager.reset();}
+            // Withdraw item alias and in-flight call borrows before manager detach/backing disposal.
+            if(resource.slot58Stored){owner->resources58[resource.group*16+resource.entry]=nullptr;resource.slot58WithdrawnNative=true;}
+            resource.loaderReceiver=nullptr;resource.postLoaderReceiver=nullptr;resource.loaderPaletteBorrow=nullptr;resource.payloadVirtualBorrow=nullptr;resource.resourcePaletteB4=nullptr;
+            // Native custody ends without inventing a source counter decrement:
+            //435940 is cumulative; source destructor has no such subtraction.
+            for(std::size_t i=resource.followingCompressedLevels.size();i;){--i;auto& next=*resource.followingCompressedLevels[i];
+                next.liveOffset118=0;next.backing.aligned=nullptr;next.backing.allocation.reset();next.backing.nativeWithdrawn=true;}
+            resource.compressedLiveOffset118=0;resource.compressedBacking.aligned=nullptr;resource.compressedBacking.allocation.reset();
+            resource.compressedBacking.nativeWithdrawn=true;
+            resource.embeddedFCPublished=nullptr;
+            if(resource.embedded){auto& embedded=*resource.embedded;embedded.cursor04=nullptr;embedded.data00=nullptr;
+                embedded.alignedBacking.reset();embedded.object20.reset();embedded.nativeWithdrawn=true;}
+            if(resource.texture&&!resource.texture->detachNative())return false;
+            if(resource.baseReferenceAcquired){for(std::size_t k=0;k<8;++k)resource.texture->storage_[k]=0;resource.nativeReferenceRetired=true;}
+            if(resource.texture)resource.texture->storage_.reset();resource.nativeWithdrawn=true;
+        }
+        if(h.registration.entered){h.registration.paletteBorrow=nullptr;h.registration.nativeWithdrawn=true;}
+        if(h.baseReturned&&!h.failureReferenceStored){for(std::size_t k=0;k<8;++k)owner->storage[k]=0;h.referenceWithdrawnNative=true;}
+        owner.reset();h.nativeWithdrawn=true;
+    }
+    return true; //Native inverse only; no source destructor/return receipt invented.
+}
+bool Owner::continueSourceSkyItems129758(std::uint32_t& pc)noexcept {
+    auto& h=sourceSkyItems129758_;
+    if(pc!=0x129758u||h.entered||!preflightSourcePostParticleModelsNative()||!sourceSkyOwner_||!sourceSkyFile_||!sourceSkyFile_->current()||
+       sourceSkyHeader129644_.countReadItems!=1u||!sourceSkyHeader129644_.paletteCount)return false;
+    const auto palettes=*sourceSkyHeader129644_.paletteCount;
+    if(palettes==0||palettes>=0x80000000u){if(!sourceSkyHeader129644_.field40Cleared)return false;}
+    else {if(palettes>sourceSkyLaterPalettes_.size()+2||!sourcePaletteReturn(palettes-1).field40Cleared)return false;}
+    const auto at=[&](std::uint32_t p){pc=sourcePostParticleModelsPC_=p;};
+    h.entered=true;h.count7D8=sourceSkyOwner_->count7D8;
+    //Native admission, not source validation: negative/wrapped32-bit counts
+    //cannot be used as safe host pointer-array lengths.
+    if(*h.count7D8>0x3fffffffu)return false;
+    h.arrayBytes=*h.count7D8*4u;at(0x129758);at(0x12975c);h.allocationAttempted=true;
+    try{sourceSkyItemSlots3C_.reset(new SourceSkyItemOwner*[*h.count7D8]);}catch(...){sourceSkyItemSlots3C_.reset();}
+    h.allocationReturned=true;h.allocationNonNull=bool(sourceSkyItemSlots3C_);at(0x129760);
+    sourceSkyPublishedItems3C_=sourceSkyItemSlots3C_.get();h.published=true;
+    at(0x129764);h.indexS4=0;at(0x129768);at(0x12976c);h.offsetS2=0;
+    at(0x129848);at(0x12984c);at(0x129850);at(0x129854);
+    if(!*h.count7D8){at(0x129858);return continueSourceSkyPostItems(pc);}
+    h.directoryEntered=true;at(0x129770);at(0x129774);
+    const auto resolverCurrent=[&](){return sourceTrackMountDomain_&&sourceTrackMountDomain_->resolver3E1A70()==sourceSkyFile_->resolver_;};
+    if(!resolverCurrent())return false;at(0x129778);at(0x12977c);at(0x129780);at(0x129784);at(0x129788);
+    a::OriginalStandardTextureDiagnostic50LA d;
+    if(!sourceSkyFile_->readItemOffset(d)){at(d.sourcePC?d.sourcePC:sourceSkyFile_->pc_);return false;}
+    const auto& item=*sourceSkyFile_->firstItem_;at(0x12978c);at(0x129790);at(0x129794);
+    if(item.offsetRead.items!=1u){at(0x129960);return false;}
+    const auto& b=item.offsetRead.bytes;h.absoluteOffset=std::uint32_t(b[0])|(std::uint32_t(b[1])<<8)|(std::uint32_t(b[2])<<16)|(std::uint32_t(b[3])<<24);
+    at(0x129798);at(0x12979c);if(!resolverCurrent())return false;at(0x1297a0);at(0x1297a4);
+    if(!sourceSkyFile_->tellItemStart(d)){at(d.sourcePC?d.sourcePC:0x12f520u);return false;}
+    at(0x1297a8);at(0x1297ac);at(0x1297b0);if(!resolverCurrent())return false;at(0x1297b4);
+    h.savedS5=*item.start<=0x7fffffffu?static_cast<std::int64_t>(*item.start):static_cast<std::int64_t>(*item.start)-0x100000000ll;
+    at(0x1297b8);at(0x1297bc);at(0x1297c0);at(0x1297c4);
+    if(!sourceSkyFile_->seekItemAbsolute(*h.absoluteOffset,d)){at(d.sourcePC?d.sourcePC:0x12f640u);return false;}
+    at(0x1297c8);return continueSourceSkyItemLoop(pc,0);
+}
+bool Owner::continueSourceSkyError129960(std::uint32_t& pc,std::size_t failedItem)noexcept {
+    if(pc!=0x129960u||sourceSkyError129960_.entered||failedItem>sourceSkyLaterItems_.size()||
+       !preflightSourcePostParticleModelsNative()||!sourceSkyOwner_||!worldApplication_)return false;
+    const auto& failed=sourceItemHistory(failedItem);
+    if(!failed.failureNullReturned||!failed.slotStored||!sourceSkyItemSlots3C_||sourceSkyItemSlots3C_[failedItem])return false;
+    auto& error=sourceSkyError129960_;auto& c=sourceSkyConstructor288A50_;auto& entity=sourceSkyOwner_->entity;
+    const auto at=[&](std::uint32_t p){pc=sourcePostParticleModelsPC_=p;};
+    at(0x129960);if(c.vtable08!=0x3d2ff0u)return false;
+    error.entered=true;error.failedItem=failedItem;at(0x129964);at(0x129968);at(0x12996c);at(0x142590);
+    at(0x1425a4);error.lockRead=true;if(worldApplication_->attachmentLock423F58())return false;
+    //Fresh source sky is a genuinely unlinked leaf. Do not substitute a tree
+    //cleanup for unsupported child/sibling/parent dispatches.
+    at(0x1425b8);if(entity.firstChild18)return false;at(0x1425bc);at(0x1425c0);
+    at(0x142604);if(entity.previous10)return false;at(0x142608);at(0x14260c);
+    at(0x142618);if(entity.next14)return false;at(0x14261c);at(0x142620);
+    at(0x14262c);if(entity.parent1C)return false;at(0x142630);at(0x142634);error.unlinkedLeafRead=true;
+    at(0x142654);at(0x142658);at(0x104970);at(0x104978);if(entity.reference00!=1u)return false;
+    //Withdraw native enrollment immediately before the genuine last-reference
+    //store, not by pretending that source destruction or count retirement ended.
+    if(!worldApplication_->entityAuthority_.retire(entity))return false;error.authorityRetired=true;
+    at(0x10497c);at(0x104980);entity.reference00=0;error.referenceStored=true;
+    at(0x104984);at(0x104988);at(0x10498c);at(0x104990);at(0x104994);at(0x104998);at(0x10499c);
+    at(0x1049a0);at(0x1049a4);at(0x288bd0);error.derivedDestructorEntered=true;
+    at(0x288be4);at(0x288be8);at(0x288bf4);c.vtable08=0x3d2ff0u;
+    at(0x288bf8);at(0x288bfc);at(0x1293e0);at(0x1293fc);at(0x129400);
+    at(0x12940c);c.vtable08=0x3cce60u;error.baseDestructorEntered=true;
+    at(0x129410);at(0x129414);at(0x129418);
+    //Constructor129280 never initializes7E8/968. This early item-parser failure
+    //has not executed the later96-row producers. Native zero-initialized array
+    //metadata is NOT evidence of sourceNULL, so stop before that unknown read.
+    return false;
+}
+bool Owner::continueSourceSkyItemFailure128C8C(std::uint32_t& pc,std::size_t occurrence)noexcept {
+    if(pc!=0x128c8cu||occurrence>sourceSkyLaterItems_.size()||!preflightSourcePostParticleModelsNative()||
+       !sourceSkyFile_||!sourceSkyFile_->current())return false;
+    auto& h=sourceItemHistory(occurrence);auto& owner=sourceItemOwner(occurrence);
+    const auto* file=sourceSkyFile_->itemOccurrence(occurrence);
+    if(!owner||!owner->storage||!file||file->receiver!=owner->storage.get()||file->nativeWithdrawn||
+       !h.parserEntered||h.parserReturned||h.slotStored||h.registration.entered||h.failureReleaseEntered)return false;
+    bool failed=file->header48.returned&&file->header48.items!=1u;
+    for(const auto& field:file->fields)if(field.returned&&field.items!=1u)failed=true;
+    if(!failed)return false; //A copied prefix or pending return is not a genuine source failure result.
+    const auto at=[&](std::uint32_t p){pc=sourcePostParticleModelsPC_=p;};
+    at(0x128c8c);if(h.vtable08!=0x3cce40u||h.reference00!=1u)return false;h.failureReleaseEntered=true;
+    at(0x128c90);at(0x128c94);at(0x128c98);at(0x104970);at(0x104978);at(0x10497c);
+    //104970 is the actual item virtual+10, not a palette release receipt.
+    at(0x104980);for(std::size_t k=0;k<8;++k)owner->storage[k]=0;h.reference00=0;h.failureReferenceStored=true;
+    at(0x104984);at(0x104988);at(0x10498c);at(0x104990);at(0x104994);at(0x104998);at(0x10499c);
+    at(0x1049a0);at(0x1049a4); //Actual derived virtual+8=1291B0, deleteflag1.
+    at(0x1291b0);h.failureDestructorEntered=true;at(0x1291d4);at(0x1291d8);at(0x1291ec);
+    //1291EC rewrites the same derived table. Fresh parser has not constructed
+    //resource slots, but authenticate each actual reverse-order load anyway.
+    for(std::size_t group=6;group;){--group;
+        at(0x1291f0);at(0x1291f4);
+        for(std::size_t entry=16;entry;){--entry;const auto index=group*16+entry,off=0x58+group*0x100+entry*4;
+            at(0x1291f8);if(owner->resources58[index])return false;
+            for(std::size_t k=0;k<4;++k)if(!owner->known[off+k]||owner->storage[off+k])return false;
+            ++h.failureNullSlotsRead;at(0x1291fc);at(0x129200);at(0x12921c);at(0x129220);
+        }
+        at(0x129224);at(0x129228);at(0x12922c);
+    }
+    at(0x129230);at(0x129234);at(0x129238);at(0x104910);at(0x104920);at(0x104924);at(0x104938);
+    at(0x10493c);h.vtable08=0x3cc980u;for(std::size_t k=0;k<4;++k)owner->storage[8+k]=static_cast<std::uint8_t>(*h.vtable08>>(8*k));
+    at(0x104948);at(0x10494c);at(0x104954);at(0x104958);h.failureBaseReturned=true;
+    at(0x12923c);at(0x129240);at(0x129244);at(0x129248);at(0x12924c);at(0x129250);
+    at(0x2e8b00);
+    if(!a::OriginalConfigProcessGlobals50LA::descriptorDelete2E8B00AdmittedNative()||
+       !sourceSkyFile_->releaseItemParserSource(owner->storage.get(),occurrence))return false;
+    //Actual source delete after completed derived/base destruction. Keep native
+    //history wrapper, but withdraw its file alias BEFORE releasing the backing.
+    owner->storage.reset();h.failureSourceDeleted=true;
+    at(0x129254);for(std::uint32_t p=0x129258;p<=0x129278;p+=4)at(p);
+    at(0x1049a8);at(0x1049ac);at(0x1049b0);at(0x1049b4);
+    at(0x128c9c);for(std::uint32_t p=0x128ca0;p<=0x128cc0;p+=4)at(p);
+    h.failureNullReturned=true;h.parserReturned=true;
+    at(0x1297f8);at(0x1297fc);at(0x129800);
+    if(!sourceSkyPublishedItems3C_||!*sourceSkyPublishedItems3C_||!preflightSourceSkyItemsNative())return false;
+    sourceSkyItemSlots3C_[occurrence]=nullptr;h.slotStored=true;
+    at(0x129804);at(0x129808);at(0x12980c);at(0x129810);at(0x129814);
+    at(0x129960);return continueSourceSkyError129960(pc,occurrence); //Actual caller error path, never item-loop advance.
+}
+bool Owner::continueSourceSkyItemBody(std::uint32_t& pc,std::size_t occurrence)noexcept {
+    if(pc!=0x1297c8u||occurrence>sourceSkyLaterItems_.size()||!sourceSkyFile_||
+       occurrence!=sourceSkyFile_->followingItems_.size()||!sourceSkyFile_->itemOccurrence(occurrence)||
+       !sourceSkyFile_->itemOccurrence(occurrence)->seekReturned||!sourceSkyItems129758_.count7D8||
+       occurrence>=*sourceSkyItems129758_.count7D8||!preflightSourcePostParticleModelsNative())return false;
+    auto& h=sourceItemHistory(occurrence);auto& owner=sourceItemOwner(occurrence);if(h.itemAllocationAttempted)return false;
+    const auto at=[&](std::uint32_t p){pc=sourcePostParticleModelsPC_=p;};
+    const auto resolverCurrent=[&](){return sourceTrackMountDomain_&&sourceTrackMountDomain_->resolver3E1A70()==sourceSkyFile_->resolver_;};
+    a::OriginalStandardTextureDiagnostic50LA d;
+    at(0x1297c8);at(0x1297cc);at(0x1297d0);at(0x1297d4);h.itemAllocationAttempted=true;
+    try{owner.reset(new SourceSkyItemOwner);}catch(...){return false;}
+    try{owner->storage.reset(new std::uint8_t[0x660]);}catch(...){owner.reset();}
+    h.itemAllocationReturned=true;h.itemAllocationNonNull=bool(owner);at(0x1297d8);at(0x1297dc);
+    if(h.itemAllocationNonNull){
+        at(0x1297e0);at(0x1297e4);at(0x128930);h.constructorEntered=true;
+        auto* bytes=owner->storage.get();auto& known=owner->known;
+        const auto store=[&](std::size_t off,std::uint64_t value,std::size_t size){for(std::size_t k=0;k<size;++k){bytes[off+k]=static_cast<std::uint8_t>(value>>(k*8));known[off+k]=true;}};
+        const auto vf0=[&](std::size_t off){store(off,0,8);store(off+8,0,4);store(off+12,0x3f800000u,4);};
+        at(0x12893c);at(0x128940);at(0x1048f8);store(8,0x3cc980u,4);at(0x104900);store(0,1,8);
+        h.reference00=1;h.vtable08=0x3cc980u;h.baseReturned=true;at(0x104904);at(0x104908);
+        at(0x128950);store(8,0x3cce40u,4);h.vtable08=0x3cce40u;
+        at(0x12895c);vf0(0x10);at(0x128968);vf0(0x20);at(0x128974);vf0(0x30);
+        at(0x128990);at(0x128994);at(0x2e8860);
+        for(std::size_t j=0;j<6;++j){at(0x2e88cc);at(0x2e88d0);at(0x1289b0);at(0x1289b4);vf0(0x140+j*0x100);at(0x1289b8);at(0x1289bc);++h.callbacks;}
+        at(0x128998);at(0x12899c);at(0x128880);at(0x128884);store(0x650,0,4);at(0x128888);store(0x40,~std::uint64_t(0),8);
+        at(0x12888c);store(0x48,0,4);at(0x128890);store(0x4c,0,2);at(0x128898);store(0x4e,0xffff,2);
+        if(!worldApplication_){at(0x1288a0);return false;}h.origin3E0900=worldApplication_->skyOrigin3E0900_;
+        for(std::size_t j=0;j<3;++j){at(0x1288a8+static_cast<std::uint32_t>(j)*12u);for(std::size_t k=0;k<4;++k)store(0x10+j*16+k*4,(*h.origin3E0900)[k],4);}
+        for(std::size_t j=0;j<6;++j){const auto off=j*0x100;at(0x1288c4);store(off+0x50,0,4);at(0x1288c8);store(off+0x54,0,2);at(0x1288cc);store(off+0x56,0,2);
+            for(std::size_t k=0;k<16;++k){at(0x1288e0);store(off+0x58+k*4,0,4);at(0x1288e4);store(off+0x98+k*4,0,4);at(0x1288e8);store(off+0xd8+k*2,0xffff,2);at(0x1288f0);store(off+0xf8+k*4,0xffffffffu,4);}
+            at(0x128904);store(off+0x140,0,4);at(0x12890c);store(off+0x144,0,4);at(0x128910);store(off+0x148,0,4);++h.defaultGroups;
+        }
+        at(0x128920);at(0x128924);at(0x1289a0);at(0x1289a4);at(0x1289a8);at(0x1289ac);h.constructorReturned=true;at(0x1297e8);
+    }
+    at(0x1297ec);at(0x1297f0);at(0x1297f4);h.parserModeA2=0;at(0x1289c0);h.parserEntered=true;at(0x1289e0);
+    if(!owner)return false; //Original NULL receiver reaches this first SD, not a fabricated loader result.
+    if(!sourceSkyFile_->beginItemParser(owner->storage.get(),occurrence))return false;
+    h.handle40=static_cast<std::uint64_t>(*sourceSkyFile_->sourceHandle_);
+    for(std::size_t k=0;k<8;++k){owner->storage[0x40+k]=static_cast<std::uint8_t>(*h.handle40>>(k*8));owner->known[0x40+k]=true;}h.handleStored=true;
+    at(0x1289e4);at(0x1289e8);at(0x1289ec);if(!resolverCurrent())return false;at(0x1289f0);at(0x1289f4);at(0x1289f8);at(0x1289fc);at(0x128a00);at(0x128a04);h.headerAttempted=true;
+    const bool returned=sourceSkyFile_->readItemHeader48(d,occurrence);const auto& read=sourceSkyFile_->itemOccurrence(occurrence)->header48;
+    if(read.copied)std::memcpy(owner->storage.get()+0x48,read.bytes.data(),read.copied);h.headerCopied=read.copied;
+    if(!returned){at(d.sourcePC?d.sourcePC:sourceSkyFile_->pc_);return false;}
+    h.headerReturned=true;h.headerItems=read.items;at(0x128a08);at(0x128a0c);at(0x128a10);
+    if(read.items!=1u){at(0x128c8c);return continueSourceSkyItemFailure128C8C(pc,occurrence);}
+    at(0x128a14);
+    //Actual stack flags, receiver4E, six halfwords, six words, then three
+    //XYZ reads. No flags-to4C store and no replacement of vector W.
+    for(std::size_t i=0;i<17;++i){const auto spec=rr::assets::OriginalSourceSkyFile50LA::itemFieldSpec(i);
+        if(!resolverCurrent()||!preflightSourceSkyItemsNative())return false;
+        at(spec.call);const bool fieldReturned=sourceSkyFile_->readItemField(i,d,occurrence);
+        const auto& field=sourceSkyFile_->itemOccurrence(occurrence)->fields[i];
+        if(i&&field.copied){std::memcpy(owner->storage.get()+spec.destination,field.bytes.data(),field.copied);
+            for(std::size_t k=0;k<field.copied;++k)owner->known[spec.destination+k]=true;}
+        if(!fieldReturned){at(d.sourcePC?d.sourcePC:sourceSkyFile_->pc_);return false;}
+        at(spec.resume);if(field.items!=1u){at(0x128c8c);return continueSourceSkyItemFailure128C8C(pc,occurrence);}
+        if(i>=2&&i<8){at(0x128a8c);at(0x128a90);at(0x128a94);at(0x128a98);}
+        if(i>=8&&i<14){at(0x128acc);at(0x128ad0);at(0x128ad4);at(0x128ad8);}
+    }
+    at(0x128b48);
+    const auto& flagsRead=sourceSkyFile_->itemOccurrence(occurrence)->fields[0];
+    if(flagsRead.items!=1u||flagsRead.copied!=2u)return false;
+    const auto flags=std::uint32_t(flagsRead.bytes[0])|(std::uint32_t(flagsRead.bytes[1])<<8);
+    at(0x128b4c);at(0x128b50);at(0x128b54);
+    const auto optionalRead=[&](std::size_t index){const auto spec=rr::assets::OriginalSourceSkyFile50LA::itemFieldSpec(index);
+        if(!resolverCurrent()||!preflightSourceSkyItemsNative())return false;
+        at(spec.call);const bool returned=sourceSkyFile_->readItemField(index,d,occurrence);
+        const auto& field=sourceSkyFile_->itemOccurrence(occurrence)->fields[index];
+        if(field.copied){std::memcpy(owner->storage.get()+spec.destination,field.bytes.data(),field.copied);
+            for(std::size_t k=0;k<field.copied;++k)owner->known[spec.destination+k]=true;}
+        if(!returned){at(d.sourcePC?d.sourcePC:sourceSkyFile_->pc_);return false;}
+        at(spec.resume);if(field.items!=1u){at(0x128c8c);return continueSourceSkyItemFailure128C8C(pc,occurrence);}return true;
+    };
+    if(flags&4u){at(0x128b58);at(0x128b5c);
+        for(std::size_t group=0;group<6;++group){if(!optionalRead(17+group))return false;
+            at(0x128b88);at(0x128b8c);at(0x128b90);at(0x128b94);}
+    }
+    at(0x128b98);at(0x128b9c);at(0x128ba0);at(0x128ba4);
+    if(flags&1u){at(0x128ba8);at(0x128bac);
+        for(std::size_t group=0;group<6;++group){at(0x128bb0);at(0x128bb4);
+            for(std::size_t entry=0;entry<16;++entry){if(!optionalRead(23+group*16+entry))return false;
+                at(0x128be0);at(0x128be4);at(0x128be8);at(0x128bec);}
+            at(0x128bf0);at(0x128bf4);at(0x128bf8);at(0x128bfc);
+        }
+    }
+    at(0x128c00);
+    if(!resolverCurrent()||!preflightSourceSkyItemsNative())return false;
+    if(!sourceSkyFile_->finishItemReads(d,occurrence)){at(d.sourcePC?d.sourcePC:sourceSkyFile_->pc_);return false;}
+    const auto& tail=*sourceSkyFile_->itemOccurrence(occurrence);at(0x128c74);at(0x128c78);at(0x128c7c);
+    if(!tail.finalPosition||*tail.finalPosition>0xffffffffu||h.parserModeA2!=0u)return false;
+    at(0x128c80);h.dataPosition650=static_cast<std::uint32_t>(*tail.finalPosition);
+    for(std::size_t k=0;k<4;++k){owner->storage[0x650+k]=static_cast<std::uint8_t>(*h.dataPosition650>>(k*8));owner->known[0x650+k]=true;}
+    at(0x128c84);at(0x128c88);at(0x128ca0);at(0x128cbc);at(0x128cc0);h.parserReturned=true;
+    //Return is this fresh item, never a prepared resource. NULL array is
+    //bounded at the actual store after parser return, not treated as success.
+    at(0x1297f8);at(0x1297fc);at(0x129800);
+    if(!sourceSkyPublishedItems3C_||!*sourceSkyPublishedItems3C_||!preflightSourceSkyItemsNative())return false;
+    sourceSkyItemSlots3C_[occurrence]=owner.get();h.slotStored=true;
+    at(0x129804);at(0x129808);at(0x12980c);at(0x129810);at(0x129814);
+    at(0x129818);at(0x12982c);return false; //The iterative parent driver owns the next source restore.
+}
+bool Owner::continueSourceSkyItemRestore(std::uint32_t& pc,std::size_t occurrence)noexcept {
+    if(occurrence>sourceSkyLaterItems_.size())return false;
+    auto& h=sourceItemLoop(occurrence);const auto& state=sourceItemHistory(occurrence);
+    if(pc!=0x12982cu||!state.slotStored||h.restoreAttempted||!preflightSourcePostParticleModelsNative()||!sourceSkyFile_||!sourceSkyOwner_)return false;
+    const auto at=[&](std::uint32_t v){pc=sourcePostParticleModelsPC_=v;};
+    const auto resolverCurrent=[&](){return sourceTrackMountDomain_&&sourceTrackMountDomain_->resolver3E1A70()==sourceSkyFile_->resolver_;};
+    rr::assets::OriginalStandardTextureDiagnostic50LA d;at(0x12981c);if(!resolverCurrent())return false;
+    at(0x12982c);at(0x129830);h.restoreAttempted=true;
+    const bool returned=sourceSkyFile_->restoreItemStart(d,occurrence);
+    h.restoreAttempted=sourceSkyFile_->itemOccurrence(occurrence)->restoreAttempted;h.restoreReturned=sourceSkyFile_->itemOccurrence(occurrence)->restoreReturned;
+    if(!returned){at(d.sourcePC?d.sourcePC:sourceSkyFile_->pc_);return false;}
+    at(0x129834);at(0x129838);if(sourceSkyFile_->itemOccurrence(occurrence)->restoreResult!=0){at(0x129960);return false;}
+    at(0x12983c);h.advancedOffsetS2=static_cast<std::uint32_t>((occurrence+1u)*4u);at(0x129840);h.advancedIndexS4=static_cast<std::uint32_t>(occurrence+1u);at(0x129844);at(0x129848);
+    if(!preflightSourcePostParticleModelsNative())return false;h.loopCount7D8=sourceSkyOwner_->count7D8;
+    at(0x12984c);at(0x129850);at(0x129854);
+    if(*h.loopCount7D8<=occurrence+1u){at(0x129858);return continueSourceSkyPostItems(pc);}
+    at(0x129770);h.nextDirectoryEntered=true;at(0x129774);if(!resolverCurrent())return false;
+    if(!sourceSkyFile_->readItemOffset(d,occurrence+1)){at(d.sourcePC?d.sourcePC:sourceSkyFile_->pc_);return false;}
+    const auto& next=*sourceSkyFile_->itemOccurrence(occurrence+1);at(0x12978c);at(0x129790);
+    if(next.offsetRead.items!=1u){at(0x129960);return false;}
+    const auto& b=next.offsetRead.bytes;h.nextAbsoluteOffset=std::uint32_t(b[0])|(std::uint32_t(b[1])<<8)|(std::uint32_t(b[2])<<16)|(std::uint32_t(b[3])<<24);
+    at(0x12979c);if(!resolverCurrent())return false;at(0x1297a0);if(!sourceSkyFile_->tellItemStart(d,occurrence+1)){at(d.sourcePC?d.sourcePC:sourceSkyFile_->pc_);return false;}
+    at(0x1297b0);if(!resolverCurrent())return false;at(0x1297b4);
+    h.nextSavedS5=*next.start<=0x7fffffffu?static_cast<std::int64_t>(*next.start):static_cast<std::int64_t>(*next.start)-0x100000000ll;
+    at(0x1297c0);if(!sourceSkyFile_->seekItemAbsolute(*h.nextAbsoluteOffset,d,occurrence+1)){at(d.sourcePC?d.sourcePC:sourceSkyFile_->pc_);return false;}
+    at(0x1297c8);
+    return false; //Next own allocation is performed by the iterative driver.
+}
+bool Owner::sourceSkyFormat29E510(std::uint32_t format)noexcept {
+    return (format>=5&&format<=12)||(format>=20&&format<=27)||(format>=31&&format<=36);
+}
+std::uint32_t Owner::sourceSkyFormat29E480(std::uint32_t format)noexcept {
+    //Original29E480 jump table3BE230; unsigned out-of-range returns zero.
+    static constexpr std::array<std::uint32_t,37> bytes{{0,3,2,2,1,2,1,2,2,3,2,2,4,2,2,4,3,2,2,1,2,1,2,2,3,2,2,4,2,2,4,3,3,2,2,4,4}};
+    return format<bytes.size()?bytes[format]:0u;
+}
+std::uint32_t Owner::sourceSkyFormat29E640(std::uint32_t format)noexcept {
+    static constexpr std::uint32_t formats[37]={0,0x378,0x22b,0x235,8,0x22b,8,0x22b,0x235,0x378,0x613,0x115c,0x22b8,
+            0x613,0x115c,0x22b8,0x378,0x22b,0x235,8,0x22b,8,0x22b,0x235,0x378,0x613,0x115c,0x22b8,
+            0x613,0x115c,0x22b8,0x378,0x378,0x613,0x613,0x22b8,0x22b8};
+    return format<37?formats[format]:0;
+}
+std::uint32_t Owner::sourceSkyFormatBits29E910(std::uint32_t format)noexcept {
+    switch(format){case 8:return 8;case 0x115c:case 0x613:case 0x22b:case 0x235:return 16;
+        case 0x378:return 24;case 0x22b8:return 32;default:return 0;}
+}
+std::uint32_t Owner::sourceSkyFileBits29E5B0(std::uint32_t format)noexcept {
+    static constexpr std::uint32_t bits[37]={0,24,16,16,8,16,8,16,16,24,16,16,32,16,16,32,24,16,16,8,16,8,16,16,24,16,16,32,16,16,32,24,24,16,16,32,32};
+    return format<37?bits[format]:0;
+}
+bool Owner::preflightSourceSkyResourcePrefix(std::size_t occurrence)const noexcept {
+    const auto& reg=sourceItemHistory(occurrence).registration;
+    if(reg.completedResources.size()>96||reg.resourceCalls.size()>95)return false;
+    for(std::size_t ordinal=0;ordinal<reg.completedResources.size();++ordinal){const auto& completed=reg.completedResources[ordinal];
+        if(!completed||completed->fileOrdinal!=ordinal||!preflightSourceSkyResourceOccurrence(occurrence,*completed,true))return false;}
+    for(std::size_t n=0;n<reg.resourceCalls.size();++n){const auto& pointer=reg.resourceCalls[n];if(!pointer)return false;const auto& call=*pointer;const auto ordinal=n+1;
+        if(!call.entered||call.index>=96||!reg.masks[call.index]||!(*reg.masks[call.index]&(1u<<(call.index%16)))||
+           (n&&reg.resourceCalls[n-1]->index>=call.index))return false;
+        const SourceSkyResourcePrefix* history=ordinal<reg.completedResources.size()?reg.completedResources[ordinal].get():ordinal==reg.completedResources.size()?reg.pendingResource.get():nullptr;
+        if(history&&(!call.bodyEntered||history->group*16+history->entry!=call.index||history->fileOrdinal!=ordinal))return false;
+        if(call.bodyEntered){const auto* file=sourceSkyFile_?sourceSkyFile_->resourceFileOccurrence(occurrence,ordinal):nullptr;
+            if(!file||file->entryCursor!=call.cursor)return false;}
+        else {if(n+1!=reg.resourceCalls.size()||history||reg.completedResources.size()!=ordinal||reg.completedEntries!=call.index)return false;
+            if(!reg.nativeWithdrawn){const auto& owner=sourceItemOwner(occurrence);
+                if(!owner||owner->resources58[call.index]||!sourceSkyFile_||sourceSkyFile_->expectedCursor_!=call.cursor)return false;}}
+    }
+    if(reg.pendingResource&&reg.pendingResource->fileOrdinal&&reg.resourceCalls.size()!=reg.pendingResource->fileOrdinal)return false;
+    if(reg.resourceScanExhausted&&(reg.completedEntries!=96||reg.pendingResource))return false;
+    return !reg.pendingResource||preflightSourceSkyResourceOccurrence(occurrence,*reg.pendingResource,false);
+}
+bool Owner::preflightSourceSkyResourceOccurrence(std::size_t occurrence,const SourceSkyResourcePrefix& h,bool completed)const noexcept {
+    const auto& state=sourceItemHistory(occurrence);const auto& reg=state.registration;
+    if((completed?(h.fileOrdinal>=reg.completedResources.size()||reg.completedResources[h.fileOrdinal].get()!=&h):h.fileOrdinal!=reg.completedResources.size())||!sourceSkyFile_||!sourceSkyFile_->resourceFileOccurrence(occurrence,h.fileOrdinal))return false;
+    if(!completed&&sourceSkyFile_->activeResourceFile(occurrence)!=sourceSkyFile_->resourceFileOccurrence(occurrence,h.fileOrdinal))return false;
+    if(!h.entered||!reg.seekReturned||h.group>=6||h.entry>=16||(completed?(!h.resourceSourceReturned||h.resourceSourceResult!=1u||reg.completedEntries<=h.group*16+h.entry):reg.completedEntries!=h.group*16+h.entry)||
+       !reg.masks[h.group*16+h.entry]||!(*reg.masks[h.group*16+h.entry]&(1u<<h.entry))||
+       (h.side&&(!h.sizeCode||*h.side!=(*h.sizeCode==0?512u:*h.sizeCode==1?64u:*h.sizeCode==2?128u:256u)))||
+       (h.format48&&h.compressed!=sourceSkyFormat29E510(*h.format48))||
+       (h.bytesPerPixel&&(!h.format48||h.compressed||*h.bytesPerPixel!=sourceSkyFormat29E480(*h.format48)))||
+       (h.payloadBytes&&!h.compressed&&(!h.side||!h.bytesPerPixel||*h.payloadBytes!=(*h.side)*(*h.side)*(*h.bytesPerPixel)))||
+       (h.sizeReadAttempted&&!h.compressed)||(h.sizeReadReturned&&!h.sizeReadAttempted)||h.sizeCopied>4||
+       (h.allocationAttempted&&(!h.side||!h.format48||(h.compressed&&!h.sizeReadReturned)||(!h.compressed&&!h.payloadBytes)))||
+       (h.allocationReturned&&!h.allocationAttempted)||(h.allocationNonNull&&!h.allocationReturned)||
+       (h.constructorEntered&&!h.allocationNonNull)||(h.baseReferenceAcquired&&(!h.constructorEntered||h.reference00!=1u))||
+       (h.nativeReferenceRetired&&(!h.nativeWithdrawn||!h.baseReferenceAcquired)))return false;
+    if(h.sizeReadAttempted){if(!sourceSkyFile_||occurrence>=sourceSkyFile_->itemResourceSeeks_.size())return false;
+        const auto& read=sourceSkyFile_->resourceFileOccurrence(occurrence,h.fileOrdinal)->resourceSizeA8;
+        if(read.attempted!=h.sizeReadAttempted||read.returned!=h.sizeReadReturned||read.copied!=h.sizeCopied||read.items!=h.sizeReadItems)return false;
+        if(h.payloadBytes){if(read.copied!=4||*h.payloadBytes!=(std::uint32_t(read.bytes[0])|(std::uint32_t(read.bytes[1])<<8)|
+           (std::uint32_t(read.bytes[2])<<16)|(std::uint32_t(read.bytes[3])<<24)))return false;}
+    }
+    if(h.compressedStackInitialized){
+        if(!h.compressed||!h.loaderClassified||!sourceSkyFile_||occurrence>=sourceSkyFile_->itemResourceSeeks_.size())return false;
+        const auto& reads=sourceSkyFile_->resourceFileOccurrence(occurrence,h.fileOrdinal)->compressedHeaders;
+        std::array<std::optional<std::uint32_t>,5> words;for(std::size_t i=1;i<5;++i)words[i]=0;
+        for(std::size_t i=0;i<5;++i){const auto& read=reads[i];
+            if(read.attempted!=h.compressedHeaderAttempted[i]||read.returned!=h.compressedHeaderReturned[i]||
+               read.copied!=h.compressedHeaderCopied[i]||read.items!=h.compressedHeaderItems[i])return false;
+            if(i||read.copied==4){std::uint32_t value=0;
+                for(std::size_t k=0;k<read.copied;++k)value|=std::uint32_t(read.bytes[k])<<(k*8);words[i]=value;}
+        }
+        if(h.compressedHeaderConverted){if(!words[0]||words[3]==0x1000u)return false;
+            if(*words[0]==31u||*words[0]==32u)words[0]=31u;
+            else if(*words[0]==33u||*words[0]==34u)words[0]=32u;
+        }
+        if(h.compressedB8Replaced){for(bool returned:h.compressedHeaderReturned)if(!returned)return false;words[3]=words[2];}
+        if(words!=h.compressedHeaderWords)return false;
+    }
+    if(!h.nativeWithdrawn&&h.compressedLoaderEntered&&(!h.compressedB8Replaced||!h.payloadBytes||h.rawLoaderEntered||
+        h.loaderReceiver!=h.texture.get()||h.loaderPaletteBorrow!=reg.paletteBorrow||h.loaderHandle40!=state.handle40||
+        h.compressedPendingReturnPC!=0x128fd0u||h.compressedInputFormat!=32u||h.compressedInputLayout!=0x613u||h.rawStackScalars!=std::array<std::uint64_t,6>{{0,0,2,1,128,0x00ff00ffu}}))return false;
+    if(h.nativeWithdrawn){if(h.loaderBufferManager)return false;
+        for(const auto& call:h.loaderBuffers)if(call.entered&&(!call.withdrawn||call.borrowed))return false;}
+    if(h.nativeWithdrawn&&(h.compressedLiveOffset118||!h.compressedBacking.nativeWithdrawn||h.compressedBacking.allocation||h.compressedBacking.aligned))return false;
+    if(h.nativeWithdrawn)for(const auto& next:h.followingCompressedLevels)
+        if(!next||next->liveOffset118||!next->backing.nativeWithdrawn||next->backing.allocation||next->backing.aligned)return false;
+    if(h.nativeWithdrawn&&h.embedded&&(!h.embedded->nativeWithdrawn||h.embedded->object20||h.embedded->alignedBacking||h.embedded->data00||h.embedded->cursor04))return false;
+    if(h.nativeWithdrawn)return !h.postLoaderReceiver&&!h.embeddedFCPublished&&!h.resourcePaletteB4&&!h.payloadVirtualBorrow&&!h.loaderReceiver&&!h.loaderPaletteBorrow&&(!h.slot58Stored||h.slot58WithdrawnNative)&&(!h.texture||(!h.texture->storage_&&!h.texture->manager_&&!h.texture->registered_&&
+        h.texture->nativeDetached_&&h.texture->topologyCurrentNative()))&&(!h.baseReferenceAcquired||h.nativeReferenceRetired);
+    if(h.texture&&!h.texture->topologyCurrentNative())return false;
+    if(h.managerRead){if(!h.texture||!sourceLoadApplication_||sourceLoadApplication_!=sourceTrackMountApplication_||
+        sourceLoadApplication_->entities()!=worldApplication_||h.texture->manager_!=sourceLoadApplication_->textureLifetimeOwner_||
+        h.texture->issuer_!=sourceLoadApplication_||!h.texture->topologyCurrentNative())return false;}
+    if(h.registrationReturned&&(!h.managerRead||!h.texture||!h.texture->registered_))return false;
+    if(h.registrationReturned)for(std::size_t k=0;k<8;++k)if(h.texture->known_[0xa0+k])return false;
+    if(h.base29C6E0Returned&&!h.registrationReturned)return false;
+    if((h.loaderGuardReturned&&!h.rawLoaderEntered&&!h.compressedLoaderEntered)||(h.loaderFrameInitialized&&!h.loaderGuardReturned)||
+       (h.loaderFormat3C&&(!h.loaderFrameInitialized||!h.loaderFormat48||*h.loaderFormat3C!=sourceSkyFormat29E640(h.compressedLoaderEntered?h.compressedInputFormat.value_or(0):*h.loaderFormat48)))||
+       (h.loaderFlagsStored&&(!h.loaderFormat3C||
+        h.loaderF8KnownZero!=(h.compressedLoaderEntered?14:11)||h.loaderF8KnownOne!=(h.compressedLoaderEntered?1:4)||
+        h.loaderEffectiveFormat!=(h.compressedLoaderEntered?34u:h.loaderFormat48.value_or(0))||
+        h.loaderEffectiveLayout!=(h.compressedLoaderEntered?0x613u:h.rawFormat29E640.value_or(0))))||
+       (h.loaderWorkspaceCleared&&!h.loaderFlagsStored)||
+       (h.loaderE8&&(!h.loaderWorkspaceCleared||!h.loaderEffectiveLayout||*h.loaderE8!=sourceSkyFormatBits29E910(*h.loaderEffectiveLayout)))||
+       (h.loaderMaximumBits&&(!h.loaderE8||*h.loaderMaximumBits!=*h.loaderE8)))return false;
+    if(h.compressedDimensionsStored&&(!h.compressedLoaderEntered||!h.loaderE8||*h.loaderE8!=16||h.loaderBufferManager||h.payloadVirtualEntered||h.payloadBranchSelected))return false;
+    if(h.compressedLoopInitialized){
+        if(!h.compressedDimensionsStored||!h.compressedLoopScale||!h.compressedLoopIndex||!sourceSkyFile_||
+           occurrence>=sourceSkyFile_->itemResourceSeeks_.size())return false;
+        const auto& file=*sourceSkyFile_->resourceFileOccurrence(occurrence,h.fileOrdinal);
+        std::array<std::uint8_t,0x30> workspace{};std::uint32_t count=0,scale=16;bool terminalReturned=false,shortExit=false;
+        for(std::size_t i=0;i<12;++i){const auto& step=file.compressedOffsets[i];const auto& read=step.read;
+            if(step.tell.attempted&&(!h.side||step.terminal!=(*h.side<scale)))return false;
+            for(std::size_t k=0;k<read.copied;++k)workspace[i*4+k]=read.bytes[k];
+            if(read.returned){if(read.items==1u){for(std::size_t k=0;k<4;++k)workspace[i*4+k]=0;
+                    if(step.terminal)terminalReturned=true;else {++count;scale*=2;}}
+                else shortExit=true;}
+        }
+        if(h.loaderWorkspace170!=workspace||h.compressedLoopIndex!=count||h.compressedLoopScale!=scale||
+           h.compressedOffsetsReturned!=terminalReturned||h.compressedOffsetShortExit!=shortExit)return false;
+    }
+    if(h.compressedCountAdjusted&&(!h.compressedOffsetsReturned||h.rawStackScalars[0]!=0))return false;
+    if(h.compressedLevelSetup){
+        if(!h.compressedCountAdjusted||!h.compressedLoopIndex||!*h.compressedLoopIndex||
+           h.compressedLevelIndex!=*h.compressedLoopIndex-1||!h.compressedPayloadSize16C||!sourceSkyFile_)return false;
+        const auto& read=sourceSkyFile_->resourceFileOccurrence(occurrence,h.fileOrdinal)->compressedPayloadSize;
+        std::uint32_t size=0;for(std::size_t k=0;k<read.copied;++k)size|=std::uint32_t(read.bytes[k])<<(k*8);
+        if(*h.compressedPayloadSize16C!=size)return false;
+        if(h.compressedLevelSizeStored&&(!read.returned||*h.compressedLevelIndex>=5))return false;
+    }
+    const auto backingCurrent=[](const SourceSkyCompressedBacking& backing,bool sizeStored,std::optional<std::uint32_t> size){
+        if((backing.attempted&&!sizeStored)||(backing.returned&&!backing.attempted)||
+           (backing.published&&!backing.returned)||backing.nativeWithdrawn)return false;
+        if(backing.attempted){if(!size)return false;
+            const auto rounded=(std::uint64_t(*size)+19u)&~std::uint64_t(15);
+            if(backing.capacity!=(rounded<16?16:rounded))return false;}
+        if(backing.aligned){if(!backing.allocation||!backing.returned)return false;
+            const auto first=reinterpret_cast<std::uintptr_t>(backing.allocation.get()),aligned=reinterpret_cast<std::uintptr_t>(backing.aligned);
+            if(aligned<first||aligned-first>=64||aligned%64)return false;
+        }else if(backing.allocation)return false;
+        return true;
+    };
+    const auto& backing=h.compressedBacking;
+    if(!backingCurrent(backing,h.compressedLevelSizeStored,h.compressedPayloadSize16C))return false;
+    if(h.compressedCounterRead&&!backing.published)return false;
+    if(h.compressedCounterRead&&!h.compressedCounterStored){std::uint32_t value=0;
+        if(!a::OriginalConfigProcessGlobals50LA::readCompressedBytes24F7F0(value)||value!=h.compressedCounterBefore)return false;}
+    if(h.compressedCounterStored&&(!h.compressedCounterRead||!backing.published||!h.compressedPayloadSize16C||
+       !a::OriginalConfigProcessGlobals50LA::compressedBytesReceiptCurrentNative(*h.compressedPayloadSize16C,
+        h.compressedCounterBefore,h.compressedCounterAfter,h.compressedCounterSequence)))return false;
+    if(h.compressedCounterStored){const auto& read=sourceSkyFile_->resourceFileOccurrence(occurrence,h.fileOrdinal)->compressedPayload;
+        if(read.attempted&&(read.requested!=h.compressedPayloadSize16C||read.destination!=backing.aligned))return false;
+        if(h.compressedKnownPrefix!=read.copied||h.compressedKnownPrefix>backing.capacity||
+           h.compressedTransferShort!=(read.returned&&read.items!=h.compressedPayloadSize16C))return false;
+        if(h.compressedLevelDimensionsStored&&(!read.returned||read.items!=h.compressedPayloadSize16C))return false;
+    }else if(h.compressedKnownPrefix||h.compressedTransferShort||h.compressedLevelDimensionsStored)return false;
+    if((h.compressedLogReturned[0]&&!h.compressedLevelDimensionsStored)||
+       (h.compressedLogReturned[1]&&!h.compressedLogReturned[0])||
+       (h.compressedMirrorDimensionsStored&&!h.compressedLogReturned[1])||
+       (h.compressedHeaderSizeAdjusted&&!h.compressedMirrorDimensionsStored)||
+       (h.compressedBaseAliasStored&&!h.compressedHeaderSizeAdjusted)||
+       (h.compressedOffsetAliasStored&&!h.compressedBaseAliasStored)||
+       h.compressedLiveOffset118!=(h.compressedOffsetAliasStored?16u:0u)||
+       (h.compressedOffsetAliasStored&&backing.aligned&&backing.capacity<16))return false;
+    if(h.compressedLoopAdvanced&&(!h.compressedOffsetAliasStored||h.compressedNextDimension!=32u||
+       h.compressedNextIteration!=1u||!h.side||h.compressedNextLoopTaken!=(*h.side>=32u)))return false;
+    if(h.followingCompressedLevels.size()>4||(!h.followingCompressedLevels.empty()&&!h.compressedNextLoopTaken))return false;
+    if(sourceSkyFile_&&occurrence<sourceSkyFile_->itemResourceSeeks_.size()&&
+       sourceSkyFile_->resourceFileOccurrence(occurrence,h.fileOrdinal)->followingCompressedSizes.size()>h.followingCompressedLevels.size())return false;
+    for(std::size_t n=0;n<h.followingCompressedLevels.size();++n){
+        if(!h.followingCompressedLevels[n])return false;
+        const auto& next=*h.followingCompressedLevels[n];
+        if(!next.selected||next.ordinal!=n+1||next.dimension!=(32u<<n)||!h.compressedLevelIndex||*h.compressedLevelIndex<next.ordinal||next.index!=*h.compressedLevelIndex-next.ordinal)return false;
+        if(n){const auto& prior=*h.followingCompressedLevels[n-1];if(!prior.loopAdvanced||!prior.nextLoopTaken)return false;}
+        if(next.loopAdvanced&&(!next.offsetAliasStored||next.nextDimension!=next.dimension*2u||next.nextOrdinal!=next.ordinal+1||!h.side||next.nextLoopTaken!=(*h.side>=next.nextDimension)))return false;
+        const auto& reads=sourceSkyFile_->resourceFileOccurrence(occurrence,h.fileOrdinal)->followingCompressedSizes;
+        if(reads.size()<=n){if(next.sizeReadAttempted||next.sizeReadReturned||next.size16C)return false;}
+        else {const auto& read=*reads[n];std::uint32_t value=0;
+            for(std::size_t k=0;k<read.copied;++k)value|=std::uint32_t(read.bytes[k])<<(k*8);
+            if(next.sizeReadAttempted!=read.attempted||next.sizeReadReturned!=read.returned||next.size16C!=value)return false;}
+        if(next.sizeStored&&(!next.sizeReadReturned||next.index>=5))return false;
+        if(!backingCurrent(next.backing,next.sizeStored,next.size16C))return false;
+        if(next.counterRead&&!next.backing.published)return false;
+        if(next.counterRead&&!next.counterStored){std::uint32_t value=0;
+            if(!a::OriginalConfigProcessGlobals50LA::readCompressedBytes24F7F0(value)||value!=next.counterBefore)return false;}
+        if(next.counterStored&&(!next.counterRead||!a::OriginalConfigProcessGlobals50LA::compressedBytesReceiptCurrentNative(next.size16C,next.counterBefore,next.counterAfter,next.counterSequence)))return false;
+        const auto& payloads=sourceSkyFile_->resourceFileOccurrence(occurrence,h.fileOrdinal)->followingCompressedPayloads;
+        if(payloads.size()<=n){if(next.knownPrefix||next.transferShort||next.transferAccepted)return false;}
+        else {const auto& read=*payloads[n];
+            if(!next.counterStored||(read.attempted&&(read.requested!=next.size16C||read.destination!=next.backing.aligned))||
+               next.knownPrefix!=read.copied||next.knownPrefix>next.backing.capacity||
+               next.transferShort!=(read.returned&&read.items!=next.size16C)||
+               next.transferAccepted!=(read.returned&&read.items==next.size16C))return false;}
+        if((next.dimensionsStored&&!next.transferAccepted)||(next.logReturned[0]&&!next.dimensionsStored)||
+           (next.logReturned[1]&&!next.logReturned[0])||(next.mirrorDimensionsStored&&!next.logReturned[1])||
+           (next.headerSizeAdjusted&&!next.mirrorDimensionsStored)||(next.baseAliasStored&&!next.headerSizeAdjusted)||
+           (next.offsetAliasStored&&!next.baseAliasStored)||next.liveOffset118!=(next.offsetAliasStored?16u:0u)||
+           (next.offsetAliasStored&&next.backing.aligned&&next.backing.capacity<16))return false;
+    }
+    if(h.loaderStack140&&(*h.loaderStack140!=0u||!h.loaderFrameInitialized))return false;
+    if(h.compressedTailEntered){
+        if(h.loaderStack140!=0u||!h.compressedLoopAdvanced||!h.compressedOffsetAliasStored)return false;
+        if(h.followingCompressedLevels.empty()){if(h.compressedNextLoopTaken)return false;}
+        else {const auto& last=*h.followingCompressedLevels.back();if(!last.loopAdvanced||last.nextLoopTaken)return false;}
+    }
+    if((h.compressedTailCountStored&&!h.compressedTailEntered)||(h.compressedTailFormatStored&&(!h.compressedTailCountStored||h.compressedTailFormat!=0x613u))||
+       (h.compressedFinalTellReturned&&!h.compressedTailFormatStored)||(h.compressedLoaderResult&&(!h.embeddedCallReturned||*h.compressedLoaderResult!=1u))||
+       (h.compressedLoaderReturned&&(!h.compressedLoaderResult||!h.compressedFinalTellReturned)))return false;
+    if(h.compressedTailEntered){const auto& tell=sourceSkyFile_->resourceFileOccurrence(occurrence,h.fileOrdinal)->compressedFinalTell;
+        if(tell.returned!=h.compressedFinalTellReturned||(tell.attempted&&!h.compressedTailFormatStored))return false;}
+    if(h.loaderWorkspaceCleared&&!h.compressedLoopInitialized)for(auto byte:h.loaderWorkspace170)if(byte)return false;
+    if(h.loaderBufferBytes&&(!h.loaderMaximumBits||!h.side||*h.loaderBufferBytes!=(*h.side)*(*h.side)*(*h.loaderMaximumBits)/8u))return false;
+    if(h.loaderBufferManager){if(!h.texture||h.loaderBufferManager!=h.texture->manager_||
+        !sourceLoadApplication_||h.loaderBufferManager!=sourceLoadApplication_->textureLifetimeOwner_)return false;
+        for(std::size_t slot=0;slot<2;++slot){const auto& call=h.loaderBuffers[slot];
+            if(!h.loaderBufferManager->sourceBufferCurrentNative(slot,&h,call))return false;
+            if(call.entered&&(!h.loaderBufferBytes||call.requested!=*h.loaderBufferBytes+(slot?4u:0u)))return false;}
+    }else for(const auto& call:h.loaderBuffers)if(call.entered)return false;
+    if(h.loaderBuffers[1].entered&&(!h.loaderBuffers[0].returned||!h.loaderBuffers[0].borrowed))return false;
+    if((h.payloadBranchSelected&&(!h.loaderBuffers[1].returned||!h.loaderBuffers[1].borrowed||!h.loaderFormat48||
+        h.payloadExtendedFormat!=(*h.loaderFormat48>=16&&*h.loaderFormat48<=30)))||
+       (h.payloadFileBits&&(!h.payloadBranchSelected||h.payloadExtendedFormat||*h.payloadFileBits!=sourceSkyFileBits29E5B0(*h.loaderFormat48)))||
+       (h.payloadReadBytes&&(!h.payloadFileBits||!h.side||*h.payloadReadBytes!=(*h.side)*(*h.side)*(*h.payloadFileBits)/8u)))return false;
+    if(h.payloadReadAttempted){
+        if(!sourceSkyFile_||occurrence>=sourceSkyFile_->itemResourceSeeks_.size()||!h.loaderBufferManager||!h.payloadReadBytes)return false;
+        const auto& read=sourceSkyFile_->resourceFileOccurrence(occurrence,h.fileOrdinal)->rawPayload;const auto& buffer=h.loaderBufferManager->sourceBuffers_[1];
+        if(!read.attempted||read.returned!=h.payloadReadReturned||read.copied!=h.payloadCopied||read.items!=h.payloadReadItems||
+           read.requested!=*h.payloadReadBytes||read.destination!=h.loaderBuffers[1].borrowed||
+           buffer.knownPrefix!=(h.payloadKnownPrefixBefore>h.payloadCopied?h.payloadKnownPrefixBefore:h.payloadCopied))return false;
+    }
+    if((h.payloadShortExit&&(!h.payloadReadReturned||h.payloadReadItems==h.payloadReadBytes))||
+       (h.payloadVirtualEntered&&(!h.payloadBranchSelected||h.payloadPendingReturnPC!=(h.payloadExtendedFormat?0x24f550u:0x25000cu)||
+        (h.payloadExtendedFormat?(h.payloadReadAttempted||h.payloadVirtualBorrow!=nullptr):
+         (!h.payloadReadReturned||h.payloadReadItems!=h.payloadReadBytes||h.payloadVirtualBorrow!=h.loaderBuffers[1].borrowed)))))return false;
+    if((h.payloadFieldsStored&&!h.payloadVirtualEntered)||(h.paletteB4Stored&&!h.payloadFieldsStored)||
+       (h.paletteB4Stored&&h.resourcePaletteB4!=reg.paletteBorrow)||
+       (h.formatNormalized&&(!h.paletteB4Stored||!h.rawFormat29E640||!h.normalizedFormatS1||
+         (*h.rawFormat29E640!=0x22b8u&&*h.rawFormat29E640!=0x115cu&&*h.rawFormat29E640!=0x613u&&*h.rawFormat29E640!=0x235u&&*h.rawFormat29E640!=0x22bu)||
+         *h.normalizedFormatS1!=((*h.rawFormat29E640==0x22b8u||*h.rawFormat29E640==0x115cu)?0x22b8u:0x613u)))||
+       (h.embeddedFCGuardReturned&&(!(h.formatNormalized||h.compressedFinalTellReturned)||h.embeddedFCCapacityArgument!=10)))return false;
+    if(h.embedded){const auto& e=*h.embedded;
+        if(!h.embeddedFCGuardReturned||e.nativeWithdrawn||(e.allocationReturned&&!e.allocationAttempted)||
+           (e.constructorEntered&&(!e.allocationReturned||!e.object20))||
+           (e.alignedAttempted&&(!e.constructorEntered||e.roundedCount!=16||e.bytes!=256))||
+           (e.alignedReturned&&!e.alignedAttempted)||(e.uncachedAliasSelected&&!e.alignedReturned)||
+           (e.zeroed&&(!e.uncachedAliasSelected||!e.alignedBacking||!e.data00))||
+           (e.constructorReturned&&(!e.zeroed||e.cursor04!=e.data00))||
+           (e.published&&(!e.allocationReturned||(e.object20&&!e.constructorReturned))))return false;
+        if(e.data00){if(!e.alignedBacking)return false;const auto address=reinterpret_cast<std::uintptr_t>(e.data00);
+            const auto base=reinterpret_cast<std::uintptr_t>(e.alignedBacking.get());
+            if(address%64||address<base||address-base>63)return false;}
+        if(e.zeroed)for(std::size_t k=0;k<e.bytes;++k)if(e.data00[k])return false;
+        if(e.constructorReturned){for(std::size_t k=0;k<8;++k)if(e.known[k])return false;
+            for(std::size_t k=8;k<0x20;++k)if(!e.known[k]||e.object20[k]!=(k==8?16:0))return false;}
+        if(e.published&&h.embeddedFCPublished!=(e.object20?h.embedded.get():nullptr))return false;
+    }
+    if((h.embeddedCallReturned&&(!h.embedded||!h.embedded->published))||
+       (h.resourceFormatFieldsStored&&(!h.embeddedCallReturned||!h.normalizedFormatS1||
+        h.resourceCurrentE8!=sourceSkyFormatBits29E910(*h.normalizedFormatS1)))||
+       (h.levelAllocationEntered&&!h.resourceFormatFieldsStored))return false;
+    if(h.loaderNullBufferExit&&!((h.loaderBuffers[0].returned&&!h.loaderBuffers[0].borrowed)||
+       (h.loaderBuffers[1].returned&&!h.loaderBuffers[1].borrowed)))return false;
+    if((h.rawFormat29E640&&(!h.loaderFormat48||*h.rawFormat29E640!=sourceSkyFormat29E640(*h.loaderFormat48)))||
+       (h.slot58Stored&&(!h.allocationReturned||(h.allocationNonNull&&!h.derivedConstructorReturned)))||
+       (h.loaderClassified&&(!h.slot58Stored||!h.allocationNonNull||h.loaderFormat48!=h.format48))||
+       (h.rawLoaderEntered&&(!h.loaderClassified||h.compressed||!h.rawFormat29E640||
+        h.loaderReceiver!=h.texture.get()||h.loaderPaletteBorrow!=reg.paletteBorrow||
+        h.loaderHandle40!=state.handle40||h.rawStackScalars!=std::array<std::uint64_t,6>{{0,0,2,1,128,0x00ff00ffu}})))return false;
+    if((h.derivedTableStored&&(!h.base29C6E0Returned||h.vtable08!=0x3d21c0u))||
+       (h.embeddedFCConstructed&&!h.derivedTableStored)||h.derivedLevels>5||
+       (h.derivedLevels&&!h.embeddedFCConstructed)||
+       (h.derivedConstructorReturned&&(h.derivedLevels!=5||h.flagsF8KnownZero!=15)))return false;
+    const auto& owner=sourceItemOwner(occurrence);if(!owner)return false;
+    if(h.postLoaderSlotReloaded&&(!h.compressedLoaderReturned||!h.slot58Stored||h.slot58WithdrawnNative||
+       !owner||owner->resources58[h.group*16+h.entry]!=h.postLoaderReceiver||h.postLoaderReceiver!=h.texture.get()||!h.postLoaderReceiver))return false;
+    if((h.postLoaderReceiver&&!h.postLoaderSlotReloaded)||
+       (h.postLoaderVirtualEntered&&(!h.postLoaderSlotReloaded||h.vtable08!=0x3d21c0u||h.postLoaderTarget!=0x2516f0u||h.postLoaderArguments!=std::array<std::uint32_t,3>{{1,0,0}}))||
+       (h.postLoaderVirtualReturned&&(!h.postLoaderVirtualEntered||h.postLoaderResult!=1u))||
+       (h.postLoaderResult&&!h.postLoaderVirtualReturned))return false;
+
+    if(h.resourceTailEntered){
+        if(!h.slot58Stored||(h.allocationNonNull?!h.postLoaderVirtualReturned:!h.allocationReturned)||!h.resourceTailFlags4C)return false;
+        if(!owner->known[0x4c]||!owner->known[0x4d]||*h.resourceTailFlags4C!=(std::uint16_t(owner->storage[0x4c])|(std::uint16_t(owner->storage[0x4d])<<8)))return false;
+        const auto& tail=*sourceSkyFile_->resourceFileOccurrence(occurrence,h.fileOrdinal);
+        if(tail.resourceTailEntered&&tail.resourceAlignmentSelected!=bool(*h.resourceTailFlags4C&2u))return false;
+        if(h.resourceAlignmentReturned!=tail.resourceAlignmentReturned)return false;
+    }
+    if((h.resourceAlignmentReturned&&!h.resourceTailEntered)||(h.resourceSourceReturned&&(!h.resourceAlignmentReturned||h.resourceSourceResult!=1u))||
+       (h.resourceSourceResult&&!h.resourceSourceReturned))return false;
+    const auto word=[&](std::size_t off,std::uint32_t value){for(std::size_t k=0;k<4;++k)
+        if(!owner->known[off+k]||owner->storage[off+k]!=((value>>(k*8))&255u))return false;return true;};
+    if(h.groupWord50&&!word(0x50+h.group*0x100,*h.groupWord50))return false;
+    if(h.format48&&!word(0x48,*h.format48))return false;
+    if(h.slot58Stored){if(owner->resources58[h.group*16+h.entry]!=(h.allocationNonNull?h.texture.get():nullptr)||h.slot58WithdrawnNative)return false;
+        const auto off=0x58+h.group*0x100+h.entry*4;
+        for(std::size_t k=0;k<4;++k)if(h.allocationNonNull?owner->known[off+k]:(!owner->known[off+k]||owner->storage[off+k]))return false;
+    }
+    if(h.sizeCode&&(!h.groupWord50||*h.sizeCode!=((*h.groupWord50>>(2*h.entry))&3u)))return false;
+    if(h.allocationNonNull!=bool(h.texture&&h.texture->storage_))return false;
+    if(h.baseReferenceAcquired){if(!h.vtable08||!h.texture)return false;
+        const auto expect=[&](std::size_t off,std::uint64_t value,std::size_t size){for(std::size_t k=0;k<size;++k)
+            if(!h.texture->known_[off+k]||h.texture->storage_[off+k]!=((value>>(k*8))&255u))return false;return true;};
+        if(!expect(0,1,8)||!expect(8,*h.vtable08,4)||!expect(0x10,0,4)||!expect(0x14,(h.payloadFieldsStored||h.compressedDimensionsStored)?h.side.value_or(0):0,4)||!expect(0x18,(h.payloadFieldsStored||h.compressedDimensionsStored)?h.side.value_or(0):0,4)||
+           (!h.registrationReturned&&(!expect(0xa0,0,4)||!expect(0xa4,0,4)))||!expect(0xa8,h.compressedDimensionsStored?16u:1u,4)||!expect(0xac,h.compressedTailFormatStored?h.compressedTailFormat.value_or(0):h.resourceFormatFieldsStored?h.normalizedFormatS1.value_or(0):0xffffffffu,4)||!expect(0x20,0,1))return false;
+        for(std::size_t off=0xb0;off<=0xc0;off+=4){
+            if(off==0xb4&&h.paletteB4Stored&&h.resourcePaletteB4){for(std::size_t k=0;k<4;++k)if(h.texture->known_[off+k])return false;}
+            else if(!expect(off,off==0xb0?((h.resourceFormatFieldsStored||h.compressedCountAdjusted)?1u:h.compressedLoopIndex.value_or(0)):0u,4))return false;
+        }
+        if(h.embeddedFCConstructed){if(h.embeddedFCPublished){for(std::size_t k=0;k<4;++k)if(h.texture->known_[0xfc+k])return false;}
+            else if(!expect(0xfc,0,4))return false;}
+        for(std::size_t j=0;j<5;++j){const auto delta=j*0x34;
+            const SourceSkyFollowingCompressedLevel* later=nullptr;
+            for(const auto& level:h.followingCompressedLevels)if(level->index==j){if(later)return false;later=level.get();}
+            if(j<h.derivedLevels){
+                if(h.level130KnownZero[j]!=3||h.texture->known_[0x130+delta]||
+                   (!(h.compressedBaseAliasStored&&h.compressedLevelIndex==j&&h.compressedBacking.aligned)&&!(later&&later->baseAliasStored&&later->backing.aligned)&&!expect(0x100+delta,0,4))||
+                   (!(h.compressedBacking.published&&h.compressedLevelIndex==j)&&!(later&&later->backing.published)&&!expect(0x118+delta,0,4))||!expect(0x124+delta,later&&later->dimensionsStored?later->dimension:h.compressedLevelDimensionsStored&&h.compressedLevelIndex==j?16u:0xffffu,2))return false;
+                if(h.compressedBaseAliasStored&&h.compressedLevelIndex==j&&h.compressedBacking.aligned)
+                    for(std::size_t k=0;k<4;++k)if(h.texture->known_[0x100+delta+k])return false;
+                if(h.compressedBacking.published&&h.compressedLevelIndex==j){
+                    if(h.compressedBacking.aligned){for(std::size_t k=0;k<4;++k)if(h.texture->known_[0x118+delta+k])return false;}
+                    else if(!expect(0x118+delta,h.compressedOffsetAliasStored?16u:0u,4))return false;
+                }
+                if(later&&later->baseAliasStored&&later->backing.aligned)
+                    for(std::size_t k=0;k<4;++k)if(h.texture->known_[0x100+delta+k])return false;
+                if(later&&later->backing.published){
+                    if(later->backing.aligned){for(std::size_t k=0;k<4;++k)if(h.texture->known_[0x118+delta+k])return false;}
+                    else if(!expect(0x118+delta,later->offsetAliasStored?16u:0u,4))return false;
+                }
+                for(const auto off:{0x104u,0x110u,0x108u,0x10cu,0x114u,0x11cu,0x120u,0x12cu,0x128u})
+                    if(!expect(off+delta,later&&later->dimensionsStored&&(off==0x104u||off==0x110u)?later->dimension:
+                        later&&later->dimensionsStored&&off==0x108u?(later->dimension/64u?later->dimension/64u:1u):
+                        later&&((later->logReturned[0]&&off==0x10cu)||(later->logReturned[1]&&off==0x114u))?static_cast<std::uint32_t>(4u+later->ordinal):
+                        later&&later->mirrorDimensionsStored&&(off==0x128u||off==0x12cu)?later->dimension:
+                        later&&later->sizeStored&&off==0x11cu?later->size16C-(later->headerSizeAdjusted?16u:0u):
+                        h.compressedLevelIndex==j&&h.compressedLevelDimensionsStored&&(off==0x104u||off==0x110u)?16u:
+                        h.compressedLevelIndex==j&&h.compressedLevelDimensionsStored&&off==0x108u?1u:
+                        h.compressedLevelIndex==j&&((h.compressedLogReturned[0]&&off==0x10cu)||(h.compressedLogReturned[1]&&off==0x114u))?4u:
+                        h.compressedLevelIndex==j&&h.compressedMirrorDimensionsStored&&(off==0x128u||off==0x12cu)?16u:
+                        off==0x11cu&&h.compressedLevelSizeStored&&h.compressedLevelIndex==j?
+                            h.compressedPayloadSize16C.value_or(0)-(h.compressedHeaderSizeAdjusted?16u:0u):0xffffffffu,4))return false;
+            }else if(h.level130KnownZero[j])return false;
+        }
+        if(h.derivedConstructorReturned){
+            if(!expect(0xe8,h.resourceCurrentE8.value_or(h.loaderE8.value_or(0xffffffffu)),4)||!expect(0x204,0,4)||!expect(0x208,0,4)||h.texture->known_[0xf8])return false;
+            for(const auto off:{0xf4u,0xecu,0xf0u})if(!expect(off,0xffffffffu,4))return false;
+        }
+    }
+    return true;
+}
+bool Owner::continueSourceSkyResourcePrefix(std::uint32_t& pc,std::size_t occurrence,std::size_t group,std::size_t entry)noexcept {
+    if(pc!=0x128d50u||occurrence>sourceSkyLaterItems_.size()||group>=6||entry>=16||!preflightSourcePostParticleModelsNative())return false;
+    auto& state=sourceItemHistory(occurrence);auto& reg=state.registration;auto& owner=sourceItemOwner(occurrence);
+    if(!reg.seekReturned||reg.pendingResource||reg.completedResources.size()>=96||reg.completedEntries!=group*16+entry||!owner)return false;
+    const auto fileOrdinal=reg.completedResources.size();
+    if(fileOrdinal){
+        if(reg.resourceCalls.size()!=fileOrdinal||!reg.resourceCalls.back()||!sourceSkyFile_)return false;auto& call=*reg.resourceCalls.back();
+        if(!call.entered||call.bodyEntered||call.index!=group*16+entry)return false;
+        a::OriginalStandardTextureDiagnostic50LA d;
+        if(!sourceSkyFile_->beginNextResource(occurrence,fileOrdinal,call.cursor,d)){pc=sourcePostParticleModelsPC_=d.sourcePC?d.sourcePC:sourceSkyFile_->pc_;return false;}
+        call.bodyEntered=true;
+    }else if(!reg.resourceCalls.empty())return false;
+    try{reg.pendingResource.reset(new SourceSkyResourcePrefix);}catch(...){return false;}
+    auto& h=*reg.pendingResource;h.entered=true;h.fileOrdinal=fileOrdinal;h.group=group;h.entry=entry;
+    const auto at=[&](std::uint32_t p){pc=sourcePostParticleModelsPC_=p;};
+    const auto word=[&](std::size_t off,std::optional<std::uint32_t>& out){for(std::size_t k=0;k<4;++k)if(!owner->known[off+k])return false;
+        out=std::uint32_t(owner->storage[off])|(std::uint32_t(owner->storage[off+1])<<8)|(std::uint32_t(owner->storage[off+2])<<16)|(std::uint32_t(owner->storage[off+3])<<24);return true;};
+    // One source callee prefix, qualified by the actual caller arguments.
+    // Original item format is not substituted for compressed input32.
+    const auto initializeLoader=[&](std::uint32_t input,std::uint32_t layout,bool indexed){
+        std::uint32_t guardPC=0x24f2ec;
+        if(!a::OriginalConfigProcessGlobals50LA::checkTextureLoad24F2C0(input,guardPC)){at(guardPC);return false;}
+        at(guardPC);h.loaderGuardReturned=true;
+        at(0x24f378);at(0x24f37c);at(0x24f380);h.loaderFrameInitialized=true;
+        at(0x29e640);at(0x24f384);h.loaderFormat3C=sourceSkyFormat29E640(input);
+        at(0x24f388);at(0x24f38c);at(0x24f390);h.loaderStack140=0;at(0x29ea50);
+        if(input>=0x80000000u&&input<0x8000001fu)return false;
+        if(indexed!=(input>=31u&&input<=36u))return false;
+        at(0x24f394);at(0x24f3a8);h.loaderF8KnownZero=indexed?14:15;h.loaderF8KnownOne=indexed?1:0;
+        at(0x24f3ac);at(0x24f3b4);at(0x24f3b8);
+        if(indexed){at(0x24f3bc);at(0x24f3c0);at(0x24f3c4);layout=0x613;
+            if(input==32u){at(0x24f3c8);at(0x24f3cc);input=34;}else {at(0x24f3d0);at(0x24f3d4);input=33;}
+        }else {at(0x24f3d8);at(0x24f3e4);h.loaderF8KnownZero=11;h.loaderF8KnownOne=4;}
+        h.loaderEffectiveFormat=input;h.loaderEffectiveLayout=layout;h.loaderFlagsStored=true;
+        // Preserve unknown upper nibble; no whole-byte host read or invented bits.
+        at(0x24f3e8);at(0x24f3f0);at(0x306478);h.loaderWorkspace170.fill(0);h.loaderWorkspaceCleared=true;
+        at(0x24f3f8);at(0x29e910);h.loaderE8=sourceSkyFormatBits29E910(layout);at(0x24f400);
+        for(std::size_t k=0;k<4;++k){h.texture->storage_[0xe8+k]=static_cast<std::uint8_t>(*h.loaderE8>>(k*8));h.texture->known_[0xe8+k]=true;}
+        return true;
+    };
+    const auto publishAndEnterLoader=[&](){
+        at(0x128e94);at(0x128e98);at(0x128e9c);
+        const auto index=group*16+entry,off=0x58+group*0x100+entry*4;
+        owner->resources58[index]=h.allocationNonNull?h.texture.get():nullptr;
+        for(std::size_t k=0;k<4;++k){if(h.allocationNonNull)owner->known[off+k]=false;
+            else {owner->storage[off+k]=0;owner->known[off+k]=true;}}
+        h.slot58Stored=true;at(0x128ea0);at(0x128ea4);at(0x128ea8);
+        if(!h.allocationNonNull){at(0x129054);return continueSourceSkyResourceTail129054(pc,occurrence);} //ActualNULL bypasses loader/virtualcall.
+        at(0x128eac);at(0x128eb0);if(!word(0x48,h.loaderFormat48))return false;
+        at(0x29e510);const bool compressed=sourceSkyFormat29E510(*h.loaderFormat48);h.loaderClassified=true;
+        at(0x128eb4);at(0x128eb8);
+        if(compressed){at(0x128ebc);at(0x128ec0);at(0x128ec4);at(0x128ec8);at(0x128ecc);
+            h.compressedStackInitialized=true;for(std::size_t i=1;i<5;++i)h.compressedHeaderWords[i]=0;
+            static constexpr std::uint32_t globals[5]={0x128ed0,0x128eec,0x128f08,0x128f24,0x128f40};
+            static constexpr std::uint32_t calls[5]={0x128ee0,0x128efc,0x128f18,0x128f34,0x128f50};
+            for(std::size_t i=0;i<5;++i){at(globals[i]);
+                if(!sourceTrackMountDomain_||sourceTrackMountDomain_->resolver3E1A70()!=sourceSkyFile_->resolver_)return false;
+                at(calls[i]);a::OriginalStandardTextureDiagnostic50LA d;
+                const bool returned=sourceSkyFile_->readCompressedResourceHeader(occurrence,i,d);
+                const auto& read=sourceSkyFile_->resourceFileOccurrence(occurrence,h.fileOrdinal)->compressedHeaders[i];
+                h.compressedHeaderAttempted[i]=read.attempted;h.compressedHeaderReturned[i]=read.returned;
+                h.compressedHeaderCopied[i]=read.copied;h.compressedHeaderItems[i]=read.items;
+                // AC was uninitialized; the other four stackwords startzero.
+                // Short reads preserve those zero suffixes; they are not errors.
+                if(i||read.copied==4){std::uint32_t value=0;for(std::size_t k=0;k<read.copied;++k)value|=std::uint32_t(read.bytes[k])<<(k*8);
+                    h.compressedHeaderWords[i]=value;}
+                if(!returned){at(d.sourcePC?d.sourcePC:sourceSkyFile_->pc_);return false;}
+            }
+            at(0x128f58);at(0x128f5c);at(0x128f60);at(0x128f64);
+            if(h.compressedHeaderWords[3]!=0x1000u){at(0x128f68);at(0x128f6c);at(0x29e9f0);
+                if(!h.compressedHeaderWords[0])return false; //Cannot read uninitialized AC suffix.
+                auto& value=*h.compressedHeaderWords[0];if(value==31u||value==32u)value=31u;else if(value==33u||value==34u)value=32u;
+                h.compressedHeaderConverted=true;at(0x29ea48);at(0x29ea4c);
+            }
+            at(0x128f70);at(0x128f80);h.compressedHeaderWords[3]=h.compressedHeaderWords[2];h.compressedB8Replaced=true;
+            at(0x128f84);h.loaderPaletteBorrow=reg.paletteBorrow;h.rawStackScalars={{0,0,2,1,128,0x00ff00ffu}};
+            at(0x128fa8);h.loaderReceiver=owner->resources58[index];at(0x128fac);h.loaderHandle40=state.handle40;
+            at(0x128fb0);if(!h.payloadBytes)return false; //Actual stackA8 load, not an earlier artificial shortread error.
+            at(0x128fb4);h.compressedInputFormat=32;at(0x128fb8);h.compressedInputLayout=0x613;at(0x128fbc);if(h.vtable08!=0x3d21c0u||h.loaderReceiver!=h.texture.get()||!h.loaderHandle40)return false;
+            at(0x128fc0);at(0x128fc4);at(0x128fc8);at(0x128fcc);h.compressedPendingReturnPC=0x128fd0u;h.compressedLoaderEntered=true;
+            at(0x24f2c0);if(!initializeLoader(*h.compressedInputFormat,*h.compressedInputLayout,true))return false;
+            at(0x24f404);at(0x24f408);at(0x24f40c);at(0x24f410);
+            // F8bit0 branches around both Application reusable-buffer calls.
+            at(0x24f4c4);at(0x29e560);at(0x24f4cc);at(0x24f4d0);
+            at(0x24f4d4);at(0x24f4d8);at(0x24f4dc);at(0x24f4e0);
+            // Effective format34 takes extended path, bit0 skips virtual+24.
+            const auto store=[&](std::size_t off,std::uint32_t value){for(std::size_t k=0;k<4;++k){
+                h.texture->storage_[off+k]=static_cast<std::uint8_t>(value>>(k*8));h.texture->known_[off+k]=true;}};
+            const auto allocateCompressed=[&](SourceSkyCompressedBacking& backing,std::uint32_t requested,std::uint32_t index,
+                bool& counterRead,bool& counterStored,std::uint32_t& counterBefore,std::uint32_t& counterAfter,std::uint64_t& counterSequence){
+            at(0x24f7b4);at(0x24f7b8);at(0x305500);
+            if(!a::OriginalConfigProcessGlobals50LA::descriptorDelete2E8B00AdmittedNative())return false;
+            //305530 rounds size+13hex, then requests rounded+50hex from
+            //305990, which itself adds13hex. Bound wrapping/signed-large
+            //allocator forms before claiming any source allocation result.
+            const auto rounded=(std::uint64_t(requested)+19u)&~std::uint64_t(15);
+            const auto capacity=rounded<16?16:rounded;
+            if(capacity+80u+19u>0x7fffffffu)return false;
+            backing.capacity=static_cast<std::size_t>(capacity);backing.attempted=true;
+            try{backing.allocation.reset(new std::uint8_t[backing.capacity+63]);}catch(...){backing.allocation.reset();}
+            backing.returned=true;
+            if(backing.allocation){const auto address=reinterpret_cast<std::uintptr_t>(backing.allocation.get());
+                backing.aligned=backing.allocation.get()+((64-address%64)%64);}
+            // Size0 may return nonNULL; no prepared buffer or fake guest pointer.
+            at(0x24f7c0);at(0x24f7c4);at(0x24f7c8);at(0x24f7cc);at(0x24f7d0);
+            at(0x24f7d4);at(0x24f7d8);at(0x24f7dc);at(0x24f7e0);at(0x24f7e4);at(0x24f7e8);at(0x24f7ec);
+            const auto pointerOffset=0x118u+0x34u*(index);
+            for(std::size_t k=0;k<4;++k){if(backing.aligned)h.texture->known_[pointerOffset+k]=false;
+                else {h.texture->storage_[pointerOffset+k]=0;h.texture->known_[pointerOffset+k]=true;}}
+            backing.published=true;at(0x24f7f0);
+            if(!a::OriginalConfigProcessGlobals50LA::readCompressedBytes24F7F0(counterBefore))return false;
+            counterRead=true;at(0x24f7f4);at(0x24f7f8);at(0x24f7fc);
+            if(!sourceTrackMountDomain_||sourceTrackMountDomain_->resolver3E1A70()!=sourceSkyFile_->resolver_)return false;
+            at(0x24f800);at(0x24f804);at(0x24f808);
+            if(!a::OriginalConfigProcessGlobals50LA::addCompressedBytes24F808(requested,
+               counterBefore,counterAfter,counterSequence))return false;
+            //The scalar addition is unconditional, including a NULL allocation.
+            counterStored=true;
+                return true;
+            };
+            const auto finishCompressedLevel=[&](std::uint32_t index,std::uint32_t dimension,std::uint32_t originalSize,SourceSkyCompressedBacking& backing,
+                bool& dimensionsStored,std::array<bool,2>& logs,bool& mirrorStored,bool& headerAdjusted,bool& baseAliasStored,bool& offsetAliasStored,std::size_t& liveOffset){
+            at(0x24f82c);at(0x24f830);at(0x24f834);at(0x24f838);at(0x24f83c);at(0x24f840);at(0x24f844);at(0x24f848);
+            const auto level=0x100u+0x34u*(index);
+            at(0x24f84c);store(level+4,dimension);at(0x24f850);store(level+0x10,dimension);
+            at(0x24f854);at(0x24f858);at(0x24f85c);h.texture->storage_[level+0x24]=static_cast<std::uint8_t>(dimension);h.texture->storage_[level+0x25]=static_cast<std::uint8_t>(dimension>>8);
+            h.texture->known_[level+0x24]=h.texture->known_[level+0x25]=true;
+            at(0x24f860);at(0x24f864);at(0x24f868);at(0x24f874);at(0x24f878);
+            //Admitted positive dimensions take BGEZ; division delay shift is
+            //signed/64. BNEL annuls24F87C when quotient>=2, then24F884 stores.
+            const auto tiles=dimension/64u;
+            if(tiles<2u){at(0x24f87c);at(0x24f888);store(level+8,1);}
+            else {at(0x24f880);at(0x24f884);store(level+8,tiles);}
+            dimensionsStored=true;
+            const auto readDimension=[&](std::size_t offset,std::uint32_t& value){value=0;
+                for(std::size_t k=0;k<4;++k){if(!h.texture->known_[offset+k])return false;
+                    value|=std::uint32_t(h.texture->storage_[offset+k])<<(k*8);}return true;};
+            std::uint32_t integerLog=0;
+            const auto dimensionLog=[&](std::uint32_t operand){
+                at(0x3101e8);if(operand!=16u&&operand!=32u&&operand!=64u&&operand!=128u&&operand!=256u)return false;
+                //Source-specific proof, NOT host log():3101E8 converts16
+                //exactly. 302A58/2FF788 normalizes16 and2 to1 (f=0),
+                //then rounds k*ln2_hi+k*ln2_lo with k=4/1. Constants:
+                //3C5D88=3FE62E42FEE00000,3C5D90=3DEA39EF35793C76.
+                //Scaling both normal finite terms by4 commutes with final
+                //binary rounding. 30FF18 therefore divides equal significands
+                //with exponentdifference2, exactly4;3102A0 truncates to4.
+                //For positive finite operands every302A58 libmode exits before
+                //errno/error callbacks; no current mode value is assumed.
+                //Independent operand32 proof: original power-of-two branch
+                //gives integer significandsD=162E42FEFA39EF and
+                //N=1BB9D3BEB8C86B, withlog2=D*2^-53 and
+                //log32=N*2^-51. For those integers,4*N-5*D=1;
+                //quotient5+1/D is inside5's halfULP2^-51 sinceD>2^51.
+                //Original nearest-even softpack returns exact5, truncate5.
+                //Independent k6/7/8 proofs: log(64/128/256)=N*2^-50,
+                //N=10A2B23F3BAB73/13687A9F1AF2B1/162E42FEFA39EF.
+                //With D above,8*N-k*D=-2/-1/0. SinceD>2*2^51,
+                //the quotients6-2/D and7-1/D round exactly6/7;8 is exact.
+                //k*HI exact; k*LO nearest-even integer significands at2^-82:
+                //13AB73681AED58 (tie-even),16F2B14ECA14E7,1A39EF35793C76.
+                //Final-sum residuals681AED58/4ECA14E7/35793C76 over2^32
+                //are each below1/2. These proofs use original softpack rules.
+                integerLog=operand==16u?4u:operand==32u?5u:operand==64u?6u:operand==128u?7u:8u;
+                at(0x30f7a0);at(0x310298);return true;
+            };
+            std::uint32_t operand=0;at(0x24f88c);if(!readDimension(level+4,operand)||!dimensionLog(operand))return false;
+            at(0x24f894);at(0x302a58);at(0x2ff788);at(0x24f89c);at(0x24f8a0);
+            at(0x24f8a4);at(0x302a58);at(0x2ff788);at(0x24f8ac);at(0x24f8b0);at(0x30ff18);
+            at(0x24f8b8);at(0x3102a0);at(0x24f8c0);store(level+0xc,integerLog);logs[0]=true;
+            at(0x24f8c4);if(!readDimension(level+0x10,operand)||!dimensionLog(operand))return false;
+            at(0x24f8cc);at(0x302a58);at(0x2ff788);at(0x24f8d4);at(0x24f8d8);
+            at(0x24f8dc);at(0x302a58);at(0x2ff788);at(0x24f8e4);at(0x24f8e8);at(0x30ff18);
+            at(0x24f8f0);at(0x3102a0);at(0x24f8f8);store(level+0x14,integerLog);logs[1]=true;
+            at(0x24f8fc);at(0x24f900);store(level+0x2c,dimension);at(0x24f904);at(0x24f908);store(level+0x28,dimension);mirrorStored=true;
+            at(0x24f90c);at(0x24f910);at(0x24f914);store(level+0x1c,originalSize-16u);headerAdjusted=true;
+            at(0x24f918);at(0x24f91c);
+            for(std::size_t k=0;k<4;++k){if(backing.aligned)h.texture->known_[level+k]=false;
+                else {h.texture->storage_[level+k]=0;h.texture->known_[level+k]=true;}}
+            baseAliasStored=true;
+            at(0x24f920);at(0x24f924);at(0x24f928);at(0x24f92c);
+            //Keep the owned allocation base and its known prefix unchanged.
+            //A NULL source base plus16 is known EE word16, NOT host address16.
+            //Nonnull base+16 is represented as a typed offset, even if it is
+            //one-past; no payload/header bytes are read by this adjustment.
+            if(backing.aligned&&backing.capacity<16)return false;
+            liveOffset=16;offsetAliasStored=true;
+            if(!backing.aligned)store(level+0x18,16);
+                at(0x24f968);return true;
+            };
+            const auto finishCompressedTail=[&](){
+                at(0x24faac);at(0x24fab0);at(0x24fab4);at(0x24fab8);h.compressedTailEntered=true;
+                if(!(h.loaderF8KnownOne&1u))return false;
+                at(0x24fbc8);std::uint32_t count=0;for(std::size_t k=0;k<4;++k){if(!h.texture->known_[0xb0+k])return false;count|=std::uint32_t(h.texture->storage_[0xb0+k])<<(k*8);}
+                at(0x24fbcc);at(0x24fbd0);if(static_cast<std::int32_t>(count)>=5){at(0x24fbd4);count=5;}
+                at(0x24fbd8);store(0xb0,count);h.compressedTailCountStored=true;
+                at(0x24fbdc);at(0x24fbe0);at(0x24fbe4);at(0x24fbe8);at(0x24fbec);at(0x29e640);
+                if(h.loaderEffectiveFormat!=34u)return false;
+                h.compressedTailFormat=sourceSkyFormat29E640(*h.loaderEffectiveFormat);
+                at(0x24fbf4);store(0xac,*h.compressedTailFormat);h.compressedTailFormatStored=true;
+                at(0x24fbf8);at(0x24fbfc);at(0x24fc00);at(0x24fc04);
+                if(!sourceTrackMountDomain_||sourceTrackMountDomain_->resolver3E1A70()!=sourceSkyFile_->resolver_)return false;
+                a::OriginalStandardTextureDiagnostic50LA tailDiagnostic;
+                if(!sourceSkyFile_->tellCompressedFinal(occurrence,tailDiagnostic)){at(tailDiagnostic.sourcePC?tailDiagnostic.sourcePC:sourceSkyFile_->pc_);return false;}
+                h.compressedFinalTellReturned=true;at(0x24fc08);
+                //Actual stack140 was zeroed at24F390, not a caller argument.
+                if(h.loaderStack140!=0u)return false;
+                at(0x24fc0c);at(0x24fc10);at(0x24fc14);at(0x24fc18);at(0x24fc1c);
+                h.embeddedFCCapacityArgument=10;at(0x257750);
+                if(!continueSourceSkyEmbedded257750(pc,occurrence))return false;
+                at(0x24fc20);h.compressedLoaderResult=1;at(0x24fc24);at(0x24fc28);
+                at(0x25000c);at(0x250010);at(0x250014);at(0x250018);at(0x25001c);at(0x250020);at(0x250024);at(0x250028);at(0x25002c);at(0x250030);at(0x250034);at(0x250038);
+                h.compressedLoaderReturned=true;at(0x128fd0);at(0x128fd4);
+                //Branch delay reloads the actual item slot, not the earlier
+                //loader return or a prepared resource. Revalidate live owners.
+                if(!preflightSourceSkyResourcePrefix(occurrence))return false;
+                h.postLoaderReceiver=owner->resources58[index];h.postLoaderSlotReloaded=true;
+                if(!h.postLoaderReceiver||h.postLoaderReceiver!=h.texture.get())return false;
+                at(0x12903c);h.postLoaderArguments[0]=1;at(0x129040);h.postLoaderArguments[1]=0;
+                at(0x129044);std::uint32_t table=0;for(std::size_t k=0;k<4;++k){if(!h.texture->known_[8+k])return false;table|=std::uint32_t(h.texture->storage_[8+k])<<(k*8);}
+                if(table!=0x3d21c0u||h.vtable08!=table)return false;
+                //Immutable original3D21C0+30 entry is2516F0. This callee is
+                //JR RA with V0=1 in its delay slot; no allocation/upload/retain.
+                at(0x129048);h.postLoaderTarget=0x2516f0u;at(0x12904c);at(0x129050);h.postLoaderArguments[2]=0;h.postLoaderVirtualEntered=true;
+                at(0x2516f0);at(0x2516f4);h.postLoaderResult=1;h.postLoaderVirtualReturned=true;
+                at(0x129054);return continueSourceSkyResourceTail129054(pc,occurrence);
+            };
+            if(!h.side)return false;
+            at(0x24f568);store(0x14,*h.side);at(0x24f56c);at(0x24f570);store(0x18,*h.side);
+            at(0x24f574);store(0xa8,16);h.compressedDimensionsStored=true;
+            at(0x24f578);store(0xb0,0);at(0x24f57c);at(0x24f580);h.compressedLoopScale=1;
+            at(0x24f584);at(0x24f588);at(0x24f58c);h.compressedLoopIndex=0;
+            at(0x24f590);h.compressedLoopScale=16;h.compressedLoopInitialized=true;
+            at(0x24f594);at(0x24f598);
+            if(!sourceTrackMountDomain_||sourceTrackMountDomain_->resolver3E1A70()!=sourceSkyFile_->resolver_)return false;
+            at(0x24f59c);a::OriginalStandardTextureDiagnostic50LA d;
+            if(!sourceSkyFile_->tellCompressedOffset(occurrence,0,false,d)){at(d.sourcePC?d.sourcePC:sourceSkyFile_->pc_);return false;}
+            at(0x24f5a4);
+            for(;;){const auto index=static_cast<std::size_t>(*h.compressedLoopIndex);const bool terminal=*h.side<*h.compressedLoopScale;
+                // Native workspace capacity bound, not a source decoder success.
+                if(index>=12)return false;
+                at(terminal?0x24f644:0x24f5a4);at(terminal?0x24f648:0x24f5a8);
+                if(!sourceTrackMountDomain_||sourceTrackMountDomain_->resolver3E1A70()!=sourceSkyFile_->resolver_)return false;
+                at(terminal?0x24f64c:0x24f5ac);
+                if(!sourceSkyFile_->tellCompressedOffset(occurrence,index+1,terminal,d)){at(d.sourcePC?d.sourcePC:sourceSkyFile_->pc_);return false;}
+                at(terminal?0x24f654:0x24f5b4);at(terminal?0x24f658:0x24f5b8);
+                // The signed-low32 tell conversion is dead on this indexed path;
+                // actual tell still occurred, and no offset addition is invented.
+                at(terminal?0x24f664:0x24f5c4);
+                if(!sourceTrackMountDomain_||sourceTrackMountDomain_->resolver3E1A70()!=sourceSkyFile_->resolver_)return false;
+                at(terminal?0x24f678:0x24f5d8);
+                if(!h.loaderWorkspaceCleared||!h.compressedLoaderEntered||h.loaderF8KnownOne!=1u||
+                   (h.loaderF8KnownZero&14u)!=14u)return false;
+                const bool returned=sourceSkyFile_->readCompressedOffset(occurrence,index,d);
+                const auto& read=sourceSkyFile_->resourceFileOccurrence(occurrence,h.fileOrdinal)->compressedOffsets[index].read;
+                for(std::size_t k=0;k<read.copied;++k)h.loaderWorkspace170[index*4+k]=read.bytes[k];
+                if(!returned){at(d.sourcePC?d.sourcePC:sourceSkyFile_->pc_);return false;}
+                at(terminal?0x24f680:0x24f5e0);at(terminal?0x24f684:0x24f5e4);
+                if(read.items!=1u){h.compressedOffsetShortExit=true;at(terminal?0x24f68c:0x24f5ec);at(0x25000c);return false;}
+                at(terminal?0x24f694:0x24f5f4);at(terminal?0x24f69c:0x24f5fc);
+                at(terminal?0x24f6b0:0x24f610);for(std::size_t k=0;k<4;++k)h.loaderWorkspace170[index*4+k]=0;
+                if(terminal){h.compressedOffsetsReturned=true;break;}
+                at(0x24f628);at(0x24f62c);*h.compressedLoopScale*=2;at(0x24f630);++*h.compressedLoopIndex;
+                at(0x24f634);at(0x24f638);at(0x24f63c);at(0x24f640);store(0xb0,*h.compressedLoopIndex);
+            }
+            at(0x24f6c4);at(0x24f6c8);at(0x24f6cc);at(0x24f6d0);
+            // Actual stack1A8 is caller stack08, presently0; no guessed flags.
+            if(h.rawStackScalars[0]!=0)return false;
+            at(0x24f6ec);store(0xb0,1);h.compressedCountAdjusted=true;
+            at(0x24f6f0);at(0x24f6f4);at(0x24f6f8);at(0x24f6fc);
+            h.compressedLevelIndex=*h.compressedLoopIndex-1;
+            at(0x24f700);at(0x24f704);at(0x24f708);at(0x24f70c);at(0x24f710);at(0x24f714);
+            at(0x24f718);at(0x24f71c);at(0x24f720);at(0x24f724);at(0x24f728);at(0x24f72c);
+            at(0x24f730);at(0x24f734);at(0x24f738);at(0x24f73c);at(0x24f740);at(0x24f744);at(0x24f748);
+            // Every successful indexed offset word was genuinely overwritten tozero,
+            //including a positive EOF clamp reporting the original requested1.
+            // New local loopS5=0; the preserved offset-loop index is historical.
+            h.compressedPayloadSize16C=0;h.compressedLevelSetup=true;
+            at(0x24f760);at(0x24f764);at(0x24f768);at(0x24f76c);at(0x24f770);at(0x24f774);
+            if(!sourceTrackMountDomain_||sourceTrackMountDomain_->resolver3E1A70()!=sourceSkyFile_->resolver_)return false;
+            at(0x24f778);at(0x24f77c);at(0x24f780);at(0x24f784);
+            if(!h.compressedOffsetsReturned||!h.loaderWorkspaceCleared||
+               h.compressedPayloadSize16C!=0u)return false;
+            const bool returned=sourceSkyFile_->readCompressedPayloadSize(occurrence,d);
+            const auto& sizeRead=sourceSkyFile_->resourceFileOccurrence(occurrence,h.fileOrdinal)->compressedPayloadSize;
+            for(std::size_t k=0;k<sizeRead.copied;++k)*h.compressedPayloadSize16C|=std::uint32_t(sizeRead.bytes[k])<<(k*8);
+            if(!returned){at(d.sourcePC?d.sourcePC:sourceSkyFile_->pc_);return false;}
+            at(0x24f78c);at(0x24f790);at(0x24f794);at(0x24f798);at(0x24f79c);at(0x24f7a0);
+            at(0x24f7a4);at(0x24f7a8);at(0x24f7ac);at(0x24f7b0);
+            const auto destination=0x11cu+0x34u*(*h.compressedLevelIndex);
+            // Side512 reaches level5 and destination220 outside fresh210.
+            // Do not perform an out-of-owner native write or claim guest success.
+            if(destination>0x210u-4u)return false;
+            store(destination,*h.compressedPayloadSize16C);h.compressedLevelSizeStored=true;
+            if(!allocateCompressed(h.compressedBacking,*h.compressedPayloadSize16C,*h.compressedLevelIndex,
+                h.compressedCounterRead,h.compressedCounterStored,h.compressedCounterBefore,h.compressedCounterAfter,h.compressedCounterSequence))return false;
+            auto& backing=h.compressedBacking;
+            at(0x24f80c);at(0x24f810);at(0x24f814);
+            const bool transferReturned=sourceSkyFile_->readCompressedPayload(occurrence,backing.aligned,*h.compressedPayloadSize16C,d);
+            const auto& transfer=sourceSkyFile_->resourceFileOccurrence(occurrence,h.fileOrdinal)->compressedPayload;
+            h.compressedKnownPrefix=transfer.copied;
+            if(!transferReturned){at(d.sourcePC?d.sourcePC:sourceSkyFile_->pc_);return false;}
+            at(0x24f81c);at(0x24f820);
+            if(transfer.items!=h.compressedPayloadSize16C){h.compressedTransferShort=true;at(0x24f824);at(0x25000c);return false;}
+            if(!finishCompressedLevel(*h.compressedLevelIndex,16,*h.compressedPayloadSize16C,h.compressedBacking,
+                h.compressedLevelDimensionsStored,h.compressedLogReturned,h.compressedMirrorDimensionsStored,h.compressedHeaderSizeAdjusted,
+                h.compressedBaseAliasStored,h.compressedOffsetAliasStored,h.compressedLiveOffset118))return false;
+            at(0x24f968);at(0x24f96c);at(0x24f970);at(0x24f974);h.compressedNextDimension=32;
+            at(0x24fa9c);h.compressedNextIteration=1;at(0x24faa0);at(0x24faa4);
+            h.compressedNextLoopTaken=*h.side>=*h.compressedNextDimension;
+            at(0x24faa8);h.compressedLoopAdvanced=true; //Height doubles in branch delay, including exit.
+            if(!h.compressedNextLoopTaken)return finishCompressedTail();
+            std::uint32_t nextDimension=*h.compressedNextDimension;std::size_t nextOrdinal=*h.compressedNextIteration;
+            for(;;){
+            at(0x24f718);
+            try{auto next=std::unique_ptr<SourceSkyFollowingCompressedLevel>(new SourceSkyFollowingCompressedLevel);h.followingCompressedLevels.push_back(std::move(next));}catch(...){return false;}
+            auto& next=*h.followingCompressedLevels.back();next.ordinal=nextOrdinal;
+            next.dimension=nextDimension;
+            at(0x24f71c);at(0x24f720);at(0x24f724);at(0x24f728);at(0x24f72c);
+            if(!h.compressedLevelIndex||*h.compressedLevelIndex<next.ordinal)return false;
+            next.index=*h.compressedLevelIndex-static_cast<std::uint32_t>(next.ordinal);
+            at(0x24f730);at(0x24f734);at(0x24f738);at(0x24f73c);at(0x24f740);at(0x24f744);at(0x24f748);
+            //Same source workspace, all indexed offsets actually zeroed. New
+            //stack16C/read occurrence, not reused first-level size or buffer.
+            next.size16C=0;next.selected=true;
+            at(0x24f760);at(0x24f764);at(0x24f768);at(0x24f76c);at(0x24f770);at(0x24f774);
+            if(!sourceTrackMountDomain_||sourceTrackMountDomain_->resolver3E1A70()!=sourceSkyFile_->resolver_)return false;
+            at(0x24f778);at(0x24f77c);at(0x24f780);at(0x24f784);
+            if(!h.compressedOffsetsReturned||!h.loaderWorkspaceCleared||next.size16C!=0u)return false;
+            const bool nextReturned=sourceSkyFile_->readFollowingCompressedSize(occurrence,next.ordinal,d);
+            const auto& following=sourceSkyFile_->resourceFileOccurrence(occurrence,h.fileOrdinal)->followingCompressedSizes;
+            if(following.size()==next.ordinal){const auto& read=*following.back();next.sizeReadAttempted=read.attempted;next.sizeReadReturned=read.returned;
+                for(std::size_t k=0;k<read.copied;++k)next.size16C|=std::uint32_t(read.bytes[k])<<(k*8);}
+            if(!nextReturned){at(d.sourcePC?d.sourcePC:sourceSkyFile_->pc_);return false;}
+            at(0x24f78c);at(0x24f790);at(0x24f794);at(0x24f798);at(0x24f79c);at(0x24f7a0);
+            at(0x24f7a4);at(0x24f7a8);at(0x24f7ac);at(0x24f7b0);
+            const auto nextDestination=0x11cu+0x34u*next.index;if(nextDestination>0x210u-4u)return false;
+            store(nextDestination,next.size16C);next.sizeStored=true;
+            if(!allocateCompressed(next.backing,next.size16C,next.index,next.counterRead,next.counterStored,
+                next.counterBefore,next.counterAfter,next.counterSequence))return false;
+            at(0x24f80c);at(0x24f810);at(0x24f814);
+            const bool nextTransferReturned=sourceSkyFile_->readFollowingCompressedPayload(occurrence,next.ordinal,next.backing.aligned,next.size16C,d);
+            const auto& payloads=sourceSkyFile_->resourceFileOccurrence(occurrence,h.fileOrdinal)->followingCompressedPayloads;
+            if(payloads.size()==next.ordinal)next.knownPrefix=payloads.back()->copied;
+            if(!nextTransferReturned){at(d.sourcePC?d.sourcePC:sourceSkyFile_->pc_);return false;}
+            const auto& nextTransfer=*payloads.back();at(0x24f81c);at(0x24f820);
+            if(nextTransfer.items!=next.size16C){next.transferShort=true;at(0x24f824);at(0x25000c);return false;}
+            next.transferAccepted=true;at(0x24f82c);
+            if(!finishCompressedLevel(next.index,next.dimension,next.size16C,next.backing,next.dimensionsStored,next.logReturned,
+                next.mirrorDimensionsStored,next.headerSizeAdjusted,next.baseAliasStored,next.offsetAliasStored,next.liveOffset118))return false;
+            at(0x24f968);at(0x24f96c);at(0x24f970);at(0x24f974);next.nextDimension=next.dimension*2u;
+            at(0x24fa9c);next.nextOrdinal=next.ordinal+1;at(0x24faa0);at(0x24faa4);
+            next.nextLoopTaken=*h.side>=next.nextDimension;
+            at(0x24faa8);next.loopAdvanced=true; //S4 delay-slot update also occurs on exit.
+            if(!next.nextLoopTaken)return finishCompressedTail();
+            nextDimension=next.nextDimension;nextOrdinal=next.nextOrdinal;
+            if(nextOrdinal>4)return false; //Native five-record bound, not source success.
+            }
+        }
+        at(0x128fd8);at(0x128fdc);at(0x29e640);
+        // Original format switch, including default0 for unsigned values>=37.
+        h.rawFormat29E640=sourceSkyFormat29E640(*h.loaderFormat48);
+        at(0x128fe0);h.loaderPaletteBorrow=reg.paletteBorrow;
+        h.rawStackScalars={{0,0,2,1,128,0x00ff00ffu}};
+        at(0x129014);h.loaderReceiver=owner->resources58[index];at(0x129018);
+        if(!state.handle40||!h.payloadBytes||!h.side||h.loaderReceiver!=h.texture.get())return false;
+        h.loaderHandle40=state.handle40;at(0x12901c);at(0x129020);at(0x129024);at(0x129028);
+        if(h.vtable08!=0x3d21c0u)return false;
+        at(0x12902c);at(0x129030);at(0x129034);h.rawLoaderEntered=true;
+        at(0x24f2c0);
+        if(!initializeLoader(*h.loaderFormat48,*h.rawFormat29E640,false))return false;
+        at(0x24f404);at(0x24f408);at(0x24f40c);at(0x24f410);
+        at(0x24f414);at(0x29e910);const auto firstBits=sourceSkyFormatBits29E910(*h.rawFormat29E640);
+        at(0x24f41c);at(0x24f420);at(0x29e910);const auto secondBits=sourceSkyFormatBits29E910(*h.loaderFormat3C);
+        at(0x24f428);at(0x24f42c);
+        h.loaderMaximumBits=firstBits>secondBits?firstBits:secondBits;
+        at(0x24f430);at(0x24f434);
+        if(!sourceLoadApplication_||sourceLoadApplication_!=sourceTrackMountApplication_||
+           sourceLoadApplication_->entities()!=worldApplication_||h.texture->manager_!=sourceLoadApplication_->textureLifetimeOwner_)return false;
+        h.loaderBufferManager=sourceLoadApplication_->textureLifetimeOwner_;
+        at(0x24f438);at(0x24f43c);at(0x24f440);at(0x24f444);at(0x24f448);at(0x24f44c);
+        h.loaderBufferBytes=(*h.side)*(*h.side)*(*h.loaderMaximumBits)/8u;
+        std::uint32_t bufferPC=0x29dfd0;
+        if(!h.loaderBufferManager->sourceBufferCallNative(0,*h.loaderBufferBytes,&h,h.loaderBuffers[0],bufferPC)){at(bufferPC);return false;}
+        at(0x24f450);at(0x24f454);at(0x24f458);at(0x24f45c);
+        if(!h.loaderBuffers[0].borrowed){at(0x24f460);at(0x24f464);h.loaderNullBufferExit=true;at(0x25000c);return false;}
+        at(0x24f468);at(0x29e910);at(0x24f470);at(0x24f474);at(0x29e910);at(0x24f47c);at(0x24f480);
+        at(0x24f484);at(0x24f488);
+        if(h.loaderBufferManager!=sourceLoadApplication_->textureLifetimeOwner_||h.texture->issuer_!=sourceLoadApplication_)return false;
+        at(0x24f48c);at(0x24f490);at(0x24f494);at(0x24f498);at(0x24f49c);at(0x24f4a0);at(0x24f4a4);
+        bufferPC=0x29e050;
+        if(!h.loaderBufferManager->sourceBufferCallNative(1,*h.loaderBufferBytes+4u,&h,h.loaderBuffers[1],bufferPC)){at(bufferPC);return false;}
+        at(0x24f4a8);at(0x24f4ac);at(0x24f4b0);at(0x24f4b4);
+        if(!h.loaderBuffers[1].borrowed){at(0x24f4b8);at(0x24f4bc);h.loaderNullBufferExit=true;at(0x250010);return false;}
+        at(0x24f4c0);at(0x24f4c4);at(0x29e560);
+        // Full switch true set is16..30,32,34,36. Raw caller excludes31..36.
+        h.payloadExtendedFormat=*h.loaderFormat48>=16&&*h.loaderFormat48<=30;h.payloadBranchSelected=true;
+        at(0x24f4cc);at(0x24f4d0);
+        if(h.payloadExtendedFormat){
+            at(0x24f4d4);at(0x24f4d8);at(0x24f4dc);at(0x24f4e0);
+            // Admitted raw loader proves F8bit0=0. This is the original
+            // virtual+24 allocation/configuration call with A1=NULL, not a
+            // successful file read or a substitute buffer38 data pointer.
+            if(!(h.loaderF8KnownZero&1u))return false;
+            at(0x24f4e4);at(0x24f4ec);at(0x24f4f0);at(0x24f4fc);
+            if(h.loaderPaletteBorrow!=reg.paletteBorrow)return false;
+            at(0x24f504);at(0x24f508);h.payloadVirtualBorrow=nullptr;
+            at(0x24f50c);at(0x24f510);at(0x24f518);at(0x24f51c);at(0x24f520);
+            at(0x24f528);at(0x24f530);at(0x24f538);at(0x24f53c);at(0x24f540);
+            if(h.vtable08!=0x3d21c0u)return false;
+            at(0x24f544);at(0x24f548);at(0x24f54c);h.payloadPendingReturnPC=0x24f550u;h.payloadVirtualEntered=true;
+            at(0x250ee0);return continueSourceSkyPayload250EE0(pc,occurrence);
+        }
+        at(0x24fc2c);at(0x24fc30);at(0x24fc34);at(0x24fc38);
+        at(0x24ff58);at(0x29e5b0);h.payloadFileBits=sourceSkyFileBits29E5B0(*h.loaderFormat48);
+        at(0x24ff60);at(0x24ff64);at(0x24ff68);at(0x24ff6c);
+        if(!sourceTrackMountDomain_||sourceTrackMountDomain_->resolver3E1A70()!=sourceSkyFile_->resolver_)return false;
+        at(0x24ff70);at(0x24ff74);at(0x24ff78);at(0x24ff7c);at(0x24ff80);
+        h.payloadReadBytes=(*h.side)*(*h.side)*(*h.payloadFileBits)/8u;
+        auto& buffer=h.loaderBufferManager->sourceBuffers_[1];
+        if(!h.loaderBufferManager->sourceBufferCurrentNative(1,&h,h.loaderBuffers[1])||*h.payloadReadBytes>buffer.capacity)return false;
+        h.payloadKnownPrefixBefore=buffer.knownPrefix;at(0x24ff84);at(0x24ff88);at(0x24ff8c);a::OriginalStandardTextureDiagnostic50LA d;
+        const bool returned=sourceSkyFile_->readItemResourcePayload(occurrence,h.loaderBuffers[1].borrowed,*h.payloadReadBytes,d);
+        const auto& read=sourceSkyFile_->resourceFileOccurrence(occurrence,h.fileOrdinal)->rawPayload;
+        h.payloadReadAttempted=read.attempted;h.payloadReadReturned=read.returned;h.payloadCopied=read.copied;h.payloadReadItems=read.items;
+        if(read.copied>buffer.knownPrefix)buffer.knownPrefix=read.copied;
+        if(!returned){at(d.sourcePC?d.sourcePC:sourceSkyFile_->pc_);return false;}
+        at(0x24ff90);at(0x24ff94);
+        if(h.payloadReadItems!=h.payloadReadBytes){at(0x24ff98);at(0x24ff9c);h.payloadShortExit=true;at(0x25000c);return false;}
+        // Genuine virtual+24 receives buffer38, same side/format/palette borrow,
+        // and original scalar arguments. No retain occurs before its body.
+        at(0x24ffa0);at(0x24ffa8);h.payloadVirtualBorrow=h.loaderBuffers[1].borrowed;
+        at(0x24fffc);if(h.vtable08!=0x3d21c0u)return false;
+        at(0x250000);at(0x250004);at(0x250008);h.payloadPendingReturnPC=0x25000cu;h.payloadVirtualEntered=true;
+        at(0x250ee0);return continueSourceSkyPayload250EE0(pc,occurrence);
+    };
+    at(0x128d68);at(0x128d6c);at(0x128d74);if(!word(0x50+group*0x100,h.groupWord50))return false;
+    //For actual entry0..15 the pair of original arithmetic shifts followed
+    //by AND3 is exactly this unsigned two-bit extraction, including bit31.
+    at(0x128db8);h.sizeCode=(*h.groupWord50>>(2*entry))&3u;
+    h.side=*h.sizeCode==0?512u:*h.sizeCode==1?64u:*h.sizeCode==2?128u:256u;
+    at(0x128e24);if(!word(0x48,h.format48))return false;at(0x128e28);at(0x29e510);
+    const auto format=*h.format48;h.compressed=sourceSkyFormat29E510(format);
+    at(0x128e30);at(0x128e34);
+    if(h.compressed){at(0x128e38);at(0x128e3c);
+        if(!sourceTrackMountDomain_||sourceTrackMountDomain_->resolver3E1A70()!=sourceSkyFile_->resolver_)return false;
+        at(0x128e40);at(0x128e4c);a::OriginalStandardTextureDiagnostic50LA d;
+        const bool returned=sourceSkyFile_->readItemResourceSize(occurrence,d);const auto& read=sourceSkyFile_->resourceFileOccurrence(occurrence,h.fileOrdinal)->resourceSizeA8;
+        h.sizeReadAttempted=read.attempted;h.sizeReadReturned=read.returned;h.sizeCopied=read.copied;h.sizeReadItems=read.items;
+        if(read.copied==4)h.payloadBytes=std::uint32_t(read.bytes[0])|(std::uint32_t(read.bytes[1])<<8)|(std::uint32_t(read.bytes[2])<<16)|(std::uint32_t(read.bytes[3])<<24);
+        if(!returned){at(d.sourcePC?d.sourcePC:sourceSkyFile_->pc_);return false;}
+        at(0x128e54);at(0x128e58); //Original ignores short source read; unknown stackA8 suffix stays unknown.
+    }else {at(0x128e5c);at(0x29e480);
+        h.bytesPerPixel=sourceSkyFormat29E480(format);at(0x128e64);at(0x128e68);
+        h.payloadBytes=(*h.side)*(*h.side)*(*h.bytesPerPixel);at(0x128e6c);at(0x128e70);
+    }
+    //Native metadata owns its link before the actual guest allocation. A
+    //metadata refusal is not a guest allocator NULL result.
+    try{h.texture.reset(new a::OriginalSourceTextureLifetimeFacet50LA);}catch(...){return false;}
+    at(0x128e74);at(0x128e78);h.allocationAttempted=true;
+    try{h.texture->storage_.reset(new std::uint8_t[0x210]);}catch(...){h.texture->storage_.reset();}
+    h.allocationReturned=true;h.allocationNonNull=bool(h.texture->storage_);at(0x128e7c);at(0x128e80);
+    if(!h.texture->storage_)return publishAndEnterLoader();
+    at(0x128e84);at(0x128e88);at(0x128e8c);at(0x24e1b0);h.constructorEntered=true;
+    const auto store=[&](std::size_t off,std::uint64_t value,std::size_t size){for(std::size_t k=0;k<size;++k){h.texture->storage_[off+k]=static_cast<std::uint8_t>(value>>(k*8));h.texture->known_[off+k]=true;}};
+    at(0x24e1bc);at(0x29c6e0);at(0x29c6f4);at(0x1049c0);at(0x1049cc);at(0x1048f0);
+    at(0x1048f8);store(8,0x3cc980u,4);at(0x104900);store(0,1,8);h.reference00=1;h.baseReferenceAcquired=true;
+    at(0x1049dc);store(8,0x3cc770u,4);at(0x1049e0);store(0x10,0,4);at(0x1049e4);store(0x14,0,4);at(0x1049e8);store(0x18,0,4);
+    at(0x29c710);store(8,0x3d3790u,4);h.vtable08=0x3d3790u;
+    at(0x29c718);store(0xa0,0,4);at(0x29c720);store(0xa4,0,4);at(0x29c728);store(0xa8,1,4);at(0x29c730);store(0xac,0xffffffffu,4);
+    for(std::size_t off=0xb0;off<=0xc0;off+=4){at(0x29c738+static_cast<std::uint32_t>((off-0xb0)*2));store(off,0,4);}
+    at(0x29c760);at(0x29c764);store(0x20,0,1);at(0x29c768);at(0x29c76c);
+    if(!sourceLoadApplication_||sourceLoadApplication_!=sourceTrackMountApplication_||sourceLoadApplication_->entities()!=worldApplication_||
+       !sourceLoadApplication_->textureLifetimeOwner_)return false;
+    if(!h.texture->capture443870(sourceLoadApplication_->textureLifetimeOwner_,sourceLoadApplication_))return false;h.managerRead=true;
+    at(0x29c770);at(0x29c774);at(0x29c778);at(0x29c77c);at(0x29c780);at(0x29c784);
+    std::uint32_t registrationPC=0x29c780;
+    if(!h.texture->register29C780(registrationPC)){at(registrationPC);return false;}h.registrationReturned=true;
+    at(0x29c788);at(0x29c78c);at(0x29c790);at(0x29c794);at(0x29c798);h.base29C6E0Returned=true;
+    at(0x24e1c4);at(0x24e1c8);at(0x24e1cc);at(0x24e1d0);
+    store(8,0x3d21c0u,4);h.vtable08=0x3d21c0u;h.derivedTableStored=true;
+    at(0x24e1d4);at(0x24e1d8);at(0x24e1dc);at(0x257740);store(0xfc,0,4);
+    at(0x257744);at(0x257748);h.embeddedFCConstructed=true;
+    at(0x24e1e0);at(0x24e1f0);store(0xe8,0xffffffffu,4);
+    // Five genuine level records, stride0x34. Unknown initial130 is not
+    // read as a host byte: source clears only bits1 then0; all other bits
+    // remain unknown and the byte-level known flag deliberately stays false.
+    for(std::size_t j=0;j<5;++j){const auto d=j*0x34;
+        at(0x24e218);store(0x100+d,0,4);
+        at(0x24e224);store(0x104+d,0xffffffffu,4);at(0x24e230);store(0x110+d,0xffffffffu,4);
+        at(0x24e23c);store(0x124+d,0xffffu,2);
+        at(0x24e248);store(0x108+d,0xffffffffu,4);at(0x24e254);store(0x10c+d,0xffffffffu,4);
+        at(0x24e260);store(0x114+d,0xffffffffu,4);at(0x24e26c);store(0x11c+d,0xffffffffu,4);
+        at(0x24e278);store(0x118+d,0,4);at(0x24e284);store(0x120+d,0xffffffffu,4);
+        at(0x24e290);at(0x24e29c);h.level130KnownZero[j]=2;
+        at(0x24e2a8);at(0x24e2b4);h.level130KnownZero[j]|=1;
+        at(0x24e2c0);store(0x12c+d,0xffffffffu,4);at(0x24e2d0);at(0x24e2d4);store(0x128+d,0xffffffffu,4);
+        ++h.derivedLevels;
+    }
+    at(0x24e2ec);store(0x204,0,4);at(0x24e2f4);store(0x208,0,4);
+    at(0x24e2fc);store(0xf4,0xffffffffu,4);at(0x24e304);store(0xec,0xffffffffu,4);at(0x24e30c);store(0xf0,0xffffffffu,4);
+    at(0x24e314);at(0x24e320);h.flagsF8KnownZero=1;
+    at(0x24e328);at(0x24e334);h.flagsF8KnownZero|=2;
+    at(0x24e33c);at(0x24e348);h.flagsF8KnownZero|=4;
+    at(0x24e350);at(0x24e35c);h.flagsF8KnownZero|=8;
+    at(0x24e360);at(0x24e364);at(0x24e368);at(0x24e36c);h.derivedConstructorReturned=true;
+    return publishAndEnterLoader();
+}
+bool Owner::continueSourceSkyResourceDriver(std::uint32_t& pc,std::size_t occurrence,std::size_t group,std::size_t entry)noexcept {
+    if(sourceSkyResourceDriverActive_)return false;
+    struct ActiveScope{bool& active;explicit ActiveScope(bool& value):active(value){active=true;}~ActiveScope(){active=false;}} scope(sourceSkyResourceDriverActive_);
+    for(;;){
+        if(pc!=0x128d50u||occurrence>sourceSkyLaterItems_.size())return false;
+        (void)continueSourceSkyResourcePrefix(pc,occurrence,group,entry);
+        auto& reg=sourceItemHistory(occurrence).registration;
+        if(pc!=0x129168u||!reg.pendingResource||!reg.pendingResource->resourceSourceReturned)return false;
+        const bool exhausted=continueSourceSkyRegistration129168(pc,occurrence);
+        if(exhausted)return pc==0x129188u&&reg.resourceScanExhausted&&reg.completedEntries==96&&!reg.pendingResource;
+        if(pc!=0x128d50u||reg.pendingResource||reg.resourceCalls.empty()||!reg.resourceCalls.back()||reg.resourceCalls.back()->bodyEntered)return false;
+        const auto index=reg.resourceCalls.back()->index;group=index/16;entry=index%16;
+        //Constant native stack depth, independent of selected-mask population.
+    }
+}
+bool Owner::continueSourceSkyRegistration129168(std::uint32_t& pc,std::size_t occurrence)noexcept {
+    if(pc!=0x129168u||occurrence>sourceSkyLaterItems_.size()||!preflightSourcePostParticleModelsNative())return false;
+    auto& reg=sourceItemHistory(occurrence).registration;auto& owner=sourceItemOwner(occurrence);
+    if(!reg.pendingResource||!owner||!reg.pendingResource->resourceSourceReturned||reg.pendingResource->resourceSourceResult!=1u||
+       reg.completedResources.size()>=96||reg.pendingResource->fileOrdinal!=reg.completedResources.size())return false;
+    const auto at=[&](std::uint32_t p){pc=sourcePostParticleModelsPC_=p;};
+    //Move only custody, never reset source history or replay originalitemseek.
+    //Vector allocation failure preserves the pending owner and return receipt.
+    try{reg.completedResources.push_back(std::move(reg.pendingResource));}catch(...){return false;}
+    at(0x129168);++reg.completedEntries;
+    for(;;){at(0x12916c);at(0x129170);at(0x129174);
+        if(reg.completedEntries%16==0){at(0x129178);at(0x12917c);at(0x129180);at(0x129184);
+            if(reg.completedEntries==96){reg.resourceScanExhausted=true;at(0x129188);return true;} //Only actually exhausted masks authorize the epilogue.
+            at(0x129128);at(0x12912c);}
+        const auto index=reg.completedEntries,group=index/16,entry=index%16,off=0x54+group*0x100;
+        at(0x129130);if(!owner->known[off]||!owner->known[off+1])return false;
+        const auto mask=std::uint16_t(owner->storage[off])|(std::uint16_t(owner->storage[off+1])<<8);reg.masks[index]=static_cast<std::uint16_t>(mask);
+        at(0x129134);at(0x129138);at(0x12913c);at(0x129140);
+        if(!(mask&(1u<<entry))){at(0x129144);++reg.completedEntries;continue;}
+        at(0x129148);const auto slot=0x58+group*0x100+entry*4;
+        //All slots were actually constructorNULL; a new nonNULL alias without
+        //retained occurrence proof is a currentness refusal, not a skipped bit.
+        for(std::size_t k=0;k<4;++k)if(!owner->known[slot+k]||owner->storage[slot+k])return false;
+        if(owner->resources58[index])return false;
+        at(0x12914c);at(0x129150);at(0x129154);at(0x129158);at(0x12915c);at(0x129160);at(0x129164);
+        if(!sourceSkyFile_||!sourceSkyFile_->current()||!sourceSkyFile_->expectedCursor_)return false;
+        if(reg.resourceCalls.size()+1!=reg.completedResources.size())return false;
+        try{auto call=std::unique_ptr<SourceSkyResourceCall>(new SourceSkyResourceCall);call->index=index;call->cursor=*sourceSkyFile_->expectedCursor_;call->entered=true;reg.resourceCalls.push_back(std::move(call));}catch(...){return false;}
+        at(0x128d50);return false; //Iterative driver opens the distinct next file/body occurrence.
+    }
+}
+bool Owner::continueSourceSkyResourceTail129054(std::uint32_t& pc,std::size_t occurrence)noexcept {
+    if(pc!=0x129054u||occurrence>sourceSkyLaterItems_.size()||!preflightSourcePostParticleModelsNative())return false;
+    auto& state=sourceItemHistory(occurrence);auto& reg=state.registration;auto& owner=sourceItemOwner(occurrence);
+    if(!reg.pendingResource||!owner||!sourceSkyFile_)return false;auto& h=*reg.pendingResource;
+    if(h.resourceTailEntered||!h.slot58Stored||(h.allocationNonNull?!h.postLoaderVirtualReturned:!h.allocationReturned))return false;
+    const auto at=[&](std::uint32_t p){pc=sourcePostParticleModelsPC_=p;};
+    at(0x129054);if(!owner->known[0x4c]||!owner->known[0x4d])return false;
+    h.resourceTailFlags4C=std::uint16_t(owner->storage[0x4c])|(std::uint16_t(owner->storage[0x4d])<<8);h.resourceTailEntered=true;
+    at(0x129058);at(0x12905c);at(0x129060);
+    if(*h.resourceTailFlags4C&2u){at(0x129064);if(!state.handle40||*state.handle40!=sourceSkyFile_->handle_||(h.loaderHandle40&&h.loaderHandle40!=state.handle40))return false;
+        at(0x129068);at(0x12906c);if(!sourceTrackMountDomain_||sourceTrackMountDomain_->resolver3E1A70()!=sourceSkyFile_->resolver_)return false;}
+    a::OriginalStandardTextureDiagnostic50LA d;
+    if(!sourceSkyFile_->alignResource129054(occurrence,*h.resourceTailFlags4C,d)){at(d.sourcePC?d.sourcePC:sourceSkyFile_->pc_);return false;}
+    if(!sourceSkyFile_->resourceFileOccurrence(occurrence,h.fileOrdinal)->resourceAlignmentReturned){
+        at(0x12909c);at(0x1290a0);if(!sourceTrackMountDomain_||sourceTrackMountDomain_->resolver3E1A70()!=sourceSkyFile_->resolver_)return false;
+        at(0x1290a4);at(0x1290a8);at(0x1290ac);at(0x1290b0);at(0x1290b4);
+        if(!sourceSkyFile_->seekResourceAlignment1290B0(occurrence,d)){at(d.sourcePC?d.sourcePC:sourceSkyFile_->pc_);return false;}
+    }
+    h.resourceAlignmentReturned=true;at(0x1290b8);at(0x1290bc);at(0x1290c0);at(0x1290c4);at(0x1290c8);at(0x1290cc);
+    at(0x1290d0);h.resourceSourceResult=1;at(0x1290d4);at(0x1290d8);h.resourceSourceReturned=true;
+    at(0x129168);return false; //Iterative caller owns registration advancement.
+}
+bool Owner::continueSourceSkyEmbedded257750(std::uint32_t& pc,std::size_t occurrence)noexcept {
+    if(pc!=0x257750u||occurrence>sourceSkyLaterItems_.size()||!preflightSourcePostParticleModelsNative())return false;
+    auto& reg=sourceItemHistory(occurrence).registration;if(!reg.pendingResource)return false;auto& h=*reg.pendingResource;
+    if(!h.texture||!h.texture->storage_||h.embedded||h.embeddedFCGuardReturned||h.embeddedFCCapacityArgument!=10||
+       !(h.formatNormalized||h.compressedFinalTellReturned))return false;
+    const auto at=[&](std::uint32_t p){pc=sourcePostParticleModelsPC_=p;};
+    std::optional<bool> fcNull=true;for(std::size_t k=0;k<4;++k){if(!h.texture->known_[0xfc+k]){fcNull.reset();break;}if(h.texture->storage_[0xfc+k])fcNull=false;}
+    std::uint32_t fcPC=0x257760;
+    if(!a::OriginalConfigProcessGlobals50LA::checkEmbeddedFC257750(fcNull,fcPC)){at(fcPC);return false;}
+    h.embeddedFCGuardReturned=true;at(fcPC);
+    // Native metadata is distinct from actual nullable0x20 guest allocation.
+    try{h.embedded.reset(new SourceSkyEmbeddedFC);}catch(...){return false;}auto& e=*h.embedded;
+    if(!a::OriginalConfigProcessGlobals50LA::descriptorDelete2E8B00AdmittedNative())return false;
+    at(0x2577d8);at(0x2577dc);e.allocationAttempted=true;
+    try{e.object20.reset(new std::uint8_t[0x20]);}catch(...){e.object20.reset();}e.allocationReturned=true;
+    at(0x2577e0);at(0x2577e4);
+    if(e.object20){at(0x2577e8);at(0x2577ec);at(0x2577f0);at(0x2577f4);at(0x2592d0);e.constructorEntered=true;
+        // Actual fixed argument10: signed rounded(10+7)/8=2, bytes2<<7,
+        // count2<<3. Native aligned custody represents uncached alias mode1
+        // without OR-ing host pointers with an EE address-region bit.
+        at(0x2592e8);at(0x259308);e.bytes=256;at(0x259310);e.roundedCount=16;
+        at(0x259314);at(0x259318);
+        if(!a::OriginalConfigProcessGlobals50LA::descriptorDelete2E8B00AdmittedNative())return false;
+        e.alignedAttempted=true;
+        try{e.alignedBacking.reset(new std::uint8_t[256+63]);}catch(...){e.alignedBacking.reset();}e.alignedReturned=true;
+        if(e.alignedBacking){const auto base=reinterpret_cast<std::uintptr_t>(e.alignedBacking.get());
+            const auto offset=static_cast<std::size_t>((64-(base%64))%64);e.data00=e.alignedBacking.get()+offset;}
+        at(0x25931c);at(0x259324);at(0x259328);at(0x25932c);at(0x259330);at(0x259338);e.uncachedAliasSelected=true;
+        at(0x259340);at(0x259348);at(0x25934c);
+        if(!e.data00)return false; //Source NULL allocation becomes EE0x20000000 alias; no safe native memset/forged ctor return.
+        for(std::size_t k=0;k<256;++k)e.data00[k]=0;e.zeroed=true;
+        at(0x259358);for(std::size_t k=0;k<4;++k){e.object20[8+k]=static_cast<std::uint8_t>(16u>>(k*8));e.known[8+k]=true;}
+        at(0x259354);at(0x2593f0);at(0x2593f4);e.cursor04=e.data00;
+        for(std::size_t off=0xc;off<=0x1c;off+=4){at(off==0x1c?0x25940cu:0x2593f8u+static_cast<std::uint32_t>(off-0xc));
+            for(std::size_t k=0;k<4;++k){e.object20[off+k]=0;e.known[off+k]=true;}}
+        at(0x259408);at(0x25940c);at(0x25935c);at(0x259374);at(0x259378);e.constructorReturned=true;
+    }
+    at(0x2577f8);h.embeddedFCPublished=e.object20?h.embedded.get():nullptr;e.published=true;
+    for(std::size_t k=0;k<4;++k){if(h.embeddedFCPublished)h.texture->known_[0xfc+k]=false;
+        else {h.texture->storage_[0xfc+k]=0;h.texture->known_[0xfc+k]=true;}}
+    at(0x2577fc);at(0x25780c);at(0x257810);h.embeddedCallReturned=true;
+    return true;
+}
+bool Owner::continueSourceSkyPayload250EE0(std::uint32_t& pc,std::size_t occurrence)noexcept {
+    if(pc!=0x250ee0u||occurrence>sourceSkyLaterItems_.size()||!preflightSourcePostParticleModelsNative())return false;
+    auto& reg=sourceItemHistory(occurrence).registration;
+    if(!reg.pendingResource)return false;auto& h=*reg.pendingResource;
+    if(!h.payloadVirtualEntered||h.payloadFieldsStored||!h.side||!h.rawFormat29E640||!h.texture||!h.texture->storage_)return false;
+    const auto at=[&](std::uint32_t p){pc=sourcePostParticleModelsPC_=p;};
+    at(0x250ee0);
+    const auto put=[&](std::size_t off,std::uint32_t value){for(std::size_t k=0;k<4;++k){h.texture->storage_[off+k]=static_cast<std::uint8_t>(value>>(k*8));h.texture->known_[off+k]=true;}};
+    // Caller24FFAC reloads T1 from loader stack168, whose actual incoming
+    // T0 was1 at128FF8. This is min-width A8, not format/side substitution.
+    at(0x250f10);put(0x14,*h.side);at(0x250f14);put(0x18,*h.side);at(0x250f18);put(0xa8,1);h.payloadFieldsStored=true;
+    at(0x250f1c);at(0x250f3c);at(0x250f40);h.resourcePaletteB4=h.loaderPaletteBorrow;
+    for(std::size_t k=0;k<4;++k){if(h.resourcePaletteB4)h.texture->known_[0xb4+k]=false;
+        else {h.texture->storage_[0xb4+k]=0;h.texture->known_[0xb4+k]=true;}}
+    h.paletteB4Stored=true; // Actual raw pointer store; no104960/AddRef in this prefix.
+    const auto format=*h.rawFormat29E640;
+    if(format==0x22b8u||format==0x115cu){at(0x250f9c);at(0x250fa8);h.normalizedFormatS1=0x22b8u;at(0x250fb8);}
+    else if(format==0x613u||format==0x235u||format==0x22bu){at(0x250f7c);at(0x250f88);h.normalizedFormatS1=0x613u;at(0x250f98);}
+    else {at(0x250f78);return false;} //Actual unsupported-format process guard/false assertion, not invented normalization.
+    h.loaderF8KnownZero&=static_cast<std::uint8_t>(~4u);h.loaderF8KnownOne|=4u;h.formatNormalized=true;
+    at(0x251024);at(0x251028);at(0x25102c);h.embeddedFCCapacityArgument=10;at(0x257750);
+    if(!continueSourceSkyEmbedded257750(pc,occurrence))return false;
+    at(0x251030);at(0x251034);at(0x29e910);h.resourceCurrentE8=sourceSkyFormatBits29E910(*h.normalizedFormatS1);
+    at(0x251038);put(0xe8,*h.resourceCurrentE8);at(0x251040);put(0xac,*h.normalizedFormatS1);at(0x251044);put(0xb0,1);h.resourceFormatFieldsStored=true;
+    at(0x251048);at(0x25104c);at(0x251050);at(0x251054);
+    // Payload stackB8 is original stack08=0; bit2 clear, no mip-count loop.
+    if(h.rawStackScalars[0]!=0)return false;
+    at(0x251098);at(0x25109c);at(0x2510a0);
+    for(std::size_t k=0;k<4;++k)if(!h.texture->known_[0x100+k]||h.texture->storage_[0x100+k])return false;
+    at(0x2510a4);at(0x2510a8);h.levelAllocationEntered=true;at(0x250040);at(0x250060);at(0x250064);
+    return false; //Next actual process442F70 backend owner; no prepared renderer/context or GPU readiness.
+}
+bool Owner::continueSourceSkyPostRegistration129890(std::uint32_t& pc)noexcept {
+    if(pc!=0x129890u||!preflightSourcePostParticleModelsNative()||!sourceSkyOwner_)return false;
+    auto& post=sourceSkyPostItems_;const auto& items=sourceSkyItems129758_;
+    if(post.tailEntered||!items.count7D8||post.indexS4!=*items.count7D8)return false;
+    const auto at=[&](std::uint32_t p){pc=sourcePostParticleModelsPC_=p;};
+    at(0x129890);post.tailEntered=true;post.index40Stored=true; //Actual sky index40=0, not filehandle40 of an item.
+    at(0x129894);at(0x129898);at(0x12989c);at(0x1298a0);at(0x1298a4);at(0x1298a8);
+    //Original unconditionally dereferences array[0], even count0. Keep that
+    //NULL/out-of-bounds source point explicit, never invent an empty success.
+    if(!*items.count7D8||!sourceSkyPublishedItems3C_||!sourceSkyItemSlots3C_)return false;
+    auto* selected=sourceSkyItemSlots3C_[0];post.firstSlotRead=true;
+    if(selected!=sourceItemOwner(0).get())return false;
+    at(0x1298ac);at(0x1298b0);sourceSkySelected38_=selected;sourceSkySelectedItemOccurrence_=0;post.firstSlotSelected=true;
+    at(0x12a120);post.packetCallEntered=true;at(0x12a148);at(0x12a14c);at(0x12a150);at(0x12a154);at(0x12a158);at(0x305500);
+    if(!a::OriginalConfigProcessGlobals50LA::descriptorDelete2E8B00AdmittedNative())return false;
+    post.packetAllocationAttempted=true;
+    try{post.packetBacking.reset(new std::uint8_t[0x340+63]);}catch(...){post.packetBacking.reset();}
+    if(post.packetBacking){const auto base=reinterpret_cast<std::uintptr_t>(post.packetBacking.get());post.packet340=post.packetBacking.get()+(64-base%64)%64;}
+    post.packetAllocationReturned=true;at(0x12a15c);at(0x12a160);at(0x12a164);at(0x12a168);at(0x12a16c);at(0x306478);
+    if(!post.packet340)return false; //ActualNULL memset is not native-safe; no invented source failure return.
+    for(std::size_t k=0;k<0x340;++k)post.packet340[k]=0;post.packetZeroed=true;
+    const auto word=[&](std::size_t off,std::uint32_t value){for(std::size_t k=0;k<4;++k)post.packet340[off+k]=static_cast<std::uint8_t>(value>>(k*8));};
+    at(0x12a170);at(0x12a174);word(0x10,0x11000000);at(0x12a178);at(0x12a17c);word(0x14,0x03000000);
+    at(0x12a180);at(0x12a184);at(0x12a188);word(0x18,0x02000000);at(0x12a18c);at(0x12a190);at(0x12a194);at(0x12a198);word(0x1c,0x6c028320);
+    at(0x12a19c);for(std::size_t k=0x20;k<0x30;++k)post.packet340[k]=0;
+    at(0x12a1a0);at(0x12a1a4);at(0x12a1a8);at(0x12a1ac);at(0x12a1b0);at(0x12a1b4);at(0x12a1b8);at(0x12a1bc);post.packet340[0x27]&=0xf3;
+    at(0x12a1c0);at(0x12a1c4);at(0x12a1c8);at(0x12a1cc);at(0x12a1d0);at(0x12a1d4);at(0x12a1d8);post.packet340[0x21]=static_cast<std::uint8_t>((post.packet340[0x21]&0x7f)|0x80);
+    at(0x12a1dc);at(0x12a1e0);at(0x12a1e4);at(0x12a1e8);at(0x12a1ec);at(0x12a1f0);at(0x12a1f4);at(0x12a1f8);post.packet340[0x27]=static_cast<std::uint8_t>((post.packet340[0x27]&0x0f)|0x10);
+    at(0x12a1fc);at(0x12a200);at(0x12a204);at(0x12a208);at(0x12a20c);at(0x12a210);at(0x12a214);at(0x12a218);post.packet340[0x20]=1;post.packet340[0x21]&=0x80;
+    at(0x12a21c);at(0x12a220);at(0x12a224);at(0x12a228);at(0x12a22c);at(0x12a230);at(0x12a234);at(0x12a238);at(0x12a23c);post.packet340[0x28]=static_cast<std::uint8_t>((post.packet340[0x28]&0xf0)|0x0e);
+    at(0x12a240);word(0x30,0x0005000c);word(0x34,0);at(0x12a244);word(0x38,0x47);word(0x3c,0);
+    at(0x12a248);word(0x40,0x14000000);at(0x12a24c);word(0x4c,0x6c2a8000);
+    at(0x12a250);word(0x50,0x3f800000);at(0x12a254);word(0x64,0x3f800000);at(0x12a258);word(0x78,0x3f800000);post.packetHeaderStored=true;
+    // Each original load reloads sky38. Do not borrow a prepared sky item or
+    // consume an unknown suffix merely because the original read reported one item.
+    constexpr std::uint32_t receiverPC[3]{0x12a25cu,0x12a28cu,0x12a2b0u};
+    constexpr std::uint32_t loadPC[3]{0x12a274u,0x12a2a4u,0x12a2b4u};
+    constexpr std::uint32_t storePC[3]{0x12a288u,0x12a2acu,0x12a2bcu};
+    for(std::size_t lane=0;lane<3;++lane){
+        at(receiverPC[lane]);
+        if(!sourceSkySelected38_||!sourceSkySelectedItemOccurrence_||*sourceSkySelectedItemOccurrence_!=0||
+           *sourceSkySelected38_!=sourceItemOwner(0).get())return false;
+        const auto* actual=*sourceSkySelected38_;
+        at(loadPC[lane]);if(!actual||!actual->storage)return false;
+        std::uint32_t bits=0;
+        for(std::size_t k=0;k<4;++k){if(!actual->known[0x10+4*lane+k])return false;
+            bits|=std::uint32_t(actual->storage[0x10+4*lane+k])<<(8*k);}
+        // Intervening instructions only establish integer masks/constants and
+        // local packet aliases; LWC1/SWC1 performs no floating-point arithmetic.
+        at(storePC[lane]);word(0x80+4*lane,bits);post.packetItemWords[lane]=bits;
+        ++post.packetItemLanesStored;
+    }
+    // t7=3F800000 from12A22C; t6=42FE0000 from12A230.
+    constexpr std::size_t oneOffsets[]{0x8c,0x190,0x1a4,0x1b8,0x1cc};
+    for(std::size_t k=0;k<5;++k){at(0x12a2c0u+static_cast<std::uint32_t>(4*k));word(oneOffsets[k],0x3f800000u);}
+    constexpr std::size_t colorOffsets[]{0x1e8,0x1e4,0x1e0,0x1f8,0x1f4,0x1f0,0x208,0x204,0x200,0x218,0x214,0x210};
+    for(std::size_t k=0;k<12;++k){at(0x12a2d4u+static_cast<std::uint32_t>(4*k));word(colorOffsets[k],0x42fe0000u);}
+    post.packetMatrixStored=true;
+    // Original private packet tag construction. The source integer masks are
+    // applied to freshly zeroed quadwords, never to prepared renderer data.
+    at(0x12a304);for(std::size_t k=0x270;k<0x280;++k)post.packet340[k]=0;
+    at(0x12a318);post.packet340[0x271]=0x80;
+    at(0x12a328);post.packet340[0x275]=0x40;
+    // DSLL/DSLL32 at12A26C/278/27C establish FC007FFFFFFFFFFF and29<<47.
+    at(0x12a338);std::uint64_t tag=0;
+    for(std::size_t k=0;k<8;++k)tag|=std::uint64_t(post.packet340[0x270+k])<<(8*k);
+    tag=(tag&UINT64_C(0xfc007fffffffffff))|(UINT64_C(29)<<47);
+    for(std::size_t k=0;k<8;++k)post.packet340[0x270+k]=static_cast<std::uint8_t>(tag>>(8*k));
+    at(0x12a348);post.packet340[0x277]&=0xf3;
+    at(0x12a358);post.packet340[0x277]=static_cast<std::uint8_t>((post.packet340[0x277]&0x0f)|0x30);
+    at(0x12a368);post.packet340[0x278]=static_cast<std::uint8_t>((post.packet340[0x278]&0xf0)|2);
+    at(0x12a378);post.packet340[0x278]=static_cast<std::uint8_t>((post.packet340[0x278]&0x0f)|0x10);
+    at(0x12a38c);post.packet340[0x279]=static_cast<std::uint8_t>((post.packet340[0x279]&0xf0)|4);
+    at(0x12a3a0);post.packet340[0x270]=5;post.packet340[0x271]&=0x80;
+    // Two independently executed zero/tag blocks at280 and2A0.
+    constexpr std::uint32_t starts[]{0x12a3a4u,0x12a40cu};
+    constexpr std::size_t offsets[]{0x280,0x2a0};
+    for(std::size_t i=0;i<2;++i){const auto off=offsets[i];const auto start=starts[i];
+        at(start);for(std::size_t k=0;k<16;++k)post.packet340[off+k]=0;
+        at(start+0x10);post.packet340[off]=1;
+        at(start+0x20);post.packet340[off+1]=0x80;
+        at(start+0x30);post.packet340[off+5]=0x40;
+        at(start+0x40);post.packet340[off+7]&=0xf3;
+        at(start+0x50);post.packet340[off+7]=static_cast<std::uint8_t>((post.packet340[off+7]&0x0f)|0x10);
+        at(start+0x60);post.packet340[off+8]=static_cast<std::uint8_t>((post.packet340[off+8]&0xf0)|0x0f);
+        at(start+0x64);word(off+0x1c,0x7f);
+    }
+    constexpr std::size_t zeroOffsets[]{0x2cc,0x2c8,0x2c4,0x2c0,0x2dc,0x2d8,0x2d4};
+    for(std::size_t k=0;k<7;++k){at(0x12a474u+static_cast<std::uint32_t>(4*k));word(zeroOffsets[k],0);}
+    at(0x12a494);word(0x2d0,0);at(0x12a498);word(0x2e0,6);at(0x12a49c);word(0x2ec,0);
+    at(0x12a4a0);word(0x2fc,0x6c02802b);at(0x12a4a4);word(0x320,0x14000010);
+    at(0x12a4ac);word(0x324,0x10000000);at(0x12a4b0);word(0x328,0x030000b5);at(0x12a4b4);word(0x32c,0x02000190);
+    at(0x12a4bc);post.packet340[0]=0x33;post.packet340[1]=0;
+    at(0x12a4c4);post.packet340[2]=0;at(0x12a4c8);post.packet340[3]=0x30;post.packetTagsStored=true;
+    // S1 was packet+10 at12A2B8. No address encoding or extra ownership is invented.
+    at(0x12a4cc);post.packetData04=post.packet340+0x10;post.packetPointerStored=true;
+    at(0x12a4d0);word(8,0);at(0x12a4d4);word(0x0c,0);
+    // POR V0,S0,zero at12A30C retained the allocation base; the register-only
+    // epilogue does not replace it or dispatch/execute the packet.
+    for(std::uint32_t p=0x12a4d8;p<=0x12a504;p+=4)at(p);
+    post.packetReturned=true;
+    at(0x1298b4);post.packet7E0=post.packet340;post.packetPublished7E0=true;
+    at(0x1298b8);post.rowsEntered=true;post.rowIndexS4=0;at(0x1298bc);post.rowOffsetS2=0;
+    // Original loop interleaves each30 constructor with12A510. Do not allocate
+    // all96 up front or advance the count before that helper genuinely returns.
+    at(0x1298c0);
+    if(!a::OriginalConfigProcessGlobals50LA::descriptorDelete2E8B00AdmittedNative())return false;
+    try{post.rows[post.rowIndexS4].reset(new SourceSkyPacketRow);}catch(...){return false;}
+    auto& row=*post.rows[post.rowIndexS4];row.allocationAttempted=true;
+    at(0x1298c4);at(0x2e8d90);
+    try{row.object30.reset(new std::uint8_t[0x30]);}catch(...){row.object30.reset();}
+    row.allocationReturned=true;at(0x1298c8);at(0x1298cc);
+    if(row.object30){
+        at(0x1298d0);at(0x1298d4);at(0x133f80);
+        const auto store=[&](std::size_t off,std::uint32_t value){for(std::size_t k=0;k<4;++k){row.object30[off+k]=static_cast<std::uint8_t>(value>>(8*k));row.known[off+k]=true;}};
+        at(0x133f84);store(0x2c,0xffffffffu);at(0x133f88);store(0x24,0);
+        at(0x133f8c);store(0x28,0);at(0x133f90);store(0x20,0);
+        at(0x133f94);at(0x133f98);row.constructorReturned=true; //POR returnsTHIS; no refcount/vtable writes.
+    }
+    at(0x1298d8);post.rows7E8[post.rowIndexS4]=row.object30.get();row.slot7E8Stored=true;
+    at(0x1298dc);at(0x1298e0);at(0x1298e4);
+    if(!post.rows7E8[post.rowIndexS4]){at(0x129960);return false;} //Real error destructor path remains bounded, not fake success.
+    at(0x1298e8);at(0x1298ec);row.helper12A510Entered=true;
+    at(0x12a510);at(0x12a520);row.packetSkyThis=sourceSkyOwner_.get();
+    at(0x12a524);at(0x12a52c);at(0x12a530);at(0x12a534);at(0x305500);
+    if(!row.packetSkyThis||!a::OriginalConfigProcessGlobals50LA::descriptorDelete2E8B00AdmittedNative())return false;
+    row.packetAllocationAttempted=true;
+    try{row.packetBacking.reset(new std::uint8_t[0xc0+63]);}catch(...){row.packetBacking.reset();}
+    if(row.packetBacking){const auto base=reinterpret_cast<std::uintptr_t>(row.packetBacking.get());row.packetC0=row.packetBacking.get()+(64-base%64)%64;}
+    row.packetAllocationReturned=true;
+    at(0x12a538);at(0x12a53c);at(0x12a540);at(0x12a544);at(0x12a548);at(0x306478);
+    if(!row.packetC0)return false; //Actual NULL memset is unsafe, not a sourceNULL return.
+    for(std::size_t k=0;k<0xc0;++k)row.packetC0[k]=0;row.packetZeroed=true;
+    const auto packetWord=[&](std::size_t off,std::uint32_t value){for(std::size_t k=0;k<4;++k)row.packetC0[off+k]=static_cast<std::uint8_t>(value>>(8*k));};
+    at(0x12a550);packetWord(0x10,0x11000000);at(0x12a558);packetWord(0x14,0x03000000);
+    at(0x12a560);packetWord(0x18,0x02000000);at(0x12a56c);packetWord(0x1c,0x6c038320);
+    at(0x12a570);for(std::size_t k=0x20;k<0x30;++k)row.packetC0[k]=0;
+    at(0x12a590);row.packetC0[0x27]&=0xf3;
+    at(0x12a5ac);row.packetC0[0x21]=static_cast<std::uint8_t>((row.packetC0[0x21]&0x7f)|0x80);
+    at(0x12a5c8);row.packetC0[0x27]=static_cast<std::uint8_t>((row.packetC0[0x27]&0x0f)|0x20);
+    at(0x12a5e8);row.packetC0[0x20]=1;row.packetC0[0x21]&=0x80;
+    at(0x12a5f8);row.packetC0[0x28]=static_cast<std::uint8_t>((row.packetC0[0x28]&0xf0)|0x0e);
+    at(0x12a608);row.packetC0[0x28]=static_cast<std::uint8_t>((row.packetC0[0x28]&0x0f)|0xe0);
+    at(0x12a60c);packetWord(0x38,6);packetWord(0x3c,0);row.packetPrefixStored=true;
+    at(0x12a610);return false; //Process443A60 Video owner/getters are not yet joined; no prepared renderer substitute.
+}
+bool Owner::continueSourceSkyPostItems(std::uint32_t& pc)noexcept {
+    auto& post=sourceSkyPostItems_;const auto& root=sourceSkyItems129758_;
+    if(pc!=0x129858u||post.entered||!root.count7D8||!preflightSourcePostParticleModelsNative()||!sourceSkyOwner_||!sourceSkyFile_)return false;
+    const auto count=*root.count7D8;
+    if(count){if(sourceSkyLaterItems_.size()+1!=count)return false;
+        for(std::size_t i=0;i<count;++i)if(!sourceItemHistory(i).slotStored||!sourceItemLoop(i).restoreReturned||sourceItemLoop(i).advancedIndexS4!=i+1u)return false;}
+    const auto at=[&](std::uint32_t p){pc=sourcePostParticleModelsPC_=p;};
+    const auto resolverCurrent=[&](){return sourceTrackMountDomain_&&sourceTrackMountDomain_->resolver3E1A70()==sourceSkyFile_->resolver_;};
+    at(0x129858);post.entered=true;post.indexS4=0;at(0x12985c);at(0x129860);post.offsetS2=0;
+    for(;;){at(0x129880);if(!preflightSourcePostParticleModelsNative())return false;
+        const auto observed=sourceSkyOwner_->count7D8;at(0x129884);at(0x129888);at(0x12988c);
+        if(post.indexS4>=observed){at(0x129890);return continueSourceSkyPostRegistration129890(pc);}
+        const auto occurrence=static_cast<std::size_t>(post.indexS4);auto& state=sourceItemHistory(occurrence);auto& owner=sourceItemOwner(occurrence);auto& reg=state.registration;
+        at(0x129864);at(0x129868);at(0x12986c);
+        if(!sourceSkyItemSlots3C_||sourceSkyItemSlots3C_[occurrence]!=owner.get()||!state.slotStored||reg.entered)return false;
+        at(0x129870);at(0x129874);at(0x12b750);reg.entered=true;at(0x12b758);
+        sourceSkySelected38_=owner.get();sourceSkySelectedItemOccurrence_=occurrence;reg.field38Stored=true;
+        at(0x12b75c);
+        if(sourceSkyPalette7D0_){reg.paletteBorrow=*sourceSkyPalette7D0_;reg.paletteOccurrence=sourceSkyPublishedPaletteOccurrence_;}
+        else {if(sourceSkyConstructor288A50_.nullFields[7]!=0u)return false;reg.paletteBorrow=nullptr;}
+        reg.paletteRead=true;at(0x12b760);at(0x12b764);at(0x1290e0);at(0x129100);
+        if(!state.dataPosition650)return false;at(0x129104);at(0x129108);at(0x12910c);at(0x129110);at(0x129114);if(!resolverCurrent())return false;
+        at(0x129118);at(0x12911c);a::OriginalStandardTextureDiagnostic50LA d;
+        const bool sought=sourceSkyFile_->seekItemResource(occurrence,d);
+        if(occurrence<sourceSkyFile_->itemResourceSeeks_.size()){reg.seekAttempted=sourceSkyFile_->itemResourceSeeks_[occurrence]->attempted;reg.seekReturned=sourceSkyFile_->itemResourceSeeks_[occurrence]->returned;}
+        if(!sought){at(d.sourcePC?d.sourcePC:sourceSkyFile_->pc_);return false;} //Native admission only; source ignores successfulseekV0.
+        at(0x129120);at(0x129124);
+        for(std::size_t group=0;group<6;++group){at(0x129128);at(0x12912c);
+            for(std::size_t entry=0;entry<16;++entry){const auto index=group*16+entry,off=0x54+group*0x100;
+                at(0x129130);if(!owner->known[off]||!owner->known[off+1])return false;
+                const auto mask=std::uint16_t(owner->storage[off])|(std::uint16_t(owner->storage[off+1])<<8);reg.masks[index]=static_cast<std::uint16_t>(mask);
+                at(0x129134);at(0x129138);at(0x12913c);at(0x129140);
+                if(mask&(1u<<entry)){at(0x129148);const auto pointerOff=0x58+group*0x100+entry*4;
+                    for(std::size_t k=0;k<4;++k)if(!owner->known[pointerOff+k]||owner->storage[pointerOff+k])return false;
+                    at(0x12914c);at(0x129150);at(0x129154);at(0x129158);at(0x12915c);at(0x129160);at(0x129164);at(0x128d50);
+                    if(!continueSourceSkyResourceDriver(pc,occurrence,group,entry))return false;
+                    goto sourceSkyResourceScanFinished;
+                }
+                at(0x129144);++reg.completedEntries;at(0x12916c);at(0x129170);at(0x129174);
+            }
+            at(0x129178);at(0x12917c);at(0x129180);at(0x129184);
+        }
+        reg.resourceScanExhausted=true;
+sourceSkyResourceScanFinished:
+        if(reg.completedEntries!=96||reg.pendingResource||!reg.resourceScanExhausted)return false;
+        at(0x129188);at(0x12918c);at(0x129190);at(0x129194);at(0x129198);at(0x12919c);at(0x1291a0);at(0x1291a4);at(0x1291a8);at(0x1291ac);at(0x12b768);at(0x12b76c);reg.returned=true;reg.sourceResult=1;
+        at(0x12b770);at(0x12b774);at(0x129878);post.offsetS2+=4;at(0x12987c);++post.indexS4;
+    }
+}
+bool Owner::continueSourceSkyItemLoop(std::uint32_t& pc,std::size_t occurrence)noexcept {
+    if(sourceSkyItemDriverActive_)return false;
+    struct ActiveScope {bool& active;explicit ActiveScope(bool& value):active(value){active=true;}~ActiveScope(){active=false;}} scope(sourceSkyItemDriverActive_);
+    for(;;){
+        if(pc!=0x1297c8u||!sourceSkyFile_||!sourceSkyItems129758_.count7D8||occurrence>=*sourceSkyItems129758_.count7D8||
+           occurrence!=sourceSkyFile_->followingItems_.size()||!sourceSkyFile_->itemOccurrence(occurrence)||
+           !sourceSkyFile_->itemOccurrence(occurrence)->seekReturned||!preflightSourcePostParticleModelsNative())return false;
+        if(occurrence){
+            if(occurrence!=sourceSkyLaterItems_.size()+1)return false;
+            //Ledger refusal precedes guest allocation, preserving every earlier
+            //slot/parser and this directory occurrence without a fake NULL.
+            try{sourceSkyLaterItems_.push_back(std::unique_ptr<SourceSkyLaterItem>(new SourceSkyLaterItem));}catch(...){return false;}
+        }else if(!sourceSkyLaterItems_.empty())return false;
+        (void)continueSourceSkyItemBody(pc,occurrence);
+        const auto& state=sourceItemHistory(occurrence);
+        if(pc!=0x12982cu||!state.parserReturned||!state.slotStored)return false;
+        (void)continueSourceSkyItemRestore(pc,occurrence);
+        const auto& loop=sourceItemLoop(occurrence);
+        if(pc!=0x1297c8u||!loop.restoreReturned||!loop.nextDirectoryEntered||
+           loop.advancedIndexS4!=occurrence+1u||sourceSkyFile_->followingItems_.size()!=occurrence+1u||
+           !sourceSkyFile_->itemOccurrence(occurrence+1)->seekReturned)return false;
+        ++occurrence; //Native stack depth is independent of authored item count.
+    }
+}
+
+bool Owner::withdrawSourceParticleEmitterBorrowsNative()noexcept {
+    if(!preflightSourceWorldParticleDescriptorsNative())return false;
+    if(!nativeParticleList3D8_)return true;
+    //Validate all live pins before any mutation. This operation is native
+    //disposal only; no source NULL stores/destructor/return receipts change.
+    for(const auto& row:nativeParticleList3D8_->rows)if(row)for(const auto& e:row->sourceEmitters)if(e&&!e->borrowsWithdrawn){
+        if(e->managerStored&&(!e->manager70||e->manager70!=trackParticles_.get()||!e->manager70->sourceParticleEmitterBorrowers_))return false;
+        if(e->modelStored&&(!e->modelOwner||!e->model74||!e->modelOwner->sourceParticleEmitterBorrowers_||
+           e->modelOwner->model()!=e->model74))return false;
+    }
+    //Close each real partial Config occurrence before model/manager pins.
+    //abortNative owns the exact shared numeric handle; not source1573B0.
+    for(auto& row:nativeParticleList3D8_->rows)if(row)for(auto& e:row->sourceEmitters)if(e&&e->config15AE00&&!e->configNativeWithdrawn){
+        a::OriginalStandardTextureDiagnostic50LA d;
+        if(!e->config15AE00->abortNative(d))return false;e->configNativeWithdrawn=true;
+    }
+    //Native cancellation removes registered links before count-owner release;
+    //retain sourceRegistered/mask history and never claim a guest detach call.
+    for(auto& row:nativeParticleList3D8_->rows)if(row)for(auto& e:row->sourceEmitters)
+        if(e&&e->sourceRegistered&&!e->nativeTopologyWithdrawn){
+            const auto detached=worldApplication_->entityAuthority_.detach(e->entity,worldApplication_->attachmentLock423F58());
+            if(detached.status!=g::OriginalWreckComponentStatus50LA::complete)return false;
+            e->nativeTopologyWithdrawn=true;
+        }
+    //The pending row call also borrows matched model/manager operands by
+    //identity. Withdraw that native call frame before those owners retire.
+    for(auto& next:sourceParticleNextRows_)if(next.entered){
+        next.row=nullptr;next.descriptor=nullptr;next.nativeWithdrawn=true;
+    }
+    for(auto& row:nativeParticleList3D8_->rows)if(row)for(auto& e:row->sourceEmitters)if(e&&!e->borrowsWithdrawn){
+        if(e->modelStored)--e->modelOwner->sourceParticleEmitterBorrowers_;
+        if(e->managerStored)--e->manager70->sourceParticleEmitterBorrowers_;
+        e->modelOwner=nullptr;e->model74=nullptr;e->manager70=nullptr;e->borrowsWithdrawn=true;
+    }
+    return true;
+}
+bool Owner::continueSourceCollisionDispatch1AA244(std::uint32_t& pc)noexcept {
+    auto& h=sourceCollisionDispatch128_;
+    if(pc!=0x1aa244||h.stage||!sourceFinishLineCallerReturn_.progressSkipped||
+       !preflightSourcePostParticleModelsNative()||!worldColdConstructed_||
+       !sourceLoadRace_||sourceLoadRace_->nativeIntroWorldEntity()!=&worldEntity_||
+       !sourceLoadApplication_||sourceLoadApplication_->entities()!=worldApplication_||
+       sceneApplication_!=worldApplication_||worldEntity_.reference00!=1)return false;
+    const auto at=[&](std::uint32_t p){pc=sourcePostParticleModelsPC_=p;};
+    //Actual1B2870 constructor calls26FC90 then stores3CF110 at+08 at1B2898.
+    //This same most-derived cold World is retained in Race74; native owner
+    //identity carries the immutable dispatch table, not a copied guest pointer.
+    at(0x1aa244);at(0x1aa248);h.worldTable08=0x3cf110u;h.stage=1;
+    at(0x1aa24c);h.target128=0x2743b0u;h.stage=2; //Original word3CF238.
+    at(0x1aa250);at(0x1aa254);at(0x2743b0); //JALR/NOP; reserve40 and save caller frame.
+    at(0x2743c4);
+    //Genuine earlier1B4EC0/27BCA0 source owners only. No legacy decoded
+    //candidates, modelPrefixes, runtimeQueries, or gameplay viewport admission.
+    if(sourceCollisionPhase_!=SourceCollisionPhase::returned||!preflightSourceWorldCollisionNative()||
+       !worldCollisionObjects3CC_||!worldCollisionObjects3CC_->sourceMode_||
+       !worldCollisionObjects3CC_->sourceArrayReturned_||
+       !sourceCollisionObjects3CC_||*sourceCollisionObjects3CC_!=worldCollisionObjects3CC_->sourceArray3CC_.get()||
+       !*sourceCollisionObjects3CC_||sourceCollisionSucceeded_!=10)return false;
+    auto& objects=*worldCollisionObjects3CC_;h.stage=3;
+    at(0x2743c8);at(0x2743cc); //Nonnull branch; S2 is this same World.
+    at(0x2743d8);h.zoneS0=0;at(0x2743dc);at(0x2743e0);h.zoneOffsetS1=0;
+    if(!sourceStandardWorldReturnV0_||*sourceStandardWorldReturnV0_!=1||
+       !nativeModelZone354_||*nativeModelZone354_!=9)return false;
+    h.previousModelZone354=nativeModelZone354_;
+    for(;;){
+    at(0x274430);if(!worldZones34C_)return false;h.liveZoneCount34C=*worldZones34C_;
+    at(0x274434);const bool moreZones=static_cast<std::int32_t>(h.zoneS0)<static_cast<std::int32_t>(*h.liveZoneCount34C);
+    at(0x274438);at(0x27443c);
+    if(!moreZones){
+        at(0x274440);at(0x274444);at(0x274448);at(0x27444c);at(0x274450);
+        at(0x274454);at(0x274458);h.worldReturned=true;at(0x1aa258);return true;
+    }
+    at(0x2743e4);if(h.zoneS0>=10)return false; //Existing ten-group owner capacity, not a substituted loop bound.
+    nativeModelZone354_=h.zoneS0;h.storedZone354=h.zoneS0;h.zone354Stored=true;h.stage=4;
+    at(0x2743e8);at(0x2743ec);at(0x2743f0);
+    const auto z=h.zoneS0;
+    if(objects.sourceArrayKnown_<=z||!objects.sourceZones_[z]||
+       (*sourceCollisionObjects3CC_)[z]!=&objects.sourceZones_[z]->entity)return false;
+    auto& group=*objects.sourceZones_[z];at(0x2743f4);
+    if(!group.sourceMode)return false;
+    h.groupCount30=group.count30;h.stage=5;
+    at(0x2743f8);at(0x2743fc);
+    if(static_cast<std::int32_t>(group.count30)<=0){
+        at(0x274400);at(0x274404);at(0x274408);at(0x27440c);
+        if(h.groupLogAttempted[z])return false;
+        //Original argument is S0 (zero-based), unlike positive-group +1 log.
+        char message[]="Zone0 does not contain any collision objects\n";message[4]=char('0'+z);
+        h.groupLogAttempted[z]=true;h.groupLogWritten[z]=std::fwrite(message,1,sizeof(message)-1,stdout);
+        h.emptyGroupsSkipped[z]=true; //No27BEA0 call/return and no callbacks.
+        at(0x274410);at(0x274414);h.zoneOffsetS1+=4u;
+        at(0x27442c);++h.zoneS0;continue;
+    }
+    at(0x274418);at(0x27441c);at(0x274420);at(0x27bea0);
+    at(0x27beb8);at(0x27bebc);at(0x27bec0);h.slotS0=0;
+    at(0x27bec4);at(0x27bec8);h.slotOffsetS1=0;h.stage=6;
+    for(;;){
+    at(0x27bef0);h.groupCount30=group.count30; //Reload live count on every edge.
+    at(0x27bef4);const bool more=static_cast<std::int32_t>(h.slotS0)<static_cast<std::int32_t>(*h.groupCount30);
+    at(0x27bef8);at(0x27befc);if(!more)break;
+    h.callbackReturned=false;h.callbackReturnV0.reset();h.loopCountReloaded=false;
+    h.wrapperTable0C.reset();h.target0C.reset();h.stage=6;
+    at(0x27becc);if(!group.sourceEntries34)return false;
+    at(0x27bed0);at(0x27bed4);
+    if(group.sourceEntriesKnown<=h.slotS0||objects.sourceWrappers_[z].size()<=h.slotS0)return false;
+    auto* wrapper=group.sourceEntries34[h.slotS0];
+    if(!wrapper||wrapper!=objects.sourceWrappers_[z][h.slotS0].get()||!wrapper->sourceMode||
+       !wrapper->sourceTypeKnown||(wrapper->type00!=1&&wrapper->type00!=2)||!wrapper->sourceDescriptorPublished||
+       !wrapper->descriptor08||!wrapper->descriptor08->sourceFields||
+       !wrapper->descriptor08->sourceFields->loaded)return false;
+    at(0x27bed8);if(wrapper->sourceVtable0C!=0x3cf0f0u)return false;
+    h.wrapperTable0C=wrapper->sourceVtable0C;h.stage=7;
+    at(0x27bedc);h.target0C=0x1b5590u;h.stage=8; //Original word3CF0FC.
+    at(0x27bee0);at(0x27bee4); //JALR; delay A1=World, A0=actual wrapper.
+    at(0x1b5590);
+    if(g::OriginalWorldCollisionObjects50LA::returnSourceSkippedCallback1B5590(
+        *wrapper,*worldApplication_,worldEntity_.sessionGeneration,pc)){
+        h.callbackReturnV0=wrapper->sourceCallback.returnV0;h.callbackReturned=true;h.stage=9;
+        at(0x27bee8u);h.slotOffsetS1+=4u;at(0x27beecu);++h.slotS0;
+        ++h.callbacksReturned[z];h.loopCountReloaded=true;h.stage=10;continue;
+    }
+    //Completed A may own detached links. Never admit B if a constructor is
+    //already suspended: old-link currentness deliberately rejects that cohort.
+    //With this retained allocator,280890 reserves before entry and has no
+    //fallible post-entry allocation. No arbitrary suspended-cohort unwind is claimed.
+    const auto& shared=worldApplication_->garageObserverShared_;
+    const auto* root=shared.sourceObserverGroup_;
+    if(wrapper->sourceCallback.entered||!root||shared.sourceObserver280890_||
+       !shared.sourceGroupCurrent(root)||!shared.ownsReturnedSourceObserver(root)||
+       !shared.allocator443138_||shared.allocator443138_.get()!=shared.sourceGroupRetainedAllocator_||
+       shared.observers443140_==std::numeric_limits<std::uint32_t>::max())return false;
+    //Same process Application's immutable3C81A0-produced sentinel. No Physics
+    //BASE alias, cached query/candidate, or decoded model prefix substitutes.
+    const auto& sentinel=worldApplication_->collisionStartup3C81A0_.vectors3E02C0[0];
+    g::OriginalWorldCollisionObjects50LA::beginSourceCallback1B5590(*wrapper,*worldApplication_,
+        worldEntity_.sessionGeneration,sentinel,pc);
+    if(pc==0x11ba2cu&&sourceLoadApplication_&&sourceLoadApplication_->entities()==worldApplication_&&
+       sceneApplication_==worldApplication_&&sourceTrackMountDomain_&&
+       sourceLoadApplication_->standardMaterialDomainOwner_==sourceTrackMountDomain_&&
+       !sourceTrackMountLease_.closed_&&sourceTrackMountDomain_->prepared()&&sourceTrackFile_){
+        const auto resolver=sourceTrackMountDomain_->resolver3E1A70();
+        if(resolver)g::OriginalWorldCollisionObjects50LA::continueSourceCallbackSearchNative(
+            *wrapper,*worldApplication_,worldEntity_.sessionGeneration,resolver,sourceTrackFile_,pc);
+    }
+    if(pc==0x11bbb8u&&g::OriginalWorldCollisionObjects50LA::observeSourceLoaderReturn1B5730(
+        *wrapper,*worldApplication_,worldEntity_.sessionGeneration,pc)){
+        //Actual World354 and World3C4 producers, never a model/query facade.
+        if(nativeModelZone354_&&*nativeModelZone354_<10&&sourceStaticOwner_&&
+           sourceModelParents3C4_&&sourceModels3C4_&&*sourceModels3C4_==sourceModelParents3C4_.get()&&
+           sourceModelParentsPublished3C4_==10&&sourceStaticOwner_->application_==worldApplication_&&
+           sourceStaticOwner_->generation_==worldEntity_.sessionGeneration&&
+           sourceStaticOwner_->preflightSourceModelParentLinksNative()){
+            const auto z=*nativeModelZone354_;
+            if(z<sourceStaticOwner_->parents_.size())if(auto& parent=sourceStaticOwner_->parents_[z]){
+                if(parent->sourceMode&&parent->constructed&&!parent->released&&parent->zone==z+1&&
+                   parent->sourceAuthorityEnrolled&&parent->sourceVtable08==0x3d2640u&&
+                   sourceModelParents3C4_[z]==&parent->entity)
+                    g::OriginalWorldCollisionObjects50LA::attachSourceCallback1B577C(*wrapper,*worldApplication_,
+                        worldEntity_.sessionGeneration,parent->entity,sourceStaticOwner_->sourceCollisionTailNative_[z],z,pc);
+            }
+        }
+    }
+    if(pc==0x1b5784u)g::OriginalWorldCollisionObjects50LA::transformSourceCallback1B5784(
+        *wrapper,*worldApplication_,worldEntity_.sessionGeneration,pc);
+    if(pc==0x11f680u)g::OriginalWorldCollisionObjects50LA::firstSourceSetter11F680(
+        *wrapper,*worldApplication_,worldEntity_.sessionGeneration,pc);
+    if(pc==0x1b5884u)g::OriginalWorldCollisionObjects50LA::secondSourceSetter1B5888(
+        *wrapper,*worldApplication_,worldEntity_.sessionGeneration,pc);
+    if(pc==0x1b5890u){
+        //Original1B5890/94/98/9C/A0/A4 use this live World, current354,
+        //actual4C4 array, and the same wrapper04. Never BodyB8 or visibility4C0.
+        at(0x1b5890u);
+        if(!nativeModelZone354_||*nativeModelZone354_>=10)return false;
+        const auto z=*nativeModelZone354_;at(0x1b5894u);
+        if(!sourceTopologyMode_||sourceTopologyWithdrawn_||!sourceCollision4C4_||
+           !sourceCollisionSlots4C4_||*sourceCollision4C4_!=sourceCollisionSlots4C4_.get()||
+           z>=sourceCollisionPublished_)return false;
+        at(0x1b5898u);
+        if(!wrapper->sourceCallback.outer||wrapper->sourceCallback.source04!=wrapper->sourceCallback.outer.get())return false;
+        at(0x1b589cu);at(0x1b58a0u);at(0x1b58a4u);
+        const auto& node=sourceSearchNodes_[1][z];
+        if(!node.owner||node.withdrawn||!node.published||!node.ordinalKnown||
+           sourceCollisionSlots4C4_[z]!=node.owner.get()||!preflightSourceSearchNodeNative(node,z,true))return false;
+        g::OriginalWorldCollisionObjects50LA::beginSourceMembership1B58A8(*wrapper,*worldApplication_,
+            worldEntity_.sessionGeneration,node.owner.get(),z,pc);
+    }
+    if(pc==0x2809c0u){
+        auto& m=wrapper->sourceCallback.membership;
+        const auto actualMethod=[&](const void* actualZone,const void* registrationOccurrence,
+            const void* actualCOL,NativeListMethodCustody*& method,std::optional<std::uint32_t>& slot,
+            bool& selectionPending,std::uint32_t& methodPC,bool select)noexcept {
+            methodPC=select?0x280afcu:0x27f5a0u;
+            if(registrationOccurrence!=&m||actualCOL!=wrapper->sourceCallback.outer.get()||
+               actualZone!=m.zoneIdentity||m.mode!=1||m.zone354>=10||!nativeModelZone354_||*nativeModelZone354_!=m.zone354||
+               !sourceTopologyMode_||sourceTopologyWithdrawn_||!sourceCollision4C4_||!sourceCollisionSlots4C4_||
+               *sourceCollision4C4_!=sourceCollisionSlots4C4_.get()||m.zone354>=sourceCollisionPublished_)return false;
+            const auto zone=m.zone354;auto& node=sourceSearchNodes_[1][zone];
+            if(node.withdrawn||!node.published||!node.owner||!node.ordinalKnown||
+               sourceCollisionSlots4C4_[zone]!=node.owner.get()||actualZone!=node.owner.get()||
+               !preflightSourceSearchNodeNative(node,zone,true))return false;
+            //Actual mode1 27F5A0 selects static collision +34 / World4CC.
+            if(!select)method=node.owner->nativeList34;
+            if(method!=node.owner->nativeList34||!method||!nativeMethods4CC_||
+               nativeMethods4CC_[zone]!=method||!sourceListMethodArrayCurrent(1,zone,method))return false;
+            const auto& publication=sourceListMethods_[1][zone];
+            if(!publication.arrayPublished||!publication.aliasPublished||!publication.aliasRetained||
+               publication.withdrawn||publication.aliasNode!=node.owner.get()||
+               !method->sourceMode_||method->world_!=static_cast<const ra_pod_scene50LA::Owner*>(this)||
+               method->application_!=worldApplication_.get()||method->ordinal_!=10u+zone||
+               method->usage10_!=1||method->reference00_!=2||
+               !method->source_.constructorReturned||method->source_.vtable08!=0x3d2d30u||
+               !sourceListEntriesCurrent(*method))return false;
+            if(!select)return true;
+            //Actual3D2D30+20=27E3B0 tailcalls27E3C0 with a3(NULL)
+            //as requested slot. +24=27E570 is owned by COL insertion.
+            return selectSourceObserverSlot27E3C0(*method,registrationOccurrence,actualCOL,
+                slot,selectionPending,methodPC,1u);
+        };
+        const auto actualPortal=[&](unsigned phase,const void* registration,const void* actualCOL,
+            const void* actualZone,const std::array<std::uint32_t,4>& center,const void* cursor,
+            auto& edge,std::shared_ptr<const void>& graphPin,std::uint32_t& portalPC)noexcept {
+            portalPC=phase==0?0x280c34u:phase==2?0x280c90u:phase==4?0x280cf8u:0x280c40u;
+            if(phase>4||registration!=&m||actualCOL!=wrapper->sourceCallback.outer.get()||
+               actualZone!=m.zoneIdentity||center!=m.center||m.mode!=1||m.zone354>=10||
+               !nativeModelZone354_||*nativeModelZone354_!=m.zone354||!sourceTopologyMode_||sourceTopologyWithdrawn_||
+               !sourceCollision4C4_||!sourceCollisionSlots4C4_||*sourceCollision4C4_!=sourceCollisionSlots4C4_.get()||
+               m.zone354>=sourceCollisionPublished_)return false;
+            const auto zone=m.zone354;auto& root=sourceSearchNodes_[1][zone];
+            if(root.withdrawn||!root.published||!root.owner||actualZone!=root.owner.get()||
+               sourceCollisionSlots4C4_[zone]!=root.owner.get()||
+               !preflightSourceSearchNodeNative(root,zone,true)||
+               !sourcePortalWorldLinksCurrent(*root.owner,true,zone))return false;
+            if(phase==0){
+                if(graphPin||cursor)return false;
+                for(const auto& old:sourceCollisionPortalBorrows_)
+                    if(old.registration==registration&&!old.token.expired())return false;
+                //Allocate native custody before exposing the source head pointer.
+                //Weak root records never keep a completed COL borrower alive.
+                try{std::shared_ptr<const void> token=std::make_shared<std::uint8_t>(0);
+                    sourceCollisionPortalBorrows_.push_back({registration,token});graphPin=std::move(token);
+                }catch(...){return false;}
+                edge.next=root.owner->portalLinks30.get();return true;
+            }
+            bool pinned=false;
+            for(const auto& borrow:sourceCollisionPortalBorrows_)if(borrow.registration==registration){
+                const auto live=borrow.token.lock();if(live&&live==graphPin){pinned=true;break;}}
+            if(!pinned||!graphPin||!cursor)return false;
+            std::size_t index=0;while(index<40&&sourcePortalWorldLinks_[index/4][index%4].published!=cursor)++index;
+            //Odd links are collision namespace (stages1/3), never visibility0/2.
+            if(index==40||!(index&1u))return false;
+            auto& link=sourcePortalWorldLinks_[index/4][index%4];
+            if(link.withdrawn||link.knownMask!=31||!link.published||link.from!=root.owner.get()||!link.to)return false;
+            auto& raw=*link.published;const auto& portal=nativePortals_[index/4];
+            if(!portal||!portal->sourceMode||raw.neighbor04!=&link.to->entity||
+               raw.portal08!=&portal->entity||!portal->source.loadReturned||
+               portal->source.normalKnown!=7||!portal->source.normalNormalized||portal->source.copiedVertices!=4)return false;
+            for(unsigned i=0;i<4;++i)if(portal->source.edgeKnown[i]!=7||!portal->source.edgeNormalized[i])return false;
+            if(phase==1){
+                edge.entered=true;edge.edge=cursor;edge.edgeIndex=index;
+                edge.neighbor=raw.neighbor04;edge.portal=raw.portal08;
+                //Actual231150 uses center and f12=+0, not half/radius80.
+                portalPC=0x231150u;
+                const bool overlapOkay=g::source_portal_overlap231150::run(portal->source.vertices30,portal->source.normal70,
+                    portal->source.edges80,center,0u,edge.overlap);
+                edge.overlapReturned=edge.overlap.returned;edge.hit=edge.overlap.hit;edge.distance=edge.overlap.outputDistance;
+                if(!overlapOkay){portalPC=edge.overlap.pc;return false;}
+                portalPC=0x280c54u;if(!edge.hit)return true;
+                if(!edge.distance)return false;
+                portalPC=0x280c60u;raw.field10=*edge.distance;link.distance10=edge.distance;edge.distanceStoreMask|=1u;
+                portalPC=0x280c64u;raw.field0C=*edge.distance;link.distance0C=edge.distance;edge.distanceStoreMask|=2u;
+            }else if(edge.edge!=cursor||edge.edgeIndex!=index||edge.neighbor!=raw.neighbor04||edge.portal!=raw.portal08||
+                     !g::source_portal_overlap231150::historyCurrent(edge.overlap))return false;
+            if(phase==4){edge.next=raw.next00.get();portalPC=0x280cf8u;return true;}
+            if(phase==3&&!edge.hit)return true;
+            //The source keeps a method cursor: each hit reads its usage10,
+            //then resolves the neighbor method using that same mode1.
+            portalPC=phase==1?0x280c6cu:portalPC;
+            const auto* prior=edge.previousMethod;
+            if(!prior||!prior->sourceMode_||prior->world_!=static_cast<const ra_pod_scene50LA::Owner*>(this)||
+               prior->application_!=worldApplication_.get()||prior->usage10_!=1||prior->ordinal_<10||prior->ordinal_>=20||
+               !sourceListMethodArrayCurrent(1,prior->ordinal_-10,prior))return false;
+            std::size_t neighborZone=0;while(neighborZone<10&&sourceCollisionSlots4C4_[neighborZone]!=link.to)++neighborZone;
+            if(neighborZone==10||neighborZone>=sourceCollisionPublished_)return false;
+            auto& neighbor=sourceSearchNodes_[1][neighborZone];
+            if(neighbor.withdrawn||!neighbor.published||neighbor.owner.get()!=link.to||
+               !preflightSourceSearchNodeNative(neighbor,neighborZone,true))return false;
+            if(phase==1){portalPC=0x27f5a0u;edge.method=link.to->nativeList34;edge.methodReturned=true;}
+            auto* method=edge.method;
+            if(!method||method!=link.to->nativeList34||!nativeMethods4CC_||nativeMethods4CC_[neighborZone]!=method||
+               !sourceListMethodArrayCurrent(1,neighborZone,method)||method->usage10_!=1||method->reference00_!=2||
+               !method->sourceMode_||method->world_!=static_cast<const ra_pod_scene50LA::Owner*>(this)||
+               method->application_!=worldApplication_.get()||method->ordinal_!=10u+neighborZone||
+               !method->source_.constructorReturned||method->source_.vtable08!=0x3d2d30u||
+               !sourceListEntriesCurrent(*method))return false;
+            const auto& publication=sourceListMethods_[1][neighborZone];
+            if(!publication.arrayPublished||!publication.aliasPublished||!publication.aliasRetained||
+               publication.withdrawn||publication.aliasNode!=link.to)return false;
+            if(phase==2){portalPC=0x280c90u;
+                if(!edge.overlap.returned||!edge.overlap.hit||edge.distanceStoreMask!=3u||!edge.methodReturned)return false;
+                return selectSourceObserverSlot27E3C0(*method,&edge,actualCOL,
+                    edge.slot,edge.selectionPending,portalPC,1u);}
+            return phase==1||phase==3;
+        };
+        g::OriginalWorldCollisionObjects50LA::continueSourceStaticMembershipNative(
+            wrapper->sourceCallback,static_cast<const ra_pod_scene50LA::Owner*>(this),actualMethod,actualPortal,pc);
+    }
+    if(pc==0x120224u&&g::OriginalWorldCollisionObjects50LA::finishSourceCallback1B58B0(
+        *wrapper,*worldApplication_,worldEntity_.sessionGeneration,pc)){
+        h.callbackReturnV0=wrapper->sourceCallback.returnV0;h.callbackReturned=true;h.stage=9;
+        //27BEA0 ignores callback V0; advance only after its genuine return.
+        at(0x27bee8u);h.slotOffsetS1+=4u;
+        at(0x27beecu);++h.slotS0;
+        ++h.callbacksReturned[z];h.loopCountReloaded=true;h.stage=10;
+        continue; //Fresh entries34 lookup and fresh callback occurrence; never replay A.
+    }
+    sourcePostParticleModelsPC_=pc;return false; //Partial B remains owned, not counted as returned.
+    }
+    //27BF00 observes live World354 for the original diagnostic arguments.
+    at(0x27bf00);if(!nativeModelZone354_||*nativeModelZone354_!=z)return false;
+    at(0x27bf04);at(0x27bf08);at(0x27bf0c);at(0x27bf10);at(0x27bf14);
+    if(h.groupLogAttempted[z])return false;
+    std::array<char,96> message{};std::size_t length=0;
+    const auto append=[&](const char* text)noexcept{while(*text)message[length++]=*text++;};
+    const auto number=[&](std::uint32_t v)noexcept{char digits[10];std::size_t n=0;
+        do{digits[n++]=char('0'+v%10);v/=10;}while(v);while(n)message[length++]=digits[--n];};
+    append("\nLoaded ");number(h.slotS0);append(" collision objects from Zone");
+    number(*nativeModelZone354_+1u);append(".\n\n");
+    //Same bounded native diagnostic adapter as source group loading. Short
+    //writes are recorded and ignored, never retried or treated as group failure.
+    h.groupLogAttempted[z]=true;h.groupLogWritten[z]=std::fwrite(message.data(),1,length,stdout);
+    at(0x27bf18);at(0x27bf1c);at(0x27bf20);at(0x27bf24);at(0x27bf28);
+    at(0x27bf2c);at(0x27bf30);at(0x27bf34);h.groupsReturned[z]=true;
+    at(0x274424);at(0x274428);h.zoneOffsetS1+=4u;
+    at(0x27442c);++h.zoneS0;
+    }
+}
+
+bool Owner::continueSourceFinishLineAnchors1B3C1C(std::uint32_t& pc)noexcept {
+    auto& h=sourceFinishLineAnchors_;
+    if(pc!=0x1b3c1c||h.entered||!sourceFinishLineMaterial544_||
+       !sourceFinishLineHeader_.setupReturned||sourceFinishLineHeader_.borrowersWithdrawn||
+       !sourceLoadApplication_||!worldApplication_||sourceLoadApplication_->entities()!=worldApplication_||
+       sceneApplication_!=worldApplication_||!sourceStaticOwner_||
+       sourceStaticOwner_->application_!=worldApplication_||
+       sourceStaticOwner_->generation_!=worldEntity_.sessionGeneration||
+       !sourceStaticOwner_->sourceLedgerPrepared_||
+       !sourceStaticOwner_->canCloseSourceNative()||!preflightSourceFinishLineNative())return false;
+    h.entered=true; //Once-only admission, including a bounded partial scan.
+    if(!worldApplication_->readWorldOrigin4342D0(h.originWords))return false;
+    pc=0x1b3c24;h.stackWords[0]=h.originWords;
+    pc=0x1b3c2c;h.stackWords[1]=h.originWords;h.initialized=true;
+    const auto equal=[](const std::string& left,const char* right)noexcept {
+        std::size_t i=0;
+        for(;;++i){
+            unsigned char a=i<left.size()?static_cast<unsigned char>(left[i]):0;
+            unsigned char b=static_cast<unsigned char>(right[i]);
+            if(a>='A'&&a<='Z')a=static_cast<unsigned char>(a+'a'-'A');
+            if(b>='A'&&b<='Z')b=static_cast<unsigned char>(b+'a'-'A');
+            if(a!=b)return false;if(!a)return true;
+        }
+    };
+    for(;;){
+        //Original1B3CC0..D0 reloads World3C4[0]/parent30 on every test.
+        pc=0x1b3cc0;
+        if(!sourceModels3C4_||!sourceModelParents3C4_||
+           *sourceModels3C4_!=sourceModelParents3C4_.get()||
+           sourceStaticOwner_->parents_.empty()||!sourceStaticOwner_->parents_[0])return false;
+        auto& parent=*sourceStaticOwner_->parents_[0];
+        pc=0x1b3cc4;if(sourceModelParents3C4_[0]!=&parent.entity||parent.released||
+           !parent.sourceMode||sourceStaticOwner_->closed_)return false;
+        pc=0x1b3cc8;h.liveCount=parent.count30;
+        //Native storage admits nonnegative signed counts only; never reinterpret
+        //an unsupported negative count as a huge unsigned traversal.
+        if(*h.liveCount>static_cast<std::uint32_t>(std::numeric_limits<std::int32_t>::max()))return false;
+        pc=0x1b3ccc;if(h.ordinal>=*h.liveCount)break;
+        pc=0x1b3c30;
+        if(!parent.sourceEntries34||h.ordinal>=parent.sourceEntriesKnown||
+           h.ordinal>=sourceStaticOwner_->sourceWrapperLedger_[0].size())return false;
+        pc=0x1b3c44;auto* wrapper=parent.sourceEntries34[h.ordinal];
+        if(wrapper!=sourceStaticOwner_->sourceWrapperLedger_[0][h.ordinal].get())return false;
+        if(!wrapper){pc=0x1b3c4c;++h.ordinal;continue;} //BEQL delay slot.
+        pc=0x1b3c50;
+        if(!sourceStaticOwner_->sourceModelCurrentNative(*wrapper))return false;
+        //The tagged Physics+8 is a BODY, not Standard model8. Never turn the
+        //native null Standard alias into an original null+8 observation.
+        if(wrapper->dispatch==ra_static_model_cold50LA::Owner::StandardWrapper::Dispatch::physics3D26C0){
+            const auto& physics=wrapper->sourcePhysics;
+            if(!physics.body8)return false;
+            if(*physics.body8){
+                pc=0x1b3c5c;std::uint8_t firstByte=0;
+                if(!physics.bodyOwner||!physics.bodyOwner->readSourceInlineName38FirstByteNative(
+                    worldApplication_.get(),worldEntity_.sessionGeneration,*physics.body8,firstByte))return false;
+                //Actual308F00 compares the inline first byte. Constructor165AF4
+                //produced NUL, hence both nonempty finish_droid names mismatch.
+                //Do not read unknown trailing bytes or invoke a Model getter on
+                //this PhysicsObject. A future nonzero producer needs real string custody.
+                if(firstByte)return false;
+                pc=0x1b3c64; //Left comparison: nonzero return, no anchor getter.
+                pc=0x1b3c98; //Right comparison: nonzero return, no anchor getter.
+            }
+        }else if(wrapper->model8){
+            auto* model=wrapper->sourceModel.get();
+            if(!model||wrapper->model8!=&model->scene||model->nativeRetired||model->scene.released())return false;
+            const auto* scene=model->scene.model();if(!scene)return false;
+            pc=0x1b3c64;int which=equal(scene->name38,"finish_droidleft.slt")?0:-1;
+            if(which<0){pc=0x1b3c98;if(equal(scene->name38,"finish_droidright.slt"))which=1;}
+            if(which>=0){
+                pc=which?0x1b3cb0:0x1b3c7c;
+                const auto index=scene->sceneIndex;
+                const auto root=static_cast<std::size_t>(index);
+                if(root>=model->graphCount||!model->parentAttached||!model->parentAttachReturned)return false;
+                //Actual28B1A0(a1=NULL) uses this graph's real cache, then only
+                //stores XYZ (28B268/270/27C). W remains the startup stack copy.
+                if(!g::refreshSceneWorld49P(model->graph(),index))return false;
+                for(std::size_t k=0;k<3;++k)
+                    std::memcpy(&h.stackWords[which][k],&model->nodes[root].world100.v[12+k],sizeof(std::uint32_t));
+                h.lastMatchingSlot[which]=h.ordinal; //Original later match overwrites earlier XYZ.
+            }
+        }
+        pc=0x1b3cb8;++h.ordinal;
+    }
+    pc=0x1b3cd8;h.scanReturned=true;return true;
+}
+
+bool Owner::continueSourceFinishLineComparison1B3CD8(std::uint32_t& pc)noexcept {
+    auto& c=sourceFinishLineComparison_;const auto& anchors=sourceFinishLineAnchors_;
+    if(pc!=0x1b3cd8||c.entered||!anchors.scanReturned||!sourceLoadApplication_||
+       !worldApplication_||sourceLoadApplication_->entities()!=worldApplication_||
+       sceneApplication_!=worldApplication_||!sourceFinishLineHeader_.setupReturned||
+       sourceFinishLineHeader_.borrowersWithdrawn||!sourceFinishLine540_||
+       !preflightSourcePostParticleModelsNative())return false;
+    c.entered=true;
+    constexpr std::uint32_t loadPC[2][3]{{0x1b3ce0,0x1b3d00,0x1b3d28},{0x1b3d54,0x1b3d74,0x1b3d9c}};
+    constexpr std::uint32_t comparePC[2][3]{{0x1b3ce8,0x1b3d04,0x1b3d2c},{0x1b3d5c,0x1b3d78,0x1b3da0}};
+    for(unsigned side=0;side<2;++side){
+        bool equal=true;
+        for(unsigned lane=0;lane<3;++lane){
+            pc=loadPC[side][lane];std::array<std::uint32_t,4> current;
+            //Reader reauthenticates the SAME live Application publication on
+            //each executed scalar load; other lanes of this copy are not receipts.
+            if(!worldApplication_->readWorldOrigin4342D0(current))return false;
+            c.originWords[side][lane]=current[lane];c.readMask[side]|=1u<<lane;
+            float stackValue,originValue;
+            std::memcpy(&stackValue,&anchors.stackWords[side][lane],sizeof(float));
+            std::memcpy(&originValue,&current[lane],sizeof(float));
+            pc=comparePC[side][lane];
+            //C.EQ.S, not integer word equality: signed zeros equal, NaN unordered
+            //and therefore false. No finite-only filter or W comparison. Host
+            //FP exception flags/traps are not an emulation of original EE FCSR.
+            if(!(stackValue==originValue)){equal=false;break;}
+        }
+        c.equalsOrigin[side]=equal;
+        pc=side?0x1b3db8:0x1b3d44;
+        if(equal){c.missingAnchor=true;c.returned=true;pc=0x1b3dc0;return true;}
+        //Left mismatch reaches right scalar comparisons. Left all-equal skips
+        //them entirely through1B3D44; no guessed anchor-count condition.
+    }
+    c.missingAnchor=false;c.returned=true;pc=0x1b3ddc;return true;
+}
+
 }

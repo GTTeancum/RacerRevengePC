@@ -23,6 +23,7 @@ class OriginalPauseStorage50LA;
 // original forest, dispatch targets, or a completed Application phase.
 class OriginalApplicationEntityAuthority50LA final {
     friend class OriginalApplicationEntities50LA;
+    friend class OriginalWorldCollisionObjects50LA; //Exact1B577C callback enrollment/attachment custody.
     friend struct ::original_main_entry50KG::Application;
     friend class OriginalLoadingManager33050LA;
     friend class OriginalLoadingScreen40Mode0LA;

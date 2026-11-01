@@ -5,12 +5,13 @@
 #include <memory>
 #include <optional>
 #include <thread>
-namespace rr::game {class OriginalSourcePhysicsCollision50LA;class OriginalWreckType0Owners50LA;}
+namespace rr::game {class OriginalSourceCollisionPath50LA;class OriginalSourcePhysicsCollision50LA;class OriginalWreckType0Owners50LA;}
 namespace rr::assets {
 //Exact COL t1=1 continuation; no PSG/native file ID is a source handle.
 class OriginalSourceCollisionFile50LA final {
     friend class OriginalStandardTextureResolver50LA;
     friend class rr::game::OriginalSourcePhysicsCollision50LA;
+    friend class rr::game::OriginalSourceCollisionPath50LA; //Dedicated NULL-model callback borrower.
     using Resource=OriginalStandardCollisionType0Resource50LA;
     using Payload=rr::game::OriginalWreckType0Owners50LA;
     using D=OriginalStandardTextureDiagnostic50LA;
@@ -27,6 +28,14 @@ class OriginalSourceCollisionFile50LA final {
     bool outputHandleStored_=false,outputCacheStored_=false;
     std::optional<std::int64_t> sourceHandle148_;
     std::optional<const void*> sourceCache150_;
+    //Distinct native custody for the model-NULL callback resource. It is not
+    //a Physics Resource or payload, nor a serialized source pointer/refcount.
+    struct CallbackResourceCustody {
+        void* resource=nullptr;
+        const rr::game::OriginalSourceCollisionPath50LA* owner=nullptr;
+        const OriginalSourceCollisionFile50LA* borrower=nullptr;
+    };
+    CallbackResourceCustody* callbackResource_=nullptr;
     Resource* associatedResource_=nullptr; //Raw source row1C; no resource retain.
     const Payload* resourceOwner_=nullptr;
     bool associationAttempted_=false,associationStored_=false,associationReturned_=false;
@@ -53,6 +62,11 @@ class OriginalSourceCollisionFile50LA final {
     //A genuine close can retain the exact source association/payload borrower.
     //Native cancellation never sets this original close return receipt.
     bool closeSource131040(D&)noexcept;
+    bool associateCallback1326A0(CallbackResourceCustody&,D&)noexcept;
+    bool withdrawCallbackAssociationNative(D&)noexcept;
+    bool canCloseCallbackNative(const CallbackResourceCustody&)const noexcept;
+    bool canCloseHandleNative()const noexcept;
+    bool canCloseNative()const noexcept; //Read-only cancellation admission, no source close receipt.
     bool closeNative(D&)noexcept;
 public:
     ~OriginalSourceCollisionFile50LA()noexcept=default; //COL owns explicit withdrawal.

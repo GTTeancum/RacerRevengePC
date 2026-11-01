@@ -10,6 +10,14 @@ inline bool Owner::preflightSourceWorldCollisionNative()const noexcept {
        sourceCollisionZoneArgIndex_>10||(sourceCollisionZoneArgIndex_<10&&
        (!sourceZones350_||sourceCollisionZoneArg_!=&sourceZones350_[sourceCollisionZoneArgIndex_]))||
        (sourceCollisionConfigArg_&&sourceCollisionConfigArg_!=sourceWorldConfig_.get()))return false;
+    for(const auto& zone:worldCollisionObjects3CC_->sourceWrappers_)for(const auto& w:zone){
+        if(w&&!g::OriginalWorldCollisionObjects50LA::sourceCallbackSearchDomainCurrentNative(*w,
+            sourceTrackMountDomain_?sourceTrackMountDomain_->resolver3E1A70().get():nullptr,
+            sourceTrackFile_.get(),sourceLoadApplication_&&sourceLoadApplication_->entities()==worldApplication_&&
+            sceneApplication_==worldApplication_&&sourceTrackMountDomain_&&
+            sourceLoadApplication_->standardMaterialDomainOwner_==sourceTrackMountDomain_&&
+            !sourceTrackMountLease_.closed_&&sourceTrackMountDomain_->prepared()))return false;
+    }
     std::uint32_t pc=0;return canReleaseWorldCollisionObjects27BB80(pc);
 }
 inline bool Owner::abortSourceWorldCollisionNative(std::uint32_t& pc)noexcept {

@@ -9,11 +9,16 @@ std::uint32_t textScanLine_=0,textStoredLines_=0;
 Line textSelectionInput_;
 Text::Bytes textSelectionBytes_,textSelectionLine_;
 
-bool textConfigCurrent()const noexcept {
-    return current()&&textReturned_&&sourceOpenReturned_&&*sourceOpenReturned_&&
+bool ownedTextConfigCurrent()const noexcept {
+    return ((occurrence_==Occurrence::manager1617A0&&!emitterOwner_)||
+            (occurrence_==Occurrence::emitter15AE00&&emitterOwner_))&&
+        current()&&textReturned_&&sourceOpenReturned_&&*sourceOpenReturned_&&
         source_->binary08==0&&source_->opened0C==1&&source_->mode10==0&&
         source_->text1C==textTable_.sourceStorage&&source_->count14==textTable_.count14&&
         source_->index18==textTable_.capacity18&&source_->child24==textChildTable_.get();
+}
+bool textConfigCurrent()const noexcept {
+    return occurrence_==Occurrence::manager1617A0&&!emitterOwner_&&ownedTextConfigCurrent();
 }
 bool retireTextChild157F90()noexcept {
     if(source_->child24!=textChildTable_.get())return false;
@@ -44,7 +49,7 @@ bool readTextSelectionLine(std::uint32_t readPc,std::uint32_t splitPc,D& d)noexc
 }
 bool selectTextSection157D00(std::string_view wanted,bool& sourceReturned,D& d)noexcept {
     d={};sourceReturned=false;sourcePC_=0x157D1Cu;
-    if(!textConfigCurrent()||textSelectBounded_)return false;
+    if(!ownedTextConfigCurrent()||textSelectBounded_)return false;
     textSelectAttempted_=true;textSelectionReturned_=false;textSelectBounded_=true;
     if(wanted.size()>=1024)return false; //Native pre-copy aperture, no source truncation.
     Text::Bytes query;
@@ -128,12 +133,12 @@ bool generalSelectionAttempted_=false;
 bool groupSectionSelected_=false;
 std::uint32_t nextGroupSection_=0,groupFieldOrdinal_=0;
 bool selectGeneralInfo157D00(bool& returned,D& d)noexcept {
-    if(generalSelectionAttempted_)return false;
+    if(!textConfigCurrent()||generalSelectionAttempted_)return false;
     generalSelectionAttempted_=true;
     return selectTextSection157D00("General Info",returned,d);
 }
 bool selectGroup157D00(std::uint32_t ordinal,bool& returned,D& d)noexcept {
-    if(!glowGetterReturned_||ordinal!=nextGroupSection_||
+    if(!textConfigCurrent()||!glowGetterReturned_||ordinal!=nextGroupSection_||
        (groupSectionSelected_&&groupFieldOrdinal_!=3))return false;
     //Original308C90 formats trusted literal Group%d at1618E8. The positive
     //loop index has the same decimal bytes; host string storage is native.
@@ -150,7 +155,7 @@ std::uint32_t nextFrameSection_=0,frameFieldOrdinal_=0,frameUVWritten_=0;
 bool frameSectionSelected_=false,frameGetterBounded_=false;
 std::array<float,4> frameUV770_; //Unknown until original16199C..AC zero stores.
 bool selectFrame157D00(std::uint32_t ordinal,bool& returned,D& d)noexcept {
-    if(!glowGetterReturned_||ordinal!=nextFrameSection_||
+    if(!textConfigCurrent()||!glowGetterReturned_||ordinal!=nextFrameSection_||
        (groupSectionSelected_&&groupFieldOrdinal_!=3)||
        (frameSectionSelected_&&frameFieldOrdinal_!=4)||frameGetterBounded_)return false;
     std::string name;

@@ -1,18 +1,23 @@
 #pragma once
 #include "ra_cold_sources50la.h"
 #include "../../src/game/original_wreck_components50la.h"
+#include "../../src/game/original_source_physics_object50la.h"
+#include <cstring>
+#include <optional>
 #include <array>
 #include <memory>
 #include <vector>
 #include <thread>
 namespace ra_pod_scene50LA {class Owner;}
 namespace ra_cold_aggregate50LA {class Owner;}
+namespace ra_static_model_cold50LA {class Owner;}
 namespace rr::game {
-// World3D4's actual PhysicsObject model index. This bounded RA route proves
-// every authored StaticType resolves Standard; it is not an empty-world claim.
+// World3D4's actual PhysicsObject model index. Source27C290 registrations
+// have exact caller/member custody, separate from legacy Standard-only readiness.
 class OriginalWorldPhysicsIndex50LA final {
     friend class ::ra_pod_scene50LA::Owner;
     friend class ::ra_cold_aggregate50LA::Owner;
+    friend class ::ra_static_model_cold50LA::Owner;
     //Actual27C010 lanes, not collision Storage or an inferred empty world.
     std::int32_t count00_=0;
     std::unique_ptr<std::uint32_t[]> capacity04_,used08_;
@@ -86,7 +91,7 @@ class OriginalWorldPhysicsIndex50LA final {
         //Different private source completion, NOT legacy decoded Standard-only readiness.
         sourcePrepared_=true;returned=true;pc=sourcePC_=0x27c1c4;return true;
     }
-    //Conditional source service, no current type2 cohort issuer. Native
+    //Actual type2 cohort27B8EC issues this source service. Native
     //capacity admission is before source writes; never a returned guest0.
     bool reserveSource27C1D0(const OriginalWreckComponent50LA& world,std::uint32_t zone,
         std::int32_t count,bool& returned,std::uint32_t& returnV0,std::uint32_t& pc)noexcept {
@@ -117,7 +122,8 @@ class OriginalWorldPhysicsIndex50LA final {
         }
         at(0x27c268);return finish(1); //Count0 still publishes allocator result and returns1.
     }
-    bool canReleaseSourceNative()const noexcept {
+    #include "original_world_physics_registration50la.inl"
+    bool sourceCurrentNative()const noexcept {
         if(!sourceMode_||!constructed_||sourceThread_!=std::this_thread::get_id()||
            !sourceWorld_||sourceWorldGeneration_!=sourceWorld_->sessionGeneration||!sourceWorld_->reference00||
            prepared_||source_||prepareAttempted_||reset_.attempted||
@@ -127,9 +133,11 @@ class OriginalWorldPhysicsIndex50LA final {
            sourceModelsProduced_-sourceCapacityProduced_>1||sourceCapacityProduced_-sourceUsedProduced_>1||
            (sourceModelsProduced_&&!models0C_)||(sourceCapacityProduced_&&!capacity04_)||
            (sourceUsedProduced_&&!used08_))return false;
-        if(sourcePrepared_&&(sourceModelsProduced_!=10||sourceCapacityProduced_!=10||sourceUsedProduced_!=10))return false;
+        if(sourcePrepared_&&(count00_!=10||sourceModelsProduced_!=10||sourceCapacityProduced_!=10||sourceUsedProduced_!=10))return false;
+        std::array<std::uint32_t,10> expectedUsed{};
+        if(!sourceRegistrationHistoryNative(expectedUsed))return false;
         //Read only constructor-reached lanes and27C1D0 zeroed row prefixes.
-        //No27C290 body pointer/used08 producer is yet admitted.
+        //Every occupied prefix slot is independently covered by27C290 history.
         for(std::size_t i=0;i<10;++i){const auto& h=sourceCapacity_[i];
             if(h.entered&&!sourcePrepared_)return false;
             if(!h.entered&&(h.capacityStored||h.allocationReturned||h.published||h.returned||h.owner))return false;
@@ -147,9 +155,17 @@ class OriginalWorldPhysicsIndex50LA final {
             }
             if(i<sourceModelsProduced_&&models0C_[i]!=(h.published?h.owner.get():nullptr))return false;
             if(i<sourceCapacityProduced_&&capacity04_[i]!=(h.capacityStored?static_cast<std::uint32_t>(h.requested):0u))return false;
-            for(std::uint32_t slot=0;slot<h.zeroed;++slot)if(h.owner[slot])return false;
+            for(std::uint32_t slot=expectedUsed[i];slot<h.zeroed;++slot)if(h.owner[slot])return false;
+            if(expectedUsed[i]>h.zeroed)return false;
         }
-        for(std::size_t i=0;i<sourceUsedProduced_;++i)if(used08_[i])return false;
+        for(std::size_t i=0;i<sourceUsedProduced_;++i)if(used08_[i]!=expectedUsed[i])return false;
+        return true;
+    }
+
+    bool canReleaseSourceNative()const noexcept {
+        if(!sourceCurrentNative())return false;
+        for(std::size_t i=0;i<sourceRegistrationCount_;++i)
+            if(!sourceRegistrations_[i].nativeWithdrawn)return false;
         return true;
     }
 

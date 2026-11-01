@@ -1,6 +1,7 @@
 #pragma once
 #include "ra_cold_sources50la.h"
 #include "original_world_collision_objects50la.h"
+#include "original_world_physics_index50la.h"
 #include "../../src/game/original_entity_chains50la.h"
 #include "../../src/game/original_racer_model_scene50la.h"
 #include "../../src/game/original_racer_model_packets50la.h"
@@ -210,7 +211,21 @@ private:
             std::optional<const void*> resultMembershipZone;
             std::uint32_t resultMembershipMode=0;
             std::optional<g::OriginalSourcePhysicsCollision50LA::Result> resultMembershipResult;
-            bool modelObserverEntered=false;
+            std::optional<g::OriginalWorldPhysicsIndex50LA*> manager3D4;
+            std::optional<std::int32_t> managerZone;
+            C* managerBase=nullptr;
+            bool managerCallEntered=false,managerReturned=false,managerNativeWithdrawn=false;
+            std::optional<std::uint32_t> managerRegistrationIndex,managerReturnV0,wrapperReturnV0;
+            std::uint32_t managerPC=0,wrapperReturnPC=0;
+            bool parentAttachEntered=false,parentAttachReturned=false;
+            std::optional<std::uint32_t> parentAttachZone;
+            C* parentAttachIdentity=nullptr;
+            std::optional<g::OriginalSourcePhysicsObject50LA::Result> parentAttachResult;
+            bool modelObserverEntered=false,modelObserverReturned=false;
+            bool bodyResetEntered=false,bodyResetReturned=false,updateReturned=false;
+            C* resetBodyD0=nullptr;
+            std::uint32_t resetDispatch08=0,resetTargetAC=0,updateReturnPC=0;
+            std::optional<g::OriginalSourcePhysicsBody50LA::Result> bodyResetResult;
             std::optional<const void*> modelObserverZone; //Actual BaseB4, not collisionB8.
             std::uint32_t modelObserverMode=0;
             std::optional<g::OriginalSourcePhysicsModel50LA::Result> modelObserverResult;
@@ -334,6 +349,7 @@ private:
         std::optional<std::uint32_t> nestedLoaderReturnV0;
         std::optional<std::int32_t> sourceLookupReturnV0;
         bool callbackEntered=false,nameFormatted=false,bodyCallEntered=false,bodyCallReturned=false;
+        bool secondCallback27B600Returned=false; //Actual JR/NOP; no produced V0 or descriptor disposal.
         bool bodyEnrolled=false,setupEntered=false;
         std::array<char,256> setupName{};std::size_t setupNameLength=0;
         std::optional<std::uint32_t> collisionZone,visibilityZone;
@@ -417,6 +433,11 @@ private:
     bool sourceMode_=false,sourceOuterReturned_=false,sourceFirstDescriptorReturned_=false;
     bool sourceLedgerAttempted_=false,sourceLedgerPrepared_=false,sourceFirstTransferred_=false,sourceAllDescriptorsReturned_=false;
     std::array<std::vector<std::unique_ptr<StandardWrapper>>,10> sourceWrapperLedger_;
+    //Nonowning exact source1B577C suffix custody.
+    //Every collision child must leave before Parent storage retires.
+    //Ordered non-owning source collision children, appended after Standard children.
+    //Container addresses stay stable; reverse native retirement pops only the exact tail.
+    std::array<std::vector<C*>,10> sourceCollisionTailNative_{};
     std::array<std::uint32_t,10> sourcePhysicsCounts_{}; //Actual27B8AC increments, not Entity counts.
     std::array<std::uint32_t,10> sourceZoneCounts_{}; //Native allocation admission, not guestcount30 stores.
     std::array<bool,10> sourceGroupOuterReturned_{};

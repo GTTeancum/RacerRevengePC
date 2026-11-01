@@ -7,7 +7,7 @@
 namespace ra_static_model_cold50LA {class Owner;}
 namespace ra_pod_scene50LA {class Owner;}
 namespace ra_cold_aggregate50LA {class Owner;}
-namespace rr::game {class OriginalSourcePhysicsModel50LA;class OriginalSourcePhysicsCollision50LA;}
+namespace rr::game {class OriginalSourceCollisionPath50LA;class OriginalSourcePhysicsModel50LA;class OriginalSourcePhysicsCollision50LA;}
 namespace rr::assets {
 class OriginalRaTrackSourceFile50LA;
 //Conditional source lookup only: no provider absence, nativeFileId, fopen,
@@ -18,6 +18,7 @@ class OriginalSourcePsgMissingLookup50LA final {
     friend class OriginalSourceCollisionFile50LA;
     friend class rr::game::OriginalSourcePhysicsModel50LA;
     friend class rr::game::OriginalSourcePhysicsCollision50LA;
+    friend class rr::game::OriginalSourceCollisionPath50LA; //Dedicated NULL-model callback borrower.
     friend class ::ra_static_model_cold50LA::Owner;
     friend class ::ra_pod_scene50LA::Owner;
     friend class ::ra_cold_aggregate50LA::Owner;

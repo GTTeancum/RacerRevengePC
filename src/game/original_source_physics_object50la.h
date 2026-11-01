@@ -13,10 +13,12 @@ namespace ra_cold_aggregate50LA {class Owner;}
 namespace rr::game {
 class OriginalCollisionBaseOwner50LA;
 class OriginalSourcePhysicsContact50LA;
+class OriginalWorldPhysicsIndex50LA;
 //Conditional constructor-only owner. No caller,165C30/165E90 setup, child
 //Model, prepared wreck state, source destructor dispatch or runtime readiness.
 class OriginalSourcePhysicsObject50LA final {
     friend class OriginalSourcePhysicsModel50LA;
+    friend class OriginalWorldPhysicsIndex50LA;
     friend class OriginalSourcePhysicsBody50LA;
     friend class OriginalSourcePhysicsGravity50LA;
     friend class OriginalSourcePhysicsCollision50LA;
@@ -189,6 +191,7 @@ class OriginalSourcePhysicsObject50LA final {
         }
         return parent.firstChild18==first&&parent.descendants24==descendants;
     }
+    const void* physicsIndexBorrower_=nullptr; //Exact27C290 manager receipt, no guest retain.
     const void* nestedModelBorrower_=nullptr; //Exact165C30 occurrence, includingNULL/partial publication.
     static std::uint64_t key(const C* c)noexcept {
         //Native identity only, never an original allocation address.
@@ -252,10 +255,28 @@ class OriginalSourcePhysicsObject50LA final {
         actualWrapper08=publishedIdentity_;wrapperPublished_=true;
         return at(Status::reached,0x27b420);
     }
+    //1B3C5C forms an INLINE byte address (+38), not a name-pointer load.
+    //165AF4 initialized this word to zero. Read only its first little-endian
+    //byte;308F00 terminates on that byte, so no invented string storage or
+    //nested Model14C/name substitution is needed for the empty prefix.
+    bool readSourceInlineName38FirstByteNative(const OriginalApplicationEntities50LA* actualApplication,
+        std::uint64_t actualGeneration,const C* actualWrapperBody,std::uint8_t& byte)const noexcept {
+        if(!actualApplication||application_.get()!=actualApplication||generation_!=actualGeneration||
+           !actualWrapperBody||!constructorReturned_||nativeWithdrawn_||nativeRetired_||
+           !object_||!wrapperPublished_||publishedIdentity_!=actualWrapperBody||
+           actualWrapperBody!=&object_->entity||!preflightNative())return false;
+        const auto& fields=object_->fields;
+        if((fields.known[0x38/4]&0xffu)!=0xffu)return false;
+        byte=static_cast<std::uint8_t>(fields.words[0x38/4]&0xffu);
+        return true;
+    }
     C* countedEntityNative()const noexcept {
         return object_&&baseCounted_&&!nativeRetired_?&object_->entity:nullptr;
     }
+    #include "original_source_physics_parent_attachment50la.inl"
     bool preflightNative()const noexcept {
+        if(!sourceParentAttachmentHistoryNative()||
+           (physicsIndexBorrower_&&(!parentAttachment_.returned||nativeWithdrawn_)))return false;
         if(!allocationAttempted_)return !application_&&!object_&&!baseCounted_&&!wrapperPublished_&&!nativeWithdrawn_;
         if(nativeWithdrawn_)return !object_&&!nestedModelBorrower_&&!nestedChild141960_&&!bodyChild141960_&&!gravityChild141960_&&!collisionChild141960_&&!collisionChildOuter141960_&&!contactChild141960_&&!detectorChild141960_&&!directCollisionChild141960_&&!directCollisionChildOuter141960_&&!proceduralCollisionChild141960_&&!proceduralCollisionChildOuter141960_&&!bodyBorrower_&&!gravityBorrower_&&!collisionBorrower_&&!directCollisionBorrower_&&!proceduralCollisionBorrower_&&!contactBorrower_&&!detectorBorrower_&&(!baseCounted_||nativeRetired_);
         if(!application_||!generation_||!wrapper08_||
@@ -270,8 +291,8 @@ class OriginalSourcePhysicsObject50LA final {
         }
         if(nativeRetired_||!constructorReturned_||!wrapperPublished_||publishedIdentity_!=&e||
            e.reference00!=1||e.sessionGeneration!=generation_||e.objectKey!=key(&e)||
-           e.kind!=K::physicsObject1659C0||e.previous10||e.next14||!sourceChildChainCurrentNative()||e.parent1C||
-           e.nativeFlags29||e.mask20||e.category28!=0xffu||
+           e.kind!=K::physicsObject1659C0||!sourceChildChainCurrentNative()||
+           e.nativeFlags29||e.category28!=0xffu||
            (e.flags29&0x0fu)!=3u||o.flags29Known!=0x0fu||o.dispatch08!=0x3cdf80u||
            !application_->objectCount423F60())return false;
         if(!o.waterKnown||!o.modelKnown||!o.pointer150Known||o.waterB0||
@@ -324,7 +345,7 @@ class OriginalSourcePhysicsObject50LA final {
     template<class RetireFromActualLedger>
     bool withdrawNative(RetireFromActualLedger&& retire)noexcept {
         if(!allocationAttempted_||nativeWithdrawn_)return true;
-        if(nestedModelBorrower_||bodyBorrower_||gravityBorrower_||collisionBorrower_||directCollisionBorrower_||proceduralCollisionBorrower_||contactBorrower_||detectorBorrower_||!preflightNative())return false;
+        if(physicsIndexBorrower_||(parentAttachment_.attached&&!parentAttachment_.nativeDetached)||nestedModelBorrower_||bodyBorrower_||gravityBorrower_||collisionBorrower_||directCollisionBorrower_||proceduralCollisionBorrower_||contactBorrower_||detectorBorrower_||!preflightNative())return false;
         if(baseCounted_&&!nativeRetired_){
             //Exact root retires ledger/authority membership before count/free.
             //Refusal leaves source custody intact and allows a later retry.

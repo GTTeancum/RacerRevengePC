@@ -3,6 +3,7 @@
 #include "original_racer_model_scene50la.h"
 #include "original_racer_model_packets50la.h"
 #include "original_source_collision_observer50la.h"
+#include "original_source_portal_overlap231150.h"
 #include <array>
 #include <memory>
 #include <new>

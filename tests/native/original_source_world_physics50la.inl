@@ -9,11 +9,12 @@ inline bool Owner::preflightSourceWorldPhysicsNative()const noexcept {
         *sourcePhysics3D4_==worldPhysics3D4_.get()&&worldPhysics3D4_->sourceWorld_==&worldEntity_&&
         !livePhysicsIndexAttempted_&&!livePhysicsIndexComplete_&&
         !runtimeCameraBorrows_&&!runtimeWorldBorrows_&&!constructorRacerWorldBorrows_&&
-        worldPhysics3D4_->canRelease27C030();
+        worldPhysics3D4_->sourceCurrentNative();
 }
 inline bool Owner::abortSourceWorldPhysicsNative(std::uint32_t& pc)noexcept {
     pc=0;if(!preflightSourceWorldPhysicsNative())return false;
     if(sourcePhysicsPhase_==SourcePhysicsPhase::unreached)return true;
+    if(worldPhysics3D4_&&!worldPhysics3D4_->canRelease27C030())return false;
     sourcePhysics3D4_.reset(); //Withdraw outer pointer knowledge BEFORE backing.
     //Exact same-thread preflight covers every release refusal; no intervening
     //callback or source mutation. Existing release owns actual acquired arrays.

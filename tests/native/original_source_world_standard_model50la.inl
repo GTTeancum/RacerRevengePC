@@ -255,6 +255,10 @@ bool Owner::preflightSourceStandardModelsNative(std::size_t& count)const noexcep
 bool Owner::retireSourceStandardModelsNative(std::uint32_t& pc)noexcept {
     std::size_t count=0;if(!preflightSourceStandardModelsNative(count))return false;
     if(!sourceStaticOwner_)return true;
+    //Native lifetime guard: source emitters74 must leave before ANY model
+    //detach, packet withdrawal, observer release or Entity retirement.
+    for(const auto& row:sourceStaticOwner_->sourceWrapperLedger_)for(const auto& w:row)
+        if(w&&w->sourceModel&&w->sourceModel->scene.sourceParticleEmitterBorrowers_)return false;
     //Retire exact staged nested Model borrowers before their PhysicsObject base.
     //Withdraw counted membership before uncounted wrapper/descriptor storage.
     for(auto& row:sourceStaticOwner_->sourceWrapperLedger_)for(auto& w:row)if(w&&w->sourcePhysics.bodyOwner){
@@ -262,6 +266,19 @@ bool Owner::retireSourceStandardModelsNative(std::uint32_t& pc)noexcept {
         const auto detachComponent=[&](g::OriginalWreckComponent50LA& entity,std::uint32_t lock)noexcept {
             return worldApplication_->entityAuthority_.detach(entity,lock);
         };
+        //Withdraw the newest manager membership before BASE detach or subtree retirement.
+        auto& config=h.configure166400;
+        if(config.managerCallEntered&&!config.managerNativeWithdrawn){
+            if(config.managerRegistrationIndex){
+                if(!config.manager3D4||!*config.manager3D4||!worldPhysics3D4_||
+                   *config.manager3D4!=worldPhysics3D4_.get()||
+                   !worldPhysics3D4_->withdrawSourceRegistrationNative(*config.managerRegistrationIndex,&config,*h.bodyOwner))return false;
+            }
+            config.managerNativeWithdrawn=true;
+        }
+        //The newest BASE-to-World-parent link must leave before its subtree.
+        //This preserves parent descendant masks while dependent children retire.
+        if(!h.bodyOwner->detachSourcePhysicsParentNative(detachComponent))return false;
         //Break all directed local-list cycles before ANY target detach/retirement.
         //Incoming pins do not block this outgoing-only phase; each retry preserves history.
         if(h.sourceCollisionE0&&!h.sourceCollisionE0->withdrawSourceLocalFiltersNative())return false;

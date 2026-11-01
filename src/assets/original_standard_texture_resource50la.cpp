@@ -2,6 +2,7 @@
 #include "original_source_psg_file50la.h"
 #include "original_source_collision_file50la.h"
 #include "original_particle_source_config50la.h"
+#include "original_source_sky_file50la.h"
 #include "original_pod_source_bank50la.h"
 #include "original_ra_track_source_file50la.h"
 #include "original_standard_texture_resource50la.h"
@@ -550,6 +551,7 @@ bool OriginalStandardTextureResolver50LA::restoreScratch132BD0(D& d)noexcept {
 // Native pointers/layout, not guest rows or a second canonical file namespace.
 // All fields below are private: no mount/lookup can turn capacity into a handle.
 struct OriginalStandardTextureResolver50LA::FreshFileCapacity {
+    const OriginalSourceSkyFile50LA* sourceSkyFileBorrower=nullptr; //Distinct native sky occurrence pin.
     const OriginalParticleSourceConfig50LA* particleConfigBorrower=nullptr; //Native lifetime, not guest state.
     // The actual fresh domain provider, retained before its first native mount.
     // Merely retaining this provider does not establish source history.
@@ -3466,8 +3468,14 @@ bool OriginalStandardTextureLifetime50LA::resetDemand14D180() noexcept {
     // No public/current caller exists. Do not invalidate a retained partial
     // warning callback if the future254AD0 owner attempts a new frame reset.
     if(nativeWarningDemandOwner_||nativeWarningDemandEpoch_)return false;
-    for(cursor08_=head00_;cursor08_;cursor08_=cursor08_->nextA0_)
-        cursor08_->resource_->resetDemand14D1A8();
+    //Preflight source alternatives before any demand mutation. They occupy
+    //the SAME source list; never reinterpret them as a prepared resource.
+    for(auto* node=head00_;node;node=node->nextA0_)
+        if(node->sourceResource_&&(!node->sourceResource_->registered_||!node->sourceResource_->topologyCurrentNative()||!node->sourceResource_->storage_))return false;
+    for(cursor08_=head00_;cursor08_;cursor08_=cursor08_->nextA0_){
+        if(cursor08_->resource_)cursor08_->resource_->resetDemand14D1A8();
+        else if(!cursor08_->sourceResource_||!cursor08_->sourceResource_->resetDemand14D1A8())return false;
+    }
     return true;
 }
 bool OriginalStandardTextureResolver50LA::registerSourceBank12CEA0(
@@ -3812,8 +3820,12 @@ bool OriginalStandardTextureResolver50LA::sourceBankMemberCurrent(const void* ro
 }
 bool OriginalStandardTextureResolver50LA::readSourceBankMember130560(const void* root,const void* occurrence,std::int32_t handle,
     void* output,std::size_t requested,std::size_t& copied,bool advance,D& d)noexcept {
-    d={};copied=0;if(!sourceBankMemberCurrent(root,occurrence,handle)||(!output&&requested))return fail(d,E::phase,0x12FB30);
+    d={};copied=0;if(!sourceBankMemberCurrent(root,occurrence,handle))return fail(d,E::phase,0x12FB30);
     auto& s=*freshFileCapacity_;auto& member=s.members150[handle];const auto amount=std::min<std::size_t>(requested,member.length14-member.cursor10);
+    //12FEAC..12FEE0 returns0 without touching destination when actual amount
+    //is0 (zero request or EOF), even forNULL. Positive copying still requires
+    //a genuine native destination; never fake a NULL allocation as readsuccess.
+    if(!output&&amount)return fail(d,E::unsupported,0x12FEF8);
     if(!activateCourseDevice12E8B0(member.deviceID00,member.logicalStart0C+member.cursor10,d))return false;
     auto& device=s.devices14[member.deviceID00];
     if(member.auxiliarySlot04<0)return fail(d,E::unsupported,0x130560); // Actual temporary-scratch allocation branch not joined.
@@ -3906,7 +3918,7 @@ bool OriginalStandardTextureResolver50LA::closeSourceBankMember131040(const void
 }
 bool OriginalStandardTextureResolver50LA::retireSourceBankNative(const void* root,D& d)noexcept {
     d={};if(!freshFileCapacity_||!root)return fail(d,E::phase,0);
-    auto& s=*freshFileCapacity_;if(s.particleConfigBorrower)return fail(d,E::phase,0);if(s.courseStage==FreshFileCapacity::CourseStage::none&&!s.courseRootOwner)return true;
+    auto& s=*freshFileCapacity_;if(s.particleConfigBorrower||s.sourceSkyFileBorrower)return fail(d,E::phase,0);if(s.courseStage==FreshFileCapacity::CourseStage::none&&!s.courseRootOwner)return true;
     if(s.courseRootOwner!=root)return fail(d,E::phase,0);
     if(s.courseStage==FreshFileCapacity::CourseStage::retired)return true;
     if(s.courseNativeBorrowers!=1)return fail(d,E::phase,0);
@@ -4295,4 +4307,5 @@ bool OriginalStandardTextureResolver50LA::registerLoadingIconBank12CEA0(std::sha
 #include "original_source_collision_file50la.inl"
 #include "original_pod_source_bank50la.inl"
 #include "original_particle_source_config50la.inl"
+#include "original_source_sky_file50la.inl"
 }

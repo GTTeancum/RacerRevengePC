@@ -568,6 +568,7 @@ class OriginalRacerModelSceneOwner50LA final {
     const void* sourcePacketBorrower_=nullptr; //Exact source packet occurrence, including unpublished/NULL1F0.
     const void* sourceObserverBorrower_=nullptr;
     const void* sourcePhysicsBodyBorrower_=nullptr; //Raw same-model source288 borrow.
+    std::size_t sourceParticleEmitterBorrowers_=0; //Actual source emitter74 leases, separate from guest Entity refs.
     const void* sourceSmokerBorrower_=nullptr; //Actual nullable source model40 borrower; not a guest field.
     // Actual source28B550(Model,NULL,stack), root-only copy route. Entity
     // attachment is distinct from SceneObject.parent180 and is not rejected.
@@ -1379,7 +1380,7 @@ private:
     // path; never rewrite ancestors into a single-generation model domain.
     template<class ActualAuthorityView>
     R preflightModelReference142590InAuthority(const ActualAuthorityView& actual)const noexcept {
-        if(sourcePhysicsBodyBorrower_||sourcePacketBorrower_||sourceWarmLifetimeBorrowedNative())return {S::phase,0x142590u};
+        if(sourceParticleEmitterBorrowers_||sourcePhysicsBodyBorrower_||sourcePacketBorrower_||sourceWarmLifetimeBorrowedNative())return {S::phase,0x142590u};
         if(!model_.constructed||referenceReleased_||released_)return {S::phase,0x142590u};
         if(*binding_.actualAttachmentLock423F58)return {S::attachmentLocked,0x1425a8u};
         const auto& c=model_.entity8;
@@ -1397,7 +1398,7 @@ private:
     // Only the scope calls immediately after actual authority preflight and
     // enrollment retirement in the same serial operation. No public token.
     R releasePreflightedModelReference142590()noexcept {
-        if(sourcePhysicsBodyBorrower_||sourcePacketBorrower_||sourceWarmLifetimeBorrowedNative())return {S::phase,0x142590u};
+        if(sourceParticleEmitterBorrowers_||sourcePhysicsBodyBorrower_||sourcePacketBorrower_||sourceWarmLifetimeBorrowedNative())return {S::phase,0x142590u};
         if(!model_.constructed||referenceReleased_||released_||
            *binding_.actualAttachmentLock423F58||model_.entity8.reference00!=1u)
             return {S::phase,0x142590u};
@@ -1415,7 +1416,7 @@ public:
         const OriginalRacerModelSceneOwner50LA* thirdSibling=nullptr,
         const OriginalRacerModelSceneOwner50LA* fourthSibling=nullptr)const noexcept {
         using namespace original_wreck_component_detail50LA;
-        if(sourcePhysicsBodyBorrower_||sourcePacketBorrower_||sourceWarmLifetimeBorrowedNative())return {S::phase,0x142590u};
+        if(sourceParticleEmitterBorrowers_||sourcePhysicsBodyBorrower_||sourcePacketBorrower_||sourceWarmLifetimeBorrowedNative())return {S::phase,0x142590u};
         if(!model_.constructed||referenceReleased_||released_)return {S::phase,0x142590u};
         if(*binding_.actualAttachmentLock423F58)return {S::attachmentLocked,0x1425a8u};
         std::array<C*,maxOriginalWreckComponents50LA> list{};
@@ -1455,7 +1456,7 @@ public:
     }
 
     R freeSourceRowTable26E5CC()noexcept {
-        if(sourcePhysicsBodyBorrower_||sourcePacketBorrower_||sourceWarmLifetimeBorrowedNative())return {S::phase,0x142590u};
+        if(sourceParticleEmitterBorrowers_||sourcePhysicsBodyBorrower_||sourcePacketBorrower_||sourceWarmLifetimeBorrowedNative())return {S::phase,0x142590u};
         if(sourceRowTable_.attempted&&!sourceRowTable_.nativeWithdrawn)return {S::phase,0x26e5ccu};
         if(!referenceReleased_||released_||rowTableFreed_)return {S::phase,0x26e5ccu};
         rowTable_.reset();rowTableFreed_=true;
@@ -1467,7 +1468,7 @@ public:
     // Only2896D0, after upstream240450 packets and26E460 material/resource
     // release and array frees. This method never claims those owners ran.
     R releaseSceneBase2896D0(const SceneGraph49P& graph)noexcept {
-        if(sourcePhysicsBodyBorrower_||sourcePacketBorrower_||sourceWarmLifetimeBorrowedNative())return {S::phase,0x142590u};
+        if(sourceParticleEmitterBorrowers_||sourcePhysicsBodyBorrower_||sourcePacketBorrower_||sourceWarmLifetimeBorrowedNative())return {S::phase,0x142590u};
         if(sourceRowTable_.attempted&&!sourceRowTable_.nativeWithdrawn)return {S::phase,0x26e5ccu};
         if(released_)return {S::complete,0x2897acu};
         if(!referenceReleased_)return {S::phase,0x2896d0u};
@@ -1528,7 +1529,7 @@ private:
     // disposal,26E5CC row-table free and26E5EC material-array free. Native
     // backing owners enforce those payload phases; stale source aliases remain.
     R releaseNativePartialSceneBase2896D0(const SceneGraph49P& graph)noexcept {
-        if(sourcePhysicsBodyBorrower_||sourcePacketBorrower_||sourceWarmLifetimeBorrowedNative())return {S::phase,0x142590u};
+        if(sourceParticleEmitterBorrowers_||sourcePhysicsBodyBorrower_||sourcePacketBorrower_||sourceWarmLifetimeBorrowedNative())return {S::phase,0x142590u};
         if(sourceRowTable_.attempted&&!sourceRowTable_.nativeWithdrawn)return {S::phase,0x26e5ccu};
         if(!referenceReleased_||rowTable_||!rowTableFreed_)return {S::phase,0x2896d0u};
         const auto admitted=preflightNativePartialScene2896D0(graph);
@@ -1545,7 +1546,7 @@ private:
     }
 
     R preflightFreshUnlinkedNative(const SceneGraph49P& graph)const noexcept {
-        if(sourcePhysicsBodyBorrower_||sourcePacketBorrower_||sourceWarmLifetimeBorrowedNative())return {S::phase,0x142590u};
+        if(sourceParticleEmitterBorrowers_||sourcePhysicsBodyBorrower_||sourcePacketBorrower_||sourceWarmLifetimeBorrowedNative())return {S::phase,0x142590u};
         if(sourceRowTable_.attempted&&!sourceRowTable_.nativeWithdrawn)return {S::phase,0x26e5ccu};
         if(released_||!model_.constructed)return {S::complete,0};
         const auto& c=model_.entity8;

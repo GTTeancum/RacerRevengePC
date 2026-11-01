@@ -17,6 +17,9 @@
            !w.sourceTypeKnown||w.type00!=2||w.sourceModel||w.model8||w.descriptor10||w.smoker0C||
            w.sourceModelCallbackEntered||w.sourceCallbackReturnV0||w.sourceDescriptorDisposed)return false;
         if(h.callbackEntered&&(!h.countedInParent||!h.descriptorReadReturned))return false;
+        if(h.secondCallback27B600Returned&&(!h.callbackEntered||
+           !h.configure166400.wrapperReturnV0||*h.configure166400.wrapperReturnV0!=1u||
+           h.configure166400.wrapperReturnPC!=0x27b5f8u||!h.configure166400.managerReturned))return false;
         if(h.nameFormatted&&(!h.callbackEntered||h.setupNameLength>h.setupName.size()-5||
            std::memcmp(h.setupName.data()+h.setupNameLength,".slt",5)))return false;
         if(h.bodyCallEntered&&!h.nameFormatted)return false;
@@ -482,6 +485,7 @@
         if(h.sourceCollisionE4&&h.sourceCollisionE4->membershipRegistration_.entered&&!config.directMembershipEntered)return false;
         if(h.sourceCollisionE0&&h.sourceCollisionE0->membershipRegistration_.entered&&!config.resultMembershipEntered)return false;
         if(h.nestedModel&&h.nestedModel->modelObserver_.entered&&!config.modelObserverEntered)return false;
+        if(h.sourceBodyD0&&h.sourceBodyD0->bodyReset_.entered&&!config.bodyResetEntered)return false;
         if(config.entered){
             if(!h.sourceSetupPositive27B470||!h.sourceSetup165C30Returned||!h.descriptor0C||
                config.descriptor!=h.descriptor0C.get()||config.receiver!=h.sourceSetupReturnedBase||
@@ -740,9 +744,75 @@
             if(config.modelObserverResult){const auto& result=*config.modelObserverResult;
                 if(!config.modelObserverEntered)return false;
                 if(modelObserver.entered){
-                    if(result.sourcePC!=modelObserver.pc||result.status!=g::OriginalSourcePhysicsModel50LA::Status::bounded)return false;
+                    if(result.sourcePC!=modelObserver.pc||result.status!=(modelObserver.returned?
+                        g::OriginalSourcePhysicsModel50LA::Status::reached:g::OriginalSourcePhysicsModel50LA::Status::bounded))return false;
                 }else if(result.sourcePC!=0x28e8a0u||result.status!=g::OriginalSourcePhysicsModel50LA::Status::owner)return false;
             }
+            if(config.modelObserverReturned!=modelObserver.returned||
+               (config.modelObserverReturned&&(!config.modelObserverResult||
+                config.modelObserverResult->status!=g::OriginalSourcePhysicsModel50LA::Status::reached||
+                config.modelObserverResult->sourcePC!=0x28ea14u)))return false;
+            if(config.resetBodyD0){
+                if(!config.modelObserverReturned||!h.sourceBodyD0||config.resetBodyD0!=h.sourceBodyD0->publishedIdentity_)return false;
+                if(h.bodyOwner->object_&&h.bodyOwner->object_->bodyD0!=
+                   std::optional<C*>(h.sourceBodyD0->nativeWithdrawn_?nullptr:config.resetBodyD0))return false;
+            }else if(config.resetDispatch08||config.resetTargetAC||config.bodyResetEntered)return false;
+            if(config.resetDispatch08&&config.resetDispatch08!=0x3ce000u)return false;
+            if(config.resetTargetAC&&(config.resetDispatch08!=0x3ce000u||config.resetTargetAC!=0x167a50u))return false;
+            if(config.bodyResetEntered&&(!config.modelObserverReturned||config.resetTargetAC!=0x167a50u))return false;
+            if(config.bodyResetResult){
+                if(!config.bodyResetEntered||!h.sourceBodyD0)return false;
+                const auto& reset=h.sourceBodyD0->bodyReset_;const auto& result=*config.bodyResetResult;
+                if(reset.entered){
+                    if(reset.updateOccurrence!=&config||reset.bodyIdentity!=config.resetBodyD0||
+                       result.status!=g::OriginalSourcePhysicsBody50LA::Status::reached||result.sourcePC!=0x167b7cu||
+                       !reset.returned||!config.bodyResetReturned||!h.sourceBodyD0->bodyResetHistoryNative())return false;
+                }else if(config.bodyResetReturned||result.status!=g::OriginalSourcePhysicsBody50LA::Status::owner||
+                         result.sourcePC!=0x167a50u)return false;
+            }else if(config.bodyResetReturned)return false;
+            if(config.updateReturned!=config.bodyResetReturned||
+               (config.updateReturned?config.updateReturnPC!=0x16677cu:config.updateReturnPC!=0u))return false;
+            const auto& parentAttachment=h.bodyOwner->parentAttachment_;
+            if(config.parentAttachZone&&(!config.updateReturned||*config.parentAttachZone>=10))return false;
+            if(config.parentAttachIdentity&&(!config.parentAttachZone||!config.updateReturned))return false;
+            if(config.parentAttachEntered&&(!config.parentAttachIdentity||!config.parentAttachZone))return false;
+            if(parentAttachment.entered&&(!config.parentAttachEntered||parentAttachment.updateOccurrence!=&config||
+               !config.parentAttachZone||parentAttachment.zone!=*config.parentAttachZone||
+               parentAttachment.parent!=config.parentAttachIdentity))return false;
+            if(config.parentAttachResult){const auto& result=*config.parentAttachResult;
+                if(!config.parentAttachEntered)return false;
+                if(parentAttachment.entered){
+                    if(result.sourcePC!=parentAttachment.pc||result.status!=(parentAttachment.returned?
+                        g::OriginalSourcePhysicsObject50LA::Status::reached:g::OriginalSourcePhysicsObject50LA::Status::bounded))return false;
+                }else if(result.sourcePC!=0x27b5c8u||result.status!=g::OriginalSourcePhysicsObject50LA::Status::owner)return false;
+            }
+            if(config.parentAttachReturned!=parentAttachment.returned||
+               (config.parentAttachReturned&&(!config.parentAttachResult||config.parentAttachResult->sourcePC!=0x27b5d0u)))return false;
+            if(config.manager3D4&&!config.parentAttachReturned)return false;
+            if(config.managerZone&&!config.manager3D4)return false;
+            if(config.managerBase&&(!config.managerZone||config.managerBase!=h.bodyOwner->publishedIdentity_))return false;
+            if(config.managerCallEntered&&(!config.manager3D4||!*config.manager3D4||
+               !config.managerZone||!config.managerBase||!config.managerPC))return false;
+            if(config.managerRegistrationIndex){
+                if(!config.managerCallEntered)return false;
+                if(!config.managerNativeWithdrawn){
+                    const auto& manager=**config.manager3D4;
+                    if(*config.managerRegistrationIndex>=manager.sourceRegistrationCount_||!manager.sourceCurrentNative())return false;
+                    const auto& registration=manager.sourceRegistrations_[*config.managerRegistrationIndex];
+                    if(registration.occurrence!=&config||registration.owner!=h.bodyOwner.get()||
+                       registration.member!=config.managerBase||registration.zone!=*config.managerZone||
+                       registration.pc!=config.managerPC||registration.returned!=config.managerReturned||
+                       registration.nativeWithdrawn||
+                       (config.managerReturnV0&&registration.returnV0!=*config.managerReturnV0))return false;
+                }
+            }else if(config.managerReturned||config.managerReturnV0||
+                     (config.managerCallEntered&&config.managerPC!=0x27c290u))return false;
+            if(config.managerReturned!=bool(config.managerReturnV0)||
+               (config.managerReturnV0&&(*config.managerReturnV0>1u||config.managerPC!=0x27c32cu))||
+               (config.managerNativeWithdrawn&&(!config.managerCallEntered||h.bodyOwner->physicsIndexBorrower_)))return false;
+            if(config.wrapperReturnV0){
+                if(*config.wrapperReturnV0!=1u||!config.managerReturned||config.wrapperReturnPC!=0x27b5f8u)return false;
+            }else if(config.wrapperReturnPC)return false;
             for(unsigned i=0;i<16;++i){
                 if(config.scratchA0[i])return false;
                 const auto expected=inertia&&inertia->zeroCopyMask==15?inertia->workingAfter[i]:0u;
@@ -766,6 +836,12 @@
             config.resultMembershipEntered||config.resultMembershipReturned||config.resultMembershipResult||
             config.resultMembershipZone||config.resultMembershipMode||
             config.modelObserverEntered||config.modelObserverResult||config.modelObserverZone||config.modelObserverMode||
+            config.manager3D4||config.managerZone||config.managerBase||config.managerCallEntered||config.managerReturned||
+            config.managerNativeWithdrawn||config.managerRegistrationIndex||config.managerReturnV0||config.wrapperReturnV0||
+            config.managerPC||config.wrapperReturnPC||
+            config.parentAttachEntered||config.parentAttachReturned||config.parentAttachZone||config.parentAttachIdentity||config.parentAttachResult||
+            config.modelObserverReturned||config.bodyResetEntered||config.bodyResetReturned||config.updateReturned||
+            config.resetBodyD0||config.resetDispatch08||config.resetTargetAC||config.updateReturnPC||config.bodyResetResult||
             config.descriptor||config.receiver||config.nestedOwner||config.model14C||config.dispatch08||config.target74||config.pc||
             config.callerStackKnown||config.argumentFpuKnown||config.calleeFpuKnown||config.savedOldFpuStores||config.savedOldFpuKnown||
             config.centerKnown||config.halfKnown||config.scratchKnown||config.workingKnown)return false;
@@ -1049,20 +1125,35 @@
     bool preflightSourceModelParentLinksNative()const noexcept {
         for(std::size_t z=0;z<parents_.size();++z)if(const auto& parent=parents_[z]){
             const C* previous=nullptr;const C* first=nullptr;std::uint32_t descendants=0;
-            for(const auto& w:sourceWrapperLedger_[z])if(w&&w->sourceModel){
-                const auto& f=*w->sourceModel;
-                if(!f.parentAttached||f.parentDetachedNative||f.nativeRetired)continue;
-                const auto& e=f.scene.model_.entity8;const auto& s=f.sourceSmoker;
-                const C* expected=s.outerAttached_&&!s.outerDetachedNative_&&!s.nativeWithdrawn_?
-                    (s.smoker_?&s.smoker_->entity:nullptr):nullptr;
-                if(!s.preflightNative())return false;
-                if(!f.parentAttachReturned||!f.parentAttachLock||*f.parentAttachLock||
-                   f.parentAttachZone!=z||f.parentAttachBorrow!=&parent->entity||
-                   e.parent1C!=&parent->entity||e.previous10!=previous||e.mask20||
-                   e.descendants24!=(expected?0xffffffffu:0u)||e.firstChild18!=expected)return false;
-                descendants|=e.mask20|e.descendants24;
-                if(previous&&previous->next14!=&e)return false;
-                if(!first)first=&e;previous=&e;
+            const auto append=[&](const C& e)noexcept {
+                if(e.parent1C!=&parent->entity||e.previous10!=previous||
+                   (previous&&previous->next14!=&e))return false;
+                descendants|=e.mask20|e.descendants24;if(!first)first=&e;previous=&e;return true;
+            };
+            for(const auto& w:sourceWrapperLedger_[z])if(w){
+                if(w->sourceModel){const auto& f=*w->sourceModel;
+                    if(!f.parentAttached||f.parentDetachedNative||f.nativeRetired)continue;
+                    const auto& e=f.scene.model_.entity8;const auto& smoker=f.sourceSmoker;
+                    const C* expected=smoker.outerAttached_&&!smoker.outerDetachedNative_&&!smoker.nativeWithdrawn_?
+                        (smoker.smoker_?&smoker.smoker_->entity:nullptr):nullptr;
+                    if(!smoker.preflightNative()||!f.parentAttachReturned||!f.parentAttachLock||*f.parentAttachLock||
+                       f.parentAttachZone!=z||f.parentAttachBorrow!=&parent->entity||e.mask20||
+                       e.descendants24!=(expected?0xffffffffu:0u)||e.firstChild18!=expected||!append(e))return false;
+                }else if(w->sourcePhysics.bodyOwner){const auto& owner=*w->sourcePhysics.bodyOwner;
+                    const auto& h=owner.parentAttachment_;
+                    if(!owner.sourceParentAttachmentHistoryNative())return false;
+                    if(!h.attached||h.nativeDetached||owner.nativeWithdrawn_)continue;
+                    const auto& config=w->sourcePhysics.configure166400;
+                    if(!owner.object_||!h.returned||h.zone!=z||h.parentOwnerIdentity!=parent.get()||
+                       h.parent!=&parent->entity||h.updateOccurrence!=&config||!config.updateReturned||
+                       config.updateReturnPC!=0x16677cu||!config.parentAttachReturned||
+                       !owner.sourceChildChainCurrentNative()||owner.object_->entity.mask20!=2u||
+                       !append(owner.object_->entity))return false;
+                }
+            }
+            for(const auto* e:sourceCollisionTailNative_[z]){
+                if(!e||e->kind!=K::collision11B190||e->sessionGeneration!=generation_||e->reference00!=1||
+                   e->mask20||e->descendants24||e->firstChild18||!append(*e))return false;
             }
             if(parent->entity.firstChild18!=first||(previous&&previous->next14)||parent->entity.descendants24!=descendants)return false;
         }
@@ -1122,6 +1213,7 @@
     bool closeSourceNative()noexcept {
         if(!canCloseSourceNative()||sourceWorld3C4Borrower_)return false;
         if(closed_)return true;
+        for(const auto& row:sourceCollisionTailNative_)if(!row.empty())return false;
         //Counted source model owners must already be retired by their actual
         //World authority, before wrapper8/descriptor/parent storage can die.
         for(const auto& row:sourceWrapperLedger_)for(const auto& w:row)

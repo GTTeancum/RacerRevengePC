@@ -70,6 +70,7 @@ Type2ResourceStatus49X prepareStaticTargetRadii49X(const assets::CollisionMesh48
 // Outputs remain unchanged on refusal; caller owns input knownness and PCs.
 class SourceCollisionPayloadMath50LA final {
     friend class OriginalWreckType0Owners50LA;
+    friend class OriginalSourceCollisionPath50LA; //Only bounded numeric leaves, not a model owner.
     static bool radius1261B0(const std::array<std::uint32_t,3>&,std::uint32_t&)noexcept;
     static bool faceLane126320(std::uint32_t,std::uint16_t&)noexcept;
 };

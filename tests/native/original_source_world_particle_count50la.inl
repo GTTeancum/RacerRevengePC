@@ -18,18 +18,43 @@ bool Owner::constructSourceParticleList27DC90(Entity& e,bool& counted,bool& enro
     if(r.status!=g::OriginalWreckComponentStatus50LA::complete)return false;
     pc=0x27dca4;if(!authority.enroll(e))return false;enrolled=true;return true;
 }
-bool Owner::preflightSourceParticleListCountNative(const Entity& e,bool counted,bool enrolled)const noexcept {
-    if(!worldApplication_||worldApplication_->attachmentLock423F58())return false;
+//Same Entity141300 base, but a distinct actual15A5B0 caller receipt.
+bool Owner::constructSourceEmitterEntity15A5B0(Entity& e,bool& counted,bool& enrolled,std::uint32_t& pc)noexcept {
+    pc=0x15a5b0;if(!worldApplication_||counted||enrolled||!reserveSourceParticleListNative())return false;
+    auto& authority=worldApplication_->entityAuthority_;
+    if(!authority.canEnroll(e,key(&e)))return false;
+    pc=0x141300;
+    const auto result=g::initializeOriginalWreckComponent50LA(e,g::OriginalWreckComponentKind50LA::entity141300,
+        worldEntity_.sessionGeneration,key(&e),true,worldApplication_->objectCount423F60());
+    counted=e.reference00!=0;
+    if(result.status!=g::OriginalWreckComponentStatus50LA::complete)return false;
+    if(!authority.enroll(e))return false;enrolled=true;return true;
+}
+//Identity/count authority only. Concrete list/emitter callers retain exact
+//topology/activity checks; the original detached-list helper stays strict.
+bool Owner::preflightSourceParticleEntityIdentityNative(const Entity& e,bool counted,bool enrolled,std::uint8_t flags)const noexcept {
+    if(!worldApplication_||worldApplication_->attachmentLock423F58()||(flags!=0&&flags!=3))return false;
     const auto& a=worldApplication_->entityAuthority_;
     if(counted){
         if(e.reference00!=1||e.kind!=g::OriginalWreckComponentKind50LA::entity141300||e.objectKey!=key(&e)||
-           e.sessionGeneration!=worldEntity_.sessionGeneration||e.category28!=0xff||(e.flags29&15u)!=3u||
-           e.nativeFlags29||e.parent1C||e.firstChild18||e.previous10||e.next14||e.mask20||e.descendants24||
-           !worldApplication_->objectCount423F60())return false;
+           e.sessionGeneration!=worldEntity_.sessionGeneration||e.category28!=0xff||(e.flags29&15u)!=flags||
+           e.nativeFlags29||!worldApplication_->objectCount423F60())return false;
     }else if(e.reference00)return false;
     if(enrolled)return counted&&a.canRetire(e);
     for(std::size_t i=0;i<a.count_;++i)if(a.entries_[i].node==&e)return false;
     return true;
+}
+bool Owner::preflightSourceParticleListCountNative(const Entity& e,bool counted,bool enrolled)const noexcept {
+    return preflightSourceParticleEntityIdentityNative(e,counted,enrolled,3)&&
+        !e.parent1C&&!e.firstChild18&&!e.previous10&&!e.next14&&!e.mask20&&!e.descendants24;
+}
+bool Owner::releaseSourceParticleEmitterCountNative(Entity& e,bool& counted,bool& enrolled,
+                                                   std::uint8_t flags,std::uint32_t mask)noexcept {
+    if((mask!=0&&mask!=0x402)||!preflightSourceParticleEntityIdentityNative(e,counted,enrolled,flags)||
+       e.parent1C||e.firstChild18||e.previous10||e.next14||e.mask20!=mask||e.descendants24)return false;
+    if(enrolled){if(!worldApplication_->entityAuthority_.retire(e))return false;enrolled=false;}
+    if(counted){--e.reference00;--worldApplication_->objectCount423F60();counted=false;}
+    return true; //Native retirement of exact counted owner, not a guest destructor.
 }
 bool Owner::releaseSourceParticleListCountNative(Entity& e,bool& counted,bool& enrolled)noexcept {
     if(!preflightSourceParticleListCountNative(e,counted,enrolled))return false;

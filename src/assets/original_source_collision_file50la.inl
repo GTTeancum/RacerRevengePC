@@ -61,16 +61,24 @@ bool OriginalStandardTextureResolver50LA::sourceCollisionFileCurrentNative(
        (p.returnedCold_&&(!p.sourceHandle148_||*p.sourceHandle148_!=p.row_||
         !p.sourceCache150_||*p.sourceCache150_||p.warmObserved_)))return false;
     if(p.associationAttempted_){
-        if(!p.associatedResource_||!p.resourceOwner_||p.warmObserved_||!p.returnedCold_||
+        if(p.warmObserved_||!p.returnedCold_||
            p.associationGuards_>3u||
            (p.associationStored_&&(p.associationGuards_!=3u||p.associationReturnV0_!=1))||
            (p.associationReturned_&&!p.associationStored_))return false;
+        if(p.callbackResource_){
+            if(p.associatedResource_||p.resourceOwner_||p.payloadBorrower_)return false;
+            //Token stays owned until file/search withdrawal completes. No cast
+            //to Physics owner and no dereference of historical resource bytes.
+            const auto& c=*p.callbackResource_;
+            if(!c.resource||c.owner!=p.collisionOwner_||
+               c.borrower!=(p.associationWithdrawn_?nullptr:&p))return false;
+        }else if(!p.associatedResource_||!p.resourceOwner_)return false;
         //History after withdrawal must not dereference a subsequently freed resource.
-        if(!p.associationWithdrawn_&&
+        if(!p.callbackResource_&&!p.associationWithdrawn_&&
            (p.payloadBorrower_!=p.resourceOwner_||
             p.associatedResource_->sourceAssociationBorrower_!=&p||
             !p.associatedResource_->sourceAssociationReady1326A0(&p,p.resourceOwner_)))return false;
-    }else if(p.associatedResource_||p.resourceOwner_||p.associationStored_||p.associationReturned_||
+    }else if(p.callbackResource_||p.associatedResource_||p.resourceOwner_||p.associationStored_||p.associationReturned_||
              p.associationWithdrawn_||p.associationGuards_||p.associationReturnV0_)return false;
     if(active&&(p.associationWithdrawn_||p.sourceCloseAttempted_))return false;
     if(p.nativeClosed_)return !active&&p.handle_==-1&&!q.collisionFileBorrower_&&!p.payloadBorrower_&&
@@ -84,10 +92,12 @@ bool OriginalStandardTextureResolver50LA::sourceCollisionFileCurrentNative(
     if(row.originalMember!=p.expected_.identity||row.filename08!=q.foundFilenameIdentity_||
        row.length14!=p.expected_.size||!row.canonicalData||std::memcmp(row.canonicalData,p.expected_.data,p.expected_.size)||row.deviceID00!=t.device)return false;
     if(!p.warmObserved_){
-        const void* expected=p.associationStored_&&!p.associationWithdrawn_?p.associatedResource_:nullptr;
+        const void* expected=p.associationStored_&&!p.associationWithdrawn_?
+            (p.callbackResource_?p.callbackResource_->resource:static_cast<const void*>(p.associatedResource_)):nullptr;
         if(row.associatedObject1C!=expected)return false;
     }
-    if(p.sourceCloseReturned_)return !active&&p.sourceCloseAttempted_&&p.sourceCloseResult_==1&&p.handle_==-1;
+    if(p.sourceCloseReturned_)return !active&&p.sourceCloseAttempted_&&p.sourceCloseResult_==1&&p.handle_==-1&&
+        (!p.callbackResource_||(!(row.flags18&4)&&!row.courseConfigOwner&&row.cursor10==0));
     if(p.handle_!=-1)return p.handle_==p.row_&&sourceBankMemberCurrent(q.root_.get(),&p,p.handle_)&&
         (!active||p.returnedCold_);
     if(active||p.returnedCold_)return false;
@@ -112,11 +122,31 @@ bool OriginalSourceCollisionFile50LA::read12FB30(void* output,std::size_t count,
 }
 bool OriginalSourceCollisionFile50LA::closeSource131040(D& d)noexcept {
     d={};if(sourceCloseAttempted_||!current()||
+       (callbackResource_&&(!associationReturned_||associationWithdrawn_))||
        (payloadBorrower_&&(!associationReturned_||associationWithdrawn_||payloadBorrower_!=resourceOwner_)))
         return fail(d,E::phase,0x131040);
     sourceCloseAttempted_=true;
     if(!resolver_->closeSourceBankMember131040(search_->root_.get(),this,handle_,false,d))return false;
     handle_=-1;sourceCloseReturned_=true;sourceCloseResult_=1;return true;
+}
+bool OriginalSourceCollisionFile50LA::canCloseNative()const noexcept {
+    return !payloadBorrower_&&(!associationAttempted_||associationWithdrawn_)&&canCloseHandleNative();
+}
+bool OriginalSourceCollisionFile50LA::canCloseCallbackNative(const CallbackResourceCustody& c)const noexcept {
+    return callbackResource_==&c&&c.owner==collisionOwner_&&c.resource&&
+        c.borrower==(associationWithdrawn_?nullptr:this)&&!payloadBorrower_&&canCloseHandleNative();
+}
+bool OriginalSourceCollisionFile50LA::canCloseHandleNative()const noexcept {
+    if(!preflightNative())return false;
+    if(nativeClosed_||handle_==-1)return true;
+    //sourceBankMemberCurrent already proves scratch, handle range and exact
+    //root/occurrence. Also prove the device gates used by131040 before any
+    //collection identity is withdrawn; no assertion or close is executed here.
+    if(!resolver_->freshFileCapacity_||!resolver_->scratch_)return false;
+    const auto& s=*resolver_->freshFileCapacity_;
+    if(!s.members150||handle_<0||handle_>=s.memberCount154||!s.devices14)return false;
+    const auto device=s.members150[handle_].deviceID00;
+    return device>=0&&device<s.deviceCount18&&(s.devices14[device].flags0C&2);
 }
 bool OriginalSourceCollisionFile50LA::closeNative(D& d)noexcept {
     d={};if(payloadBorrower_||(associationAttempted_&&!associationWithdrawn_)||!preflightNative())
@@ -157,7 +187,7 @@ bool OriginalSourceCollisionFile50LA::associateSource1326A0(
     pc_=0x1327c8;associationReturned_=true;d.sourcePC=pc_;d.sourceEffectsCommitted=true;return true;
 }
 bool OriginalSourceCollisionFile50LA::withdrawAssociationNative(D& d)noexcept {
-    d={};if(!preflightNative())return fail(d,E::phase,0);
+    d={};if(callbackResource_||!preflightNative())return fail(d,E::phase,0);
     if(!associationAttempted_||associationWithdrawn_)return true;
     if(associatedResource_->sourceResultBorrower_||associatedResource_->sourceDirectTransformBorrower_||associatedResource_->sourceUpdateBorrower_||associatedResource_->sourceContactBorrower_)return fail(d,E::phase,0);
     //All checks precede mutation. This is native cancellation, not a source
@@ -166,4 +196,29 @@ bool OriginalSourceCollisionFile50LA::withdrawAssociationNative(D& d)noexcept {
     if(associationStored_)s.members150[row_].associatedObject1C=nullptr;
     associatedResource_->sourceAssociationBorrower_=nullptr;associationWithdrawn_=true;
     return true;
+}
+
+//NULL-model callback variant: exact same source guards/stores, separate custody.
+bool OriginalSourceCollisionFile50LA::associateCallback1326A0(CallbackResourceCustody& c,D& d)noexcept {
+    d={};if(associationAttempted_||payloadBorrower_||!c.resource||c.owner!=collisionOwner_||
+       c.borrower||!current()||!canCloseHandleNative())return fail(d,E::phase,0x1326a0);
+    callbackResource_=&c;associationAttempted_=true;c.borrower=this;
+    auto& s=*resolver_->freshFileCapacity_;
+    pc_=0x1326f8;
+    if(!fileIoAssertions().cache827C_3E1BA8.reach(handle_>=0,d,pc_))return false;
+    associationGuards_|=1u;pc_=0x132764;
+    if(!fileIoAssertions().cache8280_3E1BB0.reach(handle_<s.memberCount154,d,pc_))return false;
+    associationGuards_|=2u;
+    if(handle_<0||handle_>=s.memberCount154||!s.members150)return fail(d,E::unsupported,0x132798);
+    pc_=0x1327a8;associationReturnV0_=1;
+    pc_=0x1327b0;s.members150[handle_].associatedObject1C=c.resource;associationStored_=true;
+    pc_=0x1327c8;associationReturned_=true;d.sourcePC=pc_;d.sourceEffectsCommitted=true;return true;
+}
+bool OriginalSourceCollisionFile50LA::withdrawCallbackAssociationNative(D& d)noexcept {
+    d={};if(!callbackResource_||!canCloseCallbackNative(*callbackResource_))return fail(d,E::phase,0);
+    if(associationWithdrawn_)return true;
+    //Validate exact row/resource/root before withdrawing the only external alias.
+    //No source ref60 decrement or source1326A0(NULL) call is claimed.
+    if(associationStored_)resolver_->freshFileCapacity_->members150[row_].associatedObject1C=nullptr;
+    callbackResource_->borrower=nullptr;associationWithdrawn_=true;return true;
 }

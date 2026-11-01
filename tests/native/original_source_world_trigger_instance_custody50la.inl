@@ -65,7 +65,10 @@ inline bool Owner::preflightSourceTriggerInstanceNative(const NativeTriggerDescr
 inline bool Owner::retireSourceTriggerInstanceNative(NativeTriggerDescriptor& d)noexcept {
     if(!preflightSourceTriggerInstanceNative(d))return false;
     if(!d.sourceInstance)return true;
-    auto& t=*d.sourceInstance;auto& a=worldApplication_->entityAuthority_;
+    auto& t=*d.sourceInstance;
+    //Direct disposal also obeys newest observer leases before Entity authority.
+    if(!t.withdrawServiceMembershipNative()||!detachSourceTriggerRegistrationNative(d))return false;
+    auto& a=worldApplication_->entityAuthority_;
     if(t.colliderEnrolled_){if(!a.retire(*t.colliderEntity()))return false;t.colliderEnrolled_=false;}
     if(t.enrolled_){if(!a.retire(t.entity_))return false;t.enrolled_=false;}
     //After the read-only preflight and exact membership withdrawals above,

@@ -75,6 +75,11 @@ public:
 private:
     friend class ::rr::game::original_gc_gameplay_lighting_candidate::Owner;
     friend class ::ra_cold_aggregate50LA::Owner;
+    //Fresh274B0C field read from this completed source occurrence, not cubeCount().
+    bool readSourceSkyCount274B0C(const OriginalWreckComponent50LA&,
+        const rr::platform::OriginalWorldSourceConfig50LA&,std::int32_t&)const noexcept;
+    bool readSourceSkyFile274B54(const OriginalWreckComponent50LA&,
+        const rr::platform::OriginalWorldSourceConfig50LA&,std::uint32_t,const char*&,std::size_t&)const noexcept;
     bool readSourceParticleName2771F4(const OriginalWreckComponent50LA&,
         const rr::platform::OriginalWorldSourceConfig50LA&,const char*&,std::size_t&)const noexcept;
     bool readSourceVisibilityBounds273028(const OriginalWreckComponent50LA&,

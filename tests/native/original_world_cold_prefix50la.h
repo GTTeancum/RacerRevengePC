@@ -99,8 +99,10 @@ inline bool Owner::canReleaseWorldCollisionObjects27BB80(std::uint32_t& pc)const
             }else if(z.sourceEnrolled||e.reference00)return fail(pc,0x1413e0);
             for(std::size_t n=0;n<objects.sourceWrappers_[i].size();++n){const auto& w=objects.sourceWrappers_[i][n];
                 if(n<z.sourceEntriesKnown&&z.sourceEntries34[n]!=w.get())return fail(pc,0x27bbf4);
+                if(w&&!g::OriginalWorldCollisionObjects50LA::sourceCallbackCurrentNative(*w,*worldApplication_,worldEntity_.sessionGeneration))return fail(pc,0x1b5590);
+                if(w&&w->sourceCallback.counted)++counted;
                 if(w&&(!w->sourceMode||w->collision04||w->nativeQuery||w->decodedCollision||w->source||
-                    w->descriptorRetired||(w->descriptor08&&!w->descriptor08->sourceFields)))return fail(pc,0x27bbf4);
+                    (w->descriptor08&&!w->descriptor08->sourceFields)))return fail(pc,0x27bbf4);
             }
         }
         if(worldApplication_->objectCount423F60()<counted)return fail(pc,0x1413e0);
@@ -132,7 +134,10 @@ inline bool Owner::releaseWorldCollisionObjects27BB80(std::uint32_t& pc)noexcept
         //source destructor replay follow: raw unknown tails are never read.
         sourceCollisionObjects3CC_.reset(); //Native withdrawal, not guestNULL.
         for(std::size_t i=10;i-->0;){auto& p=objects.sourceZones_[i];
-            for(std::size_t n=objects.sourceWrappers_[i].size();n-->0;)objects.sourceWrappers_[i][n].reset();
+            for(std::size_t n=objects.sourceWrappers_[i].size();n-->0;){auto& wrapper=objects.sourceWrappers_[i][n];
+                if(wrapper)g::OriginalWorldCollisionObjects50LA::withdrawSourceCallbackNative(*wrapper,*worldApplication_);
+                wrapper.reset();
+            }
             if(!p)continue;p->sourceEntries34.reset();
             if(p->counted){
                 if(p->sourceEnrolled&&!worldApplication_->entityAuthority_.retire(p->entity))std::terminate();

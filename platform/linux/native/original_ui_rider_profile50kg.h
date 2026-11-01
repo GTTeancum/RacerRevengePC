@@ -229,6 +229,9 @@ private:
     //Actual1B44E8 synchronous byte read from THIS profile's same common owner.
     //No snapshot/route readiness, mutation, reset or caller-provided source bits.
     bool readWorldProfileByte1B44E8(const OriginalUiMainProfile50KG&,std::uint8_t&)const noexcept;
+    //Fresh caller occurrence; shares storage/identity mechanics, not an earlier read receipt.
+    bool readWorldProfileByte1AA2F4(const OriginalUiMainProfile50KG&,std::uint8_t&)const noexcept;
+    bool readSharedWorldProfileByteNative(const OriginalUiMainProfile50KG&,std::uint8_t&)const noexcept;
     friend class rr::game::OriginalResults10450LA;
     friend class ::original_results_roster50LA::Read;
     // Reached DONE strcpy only. Preserves unknown suffix; no dirty/save/ack.

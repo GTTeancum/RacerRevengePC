@@ -112,6 +112,50 @@ class OriginalGarageObserverShared50KG final {
     std::unique_ptr<Allocator105620> allocator443138_;
     std::uint32_t observers443140_=0;
     std::vector<const void*> owners_;
+    //Native lifetime custody after source280920(-1), NOT another source observer.
+    //The retained observer/callback backing owns exact List and link receipts.
+    struct DetachedMembership {
+        const void* owner=nullptr;const void* occurrence=nullptr;const void* custody=nullptr;
+        const void* group=nullptr;const Allocator105620* allocator=nullptr;
+    };
+    std::vector<DetachedMembership> detachedMemberships_;
+    const DetachedMembership* detachedMembership(const void* owner)const noexcept {
+        for(const auto& d:detachedMemberships_)if(d.owner==owner)return &d;
+        return nullptr;
+    }
+    bool detachedMembershipCurrent(const void* group,const void* owner,
+        const void* occurrence,const void* custody)const noexcept {
+        const auto* d=detachedMembership(owner);
+        return d&&d->group==group&&d->occurrence==occurrence&&d->custody==custody&&
+            sourceGroupCurrent(group);
+    }
+    bool reserveDetachedMembershipNative(const void* owner)noexcept {
+        if(!owner||detachedMembership(owner)||sourceObserver280890_||
+           !ownsReturnedSourceObserver(owner)||owner==sourceObserverGroup_||observers443140_<2u)return false;
+        try{detachedMemberships_.reserve(detachedMemberships_.size()+1u);}catch(...){return false;}
+        return true;
+    }
+    //Caller authenticates immutable exact List/link receipts before this
+    //nonallocating atomic ledger transfer and source count store. No callbacks.
+    bool detachMembership28094C(const void* owner,const void* occurrence,const void* custody)noexcept {
+        if(!occurrence||!custody||!owner||detachedMembership(owner)||sourceObserver280890_||
+           !ownsReturnedSourceObserver(owner)||owner==sourceObserverGroup_||observers443140_<2u||
+           detachedMemberships_.size()==detachedMemberships_.capacity())return false;
+        for(const auto& d:detachedMemberships_)if(d.occurrence==occurrence||d.custody==custody)return false;
+        detachedMemberships_.push_back({owner,occurrence,custody,sourceObserverGroup_,allocator443138_.get()});
+        for(auto i=sourceReturnedOwners_.begin();i!=sourceReturnedOwners_.end();++i)
+            if(*i==owner){sourceReturnedOwners_.erase(i);break;}
+        for(auto i=owners_.begin();i!=owners_.end();++i)if(*i==owner){owners_.erase(i);break;}
+        --observers443140_;return true;
+    }
+    bool releaseDetachedMembershipNative(const void* owner,const void* custody)noexcept {
+        const auto* d=detachedMembership(owner);
+        if(!d||d->custody!=custody||!sourceGroupCurrent(d->group)||ownerHasLinks(owner))return false;
+        //Exact List slots/pins must already have been retired by receipt owner.
+        for(auto i=detachedMemberships_.begin();i!=detachedMemberships_.end();++i)
+            if(i->owner==owner){detachedMemberships_.erase(i);return true;}
+        return false;
+    }
     //Native provenance for completed source280890 invocations. These remain
     //in the SAME owners_/443140 ledger and443138 pool; not a second allocator.
     std::vector<const void*> sourceReturnedOwners_;
@@ -173,7 +217,15 @@ class OriginalGarageObserverShared50KG final {
             if(!p||p==sourceObserver280890_||!ownerRecorded(p))return false;
             for(std::size_t j=0;j<i;++j)if(sourceReturnedOwners_[j]==p)return false;
         }
-        if(!allocator443138_)return true;
+        for(std::size_t i=0;i<detachedMemberships_.size();++i){const auto& d=detachedMemberships_[i];
+            if(!sourceFrame||!d.owner||!d.occurrence||!d.custody||!d.group||
+               d.group!=sourceObserverGroup_||!ownerRecorded(d.group)||!sourceReturnedRecorded(d.group)||
+               d.owner==sourceObserver280890_||ownerRecorded(d.owner)||sourceReturnedRecorded(d.owner)||
+               !d.allocator||d.allocator!=allocator443138_.get()||d.allocator!=sourceGroupRetainedAllocator_)return false;
+            for(std::size_t j=0;j<i;++j)if(detachedMemberships_[j].owner==d.owner||
+                detachedMemberships_[j].custody==d.custody||detachedMemberships_[j].occurrence==d.occurrence)return false;
+        }
+        if(!allocator443138_)return detachedMemberships_.empty();
         const auto& a=*allocator443138_;
         if(a.reference00!=1||a.perBlock10!=169||a.itemSize24!=24||a.blockSize28!=4096||
            a.cached1C||a.allocatedBytes34||a.chunks.size()>std::numeric_limits<std::uint32_t>::max()/4096u||
@@ -189,7 +241,7 @@ class OriginalGarageObserverShared50KG final {
             const auto used=c+1u==a.chunks.size()?a.used20:a.perBlock10;usedTotal+=used;
             for(std::size_t i=0;i<169u;++i){const auto* borrower=chunk->records[i].nativeBorrower;
                 if(i>=used){if(borrower)return false;}
-                else if(borrower){if(!ownerRecorded(borrower))return false;++liveTotal;}
+                else if(borrower){if(!ownerRecorded(borrower)&&!detachedMembership(borrower))return false;++liveTotal;}
             }
         }
         std::size_t freeTotal=0;
@@ -203,7 +255,7 @@ class OriginalGarageObserverShared50KG final {
     bool beginSourceObserver280890(const void* owner,const void* group=nullptr)noexcept {
         //Native bookkeeping reserve occurs before any represented280890 instruction.
         //Failure is a native admission refusal, never a guest allocation return.
-        if(!owner||ownerRecorded(owner)||sourceObserver280890_||
+        if(!owner||ownerRecorded(owner)||detachedMembership(owner)||sourceObserver280890_||
            observers443140_==std::numeric_limits<std::uint32_t>::max())return false;
         if(sourceObserverGroup_){
             if(!group||!sourceGroupCurrent(group)||sourceReturnedOwners_.empty())return false;
@@ -275,7 +327,8 @@ class OriginalGarageObserverShared50KG final {
     bool retireReturnedSourceObserverNative(const void* owner)noexcept {
         //Native-only withdrawal, NOT execution/verification of guest280920.
         //No active constructor may lose its baseline owner/pool underneath it.
-        if(sourceObserver280890_||!sourceGroupCurrent(sourceObserverGroup_)||
+        if(sourceObserver280890_||(owner==sourceObserverGroup_&&!detachedMemberships_.empty())||
+           !sourceGroupCurrent(sourceObserverGroup_)||
            !ownsReturnedSourceObserver(owner)||sourceReturnedOwners_.back()!=owner||ownerHasLinks(owner))return false;
         for(auto i=sourceReturnedOwners_.begin();i!=sourceReturnedOwners_.end();++i)
             if(*i==owner){sourceReturnedOwners_.erase(i);break;}
@@ -290,7 +343,8 @@ class OriginalGarageObserverShared50KG final {
         return coherent();
     }
     bool abortSourceObserver280890(const void* owner)noexcept {
-        if(!sourceObserverCurrent280890(owner)||ownerHasLinks(owner))return false;
+        if(!sourceObserverCurrent280890(owner)||ownerHasLinks(owner)||
+           (!sourceObserverBaselineAllocator_&&!detachedMemberships_.empty()))return false;
         if(sourceObserverCountStored_){owners_.pop_back();--observers443140_;}
         //Native-only unwind of this invocation. Existing pool/chunks/links and
         //other owners are untouched. No guest280920 completion is claimed.
@@ -302,7 +356,7 @@ class OriginalGarageObserverShared50KG final {
         return coherent();
     }
     bool idleForApplicationRelease()const noexcept {
-        return coherent()&&!observers443140_&&!allocator443138_&&owners_.empty();
+        return coherent()&&!observers443140_&&!allocator443138_&&owners_.empty()&&detachedMemberships_.empty();
     }
     bool owns(const void* owner)const noexcept {return coherent()&&ownerRecorded(owner);}
     bool ownsLink(const void* owner,const Link105720* link)const noexcept {
@@ -328,7 +382,11 @@ class OriginalGarageObserverShared50KG final {
             ownsReturnedSourceObserver(owner)&&allocator443138_;
     }
     bool ownsSourceLink(const void* group,const void* owner,const Link105720* link)const noexcept {
-        return sourceLinkAccessCurrent(group,owner)&&allocatedRecord(link)&&link->nativeBorrower==owner;
+        //Ownership/native withdrawal can survive source observer death; allocation
+        //below intentionally retains ACTIVE-only sourceLinkAccessCurrent.
+        return !sourceObserver280890_&&sourceGroupCurrent(group)&&
+            (ownsReturnedSourceObserver(owner)||detachedMembership(owner))&&
+            allocatedRecord(link)&&link->nativeBorrower==owner;
     }
     SourceLinkResult allocateSource105720(const void* group,const void* owner)noexcept {
         if(!sourceLinkAccessCurrent(group,owner))return {};
@@ -431,7 +489,7 @@ class OriginalGarageObserverShared50KG final {
     }
 public:
     OriginalGarageObserverShared50KG()=default;
-    ~OriginalGarageObserverShared50KG(){if(sourceObserverGroup_||sourceObserver280890_||!sourceReturnedOwners_.empty()||observers443140_||allocator443138_)std::terminate();}
+    ~OriginalGarageObserverShared50KG(){if(!detachedMemberships_.empty()||sourceObserverGroup_||sourceObserver280890_||!sourceReturnedOwners_.empty()||observers443140_||allocator443138_)std::terminate();}
     OriginalGarageObserverShared50KG(const OriginalGarageObserverShared50KG&)=delete;
     OriginalGarageObserverShared50KG& operator=(const OriginalGarageObserverShared50KG&)=delete;
 };

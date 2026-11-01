@@ -70,6 +70,7 @@ class SourceTerrainSetupMath50LA final {
 // Classifier returns exactly 0/1; infinity is not classified as NaN.
 class SourceCollisionMath50LA final {
     friend class OriginalWreckType0Owners50LA;
+    friend class OriginalSourceCollisionPath50LA; //Actual NULL-model caller; shared process history.
     static std::uint64_t widen311038(std::uint32_t inputBits)noexcept;
     static std::uint32_t classify3022D0(std::uint64_t inputBits)noexcept;
 };

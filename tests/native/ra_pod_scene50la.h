@@ -166,6 +166,102 @@ private:
     std::optional<const void*> nativeInstanceDescriptors3DC_;
     std::optional<std::int32_t> nativeInstanceCount3E0_;
     std::optional<NativeEmptyInstances3DC> nativeEmptyInstances3DC_;
+    //Dedicated actual-source1B3B80 constructor custody. Never aliases the
+    //legacy finish-line owner or its material/anchor readiness flags.
+    std::unique_ptr<g::OriginalPodCableStripCold50LA> sourceFinishLineStripOwner_;
+    g::OriginalPodCableStripCold50LA* sourceFinishLine540_=nullptr;
+    bool sourceFinishLineConstructorEntered_=false,sourceFinishLine540Published_=false;
+    std::optional<std::uint32_t> sourceFinishLineGroupWordC8_;
+    bool sourceFinishLineSetupEntered_=false,sourceFinishLineMaterialReturned_=false;
+    bool sourceFinishLineBaseReturned_=false;
+    std::uint16_t sourceFinishLineSetupMask_=0;
+    std::uint32_t sourceFinishLineSetupPC_=0x1b3bf4;
+    std::shared_ptr<rr::assets::OriginalStandardMaterialTable50LA> sourceFinishLineMaterialTable_;
+    const std::string* sourceFinishLineDirectory_=nullptr;
+    struct SourceFinishLineAttributes {
+        bool stripAttributesEntered=false,stripAttributeGroupAttempted=false,stripAttributeGroupPublished=false;
+        std::uint16_t stripAttributeDescriptorMask=0;std::optional<std::int32_t> stripAttributeDescriptor10;
+        bool stripCommonAttempted=false,stripCommonPublished=false,stripCommonZeroed=false,stripCommonReturned=false;
+        std::uint16_t stripCommon40Mask=0,stripCommonE0Mask=0;std::uint8_t stripCommon90Mask=0,stripCommon130Mask=0;
+        std::optional<std::uint32_t> stripAttributeCount5C;
+        bool stripAttributeCountsAttempted=false,stripAttributeCountsPublished=false,stripAttributeCountStored=false;
+    } sourceFinishLineAttributes_; //Dedicated receipts; no typed-light owner/packet is borrowed.
+    bool continueSourceFinishLineAttributes23BED8(std::uint32_t&)noexcept;
+    bool preflightSourceFinishLineAttributesNative()const noexcept;
+    //Dedicated finish-line134000 owner. No typed-light packet or serial alias.
+    struct alignas(64) SourceFinishLinePacket {std::array<std::uint32_t,128> words;};
+    struct SourceFinishLineParameters {
+        std::array<std::optional<std::uint32_t>,8> header00To1C{};
+        std::unique_ptr<SourceFinishLinePacket> packet;
+        std::uint32_t* buffer20=nullptr;
+        std::uint32_t* nativePayload04=nullptr; //Typed borrow, never a guest address.
+        std::uint32_t count24=0,count28=0;
+        std::int32_t field2C=-1;
+        std::uint8_t constructorMask=0;
+        bool packetAttempted=false,bufferPublished=false;
+        std::optional<bool> bufferAssertionEnabled; //Produced only by successful guard1 admission.
+        std::uint64_t serial=0;
+    };
+    std::unique_ptr<SourceFinishLineParameters> sourceFinishLineParameters54_;
+    bool sourceFinishLineParameterAttempted_=false,sourceFinishLineParameterPublished_=false;
+    bool sourceFinishLineParameterReturned_=false,sourceFinishLineParameterWithdrawn_=false;
+    std::uint64_t sourceFinishLineParameterSerial_=0;
+    bool continueSourceFinishLineParameters23BF78(std::uint32_t&)noexcept;
+    bool preflightSourceFinishLineParametersNative()const noexcept;
+    struct SourceFinishLineStreams {
+        bool streamPayloadEntered=false,streamPayloadNativeBacking=false,streamReturned=false;
+        std::array<std::uint32_t,4> streamStackTagD0{};bool streamStackTagKnown=false;
+        std::array<std::optional<std::uint32_t>,4> streamPayloadOffsets;
+        std::array<std::optional<std::uint32_t>,128> streamPayloadWords;
+        std::array<std::uint8_t,4> streamPayloadCopies{};std::uint8_t streamPayloadFinished=0;
+        std::uint32_t streamPayloadCount=0;
+        std::optional<std::uint32_t> streamDescriptorParameterEnd,streamDescriptorParameterSpan;
+        bool streamEntered=false,streamCountStored=false;std::uint8_t streamDescriptorMask=0;
+        std::uint8_t streamArraysAttempted=0,streamArraysPublished=0;
+        bool streamAliasAllocationAttempted=false,streamAliasPublished=false,streamBatchCountStored=false;
+        std::uint8_t streamAliasConstructed=0;std::array<std::uint8_t,4> streamAliasStoreMask{};
+        std::optional<std::uint32_t> streamDescriptorParameterBegin;
+        g::OriginalStripStreamHistory23CCA0::Receipt streamBatchAssertion;
+        std::array<g::OriginalStripStreamHistory23CCA0::Receipt,4> streamAliasAssertions;
+    } sourceFinishLineStreams_;
+    struct SourceFinishLineHeader {
+        bool entered=false,returned=false,setupReturned=false;
+        std::uint8_t paddingWords=0,storeMask=0,primitiveMask=0;
+        SourceFinishLineParameters* primitiveParameters10=nullptr;
+        g::OriginalPodCableStripCold50LA* setupReturn=nullptr;
+        bool borrowersWithdrawn=false;
+    } sourceFinishLineHeader_;
+    bool continueSourceFinishLineHeader23BFBC(std::uint32_t&)noexcept;
+    bool preflightSourceFinishLineHeaderNative()const noexcept;
+    bool continueSourceFinishLineStreams23CCA0(std::uint32_t&)noexcept;
+    bool continueSourceFinishLinePayload23D088(std::uint32_t&)noexcept;
+    bool preflightSourceFinishLineStreamsNative()const noexcept;
+    struct SourceFinishLineGeometry {
+        bool entered=false,returned=false;
+        std::array<std::uint8_t,3> setterMasks{}; //Positions, triples, UV; ordered vertex prefixes.
+        std::array<std::array<std::array<g::OriginalStripStreamHistory23CCA0::Receipt,3>,4>,3> assertions;
+        std::optional<std::array<std::uint32_t,4>> zeroNormalOriginWords;
+        std::uint32_t pc=0x1b3ddc;
+    } sourceFinishLineGeometry_;
+    bool continueSourceFinishLineGeometry1B3DDC(const std::array<std::uint32_t,4>&,
+        const std::array<std::uint32_t,4>&,std::uint32_t&)noexcept;
+
+    bool constructSourceFinishLine1B3B80(std::uint32_t&)noexcept;
+    bool setupSourceFinishLine150450(const std::shared_ptr<rr::assets::OriginalStandardMaterialTable50LA>&,
+        const std::string&,std::uint32_t&)noexcept;
+    //World544 is a numeric table index, not another material reference.
+    bool sourceFinishLineIndexLookupEntered_=false;
+    std::optional<std::int32_t> sourceFinishLineMaterial544_;
+    bool continueSourceFinishLineIndex1B3BFC(std::uint32_t&)noexcept;
+    bool preflightSourceFinishLineNative()const noexcept;
+    bool retireSourceFinishLineNative()noexcept;
+    //Original negative-anchor branch only; native abort never sets this receipt.
+    struct SourceFinishLineMissingCleanup {
+        bool entered=false,returned=false;
+        std::uint16_t releaseMask=0;
+        std::optional<std::int32_t> material544Before;
+    } sourceFinishLineMissingCleanup_;
+    bool destroySourceMissingFinishLine1B3DC0(std::uint32_t&)noexcept;
     struct NativeFinishLine540 {
         std::unique_ptr<g::OriginalPodCableStripCold50LA> strip;
         std::shared_ptr<rr::assets::OriginalStandardMaterialTable50LA> table;
@@ -385,6 +481,8 @@ private:
         std::unique_ptr<SourceTriggerGeometry2DBEB4> geometry64; //Native backing custody.
         std::optional<SourceTriggerGeometry2DBEB4*> sourceGeometry64; //Actual descriptor64 lane.
         bool geometryAllocationReturned=false,geometryPublished=false,geometryConstructed=false;
+        bool geometrySourceFreeEntered=false,geometrySourceFreed=false,geometrySourceNullStored=false;
+        std::optional<SourceTriggerGeometry2DBEB4> geometrySourceHistory;
         bool nameKnown=false,ignoreKnown=false;
     };
     struct NativeTriggerDescriptor {
@@ -444,6 +542,102 @@ private:
     bool copySourceTriggerInstanceOrigin(std::array<std::uint32_t,4>& out)const noexcept {
         if(!worldColdConstructed_||!worldApplication_||worldEntity_.reference00!=1)return false;
         std::memcpy(out.data(),worldApplication_->triggerInstanceOrigin4438D0_.data(),sizeof(out));return true;
+    }
+    bool sourceTriggerGeometryCurrentNative(const NativeTriggerDescriptor& d,bool returned)const noexcept {
+        if(!d.sourceInstance||!d.sourceInstancePublished||d.trigger00!=&d.sourceInstance->entity_||
+           d.sourceInstance->application_!=worldApplication_.get()||
+           d.sourceInstance->entity_.sessionGeneration!=worldEntity_.sessionGeneration||
+           !d.sourceInstance->preflightNative())return false;
+        // The descriptor read survives a bounded refusal before callee entry.
+        return d.sourceInstance->serviceGeometryReturned_==returned&&
+            (!returned||d.sourceInstance->serviceEntered_);
+    }
+    bool refreshSourceTriggerGeometry2A0A80(NativeTriggerDescriptor& d,std::uint32_t& pc)noexcept {
+        if(!preflightSourceTriggerInstanceNative(d)||!d.sourceInstance||!d.sourceInstancePublished||
+           d.trigger00!=&d.sourceInstance->entity_||d.sourceInstance->application_!=worldApplication_.get()||
+           d.sourceInstance->entity_.sessionGeneration!=worldEntity_.sessionGeneration)return false;
+        return d.sourceInstance->refreshService2A0A80(pc);
+    }
+    bool beginSourceTriggerMembership120070(NativeTriggerDescriptor& d,std::uint32_t& pc)noexcept {
+        if(!sourceTriggerGeometryCurrentNative(d,true)||!worldApplication_)return false;
+        if(!d.sourceInstance->beginServiceMembership120070(worldApplication_->garageObserverShared_,pc))return false;
+        return d.sourceInstance->continueServiceBounds1200F0(pc);
+    }
+    bool sourceTriggerPrimaryInputsNative(const NativeTriggerDescriptor& d,
+        const void* occurrence,const void* collider)const noexcept {
+        return d.sourceInstance&&d.sourceInstancePublished&&d.trigger00==&d.sourceInstance->entity_&&
+            d.sourceInstance->application_==worldApplication_.get()&&
+            occurrence==&d.sourceInstance->servicePrimary_&&collider==d.sourceInstance->collider_.get();
+    }
+    template<class ActualMethod>
+    bool continueSourceTriggerPrimary2809C0(NativeTriggerDescriptor& d,const void* zone,
+        ActualMethod&& actualMethod,std::uint32_t& pc)noexcept {
+        if(!sourceTriggerGeometryCurrentNative(d,true))return false;
+        return d.sourceInstance->continueServicePrimary2809C0(this,zone,actualMethod,pc);
+    }
+    bool sourceTriggerPortalCenterNative(const NativeTriggerDescriptor& d,
+        const std::array<std::uint32_t,4>& center)const noexcept {
+        return d.sourceInstance&&d.sourceInstance->servicePrimary_.center==center;
+    }
+    template<class ActualPortal>
+    bool continueSourceTriggerPortals280BF0(NativeTriggerDescriptor& d,ActualPortal&& portal,std::uint32_t& pc)noexcept {
+        if(!sourceTriggerGeometryCurrentNative(d,true)||!d.sourceInstance->servicePrimary_.published)return false;
+        const bool returned=d.sourceInstance->continueServicePortals280BF0(portal);
+        pc=d.sourceInstance->pc_=d.sourceInstance->servicePrimary_.pc;return returned;
+    }
+    bool finishSourceTriggerMembership120190(NativeTriggerDescriptor& d,std::uint32_t& pc)noexcept {
+        return sourceTriggerGeometryCurrentNative(d,true)&&d.sourceInstance->finishServiceMembership120190(pc);
+    }
+    bool sourceTriggerCallbackReturnedNative(const NativeTriggerDescriptor& d)const noexcept {
+        return d.sourceInstance&&d.sourceInstance->serviceReturn_.triggerReturned&&
+            d.sourceInstance->serviceReturnCurrentNative();
+    }
+    bool installSourceTriggerLostAi1B5AD0(NativeTriggerDescriptor& d,std::uint32_t& pc)noexcept {
+        if(!preflightSourceTriggerActionNative(d)||!sourceTriggerCallbackReturnedNative(d)||
+           !d.sourceActionReaderComplete||!d.action||!d.actions68||d.actionSlotsPublished!=1||
+           d.actions68[0]!=d.action.get()||d.action->type00!=22||d.action->vtable108!=0x3cf0b0u)return false;
+        pc=0x1b5ad0;const void* payload=&d.action->payload10C;
+        pc=0x1b5ae4;if(!d.sourceInstance->installServiceAction2A0A30(payload,pc))return false;
+        pc=0x1b5af0;pc=0x1b5afc;return true; //Actual V0=1; no LostAI gameplay callback invoked.
+    }
+    bool sourceTriggerActionInstalledNative(const NativeTriggerDescriptor& d)const noexcept {
+        return d.sourceInstance&&d.sourceInstance->serviceAction_.returned&&
+            d.sourceInstance->serviceActionCurrentNative();
+    }
+    bool registerSourceTrigger141960(NativeTriggerDescriptor& d,std::uint32_t& pc)noexcept {
+        if(!nativeTriggerList3D0_||!nativeTriggerList3D0_->sourceMode||!worldApplication_||
+           !canRetireSourceTriggerNative()||!sourceTriggerCallbackReturnedNative(d)||
+           !sourceTriggerActionInstalledNative(d)||!d.sourceFields||!d.sourceFields->geometrySourceNullStored||
+           !d.sourceInstance||d.trigger00!=&d.sourceInstance->entity_)return false;
+        auto& t=*d.sourceInstance;auto& parent=nativeTriggerList3D0_->entity;
+        if(t.serviceRegistrationAttempted_)return false;
+        t.serviceParent_=&parent;t.serviceRegistrationAttempted_=true;pc=0x2dcc30;
+        const auto result=worldApplication_->entityAuthority_.attachChildren(parent,t.entity_,0x402,
+            worldApplication_->attachmentLock423F58());
+        pc=result.sourcePC;if(result.status!=g::OriginalWreckComponentStatus50LA::complete)return false;
+        t.serviceRegistered_=true;pc=0x2dcc38;return true;
+    }
+    bool sourceTriggerRegistrationCurrentNative(const NativeTriggerDescriptor& d)const noexcept {
+        return nativeTriggerList3D0_&&d.sourceInstance&&d.sourceInstance->serviceRegistered_&&
+            d.sourceInstance->serviceParent_==&nativeTriggerList3D0_->entity&&d.sourceInstance->preflightNative();
+    }
+    bool detachSourceTriggerRegistrationNative(NativeTriggerDescriptor& d)noexcept {
+        if(!d.sourceInstance)return true;auto& t=*d.sourceInstance;
+        if(!t.serviceRegistered_||t.serviceTopologyWithdrawn_)return true;
+        if(!nativeTriggerList3D0_||!worldApplication_||t.application_!=worldApplication_.get()||
+           t.serviceParent_!=&nativeTriggerList3D0_->entity||!t.preflightNative())return false;
+        const auto result=worldApplication_->entityAuthority_.detach(t.entity_,worldApplication_->attachmentLock423F58());
+        if(result.status!=g::OriginalWreckComponentStatus50LA::complete)return false;
+        t.serviceTopologyWithdrawn_=true;return true; //Native cancellation only; source402 history survives.
+    }
+    bool withdrawSourceTriggerServiceMembershipNative()noexcept {
+        if(!nativeTriggerList3D0_)return true;
+        for(std::size_t i=nativeTriggerList3D0_->descriptorOwners.size();i-->0;){
+            auto& d=nativeTriggerList3D0_->descriptorOwners[i];
+            if(d&&d->sourceInstance&&(!d->sourceInstance->withdrawServiceMembershipNative()||
+               !detachSourceTriggerRegistrationNative(*d)))return false;
+        }
+        return true;
     }
     bool reserveSourceTriggerInstanceNative()noexcept;
     bool constructSourceTriggerInstance2DBFE0(NativeTriggerDescriptor&,const std::array<std::uint32_t,4>&,std::uint32_t&)noexcept;
@@ -694,7 +888,10 @@ std::array<std::uint8_t,10> sourceSaturation44Known{},sourceSaturation48Known{};
 // no sceneApplication_/native-emitter adoption.
 bool reserveSourceParticleListNative()noexcept;
 bool constructSourceParticleList27DC90(Entity&,bool& counted,bool& enrolled,std::uint32_t&)noexcept;
+bool constructSourceEmitterEntity15A5B0(Entity&,bool&,bool&,std::uint32_t&)noexcept;
 bool preflightSourceParticleListCountNative(const Entity&,bool counted,bool enrolled)const noexcept;
+bool preflightSourceParticleEntityIdentityNative(const Entity&,bool,bool,std::uint8_t)const noexcept;
+bool releaseSourceParticleEmitterCountNative(Entity&,bool&,bool&,std::uint8_t,std::uint32_t)noexcept;
 bool releaseSourceParticleListCountNative(Entity&,bool& counted,bool& enrolled)noexcept;
 
     bool canRetireNativeWorldPrefix(const char** gate=nullptr,std::size_t extraSourceOwnedCount=0)const noexcept;
@@ -829,6 +1026,12 @@ std::array<std::array<SourcePortalWorldLink27F3B0,4>,10> sourcePortalWorldLinks_
 //portal/node pointers and list/pool borrows have been withdrawn. No callback.
 struct SourceCollisionPortalBorrow {const void* registration=nullptr;std::weak_ptr<const void> token;};
 std::vector<SourceCollisionPortalBorrow> sourceCollisionPortalBorrows_;
+struct SourcePhysicsModelPortalBorrow {const void* registration=nullptr;std::weak_ptr<const void> token;};
+std::vector<SourcePhysicsModelPortalBorrow> sourcePhysicsModelPortalBorrows_;
+bool sourcePhysicsModelPortalBorrowedNative()const noexcept {
+    for(const auto& borrow:sourcePhysicsModelPortalBorrows_)if(!borrow.token.expired())return true;
+    return false;
+}
 bool sourceCollisionPortalBorrowedNative()const noexcept {
     for(const auto& borrow:sourceCollisionPortalBorrows_)if(!borrow.token.expired())return true;
     return false;

@@ -13,6 +13,7 @@ namespace ra_cold_aggregate50LA {class Owner;}
 namespace rr::game {
 struct CollectionTree50BX;struct SearchStorage50BS;class OriginalApplicationEntities50LA;
 class OriginalSourcePhysicsCollision50LA;
+class OriginalSourcePhysicsModel50LA;
 namespace original_gc_gameplay_lighting_candidate {class Owner;}
 //Owner-local lifetime extension of the SAME actual native List service. No
 //second selected array, registry, geometry, public readiness or dispatch API.
@@ -20,7 +21,11 @@ class OriginalNativeListMethodCustody50LA final {
     friend class ::ra_pod_scene50LA::Owner;
     friend class ::ra_cold_aggregate50LA::Owner; //Same World source Model membership custody, no public API.
     friend class original_gc_gameplay_lighting_candidate::Owner;
+    friend class OriginalSourceCollisionObserver50LA; //Private detached receipt validation/native release.
+    friend class OriginalWorldCollisionObjects50LA; //Exact callback mode1 registration/native retirement.
+    friend class OriginalWorldTriggerInstance50LA; //Exact trigger mode1 primary custody.
     friend class OriginalSourcePhysicsCollision50LA; //Exact COL membership occurrence custody only.
+    friend class OriginalSourcePhysicsModel50LA; //Exact mode2 ModelBASE occurrence custody.
     const ::ra_pod_scene50LA::Owner* world_=nullptr;
     const OriginalApplicationEntities50LA* application_=nullptr;
     const CollectionTree50BX* method_=nullptr;
@@ -52,10 +57,10 @@ class OriginalNativeListMethodCustody50LA final {
         bool pendingConsumed=false,terminal=false;std::optional<std::uint32_t> abandonedConsumed;
     } sourceEntries_;
     //A pin survives selection refusal and later native entry withdrawal until
-    //the exact COL occurrence has retired its usable List pointer.
+    //the exact COL or Model occurrence has retired its usable List pointer.
     std::vector<const void*> sourceCollisionRegistrationBorrowers_;
     bool sourceCollisionEntriesCurrentNative()const noexcept {
-        //Opaque occurrence identities only: never dereference a COL borrower.
+        //Opaque occurrence identities only: never dereference a COL or Model borrower.
         for(std::size_t i=0;i<sourceCollisionRegistrationBorrowers_.size();++i){
             if(!sourceCollisionRegistrationBorrowers_[i])return false;
             for(std::size_t j=0;j<i;++j)if(sourceCollisionRegistrationBorrowers_[j]==sourceCollisionRegistrationBorrowers_[i])return false;

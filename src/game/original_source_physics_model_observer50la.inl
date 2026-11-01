@@ -13,6 +13,17 @@
         bool constructorCalled=false,constructorReturned=false,pointerStored=false;
         bool scratchInitialized=false,boundsCallReached=false,boundsCompleted=false,boundsReturned=false;
         bool nativePointerCleared=false,nativeWithdrawn=false;
+        bool primaryCalled=false,methodResolved=false,methodPinned=false,methodPinWithdrawn=false;
+        bool selectionAttempted=false,selectionReturned=false,selectionPending=false,selectionCanceled=false;
+        bool insertEntered=false,counterAdvanced=false,inserted=false,slotWithdrawn=false;
+        bool primaryPublished=false,primaryNativeWithdrawn=false;
+        OriginalNativeListMethodCustody50LA* method=nullptr;
+        std::optional<std::uint32_t> slot;
+        std::uint32_t freeHeadBefore=0,lastUsedBefore=0,freeHeadAfter=0,lastUsedAfter=0;
+        std::uint32_t selectionReturnPC=0,insertionReturnPC=0;
+        bool returnEntered=false,returnObserverRead=false,returnZoneRead=false;
+        const void* returnObserver19C=nullptr;const void* returnZone04=nullptr;
+        ObserverShared::SourceAssertionHistory returnAssertion;
         ObserverShared::SourceAssertionHistory allocationAssertion;
         std::array<std::uint32_t,4> center{},half{};
     } modelObserver_;
@@ -61,14 +72,18 @@
         h.boundsReturned=true;h.pc=0x28e96cu;
         return {Status::bounded,h.pc}; //Fresh bounds returned; registration2809C0 remains unissued.
     }
+    #include "original_source_physics_model_portals50la.inl"
+    #include "original_source_physics_model_primary50la.inl"
+    #include "original_source_physics_model_return50la.inl"
     bool sourceModelObserverHistoryNative()const noexcept {
         const auto& h=modelObserver_;
-        if(!h.entered)return !modelObserverStorage_&&!h.updateOccurrence&&!h.ownerIdentity&&!h.zone&&!h.before&&
+        if(!h.entered)return sourceModelReturnHistoryNative()&&!modelObserverStorage_&&!h.updateOccurrence&&!h.ownerIdentity&&!h.zone&&!h.before&&
             !h.published&&!h.mode&&!h.pc&&!h.returned&&!h.allocationCalled&&!h.allocationReturned&&
             !h.constructorCalled&&!h.constructorReturned&&!h.pointerStored&&!h.scratchInitialized&&!h.boundsCallReached&&
             !h.boundsCompleted&&!h.boundsReturned&&!modelObserverBounds_.entered&&
-            !h.nativePointerCleared&&!h.nativeWithdrawn&&ObserverShared::sourceAssertionHistoryCurrent(h.allocationAssertion);
-        if(!h.updateOccurrence||!h.ownerIdentity||h.mode!=2u||h.before||h.returned||
+            !h.nativePointerCleared&&!h.nativeWithdrawn&&sourceModelPrimaryHistoryNative()&&
+            ObserverShared::sourceAssertionHistoryCurrent(h.allocationAssertion);
+        if(!sourceModelPrimaryHistoryNative()||!sourceModelReturnHistoryNative()||!h.updateOccurrence||!h.ownerIdentity||h.mode!=2u||h.before||
            !postE4World_.returned||h.updateOccurrence!=postE4WorldUpdateOccurrence_||
            !nullObserver_.returned||h.updateOccurrence!=nullObserver_.updateOccurrence||
            !h.allocationCalled||!h.allocationReturned||h.constructorCalled!=bool(modelObserverStorage_)||
@@ -94,7 +109,8 @@
         const std::array<std::uint32_t,4> vf0{{0,0,0,0x3f800000u}};
         if(!b.entered)return !h.boundsReturned&&h.pc==0x28e230u&&h.center==vf0&&h.half==vf0;
         if(b.centerBefore!=vf0||b.halfBefore!=vf0||h.center!=b.centerAfter||h.half!=b.halfAfter||
-           h.boundsReturned!=b.returned||h.pc!=(b.returned?0x28e96cu:b.pc))return false;
+           h.boundsReturned!=b.returned||(!b.returned&&h.pc!=b.pc)||
+           (b.returned&&!sourceModelPrimaryHistoryNative()))return false;
         //After Model native storage is erased, only retained opaque occurrence
         //and output history remain. Live/partial cleanup still pins every byte.
         return nativeWithdrawn_?h.nativeWithdrawn:model_->sourceObserverBoundsHistoryNative(graph(),b);
@@ -104,6 +120,7 @@
         if(!sourceModelObserverHistoryNative()||!base_||!model_||!preflightNative())return false;
         //This newest shared-cohort child must retire before collision E0/E4
         //observers. No guest280920/19C=NULL or registration return is claimed.
+        if(!withdrawSourceModelPrimaryNative())return false;
         if(modelObserverStorage_&&!modelObserverStorage_->withdrawNative())return false;
         if(h.pointerStored){model_->model_.observer19C=nullptr;h.nativePointerCleared=true;}
         model_->sourceObserverBorrower_=nullptr;h.nativeWithdrawn=true;return true;

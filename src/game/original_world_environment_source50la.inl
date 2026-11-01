@@ -183,3 +183,26 @@ bool Owner::readSourceVisibilityBounds273028(const OriginalWreckComponent50LA& w
        source_->phase!=Source::Phase::returnedOne||(source_->scalarKnown&0x1e0u)!=0x1e0u)return false;
     words={{source_->scalar520[5],source_->scalar520[6],source_->scalar520[7],source_->scalar520[8]}};return true;
 }
+
+//Count00 was initialized27696C, then read276C54 and possibly collapsed276E88.
+//This entry is only the new274B0C load; it does not admit prepared sky resources.
+bool Owner::readSourceSkyCount274B0C(const OriginalWreckComponent50LA& world,
+    const rr::platform::OriginalWorldSourceConfig50LA& config,std::int32_t& out)const noexcept {
+    if(!preflightSourceNative()||sourceClosed_||!source_||sourceWorld_!=&world||sourceConfig_!=&config||
+       sourceGeneration_!=world.sessionGeneration||source_->thread!=std::this_thread::get_id()||
+       source_->phase!=Source::Phase::returnedOne)return false;
+    out=source_->count00;return true;
+}
+
+//Source files04 ownership and getter-produced terminating NUL, not prepared cubeFile().
+bool Owner::readSourceSkyFile274B54(const OriginalWreckComponent50LA& world,
+    const rr::platform::OriginalWorldSourceConfig50LA& config,std::uint32_t index,
+    const char*& out,std::size_t& length)const noexcept {
+    std::int32_t count=0;
+    if(!readSourceSkyCount274B0C(world,config,count)||index!=0||count!=1||
+       !source_->fileSlotWritten||!source_->fileTextReturned||!source_->files04||
+       !source_->firstFile||source_->files04[0]!=source_->firstFile.get())return false;
+    std::size_t n=0;while(n<260&&source_->firstFile[n])++n;
+    if(n==260)return false;
+    out=source_->firstFile.get();length=n;return true;
+}

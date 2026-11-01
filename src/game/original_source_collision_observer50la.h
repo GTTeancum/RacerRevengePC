@@ -1,13 +1,16 @@
 #pragma once
 #include "original_garage_observer_shared50kg.h"
+#include "original_native_list_method_custody50la.h"
 namespace rr::game {
 //Exact280890 storage and bounded2809C0 primary prefix. One instance represents either the
 //120070 stack observer or a separately nullable allocated heap observer.
 //The record's native size is not the guest30 allocation size. Untouched18/1C
 //remain unknown; zero-initialized backing is never source knownness.
 class OriginalSourceCollisionObserver50LA final {
+    friend class OriginalWorldTriggerInstance50LA; //Distinct trigger120070 mode1 occurrence.
     friend class OriginalSourcePhysicsCollision50LA;
     friend class OriginalSourcePhysicsModel50LA;
+    friend class OriginalWorldCollisionObjects50LA; //Actual mode13 temporary120070 occurrence.
     using Shared=OriginalGarageObserverShared50KG;
     struct Record {
         const void* next00=nullptr;
@@ -60,6 +63,138 @@ class OriginalSourceCollisionObserver50LA final {
         //Existing World source domain admits at most20 portal memberships.
         std::array<SourceSecondaryLink,20> links{};
     } secondary_;
+    //Disabled at the actual callback: only a completed mode1 registration owner
+    //may call this private handoff. No source registration/return is inferred.
+    struct DetachedListReceipt {
+        OriginalNativeListMethodCustody50LA* method=nullptr;
+        const void* borrower=nullptr;const void* member=nullptr;
+        std::uint32_t slot=0;bool released=false;
+    };
+    struct DetachedCustody {
+        bool entered=false,retired=false;
+        const void* occurrence=nullptr;const void* member=nullptr;
+        const ::ra_pod_scene50LA::Owner* world=nullptr;
+        const OriginalApplicationEntities50LA* application=nullptr;
+        std::uint32_t primaryZone=0;
+        DetachedListReceipt primary;
+        std::array<DetachedListReceipt,20> secondary{};
+        std::uint32_t count=0;
+    } detached_;
+    static bool detachedListCurrentNative(const DetachedListReceipt& r)noexcept {
+        if(!r.method||!r.borrower||!r.member||!r.slot||r.slot>1024)return false;
+        if(r.released)return true; //Never dereference a retired List pin.
+        const auto& c=*r.method;const auto& e=c.sourceEntries_;
+        if(!c.sourceMode_||!c.world_||!c.application_||c.reference00_!=2u||
+           !c.source_.constructorReturned||!c.source_.referenceKnown||!c.source_.constructorReference||
+           c.arrayReference_||c.nodeReference_||c.begun_||c.nodeAliasWasAcquired_||
+           c.usage10_!=1u||c.ordinal_<10u||c.ordinal_>=20u||
+           c.source_.vtable08!=0x3d2d30u||!c.sourceCollisionEntriesCurrentNative()||
+           !e.words||!c.source_.field40||
+           e.members[r.slot-1]!=r.member||e.borrowers[r.slot-1]!=r.borrower||e.wordKnown[r.slot-1])return false;
+        //A later callback can be bounded with a different pending selection on
+        //this same List. Retained currentness must still admit reverse cleanup
+        //of that later callback; it does not authorize free-head mutation here.
+        if(e.pending&&(e.pending==r.borrower||e.pendingIdentity==r.member||e.pendingSlot==r.slot))return false;
+        unsigned pins=0;for(const auto* p:c.sourceCollisionRegistrationBorrowers_)if(p==r.borrower)++pins;
+        return pins==1;
+    }
+    bool detachedHistoryNative()const noexcept {
+        const auto& d=detached_;
+        if(!d.entered)return !d.retired&&!d.occurrence&&!d.member&&!d.count&&!d.primary.method&&!d.world&&!d.application&&!d.primaryZone;
+        if(!destroyReturned_||lease_||destructionArgument_!=-1||d.occurrence!=primary_.occurrence||
+           !d.member||!d.world||!d.application||d.primaryZone>=10u||d.count!=secondary_.count||d.count>d.secondary.size()||
+           d.primary.method!=primary_.method||d.primary.borrower!=d.occurrence||
+           d.primary.member!=d.member||d.primary.slot!=primary_.slot||
+           d.primary.released!=primary_.nativeWithdrawn||!detachedListCurrentNative(d.primary))return false;
+        if(!d.primary.released&&(d.primary.method->world_!=d.world||
+           d.primary.method->application_!=d.application||d.primary.method->ordinal_!=10u+d.primaryZone))return false;
+        bool retiredSuffix=false;
+        for(std::uint32_t i=0;i<d.count;++i){const auto& r=d.secondary[i];const auto& e=secondary_.links[i];
+            if(r.method!=e.payload.collisionMethod08||r.borrower!=e.occurrence||r.member!=d.member||
+               r.slot!=e.payload.slot14||r.released!=e.nativeWithdrawn||!detachedListCurrentNative(r))return false;
+            if(r.released)retiredSuffix=true;
+            else if(retiredSuffix||d.primary.released||r.method->world_!=d.world||r.method->application_!=d.application)return false;
+        }
+        if(d.retired)return d.primary.released&&secondary_.nativeWithdrawn;
+        return shared_&&shared_->detachedMembershipCurrent(group_,identity(),d.occurrence,&d);
+    }
+    bool destroyRegisteredMode1Temporary280920(const void* actualOccurrence,
+        const void* actualMember,std::uint32_t actualPrimaryZone,
+        const ::ra_pod_scene50LA::Owner* actualWorld,const OriginalApplicationEntities50LA* actualApplication)noexcept {
+        //The callback must first prove2809C0,
+        //280BF0,120190/1201F0 and the actual120200(-1) call, separately.
+        if(detached_.entered||!actualOccurrence||!actualMember||!actualWorld||!actualApplication||actualPrimaryZone>=10u||
+           !preflightNative()||!lease_||destroyEntered_||nativeWithdrawn_||
+           primary_.occurrence!=actualOccurrence||primary_.stores!=31u||primary_.nativeWithdrawn||
+           !secondary_.returned||secondary_.nativeWithdrawn||!shared_)return false;
+        DetachedCustody next;next.entered=true;next.occurrence=actualOccurrence;
+        next.member=actualMember;next.count=secondary_.count;next.world=actualWorld;next.application=actualApplication;next.primaryZone=actualPrimaryZone;
+        next.primary={const_cast<OriginalNativeListMethodCustody50LA*>(primary_.method),actualOccurrence,actualMember,primary_.slot,false};
+        if(!detachedListCurrentNative(next.primary)||next.primary.method->ordinal_!=10u+actualPrimaryZone||
+           next.primary.method->world_!=actualWorld||next.primary.method->application_!=actualApplication)return false;
+        for(std::uint32_t i=0;i<next.count;++i){const auto& e=secondary_.links[i];
+            if(!e.published||e.nativeWithdrawn||!e.allocation.record||
+               !e.payload.child04||!e.payload.portal0C||!ownsSecondaryLinkNative(e.allocation.record))return false;
+            auto& r=next.secondary[i];
+            r={const_cast<OriginalNativeListMethodCustody50LA*>(e.payload.collisionMethod08),e.occurrence,actualMember,e.payload.slot14,false};
+            if(!detachedListCurrentNative(r)||r.method->application_!=next.primary.method->application_||
+               r.method->world_!=next.primary.method->world_)return false;
+            if(r.borrower==next.primary.borrower)return false;
+            for(std::uint32_t j=0;j<i;++j)if(next.secondary[j].borrower==r.borrower||
+                (next.secondary[j].method==r.method&&next.secondary[j].slot==r.slot))return false;
+            if(r.method==next.primary.method&&r.slot==next.primary.slot)return false;
+        }
+        if(!shared_->reserveDetachedMembershipNative(identity()))return false;
+        //All fallible work precedes source mutation. Stable record_, callback
+        //occurrence, List borrower identities and pool tags are NOT rewritten.
+        const auto count=shared_->observers443140_;
+        detached_=next; //Install immutable native receipts BEFORE source destructor effects.
+        if(!shared_->detachMembership28094C(identity(),actualOccurrence,&detached_)){
+            detached_=DetachedCustody{};return false; //Transfer refusal has changed no source state.
+        }
+        destroyEntered_=true;destructionArgument_=-1;
+        countBeforeDestroy_=count;countDecremented_=true;lease_=false;
+        //280958 nonlast branch skips pool destruction; -1 skips source delete.
+        //No281490/source unlink occurs. Native backing is now opaque custody.
+        destroyReturned_=true;destroyPC_=0x2809b8u;return true;
+    }
+    static void releaseDetachedListSlotNative(DetachedListReceipt& r)noexcept {
+        auto& c=*r.method;auto& e=c.sourceEntries_;const auto slot=r.slot;
+        e.nativeFreeNext[slot-1]=*c.source_.field40;e.wordKnown[slot-1]=false;
+        e.members[slot-1]=e.borrowers[slot-1]=nullptr;c.source_.field40=slot;
+    }
+    static void releaseDetachedListPinNative(DetachedListReceipt& r)noexcept {
+        auto& pins=r.method->sourceCollisionRegistrationBorrowers_;
+        for(auto i=pins.begin();i!=pins.end();++i)if(*i==r.borrower){pins.erase(i);break;}
+        r.released=true;
+    }
+    bool withdrawDetachedMembershipNative()noexcept {
+        auto& d=detached_;if(!d.entered)return false;if(d.retired)return true;
+        if(!preflightNative()||!detachedHistoryNative()||!shared_||shared_->sourceObserver280890_)return false;
+        //Mutation admission is stricter than retained currentness: a newer
+        //callback's pending slot must be canceled before any free head changes.
+        //Check the entire receipt set before releasing even one slot or pin.
+        const auto canRelease=[](const DetachedListReceipt& r)noexcept {
+            return r.released||!r.method->sourceEntries_.pending;
+        };
+        if(!canRelease(d.primary))return false;
+        for(std::uint32_t i=0;i<d.count;++i)if(!canRelease(d.secondary[i]))return false;
+        //Complete prevalidation above; native-only reverse release. No source
+        //281490/280920 replay, no allocations, FP, or callbacks while mutating.
+        for(std::uint32_t i=d.count;i>0;--i){auto& r=d.secondary[i-1];auto& e=secondary_.links[i-1];
+            if(r.released)continue;
+            releaseDetachedListSlotNative(r);
+            auto* link=e.allocation.record;auto& pool=*shared_->allocator443138_;
+            record_.next00=e.oldHead;link->next00=pool.free2C;pool.free2C=link;link->nativeBorrower=nullptr;
+            e.nativeWithdrawn=true;releaseDetachedListPinNative(r);
+        }
+        secondary_.nativeWithdrawn=true;
+        if(!d.primary.released){releaseDetachedListSlotNative(d.primary);releaseDetachedListPinNative(d.primary);}
+        primary_.nativeWithdrawn=true;
+        if(!shared_->releaseDetachedMembershipNative(identity(),&d))return false;
+        d.retired=true;shared_=nullptr;nativeWithdrawn_=true;
+        return true; //Backing may now retire even if the cohort root retires first.
+    }
     const void* sourceGroupIdentityNative()const noexcept {return group_;}
     const void* secondaryHeadNative()const noexcept {return record_.next00;}
     bool secondaryAllocationRecordedNative(const void* actualSecondaryOccurrence)const noexcept {
@@ -159,7 +294,7 @@ class OriginalSourceCollisionObserver50LA final {
     }
     bool releaseSecondaryNative(const void* actualSecondaryOccurrence)noexcept {
         auto& h=secondary_;
-        if(!h.entered||h.nativeWithdrawn||!actualSecondaryOccurrence||!preflightNative())return false;
+        if(detached_.entered||!h.entered||h.nativeWithdrawn||!actualSecondaryOccurrence||!preflightNative())return false;
         SourceSecondaryLink* selected=nullptr;
         for(std::uint32_t i=h.count;i>0;--i)if(!h.links[i-1].nativeWithdrawn){selected=&h.links[i-1];break;}
         if(!selected||selected->occurrence!=actualSecondaryOccurrence)return false;
@@ -176,7 +311,7 @@ class OriginalSourceCollisionObserver50LA final {
     bool withdrawSecondaryNative(const void* actualOccurrence)noexcept {
         auto& h=secondary_;
         if(!h.entered)return actualOccurrence==nullptr;
-        if(actualOccurrence!=h.occurrence||!preflightNative())return false;
+        if(detached_.entered||actualOccurrence!=h.occurrence||!preflightNative())return false;
         for(std::uint32_t i=0;i<h.count;++i)if(!h.links[i].nativeWithdrawn)return false;
         if(record_.next00||shared_->ownerHasLinks(identity()))return false;
         h.nativeWithdrawn=true;return true;
@@ -247,7 +382,7 @@ class OriginalSourceCollisionObserver50LA final {
     bool withdrawRegistrationNative(const void* actualOccurrence)noexcept {
         auto& h=primary_;
         if(!h.entered)return actualOccurrence==nullptr;
-        if(actualOccurrence!=h.occurrence||!preflightNative()||
+        if(detached_.entered||actualOccurrence!=h.occurrence||!preflightNative()||
            (secondary_.entered&&!secondary_.nativeWithdrawn))return false;
         //The COL owner must first cancel its exact pending/inserted method
         //receipt. This only releases native custody; source fields stay intact.
@@ -259,7 +394,10 @@ class OriginalSourceCollisionObserver50LA final {
         //This route joins the already authenticated World/default source
         //cohort. It cannot adopt a legacy/native pool or mint another root.
         const auto* group=shared.sourceObserverGroup_;
-        if(!group||!shared.sourceGroupCurrent(group)||!shared.ownsReturnedSourceObserver(group)||
+        if(!group||shared.sourceObserver280890_||!shared.sourceGroupCurrent(group)||
+           !shared.ownsReturnedSourceObserver(group)||!shared.allocator443138_||
+           shared.allocator443138_.get()!=shared.sourceGroupRetainedAllocator_||
+           shared.observers443140_==std::numeric_limits<std::uint32_t>::max()||
            !shared.beginSourceObserver280890(identity(),group))return false;
         shared_=&shared;group_=group;entered_=lease_=true;
         ctorPC_=0x2808a4u;record_.center20={{0,0,0,0x3f800000u}};vectorKnown_=true;
@@ -275,7 +413,7 @@ class OriginalSourceCollisionObserver50LA final {
         returned_=true;ctorPC_=0x280920u;return true; //JR280918/delay28091C completed.
     }
     bool preflightNative()const noexcept {
-        if(!registrationHistoryNative())return false;
+        if(!registrationHistoryNative()||!detachedHistoryNative())return false;
         if(!entered_)return !shared_&&!group_&&!lease_&&!returned_&&!vectorKnown_&&!scalarMask_&&
             !destroyEntered_&&!countDecremented_&&!destroyReturned_&&!sourceDeleted_&&
             !destructionArgument_&&!destroyPC_&&!countBeforeDestroy_&&(ctorPC_==0||ctorPC_==0x280890u);
@@ -291,7 +429,8 @@ class OriginalSourceCollisionObserver50LA final {
         }else if(countDecremented_||destroyReturned_||sourceDeleted_||destructionArgument_||destroyPC_||countBeforeDestroy_)return false;
         if(nativeWithdrawn_)return !shared_&&!lease_;
         if(!shared_)return false;
-        if(destroyReturned_)return !lease_&&shared_->sourceGroupCurrent(group_)&&!shared_->ownerRecorded(identity());
+        if(destroyReturned_)return !lease_&&shared_->sourceGroupCurrent(group_)&&!shared_->ownerRecorded(identity())&&
+            (!detached_.entered||detached_.retired||shared_->detachedMembershipCurrent(group_,identity(),detached_.occurrence,&detached_));
         if(!lease_)return false;
         return returned_?shared_->ownsReturnedSourceObserver(identity()):shared_->sourceObserverCurrent280890(identity());
     }
@@ -314,9 +453,30 @@ class OriginalSourceCollisionObserver50LA final {
         destroyPC_=0x280990u;if(actualArgument>0){destroyPC_=0x280998u;sourceDeleted_=true;}
         destroyReturned_=true;destroyPC_=0x2809b8u;return true;
     }
+    bool canWithdrawActiveRegistrationNative()const noexcept {
+        //Read-only LIFO admission before callback collection/root mutation.
+        //Links are validated by preflight and separately removed first.
+        if(nativeWithdrawn_)return true;
+        if(!preflightNative()||detached_.entered||!lease_||!returned_||!shared_)return false;
+        return !shared_->sourceObserver280890_&&shared_->sourceGroupCurrent(group_)&&
+            shared_->ownsReturnedSourceObserver(identity())&&!shared_->sourceReturnedOwners_.empty()&&
+            shared_->sourceReturnedOwners_.back()==identity();
+    }
+    bool canWithdrawUnregisteredNative()const noexcept {
+        //Nonmutating admission for callback partial cleanup before any parent
+        //link is detached. Currentness alone does not imply cohort LIFO order.
+        if(nativeWithdrawn_)return true;
+        if(!preflightNative()||primary_.entered)return false;
+        if(!lease_)return true;
+        if(!shared_||shared_->ownerHasLinks(identity()))return false;
+        if(!returned_)return shared_->sourceObserverCurrent280890(identity());
+        return !shared_->sourceObserver280890_&&shared_->sourceGroupCurrent(group_)&&
+            shared_->ownsReturnedSourceObserver(identity())&&!shared_->sourceReturnedOwners_.empty()&&
+            shared_->sourceReturnedOwners_.back()==identity();
+    }
     bool withdrawNative()noexcept {
         if(nativeWithdrawn_)return true;
-        if(!preflightNative()||(primary_.entered&&!primary_.nativeWithdrawn))return false;
+        if(!preflightNative()||(detached_.entered&&!detached_.retired)||(primary_.entered&&!primary_.nativeWithdrawn))return false;
         if(lease_){
             if(returned_){if(!shared_->retireReturnedSourceObserverNative(identity()))return false;}
             else if(!shared_->abortSourceObserver280890(identity()))return false;
@@ -329,6 +489,6 @@ public:
     OriginalSourceCollisionObserver50LA()=default;
     OriginalSourceCollisionObserver50LA(const OriginalSourceCollisionObserver50LA&)=delete;
     OriginalSourceCollisionObserver50LA& operator=(const OriginalSourceCollisionObserver50LA&)=delete;
-    ~OriginalSourceCollisionObserver50LA(){if(lease_)std::terminate();}
+    ~OriginalSourceCollisionObserver50LA(){if(lease_||(detached_.entered&&!detached_.retired))std::terminate();}
 };
 }

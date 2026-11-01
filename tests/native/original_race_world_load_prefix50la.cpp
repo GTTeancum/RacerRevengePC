@@ -4352,6 +4352,8 @@ bool Owner::preflightSourceWorldParticleCountNative()const noexcept {
 
     if(nativeParticleList3D8_&&nativeParticleList3D8_->sourceMode){
         hasSourceOwner=true;if(nativeParticleList3D8_->counted)++extra;
+        for(const auto& row:nativeParticleList3D8_->rows)if(row)for(const auto& emitter:row->sourceEmitters)
+            if(emitter&&emitter->counted){if(extra==std::numeric_limits<std::size_t>::max())return false;++extra;}
     }
     if(nativeEmptyAmbient3B4_&&nativeEmptyAmbient3B4_->sourceMode){
         hasSourceOwner=true;if(nativeEmptyAmbient3B4_->sourceCounted){

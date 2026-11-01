@@ -64,6 +64,7 @@ bool Owner::releaseSourceSearchNodeNative(SourceSearchNode27F120& n)noexcept {
     //Whole20-node/array/authority preflight and combined count floor precede this helper.
     if(n.withdrawn)return true;
     if(sourceCollisionPortalBorrowedNative())return false;
+    if(sourcePhysicsModelPortalBorrowedNative())return false;
     if(n.owner){auto& z=*n.owner;auto& c=z.entity;
         if(z.portalLinks30||z.attached||z.nativeList34||z.nativeList38||z.sourceTree34||z.sourceTree38||c.parent1C||c.previous10||c.next14)return false;
         //No attachment or raw Portal/neighbor/List borrower may survive authority withdrawal.

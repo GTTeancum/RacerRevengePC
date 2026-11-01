@@ -25,6 +25,9 @@ inline bool Owner::preflightSourceTriggerActionNative(const NativeTriggerDescrip
     if(d.actionSlotsPublished&&(!d.actions68||d.actions68[0]!=d.action.get()))return false;
     if(d.sourceActionTypeWritten&&(!d.action||d.action->type00!=22||d.actionSlotsPublished!=1))return false;
     if(d.action&&(d.action->vtable108!=0x3cf0b0||(!d.sourceActionTypeWritten&&d.action->type00!=0)))return false;
+    if(d.sourceInstance->serviceAction_.entered&&(!d.action||
+       d.sourceInstance->serviceAction_.payload!=&d.action->payload10C||
+       !d.sourceInstance->serviceActionCurrentNative()))return false;
     if(d.sourceActionReaderComplete&&(!d.sourceActionTypeWritten||d.action->payload10C.targetNodeIndex!=(row?104u:29u)||
        d.action->payload10C.reset||!d.action->text04[0]||*d.action->text04[0]!='\0'))return false;
     return true;
@@ -32,7 +35,9 @@ inline bool Owner::preflightSourceTriggerActionNative(const NativeTriggerDescrip
 inline bool Owner::retireSourceTriggerActionNative(NativeTriggerDescriptor& d)noexcept {
     if(!preflightSourceTriggerActionNative(d))return false;
     if(d.sourceActionNativeWithdrawn||!d.sourceActionAttempted)return true;
-    //No installed callback owns an action yet; exact instance count98 remains0.
+    //Withdraw the exact installed native payload alias BEFORE freeing action storage.
+    if(d.sourceInstance&&d.action&&!d.sourceInstance->withdrawServiceActionNative(&d.action->payload10C))return false;
+    //Source count98/code/data receipts remain historical; this is not a source clear.
     //Native knowledge withdrawal only. Never inspect unwritten raw array slots.
     d.actionSlotsPublished=0;d.action.reset();d.actions68.reset();d.sourceActionNativeWithdrawn=true;
     //Actual allocation/reader ledgers remain historical on a later count-close

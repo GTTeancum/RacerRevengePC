@@ -29,6 +29,7 @@ class OriginalLoadingRaFile50LA;
 class OriginalRaTrackSourceFile50LA;
 class OriginalSourcePsgFile50LA;
 class OriginalSourceCollisionFile50LA;
+class OriginalSourceSkyFile50LA;
 class OriginalSourcePsgMissingLookup50LA;
 class OriginalLoadingTextureFc50LA;
 class MaterialTextureAssets50EA;
@@ -343,6 +344,7 @@ private:
     friend class OriginalRaTrackSourceFile50LA;
     friend class OriginalSourcePsgFile50LA;
     friend class OriginalSourceCollisionFile50LA;
+    friend class OriginalSourceSkyFile50LA;
     bool continueSourceCollisionFound132988(std::shared_ptr<OriginalSourcePsgMissingLookup50LA>,const void*,
         std::shared_ptr<OriginalSourceCollisionFile50LA>&,OriginalStandardTextureDiagnostic50LA&)noexcept;
     bool sourceCollisionFileCurrentNative(const OriginalSourceCollisionFile50LA&,bool active)const noexcept;

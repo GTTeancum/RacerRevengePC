@@ -53,6 +53,7 @@ class OriginalTrackParticleCold50LA final {
     friend class ::ra_pod_scene50LA::Owner;
     friend class ::ra_cold_aggregate50LA::Owner;
     std::size_t sourceConfigInvocationBorrowers_=0;
+    std::size_t sourceParticleEmitterBorrowers_=0; //Actual27C7B0 emitter70 raw borrowers; no guest retain.
     std::size_t sourceSmokerManagerBorrowers_=0; //Native source70 borrowers; no guest retain/registration.
 public:
     OriginalTrackParticleCold50LA() noexcept=default;
@@ -135,7 +136,7 @@ public:
     //1413E0 decrements the SAME423F60 exactly once while both pins are live.
     bool close() noexcept {
         if(closed_)return true;
-        if(nativeWreckBorrower_||sourceConfigInvocationBorrowers_||sourceSmokerManagerBorrowers_)return false;
+        if(nativeWreckBorrower_||sourceConfigInvocationBorrowers_||sourceSmokerManagerBorrowers_||sourceParticleEmitterBorrowers_)return false;
         if(entityConstructed_){
             if(!application_||application_->attachmentLock423F58()||
                component_.kind!=OriginalWreckComponentKind50LA::particleManager160B10||
