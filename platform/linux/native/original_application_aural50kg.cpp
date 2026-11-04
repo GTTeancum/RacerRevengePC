@@ -477,7 +477,7 @@ bool OriginalApplicationAural50KG::initializeNative102DE0(Diagnostic& d)noexcept
     for(std::size_t n=0;n<b->mixer_.count();++n)if(b->mixer_.active(n)||b->mixer_.playbackRevision(n))
         return fail(d,Status::backend,0x267910);
     initializationAttempted_=true;interfaceA0_.emplace(); //102E30 is now known, initially allocation failure/null.
-    try{*interfaceA0_=std::make_unique<NativeInterface>();}
+    try{*interfaceA0_=std::make_unique<NativeInterface>(*this);}
     catch(...){return fail(d,Status::allocation,0x102E18);}
     auto& i=**interfaceA0_;
     i.main=std::shared_ptr<OriginalUiMainAudio50KG>(b,&b->transport_);i.mixer=&b->mixer_;
@@ -1059,6 +1059,9 @@ bool OriginalApplicationAural50KG::retireNativeOrEmpty102CD0(Diagnostic& d)noexc
             nativeListenerPhase_=NativeListenerPhase::retiring;
             for(auto& listener:nativeListenerOwners_)listener.reset();
         }
+        // Explicit native cancellation of an unissued/partial source library,
+        // not26DB20, Config1573B0 or a source loaded-flag reset.
+        if(!i.sourceStreamLibrary.closeNative())return fail(d,Status::phase,0x2668e0);
         interfaceA0_->reset();
     }
     if(nativeListenerPhase_!=NativeListenerPhase::retiring){
@@ -1157,3 +1160,5 @@ bool Application::stageAuralLightNativePrefix13FE24(std::uint32_t nativeOutputRa
 }
 
 #include "native_race_intro_transport50la.inl"
+
+#include "original_stream_library_source50la.inl"

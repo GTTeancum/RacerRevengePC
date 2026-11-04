@@ -5,21 +5,70 @@
 #include <optional>
 #include <thread>
 namespace ra_cold_aggregate50LA { class Owner; }
+namespace rr::platform { class OriginalStreamLibrarySource50LA; }
 namespace rr::assets {
 class OriginalParticleSourceConfig50LA;
+class OriginalStreamLibraryFile50LA;
 // Closed native source domain, not a mirror of an arbitrary retained retail
 // process. Every newly admitted alias/writer must join this owner or poison its
 // knownness before execution. Neither Config nor Application construction resets it.
 class OriginalConfigProcessGlobals50LA final {
     friend class OriginalParticleSourceConfig50LA;
+    friend class OriginalStreamLibraryFile50LA;
+    friend class rr::platform::OriginalStreamLibrarySource50LA;
     friend class ::ra_cold_aggregate50LA::Owner;
     friend class OriginalStandardTextureLifetime50LA;
+    // Symbolic source-pointer custody, never fabricated numeric EE addresses.
+    enum class StdioIdentity { null, reent385160, file385344, file38539C,
+        file3853F4, cleanup3046F8, read308D90, write308DF8,
+        seek308E78, close308EE0, locale3C6500, decimal3C6538 };
+    struct StandardFileSelectedFields {
+        // Only fields actually selected by304550, not a fabricated full FILE.
+        StdioIdentity cursor=StdioIdentity::null; //+00
+        std::uint32_t readCount=0,writeCount=0; //+04,+08
+        std::uint16_t flags=0,descriptor=0; //+0C,+0E
+        StdioIdentity buffer=StdioIdentity::null; //+10
+        std::uint32_t lineBufferSize=0; //+18
+        StdioIdentity cookie=StdioIdentity::null; //+1C
+        std::array<StdioIdentity,4> callbacks{{StdioIdentity::null,
+            StdioIdentity::null,StdioIdentity::null,StdioIdentity::null}}; //+20..2C
+        StdioIdentity reent=StdioIdentity::null; //+54
+    };
+    // Other existing friends cannot manufacture this key: friendship is not
+    // transitive. These private helpers are exclusively Stream source joins.
+    class StreamSprintfAccess {
+        friend class OriginalStreamLibraryFile50LA;
+        friend class rr::platform::OriginalStreamLibrarySource50LA;
+        StreamSprintfAccess()noexcept {} //User-provided: not an aggregate passkey.
+    };
     struct State {
         const std::thread::id thread=std::this_thread::get_id();
         // Startup100008..100030 clears4338B0, then ctor3C9010 table3CC4D0
         // writes(0,0,0,1) at3C906C. This owner exposes only its XYZ lanes.
         std::array<std::uint32_t,3> zero4338B0{{0,0,0}};
         bool vectorKnown=true,reentrancyKnown=true,cursorKnown=true;
+        // Image38544C and385160. This is closed-process startup provenance,
+        // not an assertion about an attached/retained retail process.
+        StdioIdentity reent38544C=StdioIdentity::reent385160;
+        const std::array<StdioIdentity,3> standardFiles{{StdioIdentity::file385344,
+            StdioIdentity::file38539C,StdioIdentity::file3853F4}}; //reent+04/08/0C
+        std::uint32_t stdioInitialized=0; //image reent+38
+        StdioIdentity stdioCleanup=StdioIdentity::null; //image reent+3C
+        std::array<StandardFileSelectedFields,3> standardFileFields{};
+        // Stable +54 custody is independent of mutable FILE/glue snapshots.
+        // Image starts NULL;304570 and stdout fallback30B520 are joined writes.
+        std::array<StdioIdentity,3> standardFileReent54{{StdioIdentity::null,
+            StdioIdentity::null,StdioIdentity::null}};
+        std::array<bool,3> standardFileReent54Known{{true,true,true}};
+        StdioIdentity glueNext=StdioIdentity::null,glueFiles=StdioIdentity::null;
+        std::uint32_t glueCount=0; //image reent+1D8/+1DC/+1E0
+        bool stdioInitializationKnown=true,standardFileFieldsKnown=true,glueKnown=true;
+        // No admitted writer; a new writer/alias must join or poison first.
+        std::uint32_t byteLimit385450=1;
+        StdioIdentity fixedLocale=StdioIdentity::locale3C6500;
+        StdioIdentity decimalPoint=StdioIdentity::decimal3C6538;
+        char decimalByte='.';
+        bool byteLimitKnown=true,fixedLocaleKnown=true;
         //Startup BSS, followed only by represented lazy15AEF4..15AF00.
         std::uint8_t guard3D5DF8=0;
         std::uint32_t assertion4338F0=0;
@@ -69,6 +118,119 @@ private:
     // implemented by this owner. Knownness is never restored by a new Config.
     static void poisonUnjoinedAliasesNative()noexcept {
         auto& s=state();s.vectorKnown=false;s.reentrancyKnown=false;s.cursorKnown=false;s.groupAssertionKnown=false;s.type0AssertionsKnown=false;s.groupLookupKnown=false;s.textureListKnown=false;s.textureLoadKnown=false;s.embeddedFCKnown=false;s.compressedBytesKnown=false;
+        s.stdioInitializationKnown=false;s.standardFileFieldsKnown=false;s.glueKnown=false;
+        s.standardFileReent54Known.fill(false);
+        s.byteLimitKnown=false;s.fixedLocaleKnown=false;
+    }
+    // First step of EVERY Stream308C90 occurrence. Do not initialize the
+    // caller's temporary FILE fields before this source read succeeds.
+    static bool readStreamReent308C98(const StreamSprintfAccess&,StdioIdentity& captured,
+                                    std::uint32_t& pc)noexcept {
+        const auto& s=state();pc=0x308c98;
+        if(s.thread!=std::this_thread::get_id()||!s.reentrancyKnown||
+           s.reent38544C!=StdioIdentity::reent385160)return false;
+        captured=s.reent38544C;pc=0x308c9c;return true;
+    }
+    // Caller has now performed308CD0/CD4/CD8/CDC/CE0/CE8 in source order
+    // on its owned temporary FILE. Only the captured identity goes into+54.
+    // Join2686B8 before status and268860 Song%d. Success is entry30B568,
+    // not a formatted-output receipt. FILE and destination live through308CF4.
+    static bool initializeStreamSprintf30B528(const StreamSprintfAccess&,
+                    StdioIdentity fileReent,std::uint32_t& pc)noexcept {
+        auto& s=state();pc=0x30b50c;
+        if(s.thread!=std::this_thread::get_id()||!s.reentrancyKnown||
+           fileReent!=StdioIdentity::reent385160)return false;
+        //Owned non-NULL FILE+54 takes30B510 branch; no global re-load here.
+        pc=0x30b528;
+        if(!s.stdioInitializationKnown||s.stdioInitialized>1)return false;
+        if(!s.stdioInitialized){
+            pc=0x30b534;
+            if(!s.standardFileFieldsKnown||!s.glueKnown)return false;
+            pc=0x30473c;s.stdioCleanup=StdioIdentity::cleanup3046F8;
+            pc=0x304740;s.stdioInitialized=1;
+            constexpr std::uint16_t flags[3]={4,9,10};
+            for(std::size_t i=0;i<3;++i){
+                auto& f=s.standardFileFields[i];
+                //Actual calls304750/764/778; only selected source stores.
+                pc=0x304570;f.reent=StdioIdentity::reent385160;
+                s.standardFileReent54[i]=f.reent;s.standardFileReent54Known[i]=true;
+                pc=0x304574;f.flags=flags[i];
+                pc=0x304578;f.descriptor=static_cast<std::uint16_t>(i);
+                pc=0x30457c;f.callbacks[0]=StdioIdentity::read308D90;
+                pc=0x304580;f.callbacks[1]=StdioIdentity::write308DF8;
+                pc=0x304584;f.callbacks[2]=StdioIdentity::seek308E78;
+                pc=0x304588;f.callbacks[3]=StdioIdentity::close308EE0;
+                pc=0x30458c;f.cursor=StdioIdentity::null;
+                pc=0x304590;f.readCount=0;
+                pc=0x304594;f.writeCount=0;
+                pc=0x304598;f.buffer=StdioIdentity::null;
+                pc=0x30459c;f.lineBufferSize=0;
+                pc=0x3045a4;f.cookie=s.standardFiles[i];
+            }
+            pc=0x304784;s.glueFiles=s.standardFiles[0];
+            pc=0x304788;s.glueCount=3;
+            pc=0x30478c;s.glueNext=StdioIdentity::null;
+        }
+        pc=0x30b568;return true;
+    }
+    // Fixed status warning only:1336C0 ->30D920 ->30B4F0 prefix.
+    // No printf result or source FILE output/callback execution is claimed.
+    static bool initializeStreamStatusWarning1336C0(const StreamSprintfAccess& key,
+                                                    std::uint32_t& pc)noexcept {
+        auto& s=state();pc=0x30d930;
+        if(s.thread!=std::this_thread::get_id()||!s.reentrancyKnown||
+           s.reent38544C!=StdioIdentity::reent385160)return false;
+        pc=0x30d93c;
+        if(s.standardFiles[1]!=StdioIdentity::file38539C)return false;
+        pc=0x30b50c;
+        if(!s.standardFileReent54Known[1])return false;
+        auto captured=s.standardFileReent54[1];
+        if(captured==StdioIdentity::null){
+            pc=0x30b51c;
+            if(!s.reentrancyKnown||s.reent38544C!=StdioIdentity::reent385160)return false;
+            captured=s.reent38544C;
+            pc=0x30b520;s.standardFileReent54[1]=captured;
+            // Keep the selected snapshot coherent only while it remains known.
+            if(s.standardFileFieldsKnown)s.standardFileFields[1].reent=captured;
+        }
+        return initializeStreamSprintf30B528(key,captured,pc);
+    }
+    // Run at actual30B5A0.305330 reads shared reent, but3052E8 ignores
+    // its argument and returns the fixed locale. No host locale substitution.
+    static bool streamLocale305328(const StreamSprintfAccess&,char& decimal,std::uint32_t& pc)noexcept {
+        const auto& s=state();pc=0x305330;
+        if(s.thread!=std::this_thread::get_id()||!s.reentrancyKnown||
+           s.reent38544C!=StdioIdentity::reent385160)return false;
+        pc=0x3052f0;
+        if(!s.fixedLocaleKnown||s.fixedLocale!=StdioIdentity::locale3C6500)return false;
+        pc=0x30b5a8;
+        if(s.decimalPoint!=StdioIdentity::decimal3C6538||s.decimalByte!='.')return false;
+        decimal=s.decimalByte;pc=0x30b5b0;return true;
+    }
+    // Actual30B658/65C ->306108, only non-NULL in-bounds immutable
+    // caller-owned format bytes. Caller keeps any prior wide value when limit0.
+    static bool streamByte306108(const StreamSprintfAccess&,unsigned char byte,
+            std::uint32_t& wide,std::int32_t& length,std::uint32_t& pc)noexcept {
+        const auto& s=state();pc=0x30b658;
+        if(s.thread!=std::this_thread::get_id()||!s.reentrancyKnown||
+           s.reent38544C!=StdioIdentity::reent385160)return false;
+        pc=0x30b65c;if(!s.byteLimitKnown)return false;
+        if(!s.byteLimit385450){pc=0x306124;length=-1;}
+        else {pc=0x306130;wide=byte;pc=0x306138;length=byte?1:0;}
+        pc=0x30b670;return true;
+    }
+    // Explicit native warning-transport boundary, NOT a retail stdio receipt.
+    // The adapter must not execute the stored source FILE/cleanup callbacks.
+    // It does not mutate this owner's+38,38544C,385450 or fixed locale.
+    // Native fputs cannot change symbolic standardFiles or FILE+54 custody.
+    // Once initialized, later sprintf does not inspect standard FILEs/glue, so their
+    // discarded snapshots are neither refreshed nor asserted to remain current.
+    // Arbitrary/source stdio, external reent aliases or unknown callback effects
+    // require poisonUnjoinedAliasesNative BEFORE admission instead.
+    static void streamNativeDiagnosticBoundary(const StreamSprintfAccess&)noexcept {
+        auto& s=state();s.standardFileFieldsKnown=false;s.glueKnown=false;
+        if(s.thread!=std::this_thread::get_id()||s.stdioInitialized!=1)
+            s.stdioInitializationKnown=false;
     }
     static bool readCompressedBytes24F7F0(std::uint32_t& value)noexcept {
         const auto& s=state();if(s.thread!=std::this_thread::get_id()||!s.compressedBytesKnown)return false;

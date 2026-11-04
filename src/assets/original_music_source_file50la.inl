@@ -17,7 +17,7 @@ bool OriginalMusicSourceFile50LA::begin131230(std::shared_ptr<R> resolver,const 
        name!="audio\\racemus.jub"||root.empty()||!resolver->freshFileCapacity_||!resolver->scratch_)
         return fail(d,E::phase,0x131230);
     auto& s=*resolver->freshFileCapacity_;
-    if(s.musicOwner||!s.members150||s.memberCount154<=0||!s.devices14||s.deviceCount18<=0||s.read174||
+    if(s.streamLibraryOwner||s.musicOwner||!s.members150||s.memberCount154<=0||!s.devices14||s.deviceCount18<=0||s.read174||
        s.registration!=C::Registration::complete||s.cursor168< -1||s.cursor168>=s.memberCount154||
        s.failedCourseDevices||s.failedCourseMembers)return fail(d,E::phase,0x131230);
     storage_=std::make_unique<Storage>();audioRoot_=root;resolver_=std::move(resolver);config_=config;

@@ -3,7 +3,7 @@ bool OriginalStandardTextureResolver50LA::registerTrackBank12CEA0(OriginalRaTrac
     d={};using C=FreshFileCapacity;
     if(!freshFileCapacity_||!scratch_||!root.archive_||!root.provider_||
        root.archive_->identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::trackRa))return fail(d,E::source,0x12CEA0);
-    auto& s=*freshFileCapacity_;if(s.musicOwner)return fail(d,E::phase,0);auto& t=s.track;
+    auto& s=*freshFileCapacity_;if(s.streamLibraryOwner||s.musicOwner)return fail(d,E::phase,0);auto& t=s.track;
     if(t.attempted||t.root||s.provider.get()!=root.provider_.get()||s.registration!=C::Registration::complete||
        !s.devices14||!s.members150||s.deviceCount18<=0||s.memberCount154<=0||s.read174)
         return fail(d,E::phase,0x12CEA0);
@@ -127,7 +127,7 @@ bool OriginalStandardTextureResolver50LA::registerTrackBank12CEA0(OriginalRaTrac
     t.joined=true;return true;
 }
 bool OriginalStandardTextureResolver50LA::resizeTrackCache132E40(OriginalRaTrackSourceFile50LA& root,D& d)noexcept {
-    d={};if(!freshFileCapacity_||!scratch_)return fail(d,E::phase,0x132E40);auto& s=*freshFileCapacity_;if(s.musicOwner)return fail(d,E::phase,0);auto& t=s.track;
+    d={};if(!freshFileCapacity_||!scratch_)return fail(d,E::phase,0x132E40);auto& s=*freshFileCapacity_;if(s.streamLibraryOwner||s.musicOwner)return fail(d,E::phase,0);auto& t=s.track;
     if(t.root!=&root||!t.registered||!s.devices14||s.read174||t.cacheAttempted)return fail(d,E::phase,0x132E40);
     std::uint32_t length=0;for(std::int32_t n=0;n<s.deviceCount18;++n)if(s.devices14[n].name04&&courseSourceName308F00("tracks\\ra.res",s.devices14[n].name04)){length=s.devices14[n].length14;break;}
     std::size_t budget=0x280000;
@@ -152,7 +152,7 @@ bool OriginalStandardTextureResolver50LA::resizeTrackCache132E40(OriginalRaTrack
     return returned?true:fail(d,E::allocation,0x13318C);
 }
 bool OriginalStandardTextureResolver50LA::closeTrackBankNative(OriginalRaTrackSourceFile50LA& root,D& d)noexcept {
-    d={};if(!freshFileCapacity_||!scratch_)return fail(d,E::phase,0);auto& s=*freshFileCapacity_;if(s.musicOwner)return fail(d,E::phase,0);auto& t=s.track;
+    d={};if(!freshFileCapacity_||!scratch_)return fail(d,E::phase,0);auto& s=*freshFileCapacity_;if(s.streamLibraryOwner||s.musicOwner)return fail(d,E::phase,0);auto& t=s.track;
     if(!t.root)return !root.acquired_;
     if(t.root!=&root||root.occurrence_||root.nativeMissingLookupBorrowers_||s.particleConfigBorrower||s.sourceSkyFileBorrower)return fail(d,E::phase,0);
     auto* members=s.members150?s.members150:s.failedCourseMembers;const auto memberCount=s.members150?s.memberCount154:s.failedCourseMemberCapacity;

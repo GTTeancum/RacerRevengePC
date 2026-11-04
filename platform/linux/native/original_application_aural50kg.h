@@ -1,5 +1,6 @@
 #pragma once
 #include "audio_mixer50hd.h"
+#include "original_stream_library_source50la.h"
 #include "native_race_intro_transport50la.h"
 #include "../../../src/game/original_application_entities50la.h"
 #include "../../../src/game/original_application_animation_clock50kg.h"
@@ -31,6 +32,7 @@ class NativeSourceReverb50KG;
 // recreating guest RPC, or importing hardware voice IDs.
 class OriginalApplicationAural50KG final {
     friend struct ::original_main_entry50KG::Application;
+    friend class OriginalStreamLibrarySource50LA;
     friend class OriginalUiLightManagerOwner50KG;
     friend class OriginalUiGaragePageOwner50KG;
     friend class RaceAudioGroups50IC;
@@ -107,6 +109,9 @@ private:
         bool valid()const noexcept;
     };
     struct NativeInterface {
+        OriginalStreamLibrarySource50LA sourceStreamLibrary;
+        explicit NativeInterface(const OriginalApplicationAural50KG& owner)noexcept
+            :sourceStreamLibrary(owner,this){}
         // Non-Entity2329A0 owner. Actual267910's three8-row allocations;
         // third contents are unknown until a producer writes them.
         std::unique_ptr<std::uint32_t[]> handles9C0,reuseAge9C8;
@@ -199,6 +204,8 @@ private:
     static bool construct13FE24(const Application&,std::shared_ptr<OriginalApplicationAural50KG>&,Diagnostic&)noexcept;
     bool sourceIdentity()const noexcept;
     bool backendCurrent(bool permitFailedTransport=false)const noexcept;
+    bool sourceStreamLibraryIdentityCurrent(const OriginalStreamLibrarySource50LA&,
+        const assets::OriginalStandardTextureResolver50LA*)const noexcept;
     bool exactAuralOnlyStartupPrefix()const noexcept;
     bool initializeNative102DE0(Diagnostic&)noexcept;
     // Explicit bounded native Light/Aural prefix, not complete retail startup.

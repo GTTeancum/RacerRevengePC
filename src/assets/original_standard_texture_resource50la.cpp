@@ -9,6 +9,7 @@
 #include "original_loading_pst_file50la.h"
 #include "original_loading_ra_file50la.h"
 #include "original_music_source_file50la.h"
+#include "original_stream_library_file50la.h"
 #include "original_loading_texture_fc50la.h"
 #include "original_loading_pst_native50la.h"
 #include "original_loading_texture_source50la.h"
@@ -27,6 +28,7 @@
 #include "original_standard_ipum_framing50la.h"
 #include "original_standard_ipum_image_lease50la.h"
 #include <cstring>
+#include <cstdio>
 #include <atomic>
 #include <new>
 #include <algorithm>
@@ -90,6 +92,7 @@ struct FileIoAssertion {
     }
 };
 struct FileIoAssertions {
+    FileIoAssertion status8218_3E1AE0,status821C_3E1AE8;
     FileIoAssertion active8214_3E1AD8,line8220_3E1AF0,line8224_3E1AF8;
     FileIoAssertion reuse81E8_3E1A80,reuseNext81EC_3E1A88;
     FileIoAssertion eof8230_3E1B10,eof8234_3E1B18;
@@ -642,6 +645,7 @@ struct OriginalStandardTextureResolver50LA::FreshFileCapacity {
     CourseStage courseStage=CourseStage::none;
     SourceBankFamily sourceBankFamily=SourceBankFamily::course;
     bool loadingFontsSourceRetired=false,loadingIconSourceRetired=false; // Only genuine source12E5E0 produces these predecessors.
+    OriginalStreamLibraryFile50LA* streamLibraryOwner=nullptr; // Same-App sequential TXT/JUK native pin.
     OriginalMusicSourceFile50LA* musicOwner=nullptr; // Pins exact Config open, including misses and bounded failures.
     OriginalLoadingRaFile50LA* loadingRaOwner=nullptr; // Distinct simultaneous loose owner, never a bank root.
     struct TrackBank {
@@ -664,6 +668,7 @@ struct OriginalStandardTextureResolver50LA::FreshFileCapacity {
     } pod;
     const void* courseRootOwner=nullptr;
     std::size_t courseNativeBorrowers=0,courseWindowBytes=0;
+    std::int32_t encodedWindowDevice=-1; // Native provenance for actual resident bytes, not a source field.
     std::size_t courseMount=static_cast<std::size_t>(-1);std::uint64_t courseGeneration=0;
     bool courseOwnsNativeMount=false;
     std::uint32_t sourceOpenFlags158=0; //12C858 actual FileManager constructor; no joined setter changes it.
@@ -1067,6 +1072,7 @@ bool OriginalStandardTextureResolver50LA::readAppStartNames17CAD4(
             return abort(E::source,0x133290,actual);
         actual+=static_cast<std::size_t>(amount);
     }
+    state.courseWindowBytes=actual;state.encodedWindowDevice=device.id00; // Actual first17CAD4 encoded read, never a synthetic refill.
     state.window7C=0;state.window80=0;
     // Exact table-loop order: subtract current, read next, conditionally
     // increment end, then test remaining. Added bounds reject unsafe variants.
@@ -1343,7 +1349,7 @@ bool OriginalStandardTextureResolver50LA::sourceScreenTemplate17CAFCClosed(
 }
 OriginalStandardTextureResolver50LA::OriginalStandardTextureResolver50LA() noexcept=default;
 OriginalStandardTextureResolver50LA::~OriginalStandardTextureResolver50LA() {
-    if(freshFileCapacity_&&freshFileCapacity_->musicOwner)std::terminate();
+    if(freshFileCapacity_&&(freshFileCapacity_->streamLibraryOwner||freshFileCapacity_->musicOwner))std::terminate();
     //Every cached live resource pins this resolver. Only cleared associations
     //can remain when the final resolver owner goes away.
     if(storage_)for(const auto& file:storage_->files)
@@ -1715,7 +1721,7 @@ bool OriginalStandardTextureResolver50LA::issueGarageBank(
 }
 bool OriginalStandardTextureResolver50LA::canRetireGarageBank12E5E0(
     const GarageBankLease50LA& lease,D& d) const noexcept {
-    if(freshFileCapacity_&&freshFileCapacity_->musicOwner)return fail(d,E::phase,0);
+    if(freshFileCapacity_&&(freshFileCapacity_->streamLibraryOwner||freshFileCapacity_->musicOwner))return fail(d,E::phase,0);
     d={};const auto& provider=lease.provider_;
     if(lease.resolver_!=this||lease.thread_!=std::this_thread::get_id()||!storage_||!provider||
        lease.managerIdentity_!=storage_->managerIdentity||storage_->provider!=provider||
@@ -1762,7 +1768,7 @@ bool OriginalStandardTextureResolver50LA::validateGarageBankRows12EAA0(
 }
 bool OriginalStandardTextureResolver50LA::retireNativeRaceMounts1316A0(
     NativeRaceMountLease50LA& lease,D& d)noexcept {
-    if(freshFileCapacity_&&freshFileCapacity_->musicOwner)return fail(d,E::phase,0);
+    if(freshFileCapacity_&&(freshFileCapacity_->streamLibraryOwner||freshFileCapacity_->musicOwner))return fail(d,E::phase,0);
     d={};
     if(lease.closed_)return true;
     if(lease.thread_!=std::this_thread::get_id()||!lease.provider_||
@@ -3539,7 +3545,7 @@ bool OriginalStandardTextureLifetime50LA::resetDemand14D180() noexcept {
 }
 bool OriginalStandardTextureResolver50LA::registerSourceBank12CEA0(
     std::shared_ptr<const OriginalUiArchive50KG> archive,const OriginalStandardArchiveProvider50LA* expectedProvider,const void* owner,SourceBankFamily family,bool& acquired,D& d)noexcept {
-    if(freshFileCapacity_&&freshFileCapacity_->musicOwner)return fail(d,E::phase,0);
+    if(freshFileCapacity_&&(freshFileCapacity_->streamLibraryOwner||freshFileCapacity_->musicOwner))return fail(d,E::phase,0);
     d={};acquired=false;using Capacity=FreshFileCapacity;
     const auto identity=family==SourceBankFamily::course?OriginalUiArchiveId50KG::course:
         family==SourceBankFamily::loadingFonts?OriginalUiArchiveId50KG::fonts:OriginalUiArchiveId50KG::loadingIcon;
@@ -3747,6 +3753,7 @@ bool OriginalStandardTextureResolver50LA::refillCourseWindow130340(std::int32_t 
     const std::size_t marker=(device.flags0C&0x200)?1:0;std::size_t offset=device.payload18;
     for(std::size_t n=0;n<block;++n){if(!length(n))return fail(d,E::source,0x130340);offset+=length(n)+marker;}
     if(offset>device.length14)return fail(d,E::source,0x130340);
+    s.encodedWindowDevice=-1;s.courseWindowBytes=0; // Invalidate native provenance before mutating shared resident buffers.
     if(marker)for(auto& input:s.inputs)if(input.pointer){
         if(!input.lengthWritten)return fail(d,E::phase,0x133230);std::memset(input.pointer,0,input.length);}
     if(!device.handle10->seek(offset))return fail(d,E::source,0x130340);
@@ -3758,7 +3765,7 @@ bool OriginalStandardTextureResolver50LA::refillCourseWindow130340(std::int32_t 
         if(amount&&!device.handle10->read(input.pointer,amount))return fail(d,E::source,0x133290,actual);
         actual+=amount;if(actual==requested)break;
     }
-    s.courseWindowBytes=actual;s.window7C=static_cast<std::int32_t>(block);s.window80=static_cast<std::int32_t>(block);
+    s.courseWindowBytes=actual;s.encodedWindowDevice=id;s.window7C=static_cast<std::int32_t>(block);s.window80=static_cast<std::int32_t>(block);
     std::int64_t remaining=static_cast<std::int64_t>(actual);std::size_t current=block;
     do {
         if(current+1>=count||!length(current))return fail(d,E::source,0x130340);
@@ -3893,13 +3900,14 @@ bool OriginalStandardTextureResolver50LA::openExactSourceMember131380(const void
 bool OriginalStandardTextureResolver50LA::sourceBankMemberCurrent(const void* root,const void* occurrence,std::int32_t handle)const noexcept {
     if(!freshFileCapacity_||!scratch_||!root||!occurrence)return false;const auto& s=*freshFileCapacity_;
     if(!((s.courseRootOwner==root&&s.courseStage==FreshFileCapacity::CourseStage::joined)||
-         (s.track.root==root&&s.track.joined)||sourcePodBankCurrentNative(root))||!s.members150||handle<0||handle>=s.memberCount154)return false;
+         (s.track.root==root&&s.track.joined)||sourcePodBankCurrentNative(root)||streamLibraryRootCurrent(root))||!s.members150||handle<0||handle>=s.memberCount154)return false;
     if(s.track.root==root){
         if(!s.provider||s.track.mount>=s.provider->mounts_.size())return false;
         const auto& bank=*s.provider->mounts_[s.track.mount];
         if(!bank.active||bank.generation!=s.track.generation)return false;
     }
-    const auto device=s.pod.root==root?s.pod.device:(s.track.root==root?s.track.device:s.courseDevice);
+    const auto device=s.streamLibraryOwner==root?0:s.pod.root==root?s.pod.device:(s.track.root==root?s.track.device:s.courseDevice);
+    if(s.streamLibraryOwner==root&&(s.streamLibraryOwner->handle_!=handle||s.streamLibraryOwner->occurrence_!=occurrence))return false;
     const auto& member=s.members150[handle];return member.courseConfigOwner==occurrence&&member.deviceID00==device&&
         (member.flags18&4)&&member.cursor10<=member.length14&&member.originalMember&&member.filename08;
 }
@@ -3927,7 +3935,7 @@ bool OriginalStandardTextureResolver50LA::readSourceBankMember130560(const void*
             const std::size_t marker=(device.flags0C&0x200)?1:0;std::size_t relative=0;
             for(std::size_t n=std::size_t(s.window7C);n<block;++n)relative+=length(n)+marker;
             const auto encodedLength=length(block);if(!encodedLength||encodedLength>Scratch::bytes||
-               relative>s.courseWindowBytes||encodedLength+marker>s.courseWindowBytes-relative)return fail(d,E::source,0x133330,copied);
+               s.encodedWindowDevice!=member.deviceID00||relative>s.courseWindowBytes||encodedLength+marker>s.courseWindowBytes-relative)return fail(d,E::source,0x133330,copied);
             //130B54..130BA8 checks the outstanding read before the marker.
             //13D880 returns native device completion and writes error/progress.
             // Our immutable synchronous encoded-input backend has completed
@@ -4003,7 +4011,7 @@ bool OriginalStandardTextureResolver50LA::closeSourceBankMember131040(const void
 }
 bool OriginalStandardTextureResolver50LA::retireSourceBankNative(const void* root,D& d)noexcept {
     d={};if(!freshFileCapacity_||!root)return fail(d,E::phase,0);
-    auto& s=*freshFileCapacity_;if(s.musicOwner||s.particleConfigBorrower||s.sourceSkyFileBorrower)return fail(d,E::phase,0);if(s.courseStage==FreshFileCapacity::CourseStage::none&&!s.courseRootOwner)return true;
+    auto& s=*freshFileCapacity_;if(s.streamLibraryOwner||s.musicOwner||s.particleConfigBorrower||s.sourceSkyFileBorrower)return fail(d,E::phase,0);if(s.courseStage==FreshFileCapacity::CourseStage::none&&!s.courseRootOwner)return true;
     if(s.courseRootOwner!=root)return fail(d,E::phase,0);
     if(s.courseStage==FreshFileCapacity::CourseStage::retired)return true;
     if(s.courseNativeBorrowers!=1)return fail(d,E::phase,0);
@@ -4248,7 +4256,7 @@ bool OriginalLoadingFontSource50LA::retireBank1CAD94(OriginalStandardTextureReso
 }
 bool OriginalStandardTextureResolver50LA::retireLoadingFontSource1CAD94(OriginalLoadingFontSource50LA& owner,
     LoadingFontsBankLease& lease,D& d)noexcept {
-    if(freshFileCapacity_&&freshFileCapacity_->musicOwner)return fail(d,E::phase,0);
+    if(freshFileCapacity_&&(freshFileCapacity_->streamLibraryOwner||freshFileCapacity_->musicOwner))return fail(d,E::phase,0);
     d={};if(!sourceBankFamilyCurrent(&owner,SourceBankFamily::loadingFonts)||!owner.joined_||owner.nativeClosed_||owner.sourceRetired_||
        owner.thread_!=std::this_thread::get_id()||owner.celOccurrence_||owner.handle_!=-1||
        owner.registryReceipts_[0].entry.expired()||owner.registryReceipts_[1].entry.expired())return fail(d,E::phase,0x1CAD94);
@@ -4387,6 +4395,7 @@ bool OriginalStandardTextureResolver50LA::registerLoadingIconBank12CEA0(std::sha
 
 #include "original_loading_ra_file50la.inl"
 #include "original_music_source_file50la.inl"
+#include "original_stream_library_file50la.inl"
 
 #include "original_ra_track_source_file50la.inl"
 #include "original_source_psg_file50la.inl"

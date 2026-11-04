@@ -4,7 +4,7 @@ bool OriginalStandardTextureResolver50LA::registerPodBank12CEA0(OriginalPodSourc
     if(!freshFileCapacity_||!scratch_||!root.archive_||!root.provider_||
        root.archive_->identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::sourcePod01)||
        root.path_!="Pods\\pod01\\pod01.res")return fail(d,E::source,0x12CEA0);
-    auto& s=*freshFileCapacity_;if(s.musicOwner)return fail(d,E::phase,0);auto& t=s.pod;
+    auto& s=*freshFileCapacity_;if(s.streamLibraryOwner||s.musicOwner)return fail(d,E::phase,0);auto& t=s.pod;
     if(t.attempted||t.root||s.provider.get()!=root.provider_.get()||s.registration!=C::Registration::complete||
        !s.devices14||!s.members150||s.deviceCount18<=0||s.memberCount154<=0||s.read174)
         return fail(d,E::phase,0x12CEA0);
@@ -131,7 +131,7 @@ bool OriginalStandardTextureResolver50LA::registerPodBank12CEA0(OriginalPodSourc
     t.joined=true;return true;
 }
 bool OriginalStandardTextureResolver50LA::closePodBankNative(OriginalPodSourceBank50LA& root,D& d)noexcept {
-    d={};if(!freshFileCapacity_||!scratch_)return fail(d,E::phase,0);auto& s=*freshFileCapacity_;if(s.musicOwner)return fail(d,E::phase,0);auto& t=s.pod;
+    d={};if(!freshFileCapacity_||!scratch_)return fail(d,E::phase,0);auto& s=*freshFileCapacity_;if(s.streamLibraryOwner||s.musicOwner)return fail(d,E::phase,0);auto& t=s.pod;
     if(!t.root)return !root.acquired_;
     if(t.root!=&root)return fail(d,E::phase,0);
     auto* members=s.members150?s.members150:s.failedCourseMembers;const auto memberCount=s.members150?s.memberCount154:s.failedCourseMemberCapacity;
