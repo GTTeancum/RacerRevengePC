@@ -159,6 +159,7 @@ def main():
         'src/game/original_simple_vcr50la.cpp',
         'src/game/original_race_music_manager50la.cpp',
         'src/game/original_race_timing_manager50la.cpp',
+        'src/game/original_race_racer_manager50la.cpp',
         'src/assets/original_results_primitive_references50la.cpp',
         'src/game/original_opponent_selection50kg.cpp',
         'src/game/source_indexed_type2_query50mb.cpp',

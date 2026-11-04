@@ -77,12 +77,29 @@ inline bool live_audio50HF::Owner::canStopResultsGameplay26D070(
 inline bool native_original_ai_audio::Owner::canStopResultsEngines26D070(
     const rr::platform::AudioMixer50HD& mixer,
     const rr::platform::RaceAudioGroups50IC& groups,std::uint64_t session)const noexcept {
-    // Exact human Course domain, never the overlapping ALL8 row0 mapping or
-    // alternative host opponent subscriber. Those remain unsupported here.
+    // Exact human Course domain. ALL8 uses its separate gate below; never
+    // borrow a human controller or admit an alternative host subscriber.
     if(!prepared_||!activated_||!session||firstAiSlot_!=1||racerCount_!=8||
        !mode_||mode_!=mixer.originalSoundMode50KG()||!mode_->ready()||
        !humanResetOwner_||!humanResetOwner_->bound()||
        humanResetOwner_->identity().session!=session||!groups.uses(mixer))return false;
+    return canStopNativeEngineRows26D070(mixer,groups,session);
+}
+inline bool native_original_ai_audio::Owner::canStopAll8Engines26D070(
+    const rr::platform::AudioMixer50HD& mixer,
+    const rr::platform::RaceAudioGroups50IC& groups,std::uint64_t session)const noexcept {
+    if(!prepared_||!activated_||!session||firstAiSlot_!=0||racerCount_!=8||
+       !mode_||mode_!=mixer.originalSoundMode50KG()||!mode_->ready()||
+       humanResetOwner_||humanResetD44_||humanMaterials_.resultsStopCount26D070()||
+       materialD44_.humanCount()!=0||materialD44_.racerCount()!=8||!groups.uses(mixer))return false;
+    for(std::size_t i=0;i<racerCount_;++i)if(!materialD44_.ownsAiSlot(i))return false;
+    return canStopNativeEngineRows26D070(mixer,groups,session);
+}
+inline bool native_original_ai_audio::Owner::canStopNativeEngineRows26D070(
+    const rr::platform::AudioMixer50HD& mixer,
+    const rr::platform::RaceAudioGroups50IC& groups,std::uint64_t session)const noexcept {
+    // Reached only after one complete domain gate. Actual per-row owners,
+    // sound addresses, revisions/PCM and group bindings supply every claim.
     for(std::size_t i=firstAiSlot_;i<racerCount_;++i){const auto& r=racers_[i];
         if(r.owner!=this||r.slot!=i||!r.engine.constructed||!r.engine.prepared||
            r.engine.blocked||r.engine.inUpdate||r.engine.identity.session!=session||
@@ -103,11 +120,22 @@ inline bool native_original_ai_audio::Owner::canStopResultsEngines26D070(
 inline bool native_original_ai_audio::Owner::canStopResultsAuxiliary26D070(
     const rr::platform::AudioMixer50HD& mixer,
     const rr::platform::RaceAudioGroups50IC& groups,std::uint64_t session)const noexcept {
+    if(!canStopResultsEngines26D070(mixer,groups,session))return false;
+    return canStopNativeAuxiliaryRows26D070(mixer,groups,session);
+}
+inline bool native_original_ai_audio::Owner::canStopAll8Auxiliary26D070(
+    const rr::platform::AudioMixer50HD& mixer,
+    const rr::platform::RaceAudioGroups50IC& groups,std::uint64_t session)const noexcept {
+    if(!canStopAll8Engines26D070(mixer,groups,session))return false;
+    return canStopNativeAuxiliaryRows26D070(mixer,groups,session);
+}
+inline bool native_original_ai_audio::Owner::canStopNativeAuxiliaryRows26D070(
+    const rr::platform::AudioMixer50HD& mixer,
+    const rr::platform::RaceAudioGroups50IC& groups,std::uint64_t session)const noexcept {
     using Group=rr::game::RaceAudioGroup50IC;
-    // Reuse exact Course identity and non-reentrant engine checks, not a
-    // range-only assumption. No extra close/reset or callback is performed.
-    if(!canStopResultsEngines26D070(mixer,groups,session)||
-       !materialPrepared_||!materialNativeBound_||!speechPrepared_||!speechInitialized_||
+    // Exact domain gate already proved all engine rows and real pool shape.
+    // ALL8's firstAiSlot0 reaches no human branch below. No reset/close occurs.
+    if(!materialPrepared_||!materialNativeBound_||!speechPrepared_||!speechInitialized_||
        materialD44_.humanCount()!=firstAiSlot_||materialD44_.racerCount()!=racerCount_)return false;
     const auto* group44=groups.sourceState44(Group::Effects110);
     if(!group44)return false;

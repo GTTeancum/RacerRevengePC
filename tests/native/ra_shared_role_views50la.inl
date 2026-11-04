@@ -60,7 +60,7 @@
         if(main.type2Resource!=q.main.resource||secondary.type2Resource!=q.secondary.resource||
            !terrain.terrainResource||!terrain.terrainResource->initialized||
            terrain.type2Resource!=&terrain.terrainResource->resource||
-           !live_terrain_probe50fr::matches(*terrain.terrainResource,q.terrain.initial)||
+           !sharedTerrainMatches(terrain,q.terrain.initial)||!sharedTerrainBankViewMatches(terrain,q.terrainLive)||
            pod.bodyA0!=staged.bodyA0||pod.type0Resource!=&authored||
            std::memcmp(shape.local40.v,authored.local40.v,sizeof(shape.local40.v))||
            std::memcmp(shape.rootCenter.v,authored.rootCenter.v,sizeof(shape.rootCenter.v))||

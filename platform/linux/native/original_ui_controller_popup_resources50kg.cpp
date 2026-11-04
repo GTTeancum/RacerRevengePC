@@ -4,6 +4,7 @@
 #include "../../../tests/native/original_ui_main_entry50kg.h"
 #include "original_ui_options_draw_resources50kg.h"
 #include "original_ui_main_draw50kg.h"
+#include "original_ui_rider_draw_resources50kg.h"
 #include "../../../src/game/original_ui_controller_popup_geometry50kg.h"
 #include <limits>
 #include <utility>
@@ -167,6 +168,33 @@ bool OriginalUiControllerPopupResources50KG::prepareOrRejoin(const OriginalUiMai
    copy.registryIdentity=b.registryIdentity;copy.material=b.material;copy.images=b.images;mapped.push_back(std::move(copy));
   }
   return prepareOrRejoin(input,std::move(images),mapped,d);
+ }catch(...){return fail(d,E::allocation,0);}
+}
+bool OriginalUiControllerPopupResources50KG::prepareOrRejoin(const OriginalUiRiderColdInput50KG& in,
+ std::shared_ptr<const assets::OriginalUiScreenAssets50KG> images,const std::vector<OriginalUiRiderMaterialBinding50KG>& bindings,D& d) noexcept {
+ d={};
+ // Unlike the Main/Options construction path, Rider must bring the existing
+ // root's exact47C, attached six-role history and same live SharedDialogs.
+ // Never fall back to the legacy five-role initialization or a new owner.
+ if(in.retainedControllerPopup.get()!=this||!loaded()||storage_->poisoned||!storage_->sharedOwner||
+    !storage_->sharedHistory||!sharedDialogBoundCurrent(*storage_->sharedOwner))return fail(d,E::history,0x2055B0);
+ if(!in.english||!in.english->loaded()||!images||!images->loaded())return fail(d,E::input,0x2055B0);
+ try {
+  // This is only a typed adapter to the existing immutable source checks.
+  // Every source/Video/runtime field is copied from the actual Rider input;
+  // no Options application, manager or runtime value is manufactured.
+  OriginalUiOptionsColdInput50KG input;input.appStart=in.appStart;input.controllerPopup=in.controllerPopup;
+  input.fonts=in.fonts;input.english=in.english;input.runtime=in.runtime;
+  input.video={in.video.lifetime,in.video.width,in.video.height,in.video.colorBits,in.video.packetZMaximum,in.video.zBufferFormat,{}};
+  constexpr std::size_t offsets[]={70804,70826,70853,70872,70891,70917};
+  std::vector<OriginalUiOptionsMaterialBinding50KG> mapped;
+  for(const auto& b:bindings)for(const auto token:OriginalUiSharedDialogMaterialHistory50KG::registryTokens)if(b.registryToken==token){
+   d.registryToken=token;
+   if(b.registryByteOffset!=offsets[token-3228])return fail(d,E::identity,0x298724);
+   OriginalUiOptionsMaterialBinding50KG copy;copy.registeredName=b.registeredName;copy.registryToken=b.registryToken;
+   copy.registryIdentity=b.registryIdentity;copy.material=b.material;copy.images=b.images;mapped.push_back(std::move(copy));
+  }
+  return storage_->sharedHistory->rejoinBank(input,std::move(images),mapped,d);
  }catch(...){return fail(d,E::allocation,0);}
 }
 bool OriginalUiControllerPopupResources50KG::project(const game::OriginalUiControllerPopupRender50KG& render,D& d)noexcept{

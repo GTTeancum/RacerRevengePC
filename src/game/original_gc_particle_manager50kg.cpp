@@ -1,4 +1,6 @@
 #include "original_gc_particle_manager50kg.h"
+#include "original_particle_fog_velocity50la.h"
+#include "original_particle_fog_lifetime50la.h"
 #include "import_world48f.h"
 #include "original_ui_pages50kg.h"
 #include <algorithm>
@@ -370,8 +372,7 @@ bool OriginalGcParticleManager50KG::sourceVelocitySlotCurrentNative(
     if(index128!=0||!expected||
        !sourcePositionSlotCurrentNative(publication138,index128,expected,nullptr))return false;
     if(!committedVelocity)return true; //No source velocity read before its reached store.
-    if((*committedVelocity)[0]||(*committedVelocity)[1]||(*committedVelocity)[2]||
-       (*committedVelocity)[3]!=0x3f800000u)return false;
+    if(!detail::sourceParticleFogVelocityVector50LA(*committedVelocity))return false;
     static_assert(offsetof(OriginalGcParticle50KG,velocity)==0x10&&
         offsetof(OriginalGcParticle50KG,velocityW)==0x1c,"source velocity10 layout");
     std::array<std::uint32_t,4> bits{};
@@ -383,7 +384,7 @@ bool OriginalGcParticleManager50KG::sourceVelocitySlotCurrentNative(
 bool OriginalGcParticleManager50KG::storeSourceVelocity16088C(
     const void* publication138,std::int32_t index128,const OriginalGcParticle50KG* expected,
     const std::array<std::uint32_t,4>& after,std::array<std::uint32_t,4>& before)noexcept {
-    if(after[0]||after[1]||after[2]||after[3]!=0x3f800000u||
+    if(!detail::sourceParticleFogVelocityVector50LA(after)||
        !sourceVelocitySlotCurrentNative(publication138,index128,expected,nullptr))return false;
     const auto& fields=sourcePool_->fogFields;
     if(fields.record||fields.emitter||fields.owner48||fields.storedCount)return false;
@@ -461,8 +462,7 @@ bool OriginalGcParticleManager50KG::sourceSuccessorVelocitySlotCurrentNative(
        !sourcePositionSlotCurrentNative(publication138,index128,expected,nullptr))return false;
     if(expected==sourcePool_->fogFields.record)return false;
     if(!committedVelocity)return true; //No source velocity read before its reached store.
-    if((*committedVelocity)[0]||(*committedVelocity)[1]||(*committedVelocity)[2]||
-       (*committedVelocity)[3]!=0x3f800000u)return false;
+    if(!detail::sourceParticleFogVelocityVector50LA(*committedVelocity))return false;
     static_assert(offsetof(OriginalGcParticle50KG,velocity)==0x10&&
         offsetof(OriginalGcParticle50KG,velocityW)==0x1c,"source velocity10 layout");
     std::array<std::uint32_t,4> bits{};
@@ -474,7 +474,7 @@ bool OriginalGcParticleManager50KG::sourceSuccessorVelocitySlotCurrentNative(
 bool OriginalGcParticleManager50KG::storeSourceSuccessorVelocity16088C(
     const void* publication138,std::int32_t index128,const OriginalGcParticle50KG* expected,
     const std::array<std::uint32_t,4>& after,std::array<std::uint32_t,4>& before)noexcept {
-    if(after[0]||after[1]||after[2]||after[3]!=0x3f800000u||
+    if(!detail::sourceParticleFogVelocityVector50LA(after)||
        !sourceSuccessorVelocitySlotCurrentNative(publication138,index128,expected,nullptr))return false;
     const auto& fields=sourcePool_->successorFogFields;
     if(fields.record||fields.emitter||fields.owner48||fields.storedCount)return false;
@@ -600,7 +600,7 @@ bool OriginalGcParticleManager50KG::storeSourceFogTail1608E0(
     //Only this exact seven-operation chain is admitted. Mirror branch
     //selection belongs to the caller's genuine saved-unit/enable receipts.
     switch(priorOps){
-        case 0:if(sourcePC!=0x1608e0u||(bits!=0x7fffffffu&&bits!=0xffffffffu))return false;break;
+        case 0:if(sourcePC!=0x1608e0u||!detail::sourceParticleFogReciprocalWord50LA(bits))return false;break;
         case 1:if(sourcePC!=0x1608e4u||bits)return false;break;
         case 2:if(sourcePC!=0x1608f0u)return false;break;
         case 4:{
@@ -686,7 +686,7 @@ bool OriginalGcParticleManager50KG::storeSourceSuccessorFogTail1608E0(
     //Only this exact seven-operation chain is admitted. Mirror branch
     //selection belongs to the caller's genuine saved-unit/enable receipts.
     switch(priorOps){
-        case 0:if(sourcePC!=0x1608e0u||(bits!=0x7fffffffu&&bits!=0xffffffffu))return false;break;
+        case 0:if(sourcePC!=0x1608e0u||!detail::sourceParticleFogReciprocalWord50LA(bits))return false;break;
         case 1:if(sourcePC!=0x1608e4u||bits)return false;break;
         case 2:if(sourcePC!=0x1608f0u)return false;break;
         case 4:{

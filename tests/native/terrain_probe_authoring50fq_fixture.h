@@ -54,9 +54,9 @@ struct Owner {
     // Canonical348+1F0 from the admitted1B1240 setup, distinct from the
     // vehicle7EC parameter and from the cold authoring receipt.
     float lift1F0=0;
-    //Distinct actual348 source lanes, unknown for the legacy projected owner.
-    //Only the private staged1B0EE0/1B1240 path supplies known constructor/setup
-    //values. Existing native callers and consumers are unchanged.
+    //Distinct348 lanes, unknown in the old projected owner. The counted
+    //source constructor and separate same-row native1B1240 continuation own
+    //their own writes. Known native values do not certify counted source348.
     std::optional<float> spring1F4,damping1F8,gravity1FC,sideForce200;
     TerrainQuery48J metadata{};
     Receipt receipt{};
@@ -236,6 +236,10 @@ inline bool installProbeCold(Owner& arena,live_terrain_probe50fr::Owner& live,
             return detail::fail(error,"cold terrain-probe identity lists differ");
     arena.initial=authored.initial;arena.follow=authored.follow;
     arena.lift1F0=authored.lift1F0;
+    //These are per-slot knownness lanes. Cold authoring does not synthesize
+    //source values, and installing a peer must not inherit another slot's.
+    arena.spring1F4=authored.spring1F4;arena.damping1F8=authored.damping1F8;
+    arena.gravity1FC=authored.gravity1FC;arena.sideForce200=authored.sideForce200;
     arena.lowerEndpoint140=authored.lowerEndpoint140;arena.receipt=authored.receipt;
     arena.prepared=authored.prepared;arena.metadata.filter.flagsF8=authored.metadata.filter.flagsF8;
     // initialize() has no fallible branch for an empty owner. Initialize at its

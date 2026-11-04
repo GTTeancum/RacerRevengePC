@@ -38,6 +38,7 @@
 #include <stdexcept>
 
 namespace original_camera_session50KX {class Session;}
+namespace ra_source_camera50LA {class OwnershipBridge;}
 // Explicit friend declarations keep this owner header independent of caller include order.
 namespace native_racer50HW { class Cables; }
 namespace ra_cold_roster50LA { class Operation; }
@@ -63,6 +64,7 @@ using Rig=native_racer50HW::Rig;
 // The no-engine combined model194 branch remains unadmitted.
 class Owner final {
     friend class ::original_camera_session50KX::Session;
+    friend class ::ra_source_camera50LA::OwnershipBridge; //Sole native physical continuation caller.
     friend class ::ra_cold_roster50LA::Operation; //Actual staged694/A0 cold operand only.
     friend class ::native_racer50HW::Cables;
     friend class ::original_cable_selection50LA::Binding;
@@ -371,6 +373,18 @@ class Owner final {
         bank_->visit(slot_,[&](){constructSourceTerrain21204C(*fixture_,bridge);});
     }
 
+    // Separate native full-publication continuation. Never selects or relaxes
+    // HandlingRoute::source, and never treats the old49N projection as a call receipt.
+    bool continueNativePhysical214710(g::OriginalRacerEntityCold50LA& actualRacer,
+        const std::vector<std::uint8_t>& retainedPhy,std::uint32_t& pc)noexcept;
+    bool nativePhysicalAttempted_=false,nativePhysicalComplete_=false;
+    bool continueNativeRepulsor214894(g::OriginalRacerEntityCold50LA& actualRacer,
+        const std::vector<std::uint8_t>& retainedPhy,::ra_source_camera50LA::OwnershipBridge& bridge,
+        std::uint32_t& pc)noexcept;
+    bool nativeRepulsorAttempted_=false,nativeRepulsorComplete_=false;
+    std::array<std::optional<float>,4> nativeRepulsorStack_;
+    std::array<std::optional<float>,5> nativePhysicalStack_;
+    g::BodyMatrix48G nativePhysicalMatrix_{};
     bool sourceMassAttempted_=false,sourceMassComplete_=false,sourceInertiaAttempted_=false;
     bool sourcePhysicalAttempted_=false,sourceRepulsorAttempted_=false;
     std::array<std::optional<float>,4> sourceRepulsorStack_;

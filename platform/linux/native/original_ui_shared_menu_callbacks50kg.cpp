@@ -1,6 +1,7 @@
 #include "original_ui_shared_dialogs50kg.h"
 #include "original_ui_main_session50kg.h"
 #include "original_ui_options_session50kg.h"
+#include "original_ui_rider_session50kg.h"
 #include "original_ui_shared_dialog_material_history50kg.h"
 #include "../../../src/assets/original_standard_texture_lifetime50la.h"
 #include "../../../src/assets/original_standard_material_table50la.h"
@@ -85,7 +86,7 @@ bool OriginalUiSharedDialogs50KG::admitControls2Menu470(const OriginalUiOptionsS
     !controls2MenuResourcesCurrent(session,draw))return false;
  // At +48 the real beginPage has reset and selected this collector's page.
  // At the prelease/+40 boundary its previous sourcePage is deliberately ignored.
- if(menu470Owner()&&(menuMainDraw_||menuOptionsDraw_!=&draw||menuOptionsSession_!=&session||
+ if(menu470Owner()&&(menuMainDraw_||menuRiderDraw_||menuRiderSession_||menuOptionsDraw_!=&draw||menuOptionsSession_!=&session||
     (menu470Phase_!=Menu470Phase::idle&&menu470Phase_!=Menu470Phase::callbacks)||
     (menu470Phase_==Menu470Phase::callbacks&&menu470Slot_!=0x48)||
     (menu470Slot_==0x48&&!draw.controls2WarningCollectorCurrent(*this,menu470Invocation_))))return false;
@@ -106,7 +107,8 @@ bool OriginalUiSharedDialogs50KG::menuTopologyCurrent()const noexcept {
 }
 const OriginalUiSourceOwner50KM* OriginalUiSharedDialogs50KG::menu470Owner()const noexcept {
  return menuMainDraw_?static_cast<const OriginalUiSourceOwner50KM*>(menuMainDraw_):
-  menuOptionsDraw_?static_cast<const OriginalUiSourceOwner50KM*>(menuOptionsDraw_):nullptr;
+  menuOptionsDraw_?static_cast<const OriginalUiSourceOwner50KM*>(menuOptionsDraw_):
+  menuRiderDraw_?static_cast<const OriginalUiSourceOwner50KM*>(menuRiderDraw_):nullptr;
 }
 bool OriginalUiSharedDialogs50KG::menu470PendingFor(const OriginalUiSourceOwner50KM& owner)const noexcept {
  return menu470Owner()==&owner||menuUpdateFailedOwner_==&owner;
@@ -119,14 +121,17 @@ bool OriginalUiSharedDialogs50KG::menu470Current()const noexcept {
     inputs_.context->textureLifetime_->nativeWarningDemandOwner_!=this||
     inputs_.context->textureLifetime_->nativeWarningDemandEpoch_!=menu470Epoch_||menu470Update_!=update470Count_)
   return false;
- return menuMainDraw_?(menuMainSession_&&!menuOptionsSession_&&!menuOptionsDraw_&&
-   menuMainSession_->sharedMenuLifetimeCurrent(*this,*menuMainDraw_)&&menuMainDraw_->sharedMenuInvocationCurrent(*this,menu470Invocation_)):
-  (menuOptionsSession_&&!menuMainSession_&&menuOptionsSession_->sharedMenuLifetimeCurrent(*this,*menuOptionsDraw_)&&
-   menuOptionsDraw_->sharedMenuInvocationCurrent(*this,menu470Invocation_));
+ if(menuMainDraw_)return menuMainSession_&&!menuOptionsSession_&&!menuOptionsDraw_&&!menuRiderSession_&&!menuRiderDraw_&&
+  menuMainSession_->sharedMenuLifetimeCurrent(*this,*menuMainDraw_)&&menuMainDraw_->sharedMenuInvocationCurrent(*this,menu470Invocation_);
+ if(menuOptionsDraw_)return menuOptionsSession_&&!menuMainSession_&&!menuRiderSession_&&!menuRiderDraw_&&
+  menuOptionsSession_->sharedMenuLifetimeCurrent(*this,*menuOptionsDraw_)&&menuOptionsDraw_->sharedMenuInvocationCurrent(*this,menu470Invocation_);
+ return menuRiderDraw_&&menuRiderSession_&&!menuMainSession_&&!menuOptionsSession_&&
+  menuRiderSession_->sharedMenuLifetimeCurrent(*this,*menuRiderDraw_)&&menuRiderDraw_->sharedMenuInvocationCurrent(*this,menu470Invocation_);
 }
 bool OriginalUiSharedDialogs50KG::menu470RenderCurrent()const noexcept {
  return menu470Current()&&(menuMainDraw_?menuMainSession_->sharedMenuRenderCurrent(*this,*menuMainDraw_):
-  menuOptionsSession_->sharedMenuRenderCurrent(*this,*menuOptionsDraw_));
+  menuOptionsDraw_?menuOptionsSession_->sharedMenuRenderCurrent(*this,*menuOptionsDraw_):
+  menuRiderSession_->sharedMenuRenderCurrent(*this,*menuRiderDraw_));
 }
 bool OriginalUiSharedDialogs50KG::serviceMenu141F3C(Diagnostic& d)noexcept {
  if(!menu470Current())return fail(d,Status::owner,0x141F3C);
@@ -162,9 +167,19 @@ bool OriginalUiSharedDialogs50KG::beginMenu470(OriginalUiOptionsSession50KG& ses
  menuOptionsSession_=&session;menuOptionsDraw_=&draw;menu470Invocation_=invocation;
  return beginMenu470Body(d);
 }
+bool OriginalUiSharedDialogs50KG::beginMenu470(OriginalUiRiderSession50KG& session,OriginalUiRiderDrawContribution50KG& draw,
+ std::uint64_t invocation,Diagnostic& d)noexcept {
+ d={};if(popup47CDraw_||nativePopup47CFifoPins_||menu470Owner()||menuUpdateFailedOwner_||!invocation||!draw.sharedMenuBoundCurrent(*this,session)||
+    !session.sharedMenuRenderCurrent(*this,draw))return fail(d,Status::owner,0x204A00);
+ // Rider receives only the genuine no-warning470 path. In particular a live
+ // Reset47C never grants Controls2 warning packets or menu raster authority.
+ if(!invisible470204AC0(d))return false;
+ menuRiderSession_=&session;menuRiderDraw_=&draw;menu470Invocation_=invocation;
+ return beginMenu470Body(d);
+}
 bool OriginalUiSharedDialogs50KG::beginMenu470Body(Diagnostic& d)noexcept {
  const auto rejectUnissued=[&](Status status,std::uint32_t pc)noexcept {
-  menuMainSession_=nullptr;menuOptionsSession_=nullptr;menuMainDraw_=nullptr;menuOptionsDraw_=nullptr;menu470Invocation_=0;
+  menuMainSession_=nullptr;menuOptionsSession_=nullptr;menuRiderSession_=nullptr;menuMainDraw_=nullptr;menuOptionsDraw_=nullptr;menuRiderDraw_=nullptr;menu470Invocation_=0;
   return fail(d,status,pc);
  };
  if(popup47CDraw_||nativePopup47CFifoPins_||menu470Phase_!=Menu470Phase::idle||firstPass470Draw_||thirdPass470Draw_||nativeWarning470FifoPins_||nativeMenuWarning470Pins_||menuRasterAttempted_||
@@ -210,7 +225,8 @@ bool OriginalUiSharedDialogs50KG::continueMenu470AfterCollectorBegin(
   menu470Phase_=Menu470Phase::failed;return false;
  };
  const bool initialized=menuMainDraw_?menuMainDraw_->sharedMenuCollectorInitialized(*this,menu470Invocation_):
-  menuOptionsDraw_->sharedMenuCollectorInitialized(*this,menu470Invocation_);
+  menuOptionsDraw_?menuOptionsDraw_->sharedMenuCollectorInitialized(*this,menu470Invocation_):
+  menuRiderDraw_->sharedMenuCollectorInitialized(*this,menu470Invocation_);
  if(!initialized){fail(d,Status::owner,0x204AC0);return failed();}
  const auto& dispatcher=scope_->dispatcher_;auto& node=dialog470_.entity;
  if(!(dispatcher.descendants24&8u)||!(node.mask20&8u)){fail(d,Status::owner,0x141D70);return failed();}
@@ -248,7 +264,8 @@ bool OriginalUiSharedDialogs50KG::completeMenuPopupProjection(const OriginalUiSo
 bool OriginalUiSharedDialogs50KG::sealMenu470Frame(const OriginalUiSourceOwner50KM& owner,std::uint64_t frame,Diagnostic& d)noexcept {
  d={};if(menu470Owner()!=&owner||!frame||!menu470RenderCurrent()||menu470Phase_!=Menu470Phase::cpuPending||
     !(menuMainDraw_?menuMainDraw_->sharedMenuFrameCurrent(*this,menu470Invocation_,frame):
-      menuOptionsDraw_->sharedMenuFrameCurrent(*this,menu470Invocation_,frame)))return fail(d,Status::phase,0x24B7B0);
+      menuOptionsDraw_?menuOptionsDraw_->sharedMenuFrameCurrent(*this,menu470Invocation_,frame):
+      menuRiderDraw_->sharedMenuFrameCurrent(*this,menu470Invocation_,frame)))return fail(d,Status::phase,0x24B7B0);
  if(!menuWarningPacketsCurrent()||!sealMenu470RasterFrame(frame,d))return false;
  menu470Frame_=frame;menu470Phase_=Menu470Phase::framePrepared;return true;
 }
@@ -283,7 +300,7 @@ void OriginalUiSharedDialogs50KG::releaseMenu470()noexcept {
  if(lifetime.nativeWarningDemandOwner_!=this||lifetime.nativeWarningDemandEpoch_!=menu470Epoch_)std::terminate();
  lifetime.nativeWarningDemandOwner_=nullptr;lifetime.nativeWarningDemandEpoch_=0;
  demand470Pending_=false;demand470Next_=0;demand470Update_=0;demand470Cache_={};demand470Effects_=false;
- menu470Phase_=Menu470Phase::idle;menuMainSession_=nullptr;menuOptionsSession_=nullptr;menuMainDraw_=nullptr;menuOptionsDraw_=nullptr;
+ menu470Phase_=Menu470Phase::idle;menuMainSession_=nullptr;menuOptionsSession_=nullptr;menuRiderSession_=nullptr;menuMainDraw_=nullptr;menuOptionsDraw_=nullptr;menuRiderDraw_=nullptr;
  menu470Invocation_=0;menu470Frame_=0;menu470Update_=0;menu470CompletedSlots_=0;menu470Slot_=0;menu470Callback_=nullptr;menuPopupPlan_=nullptr;
  if(menuDisplayPinned_){menuDisplay_->unpin();menuDisplayPinned_=false;}menuDisplay_.reset();
 }
@@ -311,11 +328,19 @@ bool OriginalUiSharedDialogs50KG::menu470CloseOwnerCurrent(const OriginalUiOptio
  return !menu470Owner()&&menuUpdateFailedOptions_&&menuUpdateFailedOwner_==menuUpdateFailedOptions_&&
   session.sharedMenuUnwindEntryCurrent(*this,*menuUpdateFailedOptions_);
 }
+bool OriginalUiSharedDialogs50KG::menu470CloseOwnerCurrent(const OriginalUiRiderSession50KG& session,
+ const VehicleWindowGl50DS& renderer)const noexcept {
+ if(!menu470CloseRendererCurrent(renderer))return false;
+ if(menuRiderSession_==&session&&menuRiderDraw_)return menu470Current()&&session.sharedMenuUnwindEntryCurrent(*this,*menuRiderDraw_);
+ return !menu470Owner()&&menuUpdateFailedRider_&&menuUpdateFailedOwner_==menuUpdateFailedRider_&&
+  !menuUpdateFailedMain_&&!menuUpdateFailedOptions_&&session.sharedMenuUnwindEntryCurrent(*this,*menuUpdateFailedRider_);
+}
 bool OriginalUiSharedDialogs50KG::retireMenu470AfterRenderer(const OriginalUiSourceOwner50KM& owner,
  const VehicleWindowGl50DS& renderer,Diagnostic& d)noexcept {
  d={};if(!menu470PendingFor(owner))return true;
  const bool retired=menuMainDraw_?menuMainDraw_->sharedMenuRetiredCurrent(*this,renderer):
-  menuOptionsDraw_?menuOptionsDraw_->sharedMenuRetiredCurrent(*this,renderer):false;
+  menuOptionsDraw_?menuOptionsDraw_->sharedMenuRetiredCurrent(*this,renderer):
+  menuRiderDraw_?menuRiderDraw_->sharedMenuRetiredCurrent(*this,renderer):false;
  if(menu470Owner()){
   if(!retired||!menu470Current()||menu470Phase_==Menu470Phase::submitting||&menuDisplay_->renderer_!=&renderer||
      menuDisplay_->dispatch_.pendingCallbackDC||menuDisplay_->dispatch_.count54||menuDisplay_->dispatch_.count60||
@@ -329,7 +354,8 @@ bool OriginalUiSharedDialogs50KG::retireMenu470AfterRenderer(const OriginalUiSou
  }
  if(menuUpdateFailedOwner_==&owner){
   const bool updateRetired=menuUpdateFailedMain_?menuUpdateFailedMain_->sharedMenuRetiredCurrent(*this,renderer):
-   menuUpdateFailedOptions_?menuUpdateFailedOptions_->sharedMenuRetiredCurrent(*this,renderer):false;
+   menuUpdateFailedOptions_?menuUpdateFailedOptions_->sharedMenuRetiredCurrent(*this,renderer):
+   menuUpdateFailedRider_?menuUpdateFailedRider_->sharedMenuRetiredCurrent(*this,renderer):false;
   if(!updateRetired||!menuUpdateFailedDisplay_||!menuUpdateFailedDisplayPinned_||
      menuUpdateFailedDisplay_->application_!=inputs_.root||menuUpdateFailedDisplay_->video_!=inputs_.video||
      !menuUpdateFailedDisplay_->frontendOwnerCurrent50KG()||!menuUpdateFailedDisplay_->canRetain()||
@@ -338,7 +364,7 @@ bool OriginalUiSharedDialogs50KG::retireMenu470AfterRenderer(const OriginalUiSou
    return fail(d,Status::retirementPending,0x2048F0);
   const auto fifo=inputs_.root->nativeCollectorFifoOwner_;
   if(fifo&&(fifo->draining_||!fifo->records_.empty()||fifo->garageRecordCount_))return fail(d,Status::retirementPending,0x105990);
-  menuUpdateAborted_=true;menuUpdateFailedOwner_=nullptr;menuUpdateFailedMain_=nullptr;menuUpdateFailedOptions_=nullptr;
+  menuUpdateAborted_=true;menuUpdateFailedOwner_=nullptr;menuUpdateFailedMain_=nullptr;menuUpdateFailedOptions_=nullptr;menuUpdateFailedRider_=nullptr;
   menuUpdateFailedDisplay_->unpin();menuUpdateFailedDisplayPinned_=false;menuUpdateFailedDisplay_.reset();
  }
  return true;
@@ -355,6 +381,13 @@ bool OriginalUiSharedDialogs50KG::advanceMenu470(OriginalUiOptionsSession50KG& s
  d={};if(!draw.sharedMenuBoundCurrent(*this,session)||!session.sharedMenuUpdateCurrent(*this,draw))return fail(d,Status::owner,0x2048F0);
  const bool okay=advanceMenu470Body(draw,delta,d);
  if(!okay&&menuUpdateFailedOwner_==&draw)menuUpdateFailedOptions_=&draw;
+ return okay;
+}
+bool OriginalUiSharedDialogs50KG::advanceMenu470(OriginalUiRiderSession50KG& session,OriginalUiRiderDrawContribution50KG& draw,
+ float delta,Diagnostic& d)noexcept {
+ d={};if(!draw.sharedMenuBoundCurrent(*this,session)||!session.sharedMenuUpdateCurrent(*this,draw))return fail(d,Status::owner,0x2048F0);
+ const bool okay=advanceMenu470Body(draw,delta,d);
+ if(!okay&&menuUpdateFailedOwner_==&draw)menuUpdateFailedRider_=&draw;
  return okay;
 }
 bool OriginalUiSharedDialogs50KG::advanceMenu470Body(const OriginalUiSourceOwner50KM& owner,float delta,Diagnostic& d)noexcept {

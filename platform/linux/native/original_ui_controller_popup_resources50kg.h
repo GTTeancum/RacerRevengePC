@@ -9,6 +9,10 @@ namespace rr::platform {
 struct OriginalUiOptionsColdInput50KG;
 struct OriginalUiMainColdInput50KG;
 struct OriginalUiMainMaterialBinding50KG;
+struct OriginalUiRiderColdInput50KG;
+struct OriginalUiRiderMaterialBinding50KG;
+class OriginalUiRiderDrawResources50KG;
+class OriginalUiRiderDrawContribution50KG;
 class OriginalUiMainDraw50KG;
 class OriginalUiSharedDialogs50KG;
 class OriginalUiSharedDialogMaterialHistory50KG;
@@ -54,6 +58,14 @@ private:
  friend class OriginalUiOptionsDrawResources50KG;
  friend class OriginalUiMainDraw50KG;
  friend class OriginalUiMainDrawResources50KG;
+ friend class OriginalUiRiderDrawResources50KG;
+ friend class OriginalUiRiderDrawContribution50KG;
+ // Rider can only join an existing canonical47C owner on the same Video.
+ // There is deliberately no cold construction route in this overload.
+ bool prepareOrRejoin(const OriginalUiRiderColdInput50KG&,
+   std::shared_ptr<const assets::OriginalUiScreenAssets50KG>,
+   const std::vector<OriginalUiRiderMaterialBinding50KG>&,
+   OriginalUiControllerPopupResourceDiagnostic50KG&) noexcept;
  bool prepareOrRejoin(const OriginalUiMainColdInput50KG&,
    std::shared_ptr<const assets::OriginalUiScreenAssets50KG>,
    const std::vector<OriginalUiMainMaterialBinding50KG>&,

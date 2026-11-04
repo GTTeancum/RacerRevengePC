@@ -1,5 +1,6 @@
 #pragma once
 #include "original_pause_entity50la.h"
+#include "../../platform/linux/native/original_spectator_menu_input50la.h"
 #include "original_race_pause_parent50la.h"
 #include "original_race_pause_forward50la.h"
 #include "original_camera_session50kx.h"
@@ -14,6 +15,7 @@ namespace original_pause_observation50LA {
 // before Application destruction. All concrete/profile ownership is weak.
 // This facet cannot supply arbitrary frames, selection, controller or settings.
 class Owner final {
+    friend struct ::original_main_entry50KG::Application;
     using Camera=original_camera_session50KX::Session;
     using Track=ra_cold_sources50LA::DecodedSources;
     // Exact consumed Race retained weakly alongside the world-owned Session.
@@ -143,7 +145,7 @@ public:
     };
     // Bounded actual1BD7C0 navigation, HUD rows2..4 and audio rows5..8.
     // Parent admission remains mandatory; no host selection/profile setter.
-    // Confirm actions other than the separate actual row0 close remain unjoined.
+    // Confirm uses separate actual row0 and retained row9/10 paths; row1 remains unjoined.
     NavigationResult pressNavigation1BD7C0(rr::game::InputEvent48Z& event,
         rr::game::DeviceButtonRecord48Y& record)const noexcept {
         using Result=NavigationResult;using Status=Result::Status;
@@ -274,6 +276,10 @@ public:
     bool openNativeAll8SpectatorMenu(const rr::game::InputEvent48Z&,Diagnostic&)const noexcept;
     NavigationResult continueRow0(rr::game::InputEvent48Z&,rr::game::DeviceButtonRecord48Y&)const noexcept;
     bool nativeSpectatorMenuOpen()const noexcept;
+    // Live caller only: consumes the actual producer-owned physical batch
+    // once, preserving event/record identity and per-edge callback order.
+    bool dispatchNativeInputBatch(rr::platform::OriginalSpectatorMenuInput50LA&,
+        rr::platform::OriginalVideoBlockingNativeBackend*,Diagnostic&)const noexcept;
     bool closeNativeSpectatorMenuForShutdown(Diagnostic&)const noexcept;
     bool prepareNativePresentation(rr::game::OriginalPauseNativeDraw50LA&,Diagnostic&,
         rr::game::OriginalPauseLayout50LA::Diagnostic&,
@@ -284,6 +290,9 @@ public:
         application_=nullptr;pause_.reset();controls_.reset();settings_.reset();
     }
 private:
+    bool dispatchNativeInputRemainder(rr::platform::OriginalSpectatorMenuInput50LA&,
+        rr::platform::OriginalVideoBlockingNativeBackend*,Diagnostic&)const noexcept;
+    bool finishNativePauseReturnInput(rr::platform::OriginalSpectatorMenuInput50LA&,Diagnostic&)const noexcept;
     bool closeLifecycle1BE830(Diagnostic&)const noexcept;
     bool retainedAttachedLifecycle(const Camera&,const rr::game::OriginalPauseStorage50LA&)const noexcept;
     bool attachedLifecycle(const Camera&,const rr::game::OriginalPauseStorage50LA&)const noexcept;

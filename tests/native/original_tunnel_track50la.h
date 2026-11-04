@@ -1,6 +1,8 @@
 #pragma once
 #include "original_ui_main_entry50kg.h"
 #include "ra_cold_navigation_lease50la.h"
+#include "source_grid50ig_fixture.h"
+#include <thread>
 #include <array>
 #include <exception>
 
@@ -10,6 +12,9 @@ enum class OriginalTunnelTrackRole50LA : unsigned { mapB8,aiBC };
 // projection. No second map/AI arrays and no claim of full2A1260 loader dispatch.
 class OriginalTunnelTrack50LA final {
     friend struct ::original_main_entry50KG::Application;
+    friend class OriginalRaceConstructor50LA;
+    friend class OriginalRaceRacerManager50LA;
+    const std::thread::id thread_=std::this_thread::get_id();
     std::shared_ptr<OriginalApplicationEntities50LA> application_;
     std::shared_ptr<const ra_cold_sources50LA::ColdNavigationLease> navigation_;
     OriginalWreckComponent50LA entity_;
@@ -26,7 +31,8 @@ class OriginalTunnelTrack50LA final {
         if(!application_||!application_->application10()||!navigation_||!session||
            application_->attachmentLock423F58())return;
         const auto key=static_cast<std::uint64_t>(reinterpret_cast<std::uintptr_t>(&entity_));
-        if(!application_->entityAuthority_.canEnroll(entity_,key))return;
+        if(!application_->entityAuthority_.reserveAdditional(1)||
+           !application_->entityAuthority_.canEnroll(entity_,key))return;
         const auto r=initializeOriginalWreckComponent50LA(entity_,
             OriginalWreckComponentKind50LA::entity141300,session,key,true,
             application_->objectCount423F60()); //1A6F48/1A7078 A1=1.
@@ -34,7 +40,7 @@ class OriginalTunnelTrack50LA final {
         if(constructed_&&!application_->entityAuthority_.enroll(entity_))std::terminate();
     }
     bool detached()const noexcept {
-        return constructed_&&!closed_&&application_&&application_->application10()&&
+        return thread_==std::this_thread::get_id()&&constructed_&&!closed_&&application_&&application_->application10()&&
             entity_.kind==OriginalWreckComponentKind50LA::entity141300&&entity_.sessionGeneration&&
             entity_.objectKey==static_cast<std::uint64_t>(reinterpret_cast<std::uintptr_t>(&entity_))&&
             entity_.reference00==1&&!entity_.previous10&&!entity_.next14&&!entity_.parent1C&&
@@ -50,6 +56,24 @@ class OriginalTunnelTrack50LA final {
            !candidate.gatesPrepared)return false;
         projection_=&candidate;return true;
     }
+    // Only a real owning Race/manager may use this retained map. This is
+    // the bounded node0/ranks0..7 numeric2A2880 projection, not a claim that
+    // the original loader2A1260 or its unrepresented fields completed.
+    bool prepareNativeRestartGrid2A2880(
+        const std::shared_ptr<OriginalApplicationEntities50LA>& application,
+        std::uint64_t generation,const TrackNavigation50EU* actualMap,
+        std::int32_t rank,GridCenterResult50AC& output,std::uint32_t& pc)const noexcept {
+        pc=0x1aeb38;
+        if(!detached()||application_!=application||entity_.sessionGeneration!=generation||
+           role_!=OriginalTunnelTrackRole50LA::mapB8||!navigation_||!projection_||
+           projection_!=actualMap||projection_!=&navigation_->map()||field74_!=0||
+           application_->attachmentLock423F58()||!application_->entityAuthority_.canRetire(entity_))return false;
+        pc=0x2a2880;
+        if(rank<0||rank>7)return false;
+        // Existing arithmetic retains its explicit rounding/nondegeneracy
+        // bounds. No zero-vector fallback, node order or lateral rank is invented.
+        return source_grid50IG::prepare(*projection_,static_cast<std::uint32_t>(rank),output);
+    }
 public:
     OriginalTunnelTrack50LA(const OriginalTunnelTrack50LA&)=delete;
     OriginalTunnelTrack50LA& operator=(const OriginalTunnelTrack50LA&)=delete;
@@ -60,6 +84,7 @@ public:
     // Bounded actual142590 route: no siblings/parent/children exist in this
     // detached owner. Lock refusal precedes104970 and preserves all ownership.
     bool release142590()noexcept {
+        if(thread_!=std::this_thread::get_id())return false;
         if(closed_)return true;
         if(!detached()||application_->attachmentLock423F58())return false;
         if(!application_->entityAuthority_.retire(entity_))return false;

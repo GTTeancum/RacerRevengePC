@@ -51,7 +51,8 @@ struct OriginalUiRiderProfileStamp50KG {
 // so Main's later mode34 changes are observed directly, never copied stale.
 //
 // This retains the original27x27 career/pod matrix and its source result
-// writeback. No original save import, save IO, or profile reset popup is claimed.
+// writeback. The private career reset owns only the profile mutation, never
+// shared-popup admission, result custody, original save IO or persistence.
 // A result commit remains private and requires a genuinely armed tournament
 // launch; current missing tournament lifecycle guards stay closed. No public readiness
 // flag or arbitrary observation setter can manufacture an initialized owner.
@@ -379,6 +380,16 @@ private:
     void autosaveGaragePurchase() noexcept;
     friend class OriginalUiFrontend50KG;
     friend class OriginalUiRiderSession50KG;
+    // Genuine Rider1EAEC8/result2 caller only. The session must retain the
+    // actual selected4C4 and popup result through this synchronous commit;
+    // numeric selection/stamp observations alone confer no mutation authority.
+    // Preflight is read-only. Commit stages all values before a nonfailing
+    // store interval; failure preserves the profile, name and generation.
+    // No selected-race fields, unlocks, dirty bit, save IO or autosave changes.
+    bool canResetRiderCareer1800E0(std::uint32_t selectedRider,
+        OriginalUiRiderProfileStamp50KG expected) const noexcept;
+    bool resetRiderCareer1800E0(std::uint32_t selectedRider,
+        OriginalUiRiderProfileStamp50KG expected) noexcept;
     // Read-only cold resource planning from a genuine Main proposal. Main's
     // live mode4 is preserved; only this returned snapshot uses the proposed
     // mode. Actual Rider entry and every profile commit still read live mode.

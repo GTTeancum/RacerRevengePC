@@ -14,6 +14,8 @@ class OriginalUiMainDraw50KG;
 class OriginalUiOptionsDrawContribution50KG;
 class OriginalUiMainSession50KG;
 class OriginalUiOptionsSession50KG;
+class OriginalUiRiderSession50KG;
+class OriginalUiRiderDrawContribution50KG;
 // Native retained UI470/47C owners, not a second dispatcher or menu manager.
 // Initial construction is a Root boot operation. A preexisting UI without this
 // owner cannot be adopted by inventing prior470 activity or resetting47C.
@@ -28,6 +30,8 @@ class OriginalUiSharedDialogs50KG final {
     friend class OriginalUiMainDraw50KG;
     friend class OriginalUiOptionsDrawContribution50KG;
     friend class OriginalUiOptionsSession50KG;
+    friend class OriginalUiRiderSession50KG;
+    friend class OriginalUiRiderDrawContribution50KG;
     friend class OriginalUiFrontend50KG;
     friend class VehicleWindowGl50DS;
     friend class OriginalUiGarageQuad50KG;
@@ -94,6 +98,8 @@ private:
     bool canStartGaragePurchase2060A0(const OriginalUiGaragePageOwner50KG&,Diagnostic&)const noexcept;
     bool writeController47CLabels2060A0(const game::OriginalUiControllerPopupState50KG&,Diagnostic&)noexcept;
     bool startGaragePurchase2060A0(const OriginalUiGaragePageOwner50KG&,Diagnostic&)noexcept;
+    bool canStartRiderReset2060A0(OriginalUiRiderSession50KG&,Diagnostic&)const noexcept;
+    bool startRiderReset2060A0(OriginalUiRiderSession50KG&,Diagnostic&)noexcept;
     bool garagePopupInputFailed_=false;
     std::shared_ptr<Scope> scope_;
     std::weak_ptr<OriginalUiMainApplication50KG> application_;
@@ -123,6 +129,7 @@ private:
     bool initialMainAttached_=false,initialMainResetPending_=false;
     bool reappendMainEntry1D7CF4(Diagnostic&)noexcept;
     bool reappendOptionsEntry1B86D0(Diagnostic&)noexcept;
+    bool reappendRiderEntry1E809C(OriginalUiRiderSession50KG&,Diagnostic&)noexcept;
     bool reappendNativeMenu1B86D0(Diagnostic&)noexcept;
     bool reappend1B86D0(const OriginalUiGaragePageOwner50KG&,Diagnostic&)noexcept;
     bool reorderCompleteFor1B872C(const OriginalUiGaragePageOwner50KG&)const noexcept;
@@ -303,12 +310,15 @@ bool admitMenuWarningCollection(std::int32_t,bool&,Diagnostic&)noexcept;
     Menu470Phase menu470Phase_=Menu470Phase::idle;
     OriginalUiMainSession50KG* menuMainSession_=nullptr;
     OriginalUiOptionsSession50KG* menuOptionsSession_=nullptr;
+    OriginalUiRiderSession50KG* menuRiderSession_=nullptr;
     OriginalUiMainDraw50KG* menuMainDraw_=nullptr;
     OriginalUiOptionsDrawContribution50KG* menuOptionsDraw_=nullptr;
+    OriginalUiRiderDrawContribution50KG* menuRiderDraw_=nullptr;
     const OriginalUiSourceOwner50KM* menuUpdateFailedOwner_=nullptr;
     bool menuUpdateAborted_=false; // Terminal failed update cannot be resumed by a new Session.
     OriginalUiMainDraw50KG* menuUpdateFailedMain_=nullptr;
     OriginalUiOptionsDrawContribution50KG* menuUpdateFailedOptions_=nullptr;
+    OriginalUiRiderDrawContribution50KG* menuUpdateFailedRider_=nullptr;
     std::uint64_t menu470Epoch_=0,menu470Invocation_=0,menu470Frame_=0,menu470Update_=0,menuUpdateEpoch_=0;
     std::uint8_t menu470CompletedSlots_=0;
     std::uint32_t menu470Slot_=0;
@@ -325,10 +335,12 @@ bool admitMenuWarningCollection(std::int32_t,bool&,Diagnostic&)noexcept;
     bool menu470PendingFor(const OriginalUiSourceOwner50KM&)const noexcept;
     bool beginMenu470(OriginalUiMainSession50KG&,OriginalUiMainDraw50KG&,std::uint64_t,Diagnostic&)noexcept;
     bool beginMenu470(OriginalUiOptionsSession50KG&,OriginalUiOptionsDrawContribution50KG&,std::uint64_t,Diagnostic&)noexcept;
+    bool beginMenu470(OriginalUiRiderSession50KG&,OriginalUiRiderDrawContribution50KG&,std::uint64_t,Diagnostic&)noexcept;
     bool beginMenu470Body(Diagnostic&)noexcept;
     bool continueMenu470AfterCollectorBegin(const OriginalUiSourceOwner50KM&,Diagnostic&)noexcept;
     bool advanceMenu470(OriginalUiMainSession50KG&,OriginalUiMainDraw50KG&,float,Diagnostic&)noexcept;
     bool advanceMenu470(OriginalUiOptionsSession50KG&,OriginalUiOptionsDrawContribution50KG&,float,Diagnostic&)noexcept;
+    bool advanceMenu470(OriginalUiRiderSession50KG&,OriginalUiRiderDrawContribution50KG&,float,Diagnostic&)noexcept;
     bool advanceMenu470Body(const OriginalUiSourceOwner50KM&,float,Diagnostic&)noexcept;
     bool walkMenu470Inherited(std::uint32_t,std::uint32_t,Diagnostic&)noexcept;
     bool serviceMenu141F3C(Diagnostic&)noexcept;
@@ -343,6 +355,7 @@ bool admitMenuWarningCollection(std::int32_t,bool&,Diagnostic&)noexcept;
     bool menu470CloseRendererCurrent(const VehicleWindowGl50DS&)const noexcept;
     bool menu470CloseOwnerCurrent(const OriginalUiMainSession50KG&,const VehicleWindowGl50DS&)const noexcept;
     bool menu470CloseOwnerCurrent(const OriginalUiOptionsSession50KG&,const VehicleWindowGl50DS&)const noexcept;
+    bool menu470CloseOwnerCurrent(const OriginalUiRiderSession50KG&,const VehicleWindowGl50DS&)const noexcept;
     bool retireMenu470AfterRenderer(const OriginalUiSourceOwner50KM&,const VehicleWindowGl50DS&,Diagnostic&)noexcept;
     void releaseMenu470()noexcept;
     bool loadedCurrent()const noexcept;

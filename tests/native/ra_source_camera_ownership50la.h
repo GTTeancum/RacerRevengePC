@@ -922,13 +922,11 @@ class OwnershipBridge final {
         if(!counted||!counted->appended()||counted->retired_||counted->stage_!=&source348Stages_[slot]||
            !racer.sourceTerrain348_||*racer.sourceTerrain348_!=counted||
            counted->base_.entity_.parent1C!=&racer.racer)return false;
-        auto shape=[&](const g::LocalSegment48I&)noexcept {
-            //The counted348 owner now exists. Its actual11C3F0 shape/result
-            //publication and retirement are not joined in the2120B4 interval.
-            //Do not run the former numerical-only initializer and falsely
-            //complete this actual owner. Prior1B1240 scalar/endpoint writes
-            //remain visible; this is a reached failure, never a no-op success.
-            return false;
+        auto shape=[&](const g::LocalSegment48I& segment)noexcept {
+            if(!counted->constructShape11C3F0(segment,*row->terrainResource,*row->terrainResult90))return false;
+            //Actual caller stores after11C3F0 return, before Stage projects its
+            //callback metadata and advances to localOffset1C0 arithmetic.
+            return counted->bindSelfCallback1B1478();
         };
         if(!source348Stages_[slot].applySetup21494C(actual_->terrain,actual_->terrainLive,
             actual_->main,parameters,actual324,actualLift7EC,actualSpring,actualDamping,
@@ -1109,7 +1107,10 @@ class OwnershipBridge final {
         stagedPods694_[slot]={collision,&shape,&body,entity.sessionGeneration,slot,
             NativePodResponseE8::constructorNull11B350};return true;
     }
-    void revokeNativePod694(std::size_t slot)noexcept {
+    bool revokeNativePod694(std::size_t slot,native_racer50HN::Bank& bank)noexcept {
+        //Withdraw active AND saved Bank resource borrows while actual body and
+        //scene still live, before the legacy shared owner/token revocations.
+        if(!retireNativeRepulsorPayload(slot,bank))return false;
         revokeSharedColdOwners(slot);
         if(slot<stagedAero_.size()){
             if(auto owner=stagedAero_[slot].lock())owner->revoked_=true;
@@ -1123,6 +1124,7 @@ class OwnershipBridge final {
             if(const auto owner=stagedSecondaryContacts_[slot].lock())owner->revoked_=true;
             stagedSecondaryContacts_[slot].reset();stagedPods694_[slot]={};
         }
+        return true;
     }
     // Shared-mode opaque identities are assigned only at the actual selected
     // resource constructor cut. Every destination must already belong to the
@@ -2209,6 +2211,7 @@ class OwnershipBridge final {
 #include "ra_shared_owner_lease50la.inl"
 #include "ra_shared_role_views50la.inl"
 #include "ra_shared_cold_attachment50la.inl"
+#include "ra_native_repulsor_replacement50la.inl"
 #include "ra_shared_fresh_attachment50la.inl"
 #include "ra_shared_direct_pod50la.inl"
 #include "ra_shared_contact50la.inl"

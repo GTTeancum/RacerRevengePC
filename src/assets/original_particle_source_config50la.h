@@ -2,7 +2,10 @@
 #include "original_standard_texture_resource50la.h"
 #include "original_config_process_globals50la.h"
 #include "original_standard_archive_provider50la.h"
+#include "original_particle_forced_sets50la.h"
 #include "../game/original_text_config_primitives50la.h"
+#include "../game/original_source_particle_random50la.h"
+#include "../game/original_particle_random_mode50la.h"
 #include <array>
 #include <cstdint>
 #include <memory>
@@ -13,6 +16,8 @@
 #include <thread>
 #include <exception>
 namespace ra_cold_aggregate50LA {class Owner;}
+namespace original_main_entry50KG {struct Application;}
+namespace rr::platform {struct OriginalUiMainApplication50KG;}
 namespace rr::assets {
 // Fresh stack Config occurrences at1617A0 and15AE00, explicitly distinct.
 // No World-derived allocation, shared numeric
@@ -43,6 +48,7 @@ class OriginalParticleSourceConfig50LA final {
     struct Emitter15AE00Tag {};
     const Occurrence occurrence_=Occurrence::manager1617A0;
     const void* emitterOwner_=nullptr; //Native occurrence identity, never source data.
+    OriginalParticleForcedSets50LA* emitterForcedSets_=nullptr; //Borrowed from that same emitter.
     Source storage_;Source* source_=&storage_;
     const std::thread::id thread_=std::this_thread::get_id();
     std::shared_ptr<OriginalStandardTextureResolver50LA> resolver_;
@@ -60,12 +66,14 @@ class OriginalParticleSourceConfig50LA final {
     bool textAttempted_=false,textReturned_=false;
     std::uint32_t textLineOrdinal_=0;
     OriginalParticleSourceConfig50LA()noexcept=default;
-    explicit OriginalParticleSourceConfig50LA(Emitter15AE00Tag,const void* emitter)noexcept
-        :occurrence_(Occurrence::emitter15AE00),emitterOwner_(emitter){sourcePC_=0x1573a4;}
+    explicit OriginalParticleSourceConfig50LA(Emitter15AE00Tag,const void* emitter,
+        OriginalParticleForcedSets50LA& forcedSets)noexcept
+        :occurrence_(Occurrence::emitter15AE00),emitterOwner_(emitter),emitterForcedSets_(&forcedSets){sourcePC_=0x1573a4;}
     bool beginEmitter15AE00(std::shared_ptr<OriginalStandardTextureResolver50LA>,
         std::shared_ptr<OriginalStandardArchiveProvider50LA>,const std::string&,const void*,D&)noexcept;
     bool emitterOccurrenceCurrentNative(const void*,const OriginalStandardTextureResolver50LA*,
-        const OriginalStandardArchiveProvider50LA*)const noexcept;
+        const OriginalStandardArchiveProvider50LA*,const OriginalParticleForcedSets50LA&,
+        const std::array<std::uint32_t,0x260/4>&,const std::array<std::uint32_t,0x260/4>&)const noexcept;
     bool beginFile1577D0(std::shared_ptr<OriginalStandardTextureResolver50LA>,
         std::shared_ptr<OriginalStandardArchiveProvider50LA>,const std::string&,std::uint32_t,D&)noexcept;
     bool begin1617A0(std::shared_ptr<OriginalStandardTextureResolver50LA>,
@@ -552,7 +560,8 @@ class OriginalParticleSourceConfig50LA final {
     bool beginCommonProperties15AEA0(std::array<std::uint32_t,0x260/4>& words,
                                     std::array<std::uint32_t,0x260/4>& known,D& d)noexcept {
         if(occurrence_!=Occurrence::emitter15AE00||!emitterOwner_||!emitterPropertiesAttempted_||
-           commonPropertiesAttempted_)return false;
+           commonPropertiesAttempted_||!emitterForcedSets_||
+           !emitterForcedSets_->currentNative(emitterOwner_,words,known))return false;
         if(emitterPropertyTarget_==0x15e6d0u){
             if(!emitterSpreadReturned_||!ownedTextSectionForFieldCurrent())return false;
         }else if(emitterPropertyTarget_==0x1602b0u){
@@ -615,6 +624,191 @@ class OriginalParticleSourceConfig50LA final {
     bool commonGroundFlagWritten_=false,commonAnimationSelectionAttempted_=false,commonAnimationSelected_=false;
     bool commonFramesWritten_=false,commonReciprocalWritten_=false,commonForcedCountWritten_=false;
     bool commonAnimationFlagWritten_=false,commonReturned_=false;
+    //Only the actual Owner's synchronous15AE48 stack may lend this adapter.
+    //It never becomes a source callback, async capability or retained callable.
+    struct Mode2DrawAdapter {
+        virtual bool draw15B148(OriginalParticleSourceConfig50LA&,std::uint32_t&)noexcept=0;
+        virtual ~Mode2DrawAdapter()=default;
+    };
+    Mode2DrawAdapter* commonMode2DrawAdapter_=nullptr;
+    class Mode2DrawScope final {
+        OriginalParticleSourceConfig50LA& config_;
+        Mode2DrawAdapter& adapter_;
+        bool bound_=false;
+    public:
+        Mode2DrawScope(OriginalParticleSourceConfig50LA& config,Mode2DrawAdapter& adapter)noexcept
+            :config_(config),adapter_(adapter){
+            if(!config_.commonMode2DrawAdapter_&&config_.occurrence_==Occurrence::emitter15AE00&&
+               !config_.nativeClosed_&&!config_.sourceClosed_&&config_.thread_==std::this_thread::get_id()){
+                config_.commonMode2DrawAdapter_=&adapter_;bound_=true;
+            }
+        }
+        ~Mode2DrawScope(){
+            if(bound_&&config_.commonMode2DrawAdapter_==&adapter_)config_.commonMode2DrawAdapter_=nullptr;
+        }
+        bool bound()const noexcept{return bound_;}
+        Mode2DrawScope(const Mode2DrawScope&)=delete;
+        Mode2DrawScope& operator=(const Mode2DrawScope&)=delete;
+    };
+    struct CommonMode2History final {
+        //Pin the actual process owner, never copy/reseed its shared RNG. The
+        //typed Application identity is checked by Owner before live withdrawal.
+        std::shared_ptr<rr::platform::OriginalUiMainApplication50KG> applicationPin;
+        const original_main_entry50KG::Application* application=nullptr;
+        std::uint32_t rawBefore=0,rawAfter=0,rawValue=0;
+        bool drawEntered=false,drawReturned=false;
+        std::optional<std::uint32_t> minimum,converted,maximum,unit,difference,product,sum,stored;
+        std::uint32_t pc=0;
+    } commonMode2_;
+    bool commonMode2TimeStored_=false;
+    bool commonMode2CurrentNative(const std::array<std::uint32_t,0x260/4>&,
+                                 const std::array<std::uint32_t,0x260/4>&)const noexcept;
+    bool initializeCommonMode2Timer15B148(std::array<std::uint32_t,0x260/4>& words,
+                                        std::array<std::uint32_t,0x260/4>& known)noexcept {
+        auto& h=commonMode2_;
+        if(h.pc||h.drawEntered||h.drawReturned||commonMode2TimeStored_||commonModeTimeCopied_||
+           !commonEmitMode5C_||*commonEmitMode5C_!=2||commonTailScalarCount_!=4||
+           commonModeScalarCount_!=4||!ownedTextSectionForFieldCurrent())return false;
+        h.pc=sourcePC_=0x15B148u;
+        if(!commonMode2DrawAdapter_)return false;
+        std::uint32_t random;
+        if(!commonMode2DrawAdapter_->draw15B148(*this,random))return false;
+        //The Owner publishes authentic308030 entry/return and raw chronology.
+        //No numeric admission precedes or rolls back that single real draw.
+        if(!h.drawEntered||!h.drawReturned||!h.applicationPin||!h.application||
+           h.pc!=0x30805Cu||h.rawValue!=random||h.rawAfter!=h.rawBefore*0x41c64e6du+0x3039u||
+           h.rawValue!=(h.rawAfter&0x7fffffffu))return false;
+        h.pc=sourcePC_=0x15B150u; //Source MTC1 preserves actual low31 before CVT.
+        h.pc=sourcePC_=0x15B154u;
+        if(known[0x1e8/4]!=0xffffffffu)return false;
+        h.minimum=words[0x1e8/4];
+        std::uint32_t result;
+        h.pc=sourcePC_=0x15B158u;
+        if(!rr::game::detail::sourceParticleTruncateInteger50LA(random,result))return false;
+        h.converted=result;
+        h.pc=sourcePC_=0x15B15Cu;
+        h.pc=sourcePC_=0x15B160u;
+        if(known[0x1ec/4]!=0xffffffffu)return false;
+        h.maximum=words[0x1ec/4];
+        h.pc=sourcePC_=0x15B164u;h.pc=sourcePC_=0x15B168u;
+        h.pc=sourcePC_=0x15B16Cu;
+        //Operand order is source fs=2^-31, ft=converted. The pinned bounded
+        //EE model includes its left-power-of-two Booth correction here.
+        if(!rr::game::detail::sourceParticleMode2Scale(*h.converted,result))return false;
+        h.unit=result;
+        h.pc=sourcePC_=0x15B170u;
+        if(!rr::game::detail::sourceParticleMode2Difference(*h.maximum,*h.minimum,result))return false;
+        h.difference=result;
+        h.pc=sourcePC_=0x15B174u;
+        if(!rr::game::detail::sourceParticleMode2Product(*h.difference,*h.unit,result))return false;
+        h.product=result;
+        h.pc=sourcePC_=0x15B178u;
+        if(!rr::game::detail::sourceParticleMode2Sum(*h.minimum,*h.product,result))return false;
+        h.sum=result;
+        h.pc=sourcePC_=0x15B17Cu; //Unconditional branch, then its actual delay store.
+        h.pc=sourcePC_=0x15B180u;
+        words[0x1e4/4]=*h.sum;known[0x1e4/4]=0xffffffffu;
+        h.stored=*h.sum;commonMode2TimeStored_=true;
+        h.pc=sourcePC_=0x15B1C8u;h.pc=sourcePC_=0x15B1CCu;
+        h.pc=sourcePC_=0x15B1D0u;return true;
+    }
+    bool readForcedSet158B30(OriginalParticleForcedSets50LA::Entry15B540& entry,
+                           std::uint32_t index)noexcept {
+        if(!emitterForcedSets_||!entry.formatReturned||entry.lookupAttempted||
+           !ownedTextSectionForFieldCurrent())return false;
+        entry.lookupAttempted=true;
+        std::string_view value;bool found=false;
+        //The request is the exact same occurrence's generated ForcedSet%d,
+        //not a supplied field name or data from an alternate parser.
+        if(!findOwnedTextField158240(entry.key.data(),value,found))return false;
+        entry.found=found;entry.lookupReturnPC=sourcePC_;
+        std::uint32_t raw=0xffffffffu;
+        if(found){
+            entry.conversionAttempted=true;std::int32_t converted;
+            const bool returned=convertInteger158920(value,converted);
+            entry.conversionPC=sourcePC_;
+            if(!returned)return false;
+            raw=static_cast<std::uint32_t>(converted);entry.convertedWord=raw;
+        }else sourcePC_=0x158B60u; //Actual missing-field default store, not a parse failure.
+        //158B30's a3 is the ACTUAL array element, not a stack temporary.
+        //Lookup/conversion precede any native destination admission failure.
+        auto& owner=*emitterForcedSets_;
+        if(!owner.publication15B534_||!owner.pointer1C4_||
+           *owner.pointer1C4_!=owner.values_.get()||!owner.values_||index>=owner.capacity_)return false;
+        owner.values_[index]=raw;entry.rawWord=raw;
+        sourcePC_=0x158B68u;sourcePC_=0x158B6Cu;sourcePC_=0x158B70u;
+        sourcePC_=0x158B74u;sourcePC_=0x158B78u;
+        entry.getterReturnPC=sourcePC_;entry.getterReturned=true;return true;
+    }
+    bool continueForcedSets15B508(std::array<std::uint32_t,0x260/4>& words,
+                                 std::array<std::uint32_t,0x260/4>& known)noexcept {
+        if(!emitterForcedSets_||!commonAnimationFlagWritten_||commonReturned_||
+           !ownedTextSectionForFieldCurrent()||
+           !emitterForcedSets_->currentNative(emitterOwner_,words,known))return false;
+        auto& owner=*emitterForcedSets_;
+        if(owner.countRead15B508_)return false; //Fresh occurrence only; no reload/copy/replacement admission.
+        sourcePC_=0x15B508u;
+        if(known[0x1c8/4]!=0xffffffffu)return false;
+        owner.countRead15B508_=words[0x1c8/4];
+        const auto count=*owner.countRead15B508_;
+        sourcePC_=0x15B50Cu;
+        if(count&&(count&0x80000000u)==0){
+            sourcePC_=0x15B514u;
+            if(!owner.pointer1C4_||*owner.pointer1C4_||known[0x1c4/4]!=0xffffffffu||words[0x1c4/4])return false;
+            owner.oldPointerRead15B514_=true; //Only the actual NULL branch skips2E8AE0.
+            sourcePC_=0x15B528u;owner.countRead15B528_=words[0x1c8/4];
+            sourcePC_=0x15B52Cu;
+            //Native extent/metadata admission precedes entering the call.
+            //Refusal here is not an executed allocator or a sourceNULL result.
+            if(*owner.countRead15B528_!=count||!owner.prepareExtentNative(count))return false;
+            sourcePC_=0x15B52Cu;sourcePC_=0x15B530u;
+            sourcePC_=0x2E8CA0u;sourcePC_=0x2E8D90u;
+            if(!owner.allocate2E8D90Native())return false;
+            sourcePC_=0x15B534u;owner.pointer1C4_=owner.values_.get();owner.publication15B534_=true;
+            //There is no guest address encoding for this host pointer. Keep
+            //the old zero as inert backing, and withdraw its numeric knownness.
+            known[0x1c4/4]=0;
+            sourcePC_=0x15B53Cu;owner.indexS0_=0;owner.indexInitialized15B53C_=true;
+            sourcePC_=0x15B590u;owner.initialCount15B590_=words[0x1c8/4];
+            if(*owner.initialCount15B590_!=count)return false;
+            sourcePC_=0x15B598u;owner.initialLoop15B598_=true;
+            for(std::uint32_t index=0;index<count;++index){
+                if(owner.indexS0_!=index||index>=owner.capacity_)return false;
+                auto& entry=owner.entries_[index];
+                sourcePC_=0x15B544u;entry.ordinal=index+1u;
+                //Exact bounded308C90("ForcedSet%d", positive signed ordinal).
+                //At most19 bytes plusNUL fit the actual source stack40..7F.
+                sourcePC_=0x15B54Cu;sourcePC_=0x15B550u;sourcePC_=0x308C90u;
+                constexpr char prefix[]="ForcedSet";
+                for(std::size_t i=0;i<9;++i)entry.key[i]=prefix[i];
+                std::array<char,10> reverse;std::size_t digits=0;
+                for(auto ordinal=*entry.ordinal;ordinal;ordinal/=10u)reverse[digits++]=static_cast<char>('0'+ordinal%10u);
+                for(std::size_t i=0;i<digits;++i)entry.key[9+i]=reverse[digits-1-i];
+                entry.key[9+digits]=0;entry.keyKnownBytes=10+digits;
+                sourcePC_=0x15B554u;entry.formatReturned=true;++owner.entriesStarted_;
+                sourcePC_=0x15B554u;
+                if(!owner.pointer1C4_||*owner.pointer1C4_!=owner.values_.get())return false;
+                sourcePC_=0x15B568u;if(!readForcedSet158B30(entry,index))return false;
+                sourcePC_=0x15B570u;
+                if(!owner.pointer1C4_||*owner.pointer1C4_!=owner.values_.get())return false;
+                sourcePC_=0x15B578u;++owner.indexS0_;entry.indexAdvanced=true;
+                sourcePC_=0x15B580u;
+                if(!entry.rawWord||!owner.values_||index>=owner.capacity_)return false;
+                entry.loaded15B580=owner.values_[index];
+                sourcePC_=0x15B584u;entry.decremented15B584=*entry.loaded15B580-1u;
+                sourcePC_=0x15B588u;owner.values_[index]=*entry.decremented15B584;
+                entry.decrementStored15B588=true;++owner.entriesStored_;
+                sourcePC_=0x15B590u;entry.countRead15B590=words[0x1c8/4];
+                if(*entry.countRead15B590!=count)return false;
+                sourcePC_=0x15B598u;entry.loopAgain15B598=owner.indexS0_<count;
+            }
+            sourcePC_=0x15B5A0u; //Only the complete positive loop supplies sourceV0=1 here.
+        }
+        //Nonpositive count uses the genuine15B50C/510 ->15B5A4 success path.
+        sourcePC_=0x15B5A4u;sourcePC_=0x15B5A8u;sourcePC_=0x15B5B4u;
+        sourcePC_=0x15B5B8u;sourcePC_=0x15B5BCu;sourcePC_=0x15B5C0u;sourcePC_=0x15B5C4u;
+        owner.returned15B5C4_=true;commonReturned_=true;return true;
+    }
     bool readEmitterInteger158B30(const char* key,std::int32_t fallback,std::int32_t& out)noexcept {
         if(occurrence_!=Occurrence::emitter15AE00||!emitterOwner_||!ownedTextSectionForFieldCurrent())return false;
         std::string_view value;bool found=false;
@@ -660,8 +854,8 @@ class OriginalParticleSourceConfig50LA final {
                 {"RandomMinTimeOff",0x1f0,0x15b128},{"RandomMinTimeOff",0x1f0,0x15b140}};
             for(const auto& f:fields){sourcePC_=f.pc;if(!readEmitterScalar158B80(f.key,0,f.offset,words,known))return false;++commonModeScalarCount_;}
             //The original repeats RandomMinTimeOff/1F0: do not repair it to
-            //MaxTimeOff/1F4. Actual process RNG308030 ownership is unjoined.
-            sourcePC_=0x308030u;return false;
+            //MaxTimeOff/1F4. Continue through the actual process RNG owner.
+            if(!initializeCommonMode2Timer15B148(words,known))return false;
         }else if(mode==3){
             sourcePC_=0x15B1A0u;if(!readEmitterScalar158B80("TimedTimeOn",0,0x1ec,words,known))return false;
             ++commonModeScalarCount_;sourcePC_=0x15B1B8u;
@@ -718,16 +912,11 @@ class OriginalParticleSourceConfig50LA final {
         const bool animated=!(frames&0x80000000u)&&frames>0x3f800000u;
         sourcePC_=animated?0x15B4F4u:0x15B504u;
         words[0x198/4]=animated?(words[0x198/4]|0x400u):(words[0x198/4]&~0x400u);commonAnimationFlagWritten_=true;
-        if(forced>0){
-            sourcePC_=0x15B514u;
-            if(known[0x1c4/4]!=0xffffffffu||words[0x1c4/4])return false;
-            sourcePC_=0x15B52Cu;return false; //Genuine2E8CA0 forced-set allocation not yet joined.
-        }
-        sourcePC_=0x15B5C4u;commonReturned_=true;return true; //Actual source1 return; not the subtype return.
+        return continueForcedSets15B508(words,known); //Common return only; never a subtype/runtime receipt.
     }
 
 public:
-    ~OriginalParticleSourceConfig50LA(){if(borrowed_)std::terminate();
+    ~OriginalParticleSourceConfig50LA(){if(borrowed_||commonMode2DrawAdapter_)std::terminate();
         OriginalConfigProcessGlobals50LA::expireStackNative(&emitterMinRange30_);
         OriginalConfigProcessGlobals50LA::expireStackNative(&emitterMaxRange30_);
         OriginalConfigProcessGlobals50LA::expireStackNative(&commonVelocity30_);

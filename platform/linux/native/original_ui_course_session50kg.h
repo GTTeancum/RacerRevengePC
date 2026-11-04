@@ -6,6 +6,7 @@
 #include "../../../src/game/original_ui_light_manager_lifetime50kg.h"
 namespace rr::platform {
 struct OriginalUiTournamentRouteProposal50KG;
+class OriginalUiPauseCourseOrigin50LA;
 enum class OriginalUiCourseSessionStatus50KG : std::uint8_t {
     ok,noChange,backProposed,unavailableDestination,notBound,alreadyBound,invalidInput,
     unsupportedState,profile,resource,widget,model,camera,lighting,aperture,
@@ -39,6 +40,10 @@ struct OriginalUiCourseSessionCold50KG {
     std::uint8_t previousScreen=0;
     // Distinct actual mode-2 origin; absent for the unchanged Rider/mode-0 path.
     std::shared_ptr<const OriginalUiTournamentRouteProposal50KG> tournamentProposal;
+    // Root-issued, one-session custody only. With this token previousScreen
+    // is0 because no previous UI manager survives the native Race retirement.
+    // Neither that value nor this pointer alone grants entry.
+    std::shared_ptr<OriginalUiPauseCourseOrigin50LA> pauseCourseOrigin;
     game::OriginalApplicationAnimationClockView50KG applicationAnimation{};
 };
 class OriginalUiCourseSession50KG;

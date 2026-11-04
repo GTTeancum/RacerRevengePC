@@ -16,6 +16,7 @@ class OriginalUiSharedDialogMaterialHistory50KG final {
     friend class OriginalUiMainDraw50KG;
     friend class OriginalUiGarageCanonicalSubmission50KG;
     friend class OriginalUiOptionsDrawContribution50KG;
+    friend class OriginalUiRiderDrawContribution50KG;
     using Key=assets::OriginalUiMaterialEquivalenceKey50KG;
     using History=assets::OriginalUiMaterialBindingState50KG;
     using D=OriginalUiControllerPopupResourceDiagnostic50KG;
@@ -68,6 +69,14 @@ private:
     bool stageMenu(const OriginalUiSourceOwner50KM*,std::uint64_t,const OriginalUiSourceFrame50KM&,
         const assets::OriginalUiImageBank50KG&,const std::vector<MenuUse>&,
         const std::array<History,6>&,D&)noexcept;
+    // Sparse Rider is admitted only by this exact draw owner's sealed source
+    // frame, bank and live residency proof. No caller-supplied readiness flag.
+    bool stageMenu(const OriginalUiRiderDrawContribution50KG*,std::uint64_t,const OriginalUiSourceFrame50KM&,
+        const assets::OriginalUiImageBank50KG&,const std::vector<MenuUse>&,
+        const std::array<History,6>&,D&)noexcept;
+    bool stageMenuWithBank(const OriginalUiSourceOwner50KM*,std::uint64_t,const OriginalUiSourceFrame50KM&,
+        const assets::OriginalUiImageBank50KG&,const std::vector<MenuUse>&,
+        const std::array<History,6>&,const OriginalUiRiderDrawContribution50KG*,D&)noexcept;
     bool beginMenu(const OriginalUiSourceOwner50KM*,std::uint64_t,const OriginalUiSourceFrame50KM&,
         const VehicleWindowGl50DS&)noexcept;
     bool cancelMenuBegin(const OriginalUiSourceOwner50KM*,std::uint64_t,const OriginalUiSourceFrame50KM&,
@@ -77,6 +86,7 @@ private:
     bool menuStagePending(const OriginalUiSourceOwner50KM*)const noexcept;
     bool releaseMenu(const OriginalUiMainDraw50KG*,const VehicleWindowGl50DS*)noexcept;
     bool releaseMenu(const OriginalUiOptionsDrawContribution50KG*,const VehicleWindowGl50DS*)noexcept;
+    bool releaseMenu(const OriginalUiRiderDrawContribution50KG*,const VehicleWindowGl50DS*)noexcept;
     bool releaseMenuAfterRetirement(const OriginalUiSourceOwner50KM*,const VehicleWindowGl50DS*)noexcept;
     static bool stageGarage(OriginalUiGarageCanonicalSubmission50KG&,OriginalUiGarageDrawContribution50KG&,D&)noexcept;
     bool garageCurrent(const OriginalUiGarageCanonicalSubmission50KG&)const noexcept;

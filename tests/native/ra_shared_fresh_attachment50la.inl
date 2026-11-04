@@ -76,7 +76,7 @@
         bool complete=false;
         try {bank.visit(slot,[&](){
             std::array<storage::Storage::SharedRosterObject*,storage::Storage::rosterRoles> rows{};
-            if(!sharedColdRowsCurrent(slot,rows)){d.message="actual shared fresh retirement ownership differs";return;}
+            if(!sharedColdRowsCurrent(slot,rows,true)){d.message="actual shared fresh retirement ownership differs";return;}
             for(unsigned i:{3u,4u}){auto& row=*rows[i];auto& object=s->objects[row.reservedRef-1u];
                 if((object.identity&&object.identity!=row.identity)||
                    (row.membership.state.attached&&row.membership.state.object!=row.reservedRef)||

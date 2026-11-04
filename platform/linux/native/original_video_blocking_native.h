@@ -13,9 +13,12 @@ enum class OriginalVideoNativeUse : std::uint8_t {
 // Concrete native display fade260850/261630. This is NOT gameplay blur2623E0.
 // Borrows the live renderer and its exact GameHost50ER context; both outlive
 // this adapter. The renderer retains all GL names, including failed work and
-// the final effect image. No UI source/submission receipt is accepted here.
+// the final effect image. No caller-supplied UI receipt is accepted here.
 //
-// Begin requires the current publication to be a real normal race submission.
+// Begin requires a real normal race publication. Blocking OUT additionally
+// admits the actual displayed original Pause image, sealed privately by this
+// renderer only after its real swap/headless completion. Shared host-menu
+// targets or prepared Pause geometry alone never grant this authority.
 // It snapshots that exact image once into a distinct immutable RGBA8 texture.
 // Every sample recopies it into the unpublished alternate effect surface,
 // applies the packed RGBAQ color with native GS-style integer byte blending,
@@ -39,7 +42,11 @@ enum class OriginalVideoNativeUse : std::uint8_t {
 // frozen real race image, including the actual human-ending camera image.
 // It does not claim async25B5D0 calls blocking261630/262D80. Use a separate
 // backend for blocking and async effects. A successfully retired instance can
-// later begin its same policy again, only after a fresh actual race publication.
+// later begin its same policy again, only after a new admitted race or
+// completed original Pause publication. Async and blocking IN retain their
+// existing race-target admission; those normal banks may already include Pause.
+// This transport admission does not authorize a Pause input callback, close,
+// Main request or claim that a source caller's full continuation is available.
 class OriginalVideoBlockingNativeBackend final : public game::OriginalVideoBlockingBackend {
 public:
     // No default mode or blend policy: every actual owner states its native
@@ -65,8 +72,9 @@ public:
     const VehicleWindowDiagnostic50DS& rendererDiagnostic() const noexcept {return diagnostic_;}
     const GameHostDiagnostic50ER& hostDiagnostic() const noexcept {return hostDiagnostic_;}
 private:
-    friend struct ::original_main_entry50KG::Application; // Exact retained Results renderer/context binding only.
+    friend struct ::original_main_entry50KG::Application; // Exact retained input renderer/context binding only.
     bool ownersCurrent() noexcept;
+    bool pauseReturnSourceCurrent()noexcept; //Private real renderer admission before irreversible row9 effects.
     bool retire(bool cancelled) noexcept;
     game::OriginalCameraStartResult failure(std::uint32_t) const noexcept;
     VehicleWindowGl50DS& renderer_;

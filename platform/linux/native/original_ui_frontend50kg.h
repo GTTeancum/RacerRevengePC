@@ -294,8 +294,14 @@ private:
     OriginalUiFrontendStatus50KG prepareNativeResultsHall(
         const OriginalUiFrontendCold50KG&,const ::original_main_entry50KG::Application&,
         OriginalUiFrontendDiagnostic50KG&)noexcept;
+    // Only the genuine retained Pause row10 request can issue this origin.
+    // It opens Course directly without a Main/Rider entry or profile replay.
+    OriginalUiFrontendStatus50KG prepareNativePauseCourse(
+        const OriginalUiFrontendCold50KG&,const std::shared_ptr<OriginalUiPauseCourseOrigin50LA>&,
+        OriginalUiFrontendDiagnostic50KG&)noexcept;
     OriginalUiFrontendStatus50KG prepareInitialNative(
         const OriginalUiFrontendCold50KG&,const ::original_main_entry50KG::Application*,
+        const std::shared_ptr<OriginalUiPauseCourseOrigin50LA>&,
         OriginalUiFrontendDiagnostic50KG&)noexcept;
     friend class OriginalUiGarageSession50KG;
     bool queueGarageScreen17DE10(const OriginalUiGarageSession50KG&,std::int32_t,std::int32_t)noexcept;

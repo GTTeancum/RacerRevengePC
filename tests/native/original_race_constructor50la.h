@@ -2,6 +2,7 @@
 namespace ra_cold_aggregate50LA {class Owner;}
 namespace ra_source_camera50LA { class OwnershipBridge; }
 #include "original_ui_main_entry50kg.h"
+#include "original_tunnel_track50la.h"
 #include "original_course_race_targets50kx.h"
 #include "../../src/game/original_race_hud_blink50la.h"
 #include "../../src/game/original_results104_50la.h"
@@ -10,6 +11,7 @@ namespace ra_source_camera50LA { class OwnershipBridge; }
 #include "../../src/game/original_simple_vcr50la.h"
 #include "../../src/game/original_race_music_manager50la.h"
 #include "../../src/game/original_race_timing_manager50la.h"
+#include "../../src/game/original_race_racer_manager50la.h"
 #include "../../src/game/original_human_finish50kg.h"
 #include <limits>
 #include <optional>
@@ -37,6 +39,7 @@ class OriginalRaceConstructor50LA final {
     friend class OriginalSimpleVCR50LA;
     friend class OriginalRaceMusicManager50LA;
     friend class OriginalRaceTimingManager50LA;
+    friend class OriginalRaceRacerManager50LA;
     friend class ::original_results_feedback50LA::Registration;
     friend class ::original_results_feedback50LA::Scope;
     friend class ::original_race_hud_scope50LA::Registration;
@@ -137,7 +140,7 @@ class OriginalRaceConstructor50LA final {
         enum class Cut:std::uint8_t {minimumLow2,minimumGetter,selectionLow2,
             selectionGetter,selectedGetter,controllerLow2,controllerSlot,owner78,
             vcrStopped,vcrFlag,worldReset,worldResetStopped,pause,pauseStopped,auralStop,
-            auralStopped,musicFade,musicFadeStopped,particleBoundary,particleStopped,worldRestartBoundary,worldRestartStopped};
+            auralStopped,musicFade,musicFadeStopped,particleBoundary,particleStopped,worldRestartBoundary,worldRestartStopped,racerRestart,racerRestartStopped};
         Cut cut=Cut::minimumLow2;
         //Actual live registers, not a sorted Results row or inferred winner.
         //S1 is overwritten with-1 at1AB99C; S2 first exists at1AB9A0.
@@ -174,6 +177,17 @@ class OriginalRaceConstructor50LA final {
     std::size_t sourcePlayerMusicBorrows_=0; // Blocks10C retirement while typed33C aliases live.
     //Actual counted1AF7F0 object, published before1AF960. Native time30/flags58
     //and lists remain the ONE existing Setup manager, never copied here.
+    // Counted2A1160 map owner retains the SAME RA World source projection.
+    // Native cold association, not completion of1A6F54/2A1260 startup calls.
+    std::shared_ptr<OriginalTunnelTrack50LA> mapB8_;
+    bool retireNativeMapB8(std::uint32_t&)noexcept;
+    // Counted1AD440 manager over the SAME native Bank. This explicit native
+    // roster adapter does not publish guest arrays44/3C or claim1AD520 return.
+    // The independent subtype3 record owner is never duplicated on this route.
+    std::unique_ptr<OriginalRaceRacerManager50LA> racerB0_;
+    bool initializeNativeRacerB0(::interactive_continuation50DU::Context&,
+        ::native_racer50HN::Bank&,std::uint32_t&)noexcept;
+    bool retireNativeRacerB0(std::uint32_t&)noexcept;
     std::unique_ptr<OriginalRaceTimingManager50LA> timingB4_;
     bool initializeNativeTimingB4(::interactive_continuation50DU::Context&,
         ::native_racer50HN::Bank&,std::uint32_t&)noexcept;
@@ -200,7 +214,8 @@ class OriginalRaceConstructor50LA final {
     OriginalRaceHudBlink50LA hudBlink_;
     // Native typed numeric lanes actually written by this constructor. Child
     // pointer slots acquire only explicitly reached native children below.
-    // B8/BC/C0 are not represented as null because1A65C0 never writes them.
+    // BC/C0 remain unrepresented. B8 is absent until the explicit native
+    // map association above;1A65C0 never writes any of these slots.
     float field94_=4.f;
     // Same constructor-zero98 lane, now consumed by the existing real ending
     // cursor. Native progress retains one actual Root invocation, not a timer.
@@ -573,7 +588,7 @@ public:
         sourcePC=0x1a65cc;
         if(rolledBack_)return true;
         if(!counted_){rolledBack_=true;return true;}
-        if(sourcePlayerMusicBorrows_||camera34_||cameraNativeAdapter34_||!endHud_.expired()||pause100_||results104_||f8Owner_||f8Attached_||vcr78Owner_||vcr78Source_||music10C_||timingB4_||nativeRootAttached_||world74_||taWorld74_||taWorldCounted_||gcWorld74_||gcWorldCounted_||maWorld74_||maWorldCounted_||saWorld74_||saWorldCounted_||gaWorld74_||gaWorldCounted_||nativeTaController48_||loadDisplay_||loadFifo_||raceAudio_||raceGroupCount_||!detachedPrefix()||application_->attachmentLock423F58()||
+        if(sourcePlayerMusicBorrows_||camera34_||cameraNativeAdapter34_||!endHud_.expired()||pause100_||results104_||f8Owner_||f8Attached_||vcr78Owner_||vcr78Source_||music10C_||timingB4_||racerB0_||mapB8_||nativeRootAttached_||world74_||taWorld74_||taWorldCounted_||gcWorld74_||gcWorldCounted_||maWorld74_||maWorldCounted_||saWorld74_||saWorldCounted_||gaWorld74_||gaWorldCounted_||nativeTaController48_||loadDisplay_||loadFifo_||raceAudio_||raceGroupCount_||!detachedPrefix()||application_->attachmentLock423F58()||
            !application_->objectCount423F60()||!application_->entityAuthority_.retire(entity_))return false;
         --entity_.reference00;--application_->objectCount423F60();
         rolledBack_=true;profile_.reset();resourceContext_.reset();resourceDomain_.reset();return true;

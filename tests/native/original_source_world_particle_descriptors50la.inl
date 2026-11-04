@@ -135,10 +135,10 @@ bool Owner::preflightSourceWorldParticleDescriptorsNative()const noexcept {
                     if(!e->counted||!e->enrolled||e->dispatch08!=table||
                        e->known[0x70/4]!=(e->managerStored?0u:0xffffffffu)||e->words[0x70/4]||
                        e->known[0x74/4]!=(e->modelStored?0u:0xffffffffu)||e->words[0x74/4]||
-                       e->known[0x1c4/4]!=0xffffffffu||e->words[0x1c4/4]||
                        e->known[0x1d4/4]!=7u||e->words[0x1d4/4]!=(e->particleActivationReturned&&e->sourceStartOn==true?3u:1u))return false;
                 }
                 if(e){
+                    if(!e->forcedSets1C4.currentNative(&e->entity,e->words,e->known))return false;
                     const bool subtype1=service.emitterType==1u;
                     const bool loaderReturned=service.emitterType==0u?e->type0LoaderReturned:
                         (subtype1?e->type1LoaderReturned:(service.emitterType==2u?e->type2LoaderReturned:(service.emitterType==9u?e->type9LoaderReturned:(service.emitterType==11u?e->type11LoaderReturned:(service.emitterType==12u?e->type12LoaderReturned:e->type8LoaderReturned)))));
@@ -330,7 +330,8 @@ bool Owner::preflightSourceWorldParticleDescriptorsNative()const noexcept {
                            (!e->configNativeWithdrawn&&(!sourceTrackMountDomain_||sourceTrackMountClosed_))||
                            !config.emitterOccurrenceCurrentNative(&e->entity,
                                e->configNativeWithdrawn?nullptr:sourceTrackMountDomain_->resolver3E1A70().get(),
-                               e->configNativeWithdrawn?nullptr:sourceTrackMountDomain_->archiveProvider3E1A70().get()))return false;
+                               e->configNativeWithdrawn?nullptr:sourceTrackMountDomain_->archiveProvider3E1A70().get(),
+                               e->forcedSets1C4,e->words,e->known))return false;
                         if(config.attempted_&&std::string_view(config.filename_)!=std::string_view(e->filename78.data(),*e->filenameBytes))return false;
                         if(config.emitterPropertyTarget_&&*config.emitterPropertyTarget_!=
                            (service.emitterType==0u?0x15c330u:(service.emitterType==1u?0x15d560u:(service.emitterType==2u?0x15dd00u:(service.emitterType==9u?0x15ef70u:(service.emitterType==11u?0x15fc10u:(service.emitterType==12u?0x1602b0u:0x15e6d0u)))))))return false;
@@ -388,11 +389,23 @@ bool Owner::preflightSourceWorldParticleDescriptorsNative()const noexcept {
                             if(e->known[tailOffsets[n]/4]!=0xffffffffu)return false;
                         if(config.commonDelayCopied_&&(e->known[0x1dc/4]!=0xffffffffu||e->words[0x1dc/4]!=e->words[0x1e0/4]))return false;
                         if(config.commonModeTimeCopied_&&(e->known[0x1e4/4]!=0xffffffffu||e->words[0x1e4/4]!=e->words[0x1ec/4]))return false;
+                        //The Config validator checks its immutable draw and
+                        //numeric/store chronology. Live custody is separate;
+                        //later legitimate consumers may advance the raw word.
+                        const auto& mode2=config.commonMode2_;
+                        if(mode2.drawEntered&&!e->borrowsWithdrawn){
+                            if(!sourceLoadApplication_||mode2.application!=sourceLoadApplication_||
+                               !sourceLoadApplication_->enabled||sourceLoadApplication_->state!=mode2.applicationPin||
+                               !mode2.applicationPin||!mode2.applicationPin->known||
+                               sourceLoadApplication_->entities()!=worldApplication_||
+                               &mode2.applicationPin->rawRandom308030!=&mode2.applicationPin->sharedNoise308030.sharedRandomState)return false;
+                        }
                         if(config.commonFlagCount_&&e->known[0x198/4]!=0xffffffffu)return false;
                         if(config.commonFramesWritten_&&e->known[0x1bc/4]!=0xffffffffu)return false;
                         if(config.commonReciprocalWritten_&&e->known[0x1c0/4]!=0xffffffffu)return false;
                         if(config.commonForcedCountWritten_&&e->known[0x1c8/4]!=0xffffffffu)return false;
-                        if(config.commonReturned_&&(e->words[0x1c8/4]&0x80000000u)==0&&e->words[0x1c8/4]!=0)return false;
+                        // A positive count is accepted only through this emitter's
+                        // complete typed allocation/entry/return history, checked above.
                         if(e->type8VelocityCopied&&(service.emitterType!=8u||!config.commonReturned_||e->known[0x220/4]!=0xffffffffu||
                            e->words[0x220/4]!=e->words[0x64/4]))return false;
                         if(e->type9VelocityCopied&&(service.emitterType!=9u||!config.commonReturned_||e->known[0x220/4]!=0xffffffffu||
@@ -438,7 +451,7 @@ bool Owner::preflightSourceWorldParticleDescriptorsNative()const noexcept {
                                    fogPopulation.randomConverted[draw]!=bits)return false;
                             }else if(fogPopulation.randomConverted[draw])return false;
                             if(unitMask&bit){std::uint32_t bits=0;
-                                if(!g::detail::sourceParticleScaleRandom50LA(fogPopulation.randomConverted[draw],bits)||
+                                if(!g::detail::sourceParticleFogScale50LA(fogPopulation.randomConverted[draw],bits)||
                                    fogPopulation.randomUnit[draw]!=bits)return false;
                             }else if(fogPopulation.randomUnit[draw])return false;
                         }
@@ -473,11 +486,11 @@ bool Owner::preflightSourceWorldParticleDescriptorsNative()const noexcept {
                             if(range.step>=3){if(range.unit!=fogPopulation.randomStack90[lane])return false;}
                             else if(range.unit)return false;
                             std::uint32_t checked=0;
-                            if(range.step>=4){if(!g::detail::sourceParticleZeroRangeDifference50LA(range.maximum,range.minimum,checked)||range.difference!=checked)return false;}
+                            if(range.step>=4){if(!g::detail::sourceParticleFogRangeDifference50LA(range.maximum,range.minimum,checked)||range.difference!=checked)return false;}
                             else if(range.difference)return false;
-                            if(range.step>=5){if(!g::detail::sourceParticleUnitTimesPositiveZero50LA(range.unit,range.difference,checked)||range.product!=checked)return false;}
+                            if(range.step>=5){if(!g::detail::sourceParticleFogRangeProduct50LA(range.unit,range.difference,checked)||range.product!=checked)return false;}
                             else if(range.product)return false;
-                            if(range.step>=6){if(!g::detail::sourceParticleBothZeroAdd50LA(range.minimum,range.product,checked)||range.sum!=checked)return false;}
+                            if(range.step>=6){if(!g::detail::sourceParticleFogRangeSum50LA(range.minimum,range.product,checked)||range.sum!=checked)return false;}
                             else if(range.sum)return false;
                             if(rangeComplete&&range.step<7){
                                 rangePendingPC=0x160658u+static_cast<std::uint32_t>(lane)*0x1cu+std::uint32_t(range.step)*4u;
@@ -505,7 +518,7 @@ bool Owner::preflightSourceWorldParticleDescriptorsNative()const noexcept {
                                 if(fogPopulation.positionLocal[lane]!=fogPopulation.randomStack70[lane])return false;
                             }else if(fogPopulation.positionLocal[lane])return false;
                             if(positionStep>=addReached[lane]){std::uint32_t checked=0;
-                                if(!g::detail::sourceParticleBothZeroAdd50LA(fogPopulation.positionInput[lane],fogPopulation.positionLocal[lane],checked)||
+                                if(!g::detail::sourceParticleFogPositionAdd50LA(fogPopulation.positionInput[lane],fogPopulation.positionLocal[lane],checked)||
                                    fogPopulation.positionResult[lane]!=checked)return false;
                             }else if(fogPopulation.positionResult[lane])return false;
                             if(positionStep>=16u+lane){if(fogPopulation.positionStackA0[lane]!=fogPopulation.positionResult[lane])return false;}
@@ -578,7 +591,7 @@ bool Owner::preflightSourceWorldParticleDescriptorsNative()const noexcept {
                                    fogPopulation.velocityRandomConverted[draw]!=bits)return false;
                             }else if(fogPopulation.velocityRandomConverted[draw])return false;
                             if(velocityStep>=velocityUnitAt[draw]){std::uint32_t bits=0;
-                                if(!g::detail::sourceParticleScaleRandom50LA(fogPopulation.velocityRandomConverted[draw],bits)||
+                                if(!g::detail::sourceParticleFogScale50LA(fogPopulation.velocityRandomConverted[draw],bits)||
                                    fogPopulation.velocityRandomUnit[draw]!=bits)return false;
                             }else if(fogPopulation.velocityRandomUnit[draw])return false;
                         }
@@ -593,7 +606,7 @@ bool Owner::preflightSourceWorldParticleDescriptorsNative()const noexcept {
                                 const auto& magnitude=product?fogPopulation.velocityMagnitude234[product-1]:fogPopulation.oscillationMagnitude234;
                                 const auto unit=product?fogPopulation.velocityRandomUnit[product-1]:fogPopulation.oscillationRandomUnit;
                                 std::uint32_t bits=0;
-                                if(!magnitude||!g::detail::sourceParticleUnitTimesPositiveZero50LA(unit,*magnitude,bits)||
+                                if(!magnitude||!g::detail::sourceParticleFogVelocityProduct50LA(unit,*magnitude,bits)||
                                    fogPopulation.velocityProducts[product]!=bits)return false;
                             }else if(fogPopulation.velocityProducts[product])return false;
                         }
@@ -601,21 +614,35 @@ bool Owner::preflightSourceWorldParticleDescriptorsNative()const noexcept {
                            fogPopulation.velocityStackB0Loaded!=(velocityStep>=11)||
                            fogPopulation.velocityStack80Copied!=(velocityStep>=11))return false;
                         const std::array<std::uint32_t,4> emptyVelocity{};
+                        std::array<std::uint32_t,4> expectedVelocity80{};
                         if(velocityStep>=11){
                             const std::array<std::uint32_t,4> expectedVelocity={{fogPopulation.velocityProducts[2],
                                 fogPopulation.velocityProducts[1],fogPopulation.velocityProducts[0],0x3f800000u}};
-                            if(fogPopulation.velocityStackB0!=expectedVelocity||fogPopulation.velocityStack80!=fogPopulation.velocityStackB0)return false;
-                        }else if(fogPopulation.velocityStackB0!=emptyVelocity||fogPopulation.velocityStack80!=emptyVelocity)return false;
+                            if(fogPopulation.velocityStackB0!=expectedVelocity)return false;
+                            expectedVelocity80=expectedVelocity;
+                        }else if(fogPopulation.velocityStackB0!=emptyVelocity)return false;
+                        if(fogPopulation.velocityNegationStoredMask&~7u)return false;
                         constexpr std::uint8_t signAt[]={14,18,22};
                         for(std::size_t lane=0;lane<3;++lane){
                             const auto& decision=fogPopulation.velocitySignLeHalf[lane];
                             const auto& negation=fogPopulation.velocityNegationInput[lane];
-                            if(decision.has_value()!=(velocityStep>=signAt[lane])||
-                               negation.has_value()!=(velocityStep==signAt[lane]))return false;
-                            if(decision&&(*decision!=(fogPopulation.velocityRandomUnit[lane+2]<=0x3f000000u)||
-                               *decision!=(velocityStep>signAt[lane])))return false;
-                            if(negation&&*negation!=fogPopulation.velocityStack80[lane])return false;
+                            const auto& result=fogPopulation.velocityNegationResult[lane];
+                            if(decision.has_value()!=(velocityStep>=signAt[lane]))return false;
+                            if(decision&&*decision!=(fogPopulation.velocityRandomUnit[lane+2]<=0x3f000000u))return false;
+                            const bool negate=decision&&!(*decision);
+                            const bool stored=negate&&velocityStep>signAt[lane];
+                            if(negation.has_value()!=negate||result.has_value()!=stored||
+                               bool(fogPopulation.velocityNegationStoredMask&(1u<<lane))!=stored)return false;
+                            //A stop at this lane's MUL is possible only on its
+                            //untaken comparison branch; earlier lane stores stay.
+                            if(velocityStep==signAt[lane]&&!negate)return false;
+                            if(negation&&*negation!=fogPopulation.velocityStackB0[lane])return false;
+                            if(stored){std::uint32_t bits=0;
+                                if(!g::detail::sourceParticleFogVelocityNegate50LA(*negation,bits)||*result!=bits)return false;
+                                expectedVelocity80[lane]=bits;
+                            }
                         }
+                        if(fogPopulation.velocityStack80!=expectedVelocity80)return false;
                         if(velocityStore.stored!=(velocityStep==24)||
                            velocityStore.pc!=(velocityStep>=23?0x16088cu:0u)||
                            (velocityStore.stored&&velocityStore.after!=fogPopulation.velocityStack80))return false;
@@ -640,7 +667,7 @@ bool Owner::preflightSourceWorldParticleDescriptorsNative()const noexcept {
                         if(oscillationRandomStep>=4&&(e->known[0x234/4]!=0xffffffffu||
                            *fogPopulation.oscillationMagnitude234!=e->words[0x234/4]))return false;
                         if(oscillationRandomStep>=5){std::uint32_t bits=0;
-                            if(!g::detail::sourceParticleScaleRandom50LA(fogPopulation.oscillationRandomConverted,bits)||
+                            if(!g::detail::sourceParticleFogScale50LA(fogPopulation.oscillationRandomConverted,bits)||
                                fogPopulation.oscillationRandomUnit!=bits)return false;
                         }else if(fogPopulation.oscillationRandomUnit)return false;
                         if(fogPopulation.sizeInput184.has_value()!=(fieldTailStep>=1)||
@@ -681,7 +708,7 @@ bool Owner::preflightSourceWorldParticleDescriptorsNative()const noexcept {
                         const auto& tail=fogPopulation.tailStores;
                         if(postDivideStep>11||(postDivideStep&&fieldTailStep!=18)||
                            fogPopulation.reciprocalBits.has_value()!=(postDivideStep>=1)||
-                           fogPopulation.reciprocalDAndSD!=(postDivideStep>=1)||
+                           (!postDivideStep&&fogPopulation.reciprocalDAndSD)||
                            fogPopulation.initialFlags198.has_value()!=(postDivideStep>=4)||
                            fogPopulation.mirrorYLeHalf.has_value()!=(postDivideStep>=5)||
                            fogPopulation.mirrorXSet.has_value()!=(postDivideStep>=6)||
@@ -689,9 +716,9 @@ bool Owner::preflightSourceWorldParticleDescriptorsNative()const noexcept {
                            fogPopulation.mirrorYSet.has_value()!=(postDivideStep>=9)||
                            fogPopulation.secondFlagsResult.has_value()!=(postDivideStep>=10)||
                            !g::OriginalTrackParticleCold50LA::sourceFogTailHistoryNative(tail))return false;
-                        if(postDivideStep>=1){std::uint32_t bits=0;
-                            if(!fields.lifeRead30||!g::detail::sourceParticleDivideOneBySignedZero50LA(*fields.lifeRead30,bits)||
-                               *fogPopulation.reciprocalBits!=bits)return false;
+                        if(postDivideStep>=1){std::uint32_t bits=0;bool assertedDivideByZero=false;
+                            if(!fields.lifeRead30||!g::detail::sourceParticleFogReciprocal50LA(*fields.lifeRead30,bits,assertedDivideByZero)||
+                               *fogPopulation.reciprocalBits!=bits||fogPopulation.reciprocalDAndSD!=assertedDivideByZero)return false;
                         }
                         if(fogPopulation.initialFlags198&&(e->known[0x198/4]!=0xffffffffu||
                            *fogPopulation.initialFlags198!=e->words[0x198/4]))return false;
@@ -735,7 +762,7 @@ bool Owner::preflightSourceWorldParticleDescriptorsNative()const noexcept {
                            (tail.completedOps>=7&&(tail.pcs[6]!=secondWritePC||tail.values[6]!=*fogPopulation.secondFlagsResult)))return false;
                         if((fogPopulation.firstFlagsResult&&*fogPopulation.firstFlagsResult!=(firstSet?(tail.values[3]|0x4000u):(tail.values[3]&0xffffbfffu)))||
                            (fogPopulation.secondFlagsResult&&*fogPopulation.secondFlagsResult!=(secondSet?(tail.values[5]|0x8000u):(tail.values[5]&0xffff7fffu))))return false;
-                        //Even an ordinary-life pendingDIV must agree with an
+                        //Even an unsupported-life pendingDIV must agree with an
                         //authoritatively empty post-DIV pool history.
                         if(!e->borrowsWithdrawn&&fieldTailStep==18){
                             const auto* current=e->manager70;
@@ -818,14 +845,14 @@ bool Owner::preflightSourceWorldParticleDescriptorsNative()const noexcept {
                             if(!g::detail::sourceParticleTruncateInteger50LA(frame.randomValue,bits)||*frame.randomConverted!=bits)return false;
                         }
                         if(frame.randomUnit){std::uint32_t bits=0;
-                            if(!g::detail::sourceParticleScaleRandom50LA(*frame.randomConverted,bits)||*frame.randomUnit!=bits)return false;
+                            if(!g::detail::sourceParticleFogScale50LA(*frame.randomConverted,bits)||*frame.randomUnit!=bits)return false;
                         }
                         if(frame.productBits){std::uint32_t bits=0;
-                            if(!g::detail::sourceParticleBothZeroMultiply50LA(*frame.spanConverted,*frame.randomUnit,bits)||
+                            if(!g::detail::sourceParticleFogFrameProduct50LA(*frame.spanConverted,*frame.randomUnit,bits)||
                                *frame.productBits!=bits)return false;
                         }
                         if(frame.offsetWord){std::uint32_t word=0;
-                            if(!g::detail::sourceParticleZeroToWord50LA(*frame.productBits,word)||*frame.offsetWord!=word)return false;
+                            if(!g::detail::sourceParticleFogFrameOffset50LA(*frame.productBits,word)||*frame.offsetWord!=word)return false;
                         }
                         if(frame.selectedWord&&*frame.selectedWord!=*frame.first1B0+*frame.offsetWord)return false;
                         const bool coldRange=frame.rangeGuard80AC==false;

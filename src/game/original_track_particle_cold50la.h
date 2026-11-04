@@ -2,6 +2,8 @@
 #include "original_application_entities50la.h"
 #include "native_directional_normalize106ea0_proposal.h"
 #include "original_gc_particle_manager50kg.h"
+#include "original_particle_fog_velocity50la.h"
+#include "original_particle_fog_lifetime50la.h"
 #include "../assets/original_standard_particle_material_reference50la.h"
 #include <exception>
 #include <cstdio>
@@ -585,7 +587,7 @@ private:
         //Historical validation never dereferences the retired position owner.
         if(!h.stored)return h.before==empty&&h.after==empty&&(h.pc==0||h.pc==0x16088cu);
         return h.pc==0x16088cu&&h.before[3]==0x3f800000u&&
-            h.after[0]==0&&h.after[1]==0&&h.after[2]==0&&h.after[3]==0x3f800000u;
+            detail::sourceParticleFogVelocityVector50LA(h.after);
     }
     bool sourceFogVelocityCurrentNative(const SourceFogPosition1606FC& position,
         const SourceFogVelocity16088C& h)const noexcept {
@@ -766,7 +768,7 @@ private:
         if(h.pc!=last&&!sourceFogTailOperationPCNative(h,h.completedOps,h.pc))return false;
         //All checks are structural. No historical emitter/pool/record pointer
         //is dereferenced, including after native borrow withdrawal.
-        if(h.completedOps>=1&&h.values[0]!=0x7fffffffu&&h.values[0]!=0xffffffffu)return false;
+        if(h.completedOps>=1&&!detail::sourceParticleFogReciprocalWord50LA(h.values[0]))return false;
         if(h.completedOps>=2&&h.values[1])return false;
         if(h.completedOps>=4&&h.values[3]!=h.values[2])return false;
         if(h.completedOps>=5&&h.values[4]!=(h.pcs[3]==0x160930u?
@@ -781,11 +783,12 @@ private:
         const void* exactEmitter)const noexcept {
         if(!sourceFogTailHistoryNative(h)||fields.storedCount!=6||fields.pc!=0x1608d8u||
            !fields.lifeRead30||!sourceFogFieldsCurrentNative(position,fields,exactEmitter))return false;
-        //Only actual+/-0 denominators admit an attempted post-DIV store. An
-        //empty receipt can still describe the unchanged ordinary-life stop.
+        //Authenticate every attempted/completed reciprocal against the real
+        //retained record30 read. An empty receipt still permits an unchanged
+        //unsupported-DIV stop; no new source read or flag effect is invented.
         if(h.pc||h.completedOps){
-            if((*fields.lifeRead30&0x7fffffffu)!=0)return false;
-            const auto inverse=*fields.lifeRead30?0xffffffffu:0x7fffffffu;
+            std::uint32_t inverse=0;bool assertedDivideByZero=false;
+            if(!detail::sourceParticleFogReciprocal50LA(*fields.lifeRead30,inverse,assertedDivideByZero))return false;
             if(h.completedOps&&h.values[0]!=inverse)return false;
         }
         return particles_->sourceFogTailCurrentNative(position.publication138,*position.index128,
@@ -800,7 +803,8 @@ private:
         h.pc=sourcePC; //Failed attempt leaves this exact source store pending.
         if(!sourceFogTailCurrentNative(position,fields,h,exactEmitter))return false;
         const auto prior=h.completedOps;
-        if(!prior&&inputBits!=(*fields.lifeRead30?0xffffffffu:0x7fffffffu))return false;
+        if(!prior){std::uint32_t inverse=0;bool assertedDivideByZero=false;
+            if(!detail::sourceParticleFogReciprocal50LA(*fields.lifeRead30,inverse,assertedDivideByZero)||inputBits!=inverse)return false;}
         if(!particles_->storeSourceFogTail1608E0(position.publication138,*position.index128,
            position.record,exactEmitter,prior,sourcePC,inputBits))return false;
         h.pcs[prior]=sourcePC;h.values[prior]=inputBits;++h.completedOps;
@@ -825,8 +829,10 @@ private:
         const SourceFogTail1608E0& h,const void* exactEmitter)noexcept {
         if(!sourceFogTailHistoryNative(h)||!sourceFogSuccessorFieldsHistoryNative(scan,position,fields,exactEmitter))return false;
         if(!h.pc&&!h.completedOps)return true;
-        if(!fields.lifeRead30||(*fields.lifeRead30&0x7fffffffu)!=0)return false;
-        return !h.completedOps||h.values[0]==(*fields.lifeRead30?0xffffffffu:0x7fffffffu);
+        if(!fields.lifeRead30)return false;
+        std::uint32_t inverse=0;bool assertedDivideByZero=false;
+        if(!detail::sourceParticleFogReciprocal50LA(*fields.lifeRead30,inverse,assertedDivideByZero))return false;
+        return !h.completedOps||h.values[0]==inverse;
     }
     bool sourceFogSuccessorTailCurrentNative(const SourceFogRetirement160570& scan,
         const SourceFogPosition1606FC& position,
@@ -834,11 +840,12 @@ private:
         const void* exactEmitter)const noexcept {
         if(!sourceFogSuccessorTailHistoryNative(scan,position,fields,h,exactEmitter)||fields.storedCount!=6||fields.pc!=0x1608d8u||
            !fields.lifeRead30||!sourceFogSuccessorFieldsCurrentNative(scan,position,fields,exactEmitter))return false;
-        //Only actual+/-0 denominators admit an attempted post-DIV store. An
-        //empty receipt can still describe the unchanged ordinary-life stop.
+        //Authenticate every attempted/completed reciprocal against the real
+        //retained record30 read. An empty receipt still permits an unchanged
+        //unsupported-DIV stop; no new source read or flag effect is invented.
         if(h.pc||h.completedOps){
-            if((*fields.lifeRead30&0x7fffffffu)!=0)return false;
-            const auto inverse=*fields.lifeRead30?0xffffffffu:0x7fffffffu;
+            std::uint32_t inverse=0;bool assertedDivideByZero=false;
+            if(!detail::sourceParticleFogReciprocal50LA(*fields.lifeRead30,inverse,assertedDivideByZero))return false;
             if(h.completedOps&&h.values[0]!=inverse)return false;
         }
         return particles_->sourceSuccessorFogTailCurrentNative(position.publication138,*position.index128,
@@ -855,7 +862,8 @@ private:
         if(sourceFogSuccessorCountPublication_.stored||sourceActiveCount128_!=1||
            !sourceFogSuccessorTailCurrentNative(scan,position,fields,h,exactEmitter))return false;
         const auto prior=h.completedOps;
-        if(!prior&&inputBits!=(*fields.lifeRead30?0xffffffffu:0x7fffffffu))return false;
+        if(!prior){std::uint32_t inverse=0;bool assertedDivideByZero=false;
+            if(!detail::sourceParticleFogReciprocal50LA(*fields.lifeRead30,inverse,assertedDivideByZero)||inputBits!=inverse)return false;}
         if(!particles_->storeSourceSuccessorFogTail1608E0(position.publication138,*position.index128,
            position.record,exactEmitter,prior,sourcePC,inputBits))return false;
         h.pcs[prior]=sourcePC;h.values[prior]=inputBits;++h.completedOps;

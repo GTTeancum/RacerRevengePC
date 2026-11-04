@@ -331,8 +331,9 @@ bool Application::completeConsumedRaWorldNativePrefix1A9EE0(
         //Explicit native loader adoption, after the actual same-World water
         //return. It never turns planned cold arrays into source publications.
         if(!session.nativeWreckOwner_||!race->stageNativeFirstWreckLoad(*this,session,*session.nativeWreckOwner_,pc))return false;
-        //The required next reader is actual374[0]->38[0]->D0, not340.
-        //Native binding facts do not open phase5 or the original caller fence.
+        //The bounded native continuation stops at214954 after native same-row
+        //Repulsor payload replacement. Later class/tuning loaders are still
+        //required. It does not open phase5 or the original caller fence.
         return false;
         //The independent source corridor remains fenced at1A6D98; native
         //backing adoption does not prove1A95B0 or174DF0 returned.
@@ -576,7 +577,18 @@ bool OwnershipBridge::stageNativeFirstWreckLoad(original_camera_session50KX::Ses
                     if(!rosterResources_->rigs_[0])return false;
                     //Same retained original PHY that produced this exact
                     //banked racer; no reopen or foreign parameter substitute.
-                    return backing.beginNativeHandling2146(rosterResources_->rigs_[0]->phy,pc);
+                    if(!backing.beginNativeHandling2146(rosterResources_->rigs_[0]->phy,pc))return false;
+                    if(!session.actual_.actualChariotModels)return false;
+                    auto* model=(*session.actual_.actualChariotModels)[0].get();
+                    if(!model||model->actualRig()!=rosterResources_->rigs_[0].get())return false;
+                    const bool physical=model->continueNativePhysical214710(session.racerEntities_[0],
+                        rosterResources_->rigs_[0]->phy,pc);
+                    backing.sourcePC_=pc; //Same reached continuation, including a retained failed prefix.
+                    if(!physical)return false;
+                    const bool repulsor=model->continueNativeRepulsor214894(session.racerEntities_[0],
+                        rosterResources_->rigs_[0]->phy,*this,pc);
+                    backing.sourcePC_=pc;
+                    return repulsor; //Native214954 only; no source2146 loader return receipt.
                 }
                 if(pc!=0x2129e0u||!backing.loadNativeNextCollectionPrefix(heights,directory,pc)||
                    !backing.setupNativeBody(0,zones,pc)||!backing.loadNativeQueryChildren(0,pc)||

@@ -20,6 +20,21 @@ struct PauseDerived {
     bool ready=false,frame=false;
 };
 std::unique_ptr<PauseDerived> pauseDerived;
+// Renderer-minted identity of the retained ORIGINAL Pause pixels. Generic
+// host menus use the same menu targets, so target membership is not proof.
+// Nonzero completedHistory is written only after the real display completion.
+struct PauseDisplayPublication {
+    const game::OriginalPauseNativeDraw50LA* owner=nullptr; //Strongly held by pauseDerived.
+    const game::OriginalCameraViewportFields* viewport=nullptr;
+    U target=0;
+    I width=0,height=0;
+    std::uint64_t serial=0,scene=0,generation=0,texturePublication=0,cameraPublication=0;
+    std::uint64_t completedHistory=0;
+} pauseDisplayPublication;
+void stagePauseDisplayPublication(U target,I w,I h)noexcept;
+void completePauseDisplayPublication()noexcept;
+bool pauseDisplayIdentityCurrent()const noexcept;
+bool completedPauseDisplayCurrent()const noexcept;
 bool pauseDerivedPreparing=false,pauseDerivedUiCreationFailed=false;
 bool hasPauseDerivedResources()const noexcept;
 bool preparePauseDerivedResources(std::shared_ptr<const game::OriginalPauseNativeDraw50LA> owner) noexcept;

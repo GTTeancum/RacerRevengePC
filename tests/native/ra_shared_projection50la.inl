@@ -65,10 +65,11 @@
                    policy->sharedMemberships_[slot][role].owner!=&row.membership.state||
                    policy->sharedMemberships_[slot][role].ref!=row.reservedRef)return false;
             }else if(role==2){
-                g::TerrainPrepareState48M state;
-                if(!row.terrainResource||row.type2Resource!=&row.terrainResource->resource||
+                g::TerrainPrepareState48M state;live_terrain_probe50fr::Owner live;
+                if(!read(slot,&actual_->terrainLive,&live,sizeof(live))||!sharedTerrainBankViewMatches(row,live)||
+                   !row.terrainResource||row.type2Resource!=&row.terrainResource->resource||
                    !read(slot,&actual_->terrain.initial,&state,sizeof(state))||
-                   !live_terrain_probe50fr::matches(*row.terrainResource,state))return false;
+                   !sharedTerrainMatches(row,state))return false;
             }else if(role==3){
                 g::PodShapeState49W shape;
                 if(row.bodyA0!=pod.bodyA0||row.type0Resource!=pod.shape||

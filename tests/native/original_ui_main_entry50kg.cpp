@@ -241,7 +241,7 @@ Application::~Application() {
         if(memoryCardConstructorOwner_||(state&&state->sharedDialogs)||(sharedUiScopeOwner_&&!sharedUiScopeOwner_->closed_))std::terminate();
         // A live source slot may still own renderer/context and counted state.
         // Application destruction cannot substitute for its checked retirement.
-        if(sourceAural00Owner_||sourceRace28COwner_||resultsHallTransfer50LA_||sourceLightManager426F60Owner_||sourceLocalization32COwner_||localizationRendererCall14C5A0_)std::terminate();
+        if(sourceAural00Owner_||sourceRace28COwner_||resultsHallTransfer50LA_||pauseInputContinuation50LA_||pauseMenuTransfer50LA_||sourceLightManager426F60Owner_||sourceLocalization32COwner_||localizationRendererCall14C5A0_)std::terminate();
         // Fail closed before invalidating the actual clock. This is not
         // cleanup: failed-prefix consumers and their mixer remain owned.
         if(garageAudioOwnerThread_!=std::this_thread::get_id()||garageAudioBackingOwner_||garageCustodyOwner_)std::terminate();
@@ -884,9 +884,18 @@ void Frontend::prepare(const Application& application,const std::shared_ptr<Vide
         std::uint64_t (*nativeNow)()noexcept,std::uint64_t nativeSessionIndex) {
         require(!materialApplicationOwner,"frontend material directory already entered");
         nativeResultsHallEntry_=bool(application.resultsHallTransfer50LA_);
+        nativePauseMainEntry_=application.nativePauseMainReceiverCurrent50LA();
+        nativePauseCourseEntry_=application.nativePauseCourseReceiverCurrent50LA();
+        require(!application.pauseMenuTransfer50LA_||(nativePauseMainEntry_!=nativePauseCourseEntry_),
+            "Pause receiver requires an exact retired-session request");
+        require(!(nativeResultsHallEntry_&&(nativePauseMainEntry_||nativePauseCourseEntry_)),"competing native receiver requests");
+        require(!nativePauseMainEntry_||application.nativePauseMainReceiverCurrent50LA(),
+            "Pause Main receiver requires exact post-batch, post-session request");
         require(!nativeResultsHallEntry_||application.nativeResultsHallReceiverCurrent50LA(),
             "Results Hall receiver requires the exact post-session request");
         materialApplicationOwner=&application;
+        require(!(nativePauseMainEntry_||nativePauseCourseEntry_)||application.bindNativePauseMenuReceiver50LA(*this,video),
+            "Pause request requires this exact native frontend/Video receiver");
         application.enterUiMaterialDirectory17DB80();
         using Id=rr::assets::OriginalUiArchiveId50KG;
         rr::platform::OriginalUiFrontendCold50KG cold;
@@ -1039,8 +1048,10 @@ void Frontend::prepare(const Application& application,const std::shared_ptr<Vide
             std::cerr<<"Original UI audio device="<<rr::platform::audioDeviceStatusName50HD(info.deviceStatus)
                 <<" capture="<<info.captureActive<<" rate="<<info.sampleRate<<" detail="<<info.deviceDetail.data()<<'\n';
         }
-        const auto prepared=nativeResultsHallEntry_?
-            coordinator.prepareNativeResultsHall(cold,application,diagnostic):coordinator.prepare(cold,diagnostic);
+        const auto prepared=nativePauseCourseEntry_?
+            coordinator.prepareNativePauseCourse(cold,application.pauseCourseReceiverOrigin50LA(*this),diagnostic):
+            nativeResultsHallEntry_?coordinator.prepareNativeResultsHall(cold,application,diagnostic):
+            coordinator.prepare(cold,diagnostic);
         if(prepared!=Status::ok)fail("preparation");
         require(coordinator.bindGarageDestinationRoot50KG(*this),"original UI same-Root destination binding failed");
         if(coordinator.configureRendererRequest(rendererRequest,diagnostic)!=Status::ok)fail("renderer configuration");
@@ -1052,16 +1063,22 @@ void Frontend::showBetaSettingsStatus() const noexcept {
     }
 
 void Frontend::activate(rr::platform::VehicleWindowGl50DS& renderer) {
+        if((nativePauseMainEntry_||nativePauseCourseEntry_)&&(!materialApplicationOwner||
+           !(nativePauseCourseEntry_?materialApplicationOwner->nativePauseCourseReceiverCurrent50LA():
+             materialApplicationOwner->nativePauseMainReceiverCurrent50LA())))fail("Pause menu receiver currentness");
         if(nativeResultsHallEntry_&&(!materialApplicationOwner||
            !materialApplicationOwner->nativeResultsHallReceiverCurrent50LA()))fail("Results Hall receiver currentness");
         std::string languageError;
         if(!materialApplicationOwner||!materialApplicationOwner->prepareFrontendLanguageServices(*this,renderer,languageError))
             throw std::runtime_error("original UI language startup rejected: "+languageError);
-        if(!nativeResultsHallEntry_&&(!materialApplicationOwner||!coordinator.prepareSharedDialogsInitial(*materialApplicationOwner,renderer,diagnostic)))
+        if(!nativeResultsHallEntry_&&!nativePauseCourseEntry_&&(!materialApplicationOwner||!coordinator.prepareSharedDialogsInitial(*materialApplicationOwner,renderer,diagnostic)))
             fail("shared UI initial ownership");
         if(coordinator.activate(renderer,diagnostic)!=Status::ok)fail("activation");
         if(nativeResultsHallEntry_&&!materialApplicationOwner->acceptNativeResultsHallReceiver50LA())
             fail("Results Hall actual entry commit");
+        if((nativePauseMainEntry_||nativePauseCourseEntry_)&&
+           !materialApplicationOwner->acceptNativePauseMenuReceiver50LA(*this,renderer))
+            fail("Pause actual destination entry commit");
         showBetaSettingsStatus();
     }
 
@@ -1571,6 +1588,8 @@ bool Frontend::closeUi() noexcept {
         if(materialApplicationOwner&&!materialApplicationOwner->withdrawCourseRaLoadingPrefix50LA(*this))return false;
         if(nativeResultsHallEntry_&&materialApplicationOwner&&
            !materialApplicationOwner->cancelNativeResultsHallTransfer50LA())return false;
+        if((nativePauseMainEntry_||nativePauseCourseEntry_)&&materialApplicationOwner&&
+           !materialApplicationOwner->cancelNativePauseMenuTransfer50LA())return false;
         if(uploadLifetime_){uploadLifetime_->retired_=true;uploadLifetime_.reset();}
         return true;
     }
@@ -1931,6 +1950,13 @@ bool Application::closePlayerWindow50DU(rr::platform::GameHostDiagnostic50ER& d)
     if(!raceDisplayOwner50LA_.expired()){
         d.error=rr::platform::GameHostError50ER::AlreadyOwned;
         d.operation="terminal player window still has a display owner";return false;
+    }
+    // Terminal path also covers stopping before the incoming frontend starts
+    // or a failed receiver preparation. Never cancel ahead of real session
+    // cleanup, and never dereference publication-local producer/observer pins.
+    if((pauseMenuTransfer50LA_&&sourceRace28COwner_)||pauseInputContinuation50LA_||!cancelNativePauseMenuTransfer50LA()){
+        d.error=rr::platform::GameHostError50ER::AlreadyOwned;
+        d.operation="terminal player window still has a Pause menu transfer";return false;
     }
     return !videoOwner_||!videoOwner_->host.ownsResources()||videoOwner_->host.close(d);
 }

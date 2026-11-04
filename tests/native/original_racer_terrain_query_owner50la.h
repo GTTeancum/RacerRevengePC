@@ -5,6 +5,10 @@
 #include "../../src/game/original_racer_main_body_owner50la.h"
 #include <array>
 #include <optional>
+#include "../../src/game/original_wreck_type2_owners50la.h"
+#include "native_terrain_result_owner50la.h"
+#include <cfenv>
+#include <cmath>
 
 namespace native_racer_model50LA {class Owner;}
 namespace rr::game {
@@ -21,6 +25,171 @@ class OriginalRacerTerrainQueryOwner50LA final {
     using Numeric=::terrain_probe_authoring50fq_fixture::Owner;
     OriginalCollisionBaseOwner50LA base_;
     OriginalWreckCategoryList50LA floorList_;
+    OriginalWreckType2Owners50LA payload_;
+    //Temporary113070 tree leaf and midpoint scratch survive rejected prefixes.
+    struct SourceLeaf {std::optional<float> volume00;Type2Ray49X endpoints10;};
+    std::unique_ptr<SourceLeaf> sourceLeaf_;
+    std::unique_ptr<SpringVector4_48N> midpoint_;
+    live_terrain_probe50fr::Owner* rowResource_=nullptr;
+    native_terrain_result50LA::Owner* rowResult_=nullptr;
+    bool shapeReadable_=false,sourceProjection_=false,nativeCancelled_=false;
+    enum class SourceCallbackE4 {none,terrain1B0E50};
+    SourceCallbackE4 sourceCallbackE4_=SourceCallbackE4::none;
+    bool bindSelfCallback1B1478()noexcept {
+        if(!payload_.loaded_||!sourceProjection_||retired_||sourceCallbackE4_!=SourceCallbackE4::none||
+           !base_.callbacksE4_[0]||*base_.callbacksE4_[0]||!base_.owner9C_||*base_.owner9C_)return false;
+        //Typed code identity, following the existing690/364 callback scheme.
+        base_.callbacksE4_[0].reset();sourceCallbackE4_=SourceCallbackE4::terrain1B0E50; //1B1478
+        base_.owner9C_=this; //1B147C actual concrete348 self, not Entity+8.
+        return true;
+    }
+    bool callbackCurrent()const noexcept {
+        for(unsigned i=1;i<4;++i)if(!base_.callbacksE4_[i]||*base_.callbacksE4_[i])return false;
+        if(sourceCallbackE4_==SourceCallbackE4::none)return base_.callbacksE4_[0]&&
+            !*base_.callbacksE4_[0]&&base_.owner9C_&&!*base_.owner9C_;
+        return payload_.loaded_&&sourceProjection_&&!base_.callbacksE4_[0]&&
+            base_.owner9C_&&*base_.owner9C_==this;
+    }
+    const void* shapeHistory_=nullptr;
+    const void* resultHistory_=nullptr;
+    std::uint16_t allocationMask_=0;
+    void observePayloadCut()noexcept {
+        allocationMask_=payload_.freshLiveAllocationMask();
+        shapeHistory_=payload_.shape8C_.get();resultHistory_=payload_.result90_.get();
+    }
+    bool constructShape11C3F0(const LocalSegment48I& segment,
+        live_terrain_probe50fr::Owner& rowResource,native_terrain_result50LA::Owner& rowResult)noexcept {
+        if(!setupComplete_||retired_||payload_.attempted_||!base_.freshShapeNull()||
+           !body128_||!*body128_||!(*body128_)->scene288()||
+           !(*body128_)->entity().reference00||
+           (*body128_)->entity().sessionGeneration!=base_.entity_.sessionGeneration||
+           !(*body128_)->scene288()->constructed||(*body128_)->scene288()->released||
+           !stage_||!stage_->live_||stage_->live_->initialized||
+           rowResource.initialized||rowResource.sourceShape8C||rowResource.sourceWithdrawn||
+           rowResult.constructed_||rowResult.revoked_||rowResult.sourceResult90_||rowResult.sourceWithdrawn_)
+            return false;
+        //11C424 calls11B600 first. Fresh known-null8C/90 takes its null path;
+        //no prior legacy payload is accepted or reset here.
+        //LocalSegment contains only XYZ. W comes from the actual registered
+        //130/140 source lanes, not an out-of-bounds fourth segment word.
+        if(!numeric_||numeric_->receipt.probe130.v[3]!=1.f||numeric_->receipt.probe140.v[3]!=1.f||
+           std::memcmp(segment.first.v,numeric_->receipt.probe130.v,12)||
+           std::memcmp(segment.second.v,numeric_->receipt.probe140.v,12))return false;
+        for(unsigned i=0;i<16;++i)if(segment.worldMatrix.v[i]!=(i%5u==0?1.f:0.f))return false;
+        rowResource_=&rowResource;rowResult_=&rowResult;
+        payload_.attempted_=true;payload_.boundary_=0x11c42cu;
+        try {
+            payload_.shape8C_=std::make_unique<OriginalWreckType2Owners50LA::Shape>();
+            base_.shape8C_=payload_.shape8C_.get(); //11C434
+            base_.shape88_=2; //11C43C, before temporary leaf allocation.
+            payload_.boundary_=0x11c44cu;
+            sourceLeaf_=std::make_unique<SourceLeaf>();
+            const SpringVector4_48N unit{{0,0,0,1}};
+            sourceLeaf_->endpoints10.first=sourceLeaf_->endpoints10.second=unit;
+            auto& s=*payload_.shape8C_;
+            s.matrix00={};for(unsigned i=0;i<4;++i)s.matrix00.v[i*5]=1.f;
+            payload_.boundary_=0x1130b0u;
+            midpoint_=std::make_unique<SpringVector4_48N>();
+            //Native count-one/identity lowering of113070+112D30. Admit only
+            //ordinary finite nonnegative-zero lanes: avoid claiming VU NaN,
+            //subnormal, signed-zero, overflow, or alternate rounding behavior.
+            if(std::fegetround()!=FE_TONEAREST){observePayloadCut();return false;}
+            for(unsigned i=0;i<3;++i){
+                const float a=segment.first.v[i],b=segment.second.v[i];
+                const auto ordinary=[](float x){return std::isfinite(x)&&
+                    (x==0.f?!std::signbit(x):std::isnormal(x));};
+                if(!ordinary(a)||!ordinary(b)){observePayloadCut();return false;}
+                volatile float sum=a+b;volatile float half=.5f*sum;
+                if(!ordinary(sum)||!ordinary(half)){observePayloadCut();return false;}
+                midpoint_->v[i]=half;
+            }
+            midpoint_->v[3]=1;
+            sourceLeaf_->volume00=-1.f; //112D8C count-one leaf marker.
+            //Identity inverse preserves admitted normal/+zero actual130/140.
+            //Only now does112D94/DA0 write leaf vectors, never during midpoint work.
+            sourceLeaf_->endpoints10.first=numeric_->receipt.probe130;
+            sourceLeaf_->endpoints10.second=numeric_->receipt.probe140;
+            midpoint_.reset(); //113250 after112D30 leaf return.
+            s.root40=type2Leaf49X;s.nodeCount=0;s.maxDepth=0; //11C50C/514
+            s.racerModel44=(*body128_)->scene288(); //actual body128->288,11C51C
+            s.normalMode54=1;s.count48=1; //11C524/52C
+            payload_.boundary_=0x11c588u;
+            s.rays50=std::make_unique<Type2Ray49X[]>(1);
+            s.rays50[0]=sourceLeaf_->endpoints10; //113880 leaf, exact two128-bit copies.
+            sourceLeaf_.reset(); //113290 leaf release, before result allocation.
+            shapeReadable_=true;
+            payload_.boundary_=0x11c5b4u;
+            payload_.result90_=std::make_unique<OriginalWreckType2Owners50LA::Result>();
+            auto& r=*payload_.result90_;
+            r.first00=r.second10=r.normal20=r.point30=r.correction40=unit;
+            r.count5C=3; //11C60C, NOT count60 reset or selectedFraction74.
+            payload_.boundary_=0x11c614u;r.words64=std::make_unique<std::uint32_t[]>(3);
+            payload_.boundary_=0x11c624u;r.flags68=std::make_unique<std::uint32_t[]>(3);
+            payload_.boundary_=0x11c634u;r.fractions6C=std::make_unique<float[]>(3);
+            payload_.boundary_=0x11c644u;r.tags70=std::make_unique<std::uint16_t[]>(3);
+            payload_.boundary_=0x11c65cu;r.pairs50=std::make_unique<Type2Ray49X[]>(3);
+            for(unsigned i=0;i<3;++i)r.pairs50[i].first=r.pairs50[i].second=unit;
+            payload_.boundary_=0x11c68cu;r.normals54=std::make_unique<SpringVector4_48N[]>(3);
+            for(unsigned i=0;i<3;++i)r.normals54[i]=unit;
+            payload_.boundary_=0x11c6bcu;r.points58=std::make_unique<SpringVector4_48N[]>(3);
+            for(unsigned i=0;i<3;++i)r.points58[i]=unit;
+            base_.result90_=payload_.result90_.get(); //11C6E4 publication only now.
+            payload_.loaded_=true;payload_.boundary_=0x11c6e4u;
+        }catch(...){observePayloadCut();return false;}
+        observePayloadCut();
+        //Both retained-row and registered Bank resource are non-owning views
+        //of ONE payload allocation. No copy to either embedded legacy pair.
+        const auto project=[&](live_terrain_probe50fr::Owner& live){
+            live.resource=payload_.resource();live.sourceShape8C=payload_.shape8C_.get();live.initialized=true;
+        };
+        project(rowResource);project(*stage_->live_);
+        rowResult.sourceResult90_=payload_.result90_.get();sourceProjection_=true;
+        return true;
+    }
+    bool payloadCurrent()const noexcept {
+        if(!payload_.attempted_)return base_.freshShapeNull()&&!sourceProjection_&&
+            !numeric_->prepared&&!stage_->live_->initialized;
+        if(payload_.retired_||allocationMask_!=payload_.freshLiveAllocationMask()||
+           shapeHistory_!=payload_.shape8C_.get()||resultHistory_!=payload_.result90_.get()||
+           !base_.shape8C_||*base_.shape8C_!=shapeHistory_||!base_.result90_||
+           *base_.result90_!=(payload_.loaded_?resultHistory_:nullptr)||
+           base_.shape88_!=(shapeHistory_?2u:0u)||!rowResource_||!rowResult_)return false;
+        if(shapeReadable_&&(!body128_||!*body128_||
+           payload_.shape8C_->racerModel44!=(*body128_)->scene288()))return false;
+        if(!sourceProjection_)return !payload_.loaded_&&!numeric_->prepared&&!rowResource_->initialized&&
+            !stage_->live_->initialized&&!rowResult_->sourceResult90_;
+        const auto matches=[&](const live_terrain_probe50fr::Owner& l){return
+            l.initialized&&!l.sourceWithdrawn&&l.sourceShape8C==shapeHistory_&&
+            l.resource.rays==payload_.shape8C_->rays50.get()&&l.resource.rayCount==1&&
+            !l.resource.nodes&&!l.resource.nodeCount&&l.resource.root==type2Leaf49X;};
+        return payload_.loaded_&&matches(*rowResource_)&&matches(*stage_->live_)&&
+            !rowResult_->constructed_&&!rowResult_->revoked_&&!rowResult_->sourceWithdrawn_&&
+            rowResult_->sourceResult90_==resultHistory_;
+    }
+    void retirePayload()noexcept {
+        if(!payload_.attempted_)return;
+        //Withdraw every native borrow BEFORE releasing allocations. Source
+        //base aliases below remain historical on incomplete cancellation.
+        const auto withdraw=[](live_terrain_probe50fr::Owner& l){l.resource={};
+            l.initialized=false;l.sourceWithdrawn=true;l.sourceShape8C=nullptr;};
+        withdraw(*rowResource_);withdraw(*stage_->live_);
+        rowResult_->sourceResult90_=nullptr;rowResult_->sourceWithdrawn_=true;
+        if(payload_.loaded_){
+            if(!payload_.releaseShapeResult11B600())std::terminate();
+            base_.shape8C_=nullptr;base_.result90_=nullptr;return;
+        }
+        const bool sourceShapeOnly=shapeReadable_&&!payload_.result90_;
+        //Incomplete headers are NOT interpreted as source pointer/count fields.
+        //Release only host allocations actually tracked at the stopped cut.
+        midpoint_.reset();sourceLeaf_.reset();
+        if(payload_.shape8C_){payload_.shape8C_->nodes4C.reset();payload_.shape8C_->rays50.reset();}
+        if(payload_.result90_){auto& r=*payload_.result90_;
+            r.fractions6C.reset();r.pairs50.reset();r.tags70.reset();r.normals54.reset();
+            r.flags68.reset();r.words64.reset();r.points58.reset();}
+        payload_.shape8C_.reset();payload_.result90_.reset();payload_.retired_=true;
+        if(sourceShapeOnly){base_.shape8C_=nullptr;base_.result90_=nullptr;}
+        else nativeCancelled_=true; //Not a claimed11B900/904 source store.
+    }
     Stage* stage_=nullptr;
     Numeric* numeric_=nullptr; //dereference only inside its actual Bank slot
     std::size_t slot_=0;
@@ -127,7 +296,7 @@ class OriginalRacerTerrainQueryOwner50LA final {
     bool preflightClose(const C* racer,const C* previous,const C* next=nullptr)const noexcept {
         if(retired_)return true;
         if(!constructorComplete_||!stage_||!numeric_||!stage_->live_||
-           numeric_->prepared||stage_->live_->initialized||!base_.freshShapeNull()||
+           !payloadCurrent()||!callbackCurrent()||
            !base_.membershipE0_.has_value()||*base_.membershipE0_||base_.listC0_||
            base_.listCC_||base_.countC4_||base_.countD0_||!collected1EC_.has_value()||
            (*collected1EC_&&*collected1EC_!=&numeric_->initial.terrain.collectedIdentities))return false;
@@ -138,7 +307,7 @@ class OriginalRacerTerrainQueryOwner50LA final {
             base_.appended_?previous:nullptr,base_.appended_?next:nullptr);
     }
     R close142590(const C* racer,const C* previous)noexcept {
-        if(retired_)return {S::complete,0x1b11a4u};
+        if(retired_)return {S::complete,nativeCancelled_?payload_.boundary_:0x1b11a4u};
         if(!preflightClose(racer,previous))return {S::owner,0x142590u};
         stage_->withdrawn_=true; //Native one-way consumer withdrawal before reference drop.
         if(!base_.dropTailReference142590(base_.appended_?racer:nullptr,
@@ -149,10 +318,22 @@ class OriginalRacerTerrainQueryOwner50LA final {
         if(floorList_.mode0Route_){
             if(!floorList_.releaseMode0AfterReferenceDrop11B51C(base_.entity_,
                 base_.listD8_,base_.countDC_,base_.modeD4_))return {S::owner,0x11b51cu};
-            r=base_.retireBase1413E0AfterMode0Payload(floorList_);
-        }else r=base_.retireBase1413E0AfterPayload();
+            retirePayload();
+            if(nativeCancelled_){
+                //Native cancellation finalizes the counted owner after proven
+                //tail-drop, filter retirement and disposal of every allocation.
+                //Keep stale8C/90 history; do NOT certify source destructor return.
+                if(base_.entity_.reference00||!payload_.retired_||payload_.shape8C_||payload_.result90_||
+                   !floorList_.retiredMode0History(base_.entity_,base_.listD8_,base_.countDC_,base_.modeD4_))
+                    std::terminate();
+                base_.entity_.kind=OriginalWreckComponentKind50LA::entity141300;
+                --base_.application_->objectCount423F60();
+                base_.phase_=OriginalCollisionBaseOwner50LA::Phase::released;
+                r={S::complete,payload_.boundary_};
+            }else r=base_.retireBase1413E0AfterMode0Payload(floorList_);
+        }else {retirePayload();r=base_.retireBase1413E0AfterPayload();}
         if(r.status!=S::complete)return r;
-        retired_=true;return {S::complete,0x1b11a4u};
+        retired_=true;return {S::complete,nativeCancelled_?payload_.boundary_:0x1b11a4u};
     }
     bool bindSourceList212090(const std::optional<const void*>& actual488,
         const std::optional<std::uint32_t>& actual48C)noexcept {

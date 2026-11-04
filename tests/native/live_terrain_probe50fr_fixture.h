@@ -7,16 +7,24 @@
 // Development-client live348 adapter. Source212090/212094 binds its limited
 // list to vehicle488/48C, the SECOND source219AD4 collector output. This is
 // separate from the spring detector's merged vehicle384/388 list.
+namespace native_repulsor_payload50LA {class Owner;}
 namespace live_terrain_probe50fr {
 using namespace rr::game;
 struct Owner {
     Type2Ray49X pair{};
     Type2ResourceView49X resource{};
     bool initialized=false;
+    //A fresh counted source348 publishes a view onto its own ray allocation.
+    //The legacy embedded pair remains unused, not a second source authority.
+    const void* sourceShape8C=nullptr;
+    bool sourceWithdrawn=false;
+    //Separate native replacement custody. Never grants counted source access.
+    const native_repulsor_payload50LA::Owner* nativePayload=nullptr;
+    bool legacyWithdrawn=false;
 };
 // Cold only. Keep Owner at its final address: resource borrows owner.pair.
 inline bool initialize(Owner& owner,const LocalSegment48I& segment) noexcept {
-    if(owner.initialized)return false;
+    if(owner.initialized||owner.sourceShape8C||owner.sourceWithdrawn||owner.nativePayload||owner.legacyWithdrawn)return false;
     for(unsigned i=0;i<3;++i){owner.pair.first.v[i]=segment.first.v[i];
         owner.pair.second.v[i]=segment.second.v[i];}
     owner.pair.first.v[3]=owner.pair.second.v[3]=1.f;

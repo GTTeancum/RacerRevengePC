@@ -4,6 +4,10 @@
 #include "../../src/assets/original_source_sky_file50la.h"
 #include "../../src/game/original_world_particle_invocation50la.h"
 #include "../../src/game/original_world_fog_invocation50la.h"
+#include "../../src/game/original_particle_fog_placement50la.h"
+#include "../../src/game/original_particle_fog_velocity50la.h"
+#include "../../src/game/original_particle_fog_lifetime50la.h"
+#include "../../src/game/original_particle_fog_frame50la.h"
 #include "../../platform/linux/native/original_ui_garage_fog_color_lease50kg.h"
 #include "../../platform/linux/native/original_world_source_config50la.h"
 namespace original_results_roster50LA { class Read; }
@@ -490,7 +494,8 @@ struct SourceTriggerServiceRow {
 struct SourceTriggerService274E90 {
     bool entered=false,listRead=false,listNonNull=false,listEntered=false,nativeWithdrawn=false;
     std::uint8_t fogPrefixStep=0; //Own bounded prologue/list/first-row/BEQL history, through12.
-    std::uint8_t fogBodyStep=0; //Own assertion/descriptor/callback operands, through16; callee2A0A80 pending.
+    std::uint8_t fogBodyStep=0; //Own assertion/descriptor/callback operands, through16.
+    std::uint8_t fogDescriptorStep=0; //Own single-action/geometry retirement/parent return stages, through18; next count remains pending.
     std::optional<std::uint32_t> fogAssertionPredicate,fogAssertionReturnV0;
     g::OriginalTriggerFogGeometryPrefix50LA fogGeometry;
     g::OriginalTriggerFogMembershipPrefix50LA fogMembership;
@@ -966,6 +971,7 @@ bool continueSourceParticleWorldReturn2743A0(std::uint32_t&)noexcept;
 bool sourceCompletedParticleWorldCustodyCurrentNative()const noexcept;
 bool continueSourceEmitterLoaderPrefixNative(std::size_t,SourceParticleService124&,std::uint32_t&)noexcept;
 bool continueSourceEmitterConfig15AE00(std::size_t,SourceParticleService124&,std::uint32_t&)noexcept;
+bool drawSourceParticleMode2Native(std::size_t,std::size_t,a::OriginalParticleSourceConfig50LA&,std::uint32_t&)noexcept;
 std::optional<std::size_t> sourceNonFogPrecedingFogRowNative(std::size_t)const noexcept;
 bool sourceNonFogAfterFogCustodyCurrentNative(std::size_t)const noexcept;
 bool withdrawSourceParticleEmitterBorrowsNative()noexcept;
@@ -1778,6 +1784,10 @@ std::uint8_t sourceOffsetKnown=0;
         bool managerStored=false,modelStored=false,offsetStored=false,borrowsWithdrawn=false;
         std::array<char,260> filename78{};std::optional<std::size_t> filenameBytes;
         bool directoryCopied=false,filenameAppended=false;
+        // The array belongs to this source emitter, not the stack Config.
+        // Declaration order destroys Config first; native array disposal is
+        // exactly once and never claims an original emitter destructor call.
+        a::OriginalParticleForcedSets50LA forcedSets1C4;
         std::unique_ptr<a::OriginalParticleSourceConfig50LA> config15AE00;
         bool configConstructAttempted=false,configConstructReturned=false,configOpenAttempted=false,configNativeWithdrawn=false;
         std::optional<bool> configOpenReturned;
@@ -1877,7 +1887,10 @@ std::uint8_t sourceOffsetKnown=0;
             std::uint8_t velocityStackB0Mask=0;
             bool velocityStackB0Loaded=false,velocityStack80Copied=false;
             std::array<std::optional<bool>,3> velocitySignLeHalf;
-            std::array<std::optional<std::uint32_t>,3> velocityNegationInput;
+            //Each reached lane multiplication and SWC1 retains its own receipt.
+            //B0 stays the pre-sign vector;80 reflects only completed lane stores.
+            std::array<std::optional<std::uint32_t>,3> velocityNegationInput,velocityNegationResult;
+            std::uint8_t velocityNegationStoredMask=0;
             g::OriginalTrackParticleCold50LA::SourceFogVelocity16088C velocityStore;
             std::optional<std::uint32_t> sizeInput184,initialSizeInput184,lifeInput17C,ageInput1A0,frameInput190;
             g::OriginalTrackParticleCold50LA::SourceFogFields1608AC fieldStores;
@@ -1885,8 +1898,9 @@ std::uint8_t sourceOffsetKnown=0;
             std::optional<std::uint32_t> reciprocalBits,initialFlags198,mirrorEnable1CC,mirrorEnable1D0;
             std::optional<std::uint32_t> firstFlagsResult,secondFlagsResult;
             std::optional<bool> mirrorYLeHalf,mirrorXSet,mirrorYSet;
-            //Local instruction outcome only: DIV asserted D/SD. No whole
-            //FCR31, unknown sticky flags or host floating status is invented.
+            //True means this DIV newly asserted D/SD. False on a completed
+            //normal reciprocal does NOT clear unknown prior D/SD or sticky
+            //state. reciprocalBits separately proves operation completion.
             bool reciprocalDAndSD=false;
             g::OriginalTrackParticleCold50LA::SourceFogTail1608E0 tailStores;
             //Distinct fresh160988/98C observations and160990 arithmetic.

@@ -7,6 +7,8 @@
 #include <limits>
 #include <memory>
 
+namespace native_terrain_result50LA {class Owner;}
+namespace native_repulsor_payload50LA {class Owner;}
 namespace rr::game {
 class OriginalWreckQueries50LA;
 class OriginalSourcePhysicsCollision50LA;
@@ -21,6 +23,9 @@ class OriginalWreckType2Owners50LA final {
     friend class OriginalSourcePhysicsCollision50LA;
     friend class OriginalRacerQuery364Owner50LA;
     friend class OriginalRacerQuery690Owner50LA;
+    friend class OriginalRacerTerrainQueryOwner50LA;
+    friend class ::native_terrain_result50LA::Owner;
+    friend class ::native_repulsor_payload50LA::Owner;
     struct Shape {
         BodyMatrix48G matrix00{};
         std::uint16_t root40=0;

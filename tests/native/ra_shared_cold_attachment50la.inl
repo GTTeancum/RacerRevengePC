@@ -13,7 +13,8 @@
         return false;
     }
     bool sharedColdRowsCurrent(std::size_t slot,
-        std::array<storage::Storage::SharedRosterObject*,storage::Storage::rosterRoles>& rows)const noexcept {
+        std::array<storage::Storage::SharedRosterObject*,storage::Storage::rosterRoles>& rows,
+        bool retirementOnly=false)const noexcept {
         const auto pin=bankLifetime_.lock();const auto* s=storage_.get();
         if(!pin||!bankIdentity_||pin->identity!=bankIdentity_||
            bankIdentity_->raWorldLifetime_.get()!=pin.get()||!bankIdentity_->sealed_||bankIdentity_->retired_||
@@ -37,8 +38,9 @@
             rows[i]=row.get();
         }
         return rows[0]->type2Resource==q.main.resource&&rows[1]->type2Resource==q.secondary.resource&&
-            rows[2]->terrainResource&&rows[2]->type2Resource==&rows[2]->terrainResource->resource&&
-            live_terrain_probe50fr::matches(*rows[2]->terrainResource,q.terrain.initial)&&
+            ((retirementOnly&&rows[2]->nativeTerrainCut!=storage::Storage::SharedRosterObject::NativeTerrainCut::none)?
+                nativeTerrainRetirementCurrent(*rows[2]):
+                (sharedTerrainMatches(*rows[2],q.terrain.initial)&&sharedTerrainBankViewMatches(*rows[2],q.terrainLive)))&&
             rows[3]->bodyA0==staged.bodyA0&&rows[3]->type0Resource==&ids.collision->mainTarget().source;
     }
     bool bindSharedPodLiveQuery(native_racer50HN::Bank& bank,std::size_t slot,
@@ -120,7 +122,7 @@
         bool complete=false;
         try {bank.visit(slot,[&](){
             std::array<storage::Storage::SharedRosterObject*,storage::Storage::rosterRoles> rows{};
-            if(!sharedColdRowsCurrent(slot,rows)){d.message="actual shared grid retirement owner differs";return;}
+            if(!sharedColdRowsCurrent(slot,rows,true)){d.message="actual shared grid retirement owner differs";return;}
             for(unsigned i=0;i<3;++i){auto& row=*rows[i];auto& object=s->objects[row.reservedRef-1u];
                 if((object.identity&&object.identity!=row.identity)||
                    (row.membership.state.attached&&row.membership.state.object!=row.reservedRef)||

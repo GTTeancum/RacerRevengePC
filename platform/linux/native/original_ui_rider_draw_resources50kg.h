@@ -1,5 +1,6 @@
 #pragma once
 #include "original_ui_material_adapter50kg.h"
+#include "original_ui_controller_popup_resources50kg.h"
 #include "../../../src/assets/original_ui_atm50kg.h"
 #include "../../../src/assets/original_ui_image_bank50kg.h"
 #include "../../../src/game/original_ui_rider_widgets50kg.h"
@@ -25,6 +26,7 @@ struct OriginalUiRiderDrawResourceDiagnostic50KG {
     game::OriginalUiRiderWidgetDiagnostic50KG widgets{};
     game::OriginalUiTextGeometryDiagnostic50KG text{};
     game::OriginalUiExitTextDiagnostic50KG exitText{};
+    OriginalUiControllerPopupResourceDiagnostic50KG controllerPopup{};
 };
 struct OriginalUiRiderVideoOwner50KG {
     // Real original-mode native video lifetime, not a synthetic ownership tag.
@@ -37,6 +39,11 @@ struct OriginalUiRiderColdInput50KG {
     const assets::OriginalUiEnglish50KG* english=nullptr;
     assets::OriginalUiMaterialRuntime50KG runtime{};
     OriginalUiRiderVideoOwner50KG video{};
+    // Optional only for a route retaining the real root SharedDialogs47C.
+    // Both absent preserves direct Course-back Rider; one alone is invalid.
+    // Rider may rejoin this owner, never construct a replacement47C/history.
+    std::shared_ptr<const assets::OriginalUiArchive50KG> controllerPopup;
+    std::shared_ptr<OriginalUiControllerPopupResources50KG> retainedControllerPopup;
 };
 struct OriginalUiRiderMaterialBinding50KG {
     std::string registeredName;
@@ -74,6 +81,7 @@ public:
     OriginalUiRiderDrawResources50KG& operator=(const OriginalUiRiderDrawResources50KG&)=delete;
     bool load(const OriginalUiRiderColdInput50KG&,OriginalUiRiderDrawResourceDiagnostic50KG&) noexcept;
     bool loaded() const noexcept;
+    std::shared_ptr<OriginalUiControllerPopupResources50KG> controllerPopup() const noexcept;
     game::OriginalUiRiderWidgets50KG* widgets() noexcept;
     const game::OriginalUiRiderWidgets50KG* widgets() const noexcept;
     std::shared_ptr<const assets::OriginalUiScreenAssets50KG> images() const noexcept;

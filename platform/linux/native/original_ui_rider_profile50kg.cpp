@@ -127,6 +127,10 @@ struct OriginalUiRiderProfileOwner50KG::Storage {
     bool scorchRcTest=false; // Distinct immutable native startup provenance.
     std::array<OriginalUiCourseProfileColors50KG,6> planetColors{};
     std::array<std::uint8_t,13> courseOrder100C4{};
+    // The source180164 LH view of this profile's thirteen constructor words
+    //100C8+40*i. All actual17EEF0..17F6D8 values fit signed16. Retained once
+    //at startup, outside save payloads and mutable per-pod remaining prizes.
+    std::array<std::int16_t,13> constructorPrizeHalves100C8{};
     TournamentCourseRecordSnapshot firstTournamentCourseRecord{};
     // Actual constructor-owned metadata, not a visual PAR guess. These
     // arrays are assigned at the same fresh-profile construction as100C4.
@@ -317,11 +321,15 @@ bool OriginalUiRiderProfileOwner50KG::initializeStartupProfile(
             next->tournament.base0180[rider]=authored.base0180;
             next->tournament.maximum0408[rider]=authored.maximum0408;
         }
+        // Actual constructor100C8+40*i values, not reset-time defaults or
+        // spent per-pod purses. The retained owner is published only after
+        // all startup preparation succeeds; save loads do not replace it.
+        next->constructorPrizeHalves100C8=game::originalTournamentPrizes50KG;
         // Authenticated constructor row profile100C4..100E8. Writes at
         //17EF00/17EEF0,17EF24/34/44/54/64/78/88 and17EF14 respectively.
         next->firstTournamentCourseRecord.slot=1;
         next->firstTournamentCourseRecord.course100C4=0;
-        next->firstTournamentCourseRecord.constructorPurse100C8=2200;
+        next->firstTournamentCourseRecord.constructorPurse100C8=next->constructorPrizeHalves100C8[0];
         next->firstTournamentCourseRecord.killPercent100CC={{30,50,60,70,80,90,100}};
         next->firstTournamentCourseRecord.par100E8=2;
         //17FFB0 initializes every career/pod row, retaining real prize/order
@@ -330,7 +338,7 @@ bool OriginalUiRiderProfileOwner50KG::initializeStartupProfile(
             for(std::size_t pod=0;pod<27;++pod){
                 career.pods[pod].abilities1920=next->tournament.base0180[pod];
                 career.pods[pod].medals1938.fill(0);
-                career.pods[pod].remainingPrizes1946=game::originalTournamentPrizes50KG;
+                career.pods[pod].remainingPrizes1946=next->constructorPrizeHalves100C8;
             }
         }
         next->saveProfile.recordFreshNames(); //180098..B0 /1864CC..F4
@@ -745,6 +753,48 @@ bool OriginalUiRiderProfileOwner50KG::colors(std::uint32_t rider,OriginalUiRider
     if(!storage_||!storage_->readable()||rider>=27||!storage_->authored[rider].present)return false;
     out=storage_->authored[rider].colors;return true;
 }
+bool OriginalUiRiderProfileOwner50KG::canResetRiderCareer1800E0(
+    std::uint32_t rider,OriginalUiRiderProfileStamp50KG expected) const noexcept {
+    if(!storage_||!storage_->readable()||storage_->common->mode34!=2||expected.mode34!=2||
+       expected.generation!=storage_->generation||
+       storage_->generation==std::numeric_limits<std::uint64_t>::max()||
+       storage_->tournamentResultArmed||rider>=storage_->authored.size()||
+       !storage_->authored[rider].present||!storage_->saveProfile.namesReady())return false;
+    const auto& s=*storage_;
+    //1EA870 requires prompt42C bit2. Its actual1EAFB0 producer requires
+    //mode2, an unlocked selected rider, and that career's diagonal medal0.
+    //The session, not this numeric predicate, owns the selected4C4/result2.
+    return s.unlock10FAC[rider]!=0&&s.tournament.careers[rider].pods[rider].medals1938[0]!=0;
+}
+bool OriginalUiRiderProfileOwner50KG::resetRiderCareer1800E0(
+    std::uint32_t rider,OriginalUiRiderProfileStamp50KG expected) noexcept {
+    if(!canResetRiderCareer1800E0(rider,expected))return false;
+    auto& s=*storage_;
+    auto next=s.tournament.careers[rider];
+    auto nextName=s.saveProfile.careerNames_[rider];
+    //180108..194: all27 pod rows, including off-diagonal/absent pods.
+    //Base0180 is the retained constructor/PHY table, never current abilities.
+    for(std::size_t pod=0;pod<next.pods.size();++pod){
+        next.pods[pod].abilities1920=s.tournament.base0180[pod];
+        next.pods[pod].medals1938.fill(0);
+        next.pods[pod].remainingPrizes1946=s.constructorPrizeHalves100C8;
+    }
+    //180148..154 repeatedly clears bit5;1801A8..1CC then clears bits0..4.
+    //Both opaque high bits survive, rather than replacing the whole byte.
+    next.progress219C=static_cast<std::uint8_t>(next.progress219C&0xc0u);
+    next.kills2198=0;next.earned2190=0;next.unspent2194=0; //18019C..1A4.
+    //1801B4/1C4/1C8: strcpy(name219D, empty3A89A0) writes byte0 ONLY.
+    //The existing value owner preserves suffix bytes and their known extent.
+    if(!nextName.replaceCString({}))return false;
+    static_assert(std::is_nothrow_copy_assignable_v<decltype(next)>);
+    static_assert(std::is_nothrow_copy_assignable_v<decltype(nextName)>);
+    //Single nonfailing native publication, with no callbacks/IO or rejection
+    //below. All other careers, source selection and save metadata survive.
+    s.tournament.careers[rider]=next;
+    s.saveProfile.careerNames_[rider]=nextName;
+    ++s.generation; //Native observer invalidation, not original dirty/save state.
+    return true;
+}
 bool OriginalUiRiderProfileOwner50KG::commitBack(const game::OriginalUiRouteDecision50KG& decision,
     OriginalUiRiderProfileStamp50KG expected) noexcept {
     if(!storage_||!storage_->readable()||expected.generation!=storage_->generation||expected.mode34!=storage_->common->mode34||
@@ -998,7 +1048,7 @@ bool OriginalUiRiderProfileOwner50KG::selectedTournamentCourseRecordSnapshot(
     if(course.courseOrder100C4!=game::originalTournamentCourseOrder50KG)return false;
     TournamentCourseRecordSnapshot row;
     row.slot=order+1;row.course100C4=course.courseOrder100C4[order];
-    row.constructorPurse100C8=game::originalTournamentPrizes50KG[order];
+    row.constructorPurse100C8=storage_->constructorPrizeHalves100C8[order];
     // Same constructor percentages consumed by original result1875C0.
     row.killPercent100CC=(order==0||order==6)?std::array<std::int32_t,7>{{30,50,60,70,80,90,100}}:
         std::array<std::int32_t,7>{{20,30,50,60,70,80,100}};

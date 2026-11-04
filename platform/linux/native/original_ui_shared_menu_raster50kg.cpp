@@ -6,7 +6,9 @@
 #include "../../../tests/native/original_race_display_lifetime50la.h"
 namespace rr::platform {
 bool OriginalUiSharedDialogs50KG::readMenu470RasterInputs(OriginalUiMenuRasterInputs50KG& out)const noexcept {
-    if(!menu470Current()||!menuDisplay_->sourceBufferCount0CInitialized_||
+    // Rider has no positive470 raster path. Reject before selecting the
+    // Main/Options raster receiver, even if reached through a failed frame.
+    if(menuRiderSession_||menuRiderDraw_||!menu470Current()||!menuDisplay_->sourceBufferCount0CInitialized_||
        menuDisplay_->sourceBufferCount0C_!=2u||menuDisplay_->sourceWidth4_!=640||menuDisplay_->sourceHeight8_!=448||
        !inputs_.video||inputs_.video->width!=640||inputs_.video->height!=448||
        inputs_.video->colorBits!=32||inputs_.video->packetZMaximum!=0xFFFFFF||inputs_.video->zBufferFormat!=0x31)return false;
@@ -41,7 +43,7 @@ bool OriginalUiSharedDialogs50KG::menu470RasterCurrent()const noexcept {
 }
 bool OriginalUiSharedDialogs50KG::sealMenu470RasterFrame(std::uint64_t frame,Diagnostic& d)noexcept {
     if(!menuRasterAttempted_)return true;
-    if(!menu470RasterCurrent()||!frame||menuRasterFrame_||menuRasterNative_||
+    if(menuRiderSession_||menuRiderDraw_||!menu470RasterCurrent()||!frame||menuRasterFrame_||menuRasterNative_||
        !(menuMainDraw_?menuMainDraw_->sharedMenuFrameCurrent(*this,menu470Invocation_,frame):
          menuOptionsDraw_->sharedMenuFrameCurrent(*this,menu470Invocation_,frame)))return fail(d,Status::owner,0x24B7B0);
     menuRasterNative_=menuMainDraw_?menuMainDraw_->draw():menuOptionsDraw_->draw();

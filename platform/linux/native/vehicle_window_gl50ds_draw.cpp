@@ -1725,6 +1725,7 @@ bool VehicleWindowGl50DS::Storage::commit(void* context, std::uint8_t bank) noex
         // 50CV publication is CPU-only. The fallible window copy is deliberately
         // OUTSIDE this transaction, after submitVehicleDrawBatch50CS succeeds.
         s.retainedRaceDisplayCompleted=false;
+        s.pauseDisplayPublication={}; //A new race target is not the prior retained Pause publication.
         s.retainedRaceContainsPause=s.pauseDerived&&s.pauseDerived->frame;
         s.retainedRaceCameraPublication=s.pendingRaceCameraPublication;
         s.published = bank;

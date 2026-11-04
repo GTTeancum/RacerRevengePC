@@ -270,6 +270,53 @@ class Owner final {
     // update may silently retry this private source invocation.
     bool restartFadeAttempted_=false,restartFadeTerminal_=false;
     UpdateReceipt50IW restartFadeReceipt_{};
+    // Private Pause row9/10 bridge, independent of restart's1.0-second request.
+    // Actual Aural26D070 already stopped playback on this SAME retained owner.
+    void writePauseReturnFadePrefix1A4AB0()noexcept {
+        state_.latch130=-1; //1A4AB4, unconditionally before transport admission.
+        state_.mode12C=0;   //1A4AB8. timer128 is neither read nor changed.
+    }
+    UpdateReceipt50IW requestPauseReturnStoppedFadeTail234440()noexcept {
+        if(pauseReturnFadeAttempted_)return pauseReturnFadeReceipt_;
+        pauseReturnFadeAttempted_=true;
+        const auto finish=[this](Result result,std::uint32_t pc,std::uint32_t helper=0u){
+            pauseReturnFadeReceipt_={result,pc,helper,.5f,nativeFade_.phase,false};
+            return pauseReturnFadeReceipt_;
+        };
+        // Every result, including pending/failed transport, is terminal for
+        // this private invocation. It never resumes or schedules an envelope.
+        if(restartFadeTerminal_)
+            return finish(restartFadeReceipt_.result,restartFadeReceipt_.sourcePC,restartFadeReceipt_.helperPC);
+        if(!mixer_)return finish(Result::Unprepared,0x234440u);
+        if(paused_)return finish(Result::Paused,0x234440u);
+        if(playPending_)return finish(Result::PendingPlay,pendingCallPC_,pendingPlayPC_);
+        if(fadePending_||nativeFade_.phase==NativeFadePhase50IW::Pending)
+            return finish(Result::PendingFade234440,0x234440u);
+        if(nativeFade_.phase!=NativeFadePhase50IW::Idle&&nativeFade_.phase!=NativeFadePhase50IW::Retired)
+            return finish(Result::BackendRejected,0x234440u);
+        if(!transportIdentity()||!mixer_->sampleRate())return finish(Result::Ownership,0x234440u);
+        rr::platform::AudioVoiceObservation50HD observed{};
+        if(!mixer_->inspectVoice(voice,observed)||!observed.groupKnown)
+            return finish(Result::Ownership,0x234440u);
+        // Actual Pause still owns Music118's group-pause until1BE830.
+        // Source234484's absent-stream return precedes fade work; a stopped
+        // native voice is equally absent even while its SAME group is paused.
+        // Preserve group pause; never resume or fabricate an active fade.
+        if(owned_){
+            // Observe the exact inactive revision/song/PCM26D070 retained.
+            // A foreign or still-active voice is not an absent source stream.
+            if(!ownedMusicIdentity(observed))return finish(Result::Ownership,0x234440u);
+        }else if(currentSong_||playbackRevision_)
+            return finish(Result::Ownership,0x234440u);
+        if(observed.voice.active)return finish(Result::Ownership,0x234440u);
+        // Explicit native equivalent of234484's absent-handle return, whose
+        //234488 delay slot returns0. No guest5C=-1, logger, IOP call, fade
+        // timer, gain, source clock, reset or completion poll is invented.
+        // In particular keep owned_, playbackRevision_, song and PCM intact.
+        return finish(Result::Updated,0x234488u);
+    }
+    bool pauseReturnFadeAttempted_=false;
+    UpdateReceipt50IW pauseReturnFadeReceipt_{};
     bool canStopResultsNative26D070(const rr::platform::AudioMixer50HD& mixer,
         const rr::platform::RaceAudioGroups50IC& groups)const noexcept {
         if(restartFadeTerminal_||mixer_!=&mixer||groups_!=&groups||!transportIdentity()||playPending_||fadePending_||

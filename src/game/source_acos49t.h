@@ -1,5 +1,6 @@
 namespace ra_pod_scene50LA {class Owner;}
 namespace terrain_probe_authoring50fq_fixture {class SourceStage348;}
+namespace ra_source_camera50LA {class OwnershipBridge;}
 #pragma once
 #include <cstdint>
 
@@ -61,6 +62,7 @@ class SourceUiLightMath50KG final {
 // order. Finite positive product, finite signed damping multiplier only.
 class SourceTerrainSetupMath50LA final {
     friend class ::terrain_probe_authoring50fq_fixture::SourceStage348;
+    friend class ::ra_source_camera50LA::OwnershipBridge; //Same native1B1240 damping leaf only.
     static bool damping1B12FC(std::uint32_t massSpringProduct,
         std::uint32_t twiceDamping,std::uint32_t& output)noexcept;
 };

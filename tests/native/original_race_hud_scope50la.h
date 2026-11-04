@@ -103,6 +103,10 @@ class Registration final {
     bool readEndAssociationHead1A8074(const rr::game::OriginalRaceConstructor50LA&,bool&)const noexcept;
     bool readEndAssociatedCount1A80AC(const rr::game::OriginalRaceConstructor50LA&,std::int32_t&)const noexcept;
     bool stop1AD230(const rr::game::OriginalRaceConstructor50LA&)noexcept;
+    // Same actual1AC998 occurrence only. Retains AI scalar effects and actual
+    // owned-map grid output; stops before the unjoined racer placement stores.
+    bool restartRacerScalars1AEA70(rr::game::OriginalRaceConstructor50LA&,
+        std::uint32_t actualA2,std::uint32_t& sourcePC)const noexcept;
     //Specific private continuation using the same actual Camera/Bank/Manager.
     //Not a callback executor, query receipt consumer or live end admission.
     void continuePreAck1AB520(rr::game::OriginalRaceConstructor50LA&,

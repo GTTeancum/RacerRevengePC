@@ -30,7 +30,8 @@ bool OriginalParticleSourceConfig50LA::beginEmitter15AE00(
     std::shared_ptr<OriginalStandardTextureResolver50LA> resolver,
     std::shared_ptr<OriginalStandardArchiveProvider50LA> provider,const std::string& filename,
     const void* actualEmitter,D& d)noexcept {
-    if(occurrence_!=Occurrence::emitter15AE00||!actualEmitter||emitterOwner_!=actualEmitter)
+    if(occurrence_!=Occurrence::emitter15AE00||!actualEmitter||emitterOwner_!=actualEmitter||
+       !emitterForcedSets_||emitterForcedSets_->emitter_!=actualEmitter||!emitterForcedSets_->pointer1C4_)
         return fail(d,E::phase,0x15ae2c);
     return beginFile1577D0(std::move(resolver),std::move(provider),filename,0x15ae2c,d);
 }
@@ -88,7 +89,11 @@ bool OriginalParticleSourceConfig50LA::beginFile1577D0(
     source_->field428=0;sourceOpenReturned_=true;sourcePC_=0x157ACC;return true;
 }
 bool OriginalParticleSourceConfig50LA::abortNative(D& d)noexcept {
-    d={};if(thread_!=std::this_thread::get_id())return false;if(nativeClosed_)return true;
+    d={};if(thread_!=std::this_thread::get_id()||commonMode2DrawAdapter_)return false;if(nativeClosed_)return true;
+    //emitterForcedSets_ is a same-emitter identity borrow, not Config-owned
+    //storage. Preserve its partial/publication history and allocation here.
+    //Mode2's authentic RNG/arithmetic history and process-owner pin also
+    //survive native cancellation; never restore, clear or reseed the stream.
     if(borrowed_){
         if(!resolver_||!resolver_->freshFileCapacity_||
            resolver_->freshFileCapacity_->particleConfigBorrower!=this)return fail(d,E::phase,0);
@@ -151,7 +156,8 @@ bool OriginalParticleSourceConfig50LA::closeStack1573B0(D& d)noexcept {
 }
 bool OriginalParticleSourceConfig50LA::closeEmitterStack1573B0(const void* owner,D& d)noexcept {
     d={};
-    if(occurrence_!=Occurrence::emitter15AE00||!owner||emitterOwner_!=owner||
+    if(occurrence_!=Occurrence::emitter15AE00||!owner||emitterOwner_!=owner||commonMode2DrawAdapter_||
+       !emitterForcedSets_||emitterForcedSets_->emitter_!=owner||!emitterForcedSets_->returned15B5C4_||
        !emitterPropertiesReturnedNative()||
        !commonReturned_||sourceDestructorAttempted_||sourceClosed_||!current()||!textReturned_||
        !sourceOpenReturned_||!*sourceOpenReturned_||source_->binary08||textSelectBounded_)return false;
@@ -161,7 +167,7 @@ bool OriginalParticleSourceConfig50LA::closeOwnedTextStack1573B0(bool missing,D&
     auto& s=*source_;
     //All native custody guards precede the actual handle close. This is the
     //opened TEXT occurrence or the genuine unopened missing-member branch.
-    if(s.child24!=textChildTable_.get()||s.text1C!=textTable_.sourceStorage||
+    if(commonMode2DrawAdapter_||s.child24!=textChildTable_.get()||s.text1C!=textTable_.sourceStorage||
        s.count14!=textTable_.count14||s.index18!=textTable_.capacity18||
        s.cacheCount438||s.names4CC||s.index4BC||s.block4C4)return false;
     sourceDestructorAttempted_=true;
@@ -186,12 +192,67 @@ bool OriginalParticleSourceConfig50LA::closeOwnedTextStack1573B0(bool missing,D&
     sourceClosed_=true;sourcePC_=0x1574F4u;return true;
 }
 
+//Immutable historical validation, separate from the live Owner/Application
+//identity checks in the cold aggregate. Later genuine308030 consumers may
+//advance the shared raw state; equality with that live raw would be wrong.
+bool OriginalParticleSourceConfig50LA::commonMode2CurrentNative(
+    const std::array<std::uint32_t,0x260/4>& words,
+    const std::array<std::uint32_t,0x260/4>& known)const noexcept {
+    const auto& h=commonMode2_;
+    if(commonMode2DrawAdapter_)return false; //No callable crosses a public boundary.
+    const unsigned mask=(h.minimum?1u:0u)|(h.converted?2u:0u)|(h.maximum?4u:0u)|
+        (h.unit?8u:0u)|(h.difference?16u:0u)|(h.product?32u:0u)|
+        (h.sum?64u:0u)|(h.stored?128u:0u);
+    if(!h.pc)return !h.applicationPin&&!h.application&&!h.rawBefore&&!h.rawAfter&&!h.rawValue&&
+        !h.drawEntered&&!h.drawReturned&&!mask&&!commonMode2TimeStored_;
+    if(!commonEmitMode5C_||*commonEmitMode5C_!=2||commonTailScalarCount_!=4||
+       commonModeScalarCount_!=4||commonModeTimeCopied_||
+       (h.pc!=0x15B1D0u&&sourcePC_!=h.pc))return false;
+    if(!h.drawEntered)return !h.applicationPin&&!h.application&&!h.rawBefore&&!h.rawAfter&&!h.rawValue&&
+        !h.drawReturned&&!mask&&!commonMode2TimeStored_&&
+        (h.pc==0x15B148u||h.pc==0x308030u||h.pc==0x308038u);
+    if(!h.applicationPin||!h.application)return false;
+    if(!h.drawReturned)return !h.rawAfter&&!h.rawValue&&!mask&&!commonMode2TimeStored_&&
+        (h.pc==0x308044u||h.pc==0x30805Cu);
+    if(h.rawAfter!=h.rawBefore*0x41c64e6du+0x3039u||h.rawValue!=(h.rawAfter&0x7fffffffu))return false;
+    //Each refused read/arithmetic operation retains precisely its predecessor
+    //receipts. A complete history freezes at the common15B1D0 join even after
+    //Properties, Animation, forced sets, source destruction or native abort.
+    unsigned expected=0;
+    switch(h.pc){
+    case 0x30805Cu:case 0x15B150u:case 0x15B154u:expected=0;break;
+    case 0x15B158u:expected=1;break;
+    case 0x15B160u:expected=3;break;
+    case 0x15B16Cu:expected=7;break;
+    case 0x15B170u:expected=15;break;
+    case 0x15B174u:expected=31;break;
+    case 0x15B178u:expected=63;break;
+    case 0x15B17Cu:case 0x15B180u:expected=127;break;
+    case 0x15B1D0u:expected=255;break;
+    default:return false;
+    }
+    if(mask!=expected||commonMode2TimeStored_!=bool(h.stored))return false;
+    if(h.minimum&&(known[0x1e8/4]!=0xffffffffu||words[0x1e8/4]!=*h.minimum))return false;
+    if(h.maximum&&(known[0x1ec/4]!=0xffffffffu||words[0x1ec/4]!=*h.maximum))return false;
+    std::uint32_t result;
+    if(h.converted&&(!rr::game::detail::sourceParticleTruncateInteger50LA(h.rawValue,result)||result!=*h.converted))return false;
+    if(h.unit&&(!rr::game::detail::sourceParticleMode2Scale(*h.converted,result)||result!=*h.unit))return false;
+    if(h.difference&&(!rr::game::detail::sourceParticleMode2Difference(*h.maximum,*h.minimum,result)||result!=*h.difference))return false;
+    if(h.product&&(!rr::game::detail::sourceParticleMode2Product(*h.difference,*h.unit,result)||result!=*h.product))return false;
+    if(h.sum&&(!rr::game::detail::sourceParticleMode2Sum(*h.minimum,*h.product,result)||result!=*h.sum))return false;
+    if(h.stored&&(*h.stored!=*h.sum||known[0x1e4/4]!=0xffffffffu||words[0x1e4/4]!=*h.stored))return false;
+    return true;
+}
+
 //Live file-custody validation for the separately-owned emitter stack Config.
 //Native cancellation retains source bytes/history, but owns no file or bank.
 bool OriginalParticleSourceConfig50LA::emitterOccurrenceCurrentNative(const void* owner,
-    const OriginalStandardTextureResolver50LA* resolver,const OriginalStandardArchiveProvider50LA* provider)const noexcept {
+    const OriginalStandardTextureResolver50LA* resolver,const OriginalStandardArchiveProvider50LA* provider,
+    const OriginalParticleForcedSets50LA& forcedSets,const std::array<std::uint32_t,0x260/4>& words,
+    const std::array<std::uint32_t,0x260/4>& known)const noexcept {
     if(occurrence_!=Occurrence::emitter15AE00||!owner||emitterOwner_!=owner||
-       thread_!=std::this_thread::get_id()||source_!=&storage_)return false;
+       thread_!=std::this_thread::get_id()||source_!=&storage_||emitterForcedSets_!=&forcedSets||
+       !forcedSets.currentNative(owner,words,known)||!commonMode2CurrentNative(words,known))return false;
     if(emitterPropertiesAttempted_!=bool(emitterPropertyTarget_)||
        (emitterPropertyTarget_&&*emitterPropertyTarget_!=0x15c330u&&*emitterPropertyTarget_!=0x15d560u&&*emitterPropertyTarget_!=0x15dd00u&&*emitterPropertyTarget_!=0x15e6d0u&&*emitterPropertyTarget_!=0x15ef70u&&*emitterPropertyTarget_!=0x15fc10u&&*emitterPropertyTarget_!=0x1602b0u))return false;
     if((emitterPropertyTarget_==0x15c330u||emitterPropertyTarget_==0x15d560u||emitterPropertyTarget_==0x15dd00u||emitterPropertyTarget_==0x15ef70u||emitterPropertyTarget_==0x15fc10u||emitterPropertyTarget_==0x1602b0u)&&(emitterGeneralReturned_||emitterGeneralFound_||
@@ -317,8 +378,9 @@ bool OriginalParticleSourceConfig50LA::emitterOccurrenceCurrentNative(const void
     if(commonModeScalarCount_>4||(commonModeScalarCount_&&commonTailScalarCount_!=4))return false;
     if(commonModeTimeCopied_&&(!commonEmitMode5C_||
        (*commonEmitMode5C_==1?commonModeScalarCount_!=1:*commonEmitMode5C_==3?commonModeScalarCount_!=2:true)))return false;
-    if(commonPropertiesSelectionAttempted_&&(commonTailScalarCount_!=4||!commonEmitMode5C_||*commonEmitMode5C_==2))return false;
+    if(commonPropertiesSelectionAttempted_&&(commonTailScalarCount_!=4||!commonEmitMode5C_))return false;
     if(commonPropertiesSelectionAttempted_&&(*commonEmitMode5C_==1||*commonEmitMode5C_==3)&&!commonModeTimeCopied_)return false;
+    if(commonPropertiesSelectionAttempted_&&*commonEmitMode5C_==2&&!commonMode2TimeStored_)return false;
     if(commonPropertiesSelected_!=bool(commonPropertiesFound_)||
        (commonPropertiesSelected_&&(!commonPropertiesSelectionAttempted_||
         (!commonAnimationSelectionAttempted_&&(!textSelectionReturned_||textSelectBounded_)))))return false;
@@ -335,6 +397,8 @@ bool OriginalParticleSourceConfig50LA::emitterOccurrenceCurrentNative(const void
     if(commonForcedCountWritten_&&!commonReciprocalWritten_)return false;
     if(commonAnimationFlagWritten_&&!commonForcedCountWritten_)return false;
     if(commonReturned_&&!commonAnimationFlagWritten_)return false;
+    if(forcedSets.countRead15B508_&&!commonAnimationFlagWritten_)return false;
+    if(commonReturned_!=forcedSets.returned15B5C4_)return false;
     if(emitterType8Returned_&&(emitterPropertyTarget_!=0x15e6d0u||!commonReturned_))return false;
     if(emitterType0Returned_&&(emitterPropertyTarget_!=0x15c330u||type0NoiseReturned_!=2||!commonReturned_))return false;
     if(emitterType1Returned_&&(emitterPropertyTarget_!=0x15d560u||!commonReturned_))return false;

@@ -124,6 +124,16 @@ inline bool Application::closeNativeConsumedRace(rr::game::OriginalRaceConstruct
     if(!owner.retireNativeTimingB4(pc)){
         d.status=S::phase;d.sourcePC=pc;d.field="actual counted B4 native retirement";return false;
     }
+    // Native detached B0 cancellation follows B4 and precedes World release.
+    // Its borrowed execution arena may already be gone: never reset/deref it.
+    if(!owner.retireNativeRacerB0(pc)){
+        d.status=S::phase;d.sourcePC=pc;d.field="actual counted B0 native retirement";return false;
+    }
+    // Native detached map release follows its B0 consumer. Other genuine
+    // World/Camera map borrowers retain their own source lifetime.
+    if(!owner.retireNativeMapB8(pc)){
+        d.status=S::phase;d.sourcePC=pc;d.field="actual counted B8 native retirement";return false;
+    }
     if(!owner.retireNativeWorldAndGroups(pc,gate)){d.status=S::phase;d.sourcePC=pc;d.field=gate;return false;}
     // World close has revoked the actual native Camera adapter. Retire its
     // counted, unselected source prefix before releasing Display/FIFO custody.

@@ -4,7 +4,7 @@
 namespace original_camera_session50KX { class Session; }
 namespace original_main_entry50KG { struct Application; }
 namespace original_race_hud_scope50LA { class Registration; class Scope; }
-namespace rr::platform { class OriginalApplicationAural50KG; }
+namespace rr::platform { class OriginalApplicationAural50KG; struct AudioOutputDiagnostic50HD; }
 namespace rr::game {
 class OriginalApplicationEntities50LA;
 class OriginalRaceConstructor50LA;
@@ -38,6 +38,9 @@ class OriginalRaceMusicManager50LA final {
         const ::original_race_hud_scope50LA::Registration&,
         const ::original_camera_session50KX::Session&,std::uint64_t beforeMix,
         bool heldSourceScene,OriginalRaceMusicManagerDiagnostic50LA&)noexcept;
+    bool serviceNativeMenuAudio(const OriginalRaceConstructor50LA&,
+        const ::original_race_hud_scope50LA::Registration&,std::uint32_t elapsedMicroseconds,
+        platform::AudioOutputDiagnostic50HD&,OriginalRaceMusicManagerDiagnostic50LA&)noexcept;
     bool nativeBackendCurrent(const ::original_race_hud_scope50LA::Registration&)const noexcept;
     bool invokeNativeContactSpeech1(const OriginalRaceConstructor50LA&,
         const ::original_race_hud_scope50LA::Registration&,OriginalRaceMusicManagerDiagnostic50LA&)noexcept;
@@ -45,6 +48,10 @@ class OriginalRaceMusicManager50LA final {
         const ::original_race_hud_scope50LA::Registration&,OriginalRaceMusicManagerDiagnostic50LA&)noexcept;
     bool restartNativeFade1AC960(const OriginalRaceConstructor50LA&,
         const ::original_race_hud_scope50LA::Registration&,OriginalRaceMusicManagerDiagnostic50LA&)noexcept;
+    enum class PauseReturnCall : std::uint32_t { main1BD9F0=0x1BD9F0,course1BDB88=0x1BDB88 };
+    bool pauseReturnNativeFade1A4AB0(const OriginalRaceConstructor50LA&,
+        const ::original_race_hud_scope50LA::Registration&,PauseReturnCall,
+        OriginalRaceMusicManagerDiagnostic50LA&)noexcept;
     bool readQueuedCount150(const OriginalRaceConstructor50LA&,
         const ::original_race_hud_scope50LA::Registration&,std::uint32_t&)const noexcept;
     bool dispatchNativeQueuedEvent3_1A4D30(const OriginalRaceConstructor50LA&,

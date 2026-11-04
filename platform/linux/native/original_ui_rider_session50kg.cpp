@@ -1,4 +1,5 @@
 #include "original_ui_rider_session50kg.h"
+#include "original_ui_shared_dialogs50kg.h"
 #include "original_ui_main_draw50kg.h"
 #include "original_ui_course_draw_resources50kg.h"
 #include "original_ui_course_hologram_draw50kg.h"
@@ -145,6 +146,10 @@ struct OriginalUiRiderSession50KG::Storage {
     bool requested=false,entered=false,managerEntered=false,opening=false,opened=false,closing=false,restored=false,closed=false;
     bool backAccepted=false,confirmAccepted=false,entryAuxiliarySeen=false,entryCompleted=false;
     bool backendBound=false,collectorBound=false,sourceClosing=false,sourceTornDown=false;
+    bool sharedEntryAttempted=false,sharedEntryComplete=false,resetInputActive=false;
+    bool resetPending=false;
+    std::uint32_t resetRider=0;
+    OriginalUiRiderProfileStamp50KG resetStamp{};
     bool drawablePoliciesPrepared=false;
     std::uint32_t destinationPreviewRiders=0;
     // No fallible source destruction is first attempted by a destructor.
@@ -788,7 +793,12 @@ Status OriginalUiRiderSession50KG::bindCold(const OriginalUiRiderSessionCold50KG
         if(!s->projectNativeEntry(copiedProfile,initialBefore,initialPhases,initialAfter,d))
             return result(d,Status::unavailableDestination,0x1E9C50);
         if(!s->backend.bindMaterialConsumer(&s->collector,s.get(),&Storage::consumeMaterialEvents))return result(d,Status::backend);
-        s->state.bound=true;storage_=std::move(s);return result(d,Status::ok);
+        s->state.bound=true;storage_=std::move(s);
+        if(const auto shared=storage_->cold.application->sharedDialogs){
+            if(!storage_->cold.resources->controllerPopup()||
+               !storage_->collector.bindSharedMenu470(*this,shared))return result(d,Status::draw,0x204A00);
+        }else if(storage_->cold.resources->controllerPopup())return result(d,Status::resource,0x2055B0);
+        return result(d,Status::ok);
     }catch(const std::bad_alloc&){return result(d,Status::allocation);}catch(...){return result(d,Status::resource);}
 }
 bool OriginalUiRiderSession50KG::canEnterMode(std::uint32_t mode) const noexcept {
@@ -820,7 +830,20 @@ Status OriginalUiRiderSession50KG::notifyTransition(const game::OriginalUiTransi
     switch(e.kind){
     case Notice::requestedPage90:
         valid=!s->requested&&t.initialRestartPending&&t.lifecycle==Life::idle&&t.phase==Phase::none&&e.sourcePC==0x2A3C44;
-        if(valid)s->requested90();break;
+        if(valid){
+            if(const auto shared=s->cold.application->sharedDialogs){
+                // Genuine constructor1E809C operation, deferred by native cold
+                // preparation until this exact incoming owner is activated.
+                // Never mutate the outgoing Main during private prewarming.
+                OriginalUiSharedDialogs50KG::Diagnostic sd;
+                if(s->sharedEntryAttempted){s->fault(Status::unsupportedState,0x1E809C);break;}
+                s->sharedEntryAttempted=true;
+                if(!shared->reappendRiderEntry1E809C(*this,sd)){
+                    s->fault(Status::unsupportedState,sd.sourcePC);break;}
+                s->sharedEntryComplete=true;
+            }
+            s->requested90();
+        }break;
     case Notice::pageEntry74:
         valid=s->requested&&!s->entered&&t.initialRestartPending&&t.lifecycle==Life::idle&&t.phase==Phase::none&&e.sourcePC==0x2A3C58;
         if(valid)s->entry74();break;
@@ -860,11 +883,69 @@ Status OriginalUiRiderSession50KG::input(const OriginalUiMainSessionInput50KG& i
     const auto finish=[&](Status status,std::uint32_t pc=0){receipt.status=status;return result(d,status,pc);};
     if(!s)return finish(Status::notBound);if(s->state.faulted)return finish(Status::faulted);if(s->state.quitRequested)return finish(Status::quit);
     if(s->inOperation||s->updatePrepared||in.controller>1||in.originalInput>15)return finish(Status::invalidInput);
+    const auto shared=s->cold.application->sharedDialogs;
+    if(shared&&shared->menu470PendingFor(s->collector))return finish(Status::unsupportedState,0x204A00);
     s->cpuDrain();if(!s->invalidateProposal()){d=s->callbackFault;receipt.status=d.status;return d.status;}
+    auto& popup=s->cold.application->controllerPopupState;
+    // Global47C receives this same event before the Rider page. The opening
+    // input5 cannot retroactively become popup Confirm. Closing state remains
+    // active until its real renderer timer returns; no early dismissal.
+    if(popup.active3CC){
+        if(!shared||!s->sharedEntryComplete||!sharedMenuLifetimeCurrent(*shared,s->collector)||
+           !s->collector.sharedPopupInputCurrent(*shared)||!popup.riderResetText)
+            return finish(Status::unavailableDestination,0x2062D0);
+        game::OriginalUiControllerPopupPlan50KG plan;
+        if(game::OriginalUiControllerPopup50KG::input(popup,in.controller,in.originalInput,true,plan)!=
+           game::OriginalUiControllerPopupStatus50KG::ok)return finish(Status::unsupportedState,0x2062D0);
+        if(plan.accepted){
+            if(!s->resetPending||!s->processCurrent()||
+               (s->cold.audioMode==OriginalUiMainAudioMode50KG::enabled&&
+                !s->cold.audio->canPlayMenuEffect(plan.soundId)))return finish(Status::audio,plan.soundPC);
+            popup=plan.state;
+            if(s->cold.audioMode==OriginalUiMainAudioMode50KG::muted)++s->state.audio.suppressedByMutedMode;
+            else if(!s->cold.audio->playMenuEffect(plan.soundId)){
+                ++s->state.audio.failed;s->fault(Status::audio,plan.soundPC);d=s->callbackFault;return d.status;
+            }else ++s->state.audio.submitted;
+            // Actual native command applies directly; transportE00==-1 was
+            // authenticated by processCurrent. No extra PCM advance/flush.
+        }
+    }
     receipt.containerReached=s->currentPage()&&s->state.pageShown&&s->state.inputContainerShown;
     if(!receipt.containerReached||!s->aperture.snapshot().inputEnabled268)return finish(Status::noChange);
     receipt.pageCallbackRan=true;
-    if(in.controller!=0||in.popupActive||in.sourceInputBlocked)return finish(Status::noChange);
+    //1EA478..490 reads47C result BEFORE player/controller/action dispatch.
+    // This same Confirm must return after result handling, never launch a race.
+    if(popup.result3D8){
+        if(!shared||!s->resetPending||!popup.riderResetText||s->resetRider!=s->state.rider4C4||
+           !sameStamp(s->cold.profile->stamp(),s->resetStamp)||!s->processCurrent()||!s->lightCurrent())
+            return finish(Status::unsupportedState,0x1EAEA4);
+        if(popup.result3D8==1u)return finish(Status::noChange,0x1EAF10);
+        if(popup.result3D8==3u){
+            popup.result3D8=0;s->resetPending=false;return finish(Status::ok,0x1EAF04);
+        }
+        if(popup.result3D8!=2u)return finish(Status::unsupportedState,0x1EAEA4);
+        game::OriginalUiRiderSelectionProfile50KG before,after;
+        game::OriginalUiRiderAppearance50KG appearance;
+        Storage::NativeProjection projected;
+        if(!s->idleInput()||!s->liveProfile(before)||s->resetRider>=before.riders.size()||
+           !s->cold.profile->canResetRiderCareer1800E0(s->resetRider,s->resetStamp))
+            return finish(Status::unavailableDestination,0x1EAEC8);
+        after=before;after.riders[s->resetRider].career1938=0;
+        if(game::projectOriginalUiRiderAppearance50KG(s->resetRider,after,appearance)!=
+               game::OriginalUiRiderSelectionStatus50KG::ok||
+           s->nativeWidgetGeneration>std::numeric_limits<std::uint64_t>::max()-appearance.count||
+           !s->widgets().beginNativeProjection(s->dynamic,projected,d.widget)||
+           !s->projectNativeAppearance(projected,s->resetRider,after,d)||!s->nativeDrawableClosure(projected,d))
+            return finish(Status::unavailableDestination,0x1EAFB0);
+        if(!s->cold.profile->resetRiderCareer1800E0(s->resetRider,s->resetStamp))
+            return finish(Status::profile,0x1EAEC8);
+        //1EAEE8 delay store precedes actual appearance1EAFB0. Do not undo the
+        //profile if the later widget/lighting consumer fails.
+        popup.result3D8=0;s->resetPending=false;
+        if(!s->appearance()){d=s->callbackFault;return d.status;}
+        return finish(Status::ok,0x1EAEE8);
+    }
+    if(in.controller!=0||in.popupActive||popup.active3CC||in.sourceInputBlocked)return finish(Status::noChange);
     if(!s->processCurrent()||!s->lightCurrent()||s->cold.application->uiObject3D8)return finish(Status::unsupportedState,0x1EA460);
     if(s->state.deferred4EC)return finish(Status::noChange,0x1EB510);
     if(s->panel.inputBlocked4E0()){
@@ -894,7 +975,29 @@ Status OriginalUiRiderSession50KG::input(const OriginalUiMainSessionInput50KG& i
         receipt.moveSerial=s->proposalSerial;receipt.moveEvent=in.originalInput;
         return finish(Status::moveProposed,receipt.selection.sourcePC);
     }
-    if(in.originalInput!=4&&in.originalInput!=6)return finish(in.originalInput==5?Status::unavailableDestination:Status::noChange,0x1EA460);
+    if(in.originalInput==5u){
+        if(!(s->state.promptMask42C&4u))return finish(Status::noChange,0x1EA870);
+        if(!shared||s->resetPending||!s->idleInput()||!s->sharedEntryComplete||
+           s->cold.prospectiveMode!=2u||!s->collector.sharedPopupInputCurrent(*shared)||
+           !s->cold.profile->canResetRiderCareer1800E0(s->state.rider4C4,s->cold.profile->stamp())||
+           (s->cold.audioMode==OriginalUiMainAudioMode50KG::enabled&&!s->cold.audio->canPlayMenuEffect(1)))
+            return finish(Status::unavailableDestination,0x1EAA20);
+        OriginalUiSharedDialogs50KG::Diagnostic sd;
+        s->resetInputActive=true;
+        const bool admitted=shared->canStartRiderReset2060A0(*this,sd);
+        if(!admitted){s->resetInputActive=false;return finish(Status::unavailableDestination,sd.sourcePC);}
+        s->resetRider=s->state.rider4C4;s->resetStamp=s->cold.profile->stamp();
+        const bool started=shared->startRiderReset2060A0(*this,sd);
+        s->resetInputActive=false;
+        if(!started){s->fault(Status::unsupportedState,sd.sourcePC);d=s->callbackFault;return d.status;}
+        s->resetPending=true;
+        if(s->cold.audioMode==OriginalUiMainAudioMode50KG::muted)++s->state.audio.suppressedByMutedMode;
+        else if(!s->cold.audio->playMenuEffect(1)){
+            ++s->state.audio.failed;s->fault(Status::audio,0x1EAA40);d=s->callbackFault;return d.status;
+        }else ++s->state.audio.submitted;
+        return finish(Status::ok,0x1EAA20);
+    }
+    if(in.originalInput!=4&&in.originalInput!=6)return finish(Status::noChange,0x1EA460);
     game::OriginalUiRiderContext50KG context;context.playerIndex=0;context.selectedRider=s->state.rider4C4;context.mode34=profile.mode34;
     context.packed1125C=s->cold.commonProfile->playerBits1125C;
     context.admission.sourceControllerReady=true;context.admission.selectionOwnerReady=true;context.admission.profileOwnerReady=true;
@@ -1093,8 +1196,10 @@ Status OriginalUiRiderSession50KG::commitMove(const OriginalUiRiderSessionInputR
         if(!residencyProposalCurrent(s->nativeDemand)||s->nativeDemand.entry_)return result(d,Status::unavailableDestination);
         s->nativeDemand.consumed_=true;
     }
-    if(!renderer.retireOriginalUiSourceOwner(s->collector,rd)||
-       !rd.submittedWorkCompleted)return result(d,Status::backend);
+    // Retire the exact source frame AND its shared canonical/history lease
+    // before model callbacks or the sparse GPU publication is replaced.
+    if(!s->collector.retireSourceRenderer(renderer,rd,d.draw)||
+       !rd.submittedWorkCompleted)return result(d,Status::backend,d.draw.sourcePC);
     s->cpuDrain();
     if(!s->backend.acceptSourceRetirement(&s->collector,generation,frontier))return result(d,Status::backend);
     if(!s->widgets().preflightNavigation(0,plan.nextNavigation,plan.navigationCommands,s->dynamic.hooks(),d.widget)){
@@ -1262,10 +1367,51 @@ Status OriginalUiRiderSession50KG::update(const OriginalUiMainSessionUpdate50KG&
             s->fault(Status::aperture,0x1EB620);
     }
     if(!s->state.faulted)s->updateWidgets(*top,in.elapsedSeconds);
+    if(!s->state.faulted)if(const auto shared=s->cold.application->sharedDialogs){
+        OriginalUiSharedDialogs50KG::Diagnostic sd;
+        if(!shared->advanceMenu470(*this,s->collector,in.elapsedSeconds,sd))s->fault(Status::unsupportedState,sd.sourcePC);
+    }
     s->inOperation=false;
     if(s->state.faulted){s->cpuDrain();d=s->callbackFault;return d.status;}
     if(s->state.updates==std::numeric_limits<std::uint64_t>::max()){s->fault(Status::unsupportedState,0x1EB4F0);d=s->callbackFault;return d.status;}
     ++s->state.updates;return result(d,Status::ok);
+}
+bool OriginalUiRiderSession50KG::sharedMenuLifetimeCurrent(const OriginalUiSharedDialogs50KG& shared,
+    const OriginalUiRiderDrawContribution50KG& draw)const noexcept {
+    const auto* s=storage_.get();
+    return s&&s->state.bound&&!s->sourceTornDown&&&s->collector==&draw&&s->cold.application&&
+        s->cold.application->sharedDialogs.get()==&shared&&s->cold.resources&&
+        s->cold.resources->controllerPopup()==shared.controller47C_.resources;
+}
+bool OriginalUiRiderSession50KG::sharedMenuUnwindEntryCurrent(const OriginalUiSharedDialogs50KG& shared,
+    const OriginalUiRiderDrawContribution50KG& draw)const noexcept {
+    const auto* s=storage_.get();return sharedMenuLifetimeCurrent(shared,draw)&&!s->inOperation&&!s->rendering;
+}
+bool OriginalUiRiderSession50KG::sharedMenuRenderCurrent(const OriginalUiSharedDialogs50KG& shared,
+    const OriginalUiRiderDrawContribution50KG& draw)const noexcept {
+    const auto* s=storage_.get();return sharedMenuLifetimeCurrent(shared,draw)&&s->sharedEntryComplete&&
+        s->inOperation&&s->rendering&&s->operational()&&!s->updatePrepared&&s->state.updates&&s->currentPage();
+}
+bool OriginalUiRiderSession50KG::sharedMenuUpdateCurrent(const OriginalUiSharedDialogs50KG& shared,
+    const OriginalUiRiderDrawContribution50KG& draw)const noexcept {
+    const auto* s=storage_.get();return sharedMenuLifetimeCurrent(shared,draw)&&s->sharedEntryComplete&&
+        s->inOperation&&!s->rendering&&s->operational()&&!s->updatePrepared&&s->currentPage();
+}
+bool OriginalUiRiderSession50KG::sharedMenuEntryCurrent(const OriginalUiSharedDialogs50KG& shared)const noexcept {
+    const auto* s=storage_.get();if(!s||!sharedMenuLifetimeCurrent(shared,s->collector))return false;
+    const auto t=s->transition();
+    return s->inOperation&&!s->rendering&&s->operational()&&s->backend.predecessorRetired()&&
+        s->sharedEntryAttempted&&!s->sharedEntryComplete&&!s->requested&&!s->entered&&
+        t.bound&&t.current.screen==5&&t.current.page==1&&t.initialRestartPending&&
+        t.lifecycle==Life::idle&&t.phase==Phase::none;
+}
+bool OriginalUiRiderSession50KG::sharedResetInputCurrent(const OriginalUiSharedDialogs50KG& shared)const noexcept {
+    const auto* s=storage_.get();return s&&sharedMenuLifetimeCurrent(shared,s->collector)&&
+        s->resetInputActive&&s->sharedEntryComplete&&s->operational()&&!s->updatePrepared&&!s->rendering&&
+        s->idleInput()&&s->processCurrent()&&s->lightCurrent()&&s->cold.prospectiveMode==2u&&
+        (s->state.promptMask42C&4u)&&!s->cold.application->controllerPopupState.active3CC&&
+        !s->cold.application->controllerPopupState.result3D8&&s->collector.sharedPopupInputCurrent(shared)&&
+        s->cold.profile->canResetRiderCareer1800E0(s->state.rider4C4,s->cold.profile->stamp());
 }
 Status OriginalUiRiderSession50KG::render(const OriginalUiRiderDrawClock50KG& clock,Diagnostic& d) noexcept {
     d={};auto* s=storage_.get();if(!s)return result(d,Status::notBound);
@@ -1281,11 +1427,19 @@ Status OriginalUiRiderSession50KG::render(const OriginalUiRiderDrawClock50KG& cl
     if(!s->cold.profile->statSnapshot(s->state.rider4C4,s->panel.offset4DC(),stats))return result(d,Status::profile,0x1EBBF0);
     s->cpuDrain();if(!s->invalidateProposal()){d=s->callbackFault;return d.status;}
     s->inOperation=true;s->rendering=true;
-    // Original order is ordinary widgets/models, custom page appearance/stat
-    // draw/backgrounds, actual aperture(+440 BEFORE rectangles), prompts, top
-    // widgets, and group drain. The collector alone can seal the full frame.
-    bool okay=s->collector.begin(clock,s->renderContext,s->lighting,d.draw)&&
-        s->collector.projectOrdinaryWidgets(true,d.draw);
+    // Retained global47C projects before this page. Its native sibling
+    // callback is followed by ordinary widgets/models, custom appearance/stat
+    // draw/backgrounds, aperture(+440 BEFORE rectangles), prompts, top
+    // widgets and group drain. Only the full collector can seal the frame.
+    bool okay=s->collector.begin(clock,s->renderContext,s->lighting,d.draw);
+    if(okay&&s->cold.application->sharedDialogs){
+        game::OriginalUiControllerPopupRender50KG popupRender;
+        OriginalUiSharedDialogs50KG::Diagnostic sd;
+        okay=s->cold.application->sharedDialogs->renderMenuPopupSibling(popupRender,sd);
+        if(!okay)d.draw.sourcePC=sd.sourcePC;
+        else okay=s->collector.projectControllerRequiredPopup(popupRender,d.draw);
+    }
+    if(okay)okay=s->collector.projectOrdinaryWidgets(true,d.draw);
     if(okay)okay=s->pageColors();
     if(okay)okay=s->collector.projectPage(stats,true,d.draw);
     if(okay){const auto status=s->aperture.render48(s->transition().lifecycle);
@@ -1342,6 +1496,7 @@ const OriginalUiRiderDrawContribution50KG* OriginalUiRiderSession50KG::rendererO
 OriginalUiRiderSessionSnapshot50KG OriginalUiRiderSession50KG::snapshot() const noexcept {
     const auto* s=storage_.get();if(!s)return {};
     auto out=s->state;out.blocked4E0=s->panel.inputBlocked4E0();out.bypass4E4=s->panel.bypass4E4();out.panelY4DC=s->panel.offset4DC();
+    out.resetPopupPending=s->resetPending;
     out.transition=s->transition();out.aperture=s->aperture.snapshot();out.bankGeneration=s->backend.generation();
     std::uint16_t character=0;
     out.selectedCharacterReady=out.selectionAttached&&s->selectedConfirmCharacter(character)&&
@@ -1354,7 +1509,7 @@ void OriginalUiRiderSession50KG::requestQuit() noexcept {
 }
 bool OriginalUiRiderSession50KG::sourceTeardownPending()const noexcept {
     return storage_&&!storage_->sourceTornDown&&storage_->backendBound&&
-        (storage_->collector.hasSourceSubmission()||storage_->backend.materialLifetime().hasOwners()||
+        (storage_->collector.sourceTeardownPending()||storage_->collector.hasSourceSubmission()||storage_->backend.materialLifetime().hasOwners()||
          storage_->backend.materialLifetime().pendingEvents());
 }
 Status OriginalUiRiderSession50KG::teardownSource(VehicleWindowGl50DS* renderer,
@@ -1370,9 +1525,9 @@ Status OriginalUiRiderSession50KG::teardownSource(VehicleWindowGl50DS* renderer,
     const auto frontier=s.backend.materialLifetime().sequence();
     // This proof is recorded by beginSourceSubmission on the exact collector.
     // A never-submitted private candidate may clean up without GL work.
-    if(s.collector.hasSourceSubmission()){
-        if(!renderer||s.collector.sourceRenderer()!=renderer||!renderer->retireOriginalUiSourceOwner(s.collector,rendererDiagnostic)||
-           !rendererDiagnostic.submittedWorkCompleted)return result(d,Status::backend);
+    if(s.collector.sourceTeardownPending()||s.collector.hasSourceSubmission()){
+        if(!renderer||!s.collector.retireSourceRenderer(*renderer,rendererDiagnostic,d.draw))
+            return result(d,Status::backend,d.draw.sourcePC);
     }
     s.collector.drain();s.state.framePublished=false;
     if(!s.collector.releasePublishedBank(d.draw))return result(d,Status::draw,d.draw.sourcePC);

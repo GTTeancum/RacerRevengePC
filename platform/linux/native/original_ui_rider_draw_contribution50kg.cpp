@@ -1,4 +1,8 @@
 #include "original_ui_rider_draw_contribution50kg.h"
+#include "original_ui_shared_dialog_material_history50kg.h"
+#include "original_ui_shared_dialogs50kg.h"
+#include "vehicle_window_gl50ds.h"
+#include "../../../src/game/original_ui_controller_popup_geometry50kg.h"
 #include "../../../src/assets/original_ui_material_equivalence50kg.h"
 #include "../../../src/assets/original_ui_material_binding50kg.h"
 #include <algorithm>
@@ -20,7 +24,7 @@ bool same(const std::string& a,const char* b) noexcept {
 bool samplerSame(const MaterialTextureSampler50EB& a,const MaterialTextureSampler50EB& b) noexcept {
     return a.minification==b.minification&&a.magnification==b.magnification&&a.s==b.s&&a.t==b.t;
 }
-enum class RegistrationKind : std::uint8_t {existingStatic,ledgerDynamic};
+enum class RegistrationKind : std::uint8_t {existingStatic,ledgerDynamic,sharedCanonical};
 using LiveMaterial=game::OriginalUiRiderLiveMaterial50KG;
 using Lifetime=game::OriginalUiRiderMaterialLifetime50KG;
 using MaterialRow=game::OriginalUiRiderMaterialRow50KG;
@@ -110,6 +114,20 @@ bool material(const assets::OriginalUiMaterialPass50KG& pass,const assets::Origi
 }
 struct OriginalUiRiderDrawContribution50KG::Storage {
     std::shared_ptr<OriginalUiRiderDrawResources50KG> resources;
+    std::shared_ptr<OriginalUiControllerPopupResources50KG> popup;
+    std::shared_ptr<OriginalUiSharedDialogMaterialHistory50KG> common;
+    std::array<std::uint32_t,6> sharedBindings{{unresolved,unresolved,unresolved,unresolved,unresolved,unresolved}};
+    std::array<std::uint32_t,5> popupMaterials{{unresolved,unresolved,unresolved,unresolved,unresolved}};
+    std::array<assets::OriginalUiMaterialBindingState50KG,6> commonPending;
+    std::vector<OriginalUiSharedDialogMaterialHistory50KG::MenuUse> menuUses;
+    std::uint64_t popupRevision=0;
+    bool popupLeased=false,popupVisited=false;
+    bool historyCurrent(const OriginalUiSourceOwner50KM* owner)const noexcept {
+        return !popup||(popupLeased&&common&&common->current(owner,popupRevision));
+    }
+    void poisonHistory(const OriginalUiSourceOwner50KM* owner)noexcept {
+        historyPoisoned=true;if(common&&popupLeased)common->poison(owner);
+    }
     std::shared_ptr<const assets::OriginalUiRiderStatAssets50KG> statAssets;
     std::shared_ptr<const assets::OriginalUiRiderBinderAssets50KG> binderAssets;
     game::OriginalUiRiderBackend50KG* backend=nullptr;
@@ -197,7 +215,8 @@ struct OriginalUiRiderDrawContribution50KG::Storage {
         std::vector<Registration>&,std::vector<std::uint32_t>&,D&)const;
     bool registrationCurrent(const Registration& record)const noexcept {
         if(!record.state.initialized())return false;
-        if(record.kind==RegistrationKind::existingStatic)return !record.ledger&&!record.row.prepared()&&!record.epoch&&!record.live;
+        if(record.kind!=RegistrationKind::ledgerDynamic)return !record.ledger&&!record.row.prepared()&&!record.epoch&&!record.live&&
+            (record.kind!=RegistrationKind::sharedCanonical||(popup&&record.rank>=3228&&record.rank<=3233&&record.pass==1));
         const auto& ledger=backend->materialLifetime();game::OriginalUiRiderMaterialRowState50KG state;
         return record.ledger==&ledger&&record.live&&record.live->ledger==&ledger&&record.epoch&&
             record.live->row.same(record.row)&&record.live->epoch==record.epoch&&
@@ -210,7 +229,130 @@ struct OriginalUiRiderDrawContribution50KG::Storage {
     }
 };
 OriginalUiRiderDrawContribution50KG::OriginalUiRiderDrawContribution50KG() noexcept=default;
-OriginalUiRiderDrawContribution50KG::~OriginalUiRiderDrawContribution50KG(){drain();if(storage_&&storage_->gpu)storage_->gpu->releaseRiderBorrow(this);}
+OriginalUiRiderDrawContribution50KG::~OriginalUiRiderDrawContribution50KG(){
+    if(storage_&&storage_->popupLeased)storage_->poisonHistory(this);
+    drain();if(storage_&&storage_->gpu)storage_->gpu->releaseRiderBorrow(this);
+}
+bool OriginalUiRiderDrawContribution50KG::historyRendererRetired(const VehicleWindowGl50DS& renderer)const noexcept {
+    return storage_&&menuRetiredRenderer_==&renderer&&!storage_->submittedRenderer&&!storage_->submissionPending;
+}
+bool OriginalUiRiderDrawContribution50KG::bindSharedMenu470(OriginalUiRiderSession50KG& session,
+    std::shared_ptr<OriginalUiSharedDialogs50KG> shared)noexcept {
+    if(menuShared_||menuSession_||!storage_||!shared||storage_->active||storage_->popupLeased||
+       !storage_->popup||storage_->popup!=shared->controller47C_.resources)return false;
+    menuSession_=&session;menuShared_=std::move(shared);return true;
+}
+bool OriginalUiRiderDrawContribution50KG::sharedMenuBoundCurrent(const OriginalUiSharedDialogs50KG& shared,
+    const OriginalUiRiderSession50KG& session)const noexcept {
+    return storage_&&menuShared_.get()==&shared&&menuSession_==&session&&storage_->resources&&
+        storage_->popup&&storage_->resources->controllerPopup()==storage_->popup&&
+        storage_->popup==shared.controller47C_.resources&&storage_->popup->loaded()&&!storage_->popup->poisoned()&&
+        bank()&&storage_->gpu&&storage_->gpu->initialized()&&storage_->publication&&
+        storage_->gpu->publicationToken()==storage_->publication&&
+        (!storage_->gpu->riderSparse()||(storage_->gpu->riderSession()==&session&&
+          storage_->gpu->riderBank()==storage_->bank.get()&&storage_->gpu->riderDemandSerial()));
+}
+bool OriginalUiRiderDrawContribution50KG::sharedMenuInvocationCurrent(const OriginalUiSharedDialogs50KG& shared,
+    std::uint64_t epoch)const noexcept {
+    return menuSession_&&sharedMenuBoundCurrent(shared,*menuSession_)&&epoch&&epoch==menuInvocationEpoch_;
+}
+bool OriginalUiRiderDrawContribution50KG::sharedMenuCollectorInitialized(const OriginalUiSharedDialogs50KG& shared,
+    std::uint64_t epoch)const noexcept {
+    if(!sharedMenuInvocationCurrent(shared,epoch))return false;const auto& s=*storage_;
+    return s.active&&!s.failed&&!s.finished&&!s.submissionPending&&!s.historyPoisoned&&s.popupLeased&&s.historyCurrent(this)&&
+        !s.popupVisited&&!s.ordinary&&!s.page&&!s.pageShown&&!s.prompts&&!s.top&&!s.apertures&&!s.exitProjected&&
+        !frame_.owner_&&!frame_.native_&&!frame_.frameGeneration_&&s.vertices.empty()&&s.w.empty()&&s.fog.empty()&&
+        s.packets.empty()&&s.order.empty()&&s.spans.empty()&&s.states.empty()&&s.orderedVertices.empty()&&
+        s.orderedW.empty()&&s.orderedFog.empty()&&s.pendingHistory.empty()&&s.pendingLive.empty()&&s.menuUses.empty();
+}
+bool OriginalUiRiderDrawContribution50KG::sharedMenuFrameCurrent(const OriginalUiSharedDialogs50KG& shared,
+    std::uint64_t epoch,std::uint64_t generation)const noexcept {
+    return sharedMenuInvocationCurrent(shared,epoch)&&storage_->active&&storage_->finished&&!storage_->failed&&
+        storage_->popupVisited&&storage_->historyCurrent(this)&&frame_.owner_==this&&frame_.native_==&storage_->draw&&
+        generation&&generation==frame_.frameGeneration_&&generation==storage_->frameGeneration;
+}
+bool OriginalUiRiderDrawContribution50KG::sharedMenuRetiredCurrent(const OriginalUiSharedDialogs50KG& shared,
+    const VehicleWindowGl50DS& renderer)const noexcept {
+    return menuSession_&&sharedMenuBoundCurrent(shared,*menuSession_)&&historyRendererRetired(renderer);
+}
+bool OriginalUiRiderDrawContribution50KG::sharedPopupInputCurrent(const OriginalUiSharedDialogs50KG& shared)const noexcept {
+    if(!menuSession_||!sharedMenuBoundCurrent(shared,*menuSession_)||!menuAcceptedEpoch_||
+       menuAcceptedEpoch_!=menuInvocationEpoch_||shared.menu470PendingFor(*this))return false;
+    const auto& s=*storage_;
+    if(s.failed||s.historyPoisoned||s.submissionPending||!s.historyCurrent(this)||!s.groupsValid||s.awaitingGroupRecord||
+       s.common->menuStagePending(this)||s.acknowledgedGeneration!=s.frameGeneration||
+       s.lifecycleSequence!=s.backend->materialLifetime().sequence()||s.registryGeneration!=s.backend->registryGeneration())return false;
+    const auto* images=s.bank->images()?s.bank->images()->textures():nullptr;if(!images)return false;
+    if(!s.gpu->riderSparse()&&!s.gpu->matchesSourceBank(*images,s.publication))return false;
+    for(std::size_t role=0;role<s.sharedBindings.size();++role){const auto index=s.sharedBindings[role];
+        if(index>=s.bindings.size())return false;const auto& binding=s.bindings[index];
+        if(binding.kind!=RegistrationKind::sharedCanonical||!binding.sourceRegistered||!binding.prototype||
+           !s.drawablePacket(index)||binding.registration>=s.history.size())return false;
+        const auto& record=s.history[binding.registration];
+        if(record.rank!=3228+role||record.pass!=1||!s.registrationCurrent(record))return false;
+        const auto& representative=s.bindings[s.representatives[binding.leaf]];
+        if(representative.registration>=s.history.size())return false;
+        const auto& final=s.history[representative.registration];
+        if(final.kind!=RegistrationKind::sharedCanonical||final.rank<3228||final.rank>3233||
+           !s.registrationCurrent(final))return false;
+        if(binding.image==unresolved){if(role!=0)return false;continue;}
+        const auto* cpu=images->texture(binding.image);const auto* gpu=s.gpu->asset(binding.image);
+        if(!cpu||!gpu||!gpu->name||cpu->identity!=gpu->identity||
+           (s.gpu->riderSparse()&&!s.gpu->riderSamplerMatches(binding.image,binding.resourceSampler)))return false;
+    }
+    return true;
+}
+bool OriginalUiRiderDrawContribution50KG::acquireSharedHistory(D& d)noexcept {
+    auto& s=*storage_;if(!s.popup)return true;
+    if(s.popupLeased)return s.historyCurrent(this)||fail(d,E::schedule,0x249BA0);
+    s.common=s.popup->sharedHistory();
+    if(!menuShared_||!s.common||!s.common->acquire(this,s.popupRevision,d.controllerPopup))
+        return fail(d,E::schedule,d.controllerPopup.sourcePC);
+    s.popupLeased=true;
+    try {
+        auto bindings=s.bindings;auto history=s.history;
+        std::array<std::uint32_t,6> joined{{unresolved,unresolved,unresolved,unresolved,unresolved,unresolved}};
+        std::array<std::uint32_t,5> popupMaterials{{unresolved,unresolved,unresolved,unresolved,unresolved}};
+        const auto& materials=*s.resources->materials();
+        for(std::size_t m=0;m<materials.size();++m){const auto& material=materials[m];
+            if(material.registryToken<3228||material.registryToken>3233)continue;
+            const auto role=material.registryToken-3228;
+            if(joined[role]!=unresolved||material.material.passes.size()!=1||material.animated||
+               material.images.size()!=(role?1u:0u)){s.poisonHistory(this);return fail(d,E::material);}
+            for(std::size_t i=0;i<bindings.size();++i){auto& binding=bindings[i];
+                if(binding.kind!=RegistrationKind::sharedCanonical||binding.pass!=&material.material.passes[0])continue;
+                if(joined[role]!=unresolved){s.poisonHistory(this);return fail(d,E::material);}
+                assets::OriginalUiMaterialEquivalenceKey50KG key;assets::OriginalUiMaterialEquivalenceDiagnostic50KG detail;
+                assets::OriginalUiMaterialBindingState50KG copied;
+                if(!assets::prepareOriginalUiMaterialEquivalence50KG(*binding.pass,binding.provenance,key,detail)||
+                   !s.common->copyHistory(this,s.popupRevision,material.registryToken,key,copied,d.controllerPopup)){
+                    s.poisonHistory(this);return fail(d,E::schedule,d.controllerPopup.sourcePC?d.controllerPopup.sourcePC:detail.sourcePC);}
+                std::size_t registration=0;
+                for(;registration<history.size();++registration)if(history[registration].rank==material.registryToken)break;
+                if(registration==history.size()){
+                    Registration record;record.kind=RegistrationKind::sharedCanonical;record.rank=material.registryToken;
+                    record.pass=1;record.source=binding.pass;record.state=std::move(copied);history.push_back(std::move(record));
+                }else{
+                    auto& record=history[registration];
+                    if(record.kind!=RegistrationKind::sharedCanonical||record.pass!=1||record.source!=binding.pass){
+                        s.poisonHistory(this);return fail(d,E::schedule);}
+                    record.state=std::move(copied);
+                }
+                binding.sourceRegistered=true;joined[role]=static_cast<std::uint32_t>(i);
+            }
+            for(std::size_t p=0;p<popupMaterials.size();++p)
+                if(material.registryToken==OriginalUiControllerPopupResources50KG::registryTokens[p])popupMaterials[p]=static_cast<std::uint32_t>(m);
+        }
+        for(const auto index:joined)if(index==unresolved){s.poisonHistory(this);return fail(d,E::material);}
+        for(const auto index:popupMaterials)if(index==unresolved){s.poisonHistory(this);return fail(d,E::material);}
+        // Rejoin the retained canonical states through Rider's actual ordered
+        // registry. Dynamic row epochs and their dependency barriers survive.
+        std::vector<Registration> scheduled;std::vector<std::uint32_t> representatives;
+        if(!s.schedule(bindings,history,scheduled,representatives,d)){s.poisonHistory(this);return false;}
+        s.bindings.swap(bindings);s.history.swap(scheduled);s.representatives.swap(representatives);
+        s.sharedBindings=joined;s.popupMaterials=popupMaterials;return true;
+    }catch(...){s.poisonHistory(this);return fail(d,E::allocation);}
+}
 bool OriginalUiRiderDrawContribution50KG::bind(std::shared_ptr<OriginalUiRiderDrawResources50KG> resources,
     std::shared_ptr<const assets::OriginalUiRiderStatAssets50KG> stat,
     std::shared_ptr<const assets::OriginalUiRiderBinderAssets50KG> binder,
@@ -234,6 +376,7 @@ bool OriginalUiRiderDrawContribution50KG::bind(std::shared_ptr<OriginalUiRiderDr
             if(!indexIdentity||!page||!config||config->indexIdentity!=indexIdentity||config->pageIdentity!=page->identity)return fail(d,E::resource);
         }
         auto s=std::make_unique<Storage>();s->resources=std::move(resources);s->statAssets=std::move(stat);s->binderAssets=std::move(binder);
+        s->popup=s->resources->controllerPopup();
         s->backend=&backend;s->dynamic=&dynamic;s->light=&light;s->staticOwner=staticOwner;s->statOwner=statOwner;
         s->transition=std::move(transition);s->pageApertures=apertures;
         if(!s->stats.bind(s->statAssets,d.stat))return fail(d,E::stat);
@@ -270,10 +413,15 @@ bool OriginalUiRiderDrawContribution50KG::prepareBank(D& d) noexcept {
         const auto& materials=*s.resources->materials();
         for(std::size_t i=0;i<materials.size();++i){d.material=static_cast<std::uint32_t>(i);const auto& m=materials[i];
             if(m.material.passes.size()!=1)return fail(d,E::material);const auto& pass=m.material.passes[0];
+            // Shared canonical rows exist on the retained global owner. Until
+            // its lease transfers, admit only their immutable image/policy
+            // closure, never a cold replacement history or native registration.
+            const auto kind=s.popup&&m.registryToken>=3228&&m.registryToken<=3233?
+                RegistrationKind::sharedCanonical:RegistrationKind::existingStatic;
             if(m.images.empty()){
-                if(!s.add(m.registeredName,pass,*s.resources->images(),unresolved,nullptr,bindings,d))return false;
+                if(!s.add(m.registeredName,pass,*s.resources->images(),unresolved,nullptr,bindings,d,kind))return false;
             }else for(auto image:m.images)
-                if(!s.add(m.registeredName,pass,*s.resources->images(),image,s.backend->staticImage(s.staticOwner,image),bindings,d))return false;
+                if(!s.add(m.registeredName,pass,*s.resources->images(),image,s.backend->staticImage(s.staticOwner,image),bindings,d,kind))return false;
         }
         const auto statImages=s.statAssets->images();
         const auto addStat=[&](const assets::OriginalUiRiderStatResource50KG* resource){
@@ -352,6 +500,8 @@ bool OriginalUiRiderDrawContribution50KG::nativeDrawableModels(const std::array<
     // Static includes the actual stat/widget/ATM lifetime registrations.
     for(const auto& binding:s.bindings)if(binding.kind==RegistrationKind::existingStatic&&
         (!binding.sourceRegistered||!binding.prototype))return fail(d,E::material);
+    for(const auto& binding:s.bindings)if(binding.kind==RegistrationKind::sharedCanonical&&
+        (!s.popup||!s.popup->loaded()||s.popup->poisoned()||!binding.prototype))return fail(d,E::material);
     if(models[0])return fail(d,E::model);
     bool pod=false;
     for(std::uint16_t id=1;id<120;++id)if(models[id]){
@@ -392,11 +542,13 @@ bool OriginalUiRiderDrawContribution50KG::nativeResidencyImages(
             if(index>=needed.size()||!textures->texture(index))return false;
             needed[index]=true;return true;
         };
-        // These source material registrations live for this manager. Retain
-        // their complete image/frame closures; this is not visibility parity.
+        // Manager statics and the retained shared47C material population keep
+        // their complete real image/frame closures. Dormant shared bindings
+        // grant residency only until their canonical lease joins at begin().
         for(const auto& binding:s.bindings)
-            if(binding.kind==RegistrationKind::existingStatic){
-                if(!binding.sourceRegistered||!coverage(binding)||!add(binding.image))return fail(d,E::material);
+            if(binding.kind!=RegistrationKind::ledgerDynamic){
+                if((binding.kind==RegistrationKind::existingStatic&&!binding.sourceRegistered)||
+                   !coverage(binding)||!add(binding.image))return fail(d,E::material);
             }
         bool pod=false;
         for(std::uint16_t id=1;id<120;++id)if(models[id]){
@@ -540,7 +692,9 @@ bool OriginalUiRiderDrawContribution50KG::consumeMaterials(bool rebuild,D& d) no
                     identityChanged=true;
                 }
             }else{
-                if(old.registration>=s.history.size()||s.history[old.registration].kind!=RegistrationKind::existingStatic)return fail(d,E::schedule);
+                if(binding.kind==RegistrationKind::sharedCanonical&&!binding.sourceRegistered){
+                    binding.leaf=binding.registration=unresolved;continue;}
+                if(old.registration>=s.history.size()||s.history[old.registration].kind!=binding.kind)return fail(d,E::schedule);
                 rank=s.history[old.registration].rank;
             }
             binding.registration=unresolved;
@@ -594,7 +748,8 @@ const std::vector<MaterialTextureSampler50EB>* OriginalUiRiderDrawContribution50
 }
 bool OriginalUiRiderDrawContribution50KG::releasePublishedBank(D& d) noexcept {
     d={};if(!storage_)return true;auto& s=*storage_;
-    if(s.active||frame_.native_||s.submissionPending)return fail(d,E::phase);
+    if(s.active||frame_.native_||s.submissionPending||s.popupLeased||
+       (menuShared_&&menuShared_->menu470PendingFor(*this)))return fail(d,E::phase);
     if(s.gpu&&!s.gpu->releaseRiderBorrow(this))return fail(d,E::publication);
     s.gpu.reset();s.publication=0;return true;
 }
@@ -605,6 +760,7 @@ bool OriginalUiRiderDrawContribution50KG::bindPublishedBank(std::shared_ptr<cons
     for(std::uint32_t i=0;i<gpu->textureCount();++i){const auto* a=gpu->asset(i);const auto* b=textures->texture(i);
         if(!b||(!a&&!gpu->riderSparse())||(a&&(!a->name||a->identity!=b->identity)))return fail(d,E::publication);}
     if(storage_->gpu==gpu)return true;
+    if(storage_->popupLeased||(menuShared_&&menuShared_->menu470PendingFor(*this)))return fail(d,E::phase);
     if(!gpu->acquireRiderBorrow(this))return fail(d,E::publication);
     if(storage_->gpu&&!storage_->gpu->releaseRiderBorrow(this)){
         gpu->releaseRiderBorrow(this);return fail(d,E::publication);}
@@ -623,6 +779,17 @@ bool OriginalUiRiderDrawContribution50KG::begin(const OriginalUiRiderDrawClock50
     if(!s.pageApertures[player])return fail(d,E::phase);
     const auto aperture=s.pageApertures[player]->snapshot();
     if(!aperture.bound)return fail(d,E::phase);
+    if((menuShared_&&menuShared_->menu470PendingFor(*this))||(s.common&&s.common->menuStagePending(this)))
+        return fail(d,E::phase,0x204A00);
+    // Rider has no Controls2 warning authority. It joins only the genuine
+    // invisible470 inherited callbacks followed by the retained47C sibling.
+    if(menuShared_){OriginalUiSharedDialogs50KG::Diagnostic shared;
+        if(!menuShared_->invisible470204AC0(shared)||menuInvocationEpoch_==std::numeric_limits<std::uint64_t>::max())
+            return fail(d,E::phase,shared.sourcePC);}
+    if(!acquireSharedHistory(d))return false;
+    if(menuShared_){OriginalUiSharedDialogs50KG::Diagnostic shared;++menuInvocationEpoch_;menuRetiredRenderer_=nullptr;
+        if(!menuSession_||!menuShared_->beginMenu470(*menuSession_,*this,menuInvocationEpoch_,shared)){
+            s.failed=true;return fail(d,E::phase,shared.sourcePC);}}
     game::OriginalUiRiderVisibilityDiagnostic50KG visibility;
     game::OriginalUiLightManagerLifetimeDiagnostic50KG lights;
     if(!s.backend->beginFrame())return fail(d,E::phase);
@@ -634,10 +801,14 @@ bool OriginalUiRiderDrawContribution50KG::begin(const OriginalUiRiderDrawClock50
     s.sourcePlayer=player;s.apertureAtBegin=aperture;s.exitProjected=false;
     s.exitExpected=lifecycle.lifecycle==game::OriginalUiTransitionLifecycle50KG::waitScreenExit&&
         aperture.state==game::OriginalUiApertureState50KG::closing&&aperture.top284>=224&&aperture.bottom28C<=224;
-    s.ordinary=s.page=s.pageShown=s.prompts=s.top=s.finished=s.failed=false;s.apertures=0;
+    s.popupVisited=false;s.ordinary=s.page=s.pageShown=s.prompts=s.top=s.finished=s.failed=false;s.apertures=0;
     s.vertices.clear();s.w.clear();s.fog.clear();s.packets.clear();s.order.clear();s.spans.clear();s.states.clear();
+    s.orderedVertices.clear();s.orderedW.clear();s.orderedFog.clear();s.pendingHistory.clear();s.pendingLive.clear();s.menuUses.clear();
     for(std::size_t i=0;i<s.animations.size();++i)if((*s.resources->materials())[i].animated&&
        !game::selectOriginalUiTextureAnimationFrame50KG(s.animations[i],s.frames[i])){s.failed=true;return fail(d,E::clock);}
+    if(menuShared_){OriginalUiSharedDialogs50KG::Diagnostic shared;
+        if(!menuShared_->continueMenu470AfterCollectorBegin(*this,shared)){
+            s.failed=true;return fail(d,E::phase,shared.sourcePC);}}
     return true;
 }
 bool OriginalUiRiderDrawContribution50KG::append(const game::OriginalUiOverlayQuad50KG& quad,
@@ -789,9 +960,51 @@ bool OriginalUiRiderDrawContribution50KG::widgets(bool top,bool shown,D& d) noex
     }
     return true;
 }
+bool OriginalUiRiderDrawContribution50KG::projectControllerRequiredPopup(
+    const game::OriginalUiControllerPopupRender50KG& render,D& d)noexcept {
+    d={};if(!storage_)return fail(d,E::input);auto& s=*storage_;
+    if(!s.active||!s.popup||!menuShared_||s.popupVisited||s.ordinary||s.page||s.top||s.finished||s.failed||
+       !s.historyCurrent(this)||!menuShared_->menuPopupProjectionCurrent(*this,render))return fail(d,E::phase,0x2064C0);
+    if(!s.popup->project(render,d.controllerPopup)){s.failed=true;return fail(d,E::geometry,d.controllerPopup.sourcePC);}
+    const auto* geometry=s.popup->geometry();if(!geometry){s.failed=true;return fail(d,E::resource);}
+    try {
+        for(std::size_t i=0;i<geometry->packetCount();++i){const auto& packet=geometry->packets()[i];
+            const auto role=static_cast<std::size_t>(packet.material);
+            if(role>=s.popupMaterials.size()||bool(packet.quad)==bool(packet.text)){
+                s.failed=true;return fail(d,E::geometry,packet.sourcePC);}
+            const auto material=s.popupMaterials[role];
+            if(material>=s.resources->materials()->size()){s.failed=true;return fail(d,E::material);}
+            if(packet.quad){if(!append(*packet.quad,material,packet.packetDepth,d)){s.failed=true;return false;}continue;}
+            const auto& text=*packet.text;const auto& source=(*s.resources->materials())[material];
+            if(source.images.size()!=1||source.animated||source.material.passes.size()!=1||
+               text.count>text.quads.size()||packet.packetColor[3]>128||packet.packetDepth!=16777214.f){
+                s.failed=true;return fail(d,E::geometry,packet.sourcePC);}
+            if(!text.count)continue;
+            const auto* map=s.backend->staticImage(s.staticOwner,source.images[0]);
+            const auto binding=map?s.find(&source.material.passes[0],map->combinedIndex):unresolved;
+            if(binding==unresolved){s.failed=true;return fail(d,E::material);}
+            if(!s.capacity(text.count)){s.failed=true;return fail(d,E::capacity);}
+            for(std::size_t q=0;q<text.count;++q)for(const auto& glyph:text.quads[q].vertices)
+                if(!std::isfinite(glyph.x)||!std::isfinite(glyph.y)||!std::isfinite(glyph.u)||!std::isfinite(glyph.v)){
+                    s.failed=true;return fail(d,E::geometry,packet.sourcePC);}
+            const auto first=static_cast<std::uint32_t>(s.vertices.size()/4),ordinal=static_cast<std::uint32_t>(s.packets.size());
+            for(std::size_t q=0;q<text.count;++q)for(const auto& glyph:text.quads[q].vertices){assets::Vertex48B vertex{};
+                vertex.position[0]=glyph.x;vertex.position[1]=glyph.y;vertex.position[2]=packet.packetDepth;
+                vertex.uv[0]=glyph.u;vertex.uv[1]=glyph.v;
+                for(unsigned c=0;c<4;++c)vertex.color[c]=packet.packetColor[c];
+                s.vertices.push_back(vertex);s.w.push_back(1);s.fog.push_back(0);
+            }
+            s.packets.push_back({first,text.count,binding,ordinal});
+        }
+        s.popupVisited=true;OriginalUiSharedDialogs50KG::Diagnostic shared;
+        if(!menuShared_->completeMenuPopupProjection(*this,render,shared)){
+            s.failed=true;return fail(d,E::phase,shared.sourcePC);}
+        return true;
+    }catch(...){s.failed=true;return fail(d,E::allocation);}
+}
 bool OriginalUiRiderDrawContribution50KG::projectOrdinaryWidgets(bool shown,D& d) noexcept {
     d={};if(!storage_)return fail(d,E::input);auto& s=*storage_;
-    if(!s.active||s.ordinary||s.page||s.failed)return fail(d,E::phase);
+    if(!s.active||(s.popup&&!s.popupVisited)||s.ordinary||s.page||s.failed)return fail(d,E::phase);
     if(!widgets(false,shown,d)){s.failed=true;return false;}s.ordinary=true;return true;
 }
 bool OriginalUiRiderDrawContribution50KG::projectPage(const game::OriginalUiRiderStatInput50KG& input,bool shown,D& d) noexcept {
@@ -996,7 +1209,7 @@ bool OriginalUiRiderDrawContribution50KG::Storage::schedule(std::vector<Binding>
 
 bool OriginalUiRiderDrawContribution50KG::finish(D& d) noexcept {
     d={};if(!storage_)return fail(d,E::input);auto& s=*storage_;
-    if(!s.active||!s.ordinary||!s.page||!s.top||s.failed||s.finished||
+    if(!s.active||(s.popup&&(!s.popupVisited||!s.historyCurrent(this)))||!s.ordinary||!s.page||!s.top||s.failed||s.finished||
        (s.pageShown&&(!s.prompts||s.apertures!=2||s.exitExpected!=s.exitProjected)))return fail(d,E::unfinished);
     if(!bank()||!s.gpu||s.gpu->publicationToken()!=s.publication||
        s.vertices.size()!=s.w.size()||s.vertices.size()!=s.fog.size()||s.vertices.size()%4||
@@ -1040,9 +1253,9 @@ bool OriginalUiRiderDrawContribution50KG::finish(D& d) noexcept {
         }
         // Propose native binding updates before sealing. Only actual source
         // acceptance may commit them; a composed or rejected frame is no bind.
-        s.pendingHistory=s.history;s.pendingLive.clear();
+        s.pendingHistory=s.history;s.pendingLive.clear();s.menuUses.clear();
         OriginalUiSourceTerminal50KN terminal{};
-        std::uint32_t terminalLeaf=unresolved;
+        std::uint32_t terminalLeaf=unresolved,spanOrdinal=0;
         for(const auto index:s.order){const auto leaf=s.bindings[s.packets[index].binding].leaf;
             if(leaf>=s.representatives.size()||s.representatives[leaf]>=s.bindings.size()){
                 s.failed=true;return fail(d,E::schedule);
@@ -1065,6 +1278,15 @@ bool OriginalUiRiderDrawContribution50KG::finish(D& d) noexcept {
             if(!s.pendingHistory[representative.registration].state.initialized()){
                 s.failed=true;return fail(d,E::schedule);
             }
+            if(s.common){const auto& origin=s.bindings[s.packets[index].binding];
+                if(origin.registration>=s.pendingHistory.size()){s.failed=true;return fail(d,E::schedule);}
+                // Observations follow the real sorted FINALREP walk. Aliases
+                // retain their origin token; only the final leaf receives the
+                // actual native binding, in the same span/FIFO order.
+                s.menuUses.push_back({s.pendingHistory[origin.registration].rank,
+                    s.pendingHistory[representative.registration].rank,spanOrdinal,origin.image});
+            }
+            ++spanOrdinal;
             terminalLeaf=leaf;
         }
         if(terminalLeaf!=unresolved){
@@ -1120,51 +1342,147 @@ bool OriginalUiRiderDrawContribution50KG::finish(D& d) noexcept {
         frame_.native_=&s.draw;frame_.owner_=this;frame_.frameGeneration_=++s.frameGeneration;frame_.terminal_=terminal;
         frame_.riderSession_=s.gpu->riderSession();frame_.riderTextures_=s.gpu->riderSparse()?s.gpu.get():nullptr;
         frame_.riderResidencySerial_=s.gpu->riderDemandSerial();
+        if(s.common){
+            for(std::size_t role=0;role<s.sharedBindings.size();++role){const auto index=s.sharedBindings[role];
+                if(index>=s.bindings.size()||s.bindings[index].registration>=s.pendingHistory.size()){
+                    s.failed=true;return fail(d,E::schedule);}
+                const auto& record=s.pendingHistory[s.bindings[index].registration];
+                if(record.kind!=RegistrationKind::sharedCanonical||record.rank!=3228+role||record.pass!=1){
+                    s.failed=true;return fail(d,E::schedule);}
+                s.commonPending[role]=record.state;
+            }
+            if(!s.common->stageMenu(this,s.popupRevision,frame_,*s.bank,s.menuUses,s.commonPending,d.controllerPopup)){
+                s.failed=true;frame_.native_=nullptr;frame_.owner_=nullptr;return fail(d,E::schedule,d.controllerPopup.sourcePC);}
+        }
+        if(menuShared_){OriginalUiSharedDialogs50KG::Diagnostic shared;
+            if(!menuShared_->sealMenu470Frame(*this,s.frameGeneration,shared)){
+                s.failed=true;return fail(d,E::phase,shared.sourcePC);}}
         return true;
     }catch(...){s.failed=true;return fail(d,E::allocation);}
 }
 const OriginalUiSourceFrame50KM* OriginalUiRiderDrawContribution50KG::frame()const noexcept {
-    return storage_&&storage_->active&&storage_->finished&&!storage_->failed&&
+    if(!(storage_&&storage_->active&&storage_->finished&&!storage_->failed&&
         !storage_->historyPoisoned&&!storage_->submissionPending&&storage_->groupsValid&&!storage_->awaitingGroupRecord&&
         storage_->lifecycleSequence==storage_->backend->materialLifetime().sequence()&&
         storage_->bankGeneration==storage_->backend->generation()&&
-        storage_->registryGeneration==storage_->backend->registryGeneration()&&frame_.native_?&frame_:nullptr;
+        storage_->registryGeneration==storage_->backend->registryGeneration()&&frame_.native_&&storage_->historyCurrent(this)))return nullptr;
+    if(menuShared_&&!menuShared_->menu470FrameCurrent(*this,frame_.frameGeneration_)&&
+       !(menuAcceptedEpoch_==menuInvocationEpoch_&&storage_->acknowledgedGeneration==frame_.frameGeneration_))return nullptr;
+    return &frame_;
+}
+const OriginalUiNativeDraw50KG* OriginalUiRiderDrawContribution50KG::draw()const noexcept {
+    return storage_&&storage_->active&&storage_->finished&&!storage_->failed?&storage_->draw:nullptr;
+}
+bool OriginalUiRiderDrawContribution50KG::residentSourceFrameCurrent(const OriginalUiSourceFrame50KM& frame,
+    const assets::OriginalUiImageBank50KG& bank)const noexcept {
+    if(!storage_||&frame!=&frame_||frame.owner_!=this||frame.native_!=&storage_->draw||
+       !frame.frameGeneration_||frame.frameGeneration_!=storage_->frameGeneration||frame.garageCanonical_||frame.directVideoPresent_)
+        return false;
+    const auto& s=*storage_;
+    if(!s.active||!s.finished||s.failed||s.historyPoisoned||s.submissionPending||!s.historyCurrent(this)||
+       !s.groupsValid||s.awaitingGroupRecord||s.bank.get()!=&bank||!bank.loaded()||
+       s.bankGeneration!=s.backend->generation()||s.registryGeneration!=s.backend->registryGeneration()||
+       s.lifecycleSequence!=s.backend->materialLifetime().sequence()||
+       !s.gpu||!s.gpu->initialized()||!s.publication||s.gpu->publicationToken()!=s.publication)return false;
+    if(s.popup&&(!menuShared_||!sharedMenuFrameCurrent(*menuShared_,menuInvocationEpoch_,frame.frameGeneration_)))return false;
+    const auto images=bank.images();const auto* textures=images?images->textures():nullptr;
+    if(!textures||s.gpu->textureCount()!=textures->textureCount())return false;
+    if(s.gpu->riderSparse()){
+        if(!menuSession_||s.gpu->riderSession()!=menuSession_||frame.riderSession_!=menuSession_||
+           s.gpu->riderBank()!=&bank||frame.riderTextures_!=s.gpu.get()||!frame.riderResidencySerial_||
+           frame.riderResidencySerial_!=s.gpu->riderDemandSerial())return false;
+    }else if(frame.riderSession_||frame.riderTextures_||frame.riderResidencySerial_||
+             !s.gpu->matchesSourceBank(*textures,s.publication))return false;
+    const auto& native=*frame.native_;const auto& draw=native.draw;
+    if(draw.textures!=s.gpu.get()||draw.texturePublication!=s.publication||draw.vertices!=s.orderedVertices.data()||
+       draw.quadCount!=s.orderedVertices.size()/4||!draw.quadCount||s.orderedVertices.size()%4||
+       draw.spans!=s.spans.data()||draw.spanCount!=s.spans.size()||draw.spanCount!=s.order.size()||
+       native.states!=s.states.data()||native.stateCount!=s.states.size()||native.stateCount!=draw.spanCount||
+       native.sourceRasterW!=s.orderedW.data()||native.sourceRasterWCount!=s.orderedW.size()||
+       native.particleFog!=s.orderedFog.data()||native.particleFogCount!=s.orderedFog.size()||
+       s.orderedW.size()!=s.orderedVertices.size()||s.orderedFog.size()!=s.orderedVertices.size())return false;
+    std::uint32_t first=0;
+    for(std::size_t i=0;i<s.order.size();++i){
+        if(s.order[i]>=s.packets.size())return false;const auto& packet=s.packets[s.order[i]];
+        if(!s.drawablePacket(packet.binding)||packet.binding>=s.bindings.size())return false;
+        const auto& binding=s.bindings[packet.binding];const auto& span=s.spans[i];
+        if(!span.quadCount||span.firstQuad!=first||span.quadCount!=packet.count||span.quadCount>draw.quadCount-first||
+           span.textureIndex!=binding.image||!samplerSame(s.states[i].sampler,binding.prototype->native.sampler))return false;
+        first+=span.quadCount;if(binding.image==unresolved)continue;
+        const auto* cpu=textures->texture(binding.image);const auto* gpu=s.gpu->asset(binding.image);
+        if(!cpu||!gpu||!gpu->name||cpu->identity!=gpu->identity||
+           (s.gpu->riderSparse()&&!s.gpu->riderSamplerMatches(binding.image,s.states[i].sampler)))return false;
+    }
+    return first==draw.quadCount;
 }
 void OriginalUiRiderDrawContribution50KG::drain() noexcept {
     frame_.native_=nullptr;frame_.owner_=nullptr;frame_.frameGeneration_=0;frame_.terminal_={};
     frame_.riderSession_=nullptr;frame_.riderTextures_=nullptr;frame_.riderResidencySerial_=0;
     if(!storage_)return;auto& s=*storage_;
-    if(s.submissionPending)s.historyPoisoned=true;
+    if(s.submissionPending){s.poisonHistory(this);if(menuShared_)menuShared_->failMenu470Submission(*this);}
     if(s.active)s.backend->endFrame();s.active=false;s.finished=false;s.draw={};s.pendingHistory.clear();s.pendingLive.clear();
+}
+bool OriginalUiRiderDrawContribution50KG::sourceTeardownPending()const noexcept {
+    return storage_&&(storage_->submittedRenderer||storage_->popupLeased||
+        (menuShared_&&menuShared_->menu470PendingFor(*this)));
+}
+bool OriginalUiRiderDrawContribution50KG::retireSourceRenderer(VehicleWindowGl50DS& renderer,
+    VehicleWindowDiagnostic50DS& rendererDiagnostic,D& d)noexcept {
+    d={};rendererDiagnostic={};if(!storage_)return true;auto& s=*storage_;
+    if(s.submissionPending||(s.submittedRenderer&&s.submittedRenderer!=&renderer))return fail(d,E::phase);
+    const bool submitted=s.submittedRenderer!=nullptr;
+    if(!renderer.retireOriginalUiSourceOwner(*this,rendererDiagnostic)||
+       (submitted&&!rendererDiagnostic.submittedWorkCompleted))return fail(d,E::publication);
+    s.submittedRenderer=nullptr;menuRetiredRenderer_=&renderer;
+    if(menuShared_){OriginalUiSharedDialogs50KG::Diagnostic shared;
+        if(!menuShared_->retireMenu470AfterRenderer(*this,renderer,shared))return fail(d,E::phase,shared.sourcePC);}
+    if(s.popupLeased&&(!s.common||!s.common->releaseMenu(this,&renderer)))return fail(d,E::schedule,0x249BA0);
+    s.popupLeased=false;
+    // CPU publication and backend frame lifetime end separately in drain().
+    frame_.native_=nullptr;frame_.owner_=nullptr;frame_.frameGeneration_=0;return true;
 }
 bool OriginalUiRiderDrawContribution50KG::beginSourceSubmission(std::uint64_t generation,const VehicleWindowGl50DS& renderer)const noexcept {
     if(!storage_||!frame()||generation!=frame_.frameGeneration_)return false;
     auto& s=*storage_;if((s.submittedRenderer&&s.submittedRenderer!=&renderer)||s.submissionPending||s.historyPoisoned||generation<=s.acknowledgedGeneration||
        generation<=s.attemptedGeneration||s.pendingHistory.size()!=s.history.size())return false;
     for(const auto& record:s.pendingHistory)if(!s.registrationCurrent(record))return false;
-    if(!s.backend->sourceSubmissionStarted(this,generation))return false;
+    if(s.common&&!s.common->beginMenu(this,s.popupRevision,frame_,renderer))return false;
+    if(menuShared_&&!menuShared_->beginMenu470Submission(*this,generation,renderer)){
+        if(s.common&&!s.common->cancelMenuBegin(this,s.popupRevision,frame_,renderer))s.poisonHistory(this);
+        menuShared_->failMenu470Submission(*this);return false;}
+    if(!s.backend->sourceSubmissionStarted(this,generation)){
+        if(s.common&&!s.common->cancelMenuBegin(this,s.popupRevision,frame_,renderer))s.poisonHistory(this);
+        if(menuShared_)menuShared_->failMenu470Submission(*this);return false;}
     s.submittedRenderer=&renderer;s.attemptedGeneration=generation;s.submissionPending=true;return true;
 }
 void OriginalUiRiderDrawContribution50KG::finishSourceSubmission(std::uint64_t generation,bool accepted,bool started)const noexcept {
     if(!storage_)return;auto& s=*storage_;
-    if(!s.submissionPending||generation!=frame_.frameGeneration_){s.historyPoisoned=true;return;}
+    const auto reject=[&]()noexcept {s.poisonHistory(this);if(menuShared_)menuShared_->failMenu470Submission(*this);};
+    if(!s.submissionPending||generation!=frame_.frameGeneration_){reject();return;}
     s.submissionPending=false;
     if(accepted){
         // Validate the whole transaction before the first nonallocating swap.
         // Synchronous backend submission ownership forbids source destruction
         // in between; an invariant failure poisons rather than partially commits.
         if(s.lifecycleSequence!=s.backend->materialLifetime().sequence()||s.pendingHistory.size()!=s.history.size()){
-            s.historyPoisoned=true;return;
+            reject();return;
         }
-        for(const auto& record:s.pendingHistory)if(!s.registrationCurrent(record)){s.historyPoisoned=true;return;}
+        for(const auto& record:s.pendingHistory)if(!s.registrationCurrent(record)){reject();return;}
         for(const auto& pending:s.pendingLive){
-            if(!pending.live||pending.live->states.size()!=pending.states.size()) {s.historyPoisoned=true;return;}
-            for(const auto& state:pending.states)if(!state.initialized()){s.historyPoisoned=true;return;}
+            if(!pending.live||pending.live->states.size()!=pending.states.size()) {reject();return;}
+            for(const auto& state:pending.states)if(!state.initialized()){reject();return;}
         }
+    }
+    // Every local accepted store is preflighted before the canonical commit.
+    // Only the renderer's actual finish callback can commit either history.
+    if(s.common&&!s.common->finishMenu(this,s.popupRevision,frame_,accepted,started)){reject();return;}
+    if(accepted){
         for(auto& pending:s.pendingLive)pending.live->states.swap(pending.states);
         s.history.swap(s.pendingHistory);s.acknowledgedGeneration=generation;s.pendingHistory.clear();s.pendingLive.clear();
     }else{
-        s.pendingLive.clear();if(started)s.historyPoisoned=true;
+        s.pendingLive.clear();if(started)s.poisonHistory(this);
     }
+    if(menuShared_){if(!menuShared_->finishMenu470Submission(*this,generation,accepted,started)){reject();return;}
+        if(accepted)menuAcceptedEpoch_=menuInvocationEpoch_;}
 }
 } // namespace rr::platform

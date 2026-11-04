@@ -54,11 +54,12 @@
                resource!=(role==0u?&row.collision->main():&row.collision->secondary())||
                !read(&query.sphere,&sphere,sizeof(sphere)))return false;
         }else if(role==2u){
-            g::TerrainPrepareState48M state;
-            if(!row.terrainResource||!row.terrainResource->initialized||
+            g::TerrainPrepareState48M state;live_terrain_probe50fr::Owner live;
+            if(!read(&actual_->terrainLive,&live,sizeof(live))||!sharedTerrainBankViewMatches(row,live)||
+               !row.terrainResource||!row.terrainResource->initialized||
                row.type2Resource!=&row.terrainResource->resource||
                !read(&actual_->terrain.initial,&state,sizeof(state))||
-               !live_terrain_probe50fr::matches(*row.terrainResource,state))return false;
+               !sharedTerrainMatches(row,state))return false;
             sphere=state.sphere;
         }else{
             std::uint32_t actualTag=0,pairs=0;

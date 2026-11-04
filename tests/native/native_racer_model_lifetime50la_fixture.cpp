@@ -2397,6 +2397,140 @@ void Owner::reserveSourceHandlingBefore2146(runtime_startup50fl::Fixture& actual
     sourceGeometryReserved_=true;
 }
 
+// Explicit native continuation of the real full-publication caller. The
+// earlier legacy projection is neither replayed nor adopted as source work.
+// This writes the SAME canonical body and source gravity fields, stopping
+// at214894, where the distinct same-owner native Repulsor continuation joins.
+bool Owner::continueNativePhysical214710(g::OriginalRacerEntityCold50LA& actualRacer,
+        const std::vector<std::uint8_t>& retainedPhy,std::uint32_t& pc)noexcept {
+    if(!fixture_||!sourceHandlingBodyCurrent(*fixture_)||handlingRoute_!=HandlingRoute::legacy||
+       nativePhysicalAttempted_||nativePhysicalComplete_||sourcePhysicalAttempted_||
+       !racer_||racer_!=&actualRacer||!attachedFor(actualRacer)||!racer_->prepared()||racer_->nativeWreckWithdrawn_||
+       !racer_->nativePostEmberAttempted_||racer_->nativePostEmberPC_!=0x214710u||pc!=0x214710u||
+       racer_->racer.sessionGeneration!=generation_||racer_->racer.reference00!=1u||
+       racer_->racer.kind!=g::OriginalWreckComponentKind50LA::racer27E130||
+       racer_->body340!=body340_.get()||body340_->stage_!=g::OriginalRacerMainBodyOwner50LA::Stage::appended||
+       body340_->entity_.reference00!=1u||body340_->entity_.parent1C!=&racer_->racer||
+       body340_->entity_.kind!=g::OriginalWreckComponentKind50LA::body167920||
+       !racer_->sourceGravity378_||!racer_->sourceAirborneGravity37C_||
+       !rig_||&retainedPhy!=&rig_->phy||retainedPhy.empty())return false;
+    nativePhysicalAttempted_=true;
+    auto& actual=*fixture_;
+    auto at=[&](std::uint32_t address){pc=failurePC_=racer_->nativePostEmberPC_=address;};
+    try {
+        // Canonical378/37C were initialized by20FA24/2C. Never derive them
+        // from the already-authored legacy selectors. Missing keys keep them.
+        const auto publishGravity=[&](bool airborne,float value){
+            if(airborne){racer_->sourceAirborneGravity37C_=value;
+                actual.selectors.vehicle37C=value;actual.secondaryInputs.gravity37C=value;}
+            else{racer_->sourceGravity378_=value;
+                actual.selectors.vehicle378=value;actual.secondaryInputs.gravity378=value;}
+        };
+        at(0x214738u);nativePhysicalMatrix_={}; //14D7F0, zero matrix.
+        constexpr const char* keys[]={"Weight","ChariotWeight","RollInertiaScale","PitchInertiaScale","YawInertiaScale"};
+        constexpr std::uint32_t readers[]={0x214774u,0x214788u,0x21479cu,0x2147b0u,0x2147c4u};
+        for(unsigned i=0;i<5;++i){at(readers[i]);
+            if(!g::OriginalRacerEntityCold50LA::sourceFloat158A70(retainedPhy,
+                "Physical Properties",keys[i],nativePhysicalStack_[i]))return false;}
+        std::optional<float> value;at(0x2147d8u);
+        if(!g::OriginalRacerEntityCold50LA::sourceFloat158A70(retainedPhy,
+            "Physical Properties","Gravity",value))return false;
+        if(value)publishGravity(false,*value);
+        value.reset();at(0x2147ecu);
+        if(!g::OriginalRacerEntityCold50LA::sourceFloat158A70(retainedPhy,
+            "Physical Properties","AirborneGravity",value))return false;
+        if(value)publishGravity(true,*value);
+        at(0x214808u);if(std::fegetround()!=FE_TONEAREST)return false;
+        g::original_wreck_tuning_detail50LA::Math math;
+        const float unit=coldFloat(0x4200cccdu);
+        const float gravity=math.mul(*racer_->sourceGravity378_,unit);
+        if(!math.valid)return false;publishGravity(false,gravity); //21480C.
+        at(0x214820u);const float airborne=math.mul(*racer_->sourceAirborneGravity37C_,unit);
+        if(!math.valid)return false;publishGravity(true,airborne); //214828.
+        // Original stack reads, not required-key defaults. ChariotWeight was
+        // read but is not consumed by this bounded call.
+        at(0x21482cu);if(!nativePhysicalStack_[0])return false;
+        at(0x214830u);if(!nativePhysicalStack_[3])return false;
+        at(0x214834u);if(!nativePhysicalStack_[4])return false;
+        at(0x214838u);if(!nativePhysicalStack_[2])return false;
+        at(0x21483cu);const float mass=math.div(*nativePhysicalStack_[0],unit);if(!math.valid)return false;
+        at(0x214840u);float scale=math.div(mass,12.f);if(!math.valid)return false;
+        at(0x214844u);scale=math.mul(2.f,scale);if(!math.valid)return false;
+        at(0x214848u);scale=math.mul(scale,10.f);if(!math.valid)return false;
+        at(0x21484cu);scale=math.mul(10.f,scale);if(!math.valid)return false;
+        at(0x214850u);const float pitch=math.mul(*nativePhysicalStack_[3],scale);if(!math.valid)return false;
+        at(0x214854u);const float yaw=math.mul(*nativePhysicalStack_[4],scale);if(!math.valid)return false;
+        nativePhysicalMatrix_.v[0]=pitch; //214858.
+        at(0x21485cu);const float roll=math.mul(*nativePhysicalStack_[2],scale);if(!math.valid)return false;
+        nativePhysicalMatrix_.v[5]=yaw;nativePhysicalMatrix_.v[10]=roll;nativePhysicalMatrix_.v[15]=1.f;
+        at(0x214878u); //Actual340 slot78=165300; nonpositive mass is a no-store return.
+        if(mass>0.f){
+            at(0x165318u);actual.parameters.bodies.main.body.mass=mass;
+            at(0x16532cu);volatile float inverse=1.f/actual.parameters.bodies.main.body.mass;
+            if(!std::isfinite(inverse))return false;
+            actual.parameters.bodies.main.body.inverseMass=inverse; //165330.
+        }
+        at(0x21488cu); //Actual340 slot7C=165340. Copies precede fallible inversion.
+        for(unsigned i=0;i<16u;i+=2u){std::uint32_t pair[2];
+            std::memcpy(pair,nativePhysicalMatrix_.v+i,8);std::memcpy(body340_->inertia100_.v+i,pair,8);}
+        at(0x16537cu);const auto inverse=math.inverse(body340_->inertia100_);
+        if(!math.valid)return false;
+        constexpr unsigned extra[]={3,7,11,12,13,14,15};
+        for(unsigned i=0;i<16u;++i){
+            if(i%4u<3u&&i/4u<3u)
+                actual.parameters.bodies.main.body.inverseInertiaColumns[i/4u].v[i%4u]=inverse.v[i];
+            else for(unsigned j=0;j<7u;++j)if(extra[j]==i)
+                actual.parameters.bodies.mainSphere.inverseInertiaExtra[j]=inverse.v[i];
+        }
+        nativePhysicalComplete_=true;at(0x214894u);return true;
+    }catch(...){return false;} //Reached source effects and the attempt latch survive.
+}
+
+//Native same-model continuation of the active full-publication path. Missing
+//reader keys retain unknown stack/direct-field knowledge until consumed; no
+//legacy projected value or counted source348 owner substitutes for it.
+bool Owner::continueNativeRepulsor214894(g::OriginalRacerEntityCold50LA& actualRacer,
+        const std::vector<std::uint8_t>& retainedPhy,ra_source_camera50LA::OwnershipBridge& bridge,
+        std::uint32_t& pc)noexcept {
+    if(!fixture_||!sourceHandlingBodyCurrent(*fixture_)||handlingRoute_!=HandlingRoute::legacy||
+       !nativePhysicalComplete_||nativeRepulsorAttempted_||nativeRepulsorComplete_||sourceRepulsorAttempted_||
+       !racer_||racer_!=&actualRacer||!attachedFor(actualRacer)||!racer_->prepared()||racer_->nativeWreckWithdrawn_||
+       pc!=0x214894u||racer_->nativePostEmberPC_!=pc||racer_->racer.sessionGeneration!=generation_||
+       racer_->body340!=body340_.get()||!racer_->sourceLift7EC_||!racer_->sourceGravity378_||
+       !rig_||&retainedPhy!=&rig_->phy||retainedPhy.empty())return false;
+    nativeRepulsorAttempted_=true;
+    const auto at=[&](std::uint32_t address){pc=failurePC_=racer_->nativePostEmberPC_=address;};
+    const auto read=[&](const char* key,std::optional<float>& value){return
+        g::OriginalRacerEntityCold50LA::sourceFloat158A70(retainedPhy,"Repulsor",key,value);};
+    try {
+        std::optional<float> value;at(0x2148b0u);
+        if(!read("MaxLiftHeight",value))return false;
+        if(value){racer_->sourceLift7EC_=*value;fixture_->parameters.visual.verticalLimit7EC=*value;}
+        at(0x2148c4u);if(!read("Spring",nativeRepulsorStack_[0]))return false;
+        at(0x2148d8u);if(!read("Damping",nativeRepulsorStack_[1]))return false;
+        at(0x2148f0u);if(!read("SideForceCoefficient",nativeRepulsorStack_[2]))return false;
+        //Direct200 missing key keeps the native lane unknown/unchanged. It is
+        //not a stack operand consumed by this setter and does not become zero.
+        if(nativeRepulsorStack_[2]&&!bridge.writeNative348ScalarBefore21494C(
+            slot_,*racer_,*this,*nativeRepulsorStack_[2]))return false;
+        at(0x214904u);if(!read("OrientationSpring",nativeRepulsorStack_[3]))return false;
+        at(0x214918u);if(!bridge.writeNative348ScalarBefore21494C(
+            slot_,*racer_,*this,*racer_->sourceGravity378_))return false;
+        at(0x21491cu);float native324;
+        if(!bridge.readNativeRepulsorBound324(slot_,*racer_,*this,native324))return false;
+        at(0x214920u);if(!nativeRepulsorStack_[0])return false;
+        at(0x214924u);if(!nativeRepulsorStack_[1])return false;
+        at(0x214928u);if(!nativeRepulsorStack_[3])return false;
+        at(0x21494cu);
+        const bool done=bridge.applyNative348Setup21494C(slot_,*racer_,*this,native324,
+            *racer_->sourceLift7EC_,*nativeRepulsorStack_[0],*nativeRepulsorStack_[1],
+            *nativeRepulsorStack_[3],pc);
+        failurePC_=racer_->nativePostEmberPC_=pc;
+        if(!done)return false;
+        nativeRepulsorComplete_=true;at(0x214954u);return true;
+    }catch(...){return false;} //Actual prefixes retained and never replayed.
+}
+
 void Owner::applySourcePhysical214710(runtime_startup50fl::Fixture& actual) {
     need(sourceHandlingBodyCurrent(actual)&&handlingRoute_==HandlingRoute::source&&
         sourceGeometryComplete_&&!sourcePhysicalAttempted_&&racer_&&racer_->prepared()&&

@@ -71,14 +71,14 @@ def main():
             if not arg.startswith(('-O','-std=')) and arg not in common:options.append(arg)
         win=json.loads((root/'platform/windows/native/interactive50du.sources.json').read_text())
         for p,pin in win['sourceListProvenance'].items():assert sha(root/p)==pin
-        assert len(units)==608 and len(set(units))==608 and all(x.endswith('.cpp') for x in units)
-        assert len(win['sources'])==607 and len(win['nativeDependencySources'])==6
+        assert len(units)==609 and len(set(units))==609 and all(x.endswith('.cpp') for x in units)
+        assert len(win['sources'])==608 and len(win['nativeDependencySources'])==6
         assert set(win['sources']).issubset(units) and len(set(units)-set(win['sources']))==1
         assert '-lz' in command and '-ldl' in command
         write(out/'source-closure.json',units)
         objects=[]
         for i,unit in enumerate(units):
-            heavy=unit.startswith(('tests/native/','platform/linux/native/','src/game/original_results104','src/game/original_race_end_')) or unit in ('src/game/original_race_timing_manager50la.cpp','src/game/original_race_music_manager50la.cpp','src/game/original_gc_gameplay_lighting_candidate.cpp')
+            heavy=unit.startswith(('tests/native/','platform/linux/native/','src/game/original_results104','src/game/original_race_end_')) or unit in ('src/game/original_race_racer_manager50la.cpp','src/game/original_race_timing_manager50la.cpp','src/game/original_race_music_manager50la.cpp','src/game/original_gc_gameplay_lighting_candidate.cpp')
             obj=out/('%04d.o'%i);dep=out/('%04d.d'%i)
             if not run('%04d'%i,compile_prefix+common+['-O0' if heavy else '-O2','-std=c++20']+options+['-MD','-MF',str(dep),'-c',str(root/unit),'-o',str(obj)],source=unit):continue
             assert obj.is_file() and dep.is_file();objects.append(str(obj));receipt['objects'].append(dict(unit=unit,sha256=sha(obj),dependencies_sha256=sha(dep)));write(out/'RESULT.json',receipt)

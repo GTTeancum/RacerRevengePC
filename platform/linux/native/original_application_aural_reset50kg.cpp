@@ -110,18 +110,26 @@ bool OriginalApplicationAural50KG::stopResultsNative26D070(
     // representations of ORIGINAL audio even where their logical voices do
     // not use the source48 pool. Never advance DONE while one survives.
     // Caller passes only its exact retained Race.raceAudio_, not supplied IDs.
-    // Typed Music/UI/Announcer, human gameplay and Course AI engine stops
-    // cover actual retained owner instances. Other providers require inactivity.
-    // No generic
-    // stopAll and no reclassification of those original sources as unrelated.
+    // Typed Music/UI/Announcer and the separately admitted human Course or
+    // zero-human ALL8 owner layout cover actual retained instances. This is
+    // the shared native26D070 transport, not an input/End/Pause authorization.
+    // Other providers require inactivity; no generic stopAll or relabeling.
     if(!groups.current()||groups.coldApplication_!=entities_||!groups.coldStarted_||
        groups.taIntroTransport_.get()!=intro||!groups.mixer_||
        (intro&&(intro->mixer_!=groups.mixer_||!intro->current())))
         return fail(d,Status::owner,0x26d070);
+    const bool all8=engines.firstAiSlot_==0u; //Actual prepared owner, never a caller policy flag.
     if(groups.mixer_==i.mixer||!music.canStopResultsNative26D070(*groups.mixer_,groups)||
        !feedback.canStopResultsNative26D070(*groups.mixer_,groups)||
-       !announcer.canStopResultsNative26D070(*groups.mixer_,groups)||
-       !gameplay.canStopResultsGameplay26D070(*groups.mixer_,groups,session)||
+       !announcer.canStopResultsNative26D070(*groups.mixer_,groups))
+        return fail(d,Status::backend,0x26d070);
+    if(all8){
+        if(groups.coldSession_!=session||
+           !engines.canStopAll8Engines26D070(*groups.mixer_,groups,session)||
+           !gameplay.all8NonHumanMixerOwner26D070(*groups.mixer_,groups,
+               engines.racers_[0].engine.identity.pod60))
+            return fail(d,Status::backend,0x26d070);
+    }else if(!gameplay.canStopResultsGameplay26D070(*groups.mixer_,groups,session)||
        !engines.canStopResultsEngines26D070(*groups.mixer_,groups,session)||
        engines.humanResetOwner_!=&gameplay.humanController_)
         return fail(d,Status::backend,0x26d070);
@@ -130,8 +138,11 @@ bool OriginalApplicationAural50KG::stopResultsNative26D070(
     // residual-active fence then requires every such voice to be inactive.
     // Thus unsupported/unprepared quiet providers preserve the old domain;
     // active ownership is never inferred from a slot number or filename.
-    const bool auxiliary=engines.canStopResultsAuxiliary26D070(*groups.mixer_,groups,session);
-    const bool lap=gameplay.canStopResultsLap26D070(*groups.mixer_,groups,session);
+    const bool auxiliary=all8?engines.canStopAll8Auxiliary26D070(*groups.mixer_,groups,session):
+        engines.canStopResultsAuxiliary26D070(*groups.mixer_,groups,session);
+    // The selected human Provider/lap owner is not reclassified as ALL8 row0.
+    // Any active voice outside the genuine AI/shared claims still rejects below.
+    const bool lap=!all8&&gameplay.canStopResultsLap26D070(*groups.mixer_,groups,session);
     const bool countdownAdmitted=countdown&&countdown->announcer_==announcer.episode_&&
         countdown->canStopResultsCountdown26D070(*groups.mixer_,groups);
     const auto auxiliaryCount=auxiliary?engines.resultsAuxiliaryStopCount26D070():0u;
@@ -139,7 +150,7 @@ bool OriginalApplicationAural50KG::stopResultsNative26D070(
     const auto countdownCount=countdownAdmitted?countdown->resultsCountdownStopCount26D070():0u;
     if(auxiliaryCount>audioMaximumVoices50HD||lapCount>audioMaximumVoices50HD||
        !groups.mixer_->canRecordControlChanges(3u+(intro?intro->count_:0u)+
-           ::gameplay_audio50HE::cueCount+engines.resultsEngineStopCount26D070()+auxiliaryCount+lapCount+countdownCount))
+           (all8?0u: ::gameplay_audio50HE::cueCount)+engines.resultsEngineStopCount26D070()+auxiliaryCount+lapCount+countdownCount))
         return fail(d,Status::backend,0x26d070);
     const auto announcerSlot=announcer.resultsStopVoice26D070();
     if(announcerSlot>=groups.count_||announcerSlot==::race_music50IE::voice||
@@ -153,7 +164,7 @@ bool OriginalApplicationAural50KG::stopResultsNative26D070(
     };
     if(!claim(::race_music50IE::voice)||!claim(::original_camera_cycle_audio50KX::Owner::voice)||
        !claim(announcerSlot))return fail(d,Status::owner,0x26d070);
-    for(std::size_t n=0;n<::gameplay_audio50HE::cueCount;++n){std::size_t slot;
+    if(!all8)for(std::size_t n=0;n<::gameplay_audio50HE::cueCount;++n){std::size_t slot;
         if(gameplay.resultsGameplayStopVoice26D070(n,slot)&&!claim(slot))
             return fail(d,Status::owner,0x26d070);
     }
@@ -195,7 +206,7 @@ bool OriginalApplicationAural50KG::stopResultsNative26D070(
     music.stopResultsNativePreflighted26D070();
     feedback.stopResultsNativePreflighted26D070();
     announcer.stopResultsNativePreflighted26D070();
-    gameplay.stopResultsGameplayPreflighted26D070();
+    if(!all8)gameplay.stopResultsGameplayPreflighted26D070();
     engines.stopResultsEnginesPreflighted26D070();
     if(auxiliary)engines.stopResultsAuxiliaryPreflighted26D070();
     if(lap)gameplay.stopResultsLapPreflighted26D070();

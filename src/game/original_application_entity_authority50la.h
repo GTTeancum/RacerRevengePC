@@ -36,6 +36,7 @@ class OriginalApplicationEntityAuthority50LA final {
     friend class OriginalTrackParticleCold50LA;
     friend class OriginalRaceMusicManager50LA;
     friend class OriginalRaceTimingManager50LA;
+    friend class OriginalRaceRacerManager50LA;
     friend class OriginalTunnelTrack50LA;
     friend class OriginalRaceConstructor50LA;
     friend class ::original_camera_session50KX::Session;

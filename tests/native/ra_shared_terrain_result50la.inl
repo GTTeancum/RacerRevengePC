@@ -4,7 +4,9 @@
             sharedLeaseCurrent(call.lease_)&&call.result_.nativeTerrainSeedPublished&&
             call.result_.projectionRevision==call.lease_.projection_&&call.row_.terrainResult90&&
             call.row_.terrainResult90->constructed_&&!call.row_.terrainResult90->revoked_&&
-            call.row_.terrainResult90->resetKnown_;
+            call.row_.terrainResult90->resetKnown_&&actual_&&
+            sharedTerrainMatches(call.row_,actual_->terrain.initial)&&
+            sharedTerrainBankViewMatches(call.row_,actual_->terrainLive);
     }
     //Pure geometry has returned. Publish the genuine one-ray selected/pair
     //effects BEFORE original candidate copies/E4/E8, never at whole-query end.
@@ -13,35 +15,40 @@
         if(!sharedTerrainLimitedCurrent(call)||
            call.row_.effectRevision==std::numeric_limits<std::uint64_t>::max())return false;
         auto& result=*call.row_.terrainResult90;
-        if(result.count60_>1u||!call.row_.terrainResource)return false;
-        float prior=0.f;std::memcpy(&prior,&result.words6C_[0],sizeof(prior));
+        if(result.hits()>1u||!call.row_.terrainResource)return false;
         const auto vector=[](const g::Vector3_48C& xyz,float w){
             return g::SpringVector4_48N{{xyz.v[0],xyz.v[1],xyz.v[2],w}};
         };
-        const auto& pair=call.row_.terrainResource->pair;
-        if(!result.count60_||hit.nearestPair.fraction<prior){
-            //1087E8..108898 first append, or108780..1087E4 nearer overwrite.
-            //Original single ray tag8000 owns ONE slot, capacity remains3.
-            if(!result.count60_){
-                result.endpoints50_[0]=pair.first;result.endpoints50_[1]=pair.second;
-                result.tags70_[0]=g::type2Leaf49X;result.count60_=1;
+        const auto* borrowed=sharedTerrainPair(call.row_);if(!borrowed)return false;
+        const auto& pair=*borrowed;
+        //fraction[0] is unknown until the first actual append. Short-circuit
+        //the read instead of promoting value-initialized backing to authority.
+        if(!result.hits()||hit.nearestPair.fraction<result.contactFraction(0)){
+            if(!result.hits()){
+                result.endpoint(0)=pair.first;result.endpoint(1)=pair.second;
+                result.contactTag(0)=g::type2Leaf49X;result.hits()=1;
             }
-            std::memcpy(&result.words6C_[0],&hit.nearestPair.fraction,sizeof(float));
-            result.normals54_[0]=vector(hit.nearestPair.normal,2.f);
-            result.surfacePoints58_[0]=vector(hit.nearestPair.point,1.f);
-            result.words64_[0]=1; //Actual121590..12161C world conversion completed.
+            result.contactFraction(0,hit.nearestPair.fraction);
+            result.contactNormal(0)=vector(hit.nearestPair.normal,2.f);
+            result.contactPoint(0)=vector(hit.nearestPair.point,1.f);
+            result.contactWord(0)=1; //Actual world conversion completed.
         }
-        if(hit.selected.fraction<=result.selected_.fraction){
-            auto& selected=result.selected_;
-            selected.first=pair.first;selected.second=pair.second;
-            selected.normal=vector(hit.selected.normal,2.f);
-            selected.surfacePoint=vector(hit.selected.point,1.f);
-            selected.correction=vector(hit.selected.correction,3.f);
-            selected.fraction=hit.selected.fraction;
-            selected.flags=static_cast<std::uint8_t>(selected.flags|1u);
-            //These are native diagnostic identities, not extra guest stores.
-            selected.candidateIdentity=hit.selected.candidateId;selected.face=hit.selected.face;
-            selected.queryTag=g::type2Leaf49X;
+        if(hit.selected.fraction<=result.fraction()){
+            result.first()=pair.first;result.second()=pair.second;
+            result.normal()=vector(hit.selected.normal,2.f);
+            result.point()=vector(hit.selected.point,1.f);
+            result.correction()=vector(hit.selected.correction,3.f);
+            result.fraction()=hit.selected.fraction;
+            if(result.nativeResult90_){
+                //No stale flags or selected-vector mirror from old fixed90.
+                result.nativeDiagnostics_={hit.selected.candidateId,hit.selected.face,g::type2Leaf49X};
+            }else{
+                auto& selected=result.selected_;
+                selected.flags=static_cast<std::uint8_t>(selected.flags|1u);
+                selected.candidateIdentity=hit.selected.candidateId;selected.face=hit.selected.face;
+                selected.queryTag=g::type2Leaf49X;
+            }
+            result.selectedHitKnown_=true;
         }
         auto& flags=call.row_.canonicalFilter->flagsF8;
         flags=static_cast<std::uint8_t>(flags|0x20u);
@@ -90,13 +97,12 @@
         out.stoppedPC=0x1b19b4;
         if((call.row_.canonicalFilter->flagsF8&0x20u)&&!probe.field12C){
             const auto& result=*call.row_.terrainResult90;
-            if(!result.count60_||result.count60_>1u)return;
-            const auto& selected=result.selected_;
-            if(!probe.field110||!(selected.surfacePoint.v[1]<=probe.point150[1])){
+            if(!result.hits()||result.hits()>1u||(result.nativeResult90_&&!result.selectedHitKnown_))return;
+            if(!probe.field110||!(result.point().v[1]<=probe.point150[1])){
                 //Point150 retains the full source vector. Existing native normal170
                 //owns XYZ only; do not manufacture a separate guest W lane.
-                std::memcpy(probe.point150,selected.surfacePoint.v,sizeof(probe.point150));
-                std::memcpy(actual_->frame.terrainProbe.normal170.v,selected.normal.v,3*sizeof(float));
+                std::memcpy(probe.point150,result.point().v,sizeof(probe.point150));
+                std::memcpy(actual_->frame.terrainProbe.normal170.v,result.normal().v,3*sizeof(float));
                 probe.field110=0;probe.field114=1;
             }
         }

@@ -1,5 +1,6 @@
 #include "player_session_gl_reset50du.h"
 #include "game_host50er.h"
+#include "original_spectator_menu_input50la.h"
 #include "vehicle_window_gl50ds.h"
 #include <exception>
 
@@ -267,6 +268,7 @@ void GameHost50ER::retainSharedDialogPoll50KG(const GameHostInput50ER& input)noe
     sharedDialogPrimaryPresent50KG_=info_.inputConnected;
     sharedDialogSecondPresence50KG_=input.keys.secondControllerPresence;
     sharedDialogPollCurrent50KG_=true;
+    spectatorPollDestination50LA_=&input;
 }
 bool GameHost50ER::retainedResultsPollCurrent50LA(const rr::game::OriginalResults10450LA& owner)const noexcept {
     return ownerThread()&&created()&&hasWindow()&&retainedResultsPollOwner50LA_==&owner&&
@@ -309,6 +311,9 @@ bool GameHost50ER::poll(GameHostInput50ER& input, GameHostDiagnostic50ER& d) noe
     if (!created()) return fail(d, GameHostError50ER::NotCreated, "poll");
     if(retainedResultsPollOwner50LA_)
         return fail(d,GameHostError50ER::AlreadyOwned,"Results retained source poll pending");
+    if(spectatorBatchOwner50LA_)
+        return fail(d,GameHostError50ER::AlreadyOwned,"Pause native input batch requires retirement");
+    spectatorPollDestination50LA_=nullptr;
     sharedDialogPollCurrent50KG_=false;
     resultsInput50LA_.invalidate();resultsPollDestination50LA_=nullptr;
     claimedResultsOwner50LA_=nullptr;claimedResultsEvent50LA_=nullptr;
@@ -412,6 +417,12 @@ bool GameHost50ER::pollLoading50DU(bool& quitRequested,GameHostDiagnostic50ER& d
     if(!ownerThread())return fail(d,GameHostError50ER::WrongThread,"pollLoading");
     if(!created())return fail(d,GameHostError50ER::NotCreated,"pollLoading");
     if(!hasWindow())return fail(d,GameHostError50ER::NotWindow,"pollLoading");
+    if(spectatorBatchOwner50LA_&&
+       (spectatorBatchOwner50LA_->phase_!=OriginalSpectatorMenuInput50LA::Phase::suspended||
+        !spectatorBatchOwner50LA_->retainedForPauseReturn_||
+        !spectatorBatchOwner50LA_->currentPoll()))
+        return fail(d,GameHostError50ER::AlreadyOwned,"Pause input requires its actual retained continuation before loading poll");
+    spectatorPollDestination50LA_=nullptr;
     if(retainedResultsPollOwner50LA_&&resultsPollDestination50LA_)
         return fail(d,GameHostError50ER::AlreadyOwned,"Results handoff requires synchronous output retirement first");
     sharedDialogPollCurrent50KG_=false;
@@ -469,6 +480,9 @@ bool GameHost50ER::close(GameHostDiagnostic50ER& d) noexcept {
     return closeOwned(d);
 }
 bool GameHost50ER::closeOwned(GameHostDiagnostic50ER& d) noexcept {
+    if(spectatorBatchOwner50LA_)
+        return fail(d,GameHostError50ER::AlreadyOwned,"Pause native input batch requires retirement or owner abandonment");
+    spectatorPollDestination50LA_=nullptr;
     window_.revokeSourcePadNative();
     if(retainedResultsPollOwner50LA_)
         return fail(d,GameHostError50ER::AlreadyOwned,"Results retained poll requires explicit continuation cancellation");

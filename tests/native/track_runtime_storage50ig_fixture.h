@@ -6,6 +6,7 @@
 #include "authored_runtime_ground50cp_fixture.h"
 #include "live_terrain_probe50fr_fixture.h"
 #include "native_terrain_result_owner50la.h"
+#include "native_repulsor_payload_owner50la.h"
 #include "../../src/game/native_racer_terrain_owner50la.h"
 #include "../../src/game/native_racer_aero_owner50la.h"
 #include "../../src/game/pod_live_query50iz.h"
@@ -205,6 +206,11 @@ private:
         const OriginalRacerMainBodyOwner50LA* nativeTerrainBody128=nullptr;
         std::unique_ptr<live_terrain_probe50fr::Owner> terrainResource;
         std::unique_ptr<native_terrain_result50LA::Owner> terrainResult90;
+        //Distinct unbanked replacement, never the counted source348 route.
+        enum class NativeTerrainCut {none,admitted,removed,withdrawn,returned,attached,published,retired};
+        NativeTerrainCut nativeTerrainCut=NativeTerrainCut::none;
+        std::uint32_t nativeTerrainPC=0;
+        std::unique_ptr<native_repulsor_payload50LA::Owner> nativeTerrainPayload;
         std::unique_ptr<const SharedColdFilter> coldFilter;
         std::optional<PodLiveQueryContext50IZ> podContext; //Actual saved per-slot binding; included in row budget.
         std::uint32_t identity=0;

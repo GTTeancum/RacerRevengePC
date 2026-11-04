@@ -407,7 +407,7 @@ public:
         // Model::close owns its actual Bank visit. Never nest it in one here.
         // Reverse source role order; partial successes remain retained/closed.
         for(std::size_t slot=resources_->racerCount_;slot-->0;){
-            r.revokeNativePod694(slot); //Before any borrowed body/model can retire.
+            if(!r.revokeNativePod694(slot,*bank_))return false; //Before any borrowed body/model can retire.
             for(auto* model:{&chariot_[slot],&bottomLeft_[slot],&bottomRight_[slot],&left_[slot],&right_[slot]})
                 if(*model&&!(*model)->close())return false;
         }

@@ -137,6 +137,12 @@ racerBank.owner(terrainOwner.initial);
 racerBank.owner(terrainOwner.follow);
 racerBank.owner(terrainOwner.lowerEndpoint140);
 racerBank.owner(terrainOwner.lift1F0);
+//Native full-route direct1F4/1F8/1FC/200 writes must follow the selected slot.
+//Initial absence is unknown, never constructor zero or another racer's value.
+racerBank.owner(terrainOwner.spring1F4);
+racerBank.owner(terrainOwner.damping1F8);
+racerBank.owner(terrainOwner.gravity1FC);
+racerBank.owner(terrainOwner.sideForce200);
 racerBank.owner(terrainOwner.receipt);
 racerBank.owner(terrainOwner.prepared);
 // resource.rays must point to the SAME live arena terrainLiveOwner.pair for

@@ -12,6 +12,7 @@ namespace interactive_loop50DU { struct Context; }
 namespace rr::platform {
 class VehicleWindowGl50DS;
 class OriginalUiSharedDialogs50KG;
+class OriginalSpectatorMenuInput50LA;
 enum class GameHostMode50ER : std::uint8_t { Unspecified, Window, HeadlessLive };
 inline constexpr std::size_t gameHostInputByteBudget50ER = 1024;
 inline constexpr std::size_t gameHostCommandCapacity50ER = 64;
@@ -134,6 +135,12 @@ private:
     friend struct ::original_main_entry50KG::Application;
     friend struct ::interactive_loop50DU::Context;
     friend class rr::game::OriginalResults10450LA;
+    friend class OriginalSpectatorMenuInput50LA;
+    // Separate from Results retirement: the native ALL8 Pause branch runs
+    // later in this same actual poll. Only its lexical producer may consume
+    // this pointer and retain the stable event/record batch. No snapshot API.
+    const GameHostInput50ER* spectatorPollDestination50LA_=nullptr;
+    const OriginalSpectatorMenuInput50LA* spectatorBatchOwner50LA_=nullptr;
     OriginalResultsHostInput50LA resultsInput50LA_;
     // End the one fresh-poll dispatch window before existing native clients.
     // Availability remains current; retired edges can never be replayed later.

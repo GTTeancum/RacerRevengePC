@@ -5,7 +5,7 @@
   "sourceListProvenance": {
     "tools/check_terrain_registered_drive50bv.py": "22ac85b024b7639cce293624fc7f1bdebcf86a0c0d363f84560fb173861dd1aa",
     "tools/prepare_offscreen_build50do.py": "050e81276ecc51dab310df4f64b4de527c92626bbc79630857f457a8d86f6833",
-    "tools/prepare_interactive_build50dv.py": "3b765e856428f900c412c6efd911a78e98969fa235463cf62964de1f956b16ca"
+    "tools/prepare_interactive_build50dv.py": "53b0e0b30eee930ac7f91939e6325ea6e2f970ff8a0f60609e4c34f2bfeec1a9"
   },
   "excludedPlatformSources": [
     "platform/linux/native/offscreen_gl_context50dc.cpp",
@@ -601,6 +601,7 @@
     "src/game/original_simple_vcr50la.cpp",
     "src/game/original_race_music_manager50la.cpp",
     "src/game/original_race_timing_manager50la.cpp",
+    "src/game/original_race_racer_manager50la.cpp",
     "src/game/original_results104_keyboard_page50la.cpp",
     "src/game/original_results104_update50la.cpp",
     "tests/native/original_results104_update50la.cpp",

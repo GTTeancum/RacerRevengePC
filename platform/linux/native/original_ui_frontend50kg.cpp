@@ -6,6 +6,7 @@
 #include "../../../tests/native/original_race_display_lifetime50la.h"
 // Source-reviewed bounded Course/Tournament integration; runtime acceptance is pending.
 #include "original_ui_frontend50kg.h"
+#include "original_ui_pause_course_origin50la.h"
 #include "original_ui_overlay_text_storage50kg.h"
 #include "original_ui_memory_card_constructor50kg.h"
 #include "original_save_profile_owner50kg.h"
@@ -17,6 +18,7 @@
 #include <algorithm>
 #include "../../../src/assets/original_ui_course_background50kg.h"
 #include <new>
+#include <limits>
 #include <utility>
 
 namespace rr::platform {
@@ -104,7 +106,30 @@ bool optionsPageShape(const game::OriginalUiRouteDecision50KG& d) noexcept {
         r.sourcePC==0x1F51D8&&p.field==game::OriginalUiProfileField50KG::optionsGroup6E8&&p.sourcePC==0x1F51C8;
 }
 }
+bool OriginalUiPauseCourseOrigin50LA::bindSession(const OriginalUiCourseSession50KG& session)noexcept {
+    if(session_||entryCommitted_||!root_||!frontend_||preimage_.mode34!=0||
+       preimage_.generation==std::numeric_limits<std::uint64_t>::max())return false;
+    // Bind once even if a subsequent resource step fails. A failed receiver
+    // cannot donate this origin to another Course or manufacture a retry.
+    session_=&session;return current(session);
+}
+bool OriginalUiPauseCourseOrigin50LA::current(const OriginalUiCourseSession50KG& session)const noexcept {
+    return root_&&frontend_&&session_==&session&&!entryCommitted_&&preimage_.mode34==0&&
+        frontend_->materialApplicationOwner==root_&&frontend_->coordinator.courseSession()==&session&&
+        root_->nativePauseCourseOriginCurrent50LA(*this,session);
+}
+bool OriginalUiPauseCourseOrigin50LA::commitEntry(const OriginalUiCourseSession50KG& session,
+    OriginalUiRiderProfileStamp50KG before,OriginalUiRiderProfileStamp50KG after)noexcept {
+    if(session_!=&session||entryCommitted_||before.mode34!=0||after.mode34!=0||
+       before.mode34!=preimage_.mode34||before.generation!=preimage_.generation||
+       before.generation==std::numeric_limits<std::uint64_t>::max()||after.generation!=before.generation+1)
+        return false;
+    entryCommitted_=true;return true;
+}
 struct OriginalUiFrontend50KG::Storage {
+    // Private genuine Pause origin applies only to this initial Course owner.
+    // It is never consulted after entry commit or after request retirement.
+    std::shared_ptr<OriginalUiPauseCourseOrigin50LA> nativePauseCourseOrigin;
     // Same actual outer Application owns this receiver lifetime. This is an
     // initial-route identity, not proof of Results origin or a guest queue.
     const ::original_main_entry50KG::Application* nativeHallRoot=nullptr;
@@ -905,6 +930,8 @@ struct OriginalUiFrontend50KG::Storage {
     bool build(std::unique_ptr<Manager>& out,Route route,Diagnostic& d,std::uint32_t prospectiveMode=0) noexcept {
         if(out){result(d,Status::invalidInput);return false;}
         const bool initialNativeHall=nativeHallRoot && &out==&active && !active&&!activated&&!renderer;
+        const bool initialNativePauseCourse=nativePauseCourseOrigin && &out==&active &&
+            !active&&!activated&&!renderer&&!nativeHallRoot;
         try {
             out=std::make_unique<Manager>();auto& m=*out;m.owner=this;m.initialRoute=route;
             m.transition=std::make_shared<game::OriginalUiTransitionOwner50KG>();
@@ -946,6 +973,11 @@ struct OriginalUiFrontend50KG::Storage {
                 if(!riderInputsReady()||prospectiveMode>2){result(d,Status::unavailableDestination);return false;}
                 OriginalUiRiderColdInput50KG input;input.appStart=cold.appStart;input.rider=cold.rider;input.fonts=cold.fonts;
                 input.backgrounds=cold.backgrounds;input.overlays=cold.overlays;input.english=&english;input.runtime=cold.runtime;
+                if(cold.application->sharedDialogs){
+                    input.controllerPopup=cold.controllerPopup;
+                    input.retainedControllerPopup=cold.application->controllerPopupResources;
+                    if(!input.retainedControllerPopup){result(d,Status::resource);return false;}
+                }
                 input.video={cold.video.lifetime,cold.video.width,cold.video.height,cold.video.colorBits,cold.video.packetZMaximum,cold.video.zBufferFormat};
                 m.riderResources=std::make_shared<OriginalUiRiderDrawResources50KG>();
                 m.riderStats=std::make_shared<assets::OriginalUiRiderStatAssets50KG>();
@@ -982,7 +1014,8 @@ struct OriginalUiFrontend50KG::Storage {
                 const bool fromRider=active&&active->rider&&same(active->currentRoute(),{5,1})&&prospectiveMode==0;
                 const bool fromTournament=active&&active->tournament&&same(active->currentRoute(),{9,1})&&prospectiveMode==2&&
                     active->tournament->routeProposalCurrent(tournamentProposal)&&tournamentProposal.decision.request.targetScreen==6;
-                if(!courseInputsReady(prospectiveMode)||(!fromRider&&!fromTournament)){
+                const bool fromPause=initialNativePauseCourse&&prospectiveMode==0;
+                if(!courseInputsReady(prospectiveMode)||(!fromRider&&!fromTournament&&!fromPause)){
                     result(d,Status::unavailableDestination);return false;}
                 OriginalUiCourseColdInput50KG input;input.appStart=cold.appStart;input.course=cold.course;
                 input.prepareRylothBackground=true; // Original background resource, independent of test-pair provenance.
@@ -997,7 +1030,8 @@ struct OriginalUiFrontend50KG::Storage {
                 OriginalUiCourseSessionCold50KG session;session.resources=m.courseResources;session.holograms=m.courseHolograms;
                 session.courseArchive=cold.course;session.english=&english;session.profile=cold.riderProfile;
                 session.commonProfile=cold.profile;session.application=cold.application;session.lightManager=cold.lightManager;
-                session.externalTransition=m.transition;session.audioMode=cold.audioMode;session.audio=cold.audio;session.previousScreen=fromTournament?9:5;
+                session.externalTransition=m.transition;session.audioMode=cold.audioMode;session.audio=cold.audio;session.previousScreen=fromPause?0:fromTournament?9:5;
+                if(fromPause)session.pauseCourseOrigin=nativePauseCourseOrigin;
                 if(fromTournament){
                     session.applicationAnimation=cold.applicationAnimation;
                     m.tournamentCourseOrigin=std::make_shared<const OriginalUiTournamentRouteProposal50KG>(tournamentProposal);
@@ -1335,7 +1369,7 @@ OriginalUiFrontend50KG::~OriginalUiFrontend50KG() noexcept {
         }
 }
 Status OriginalUiFrontend50KG::prepare(const OriginalUiFrontendCold50KG& cold,Diagnostic& d) noexcept {
-    return prepareInitialNative(cold,nullptr,d);
+    return prepareInitialNative(cold,nullptr,{},d);
 }
 Status OriginalUiFrontend50KG::prepareNativeResultsHall(const OriginalUiFrontendCold50KG& cold,
     const ::original_main_entry50KG::Application& root,Diagnostic& d)noexcept {
@@ -1348,11 +1382,36 @@ Status OriginalUiFrontend50KG::prepareNativeResultsHall(const OriginalUiFrontend
        cold.video.lifetime.get()!=root.videoOwner_.get()||!root.videoOwner_->originalMain||
        !root.videoOwner_->host.created()||!cold.profile||cold.profile->mode34!=0u)
         return result(d,Status::invalidInput);
-    return prepareInitialNative(cold,&root,d);
+    return prepareInitialNative(cold,&root,{},d);
+}
+Status OriginalUiFrontend50KG::prepareNativePauseCourse(const OriginalUiFrontendCold50KG& cold,
+    const std::shared_ptr<OriginalUiPauseCourseOrigin50LA>& origin,Diagnostic& d)noexcept {
+    d={};
+    if(!origin||!origin->root_||!origin->frontend_||origin->session_||origin->entryCommitted_||
+       &origin->frontend_->coordinator!=this||origin->frontend_->materialApplicationOwner!=origin->root_)
+        return result(d,Status::invalidInput);
+    const auto& root=*origin->root_;
+    if(root.garageAudioOwnerThread_!=std::this_thread::get_id()||!root.nativePauseCourseReceiverCurrent50LA()||
+       root.sourceRace28COwner_||root.resultsInputContinuation50LA_||
+       cold.profile!=root.profile||cold.application!=root.state||!cold.profile||cold.profile->mode34!=0||
+       !cold.riderProfile||!cold.riderProfile->initialized()||cold.riderProfile!=root.riderProfile||
+       cold.riderProfile->commonProfile()!=cold.profile.get()||cold.lightManager!=root.lightManager||
+       !root.videoOwner_||cold.video.lifetime.get()!=root.videoOwner_.get()||!root.videoOwner_->originalMain||
+       !root.videoOwner_->host.created()||
+       !cold.application||cold.application->sharedDialogs||cold.application->controllerPopupState.active3CC||
+       cold.application->controllerPopupState.closing3C8||
+       cold.riderProfile->stamp().generation!=origin->preimage_.generation||origin->preimage_.mode34!=0)
+        return result(d,Status::invalidInput);
+    // Global470/47C are deliberately unjoined for this bounded native route.
+    // Course still builds its own real438 popup. No Main-only1B7BD0 boot,
+    // retired-dialog adoption or original dispatcher completion is implied.
+    return prepareInitialNative(cold,nullptr,origin,d);
 }
 Status OriginalUiFrontend50KG::prepareInitialNative(const OriginalUiFrontendCold50KG& cold,
-    const ::original_main_entry50KG::Application* nativeHall,Diagnostic& d)noexcept {
+    const ::original_main_entry50KG::Application* nativeHall,
+    const std::shared_ptr<OriginalUiPauseCourseOrigin50LA>& pauseOrigin,Diagnostic& d)noexcept {
     d={};if(storage_)return result(d,Status::alreadyPrepared);
+    if(nativeHall&&pauseOrigin)return result(d,Status::invalidInput);
     using Id=assets::OriginalUiArchiveId50KG;
     if(!archive(cold.appStart,Id::appStart)||!archive(cold.mainMenu,Id::mainMenu)||!archive(cold.options,Id::options)||
         !archive(cold.fonts,Id::fonts)||!archive(cold.controllerPopup,Id::controllerPopup)||!archive(cold.overlays,Id::overlays)||
@@ -1395,12 +1454,15 @@ Status OriginalUiFrontend50KG::prepareInitialNative(const OriginalUiFrontendCold
     try {
         storage_=std::make_unique<Storage>();auto& s=*storage_;Operation operation(s.inOperation);s.cold=cold;
         if(!s.processReady())return s.fault(d,Status::invalidInput);
+        s.nativePauseCourseOrigin=pauseOrigin;
         if(nativeHall){
             s.nativeHallRoot=nativeHall;s.nativeHallPreimage=*cold.profile;
             s.nativeHallStamp=cold.riderProfile->stamp();
         }
         if(!assets::readOriginalUiEnglish50KG(*cold.localization,s.english,d.localization))return s.fault(d,Status::localization);
-        if(!s.build(s.active,nativeHall?Route{11,1}:Route{4,1},d,nativeHall?5u:0u))return s.fault(d,d.status);
+        if(!s.build(s.active,pauseOrigin?Route{6,1}:nativeHall?Route{11,1}:Route{4,1},d,nativeHall?5u:0u))return s.fault(d,d.status);
+        if(pauseOrigin&&(!s.active->course||!pauseOrigin->current(*s.active->course)))
+            return s.fault(d,Status::invalidInput);
         if(nativeHall&&(!sameProfile(s.nativeHallPreimage,*cold.profile)||
            cold.riderProfile->stamp().generation!=s.nativeHallStamp.generation))return s.fault(d,Status::invalidInput);
         s.prepared=true;return result(d,Status::ok);
@@ -1648,9 +1710,21 @@ Status OriginalUiFrontend50KG::activate(VehicleWindowGl50DS& renderer,Diagnostic
            !s->active->hall||!display||!display->frontendOwnerCurrent50KG()||&display->renderer_!=&renderer)
             return s->fault(d,Status::invalidInput);
     }
-    s->renderer=&renderer; // Native Hall custody is proven before retaining this cleanup target.
+    if(s->nativePauseCourseOrigin){
+        const auto& origin=*s->nativePauseCourseOrigin;const auto& root=*origin.root_;
+        const auto display=root.raceDisplayOwner50LA_.lock();
+        if(!s->active->course||!origin.current(*s->active->course)||
+           !root.videoOwner_||s->cold.video.lifetime.get()!=root.videoOwner_.get()||
+           s->cold.lightManager!=root.lightManager||root.profile!=s->cold.profile||
+           root.state!=s->cold.application||root.riderProfile!=s->cold.riderProfile||
+           s->cold.application->sharedDialogs||s->cold.application->controllerPopupState.active3CC||
+           s->cold.application->controllerPopupState.closing3C8||
+           !display||!display->frontendOwnerCurrent50KG()||&display->renderer_!=&renderer)
+            return s->fault(d,Status::invalidInput);
+    }
+    s->renderer=&renderer; // Native receiver custody precedes retaining this cleanup target.
     if(!s->active->prepared()||!renderer.originalUiSourceRgbaAvailable()||!renderer.bindOriginalUiTextures(*s->active->textures(),*s->active->gpu,d.renderer))return s->fault(d,Status::renderer);
-    if(!s->enterLightManager(*(s->nativeHallRoot?s->cold.hall:s->cold.mainMenu),d))return s->fault(d,Status::session,d.lightManager.sourcePC);
+    if(!s->enterLightManager(*(s->nativePauseCourseOrigin?s->cold.course:s->nativeHallRoot?s->cold.hall:s->cold.mainMenu),d))return s->fault(d,Status::session,d.lightManager.sourcePC);
     if(s->nativeHallRoot){
         // Same existing Hall entry commit: previous mode then5, never a
         // synthetic generation refresh, Options selection or Main setup.
@@ -1659,7 +1733,7 @@ Status OriginalUiFrontend50KG::activate(VehicleWindowGl50DS& renderer,Diagnostic
         if(!s->active->hall->acceptEntryProfileCommit())return s->fault(d,Status::session);
     }
     s->bank=s->active.get();s->activating=s->active.get();
-    const auto initial=s->nativeHallRoot?Route{11,1}:Route{4,1};
+    const auto initial=s->nativePauseCourseOrigin?Route{6,1}:s->nativeHallRoot?Route{11,1}:Route{4,1};
     d.transition=s->active->transition->bindInitialPage(initial.screen,initial.page,s->callbacks(*s->active));s->activating=nullptr;
     if(d.transition!=Transition::ok||s->faulted)return s->fault(d,Status::transition,0x2A3C10);
     s->activated=true;return result(d,Status::ok);
@@ -2016,8 +2090,8 @@ Status OriginalUiFrontend50KG::update(const OriginalUiMainSessionUpdate50KG& inp
         m.options->update(input,d.options)==OptionsStatus::ok:m.hall?m.hall->update(input,d.hall)==HallStatus::ok:m.rider?m.rider->update(input,d.rider)==RiderStatus::ok:
         m.course?m.course->update(input,d.course)==CourseStatus::ok:m.tournament&&m.tournament->update(input,d.tournament)==TournamentStatus::ok;
     if(!updated)return s->fault(d,Status::session);
-    if(const auto shared=s->cold.application->sharedDialogs;shared&&!m.main&&!m.options){
-        // Main/Options already run the same470 call immediately before their
+    if(const auto shared=s->cold.application->sharedDialogs;shared&&!m.main&&!m.options&&!m.rider){
+        // Main/Options/Rider already run the same470 call immediately before their
         // real47C update. Other native managers must not freeze global state.
         OriginalUiSharedDialogs50KG::Diagnostic sd;
         if(!shared->advance4702048F0(input.elapsedSeconds,sd))return s->fault(d,Status::session,sd.sourcePC);
@@ -2077,7 +2151,7 @@ Status OriginalUiFrontend50KG::render(const OriginalUiMainFrameClock50KG& clock,
         if(!shared->invisible470204AC0(sd)&&
            (!m.options||!m.options->admitSharedMenu470(*shared)))
             return s->fault(d,Status::session,sd.sourcePC);
-        if(!m.main&&!m.options&&s->cold.application->controllerPopupState.active3CC)
+        if(!m.main&&!m.options&&!m.rider&&s->cold.application->controllerPopupState.active3CC)
             return s->fault(d,Status::session,0x206420);
     }
     const bool rendered=m.main?m.main->render(clock,d.main)==MainStatus::ok:m.options?
@@ -2328,28 +2402,33 @@ Status OriginalUiFrontend50KG::close(Diagnostic& d) noexcept {
             if(manager&&manager->optionsNativeInputs&&manager->optionsNativeInputs->construction&&
                !manager->optionsNativeInputs->abortConstructionNative())return result(d,Status::cleanup);
     }
-    // A failed/unsubmitted bounded Main/Options callback owns its own real
+    // A failed/unsubmitted bounded Main/Options/Rider callback owns its own real
     // Display pin. Retire only that authenticated Session before the general
     // dependent gate, otherwise close would wait for the pin it must release.
     // This does not retire any unrelated manager, primitive, Garage or FIFO.
     if(s->renderer){if(const auto shared=s->cold.application->sharedDialogs){
         Operation operation(s->inOperation);
-        decltype(s->active.get()) ownMenu=nullptr;bool ownMain=false;
+        decltype(s->active.get()) ownMenu=nullptr;std::uint8_t ownKind=0;
         for(auto* manager:{s->retiring.get(),s->pending.get(),s->active.get(),s->garageRestoration.get()}){
             if(!manager)continue;
             const bool mainMatch=manager->main&&!manager->mainRetired&&shared->menu470CloseOwnerCurrent(*manager->main,*s->renderer);
             const bool optionsMatch=manager->options&&!manager->optionsRetired&&shared->menu470CloseOwnerCurrent(*manager->options,*s->renderer);
-            if((mainMatch&&optionsMatch)||((mainMatch||optionsMatch)&&ownMenu))return result(d,Status::cleanup,0x204A00);
-            if(mainMatch||optionsMatch){ownMenu=manager;ownMain=mainMatch;}
+            const bool riderMatch=manager->rider&&!manager->riderRetired&&shared->menu470CloseOwnerCurrent(*manager->rider,*s->renderer);
+            const auto matches=unsigned(mainMatch)+unsigned(optionsMatch)+unsigned(riderMatch);
+            if(matches>1u||(matches&&ownMenu))return result(d,Status::cleanup,0x204A00);
+            if(matches){ownMenu=manager;ownKind=mainMatch?1u:optionsMatch?2u:3u;}
         }
         if(shared->menu470Owner()||shared->menuUpdateFailedOwner_){
             if(!ownMenu)return result(d,Status::cleanup,0x204A00);
-            if(ownMain){
+            if(ownKind==1u){
                 if(ownMenu->main->teardownSource(s->renderer,d.main)!=MainStatus::ok)return result(d,Status::cleanup);
                 ownMenu->mainRetired=true;
-            }else{
+            }else if(ownKind==2u){
                 if(ownMenu->options->teardownSource(s->renderer,d.options)!=OptionsStatus::ok)return result(d,Status::cleanup);
                 ownMenu->optionsRetired=true;
+            }else{
+                if(ownMenu->rider->teardownSource(s->renderer,d.renderer,d.rider)!=RiderStatus::ok)return result(d,Status::cleanup);
+                ownMenu->riderRetired=true;
             }
         }
     }}

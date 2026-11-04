@@ -23,7 +23,7 @@ struct VehicleWindowDiagnostic50DS;
 }
 
 // Original exit values; shared without importing any gameplay Context.
-enum class SessionExit50DU { Quit, Restart, Checkpoint, ReturnOriginalMain, CourseColdLoad, ResultsHallReturn };
+enum class SessionExit50DU { Quit, Restart, Checkpoint, ReturnOriginalMain, CourseColdLoad, ResultsHallReturn, PauseMenuReturn };
 
 // Original main-TU functions, including the one monotonic clock epoch.
 // This borrowed service view owns no state and is consumed synchronously.

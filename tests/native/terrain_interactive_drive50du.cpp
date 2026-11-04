@@ -307,6 +307,9 @@ int nativeApplicationMain50DU(int argc,char**argv){try{
   if(exit==SessionExit50DU::ResultsHallReturn)
    require50DU(originalMainApplication.finishNativeResultsHallDeparture50LA(),
        "Results Hall transfer requires real completed session/Light retirement");
+  if(exit==SessionExit50DU::PauseMenuReturn)
+   require50DU(originalMainApplication.finishNativePauseMenuDeparture50LA(),
+       "Pause menu transfer requires real completed session/Display/Light retirement");
   if(exit==SessionExit50DU::Quit)break;
   const char* originalAiSetting=std::getenv("RR_ORIGINAL_AI_FIRST_SLICE");
   const char* allAiSetting=std::getenv("RR_ORIGINAL_AI_ALL_RACERS");
@@ -332,13 +335,13 @@ int nativeApplicationMain50DU(int argc,char**argv){try{
         (effectiveTrack==rr::platform::HostTrack50IM::GB&&gbNativeWorldRequested)||
         (effectiveTrack==rr::platform::HostTrack50IM::MC&&mcNativeWorldRequested))));
   if(allOriginalAi||humanCourse){
-   require50DU((exit==SessionExit50DU::Restart||exit==SessionExit50DU::ReturnOriginalMain||exit==SessionExit50DU::CourseColdLoad||exit==SessionExit50DU::ResultsHallReturn)&&
+   require50DU((exit==SessionExit50DU::Restart||exit==SessionExit50DU::ReturnOriginalMain||exit==SessionExit50DU::CourseColdLoad||exit==SessionExit50DU::ResultsHallReturn||exit==SessionExit50DU::PauseMenuReturn)&&
        rr::platform::validHostTrack50IM(effectiveTrack)&&selectedTrack==effectiveTrack,
        "native roster rebuild requires an explicit supported restart/return/Course request");
   }else if(originalAiSetting&&std::string(originalAiSetting)=="1"){
    require50DU(false,"mixed original AI first slice rejected session rebuild");
   }
-  enterOriginalUi=exit==SessionExit50DU::ReturnOriginalMain||exit==SessionExit50DU::ResultsHallReturn;
+  enterOriginalUi=exit==SessionExit50DU::ReturnOriginalMain||exit==SessionExit50DU::ResultsHallReturn||exit==SessionExit50DU::PauseMenuReturn;
   require50DU(!enterOriginalUi||originalMainApplication.enabled,"original Main application owner unavailable");
   if(exit==SessionExit50DU::Restart){effectiveAudioSettings=selectedAudioSettings;effectiveTrack=selectedTrack;}
   require50DU(sessionIndex<std::numeric_limits<std::uint64_t>::max()-1,"audio session index exhausted");

@@ -8,8 +8,11 @@
 #include "../../src/game/original_camera_start_effects.h"
 #include "../../platform/linux/native/original_application_aural50kg.h"
 namespace rr::platform {class OriginalUiCoursePopupPayload50KG;class OriginalUiCoursePagePayload50KG;}
+namespace rr::platform { class OriginalUiPauseCourseOrigin50LA; class OriginalUiCourseSession50KG; }
 namespace original_main_entry50KG { class OriginalLoadingCollector50LA; }
 namespace original_pause_observation50LA { class Owner; }
+namespace original_race_hud_scope50LA { class Registration; }
+namespace live_audio50HF { class Owner; }
 namespace rr::game { class OriginalLoadingScreen40Mode0LA; class OriginalSessionF8Intro50LA;class OriginalLoadingManager33050LA;}
 namespace original_results_roster50LA { class Read; }
 namespace interactive_publication50DU { struct Context; }
@@ -31,7 +34,7 @@ namespace original_camera_session50KX { class Session; struct ActualOwners; stru
 namespace rr::assets {class OriginalUiGarageSceneAssets50KG; struct OriginalUiGaragePageData50KG;}
 namespace rr::platform {class OriginalUiMemoryCardConstructor50KG; class OriginalUiSharedDialogs50KG; class OriginalUiGarageSharedPageDrawOwner50KG; class OriginalUiGarageSession50KG; struct OriginalUiGarageNativeInput50KG; struct OriginalUiGarageNativeState50KG; class OriginalUiGarageModelResources50KG; class OriginalUiGarageVisibility50KG; class OriginalUiGarageTextOverlay50KG; class OriginalUiGarageFogColorLease50KG; class OriginalUiGarageScreenText50KG; struct OriginalUiGarageScreenTextDiagnostic50KG; class OriginalUiGarageWidget1Owner50KG; struct OriginalUiGarageWidget1Diagnostic50KG; class OriginalUiGarageManagerFog50KG;}
 namespace rr::platform { class OriginalUiMainDrawResources50KG; }
-namespace rr::platform { class OriginalVideoBlockingNativeBackend; }
+namespace rr::platform { class OriginalVideoBlockingNativeBackend; class OriginalSpectatorMenuInput50LA; }
 namespace native_ai50IV { struct Session; }
 #include "original_ui_main_output50kg.h"
 #include "../../platform/linux/native/original_ui_garage_audio_backing50kg.h"
@@ -135,6 +138,8 @@ std::shared_ptr<const rr::assets::OriginalUiArchive50KG> readArchive(
 struct Video;
 struct NativeResultsInputContinuation50LA;
 struct NativeResultsHallTransfer50LA;
+struct NativePauseInputContinuation50LA;
+struct NativePauseMenuTransfer50LA;
 class RaceDisplayLifetime50LA;
 class RaceF8RendererLease50LA;
 class NativeF8BarPrefix50LA;
@@ -245,6 +250,7 @@ private:
     bool passResultsProcessPredecessors50LA(const rr::game::OriginalRaceConstructor50LA&,
         const rr::game::InputEvent48Z*,rr::game::OriginalResults104Diagnostic50LA&)const noexcept;
     friend class ::original_pause_observation50LA::Owner;
+    friend class ::original_race_hud_scope50LA::Registration; //Separate ALL8 listener camera borrow, never End/HUD authority.
     friend class ::original_results_roster50LA::Read;
     friend class ::ra_native_session50LA::Join;
     const std::shared_ptr<rr::assets::OriginalPauseSourceData50LA>&
@@ -278,6 +284,36 @@ private:
         rr::game::OriginalResults104Diagnostic50LA&)const noexcept;
     mutable std::shared_ptr<NativeResultsInputContinuation50LA> resultsInputContinuation50LA_;
     mutable std::shared_ptr<NativeResultsHallTransfer50LA> resultsHallTransfer50LA_;
+    // Distinct private ALL8 Pause origin and counted App17DE10(6,4/6,1)
+    // transfer. No human Results/Hall entry or public readiness authority.
+    mutable std::shared_ptr<NativePauseInputContinuation50LA> pauseInputContinuation50LA_;
+    enum class PauseReturnStart50LA { unavailable,sourceSkipped,started,failed };
+    PauseReturnStart50LA beginNativePauseReturn50LA(const original_pause_observation50LA::Owner&,
+        rr::platform::OriginalSpectatorMenuInput50LA&,rr::platform::OriginalVideoBlockingNativeBackend*,
+        std::uint32_t&)const noexcept;
+    bool pauseInputContinuationCurrent50LA()const noexcept;
+    bool pauseInputBatchReturned50LA(const NativePauseInputContinuation50LA&)const noexcept;
+    bool pauseReturnInputPending50LA()const noexcept;
+    bool advanceNativePauseReturn50LA(std::uint32_t&)const noexcept;
+    bool cancelNativePauseReturn50LA(rr::platform::OriginalVideoBlockingNativeBackend*)const noexcept;
+    mutable std::shared_ptr<NativePauseMenuTransfer50LA> pauseMenuTransfer50LA_;
+    bool preparePauseMenuTransfer50LA(const NativePauseInputContinuation50LA&)const noexcept;
+    bool commitPauseMenuTransfer50LA(const NativePauseInputContinuation50LA&)const noexcept;
+    bool markPauseMenuBatchReturned50LA(const NativePauseInputContinuation50LA&)const noexcept;
+    bool pauseMenuRequestTailCurrent50LA(const rr::game::OriginalRaceConstructor50LA&)const noexcept;
+    bool passPauseMenuProcessSuccessors50LA(const rr::game::OriginalRaceConstructor50LA&)const noexcept;
+    bool beginNativePauseMenuDeparture50LA(bool& selected)const noexcept;
+    bool nativePauseMenuDeparting50LA()const noexcept;
+    bool cancelNativePauseMenuTransfer50LA()const noexcept;
+    friend class rr::platform::OriginalUiPauseCourseOrigin50LA;
+    bool nativePauseMenuReceiverCurrent50LA()const noexcept;
+    bool nativePauseMainReceiverCurrent50LA()const noexcept;
+    bool nativePauseCourseReceiverCurrent50LA()const noexcept;
+    std::shared_ptr<rr::platform::OriginalUiPauseCourseOrigin50LA> pauseCourseReceiverOrigin50LA(const Frontend&)const noexcept;
+    bool nativePauseCourseOriginCurrent50LA(const rr::platform::OriginalUiPauseCourseOrigin50LA&,
+        const rr::platform::OriginalUiCourseSession50KG&)const noexcept;
+    bool bindNativePauseMenuReceiver50LA(const Frontend&,const std::shared_ptr<Video>&)const noexcept;
+    bool acceptNativePauseMenuReceiver50LA(const Frontend&,const rr::platform::VehicleWindowGl50DS&)const noexcept;
     bool prepareResultsHallTransfer50LA(rr::game::OriginalRaceConstructor50LA&)const noexcept;
     bool commitResultsHallTransfer50LA(rr::game::OriginalRaceConstructor50LA&,
         const rr::game::OriginalRaceRecordInsertionStage50KG&,
@@ -540,11 +576,17 @@ private:
     bool consumedRaAll8CameraCustodyNative34Current(const original_camera_session50KX::Session&)const noexcept;
     bool bindConsumedRaCameraNative34(original_camera_session50KX::Session&)const noexcept;
     bool completeConsumedRaCameraNative34(original_camera_session50KX::Session&)const noexcept;
-    enum class All8MusicPrefixStatus:std::uint8_t {unavailable,publishedBeforeChildren,failed};
-    // Separate native ALL8 entry. No human camera completion, listener/HUD
-    // readiness or original1A9240 return is implied by this counted prefix.
-    All8MusicPrefixStatus stageConsumedRaAll8MusicPrefixNative10C(
+    enum class All8MusicStatus:std::uint8_t {unavailable,nativeChildrenReady,failed};
+    // Separate native ALL8 entry: actual counted10C and prepared PCM/Dax join,
+    // real listener registration and shared FIFO. No human End/HUD authority,
+    // original child IO, camera completion or retail1A3C00 return is implied.
+    All8MusicStatus stageConsumedRaAll8MusicNative10C(
         original_camera_session50KX::Session&,std::uint32_t&)const noexcept;
+    bool consumedRaAll8ListenerCustodyNativeCurrent(const original_camera_session50KX::Session&)const noexcept;
+    bool advanceConsumedRaAll8MusicListenerNative(const original_camera_session50KX::Session&,
+        std::uint64_t beforeMix,bool heldSourceScene,std::uint32_t&)const noexcept;
+    bool serviceConsumedRaAll8MenuAudioNative(const original_camera_session50KX::Session&,live_audio50HF::Owner&,
+        std::uint32_t elapsedMicroseconds,rr::platform::AudioOutputDiagnostic50HD&,std::uint32_t&)const noexcept;
     bool completeConsumedRaMusicNative10C(original_camera_session50KX::Session&,std::uint32_t&)const noexcept;
     bool advanceConsumedRaMusicListenerNative(const original_camera_session50KX::Session&,
         std::uint64_t beforeMix,bool heldSourceScene,std::uint32_t&)const noexcept;
@@ -1069,6 +1111,7 @@ public:
     // Called only after the real session stack and its gameplay Light lease
     // retire. Requires the exact consumed request; never selects a route.
     bool finishNativeResultsHallDeparture50LA()const noexcept;
+    bool finishNativePauseMenuDeparture50LA()const noexcept;
     std::shared_ptr<RaceDisplayLifetime50LA> raceDisplayForSession50LA() const;
     // Exact frontend create successor only; success is a bounded114A00 leaf,
     // never loading-manager initialization or gameplay readiness.
@@ -1525,6 +1568,7 @@ inline bool Application::continueSourceInput04NativeActivation()const noexcept {
 struct Frontend : rr::platform::OriginalUiRiderPresentationHost50KG {
 private:
     bool nativeResultsHallEntry_=false;
+    bool nativePauseMainEntry_=false,nativePauseCourseEntry_=false;
     using UploadLifetime=rr::assets::OriginalNativeFrontendUploadLifetime50LA;
     std::shared_ptr<UploadLifetime> uploadLifetime_;
     friend struct Application;

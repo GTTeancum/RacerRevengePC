@@ -2401,6 +2401,14 @@ SessionExit50DU Context::run() {
    //Only the actual consumed RA uses the counted B4/native same-state join.
    //A rejected/partial canonical prefix never falls through to legacy reset.
    if(isRaTrack&&consumedRaStage.race()){
+    // Native roster backing already exists. Give its B0 role one counted
+    // owner before the B4 association, except the actual subtype3 record
+    // route which already owns a distinct source manager. No second roster.
+    if(!nativeRacerManager){
+     std::uint32_t b0PC=0;
+     require50DU(consumedRaStage.race()->initializeNativeRacerB0(*this,racerBank,b0PC),
+         "actual counted B0/native roster cold join rejected");
+    }
     std::uint32_t b4PC=0;
     require50DU(consumedRaStage.race()->initializeNativeTimingB4(*this,racerBank,b4PC),
         "actual counted B4/native manager cold join rejected");
@@ -3291,6 +3299,10 @@ SessionExit50DU Context::run() {
   // supplies no pose/provider: it calls the retained actual Session directly.
   if(!sourceCameraSession)return !ownedListenerCameraObserved; //No fallback after actual owner.
   ownedListenerCameraObserved=true;
+  // The exact consumed ALL8 Pause route has no human/TA issuance. Keep its
+  // listener on this real shared-mix callback without widening that issuance.
+  if(sourceConsumedPauseActivation)
+   return originalMainApplication.advanceConsumedRaAll8MusicListenerNative(*sourceCameraSession,before,held,pc);
   return sourceCameraSession->advanceNativeMusicListenerConsumedStep(before,held,pc);
  };
  sourceCamera::Session::GameplayFogRenderPhase sourceFogRenderPhase;
@@ -3384,6 +3396,13 @@ SessionExit50DU Context::run() {
  //Same lexical lifetime, distinct actual HUD authority; no end-flow caller.
  original_race_hud_scope50LA::Scope sourceEndHud{*this,racerBank};
  auto closeWindow=[&](){
+  if(!originalMainApplication.cancelNativePauseReturn50LA(sourceFadeOut.get())){
+   std::cerr<<"native_close_rejected gate=Pause_retained_input_cancel\n";return false;
+  }
+  if(!originalMainApplication.nativePauseMenuDeparting50LA()&&
+     !originalMainApplication.cancelNativePauseMenuTransfer50LA()){
+   std::cerr<<"native_close_rejected gate=Pause_menu_request_cancel\n";return false;
+  }
   // The pending input owns Camera/World/Display pins and a live fade capture.
   // Retire it before revoking any registered source callback or GPU owner.
   // A failed drain retains ALL custody for the existing close retry.
@@ -4535,7 +4554,8 @@ SessionExit50DU Context::run() {
  std::cout<<"Host lap state: completed="<<lapContinuity.state.vehicleCC8<<" marker_cursor="
           <<lapContinuity.state.vehicleFF8<<" callbacks="<<lapOwner.completedCallbacks
           <<" unavailable_sound_calls="<<lapOwner.unavailableSounds<<'\n';
- return originalMainApplication.nativeResultsHallDeparting50LA()?SessionExit50DU::ResultsHallReturn:
+ return originalMainApplication.nativePauseMenuDeparting50LA()?SessionExit50DU::PauseMenuReturn:
+        originalMainApplication.nativeResultsHallDeparting50LA()?SessionExit50DU::ResultsHallReturn:
      returnOriginalMainRequested?SessionExit50DU::ReturnOriginalMain:
      checkpointRequested?SessionExit50DU::Checkpoint:(restartRequested?SessionExit50DU::Restart:SessionExit50DU::Quit);
 }
@@ -4543,6 +4563,55 @@ SessionExit50DU Context::run() {
 
 //Definitions stay at the existing lexical Context owner; no new source admission.
 namespace rr::game {
+bool OriginalRaceConstructor50LA::initializeNativeRacerB0(
+    ::interactive_continuation50DU::Context& context,::native_racer50HN::Bank& bank,
+    std::uint32_t& pc)noexcept {
+    pc=0x1aa548;
+    if(resultsFeedbackThread_!=std::this_thread::get_id())return false;
+    // Existing lexical native producer only, after its real registered roster
+    // and grounded grid creation. This does not enter source1AA580/1AD520.
+    if(!context.isRaTrack||!context.originalAiEnabled||context.nativeRacerManager||
+       context.consumedRaStage.race().get()!=this||context.originalMainApplication.race28C()!=this||
+       application_!=context.originalMainApplication.entities()||!counted_||rolledBack_||
+       !world74_||world74_!=context.raWorld||world74_->terminal_||world74_->closed_||
+       !world74_->runtimeQueries_||!world74_->source_||!profile_||
+       profile_!=context.originalMainApplication.riderProfile||
+       context.originalAiHumanCount>1u||context.originalAiHumanCount>bank.count()||
+       context.originalAiOpponentCount!=bank.count()-context.originalAiHumanCount)return false;
+    const auto& runtime=*world74_->runtimeQueries_;
+    if(runtime.terminal_||runtime.closed_||!runtime.cameraBankCurrent()||runtime.bankIdentity_!=&bank)return false;
+    try {
+        // Original1A6F4C calls2A1160,1A6F54 publishes B8, then1A6F5C
+        // loads it. Here the existing native cold producer adopts only the
+        // same retained RA projection, BEFORE constructing native B0.
+        pc=0x1a6f48;
+        if(!mapB8_){
+            ra_cold_aggregate50LA::Diagnostic diagnostic;
+            auto navigation=world74_->borrowColdNavigation(diagnostic);
+            if(!navigation||&navigation->map()!=context.navigationMap)return false;
+            auto next=context.originalMainApplication.constructTunnelTrackCold2A1160(
+                entity_.sessionGeneration,OriginalTunnelTrackRole50LA::mapB8,std::move(navigation));
+            if(!next)return false;
+            mapB8_=std::move(next); //Retain actual count if later binding fails.
+        }
+        pc=0x1a6f5c;
+        if(!mapB8_->navigation()&&
+           !context.originalMainApplication.bindTunnelTrackColdProjection2A1260(*mapB8_))return false;
+        if(mapB8_->navigation()!=context.navigationMap||mapB8_->application_!=application_||
+           mapB8_->entity_.sessionGeneration!=entity_.sessionGeneration)return false;
+        pc=0x1aa548;
+        if(!racerB0_){
+            std::unique_ptr<OriginalRaceRacerManager50LA> next(new OriginalRaceRacerManager50LA(
+                application_,entity_.sessionGeneration,bank,context.s,context.originalAi,context.originalAiHumanCount));
+            if(!next->constructed()){pc=0x1ad440;return false;}
+            // Explicit native typed B0 publication after actual counted ctor.
+            // No guest malloc result, loaded44/3C or full Race load is inferred.
+            racerB0_=std::move(next);
+        }
+        return racerB0_->associateNativeRoster(*this,bank,context.s,context.originalAi,
+            context.originalAiHumanCount,pc);
+    }catch(...){return false;} // Retain published count and every reached effect.
+}
 bool OriginalRaceConstructor50LA::initializeNativeTimingB4(
     ::interactive_continuation50DU::Context& context,::native_racer50HN::Bank& bank,
     std::uint32_t& pc)noexcept {

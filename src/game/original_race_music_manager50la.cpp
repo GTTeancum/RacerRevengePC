@@ -1,6 +1,7 @@
 #include "../../tests/native/original_race_display_lifetime50la.h"
 #include "original_player_overlay_renderer_lease50la.h"
 #include "original_race_music_manager50la.h"
+#include "original_pause_storage50la.h"
 #include "original_application_entities50la.h"
 #include "../../tests/native/original_race_constructor50la.h"
 #include "../../tests/native/original_race_hud_scope50la.h"
@@ -59,6 +60,7 @@ struct OriginalRaceMusicManager50LA::Impl final {
     std::array<std::uint32_t,128> endContactSpeechScratch{};
     std::array<bool,128> endContactSpeechScratchKnown{};
     std::optional<race_music50IE::UpdateReceipt50IW> restartFadeReceipt;
+    std::optional<race_music50IE::UpdateReceipt50IW> pauseReturnFadeReceipt;
     bool endQueueStopped=false;
     std::uint32_t endQueueStopPC=0x1a4cd4;
 
@@ -291,6 +293,32 @@ bool OriginalRaceMusicManager50LA::nativeBackendCurrent(
         p.application->aural00_==view.entity&&p.music->mixer_==p.announcer->mixer_&&
         p.music->groups_==race->raceAudio_&&p.announcer->groups_==race->raceAudio_;
 }
+bool OriginalRaceMusicManager50LA::serviceNativeMenuAudio(
+    const OriginalRaceConstructor50LA& race,const Impl::Registration& scope,std::uint32_t micros,
+    platform::AudioOutputDiagnostic50HD& audio,OriginalRaceMusicManagerDiagnostic50LA& d)noexcept {
+    d={};
+    if(!nativeBackendCurrent(scope)||race.music10C_.get()!=this||!scope.gameplay_)
+        return Impl::stop(d,0x1a4440,"Actual ALL8 listener/menu mixer owner unavailable");
+    auto& p=*impl_;const auto before=scope.gameplay_->mixedFrames();
+    if(!p.listenerMixCursor||before!=*p.listenerMixCursor){
+        p.listenerStepStopped=true;
+        return Impl::stop(d,0x1a4440,"Unaccounted mix precedes actual native menu service");
+    }
+    // The private Application caller proves actual open Pause and App11C.
+    // Existing service checks World4D8's actual pause and bounded host interval,
+    // polls real duck completion and consumes the SAME output exactly once.
+    const bool serviced=scope.gameplay_->serviceNativeMenuAudio(micros,audio);
+    const auto after=scope.gameplay_->mixedFrames();
+    p.listenerMixCursor=after; //Actual consumption, including partial output failure.
+    if(after<before||after-before>live_audio50HF::stepFrames||!serviced){
+        p.listenerStepStopped=true;
+        return Impl::stop(d,0x1a4440,"Native menu service stopped; actual mixed-frame custody retained");
+    }
+    // Scheduling custody ONLY. No listener pose/velocity/publication writes,
+    // music timer, world delta, source update return or synthesized768 frames.
+    // Fractional native output clock can consume zero frames for a short call.
+    d.sourcePC=0x1a4440;return true;
+}
 bool OriginalRaceMusicManager50LA::restartNativeFade1AC960(
     const OriginalRaceConstructor50LA& race,const Impl::Registration& scope,
     OriginalRaceMusicManagerDiagnostic50LA& d)noexcept {
@@ -314,6 +342,40 @@ bool OriginalRaceMusicManager50LA::restartNativeFade1AC960(
         return Impl::stop(d,result.helperPC?result.helperPC:result.sourcePC,
             "Actual native234440 transport continuation stopped; source music prefix and reached fade effects retained");
     d.sourcePC=0x1ac968;return true; //Native transport adaptation, not guest IOP/logging completion.
+}
+bool OriginalRaceMusicManager50LA::pauseReturnNativeFade1A4AB0(
+    const OriginalRaceConstructor50LA& race,const Impl::Registration& scope,PauseReturnCall call,
+    OriginalRaceMusicManagerDiagnostic50LA& d)noexcept {
+    d={};const auto caller=static_cast<std::uint32_t>(call);
+    if(call!=PauseReturnCall::main1BD9F0&&call!=PauseReturnCall::course1BDB88)
+        return Impl::stop(d,0x1a4ab0,"Unsupported private Pause music caller");
+    // Actual retained Pause row9/10 caller only, after its real Aural26D070. Authenticate
+    // component, lexical providers and Race10C before borrowing source state;
+    // transport admission must follow the unconditional1A4AB0 stores.
+    if(!impl_||!impl_->componentCurrent()||!impl_->constructed||
+       !impl_->providersCurrent(scope)||impl_->loadCut!=Impl::LoadCut::nativeReady||
+       scope.race_.lock().get()!=&race||race.music10C_.get()!=this)
+        return Impl::stop(d,caller+4u,"Actual Pause same-Race10C/native state owner unavailable");
+    auto& p=*impl_;
+    if(p.pauseReturnFadeReceipt)
+        return Impl::stop(d,p.pauseReturnFadeReceipt->helperPC?p.pauseReturnFadeReceipt->helperPC:
+            p.pauseReturnFadeReceipt->sourcePC,"Pause return music invocation already attempted; no replay");
+    //1BD9E4/E8 or1BDB7C/80 supplies F12=.5 at the actual call.1A4AB4 writes130=-1,
+    //1A4AB8 writes12C=0, then1A4ABC/C0 tail-calls234440 on child164.
+    // Neither128 nor restart's independent one-time custody is touched.
+    p.music->writePauseReturnFadePrefix1A4AB0();
+    p.pauseReturnFadeReceipt=race_music50IE::UpdateReceipt50IW{
+        race_music50IE::Result::Ownership,0x1a4ac0u,0x234440u,.5f,p.music->nativeFade_.phase,false};
+    // Even backend failure is terminal for this invocation, with both source
+    // stores retained. Do not preflight it before130/12C or repair/retry it.
+    if(!nativeBackendCurrent(scope)||!p.aural->backendCurrent())
+        return Impl::stop(d,0x234440,"Actual Pause native backend unavailable; source130/12C retained");
+    p.pauseReturnFadeReceipt=p.music->requestPauseReturnStoppedFadeTail234440();
+    const auto& result=*p.pauseReturnFadeReceipt;
+    if(!result.completed())
+        return Impl::stop(d,result.helperPC?result.helperPC:result.sourcePC,
+            "Actual Pause stopped music continuation rejected; source prefix and native ownership retained");
+    d.sourcePC=caller+8u;return true; //Native stopped-stream adapter, not original IOP/logging completion.
 }
 bool OriginalRaceMusicManager50LA::advanceNativeListenerConsumedStep(
     const OriginalRaceConstructor50LA& race,const Impl::Registration& scope,
@@ -705,22 +767,17 @@ bool OriginalRaceMusicManager50LA::retireNativeDetached(OriginalRaceMusicManager
 }
 
 namespace original_main_entry50KG {
-Application::All8MusicPrefixStatus Application::stageConsumedRaAll8MusicPrefixNative10C(
+Application::All8MusicStatus Application::stageConsumedRaAll8MusicNative10C(
     original_camera_session50KX::Session& session,std::uint32_t& pc)const noexcept {
-    using S=All8MusicPrefixStatus;using Manager=rr::game::OriginalRaceMusicManager50LA;
+    using S=All8MusicStatus;using Manager=rr::game::OriginalRaceMusicManager50LA;
     pc=0x1a6c90;
     // Genuine completed native services on the exact ALL8 Session. This
     // private adapter does not assert a retail1A9240 return, promote Camera34,
     // or call the separate human Camera/Music/world completion route.
-    if(!consumedRaAll8CameraCustodyNative34Current(session))return S::unavailable;
+    if(!consumedRaAll8ListenerCustodyNativeCurrent(session))return S::unavailable;
     const auto race=sourceRace28COwner_;const auto scope=race->endHud_.lock();
     if(race->music10C_)return S::failed; //One synchronous native entry, no replay/adoption.
-    if(!scope||scope->thread_!=std::this_thread::get_id()||!scope->active_||
-       scope->application_!=this||scope->race_.lock()!=race||
-       scope->generation_!=race->entity_.sessionGeneration||scope->bank_!=&session.actual_.bank||
-       !scope->manager_||&scope->manager_->manager!=&session.actual_.all8Manager||
-       scope->camera_||scope->published_||
-       !Manager::freshAll8NativePrefix(*race,*scope))return S::unavailable;
+    if(!Manager::freshAll8NativePrefix(*race,*scope))return S::unavailable;
     // Unsupported/missing/used native preparation above has no source effect.
     // Once entered, real allocation/count/load failure is terminal to this
     // publication attempt. Retain the actual partial owner for existing close.
@@ -730,10 +787,67 @@ Application::All8MusicPrefixStatus Application::stageConsumedRaAll8MusicPrefixNa
         race->music10C_=std::move(next); //Actual1A6CAC publication BEFORE load38/44.
     }catch(...){return S::failed;}
     rr::game::OriginalRaceMusicManagerDiagnostic50LA d;
-    if(!race->music10C_->stageNativeLoadPrefix(*race,sourceAural00Owner_,d)){
+    // Reuse the actual shared native child owners and exact existing listener
+    // allocator, not a second PCM/mixer or invented original child pointers.
+    // This preserves38/44, reached activation/reservation/allocation stores and
+    // real listener cleanup custody on any later failure. No fallback/replay.
+    if(!race->music10C_->acceptNativeChildren(*race,sourceAural00Owner_,d)){
         pc=d.sourcePC;return S::failed;
     }
-    pc=d.sourcePC;return S::publishedBeforeChildren;
+    pc=d.sourcePC;return S::nativeChildrenReady;
+}
+bool Application::consumedRaAll8ListenerCustodyNativeCurrent(
+    const original_camera_session50KX::Session& session)const noexcept {
+    if(!consumedRaAll8CameraCustodyNative34Current(session))return false;
+    const auto race=sourceRace28COwner_;const auto scope=race->endHud_.lock();
+    // Camera-only custody remains independent of Scope for active-Pause close.
+    // This separate live listener borrow requires the exact lexical providers
+    // and manager. Never publish camera_/HUD or authorize human End/Results.
+    return scope&&scope->thread_==std::this_thread::get_id()&&scope->active_&&
+        scope->application_==this&&scope->race_.lock()==race&&
+        scope->generation_==race->entity_.sessionGeneration&&scope->bank_==&session.actual_.bank&&
+        scope->manager_ && &scope->manager_->manager==&session.actual_.all8Manager&&
+        !scope->camera_&&!scope->published_;
+}
+bool Application::advanceConsumedRaAll8MusicListenerNative(
+    const original_camera_session50KX::Session& session,std::uint64_t beforeMix,
+    bool heldSourceScene,std::uint32_t& pc)const noexcept {
+    pc=0x1a4440;
+    if(!consumedRaAll8CameraCustodyNative34Current(session))return false;
+    const auto race=sourceRace28COwner_;
+    // Only the never-entered native preparation route has no counted owner.
+    // This includes an unavailable lexical Scope. Once10C exists, neither
+    // revoked providers, partial load nor failed consumption can fall back.
+    if(!race->music10C_)return true;
+    if(!consumedRaAll8ListenerCustodyNativeCurrent(session))return false;
+    const auto scope=race->endHud_.lock();
+    rr::game::OriginalRaceMusicManagerDiagnostic50LA d;
+    const bool okay=race->music10C_->advanceNativeListenerConsumedStep(*race,*scope,session,
+        beforeMix,heldSourceScene,d);
+    pc=d.sourcePC;return okay;
+}
+bool Application::serviceConsumedRaAll8MenuAudioNative(
+    const original_camera_session50KX::Session& session,live_audio50HF::Owner& actualGameplay,
+    std::uint32_t micros,rr::platform::AudioOutputDiagnostic50HD& audio,std::uint32_t& pc)const noexcept {
+    pc=0x1a4440;
+    if(!consumedRaAll8CameraCustodyNative34Current(session))return false;
+    const auto race=sourceRace28COwner_;
+    const auto pause=race->pause100_;std::uint32_t paused=0;
+    if(!pause||!pause->active200_||!pause->entity_||
+       !race->nativeRootAttached_||pause->entity_->application!=entitiesOwner_||
+       !pause->entity_->initialized||pause->entity_->releasing||
+       !pause->entity_->currentForest()||pause->entity_->component.parent1C!=entitiesOwner_->application10()||
+       pause->entity_->component.mask20!=0x1402u||(pause->entity_->component.flags29&3u)!=3u||
+       !session.actual_.applicationAnimation.readPause11C(paused)||!paused)return false;
+    // Invoke the existing service here, rather than accepting a caller-supplied
+    // gap receipt or resetting the listener cursor at Resume. No second mix.
+    if(!race->music10C_)return actualGameplay.serviceNativeMenuAudio(micros,audio);
+    if(!consumedRaAll8ListenerCustodyNativeCurrent(session))return false;
+    const auto scope=race->endHud_.lock();
+    if(scope->gameplay_!=&actualGameplay)return false;
+    rr::game::OriginalRaceMusicManagerDiagnostic50LA d;
+    const bool okay=race->music10C_->serviceNativeMenuAudio(*race,*scope,micros,audio,d);
+    pc=d.sourcePC;return okay;
 }
 bool Application::completeConsumedRaMusicNative10C(original_camera_session50KX::Session& session,
     std::uint32_t& pc)const noexcept {

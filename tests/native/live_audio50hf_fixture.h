@@ -102,6 +102,18 @@ class Owner final {
 
     bool canStopResultsGameplay26D070(const rr::platform::AudioMixer50HD&,
         const rr::platform::RaceAudioGroups50IC&,std::uint64_t)const noexcept;
+    // ALL8 has no bound human controller. Its prepared selected Provider is
+    // NOT a stop owner: row0 AI loops already own the overlapping57..59 slots.
+    // This proves only the actual shared mixer backing and absence of human
+    // authority; outer residual-active checks still cover every unclaimed voice.
+    bool all8NonHumanMixerOwner26D070(const rr::platform::AudioMixer50HD& mixer,
+        const rr::platform::RaceAudioGroups50IC& groups,std::uint32_t row0Racer60)const noexcept {
+        return coldStorage_&&coldStorageThread_==std::this_thread::get_id()&&prepared_&&!closed_&&
+            &mixer_==&mixer && &groups_==&groups&&coldStorageEpoch_==mixer.groupEpoch50IC()&&
+            groups.uses(mixer)&&preparedRacer60_==row0Racer60&&!humanController_.bound()&&
+            !speechApplication_&&!speechBankOwner_&&!speechGeneration_&&
+            !humanSpeechCounts_&&!humanSpeechState_&&!humanSpeechRaw_;
+    }
     bool resultsGameplayStopVoice26D070(std::size_t n,std::size_t& slot)const noexcept {
         return provider_.resultsStopVoice26D070(n,slot);
     }

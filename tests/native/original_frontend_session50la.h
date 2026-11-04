@@ -440,7 +440,7 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
    const bool courseConfirmFromController=menuEvents[4]&&
        !(input.pressed[40]||input.pressed[88]||input.pressed[44]);
    menuEvents[4]=menuEvents[4]||input.pressed[40]||input.pressed[88]||input.pressed[44];
-   menuEvents[5]=menuEvents[5]||((gameOptions||controls||memoryCard||tournament)&&input.pressed[21]);
+   menuEvents[5]=menuEvents[5]||((gameOptions||controls||memoryCard||rider||tournament)&&input.pressed[21]);
    menuEvents[7]=menuEvents[7]||((controls||memoryCard)&&input.pressed[43]);
    menuEvents[6]=menuEvents[6]||input.pressed[41]||hostInput.menuRequested;
    // Same source-ID merge/order as the existing race-hosted frontend. One

@@ -8,6 +8,17 @@ using Error=OriginalUiRiderDrawResourceError50KG;
 using Diagnostic=OriginalUiRiderDrawResourceDiagnostic50KG;
 using Archive=assets::OriginalUiArchiveId50KG;
 constexpr auto unresolved=assets::unresolvedMaterialTexture50EA;
+struct PopupMaterial {const char* name;const char* texture;std::uint32_t token;std::size_t offset;bool font;};
+// Exact APPSTART rows for the existing root470/47C owners. These are not
+// Rider widgets or substitute overlay materials.
+constexpr PopupMaterial popupMaterials[]={
+    {"ui/textures/dimpopup",nullptr,3228,70804,false},
+    {"ui/textures/overlay1popup","overlay1",3229,70826,false},
+    {"font/venus16popup","venus16",3230,70853,true},
+    {"font/venus14popup","venus14",3231,70872,true},
+    {"ui/textures/icon_x_popup","icon_x",3232,70891,false},
+    {"ui/textures/icon_tri_popup","icon_tri",3233,70917,false}
+};
 bool fail(Diagnostic& d,Error error,std::uint32_t pc=0) noexcept {d.error=error;d.sourcePC=pc;return false;}
 char fold(char c) noexcept {return c=='\\'?'/':c>='A'&&c<='Z'?char(c+32):c;}
 bool same(const std::string& a,const std::string& b) noexcept {
@@ -102,11 +113,13 @@ bool OriginalUiRiderDrawResources50KG::load(const OriginalUiRiderColdInput50KG& 
         return fail(d,Error::archive);
     if(!validVideo(in.video))return fail(d,Error::videoOwner);
     if(!in.english||!in.english->loaded()||!in.runtime.overrideKnown)return fail(d,Error::input);
+    if(bool(in.controllerPopup)!=bool(in.retainedControllerPopup))return fail(d,Error::input,0x2055B0);
+    if(in.controllerPopup&&!authentic(in.controllerPopup,Archive::controllerPopup))return fail(d,Error::archive,0x2055B0);
     try {
         auto s=std::make_unique<Storage>();s->owners=in;s->owners.english=nullptr;s->widgetMaterial.fill(unresolved);
         if(!s->widgets.bind(in.rider,in.english,d.widgets))return fail(d,Error::widgets);
         if(!s->templates.load(*in.appStart,d.material))return fail(d,Error::material);
-        s->bindings.reserve(37);
+        s->bindings.reserve(in.retainedControllerPopup?43:37);
         std::vector<assets::OriginalUiImageSource50KG> sources;
         const auto addImages=[&](OriginalUiRiderMaterialBinding50KG& b,const assets::OriginalUiArchive50KG& owner,
             const std::string& name,bool font,bool animated)->bool {
@@ -126,7 +139,20 @@ bool OriginalUiRiderDrawResources50KG::load(const OriginalUiRiderColdInput50KG& 
                 const auto cel=font?owner.find("font/"+name+".cel"):assets::OriginalUiMemberView50KG{};
                 if(font&&(!cel.identity||!cel.data))return fail(d,Error::resource);
                 const auto identity=imageIdentity(owner.identity()->id,member,0);if(!identity)return fail(d,Error::resource);
-                b.images.push_back(static_cast<std::uint32_t>(sources.size()));sources.push_back({identity,member,0,member.size,cel});
+                // Popup Venus14/16 reuse the exact retained font PST/CEL pair
+                // already in Rider owner0. Never duplicate its image identity
+                // or substitute the Rider/overlay archive's same-name icon.
+                std::size_t index=0;
+                for(;index<sources.size();++index){const auto& source=sources[index];
+                    if(source.identity!=identity)continue;
+                    if(source.member.identity!=member.identity||source.member.data!=member.data||
+                        source.member.size!=member.size||source.pstOffset||source.pstBytes!=member.size||
+                        source.cel.identity!=cel.identity||source.cel.data!=cel.data||source.cel.size!=cel.size)
+                        return fail(d,Error::resource);
+                    break;
+                }
+                if(index==sources.size())sources.push_back({identity,member,0,member.size,cel});
+                b.images.push_back(static_cast<std::uint32_t>(index));
             }
             if(b.material.passes.size()!=1)return fail(d,Error::material);
             const auto& pass=b.material.passes[0];
@@ -182,7 +208,24 @@ bool OriginalUiRiderDrawResources50KG::load(const OriginalUiRiderColdInput50KG& 
             s->backgrounds[rider].rider=rider;s->backgrounds[rider].material=static_cast<std::uint32_t>(s->bindings.size());
             s->bindings.push_back(std::move(b));
         }
-        if(!registry(in.appStart->find("AppStart/Mat_Stbl.txt"),s->bindings))return fail(d,Error::registry,0x298724);
+        if(in.retainedControllerPopup){
+            for(const auto& entry:popupMaterials){
+                OriginalUiRiderMaterialBinding50KG b;b.registeredName=entry.name;
+                if(!assets::readOriginalUiMaterial50KG(*in.controllerPopup,b.registeredName+".psm",s->templates,
+                    assets::OriginalUiTemplate50KG::screenMt,in.runtime,b.material,d.material))return fail(d,Error::material);
+                if(entry.texture&&!addImages(b,entry.font?*in.fonts:*in.controllerPopup,entry.texture,entry.font,false))return false;
+                if(!entry.texture&&(b.material.passes.size()!=1||b.material.passes[0].textureCount!=0))return fail(d,Error::material);
+                s->bindings.push_back(std::move(b));
+            }
+        }
+        const auto table=in.appStart->find("AppStart/Mat_Stbl.txt");
+        if(!registry(table,s->bindings))return fail(d,Error::registry,0x298724);
+        if(in.retainedControllerPopup)for(const auto& entry:popupMaterials){
+            const auto index=find(s->bindings,entry.name);
+            if(index==unresolved||s->bindings[index].registryToken!=entry.token||
+                s->bindings[index].registryByteOffset!=entry.offset||s->bindings[index].registryIdentity!=table.identity)
+                return fail(d,Error::registry,0x298724);
+        }
         s->images=std::make_shared<assets::OriginalUiScreenAssets50KG>();
         if(!s->images->load(sources,d.resource))return fail(d,Error::resource);
         const auto* bank=s->images->textures();if(!bank)return fail(d,Error::resource);
@@ -255,10 +298,21 @@ bool OriginalUiRiderDrawResources50KG::load(const OriginalUiRiderColdInput50KG& 
             if(s->exitText[player].prepare({5,static_cast<std::uint8_t>(player+1)},in.rider,*in.english,s->images,
                 s->bindings[denmark].images[0],d.exitText)!=game::OriginalUiExitTextStatus50KG::ok)return fail(d,Error::geometry,0x1d6aec);
         s->bankInput.archives={in.appStart,in.rider,in.fonts,in.backgrounds,in.overlays};s->bankInput.owners={s->images};
+        if(in.retainedControllerPopup){
+            s->bankInput.archives.push_back(in.controllerPopup);
+            // Retain the caller's actual root47C. Its checked rejoin verifies
+            // all six keys against the existing canonical same-Video history.
+            // No constructor, initialization or history reset occurs here.
+            if(!in.retainedControllerPopup->prepareOrRejoin(in,s->images,s->bindings,d.controllerPopup))
+                return fail(d,Error::resource,d.controllerPopup.sourcePC);
+        }
         storage_=std::move(s);d={};return true;
     }catch(...){return fail(d,Error::allocation);}
 }
 bool OriginalUiRiderDrawResources50KG::loaded() const noexcept {return bool(storage_);}
+std::shared_ptr<OriginalUiControllerPopupResources50KG> OriginalUiRiderDrawResources50KG::controllerPopup() const noexcept {
+    return storage_?storage_->owners.retainedControllerPopup:nullptr;
+}
 game::OriginalUiRiderWidgets50KG* OriginalUiRiderDrawResources50KG::widgets() noexcept {return storage_?&storage_->widgets:nullptr;}
 const game::OriginalUiRiderWidgets50KG* OriginalUiRiderDrawResources50KG::widgets() const noexcept {return storage_?&storage_->widgets:nullptr;}
 std::shared_ptr<const assets::OriginalUiScreenAssets50KG> OriginalUiRiderDrawResources50KG::images() const noexcept {return storage_?storage_->images:nullptr;}

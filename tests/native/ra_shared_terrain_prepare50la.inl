@@ -71,7 +71,7 @@
         if(!frame.terrainProbe.enabled||frame.bodies.main.domain.probe100!=1u)return;
         out.stoppedPC=0x1b1910;
         auto& preparedOwner=actual_->terrain.initial;
-        if(!live_terrain_probe50fr::matches(*row.terrainResource,preparedOwner)||
+        if(!sharedTerrainMatches(row,preparedOwner)||!sharedTerrainBankViewMatches(row,actual_->terrainLive)||
            row.effectRevision==std::numeric_limits<std::uint64_t>::max())return;
         g::QuerySpherePrepareInput48O input{};
         input.preparedScene=call.scene100_;
@@ -80,7 +80,8 @@
             //1B1968..1980 copies XYZ only; identity W remains1.
             for(unsigned i=0;i<3;++i)input.preparedScene.v[12+i]=call.scene100_.v[12+i];
         }
-        input.first=row.terrainResource->pair.first;input.second=row.terrainResource->pair.second;
+        const auto* pair=sharedTerrainPair(row);if(!pair)return;
+        input.first=pair->first;input.second=pair->second;
         g::QuerySpherePrepareOutput48O prepared{};
         out.stoppedPC=0x11f680;
         if(g::prepareQuerySphere48O(input,prepared)!=g::QuerySpherePrepareStatus48O::Ready||
@@ -122,9 +123,10 @@
         //owner borrow, not global guest3DF5B8 or a spring/MB transaction.
         auto& result=*row.terrainResult90;
         const auto& sentinel=original_follow_query_bridge::QueryBridge::sentinel3E02C0;
-        std::memcpy(&result.selected_.first,&sentinel,sizeof(sentinel));
-        std::memcpy(&result.selected_.second,&sentinel,sizeof(sentinel));
-        result.selected_.fraction=1.f;result.count60_=0;result.resetKnown_=true;
+        std::memcpy(&result.first(),&sentinel,sizeof(sentinel));
+        std::memcpy(&result.second(),&sentinel,sizeof(sentinel));
+        result.fraction()=1.f;result.hits()=0;result.resetKnown_=true;
+        result.selectedHitKnown_=false; //Native guard only; source suffix survives.
         //All previous selected suffix/per-contact bytes survive11DD00.
         call.cut_=SharedTerrainInvocation::Cut::limited;out.stoppedPC=0x1226b0;
         if(!lease.producer_->terrainLimited)return;

@@ -73,8 +73,9 @@ bool OriginalUiControllerPopupGeometry50KG::prepare(const assets::OriginalUiEngl
         return fail(d,Error::localization,0x1F97E4);
     const auto* message=english.at(OriginalUiControllerPopup50KG::controller2TextId);
     const auto* confirm=english.at(OriginalUiControllerPopup50KG::confirmTextId);
-    const auto* purchase=english.at(217);const auto* yes=english.at(9);const auto* no=english.at(10);
-    if(!purchase||!yes||!no||purchase->text.empty()||yes->text.empty()||no->text.empty())return fail(d,Error::localization,0x2060A0);
+    const auto* purchase=english.at(217);const auto* accept=english.at(9);const auto* cancel=english.at(10);
+    const auto* reset=english.at(OriginalUiControllerPopup50KG::riderResetTextId);
+    if(!purchase||!accept||!cancel||!reset||purchase->text.empty()||accept->text.empty()||cancel->text.empty()||reset->text.empty())return fail(d,Error::localization,0x2060A0);
     if(!message||!confirm||message->text.empty()||confirm->text.empty())return fail(d,Error::localization,0x1F97E4);
     if(!images.loaded()||!images.textures())return fail(d,Error::resource,0x2057E8);
     const assets::Texture48B *atlas=nullptr,*cross=nullptr,*triangle=nullptr,*overlay=nullptr;
@@ -94,12 +95,13 @@ bool OriginalUiControllerPopupGeometry50KG::prepare(const assets::OriginalUiEngl
     }
     if(!overlay)return fail(d,Error::resource,0x205B4C);
     try {
-        std::array<std::array<OriginalUiControllerPopupText50KG,3>,3> next{};
+        std::array<std::array<OriginalUiControllerPopupText50KG,3>,4> next{};
         for(std::size_t variant=0;variant<next.size();++variant){
             const bool dual=variant!=0;
-            if(!text(next[variant][0],variant==1?purchase->text:message->text,60,0x270,320,204,3,*font,*atlas,d)||
-               !text(next[variant][1],variant==1?yes->text:confirm->text,40,0x2E0,dual?412:312,257,0,*font,*atlas,d)||
-               !text(next[variant][2],dual?no->text:std::string{},40,0x350,dual?232:0,dual?257:0,0,*font,*atlas,d))return false;
+            const bool accepts=variant==1||variant==3;
+            if(!text(next[variant][0],variant==3?reset->text:variant==1?purchase->text:message->text,60,0x270,320,204,3,*font,*atlas,d)||
+               !text(next[variant][1],accepts?accept->text:confirm->text,40,0x2E0,dual?412:312,257,0,*font,*atlas,d)||
+               !text(next[variant][2],dual?cancel->text:std::string{},40,0x350,dual?232:0,dual?257:0,0,*font,*atlas,d))return false;
         }
         textVariants_=std::move(next);selectedTexts_=0;
         crossWidth_=float(cross->width);crossHeight_=float(cross->height);
@@ -124,7 +126,7 @@ bool OriginalUiControllerPopupGeometry50KG::project(const OriginalUiControllerPo
             return fail(d,Error::invalidRender,0x206538,static_cast<std::uint16_t>(0x40+0x60*i));
     }
     const bool dual=render.state.hasConfirm3D0&&render.state.hasCancel3D4;
-    selectedTexts_=render.state.garagePurchaseText?1:dual?2:0;
+    selectedTexts_=render.state.riderResetText?3:render.state.garagePurchaseText?1:dual?2:0;
     std::array<OriginalUiOverlayQuad50KG,6> next{};
     // 205764 writes alpha79 directly; 2057AC calls133F20(0x191919), whose
     // byte>>1 conversion yields12/12/12. Do not convert alpha79 a second time.

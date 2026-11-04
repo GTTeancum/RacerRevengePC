@@ -311,6 +311,7 @@ class OriginalApplicationEntities50LA final {
     friend class OriginalSimpleVCR50LA;
     friend class OriginalRaceMusicManager50LA;
     friend class OriginalRaceTimingManager50LA;
+    friend class OriginalRaceRacerManager50LA;
     friend class OriginalTunnelTrack50LA;
     friend class OriginalRaceConstructor50LA;
     friend class ::ra_source_camera50LA::OwnershipBridge;

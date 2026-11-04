@@ -342,6 +342,7 @@ void OriginalRaceConstructor50LA::continuePreAck1AB520(
         case Cut::musicFadeStopped:
         case Cut::particleStopped:
         case Cut::worldRestartStopped:
+        case Cut::racerRestartStopped:
             stop(S::incomplete,scan.stoppedPC,
                 "Waiting-results restart prefix stopped; actual writes retained without retry or replay");return;
         case Cut::vcrFlag:
@@ -430,9 +431,25 @@ void OriginalRaceConstructor50LA::continuePreAck1AB520(
                     "Actual World restart stopped; ordered owner effects retained without replay");return;
             }
             scan.stoppedPC=0x1ac994;field90_=0; //Actual SAME Race scalar after World return.
-            scan.stoppedPC=0x1ac998;
-            stop(S::incomplete,scan.stoppedPC,
-                "World restart returned and Race90 cleared; actual RaceB0 publication/reset1AEA70 remains unjoined");return;
+            scan.cut=Cut::racerRestart;break;
+        case Cut::racerRestart: {
+            //1AC998 loads the actual B0.1AC9A4 passes the saved original
+            //1AC8E0 A1, which is zero for THIS1ABAD8 Results call (delay1ABADC).
+            // Claim before any16E830 mutation; never replay a reached AI row.
+            scan.cut=Cut::racerRestartStopped;scan.stoppedPC=0x1ac998;
+            const auto scope=endHud_.lock();
+            if(!endWorldCurrentNative()||!scope||!racerB0_){
+                stop(S::owner,scan.stoppedPC,"Actual same-Race native B0/World/Scope unavailable");return;
+            }
+            if(!scope->restartRacerScalars1AEA70(*this,0u,scan.stoppedPC)){
+                stop(S::incomplete,scan.stoppedPC,
+                    "Actual B0 restart stopped; reached AI scalar resets retained before placement dependency");return;
+            }
+            // The current bounded callee never reaches1AEA70's return. A
+            // future implementation must join the real1AED30 successor here.
+            scan.stoppedPC=0x1ac9a8;
+            stop(S::incomplete,scan.stoppedPC,"Actual B0 returned; separate1AED30 body reset remains unjoined");return;
+        }
         }
     }
 }

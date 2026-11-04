@@ -11,6 +11,7 @@
 #include "original_ui_garage_draw_contribution50kg.h"
 #include "original_ui_main_draw50kg.h"
 #include "original_ui_options_draw_contribution50kg.h"
+#include "original_ui_rider_draw_contribution50kg.h"
 #include "../../../src/assets/original_standard_ipum_image_lease50la.h"
 #include "../../../src/assets/original_standard_texture_resource50la.h"
 #include <type_traits>
@@ -84,6 +85,7 @@ struct OriginalUiSharedDialogMaterialHistory50KG::Storage {
     bool menuRendererNew=false;
     const OriginalUiSourceFrame50KM* menuFrame=nullptr;
     const OriginalUiNativeDraw50KG* menuDraw=nullptr;
+    const OriginalUiRiderDrawContribution50KG* menuRider=nullptr;
     const VehicleWindowGl50DS* renderer=nullptr;
     std::uint64_t menuGeneration=0,attemptedGeneration=0;
     OriginalUiGarageCanonicalSubmission50KG* garage=nullptr;
@@ -474,12 +476,25 @@ bool OriginalUiSharedDialogMaterialHistory50KG::authenticateImage(std::size_t ro
 bool OriginalUiSharedDialogMaterialHistory50KG::stageMenu(const OriginalUiSourceOwner50KM* owner,
     std::uint64_t revision,const OriginalUiSourceFrame50KM& frame,const assets::OriginalUiImageBank50KG& bank,
     const std::vector<MenuUse>& uses,const std::array<History,6>& candidate,D& d)noexcept {
+    return stageMenuWithBank(owner,revision,frame,bank,uses,candidate,nullptr,d);
+}
+bool OriginalUiSharedDialogMaterialHistory50KG::stageMenu(const OriginalUiRiderDrawContribution50KG* owner,
+    std::uint64_t revision,const OriginalUiSourceFrame50KM& frame,const assets::OriginalUiImageBank50KG& bank,
+    const std::vector<MenuUse>& uses,const std::array<History,6>& candidate,D& d)noexcept {
+    return stageMenuWithBank(owner,revision,frame,bank,uses,candidate,owner,d);
+}
+bool OriginalUiSharedDialogMaterialHistory50KG::stageMenuWithBank(const OriginalUiSourceOwner50KM* owner,
+    std::uint64_t revision,const OriginalUiSourceFrame50KM& frame,const assets::OriginalUiImageBank50KG& bank,
+    const std::vector<MenuUse>& uses,const std::array<History,6>& candidate,
+    const OriginalUiRiderDrawContribution50KG* rider,D& d)noexcept {
     d={};if(!current(owner,revision)||storage_->menuStaged||storage_->garage||storage_->menuPending||
        storage_->revision==std::numeric_limits<std::uint64_t>::max()||frame.owner_!=owner||!frame.native_||
        !frame.frameGeneration_||frame.garageCanonical_||!bank.loaded())return fail(d,E::history,0x249BA0);
     auto& s=*storage_;const auto& draw=frame.native_->draw;const auto images=bank.images();
-    if(!images||!images->textures()||!draw.textures||!draw.textures->matchesSourceBank(*images->textures(),draw.texturePublication)||
+    if(!images||!images->textures()||!draw.textures||
        !draw.spans||!frame.native_->states||draw.spanCount!=frame.native_->stateCount)return fail(d,E::identity,0x24B26C);
+    if(rider?(rider!=owner||!rider->residentSourceFrameCurrent(frame,bank)):
+       !draw.textures->matchesSourceBank(*images->textures(),draw.texturePublication))return fail(d,E::identity,0x24B26C);
     try {
         auto expected=s.history;std::array<bool,6> touched{};std::array<std::uint32_t,6> imageIndex{};
         std::uint32_t last=0;bool haveLast=false;
@@ -525,7 +540,8 @@ bool OriginalUiSharedDialogMaterialHistory50KG::stageMenu(const OriginalUiSource
             if(!sameCanonicalHistory(i,s.stagedHistory[i],slot.afterContext,slot.afterNativeBindings[0]))okay=false;
         }
         if(!okay){table->cancelUiSharedHistory(this,s.menuReceipt);return fail(d,E::history,d.sourcePC?d.sourcePC:0x249BA0);}
-        s.menuStaged=true;s.menuFrame=&frame;s.menuDraw=frame.native_;s.menuGeneration=frame.frameGeneration_;s.stagedBank=&bank;return true;
+        s.menuStaged=true;s.menuFrame=&frame;s.menuDraw=frame.native_;s.menuGeneration=frame.frameGeneration_;
+        s.stagedBank=&bank;s.menuRider=rider;return true;
     }catch(...){return fail(d,E::allocation,0);}
 }
 bool OriginalUiSharedDialogMaterialHistory50KG::beginMenu(const OriginalUiSourceOwner50KM* owner,
@@ -534,6 +550,7 @@ bool OriginalUiSharedDialogMaterialHistory50KG::beginMenu(const OriginalUiSource
     if(!s.menuStaged||s.menuPending||s.menuFrame!=&frame||s.menuDraw!=frame.native_||frame.owner_!=owner||
        frame.garageCanonical_||s.menuGeneration!=frame.frameGeneration_||s.menuGeneration<=s.attemptedGeneration||
        (s.renderer&&s.renderer!=&renderer)||!s.stagedBank||!s.stagedBank->loaded()||
+       (s.menuRider&&!s.menuRider->residentSourceFrameCurrent(frame,*s.stagedBank))||
        !s.domain->materials382B38()->uiSharedHistoryCurrent(this,s.menuReceipt))return false;
     s.menuRendererNew=!s.renderer;s.renderer=&renderer;s.attemptedGeneration=s.menuGeneration;s.menuPending=true;return true;
 }
@@ -565,7 +582,7 @@ bool OriginalUiSharedDialogMaterialHistory50KG::finishMenu(const OriginalUiSourc
     }else if(started){poison(owner);table->poisonUiSharedHistory(this,s.menuReceipt);}
     const bool released=table->releaseUiSharedHistory(this,s.menuReceipt);
     if(!released){s.poisoned=true;return false;}
-    s.menuStaged=false;s.menuFrame=nullptr;s.menuDraw=nullptr;s.stagedBank=nullptr;s.menuGeneration=0;s.menuRendererNew=false;
+    s.menuStaged=false;s.menuFrame=nullptr;s.menuDraw=nullptr;s.stagedBank=nullptr;s.menuRider=nullptr;s.menuGeneration=0;s.menuRendererNew=false;
     return !s.poisoned;
 }
 bool OriginalUiSharedDialogMaterialHistory50KG::menuStagePending(const OriginalUiSourceOwner50KM* owner)const noexcept {
@@ -579,12 +596,16 @@ bool OriginalUiSharedDialogMaterialHistory50KG::releaseMenu(const OriginalUiOpti
     const VehicleWindowGl50DS* renderer)noexcept {
     return owner&&renderer&&owner->historyRendererRetired(*renderer)&&releaseMenuAfterRetirement(owner,renderer);
 }
+bool OriginalUiSharedDialogMaterialHistory50KG::releaseMenu(const OriginalUiRiderDrawContribution50KG* owner,
+    const VehicleWindowGl50DS* renderer)noexcept {
+    return owner&&renderer&&owner->historyRendererRetired(*renderer)&&releaseMenuAfterRetirement(owner,renderer);
+}
 bool OriginalUiSharedDialogMaterialHistory50KG::releaseMenuAfterRetirement(const OriginalUiSourceOwner50KM* owner,
     const VehicleWindowGl50DS* retiredRenderer)noexcept {
     if(!storage_||!owner||storage_->lease!=owner||storage_->garage||storage_->menuPending)return false;
     auto& s=*storage_;if(s.renderer&&s.renderer!=retiredRenderer)return false;
     if(s.menuStaged&&!s.domain->materials382B38()->cancelUiSharedHistory(this,s.menuReceipt))return false;
-    s.menuStaged=false;s.menuFrame=nullptr;s.menuDraw=nullptr;s.stagedBank=nullptr;s.menuGeneration=0;
+    s.menuStaged=false;s.menuFrame=nullptr;s.menuDraw=nullptr;s.stagedBank=nullptr;s.menuRider=nullptr;s.menuGeneration=0;
     s.renderer=nullptr;s.lease=nullptr;s.attemptedGeneration=0;return true;
 }
 bool OriginalUiSharedDialogMaterialHistory50KG::stageGarage(OriginalUiGarageCanonicalSubmission50KG& tx,

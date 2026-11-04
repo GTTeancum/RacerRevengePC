@@ -719,7 +719,7 @@ bool VehicleWindowGl50DS::Storage::restoreDisplayFadeBindings(I w,I h) noexcept 
 
 bool VehicleWindowGl50DS::Storage::deleteDisplayFadeNames(VehicleWindowDiagnostic50DS& d) noexcept {
         // Last complete publication may point at an effect surface. Call only
-        // after a newer race publication or after close has invalidated it.
+        // after a newer admitted race/Pause publication or after close has invalidated it.
         displayFadeDeletionPending=true;
         if(!deleteShaderName(displayFadeProgram,true,d) ||
            !deleteShaderName(displayFadeVertexShader,false,d) ||
@@ -2033,6 +2033,7 @@ bool VehicleWindowGl50DS::Storage::cleanup(VehicleWindowDiagnostic50DS& d) noexc
         frameCables = nullptr; frameHostHud = false;frameGcParticles=nullptr;
         committedWidth = committedHeight = raceWidth = raceHeight = 0;
         retainedRaceDisplayCompleted=retainedRaceContainsPause=false;
+        pauseDisplayPublication={};
         pendingRaceCameraPublication=retainedRaceCameraPublication=0;
         displayedTarget = 0;
         trackVisibilityPendingTarget=0;trackVisibilityCompletedValid=false;

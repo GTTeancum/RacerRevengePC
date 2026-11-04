@@ -1606,6 +1606,49 @@ bool VehicleWindowGl50DS::Storage::preparePauseDerivedResources(std::shared_ptr<
     h.ready=true;return true;
 }
 
+bool VehicleWindowGl50DS::Storage::pauseDisplayIdentityCurrent()const noexcept {
+    const auto& p=pauseDisplayPublication;
+    if(!pauseDerived||!pauseDerived->ready||!p.owner||!p.target||
+       p.target!=displayedTarget||p.target!=menuTargets[menuPublished]||
+       !imageCommitted||p.width!=committedWidth||p.height!=committedHeight||
+       p.width!=raceWidth||p.height!=raceHeight||p.width<=0||p.height<=0||
+       !retainedRaceDisplayCompleted||retainedRaceContainsPause||
+       !p.cameraPublication||p.cameraPublication!=retainedRaceCameraPublication)return false;
+    const auto& h=*pauseDerived;
+    // These are the prepared draw's actual owner/viewport/material identities,
+    // not a later supplied frame or a claim that the Pause remains active.
+    // close1BE830 does not replace the already displayed native pixels.
+    return h.owner.get()==p.owner&&p.viewport&&h.viewport==p.viewport&&
+        p.serial&&h.serial==p.serial&&p.scene&&h.scene==p.scene&&
+        p.generation&&h.generation==p.generation&&h.publication==p.texturePublication&&
+        h.cameraPublication==p.cameraPublication;
+}
+void VehicleWindowGl50DS::Storage::stagePauseDisplayPublication(U target,I w,I height)noexcept {
+    pauseDisplayPublication={};
+    if(!pauseDerived||!pauseDerived->ready||!pauseDerived->owner)return;
+    const auto& h=*pauseDerived;
+    pauseDisplayPublication={h.owner.get(),h.viewport,target,w,height,h.serial,h.scene,
+        h.generation,h.publication,h.cameraPublication,0};
+}
+void VehicleWindowGl50DS::Storage::completePauseDisplayPublication()noexcept {
+    // Called after successful actual swap/headless completion and all existing
+    // completion owners. No GL, allocation, user callback or source mutation.
+    if(!pauseDisplayIdentityCurrent()||!gameplayHistoryValid||!gameplayHistoryGeneration||
+       gameplayHistoryStaged||gameplayAwaitingTarget||
+       gameplayHistoryWidth!=committedWidth||gameplayHistoryHeight!=committedHeight){
+        pauseDisplayPublication={};return;
+    }
+    pauseDisplayPublication.completedHistory=gameplayHistoryGeneration;
+}
+bool VehicleWindowGl50DS::Storage::completedPauseDisplayCurrent()const noexcept {
+    const auto& p=pauseDisplayPublication;
+    return p.completedHistory&&p.completedHistory==gameplayHistoryGeneration&&
+        gameplayHistoryValid&&!gameplayHistoryStaged&&!gameplayAwaitingTarget&&
+        gameplayHistoryWidth==p.width&&gameplayHistoryHeight==p.height&&pauseDisplayIdentityCurrent()&&
+        pauseDerived->owner->current()&&
+        pauseDerived->textures.validBorrow(request.context,request.isCurrent,p.texturePublication);
+}
+
 bool VehicleWindowGl50DS::Storage::preparePauseDerivedFrame(const game::OriginalPauseNativeDraw50LA* owner) noexcept {
     if(pauseDerived){pauseDerived->frame=false;pauseDerived->quads=pauseDerived->packetCount=0;}
     if(!owner)return true;
@@ -1726,6 +1769,7 @@ bool VehicleWindowGl50DS::Storage::drawPauseDerivedTargets(U sourceTarget,U dest
 }
 
 bool VehicleWindowGl50DS::Storage::deletePauseDerivedNames(VehicleWindowDiagnostic50DS& d) noexcept {
+    pauseDisplayPublication={};
     if(!pauseDerived)return true;auto& h=*pauseDerived;h.ready=h.frame=false;
     MaterialTextureGlDiagnostic50EB td;
     if(!h.textures.close(td)){if(td.cleanupIncomplete){d.cleanupIncomplete=true;return false;}

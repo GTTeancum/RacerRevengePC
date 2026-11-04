@@ -215,7 +215,15 @@ bool Registration::readNativeListenerScene(const rr::game::OriginalRaceConstruct
     const original_camera_session50KX::Session& camera,bool heldSourceScene,
     std::uint64_t previousPublication,std::uint64_t& publication,
     std::array<const float*,9>& actualXYZ)const noexcept {
-    if(camera_!=&camera||!endStateCurrent(race,camera)||!camera.coldBound_||
+    const bool human=camera_==&camera&&endStateCurrent(race,camera);
+    // Dedicated zero-human, one-view ALL8 adapter. The actual Application
+    // proves this Race's unique Session/Bank/manager/display and lexical Scope.
+    // Do not reuse endStateCurrent or publish HUD camera_ to obtain authority.
+    // This borrow deliberately does not check listenerStepStopped: the caller
+    // already claimed the actual mix token before these reached camera reads.
+    const bool all8=!camera_&&!published_&&application_&&race_.lock().get()==&race&&
+        race.endHud_.lock().get()==this&&application_->consumedRaAll8ListenerCustodyNativeCurrent(camera);
+    if((!human&&!all8)||!camera.coldBound_||
        camera.closed_||camera.abandoned_||!camera.hasView()||
        camera.frameStage_!=original_camera_session50KX::Session::FrameStage::published||
        camera.pendingDisplayWork()||!race.ownsNativeCameraAdapter34(camera)||

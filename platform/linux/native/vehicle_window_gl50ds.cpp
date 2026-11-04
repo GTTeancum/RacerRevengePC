@@ -840,6 +840,9 @@ bool VehicleWindowGl50DS::submitHostMenu(const VehicleWindowHostMenu50DS& input,
     if (accepted) {
         // Separate color-only targets leave the native adapter's publication
         // bank, both GPU vertex banks, and its last complete race image intact.
+        // This writer is NOT original Pause. Repeated or failed window copies
+        // may cycle back to the same menu FBO; revoke its prior typed identity.
+        s.pauseDisplayPublication={};
         s.gl.bindFramebuffer(framebuffer, s.menuTargets[pending]);
         s.gl.drawBuffer(colorAttachment); s.gl.readBuffer(colorAttachment);
         s.gl.viewport(0, 0, width, height);
@@ -922,6 +925,9 @@ bool VehicleWindowGl50DS::submitRetainedOriginalPause(
         s.menuPublished=pending;s.displayedTarget=s.menuTargets[pending];
         s.uiPrivatePublicationGeneration=0;s.uiSourcePublishedTargetGeneration=0;
         s.committedWidth=width;s.committedHeight=height;s.imageCommitted=true;
+        // Private rendering is not display completion. The actual host swap
+        // or headless completion below will seal this exact typed candidate.
+        s.stagePauseDisplayPublication(s.displayedTarget,width,height);
         if(s.request.output==VehicleWindowOutput50DS::headless)
             s.noteGameplayDisplayPending(s.displayedTarget,width,height);
         else {
@@ -1145,6 +1151,13 @@ bool OriginalVideoBlockingNativeBackend::ownersCurrent() noexcept {
         return fail(diagnostic_,VehicleWindowError50DS::frame,"display fade requires idle non-reentrant renderer");
     return checkHost_(host_,window_,width_,height_,diagnostic_);
 }
+bool OriginalVideoBlockingNativeBackend::pauseReturnSourceCurrent()noexcept {
+    if(use_!=OriginalVideoNativeUse::blockingSourceLoops||!blendPoliciesSupported()||
+       (phase_!=OriginalVideoNativePhase::idle&&phase_!=OriginalVideoNativePhase::retired))return false;
+    if(phase_==OriginalVideoNativePhase::retired)width_=height_=0;
+    diagnostic_={};hostDiagnostic_={};
+    return ownersCurrent()&&renderer_.storage_->completedPauseDisplayCurrent();
+}
 game::OriginalCameraStartResult OriginalVideoBlockingNativeBackend::begin(
     game::OriginalVideoFadeDirection direction,const game::OriginalVideoFadeState& video) {
     OriginalOptionsMutationInterlock50KG::Operation operation;
@@ -1174,11 +1187,19 @@ game::OriginalCameraStartResult OriginalVideoBlockingNativeBackend::begin(
     if(phase_==OriginalVideoNativePhase::retired)width_=height_=0;
     if(!ownersCurrent())return failure(pc);
     auto& s=*renderer_.storage_;
+    // Original260850 snapshots the selected framebuffer through262830 before
+    // its262C70 recopy loop. Pause close changes activity, not those pixels.
+    // Admit only a renderer-sealed, actually presented ORIGINAL Pause image;
+    // a shared menu FBO, prepared frame or generic host-menu image is not proof.
+    const bool pauseSource=!async&&direction==game::OriginalVideoFadeDirection::out260850&&
+        s.completedPauseDisplayCurrent();
     if(!s.imageCommitted || !s.raceWidth || !s.raceHeight ||
-       s.displayedTarget!=s.targets[s.published] || s.committedWidth!=s.raceWidth || s.committedHeight!=s.raceHeight){
-        fail(diagnostic_,VehicleWindowError50DS::noImage,"display fade requires current real race image, never UI or invented cold image");
+       (s.displayedTarget!=s.targets[s.published]&&!pauseSource) ||
+       s.committedWidth!=s.raceWidth || s.committedHeight!=s.raceHeight){
+        fail(diagnostic_,VehicleWindowError50DS::noImage,"display fade requires actual race or completed original Pause image");
         return failure(pc);
     }
+    const auto sourceTarget=s.displayedTarget; //Same immutable snapshot source, never the underlay fallback.
     width_=s.raceWidth;height_=s.raceHeight;
     if(!ownersCurrent()){width_=height_=0;return failure(pc);}
     s.diagnostic=&diagnostic_;
@@ -1188,7 +1209,7 @@ game::OriginalCameraStartResult OriginalVideoBlockingNativeBackend::begin(
     // Failed work retains it; only real retirement/cancellation unlocks it.
     direction_=direction;nextOrdinal_=windowSwaps_=headlessCompletions_=0;last_={};pending_={};pendingBank_=0;
     s.displayFadeOwner=this;phase_=OriginalVideoNativePhase::failed;
-    s.gl.finish();accepted=s.check("complete race source before display-fade snapshot");
+    s.gl.finish();accepted=s.check("complete authenticated source before display-fade snapshot");
     if(accepted && !s.deleteDisplayFadeNames(diagnostic_))
         accepted=fail(diagnostic_,VehicleWindowError50DS::cleanup,"display-fade cached name deletion remains pending");
     I textureLimit=0,textureUnits=0;
@@ -1203,10 +1224,10 @@ game::OriginalCameraStartResult OriginalVideoBlockingNativeBackend::begin(
         s.createDisplayFadeTarget(s.displayFadeTargets[1],s.displayFadeColors[1],width_,height_) && s.createDisplayFadeProgram();
     if(accepted){
         s.gl.disable(0x0C11);s.gl.disable(0x8DB9);
-        s.gl.bindFramebuffer(readFramebuffer,s.targets[s.published]);s.gl.readBuffer(colorAttachment);
+        s.gl.bindFramebuffer(readFramebuffer,sourceTarget);s.gl.readBuffer(colorAttachment);
         s.gl.bindFramebuffer(drawFramebuffer,s.displayFadeSourceTarget);s.gl.drawBuffer(colorAttachment);
         s.gl.blitFramebuffer(0,0,width_,height_,0,0,width_,height_,colorBufferBit,0x2600);
-        accepted=s.check("snapshot actual committed race into distinct immutable display-fade source");
+        accepted=s.check("snapshot authenticated displayed image into distinct immutable display-fade source");
     }
     const bool restored=s.restoreDisplayFadeBindings(width_,height_);accepted=accepted && restored;
     if(accepted){s.gl.finish();accepted=s.check("complete immutable display-fade source snapshot");}
@@ -1531,6 +1552,7 @@ bool VehicleWindowGl50DS::completeGameplayDisplayImpl(GameHost50ER& host,
     s.acceptGameplayDisplayedHistory();
     s.acceptCompletedTrackVisibility();
     if(!s.completeRcParticleAttempt(d)||!s.completeGbParticleAttempt(d)||!s.completeMcParticleAttempt(d))return false;
+    s.completePauseDisplayPublication(); //Only this real completed display may seal Pause pixels.
     d.gameplayDisplayHistoryAccepted=true;
     d.gameplayDisplayHistoryGeneration=s.gameplayHistoryGeneration;
     d.gameplayWindowSwapSubmitted=window;d.gameplayHeadlessDisplayCompleted=!window;

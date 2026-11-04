@@ -99,6 +99,71 @@ inline Owner::NavigationResult Owner::continueRow0(rr::game::InputEvent48Z& even
     out.status=routed.status==rr::game::EventRouteStatus48Z::Complete?S::complete:S::childRoute;
     out.sourcePC=0x1BE80C;out.originalReturn=routed.handled?1u:0u;return out;
 }
+inline bool Owner::dispatchNativeInputBatch(rr::platform::OriginalSpectatorMenuInput50LA& input,
+    rr::platform::OriginalVideoBlockingNativeBackend* backend,Diagnostic& d)const noexcept {
+    d={};if(!input.beginDispatch(*this))return false;
+    return dispatchNativeInputRemainder(input,backend,d);
+}
+inline bool Owner::dispatchNativeInputRemainder(rr::platform::OriginalSpectatorMenuInput50LA& input,
+    rr::platform::OriginalVideoBlockingNativeBackend* backend,Diagnostic& d)const noexcept {
+    using Phase=rr::platform::OriginalSpectatorMenuInput50LA::Phase;
+    while(input.next_<input.batch_.count){
+        auto& event=input.batch_.events[input.next_];
+        auto& record=input.batch_.records[input.next_];
+        input.eventStarted_=true; //Claim before this input callback can mutate source state or audio.
+        const bool open=nativeSpectatorMenuOpen();
+        if(!open&&event.code==8){
+            if(!openNativeAll8SpectatorMenu(event,d)){
+                input.phase_=Phase::failed;return false;
+            }
+        }else if(open&&(event.code==12||event.code==14||event.code==2||event.code==15||event.code==13)){
+            const auto pause=pause_.lock();
+            if(event.code==2&&pause&&(pause->selection880_==9u||pause->selection880_==10u)){
+                using Start=original_main_entry50KG::Application::PauseReturnStart50LA;
+                const auto started=application_->beginNativePauseReturn50LA(*this,input,backend,d.sourcePC);
+                if(started==Start::started)return true; //Same event remains started and the whole batch stays owned.
+                if(started==Start::failed){input.phase_=Phase::failed;return false;}
+                if(started==Start::sourceSkipped){
+                    //Actual App2E0==0 skips the body, but still calls the real child tail.
+                    const rr::game::EventChildRouter48Z children{pause->entity_->component.descendants24,
+                        rr::game::noEventChild48Z,nullptr,0};
+                    if(rr::game::routeChildInputEvent48Z(children,true,event,record,nullptr,nullptr,0).status!=
+                        rr::game::EventRouteStatus48Z::Complete){input.phase_=Phase::failed;return false;}
+                }
+                input.eventStarted_=false;++input.next_;continue;
+            }
+            const auto result=event.code==2?continueRow0(event,record):pressNavigation1BD7C0(event,record);
+            using S=NavigationResult::Status;
+            if(result.status!=S::complete&&result.status!=S::actionUnavailable){
+                d.sourcePC=result.sourcePC;input.phase_=Phase::failed;return false;
+            }
+            // Other unavailable actions retain their original bounded behavior.
+            // Never invoke a generic extra child tail or fabricate handled input.
+        }
+        input.eventStarted_=false;++input.next_;
+    }
+    if(!input.retire(*this)){input.phase_=Phase::failed;return false;}
+    return true;
+}
+inline bool Owner::finishNativePauseReturnInput(rr::platform::OriginalSpectatorMenuInput50LA& input,
+    Diagnostic& d)const noexcept {
+    using Phase=rr::platform::OriginalSpectatorMenuInput50LA::Phase;
+    d={};d.sourcePC=0x1BE80C;
+    const auto pause=pause_.lock();const auto camera=camera_.lock();
+    if(!pause||!camera||!retainedAttachedLifecycle(*camera,*pause)||pause->active200_||
+       input.phase_!=Phase::suspended||!input.retainedForPauseReturn_||!input.currentPoll()||
+       input.claimedOwner_!=this||!input.eventStarted_||input.next_>=input.batch_.count)return false;
+    auto& event=input.batch_.events[input.next_];auto& record=input.batch_.records[input.next_];
+    const rr::game::EventChildRouter48Z children{pause->entity_->component.descendants24,
+        rr::game::noEventChild48Z,nullptr,0};
+    if(rr::game::routeChildInputEvent48Z(children,true,event,record,nullptr,nullptr,0).status!=
+        rr::game::EventRouteStatus48Z::Complete)return false;
+    input.eventStarted_=false;++input.next_;input.phase_=Phase::dispatching;
+    // Complete the SAME original physical batch after its source child tail.
+    // In this fixed order only Left/Right can follow Confirm; closed Pause
+    // consumes them without reopening or invoking another row9 body.
+    return dispatchNativeInputRemainder(input,nullptr,d);
+}
 inline bool Owner::resetNativePresentationClock()const noexcept {
     const auto pause=pause_.lock();const auto camera=camera_.lock();
     return pause&&camera&&attachedLifecycle(*camera,*pause)&&application_->resetUpdateClock140D70();

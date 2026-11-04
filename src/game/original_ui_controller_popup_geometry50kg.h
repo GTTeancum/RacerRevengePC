@@ -60,7 +60,7 @@ public:
     bool project(const OriginalUiControllerPopupRender50KG&,Diagnostic&) noexcept;
     const std::array<OriginalUiControllerPopupText50KG,3>& garagePurchaseTexts()const noexcept{return textVariants_[1];}
     const std::array<OriginalUiControllerPopupText50KG,3>& startTexts(const OriginalUiControllerPopupState50KG& state)const noexcept {
-        return textVariants_[state.garagePurchaseText?1:state.hasConfirm3D0&&state.hasCancel3D4?2:0];
+        return textVariants_[state.riderResetText?3:state.garagePurchaseText?1:state.hasConfirm3D0&&state.hasCancel3D4?2:0];
     }
     bool prepared()const noexcept{return prepared_;}
     std::size_t packetCount()const noexcept{return packetCount_;}
@@ -69,8 +69,8 @@ public:
 private:
     bool prepared_=false;
     // Cold-prepared original strings: Controller2, Garage, Controller2 after
-    // Garage (null a3 retains the original No label and hasCancel flag).
-    std::array<std::array<OriginalUiControllerPopupText50KG,3>,3> textVariants_{};
+    // Garage or Rider (null a3 retains CANCEL and hasCancel), and Rider reset.
+    std::array<std::array<OriginalUiControllerPopupText50KG,3>,4> textVariants_{};
     std::size_t selectedTexts_=0;
     std::array<OriginalUiOverlayQuad50KG,6> quads_{}; // dim, cross, triangle, three strips.
     std::array<OriginalUiControllerPopupPacket50KG,maximumPackets> packets_{};

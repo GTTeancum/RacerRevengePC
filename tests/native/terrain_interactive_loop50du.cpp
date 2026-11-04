@@ -99,6 +99,20 @@ void Context::run() {
   for(;;){
    // A suspended source input call still owns its original poll. Do not
    // dispatch fresh input, run simulation or commit tournament work around it.
+   if(originalMainApplication.pauseReturnInputPending50LA()){
+    discardTrackBaseline();bool closeRequested=false;
+    require50DU(host.pollLoading50DU(closeRequested,hostDiagnostic),"Pause retained input close pump failed");
+    hostClock.pause(monotonicNow50DU());
+    if(closeRequested)break; //Publication guard cancels backend before event storage unwinds.
+    std::uint32_t pc=0;
+    require50DU(originalMainApplication.advanceNativePauseReturn50LA(pc),
+        "Pause retained return failed with original effects and event custody retained");
+    captureCommitted();continue; //No fresh input/world step, including the successful return iteration.
+   }
+   bool pauseMenuDeparture=false;
+   require50DU(originalMainApplication.beginNativePauseMenuDeparture50LA(pauseMenuDeparture),
+       "Pause post-batch Main request consumption rejected");
+   if(pauseMenuDeparture)break;
    if(originalMainApplication.resultsDonePending50LA()){
     discardTrackBaseline();bool closeRequested=false;
     require50DU(host.pollLoading50DU(closeRequested,hostDiagnostic),
@@ -319,7 +333,7 @@ void Context::run() {
     const bool courseConfirmFromController=menuEvents[4]&&
         !(input.pressed[40]||input.pressed[88]||input.pressed[44]);
     menuEvents[4]=menuEvents[4]||input.pressed[40]||input.pressed[88]||input.pressed[44];
-    menuEvents[5]=menuEvents[5]||((gameOptionsInput||controlsInput||memoryCardInput||tournamentInput)&&input.pressed[21]);
+    menuEvents[5]=menuEvents[5]||((gameOptionsInput||controlsInput||memoryCardInput||riderInput||tournamentInput)&&input.pressed[21]);
     menuEvents[7]=menuEvents[7]||((controlsInput||memoryCardInput)&&input.pressed[43]);
     menuEvents[6]=menuEvents[6]||input.pressed[41]||hostInput.menuRequested;
     for(const unsigned event:{0u,1u,2u,3u,4u,5u,7u,6u})
@@ -406,32 +420,26 @@ void Context::run() {
         !input.eventBudgetExhausted&&sourceCameraSession&&sourceCameraSession->hasView()&&
         !sourceCameraSession->pendingDisplayWork()&&spectatorUnderlayPublication&&
         spectatorUnderlayPublication==sourceCameraSession->publicationCount();
-    platform::OriginalSpectatorMenuInput50LA::Batch menuEdges;
-    require50DU(spectatorMenuInput.observe(input,active,menuEdges),"spectator UI physical snapshot rejected");
+    require50DU(spectatorMenuInput.observe(host,hostInput,active),"spectator UI actual poll custody rejected");
     if(!active)spectatorClockResetRequired=true;
     if(active&&spectatorClockResetRequired){
      require50DU(sourcePauseObservation.resetNativePresentationClock(),"spectator UI source clock reset rejected");
      spectatorClockResetRequired=false;
     }
     const bool wasOpen=sourcePauseObservation.nativeSpectatorMenuOpen();
-    for(std::size_t edge=0;edge<menuEdges.count;++edge){
-     auto& event=menuEdges.events[edge];auto& record=menuEdges.records[edge];
-     const bool open=sourcePauseObservation.nativeSpectatorMenuOpen();
-     if(!open&&event.code==8){
-      original_pause_observation50LA::Owner::Diagnostic d;
-      require50DU(sourcePauseObservation.openNativeAll8SpectatorMenu(event,d),"native spectator Pause opening failed");
-     }else if(open&&(event.code==12||event.code==14||event.code==2||event.code==15||event.code==13)){
-      const auto result=event.code==2?sourcePauseObservation.continueRow0(event,record):
-          sourcePauseObservation.pressNavigation1BD7C0(event,record);
-      using Status=original_pause_observation50LA::Owner::NavigationResult::Status;
-      require50DU(result.status==Status::complete||result.status==Status::actionUnavailable,
-          "original Pause navigation failed after source effects");
-     }
+    original_pause_observation50LA::Owner::Diagnostic inputDiagnostic;
+    if(!sourcePauseObservation.dispatchNativeInputBatch(spectatorMenuInput,sourceFadeOut.get(),inputDiagnostic)){
+     std::ostringstream message;message<<"original Pause input failed after reached source effects, pc="
+         <<std::hex<<inputDiagnostic.sourcePC;
+     throw std::runtime_error(message.str());
     }
     // Original Pause owns this admitted route. No host-menu/restart command
     // or human driving packet may consume the same physical edge.
     hostInput.pauseRequested=hostInput.resumeRequested=hostInput.menuRequested=false;
     hostInput.restartRequested=hostInput.checkpointRequested=false;
+    if(originalMainApplication.pauseReturnInputPending50LA()){
+     discardTrackBaseline();hostClock.pause(monotonicNow50DU());continue;
+    }
     const bool open=sourcePauseObservation.nativeSpectatorMenuOpen();
     if(wasOpen&&!open){
      spectatorAudioLastNs=spectatorAudioCarryNs=0;
@@ -463,7 +471,13 @@ void Context::run() {
            spectatorAudioCarryNs+std::min<std::uint64_t>(elapsed,64000000));
        while(spectatorAudioCarryNs>=1000){
         const auto micros=static_cast<std::uint32_t>(std::min<std::uint64_t>(16000,spectatorAudioCarryNs/1000));
-        require50DU(liveAudio->serviceNativeMenuAudio(micros,audioDiagnostic),"native menu audio service rejected");
+        // The counted ALL8 listener accounts for actual menu consumption only;
+        // its world pose/velocity and music update remain held until Resume.
+        std::uint32_t listenerPC=0;
+        const bool serviced=sourceCameraSession&&originalMainApplication.serviceConsumedRaAll8MenuAudioNative(
+            *sourceCameraSession,*liveAudio,micros,audioDiagnostic,listenerPC);
+        if(!serviced)std::cerr<<"all8_menu_audio_stopped pc="<<listenerPC<<'\n';
+        require50DU(serviced,"native menu audio service rejected; reached mix retained");
         spectatorAudioCarryNs-=std::uint64_t(micros)*1000;
        }
       }

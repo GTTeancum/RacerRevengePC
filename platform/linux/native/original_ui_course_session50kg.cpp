@@ -3,6 +3,7 @@
 // Not byte-verified against lost candidate. Popup cloning/disable owner joined;
 // source-only review still required before destination admission.
 #include "original_ui_course_session50kg.h"
+#include "original_ui_pause_course_origin50la.h"
 #include "original_ui_tournament_session50kg.h"
 #include "../../../src/game/original_ui_course_mode2_entry50kg.h"
 #include <cmath>
@@ -310,8 +311,21 @@ S OriginalUiCourseSession50KG::bind(const OriginalUiCourseSessionCold50KG& cold,
        !cold.holograms||!cold.holograms->loaded()||!cold.courseArchive||!cold.english||!cold.english->loaded()||
        !cold.profile||!cold.profile->initialized()||!cold.commonProfile||!cold.application||!cold.lightManager||
        !cold.externalTransition||cold.externalTransition->snapshot().bound||
-       (cold.previousScreen!=5&&cold.previousScreen!=9))return result(d,S::unsupportedState);
+       (cold.previousScreen!=5&&cold.previousScreen!=9&&
+        !(cold.previousScreen==0&&cold.pauseCourseOrigin)))return result(d,S::unsupportedState);
     const bool tournament=cold.previousScreen==9;
+    const bool fromPause=bool(cold.pauseCourseOrigin);
+    if(fromPause){
+        game::OriginalUiCourseRememberedProfile50KG remembered;
+        OriginalUiRiderProfileOwner50KG::RiderSelectionFacts rider;
+        if(cold.previousScreen!=0||tournament||cold.tournamentProposal||
+           cold.application->sharedDialogs||cold.application->controllerPopupState.active3CC||
+           cold.application->controllerPopupState.closing3C8||
+           !cold.profile->courseSnapshot(remembered)||!bounded(remembered,*cold.commonProfile)||
+           remembered.subtype70C<1||remembered.subtype70C>2||
+           !cold.profile->courseRiderSelectionSnapshot(rider)||
+           !cold.pauseCourseOrigin->bindSession(*this))return result(d,S::profile,0x1DA4A0);
+    }
     if(tournament){
         const auto& p=cold.tournamentProposal;
         if(!p||!p->source||!p->source->ownsProfile(*cold.profile)||!p->source->routeProposalCurrent(*p)||
@@ -402,6 +416,8 @@ S OriginalUiCourseSession50KG::notifyTransition(const game::OriginalUiTransition
         game::OriginalUiCourseEntryPrefix50KG entry;game::OriginalUiCourseMode2EntryPlan50KG mode2;
         const auto stamp=s->cold.profile->stamp();OriginalUiRiderProfileOwner50KG::RiderSelectionFacts rider;
         const bool origin=s->state.mode34==2?(s->tournamentContinueAccepted&&sameStamp(stamp,s->coldStamp)):
+            s->cold.pauseCourseOrigin?(sameStamp(stamp,s->coldStamp)&&stamp.mode34==0&&
+                s->cold.pauseCourseOrigin->current(*this)&&s->cold.profile->courseRiderSelectionSnapshot(rider)):
             (stamp.mode34==0&&stamp.generation==s->coldStamp.generation+1&&s->cold.profile->courseRiderSelectionSnapshot(rider));
         valid=(s->state.mode34!=2||s->published)&&s->profileCurrent()&&origin&&s->entryPlan(entry,mode2)&&
             !entry.showPopup438&&entry.courseSlot14E4<=13&&assets::originalUiCourseBackgroundName50KG(entry.selectedControl.planet40);
@@ -412,6 +428,11 @@ S OriginalUiCourseSession50KG::notifyTransition(const game::OriginalUiTransition
         const bool committed=s->state.mode34==2?s->cold.profile->commitCourseMode2Entry(s->selection,mode2,stamp):
             s->cold.profile->commitCourseEntry(s->selection,entry,stamp);
         if(!committed){s->fault(S::profile,0x1DA618);break;}
+        // The genuine Pause receiver preserves its preimage until this same
+        // ordinary1DA618 write. Do not ask Root for the old stamp afterward:
+        // its counted request retires after exact incoming activation returns.
+        if(s->cold.pauseCourseOrigin&&!s->cold.pauseCourseOrigin->commitEntry(
+            *this,stamp,s->cold.profile->stamp())){s->fault(S::profile,0x1DA618);break;}
         s->liveStamp=s->cold.profile->stamp();s->state.courseSlot14E4=entry.courseSlot14E4;s->state.subtypeSlot14F4=entry.subtypeSlot14F4;
         if(s->state.mode34==2)s->state.tier14E8=mode2.tier14E8;
         else {s->state.laps14EC=entry.laps14EC;s->state.entrants14F0=entry.entrants14F0;}

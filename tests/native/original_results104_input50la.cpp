@@ -5,10 +5,16 @@
 #include "original_position_stats_adapter50la.h"
 #include "ra_cold_aggregate50la.h"
 #include "../../src/game/original_pause_storage50la.h"
+#include "original_pause_observation50la.h"
+#include "../../src/game/original_race_music_manager50la.h"
+#include "../../platform/linux/native/original_ui_pause_course_origin50la.h"
 #include "../../platform/linux/native/original_video_blocking_native.h"
 #include <limits>
+#include <cmath>
+#include <cfenv>
 
 namespace original_main_entry50KG {
+#include "original_pause_input50la.inl"
 struct NativeResultsInputContinuation50LA {
     std::shared_ptr<rr::game::OriginalRaceConstructor50LA> race;
     std::shared_ptr<original_camera_session50KX::Session> camera;

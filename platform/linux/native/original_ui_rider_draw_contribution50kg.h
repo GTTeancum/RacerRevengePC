@@ -3,10 +3,14 @@
 #include "original_ui_rider_draw_resources50kg.h"
 #include "original_ui_rider_stat_draw50kg.h"
 #include "original_ui_lit_material_adapter50km.h"
+#include "original_ui_controller_popup_resources50kg.h"
 #include "../../../src/game/original_ui_rider_selected_packet50kg.h"
 #include "../../../src/game/original_ui_aperture_owner50kg.h"
 namespace rr::platform {
 class VehicleWindowGl50DS;
+struct VehicleWindowDiagnostic50DS;
+class OriginalUiSharedDialogs50KG;
+class OriginalUiSharedDialogMaterialHistory50KG;
 struct OriginalUiRiderDrawClock50KG {bool known=false,advanceAnimations=false;std::uint32_t milliseconds=0;
     game::OriginalApplicationAnimationClockView50KG applicationAnimation{};};
 enum class OriginalUiRiderContributionError50KG : std::uint8_t {
@@ -26,10 +30,11 @@ struct OriginalUiRiderContributionDiagnostic50KG {
     game::OriginalUiRiderSelectedPacketDiagnostic50KG selected;
     game::OriginalUiRiderModelDiagnostic50KG model;
     game::OriginalUiTextDiagnostic50KG text;
+    OriginalUiControllerPopupResourceDiagnostic50KG controllerPopup;
 };
 // Complete native Rider frame owner. One sealed OriginalUiSourceFrame50KM composer.
 // It owns every projected vertex/W/fog stream and all pass/bank lifetime pins.
-// Session must preserve this exact source order: ordinary widgets/models,
+// Session must preserve this exact source order: actual shared47C, ordinary widgets/models,
 // page stats then four background sprites, aperture0/1, prompts, top widgets,
 // and group drain. No partial contribution can obtain a source-frame seal.
 class OriginalUiRiderDrawContribution50KG final : public OriginalUiSourceOwner50KM {
@@ -59,6 +64,8 @@ public:
     bool bindPublishedBank(std::shared_ptr<const MaterialTextureGl50EB>,OriginalUiRiderContributionDiagnostic50KG&) noexcept;
     bool begin(const OriginalUiRiderDrawClock50KG&,const game::OriginalUiRiderRenderContext50KG&,
         const game::OriginalUiRiderLighting50KG&,OriginalUiRiderContributionDiagnostic50KG&) noexcept;
+    bool projectControllerRequiredPopup(const game::OriginalUiControllerPopupRender50KG&,
+        OriginalUiRiderContributionDiagnostic50KG&) noexcept;
     bool projectOrdinaryWidgets(bool ancestorsShown,OriginalUiRiderContributionDiagnostic50KG&) noexcept;
     bool projectPage(const game::OriginalUiRiderStatInput50KG&,bool pageShown,OriginalUiRiderContributionDiagnostic50KG&) noexcept;
     bool projectExitText(const game::OriginalUiApertureHook50KG&,OriginalUiRiderContributionDiagnostic50KG&) noexcept;
@@ -67,11 +74,32 @@ public:
     bool projectOnTopWidgets(bool ancestorsShown,OriginalUiRiderContributionDiagnostic50KG&) noexcept;
     bool finish(OriginalUiRiderContributionDiagnostic50KG&) noexcept;
     const OriginalUiSourceFrame50KM* frame()const noexcept;
+    const OriginalUiNativeDraw50KG* draw()const noexcept;
     // Invalidates CPU publication; invoke before callbacks or bank replacement.
     // Renderer retirement is SEPARATE: call retireOriginalUiSourceOwner while
     // this instance lives, and keep it alive for retry if that operation fails.
     void drain() noexcept;
 private:
+    friend class OriginalUiSharedDialogs50KG;
+    friend class OriginalUiSharedDialogMaterialHistory50KG;
+    std::shared_ptr<OriginalUiSharedDialogs50KG> menuShared_;
+    OriginalUiRiderSession50KG* menuSession_=nullptr;
+    std::uint64_t menuInvocationEpoch_=0;
+    mutable std::uint64_t menuAcceptedEpoch_=0;
+    const VehicleWindowGl50DS* menuRetiredRenderer_=nullptr;
+    bool bindSharedMenu470(OriginalUiRiderSession50KG&,std::shared_ptr<OriginalUiSharedDialogs50KG>)noexcept;
+    bool sharedMenuBoundCurrent(const OriginalUiSharedDialogs50KG&,const OriginalUiRiderSession50KG&)const noexcept;
+    bool sharedMenuInvocationCurrent(const OriginalUiSharedDialogs50KG&,std::uint64_t)const noexcept;
+    bool sharedMenuCollectorInitialized(const OriginalUiSharedDialogs50KG&,std::uint64_t)const noexcept;
+    bool sharedMenuFrameCurrent(const OriginalUiSharedDialogs50KG&,std::uint64_t,std::uint64_t)const noexcept;
+    bool sharedMenuRetiredCurrent(const OriginalUiSharedDialogs50KG&,const VehicleWindowGl50DS&)const noexcept;
+    bool sharedPopupInputCurrent(const OriginalUiSharedDialogs50KG&)const noexcept;
+    bool historyRendererRetired(const VehicleWindowGl50DS&)const noexcept;
+    bool residentSourceFrameCurrent(const OriginalUiSourceFrame50KM&,const assets::OriginalUiImageBank50KG&)const noexcept;
+    bool sourceTeardownPending()const noexcept;
+    bool retireSourceRenderer(VehicleWindowGl50DS&,VehicleWindowDiagnostic50DS&,
+        OriginalUiRiderContributionDiagnostic50KG&)noexcept;
+    bool acquireSharedHistory(OriginalUiRiderContributionDiagnostic50KG&)noexcept;
     // Synchronous parent+A4 grouping or authenticated retirement consumption.
     // Lifecycle acceptance is independent from source-frame acceptance. Only
     // the backend acknowledges the prefix after both consumers accepted it.

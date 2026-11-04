@@ -316,8 +316,12 @@ class QueryBridge {
             }
             const auto index=b.owner->ref(1)-1u;const auto& shape=b.owner->query(1).type0;
             std::size_t extent=0;
-            if(!meshExtent(b.assets->targetE4().mesh,extent)||extent>wreckMeshStackCapacity_||extent>meshStack_.size()||
-               geometry_[index].mesh!=&b.assets->targetE4().mesh||geometry_[index].compound||
+            const auto& query=b.owner->query(1);
+            const auto* owned=query.type0Owners.resource();
+            const auto* mesh=query.type0Owners.attempted()?
+                (query.type0Owners.loaded()&&owned&&owned->live()?&owned->mesh():nullptr):&b.assets->targetE4().mesh;
+            if(!mesh||!meshExtent(*mesh,extent)||extent>wreckMeshStackCapacity_||extent>meshStack_.size()||
+               geometry_[index].mesh!=mesh||geometry_[index].compound||
                !geometry_[index].hasResponseCallbackE8||
                std::memcmp(geometry_[index].world.v,shape.composed00.v,sizeof shape.composed00.v))return false;
         }

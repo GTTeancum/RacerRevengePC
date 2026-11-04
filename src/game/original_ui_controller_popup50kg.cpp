@@ -19,6 +19,7 @@ OriginalUiControllerPopupStatus50KG begin(const OriginalUiControllerPopupState50
 }
 }
 bool OriginalUiControllerPopup50KG::valid(const OriginalUiControllerPopupState50KG& s) noexcept {
+    if(s.riderResetText&&(s.garagePurchaseText||!s.hasConfirm3D0||!s.hasCancel3D4))return false;
     if(!std::isfinite(s.delta3C0)||s.delta3C0<0||!std::isfinite(s.timer3C4)||s.timer3C4>.25f||s.result3D8>3)return false;
     for(const auto& q:s.strips)if(!std::isfinite(q.x)||!std::isfinite(q.y)||!std::isfinite(q.width)||!std::isfinite(q.height)||q.width!=640.f||q.height<0)return false;
     return true;
@@ -40,7 +41,7 @@ OriginalUiControllerPopupStatus50KG OriginalUiControllerPopup50KG::optionsEntryR
 }
 OriginalUiControllerPopupStatus50KG OriginalUiControllerPopup50KG::startController2(const OriginalUiControllerPopupState50KG& s,OriginalUiControllerPopupPlan50KG& p) noexcept {
     const auto status=begin(s,p,0x2060A0);if(status!=OriginalUiControllerPopupStatus50KG::ok)return status;
-    p.state.garagePurchaseText=false;
+    p.state.garagePurchaseText=false;p.state.riderResetText=false;
     p.state.hasConfirm3D0=true; // Nonnull a2. Null a3 does NOT clear stale 3D4.
     p.state.timer3C4=.125f;p.state.closing3C8=false;p.state.active3CC=true;p.state.result3D8=1;p.accepted=true;
     return status;
@@ -48,7 +49,15 @@ OriginalUiControllerPopupStatus50KG OriginalUiControllerPopup50KG::startControll
 OriginalUiControllerPopupStatus50KG OriginalUiControllerPopup50KG::startGaragePurchase(const OriginalUiControllerPopupState50KG& s,OriginalUiControllerPopupPlan50KG& p) noexcept {
     const auto status=begin(s,p,0x2060A0);if(status!=OriginalUiControllerPopupStatus50KG::ok)return status;
     // Garage1FDE70 supplies217,9,10: both argument pointers are nonnull.
-    p.state.garagePurchaseText=true;p.state.hasConfirm3D0=true;p.state.hasCancel3D4=true;
+    p.state.garagePurchaseText=true;p.state.riderResetText=false;p.state.hasConfirm3D0=true;p.state.hasCancel3D4=true;
+    p.state.timer3C4=.125f;p.state.closing3C8=false;p.state.active3CC=true;p.state.result3D8=1;p.accepted=true;
+    return status;
+}
+OriginalUiControllerPopupStatus50KG OriginalUiControllerPopup50KG::startRiderReset(const OriginalUiControllerPopupState50KG& s,OriginalUiControllerPopupPlan50KG& p) noexcept {
+    const auto status=begin(s,p,0x2060A0);if(status!=OriginalUiControllerPopupStatus50KG::ok)return status;
+    // Rider1EAA20 supplies171,9,10 after1EA870's prompt42C bit2 gate.
+    // Both argument pointers are nonnull; this is the retained shared popup.
+    p.state.garagePurchaseText=false;p.state.riderResetText=true;p.state.hasConfirm3D0=true;p.state.hasCancel3D4=true;
     p.state.timer3C4=.125f;p.state.closing3C8=false;p.state.active3CC=true;p.state.result3D8=1;p.accepted=true;
     return status;
 }

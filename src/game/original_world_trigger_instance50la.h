@@ -4,6 +4,8 @@
 #include "original_source_collision_observer50la.h"
 #include "original_collision_membership_guards50la.h"
 #include "original_source_portal_overlap231150.h"
+#include "original_bounded_portal_query50la.h"
+#include "original_bounded_portal_miss_tail50la.h"
 #include <bit>
 #include <cfenv>
 #include <cmath>
@@ -354,6 +356,7 @@ struct OriginalTriggerFogPrimaryPrefix50LA {
         std::optional<std::uint32_t> radiusF12,callContinuation;
         std::array<std::optional<std::uint32_t>,3> centerWords,vertexWords;
         bool operator==(const PortalInputs&)const=default;
+        bool helperEntered()const noexcept{return step==12;}
         bool historyCurrent()const noexcept {
             if(step>12||(step&&!nativeAdmissionAttempted)||bool(radiusF12)!=(step>=3)||
                (radiusF12&&*radiusF12!=0u)||bool(callContinuation)!=(step>=4)||
@@ -363,12 +366,661 @@ struct OriginalTriggerFogPrimaryPrefix50LA {
             return true;
         }
     } portalInputs;
+    struct PortalRelative {
+        using Words=std::array<std::uint32_t,4>;
+        std::uint8_t step=0; //Contiguous original23116C..23119C, stopping before normal LQC2.
+        std::array<std::optional<std::uint32_t>,3> differences;
+        std::optional<std::uint32_t> oneV0,normalOffset;
+        std::array<std::optional<std::uint32_t>,4> temporary10;
+        std::optional<Words> quadV0,local00,vf4;
+        //Value-only inference from the pinned PS2Float Sub/DoAdd intended
+        //signed model. No portable-source execution or EE hardware claim.
+        static std::optional<std::uint32_t> difference(std::uint32_t fs,std::uint32_t ft)noexcept {
+            if(!OriginalTriggerFogGeometryPrefix50LA::unitProductDomain(fs))return std::nullopt;
+            if((ft&0x7fffffffu)==0u)return fs; //Both signed zero operands; source sign is retained in the input receipt.
+            const auto exponent=(fs>>23)&255u;
+            if(!OriginalTriggerFogGeometryPrefix50LA::unitProductDomain(ft)||exponent<8u||
+               ((fs^ft)&0x7f800000u))return std::nullopt;
+            const auto delta=static_cast<std::int32_t>((fs&0x7fffffu)>>16)-static_cast<std::int32_t>((ft&0x7fffffu)>>16);
+            if(!delta)return 0u; //Pinned exact cancellation is positive zero.
+            const auto magnitude=static_cast<std::uint32_t>(delta<0?-delta:delta); //1..127, no signed overflow.
+            unsigned q=0;for(auto v=magnitude;v>1u;v>>=1u)++q;
+            const auto resultExponent=exponent+q-7u; //1..253; no subnormal, underflow or exponent255 result.
+            return (delta<0?0x80000000u:0u)|(resultExponent<<23)|((magnitude<<(23u-q))&0x7fffffu);
+        }
+        bool operator==(const PortalRelative&)const=default;
+        template<class Inputs>
+        bool historyCurrent(const Inputs& inputs)const noexcept {
+            if(step>13||(step&&!inputs.helperEntered())||bool(oneV0)!=(step>=2)||(oneV0&&*oneV0!=0x3f800000u)||
+               bool(normalOffset)!=(step>=6)||(normalOffset&&*normalOffset!=0x70u)||
+               bool(quadV0)!=(step>=11)||bool(local00)!=(step>=12)||bool(vf4)!=(step>=13))return false;
+            constexpr unsigned resultStep[3]={1,4,7},storeStep[4]={5,8,9,10};
+            for(unsigned k=0;k<3;++k){
+                if(bool(differences[k])!=(step>=resultStep[k]))return false;
+                if(differences[k]&&(!inputs.centerWords[k]||!inputs.vertexWords[k]||
+                   differences[k]!=difference(*inputs.centerWords[k],*inputs.vertexWords[k])))return false;
+            }
+            for(unsigned k=0;k<4;++k){
+                if(bool(temporary10[k])!=(step>=storeStep[k]))return false;
+                if(temporary10[k]&&temporary10[k]!=(k<3?differences[k]:oneV0))return false;
+            }
+            if(quadV0)for(unsigned k=0;k<4;++k)if((*quadV0)[k]!=*temporary10[k])return false;
+            return (!local00||local00==quadV0)&&(!vf4||vf4==local00);
+        }
+    } portalRelative;
+    struct PortalDot {
+        std::uint8_t step=0;
+        bool nativeAdmissionAttempted=false;
+        //Unknown W remains absent across LQC2, masked VMUL and full QMFC2.
+        std::array<std::optional<std::uint32_t>,4> normalVF5,productsVF5,gprV0;
+        std::optional<std::uint32_t> oneVF6,accX,sumVF5X,scalarF1,absoluteF8,temporary3C,reloadF0,outputDistance;
+        std::optional<bool> outputNonNull;
+        bool operator==(const PortalDot&)const=default;
+        static bool signedDomain(std::uint32_t w)noexcept {
+            return !(w&0x7fffffffu)||OriginalTriggerFogGeometryPrefix50LA::unitProductDomain(w&0x7fffffffu);
+        }
+        static std::optional<std::uint32_t> unitProduct(std::uint32_t fs,std::uint32_t ft)noexcept {
+            if(!signedDomain(fs)||!signedDomain(ft))return std::nullopt;
+            const auto a=fs&0x7fffffffu,b=ft&0x7fffffffu,sign=(fs^ft)&0x80000000u;
+            if(!a||!b)return sign;
+            if(a==0x3f800000u)return b|sign;
+            if(b==0x3f800000u)return a|sign;
+            return std::nullopt; //No general VU multiplier.
+        }
+        static std::optional<std::uint32_t> zeroSum(std::uint32_t fs,std::uint32_t ft)noexcept {
+            if(!signedDomain(fs)||!signedDomain(ft))return std::nullopt;
+            const auto a=fs&0x7fffffffu,b=ft&0x7fffffffu;
+            if(!a&&!b)return (fs&ft)&0x80000000u;
+            if(!a)return ft;if(!b)return fs;
+            return std::nullopt; //At most one nonzero term in this axis-normal domain.
+        }
+        bool axisNormal()const noexcept {
+            unsigned units=0;
+            for(unsigned k=0;k<3;++k){if(!normalVF5[k])return false;
+                const auto magnitude=*normalVF5[k]&0x7fffffffu;
+                if(magnitude==0x3f800000u)++units;else if(magnitude)return false;}
+            return units==1&&!normalVF5[3];
+        }
+        bool historyCurrent(const PortalRelative& relative)const noexcept {
+            if(step>14||(step&&!nativeAdmissionAttempted)||(nativeAdmissionAttempted&&relative.step!=13)||
+               normalVF5[3]||productsVF5[3]||gprV0[3]||bool(oneVF6)!=(step>=3)||
+               (oneVF6&&*oneVF6!=0x3f800000u)||bool(accX)!=(step>=4)||bool(sumVF5X)!=(step>=5)||
+               bool(scalarF1)!=(step>=7)||outputNonNull.has_value()!=(step>=8)||
+               (outputNonNull&&!*outputNonNull)||bool(absoluteF8)!=(step>=11)||
+               bool(temporary3C)!=(step>=12)||bool(reloadF0)!=(step>=13)||bool(outputDistance)!=(step>=14))return false;
+            for(unsigned k=0;k<3;++k){
+                if(bool(normalVF5[k])!=(step>=1)||bool(productsVF5[k])!=(step>=2)||bool(gprV0[k])!=(step>=6))return false;
+                if(productsVF5[k]&&(!relative.vf4||productsVF5[k]!=unitProduct((*relative.vf4)[k],*normalVF5[k])))return false;
+                if(gprV0[k]&&gprV0[k]!=(k?productsVF5[k]:sumVF5X))return false;
+            }
+            if(step>=2&&!axisNormal())return false;
+            if(accX&&accX!=zeroSum(*productsVF5[0],*productsVF5[1]))return false;
+            if(sumVF5X){const auto product=unitProduct(*oneVF6,*productsVF5[2]);
+                if(!product||sumVF5X!=zeroSum(*accX,*product))return false;}
+            return (!scalarF1||scalarF1==gprV0[0])&&(!absoluteF8||*absoluteF8==(*scalarF1&0x7fffffffu))&&
+                (!temporary3C||temporary3C==absoluteF8)&&(!reloadF0||reloadF0==temporary3C)&&
+                (!outputDistance||outputDistance==reloadF0);
+        }
+    } portalDot;
+    struct PortalSlab {
+        using Words=std::array<std::uint32_t,4>;
+        std::uint8_t prefixStep=0,negativeStep=0,missStep=0;
+        std::optional<bool> firstCondition,secondCondition,conditionBit,callerBranchTaken;
+        std::optional<Words> delayV0,secondZeroV0,returnV0; //POR establishes all128 bits, including the caller BEQ's whole operand.
+        std::optional<std::uint32_t> negativeRadius,returnPC,callerTarget;
+        bool operator==(const PortalSlab&)const=default;
+        static std::optional<bool> lessEqualZero(std::uint32_t fs)noexcept {
+            if(!PortalDot::signedDomain(fs))return std::nullopt;
+            return !(fs&0x7fffffffu)||bool(fs&0x80000000u);
+        }
+        static std::optional<bool> lessNegativeZero(std::uint32_t fs)noexcept {
+            if(!PortalDot::signedDomain(fs))return std::nullopt;
+            return bool(fs&0x80000000u)&&bool(fs&0x7fffffffu);
+        }
+        template<class Inputs>
+        bool historyCurrent(const PortalDot& dot,const Inputs& inputs)const noexcept {
+            if(prefixStep>4||negativeStep>5||missStep>6||(prefixStep&&dot.step!=14)||
+               firstCondition.has_value()!=(prefixStep>=1)||conditionBit.has_value()!=(prefixStep>=1)||
+               bool(delayV0)!=(prefixStep>=4)||(delayV0&&*delayV0!=Words{})||
+               bool(negativeRadius)!=(negativeStep>=1)||(negativeRadius&&*negativeRadius!=0x80000000u)||
+               secondCondition.has_value()!=(negativeStep>=2)||bool(returnV0)!=(missStep>=4)||
+               (returnV0&&*returnV0!=Words{})||bool(returnPC)!=(missStep>=4)||
+               (returnPC&&returnPC!=inputs.callContinuation)||callerBranchTaken.has_value()!=(missStep>=5)||
+               (callerBranchTaken&&!*callerBranchTaken)||bool(callerTarget)!=(missStep>=6)||
+               (callerTarget&&*callerTarget!=0x280cf8u))return false;
+            if(firstCondition&&(!dot.scalarF1||inputs.radiusF12!=0u||firstCondition!=lessEqualZero(*dot.scalarF1)))return false;
+            if(negativeStep&&(prefixStep!=4||firstCondition!=true))return false;
+            if(secondCondition&&(!dot.scalarF1||secondCondition!=lessNegativeZero(*dot.scalarF1)))return false;
+            if(conditionBit!=(negativeStep>=2?secondCondition:firstCondition))return false;
+            const bool secondMiss=negativeStep==5&&secondCondition==true;
+            if(secondZeroV0&&(!secondMiss||*secondZeroV0!=Words{}))return false;
+            if(missStep){
+                if(prefixStep!=4)return false;
+                if(firstCondition==false){if(negativeStep||secondZeroV0)return false;}
+                else if(!secondMiss||!secondZeroV0)return false;
+            }
+            return true;
+        }
+    } portalSlab;
+    struct PortalEdge0 {
+        using Words=std::array<std::uint32_t,4>;
+        std::uint8_t step=0,advanceStep=0,missStep=0;
+        bool nativeAdmissionAttempted=false;
+        std::optional<std::uint32_t> edgeOffset,oneVF6,accX,sumVF5X,scalarF0,returnPC,target;
+        std::optional<Words> relativeVF4,zeroV0,returnV0;
+        std::array<std::optional<std::uint32_t>,4> edgeVF5,productsVF5,gprV0;
+        std::optional<std::uint64_t> counterA2,oneV1,loopTestV0,loopOffsetV0; //Known low64, not invented high64.
+        std::optional<bool> conditionBit,callerBranchTaken;
+        bool operator==(const PortalEdge0&)const=default;
+        bool axisEdge()const noexcept {
+            unsigned units=0;for(unsigned k=0;k<3;++k){if(!edgeVF5[k])return false;
+                const auto magnitude=*edgeVF5[k]&0x7fffffffu;
+                if(magnitude==0x3f800000u)++units;else if(magnitude)return false;}
+            return units==1&&!edgeVF5[3];
+        }
+        template<class Inputs>
+        bool historyCurrent(const PortalSlab& slab,const PortalRelative& relative,const Inputs& inputs)const noexcept {
+            if(step>14||advanceStep>5||missStep>7||
+               (step&&(slab.prefixStep!=4||slab.negativeStep!=5||slab.secondCondition!=false||slab.missStep))||
+               (nativeAdmissionAttempted&&step<2)||(step>=3&&!nativeAdmissionAttempted)||
+               bool(edgeOffset)!=(step>=1)||(edgeOffset&&*edgeOffset!=0x80u)||bool(relativeVF4)!=(step>=2)||
+               (relativeVF4&&relativeVF4!=relative.local00)||edgeVF5[3]||productsVF5[3]||gprV0[3]||
+               bool(oneVF6)!=(step>=5)||(oneVF6&&*oneVF6!=0x3f800000u)||bool(accX)!=(step>=6)||
+               bool(sumVF5X)!=(step>=7)||bool(scalarF0)!=(step>=9)||conditionBit.has_value()!=(step>=11)||
+               bool(counterA2)!=(step>=14)||(counterA2&&*counterA2!=1u))return false;
+            for(unsigned k=0;k<3;++k){
+                if(bool(edgeVF5[k])!=(step>=3)||bool(productsVF5[k])!=(step>=4)||bool(gprV0[k])!=(step>=8))return false;
+                if(productsVF5[k]&&productsVF5[k]!=PortalDot::unitProduct((*relativeVF4)[k],*edgeVF5[k]))return false;
+                if(gprV0[k]&&gprV0[k]!=(k?productsVF5[k]:sumVF5X))return false;
+            }
+            if(step>=4&&!axisEdge())return false;
+            if(accX&&accX!=PortalDot::zeroSum(*productsVF5[0],*productsVF5[1]))return false;
+            if(sumVF5X){const auto product=PortalDot::unitProduct(*oneVF6,*productsVF5[2]);
+                if(!product||sumVF5X!=PortalDot::zeroSum(*accX,*product))return false;}
+            if(scalarF0&&scalarF0!=gprV0[0])return false;
+            if(conditionBit&&(inputs.radiusF12!=0u||conditionBit!=PortalSlab::lessEqualZero(*scalarF0)))return false;
+            if((advanceStep&&(step!=14||conditionBit!=true||missStep))||
+               (missStep&&(step!=14||conditionBit!=false||advanceStep)))return false;
+            if(bool(oneV1)!=(advanceStep>=2)||(oneV1&&*oneV1!=0x3f800000u)||
+               bool(loopTestV0)!=(advanceStep>=3)||(loopTestV0&&*loopTestV0!=1u)||
+               bool(loopOffsetV0)!=(advanceStep>=5)||(loopOffsetV0&&*loopOffsetV0!=16u)||
+               bool(zeroV0)!=(missStep>=2)||(zeroV0&&*zeroV0!=Words{})||bool(returnV0)!=(missStep>=5)||
+               (returnV0&&returnV0!=zeroV0)||bool(returnPC)!=(missStep>=5)||
+               (returnPC&&returnPC!=inputs.callContinuation)||callerBranchTaken.has_value()!=(missStep>=6)||
+               (callerBranchTaken&&!*callerBranchTaken)||bool(target)!=(advanceStep>=5||missStep>=7))return false;
+            return !target||*target==(advanceStep?0x23125cu:0x280cf8u);
+        }
+    } portalEdge0;
+    struct PortalLoop {
+        using Words=std::array<std::uint32_t,4>;
+        struct Iteration {
+            std::uint8_t step=0,advanceStep=0,missStep=0; //23125C..2312CC; taken2312D0 is step30.
+            bool addressAttempted=false,edgeAddressAttempted=false,edgeLoadAttempted=false;
+            std::optional<std::uint64_t> counterIn,vertexOffset,counterOut,loopTestV0,loopOffsetV0;
+            std::optional<std::uint32_t> edgeOffset,oneVF6,accX,sumVF5X,scalarF0,target;
+            std::array<std::optional<std::uint32_t>,3> centerWords,vertexWords,differences;
+            std::array<std::optional<std::uint32_t>,4> temporary20,edgeVF5,productsVF5,gprV0;
+            std::optional<Words> quadV0,local00,relativeVF4,zeroV0;
+            std::optional<bool> conditionBit,loopBranchTaken;
+            bool operator==(const Iteration&)const=default;
+            bool axisEdge()const noexcept {
+                unsigned units=0;for(unsigned k=0;k<3;++k){if(!edgeVF5[k])return false;
+                    const auto m=*edgeVF5[k]&0x7fffffffu;if(m==0x3f800000u)++units;else if(m)return false;}
+                return units==1&&!edgeVF5[3];
+            }
+            template<class Inputs>
+            bool historyCurrent(unsigned index,const Inputs& inputs,const PortalEdge0& edge0)const noexcept {
+                if(index<1||index>3||step>30||advanceStep>3||missStep>2||(step&&!addressAttempted)||
+                   (edgeAddressAttempted&&step<7)||(step>=8&&!edgeAddressAttempted)||
+                   (edgeLoadAttempted&&step<18)||(step>=19&&!edgeLoadAttempted)||
+                   bool(counterIn)!=(step>=1)||(counterIn&&*counterIn!=index)||
+                   bool(vertexOffset)!=(step>=1)||(vertexOffset&&*vertexOffset!=16u*index)||
+                   bool(edgeOffset)!=(step>=8)||(edgeOffset&&*edgeOffset!=0x80u+16u*index)||
+                   bool(quadV0)!=(step>=16)||bool(local00)!=(step>=17)||bool(relativeVF4)!=(step>=18)||
+                   bool(oneVF6)!=(step>=21)||(oneVF6&&*oneVF6!=0x3f800000u)||bool(accX)!=(step>=22)||
+                   bool(sumVF5X)!=(step>=23)||bool(scalarF0)!=(step>=25)||conditionBit.has_value()!=(step>=27)||
+                   edgeVF5[3]||productsVF5[3]||gprV0[3])return false;
+                constexpr unsigned centerStep[3]={2,5,6},vertexStep[3]={3,4,7},diffStep[3]={9,10,12},storeStep[4]={11,13,14,15};
+                for(unsigned k=0;k<3;++k){
+                    if(bool(centerWords[k])!=(step>=centerStep[k])||bool(vertexWords[k])!=(step>=vertexStep[k])||
+                       bool(differences[k])!=(step>=diffStep[k])||bool(edgeVF5[k])!=(step>=19)||
+                       bool(productsVF5[k])!=(step>=20)||bool(gprV0[k])!=(step>=24))return false;
+                    if(centerWords[k]&&centerWords[k]!=inputs.centerWords[k])return false;
+                    if(differences[k]&&differences[k]!=PortalRelative::difference(*centerWords[k],*vertexWords[k]))return false;
+                    if(productsVF5[k]&&productsVF5[k]!=PortalDot::unitProduct((*relativeVF4)[k],*edgeVF5[k]))return false;
+                    if(gprV0[k]&&gprV0[k]!=(k?productsVF5[k]:sumVF5X))return false;
+                }
+                for(unsigned k=0;k<4;++k){if(bool(temporary20[k])!=(step>=storeStep[k]))return false;
+                    if(temporary20[k]&&(k<3?temporary20[k]!=differences[k]:
+                       (!edge0.oneV1||*temporary20[k]!=static_cast<std::uint32_t>(*edge0.oneV1))))return false;
+                    if(quadV0&&(*quadV0)[k]!=*temporary20[k])return false;}
+                if((local00&&local00!=quadV0)||(relativeVF4&&relativeVF4!=local00)||(step>=20&&!axisEdge()))return false;
+                if(accX&&accX!=PortalDot::zeroSum(*productsVF5[0],*productsVF5[1]))return false;
+                if(sumVF5X){const auto p=PortalDot::unitProduct(*oneVF6,*productsVF5[2]);
+                    if(!p||sumVF5X!=PortalDot::zeroSum(*accX,*p))return false;}
+                if((scalarF0&&scalarF0!=gprV0[0])||(conditionBit&&
+                   (inputs.radiusF12!=0u||conditionBit!=PortalSlab::lessEqualZero(*scalarF0))))return false;
+                if(bool(counterOut)!=(step>=30)||(counterOut&&(*counterOut!=index+1u||conditionBit!=true)))return false;
+                if((advanceStep&&(step!=30||missStep))||(missStep&&(step!=29||conditionBit!=false||advanceStep)))return false;
+                if(bool(loopTestV0)!=(advanceStep>=1)||(loopTestV0&&*loopTestV0!=(index<3?1u:0u))||
+                   loopBranchTaken.has_value()!=(advanceStep>=2)||(loopBranchTaken&&*loopBranchTaken!=(index<3))||
+                   bool(loopOffsetV0)!=(advanceStep>=3)||(loopOffsetV0&&*loopOffsetV0!=16u*(index+1u))||
+                   bool(zeroV0)!=(missStep>=2)||(zeroV0&&*zeroV0!=Words{})||
+                   bool(target)!=(advanceStep>=3||missStep>=2))return false;
+                return !target||*target==(missStep?0x2312f0u:(index<3?0x23125cu:0x2312ecu));
+            }
+        };
+        std::array<Iteration,3> iterations;
+        std::uint8_t successStep=0,returnStep=0;
+        std::optional<std::uint64_t> successLow64,returnLow64;
+        std::array<std::optional<std::uint32_t>,2> returnUpper64;
+        std::optional<std::uint32_t> returnPC,target;
+        std::optional<bool> callerBranchTaken;
+        bool operator==(const PortalLoop&)const=default;
+        template<class Inputs>
+        bool historyCurrent(const Inputs& inputs,const PortalEdge0& edge0)const noexcept {
+            const Iteration* terminal=nullptr;
+            for(unsigned i=0;i<3;++i){const auto& it=iterations[i];if(!it.historyCurrent(i+1,inputs,edge0))return false;
+                if(it.addressAttempted){
+                    if(edge0.advanceStep!=5||edge0.target!=0x23125cu||edge0.conditionBit!=true||edge0.missStep)return false;
+                    if(i&&(iterations[i-1].advanceStep!=3||iterations[i-1].target!=0x23125cu))return false;}
+                if(it.missStep==2||(i==2&&it.advanceStep==3))terminal=&it;
+            }
+            const bool hit=terminal&&terminal==&iterations[2]&&terminal->advanceStep==3;
+            if(successStep>1||returnStep>5||(successStep&&!hit)||(returnStep&&(!terminal||(hit&&!successStep)))||
+               bool(successLow64)!=(successStep==1)||(successLow64&&*successLow64!=1u)||
+               bool(returnLow64)!=(returnStep>=3)||(returnLow64&&*returnLow64!=(hit?1u:0u))||
+               bool(returnUpper64[0])!=(returnStep>=3)||bool(returnUpper64[1])!=(returnStep>=3&&!hit)||
+               bool(returnPC)!=(returnStep>=3)||(returnPC&&returnPC!=inputs.callContinuation)||
+               callerBranchTaken.has_value()!=(returnStep>=4)||(callerBranchTaken&&*callerBranchTaken==hit)||
+               bool(target)!=(returnStep>=5))return false;
+            if(returnStep>=3&&(returnUpper64[0]!=(hit?terminal->gprV0[2]:std::optional<std::uint32_t>(0u))||
+                (!hit&&returnUpper64[1]!=0u)))return false;
+            return !target||*target==(hit?0x280c5cu:0x280cf8u);
+        }
+    } portalLoop;
+    struct PortalHit {
+        std::uint8_t step=0,storeAttemptMask=0;
+        std::optional<std::uint32_t> reloadF0,stored10,stored0C;
+        bool operator==(const PortalHit&)const=default;
+        bool historyCurrent(const PortalLoop& loop,const PortalDot& dot)const noexcept {
+            if(step>3||(storeAttemptMask&~3u)||(step&&(loop.returnStep!=5||loop.target!=0x280c5cu||loop.returnLow64!=1u))||
+               ((storeAttemptMask&1u)&&step<1)||((storeAttemptMask&2u)&&step<2)||
+               (step>=2&&!(storeAttemptMask&1u))||(step>=3&&storeAttemptMask!=3u)||
+               bool(reloadF0)!=(step>=1)||(reloadF0&&reloadF0!=dot.outputDistance)||
+               bool(stored10)!=(step>=2)||(stored10&&stored10!=reloadF0)||
+               bool(stored0C)!=(step>=3)||(stored0C&&stored0C!=reloadF0))return false;
+            return true;
+        }
+    } portalHit;
+    bool portalMissAt280CF8()const noexcept {
+        const unsigned sources=(portalSlab.missStep==6&&portalSlab.callerTarget==0x280cf8u?1u:0u)+
+            (portalEdge0.missStep==7&&portalEdge0.target==0x280cf8u?1u:0u)+
+            (portalLoop.returnStep==5&&portalLoop.target==0x280cf8u&&portalLoop.returnLow64==0u?1u:0u);
+        return sources==1u;
+    }
+    struct PortalNext {
+        std::uint8_t step=0; //Next LW,branch,delay,fallthrough NOP,restores,JR,return delay.
+        bool nativeAdmissionAttempted=false;
+        std::optional<bool> nextNonNull,branchTaken;
+        std::optional<std::uint32_t> branchTarget,returnPC;
+        bool operator==(const PortalNext&)const=default;
+        bool historyCurrent(bool miss,const Publication& pub)const noexcept {
+            if(step>7||(nativeAdmissionAttempted&&!miss)||(step&&!nativeAdmissionAttempted)||
+               nextNonNull.has_value()!=(step>=1)||branchTaken.has_value()!=(step>=2)||
+               (branchTaken&&branchTaken!=nextNonNull)||bool(branchTarget)!=(step>=3)||
+               (branchTarget&&*branchTarget!=(nextNonNull==true?0x280c40u:0x280d04u))||
+               (step>=4&&nextNonNull!=false)||bool(returnPC)!=(step>=7)||
+               (returnPC&&returnPC!=pub.callContinuation))return false;
+            return true;
+        }
+    } portalNext;
+    struct PortalNeighbor {
+        using Words=std::array<std::uint32_t,4>;
+        std::uint8_t step=0;
+        bool neighborAdmissionAttempted=false,methodAdmissionAttempted=false,nativePinAttempted=false,nativePinAcquired=false;
+        std::optional<std::uint32_t> usage10,lookupContinuation,lookupReturnPC,table08,target20,callContinuation,shimTarget;
+        std::optional<std::uint64_t> usageBit1V0,usageBit2V0;
+        std::optional<bool> lookupBranchTaken;
+        std::optional<Words> preferredA3,preferredA1;
+        bool operator==(const PortalNeighbor&)const=default;
+        bool historyCurrent(const PortalHit& hit)const noexcept {
+            if(step>21||(neighborAdmissionAttempted&&hit.step!=3)||(step&&!neighborAdmissionAttempted)||
+               (methodAdmissionAttempted&&step<8)||(step>=9&&!methodAdmissionAttempted)||
+               (nativePinAttempted&&step<11)||(nativePinAcquired&&!nativePinAttempted)||(step>=12&&!nativePinAcquired)||
+               bool(usage10)!=(step>=2)||(usage10&&*usage10!=1u)||
+               bool(lookupContinuation)!=(step>=3)||(lookupContinuation&&*lookupContinuation!=0x280c78u)||
+               bool(usageBit1V0)!=(step>=5)||(usageBit1V0&&*usageBit1V0!=(*usage10&1u))||
+               lookupBranchTaken.has_value()!=(step>=6)||(lookupBranchTaken&&*lookupBranchTaken)||
+               bool(usageBit2V0)!=(step>=7)||(usageBit2V0&&*usageBit2V0!=(*usage10&2u))||
+               bool(lookupReturnPC)!=(step>=11)||(lookupReturnPC&&lookupReturnPC!=lookupContinuation)||
+               bool(table08)!=(step>=12)||(table08&&*table08!=0x3d2d30u)||
+               bool(target20)!=(step>=17)||(target20&&*target20!=0x27e3b0u)||
+               bool(callContinuation)!=(step>=18)||(callContinuation&&*callContinuation!=0x280c98u)||
+               bool(preferredA3)!=(step>=19)||(preferredA3&&*preferredA3!=Words{})||
+               bool(shimTarget)!=(step>=20)||(shimTarget&&*shimTarget!=0x27e3c0u)||
+               bool(preferredA1)!=(step>=21)||(preferredA1&&preferredA1!=preferredA3))return false;
+            return true; //No selected slot, return value, pending reservation or secondary observer exists yet.
+        }
+    } portalNeighbor;
+    struct PortalSelector {
+        std::uint8_t step=0; //Own secondary selection:1..6 prefix;7..9 allocator boundary OR10..23 typed return/caller branch.
+        bool nativeReservationAttempted=false,nativeReservationAcquired=false;
+        std::optional<bool> selectedNonNull,callerBranchTaken;
+        std::optional<std::uint32_t> callerTarget;
+        std::optional<bool> freeHeadNull,appendBranch,tableNonNull;
+        std::optional<std::uint32_t> lastUsed38,perBlock30,blockCount34,newBlockCount,
+            freshLastUsed38,tableOffsetBytes,wordOffsetBytes,nativeOrdinal,returnPC;
+        bool blockRead=false,entryAliasResolved=false,s3Retained=false;
+        bool operator==(const PortalSelector&)const=default;
+        bool historyCurrent()const noexcept {
+            if(step>23||(step&&!nativeReservationAcquired)||(nativeReservationAcquired&&!nativeReservationAttempted)||
+               selectedNonNull.has_value()!=(step>=21)||(selectedNonNull&&!*selectedNonNull)||
+               callerBranchTaken.has_value()!=(step>=22)||(callerBranchTaken&&*callerBranchTaken)||
+               bool(callerTarget)!=(step>=23)||(callerTarget&&*callerTarget!=0x280ca4u)||freeHeadNull.has_value()!=(step>=3)||(freeHeadNull&&!*freeHeadNull)||
+               bool(lastUsed38)!=(step>=4)||bool(perBlock30)!=(step>=5)||
+               appendBranch.has_value()!=(step>=6)||(step>=6&&perBlock30!=1024u)||
+               (appendBranch&&*appendBranch!=(*lastUsed38!=*perBlock30)))return false;
+            const bool append=appendBranch.value_or(false);
+            if((step>=7&&step<=9&&append)||(step>=10&&!append))return false;
+            if(bool(blockCount34)!=(append?step>=10:step>=7)||
+               tableNonNull.has_value()!=(append?step>=11:step>=8)||
+               bool(newBlockCount)!=(!append&&step>=9)||bool(freshLastUsed38)!=(step>=12)||
+               bool(tableOffsetBytes)!=(step>=13)||bool(wordOffsetBytes)!=(step>=15)||
+               blockRead!=(step>=16)||entryAliasResolved!=(step>=17)||bool(nativeOrdinal)!=(step>=17)||
+               bool(returnPC)!=(step>=20)||s3Retained!=(step>=21))return false;
+            if(lastUsed38&&*lastUsed38>1024u)return false;
+            if(blockCount34&&(*blockCount34>1u||(append&&*blockCount34!=1u)))return false;
+            if(newBlockCount&&*newBlockCount!=*blockCount34+1u)return false;
+            if(append&&step>=11&&tableNonNull!=true)return false;
+            if(freshLastUsed38&&(freshLastUsed38!=lastUsed38||*freshLastUsed38>=1024u))return false;
+            if((tableOffsetBytes&&*tableOffsetBytes!=4u* *blockCount34)||
+               (wordOffsetBytes&&*wordOffsetBytes!=4u* *freshLastUsed38)||
+               (nativeOrdinal&&*nativeOrdinal!=*freshLastUsed38+1u)||(returnPC&&returnPC!=0x280c98u))return false;
+            return true; //No raw guest address is stored in this pointer-free history.
+        }
+    } portalSelector;
+    struct PortalEntryCall {
+        std::uint8_t step=0; //Eight actual secondary setup instructions280CA4..280CC0; no primary assertion.
+        std::optional<std::uint32_t> table08,target24,callContinuation;
+        bool operator==(const PortalEntryCall&)const=default;
+        bool historyCurrent()const noexcept {
+            return step<=8&&bool(table08)==(step>=1)&&(!table08||table08==0x3d2d30u)&&
+                bool(target24)==(step>=6)&&(!target24||target24==0x27e570u)&&
+                bool(callContinuation)==(step>=7)&&(!callContinuation||callContinuation==0x280cc4u);
+        }
+    } portalEntryCall;
+    struct PortalInsertion {
+        std::uint8_t step=0; //Free-head load,branch,old-count load,add,count store,JR,member store in delay.
+        std::optional<std::uint32_t> freeHead40,lastUsed38,incremented38,returnPC;
+        bool counterStored=false,memberStored=false;
+        bool operator==(const PortalInsertion&)const=default;
+        bool historyCurrent()const noexcept {
+            if(step>7||bool(freeHead40)!=(step>=1)||(freeHead40&&*freeHead40)||
+               bool(lastUsed38)!=(step>=3)||(lastUsed38&&*lastUsed38>=1024u)||
+               bool(incremented38)!=(step>=4)||(incremented38&&*incremented38!=*lastUsed38+1u)||
+               counterStored!=(step>=5)||memberStored!=(step>=7)||
+               bool(returnPC)!=(step>=7)||(returnPC&&returnPC!=0x280cc4u))return false;
+            return true; //No V0 result exists in27E570; member pointer bits stay unknown.
+        }
+    } portalInsertion;
+    struct PortalPool {
+        std::uint8_t callStep=0,bodyStep=0; //Caller3 instructions; body prefix through tail/free/cold branch cuts only.
+        bool poolReadAttempted=false;
+        std::optional<std::uint32_t> addressHighAT,callContinuation,used20,perBlock10;
+        std::optional<bool> less,fullBranch,free2CNull,freeBranch,cached1CNull,cachedBranch;
+        bool operator==(const PortalPool&)const=default;
+        bool historyCurrent()const noexcept {
+            if(callStep>3||bodyStep>12||bool(addressHighAT)!=(callStep>=1)||(addressHighAT&&addressHighAT!=0x00440000u)||
+               bool(callContinuation)!=(callStep>=2)||(callContinuation&&callContinuation!=0x280cd0u)||
+               (poolReadAttempted&&callStep<2)||(callStep>=3&&!poolReadAttempted)||(bodyStep&&callStep!=3)||
+               bool(used20)!=(bodyStep>=2)||(used20&&*used20>169u)||
+               bool(perBlock10)!=(bodyStep>=3)||(perBlock10&&*perBlock10!=169u)||
+               less.has_value()!=(bodyStep>=4)||(less&&*less!=(*used20<*perBlock10))||
+               fullBranch.has_value()!=(bodyStep>=5)||(fullBranch&&*fullBranch==*less)||
+               (bodyStep>=7&&less!=false)||free2CNull.has_value()!=(bodyStep>=7)||
+               freeBranch.has_value()!=(bodyStep>=8)||(freeBranch&&freeBranch!=free2CNull)||
+               (bodyStep>=10&&free2CNull!=true)||cached1CNull.has_value()!=(bodyStep>=10)||
+               (cached1CNull&&!*cached1CNull)||cachedBranch.has_value()!=(bodyStep>=11)||
+               (cachedBranch&&cachedBranch!=cached1CNull))return false;
+            return true; //Read/branch history only; no pool count/store, allocation result or source return.
+        }
+    } portalPool;
+    struct PortalPoolMutation {
+        bool admissionAttempted=false,admitted=false,poolStored=false,resultAddressRetained=false;
+        std::optional<bool> fromFree,nextNull;
+        std::uint8_t step=0;
+        std::optional<std::uint32_t> itemSize24,incremented20,productV1,boundaryPC;
+        bool operator==(const PortalPoolMutation&)const=default;
+        bool historyCurrent(const PortalPool& p)const noexcept {
+            if(fromFree.has_value()!=admissionAttempted||(admitted&&!admissionAttempted)||(step&&!admitted))return false;
+            const bool free=fromFree.value_or(false);
+            if(admissionAttempted&&(p.callStep!=3||(free?(p.bodyStep!=9||p.free2CNull!=false):(p.bodyStep!=6||p.less!=true))))return false;
+            if(step>(free?3u:8u)||bool(itemSize24)!=(!free&&step>=1)||(itemSize24&&*itemSize24!=24u)||
+               bool(incremented20)!=(!free&&step>=3)||(incremented20&&*incremented20!=*p.used20+1u)||
+               bool(productV1)!=(!free&&step>=4)||(productV1&&*productV1!=*p.used20*24u)||
+               nextNull.has_value()!=(free&&step>=1)||poolStored!=(step>=(free?3u:6u))||
+               resultAddressRetained!=(step>=(free?3u:8u))||bool(boundaryPC)!=resultAddressRetained||
+               (boundaryPC&&*boundaryPC!=0x105804u))return false;
+            return true; //Typed result identity only. Unknown34 accounting and allocator return remain pending.
+        }
+    } portalPoolMutation;
+    struct PortalPoolReturn {
+        bool admissionAttempted=false,admitted=false,input34Unknown=false,sum34Unknown=false,accountingStored=false;
+        std::uint8_t step=0;
+        std::optional<bool> resultNonNull,branchTaken;
+        std::optional<std::uint32_t> itemSize24,returnPC;
+        bool operator==(const PortalPoolReturn&)const=default;
+        bool historyCurrent(const PortalPool& p,const PortalPoolMutation& m)const noexcept {
+            return step<=10&&(!admitted||admissionAttempted)&&(!step||admitted)&&
+                (!admissionAttempted||(m.resultAddressRetained&&m.boundaryPC==0x105804u))&&
+                resultNonNull.has_value()==(step>=1)&&(!resultNonNull||*resultNonNull)&&
+                branchTaken.has_value()==(step>=1)&&(!branchTaken||!*branchTaken)&&
+                input34Unknown==(step>=3)&&bool(itemSize24)==(step>=4)&&(!itemSize24||*itemSize24==24u)&&
+                sum34Unknown==(step>=5)&&accountingStored==(step>=6)&&bool(returnPC)==(step>=10)&&
+                (!returnPC||(returnPC==p.callContinuation&&*returnPC==0x280cd0u));
+        }
+    } portalPoolReturn;
+    struct PortalPoolSlot14 {
+        bool storeAttempted=false,stored=false;
+        std::optional<std::uint32_t> boundaryPC;
+        bool operator==(const PortalPoolSlot14&)const=default;
+        bool historyCurrent(const PortalPoolReturn& r)const noexcept {
+            return (!storeAttempted||(r.step==10&&r.returnPC==0x280cd0u))&&(!stored||storeAttempted)&&
+                bool(boundaryPC)==stored&&(!boundaryPC||*boundaryPC==0x280cd4u);
+        }
+    } portalPoolSlot14; //Pointer-free reached-store history, not numeric slot14 bits or observer-head publication.
+    struct PortalPoolPayload {
+        bool entered=false,portalLoadAttempted=false,headLoadAttempted=false;
+        std::uint8_t step=0,stores=0;
+        std::optional<bool> portalNonNull,oldHeadNull;
+        std::optional<std::uint32_t> distanceF0,boundaryPC;
+        bool operator==(const PortalPoolPayload&)const=default;
+        bool historyCurrent(const PortalPoolSlot14& slot)const noexcept {
+            const unsigned expected=step>=9?63u:step>=8?31u:step>=6?15u:step>=4?7u:step>=2?3u:step>=1?1u:0u;
+            return step<=9&&(!entered||(slot.stored&&slot.boundaryPC==0x280cd4u))&&(!step||entered)&&stores==expected&&
+                (!portalLoadAttempted||(entered&&step>=2))&&(step<3||portalLoadAttempted)&&
+                portalNonNull.has_value()==(step>=3)&&(!portalNonNull||*portalNonNull)&&
+                bool(distanceF0)==(step>=5)&&(!headLoadAttempted||(entered&&step>=6))&&(step<7||headLoadAttempted)&&
+                oldHeadNull.has_value()==(step>=7)&&(!oldHeadNull||*oldHeadNull)&&
+                bool(boundaryPC)==(step>=9)&&(!boundaryPC||*boundaryPC==0x280cf8u);
+        }
+    } portalPoolPayload;
+    struct PortalHitNext {
+        std::uint8_t step=0;
+        bool nativeAdmissionAttempted=false,portalReadAttempted=false,portalReadCompleted=false;
+        std::optional<bool> nextNonNull,branchTaken,portalNonNull;
+        std::optional<std::uint32_t> branchTarget,returnPC,inputBoundary;
+        bool operator==(const PortalHitNext&)const=default;
+        bool historyCurrent(const PortalPoolPayload& payload,const Publication& pub)const noexcept {
+            return step<=7&&(!nativeAdmissionAttempted||(payload.step==9&&payload.stores==63u&&payload.boundaryPC==0x280cf8u))&&
+                (!step||nativeAdmissionAttempted)&&nextNonNull.has_value()==(step>=1)&&branchTaken.has_value()==(step>=2)&&
+                (!branchTaken||branchTaken==nextNonNull)&&bool(branchTarget)==(step>=3)&&
+                (!branchTarget||*branchTarget==(nextNonNull==true?0x280c40u:0x280d04u))&&
+                (step<4||nextNonNull==false)&&bool(returnPC)==(step>=7)&&(!returnPC||returnPC==pub.callContinuation)&&
+                (!portalReadAttempted||(step==3&&branchTarget==0x280c40u))&&(!portalReadCompleted||portalReadAttempted)&&
+                portalNonNull.has_value()==portalReadCompleted&&(!portalNonNull||*portalNonNull)&&
+                bool(inputBoundary)==portalReadCompleted&&(!inputBoundary||*inputBoundary==0x280c44u);
+        }
+    } portalHitNext; //Distinct published-hit exit and fresh next portal08 read; never reuses first/miss occurrence receipts.
+    struct PortalNextInputs {
+        std::uint8_t step=0;
+        bool nativeAdmissionAttempted=false,nativeInputsAcquired=false;
+        std::optional<std::uint32_t> radiusF12,callTarget,callContinuation,stackBytes,boundaryPC;
+        std::array<std::optional<std::uint32_t>,3> centerWords,vertexWords;
+        bool operator==(const PortalNextInputs&)const=default;
+        bool helperEntered()const noexcept{return step==11;}
+        bool historyCurrent(const PortalHitNext& next,const PortalHead& head)const noexcept {
+            if(step>11||(nativeAdmissionAttempted&&(!next.portalReadCompleted||next.inputBoundary!=0x280c44u))||
+               (nativeInputsAcquired&&!nativeAdmissionAttempted)||(step&&!nativeInputsAcquired)||
+               bool(radiusF12)!=(step>=2)||(radiusF12&&(radiusF12!=head.radiusF20||*radiusF12))||
+               bool(callTarget)!=(step>=3)||(callTarget&&*callTarget!=0x231150u)||
+               bool(callContinuation)!=(step>=3)||(callContinuation&&*callContinuation!=0x280c54u)||
+               bool(stackBytes)!=(step>=11)||(stackBytes&&*stackBytes!=0x40u)||
+               bool(boundaryPC)!=(step>=11)||(boundaryPC&&*boundaryPC!=0x23116cu))return false;
+            for(unsigned k=0;k<3;++k)if(bool(centerWords[k])!=(step>=5+2*k)||bool(vertexWords[k])!=(step>=6+2*k))return false;
+            return true; //New occurrence's raw loads only; no arithmetic, local/output store, overlap or return receipt.
+        }
+    } portalNextInputs;
+    // One whole, separately owned 231150 activation. The same proven phase
+    // types are reused as fresh values; no first-call receipt is copied.
+    struct PortalQuery {
+        bool entered=false;
+        std::uint32_t pc=0;
+        PortalRelative portalRelative;
+        PortalDot portalDot;
+        PortalSlab portalSlab;
+        PortalEdge0 portalEdge0;
+        PortalLoop portalLoop;
+        bool operator==(const PortalQuery&)const=default;
+        bool returned()const noexcept {
+            return (portalSlab.missStep==6&&portalSlab.callerTarget==0x280cf8u)||
+                (portalEdge0.missStep==7&&portalEdge0.target==0x280cf8u)||
+                (portalLoop.returnStep==5&&(portalLoop.target==0x280c5cu||portalLoop.target==0x280cf8u));
+        }
+        template<class Inputs>
+        bool historyCurrent(const Inputs& inputs)const noexcept {
+            if(!entered)return !pc&&portalRelative==PortalRelative{}&&portalDot==PortalDot{}&&
+                portalSlab==PortalSlab{}&&portalEdge0==PortalEdge0{}&&portalLoop==PortalLoop{};
+            if(!inputs.helperEntered()||!pc||!portalRelative.historyCurrent(inputs)||
+               !portalDot.historyCurrent(portalRelative)||!portalSlab.historyCurrent(portalDot,inputs)||
+               !portalEdge0.historyCurrent(portalSlab,portalRelative,inputs)||!portalLoop.historyCurrent(inputs,portalEdge0))return false;
+            const unsigned terminal=(portalSlab.missStep==6?1u:0u)+(portalEdge0.missStep==7?1u:0u)+(portalLoop.returnStep==5?1u:0u);
+            if(terminal>1u)return false;
+            if(terminal)return pc==(portalLoop.returnStep==5?*portalLoop.target:0x280cf8u);
+            return (pc>=0x23116cu&&pc<=0x2312f8u&&(pc&3u)==0u)||pc==0x280c54u||pc==0x280c58u;
+        }
+    } portalNextQuery;
+    //Native cohort bound: ten source portals, each with distinct endpoints,
+    //contribute at most one collision link to the authenticated original root.
+    static constexpr unsigned portalChainCapacity=10u;
+    struct PortalMissTail {
+        struct Occurrence {
+            PortalInputs inputs;
+            PortalQuery query;
+            PortalNext next;
+            bool operator==(const Occurrence&)const=default;
+        };
+        bool entered=false,fromSecond=false;
+        std::uint8_t count=0; //Native retained activations, not a source count store.
+        std::uint32_t pc=0;
+        PortalNext seedNext; //Only the existing second query's own next00 read.
+        std::array<Occurrence,portalChainCapacity> occurrences{};
+        bool operator==(const PortalMissTail&)const=default;
+        bool historyCurrent(const PortalNext& first,const PortalQuery& second,const Publication& pub,const PortalHead& head)const noexcept {
+            if(!entered)return *this==PortalMissTail{};
+            if(count+(fromSecond?2u:1u)>portalChainCapacity)return false;
+            if(fromSecond){
+                if(!second.returned()||second.pc!=0x280cf8u||!seedNext.historyCurrent(true,pub)||
+                   (count&&(seedNext.step!=3||seedNext.branchTarget!=0x280c40u)))return false;
+            }else if(first.step!=3||first.branchTarget!=0x280c40u||seedNext!=PortalNext{})return false;
+            for(unsigned i=0;i<occurrences.size();++i){const auto& o=occurrences[i];
+                if(i>=count){if(o!=Occurrence{})return false;continue;}
+                if(!o.inputs.nativeAdmissionAttempted||!o.inputs.historyCurrent()||!o.query.historyCurrent(o.inputs)||
+                   !o.next.historyCurrent(o.query.returned()&&o.query.pc==0x280cf8u,pub)||
+                   (o.inputs.radiusF12&&o.inputs.radiusF12!=head.radiusF20))return false;
+                if(i+1<count&&(o.next.step!=3||o.next.branchTarget!=0x280c40u))return false;
+            }
+            if(!count)return fromSecond&&seedNext.nativeAdmissionAttempted&&
+                (seedNext.step==7?pc==seedNext.returnPC:pc==0x280cf8u);
+            const auto& last=occurrences[count-1];
+            if(last.next.step==7)return pc==last.next.returnPC;
+            if(last.next.step==3)return pc==0x280c40u;
+            if(last.next.nativeAdmissionAttempted)return !last.next.step&&pc==0x280cf8u;
+            if(last.query.entered)return pc==last.query.pc;
+            return pc==0x280c40u; //Only portal-owner admission can refuse within the raw input prefix.
+        }
+    } portalMissTail;
+    unsigned portalNullReturns()const noexcept {
+        unsigned n=(portalHead.step==12&&portalHead.returnPC==0x280bc0u?1u:0u)+
+            (portalNext.step==7&&portalNext.returnPC==0x280bc0u?1u:0u)+
+            (portalHitNext.step==7&&portalHitNext.returnPC==0x280bc0u?1u:0u);
+        if(portalMissTail.entered){
+            if(portalMissTail.seedNext.step==7&&portalMissTail.seedNext.returnPC==0x280bc0u)++n;
+            if(portalMissTail.count&&portalMissTail.count<=portalMissTail.occurrences.size()){
+                const auto& last=portalMissTail.occurrences[portalMissTail.count-1].next;
+                if(last.step==7&&last.returnPC==0x280bc0u)++n;
+            }
+        }
+        return n; //Only actualNULL epilogues, never a hit, capacity refusal or generic portal receipt.
+    }
+    struct ReturnFlow {
+        bool entered=false,zoneRead=false,stackAttempted=false,stackReturned=false;
+        std::uint8_t primaryStep=0,callStep=0,membershipStep=0,triggerStep=0;
+        std::uint32_t pc=0;
+        std::optional<std::uint32_t> primaryReturn,stackTarget,stackContinuation,stackCountBefore,stackCountAfter,membershipReturn,triggerReturn;
+        std::optional<bool> zoneNonNull;
+        std::optional<std::int32_t> stackArgument;
+        OriginalCollisionMembershipGuards50LA::History zoneGuard;
+        bool operator==(const ReturnFlow&)const=default;
+        bool triggerReturned()const noexcept{return triggerStep==5&&triggerReturn==0x2dc2acu;}
+        bool historyCurrent(unsigned portalReturns)const noexcept {
+            if(!entered)return *this==ReturnFlow{};
+            if(portalReturns!=1u||primaryStep!=11||primaryReturn!=0x120190u||
+               !OriginalCollisionMembershipGuards50LA::zoneHistory(zoneGuard)||!zoneGuard.entered||
+               zoneNonNull.has_value()!=zoneRead||(zoneRead&&!zoneGuard.processAdmitted)||
+               zoneRead!=zoneGuard.finishAttempted||(zoneRead&&zoneNonNull!=zoneGuard.nonnull)||
+               callStep>3||(callStep&&!zoneGuard.returned)||bool(stackTarget)!=(callStep>=2)||
+               (stackTarget&&*stackTarget!=0x280920u)||bool(stackContinuation)!=(callStep>=2)||
+               (stackContinuation&&*stackContinuation!=0x120208u)||bool(stackArgument)!=(callStep>=3)||
+               (stackArgument&&*stackArgument!=-1)||stackAttempted!=(callStep==3)||
+               (stackReturned&&!stackAttempted)||bool(stackCountBefore)!=stackReturned||bool(stackCountAfter)!=stackReturned||
+               (stackCountBefore&&(*stackCountBefore<3u||*stackCountAfter!=*stackCountBefore-1u))||
+               membershipStep>7||(membershipStep&&!stackReturned)||bool(membershipReturn)!=(membershipStep==7)||
+               (membershipReturn&&*membershipReturn!=0x2a0b1cu)||triggerStep>5||(triggerStep&&membershipStep!=7)||
+               bool(triggerReturn)!=(triggerStep==5)||(triggerReturn&&*triggerReturn!=0x2dc2acu))return false;
+            if(!zoneGuard.returned)return !callStep&&!stackReturned&&!membershipStep&&!triggerStep&&pc==zoneGuard.pc;
+            if(!stackReturned)return callStep==3&&pc==0x280920u;
+            return membershipStep==7&&triggerReturned()&&pc==0x2dc2acu;
+        }
+    } returnFlow;
     bool operator==(const OriginalTriggerFogPrimaryPrefix50LA&)const=default;
     bool historyCurrent()const noexcept {
         for(unsigned k=0;k<3;++k)if(portalInputs.centerWords[k]&&
             (!nativeCenter||*portalInputs.centerWords[k]!=(*nativeCenter)[k]))return false;
         if(step>21||!selector.historyCurrent()||!entryCall.historyCurrent()||!insertion.historyCurrent()||!publication.historyCurrent()||
-           !portalHead.historyCurrent()||!portalInputs.historyCurrent()||(portalHead.step&&publication.step!=12)||
+           !portalHead.historyCurrent()||!portalInputs.historyCurrent()||!portalRelative.historyCurrent(portalInputs)||
+           !portalDot.historyCurrent(portalRelative)||!portalSlab.historyCurrent(portalDot,portalInputs)||
+           !portalEdge0.historyCurrent(portalSlab,portalRelative,portalInputs)||!portalLoop.historyCurrent(portalInputs,portalEdge0)||
+           !portalHit.historyCurrent(portalLoop,portalDot)||!portalNext.historyCurrent(portalMissAt280CF8(),publication)||
+           (portalHit.step&&portalNext.nativeAdmissionAttempted)||!portalNeighbor.historyCurrent(portalHit)||
+           !portalSelector.historyCurrent()||(portalSelector.nativeReservationAttempted&&portalNeighbor.step!=21)||
+           (portalSelector.returnPC&&portalSelector.returnPC!=portalNeighbor.callContinuation)||
+           !portalEntryCall.historyCurrent()||!portalInsertion.historyCurrent()||
+           (portalEntryCall.step&&(portalSelector.step!=23||portalSelector.callerTarget!=0x280ca4u))||
+           (portalInsertion.step&&portalEntryCall.step!=8)||
+           (portalInsertion.lastUsed38&&portalInsertion.lastUsed38!=portalSelector.freshLastUsed38)||
+           (portalInsertion.incremented38&&portalInsertion.incremented38!=portalSelector.nativeOrdinal)||
+           (portalInsertion.returnPC&&portalInsertion.returnPC!=portalEntryCall.callContinuation)||
+           !portalPool.historyCurrent()||!portalPoolMutation.historyCurrent(portalPool)||!portalPoolReturn.historyCurrent(portalPool,portalPoolMutation)||
+           !portalPoolSlot14.historyCurrent(portalPoolReturn)||!portalPoolPayload.historyCurrent(portalPoolSlot14)||
+           !portalHitNext.historyCurrent(portalPoolPayload,publication)||(portalHitNext.nativeAdmissionAttempted&&portalNext.nativeAdmissionAttempted)||
+           !portalNextInputs.historyCurrent(portalHitNext,portalHead)||!portalNextQuery.historyCurrent(portalNextInputs)||
+           !portalMissTail.historyCurrent(portalNext,portalNextQuery,publication,portalHead)||
+           !returnFlow.historyCurrent(portalNullReturns())||
+           (portalPoolPayload.distanceF0&&portalPoolPayload.distanceF0!=portalDot.outputDistance)||
+           (portalPool.callStep&&(portalInsertion.step!=7||portalInsertion.returnPC!=0x280cc4u))||
+           (portalHead.step&&publication.step!=12)||
            (portalInputs.nativeAdmissionAttempted&&(portalHead.step!=9||portalHead.headNull!=false))||
            (portalInputs.radiusF12&&portalInputs.radiusF12!=portalHead.radiusF20)||
            (portalHead.radiusF20&&portalHead.radiusF20!=publication.radiusF12)||
@@ -553,7 +1205,8 @@ class OriginalWorldTriggerInstance50LA final {
            membershipOldE0NullRead_!=(h.step>=8&&!h.oldE0NonNull.value_or(true))||
            membershipHeapAllocationReturned_!=(h.step>=9)||bool(serviceHeapMembership_)!=h.heapNonNull.value_or(false)||
            membershipHeapReturned_!=(h.step>=10&&h.heapNonNull.value_or(false))||membershipE0Published_!=(h.step==11))return false;
-        if(h.stackConstructorPC&&serviceStackMembership_->pc()!=*h.stackConstructorPC)return false;
+        //Constructor history remains constructor history after its own genuine destructor.
+        if(h.stackConstructorPC&&serviceStackMembership_->ctorPC_!=*h.stackConstructorPC)return false;
         if(h.heapConstructorPC&&serviceHeapMembership_->pc()!=*h.heapConstructorPC)return false;
         //Only own separately mirrored Fog bounds/primary prefixes may follow publication.
         return fogBoundsCurrentNative()&&fogPrimaryCurrentNative()&&!serviceReturn_.entered;
@@ -1012,17 +1665,334 @@ class OriginalWorldTriggerInstance50LA final {
     const FogPortalVertices* fogPortalVertices_=nullptr;
     const SpringVector4_48N* fogPortalCenterA1_=nullptr;
     //Native backing for caller sp+AC. Initial backing bits are NOT source
-    //knownness; no source output word is written or adopted by this prefix.
+    //knownness; portalDot.outputDistance witnesses the reached2311D4 store.
     std::uint32_t fogPortalDistanceBacking_=0;
     std::uint32_t* fogPortalDistanceA2_=nullptr;
+    std::array<std::uint32_t,4> fogPortalRelative10_{},fogPortalRelative00_{};
+    std::array<std::uint32_t,4>* fogPortalRelativeA3_=nullptr;
+    const std::array<std::uint32_t,4>* fogPortalNormal_=nullptr;
+    std::uint32_t fogPortalTemporary3C_=0;
+    std::uint32_t* fogPortalTemporaryV0_=nullptr;
+    const std::array<std::uint32_t,4>* fogPortalEdgeRelativeT0_=nullptr;
+    const std::array<std::uint32_t,4>* fogPortalFirstEdge_=nullptr;
+    //Per-iteration aliases retain actual source storage, never guest-address bits.
+    std::array<const std::array<std::uint32_t,4>*,3> fogPortalLoopVertices_{},fogPortalLoopEdges_{};
+    std::array<std::uint32_t,4> fogPortalRelative20_{};
+    const void* fogPortalNextCursor_=nullptr; //Miss-only actual next00 read, distinct from the immutable initial-head alias.
+    const void* fogPortalHitNextCursor_=nullptr; //Separate published-hit next00; actual graph owner validates its same-root link.
+    const C* fogPortalNextPortalA0_=nullptr; //Fresh next-occurrence280C40 portal08 only; no first-occurrence alias is overwritten.
+    const std::array<std::array<std::uint32_t,4>,4>* fogPortalNextVertices_=nullptr;
+    const SpringVector4_48N* fogPortalNextCenterA1_=nullptr;
+    std::uint32_t* fogPortalNextDistanceA2_=nullptr; //Own argument alias to SAME caller sp+AC backing; no second location or initialization.
+    OriginalBoundedPortalQuery50LA<OriginalTriggerFogPrimaryPrefix50LA,SpringVector4_48N,C> fogPortalNextQuery_;
+    OriginalBoundedPortalMissTail50LA<OriginalTriggerFogPrimaryPrefix50LA,SpringVector4_48N,C> fogPortalMissTail_;
+    const void* fogPortalNeighborNode_=nullptr;
+    const C* fogPortalNeighborS0_=nullptr; //Actual neighbor04 Entity, never cast to the native SearchNode owner.
+    OriginalNativeListMethodCustody50LA* fogPortalNeighborMethod_=nullptr;
+    OriginalNativeListMethodCustody50LA* fogPortalCurrentMethodS2_=nullptr;
+    OriginalNativeListMethodCustody50LA* fogPortalSelectA0_=nullptr;
+    const SpringVector4_48N* fogPortalSelectCenterA1_=nullptr;
+    const SpringVector4_48N* fogPortalSelectHalfA2_=nullptr;
+    std::uint8_t fogPortalNeighborPinIdentity_=0; //Stable opaque native occurrence identity, never a guest token.
+    bool fogPortalNeighborUnpinned_=false;
+    std::uint32_t* const* fogPortalSelectorTable_=nullptr;
+    std::uint32_t* const* fogPortalSelectorTableEnd_=nullptr;
+    std::uint32_t* fogPortalSelectorBlock_=nullptr;
+    std::uint32_t* fogPortalSelectorEntry_=nullptr;
+    std::uint32_t* fogPortalSelectorS3_=nullptr;
+    bool fogPortalSelectorWithdrawn_=false,fogPortalSelectorCanceled_=false;
+    OriginalNativeListMethodCustody50LA* fogPortalInsertionA0_=nullptr;
+    const B* fogPortalInsertionA1_=nullptr;
+    std::uint32_t* fogPortalInsertionA2_=nullptr;
+    const SpringVector4_48N* fogPortalInsertionA3_=nullptr;
+    const SpringVector4_48N* fogPortalInsertionT0_=nullptr;
+    bool fogPortalInsertionMemberWithdrawn_=false,fogPortalInsertionAbandoned_=false;
+    bool fogPortalSelectorCurrentNative()const noexcept {
+        const auto& f=fogPrimary_.portalSelector;const auto& call=fogPrimary_.portalEntryCall;const auto& inserted=fogPrimary_.portalInsertion;
+        if(!f.historyCurrent()||!call.historyCurrent()||!inserted.historyCurrent()||
+           (f.nativeReservationAttempted&&fogPrimary_.portalNeighbor.step!=21)||
+           (call.step&&(f.step!=23||f.callerTarget!=0x280ca4u))||(inserted.step&&call.step!=8)||
+           (inserted.lastUsed38&&inserted.lastUsed38!=f.freshLastUsed38)||
+           (inserted.incremented38&&inserted.incremented38!=f.nativeOrdinal)||
+           (inserted.returnPC&&inserted.returnPC!=call.callContinuation))return false;
+        const bool noAliases=!fogPortalSelectorTable_&&!fogPortalSelectorTableEnd_&&!fogPortalSelectorBlock_&&
+            !fogPortalSelectorEntry_&&!fogPortalSelectorS3_&&!fogPortalInsertionA0_&&!fogPortalInsertionA1_&&
+            !fogPortalInsertionA2_&&!fogPortalInsertionA3_&&!fogPortalInsertionT0_;
+        if(fogPortalCustodyWithdrawn_)return noAliases&&fogPortalSelectorWithdrawn_==f.nativeReservationAttempted&&
+            fogPortalSelectorCanceled_==f.nativeReservationAcquired&&fogPortalInsertionMemberWithdrawn_==inserted.memberStored&&
+            fogPortalInsertionAbandoned_==(inserted.counterStored&&!inserted.memberStored);
+        if(fogPortalSelectorWithdrawn_||fogPortalSelectorCanceled_||fogPortalInsertionMemberWithdrawn_||fogPortalInsertionAbandoned_)return false;
+        if((call.step>=2?fogPortalInsertionA0_!=fogPortalNeighborMethod_:bool(fogPortalInsertionA0_))||
+           (call.step>=3?fogPortalInsertionA1_!=collider_.get():bool(fogPortalInsertionA1_))||
+           (call.step>=4?fogPortalInsertionA2_!=fogPortalSelectorS3_:bool(fogPortalInsertionA2_))||
+           (call.step>=5?fogPortalInsertionA3_!=&boundsCenter_:bool(fogPortalInsertionA3_))||
+           (call.step>=8?fogPortalInsertionT0_!=&boundsHalf_:bool(fogPortalInsertionT0_)))return false;
+        if(!f.nativeReservationAcquired)return noAliases&&(!fogPortalNeighborMethod_||
+            fogPortalNeighborMethod_->sourceEntries_.pending!=&fogPortalNeighborPinIdentity_);
+        if(!fogPortalNeighborMethod_||!fogPrimary_.portalNeighbor.nativePinAcquired||fogPortalNeighborUnpinned_)return false;
+        const auto& c=*fogPortalNeighborMethod_;const auto& s=c.source_;const auto& e=c.sourceEntries_;
+        const auto expectedLast=inserted.counterStored?inserted.incremented38:f.lastUsed38;
+        if(!c.sourceCollisionEntriesCurrentNative()||e.terminal||e.pending!=&fogPortalNeighborPinIdentity_||
+           e.pendingIdentity!=collider_.get()||e.pendingConsumed!=inserted.counterStored||e.pendingSlot!=f.nativeOrdinal.value_or(0u)||
+           (f.freeHeadNull&&s.field40!=0u)||(expectedLast&&s.lastUsed38!=expectedLast)||
+           (f.perBlock30&&s.perBlock30!=f.perBlock30)||(f.blockCount34&&s.blockCount34!=f.blockCount34))return false;
+        if(f.tableNonNull){if(!s.pointer3C||*s.pointer3C!=e.table.get()||fogPortalSelectorTable_!=e.table.get()||
+            *f.tableNonNull!=bool(fogPortalSelectorTable_))return false;}
+        else if(fogPortalSelectorTable_)return false;
+        if(f.step>=14){if(!fogPortalSelectorTable_||fogPortalSelectorTableEnd_!=fogPortalSelectorTable_+1)return false;}
+        else if(fogPortalSelectorTableEnd_)return false;
+        if(f.blockRead){if(!e.ready||!e.words||!fogPortalSelectorTableEnd_||fogPortalSelectorBlock_!=fogPortalSelectorTableEnd_[-1]||
+            fogPortalSelectorBlock_!=e.words.get())return false;}
+        else if(fogPortalSelectorBlock_)return false;
+        if(f.entryAliasResolved){const auto index=*f.nativeOrdinal-1u;
+            if(index>=1024u||!fogPortalSelectorBlock_||fogPortalSelectorEntry_!=fogPortalSelectorBlock_+index||
+               e.members[index]!=(inserted.memberStored?collider_.get():nullptr)||
+               e.borrowers[index]!=(inserted.memberStored?&fogPortalNeighborPinIdentity_:nullptr)||e.wordKnown[index])return false;}
+        else if(fogPortalSelectorEntry_)return false;
+        if(f.s3Retained)return fogPortalSelectorS3_==fogPortalSelectorEntry_&&f.selectedNonNull==bool(fogPortalSelectorS3_);
+        return !fogPortalSelectorS3_;
+    }
+    bool withdrawFogPortalSelectorNative()noexcept {
+        const auto& f=fogPrimary_.portalSelector;
+        if(!f.nativeReservationAttempted)return true;
+        if(!fogPortalSelectorCurrentNative())return false;
+        const auto& inserted=fogPrimary_.portalInsertion;
+        fogPortalInsertionA0_=nullptr;fogPortalInsertionA1_=nullptr;fogPortalInsertionA2_=nullptr;
+        fogPortalInsertionA3_=fogPortalInsertionT0_=nullptr;
+        fogPortalSelectorS3_=fogPortalSelectorEntry_=fogPortalSelectorBlock_=nullptr;
+        fogPortalSelectorTableEnd_=fogPortalSelectorTable_=nullptr;
+        //All usable argument/table/block/entry aliases die before the exclusive reservation is released.
+        if(f.nativeReservationAcquired){auto& c=*fogPortalNeighborMethod_;auto& e=c.sourceEntries_;
+            if(e.pendingConsumed){
+                if(!inserted.memberStored){e.abandonedConsumed=e.pendingSlot;e.terminal=true;fogPortalInsertionAbandoned_=true;}
+                e.pendingConsumed=false;
+            }
+            e.pending=e.pendingIdentity=nullptr;e.pendingSlot=0;fogPortalSelectorCanceled_=true;
+            if(inserted.memberStored){const auto index=*f.nativeOrdinal-1u; //Exact cell was checked before any custody mutation.
+                e.nativeFreeNext[index]=*c.source_.field40;e.members[index]=e.borrowers[index]=nullptr;
+                e.wordKnown[index]=false;c.source_.field40=*f.nativeOrdinal;fogPortalInsertionMemberWithdrawn_=true;
+            }
+        }
+        fogPortalSelectorWithdrawn_=true;return true; //Native unlink only. No original return, count rollback or fabricated guest free address.
+    }
+    Membership::FogPoolAllocator* fogPortalPoolA0_=nullptr; //Retained native call-argument custody, not live architectural A0 after scalar loads.
+    Membership::FogPoolAllocator* fogPortalPoolS0_=nullptr;
+    Membership::SecondaryLink* fogPortalPoolFreeV0_=nullptr;
+    bool fogPortalPoolWithdrawn_=false,fogPortalPoolRecordWithdrawn_=false,fogPortalPoolSlot14Withdrawn_=false;
+    Membership::FogPoolChunk* fogPortalPoolChunkA0_=nullptr;
+    Membership::SecondaryLink* fogPortalPoolBaseA0_=nullptr;
+    Membership::SecondaryLink* fogPortalPoolNextV1_=nullptr;
+    Membership::SecondaryLink* fogPortalPoolResultV0_=nullptr;
+    const C* fogPortalPayloadV1_=nullptr; //Actual280CDC portal08 load; replaced by genuineNULL head at280CEC.
+    bool fogPortalPoolCurrentNative()const noexcept {
+        const auto& f=fogPrimary_.portalPool;const auto& m=fogPrimary_.portalPoolMutation;const auto& r=fogPrimary_.portalPoolReturn;
+        const auto& slot=fogPrimary_.portalPoolSlot14;const auto& payload=fogPrimary_.portalPoolPayload;
+        if(!f.historyCurrent()||!m.historyCurrent(f)||!r.historyCurrent(f,m)||!slot.historyCurrent(r)||!payload.historyCurrent(slot)||
+           (f.callStep&&(fogPrimary_.portalInsertion.step!=7||fogPrimary_.portalInsertion.returnPC!=0x280cc4u)))return false;
+        const bool noAliases=!fogPortalPoolA0_&&!fogPortalPoolS0_&&!fogPortalPoolFreeV0_&&!fogPortalPoolChunkA0_&&
+            !fogPortalPoolBaseA0_&&!fogPortalPoolNextV1_&&!fogPortalPoolResultV0_&&!fogPortalPayloadV1_;
+        if(fogPortalCustodyWithdrawn_)return noAliases&&fogPortalPoolWithdrawn_==bool(f.callStep)&&
+            fogPortalPoolRecordWithdrawn_==m.poolStored&&fogPortalPoolSlot14Withdrawn_==slot.stored;
+        if(fogPortalPoolWithdrawn_||fogPortalPoolRecordWithdrawn_||fogPortalPoolSlot14Withdrawn_)return false;
+        if(f.callStep<3)return noAliases;
+        if(!serviceHeapMembership_||!serviceHeapMembership_->fogPoolAliasesCurrentNative(&servicePrimary_,fogPortalPoolA0_,fogPortalPoolFreeV0_)||
+           (r.step>=8?bool(fogPortalPoolS0_):(f.bodyStep>=6?fogPortalPoolS0_!=fogPortalPoolA0_:bool(fogPortalPoolS0_)))||
+           (f.free2CNull?*f.free2CNull!=!fogPortalPoolFreeV0_:bool(fogPortalPoolFreeV0_)))return false;
+        const bool free=m.fromFree.value_or(false);
+        if(!free&&m.step>=2){if(!serviceHeapMembership_->fogPoolChunkCurrentNative(&servicePrimary_,fogPortalPoolA0_,fogPortalPoolChunkA0_))return false;}
+        else if(fogPortalPoolChunkA0_)return false;
+        if(!free&&m.step>=5){if(fogPortalPoolBaseA0_!=&fogPortalPoolChunkA0_->records[0])return false;}
+        else if(fogPortalPoolBaseA0_)return false;
+        if(m.nextNull){if(*m.nextNull!=!fogPortalPoolNextV1_||
+            !serviceHeapMembership_->fogPoolAliasesCurrentNative(&servicePrimary_,fogPortalPoolA0_,fogPortalPoolNextV1_))return false;}
+        else if(fogPortalPoolNextV1_)return false;
+        const auto& a=serviceHeapMembership_->fogPoolAllocation_;
+        if(a.entered!=m.poolStored||a.accountingStored!=r.accountingStored||a.slot14Stored!=slot.stored||a.slot14AliasWithdrawn||
+           a.payloadMask!=payload.stores||a.oldHeadRead!=payload.oldHeadNull.has_value())return false;
+        if(m.poolStored&&(a.nativeWithdrawn||a.primaryOccurrence!=&servicePrimary_||a.secondaryOccurrence!=&fogPortalNeighborPinIdentity_||
+           a.pool!=fogPortalPoolA0_||a.fromFree!=free||!serviceHeapMembership_->fogPoolAllocationHistoryNative()||
+           a.record!=(free?fogPortalPoolFreeV0_:&fogPortalPoolChunkA0_->records[*f.used20])))return false;
+        if(m.resultAddressRetained){if(fogPortalPoolResultV0_!=a.record)return false;}
+        else if(fogPortalPoolResultV0_)return false;
+        if(slot.stored&&(a.slot14Method!=fogPortalNeighborMethod_||a.slot14Member!=collider_.get()||
+           a.record->fogSlot14!=fogPortalSelectorS3_))return false;
+        if((payload.step>=3&&payload.step<7?fogPortalPayloadV1_!=fogPortalOperandA0_:bool(fogPortalPayloadV1_))||
+           ((payload.stores&1u)&&a.child04!=fogPortalNeighborS0_)||
+           ((payload.stores&4u)&&a.portal0C!=fogPortalOperandA0_)||
+           (payload.distanceF0&&payload.distanceF0!=fogPrimary_.portalDot.outputDistance)||
+           ((payload.stores&8u)&&a.distance10!=payload.distanceF0))return false;
+        return true; //Read snapshots remain historical; only this exact consumed record is continuously owned.
+    }
+    bool fogPortalPoolApplicationCurrentNative(const OriginalGarageObserverShared50KG& actualShared)const noexcept {
+        return !fogPrimary_.portalPool.callStep||fogPortalCustodyWithdrawn_||
+            (serviceHeapMembership_&&serviceHeapMembership_->shared_==&actualShared);
+    }
+    bool withdrawFogPortalPoolNative()noexcept {
+        if(!fogPrimary_.portalPool.callStep)return true;
+        if(!fogPortalPoolCurrentNative())return false;
+        if(fogPrimary_.portalPoolSlot14.stored){
+            if(!serviceHeapMembership_->withdrawFogPoolSlot14AliasNative(&servicePrimary_,&fogPortalNeighborPinIdentity_))return false;
+            fogPortalPoolSlot14Withdrawn_=true;
+        }
+        fogPortalPoolResultV0_=fogPortalPoolNextV1_=fogPortalPoolBaseA0_=nullptr;fogPortalPoolChunkA0_=nullptr;fogPortalPayloadV1_=nullptr;
+        fogPortalPoolFreeV0_=nullptr;fogPortalPoolS0_=fogPortalPoolA0_=nullptr;fogPortalPoolWithdrawn_=true;
+        return true; //Usable frame aliases die first. The exact consumed record is released after the own List member.
+    }
+    bool fogPortalNeighborCurrentNative()const noexcept {
+        const auto& f=fogPrimary_.portalNeighbor;
+        if(!f.historyCurrent(fogPrimary_.portalHit)||!fogPortalSelectorCurrentNative()||!fogPortalPoolCurrentNative())return false;
+        if(fogPortalCustodyWithdrawn_)return !fogPortalNeighborNode_&&!fogPortalNeighborS0_&&!fogPortalNeighborMethod_&&
+            !fogPortalCurrentMethodS2_&&!fogPortalSelectA0_&&!fogPortalSelectCenterA1_&&!fogPortalSelectHalfA2_&&
+            (!f.nativePinAcquired||fogPortalNeighborUnpinned_);
+        if(fogPortalNeighborUnpinned_||(f.neighborAdmissionAttempted&&!fogPortalGraphPin_)||
+           bool(fogPortalNeighborNode_)!=(f.step>=1)||bool(fogPortalNeighborS0_)!=(f.step>=1)||
+           bool(fogPortalNeighborMethod_)!=(f.step>=9)||
+           (f.step>=13?fogPortalCurrentMethodS2_!=fogPortalNeighborMethod_:bool(fogPortalCurrentMethodS2_))||
+           (f.step>=14?fogPortalSelectA0_!=fogPortalNeighborMethod_:bool(fogPortalSelectA0_))||
+           (f.step>=15&&f.step<21?fogPortalSelectCenterA1_!=&boundsCenter_:bool(fogPortalSelectCenterA1_))||
+           (f.step>=16?fogPortalSelectHalfA2_!=&boundsHalf_:bool(fogPortalSelectHalfA2_)))return false;
+        if(fogPortalNeighborMethod_){const auto& c=*fogPortalNeighborMethod_;
+            if(fogPortalNeighborMethod_==servicePrimary_.method||!c.sourceMode_||c.world_!=servicePrimary_.world||
+               c.application_!=application_||c.ordinal_<10u||c.ordinal_>=20u||!c.source_.usageKnown||c.usage10_!=1u||
+               !c.source_.constructorReturned||c.source_.vtable08!=0x3d2d30u||!c.sourceCollisionEntriesCurrentNative())return false;
+            unsigned pins=0;for(const auto* id:c.sourceCollisionRegistrationBorrowers_)if(id==&fogPortalNeighborPinIdentity_)++pins;
+            if(pins!=(f.nativePinAcquired?1u:0u))return false; //Own pending/count/member custody is checked separately, never borrowed from primary.
+            unsigned members=0;for(const auto* id:c.sourceEntries_.borrowers)if(id==&fogPortalNeighborPinIdentity_)++members;
+            if(members!=(fogPrimary_.portalInsertion.memberStored?1u:0u))return false;
+        }
+        return true;
+    }
+    bool withdrawFogPortalNeighborNative()noexcept {
+        if(!fogPortalNeighborCurrentNative()||!withdrawFogPortalPoolNative()||!withdrawFogPortalSelectorNative())return false;
+        if(fogPrimary_.portalPoolMutation.poolStored){
+            if(!serviceHeapMembership_||!serviceHeapMembership_->releaseFogPoolAllocationNative(&servicePrimary_,&fogPortalNeighborPinIdentity_))return false;
+            fogPortalPoolRecordWithdrawn_=true;
+        }
+        const auto clearAliases=[&]()noexcept {
+            fogPortalSelectCenterA1_=fogPortalSelectHalfA2_=nullptr;
+            fogPortalSelectA0_=fogPortalCurrentMethodS2_=fogPortalNeighborMethod_=nullptr;
+            fogPortalNeighborS0_=nullptr;fogPortalNeighborNode_=nullptr;
+        };
+        if(fogPrimary_.portalNeighbor.nativePinAcquired&&!fogPortalNeighborUnpinned_){
+            auto& pins=fogPortalNeighborMethod_->sourceCollisionRegistrationBorrowers_;
+            auto it=pins.begin();while(it!=pins.end()&&*it!=&fogPortalNeighborPinIdentity_)++it;
+            if(it==pins.end())return false;
+            clearAliases();pins.erase(it);fogPortalNeighborUnpinned_=true;
+        }else clearAliases();
+        return true; //Usable aliases die before the own native pin; no source reference decrement or primary-slot withdrawal.
+    }
+    bool fogPortalSharedOutputCurrentNative()const noexcept {
+        // Actual caller SP+AC has one backing. Source-reached stores choose its
+        // current writer; earlier reads and published records keep their own value.
+        const auto& second=fogPrimary_.portalNextQuery.portalDot.outputDistance;
+        auto latest=second?second:fogPrimary_.portalDot.outputDistance;
+        for(const auto& o:fogPrimary_.portalMissTail.occurrences)
+            if(o.query.portalDot.outputDistance)latest=o.query.portalDot.outputDistance;
+        return !latest||fogPortalDistanceBacking_==*latest;
+    }
+    bool fogPortalNextInputsCurrentNative()const noexcept {
+        const auto& f=fogPrimary_.portalNextInputs;
+        if(!f.historyCurrent(fogPrimary_.portalHitNext,fogPrimary_.portalHead)||
+           !fogPortalNextQuery_.current(fogPrimary_.portalNextQuery,f,fogPortalNextPortalA0_,fogPortalNextVertices_,
+                fogPortalNextCenterA1_,&fogPortalDistanceBacking_,fogPortalCustodyWithdrawn_)||
+           !fogPortalSharedOutputCurrentNative())return false;
+        if(fogPortalCustodyWithdrawn_)return !fogPortalNextVertices_&&!fogPortalNextCenterA1_&&!fogPortalNextDistanceA2_;
+        if(bool(fogPortalNextVertices_)!=f.nativeInputsAcquired||
+           (fogPrimary_.portalNextQuery.portalEdge0.step>=14?bool(fogPortalNextDistanceA2_):
+             (f.step>=1?fogPortalNextDistanceA2_!=&fogPortalDistanceBacking_:bool(fogPortalNextDistanceA2_)))||
+           (f.step>=4?fogPortalNextCenterA1_!=&boundsCenter_:bool(fogPortalNextCenterA1_))||
+           (f.nativeInputsAcquired&&(!fogPortalGraphPin_||!fogPortalHitNextCursor_||!fogPortalNextPortalA0_)))return false;
+        for(unsigned k=0;k<3;++k){
+            if(f.centerWords[k]&&*f.centerWords[k]!=std::bit_cast<std::uint32_t>(boundsCenter_.v[k]))return false;
+            if(f.vertexWords[k]&&*f.vertexWords[k]!=(*fogPortalNextVertices_)[0][k])return false;
+        }
+        return true; //Historical first values remain fixed; only a reached second output store changes SP+AC.
+    }
+    bool fogPortalAfterCurrentNative()const noexcept {
+        const auto& hit=fogPrimary_.portalHit;const auto& next=fogPrimary_.portalNext;const auto& afterHit=fogPrimary_.portalHitNext;
+        if(!hit.historyCurrent(fogPrimary_.portalLoop,fogPrimary_.portalDot)||
+           !next.historyCurrent(fogPrimary_.portalMissAt280CF8(),fogPrimary_.publication)||
+           !afterHit.historyCurrent(fogPrimary_.portalPoolPayload,fogPrimary_.publication)||
+           (next.nativeAdmissionAttempted&&afterHit.nativeAdmissionAttempted)||!fogPortalNeighborCurrentNative()||
+           !fogPortalNextInputsCurrentNative()||
+           !fogPortalMissTail_.current(fogPrimary_.portalMissTail,fogPortalHead_,fogPortalNextCursor_,fogPortalHitNextCursor_,
+                &boundsCenter_,&fogPortalDistanceBacking_,fogPortalCustodyWithdrawn_))return false;
+        if(fogPortalCustodyWithdrawn_)return !fogPortalNextCursor_&&!fogPortalHitNextCursor_&&!fogPortalNextPortalA0_;
+        if((hit.step||next.nativeAdmissionAttempted||afterHit.nativeAdmissionAttempted)&&!fogPortalGraphPin_)return false;
+        if(hit.reloadF0&&hit.reloadF0!=fogPrimary_.portalDot.outputDistance)return false;
+        if((afterHit.step?afterHit.nextNonNull!=bool(fogPortalHitNextCursor_):bool(fogPortalHitNextCursor_))||
+           (fogPortalHitNextCursor_&&fogPortalHitNextCursor_==fogPortalHead_)||
+           bool(fogPortalNextPortalA0_)!=afterHit.portalReadCompleted)return false;
+        return next.step?next.nextNonNull==bool(fogPortalNextCursor_):!fogPortalNextCursor_;
+    }
+    const std::array<std::uint32_t,4>* fogPortalLiveLocal00History()const noexcept {
+        const auto* latest=fogPrimary_.portalRelative.local00?&*fogPrimary_.portalRelative.local00:nullptr;
+        for(const auto& it:fogPrimary_.portalLoop.iterations)if(it.local00)latest=&*it.local00;
+        return latest; //Latest reached SQ, not an older historical snapshot.
+    }
+    bool fogPortalLoopCurrentNative()const noexcept {
+        const auto& f=fogPrimary_.portalLoop;
+        if(!f.historyCurrent(fogPrimary_.portalInputs,fogPrimary_.portalEdge0)||!fogPortalAfterCurrentNative())return false;
+        if(fogPortalCustodyWithdrawn_){for(unsigned i=0;i<3;++i)if(fogPortalLoopVertices_[i]||fogPortalLoopEdges_[i])return false;return true;}
+        std::array<std::optional<std::uint32_t>,4> latest20;
+        for(unsigned i=0;i<3;++i){const auto& it=f.iterations[i];
+            if(bool(fogPortalLoopVertices_[i])!=(it.step>=1)||bool(fogPortalLoopEdges_[i])!=(it.step>=8))return false;
+            if(it.step&&(!fogPortalGraphPin_||!fogPortalVertices_||fogPortalLoopVertices_[i]!=&(*fogPortalVertices_)[i+1]))return false;
+            for(unsigned k=0;k<3;++k){
+                if(it.centerWords[k]&&*it.centerWords[k]!=std::bit_cast<std::uint32_t>(boundsCenter_.v[k]))return false;
+                if(it.vertexWords[k]&&*it.vertexWords[k]!=(*fogPortalLoopVertices_[i])[k])return false;
+                if(it.edgeVF5[k]&&*it.edgeVF5[k]!=(*fogPortalLoopEdges_[i])[k])return false;
+            }
+            for(unsigned k=0;k<4;++k)if(it.temporary20[k])latest20[k]=it.temporary20[k];
+        }
+        for(unsigned k=0;k<4;++k)if(latest20[k]&&fogPortalRelative20_[k]!=*latest20[k])return false;
+        const auto* latest=fogPortalLiveLocal00History();return !latest||fogPortalRelative00_==*latest;
+    }
+    bool fogPortalFirstEdgeCurrentNative()const noexcept {
+        const auto& f=fogPrimary_.portalEdge0;
+        if(!f.historyCurrent(fogPrimary_.portalSlab,fogPrimary_.portalRelative,fogPrimary_.portalInputs)||!fogPortalLoopCurrentNative())return false;
+        if(fogPortalCustodyWithdrawn_)return !fogPortalFirstEdge_;
+        if(bool(fogPortalFirstEdge_)!=(f.step>=3))return false;
+        if(f.step&&!fogPortalGraphPin_)return false;
+        //relativeVF4 is the edge0 historical reload; later loop SQ may overwrite local00.
+        if(fogPortalFirstEdge_)for(unsigned k=0;k<3;++k)if(f.edgeVF5[k]!=(*fogPortalFirstEdge_)[k])return false;
+        return true;
+    }
+    bool fogPortalSlabCurrentNative()const noexcept {
+        const auto& f=fogPrimary_.portalSlab;
+        if(!f.historyCurrent(fogPrimary_.portalDot,fogPrimary_.portalInputs)||!fogPortalFirstEdgeCurrentNative())return false;
+        if(fogPortalCustodyWithdrawn_)return !fogPortalEdgeRelativeT0_;
+        return f.negativeStep>=5?fogPortalEdgeRelativeT0_==&fogPortalRelative00_:!fogPortalEdgeRelativeT0_;
+    }
+    bool fogPortalDotCurrentNative()const noexcept {
+        const auto& f=fogPrimary_.portalDot;
+        if(!f.historyCurrent(fogPrimary_.portalRelative)||!fogPortalSlabCurrentNative())return false;
+        if(fogPortalCustodyWithdrawn_)return !fogPortalNormal_&&!fogPortalTemporaryV0_;
+        if(bool(fogPortalNormal_)!=(f.step>=1)||
+           (f.step>=10?fogPortalTemporaryV0_!=&fogPortalTemporary3C_:bool(fogPortalTemporaryV0_)))return false;
+        if(f.step&&!fogPortalGraphPin_)return false;
+        if(fogPortalNormal_)for(unsigned k=0;k<3;++k)if(f.normalVF5[k]!=(*fogPortalNormal_)[k])return false;
+        return (!f.temporary3C||fogPortalTemporary3C_==*f.temporary3C)&&
+            fogPortalSharedOutputCurrentNative();
+    }
+    bool fogPortalRelativeCurrentNative()const noexcept {
+        const auto& f=fogPrimary_.portalRelative;
+        if(!f.historyCurrent(fogPrimary_.portalInputs))return false;
+        if(fogPortalCustodyWithdrawn_)return !fogPortalRelativeA3_;
+        if(fogPrimary_.portalLoop.iterations[0].step>=8?bool(fogPortalRelativeA3_):
+           (f.step>=3?fogPortalRelativeA3_!=&fogPortalRelative00_:bool(fogPortalRelativeA3_)))return false;
+        for(unsigned k=0;k<4;++k)if(f.temporary10[k]&&fogPortalRelative10_[k]!=*f.temporary10[k])return false;
+        const auto* latest=fogPortalLiveLocal00History();return !latest||fogPortalRelative00_==*latest;
+    }
     bool fogPortalInputsCurrentNative()const noexcept {
         const auto& f=fogPrimary_.portalInputs;
-        if(!f.historyCurrent())return false;
+        if(!f.historyCurrent()||!fogPortalRelativeCurrentNative()||!fogPortalDotCurrentNative())return false;
         if(fogPortalCustodyWithdrawn_||!f.step)return !fogPortalOperandA0_&&!fogPortalVertices_&&
             !fogPortalCenterA1_&&!fogPortalDistanceA2_;
         if(!fogPortalGraphPin_||!fogPortalHead_||fogPrimary_.portalHead.step!=9||
            fogPrimary_.portalHead.headNull!=false||!fogPortalOperandA0_||!fogPortalVertices_)return false;
-        if((f.step>=2?fogPortalDistanceA2_!=&fogPortalDistanceBacking_:bool(fogPortalDistanceA2_))||
+        if((fogPrimary_.portalEdge0.step>=14?bool(fogPortalDistanceA2_):
+            (f.step>=2?fogPortalDistanceA2_!=&fogPortalDistanceBacking_:bool(fogPortalDistanceA2_)))||
            (f.step>=5?fogPortalCenterA1_!=&boundsCenter_:bool(fogPortalCenterA1_)))return false;
         for(unsigned k=0;k<3;++k){
             if(f.centerWords[k]&&*f.centerWords[k]!=std::bit_cast<std::uint32_t>(boundsCenter_.v[k]))return false;
@@ -1046,7 +2016,13 @@ class OriginalWorldTriggerInstance50LA final {
     }
     bool withdrawFogPortalHeadNative()noexcept {
         if(!fogPrimary_.portalHead.step||fogPortalCustodyWithdrawn_)return fogPortalHeadCurrentNative();
-        if(!fogPortalHeadCurrentNative())return false;
+        if(!fogPortalHeadCurrentNative()||!withdrawFogPortalNeighborNative())return false;
+        fogPortalNextCursor_=fogPortalHitNextCursor_=nullptr;fogPortalNextPortalA0_=nullptr;
+        fogPortalNextQuery_.retire(); //Own activation aliases die before the complete-chain graph pin.
+        fogPortalMissTail_.retire(); //Every later occurrence and next cursor dies before the same graph token.
+        fogPortalNextVertices_=nullptr;fogPortalNextCenterA1_=nullptr;fogPortalNextDistanceA2_=nullptr;
+        fogPortalLoopVertices_.fill(nullptr);fogPortalLoopEdges_.fill(nullptr);
+        fogPortalFirstEdge_=nullptr;fogPortalEdgeRelativeT0_=nullptr;fogPortalNormal_=nullptr;fogPortalTemporaryV0_=nullptr;fogPortalRelativeA3_=nullptr;
         fogPortalOperandA0_=nullptr;fogPortalVertices_=nullptr;fogPortalCenterA1_=nullptr;fogPortalDistanceA2_=nullptr;
         fogPortalHead_=fogPortalZone_=nullptr;fogPortalMethod_=nullptr;
         fogPortalGraphPin_.reset();fogPortalCustodyWithdrawn_=true;
@@ -1097,7 +2073,561 @@ class OriginalWorldTriggerInstance50LA final {
             at(0x231154u+8*k);f.vertexWords[k]=(*fogPortalVertices_)[0][k];f.step=7+2*k;
         }
         at(0x231168);f.step=12; //Actual callee stack decrement, not a guest address fabrication.
-        at(0x23116c);return false; //Before SUB.S; no difference, output distance, hit or return is claimed.
+        at(0x23116c);return continueFogPortalRelative23116C(pc);
+    }
+    bool continueFogPortalRelative23116C(std::uint32_t& pc)noexcept {
+        if(pc!=0x23116c||fogPrimary_.portalInputs.step!=12||fogPrimary_.portalRelative.step||
+           membershipNativeWithdrawn_||nativeClosed_||!preflightNative())return false;
+        auto& h=servicePrimary_;auto& f=fogPrimary_.portalRelative;const auto& in=fogPrimary_.portalInputs;
+        const auto at=[&](std::uint32_t p){pc=pc_=h.pc=p;};
+        at(0x23116c);const auto x=f.difference(*in.centerWords[0],*in.vertexWords[0]);if(!x)return false;
+        f.differences[0]=x;f.step=1;
+        at(0x231170);f.oneV0=0x3f800000u;f.step=2;
+        at(0x231174);fogPortalRelativeA3_=&fogPortalRelative00_;f.step=3;
+        at(0x231178);const auto y=f.difference(*in.centerWords[1],*in.vertexWords[1]);if(!y)return false;
+        f.differences[1]=y;f.step=4;
+        at(0x23117c);fogPortalRelative10_[0]=*x;f.temporary10[0]=x;f.step=5;
+        at(0x231180);f.normalOffset=0x70u;f.step=6; //Symbolic offset from the SAME retained portal A0; no normal read yet.
+        at(0x231184);const auto z=f.difference(*in.centerWords[2],*in.vertexWords[2]);if(!z)return false;
+        f.differences[2]=z;f.step=7;
+        at(0x231188);fogPortalRelative10_[1]=*y;f.temporary10[1]=y;f.step=8;
+        at(0x23118c);fogPortalRelative10_[2]=*z;f.temporary10[2]=z;f.step=9;
+        at(0x231190);fogPortalRelative10_[3]=*f.oneV0;f.temporary10[3]=f.oneV0;f.step=10;
+        at(0x231194);f.quadV0=fogPortalRelative10_;f.step=11;
+        at(0x231198);*fogPortalRelativeA3_=*f.quadV0;f.local00=*f.quadV0;f.step=12;
+        at(0x23119c);f.vf4=*fogPortalRelativeA3_;f.step=13;
+        at(0x2311a0);return false; //Before normal LQC2/VU dot; output distance and all enclosing returns remain unknown.
+    }
+    template<class ActualNormal>
+    bool continueFogPortalDot2311A0(ActualNormal&& actualNormal,std::uint32_t& pc)noexcept {
+        if(pc!=0x2311a0||fogPrimary_.portalRelative.step!=13||fogPrimary_.portalDot.nativeAdmissionAttempted||
+           membershipNativeWithdrawn_||nativeClosed_||!preflightNative())return false;
+        auto& h=servicePrimary_;auto& f=fogPrimary_.portalDot;const auto& relative=*fogPrimary_.portalRelative.vf4;
+        const auto at=[&](std::uint32_t p){pc=pc_=h.pc=p;};
+        at(0x2311a0);f.nativeAdmissionAttempted=true;
+        if(!actualNormal(&h,collider_.get(),fogPortalZone_,fogPortalHead_,fogPortalGraphPin_,fogPortalNormal_,pc)){at(pc);return false;}
+        for(unsigned k=0;k<3;++k)f.normalVF5[k]=(*fogPortalNormal_)[k];f.step=1; //XYZ known; W stays unknown, never read as known.
+        at(0x2311a4);if(!f.axisNormal())return false;
+        std::array<std::uint32_t,3> products;
+        for(unsigned k=0;k<3;++k){const auto product=f.unitProduct(relative[k],*f.normalVF5[k]);if(!product)return false;products[k]=*product;}
+        for(unsigned k=0;k<3;++k)f.productsVF5[k]=products[k];f.step=2;
+        at(0x2311a8);f.oneVF6=0x3f800000u;f.step=3; //VADDw.x VF6,VF0,VF0; other VF6 lanes remain unknown.
+        at(0x2311ac);const auto acc=f.zeroSum(products[0],products[1]);if(!acc)return false;f.accX=acc;f.step=4;
+        at(0x2311b0);const auto product=f.unitProduct(*f.oneVF6,products[2]);if(!product)return false;
+        const auto sum=f.zeroSum(*f.accX,*product);if(!sum)return false;f.sumVF5X=sum;f.step=5;
+        at(0x2311b4);f.gprV0[0]=sum;f.gprV0[1]=products[1];f.gprV0[2]=products[2];f.step=6; //Full QMFC2 retains unknown W.
+        at(0x2311b8);f.scalarF1=f.gprV0[0];f.step=7; //MTC1 consumes only the known low word.
+        at(0x2311bc);if(fogPortalDistanceA2_!=&fogPortalDistanceBacking_)return false;
+        f.outputNonNull=true;f.step=8;at(0x2311c0);f.step=9; //Actual nonNULL caller output address; branch not taken, delay still executes.
+        at(0x2311c4);fogPortalTemporaryV0_=&fogPortalTemporary3C_;f.step=10;
+        at(0x2311c8);f.absoluteF8=*f.scalarF1&0x7fffffffu;f.step=11;
+        at(0x2311cc);*fogPortalTemporaryV0_=*f.absoluteF8;f.temporary3C=f.absoluteF8;f.step=12;
+        at(0x2311d0);f.reloadF0=fogPortalTemporary3C_;f.step=13;
+        at(0x2311d4);*fogPortalDistanceA2_=*f.reloadF0;f.outputDistance=f.reloadF0;f.step=14;
+        at(0x2311d8);return continueFogPortalSlab2311D8(pc);
+    }
+    bool continueFogPortalSlab2311D8(std::uint32_t& pc)noexcept {
+        if(pc!=0x2311d8||fogPrimary_.portalDot.step!=14||fogPrimary_.portalSlab.prefixStep||
+           membershipNativeWithdrawn_||nativeClosed_||!preflightNative())return false;
+        auto& h=servicePrimary_;auto& f=fogPrimary_.portalSlab;
+        const auto distance=*fogPrimary_.portalDot.scalarF1; //Signed F1, never the ABS output.
+        const auto at=[&](std::uint32_t p){pc=pc_=h.pc=p;};
+        at(0x2311d8);const auto le=f.lessEqualZero(distance);if(!le||fogPrimary_.portalInputs.radiusF12!=0u)return false;
+        f.firstCondition=f.conditionBit=le;f.prefixStep=1;
+        at(0x2311dc);f.prefixStep=2;at(0x2311e0);f.prefixStep=3;
+        at(0x2311e4);f.delayV0=decltype(f.delayV0)::value_type{};f.prefixStep=4; //Ordinary BC1F: POR V0,zero,zero delay always executes.
+        if(*le){
+            at(0x2311e8);f.negativeRadius=*fogPrimary_.portalInputs.radiusF12^0x80000000u;f.negativeStep=1;
+            at(0x2311ec);const auto lt=f.lessNegativeZero(distance);if(!lt)return false;
+            f.secondCondition=f.conditionBit=lt;f.negativeStep=2;
+            at(0x2311f0);f.negativeStep=3;at(0x2311f4);f.negativeStep=4;
+            at(0x2311f8);fogPortalEdgeRelativeT0_=&fogPortalRelative00_;f.negativeStep=5; //Ordinary BC1F delay, on both outcomes.
+            if(!*lt){at(0x23120c);return false;} //Either signed zero: before first edge setup, no hit/miss result.
+            at(0x2311fc);f.secondZeroV0=decltype(f.secondZeroV0)::value_type{}; //Negative nonzero miss, before the common branch.
+        }
+        at(0x231200);f.missStep=1;
+        at(0x231204);f.missStep=2; //Unconditional branch delay restores SP by0x40 before JR.
+        at(0x2312f4);f.missStep=3;
+        at(0x2312f8);f.returnV0=f.secondZeroV0?f.secondZeroV0:f.delayV0;
+        f.returnPC=fogPrimary_.portalInputs.callContinuation;f.missStep=4; //Actual JR delay; no padding-as-return shortcut.
+        at(0x280c54);if(f.returnV0!=decltype(f.returnV0)::value_type{}||f.returnPC!=0x280c54u)return false;
+        f.callerBranchTaken=true;f.missStep=5;
+        at(0x280c58);f.callerTarget=0x280cf8u;f.missStep=6;
+        at(0x280cf8);return false; //Before next-link LW; no edge distance store, traversal, portal or primary return.
+    }
+    template<class ActualEdge>
+    bool continueFogPortalEdge023120C(ActualEdge&& actualEdge,std::uint32_t& pc)noexcept {
+        if(pc!=0x23120c||fogPrimary_.portalSlab.negativeStep!=5||fogPrimary_.portalSlab.secondCondition!=false||
+           fogPrimary_.portalSlab.missStep||fogPrimary_.portalEdge0.step||membershipNativeWithdrawn_||nativeClosed_||!preflightNative())return false;
+        auto& h=servicePrimary_;auto& f=fogPrimary_.portalEdge0;
+        const auto at=[&](std::uint32_t p){pc=pc_=h.pc=p;};
+        at(0x23120c);f.edgeOffset=0x80u;f.step=1; //Symbolic offset from same actual portal A0.
+        at(0x231210);if(fogPortalEdgeRelativeT0_!=&fogPortalRelative00_)return false;
+        f.relativeVF4=*fogPortalEdgeRelativeT0_;f.step=2;
+        at(0x231214);f.nativeAdmissionAttempted=true;
+        if(!actualEdge(&h,collider_.get(),fogPortalZone_,fogPortalHead_,fogPortalGraphPin_,fogPortalFirstEdge_,pc)){at(pc);return false;}
+        for(unsigned k=0;k<3;++k)f.edgeVF5[k]=(*fogPortalFirstEdge_)[k];f.step=3; //W remains unknown.
+        at(0x231218);if(!f.axisEdge())return false;std::array<std::uint32_t,3> products;
+        for(unsigned k=0;k<3;++k){const auto product=decltype(fogPrimary_.portalDot)::unitProduct((*f.relativeVF4)[k],*f.edgeVF5[k]);
+            if(!product)return false;products[k]=*product;}
+        for(unsigned k=0;k<3;++k)f.productsVF5[k]=products[k];f.step=4;
+        at(0x23121c);f.oneVF6=0x3f800000u;f.step=5;
+        at(0x231220);const auto acc=decltype(fogPrimary_.portalDot)::zeroSum(products[0],products[1]);if(!acc)return false;f.accX=acc;f.step=6;
+        at(0x231224);const auto product=decltype(fogPrimary_.portalDot)::unitProduct(*f.oneVF6,products[2]);if(!product)return false;
+        const auto sum=decltype(fogPrimary_.portalDot)::zeroSum(*f.accX,*product);if(!sum)return false;f.sumVF5X=sum;f.step=7;
+        at(0x231228);f.gprV0[0]=sum;f.gprV0[1]=products[1];f.gprV0[2]=products[2];f.step=8;
+        at(0x23122c);f.scalarF0=f.gprV0[0];f.step=9;
+        at(0x231230);f.step=10;at(0x231234);
+        const auto le=decltype(fogPrimary_.portalSlab)::lessEqualZero(*f.scalarF0);if(!le||fogPrimary_.portalInputs.radiusF12!=0u)return false;
+        f.conditionBit=le;f.step=11;at(0x231238);f.step=12;at(0x23123c);f.step=13;
+        at(0x231240);f.counterA2=1u;fogPortalDistanceA2_=nullptr;f.step=14; //Ordinary BC1T delay replaces output pointer with low64 counter1.
+        if(*le){
+            at(0x231250);f.advanceStep=1;
+            at(0x231254);f.oneV1=0x3f800000u;f.advanceStep=2;
+            at(0x2312e0);f.loopTestV0=1u;f.advanceStep=3; //Signed1<4; SLTI writes known low64.
+            at(0x2312e4);f.advanceStep=4;
+            at(0x2312e8);f.loopOffsetV0=16u;f.target=0x23125cu;f.advanceStep=5; //SLL delay;231258 duplicate SLL is skipped.
+            at(0x23125c);return false; //Before ADDU forms vertex1 address or any fresh vertex loads.
+        }
+        at(0x231244);f.missStep=1;
+        at(0x231248);f.zeroV0=decltype(f.zeroV0)::value_type{};f.missStep=2;
+        at(0x2312f0);f.missStep=3; //This distinct miss route restores SP here, not at231204.
+        at(0x2312f4);f.missStep=4;
+        at(0x2312f8);f.returnV0=f.zeroV0;f.returnPC=fogPrimary_.portalInputs.callContinuation;f.missStep=5;
+        at(0x280c54);if(f.returnV0!=decltype(f.returnV0)::value_type{}||f.returnPC!=0x280c54u)return false;
+        f.callerBranchTaken=true;f.missStep=6;
+        at(0x280c58);f.target=0x280cf8u;f.missStep=7;
+        at(0x280cf8);return false; //Before next-link read; no portal/primary return or hit-path distance stores.
+    }
+    template<class ActualLoopOperand>
+    bool continueFogPortalLoop23125C(ActualLoopOperand&& actualOperand,std::uint32_t& pc)noexcept {
+        auto& f=fogPrimary_.portalLoop;auto& edge0=fogPrimary_.portalEdge0;auto& h=servicePrimary_;
+        if(pc!=0x23125c||edge0.advanceStep!=5||edge0.target!=0x23125cu||f.iterations[0].addressAttempted||
+           membershipNativeWithdrawn_||nativeClosed_||!preflightNative())return false;
+        const auto at=[&](std::uint32_t p){pc=pc_=h.pc=p;};
+        const OriginalTriggerFogPrimaryPrefix50LA::PortalLoop::Iteration* terminal=nullptr;
+        for(unsigned n=0;n<3;++n){auto& it=f.iterations[n];const unsigned index=n+1;
+            const auto counter=n?f.iterations[n-1].counterOut:edge0.counterA2;
+            const auto offset=n?f.iterations[n-1].loopOffsetV0:edge0.loopOffsetV0;
+            at(0x23125c);if(!counter||*counter!=index||!offset||*offset!=16u*index||
+                (n&&(f.iterations[n-1].advanceStep!=3||f.iterations[n-1].target!=0x23125cu)))return false;
+            it.addressAttempted=true;
+            const C* portal=nullptr;const FogPortalVertices* vertices=nullptr;const std::array<std::uint32_t,4>* edge=nullptr;
+            if(!actualOperand(&h,collider_.get(),fogPortalZone_,fogPortalHead_,fogPortalGraphPin_,index,1u,portal,vertices,edge,pc)){at(pc);return false;}
+            if(portal!=fogPortalOperandA0_||vertices!=fogPortalVertices_||!vertices||edge)return false;
+            fogPortalLoopVertices_[n]=&(*vertices)[index];it.counterIn=counter;it.vertexOffset=offset;it.step=1;
+            at(0x231260);if(fogPortalCenterA1_!=&boundsCenter_)return false;
+            it.centerWords[0]=std::bit_cast<std::uint32_t>(fogPortalCenterA1_->v[0]);it.step=2;
+            at(0x231264);it.vertexWords[0]=(*fogPortalLoopVertices_[n])[0];it.step=3;
+            at(0x231268);it.vertexWords[1]=(*fogPortalLoopVertices_[n])[1];it.step=4;
+            at(0x23126c);it.centerWords[1]=std::bit_cast<std::uint32_t>(fogPortalCenterA1_->v[1]);it.step=5;
+            at(0x231270);it.centerWords[2]=std::bit_cast<std::uint32_t>(fogPortalCenterA1_->v[2]);it.step=6;
+            at(0x231274);it.vertexWords[2]=(*fogPortalLoopVertices_[n])[2];it.step=7;
+            at(0x231278);it.edgeAddressAttempted=true;portal=nullptr;vertices=nullptr;
+            if(!actualOperand(&h,collider_.get(),fogPortalZone_,fogPortalHead_,fogPortalGraphPin_,index,8u,portal,vertices,edge,pc)){at(pc);return false;}
+            if(portal!=fogPortalOperandA0_||vertices!=fogPortalVertices_||!edge)return false;
+            fogPortalLoopEdges_[n]=edge;fogPortalRelativeA3_=nullptr;it.edgeOffset=0x80u+16u*index;it.step=8;
+            at(0x23127c);auto result=decltype(fogPrimary_.portalRelative)::difference(*it.centerWords[0],*it.vertexWords[0]);
+            if(!result)return false;it.differences[0]=result;it.step=9;
+            at(0x231280);result=decltype(fogPrimary_.portalRelative)::difference(*it.centerWords[1],*it.vertexWords[1]);
+            if(!result)return false;it.differences[1]=result;it.step=10;
+            at(0x231284);fogPortalRelative20_[0]=*it.differences[0];it.temporary20[0]=it.differences[0];it.step=11;
+            at(0x231288);result=decltype(fogPrimary_.portalRelative)::difference(*it.centerWords[2],*it.vertexWords[2]);
+            if(!result)return false;it.differences[2]=result;it.step=12;
+            at(0x23128c);fogPortalRelative20_[1]=*it.differences[1];it.temporary20[1]=it.differences[1];it.step=13;
+            at(0x231290);fogPortalRelative20_[2]=*it.differences[2];it.temporary20[2]=it.differences[2];it.step=14;
+            at(0x231294);if(edge0.oneV1!=0x3f800000u)return false;
+            fogPortalRelative20_[3]=static_cast<std::uint32_t>(*edge0.oneV1);it.temporary20[3]=fogPortalRelative20_[3];it.step=15;
+            at(0x231298);it.quadV0=fogPortalRelative20_;it.step=16;
+            at(0x23129c);fogPortalRelative00_=*it.quadV0;it.local00=fogPortalRelative00_;it.step=17;
+            at(0x2312a0);if(fogPortalEdgeRelativeT0_!=&fogPortalRelative00_)return false;
+            it.relativeVF4=*fogPortalEdgeRelativeT0_;it.step=18;
+            at(0x2312a4);it.edgeLoadAttempted=true;portal=nullptr;vertices=nullptr;edge=nullptr;
+            if(!actualOperand(&h,collider_.get(),fogPortalZone_,fogPortalHead_,fogPortalGraphPin_,index,19u,portal,vertices,edge,pc)){at(pc);return false;}
+            if(portal!=fogPortalOperandA0_||vertices!=fogPortalVertices_||edge!=fogPortalLoopEdges_[n])return false;
+            for(unsigned k=0;k<3;++k)it.edgeVF5[k]=(*edge)[k];it.step=19;
+            at(0x2312a8);if(!it.axisEdge())return false;std::array<std::uint32_t,3> products;
+            for(unsigned k=0;k<3;++k){const auto p=decltype(fogPrimary_.portalDot)::unitProduct((*it.relativeVF4)[k],*it.edgeVF5[k]);
+                if(!p)return false;products[k]=*p;}
+            for(unsigned k=0;k<3;++k)it.productsVF5[k]=products[k];it.step=20;
+            at(0x2312ac);it.oneVF6=0x3f800000u;it.step=21;
+            at(0x2312b0);const auto acc=decltype(fogPrimary_.portalDot)::zeroSum(products[0],products[1]);if(!acc)return false;it.accX=acc;it.step=22;
+            at(0x2312b4);const auto p=decltype(fogPrimary_.portalDot)::unitProduct(*it.oneVF6,products[2]);if(!p)return false;
+            const auto sum=decltype(fogPrimary_.portalDot)::zeroSum(*it.accX,*p);if(!sum)return false;it.sumVF5X=sum;it.step=23;
+            at(0x2312b8);it.gprV0[0]=sum;it.gprV0[1]=products[1];it.gprV0[2]=products[2];it.step=24;
+            at(0x2312bc);it.scalarF0=it.gprV0[0];it.step=25;at(0x2312c0);it.step=26;
+            at(0x2312c4);const auto le=decltype(fogPrimary_.portalSlab)::lessEqualZero(*it.scalarF0);
+            if(!le||fogPrimary_.portalInputs.radiusF12!=0u)return false;it.conditionBit=le;it.step=27;
+            at(0x2312c8);it.step=28;at(0x2312cc);it.step=29;
+            if(!*le){ //BC1TL annuls2312D0: counter remains index, never index+1.
+                at(0x2312d4);it.missStep=1;at(0x2312d8);it.zeroV0=decltype(it.zeroV0)::value_type{};
+                it.target=0x2312f0u;it.missStep=2;terminal=&it;break;
+            }
+            at(0x2312d0);it.counterOut=*it.counterIn+1u;it.step=30;
+            at(0x2312e0);it.loopTestV0=*it.counterOut<4u?1u:0u;it.advanceStep=1;
+            at(0x2312e4);it.loopBranchTaken=*it.loopTestV0!=0u;it.advanceStep=2;
+            at(0x2312e8);it.loopOffsetV0=*it.counterOut<<4;it.target=*it.loopBranchTaken?0x23125cu:0x2312ecu;it.advanceStep=3;
+            if(!*it.loopBranchTaken){terminal=&it;break;} //Ordinary BNE executes its delay even on final fallthrough.
+        }
+        if(!terminal)return false;const bool hit=terminal==&f.iterations[2]&&terminal->advanceStep==3;
+        if(hit){at(0x2312ec);f.successLow64=1u;f.successStep=1;} //ADDIU changes low64 only; final QMFC2 upper64 survives.
+        at(0x2312f0);f.returnStep=1;at(0x2312f4);f.returnStep=2;
+        at(0x2312f8);f.returnLow64=hit?1u:0u;f.returnUpper64[0]=hit?terminal->gprV0[2]:std::optional<std::uint32_t>(0u);
+        if(!hit)f.returnUpper64[1]=0u;f.returnPC=fogPrimary_.portalInputs.callContinuation;f.returnStep=3;
+        at(0x280c54);if(f.returnPC!=0x280c54u)return false;f.callerBranchTaken=*f.returnLow64==0u;f.returnStep=4;
+        at(0x280c58);f.target=*f.callerBranchTaken?0x280cf8u:0x280c5cu;f.returnStep=5;
+        at(*f.target);return false; //Before first hit-distance reload or next-link LW; no enclosing registration return.
+    }
+    template<class ActualHitStore>
+    bool continueFogPortalHit280C5C(ActualHitStore&& actualStore,std::uint32_t& pc)noexcept {
+        auto& f=fogPrimary_.portalHit;auto& h=servicePrimary_;
+        if(pc!=0x280c5c||fogPrimary_.portalLoop.returnStep!=5||fogPrimary_.portalLoop.target!=0x280c5cu||f.step||
+           f.storeAttemptMask||membershipNativeWithdrawn_||nativeClosed_||!preflightNative())return false;
+        const auto at=[&](std::uint32_t p){pc=pc_=h.pc=p;};
+        at(0x280c5c);if(!fogPrimary_.portalDot.outputDistance||fogPortalDistanceBacking_!=*fogPrimary_.portalDot.outputDistance)return false;
+        f.reloadF0=fogPortalDistanceBacking_;f.step=1; //Caller sp+AC backing, not any edge-dot result or retired A2 alias.
+        at(0x280c60);f.storeAttemptMask|=1u;
+        if(!actualStore(&h,collider_.get(),fogPortalZone_,fogPortalHead_,fogPortalGraphPin_,1u,*f.reloadF0,pc)){at(pc);return false;}
+        f.stored10=f.reloadF0;f.step=2;
+        at(0x280c64);f.storeAttemptMask|=2u;
+        if(!actualStore(&h,collider_.get(),fogPortalZone_,fogPortalHead_,fogPortalGraphPin_,2u,*f.reloadF0,pc)){at(pc);return false;}
+        f.stored0C=f.reloadF0;f.step=3;
+        at(0x280c68);return false; //Before neighbor04 load, method lookup, secondary selection or publication.
+    }
+    template<class ActualNext>
+    bool continueFogPortalNext280CF8(ActualNext&& actualNext,std::uint32_t& pc)noexcept {
+        auto& f=fogPrimary_.portalNext;auto& h=servicePrimary_;
+        if(pc!=0x280cf8||!fogPrimary_.portalMissAt280CF8()||f.nativeAdmissionAttempted||fogPrimary_.portalHit.step||
+           membershipNativeWithdrawn_||nativeClosed_||!preflightNative())return false;
+        const auto at=[&](std::uint32_t p){pc=pc_=h.pc=p;};
+        at(0x280cf8);f.nativeAdmissionAttempted=true;const void* next=nullptr;
+        if(!actualNext(&h,collider_.get(),fogPortalZone_,fogPortalHead_,fogPortalGraphPin_,next,pc)){at(pc);return false;}
+        fogPortalNextCursor_=next;f.nextNonNull=bool(next);f.step=1; //S1 changes; historical initial head does not.
+        at(0x280cfc);f.branchTaken=f.nextNonNull;f.step=2;
+        at(0x280d00);f.branchTarget=*f.branchTaken?0x280c40u:0x280d04u;f.step=3;
+        if(*f.branchTaken){at(0x280c40);return false;} //Before fresh next-portal08 read or a new helper occurrence.
+        at(0x280d04);f.step=4; //Real fallthrough NOP, not padding after return.
+        //Saved RA,S7..S0,F20 restored in original order; do not fabricate register values.
+        for(std::uint32_t p=0x280d08;p<=0x280d2c;p+=4)at(p);f.step=5;
+        at(0x280d30);f.step=6;
+        at(0x280d34);f.returnPC=fogPrimary_.publication.callContinuation;f.step=7; //JR delay restores SP byB0.
+        at(*f.returnPC);return false; //Actual portal helper return280BC0, before the primary epilogue.
+    }
+    template<class ActualNext,class ActualPortal>
+    bool continueFogPortalHitNext280CF8(ActualNext&& actualNext,ActualPortal&& actualPortal,std::uint32_t& pc)noexcept {
+        auto& f=fogPrimary_.portalHitNext;auto& h=servicePrimary_;const auto& payload=fogPrimary_.portalPoolPayload;
+        if(pc!=0x280cf8u||payload.step!=9||payload.stores!=63u||payload.boundaryPC!=pc||
+           f.nativeAdmissionAttempted||fogPrimary_.portalNext.nativeAdmissionAttempted||
+           membershipNativeWithdrawn_||nativeClosed_||!preflightNative())return false;
+        const auto at=[&](std::uint32_t p){pc=pc_=h.pc=p;};
+        at(0x280cf8);f.nativeAdmissionAttempted=true;const void* next=nullptr;
+        if(!actualNext(&h,collider_.get(),fogPortalZone_,fogPortalHead_,fogPortalGraphPin_,next,pc)){at(pc);return false;}
+        fogPortalHitNextCursor_=next;f.nextNonNull=bool(next);f.step=1;
+        at(0x280cfc);f.branchTaken=f.nextNonNull;f.step=2;
+        at(0x280d00);f.branchTarget=*f.branchTaken?0x280c40u:0x280d04u;f.step=3; //Ordinary NOP delay on both paths.
+        if(*f.branchTaken){
+            at(0x280c40);f.portalReadAttempted=true;const C* portal=nullptr;
+            if(!actualPortal(&h,collider_.get(),fogPortalZone_,fogPortalHitNextCursor_,fogPortalGraphPin_,portal,pc)){at(pc);return false;}
+            if(!portal)return false;fogPortalNextPortalA0_=portal;f.portalNonNull=true;f.portalReadCompleted=true;
+            f.inputBoundary=0x280c44u;at(*f.inputBoundary);return false; //Only a new portal08 LW. No old helper/backing/history reuse.
+        }
+        at(0x280d04);f.step=4;
+        for(std::uint32_t p=0x280d08;p<=0x280d2c;p+=4)at(p);f.step=5; //Saved RA,S7..S0,F20 restored; no fabricated register values.
+        at(0x280d30);f.step=6;
+        at(0x280d34);f.returnPC=fogPrimary_.publication.callContinuation;f.step=7;
+        at(*f.returnPC);return false; //GenuineNULL helper return280BC0 only; first published record and native owner custody remain.
+    }
+    template<class ActualInputs>
+    bool continueFogPortalNextInputs280C44(ActualInputs&& actualInputs,std::uint32_t& pc)noexcept {
+        auto& f=fogPrimary_.portalNextInputs;auto& h=servicePrimary_;const auto& next=fogPrimary_.portalHitNext;
+        if(pc!=0x280c44u||!next.portalReadCompleted||next.inputBoundary!=pc||f.nativeAdmissionAttempted||
+           membershipNativeWithdrawn_||nativeClosed_||!preflightNative())return false;
+        const auto at=[&](std::uint32_t p){pc=pc_=h.pc=p;};
+        at(0x280c44);f.nativeAdmissionAttempted=true;
+        const std::array<std::array<std::uint32_t,4>,4>* vertices=nullptr;
+        if(!actualInputs(&h,collider_.get(),fogPortalZone_,fogPortalHitNextCursor_,fogPortalGraphPin_,
+            fogPortalNextPortalA0_,vertices,pc)){at(pc);return false;}
+        if(!vertices)return false;fogPortalNextVertices_=vertices;f.nativeInputsAcquired=true; //Native backing admission, not a source vertex load.
+        at(0x280c44);fogPortalNextDistanceA2_=&fogPortalDistanceBacking_;f.step=1;
+        at(0x280c48);f.radiusF12=fogPrimary_.portalHead.radiusF20;f.step=2; //Fresh MOV.S from the retained outer F20.
+        at(0x280c4c);f.callTarget=0x231150u;f.callContinuation=0x280c54u;f.step=3;
+        at(0x280c50);fogPortalNextCenterA1_=&boundsCenter_;f.step=4; //JAL delay, actual retained S5 center.
+        for(unsigned k=0;k<3;++k){
+            at(0x231150u+8*k);f.centerWords[k]=std::bit_cast<std::uint32_t>(fogPortalNextCenterA1_->v[k]);f.step=5+2*k;
+            at(0x231154u+8*k);f.vertexWords[k]=(*fogPortalNextVertices_)[0][k];f.step=6+2*k;
+        }
+        at(0x231168);f.stackBytes=0x40u;f.step=11; //Same caller sp+AC is now callee sp+EC; no native stack address or value fabricated.
+        f.boundaryPC=0x23116cu;at(*f.boundaryPC);return false; //Before this occurrence's first SUB.S; no first relative/dot/helper history reuse.
+    }
+    template<class ActualOperand>
+    bool continueFogPortalNextQuery23116C(ActualOperand&& actualOperand,std::uint32_t& pc)noexcept {
+        auto& q=fogPrimary_.portalNextQuery;
+        if(pc!=0x23116cu||!fogPrimary_.portalNextInputs.helperEntered()||q.entered||
+           membershipNativeWithdrawn_||nativeClosed_||!preflightNative())return false;
+        auto& h=servicePrimary_;
+        const auto read=[&](unsigned index,unsigned stage,const C*& portal,const FogPortalVertices*& vertices,
+            const std::array<std::uint32_t,4>*& operand,std::uint32_t& reachedPC)noexcept {
+            pc_=h.pc=reachedPC;
+            return actualOperand(&h,collider_.get(),fogPortalZone_,fogPortalHitNextCursor_,fogPortalGraphPin_,
+                index,stage,portal,vertices,operand,reachedPC);
+        };
+        const bool returned=fogPortalNextQuery_.run(q,fogPrimary_.portalNextInputs,fogPortalNextPortalA0_,
+            fogPortalNextVertices_,fogPortalNextCenterA1_,fogPortalNextDistanceA2_,read,pc);
+        pc_=h.pc=pc;
+        if(q.portalEdge0.step>=14)fogPortalNextDistanceA2_=nullptr; //Actual231240 replaces A2 with integer1.
+        return returned; //Only the query/caller branch, never second publication or enclosing registration.
+    }
+    template<class ActualPortal,class ActualNext,class ActualOperand>
+    bool continueFogPortalMissTailNative(ActualPortal&& actualPortal,ActualNext&& actualNext,
+        ActualOperand&& actualOperand,std::uint32_t& pc)noexcept {
+        const bool first=pc==0x280c40u&&fogPrimary_.portalNext.step==3&&fogPrimary_.portalNext.branchTarget==pc;
+        const bool second=pc==0x280cf8u&&fogPrimary_.portalNextQuery.returned()&&fogPrimary_.portalNextQuery.pc==pc;
+        if((!first&&!second)||fogPrimary_.portalMissTail.entered||membershipNativeWithdrawn_||nativeClosed_||!preflightNative())return false;
+        auto& h=servicePrimary_;
+        const auto sync=[&](std::uint32_t p)noexcept{pc_=h.pc=p;};
+        const auto portal=[&](const void* cursor,const C*& p,const FogPortalVertices*& v,std::uint32_t& at)noexcept{
+            sync(at);return actualPortal(&h,collider_.get(),fogPortalZone_,cursor,fogPortalGraphPin_,p,v,at);
+        };
+        const auto next=[&](const void* cursor,const void*& n,std::uint32_t& at)noexcept{
+            sync(at);return actualNext(&h,collider_.get(),fogPortalZone_,cursor,fogPortalGraphPin_,n,at);
+        };
+        const auto operand=[&](const void* cursor,unsigned index,unsigned stage,const C*& p,
+            const FogPortalVertices*& v,const std::array<std::uint32_t,4>*& word,std::uint32_t& at)noexcept{
+            sync(at);return actualOperand(&h,collider_.get(),fogPortalZone_,cursor,fogPortalGraphPin_,index,stage,p,v,word,at);
+        };
+        const bool returned=fogPortalMissTail_.run(fogPrimary_.portalMissTail,second,fogPortalHead_,fogPortalNextCursor_,
+            fogPortalHitNextCursor_,&boundsCenter_,&fogPortalDistanceBacking_,*fogPrimary_.portalHead.radiusF20,
+            *fogPrimary_.publication.callContinuation,portal,next,operand,sync,pc);
+        sync(pc);return returned; //Only genuine NULL helper return, never primary/registration completion or a later hit publication.
+    }
+    template<class ActualNeighbor>
+    bool continueFogPortalNeighbor280C68(ActualNeighbor&& actualNeighbor,std::uint32_t& pc)noexcept {
+        auto& f=fogPrimary_.portalNeighbor;auto& h=servicePrimary_;
+        if(pc!=0x280c68||fogPrimary_.portalHit.step!=3||f.neighborAdmissionAttempted||
+           membershipNativeWithdrawn_||nativeClosed_||!preflightNative())return false;
+        const auto at=[&](std::uint32_t p){pc=pc_=h.pc=p;};
+        const void* node=nullptr;const C* neighbor=nullptr;OriginalNativeListMethodCustody50LA* method=nullptr;
+        at(0x280c68);f.neighborAdmissionAttempted=true;
+        if(!actualNeighbor(&h,collider_.get(),fogPortalZone_,fogPortalHead_,fogPortalGraphPin_,1u,node,neighbor,method,pc)){at(pc);return false;}
+        if(!node||!neighbor||method)return false;fogPortalNeighborNode_=node;fogPortalNeighborS0_=neighbor;f.step=1;
+        at(0x280c6c);if(!fogPortalMethod_||fogPortalMethod_!=h.method||!fogPortalMethod_->source_.usageKnown||fogPortalMethod_->usage10_!=1u)return false;
+        f.usage10=fogPortalMethod_->usage10_;f.step=2; //Actual current S2 usage read, not neighbor usage or a fabricated mode.
+        at(0x280c70);f.lookupContinuation=0x280c78u;f.step=3;
+        at(0x280c74);f.step=4; //POR A0,S0: exact retained neighbor Entity identity.
+        at(0x27f590);f.usageBit1V0=*f.usage10&1u;f.step=5;
+        at(0x27f594);f.lookupBranchTaken=*f.usageBit1V0==0u;f.step=6;
+        at(0x27f598);f.usageBit2V0=*f.usage10&2u;f.step=7; //Ordinary branch delay runs even though mode1 branch is not taken.
+        at(0x27f59c);f.step=8;
+        at(0x27f5a0);f.methodAdmissionAttempted=true;node=nullptr;neighbor=nullptr;
+        if(!actualNeighbor(&h,collider_.get(),fogPortalZone_,fogPortalHead_,fogPortalGraphPin_,9u,node,neighbor,method,pc)){at(pc);return false;}
+        if(node!=fogPortalNeighborNode_||neighbor!=fogPortalNeighborS0_||!method||method==h.method)return false;
+        fogPortalNeighborMethod_=method;f.step=9; //LW neighbor34 in the unconditional branch delay; never node38.
+        at(0x27f5bc);f.step=10;at(0x27f5c0);f.lookupReturnPC=f.lookupContinuation;f.step=11;
+        at(0x280c78);f.nativePinAttempted=true;
+        for(const auto* pin:method->sourceCollisionRegistrationBorrowers_)if(pin==&fogPortalNeighborPinIdentity_)return false;
+        try{method->sourceCollisionRegistrationBorrowers_.push_back(&fogPortalNeighborPinIdentity_);}catch(...){return false;}
+        f.nativePinAcquired=true; //Native lifetime only; allocation refusal retains the authentic method return, before vtable load.
+        if(method->source_.vtable08!=0x3d2d30u)return false;f.table08=method->source_.vtable08;f.step=12;
+        at(0x280c7c);fogPortalCurrentMethodS2_=method;f.step=13; //Original primary method/head history remains unchanged.
+        at(0x280c80);fogPortalSelectA0_=fogPortalCurrentMethodS2_;f.step=14;
+        at(0x280c84);fogPortalSelectCenterA1_=&boundsCenter_;f.step=15;
+        at(0x280c88);fogPortalSelectHalfA2_=&boundsHalf_;f.step=16;
+        at(0x280c8c);f.target20=0x27e3b0u;f.step=17; //Actual source table word3D2D50.
+        at(0x280c90);f.callContinuation=0x280c98u;f.step=18;
+        at(0x280c94);f.preferredA3=decltype(f.preferredA3)::value_type{};f.step=19; //POR zero supplies all128 bits.
+        at(0x27e3b0);f.shimTarget=0x27e3c0u;f.step=20;
+        at(0x27e3b4);f.preferredA1=f.preferredA3;fogPortalSelectCenterA1_=nullptr;f.step=21; //J delay overwrites A1, not the retained center S5.
+        at(0x27e3c0);return false; //Before fresh neighbor selection; no slot, pending reservation, S3 or return280C98.
+    }
+    bool continueFogPortalSelector27E3C0(std::uint32_t& pc)noexcept {
+        auto& f=fogPrimary_.portalSelector;const auto& neighbor=fogPrimary_.portalNeighbor;auto& h=servicePrimary_;
+        if(pc!=0x27e3c0||neighbor.step!=21||neighbor.preferredA1!=decltype(neighbor.preferredA1)::value_type{}||
+           f.nativeReservationAttempted||membershipNativeWithdrawn_||nativeClosed_||!preflightNative())return false;
+        if(!fogPortalNeighborMethod_||fogPortalSelectA0_!=fogPortalNeighborMethod_||!neighbor.nativePinAcquired||fogPortalNeighborUnpinned_)return false;
+        auto& c=*fogPortalNeighborMethod_;auto& e=c.sourceEntries_;auto& s=c.source_;
+        f.nativeReservationAttempted=true;
+        if(!c.sourceCollisionEntriesCurrentNative()||e.pending||e.terminal||!c.sourceMode_||c.application_!=application_||
+           c.world_!=h.world||c.usage10_!=1u||c.reference00_!=2u||c.ordinal_/10u!=1u)return false;
+        //Separate native reservation protects this neighbor's actual backing. It is not a source slot/result or insertion.
+        e.entered=true;e.pending=&fogPortalNeighborPinIdentity_;e.pendingIdentity=collider_.get();f.nativeReservationAcquired=true;
+        const auto at=[&](std::uint32_t p){pc=pc_=h.pc=p;};
+        for(std::uint32_t p=0x27e3c0;p<=0x27e3cc;p+=4)at(p);f.step=1;
+        at(0x27e3d0);at(0x27e3d4);f.step=2;
+        at(0x27e3e0);if(!s.field40||*s.field40)return false; //A native free ordinal is not authentic guest entry-address custody.
+        f.freeHeadNull=true;f.step=3;at(0x27e3e4);at(0x27e3e8);
+        at(0x27e3f4);if(!s.lastUsed38)return false;f.lastUsed38=s.lastUsed38;f.step=4;
+        at(0x27e3f8);if(!s.perBlock30)return false;f.perBlock30=s.perBlock30;f.step=5;
+        at(0x27e3fc);if(f.perBlock30!=1024u)return false;
+        at(0x27e400);f.appendBranch=*f.lastUsed38!=*f.perBlock30;f.step=6; //Original inequality, not an invented less-than branch.
+        if(!*f.appendBranch){
+            at(0x27e404);if(!s.blockCount34)return false;f.blockCount34=s.blockCount34;f.step=7;
+            at(0x27e408);if(!s.pointer3C||*s.pointer3C!=e.table.get())return false;
+            fogPortalSelectorTable_=e.table.get();f.tableNonNull=bool(fogPortalSelectorTable_);f.step=8;
+            at(0x27e40c);f.newBlockCount=*f.blockCount34+1u;f.step=9;
+            at(0x27e410);return false; //Before original allocator JAL and its size delay; no new[] or ready-block substitution.
+        }
+        at(0x27e534);if(!s.blockCount34)return false;f.blockCount34=s.blockCount34;f.step=10;
+        at(0x27e538);if(f.blockCount34!=1u||!e.ready||!e.tablePublished||!e.blockPublished||!e.table||!e.words||
+            !s.pointer3C||*s.pointer3C!=e.table.get()||e.table[0]!=e.words.get())return false;
+        fogPortalSelectorTable_=e.table.get();f.tableNonNull=true;f.step=11;
+        at(0x27e53c);f.freshLastUsed38=s.lastUsed38;f.step=12;
+        if(!f.freshLastUsed38||*f.freshLastUsed38>=1024u||f.freshLastUsed38!=f.lastUsed38)return false;
+        at(0x27e540);f.tableOffsetBytes=*f.blockCount34<<2;f.step=13;
+        at(0x27e544);fogPortalSelectorTableEnd_=fogPortalSelectorTable_+*f.blockCount34;f.step=14;
+        at(0x27e548);f.wordOffsetBytes=*f.freshLastUsed38<<2;f.step=15;
+        at(0x27e54c);fogPortalSelectorBlock_=fogPortalSelectorTableEnd_[-1];f.blockRead=true;f.step=16;
+        at(0x27e550);const auto index=*f.freshLastUsed38;
+        if(fogPortalSelectorBlock_!=e.words.get()||e.members[index]||e.borrowers[index]||e.wordKnown[index])return false;
+        fogPortalSelectorEntry_=fogPortalSelectorBlock_+index;f.nativeOrdinal=index+1u;f.entryAliasResolved=true;f.step=17;
+        e.pendingSlot=*f.nativeOrdinal; //Native sidecar index only; source V0 is the separately held typed address, not this ordinal.
+        at(0x27e554);at(0x27e558);at(0x27e55c);f.step=18;at(0x27e560);f.step=19;
+        at(0x27e564);f.returnPC=neighbor.callContinuation;f.step=20;
+        at(0x280c98);fogPortalSelectorS3_=fogPortalSelectorEntry_;f.s3Retained=true;f.selectedNonNull=bool(fogPortalSelectorS3_);f.step=21;
+        at(0x280c9c);f.callerBranchTaken=!*f.selectedNonNull;f.step=22;
+        at(0x280ca0);f.callerTarget=*f.callerBranchTaken?0x280cf8u:0x280ca4u;f.step=23;
+        at(*f.callerTarget);return false; //Before secondary insertion-call setup; no source counter/member/pool/observer effects.
+    }
+    bool continueFogPortalInsertion280CA4(std::uint32_t& pc)noexcept {
+        const auto& selected=fogPrimary_.portalSelector;auto& call=fogPrimary_.portalEntryCall;auto& f=fogPrimary_.portalInsertion;
+        if(pc!=0x280ca4||selected.step!=23||selected.callerTarget!=pc||call.step||f.step||
+           !fogPortalSelectorS3_||membershipNativeWithdrawn_||nativeClosed_||!preflightNative())return false;
+        auto& h=servicePrimary_;auto& c=*fogPortalNeighborMethod_;auto& e=c.sourceEntries_;auto& s=c.source_;
+        const auto at=[&](std::uint32_t p){pc=pc_=h.pc=p;};
+        at(0x280ca4);if(s.vtable08!=0x3d2d30u)return false;call.table08=s.vtable08;call.step=1;
+        at(0x280ca8);fogPortalInsertionA0_=fogPortalCurrentMethodS2_;call.step=2;
+        at(0x280cac);fogPortalInsertionA1_=collider_.get();call.step=3; //Retained actual collider S7.
+        at(0x280cb0);fogPortalInsertionA2_=fogPortalSelectorS3_;call.step=4;
+        at(0x280cb4);fogPortalInsertionA3_=&boundsCenter_;call.step=5; //Retained center S5, no new vector load.
+        at(0x280cb8);call.target24=0x27e570u;call.step=6; //Actual source table word3D2D54.
+        at(0x280cbc);call.callContinuation=0x280cc4u;call.step=7;
+        at(0x280cc0);fogPortalInsertionT0_=&boundsHalf_;call.step=8; //JALR delay retains half S4, not the primary caller's slot S4.
+        at(0x27e570);if(s.field40!=0u)return false;f.freeHead40=s.field40;f.step=1;
+        at(0x27e574);at(0x27e578);f.step=2; //BEQ taken, ordinary NOP delay, skip nonzero free-head pop.
+        at(0x27e598);if(!s.lastUsed38||s.lastUsed38!=selected.freshLastUsed38||*s.lastUsed38>=1024u)return false;
+        f.lastUsed38=s.lastUsed38;f.step=3;
+        at(0x27e59c);f.incremented38=*f.lastUsed38+1u;f.step=4; //Exact bounded0..1023 ->1..1024.
+        at(0x27e5a0);s.lastUsed38=f.incremented38;e.pendingConsumed=true;f.counterStored=true;f.step=5;
+        at(0x27e5a4);f.step=6;
+        at(0x27e5a8);const auto index=*selected.nativeOrdinal-1u;
+        //Revalidate after the original counter store; refusal retains the consumed reservation and count.
+        if(!fogPortalSelectorCurrentNative()||index>=1024u||!e.words||fogPortalInsertionA2_!=e.words.get()+index||
+           e.members[index]||e.borrowers[index]||e.wordKnown[index])return false;
+        e.members[index]=fogPortalInsertionA1_;e.borrowers[index]=&fogPortalNeighborPinIdentity_;e.wordKnown[index]=false;
+        f.memberStored=true;f.returnPC=call.callContinuation;f.step=7;
+        //SW's guest pointer bits stay unknown. This own typed member and consumed pending reservation remain live.
+        at(*f.returnPC);return false; //Before280CC4 pool setup. No allocation, secondary observer publication or portal return.
+    }
+    bool continueFogPortalPool280CC4(OriginalGarageObserverShared50KG& actualApplicationShared,std::uint32_t& pc)noexcept {
+        auto& f=fogPrimary_.portalPool;const auto& inserted=fogPrimary_.portalInsertion;
+        if(pc!=0x280cc4||inserted.step!=7||inserted.returnPC!=pc||f.callStep||
+           membershipNativeWithdrawn_||nativeClosed_||!preflightNative())return false;
+        auto& h=servicePrimary_;const auto at=[&](std::uint32_t p){pc=pc_=h.pc=p;};
+        at(0x280cc4);f.addressHighAT=0x00440000u;f.callStep=1;
+        at(0x280cc8);f.callContinuation=0x280cd0u;f.callStep=2;
+        at(0x280ccc);f.poolReadAttempted=true;
+        if(!serviceHeapMembership_->readFogPool443138Native(actualApplicationShared,&h,fogPortalPoolA0_))return false;
+        f.callStep=3; //Actual shared443138 load in JAL delay, not the List occurrence's native identity.
+        at(0x105720);at(0x105724);at(0x105728);f.bodyStep=1;
+        at(0x10572c);f.used20=fogPortalPoolA0_->used20;f.bodyStep=2;
+        at(0x105730);f.perBlock10=fogPortalPoolA0_->perBlock10;f.bodyStep=3;
+        at(0x105734);if(*f.used20>169u||*f.perBlock10!=169u)return false;
+        f.less=*f.used20<*f.perBlock10;f.bodyStep=4; //Original signed SLT, equal to this bounded nonnegative comparison.
+        at(0x105738);f.fullBranch=!*f.less;f.bodyStep=5;
+        at(0x10573c);fogPortalPoolS0_=fogPortalPoolA0_;f.bodyStep=6; //Ordinary branch delay POR retains actual pool.
+        if(!*f.fullBranch){at(0x105740);return false;} //Before item-size/current-block reads, multiply or used20 store.
+        at(0x105760);fogPortalPoolFreeV0_=fogPortalPoolS0_->free2C;f.free2CNull=!fogPortalPoolFreeV0_;f.bodyStep=7;
+        at(0x105764);f.freeBranch=*f.free2CNull;f.bodyStep=8;at(0x105768);f.bodyStep=9;
+        if(!*f.freeBranch){at(0x10576c);return false;} //Before reading next00 or popping this historical free-record alias.
+        at(0x105778);if(fogPortalPoolS0_->cached1C)return false;f.cached1CNull=true;f.bodyStep=10;
+        at(0x10577c);f.cachedBranch=true;f.bodyStep=11;at(0x105780);f.bodyStep=12;
+        at(0x1057d8);return false; //Before JAL105870 and its delay. No allocation, pool mutation or return280CD0.
+    }
+    bool continueFogPortalPoolMutationNative(std::uint32_t& pc)noexcept {
+        auto& m=fogPrimary_.portalPoolMutation;const auto& p=fogPrimary_.portalPool;
+        const bool free=pc==0x10576cu;
+        if((pc!=0x105740u&&!free)||m.admissionAttempted||
+           (free?(p.bodyStep!=9||p.free2CNull!=false):(p.bodyStep!=6||p.less!=true))||
+           membershipNativeWithdrawn_||nativeClosed_||!preflightNative())return false;
+        auto& h=servicePrimary_;auto& observer=*serviceHeapMembership_;m.admissionAttempted=true;m.fromFree=free;
+        if(!observer.admitFogPoolMutationNative(&h,&fogPortalNeighborPinIdentity_,fogPortalPoolS0_,*p.used20,free,free?fogPortalPoolFreeV0_:nullptr))return false;
+        m.admitted=true;const auto at=[&](std::uint32_t v){pc=pc_=h.pc=v;};
+        if(free){
+            at(0x10576c);fogPortalPoolNextV1_=fogPortalPoolFreeV0_->next00;m.nextNull=!fogPortalPoolNextV1_;m.step=1;
+            at(0x105770);m.step=2;
+            at(0x105774);if(!observer.consumeFogPoolFree105774(&h,&fogPortalNeighborPinIdentity_,fogPortalPoolS0_,
+                fogPortalPoolFreeV0_,fogPortalPoolNextV1_,*p.used20))return false;
+            m.poolStored=true;fogPortalPoolResultV0_=fogPortalPoolFreeV0_;m.resultAddressRetained=true;m.boundaryPC=0x105804u;m.step=3;
+        }else{
+            at(0x105740);m.itemSize24=fogPortalPoolS0_->itemSize24;m.step=1;
+            at(0x105744);fogPortalPoolChunkA0_=fogPortalPoolS0_->current18;m.step=2;
+            at(0x105748);m.incremented20=*p.used20+1u;m.step=3;
+            at(0x10574c);m.productV1=*p.used20* *m.itemSize24;m.step=4; //Exact positive MULT low result, at most168*24=4032.
+            at(0x105750);fogPortalPoolBaseA0_=&fogPortalPoolChunkA0_->records[0];m.step=5; //Guest header+24 mapped to actual first record, not host byte arithmetic.
+            at(0x105754);if(!observer.consumeFogPoolTail105754(&h,&fogPortalNeighborPinIdentity_,fogPortalPoolS0_,fogPortalPoolChunkA0_,*p.used20))return false;
+            m.poolStored=true;m.step=6; //Native record custody starts with the count store; source result V0 is still the increment.
+            at(0x105758);m.step=7;
+            at(0x10575c);fogPortalPoolResultV0_=fogPortalPoolBaseA0_+*p.used20;
+            m.resultAddressRetained=true;m.boundaryPC=0x105804u;m.step=8; //Original branch-delay address result, never a guest ordinal.
+        }
+        at(0x105804);return false; //Before result-null test, unknown34 accounting, JR or caller slot14 store.
+    }
+    bool continueFogPortalPoolReturn105804(std::uint32_t& pc)noexcept {
+        auto& r=fogPrimary_.portalPoolReturn;const auto& p=fogPrimary_.portalPool;const auto& m=fogPrimary_.portalPoolMutation;
+        if(pc!=0x105804||!m.resultAddressRetained||m.boundaryPC!=pc||r.admissionAttempted||
+           membershipNativeWithdrawn_||nativeClosed_||!preflightNative())return false;
+        auto& h=servicePrimary_;auto& observer=*serviceHeapMembership_;r.admissionAttempted=true;
+        if(!observer.admitFogPoolAccountingNative(&h,&fogPortalNeighborPinIdentity_,fogPortalPoolS0_,fogPortalPoolResultV0_))return false;
+        r.admitted=true;const auto at=[&](std::uint32_t v){pc=pc_=h.pc=v;};
+        at(0x105804);r.resultNonNull=bool(fogPortalPoolResultV0_);r.branchTaken=!*r.resultNonNull;r.step=1;
+        at(0x105808);r.step=2; //Ordinary NOP delay. This authentic existing-record result takes the nonnull path.
+        at(0x10580c);if(fogPortalPoolS0_->allocatedBytes34)return false;r.input34Unknown=true;r.step=3;
+        at(0x105810);r.itemSize24=fogPortalPoolS0_->itemSize24;r.step=4; //Fresh source read for either branch, not tail's earlier stride receipt.
+        at(0x105814);if(r.itemSize24!=24u)return false;r.sum34Unknown=true;r.step=5; //ADDU: unknown32 +24 modulo2^32 remains unknown.
+        at(0x105818);if(!observer.storeFogUnknownAccounting105818(&h,&fogPortalNeighborPinIdentity_,fogPortalPoolS0_,
+            fogPortalPoolResultV0_,*r.itemSize24))return false;
+        r.accountingStored=true;r.step=6; //Distinct source store and own observer receipt; no numeric zero or invented account balance.
+        at(0x10581c);r.step=7; //Restore the actual saved caller RA280CD0.
+        at(0x105820);fogPortalPoolS0_=nullptr;r.step=8; //Callee pool S0 retires; caller's separate neighbor S0 custody is unchanged.
+        at(0x105824);r.step=9;
+        at(0x105828);r.returnPC=p.callContinuation;r.step=10; //JR delay restores SP+20; V0 retains the exact owned record identity.
+        at(*r.returnPC);return true; //Actual105720 return only. Before the unconditional caller slot14 store280CD0.
+    }
+    bool continueFogPortalSlot14280CD0(std::uint32_t& pc)noexcept {
+        auto& slot=fogPrimary_.portalPoolSlot14;const auto& r=fogPrimary_.portalPoolReturn;
+        if(pc!=0x280cd0u||r.step!=10||r.returnPC!=pc||slot.storeAttempted||
+           membershipNativeWithdrawn_||nativeClosed_||!preflightNative())return false;
+        slot.storeAttempted=true;pc=pc_=servicePrimary_.pc=0x280cd0u;
+        if(!serviceHeapMembership_->storeFogPoolSlot14280CD0(&servicePrimary_,&fogPortalNeighborPinIdentity_,
+            fogPortalPoolA0_,fogPortalPoolResultV0_,fogPortalNeighborMethod_,collider_.get(),fogPortalSelectorS3_))return false;
+        slot.stored=true;slot.boundaryPC=0x280cd4u;pc=pc_=servicePrimary_.pc=*slot.boundaryPC;
+        return false; //Only the authentic slot14 SW completed. Before neighbor04/method08 or any observer-head publication.
+    }
+    template<class ActualPortal>
+    bool continueFogPortalPayload280CD4(ActualPortal&& actualPortal,std::uint32_t& pc)noexcept {
+        auto& f=fogPrimary_.portalPoolPayload;auto& h=servicePrimary_;const auto& slot=fogPrimary_.portalPoolSlot14;
+        if(pc!=0x280cd4u||!slot.stored||slot.boundaryPC!=pc||f.entered||
+           membershipNativeWithdrawn_||nativeClosed_||!preflightNative())return false;
+        f.entered=true;auto& observer=*serviceHeapMembership_;
+        const auto at=[&](std::uint32_t v){pc=pc_=h.pc=v;};
+        const auto store=[&](std::uint32_t atPC,const C* child,const OriginalNativeListMethodCustody50LA* method,const C* portal,
+            std::optional<std::uint32_t> distance)noexcept {
+            return observer.publishFogPoolPayloadNative(atPC,&h,&fogPortalNeighborPinIdentity_,fogPortalPoolResultV0_,child,method,portal,distance);
+        };
+        at(0x280cd4);if(!store(pc,fogPortalNeighborS0_,nullptr,nullptr,std::nullopt))return false;f.stores=1u;f.step=1;
+        at(0x280cd8);if(!store(pc,nullptr,fogPortalCurrentMethodS2_,nullptr,std::nullopt))return false;f.stores=3u;f.step=2;
+        at(0x280cdc);f.portalLoadAttempted=true;const C* portal=nullptr;
+        if(!actualPortal(&h,collider_.get(),fogPortalZone_,fogPortalHead_,fogPortalGraphPin_,portal,pc)){at(pc);return false;}
+        if(!portal||portal!=fogPortalOperandA0_)return false;
+        fogPortalPayloadV1_=portal;f.portalNonNull=true;f.step=3;
+        at(0x280ce0);if(!store(pc,nullptr,nullptr,fogPortalPayloadV1_,std::nullopt))return false;f.stores=7u;f.step=4;
+        at(0x280ce4);f.distanceF0=fogPortalDistanceBacking_;f.step=5; //Fresh actual sp+AC load, no arithmetic or zero inference.
+        at(0x280ce8);if(!store(pc,nullptr,nullptr,nullptr,f.distanceF0))return false;f.stores=15u;f.step=6;
+        at(0x280cec);f.headLoadAttempted=true;bool headNull=false;
+        if(!observer.readFogPoolHead280CEC(&h,&fogPortalNeighborPinIdentity_,headNull))return false;
+        fogPortalPayloadV1_=nullptr;f.oldHeadNull=headNull;f.step=7; //V1 now carries actualNULL, not the earlier portal identity.
+        at(0x280cf0);if(!store(pc,nullptr,nullptr,nullptr,std::nullopt))return false;f.stores=31u;f.step=8;
+        at(0x280cf4);if(!store(pc,nullptr,nullptr,nullptr,std::nullopt))return false;f.stores=63u;f.step=9;
+        f.boundaryPC=0x280cf8u;at(*f.boundaryPC);return false; //One genuine observer head published; before next-link LW or any enclosing return.
     }
     //Native typed aliases of actual owned table/block/entry storage. Never
     //cast to a guest DWORD or equate these addresses with a1-based ordinal.
@@ -1149,10 +2679,60 @@ class OriginalWorldTriggerInstance50LA final {
         else if(fogInsertionA2_)return false;
         return f.s4Retained?fogSelectorS4_==fogSelectorEntry_:!fogSelectorS4_;
     }
+    bool fogReturnCurrentNative()const noexcept {
+        const auto& r=fogPrimary_.returnFlow;
+        if(!r.historyCurrent(fogPrimary_.portalNullReturns()))return false;
+        if(!r.entered)return !serviceStackMembership_||!serviceStackMembership_->destroyEntered_;
+        if(!serviceStackMembership_||!serviceHeapMembership_||serviceReturn_.entered||
+           serviceStackMembership_.get()==serviceHeapMembership_.get())return false;
+        const auto& stack=*serviceStackMembership_;const auto& heap=*serviceHeapMembership_;
+        if(r.zoneRead&&(r.zoneNonNull!=bool(heap.record_.zone04)||heap.record_.zone04!=servicePrimary_.zone||
+           heap.record_.zone04!=fogMembershipNode_))return false;
+        if(!r.stackReturned)return !stack.destroyEntered_&&!stack.countDecremented_&&!stack.destroyReturned_;
+        return stack.destroyEntered_&&stack.destroyReturned_&&stack.countDecremented_&&!stack.lease_&&
+            stack.destructionArgument_==-1&&!stack.sourceDeleted_&&stack.destroyPC_==0x2809b8u&&
+            r.stackCountBefore==stack.countBeforeDestroy_&&!heap.destroyEntered_;
+    }
+    bool finishFogServiceMembership280BC0(std::uint32_t& pc)noexcept {
+        auto& r=fogPrimary_.returnFlow;
+        if(pc!=0x280bc0u||r.entered||fogPrimary_.portalNullReturns()!=1u||membershipNativeWithdrawn_||
+           nativeClosed_||!serviceStackMembership_||!serviceHeapMembership_||!preflightNative())return false;
+        auto& stack=*serviceStackMembership_;auto& heap=*serviceHeapMembership_;
+        if(&stack==&heap||stack.primary_.entered||!stack.lease_||!heap.lease_||
+           !stack.shared_||stack.shared_!=heap.shared_||stack.group_!=heap.group_||
+           stack.identity()==heap.identity()||stack.group_==stack.identity()||stack.group_==heap.identity()||heap.record_.zone04!=servicePrimary_.zone||
+           heap.record_.zone04!=fogMembershipNode_)return false;
+        const auto at=[&](std::uint32_t p)noexcept{pc=pc_=servicePrimary_.pc=r.pc=p;};
+        r.entered=true;
+        //Actual RA,S6..S0,F20 restores, JR280BE4 and SP+90 delay280BE8.
+        //280BEC is padding, not this call's continuation.
+        for(std::uint32_t p=0x280bc0;p<=0x280be8;p+=4){at(p);++r.primaryStep;}
+        r.primaryReturn=0x120190u;at(*r.primaryReturn);
+        if(!OriginalCollisionMembershipGuards50LA::beginZone(r.zoneGuard)){at(r.zoneGuard.pc);return false;}
+        at(0x1201bc);r.zoneNonNull=bool(heap.record_.zone04);r.zoneRead=true;
+        if(!OriginalCollisionMembershipGuards50LA::finishZone(r.zoneGuard,*r.zoneNonNull)){
+            at(r.zoneGuard.pc);return false;}
+        at(0x1201fc);r.callStep=1; //Actual caller stack+50, not selected heapE0.
+        at(0x120200);r.stackTarget=0x280920u;r.stackContinuation=0x120208u;r.callStep=2;
+        at(0x120204);r.stackArgument=-1;r.callStep=3; //JAL delay: signed low16 remains -1.
+        at(*r.stackTarget);r.stackAttempted=true;
+        if(!stack.destroy280920(*r.stackArgument))return false;
+        r.stackReturned=true;r.stackCountBefore=stack.countBeforeDestroy_;r.stackCountAfter=*r.stackCountBefore-1u;
+        //The reused native destructor retains end boundary2809B8. Its actual
+        //JR2809B0/delay2809B4 returns here, not to that padding. V0 is the
+        //same stack identity; no scalar result or heap death is fabricated.
+        at(*r.stackContinuation);
+        for(std::uint32_t p=0x120208;p<=0x120220;p+=4){at(p);++r.membershipStep;}
+        r.membershipReturn=0x2a0b1cu;at(*r.membershipReturn);
+        for(std::uint32_t p=0x2a0b1c;p<=0x2a0b2c;p+=4){at(p);++r.triggerStep;}
+        r.triggerReturn=0x2dc2acu;at(*r.triggerReturn);
+        return true; //Whole void geometry callback returned; action-loop POR2DC2AC remains unexecuted.
+    }
     bool fogPrimaryCurrentNative()const noexcept {
         const auto& f=fogPrimary_;const auto& h=servicePrimary_;
         if(!f.historyCurrent())return false;
         if(!f.step&&!fogGeometry_.step)return true;
+        if(!fogReturnCurrentNative())return false;
         if((f.step&&(fogBounds_.tailStep!=100||fogMembership_.step!=11))||h.entered!=(f.step>=9)||
            (!f.selector.step&&(h.selectionAttempted||h.selectionReturned||h.selectionPending||h.selectionCanceled||h.slot))||
            h.published!=(f.publication.stores==31u)||h.portals.entered||serviceReturn_.entered||!fogSelectorCurrentNative())return false;
@@ -1705,14 +3285,18 @@ class OriginalWorldTriggerInstance50LA final {
            stack.destructionArgument_!=-1||stack.sourceDeleted_||stack.destroyPC_!=0x2809b8u)return false;
         return h.membershipReturned&&h.triggerReturned&&h.pc==0x2dc2acu;
     }
+    bool serviceCallbackReturnedNative()const noexcept {
+        return fogGeometry_.step?fogPrimary_.returnFlow.triggerReturned():serviceReturn_.triggerReturned;
+    }
     struct ServiceAction2A0A30 {
         bool entered=false,dataStored=false,codeStored=false,countIncremented=false,returned=false,nativeWithdrawn=false;
         const void* payload=nullptr;
         std::optional<std::uint32_t> countRead,capacityRead,codeA0;
+        std::optional<std::uint32_t> fogCallReturnPC; //Own JAL1B5AE4 continuation, not padding2A0A7C.
     } serviceAction_;
     bool installServiceAction2A0A30(const void* actualPayload,std::uint32_t& pc)noexcept {
         auto& h=serviceAction_;
-        if(h.entered||!actualPayload||!serviceReturn_.triggerReturned||membershipNativeWithdrawn_||!preflightNative())return false;
+        if(h.entered||!actualPayload||!serviceCallbackReturnedNative()||membershipNativeWithdrawn_||!preflightNative())return false;
         h.entered=true;h.payload=actualPayload;pc=pc_=0x2a0a30;
         if(!count98_)return false;h.countRead=*count98_;
         pc=pc_=0x2a0a34;if(!capacity94_)return false;h.capacityRead=*capacity94_;
@@ -1731,13 +3315,19 @@ class OriginalWorldTriggerInstance50LA final {
             pc=pc_=0x2a0a68;if(!count98_||*count98_!=*h.countRead)return false;
             pc=pc_=0x2a0a70;count98_=*h.countRead+1u;h.countIncremented=true;
         }
-        pc=pc_=0x2a0a7c;h.returned=true;return true;
+        if(fogGeometry_.step){
+            pc=pc_=0x2a0a74;pc=pc_=0x2a0a78; //Actual JR and ordinary return delay.
+            h.fogCallReturnPC=0x1b5aecu;pc=pc_=*h.fogCallReturnPC;
+        }else pc=pc_=0x2a0a7c; //Existing generic historical end boundary remains unchanged.
+        h.returned=true;return true;
     }
     bool serviceActionCurrentNative()const noexcept {
         const auto& h=serviceAction_;
         if(!h.entered)return !h.payload&&!h.countRead&&!h.capacityRead&&!h.codeA0&&!h.dataStored&&
-            !h.codeStored&&!h.countIncremented&&!h.returned&&!h.nativeWithdrawn;
-        if(!serviceReturn_.triggerReturned||!h.payload||(h.capacityRead&&!h.countRead)||
+            !h.codeStored&&!h.countIncremented&&!h.returned&&!h.nativeWithdrawn&&!h.fogCallReturnPC;
+        if(!serviceCallbackReturnedNative()||!h.payload||(h.capacityRead&&!h.countRead)||
+           bool(h.fogCallReturnPC)!=(bool(fogGeometry_.step)&&h.returned)||
+           (h.fogCallReturnPC&&*h.fogCallReturnPC!=0x1b5aecu)||
            (h.dataStored&&(!h.countRead||!h.capacityRead||*h.countRead!=0||*h.capacityRead!=1))||
            (h.codeStored!=h.codeA0.has_value())||(h.codeStored&&(!h.dataStored||*h.codeA0!=0x1b27c0u))||
            (h.countIncremented&&!h.codeStored)||(h.returned&&(!h.countRead||!h.capacityRead||
@@ -1905,7 +3495,7 @@ class OriginalWorldTriggerInstance50LA final {
         if(serviceRadiusStored_&&(!collider_||!shape_||!collider_->radius80_||
            std::bit_cast<std::uint32_t>(*collider_->radius80_)!=std::bit_cast<std::uint32_t>(shape_->value.radius50)))return false;
 
-        if((serviceRegistrationAttempted_&&(!serviceReturn_.triggerReturned||!serviceParent_))||
+        if((serviceRegistrationAttempted_&&(!serviceCallbackReturnedNative()||!serviceParent_))||
            (serviceParent_&&!serviceRegistrationAttempted_)||(serviceRegistered_&&!serviceRegistrationAttempted_)||
            (serviceTopologyWithdrawn_&&!serviceRegistered_))return false;
         if(counted_&&(entity_.reference00!=1||entity_.nativeFlags29||entity_.mask20!=(serviceRegistered_?0x402u:0u)))return false;
@@ -1949,7 +3539,23 @@ class OriginalWorldTriggerInstance50LA final {
             if(!withdrawServiceActionNative(serviceAction_.payload))std::terminate();
         }
         if(fogPortalZone_||fogPortalMethod_||fogPortalHead_||fogPortalGraphPin_||fogPortalOperandA0_||
-           fogPortalVertices_||fogPortalCenterA1_||fogPortalDistanceA2_)std::terminate();
+           fogPortalVertices_||fogPortalCenterA1_||fogPortalDistanceA2_||fogPortalRelativeA3_||
+           fogPortalNormal_||fogPortalTemporaryV0_||fogPortalEdgeRelativeT0_||fogPortalFirstEdge_)std::terminate();
+        if(fogPortalSelectorTable_||fogPortalSelectorTableEnd_||fogPortalSelectorBlock_||fogPortalSelectorEntry_||fogPortalSelectorS3_||
+           fogPortalInsertionA0_||fogPortalInsertionA1_||fogPortalInsertionA2_||fogPortalInsertionA3_||fogPortalInsertionT0_||
+           (fogPrimary_.portalSelector.nativeReservationAcquired&&!fogPortalSelectorCanceled_)||
+           (fogPrimary_.portalInsertion.memberStored&&!fogPortalInsertionMemberWithdrawn_)||
+           (fogPrimary_.portalInsertion.counterStored&&!fogPrimary_.portalInsertion.memberStored&&!fogPortalInsertionAbandoned_))std::terminate();
+        if(fogPortalPoolA0_||fogPortalPoolS0_||fogPortalPoolFreeV0_||fogPortalPoolChunkA0_||fogPortalPoolBaseA0_||
+           fogPortalPoolNextV1_||fogPortalPoolResultV0_||fogPortalPayloadV1_||(fogPrimary_.portalPool.callStep&&!fogPortalPoolWithdrawn_)||
+           (fogPrimary_.portalPoolMutation.poolStored&&!fogPortalPoolRecordWithdrawn_)||
+           (fogPrimary_.portalPoolSlot14.stored&&!fogPortalPoolSlot14Withdrawn_))std::terminate();
+        if(fogPortalNextCursor_||fogPortalHitNextCursor_||fogPortalNextPortalA0_||fogPortalNextVertices_||
+           fogPortalNextCenterA1_||fogPortalNextDistanceA2_||fogPortalNeighborNode_||fogPortalNeighborS0_||fogPortalNeighborMethod_||
+           fogPortalCurrentMethodS2_||fogPortalSelectA0_||fogPortalSelectCenterA1_||fogPortalSelectHalfA2_||
+           (fogPrimary_.portalNeighbor.nativePinAcquired&&!fogPortalNeighborUnpinned_))std::terminate();
+        if(!fogPortalNextQuery_.aliasesCleared()||!fogPortalMissTail_.aliasesCleared())std::terminate();
+        for(unsigned i=0;i<3;++i)if(fogPortalLoopVertices_[i]||fogPortalLoopEdges_[i])std::terminate();
         // World withdraws both observer leases before authority/count disposal.
         if((serviceStackMembership_&&!serviceStackMembership_->nativeWithdrawn_)||
            (serviceHeapMembership_&&!serviceHeapMembership_->nativeWithdrawn_))std::terminate();

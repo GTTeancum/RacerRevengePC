@@ -6,6 +6,7 @@
 #include "../../../src/game/original_ui_rider_render_context50kg.h"
 #include "../../../src/assets/original_ui_ipum_texture_cache50kg.h"
 namespace rr::platform {
+class OriginalUiSharedDialogs50KG;
 class OriginalUiMainDrawResources50KG;
 class OriginalUiCourseDrawResources50KG;
 class OriginalUiCourseHologramDraw50KG;
@@ -103,6 +104,7 @@ struct OriginalUiRiderSessionSnapshot50KG {
     bool bound=false,faulted=false,quitRequested=false,pageShown=false,inputContainerShown=false;
     bool cameraActive=false,selectionAttached=false,framePublished=false,backProposalPending=false;
     bool confirmProposalPending=false;
+    bool resetPopupPending=false;
     // Observed from the actual selected, attached character's source owner.
     // Evidence consumers may wait for this without changing input admission.
     bool selectedCharacterReady=false;
@@ -123,7 +125,8 @@ struct OriginalUiRiderSessionSnapshot50KG {
 // directional selection, normal Back and mode0/2 Confirm proposals use real resource,
 // renderer-retirement, profile, animation and shared voice-RNG owners. Actual
 // mode2 admission additionally requires the complete retained Tournament owner. Other
-// unprepared roster entries, page2 and reset popup remain unavailable before mutation.
+// unprepared roster entries and page2 remain unavailable before mutation.
+// Career reset additionally requires the genuine retained shared47C owner.
 // The frontend owns sole manager.tick, profile commit, GPU upload/publication,
 // source-renderer retirement, and application queue consumption.
 class OriginalUiRiderSession50KG final {
@@ -176,6 +179,14 @@ public:
     void requestQuit() noexcept;
 private:
     friend class OriginalUiFrontend50KG;
+    friend class OriginalUiSharedDialogs50KG;
+    friend class OriginalUiRiderDrawContribution50KG;
+    bool sharedMenuLifetimeCurrent(const OriginalUiSharedDialogs50KG&,const OriginalUiRiderDrawContribution50KG&)const noexcept;
+    bool sharedMenuUnwindEntryCurrent(const OriginalUiSharedDialogs50KG&,const OriginalUiRiderDrawContribution50KG&)const noexcept;
+    bool sharedMenuRenderCurrent(const OriginalUiSharedDialogs50KG&,const OriginalUiRiderDrawContribution50KG&)const noexcept;
+    bool sharedMenuUpdateCurrent(const OriginalUiSharedDialogs50KG&,const OriginalUiRiderDrawContribution50KG&)const noexcept;
+    bool sharedMenuEntryCurrent(const OriginalUiSharedDialogs50KG&)const noexcept;
+    bool sharedResetInputCurrent(const OriginalUiSharedDialogs50KG&)const noexcept;
     friend class OriginalUiTournamentCareerResources50KG;
     friend class OriginalUiTournamentSession50KG;
     bool ownsProfile(const OriginalUiRiderProfileOwner50KG&) const noexcept;

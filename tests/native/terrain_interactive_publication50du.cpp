@@ -2016,17 +2016,18 @@ void Context::run() {
    if(sourceConsumedPauseActivation&&consumedRaStage.race()){
     // Separate ALL8 native contract on this actual prepared Camera/provider
     // scope. Unavailable preparation acquires no source owner; row9 stays
-    // unsupported. A reached count/load failure retains its owner for cleanup.
+    // unsupported. Successful native children have the existing actual shared-
+    // mix listener consumer. A reached failure retains its owner for cleanup.
     std::uint32_t musicPC=0;
-    const auto musicPrefix=originalMainApplication.stageConsumedRaAll8MusicPrefixNative10C(
+    const auto music=originalMainApplication.stageConsumedRaAll8MusicNative10C(
         *sourceCameraSession,musicPC);
-    using MusicPrefix=original_main_entry50KG::Application::All8MusicPrefixStatus;
-    if(musicPrefix==MusicPrefix::failed){
-     std::cerr<<"all8_music_prefix_failed pc="<<musicPC<<'\n';
-     require50DU(false,"actual ALL8 counted music prefix stopped; partial owner retained");
+    using Music=original_main_entry50KG::Application::All8MusicStatus;
+    if(music==Music::failed){
+     std::cerr<<"all8_music_children_failed pc="<<musicPC<<'\n';
+     require50DU(false,"actual ALL8 counted music/native children stopped; partial owner retained");
     }
-    if(musicPrefix==MusicPrefix::unavailable)
-     std::cerr<<"all8_music_prefix_unjoined pc="<<musicPC<<'\n';
+    if(music==Music::unavailable)
+     std::cerr<<"all8_music_children_unjoined pc="<<musicPC<<'\n';
    }
    // Pause draw admission pins FINAL: finish only after every real HUD/camera
    // resource retain and population call above has completed.
@@ -2165,6 +2166,14 @@ void Context::run() {
   const bool captureVisibility=visibilitySetting&&std::string(visibilitySetting)=="1";
   platform::OriginalUiControllerNavigation50LA originalUiControllerNavigation,originalUiSecondControllerNavigation;
   platform::OriginalSpectatorMenuInput50LA spectatorMenuInput;
+  // Destruction order matters: retire the real fade BEFORE the publication-
+  // local producer drops its event/record arrays, then outer closeWindow may
+  // revoke Scope/Camera/World/Display. Never abandon an in-flight GPU borrow.
+  const auto cancelPauseInput=[&]()noexcept {
+   return originalMainApplication.cancelNativePauseReturn50LA(sourceFadeOut.get());
+  };
+  struct PauseInputGuard {const decltype(cancelPauseInput)& cancel;
+   ~PauseInputGuard()noexcept{if(!cancel())std::terminate();}} pauseInputGuard{cancelPauseInput};
   bool spectatorInputActive=false,spectatorClockResetRequired=true;
   std::uint64_t spectatorUnderlayPublication=0;
   std::uint64_t spectatorAudioLastNs=0,spectatorAudioCarryNs=0;

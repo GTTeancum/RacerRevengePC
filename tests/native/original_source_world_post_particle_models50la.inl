@@ -2214,9 +2214,11 @@ bool Owner::continueSourceParticleRowCreation27C81C(std::size_t rowIndex,SourceP
             e.words[0x1d4/4]=1;e.known[0x1d4/4]=7;
             e.word(0x70,0);e.word(0x74,0);e.word(0x17c,0x457a0000);e.word(0x180,0x40c00000);
             e.word(0x184,0x3f800000);e.word(0x188,0x41200000);e.word(0x18c,0);
-            for(auto off:{0x1ccu,0x1d0u,0x190u,0x198u,0x19cu,0x1a0u,0x1b0u,0x1b4u,0x1c4u})e.word(off,0);
+            for(auto off:{0x1ccu,0x1d0u,0x190u,0x198u,0x19cu,0x1a0u,0x1b0u,0x1b4u})e.word(off,0);
             e.word(0x194,0x00ffffff);e.word(0x1b8,0xffffffff);
             for(std::uint32_t off=0x1d8;off<=0x1f4;off+=4)e.word(off,0);
+            at(0x15a70c);if(!e.forcedSets1C4.constructorNull15A70C(&e.entity))return false;
+            e.word(0x1c4,0); // Actual source NULL, with separate future typed-array custody.
             e.dispatch08=branch->table;
             if(type==0){
                 constexpr std::uint32_t values[]={0,0x3f800000,0,0x40a00000,0x3c23d70a,0x43fa0000,
@@ -2451,6 +2453,60 @@ bool Owner::sourceNonFogAfterFogCustodyCurrentNative(std::size_t rowIndex)const 
         !population.countStore.pc&&manager.sourceActiveCount128_==0&&
         manager.sourceFogCountReceiptCurrentNative(population.countStore,&fog,&population);
 }
+bool Owner::drawSourceParticleMode2Native(std::size_t rowIndex,std::size_t emitterIndex,
+    a::OriginalParticleSourceConfig50LA& config,std::uint32_t& value)noexcept {
+    auto& history=config.commonMode2_;
+    if(config.sourcePC_!=0x15b148u||history.pc!=0x15b148u||!config.commonMode2DrawAdapter_||
+       history.drawEntered||history.drawReturned||history.applicationPin||history.application||
+       history.rawBefore||history.rawAfter||history.rawValue||history.minimum||history.converted||
+       history.maximum||history.unit||history.difference||history.product||history.sum||history.stored)return false;
+    const auto at=[&](std::uint32_t p){config.sourcePC_=history.pc=p;};
+    at(0x308030);at(0x308038);
+    //Only leaf admission while this exact Config's scoped adapter is live.
+    //The full descriptor preflight requires the adapter already withdrawn.
+    if(nativeScbThread_!=std::this_thread::get_id()||rowIndex>=4||!nativeParticleList3D8_||
+       !nativeParticleList3D8_->rows[rowIndex]||!worldApplication_||
+       worldApplication_->nativeOwnerThread_!=std::this_thread::get_id()||
+       !worldApplication_->constructed_||worldApplication_->released_)return false;
+    auto& row=*nativeParticleList3D8_->rows[rowIndex];
+    auto& service=rowIndex?sourceParticleLaterRows_[rowIndex-1]:sourceParticleService124_;
+    if(!row.sourceEmitterArrayPublished||!row.sourceEmitterArray00||
+       *row.sourceEmitterArray00!=row.sourceEmitterPointers.get()||!row.sourceEmitterPointers||
+       emitterIndex>=row.sourceEmitterPublishedSlots||emitterIndex>=row.sourceEmitters.size()||
+       !row.sourceEmitters[emitterIndex]||service.configEmitterIndex!=emitterIndex||
+       !service.configEntered||service.configTarget10!=0x27d7a0u||
+       service.emitterConfigTarget94!=config.emitterPropertyTarget_)return false;
+    auto& emitter=*row.sourceEmitters[emitterIndex];
+    if(row.sourceEmitterPointers[emitterIndex]!=&emitter.entity||
+       emitter.config15AE00.get()!=&config||config.emitterOwner_!=&emitter.entity||
+       !emitter.constructorReturned||!emitter.counted||!emitter.enrolled||
+       emitter.nativeTopologyWithdrawn||emitter.borrowsWithdrawn||emitter.configNativeWithdrawn||
+       !emitter.managerStored||!emitter.manager70||emitter.manager70!=trackParticles_.get()||
+       !sourceParticle4A0_||*sourceParticle4A0_!=emitter.manager70||!sourceParticleLoadReturned_||
+       sourceParticleStageNativeClosed_||sourceParticle4A0NativeWithdrawn_||
+       emitter.configOpenReturned!=true||config.sourceOpenReturned_!=true||
+       config.sourceClosed_||config.nativeClosed_||!config.current()||
+       !config.emitterPropertiesAttempted_||!config.commonTailAttempted_||
+       config.commonEmitMode5C_!=2||!config.commonModeStored_||config.commonTailScalarCount_!=4||
+       config.commonModeScalarCount_!=4||config.commonMode2TimeStored_||
+       config.commonModeTimeCopied_||config.commonPropertiesSelectionAttempted_||config.commonReturned_)return false;
+    if(!sourceLoadApplication_||!sourceLoadApplication_->enabled||!sourceLoadApplication_->state||
+       !sourceLoadApplication_->state->known||sourceLoadApplication_->entities()!=worldApplication_||
+       !sourceLoadRace_||sourceLoadRace_->nativeIntroWorldEntity()!=&worldEntity_||
+       sourceLoadApplication_->sourceRace28COwner_.get()!=sourceLoadRace_||
+       &sourceLoadApplication_->state->rawRandom308030!=
+           &sourceLoadApplication_->state->sharedNoise308030.sharedRandomState)return false;
+    //Pin this existing process state; never copy its noise object, install a
+    //seed, sample a clock, or manufacture a per-emitter random stream.
+    history.applicationPin=sourceLoadApplication_->state;
+    history.application=sourceLoadApplication_;
+    at(0x308044);history.drawEntered=true;
+    history.rawBefore=history.applicationPin->rawRandom308030;
+    at(0x30804c);at(0x308050);at(0x308054);at(0x308058);at(0x30805c);
+    history.rawValue=g::drawOriginalSharedRng50IU(history.applicationPin->sharedNoise308030);
+    history.rawAfter=history.applicationPin->rawRandom308030;
+    history.drawReturned=true;value=history.rawValue;return true;
+}
 bool Owner::continueSourceEmitterConfig15AE00(std::size_t rowIndex,SourceParticleService124& h,std::uint32_t& pc)noexcept {
     if(rowIndex>=4||(rowIndex==0&& &h!=&sourceParticleService124_)||
        (rowIndex>0&& &h!=&sourceParticleLaterRows_[rowIndex-1]))return false;
@@ -2478,7 +2534,7 @@ bool Owner::continueSourceEmitterConfig15AE00(std::size_t rowIndex,SourceParticl
         //Native heap custody for the original stack object; failure is a
         //host allocation bound, not an invented source nullable new branch.
         e.config15AE00.reset(new a::OriginalParticleSourceConfig50LA(
-            a::OriginalParticleSourceConfig50LA::Emitter15AE00Tag{},&e.entity));
+            a::OriginalParticleSourceConfig50LA::Emitter15AE00Tag{},&e.entity,e.forcedSets1C4));
     }catch(...){return false;}
     at(0x1573a4);e.configConstructReturned=true;h.emitterConfigConstructReturned=true;at(0x15ae24);
     std::string filename;
@@ -2497,6 +2553,19 @@ bool Owner::continueSourceEmitterConfig15AE00(std::size_t rowIndex,SourceParticl
     at(0x15ae3c);at(0x15ae40);at(0x15ae44);h.emitterConfigTarget94=subtype0?0x15c330u:(subtype1?0x15d560u:(subtype2?0x15dd00u:(subtype9?0x15ef70u:(subtype11?0x15fc10u:(subtype12?0x1602b0u:0x15e6d0u)))));
     at(0x15ae48);
     auto& config=*e.config15AE00;
+    {
+    //The adapter can only serve this synchronous, genuine property call.
+    //Its RAII scope ends before external currentness, even on partial failure.
+    struct Mode2Draw final : a::OriginalParticleSourceConfig50LA::Mode2DrawAdapter {
+        Owner& owner;std::size_t row,index;a::OriginalParticleSourceConfig50LA* expected;
+        Mode2Draw(Owner& o,std::size_t r,std::size_t i,a::OriginalParticleSourceConfig50LA& c)noexcept
+            :owner(o),row(r),index(i),expected(&c){}
+        bool draw15B148(a::OriginalParticleSourceConfig50LA& c,std::uint32_t& result)noexcept override {
+            return &c==expected&&owner.drawSourceParticleMode2Native(row,index,c,result);
+        }
+    } adapter(*this,rowIndex,*h.configEmitterIndex,config);
+    a::OriginalParticleSourceConfig50LA::Mode2DrawScope drawScope(config,adapter);
+    if(!drawScope.bound())return false;
     if(subtype1){
         const bool returned=config.beginType1Properties15D560(&e.entity,e.words,e.known,diagnostic);
         at(config.sourcePC_);(void)returned;
@@ -2526,6 +2595,7 @@ bool Owner::continueSourceEmitterConfig15AE00(std::size_t rowIndex,SourceParticl
         at(config.sourcePC_);(void)returned;
         if(pc!=0x15e758)return false;
     }
+    } //No Config keeps a pointer to the stack adapter beyond this call.
     if(!config.commonReturned_||!config.current()||!preflightSourceWorldParticleDescriptorsNative())return false;
     if(!subtype0&&!subtype1&&!subtype2&&!subtype11&&!subtype12){
         at(subtype9?0x15eff8u:0x15e758u);if(e.known[0x64/4]!=0xffffffffu)return false;
@@ -2718,7 +2788,7 @@ bool Owner::continueSourceEmitterConfig15AE00(std::size_t rowIndex,SourceParticl
                 };
                 const auto scale=[&](std::size_t n,std::uint32_t sourcePC)noexcept {
                     populationAt(sourcePC);std::uint32_t bits=0;
-                    if(!(population.randomConvertedMask&(1u<<n))||!g::detail::sourceParticleScaleRandom50LA(population.randomConverted[n],bits))return false;
+                    if(!(population.randomConvertedMask&(1u<<n))||!g::detail::sourceParticleFogScale50LA(population.randomConverted[n],bits))return false;
                     population.randomUnit[n]=bits;population.randomUnitMask|=static_cast<std::uint8_t>(1u<<n);return true;
                 };
                 populationAt(0x1605dc);populationAt(0x1605e0);if(!draw(0))return false;
@@ -2744,9 +2814,13 @@ bool Owner::continueSourceEmitterConfig15AE00(std::size_t rowIndex,SourceParticl
                 populationAt(0x16064c);population.randomStack90[3]=0x3f800000u;population.randomStack90Mask=15;
                 populationAt(0x160650);populationAt(0x160654);
                 population.randomStack70Initial=population.randomStack90;population.randomStack70=population.randomStack70Initial;population.randomStack70Copied=true;
-                //Only the documented literal+0 range domain is admitted.
-                //Each original operand/read/operation/store retains its own
-                //receipt. A later refusal does not undo earlier RNG or lanes.
+                //Signed finite endpoints use the bounded scalar SUB/ADD.
+                //The actual difference remains visible before MUL admits only
+                //+0 or bounded positive widths, including non-powers. Initial scales
+                //use constantLEFT; range products use unitLEFT,widthRIGHT.
+                //Their different pinned-model corrections are never exchanged.
+                //Every reached read/operation/store retains its own receipt;
+                //a later refusal cannot undo earlier RNG or completed lanes.
                 for(std::size_t lane=0;lane<3;++lane){
                     auto& range=population.rangeAxes[lane];
                     const auto base=0x160658u+static_cast<std::uint32_t>(lane)*0x1cu;
@@ -2756,11 +2830,11 @@ bool Owner::continueSourceEmitterConfig15AE00(std::size_t rowIndex,SourceParticl
                     range.minimum=e.words[0x200/4+lane];range.step=2;
                     populationAt(base+8);range.unit=population.randomStack70[lane];range.step=3;
                     populationAt(base+12);
-                    if(!g::detail::sourceParticleZeroRangeDifference50LA(range.maximum,range.minimum,range.difference))return false;
+                    if(!g::detail::sourceParticleFogRangeDifference50LA(range.maximum,range.minimum,range.difference))return false;
                     range.step=4;populationAt(base+16);
-                    if(!g::detail::sourceParticleUnitTimesPositiveZero50LA(range.unit,range.difference,range.product))return false;
+                    if(!g::detail::sourceParticleFogRangeProduct50LA(range.unit,range.difference,range.product))return false;
                     range.step=5;populationAt(base+20);
-                    if(!g::detail::sourceParticleBothZeroAdd50LA(range.minimum,range.product,range.sum))return false;
+                    if(!g::detail::sourceParticleFogRangeSum50LA(range.minimum,range.product,range.sum))return false;
                     range.step=6;populationAt(base+24);
                     population.randomStack70[lane]=range.sum;range.step=7;
                 }
@@ -2780,8 +2854,11 @@ bool Owner::continueSourceEmitterConfig15AE00(std::size_t rowIndex,SourceParticl
                     (successorFog&&!manager.sourceFogSuccessorCountObservationCurrentNative(manager.sourceActiveCount128_,
                         population.retirementScan,&e,&population)))return false;
                 population.positionIndex128=manager.sourceActiveCount128_; //Distinct fresh1606C4 observation.
+                //Each genuine emitter/local pair uses the bounded pinned
+                //scalar ADD, including nonzero translated boxes. Refusal at a
+                //later axis preserves earlier results and owner observations.
                 positionAt(7);
-                if(!g::detail::sourceParticleBothZeroAdd50LA(population.positionInput[2],population.positionLocal[2],population.positionResult[2]))return false;
+                if(!g::detail::sourceParticleFogPositionAdd50LA(population.positionInput[2],population.positionLocal[2],population.positionResult[2]))return false;
                 positionAt(8);population.positionLocal[0]=population.randomStack70[0];
                 positionAt(9);if(!manager.sourceParticlePointersPublished_)return false;
                 population.positionPublication138=manager.sourceParticlePointers138_;
@@ -2789,9 +2866,9 @@ bool Owner::continueSourceEmitterConfig15AE00(std::size_t rowIndex,SourceParticl
                 //symbolic source address. The private slot owner performs safe
                 //host-width indexing only at1606E4; no guest pointer is forged.
                 positionAt(10);positionAt(11);
-                if(!g::detail::sourceParticleBothZeroAdd50LA(population.positionInput[1],population.positionLocal[1],population.positionResult[1]))return false;
+                if(!g::detail::sourceParticleFogPositionAdd50LA(population.positionInput[1],population.positionLocal[1],population.positionResult[1]))return false;
                 positionAt(12);positionAt(13);
-                if(!g::detail::sourceParticleBothZeroAdd50LA(population.positionInput[0],population.positionLocal[0],population.positionResult[0]))return false;
+                if(!g::detail::sourceParticleFogPositionAdd50LA(population.positionInput[0],population.positionLocal[0],population.positionResult[0]))return false;
                 positionAt(14);
                 if(successorFog){
                     if(!manager.readSourceFogSuccessorPositionSlot1606E4(population.retirementScan,*population.positionIndex128,
@@ -2840,13 +2917,14 @@ bool Owner::continueSourceEmitterConfig15AE00(std::size_t rowIndex,SourceParticl
                     if(e.known[0x234/4]!=0xffffffffu)return false;
                     population.oscillationMagnitude234=e.words[0x234/4];population.oscillationRandomStep=4;
                     populationAt(0x160734);
-                    if(!g::detail::sourceParticleScaleRandom50LA(population.oscillationRandomConverted,population.oscillationRandomUnit))return false;
+                    if(!g::detail::sourceParticleFogScale50LA(population.oscillationRandomConverted,population.oscillationRandomUnit))return false;
                     population.oscillationRandomStep=5;
                     populationAt(0x160738);populationAt(0x16073c);
                     //JAL160738's delay must complete BEFORE its fifth draw.
-                    //Only the already-supported literal+0 magnitude is used;
-                    //ordinary authored magnitudes remain pending at this MUL.
-                    if(!g::detail::sourceParticleUnitTimesPositiveZero50LA(population.oscillationRandomUnit,
+                    //Actual magnitude is LEFT and unit RIGHT. Admit+0 or
+                    //bounded positive magnitudes using that exact operand order;
+                    //each authentic draw and partial product stays irreversible.
+                    if(!g::detail::sourceParticleFogVelocityProduct50LA(population.oscillationRandomUnit,
                        *population.oscillationMagnitude234,population.velocityProducts[0]))return false;
                     const auto velocityAt=[&](std::uint8_t step,std::uint32_t pc){
                         population.velocityStep=step;populationAt(pc);
@@ -2871,9 +2949,9 @@ bool Owner::continueSourceEmitterConfig15AE00(std::size_t rowIndex,SourceParticl
                     populationAt(0x16074c);populationAt(0x160750);velocityAt(3,0x160754);
                     if(e.known[0x234/4]!=0xffffffffu)return false;
                     population.velocityMagnitude234[0]=e.words[0x234/4];velocityAt(4,0x160758);
-                    if(!g::detail::sourceParticleScaleRandom50LA(population.velocityRandomConverted[0],population.velocityRandomUnit[0]))return false;
+                    if(!g::detail::sourceParticleFogScale50LA(population.velocityRandomConverted[0],population.velocityRandomUnit[0]))return false;
                     populationAt(0x16075c);velocityAt(5,0x160760);
-                    if(!g::detail::sourceParticleUnitTimesPositiveZero50LA(population.velocityRandomUnit[0],
+                    if(!g::detail::sourceParticleFogVelocityProduct50LA(population.velocityRandomUnit[0],
                        *population.velocityMagnitude234[0],population.velocityProducts[1]))return false;
                     //The sixth call follows its actual160760 delay product.
                     if(!velocityDraw(1,6))return false;
@@ -2882,9 +2960,9 @@ bool Owner::continueSourceEmitterConfig15AE00(std::size_t rowIndex,SourceParticl
                     populationAt(0x160770);populationAt(0x160774);velocityAt(8,0x160778);
                     if(e.known[0x234/4]!=0xffffffffu)return false;
                     population.velocityMagnitude234[1]=e.words[0x234/4];velocityAt(9,0x16077c);
-                    if(!g::detail::sourceParticleScaleRandom50LA(population.velocityRandomConverted[1],population.velocityRandomUnit[1]))return false;
+                    if(!g::detail::sourceParticleFogScale50LA(population.velocityRandomConverted[1],population.velocityRandomUnit[1]))return false;
                     velocityAt(10,0x160780);
-                    if(!g::detail::sourceParticleUnitTimesPositiveZero50LA(population.velocityRandomUnit[1],
+                    if(!g::detail::sourceParticleFogVelocityProduct50LA(population.velocityRandomUnit[1],
                        *population.velocityMagnitude234[1],population.velocityProducts[2]))return false;
                     populationAt(0x160784);population.velocityStackB0[0]=population.velocityProducts[2];population.velocityStackB0Mask=1;
                     populationAt(0x160788);population.velocityStackB0[1]=population.velocityProducts[1];population.velocityStackB0Mask=3;
@@ -2899,36 +2977,51 @@ bool Owner::continueSourceEmitterConfig15AE00(std::size_t rowIndex,SourceParticl
                     populationAt(0x1607a0);populationAt(0x1607a4);velocityAt(12,0x1607a8);
                     if(!g::detail::sourceParticleTruncateInteger50LA(population.velocityRandomValue[2],population.velocityRandomConverted[2]))return false;
                     populationAt(0x1607ac);populationAt(0x1607b0);populationAt(0x1607b4);populationAt(0x1607b8);velocityAt(13,0x1607bc);
-                    if(!g::detail::sourceParticleScaleRandom50LA(population.velocityRandomConverted[2],population.velocityRandomUnit[2]))return false;
+                    if(!g::detail::sourceParticleFogScale50LA(population.velocityRandomConverted[2],population.velocityRandomUnit[2]))return false;
                     populationAt(0x1607c0);population.velocitySignLeHalf[0]=population.velocityRandomUnit[2]<=0x3f000000u;
                     populationAt(0x1607c4);populationAt(0x1607c8);populationAt(0x1607cc);
                     if(!*population.velocitySignLeHalf[0]){
                         populationAt(0x1607d0);population.velocityNegationInput[0]=population.velocityStack80[0];
-                        populationAt(0x1607d4);populationAt(0x1607d8);populationAt(0x1607dc);velocityAt(14,0x1607e0);return false;
+                        populationAt(0x1607d4);populationAt(0x1607d8);populationAt(0x1607dc);velocityAt(14,0x1607e0);
+                        std::uint32_t result=0;
+                        if(!g::detail::sourceParticleFogVelocityNegate50LA(*population.velocityNegationInput[0],result))return false;
+                        population.velocityNegationResult[0]=result;
+                        populationAt(0x1607e4);population.velocityStack80[0]=result;
+                        population.velocityNegationStoredMask|=static_cast<std::uint8_t>(1u<<0);
                     }
                     populationAt(0x1607e8);populationAt(0x1607ec);
                     if(!velocityDraw(3,15))return false;
                     populationAt(0x1607f0);populationAt(0x1607f4);velocityAt(16,0x1607f8);
                     if(!g::detail::sourceParticleTruncateInteger50LA(population.velocityRandomValue[3],population.velocityRandomConverted[3]))return false;
                     populationAt(0x1607fc);populationAt(0x160800);populationAt(0x160804);populationAt(0x160808);velocityAt(17,0x16080c);
-                    if(!g::detail::sourceParticleScaleRandom50LA(population.velocityRandomConverted[3],population.velocityRandomUnit[3]))return false;
+                    if(!g::detail::sourceParticleFogScale50LA(population.velocityRandomConverted[3],population.velocityRandomUnit[3]))return false;
                     populationAt(0x160810);population.velocitySignLeHalf[1]=population.velocityRandomUnit[3]<=0x3f000000u;
                     populationAt(0x160814);populationAt(0x160818);populationAt(0x16081c);
                     if(!*population.velocitySignLeHalf[1]){
                         populationAt(0x160820);population.velocityNegationInput[1]=population.velocityStack80[1];
-                        populationAt(0x160824);populationAt(0x160828);populationAt(0x16082c);velocityAt(18,0x160830);return false;
+                        populationAt(0x160824);populationAt(0x160828);populationAt(0x16082c);velocityAt(18,0x160830);
+                        std::uint32_t result=0;
+                        if(!g::detail::sourceParticleFogVelocityNegate50LA(*population.velocityNegationInput[1],result))return false;
+                        population.velocityNegationResult[1]=result;
+                        populationAt(0x160834);population.velocityStack80[1]=result;
+                        population.velocityNegationStoredMask|=static_cast<std::uint8_t>(1u<<1);
                     }
                     populationAt(0x160838);populationAt(0x16083c);
                     if(!velocityDraw(4,19))return false;
                     populationAt(0x160840);populationAt(0x160844);velocityAt(20,0x160848);
                     if(!g::detail::sourceParticleTruncateInteger50LA(population.velocityRandomValue[4],population.velocityRandomConverted[4]))return false;
                     populationAt(0x16084c);populationAt(0x160850);populationAt(0x160854);populationAt(0x160858);velocityAt(21,0x16085c);
-                    if(!g::detail::sourceParticleScaleRandom50LA(population.velocityRandomConverted[4],population.velocityRandomUnit[4]))return false;
+                    if(!g::detail::sourceParticleFogScale50LA(population.velocityRandomConverted[4],population.velocityRandomUnit[4]))return false;
                     populationAt(0x160860);population.velocitySignLeHalf[2]=population.velocityRandomUnit[4]<=0x3f000000u;
                     populationAt(0x160864);populationAt(0x160868);populationAt(0x16086c);
                     if(!*population.velocitySignLeHalf[2]){
                         populationAt(0x160870);population.velocityNegationInput[2]=population.velocityStack80[2];
-                        populationAt(0x160874);populationAt(0x160878);populationAt(0x16087c);velocityAt(22,0x160880);return false;
+                        populationAt(0x160874);populationAt(0x160878);populationAt(0x16087c);velocityAt(22,0x160880);
+                        std::uint32_t result=0;
+                        if(!g::detail::sourceParticleFogVelocityNegate50LA(*population.velocityNegationInput[2],result))return false;
+                        population.velocityNegationResult[2]=result;
+                        populationAt(0x160884);population.velocityStack80[2]=result;
+                        population.velocityNegationStoredMask|=static_cast<std::uint8_t>(1u<<2);
                     }
                     populationAt(0x160888);velocityAt(23,0x16088c);
                     if(successorFog){
@@ -2976,11 +3069,12 @@ bool Owner::continueSourceEmitterConfig15AE00(std::size_t rowIndex,SourceParticl
                         population.positionStore,&e,population.fieldStores))return false;
                 }else if(!manager.readSourceFogLife1608D8(population.positionStore,&e,population.fieldStores))return false;
                 fieldTailAt(18); //Actual record30 readback precedes DIV1608DC.
-                std::uint32_t inverse=0;
-                if(!g::detail::sourceParticleDivideOneBySignedZero50LA(*population.fieldStores.lifeRead30,inverse))return false;
-                population.reciprocalBits=inverse;population.reciprocalDAndSD=true;
-                //DIV's D/SD outcome is recorded locally. Comparison C remains
-                //the real1608A8 result; no host divide or FCR31 replacement.
+                std::uint32_t inverse=0;bool assertedDivideByZero=false;
+                if(!g::detail::sourceParticleFogReciprocal50LA(*population.fieldStores.lifeRead30,inverse,assertedDivideByZero))return false;
+                population.reciprocalBits=inverse;population.reciprocalDAndSD=assertedDivideByZero;
+                //Record only a new divide-by-zero assertion, never a clearing
+                //of unknown prior D/SD. C remains the real1608A8 result; the
+                //positive-normal path is the pinned model, not host division.
                 const auto postDivideAt=[&](std::uint8_t step,std::uint32_t pc){
                     population.postDivideStep=step;populationAt(pc);
                 };
@@ -3134,13 +3228,14 @@ bool Owner::continueSourceEmitterConfig15AE00(std::size_t rowIndex,SourceParticl
                 if(!frameOwnerCurrent())return false;
                 frame.rangeGuard80AC=selectors.range.lazy80AC; //Actual reached LB, before either multiply.
                 populationAt(0x160a0c);populationAt(0x160a10);frameAt(12,0x160a14);
-                if(!g::detail::sourceParticleScaleRandom50LA(*frame.randomConverted,frameBits))return false;
+                if(!g::detail::sourceParticleFogScale50LA(*frame.randomConverted,frameBits))return false;
                 frame.randomUnit=frameBits;frameAt(13,0x160a18);
-                //Use only Sony's explicitly enumerated zero*zero domain.
-                //Default span-14, even with unit0, still remains pending here.
-                if(!g::detail::sourceParticleBothZeroMultiply50LA(*frame.spanConverted,*frame.randomUnit,frameBits))return false;
+                //Actual span is LEFT, unit RIGHT. Admit zero or positive
+                //integer spans through2^24; the genuine fallback span-14
+                //still refuses here, after its real random draw and scale.
+                if(!g::detail::sourceParticleFogFrameProduct50LA(*frame.spanConverted,*frame.randomUnit,frameBits))return false;
                 frame.productBits=frameBits;frameAt(14,0x160a1c);
-                if(!g::detail::sourceParticleZeroToWord50LA(*frame.productBits,frameBits))return false;
+                if(!g::detail::sourceParticleFogFrameOffset50LA(*frame.productBits,frameBits))return false;
                 frame.offsetWord=frameBits;populationAt(0x160a20);populationAt(0x160a24);
                 frameAt(15,0x160a28);
                 frame.selectedWord=*frame.first1B0+*frame.offsetWord; //ADDU in the ordinary BNE delay, both edges.
@@ -4021,14 +4116,14 @@ bool Owner::preflightSourceTriggerServiceNative()const noexcept {
     if(s.fogBounds.commonResult&&s.fogBounds.commonResult!=s.fogGeometry.transformedCenter)return false;
     if(s.fogBounds.matrixWords){if(!s.fogGeometry.matrix50)return false;
         for(unsigned k=0;k<s.fogBounds.matrixWords;++k)if(s.fogBounds.matrix10[k]!=(*s.fogGeometry.matrix50)[k])return false;}
-    if(!fogCaller&&(s.fogPrefixStep||s.fogBodyStep||s.fogAssertionPredicate||s.fogAssertionReturnV0))return false;
+    if(!fogCaller&&(s.fogPrefixStep||s.fogBodyStep||s.fogDescriptorStep||s.fogAssertionPredicate||s.fogAssertionReturnV0))return false;
     if(fogCaller){
         const auto step=s.fogPrefixStep;const auto& first=s.rows[0];
         //Pure scalar history, retained after native withdrawal. No live
         //loaded-owner or Fog-count predicate may be called from this check.
         if(step>12||s.entered!=(step>=1)||s.listRead!=(step>=2)||s.listNonNull!=(step>=2)||
            bool(s.listTable08)!=(step>=3)||bool(s.listTarget7C)!=(step>=4)||s.listEntered!=(step>=5)||
-           bool(s.currentRow)!=(step>=7)||(s.currentRow&&s.currentRow!=0u)||
+           bool(s.currentRow)!=(step>=7)||(s.currentRow&&*s.currentRow!=(first.parentAdvanced?1u:0u))||
            bool(s.freshCount30)!=(step>=8)||(s.freshCount30&&s.freshCount30!=2u)||
            bool(first.rowIndex)!=(step>=10)||(first.rowIndex&&first.rowIndex!=0u)||
            bool(first.count30)!=(step>=10)||(first.count30&&first.count30!=2u)||
@@ -4057,12 +4152,25 @@ bool Owner::preflightSourceTriggerServiceNative()const noexcept {
                row.guard3D686CRead||row.assertionLazyStored||row.assertion444618Read||row.worldZones34CRead||
                row.zone08||row.assertionReturned||row.descriptorTable6C||row.descriptorTarget0C||row.descriptorEntered||
                row.callbackZone08||row.collisionArrayRead||row.collisionNodeRead||row.trigger00Read))return false;
-            if((i&&row.geometryReturned)||
-               row.triggerCallbackReturned||row.actionLoopEntered||row.actionIndex||row.actionOffset||row.actionCount||
+            if(i&&(row.geometryReturned||row.triggerCallbackReturned||row.actionLoopEntered||row.actionIndex||row.actionOffset||row.actionCount||
                row.actionRead||row.actionTable108||row.actionTarget0C||row.actionReturned||row.actionReturnV0||
                row.geometrySourceFreed||row.descriptorReturned||row.descriptorReturnV0||row.parentOperandsRead||
-               row.registrationReturned||row.parentAdvanced||row.nextRow)return false;
+               row.registrationReturned||row.parentAdvanced||row.nextRow))return false;
+            if(!i&&row.triggerCallbackReturned!=s.fogPrimary.returnFlow.triggerReturned())return false;
         }
+        const auto tail=s.fogDescriptorStep;
+        if(tail>18||(tail&&!first.triggerCallbackReturned)||first.actionLoopEntered!=(tail>=1)||
+           bool(first.actionIndex)!=(tail>=1)||(first.actionIndex&&*first.actionIndex!=(tail>=9?1u:0u))||
+           bool(first.actionOffset)!=(tail>=2)||(first.actionOffset&&*first.actionOffset!=(tail>=8?4u:0u))||
+           bool(first.actionCount)!=(tail>=3)||(first.actionCount&&*first.actionCount!=1u)||
+           first.actionRead!=(tail>=4)||bool(first.actionTable108)!=(tail>=5)||
+           (first.actionTable108&&*first.actionTable108!=0x3cf0b0u)||bool(first.actionTarget0C)!=(tail>=6)||
+           (first.actionTarget0C&&*first.actionTarget0C!=0x1b5ad0u)||first.actionReturned!=(tail>=7)||
+           bool(first.actionReturnV0)!=(tail>=7)||(first.actionReturnV0&&*first.actionReturnV0!=1u)||
+           first.geometrySourceFreed!=(tail>=12)||bool(first.descriptorReturnV0)!=(tail>=13)||
+           (first.descriptorReturnV0&&*first.descriptorReturnV0!=1u)||first.descriptorReturned!=(tail>=14)||
+           first.parentOperandsRead!=(tail>=15)||first.registrationReturned!=(tail>=16)||
+           first.parentAdvanced!=(tail>=17)||bool(first.nextRow)!=(tail>=17)||(first.nextRow&&*first.nextRow!=1u))return false;
     }
     if(!s.entered&&(s.listRead||s.listEntered||s.nativeWithdrawn||s.currentRow||s.freshCount30))return false;
     if((s.entered&&(sourcePostCollisionCaller_.target144!=0x274e90u||!sourcePostCollisionCaller_.particleReturned))||
@@ -4295,6 +4403,80 @@ bool Owner::continueSourceTriggerFogBody2DCB6C(std::uint32_t& pc)noexcept {
     //admission is now safe, before a distinct portal prefix begins.
     if(!sourceCompletedParticleWorldCustodyCurrentNative()||!preflightSourceTriggerServiceNative()||
        !sourceTriggerFogPortalGraphLiveNative(z))return false;
+    const auto finishFogDescriptor=[&]()noexcept {
+        if(pc!=0x2dc2acu||s.fogDescriptorStep||!h.triggerCallbackReturned||!h.rowIndex||*h.rowIndex||
+           !sourceCompletedParticleWorldCustodyCurrentNative()||!preflightSourceTriggerServiceNative()||
+           !sourceTriggerFogPortalGraphLiveNative(z)||!worldApplication_||worldApplication_->released_||
+           sourceTopologyWithdrawn_||row.sourceActionNativeWithdrawn||!row.sourceInstance||
+           row.sourceInstance->nativeClosed_||row.sourceInstance->membershipNativeWithdrawn_)return false;
+        const auto liveRow=[&]()noexcept {
+            return sourceTriggerPhase_==SourceTriggerPhase::listReturned&&sourceTriggerPublished_&&
+                sourceTrigger3D0_&&*sourceTrigger3D0_==&list&&list.sourceMode&&list.counted&&list.sourceEnrolled&&
+                list.sourceCountKnown&&list.count30==2&&list.sourceArrayKnown&&list.descriptors34&&
+                list.descriptorSlotsPublished==2&&!list.sourceDescriptorNativeRetired[0]&&
+                list.descriptorOwners[0].get()==&row&&list.descriptors34[0]==&row&&
+                row.sourceDescriptorReturned&&row.sourceActionReaderComplete&&!row.sourceActionNativeWithdrawn&&
+                row.sourceInstance&&row.sourceInstancePublished&&row.trigger00==&row.sourceInstance->entity_&&
+                !row.sourceInstance->nativeClosed_&&!row.sourceInstance->membershipNativeWithdrawn_&&
+                preflightSourceTriggerInstanceNative(row)&&preflightSourceTriggerActionNative(row);
+        };
+        if(!liveRow())return false;
+        at(0x2dc2ac);h.actionLoopEntered=true;h.actionIndex=0;s.fogDescriptorStep=1;
+        at(0x2dc2b0);at(0x2dc2b4);h.actionOffset=0;s.fogDescriptorStep=2; //Unconditional branch and offset-zero delay.
+        at(0x2dc2e0);if(!liveRow()||row.actionCount04!=1)return false;
+        h.actionCount=static_cast<std::uint32_t>(row.actionCount04);s.fogDescriptorStep=3;
+        at(0x2dc2e4);at(0x2dc2e8);at(0x2dc2ec); //Actual signed0<1 branch, ordinary NOP delay.
+        at(0x2dc2b8);if(!liveRow()||!row.actions68||!row.action||row.actionSlotsPublished!=1)return false;
+        at(0x2dc2bc);if(row.trigger00!=&row.sourceInstance->entity_)return false;
+        at(0x2dc2c0);at(0x2dc2c4);if(row.actions68[0]!=row.action.get())return false;
+        h.actionRead=true;s.fogDescriptorStep=4;
+        at(0x2dc2c8);h.actionTable108=row.action->vtable108;s.fogDescriptorStep=5;
+        if(*h.actionTable108!=0x3cf0b0u)return false;
+        at(0x2dc2cc);h.actionTarget0C=0x1b5ad0u;s.fogDescriptorStep=6;
+        at(0x2dc2d0);at(0x2dc2d4); //Actual JALR and World->A1 delay; own return2DC2D8.
+        if(!installSourceTriggerLostAi1B5AD0(row,pc)){sourcePostParticleModelsPC_=pc;return false;}
+        sourcePostParticleModelsPC_=pc;if(pc!=0x2dc2d8u)return false;
+        h.actionReturned=true;h.actionReturnV0=1;s.fogDescriptorStep=7;
+        at(0x2dc2d8);*h.actionOffset+=4u;s.fogDescriptorStep=8;
+        at(0x2dc2dc);++*h.actionIndex;s.fogDescriptorStep=9;
+        at(0x2dc2e0);if(!liveRow()||row.actionCount04!=1)return false;
+        h.actionCount=static_cast<std::uint32_t>(row.actionCount04);s.fogDescriptorStep=10; //Own fresh reload, not a reused loop test.
+        at(0x2dc2e4);at(0x2dc2e8);at(0x2dc2ec); //1<1 is false; NOP delay still executes.
+        at(0x2dc2f0);at(0x2dc2f4); //JAL2E8B00; delay reads this descriptor's source64.
+        if(!liveRow()||!row.sourceFields)return false;auto& geometry=*row.sourceFields;
+        if(!geometry.sourceGeometry64||!geometry.geometry64||*geometry.sourceGeometry64!=geometry.geometry64.get()||
+           !geometry.geometryAllocationReturned||!geometry.geometryPublished||!geometry.geometryConstructed||
+           geometry.geometrySourceFreeEntered||!preflightSourceWorldTriggerNative())return false;
+        geometry.geometrySourceHistory=*geometry.geometry64;geometry.geometrySourceFreeEntered=true;s.fogDescriptorStep=11;
+        at(0x2e8b00);if(!a::OriginalConfigProcessGlobals50LA::descriptorDelete2E8B00AdmittedNative())return false;
+        geometry.geometry64.reset();geometry.geometrySourceFreed=true; //Only plain descriptor80B; action/instance/shape remain owned.
+        at(0x2dc2f8);geometry.sourceGeometry64=nullptr;geometry.geometrySourceNullStored=true;
+        h.geometrySourceFreed=true;s.fogDescriptorStep=12; //No fallible gap between native free and source-knownNULL publication.
+        for(std::uint32_t p=0x2dc2fc;p<=0x2dc30c;p+=4)at(p);
+        at(0x2dc310);h.descriptorReturnV0=1;s.fogDescriptorStep=13;
+        at(0x2dc314);at(0x2dc318);h.descriptorReturned=true;s.fogDescriptorStep=14;
+        at(0x2dcc18); //Own caller continuation;2DC31C padding is not executed.
+        if(!liveRow()||!sourceCompletedParticleWorldCustodyCurrentNative()||!preflightSourceTriggerServiceNative())return false;
+        at(0x2dcc1c);at(0x2dcc20);at(0x2dcc24); //Original index offset,402 argument and slot address.
+        at(0x2dcc28);if(list.descriptors34[*h.rowIndex]!=&row)return false;
+        at(0x2dcc2c);if(row.trigger00!=&row.sourceInstance->entity_)return false;
+        h.parentOperandsRead=true;s.fogDescriptorStep=15;
+        at(0x2dcc30);at(0x2dcc34); //JAL141960 with actual list parent in delay.
+        if(!registerSourceTrigger141960(row,pc)){sourcePostParticleModelsPC_=pc;return false;}
+        sourcePostParticleModelsPC_=pc;if(pc!=0x2dcc38u)return false;
+        h.registrationReturned=true;s.fogDescriptorStep=16; //Actual returned trigger identity, not scalar V0=1.
+        at(0x2dcc38);++*s.currentRow;h.nextRow=*s.currentRow;h.parentAdvanced=true;s.fogDescriptorStep=17;
+        at(0x2dcc3c);s.fogDescriptorStep=18;at(0x2dcc40);
+        return false; //Descriptor0 complete; the next fresh count load and descriptor1 service remain unexecuted.
+    };
+    const auto finishFogMembership=[&]()noexcept {
+        if(pc!=0x280bc0u||!sourceCompletedParticleWorldCustodyCurrentNative()||
+           !preflightSourceTriggerServiceNative()||!sourceTriggerFogPortalGraphLiveNative(z))return false;
+        const bool returned=finishSourceTriggerFogMembership280BC0(row,s.fogPrimary,pc);
+        h.triggerCallbackReturned=returned;sourcePostParticleModelsPC_=pc;
+        if(returned&&pc==0x2dc2acu)return finishFogDescriptor();
+        return false; //Assertion/destructor refusal retains its own exact partial state.
+    };
     const auto actualHead=[&](const void* registration,const void* actualCollider,const void* actualZone,
         const NativeListMethodCustody* actualMethod,const void*& head,std::shared_ptr<const void>& graphPin,
         std::uint32_t& portalPC)noexcept {
@@ -4315,7 +4497,8 @@ bool Owner::continueSourceTriggerFogBody2DCB6C(std::uint32_t& pc)noexcept {
     };
     (void)continueSourceTriggerFogPortalHead280BF0(row,s.fogPrimary,actualHead,pc);
     sourcePostParticleModelsPC_=pc;
-    if(pc!=0x280c40u)return false; //Authentic NULL still stops at280BC0, before primary epilogue.
+    if(pc==0x280bc0u)return finishFogMembership();
+    if(pc!=0x280c40u)return false;
     if(!sourceCompletedParticleWorldCustodyCurrentNative()||!preflightSourceTriggerServiceNative()||
        !sourceTriggerFogPortalGraphLiveNative(z))return false;
     const auto actualPortal=[&](const void* registration,const void* actualCollider,const void* actualZone,
@@ -4330,7 +4513,223 @@ bool Owner::continueSourceTriggerFogBody2DCB6C(std::uint32_t& pc)noexcept {
     };
     (void)continueSourceTriggerFogPortalInputs280C40(row,s.fogPrimary,actualPortal,pc);
     sourcePostParticleModelsPC_=pc;
-    return false; //Six actual input loads; stop before23116C SUB.S. No overlap result or enclosing return.
+    if(pc!=0x2311a0u)return false;
+    if(!sourceCompletedParticleWorldCustodyCurrentNative()||!preflightSourceTriggerServiceNative()||
+       !sourceTriggerFogPortalGraphLiveNative(z))return false;
+    const auto continueMissTail=[&]()noexcept {
+        if(!sourceCompletedParticleWorldCustodyCurrentNative()||!preflightSourceTriggerServiceNative()||
+           !sourceTriggerFogPortalGraphLiveNative(z))return false;
+        const auto admitted=[&](const void* registration,const void* collider,const void* zone,
+            const std::shared_ptr<const void>& pin)noexcept {
+            return bool(pin)&&sourceTriggerPrimaryInputsNative(row,registration,collider)&&h.callbackZone08&&
+                *h.callbackZone08>=0&&static_cast<std::uint32_t>(*h.callbackZone08)==z&&
+                sourceTriggerFogPortalGraphLiveNative(z)&&zone==node.owner.get();
+        };
+        const auto portal=[&](const void* registration,const void* collider,const void* zone,const void* cursor,
+            const std::shared_ptr<const void>& pin,auto& p,auto& vertices,std::uint32_t& reached)noexcept {
+            reached=0x280c40u;
+            return admitted(registration,collider,zone,pin)&&sourceTriggerFogTailPortalNative(row,cursor,p,vertices);
+        };
+        const auto next=[&](const void* registration,const void* collider,const void* zone,const void* cursor,
+            const std::shared_ptr<const void>& pin,const void*& result,std::uint32_t& reached)noexcept {
+            reached=0x280cf8u;
+            return admitted(registration,collider,zone,pin)&&sourceTriggerFogTailNextNative(row,cursor,result);
+        };
+        const auto operand=[&](const void* registration,const void* collider,const void* zone,const void* cursor,
+            const std::shared_ptr<const void>& pin,unsigned index,unsigned stage,auto& p,auto& vertices,auto& word,
+            std::uint32_t& reached)noexcept {
+            reached=stage==0u?0x2311a0u:stage==3u?0x231214u:stage==1u?0x23125cu:stage==8u?0x231278u:0x2312a4u;
+            return admitted(registration,collider,zone,pin)&&sourceTriggerFogTailOperandNative(row,cursor,index,stage,p,vertices,word);
+        };
+        (void)continueSourceTriggerFogPortalMissTailNative(row,s.fogPrimary,portal,next,operand,pc);
+        sourcePostParticleModelsPC_=pc;
+        if(pc==0x280bc0u)return finishFogMembership();
+        return false; //A new hit remains pending280C5C; no old hit publication is borrowed.
+    };
+    const auto continuePortalResult=[&]()noexcept {
+        if((pc!=0x280c5cu&&pc!=0x280cf8u)||!sourceCompletedParticleWorldCustodyCurrentNative()||
+           !preflightSourceTriggerServiceNative()||!sourceTriggerFogPortalGraphLiveNative(z))return false;
+        const auto actualStore=[&](const void* registration,const void* actualCollider,const void* actualZone,
+            const void* head,const std::shared_ptr<const void>& graphPin,unsigned stage,std::uint32_t distance,
+            std::uint32_t& portalPC)noexcept {
+            portalPC=stage==1u?0x280c60u:0x280c64u;
+            if(!graphPin||!sourceTriggerPrimaryInputsNative(row,registration,actualCollider)||
+               !h.callbackZone08||*h.callbackZone08<0||static_cast<std::uint32_t>(*h.callbackZone08)!=z||
+               !sourceTriggerFogPortalGraphLiveNative(z)||actualZone!=node.owner.get())return false;
+            return storeSourceTriggerFogPortalDistanceNative(row,head,stage,distance);
+        };
+        const auto actualNext=[&](const void* registration,const void* actualCollider,const void* actualZone,
+            const void* head,const std::shared_ptr<const void>& graphPin,const void*& next,std::uint32_t& portalPC)noexcept {
+            portalPC=0x280cf8u;
+            if(next||!graphPin||!sourceTriggerPrimaryInputsNative(row,registration,actualCollider)||
+               !h.callbackZone08||*h.callbackZone08<0||static_cast<std::uint32_t>(*h.callbackZone08)!=z||
+               !sourceTriggerFogPortalGraphLiveNative(z)||actualZone!=node.owner.get())return false;
+            return readSourceTriggerFogPortalNextNative(row,head,next);
+        };
+        (void)continueSourceTriggerFogPortalAfterNative(row,s.fogPrimary,actualStore,actualNext,pc);
+        sourcePostParticleModelsPC_=pc;
+        if(pc==0x280c40u)return continueMissTail();
+        if(pc==0x280bc0u)return finishFogMembership();
+        if(pc!=0x280c68u)return false; //First hit keeps its original publication path.
+        if(!sourceCompletedParticleWorldCustodyCurrentNative()||!preflightSourceTriggerServiceNative()||
+           !sourceTriggerFogPortalGraphLiveNative(z))return false;
+        const auto actualNeighbor=[&](const void* registration,const void* actualCollider,const void* actualZone,
+            const void* head,const std::shared_ptr<const void>& graphPin,unsigned stage,const void*& neighborNode,
+            const g::OriginalWreckComponent50LA*& neighbor,NativeListMethodCustody*& method,std::uint32_t& portalPC)noexcept {
+            portalPC=stage==1u?0x280c68u:0x27f5a0u;
+            if((stage!=1u&&stage!=9u)||neighborNode||neighbor||method||!graphPin||
+               !sourceTriggerPrimaryInputsNative(row,registration,actualCollider)||!h.callbackZone08||*h.callbackZone08<0||
+               static_cast<std::uint32_t>(*h.callbackZone08)!=z||!sourceTriggerFogPortalGraphLiveNative(z)||actualZone!=node.owner.get())return false;
+            return sourceTriggerFogPortalNeighborOwnerNative(row,head,stage==9u,neighborNode,neighbor,method);
+        };
+        (void)continueSourceTriggerFogPortalNeighbor280C68(row,s.fogPrimary,actualNeighbor,pc);
+        sourcePostParticleModelsPC_=pc;
+        if(pc!=0x27e3c0u)return false;
+        if(!sourceCompletedParticleWorldCustodyCurrentNative()||!preflightSourceTriggerServiceNative()||
+           !sourceTriggerFogPortalGraphLiveNative(z))return false;
+        (void)continueSourceTriggerFogPortalSelector27E3C0(row,s.fogPrimary,pc);
+        sourcePostParticleModelsPC_=pc;
+        if(pc!=0x280ca4u)return false;
+        if(!sourceCompletedParticleWorldCustodyCurrentNative()||!preflightSourceTriggerServiceNative()||
+           !sourceTriggerFogPortalGraphLiveNative(z))return false;
+        (void)continueSourceTriggerFogPortalInsertion280CA4(row,s.fogPrimary,pc);
+        sourcePostParticleModelsPC_=pc;
+        if(pc!=0x280cc4u)return false;
+        if(!sourceCompletedParticleWorldCustodyCurrentNative()||!preflightSourceTriggerServiceNative()||
+           !sourceTriggerFogPortalGraphLiveNative(z))return false;
+        (void)continueSourceTriggerFogPortalPool280CC4(row,s.fogPrimary,pc);
+        sourcePostParticleModelsPC_=pc;
+        if(pc!=0x105740u&&pc!=0x10576cu)return false; //Cold growth remains pending1057D8.
+        if(!sourceCompletedParticleWorldCustodyCurrentNative()||!preflightSourceTriggerServiceNative()||
+           !sourceTriggerFogPortalGraphLiveNative(z))return false;
+        (void)continueSourceTriggerFogPortalPoolMutationNative(row,s.fogPrimary,pc);
+        sourcePostParticleModelsPC_=pc;
+        if(pc!=0x105804u)return false;
+        if(!sourceCompletedParticleWorldCustodyCurrentNative()||!preflightSourceTriggerServiceNative()||
+           !sourceTriggerFogPortalGraphLiveNative(z))return false;
+        (void)continueSourceTriggerFogPortalPoolReturn105804(row,s.fogPrimary,pc);
+        sourcePostParticleModelsPC_=pc;
+        if(pc!=0x280cd0u)return false;
+        if(!sourceCompletedParticleWorldCustodyCurrentNative()||!preflightSourceTriggerServiceNative()||
+           !sourceTriggerFogPortalGraphLiveNative(z))return false;
+        (void)continueSourceTriggerFogPortalSlot14280CD0(row,s.fogPrimary,pc);
+        sourcePostParticleModelsPC_=pc;
+        if(pc!=0x280cd4u)return false;
+        if(!sourceCompletedParticleWorldCustodyCurrentNative()||!preflightSourceTriggerServiceNative()||
+           !sourceTriggerFogPortalGraphLiveNative(z))return false;
+        const auto actualPayloadPortal=[&](const void* registration,const void* actualCollider,const void* actualZone,
+            const void* cursor,const std::shared_ptr<const void>& graphPin,const g::OriginalWreckComponent50LA*& portal,
+            std::uint32_t& portalPC)noexcept {
+            portalPC=0x280cdcu;
+            if(portal||!graphPin||!sourceTriggerPrimaryInputsNative(row,registration,actualCollider)||
+               !h.callbackZone08||*h.callbackZone08<0||static_cast<std::uint32_t>(*h.callbackZone08)!=z||
+               !sourceTriggerFogPortalGraphLiveNative(z)||actualZone!=node.owner.get())return false;
+            const std::array<std::array<std::uint32_t,4>,4>* vertices=nullptr;
+            return sourceTriggerFogPortalInputsOwnerNative(row,cursor,portal,vertices); //Fresh actual link08 read under the original graph owner.
+        };
+        (void)continueSourceTriggerFogPortalPayload280CD4(row,s.fogPrimary,actualPayloadPortal,pc);
+        sourcePostParticleModelsPC_=pc;
+        if(pc!=0x280cf8u)return false;
+        if(!sourceCompletedParticleWorldCustodyCurrentNative()||!preflightSourceTriggerServiceNative()||
+           !sourceTriggerFogPortalGraphLiveNative(z))return false;
+        const auto actualHitNext=[&](const void* registration,const void* actualCollider,const void* actualZone,
+            const void* head,const std::shared_ptr<const void>& graphPin,const void*& next,std::uint32_t& portalPC)noexcept {
+            portalPC=0x280cf8u;
+            if(next||!graphPin||!sourceTriggerPrimaryInputsNative(row,registration,actualCollider)||
+               !h.callbackZone08||*h.callbackZone08<0||static_cast<std::uint32_t>(*h.callbackZone08)!=z||
+               !sourceTriggerFogPortalGraphLiveNative(z)||actualZone!=node.owner.get())return false;
+            return readSourceTriggerFogPortalHitNextNative(row,head,next);
+        };
+        const auto actualNextPortal=[&](const void* registration,const void* actualCollider,const void* actualZone,
+            const void* cursor,const std::shared_ptr<const void>& graphPin,const g::OriginalWreckComponent50LA*& portal,
+            std::uint32_t& portalPC)noexcept {
+            portalPC=0x280c40u;
+            if(portal||!graphPin||!sourceTriggerPrimaryInputsNative(row,registration,actualCollider)||
+               !h.callbackZone08||*h.callbackZone08<0||static_cast<std::uint32_t>(*h.callbackZone08)!=z||
+               !sourceTriggerFogPortalGraphLiveNative(z)||actualZone!=node.owner.get())return false;
+            return sourceTriggerFogNextPortalOwnerNative(row,cursor,portal);
+        };
+        (void)continueSourceTriggerFogPortalHitNext280CF8(row,s.fogPrimary,actualHitNext,actualNextPortal,pc);
+        sourcePostParticleModelsPC_=pc;
+        if(pc==0x280bc0u)return finishFogMembership();
+        if(pc!=0x280c44u)return false;
+        if(!sourceCompletedParticleWorldCustodyCurrentNative()||!preflightSourceTriggerServiceNative()||
+           !sourceTriggerFogPortalGraphLiveNative(z))return false;
+        const auto actualNextInputs=[&](const void* registration,const void* actualCollider,const void* actualZone,
+            const void* cursor,const std::shared_ptr<const void>& graphPin,const g::OriginalWreckComponent50LA* portal,
+            const std::array<std::array<std::uint32_t,4>,4>*& vertices,std::uint32_t& portalPC)noexcept {
+            portalPC=0x280c44u;
+            if(vertices||!portal||!graphPin||!sourceTriggerPrimaryInputsNative(row,registration,actualCollider)||
+               !h.callbackZone08||*h.callbackZone08<0||static_cast<std::uint32_t>(*h.callbackZone08)!=z||
+               !sourceTriggerFogPortalGraphLiveNative(z)||actualZone!=node.owner.get())return false;
+            return sourceTriggerFogNextInputsOwnerNative(row,cursor,portal,vertices);
+        };
+        (void)continueSourceTriggerFogPortalNextInputs280C44(row,s.fogPrimary,actualNextInputs,pc);
+        sourcePostParticleModelsPC_=pc;
+        if(pc!=0x23116cu)return false;
+        if(!sourceCompletedParticleWorldCustodyCurrentNative()||!preflightSourceTriggerServiceNative()||
+           !sourceTriggerFogPortalGraphLiveNative(z))return false;
+        const auto actualQueryOperand=[&](const void* registration,const void* actualCollider,const void* actualZone,
+            const void* cursor,const std::shared_ptr<const void>& graphPin,unsigned index,unsigned stage,
+            const g::OriginalWreckComponent50LA*& portal,const std::array<std::array<std::uint32_t,4>,4>*& vertices,
+            const std::array<std::uint32_t,4>*& operand,std::uint32_t& portalPC)noexcept {
+            portalPC=stage==0u?0x2311a0u:stage==3u?0x231214u:stage==1u?0x23125cu:stage==8u?0x231278u:0x2312a4u;
+            if(portal||vertices||operand||!graphPin||!sourceTriggerPrimaryInputsNative(row,registration,actualCollider)||
+               !h.callbackZone08||*h.callbackZone08<0||static_cast<std::uint32_t>(*h.callbackZone08)!=z||
+               !sourceTriggerFogPortalGraphLiveNative(z)||actualZone!=node.owner.get())return false;
+            return sourceTriggerFogNextQueryOperandNative(row,cursor,index,stage,portal,vertices,operand);
+        };
+        (void)continueSourceTriggerFogPortalNextQuery23116C(row,s.fogPrimary,actualQueryOperand,pc);
+        sourcePostParticleModelsPC_=pc;
+        if(pc==0x280cf8u&&s.fogPrimary.portalNextQuery.returned())return continueMissTail();
+        return false; //A second hit or unsupported arithmetic still stops without borrowing first-hit publication.
+    };
+    const auto actualNormal=[&](const void* registration,const void* actualCollider,const void* actualZone,
+        const void* cursor,const std::shared_ptr<const void>& graphPin,const std::array<std::uint32_t,4>*& normal,
+        std::uint32_t& portalPC)noexcept {
+        portalPC=0x2311a0u;
+        if(normal||!graphPin||!sourceTriggerPrimaryInputsNative(row,registration,actualCollider)||
+           !h.callbackZone08||*h.callbackZone08<0||static_cast<std::uint32_t>(*h.callbackZone08)!=z||
+           !sourceTriggerFogPortalGraphLiveNative(z)||actualZone!=node.owner.get())return false;
+        const g::OriginalWreckComponent50LA* portal=nullptr;
+        const std::array<std::array<std::uint32_t,4>,4>* vertices=nullptr;
+        return sourceTriggerFogPortalInputsOwnerNative(row,cursor,portal,vertices,&normal);
+    };
+    (void)continueSourceTriggerFogPortalDot2311A0(row,s.fogPrimary,actualNormal,pc);
+    sourcePostParticleModelsPC_=pc;
+    if(pc!=0x23120cu)return continuePortalResult(); //Only an authentic helper miss can advance the link.
+    if(!sourceCompletedParticleWorldCustodyCurrentNative()||!preflightSourceTriggerServiceNative()||
+       !sourceTriggerFogPortalGraphLiveNative(z))return false;
+    const auto actualEdge=[&](const void* registration,const void* actualCollider,const void* actualZone,
+        const void* cursor,const std::shared_ptr<const void>& graphPin,const std::array<std::uint32_t,4>*& edge0,
+        std::uint32_t& portalPC)noexcept {
+        portalPC=0x231214u;
+        if(edge0||!graphPin||!sourceTriggerPrimaryInputsNative(row,registration,actualCollider)||
+           !h.callbackZone08||*h.callbackZone08<0||static_cast<std::uint32_t>(*h.callbackZone08)!=z||
+           !sourceTriggerFogPortalGraphLiveNative(z)||actualZone!=node.owner.get())return false;
+        const g::OriginalWreckComponent50LA* portal=nullptr;
+        const std::array<std::array<std::uint32_t,4>,4>* vertices=nullptr;
+        return sourceTriggerFogPortalInputsOwnerNative(row,cursor,portal,vertices,nullptr,&edge0);
+    };
+    (void)continueSourceTriggerFogPortalEdge023120C(row,s.fogPrimary,actualEdge,pc);
+    sourcePostParticleModelsPC_=pc;
+    if(pc!=0x23125cu)return continuePortalResult();
+    if(!sourceCompletedParticleWorldCustodyCurrentNative()||!preflightSourceTriggerServiceNative()||
+       !sourceTriggerFogPortalGraphLiveNative(z))return false;
+    const auto actualLoopOperand=[&](const void* registration,const void* actualCollider,const void* actualZone,
+        const void* cursor,const std::shared_ptr<const void>& graphPin,unsigned index,unsigned stage,
+        const g::OriginalWreckComponent50LA*& portal,const std::array<std::array<std::uint32_t,4>,4>*& vertices,
+        const std::array<std::uint32_t,4>*& edge,std::uint32_t& portalPC)noexcept {
+        portalPC=stage==1u?0x23125cu:(stage==8u?0x231278u:0x2312a4u);
+        if(index<1u||index>3u||(stage!=1u&&stage!=8u&&stage!=19u)||portal||vertices||edge||!graphPin||
+           !sourceTriggerPrimaryInputsNative(row,registration,actualCollider)||!h.callbackZone08||*h.callbackZone08<0||
+           static_cast<std::uint32_t>(*h.callbackZone08)!=z||!sourceTriggerFogPortalGraphLiveNative(z)||actualZone!=node.owner.get())return false;
+        //Address formation needs the authentic owner. Edge contents become required only at the actual LQC2.
+        return sourceTriggerFogPortalInputsOwnerNative(row,cursor,portal,vertices,nullptr,stage>=8u?&edge:nullptr,index,stage>=19u);
+    };
+    (void)continueSourceTriggerFogPortalLoop23125C(row,s.fogPrimary,actualLoopOperand,pc);
+    sourcePostParticleModelsPC_=pc;
+    return continuePortalResult(); //Hit stops before neighbor setup; miss stops before a fresh portal occurrence or primary epilogue.
 }
 bool Owner::continueSourceTriggerService274E90(std::uint32_t& pc)noexcept {
     const bool fogCaller=sourcePostParticleCaller_.step!=0;

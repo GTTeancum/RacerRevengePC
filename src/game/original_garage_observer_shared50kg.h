@@ -86,6 +86,9 @@ class OriginalGarageObserverShared50KG final {
         const OriginalNativeListMethodCustody50LA* collisionMethod08=nullptr;
         const OriginalWreckComponent50LA* portal0C=nullptr;
         std::uint32_t distance10=0,slot14=0;
+        //Typed Fog alternative for the SAME source word14. Numeric slot14 is
+        //not authoritative for that occurrence; no guest address bits or ordinal conversion.
+        std::uint32_t* fogSlot14=nullptr;
         //Native allocation custody, not an additional source field or refcount.
         //Zero-initialized host storage is not a receipt for source payload stores.
         const void* nativeBorrower=nullptr;
@@ -240,6 +243,7 @@ class OriginalGarageObserverShared50KG final {
             if(!chunk||chunk->next00!=(c+1u<a.chunks.size()?a.chunks[c+1u].get():nullptr))return false;
             const auto used=c+1u==a.chunks.size()?a.used20:a.perBlock10;usedTotal+=used;
             for(std::size_t i=0;i<169u;++i){const auto* borrower=chunk->records[i].nativeBorrower;
+                if(!borrower&&chunk->records[i].fogSlot14)return false; //No usable List alias on free/unused pool storage.
                 if(i>=used){if(borrower)return false;}
                 else if(borrower){if(!ownerRecorded(borrower)&&!detachedMembership(borrower))return false;++liveTotal;}
             }
@@ -423,7 +427,7 @@ class OriginalGarageObserverShared50KG final {
     bool releaseSource105830(const void* group,const void* owner,Link105720* record,
         std::uint32_t& pc)noexcept {
         pc=0x105830;
-        if(!ownsSourceLink(group,owner,record))return false;
+        if(!ownsSourceLink(group,owner,record)||record->fogSlot14)return false; //Retire typed List aliases before freeing their record.
         auto& a=*allocator443138_;
         pc=0x105844;record->next00=a.free2C;
         pc=0x105848;a.free2C=record;record->nativeBorrower=nullptr;
@@ -456,7 +460,7 @@ class OriginalGarageObserverShared50KG final {
         return result;
     }
     bool release105830(const void* owner,Link105720* link)noexcept {
-        if(!ownsLink(owner,link))return false;
+        if(!ownsLink(owner,link)||link->fogSlot14)return false;
         auto& a=*allocator443138_;
         link->next00=a.free2C;a.free2C=link;link->nativeBorrower=nullptr;
         //105850..858 unknown34 minus24 remains unknown; other payload retained.

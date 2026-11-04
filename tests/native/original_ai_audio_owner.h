@@ -81,13 +81,22 @@ class Owner final {
     bool nativeSpeechReceiptCaptured_=false;
     // Additional SAME-owner original PCM: D40 wreck sounds, all roster D44
     // arrays (including actual human row0), and each AI D48 speech provider.
-    // Private uncalled leaves until Aural adds aggregate claims/capacity.
+    // Aural owns aggregate disjoint claims/capacity before these private stops.
     bool canStopResultsAuxiliary26D070(const rr::platform::AudioMixer50HD&,
         const rr::platform::RaceAudioGroups50IC&,std::uint64_t)const noexcept;
     std::size_t resultsAuxiliaryStopCount26D070()const noexcept;
     std::size_t resultsAuxiliaryStopVoice26D070(std::size_t)const noexcept;
     void stopResultsAuxiliaryPreflighted26D070()noexcept;
     bool canStopResultsEngines26D070(const rr::platform::AudioMixer50HD&,
+        const rr::platform::RaceAudioGroups50IC&,std::uint64_t)const noexcept;
+    // Separate zero-human domain. Never relax the existing human Course gate.
+    bool canStopAll8Engines26D070(const rr::platform::AudioMixer50HD&,
+        const rr::platform::RaceAudioGroups50IC&,std::uint64_t)const noexcept;
+    bool canStopAll8Auxiliary26D070(const rr::platform::AudioMixer50HD&,
+        const rr::platform::RaceAudioGroups50IC&,std::uint64_t)const noexcept;
+    bool canStopNativeEngineRows26D070(const rr::platform::AudioMixer50HD&,
+        const rr::platform::RaceAudioGroups50IC&,std::uint64_t)const noexcept;
+    bool canStopNativeAuxiliaryRows26D070(const rr::platform::AudioMixer50HD&,
         const rr::platform::RaceAudioGroups50IC&,std::uint64_t)const noexcept;
     std::size_t resultsEngineStopCount26D070()const noexcept {
         return (racerCount_-firstAiSlot_)*3;

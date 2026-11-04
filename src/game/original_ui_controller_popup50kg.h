@@ -10,7 +10,7 @@ struct OriginalUiControllerPopupStrip50KG {
 };
 struct OriginalUiControllerPopupState50KG {
     // Bounded ownership of authenticated2060A0 text arguments, not a guest field.
-    bool garagePurchaseText=false;
+    bool garagePurchaseText=false,riderResetText=false;
     float delta3C0=0,timer3C4=0;
     bool closing3C8=false,active3CC=false,hasConfirm3D0=false,hasCancel3D4=false;
     std::uint32_t result3D8=0; // 0 reset, 1 awaiting input, 2 Confirm, 3 Cancel.
@@ -33,6 +33,7 @@ enum class OriginalUiControllerPopupStatus50KG : std::uint8_t {ok,invalidState,i
 class OriginalUiControllerPopup50KG final {
 public:
     static constexpr std::uint16_t controller2TextId=88,confirmTextId=90;
+    static constexpr std::uint16_t riderResetTextId=171;
     static OriginalUiControllerPopupState50KG initialState() noexcept;
     // 207330, called before detach/reappend to the shared manager child tail.
     static OriginalUiControllerPopupStatus50KG attach(const OriginalUiControllerPopupState50KG&,OriginalUiControllerPopupPlan50KG&) noexcept;
@@ -40,6 +41,7 @@ public:
     static OriginalUiControllerPopupStatus50KG optionsEntryResetResult(const OriginalUiControllerPopupState50KG&,OriginalUiControllerPopupPlan50KG&) noexcept;
     static OriginalUiControllerPopupStatus50KG startController2(const OriginalUiControllerPopupState50KG&,OriginalUiControllerPopupPlan50KG&) noexcept;
     static OriginalUiControllerPopupStatus50KG startGaragePurchase(const OriginalUiControllerPopupState50KG&,OriginalUiControllerPopupPlan50KG&) noexcept;
+    static OriginalUiControllerPopupStatus50KG startRiderReset(const OriginalUiControllerPopupState50KG&,OriginalUiControllerPopupPlan50KG&) noexcept;
     // sourceInput is the resolved logical input (Confirm4/Back6). eventKind2
     // means an event accepted by 127870(...,2,event,...), not a polled hold.
     // controller is the original event object's +8 controller field.

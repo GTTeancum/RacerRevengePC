@@ -79,6 +79,7 @@ add_library(rr_native_gameplay50dj STATIC
   "${RR_ROOT}/src/game/original_simple_vcr50la.cpp"
   "${RR_ROOT}/src/game/original_race_music_manager50la.cpp"
   "${RR_ROOT}/src/game/original_race_timing_manager50la.cpp"
+  "${RR_ROOT}/src/game/original_race_racer_manager50la.cpp"
   "${RR_ROOT}/tests/native/original_results_roster_read50la.cpp"
   "${RR_ROOT}/src/assets/original_results_primitive_references50la.cpp"
   "${RR_ROOT}/src/game/original_opponent_selection50kg.cpp"
