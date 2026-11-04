@@ -93,6 +93,12 @@ bool Owner::preflightSourceWorldParticleDescriptorsNative()const noexcept {
                        e->known[0x1d4/4]!=7u||e->words[0x1d4/4]!=(e->particleActivationReturned&&e->sourceStartOn==true?3u:1u))return false;
                 }
                 if(e){
+                    //Subtype1 is recovered only through loader return27D8D0.
+                    //Its distinct15CFF0 wrapper has not positioned/activated
+                    //or registered this emitter, even on the attached branch.
+                    if(service.emitterType==1u&&(e->positionCopyCount||e->sourceStartOn||
+                       e->particleActivationReturned||e->entityActivityStored||e->entityActivityReturned||
+                       e->rowConfigReturned||e->sourceRegistered))return false;
                     if(e->positionCopyCount>2||(e->positionCopyCount&&(!(service.emitterType==0u?e->type0LoaderReturned:e->type8LoaderReturned)||e->modelStored)))return false;
                     if(e->sourceStartOn&&(!(service.emitterType==0u?e->type0LoaderReturned:e->type8LoaderReturned)||!r->unknown10||
                        *e->sourceStartOn!=(*r->unknown10!=0)||(!e->modelStored&&e->positionCopyCount!=2)))return false;
@@ -168,29 +174,31 @@ bool Owner::preflightSourceWorldParticleDescriptorsNative()const noexcept {
                         if(config.commonReciprocalWritten_&&e->known[0x1c0/4]!=0xffffffffu)return false;
                         if(config.commonForcedCountWritten_&&e->known[0x1c8/4]!=0xffffffffu)return false;
                         if(config.commonReturned_&&(e->words[0x1c8/4]&0x80000000u)==0&&e->words[0x1c8/4]!=0)return false;
-                        if(e->type8VelocityCopied&&(!config.commonReturned_||e->known[0x220/4]!=0xffffffffu||
+                        if(e->type8VelocityCopied&&(service.emitterType!=8u||!config.commonReturned_||e->known[0x220/4]!=0xffffffffu||
                            e->words[0x220/4]!=e->words[0x64/4]))return false;
-                        const bool subtype0=service.emitterType==0u;
-                        const auto& groupsNonNull=subtype0?e->type0GroupsNonNull:e->type8GroupsNonNull;
-                        const auto& groupIndex=subtype0?e->type0GroupIndex:e->type8GroupIndex;
-                        const auto groupCopyMask=subtype0?e->type0GroupCopyMask:e->type8GroupCopyMask;
-                        const bool propertiesReturned=subtype0?e->type0PropertiesReturned:e->type8PropertiesReturned;
-                        if(subtype0&&(e->type8GroupsNonNull||e->type8GroupIndex||e->type8GroupCopyMask||e->type8PropertiesReturned||e->type8LoaderReturned))return false;
+                        const bool subtype0=service.emitterType==0u,subtype1=service.emitterType==1u;
+                        const auto& groupsNonNull=subtype0?e->type0GroupsNonNull:(subtype1?e->type1GroupsNonNull:e->type8GroupsNonNull);
+                        const auto& groupIndex=subtype0?e->type0GroupIndex:(subtype1?e->type1GroupIndex:e->type8GroupIndex);
+                        const auto groupCopyMask=subtype0?e->type0GroupCopyMask:(subtype1?e->type1GroupCopyMask:e->type8GroupCopyMask);
+                        const bool propertiesReturned=subtype0?e->type0PropertiesReturned:(subtype1?e->type1PropertiesReturned:e->type8PropertiesReturned);
                         if(!subtype0&&(e->type0GroupsNonNull||e->type0GroupIndex||e->type0GroupCopyMask||e->type0PropertiesReturned||e->type0LoaderReturned))return false;
-                        if(groupsNonNull&&(subtype0?config.type0NoiseReturned_!=2:!e->type8VelocityCopied))return false;
-                        if(groupIndex&&groupsNonNull!=true)return false;
+                        if(!subtype1&&(e->type1GroupsNonNull||e->type1GroupIndex||e->type1GroupCopyMask||e->type1PropertiesReturned||e->type1LoaderReturned))return false;
+                        if((subtype0||subtype1)&&(e->type8GroupsNonNull||e->type8GroupIndex||e->type8GroupCopyMask||e->type8PropertiesReturned||e->type8LoaderReturned))return false;
+                        if(groupsNonNull&&(!config.commonReturned_||
+                           (subtype0?config.type0NoiseReturned_!=2:(!subtype1&&!e->type8VelocityCopied))))return false;
+                        if(groupIndex&&(groupsNonNull!=true||e->known[0x1b8/4]!=0xffffffffu||e->words[0x1b8/4]!=*groupIndex))return false;
                         if(groupCopyMask!=0&&groupCopyMask!=1&&groupCopyMask!=3&&groupCopyMask!=7)return false;
-                        if(groupCopyMask&&!groupsNonNull)return false;
-                        if(propertiesReturned!=(subtype0?config.emitterType0Returned_:config.emitterType8Returned_)||
+                        if(groupCopyMask&&(!groupsNonNull||(*groupsNonNull&&!groupIndex)))return false;
+                        if(propertiesReturned!=(subtype0?config.emitterType0Returned_:(subtype1?config.emitterType1Returned_:config.emitterType8Returned_))||
                            (propertiesReturned&&groupCopyMask!=7))return false;
-                        if(e->emitterFileLoadReturned&&(!propertiesReturned||!config.sourceClosed_))return false;
-                        if((subtype0?e->type0LoaderReturned:e->type8LoaderReturned)&&!e->emitterFileLoadReturned)return false;
+                        if(e->emitterFileLoadReturned&&(!propertiesReturned||!config.sourceClosed_||!e->configNativeWithdrawn))return false;
+                        if((subtype0?e->type0LoaderReturned:(subtype1?e->type1LoaderReturned:e->type8LoaderReturned))&&!e->emitterFileLoadReturned)return false;
                         if((groupCopyMask&1)&&e->known[0x1b4/4]!=0xffffffffu)return false;
                         if((groupCopyMask&2)&&e->known[0x1b0/4]!=0xffffffffu)return false;
                         if((groupCopyMask&4)&&(e->known[0x190/4]!=0xffffffffu||e->words[0x190/4]!=e->words[0x1b0/4]))return false;
                         if(groupsNonNull==false){
-                            if((groupCopyMask&1)&&e->words[0x1b4/4]!=(subtype0?0x1fu:0x40u))return false;
-                            if((groupCopyMask&2)&&e->words[0x1b0/4]!=(subtype0?0x10u:0x54u))return false;
+                            if((groupCopyMask&1)&&e->words[0x1b4/4]!=((subtype0||subtype1)?0x1fu:0x40u))return false;
+                            if((groupCopyMask&2)&&e->words[0x1b0/4]!=((subtype0||subtype1)?0x10u:0x54u))return false;
                         }
                         if(!e->borrowsWithdrawn&&groupsNonNull){
                             if(!e->manager70||(*groupsNonNull!=(e->manager70->sourceGroups13C_!=nullptr)))return false;

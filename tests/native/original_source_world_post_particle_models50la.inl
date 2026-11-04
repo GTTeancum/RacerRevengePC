@@ -2299,9 +2299,8 @@ bool Owner::continueSourceEmitterConfig15AE00(std::size_t rowIndex,SourceParticl
     if(subtype1){
         const bool returned=config.beginType1Properties15D560(&e.entity,e.words,e.known,diagnostic);
         at(config.sourcePC_);(void)returned;
-        return false; //Actual15D574 group-tail and subtype return remain unjoined.
-    }
-    if(subtype0){
+        if(pc!=0x15d574||!config.commonReturned_)return false;
+    }else if(subtype0){
         const bool returned=config.beginType0Properties15C330(&e.entity,e.words,e.known,diagnostic);
         at(config.sourcePC_);(void)returned;
         if(pc!=0x15cca8||config.type0NoiseReturned_!=2)return false;
@@ -2311,19 +2310,21 @@ bool Owner::continueSourceEmitterConfig15AE00(std::size_t rowIndex,SourceParticl
         if(pc!=0x15e758)return false;
     }
     if(!config.commonReturned_||!config.current()||!preflightSourceWorldParticleDescriptorsNative())return false;
-    if(!subtype0){
+    if(!subtype0&&!subtype1){
         at(0x15e758);if(e.known[0x64/4]!=0xffffffffu)return false;
         at(0x15e75c);e.word(0x220,e.words[0x64/4]);e.type8VelocityCopied=true;
     }
-    auto& groupsNonNull=subtype0?e.type0GroupsNonNull:e.type8GroupsNonNull;
-    auto& groupIndex=subtype0?e.type0GroupIndex:e.type8GroupIndex;
-    auto& groupCopyMask=subtype0?e.type0GroupCopyMask:e.type8GroupCopyMask;
-    at(subtype0?0x15cca8u:0x15e760u);auto& manager=*e.manager70;
+    auto& groupsNonNull=subtype0?e.type0GroupsNonNull:(subtype1?e.type1GroupsNonNull:e.type8GroupsNonNull);
+    auto& groupIndex=subtype0?e.type0GroupIndex:(subtype1?e.type1GroupIndex:e.type8GroupIndex);
+    auto& groupCopyMask=subtype0?e.type0GroupCopyMask:(subtype1?e.type1GroupCopyMask:e.type8GroupCopyMask);
+    at(subtype0?0x15cca8u:(subtype1?0x15d574u:0x15e760u));auto& manager=*e.manager70;
     if(manager.closed_||!manager.constructorReturned_||!manager.sourceEntityEnrolled_||
        !manager.sourceParticleEmitterBorrowers_)return false;
-    at(subtype0?0x15ccacu:0x15e764u);groupsNonNull=manager.sourceGroups13C_!=nullptr;
+    at(subtype0?0x15ccacu:(subtype1?0x15d578u:0x15e764u));groupsNonNull=manager.sourceGroups13C_!=nullptr;
+    if(subtype1){at(0x15d57c);at(0x15d580);} //Delay initializes the source lookup result toNULL.
     if(*groupsNonNull){
-        at(subtype0?0x15ccbcu:0x15e770u);if(e.known[0x1b8/4]!=0xffffffffu)return false;
+        if(subtype1)at(0x15d584);
+        at(subtype0?0x15ccbcu:(subtype1?0x15d588u:0x15e770u));if(e.known[0x1b8/4]!=0xffffffffu)return false;
         const auto bits=e.words[0x1b8/4];
         const auto group=bits<=0x7fffffffu?static_cast<std::int32_t>(bits):static_cast<std::int32_t>(std::int64_t(bits)-0x100000000LL);
         at(0x161eb0);
@@ -2335,21 +2336,29 @@ bool Owner::continueSourceEmitterConfig15AE00(std::size_t rowIndex,SourceParticl
         const auto index=static_cast<std::uint32_t>(group);
         if(!manager.sourceGroupAllocationPublished_||!manager.sourceGroupRows_||
            manager.sourceGroups13C_!=manager.sourceGroupStorage13C_.get()||index>=manager.sourceGroupCapacity_)return false;
-        groupIndex=index;at(0x161f58);at(subtype0?0x15ccc8u:0x15e780u);
+        groupIndex=index;at(0x161f58);
+        if(subtype1)at(0x15d58c); //Nonnull result annuls the BEQL delay15D590.
+        at(subtype0?0x15ccc8u:(subtype1?0x15d594u:0x15e780u));
         const auto& record=manager.sourceGroupRows_[index].lanes;
         if(!record[2])return false;
-        at(subtype0?0x15ccccu:0x15e784u);e.word(0x1b4,static_cast<std::uint32_t>(*record[2]));groupCopyMask=1;
-        at(subtype0?0x15ccd0u:0x15e788u);if(!record[1])return false;
-        at(subtype0?0x15ccd4u:0x15e78cu);e.word(0x1b0,static_cast<std::uint32_t>(*record[1]));groupCopyMask=3;
-        at(subtype0?0x15ccdcu:0x15e794u);e.word(0x190,e.words[0x1b0/4]);groupCopyMask=7;
+        at(subtype0?0x15ccccu:(subtype1?0x15d598u:0x15e784u));e.word(0x1b4,static_cast<std::uint32_t>(*record[2]));groupCopyMask=1;
+        at(subtype0?0x15ccd0u:(subtype1?0x15d59cu:0x15e788u));if(!record[1])return false;
+        at(subtype0?0x15ccd4u:(subtype1?0x15d5a0u:0x15e78cu));e.word(0x1b0,static_cast<std::uint32_t>(*record[1]));groupCopyMask=3;
+        if(subtype1)at(0x15d5a4);
+        at(subtype0?0x15ccdcu:(subtype1?0x15d5a8u:0x15e794u));e.word(0x190,e.words[0x1b0/4]);groupCopyMask=7;
     }else{
-        at(subtype0?0x15cce4u:0x15e79cu);e.word(0x1b4,subtype0?0x1fu:0x40u);groupCopyMask=1;
-        at(subtype0?0x15ccecu:0x15e7a4u);e.word(0x1b0,subtype0?0x10u:0x54u);groupCopyMask=3;
-        at(subtype0?0x15ccf0u:0x15e7a8u);e.word(0x190,subtype0?0x10u:0x54u);groupCopyMask=7;
+        if(subtype1){at(0x15d58c);at(0x15d590);} //Taken BEQL supplies31;15D5AC is not executed.
+        at(subtype0?0x15cce4u:(subtype1?0x15d5b0u:0x15e79cu));e.word(0x1b4,(subtype0||subtype1)?0x1fu:0x40u);groupCopyMask=1;
+        if(subtype1)at(0x15d5b4);
+        at(subtype0?0x15ccecu:(subtype1?0x15d5b8u:0x15e7a4u));e.word(0x1b0,(subtype0||subtype1)?0x10u:0x54u);groupCopyMask=3;
+        at(subtype0?0x15ccf0u:(subtype1?0x15d5bcu:0x15e7a8u));e.word(0x190,(subtype0||subtype1)?0x10u:0x54u);groupCopyMask=7;
     }
     //These are LastFrame/FirstFrame/current frame, not renderer dimensions.
     if(subtype0){at(0x15ccf8);at(0x15cd10);e.type0PropertiesReturned=true;config.emitterType0Returned_=true;}
-    else{at(0x15e7b0);at(0x15e7c8);e.type8PropertiesReturned=true;config.emitterType8Returned_=true;}
+    else if(subtype1){
+        at(0x15d5c0);at(0x15d5c4);at(0x15d5c8);at(0x15d5cc);at(0x15d5d0);
+        e.type1PropertiesReturned=true;config.emitterType1Returned_=true;
+    }else{at(0x15e7b0);at(0x15e7c8);e.type8PropertiesReturned=true;config.emitterType8Returned_=true;}
     at(0x15ae50);at(0x15ae54);
     if(!config.closeEmitterStack1573B0(&e.entity,diagnostic)){
         at(diagnostic.sourcePC?diagnostic.sourcePC:config.sourcePC_);return false;
@@ -2367,6 +2376,16 @@ bool Owner::continueSourceEmitterConfig15AE00(std::size_t rowIndex,SourceParticl
         //15BAAC delay slot sets V0 to this same emitter; no new retain.
         at(0x15baa8);at(0x15baac);at(0x15bac8);at(0x15bae4);e.type0LoaderReturned=true;
         at(0x27d830);
+    }else if(subtype1){
+        //15CF88 skips the fallback after the actual nonzero15AE00 return.
+        //Its delay15CF8C preserves this exact emitter as the loader result.
+        at(0x15cf88);at(0x15cf8c);
+        for(std::uint32_t p=0x15cfc8;p<=0x15cfe4;p+=4)at(p);
+        e.type1LoaderReturned=true;
+        at(0x27d8d0);
+        //The next wrapper uses15CFF0 twice when unattached, not15ACB0.
+        //No position/activation/registration/row-completion receipt is issued.
+        return false;
     }else{
         at(0x15e02c);at(0x15e030);at(0x15e0b0);at(0x15e0cc);e.type8LoaderReturned=true;
         at(0x27da20);

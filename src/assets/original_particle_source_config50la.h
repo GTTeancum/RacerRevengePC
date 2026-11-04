@@ -78,7 +78,13 @@ class OriginalParticleSourceConfig50LA final {
     bool closeStack1573B0(D&)noexcept;
     bool closeEmitterStack1573B0(const void*,D&)noexcept;
     bool closeOwnedTextStack1573B0(bool,D&)noexcept;
-    bool emitterType8Returned_=false,emitterType0Returned_=false;
+    bool emitterType8Returned_=false,emitterType0Returned_=false,emitterType1Returned_=false;
+    bool emitterPropertiesReturnedNative()const noexcept {
+        if(emitterPropertyTarget_==0x15c330u)return emitterType0Returned_;
+        if(emitterPropertyTarget_==0x15d560u)return emitterType1Returned_;
+        if(emitterPropertyTarget_==0x15e6d0u)return emitterType8Returned_;
+        return false;
+    }
     bool checkEmitterGroupLookup161EA0(std::int32_t index,std::int32_t count)noexcept {
         if(occurrence_!=Occurrence::emitter15AE00||!emitterOwner_||!commonReturned_||!current())return false;
         return OriginalConfigProcessGlobals50LA::groupLookup161EC0(index,count,sourcePC_);

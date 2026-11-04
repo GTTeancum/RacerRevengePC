@@ -148,7 +148,7 @@ bool OriginalParticleSourceConfig50LA::closeStack1573B0(D& d)noexcept {
 bool OriginalParticleSourceConfig50LA::closeEmitterStack1573B0(const void* owner,D& d)noexcept {
     d={};
     if(occurrence_!=Occurrence::emitter15AE00||!owner||emitterOwner_!=owner||
-       !(emitterPropertyTarget_==0x15c330u?emitterType0Returned_:emitterType8Returned_)||
+       !emitterPropertiesReturnedNative()||
        !commonReturned_||sourceDestructorAttempted_||sourceClosed_||!current()||!textReturned_||
        !sourceOpenReturned_||!*sourceOpenReturned_||source_->binary08||textSelectBounded_)return false;
     return closeOwnedTextStack1573B0(false,d);
@@ -266,9 +266,10 @@ bool OriginalParticleSourceConfig50LA::emitterOccurrenceCurrentNative(const void
     if(commonForcedCountWritten_&&!commonReciprocalWritten_)return false;
     if(commonAnimationFlagWritten_&&!commonForcedCountWritten_)return false;
     if(commonReturned_&&!commonAnimationFlagWritten_)return false;
-    if(emitterType8Returned_&&!commonReturned_)return false;
+    if(emitterType8Returned_&&(emitterPropertyTarget_!=0x15e6d0u||!commonReturned_))return false;
     if(emitterType0Returned_&&(emitterPropertyTarget_!=0x15c330u||type0NoiseReturned_!=2||!commonReturned_))return false;
-    if(sourceDestructorAttempted_&&!(emitterPropertyTarget_==0x15c330u?emitterType0Returned_:emitterType8Returned_))return false;
+    if(emitterType1Returned_&&(emitterPropertyTarget_!=0x15d560u||!commonReturned_))return false;
+    if(sourceDestructorAttempted_&&!emitterPropertiesReturnedNative())return false;
     if(sourceClosed_&&!sourceDestructorAttempted_)return false;
     if(nativeClosed_)return !borrowed_&&!resolver_&&!provider_&&handle_==-1&&!selectedRoot_;
     if(!attempted_)return !borrowed_&&!resolver_&&!provider_&&handle_==-1&&!selectedRoot_&&!sourceOpenReturned_;
