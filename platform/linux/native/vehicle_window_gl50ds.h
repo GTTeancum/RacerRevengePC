@@ -34,7 +34,7 @@ namespace gb_particle_visual50GB { class Window; }
 namespace mc_particle_visual50MC { class Window; }
 namespace gb_particle_render50GB { class Owner; }
 namespace mc_particle_render50MC { class Owner; }
-namespace original_main_entry50KG { struct Application; class RaceDisplayLifetime50LA; class NativeF8BarPrefix50LA; class ResultsRendererLease50LA; class NativeResultsFrame50LA; }
+namespace original_main_entry50KG { struct Application; class NativeVideoPacketInvocation50LA; class RaceDisplayLifetime50LA; class NativeF8BarPrefix50LA; class ResultsRendererLease50LA; class NativeResultsFrame50LA; }
 namespace ra_static_fire_visual50LA {class Owner;class CompletedDrawReceipt;}
 namespace rr::game { struct CameraViewOutput49F; class OriginalRaceHud50KG; class OriginalTimeStats50LA; class OriginalDamage50LA; class OriginalPauseNativeDraw50LA; class OriginalPositionStatsNativeOwner50LA; class OriginalSpeedBoost50LA; struct PodCableMesh50FD; namespace original_gameplay_binder_candidate { struct Mesh; } }
 namespace rr::game { class OriginalRacerModelPackets50LA; class OriginalRacerModelRenderGlobals50LA; struct OriginalRaceFogFields; }
@@ -1448,6 +1448,21 @@ public:
     bool hasSessionDependents50LA() const noexcept { return sessionDependentPins50LA_!=0; }
 private:
     friend struct ::original_main_entry50KG::Application;
+    friend class ::original_main_entry50KG::NativeVideoPacketInvocation50LA;
+    using NativeVideoInvocation50LA=::original_main_entry50KG::NativeVideoPacketInvocation50LA;
+    bool claimNativeVideoInvocation50LA(const NativeVideoInvocation50LA&,VehicleWindowDiagnostic50DS&)noexcept;
+    bool releaseNativeVideoInvocation50LA(const NativeVideoInvocation50LA&,VehicleWindowDiagnostic50DS&)noexcept;
+    bool prepareNativeVideoPacketClearImpl50LA(const game::OriginalVideoClearPacket25CAD0Native50LA&,
+        OriginalVideoPacketCpuRenderer50LA::NativePolicies,std::size_t,VehicleWindowDiagnostic50DS&,
+        const NativeVideoInvocation50LA*)noexcept;
+    bool submitNativeVideoPacketClearImpl50LA(const game::OriginalVideoClearPacket25CAD0Native50LA&,
+        VehicleWindowDiagnostic50DS&,const NativeVideoInvocation50LA*)noexcept;
+    bool beginNativeVideoPacketFinishImpl50LA(const game::OriginalVideoFinishPacket25AB2CNative50LA&,
+        NativeVideoPacketFinishInfo50LA&,VehicleWindowDiagnostic50DS&,const NativeVideoInvocation50LA*)noexcept;
+    bool pollNativeVideoPacketFinishImpl50LA(NativeVideoPacketFinishInfo50LA&,
+        VehicleWindowDiagnostic50DS&,const NativeVideoInvocation50LA*)noexcept;
+    bool cancelNativeVideoPacketFinishImpl50LA(NativeVideoPacketFinishInfo50LA&,
+        VehicleWindowDiagnostic50DS&,const NativeVideoInvocation50LA*)noexcept;
     friend class ::original_main_entry50KG::ResultsRendererLease50LA;
     bool retireNativeResultsResources50LA(VehicleWindowDiagnostic50DS&)noexcept;
     // Uncalled native copied-image upload only; no Frame/draw admission.

@@ -53,6 +53,8 @@ static void shaBlock(const std::uint8_t* block, std::array<std::uint32_t, 8>& h)
     }
     h[0]+=a; h[1]+=b; h[2]+=c; h[3]+=d; h[4]+=e; h[5]+=f; h[6]+=g; h[7]+=v;
 }
+public:
+// Pure byte authentication only; confers no source-file or loading authority.
 static bool hashMatches(const std::uint8_t* data, std::size_t size,
     const char* expected) noexcept {
     std::array<std::uint32_t, 8> h{{0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,
@@ -77,6 +79,7 @@ static bool hashMatches(const std::uint8_t* data, std::size_t size,
             return false;
     return true;
 }
+private:
     static std::shared_ptr<const OriginalLoadingTextureSource50LA> readRa(
         const std::filesystem::path& actualApplicationRoot)noexcept {
         try {

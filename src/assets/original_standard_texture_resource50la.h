@@ -26,6 +26,7 @@ class OriginalApplicationFonts50LA;
 class OriginalLoadingFontSource50LA;
 class OriginalLoadingPstFile50LA;
 class OriginalLoadingRaFile50LA;
+class OriginalMusicSourceFile50LA;
 class OriginalRaTrackSourceFile50LA;
 class OriginalSourcePsgFile50LA;
 class OriginalSourceCollisionFile50LA;
@@ -348,6 +349,7 @@ private:
     friend class ::rr::platform::OriginalLoadingLsiConfig50LA;
     friend class OriginalLoadingFontSource50LA;
     friend class OriginalLoadingRaFile50LA;
+    friend class OriginalMusicSourceFile50LA;
     friend class OriginalApplicationFonts50LA; // Exact private Loading PST population interval only.
     friend class OriginalPodSourceBank50LA;
     bool registerPodBank12CEA0(OriginalPodSourceBank50LA&,OriginalStandardTextureDiagnostic50LA&)noexcept;

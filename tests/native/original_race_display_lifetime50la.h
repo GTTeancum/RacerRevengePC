@@ -22,6 +22,7 @@ class PositionStatsTextureLease50LA;
 // borrow these same members. No PositionStats resources are activated here.
 class RaceDisplayLifetime50LA final : public std::enable_shared_from_this<RaceDisplayLifetime50LA> {
     friend struct Application;
+    friend class NativeVideoPacketInvocation50LA;
     friend class rr::game::OriginalPlayerOverlayRendererLease50LA;
     friend class ::ra_cold_aggregate50LA::Owner; //Actual phase1 SunFlare viewport reader.
     friend class RaceF8RendererLease50LA;

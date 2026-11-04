@@ -2,6 +2,7 @@
 // Included before the music manager Impl. Private source-owned backing only;
 // none of these fields is a public readiness or caller-supplied completion token.
 #include <cstring>
+#include "../assets/original_music_source_file50la.h"
 namespace rr::game::original_race_music_source50LA {
 struct VectorAssertions final {
     const std::thread::id thread=std::this_thread::get_id();
@@ -43,6 +44,26 @@ struct Child final {
     std::optional<std::uint32_t> word58,word5C,word60,word64,word68,word6C,word70,word78;
     std::uint8_t flags74KnownMask=0,flags74KnownValue=0;
     std::optional<Config> config60;
+    // The file occurrence belongs to THIS retained automatic Config. Native
+    // backing/knownness below does not mint a source open/Config return.
+    std::unique_ptr<assets::OriginalMusicSourceFile50LA> configFile;
+    assets::OriginalStandardTextureDiagnostic50LA configFileDiagnostic{};
+    bool configOpenAttempted=false;
+    std::optional<std::uint32_t> configOpenReturn;
+    struct Read final {
+        std::uint32_t callPC=0;std::size_t requested=0,copied=0;
+        bool returned=false;
+    };
+    std::array<Read,100> configReads{};
+    std::size_t configReadCount=0;
+    std::array<std::uint8_t,7> magic48;
+    std::array<std::uint8_t,4> version54,sections58,length5C;
+    std::size_t magicKnown=0,versionKnown=0,sectionsKnown=0;
+    bool magicTerminatorWritten=false,lengthZeroed=false;
+    std::uint32_t nameOrdinal=0;
+    std::array<std::size_t,48> nameKnown{};
+    std::unique_ptr<std::uint8_t[]> names4CC,index4BC; // No zero filling.
+    std::size_t indexKnown=0;
     std::array<char,0x110> filename640,filename750; // Unknown beyond reached NUL.
     std::size_t filename640Known=0,filename750Known=0;
     std::uint32_t pc=0x1a3c34;

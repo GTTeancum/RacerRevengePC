@@ -2,6 +2,7 @@
 #include "../../src/game/original_application_input04_source50la.h"
 #include "../../src/game/original_application_startup17c910_source50la.h"
 #include "../../src/game/original_application_video_source50la.h"
+#include "original_native_video_packet_invocation50la.h"
 #include "../../src/game/original_audio_directory_source50la.h"
 #pragma once
 #include "../../src/game/original_player_race_music_borrow50la.h"
@@ -879,6 +880,9 @@ private:
     // do not enter it or certify it. A private native initializer may issue
     // this exact fresh producer; neither path claims guest outer startup.
     mutable rr::game::OriginalApplicationVideoSource50LA sourceVideoProduction_;
+    friend class NativeVideoPacketInvocation50LA;
+    mutable std::unique_ptr<NativeVideoPacketInvocation50LA> nativeVideoPacketInvocation50LA_;
+    mutable std::uint64_t nativeVideoPacketInvocationSerial50LA_=0;
     rr::game::OriginalApplicationVideoSource50LA::Result constructSourceVideo2376A0()const noexcept {
         if(!rr::game::OriginalVideoPreFlipList50KG::applicationVideoEntryCurrent(*this))
             return rr::game::OriginalApplicationVideoSource50LA::Result::authority;
@@ -1109,6 +1113,17 @@ public:
         if(!rr::game::OriginalVideoPreFlipList50KG::applicationVideoEntryCurrent(*this))return {};
         return sourceVideoProduction_.encodeNativeFinishPacket25AB2C(*this);
     }
+    // Explicit native private-target work only; not a startup/frame/DMA call.
+    // A false result after issuance retains the invocation until cancellation.
+    bool beginNativeVideoPacketInvocation50LA(std::uint32_t,std::uint32_t,std::uint32_t,std::uint32_t,
+        rr::platform::OriginalVideoPacketCpuRenderer50LA::NativePolicies,std::size_t,
+        NativeVideoPacketInvocationInfo50LA&,rr::platform::VehicleWindowDiagnostic50DS&)const noexcept;
+    bool pollNativeVideoPacketInvocation50LA(NativeVideoPacketInvocationInfo50LA&,
+        rr::platform::VehicleWindowDiagnostic50DS&)const noexcept;
+    bool cancelNativeVideoPacketInvocation50LA(NativeVideoPacketInvocationInfo50LA&,
+        rr::platform::VehicleWindowDiagnostic50DS&)const noexcept;
+    bool retireNativeVideoPacketInvocation50LA(NativeVideoPacketInvocationInfo50LA&,
+        rr::platform::VehicleWindowDiagnostic50DS&)const noexcept;
     bool retainsPlayerWindow50DU()const noexcept{return retainPlayerWindow50DU_;}
     // Read-only host access for the root loading presentation; not a display
     // factory, source readiness capability, or renderer/GPU lease.

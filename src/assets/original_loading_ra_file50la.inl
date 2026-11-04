@@ -44,7 +44,7 @@ bool OriginalStandardTextureResolver50LA::beginLoadingRa132820(OriginalLoadingRa
        !owner.storage_||!owner.source_||pending||unjoinedLoadingRaFileHistory_||!freshFileCapacity_||!scratch_)
         return fail(d,E::phase,0x132820);
     auto& s=*freshFileCapacity_;
-    if(s.loadingRaOwner||s.courseRootOwner||s.courseStage!=FreshFileCapacity::CourseStage::none||
+    if(s.musicOwner||s.loadingRaOwner||s.courseRootOwner||s.courseStage!=FreshFileCapacity::CourseStage::none||
        s.registration!=FreshFileCapacity::Registration::complete||s.templateStage!=2||s.templateMember!=-1||
        s.templateFailed||!s.namesReadAttempted||!s.devices14||s.deviceCount18!=1||s.freeDevice10!=-1||
        !s.members150||s.memberCount154<=0||s.sourceFileMode170!=1||s.read174||
@@ -212,6 +212,7 @@ bool OriginalStandardTextureResolver50LA::closeLoadingRaNative(OriginalLoadingRa
         if(file.loadingRa!=owner.source_||file.pstBorrowers||file.cacheIdentity||!file.cached.expired())return fail(d,E::phase,0);
     }
     if(owner.acquired_){
+        if(freshFileCapacity_&&freshFileCapacity_->musicOwner)return fail(d,E::phase,0);
         if(!freshFileCapacity_||!scratch_||freshFileCapacity_->loadingRaOwner!=&owner)return fail(d,E::phase,0);
         auto& s=*freshFileCapacity_;
         auto* members=s.members150?s.members150:s.failedCourseMembers;

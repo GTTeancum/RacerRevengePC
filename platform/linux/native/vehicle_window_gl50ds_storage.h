@@ -643,7 +643,8 @@ bool uiCoverageDisjointTraced=false;
     bool current(VehicleWindowDiagnostic50DS& d,
         const OriginalVideoBlockingNativeBackend* fadeOwner=nullptr,
         const OriginalUiSharedDialogs50KG* menuOwner=nullptr,
-        const OriginalOptionsMutationInterlock50KG* optionsOwner=nullptr) const noexcept;
+        const OriginalOptionsMutationInterlock50KG* optionsOwner=nullptr,
+        const NativeVideoInvocation50LA* invocation=nullptr) const noexcept;
     std::uint64_t gameplayBinderPublication=0;
     const game::original_gameplay_binder_candidate::Mesh* frameGameplayBinders=nullptr;
     U frameGameplayBinderCount=0,frameGameplayBinderImage=0;
@@ -843,6 +844,9 @@ bool uiCoverageDisjointTraced=false;
     bool nativeVideoPacketAttempted50LA=false,nativeVideoPacketReady50LA=false;
     bool nativeVideoPacketImage50LA=false;
     // One retained native marker, never Garage's marker or source CSR state.
+    // Private command-stream custody. Never supplied by a public caller or
+    // inferred from the copyable numeric observations of a native FINISH.
+    const NativeVideoInvocation50LA* nativeVideoInvocation50LA=nullptr;
     __GLsync* nativeVideoFinishFence50LA=nullptr;
     void (*nativeVideoFinishFlush50LA)()=nullptr;
     NativeVideoPacketFinishState50LA nativeVideoFinishState50LA=NativeVideoPacketFinishState50LA::idle;
@@ -861,8 +865,8 @@ bool uiCoverageDisjointTraced=false;
         I draw=0,read=0,renderbuffer=0,enabled[4]{};
         std::uint8_t colorMask[4]{};
     };
-    bool nativeVideoPacketContextIdle50LA(VehicleWindowDiagnostic50DS&) const noexcept;
-    bool nativeVideoPacketIdle50LA(VehicleWindowDiagnostic50DS&) const noexcept;
+    bool nativeVideoPacketContextIdle50LA(VehicleWindowDiagnostic50DS&,const NativeVideoInvocation50LA* =nullptr) const noexcept;
+    bool nativeVideoPacketIdle50LA(VehicleWindowDiagnostic50DS&,const NativeVideoInvocation50LA* =nullptr) const noexcept;
     bool saveNativeVideoPacketState50LA(NativeVideoPacketSavedState50LA&) noexcept;
     bool restoreNativeVideoPacketState50LA(const NativeVideoPacketSavedState50LA&) noexcept;
     bool allocateNativeVideoPacketPair50LA(U (&targets)[2],U (&colors)[2]) noexcept;

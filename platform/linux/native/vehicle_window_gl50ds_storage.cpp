@@ -220,7 +220,15 @@ VehicleWindowGl50DS::Storage::RacerView VehicleWindowGl50DS::Storage::racerView(
 bool VehicleWindowGl50DS::Storage::current(VehicleWindowDiagnostic50DS& d,
         const OriginalVideoBlockingNativeBackend* fadeOwner,
         const OriginalUiSharedDialogs50KG* menuOwner,
-        const OriginalOptionsMutationInterlock50KG* optionsOwner) const noexcept {
+        const OriginalOptionsMutationInterlock50KG* optionsOwner,
+        const NativeVideoInvocation50LA* invocation) const noexcept {
+        if (thread != std::this_thread::get_id())
+            return fail(d, VehicleWindowError50DS::wrongThread, "renderer requires creating thread");
+        // Exclude ALL unrelated renderer context work, including Garage fence
+        // allocation. Otherwise a failed foreign fence could block invocation
+        // cancellation while its dependent pin simultaneously blocks close.
+        if(nativeVideoInvocation50LA!=invocation)
+            return fail(d,VehicleWindowError50DS::alreadyOwned,"native Video invocation owns renderer command custody");
         if(!OriginalOptionsMutationInterlock50KG::permitted(optionsOwner))
             return fail(d,VehicleWindowError50DS::frame,"Options viewport excludes renderer mutation");
         // Every ordinary context-consuming renderer entry is excluded while
@@ -231,10 +239,8 @@ bool VehicleWindowGl50DS::Storage::current(VehicleWindowDiagnostic50DS& d,
             return fail(d,VehicleWindowError50DS::frame,"pending native menu raster excludes unrelated renderer work");
         if(displayFadeOwner && displayFadeOwner!=fadeOwner)
             return fail(d,VehicleWindowError50DS::frame,"blocking display fade owns renderer until retirement");
-        if (thread != std::this_thread::get_id())
-            return fail(d, VehicleWindowError50DS::wrongThread, "renderer requires creating thread");
         return (request.isCurrent && request.isCurrent(request.context)&&
-            OriginalOptionsMutationInterlock50KG::permitted(optionsOwner)) ||
+            nativeVideoInvocation50LA==invocation&&OriginalOptionsMutationInterlock50KG::permitted(optionsOwner)) ||
             fail(d, VehicleWindowError50DS::notCurrent, "caller context/host surface is not current or mutation owner changed");
     }
 
@@ -1983,6 +1989,9 @@ bool VehicleWindowGl50DS::Storage::deleteShaderName(U& name, bool program, Vehic
     }
 
 bool VehicleWindowGl50DS::Storage::cleanup(VehicleWindowDiagnostic50DS& d) noexcept {
+        if(thread==std::this_thread::get_id()&&nativeVideoInvocation50LA){d.cleanupIncomplete=true;
+            return fail(d,VehicleWindowError50DS::cleanup,"native packet invocation must retire before renderer cleanup");}
+
         nativeSkyMeshIdentity129280=nullptr; // Even retained failed cleanup cannot certify old upload.
         if(frameNativeResults||nativeResultsFrame||nativeResultsRenderer){d.cleanupIncomplete=true;
             return fail(d,VehicleWindowError50DS::cleanup,"Results native Frame borrow must end before cleanup");}

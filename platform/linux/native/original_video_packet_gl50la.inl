@@ -14,8 +14,9 @@ bool nativeVideoPacketFullClear50LA(const NativeVideoPacketCpu50LA::DecodedDraw&
 }
 }
 
-bool VehicleWindowGl50DS::Storage::nativeVideoPacketContextIdle50LA(VehicleWindowDiagnostic50DS& d) const noexcept {
-    if(!current(d))return false;
+bool VehicleWindowGl50DS::Storage::nativeVideoPacketContextIdle50LA(VehicleWindowDiagnostic50DS& d,
+    const NativeVideoInvocation50LA* invocation) const noexcept {
+    if(!current(d,nullptr,nullptr,nullptr,invocation))return false;
     if(active || frameSet || diagnostic ||
        garagePreludeOwner50KG || garagePollFence50KG || nativeF8BarPreparing ||
        frameNativeF8Bars || nativeF8BarFrame || nativeF8BarRenderer ||
@@ -24,13 +25,39 @@ bool VehicleWindowGl50DS::Storage::nativeVideoPacketContextIdle50LA(VehicleWindo
     return true;
 }
 
-bool VehicleWindowGl50DS::Storage::nativeVideoPacketIdle50LA(VehicleWindowDiagnostic50DS& d) const noexcept {
-    if(!nativeVideoPacketContextIdle50LA(d))return false;
+bool VehicleWindowGl50DS::Storage::nativeVideoPacketIdle50LA(VehicleWindowDiagnostic50DS& d,
+    const NativeVideoInvocation50LA* invocation) const noexcept {
+    if(!nativeVideoPacketContextIdle50LA(d,invocation))return false;
     if(nativeGlFaultObserved50KG || nativeVideoFinishFence50LA ||
        nativeVideoFinishState50LA==NativeVideoPacketFinishState50LA::pending ||
        nativeVideoFinishState50LA==NativeVideoPacketFinishState50LA::faulted)
         return fail(d,VehicleWindowError50DS::frame,"native packet requires fault-free renderer without owned FINISH operation");
     return true;
+}
+
+bool VehicleWindowGl50DS::claimNativeVideoInvocation50LA(const NativeVideoInvocation50LA& invocation,
+    VehicleWindowDiagnostic50DS& d)noexcept {
+    d={};OriginalOptionsMutationInterlock50KG::Operation operation;
+    if(!operation.admitted())return fail(d,VehicleWindowError50DS::frame,"Options excludes native packet custody");
+    if(!storage_||storage_->thread!=std::this_thread::get_id())
+        return fail(d,VehicleWindowError50DS::wrongThread,"native packet custody requires live creating thread");
+    auto& s=*storage_;
+    if(!s.initialized)return fail(d,VehicleWindowError50DS::notInitialized,"native packet custody needs renderer");
+    if(!s.nativeVideoPacketIdle50LA(d))return false;
+    s.nativeVideoInvocation50LA=&invocation;return true;
+}
+
+bool VehicleWindowGl50DS::releaseNativeVideoInvocation50LA(const NativeVideoInvocation50LA& invocation,
+    VehicleWindowDiagnostic50DS& d)noexcept {
+    d={};OriginalOptionsMutationInterlock50KG::Operation operation;
+    if(!operation.admitted())return fail(d,VehicleWindowError50DS::frame,"Options excludes native packet custody release");
+    if(!storage_||storage_->thread!=std::this_thread::get_id())
+        return fail(d,VehicleWindowError50DS::wrongThread,"native packet custody release requires live creating thread");
+    auto& s=*storage_;
+    if(!s.nativeVideoPacketContextIdle50LA(d,&invocation))return false;
+    if(s.nativeVideoFinishFence50LA||s.nativeVideoFinishState50LA==NativeVideoPacketFinishState50LA::pending)
+        return fail(d,VehicleWindowError50DS::alreadyOwned,"native packet invocation still owns its FINISH marker");
+    s.nativeVideoInvocation50LA=nullptr;return true;
 }
 
 void VehicleWindowGl50DS::Storage::observeNativeVideoPacketFinish50LA(NativeVideoPacketFinishInfo50LA& out) const noexcept {
@@ -66,13 +93,20 @@ bool VehicleWindowGl50DS::Storage::retireNativeVideoPacketFinish50LA(VehicleWind
 bool VehicleWindowGl50DS::beginNativeVideoPacketFinish(
     const game::OriginalVideoFinishPacket25AB2CNative50LA& packet,
     NativeVideoPacketFinishInfo50LA& out,VehicleWindowDiagnostic50DS& d) noexcept {
+    return beginNativeVideoPacketFinishImpl50LA(packet,out,d,nullptr);
+}
+
+bool VehicleWindowGl50DS::beginNativeVideoPacketFinishImpl50LA(
+    const game::OriginalVideoFinishPacket25AB2CNative50LA& packet,
+    NativeVideoPacketFinishInfo50LA& out,VehicleWindowDiagnostic50DS& d,
+    const NativeVideoInvocation50LA* invocation) noexcept {
     out={};d={};OriginalOptionsMutationInterlock50KG::Operation operation;
     if(!operation.admitted())return fail(d,VehicleWindowError50DS::frame,"Options viewport excludes native FINISH issuance");
     if(!storage_)return fail(d,VehicleWindowError50DS::notInitialized,"native FINISH needs actual renderer");
     auto& s=*storage_;
     if(s.thread!=std::this_thread::get_id())return fail(d,VehicleWindowError50DS::wrongThread,"native FINISH requires creating thread");
     if(!s.initialized)return fail(d,VehicleWindowError50DS::notInitialized,"native FINISH needs actual renderer");
-    if(!s.nativeVideoPacketIdle50LA(d))return false;
+    if(!s.nativeVideoPacketIdle50LA(d,invocation))return false;
     if(!s.nativeVideoPacketReady50LA||!s.nativeVideoPacketImage50LA||!s.nativeVideoPacketSerial50LA||
        s.nativeVideoPacketPublished50LA>1||!s.nativeVideoPacketTargets50LA[s.nativeVideoPacketPublished50LA])
         return fail(d,VehicleWindowError50DS::noImage,"native FINISH requires an accepted private packet image");
@@ -111,13 +145,19 @@ bool VehicleWindowGl50DS::beginNativeVideoPacketFinish(
 
 bool VehicleWindowGl50DS::pollNativeVideoPacketFinish(NativeVideoPacketFinishInfo50LA& out,
     VehicleWindowDiagnostic50DS& d) noexcept {
+    return pollNativeVideoPacketFinishImpl50LA(out,d,nullptr);
+}
+
+bool VehicleWindowGl50DS::pollNativeVideoPacketFinishImpl50LA(NativeVideoPacketFinishInfo50LA& out,
+    VehicleWindowDiagnostic50DS& d,
+    const NativeVideoInvocation50LA* invocation) noexcept {
     out={};d={};OriginalOptionsMutationInterlock50KG::Operation operation;
     if(!operation.admitted())return fail(d,VehicleWindowError50DS::frame,"Options viewport excludes native FINISH polling");
     if(!storage_)return fail(d,VehicleWindowError50DS::notInitialized,"native FINISH polling needs live renderer");
     auto& s=*storage_;
     if(s.thread!=std::this_thread::get_id())return fail(d,VehicleWindowError50DS::wrongThread,"native FINISH polling requires creating thread");
     if(!s.initialized)return fail(d,VehicleWindowError50DS::notInitialized,"native FINISH polling needs live renderer");
-    if(!s.nativeVideoPacketContextIdle50LA(d))return false;
+    if(!s.nativeVideoPacketContextIdle50LA(d,invocation))return false;
     if(s.nativeGlFaultObserved50KG){
         s.nativeVideoFinishState50LA=NativeVideoPacketFinishState50LA::faulted;
         s.observeNativeVideoPacketFinish50LA(out);
@@ -160,6 +200,12 @@ bool VehicleWindowGl50DS::pollNativeVideoPacketFinish(NativeVideoPacketFinishInf
 
 bool VehicleWindowGl50DS::cancelNativeVideoPacketFinish(NativeVideoPacketFinishInfo50LA& out,
     VehicleWindowDiagnostic50DS& d) noexcept {
+    return cancelNativeVideoPacketFinishImpl50LA(out,d,nullptr);
+}
+
+bool VehicleWindowGl50DS::cancelNativeVideoPacketFinishImpl50LA(NativeVideoPacketFinishInfo50LA& out,
+    VehicleWindowDiagnostic50DS& d,
+    const NativeVideoInvocation50LA* invocation) noexcept {
     out={};d={};OriginalOptionsMutationInterlock50KG::Operation operation;
     if(!operation.admitted())return fail(d,VehicleWindowError50DS::frame,"Options viewport excludes native FINISH cancellation");
     if(!storage_){out.state=NativeVideoPacketFinishState50LA::cancelled;return true;}
@@ -167,7 +213,7 @@ bool VehicleWindowGl50DS::cancelNativeVideoPacketFinish(NativeVideoPacketFinishI
     if(s.thread!=std::this_thread::get_id())return fail(d,VehicleWindowError50DS::wrongThread,"native FINISH cancellation requires creating thread");
     // Do not require initialized/ready/image/serial or a fault-free GL history:
     // those may already be invalidated by a failed close or sync operation.
-    if(!s.nativeVideoPacketContextIdle50LA(d))return false;
+    if(!s.nativeVideoPacketContextIdle50LA(d,invocation))return false;
     if(!s.nativeVideoFinishFence50LA){
         // No GL release is needed. A failed renderer creation may not even
         // have loaded getError; cancellation cannot assume initialized hooks.
@@ -278,12 +324,21 @@ bool VehicleWindowGl50DS::prepareNativeVideoPacketClear(
     const game::OriginalVideoClearPacket25CAD0Native50LA& packet,
     NativeVideoPacketCpu50LA::NativePolicies policies,std::size_t maximumGpuColorBytes,
     VehicleWindowDiagnostic50DS& d) noexcept {
+    return prepareNativeVideoPacketClearImpl50LA(packet,policies,maximumGpuColorBytes,d,nullptr);
+}
+
+bool VehicleWindowGl50DS::prepareNativeVideoPacketClearImpl50LA(
+    const game::OriginalVideoClearPacket25CAD0Native50LA& packet,
+    NativeVideoPacketCpu50LA::NativePolicies policies,std::size_t maximumGpuColorBytes,
+    VehicleWindowDiagnostic50DS& d,
+    const NativeVideoInvocation50LA* invocation) noexcept {
     d={};OriginalOptionsMutationInterlock50KG::Operation operation;
     if(!operation.admitted())return fail(d,VehicleWindowError50DS::frame,"Options viewport excludes native packet preparation");
+    if(storage_&&storage_->thread!=std::this_thread::get_id())return fail(d,VehicleWindowError50DS::wrongThread,"native packet invocation requires creating thread");
     if(!initialized())return fail(d,VehicleWindowError50DS::notInitialized,"native packet preparation needs actual renderer");
     auto& s=*storage_;
-    if(!s.nativeVideoPacketIdle50LA(d))return false;
-    if(s.nativeVideoPacketAttempted50LA)
+    if(!s.nativeVideoPacketIdle50LA(d,invocation))return false;
+    if(s.nativeVideoPacketAttempted50LA&&!invocation)
         return fail(d,VehicleWindowError50DS::alreadyOwned,"native packet preparation already attempted; close renderer before retry");
     auto decoded=NativeVideoPacketCpu50LA::decode(packet);
     if(decoded.status!=NativeVideoPacketCpu50LA::Status::decoded || !decoded.draw ||
@@ -296,6 +351,15 @@ bool VehicleWindowGl50DS::prepareNativeVideoPacketClear(
     const std::uint64_t pixels=std::uint64_t(draw.width())*draw.height();
     if(pixels>std::numeric_limits<std::size_t>::max()/8 || pixels*8>maximumGpuColorBytes)
         return fail(d,VehicleWindowError50DS::limits,"native packet two-plane color budget is insufficient");
+    if(s.nativeVideoPacketAttempted50LA){
+        // Only the real invocation may reuse existing compatible native
+        // targets. Public cold preparation retains its one-attempt contract.
+        if(invocation&&s.nativeVideoPacketReady50LA&&
+           s.nativeVideoPacketWidth50LA==I(draw.width())&&s.nativeVideoPacketHeight50LA==I(draw.height())&&
+           s.nativeVideoPacketPolicies50LA.fba==policies.fba&&s.nativeVideoPacketPolicies50LA.scanmask==policies.scanmask)
+            return true;
+        return fail(d,VehicleWindowError50DS::alreadyOwned,"native packet preparation already attempted or incompatible");
+    }
     s.nativeVideoPacketAttempted50LA=true;
     s.nativeVideoPacketWidth50LA=I(draw.width());s.nativeVideoPacketHeight50LA=I(draw.height());
     s.nativeVideoPacketRgbaBytes50LA=std::size_t(pixels)*4;
@@ -314,11 +378,18 @@ bool VehicleWindowGl50DS::prepareNativeVideoPacketClear(
 
 bool VehicleWindowGl50DS::submitNativeVideoPacketClear(
     const game::OriginalVideoClearPacket25CAD0Native50LA& packet,VehicleWindowDiagnostic50DS& d) noexcept {
+    return submitNativeVideoPacketClearImpl50LA(packet,d,nullptr);
+}
+
+bool VehicleWindowGl50DS::submitNativeVideoPacketClearImpl50LA(
+    const game::OriginalVideoClearPacket25CAD0Native50LA& packet,VehicleWindowDiagnostic50DS& d,
+    const NativeVideoInvocation50LA* invocation) noexcept {
     d={};OriginalOptionsMutationInterlock50KG::Operation operation;
     if(!operation.admitted())return fail(d,VehicleWindowError50DS::frame,"Options viewport excludes native packet clear");
+    if(storage_&&storage_->thread!=std::this_thread::get_id())return fail(d,VehicleWindowError50DS::wrongThread,"native packet invocation requires creating thread");
     if(!initialized())return fail(d,VehicleWindowError50DS::notInitialized,"native packet clear needs actual renderer");
     auto& s=*storage_;
-    if(!s.nativeVideoPacketIdle50LA(d))return false;
+    if(!s.nativeVideoPacketIdle50LA(d,invocation))return false;
     if(!s.nativeVideoPacketReady50LA)
         return fail(d,VehicleWindowError50DS::request,"native packet target was not prepared");
     auto decoded=NativeVideoPacketCpu50LA::decode(packet);

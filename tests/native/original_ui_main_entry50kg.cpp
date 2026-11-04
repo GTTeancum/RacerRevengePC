@@ -3,6 +3,7 @@
 #include "original_ui_main_entry50kg.h"
 #include "../../src/game/original_loading_manager33050la.h"
 #include "original_race_display_lifetime50la.h"
+#include "original_native_video_packet_invocation50la.inl"
 #include "../../src/game/original_loading_screen40_mode050la.inl"
 #include "original_course_loading_prefix50la.inl"
 #include "../../platform/linux/native/original_ui_course_owned_lifecycle50kg.h"
@@ -230,6 +231,8 @@ void Application::saveAcceptedSettings() const noexcept {
     }
 
 Application::~Application() {
+        // Never silently erase a live native packet command/marker owner.
+        if(nativeVideoPacketInvocation50LA_)std::terminate();
         // Actual native teardown hook: revoke pad transport and source-input
         // use before shared Player borrowers can outlive this Application.
         // Deferred input backing exists only for native partial cancellation.

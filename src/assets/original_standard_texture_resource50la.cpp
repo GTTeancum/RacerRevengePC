@@ -8,6 +8,7 @@
 #include "original_standard_texture_resource50la.h"
 #include "original_loading_pst_file50la.h"
 #include "original_loading_ra_file50la.h"
+#include "original_music_source_file50la.h"
 #include "original_loading_texture_fc50la.h"
 #include "original_loading_pst_native50la.h"
 #include "original_loading_texture_source50la.h"
@@ -565,11 +566,13 @@ struct OriginalStandardTextureResolver50LA::FreshFileCapacity {
         OriginalUiEncodedArchiveView50KG input;
         std::size_t cursor=0;
         std::shared_ptr<const OriginalLoadingTextureSource50LA> looseOwner;
+        std::shared_ptr<const std::vector<std::uint8_t>> musicInput;
+        explicit Handle(std::shared_ptr<const std::vector<std::uint8_t>> input)noexcept:musicInput(std::move(input)){}
         const std::uint8_t* looseData=nullptr;std::size_t looseBytes=0;
         Handle(std::shared_ptr<const OriginalLoadingTextureSource50LA> owner,const std::uint8_t* data,std::size_t bytes)noexcept
             :looseOwner(std::move(owner)),looseData(data),looseBytes(bytes){}
-        const std::uint8_t* data()const noexcept{return looseOwner?looseData:input.data();}
-        std::size_t size()const noexcept{return looseOwner?looseBytes:input.size();}
+        const std::uint8_t* data()const noexcept{return musicInput?musicInput->data():looseOwner?looseData:input.data();}
+        std::size_t size()const noexcept{return musicInput?musicInput->size():looseOwner?looseBytes:input.size();}
         explicit Handle(OriginalUiEncodedArchiveView50KG value)noexcept:input(std::move(value)){}
         bool seek(std::size_t at)noexcept {if(at>size())return false;cursor=at;return true;}
         bool read(void* output,std::size_t bytes)noexcept {
@@ -605,6 +608,7 @@ struct OriginalStandardTextureResolver50LA::FreshFileCapacity {
         const std::string* canonicalName=nullptr;
         const std::uint8_t* canonicalData=nullptr;
         const OriginalLoadingRaFile50LA* loadingRaOwner=nullptr;
+        const OriginalMusicSourceFile50LA* musicOwner=nullptr;
         const void* courseConfigOwner=nullptr; // Exact private native occurrence, never a source handle ID.
         void initialize()noexcept {
             flags18=1;filename08=nullptr;deviceID00=0;logicalStart0C=0;
@@ -638,6 +642,7 @@ struct OriginalStandardTextureResolver50LA::FreshFileCapacity {
     CourseStage courseStage=CourseStage::none;
     SourceBankFamily sourceBankFamily=SourceBankFamily::course;
     bool loadingFontsSourceRetired=false,loadingIconSourceRetired=false; // Only genuine source12E5E0 produces these predecessors.
+    OriginalMusicSourceFile50LA* musicOwner=nullptr; // Pins exact Config open, including misses and bounded failures.
     OriginalLoadingRaFile50LA* loadingRaOwner=nullptr; // Distinct simultaneous loose owner, never a bank root.
     struct TrackBank {
         OriginalRaTrackSourceFile50LA* root=nullptr;
@@ -716,7 +721,7 @@ struct OriginalStandardTextureResolver50LA::FreshFileCapacity {
             if(slot.status08==i){slot.status08=-1;scratchOwner->selected148=row.auxiliarySlot04;}
         }
         delete[] row.filename08;row.filename08=nullptr;
-        row.originalMember=nullptr;row.canonicalName=nullptr;row.canonicalData=nullptr;row.courseConfigOwner=nullptr;row.loadingRaOwner=nullptr;
+        row.originalMember=nullptr;row.canonicalName=nullptr;row.canonicalData=nullptr;row.courseConfigOwner=nullptr;row.loadingRaOwner=nullptr;row.musicOwner=nullptr;
         row.auxiliarySlot04=0;row.cursor10=0;row.deviceID00=0;
         row.flags18=1;row.associatedObject1C=nullptr;row.length14=0;row.logicalStart0C=0;
         freeMember14C=i;
@@ -1338,6 +1343,7 @@ bool OriginalStandardTextureResolver50LA::sourceScreenTemplate17CAFCClosed(
 }
 OriginalStandardTextureResolver50LA::OriginalStandardTextureResolver50LA() noexcept=default;
 OriginalStandardTextureResolver50LA::~OriginalStandardTextureResolver50LA() {
+    if(freshFileCapacity_&&freshFileCapacity_->musicOwner)std::terminate();
     //Every cached live resource pins this resolver. Only cleared associations
     //can remain when the final resolver owner goes away.
     if(storage_)for(const auto& file:storage_->files)
@@ -1709,6 +1715,7 @@ bool OriginalStandardTextureResolver50LA::issueGarageBank(
 }
 bool OriginalStandardTextureResolver50LA::canRetireGarageBank12E5E0(
     const GarageBankLease50LA& lease,D& d) const noexcept {
+    if(freshFileCapacity_&&freshFileCapacity_->musicOwner)return fail(d,E::phase,0);
     d={};const auto& provider=lease.provider_;
     if(lease.resolver_!=this||lease.thread_!=std::this_thread::get_id()||!storage_||!provider||
        lease.managerIdentity_!=storage_->managerIdentity||storage_->provider!=provider||
@@ -1755,6 +1762,7 @@ bool OriginalStandardTextureResolver50LA::validateGarageBankRows12EAA0(
 }
 bool OriginalStandardTextureResolver50LA::retireNativeRaceMounts1316A0(
     NativeRaceMountLease50LA& lease,D& d)noexcept {
+    if(freshFileCapacity_&&freshFileCapacity_->musicOwner)return fail(d,E::phase,0);
     d={};
     if(lease.closed_)return true;
     if(lease.thread_!=std::this_thread::get_id()||!lease.provider_||
@@ -3531,6 +3539,7 @@ bool OriginalStandardTextureLifetime50LA::resetDemand14D180() noexcept {
 }
 bool OriginalStandardTextureResolver50LA::registerSourceBank12CEA0(
     std::shared_ptr<const OriginalUiArchive50KG> archive,const OriginalStandardArchiveProvider50LA* expectedProvider,const void* owner,SourceBankFamily family,bool& acquired,D& d)noexcept {
+    if(freshFileCapacity_&&freshFileCapacity_->musicOwner)return fail(d,E::phase,0);
     d={};acquired=false;using Capacity=FreshFileCapacity;
     const auto identity=family==SourceBankFamily::course?OriginalUiArchiveId50KG::course:
         family==SourceBankFamily::loadingFonts?OriginalUiArchiveId50KG::fonts:OriginalUiArchiveId50KG::loadingIcon;
@@ -3701,7 +3710,11 @@ bool OriginalStandardTextureResolver50LA::activateCourseDevice12E8B0(std::int32_
         }
     }
     if(!device.handle10){
-        if(s.loadingRaOwner&&id==s.loadingRaOwner->device_){
+        if(s.musicOwner&&id==s.musicOwner->device_){
+            const auto& owner=*s.musicOwner;
+            if(!owner.registered_||owner.nativeClosed_||!owner.input_||!device.name04)return fail(d,E::source,0x13C980);
+            device.handle10=new(std::nothrow) FreshFileCapacity::Handle(owner.input_);
+        }else if(s.loadingRaOwner&&id==s.loadingRaOwner->device_){
             const auto& owner=*s.loadingRaOwner;
             if(!owner.registered_||owner.nativeClosed_||!owner.source_||!device.name04)return fail(d,E::source,0x13C980);
             device.handle10=new(std::nothrow) FreshFileCapacity::Handle(owner.source_,owner.source_->bytes_.data(),owner.source_->bytes_.size());
@@ -3853,7 +3866,7 @@ bool OriginalStandardTextureResolver50LA::openExactSourceMember131380(const void
     if(!s.members150||index<0||index>=s.memberCount154)return fail(d,E::phase,0x131380);
     auto& member=s.members150[index];
     if(!fileIoAssertions().open8270_3E1B90.reach(!(member.flags18&4),d,0x1313F4))return false;
-    if(member.courseConfigOwner||member.flags18&4||(!member.originalMember&&!member.loadingRaOwner)||!member.canonicalData)
+    if(member.courseConfigOwner||member.flags18&4||(!member.originalMember&&!member.loadingRaOwner&&!member.musicOwner)||!member.canonicalData)
         return fail(d,E::phase,0x131380);
     member.flags18|=4;member.cursor10=0;
     member.courseConfigOwner=occurrence;handle=index;
@@ -3990,7 +4003,7 @@ bool OriginalStandardTextureResolver50LA::closeSourceBankMember131040(const void
 }
 bool OriginalStandardTextureResolver50LA::retireSourceBankNative(const void* root,D& d)noexcept {
     d={};if(!freshFileCapacity_||!root)return fail(d,E::phase,0);
-    auto& s=*freshFileCapacity_;if(s.particleConfigBorrower||s.sourceSkyFileBorrower)return fail(d,E::phase,0);if(s.courseStage==FreshFileCapacity::CourseStage::none&&!s.courseRootOwner)return true;
+    auto& s=*freshFileCapacity_;if(s.musicOwner||s.particleConfigBorrower||s.sourceSkyFileBorrower)return fail(d,E::phase,0);if(s.courseStage==FreshFileCapacity::CourseStage::none&&!s.courseRootOwner)return true;
     if(s.courseRootOwner!=root)return fail(d,E::phase,0);
     if(s.courseStage==FreshFileCapacity::CourseStage::retired)return true;
     if(s.courseNativeBorrowers!=1)return fail(d,E::phase,0);
@@ -4235,6 +4248,7 @@ bool OriginalLoadingFontSource50LA::retireBank1CAD94(OriginalStandardTextureReso
 }
 bool OriginalStandardTextureResolver50LA::retireLoadingFontSource1CAD94(OriginalLoadingFontSource50LA& owner,
     LoadingFontsBankLease& lease,D& d)noexcept {
+    if(freshFileCapacity_&&freshFileCapacity_->musicOwner)return fail(d,E::phase,0);
     d={};if(!sourceBankFamilyCurrent(&owner,SourceBankFamily::loadingFonts)||!owner.joined_||owner.nativeClosed_||owner.sourceRetired_||
        owner.thread_!=std::this_thread::get_id()||owner.celOccurrence_||owner.handle_!=-1||
        owner.registryReceipts_[0].entry.expired()||owner.registryReceipts_[1].entry.expired())return fail(d,E::phase,0x1CAD94);
@@ -4372,6 +4386,7 @@ bool OriginalStandardTextureResolver50LA::registerLoadingIconBank12CEA0(std::sha
 #include "original_loading_pst_file50la.inl"
 
 #include "original_loading_ra_file50la.inl"
+#include "original_music_source_file50la.inl"
 
 #include "original_ra_track_source_file50la.inl"
 #include "original_source_psg_file50la.inl"

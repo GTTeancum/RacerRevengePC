@@ -31,7 +31,7 @@ bool OriginalRaceMusicManager50LA::beginSourceAfterLoadingCamera1A6C90(
     }catch(...){return false;}
     OriginalRaceMusicManagerDiagnostic50LA d;
     const bool done=race.music10C_->loadSourceMusicChild1A3C00(app,race,aural,d);
-    pc=d.sourcePC;return done; // Currently always stops before1577D0.
+    pc=d.sourcePC;return done; // Config may return; the child load still has no return.
 }
 
 bool OriginalRaceMusicManager50LA::loadSourceMusicChild1A3C00(
@@ -138,9 +138,10 @@ bool OriginalRaceMusicManager50LA::loadSourceMusicChild1A3C00(
     constexpr char extension[]={'.','j','u','b','\0'};
     std::memcpy(child.filename750.data()+dot,extension,sizeof(extension));
     child.filename750Known=dot+sizeof(extension);
-    return stop(0x2c0b98,"Genuine racemus.jub Config open is pending; no resource or load result");
-    //1577D0 is not entered, so no failed-open branch/2C0E40 fallback, song
-    //count, child74 success bit, attachment141960 or1A3C00 return exists.
+    child.pc=p.sourcePC=0x2c0b98;
+    return openSourceMusicConfig2C0B98(app,race,d);
+    // No song selection/count, child74 success bit, attachment141960 or
+    //1A3C00 return exists. Failed first open stops before2C0E40 conversion.
 }
 
 bool OriginalRaceMusicManager50LA::retireSourceMusicChildNative(
@@ -152,6 +153,14 @@ bool OriginalRaceMusicManager50LA::retireSourceMusicChildNative(
     if(p.sourceGroups&&p.sourceGroups->sourceMusicBorrower_!=this)
         return Impl::stop(d,p.sourcePC,"Source music group lifetime pin changed");
     if(p.sourceChild){auto& child=*p.sourceChild;auto& e=child.entity;
+        // Release the FileManager borrower before Config/array/child storage.
+        // This native cancellation is not1573B0 and cannot restore mode170.
+        if(child.configFile){
+            assets::OriginalStandardTextureDiagnostic50LA fd;
+            if(!child.configFile->closeNative(fd))
+                return Impl::stop(d,fd.sourcePC,"Source music file native cancellation unavailable");
+            child.configFile.reset();
+        }
         if(child.counted){
             if(e.reference00!=1u||e.kind!=OriginalWreckComponentKind50LA::music2C0980||
                e.sessionGeneration!=p.component.sessionGeneration||
