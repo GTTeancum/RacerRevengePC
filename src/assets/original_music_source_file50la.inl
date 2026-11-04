@@ -3,6 +3,16 @@ struct OriginalMusicSourceFile50LA::Storage {
     std::unique_ptr<R::FreshFileCapacity::Handle> pendingHandle;
     // Retains even incompletely read/authenticated native input on refusal.
     std::shared_ptr<std::vector<std::uint8_t>> pendingInput;
+    struct Close {
+        const void *handleIdentity=nullptr,*deviceNameIdentity=nullptr,*memberNameIdentity=nullptr;
+        //Selected13D9F0 stores on the original handle, not a fabricated full
+        //guest handle. The existing native Handle retains its physical input.
+        std::optional<std::uint32_t> handle28,handle24;
+        std::optional<std::int32_t> handleReturn;
+        bool handleFreeEntered=false,handleFreeReturned=false;
+        bool deviceEntered=false,deviceNameFreeEntered=false,deviceNameFreeReturned=false,deviceReturned=false;
+        bool memberEntered=false,memberNameFreeEntered=false,memberNameFreeReturned=false,memberReturned=false;
+    } close;
 };
 OriginalMusicSourceFile50LA::OriginalMusicSourceFile50LA(
     const original_main_entry50KG::Application* issuer,const rr::game::OriginalRaceMusicManager50LA* manager)noexcept
@@ -117,7 +127,7 @@ bool OriginalMusicSourceFile50LA::current(const void* config,std::int64_t handle
 }
 bool OriginalMusicSourceFile50LA::read12FB30(const void* config,std::int64_t handle,
     void* output,std::size_t requested,std::size_t& copied,D& d)noexcept {
-    d={};copied=0;if(!current(config,handle)||handle_==-1)return fail(d,E::phase,0x12FB30);
+    d={};copied=0;if(flushAttempted_||closeAttempted_||!current(config,handle)||handle_==-1)return fail(d,E::phase,0x12FB30);
     auto& s=*resolver_->freshFileCapacity_;auto& member=s.members150[handle_];
     if(!readAssertions12FB30(handle_,s.memberCount154,member.flags18,d))return false;
     const auto amount=std::min<std::size_t>(requested,member.length14-member.cursor10);
@@ -156,7 +166,7 @@ bool OriginalMusicSourceFile50LA::read12FB30(const void* config,std::int64_t han
 }
 bool OriginalMusicSourceFile50LA::seekSet12F640(const void* config,std::int64_t handle,
     std::uint32_t position,D& d)noexcept {
-    d={};if(!current(config,handle)||handle_==-1)return fail(d,E::phase,0x12F640);
+    d={};if(flushAttempted_||closeAttempted_||!current(config,handle)||handle_==-1)return fail(d,E::phase,0x12F640);
     auto& s=*resolver_->freshFileCapacity_;auto& row=s.members150[handle_];
     if(position>row.length14)return fail(d,E::unsupported,0x12F640);
     if(!seekAssertions12F640(handle_,s.memberCount154,d))return false;
@@ -164,20 +174,96 @@ bool OriginalMusicSourceFile50LA::seekSet12F640(const void* config,std::int64_t 
     // activates the device at that position; physical/scratch state stays here.
     row.cursor10=position;d.sourceEffectsCommitted=true;return true;
 }
+bool OriginalMusicSourceFile50LA::flush12F290(const void* config,std::int64_t handle,
+    std::int32_t& returned,D& d)noexcept {
+    d={};if(flushAttempted_||closeAttempted_||!current(config,handle)||handle_==-1)
+        return fail(d,E::phase,0x12f290);
+    flushAttempted_=true;auto& s=*resolver_->freshFileCapacity_;
+    d.sourceEffectsCommitted=true;
+    if(!fileAssertions12F290(handle_,s.memberCount154,d))return false;
+    const auto deviceID=s.members150[handle_].deviceID00;
+    if(!s.devices14||deviceID<0||deviceID>=s.deviceCount18||deviceID!=device_)
+        return fail(d,E::phase,0x12f3ac);
+    //Actual12F3AC reads this member's device handle. A non-NULL handle calls
+    //13D9E0, exactly JR RA with zero in its delay slot; NULL also returns0.
+    //No host flush, callback, file close, mode change or device reset occurs.
+    flushHandleCall_=s.devices14[deviceID].handle10!=nullptr;
+    flushReturned_=true;returned=0;return true;
+}
 bool OriginalMusicSourceFile50LA::close131040(const void* config,std::int64_t handle,D& d)noexcept {
-    d={};if(!current(config,handle)||handle_==-1)return fail(d,E::phase,0x131040);
-    auto& s=*resolver_->freshFileCapacity_;
+    d={};if(closeAttempted_||(flushAttempted_&&!flushReturned_)||!current(config,handle)||handle_==-1)
+        return fail(d,E::phase,0x131040);
+    closeAttempted_=true;auto& s=*resolver_->freshFileCapacity_;auto& retired=storage_->close;
+    d.sourceEffectsCommitted=true;
     if(!closeAssertions131040(handle_,s.memberCount154,d))return false;
     auto& row=s.members150[handle_];auto& device=s.devices14[device_];
-    row.cursor10=0;row.flags18&=~std::uint32_t(4);
-    if(row.auxiliarySlot04>=0&&std::size_t(row.auxiliarySlot04)<resolver_->scratch_->slots.size()&&
-       resolver_->scratch_->slots[row.auxiliarySlot04].status08==handle_)resolver_->scratch_->selected148=row.auxiliarySlot04;
-    // Loose1311D8 close. No invented Config association or bank withdrawal.
-    delete device.handle10;device.handle10=nullptr;row.courseConfigOwner=nullptr;handle_=-1;
-    if(!row.associatedObject1C&&!(row.flags18&8)){
-        s.retireDevice12EB60(device);s.retireMember12EAA0(member_);registered_=false;
+    row.cursor10=0;row.flags18&=~std::uint32_t(4); //131164/174.
+    //131178..8C indexes this slot unconditionally, unlike12EAA0's -1 skip.
+    if(row.auxiliarySlot04<0||std::size_t(row.auxiliarySlot04)>=resolver_->scratch_->slots.size())
+        return fail(d,E::phase,0x13118c); //Native custody bound before the original indexed read.
+    if(resolver_->scratch_->slots[row.auxiliarySlot04].status08==handle_)
+        resolver_->scratch_->selected148=row.auxiliarySlot04; //131198.
+    //This source occurrence owns a loose flags4 device, not an archive branch.
+    using G=OriginalConfigProcessGlobals50LA;
+    if(device.handle10){
+        retired.handleIdentity=device.handle10;
+        retired.handle28=0; //13D9FC, before the free's reentrancy read.
+        retired.handle24=0;device.handle10->cursor=0; //13DA04; native logical cursor adapter.
+        retired.handleFreeEntered=true;
+        if(!G::descriptorDelete2E8B00AdmittedNative())return fail(d,E::phase,0x305734);
+        //Matched native delete adapts2E8B00->305728. No guest heap bins/locks.
+        delete device.handle10;retired.handleFreeReturned=true;retired.handleReturn=-1;
+        device.handle10=nullptr; //1311D8 only after13D9F0 returned.
     }
-    closed_=true;d.sourceEffectsCommitted=true;return true;
+    if(row.associatedObject1C)return fail(d,E::unsupported,0x1311dc);
+    if(row.flags18&8u)return fail(d,E::unsupported,0x1311e8);
+    //Actual1311FC ->12EB60. Split at its reached source frees instead of
+    //claiming monolithic retirement when shared reentrancy is unknown.
+    retired.deviceEntered=true;
+    for(std::size_t at=0;at<s.active.size();++at)if(s.active[at]==device.id00){
+        for(std::size_t donor=s.active.size();donor>0;--donor)if(s.active[donor-1]!=-1){
+            s.active[at]=s.active[donor-1];s.active[donor-1]=-1;break;}
+        break;
+    }
+    if(s.current74==device.id00){
+        //132CD0(-1) observes handleNULL after the earlier13D9F0. Therefore
+        //13D840 is skipped, not replaced by a synthetic synchronization.
+        s.window7C=-1;s.window80=-1;s.current74=-1; //132D28/2C/30.
+    }
+    s.freeDevice10=device.id00; //12EC28, before device-name free.
+    if(device.handle10)return fail(d,E::phase,0x12ec2c); //No unjoined replacement.
+    if(device.name04){
+        retired.deviceNameIdentity=device.name04;retired.deviceNameFreeEntered=true;
+        if(!G::descriptorDelete2E8B00AdmittedNative())return fail(d,E::phase,0x305734);
+        delete[] device.name04;retired.deviceNameFreeReturned=true;
+        device.name04=nullptr; //12EC58 only after305728 returned.
+    }
+    device.flags0C=1;device.cursor08=0;device.length14=0;device.payload18=0;
+    device.tableBytes20=0;device.tableOffset1C=0;device.byte24=0; //12EC60..78.
+    retired.deviceReturned=true;
+    //Actual131208 ->12EAA0. Scratch invalidation precedes filename free.
+    retired.memberEntered=true;
+    if(row.auxiliarySlot04!=-1){
+        if(row.auxiliarySlot04<0||std::size_t(row.auxiliarySlot04)>=resolver_->scratch_->slots.size())
+            return fail(d,E::phase,0x12eaf4); //Keep earlier device retirement on a custody bound.
+        auto& slot=resolver_->scratch_->slots[row.auxiliarySlot04];
+        if(slot.status08==member_){slot.status08=-1;resolver_->scratch_->selected148=row.auxiliarySlot04;}
+    }
+    if(row.filename08){
+        retired.memberNameIdentity=row.filename08;retired.memberNameFreeEntered=true;
+        if(!G::descriptorDelete2E8B00AdmittedNative())return fail(d,E::phase,0x305734);
+        delete[] row.filename08;retired.memberNameFreeReturned=true;
+        row.filename08=nullptr; //12EB20 only after305728 returned.
+    }
+    row.auxiliarySlot04=0;row.cursor10=0;row.deviceID00=0;row.flags18=1;
+    row.associatedObject1C=nullptr;row.length14=0;row.logicalStart0C=0;
+    s.freeMember14C=member_; //12EB24..44, exact source field order.
+    //Native authentication/borrow fields retire only after those source stores.
+    row.originalMember=nullptr;row.canonicalName=nullptr;row.canonicalData=nullptr;
+    row.courseConfigOwner=nullptr;row.loadingRaOwner=nullptr;row.musicOwner=nullptr;
+    retired.memberReturned=true;registered_=false;sourceLooseSlotsRetired_=true;
+    handle_=-1;closed_=true;return true; //Actual131040 return, no root-pin release yet.
+
 }
 bool OriginalMusicSourceFile50LA::closeNative(D& d)noexcept {
     d={};if(nativeClosed_)return true;
@@ -185,21 +271,28 @@ bool OriginalMusicSourceFile50LA::closeNative(D& d)noexcept {
     if(!acquired_){nativeClosed_=true;return true;}
     if(!resolver_||!resolver_->freshFileCapacity_||!resolver_->scratch_||!storage_)return fail(d,E::phase,0);
     auto& s=*resolver_->freshFileCapacity_;if(s.musicOwner!=this)return fail(d,E::phase,0);
+    if(closed_&&sourceLooseSlotsRetired_&&!registered_){
+        //Original131040 already retired both numeric slots. Do not read or
+        //retire them again: their indices are historical and may be reused.
+        //Only end this adapter's native root pin; no source call is implied.
+        s.musicOwner=nullptr;nativeClosed_=true;return true;
+    }
     auto* members=s.members150?s.members150:s.failedCourseMembers;
     const auto memberCount=s.members150?s.memberCount154:s.failedCourseMemberCapacity;
     auto* devices=s.devices14?s.devices14:s.failedCourseDevices;
     const auto deviceCount=s.devices14?s.deviceCount18:s.failedCourseDeviceCapacity;
-    if(member_>=0){
+    const bool memberRetired=storage_->close.memberReturned,deviceRetired=storage_->close.deviceReturned;
+    if(member_>=0&&!memberRetired){
         if(!members||member_>=memberCount)return fail(d,E::phase,0);
         const auto& row=members[member_];
         if((row.musicOwner&&row.musicOwner!=this)||(row.courseConfigOwner&&row.courseConfigOwner!=config_)||row.associatedObject1C)
             return fail(d,E::phase,0);
     }
-    if(device_>=0&&(!devices||device_>=deviceCount))return fail(d,E::phase,0);
+    if(device_>=0&&!deviceRetired&&(!devices||device_>=deviceCount))return fail(d,E::phase,0);
     // Native cancellation retains original NULL realloc history and never
     // claims131040 returned. Foreign winner_ is never touched.
     storage_->pendingHandle.reset();
-    if(member_>=0&&!(members[member_].flags18&1)){
+    if(member_>=0&&!memberRetired&&!(members[member_].flags18&1)){
         if(s.members150)s.retireMember12EAA0(member_);
         else {
             auto& row=members[member_];
@@ -211,7 +304,7 @@ bool OriginalMusicSourceFile50LA::closeNative(D& d)noexcept {
             row.canonicalData=nullptr;row.canonicalName=nullptr;row.flags18=1;row.deviceID00=0;
         }
     }
-    if(device_>=0){
+    if(device_>=0&&!deviceRetired){
         auto& device=devices[device_];
         // Even an unpublished/free device can own the exact reserved slot.
         s.retireDevice12EB60(device);

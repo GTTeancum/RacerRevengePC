@@ -1,5 +1,7 @@
 #pragma once
 #include "original_standard_texture_resource50la.h"
+#include "original_config_process_globals50la.h"
+#include <optional>
 #include <filesystem>
 #include <string_view>
 namespace rr::game {class OriginalRaceMusicManager50LA;}
@@ -24,6 +26,8 @@ class OriginalMusicSourceFile50LA final {
     std::int32_t device_=-1,member_=-1,handle_=-1,winner_=-1;
     std::uint32_t observedMode170_=0;
     bool attempted_=false,acquired_=false,registered_=false,returned_=false,closed_=false,nativeClosed_=false;
+    bool flushAttempted_=false,flushReturned_=false,flushHandleCall_=false,closeAttempted_=false;
+    bool sourceLooseSlotsRetired_=false; //Only actual1311FC/131208 completion, never native cancellation.
     OriginalMusicSourceFile50LA(const original_main_entry50KG::Application*,
         const rr::game::OriginalRaceMusicManager50LA*)noexcept;
     bool begin131230(std::shared_ptr<R>,const void* exactConfig,const std::filesystem::path& actualAudioRoot,
@@ -31,6 +35,7 @@ class OriginalMusicSourceFile50LA final {
     bool current(const void* exactConfig,std::int64_t handle)const noexcept;
     bool read12FB30(const void* exactConfig,std::int64_t handle,void*,std::size_t,std::size_t&,D&)noexcept;
     bool seekSet12F640(const void* exactConfig,std::int64_t handle,std::uint32_t position,D&)noexcept;
+    bool flush12F290(const void* exactConfig,std::int64_t handle,std::int32_t& returned,D&)noexcept;
     bool close131040(const void* exactConfig,std::int64_t handle,D&)noexcept;
     bool closeNative(D&)noexcept;
 public:

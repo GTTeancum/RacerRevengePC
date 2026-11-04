@@ -242,5 +242,5 @@ bool OriginalRaceMusicManager50LA::loadSourceMusicMetadata2C0BE4(
         //2C0D78 signed count<s0; admitted count47 and ordinal1..48 avoid overflow.
     }
     child.pc=p.sourcePC=0x2c0e08;
-    return stop(0x2c0e08,"Original47-song loop returned its lookups; automatic Config destruction remains unissued");
+    return finishSourceMusicLoad2C0E08(app,race,d);
 }

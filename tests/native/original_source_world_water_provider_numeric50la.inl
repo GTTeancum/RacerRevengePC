@@ -2,6 +2,7 @@
 //configured-model effect receipts, never a live FCR31 or hardware-ready flag.
 bool Owner::preflightSourceWaterProviderNumericNative()const noexcept {
     const auto& n=sourceWaterProviderNumeric_;const auto& m=sourceWaterProviderMembers_;
+    if(!preflightSourceWaterProviderInitializerNative())return false;
     const auto& h=sourceWaterProvider274720_;
     if(!n.entered){
         if(n.pc!=0x2b84c0u||n.thirdDivideBoundary||n.negated390||n.negateClearMask)return false;
@@ -11,7 +12,8 @@ bool Owner::preflightSourceWaterProviderNumericNative()const noexcept {
         return true;
     }
     if(!m.integerPrefixComplete||!m.field384||!m.fieldD8||!h.countAcquired||
-       m.rawF1!=0xc0000000u||m.rawF0!=0x40000000u||h.pc!=n.pc)return false;
+       m.rawF1!=0xc0000000u||m.rawF0!=0x40000000u||
+       h.pc!=(sourceWaterProviderInitializer_.entered?sourceWaterProviderInitializer_.pc:n.pc))return false;
     const auto c=*m.field384,b=*m.fieldD8,b17=(b<<4u)+b;
     const std::uint32_t words[5]={c-1u,c-2u,c+2u,b17,b17+2u};
     for(std::size_t i=0;i<5;++i){const auto& conversion=n.conversions[i];
@@ -54,7 +56,8 @@ bool Owner::preflightSourceWaterProviderNumericNative()const noexcept {
         !n.conversions[1].bits?0x2b84f4u:!n.quotients[1]?0x2b84f8u:
         !n.conversions[2].bits?0x2b8524u:!n.conversions[3].bits?0x2b8548u:
         !n.conversions[4].bits?0x2b854cu:0x2b8550u;
-    if(n.pc!=expectedPC||n.thirdDivideBoundary!=(expectedPC==0x2b8550u))return false;
+    if(n.pc!=(sourceWaterProviderInitializer_.entered?sourceWaterProviderInitializer_.pc:expectedPC)||
+       n.thirdDivideBoundary!=(expectedPC==0x2b8550u))return false;
     if(h.nativeWithdrawn)return true;
     if(!worldApplication_)return false;const auto& p=worldApplication_->sourceWaterProcessScalars_;
     for(std::size_t i=0;i<2;++i)if(n.processPublications[i]){
@@ -110,7 +113,6 @@ bool Owner::continueSourceWaterProviderNumeric2B84C0(std::uint32_t& pc)noexcept 
     at(0x2b853c);n.conversions[3].rawWord=denominator;
     at(0x2b8540);n.conversions[4].rawWord=numerator;at(0x2b8544);
     if(!convert(3,0x2b8548)||!convert(4,0x2b854c))return false;
-    //This numerator is not +/-2. Do not reuse the bounded helper, perform
-    //host division, write498 or claim derived return/World400/hardware events.
-    at(0x2b8550);n.thirdDivideBoundary=true;return false;
+    at(0x2b8550);n.thirdDivideBoundary=true;return continueSourceWaterProviderInitializer2B8550(pc);
 }
+#include "original_source_world_water_provider_initializer50la.inl"

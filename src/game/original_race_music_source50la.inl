@@ -31,7 +31,7 @@ bool OriginalRaceMusicManager50LA::beginSourceAfterLoadingCamera1A6C90(
     }catch(...){return false;}
     OriginalRaceMusicManagerDiagnostic50LA d;
     const bool done=race.music10C_->loadSourceMusicChild1A3C00(app,race,aural,d);
-    pc=d.sourcePC;return done; // Config may return; the child load still has no return.
+    pc=d.sourcePC;return done; //Local child load may return; manager1A3C00 remains bounded.
 }
 
 bool OriginalRaceMusicManager50LA::loadSourceMusicChild1A3C00(
@@ -144,11 +144,23 @@ bool OriginalRaceMusicManager50LA::loadSourceMusicChild1A3C00(
     std::memcpy(child.filename750.data()+dot,extension,sizeof(extension));
     child.filename750Known=dot+sizeof(extension);
     child.pc=p.sourcePC=0x2c0b98;
-    return openSourceMusicConfig2C0B98(app,race,d);
-    //The original loop requires a genuine same-backend268690 return before
-    //any2684E0 lookup. Its end still stops before Config destruction2C0E08;
-    //no child74 success bit, attachment141960 or1A3C00 return is claimed.
-    //Failed first open stops before2C0E40 conversion.
+    if(!openSourceMusicConfig2C0B98(app,race,d))return false;
+    //Only the genuine positive2C0B00 epilogue can reach this2C0AA4 branch.
+    //The manager's caller must NOT see booltrue until1A3C00 itself returns.
+    if(child.load2C0B00Return!=1u||!child.configDestruction.returned||
+       !child.configDestruction.automaticLifetimeEnded||!child.configDestruction.nativeFileRetired||
+       child.configFile||child.initialize2C0A60Returned)
+        return stop(0x2c0aa4,"Actual original Music child load return unavailable");
+    child.pc=p.sourcePC=0x2c0aac;
+    //Read/modify/write preserves every other bit, including UNKNOWN bit7.
+    child.flags74KnownValue=std::uint8_t((child.flags74KnownValue&~1u)|1u);
+    child.flags74KnownMask|=1u; //2C0AC8 branch delay store.
+    child.initialize2C0A60Return=&child.entity;child.initialize2C0A60Returned=true;
+    child.pc=p.sourcePC=0x2c0af4; //Actual child-pointer return; no playback action.
+    //Stop before1A3C74 reloads child164 and1A3C78 prepares attachment args.
+    //No register preparation,141960 call or outer1A3C00 return is claimed.
+    return stop(0x1a3c74,"Original child load returned; manager attachment preparation remains unissued");
+    //Failed first open still stops before unimplemented2C0E40 conversion.
 }
 
 bool OriginalRaceMusicManager50LA::retireSourceMusicChildNative(
@@ -177,7 +189,7 @@ bool OriginalRaceMusicManager50LA::retireSourceMusicChildNative(
                (child.published164&&(!p.fields.child164||*p.fields.child164!=&e)))
                 return Impl::stop(d,p.sourcePC,"Detached source stream cannot retire");
             // Native cancellation, not2C0A00/2340C0 or a Config destructor.
-            // No source child load returned and no stream stop was reached.
+            //This does not replay a returned child load or execute a source stream stop.
             if(!p.application->entityAuthority_.retire(e))return false;
             --e.reference00;--p.application->objectCount423F60();child.counted=false;
         }

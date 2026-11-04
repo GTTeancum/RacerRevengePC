@@ -57,8 +57,17 @@ bool Owner::withdrawSourceWaterProviderNative()noexcept {
     //The public close path reaches this before its later combined floor.
     //Validate all still-owned source counts before decrementing any one.
     if(h.countAcquired&&!preflightSourceWorldParticleCountNative())return false;
-    //No World400, provider global, callback or graph alias exists in this
-    //prefix. Release the exact enrollment/count once; process type effects stay.
+    //Withdraw the exact native World400 publication before freeing backing.
+    //Unknown knowledge is not a source NULL store or unfinished destructor.
+    auto& continuation=sourceWaterProviderInitializer_;
+    if(continuation.world400Published&&!continuation.world400NativeWithdrawn){
+        if(!sourceWaterProvider_||!worldWater400_||
+           *worldWater400_!=&sourceWaterProvider_->entity)return false;
+        worldWater400_.reset();continuation.world400NativeWithdrawn=true;
+        continuation.lightPin.reset();
+    }
+    //No provider globals443B80/443CE8, callback or graph alias are published
+    //by this prefix. Retire the exact count once; process scalar/guard effects stay.
     if(h.countAcquired){auto& e=sourceWaterProvider_->entity;
         if(!worldApplication_->entityAuthority_.retire(e))return false;
         --e.reference00;--worldApplication_->objectCount423F60();h.countRetiredNative=true;

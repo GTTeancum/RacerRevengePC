@@ -458,6 +458,13 @@ class OriginalApplicationEntities50LA final {
             p.publications[0]!=std::numeric_limits<std::uint64_t>::max()&&
             p.publications[1]!=std::numeric_limits<std::uint64_t>::max();
     }
+    //Actual startup BSS, joined only by2B8680..86B4. One process occurrence,
+    //never reset by provider/World cancellation. Future unjoined aliases poison.
+    struct SourceWaterInitializerGlobals {
+        std::uint8_t guard3D66F0=0;std::uint32_t assertion443EE8=0;
+        bool known=true;
+    } sourceWaterInitializerGlobals_;
+    void invalidateWaterInitializerGlobalsNative()noexcept {sourceWaterInitializerGlobals_.known=false;}
     // Native historical-use barrier, not a guest flag or readiness token.
     // All native value/reference consumers must use the observer below so
     // even a retired borrower prevents a late replay of the startup write.

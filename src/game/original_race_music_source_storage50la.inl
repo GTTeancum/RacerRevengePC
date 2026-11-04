@@ -116,6 +116,20 @@ struct Child final {
     std::size_t songEntryBytes=0;
     std::optional<std::uint32_t> songOrdinal,songContinueS3;
 
+    struct Free {const void* identity=nullptr;std::uint32_t callPC=0;
+        bool entered=false,returned=false;};
+    struct ConfigDestruction {
+        bool entered=false,delayValueWritten=false,flushEntered=false,closeEntered=false;
+        std::optional<std::uint32_t> savedResultS0;
+        std::optional<std::int32_t> flushReturn,closeReturn;
+        bool closeReturned=false,selectedClearReturned=false;
+        Free names,index,block;
+        bool returned=false,automaticLifetimeEnded=false,nativeFileRetired=false;
+        const void* returnedThis=nullptr;std::int32_t flag=-1;
+    } configDestruction;
+    std::optional<std::uint32_t> load2C0B00Return;
+    const OriginalWreckComponent50LA* initialize2C0A60Return=nullptr;
+    bool initialize2C0A60Returned=false; //Actual pointer return, not playback/readiness.
     std::array<char,0x110> filename640,filename750; // Unknown beyond reached NUL.
     std::size_t filename640Known=0,filename750Known=0;
     std::uint32_t pc=0x1a3c34;

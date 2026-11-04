@@ -38,6 +38,7 @@ class OriginalConfigProcessGlobals50LA final {
     };
     class StreamLookupAccess {
         friend class rr::platform::OriginalStreamLibrarySource50LA;
+        friend class OriginalConfigProcessGlobals50LA;
         StreamLookupAccess()noexcept {}
     };
     class WaterSprintfAccess;
@@ -323,6 +324,12 @@ private:
         if(s.thread!=std::this_thread::get_id()||!s.streamLookupAsciiKnown||byte>127u)return false;
         folded=byte>=static_cast<unsigned char>('A')&&byte<=static_cast<unsigned char>('Z')?
             std::int32_t(byte)+32:std::int32_t(byte);return true;
+    }
+    //Water's actual308F00 shares the SAME hardcoded3C6391 ASCII owner.
+    //The outer class alone manufactures the lookup key; no key escapes.
+    static bool waterFold308F00(const WaterSprintfAccess&,unsigned char byte,
+                               std::int32_t& folded,std::uint32_t& pc)noexcept {
+        return streamLookupFold308F00(StreamLookupAccess{},byte,folded,pc);
     }
     static bool streamLookupIndexAssertion268514(const StreamLookupAccess&,std::int32_t index,
                                                  std::uint32_t& pc)noexcept {

@@ -50,8 +50,8 @@ bool Owner::preflightSourceWaterFactoryNative()const noexcept {
         (*h.visibilityWasNull?!h.visibilityFallbackReturned:
             visibility.caller!=SourceVisibilityEnvironmentCaller::particle1B4E2C)))||
        h.providerAllocationReached!=h.visibilityOwnerValidated)return false;
-    //The non-none factory can return only on its genuine missing-file path.
-    //A found entry has NOT yet constructed/initialized or published a provider.
+    //The non-none factory returns only on the genuine missing-file path.
+    //The found provider may be published, but its initializer has NOT returned.
     if(call.returnV0){
         if(h.existsV0!=0u||!h.existing400Read)return false;
         if(*h.existing400){if(*call.returnV0!=1u||h.diagnosticAttempted)return false;}

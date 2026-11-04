@@ -602,8 +602,8 @@ struct SourceWaterFactory274570 {
 bool continueSourceWaterFactory2745D4(std::uint32_t&)noexcept;
 bool preflightSourceWaterFactoryNative()const noexcept;
 
-//Actual success-only274720 allocation role. It is not World400 until the
-//unrepresented constructor returns; native lifetime keeps every partial base.
+//Actual success-only274720 allocation role. World400 is published only after
+//the represented constructor returns this exact counted entity identity.
 struct SourceWaterProviderOwner {g::OriginalWreckComponent50LA entity;};
 std::unique_ptr<SourceWaterProviderOwner> sourceWaterProvider_;
 struct SourceWaterProvider274720 {
@@ -675,6 +675,36 @@ struct SourceWaterProviderNumeric {
 } sourceWaterProviderNumeric_;
 bool continueSourceWaterProviderNumeric2B84C0(std::uint32_t&)noexcept;
 bool preflightSourceWaterProviderNumericNative()const noexcept;
+struct SourceWaterProviderInitializer {
+    bool entered=false;std::uint32_t pc=0x2b8550u;
+    std::optional<std::uint32_t> ratio,field498,ratioClearMask;
+    std::optional<bool> ratioAssertedD;
+    std::array<std::optional<std::uint32_t>,3> tailZeroWords; //140,D0,4A4.
+    const g::OriginalWreckComponent50LA* constructorThis=nullptr;
+    std::uint8_t constructorRestoreMask=0;bool constructorStackReleased=false,constructorReturned=false;
+    bool world400Published=false,world400NativeWithdrawn=false,world400Read=false;
+    std::shared_ptr<rr::platform::OriginalUiLightManagerOwner50KG> lightPin;
+    const g::OriginalWreckComponent50LA* lightArgument=nullptr;
+    bool lightArgumentRead=false,filenameArgument=false,receiverValidated=false,initializerEntered=false;
+    std::optional<std::uint32_t> argumentA3,argumentT0,argumentF12;
+    std::optional<std::uint8_t> guardBefore;
+    bool assertionWordStored=false,assertionGuardStored=false;
+    std::optional<std::uint32_t> assertionRead,assertionReturn;
+    bool assertionCalled=false,baseEntered=false;
+    const g::OriginalWreckComponent50LA* field38=nullptr;bool field38Stored=false;
+    std::optional<std::uint32_t> field4C,fieldB4,fieldB0,halfRaw,convertedB0,product,fieldB8,multiplyClearMask;
+    std::size_t forwardReadBytes=0;std::optional<std::size_t> suffixIndex;
+    bool extensionIsNull=false,extensionSelected=false,comparisonEntered=false;
+    std::size_t comparisonBytes=0;std::optional<std::int32_t> comparisonV0;
+    bool comparisonReturnFoldEntered=false;
+    std::optional<std::int32_t> comparisonFinalA,comparisonFinalB;
+    bool wttLoaderEntered=false,alternateLoaderEntered=false;
+    std::optional<std::uint32_t> alternateLoaderReturn;
+    std::array<char,256> filename398;std::size_t filename398Known=0;
+    bool filenameCopyReturned=false;
+} sourceWaterProviderInitializer_;
+bool continueSourceWaterProviderInitializer2B8550(std::uint32_t&)noexcept;
+bool preflightSourceWaterProviderInitializerNative()const noexcept;
 
 //Distinct source3F8 custody. No prepared NativeSkyArray3F8 or image fixture.
 //Pointer slots are unknown until their actual source stores; only published slots may be read.
