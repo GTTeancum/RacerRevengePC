@@ -545,7 +545,11 @@ inline bool Owner::mountRetainedRuntimeRosterArchives(
             // The existing Archive authenticates the original container against
             // this retained Rig and mounts complete bytes into the SAME provider.
             // This is native cold namespace staging, not model construction.
-            original_racer_animation_setup50LA::Archive archive(*rig);
+            // Native mounting now consumes the same immutable adoption input,
+            // including any separately authenticated source POD01 archive.
+            // No later disk reopen can replace the retained Resources bytes.
+            original_racer_animation_setup50LA::Archive archive(*rig,
+                runtimeQueries_->rosterResources_->rawRes_[slot]);
             if(!archive.mount(*provider,d.rosterMount,&nativeRosterMounts_))
                 return fail(d,"actual roster archive mount rejected; earlier mounts retained");
         }

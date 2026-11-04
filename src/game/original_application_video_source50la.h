@@ -1,6 +1,7 @@
 #pragma once
 #include "original_video_preflip50kg.h"
 #include "original_video_clear_packet25cad0_native50la.h"
+#include "original_video_finish_packet25ab2c_native50la.h"
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -205,6 +206,11 @@ public:
     struct NativeClearPacket {
         NativeClearPacketStatus status=NativeClearPacketStatus::authority;
         std::unique_ptr<const OriginalVideoClearPacket25CAD0Native50LA> packet;
+    };
+    enum class NativeFinishPacketStatus : std::uint8_t {authority,backingUnavailable,allocation,encodingBounds,encoded};
+    struct NativeFinishPacket {
+        NativeFinishPacketStatus status=NativeFinishPacketStatus::authority;
+        std::unique_ptr<const OriginalVideoFinishPacket25AB2CNative50LA> packet;
     };
     struct NativeModeQuery {
         NativeModeQueryStatus status=NativeModeQueryStatus::authority;
@@ -453,21 +459,25 @@ private:
         //the pending syscall. It cannot release a different owner's custody.
         return true;
     }
+    bool nativePacketBackingAvailable()const noexcept {
+        const auto& storage=*allocation_;
+        if(!storage.constructorReturned||!modeDescendantsEntered_||allocatorReturnUnowned_||
+           !storage.buffer88AllocationAttempted||!storage.buffer88||!storage.buffer88Published)
+            return false;
+        const auto& buffer=*storage.buffer88;
+        if(!buffer.constructorReturned||!buffer.backingAllocationAttempted||!buffer.backing||
+           !buffer.pointer00Published||!buffer.uncachedAlias00||buffer.invalidNullAlias00||!buffer.backingZeroed||
+           !buffer.cursor04Aliases00||buffer.source.readWord(8)!=24)return false;
+        for(std::size_t offset=0x0c;offset<0x20;offset+=4)
+            if(buffer.source.readWord(offset)!=0)return false;
+        return true;
+    }
     NativeClearPacket encodeNativeClearPacket25CAD0(const Application& app,
         std::uint32_t red,std::uint32_t green,std::uint32_t blue,std::uint32_t alpha)const noexcept {
         using S=NativeClearPacketStatus;using Packet=OriginalVideoClearPacket25CAD0Native50LA;
         if(thread_!=std::this_thread::get_id()||nativeClosed_||application_!=&app||
            !attempted_||!published443A60_||!allocation_||global443A60_!=allocation_.get())return {};
-        const auto& storage=*allocation_;
-        if(!storage.constructorReturned||!modeDescendantsEntered_||allocatorReturnUnowned_||
-           !storage.buffer88AllocationAttempted||!storage.buffer88||!storage.buffer88Published)
-            return {S::backingUnavailable,{}};
-        const auto& buffer=*storage.buffer88;
-        if(!buffer.constructorReturned||!buffer.backingAllocationAttempted||!buffer.backing||
-           !buffer.pointer00Published||!buffer.uncachedAlias00||buffer.invalidNullAlias00||!buffer.backingZeroed||
-           !buffer.cursor04Aliases00||buffer.source.readWord(8)!=24)return {S::backingUnavailable,{}};
-        for(std::size_t offset=0x0c;offset<0x20;offset+=4)
-            if(buffer.source.readWord(offset)!=0)return {S::backingUnavailable,{}};
+        if(!nativePacketBackingAvailable())return {S::backingUnavailable,{}};
         //Explicit native output allocation, NOT an original allocator call.
         //The source buffer is used only to establish the actual owned capacity;
         //never copy/mutate its bytes, metadata, pending PC or IRQ custody.
@@ -477,6 +487,20 @@ private:
         return {S::encoded,std::move(packet)};
         //25A87C/25CAD0 were not entered. This independent immutable encoding
         //has no framebuffer, mode, source address, submit or completion grant.
+    }
+    NativeFinishPacket encodeNativeFinishPacket25AB2C(const Application& app)const noexcept {
+        using S=NativeFinishPacketStatus;using Packet=OriginalVideoFinishPacket25AB2CNative50LA;
+        if(thread_!=std::this_thread::get_id()||nativeClosed_||application_!=&app||
+           !attempted_||!published443A60_||!allocation_||global443A60_!=allocation_.get())return {};
+        if(!nativePacketBackingAvailable())return {S::backingUnavailable,{}};
+        //Same actual source+88 capacity admission as the clear packet, with
+        //separate native output. No mutation of that buffer or paused source PC.
+        std::unique_ptr<Packet> packet(new(std::nothrow) Packet);
+        if(!packet)return {S::allocation,{}};
+        if(!packet->encode())return {S::encodingBounds,{}};
+        return {S::encoded,std::move(packet)};
+        //No CSR acknowledgment,2596A0 submission, FINISH/IRQ event,442D08
+        //counter update, frame return or source mode readiness is issued.
     }
     NativeModeQuery queryNativeMode25A900(const Application& app,
         std::uint32_t width,std::uint32_t height,std::uint32_t colorBits)const noexcept {

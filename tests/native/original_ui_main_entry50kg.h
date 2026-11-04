@@ -1103,6 +1103,12 @@ public:
         if(!rr::game::OriginalVideoPreFlipList50KG::applicationVideoEntryCurrent(*this))return {};
         return sourceVideoProduction_.encodeNativeClearPacket25CAD0(*this,red,green,blue,alpha);
     }
+    //Independent CPU FINISH packet bytes. Encoding is not GPU submission,
+    //a CSR FINISH event, an interrupt-counter tick or a source frame return.
+    rr::game::OriginalApplicationVideoSource50LA::NativeFinishPacket encodeNativeSourceVideoFinishPacket25AB2C()const noexcept {
+        if(!rr::game::OriginalVideoPreFlipList50KG::applicationVideoEntryCurrent(*this))return {};
+        return sourceVideoProduction_.encodeNativeFinishPacket25AB2C(*this);
+    }
     bool retainsPlayerWindow50DU()const noexcept{return retainPlayerWindow50DU_;}
     // Read-only host access for the root loading presentation; not a display
     // factory, source readiness capability, or renderer/GPU lease.

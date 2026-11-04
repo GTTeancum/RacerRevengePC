@@ -7,6 +7,7 @@
 #include <cstdlib>
 #include <limits>
 
+namespace ra_cold_aggregate50LA {class Owner;}
 namespace original_racer_animation_setup50LA {
 using Rig=native_racer50HW::Rig;
 namespace detail {
@@ -39,9 +40,10 @@ class Archive final {
     std::string digest_;
     std::string originalPath_;
     std::size_t encodedBytes_=0;
-public:
-    explicit Archive(const Rig& rig){
-        const auto bytes=runtime_startup50fl::readBytes(rig.resourceFile);
+    friend class ::ra_cold_aggregate50LA::Owner;
+    // The actual aggregate alone supplies its same retained roster bytes.
+    // This is input custody, not a source registration/call-site capability.
+    Archive(const Rig& rig,const std::vector<std::uint8_t>& bytes){
         originalPath_=rig.resourceFile.generic_string();encodedBytes_=bytes.size();
         digest_=pod_materials50ed_fixture::detail::sha256(bytes);
         detail::need(digest_==rig.manifest.at("source_container_sha256").get<std::string>(),
@@ -49,6 +51,8 @@ public:
         a::DecodeError48C d;
         detail::need(a::decodeResource48C(bytes,archive_,d),"original animation RES directory rejected");
     }
+public:
+    explicit Archive(const Rig& rig):Archive(rig,runtime_startup50fl::readBytes(rig.resourceFile)){}
     std::optional<std::string> originalMemberName(const std::string& name)const{
         std::optional<std::string> found;const auto key=detail::canonical(name);
         for(const auto& entry:archive_.entries)if(detail::canonical(entry.name)==key){
