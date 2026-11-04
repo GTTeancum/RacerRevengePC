@@ -1,19 +1,25 @@
 #pragma once
 #include <cstdint>
 #include <memory>
+#include <cstddef>
+#include <optional>
 #include <thread>
 #include <string_view>
 namespace original_main_entry50KG {struct Application;}
 namespace rr::assets {class OriginalStandardTextureResolver50LA;}
-namespace rr::game {class OriginalApplicationStartup17CCF0Source50LA;}
+namespace rr::game {class OriginalApplicationStartup17CCF0Source50LA;class OriginalRaceMusicManager50LA;}
 namespace rr::platform {
 class OriginalApplicationAural50KG;
 // Same actual interface+40, never a library created from immutable authoring.
 // No current source17CCF0 issuer exists. Both private loader bodies remain
 // UNCALLED; future issuance must return232EA0 before entering268690.
 class OriginalStreamLibrarySource50LA final {
+public:
+    class Lookup; //Opaque retained call; no public constructor, fields or readiness API.
+private:
     friend class OriginalApplicationAural50KG;
     friend class rr::game::OriginalApplicationStartup17CCF0Source50LA;
+    friend class rr::game::OriginalRaceMusicManager50LA;
     using Aural=OriginalApplicationAural50KG;
     using Resolver=assets::OriginalStandardTextureResolver50LA;
     struct Diagnostic {std::uint32_t sourcePC=0;const char* reason=nullptr;};
@@ -35,6 +41,8 @@ class OriginalStreamLibrarySource50LA final {
     bool begin232EA0(std::shared_ptr<Resolver> actualResolver,Diagnostic&)noexcept;
     bool begin268690(std::shared_ptr<Resolver> actualResolver,Diagnostic&)noexcept;
     bool loadCatalog2985B0(Catalog&,CatalogLoad&,bool audioDirectory,std::string_view filename,Diagnostic&)noexcept;
+    bool lookup2684E0(std::shared_ptr<Lookup>& retained,char* filename,std::size_t known,
+        std::size_t extent,std::uint8_t* output,std::optional<std::int32_t>& outputKnown,Diagnostic&)noexcept;
     bool openConfig1577D0(Diagnostic&)noexcept;
     bool format308C90(bool song,std::uint32_t ordinal,Diagnostic&)noexcept;
     bool finish268690(std::uint32_t callPC,std::uint32_t sourceResult,Diagnostic&)noexcept;

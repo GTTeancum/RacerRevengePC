@@ -6,6 +6,7 @@
 #include <thread>
 namespace ra_cold_aggregate50LA { class Owner; }
 namespace rr::platform { class OriginalStreamLibrarySource50LA; }
+namespace rr::game { class OriginalRaceMusicManager50LA; }
 namespace rr::assets {
 class OriginalParticleSourceConfig50LA;
 class OriginalStreamLibraryFile50LA;
@@ -16,6 +17,7 @@ class OriginalConfigProcessGlobals50LA final {
     friend class OriginalParticleSourceConfig50LA;
     friend class OriginalStreamLibraryFile50LA;
     friend class rr::platform::OriginalStreamLibrarySource50LA;
+    friend class rr::game::OriginalRaceMusicManager50LA;
     friend class ::ra_cold_aggregate50LA::Owner;
     friend class OriginalStandardTextureLifetime50LA;
     // Symbolic source-pointer custody, never fabricated numeric EE addresses.
@@ -34,6 +36,10 @@ class OriginalConfigProcessGlobals50LA final {
             StdioIdentity::null,StdioIdentity::null,StdioIdentity::null}}; //+20..2C
         StdioIdentity reent=StdioIdentity::null; //+54
     };
+    class StreamLookupAccess {
+        friend class rr::platform::OriginalStreamLibrarySource50LA;
+        StreamLookupAccess()noexcept {}
+    };
     class WaterSprintfAccess;
     //Other existing friends cannot manufacture these keys: friendship is not
     //transitive. The Water bridge shares this SAME process State and helpers.
@@ -48,7 +54,17 @@ class OriginalConfigProcessGlobals50LA final {
         friend class OriginalConfigProcessGlobals50LA;
         WaterSprintfAccess()noexcept {} //Only the concrete World water caller.
     };
+    class MusicSprintfAccess {
+        friend class rr::game::OriginalRaceMusicManager50LA;
+        MusicSprintfAccess()noexcept {} //Only the actual retained Music manager.
+    };
     struct State {
+        //One process BSS guard3D6480/assertion442E80 for2684E0.
+        bool streamIndexGuard8B10=false;std::uint32_t streamIndexAssertion442E80=0;
+        bool streamIndexAssertionKnown=true,streamLookupAsciiKnown=true;
+        //Loaded3C6391 ASCII table: bit0 marks exactly A..Z. Unknown writers
+        //must poison this same lane; no host locale or per-lookup reset.
+
         const std::thread::id thread=std::this_thread::get_id();
         // Startup100008..100030 clears4338B0, then ctor3C9010 table3CC4D0
         // writes(0,0,0,1) at3C906C. This owner exposes only its XYZ lanes.
@@ -127,6 +143,7 @@ private:
         auto& s=state();s.vectorKnown=false;s.reentrancyKnown=false;s.cursorKnown=false;s.groupAssertionKnown=false;s.type0AssertionsKnown=false;s.groupLookupKnown=false;s.textureListKnown=false;s.textureLoadKnown=false;s.embeddedFCKnown=false;s.compressedBytesKnown=false;
         s.stdioInitializationKnown=false;s.standardFileFieldsKnown=false;s.glueKnown=false;
         s.standardFileReent54Known.fill(false);
+        s.streamIndexAssertionKnown=false;s.streamLookupAsciiKnown=false;
         s.byteLimitKnown=false;s.fixedLocaleKnown=false;
     }
     // First step of EVERY Stream308C90 occurrence. Do not initialize the
@@ -244,6 +261,38 @@ private:
         std::uint32_t& wide,std::int32_t& length,std::uint32_t& pc)noexcept {
         return streamByte306108(StreamSprintfAccess{},byte,wide,length,pc);
     }
+    //Narrow Music2C0C44 bridge into the SAME process State. The manager
+    //cannot extract a Stream key; only this outer class constructs that key.
+    //Child storage retains its own symbolic identity, never a private G type.
+    static bool readMusicReent308C98(const MusicSprintfAccess&,StdioIdentity& captured,
+                                   std::uint32_t& pc)noexcept {
+        return readStreamReent308C98(StreamSprintfAccess{},captured,pc);
+    }
+    static bool initializeMusicSprintf30B528(const MusicSprintfAccess&,StdioIdentity captured,
+                                           std::uint32_t& pc)noexcept {
+        return initializeStreamSprintf30B528(StreamSprintfAccess{},captured,pc);
+    }
+    static bool musicLocale305328(const MusicSprintfAccess&,char& decimal,std::uint32_t& pc)noexcept {
+        return streamLocale305328(StreamSprintfAccess{},decimal,pc);
+    }
+    static bool musicByte306108(const MusicSprintfAccess&,unsigned char byte,
+        std::uint32_t& wide,std::int32_t& length,std::uint32_t& pc)noexcept {
+        return streamByte306108(StreamSprintfAccess{},byte,wide,length,pc);
+    }
+    //158A34 ->30AE70 reads38544C at30AE84 before the admitted decimal
+    //30AC38 path. No integer result, errno write, or call return is minted here.
+    static bool readMusicIntegerReent30AE84(const MusicSprintfAccess&,std::uint32_t& pc)noexcept {
+        const auto& s=state();pc=0x30ae84;
+        if(s.thread!=std::this_thread::get_id()||!s.reentrancyKnown||
+           s.reent38544C!=StdioIdentity::reent385160)return false;
+        pc=0x30ae88;return true;
+    }
+    //Apply BEFORE Music's native2C0B40 filename-concat adapter. A later
+    //Song formatter cannot retroactively establish earlier stdio initialization.
+    //This forwards the existing native boundary, not source printf execution.
+    static void nativeMusicStdioAdapterBoundary(const MusicSprintfAccess&)noexcept {
+        streamNativeDiagnosticBoundary(StreamSprintfAccess{});
+    }
     //World1B38DC/F4 and later2746D8 sprintf/1336C0 log occurrences are
     //closed native byte/diagnostic adapters, not joined source stdio. Apply
     //this boundary BEFORE the first such World adapter, and reconcile again
@@ -267,6 +316,27 @@ private:
         auto& s=state();s.standardFileFieldsKnown=false;s.glueKnown=false;
         if(s.thread!=std::this_thread::get_id()||s.stdioInitialized!=1)
             s.stdioInitializationKnown=false;
+    }
+    static bool streamLookupFold308F00(const StreamLookupAccess&,unsigned char byte,
+                                       std::int32_t& folded,std::uint32_t&)noexcept {
+        const auto& s=state();
+        if(s.thread!=std::this_thread::get_id()||!s.streamLookupAsciiKnown||byte>127u)return false;
+        folded=byte>=static_cast<unsigned char>('A')&&byte<=static_cast<unsigned char>('Z')?
+            std::int32_t(byte)+32:std::int32_t(byte);return true;
+    }
+    static bool streamLookupIndexAssertion268514(const StreamLookupAccess&,std::int32_t index,
+                                                 std::uint32_t& pc)noexcept {
+        auto& s=state();pc=0x268514;
+        if(s.thread!=std::this_thread::get_id()||!s.streamIndexAssertionKnown)return false;
+        if(!s.streamIndexGuard8B10){pc=0x268528;s.streamIndexAssertion442E80=1;
+            pc=0x26852c;s.streamIndexGuard8B10=true;}
+        pc=0x268534;
+        if(s.streamIndexAssertion442E80){
+            //Positive predicate133660 returns0 on both36C100 branches.
+            //Missing-index logging/assert continuation is NOT manufactured.
+            pc=0x268554;if(index==-1)return false;
+        }
+        pc=0x268588;return true;
     }
     static bool readCompressedBytes24F7F0(std::uint32_t& value)noexcept {
         const auto& s=state();if(s.thread!=std::this_thread::get_id()||!s.compressedBytesKnown)return false;

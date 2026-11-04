@@ -38,6 +38,8 @@ class OriginalRaceMusicManager50LA final {
         OriginalRaceConstructor50LA&,OriginalRaceMusicManagerDiagnostic50LA&)noexcept;
     bool loadSourceMusicMetadata2C0BE4(const ::original_main_entry50KG::Application&,
         OriginalRaceConstructor50LA&,OriginalRaceMusicManagerDiagnostic50LA&)noexcept;
+    bool formatSourceSong2C0C44(std::uint32_t ordinal,
+        OriginalRaceMusicManagerDiagnostic50LA&)noexcept;
     bool retireSourceMusicChildNative(OriginalRaceMusicManagerDiagnostic50LA&)noexcept;
     bool constructed()const noexcept;
     static bool noNativePreparation(const ::original_race_hud_scope50LA::Registration&)noexcept;

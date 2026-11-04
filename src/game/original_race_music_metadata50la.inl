@@ -1,5 +1,6 @@
 // Private continuation of the returned first binary open. All bytes below
 // originate in the retained numeric FileManager occurrence, not a JUB parser.
+// Each playlist index requires the SAME backend's genuine returned Stream load.
 bool OriginalRaceMusicManager50LA::loadSourceMusicMetadata2C0BE4(
     const ::original_main_entry50KG::Application& app,OriginalRaceConstructor50LA& race,
     OriginalRaceMusicManagerDiagnostic50LA& d)noexcept {
@@ -177,6 +178,10 @@ bool OriginalRaceMusicManager50LA::loadSourceMusicMetadata2C0BE4(
         // Exact admitted positive decimal strtol(base0) subset, including low32
         // truncation. Other whitespace/sign/base/overflow cases remain
         // bounded; they are not strict-parse source failures or guessed zero.
+        using G=assets::OriginalConfigProcessGlobals50LA;
+        const G::MusicSprintfAccess access;std::uint32_t conversionPC=0x30ae84;
+        if(!G::readMusicIntegerReent30AE84(access,conversionPC))
+            return stop(conversionPC,"Original song-count integer reentrancy read remains bounded");
         if(number.empty()||number.size()>10u||number[0]=='0')return stop(0x158a34,"Original integer conversion outside admitted decimal subset");
         std::uint64_t value=0;
         for(const char c:number){if(c<'0'||c>'9')return stop(0x158a34,"Original integer conversion outside admitted decimal subset");value=value*10u+std::uint32_t(c-'0');}
@@ -189,19 +194,53 @@ bool OriginalRaceMusicManager50LA::loadSourceMusicMetadata2C0BE4(
     catch(...){return stop(0x2c0c20,"Native playlist backing unavailable; source malloc return unknown");}
     child.songOrdinal=1;child.sourceSongs58=child.songEntries58.get();child.songs58Published=true;
     child.word58.reset(); // Typed pointer is known; never encode a host address as a guest word.
-    child.songContinueS3=1; //2C0C40 BEFORE sprintf2C0C44 and section lookup.
-    constexpr char firstSection[]="Song 1";
-    std::memcpy(child.songSection860.data(),firstSection,sizeof(firstSection));child.songSectionKnown=sizeof(firstSection);
-    if(!select(1,std::string_view(child.songSection860.data(),child.songSectionKnown-1u)))return false;
-    if(*child.selections[1].returned){
-        if(!getString(child.filenameGetter,"Filename",child.songFilename530.data(),child.songFilename530.size(),0x104))return false;
-        child.songContinueS3=*child.filenameGetter.returned?1u:0u;
+    while(*child.songOrdinal<=converted){
+        const auto ordinal=*child.songOrdinal;
+        auto& song=child.songLookups[ordinal-1u];
+        auto& filenameGetter=child.filenameGetters[ordinal-1u];
+        child.songContinueS3=1; //2C0C40 BEFORE formatting and section selection.
+        child.pc=p.sourcePC=0x2c0c44;
+        if(!formatSourceSong2C0C44(ordinal,d)){p.sourcePC=child.pc;return false;}
+        if(!select(ordinal,std::string_view(child.songSection860.data(),child.songSectionKnown-1u)))return false;
+        if(*child.selections[ordinal].returned){
+            if(!getString(filenameGetter,"Filename",child.songFilename530.data(),child.songFilename530.size(),0x104))return false;
+            if(filenameGetter.produced)child.songFilenameKnown=filenameGetter.produced;
+            child.songContinueS3=*filenameGetter.returned?1u:0u;
+        }
+        //A section miss leaves s3=1 and the SAME prior stack530 bytes. It is
+        //not a convenient false return. On the first iteration they are unknown.
+        if(!*child.songContinueS3)return stop(0x2c0cf0,"Original missing filename assertion path is not joined");
+        if(!child.songFilenameKnown)return stop(0x2c0cb8,"Original filename strcpy would consume unknown stack bytes");
+        std::size_t nameBytes=0;
+        while(nameBytes<child.songFilenameKnown&&child.songFilename530[nameBytes])++nameBytes;
+        if(nameBytes==child.songFilenameKnown)return stop(0x2c0cb8,"Original filename strcpy has no known terminator");
+        ++nameBytes;
+        const auto offset=std::size_t(ordinal-1u)*0x108u;
+        if(child.sourceSongs58!=child.songEntries58.get()||!child.songs58Published||
+           offset>child.songEntryBytes||0x108u>child.songEntryBytes-offset||nameBytes>0x104u)
+            return stop(0x2c0cb8,"Original playlist entry allocation identity or extent changed");
+        auto* const entry=child.songEntries58.get()+offset;
+        std::memcpy(entry,child.songFilename530.data(),nameBytes); //Actual309230 at2C0CB8.
+        song.filenameKnown=nameBytes;song.copied=true; //No name-tail or index initialization.
+        child.pc=p.sourcePC=0x2c0ce0;
+        //The concrete manager derives both arguments from its SAME live264-byte
+        //entry; neither is a public caller-selected buffer or metadata index.
+        if(!p.componentCurrent()||!p.aural||!p.aural->current()||
+           p.aural->issuer_!=&app||p.aural->entities_!=p.application||
+           !p.aural->interfaceA0_||!*p.aural->interfaceA0_||
+           child.backend3C!=p.nativeInterface44||
+           p.nativeInterface44!=&**p.aural->interfaceA0_||
+           race.music10C_.get()!=this||race.application_!=p.application)
+            return stop(0x2c0ce0,"Actual music caller and same-Aural interface identity unavailable");
+        auto& library=(**p.aural->interfaceA0_).sourceStreamLibrary;
+        platform::OriginalStreamLibrarySource50LA::Diagnostic lookupDiagnostic;
+        if(!library.lookup2684E0(song.occurrence,reinterpret_cast<char*>(entry),
+                song.filenameKnown,0x104u,entry+0x104u,song.index,lookupDiagnostic))
+            return stop(lookupDiagnostic.sourcePC,lookupDiagnostic.reason);
+        song.sourceReturn=1u;++child.lookupReturns; //Actual2684E0 return; caller ignores its value.
+        ++*child.songOrdinal;child.pc=p.sourcePC=0x2c0cec; //Only after actual lookup return.
+        //2C0D78 signed count<s0; admitted count47 and ordinal1..48 avoid overflow.
     }
-    // Selection miss leaves s3=1 and stale stack530, unlike a getter miss.
-    if(!*child.songContinueS3)return stop(0x2c0cf0,"Original missing filename reached its unimplemented assertion path");
-    if(!child.filenameGetter.returned||!*child.filenameGetter.returned||!child.filenameGetter.produced)
-        return stop(0x2c0cb8,"Original filename strcpy would consume unknown/stale stack bytes");
-    std::memcpy(child.songEntries58.get(),child.songFilename530.data(),child.filenameGetter.produced);
-    child.firstSongNameKnown=child.filenameGetter.produced; //2C0CB8 only this prefix; entry+104 remains UNKNOWN.
-    return stop(0x2c0ce0,"First original song filename copied; actual Stream Library2684E0 owner remains unresolved");
+    child.pc=p.sourcePC=0x2c0e08;
+    return stop(0x2c0e08,"Original47-song loop returned its lookups; automatic Config destruction remains unissued");
 }

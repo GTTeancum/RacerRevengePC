@@ -125,6 +125,11 @@ bool OriginalRaceMusicManager50LA::loadSourceMusicChild1A3C00(
     std::string_view directory;
     if(!app.nativeAudioDirectory36AFE0().read36AFE0(app,directory))
         return stop(0x2c0b40,"Actual writable audio directory unavailable; Config retained");
+    //Existing2C0B40 fixed%s%s filename adapter remains explicitly native.
+    //It cannot establish source stdio initialization before the later exact
+    //Song%d call. Preserve only genuine earlier initialization, or stop later.
+    using G=assets::OriginalConfigProcessGlobals50LA;
+    G::nativeMusicStdioAdapterBoundary(G::MusicSprintfAccess{});
     constexpr std::string_view name="racemus.juk";
     const auto length=directory.size()+name.size();
     if(length>=child.filename640.size())return stop(0x2c0b40,"Native pathname extent unavailable");
@@ -140,9 +145,10 @@ bool OriginalRaceMusicManager50LA::loadSourceMusicChild1A3C00(
     child.filename750Known=dot+sizeof(extension);
     child.pc=p.sourcePC=0x2c0b98;
     return openSourceMusicConfig2C0B98(app,race,d);
-    // The returned-open branch can select/count and copy the first filename,
-    // but stops before2684E0. No child74 success bit, attachment141960 or
-    //1A3C00 return exists. Failed first open stops before2C0E40 conversion.
+    //The original loop requires a genuine same-backend268690 return before
+    //any2684E0 lookup. Its end still stops before Config destruction2C0E08;
+    //no child74 success bit, attachment141960 or1A3C00 return is claimed.
+    //Failed first open stops before2C0E40 conversion.
 }
 
 bool OriginalRaceMusicManager50LA::retireSourceMusicChildNative(

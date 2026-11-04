@@ -204,6 +204,8 @@ private:
     static bool construct13FE24(const Application&,std::shared_ptr<OriginalApplicationAural50KG>&,Diagnostic&)noexcept;
     bool sourceIdentity()const noexcept;
     bool backendCurrent(bool permitFailedTransport=false)const noexcept;
+    bool sourceStreamLibraryOwnerCurrent(const OriginalStreamLibrarySource50LA&,
+        const assets::OriginalStandardTextureResolver50LA*)const noexcept;
     bool sourceStreamLibraryIdentityCurrent(const OriginalStreamLibrarySource50LA&,
         const assets::OriginalStandardTextureResolver50LA*)const noexcept;
     bool exactAuralOnlyStartupPrefix()const noexcept;

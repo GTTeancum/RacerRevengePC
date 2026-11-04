@@ -3,6 +3,7 @@
 // none of these fields is a public readiness or caller-supplied completion token.
 #include <cstring>
 #include "../assets/original_music_source_file50la.h"
+#include "../../platform/linux/native/original_stream_library_source50la.h"
 namespace rr::game::original_race_music_source50LA {
 struct VectorAssertions final {
     const std::thread::id thread=std::this_thread::get_id();
@@ -54,7 +55,7 @@ struct Child final {
         std::uint32_t callPC=0;std::size_t requested=0,copied=0;
         bool returned=false;
     };
-    std::array<Read,104> configReads{};
+    std::array<Read,196> configReads{}; //100 open reads plus48 selections, two reads each.
     std::size_t configReadCount=0;
     std::array<std::uint8_t,7> magic48;
     std::array<std::uint8_t,4> version54,sections58,length5C;
@@ -78,18 +79,41 @@ struct Child final {
     };
     struct Getter final {Lookup lookup;std::optional<bool> returned;std::size_t produced=0;};
     bool metadataAttempted=false;
-    std::array<Selection,2> selections;
-    Getter numberGetter,filenameGetter;
+    std::array<Selection,48> selections;
+    Getter numberGetter;std::array<Getter,47> filenameGetters;
+    struct SongLookup {
+        std::shared_ptr<platform::OriginalStreamLibrarySource50LA::Lookup> occurrence;
+        std::optional<std::int32_t> index;
+        std::optional<std::uint32_t> sourceReturn;
+        std::size_t filenameKnown=0;bool copied=false;
+    };
+    std::array<SongLookup,47> songLookups;
+    std::size_t songFilenameKnown=0,lookupReturns=0;
     std::unique_ptr<std::uint8_t[]> block4C4,blockKnown;
     std::size_t blockCapacity=0,configNameKnown=1;
     std::array<char,1024> numberStack20;
     std::optional<bool> numberOfSongsReturned;
+    struct SongFormat final {
+        //This non-friend Child never names or manufactures a Globals passkey.
+        //No numeric EE address or independently owned process state is stored.
+        enum class ReentIdentity { source385160 };
+        std::optional<ReentIdentity> capturedReent,fileReent54;
+        std::optional<char*> buffer10,cursor00;
+        std::optional<std::uint32_t> remaining08,bufferSize14;
+        std::optional<std::uint16_t> flags0C;
+        struct Scan {std::size_t offset=0;std::optional<std::uint32_t> wide;std::optional<std::int32_t> length;};
+        std::array<Scan,7> scans;std::size_t scanCount=0,copied=0;
+        std::array<std::size_t,2> copiedSegments{};std::size_t segmentCount=0;
+        bool attempted=false,initializerReturned=false,localeReturned=false,terminated=false;
+        std::optional<std::uint32_t> formatterReturn,sourceReturn;
+    };
+    std::array<SongFormat,47> songFormats; //Native receipts only; no source stack zero fill.
     std::array<char,0x110> songSection860;
     std::size_t songSectionKnown=0;
     std::array<char,0x104> songFilename530;
     std::unique_ptr<std::uint8_t[]> songEntries58;
     const void* sourceSongs58=nullptr;bool songs58Published=false;
-    std::size_t songEntryBytes=0,firstSongNameKnown=0;
+    std::size_t songEntryBytes=0;
     std::optional<std::uint32_t> songOrdinal,songContinueS3;
 
     std::array<char,0x110> filename640,filename750; // Unknown beyond reached NUL.

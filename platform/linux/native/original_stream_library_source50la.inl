@@ -17,6 +17,7 @@ struct OriginalStreamLibrarySource50LA::Catalog final {
     struct Row {
         const char* name00=nullptr;const void* payload04=nullptr;std::uint32_t references08=0;
         bool nameKnown=false,payloadKnown=false,referencesKnown=false;
+        std::optional<std::size_t> nameOffset; //Native extent custody at actual2988A0, not a guest address.
         std::unique_ptr<std::array<std::uint8_t,8>> payloadBacking; // Native ownership of associated source+4.
     };
     std::unique_ptr<Row[]> rows1C;
@@ -134,10 +135,9 @@ OriginalStreamLibrarySource50LA::OriginalStreamLibrarySource50LA(
 OriginalStreamLibrarySource50LA::~OriginalStreamLibrarySource50LA()noexcept {
     if((load_||catalog98A0_||audioDirectoryLoad_||audioDirectory98A4_)&&!nativeClosed_)std::terminate();
 }
-bool OriginalApplicationAural50KG::sourceStreamLibraryIdentityCurrent(
+bool OriginalApplicationAural50KG::sourceStreamLibraryOwnerCurrent(
     const OriginalStreamLibrarySource50LA& library,const assets::OriginalStandardTextureResolver50LA* resolver)const noexcept {
-    if(!current()||!nativeInitialized_||!backendCurrent()||attached_||entity_.parent1C||
-       entities_->pendingWaves98A4_||entities_->pendingWavesCreated_||
+    if(!current()||!nativeInitialized_||!backendCurrent()||
        !interfaceA0_||!*interfaceA0_||library.aural_!=this||library.issuer_!=issuer_||
        library.thread_!=thread_||library.nativeClosed_||!issuer_->sourceAural00Owner_||
        issuer_->sourceAural00Owner_.get()!=this||!issuer_->standardMaterialDomainOwner_||
@@ -145,6 +145,13 @@ bool OriginalApplicationAural50KG::sourceStreamLibraryIdentityCurrent(
     const auto& i=**interfaceA0_;
     return library.interfaceA0_==&i&&&i.sourceStreamLibrary==&library&&resolver&&
         issuer_->standardMaterialDomainOwner_->resolver3E1A70().get()==resolver;
+}
+bool OriginalApplicationAural50KG::sourceStreamLibraryIdentityCurrent(
+    const OriginalStreamLibrarySource50LA& library,const assets::OriginalStandardTextureResolver50LA* resolver)const noexcept {
+    //Startup-only admission. Later genuine catalog calls use the same-owner
+    //predicate plus their retained completed268690, not this unattached state.
+    return sourceStreamLibraryOwnerCurrent(library,resolver)&&!attached_&&!entity_.parent1C&&
+        !entities_->pendingWaves98A4_&&!entities_->pendingWavesCreated_;
 }
 bool OriginalStreamLibrarySource50LA::closeNative()noexcept {
     if(thread_!=std::this_thread::get_id())return false;
@@ -253,7 +260,7 @@ bool OriginalStreamLibrarySource50LA::loadCatalog2985B0(Catalog& catalog,Catalog
             if(catalog.rowsWritten>=catalog.rowsExtent)return fail(0x29888c,"Original emitted row exceeds native extent");
             auto& row=catalog.rows1C[catalog.rowsWritten++];inToken=true;
             row.payload04=nullptr;row.payloadKnown=true; //29888C.
-            row.name00=reinterpret_cast<const char*>(catalog.text18.get()+n);row.nameKnown=true; //2988A0.
+            row.name00=reinterpret_cast<const char*>(catalog.text18.get()+n);row.nameKnown=true;row.nameOffset=n; //2988A0.
             row.references08=0;row.referencesKnown=true; //2988B0.
         }
         child.rowScanBytes=n+1;
@@ -293,6 +300,113 @@ bool OriginalStreamLibrarySource50LA::begin268690(std::shared_ptr<Resolver> reso
             std::string_view(child.filename80.data(),child.filenameKnown-1u),d))return false;
     child.pc=0x268768;
     return openConfig1577D0(d);
+}
+
+class OriginalStreamLibrarySource50LA::Lookup final {
+    friend class OriginalStreamLibrarySource50LA;
+    const OriginalStreamLibrarySource50LA* owner=nullptr;
+    const Catalog* catalog=nullptr;char* filename=nullptr;std::uint8_t* output=nullptr;
+    std::uint32_t pc=0x2684e0;
+    std::size_t strlenResult=0;bool strlenReturned=false,trimmed=false;
+    struct Visit {std::int32_t index=0;bool nameReturned=false;
+        std::size_t comparedBytes=0;std::optional<std::int32_t> comparison;};
+    std::array<Visit,1743> visits;std::size_t visited=0;
+    std::optional<std::int32_t> findReturn;
+    bool outputWritten=false,assertionReturned=false;
+    std::optional<std::uint32_t> sourceReturn;
+    Lookup()noexcept {} //Only the concrete source method creates a call frame.
+public:
+    ~Lookup()noexcept=default;
+};
+bool OriginalStreamLibrarySource50LA::lookup2684E0(std::shared_ptr<Lookup>& retained,
+    char* filename,std::size_t known,std::size_t extent,std::uint8_t* output,
+    std::optional<std::int32_t>& outputKnown,Diagnostic& d)noexcept {
+    d={};
+    //DFC=1 is stored BEFORE Config destruction. It is not sufficient evidence
+    //that268690 returned. No current startup issuer can produce this predicate.
+    if(thread_!=std::this_thread::get_id()||nativeClosed_||retained||!aural_||!load_||
+       !load_->libraryReturn||*load_->libraryReturn!=1u||!load_->destruction.loadedStoreReached||
+       !audioDirectoryLoad_||!audioDirectoryLoad_->source232Return||!audioDirectory98A4_||
+       !load_->destruction.returned||
+       !load_->destruction.automaticLifetimeEnded||!load_->destruction.nativeFileRetired||
+       load_->configFile||load_->resolver||loadedDFC_!=1u||!catalog98A0_)
+        return stop(d,0x2684e0,"Actual same-backend returned268690 occurrence unavailable");
+    const auto resolver=load_->resolverIdentity.lock();
+    if(!resolver||!aural_->sourceStreamLibraryOwnerCurrent(*this,resolver.get()))
+        return stop(d,0x2684e0,"Original Stream Library owner lifetime changed");
+    const auto currentResolver=issuer_->standardMaterialDomainOwner_->resolver3E1A70();
+    if(currentResolver.owner_before(resolver)||resolver.owner_before(currentResolver))
+        return stop(d,0x2684e0,"Original Stream Library resolver shared custody changed");
+    try {retained=std::shared_ptr<Lookup>(new Lookup);}
+    catch(...){return stop(d,0x2684e0,"Native lookup receipt unavailable before source call");}
+    auto& call=*retained;call.owner=this;call.catalog=catalog98A0_.get();
+    call.filename=filename;call.output=output;
+    const auto fail=[&](std::uint32_t pc,const char* why)noexcept {call.pc=pc;return stop(d,pc,why);};
+    call.pc=0x2684f0; //Actual owned loaded flag; never a native readiness query.
+    if(!output)return fail(0x268594,"Original null-output assertion branch is not joined");
+    //The sole current caller supplies a freshly allocated264-byte playlist
+    //entry. Its260-byte name and final4-byte index never alias each other or
+    //this backend/catalog/process state. Caller separately proves its live row.
+    if(!filename||extent!=0x104u||!known||known>extent||outputKnown||
+       output!=reinterpret_cast<std::uint8_t*>(filename)+extent)
+        return fail(0x2684e0,"Original music entry name/index custody is not the admitted disjoint layout");
+    call.pc=0x266c6c;
+    if(!filename||!known||known>extent)return fail(call.pc,"Original strlen input ownership unavailable");
+    std::size_t length=0;
+    while(length<known&&filename[length])++length;
+    if(length==known)return fail(0x3093a8,"Original strlen would consume unknown filename bytes");
+    call.strlenResult=length;call.strlenReturned=true;
+    if(!length)return fail(0x266c78,"Original empty filename would read before its owned extent");
+    //Only ONE terminal LF or CR is stripped, on the actual playlist string.
+    if(filename[length-1u]=='\n'||filename[length-1u]=='\r'){
+        filename[length-1u]=0;call.trimmed=true; //266CA0, before the secondDFC read.
+    }
+    call.pc=0x266ca4;
+    auto& catalog=*catalog98A0_;
+    if(loadedDFC_!=1u||catalog.dispatch08!=0x3d3690u||!catalog.rows1C||
+       !catalog.text18||!catalog.textKnown||catalog.count10>1743u||
+       catalog.count10!=catalog.rowsExtent||catalog.capacity14!=catalog.count10)
+        return fail(0x266cf8,"Actual Stream catalog extent or source loaded state changed");
+    using G=assets::OriginalConfigProcessGlobals50LA;
+    const G::StreamLookupAccess key;
+    std::int32_t found=-1;
+    for(std::int32_t index=0;index<static_cast<std::int32_t>(catalog.count10);++index){
+        auto& visit=call.visits[call.visited++];visit.index=index;
+        //298D90 asserts only index<0 OR count<index, not index==count.
+        //This caller's own signed loop condition keeps index strictly belowcount.
+        const auto& row=catalog.rows1C[std::size_t(index)];
+        if(!row.nameKnown||!row.nameOffset||*row.nameOffset>=catalog.textExtent||
+           row.name00!=reinterpret_cast<const char*>(catalog.text18.get()+*row.nameOffset))
+            return fail(0x298e4c,"Original row-name pointer is not owned known text");
+        visit.nameReturned=true;call.pc=0x266cd0;
+        std::size_t n=0;std::int32_t compared=0;
+        for(;;){
+            const auto offset=*row.nameOffset;
+            if(n>=catalog.textExtent-offset||!catalog.textKnown[offset+n])
+                return fail(n?0x308f60:0x308f08,"Original catalog comparison would consume unknown text");
+            const auto a=catalog.text18[offset+n];
+            if(n>=known)return fail(a?0x308f18:0x308f80,"Original comparison would consume unknown filename bytes");
+            const auto b=static_cast<unsigned char>(filename[n]);
+            std::int32_t foldedA=0,foldedB=0;std::uint32_t pc=a?0x308f34:0x308f90;
+            if(!G::streamLookupFold308F00(key,a,foldedA,pc))return fail(pc,"Original ASCII ctype ownership unavailable");
+            pc=a?0x308f3c:0x308f94;
+            if(!G::streamLookupFold308F00(key,b,foldedB,pc))return fail(pc,"Original ASCII ctype ownership unavailable");
+            visit.comparedBytes=n+1u;
+            if(!a||foldedA!=foldedB){compared=foldedA-foldedB;break;}
+            ++n;
+        }
+        visit.comparison=compared;
+        if(!compared){found=index;break;} //First matching row only.
+    }
+    call.findReturn=found; //266CE4 or266D10, restored frame returns266D98.
+    const auto bits=static_cast<std::uint32_t>(found);
+    for(std::size_t i=0;i<4;++i)output[i]=std::uint8_t(bits>>(i*8u)); //268510.
+    outputKnown=found;call.outputWritten=true;
+    std::uint32_t pc=0x268514;
+    if(!G::streamLookupIndexAssertion268514(key,found,pc))
+        return fail(pc,"Original Stream index assertion remains bounded after output store");
+    call.assertionReturned=true;call.sourceReturn=1u;call.pc=0x268680;
+    d={call.pc,nullptr};return true; //Original caller ignores this1; output is independently retained.
 }
 
 bool OriginalStreamLibrarySource50LA::format308C90(bool song,std::uint32_t ordinal,Diagnostic& d)noexcept {

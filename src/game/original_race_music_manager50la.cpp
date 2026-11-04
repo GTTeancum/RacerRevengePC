@@ -1,6 +1,7 @@
 #include "../../tests/native/original_race_display_lifetime50la.h"
 #include "original_player_overlay_renderer_lease50la.h"
 #include "original_race_music_manager50la.h"
+#include "../assets/original_config_process_globals50la.h"
 #include "original_pause_storage50la.h"
 #include "original_application_entities50la.h"
 #include "../../tests/native/original_race_constructor50la.h"
@@ -168,6 +169,7 @@ struct OriginalRaceMusicManager50LA::Impl final {
 #include "original_race_music_source50la.inl"
 #include "original_race_music_config_open50la.inl"
 #include "original_race_music_metadata50la.inl"
+#include "original_race_music_format50la.inl"
 OriginalRaceMusicManager50LA::OriginalRaceMusicManager50LA(
     std::shared_ptr<OriginalApplicationEntities50LA> app,std::uint64_t generation,
     const std::shared_ptr<::original_race_hud_scope50LA::Registration>& scope)
