@@ -34,12 +34,19 @@ class OriginalConfigProcessGlobals50LA final {
             StdioIdentity::null,StdioIdentity::null,StdioIdentity::null}}; //+20..2C
         StdioIdentity reent=StdioIdentity::null; //+54
     };
-    // Other existing friends cannot manufacture this key: friendship is not
-    // transitive. These private helpers are exclusively Stream source joins.
+    class WaterSprintfAccess;
+    //Other existing friends cannot manufacture these keys: friendship is not
+    //transitive. The Water bridge shares this SAME process State and helpers.
     class StreamSprintfAccess {
         friend class OriginalStreamLibraryFile50LA;
         friend class rr::platform::OriginalStreamLibrarySource50LA;
+        friend class OriginalConfigProcessGlobals50LA;
         StreamSprintfAccess()noexcept {} //User-provided: not an aggregate passkey.
+    };
+    class WaterSprintfAccess {
+        friend class ::ra_cold_aggregate50LA::Owner;
+        friend class OriginalConfigProcessGlobals50LA;
+        WaterSprintfAccess()noexcept {} //Only the concrete World water caller.
     };
     struct State {
         const std::thread::id thread=std::this_thread::get_id();
@@ -218,6 +225,35 @@ private:
         if(!s.byteLimit385450){pc=0x306124;length=-1;}
         else {pc=0x306130;wide=byte;pc=0x306138;length=byte?1:0;}
         pc=0x30b670;return true;
+    }
+    //Narrow water308C90 bridge. No new reentrancy/locale/byte-limit owner,
+    //no mutable input identities. Only this outer class constructs the inner
+    //Stream key; the World caller cannot extract one from its Water key.
+    static bool readWaterReent308C98(const WaterSprintfAccess&,StdioIdentity& captured,
+                                   std::uint32_t& pc)noexcept {
+        return readStreamReent308C98(StreamSprintfAccess{},captured,pc);
+    }
+    static bool initializeWaterSprintf30B528(const WaterSprintfAccess&,StdioIdentity captured,
+                                           std::uint32_t& pc)noexcept {
+        return initializeStreamSprintf30B528(StreamSprintfAccess{},captured,pc);
+    }
+    static bool waterLocale305328(const WaterSprintfAccess&,char& decimal,std::uint32_t& pc)noexcept {
+        return streamLocale305328(StreamSprintfAccess{},decimal,pc);
+    }
+    static bool waterByte306108(const WaterSprintfAccess&,unsigned char byte,
+        std::uint32_t& wide,std::int32_t& length,std::uint32_t& pc)noexcept {
+        return streamByte306108(StreamSprintfAccess{},byte,wide,length,pc);
+    }
+    //World1B38DC/F4 and later2746D8 sprintf/1336C0 log occurrences are
+    //closed native byte/diagnostic adapters, not joined source stdio. Apply
+    //this boundary BEFORE the first such World adapter, and reconcile again
+    //before exact Water use. It cannot establish+38=1: preserve it only if a
+    //represented earlier startup call already established it. Otherwise its
+    //knownness stays invalid and later30B528 reads stop, including Stream.
+    //Discard FILE/glue snapshots; no source call/return receipt is fabricated.
+    //Unknown source callbacks/aliases still require full poison before admission.
+    static void worldNativeStdioAdapterBoundary(const WaterSprintfAccess&)noexcept {
+        streamNativeDiagnosticBoundary(StreamSprintfAccess{});
     }
     // Explicit native warning-transport boundary, NOT a retail stdio receipt.
     // The adapter must not execute the stored source FILE/cleanup callbacks.

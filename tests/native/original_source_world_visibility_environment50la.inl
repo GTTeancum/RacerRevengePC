@@ -3,11 +3,14 @@
 namespace ra_pod_scene50LA {
 bool Owner::allocateSourceVisibilityTree272FE4(std::uint32_t& pc)noexcept {
     auto& f=sourceVisibilityEnvironment_;pc=f.pc=0x272fd4;
-    if(f.attempted||f.withdrawn||!worldApplication_||worldApplication_->visibility443A98_||worldApplication_->activeTree442E18_||
+    if(f.caller==SourceVisibilityEnvironmentCaller::unreached||f.attempted||f.withdrawn||!worldApplication_||worldApplication_->visibility443A98_||worldApplication_->activeTree442E18_||
        !sourceTopologyMode_||sourceTopologyWithdrawn_)return false;
     f.attempted=true;pc=f.pc=0x272fe4;
-    f.tree.reset(new(std::nothrow) g::OriginalVisibilityQuadTree50LA);f.outerReturned=true;
-    if(f.tree&&!f.tree->constructSource2AEF70(*worldApplication_,pc)){f.pc=pc;return false;}
+    f.tree.reset(new(std::nothrow) g::OriginalVisibilityQuadTree50LA);
+    const bool water=f.caller==SourceVisibilityEnvironmentCaller::water274714;
+    if(water&&!f.tree){f.nativeTreeAllocationRefused=true;return false;}
+    f.outerReturned=true;
+    if(f.tree&&!f.tree->constructSource2AEF70(*worldApplication_,pc,water)){f.pc=pc;return false;}
     pc=f.pc=0x273000;worldApplication_->visibility443A98_=f.tree.get();f.treePublished=true;
     return true; //Including outerNULL: the source still reads Environment bounds.
 }
@@ -26,7 +29,9 @@ bool Owner::finishSourceVisibilityEnvironment27303C(const std::array<std::uint32
     at(0x2730cc);
     if(worldApplication_->environment443108_){at(0x2730d0);return false;} //No unrelated raw-global adoption.
     if(!reserveSourceParticleListNative())return false; //Native ledger admission, no source count effect.
-    auto& n=f.node;at(0x2730d8);n.attempted=true;n.owner.reset(new(std::nothrow) SearchNode);f.nodeAllocationReturned=true;
+    auto& n=f.node;at(0x2730d8);n.attempted=true;n.owner.reset(new(std::nothrow) SearchNode);
+    if(f.caller==SourceVisibilityEnvironmentCaller::water274714&&!n.owner){f.nativeNodeAllocationRefused=true;return false;}
+    f.nodeAllocationReturned=true;
     if(n.owner&&!constructSourceSearchNode27F120(n,pc)){f.pc=pc;return false;}
     at(0x2730f8);worldApplication_->environment443108_=n.owner?&n.owner->entity:nullptr;
     n.published=true;f.nodePublished=true;
@@ -63,14 +68,24 @@ bool Owner::preflightSourceVisibilityEnvironmentForestNative(const Entity& paren
 bool Owner::preflightSourceVisibilityEnvironmentOwnerNative()const noexcept {
     const auto& f=sourceVisibilityEnvironment_;const auto& n=f.node;
     if(f.withdrawn)return !f.tree&&!n.owner&&!n.counted&&!n.enrolled;
-    if(!f.attempted)return !f.tree&&!n.owner&&!f.outerReturned&&!f.treePublished&&!f.bounds&&!f.returned;
+    if(!f.attempted)return f.caller==SourceVisibilityEnvironmentCaller::unreached&&
+        !f.tree&&!n.owner&&!f.outerReturned&&!f.treePublished&&!f.bounds&&!f.returned&&
+        !f.nativeTreeAllocationRefused&&!f.nativeNodeAllocationRefused;
+    if(f.caller==SourceVisibilityEnvironmentCaller::unreached)return false;
     if(!worldApplication_||!sourceTopologyMode_||sourceTopologyWithdrawn_||worldApplication_->attachmentLock423F58())return false;
+    if(f.nativeTreeAllocationRefused)return f.caller==SourceVisibilityEnvironmentCaller::water274714&&
+        f.pc==0x272fe4u&&!f.tree&&!f.outerReturned&&!f.treePublished&&!f.bounds&&!f.returned&&
+        !n.attempted&&!n.owner&&!n.counted&&!n.enrolled&&!f.nativeNodeAllocationRefused;
+    if(f.nativeNodeAllocationRefused&&(f.caller!=SourceVisibilityEnvironmentCaller::water274714||
+       f.pc!=0x2730d8u||!f.tree||!f.tree->sourceConstruction_.capacityReturned||!n.attempted||n.owner||
+       f.nodeAllocationReturned||f.nodePublished||f.returned))return false;
     if(!f.outerReturned||f.treePublished&&f.tree&& !f.tree->sourceConstruction_.constructorReturned)return false;
     if(f.treePublished&&worldApplication_->visibility443A98_!=f.tree.get())return false;
     if(f.bounds&&!f.treePublished)return false;
     if(f.activeNullPublished&&(f.tree||!f.bounds||worldApplication_->activeTree442E18_))return false;
     if(f.tree){
         const auto& t=*f.tree;if(!t.preflightSourceConstructionNative())return false;
+        if(t.sourceConstruction_.requireNativeAllocationSuccess!=(f.caller==SourceVisibilityEnvironmentCaller::water274714))return false;
         const auto expected=std::uint64_t(t.sourceConstruction_.baseConstructed&&!f.constructorReleased&&!f.nativeConstructorReleased)+
             std::uint64_t(f.alias34Retained&&!f.nativeAliasesWithdrawn)+std::uint64_t(f.alias38Retained&&!f.nativeAliasesWithdrawn);
         if(t.reference00_!=expected||f.constructorReleased&&(!f.alias34Retained||!f.alias38Retained))return false;
@@ -141,20 +156,42 @@ bool Owner::preflightSourceVisibilityEnvironmentNative()const noexcept {
     if(!preflightSourceVisibilityEnvironmentOwnerNative())return false;
     const auto& f=sourceVisibilityEnvironment_;
     if(!f.attempted)return !sourceVisibilityEnvironmentReturned_&&!sourceVisibilityEnvironmentReturnV0_;
-    if(!sourceParticlePredecessorEntered_||!sourceParticleEnvironment35CWritten_||!sourceParticleVisibilityWasNull_||
-       !*sourceParticleVisibilityWasNull_)return false;
+    if(f.caller==SourceVisibilityEnvironmentCaller::particle1B4E2C){
+        if(!sourceParticlePredecessorEntered_||!sourceParticleEnvironment35CWritten_||!sourceParticleVisibilityWasNull_||
+           !*sourceParticleVisibilityWasNull_)return false;
+    }else if(f.caller==SourceVisibilityEnvironmentCaller::water274714){
+        const auto& h=sourceWaterFactory274570_;
+        if(!h.entered||h.existsV0!=1u||h.visibilityWasNull!=true||!h.environment35CWritten||
+           !h.visibilityFallbackEntered||sourceParticlePredecessorEntered_||sourceParticleEnvironment35CWritten_)return false;
+    }else return false;
     if(sourceVisibilityEnvironmentReturned_!=f.returned)return false;
     return sourceVisibilityEnvironmentReturned_?(sourceVisibilityEnvironmentReturnV0_&&*sourceVisibilityEnvironmentReturnV0_==1):
         !sourceVisibilityEnvironmentReturnV0_;
 }
 bool Owner::constructSourceVisibilityEnvironment272FC0(std::uint32_t& pc)noexcept {
+    auto& f=sourceVisibilityEnvironment_;const auto& water=sourceWaterFactory274570_;
+    const bool particleCall=pc==0x1b4e2cu&&sourcePostLightPC_==pc&&
+        sourcePostLightPhase_==SourcePostLightPhase::particleEntered&&sourceParticlePredecessorEntered_&&
+        sourceParticleEnvironment35CWritten_&&sourceParticleVisibilityWasNull_==true;
+    const bool waterCall=pc==0x274714u&&sourcePostParticleModelsPC_==pc&&
+        sourcePostParticleModelsPhase_==SourcePostParticleModelsPhase::entered&&
+        sourcePostLightPhase_==SourcePostLightPhase::particleReturned&&
+        water.entered&&water.existsV0==1u&&water.visibilityWasNull==true&&water.environment35CWritten&&
+        water.visibilityFallbackEntered&&!water.visibilityFallbackReturned&&
+        sourcePostSkyTail_.water[0].dispatched&&sourcePostSkyTail_.water[0].worldTable08==0x3cf110u&&
+        sourcePostSkyTail_.water[0].target==0x274570u&&
+        !sourcePostSkyTail_.water[0].returnV0&&!sourceParticlePredecessorEntered_&&!sourceParticleEnvironment35CWritten_;
     if(nativeScbThread_!=std::this_thread::get_id()||closed_||terminal_||nativeScbRevoked_||
-       sourcePostLightPhase_!=SourcePostLightPhase::particleEntered||!sourceParticlePredecessorEntered_||
-       !sourceParticleEnvironment35CWritten_||useEnvironment35C_!=1||!sourceParticleVisibilityWasNull_||
-       !*sourceParticleVisibilityWasNull_||!sourceEnvironment3A4_||!sourceWorldConfig_||
+       particleCall==waterCall||useEnvironment35C_!=1||!sourceEnvironment3A4_||!sourceWorldConfig_||
+       f.caller!=SourceVisibilityEnvironmentCaller::unreached||f.attempted||f.withdrawn||
+       !sourceTopologyMode_||sourceTopologyWithdrawn_||
+       !worldApplication_||worldApplication_->visibility443A98_||worldApplication_->activeTree442E18_||
+       !sourceLoadRace_||!sourceLoadApplication_||sourceLoadRace_->world74_.get()!=this||
+       sourceLoadApplication_->entities()!=worldApplication_||
        !nativeEnvironment3A4_||*nativeEnvironment3A4_!=sourceEnvironment3A4_.get()||
        sourceEnvironmentPhase_!=SourceEnvironmentPhase::returnedOne||
        !preflightSourceWorldTopologyCountNative())return false;
+    f.caller=waterCall?SourceVisibilityEnvironmentCaller::water274714:SourceVisibilityEnvironmentCaller::particle1B4E2C;
     if(!allocateSourceVisibilityTree272FE4(pc))return false;
     pc=sourceVisibilityEnvironment_.pc=0x273028;std::array<std::uint32_t,4> bounds;
     if(!sourceEnvironment3A4_->readSourceVisibilityBounds273028(worldEntity_,*sourceWorldConfig_,bounds))return false;

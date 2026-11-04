@@ -82,6 +82,11 @@ class OriginalVisibilityQuadTree50LA final {
     //native zero defaults are not source observations. The receipt's store
     //bits/known masks are the authority; native cleanup is not a destructor.
     struct SourceConstruction {
+        //Private water caller admits only successful native backing. Refusal
+        //does not stand in for2E8D90's mutable new-handler/throw/NULL behavior.
+        bool requireNativeAllocationSuccess=false;
+        enum class NativeAllocationRefusal:std::uint8_t {none,selected,root,scratch,items};
+        NativeAllocationRefusal nativeAllocationRefusal=NativeAllocationRefusal::none;
         bool sourceMode=false,baseConstructed=false,selectedInitialized=false;
         bool selectedStored=false,innerPublished=false,constructorReturned=false;
         bool configurationEntered=false,resetStored=false,rootStored=false;
@@ -110,21 +115,27 @@ class OriginalVisibilityQuadTree50LA final {
     static float sourceTreeFloat(std::uint32_t bits)noexcept {
         float value=0;std::memcpy(&value,&bits,sizeof value);return value;
     }
-    bool constructSource2AEF70(OriginalApplicationEntities50LA& app,std::uint32_t& pc)noexcept {
+    bool constructSource2AEF70(OriginalApplicationEntities50LA& app,std::uint32_t& pc,
+        bool requireNativeAllocationSuccess=false)noexcept {
         auto& r=sourceConstruction_;pc=0;
         //Fresh source route excludes legacy constructors and a foreign singleton.
         if(r.sourceMode||reference00_||application_||published_||configured_||
            selected18_||root94_||items98_||scratch9C_||app.visibility443A98_){pc=0x2aef70;return false;}
-        r.sourceMode=true;application_=&app;
+        r.sourceMode=true;r.requireNativeAllocationSuccess=requireNativeAllocationSuccess;application_=&app;
         reference00_=1;r.baseConstructed=true; //27E9DC ->1048F0.
         r.vtableStage=SourceConstruction::VtableStage::searchTree27E9D0; //27E9F0.
         selectedCount18_=selectedGrowth20_=selectedCapacity24_=0;selectedOwned28_=false;
         r.selected28Known=1;r.selected28Bits=0;r.selectedInitialized=true; //27ED10.
         usage10_=0; //27EA0C.
         if(!selected_array_guards27ED40::runFresh30(r.selectedGuards,pc)){r.lastPc=pc;return false;}
-        //27EE38's null is a source result, ignored by27E9D0. No fictitious
-        //selected entries are initialized; only pointer/capacity/bit0 are stored.
+        //The existing particle adapter retains its nullable result policy.
+        //Water refuses native failure before any source result/publication.
+        //No fictitious selected entries are initialized.
         selected18_.reset(new(std::nothrow) OriginalVisibilityMembership50LA*[30]);
+        if(!selected18_&&r.requireNativeAllocationSuccess){
+            r.nativeAllocationRefusal=SourceConstruction::NativeAllocationRefusal::selected;
+            pc=r.lastPc=0x27ee38;return false;
+        }
         r.selectedAllocationReturn=selected18_?1u:0u;
         selectedGrowth20_=selectedCapacity24_=30;selectedOwned28_=true;
         r.selected28Bits=1;r.selectedStored=true;
@@ -178,6 +189,10 @@ class OriginalVisibilityQuadTree50LA final {
         //Derived vtable3D4580+4C ->2AF160 ->2AF190 ->264CD0. Null
         //does not call node constructor/increment888, but stores null94.
         root94_.reset(new(std::nothrow) Node);
+        if(!root94_&&r.requireNativeAllocationSuccess){
+            r.nativeAllocationRefusal=SourceConstruction::NativeAllocationRefusal::root;
+            pc=r.lastPc=0x2af168;return false;
+        }
         r.rootAllocationReturn=root94_?1u:0u;
         if(root94_){++nodeCount888_;r.derivedRootConstructed=true;r.rootVtable10=0x3d4560u;}r.rootStored=true;
         originX30_=xmin;maximumX34_=xmax;originZ38_=zmin;maximumZ3C_=zmax;
@@ -193,12 +208,23 @@ class OriginalVisibilityQuadTree50LA final {
         --maximumLevel54_;smallestQuantum58_=quanta60_[maximumLevel54_];r.quantaComplete=true;
         scratchDirty16_=false;r.scratch16Known=1;r.scratch16Bits=0;field14_=0;
         headA4_=tailA8_=nullptr;countAC_=countB4_=0;r.scratchResetStored=true;
-        //Independent nullable allocations. Neither failure erases earlier
-        //root/bounds/quanta effects or suppresses the later pool allocation.
+        //Independent allocations preserve earlier root/bounds/quanta effects.
+        //Water's success-only policy stops on native refusal; the preexisting
+        //particle adapter retains its nullable result policy.
         scratch9C_.reset(new(std::nothrow) Pool<ScratchItem,8>);
+        if(!scratch9C_&&r.requireNativeAllocationSuccess){
+            r.nativeAllocationRefusal=SourceConstruction::NativeAllocationRefusal::scratch;
+            pc=r.lastPc=0x263b4c;return false;
+        }
         r.scratchAllocationReturn=scratch9C_?1u:0u;
         if(scratch9C_){r.scratchPoolConstructed=true;r.scratchPoolVtable8=0x3cc9e0u;}r.scratchPoolStored=true;
         items98_.reset(new(std::nothrow) Pool<ItemBlock,20>);
+        if(!items98_&&r.requireNativeAllocationSuccess){
+            //263B74 is this call's delay slot: successful scratch+9C is
+            //already published, but the later items+98 store is unreached.
+            r.nativeAllocationRefusal=SourceConstruction::NativeAllocationRefusal::items;
+            pc=r.lastPc=0x263b70;return false;
+        }
         r.itemsAllocationReturn=items98_?1u:0u;
         if(items98_){r.itemsPoolConstructed=true;r.itemsPoolVtable8=0x3cc9e0u;}r.itemsPoolStored=true;
         configured_=true;r.configurationReturned=true;pc=r.lastPc=0x2af148;return true;
@@ -212,6 +238,23 @@ class OriginalVisibilityQuadTree50LA final {
     }
     bool preflightSourceConstructionNative()const noexcept {
         const auto& r=sourceConstruction_;
+        using Refusal=SourceConstruction::NativeAllocationRefusal;
+        if(r.nativeAllocationRefusal!=Refusal::none&&!r.requireNativeAllocationSuccess)return false;
+        if(r.requireNativeAllocationSuccess&&((r.selectedStored&&!r.selectedAllocationReturn)||
+           (r.rootStored&&!r.rootAllocationReturn)||(r.scratchPoolStored&&!r.scratchAllocationReturn)||
+           (r.itemsPoolStored&&!r.itemsAllocationReturn)))return false;
+        switch(r.nativeAllocationRefusal){
+        case Refusal::none:break;
+        case Refusal::selected:
+            if(r.lastPc!=0x27ee38u||!r.selectedGuards.returned||r.selectedStored||selected18_||r.typesWritten)return false;break;
+        case Refusal::root:
+            if(r.lastPc!=0x2af168u||!r.resetStored||r.rootStored||root94_||r.boundsStored)return false;break;
+        case Refusal::scratch:
+            if(r.lastPc!=0x263b4cu||!r.scratchResetStored||r.scratchPoolStored||scratch9C_||r.itemsPoolStored)return false;break;
+        case Refusal::items:
+            if(r.lastPc!=0x263b70u||!r.scratchPoolStored||r.itemsPoolStored||items98_)return false;break;
+        default:return false;
+        }
         if(!r.sourceMode||r.withdrawn||!r.baseConstructed||!application_||reference00_>3||
            !selected_array_guards27ED40::preflight(r.selectedGuards)||r.typesWritten>3||
            r.selected28Known!=1||r.selected28Bits>1||r.destroyingA0Known>1||r.scratch16Known>1||

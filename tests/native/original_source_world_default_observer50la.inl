@@ -8,12 +8,18 @@ bool Owner::preflightSourceDefaultObserverNative()const noexcept {
         return !sourceDefaultObserver_&&!sourceDefaultObserverLease_;
     if(!worldApplication_||!sourceTopologyMode_||sourceTopologyWithdrawn_||particlePredecessorAttempted_||
        topologyAttempted_||topologyConstructed_||nativeDefaultObserver443148_||nativeEnvironmentAliases273174_)return false;
-    //272F28 is a historical read. A later genuine1B4E20 may write35C=1
+    //272F28 is a historical read. Later genuine1B4E20 or274708 may write35C=1
     //without rewriting that completed call's input receipt.
     if(sourceParticleEnvironment35CWritten_){
         if(!sourceParticlePredecessorEntered_||!sourceParticleVisibilityWasNull_||!*sourceParticleVisibilityWasNull_||
            !sourceParticleSelectorNone_||*sourceParticleSelectorNone_||!sourceFogCallReturnV0_||
            *sourceFogCallReturnV0_!=1||useEnvironment35C_!=1||!sourceDefaultEnvironment35C_||*sourceDefaultEnvironment35C_!=0)return false;
+    }else if(sourceWaterFactory274570_.environment35CWritten){
+        const auto& h=sourceWaterFactory274570_;
+        if(!h.entered||h.existsV0!=1u||h.visibilityWasNull!=true||!h.visibilityFallbackEntered||
+           !sourcePostSkyTail_.water[0].dispatched||sourcePostSkyTail_.water[0].target!=0x274570u||
+           sourcePostSkyTail_.water[0].equalsNone!=false||useEnvironment35C_!=1||
+           !sourceDefaultEnvironment35C_||*sourceDefaultEnvironment35C_!=0)return false;
     }else if(sourceDefaultEnvironment35C_&&*sourceDefaultEnvironment35C_!=useEnvironment35C_)return false;
     if(sourceDefaultObserverPublished_&&worldApplication_->defaultZoneObserver443148_!=sourceDefaultObserver_.get())return false;
     if(sourceDefaultObserverLease_){

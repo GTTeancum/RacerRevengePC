@@ -1,4 +1,5 @@
 #pragma once
+#include <cstdio>
 #include "../../src/game/original_shared_rng50iu.h"
 #include "../../src/assets/original_loading_pst_native50la.h"
 #include "../../src/game/original_source_particle_random50la.h"
@@ -473,6 +474,9 @@ bool Owner::abortSourcePostParticleModelsNative(std::uint32_t& pc)noexcept {
     if(!preflightSourcePostParticleModelsNative())return false;
     if(sourcePostParticleModelsPhase_==SourcePostParticleModelsPhase::unreached||
        sourcePostParticleModelsPhase_==SourcePostParticleModelsPhase::nativeClosed)return true;
+    //The newest provider has no World400 publication or graph attachment.
+    //Retire its exact partial Entity count before the older scene owners.
+    if(!withdrawSourceWaterProviderNative())return false;
     //Later3F8 unknown-slot array leaves before the Environment owner/config.
     if(!withdrawSourceSkyArrayNative())return false;
     //Latest trigger stack/heap280890 leases leave before older observer cohorts.
@@ -5128,8 +5132,11 @@ bool Owner::continueSourceSkySetup274AF4(std::uint32_t& pc)noexcept {
     if(!*h.argumentS1){at(0x1aa324);h.callerSkipExecuted=true;}
     at(0x1aa33c);return continueSourcePostSkyTail1AA33C(pc);
 }
+#include "original_source_world_water_provider50la.inl"
+#include "original_source_world_water_factory50la.inl"
 bool Owner::preflightSourcePostSkyTailNative()const noexcept {
     const auto& h=sourcePostSkyTail_;
+    if(!preflightSourceWaterFactoryNative())return false;
     if((h.entered&&(!sourceSkySetup274AE0_.returned||sourceSkySetup274AE0_.returnV0!=1u||
         (sourceSkySetup274AE0_.callerResumePC!=0x1aa33cu&&!sourceSkySetup274AE0_.callerSkipExecuted)))||
        (h.courseApplicationRead&&!h.entered)||(h.courseProfileRead&&!h.courseApplicationRead)||
@@ -5154,8 +5161,14 @@ bool Owner::preflightSourcePostSkyTailNative()const noexcept {
            c.dispatched!=bool(c.argumentA2)||(c.environmentRead&&!c.dispatched)||
            (c.environmentNonNull&&!c.environmentRead)||(c.selectorLength&&!c.environmentNonNull)||
            !stringCurrent(c.selector,c.selectorLength,c.equalsNone))return false;
-        if(c.returnV0&&(*c.returnV0!=1u||!c.environmentRead||
-           (c.environmentNonNull?c.equalsNone!=true:i!=0)))return false;
+        if(c.returnV0){
+            if(!c.environmentRead)return false;
+            if(!i&&c.equalsNone==false){
+                //Actual non-none missing-file return, validated by its own
+                //source131A40/World400/diagnostic history above. Caller ignoresV0.
+                if(!sourceWaterFactory274570_.entered||*c.returnV0>1u)return false;
+            }else if(*c.returnV0!=1u||(c.environmentNonNull?c.equalsNone!=true:i!=0))return false;
+        }
         const unsigned mask=c.restoreMask,full=i?31u:127u;
         if(mask>full||(mask&&(mask&(mask+1u)))||(mask&&!c.returnV0)||
            (c.stackReleased&&mask!=full)||c.returned!=c.stackReleased||
@@ -5287,8 +5300,12 @@ bool Owner::continueSourcePostSkyTail1AA33C(std::uint32_t& pc)noexcept {
             //Typed bounded adaptation of this exact strcmp; no guest pointer conversion.
             c.equalsNone=length==4&&std::memcmp(name,"none",4)==0;
             at(i?0x2747f4u:0x2745c0u);at(i?0x2747f8u:0x2745c4u);
-            if(!*c.equalsNone){at(i?0x274804u:0x2745d4u);return false;}
-            at(i?0x2747fcu:0x2745c8u);at(i?0x274800u:0x2745ccu);c.returnV0=1;
+            if(!*c.equalsNone){
+                at(i?0x274804u:0x2745d4u);
+                if(i||!continueSourceWaterFactory2745D4(pc))return false;
+            }else{
+                at(i?0x2747fcu:0x2745c8u);at(i?0x274800u:0x2745ccu);c.returnV0=1;
+            }
         }
         const auto base=i?0x2748d4u:0x274794u;const unsigned restores=i?5u:7u;
         for(unsigned r=0;r<restores;++r){at(base+4u*r);c.restoreMask|=std::uint8_t(1u<<r);}

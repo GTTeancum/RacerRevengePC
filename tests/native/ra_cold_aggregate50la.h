@@ -1,7 +1,11 @@
 #pragma once
 #include "ra_cold_aggregate_prefix50la.h"
 #include "../../src/assets/original_particle_source_config50la.h"
+#include "../../src/assets/original_config_process_globals50la.h"
+#include "../../src/game/original_water_constructor_numeric50la.h"
 #include "../../src/assets/original_source_sky_file50la.h"
+#include "../../src/assets/original_source_water_exists131a40.h"
+#include "../../src/game/original_water_readback_layout50la.h"
 #include "../../src/assets/original_sky_palette_codec14cbe0_native50la.h"
 #include "../../src/game/original_world_particle_invocation50la.h"
 #include "../../src/game/original_world_fog_invocation50la.h"
@@ -578,6 +582,100 @@ struct SourcePostSkyTail {
 } sourcePostSkyTail_;
 bool continueSourcePostSkyTail1AA33C(std::uint32_t&)noexcept;
 bool preflightSourcePostSkyTailNative()const noexcept;
+//Non-none continuation owned by the actual World130 call above. No caller
+//can inject dimensions, a filename, search result or provider-ready value.
+struct SourceWaterFactory274570 {
+    bool entered=false,environmentReloaded=false,directoryRead=false,formatted=false,lookupAttempted=false;
+    std::optional<g::OriginalWaterReadbackLayout50LA::FactoryArguments> arguments;
+    std::optional<g::OriginalWaterReadbackLayout50LA> numericLayout;
+    std::array<char,260> path70; //Conservative native bound, not source sprintf truncation.
+    std::optional<std::size_t> directoryLength,pathLength;
+    std::unique_ptr<a::OriginalSourceWaterExists131A40> existence;
+    std::optional<std::uint32_t> existsV0;
+    bool visibilityRead=false,existing400Read=false;
+    std::optional<bool> visibilityWasNull;
+    bool environment35CWritten=false,visibilityFallbackEntered=false,visibilityFallbackReturned=false;
+    bool visibilityOwnerValidated=false,providerAllocationReached=false;
+    std::optional<const void*> existing400;
+    bool diagnosticAttempted=false;std::size_t diagnosticWritten=0;
+} sourceWaterFactory274570_;
+bool continueSourceWaterFactory2745D4(std::uint32_t&)noexcept;
+bool preflightSourceWaterFactoryNative()const noexcept;
+
+//Actual success-only274720 allocation role. It is not World400 until the
+//unrepresented constructor returns; native lifetime keeps every partial base.
+struct SourceWaterProviderOwner {g::OriginalWreckComponent50LA entity;};
+std::unique_ptr<SourceWaterProviderOwner> sourceWaterProvider_;
+struct SourceWaterProvider274720 {
+    bool allocationAttempted=false,allocationReturned=false,nativeAllocationRefused=false;
+    bool constructorEntered=false,baseEntered=false,countAcquired=false,countRetiredNative=false;
+    bool typeCallEntered=false,typeCallReturned=false,searchableReturned=false,waterBaseEntered=false;
+    bool formatCallEntered=false,nativeWithdrawn=false;
+    std::optional<std::uint32_t> countBefore,vtable08;
+    std::optional<std::uint16_t> query30; //27E154 is SH, never a32-bit query store.
+    std::optional<std::uint8_t> type32,typeReturned;
+    std::uint8_t flags33Known=0,flags33Bits=0;
+    //Exact numeric zero-word writes only. Unreached lanes and upper33 bits
+    //remain unknown; no host pointer is fabricated from a source word.
+    std::array<std::optional<std::uint32_t>,22> zeroWords;
+    std::size_t zeroWordsWritten=0;
+    std::uint32_t pc=0x274720;
+} sourceWaterProvider274720_;
+bool continueSourceWaterProvider274720(std::uint32_t&)noexcept;
+bool sourceWaterProviderCountedNative(std::size_t&)const noexcept;
+bool withdrawSourceWaterProviderNative()noexcept;
+struct SourceWaterProviderMembers {
+    bool entered=false,formatReturned=false,baseReturned=false,embeddedReturned=false;
+    bool vectorArrayReturned=false,zeroArrayReturned=false,integerPrefixComplete=false;
+    using StdioIdentity=a::OriginalConfigProcessGlobals50LA::StdioIdentity;
+    std::optional<StdioIdentity> capturedReent,fileReent54;
+    std::optional<std::uint16_t> fileFlags0C;
+    std::optional<std::uint32_t> fileCapacity14,fileRemaining08;
+    bool fileBuffer10=false;std::optional<std::size_t> fileCursor00;
+    bool priorNativeStdioBounded=false; //Native invalidation, not source initialization.
+    bool stdioInitialized=false,localeReturned=false,terminated=false;
+    struct FormatScan {std::optional<std::uint32_t> wide;std::optional<std::int32_t> length;};
+    std::array<FormatScan,3> scans;std::size_t scansEntered=0,scansReturned=0;
+    std::array<std::optional<std::size_t>,2> stringLengths,copiedSegments;
+    std::size_t segmentCount=0,copied=0;
+    //Historical caller operands/output only. Later consumers must read the
+    //same App process directory, never adopt these copies as current globals.
+    std::array<char,260> trackPrefix{},waterSuffix{};
+    std::array<char,256> formattedPath{};
+    std::optional<std::size_t> trackLength,suffixLength,pathLength;
+    std::optional<std::uint64_t> pathPublication;
+    std::optional<std::uint32_t> formatReturnV0;
+    //133F80(this+F0) writes only outer11C,114,118,110, in that order.
+    std::array<std::optional<std::uint32_t>,4> embeddedWords;
+    std::uint8_t embeddedWritten=0;
+    //Offsets1E0,1F0,200,210,2B0,2C0,2D0,300,310. vf0 W is1.
+    std::array<std::optional<std::array<std::uint32_t,4>>,9> vectors;
+    //2B8590 at2E0/2F0 is INTEGER zero, unlike vf0.
+    std::array<std::array<std::optional<std::uint32_t>,4>,2> integerArrays;
+    std::array<std::uint8_t,2> integerArrayWritten{};
+    std::optional<std::uint32_t> rawF0,rawF1;
+    std::optional<std::uint32_t> field380,field384,fieldD8,field388,fieldE0,fieldDC;
+} sourceWaterProviderMembers_;
+bool continueSourceWaterProviderFormat308C90(std::uint32_t&)noexcept;
+bool preflightSourceWaterProviderMembersNative()const noexcept;
+struct SourceWaterProviderNumeric {
+    bool entered=false,thirdDivideBoundary=false;
+    std::uint32_t pc=0x2b84c0u;
+    struct Conversion {std::optional<std::uint32_t> rawWord,bits;};
+    //C-1,C-2,C+2,17*B,17*B+2, in source conversion order.
+    std::array<Conversion,5> conversions;
+    std::array<std::optional<std::uint32_t>,2> quotients,storedFields; //38C,390.
+    std::array<std::optional<bool>,2> divideAssertedD;
+    std::optional<std::uint32_t> negated390;
+    //Local pinned-model effects only. No live/shared FCR31 value is claimed.
+    std::array<std::optional<std::uint32_t>,2> divideClearMasks;
+    std::optional<std::uint32_t> negateClearMask;
+    std::array<std::optional<std::uint32_t>,2> processWords;
+    std::array<std::optional<std::uint64_t>,2> processPublications;
+} sourceWaterProviderNumeric_;
+bool continueSourceWaterProviderNumeric2B84C0(std::uint32_t&)noexcept;
+bool preflightSourceWaterProviderNumericNative()const noexcept;
+
 //Distinct source3F8 custody. No prepared NativeSkyArray3F8 or image fixture.
 //Pointer slots are unknown until their actual source stores; only published slots may be read.
 //Native typed facet of actual0xAF0 allocation; unreached guest lanes stay unknown.

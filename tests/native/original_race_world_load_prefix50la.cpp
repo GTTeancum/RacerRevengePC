@@ -126,6 +126,10 @@ bool Owner::bindNativeTrackScb34(const original_main_entry50KG::Application& app
     if(!nativeTrackArchiveCurrent(app)||nativeTob34_)return false;
     const auto provider=rosterMountDomain_->archiveProvider3E1A70();
     if(!nativeScb34_){
+        //This native entry skips original1B38DC/F4 sprintf effects. It may
+        //not leave image stdio snapshots current for a later exact caller.
+        using Globals=a::OriginalConfigProcessGlobals50LA;
+        Globals::worldNativeStdioAdapterBoundary(Globals::WaterSprintfAccess{});
         nativeScb34_.emplace(); //Native parser-role publication BEFORE load.
         worldParser34_=&*nativeScb34_;
         //The existing native entry starts1B399C, AFTER unjoined sprintf
@@ -901,6 +905,11 @@ bool Owner::loadSourceWorld1B3880(std::uint32_t& pc)noexcept {
     // Derived1B3880 exact admitted tracks\ra path:13DA50 produces empty
     // drive, tracks\ path, ra stem, empty extension. Only actual sprintf bytes
     // (including NUL) are written; untouched tails retain prior source history.
+    //Bound omitted libc effects BEFORE these native sprintf adapters. A
+    //genuine earlier startup initialization remains1; image0 becomes unknown,
+    //so a later Stream/Water call cannot initialize fictitiously after this.
+    using Globals=a::OriginalConfigProcessGlobals50LA;
+    Globals::worldNativeStdioAdapterBoundary(Globals::WaterSprintfAccess{});
     static constexpr char directory[]="tracks\\";
     static constexpr char name[]="ra";
     for(std::size_t i=0;i<sizeof(directory);++i)worldText3C_[i]=std::uint8_t(directory[i]);
@@ -4493,6 +4502,10 @@ bool Owner::preflightSourceWorldParticleCountNative()const noexcept {
     if(sourceParticleAllocationAttempted_){hasSourceOwner=true;
         if(particleManagerCount>std::numeric_limits<std::size_t>::max()-extra)return false;extra+=particleManagerCount;}
     if(sourceVisibilityEnvironment_.node.counted){hasSourceOwner=true;++extra;}
+    std::size_t waterProviderCount=0;
+    if(!sourceWaterProviderCountedNative(waterProviderCount))return false;
+    if(sourceWaterProvider274720_.allocationAttempted){hasSourceOwner=true;
+        if(waterProviderCount>std::numeric_limits<std::size_t>::max()-extra)return false;extra+=waterProviderCount;}
     if(sourceFirstLight_){hasSourceOwner=true;if(sourceFirstLightCounted_)++extra;}
     if(sourceSecondLight_){hasSourceOwner=true;if(sourceSecondLightCounted_)++extra;}
 

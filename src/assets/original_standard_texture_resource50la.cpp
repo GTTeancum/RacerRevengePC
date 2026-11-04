@@ -3,6 +3,7 @@
 #include "original_source_collision_file50la.h"
 #include "original_particle_source_config50la.h"
 #include "original_source_sky_file50la.h"
+#include "original_source_water_exists131a40.h"
 #include "original_pod_source_bank50la.h"
 #include "original_ra_track_source_file50la.h"
 #include "original_standard_texture_resource50la.h"
@@ -4404,4 +4405,5 @@ bool OriginalStandardTextureResolver50LA::registerLoadingIconBank12CEA0(std::sha
 #include "original_pod_source_bank50la.inl"
 #include "original_particle_source_config50la.inl"
 #include "original_source_sky_file50la.inl"
+#include "original_source_water_exists131a40.inl"
 }

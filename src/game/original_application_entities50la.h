@@ -30,6 +30,7 @@ namespace native_racer_model50LA { class Owner; }
 #include <string_view>
 #include <string>
 #include <optional>
+#include <limits>
 #include <vector>
 #include <thread>
 
@@ -414,6 +415,49 @@ class OriginalApplicationEntities50LA final {
     // Native process-lifetime namespace, initialized from actual file-backed
     //zero data at36B0F0, not reset on menu/Scene entry.
     std::string collisionDirectory36B0F0_;
+    //One fresh native App/process domain, like36B0F0 above. Original LOAD
+    //contains zero bytes at36BEC0/36BFD0; entry BSS clearing starts3D5A00.
+    //These are not per-provider defaults or a claim about an arbitrary guest
+    //after unrepresented writers.260/256 are conservative native windows, not
+    //recovered source declaration size. Preserve trailing bytes on sprintf.
+    struct SourceWaterProcessPaths {
+        std::array<char,260> suffix36BEC0{};
+        std::array<char,256> directory36BFD0{}; //Does not overlap adjacent36C0D0.
+        std::uint64_t publication=0; //Native history serial, not a source lane.
+        bool unknown=false;
+    } sourceWaterProcessPaths_;
+    //Any future unsupported producer/alias must invalidate this same owner,
+    //not import an equal-valued suffix or reset it on Scene/race reentry.
+    void invalidateWaterProcessPathsNative()noexcept {sourceWaterProcessPaths_.unknown=true;}
+    bool waterDirectory2B095CAdmitted(std::string_view actualTrackDirectory)const noexcept {
+        const auto& p=sourceWaterProcessPaths_;
+        if(nativeOwnerThread_!=std::this_thread::get_id()||!constructed_||released_||p.unknown||
+           p.publication==std::numeric_limits<std::uint64_t>::max()||
+           actualTrackDirectory.find('\0')!=std::string_view::npos)return false;
+        std::size_t suffix=0;
+        while(suffix<p.suffix36BEC0.size()&&p.suffix36BEC0[suffix])++suffix;
+        //Native whole-call byte-capacity admission only, no source read/store
+        //receipt. The actual caller still performs stdio, each%s and flush in
+        //order and retains partial writes if a later source boundary refuses.
+        return suffix<p.suffix36BEC0.size()&&actualTrackDirectory.size()<p.directory36BFD0.size()&&
+            suffix<p.directory36BFD0.size()-actualTrackDirectory.size();
+    }
+    //Only the first scalar words are joined at2B850C/2B8528. No claim is
+    //made about the other12 bytes of either global vector. These process
+    //lanes survive provider/World retirement and can be overwritten by later
+    //joined writers; they are not per-provider constructor constants.
+    struct SourceWaterProcessScalars {
+        std::array<std::optional<std::uint32_t>,2> words; //443EC0,443ED0.
+        std::array<std::uint64_t,2> publications{}; //Native history only.
+        bool unknown=false;
+    } sourceWaterProcessScalars_;
+    void invalidateWaterProcessScalarsNative()noexcept {sourceWaterProcessScalars_.unknown=true;}
+    bool waterConstructorScalarsAdmittedNative()const noexcept {
+        const auto& p=sourceWaterProcessScalars_;
+        return nativeOwnerThread_==std::this_thread::get_id()&&constructed_&&!released_&&!p.unknown&&
+            p.publications[0]!=std::numeric_limits<std::uint64_t>::max()&&
+            p.publications[1]!=std::numeric_limits<std::uint64_t>::max();
+    }
     // Native historical-use barrier, not a guest flag or readiness token.
     // All native value/reference consumers must use the observer below so
     // even a retired borrower prevents a late replay of the startup write.

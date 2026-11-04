@@ -32,6 +32,7 @@ class OriginalRaTrackSourceFile50LA;
 class OriginalSourcePsgFile50LA;
 class OriginalSourceCollisionFile50LA;
 class OriginalSourceSkyFile50LA;
+class OriginalSourceWaterExists131A40;
 class OriginalSourcePsgMissingLookup50LA;
 class OriginalLoadingTextureFc50LA;
 class MaterialTextureAssets50EA;
@@ -361,6 +362,9 @@ private:
     friend class OriginalSourcePsgFile50LA;
     friend class OriginalSourceCollisionFile50LA;
     friend class OriginalSourceSkyFile50LA;
+    //Only the genuine World water caller may issue this synchronous131A40.
+    bool captureSourceWaterExists131A40(const std::shared_ptr<OriginalRaTrackSourceFile50LA>&,
+        const std::string&,OriginalSourceWaterExists131A40&,OriginalStandardTextureDiagnostic50LA&)noexcept;
     bool continueSourceCollisionFound132988(std::shared_ptr<OriginalSourcePsgMissingLookup50LA>,const void*,
         std::shared_ptr<OriginalSourceCollisionFile50LA>&,OriginalStandardTextureDiagnostic50LA&)noexcept;
     bool sourceCollisionFileCurrentNative(const OriginalSourceCollisionFile50LA&,bool active)const noexcept;

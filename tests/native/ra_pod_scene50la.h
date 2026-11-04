@@ -1801,7 +1801,9 @@ struct SourceSearchNode27F120 {
     std::size_t exclusionProduced=0;
 };
 //Actual fresh272FC0 ownership, separate from the twenty zone method nodes.
+enum class SourceVisibilityEnvironmentCaller:std::uint8_t {unreached,particle1B4E2C,water274714};
 struct SourceVisibilityEnvironment272FC0 {
+    SourceVisibilityEnvironmentCaller caller=SourceVisibilityEnvironmentCaller::unreached;
     std::unique_ptr<g::OriginalVisibilityQuadTree50LA> tree;
     SourceSearchNode27F120 node;
     bool attempted=false,outerReturned=false,treePublished=false,activeNullPublished=false;
@@ -1809,6 +1811,8 @@ struct SourceVisibilityEnvironment272FC0 {
     bool alias34Stored=false,alias34Retained=false,alias38Stored=false,alias38Retained=false;
     bool constructorReleased=false,returned=false,withdrawn=false;
     bool nativeNodeDetached=false,nativeAliasesWithdrawn=false,nativeConstructorReleased=false;
+    //Water's host allocation refusal is NOT the original new-handler/NULL path.
+    bool nativeTreeAllocationRefused=false,nativeNodeAllocationRefused=false;
     std::optional<std::uint32_t> attachLock;
     std::optional<std::array<std::uint32_t,4>> bounds;
     std::uint32_t pc=0x272fc0;
