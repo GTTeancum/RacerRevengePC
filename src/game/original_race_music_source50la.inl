@@ -140,7 +140,8 @@ bool OriginalRaceMusicManager50LA::loadSourceMusicChild1A3C00(
     child.filename750Known=dot+sizeof(extension);
     child.pc=p.sourcePC=0x2c0b98;
     return openSourceMusicConfig2C0B98(app,race,d);
-    // No song selection/count, child74 success bit, attachment141960 or
+    // The returned-open branch can select/count and copy the first filename,
+    // but stops before2684E0. No child74 success bit, attachment141960 or
     //1A3C00 return exists. Failed first open stops before2C0E40 conversion.
 }
 

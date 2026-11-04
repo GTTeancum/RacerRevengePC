@@ -154,6 +154,16 @@ bool OriginalMusicSourceFile50LA::read12FB30(const void* config,std::int64_t han
     }
     member.cursor10+=static_cast<std::uint32_t>(copied);d.sourceEffectsCommitted=true;return true;
 }
+bool OriginalMusicSourceFile50LA::seekSet12F640(const void* config,std::int64_t handle,
+    std::uint32_t position,D& d)noexcept {
+    d={};if(!current(config,handle)||handle_==-1)return fail(d,E::phase,0x12F640);
+    auto& s=*resolver_->freshFileCapacity_;auto& row=s.members150[handle_];
+    if(position>row.length14)return fail(d,E::unsupported,0x12F640);
+    if(!seekAssertions12F640(handle_,s.memberCount154,d))return false;
+    // Actual seek-origin0 changes logical member cursor only. The next read
+    // activates the device at that position; physical/scratch state stays here.
+    row.cursor10=position;d.sourceEffectsCommitted=true;return true;
+}
 bool OriginalMusicSourceFile50LA::close131040(const void* config,std::int64_t handle,D& d)noexcept {
     d={};if(!current(config,handle)||handle_==-1)return fail(d,E::phase,0x131040);
     auto& s=*resolver_->freshFileCapacity_;

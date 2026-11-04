@@ -30,6 +30,7 @@ class OriginalMusicSourceFile50LA final {
         std::string_view exactName,std::int64_t& returnedSourceHandle,D&)noexcept;
     bool current(const void* exactConfig,std::int64_t handle)const noexcept;
     bool read12FB30(const void* exactConfig,std::int64_t handle,void*,std::size_t,std::size_t&,D&)noexcept;
+    bool seekSet12F640(const void* exactConfig,std::int64_t handle,std::uint32_t position,D&)noexcept;
     bool close131040(const void* exactConfig,std::int64_t handle,D&)noexcept;
     bool closeNative(D&)noexcept;
 public:

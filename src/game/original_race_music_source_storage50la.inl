@@ -54,7 +54,7 @@ struct Child final {
         std::uint32_t callPC=0;std::size_t requested=0,copied=0;
         bool returned=false;
     };
-    std::array<Read,100> configReads{};
+    std::array<Read,104> configReads{};
     std::size_t configReadCount=0;
     std::array<std::uint8_t,7> magic48;
     std::array<std::uint8_t,4> version54,sections58,length5C;
@@ -64,6 +64,34 @@ struct Child final {
     std::array<std::size_t,48> nameKnown{};
     std::unique_ptr<std::uint8_t[]> names4CC,index4BC; // No zero filling.
     std::size_t indexKnown=0;
+    struct Lookup final {
+        std::array<char,1024> lowerKey;std::size_t lowerKnown=0;
+        std::array<std::int32_t,16> visited{};std::size_t visitedCount=0;
+        std::optional<std::int32_t> result;
+        std::uint32_t comparisonPC=0;std::uint8_t matchArm=0; //0 single,1 midpoint,2 low,3 high.
+    };
+    struct Selection final {
+        Lookup lookup;std::optional<bool> returned;
+        std::optional<std::uint32_t> offset,length;
+        std::array<std::uint8_t,4> fieldCount86C;
+        bool countZeroed=false,seekReturned=false;
+    };
+    struct Getter final {Lookup lookup;std::optional<bool> returned;std::size_t produced=0;};
+    bool metadataAttempted=false;
+    std::array<Selection,2> selections;
+    Getter numberGetter,filenameGetter;
+    std::unique_ptr<std::uint8_t[]> block4C4,blockKnown;
+    std::size_t blockCapacity=0,configNameKnown=1;
+    std::array<char,1024> numberStack20;
+    std::optional<bool> numberOfSongsReturned;
+    std::array<char,0x110> songSection860;
+    std::size_t songSectionKnown=0;
+    std::array<char,0x104> songFilename530;
+    std::unique_ptr<std::uint8_t[]> songEntries58;
+    const void* sourceSongs58=nullptr;bool songs58Published=false;
+    std::size_t songEntryBytes=0,firstSongNameKnown=0;
+    std::optional<std::uint32_t> songOrdinal,songContinueS3;
+
     std::array<char,0x110> filename640,filename750; // Unknown beyond reached NUL.
     std::size_t filename640Known=0,filename750Known=0;
     std::uint32_t pc=0x1a3c34;

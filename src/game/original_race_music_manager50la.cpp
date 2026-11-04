@@ -15,6 +15,7 @@
 #include "dynamic_impact_events50iw.h"
 #include "../../tests/native/live_audio50hf_fixture.h"
 #include "../../tests/native/native_ai_session50iv_fixture.h"
+#include <algorithm>
 #include <array>
 #include <bit>
 #include <cfenv>
@@ -166,6 +167,7 @@ struct OriginalRaceMusicManager50LA::Impl final {
 };
 #include "original_race_music_source50la.inl"
 #include "original_race_music_config_open50la.inl"
+#include "original_race_music_metadata50la.inl"
 OriginalRaceMusicManager50LA::OriginalRaceMusicManager50LA(
     std::shared_ptr<OriginalApplicationEntities50LA> app,std::uint64_t generation,
     const std::shared_ptr<::original_race_hud_scope50LA::Registration>& scope)

@@ -106,5 +106,6 @@ bool OriginalRaceMusicManager50LA::openSourceMusicConfig2C0B98(
     // Original157A94/98 returns1 regardless of the returned read byte count.
     // Keep that source result separate from which index bytes are actually known.
     child.configOpenReturn=1;
-    return stop(0x2c0be4,"Original binary Config open returned1; Songs selection is not implemented");
+    p.sourcePC=child.pc=0x2c0be4;
+    return loadSourceMusicMetadata2C0BE4(app,race,d);
 }
