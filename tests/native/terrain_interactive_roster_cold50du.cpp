@@ -661,3 +661,5 @@ bool OwnershipBridge::sourceContact368Lanes2127C8(std::size_t slot,
     spring=&fresh->secondarySpring_;response=&fresh->secondaryResponse_;return true;
 }
 } // namespace ra_source_camera50LA
+
+#include "ra_native_handling_tail_owners50la.inl"

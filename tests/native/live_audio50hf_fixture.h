@@ -21,6 +21,7 @@ namespace interactive_continuation50DU {struct Context;}
 namespace original_race_hud_scope50LA {class Registration;class Scope;}
 namespace original_main_entry50KG {struct Application;}
 namespace native_racer50HN {class Bank;}
+namespace ra_source_camera50LA {class OwnershipBridge;}
 namespace live_audio50HF {
 // Existing0..219 reservations remain fixed; original D44 arrays own the
 // separate220..571 suffix and share this SAME sample clock/mixer.
@@ -58,12 +59,13 @@ inline constexpr std::size_t unsupportedTriggerCues() noexcept{return gameplay_a
 // only consume the output's separately owned PCM ring.
 class Owner final {
     friend class rr::platform::OriginalApplicationAural50KG;
+    friend class ::ra_source_camera50LA::OwnershipBridge;
     friend struct ::interactive_continuation50DU::Context;
     friend class ::original_race_hud_scope50LA::Registration;
     friend class ::original_race_hud_scope50LA::Scope;
-    // Actual native successful-initializer receipt. These borrow the ONE
-    // Setup/Context human D48 numerical fields; never instantiate a second
-    // state or claim source22A210 allocation/attachment already happened.
+    // Canonical Setup/Context human speech borrows. The new forward phase
+    // is distinct from the old successful-native-initializer receipt below.
+    // Neither phase alone proves source22A210 return or22A25C attachment.
     const ::original_main_entry50KG::Application* speechApplication_=nullptr;
     const ::native_racer50HN::Bank* speechBankOwner_=nullptr;
     std::uint64_t speechGeneration_=0;
@@ -71,13 +73,111 @@ class Owner final {
     rr::game::PodSpeechCounts50HG* humanSpeechCounts_=nullptr;
     rr::game::PodSpeechState50HG* humanSpeechState_=nullptr;
     std::uint32_t* humanSpeechRaw_=nullptr;
+    // Forward custody is not the later initializeSpeech receipt. No copied
+    // PodSpeechState or counts; construction writes the same root-owned fields.
+    std::shared_ptr<rr::game::OriginalApplicationEntities50LA> speechEntities_;
+    bool speechForwardBound_=false,speechConstructorAttempted_=false;
+    bool nativeHumanSpeechProviderCurrent()const noexcept {
+        if(!prepared_||closed_||!coldStorage_||coldStorageThread_!=std::this_thread::get_id()||
+           coldStorageEpoch_!=mixer_.groupEpoch50IC()||!groups_.uses(mixer_)||
+           provider_.mixer_!=&mixer_||provider_.epoch_!=mixer_.groupEpoch50IC())return false;
+        for(std::size_t i=0;i<gameplay_audio50HE::cueCount;++i){
+            const auto bank=gameplay_audio50HE::catalog[i].bank;
+            if(bank!=rr::game::AudioBank50HE::PodCurses&&bank!=rr::game::AudioBank50HE::PodTaunts&&
+               bank!=rr::game::AudioBank50HE::PodSpecial)continue;
+            const bool authored=!selected_.catalog[i].name.empty();
+            if(provider_.authored_[i]!=authored)return false;
+            if(authored&&(provider_.voiceSlots_[i]!=gameplay_audio50HE::cueVoice(providerFirstVoice,i)||
+               groups_.binding(provider_.voiceSlots_[i])!=rr::game::RaceAudioGroup50IC::Character11C))return false;
+        }
+        return true;
+    }
+    bool bindNativeHumanSpeechForward22A210(const ::original_main_entry50KG::Application& app,
+        const ::native_racer50HN::Bank& bank,
+        const std::shared_ptr<rr::game::OriginalApplicationEntities50LA>& entities,
+        std::uint64_t generation,std::uint32_t racer60,rr::game::PodSpeechCounts50HG& counts,
+        rr::game::PodSpeechState50HG& state,std::uint32_t& actualRaw)noexcept {
+        if(!nativeHumanSpeechProviderCurrent()||speechApplication_||speechBankOwner_||speechGeneration_||
+           humanSpeechCounts_||humanSpeechState_||humanSpeechRaw_||speechEntities_||speechForwardBound_||
+           speechConstructorAttempted_||!generation||preparedRacer60_!=racer60||state.initialized||
+           !entities||groups_.coldApplication_!=entities||
+           groups_.coldApplication_.owner_before(entities)||entities.owner_before(groups_.coldApplication_)||
+           groups_.coldSession_!=generation)return false;
+        const auto& c=selected_.speech;
+        if(counts.lowDamage!=c.lowDamage||counts.wallHit!=c.wallHit||counts.passed!=c.passed||
+           counts.attacked!=c.attacked||counts.passing!=c.passing||counts.attacking!=c.attacking||
+           counts.death!=c.death||counts.win!=c.win||counts.lose!=c.lose)return false;
+        speechApplication_=&app;speechBankOwner_=&bank;speechGeneration_=generation;speechEntities_=entities;
+        humanSpeechCounts_=&counts;humanSpeechState_=&state;humanSpeechRaw_=&actualRaw;
+        speechForwardBound_=true;return true;
+    }
+    rr::platform::NativePlayerSpeechConstructorResult50LA constructNativeHumanSpeech2C1000(
+        const ::original_main_entry50KG::Application& app,const ::native_racer50HN::Bank& bank,
+        const std::shared_ptr<rr::game::OriginalApplicationEntities50LA>& entities,
+        std::uint64_t generation,std::uint32_t racer60,
+        const rr::game::OriginalWreckComponent50LA& race,const rr::game::OriginalWreckComponent50LA& character11C,
+        rr::game::OriginalWreckComponent50LA& racer,std::uint32_t& actualRaw)noexcept {
+        if(!nativeHumanSpeechProviderCurrent()||!speechForwardBound_||speechConstructorAttempted_||
+           speechApplication_!=&app||speechBankOwner_!=&bank||speechGeneration_!=generation||
+           preparedRacer60_!=racer60||speechEntities_!=entities||speechEntities_.owner_before(entities)||
+           entities.owner_before(speechEntities_)||humanSpeechRaw_!=&actualRaw||
+           !humanSpeechCounts_||!humanSpeechState_||humanSpeechState_->initialized)return {};
+        speechConstructorAttempted_=true; // Never replay a refused native allocation.
+        return groups_.constructNativePlayerSpeech2C1000(this,entities,generation,race,character11C,racer,
+            *humanSpeechCounts_,*humanSpeechState_);
+    }
+    bool canWithdrawNativeHumanSpeechForward22A210(const ::original_main_entry50KG::Application& app,
+        const ::native_racer50HN::Bank& bank,std::uint64_t generation)const noexcept {
+        // Native alias cancellation only, including failure before Session
+        // exists. No source object, count, serial, numeric field or RNG write.
+        return speechForwardBound_&&!groups_.coldNativePlayerSpeech_&&speechApplication_==&app&&
+            speechBankOwner_==&bank&&speechGeneration_==generation&&generation&&speechEntities_&&
+            speechEntities_==groups_.coldApplication_&&
+            !speechEntities_.owner_before(groups_.coldApplication_)&&
+            !groups_.coldApplication_.owner_before(speechEntities_)&&
+            coldStorageThread_==std::this_thread::get_id()&&
+            humanSpeechCounts_&&humanSpeechState_&&humanSpeechRaw_;
+    }
+    bool withdrawNativeHumanSpeechForward22A210(const ::original_main_entry50KG::Application& app,
+        const ::native_racer50HN::Bank& bank,std::uint64_t generation)noexcept {
+        if(!canWithdrawNativeHumanSpeechForward22A210(app,bank,generation))return false;
+        speechApplication_=nullptr;speechBankOwner_=nullptr;speechGeneration_=0;
+        humanSpeechCounts_=nullptr;humanSpeechState_=nullptr;humanSpeechRaw_=nullptr;
+        speechForwardBound_=false;speechEntities_.reset();return true;
+    }
+    bool canRetireNativeHumanSpeech2C10B0(const ::original_main_entry50KG::Application& app,
+        const ::native_racer50HN::Bank& bank,std::uint64_t generation,
+        const rr::game::OriginalWreckComponent50LA& racer,
+        const rr::game::OriginalWreckComponent50LA* publishedD48)const noexcept {
+        if(!nativeHumanSpeechProviderCurrent()||!speechForwardBound_||speechApplication_!=&app||
+           speechBankOwner_!=&bank||speechGeneration_!=generation||!speechEntities_||
+           !humanSpeechCounts_||!humanSpeechState_||!humanSpeechRaw_)return false;
+        if(!groups_.coldNativePlayerSpeech_)return publishedD48==nullptr;
+        return groups_.canRetireNativePlayerSpeech2C10B0(this,racer,publishedD48);
+    }
+    bool retireNativeHumanSpeech2C10B0(const ::original_main_entry50KG::Application& app,
+        const ::native_racer50HN::Bank& bank,std::uint64_t generation,
+        const rr::game::OriginalWreckComponent50LA& racer,
+        const rr::game::OriginalWreckComponent50LA* historicalD48)noexcept {
+        if(!canRetireNativeHumanSpeech2C10B0(app,bank,generation,racer,historicalD48))return false;
+        // Caller first withdraws its native aliases/sourceD48 after this same
+        // preflight. Revoke our borrowed state before its source backing dies.
+        speechApplication_=nullptr;speechBankOwner_=nullptr;speechGeneration_=0;
+        humanSpeechCounts_=nullptr;humanSpeechState_=nullptr;humanSpeechRaw_=nullptr;
+        speechForwardBound_=false;speechEntities_.reset();
+        if(groups_.coldNativePlayerSpeech_&&
+           !groups_.retireNativePlayerSpeech2C10B0(this,racer,historicalD48))std::terminate();
+        return true;
+    }
+
     bool retainNativeHumanSpeechInitialization(const ::original_main_entry50KG::Application& app,
         const ::native_racer50HN::Bank& bank,std::uint64_t generation,std::uint32_t racer60,
         rr::game::PodSpeechCounts50HG& counts,rr::game::PodSpeechState50HG& state,
         std::uint32_t& actualRaw)noexcept {
         //Called ONLY immediately after actual successful initializeSpeech in
         //Context's real activation. No RNG, timer, cursor or guest D48 store.
-        if(!prepared_||closed_||speechApplication_||!generation||preparedRacer60_!=racer60||!state.initialized)return false;
+        if(!prepared_||closed_||speechForwardBound_||speechConstructorAttempted_||speechApplication_||
+           !generation||preparedRacer60_!=racer60||!state.initialized)return false;
         const auto& c=selected_.speech;
         if(counts.lowDamage!=c.lowDamage||counts.wallHit!=c.wallHit||counts.passed!=c.passed||
            counts.attacked!=c.attacked||counts.passing!=c.passing||counts.attacking!=c.attacking||
@@ -90,12 +190,14 @@ class Owner final {
         std::uint32_t& actualRaw,rr::game::PodSpeechCounts50HG*& counts,
         rr::game::PodSpeechState50HG*& state)noexcept {
         counts=nullptr;state=nullptr;
-        if(!prepared_||closed_||speechApplication_!=&app||speechBankOwner_!=&bank||
+        if(!prepared_||closed_||speechForwardBound_||speechConstructorAttempted_||
+           speechApplication_!=&app||speechBankOwner_!=&bank||
            speechGeneration_!=generation||preparedRacer60_!=actualRacer60||
            humanSpeechRaw_!=&actualRaw||!humanSpeechCounts_||!humanSpeechState_||!humanSpeechState_->initialized)return false;
         counts=humanSpeechCounts_;state=humanSpeechState_;return true;
     }
     void revokeNativeHumanSpeech()noexcept {
+        if(speechForwardBound_||groups_.coldNativePlayerSpeech_)std::terminate(); // Use authenticated retirement.
         speechApplication_=nullptr;speechBankOwner_=nullptr;speechGeneration_=0;
         humanSpeechCounts_=nullptr;humanSpeechState_=nullptr;humanSpeechRaw_=nullptr;
     }
@@ -380,6 +482,8 @@ public:
     // Destructor is only a fallback; host construction order remains important.
     bool close(rr::platform::AudioOutputDiagnostic50HD& diagnostic)noexcept {
         if(closeComplete_){diagnostic={};return true;}
+        if(speechForwardBound_||groups_.coldNativePlayerSpeech_)return fail(diagnostic,
+            rr::platform::AudioOutputError50HD::Mixer,"50HF.close","Source D48 custody must retire before audio close");
         revokeNativeHumanSpeech(); //Native borrows end BEFORE provider/output teardown.
         const bool restored=announcer_.stop();
         mixer_.stopAll();

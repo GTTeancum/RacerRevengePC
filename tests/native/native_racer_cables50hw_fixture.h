@@ -57,6 +57,15 @@ class Cables final {
     friend class ::ra_cold_aggregate50LA::Owner;
     std::uint32_t nativeFifoPins_=0,cameraPins_=0;
     std::unique_ptr<g::OriginalRacerStripOwners50LA> lateStrips_;
+    // Private native-only, one-shot outer-loader continuation. The sole caller
+    // authenticates the active Bank.visit(0), same Session racer60 and pin.
+    bool continueNativeOuter212DF0(g::OriginalRacerEntityCold50LA&,
+        const native_racer_model50LA::Owner&,
+        std::shared_ptr<g::OriginalApplicationEntities50LA>,std::uint32_t actualRacer60,
+        std::uint32_t& pc)noexcept;
+    bool nativeOuterAttempted_=false,nativeOuterReturned_=false;
+    bool nativeOuterCablesAllocationAttempted_=false;
+    g::OriginalPodCableAllocationResult50LA nativeOuterResult_{};
     class SourceCameraPin final {
         friend class Cables;
         Cables* owner_;
@@ -74,6 +83,8 @@ class Cables final {
         if(lateStrips_&&(!lateStrips_->closed_||lateStrips_->racer_||lateStrips_->app_))return {};
         if(allocation){selectionState_.allocation_.reset();selectionState_.membership50_=0;}
         lateStrips_.reset();
+        nativeOuterAttempted_=nativeOuterReturned_=nativeOuterCablesAllocationAttempted_=false;
+        nativeOuterResult_={};
         return std::unique_ptr<SourceCameraPin>(new SourceCameraPin(*this));
     }
     const Rig* sourceRig_=nullptr;

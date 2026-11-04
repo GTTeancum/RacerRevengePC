@@ -232,6 +232,8 @@ private:
     bool readWorldProfileByte1B44E8(const OriginalUiMainProfile50KG&,std::uint8_t&)const noexcept;
     //Fresh caller occurrence; shares storage/identity mechanics, not an earlier read receipt.
     bool readWorldProfileByte1AA2F4(const OriginalUiMainProfile50KG&,std::uint8_t&)const noexcept;
+    //Exact fresh course byte at1AA354; does not read unrelated snapshot lanes.
+    bool readWorldCourseByte1AA354(const OriginalUiMainProfile50KG&,std::uint8_t&)const noexcept;
     bool readSharedWorldProfileByteNative(const OriginalUiMainProfile50KG&,std::uint8_t&)const noexcept;
     friend class rr::game::OriginalResults10450LA;
     friend class ::original_results_roster50LA::Read;

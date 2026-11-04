@@ -1701,6 +1701,7 @@ class OriginalWorldTriggerInstance50LA final {
     std::uint32_t* fogPortalSelectorEntry_=nullptr;
     std::uint32_t* fogPortalSelectorS3_=nullptr;
     bool fogPortalSelectorWithdrawn_=false,fogPortalSelectorCanceled_=false;
+    bool fogPortalSelectorCommitted_=false; //Successful native reservation handoff, not cancellation or source readiness.
     OriginalNativeListMethodCustody50LA* fogPortalInsertionA0_=nullptr;
     const B* fogPortalInsertionA1_=nullptr;
     std::uint32_t* fogPortalInsertionA2_=nullptr;
@@ -1714,12 +1715,15 @@ class OriginalWorldTriggerInstance50LA final {
            (call.step&&(f.step!=23||f.callerTarget!=0x280ca4u))||(inserted.step&&call.step!=8)||
            (inserted.lastUsed38&&inserted.lastUsed38!=f.freshLastUsed38)||
            (inserted.incremented38&&inserted.incremented38!=f.nativeOrdinal)||
-           (inserted.returnPC&&inserted.returnPC!=call.callContinuation))return false;
+           (inserted.returnPC&&inserted.returnPC!=call.callContinuation)||
+           (fogPortalSelectorCommitted_&&(!fogSelectorCommitted_||!f.nativeReservationAcquired||inserted.step!=7||
+            fogPrimary_.portalPoolPayload.stores!=63u||!fogPrimary_.returnFlow.triggerReturned()||!serviceRegistered_)))return false;
         const bool noAliases=!fogPortalSelectorTable_&&!fogPortalSelectorTableEnd_&&!fogPortalSelectorBlock_&&
             !fogPortalSelectorEntry_&&!fogPortalSelectorS3_&&!fogPortalInsertionA0_&&!fogPortalInsertionA1_&&
             !fogPortalInsertionA2_&&!fogPortalInsertionA3_&&!fogPortalInsertionT0_;
         if(fogPortalCustodyWithdrawn_)return noAliases&&fogPortalSelectorWithdrawn_==f.nativeReservationAttempted&&
-            fogPortalSelectorCanceled_==f.nativeReservationAcquired&&fogPortalInsertionMemberWithdrawn_==inserted.memberStored&&
+            fogPortalSelectorCanceled_==(f.nativeReservationAcquired&&!fogPortalSelectorCommitted_)&&
+            fogPortalInsertionMemberWithdrawn_==inserted.memberStored&&
             fogPortalInsertionAbandoned_==(inserted.counterStored&&!inserted.memberStored);
         if(fogPortalSelectorWithdrawn_||fogPortalSelectorCanceled_||fogPortalInsertionMemberWithdrawn_||fogPortalInsertionAbandoned_)return false;
         if((call.step>=2?fogPortalInsertionA0_!=fogPortalNeighborMethod_:bool(fogPortalInsertionA0_))||
@@ -1732,10 +1736,15 @@ class OriginalWorldTriggerInstance50LA final {
         if(!fogPortalNeighborMethod_||!fogPrimary_.portalNeighbor.nativePinAcquired||fogPortalNeighborUnpinned_)return false;
         const auto& c=*fogPortalNeighborMethod_;const auto& s=c.source_;const auto& e=c.sourceEntries_;
         const auto expectedLast=inserted.counterStored?inserted.incremented38:f.lastUsed38;
-        if(!c.sourceCollisionEntriesCurrentNative()||e.terminal||e.pending!=&fogPortalNeighborPinIdentity_||
-           e.pendingIdentity!=collider_.get()||e.pendingConsumed!=inserted.counterStored||e.pendingSlot!=f.nativeOrdinal.value_or(0u)||
-           (f.freeHeadNull&&s.field40!=0u)||(expectedLast&&s.lastUsed38!=expectedLast)||
+        if(!c.sourceCollisionEntriesCurrentNative()||(!fogPortalSelectorCommitted_&&e.terminal)||
            (f.perBlock30&&s.perBlock30!=f.perBlock30)||(f.blockCount34&&s.blockCount34!=f.blockCount34))return false;
+        if(fogPortalSelectorCommitted_){
+            if(e.pending&&(e.pending==&fogPortalNeighborPinIdentity_||e.pendingIdentity==collider_.get()||
+               e.pendingSlot==f.nativeOrdinal.value_or(0u)))return false;
+        }else if(e.pending!=&fogPortalNeighborPinIdentity_||e.pendingIdentity!=collider_.get()||
+           e.pendingConsumed!=inserted.counterStored||e.pendingSlot!=f.nativeOrdinal.value_or(0u)||
+           (f.freeHeadNull&&s.field40!=0u)||(expectedLast&&s.lastUsed38!=expectedLast))return false;
+        //Completed reads of lastUsed/freeHead stay historical; exact table/cell/borrower custody remains live.
         if(f.tableNonNull){if(!s.pointer3C||*s.pointer3C!=e.table.get()||fogPortalSelectorTable_!=e.table.get()||
             *f.tableNonNull!=bool(fogPortalSelectorTable_))return false;}
         else if(fogPortalSelectorTable_)return false;
@@ -1755,19 +1764,22 @@ class OriginalWorldTriggerInstance50LA final {
     bool withdrawFogPortalSelectorNative()noexcept {
         const auto& f=fogPrimary_.portalSelector;
         if(!f.nativeReservationAttempted)return true;
-        if(!fogPortalSelectorCurrentNative())return false;
+        if(!fogPortalSelectorCurrentNative()||
+           (fogPortalSelectorCommitted_&&fogPortalNeighborMethod_->sourceEntries_.pending))return false;
         const auto& inserted=fogPrimary_.portalInsertion;
         fogPortalInsertionA0_=nullptr;fogPortalInsertionA1_=nullptr;fogPortalInsertionA2_=nullptr;
         fogPortalInsertionA3_=fogPortalInsertionT0_=nullptr;
         fogPortalSelectorS3_=fogPortalSelectorEntry_=fogPortalSelectorBlock_=nullptr;
         fogPortalSelectorTableEnd_=fogPortalSelectorTable_=nullptr;
-        //All usable argument/table/block/entry aliases die before the exclusive reservation is released.
+        //All usable aliases die before cancellation or member unlink. Never clear a later occurrence's pending reservation.
         if(f.nativeReservationAcquired){auto& c=*fogPortalNeighborMethod_;auto& e=c.sourceEntries_;
-            if(e.pendingConsumed){
-                if(!inserted.memberStored){e.abandonedConsumed=e.pendingSlot;e.terminal=true;fogPortalInsertionAbandoned_=true;}
-                e.pendingConsumed=false;
+            if(!fogPortalSelectorCommitted_){
+                if(e.pendingConsumed){
+                    if(!inserted.memberStored){e.abandonedConsumed=e.pendingSlot;e.terminal=true;fogPortalInsertionAbandoned_=true;}
+                    e.pendingConsumed=false;
+                }
+                e.pending=e.pendingIdentity=nullptr;e.pendingSlot=0;fogPortalSelectorCanceled_=true;
             }
-            e.pending=e.pendingIdentity=nullptr;e.pendingSlot=0;fogPortalSelectorCanceled_=true;
             if(inserted.memberStored){const auto index=*f.nativeOrdinal-1u; //Exact cell was checked before any custody mutation.
                 e.nativeFreeNext[index]=*c.source_.field40;e.members[index]=e.borrowers[index]=nullptr;
                 e.wordKnown[index]=false;c.source_.field40=*f.nativeOrdinal;fogPortalInsertionMemberWithdrawn_=true;
@@ -1808,6 +1820,7 @@ class OriginalWorldTriggerInstance50LA final {
         else if(fogPortalPoolNextV1_)return false;
         const auto& a=serviceHeapMembership_->fogPoolAllocation_;
         if(a.entered!=m.poolStored||a.accountingStored!=r.accountingStored||a.slot14Stored!=slot.stored||a.slot14AliasWithdrawn||
+           a.slot14ReservationCommitted!=fogPortalSelectorCommitted_||
            a.payloadMask!=payload.stores||a.oldHeadRead!=payload.oldHeadNull.has_value())return false;
         if(m.poolStored&&(a.nativeWithdrawn||a.primaryOccurrence!=&servicePrimary_||a.secondaryOccurrence!=&fogPortalNeighborPinIdentity_||
            a.pool!=fogPortalPoolA0_||a.fromFree!=free||!serviceHeapMembership_->fogPoolAllocationHistoryNative()||
@@ -1815,7 +1828,7 @@ class OriginalWorldTriggerInstance50LA final {
         if(m.resultAddressRetained){if(fogPortalPoolResultV0_!=a.record)return false;}
         else if(fogPortalPoolResultV0_)return false;
         if(slot.stored&&(a.slot14Method!=fogPortalNeighborMethod_||a.slot14Member!=collider_.get()||
-           a.record->fogSlot14!=fogPortalSelectorS3_))return false;
+           a.slot14NativeOrdinal!=fogPrimary_.portalSelector.nativeOrdinal||a.record->fogSlot14!=fogPortalSelectorS3_))return false;
         if((payload.step>=3&&payload.step<7?fogPortalPayloadV1_!=fogPortalOperandA0_:bool(fogPortalPayloadV1_))||
            ((payload.stores&1u)&&a.child04!=fogPortalNeighborS0_)||
            ((payload.stores&4u)&&a.portal0C!=fogPortalOperandA0_)||
@@ -1863,7 +1876,10 @@ class OriginalWorldTriggerInstance50LA final {
         return true;
     }
     bool withdrawFogPortalNeighborNative()noexcept {
-        if(!fogPortalNeighborCurrentNative()||!withdrawFogPortalPoolNative()||!withdrawFogPortalSelectorNative())return false;
+        if(!fogPortalNeighborCurrentNative()||
+           (fogPortalSelectorCommitted_&&fogPortalNeighborMethod_->sourceEntries_.pending))return false;
+        //Refuse before any observer/head alias changes if unlink would invalidate another selection's free-head read.
+        if(!withdrawFogPortalPoolNative()||!withdrawFogPortalSelectorNative())return false;
         if(fogPrimary_.portalPoolMutation.poolStored){
             if(!serviceHeapMembership_||!serviceHeapMembership_->releaseFogPoolAllocationNative(&servicePrimary_,&fogPortalNeighborPinIdentity_))return false;
             fogPortalPoolRecordWithdrawn_=true;
@@ -2638,6 +2654,7 @@ class OriginalWorldTriggerInstance50LA final {
     std::uint32_t* fogSelectorS4_=nullptr;
     std::uint32_t* fogInsertionA2_=nullptr; //Same live entry, retained by actual280B7C.
     bool fogSelectorCustodyWithdrawn_=false;
+    bool fogSelectorCommitted_=false; //A persistent registered member, no longer an exclusive pending selector.
     bool fogSelectorCurrentNative()const noexcept {
         const auto& f=fogPrimary_.selector;const auto& h=servicePrimary_;
         const auto& call=fogPrimary_.entryCall;const auto& inserted=fogPrimary_.insertion;const auto& pub=fogPrimary_.publication;
@@ -2645,8 +2662,13 @@ class OriginalWorldTriggerInstance50LA final {
            (pub.step&&inserted.step!=7)||(call.step&&f.step!=21)||
            (inserted.step&&call.step!=11)||(inserted.lastUsed38&&inserted.lastUsed38!=f.freshLastUsed38)||
            (inserted.incremented38&&inserted.incremented38!=f.nativeOrdinal))return false;
-        if(!f.step)return !fogSelectorTable_&&!fogSelectorTableEnd_&&!fogSelectorBlock_&&!fogSelectorEntry_&&!fogSelectorS4_&&!fogInsertionA2_&&!fogSelectorCustodyWithdrawn_;
-        if(h.selectionAttempted!=true||h.selectionReturned||h.slot||h.selectionPending==h.selectionCanceled||
+        if(!f.step)return !fogSelectorTable_&&!fogSelectorTableEnd_&&!fogSelectorBlock_&&!fogSelectorEntry_&&!fogSelectorS4_&&
+            !fogInsertionA2_&&!fogSelectorCustodyWithdrawn_&&!fogSelectorCommitted_;
+        if(fogSelectorCommitted_&&(inserted.step!=7||pub.stores!=31u||!fogPrimary_.returnFlow.triggerReturned()||
+           !serviceAction_.returned||!serviceRegistered_||
+           fogPortalSelectorCommitted_!=fogPrimary_.portalSelector.nativeReservationAcquired))return false;
+        if(h.selectionAttempted!=true||h.selectionReturned||h.slot||
+           unsigned(h.selectionPending)+unsigned(h.selectionCanceled)+unsigned(fogSelectorCommitted_)!=1u||
            h.counterAdvanced!=inserted.counterStored||h.inserted!=inserted.memberStored||h.published!=(pub.stores==31u)||
            (h.slotWithdrawn&&(!inserted.memberStored||!fogSelectorCustodyWithdrawn_)))return false;
         if(pub.stores&4u){
@@ -2655,13 +2677,17 @@ class OriginalWorldTriggerInstance50LA final {
             else if(fogSelectorCustodyWithdrawn_||observer.fogSlot14_!=fogSelectorS4_)return false;
         }
         if(fogSelectorCustodyWithdrawn_)return !fogSelectorTable_&&!fogSelectorTableEnd_&&!fogSelectorBlock_&&!fogSelectorEntry_&&!fogSelectorS4_&&!fogInsertionA2_;
-        if(h.methodUnpinned||h.nativeWithdrawn||!h.methodPinned||!h.method||!h.selectionPending)return false;
+        if(h.methodUnpinned||h.nativeWithdrawn||!h.methodPinned||!h.method||(!h.selectionPending&&!fogSelectorCommitted_))return false;
         const auto& c=*h.method;const auto& e=c.sourceEntries_;const auto& s=c.source_;
-        if(!c.sourceCollisionEntriesCurrentNative()||e.pending!=&h||e.pendingIdentity!=collider_.get()||
-           e.pendingSlot!=f.nativeOrdinal.value_or(0u)||e.pendingConsumed!=inserted.counterStored)return false;
-        const auto expectedLast=inserted.counterStored?inserted.incremented38:f.lastUsed38;
-        if((f.freeHeadNull&&s.field40!=0u)||(expectedLast&&s.lastUsed38!=expectedLast)||
+        if(!c.sourceCollisionEntriesCurrentNative()||
            (f.perBlock30&&s.perBlock30!=f.perBlock30)||(f.blockCount34&&s.blockCount34!=f.blockCount34))return false;
+        const auto expectedLast=inserted.counterStored?inserted.incremented38:f.lastUsed38;
+        if(fogSelectorCommitted_){
+            if(e.pending&&(e.pending==&h||e.pendingIdentity==collider_.get()||e.pendingSlot==f.nativeOrdinal.value_or(0u)))return false;
+        }else if(e.pending!=&h||e.pendingIdentity!=collider_.get()||
+           e.pendingSlot!=f.nativeOrdinal.value_or(0u)||e.pendingConsumed!=inserted.counterStored||
+           (f.freeHeadNull&&s.field40!=0u)||(expectedLast&&s.lastUsed38!=expectedLast))return false;
+        //After successful handoff, only the original read history freezes; live shared counters may advance.
         if(f.tableNonNull){if(!s.pointer3C||*s.pointer3C!=e.table.get()||fogSelectorTable_!=e.table.get()||
             *f.tableNonNull!=bool(fogSelectorTable_))return false;}
         else if(fogSelectorTable_)return false;
@@ -2678,6 +2704,32 @@ class OriginalWorldTriggerInstance50LA final {
         if(call.step>=7){if(fogInsertionA2_!=fogSelectorS4_)return false;}
         else if(fogInsertionA2_)return false;
         return f.s4Retained?fogSelectorS4_==fogSelectorEntry_:!fogSelectorS4_;
+    }
+    bool commitFogRegistrationReservationsNative()noexcept {
+        auto& h=servicePrimary_;const auto& f=fogPrimary_;
+        if(fogSelectorCommitted_||fogPortalSelectorCommitted_||nativeClosed_||membershipNativeWithdrawn_||
+           !serviceRegistered_||serviceTopologyWithdrawn_||!serviceParent_||!fogGeometry_.step||
+           !f.returnFlow.triggerReturned()||!serviceAction_.returned||serviceAction_.nativeWithdrawn||
+           f.insertion.step!=7||f.publication.stores!=31u||!h.selectionPending||h.selectionCanceled||
+           !serviceHeapMembership_||!preflightNative())return false;
+        auto& observer=*serviceHeapMembership_;
+        const bool secondary=f.portalSelector.nativeReservationAcquired;
+        if(f.portalSelector.nativeReservationAttempted!=secondary||
+           (secondary?(f.portalInsertion.step!=7||f.portalPoolPayload.stores!=63u||
+             !observer.fogPoolAllocation_.slot14Stored||observer.fogPoolAllocation_.slot14ReservationCommitted||
+             observer.fogPoolAllocation_.slot14NativeOrdinal!=f.portalSelector.nativeOrdinal||
+             observer.fogPoolAllocation_.record!=fogPortalPoolResultV0_):
+             (observer.fogPoolAllocation_.entered||f.portalPoolPayload.stores)))return false;
+        //Both pending selections and every live observer/table/cell/pin were admitted by preflightNative.
+        //All following operations are non-failing native bookkeeping. No guest store, counter change, pointer conversion,
+        //source return/PC or generic selection receipt is added. Exact registered members and their lifetime pins remain.
+        auto& primary=h.method->sourceEntries_;
+        if(secondary){auto& e=fogPortalNeighborMethod_->sourceEntries_;
+            e.pending=e.pendingIdentity=nullptr;e.pendingSlot=0;e.pendingConsumed=false;
+            observer.fogPoolAllocation_.slot14ReservationCommitted=true;fogPortalSelectorCommitted_=true;
+        }
+        primary.pending=primary.pendingIdentity=nullptr;primary.pendingSlot=0;primary.pendingConsumed=false;
+        h.selectionPending=false;fogSelectorCommitted_=true;return true;
     }
     bool fogReturnCurrentNative()const noexcept {
         const auto& r=fogPrimary_.returnFlow;
@@ -3214,6 +3266,10 @@ class OriginalWorldTriggerInstance50LA final {
         auto& h=servicePrimary_;if(!h.entered||h.nativeWithdrawn)return true;
         if(!servicePrimaryCurrentNative()||!serviceHeapMembership_||!serviceHeapMembership_->preflightNative())return false;
         if(serviceHeapMembership_->primary_.entered&&!serviceHeapMembership_->canWithdrawActiveRegistrationNative())return false;
+        if((fogSelectorCommitted_&&!h.slotWithdrawn&&h.method->sourceEntries_.pending)||
+           (fogPortalSelectorCommitted_&&!fogPortalInsertionMemberWithdrawn_&&fogPortalNeighborMethod_->sourceEntries_.pending))return false;
+        //A completed registration may coexist with later pending work, but unlink must wait for its reverse cleanup.
+        //Check both methods before changing any observer, graph, payload, selector or member alias.
         if(!withdrawServicePortalsNative()||!withdrawFogPortalHeadNative())return false;
         if((fogPrimary_.publication.stores&4u)&&!serviceHeapMembership_->withdrawFogSlot14AliasNative(&h))return false;
         if(fogPrimary_.selector.step&&!fogSelectorCustodyWithdrawn_){
@@ -3543,7 +3599,7 @@ class OriginalWorldTriggerInstance50LA final {
            fogPortalNormal_||fogPortalTemporaryV0_||fogPortalEdgeRelativeT0_||fogPortalFirstEdge_)std::terminate();
         if(fogPortalSelectorTable_||fogPortalSelectorTableEnd_||fogPortalSelectorBlock_||fogPortalSelectorEntry_||fogPortalSelectorS3_||
            fogPortalInsertionA0_||fogPortalInsertionA1_||fogPortalInsertionA2_||fogPortalInsertionA3_||fogPortalInsertionT0_||
-           (fogPrimary_.portalSelector.nativeReservationAcquired&&!fogPortalSelectorCanceled_)||
+           (fogPrimary_.portalSelector.nativeReservationAcquired&&!fogPortalSelectorCanceled_&&!fogPortalSelectorCommitted_)||
            (fogPrimary_.portalInsertion.memberStored&&!fogPortalInsertionMemberWithdrawn_)||
            (fogPrimary_.portalInsertion.counterStored&&!fogPrimary_.portalInsertion.memberStored&&!fogPortalInsertionAbandoned_))std::terminate();
         if(fogPortalPoolA0_||fogPortalPoolS0_||fogPortalPoolFreeV0_||fogPortalPoolChunkA0_||fogPortalPoolBaseA0_||

@@ -29,6 +29,7 @@ namespace ra_cold_roster50LA {
 struct Diagnostic {std::size_t slot=0;const char* stage=nullptr;const char* failure=nullptr;std::string detail;};
 class Operation final {
     friend class FreshExecutionArena;
+    friend class ::ra_source_camera50LA::OwnershipBridge; //Actual native handling lanes during the existing Bank visit.
     friend class ::ra_native_session50LA::Join;
     friend class ::original_results_roster50LA::Read;
     friend class rr::game::OriginalResults10450LA;
@@ -55,6 +56,66 @@ class Operation final {
     std::array<std::unique_ptr<native_racer50HW::Visual>,8>& visuals_;
     std::array<std::unique_ptr<native_racer50HW::Cables>,8>& cables_;
     std::array<native_racer_contact50HW::Binding,8>& contacts_;
+    std::array<a::NativePhyLoad50LA,8> nativePhyLoads_;
+    // Native human caller custody begins before cold consumers. The separate
+    // source Player allocation/axes/vtable are deliberately not adopted.
+    struct NativePlayerLoad final {
+        bool armAttempted=false,armed=false,returnAttempted=false,steeringLoaded=false;
+        bool steeringStored=false,returned=false,retired=false;
+        std::uint32_t pc=0,source5C=0,indexFFC=0,steeringWord=0;
+        const g::PlayerEventBindings49A* bindings=nullptr;
+        original_camera_session50KX::Session* session=nullptr;
+        Model* model=nullptr;
+        g::OriginalRacerEntityCold50LA* racer=nullptr;
+        g::OriginalRacerEntityCold50LA* nativeReturn=nullptr;
+        std::uint64_t racerKey=0;
+        // A NEW native manager call after this return, not the earlier Race
+        // population receipt. Keep Player return history separate and final.
+        bool managerAttempted=false,resourcePairReturned=false;
+        std::uint32_t managerPC=0;
+        g::OriginalRacerEntityCold50LA* managerReceiver=nullptr;
+        const g::OriginalRaceConstructor50LA* resourceRace=nullptr;
+        const a::OriginalStandardMaterialDomain50LA* resourceDomain=nullptr;
+        const a::OriginalStandardMaterialContext50LA* resourceContext=nullptr;
+        a::OriginalStandardMaterialDiagnostic50LA resourceDiagnostic{};
+        bool speechForwardAttempted=false,speechForwardBound=false,speechCallAttempted=false;
+        bool base9CReturned=false,speechConstructorComplete=false,speechPublished=false,speechRetired=false;
+        std::uint32_t speechPC=0;
+        g::OriginalWreckComponent50LA* speechEntity=nullptr;
+    } nativePlayerLoad_;
+    bool nativePlayerCameraOwnersCurrent(const g::PlayerEventState49A* player,
+        const g::ManagerHeldSources49A& held)const noexcept {
+        return nativePlayerLoad_.armed&&!nativePlayerLoad_.retired&&
+            player==arena_.nativePlayerCaller.player_&&arena_.nativePlayerCaller.environment_&&
+            &held==&arena_.nativePlayerCaller.environment_->held;
+    }
+    bool armNativePlayerLoad()noexcept {
+        auto& h=nativePlayerLoad_;const auto& c=arena_.nativePlayerCaller;
+        if(h.armAttempted||h.retired)return false;
+        h.armAttempted=true;
+        auto& r=runtime();const auto lane=[&](const auto* p){return p&&r.registeredRange(p,sizeof(*p));};
+        if(arena_.humanCount!=1u||c.bank_!=bank_||!c.ingress_||!c.actions_||
+           !lane(c.queue_)||!lane(c.application_)||!lane(c.child_)||!lane(c.player_)||!lane(c.environment_)||
+           c.authored_!=arena_.selectedAuthored||!c.authored_||
+           c.steering10A4_!=arena_.selectedSteering||!c.steering10A4_||
+           c.actions_->phase()!=g::ControllerActionPhase50EC::Idle||c.queue_->count!=0||
+           c.player_->source5C>=8u||c.actions_->deviceIndex()!=c.player_->source5C||
+           c.environment_->held.devices[c.player_->source5C]!=&c.ingress_->buttons()||
+           c.child_->player!=c.player_||c.child_->environment!=c.environment_||
+           !c.child_->bindings||c.child_->childIndex!=0u||
+           (c.application_->rootFlags228&12u)||
+           (c.application_->root.flags24&0x600u)!=0x600u||
+           c.application_->root.firstChild!=0u||c.application_->root.childCount!=1u||
+           !c.application_->root.children||c.application_->visitBudget<1u||
+           c.application_->root.children[0].next!=g::noEventChild48Z||
+           !(c.application_->root.children[0].flags29&1u)||(c.application_->root.children[0].flags29&8u)||
+           c.application_->childCallback!=g::playerEventChild49A||c.application_->childContext!=c.child_||
+           arena_.live.state.fields.vehicle58!=0u||arena_.live.state.fields.nativeAiOwnersBound50IV)return false;
+        h.source5C=c.player_->source5C;h.indexFFC=c.player_->indexFFC;h.bindings=c.child_->bindings;
+        if(!c.racer60_)return false;
+        if(c.audio_&&!r.bindNativePlayerSpeechForward22A210(*this))return false;
+        h.armed=true;h.pc=0x1a0848u;return true;
+    }
     std::array<bool,8> attempted_{},completed_{};
     std::size_t nextSlot_=0;
     // Immutable source closure retained even after a later partial failure.
@@ -179,6 +240,9 @@ private:
             need(arena.humanCount<=1u&&bool(arena.selectedAuthored)==bool(arena.selectedSteering)&&
                 (!arena.humanCount||(arena.selectedAuthored&&arena.selectedSteering)),
                 "RA requires actual single-human or ALL8 constructor roles");
+            need(fresh||(!arena.humanCount?arena.nativePlayerCaller.bank_==nullptr:
+                arena.nativePlayerCaller.bank_==&bank),
+                "native human loading requires its actual forward cold caller");
             need(aggregate&&!aggregate->terminal_&&!aggregate->closed_&&aggregate->runtimeQueries_&&
                 aggregate->prefix_.runtimeQueryWorldOwners&&aggregate->prefix_.trackParticleManager&&
                 !aggregate->worldImagesAttempted_&&aggregate->rosterMountComplete_&&
@@ -255,9 +319,25 @@ public:
                 need(s.phase==g::VehicleFramePhase49W::Ready&&s.bodies.main.frameFactor==0.f&&
                     !q.recovery->sourcePrepared&&!s.shape.registrationE0,
                     "actual initial Ready/recovery constructor state required");
+                if(slot==0u&&arena_.humanCount){
+                    d.stage="native human load caller";
+                    need(armNativePlayerLoad(),"actual cold Player input/caller ownership differs");
+                }
+                d.stage="native PHY load ownership";
+                const a::NativePhyLoad50LA::Context phyContext{this,bank_,generation_,slot};
+                auto& phyOwner=nativePhyLoads_[slot];
+                //Aliasing pin owns the existing Resources/Rig lifetime, not
+                //another PHY copy or reopened archive. The parser starts now,
+                //before real consumers; no earlier guest Config is claimed.
+                need(phyOwner.open(phyContext,std::shared_ptr<const std::vector<std::uint8_t>>(
+                    resources_,&rig.phy)),"native PHY owner could not open");
+                auto phyBorrow=phyOwner.borrow(phyContext,rig.phy);
+                need(bool(phyBorrow),"native PHY cold borrow unavailable");
+                const auto& phy=phyBorrow.bytes();
                 d.stage="rig installation";
                 auto model=[&](std::unique_ptr<Model>& out,unsigned role){
                     out=std::make_unique<Model>();
+                    out->nativePhyLoad_=&phyOwner;out->nativePhyContext_=phyContext;
                     out->prepareEarly(rig,slot,generation_,actualBank,x,entities_,domain_,motions_,
                         application_->modelDirectory36B860(),role);
                 };
@@ -284,7 +364,7 @@ public:
                 }
                 if(aiOwned)selection.mode58Nonzero=true;
                 d.stage="handling bind";
-                const auto receipt=native_racer50HW::bindColdHandling(rig.phy,rig.hierarchy[1],rig.hierarchy[0],
+                const auto receipt=native_racer50HW::bindColdHandling(phy,rig.hierarchy[1],rig.hierarchy[0],
                     rig.geometry,collision.mainTarget().source,selection,x,arena_.tuning,
                     rig.modelCount==5?&rig.hierarchy[native_racer50HW::Rig::bottomRight]:nullptr,
                     rig.modelCount==5?&rig.hierarchy[native_racer50HW::Rig::bottomLeft]:nullptr,chariot_[slot].get());
@@ -333,7 +413,7 @@ public:
                 terrain_probe_authoring50fq_fixture::Owner authoredProbe{};std::string error;
                 d.stage="terrain probe authoring";
                 const bool probeAuthored=terrain_probe_authoring50fq_fixture::prepare(authoredProbe,q.main,x.parameters,
-                    rig.phy,probeBindings,error,collision);
+                    phy,probeBindings,error,collision);
                 need(probeAuthored,error.empty()?"original probe authoring failed":error.c_str());
                 for(unsigned axis=0;axis<3;++axis)x.parameters.bodies.main.probeLocal140[axis]=authoredProbe.lowerEndpoint140.v[axis];
                 x.parameters.bodies.main.probeLocal140[3]=1.f;
@@ -343,7 +423,7 @@ public:
                 need(r.constructSharedTerrainResource(slot,authoredProbe),"actual per-row348 resource constructor differs");
                 d.stage="selected recovery construction";
                 const bool recoveryBound=undertrack_owners50ew_fixture::bindSelectedCold(*q.recovery,collision,q.main,q.secondary,
-                    x.parameters,rig.phy,error);
+                    x.parameters,phy,error);
                 need(recoveryBound,error.empty()?"original recovery source bind failed":error.c_str());
                 if(r.storage_.get()->count.sharedRosterCount){
                     need(chariot_[slot]->nativeSecondaryContacts_!=nullptr,
@@ -404,9 +484,22 @@ public:
         auto& r=runtime();if(!r.cameraBankCurrent()||r.bankIdentity_!=bank_)return false;
         if(!r.cameraRetiredForRoster())return false;
         for(unsigned i=0;i<8;++i)if(r.gridRetirementRequired_[i]||r.freshRetirementRequired_[i])return false;
+        if(!r.withdrawNativePlayerSpeechForward22A210(*this))return false;
+        // Withdraw borrowed caller/return pointers before any model or input
+        // backing can retire. Keep reached history and the actual10A4 scalar.
+        nativePlayerLoad_.retired=true;nativePlayerLoad_.session=nullptr;
+        nativePlayerLoad_.model=nullptr;nativePlayerLoad_.racer=nullptr;
+        nativePlayerLoad_.nativeReturn=nullptr;nativePlayerLoad_.bindings=nullptr;
+        nativePlayerLoad_.managerReceiver=nullptr;nativePlayerLoad_.resourceRace=nullptr;
+        nativePlayerLoad_.resourceDomain=nullptr;nativePlayerLoad_.resourceContext=nullptr;
+        arena_.nativePlayerCaller={};
         // Model::close owns its actual Bank visit. Never nest it in one here.
         // Reverse source role order; partial successes remain retained/closed.
         for(std::size_t slot=resources_->racerCount_;slot-->0;){
+            //Abort/terminal retirement is separate from the successful load
+            //close. Never fabricate a close receipt for an incomplete slot.
+            const a::NativePhyLoad50LA::Context context{this,bank_,generation_,slot};
+            if(!nativePhyLoads_[slot].abort(context))return false;
             if(!r.revokeNativePod694(slot,*bank_))return false; //Before any borrowed body/model can retire.
             for(auto* model:{&chariot_[slot],&bottomLeft_[slot],&bottomRight_[slot],&left_[slot],&right_[slot]})
                 if(*model&&!(*model)->close())return false;
@@ -669,7 +762,9 @@ inline bool Owner::constructRetainedRuntimeSourceCamera(
        &actual.poseHistory!=&op->arena_.history||
        &actual.launchKind11258!=&op->arena_.launchKind11258||
        actual.humanCount34!=op->arena_.humanCount||
-       (actual.humanCount34&&!actual.raceHud))
+       (actual.humanCount34&&!actual.raceHud)||
+       (!op->constructorOnly_&&actual.humanCount34&&
+        !op->nativePlayerCameraOwnersCurrent(actual.nativeHumanPlayer0,actual.humanHeld)))
         return failRetainedHandoff(d,"retained camera runtime differs from the actual constructor arena");
     const ra_source_camera50LA::CameraCallerOwners owners{
         actual.bank,actual.arena,actual.bindings,actual.baseTail,actual.ai,
@@ -681,7 +776,7 @@ inline bool Owner::constructRetainedRuntimeSourceCamera(
         op->resources_->rigs_,op->cables_,op->right_,op->left_,op->chariot_,
         &op->bottomRight_,&op->bottomLeft_,actual.raceHud,actual.deathDebris,
         actual.startMusicContext,actual.startMusicRequest,actual.recordManager40,
-        actual.introAudio,actual.introAuthoring,actual.introMusicFadeRequest};
+        actual.introAudio,actual.introAuthoring,actual.introMusicFadeRequest,actual.nativeHumanPlayer0};
     return constructRuntimeSourceCamera(app,owners,cam,display,d);
 }
 inline bool Owner::prepareRuntimeRosterQueryStorage(

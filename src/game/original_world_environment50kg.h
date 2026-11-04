@@ -80,6 +80,13 @@ private:
         const rr::platform::OriginalWorldSourceConfig50LA&,std::int32_t&)const noexcept;
     bool readSourceSkyFile274B54(const OriginalWreckComponent50LA&,
         const rr::platform::OriginalWorldSourceConfig50LA&,std::uint32_t,const char*&,std::size_t&)const noexcept;
+    //Fresh post-Sky source field reads, never prepared native metadata.
+    bool readSourceWaterFile110(const OriginalWreckComponent50LA&,
+        const rr::platform::OriginalWorldSourceConfig50LA&,const char*&,std::size_t&)const noexcept;
+    bool readSourceEcosystemFile318(const OriginalWreckComponent50LA&,
+        const rr::platform::OriginalWorldSourceConfig50LA&,const char*&,std::size_t&)const noexcept;
+    bool readSourceKnownStringNative(const OriginalWreckComponent50LA&,
+        const rr::platform::OriginalWorldSourceConfig50LA&,unsigned,const char*&,std::size_t&)const noexcept;
     bool readSourceParticleName2771F4(const OriginalWreckComponent50LA&,
         const rr::platform::OriginalWorldSourceConfig50LA&,const char*&,std::size_t&)const noexcept;
     bool readSourceVisibilityBounds273028(const OriginalWreckComponent50LA&,

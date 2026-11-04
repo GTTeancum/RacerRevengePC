@@ -205,7 +205,12 @@ void OwnersContext::run() {
        rebaseModels,rebaseModelCount,rebaseWorkspace,rebaseBounds,rebaseDiagnostic,namesForEffects,
        nativeEffects,nativeEffectCount,resetEffectBindings,resetEffectState,resetEffectWorkspace,
        originalRecoveryModels,terrainBindings,coldFlame,nativeOrdinaryLaunch11258,
-       originalAiHumanCount,&authored,&authoredFinishSteering10A4};
+       originalAiHumanCount,&authored,&authoredFinishSteering10A4,
+       humanCourseEnabled&&!allAiEnabled?
+           ra_cold_roster50LA::NativePlayerLoadCaller50LA(racerBank,controller,controllerActions,
+               controllerEvents,applicationEvents,playerEventChild,playerEvents,playerEnvironment,
+               authored,authoredFinishSteering10A4,actualRacer60ForResults,nativeHumanAudio,
+               nativeHumanSpeechCounts,speechState):ra_cold_roster50LA::NativePlayerLoadCaller50LA{}};
    const bool raSessionReady=humanResultsCold?
        raSession->constructHumanTournamentCold(arena,raFreshProbe,{endpoints,endpointScenes,movementSource},
            raMaterialContext,crowdImages,raSessionDiagnostic,nativeRosterOwners,

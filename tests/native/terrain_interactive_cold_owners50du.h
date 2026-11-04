@@ -5,6 +5,8 @@
 #include "native_borrowed_call50du.h"
 #include "sc_trigger_authoring_fixture.h"
 
+namespace live_audio50HF {class Owner;}
+namespace rr::game {struct PodSpeechCounts50HG;}
 namespace interactive_cold50DU {
 namespace platform=rr::platform;
 using namespace rr::game;
@@ -493,6 +495,9 @@ struct OwnersContext final {
     wrongWayUpdatesType& wrongWayUpdates;
     using xType = runtime_startup50fl::Fixture;
     xType& x;
+    // Optional actual native human audio; absence never supplies source D48.
+    ::live_audio50HF::Owner* nativeHumanAudio=nullptr;
+    rr::game::PodSpeechCounts50HG* nativeHumanSpeechCounts=nullptr;
     void run();
 };
 } // namespace interactive_cold50DU

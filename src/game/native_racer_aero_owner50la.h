@@ -2,6 +2,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 namespace native_racer50HN {class Bank;}
 namespace native_racer_model50LA {class Owner;}
 namespace ra_source_camera50LA {class OwnershipBridge;}
@@ -36,6 +37,11 @@ class NativeRacerAeroOwner50LA final {
     //known source word until the actual100330/16CCD0 owner writes it.
     std::uint32_t flowEnabled34_=0;
     std::array<std::uint32_t,4> flow40Words_; //Actual App3D6B40 initializer copy.
+    // Native legacy coefficients absent from AeroParameters48E, in actual
+    // offset order5C,60,64,70,74,7C,80,8C,94,98,9C,A0,A4,A8,AC,B4,BC,C0,C4.
+    // The canonical nine used by48E remain in parameters_->aero. These lanes
+    // become known only when this native continuation reaches1004B0.
+    std::array<std::optional<float>,19> nativeBaseCoefficients_{};
     bool published_=false,revoked_=false;
     //Legacy current-state ctor remains unchanged. Fresh source reservation
     //has no claimed100330/16CCD0 numeric writes or runtime read authority.

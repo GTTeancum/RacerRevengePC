@@ -2,6 +2,7 @@
 // Out-of-line retained model implementation, including source-only counted348 lifetime.
 #include "native_racer_model_lifetime50la_fixture.h"
 #include "../../src/game/original_wreck_tuning50la.h"
+#include "../../src/assets/original_phy_cursor50la.h"
 #include "ra_source_camera_ownership50la.h"
 
 namespace native_racer_model50LA {
@@ -2414,6 +2415,9 @@ bool Owner::continueNativePhysical214710(g::OriginalRacerEntityCold50LA& actualR
        body340_->entity_.kind!=g::OriginalWreckComponentKind50LA::body167920||
        !racer_->sourceGravity378_||!racer_->sourceAirborneGravity37C_||
        !rig_||&retainedPhy!=&rig_->phy||retainedPhy.empty())return false;
+    if(!nativePhyLoad_||racer_->nativePhyLoad_!=nativePhyLoad_)return false;
+    auto phy=nativePhyLoad_->borrow(nativePhyContext_,retainedPhy);if(!phy)return false;
+    auto& reader=phy.cursor();
     nativePhysicalAttempted_=true;
     auto& actual=*fixture_;
     auto at=[&](std::uint32_t address){pc=failurePC_=racer_->nativePostEmberPC_=address;};
@@ -2426,19 +2430,18 @@ bool Owner::continueNativePhysical214710(g::OriginalRacerEntityCold50LA& actualR
             else{racer_->sourceGravity378_=value;
                 actual.selectors.vehicle378=value;actual.secondaryInputs.gravity378=value;}
         };
+        at(0x214718u);bool present=false;
+        if(!reader.select157D00("Physical Properties",present))return false;
         at(0x214738u);nativePhysicalMatrix_={}; //14D7F0, zero matrix.
         constexpr const char* keys[]={"Weight","ChariotWeight","RollInertiaScale","PitchInertiaScale","YawInertiaScale"};
         constexpr std::uint32_t readers[]={0x214774u,0x214788u,0x21479cu,0x2147b0u,0x2147c4u};
         for(unsigned i=0;i<5;++i){at(readers[i]);
-            if(!g::OriginalRacerEntityCold50LA::sourceFloat158A70(retainedPhy,
-                "Physical Properties",keys[i],nativePhysicalStack_[i]))return false;}
+            if(!reader.float158A70(keys[i],nativePhysicalStack_[i]))return false;}
         std::optional<float> value;at(0x2147d8u);
-        if(!g::OriginalRacerEntityCold50LA::sourceFloat158A70(retainedPhy,
-            "Physical Properties","Gravity",value))return false;
+        if(!reader.float158A70("Gravity",value))return false;
         if(value)publishGravity(false,*value);
         value.reset();at(0x2147ecu);
-        if(!g::OriginalRacerEntityCold50LA::sourceFloat158A70(retainedPhy,
-            "Physical Properties","AirborneGravity",value))return false;
+        if(!reader.float158A70("AirborneGravity",value))return false;
         if(value)publishGravity(true,*value);
         at(0x214808u);if(std::fegetround()!=FE_TONEAREST)return false;
         g::original_wreck_tuning_detail50LA::Math math;
@@ -2498,11 +2501,13 @@ bool Owner::continueNativeRepulsor214894(g::OriginalRacerEntityCold50LA& actualR
        pc!=0x214894u||racer_->nativePostEmberPC_!=pc||racer_->racer.sessionGeneration!=generation_||
        racer_->body340!=body340_.get()||!racer_->sourceLift7EC_||!racer_->sourceGravity378_||
        !rig_||&retainedPhy!=&rig_->phy||retainedPhy.empty())return false;
-    nativeRepulsorAttempted_=true;
+    if(!nativePhyLoad_||racer_->nativePhyLoad_!=nativePhyLoad_)return false;
+    auto phy=nativePhyLoad_->borrow(nativePhyContext_,retainedPhy);if(!phy)return false;
+    auto& reader=phy.cursor();nativeRepulsorAttempted_=true;
     const auto at=[&](std::uint32_t address){pc=failurePC_=racer_->nativePostEmberPC_=address;};
-    const auto read=[&](const char* key,std::optional<float>& value){return
-        g::OriginalRacerEntityCold50LA::sourceFloat158A70(retainedPhy,"Repulsor",key,value);};
+    const auto read=[&](const char* key,std::optional<float>& value){return reader.float158A70(key,value);};
     try {
+        at(0x21489cu);bool present=false;if(!reader.select157D00("Repulsor",present))return false;
         std::optional<float> value;at(0x2148b0u);
         if(!read("MaxLiftHeight",value))return false;
         if(value){racer_->sourceLift7EC_=*value;fixture_->parameters.visual.verticalLimit7EC=*value;}
@@ -2530,6 +2535,10 @@ bool Owner::continueNativeRepulsor214894(g::OriginalRacerEntityCold50LA& actualR
         nativeRepulsorComplete_=true;at(0x214954u);return true;
     }catch(...){return false;} //Actual prefixes retained and never replayed.
 }
+
+#include "native_racer_aero_engine21495450la.inl"
+#include "native_racer_handling_return2154d850la.inl"
+#include "native_racer_spin_inventory212ed050la.inl"
 
 void Owner::applySourcePhysical214710(runtime_startup50fl::Fixture& actual) {
     need(sourceHandlingBodyCurrent(actual)&&handlingRoute_==HandlingRoute::source&&

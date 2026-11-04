@@ -2,6 +2,7 @@
 #include "ra_cold_aggregate_prefix50la.h"
 #include "../../src/assets/original_particle_source_config50la.h"
 #include "../../src/assets/original_source_sky_file50la.h"
+#include "../../src/assets/original_sky_palette_codec14cbe0_native50la.h"
 #include "../../src/game/original_world_particle_invocation50la.h"
 #include "../../src/game/original_world_fog_invocation50la.h"
 #include "../../src/game/original_particle_fog_placement50la.h"
@@ -491,25 +492,47 @@ struct SourceTriggerServiceRow {
     bool parentAdvanced=false;
     std::optional<std::uint32_t> nextRow;
 };
+struct SourceTriggerFogRow {
+    std::uint8_t entryStep=0; //Own fresh count, signed branch/delay, index/slot, descriptor LW, nonnull BEQL; through5.
+    std::optional<std::uint32_t> count30;
+    std::optional<bool> branchTaken;
+    std::uint8_t bodyStep=0,descriptorStep=0; //Existing original body16/tail18, never reset for another row.
+    std::optional<std::uint32_t> assertionPredicate,assertionReturnV0;
+    g::OriginalTriggerFogGeometryPrefix50LA geometry;
+    g::OriginalTriggerFogMembershipPrefix50LA membership;
+    g::OriginalTriggerFogBoundsPrefix50LA bounds;
+    g::OriginalTriggerFogPrimaryPrefix50LA primary;
+    bool operator==(const SourceTriggerFogRow&)const=default;
+};
+struct SourceTriggerFogReturn {
+    std::uint8_t step=0; //Own terminal count/compare/delay, List epilogue, World wrapper epilogue; through14.
+    std::optional<std::uint32_t> indexS0,count30,listContinuation,wrapperContinuation;
+    std::optional<bool> branchTaken;
+    bool operator==(const SourceTriggerFogReturn&)const=default;
+    bool historyCurrent()const noexcept {
+        return step<=14&&bool(indexS0)==(step>=1)&&(!indexS0||*indexS0==2u)&&
+            bool(count30)==(step>=1)&&(!count30||*count30==2u)&&
+            bool(branchTaken)==(step>=2)&&(!branchTaken||!*branchTaken)&&
+            bool(listContinuation)==(step>=10)&&(!listContinuation||*listContinuation==0x274ec0u)&&
+            bool(wrapperContinuation)==(step>=14)&&(!wrapperContinuation||*wrapperContinuation==0x1aa2e0u);
+    }
+};
 struct SourceTriggerService274E90 {
     bool entered=false,listRead=false,listNonNull=false,listEntered=false,nativeWithdrawn=false;
     std::uint8_t fogPrefixStep=0; //Own bounded prologue/list/first-row/BEQL history, through12.
-    std::uint8_t fogBodyStep=0; //Own assertion/descriptor/callback operands, through16.
-    std::uint8_t fogDescriptorStep=0; //Own single-action/geometry retirement/parent return stages, through18; next count remains pending.
-    std::optional<std::uint32_t> fogAssertionPredicate,fogAssertionReturnV0;
-    g::OriginalTriggerFogGeometryPrefix50LA fogGeometry;
-    g::OriginalTriggerFogMembershipPrefix50LA fogMembership;
-    g::OriginalTriggerFogBoundsPrefix50LA fogBounds;
-    g::OriginalTriggerFogPrimaryPrefix50LA fogPrimary;
+    std::array<SourceTriggerFogRow,2> fogRows; //Distinct stable receipts for the genuine two loaded descriptors.
+    SourceTriggerFogReturn fogReturn; //Third fresh count occurrence, never a reused row0/row1 test.
     std::optional<std::uint32_t> listTable08,listTarget7C,currentRow,freshCount30;
     std::array<SourceTriggerServiceRow,2> rows;
     bool listReturned=false,wrapperReturned=false;
     std::optional<std::uint32_t> listReturnV0,wrapperReturnV0;
 } sourceTriggerService274E90_;
+bool preflightSourceTriggerFogRowNative(const SourceTriggerServiceRow&,const SourceTriggerFogRow&,std::size_t,bool)const noexcept;
 bool preflightSourceTriggerServiceRowNative(const SourceTriggerServiceRow&,std::size_t)const noexcept;
 bool continueSourceTriggerService274E90(std::uint32_t&)noexcept;
 bool sourceTriggerFogPortalGraphLiveNative(std::size_t)const noexcept;
 bool continueSourceTriggerFogBody2DCB6C(std::uint32_t&)noexcept;
+bool continueSourceTriggerFogReturn2DCC40(std::uint32_t&)noexcept;
 bool preflightSourceTriggerServiceNative()const noexcept;
 //New synchronous caller occurrence after274E90; stored values are history,
 //never a profile snapshot used to authorize later calls.
@@ -527,6 +550,34 @@ struct SourceSkySetup274AE0 {
     bool stackReleased=false,callerSkipExecuted=false;
 } sourceSkySetup274AE0_;
 bool continueSourceSkySetup274AF4(std::uint32_t&)noexcept;
+//Own post-Sky call occurrences. No prepared water domain, native lighting
+//selector or snapshot can issue these source receipts.
+struct SourcePostSkyWaterCall {
+    bool applicationRead=false,worldRead=false,profileRead=false,dispatched=false;
+    std::optional<std::uint32_t> race8C,worldTable08,target,argumentA2;
+    std::optional<std::uint8_t> profile1125C;
+    bool environmentRead=false,environmentNonNull=false;
+    std::array<char,260> selector{};std::optional<std::size_t> selectorLength;
+    std::optional<bool> equalsNone;
+    std::optional<std::uint32_t> returnV0,continuation;
+    std::uint8_t restoreMask=0;bool stackReleased=false,returned=false;
+};
+struct SourcePostSkyTail {
+    bool entered=false,courseApplicationRead=false,courseProfileRead=false,courseReady=false;
+    std::optional<std::uint8_t> course1125F,conditional1125C;
+    std::optional<std::uint32_t> courseLow4,argumentA3;
+    std::array<SourcePostSkyWaterCall,2> water;
+    bool copyWorldRead=false,race70Stored=false,ecosystemWorldRead=false,ecosystemEnvironmentRead=false;
+    std::optional<bool> water400WasNull,ecosystemEnvironmentNonNull,ecosystemEqualsNone;
+    std::array<char,260> ecosystem{};std::optional<std::size_t> ecosystemLength;
+    std::optional<std::uint32_t> fixedSizeS0,directoryLength,directoryCopyLength;
+    bool assertionSkipped=false,directoryCopyEntered=false,directoryCopyReturned=false,directoryTerminatorStored=false;
+    std::uint8_t restoreMask=0;
+    std::optional<std::uint32_t> returnV0,continuation;
+    bool stackReleased=false,returned=false;
+} sourcePostSkyTail_;
+bool continueSourcePostSkyTail1AA33C(std::uint32_t&)noexcept;
+bool preflightSourcePostSkyTailNative()const noexcept;
 //Distinct source3F8 custody. No prepared NativeSkyArray3F8 or image fixture.
 //Pointer slots are unknown until their actual source stores; only published slots may be read.
 //Native typed facet of actual0xAF0 allocation; unreached guest lanes stay unknown.
@@ -585,6 +636,32 @@ struct SourceSkyPaletteOwner {
 };
 std::unique_ptr<SourceSkyPaletteOwner> sourceSkyPaletteOwner_;
 std::optional<SourceSkyPaletteOwner*> sourceSkyPalette7D0_;
+struct SourceSkyPaletteFinalization {
+    struct RGBRead {std::optional<std::uint32_t> first10,count14,index;};
+    std::array<RGBRead,3> rgbReads;
+    std::uint8_t rgbStoreMask=0,lookupStoreMask=0;
+    //Actual signed LB operands, independently reloaded for each lookup SB.
+    std::array<std::optional<std::int32_t>,2> lookupFirst10,lookupCount14;
+    std::array<std::optional<std::uint8_t>,2> lookupValue;
+    std::optional<std::uint32_t> incrementRead14,incrementAfter14;
+    bool countStored14=false;
+};
+struct SourceSkyCompressedPalette {
+    struct Block {
+        bool sizeAttempted=false,sizeReturned=false,selected=false,direct=false;
+        std::size_t sizeCopied=0,copied=0,outputKnownPrefix=0;
+        std::optional<std::uint32_t> sizeItems,size,payloadItems;
+        bool payloadAttempted=false,payloadReturned=false,codecCallReached=false,codecReturned=false,completed=false;
+        std::unique_ptr<a::OriginalSkyPaletteCodec14CBE0Native50LA> codec;
+    };
+    bool entered=false,allocationAttempted=false,allocationReturned=false,allocationNonNull=false;
+    bool errorExit=false,freeReached=false,scratchFreedSource=false,bodyReturned=false,nativeWithdrawn=false;
+    std::unique_ptr<std::uint8_t[]> scratch;
+    std::size_t scratchKnownPrefix=0;
+    std::array<std::uint8_t,4> sizeWord; //Only mask-qualified bytes are source-known; reused stack3C.
+    std::uint8_t sizeKnownMask=0;
+    std::array<Block,3> blocks;
+};
 struct SourceSkyPalette2E38C0 {
     bool entered=false,allocationAttempted=false,allocationReturned=false,allocationNonNull=false;
     bool constructorEntered=false,baseReturned=false,derivedVtableStored=false,slotPublished=false,nativeWithdrawn=false;
@@ -601,9 +678,16 @@ struct SourceSkyPalette2E38C0 {
     std::array<std::size_t,3> payloadBytes{{0,0,0}};
     std::optional<std::uint32_t> count14;
     std::uint32_t convertedColors=0;
+    SourceSkyPaletteFinalization finalization;
+    SourceSkyCompressedPalette compressed;
 } sourceSkyPalette2E38C0_;
 bool continueSourceSkyPalette1296F4(std::uint32_t&)noexcept;
 bool continueSourceSkyRawPalette2E3B68(std::uint32_t&,std::size_t occurrence=0)noexcept;
+bool continueSourceSkyPaletteFinalize2E3BE4(std::uint32_t&,std::size_t)noexcept;
+bool continueSourceSkyCompressedPalette2E3974(std::uint32_t&,std::size_t)noexcept;
+bool preflightSourceSkyCompressedPaletteNative(std::size_t,const SourceSkyPalette2E38C0&,const SourceSkyPaletteOwner*)const noexcept;
+static bool sourceSkyPaletteRGBByteKnown(const SourceSkyPalette2E38C0&,std::size_t)noexcept;
+bool preflightSourceSkyPaletteFinalizationNative(std::size_t,const SourceSkyPalette2E38C0&,const SourceSkyPaletteOwner*)const noexcept;
 bool continueSourceSkyPaletteHeaders2E38FC(std::uint32_t&,std::size_t)noexcept;
 bool continueSourceSkyNextPaletteReturn129710(std::uint32_t&)noexcept;
 struct SourceSkyPaletteReturn129710 {
@@ -685,6 +769,61 @@ struct SourceSkyFollowingCompressedLevel {
     std::uint32_t nextDimension=0;
     std::size_t nextOrdinal=0;
 };
+struct SourceSkyRawLevel250040 {
+    bool rendererRead=false;std::optional<std::uint64_t> rendererGeneration;
+    std::optional<std::uint32_t> rendererTable40,target4C,formatAC,predicateResult;
+    bool predicateReturned=false;
+    std::optional<std::uint32_t> width14,height18,bitsE8,bytes;
+    bool allocationAttempted=false,allocationReturned=false,allocationNonNull=false,published100=false;
+    std::unique_ptr<std::uint8_t[]> allocation;std::uint8_t* pointer100=nullptr;
+    bool counterRead=false,counterStored=false;
+    std::uint32_t counterBefore=0,counterAfter=0;std::uint64_t counterSequence=0;
+    std::uint8_t dimensionMask=0,logMask=0,mirrorMask=0;
+    std::array<std::optional<std::uint32_t>,2> exponents;
+    std::optional<std::uint32_t> blocks108,countB0,result,continuation;
+    std::uint8_t restoreMask=0;bool returned=false,nativeWithdrawn=false;
+};
+struct SourceSkyPayloadConversion {
+    bool entered=false,transformReturned=false,keyRead=false,keyPrepared=false,argumentsRead=false;
+    bool kernelEntered=false,kernelReturned=false,dispatcherReturned=false,flagsRead=false,mipSkipped=false;
+    std::optional<std::uint32_t> sourceFormat,width,height,pitch,inputBytes,outputBytes;
+    std::optional<std::uint32_t> destinationForKey,destinationForCall,keyBefore,keyAfter,alpha,reduction;
+    std::optional<std::uint32_t> kernelTarget,kernelResult,flagsB8;
+    std::size_t mutatedPixels=0,outputKnownPrefix=0;
+    std::uint8_t dispatcherRestoreMask=0;
+};
+struct SourceSkyExtendedRawStep {
+    std::uint32_t dimension=0,ordinal=0,offsetDifference=0,rowBytes=0;
+    bool differenceStored=false,readAttempted=false,readReturned=false,itemsAccepted=false,inputAdmitted=false,outputSelected=false;
+    std::size_t copied=0,knownBefore=0,outputKnownPrefix=0,postTransformWords=0;
+    std::optional<std::uint32_t> items,destinationFormat,kernelTarget,kernelResult,keyBefore,keyAfter;
+    bool kernelEntered=false,kernelReturned=false,dispatcherReturned=false,postTransformReturned=false,keyAdjusted=false,loopAdvanced=false;
+    std::uint8_t dispatcherRestoreMask=0;std::uint32_t nextDimension=0;
+};
+struct SourceSkyExtendedRaw {
+    bool entered=false,stack140Stored=false,loopInitialized=false,offsetsReturned=false,countAdjusted=false,tailEntered=false,countClamped=false,joinedOuterEpilogue=false;
+    bool offsetShortExit=false,rowShortExit=false;
+    std::uint32_t countB0=0,scale=1,offsetIndex=0,oldIndex150=0,currentKey=0;
+    std::array<bool,12> offsetAdjusted{};
+    std::array<std::uint32_t,12> offsets{};
+    std::vector<std::unique_ptr<SourceSkyExtendedRawStep>> levels;
+    std::size_t initialKnownPrefix=0,knownOutputPrefix=0;
+    std::optional<std::uint32_t> result;
+};
+struct SourceSkyLoaderFailure {
+    enum class Kind : std::uint8_t {none,buffer0Null,buffer1Null,compressedOffset,
+        compressedPayload,rawPayload,extendedOffset,extendedRows};
+    Kind kind=Kind::none;
+    std::size_t readIndex=0;
+    // Actual returned buffer results, never a guest address or a current
+    // shared-buffer pointer after its call borrow has ended: 0 absent, 1 live,
+    // 2 NULL. This keeps an old NULL result distinct from later native retirement.
+    std::array<std::uint8_t,2> bufferResults{};
+    std::uint32_t zeroPC=0,branchPC=0,entryPC=0;
+    std::uint16_t restoreMask=0;
+    std::optional<std::uint32_t> result,continuation;
+    bool returned=false,borrowsRetired=false;
+};
 struct SourceSkyResourcePrefix {
     bool entered=false,compressed=false,sizeReadAttempted=false,sizeReadReturned=false;
     bool allocationAttempted=false,allocationReturned=false,allocationNonNull=false,constructorEntered=false,baseReferenceAcquired=false;
@@ -745,6 +884,7 @@ struct SourceSkyResourcePrefix {
     std::shared_ptr<a::OriginalStandardTextureLifetime50LA> loaderBufferManager;
     std::array<a::OriginalStandardTextureLifetime50LA::SourceBufferCall,2> loaderBuffers;
     bool loaderNullBufferExit=false;
+    SourceSkyLoaderFailure loaderFailure;
     std::optional<std::uint32_t> loaderBufferBytes;
     bool payloadBranchSelected=false,payloadExtendedFormat=false,payloadReadAttempted=false,payloadReadReturned=false,payloadShortExit=false,payloadVirtualEntered=false;
     std::optional<std::uint32_t> payloadFileBits,payloadReadBytes,payloadReadItems;
@@ -758,6 +898,16 @@ struct SourceSkyResourcePrefix {
     std::unique_ptr<SourceSkyEmbeddedFC> embedded;
     SourceSkyEmbeddedFC* embeddedFCPublished=nullptr;
     bool embeddedCallReturned=false,resourceFormatFieldsStored=false,levelAllocationEntered=false;
+    SourceSkyRawLevel250040 rawLevel;
+    SourceSkyPayloadConversion conversion;
+    SourceSkyExtendedRaw extendedRaw;
+    bool rawAllocationCallerPassed=false,rawPayloadRead=false,rawPayloadWasNull=false;
+    std::uint16_t rawPayloadRestoreMask=0;
+    std::optional<std::uint32_t> rawPayloadResult,rawPayloadContinuation;
+    bool rawPayloadReturned=false;
+    bool rawOuterEntered=false,rawOuterReturned=false,rawScratchReleasedNative=false;
+    std::uint16_t rawOuterRestoreMask=0;
+    std::optional<std::uint32_t> rawOuterPreservedResult,rawOuterContinuation;
     std::optional<std::uint32_t> resourceCurrentE8;
     std::array<std::uint64_t,6> rawStackScalars{}; // stack08..30; palette at00 is typed separately.
 };
@@ -852,6 +1002,16 @@ bool preflightSourceSkyResourcePrefix(std::size_t)const noexcept;
 bool continueSourceSkyResourceTail129054(std::uint32_t&,std::size_t)noexcept;
 bool continueSourceSkyEmbedded257750(std::uint32_t&,std::size_t)noexcept;
 bool continueSourceSkyPayload250EE0(std::uint32_t&,std::size_t)noexcept;
+bool continueSourceSkyRawLevel250040(std::uint32_t&,std::size_t)noexcept;
+bool preflightSourceSkyRawLevelNative(const SourceSkyResourcePrefix&)const noexcept;
+bool continueSourceSkyConversion2511B0(std::uint32_t&,std::size_t)noexcept;
+bool preflightSourceSkyConversionNative(const SourceSkyResourcePrefix&)const noexcept;
+bool continueSourceSkyRawOuter25000C(std::uint32_t&,std::size_t)noexcept;
+bool preflightSourceSkyRawOuterNative(const SourceSkyResourcePrefix&)const noexcept;
+bool preflightSourceSkyLoaderFailureNative(std::size_t,const SourceSkyResourcePrefix&,const SourceSkyLoaderFailure&)const noexcept;
+bool continueSourceSkyLoaderFailure(std::uint32_t&,std::size_t,SourceSkyLoaderFailure::Kind,std::size_t=0)noexcept;
+bool continueSourceSkyExtendedRaw24F550(std::uint32_t&,std::size_t)noexcept;
+bool preflightSourceSkyExtendedRawNative(std::size_t,const SourceSkyResourcePrefix&)const noexcept;
 static bool sourceSkyFormat29E510(std::uint32_t)noexcept;
 static std::uint32_t sourceSkyFormat29E480(std::uint32_t)noexcept;
 static std::uint32_t sourceSkyFormat29E640(std::uint32_t)noexcept;

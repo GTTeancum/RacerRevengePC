@@ -331,9 +331,11 @@ bool Application::completeConsumedRaWorldNativePrefix1A9EE0(
         //Explicit native loader adoption, after the actual same-World water
         //return. It never turns planned cold arrays into source publications.
         if(!session.nativeWreckOwner_||!race->stageNativeFirstWreckLoad(*this,session,*session.nativeWreckOwner_,pc))return false;
-        //The bounded native continuation stops at214954 after native same-row
-        //Repulsor payload replacement. Later class/tuning loaders are still
-        //required. It does not open phase5 or the original caller fence.
+        // The actual base receiver's shared+98 now reaches a real detached
+        // D48 constructor/publication, but remains pending at2C1170. No load,
+        // attachment, Player+9C/D40 ownership or full+98 return is inferred.
+        // Native human return/resource scans are not source Player/Config
+        // history. No phase5, camera continuation or Restart readiness follows.
         return false;
         //The independent source corridor remains fenced at1A6D98; native
         //backing adoption does not prove1A95B0 or174DF0 returned.
@@ -375,6 +377,9 @@ bool OriginalRaceConstructor50LA::readSameControllerWorldCount174E48(
 namespace original_camera_session50KX {
 bool Session::stageNativeRetainedWreckCold()noexcept {
     return !nativeWreckOwner_||nativeWreckOwner_->stageNativeRetainedWreckCold(*this);
+}
+bool Session::retireNativePlayerSpeechCold()noexcept {
+    return !nativeWreckOwner_||nativeWreckOwner_->retireNativePlayerSpeechCold(*this);
 }
 bool Session::retireNativeRetainedWreckCold()noexcept {
     return !nativeWreckOwner_||nativeWreckOwner_->retireNativeRetainedWreckCold(*this);
@@ -475,7 +480,7 @@ bool OriginalRaceConstructor50LA::stageNativeFirstWreckLoad(
     if(!state||!bridge.nativeFirstWreckApplicationCurrent(session,app))return false;
     // Synchronous borrow of this SAME live App state. No copied seed/facade,
     // no retained raw pointer, and failure never rolls back consumed draws.
-    return bridge.stageNativeFirstWreckLoad(session,*world74_,heights,app.materialDirectory36B970(),
+    return bridge.stageNativeFirstWreckLoad(session,*this,*world74_,heights,app.materialDirectory36B970(),
         app.particleDirectory36B530(),*world74_->worldWater3FC_,state->rawRandom308030,pc);
 }
 }
@@ -487,8 +492,62 @@ bool OwnershipBridge::nativeFirstWreckApplicationCurrent(
     return state&&app.entities()==session.actual_.applicationEntities&&
         session.actual_.arena.borrowedNoise50KG==&state->sharedNoise308030;
 }
+//Synchronous adapter to the same native frame/control owners. This does not
+//upgrade the cold Entity's base dispatch to Player/AI or claim their loaders.
+bool OwnershipBridge::nativeRacerInputOwnerCurrent(original_camera_session50KX::Session& session,
+    const native_racer_model50LA::Owner& model)const noexcept {
+    const auto pin=bankLifetime_.lock();
+    if(!session.onOwnerThread()||!camera_||camera_->session.get()!=&session||
+       session.nativeWreckOwner_!=this||session.closed_||session.abandoned_||terminal_||closed_||
+       cameraPrepareTerminal_||source348Arena_||!pin||!bankIdentity_||pin->identity!=bankIdentity_||
+       bankIdentity_->raWorldLifetime_.get()!=pin.get()||!bankIdentity_->sealed_||bankIdentity_->retired_||
+       bankIdentity_->visitDepth_!=1u||(!bankIdentity_->visiting_&&!bankIdentity_->readBlocked_)||
+       bankIdentity_->sourceQueryPending()||model.slot_>=session.racerEntities_.size()||
+       bankIdentity_->currentSlot_!=model.slot_||&session.actual_.bank!=bankIdentity_||
+       !actual_||!gridArena_||!gridInputsRegistered(*gridArena_)||sharedOwnerLease_||sharedRoleViews_||
+       nativeFifoPins_||triggerQueryActive_||sharedEffectsStopped_||!nativeWreckPrepared_||nativeWreckRetired_||
+       !session.actual_.actualChariotModels||(*session.actual_.actualChariotModels)[model.slot_].get()!=&model||
+       model.bank_!=bankIdentity_||!model.fixture_||
+       &model.fixture_->parameters!=&gridArena_->parameters||model.arena_!=&actual_->frame||
+       &session.actual_.arena!=&actual_->frame||!model.application_||
+       model.application_!=session.actual_.applicationEntities||
+       model.handlingRoute_!=native_racer_model50LA::Owner::HandlingRoute::legacy||
+       model.generation_!=session.generation_)return false;
+    const auto& racer=session.racerEntities_[model.slot_];
+    return model.racer_==&racer&&model.attachedFor(racer)&&racer.prepared()&&!racer.nativeWreckWithdrawn_&&
+        racer.racer.sessionGeneration==session.generation_&&racer.body340==model.body340_.get()&&
+        racer.body340&&racer.body340->canonicalNumericAddress()==&actual_->frame.bodies.main&&
+        registeredRange(&actual_->frame.fields.vehicle58,sizeof(actual_->frame.fields.vehicle58))&&
+        registeredRange(&gridArena_->parameters.bodies.main,sizeof(gridArena_->parameters.bodies.main));
+}
+bool OwnershipBridge::nativeHandlingInputOwnerCurrent(original_camera_session50KX::Session& session,
+    const native_racer_model50LA::Owner& model)const noexcept {
+    return model.nativePhysicalComplete_&&model.nativeRepulsorComplete_&&
+        nativeRacerInputOwnerCurrent(session,model);
+}
+bool OwnershipBridge::readNativeHandlingTrack187330(original_camera_session50KX::Session& session,
+    const native_racer_model50LA::Owner& model,const g::OriginalRaceConstructor50LA& race,
+    std::array<char,3>& out)const noexcept {
+    //The ordinary ownsNativeCameraAdapter34 gate requires an idle Bank.
+    //This getter instead runs inside the already-authenticated mutable visit.
+    return nativeHandlingInputOwnerCurrent(session,model)&&race.cameraNativeAdapter34_==&session&&
+        race.nativeCameraAdapter34LifetimeCurrent(session)&&race.world74_&&
+        race.world74_->runtimeQueries_.get()==this&&!race.world74_->terminal_&&!race.world74_->closed_&&
+        camera_->display&&race.readSourceTrackName187330(out);
+}
+bool OwnershipBridge::readNativeHandlingConfiguration215434(original_camera_session50KX::Session& session,
+    const native_racer_model50LA::Owner& model,std::uint32_t& out)const noexcept {
+    if(!nativeHandlingInputOwnerCurrent(session,model)||model.slot_!=0u||
+       session.actual_.humanCount34!=1u||actual_->frame.fields.vehicle58!=0u||
+       actual_->frame.fields.nativeAiOwnersBound50IV||!session.actual_.nativeHumanPlayer0)return false;
+    //Native PlayerEventState is the SAME owner used by48Z/49A dispatch, not
+    //a copied cold selection. It is explicitly not a2107E8 source receipt.
+    const auto index=session.actual_.nativeHumanPlayer0->source5C;
+    if(index>=g::controlPresetSlots49D)return false;
+    out=session.actual_.preferences.slots[index].configuration11040;return true;
+}
 bool OwnershipBridge::stageNativeFirstWreckLoad(original_camera_session50KX::Session& session,
-    ra_pod_scene50LA::Owner& world,const g::UndertrackPhysicsDomain50EW& heights,const std::string& directory,
+    const g::OriginalRaceConstructor50LA& race,ra_pod_scene50LA::Owner& world,const g::UndertrackPhysicsDomain50EW& heights,const std::string& directory,
     const std::string& actualParticleDirectory36B530,const void* actualWorld3FC,std::uint32_t& actualRawRandom,std::uint32_t& pc)noexcept {
     try {
         if(!session.onOwnerThread()||!camera_||camera_->session.get()!=&session||
@@ -500,7 +559,17 @@ bool OwnershipBridge::stageNativeFirstWreckLoad(original_camera_session50KX::Ses
            !rosterResources_->wreckBacking_||!follow_||follow_->attempted_||follow_->closed_)return false;
         return session.actual_.bank.visit(0,[&](){
             auto& backing=*rosterResources_->wreckBacking_;
-            if(!backing.loadNativeFirstRacerSource(session.racerEntities_[0],heights,directory,actualWorld3FC,pc))return false;
+            if(!session.actual_.actualChariotModels)return false;
+            auto* nativeModel=(*session.actual_.actualChariotModels)[0].get();
+            auto* phy=nativeModel?nativePhyOwnerCurrent(session,*nativeModel):nullptr;
+            auto& actualRacer=session.racerEntities_[0];
+            if(!phy||actualRacer.nativePhyLoad_)return false;
+            if(session.actual_.humanCount34&&!bindNativePlayerLoad1A0848(session,*nativeModel))return false;
+            //Forward bind to the genuine pre-existing cold occurrence. Earlier
+            //Wreck inventory reads remain explicitly native-adapted; no fake
+            //210A48 open or2129AC selection history is manufactured here.
+            actualRacer.nativePhyLoad_=phy;
+            if(!backing.loadNativeFirstRacerSource(actualRacer,heights,directory,actualWorld3FC,pc))return false;
             g::OriginalWreckSetupZones50LA zones;g::CollectionRef50BX visibility=0,collision=0;
             if(nativeWreckZoneOwner_||!world.retainNativeWreckFirstZones(this,
                 session.racerEntities_[0].racer.sessionGeneration,zones,visibility,collision))return false;
@@ -575,12 +644,15 @@ bool OwnershipBridge::stageNativeFirstWreckLoad(original_camera_session50KX::Ses
                     if(!backing.loadNativeRacer814810(pc))return false;
                     if(!backing.loadNativeRacer818(actualParticleDirectory36B530,actualRawRandom,pc))return false;
                     if(!rosterResources_->rigs_[0])return false;
-                    //Same retained original PHY that produced this exact
-                    //banked racer; no reopen or foreign parameter substitute.
-                    if(!backing.beginNativeHandling2146(rosterResources_->rigs_[0]->phy,pc))return false;
-                    if(!session.actual_.actualChariotModels)return false;
-                    auto* model=(*session.actual_.actualChariotModels)[0].get();
-                    if(!model||model->actualRig()!=rosterResources_->rigs_[0].get())return false;
+                    //Same real forward parser owner and retained PHY. End
+                    //this reader lease before any nested handling borrower.
+                    auto* model=nativeModel;
+                    if(!model||model->actualRig()!=rosterResources_->rigs_[0].get()||
+                       nativePhyOwnerCurrent(session,*model)!=phy||actualRacer.nativePhyLoad_!=phy)return false;
+                    {
+                        auto reader=phy->borrow(model->nativePhyContext_,rosterResources_->rigs_[0]->phy);
+                        if(!reader||!backing.beginNativeHandling2146(reader,pc))return false;
+                    }
                     const bool physical=model->continueNativePhysical214710(session.racerEntities_[0],
                         rosterResources_->rigs_[0]->phy,pc);
                     backing.sourcePC_=pc; //Same reached continuation, including a retained failed prefix.
@@ -588,7 +660,69 @@ bool OwnershipBridge::stageNativeFirstWreckLoad(original_camera_session50KX::Ses
                     const bool repulsor=model->continueNativeRepulsor214894(session.racerEntities_[0],
                         rosterResources_->rigs_[0]->phy,*this,pc);
                     backing.sourcePC_=pc;
-                    return repulsor; //Native214954 only; no source2146 loader return receipt.
+                    if(!repulsor)return false;
+                    const bool handling=model->continueNativeAeroEngine214954(session.racerEntities_[0],
+                        rosterResources_->rigs_[0]->phy,session,race,*this,pc);
+                    backing.sourcePC_=pc;
+                    if(!handling)return false;
+                    const bool animation=model->continueNativeAnimationContact2154D8(session.racerEntities_[0],
+                        rosterResources_->rigs_[0]->phy,session,*this,pc);
+                    backing.sourcePC_=pc;
+                    if(!animation||!model->nativeHandlingStack_||!nativeHandlingInputOwnerCurrent(session,*model))return false;
+                    //Same collection cohort, Config selection and2146 stack.
+                    //Each22C310 finishes before its own22C610; no reordered
+                    //whole-roster pass or reconstructed temporary bodies.
+                    bool wreck=false;
+                    {
+                        auto reader=phy->borrow(model->nativePhyContext_,rosterResources_->rigs_[0]->phy);
+                        if(!reader||nativePhyOwnerCurrent(session,*model)!=reader.owner())return false;
+                        wreck=backing.continueNativeWreck215AF8(session.racerEntities_[0],reader,
+                            model->nativeHandlingStack_->gravity47C,pc);
+                    }
+                    backing.sourcePC_=model->failurePC_=session.racerEntities_[0].nativePostEmberPC_=pc;
+                    if(!wreck||pc!=0x215bb8u)return false;
+                    model->nativeWreckTuningComplete_=true;
+                    const bool returned=model->continueNativeHandling215BB8(session.racerEntities_[0],
+                        rosterResources_->rigs_[0]->phy,session,race,*this,pc);
+                    backing.sourcePC_=pc;
+                    if(!returned||pc!=0x216034u)return false;
+                    //The current native Cables adapter is the retained owner
+                    //of the later source allocations, not a replacement254.
+                    //Stay in this exact mutable Bank visit: never enter the
+                    //inactive wrapper that reparses PHY or nests a visit.
+                    if(!nativeHandlingInputOwnerCurrent(session,*model)||
+                       session.actual_.actualCables!=&camera_->cables||
+                       !camera_->cablePins[0]||!camera_->cables[0]||
+                       session.actual_.racer60[0]!=session.identity_[0].pod60){
+                        pc=backing.sourcePC_=model->failurePC_=
+                            session.racerEntities_[0].nativePostEmberPC_=0x212df0u;
+                        return false;
+                    }
+                    const bool outer=camera_->cables[0]->continueNativeOuter212DF0(
+                        session.racerEntities_[0],*model,session.actual_.applicationEntities,
+                        session.actual_.racer60[0],pc);
+                    //Retain every reached native/source effect, including a
+                    //failed partial material/strip/cable owner. No retry of
+                    //the one-shot handling or loader prefix is authorized.
+                    backing.sourcePC_=model->failurePC_=
+                        session.racerEntities_[0].nativePostEmberPC_=pc;
+                    if(!outer||pc!=0x212e10u||
+                       !camera_->cables[0]->nativeOuterReturned_||
+                       camera_->cables[0]->nativeOuterResult_.sourcePC!=pc||
+                       !nativeHandlingInputOwnerCurrent(session,*model))return false;
+                    const bool spin=model->continueNativeSpin212ED0(session.racerEntities_[0],pc);
+                    backing.sourcePC_=model->failurePC_=session.racerEntities_[0].nativePostEmberPC_=pc;
+                    if(!spin||pc!=0x212e18u)return false;
+                    const bool tail=continueNativeOuterStorage212E18(session,*model,pc);
+                    backing.sourcePC_=model->failurePC_=session.racerEntities_[0].nativePostEmberPC_=pc;
+                    // Only real native close permits the typed outer return.
+                    // The forward human caller now consumes the SAME current
+                    // Aero steering. Keep outer PCs separate from caller PCs.
+                    if(!tail)return false;
+                    if(!session.actual_.humanCount34)return true;
+                    if(!continueNativePlayerReturn1A0850(session,*model,pc))return false;
+                    if(!continueNativePlayerResources1AE104(session,*model,race,pc))return false;
+                    return continueNativeBaseRacerSpeech22A1D0(session,*model,race,pc);
                 }
                 if(pc!=0x2129e0u||!backing.loadNativeNextCollectionPrefix(heights,directory,pc)||
                    !backing.setupNativeBody(0,zones,pc)||!backing.loadNativeQueryChildren(0,pc)||

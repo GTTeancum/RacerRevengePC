@@ -23,6 +23,7 @@ namespace rr::game { class OriginalRaceConstructor50LA; }
 #include "../../src/game/vehicle_contact48r.h"
 #include "../../src/game/chariot_scene49u.h"
 #include "../../src/game/spring_force48l.h"
+#include "../../src/game/boost_controls50fk.h"
 #include "../../src/game/type0_bounds50ew.h"
 #include "../../src/game/collision_result_binding50mb.h"
 #include "../../src/game/collection_projection50cf.h"
@@ -1883,8 +1884,49 @@ class OwnershipBridge final {
     g::OriginalTrackParticleCold50LA* nativeWreckParticles_=nullptr;
     bool nativeFirstWreckApplicationCurrent(const original_camera_session50KX::Session&,
         const original_main_entry50KG::Application&)const noexcept;
+    bool nativeRacerInputOwnerCurrent(original_camera_session50KX::Session&,
+        const native_racer_model50LA::Owner&)const noexcept;
+    bool nativeHandlingInputOwnerCurrent(original_camera_session50KX::Session&,
+        const native_racer_model50LA::Owner&)const noexcept;
+    rr::assets::NativePhyLoad50LA* nativePhyOwnerCurrent(original_camera_session50KX::Session&,
+        const native_racer_model50LA::Owner&)const noexcept;
+    bool readNativeHandlingTrack187330(original_camera_session50KX::Session&,
+        const native_racer_model50LA::Owner&,const g::OriginalRaceConstructor50LA&,std::array<char,3>&)const noexcept;
+    bool readNativeHandlingConfiguration215434(original_camera_session50KX::Session&,
+        const native_racer_model50LA::Owner&,std::uint32_t&)const noexcept;
+    ra_cold_roster50LA::Operation* nativeRacerOperationCurrent(original_camera_session50KX::Session&,
+        const native_racer_model50LA::Owner&)const noexcept;
+    ra_cold_roster50LA::Operation* nativeHandlingOperationCurrent(original_camera_session50KX::Session&,
+        const native_racer_model50LA::Owner&)const noexcept;
+    bool readNativeHandlingContact215900(original_camera_session50KX::Session&,
+        const native_racer_model50LA::Owner&,g::SpringGeneratedParameters48K*&,
+        g::SpringResponseParameters48L*&)const noexcept;
+    bool publishNativeHandlingContact215A70(original_camera_session50KX::Session&,
+        const native_racer_model50LA::Owner&)const noexcept;
+    bool readNativeHandlingCooling215CC8(original_camera_session50KX::Session&,
+        const native_racer_model50LA::Owner&,g::BoostParameters50FK*&,float*&)const noexcept;
+    bool readNativeHandlingProfile216040(original_camera_session50KX::Session&,
+        const native_racer_model50LA::Owner&,const g::OriginalRaceConstructor50LA&,
+        bool&,std::array<float,6>&)const noexcept;
+    bool publishNativeHandlingDifference21600C(original_camera_session50KX::Session&,
+        const native_racer_model50LA::Owner&,float)const noexcept;
+    bool bindNativePlayerSpeechForward22A210(ra_cold_roster50LA::Operation&)noexcept;
+    bool withdrawNativePlayerSpeechForward22A210(ra_cold_roster50LA::Operation&)noexcept;
+    bool continueNativeBaseRacerSpeech22A1D0(original_camera_session50KX::Session&,
+        native_racer_model50LA::Owner&,const g::OriginalRaceConstructor50LA&,std::uint32_t&)noexcept;
+    bool retireNativePlayerSpeechCold(original_camera_session50KX::Session&)noexcept;
+    ra_cold_roster50LA::Operation* nativePlayerOperationCurrent(original_camera_session50KX::Session&,
+        const native_racer_model50LA::Owner&)const noexcept;
+    bool bindNativePlayerLoad1A0848(original_camera_session50KX::Session&,
+        native_racer_model50LA::Owner&)noexcept;
+    bool continueNativePlayerReturn1A0850(original_camera_session50KX::Session&,
+        native_racer_model50LA::Owner&,std::uint32_t&)noexcept;
+    bool continueNativePlayerResources1AE104(original_camera_session50KX::Session&,
+        native_racer_model50LA::Owner&,const g::OriginalRaceConstructor50LA&,std::uint32_t&)noexcept;
+    bool continueNativeOuterStorage212E18(original_camera_session50KX::Session&,
+        native_racer_model50LA::Owner&,std::uint32_t&)noexcept;
     bool stageNativeFirstWreckLoad(original_camera_session50KX::Session&,
-        ::ra_pod_scene50LA::Owner&,const g::UndertrackPhysicsDomain50EW&,const std::string&,const std::string&,const void*,std::uint32_t&,std::uint32_t&)noexcept;
+        const g::OriginalRaceConstructor50LA&,::ra_pod_scene50LA::Owner&,const g::UndertrackPhysicsDomain50EW&,const std::string&,const std::string&,const void*,std::uint32_t&,std::uint32_t&)noexcept;
 
     bool retireNativeRetainedWreckCold(original_camera_session50KX::Session&)noexcept;
 

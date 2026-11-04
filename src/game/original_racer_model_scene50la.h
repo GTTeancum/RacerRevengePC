@@ -119,6 +119,7 @@ class OriginalRacerModelSceneOwner50LA final {
     friend class ::ra_pod_scene50LA::Owner;
     friend class ::ra_cold_aggregate50LA::Owner;
     friend class OriginalWreckRacerStorage50LA;
+    friend class OriginalWreckPieceStorage50LA; //Retains its same-model bounds invocation history.
     friend class OriginalRacerColdScenes50LA;
     friend class ::ra_static_model_cold50LA::Owner;
     friend class original_gc_gameplay_lighting_candidate::Owner;
@@ -633,6 +634,13 @@ class OriginalRacerModelSceneOwner50LA final {
     };
     R produceSourceLocalBounds28D670(const SceneGraph49P&,std::array<std::uint32_t,4>& center,
         std::array<std::uint32_t,4>& half,SourceLocalBounds28D670&)noexcept;
+    // Private Wreck-only native caller: the actual legacy typed constructor and
+    // row table authorize this graph. It does not manufacture source File/PSG
+    // history or relax the distinct source-renderable entry above.
+    R produceNativeWreckLocalBounds28D670(const SceneGraph49P&,std::array<std::uint32_t,4>& center,
+        std::array<std::uint32_t,4>& half,SourceLocalBounds28D670&)noexcept;
+    R produceBoundLocalBounds28D670Native(const SceneGraph49P&,std::array<std::uint32_t,4>& center,
+        std::array<std::uint32_t,4>& half,SourceLocalBounds28D670&)noexcept;
     bool sourceLocalBoundsHistoryNative(const SceneGraph49P&,const SourceLocalBounds28D670&,
         const SourceTranslation28ADD0* laterTranslation=nullptr,
         const SourceOrientation28A090* laterOrientation=nullptr,
@@ -1053,6 +1061,9 @@ private:
                 if(index==b.sourceRowIndices[prior])return {S::binding,0x28cb0cu};
         }
         binding_=b;rootMode_=mode;
+        // Native constructor custody only, never sourceConstructor_ receipts.
+        // The retained graph allocation must outlive this exact model owner.
+        nativeModelNodes_=graph.nodes;nativeModelNodeCount_=graph.count;
         for(std::uint32_t row=0;row<b.sourceRowCount;++row)indices_[row]=b.sourceRowIndices[row];
         // Own the native index map, not the caller's temporary pointer array.
         binding_.sourceRowIndices=indices_.data();
@@ -1983,6 +1994,8 @@ private:
     }
 private:
     OriginalRacerModelSceneBinding50LA binding_{};
+    const SceneNode49P* nativeModelNodes_=nullptr;
+    std::uint32_t nativeModelNodeCount_=0;
     O model_;
     OriginalRacerModelFields50LA fields_;
     std::array<I,rr::assets::maxModelNodes49O> indices_{};

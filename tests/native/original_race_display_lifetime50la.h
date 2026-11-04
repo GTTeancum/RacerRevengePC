@@ -81,6 +81,9 @@ class RaceDisplayLifetime50LA final : public std::enable_shared_from_this<RaceDi
     rr::platform::VehicleWindowGl50DS renderer_;
     rr::game::OriginalRendererDispatchFields dispatch_{1,2,0,0,0};
     rr::game::OriginalRendererServiceFields50KG sourceRendererService_;
+    //243AA0 constructor publication on THIS actual Root-issued Display.
+    //Only receiver-independent245CA0 is consumed here; not GPU/context readiness.
+    const std::uint32_t sourceRendererTable40_=0x3d2050u;
     // SAME renderer's scalar2C: base26F880 initializes zero; race load
     // writes one at1A6AD8.243FC0 reads it to choose default clear mask2/3.
     // It is separate from current scene0 and dispatch queue44.

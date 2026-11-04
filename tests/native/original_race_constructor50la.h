@@ -31,6 +31,7 @@ class OriginalRaceConstructor50LA final {
     // Only the existing lexical human-RA continuation binds its94 reference;
     // no public timer/finished setter or ownership receipt is exposed.
     friend struct ::interactive_continuation50DU::Context;
+    friend class ::ra_source_camera50LA::OwnershipBridge; //Synchronous same-Race native handling getter.
     friend struct ::original_main_entry50KG::Application;
     friend class rr::platform::OriginalUiLightManagerOwner50KG;
     friend class ::original_pause_observation50LA::Owner;
@@ -423,6 +424,23 @@ class OriginalRaceConstructor50LA final {
         // whole-table pair over the SAME382B38/382B70/383400/resolver owners.
         if(!resourceDomain_->populateTimeStatsResources2DF144(resourceContext_,d))return false;
         resourcesPrepared_=true;d.sourcePC=0x1aa5c8;return true;
+    }
+    // Private leaf for a DISTINCT authenticated native caller occurrence.
+    // OwnershipBridge retains its one-shot history only after genuine native
+    // Player-style return; never reset/reuse resourcesAttempted_ above.
+    bool populateNativeReturnedPlayerResources1AA5A0(
+        assets::OriginalStandardMaterialDiagnostic50LA& d)const noexcept {
+        d={};
+        if(resultsFeedbackThread_!=std::this_thread::get_id()||!counted_||rolledBack_||
+           !resourcesPrepared_||!resourceDomain_||!resourceDomain_->prepared()||
+           !resourceContext_||!resourceContext_->live()){
+            d.status=assets::OriginalStandardMaterialStatus50LA::phase;
+            d.sourcePC=0x1aa5a0u;return false;
+        }
+        // Actual ascending14D370 scan followed by29E340, on the retained
+        // canonical owners/context. This can publish newly referenced rows;
+        // it is not a cached success, collector rebuild or forced residency.
+        return resourceDomain_->populateTimeStatsResources2DF144(resourceContext_,d);
     }
     inline static constexpr RaceAudioGroup50IC groupOrder_[]={RaceAudioGroup50IC::Effects110,
         RaceAudioGroup50IC::Engines114,RaceAudioGroup50IC::Music118,RaceAudioGroup50IC::Character11C,

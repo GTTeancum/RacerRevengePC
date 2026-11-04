@@ -164,6 +164,11 @@ bool OriginalUiRiderProfileOwner50KG::readWorldProfileByte1AA2F4(
     const OriginalUiMainProfile50KG& actualCommon,std::uint8_t& out)const noexcept {
     return readSharedWorldProfileByteNative(actualCommon,out);
 }
+bool OriginalUiRiderProfileOwner50KG::readWorldCourseByte1AA354(
+    const OriginalUiMainProfile50KG& actualCommon,std::uint8_t& out)const noexcept {
+    if(!storage_||!storage_->readable()||storage_->common.get()!=&actualCommon)return false;
+    out=storage_->packed1125F;return true;
+}
 bool OriginalUiRiderProfileOwner50KG::readSharedWorldProfileByteNative(
     const OriginalUiMainProfile50KG& actualCommon,std::uint8_t& out)const noexcept {
     if(!storage_||!storage_->readable()||storage_->common.get()!=&actualCommon)return false;

@@ -48,6 +48,12 @@ class OriginalSourceSkyFile50LA final {
         std::optional<std::uint32_t> pendingSourceItems; //Positive EOF clamp: bound before12FF34, not copied/size.
     };
     std::array<PalettePayloadRead,3> rawPaletteReads_;
+    struct CompressedPaletteBlockRead {
+        Read4 size;PalettePayloadRead payload;
+        std::size_t requested=0;bool direct=false,nativeWithdrawn=false;
+        std::uint8_t* destination=nullptr; //Live only while the source read has not returned.
+    };
+    std::array<CompressedPaletteBlockRead,3> compressedPaletteReads_;
     std::optional<std::size_t> expectedCursor_,resourceStart_,resourceSeekTarget_;
     bool restoreAttempted_=false,restoreReturned_=false;
     std::optional<std::size_t> restoreTarget_;
@@ -64,6 +70,7 @@ class OriginalSourceSkyFile50LA final {
         std::optional<std::size_t> restoreTarget;
         std::array<Read4,3> headers;
         std::array<PalettePayloadRead,3> payloads;
+        std::array<CompressedPaletteBlockRead,3> compressed;
     };
     std::vector<std::unique_ptr<PaletteIteration>> followingPalettes_;
     struct ItemFieldSpec {std::size_t destination,size;std::uint32_t call,resume;};
@@ -120,6 +127,7 @@ class OriginalSourceSkyFile50LA final {
         std::uint8_t* destination=nullptr;
         bool nativeWithdrawn=false;
     };
+    struct RawExtendedRows : ResourcePayloadRead {std::uint32_t dimension=0,rowBytes=0,rows=0;};
     struct CompressedTell {bool attempted=false,returned=false;std::optional<std::size_t> position;};
     struct CompressedOffset {CompressedTell tell;Read4 read;bool terminal=false;};
     struct ResourceFileOccurrence {
@@ -128,6 +136,9 @@ class OriginalSourceSkyFile50LA final {
         CompressedTell resourceAlignmentTell;
         std::optional<std::uint32_t> resourceAlignmentPadding;
         std::optional<std::size_t> resourceAlignmentTarget;
+        bool rawExtendedEntered=false;CompressedTell rawExtendedInitialTell;
+        std::array<CompressedOffset,12> rawExtendedOffsets;
+        std::vector<std::unique_ptr<RawExtendedRows>> rawExtendedRows;
         Read4 resourceSizeA8;std::array<Read4,5> compressedHeaders;CompressedTell compressedInitialTell,compressedFinalTell;std::array<CompressedOffset,12> compressedOffsets;Read4 compressedPayloadSize;ResourcePayloadRead compressedPayload,rawPayload;std::vector<std::unique_ptr<Read4>> followingCompressedSizes;std::vector<std::unique_ptr<ResourcePayloadRead>> followingCompressedPayloads;};
     struct ItemResourceSeek : ResourceFileOccurrence {
         std::size_t occurrence=0;bool attempted=false,returned=false;
@@ -157,6 +168,9 @@ class OriginalSourceSkyFile50LA final {
     bool transferCompressedPayload(ResourcePayloadRead&,std::uint8_t*,std::size_t,D&)noexcept;
     bool readFollowingCompressedPayload(std::size_t,std::size_t,std::uint8_t*,std::size_t,D&)noexcept;
     bool readItemResourcePayload(std::size_t,std::uint8_t*,std::size_t,D&)noexcept;
+    bool tellRawExtendedOffset(std::size_t,std::size_t,bool,D&)noexcept;
+    bool readRawExtendedOffset(std::size_t,std::size_t,D&)noexcept;
+    bool readRawExtendedRows(std::size_t,std::uint8_t*,std::uint32_t,std::uint32_t,D&)noexcept;
     bool beginItemParser(void*,std::size_t occurrence=0)noexcept;
     bool releaseItemParserSource(void*,std::size_t occurrence)noexcept;
     bool readItemHeader48(D&,std::size_t occurrence=0)noexcept;
@@ -179,6 +193,11 @@ class OriginalSourceSkyFile50LA final {
     bool seekResourceAbsolute(std::uint32_t,D&)noexcept;
     bool beginPalette2E38C0(void*,std::size_t occurrence=0)noexcept;
     bool readRawPaletteBlock(std::size_t,D&,std::size_t occurrence=0)noexcept;
+    bool readCompressedPaletteSize(std::size_t,std::size_t,D&)noexcept;
+    bool readCompressedPaletteBlock(std::size_t,std::size_t,std::uint8_t*,D&)noexcept;
+    const CompressedPaletteBlockRead& compressedPaletteRead(std::size_t occurrence,std::size_t index)const noexcept {
+        return occurrence?followingPalettes_[occurrence-1]->compressed[index]:compressedPaletteReads_[index];
+    }
     bool readPaletteHeader4(std::size_t,D&,std::size_t occurrence=0)noexcept;
     const Read4& paletteHeader(std::size_t occurrence,std::size_t index)const noexcept {
         return occurrence?followingPalettes_[occurrence-1]->headers[index]:paletteHeaderReads_[index];

@@ -1,5 +1,5 @@
 #pragma once
-// Explicit inactive owner adapter. No current aggregate/runtime call site.
+// Legacy inactive adapters plus the private same-owner native outer-loader join.
 #include "native_racer_cables50hw_fixture.h"
 #include "native_racer_model_lifetime50la_fixture.h"
 
@@ -112,4 +112,5 @@ inline g::OriginalPodCableAllocationResult50LA Cables::closeSelectionAllocationP
     }
     return lateStrips_?lateStrips_->close():g::OriginalPodCableAllocationResult50LA{S::closed,0};
 }
+#include "native_racer_outer_loader212df050la.inl"
 }

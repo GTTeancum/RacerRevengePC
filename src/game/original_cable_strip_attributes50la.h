@@ -170,10 +170,13 @@ private:
         pc=0x23bf78u;vertices_=std::make_unique<NativeVertices>();
         auto& g=*group_;g.vertexCount=4;g.batchCount=1;
         pc=0x23cea4u;g.counts.reset(new std::uint32_t[1]);g.counts[0]=4;
-        g.batches.reset(new Batch[1]);g.positions.reset(new View<Position>[1]);
-        g.triples.reset(new View<Triple>[1]);g.extra.reset(new std::optional<View<Triple>>[1]);
-        g.colors.reset(new std::optional<View<Color>>[1]);g.texcoords.reset(new View<Texcoord>[1]);
-        g.aliases.reset(new VertexCopies[4]);
+        pc=0x23ceb4u;g.batches.reset(new Batch[1]);
+        pc=0x23cec4u;g.positions.reset(new View<Position>[1]);
+        pc=0x23ced4u;g.triples.reset(new View<Triple>[1]);
+        pc=0x23cee4u;g.extra.reset(new std::optional<View<Triple>>[1]);
+        pc=0x23cef4u;g.colors.reset(new std::optional<View<Color>>[1]);
+        pc=0x23cf04u;g.texcoords.reset(new View<Texcoord>[1]);
+        pc=0x23cf20u;g.aliases.reset(new VertexCopies[4]);
         g.positions[0]={vertices_->positions.data(),4};g.triples[0]={vertices_->triples.data(),4};
         g.texcoords[0]={vertices_->texcoords.data(),4};
         if(format&8u)g.colors[0]=View<Color>{vertices_->colors.data(),4};

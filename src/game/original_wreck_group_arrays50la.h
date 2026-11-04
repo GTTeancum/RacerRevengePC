@@ -210,14 +210,15 @@ class OriginalWreckGroupArrays50LA final {
             p.component->kind==OriginalWreckComponentKind50LA::piece2CB4B0&&
             p.component->reference00&&p.component->objectKey&&p.component->sessionGeneration==generation;
     }
-    bool retireNativeUnactivated2C9F30()noexcept {
+    bool retireNativeUnactivated2C9F30(bool authenticatedNativeTuning=false)noexcept {
         if(nativeRetired_)return true;
-        if(!cold_||!fields_||!component_||component_->reference00||registered30_)return false;
+        if(!cold_||!fields_||!component_||component_->reference00||(!authenticatedNativeTuning&&registered30_))return false;
         //Exact source disposal44,48,A0,A4,A8,B0; no piece/body ownership.
-        //Prewarmed zero-capacity backing disposal is native cancellation, not
-        //a claim of guest malloc results. No attached or registered members.
+        //Prewarmed backing disposal does not claim guest malloc results.
+        //Registered members require the storage caller's same-owner source
+        //history validation; attached members are never admitted here.
         if(bound_)for(std::size_t i=0;i<allocated_;++i)
-            if(pieces44_[i].piece||attachedA0_[i]||breakLatchB0_[i])return false;
+            if((!authenticatedNativeTuning&&pieces44_[i].piece)||attachedA0_[i]||breakLatchB0_[i])return false;
         pieces44_.reset();offsets48_.reset();attachedA0_.reset();
         breakRateA4_.reset();breakScaleA8_.reset();breakLatchB0_.reset();
         nativeRetired_=true;return true;

@@ -2129,6 +2129,8 @@ SessionExit50DU Context::run() {
    .wrongWayReceipt=wrongWayReceipt,
    .wrongWayUpdates=wrongWayUpdates,
    .x=x,
+   .nativeHumanAudio=audioEnabled&&originalUiStarted&&consumedRaStage.race()?liveAudio.get():nullptr,
+   .nativeHumanSpeechCounts=&speechCounts,
   }.run();
  // Bind once to the selected authenticated map representation. Placement is
  // shared across human/opponents; no per-racer track dispatch or null fallback.

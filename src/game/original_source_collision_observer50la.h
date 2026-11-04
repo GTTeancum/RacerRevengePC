@@ -54,21 +54,26 @@ class OriginalSourceCollisionObserver50LA final {
         FogPoolAllocator* pool=nullptr;SecondaryLink* record=nullptr;
         bool entered=false,fromFree=false,nativeWithdrawn=false,accountingStored=false;
         bool slot14Stored=false,slot14AliasWithdrawn=false;
+        std::uint32_t slot14NativeOrdinal=0; //Authenticated List cell identity, NEVER the guest slot14 address/value.
+        bool slot14ReservationCommitted=false; //Native successful handoff only; source payload history is unchanged.
         const OriginalNativeListMethodCustody50LA* slot14Method=nullptr;const void* slot14Member=nullptr;
         std::uint8_t payloadMask=0;bool oldHeadRead=false;
         const OriginalWreckComponent50LA* child04=nullptr;const OriginalWreckComponent50LA* portal0C=nullptr;
         std::optional<std::uint32_t> distance10;
     } fogPoolAllocation_; //One actual consumed record and its distinct typed slot14 store; never a generic secondary entry.
     bool fogPoolSlot14BackingCurrentNative(const void* secondary,const OriginalNativeListMethodCustody50LA* method,
-        const void* member,const std::uint32_t* entry)const noexcept {
-        if(!secondary||secondary==primary_.occurrence||!method||!primary_.method||method==primary_.method||!member||!entry)return false;
+        const void* member,const std::uint32_t* entry,std::uint32_t nativeOrdinal,bool committed)const noexcept {
+        if(!secondary||secondary==primary_.occurrence||!method||!primary_.method||method==primary_.method||!member||!entry||
+           !nativeOrdinal||nativeOrdinal>1024u)return false;
         const auto& c=*method;const auto& e=c.sourceEntries_;const auto& s=c.source_;
         if(!c.sourceMode_||c.world_!=primary_.method->world_||c.application_!=primary_.method->application_||
            c.reference00_!=2u||c.ordinal_<10u||c.ordinal_>=20u||!s.constructorReturned||s.vtable08!=0x3d2d30u||
-           !s.usageKnown||c.usage10_!=1u||!c.sourceCollisionEntriesCurrentNative()||e.terminal||!e.ready||!e.words||
-           !s.pointer3C||*s.pointer3C!=e.table.get()||!e.table||e.table[0]!=e.words.get()||
-           e.pending!=secondary||e.pendingIdentity!=member||!e.pendingConsumed||!e.pendingSlot||e.pendingSlot>1024u)return false;
-        const auto index=e.pendingSlot-1u; //Native custody index only, never the stored source pointer value.
+           !s.usageKnown||c.usage10_!=1u||!c.sourceCollisionEntriesCurrentNative()||(!committed&&e.terminal)||!e.ready||!e.words||
+           !s.pointer3C||*s.pointer3C!=e.table.get()||!e.table||e.table[0]!=e.words.get())return false;
+        if(committed){
+            if(e.pending&&(e.pending==secondary||e.pendingIdentity==member||e.pendingSlot==nativeOrdinal))return false;
+        }else if(e.pending!=secondary||e.pendingIdentity!=member||!e.pendingConsumed||e.pendingSlot!=nativeOrdinal)return false;
+        const auto index=nativeOrdinal-1u; //Retained cell identity, not an ordinal reconstructed from a host/guest pointer.
         if(entry!=e.words.get()+index||e.members[index]!=member||e.borrowers[index]!=secondary||e.wordKnown[index])return false;
         unsigned pins=0;for(const auto* key:c.sourceCollisionRegistrationBorrowers_)if(key==secondary)++pins;
         return pins==1u;
@@ -81,6 +86,8 @@ class OriginalSourceCollisionObserver50LA final {
     bool fogPoolAllocationHistoryNative()const noexcept {
         const auto& f=fogPoolAllocation_;
         if((f.slot14Stored&&!f.accountingStored)||(f.slot14AliasWithdrawn&&!f.slot14Stored)||
+           f.slot14Stored!=bool(f.slot14NativeOrdinal)||f.slot14NativeOrdinal>1024u||
+           (f.slot14ReservationCommitted&&(!f.slot14Stored||f.payloadMask!=63u))||
            (f.payloadMask!=0u&&f.payloadMask!=1u&&f.payloadMask!=3u&&f.payloadMask!=7u&&
             f.payloadMask!=15u&&f.payloadMask!=31u&&f.payloadMask!=63u)||
            (f.payloadMask&&!f.slot14Stored)||(f.oldHeadRead&&f.payloadMask<15u)||
@@ -88,7 +95,8 @@ class OriginalSourceCollisionObserver50LA final {
            bool(f.child04)!=bool((f.payloadMask&1u)&&!f.slot14AliasWithdrawn)||
            bool(f.portal0C)!=bool((f.payloadMask&4u)&&!f.slot14AliasWithdrawn))return false;
         if(!f.entered)return !f.primaryOccurrence&&!f.secondaryOccurrence&&!f.pool&&!f.record&&!f.fromFree&&!f.nativeWithdrawn&&!f.accountingStored&&
-            !f.slot14Stored&&!f.slot14AliasWithdrawn&&!f.slot14Method&&!f.slot14Member&&!f.payloadMask&&!f.oldHeadRead&&fogPoolHeadCurrentNative();
+            !f.slot14Stored&&!f.slot14AliasWithdrawn&&!f.slot14NativeOrdinal&&!f.slot14ReservationCommitted&&
+            !f.slot14Method&&!f.slot14Member&&!f.payloadMask&&!f.oldHeadRead&&fogPoolHeadCurrentNative();
         if(!f.primaryOccurrence||f.primaryOccurrence!=primary_.occurrence||!f.secondaryOccurrence||f.secondaryOccurrence==f.primaryOccurrence||
            primary_.fogSelectedAddressNonNull!=true||primary_.stores!=31u||secondary_.entered||detached_.entered)return false;
         if(f.nativeWithdrawn)return !f.pool&&!f.record&&!f.slot14Method&&!f.slot14Member&&
@@ -104,7 +112,8 @@ class OriginalSourceCollisionObserver50LA final {
            ((f.payloadMask&8u)&&f.record->distance10!=*f.distance10)||
            ((f.payloadMask&16u)&&f.record->next00))return false;
         if(!f.slot14Stored||f.slot14AliasWithdrawn)return !f.record->fogSlot14&&!f.slot14Method&&!f.slot14Member;
-        return fogPoolSlot14BackingCurrentNative(f.secondaryOccurrence,f.slot14Method,f.slot14Member,f.record->fogSlot14);
+        return fogPoolSlot14BackingCurrentNative(f.secondaryOccurrence,f.slot14Method,f.slot14Member,f.record->fogSlot14,
+            f.slot14NativeOrdinal,f.slot14ReservationCommitted);
         //No numeric slot14 read: its old/default bits are not this Fog occurrence's stored source address.
     }
     bool fogPoolOwnerRecordsCurrentNative()const noexcept {
@@ -159,12 +168,14 @@ class OriginalSourceCollisionObserver50LA final {
     bool storeFogPoolSlot14280CD0(const void* occurrence,const void* secondary,FogPoolAllocator* pool,SecondaryLink* record,
         const OriginalNativeListMethodCustody50LA* method,const void* member,std::uint32_t* actualEntry)noexcept {
         auto& f=fogPoolAllocation_;
+        const auto nativeOrdinal=method?method->sourceEntries_.pendingSlot:0u;
         if(!f.entered||f.nativeWithdrawn||!f.accountingStored||f.slot14Stored||f.slot14AliasWithdrawn||
            f.primaryOccurrence!=occurrence||f.secondaryOccurrence!=secondary||f.pool!=pool||f.record!=record||
            !fogPoolAliasesCurrentNative(occurrence,pool,nullptr)||!shared_->sourceLinkAccessCurrent(group_,identity())||
-           !fogPoolSlot14BackingCurrentNative(secondary,method,member,actualEntry))return false;
+           !fogPoolSlot14BackingCurrentNative(secondary,method,member,actualEntry,nativeOrdinal,false))return false;
         //Non-failing original SW to this exact consumed record. Typed address, never a native ordinal or a guest DWORD cast.
-        record->fogSlot14=actualEntry;f.slot14Method=method;f.slot14Member=member;f.slot14Stored=true;return true;
+        record->fogSlot14=actualEntry;f.slot14Method=method;f.slot14Member=member;
+        f.slot14NativeOrdinal=nativeOrdinal;f.slot14Stored=true;return true;
     }
     bool publishFogPoolPayloadNative(std::uint32_t sourcePC,const void* occurrence,const void* secondary,SecondaryLink* record,
         const OriginalWreckComponent50LA* child,const OriginalNativeListMethodCustody50LA* method,

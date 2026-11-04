@@ -266,8 +266,8 @@ bool Owner::continueSourceStandardObserverSecondary280BF0(SourceModelObserverFra
             portal->source.edges80,f.centerWords,0u,s.overlap))return stop(s.overlap.pc);
         at(0x280c54);if(!s.overlap.hit){s.complete=true;at(0x280cf8);o.portalCursor=edge.next00.get();continue;}
         if(!s.overlap.outputDistance)return stop(0x280c5c);
-        at(0x280c60);edge.field10=*s.overlap.outputDistance;r.distance10=s.overlap.outputDistance;s.edgeDistanceMask|=1;
-        at(0x280c64);edge.field0C=*s.overlap.outputDistance;r.distance0C=s.overlap.outputDistance;s.edgeDistanceMask|=2;
+        at(0x280c60);r.storeDistance10Native(*s.overlap.outputDistance);s.edgeDistanceMask|=1;
+        at(0x280c64);r.storeDistance0CNative(*s.overlap.outputDistance);s.edgeDistanceMask|=2;
         at(0x280c6c);if(!o.cursorMethod)return stop(pc);const auto usage=o.cursorMethod->usage10_;
         if(&r.to->entity!=s.neighbor)return stop(0x27f5a0);
         s.method=(usage&1u)?r.to->nativeList34:(usage&2u)?r.to->nativeList38:nullptr;s.methodReturned=true;

@@ -15,6 +15,8 @@
 #include "original_application_aural50kg.h"
 #include "../../../src/assets/original_ta_intro_authoring_candidate.h"
 #include "native_race_intro_transport50la.h"
+#include "native_player_speech_constructor50la.h"
+#include "../../../src/game/pod_speech50hg.h"
 
 namespace live_audio50HF { class Owner; }
 namespace interactive_loop50DU { struct Context; }
@@ -30,7 +32,7 @@ class RaceAudioGroups50IC final {
     friend class ::original_camera_session50KX::Session;
 public:
     RaceAudioGroups50IC() noexcept { bindings_.fill(game::RaceAudioGroup50IC::Unrepresented); }
-    ~RaceAudioGroups50IC()noexcept { if(coldTaIntroEmitter_)std::terminate();for(const auto& p:coldGroups_)if(p.constructed)std::terminate(); }
+    ~RaceAudioGroups50IC()noexcept { if(coldTaIntroEmitter_||coldNativePlayerSpeech_)std::terminate();for(const auto& p:coldGroups_)if(p.constructed)std::terminate(); }
     RaceAudioGroups50IC(const RaceAudioGroups50IC&)=delete;
     RaceAudioGroups50IC& operator=(const RaceAudioGroups50IC&)=delete;
     RaceAudioGroups50IC(RaceAudioGroups50IC&&)=delete;
@@ -56,6 +58,7 @@ public:
         // Populated source Sounds are admitted only through the concrete TA
         // source transport, member/service and lifetime checks below.
         if(coldTaIntroEmitter_&&!taIntroBackingCurrent())return false;
+        if(coldNativePlayerSpeech_&&!nativePlayerSpeechBackingCurrent())return false;
         for(std::size_t n=0;n<coldGroups_.size();++n){const auto& p=coldGroups_[n];
             if((p.count48||p.taIntroAuthoring||p.taIntroManager)&&
                (n!=static_cast<std::size_t>(game::RaceAudioGroup50IC::Announcer120)||!taIntroBackingCurrent()))return false;
@@ -464,6 +467,50 @@ private:
         game::OriginalWreckComponent50LA* controllerParent=nullptr;
         bool everAttached=false; // Native custody history; not a source flag.
     };
+    // Source2C1000 owner only. This is NOT a Character Sound member or a
+    // second native speech scheduler. Numeric source fields borrow the exact
+    // Context storage used by existing speech consumers.
+    struct ColdNativePlayerSpeech {
+        game::OriginalWreckComponent50LA entity;
+        std::uint32_t dispatch08=0;
+        ColdGroup* group30=nullptr;
+        std::array<std::uint32_t,4> previous40{};
+        std::uint32_t serial50=0;char name54=0;
+        std::uint32_t flags158=0;
+        std::array<std::uint32_t,28> configuration160{};
+        std::uint32_t distance1D0Bits=0;std::uint8_t flags1D4Low5=0;
+        const game::OriginalWreckComponent50LA* manager1D8=nullptr;
+        std::uint32_t trigger1DCBits=0,chance1E0Bits=0;
+        std::uint16_t type1E4=0;
+        std::uint32_t word1E8=0,word1EC=0;ColdSound* sound1F0=nullptr;
+        std::array<const void*,3> jukebox200{};
+        game::OriginalWreckComponent50LA* racer20C=nullptr;
+        // Constructor does NOT initialize210. Nullopt is unknown, not null.
+        std::optional<const void*> timing210;
+        game::PodSpeechCounts50HG* counts214=nullptr;
+        game::PodSpeechState50HG* state21D=nullptr;
+        // Native custody is deliberately separate from source racer20C.
+        const void* nativeIssuer=nullptr;
+        const OriginalApplicationAural50KG* nativeAural=nullptr;
+        const game::OriginalWreckComponent50LA* nativeRace=nullptr;
+        game::OriginalWreckComponent50LA* nativeExpectedRacer=nullptr;
+        std::uint64_t nativeExpectedRacerKey=0; //Session identity, not the Entity address.
+    };
+    bool nativePlayerSpeechContextCurrent(
+        const std::shared_ptr<game::OriginalApplicationEntities50LA>&,std::uint64_t,
+        const game::OriginalWreckComponent50LA&,const game::OriginalWreckComponent50LA&,
+        const game::OriginalWreckComponent50LA&)const noexcept;
+    NativePlayerSpeechConstructorResult50LA constructNativePlayerSpeech2C1000(
+        const void*,const std::shared_ptr<game::OriginalApplicationEntities50LA>&,std::uint64_t,
+        const game::OriginalWreckComponent50LA&,const game::OriginalWreckComponent50LA&,
+        game::OriginalWreckComponent50LA&,game::PodSpeechCounts50HG&,game::PodSpeechState50HG&)noexcept;
+    bool nativePlayerSpeechBackingCurrent()const noexcept;
+    bool canRetireNativePlayerSpeech2C10B0(const void*,
+        const game::OriginalWreckComponent50LA&,const game::OriginalWreckComponent50LA*)const noexcept;
+    bool retireNativePlayerSpeech2C10B0(const void*,
+        const game::OriginalWreckComponent50LA&,const game::OriginalWreckComponent50LA*)noexcept;
+    std::unique_ptr<ColdNativePlayerSpeech> coldNativePlayerSpeech_;
+    bool nativePlayerSpeechAttempted_=false; // Never cleared by retirement.
     std::unique_ptr<ColdTaIntroEmitter> coldTaIntroEmitter_;
     std::array<ColdGroup,game::raceAudioGroupCount50IC> coldGroups_;
     std::shared_ptr<game::OriginalApplicationEntities50LA> coldApplication_;
@@ -563,3 +610,5 @@ private:
 #include "race_audio_groups_ta_intro_controller_candidate.inl"
 
 #include "race_audio_groups_ta_intro_live_candidate.inl"
+
+#include "race_audio_groups_native_player_speech50la.inl"

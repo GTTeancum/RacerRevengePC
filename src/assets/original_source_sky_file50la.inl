@@ -34,6 +34,10 @@ bool OriginalSourceSkyFile50LA::sourceReadBoundsCurrentNative()const noexcept {
         if(row.compressedPayload.pendingSourceItems)return false;
         for(const auto& size:row.followingCompressedSizes)if(!size||!check(*size,4,1,true))return false;
         for(const auto& payload:row.followingCompressedPayloads)if(!payload||payload->pendingSourceItems)return false;
+        for(const auto& step:row.rawExtendedOffsets)if(!check(step.read,4,1,true))return false;
+        //New row readers separately validate original item counts versus real
+        //copied/known bytes. A full-clamped read may return requested rows.
+        for(const auto& payload:row.rawExtendedRows)if(!payload||payload->pendingSourceItems)return false;
     }
     }
     return true;
@@ -60,6 +64,29 @@ bool OriginalSourceSkyFile50LA::preflightNative()const noexcept {
     }
     std::optional<std::size_t> latest=seekReturned_?resourceSeekTarget_:paletteOffsetRead_.after?paletteOffsetRead_.after:
         countRead_.after?countRead_.after:read_.after;
+    const auto compressedPaletteCurrent=[&](const auto& blocks,const auto& headers,const void* receiver,bool retired)noexcept {
+        std::array<std::uint8_t,4> sizeWord{};unsigned known=0;
+        constexpr std::size_t outputSizes[3]={0x300,0x8000,0x10000},offsets[3]={0x18,0x718,0x8718};
+        for(unsigned i=0;i<3;++i){const auto& block=blocks[i];const auto& size=block.size;const auto& payload=block.payload;
+            if(size.pendingSourceItems||payload.pendingSourceItems||size.copied>4||
+               (size.attempted&&(headers[2].items!=1u||(i&&blocks[i-1].payload.items!=1u)||size.before!=latest))||
+               (size.returned&&(!size.attempted||!size.before||!size.after||size.items!=(size.copied?1u:0u)))||
+               (size.items&&!size.returned)||(size.after&&(!size.before||*size.after!=*size.before+(size.returned?size.copied:0u))))return false;
+            if(size.attempted){std::uint32_t encoding=0;for(unsigned k=0;k<4;++k)encoding|=std::uint32_t(headers[2].bytes[k])<<(8*k);if(!encoding)return false;}
+            for(std::size_t k=0;k<size.copied;++k){sizeWord[k]=size.bytes[k];known|=1u<<k;}
+            if(size.after)latest=size.after;
+            if(!payload.attempted){if(payload.copied||payload.returned||payload.items||payload.before||payload.after||block.requested||block.direct||block.destination||block.nativeWithdrawn)return false;continue;}
+            std::uint32_t length=0;if(known!=15u||!size.returned||size.items!=1u)return false;
+            for(unsigned k=0;k<4;++k)length|=std::uint32_t(sizeWord[k])<<(8*k);
+            if(length>0x10000u||block.requested!=length||block.direct!=(length==outputSizes[i])||payload.copied>length||payload.before!=latest||
+               (payload.returned&&(!payload.before||!payload.after||payload.items!=(payload.copied?1u:0u)||!block.nativeWithdrawn))||
+               (payload.items&&!payload.returned)||(payload.after&&(!payload.before||*payload.after!=*payload.before+(payload.returned?payload.copied:0u)))||
+               (block.nativeWithdrawn&&(block.destination||(!payload.returned&&!retired)))||(!block.nativeWithdrawn&&!block.destination))return false;
+            if(block.direct&&!block.nativeWithdrawn&&(!receiver||block.destination!=static_cast<const std::uint8_t*>(receiver)+offsets[i]))return false;
+            if(payload.after)latest=payload.after;
+        }
+        return true;
+    };
     const Read4* previousPalette=nullptr;
     for(const auto& row:paletteHeaderReads_){
         if(row.copied>4||(row.attempted&&(!paletteEntered_||!seekReturned_||row.before!=latest))||
@@ -69,6 +96,7 @@ bool OriginalSourceSkyFile50LA::preflightNative()const noexcept {
            (row.attempted&&previousPalette&&previousPalette->items!=1u))return false;
         if(row.after)latest=row.after;previousPalette=&row;
     }
+    if(!compressedPaletteCurrent(compressedPaletteReads_,paletteHeaderReads_,paletteReceiver_,paletteWithdrawn_||paletteReleasedSource_))return false;
     constexpr std::size_t payloadSizes[3]={0x300,0x8000,0x10000};
     for(std::size_t i=0;i<rawPaletteReads_.size();++i){const auto& row=rawPaletteReads_[i];
         if(row.copied>payloadSizes[i]||(row.attempted&&(!paletteEntered_||row.before!=latest||
@@ -103,7 +131,9 @@ bool OriginalSourceSkyFile50LA::preflightNative()const noexcept {
                (read.returned&&*read.after!=*read.before+read.copied))return false;
             if(read.after)latest=read.after;
         }
-        for(std::size_t i=0;i<3;++i){const auto& read=step.payloads[i];
+        if(!compressedPaletteCurrent(step.compressed,step.headers,step.parserReceiver,step.parserWithdrawn||step.parserReleasedSource))return false;
+        for(std::size_t i=0;i<3;++i){
+            const auto& read=step.payloads[i];
             if(read.copied>payloadSizes[i]||(read.attempted&&(!step.parserEntered||step.headers[2].items!=1u||
                read.before!=latest||(i&&step.payloads[i-1].items!=1u)))||
                (read.returned&&(!read.attempted||!read.before||!read.after||!read.items))||
@@ -241,6 +271,29 @@ bool OriginalSourceSkyFile50LA::preflightNative()const noexcept {
         if(!validTell(row->compressedFinalTell))return false;
         if(row->compressedFinalTell.attempted){const auto* last=row->followingCompressedPayloads.empty()?&compressed:row->followingCompressedPayloads.back().get();
             if(!last||!last->returned||last->items!=last->requested||row->followingCompressedSizes.size()!=row->followingCompressedPayloads.size())return false;}
+        if(row->rawExtendedEntered&&(!row->entryOpened||row->resourceSizeA8.attempted||row->compressedHeaders[0].attempted||row->rawPayload.attempted))return false;
+        if(!validTell(row->rawExtendedInitialTell)||(row->rawExtendedInitialTell.attempted&&!row->rawExtendedEntered))return false;
+        bool rawTerminal=false;
+        for(std::size_t j=0;j<12;++j){const auto& part=row->rawExtendedOffsets[j];const auto& rd=part.read;
+            if(!validTell(part.tell)||(part.tell.attempted&&(!row->rawExtendedInitialTell.returned||
+               (j&&(row->rawExtendedOffsets[j-1].read.items!=1u||row->rawExtendedOffsets[j-1].terminal))))||
+               rd.copied>4||(rd.attempted&&(!part.tell.returned||rd.before!=latest))||
+               (rd.returned&&(!rd.attempted||!rd.before||!rd.after||rd.items!=(rd.copied?1u:0u)))||
+               (rd.items&&!rd.returned)||(rd.after&&(!rd.before||*rd.after!=*rd.before+(rd.returned?rd.copied:0u))))return false;
+            if(rd.after)latest=rd.after;
+            if(part.terminal&&rd.items==1u)rawTerminal=true;
+        }
+        if(row->rawExtendedRows.size()>10)return false;
+        for(std::size_t j=0;j<row->rawExtendedRows.size();++j){const auto& pointer=row->rawExtendedRows[j];if(!pointer)return false;const auto& part=*pointer;
+            if(!rawTerminal||part.dimension!=(1u<<j)||part.rows!=part.dimension||
+               (part.rowBytes!=part.dimension*2u&&part.rowBytes!=part.dimension*4u)||part.requested!=std::size_t(part.rowBytes)*part.rows||
+               (j&&(!row->rawExtendedRows[j-1]->returned||row->rawExtendedRows[j-1]->items!=row->rawExtendedRows[j-1]->rows))||
+               part.copied>part.requested||(part.attempted&&part.before!=latest)||
+               (part.returned&&(!part.attempted||!part.before||!part.after||part.items!=(part.copied?part.rows:0u)))||
+               (part.items&&!part.returned)||(part.after&&(!part.before||*part.after!=*part.before+(part.returned?part.copied:0u)))||
+               (part.attempted&&!part.nativeWithdrawn&&!part.destination)||(part.nativeWithdrawn&&part.destination))return false;
+            if(part.after)latest=part.after;
+        }
         const auto& payload=row->rawPayload;
         if(payload.copied>payload.requested||(payload.attempted&&(!row->entryOpened||payload.before!=latest))||
            (payload.returned&&(!payload.attempted||!payload.before||!payload.after||!payload.items))||
@@ -401,9 +454,52 @@ bool OriginalSourceSkyFile50LA::readRawPaletteBlock(std::size_t index,D& d,std::
     if(row.copied&&row.copied<sizes[index]){row.pendingSourceItems=1;pc_=0x12ff34;return fail(d,E::unsupported,pc_);}
     row.returned=true;row.items=row.copied?1u:0u;pc_=resumes[index];return true;
 }
+bool OriginalSourceSkyFile50LA::readCompressedPaletteSize(std::size_t occurrence,std::size_t index,D& d)noexcept {
+    d={};if(!current()||index>=3||occurrence>followingPalettes_.size())return fail(d,E::phase,0x12fb30);
+    auto& headers=occurrence?followingPalettes_[occurrence-1]->headers:paletteHeaderReads_;
+    auto& blocks=occurrence?followingPalettes_[occurrence-1]->compressed:compressedPaletteReads_;
+    const bool live=occurrence?(followingPalettes_[occurrence-1]->parserEntered&&!followingPalettes_[occurrence-1]->parserWithdrawn&&!followingPalettes_[occurrence-1]->parserReleasedSource&&followingPalettes_[occurrence-1]->parserReceiver):
+        (paletteEntered_&&!paletteWithdrawn_&&!paletteReleasedSource_&&paletteReceiver_);
+    if(!live||headers[2].items!=1u||(index&&blocks[index-1].payload.items!=1u))return fail(d,E::phase,0x12fb30);
+    std::uint32_t encoding=0;for(unsigned k=0;k<4;++k)encoding|=std::uint32_t(headers[2].bytes[k])<<(8*k);
+    auto& row=blocks[index].size;if(!encoding||row.attempted)return fail(d,E::phase,0x12fb30);
+    row.attempted=true;row.before=expectedCursor_;pc_=0x12fb30;
+    const bool returned=resolver_->readSourceBankMember12FB30(selectedRoot_,this,handle_,row.bytes.data(),4,row.copied,d);
+    row.after=resolver_->freshFileCapacity_->members150[handle_].cursor10;expectedCursor_=row.after;
+    if(!returned){pc_=d.sourcePC?d.sourcePC:pc_;return false;}
+    row.returned=true;row.items=row.copied?1u:0u;
+    constexpr std::uint32_t resumes[3]={0x2e39a0,0x2e3a38,0x2e3ad0};pc_=resumes[index];return true;
+}
+bool OriginalSourceSkyFile50LA::readCompressedPaletteBlock(std::size_t occurrence,std::size_t index,std::uint8_t* scratch,D& d)noexcept {
+    d={};if(!current()||!scratch||index>=3||occurrence>followingPalettes_.size())return fail(d,E::phase,0x12fb30);
+    auto& blocks=occurrence?followingPalettes_[occurrence-1]->compressed:compressedPaletteReads_;
+    auto* receiver=occurrence?followingPalettes_[occurrence-1]->parserReceiver:paletteReceiver_;
+    const bool live=occurrence?(followingPalettes_[occurrence-1]->parserEntered&&!followingPalettes_[occurrence-1]->parserWithdrawn&&!followingPalettes_[occurrence-1]->parserReleasedSource):
+        (paletteEntered_&&!paletteWithdrawn_&&!paletteReleasedSource_);
+    auto& block=blocks[index];if(!live||!receiver||!block.size.returned||block.size.items!=1u||block.payload.attempted)return fail(d,E::phase,0x12fb30);
+    std::array<std::uint8_t,4> word{};unsigned known=0;
+    for(std::size_t i=0;i<=index;++i)for(std::size_t k=0;k<blocks[i].size.copied;++k){word[k]=blocks[i].size.bytes[k];known|=1u<<k;}
+    if(known!=15u)return fail(d,E::unsupported,0x12fb30);
+    std::uint32_t length=0;for(unsigned k=0;k<4;++k)length|=std::uint32_t(word[k])<<(8*k);
+    if(length>0x10000u)return fail(d,E::unsupported,0x12fb30);
+    constexpr std::size_t sizes[3]={0x300,0x8000,0x10000},offsets[3]={0x18,0x718,0x8718};
+    block.direct=length==sizes[index];block.requested=length;block.destination=block.direct?static_cast<std::uint8_t*>(receiver)+offsets[index]:scratch;
+    auto& row=block.payload;row.attempted=true;row.before=expectedCursor_;pc_=0x12fb30;
+    const bool returned=resolver_->readSourceBankMember12FB30(selectedRoot_,this,handle_,block.destination,length,row.copied,d);
+    row.after=resolver_->freshFileCapacity_->members150[handle_].cursor10;expectedCursor_=row.after;
+    if(!returned){pc_=d.sourcePC?d.sourcePC:pc_;return false;}
+    row.returned=true;row.items=row.copied?1u:0u;
+    //End this native file-read destination lease only after the source call
+    //returns. This is not a source free; caller/codec retain actual storage.
+    block.destination=nullptr;block.nativeWithdrawn=true;
+    constexpr std::uint32_t direct[3]={0x2e39d4,0x2e3a6c,0x2e3b08},coded[3]={0x2e39fc,0x2e3a94,0x2e3b30};
+    pc_=block.direct?direct[index]:coded[index];return true;
+}
 bool OriginalSourceSkyFile50LA::withdrawPaletteNative()noexcept {
     if(!preflightNative()||paletteScanMatchDetected_)return false;
     for(const auto& step:followingPalettes_)if(step->scanMatchDetected)return false;
+    for(auto& block:compressedPaletteReads_)if(block.payload.attempted){block.destination=nullptr;block.nativeWithdrawn=true;}
+    for(auto& step:followingPalettes_)for(auto& block:step->compressed)if(block.payload.attempted){block.destination=nullptr;block.nativeWithdrawn=true;}
     if(paletteEntered_&&!paletteWithdrawn_&&!paletteReleasedSource_){paletteReceiver_=nullptr;paletteWithdrawn_=true;}
     for(auto& step:followingPalettes_)if(step->parserEntered&&!step->parserWithdrawn&&!step->parserReleasedSource){step->parserReceiver=nullptr;step->parserWithdrawn=true;}
     return true; //Withdraw constructor destinations before backing, not guest destructors.
@@ -698,6 +794,44 @@ bool OriginalSourceSkyFile50LA::readFollowingCompressedSize(std::size_t occurren
     //size is NOT carried forward. Owner keeps separate occurrence receipts.
     return read4(*row.followingCompressedSizes.back(),0x24f78c,d,true);
 }
+bool OriginalSourceSkyFile50LA::tellRawExtendedOffset(std::size_t occurrence,std::size_t index,bool terminal,D& d)noexcept {
+    d={};if(!current()||occurrence>=itemResourceSeeks_.size()||occurrence+1!=itemResourceSeeks_.size()||index>12)return fail(d,E::phase,0x12f520);
+    auto& row=*activeResourceFile(occurrence);
+    if(!row.entryOpened||row.resourceSizeA8.attempted||row.compressedHeaders[0].attempted||row.rawPayload.attempted||!row.rawExtendedRows.empty())return fail(d,E::phase,0x12f520);
+    auto& tell=index?row.rawExtendedOffsets[index-1].tell:row.rawExtendedInitialTell;
+    if(tell.attempted||(index&&(!row.rawExtendedInitialTell.returned||
+       (index>1&&(row.rawExtendedOffsets[index-2].read.items!=1u||row.rawExtendedOffsets[index-2].terminal)))))return fail(d,E::phase,0x12f520);
+    if(!index){if(row.rawExtendedEntered)return fail(d,E::phase,0x12f520);row.rawExtendedEntered=true;}
+    else row.rawExtendedOffsets[index-1].terminal=terminal;
+    tell.attempted=true;pc_=0x12f520;std::size_t position=0;
+    if(!resolver_->tellSourceBankMember12F520(selectedRoot_,this,handle_,position,d))return false;
+    tell.position=position;tell.returned=true;pc_=index?(terminal?0x24f654:0x24f5b4):0x24f5a4;return true;
+}
+bool OriginalSourceSkyFile50LA::readRawExtendedOffset(std::size_t occurrence,std::size_t index,D& d)noexcept {
+    d={};if(!current()||index>=12||occurrence>=itemResourceSeeks_.size()||occurrence+1!=itemResourceSeeks_.size())return fail(d,E::phase,0x12fb30);
+    auto& row=activeResourceFile(occurrence)->rawExtendedOffsets[index];if(!row.tell.returned)return fail(d,E::phase,0x12fb30);
+    //Actual stack170..19F was zeroed; this distinct word keeps its real zero
+    //suffix after a positive short clamp. It is subsequently ADDed, not zeroed.
+    return read4(row.read,row.terminal?0x24f680:0x24f5e0,d,true);
+}
+bool OriginalSourceSkyFile50LA::readRawExtendedRows(std::size_t occurrence,std::uint8_t* destination,std::uint32_t dimension,std::uint32_t rowBytes,D& d)noexcept {
+    d={};if(!current()||!destination||occurrence>=itemResourceSeeks_.size()||occurrence+1!=itemResourceSeeks_.size())return fail(d,E::phase,0x24f950);
+    auto& owner=*activeResourceFile(occurrence);const auto ordinal=owner.rawExtendedRows.size();bool terminal=false;
+    for(const auto& offset:owner.rawExtendedOffsets)if(offset.terminal&&offset.read.items==1u)terminal=true;
+    if(!owner.rawExtendedEntered||!terminal||ordinal>=10||dimension!=(1u<<ordinal)||
+       (rowBytes!=dimension*2u&&rowBytes!=dimension*4u)||
+       (ordinal&&(!owner.rawExtendedRows.back()->returned||owner.rawExtendedRows.back()->items!=owner.rawExtendedRows.back()->rows)))return fail(d,E::phase,0x24f950);
+    try{owner.rawExtendedRows.emplace_back(new RawExtendedRows);}catch(...){return fail(d,E::allocation,0x24f950);}
+    auto& row=*owner.rawExtendedRows.back();row.dimension=dimension;row.rowBytes=rowBytes;row.rows=dimension;
+    row.requested=std::size_t(rowBytes)*dimension;row.destination=destination;row.attempted=true;row.before=expectedCursor_;pc_=0x12fb30;
+    const bool returned=resolver_->readSourceBankMember12FB30(selectedRoot_,this,handle_,destination,row.requested,row.copied,d);
+    row.after=resolver_->freshFileCapacity_->members150[handle_].cursor10;expectedCursor_=row.after;
+    if(!returned){pc_=d.sourcePC?d.sourcePC:pc_;return false;}
+    //The owned lower reader returns only after fully copying its positive
+    //clamp. Original12FF34 returns REQUESTED ROWS then, even on EOF clamp.
+    //No knowledge is invented: caller must prove the whole real input extent.
+    row.returned=true;row.items=row.copied?dimension:0u;pc_=0x24f958;return true;
+}
 bool OriginalSourceSkyFile50LA::readItemResourcePayload(std::size_t occurrence,std::uint8_t* destination,std::size_t count,D& d)noexcept {
     d={};if(!current()||!destination||occurrence>=itemResourceSeeks_.size()||occurrence+1!=itemResourceSeeks_.size()||
        !activeResourceFile(occurrence)->entryOpened||activeResourceFile(occurrence)->resourceSizeA8.attempted)return fail(d,E::phase,0x24ff88);
@@ -729,7 +863,8 @@ bool OriginalSourceSkyFile50LA::withdrawFirstItemNative()noexcept {
     if(!preflightNative())return false;
     for(std::size_t item=itemResourceSeeks_.size();item;){--item;
       for(std::size_t ordinal=itemResourceSeeks_[item]->resourceEntries.size()+1;ordinal;){--ordinal;auto* resource=resourceFileOccurrence(item,ordinal);resource->rawPayload.destination=nullptr;resource->rawPayload.nativeWithdrawn=true;resource->compressedPayload.destination=nullptr;resource->compressedPayload.nativeWithdrawn=true;
-        for(auto& payload:resource->followingCompressedPayloads){payload->destination=nullptr;payload->nativeWithdrawn=true;}}
+        for(auto& payload:resource->followingCompressedPayloads){payload->destination=nullptr;payload->nativeWithdrawn=true;}
+        for(auto& payload:resource->rawExtendedRows){payload->destination=nullptr;payload->nativeWithdrawn=true;}}
     }
     if(firstItem_){firstItem_->receiver=nullptr;firstItem_->nativeWithdrawn=true;}
     for(auto& row:followingItems_){row->receiver=nullptr;row->nativeWithdrawn=true;}return true;

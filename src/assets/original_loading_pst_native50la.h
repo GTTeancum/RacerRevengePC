@@ -2,6 +2,7 @@
 #include <atomic>
 #include <cstdint>
 #include <thread>
+namespace ra_cold_aggregate50LA {class Owner;}
 namespace rr::assets {
 class OriginalStandardTextureResource50LA;
 // One process history, NEVER reset by bank/screen/resource lifetime. Generic
@@ -9,9 +10,11 @@ class OriginalStandardTextureResource50LA;
 // interval; BSS initialization is not permission to forget previous calls.
 class OriginalTextureAllocationHistory50LA final {
     friend class OriginalStandardTextureResource50LA;
+    friend class ::ra_cold_aggregate50LA::Owner; //Same435938 owner, never a second Sky counter.
     struct State {
         const std::thread::id thread=std::this_thread::get_id();
         std::atomic<bool> known{true},assertionsKnown{true};std::uint32_t bytes435938=0; // Original BSS initializer.
+        std::uint64_t sequence=0; //Native write history only, not an original counter lane.
         std::atomic<std::uint8_t> version8974{0},allocation8994{0},width8984{0};
         std::atomic<std::uint32_t> version435980{0},allocation4359C0{0},width4359A0{0};
     };
@@ -21,8 +24,23 @@ class OriginalTextureAllocationHistory50LA final {
     static void invalidateNativeCounterCleanup()noexcept {state().known=false;}
     static bool assertionHistoryCurrent()noexcept {return state().assertionsKnown.load()&&state().thread==std::this_thread::get_id();}
     static bool add2505E8(std::uint32_t bytes)noexcept {
-        auto& s=state();if(!s.known||s.thread!=std::this_thread::get_id())return false;
-        s.bytes435938+=bytes;return true; // Source32-bit wrap, not size_t sum.
+        auto& s=state();if(!s.known||s.thread!=std::this_thread::get_id()||s.sequence==~std::uint64_t(0))return false;
+        s.bytes435938+=bytes;++s.sequence;return true; // Source32-bit wrap, not size_t sum.
+    }
+    static bool read2500AC(std::uint32_t& value)noexcept {
+        const auto& s=state();if(!s.known||s.thread!=std::this_thread::get_id())return false;
+        value=s.bytes435938;return true;
+    }
+    static bool store2500B8(std::uint32_t bytes,std::uint32_t before,std::uint32_t& after,std::uint64_t& sequence)noexcept {
+        auto& s=state();if(!s.known||s.thread!=std::this_thread::get_id()||s.bytes435938!=before||s.sequence==~std::uint64_t(0))return false;
+        after=before+bytes;s.bytes435938=after;sequence=++s.sequence;return true;
+    }
+    static bool sourceWriteHistoryCurrent(std::uint32_t bytes,std::uint32_t before,std::uint32_t after,std::uint64_t sequence)noexcept {
+        const auto& s=state();
+        //An unrepresented later writer/native cleanup poisons FUTURE reads,
+        //not a genuinely completed earlier addition or its retireable backing.
+        return s.thread==std::this_thread::get_id()&&sequence&&sequence<=s.sequence&&after==before+bytes&&
+            (!s.known||sequence!=s.sequence||after==s.bytes435938);
     }
     static bool version24E900(std::uint32_t version)noexcept {
         auto& s=state();if(!s.version8974.load()){s.version435980.store(1);s.version8974.store(1);}

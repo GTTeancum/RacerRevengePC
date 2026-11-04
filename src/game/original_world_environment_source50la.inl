@@ -206,3 +206,26 @@ bool Owner::readSourceSkyFile274B54(const OriginalWreckComponent50LA& world,
     if(n==260)return false;
     out=source_->firstFile.get();length=n;return true;
 }
+
+//Only the two completed getter-written post-Sky lanes are admitted. The known
+//prefix is checked without touching constructor-unknown suffix bytes.
+bool Owner::readSourceKnownStringNative(const OriginalWreckComponent50LA& world,
+    const rr::platform::OriginalWorldSourceConfig50LA& config,unsigned lane,
+    const char*& out,std::size_t& length)const noexcept {
+    if((lane!=1&&lane!=3)||!preflightSourceNative()||sourceClosed_||!source_||
+       sourceWorld_!=&world||sourceConfig_!=&config||sourceGeneration_!=world.sessionGeneration||
+       source_->thread!=std::this_thread::get_id()||source_->phase!=Source::Phase::returnedOne)return false;
+    const auto& text=lane==1?source_->water110:source_->ecosystem318;
+    const auto known=source_->stringKnown[lane];
+    if(!known||known>text.size()||text[known-1]!=0)return false;
+    for(std::size_t i=0;i+1<known;++i)if(text[i]==0)return false;
+    out=text.data();length=known-1;return true;
+}
+bool Owner::readSourceWaterFile110(const OriginalWreckComponent50LA& world,
+    const rr::platform::OriginalWorldSourceConfig50LA& config,const char*& out,std::size_t& length)const noexcept {
+    return readSourceKnownStringNative(world,config,1,out,length);
+}
+bool Owner::readSourceEcosystemFile318(const OriginalWreckComponent50LA& world,
+    const rr::platform::OriginalWorldSourceConfig50LA& config,const char*& out,std::size_t& length)const noexcept {
+    return readSourceKnownStringNative(world,config,3,out,length);
+}

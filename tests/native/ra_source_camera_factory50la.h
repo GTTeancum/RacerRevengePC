@@ -129,7 +129,7 @@ inline bool Owner::constructRuntimeSourceCameraImpl(
             &actual.actualChariotModels,actual.actualBottomRightModels,actual.actualBottomLeftModels,
             application.animationClock(),fresh?nullptr:&camera.cables,&source->map,{},{},{},{},{},
             actual.startMusicContext,actual.startMusicRequest,actual.recordManager40,
-            actual.introAudio,actual.introAuthoring,actual.introMusicFadeRequest};
+            actual.introAudio,actual.introAuthoring,actual.introMusicFadeRequest,actual.nativeHumanPlayer0};
         camera.session.reset(fresh?new c::Session(sessionOwners,fresh,world):new c::Session(sessionOwners));
         // Exact same retained bridge; no unowned callback or supplied key.
         camera.session->nativeWreckOwner_=&runtime;

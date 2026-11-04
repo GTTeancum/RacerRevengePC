@@ -109,8 +109,8 @@
                 if(!overlapOkay){portalPC=edge.overlap.pc;return false;}
                 portalPC=0x280c54u;if(!edge.hit)return true;
                 if(!edge.distance)return false;
-                portalPC=0x280c60u;raw.field10=*edge.distance;link.distance10=edge.distance;edge.distanceStoreMask|=1u;
-                portalPC=0x280c64u;raw.field0C=*edge.distance;link.distance0C=edge.distance;edge.distanceStoreMask|=2u;
+                portalPC=0x280c60u;link.storeDistance10Native(*edge.distance);edge.distanceStoreMask|=1u;
+                portalPC=0x280c64u;link.storeDistance0CNative(*edge.distance);edge.distanceStoreMask|=2u;
             }else if(edge.edge!=cursor||edge.edgeIndex!=index||edge.neighbor!=raw.neighbor04||edge.portal!=raw.portal08||
                      !g::source_portal_overlap231150::historyCurrent(edge.overlap))return false;
             if(phase==4){edge.next=raw.next00.get();portalPC=0x280cf8u;return true;}

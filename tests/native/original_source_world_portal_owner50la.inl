@@ -124,6 +124,7 @@ bool Owner::preflightSourcePortalOwnersNative(const Entity* parent)const noexcep
         if(s.loadReturned&&(s.copiedVertices!=4||!s.quadReturned||!s.diagonalReturned||!s.normalNormalized||
            !s.edgeNormalized[0]||!s.edgeNormalized[1]||!s.edgeNormalized[2]||!s.edgeNormalized[3]))return false;
         for(std::size_t stage=0;stage<4;++stage){const auto& r=sourcePortalWorldLinks_[i][stage];
+            if(!r.fogDistanceHistoryCurrentNative())return false;
             if(r.withdrawn){if(r.pending)return false;continue;}
             if(r.knownMask&~31u)return false;
             if((r.distance0C||r.distance10)&&(!r.published||r.knownMask!=31))return false;

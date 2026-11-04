@@ -35,6 +35,7 @@ inline bool RaceAudioGroups50IC::pauseColdGroup2356A0(
     return true;
 }
 inline bool RaceAudioGroups50IC::retireNativeVoiceBindings()noexcept {
+    if(coldNativePlayerSpeech_)return false; // Actual D48 retires before its native/provider backing.
     if(!coldStarted_||!coldApplication_||coldThread_!=std::this_thread::get_id()||
        !mixer_||coldMixer_!=mixer_||coldEpoch_!=epoch_||mixer_->groupEpoch50IC()!=epoch_||
        mixer_->count()!=count_||!mixer_->requiresVoiceGroupGains50IC()||
@@ -104,7 +105,7 @@ inline bool RaceAudioGroups50IC::constructNextCold2350D0(AudioMixer50HD& mixer,
     ++coldNext_;return true;
 }
 inline bool RaceAudioGroups50IC::canReleaseEmptyCold142590(game::RaceAudioGroup50IC group)const noexcept {
-    if(coldTaIntroEmitter_)return false; // No partial group retirement can strand its detached emitter.
+    if(coldTaIntroEmitter_||coldNativePlayerSpeech_)return false; // Never strand a detached counted emitter.
     if(!represented(group)||!coldStarted_||!coldApplication_||!coldMixer_||
        coldThread_!=std::this_thread::get_id()||coldEpoch_!=coldMixer_->groupEpoch50IC()||
        coldApplication_->attachmentLock423F58())return false;

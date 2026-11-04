@@ -17,6 +17,8 @@ namespace ra_cold_roster50LA { class WreckBacking; class NativeWreckEffectChildr
 #include <optional>
 #include <exception>
 #include <vector>
+#include "../assets/original_phy_cursor50la.h"
+#include <charconv>
 
 namespace rr::game {
 class OriginalWreckRacerStorage50LA;
@@ -68,6 +70,16 @@ struct OriginalWreckPieceProgress50LA {
 class OriginalWreckPieceStorage50LA final {
     friend class OriginalWreckRacerStorage50LA;
     OriginalWreckPieceProgress50LA progress_;
+    // One native source invocation, not an inferred atomic tuning receipt.
+    struct NativeTuningHistory {
+        bool entered=false,complete=false,gravityStored=false;
+        std::uint32_t pc=0x22c310u;
+        std::optional<std::size_t> publishedSlot;
+        unsigned registrationStores=0; //44,A4,A8,48,30, in source order
+        std::unique_ptr<OriginalRacerModelSceneOwner50LA::SourceLocalBounds28D670> bounds;
+        std::array<std::uint32_t,4> center40{},half50{};
+    } nativeTuning_;
+
     bool nativePreBodyRetired_=false;
     std::optional<OriginalRacerSceneObject50LA*> sourceModel14C_;
     OriginalWreckAssets50LA* assets_=nullptr; // owned by the adopted inventory
@@ -349,6 +361,10 @@ class OriginalWreckRacerStorage50LA final {
         }
     };
     std::unique_ptr<Storage> storage_;
+    bool nativeTuningAttempted_=false,nativeTuningComplete_=false;
+    std::uint32_t nativeTuningPC_=0x215af8u;
+    #include "original_wreck_native_tuning50la.inl"
+
     // All callers retain their existing storage/adoption admission. These
     // selectors deliberately remain fixed to the established first occurrence.
     OriginalWreckCollectionStorage50LA& firstCollection()noexcept{return storage_->collections[0];}
@@ -1502,10 +1518,14 @@ OriginalWreckPrefixRetirementResult50LA retirePieceBeforeE0Core(
         auto* piece=retirementOccurrence(ci,pi);if(!piece)return rejected;
         auto& p=*piece;auto& progress=p.progress_;
         if(p.nativePreBodyRetired_)return progress.retirementResult;
-        //Only collection0 is adopted. Its genuine occurrence cursor and
-        //tail-first retirement gates remain authoritative for every piece.
-        if(ci||!storage_->nativeSourceMode||!progress.e0ConstructorAttempted||
-           !p.setupZonesBound_||p.collisionWorldB8_!=&world)return rejected;
+        //Each actual source cohort retains its own array38/ordinal and
+        //tail-first retirement gates. Never substitute collection0 for ci.
+        const auto& cohort=storage_->collections[ci];
+        if(!storage_->nativeSourceMode||!cohort.nativeSourceMode_||
+           cohort.sourceArray38_!=cohort.ordered38_.get()||cohort.sourceArray38_[pi]!=&p||
+           p.collectionOrdinal_!=cohort.ordinal_||p.pieceOrdinal_!=pi+1u||
+           (cohort.nativeGroupAttempted_&&!cohort.nativeGroupRetired_)||
+           !progress.e0ConstructorAttempted||!p.setupZonesBound_||p.collisionWorldB8_!=&world)return rejected;
         switch(progress.prefixResult.status){
         case C::queryPublicationRequired:case C::queryConstructionFailed:
         case C::contactConstructorRequired:case C::contactConstructionFailed:
@@ -2079,7 +2099,7 @@ OriginalWreckPrefixRetirementResult50LA retirePieceBeforeE0Core(
            !c.group_.fields_&&!c.nativeGroupChildAttempted_[0]&&!c.nativeGroupChildAttempted_[1]){
             c.nativeGroupRetired_=true;return true; //native unconstructed cancellation only
         }
-        if(!c.nativeGroupConstructed_||!c.group_.fields_||c.group_.registered30_||
+        if(!c.nativeGroupConstructed_||!c.group_.fields_||(!nativeTuningAttempted_&&c.group_.registered30_)||
            c.source3C_!=&g||g.reference00!=1u||g.kind!=K::group2CBFC0||g.firstChild18||g.next14||
            !storage_->actualObjectCount423F60||!*storage_->actualObjectCount423F60||
            !storage_->actualAttachmentLock423F58||*storage_->actualAttachmentLock423F58)return false;
@@ -2091,7 +2111,8 @@ OriginalWreckPrefixRetirementResult50LA retirePieceBeforeE0Core(
                    !original_wreck_component_detail50LA::effectControlIdentityBound(*child))return false;
             }else if(child->reference00||child->kind!=K::entity141300)return false;
         }
-        if(c.group_.bound_)for(std::size_t i=0;i<c.group_.allocated_;++i)
+        if(nativeTuningAttempted_){if(!nativeTuningRowsRetirable(c))return false;}
+        else if(c.group_.bound_)for(std::size_t i=0;i<c.group_.allocated_;++i)
             if(c.group_.pieces44_[i].piece||c.group_.attachedA0_[i]||c.group_.breakLatchB0_[i])return false;
         if(c.nativeGroupAppended_){
             if(g.parent1C!=&c.collectionComponent_||!g.previous10||
@@ -2099,7 +2120,7 @@ OriginalWreckPrefixRetirementResult50LA retirePieceBeforeE0Core(
         }else if(g.parent1C||g.previous10)return false;
         if(g.previous10)g.previous10->next14=nullptr;
         --g.reference00;
-        if(!c.group_.retireNativeUnactivated2C9F30())std::terminate();
+        if(!c.group_.retireNativeUnactivated2C9F30(nativeTuningAttempted_))std::terminate();
         g.kind=K::entity141300;--*storage_->actualObjectCount423F60;
         c.nativeGroupRetired_=true;return true; //source3C/C0/C4 retained as history
     }
@@ -4111,7 +4132,7 @@ private:
         };
         auto modelResult=piece.modelOwner_.constructDirectRoot2403A0(modelBinding,graph,true);
         collectRows();if(!modelResult.okay())return finish(S::components,modelResult.sourcePC);
-        if(fresh)piece.sourceModel14C_=&piece.modelOwner_.model_; //165CBC, canonical Model identity.
+        if(storage_->nativeSourceMode)piece.sourceModel14C_=&piece.modelOwner_.model_; //165CBC, canonical Model identity.
         modelResult=piece.modelOwner_.prepareDirectRoot26E934(graph,*piece.assets_->standardModelPayload()->member());
         if(!modelResult.okay())return finish(S::components,modelResult.sourcePC);
         const auto file=piece.assets_->modelFileIdentity();

@@ -45,6 +45,8 @@ struct CameraCallerOwners {
     rr::platform::RaceAudioGroups50IC* introAudio=nullptr;
     std::shared_ptr<const rr::assets::OriginalTaIntroAuthoringCandidate> introAuthoring;
     bool (*introMusicFadeRequest)(void*,float)=nullptr;
+    // Existing native human event owner, not a source Player constructor receipt.
+    const rr::game::PlayerEventState49A* nativeHumanPlayer0=nullptr;
 };
 // Same runtime services, without caller-supplied roster arrays. The retained
 // roster handoff obtains model/rig/cable ownership from the actual Bank pin.
@@ -80,5 +82,7 @@ struct CameraRuntimeOwners {
     rr::platform::RaceAudioGroups50IC* introAudio=nullptr;
     std::shared_ptr<const rr::assets::OriginalTaIntroAuthoringCandidate> introAuthoring;
     bool (*introMusicFadeRequest)(void*,float)=nullptr;
+    // Existing native human event owner, not a source Player constructor receipt.
+    const rr::game::PlayerEventState49A* nativeHumanPlayer0=nullptr;
 };
 } // namespace ra_source_camera50LA

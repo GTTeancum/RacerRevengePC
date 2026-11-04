@@ -211,6 +211,10 @@ struct ActualOwners {
     rr::platform::RaceAudioGroups50IC* taIntroAudio=nullptr;
     std::shared_ptr<const rr::assets::OriginalTaIntroAuthoringCandidate> taIntroAuthoring;
     bool (*introMusicFadeRequest)(void*,float)=nullptr;
+    // Borrowed from the SAME live native event dispatcher. It supplies its
+    // configuration index5C; Bank slot and actionFFC are not substitutes.
+    // No original1A02E0/210770 constructor/load completion is implied.
+    const PlayerEventState49A* nativeHumanPlayer0=nullptr;
 
 };
 enum class Cut : std::uint8_t {
@@ -379,6 +383,7 @@ class Session final {
     // Private actual RA owner hook. Never installed for standalone sessions.
     ra_source_camera50LA::OwnershipBridge* nativeWreckOwner_=nullptr;
     bool stageNativeRetainedWreckCold()noexcept;
+    bool retireNativePlayerSpeechCold()noexcept;
     bool retireNativeRetainedWreckCold()noexcept;
 
     DisplayInputs* displayInputs_=nullptr;
@@ -1107,6 +1112,10 @@ class Session final {
         //No public intro work may survive a failed dependent-owner cleanup.
         if(actual_.taIntroAudio&&actual_.taIntroAudio->taIntroNativeReserved_)
             actual_.taIntroAudio->taIntroNativeWithdrawn_=true;
+        if(!retireNativePlayerSpeechCold()){
+            result_.entityCleanup={OriginalRacerEntityColdCleanupStatus50LA::topology,0x2c10b0u};
+            return false;
+        }
         if(!retireNativeRetainedWreckCold()){
             result_.entityCleanup={OriginalRacerEntityColdCleanupStatus50LA::topology,0x22ce10u};
             return false;

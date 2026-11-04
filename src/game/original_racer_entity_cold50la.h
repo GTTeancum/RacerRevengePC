@@ -7,6 +7,7 @@
 #include "undertrack_reset50ew.h"
 #include "../assets/original_standard_screen_material_reference50la.h"
 #include "../assets/pod_physics49n.h"
+#include "../assets/native_phy_load50la.h"
 #include <string_view>
 #include <array>
 #include <cstddef>
@@ -374,6 +375,9 @@ class OriginalRacerEntityCold50LA final {
     // Native source-load aliases. Unknown until the exact same-world producer;
     // cold storage never publishes its planned members here.
     bool nativeWreckLoadAttempted_=false,nativeWreckWithdrawn_=false;
+    //Bound forward by the real native load caller to the pre-existing
+    //Operation occurrence. Never constructed here or inferred at close.
+    rr::assets::NativePhyLoad50LA* nativePhyLoad_=nullptr;
     std::optional<OriginalWreckComponent50LA*> sourceRacerExplosion814_,sourceRacerSparks810_; //Unknown until212B78/212BEC.
     std::optional<OriginalWreckComponent50LA*> sourceParticle7FC_; //Unknown before actual210A0C.
     std::optional<OriginalRacerTerrainQueryOwner50LA*> sourceTerrain348_;
@@ -414,7 +418,52 @@ class OriginalRacerEntityCold50LA final {
     // Source20F3D4 concrete dispatch identity, not a synthetic runtime vtable.
     bool nativeDispatch20F390Known_=false,nativePostEmberAttempted_=false;
     std::uint32_t nativePostEmberPC_=0x212dc8u;
+    //212ED0 inventory belongs to this SAME racer. B54 is unknown until212EDC;
+    //B58 becomes known NULL only at2100BC, then the actual212F50 allocation
+    //store publishes its native pointer-width buffer. Unwritten entries are
+    //not initialized or exposed as source NULLs. The extent is host custody
+    //metadata, separate from both B54 and the retained source stack2C cursor.
+    std::optional<std::int32_t> sourceSpinCountB54_;
+    std::optional<const OriginalRacerSceneObject50LA* const*> sourceSpinB58_;
+    std::unique_ptr<const OriginalRacerSceneObject50LA*[]> spinAllocationB58_;
+    std::size_t nativeSpinB58Capacity_=0,nativeSpinB58PublishedRows_=0;
+    // Native fixed-backing adoption for the reached212E18 tail. These are
+    // NOT guest CC0/D34 pointer words or malloc/calloc results. Bank numeric
+    // addresses denote this racer ONLY during the same active slot visit.
+    // No consumer may use these descriptors without reauthenticating that
+    // Bank/generation/slot; all live consumers retain the existing numeric lanes.
+    struct NativeOuterStorage212E18 final {
+        bool attempted=false,sourcePhyClose1573B0Unrepresented=false,nativePhyClosed=false;
+        OriginalRacerEntityCold50LA* nativeReturnRacer=nullptr; //Typed native return only.
+        std::uint32_t pc=0x212e18u;
+        const void* bank=nullptr;
+        std::uint64_t generation=0;
+        std::size_t slot=0;
+        float* lapTimesCC0=nullptr; //Exactly the existing100-float timing array.
+        struct ImpactD34 final {
+            std::uint32_t* partnerId=nullptr;
+            std::uint32_t* partnerState=nullptr;
+            float* timer08=nullptr;
+            float* amount0C=nullptr;
+            float* duration10=nullptr;
+        } impact;
+        std::uint8_t impactStores=0;
+        std::uint32_t refreshedNodes=0;
+    } nativeOuterStorage_;
+    // Only this RA Water-NONE route lacks an existing BE0 owner. The four
+    // actual28B2B0 output words remain unknown until212E44. GC/MC Water paths
+    // must borrow their own previousBE0_ instead of using this RA-only lane.
+    std::optional<std::array<std::uint32_t,4>> nativePreviousBE0_;
     std::optional<float> engineMotionAB0_; //unknown before actual21003C
+    // Missing native canonical lanes. Each becomes known only at the actual
+    // base20F390 producer below; native class58 never upgrades this dispatch.
+    std::optional<const void*> sourceAudioD40_;
+    // Native pointer-width D48 alias. Unknown until actual20F63C; later only
+    // the authentic same-App speech constructor may publish its exact Entity.
+    std::optional<OriginalWreckComponent50LA*> nativeSpeechD48_;
+    std::optional<float> explosiveWreckSpeed50_,resetSpeed54_,powerslideYawA90_;
+    std::optional<float> binderMeshHalfHeight25C_;
+    std::optional<std::array<float,4>> cameraOffsetCE0_;
     // Canonical source lanes. Legacy native handling remains a separate
     // projection, never proof that these later source stores occurred.
     std::optional<float> sourceGravity378_,sourceAirborneGravity37C_,sourceLift7EC_;
@@ -463,9 +512,10 @@ class OriginalRacerEntityCold50LA final {
         std::optional<float>& written)noexcept {
         return sourceFloat158A70(phy,"Pod Setup","EngineMotion",written);
     }
-    bool beginNativeHandling2146(const std::vector<std::uint8_t>& retainedPhy,std::uint32_t& pc)noexcept{
+    bool beginNativeHandling2146(rr::assets::NativePhyLoad50LA::Reader& phy,std::uint32_t& pc)noexcept{
         pc=nativePostEmberPC_;
-        if(nativePostEmberAttempted_||nativeWreckWithdrawn_||!nativeWreckLoadAttempted_||
+        if(!phy||!nativePhyLoad_||phy.owner()!=nativePhyLoad_||
+           nativePostEmberAttempted_||nativeWreckWithdrawn_||!nativeWreckLoadAttempted_||
            !prepared()||!postOverlayConstructed210A20()||nativeSource818Published_!=10u||
            !nativeDispatch20F390Known_||!engineMotionAB0_||mode3C_!=0u||
            racer.kind!=OriginalWreckComponentKind50LA::racer27E130||
@@ -474,9 +524,15 @@ class OriginalRacerEntityCold50LA final {
         pc=nativePostEmberPC_=0x212ddcu;
         //20F3D4 installs3D1790; actual+A0=212EC0 is JR RA/NOP. This
         //concrete owner proves that call, not a generic virtual no-op policy.
+        pc=nativePostEmberPC_=0x2146f4u;bool present=false;
+        //The earlier bulk/inventory phase is native-adapted, not historical
+        //Config selection. Require this actual first shared selection to
+        //succeed; never invent an unknown pre-2146 selected block on a miss.
+        auto& reader=phy.cursor();
+        if(!reader.select157D00("Pod Setup",present)||!present)return false;
         pc=nativePostEmberPC_=0x214708u;
         std::optional<float> value;
-        if(!engineMotionSource158A70(retainedPhy,value))return false;
+        if(!reader.float158A70("EngineMotion",value))return false;
         if(value)engineMotionAB0_=*value; //actual158AAC reached from214708
         pc=nativePostEmberPC_=0x214710u;
         //The separate physical-properties/source340 producer split remains
@@ -572,8 +628,14 @@ public:
         entityType32=type.type;
         entityFlags33=std::uint8_t((entityFlags33&~7u)|1u); //27E1F8/214..240
         nativeDispatch20F390Known_=true; //actual20F3D4, after base27E130 returned
-        if(b.sourceConstructorOnly){
+        if(b.sourceConstructorOnly)
             sourceAnchor300_=std::array<std::uint32_t,4>{{0,0,0,0x3f800000u}}; //20F440 VF0.
+        cameraOffsetCE0_=std::array<float,4>{{0.f,0.f,0.f,1.f}}; //20F5D4 SQ vf0.
+        sourceAudioD40_=nullptr; //20F62C, BEFORE the native base+A0 no-op212EC0.
+        nativeSpeechD48_=nullptr; //20F63C. Not a constructor/load receipt for D48.
+        explosiveWreckSpeed50_=0.f;resetSpeed54_=0.f; //20F6C4/20F6CC.
+        binderMeshHalfHeight25C_=2.25f; //20F944, s6=bits40100000.
+        if(b.sourceConstructorOnly){
             if(!b.actualAnchorOrigin434630)return result(S::binding,0x20f990u);
             sourceAnchor300_=*b.actualAnchorOrigin434630; //20F99C, before query690 NULL.
         }
@@ -588,7 +650,9 @@ public:
         sourceCount384_=0u; //Actual20FA3C.388 remains unknown, not a fabricated array.
         sourceList488_=nullptr; //20FA44;48C is not written by this prefix.
         sourceLift7EC_=10.f;
+        powerslideYawA90_=0.f; //20FF48, never a lifecycle-derived default.
         engineMotionAB0_=0.f; //actual21003C, before selected-bit210414 store
+        sourceSpinB58_=nullptr; //Actual2100BC. There is no constructor B54 store.
         // The enclosing racer20F390 constructor then sets selected bit1 at
         //210414..210430, before the represented210770/210878 cold prefix.
         // This is an actual racer write, not model191, clipping, a draw receipt,
@@ -697,6 +761,7 @@ public:
         // The concrete partial cable owner must close first. Never erase its
         // live254 alias while releasing the containing racer.
         if(cables254||lateStrips_)return {S::topology,0x2104d0u};
+        if(nativeSpeechD48_&&*nativeSpeechD48_)return {S::topology,0x2c10b0u};
         if(nativeWreckLoadAttempted_&&!nativeWreckWithdrawn_)return {S::topology,0x2129c0u};
 
         if(!binding_.actualObjectCount423F60||!binding_.actualAttachmentLock423F58)
@@ -742,6 +807,14 @@ public:
         // that source2104D0 writes null back into its old owner slots.
         if(count_){
             --racer.reference00; //104970 enters the represented2104D0 destructor.
+            //2104FC..21050C precedes CC0/800 cleanup.2E8AE0 frees the
+            //plain B58 allocation only; it neither visits borrowed SceneObjects
+            //nor clears the source alias/count. Models may already be retired.
+            spinAllocationB58_.reset();
+            //Native CC0 borrows banked inline storage. Withdraw after B58,
+            //at the represented21051C lifetime point, without calling305728
+            //or reading/freeing/resetting another active Bank slot's array.
+            nativeOuterStorage_.lapTimesCC0=nullptr;
             slots800_.reset();slots804_.reset();slots808_.reset();slots80C_.reset();
             slots818_.reset();slots81C_.reset();
             if(count_==2u){--detached7F8.reference00;--counter;}
@@ -749,6 +822,10 @@ public:
             // attached children and AFTER detached7F8. Borrowed scene records
             // may already be dead: plain allocation deletion never reads them.
             wristAllocations_[0].reset();wristAllocations_[1].reset();
+            //210710's D34 lifetime: withdraw split native lane descriptors.
+            //No source2E8B00 receipt and no dereference/reset of banked memory.
+            nativeOuterStorage_.impact={};nativeOuterStorage_.bank=nullptr;
+            nativePhyLoad_=nullptr; //Borrow withdrawal only; Operation owns it.
             --counter;
         }
         cleanupPhase_=3;released_=true;

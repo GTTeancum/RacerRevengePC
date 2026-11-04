@@ -1926,7 +1926,8 @@ void Context::run() {
         sourceBlur,poseHistory,boostState,sourceCameraCycleAudio,dynamicRacer60,originalAiHumanCount,
         humanResultsCountdown,playerEnvironment.held,humanCourseEnabled?&sourceRaceHud:nullptr,nullptr,
         &startMusicContext,requestStartMusic,nativeRecordActor.get(),
-        taIntroAuthoring?liveAudio->groupsForProviders():nullptr,taIntroAuthoring,requestIntroMusicFade};
+        taIntroAuthoring?liveAudio->groupsForProviders():nullptr,taIntroAuthoring,requestIntroMusicFade,
+        humanCourseEnabled?&playerEvents:nullptr};
     const bool cameraConstructed=raSession&&raSession->constructCamera(runtime,sourceCameraAssets.cam,*sourceCameraDisplay,raSessionDiagnostic);
     if(!cameraConstructed){
      std::cerr<<"RA camera failure="<<(raSessionDiagnostic.aggregate.failure?raSessionDiagnostic.aggregate.failure:"")

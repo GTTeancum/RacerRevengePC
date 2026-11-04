@@ -9,10 +9,36 @@ inline OriginalRacerModelSceneResult50LA OriginalRacerModelSceneOwner50LA::produ
        !graph.count||graph.count>maxModelBoundsNodes49O||!validateSceneGraph49P(graph)||
        !inRange(graph,model_.sceneIndex)||at(graph,model_.sceneIndex).parent180!=none)
         return {S::phase,0x28d670u}; //Native domain: actual cold parentless source hierarchy.
+    // Preserve the source entry's actual byte-read history requirement. The
+    // new native Wreck entry never fills or borrows these source receipts.
+    for(std::uint32_t row=0;row<graph.count;++row)
+        if(sourceDirectRows_.readMask[row]!=63u)return {S::sourceRowTable,0x28d670u};
+    return produceBoundLocalBounds28D670Native(graph,actualCenter,actualHalf,h);
+}
+inline OriginalRacerModelSceneResult50LA OriginalRacerModelSceneOwner50LA::produceNativeWreckLocalBounds28D670(
+    const SceneGraph49P& graph,std::array<std::uint32_t,4>& actualCenter,
+    std::array<std::uint32_t,4>& actualHalf,SourceLocalBounds28D670& h)noexcept {
+    if(h.entered||&actualCenter==&actualHalf||sourceConstructor_.attempted||
+       !modelConstructorComplete_||!model_.constructed||model_.released||released_||referenceReleased_||
+       rootMode_!=RootMode::direct||!directRootPrepared_||!directRowsStarted_||!rowsLoaded_||
+       warmChildlessRows_||warmHierarchyRows_||!quantizationLoaded_||!fields_.geometry1B4||
+       !rowTable_||rowTableFreed_||fields_.sourceRows1B8!=rowTable_.get()||
+       graph.nodes!=nativeModelNodes_||graph.count!=nativeModelNodeCount_||
+       graph.count!=binding_.sourceRowCount||!graph.count||graph.count>maxModelBoundsNodes49O||
+       !validateSceneGraph49P(graph)||!inRange(graph,model_.sceneIndex)||
+       at(graph,model_.sceneIndex).parent180!=none||model_.nodeCount1A0!=graph.count)
+        return {S::phase,0x28d670u};
+    return produceBoundLocalBounds28D670Native(graph,actualCenter,actualHalf,h);
+}
+inline OriginalRacerModelSceneResult50LA OriginalRacerModelSceneOwner50LA::produceBoundLocalBounds28D670Native(
+    const SceneGraph49P& graph,std::array<std::uint32_t,4>& actualCenter,
+    std::array<std::uint32_t,4>& actualHalf,SourceLocalBounds28D670& h)noexcept {
+    // Both private callers already established their distinct construction
+    // authority. The SAME canonical row/DFS/cache/numeric body follows.
     std::array<const O*,maxSceneNodes49P> objects{};
     for(std::uint32_t row=0;row<graph.count;++row){const auto* object=sourceRowObject(row);
         if(!object||!object->constructed||object->released||!inRange(graph,object->sceneIndex)||
-           !rowTable_||rowTable_[row]!=object||sourceDirectRows_.readMask[row]!=63u)return {S::sourceRowTable,0x28d670u};
+           !rowTable_||rowTable_[row]!=object)return {S::sourceRowTable,0x28d670u};
         const auto index=static_cast<std::uint32_t>(object->sceneIndex);
         if(objects[index])return {S::hierarchy,0x28d670u};objects[index]=object;
     }

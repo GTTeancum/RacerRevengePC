@@ -282,7 +282,7 @@ inline bool Owner::constructRetainedRuntimeSourceCamera(
         op->resources_->rigs_,op->cables_,op->right_,op->left_,op->chariot_,
         &op->bottomRight_,&op->bottomLeft_,actual.raceHud,actual.deathDebris,
         actual.startMusicContext,actual.startMusicRequest,actual.recordManager40,
-        actual.introAudio,actual.introAuthoring,actual.introMusicFadeRequest};
+        actual.introAudio,actual.introAuthoring,actual.introMusicFadeRequest,actual.nativeHumanPlayer0};
     const auto world=mintConstructorRacerWorldBorrow(op->aggregate_);
     if(!world)return fail(d,"constructor-only Racer World source owner unavailable at native admission");
     return constructRuntimeSourceCamera(app,owners,cam,display,fresh,world,d);

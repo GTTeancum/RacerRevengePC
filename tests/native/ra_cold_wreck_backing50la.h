@@ -329,6 +329,21 @@ private:
             return sourcePC_==0x2129e0u||sourcePC_==0x212b50u;
         }catch(...){return false;}
     }
+    bool continueNativeWreck215AF8(rr::game::OriginalRacerEntityCold50LA& actualRacer,
+        rr::assets::NativePhyLoad50LA::Reader& phy,
+        std::optional<float>& gravity47C,std::uint32_t& pc)noexcept {
+        if(pc!=0x215af8u||sourcePC_!=pc||actualRacer.nativePostEmberPC_!=pc||
+           !phy||!actualRacer.nativePhyLoad_||phy.owner()!=actualRacer.nativePhyLoad_)return false;
+        if(thread_!=std::this_thread::get_id()||closed_||retiring_||sourceWithdrawn_||
+           !sourceAttempted_||freshSourceSelected_||!identitiesBound_||!modelSourcesBound_||
+           !actualRacer.prepared()||actualRacer.racer.sessionGeneration!=generation_||racers_[0]!=&actualRacer.racer||
+           sourceRacer_!=&actualRacer||actualRacer.nativeWreckWithdrawn_||!storage_[0]||
+           !application_||application_->released_||!domain_||!actualRacer.sourceWreckCount370_||
+           !storage_[0]->nativeSource374AliasCurrent(actualRacer.sourceWreck374_,
+               *actualRacer.sourceWreckCount370_,actualRacer.sourceWreck374Slots_))return false;
+        const bool done=storage_[0]->continueNativeTuning215AF8(phy.cursor(),gravity47C,pc);
+        sourcePC_=pc;return done;
+    }
     bool loadNativeRacer814810(std::uint32_t& pc)noexcept {
         pc=sourcePC_;
         if(thread_!=std::this_thread::get_id()||closed_||retiring_||sourceWithdrawn_||sourcePC_!=0x212b50u||
@@ -359,13 +374,13 @@ private:
         const bool done=nativeEffects_->loadRacer818(*storage_[0],*application_,*domain_->archiveProvider3E1A70(),directory,actualRaw,publish,pc);
         sourcePC_=pc;return done;
     }
-    bool beginNativeHandling2146(const std::vector<std::uint8_t>& retainedPhy,std::uint32_t& pc)noexcept{
+    bool beginNativeHandling2146(rr::assets::NativePhyLoad50LA::Reader& phy,std::uint32_t& pc)noexcept{
         pc=sourcePC_;
         if(thread_!=std::this_thread::get_id()||closed_||retiring_||sourceWithdrawn_||sourcePC_!=0x212dc8u||
            !sourceRacer_||sourceRacer_->nativeWreckWithdrawn_||!nativeEffects_||!nativeEffects_->emberComplete_||
            !application_||application_->released_||!sourceRacer_->slots818_||
            !nativeEffects_->emberAliasesCurrent(sourceRacer_->slots818_->data(),sourceRacer_->nativeSource818Published_))return false;
-        const bool done=sourceRacer_->beginNativeHandling2146(retainedPhy,pc);sourcePC_=pc;return done;
+        const bool done=sourceRacer_->beginNativeHandling2146(phy,pc);sourcePC_=pc;return done;
     }
     bool retireNativeSourcePrefix(const rr::game::LiveZoneWorld50EN& world)noexcept {
         if(thread_!=std::this_thread::get_id())return false;

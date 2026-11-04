@@ -36,8 +36,10 @@
 #include <memory>
 #include <optional>
 #include <stdexcept>
+#include <string_view>
 
 namespace original_camera_session50KX {class Session;}
+namespace rr::game {class OriginalRaceConstructor50LA;}
 namespace ra_source_camera50LA {class OwnershipBridge;}
 // Explicit friend declarations keep this owner header independent of caller include order.
 namespace native_racer50HW { class Cables; }
@@ -68,6 +70,10 @@ class Owner final {
     friend class ::ra_cold_roster50LA::Operation; //Actual staged694/A0 cold operand only.
     friend class ::native_racer50HW::Cables;
     friend class ::original_cable_selection50LA::Binding;
+    //Forward native PHY lifetime, owned by the same retained Operation before
+    //the first cold bulk consumer; no source1577D0/file handle receipt.
+    a::NativePhyLoad50LA* nativePhyLoad_=nullptr;
+    a::NativePhyLoad50LA::Context nativePhyContext_{};
     // Native lifetime staging of source cold operands, not shadow live fields.
     // Only these methods create them, on this retained model's construction
     // path before Rig normalization/motion/placement. No caller data/ready bit.
@@ -382,6 +388,52 @@ class Owner final {
         const std::vector<std::uint8_t>& retainedPhy,::ra_source_camera50LA::OwnershipBridge& bridge,
         std::uint32_t& pc)noexcept;
     bool nativeRepulsorAttempted_=false,nativeRepulsorComplete_=false;
+    bool continueNativeAeroEngine214954(g::OriginalRacerEntityCold50LA& actualRacer,
+        const std::vector<std::uint8_t>& retainedPhy,::original_camera_session50KX::Session&,
+        const g::OriginalRaceConstructor50LA&,::ra_source_camera50LA::OwnershipBridge&,std::uint32_t& pc)noexcept;
+    bool nativeAeroEngineAttempted_=false,nativeAeroEngineComplete_=false;
+    bool continueNativeAnimationContact2154D8(g::OriginalRacerEntityCold50LA& actualRacer,
+        const std::vector<std::uint8_t>& retainedPhy,::original_camera_session50KX::Session&,
+        ::ra_source_camera50LA::OwnershipBridge&,std::uint32_t& pc)noexcept;
+    bool continueNativeHandling215BB8(g::OriginalRacerEntityCold50LA& actualRacer,
+        const std::vector<std::uint8_t>& retainedPhy,::original_camera_session50KX::Session&,
+        const g::OriginalRaceConstructor50LA&,::ra_source_camera50LA::OwnershipBridge&,std::uint32_t& pc)noexcept;
+    bool nativeAnimationContactAttempted_=false,nativeAnimationContactComplete_=false;
+    bool nativeWreckTuningComplete_=false;
+    bool nativeHandlingTailAttempted_=false,nativeHandlingReturned_=false;
+    //Bridge calls only after SAME retained Cables returned212E10, while the
+    //actual slot0 Bank visit remains active. No visiting/public wrapper exists.
+    bool continueNativeSpin212ED0(g::OriginalRacerEntityCold50LA& actualRacer,
+        std::uint32_t& pc)noexcept;
+    bool nativeSpinAttempted_=false,nativeSpinReturned_=false;
+    bool nativeSpinAllocationAttempted_=false;
+    std::optional<std::uint32_t> nativeSpinCursor2C_; //Actual212F54, not B54.
+    std::uint32_t nativeSpinPC_=0x212e10u;
+    // One retained2146 stack, not detached parsed authoring or live aliases.
+    // Empty optionals are genuinely unreached/unknown. Initialization happens
+    // only at the corresponding source instruction in the continuation.
+    struct NativeHandlingStack final {
+        std::optional<unsigned> selectedClass;
+        std::optional<bool> useValues;
+        std::optional<float> upgrade3F0;
+        std::optional<std::int32_t> tuning3F4;
+        std::array<std::optional<float>,28> aero100;
+        std::optional<float> rampDownElevator3F8,maxElevator3FC;
+        std::array<std::optional<float>,5> steering400;
+        std::array<std::optional<float>,10> engine414;
+        std::array<std::optional<float>,8> abilities43C;
+        std::array<std::optional<std::array<float,4>>,2> engineVectors170;
+        std::array<std::optional<float>,8> contact45C;
+        std::optional<float> gravity47C;
+        std::array<std::optional<float>,12> damage480;
+        std::array<std::optional<float>,13> profile4C;
+        std::optional<std::string_view> binderColor2B0;
+        std::array<std::optional<std::int32_t>,3> binderChannels;
+    };
+    std::optional<NativeHandlingStack> nativeHandlingStack_;
+    // Full2E7680 vector destination W words absent from existing XYZ-only48D
+    // parameters. Per-model native backing, never counted source34C fields.
+    std::array<std::optional<std::uint32_t>,2> nativeEngineBasisW_;
     std::array<std::optional<float>,4> nativeRepulsorStack_;
     std::array<std::optional<float>,5> nativePhysicalStack_;
     g::BodyMatrix48G nativePhysicalMatrix_{};

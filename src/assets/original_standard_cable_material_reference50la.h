@@ -1,7 +1,7 @@
 namespace ra_pod_scene50LA {class Owner;}
 namespace original_local_flare50LA {class Emission;}
 #pragma once
-namespace rr::game {class OriginalRacerStripOwners50LA;}
+namespace rr::game {class OriginalRacerStripOwners50LA;class OriginalPodCableAllocation50LA;}
 namespace original_cable_selection50LA { class Binding; }
 #include "original_standard_material_table50la.h"
 #include <array>
@@ -24,6 +24,7 @@ public:
     }
 private:
     friend class rr::game::OriginalRacerStripOwners50LA;
+    friend class rr::game::OriginalPodCableAllocation50LA;
     friend class ::ra_pod_scene50LA::Owner; //Concrete14AB30 and1B3BB0 World strip services; no racer-owner substitution.
     // Concrete LightFlare14B894/14B89C uses this retained strip's handle.
     // The existing table leaf is the common298E60/29BFF0 operation despite

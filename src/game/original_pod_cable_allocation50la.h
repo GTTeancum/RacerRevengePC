@@ -17,7 +17,9 @@ class OriginalRacerStripOwners50LA;
 
 enum class OriginalPodCableAllocationStatus50LA : std::uint8_t {
     owner,alreadyStarted,allocation,component,stripSetupRequired,closed,topology,
-    material,attributeGlobalsRequired,selectionAttachmentComplete
+    material,attributeGlobalsRequired,selectionAttachmentComplete,
+    // Native storage failure is not a returned guest NULL allocation.
+    hostAllocation,multiplicityProducerRequired
 };
 struct OriginalPodCableAllocationResult50LA {
     OriginalPodCableAllocationStatus50LA status=OriginalPodCableAllocationStatus50LA::owner;
@@ -65,8 +67,9 @@ private:
 
 // Source-ordered173EB0 construction and214238 cold attachment. Each
 // array has independent owned backing, and source-undefined elements are not
-// zero-filled and then presented as authored/source values. Completion remains
-// inactive; no selection224720 or renderer receipt is produced.
+// zero-filled and then presented as authored/source values. The private native
+// outer-loader join owns these same resources; no selection224720, process
+// assertion history or renderer receipt is produced by numeric construction.
 class OriginalPodCableAllocation50LA final {
     friend class ::original_cable_selection50LA::Binding;
     friend class OriginalRacerStripOwners50LA;
@@ -114,6 +117,17 @@ private:
         std::shared_ptr<OriginalApplicationEntities50LA> app,std::uint32_t count,
         std::shared_ptr<rr::assets::OriginalStandardMaterialTable50LA> materials,
         const std::string& directory,const OriginalWreckComponentDomain50LA& prior)noexcept {
+        return constructWithConstructorLanes(racer,std::move(app),count,std::move(materials),
+            directory,prior,false,[]()noexcept{});
+    }
+    // Private source-boundary hook: the native Cables caller writes only its
+    // SAME existing40/50 backing, never a new position or membership owner.
+    template<class ConstructorLanes> Result constructWithConstructorLanes(OriginalRacerEntityCold50LA& racer,
+        std::shared_ptr<OriginalApplicationEntities50LA> app,std::uint32_t count,
+        std::shared_ptr<rr::assets::OriginalStandardMaterialTable50LA> materials,
+        const std::string& directory,const OriginalWreckComponentDomain50LA& prior,
+        bool nativeOuter,ConstructorLanes&& writeConstructorLanes)noexcept {
+        static_assert(noexcept(writeConstructorLanes()),"173CC0 native lane stores must not throw");
         if(racer_||closed_)return {Status::alreadyStarted,0x214200u};
         if(!app||!app->application10()||!racer.prepared()||racer.cables254||
            racer.actualCounter423F60()!=&app->objectCount423F60()||
@@ -130,6 +144,7 @@ private:
         if(r.status!=OriginalWreckComponentStatus50LA::complete){
             racer_=nullptr;application_.reset();return {Status::component,r.sourcePC};
         }
+        writeConstructorLanes(); //173CE8 position40,173D1C membership50, before214218.
         racer.cables254=this; //214218, before173EB0, retained even on failure.
         count3C_=count;samples38_=9;scale54_=6.5f; //173EF4..173F04
         std::uint32_t pc=0x173f14u;
@@ -161,8 +176,16 @@ private:
                 strip.groups38_[0]=18; //1504CC..EC
                 pc=0x1504f0u;strip.primitive30_.reset(new OriginalPodCableStripCold50LA::Primitive);
                 rr::assets::OriginalStandardMaterialDiagnostic50LA materialDiagnostic;
-                if(!strip.primitive30_->reference.acquire299BE0(materials,directory,materialDiagnostic))
-                    return {Status::material,materialDiagnostic.sourcePC};
+                // Native continuation stops before a material handle store if
+                // the real table lookup did not return. This no-op hook does
+                // NOT claim the unrepresented shared299CB8 source guard.
+                const bool materialReturned=nativeOuter?
+                    strip.primitive30_->reference.acquireNamed299BE0Impl(materials,directory,"cable",
+                        materialDiagnostic,[]()noexcept{},true):
+                    strip.primitive30_->reference.acquire299BE0(materials,directory,materialDiagnostic);
+                if(!materialReturned)return {nativeOuter&&materialDiagnostic.status==
+                    rr::assets::OriginalStandardMaterialStatus50LA::allocation?Status::hostAllocation:
+                    Status::material,materialDiagnostic.sourcePC};
                 strip.primitive30_->byte0C=7; //2465CC after successful299BE0
                 strip.attributes_.construct23BEB0(pc);
                 strip.primitive30_->attributes10=&strip.attributes_; //23BFD8 lifetime, native borrow
@@ -215,8 +238,10 @@ private:
             r=appendOriginalWreckComponent50LA(domain,racer.detached7F8,entity_,0x1008u,
                 application_->attachmentLock423F58());
             if(r.status!=OriginalWreckComponentStatus50LA::complete)return {Status::component,r.sourcePC};
-            return {Status::selectionAttachmentComplete,0x214240u};
-        }catch(...){return {Status::allocation,pc};}
+            // Native bounded continuation also returns through214250/214254;
+            // the legacy inactive adapter retains its attachment milestone.
+            return {Status::selectionAttachmentComplete,nativeOuter?0x214254u:0x214240u};
+        }catch(...){return {nativeOuter?Status::hostAllocation:Status::allocation,pc};}
     }
     static bool detached(const OriginalWreckComponent50LA& e)noexcept {
         return !e.parent1C&&!e.previous10&&!e.next14&&!e.firstChild18&&e.reference00==1u;

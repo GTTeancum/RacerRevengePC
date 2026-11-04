@@ -1,6 +1,7 @@
 #pragma once
 // Stable native references only; independent of Operation and Session factories.
 #include "ra_cold_roster_storage50la.h"
+#include "ra_native_player_load50la.h"
 #include "runtime_startup50fl_fixture.h"
 #include "native_racer_handling50hw_fixture.h"
 #include "native_ai_session50iv_fixture.h"
@@ -43,5 +44,6 @@ struct Arena {
     std::uint32_t humanCount=0;
     g::AuthoredBinding49N* selectedAuthored=nullptr;
     float* selectedSteering=nullptr;
+    NativePlayerLoadCaller50LA nativePlayerCaller{};
 };
 } // namespace ra_cold_roster50LA

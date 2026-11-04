@@ -772,10 +772,23 @@ private:
         if(!h.historyCurrent()||h.portalLoop.target!=0x280c5cu||hit.reloadF0!=distance||
            (stage==1u?(hit.step!=1||hit.storeAttemptMask!=1u):(hit.step!=2||hit.storeAttemptMask!=3u)))return false;
         std::size_t index=40;if(!sourceTriggerFogPortalHeadLinkNative(d,head,index))return false;
-        auto& link=sourcePortalWorldLinks_[index/4][index%4];auto& raw=*link.published;
-        if(stage==1u){raw.field10=distance;link.distance10=distance;}
-        else{raw.field0C=distance;link.distance0C=distance;}
-        return true; //Exactly one reached SWC1 plus its native ownership ledger; no rollback of the first store.
+        auto& link=sourcePortalWorldLinks_[index/4][index%4];
+        if(!link.fogDistanceHistoryCurrentNative())return false;
+        const void* occurrence=&d.sourceInstance->servicePrimary_;
+        if(stage==1u){
+            if(link.fogDistanceCount>=link.fogDistanceWrites.size())return false;
+            for(std::size_t i=0;i<link.fogDistanceCount;++i)if(link.fogDistanceWrites[i].occurrence==occurrence)return false;
+            if(link.fogDistanceCount&&!link.fogDistanceWrites[link.fogDistanceCount-1u].stored0C)return false;
+            auto& write=link.fogDistanceWrites[link.fogDistanceCount];
+            //One non-failing original SW plus append-only native history; capacity refusal precedes every mutation.
+            link.storeDistance10Native(distance);write.occurrence=occurrence;write.stored10=distance;
+            ++link.fogDistanceCount;link.fogLatestWriter10=link.fogDistanceCount;
+        }else{
+            if(!link.fogDistanceCount)return false;auto& write=link.fogDistanceWrites[link.fogDistanceCount-1u];
+            if(write.occurrence!=occurrence||write.stored10!=distance||write.stored0C)return false;
+            link.storeDistance0CNative(distance);write.stored0C=distance;link.fogLatestWriter0C=link.fogDistanceCount;
+        }
+        return true; //No rollback or overwrite of an earlier occurrence's receipt; shared raw fields still carry their latest stores.
     }
     bool readSourceTriggerFogPortalNextNative(const NativeTriggerDescriptor& d,const void* head,const void*& next)const noexcept {
         if(!d.sourceInstance||next)return false;const auto& h=d.sourceInstance->fogPrimary_;
@@ -928,9 +941,15 @@ private:
         if(history.portalHit.step||history.portalNext.step){
             std::size_t index=40;if(!sourceTriggerFogPortalHeadLinkNative(d,t.fogPortalHead_,index))return false;
             const auto& link=sourcePortalWorldLinks_[index/4][index%4];const auto& hit=history.portalHit;
-            if((hit.stored10&&(link.distance10!=hit.stored10||link.published->field10!=*hit.stored10))||
-               (hit.stored0C&&(link.distance0C!=hit.stored0C||link.published->field0C!=*hit.stored0C))||
+            if(!link.fogDistanceHistoryCurrentNative())return false;
+            unsigned own=0;
+            for(std::size_t i=0;i<link.fogDistanceCount;++i){const auto& write=link.fogDistanceWrites[i];
+                if(write.occurrence!=&t.servicePrimary_)continue;++own;
+                if(write.stored10!=hit.stored10||write.stored0C!=hit.stored0C)return false;
+            }
+            if(own!=(hit.stored10?1u:0u)||
                (history.portalNext.step&&t.fogPortalNextCursor_!=link.published->next00.get()))return false;
+            //The graph owner validates latest raw fields; this occurrence validates its own immutable reached stores.
         }
         if(history.portalNeighbor.step){
             const void* neighborNode=nullptr;const g::OriginalWreckComponent50LA* neighbor=nullptr;NativeListMethodCustody* selected=nullptr;
@@ -1296,6 +1315,19 @@ private:
             worldApplication_->attachmentLock423F58());
         pc=result.sourcePC;if(result.status!=g::OriginalWreckComponentStatus50LA::complete)return false;
         t.serviceRegistered_=true;pc=0x2dcc38;return true;
+    }
+    bool commitSourceTriggerFogRegistrationNative(NativeTriggerDescriptor& d,
+        const g::OriginalTriggerFogPrimaryPrefix50LA& history,std::uint32_t pc)noexcept {
+        if(pc!=0x2dcc38u||!history.returnFlow.triggerReturned()||!sourceTriggerFogPrimaryCurrentNative(d,history)||
+           !sourceTriggerRegistrationCurrentNative(d)||!preflightSourceTriggerInstanceNative(d)||
+           !preflightSourceTriggerActionNative(d)||!d.sourceDescriptorReturned||!d.sourceActionReaderComplete||
+           d.sourceActionNativeWithdrawn||!d.sourceInstancePublished||d.trigger00!=&d.sourceInstance->entity_||
+           !d.sourceFields||!d.sourceFields->geometrySourceFreed||!d.sourceFields->geometrySourceNullStored||
+           !worldApplication_||!worldApplication_->constructed_||worldApplication_->released_)return false;
+        return d.sourceInstance->commitFogRegistrationReservationsNative(); //No source history/PC changes; no descriptor1 admission.
+    }
+    bool sourceTriggerFogRegistrationCommittedNative(const NativeTriggerDescriptor& d)const noexcept {
+        return d.sourceInstance&&d.sourceInstance->fogSelectorCommitted_&&d.sourceInstance->fogPrimaryCurrentNative();
     }
     bool sourceTriggerRegistrationCurrentNative(const NativeTriggerDescriptor& d)const noexcept {
         return nativeTriggerList3D0_&&d.sourceInstance&&d.sourceInstance->serviceRegistered_&&
@@ -1698,6 +1730,32 @@ struct SourcePortalWorldLink27F3B0 {
     SearchNode* from=nullptr;SearchNode* to=nullptr;
     bool attempted=false,withdrawn=false;
     std::optional<std::uint32_t> distance0C,distance10; //Latest actual280C60/64 stores, retained after borrower withdrawal.
+    struct FogDistanceWrite {
+        const void* occurrence=nullptr; //Opaque historical identity only; never dereferenced after native retirement.
+        std::optional<std::uint32_t> stored10,stored0C;
+    };
+    std::array<FogDistanceWrite,2> fogDistanceWrites{}; //At most one head hit per each of the two actual trigger descriptors.
+    std::uint8_t fogDistanceCount=0,fogLatestWriter10=0,fogLatestWriter0C=0; //0 means constructor/another genuine producer.
+    void storeDistance10Native(std::uint32_t bits)noexcept {
+        published->field10=bits;distance10=bits;fogLatestWriter10=0; //Same original SW; prior Fog receipt remains historical.
+    }
+    void storeDistance0CNative(std::uint32_t bits)noexcept {
+        published->field0C=bits;distance0C=bits;fogLatestWriter0C=0;
+    }
+    bool fogDistanceHistoryCurrentNative()const noexcept {
+        if(fogDistanceCount>fogDistanceWrites.size()||fogLatestWriter10>fogDistanceCount||fogLatestWriter0C>fogDistanceCount)return false;
+        std::optional<std::uint32_t> latest10,latest0C;std::uint8_t last0C=0;
+        for(std::size_t i=0;i<fogDistanceWrites.size();++i){const auto& w=fogDistanceWrites[i];
+            if(i>=fogDistanceCount){if(w.occurrence||w.stored10||w.stored0C)return false;continue;}
+            if(!w.occurrence||!w.stored10||(i+1u<fogDistanceCount&&!w.stored0C)||
+               (w.stored0C&&w.stored0C!=w.stored10))return false;
+            for(std::size_t j=0;j<i;++j)if(fogDistanceWrites[j].occurrence==w.occurrence)return false;
+            latest10=w.stored10;if(w.stored0C){latest0C=w.stored0C;last0C=static_cast<std::uint8_t>(i+1u);}
+        }
+        //A different genuine producer can write before or after Fog. Existing graph checks still authenticate raw/latest metadata.
+        return (!fogLatestWriter10||(fogLatestWriter10==fogDistanceCount&&distance10==latest10))&&
+            (!fogLatestWriter0C||(fogLatestWriter0C==last0C&&distance0C==latest0C));
+    }
     std::uint8_t knownMask=0;
 };
 std::array<SourcePortalAttempt272B3C,10> sourcePortalFrames_;
