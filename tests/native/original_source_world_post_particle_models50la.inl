@@ -5339,7 +5339,33 @@ bool Owner::continueSourcePostSkyTail1AA33C(std::uint32_t& pc)noexcept {
     at(0x1aa4f4);h.restoreMask|=1;at(0x1aa4f8);h.restoreMask|=2;at(0x1aa4fc);h.restoreMask|=4;
     at(0x1aa500);h.returnV0=1;at(0x1aa504);at(0x1aa508);h.stackReleased=true;h.returned=true;
     h.continuation=0x1a6d88u;at(*h.continuation);
-    return false; //Genuine1A9EE0 return is recorded; the next outer Race instruction remains unjoined.
+    // Consume only this genuine source result, in the SAME caller occurrence.
+    // Keep World's historical continuation PC at1A6D88; the outer Race owns
+    // its separate saved PC. The native leaf's false bool is NOT source V0.
+    auto& caller=race.sourceWorldReturn1A6D88_;
+    if(!ownersCurrent()||!app.enabled||app.garageAudioOwnerThread_!=std::this_thread::get_id()||
+       app.raceConstructorColdOwner50LA_.lock().get()!=&race||!race.nativeIntroRaceEntity()||
+       race.nativeTrackLoadStep_!=g::OriginalRaceConstructor50LA::NativeTrackLoadStep::unreached||
+       race.cameraNativeAdapter34_||!race.loadingCamera34_.suffixReturned||race.loadingCamera34_.terminal||
+       race.loadingCamera34_.stopPC!=0x1a9598u||race.loadingCamera34_.arrayWithdrawn||
+       !race.loadingCameraSourceNullSuffixCurrent()||!sourceTrackNativeAttempted_||
+       sourceTrackStep_==SourceTrackStep::unreached||sourceTrackStep_==SourceTrackStep::terminal||
+       sourceTrackStep_==SourceTrackStep::nativeClosed||nativeScbRevoked_||closed_||terminal_||
+       sourcePostParticleModelsPhase_==SourcePostParticleModelsPhase::unreached||
+       sourcePostParticleModelsPhase_==SourcePostParticleModelsPhase::nativeClosed||
+       !preflightSourcePostParticleModelsNative()||!preflightSourcePostSkyTailNative()||
+       !h.entered||!h.returned||!h.stackReleased||h.restoreMask!=7u||h.returnV0!=1u||
+       h.continuation!=0x1a6d88u||!h.directoryTerminatorStored||sourcePostParticleModelsPC_!=0x1a6d88u||
+       caller.entered||caller.returnV0||caller.nonzeroBranchTaken||caller.delaySlotExecuted||caller.pc!=0x1a6d88u)
+        return false;
+    caller.entered=true;caller.returnV0=*h.returnV0;pc=caller.pc=0x1a6d88u;
+    caller.nonzeroBranchTaken=*caller.returnV0!=0u; //14400003: bnez v0,1A6D98.
+    pc=caller.pc=0x1a6d8cu;caller.delaySlotExecuted=true; //00000000: actual NOP.
+    pc=caller.pc=0x1a6d98u;
+    // STOP BEFORE LW Race+30. Its constructor-zero backing is not complete
+    // source writer-history authority. Do not skip114770, enter1A95B0, issue
+    // World rows, or approach1AA580 from a native Session/roster observation.
+    return false;
 }
 bool Owner::preflightSourceSkyArrayNative()const noexcept {
     const auto& h=sourceSkyArray274B24_;const auto& sky=sourceSkySetup274AE0_;

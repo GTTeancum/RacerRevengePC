@@ -734,6 +734,7 @@ bool VehicleWindowGl50DS::Storage::deleteDisplayFadeNames(VehicleWindowDiagnosti
     }
 
 bool VehicleWindowGl50DS::Storage::hasGlResources() const noexcept {
+        if(nativeVideoFinishFence50LA)return true;
         if(nativeVideoOverlayTextures50LA[0]||nativeVideoOverlayTextures50LA[1]||nativeVideoOverlayProgram50LA||nativeVideoOverlayShader50LA)return true;
         for(U b=0;b<2;++b)if(nativeVideoPacketTargets50LA[b]||nativeVideoPacketColors50LA[b]||
             nativeVideoSnapshotTargets50LA[b]||nativeVideoSnapshotColors50LA[b])return true;
@@ -2025,6 +2026,8 @@ bool VehicleWindowGl50DS::Storage::cleanup(VehicleWindowDiagnostic50DS& d) noexc
         if (hasGlResources() && !current(d)) { d.cleanupIncomplete = true; return false; }
         if(raStaticFireOwner)raStaticFireOwner->nativeCompletionLive_=false;
         initialized = false; active = frameSet = imageCommitted = false;
+        // Invalidate native observations, but retain the exact sync for cleanup.
+        nativeVideoFinishState50LA=NativeVideoPacketFinishState50LA::cancelled;
         nativeVideoPacketReady50LA=nativeVideoPacketImage50LA=false;nativeVideoPacketSerial50LA=0;
         nativeVideoSnapshotReady50LA=nativeVideoSnapshotImage50LA=false;
         nativeVideoSnapshotSerial50LA=nativeVideoSnapshotImageSerial50LA=nativeVideoSnapshotClearSerial50LA=0;
@@ -2048,6 +2051,9 @@ bool VehicleWindowGl50DS::Storage::cleanup(VehicleWindowDiagnostic50DS& d) noexc
             d.cleanupIncomplete = true;
             return fail(d, VehicleWindowError50DS::cleanup, "GL error state will not clear for cleanup");
         }
+        // The packet marker is independent of Garage and survives all packet
+        // metadata resets above. Cancellation never reports GPU completion.
+        if(!retireNativeVideoPacketFinish50LA(d))return false;
         // A failed nonblocking Garage observation can retain its one native
         // fence. Query actual ownership before deletion, including a prior
         // delete whose diagnostic outcome was uncertain. No replayed draw.

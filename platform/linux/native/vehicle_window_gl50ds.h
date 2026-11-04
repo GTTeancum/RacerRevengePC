@@ -2,6 +2,7 @@
 #pragma once
 #include "vehicle_draw_gl50cv.h"
 #include "original_video_packet_cpu50la.h"
+#include "../../../src/game/original_video_finish_packet25ab2c_native50la.h"
 #include "../../../src/game/original_video_blocking_color50la.h"
 #include "../../../src/game/original_racer_diffuse_camera50la.h"
 #include "vehicle_shader_gl50cz.h"
@@ -1038,6 +1039,15 @@ private:
 };
 
 enum class NativeVideoPacketWrite50LA : std::uint8_t {none,clear,recopy,overlay};
+enum class NativeVideoPacketFinishState50LA : std::uint8_t {idle,pending,completed,cancelled,faulted};
+// Numeric context-local observation only, never accepted as authority by an API.
+// A copy is historical, cannot identify a recreated renderer, and grants no
+// source CSR/DMA/INTC/frame result. The actual operation stays inside Storage.
+struct NativeVideoPacketFinishInfo50LA {
+    NativeVideoPacketFinishState50LA state=NativeVideoPacketFinishState50LA::idle;
+    std::uint64_t operationSerial=0,acceptedImageSerial=0,acceptedCaptureSerial=0;
+    bool markerOwned=false;
+};
 // Numeric observation only. This never grants source-frame, target or IRQ authority.
 struct NativeVideoPacketClearInfo50LA {
     std::uint32_t width=0,height=0;
@@ -1122,6 +1132,19 @@ public:
     bool readNativeVideoPacketClearRgba(std::uint8_t*,std::size_t capacityBytes,
         VehicleWindowDiagnostic50DS&) noexcept;
     bool nativeVideoPacketClearInfo(NativeVideoPacketClearInfo50LA&) const noexcept;
+    // Exact immutable FINISH grammar, interpreted only on this private native
+    // packet stream. Captures its current accepted prefix, inserts one actual
+    // GPU fence and flushes once. No source packet/CSR/IRQ completion is issued.
+    // A failed issued attempt stays owned/faulted until cancel or close.
+    bool beginNativeVideoPacketFinish(const game::OriginalVideoFinishPacket25AB2CNative50LA&,
+        NativeVideoPacketFinishInfo50LA&,VehicleWindowDiagnostic50DS&) noexcept;
+    // Nonblocking: reuses the retained marker. True+pending is not completion.
+    // Completed is published only after signal observation AND sync retirement;
+    // its captured prefix never expands to later commands. No caller receipt.
+    bool pollNativeVideoPacketFinish(NativeVideoPacketFinishInfo50LA&,VehicleWindowDiagnostic50DS&) noexcept;
+    // Cancellation retires native custody, even after a fault/failed close.
+    // It neither waits for GPU work nor reports that work complete.
+    bool cancelNativeVideoPacketFinish(NativeVideoPacketFinishInfo50LA&,VehicleWindowDiagnostic50DS&) noexcept;
     // Native full-rectangle capture/recopy, based on the 262830/262C70 transfer
     // operation, but using only this renderer's real packet-image ownership.
     // Never substitutes native extents/bases into original Video fields.

@@ -14,14 +14,174 @@ bool nativeVideoPacketFullClear50LA(const NativeVideoPacketCpu50LA::DecodedDraw&
 }
 }
 
-bool VehicleWindowGl50DS::Storage::nativeVideoPacketIdle50LA(VehicleWindowDiagnostic50DS& d) const noexcept {
+bool VehicleWindowGl50DS::Storage::nativeVideoPacketContextIdle50LA(VehicleWindowDiagnostic50DS& d) const noexcept {
     if(!current(d))return false;
-    if(active || frameSet || diagnostic || nativeGlFaultObserved50KG ||
+    if(active || frameSet || diagnostic ||
        garagePreludeOwner50KG || garagePollFence50KG || nativeF8BarPreparing ||
        frameNativeF8Bars || nativeF8BarFrame || nativeF8BarRenderer ||
        nativeResultsDrawPreparing || frameNativeResults || nativeResultsFrame || nativeResultsRenderer)
-        return fail(d,VehicleWindowError50DS::frame,"native packet clear requires idle fault-free renderer without pending borrowers");
+        return fail(d,VehicleWindowError50DS::frame,"native packet requires idle renderer without pending borrowers");
     return true;
+}
+
+bool VehicleWindowGl50DS::Storage::nativeVideoPacketIdle50LA(VehicleWindowDiagnostic50DS& d) const noexcept {
+    if(!nativeVideoPacketContextIdle50LA(d))return false;
+    if(nativeGlFaultObserved50KG || nativeVideoFinishFence50LA ||
+       nativeVideoFinishState50LA==NativeVideoPacketFinishState50LA::pending ||
+       nativeVideoFinishState50LA==NativeVideoPacketFinishState50LA::faulted)
+        return fail(d,VehicleWindowError50DS::frame,"native packet requires fault-free renderer without owned FINISH operation");
+    return true;
+}
+
+void VehicleWindowGl50DS::Storage::observeNativeVideoPacketFinish50LA(NativeVideoPacketFinishInfo50LA& out) const noexcept {
+    out={};out.state=nativeVideoFinishState50LA;out.operationSerial=nativeVideoFinishOperation50LA;
+    out.acceptedImageSerial=nativeVideoFinishImage50LA;out.acceptedCaptureSerial=nativeVideoFinishCapture50LA;
+    out.markerOwned=nativeVideoFinishFence50LA!=nullptr;
+}
+
+bool VehicleWindowGl50DS::Storage::retireNativeVideoPacketFinish50LA(VehicleWindowDiagnostic50DS& d) noexcept {
+    // Caller owns the current context and has drained pre-existing errors.
+    // This is cancellation/recovery, never a signal observation or completion.
+    if(nativeVideoFinishFence50LA){
+        if(!gl.isSync||!gl.deleteSync){d.cleanupIncomplete=true;
+            return fail(d,VehicleWindowError50DS::cleanup,"native FINISH marker lacks its release functions");}
+        const auto failed=[&](U error){
+            nativeGlFaultObserved50KG=true;d.cleanupIncomplete=true;
+            if(!d.cleanupGlError)d.cleanupGlError=error;
+            return fail(d,VehicleWindowError50DS::cleanup,"native FINISH marker retirement failed");
+        };
+        // A prior delete may have executed before its diagnostic failed.
+        // Its sticky GL fault excludes new packet/Garage sync allocation;
+        // a healthy live marker cannot have its handle reused.
+        const auto alive=gl.isSync(nativeVideoFinishFence50LA);
+        U error=drawGl.getError();if(error)return failed(error);
+        if(alive){gl.deleteSync(nativeVideoFinishFence50LA);
+            error=drawGl.getError();if(error)return failed(error);}
+        nativeVideoFinishFence50LA=nullptr;
+    }
+    nativeVideoFinishState50LA=NativeVideoPacketFinishState50LA::cancelled;
+    return true;
+}
+
+bool VehicleWindowGl50DS::beginNativeVideoPacketFinish(
+    const game::OriginalVideoFinishPacket25AB2CNative50LA& packet,
+    NativeVideoPacketFinishInfo50LA& out,VehicleWindowDiagnostic50DS& d) noexcept {
+    out={};d={};OriginalOptionsMutationInterlock50KG::Operation operation;
+    if(!operation.admitted())return fail(d,VehicleWindowError50DS::frame,"Options viewport excludes native FINISH issuance");
+    if(!storage_)return fail(d,VehicleWindowError50DS::notInitialized,"native FINISH needs actual renderer");
+    auto& s=*storage_;
+    if(s.thread!=std::this_thread::get_id())return fail(d,VehicleWindowError50DS::wrongThread,"native FINISH requires creating thread");
+    if(!s.initialized)return fail(d,VehicleWindowError50DS::notInitialized,"native FINISH needs actual renderer");
+    if(!s.nativeVideoPacketIdle50LA(d))return false;
+    if(!s.nativeVideoPacketReady50LA||!s.nativeVideoPacketImage50LA||!s.nativeVideoPacketSerial50LA||
+       s.nativeVideoPacketPublished50LA>1||!s.nativeVideoPacketTargets50LA[s.nativeVideoPacketPublished50LA])
+        return fail(d,VehicleWindowError50DS::noImage,"native FINISH requires an accepted private packet image");
+    if(s.nativeVideoFinishOperation50LA==std::numeric_limits<std::uint64_t>::max())
+        return fail(d,VehicleWindowError50DS::limits,"native FINISH operation serial exhausted");
+    // Consume the exact supported grammar before any GL effect. This verifies
+    // numeric bytes only; the artifact supplies no source or context authority.
+    static constexpr std::uint32_t expected[16]={
+        0x10000002u,0,0,0,0x00008001u,0x10000000u,0x0eu,0,1,0,0x61u,0,0x70000000u,0,0,0};
+    if(packet.sizeBytes()!=64)return fail(d,VehicleWindowError50DS::request,"native FINISH packet extent differs");
+    for(std::size_t i=0;i<16;++i)for(unsigned b=0;b<4;++b)
+        if(packet.data()[i*4+b]!=std::uint8_t(expected[i]>>(8*b)))
+            return fail(d,VehicleWindowError50DS::request,"native FINISH packet grammar differs");
+    s.diagnostic=&d;
+    const bool loaded=(s.gl.fenceSync||s.load(s.gl.fenceSync,"glFenceSync"))&&
+        (s.gl.getSynciv||s.load(s.gl.getSynciv,"glGetSynciv"))&&
+        (s.gl.isSync||s.load(s.gl.isSync,"glIsSync"))&&
+        (s.gl.deleteSync||s.load(s.gl.deleteSync,"glDeleteSync"))&&
+        (s.nativeVideoFinishFlush50LA||s.load(s.nativeVideoFinishFlush50LA,"glFlush"));
+    if(!loaded||!s.check("before native FINISH marker")){s.diagnostic=nullptr;return false;}
+    // This Storage owns its exact creating context contract and lifetime. No
+    // supplied serial, bank, callback, flag or old observation selects the work.
+    ++s.nativeVideoFinishOperation50LA;s.nativeVideoFinishImage50LA=s.nativeVideoPacketSerial50LA;
+    s.nativeVideoFinishCapture50LA=s.nativeVideoSnapshotSerial50LA;
+    s.nativeVideoFinishBank50LA=s.nativeVideoPacketPublished50LA;
+    s.nativeVideoFinishState50LA=NativeVideoPacketFinishState50LA::faulted;
+    s.nativeVideoFinishFence50LA=s.gl.fenceSync(0x9117u,0u); //SYNC_GPU_COMMANDS_COMPLETE.
+    // Retain the nonnull result BEFORE checking errors, including ambiguous failures.
+    bool accepted=s.check("create retained native FINISH marker");
+    if(accepted&&!s.nativeVideoFinishFence50LA)
+        accepted=fail(d,VehicleWindowError50DS::gl,"native FINISH marker is null");
+    if(accepted){s.nativeVideoFinishFlush50LA();accepted=s.check("flush retained native FINISH marker once");}
+    if(accepted)s.nativeVideoFinishState50LA=NativeVideoPacketFinishState50LA::pending;
+    s.diagnostic=nullptr;s.observeNativeVideoPacketFinish50LA(out);return accepted;
+}
+
+bool VehicleWindowGl50DS::pollNativeVideoPacketFinish(NativeVideoPacketFinishInfo50LA& out,
+    VehicleWindowDiagnostic50DS& d) noexcept {
+    out={};d={};OriginalOptionsMutationInterlock50KG::Operation operation;
+    if(!operation.admitted())return fail(d,VehicleWindowError50DS::frame,"Options viewport excludes native FINISH polling");
+    if(!storage_)return fail(d,VehicleWindowError50DS::notInitialized,"native FINISH polling needs live renderer");
+    auto& s=*storage_;
+    if(s.thread!=std::this_thread::get_id())return fail(d,VehicleWindowError50DS::wrongThread,"native FINISH polling requires creating thread");
+    if(!s.initialized)return fail(d,VehicleWindowError50DS::notInitialized,"native FINISH polling needs live renderer");
+    if(!s.nativeVideoPacketContextIdle50LA(d))return false;
+    if(s.nativeGlFaultObserved50KG){
+        s.nativeVideoFinishState50LA=NativeVideoPacketFinishState50LA::faulted;
+        s.observeNativeVideoPacketFinish50LA(out);
+        return fail(d,VehicleWindowError50DS::gl,"native FINISH observation invalidated by renderer fault");
+    }
+    if(s.nativeVideoFinishState50LA==NativeVideoPacketFinishState50LA::completed){
+        s.observeNativeVideoPacketFinish50LA(out);return true; //Historical captured prefix only.
+    }
+    if(s.nativeVideoFinishState50LA!=NativeVideoPacketFinishState50LA::pending){
+        s.observeNativeVideoPacketFinish50LA(out);
+        return fail(d,VehicleWindowError50DS::frame,"native FINISH has no pending healthy operation");
+    }
+    if(!s.nativeVideoFinishFence50LA||!s.gl.getSynciv||!s.gl.deleteSync||
+       !s.nativeVideoPacketReady50LA||!s.nativeVideoPacketImage50LA||
+       s.nativeVideoFinishImage50LA!=s.nativeVideoPacketSerial50LA||
+       s.nativeVideoFinishCapture50LA!=s.nativeVideoSnapshotSerial50LA||
+       s.nativeVideoFinishBank50LA!=s.nativeVideoPacketPublished50LA){
+        s.nativeVideoFinishState50LA=NativeVideoPacketFinishState50LA::faulted;
+        s.observeNativeVideoPacketFinish50LA(out);
+        return fail(d,VehicleWindowError50DS::frame,"native FINISH prefix or marker is no longer current");
+    }
+    s.diagnostic=&d;
+    bool accepted=s.check("before retained native FINISH poll");I length=0,status=0;
+    if(accepted){s.gl.getSynciv(s.nativeVideoFinishFence50LA,0x9114u,1,&length,&status);
+        accepted=s.check("observe retained native FINISH marker");}
+    if(accepted&&(length!=1||(status!=0x9118&&status!=0x9119)))
+        accepted=fail(d,VehicleWindowError50DS::gl,"native FINISH marker status is invalid");
+    if(accepted&&status==0x9119){
+        // Only this successful signal observation can reach completed. A
+        // missing sync during later cancellation never supplies that evidence.
+        s.gl.deleteSync(s.nativeVideoFinishFence50LA);
+        accepted=s.check("retire signaled native FINISH marker");
+        if(accepted){s.nativeVideoFinishFence50LA=nullptr;
+            s.nativeVideoFinishState50LA=NativeVideoPacketFinishState50LA::completed;}
+    }
+    if(!accepted)s.nativeVideoFinishState50LA=NativeVideoPacketFinishState50LA::faulted;
+    s.diagnostic=nullptr;s.observeNativeVideoPacketFinish50LA(out);return accepted;
+    // UNSIGNALED retains this same fence, captured prefix and pending state.
+}
+
+bool VehicleWindowGl50DS::cancelNativeVideoPacketFinish(NativeVideoPacketFinishInfo50LA& out,
+    VehicleWindowDiagnostic50DS& d) noexcept {
+    out={};d={};OriginalOptionsMutationInterlock50KG::Operation operation;
+    if(!operation.admitted())return fail(d,VehicleWindowError50DS::frame,"Options viewport excludes native FINISH cancellation");
+    if(!storage_){out.state=NativeVideoPacketFinishState50LA::cancelled;return true;}
+    auto& s=*storage_;
+    if(s.thread!=std::this_thread::get_id())return fail(d,VehicleWindowError50DS::wrongThread,"native FINISH cancellation requires creating thread");
+    // Do not require initialized/ready/image/serial or a fault-free GL history:
+    // those may already be invalidated by a failed close or sync operation.
+    if(!s.nativeVideoPacketContextIdle50LA(d))return false;
+    if(!s.nativeVideoFinishFence50LA){
+        // No GL release is needed. A failed renderer creation may not even
+        // have loaded getError; cancellation cannot assume initialized hooks.
+        s.nativeVideoFinishState50LA=NativeVideoPacketFinishState50LA::cancelled;
+        s.observeNativeVideoPacketFinish50LA(out);return true;
+    }
+    if(!s.drainCleanupErrors(d)){
+        s.nativeVideoFinishState50LA=NativeVideoPacketFinishState50LA::faulted;
+        s.observeNativeVideoPacketFinish50LA(out);d.cleanupIncomplete=true;
+        return fail(d,VehicleWindowError50DS::cleanup,"native FINISH cancellation could not drain GL errors");
+    }
+    const bool retired=s.retireNativeVideoPacketFinish50LA(d);
+    if(!retired)s.nativeVideoFinishState50LA=NativeVideoPacketFinishState50LA::faulted;
+    s.observeNativeVideoPacketFinish50LA(out);return retired;
 }
 
 bool VehicleWindowGl50DS::Storage::prepareNativeVideoPacketFunctions50LA() noexcept {
@@ -259,6 +419,8 @@ bool VehicleWindowGl50DS::nativeVideoPacketClearInfo(NativeVideoPacketClearInfo5
 }
 
 bool VehicleWindowGl50DS::Storage::deleteNativeVideoPacketTargets50LA(VehicleWindowDiagnostic50DS& d) noexcept {
+    if(nativeVideoFinishFence50LA){d.cleanupIncomplete=true;
+        return fail(d,VehicleWindowError50DS::cleanup,"native FINISH marker must retire before packet targets");}
     nativeVideoPacketReady50LA=nativeVideoPacketImage50LA=false;nativeVideoPacketSerial50LA=0;
     nativeVideoSnapshotReady50LA=nativeVideoSnapshotImage50LA=false;
     nativeVideoSnapshotSerial50LA=nativeVideoSnapshotImageSerial50LA=nativeVideoSnapshotClearSerial50LA=0;

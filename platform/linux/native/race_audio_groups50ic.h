@@ -20,7 +20,7 @@
 
 namespace live_audio50HF { class Owner; }
 namespace interactive_loop50DU { struct Context; }
-namespace rr::game { class OriginalRaceConstructor50LA; class OriginalGcIntroExitOwner; }
+namespace rr::game { class OriginalRaceConstructor50LA; class OriginalRaceMusicManager50LA; class OriginalGcIntroExitOwner; }
 namespace rr::platform {
 class RaceAudioGroups50IC final {
     friend struct ::interactive_loop50DU::Context;
@@ -28,11 +28,12 @@ class RaceAudioGroups50IC final {
     friend class ::ra_pod_scene50LA::Owner;
     friend class ::live_audio50HF::Owner;
     friend class rr::game::OriginalRaceConstructor50LA;
+    friend class rr::game::OriginalRaceMusicManager50LA;
     friend class rr::game::OriginalGcIntroExitOwner;
     friend class ::original_camera_session50KX::Session;
 public:
     RaceAudioGroups50IC() noexcept { bindings_.fill(game::RaceAudioGroup50IC::Unrepresented); }
-    ~RaceAudioGroups50IC()noexcept { if(coldTaIntroEmitter_||coldNativePlayerSpeech_)std::terminate();for(const auto& p:coldGroups_)if(p.constructed)std::terminate(); }
+    ~RaceAudioGroups50IC()noexcept { if(coldTaIntroEmitter_||coldNativePlayerSpeech_||sourceMusicBorrower_)std::terminate();for(const auto& p:coldGroups_)if(p.constructed)std::terminate(); }
     RaceAudioGroups50IC(const RaceAudioGroups50IC&)=delete;
     RaceAudioGroups50IC& operator=(const RaceAudioGroups50IC&)=delete;
     RaceAudioGroups50IC(RaceAudioGroups50IC&&)=delete;
@@ -426,6 +427,9 @@ private:
     };
     bool coldTaIntroGroupIdentity()const noexcept;
     bool coldTaIntroSoundIdentity(std::size_t)const noexcept;
+    // Native lifetime pin for the actual Music164 group38 copy. It does not
+    // populate logicalMembers4C or create a voice. Withdraw before group death.
+    const rr::game::OriginalRaceMusicManager50LA* sourceMusicBorrower_=nullptr;
     struct ColdGroup {
         game::OriginalWreckComponent50LA entity;
         std::unique_ptr<ColdSound*[]> logicalMembers4C;

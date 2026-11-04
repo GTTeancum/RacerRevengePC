@@ -26,7 +26,8 @@ enum class OriginalWreckComponentKind50LA : std::uint8_t {
     uiCourseManager1D0070,uiCoursePage1D8D70,uiIcon2AC4B0,uiSelectableIcon2ACF00,uiSoultree2A85F0,effect15B860,terrain1B0EE0,engine2E7510,aeroBase100330,aero16CCD0, // Distinct detached Course constructors; no dispatch claim.
     smoker288C30,smokerEmitter288E90, //Appended source smoker identities; no update/emission admission.
     physicsObject1659C0, //Base PhysicsObject identity; no derived Racer/setup dispatch.
-    speech2C1000 //Actual detached speech constructor; no Player or speech-load dispatch.
+    speech2C1000, //Actual detached speech constructor; no Player or speech-load dispatch.
+    music2C0980 //Actual detached stream constructor; no playback/child dispatch admission.
 };
 struct OriginalWreckComponent50LA final {
     //1048F0 base constructor owns the actual64-bit reference at source00.

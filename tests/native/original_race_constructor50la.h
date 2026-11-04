@@ -223,6 +223,14 @@ class OriginalRaceConstructor50LA final {
     OriginalHumanEndClock50KG endClock98_;
     std::uint64_t endClockRootPublication_=0;
     std::optional<OriginalHumanEndClockResult50KG> endClockProgress_;
+    // Native saved caller history only. The genuine1A9EE0 result is consumed
+    // once, never inferred from the source leaf's pending bool or Session.
+    // No new source field, World borrow, or manager-readiness receipt.
+    struct SourceWorldReturn1A6D88 {
+        bool entered=false,nonzeroBranchTaken=false,delaySlotExecuted=false;
+        std::optional<std::uint32_t> returnV0;
+        std::uint32_t pc=0x1a6d88u;
+    } sourceWorldReturn1A6D88_;
     std::uint32_t field30_=0,field44_=0,field58_=0,field6C_=0,field70_=0;
     std::uint32_t field8C_=0,field90_=0,field9C_=0,fieldA0_=0,fieldA4_=0,fieldA8_=0;
     // Actual first source Camera34, not a guest integer or a second Session.

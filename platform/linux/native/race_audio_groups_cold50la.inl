@@ -105,7 +105,7 @@ inline bool RaceAudioGroups50IC::constructNextCold2350D0(AudioMixer50HD& mixer,
     ++coldNext_;return true;
 }
 inline bool RaceAudioGroups50IC::canReleaseEmptyCold142590(game::RaceAudioGroup50IC group)const noexcept {
-    if(coldTaIntroEmitter_||coldNativePlayerSpeech_)return false; // Never strand a detached counted emitter.
+    if(coldTaIntroEmitter_||coldNativePlayerSpeech_||sourceMusicBorrower_)return false; // Never strand a detached counted audio owner.
     if(!represented(group)||!coldStarted_||!coldApplication_||!coldMixer_||
        coldThread_!=std::this_thread::get_id()||coldEpoch_!=coldMixer_->groupEpoch50IC()||
        coldApplication_->attachmentLock423F58())return false;

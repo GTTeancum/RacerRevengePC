@@ -25,6 +25,8 @@
 #include <thread>
 #include <utility>
 
+#include "original_race_music_source_storage50la.inl"
+
 namespace rr::game {
 struct OriginalRaceMusicManager50LA::Impl final {
     using Registration=::original_race_hud_scope50LA::Registration;
@@ -64,6 +66,12 @@ struct OriginalRaceMusicManager50LA::Impl final {
     bool endQueueStopped=false;
     std::uint32_t endQueueStopPC=0x1a4cd4;
 
+    const bool sourceOnly;
+    RaceMusicState50IE source128_12C_130{}; // Used only by the distinct source occurrence.
+    std::unique_ptr<original_race_music_source50LA::Child> sourceChild;
+    platform::RaceAudioGroups50IC* sourceGroups=nullptr; // Private native lifetime borrow.
+    bool sourceLoadAttempted=false;
+    std::uint32_t sourcePC=0x1a3c00;
     bool counted=false,constructed=false,closed=false;
     struct Fields {
         std::array<std::uint32_t,4> quad60{},quad70{},quad90{};
@@ -115,16 +123,21 @@ struct OriginalRaceMusicManager50LA::Impl final {
             music->state_.timer128==0.f&&music->state_.mode12C==0&&music->state_.latch130==-1;
     }
     Impl(std::shared_ptr<OriginalApplicationEntities50LA> app,std::uint64_t generation,
-        const std::shared_ptr<Registration>& scope):application(std::move(app)),registration(scope) {
-        if(!scope||scope->thread_!=thread||!application||application->nativeOwnerThread_!=thread||
-           !application->application10()||application->attachmentLock423F58()||!generation||
-           scope->generation_!=generation||!scope->active_||!scope->music_||!scope->announcer_||
+        const std::shared_ptr<Registration>& scope,bool originalSource=false)
+        :application(std::move(app)),registration(scope),sourceOnly(originalSource) {
+        if(!application||application->nativeOwnerThread_!=thread||!application->application10()||
+           application->attachmentLock423F58()||!generation||
            application->objectCount423F60()==std::numeric_limits<std::uint32_t>::max())return;
-        music=scope->music_;announcer=scope->announcer_;
+        if(sourceOnly){if(scope)return;}
+        else {
+            if(!scope||scope->thread_!=thread||scope->generation_!=generation||!scope->active_||
+               !scope->music_||!scope->announcer_)return;
+            music=scope->music_;announcer=scope->announcer_;
+        }
         // Existing PCM/semantic preparation is native work, not this source
         // constructor. Admit only a genuinely unused music state; no reset of
         // an active/previous manager to manufacture its constructor values.
-        if(!freshMusicState(*scope))return;
+        if(!sourceOnly&&!freshMusicState(*scope))return;
         auto& authority=application->entityAuthority_;
         const auto key=std::uint64_t(reinterpret_cast<std::uintptr_t>(&component));
         if(!authority.reserveAdditional(1)||!authority.canEnroll(component,key))return;
@@ -133,7 +146,8 @@ struct OriginalRaceMusicManager50LA::Impl final {
             application->objectCount423F60()); //1A39FC/3A00: A1=1.
         if(made.status!=OriginalWreckComponentStatus50LA::complete)return;
         counted=true;if(!authority.enroll(component))std::terminate();
-        live128_12C_130=&music->state_;nativeAnnouncerState=&announcer->state_;
+        live128_12C_130=sourceOnly?&source128_12C_130:&music->state_;
+        nativeAnnouncerState=sourceOnly?nullptr:&announcer->state_;
         // Exact1A3A14..ADC constructor store order.3CEE00 is this concrete
         // native type, never an executable guest pointer. No callbacks below.
         fields.quad60.fill(0);fields.quad70.fill(0);fields.quad90.fill(0);
@@ -150,6 +164,7 @@ struct OriginalRaceMusicManager50LA::Impl final {
         constructed=true;
     }
 };
+#include "original_race_music_source50la.inl"
 OriginalRaceMusicManager50LA::OriginalRaceMusicManager50LA(
     std::shared_ptr<OriginalApplicationEntities50LA> app,std::uint64_t generation,
     const std::shared_ptr<::original_race_hud_scope50LA::Registration>& scope)
@@ -746,6 +761,7 @@ bool OriginalRaceMusicManager50LA::retireNativeDetached(OriginalRaceMusicManager
     d={};if(!impl_)return true;auto& p=*impl_;
     if(p.thread!=std::this_thread::get_id())return Impl::stop(d,0x1a3af0,"Music manager retirement thread mismatch");
     if(p.closed)return true;
+    if(p.sourceOnly&&!retireSourceMusicChildNative(d))return false;
     if(p.listenerAttempted&&!p.listenerRetired){
         platform::OriginalApplicationAural50KG::Diagnostic listener;
         if(!p.aural||!p.aural->removeSingleRaceListener103040(*this,listener))

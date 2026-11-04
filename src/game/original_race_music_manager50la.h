@@ -12,9 +12,10 @@ struct OriginalRaceMusicManagerDiagnostic50LA {
     std::uint32_t sourcePC=0;
     const char* operation=nullptr;
 };
-// One actual counted1A39F0 manager. Its128/12C/130 lanes are references into
-// the SAME existing native music owner; no second mode or PCM/voice transport.
-// Platform child IO is an explicit native adapter, NOT full source1A3C00.
+// One actual counted1A39F0 manager. Native occurrences borrow128/12C/130
+// from their SAME existing music owner. The distinct source occurrence owns
+// those lanes itself and cannot adopt native Scope/PCM or listener readiness.
+// Native platform child IO remains an explicit adapter, NOT full1A3C00.
 class OriginalRaceMusicManager50LA final {
     friend struct ::original_main_entry50KG::Application;
     friend class OriginalRaceConstructor50LA;
@@ -24,6 +25,16 @@ class OriginalRaceMusicManager50LA final {
     std::unique_ptr<Impl> impl_;
     OriginalRaceMusicManager50LA(std::shared_ptr<OriginalApplicationEntities50LA>,std::uint64_t,
         const std::shared_ptr<::original_race_hud_scope50LA::Registration>&);
+    // Distinct original-source occurrence. No native Scope, PCM, mixer state,
+    // listener or prepared Announcer is adopted by this constructor.
+    OriginalRaceMusicManager50LA(std::shared_ptr<OriginalApplicationEntities50LA>,std::uint64_t);
+    static bool beginSourceAfterLoadingCamera1A6C90(const ::original_main_entry50KG::Application&,
+        OriginalRaceConstructor50LA&,const std::shared_ptr<platform::OriginalApplicationAural50KG>&,
+        std::uint32_t&)noexcept;
+    bool loadSourceMusicChild1A3C00(const ::original_main_entry50KG::Application&,
+        OriginalRaceConstructor50LA&,const std::shared_ptr<platform::OriginalApplicationAural50KG>&,
+        OriginalRaceMusicManagerDiagnostic50LA&)noexcept;
+    bool retireSourceMusicChildNative(OriginalRaceMusicManagerDiagnostic50LA&)noexcept;
     bool constructed()const noexcept;
     static bool noNativePreparation(const ::original_race_hud_scope50LA::Registration&)noexcept;
     static bool freshAll8NativePrefix(const OriginalRaceConstructor50LA&,

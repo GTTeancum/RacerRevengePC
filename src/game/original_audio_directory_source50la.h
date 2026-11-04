@@ -16,6 +16,7 @@ namespace rr::game {
 class OriginalAudioDirectorySource50LA final {
     friend struct ::original_main_entry50KG::Application;
     friend class ::native_player_speech50LA::LoadPrefix;
+    friend class OriginalRaceMusicManager50LA;
     struct State {
         const std::thread::id thread=std::this_thread::get_id();
         const OriginalAudioDirectorySource50LA* nativeOwner=nullptr;

@@ -275,6 +275,11 @@ bool Application::finishConsumedRaLoadingCamera1A9750(
     // branches omit13E920 and v20/v18. Revalidate after array publication.
     if(!race.loadingCameraSourceNullSuffixCurrent())return fail(0x1a97b8);
     n.suffixReturned=true;n.stopPC=pc=0x1a9598;
-    return true; // Before caller literal success; not World load or Session-ready.
+    // Consume the genuine single-view1A9240 epilogue, then enter the actual
+    // outer music occurrence. Native Session completion cannot enter this path.
+    // The source music body retains its reached prefix and returns false at
+    // the next unimplemented boundary; it never authorizes the track segment.
+    return rr::game::OriginalRaceMusicManager50LA::beginSourceAfterLoadingCamera1A6C90(
+        *this,race,sourceAural00Owner_,pc);
 }
 }
