@@ -734,6 +734,9 @@ bool VehicleWindowGl50DS::Storage::deleteDisplayFadeNames(VehicleWindowDiagnosti
     }
 
 bool VehicleWindowGl50DS::Storage::hasGlResources() const noexcept {
+        if(nativeVideoOverlayTextures50LA[0]||nativeVideoOverlayTextures50LA[1]||nativeVideoOverlayProgram50LA||nativeVideoOverlayShader50LA)return true;
+        for(U b=0;b<2;++b)if(nativeVideoPacketTargets50LA[b]||nativeVideoPacketColors50LA[b]||
+            nativeVideoSnapshotTargets50LA[b]||nativeVideoSnapshotColors50LA[b])return true;
         if(hasNativeResultsResources())return true;
         if(hasNativeF8BarResources())return true;
         if(garagePollFence50KG)return true;
@@ -2022,6 +2025,11 @@ bool VehicleWindowGl50DS::Storage::cleanup(VehicleWindowDiagnostic50DS& d) noexc
         if (hasGlResources() && !current(d)) { d.cleanupIncomplete = true; return false; }
         if(raStaticFireOwner)raStaticFireOwner->nativeCompletionLive_=false;
         initialized = false; active = frameSet = imageCommitted = false;
+        nativeVideoPacketReady50LA=nativeVideoPacketImage50LA=false;nativeVideoPacketSerial50LA=0;
+        nativeVideoSnapshotReady50LA=nativeVideoSnapshotImage50LA=false;
+        nativeVideoSnapshotSerial50LA=nativeVideoSnapshotImageSerial50LA=nativeVideoSnapshotClearSerial50LA=0;
+        nativeVideoPacketClearAncestor50LA=0;nativeVideoPacketLastWrite50LA=NativeVideoPacketWrite50LA::none;
+        nativeVideoOverlayReady50LA=false;nativeVideoOverlayImageSerial50LA=nativeVideoOverlayCaptureSerial50LA=0;
         frameCables = nullptr; frameHostHud = false;frameGcParticles=nullptr;
         committedWidth = committedHeight = raceWidth = raceHeight = 0;
         retainedRaceDisplayCompleted=retainedRaceContainsPause=false;
@@ -2089,6 +2097,8 @@ bool VehicleWindowGl50DS::Storage::cleanup(VehicleWindowDiagnostic50DS& d) noexc
             return fail(d, VehicleWindowError50DS::cleanup, "unbind renderer resources before cleanup");
         }
         bool complete = true;
+        if(!deleteNativeVideoOverlay50LA(d))goto incomplete;
+        if(!deleteNativeVideoPacketTargets50LA(d))goto incomplete;
         if(!deleteNativeResultsResources(d))goto incomplete;
         if(!deleteNativeF8BarNames(d))goto incomplete;
         if(!deleteSpeedBoostNames(d))goto incomplete;

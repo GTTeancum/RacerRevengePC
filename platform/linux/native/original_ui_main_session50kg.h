@@ -202,6 +202,12 @@ struct OriginalUiMainSessionUpdate50KG {
     // Results of the actual source input-level queries(7,6,5,4;2,63).
     // The host supplies its real held-button snapshot, not generated input.
     std::array<bool,4> debugChordHeld{};
+    // Native physical left/right levels, in that order, for Course's actual
+    // 1DFEA0 queries of source descriptors15/13. The real host merges its
+    // focused arrow keys and release-armed first-pad D-pad from the SAME poll.
+    // These are not generated input edges, analog thresholds, guest pad
+    // registration or a repeat-completion claim. Other pages ignore them.
+    std::array<bool,2> courseHorizontalHeld{};
 };
 // Concrete bounded Main lifecycle, tree update and render composition. The
 // session owns callback implementations, shared+440 ScreenText and full Main

@@ -62,8 +62,9 @@ struct OriginalUiCourseSessionSnapshot50KG {
     std::uint32_t courseSlot14E4=0,subtypeSlot14F4=0,laps14EC=0,entrants14F0=0;
     std::uint32_t mode34=0,tier14E8=0;
     std::uint32_t promptMask42C=0,selectedPlanet40=0,selectedCourse44=0,deferred14D0=0;
-    // Initial source repeat timer writes are retained; physical-edge input
-    // only. A held-controller-state owner is still required for repeat updates.
+    // Same page-owned timers for physical-edge0.65s admission and actual
+    // Course update0.13s repeats. The host supplies observed held levels;
+    // no generic menu repeat or persistent profile write is introduced.
     float repeatRight14D4=0,repeatLeft14D8=0;
     std::int16_t controllerGroup=-1;
     std::uint64_t updates=0,renders=0,registryGeneration=0;

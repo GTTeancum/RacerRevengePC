@@ -1,7 +1,50 @@
 #pragma once
 #include "original_race_world_join50la.h"
+#include "../../src/game/original_pause_storage50la.h"
 
 namespace rr::game {
+// Canonical1BD7C0 rows5..8 under the retained Race/Pause. The caller binds
+// the actual Application game-settings facet before entering this private leaf.
+inline bool OriginalRaceConstructor50LA::adjustPauseAudio1BD7C0(
+    const OriginalPauseStorage50LA& pause,OriginalUiGameSettingsProfile50KG& profile,
+    const OriginalApplicationAnimationClockView50KG& clock,std::uint32_t row,
+    bool increase,bool& changed)noexcept {
+    changed=false;std::uint32_t paused=0;
+    if(row>=4||!counted_||rolledBack_||!nativeRootAttached_||!application_||
+       pause100_.get()!=&pause||!pause.active200_||pause.mode1F0_||
+       !validOriginalUiGameSettingsProfile50KG(profile)||!clock.readPause11C(paused)||!paused)
+        return false;
+    const auto old=profile.volume11020[row];
+    // Original bound branches do not reach a profile helper, floating-point
+    // conversion or group setter. In particular they need no mixer revision.
+    if((increase&&old==100u)||(!increase&&old==0u))return true;
+    if(!raceAudio_||application_->attachmentLock423F58()||raceGroupCount_!=6||raceGroupsAttached_!=6||
+       raceAudio_->coldApplication_!=application_||raceAudio_->coldSession_!=entity_.sessionGeneration||
+       !raceAudio_->current()||!application_->entityAuthority_.canRetire(entity_)||
+       !original_entity_chain_detail50LA::forest(application_->entityAuthority_.view())||
+       entity_.firstChild18!=raceGroups_[0])return false;
+    // These are the actual Race110/114/118/11C/120/124 constructor fields,
+    // not enum labels standing in for unattached source objects.
+    for(std::size_t i=0;i<6;++i){
+        const auto* child=raceGroups_[i];
+        if(!child||child!=&raceAudio_->coldGroups_[static_cast<std::size_t>(groupOrder_[i])].entity||
+           child->parent1C!=&entity_||child->previous10!=(i?raceGroups_[i-1]:nullptr)||
+           child->next14!=(i+1<6?raceGroups_[i+1]:nullptr))return false;
+    }
+    // Effects alone reaches Race74->World4D8 after Race110 and114.
+    // World4D8 is owned by this real World, not a made-up seventh Race child.
+    if(row==0&&(!world74_||!world74_->worldColdConstructed_||world74_->topologyClosed_||
+       world74_->worldApplication_!=application_||world74_->worldAudio_!=raceAudio_||
+       world74_->worldEntity_.sessionGeneration!=entity_.sessionGeneration))return false;
+    const auto observed=profile.volume11020;
+    // Shared native transport preflights same-profile configuration, actual
+    // registered group slots, epoch/thread, voice gains/leases and aggregate
+    // revision capacity before any profile store. Then profile, group38 and
+    // native voice gains commit in original order. It does not issue26D200.
+    if(!raceAudio_->adjustNativePauseAudio(profile,application_,*raceAudio_->mixer_,
+        clock,observed,row,increase))return false;
+    changed=true;return true;
+}
 // Actual table3CEE80+50=142040, separate from direct1ACF50 below.
 inline bool OriginalRaceConstructor50LA::pauseEntity142040(bool requested)noexcept {
     if(!counted_||rolledBack_||!application_||!raceAudio_||

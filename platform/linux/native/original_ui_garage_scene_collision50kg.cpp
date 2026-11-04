@@ -154,7 +154,7 @@ bool OriginalUiGarageSceneCollision50KG::load11B920(std::size_t ordinal,D& d)noe
     if(!app||q.loaded||q.providerAbsent||q.shape8C||!q.entityLive||q.entity8.reference00!=1)
         return collisionFail(d,S::phase,0x11B920);
     try {
-        const auto& directory=app->collisionDirectory36B0F0_;
+        const auto& directory=app->observeCollisionDirectory36B0F0();
         // The bounded namespace has no extension in its directory. Do not
         // reinterpret1169D0 on an unknown dotted directory as basename logic.
         if(directory.find('.')!=std::string::npos||directory.size()>127)

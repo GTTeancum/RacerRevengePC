@@ -108,8 +108,9 @@ S OriginalUiCourseWidgetController50KG::moveLaps(const OriginalUiNavigation50KG&
     next.laps14EC=forward?(laps==maximum?1:laps+1):(laps==1?maximum:laps-1);
     next.sourcePC=n.groups[2].selectedSlot==2?(forward?0x1DF604:0x1DF350):(forward?0x1DF5C4:0x1DF310);
     next.audioPC=forward?0x1DF64C:0x1DF398;next.effectId=forward?4u:3u;
-    // Source bits3F266666. The host supplies physical input edges; retained
-    // timer writes do not claim that original held-input repeat is joined.
+    // Source bits3F266666. These are the initial physical-edge timers.
+    // The same live Course Session later consumes actual held levels in
+    // update1DFEA0; it never replays this edge to synthesize a repeat.
     next.repeatRight14D4=forward?0.65f:0.0f;next.repeatLeft14D8=forward?0.0f:0.65f;
     out=next;return S::ok;
 }

@@ -79,6 +79,80 @@ class OriginalGcParticleManager50KG final {
     bool allocateSourcePointers160F08(std::uint32_t&)noexcept;
     const void* sourcePointerPublication138()const noexcept;
     bool constructSourceRecords160F1C(std::uint32_t&)noexcept;
+    // Private sourcePending-only position prefix. The actual138 pointer array
+    // and its published slot are retained; NULL is a valid slot-load result.
+    // No native-prepared Storage, emitter registry, owner48 or count mutation.
+    bool readSourcePositionSlot1606E4(const void* publication138,std::int32_t index128,
+        const OriginalGcParticle50KG*& record)const noexcept;
+    bool storeSourcePosition1606FC(const void* publication138,std::int32_t index128,
+        const OriginalGcParticle50KG* expected,const std::array<std::uint32_t,4>& after,
+        std::array<std::uint32_t,4>& before)noexcept;
+    bool sourcePositionSlotCurrentNative(const void* publication138,std::int32_t index128,
+        const OriginalGcParticle50KG* expected,
+        const std::array<std::uint32_t,4>* committedPosition)const noexcept;
+    //One actual16088C velocity SQ for the first inactive Fog record. The
+    //caller retains the exact earlier position/slot occurrence. Currentness
+    //remains valid after later scalar/owner stores; only STORE forbids them.
+    bool sourceVelocitySlotCurrentNative(const void* publication138,std::int32_t index128,
+        const OriginalGcParticle50KG* expected,
+        const std::array<std::uint32_t,4>* committedVelocity)const noexcept;
+    bool storeSourceVelocity16088C(const void* publication138,std::int32_t index128,
+        const OriginalGcParticle50KG* expected,const std::array<std::uint32_t,4>& after,
+        std::array<std::uint32_t,4>& before)noexcept;
+    //Distinct inactive slot1 only. No widening of the first occurrence's APIs.
+    bool sourceSuccessorVelocitySlotCurrentNative(const void* publication138,std::int32_t index128,
+        const OriginalGcParticle50KG* expected,const std::array<std::uint32_t,4>* committedVelocity)const noexcept;
+    bool storeSourceSuccessorVelocity16088C(const void* publication138,std::int32_t index128,
+        const OriginalGcParticle50KG* expected,const std::array<std::uint32_t,4>& after,
+        std::array<std::uint32_t,4>& before)noexcept;
+    bool sourceSuccessorFogFieldsCurrentNative(const void* publication138,std::int32_t index128,
+        const OriginalGcParticle50KG* expected,const void* emitter,std::uint8_t storedCount,
+        const std::array<std::uint32_t,5>& values)const noexcept;
+    bool storeSourceSuccessorFogField1608AC(const void* publication138,std::int32_t index128,
+        const OriginalGcParticle50KG* expected,const void* emitter,std::uint8_t priorCount,
+        std::uint32_t sourcePC,std::uint32_t bits)noexcept;
+    //First inactive Fog record only. Native-width source48 is private pool
+    //field-state, never the legacy32-bit ownerId. No owner dereference API.
+    bool sourceFogFieldsCurrentNative(const void* publication138,std::int32_t index128,
+        const OriginalGcParticle50KG* expected,const void* emitter,std::uint8_t storedCount,
+        const std::array<std::uint32_t,5>& values)const noexcept;
+    bool storeSourceFogField1608AC(const void* publication138,std::int32_t index128,
+        const OriginalGcParticle50KG* expected,const void* emitter,std::uint8_t priorCount,
+        std::uint32_t sourcePC,std::uint32_t bits)noexcept;
+    //Read-only authoritative source48 identity. No legacy ownerId or emitter dereference.
+    bool readSourceFogRetirementSlot16056C(const void* publication138,
+        const OriginalGcParticle50KG*& record)const noexcept;
+    bool readSourceFogOwner160570(const void* publication138,std::int32_t index128,
+        const OriginalGcParticle50KG* expected,const void*& owner48)const noexcept;
+    bool readSourceFogLife1608D8(const void* publication138,std::int32_t index128,
+        const OriginalGcParticle50KG* expected,const void* emitter,std::uint32_t& bits)const noexcept;
+    //Separate post-DIV history on the SAME source record. Seven operations:
+    //store34,store40,store44,read44,store44,read44,store44. Actual flags reads
+    //are retained in native metadata, never replaced by receipt-value replay.
+    bool sourceFogTailCurrentNative(const void* publication138,std::int32_t index128,
+        const OriginalGcParticle50KG* expected,const void* emitter,std::uint8_t completedOps,
+        const std::array<std::uint32_t,7>& pcs,const std::array<std::uint32_t,7>& values)const noexcept;
+    bool storeSourceFogTail1608E0(const void* publication138,std::int32_t index128,
+        const OriginalGcParticle50KG* expected,const void* emitter,std::uint8_t priorOps,
+        std::uint32_t sourcePC,std::uint32_t bits)noexcept;
+    bool readSourceFogFlags160930(const void* publication138,std::int32_t index128,
+        const OriginalGcParticle50KG* expected,const void* emitter,std::uint8_t priorOps,
+        std::uint32_t sourcePC,std::uint32_t& bits)noexcept;
+    //Distinct slot1 life/tail operations. No first-record custody adoption.
+    bool readSourceSuccessorFogLife1608D8(const void* publication138,std::int32_t index128,
+        const OriginalGcParticle50KG* expected,const void* emitter,std::uint32_t& bits)const noexcept;
+    //Separate post-DIV history on the SAME source record. Seven operations:
+    //store34,store40,store44,read44,store44,read44,store44. Actual flags reads
+    //are retained in native metadata, never replaced by receipt-value replay.
+    bool sourceSuccessorFogTailCurrentNative(const void* publication138,std::int32_t index128,
+        const OriginalGcParticle50KG* expected,const void* emitter,std::uint8_t completedOps,
+        const std::array<std::uint32_t,7>& pcs,const std::array<std::uint32_t,7>& values)const noexcept;
+    bool storeSourceSuccessorFogTail1608E0(const void* publication138,std::int32_t index128,
+        const OriginalGcParticle50KG* expected,const void* emitter,std::uint8_t priorOps,
+        std::uint32_t sourcePC,std::uint32_t bits)noexcept;
+    bool readSourceSuccessorFogFlags160930(const void* publication138,std::int32_t index128,
+        const OriginalGcParticle50KG* expected,const void* emitter,std::uint8_t priorOps,
+        std::uint32_t sourcePC,std::uint32_t& bits)noexcept;
     friend class OriginalUiGarageParticles50KG;
     OriginalGcParticleStatus50KG normalizeGarageAtlas161234(float,float) noexcept;
 public:

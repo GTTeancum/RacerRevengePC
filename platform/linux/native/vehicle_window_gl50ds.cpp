@@ -1154,6 +1154,13 @@ game::OriginalCameraStartResult OriginalVideoBlockingNativeBackend::begin(
     const auto pc=async?0x25e610u:(direction==game::OriginalVideoFadeDirection::out260850?0x260850u:0x261630u);
     if(phase_==OriginalVideoNativePhase::failed)return failure(pc);
     diagnostic_={};hostDiagnostic_={};
+    // These are explicit native shader semantics, not source GS state.
+    // Reject before context queries, exclusive borrowing, capture or allocation.
+    if(!blendPoliciesSupported()){
+        fail(diagnostic_,VehicleWindowError50DS::request,
+            "display fade requires explicit signed-floor, clamp8, PABE0 and packed-alpha policies");
+        return failure(pc);
+    }
     if(phase_==OriginalVideoNativePhase::sourceReady && direction==direction_)
         return ownersCurrent()?game::OriginalCameraStartResult{S::complete,pc}:failure(pc);
     if((phase_!=OriginalVideoNativePhase::idle && phase_!=OriginalVideoNativePhase::retired) ||
@@ -1583,4 +1590,7 @@ bool VehicleWindowGl50DS::close(VehicleWindowDiagnostic50DS& d) noexcept {
     return result;
 }
 bool VehicleWindowGl50DS::initialized() const noexcept { return storage_ && storage_->initialized; }
+
+// Native packet color backend; one definition in the existing renderer TU.
+#include "original_video_packet_gl50la.inl"
 }

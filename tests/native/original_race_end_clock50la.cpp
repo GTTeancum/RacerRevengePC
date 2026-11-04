@@ -185,7 +185,10 @@ original_camera_session50KX::Result Registration::advanceFadeIn1A7BD0(
         const auto actual=world->borrowRuntimeSourceCamera(world,wd);
         if(!actual||actual.get()!=&session)return {S::owner,0x1a7bd0};
         auto& app=*session.displayInputs_;auto& video=app.video;
-        if((video.flags404Low6&3u)&&!(video.flags404Low6&4u))return session.set(S::videoPending);
+        if(session.endingFadeRequest_.pending()||
+           (session.retainedFadeInRequestPending50LA()&&app.fadeManagerA8!=8))return session.set(S::owner,0x2ae93c);
+        if((video.flags404Low6&3u)&&!(video.flags404Low6&4u)&&
+           !(app.fadeManagerA8==8&&session.retainedFadeInRequestPending50LA()))return session.set(S::videoPending);
         if((race.flags1B0KnownMask_&8u)!=8u)return session.set(S::owner,0x1a7bd0);
         if(race.flags1B0KnownValue_&8u){
             // Existing real accepted-restored-image scheduling; no fabricated
@@ -201,14 +204,9 @@ original_camera_session50KX::Result Registration::advanceFadeIn1A7BD0(
         // retain their independent ownership. Later video failure keeps bit3.
         session.raceFlags1B0_=std::uint8_t((session.raceFlags1B0_&~8u)|(race.flags1B0KnownValue_&8u));
         if(app.fadeManagerA8==8){
-            session.result_.start=rr::game::requestOriginalVideoFade260610(video,session.actual_.applicationClock,
-                app.currentApplicationMode22C(),app.fadeDuration98,true);
+            session.result_.start=session.serviceAsyncFadeInRequest260610();
             if(session.result_.start.status!=rr::game::OriginalCameraStartStatus::complete)
                 return session.set(S::videoPending,session.result_.start.sourcePC);
-            app.fadeManagerA8=0;
-            if(session.taSkipFadeFinished_&&!session.exit_.complete()&&!session.directStart_.complete())
-                session.taSkipFadeInRequested_=true;
-            else session.fadeInRequested_=true;
         }else if(app.fadeManagerA8)return session.set(S::sourcePath,0x2ae7fc);
         return session.set(S::complete,0x2ae958);
     }catch(...){return {S::owner,0x1a7bd0};}

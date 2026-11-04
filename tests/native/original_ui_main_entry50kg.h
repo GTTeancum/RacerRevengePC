@@ -1,5 +1,7 @@
 #include "../../src/game/original_player_overlay_renderer_lease50la.h"
 #include "../../src/game/original_application_input04_source50la.h"
+#include "../../src/game/original_application_startup17c910_source50la.h"
+#include "../../src/game/original_application_video_source50la.h"
 #pragma once
 #include "../../src/game/original_player_race_music_borrow50la.h"
 #include "../../platform/linux/native/native_beta_settings50kg.h"
@@ -398,6 +400,34 @@ private:
     // input and uncalled until its true startup dispatcher predecessor joins.
     friend class rr::game::OriginalPlayerConstructorPrefix50LA;
     mutable std::shared_ptr<rr::game::OriginalApplicationInput04Source50LA> sourceInput04_;
+    //Declare caller before body so the body is destroyed first. Both are
+    //embedded one-shot identities; close revokes caller before descendant.
+    mutable rr::game::OriginalApplicationStartupCall23A0DCNative50LA nativeStartupCall23A0DC_;
+    mutable rr::game::OriginalApplicationStartup17C910Source50LA sourceStartup17C910_;
+    //Private and uncalled: source entry stops at the unowned argument read.
+    //The separate native normal-UI continuation never fabricates guest argv.
+    rr::game::OriginalApplicationStartup17C910Source50LA::Result enterSourceStartup17C910()const noexcept;
+    rr::game::OriginalApplicationStartup17C910Source50LA::Result continueNativeNormalStartup17C910()const noexcept;
+    rr::game::OriginalApplicationStartup17C910Source50LA::Result continueSourceStartupDirectories17CA88()const noexcept;
+    rr::game::OriginalApplicationStartup17C910Source50LA::Result continueSourceStartupAppStart17CAB8()const noexcept;
+    rr::game::OriginalApplicationStartup17C910Source50LA::Result continueSourceStartupMaterialRead17CAD4()const noexcept;
+    rr::game::OriginalApplicationStartup17C910Source50LA::Result continueSourceStartupMaterialRows29871C()const noexcept;
+    rr::game::OriginalApplicationStartup17C910Source50LA::Result continueSourceStartupMaterialPopulation2987E8()const noexcept;
+    rr::game::OriginalApplicationStartup17C910Source50LA::Result continueSourceStartupDefaultTemplate17CAE8()const noexcept;
+    rr::game::OriginalApplicationStartup17C910Source50LA::Result continueSourceStartupScreenTemplate17CAFC()const noexcept;
+    rr::game::OriginalApplicationStartup17C910Source50LA::Result continueSourceStartupInputMappings17CB04()const noexcept;
+    rr::game::OriginalApplicationStartup17C910Source50LA::Result captureNativeStartupBodyResult17CB9C()const noexcept;
+    rr::game::OriginalApplicationStartupCall23A0DCNative50LA::Result enterNativeStartupCall23A0DC()const noexcept;
+    rr::game::OriginalApplicationStartupCall23A0DCNative50LA::Result returnNativeStartupCall23A0E4()const noexcept;
+    rr::game::OriginalApplicationStartupCall23A0DCNative50LA::Result continueNativeStartupInitialize23A0E4()const noexcept;
+    rr::game::OriginalApplicationStartupCall23A0DCNative50LA::Result enterNativeInitialize237640()const noexcept;
+    rr::game::OriginalApplicationStartupCall23A0DCNative50LA::Result continueNativeStartupVideo2376A0()const noexcept;
+    bool nativeStartupVideoInitializationOwnerCurrent()const noexcept;
+    bool nativeStartupVideoIntcBoundaryCurrent()const noexcept;
+    rr::game::OriginalApplicationStartupCall23A0DCNative50LA::Result continueNativeStartupVideoIntc25A68C()const noexcept;
+    rr::game::OriginalApplicationStartupCall23A0DCNative50LA::Result holdNativeStartupVideoIntcCustody()const noexcept;
+    rr::game::OriginalApplicationStartupCall23A0DCNative50LA::Result continueNativeStartupModeTable2376C0()const noexcept;
+    rr::game::OriginalApplicationStartupCall23A0DCNative50LA::Result continueNativeStartupVideoDescendants25A5EC()const noexcept;
     bool constructSourceInput04_13FD40()const noexcept {
         if(sourceInput04_||!enabled||!entities())return false;
         try{sourceInput04_.reset(new(std::nothrow) rr::game::OriginalApplicationInput04Source50LA);}
@@ -415,6 +445,8 @@ private:
         const rr::game::OriginalRaceConstructor50LA*)const noexcept;
     bool sourceInput04NativeBorrowCurrent(const rr::game::OriginalApplicationInput04Source50LA* input)const noexcept;
     bool closeSourceInput04Native()const noexcept {
+        if(!nativeStartupCall23A0DC_.closeNative(*this))return false;
+        if(!sourceStartup17C910_.closeNative(*this))return false;
         if(sourcePadHostLease_)sourcePadHostLease_->revoke();
         sourcePadHostLease_.reset();
         return !sourceInput04_||sourceInput04_->closeNative(*this);
@@ -503,8 +535,16 @@ private:
     // Genuine single-view1A9240 prefix and concrete Windows/Linux adapter.
     // Native accepted initialization is distinct from a retail2361C0 receipt.
     bool continueConsumedRaCamera1A9240(rr::game::OriginalRaceConstructor50LA&,std::uint32_t&)const noexcept;
+    // Private read-only native ALL8 custody, not Camera34 completion/issuance.
+    // Used by the actual Pause borrower while the original1A9240 stays pending.
+    bool consumedRaAll8CameraCustodyNative34Current(const original_camera_session50KX::Session&)const noexcept;
     bool bindConsumedRaCameraNative34(original_camera_session50KX::Session&)const noexcept;
     bool completeConsumedRaCameraNative34(original_camera_session50KX::Session&)const noexcept;
+    enum class All8MusicPrefixStatus:std::uint8_t {unavailable,publishedBeforeChildren,failed};
+    // Separate native ALL8 entry. No human camera completion, listener/HUD
+    // readiness or original1A9240 return is implied by this counted prefix.
+    All8MusicPrefixStatus stageConsumedRaAll8MusicPrefixNative10C(
+        original_camera_session50KX::Session&,std::uint32_t&)const noexcept;
     bool completeConsumedRaMusicNative10C(original_camera_session50KX::Session&,std::uint32_t&)const noexcept;
     bool advanceConsumedRaMusicListenerNative(const original_camera_session50KX::Session&,
         std::uint64_t beforeMix,bool heldSourceScene,std::uint32_t&)const noexcept;
@@ -790,6 +830,85 @@ private:
     // Explicit diagnostic/headless entry keeps its original close/reopen policy.
     const bool retainPlayerWindow50DU_;
     mutable std::shared_ptr<Video> videoOwner_;
+    // Original2376A0/259E00/2376BC is a DISTINCT source producer. Native
+    // videoForSession(), Window creation, and immutable640x448/480 constants
+    // do not enter it or certify it. A private native initializer may issue
+    // this exact fresh producer; neither path claims guest outer startup.
+    mutable rr::game::OriginalApplicationVideoSource50LA sourceVideoProduction_;
+    rr::game::OriginalApplicationVideoSource50LA::Result constructSourceVideo2376A0()const noexcept {
+        if(!rr::game::OriginalVideoPreFlipList50KG::applicationVideoEntryCurrent(*this))
+            return rr::game::OriginalApplicationVideoSource50LA::Result::authority;
+        if(sourceVideoProduction_.nativeInitializerCaller_){
+            const auto& call=nativeStartupCall23A0DC_;
+            if(sourceVideoProduction_.nativeInitializerCaller_!=&call||!call.current(*this)||
+               call.phase_!=rr::game::OriginalApplicationStartupCall23A0DCNative50LA::Phase::videoConstructionIssuing||
+               call.initialization_.video!=&sourceVideoProduction_||!call.initialization_.videoCallIssued||
+               call.initialization_.pc!=0x2376a0)
+                return rr::game::OriginalApplicationVideoSource50LA::Result::authority;
+        }
+        return sourceVideoProduction_.begin2376A0(*this);
+    }
+    // Private, uncalled successor of the SAME source publication. Produces
+    // only25A3E0's table prefix and stops before its descendant allocation;
+    // it must not be invoked by a native renderer/session readiness query.
+    rr::game::OriginalApplicationVideoSource50LA::ModeTableResult continueSourceVideoModeTable25A3E0()const noexcept {
+        if(!rr::game::OriginalVideoPreFlipList50KG::applicationVideoEntryCurrent(*this))
+            return rr::game::OriginalApplicationVideoSource50LA::ModeTableResult::authority;
+        if(sourceVideoProduction_.nativeInitializerCaller_){
+            const auto& call=nativeStartupCall23A0DC_;const auto& init=call.initialization_;
+            if(sourceVideoProduction_.nativeInitializerCaller_!=&call||!call.current(*this)||
+               call.phase_!=rr::game::OriginalApplicationStartupCall23A0DCNative50LA::Phase::modeTableIssuing||
+               init.video!=&sourceVideoProduction_||!init.videoPublicationObserved||
+               !init.modeTableCallIssued||init.modeTablePrefixObserved||init.pc!=0x2376c0)
+                return rr::game::OriginalApplicationVideoSource50LA::ModeTableResult::phase;
+        }
+        return sourceVideoProduction_.continueModeTable25A3E0(*this);
+    }
+    // Private, uncalled CPU successor. Retains original allocation/publication
+    //ordering and stops before installing any platform callback or MMIO state.
+    rr::game::OriginalApplicationVideoSource50LA::DescendantResult continueSourceVideoDescendants25A5EC()const noexcept {
+        if(!rr::game::OriginalVideoPreFlipList50KG::applicationVideoEntryCurrent(*this))
+            return rr::game::OriginalApplicationVideoSource50LA::DescendantResult::authority;
+        if(sourceVideoProduction_.nativeInitializerCaller_){
+            const auto& call=nativeStartupCall23A0DC_;const auto& init=call.initialization_;
+            if(sourceVideoProduction_.nativeInitializerCaller_!=&call||!call.current(*this)||
+               call.phase_!=rr::game::OriginalApplicationStartupCall23A0DCNative50LA::Phase::descendantsIssuing||
+               init.video!=&sourceVideoProduction_||!init.modeTableCallIssued||!init.modeTablePrefixObserved||
+               !init.descendantsContinuationIssued||init.descendantsPrefixObserved||init.pc!=0x25a5ec)
+                return rr::game::OriginalApplicationVideoSource50LA::DescendantResult::phase;
+        }
+        return sourceVideoProduction_.continueModeDescendants25A5EC(*this);
+    }
+    // Private, uncalled entry to the exact source syscall boundary only. A
+    //pending call image is not native registration or an interrupt producer.
+    rr::game::OriginalApplicationVideoSource50LA::RegistrationResult enterSourceVideoIntcRegistration25A68C()const noexcept {
+        if(!rr::game::OriginalVideoPreFlipList50KG::applicationVideoEntryCurrent(*this))
+            return rr::game::OriginalApplicationVideoSource50LA::RegistrationResult::authority;
+        if(sourceVideoProduction_.nativeInitializerCaller_){
+            const auto& call=nativeStartupCall23A0DC_;const auto& init=call.initialization_;
+            if(sourceVideoProduction_.nativeInitializerCaller_!=&call||!call.current(*this)||
+               call.phase_!=rr::game::OriginalApplicationStartupCall23A0DCNative50LA::Phase::intcRegistrationIssuing||
+               init.video!=&sourceVideoProduction_||!init.descendantsContinuationIssued||!init.descendantsPrefixObserved||
+               !init.intcRegistrationCallIssued||init.intcSyscallBoundaryReached||init.pc!=0x25a68c)
+                return rr::game::OriginalApplicationVideoSource50LA::RegistrationResult::phase;
+        }
+        return sourceVideoProduction_.enterIntcRegistration25A68C(*this);
+    }
+    // Native-only custody of the same pending source request. No host hook,
+    //source return, IRQ, callback delivery, or mode admission is issued.
+    rr::game::OriginalApplicationVideoSource50LA::NativeIntcCustodyResult holdSourceVideoPendingIntcNativeCustody()const noexcept {
+        if(!rr::game::OriginalVideoPreFlipList50KG::applicationVideoEntryCurrent(*this))
+            return rr::game::OriginalApplicationVideoSource50LA::NativeIntcCustodyResult::authority;
+        if(sourceVideoProduction_.nativeInitializerCaller_){
+            const auto& call=nativeStartupCall23A0DC_;const auto& init=call.initialization_;
+            if(sourceVideoProduction_.nativeInitializerCaller_!=&call||!call.current(*this)||
+               call.phase_!=rr::game::OriginalApplicationStartupCall23A0DCNative50LA::Phase::intcCustodyIssuing||
+               init.video!=&sourceVideoProduction_||!init.intcRegistrationCallIssued||!init.intcSyscallBoundaryReached||
+               !init.intcCustodyAttempted||init.pc!=0x2f5884)
+                return rr::game::OriginalApplicationVideoSource50LA::NativeIntcCustodyResult::phase;
+        }
+        return sourceVideoProduction_.holdPendingIntcNativeCustody(*this);
+    }
     // Retain the exact construction capability, not just equivalent fields.
     // Its dependencies pin Video/templates/runtime/list, never Application,
     // so these two application-owned handles do not form a reference cycle.
@@ -859,8 +978,8 @@ private:
     //17CA98/AC copies the exact eight bytes3A8648;1A9FD0/1AA010 later
     //selects tracks again. Not derived from native asset-root/CLI paths.
     mutable std::string trackDirectory36B640_="tracks\\";
-    // Unrepresented startup contents stay unknown; genuine1B8330 selection
-    // below owns the first represented writes to these SAME process strings.
+    //UI-resource startup remains unrepresented. Animation stays unknown until
+    //the reached17CA1C/20 copy or existing1B8330 selection writes this SAME field.
     mutable std::optional<std::string> uiResourceDirectory36BB90_;
     mutable std::optional<std::string> animationDirectory36AED0_;
 
@@ -916,6 +1035,30 @@ public:
         animationClockOwner_->value_.pause11C=paused?1u:0u;
     }
     std::shared_ptr<Video> videoForSession() const;
+    // Diagnostic only. Constructor-published0x510 backing is not an admitted
+    // display mode; the private source producer is still deliberately uncalled.
+    bool inspectSourceVideo2376A0(rr::game::OriginalApplicationVideoSource50LA::Observation& out)const noexcept {
+        return sourceVideoProduction_.inspect(*this,out);
+    }
+    bool inspectSourceStartup17C910(rr::game::OriginalApplicationStartup17C910Source50LA::Observation& out)const noexcept {
+        return sourceStartup17C910_.inspect(*this,out);
+    }
+    bool inspectNativeStartupCall23A0DC(rr::game::OriginalApplicationStartupCall23A0DCNative50LA::Observation& out)const noexcept {
+        return nativeStartupCall23A0DC_.inspect(*this,out);
+    }
+    // Native read-only lookup using25A900's data algorithm and the actual
+    // owned source table. No source call, mode selection, or readiness grant.
+    rr::game::OriginalApplicationVideoSource50LA::NativeModeQuery queryNativeSourceVideoMode25A900(
+        std::uint32_t width,std::uint32_t height,std::uint32_t colorBits)const noexcept {
+        return sourceVideoProduction_.queryNativeMode25A900(*this,width,height,colorBits);
+    }
+    //Explicit native CPU packet artifact from25CAD0's algorithm. Independent
+    //immutable backing, not a clear operation or source mode/IRQ continuation.
+    rr::game::OriginalApplicationVideoSource50LA::NativeClearPacket encodeNativeSourceVideoClearPacket25CAD0(
+        std::uint32_t red,std::uint32_t green,std::uint32_t blue,std::uint32_t alpha)const noexcept {
+        if(!rr::game::OriginalVideoPreFlipList50KG::applicationVideoEntryCurrent(*this))return {};
+        return sourceVideoProduction_.encodeNativeClearPacket25CAD0(*this,red,green,blue,alpha);
+    }
     bool retainsPlayerWindow50DU()const noexcept{return retainPlayerWindow50DU_;}
     // Read-only host access for the root loading presentation; not a display
     // factory, source readiness capability, or renderer/GPU lease.
@@ -1376,6 +1519,8 @@ inline bool Application::continueSourceInput04NativeActivation()const noexcept {
     // Conditional adapted 13FD40 return ONLY. No outer App startup/Race
     // admission, Player FF0 borrow, sampled-input bridge or gameplay claim.
 }
+
+#include "original_application_startup17c910_source50la.inl"
 
 struct Frontend : rr::platform::OriginalUiRiderPresentationHost50KG {
 private:

@@ -4,6 +4,8 @@
 #include "original_ui_course_hologram_draw50kg.h"
 #include "vehicle_window_gl50ds.h"
 #include <cmath>
+#include <bit>
+#include <cfenv>
 #include <algorithm>
 #include <limits>
 #include <new>
@@ -259,6 +261,29 @@ struct OriginalUiRiderSession50KG::Storage {
         else if(!cold.audio->playRiderConfirmVoice(state.voice.soundId,confirmPlayback)){
             ++state.audio.failed;fault(Status::audio,0x1EA780);return false;
         }else ++state.audio.submitted;
+        return true;
+    }
+    bool updateConfirmStop1EB5C8(float dt) noexcept {
+        auto& timer=state.confirmStopTimer7D24;
+        if(!std::isfinite(timer)){fault(Status::unsupportedState,0x1EB5C8);return false;}
+        if(timer<=0)return true;
+        // Native admission, not an original branch. The preceding ordinary
+        // widgets/panel effects remain committed if strict arithmetic fails.
+        if(std::fegetround()!=FE_TONEAREST){fault(Status::unsupportedState,0x1EB5E4);return false;}
+        volatile float next=timer-dt;
+        timer=next; //1EB5E8: retain overshoot, with no clamp or catch-up.
+        if(!panel.bypass4E4()||timer>0)return true;
+        // Original2924A0 stops page53B8's UIACCEPT group. This bounded native
+        // page can issue only its one retained confirm utterance. Release the
+        // exact transport/revision receipt; never stop generic selection audio,
+        // another page's voice, music or a mixer-wide group. Empty/muted has
+        // no owned utterance to stop. This is no new PCM advance or IOP claim.
+        if(!audioReady()||(cold.audioMode==OriginalUiMainAudioMode50KG::enabled&&
+            !cold.audio->releaseRiderConfirmVoice(confirmPlayback))){
+            ++state.audio.failed;fault(Status::audio,0x1EB60C);return false;
+        }
+        // A successful release consumes the receipt. Teardown will not repeat
+        // it, and the nonpositive source timer prevents another update stop.
         return true;
     }
     bool confirmReady(game::OriginalUiRiderDynamicDiagnostic50KG& d) const noexcept {
@@ -842,7 +867,16 @@ Status OriginalUiRiderSession50KG::input(const OriginalUiMainSessionInput50KG& i
     if(in.controller!=0||in.popupActive||in.sourceInputBlocked)return finish(Status::noChange);
     if(!s->processCurrent()||!s->lightCurrent()||s->cold.application->uiObject3D8)return finish(Status::unsupportedState,0x1EA460);
     if(s->state.deferred4EC)return finish(Status::noChange,0x1EB510);
-    if(s->panel.inputBlocked4E0())return finish(in.originalInput==4?Status::unavailableDestination:Status::noChange,0x1EA460);
+    if(s->panel.inputBlocked4E0()){
+        if(in.originalInput!=4)return finish(Status::noChange,0x1EAF40);
+        // Actual page0/controller0 second Confirm1EAF34..5C. Existing
+        // container/input268 gates above still apply during panel travel and
+        // readiness wait. Do not replay the accepted route, profile, voice
+        // selection/RNG or character _sel action from the first Confirm.
+        s->panel.confirmWhileClosing(); //1EAF54: bypass4E4=1 first.
+        s->state.confirmStopTimer7D24=std::bit_cast<float>(std::uint32_t{0x3EB33333}); //1EAF5C
+        return finish(Status::ok,0x1EAF5C);
+    }
     game::OriginalUiRiderSelectionProfile50KG profile;
     if(!s->liveProfile(profile))return finish(Status::profile,0x1EA460);
     if(in.originalInput<=1){
@@ -1223,6 +1257,7 @@ Status OriginalUiRiderSession50KG::update(const OriginalUiMainSessionUpdate50KG&
         if(s->state.deferred4EC)--s->state.deferred4EC;
         const auto t=s->transition();
         if(!s->panel.update38(in.elapsedSeconds,t.lifecycle,t.phase,*s->nav(),s->dynamic))s->fault(Status::aperture,0x1ECFE0);
+        if(!s->state.faulted)s->updateConfirmStop1EB5C8(in.elapsedSeconds);
         if(!s->state.faulted&&s->aperture.saveRiderUpdateDelta38(in.elapsedSeconds)!=ApertureStatus::ok)
             s->fault(Status::aperture,0x1EB620);
     }

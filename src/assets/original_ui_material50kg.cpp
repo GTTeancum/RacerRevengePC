@@ -592,6 +592,75 @@ bool OriginalUiMaterialTemplates50KG::loadSourceApplication(const OriginalUiArch
         archive.materialTemplates_=sourceStorage_;storage_=sourceStorage_;return true;
     }catch(...){d.error=Error::allocation;return false;}
 }
+bool OriginalUiMaterialTemplates50KG::loadSourceDefault17CAE8(const OriginalUiArchive50KG& archive,
+    OriginalStandardTextureResolver50LA& resolver,std::shared_ptr<OriginalStandardProgramTable50LA> programs,
+    OriginalUiMaterialDiagnostic50KG& d) noexcept {
+    d={};
+    try {
+        if(storage_||sourceAttempted_||sourceStorage_||sourceDefaultReturned17CAE8_)
+            return fail(d,Error::alreadyLoaded,"APPSTART",0x17cae8u);
+        sourceAttempted_=true;
+        if(archive.identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::appStart)||
+           !archive.loaded()||!programs||!programs->prepared())
+            return fail(d,Error::archive,"APPSTART",0x17cae8u);
+        if(archive.materialTemplates_)return fail(d,Error::alreadyLoaded,"APPSTART",0x17cae8u);
+        //The same persistent pair as the existing application owner. Native
+        //constructor-field binding is not replay of static3CAFAC/3CAFB8 and
+        //does not claim that ScreenMT's later file call has run.
+        sourceStorage_=std::make_shared<OriginalUiMaterialTemplateStorage50KG>();
+        sourceStorage_->sourcePrograms=std::move(programs);
+        for(auto* state:{&sourceStorage_->defaults,&sourceStorage_->screen})
+            for(std::size_t i=0;i<originalUiGsFieldCount50KG;++i)
+                state->gs.fields[i]={specs[i].initial,nullptr,0,0x24a8e0u};
+        //Existing genuine service-backed Config read, lookup, ordered getters
+        //and close. Partial fields remain in sourceStorage_ on every failure.
+        if(!loadSourceTemplate(false,sourceStorage_->defaults,resolver,*sourceStorage_->sourcePrograms,d))
+            return false;
+        sourceDefaultReturned17CAE8_=true;
+        //Intentionally no archive.materialTemplates_ or storage_ publication.
+        //The independent17CAFC ScreenMT call remains pending.
+        return true;
+    }catch(...){d.error=Error::allocation;return false;}
+}
+bool OriginalUiMaterialTemplates50KG::sourceDefault17CAE8Current(const OriginalUiArchive50KG& archive,
+    const std::shared_ptr<OriginalStandardProgramTable50LA>& programs)const noexcept {
+    return sourceAttempted_&&sourceDefaultReturned17CAE8_&&sourceStorage_&&!storage_&&
+        !sourceScreenAttempted17CAFC_&&!sourceScreenReturned17CAFC_&&
+        !archive.materialTemplates_&&programs&&programs->prepared()&&
+        sourceStorage_->sourcePrograms==programs&&
+        sourceStorage_->defaults.identity==catalogMember(OriginalUiArchiveId50KG::appStart,"AppStart\\DefaultMT.psm")&&
+        sourceStorage_->defaults.sourceProgramIndexKnown&&sourceStorage_->screen.identity==nullptr;
+}
+bool OriginalUiMaterialTemplates50KG::loadSourceScreen17CAFC(const OriginalUiArchive50KG& archive,
+    OriginalStandardTextureResolver50LA& resolver,const std::shared_ptr<OriginalStandardProgramTable50LA>& programs,
+    OriginalUiMaterialDiagnostic50KG& d) noexcept {
+    d={};
+    try {
+        if(sourceScreenAttempted17CAFC_||sourceScreenReturned17CAFC_)
+            return fail(d,Error::alreadyLoaded,"AppStart\\ScreenMT.psm",0x17cafcu);
+        if(!sourceDefault17CAE8Current(archive,programs))
+            return fail(d,Error::templateOwner,"AppStart\\ScreenMT.psm",0x17cafcu);
+        //This occurrence becomes terminal BEFORE opening ScreenMT. The pair,
+        //DefaultMT fields and program identity remain the same throughout.
+        sourceScreenAttempted17CAFC_=true;
+        if(!loadSourceTemplate(true,sourceStorage_->screen,resolver,*sourceStorage_->sourcePrograms,d))
+            return false;
+        sourceScreenReturned17CAFC_=true;
+        //Both original template calls have returned, but this bounded source
+        //continuation still does not publish archive/public native readiness.
+        return true;
+    }catch(...){d.error=Error::allocation;return false;}
+}
+bool OriginalUiMaterialTemplates50KG::sourceScreen17CAFCCurrent(const OriginalUiArchive50KG& archive,
+    const std::shared_ptr<OriginalStandardProgramTable50LA>& programs)const noexcept {
+    return sourceAttempted_&&sourceDefaultReturned17CAE8_&&sourceScreenAttempted17CAFC_&&
+        sourceScreenReturned17CAFC_&&sourceStorage_&&!storage_&&!archive.materialTemplates_&&
+        programs&&programs->prepared()&&sourceStorage_->sourcePrograms==programs&&
+        sourceStorage_->defaults.identity==catalogMember(OriginalUiArchiveId50KG::appStart,"AppStart\\DefaultMT.psm")&&
+        sourceStorage_->defaults.sourceProgramIndexKnown&&
+        sourceStorage_->screen.identity==catalogMember(OriginalUiArchiveId50KG::appStart,"AppStart\\ScreenMT.psm")&&
+        sourceStorage_->screen.sourceProgramIndexKnown;
+}
 const OriginalUiMaterialTemplateState50KG* OriginalUiMaterialTemplates50KG::get(
     OriginalUiTemplate50KG owner) const noexcept {
     if (!storage_) return nullptr;

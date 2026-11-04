@@ -800,6 +800,12 @@ OriginalStandardTextureResolver50LA::registeredAppStart17CAB8()const noexcept {
     return freshFileCapacity_&&freshFileCapacity_->registration==FreshFileCapacity::Registration::complete?
         freshFileCapacity_->appStart:std::shared_ptr<const OriginalUiArchive50KG>{};
 }
+bool OriginalStandardTextureResolver50LA::nativeBeforeAppStart17CAB8()const noexcept {
+    if(!freshFileCapacity_||freshFileCapacity_->registration!=FreshFileCapacity::Registration::untouched)
+        return false;
+    const auto& provider=freshFileCapacity_->provider;
+    return provider&&provider->mountCount()==0&&provider->revision()==0&&!provider->sealed();
+}
 bool OriginalStandardTextureResolver50LA::registerAppStart17CAB8(
     std::shared_ptr<const OriginalUiArchive50KG> archive,D& d)noexcept {
     d={};using Capacity=FreshFileCapacity;
@@ -971,7 +977,7 @@ bool OriginalStandardTextureResolver50LA::joinAppStartCanonicalMount(D& d)noexce
     return true;
 }
 bool OriginalStandardTextureResolver50LA::readAppStartNames17CAD4(
-    std::vector<std::uint8_t>& bytes,D& d)noexcept {
+    std::vector<std::uint8_t>& bytes,D& d,bool retainTerminator)noexcept {
     d={};using Capacity=FreshFileCapacity;
     if(!bytes.empty()||!freshFileCapacity_||!scratch_)return fail(d,E::phase,0x17CAD4);
     auto& state=*freshFileCapacity_;
@@ -1114,7 +1120,10 @@ bool OriginalStandardTextureResolver50LA::readAppStartNames17CAD4(
     // Exactly one full requested item. Source2985B0 ignores this count; native
     // consumer rejects short/failed reads rather than parsing invented bytes.
     if(!close())return false; //298714 before lowercase/tokenization/publication.
-    bytes.resize(member.length14);return true;
+    //Source2986F4's actual terminator stays inside the vector's live range for
+    //the bounded29871C continuation. The legacy semantic parser consumes only
+    //member bytes; neither choice replaces the read or performs a new one.
+    if(!retainTerminator)bytes.resize(member.length14);return true;
 }
 bool OriginalStandardTextureResolver50LA::beginAppStartTemplate24AA10(
     bool screen,OriginalAppStartTemplateCache50KG& cache,D& d)noexcept {
@@ -1290,6 +1299,42 @@ bool OriginalStandardTextureResolver50LA::closeAppStartTemplate1573B0(bool succe
     state.templateMember=-1;
     if(success)++state.templateStage;else state.templateFailed=true;
     d.sourceEffectsCommitted=true;return true;
+}
+bool OriginalStandardTextureResolver50LA::sourceDefaultTemplate17CAE8Closed(
+    const std::shared_ptr<const OriginalUiArchive50KG>& archive)const noexcept {
+    if(!freshFileCapacity_||!scratch_||!archive)return false;
+    const auto& s=*freshFileCapacity_;
+    if(s.registration!=FreshFileCapacity::Registration::complete||s.appStart!=archive||
+       s.templateStage!=1||s.templateMember!=-1||s.templateFailed||s.memberCount154<=1||
+       s.deviceCount18!=1||!s.devices14||!s.members150||s.cursor168!=1||s.current74!=0||s.active[0]!=0||
+       !s.devices14[0].handle10||s.devices14[0].cursor08!=73810||s.read174)return false;
+    const auto& member=s.members150[1];
+    const auto selected=scratch_->selected148;
+    return member.cursor10==0&&!(member.flags18&4)&&selected==member.auxiliarySlot04&&
+        selected>=0&&static_cast<std::size_t>(selected)<scratch_->slots.size()&&
+        scratch_->slots[selected].pointer00&&scratch_->slots[selected].status08==1&&
+        scratch_->slots[selected].offset10==73728;
+}
+bool OriginalStandardTextureResolver50LA::sourceScreenTemplate17CAFCClosed(
+    const std::shared_ptr<const OriginalUiArchive50KG>& archive)const noexcept {
+    if(!freshFileCapacity_||!scratch_||!archive||storage_)return false;
+    const auto& s=*freshFileCapacity_;
+    if(s.registration!=FreshFileCapacity::Registration::complete||s.appStart!=archive||
+       !s.namesReadAttempted||s.templateStage!=2||s.templateMember!=-1||s.templateFailed||
+       s.memberCount154<=2||s.deviceCount18!=1||!s.devices14||!s.members150||
+       s.cursor168!=2||s.current74!=0||s.active[0]!=0||s.active[1]!=-1||s.active[2]!=-1||s.active[3]!=-1||
+       s.window7C!=0||s.window80!=30||!s.lengthTable84||s.read174||
+       !s.devices14[0].handle10||s.devices14[0].cursor08!=99052)return false;
+    //Expected values are observations of actual begin/read/close effects,
+    //never assignments that complete a member or fabricate a source return.
+    const auto& prior=s.members150[1];const auto& member=s.members150[2];
+    const auto selected=scratch_->selected148;
+    return prior.cursor10==0&&!(prior.flags18&4)&&
+        member.originalMember==archive->member(2).identity&&member.logicalStart0C==98304&&member.length14==748&&
+        member.cursor10==0&&!(member.flags18&4)&&selected==member.auxiliarySlot04&&
+        selected>=0&&static_cast<std::size_t>(selected)<scratch_->slots.size()&&
+        scratch_->slots[selected].pointer00&&scratch_->slots[selected].status08==2&&
+        scratch_->slots[selected].offset10==98304;
 }
 OriginalStandardTextureResolver50LA::OriginalStandardTextureResolver50LA() noexcept=default;
 OriginalStandardTextureResolver50LA::~OriginalStandardTextureResolver50LA() {

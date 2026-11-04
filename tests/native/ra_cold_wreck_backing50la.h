@@ -642,7 +642,7 @@ private:
         second.e0LoadAttempted=true;
         rr::assets::OriginalStandardTextureDiagnostic50LA diagnostic;
         const auto result=storage_[slot]->loadFreshOccurrenceE0NativeTransport166074(domain_->resolver3E1A70(),
-            application_->collisionDirectory36B0F0_,application_->collisionName3E0730_,diagnostic,1u);
+            application_->observeCollisionDirectory36B0F0(),application_->collisionName3E0730_,diagnostic,1u);
         pc=state.pc=result.sourcePC?result.sourcePC:state.pc;
         if(result.status!=S::e0PreparationRequired||result.sourcePC!=0x16607cu)return false;
         second.e0LoadComplete=true;return true;
@@ -682,7 +682,7 @@ private:
         state.e0LoadAttempted=true;
         rr::assets::OriginalStandardTextureDiagnostic50LA diagnostic;
         const auto result=storage_[slot]->loadFreshOccurrenceE0NativeTransport166074(domain_->resolver3E1A70(),
-            application_->collisionDirectory36B0F0_,application_->collisionName3E0730_,diagnostic);
+            application_->observeCollisionDirectory36B0F0(),application_->collisionName3E0730_,diagnostic);
         pc=state.pc=result.sourcePC?result.sourcePC:state.pc;
         if(result.status!=S::e0PreparationRequired||result.sourcePC!=0x16607cu)return false;
         state.e0LoadComplete=true;return true;
@@ -803,7 +803,7 @@ private:
         if(!second.modelName210)return false;
         rr::assets::OriginalStandardTextureDiagnostic50LA diagnostic;
         const auto result=storage_[slot]->constructLoadFreshE41661D8(*second.modelName210,application_->types383408(),
-            domain_->resolver3E1A70(),application_->collisionDirectory36B0F0_,application_->collisionName3E0730_,diagnostic,1u);
+            domain_->resolver3E1A70(),application_->observeCollisionDirectory36B0F0(),application_->collisionName3E0730_,diagnostic,1u);
         pc=state.pc=result.sourcePC?result.sourcePC:state.pc;
         if(result.status!=S::e4NativeLoadComplete||result.sourcePC!=0x16629cu)return false;
         second.e4Complete=true;return true;
@@ -844,7 +844,7 @@ private:
         if(!state.modelName210)return false;
         rr::assets::OriginalStandardTextureDiagnostic50LA diagnostic;
         const auto result=storage_[slot]->constructLoadFreshE41661D8(*state.modelName210,application_->types383408(),
-            domain_->resolver3E1A70(),application_->collisionDirectory36B0F0_,application_->collisionName3E0730_,diagnostic);
+            domain_->resolver3E1A70(),application_->observeCollisionDirectory36B0F0(),application_->collisionName3E0730_,diagnostic);
         pc=state.pc=result.sourcePC?result.sourcePC:state.pc;
         if(result.status!=S::e4NativeLoadComplete||result.sourcePC!=0x16629cu)return false;
         state.e4Complete=true;return true;

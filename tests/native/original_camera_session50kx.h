@@ -72,6 +72,7 @@ namespace original_time_stats_adapter50LA { class Owner; }
 namespace original_speed_boost_adapter50LA { class Owner; }
 namespace original_position_stats_adapter50LA { class Owner; }
 namespace original_pause_observation50LA { class Owner; }
+namespace interactive_loop50DU { struct Context; }
 namespace original_main_entry50KG { struct Application; class RaceDisplayLifetime50LA; class NativeF8BarPrefix50LA; }
 namespace original_camera_session50KX {
 // Explicit source course identity, never a TA default for an unknown route.
@@ -248,6 +249,7 @@ struct Result {
 };
 
 class Session final {
+    friend struct ::interactive_loop50DU::Context;
     friend class rr::game::OriginalSessionF8Intro50LA;
     friend class ::original_race_hud_scope50LA::Registration;
     friend struct ::original_main_entry50KG::Application;
@@ -319,6 +321,53 @@ class Session final {
     // Keep the actual F8 owner identity private; existing friends need only this check.
     bool onOwnerThread()const noexcept {
         return f8Intro_.ownerThread_==std::this_thread::get_id();
+    }
+    // Concrete native human Pause adapter only. The caller supplies its actual
+    // Application clock/profile observations and proves their shared owner in
+    // the loop. These three words already feed the live original HUD owners.
+    // This is not an original Pause Entity/input/audio callback or a save.
+    bool observeNativeHumanHud(const ControlPresets49D& expected,
+        const OriginalApplicationAnimationClockView50KG& applicationClock,
+        std::uint8_t playerBits1125C,std::array<std::uint32_t,4>& out)const noexcept {
+        if(!onOwnerThread()||!coldBound_||closed_||abandoned_||!readsBound_||!hasView()||
+           frameStage_!=FrameStage::published||pendingDisplayWork()||
+           &actual_.preferences!=&expected||!actual_.applicationAnimation.sameOwner(applicationClock)||
+           actual_.humanCount34!=1||((playerBits1125C>>5)&3u)!=1||
+           !controller_.bound||controller_.binding.bootstrap!=CameraBootstrap::original_single_player||
+           controller_.binding.racerClass!=CameraRacerClass::player||
+           controller_.binding.managerIndex!=0||(raceFlags1B0_&3u)!=1||
+           actual_.launchKind11258<1||actual_.launchKind11258>3)return false;
+        try {if(!identitiesCurrent())return false;}catch(...){return false;}
+        const auto& slot=actual_.preferences.slots[0];
+        if(slot.field10F94>7||slot.field10F9C>7)return false;
+        out={{slot.field10F94,slot.field10F9C,slot.field10FA4,actual_.launchKind11258}};
+        return true;
+    }
+    bool adjustNativeHumanHud(ControlPresets49D& expected,
+        const OriginalApplicationAnimationClockView50KG& applicationClock,
+        std::uint8_t playerBits1125C,const std::array<std::uint32_t,4>& observed,
+        std::uint32_t row,bool right)noexcept {
+        std::array<std::uint32_t,4> current{};std::uint32_t paused=0;
+        if(row>=3||!observeNativeHumanHud(expected,applicationClock,playerBits1125C,current)||
+           current!=observed||!applicationClock.readPause11C(paused)||!paused)return false;
+        auto& slot=actual_.preferences.slots[0];
+        if(row==2){
+            slot.field10FA4=slot.field10FA4?0u:1u; //1BDE98 /1BE490.
+        }else if(row==1&&actual_.launchKind11258==3){
+            // Count1 was read from actual profile1125C above. Retail subtype3
+            // toggles NONE/MAP in either direction, including initial ALL->NONE.
+            slot.field10F9C=slot.field10F9C?0u:6u; //1BDD4C/54,1BE344/34C.
+        }else {
+            auto& value=row==0?slot.field10F94:slot.field10F9C;
+            // Exact bounded0..7 increment/decrement and source wrap order.
+            // Native admission excludes malformed source values before writes.
+            value+=right?1u:0xffffffffu;
+            if(right){if(value>=8)value=0;}
+            else if(std::bit_cast<std::int32_t>(value)<0)value=7;
+        }
+        // Native Pause has no original1A4B90 dispatch. Keep its existing quiet
+        // UI policy: no skipped source-audio success, flush or lifecycle receipt.
+        return true;
     }
     // Stable per-racer Entity extensions live outside the multiplexed bank.
     // The bank still owns every existing handling/body/rig field. These cold
@@ -638,6 +687,37 @@ class Session final {
     OriginalRaceStartCountdown countdown_;
     OriginalVideoBlockingFade blockingFade_;
     AsyncRetainedFade asyncFade_,endingFade_,taSkipAsyncFade_;
+    OriginalVideoAsyncRequest50LA fadeInRequest_,taSkipFadeInRequest_,endingFadeRequest_;
+    enum class FadeInRequestConsumer : std::uint8_t {none,normal,taSkip};
+    FadeInRequestConsumer fadeInRequestConsumer_=FadeInRequestConsumer::none;
+    bool retainedFadeInRequestPending50LA()const noexcept {
+        return fadeInRequestConsumer_==FadeInRequestConsumer::normal?fadeInRequest_.pending():
+            fadeInRequestConsumer_==FadeInRequestConsumer::taSkip&&taSkipFadeInRequest_.pending();
+    }
+    bool blockingRequestPending50LA()const noexcept{return exit_.requestPending()||taSkipFadeRequest_.pending();}
+    bool videoRequestPending50LA()const noexcept {
+        return blockingRequestPending50LA()||fadeInRequest_.pending()||taSkipFadeInRequest_.pending()||endingFadeRequest_.pending();
+    }
+    OriginalCameraStartResult serviceAsyncFadeInRequest260610()noexcept {
+        using S=OriginalCameraStartStatus;
+        if(!displayInputs_||displayInputs_->fadeManagerA8!=8||blockingRequestPending50LA()||endingFadeRequest_.pending())return {S::owner,0x2ae93c};
+        auto& app=*displayInputs_;
+        if(fadeInRequestConsumer_==FadeInRequestConsumer::none){
+            const bool skip=taSkipFadeFinished_&&!exit_.complete()&&!directStart_.complete();
+            auto& selected=skip?taSkipFadeInRequest_:fadeInRequest_;
+            // A later source invocation cannot borrow a completed request's return.
+            if(selected.attempted())return {S::owner,0x2ae93c};
+            fadeInRequestConsumer_=skip?FadeInRequestConsumer::taSkip:FadeInRequestConsumer::normal;
+        }
+        auto& request=fadeInRequestConsumer_==FadeInRequestConsumer::taSkip?taSkipFadeInRequest_:fadeInRequest_;
+        const auto r=request.invoke(OriginalVideoFadeDirection::in261630,app.video,actual_.applicationClock,
+            app.currentApplicationMode22C(),app.fadeDuration98);
+        if(r.status!=S::complete)return r;
+        app.fadeManagerA8=0; //2AE958 only after the actual request returns.
+        if(fadeInRequestConsumer_==FadeInRequestConsumer::taSkip)taSkipFadeInRequested_=true;
+        else fadeInRequested_=true;
+        fadeInRequestConsumer_=FadeInRequestConsumer::none;return r;
+    }
     //2255B0 camera tail belongs to this one genuine Player camera, outside
     // all racer snapshots. It is separate from the ordinary camera-frame cursor.
     struct HumanResetCamera {
@@ -1454,18 +1534,18 @@ public:
     }
     std::uint64_t publicationCount()const noexcept{return publicationCount_;}
     bool blockingVideoPending()const noexcept {
-        return !abandoned_&&displayInputs_&&(displayInputs_->video.flags404Low6&3u)&&
+        return !abandoned_&&!videoRequestPending50LA()&&displayInputs_&&(displayInputs_->video.flags404Low6&3u)&&
             !(displayInputs_->video.flags404Low6&4u);
     }
     bool asyncVideoPending()const noexcept {
         //Numeric25B5D0 may clear direction bits before the final staged GPU
         //sample/restore retires. Retained owner state, not flags alone, wins.
-        return !abandoned_&&((taSkipFadeInRequested_&&!taSkipAsyncFade_.complete())||
+        return !abandoned_&&!videoRequestPending50LA()&&((taSkipFadeInRequested_&&!taSkipAsyncFade_.complete())||
             (fadeInRequested_&&!asyncFade_.complete())||
             (endingFadeRequested_&&!endingFade_.complete()));
     }
     bool pendingDisplayWork()const noexcept {
-        return displayInputs_&&((displayInputs_->video.flags404Low6&3u)||
+        return displayInputs_&&(videoRequestPending50LA()||(displayInputs_->video.flags404Low6&3u)||
             (raceFlags1B0_&8u)||displayInputs_->fadeManagerA8==8||
             (asyncFade_.started()&&!asyncFade_.complete())||
             (taSkipAsyncFade_.started()&&!taSkipAsyncFade_.complete())||
@@ -1553,10 +1633,11 @@ public:
                 display_.drainPolicy=app.drainPolicy;
                 ++coldPhase_;break;
             case 1:
-                if(!coldViewport_.complete()){
-                    result_.start=coldViewport_.advance(true,display_,sceneBorrow(),app.renderer,app.diagnostic);
-                    if(result_.start.status!=OriginalCameraStartStatus::complete)return set(Status::renderer,result_.start.sourcePC);
-                }
+                //2361C0 selects26F940 before1A9240 reaches1A9590(true).
+                // Select this actual native scene BEFORE the separate cold
+                //1158A0/drain/zoom/matrix call.245918 must see its real target,
+                // not an empty current-scene slot. This is not source114A00
+                // completion or publication of the counted Camera34.
                 if(!coldCameraSelected26F940_){
                     result_.start=selectOriginalRaceScene26F940(display_,viewport_,app.rendererWidth4,app.rendererHeight8);
                     //26F948 precedes the dimension branch. Only the completed
@@ -1564,6 +1645,12 @@ public:
                     observeSelectedGameplayCamera26F940();
                     if(result_.start.status!=OriginalCameraStartStatus::complete)return set(Status::sourcePath,result_.start.sourcePC);
                     coldCameraSelected26F940_=true;
+                }
+                if(!coldViewport_.complete()){
+                    // Pending/failing work retains this same selection and
+                    // cursor. Resume its reached phases, never select again.
+                    result_.start=coldViewport_.advance(true,display_,sceneBorrow(),app.renderer,app.diagnostic);
+                    if(result_.start.status!=OriginalCameraStartStatus::complete)return set(Status::renderer,result_.start.sourcePC);
                 }
                 // Actual renderer work and selection precede this bounded
                 // native adapter acceptance; numeric preparation alone cannot.
@@ -2150,6 +2237,7 @@ public:
     Result advanceBlockingVideo(OriginalVideoBlockingBackend* backend){
         if(abandoned_)return set(Status::abandoned);
         if(!actual_.followQueries.get()||!coldBound_||!displayInputs_)return set(Status::owner);
+        if(videoRequestPending50LA())return set(Status::sourcePath,0x25aa4c);
         auto& v=displayInputs_->video;
         if(!(v.flags404Low6&3u))return set(Status::complete);
         if(v.flags404Low6&4u)return set(Status::sourcePath,0x25aa38);
@@ -2167,10 +2255,16 @@ public:
         if(f8Intro_.ownerThread_!=std::this_thread::get_id())return {Status::owner,0x1a7bd0};
         if(abandoned_)return set(Status::abandoned);
         if(!actual_.followQueries.get()||!coldBound_||!displayInputs_||(!exit_.complete()&&!directStart_.complete()&&!taSkipFadeFinished_)||!hasView())return set(Status::owner);
+        if(blockingRequestPending50LA())return set(Status::sourcePath,0x2aed60);
         if(nativeTaIssuance_&&nativeTaIssuance_->course==OriginalCameraStartCourse::ra)
             return advanceCanonicalRaceFadeInPrefix();
         auto& app=*displayInputs_;auto& video=app.video;
-        if((video.flags404Low6&3u)&&!(video.flags404Low6&4u))return set(Status::videoPending);
+        if(endingFadeRequest_.pending()||(retainedFadeInRequestPending50LA()&&app.fadeManagerA8!=8))
+            return set(Status::owner,0x2ae93c);
+        // A partial async request has direction bits but may not yet have
+        // bit2. Only its same retained A8=8 invocation bypasses this gate.
+        if((video.flags404Low6&3u)&&!(video.flags404Low6&4u)&&
+           !(app.fadeManagerA8==8&&retainedFadeInRequestPending50LA()))return set(Status::videoPending);
         if(raceFlags1B0_&8u){
             //Original2AEE90 returns0 if manager busy or video not covered.
             //Only an actual accepted scheduling write clears the race flag.
@@ -2182,12 +2276,8 @@ public:
         }
         if(app.fadeManagerA8==8){
             //2AE93C..2AE958: actual duration98,+38=260610,a2=1;clear A8.
-            result_.start=requestOriginalVideoFade260610(video,actual_.applicationClock,
-                app.currentApplicationMode22C(),app.fadeDuration98,true);
+            result_.start=serviceAsyncFadeInRequest260610();
             if(result_.start.status!=OriginalCameraStartStatus::complete)return set(Status::videoPending,result_.start.sourcePC);
-            app.fadeManagerA8=0;
-            if(taSkipFadeFinished_&&!exit_.complete()&&!directStart_.complete())taSkipFadeInRequested_=true;
-            else fadeInRequested_=true;
         }else if(app.fadeManagerA8)return set(Status::sourcePath,0x2ae7fc);
         return set(Status::complete,0x2ae958);
     }
@@ -2239,9 +2329,11 @@ public:
     Result advanceHumanEndFadeManager() noexcept {
         if(!actual_.humanCount34||!actual_.followQueries.get()||!coldBound_||!displayInputs_)return set(Status::owner);
         auto& app=*displayInputs_;
+        if(blockingRequestPending50LA()||retainedFadeInRequestPending50LA()||(endingFadeRequest_.pending()&&app.fadeManagerA8!=7))
+            return set(Status::owner,0x2ae938);
         if(app.fadeManagerA8==7){
-            result_.start=requestOriginalVideoFade260320(app.video,actual_.applicationClock,
-                app.currentApplicationMode22C(),app.fadeDuration98,true,false);
+            result_.start=endingFadeRequest_.invoke(OriginalVideoFadeDirection::out260850,app.video,actual_.applicationClock,
+                app.currentApplicationMode22C(),app.fadeDuration98);
             if(result_.start.status!=OriginalCameraStartStatus::complete)return set(Status::sourcePath,result_.start.sourcePC);
             app.fadeManagerA8=4;endingFadeRequested_=true;
         }else if(app.fadeManagerA8==4){
@@ -2256,6 +2348,7 @@ public:
     Result advanceAsyncVideo(OriginalVideoBlockingBackend* backend){
         if(abandoned_)return set(Status::abandoned);
         if(!actual_.followQueries.get()||!coldBound_||!displayInputs_)return set(Status::owner);
+        if(videoRequestPending50LA())return set(Status::sourcePath,0x25e610);
         if(endingVideoPending())result_.start=endingFade_.advance(displayInputs_->video,actual_.applicationClock,
             publicationCount_,backend,OriginalVideoFadeDirection::out260850);
         else if(taSkipFadeInRequested_&&!taSkipAsyncFade_.complete())result_.start=taSkipAsyncFade_.advance(

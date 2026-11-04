@@ -31,6 +31,46 @@ class OriginalUiMaterialApplication50LA final {
         appStart_=std::move(appStart);sourceResolver_=std::move(resolver);
         return templates_.loadSourceApplication(*appStart_,*sourceResolver_,std::move(programs),diagnostic);
     }
+    //One genuine source template call on this SAME Application owner. Input
+    //pins precede work, so failed/partial state cannot fall back to legacy.
+    bool prepareSourceDefault17CAE8(std::shared_ptr<const OriginalUiArchive50KG> appStart,
+        std::shared_ptr<OriginalStandardTextureResolver50LA> resolver,
+        std::shared_ptr<OriginalStandardProgramTable50LA> programs,
+        OriginalUiMaterialDiagnostic50KG& diagnostic)noexcept {
+        diagnostic={};
+        if(appStart_||sourceResolver_){diagnostic.error=OriginalUiMaterialError50KG::alreadyLoaded;return false;}
+        if(!appStart||!appStart->loaded()||!resolver||!programs||
+           appStart->identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::appStart)){
+            diagnostic.error=OriginalUiMaterialError50KG::archive;return false;
+        }
+        appStart_=std::move(appStart);sourceResolver_=std::move(resolver);
+        return templates_.loadSourceDefault17CAE8(*appStart_,*sourceResolver_,std::move(programs),diagnostic);
+    }
+    bool sourceDefault17CAE8Current(const std::shared_ptr<const OriginalUiArchive50KG>& archive,
+        const std::shared_ptr<OriginalStandardTextureResolver50LA>& resolver,
+        const std::shared_ptr<OriginalStandardProgramTable50LA>& programs)const noexcept {
+        return appStart_&&appStart_==archive&&sourceResolver_==resolver&&
+            templates_.sourceDefault17CAE8Current(*appStart_,programs);
+    }
+    //No new input pins, template pair or program table: this is the next
+    //source call on the owner retained before DefaultMT, including failure.
+    bool prepareSourceScreen17CAFC(const std::shared_ptr<const OriginalUiArchive50KG>& archive,
+        const std::shared_ptr<OriginalStandardTextureResolver50LA>& resolver,
+        const std::shared_ptr<OriginalStandardProgramTable50LA>& programs,
+        OriginalUiMaterialDiagnostic50KG& diagnostic)noexcept {
+        diagnostic={};
+        if(!sourceDefault17CAE8Current(archive,resolver,programs)){
+            diagnostic.error=OriginalUiMaterialError50KG::templateOwner;
+            diagnostic.sourcePC=0x17cafc;return false;
+        }
+        return templates_.loadSourceScreen17CAFC(*appStart_,*sourceResolver_,programs,diagnostic);
+    }
+    bool sourceScreen17CAFCCurrent(const std::shared_ptr<const OriginalUiArchive50KG>& archive,
+        const std::shared_ptr<OriginalStandardTextureResolver50LA>& resolver,
+        const std::shared_ptr<OriginalStandardProgramTable50LA>& programs)const noexcept {
+        return appStart_&&appStart_==archive&&sourceResolver_==resolver&&
+            templates_.sourceScreen17CAFCCurrent(*appStart_,programs);
+    }
 public:
     OriginalUiMaterialApplication50LA() noexcept=default;
     OriginalUiMaterialApplication50LA(const OriginalUiMaterialApplication50LA&)=delete;

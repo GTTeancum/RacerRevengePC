@@ -326,7 +326,7 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
   platform::OriginalUiControllerNavigation50LA originalUiControllerNavigation,originalUiSecondControllerNavigation;
   reportUiState("bound");
   std::cerr<<"Original UI controls: arrows select/change; Enter/Space confirm; Escape/menu back; "
-      "R defaults/rotate; Tab controller configuration. Pad: D-pad select/change, A confirm, Y back. Accepted Course Confirm retains that input device for driving unless RR_HUMAN_INPUT_DEVICE overrides it; keyboard wins simultaneous confirms. In race: Start opens Pause/resumes from its main page, D-pad selects, A confirms, Y cancels/backs out. Window Close, quit, or stdin EOF exits.\n";
+      "R defaults/rotate; Tab controller configuration. Pad: D-pad or left stick select/change, A confirm, Y back. Center the stick between steps; only Course keeps its original horizontal held repeat. Accepted Course Confirm retains that input device for driving unless RR_HUMAN_INPUT_DEVICE overrides it; keyboard wins simultaneous confirms. In race: Start opens Pause/resumes from its main page, D-pad selects, A confirms, Y cancels/backs out. Window Close, quit, or stdin EOF exits.\n";
   // Bounded, opt-in observations only. Keep focus, timing and draw admission
   // unchanged; a bound frontend is not evidence that this gate ever opened.
   std::uint32_t tracePolls=0,traceGateReports=0,previousGateMask=0;
@@ -498,6 +498,9 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
    const auto elapsedNanoseconds=originalMain.acceptedElapsed(monotonicNow50DU());
    platform::OriginalUiMainSessionUpdate50KG update;
    update.elapsedSeconds=originalMain.preparedSourceUpdateSeconds();
+   if(physicalInput){
+    update.courseHorizontalHeld=originalUiControllerNavigation.courseHorizontalHeld();
+   } // Actual same-poll levels only; unattended route actions do not hold keys.
    const auto acceptedSource=originalMain.update(update,elapsedNanoseconds);
    // Garage Root already committed its exact source timing; PCM was still advanced once.
    if(!acceptedSource.sourceTimingCommitted)originalMain.commitSourceUpdateTiming();

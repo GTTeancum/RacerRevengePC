@@ -253,9 +253,25 @@ struct OriginalGcParticleManager50KG::SourcePool {
     std::size_t allocationAttempts=0,published=0;
     bool pointersPublished=false,loopAttempted=false,loopReturned=false;
     // Every nonNULL published/unpublished record has ONLY position00 and
-    // velocity10 (two VF0 vectors) source-known. Other host-initialized lanes
-    // are never read through this pending mode or interpreted as source data.
+    // velocity10 source-known, initially two VF0 vectors. The private Fog
+    //1606FC/16088C prefixes may replace position00/velocity10. The two bounded
+    //Fog occurrences below separately know their completed scalar/owner stores; no other
+    //host-initialized lanes are interpreted as source data.
     static constexpr std::size_t knownRecordPrefixBytes=0x20;
+    struct FogFields1608AC {
+        const OriginalGcParticle50KG* record=nullptr;
+        const void* emitter=nullptr; //Native occurrence binding, not source48.
+        const void* owner48=nullptr; //Actual source lane, known only at count>=3.
+        std::uint8_t storedCount=0; //38,3C,48,30,2C,28 in exact source order.
+    } fogFields;
+    FogFields1608AC successorFogFields; //Only inactive slot1; independent source48 knownness and six stores.
+    struct FogTail1608E0 {
+        std::uint8_t completedOps=0;
+        //Only completed operations populate these native receipts. The same
+        //fogFields binding supplies record/emitter/authoritative source48.
+        std::array<std::uint32_t,7> pcs{},values{};
+    } fogTail;
+    FogTail1608E0 successorFogTail; //Seven actual slot1 operations, independent of slot0.
     ~SourcePool()noexcept {
         for(std::size_t i=0;i<published;++i)delete pointers[i];
         //unique_ptr retains the attempted record when138 wasNULL at160F48.
@@ -294,6 +310,421 @@ bool OriginalGcParticleManager50KG::constructSourceRecords160F1C(std::uint32_t& 
         pool.pointers[pool.published++]=record.release(); //Publish evenNULL, then continue.
     }
     pool.loopReturned=true;pc=0x160f60;return true;
+}
+// The source pointer-array allocation is fixed5000 in this admitted caller.
+// Host-width indexing adapts EE index*4; it does not encode/truncate a pointer.
+bool OriginalGcParticleManager50KG::readSourcePositionSlot1606E4(
+    const void* publication138,std::int32_t index128,
+    const OriginalGcParticle50KG*& record)const noexcept {
+    if(poolMode_!=PoolMode::sourcePending||storage_||!sourcePool_)return false;
+    const auto& pool=*sourcePool_;
+    if(!pool.pointersPublished||!pool.loopAttempted||!pool.loopReturned||
+       !pool.pointers||publication138!=pool.pointers.get()||pool.unpublishedRecord||
+       pool.allocationAttempts!=originalGcParticleCapacity50KG||
+       pool.published!=originalGcParticleCapacity50KG||index128<0)return false;
+    const auto index=static_cast<std::size_t>(index128);
+    if(index>=originalGcParticleCapacity50KG||index>=pool.published)return false;
+    record=pool.pointers[index]; //1606E4 pointer read, including NULL.
+    return true; //No record dereference before the reached1606FC store.
+}
+bool OriginalGcParticleManager50KG::sourcePositionSlotCurrentNative(
+    const void* publication138,std::int32_t index128,
+    const OriginalGcParticle50KG* expected,
+    const std::array<std::uint32_t,4>* committedPosition)const noexcept {
+    const OriginalGcParticle50KG* actual=nullptr;
+    if(!readSourcePositionSlot1606E4(publication138,index128,actual)||actual!=expected)return false;
+    if(!committedPosition)return true; //NULL slot remains a genuine read result.
+    if(!actual)return false;
+    static_assert(offsetof(OriginalGcParticle50KG,position)==0&&
+        offsetof(OriginalGcParticle50KG,positionW)==0x0c,"source position00 layout");
+    std::array<std::uint32_t,4> bits{};
+    std::memcpy(bits.data(),actual->position.data(),12);
+    std::memcpy(&bits[3],&actual->positionW,4);
+    return bits==*committedPosition;
+}
+bool OriginalGcParticleManager50KG::storeSourcePosition1606FC(
+    const void* publication138,std::int32_t index128,
+    const OriginalGcParticle50KG* expected,const std::array<std::uint32_t,4>& after,
+    std::array<std::uint32_t,4>& before)noexcept {
+    // This native validation is not a second source slot load or source test.
+    // Exact identity comes from the private array already owned by this pool.
+    if(!expected||after[3]!=0x3f800000u||
+       !sourcePositionSlotCurrentNative(publication138,index128,expected,nullptr))return false;
+    auto* record=sourcePool_->pointers[static_cast<std::size_t>(index128)];
+    std::array<std::uint32_t,4> previous{};
+    //Only the genuine constructor-known00..0F prefix is observed. Neither
+    //unknown host defaults nor ownerId's legacy native representation is used.
+    std::memcpy(previous.data(),record->position.data(),12);
+    std::memcpy(&previous[3],&record->positionW,4);
+    if(previous[3]!=0x3f800000u)return false;
+    //One logical SQ: all guards precede these nonthrowing byte copies. No
+    //later operation can fail between the source write and its receipt.
+    std::memcpy(record->position.data(),after.data(),12);
+    std::memcpy(&record->positionW,&after[3],4);
+    before=previous;
+    return true;
+}
+bool OriginalGcParticleManager50KG::sourceVelocitySlotCurrentNative(
+    const void* publication138,std::int32_t index128,const OriginalGcParticle50KG* expected,
+    const std::array<std::uint32_t,4>* committedVelocity)const noexcept {
+    if(index128!=0||!expected||
+       !sourcePositionSlotCurrentNative(publication138,index128,expected,nullptr))return false;
+    if(!committedVelocity)return true; //No source velocity read before its reached store.
+    if((*committedVelocity)[0]||(*committedVelocity)[1]||(*committedVelocity)[2]||
+       (*committedVelocity)[3]!=0x3f800000u)return false;
+    static_assert(offsetof(OriginalGcParticle50KG,velocity)==0x10&&
+        offsetof(OriginalGcParticle50KG,velocityW)==0x1c,"source velocity10 layout");
+    std::array<std::uint32_t,4> bits{};
+    std::memcpy(bits.data(),expected->velocity.data(),12);
+    std::memcpy(&bits[3],&expected->velocityW,4);
+    //Later common-tail scalar/owner writes do not invalidate this earlier SQ.
+    return bits==*committedVelocity;
+}
+bool OriginalGcParticleManager50KG::storeSourceVelocity16088C(
+    const void* publication138,std::int32_t index128,const OriginalGcParticle50KG* expected,
+    const std::array<std::uint32_t,4>& after,std::array<std::uint32_t,4>& before)noexcept {
+    if(after[0]||after[1]||after[2]||after[3]!=0x3f800000u||
+       !sourceVelocitySlotCurrentNative(publication138,index128,expected,nullptr))return false;
+    const auto& fields=sourcePool_->fogFields;
+    if(fields.record||fields.emitter||fields.owner48||fields.storedCount)return false;
+    auto* record=sourcePool_->pointers[0];
+    std::array<std::uint32_t,4> previous{};
+    //Only constructor-known10..1F is read. No unknown scalar/owner lane or
+    //whole-record snapshot is observed; source owner48 remains untouched.
+    std::memcpy(previous.data(),record->velocity.data(),12);
+    std::memcpy(&previous[3],&record->velocityW,4);
+    if(previous[3]!=0x3f800000u)return false;
+    //All guards precede one logical full SQ. Nothing can fail between these
+    //nonthrowing copies and the returned pre-store receipt.
+    std::memcpy(record->velocity.data(),after.data(),12);
+    std::memcpy(&record->velocityW,&after[3],4);
+    before=previous;
+    return true;
+}
+bool OriginalGcParticleManager50KG::sourceFogFieldsCurrentNative(
+    const void* publication138,std::int32_t index128,const OriginalGcParticle50KG* expected,
+    const void* emitter,std::uint8_t storedCount,const std::array<std::uint32_t,5>& values)const noexcept {
+    if(index128!=0||!expected||!emitter||storedCount>6||
+       !sourcePositionSlotCurrentNative(publication138,index128,expected,nullptr))return false;
+    const auto& fields=sourcePool_->fogFields;
+    if(fields.storedCount!=storedCount)return false;
+    if(!storedCount)return !fields.record&&!fields.emitter&&!fields.owner48;
+    if(fields.record!=expected||fields.emitter!=emitter||
+       (storedCount>=3?fields.owner48!=emitter:fields.owner48!=nullptr))return false;
+    //Only completed source writes make these lanes readable. No previous
+    //unknown value or whole-record copy is used for native validation.
+    std::uint32_t bits=0;
+    if(storedCount>=1){std::memcpy(&bits,&expected->size,4);if(bits!=values[0])return false;}
+    if(storedCount>=2){std::memcpy(&bits,&expected->initialSize,4);if(bits!=values[1])return false;}
+    if(storedCount>=4){std::memcpy(&bits,&expected->lifeMilliseconds,4);if(bits!=values[2])return false;}
+    if(storedCount>=5){std::memcpy(&bits,&expected->ageMilliseconds,4);if(bits!=values[3])return false;}
+    if(storedCount>=6){std::memcpy(&bits,&expected->frame,4);if(bits!=values[4])return false;}
+    return true;
+}
+bool OriginalGcParticleManager50KG::storeSourceFogField1608AC(
+    const void* publication138,std::int32_t index128,const OriginalGcParticle50KG* expected,
+    const void* emitter,std::uint8_t priorCount,std::uint32_t sourcePC,std::uint32_t bits)noexcept {
+    constexpr std::uint32_t stores[]={0x1608ac,0x1608b8,0x1608bc,0x1608c4,0x1608cc,0x1608d4};
+    if(priorCount>=6||sourcePC!=stores[priorCount]||index128!=0||!expected||!emitter||
+       (priorCount==2&&bits)||!sourcePositionSlotCurrentNative(publication138,index128,expected,nullptr))return false;
+    auto& fields=sourcePool_->fogFields;
+    if(fields.storedCount!=priorCount)return false;
+    if(!priorCount){if(fields.record||fields.emitter||fields.owner48)return false;}
+    else if(fields.record!=expected||fields.emitter!=emitter||
+            (priorCount>=3?fields.owner48!=emitter:fields.owner48!=nullptr))return false;
+    static_assert(offsetof(OriginalGcParticle50KG,size)==0x38&&
+        offsetof(OriginalGcParticle50KG,initialSize)==0x3c&&
+        offsetof(OriginalGcParticle50KG,lifeMilliseconds)==0x30&&
+        offsetof(OriginalGcParticle50KG,ageMilliseconds)==0x2c&&
+        offsetof(OriginalGcParticle50KG,frame)==0x28,"source Fog scalar layout");
+    auto* record=sourcePool_->pointers[0];
+    //All refusal points precede the one source store. Embedded metadata and
+    //the completed-count update cannot allocate or throw after its effect.
+    switch(priorCount){
+        case 0:std::memcpy(&record->size,&bits,4);break;
+        case 1:std::memcpy(&record->initialSize,&bits,4);break;
+        case 2:fields.owner48=emitter;break; //No ownerId write/truncation/registry.
+        case 3:std::memcpy(&record->lifeMilliseconds,&bits,4);break;
+        case 4:std::memcpy(&record->ageMilliseconds,&bits,4);break;
+        case 5:std::memcpy(&record->frame,&bits,4);break;
+    }
+    if(!priorCount){fields.record=expected;fields.emitter=emitter;}
+    ++fields.storedCount;
+    return true;
+}
+//Independent slot1 velocity/field custody. The first fogFields/fogTail are
+//never reset or adopted, and this native source48 is not a legacy ownerId.
+bool OriginalGcParticleManager50KG::sourceSuccessorVelocitySlotCurrentNative(
+    const void* publication138,std::int32_t index128,const OriginalGcParticle50KG* expected,
+    const std::array<std::uint32_t,4>* committedVelocity)const noexcept {
+    if(index128!=1||!expected||
+       !sourcePositionSlotCurrentNative(publication138,index128,expected,nullptr))return false;
+    if(expected==sourcePool_->fogFields.record)return false;
+    if(!committedVelocity)return true; //No source velocity read before its reached store.
+    if((*committedVelocity)[0]||(*committedVelocity)[1]||(*committedVelocity)[2]||
+       (*committedVelocity)[3]!=0x3f800000u)return false;
+    static_assert(offsetof(OriginalGcParticle50KG,velocity)==0x10&&
+        offsetof(OriginalGcParticle50KG,velocityW)==0x1c,"source velocity10 layout");
+    std::array<std::uint32_t,4> bits{};
+    std::memcpy(bits.data(),expected->velocity.data(),12);
+    std::memcpy(&bits[3],&expected->velocityW,4);
+    //Later common-tail scalar/owner writes do not invalidate this earlier SQ.
+    return bits==*committedVelocity;
+}
+bool OriginalGcParticleManager50KG::storeSourceSuccessorVelocity16088C(
+    const void* publication138,std::int32_t index128,const OriginalGcParticle50KG* expected,
+    const std::array<std::uint32_t,4>& after,std::array<std::uint32_t,4>& before)noexcept {
+    if(after[0]||after[1]||after[2]||after[3]!=0x3f800000u||
+       !sourceSuccessorVelocitySlotCurrentNative(publication138,index128,expected,nullptr))return false;
+    const auto& fields=sourcePool_->successorFogFields;
+    if(fields.record||fields.emitter||fields.owner48||fields.storedCount)return false;
+    auto* record=sourcePool_->pointers[1];
+    std::array<std::uint32_t,4> previous{};
+    //Only constructor-known10..1F is read. No unknown scalar/owner lane or
+    //whole-record snapshot is observed; source owner48 remains untouched.
+    std::memcpy(previous.data(),record->velocity.data(),12);
+    std::memcpy(&previous[3],&record->velocityW,4);
+    if(previous[3]!=0x3f800000u)return false;
+    //All guards precede one logical full SQ. Nothing can fail between these
+    //nonthrowing copies and the returned pre-store receipt.
+    std::memcpy(record->velocity.data(),after.data(),12);
+    std::memcpy(&record->velocityW,&after[3],4);
+    before=previous;
+    return true;
+}
+bool OriginalGcParticleManager50KG::sourceSuccessorFogFieldsCurrentNative(
+    const void* publication138,std::int32_t index128,const OriginalGcParticle50KG* expected,
+    const void* emitter,std::uint8_t storedCount,const std::array<std::uint32_t,5>& values)const noexcept {
+    if(index128!=1||!expected||!emitter||storedCount>6||
+       !sourcePositionSlotCurrentNative(publication138,index128,expected,nullptr))return false;
+    const auto& fields=sourcePool_->successorFogFields;
+    if(expected==sourcePool_->fogFields.record||emitter==sourcePool_->fogFields.emitter||fields.storedCount!=storedCount)return false;
+    if(!storedCount)return !fields.record&&!fields.emitter&&!fields.owner48;
+    if(fields.record!=expected||fields.emitter!=emitter||
+       (storedCount>=3?fields.owner48!=emitter:fields.owner48!=nullptr))return false;
+    //Only completed source writes make these lanes readable. No previous
+    //unknown value or whole-record copy is used for native validation.
+    std::uint32_t bits=0;
+    if(storedCount>=1){std::memcpy(&bits,&expected->size,4);if(bits!=values[0])return false;}
+    if(storedCount>=2){std::memcpy(&bits,&expected->initialSize,4);if(bits!=values[1])return false;}
+    if(storedCount>=4){std::memcpy(&bits,&expected->lifeMilliseconds,4);if(bits!=values[2])return false;}
+    if(storedCount>=5){std::memcpy(&bits,&expected->ageMilliseconds,4);if(bits!=values[3])return false;}
+    if(storedCount>=6){std::memcpy(&bits,&expected->frame,4);if(bits!=values[4])return false;}
+    return true;
+}
+bool OriginalGcParticleManager50KG::storeSourceSuccessorFogField1608AC(
+    const void* publication138,std::int32_t index128,const OriginalGcParticle50KG* expected,
+    const void* emitter,std::uint8_t priorCount,std::uint32_t sourcePC,std::uint32_t bits)noexcept {
+    constexpr std::uint32_t stores[]={0x1608ac,0x1608b8,0x1608bc,0x1608c4,0x1608cc,0x1608d4};
+    if(priorCount>=6||sourcePC!=stores[priorCount]||index128!=1||!expected||!emitter||
+       (priorCount==2&&bits)||!sourcePositionSlotCurrentNative(publication138,index128,expected,nullptr))return false;
+    auto& fields=sourcePool_->successorFogFields;
+    if(expected==sourcePool_->fogFields.record||emitter==sourcePool_->fogFields.emitter||fields.storedCount!=priorCount)return false;
+    if(!priorCount){if(fields.record||fields.emitter||fields.owner48)return false;}
+    else if(fields.record!=expected||fields.emitter!=emitter||
+            (priorCount>=3?fields.owner48!=emitter:fields.owner48!=nullptr))return false;
+    static_assert(offsetof(OriginalGcParticle50KG,size)==0x38&&
+        offsetof(OriginalGcParticle50KG,initialSize)==0x3c&&
+        offsetof(OriginalGcParticle50KG,lifeMilliseconds)==0x30&&
+        offsetof(OriginalGcParticle50KG,ageMilliseconds)==0x2c&&
+        offsetof(OriginalGcParticle50KG,frame)==0x28,"source Fog scalar layout");
+    auto* record=sourcePool_->pointers[1];
+    //All refusal points precede the one source store. Embedded metadata and
+    //the completed-count update cannot allocate or throw after its effect.
+    switch(priorCount){
+        case 0:std::memcpy(&record->size,&bits,4);break;
+        case 1:std::memcpy(&record->initialSize,&bits,4);break;
+        case 2:fields.owner48=emitter;break; //No ownerId write/truncation/registry.
+        case 3:std::memcpy(&record->lifeMilliseconds,&bits,4);break;
+        case 4:std::memcpy(&record->ageMilliseconds,&bits,4);break;
+        case 5:std::memcpy(&record->frame,&bits,4);break;
+    }
+    if(!priorCount){fields.record=expected;fields.emitter=emitter;}
+    ++fields.storedCount;
+    return true;
+}
+bool OriginalGcParticleManager50KG::readSourceFogRetirementSlot16056C(
+    const void* publication138,const OriginalGcParticle50KG*& record)const noexcept {
+    //Shared private backing admission, distinct source16056C load identity.
+    return readSourcePositionSlot1606E4(publication138,0,record);
+}
+bool OriginalGcParticleManager50KG::readSourceFogOwner160570(
+    const void* publication138,std::int32_t index128,const OriginalGcParticle50KG* expected,
+    const void*& owner48)const noexcept {
+    if(index128!=0||!expected||!sourcePositionSlotCurrentNative(publication138,index128,expected,nullptr))return false;
+    const auto& fields=sourcePool_->fogFields;
+    if(fields.record!=expected||!fields.emitter||fields.storedCount<3||fields.storedCount>6||
+       fields.owner48!=fields.emitter)return false;
+    owner48=fields.owner48;return true; //Actual pointer-width source lane; never a legacy numeric owner.
+}
+bool OriginalGcParticleManager50KG::readSourceFogLife1608D8(
+    const void* publication138,std::int32_t index128,const OriginalGcParticle50KG* expected,
+    const void* emitter,std::uint32_t& bits)const noexcept {
+    if(index128!=0||!expected||!emitter||
+       !sourcePositionSlotCurrentNative(publication138,index128,expected,nullptr))return false;
+    const auto& fields=sourcePool_->fogFields;
+    if(fields.record!=expected||fields.emitter!=emitter||fields.owner48!=emitter||fields.storedCount!=6)return false;
+    std::memcpy(&bits,&expected->lifeMilliseconds,4); //Actual1608D8 load, not replay of17C.
+    return true;
+}
+bool OriginalGcParticleManager50KG::sourceFogTailCurrentNative(
+    const void* publication138,std::int32_t index128,const OriginalGcParticle50KG* expected,
+    const void* emitter,std::uint8_t completedOps,const std::array<std::uint32_t,7>& pcs,
+    const std::array<std::uint32_t,7>& values)const noexcept {
+    if(index128!=0||!expected||!emitter||completedOps>7||
+       !sourcePositionSlotCurrentNative(publication138,index128,expected,nullptr))return false;
+    const auto& fields=sourcePool_->fogFields;const auto& tail=sourcePool_->fogTail;
+    if(fields.record!=expected||fields.emitter!=emitter||fields.owner48!=emitter||fields.storedCount!=6||
+       tail.completedOps!=completedOps||tail.pcs!=pcs||tail.values!=values)return false;
+    static_assert(sizeof(float)==4&&sizeof(std::uint32_t)==4&&
+        offsetof(OriginalGcParticle50KG,inverseLife)==0x34&&
+        offsetof(OriginalGcParticle50KG,growth)==0x40&&
+        offsetof(OriginalGcParticle50KG,flags)==0x44,"source Fog post-DIV layout");
+    //No unknown34/40/44 before-image. Exceptional EE words stay raw bytes;
+    //they must never be interpreted as host floats (where they encode NaNs).
+    std::uint32_t bits=0;
+    if(completedOps>=1){std::memcpy(&bits,&expected->inverseLife,4);if(bits!=values[0])return false;}
+    if(completedOps>=2){std::memcpy(&bits,&expected->growth,4);if(bits!=values[1])return false;}
+    if(completedOps>=3){
+        const auto latest=completedOps>=7?6u:(completedOps>=5?4u:2u);
+        std::memcpy(&bits,&expected->flags,4);if(bits!=values[latest])return false;
+    }
+    return true;
+}
+bool OriginalGcParticleManager50KG::storeSourceFogTail1608E0(
+    const void* publication138,std::int32_t index128,const OriginalGcParticle50KG* expected,
+    const void* emitter,std::uint8_t priorOps,std::uint32_t sourcePC,std::uint32_t bits)noexcept {
+    if(!sourcePool_||priorOps>=7)return false;
+    auto& tail=sourcePool_->fogTail;
+    if(!sourceFogTailCurrentNative(publication138,index128,expected,emitter,priorOps,tail.pcs,tail.values))return false;
+    //Only this exact seven-operation chain is admitted. Mirror branch
+    //selection belongs to the caller's genuine saved-unit/enable receipts.
+    switch(priorOps){
+        case 0:if(sourcePC!=0x1608e0u||(bits!=0x7fffffffu&&bits!=0xffffffffu))return false;break;
+        case 1:if(sourcePC!=0x1608e4u||bits)return false;break;
+        case 2:if(sourcePC!=0x1608f0u)return false;break;
+        case 4:{
+            const bool set=tail.pcs[3]==0x160930u;
+            if((!set&&tail.pcs[3]!=0x160940u)||sourcePC!=(set?0x16093cu:0x16094cu)||
+               bits!=(set?(tail.values[3]|0x4000u):(tail.values[3]&0xffffbfffu)))return false;
+            break;
+        }
+        case 6:{
+            const bool set=tail.pcs[5]==0x160964u;
+            if((!set&&tail.pcs[5]!=0x160974u)||sourcePC!=(set?0x160970u:0x160984u)||
+               bits!=(set?(tail.values[5]|0x8000u):(tail.values[5]&0xffff7fffu)))return false;
+            break;
+        }
+        default:return false; //The two44 source loads cannot be skipped.
+    }
+    auto* record=sourcePool_->pointers[0];
+    //Every refusal is above the actual store. Both source bytes and the
+    //embedded completed-operation receipt commit without allocation/throw.
+    if(priorOps==0)std::memcpy(&record->inverseLife,&bits,4);
+    else if(priorOps==1)std::memcpy(&record->growth,&bits,4);
+    else std::memcpy(&record->flags,&bits,4);
+    tail.pcs[priorOps]=sourcePC;tail.values[priorOps]=bits;++tail.completedOps;
+    return true;
+}
+bool OriginalGcParticleManager50KG::readSourceFogFlags160930(
+    const void* publication138,std::int32_t index128,const OriginalGcParticle50KG* expected,
+    const void* emitter,std::uint8_t priorOps,std::uint32_t sourcePC,std::uint32_t& bits)noexcept {
+    if(!sourcePool_||(priorOps!=3&&priorOps!=5))return false;
+    auto& tail=sourcePool_->fogTail;
+    if((priorOps==3?(sourcePC!=0x160930u&&sourcePC!=0x160940u):
+                       (sourcePC!=0x160964u&&sourcePC!=0x160974u))||
+       !sourceFogTailCurrentNative(publication138,index128,expected,emitter,priorOps,tail.pcs,tail.values))return false;
+    //Actual source LW from this exact record, not tail.values[2 or4].
+    //Native receipt bookkeeping is not a source write to the particle.
+    std::uint32_t actual=0;std::memcpy(&actual,&expected->flags,4);
+    tail.pcs[priorOps]=sourcePC;tail.values[priorOps]=actual;++tail.completedOps;
+    bits=actual;return true;
+}
+//A second independently bound record; the first field/tail ledgers remain intact.
+bool OriginalGcParticleManager50KG::readSourceSuccessorFogLife1608D8(
+    const void* publication138,std::int32_t index128,const OriginalGcParticle50KG* expected,
+    const void* emitter,std::uint32_t& bits)const noexcept {
+    if(index128!=1||!expected||!emitter||
+       !sourcePositionSlotCurrentNative(publication138,index128,expected,nullptr))return false;
+    if(expected==sourcePool_->fogFields.record||emitter==sourcePool_->fogFields.emitter)return false;
+    const auto& fields=sourcePool_->successorFogFields;
+    if(fields.record!=expected||fields.emitter!=emitter||fields.owner48!=emitter||fields.storedCount!=6)return false;
+    std::memcpy(&bits,&expected->lifeMilliseconds,4); //Actual1608D8 load, not replay of17C.
+    return true;
+}
+bool OriginalGcParticleManager50KG::sourceSuccessorFogTailCurrentNative(
+    const void* publication138,std::int32_t index128,const OriginalGcParticle50KG* expected,
+    const void* emitter,std::uint8_t completedOps,const std::array<std::uint32_t,7>& pcs,
+    const std::array<std::uint32_t,7>& values)const noexcept {
+    if(index128!=1||!expected||!emitter||completedOps>7||
+       !sourcePositionSlotCurrentNative(publication138,index128,expected,nullptr))return false;
+    if(expected==sourcePool_->fogFields.record||emitter==sourcePool_->fogFields.emitter)return false;
+    const auto& fields=sourcePool_->successorFogFields;const auto& tail=sourcePool_->successorFogTail;
+    if(fields.record!=expected||fields.emitter!=emitter||fields.owner48!=emitter||fields.storedCount!=6||
+       tail.completedOps!=completedOps||tail.pcs!=pcs||tail.values!=values)return false;
+    static_assert(sizeof(float)==4&&sizeof(std::uint32_t)==4&&
+        offsetof(OriginalGcParticle50KG,inverseLife)==0x34&&
+        offsetof(OriginalGcParticle50KG,growth)==0x40&&
+        offsetof(OriginalGcParticle50KG,flags)==0x44,"source Fog post-DIV layout");
+    //No unknown34/40/44 before-image. Exceptional EE words stay raw bytes;
+    //they must never be interpreted as host floats (where they encode NaNs).
+    std::uint32_t bits=0;
+    if(completedOps>=1){std::memcpy(&bits,&expected->inverseLife,4);if(bits!=values[0])return false;}
+    if(completedOps>=2){std::memcpy(&bits,&expected->growth,4);if(bits!=values[1])return false;}
+    if(completedOps>=3){
+        const auto latest=completedOps>=7?6u:(completedOps>=5?4u:2u);
+        std::memcpy(&bits,&expected->flags,4);if(bits!=values[latest])return false;
+    }
+    return true;
+}
+bool OriginalGcParticleManager50KG::storeSourceSuccessorFogTail1608E0(
+    const void* publication138,std::int32_t index128,const OriginalGcParticle50KG* expected,
+    const void* emitter,std::uint8_t priorOps,std::uint32_t sourcePC,std::uint32_t bits)noexcept {
+    if(!sourcePool_||priorOps>=7)return false;
+    auto& tail=sourcePool_->successorFogTail;
+    if(!sourceSuccessorFogTailCurrentNative(publication138,index128,expected,emitter,priorOps,tail.pcs,tail.values))return false;
+    //Only this exact seven-operation chain is admitted. Mirror branch
+    //selection belongs to the caller's genuine saved-unit/enable receipts.
+    switch(priorOps){
+        case 0:if(sourcePC!=0x1608e0u||(bits!=0x7fffffffu&&bits!=0xffffffffu))return false;break;
+        case 1:if(sourcePC!=0x1608e4u||bits)return false;break;
+        case 2:if(sourcePC!=0x1608f0u)return false;break;
+        case 4:{
+            const bool set=tail.pcs[3]==0x160930u;
+            if((!set&&tail.pcs[3]!=0x160940u)||sourcePC!=(set?0x16093cu:0x16094cu)||
+               bits!=(set?(tail.values[3]|0x4000u):(tail.values[3]&0xffffbfffu)))return false;
+            break;
+        }
+        case 6:{
+            const bool set=tail.pcs[5]==0x160964u;
+            if((!set&&tail.pcs[5]!=0x160974u)||sourcePC!=(set?0x160970u:0x160984u)||
+               bits!=(set?(tail.values[5]|0x8000u):(tail.values[5]&0xffff7fffu)))return false;
+            break;
+        }
+        default:return false; //The two44 source loads cannot be skipped.
+    }
+    auto* record=sourcePool_->pointers[1];
+    //Every refusal is above the actual store. Both source bytes and the
+    //embedded completed-operation receipt commit without allocation/throw.
+    if(priorOps==0)std::memcpy(&record->inverseLife,&bits,4);
+    else if(priorOps==1)std::memcpy(&record->growth,&bits,4);
+    else std::memcpy(&record->flags,&bits,4);
+    tail.pcs[priorOps]=sourcePC;tail.values[priorOps]=bits;++tail.completedOps;
+    return true;
+}
+bool OriginalGcParticleManager50KG::readSourceSuccessorFogFlags160930(
+    const void* publication138,std::int32_t index128,const OriginalGcParticle50KG* expected,
+    const void* emitter,std::uint8_t priorOps,std::uint32_t sourcePC,std::uint32_t& bits)noexcept {
+    if(!sourcePool_||(priorOps!=3&&priorOps!=5))return false;
+    auto& tail=sourcePool_->successorFogTail;
+    if((priorOps==3?(sourcePC!=0x160930u&&sourcePC!=0x160940u):
+                       (sourcePC!=0x160964u&&sourcePC!=0x160974u))||
+       !sourceSuccessorFogTailCurrentNative(publication138,index128,expected,emitter,priorOps,tail.pcs,tail.values))return false;
+    //Actual source LW from this exact record, not tail.values[2 or4].
+    //Native receipt bookkeeping is not a source write to the particle.
+    std::uint32_t actual=0;std::memcpy(&actual,&expected->flags,4);
+    tail.pcs[priorOps]=sourcePC;tail.values[priorOps]=actual;++tail.completedOps;
+    bits=actual;return true;
 }
 struct OriginalGcParticleManager50KG::Storage {
     std::array<OriginalGcParticle50KG,originalGcParticleCapacity50KG> pool{};

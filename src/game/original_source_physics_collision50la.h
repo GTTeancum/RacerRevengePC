@@ -981,7 +981,7 @@ class OriginalSourcePhysicsCollision50LA final {
         try{requestName_.assign(actualRequest.data(),actualRequest.size());}
         catch(...){return at(Status::bounded,0x11b934);} //Native capture before source path stores.
         requestCaptured_=true;
-        const auto& directory=base_->application_->collisionDirectory36B0F0_;
+        const auto& directory=base_->application_->observeCollisionDirectory36B0F0();
         directoryIdentity_=&directory;directoryNonempty_=!directory.empty();directoryRead_=true;
         if(directory.find('\0')!=std::string::npos)return at(Status::bounded,0x11b938);
         if(directoryNonempty_){

@@ -230,7 +230,7 @@ OriginalStandardMaterialTable50LA::~OriginalStandardMaterialTable50LA()=default;
 bool OriginalStandardMaterialTable50LA::prepareFresh(
     std::shared_ptr<const OriginalUiArchive50KG> app,
     std::shared_ptr<const OriginalUiMaterialTemplates50KG> templates,D& d) noexcept {
-    d={};if(storage_||appStartNames_)return fail(d,S::alreadyPrepared,0x14D2F0);
+    d={};if(storage_||appStartNames_||sourceNamesReadApp_)return fail(d,S::alreadyPrepared,0x14D2F0);
     if(!app||!app->loaded()||app->identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::appStart))
         return fail(d,S::archive,0x2985B0);
     const auto* defaults=templates?templates->get(OriginalUiTemplate50KG::defaultMt):nullptr;
@@ -257,7 +257,7 @@ bool OriginalStandardMaterialTable50LA::prepareFresh(
 bool OriginalStandardMaterialTable50LA::prepareAppStartNames17CAD4(
     std::shared_ptr<const OriginalUiArchive50KG> app,
     const std::vector<std::uint8_t>& sourceBytes,D& d) noexcept {
-    d={};if(storage_||appStartNames_)return fail(d,S::alreadyPrepared,0x14D2F0);
+    d={};if(storage_||appStartNames_||sourceNamesReadApp_)return fail(d,S::alreadyPrepared,0x14D2F0);
     if(!app||!app->loaded()||app->identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::appStart))
         return fail(d,S::archive,0x2985B0);
     try {
@@ -277,6 +277,162 @@ bool OriginalStandardMaterialTable50LA::prepareAppStartNames17CAD4(
         appStartNames_=std::move(next);return true;
     }catch(const std::bad_alloc&){return fail(d,S::allocation,0x2987DC);}
     catch(...){return fail(d,S::input,0x2985B0);}
+}
+bool OriginalStandardMaterialTable50LA::allocateSourceAppStartNameRows29871C(D& d)noexcept {
+    d={};
+    if(!sourceNamesReadApp_||!sourceNamesReadAttempted_||!sourceNamesReadReturned_||
+       sourceNameRowsAttempted_||sourceNameRows1C_||sourceNameRows1CPublished_||
+       appStartNames_||storage_||sourceNamesPreloaded24_!=0)
+        return fail(d,S::phase,0x29871C);
+    // Actual full reader output, including its existing2986F4 terminator.
+    // These are native bounds, not substitutes for count+10 or source text.
+    if(sourceNamesReadBytes_.size()!=tableBytes+1||sourceNamesReadBytes_.back()!=0)
+        return fail(d,S::source,0x29871C);
+    for(const auto c:sourceNamesReadBytes_)if(c>=128)
+        return fail(d,S::input,0x29871C);
+    //3094E0 uses a signed-byte index into3C6391. Static bit0 is set only for
+    //ASCII A..Z in the admitted range. Do not use host locale/ctype or invent
+    //the original negative-index behavior for bytes outside that range.
+    sourceNameRowsAttempted_=true;sourceNameRowsPC_=0x29871c;
+    for(std::size_t i=0;sourceNamesReadBytes_[i]!=0;++i){
+        auto& c=sourceNamesReadBytes_[i];
+        if(c>='A'&&c<='Z')c=static_cast<std::uint8_t>(c+32);
+    }
+    sourceNamesLowered_=true;sourceNameRowsPC_=0x298730;
+    sourceNamesCount10_=0;sourceNamesCount10Written_=true; //298730.
+    d.sourceEffectsCommitted=true;
+    bool inside=false;
+    const auto length=sourceNamesReadBytes_.size()-1;
+    for(std::size_t i=0;i<length;++i){
+        auto& c=sourceNamesReadBytes_[i];
+        if(c=='\r'||c=='\n'||c==' '){
+            c=0;inside=false; //298754/298768/29877C, then a3=0.
+        }else if(!inside){
+            inside=true;++sourceNamesCount10_; //298790..29879C.
+        }
+        //No generic whitespace split. In particular NUL is NOT one of this
+        //first pass's delimiters, even though the later row scan treats it so.
+    }
+    sourceNamesTokenized_=true;sourceNameRowsPC_=0x2987c0;
+    //2987CC adds the SAME fresh receiver's actual preloaded count (zero), not
+    //the authenticated file's expected3235 rows or a caller-supplied count.
+    sourceNamesCount10_+=sourceNamesPreloaded24_;
+    sourceNameRowsRequestedBytes_=std::size_t(sourceNamesCount10_)*12;
+    sourceNameRowsNativeBytes_=sourceNameRowsRequestedBytes_?sourceNameRowsRequestedBytes_:1;
+    sourceNameRowsPC_=0x2987dc;sourceNameRowsAllocationAttempted_=true;
+    //Explicit native allocator.2E8CA0 ->2E8D90 may call mutable383730 or throw
+    //using383738 on failure; neither is owned here. A failed native allocation
+    //therefore blocks THIS occurrence before original return/publication.
+    auto* backing=new(std::nothrow) std::uint8_t[sourceNameRowsNativeBytes_];
+    if(!backing)return fail(d,S::allocation,0x2987DC);
+    //2987E4: publish only actual owned backing. Never truncate a native pointer
+    //into guest words, prefill rows, set+14 capacity or invent NULL field stores.
+    sourceNameRows1C_.reset(backing);sourceNameRows1CPublished_=true;
+    sourceNameRowsPC_=0x2987e8;d.sourcePC=sourceNameRowsPC_;return true;
+}
+bool OriginalStandardMaterialTable50LA::populateSourceAppStartNameRows2987E8(D& d)noexcept {
+    d={};
+    if(!sourceNamesReadApp_||!sourceNamesReadReturned_||!sourceNamesTokenized_||
+       !sourceNamesCount10Written_||!sourceNameRows1CPublished_||!sourceNameRows1C_||
+       sourceNameRowsPC_!=0x2987e8||sourceNamesPreloaded24_!=0||sourceNamePopulationAttempted_||
+       sourceNameAliases_||sourceNameAssociations30_||appStartNames_||storage_)
+        return fail(d,S::phase,0x2987E8);
+    if(sourceNamesReadBytes_.size()!=tableBytes+1||sourceNamesReadBytes_.back()!=0||
+       sourceNamesCount10_>tableBytes||sourceNameRowsRequestedBytes_!=std::size_t(sourceNamesCount10_)*12||
+       sourceNameRowsNativeBytes_!=(sourceNameRowsRequestedBytes_?sourceNameRowsRequestedBytes_:1))
+        return fail(d,S::source,0x2987E8);
+    sourceNamePopulationAttempted_=true;
+    //Native alias/knownness metadata must exist before any source row store.
+    //Its failure is not an original allocation result or an erased row prefix.
+    if(sourceNamesCount10_){
+        sourceNameAliases_.reset(new(std::nothrow) SourceNameAlias[sourceNamesCount10_]);
+        if(!sourceNameAliases_)return fail(d,S::allocation,0x2987E8);
+    }
+    sourceNameAliasCount_=sourceNamesCount10_;
+    sourceNameAliasBuffer_=sourceNamesReadBytes_.data();
+    //2987E8..298854: v0=0 and the source+24 preload loop is genuinely empty
+    //for this fresh receiver. The second scan is over the same mutated text.
+    const auto length=sourceNamesReadBytes_.size()-1;
+    bool inside=false;
+    for(std::size_t offset=0;offset<length;++offset){
+        const auto c=sourceNamesReadBytes_[offset];
+        if(c==0){inside=false;continue;} //298864..298870.
+        if(inside)continue;
+        inside=true;
+        const auto row=sourceNameRowsInitialized_;
+        sourceNameRowsPC_=0x29888c;
+        //Native safety before the source's unchecked first store. Preserve
+        //all earlier rows and reject rather than write beyond actual backing.
+        if(row>=sourceNamesCount10_)return fail(d,S::range,sourceNameRowsPC_);
+        auto* raw=sourceNameRows1C_.get()+std::size_t(row)*12;
+        auto& alias=sourceNameAliases_[row];
+        std::memset(raw+4,0,4);alias.semanticWrites|=1; //29888C object04=NULL.
+        d.sourceEffectsCommitted=true;sourceNameRowsPC_=0x2988a0;
+        alias.name00=sourceNameAliasBuffer_+offset;
+        alias.byteOffset=static_cast<std::uint32_t>(offset);
+        alias.semanticWrites|=2; //2988A0 name00 aliases this SAME owned buffer.
+        //No narrowed host address or invented guest pointer is written to+00.
+        sourceNameRowsPC_=0x2988b0;
+        std::memset(raw+8,0,4);alias.semanticWrites|=4; //2988B0 references08=0.
+        ++sourceNameRowsInitialized_;
+    }
+    sourceNameRowsPC_=0x2988d8;
+    //Original does not check this equality. Native admission refuses a shape
+    //that would leave counted rows unknown (for example embedded-NUL text),
+    //without claiming that the original reader returned an error or rolled back.
+    if(sourceNameRowsInitialized_!=sourceNamesCount10_)
+        return fail(d,S::source,sourceNameRowsPC_);
+    sourceNameCapacity14_=sourceNamesCount10_;sourceNameCapacity14Written_=true; //2988DC.
+    d.sourceEffectsCommitted=true;
+    //2988E0/2988F4 returns the actual count to14D304. This source return is
+    //distinct from this native method's bool or an eventual startup return.
+    sourceNameBaseReturned_=true;sourceNameRowsPC_=0x14d304;
+    //Actual fresh+30 is NULL.14D308 skips the old-association free. No arbitrary
+    //warm destructor/NULL substitute is admitted, and row ownership persists.
+    sourceNameAssociationsRequestedBytes_=std::size_t(sourceNamesCount10_)*4;
+    sourceNameAssociationsNativeBytes_=sourceNameAssociationsRequestedBytes_?
+        sourceNameAssociationsRequestedBytes_:1;
+    sourceNameAssociationsAttempted_=true;sourceNameRowsPC_=0x14d31c;
+    auto* associations=new(std::nothrow) std::uint8_t[sourceNameAssociationsNativeBytes_];
+    //Same explicit native heap contract as2987DC: no invented source NULL
+    //return, handler invocation or+30 store on native allocation failure.
+    if(!associations)return fail(d,S::allocation,sourceNameRowsPC_);
+    sourceNameAssociations30_.reset(associations);sourceNameAssociations30Published_=true; //14D324.
+    sourceNameRowsPC_=0x14d328;
+    for(std::uint32_t i=0;i<sourceNamesCount10_;++i){
+        sourceNameRowsPC_=0x14d344;
+        std::memset(sourceNameAssociations30_.get()+std::size_t(i)*4,0,4);
+        sourceNameAssociationsInitialized_=i+1;
+    }
+    //All reached null associations are genuine stores on owned backing. This
+    //does not construct either template or promote native public material rows.
+    sourceNamesCallReturned17CAD4_=true;sourceNameRowsPC_=0x17cadc;
+    d.sourcePC=sourceNameRowsPC_;return true;
+}
+bool OriginalStandardMaterialTable50LA::sourceAppStartNamesReturned17CAD4()const noexcept {
+    if(!sourceNamesCallReturned17CAD4_||sourceNameRowsPC_!=0x17cadc||!sourceNameBaseReturned_||
+       !sourceNamePopulationAttempted_||!sourceNameAssociationsAttempted_||sourceNamesCount10_>tableBytes||
+       sourceNamesReadBytes_.size()!=tableBytes+1||sourceNamesReadBytes_.back()!=0||
+       sourceNameAssociationsRequestedBytes_!=std::size_t(sourceNamesCount10_)*4||
+       sourceNameAssociationsNativeBytes_!=(sourceNameAssociationsRequestedBytes_?
+           sourceNameAssociationsRequestedBytes_:1)||
+       !sourceNameCapacity14Written_||sourceNameCapacity14_!=sourceNamesCount10_||
+       sourceNameRowsInitialized_!=sourceNamesCount10_||sourceNameAliasCount_!=sourceNamesCount10_||
+       !sourceNameRows1CPublished_||!sourceNameRows1C_||
+       sourceNameAliasBuffer_!=sourceNamesReadBytes_.data()||
+       !sourceNameAssociations30Published_||!sourceNameAssociations30_||
+       sourceNameAssociationsInitialized_!=sourceNamesCount10_||
+       (sourceNamesCount10_&&!sourceNameAliases_)||appStartNames_||storage_)return false;
+    const auto length=sourceNamesReadBytes_.size()-1;
+    for(std::uint32_t i=0;i<sourceNamesCount10_;++i){
+        const auto& alias=sourceNameAliases_[i];
+        if(alias.semanticWrites!=7||alias.byteOffset>=length||
+           alias.name00!=sourceNameAliasBuffer_+alias.byteOffset)return false;
+    }
+    return true;
+}
+bool OriginalStandardMaterialTable50LA::appStartNamesPrepared17CAD4()const noexcept {
+    return appStartNames_&&appStartNames_->sourceNames17CAD4&&!sourceNamesReadApp_;
 }
 bool OriginalStandardMaterialTable50LA::attachAppStartTemplates(
     std::shared_ptr<const OriginalUiMaterialApplication50LA> application,D& d) noexcept {

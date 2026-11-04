@@ -20,7 +20,7 @@ class OriginalResultsHostInput50LA final {
     // driving rows and from original managerCBC. SDL supplies already-mapped
     // logical Dpad/A; no raw joystick index or source CBC custody is implied.
     // Changing this transport requires a new policy version and a fresh poll.
-    static constexpr std::uint32_t fixedUiPolicyVersion_=2;
+    static constexpr std::uint32_t fixedUiPolicyVersion_=3;
     static constexpr std::array<unsigned,6> keys_{{82,81,80,79,40,88}};
     static constexpr std::array<unsigned,5> buttons_{{11,12,13,14,0}};
     static constexpr std::array<std::uint32_t,5> codes_{{12,14,15,13,2}};
@@ -36,11 +36,13 @@ class OriginalResultsHostInput50LA final {
     std::array<bool,6> handbackKeys_{};
     std::array<std::array<bool,5>,2> handbackButtons_{};
     std::array<std::int32_t,2> handbackInstances_{{-1,-1}};
-    // B/right-pad-right is observed by this same Window producer but never
+    // B/right-pad-right and native H use this same Window producer, but are never
     // emitted until the actual active Results issuer offers this exact poll.
     // Ordinary menus keep their existing stream and five-button policy.
     std::array<bool,2> hideArmed_{},hideEdges_{},hideHandback_{};
     std::array<std::int32_t,2> hideInstances_{{-1,-1}};
+    static constexpr unsigned hideKeyboardKey_=11; //SDL H, native alias only.
+    bool hideKeyboardArmed_=false,hideKeyboardEdge_=false,hideKeyboardHandback_=false;
     std::uint64_t hideObservationRevision_=0;
     bool hideObservationValid_=false;
     enum class HideAppend : std::uint8_t {absent,appended,capacity,invalid};
@@ -80,6 +82,13 @@ class OriginalResultsHostInput50LA final {
                     output.down[key]=output.pressed[key]=output.released[key]=0;
                 }
             }
+            // H belongs only to the authenticated Results extension, never
+            // to an ordinary menu's six-key claim. Retain its own handback
+            // quarantine until the actual key is released.
+            if((claimed&&hideIssuer_)||hideKeyboardHandback_){
+                hideKeyboardHandback_=output.down[hideKeyboardKey_]||output.pressed[hideKeyboardKey_];
+                output.down[hideKeyboardKey_]=output.pressed[hideKeyboardKey_]=output.released[hideKeyboardKey_]=0;
+            }
             for(std::size_t port=0;port<2;++port){
                 auto& pad=output.controllers[port];
                 if(!pad.connected||handbackInstances_[port]!=pad.instanceId)
@@ -113,28 +122,31 @@ class OriginalResultsHostInput50LA final {
     std::uint64_t revision_=0;
     void invalidate()noexcept {
         current_=edgesOpen_=false;count_=0;pollPolicyVersion_=0;claimedRevision_=0;
-        hideEdges_={};hideObservationRevision_=0;hideObservationValid_=false;
+        hideEdges_={};hideKeyboardEdge_=false;hideObservationRevision_=0;hideObservationValid_=false;
         hideIssuer_=nullptr;hideAppend_=HideAppend::absent;
     }
     void interrupt()noexcept {
         invalidate();keyboardArmed_=false;padArmed_={};padInstance_={{-1,-1}};
         handbackKeys_={};handbackButtons_={};handbackInstances_={{-1,-1}};
         hideArmed_={};hideHandback_={};hideInstances_={{-1,-1}};
+        hideKeyboardArmed_=hideKeyboardHandback_=false;
     }
     bool appendResultsHideSamePoll(const game::OriginalResults10450LA& issuer)noexcept {
         if(!fixedUiCurrent()||!edgesOpen_||claimedRevision_||hideIssuer_||
            hideAppend_!=HideAppend::absent||hideObservationRevision_!=revision_)return false;
         hideIssuer_=&issuer;
         if(!hideObservationValid_){hideAppend_=HideAppend::invalid;count_=0;return true;}
-        const std::size_t extra=std::size_t(hideEdges_[0])+std::size_t(hideEdges_[1]);
+        const bool port0Hide=hideKeyboardEdge_||hideEdges_[0];
+        const std::size_t extra=std::size_t(port0Hide)+std::size_t(hideEdges_[1]);
         if(count_>events_.size()||extra>events_.size()-count_){
             // Keep the original ten-event budget. Reject the WHOLE batch;
             // Results must claim/retire controls before reporting refusal.
             hideAppend_=HideAppend::capacity;count_=0;return true;
         }
         // Preserve every existing event's relative order. Native extension
-        // appends B0 then B1; this is not a PS2 event-order claim.
-        for(std::size_t port=0;port<2;++port)if(hideEdges_[port]){
+        // appends logical0 (H/B coalesced) then B1; this is not a PS2
+        // event-order claim or a remapping of original1277D0 code1.
+        for(std::size_t port=0;port<2;++port)if(port==0?port0Hide:hideEdges_[port]){
             events_[count_].event={1u,2u,static_cast<std::uint32_t>(port),1u,0u};
             events_[count_].record={1u,1.f,0u,0u,0u,0u};++count_;
         }
@@ -186,6 +198,16 @@ class OriginalResultsHostInput50LA final {
             events_[count_].record={1u,1.f,0u,0u,0u,0u};++count_;
         }
         hideObservationValid_=true;
+        // Separate release-to-arm state: adding a Results-only H alias must
+        // not make holding H suppress ordinary arrows/Confirm, or retire H
+        // when the actual Results issuer has not claimed this exact poll.
+        if(!active||!actualKeyboardConnected)hideKeyboardArmed_=false;
+        else if(input.down[hideKeyboardKey_]>1||input.pressed[hideKeyboardKey_]>1||
+                input.released[hideKeyboardKey_]>1){
+            hideObservationValid_=false;hideKeyboardArmed_=false;
+        }else if(!hideKeyboardArmed_)
+            hideKeyboardArmed_=!input.down[hideKeyboardKey_]&&!input.pressed[hideKeyboardKey_];
+        else hideKeyboardEdge_=input.pressed[hideKeyboardKey_]!=0;
         for(std::size_t port=0;port<2;++port){
             const auto& pad=input.controllers[port];
             if(!input.gameControllersEnabled||!pad.connected){

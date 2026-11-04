@@ -154,6 +154,39 @@ bool cleanMatrixDirectionPrefix49U(const BodyMatrix48G& matrix,const V& input,
     if(std::fegetround()!=FE_TONEAREST)return false;
     Math f;output=vector(matrix,input,false,context,f);return f.valid;
 }
+bool cleanMatrixDirectionXYZPrefix49U(const BodyMatrix48G& matrix,const V& input,
+    std::array<float,3>& output,std::uint32_t& pc)noexcept {
+    pc=0x28ba74u;
+    if(std::fegetround()!=FE_TONEAREST)return false;
+    Math f;std::array<float,3> candidate{};
+    //Stage every XYZ lane of each VU instruction before the next instruction.
+    //This reports the first original operation on a bounded numerical input,
+    //rather than completing X's later instructions before reading Y/Z.
+    for(unsigned lane=0;lane<3;++lane){
+        candidate[lane]=f.mul(matrix.v[lane],input.v[0]);
+        if(!f.valid)return false;
+    }
+    pc=0x28ba78u;
+    for(unsigned lane=0;lane<3;++lane){
+        const float product=f.mul(matrix.v[4+lane],input.v[1]);
+        if(!f.valid)return false;
+        candidate[lane]=f.add(candidate[lane],product);
+        if(!f.valid)return false;
+    }
+    pc=0x28ba7cu;
+    for(unsigned lane=0;lane<3;++lane){
+        const float product=f.mul(matrix.v[8+lane],input.v[2]);
+        if(!f.valid)return false;
+        candidate[lane]=f.add(candidate[lane],product);
+        if(!f.valid)return false;
+    }
+    pc=0x28ba80u;
+    for(unsigned lane=0;lane<3;++lane){
+        candidate[lane]=f.add(candidate[lane],0.0f);
+        if(!f.valid)return false;
+    }
+    output=candidate;return true;
+}
 bool cleanMatrixPointPrefix49U(const BodyMatrix48G& matrix,const V& input,
     SceneVectorContext49U& context,V& output)noexcept {
     if(std::fegetround()!=FE_TONEAREST)return false;

@@ -2,8 +2,9 @@
 
 namespace rr::platform {
 OriginalVideoBlockingNativeBackend::OriginalVideoBlockingNativeBackend(
-    VehicleWindowGl50DS& renderer,GameHost50ER& host,OriginalVideoNativeUse use) noexcept :
-    renderer_(renderer),host_(host),use_(use),window_(host.hasWindow()) {
+    VehicleWindowGl50DS& renderer,GameHost50ER& host,OriginalVideoNativeUse use,
+    NativeVideoPacketOverlayPolicies50LA blendPolicies) noexcept :
+    renderer_(renderer),host_(host),use_(use),blendPolicies_(blendPolicies),window_(host.hasWindow()) {
     // These two private bindings are the concrete host implementation, not a
     // plugin/no-op completion interface. Only users of this optional backend
     // need this translation unit and GameHost50ER's actual window/EGL owners.

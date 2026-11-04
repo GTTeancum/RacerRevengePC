@@ -253,7 +253,7 @@ class OriginalWorldCollisionObjects50LA final {
                w.descriptorRetired!=type2||h.nameCompared==type2||
                h.skipDiagnosticAttempted==type2)return false;
             if(!setterCurrentNative(h)||!membershipCurrentNative(h)||
-               !h.loaderPath.currentNative(app.collisionDirectory36B0F0_,app.collisionName3E0730_,
+               !h.loaderPath.currentNative(app.observeCollisionDirectory36B0F0(),app.collisionName3E0730_,
                    std::string_view{},h.pc))return false;
             if(type2)return !w.descriptor08&&!h.descriptorIdentity&&!h.skipDiagnosticWritten;
             if(!w.descriptor08||h.descriptorIdentity!=w.descriptor08.get()||!w.descriptor08->sourceFields)return false;
@@ -308,7 +308,7 @@ class OriginalWorldCollisionObjects50LA final {
         if(h.loaderPath.partialType0_&&h.loaderPath.partialType0_->payload.entered&&
            h.loaderPath.partialType0_->payload.application!=&app)return false;
         if(h.loaderPath.entered_&&(!h.descriptorBytesStored||!h.mode13Returned))return false;
-        if(!h.loaderPath.currentNative(app.collisionDirectory36B0F0_,app.collisionName3E0730_,
+        if(!h.loaderPath.currentNative(app.observeCollisionDirectory36B0F0(),app.collisionName3E0730_,
             std::string_view(h.stackName.data(),h.stackNameKnown?h.stackNameKnown-1:0),h.loaderSuccessObserved?0x11bbb8u:h.pc))return false;
         if(h.mode13Returned&&(!h.entered||!h.allocationAttempted||!h.counted||!h.outer||!h.source04||!h.constructorReturned||!h.published))return false;
         if(!h.mode13Returned&&(h.categoryStored||h.descriptorBytesStored||h.foldedNameBytes||h.startupCategoryA4||h.modeReturn))return false;
@@ -440,7 +440,7 @@ class OriginalWorldCollisionObjects50LA final {
         if(d.field184!=0&&(d.field184&0x80000000u)==0)h.outer->fieldA9_=static_cast<std::uint8_t>(d.field184);
         h.outer->fieldA8_=static_cast<std::uint8_t>(d.field180);h.descriptorBytesStored=true;
         pc=h.pc=0x11b920;
-        h.loaderPath.begin11B920(app.collisionDirectory36B0F0_,app.collisionName3E0730_,
+        h.loaderPath.begin11B920(app.observeCollisionDirectory36B0F0(),app.collisionName3E0730_,
             std::string_view(h.stackName.data(),h.stackNameKnown-1),h.pc);
         pc=h.pc;return false; //Dedicated source path reached; generic132820 search is next.
     }

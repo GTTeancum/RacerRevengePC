@@ -5,28 +5,14 @@
 #include "original_ui_garage_session50kg.h"
 #include "original_ui_garage_visibility50kg.h"
 #include "original_ui_frontend50kg.h"
+#include "../../../src/game/lap_host_clock50id.h"
 #include "../../../tests/native/original_ui_main_entry50kg.h"
 #include "../../../tests/native/original_native_collector_fifo50la.h"
 #include "../../../tests/native/original_race_display_lifetime50la.h"
 #include <bit>
 #include <chrono>
 #include <limits>
-namespace rr::platform {namespace {
-// Same actual Application host clock and49J float conversion as the existing
-// Video fade kernel. No second epoch, fake guest timer or frame-dt clock.
-bool videoMilliseconds(game::HostMonotonicClock50ID& clock,float& out)noexcept {
- const auto elapsed=std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now()-clock.epoch).count();
- if(elapsed<0)return false;
- const auto ns=static_cast<std::uint64_t>(elapsed);
- if(ns<clock.lastNanoseconds)return false;
- constexpr std::uint64_t billion=1000000000u,rate=576000u;
- const auto seconds=ns/billion,remainder=ns%billion;
- if(seconds>std::numeric_limits<std::uint64_t>::max()/rate)return false;
- game::ClockQuantization49J q;
- if(!game::quantizeCounter49J(seconds*rate+remainder*rate/billion,q))return false;
- clock.lastNanoseconds=ns;out=std::bit_cast<float>(q.scaledMillisecondBits);return true;
-}
-}
+namespace rr::platform {
 bool OriginalUiGarageCameraFrame50KG::readFinalSearchInvocation2805F0(
  const OriginalUiGaragePageOwner50KG& page,const OriginalUiGarageVisibility50KG& visibility,
  const game::OriginalWreckComponent50LA& receiver,std::uint64_t& serial)const noexcept {
@@ -60,7 +46,7 @@ bool OriginalUiGarageDrawContribution50KG::finishRenderer2440E0(Diagnostic& d)no
  if(view.overlay494)return fail(d,0x25B180); //Required25DBB0 image effect.
  if(view.completed300!=1u){
    if(view.covered2F4||view.increasing2F8||view.decreasing2FC)return fail(d,0x25B200);
-   float now=0;if(!videoMilliseconds(clock,now))return fail(d,0x25B334);
+   float now=0;if(!game::sampleHostFloatMilliseconds50ID(clock,now))return fail(d,0x25B334);
    view.lastMilliseconds3C4=now; //Actual inactive25B200 branch still writes time.
  }
  game::OriginalVideoFadeDraw fade;

@@ -352,11 +352,13 @@ public:
 class OriginalGcIntroExitOwner final {
     unsigned phase_=0;std::size_t nextRacer_=0;
     bool begun_=false,completed_=false;
+    OriginalCameraExitFadeRequest2AED60 fadeRequest_;
     std::uint64_t generation_=0,controllerKey_=0;
     OriginalRaceViewportCall viewportCall_;
     OriginalEventStartMusic music_;
 public:
     bool complete() const noexcept {return completed_;}
+    bool requestPending()const noexcept{return fadeRequest_.pending();}
     //RacerBank must be the actual stable50HN Bank. The references point to
     //its existing live arena, whose registered slots contain BaseTail/fields.
     //No GcStartRacerEffectBank shadow state or pretend Player owner is used.
@@ -395,7 +397,7 @@ public:
                     resetOriginalCameraRacerStartFields(liveTail,liveFields);
                 });
                 break;
-            case 2:r=requestOriginalCameraExitFade2AED60(b.actualFadeManagerA8,b.actualApplicationMode22C,b.video,b.sharedClock);break;
+            case 2:r=fadeRequest_.invoke(b.actualFadeManagerA8,b.actualApplicationMode22C,b.video,b.sharedClock);break;
             case 3:
                 if(b.taExitReason>=2&&(!b.introMusicFadeRequest||!b.introMusicFadeRequest(b.startMusicContext,.5f)))
                     return {S::sourcePath,0x1a4ab0};

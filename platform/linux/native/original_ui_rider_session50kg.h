@@ -115,6 +115,9 @@ struct OriginalUiRiderSessionSnapshot50KG {
     game::OriginalUiApertureSnapshot50KG aperture{};
     OriginalUiMainSessionAudioReceipt50KG audio{};
     game::OriginalUiRiderVoiceChoiceReceipt50KG voice{};
+    // Constructor1E7E98 zero; no page-entry reset. A real second Confirm
+    // while blocked arms0.35s. Update retains the original negative overshoot.
+    float confirmStopTimer7D24=0;
 };
 // Actual bounded Rider5/1 lifecycle and frame owner. Default-unlocked entry,
 // directional selection, normal Back and mode0/2 Confirm proposals use real resource,

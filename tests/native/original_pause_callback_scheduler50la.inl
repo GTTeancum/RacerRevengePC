@@ -1,13 +1,13 @@
 #pragma once
 namespace original_pause_observation50LA {
-inline bool Owner::attachedLifecycle(const Camera& camera,
+inline bool Owner::retainedAttachedLifecycle(const Camera& camera,
     const rr::game::OriginalPauseStorage50LA& pause)const noexcept {
     if(lifecycleRejected_||!application_||!pause.entity_||!pause.entity_->initialized||pause.entity_->releasing||
        camera.generation_!=cameraGeneration_||camera.actual_.humanCount34!=0)return false;
     const auto controls=controls_.lock();const auto track=track_.lock();
     const auto& race=application_->sourceRace28COwner_;
     if(!controls||!track||application_->controlsProfile!=controls||
-       !raceIdentity(camera,*track,pause,*controls)||!race||race->pause100_.get()!=&pause||
+       !retainedRaceIdentity(camera,*track,pause,*controls)||!race||race->pause100_.get()!=&pause||
        !race->nativeRootAttached_||race->application_!=application_->entities()||
        race->entity_.sessionGeneration!=cameraGeneration_)return false;
     const auto& c=pause.entity_->component;
@@ -15,6 +15,11 @@ inline bool Owner::attachedLifecycle(const Camera& camera,
         c.parent1C==application_->entities()->application10()&&c.mask20==0x1402u&&
         !(c.flags29&8u)&&!c.firstChild18&&!c.descendants24&&
         pause.entity_->currentForest();
+}
+inline bool Owner::attachedLifecycle(const Camera& camera,
+    const rr::game::OriginalPauseStorage50LA& pause)const noexcept {
+    return retainedAttachedLifecycle(camera,pause)&&
+        application_->consumedRaAll8CameraCustodyNative34Current(camera);
 }
 inline bool Owner::nativeSpectatorMenuOpen()const noexcept {
     const auto pause=pause_.lock();const auto camera=camera_.lock();
@@ -61,7 +66,11 @@ inline bool Owner::closeLifecycle1BE830(Diagnostic& d)const noexcept {
 }
 inline bool Owner::closeNativeSpectatorMenuForShutdown(Diagnostic& d)const noexcept {
     d={};const auto pause=pause_.lock();const auto camera=camera_.lock();
-    if(!pause||!camera||!attachedLifecycle(*camera,*pause))return false;
+    // A gameplay failure can invalidate live Bank/Display admission while this
+    // exact world still owns its Session. An already inactive Pause has no
+    // close callback left to run; retain the original cleanup path without
+    // claiming that failed native camera work completed.
+    if(!pause||!camera||!retainedAttachedLifecycle(*camera,*pause))return false;
     if(!pause->active200_)return true;
     //Explicit native shutdown invokes actual close directly, regardless of row.
     //No invented confirm edge, selection mutation, or row-confirm feedback.

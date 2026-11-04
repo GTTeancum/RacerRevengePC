@@ -246,6 +246,10 @@ Application::~Application() {
         // cleanup: failed-prefix consumers and their mixer remain owned.
         if(garageAudioOwnerThread_!=std::this_thread::get_id()||garageAudioBackingOwner_||garageCustodyOwner_)std::terminate();
         if(!rr::game::OriginalVideoPreFlipList50KG::applicationMayRetire(*this))std::terminate();
+        // Native source-prefix revocation only. Keep partial constructor and
+        // publication backing until normal member destruction, with no claim
+        // that25A300 teardown or any original video frame call has returned.
+        if(!sourceVideoProduction_.closeNative(*this))std::terminate();
         // Checked audio retirement must precede lifetime invalidation. This
         // assertion does not clear rows, flush registrations, or drain owners.
         if(!rr::platform::OriginalAudioPendingWaves50KG::applicationMayRetire(*this))std::terminate();

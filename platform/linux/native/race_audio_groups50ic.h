@@ -3,7 +3,10 @@
 // mixer. Host voice-slot assignments are supplied explicitly by each provider.
 #include "audio_mixer50hd.h"
 #include "../../../src/game/announcer_callbacks50ic.h"
+#include "../../../src/game/original_ui_game_options_controller50kg.h"
+#include "../../../src/game/original_application_animation_clock50kg.h"
 #include <array>
+#include <bit>
 #include <memory>
 #include <thread>
 #include "../../../src/game/original_application_entities50la.h"
@@ -14,9 +17,11 @@
 #include "native_race_intro_transport50la.h"
 
 namespace live_audio50HF { class Owner; }
+namespace interactive_loop50DU { struct Context; }
 namespace rr::game { class OriginalRaceConstructor50LA; class OriginalGcIntroExitOwner; }
 namespace rr::platform {
 class RaceAudioGroups50IC final {
+    friend struct ::interactive_loop50DU::Context;
     friend class OriginalApplicationAural50KG;
     friend class ::ra_pod_scene50LA::Owner;
     friend class ::live_audio50HF::Owner;
@@ -119,15 +124,15 @@ public:
         if(!current())return {};
         auto groups=groups_;auto duck=duck_;
         auto receipt=game::beginAnnouncerDucking50IC(groups,duck);
-        if(!receipt.complete||!synchronize(groups,receipt))return {};
-        groups_=groups;duck_=duck;return receipt;
+        if(!receipt.complete||!synchronizeDucking(receipt,duck,true))return {};
+        return receipt;
     }
     game::AnnouncerDuckingReceipt50IC end()noexcept {
         if(!current())return {};
         auto groups=groups_;auto duck=duck_;
         auto receipt=game::endAnnouncerDucking50IC(settings_,groups,duck);
-        if(!receipt.complete||!synchronize(groups,receipt))return {};
-        groups_=groups;duck_=duck;return receipt;
+        if(!receipt.complete||!synchronizeDucking(receipt,duck,false))return {};
+        return receipt;
     }
     // Audio suffix2356EC..700 reached by actual1ACF50 World4D8 setter.
     // The original caller must first perform Entity142040 propagation; this
@@ -160,6 +165,140 @@ public:
     // live playback or execute source2353D0 logical-member callbacks.
     bool retireNativeVoiceBindings()noexcept;
 private:
+    // Shared private native Pause transport. The human loop authenticates
+    // its Application/profile/Camera/liveAudio; the canonical Pause caller
+    // separately authenticates actual Race/group/World ownership. Neither uses
+    // the host next-session settings copy. This leaf alone is not an original
+    // Pause callback or a source26D200/SPU command receipt.
+    bool observeNativePauseAudio(const game::OriginalUiGameSettingsProfile50KG& profile,
+        const std::shared_ptr<game::OriginalApplicationEntities50LA>& application,
+        const AudioMixer50HD& mixer,std::array<std::uint32_t,4>& out)const noexcept {
+        namespace d=game::announcer_callbacks50IC_detail;
+        if(std::fegetround()!=FE_TONEAREST||!application||!uses(mixer)||
+           !game::validOriginalUiGameSettingsProfile50KG(profile)||!d::settings(settings_)||
+           !d::valid(groups_)||!mixer_->canRecordControlChanges())return false;
+        const std::array<std::uint32_t,4> configured{{std::uint32_t(settings_.effects11020),
+            std::uint32_t(settings_.music11024),std::uint32_t(settings_.character11028),
+            std::uint32_t(settings_.announcer1102C)}};
+        if(profile.volume11020!=configured)return false;
+        if(coldStarted_){
+            if(coldApplication_!=application||coldMixer_!=mixer_||coldEpoch_!=epoch_||
+               coldNext_!=game::raceAudioGroupCount50IC||application->attachmentLock423F58())return false;
+            for(const auto& group:coldGroups_){
+                if(!group.constructed||!group.loaded||group.entity.sessionGeneration!=coldSession_||
+                   group.slot40<0||std::size_t(group.slot40)>=application->soundGroups434A10_.size()||
+                   application->soundGroups434A10_[group.slot40]!=&group.entity)return false;
+            }
+        }
+        // Compare to CURRENT group words, not the configured restore target:
+        // ducking, or a prior Pause adjustment while ducked, can differ from it.
+        for(std::size_t i=0;i<count_;++i){
+            if(!represented(bindings_[i])){
+                if(bindings_[i]!=game::RaceAudioGroup50IC::Unrepresented)return false;
+                continue;
+            }
+            if(!mixer_->hasVoiceGroupGain50IC(i)||
+               mixer_->groupGains50IC_[i]!=normalized(groups_,bindings_[i])||
+               mixer_->groupPaused50IC_[i]!=(groups_.state44[static_cast<std::size_t>(bindings_[i])]!=0))return false;
+        }
+        out=configured;return true;
+    }
+    bool adjustNativePauseAudio(game::OriginalUiGameSettingsProfile50KG& profile,
+        const std::shared_ptr<game::OriginalApplicationEntities50LA>& application,
+        AudioMixer50HD& mixer,const game::OriginalApplicationAnimationClockView50KG& clock,
+        const std::array<std::uint32_t,4>& observed,std::uint32_t row,bool increase)noexcept {
+        namespace d=game::announcer_callbacks50IC_detail;
+        std::array<std::uint32_t,4> current{};std::uint32_t paused=0;
+        if(row>=4||!observeNativePauseAudio(profile,application,mixer,current)||current!=observed||
+           !clock.readPause11C(paused)||!paused)return false;
+        const auto old=current[row];
+        if((increase&&old==100u)||(!increase&&old==0u))return true; //Source limit: no store/setter.
+        const auto next=increase?(old>90u?100u:old+10u):(old<10u?0u:old-10u);
+        auto configured=settings_;
+        auto* field=row==0?&configured.effects11020:row==1?&configured.music11024:
+            row==2?&configured.character11028:&configured.announcer1102C;
+        *field=static_cast<std::int32_t>(next);
+        using G=game::RaceAudioGroup50IC;
+        const std::array<G,3> order=row==0?std::array<G,3>{{G::Effects110,G::Engines114,G::World4D8}}:
+            std::array<G,3>{{row==1?G::Music118:row==2?G::Character11C:G::Announcer120,
+                G::Unrepresented,G::Unrepresented}};
+        const std::size_t writes=row==0?3u:1u;
+        std::array<std::int32_t,3> levels{};std::array<float,3> gains{};
+        std::uint64_t changes=0;
+        for(std::size_t n=0;n<writes;++n){
+            // Same bounded binary32 product/truncation as the existing race
+            // setup and restore. Native admission requires FE_TONEAREST.
+            levels[n]=d::restored(order[n],configured);
+            gains[n]=static_cast<float>(levels[n])/100.f;
+            for(std::size_t i=0;i<count_;++i)if(bindings_[i]==order[n]){
+                if(!mixer_->nativeWetVoiceAdmitted(i)&&!mixer_->nativeRaceIntroClaimed(i))return false;
+                if(mixer_->groupGains50IC_[i]!=gains[n])++changes;
+            }
+        }
+        // Preflight the entire native gain transaction, including revision
+        // capacity, before the source profile stores. No counter wrap/retry.
+        if(!mixer_->canRecordControlChanges(changes))return false;
+        auto& value=profile.volume11020[row];
+        value+=increase?10u:std::uint32_t(-10); //17FE30/90/F0 or17FF50 first store.
+        if(increase){if(value>100u)value=100u;}
+        else if(std::bit_cast<std::int32_t>(value)<0)value=0u;
+        settings_=configured; //SAME current target for later actual duck end.
+        for(std::size_t n=0;n<writes;++n){
+            groups_.volume38[static_cast<std::size_t>(order[n])]=levels[n]; //235500 BEFORE transport.
+            for(std::size_t i=0;i<count_;++i)if(bindings_[i]==order[n]){
+                // All setter rejection/capacity paths were preflighted on
+                // this serial owner. Never roll back or replay reached stores.
+                if(!mixer_->setVoiceGroupGain50IC(i,gains[n]))std::terminate();
+            }
+        }
+        // Preserve duck flags/deltas, state44, per-voice controls and cursors.
+        // No source feedback3/4/6, mixing, pause toggling or disk save is implied.
+        return true;
+    }
+    // Explicit native audio-only restore action. Source1865CC..F8 provides
+    // the four defaults; source race setup supplies category scale/order.
+    // This is NOT whole Game Options1F6840, a profile reset, or Pause input.
+    bool restoreNativePauseVolumes(game::OriginalUiGameSettingsProfile50KG& profile,
+        const std::shared_ptr<game::OriginalApplicationEntities50LA>& application,
+        AudioMixer50HD& mixer,const game::OriginalApplicationAnimationClockView50KG& clock,
+        const std::array<std::uint32_t,4>& observed)noexcept {
+        namespace d=game::announcer_callbacks50IC_detail;
+        std::array<std::uint32_t,4> current{};std::uint32_t paused=0;
+        if(!observeNativePauseAudio(profile,application,mixer,current)||current!=observed||
+           !clock.readPause11C(paused)||!paused)return false;
+        constexpr auto defaults=game::freshOriginalAudioSettings50IC();
+        using G=game::RaceAudioGroup50IC;
+        constexpr std::array<G,6> order{{G::Effects110,G::Engines114,G::World4D8,
+            G::Music118,G::Character11C,G::Announcer120}};
+        std::array<std::int32_t,6> levels{};std::array<float,6> gains{};
+        std::uint64_t changes=0;
+        for(std::size_t n=0;n<order.size();++n){
+            levels[n]=d::restored(order[n],defaults);
+            gains[n]=static_cast<float>(levels[n])/100.f;
+            for(std::size_t i=0;i<count_;++i)if(bindings_[i]==order[n]){
+                if(!mixer_->nativeWetVoiceAdmitted(i)&&!mixer_->nativeRaceIntroClaimed(i))return false;
+                if(mixer_->groupGains50IC_[i]!=gains[n])++changes;
+            }
+        }
+        // All six native categories form one admission, not four partially
+        // successful slider edits. Source/profile stores begin only afterward.
+        if(!mixer_->canRecordControlChanges(changes))return false;
+        profile.volume11020[0]=std::uint32_t(defaults.effects11020); //1865CC
+        profile.volume11020[1]=std::uint32_t(defaults.music11024); //1865DC
+        profile.volume11020[2]=std::uint32_t(defaults.character11028); //1865EC
+        profile.volume11020[3]=std::uint32_t(defaults.announcer1102C); //1865F8
+        settings_=defaults; // Same actual target later consumed by duck end.
+        for(std::size_t n=0;n<order.size();++n){
+            groups_.volume38[static_cast<std::size_t>(order[n])]=levels[n]; //235500 before transport.
+            for(std::size_t i=0;i<count_;++i)if(bindings_[i]==order[n])
+                if(!mixer_->setVoiceGroupGain50IC(i,gains[n]))std::terminate();
+        }
+        // Deliberately reapply even if profile values were already defaults:
+        // current ducked groups may differ. Like the live volume setters,
+        // retain duck flags/deltas rather than inventing an end/begin callback.
+        // Auxiliary, sound mode, flags11050, HUD, pause and playback survive.
+        return true;
+    }
     struct ColdSound;
     struct ColdGroup;
     struct ColdTaIntroEmitter;
@@ -337,20 +476,70 @@ private:
                             game::RaceAudioGroup50IC group)noexcept {
         return static_cast<float>(groups.volume38[static_cast<std::size_t>(group)])/100.f;
     }
-    bool synchronize(const game::RaceAudioGroups50IC& groups,
-                     const game::AnnouncerDuckingReceipt50IC& receipt)noexcept {
-        if(!current()||!game::announcer_callbacks50IC_detail::valid(groups)||
-           !receipt.complete||receipt.count>receipt.writes.size())return false;
-        for(std::size_t i=0;i<count_;++i)
-            if(represented(bindings_[i])&&!mixer_->hasVoiceGroupGain50IC(i))return false;
-        for(std::size_t n=0;n<receipt.count;++n)
-            if(!represented(receipt.writes[n].group))return false;
-        // Preserve original callback group-write order. The Dax group has no
-        // begin/end writes and is never touched by this callback propagation.
-        for(std::size_t n=0;n<receipt.count;++n)
-            for(std::size_t i=0;i<count_;++i)
-                if(bindings_[i]==receipt.writes[n].group&&
-                   !mixer_->setVoiceGroupGain50IC(i,normalized(groups,bindings_[i])))return false;
+    // Scalar helpers above prepare the exact callback writes on copies. A
+    // native rejection must leave ALL live groups, duck words and gains intact;
+    // there is no source receipt for a partly applied native transaction.
+    bool synchronizeDucking(const game::AnnouncerDuckingReceipt50IC& receipt,
+        const game::AnnouncerDuckingState50IC& nextDuck,bool beginning)noexcept {
+        namespace d=game::announcer_callbacks50IC_detail;
+        if(!current()||std::fegetround()!=FE_TONEAREST||!d::valid(groups_)||
+           !receipt.complete||receipt.count>duck_.flags.size())return false;
+        // Compare actual bound voices with CURRENT source group words, not
+        // settings_ or an assumed duck fraction. A legitimate live Pause edit
+        // can replace a group level while its original duck flag stays set.
+        for(std::size_t i=0;i<count_;++i){
+            if(!represented(bindings_[i])){
+                if(bindings_[i]!=game::RaceAudioGroup50IC::Unrepresented)return false;
+                continue;
+            }
+            if(!mixer_->hasVoiceGroupGain50IC(i)||
+               mixer_->groupGains50IC_[i]!=normalized(groups_,bindings_[i])||
+               mixer_->groupPaused50IC_[i]!=(groups_.state44[static_cast<std::size_t>(bindings_[i])]!=0))return false;
+        }
+        std::array<float,5> gains{};
+        std::array<std::size_t,5> flagIndex{};
+        std::size_t n=0;std::uint64_t changes=0;
+        // Only the actual callback's active subsequence is admitted. This also
+        // proves each group is written once, so revision costs cannot double
+        // count an intermediate gain or accidentally touch Announcer/Auxiliary.
+        for(std::size_t k=0;k<duck_.flags.size();++k){
+            if(beginning?duck_.flags[k]!=0:duck_.flags[k]==0)continue;
+            if(n>=receipt.count)return false;
+            const auto& write=receipt.writes[n];
+            if(write.group!=d::groups[k]||!d::volume(write.volume)||
+               write.callSite!=(beginning?d::beginSites[k]:d::endSites[k])||
+               nextDuck.flags[k]!=(beginning?1u:0u)||
+               nextDuck.deltas[k]!=(beginning?
+                   groups_.volume38[static_cast<std::size_t>(write.group)]-write.volume:
+                   duck_.deltas[k]))return false;
+            flagIndex[n]=k;gains[n]=static_cast<float>(write.volume)/100.f;
+            for(std::size_t i=0;i<count_;++i)if(bindings_[i]==write.group){
+                // Match the setter's real lease predicate, including the
+                // existing typed race-intro exception. Never steal wet voices.
+                if(!mixer_->nativeWetVoiceAdmitted(i)&&!mixer_->nativeRaceIntroClaimed(i))return false;
+                if(mixer_->groupGains50IC_[i]!=gains[n])++changes;
+            }
+            ++n;
+        }
+        // This checks all admitted setters before ANY source or mixer store.
+        // An already exhausted identity rejects even a zero-write callback;
+        // an unexhausted terminal revision still permits genuine no-op gains.
+        if(n!=receipt.count||!mixer_->canRecordControlChanges(changes))return false;
+        for(n=0;n<receipt.count;++n){
+            const auto& write=receipt.writes[n];const auto k=flagIndex[n];
+            groups_.volume38[static_cast<std::size_t>(write.group)]=write.volume; //235500 first.
+            // Preserve source callback group order and the existing native
+            // ascending voice order. All setter failure paths and revision
+            // costs are preflighted on this serial owner, with no callbacks.
+            for(std::size_t i=0;i<count_;++i)if(bindings_[i]==write.group)
+                if(!mixer_->setVoiceGroupGain50IC(i,gains[n]))std::terminate();
+            //1A3E20/24 and counterparts follow the begin setter's return.
+            //1A3F64 and counterparts clear only the flag after end's setter.
+            if(beginning)duck_.deltas[k]=nextDuck.deltas[k];
+            duck_.flags[k]=nextDuck.flags[k];
+        }
+        // No blanket copy after transport: retain exact reached store order,
+        // untouched deltas, state44, ordinary voice controls and playback.
         return true;
     }
     AudioMixer50HD* mixer_=nullptr;

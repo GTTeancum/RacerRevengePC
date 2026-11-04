@@ -103,8 +103,101 @@ class OriginalStandardMaterialDomain50LA final {
         }
         serviceAppStart_=std::move(archive);return true;
     }
+    // Source-startup-only bounded receiver. Native owner construction is not
+    // original382B38 publication. Retain this SAME table before its first read,
+    // including partial bytes and the resolver's actual failure history.
+    bool readSourceAppStartNames17CAD4(OriginalStandardMaterialDiagnostic50LA& d)noexcept {
+        d={};
+        if(!resolver_||!serviceAppStart_||!archiveProvider_||earlyAppStartMaterials_||
+           programs_||application_||prepared()||
+           resolver_->registeredAppStart17CAB8()!=serviceAppStart_){
+            d.status=OriginalStandardMaterialStatus50LA::phase;return false;
+        }
+        try {earlyAppStartMaterials_=std::make_shared<OriginalStandardMaterialTable50LA>();}
+        catch(...){d.status=OriginalStandardMaterialStatus50LA::allocation;return false;}
+        auto& table=*earlyAppStartMaterials_;
+        table.sourceNamesReadApp_=serviceAppStart_;
+        table.sourceNamesReadAttempted_=true;
+        //131230 ->12EC90 ->2986D4 ->12FB30 ->131040, using the canonical
+        //resolver's genuine source rows, encoded input and decoded scratch.
+        if(!resolver_->readAppStartNames17CAD4(table.sourceNamesReadBytes_,d.texture,true)){
+            d.status=OriginalStandardMaterialStatus50LA::source;return false;
+        }
+        table.sourceNamesReadReturned_=true;
+        //No29871C lowercase,2987DC row backing,14D31C association backing,
+        //template preparation or17CAD4 return. Retain remaining source work.
+        return true;
+    }
+    bool sourceAppStartNamesReadCurrent(
+        const std::shared_ptr<OriginalStandardMaterialTable50LA>& table,
+        const std::shared_ptr<const OriginalUiArchive50KG>& archive)const noexcept {
+        return table&&earlyAppStartMaterials_==table&&serviceAppStart_==archive&&
+            table->sourceNamesReadApp_==archive&&table->sourceNamesReadAttempted_&&
+            table->sourceNamesReadReturned_&&!table->appStartNames_&&!table->storage_;
+    }
+    bool allocateSourceAppStartNameRows29871C(
+        const std::shared_ptr<OriginalStandardMaterialTable50LA>& table,
+        const std::shared_ptr<const OriginalUiArchive50KG>& archive,
+        OriginalStandardMaterialDiagnostic50LA& d)noexcept {
+        d={};
+        if(!sourceAppStartNamesReadCurrent(table,archive)||!resolver_||programs_||application_||prepared()||
+           resolver_->registeredAppStart17CAB8()!=archive){
+            d.status=OriginalStandardMaterialStatus50LA::phase;return false;
+        }
+        return table->allocateSourceAppStartNameRows29871C(d);
+    }
+    bool sourceAppStartNameRowsCurrent(
+        const std::shared_ptr<OriginalStandardMaterialTable50LA>& table,
+        const std::shared_ptr<const OriginalUiArchive50KG>& archive)const noexcept {
+        return sourceAppStartNamesReadCurrent(table,archive)&&table->sourceNameRowsAttempted_&&
+            table->sourceNamesLowered_&&table->sourceNamesTokenized_&&table->sourceNamesCount10Written_&&
+            table->sourceNameRowsAllocationAttempted_&&table->sourceNameRows1CPublished_&&
+            table->sourceNameRows1C_&&table->sourceNameRowsPC_==0x2987e8;
+    }
+    bool populateSourceAppStartNameRows2987E8(
+        const std::shared_ptr<OriginalStandardMaterialTable50LA>& table,
+        const std::shared_ptr<const OriginalUiArchive50KG>& archive,
+        OriginalStandardMaterialDiagnostic50LA& d)noexcept {
+        d={};
+        if(!sourceAppStartNameRowsCurrent(table,archive)||!resolver_||programs_||application_||prepared()||
+           resolver_->registeredAppStart17CAB8()!=archive){
+            d.status=OriginalStandardMaterialStatus50LA::phase;return false;
+        }
+        return table->populateSourceAppStartNameRows2987E8(d);
+    }
+    bool sourceAppStartMaterialNamesCurrent(
+        const std::shared_ptr<OriginalStandardMaterialTable50LA>& table,
+        const std::shared_ptr<const OriginalUiArchive50KG>& archive)const noexcept {
+        return sourceAppStartNamesReadCurrent(table,archive)&&table->sourceAppStartNamesReturned17CAD4();
+    }
+    //Native name/index prerequisite for the actual DefaultMT lookup. This
+    //binds the existing canonical382B70 owner; it is not a17CAE8 registration
+    //or a replay of3C8C10/1505C0, and it supplies no executable/GPU programs.
+    bool prepareNativeSourceStartupPrograms17CAE8(
+        const std::shared_ptr<OriginalStandardMaterialTable50LA>& table,
+        const std::shared_ptr<const OriginalUiArchive50KG>& archive,
+        OriginalStandardMaterialDiagnostic50LA& d)noexcept {
+        d={};
+        if(!sourceAppStartMaterialNamesCurrent(table,archive)||!resolver_||programs_||application_||prepared()||
+           resolver_->registeredAppStart17CAB8()!=archive){
+            d.status=OriginalStandardMaterialStatus50LA::phase;return false;
+        }
+        try {programs_=std::make_shared<OriginalStandardProgramTable50LA>();}
+        catch(...){d.status=OriginalStandardMaterialStatus50LA::allocation;return false;}
+        //Retain this exact owner even if its preparation fails. No adoption
+        //of another caller's program table and no replacement after failure.
+        if(!programs_->prepareFresh(d.program)){
+            d.status=OriginalStandardMaterialStatus50LA::program;return false;
+        }
+        return true;
+    }
     bool prepareAppStartNames17CAD4(OriginalStandardMaterialDiagnostic50LA& d)noexcept {
-        d={};if(earlyAppStartMaterials_)return true; // Native continuation only.
+        d={};
+        if(earlyAppStartMaterials_){
+            if(earlyAppStartMaterials_->appStartNamesPrepared17CAD4())return true;
+            //A retained source read/failure is NOT a completed name table.
+            d.status=OriginalStandardMaterialStatus50LA::phase;return false;
+        }
         if(!resolver_||!serviceAppStart_||application_||prepared()){
             d.status=OriginalStandardMaterialStatus50LA::source;return false;
         }
@@ -125,7 +218,8 @@ class OriginalStandardMaterialDomain50LA final {
     }
     bool prepareAppStartPrograms17CAE8(OriginalStandardMaterialDiagnostic50LA& d)noexcept {
         d={};if(programs_)return programs_->prepared();
-        if(!earlyAppStartMaterials_||!resolver_||!serviceAppStart_||application_||prepared()){
+        if(!earlyAppStartMaterials_||!earlyAppStartMaterials_->appStartNamesPrepared17CAD4()||
+           !resolver_||!serviceAppStart_||application_||prepared()){
             d.status=OriginalStandardMaterialStatus50LA::source;return false;
         }
         try {

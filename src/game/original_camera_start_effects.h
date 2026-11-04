@@ -9,6 +9,7 @@
 #include <optional>
 
 namespace original_main_entry50KG { struct Application; }
+namespace original_camera_session50KX { class AsyncRetainedFade; }
 namespace rr::game {
 // These are additional fields of the ACTUAL application/video/race owners.
 // Borrow them across camera calls; do not construct private shadow copies.
@@ -42,12 +43,52 @@ struct OriginalVideoFadeState {
 // Source260320's nonzero source-render callback and application mode6 assert
 // are NOT converted into success. Clock is the same application-wide host
 // backend used by101A50;400 retains49J FLOAT milliseconds, not uint32 time.
-OriginalCameraStartResult requestOriginalCameraExitFade2AED60(
-    std::int32_t actualFadeManagerA8,std::int32_t actualApplicationMode22C,
-    OriginalVideoFadeState&,HostMonotonicClock50ID&) noexcept;
+// One actual2AED60(500,0,0,*) request prefix. Camera T0=0 returns after
+// this prefix; TA skip/Results T0=1 must still own the actual260850 wait.
+// Retain separately for each real caller; never retry through a fresh cursor.
+class OriginalCameraExitFadeRequest2AED60 final {
+    OriginalVideoFadeState* video_=nullptr;
+    HostMonotonicClock50ID* clock_=nullptr;
+    std::chrono::steady_clock::time_point epoch_{};
+    OriginalVideoFadeState expected_;
+    std::int32_t manager_=0,mode_=0;
+    OriginalCameraStartResult result_{};
+public:
+    OriginalCameraExitFadeRequest2AED60()=default;
+    OriginalCameraExitFadeRequest2AED60(const OriginalCameraExitFadeRequest2AED60&)=delete;
+    OriginalCameraExitFadeRequest2AED60& operator=(const OriginalCameraExitFadeRequest2AED60&)=delete;
+    bool pending()const noexcept{return video_&&result_.status!=OriginalCameraStartStatus::complete;}
+    // Same Video, clock/epoch and actual parent arguments. Failed calls retain
+    // partial effects and repeat only their cached failure, never the prefix.
+    OriginalCameraStartResult invoke(std::int32_t actualFadeManagerA8,std::int32_t actualApplicationMode22C,
+        OriginalVideoFadeState&,HostMonotonicClock50ID&)noexcept;
+};
 enum class OriginalVideoFadeDirection : std::uint8_t { out260850,in261630 };
-// The two real video virtual request methods. They do not execute a fade or
-// manufacture an alpha value. Unknown constructor3E8 remains explicit.
+// One retained ASYNC request: OUT260320(true,false) or IN260610(true).
+// Source target/direction/400 stores survive later failure. A retry returns
+// the same terminal failure instead of re-entering the newly set no-op bit.
+// Pair each instance with one real caller invocation/consumer; never reset it
+// to retry failed source work or reuse successful custody for another request.
+class OriginalVideoAsyncRequest50LA final {
+    OriginalVideoFadeState* video_=nullptr;
+    HostMonotonicClock50ID* clock_=nullptr;
+    std::chrono::steady_clock::time_point epoch_{};
+    OriginalVideoFadeState expected_;
+    OriginalVideoFadeDirection direction_=OriginalVideoFadeDirection::out260850;
+    std::int32_t mode_=0,duration_=0;
+    OriginalCameraStartResult result_{};
+public:
+    OriginalVideoAsyncRequest50LA()=default;
+    OriginalVideoAsyncRequest50LA(const OriginalVideoAsyncRequest50LA&)=delete;
+    OriginalVideoAsyncRequest50LA& operator=(const OriginalVideoAsyncRequest50LA&)=delete;
+    bool attempted()const noexcept{return video_!=nullptr;}
+    bool pending()const noexcept{return attempted()&&result_.status!=OriginalCameraStartStatus::complete;}
+    // Borrows the actual Video and one application clock through the entire
+    // caller continuation. Shared lastNanoseconds may advance elsewhere.
+    // Re-invoking a successful request never returns complete a second time.
+    OriginalCameraStartResult invoke(OriginalVideoFadeDirection,OriginalVideoFadeState&,
+        HostMonotonicClock50ID&,std::int32_t applicationMode22C,std::int32_t durationMilliseconds)noexcept;
+};
 // Exact17C5C8 zero-duration/nonasync/no-redraw prefix. Preserves source
 // stores and the real400 clock sample before the unresolved3E8 read. Never
 // certifies the request's return or invents initial alpha/interval arithmetic.
@@ -58,12 +99,6 @@ class OriginalLoadingFadePrefix17C5C8 final {
     static OriginalCameraStartResult advance(
         OriginalVideoFadeState&,HostMonotonicClock50ID&,std::int32_t applicationMode22C)noexcept;
 };
-OriginalCameraStartResult requestOriginalVideoFade260320(
-    OriginalVideoFadeState&,HostMonotonicClock50ID&,std::int32_t applicationMode22C,
-    std::int32_t durationMilliseconds,bool asynchronous,bool redrawSource);
-OriginalCameraStartResult requestOriginalVideoFade260610(
-    OriginalVideoFadeState&,HostMonotonicClock50ID&,std::int32_t applicationMode22C,
-    std::int32_t durationMilliseconds,bool asynchronous);
 //1B7D50->2AEE90(500,1,0). Fresh uncovered video genuinely skips this call.
 //When covered, it writes the real manager A8=8/98=500; its later2AE7D0
 //consumer requests asynchronous260610. These manager fields are borrowed.
@@ -94,10 +129,15 @@ public:
 class OriginalVideoBlockingFade final {
     OriginalVideoFadeState* video_=nullptr;
     OriginalVideoBlockingBackend* backend_=nullptr;
+    // Same actual application clock and epoch for every pending phase. This
+    // is a borrow, not a private time origin; all owners must outlive the
+    // entire pending continuation and its required backend retirement.
+    HostMonotonicClock50ID* clock_=nullptr;
+    std::chrono::steady_clock::time_point clockEpoch_{};
     OriginalVideoFadeDirection direction_=OriginalVideoFadeDirection::out260850;
     unsigned phase_=0;std::uint64_t ordinal_=0;
     std::int32_t startAlpha_=0,alpha_=0,step_=1,distance_=0;
-    float startMilliseconds_=0,waitUntilDelta_=0;
+    float startMilliseconds_=0;
     OriginalVideoFadeState parameters_;
     bool completed_=false;
 public:
@@ -108,6 +148,12 @@ public:
     //Call at25A9C0's reached25AA4C/25AA78, after its real frame drain and
     //261E80 registered update callbacks. No simulation advance while pending.
     //nullptr is a concrete missing-backend result, never completed rendering.
+    // The same borrowed clock identity/epoch is sealed before backend begin.
+    // Legitimate shared lastNanoseconds advances remain allowed. A changed
+    // epoch/clock or represented Video field rejects before further backend
+    // work or sampling, including after a successful synchronous backend return.
+    // Completed phases stay advanced; restoring admission cannot replay them.
+    // This guard does not cancel or release a pending renderer transaction.
     OriginalCameraStartResult advance(OriginalVideoFadeState&,HostMonotonicClock50ID&,
         OriginalVideoBlockingBackend*);
 };
@@ -116,12 +162,15 @@ public:
 // caller must retain Application/Video/clock/backend and its original input
 // batch, hold simulation, and retire/cancel the real backend before releasing
 // those owners. A separate instance is required for every source invocation;
-// the completed initial-Camera cursor is never reused. Currently uncalled.
+// the completed initial-Camera cursor is never reused. The actual retained
+// Results input continuation owns this separate cursor and real backend.
 class OriginalResultsBlockingFade2AED60 final {
+    OriginalCameraExitFadeRequest2AED60 request_;
     OriginalVideoBlockingFade fade_;
     OriginalVideoFadeState* video_=nullptr;
     HostMonotonicClock50ID* clock_=nullptr;
     OriginalVideoBlockingBackend* backend_=nullptr;
+    std::chrono::steady_clock::time_point epoch_{};
     bool requested_=false,finished_=false;
     OriginalCameraStartResult requestResult_{};
 public:
@@ -135,12 +184,48 @@ public:
         HostMonotonicClock50ID&,OriginalVideoBlockingBackend*);
     bool complete()const noexcept{return finished_;}
 };
-// Bounded numeric25B5D0 active-fade update. It owns no renderer draw primitive:
-// actual25E610 color is returned for the same shared video presentation owner.
+// Numeric25E610 arguments only, never a draw/completion receipt.
 struct OriginalVideoFadeDraw {
     bool reached25E610=false;
     std::uint32_t argb=0;
 };
+// One actual25B5D0 invocation. Preserves pre-draw alpha/time stores and waits
+// at25E610; completion flags are private post-return effects, not preparation.
+// The native retained-image owner alone may join its actual backend return.
+class OriginalVideoFadeUpdate25B5D0 final {
+    friend class ::original_camera_session50KX::AsyncRetainedFade;
+    enum class Phase : std::uint8_t {fresh,clock,draw,complete,failed};
+    enum class DrawReturn : std::uint8_t {covered,increasing,decreasing};
+    OriginalVideoFadeState* video_=nullptr;
+    HostMonotonicClock50ID* clock_=nullptr;
+    std::chrono::steady_clock::time_point epoch_{};
+    OriginalVideoFadeState expected_;
+    std::int32_t view_=0,count_=0;
+    Phase phase_=Phase::fresh;
+    DrawReturn return_=DrawReturn::covered;
+    OriginalVideoFadeDraw draw_{};
+    OriginalCameraStartResult result_{};
+    static bool sameFields(const OriginalVideoFadeState&,const OriginalVideoFadeState&)noexcept;
+    bool current(const OriginalVideoFadeState&,const HostMonotonicClock50ID&)const noexcept;
+    bool complete()const noexcept{return phase_==Phase::complete;}
+    // No caller-provided boolean/token may acknowledge25E610. Only the
+    // retained owner calls this after its real copyDrawAndComplete succeeds.
+    OriginalCameraStartResult afterNativeDrawComplete(OriginalVideoFadeState&,HostMonotonicClock50ID&)noexcept;
+public:
+    OriginalVideoFadeUpdate25B5D0()=default;
+    OriginalVideoFadeUpdate25B5D0(const OriginalVideoFadeUpdate25B5D0&)=delete;
+    OriginalVideoFadeUpdate25B5D0& operator=(const OriginalVideoFadeUpdate25B5D0&)=delete;
+    // Same actual Video, clock/epoch and camera arguments across retries.
+    // videoBackend/25E610 means a cached draw boundary, not completed drawing.
+    // Numeric/clock failure is cached: no repeated sample or prefix mutation.
+    OriginalCameraStartResult advance(OriginalVideoFadeState&,HostMonotonicClock50ID&,
+        std::int32_t actualApplicationViewIndex0C,std::int32_t actualCameraCount264,
+        OriginalVideoFadeDraw&)noexcept;
+};
+// One-shot prefix for callers with no draw owner. Complete is possible only
+// for no-draw paths. A required25E610 returns videoBackend and preserves only
+// its reached prefix. Caller must treat that boundary/failure as terminal;
+// use the retained cursor above when a real native draw can later return.
 OriginalCameraStartResult advanceOriginalVideoFade25B5D0(
     OriginalVideoFadeState&,HostMonotonicClock50ID&,
     std::int32_t actualApplicationViewIndex0C,std::int32_t actualCameraCount264,

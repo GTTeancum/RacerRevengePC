@@ -413,6 +413,32 @@ class OriginalApplicationEntities50LA final {
     // Native process-lifetime namespace, initialized from actual file-backed
     //zero data at36B0F0, not reset on menu/Scene entry.
     std::string collisionDirectory36B0F0_;
+    // Native historical-use barrier, not a guest flag or readiness token.
+    // All native value/reference consumers must use the observer below so
+    // even a retired borrower prevents a late replay of the startup write.
+    mutable bool collisionDirectoryNativeObserved_=false;
+    bool collisionDirectoryStartupWritten_=false;
+    const std::string& observeCollisionDirectory36B0F0()const noexcept {
+        if(nativeOwnerThread_!=std::this_thread::get_id())std::terminate();
+        collisionDirectoryNativeObserved_=true;return collisionDirectory36B0F0_;
+    }
+    enum class CollisionDirectoryStartupResult : std::uint8_t {authority,used,allocation,copied};
+    CollisionDirectoryStartupResult writeCollisionDirectory17CA88()noexcept {
+        if(nativeOwnerThread_!=std::this_thread::get_id()||!constructed_||released_)
+            return CollisionDirectoryStartupResult::authority;
+        if(collisionDirectoryNativeObserved_||collisionDirectoryStartupWritten_||
+           !collisionDirectory36B0F0_.empty()||attachmentLock423F58_||objectCount423F60_!=2||
+           entityAuthority_.count_!=2||entityAuthority_.enrollmentSerial_!=2||
+           entityAuthority_.nonRootEnrollmentObserved_)
+            return CollisionDirectoryStartupResult::used;
+        try {
+            // Exact immutable3A85B0, not the mutable model directory's value.
+            // Prepare native storage before the17CA88/90 copy; no partial
+            // source store is claimed if this native allocation fails.
+            std::string next="geometry\\";collisionDirectory36B0F0_.swap(next);
+            collisionDirectoryStartupWritten_=true;return CollisionDirectoryStartupResult::copied;
+        }catch(...){return CollisionDirectoryStartupResult::allocation;}
+    }
 #include "original_source_collision_category_startup50la.inl"
     // Borrow the exact immutable HOST namespace used by native track/query
     //consumers. This is not a recovered guest category registry or its values.

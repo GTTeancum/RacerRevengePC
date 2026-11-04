@@ -756,6 +756,198 @@ class OriginalRacerModelSceneOwner50LA final {
         return true;
     }
 
+    //Distinct source occurrences for Fog loader15FF6C/15FF7C. These private
+    //root-only adapters own neither the model nor its graph. The caller must
+    //authenticate its same wrapper/model74 lease before each invocation.
+    //Only the ready and dirty-parentless routes are admitted. Root siblings,
+    //nonnull graph parents, relative getters and observer work stay bounded.
+    struct SourcePosition28B1A0 {
+        const OriginalRacerModelSceneOwner50LA* owner=nullptr;
+        const SceneNode49P* canonicalNodes=nullptr;
+        std::uint32_t graphCount=0,sceneIndex=0,pc=0;
+        SceneNodeIndex49P firstChild184=none;
+        bool entered=false,refreshAttempted=false,worldReady=false,returned=false;
+        std::uint8_t flags190Before=0,flags190After=0,outputMask=0;
+        std::uint16_t refreshWordMask=0;
+        std::array<std::uint32_t,16> localBefore{},worldBefore{},world{};
+        std::array<std::uint32_t,3> output{}; //No emitterW or source scratchW.
+    };
+    struct SourceDirection28B9B0 {
+        const OriginalRacerModelSceneOwner50LA* owner=nullptr;
+        const SceneNode49P* canonicalNodes=nullptr;
+        std::uint32_t graphCount=0,sceneIndex=0,pc=0;
+        SceneNodeIndex49P firstChild184=none;
+        bool entered=false,refreshAttempted=false,worldReady=false;
+        bool arithmeticEntered=false,arithmeticReturned=false,returned=false;
+        std::uint8_t flags190Before=0,flags190After=0,outputMask=0,arithmeticMask=0;
+        std::uint16_t refreshWordMask=0;
+        std::array<std::uint32_t,16> localBefore{},worldBefore{},world{};
+        std::array<std::uint32_t,4> input{}; //Actual full LQC2; W is copy-only.
+        std::array<std::uint32_t,3> output{}; //Original caller ignores stack6C.
+    };
+    //Structural retained-history checks never dereference owner/canonicalNodes.
+    //They remain usable after native borrow withdrawal, but are not live owner
+    //authentication and do not re-execute arithmetic to fabricate receipts.
+    template<class H> static bool sourceFogCacheHistoryNative(const H& h)noexcept {
+        if(!h.entered){
+            if(h.owner||h.canonicalNodes||h.graphCount||h.sceneIndex||h.pc||
+               h.firstChild184!=none||h.refreshAttempted||h.worldReady||h.returned||
+               h.flags190Before||h.flags190After||h.outputMask||h.refreshWordMask)return false;
+            for(auto v:h.localBefore)if(v)return false;
+            for(auto v:h.worldBefore)if(v)return false;
+            for(auto v:h.world)if(v)return false;
+            for(auto v:h.output)if(v)return false;
+            return true;
+        }
+        if(!h.owner||!h.canonicalNodes||!h.graphCount||
+           h.graphCount>rr::assets::maxModelNodes49O||h.sceneIndex>=h.graphCount||
+           !h.worldReady||!h.pc)return false;
+        if(h.firstChild184!=none&&(static_cast<std::int32_t>(h.firstChild184)<0||
+           static_cast<std::uint32_t>(h.firstChild184)>=h.graphCount))return false;
+        if(h.flags190Before&1u){
+            if(h.refreshAttempted||h.refreshWordMask||
+               h.flags190After!=h.flags190Before||h.world!=h.worldBefore)return false;
+        }else if(!h.refreshAttempted||h.refreshWordMask!=0xffffu||
+                 h.flags190After!=static_cast<std::uint8_t>(h.flags190Before|1u)||
+                 h.world!=h.localBefore)return false;
+        return true;
+    }
+    static bool sourcePositionHistoryNative(const SourcePosition28B1A0& h)noexcept {
+        if(!sourceFogCacheHistoryNative(h))return false;
+        if(!h.entered)return true;
+        //This root-copy/copy-only leaf has no failure after admission. XYZ
+        //stores remain independently recorded at28B268/270/27C.
+        if(!h.returned||h.pc!=0x28b2acu||h.outputMask!=7u)return false;
+        for(unsigned lane=0;lane<3;++lane)if(h.output[lane]!=h.world[12+lane])return false;
+        return true;
+    }
+    static bool sourceDirectionHistoryNative(const SourceDirection28B9B0& h)noexcept {
+        if(!sourceFogCacheHistoryNative(h))return false;
+        if(!h.entered){
+            if(h.arithmeticEntered||h.arithmeticReturned||h.arithmeticMask)return false;
+            for(auto v:h.input)if(v)return false;
+            return true;
+        }
+        if(!h.arithmeticEntered)return false;
+        if(h.returned)return h.arithmeticReturned&&h.arithmeticMask==15u&&
+            h.outputMask==7u&&h.pc==0x28baa4u;
+        if(h.arithmeticReturned||h.outputMask)return false;
+        for(auto v:h.output)if(v)return false;
+        return (h.pc==0x28ba74u&&h.arithmeticMask==0u)||
+            (h.pc==0x28ba78u&&h.arithmeticMask==1u)||
+            (h.pc==0x28ba7cu&&h.arithmeticMask==3u)||
+            (h.pc==0x28ba80u&&h.arithmeticMask==7u);
+    }
+    static bool sourceFogTransformHistoryNative(const SourcePosition28B1A0& position,
+        const SourceDirection28B9B0& direction)noexcept {
+        if(!sourcePositionHistoryNative(position)||!sourceDirectionHistoryNative(direction))return false;
+        if(!direction.entered)return true;
+        //Retained evidence only. No callback or mutation separates the getters.
+        return position.returned&&direction.owner==position.owner&&
+            direction.canonicalNodes==position.canonicalNodes&&direction.graphCount==position.graphCount&&
+            direction.sceneIndex==position.sceneIndex&&direction.firstChild184==position.firstChild184&&
+            !direction.refreshAttempted&&direction.flags190Before==position.flags190After&&
+            direction.localBefore==position.localBefore&&direction.worldBefore==position.world;
+    }
+    R copySourcePosition28B1A0(const SceneGraph49P& graph,
+        std::array<std::uint32_t,3>& output,SourcePosition28B1A0& h)noexcept {
+        if(!sourcePositionHistoryNative(h)||h.entered||&output==&h.output||
+           !preflightSourceRenderableReturn26E820Native()||
+           graph.nodes!=sourceConstructor_.canonicalNodes||graph.count!=binding_.sourceRowCount||
+           !graph.count||graph.count>rr::assets::maxModelNodes49O||
+           !validateSceneGraph49P(graph)||!inRange(graph,model_.sceneIndex))return {S::phase,0x28b1a0u};
+        auto& node=at(graph,model_.sceneIndex);
+        if(node.parent180!=none)return {S::graph,0x28b1a0u};
+        h.owner=this;h.canonicalNodes=graph.nodes;h.graphCount=graph.count;
+        h.sceneIndex=static_cast<std::uint32_t>(model_.sceneIndex);h.entered=true;
+        h.firstChild184=node.firstChild184;
+        h.pc=0x28b1e0u;h.flags190Before=h.flags190After=node.sceneFlags190;
+        std::memcpy(h.localBefore.data(),node.localC0.v,64);
+        std::memcpy(h.worldBefore.data(),node.world100.v,64);
+        if(!(node.sceneFlags190&1u)){
+            h.refreshAttempted=true;
+            //28B224..248: eight pairs copied as raw words, no numeric gate.
+            for(unsigned pair=0;pair<8;++pair)for(unsigned lane=0;lane<2;++lane){
+                const auto i=2u*pair+lane;h.pc=lane?0x28b23cu:0x28b238u;
+                std::memcpy(node.world100.v+i,node.localC0.v+i,4);
+                h.refreshWordMask|=static_cast<std::uint16_t>(1u<<i);
+            }
+            h.pc=0x28b260u;node.sceneFlags190=static_cast<std::uint8_t>(node.sceneFlags190|1u);
+            h.flags190After=node.sceneFlags190;
+        }
+        h.worldReady=true;std::memcpy(h.world.data(),node.world100.v,64);
+        constexpr std::uint32_t stores[]{0x28b268u,0x28b270u,0x28b27cu};
+        for(unsigned lane=0;lane<3;++lane){
+            h.pc=stores[lane];std::memcpy(&h.output[lane],node.world100.v+12+lane,4);
+            output[lane]=h.output[lane];h.outputMask|=static_cast<std::uint8_t>(1u<<lane);
+        }
+        //Relative=NULL at28B278. No inverse call, no fourth-lane output store.
+        h.pc=0x28b2acu;h.returned=true;return {S::complete,h.pc};
+    }
+    R transformSourceDirection28B9B0(const SceneGraph49P& graph,
+        const std::array<std::uint32_t,4>& input,std::array<std::uint32_t,3>& output,
+        SourceDirection28B9B0& h)noexcept {
+        if(!sourceDirectionHistoryNative(h)||h.entered||&input==&h.input||&output==&h.output||
+           !preflightSourceRenderableReturn26E820Native()||
+           graph.nodes!=sourceConstructor_.canonicalNodes||graph.count!=binding_.sourceRowCount||
+           !graph.count||graph.count>rr::assets::maxModelNodes49O||
+           !validateSceneGraph49P(graph)||!inRange(graph,model_.sceneIndex))return {S::phase,0x28b9b0u};
+        auto& node=at(graph,model_.sceneIndex);
+        if(node.parent180!=none)return {S::graph,0x28b9b0u};
+        h.owner=this;h.canonicalNodes=graph.nodes;h.graphCount=graph.count;
+        h.sceneIndex=static_cast<std::uint32_t>(model_.sceneIndex);h.entered=true;
+        h.firstChild184=node.firstChild184;
+        h.pc=0x28b9d8u;h.flags190Before=h.flags190After=node.sceneFlags190;
+        std::memcpy(h.localBefore.data(),node.localC0.v,64);
+        std::memcpy(h.worldBefore.data(),node.world100.v,64);
+        if(!(node.sceneFlags190&1u)){
+            h.refreshAttempted=true;
+            for(unsigned pair=0;pair<8;++pair)for(unsigned lane=0;lane<2;++lane){
+                const auto i=2u*pair+lane;h.pc=lane?0x28ba34u:0x28ba30u;
+                std::memcpy(node.world100.v+i,node.localC0.v+i,4);
+                h.refreshWordMask|=static_cast<std::uint16_t>(1u<<i);
+            }
+            h.pc=0x28ba58u;node.sceneFlags190=static_cast<std::uint8_t>(node.sceneFlags190|1u);
+            h.flags190After=node.sceneFlags190;
+        }
+        h.pc=0x28ba60u;h.worldReady=true;std::memcpy(h.world.data(),node.world100.v,64);
+        h.pc=0x28ba70u;h.input=input;
+        VisualVector49R in{};std::memcpy(in.v,input.data(),16);
+        std::array<float,3> candidate{};h.arithmeticEntered=true;
+        if(!detail::cleanMatrixDirectionXYZPrefix49U(node.world100,in,candidate,h.pc)){
+            h.arithmeticMask=h.pc==0x28ba80u?7u:(h.pc==0x28ba7cu?3u:(h.pc==0x28ba78u?1u:0u));
+            return {S::graph,h.pc}; //The earlier real cache writes survive.
+        }
+        h.arithmeticReturned=true;h.arithmeticMask=15u;
+        //Original28BA8C stores four lanes, but this loader's projection retains
+        //only XYZ. There is deliberately no outputW value or knownness claim.
+        h.pc=0x28ba8cu;std::memcpy(h.output.data(),candidate.data(),12);
+        output=h.output;h.outputMask=7u;
+        h.pc=0x28baa4u;h.returned=true;return {S::complete,h.pc};
+    }
+    bool sourceFogTransformGraphCurrentNative(const SceneGraph49P& graph,
+        const SourcePosition28B1A0& position,const SourceDirection28B9B0& direction)const noexcept {
+        if(!sourceFogTransformHistoryNative(position,direction))return false;
+        //An admission refusal leaves no source graph receipt to authenticate.
+        //The outer caller still checks the actual same-wrapper model lease.
+        if(!position.entered)return true;
+        if(!preflightSourceRenderableReturn26E820Native()||
+           graph.nodes!=sourceConstructor_.canonicalNodes||graph.count!=binding_.sourceRowCount||
+           !graph.count||graph.count>rr::assets::maxModelNodes49O||
+           !validateSceneGraph49P(graph)||!inRange(graph,model_.sceneIndex))return false;
+        const auto& node=at(graph,model_.sceneIndex);
+        if(node.parent180!=none)return false;
+        const auto current=[&](const auto& h)noexcept {
+            return h.owner==this&&h.canonicalNodes==graph.nodes&&h.graphCount==graph.count&&
+                h.sceneIndex==static_cast<std::uint32_t>(model_.sceneIndex)&&
+                h.firstChild184==node.firstChild184&&h.flags190After==node.sceneFlags190&&
+                !std::memcmp(h.localBefore.data(),node.localC0.v,64)&&
+                !std::memcmp(h.world.data(),node.world100.v,64);
+        };
+        if(!current(position))return false;
+        return !direction.entered||current(direction);
+    }
+
     struct SourcePoint28BAB0 {
         const OriginalRacerModelSceneOwner50LA* owner=nullptr;
         bool entered=false,refreshAttempted=false,worldReady=false,arithmeticReturned=false,outputStored=false,returned=false;

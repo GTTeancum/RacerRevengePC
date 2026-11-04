@@ -1,4 +1,5 @@
 #include "original_camera_start_effects.h"
+#include "original_video_blocking_color50la.h"
 #include "body_scene48g.h"
 #include "scalar_minmax48o.h"
 #include <cfenv>
@@ -10,6 +11,10 @@ namespace rr::game {
 namespace {
 using Vec=assets::TVCameraVector49E;
 using Mat=std::array<float,16>;
+// Private body: only retained caller cursors below may execute this once.
+bool sameRequestVideoFields(const OriginalVideoFadeState&,const OriginalVideoFadeState&)noexcept;
+OriginalCameraStartResult orderedVideoRequestPrefix(OriginalVideoFadeState&,HostMonotonicClock50ID&,
+    std::int32_t mode,std::int32_t duration,bool asynchronous,bool out)noexcept;
 void copyVector(Vec& to,const Vec& from) noexcept {std::memcpy(&to,&from,sizeof(Vec));}
 float constant(std::uint32_t bits) noexcept {
     float f; std::memcpy(&f,&bits,sizeof(f)); return f;
@@ -125,19 +130,6 @@ bool cvt(float x,std::int32_t& out) noexcept {
     if(!std::isfinite(x)||double(x)<-2147483648.0||double(x)>=2147483648.0)return false;
     out=static_cast<std::int32_t>(x);return true;
 }
-bool sampledMilliseconds(HostMonotonicClock50ID& clock,float& value) noexcept {
-    const auto elapsed=std::chrono::duration_cast<std::chrono::nanoseconds>(
-        std::chrono::steady_clock::now()-clock.epoch).count();
-    if(elapsed<0)return false;
-    const auto ns=static_cast<std::uint64_t>(elapsed);
-    if(ns<clock.lastNanoseconds)return false;
-    constexpr std::uint64_t billion=1000000000u,rate=576000u;
-    const auto seconds=ns/billion,remainder=ns%billion;
-    if(seconds>std::numeric_limits<std::uint64_t>::max()/rate)return false;
-    ClockQuantization49J q;
-    if(!quantizeCounter49J(seconds*rate+remainder*rate/billion,q))return false;
-    value=constant(q.scaledMillisecondBits);clock.lastNanoseconds=ns;return true;
-}
 bool guards(Arithmetic& a,OriginalCameraViewportFields& p) noexcept {
     const float xx=std::fabs(a.check(p.screen140[0]));
     const float yy=std::fabs(a.check(p.screen140[5]));
@@ -175,41 +167,51 @@ OriginalCameraStartResult setOriginalCameraRange237000(float nearPlane,float far
     if(!a.ok)return result(S::arithmetic,0x237148);
     guardCombined=product;return result(S::complete,0x2371C0);
 }
-OriginalCameraStartResult requestOriginalCameraExitFade2AED60(std::int32_t a8,
-    std::int32_t appMode,OriginalVideoFadeState& video,HostMonotonicClock50ID& clock) noexcept {
-    if(a8!=0)return result(S::complete,0x2aee60); //v0=0, caller ignores it.
-    if(std::fegetround()!=FE_TONEAREST)return result(S::arithmetic,0x2aedd8);
-    auto v=video;Arithmetic a;std::int32_t duration=500;
-    if(v.covered3DC||(v.flags404Low6&16u)){
-        if(!v.alpha3E8)return result(S::unknownVideoAlpha,0x2aedd4);
-        const float scale=a.sub(1,a.div(static_cast<float>(*v.alpha3E8),128));
-        if(!cvt(a.mul(scale,500),duration)||!a.ok)return result(S::arithmetic,0x2aedec);
-        if(duration==0)return result(S::complete,0x2aee00);
+OriginalCameraStartResult OriginalCameraExitFadeRequest2AED60::invoke(std::int32_t a8,
+    std::int32_t appMode,OriginalVideoFadeState& video,HostMonotonicClock50ID& clock)noexcept {
+    if(video_){
+        if(video_!=&video||clock_!=&clock||epoch_!=clock.epoch||manager_!=a8||mode_!=appMode||
+           !sameRequestVideoFields(expected_,video))return result(S::owner,0x2aed60);
+        return result_.status==S::complete?result(S::alreadyComplete,result_.sourcePC):result_;
     }
-    //2AED60 passes a2=0: source2605C8 leaves bit2 clear. The NEXT reached
-    //25A9C0 invokes blocking260850 at25AA4C;25B5D0 is not its consumer.
-    return requestOriginalVideoFade260320(video,clock,appMode,duration,false,false);
+    video_=&video;clock_=&clock;epoch_=clock.epoch;manager_=a8;mode_=appMode;
+    const auto stop=[&](OriginalCameraStartResult r){expected_=video;result_=r;return r;};
+    if(a8!=0)return stop(result(S::complete,0x2aee60)); //Source v0=0; no child call.
+    std::int32_t duration=500;
+    if(video.covered3DC||(video.flags404Low6&16u)){ //Actual virtual+40=260300.
+        if(!video.alpha3E8)return stop(result(S::unknownVideoAlpha,0x2aedd4));
+        // Native arithmetic admission only when the source enters this branch.
+        if(std::fegetround()!=FE_TONEAREST)return stop(result(S::arithmetic,0x2aedd8));
+        volatile float durationValue=static_cast<float>(duration); //2AEDD8.
+        volatile float alphaValue=static_cast<float>(*video.alpha3E8); //2AEDDC.
+        Arithmetic a;const float scale=a.sub(1,a.div(alphaValue,128));
+        if(!cvt(a.mul(scale,durationValue),duration)||!a.ok)return stop(result(S::arithmetic,0x2aedec));
+        if(duration==0)return stop(result(S::complete,0x2aee00)); //Source v0=1; no child/wait.
+    }
+    // Source2AEE38 calls260320 with a2=0,a3=0. Its ordered partial effects
+    // survive failure. T0=1 callers separately own the subsequent260850 wait.
+    return stop(orderedVideoRequestPrefix(video,clock,appMode,duration,false,true));
 }
 OriginalCameraStartResult OriginalResultsBlockingFade2AED60::advance(std::int32_t a8,
     std::int32_t appMode,OriginalVideoFadeState& video,HostMonotonicClock50ID& clock,
     OriginalVideoBlockingBackend* backend) {
-    if(requested_&&(video_!=&video||clock_!=&clock||backend_!=backend))
+    if(requested_&&(video_!=&video||clock_!=&clock||epoch_!=clock.epoch||backend_!=backend))
         return result(S::owner,0x2aee48);
     if(finished_)return result(S::alreadyComplete,0x2aee60);
     if(!requested_){
         // Seal the actual borrowed identities BEFORE the request. Failed
         // requests are terminal here: never repeat a source call/clock sample
         // on a later poll. The owning transaction must cancel on failure.
-        video_=&video;clock_=&clock;backend_=backend;requested_=true;
+        video_=&video;clock_=&clock;epoch_=clock.epoch;backend_=backend;requested_=true;
         // This shares ONLY the exact request arithmetic/260320(false,false).
         // Unlike Camera exit's T0=0 caller, Results T0=1 immediately waits.
-        requestResult_=requestOriginalCameraExitFade2AED60(a8,appMode,video,clock);
+        requestResult_=request_.invoke(a8,appMode,video,clock);
         if(requestResult_.status!=S::complete)return requestResult_;
         if(requestResult_.sourcePC==0x2aee60||requestResult_.sourcePC==0x2aee00){
             finished_=true;return requestResult_;
         }
     }
-    if(requestResult_.status!=S::complete)return requestResult_;
+    if(requestResult_.status!=S::complete)return request_.invoke(a8,appMode,video,clock);
     // No flag-only or elapsed-time-only completion. The existing concrete
     //260850 cursor captures the accepted image, presents each real sample,
     //then requires restoreAndComplete before it can return complete.
@@ -217,49 +219,110 @@ OriginalCameraStartResult OriginalResultsBlockingFade2AED60::advance(std::int32_
     if(r.status==S::complete)finished_=true;
     return r;
 }
+bool OriginalVideoFadeUpdate25B5D0::sameFields(const OriginalVideoFadeState& a,
+    const OriginalVideoFadeState& b)noexcept {
+    const auto sameFloat=[](const float& x,const float& y)noexcept{return std::memcmp(&x,&y,sizeof(float))==0;};
+    return a.covered3DC==b.covered3DC&&a.flags404Low6==b.flags404Low6&&
+        a.toColor3E0==b.toColor3E0&&a.fromColor3E4==b.fromColor3E4&&a.alpha3E8==b.alpha3E8&&
+        a.targetAlpha3EC==b.targetAlpha3EC&&a.millisecondsPerStep3F0==b.millisecondsPerStep3F0&&
+        sameFloat(a.redSlope3F4,b.redSlope3F4)&&sameFloat(a.greenSlope3F8,b.greenSlope3F8)&&
+        sameFloat(a.blueSlope3FC,b.blueSlope3FC)&&sameFloat(a.lastMilliseconds400,b.lastMilliseconds400);
+}
+bool OriginalVideoFadeUpdate25B5D0::current(const OriginalVideoFadeState& video,
+    const HostMonotonicClock50ID& clock)const noexcept {
+    return video_==&video&&clock_==&clock&&epoch_==clock.epoch&&sameFields(expected_,video);
+}
+OriginalCameraStartResult OriginalVideoFadeUpdate25B5D0::advance(OriginalVideoFadeState& video,
+    HostMonotonicClock50ID& clock,std::int32_t view,std::int32_t count,OriginalVideoFadeDraw& draw)noexcept {
+    draw={};
+    if(!video_){video_=&video;clock_=&clock;epoch_=clock.epoch;view_=view;count_=count;expected_=video;}
+    else if(!current(video,clock)||view_!=view||count_!=count)return result(S::owner,0x25b5d0);
+    const auto failPrefix=[&](S status,std::uint32_t pc){
+        expected_=video;phase_=Phase::failed;result_=result(status,pc);return result_;
+    };
+    const auto finish=[&](){expected_=video;phase_=Phase::complete;result_=result(S::complete,0x25b9b8);return result_;};
+    const auto drawBoundary=[&](){
+        expected_=video;phase_=Phase::draw;draw=draw_;result_=result(S::videoBackend,0x25e610);return result_;
+    };
+    if(phase_==Phase::failed||phase_==Phase::complete)return result_;
+    if(phase_==Phase::draw){draw=draw_;return result_;}
+    if(phase_==Phase::fresh){
+        if(std::int64_t(view)<std::int64_t(count)-1||(video.flags404Low6&8u))return finish();
+        //25B654 occurs BEFORE the actual clock sample in this covered path.
+        if(video.covered3DC&&!(video.flags404Low6&3u)){
+            draw_={true,video.toColor3E0};return_=DrawReturn::covered;return drawBoundary();
+        }
+        phase_=Phase::clock;
+    }
+    float now=0;
+    if(!sampleHostFloatMilliseconds50ID(clock,now))return failPrefix(S::clock,0x25b718);
+    //25B728/734 read400 and subtract only AFTER the shared clock sample.
+    Arithmetic a;const float delta=a.sub(now,video.lastMilliseconds400);
+    if(!a.ok)return failPrefix(S::arithmetic,0x25b728);
+    const bool increasing=(video.flags404Low6&5u)==5u;
+    const bool decreasing=!increasing&&(video.flags404Low6&6u)==6u;
+    if(!increasing&&!decreasing){video.lastMilliseconds400=now;return finish();} //25B9B4.
+    if(video.millisecondsPerStep3F0==0)return failPrefix(S::arithmetic,increasing?0x25b750:0x25b88c);
+    std::int32_t steps=0;
+    if(!cvt(a.div(delta,static_cast<float>(video.millisecondsPerStep3F0)),steps)||!a.ok)
+        return failPrefix(S::arithmetic,increasing?0x25b758:0x25b894);
+    if(!video.alpha3E8)return failPrefix(S::unknownVideoAlpha,increasing?
+        (steps>0?0x25b76c:0x25b77c):(steps>0?0x25b8a8:0x25b8b8));
+    if(steps>0){
+        const std::uint32_t raw=std::uint32_t(*video.alpha3E8)+(increasing?
+            std::uint32_t(steps):0u-std::uint32_t(steps));
+        std::int32_t next;std::memcpy(&next,&raw,sizeof(next));
+        video.alpha3E8=next; //25B774 /25B8B0, before400.
+        video.lastMilliseconds400=now; //25B778 /25B8B4. Preserve on later failure.
+    }
+    if((increasing&&*video.alpha3E8>video.targetAlpha3EC)||
+       (decreasing&&*video.alpha3E8<video.targetAlpha3EC))video.alpha3E8=video.targetAlpha3EC;
+    const float alpha=static_cast<float>(*video.alpha3E8);
+    std::int32_t red=0,green=0,blue=0;
+    // Async source order differs from the blocking color evaluator: convert
+    // red, then compute green/blue products, then convert green and blue.
+    if(!cvt(a.mul(video.redSlope3F4,alpha),red)||!a.ok)
+        return failPrefix(S::arithmetic,increasing?0x25b7d4:0x25b910);
+    const float greenValue=a.mul(video.greenSlope3F8,alpha),blueValue=a.mul(video.blueSlope3FC,alpha);
+    if(!cvt(greenValue,green))return failPrefix(S::arithmetic,increasing?0x25b7e4:0x25b920);
+    if(!cvt(blueValue,blue)||!a.ok)return failPrefix(S::arithmetic,increasing?0x25b7f4:0x25b930);
+    // Full32-bit ADD packing, including base alpha/carries, then OR alpha.
+    // Do not reuse blocking signed64-bit OR packing or clean byte clamps.
+    draw_={true,(video.fromColor3E4+(std::uint32_t(red)<<16)+
+        (std::uint32_t(green)<<8)+std::uint32_t(blue))|(std::uint32_t(*video.alpha3E8)<<24)};
+    return_=increasing?DrawReturn::increasing:DrawReturn::decreasing;
+    return drawBoundary(); //No post25E610 completion flags yet.
+}
+OriginalCameraStartResult OriginalVideoFadeUpdate25B5D0::afterNativeDrawComplete(
+    OriginalVideoFadeState& video,HostMonotonicClock50ID& clock)noexcept {
+    if(!current(video,clock))return result(S::owner,0x25e610);
+    if(phase_==Phase::complete||phase_==Phase::failed)return result_;
+    if(phase_!=Phase::draw)return result(S::owner,0x25e610);
+    if(return_==DrawReturn::covered){
+        video.flags404Low6=std::uint8_t(video.flags404Low6|8u); //25B670, before clock.
+        expected_=video;phase_=Phase::clock;draw_={};OriginalVideoFadeDraw unused;
+        return advance(video,clock,view_,count_,unused);
+    }
+    // Prefix already proved/read alpha; exact expected fields remain sealed.
+    if(!video.alpha3E8)return result(S::owner,0x25e610);
+    if(*video.alpha3E8==video.targetAlpha3EC){
+        if(return_==DrawReturn::increasing){
+            video.covered3DC=1; //25B828.
+            video.flags404Low6=std::uint8_t(video.flags404Low6&~1u); //25B840.
+        }else{
+            video.covered3DC=0; //25B960.
+            video.flags404Low6=std::uint8_t(video.flags404Low6&~16u); //25B980.
+            video.flags404Low6=std::uint8_t(video.flags404Low6&~2u); //25B994.
+        }
+    }
+    video.flags404Low6=std::uint8_t(video.flags404Low6|8u); //25B85C /25B9B0.
+    expected_=video;phase_=Phase::complete;result_=result(S::complete,0x25b9b8);return result_;
+}
 OriginalCameraStartResult advanceOriginalVideoFade25B5D0(OriginalVideoFadeState& video,
     HostMonotonicClock50ID& clock,std::int32_t view,std::int32_t count,OriginalVideoFadeDraw& draw) noexcept {
-    //25B5D0 reaches rendering only on the last actual camera view.
-    if(std::int64_t(view)<std::int64_t(count)-1||(video.flags404Low6&8u)){
-        draw={};return result(S::complete,0x25b9b8);
-    }
-    if(std::fegetround()!=FE_TONEAREST)return result(S::arithmetic,0x25b720);
-    auto v=video;OriginalVideoFadeDraw d;Arithmetic a;
-    const bool increasing=(v.flags404Low6&5u)==5u;
-    const bool decreasing=!increasing&&(v.flags404Low6&6u)==6u;
-    if((increasing||decreasing)&&!v.alpha3E8)return result(S::unknownVideoAlpha,0x25b76c);
-    if((increasing||decreasing)&&v.millisecondsPerStep3F0==0)return result(S::arithmetic,0x25b750);
-    if(!std::isfinite(v.lastMilliseconds400))return result(S::arithmetic,0x25b728);
-    float now;if(!sampledMilliseconds(clock,now))return result(S::clock,0x25b718);
-    if(v.covered3DC&&!(v.flags404Low6&3u)){
-        d.reached25E610=true;d.argb=v.toColor3E0;v.flags404Low6|=8u;
-    }
-    if(increasing||decreasing){
-        const float delta=a.sub(now,v.lastMilliseconds400);std::int32_t steps=0;
-        if(!cvt(a.div(delta,static_cast<float>(v.millisecondsPerStep3F0)),steps)||!a.ok)
-            return result(S::arithmetic,0x25b758);
-        if(steps>0){
-            // Original ADDU/SUBU wraps low32; decode signed without UB.
-            const auto raw=static_cast<std::uint32_t>(*v.alpha3E8)+(increasing?
-                static_cast<std::uint32_t>(steps):0u-static_cast<std::uint32_t>(steps));
-            std::int32_t signedRaw;std::memcpy(&signedRaw,&raw,4);v.alpha3E8=signedRaw;v.lastMilliseconds400=now;
-        }
-        if((increasing&&*v.alpha3E8>v.targetAlpha3EC)||(decreasing&&*v.alpha3E8<v.targetAlpha3EC))
-            v.alpha3E8=v.targetAlpha3EC;
-        std::int32_t red=0,green=0,blue=0;const float alpha=static_cast<float>(*v.alpha3E8);
-        if(!cvt(a.mul(v.redSlope3F4,alpha),red)||!cvt(a.mul(v.greenSlope3F8,alpha),green)||
-            !cvt(a.mul(v.blueSlope3FC,alpha),blue)||!a.ok)return result(S::arithmetic,0x25b7d4);
-        d.reached25E610=true;
-        d.argb=(v.fromColor3E4+(static_cast<std::uint32_t>(red)<<16)+
-            (static_cast<std::uint32_t>(green)<<8)+static_cast<std::uint32_t>(blue))|
-            (static_cast<std::uint32_t>(*v.alpha3E8)<<24);
-        if(*v.alpha3E8==v.targetAlpha3EC){
-            if(increasing){v.covered3DC=1;v.flags404Low6&=static_cast<std::uint8_t>(~1u);}
-            else{v.covered3DC=0;v.flags404Low6&=static_cast<std::uint8_t>(~18u);}
-        }
-        v.flags404Low6|=8u;
-    }else v.lastMilliseconds400=now;
-    video=v;draw=d;return result(S::complete,0x25b9b8);
+    // Garage's real caller fails terminally when25E610 has no draw owner.
+    // It cannot consume post-call flags or repeatedly resample this boundary.
+    OriginalVideoFadeUpdate25B5D0 prefix;return prefix.advance(video,clock,view,count,draw);
 }
 OriginalCameraStartResult beginOriginalRaceCountdown1AFD80(OriginalRaceStartCountdown& countdown,
     LapTimingManager50ID& manager,std::int32_t app33C,std::int32_t launch,
@@ -400,37 +463,47 @@ std::int32_t wordAdd(std::int32_t x,std::int32_t y) noexcept {
 std::int32_t wordSub(std::int32_t x,std::int32_t y) noexcept {
     return signedWord(static_cast<std::uint32_t>(x)-static_cast<std::uint32_t>(y));
 }
-OriginalCameraStartResult videoRequest(OriginalVideoFadeState& video,HostMonotonicClock50ID& clock,
-    std::int32_t mode,std::int32_t duration,bool async,bool redraw,bool out) {
-    const std::uint32_t pc=out?0x260320:0x260610;
-    if(mode==6||(!out&&redraw)||(redraw&&async))return result(S::sourcePath,pc);
-    if(std::fegetround()!=FE_TONEAREST)return result(S::arithmetic,pc);
-    auto next=video;
-    if(out)next.flags404Low6=static_cast<std::uint8_t>((next.flags404Low6&~32u)|(redraw?32u:0u));
-    if(next.flags404Low6&(out?1u:2u)){video=next;return result(S::complete,out?0x260474:0x2606c0);}
-    if(!next.alpha3E8)return result(S::unknownVideoAlpha,out?0x260594:0x2607d8);
-    next.targetAlpha3EC=static_cast<std::int32_t>(((out?next.toColor3E0:next.fromColor3E4)>>24)&255u);
-    next.flags404Low6=static_cast<std::uint8_t>((next.flags404Low6&~3u)|(out?1u:2u));
-    Arithmetic a;const float delta=out?
-        a.sub(static_cast<float>(next.targetAlpha3EC),static_cast<float>(*next.alpha3E8)):
-        a.sub(static_cast<float>(*next.alpha3E8),static_cast<float>(next.targetAlpha3EC));
+bool sameRequestVideoFields(const OriginalVideoFadeState& a,const OriginalVideoFadeState& b)noexcept {
+        const auto sameFloat=[](const float& x,const float& y)noexcept{return std::memcmp(&x,&y,sizeof(float))==0;};
+        return a.covered3DC==b.covered3DC&&a.flags404Low6==b.flags404Low6&&
+            a.toColor3E0==b.toColor3E0&&a.fromColor3E4==b.fromColor3E4&&a.alpha3E8==b.alpha3E8&&
+            a.targetAlpha3EC==b.targetAlpha3EC&&a.millisecondsPerStep3F0==b.millisecondsPerStep3F0&&
+            sameFloat(a.redSlope3F4,b.redSlope3F4)&&sameFloat(a.greenSlope3F8,b.greenSlope3F8)&&
+            sameFloat(a.blueSlope3FC,b.blueSlope3FC)&&sameFloat(a.lastMilliseconds400,b.lastMilliseconds400);
+}
+OriginalCameraStartResult orderedVideoRequestPrefix(OriginalVideoFadeState& video,HostMonotonicClock50ID& clock,
+    std::int32_t mode,std::int32_t duration,bool asynchronous,bool out)noexcept {
+    if(mode==6)return result(S::sourcePath,out?0x260354:0x26063c); //Unowned assertion path.
+    if(out)video.flags404Low6=std::uint8_t(video.flags404Low6&~32u); //260468, before no-op.
+    if(video.flags404Low6&(out?1u:2u))return result(S::complete,out?0x2605e4:0x26082c);
+    video.targetAlpha3EC=std::int32_t(((out?video.toColor3E0:video.fromColor3E4)>>24)&255u);
+    if(out){
+        video.flags404Low6=std::uint8_t(video.flags404Low6|1u); //2604B4.
+        video.flags404Low6=std::uint8_t(video.flags404Low6&~2u); //2604C4.
+    }else{
+        video.flags404Low6=std::uint8_t(video.flags404Low6&~1u); //2606FC.
+        video.flags404Low6=std::uint8_t(video.flags404Low6|2u); //26070C.
+    }
+    // Native numeric admission is at the reached sample point, after stores.
+    const auto clockPC=out?0x26057cu:0x2607c4u;
+    if(std::fegetround()!=FE_TONEAREST)return result(S::arithmetic,clockPC);
+    float now=0;if(!sampleHostFloatMilliseconds50ID(clock,now))return result(S::clock,clockPC);
+    video.lastMilliseconds400=now; //26058C /2607D4, BEFORE unknown-alpha read.
+    if(!video.alpha3E8)return result(S::unknownVideoAlpha,out?0x260594:0x2607d8);
+    // Preserve original separately rounded duration/left/right conversions.
+    volatile float durationValue=static_cast<float>(duration);
+    volatile float left=static_cast<float>(out?video.targetAlpha3EC:*video.alpha3E8);
+    volatile float right=static_cast<float>(out?*video.alpha3E8:video.targetAlpha3EC);
+    Arithmetic a;const float delta=a.sub(left,right);
     if(delta==0)return result(S::arithmetic,out?0x2605b4:0x2607fc);
-    //Native admission precedes the effectful clock sample. On the admitted
-    //path the source sample precedes the interval computation and final bit2.
-    if(!sampledMilliseconds(clock,next.lastMilliseconds400))return result(S::clock,out?0x26057c:0x2607c4);
-    if(!cvt(a.add(.5f,a.div(static_cast<float>(duration),delta)),next.millisecondsPerStep3F0)||!a.ok)
+    std::int32_t interval=0;
+    if(!cvt(a.add(.5f,a.div(durationValue,delta)),interval)||!a.ok)
         return result(S::arithmetic,out?0x2605bc:0x260804);
-    next.flags404Low6=static_cast<std::uint8_t>((next.flags404Low6&~4u)|(async?4u:0u));
-    video=next;return result(S::complete,out?0x2605e0:0x260828);
+    video.millisecondsPerStep3F0=interval; //2605C8 /260810. Zero is not rejected here.
+    video.flags404Low6=std::uint8_t((video.flags404Low6&~4u)|(asynchronous?4u:0u)); //2605E0 /260828, LAST.
+    return result(S::complete,out?0x2605e4:0x26082c);
 }
-bool sameBlockingParameters(const OriginalVideoFadeState& a,const OriginalVideoFadeState& b) noexcept {
-    return a.flags404Low6==b.flags404Low6&&a.covered3DC==b.covered3DC&&
-        a.fromColor3E4==b.fromColor3E4&&a.toColor3E0==b.toColor3E0&&
-        a.alpha3E8==b.alpha3E8&&a.targetAlpha3EC==b.targetAlpha3EC&&
-        a.millisecondsPerStep3F0==b.millisecondsPerStep3F0&&
-        a.redSlope3F4==b.redSlope3F4&&a.greenSlope3F8==b.greenSlope3F8&&a.blueSlope3FC==b.blueSlope3FC&&
-        a.lastMilliseconds400==b.lastMilliseconds400;
-}
+
 }
 OriginalCameraStartResult OriginalLoadingFadePrefix17C5C8::advance(OriginalVideoFadeState& video,
     HostMonotonicClock50ID& clock,std::int32_t mode)noexcept {
@@ -443,18 +516,28 @@ OriginalCameraStartResult OriginalLoadingFadePrefix17C5C8::advance(OriginalVideo
     video.flags404Low6=static_cast<std::uint8_t>(video.flags404Low6&~2u); //2604C4.
     // Native numeric admission at the actual sample point, not before stores.
     if(std::fegetround()!=FE_TONEAREST)return result(S::arithmetic,0x26057c);
-    float now=0;if(!sampledMilliseconds(clock,now))return result(S::clock,0x26057c);
+    float now=0;if(!sampleHostFloatMilliseconds50ID(clock,now))return result(S::clock,0x26057c);
     video.lastMilliseconds400=now; //26058C BEFORE260594 input read.
     return result(video.alpha3E8?S::sourcePath:S::unknownVideoAlpha,0x260594);
 }
-OriginalCameraStartResult requestOriginalVideoFade260320(OriginalVideoFadeState& v,HostMonotonicClock50ID& c,
-    std::int32_t mode,std::int32_t duration,bool asynchronous,bool redrawSource){
-    return videoRequest(v,c,mode,duration,asynchronous,redrawSource,true);
+OriginalCameraStartResult OriginalVideoAsyncRequest50LA::invoke(OriginalVideoFadeDirection direction,
+    OriginalVideoFadeState& video,HostMonotonicClock50ID& clock,std::int32_t mode,std::int32_t duration)noexcept {
+    if(direction!=OriginalVideoFadeDirection::out260850&&direction!=OriginalVideoFadeDirection::in261630)
+        return result(S::owner,0x260320);
+    const bool out=direction==OriginalVideoFadeDirection::out260850;
+    const auto pc=out?0x260320u:0x260610u;
+    if(video_){
+        if(video_!=&video||clock_!=&clock||epoch_!=clock.epoch||direction_!=direction||mode_!=mode||duration_!=duration||
+           !sameRequestVideoFields(expected_,video))return result(S::owner,pc);
+        return result_.status==S::complete?result(S::alreadyComplete,result_.sourcePC):result_;
+    }
+    // Seal the exact invocation BEFORE any source effect, including no-op
+    // OUT's redraw-bit clear. There is no implicit reset or replacement.
+    video_=&video;clock_=&clock;epoch_=clock.epoch;direction_=direction;mode_=mode;duration_=duration;
+    result_=orderedVideoRequestPrefix(video,clock,mode,duration,true,out);
+    expected_=video;return result_;
 }
-OriginalCameraStartResult requestOriginalVideoFade260610(OriginalVideoFadeState& v,HostMonotonicClock50ID& c,
-    std::int32_t mode,std::int32_t duration,bool asynchronous){
-    return videoRequest(v,c,mode,duration,asynchronous,false,false);
-}
+
 OriginalCameraStartResult requestOriginalFirstMainFade1B7D50(const OriginalVideoFadeState& v,
     std::int32_t& a8,std::int32_t& duration98) noexcept {
     if(a8||!(v.covered3DC||(v.flags404Low6&16u)))return result(S::complete,0x2aef38);
@@ -475,39 +558,48 @@ OriginalCameraStartResult OriginalVideoBlockingFade::advance(OriginalVideoFadeSt
         if(!std::isfinite(video.redSlope3F4)||!std::isfinite(video.greenSlope3F8)||
            !std::isfinite(video.blueSlope3FC)||!std::isfinite(video.lastMilliseconds400))
             return result(S::arithmetic,0x2610e0);
-        video_=&video;backend_=backend;parameters_=video;
+        video_=&video;backend_=backend;clock_=&clock;clockEpoch_=clock.epoch;parameters_=video;
         startAlpha_=static_cast<std::int32_t>(((direction_==OriginalVideoFadeDirection::out260850?
             video.fromColor3E4:video.toColor3E0)>>24)&255u);
         alpha_=startAlpha_;
-    }else if(video_!=&video||backend_!=backend||!sameBlockingParameters(parameters_,video))
+    }else if(video_!=&video||backend_!=backend||clock_!=&clock||clockEpoch_!=clock.epoch||
+             !sameRequestVideoFields(parameters_,video))
         return result(S::owner,0x25aa4c);
     const bool out=direction_==OriginalVideoFadeDirection::out260850;
     for(;;){
+        // Recheck the borrowed Video/clock after every synchronous backend
+        // return, before more source work. A completed backend phase has
+        // already advanced, so restored admission never repeats its effects.
+        // The real native backend does not modify these source fields; this
+        // guards custody across the abstract backend boundary as well.
+        if(clock_!=&clock||clockEpoch_!=clock.epoch||!sameRequestVideoFields(parameters_,video))
+            return result(S::owner,0x25aa4c);
+        // A completed backend can change host rounding before the next phase.
+        // Recheck native numeric admission BEFORE counter advancement,
+        // post-clock deadline CVT.S.W (2613A4/261C00), or other phase work. The
+        // already-completed backend phase stays advanced: retrying with the
+        // required rounding never repeats that draw/begin/restoration.
+        if(std::fegetround()!=FE_TONEAREST)return result(S::arithmetic,0x260a14);
         OriginalCameraStartResult r{S::complete,0};Arithmetic a;
         switch(phase_){
         case 0:
             r=backend_->begin(direction_,video);if(r.status!=S::complete)return r;
             ++phase_;break;
         case 1:
-            if(!sampledMilliseconds(clock,startMilliseconds_))return result(S::clock,out?0x260ac0:0x2618a4);
+            if(!sampleHostFloatMilliseconds50ID(clock,startMilliseconds_))return result(S::clock,out?0x260ac0:0x2618a4);
             ++phase_;break;
         case 2:
             if(out?alpha_>video.targetAlpha3EC:alpha_<video.targetAlpha3EC){phase_=7;break;}
             phase_=3;break;
         case 3:{
-            //GS RGBAQ is R at bit0,G at8,B at16,A at24,Q at32. Original
-            //packed colors3E4 are ARGB; preserve that explicit lane swap.
-            const auto base=video.fromColor3E4;
-            const float delta=static_cast<float>(wordSub(alpha_,startAlpha_));
-            std::int32_t red,green,blue;
-            if(!cvt(a.add(static_cast<float>((base>>16)&255u),a.mul(video.redSlope3F4,delta)),red)||
-               !cvt(a.add(static_cast<float>((base>>8)&255u),a.mul(video.greenSlope3F8,delta)),green)||
-               !cvt(a.add(static_cast<float>(base&255u),a.mul(video.blueSlope3FC,delta)),blue)||!a.ok)
+            // Share only the numeric body. This reached owner still selects
+            // start/current alpha and exclusively constructs the source sample.
+            const OriginalVideoFadeColorCoefficients50LA color{
+                video.fromColor3E4,video.redSlope3F4,video.greenSlope3F8,video.blueSlope3FC};
+            std::uint64_t rgbaq=0;
+            if(!computeOriginalVideoBlockingColor50LA(color,startAlpha_,alpha_,rgbaq))
                 return result(S::arithmetic,out?0x2611e4:0x261a40);
-            //Source widens SIGNED int32 lanes before OR, with no masking.
-            const auto lane=[](std::int32_t x){return static_cast<std::uint64_t>(static_cast<std::int64_t>(x));};
-            OriginalVideoBlockingSample sample{direction_,ordinal_,
-                lane(red)|(lane(green)<<8)|(lane(blue)<<16)|(lane(alpha_)<<24)|(std::uint64_t(0x3f800000)<<32),
+            OriginalVideoBlockingSample sample{direction_,ordinal_,rgbaq,
                 alpha_,out?0x262c70u:0x262d80u};
             r=backend_->copyDrawAndComplete(sample);if(r.status!=S::complete)return r;
             ++phase_;break;
@@ -516,26 +608,43 @@ OriginalCameraStartResult OriginalVideoBlockingFade::advance(OriginalVideoFadeSt
             const auto old=alpha_;alpha_=out?wordAdd(alpha_,step_):wordSub(alpha_,step_);
             if((out?alpha_>video.targetAlpha3EC:alpha_<video.targetAlpha3EC)&&old!=video.targetAlpha3EC)
                 alpha_=video.targetAlpha3EC;
-            distance_=out?wordSub(alpha_,startAlpha_):wordSub(startAlpha_,alpha_);
-            //MULT writes low32 into v0. Native signed overflow is forbidden.
-            const auto product=static_cast<std::uint32_t>(video.millisecondsPerStep3F0)*static_cast<std::uint32_t>(distance_);
-            waitUntilDelta_=static_cast<float>(signedWord(product));
+            //2612B8/261B18 counter and clamp precede the clock. Distance,
+            //interval read and deadline conversion occur only AFTER its return.
             phase_=5;break;
         }
         case 5:{
-            float now;if(!sampledMilliseconds(clock,now))return result(S::clock,out?0x26137c:0x261bdc);
-            const float elapsed=a.sub(now,startMilliseconds_);if(!a.ok)return result(S::arithmetic,0x261394);
+            float now;if(!sampleHostFloatMilliseconds50ID(clock,now))return result(S::clock,out?0x26137c:0x261bdc);
+            //26138C/261BEC follows the actual clock call. Preserve the
+            //source elapsed subtraction before MULT/CVT.S.W deadline work.
+            std::int32_t interval=0;
+            if(out){
+                distance_=wordSub(alpha_,startAlpha_); //26138C.
+                interval=video.millisecondsPerStep3F0; //261390.
+            }else{
+                interval=video.millisecondsPerStep3F0; //261BE4.
+                distance_=wordSub(startAlpha_,alpha_); //261BEC.
+            }
+            const float elapsed=a.sub(now,startMilliseconds_);
+            if(!a.ok)return result(S::arithmetic,out?0x261394:0x261bf0);
+            //MULT retains low32; signed host overflow is never used.
+            const auto product=std::uint32_t(interval)*std::uint32_t(distance_);
+            volatile float deadline=static_cast<float>(signedWord(product)); //2613A4 /261C00.
             //This adaptive increment occurs ONCE immediately after the draw,
             //not on each polling call in the following busy-wait translation.
-            if(elapsed>waitUntilDelta_)step_=wordAdd(step_,1);
-            if(elapsed<waitUntilDelta_){phase_=6;return result(S::videoClockWait,out?0x261494:0x261cec);}
+            if(elapsed>deadline)step_=wordAdd(step_,1);
+            if(elapsed<deadline){phase_=6;return result(S::videoClockWait,out?0x261494:0x261cec);}
             ++ordinal_;phase_=2;
             break;
         }
         case 6:{
-            float now;if(!sampledMilliseconds(clock,now))return result(S::clock,out?0x261464:0x261cbc);
-            const float elapsed=a.sub(now,startMilliseconds_);if(!a.ok)return result(S::arithmetic,0x261470);
-            if(elapsed<waitUntilDelta_)return result(S::videoClockWait,out?0x261494:0x261cec);
+            float now;if(!sampleHostFloatMilliseconds50ID(clock,now))return result(S::clock,out?0x261464:0x261cbc);
+            const float elapsed=a.sub(now,startMilliseconds_);
+            if(!a.ok)return result(S::arithmetic,out?0x261470:0x261cc8);
+            //Each original wait iteration reloads3F0 and rebuilds its
+            //deadline AFTER the sample/subtraction (261478..488/261CD0..CE0).
+            const auto product=std::uint32_t(video.millisecondsPerStep3F0)*std::uint32_t(distance_);
+            volatile float deadline=static_cast<float>(signedWord(product));
+            if(elapsed<deadline)return result(S::videoClockWait,out?0x261494:0x261cec);
             ++ordinal_;phase_=2;break;
         }
         case 7:
@@ -544,9 +653,19 @@ OriginalCameraStartResult OriginalVideoBlockingFade::advance(OriginalVideoFadeSt
         case 8:
             //The source draws target itself, advances once again, and stores
             //the OVERSHOOT. Do not clamp this final shared alpha to0 or128.
-            video.alpha3E8=alpha_;
-            if(out)video.flags404Low6=static_cast<std::uint8_t>((video.flags404Low6&~9u)|16u);
-            else{video.covered3DC=0;video.flags404Low6&=static_cast<std::uint8_t>(~18u);}
+            //One callback-free source return phase, AFTER actual backend
+            //restoration. Do not introduce an artificial yield between stores.
+            if(out){
+                video.flags404Low6=std::uint8_t(video.flags404Low6&~1u); //2615B4.
+                video.alpha3E8=alpha_; //2615B8.
+                video.flags404Low6=std::uint8_t(video.flags404Low6&~8u); //2615D4.
+                video.flags404Low6=std::uint8_t(video.flags404Low6|16u); //2615E4.
+            }else{
+                video.covered3DC=0; //261DF8.
+                video.flags404Low6=std::uint8_t(video.flags404Low6&~2u); //261E18.
+                video.alpha3E8=alpha_; //261E1C.
+                video.flags404Low6=std::uint8_t(video.flags404Low6&~16u); //261E30.
+            }
             completed_=true;return result(S::complete,out?0x2615e4:0x261e30);
         default:return result(S::owner,0x25aa4c);
         }

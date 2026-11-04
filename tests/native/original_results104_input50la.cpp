@@ -71,7 +71,7 @@ bool Application::suspendResultsBlockingInput50LA(rr::game::OriginalResults10450
            !camera||camera.get()!=&observed||!camera->displayInputs_||camera->abandoned_||
            &camera->displayInputs_->renderer!=&display->renderer_||
            !scope||!scope->endStateCurrent(race,*camera)||
-           camera->blockingVideoPending()||camera->asyncVideoPending()||
+           camera->pendingDisplayWork()||camera->blockingVideoPending()||camera->asyncVideoPending()||
            !resultsPublishedRoot50LA(race,d))return false;
         auto p=std::make_shared<NativeResultsInputContinuation50LA>();
         p->race=sourceRace28COwner_;p->video=videoOwner_;p->display=display;p->scope=scope;p->camera=std::move(camera);

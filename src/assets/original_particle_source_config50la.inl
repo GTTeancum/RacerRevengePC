@@ -119,6 +119,10 @@ bool OriginalParticleSourceConfig50LA::abortNative(D& d)noexcept {
     OriginalConfigProcessGlobals50LA::expireStackNative(&emitterMaxRange30_);
     OriginalConfigProcessGlobals50LA::expireStackNative(&commonVelocity30_);
     for(auto& input:type0Noise30_)OriginalConfigProcessGlobals50LA::expireStackNative(&input);
+    for(auto& input:type2Range30_)OriginalConfigProcessGlobals50LA::expireStackNative(&input);
+    for(auto& input:type9Range30_)OriginalConfigProcessGlobals50LA::expireStackNative(&input);
+    for(auto& input:type11Range30_)OriginalConfigProcessGlobals50LA::expireStackNative(&input);
+    for(auto& input:type12Range30_)OriginalConfigProcessGlobals50LA::expireStackNative(&input);
     handle_=-1;selectedRoot_=nullptr;resolver_.reset();provider_.reset();nativeClosed_=true;return true;
 }
 
@@ -189,8 +193,8 @@ bool OriginalParticleSourceConfig50LA::emitterOccurrenceCurrentNative(const void
     if(occurrence_!=Occurrence::emitter15AE00||!owner||emitterOwner_!=owner||
        thread_!=std::this_thread::get_id()||source_!=&storage_)return false;
     if(emitterPropertiesAttempted_!=bool(emitterPropertyTarget_)||
-       (emitterPropertyTarget_&&*emitterPropertyTarget_!=0x15c330u&&*emitterPropertyTarget_!=0x15d560u&&*emitterPropertyTarget_!=0x15e6d0u))return false;
-    if((emitterPropertyTarget_==0x15c330u||emitterPropertyTarget_==0x15d560u)&&(emitterGeneralReturned_||emitterGeneralFound_||
+       (emitterPropertyTarget_&&*emitterPropertyTarget_!=0x15c330u&&*emitterPropertyTarget_!=0x15d560u&&*emitterPropertyTarget_!=0x15dd00u&&*emitterPropertyTarget_!=0x15e6d0u&&*emitterPropertyTarget_!=0x15ef70u&&*emitterPropertyTarget_!=0x15fc10u&&*emitterPropertyTarget_!=0x1602b0u))return false;
+    if((emitterPropertyTarget_==0x15c330u||emitterPropertyTarget_==0x15d560u||emitterPropertyTarget_==0x15dd00u||emitterPropertyTarget_==0x15ef70u||emitterPropertyTarget_==0x15fc10u||emitterPropertyTarget_==0x1602b0u)&&(emitterGeneralReturned_||emitterGeneralFound_||
        emitterMinRangeFound_||emitterMaxRangeFound_||emitterMinRangeKnownBytes_||emitterMaxRangeKnownBytes_||
        emitterVectorWritten_[0]||emitterVectorWritten_[1]||emitterMinRangeReturned_||emitterMaxRangeReturned_||
        emitterSpreadReturned_||emitterType8Returned_))return false;
@@ -209,6 +213,70 @@ bool OriginalParticleSourceConfig50LA::emitterOccurrenceCurrentNative(const void
         const auto mask=type0NoiseWritten_[i];if(mask!=0&&mask!=1&&mask!=3&&mask!=7)return false;
         if((mask&&!type0NoiseFound_[i])||(type0NoiseReturned_>i&&mask!=7))return false;
     }
+    if(type2GeneralReturned_!=bool(type2GeneralFound_)||
+       (type2GeneralReturned_&&(emitterPropertyTarget_!=0x15dd00u||!emitterPropertiesAttempted_||
+           (!commonPropertiesAttempted_&&(!textSelectionReturned_||textSelectBounded_)))))return false;
+    if(type2MovingFound_&&!type2GeneralReturned_)return false;
+    if(type2MovingReturned_&&!type2MovingFound_)return false;
+    if(type2RangeReturned_>2||(type2RangeReturned_&&!type2MovingReturned_))return false;
+    for(std::size_t i=0;i<2;++i){
+        if(type2RangeFound_[i]&&(!type2MovingReturned_||(i&&type2RangeReturned_<1)))return false;
+        if(type2RangeKnownBytes_[i]&&(!type2RangeFound_[i]||
+           type2RangeKnownBytes_[i]!=(*type2RangeFound_[i]?128u:1u)))return false;
+        const auto mask=type2RangeWritten_[i];if(mask!=0&&mask!=1&&mask!=3&&mask!=7)return false;
+        if((mask&&!type2RangeFound_[i])||(type2RangeReturned_>i&&mask!=7))return false;
+    }
+    if(type9GeneralReturned_!=bool(type9GeneralFound_)||
+       (type9GeneralReturned_&&(emitterPropertyTarget_!=0x15ef70u||!emitterPropertiesAttempted_||
+           (!commonPropertiesAttempted_&&(!textSelectionReturned_||textSelectBounded_)))))return false;
+    if(type9RangeReturned_>2||(type9RangeReturned_&&!type9GeneralReturned_))return false;
+    for(std::size_t i=0;i<2;++i){
+        if(type9RangeFound_[i]&&(!type9GeneralReturned_||(i&&type9RangeReturned_<1)))return false;
+        if(type9RangeKnownBytes_[i]&&(!type9RangeFound_[i]||
+           type9RangeKnownBytes_[i]!=(*type9RangeFound_[i]?128u:1u)))return false;
+        const auto mask=type9RangeWritten_[i];if(mask!=0&&mask!=1&&mask!=3&&mask!=7)return false;
+        if((mask&&!type9RangeFound_[i])||(type9RangeReturned_>i&&mask!=7))return false;
+    }
+    if(type9SpreadFound_&&type9RangeReturned_!=2)return false;
+    if(type9SpreadReturned_&&!type9SpreadFound_)return false;
+    if(type11GeneralReturned_!=bool(type11GeneralFound_)||
+       (type11GeneralReturned_&&(emitterPropertyTarget_!=0x15fc10u||!emitterPropertiesAttempted_||
+           (!commonPropertiesAttempted_&&(!textSelectionReturned_||textSelectBounded_)))))return false;
+    if(type11ScalarCount_>6||(type11ScalarCount_&&!type11GeneralReturned_))return false;
+    if(type11HeadFound_&&type11ScalarCount_!=6)return false;
+    if(type11HeadReturned_&&!type11HeadFound_)return false;
+    if(type11RangeReturned_>2||(type11RangeReturned_&&!type11HeadReturned_))return false;
+    for(std::size_t i=0;i<2;++i){
+        if(type11RangeFound_[i]&&(!type11HeadReturned_||(i&&type11RangeReturned_<1)))return false;
+        if(type11RangeKnownBytes_[i]&&(!type11RangeFound_[i]||
+           type11RangeKnownBytes_[i]!=(*type11RangeFound_[i]?128u:1u)))return false;
+        const auto mask=type11RangeWritten_[i];if(mask!=0&&mask!=1&&mask!=3&&mask!=7)return false;
+        if((mask&&!type11RangeFound_[i])||(type11RangeReturned_>i&&mask!=7))return false;
+    }
+    if(type11MovingFound_&&type11RangeReturned_!=2)return false;
+    if(type11MovingReturned_&&!type11MovingFound_)return false;
+    if(type12GeneralReturned_!=bool(type12GeneralFound_)||
+       (type12GeneralReturned_&&(emitterPropertyTarget_!=0x1602b0u||!emitterPropertiesAttempted_||
+           (!commonPropertiesAttempted_&&(!textSelectionReturned_||textSelectBounded_)))))return false;
+    if(type12RangeReturned_>2||(type12RangeReturned_&&!type12GeneralReturned_))return false;
+    for(std::size_t i=0;i<2;++i){
+        if(type12RangeFound_[i]&&(!type12GeneralReturned_||(i&&type12RangeReturned_<1)))return false;
+        if(type12RangeKnownBytes_[i]&&(!type12RangeFound_[i]||
+           type12RangeKnownBytes_[i]!=(*type12RangeFound_[i]?128u:1u)))return false;
+        const auto mask=type12RangeWritten_[i];if(mask!=0&&mask!=1&&mask!=3&&mask!=7)return false;
+        if((mask&&!type12RangeFound_[i])||(type12RangeReturned_>i&&mask!=7))return false;
+    }
+    if(type12DistanceInput_&&type12RangeReturned_!=2)return false;
+    if(type12SquaredBits_&&!type12DistanceInput_)return false;
+    if(type12DistanceSquared_!=bool(type12SquaredBits_))return false;
+    if(type12ReciprocalBits_&&!type12DistanceSquared_)return false;
+    if(type12ReciprocalWritten_!=bool(type12ReciprocalBits_))return false;
+    if(type12TailScalarCount_>3||(type12TailScalarCount_&&!type12ReciprocalWritten_))return false;
+    if(type12OscillationEnabled_&&type12TailScalarCount_!=3)return false;
+    if(type12OscillationMask_!=0&&type12OscillationMask_!=1&&type12OscillationMask_!=3&&type12OscillationMask_!=7)return false;
+    if(type12OscillationMask_&&type12OscillationEnabled_!=true)return false;
+    if(type12FlagMask_!=0&&type12FlagMask_!=1&&type12FlagMask_!=3)return false;
+    if(type12FlagMask_&&(!commonReturned_||emitterPropertyTarget_!=0x1602b0u))return false;
     if(emitterPropertiesAttempted_&&(!sourceOpenReturned_||!*sourceOpenReturned_||!textReturned_))return false;
     if(emitterGeneralReturned_!=bool(emitterGeneralFound_)||
        (emitterGeneralReturned_&&(!emitterPropertiesAttempted_||
@@ -226,7 +294,8 @@ bool OriginalParticleSourceConfig50LA::emitterOccurrenceCurrentNative(const void
     if((emitterMinRangeReturned_&&emitterVectorWritten_[0]!=7)||
        (emitterMaxRangeReturned_&&(!emitterMinRangeReturned_||emitterVectorWritten_[1]!=7))||
        (emitterSpreadReturned_&&!emitterMaxRangeReturned_))return false;
-    if(commonPropertiesAttempted_&&(emitterPropertyTarget_==0x15e6d0u?!emitterSpreadReturned_:(emitterPropertyTarget_!=0x15c330u&&emitterPropertyTarget_!=0x15d560u)))return false;
+    if(commonPropertiesAttempted_&&(emitterPropertyTarget_==0x15e6d0u?!emitterSpreadReturned_:
+        (emitterPropertyTarget_==0x15dd00u?type2RangeReturned_!=2:(emitterPropertyTarget_==0x15ef70u?!type9SpreadReturned_:(emitterPropertyTarget_==0x15fc10u?!type11MovingReturned_:(emitterPropertyTarget_==0x1602b0u?(!type12OscillationEnabled_||type12TailScalarCount_!=3||type12OscillationMask_!=(*type12OscillationEnabled_?7u:0u)):(emitterPropertyTarget_!=0x15c330u&&emitterPropertyTarget_!=0x15d560u)))))))return false;
     if(commonGeneralReturned_!=bool(commonGeneralFound_)||
        (commonGeneralReturned_&&(!commonPropertiesAttempted_||
            (!commonPropertiesSelectionAttempted_&&(!textSelectionReturned_||textSelectBounded_)))))return false;
@@ -269,6 +338,10 @@ bool OriginalParticleSourceConfig50LA::emitterOccurrenceCurrentNative(const void
     if(emitterType8Returned_&&(emitterPropertyTarget_!=0x15e6d0u||!commonReturned_))return false;
     if(emitterType0Returned_&&(emitterPropertyTarget_!=0x15c330u||type0NoiseReturned_!=2||!commonReturned_))return false;
     if(emitterType1Returned_&&(emitterPropertyTarget_!=0x15d560u||!commonReturned_))return false;
+    if(emitterType2Returned_&&(emitterPropertyTarget_!=0x15dd00u||type2RangeReturned_!=2||!commonReturned_))return false;
+    if(emitterType9Returned_&&(emitterPropertyTarget_!=0x15ef70u||!type9SpreadReturned_||!commonReturned_))return false;
+    if(emitterType11Returned_&&(emitterPropertyTarget_!=0x15fc10u||!type11MovingReturned_||!commonReturned_))return false;
+    if(emitterType12Returned_&&(emitterPropertyTarget_!=0x1602b0u||type12FlagMask_!=3||!commonReturned_))return false;
     if(sourceDestructorAttempted_&&!emitterPropertiesReturnedNative())return false;
     if(sourceClosed_&&!sourceDestructorAttempted_)return false;
     if(nativeClosed_)return !borrowed_&&!resolver_&&!provider_&&handle_==-1&&!selectedRoot_;

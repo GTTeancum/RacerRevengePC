@@ -24,7 +24,7 @@ bool Owner::beginNativeCollisionPrefix2743B0(ra_static_model_cold50LA::Owner& mo
        actual.recovery->globals.movementCategory3E0720!=actual.main.materialMask||
        actual.main.collisionTypeTag!=candidates.names_.collisionTypeTag||
        &storage.globalValid3E0730!=&worldApplication_->collisionGlobalValid3E0730_||
-       !worldApplication_->collisionDirectory36B0F0_.empty()||
+       !worldApplication_->observeCollisionDirectory36B0F0().empty()||
        worldApplication_->attachmentLock423F58())return false;
     auto& objects=*worldCollisionObjects3CC_;
     const auto* data=objects.source_->sourcesDecoded();

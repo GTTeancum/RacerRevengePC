@@ -22,6 +22,13 @@ enum class OriginalVideoNativeUse : std::uint8_t {
 // finishes, and either swaps through GameHost50ER or commits headlessly.
 // Other renderer operations are locked out until real restore/retirement.
 //
+// The immutable caller-selected blend policies must explicitly admit
+// signedFloor128, clamp8, PABE0 and packedSourceByte alpha storage. The
+// source packet establishes its ALPHA expression, not COLCLAMP/PABE/FBA
+// provenance. These are native lowering choices, never recovered GS state.
+// Reusing the plain numeric policy type grants no packet/target authority.
+// Unspecified/unsupported choices reject before native capture/allocation.
+//
 // Native policy: cover the full actual race viewport, in its existing pixel
 // resolution/orientation. No PS2 scanout, field timing, or general GS parity
 // is claimed. Root pauses simulation, handles events/quit, and continues the
@@ -35,8 +42,10 @@ enum class OriginalVideoNativeUse : std::uint8_t {
 // later begin its same policy again, only after a fresh actual race publication.
 class OriginalVideoBlockingNativeBackend final : public game::OriginalVideoBlockingBackend {
 public:
+    // No default mode or blend policy: every actual owner states its native
+    // adaptation at construction. A retired reuse retains those same choices.
     OriginalVideoBlockingNativeBackend(VehicleWindowGl50DS&, GameHost50ER&,
-        OriginalVideoNativeUse=OriginalVideoNativeUse::blockingSourceLoops) noexcept;
+        OriginalVideoNativeUse,NativeVideoPacketOverlayPolicies50LA) noexcept;
     ~OriginalVideoBlockingNativeBackend() noexcept override;
     OriginalVideoBlockingNativeBackend(const OriginalVideoBlockingNativeBackend&)=delete;
     OriginalVideoBlockingNativeBackend& operator=(const OriginalVideoBlockingNativeBackend&)=delete;
@@ -63,6 +72,14 @@ private:
     VehicleWindowGl50DS& renderer_;
     GameHost50ER& host_;
     const OriginalVideoNativeUse use_;
+    const NativeVideoPacketOverlayPolicies50LA blendPolicies_;
+    bool blendPoliciesSupported()const noexcept {
+        using P=NativeVideoPacketOverlayPolicies50LA;
+        return blendPolicies_.rounding==P::Rounding::signedFloor128 &&
+            blendPolicies_.colorRange==P::ColorRange::clamp8 &&
+            blendPolicies_.pabe==P::Pabe::zero &&
+            blendPolicies_.alphaStore==P::AlphaStore::packedSourceByte;
+    }
     // Sealed by the out-of-line constructor, never caller-supplied callbacks.
     // Keeps optional GameHost link dependencies out of ordinary50DS clients.
     bool window_=false;

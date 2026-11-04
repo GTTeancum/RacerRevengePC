@@ -187,11 +187,172 @@ private:
     // a PRT, publish World4A0, or claim160E00 has returned.
     //Same concrete owner validates its authority membership; no new broad
     //friendship to Application's private entity ledger is required.
+    //The first source Fog count store has separate native custody from its
+    //caller receipt. No emitter/occurrence pointer below is a live capability.
+    //Both abort orders are valid: emitter before Track, or Track before the
+    //withdrawn descriptor. Structural history never dereferences these IDs.
+    struct SourceFogCount160994 {
+        const OriginalTrackParticleCold50LA* manager=nullptr;
+        const OriginalGcParticleManager50KG* pool=nullptr;
+        const OriginalGcParticle50KG* record=nullptr;
+        const void* publication138=nullptr;
+        const void* emitter=nullptr;
+        const void* occurrence=nullptr;
+        std::uint64_t generation=0;
+        std::int32_t index128=0,before128=0,after128=0;
+        std::uint32_t pc=0;
+        bool stored=false;
+    };
+    static bool sourceFogCountHistoryNative(const SourceFogCount160994& h)noexcept {
+        if(!h.stored)return !h.manager&&!h.pool&&!h.record&&!h.publication138&&
+            !h.emitter&&!h.occurrence&&!h.generation&&!h.index128&&!h.before128&&!h.after128&&
+            (h.pc==0||h.pc==0x160994u);
+        return h.manager&&h.pool&&h.record&&h.publication138&&h.emitter&&h.occurrence&&
+            h.generation&&h.index128==0&&h.before128==0&&h.after128==1&&h.pc==0x160994u;
+    }
+    static bool sourceFogSuccessorCountHistoryNative(const SourceFogCount160994& h)noexcept {
+        if(!h.stored)return sourceFogCountHistoryNative(h);
+        return h.manager&&h.pool&&h.record&&h.publication138&&h.emitter&&h.occurrence&&
+            h.generation&&h.index128==1&&h.before128==1&&h.after128==2&&h.pc==0x160994u;
+    }
+    bool sourceActiveCountAuthorityNative()const noexcept {
+        const auto& h=sourceFogCountPublication_;const auto& next=sourceFogSuccessorCountPublication_;
+        if(sourceActiveCount128Known_!=constructorReturned_||!sourceFogCountHistoryNative(h)||
+           !sourceFogSuccessorCountHistoryNative(next))return false;
+        if(!h.stored)return !h.pc&&!next.pc&&!next.stored&&(!sourceActiveCount128Known_||sourceActiveCount128_==0);
+        //Both immutable events outlive their emitters. No dereference of
+        //borrowed identities, legacy count, or caller receipt is needed here.
+        if(!sourceActiveCount128Known_||h.manager!=this||h.generation!=generation_||!particles_||
+           h.pool!=particles_.get()||!sourceParticlePointersPublished_||h.publication138!=sourceParticlePointers138_||
+           !sourceLoadReturned160E00_||!sourcePoolAttempted_||capacity130_!=5000)return false;
+        if(!next.stored)return !next.pc&&sourceActiveCount128_==1;
+        return sourceActiveCount128_==2&&next.manager==this&&next.generation==h.generation&&
+            next.pool==h.pool&&next.publication138==h.publication138&&next.record!=h.record&&
+            next.emitter!=h.emitter&&next.occurrence!=h.occurrence&&
+            next.emitter==sourceFogSuccessorEmitter_&&next.occurrence==sourceFogSuccessorOccurrence_&&
+            sourceFogSuccessorPosition_.stored&&sourceFogSuccessorPosition_.index128==1&&
+            next.record==sourceFogSuccessorPosition_.record&&next.pool==sourceFogSuccessorPosition_.pool&&
+            next.publication138==sourceFogSuccessorPosition_.publication138;
+    }
+    bool sourceFogCountObservationCurrentNative(std::int32_t observed,const void* occurrence)const noexcept {
+        //1605AC,1605C8 and1606C4 belong to epoch0. Their retained values
+        //stay zero after this SAME occurrence publishes epoch1, including
+        //after the separate authenticated successor publishes epoch2.
+        return occurrence&&observed==0&&sourceActiveCount128Known_&&sourceActiveCountAuthorityNative()&&
+            (!sourceFogCountPublication_.stored||sourceFogCountPublication_.occurrence==occurrence);
+    }
+    bool sourceFogCountReceiptCurrentNative(const SourceFogCount160994& h,
+        const void* exactEmitter,const void* occurrence)const noexcept {
+        if(!sourceFogCountHistoryNative(h)||!exactEmitter||!occurrence||
+           !sourceActiveCount128Known_||!sourceActiveCountAuthorityNative())return false;
+        const auto& actual=sourceFogCountPublication_;
+        if(h.stored!=actual.stored)return false;
+        if(!h.stored)return true;
+        return h.manager==actual.manager&&h.pool==actual.pool&&h.record==actual.record&&
+            h.publication138==actual.publication138&&h.emitter==actual.emitter&&h.emitter==exactEmitter&&
+            h.occurrence==actual.occurrence&&h.occurrence==occurrence&&h.generation==actual.generation&&
+            h.index128==actual.index128&&h.before128==actual.before128&&h.after128==actual.after128&&h.pc==actual.pc;
+    }
+    //One distinct successor's read-only retirement scan. This Track-issued
+    //ledger retains the first count publication independently of epoch2.
+    //Copied identities are inert history after native borrower withdrawal.
+    struct SourceFogRetirement160570 {
+        SourceFogCount160994 publication;
+        const void* readerEmitter=nullptr;
+        const void* readerOccurrence=nullptr;
+        const void* publication138=nullptr;
+        const OriginalGcParticle50KG* record=nullptr; //A completed slot read may be NULL.
+        const void* owner48=nullptr;
+        std::array<const OriginalTrackParticleCold50LA*,3> managers70{};
+        std::optional<std::int32_t> first128,again128;
+        std::uint32_t index=0;
+        std::uint8_t step=0; //5A8,AC,55C,564,56C,570,578,5A8,5AC,5B8 completed.
+    };
+    static bool sameSourceFogCountNative(const SourceFogCount160994& a,const SourceFogCount160994& b)noexcept {
+        return a.manager==b.manager&&a.pool==b.pool&&a.record==b.record&&a.publication138==b.publication138&&
+            a.emitter==b.emitter&&a.occurrence==b.occurrence&&a.generation==b.generation&&
+            a.index128==b.index128&&a.before128==b.before128&&a.after128==b.after128&&a.pc==b.pc&&a.stored==b.stored;
+    }
+    static bool sourceFogRetirementHistoryNative(const SourceFogRetirement160570& h)noexcept {
+        if(h.step>10||!sourceFogCountHistoryNative(h.publication))return false;
+        if(!h.step)return !h.publication.stored&&!h.publication.pc&&!h.readerEmitter&&!h.readerOccurrence&&
+            !h.publication138&&!h.record&&!h.owner48&&!h.managers70[0]&&!h.managers70[1]&&!h.managers70[2]&&
+            !h.first128&&!h.again128&&!h.index;
+        if(!h.publication.stored||!h.readerEmitter||!h.readerOccurrence||
+           h.readerEmitter==h.publication.emitter||h.readerOccurrence==h.publication.occurrence||
+           h.first128.has_value()!=(h.step>=2)||(h.first128&&*h.first128!=1)||
+           h.managers70[0]!=h.publication.manager||
+           h.managers70[1]!=(h.step>=3?h.publication.manager:nullptr)||
+           h.managers70[2]!=(h.step>=8?h.publication.manager:nullptr)||
+           h.publication138!=(h.step>=4?h.publication.publication138:nullptr)||
+           (h.step<5&&h.record)||h.owner48!=(h.step>=6?h.publication.emitter:nullptr)||
+           (h.step>=6&&h.record!=h.publication.record)||h.index!=(h.step>=7?1u:0u)||
+           h.again128.has_value()!=(h.step>=9)||(h.again128&&*h.again128!=1))return false;
+        return true;
+    }
+    bool sourceFogRetirementCurrentNative(const SourceFogRetirement160570& h,
+        const void* reader,const void* occurrence)const noexcept {
+        if(!sourceFogRetirementHistoryNative(h)||!h.step||!reader||!occurrence||
+           h.readerEmitter!=reader||h.readerOccurrence!=occurrence||closed_||prepared_||
+           !constructorReturned_||!sourceEntityEnrolled_||sourceParticleEmitterBorrowers_<2||
+           !sourceLoadReturned160E00_||!particles_||!sourcePoolAttempted_||capacity130_!=5000||
+           !sourceFogCountReceiptCurrentNative(h.publication,h.publication.emitter,h.publication.occurrence))return false;
+        const auto& actual=sourceFogRetirementObservation_;
+        if(!sourceFogRetirementHistoryNative(actual)||!sameSourceFogCountNative(h.publication,actual.publication)||
+           h.readerEmitter!=actual.readerEmitter||h.readerOccurrence!=actual.readerOccurrence||
+           h.publication138!=actual.publication138||h.record!=actual.record||h.owner48!=actual.owner48||
+           h.managers70!=actual.managers70||h.first128!=actual.first128||h.again128!=actual.again128||
+           h.index!=actual.index||h.step!=actual.step)return false;
+        if(h.step>=4&&h.publication138!=sourceParticlePointers138_)return false;
+        if(h.step>=5&&!particles_->sourcePositionSlotCurrentNative(h.publication138,0,h.record,nullptr))return false;
+        if(h.step>=6){const void* owner=nullptr;
+            if(!particles_->readSourceFogOwner160570(h.publication138,0,h.record,owner)||owner!=h.owner48)return false;
+        }
+        return true;
+    }
+    bool stepSourceFogRetirement160570(std::uint32_t pc,const OriginalTrackParticleCold50LA* freshManager70,
+        const void* reader,const void* occurrence,std::uint64_t generation,SourceFogRetirement160570& h)noexcept {
+        if(sourceFogSuccessorCountPublication_.stored||sourceActiveCount128_!=1)return false;
+        constexpr std::uint32_t pcs[]={0x1605a8,0x1605ac,0x16055c,0x160564,0x16056c,0x160570,0x160578,0x1605a8,0x1605ac,0x1605b8};
+        if(!sourceFogRetirementHistoryNative(h)||h.step>=10||pc!=pcs[h.step]||freshManager70!=this||
+           !reader||!occurrence||generation!=generation_)return false;
+        if(!h.step){
+            if(sourceFogRetirementObservation_.step||!sourceFogRetirementHistoryNative(sourceFogRetirementObservation_)||
+               closed_||prepared_||!constructorReturned_||!sourceEntityEnrolled_||sourceParticleEmitterBorrowers_<2||
+               !sourceLoadReturned160E00_||!particles_||!sourcePoolAttempted_||capacity130_!=5000||
+               !sourceActiveCountAuthorityNative()||!sourceFogCountPublication_.stored||
+               sourceActiveCount128_!=1||sourceFogCountPublication_.emitter==reader||
+               sourceFogCountPublication_.occurrence==occurrence)return false;
+        }else if(!sourceFogRetirementCurrentNative(h,reader,occurrence))return false;
+        auto next=h;
+        switch(h.step){
+            case 0:next.publication=sourceFogCountPublication_;next.readerEmitter=reader;next.readerOccurrence=occurrence;
+                next.managers70[0]=freshManager70;break; //Actual initial1605A8 read; no count read claimed yet.
+            case 1:next.first128=sourceActiveCount128_;break; //Actual first1605AC read, not epoch0 replay.
+            case 2:if(!h.first128||static_cast<std::int32_t>(h.index)>=*h.first128)return false;
+                next.managers70[1]=freshManager70;break; //Reached only through the actual true signed comparison.
+            case 3:next.publication138=sourceParticlePointers138_;break;
+            case 4:if(!particles_->readSourceFogRetirementSlot16056C(h.publication138,next.record))return false;break;
+            case 5:
+                if(h.record!=h.publication.record||!particles_->readSourceFogOwner160570(
+                    h.publication138,0,h.record,next.owner48)||next.owner48!=h.publication.emitter)return false;
+                break;
+            case 6:if(h.owner48==reader)return false;next.index=1;break; //Taken BNEL delay only.
+            case 7:next.managers70[2]=freshManager70;break; //Fresh second1605A8.
+            case 8:if(sourceActiveCount128_!=1)return false;next.again128=sourceActiveCount128_;break;
+            case 9:if(!h.again128||static_cast<std::int32_t>(h.index)<*h.again128)return false;break;
+        }
+        ++next.step;if(!sourceFogRetirementHistoryNative(next))return false;
+        sourceFogRetirementObservation_=next;h=next;return true;
+    }
     bool sourceEntityCountedNative(const OriginalApplicationEntities50LA* expected,std::uint64_t generation,
         std::size_t& count)const noexcept {
         count=0;
         if(closed_||application_.get()!=expected||!expected||generation_!=generation||!attempted_||prepared_||
            nativeWreckBorrower_||!canRetireNativeResources160E00())return false;
+        //Constructor epoch0, or the two independently authenticated160994 events.
+        //This fixed Track-owned history outlives the emitter on direct abort.
+        if(!sourceActiveCountAuthorityNative())return false;
         const auto& e=component_;const auto& authority=application_->entityAuthority_;
         if(entityConstructed_){
             if(e.reference00!=1||e.kind!=OriginalWreckComponentKind50LA::particleManager160B10||
@@ -287,6 +448,491 @@ private:
         //Before1617A0 consumes the true incoming environment filename and
         //same FileManager/Config custody. No source loader return/readiness.
     }
+    //One source1606E4 slot load and optional1606FC position SQ only. These
+    //native receipt pointers never replace source fields or claim owner48.
+    struct SourceFogPosition1606FC {
+        const OriginalGcParticleManager50KG* pool=nullptr;
+        const OriginalGcParticle50KG* record=nullptr;
+        const void* publication138=nullptr;
+        std::optional<std::int32_t> index128;
+        std::array<std::uint32_t,4> before{},after{};
+        bool slotRead=false,stored=false;
+        std::uint32_t pc=0;
+    };
+    static bool sourceFogPositionHistoryNative(const SourceFogPosition1606FC& h)noexcept {
+        const std::array<std::uint32_t,4> empty{};
+        //Structural history only. In particular, do not dereference these
+        //historical pointers after native emitter-borrow withdrawal.
+        if(!h.slotRead)return !h.pool&&!h.record&&!h.publication138&&!h.index128&&
+            !h.stored&&h.before==empty&&h.after==empty&&(h.pc==0||h.pc==0x1606e4u);
+        if(!h.pool||!h.publication138||!h.index128||*h.index128<0||
+           static_cast<std::uint32_t>(*h.index128)>=originalGcParticleCapacity50KG||
+           (h.pc!=0x1606e4u&&h.pc!=0x1606fcu))return false;
+        if(!h.stored)return h.before==empty&&h.after==empty;
+        return h.record&&h.pc==0x1606fcu&&h.before[3]==0x3f800000u&&h.after[3]==0x3f800000u;
+    }
+    bool sourceFogPositionCurrentNative(const SourceFogPosition1606FC& h)const noexcept {
+        if(!sourceFogPositionHistoryNative(h))return false;
+        if(!h.slotRead)return true;
+        if(closed_||prepared_||!constructorReturned_||!sourceEntityEnrolled_||
+           !sourceLoadReturned160E00_||!sourcePoolAttempted_||!sourceParticlePointersPublished_||
+           !sourceParticleEmitterBorrowers_||!particles_||particles_.get()!=h.pool||
+           sourceParticlePointers138_!=h.publication138||!sourceActiveCount128Known_||
+           *h.index128!=0||!sourceActiveCountAuthorityNative()||capacity130_!=5000)return false;
+        //The reached1606C4 index remains epoch0. Only this same stable slot
+        //may survive the sole count publication; no later creator is admitted.
+        const auto& count=sourceFogCountPublication_;
+        if(count.stored&&(count.pool!=h.pool||count.publication138!=h.publication138||
+           count.record!=h.record||count.index128!=*h.index128))return false;
+        return particles_->sourcePositionSlotCurrentNative(h.publication138,*h.index128,h.record,
+            h.stored?&h.after:nullptr);
+    }
+    bool readSourceFogPositionSlot1606E4(std::int32_t reachedIndex128,
+        const void* reachedPublication138,SourceFogPosition1606FC& h)noexcept {
+        if(!sourceFogPositionHistoryNative(h)||h.pc||h.slotRead)return false;
+        h.pc=0x1606e4; //Failed native admission leaves the real source load pending.
+        if(closed_||prepared_||!constructorReturned_||!sourceEntityEnrolled_||
+           !sourceLoadReturned160E00_||!sourcePoolAttempted_||!sourceParticlePointersPublished_||
+           !sourceParticleEmitterBorrowers_||!particles_||!sourceActiveCount128Known_||
+           !sourceActiveCountAuthorityNative()||sourceFogCountPublication_.stored||
+           sourceActiveCount128_!=reachedIndex128||
+           sourceParticlePointers138_!=reachedPublication138||capacity130_!=5000)return false;
+        const OriginalGcParticle50KG* record=nullptr;
+        //Use the caller's actual1606D0 operand, not a fresh source-field read.
+        //The native equality guard above authenticates that retained identity.
+        if(!particles_->readSourcePositionSlot1606E4(reachedPublication138,reachedIndex128,record))return false;
+        h.pool=particles_.get();h.publication138=reachedPublication138;
+        h.index128=reachedIndex128;h.record=record;h.slotRead=true;
+        return true; //NULL is retained; its reached store is bounded separately.
+    }
+    bool storeSourceFogPosition1606FC(const std::array<std::uint32_t,4>& after,
+        SourceFogPosition1606FC& h)noexcept {
+        if(!sourceFogPositionHistoryNative(h)||!h.slotRead||h.stored||h.pc!=0x1606e4u)return false;
+        h.pc=0x1606fc;
+        if(!sourceFogPositionCurrentNative(h))return false;
+        std::array<std::uint32_t,4> before{};
+        if(!particles_->storeSourcePosition1606FC(h.publication138,*h.index128,h.record,after,before))return false;
+        h.before=before;h.after=after;h.stored=true;
+        return true; //Before160700: no later source22C/velocity/48 access or128 write.
+    }
+    //Actual epoch1 reads by the exact scanned successor. After its own
+    //publication they remain historical1, not a fresh epoch2 read or replay.
+    bool sourceFogSuccessorCountObservationCurrentNative(std::int32_t observed,
+        const SourceFogRetirement160570& scan,const void* reader,const void* occurrence)const noexcept {
+        return observed==1&&scan.step==10&&sourceFogRetirementCurrentNative(scan,reader,occurrence)&&
+            sourceActiveCount128Known_&&(!sourceFogSuccessorCountPublication_.stored?
+                sourceActiveCount128_==1:(sourceActiveCount128_==2&&
+                sourceFogSuccessorCountPublication_.emitter==reader&&sourceFogSuccessorCountPublication_.occurrence==occurrence));
+    }
+    static bool sourceFogSuccessorPositionHistoryNative(const SourceFogRetirement160570& scan,
+        const SourceFogPosition1606FC& h)noexcept {
+        if(!sourceFogRetirementHistoryNative(scan)||!sourceFogPositionHistoryNative(h))return false;
+        if(!h.pc&&!h.slotRead)return true;
+        if(scan.step!=10)return false;
+        if(!h.slotRead)return h.pc==0x1606e4u;
+        return h.index128==1&&h.pool==scan.publication.pool&&h.publication138==scan.publication.publication138&&
+            (!h.stored||h.record!=scan.publication.record);
+    }
+    bool sourceFogSuccessorPositionCurrentNative(const SourceFogRetirement160570& scan,
+        const SourceFogPosition1606FC& h)const noexcept {
+        if(!sourceFogSuccessorPositionHistoryNative(scan,h)||
+           !sourceFogSuccessorCountObservationCurrentNative(1,scan,scan.readerEmitter,scan.readerOccurrence))return false;
+        const auto& actual=sourceFogSuccessorPosition_;
+        if(!h.slotRead)return !actual.pc&&!actual.slotRead&&!sourceFogSuccessorEmitter_&&!sourceFogSuccessorOccurrence_;
+        if(sourceFogSuccessorEmitter_!=scan.readerEmitter||sourceFogSuccessorOccurrence_!=scan.readerOccurrence||
+           !sourceFogSuccessorPositionHistoryNative(scan,actual)||!actual.slotRead||h.pool!=actual.pool||
+           h.record!=actual.record||h.publication138!=actual.publication138||h.index128!=actual.index128||
+           h.before!=actual.before||h.after!=actual.after||h.stored!=actual.stored||
+           (h.pc!=actual.pc&&!(h.pc==0x1606fcu&&actual.pc==0x1606e4u&&!h.stored)))return false;
+        //An attempted SQ changes only the caller's pending PC until the real
+        //write succeeds. The exact issued slot observation remains immutable.
+        return particles_->sourcePositionSlotCurrentNative(h.publication138,1,h.record,h.stored?&h.after:nullptr);
+    }
+    bool readSourceFogSuccessorPositionSlot1606E4(const SourceFogRetirement160570& scan,
+        std::int32_t reachedIndex128,const void* reachedPublication138,SourceFogPosition1606FC& h)noexcept {
+        if(sourceFogSuccessorCountPublication_.stored||sourceActiveCount128_!=1)return false;
+        if(!sourceFogPositionHistoryNative(h)||h.pc||h.slotRead)return false;
+        h.pc=0x1606e4;
+        if(!sourceFogSuccessorPositionCurrentNative(scan,h)||reachedIndex128!=1||
+           reachedPublication138!=sourceParticlePointers138_)return false;
+        const OriginalGcParticle50KG* record=nullptr;
+        if(!particles_->readSourcePositionSlot1606E4(reachedPublication138,reachedIndex128,record))return false;
+        h.pool=particles_.get();h.publication138=reachedPublication138;h.index128=reachedIndex128;
+        h.record=record;h.slotRead=true; //NULL or alias is retained before any record-store admission.
+        sourceFogSuccessorPosition_=h;sourceFogSuccessorEmitter_=scan.readerEmitter;
+        sourceFogSuccessorOccurrence_=scan.readerOccurrence;return true;
+    }
+    bool storeSourceFogSuccessorPosition1606FC(const SourceFogRetirement160570& scan,
+        const std::array<std::uint32_t,4>& after,SourceFogPosition1606FC& h)noexcept {
+        if(sourceFogSuccessorCountPublication_.stored||sourceActiveCount128_!=1)return false;
+        if(!sourceFogSuccessorPositionHistoryNative(scan,h)||!h.slotRead||h.stored||h.pc!=0x1606e4u)return false;
+        h.pc=0x1606fc;
+        if(!sourceFogSuccessorPositionCurrentNative(scan,h)||!h.record||h.record==scan.publication.record)return false;
+        std::array<std::uint32_t,4> before{};
+        if(!particles_->storeSourcePosition1606FC(h.publication138,1,h.record,after,before))return false;
+        h.before=before;h.after=after;h.stored=true;sourceFogSuccessorPosition_=h;
+        return true; //Only inactive slot1 position00. Count1, slot0 and all source48 lanes are untouched.
+    }
+    //One16088C SQ into the same already-positioned first Fog record. There
+    //is no separate slot identity or replacement record in this receipt.
+    struct SourceFogVelocity16088C {
+        std::array<std::uint32_t,4> before{},after{};
+        bool stored=false;
+        std::uint32_t pc=0;
+    };
+    static bool sourceFogVelocityHistoryNative(const SourceFogVelocity16088C& h)noexcept {
+        const std::array<std::uint32_t,4> empty{};
+        //Historical validation never dereferences the retired position owner.
+        if(!h.stored)return h.before==empty&&h.after==empty&&(h.pc==0||h.pc==0x16088cu);
+        return h.pc==0x16088cu&&h.before[3]==0x3f800000u&&
+            h.after[0]==0&&h.after[1]==0&&h.after[2]==0&&h.after[3]==0x3f800000u;
+    }
+    bool sourceFogVelocityCurrentNative(const SourceFogPosition1606FC& position,
+        const SourceFogVelocity16088C& h)const noexcept {
+        if(!sourceFogVelocityHistoryNative(h)||!position.stored||!position.index128||
+           *position.index128!=0||!sourceFogPositionCurrentNative(position))return false;
+        return particles_->sourceVelocitySlotCurrentNative(position.publication138,*position.index128,
+            position.record,h.stored?&h.after:nullptr);
+    }
+    bool storeSourceFogVelocity16088C(const SourceFogPosition1606FC& position,
+        const std::array<std::uint32_t,4>& after,SourceFogVelocity16088C& h)noexcept {
+        if(!sourceFogVelocityHistoryNative(h)||h.pc||h.stored)return false;
+        h.pc=0x16088c; //One attempt: every refusal retains this exact pending SQ.
+        if(!sourceFogVelocityCurrentNative(position,h))return false;
+        std::array<std::uint32_t,4> before{};
+        if(!particles_->storeSourceVelocity16088C(position.publication138,*position.index128,
+           position.record,after,before))return false;
+        h.before=before;h.after=after;h.stored=true;
+        return true; //No scalar/owner field or count128 publication here.
+    }
+    static bool sourceFogSuccessorVelocityHistoryNative(const SourceFogRetirement160570& scan,
+        const SourceFogPosition1606FC& position,const SourceFogVelocity16088C& h)noexcept {
+        return sourceFogVelocityHistoryNative(h)&&sourceFogSuccessorPositionHistoryNative(scan,position)&&
+            ((!h.pc&&!h.stored)||(scan.step==10&&position.stored));
+    }
+    bool sourceFogSuccessorVelocityCurrentNative(const SourceFogRetirement160570& scan,
+        const SourceFogPosition1606FC& position,const SourceFogVelocity16088C& h)const noexcept {
+        if(!sourceFogSuccessorVelocityHistoryNative(scan,position,h)||!position.stored||
+           !sourceFogSuccessorPositionCurrentNative(scan,position))return false;
+        const auto& actual=sourceFogSuccessorVelocity_;
+        if(!sourceFogVelocityHistoryNative(actual)||h.stored!=actual.stored||h.before!=actual.before||h.after!=actual.after||
+           (h.pc!=actual.pc&&!(h.pc==0x16088cu&&!actual.pc&&!h.stored)))return false;
+        return particles_->sourceSuccessorVelocitySlotCurrentNative(position.publication138,1,position.record,
+            h.stored?&h.after:nullptr);
+    }
+    bool storeSourceFogSuccessorVelocity16088C(const SourceFogRetirement160570& scan,
+        const SourceFogPosition1606FC& position,const std::array<std::uint32_t,4>& after,
+        SourceFogVelocity16088C& h)noexcept {
+        if(sourceFogSuccessorCountPublication_.stored||sourceActiveCount128_!=1)return false;
+        if(!sourceFogSuccessorVelocityHistoryNative(scan,position,h)||h.pc||h.stored)return false;
+        h.pc=0x16088c;
+        if(!sourceFogSuccessorVelocityCurrentNative(scan,position,h))return false;
+        std::array<std::uint32_t,4> before{};
+        if(!particles_->storeSourceSuccessorVelocity16088C(position.publication138,1,position.record,after,before))return false;
+        h.before=before;h.after=after;h.stored=true;sourceFogSuccessorVelocity_=h;
+        return true; //One actual slot1 SQ; no count or source48 effect.
+    }
+    //One partial first Fog record after1606FC. emitter is native provenance
+    //from the first successful store; source48 is known only at count>=3.
+    struct SourceFogFields1608AC {
+        const void* emitter=nullptr;
+        std::array<std::uint32_t,5> values{}; //38,3C,30,2C,28 raw source inputs.
+        std::uint8_t storedCount=0;
+        std::uint32_t pc=0;
+        std::optional<std::uint32_t> lifeRead30;
+    };
+    static bool sourceFogFieldsHistoryNative(const SourceFogFields1608AC& h)noexcept {
+        constexpr std::uint32_t stores[]={0x1608ac,0x1608b8,0x1608bc,0x1608c4,0x1608cc,0x1608d4};
+        constexpr std::uint8_t knownAt[]={1,2,4,5,6};
+        if(h.storedCount>6||bool(h.emitter)!=(h.storedCount!=0))return false;
+        for(std::size_t i=0;i<h.values.size();++i)if(h.storedCount<knownAt[i]&&h.values[i])return false;
+        //Exact completed-store PC or the one attempted next operation. No
+        //historical pool, particle or emitter pointer is dereferenced here.
+        const auto last=h.storedCount?stores[h.storedCount-1]:0u;
+        const auto next=h.storedCount<6?stores[h.storedCount]:0x1608d8u;
+        if(h.pc!=last&&h.pc!=next)return false;
+        return !h.lifeRead30||(h.storedCount==6&&h.pc==0x1608d8u&&*h.lifeRead30==h.values[2]);
+    }
+    bool sourceFogFieldsCurrentNative(const SourceFogPosition1606FC& position,
+        const SourceFogFields1608AC& h,const void* exactEmitter)const noexcept {
+        if(!sourceFogFieldsHistoryNative(h)||!position.stored||!position.index128||
+           *position.index128!=0||!exactEmitter||(h.emitter&&h.emitter!=exactEmitter)||
+           (sourceFogCountPublication_.stored&&sourceFogCountPublication_.emitter!=exactEmitter)||
+           !sourceFogPositionCurrentNative(position))return false;
+        return particles_->sourceFogFieldsCurrentNative(position.publication138,*position.index128,
+            position.record,exactEmitter,h.storedCount,h.values);
+    }
+    bool storeSourceFogField1608AC(const SourceFogPosition1606FC& position,const void* exactEmitter,
+        std::uint32_t sourcePC,std::uint32_t inputBits,SourceFogFields1608AC& h)noexcept {
+        constexpr std::uint32_t stores[]={0x1608ac,0x1608b8,0x1608bc,0x1608c4,0x1608cc,0x1608d4};
+        if(!sourceFogFieldsHistoryNative(h)||h.storedCount>=6||h.lifeRead30||
+           sourcePC!=stores[h.storedCount]||h.pc!=(h.storedCount?stores[h.storedCount-1]:0u))return false;
+        h.pc=sourcePC; //One-attempt boundary. Earlier successful stores stay.
+        if(!sourceFogFieldsCurrentNative(position,h,exactEmitter))return false;
+        const auto prior=h.storedCount;
+        if(!particles_->storeSourceFogField1608AC(position.publication138,*position.index128,
+            position.record,exactEmitter,prior,sourcePC,inputBits))return false;
+        if(prior<2)h.values[prior]=inputBits;
+        else if(prior>2)h.values[prior-1]=inputBits;
+        h.emitter=exactEmitter;++h.storedCount;
+        return true; //Only this one original store; no source128 change.
+    }
+    bool readSourceFogLife1608D8(const SourceFogPosition1606FC& position,const void* exactEmitter,
+        SourceFogFields1608AC& h)noexcept {
+        if(!sourceFogFieldsHistoryNative(h)||h.storedCount!=6||h.pc!=0x1608d4u||h.lifeRead30)return false;
+        h.pc=0x1608d8;
+        if(!sourceFogFieldsCurrentNative(position,h,exactEmitter))return false;
+        std::uint32_t bits=0;
+        if(!particles_->readSourceFogLife1608D8(position.publication138,*position.index128,
+            position.record,exactEmitter,bits))return false;
+        h.lifeRead30=bits;
+        return true; //Authentic operand for the separately bounded DIV.S1608DC.
+    }
+    static bool sourceFogSuccessorFieldsHistoryNative(const SourceFogRetirement160570& scan,
+        const SourceFogPosition1606FC& position,const SourceFogFields1608AC& h,const void* exactEmitter)noexcept {
+        if(!sourceFogFieldsHistoryNative(h)||!sourceFogSuccessorPositionHistoryNative(scan,position))return false;
+        if(!h.pc&&!h.storedCount)return true;
+        return scan.step==10&&position.stored&&exactEmitter&&exactEmitter==scan.readerEmitter&&
+            (!h.emitter||h.emitter==exactEmitter);
+    }
+    bool sourceFogSuccessorFieldsCurrentNative(const SourceFogRetirement160570& scan,
+        const SourceFogPosition1606FC& position,const SourceFogFields1608AC& h,const void* exactEmitter)const noexcept {
+        if(!sourceFogSuccessorFieldsHistoryNative(scan,position,h,exactEmitter)||!position.stored||
+           !exactEmitter||exactEmitter!=scan.readerEmitter||h.lifeRead30!=sourceFogSuccessorLifeRead30_||
+           !sourceFogSuccessorPositionCurrentNative(scan,position))return false;
+        return particles_->sourceSuccessorFogFieldsCurrentNative(position.publication138,1,position.record,
+            exactEmitter,h.storedCount,h.values);
+    }
+    bool storeSourceFogSuccessorField1608AC(const SourceFogRetirement160570& scan,
+        const SourceFogPosition1606FC& position,const void* exactEmitter,std::uint32_t sourcePC,
+        std::uint32_t inputBits,SourceFogFields1608AC& h)noexcept {
+        if(sourceFogSuccessorCountPublication_.stored||sourceActiveCount128_!=1)return false;
+        constexpr std::uint32_t stores[]={0x1608ac,0x1608b8,0x1608bc,0x1608c4,0x1608cc,0x1608d4};
+        if(!sourceFogSuccessorFieldsHistoryNative(scan,position,h,exactEmitter)||h.storedCount>=6||
+           sourcePC!=stores[h.storedCount]||h.pc!=(h.storedCount?stores[h.storedCount-1]:0u))return false;
+        h.pc=sourcePC;
+        if(!sourceFogSuccessorFieldsCurrentNative(scan,position,h,exactEmitter))return false;
+        const auto prior=h.storedCount;
+        if(!particles_->storeSourceSuccessorFogField1608AC(position.publication138,1,position.record,
+            exactEmitter,prior,sourcePC,inputBits))return false;
+        if(prior<2)h.values[prior]=inputBits;
+        else if(prior>2)h.values[prior-1]=inputBits;
+        h.emitter=exactEmitter;++h.storedCount;
+        return true; //One source store only. The new+48 lane is known after store3, never before.
+    }
+    bool readSourceFogSuccessorLife1608D8(const SourceFogRetirement160570& scan,
+        const SourceFogPosition1606FC& position,const void* exactEmitter,SourceFogFields1608AC& h)noexcept {
+        if(!sourceFogSuccessorFieldsHistoryNative(scan,position,h,exactEmitter)||
+           h.storedCount!=6||h.pc!=0x1608d4u||h.lifeRead30)return false;
+        h.pc=0x1608d8;
+        if(sourceFogSuccessorCountPublication_.stored||sourceActiveCount128_!=1||
+           !sourceFogSuccessorFieldsCurrentNative(scan,position,h,exactEmitter))return false;
+        std::uint32_t bits=0;
+        if(!particles_->readSourceSuccessorFogLife1608D8(position.publication138,1,position.record,exactEmitter,bits))return false;
+        sourceFogSuccessorLifeRead30_=bits;h.lifeRead30=bits;
+        return true; //Actual slot1 read, separately issued before the bounded DIV.
+    }
+    //Post-DIV custody is separate from the six completed1608AC..1608D4
+    //stores and authentic1608D8 load. pcs/values record only completed source
+    //operations; pc records the last operation or a failed next attempt.
+    struct SourceFogTail1608E0 {
+        std::array<std::uint32_t,7> pcs{},values{};
+        std::uint8_t completedOps=0;
+        std::uint32_t pc=0;
+    };
+    static bool sourceFogTailOperationPCNative(const SourceFogTail1608E0& h,
+        std::uint8_t operation,std::uint32_t pc)noexcept {
+        switch(operation){
+            case 0:return pc==0x1608e0u;
+            case 1:return pc==0x1608e4u;
+            case 2:return pc==0x1608f0u;
+            case 3:return pc==0x160930u||pc==0x160940u;
+            case 4:return (h.pcs[3]==0x160930u&&pc==0x16093cu)||
+                          (h.pcs[3]==0x160940u&&pc==0x16094cu);
+            case 5:return pc==0x160964u||pc==0x160974u;
+            case 6:return (h.pcs[5]==0x160964u&&pc==0x160970u)||
+                          (h.pcs[5]==0x160974u&&pc==0x160984u);
+            default:return false;
+        }
+    }
+    static bool sourceFogTailHistoryNative(const SourceFogTail1608E0& h)noexcept {
+        if(h.completedOps>7)return false;
+        for(std::uint8_t operation=0;operation<7;++operation){
+            if(operation<h.completedOps){
+                if(!sourceFogTailOperationPCNative(h,operation,h.pcs[operation]))return false;
+            }else if(h.pcs[operation]||h.values[operation])return false;
+        }
+        const auto last=h.completedOps?h.pcs[h.completedOps-1]:0u;
+        if(h.pc!=last&&!sourceFogTailOperationPCNative(h,h.completedOps,h.pc))return false;
+        //All checks are structural. No historical emitter/pool/record pointer
+        //is dereferenced, including after native borrow withdrawal.
+        if(h.completedOps>=1&&h.values[0]!=0x7fffffffu&&h.values[0]!=0xffffffffu)return false;
+        if(h.completedOps>=2&&h.values[1])return false;
+        if(h.completedOps>=4&&h.values[3]!=h.values[2])return false;
+        if(h.completedOps>=5&&h.values[4]!=(h.pcs[3]==0x160930u?
+           (h.values[3]|0x4000u):(h.values[3]&0xffffbfffu)))return false;
+        if(h.completedOps>=6&&h.values[5]!=h.values[4])return false;
+        if(h.completedOps>=7&&h.values[6]!=(h.pcs[5]==0x160964u?
+           (h.values[5]|0x8000u):(h.values[5]&0xffff7fffu)))return false;
+        return true;
+    }
+    bool sourceFogTailCurrentNative(const SourceFogPosition1606FC& position,
+        const SourceFogFields1608AC& fields,const SourceFogTail1608E0& h,
+        const void* exactEmitter)const noexcept {
+        if(!sourceFogTailHistoryNative(h)||fields.storedCount!=6||fields.pc!=0x1608d8u||
+           !fields.lifeRead30||!sourceFogFieldsCurrentNative(position,fields,exactEmitter))return false;
+        //Only actual+/-0 denominators admit an attempted post-DIV store. An
+        //empty receipt can still describe the unchanged ordinary-life stop.
+        if(h.pc||h.completedOps){
+            if((*fields.lifeRead30&0x7fffffffu)!=0)return false;
+            const auto inverse=*fields.lifeRead30?0xffffffffu:0x7fffffffu;
+            if(h.completedOps&&h.values[0]!=inverse)return false;
+        }
+        return particles_->sourceFogTailCurrentNative(position.publication138,*position.index128,
+            position.record,exactEmitter,h.completedOps,h.pcs,h.values);
+    }
+    bool storeSourceFogTail1608E0(const SourceFogPosition1606FC& position,
+        const SourceFogFields1608AC& fields,const void* exactEmitter,std::uint32_t sourcePC,
+        std::uint32_t inputBits,SourceFogTail1608E0& h)noexcept {
+        if(!sourceFogTailHistoryNative(h)||h.completedOps>=7||h.completedOps==3||h.completedOps==5||
+           !sourceFogTailOperationPCNative(h,h.completedOps,sourcePC)||
+           h.pc!=(h.completedOps?h.pcs[h.completedOps-1]:0u))return false;
+        h.pc=sourcePC; //Failed attempt leaves this exact source store pending.
+        if(!sourceFogTailCurrentNative(position,fields,h,exactEmitter))return false;
+        const auto prior=h.completedOps;
+        if(!prior&&inputBits!=(*fields.lifeRead30?0xffffffffu:0x7fffffffu))return false;
+        if(!particles_->storeSourceFogTail1608E0(position.publication138,*position.index128,
+           position.record,exactEmitter,prior,sourcePC,inputBits))return false;
+        h.pcs[prior]=sourcePC;h.values[prior]=inputBits;++h.completedOps;
+        return true; //No source128 change or owner48 dereference.
+    }
+    bool readSourceFogFlags160930(const SourceFogPosition1606FC& position,
+        const SourceFogFields1608AC& fields,const void* exactEmitter,std::uint32_t sourcePC,
+        SourceFogTail1608E0& h)noexcept {
+        if(!sourceFogTailHistoryNative(h)||(h.completedOps!=3&&h.completedOps!=5)||
+           !sourceFogTailOperationPCNative(h,h.completedOps,sourcePC)||
+           h.pc!=h.pcs[h.completedOps-1])return false;
+        h.pc=sourcePC; //Each failed native admission retains the reached LW.
+        if(!sourceFogTailCurrentNative(position,fields,h,exactEmitter))return false;
+        const auto prior=h.completedOps;std::uint32_t bits=0;
+        if(!particles_->readSourceFogFlags160930(position.publication138,*position.index128,
+           position.record,exactEmitter,prior,sourcePC,bits))return false;
+        h.pcs[prior]=sourcePC;h.values[prior]=bits;++h.completedOps;
+        return true; //Actual record44 read; values[3]/[5] are its source result.
+    }
+    static bool sourceFogSuccessorTailHistoryNative(const SourceFogRetirement160570& scan,
+        const SourceFogPosition1606FC& position,const SourceFogFields1608AC& fields,
+        const SourceFogTail1608E0& h,const void* exactEmitter)noexcept {
+        if(!sourceFogTailHistoryNative(h)||!sourceFogSuccessorFieldsHistoryNative(scan,position,fields,exactEmitter))return false;
+        if(!h.pc&&!h.completedOps)return true;
+        if(!fields.lifeRead30||(*fields.lifeRead30&0x7fffffffu)!=0)return false;
+        return !h.completedOps||h.values[0]==(*fields.lifeRead30?0xffffffffu:0x7fffffffu);
+    }
+    bool sourceFogSuccessorTailCurrentNative(const SourceFogRetirement160570& scan,
+        const SourceFogPosition1606FC& position,
+        const SourceFogFields1608AC& fields,const SourceFogTail1608E0& h,
+        const void* exactEmitter)const noexcept {
+        if(!sourceFogSuccessorTailHistoryNative(scan,position,fields,h,exactEmitter)||fields.storedCount!=6||fields.pc!=0x1608d8u||
+           !fields.lifeRead30||!sourceFogSuccessorFieldsCurrentNative(scan,position,fields,exactEmitter))return false;
+        //Only actual+/-0 denominators admit an attempted post-DIV store. An
+        //empty receipt can still describe the unchanged ordinary-life stop.
+        if(h.pc||h.completedOps){
+            if((*fields.lifeRead30&0x7fffffffu)!=0)return false;
+            const auto inverse=*fields.lifeRead30?0xffffffffu:0x7fffffffu;
+            if(h.completedOps&&h.values[0]!=inverse)return false;
+        }
+        return particles_->sourceSuccessorFogTailCurrentNative(position.publication138,*position.index128,
+            position.record,exactEmitter,h.completedOps,h.pcs,h.values);
+    }
+    bool storeSourceFogSuccessorTail1608E0(const SourceFogRetirement160570& scan,
+        const SourceFogPosition1606FC& position,
+        const SourceFogFields1608AC& fields,const void* exactEmitter,std::uint32_t sourcePC,
+        std::uint32_t inputBits,SourceFogTail1608E0& h)noexcept {
+        if(!sourceFogTailHistoryNative(h)||h.completedOps>=7||h.completedOps==3||h.completedOps==5||
+           !sourceFogTailOperationPCNative(h,h.completedOps,sourcePC)||
+           h.pc!=(h.completedOps?h.pcs[h.completedOps-1]:0u))return false;
+        h.pc=sourcePC; //Failed attempt leaves this exact source store pending.
+        if(sourceFogSuccessorCountPublication_.stored||sourceActiveCount128_!=1||
+           !sourceFogSuccessorTailCurrentNative(scan,position,fields,h,exactEmitter))return false;
+        const auto prior=h.completedOps;
+        if(!prior&&inputBits!=(*fields.lifeRead30?0xffffffffu:0x7fffffffu))return false;
+        if(!particles_->storeSourceSuccessorFogTail1608E0(position.publication138,*position.index128,
+           position.record,exactEmitter,prior,sourcePC,inputBits))return false;
+        h.pcs[prior]=sourcePC;h.values[prior]=inputBits;++h.completedOps;
+        return true; //No source128 change or owner48 dereference.
+    }
+    bool readSourceFogSuccessorFlags160930(const SourceFogRetirement160570& scan,
+        const SourceFogPosition1606FC& position,
+        const SourceFogFields1608AC& fields,const void* exactEmitter,std::uint32_t sourcePC,
+        SourceFogTail1608E0& h)noexcept {
+        if(!sourceFogTailHistoryNative(h)||(h.completedOps!=3&&h.completedOps!=5)||
+           !sourceFogTailOperationPCNative(h,h.completedOps,sourcePC)||
+           h.pc!=h.pcs[h.completedOps-1])return false;
+        h.pc=sourcePC; //Each failed native admission retains the reached LW.
+        if(sourceFogSuccessorCountPublication_.stored||sourceActiveCount128_!=1||
+           !sourceFogSuccessorTailCurrentNative(scan,position,fields,h,exactEmitter))return false;
+        const auto prior=h.completedOps;std::uint32_t bits=0;
+        if(!particles_->readSourceSuccessorFogFlags160930(position.publication138,*position.index128,
+           position.record,exactEmitter,prior,sourcePC,bits))return false;
+        h.pcs[prior]=sourcePC;h.values[prior]=bits;++h.completedOps;
+        return true; //Actual record44 read; values[3]/[5] are its source result.
+    }
+    bool storeSourceFogCount160994(const SourceFogPosition1606FC& position,
+        const SourceFogFields1608AC& fields,const SourceFogTail1608E0& tail,
+        const void* exactEmitter,const void* occurrence,const OriginalTrackParticleCold50LA* reachedManager70,
+        std::int32_t reachedBefore128,std::int32_t reachedAfter128,SourceFogCount160994& h)noexcept {
+        if(!sourceFogCountHistoryNative(h)||h.pc||h.stored)return false;
+        h.pc=0x160994; //One attempt; refusal leaves the real SW pending.
+        if(!exactEmitter||!occurrence||reachedManager70!=this||reachedBefore128!=0||reachedAfter128!=1||
+           sourceFogCountPublication_.stored||!sourceActiveCountAuthorityNative()||
+           !sourceActiveCount128Known_||sourceActiveCount128_!=reachedBefore128||
+           tail.completedOps!=7||tail.pc!=tail.pcs[6]||
+           !sourceFogTailCurrentNative(position,fields,tail,exactEmitter))return false;
+        SourceFogCount160994 committed;
+        committed.manager=this;committed.pool=position.pool;committed.record=position.record;
+        committed.publication138=position.publication138;committed.emitter=exactEmitter;
+        committed.occurrence=occurrence;committed.generation=generation_;
+        committed.index128=*position.index128;committed.before128=reachedBefore128;
+        committed.after128=reachedAfter128;committed.pc=0x160994;committed.stored=true;
+        //All admission precedes the original SW. These fixed-size copies
+        //cannot allocate or fail. Never roll this count back on later refusal
+        //or native cancellation, and never clear the source48 identity.
+        sourceActiveCount128_=reachedAfter128;
+        sourceFogCountPublication_=committed;h=committed;
+        return true; //Before160998: no lazy guard/clock/RNG or helper return.
+    }
+    bool sourceFogSuccessorCountReceiptCurrentNative(const SourceFogCount160994& h,
+        const void* exactEmitter,const void* occurrence)const noexcept {
+        if(!sourceFogSuccessorCountHistoryNative(h)||!exactEmitter||!occurrence||
+           exactEmitter!=sourceFogSuccessorEmitter_||occurrence!=sourceFogSuccessorOccurrence_||
+           !sourceActiveCount128Known_||!sourceActiveCountAuthorityNative())return false;
+        const auto& actual=sourceFogSuccessorCountPublication_;
+        if(h.stored!=actual.stored)return false;
+        return !h.stored||sameSourceFogCountNative(h,actual);
+    }
+    bool storeSourceFogSuccessorCount160994(const SourceFogRetirement160570& scan,
+        const SourceFogPosition1606FC& position,const SourceFogFields1608AC& fields,const SourceFogTail1608E0& tail,
+        const void* exactEmitter,const void* occurrence,const OriginalTrackParticleCold50LA* reachedManager70,
+        std::int32_t reachedBefore128,std::int32_t reachedAfter128,SourceFogCount160994& h)noexcept {
+        if(!sourceFogSuccessorCountHistoryNative(h)||h.pc||h.stored)return false;
+        h.pc=0x160994;
+        if(!exactEmitter||!occurrence||scan.readerEmitter!=exactEmitter||scan.readerOccurrence!=occurrence||
+           reachedManager70!=this||reachedBefore128!=1||reachedAfter128!=2||sourceFogSuccessorCountPublication_.stored||
+           !sourceFogSuccessorCountReceiptCurrentNative(h,exactEmitter,occurrence)||sourceActiveCount128_!=1||
+           !sourceFogSuccessorCountObservationCurrentNative(reachedBefore128,scan,exactEmitter,occurrence)||
+           tail.completedOps!=7||tail.pc!=tail.pcs[6]||
+           !sourceFogSuccessorTailCurrentNative(scan,position,fields,tail,exactEmitter))return false;
+        SourceFogCount160994 committed;
+        committed.manager=this;committed.pool=position.pool;committed.record=position.record;
+        committed.publication138=position.publication138;committed.emitter=exactEmitter;
+        committed.occurrence=occurrence;committed.generation=generation_;
+        committed.index128=1;committed.before128=reachedBefore128;committed.after128=reachedAfter128;
+        committed.pc=0x160994;committed.stored=true;
+        //Original SW and fixed-size custody publication cannot fail. Keep
+        //the original0->1 event, both source48 lanes, and all earlier effects.
+        sourceActiveCount128_=reachedAfter128;sourceFogSuccessorCountPublication_=committed;h=committed;
+        return true; //Before160998; no lazy guard, clock, extra RNG or return.
+    }
     bool construct160B10(OriginalTrackParticleColdDiagnostic50LA& d)noexcept {
         using S=OriginalTrackParticleColdStatus50LA;
         if(constructorReturned_||entityConstructed_||!application_||!generation_||closed_)
@@ -307,7 +953,8 @@ private:
         for(auto& record:quadRemainder90_)for(auto& word:record)word.reset();
         primitive160_=Buffer160E00{};primitive190_=Buffer160E00{};
         //133F80 writes only+20/+24/+28=0 and+2C=-1;00..1C stay unknown.
-        sourceParticles128_=nullptr;field12C_=0;capacity130_=0;
+        //160BB4 is SW zero,+128: an active signed count, never a pointer.
+        sourceActiveCount128_=0;sourceActiveCount128Known_=true;field12C_=0;capacity130_=0;
         gravity40_[0]=0;gravity40_[1]=-64;gravity40_[2]=0;
         sourceAtlas110_=nullptr;sourceNumFrames154_=0;field158_=0;field134_=0;
         sourceParticlePointers138_=nullptr;sourceGroups13C_=nullptr;sourceNumGroups140_=0;
@@ -579,11 +1226,21 @@ private:
     std::uint32_t sourceDispatch08_=0;
     // Source constructor pointer lanes, distinct from the native numeric
     // provider's internal storage. No160E00 publication is inferred from it.
-    const void *sourceAtlas110_=nullptr,*sourceParticles128_=nullptr,*sourceParticlePointers138_=nullptr,
+    const void *sourceAtlas110_=nullptr,*sourceParticlePointers138_=nullptr,
         *sourceGroups13C_=nullptr;
     //160BEC/160C14 zero stores;161870/161888 pass these SAME integer lanes
     //to158B30. They are signed counts, not constructor-NULL pointer owners.
     std::int32_t sourceNumFrames154_=0,sourceNumGroups140_=0;
+    std::int32_t sourceActiveCount128_=0;
+    bool sourceActiveCount128Known_=false; //Actual160BB4, not legacy particleCount().
+    SourceFogCount160994 sourceFogCountPublication_; //First irrevocable source0->1 event.
+    SourceFogCount160994 sourceFogSuccessorCountPublication_; //Separate source1->2 event, never epoch0 replay.
+    std::optional<std::uint32_t> sourceFogSuccessorLifeRead30_; //Actual issued slot1 read, not an inferred value.
+    SourceFogRetirement160570 sourceFogRetirementObservation_; //One distinct read-only successor scan.
+    SourceFogPosition1606FC sourceFogSuccessorPosition_; //Separate one-shot inactive slot1 write custody.
+    SourceFogVelocity16088C sourceFogSuccessorVelocity_; //Issued SQ receipt, even when identical to constructor VF0.
+    const void* sourceFogSuccessorEmitter_=nullptr;
+    const void* sourceFogSuccessorOccurrence_=nullptr; //Native identity only, never source48 or a live capability.
     bool constructorReturned_=false,sourceEntityEnrolled_=false;
     enum class DepthWriteOrigin {none,nativePrewarm,source160E78};
     DepthWriteOrigin depthWriteOrigin_=DepthWriteOrigin::none;

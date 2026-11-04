@@ -8,9 +8,10 @@ namespace original_main_entry50KG {struct Application;struct Video;}
 namespace rr::platform {class OriginalScreenRain50KG;}
 namespace rr::game {
 class OriginalApplicationEntities50LA;
+class OriginalApplicationVideoSource50LA;
 class OriginalVideoPreFlipObject50KG;
 enum class OriginalVideoPreFlipStatus50KG : std::uint8_t {
- complete,authority,phase,backing,allocation,capacity,nativeLifetime
+ complete,authority,phase,backing,allocation,capacity,nativeLifetime,allocatorReturnUnowned,nativeAbandoned
 };
 struct OriginalVideoPreFlipDiagnostic50KG {
  OriginalVideoPreFlipStatus50KG status=OriginalVideoPreFlipStatus50KG::authority;
@@ -22,6 +23,7 @@ struct OriginalVideoPreFlipDiagnostic50KG {
 class OriginalVideoPreFlipList50KG final {
  friend struct ::original_main_entry50KG::Application;
  friend struct ::original_main_entry50KG::Video;
+ friend class OriginalApplicationVideoSource50LA; //Same process constructor assertion records, not native list admission.
  friend class OriginalVideoPreFlipObject50KG;
  using Application=::original_main_entry50KG::Application;
  using Video=::original_main_entry50KG::Video;
@@ -54,10 +56,16 @@ class OriginalVideoPreFlipList50KG final {
  std::unique_ptr<Slot[]> slots4_;
  std::int32_t count0_=0,growth8_=0,capacityC_=0;
  bool initialized10Bit0_=false;
+ //A failed host backing allocation does not establish2E8D90's outcome.
+ //Sticky for this list; cleanup remains possible, but no append/retry is issued.
+ bool allocatorReturnUnowned_=false;
+ std::uint32_t blockedAllocationCallPC_=0;
 public:
  struct Observation {
   std::int32_t count=0,growth=0,capacity=0;
   bool initialized=false,backing=false,registrationHistoryEstablished=false;
+  bool allocatorReturnUnowned=false;
+  std::uint32_t blockedAllocationCallPC=0;
  };
  ~OriginalVideoPreFlipList50KG()noexcept;
  OriginalVideoPreFlipList50KG(const OriginalVideoPreFlipList50KG&)=delete;
@@ -83,6 +91,7 @@ class OriginalVideoPreFlipObject50KG final {
  std::shared_ptr<::original_main_entry50KG::Video> video_;
  const std::thread::id thread_=std::this_thread::get_id();
  bool constructed_=false,inserted_=false,retired_=false;
+ bool constructorReturnUnowned_=false;
 public:
  ~OriginalVideoPreFlipObject50KG()noexcept;
  OriginalVideoPreFlipObject50KG(const OriginalVideoPreFlipObject50KG&)=delete;

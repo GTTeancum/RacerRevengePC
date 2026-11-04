@@ -39,6 +39,7 @@ public:
         bool enabledStored=false,guardStored=false,enabledRead=false;
         bool finishAttempted=false,conditionRead=false,nonnull=false;
         bool assertionReached=false,assertionReturned=false,returned=false;
+        bool operator==(const History&)const=default; //Value-only occurrence mirror; never fresh process admission.
     };
 private:
     static bool begin(unsigned lane,History& h)noexcept {

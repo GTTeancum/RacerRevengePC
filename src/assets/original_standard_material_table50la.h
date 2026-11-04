@@ -249,6 +249,12 @@ private:
     // Bytes must equal this SAME authenticated APPSTART Mat_Stbl member.
     bool prepareAppStartNames17CAD4(std::shared_ptr<const OriginalUiArchive50KG>,
         const std::vector<std::uint8_t>& sourceBytes,OriginalStandardMaterialDiagnostic50LA&) noexcept;
+    // Only the same canonical domain may advance its actual retained read.
+    // Success stops after2987E4 publication, before any row field is written.
+    bool allocateSourceAppStartNameRows29871C(OriginalStandardMaterialDiagnostic50LA&)noexcept;
+    bool populateSourceAppStartNameRows2987E8(OriginalStandardMaterialDiagnostic50LA&)noexcept;
+    bool sourceAppStartNamesReturned17CAD4()const noexcept;
+    bool appStartNamesPrepared17CAD4()const noexcept;
     // Aliases the same actual application's templates after their success.
     // Promotes the SAME Storage/rows, without another parse or table copy.
     bool attachAppStartTemplates(std::shared_ptr<const OriginalUiMaterialApplication50LA>,
@@ -445,6 +451,50 @@ private:
     // Every existing consumer uses storage_ as its template-ready boundary.
     // Names-only storage is unreachable through ALL public row/lookup APIs,
     // including prepared(), until the private attachment promotes it intact.
+    // Actual same-receiver2986D4/298704 output retained BEFORE the read.
+    // Kept on failure as well as success; no canonical immutable-member copy.
+    // Kept through in-place tokenization and the separately owned row backing.
+    // It cannot be promoted by the legacy all-or-nothing parser.
+    std::shared_ptr<const OriginalUiArchive50KG> sourceNamesReadApp_;
+    std::vector<std::uint8_t> sourceNamesReadBytes_;
+    bool sourceNamesReadAttempted_=false,sourceNamesReadReturned_=false;
+    // This private receiver is created fresh by the canonical domain, with no
+    // preloaded rows.2984C4 is the corresponding source+24 zero. This bounded
+    // continuation cannot adopt a populated/warm registry or change that value.
+    const std::uint32_t sourceNamesPreloaded24_=0;
+    std::uint32_t sourceNamesCount10_=0,sourceNameRowsPC_=0;
+    bool sourceNamesCount10Written_=false,sourceNamesLowered_=false,sourceNamesTokenized_=false;
+    bool sourceNameRowsAttempted_=false,sourceNameRowsAllocationAttempted_=false;
+    bool sourceNameRows1CPublished_=false;
+    std::size_t sourceNameRowsRequestedBytes_=0,sourceNameRowsNativeBytes_=0;
+    // Exactly12*count native byte backing (zero-size new normalized to1 as
+    //2E8DAC..B0). No value initialization: ALL row fields remain unwritten.
+    // Native allocation identity is not a fabricated32-bit guest pointer.
+    // Failed native allocation does not manufacture an original allocator
+    // return or+1C publication: the source new-handler path remains unowned.
+    std::unique_ptr<std::uint8_t[]> sourceNameRows1C_;
+    // Native representation of each guest name pointer, not copied text or a
+    // second registry. Raw+00 address bytes remain unknown on64-bit hosts.
+    // semanticWrites bits follow source order: object04=1,name00=2,ref08=4.
+    struct SourceNameAlias {
+        const std::uint8_t* name00=nullptr;
+        std::uint32_t byteOffset=0;
+        std::uint8_t semanticWrites=0;
+    };
+    std::unique_ptr<SourceNameAlias[]> sourceNameAliases_;
+    const std::uint8_t* sourceNameAliasBuffer_=nullptr;
+    std::uint32_t sourceNameAliasCount_=0,sourceNameRowsInitialized_=0;
+    bool sourceNamePopulationAttempted_=false,sourceNameCapacity14Written_=false;
+    std::uint32_t sourceNameCapacity14_=0;
+    bool sourceNameBaseReturned_=false;
+    // Fresh native receiver owns NULL+30 (3C8AF4); no warm free is admitted.
+    // Separate real4*count backing, not references to a completed template.
+    std::unique_ptr<std::uint8_t[]> sourceNameAssociations30_;
+    std::size_t sourceNameAssociationsRequestedBytes_=0,sourceNameAssociationsNativeBytes_=0;
+    std::uint32_t sourceNameAssociationsInitialized_=0;
+    bool sourceNameAssociationsAttempted_=false,sourceNameAssociations30Published_=false;
+    bool sourceNamesCallReturned17CAD4_=false;
+
     std::unique_ptr<Storage> appStartNames_;
     std::unique_ptr<Storage> storage_;
 };

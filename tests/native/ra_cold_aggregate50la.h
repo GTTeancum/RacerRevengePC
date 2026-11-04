@@ -8,7 +8,7 @@
 #include "../../platform/linux/native/original_world_source_config50la.h"
 namespace original_results_roster50LA { class Read; }
 namespace ra_native_session50LA { class Join; }
-namespace rr::platform {class OriginalUiLightManagerOwner50KG;}
+namespace rr::platform {class OriginalUiLightManagerOwner50KG;struct OriginalUiMainApplication50KG;}
 namespace rr::game { class OriginalRacePauseWorldAuthority50LA; }
 #include "ra_static_registry50la.h"
 #include "ra_cold_navigation_lease50la.h"
@@ -462,8 +462,16 @@ struct SourcePostCollisionCaller {
     std::optional<std::uint32_t> baseToyReturnV0,toyReturnV0;
     bool toyReturned=false,particleDispatched=false,particleReturned=false;
     std::optional<std::uint32_t> particleReturnV0,target144;
+    //Bounded Fog-derived World epilogue: V0, restoreRA, JR, stack delay.
+    std::uint8_t particleWrapperReturnMask=0;
 } sourcePostCollisionCaller_;
 bool continueSourcePostCollisionCaller1AA258(std::uint32_t&)noexcept;
+struct SourcePostParticleCaller1AA2CC {
+    std::uint8_t step=0; //Fresh World, table, target144, JALR, NOP delay.
+    std::optional<std::uint32_t> worldTable08;
+} sourcePostParticleCaller_;
+bool preflightSourcePostParticleCallerNative()const noexcept;
+bool continueSourcePostParticleCaller1AA2CC(std::uint32_t&)noexcept;
 struct SourceTriggerServiceRow {
     std::optional<std::uint32_t> rowIndex,count30,descriptorTable6C,descriptorTarget0C;
     bool rowRead=false,rowNonNull=false,assertionLazyStored=false,assertionReturned=false,descriptorEntered=false;
@@ -481,6 +489,13 @@ struct SourceTriggerServiceRow {
 };
 struct SourceTriggerService274E90 {
     bool entered=false,listRead=false,listNonNull=false,listEntered=false,nativeWithdrawn=false;
+    std::uint8_t fogPrefixStep=0; //Own bounded prologue/list/first-row/BEQL history, through12.
+    std::uint8_t fogBodyStep=0; //Own assertion/descriptor/callback operands, through16; callee2A0A80 pending.
+    std::optional<std::uint32_t> fogAssertionPredicate,fogAssertionReturnV0;
+    g::OriginalTriggerFogGeometryPrefix50LA fogGeometry;
+    g::OriginalTriggerFogMembershipPrefix50LA fogMembership;
+    g::OriginalTriggerFogBoundsPrefix50LA fogBounds;
+    g::OriginalTriggerFogPrimaryPrefix50LA fogPrimary;
     std::optional<std::uint32_t> listTable08,listTarget7C,currentRow,freshCount30;
     std::array<SourceTriggerServiceRow,2> rows;
     bool listReturned=false,wrapperReturned=false;
@@ -488,6 +503,8 @@ struct SourceTriggerService274E90 {
 } sourceTriggerService274E90_;
 bool preflightSourceTriggerServiceRowNative(const SourceTriggerServiceRow&,std::size_t)const noexcept;
 bool continueSourceTriggerService274E90(std::uint32_t&)noexcept;
+bool sourceTriggerFogPortalGraphLiveNative(std::size_t)const noexcept;
+bool continueSourceTriggerFogBody2DCB6C(std::uint32_t&)noexcept;
 bool preflightSourceTriggerServiceNative()const noexcept;
 //New synchronous caller occurrence after274E90; stored values are history,
 //never a profile snapshot used to authorize later calls.
@@ -923,6 +940,14 @@ struct SourceParticleService124 {
     bool type0DirectoryCopied=false,type0FilenameAppended=false;
     bool type1LoadEntered=false,type1NoOpReturned=false,type1ManagerStored=false,type1ModelStored=false,type1OffsetStored=false;
     bool type1DirectoryCopied=false,type1FilenameAppended=false;
+    bool type2LoadEntered=false,type2NoOpReturned=false,type2ManagerStored=false,type2ModelStored=false,type2OffsetStored=false;
+    bool type2DirectoryCopied=false,type2FilenameAppended=false;
+    bool type9LoadEntered=false,type9NoOpReturned=false,type9ManagerStored=false,type9ModelStored=false,type9OffsetStored=false;
+    bool type9DirectoryCopied=false,type9FilenameAppended=false;
+    bool type11LoadEntered=false,type11NoOpReturned=false,type11ManagerStored=false,type11ModelStored=false,type11OffsetStored=false;
+    bool type11DirectoryCopied=false,type11FilenameAppended=false;
+    bool type12LoadEntered=false,type12NoOpReturned=false,type12ManagerStored=false,type12ModelStored=false,type12OffsetStored=false;
+    bool type12DirectoryCopied=false,type12FilenameAppended=false;
     bool type8LoadEntered=false,type8NoOpReturned=false,type8ManagerStored=false,type8ModelStored=false,type8OffsetStored=false;
     bool type8DirectoryCopied=false,type8FilenameAppended=false;
     bool emitterConfigConstructAttempted=false,emitterConfigConstructReturned=false,emitterConfigOpenAttempted=false;
@@ -937,8 +962,12 @@ std::array<SourceParticleService124,3> sourceParticleLaterRows_;
 bool continueSourceParticleRowCreation27C81C(std::size_t,SourceParticleService124&,std::uint32_t&)noexcept;
 bool continueSourceParticleRowAttachment27CC08(std::size_t,SourceParticleService124&,std::uint32_t&)noexcept;
 bool continueSourceParticleService274370(std::uint32_t&)noexcept;
+bool continueSourceParticleWorldReturn2743A0(std::uint32_t&)noexcept;
+bool sourceCompletedParticleWorldCustodyCurrentNative()const noexcept;
 bool continueSourceEmitterLoaderPrefixNative(std::size_t,SourceParticleService124&,std::uint32_t&)noexcept;
 bool continueSourceEmitterConfig15AE00(std::size_t,SourceParticleService124&,std::uint32_t&)noexcept;
+std::optional<std::size_t> sourceNonFogPrecedingFogRowNative(std::size_t)const noexcept;
+bool sourceNonFogAfterFogCustodyCurrentNative(std::size_t)const noexcept;
 bool withdrawSourceParticleEmitterBorrowsNative()noexcept;
 
 
@@ -1760,6 +1789,134 @@ std::uint8_t sourceOffsetKnown=0;
         std::optional<bool> type1GroupsNonNull;
         std::optional<std::uint32_t> type1GroupIndex;
         std::uint8_t type1GroupCopyMask=0;
+        struct Type1Position15CFF0 {
+            std::optional<std::uint32_t> argumentF12;
+            std::array<std::uint32_t,4> temporary00{},previous30{};
+            //Ordered source stores: stack00,previous40,current30,return200.
+            std::uint8_t copyMask=0;
+        };
+        std::array<Type1Position15CFF0,2> type1PositionCalls;
+        bool type2PropertiesReturned=false,type2LoaderReturned=false;
+        std::optional<bool> type2GroupsNonNull;
+        std::optional<std::uint32_t> type2GroupIndex;
+        std::uint8_t type2GroupCopyMask=0;
+        bool type9VelocityCopied=false,type9PropertiesReturned=false,type9LoaderReturned=false;
+        std::optional<bool> type9GroupsNonNull;
+        std::optional<std::uint32_t> type9GroupIndex;
+        std::uint8_t type9GroupCopyMask=0;
+        //Fresh subtype9 StartOff invokes15F070, never generic15AD00.
+        std::optional<std::uint32_t> type9StopMode1D8;
+        std::optional<bool> type9StopActiveBit;
+        std::uint8_t type9StopWriteMask=0; //Ordered bit1,bit2,previous40,19C stores.
+        bool type9StopReturned=false;
+        bool type11PropertiesReturned=false,type11LoaderReturned=false;
+        std::optional<bool> type11GroupsNonNull;
+        std::optional<std::uint32_t> type11GroupIndex;
+        std::uint8_t type11GroupCopyMask=0;
+        std::array<std::uint32_t,4> type12PositionInput{};
+        std::uint8_t type12PositionMask=0; //LQ input, current30, previous40; not15ACB0 calls.
+        bool type12AttachmentPositionPending=false,type12PopulationPending=false;
+        bool type12PropertiesReturned=false,type12LoaderReturned=false;
+        //Fog's own+84 target160490, never generic15AD00 or subtype9's15F070.
+        std::optional<std::uint32_t> type12StopMode1D8;
+        std::optional<bool> type12StopActiveBit;
+        std::uint8_t type12StopWriteMask=0; //Ordered bit1,bit2,previous40,19C stores.
+        bool type12StopReturned=false;
+        g::OriginalRacerModelSceneOwner50LA::SourcePosition28B1A0 type12AttachmentPosition;
+        g::OriginalRacerModelSceneOwner50LA::SourceDirection28B9B0 type12AttachmentDirection;
+        std::array<std::uint32_t,3> type12AttachmentPositionXYZ{},type12AttachmentDirectionXYZ{},type12AttachmentAddResult{};
+        std::uint8_t type12AttachmentAddMask=0;
+        bool type12AttachmentPreviousStored=false;
+        struct Type12Population160520 {
+            const g::OriginalTrackParticleCold50LA* manager=nullptr;
+            bool entered=false,retirementEmpty=false,randomPending=false,returned=false;
+            g::OriginalTrackParticleCold50LA::SourceFogRetirement160570 retirementScan;
+            std::optional<std::int32_t> retirementCount128,creationCount128,capacity130;
+            std::optional<std::uint32_t> creationIndexInitial; //Actual1605C0 s0=0, separate from manager128.
+            std::optional<std::uint32_t> volume228;
+            std::optional<bool> volumePositive,capacityAvailable;
+            //Native pin to the SAME Application process owner, never a copy,
+            //new seed, per-emitter RNG or original guest retain operation.
+            std::shared_ptr<rr::platform::OriginalUiMainApplication50KG> randomOwner;
+            const original_main_entry50KG::Application* randomApplication=nullptr;
+            std::array<std::uint32_t,3> randomBefore{},randomAfter{},randomValue{},randomConverted{},randomUnit{};
+            std::uint8_t randomDrawCount=0,randomConvertedMask=0,randomUnitMask=0,randomStack90Mask=0;
+            std::array<std::uint32_t,4> randomStack90{},randomStack70{};
+            bool randomStack70Copied=false;
+            //Immutable bits observed by the160654 copy;randomStack70 remains
+            //the same mutable source scratch vector.
+            std::array<std::uint32_t,4> randomStack70Initial{};
+            struct RangeAxis160658 {
+                std::uint32_t maximum=0,minimum=0,unit=0,difference=0,product=0,sum=0;
+                //Ordered max,min,unit reads;SUB,MUL,ADD;stack70 store.
+                std::uint8_t step=0;
+            };
+            std::array<RangeAxis160658,3> rangeAxes;
+            //One ordered1606AC..1606FC prefix. These are actual fresh reads,
+            //not aliases of the earlier1605C8 count/capacity receipt.
+            std::array<std::uint32_t,3> positionInput{},positionLocal{},positionResult{};
+            std::optional<std::int32_t> positionIndex128;
+            std::optional<const void*> positionPublication138;
+            std::array<std::uint32_t,4> positionStackA0{};
+            std::uint8_t positionStep=0;
+            g::OriginalTrackParticleCold50LA::SourceFogPosition1606FC positionStore;
+            //Actual22C comparison/branch after the committed position SQ.
+            //Common step0:before700;1:before704;2:branch/delay completed.
+            std::uint8_t oscillationStep=0,oscillationRandomStep=0,fieldTailStep=0;
+            std::optional<std::uint32_t> oscillation22C,oscillationMagnitude234;
+            std::optional<bool> oscillationDisabled,initialMirrorXLeHalf;
+            std::uint32_t oscillationRandomBefore=0,oscillationRandomAfter=0,oscillationRandomValue=0;
+            std::uint32_t oscillationRandomConverted=0,oscillationRandomUnit=0;
+            //Following real draws5..9:two magnitude draws,then XYZ signs.
+            //velocityStep authenticates the exact reached failure frontier.
+            std::uint8_t velocityStep=0;
+            std::array<std::uint32_t,5> velocityRandomBefore{},velocityRandomAfter{},velocityRandomValue{},velocityRandomConverted{},velocityRandomUnit{};
+            std::array<std::optional<std::uint32_t>,2> velocityMagnitude234;
+            std::array<std::uint32_t,3> velocityProducts{}; //f20,f23,f0, then Z,Y,X.
+            std::array<std::uint32_t,4> velocityStackB0{},velocityStack80{};
+            std::uint8_t velocityStackB0Mask=0;
+            bool velocityStackB0Loaded=false,velocityStack80Copied=false;
+            std::array<std::optional<bool>,3> velocitySignLeHalf;
+            std::array<std::optional<std::uint32_t>,3> velocityNegationInput;
+            g::OriginalTrackParticleCold50LA::SourceFogVelocity16088C velocityStore;
+            std::optional<std::uint32_t> sizeInput184,initialSizeInput184,lifeInput17C,ageInput1A0,frameInput190;
+            g::OriginalTrackParticleCold50LA::SourceFogFields1608AC fieldStores;
+            std::uint8_t postDivideStep=0;
+            std::optional<std::uint32_t> reciprocalBits,initialFlags198,mirrorEnable1CC,mirrorEnable1D0;
+            std::optional<std::uint32_t> firstFlagsResult,secondFlagsResult;
+            std::optional<bool> mirrorYLeHalf,mirrorXSet,mirrorYSet;
+            //Local instruction outcome only: DIV asserted D/SD. No whole
+            //FCR31, unknown sticky flags or host floating status is invented.
+            bool reciprocalDAndSD=false;
+            g::OriginalTrackParticleCold50LA::SourceFogTail1608E0 tailStores;
+            //Distinct fresh160988/98C observations and160990 arithmetic.
+            //Step0..4 is pending988,98C,990,994,998; no helper return.
+            std::uint8_t countStep=0;
+            const g::OriginalTrackParticleCold50LA* countManager70=nullptr;
+            std::optional<std::int32_t> countBefore128,countAfter128;
+            g::OriginalTrackParticleCold50LA::SourceFogCount160994 countStore;
+            struct FrameSelection160998 {
+                std::uint8_t step=0;
+                std::optional<bool> seedGuard80A8,rangeGuard80AC;
+                std::optional<std::uint32_t> first1B0,last1B4,seedCache3D6B30;
+                bool seedCacheCleared=false,seedGuardStored=false;
+                std::optional<std::uint32_t> differenceWord,spanWord,spanConverted;
+                std::uint32_t randomBefore=0,randomAfter=0,randomValue=0;
+                bool randomDrawn=false;
+                std::optional<std::uint32_t> randomConverted,randomUnit;
+                std::optional<std::uint32_t> productBits,offsetWord,selectedWord,rangeCheck3D6B38;
+                bool rangeCacheStored=false,rangeGuardStored=false;
+                std::optional<bool> selectedBelowFirst,lastBelowSelected,rangeCondition;
+                std::optional<std::uint32_t> assertionArgument,assertionReturnV0;
+                bool frameStored190=false;
+                std::optional<std::uint32_t> creationIndexAfter,loopVolume228,indexConverted;
+                std::optional<bool> loopAgain;
+            } frameSelection;
+            std::uint32_t pc=0;
+        } type12Population;
+        std::optional<bool> type12GroupsNonNull;
+        std::optional<std::uint32_t> type12GroupIndex;
+        std::uint8_t type12GroupCopyMask=0;
         bool type8VelocityCopied=false,type8PropertiesReturned=false,emitterFileLoadReturned=false,type8LoaderReturned=false;
         std::optional<bool> type8GroupsNonNull;
         std::optional<std::uint32_t> type8GroupIndex;

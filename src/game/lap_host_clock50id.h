@@ -2,6 +2,7 @@
 #include "lap_event_random50id.h"
 #include <chrono>
 #include <cstdint>
+#include <cstring>
 #include <limits>
 
 namespace rr::game {
@@ -12,28 +13,53 @@ struct HostMonotonicClock50ID {
     std::chrono::steady_clock::time_point epoch=std::chrono::steady_clock::now();
     std::uint64_t lastNanoseconds=0;
 };
-inline bool hostNanosecondsToSourceTimestamp50ID(std::uint64_t nanoseconds,
-    std::uint32_t& timestamp) noexcept {
+// Shared HOST nanosecond-to49J numeric projection. Neither this nor its
+// callers sample an EE timer, consume guest overflows or certify IRQ custody.
+inline bool hostNanosecondsToSourceClockQuantization50ID(std::uint64_t nanoseconds,
+    ClockQuantization49J& output) noexcept {
     // Original timer selector yields576000 ticks/second;49J multiplies by
-    // binary32 bits3AE38E39 (~1/576), returning uint32 milliseconds. Splitting
-    // seconds/remainder avoids nanoseconds*576000 overflow. No MMIO/IRQ is
-    // simulated, and no ideal-millisecond shortcut bypasses49J rounding.
+    // binary32 bits3AE38E39 (~1/576). Preserve the full quantization: fades
+    // need FLOAT milliseconds, while101A50 uses the uint32 conversion.
+    // Splitting seconds/remainder avoids nanoseconds*576000 overflow.
     constexpr std::uint64_t billion=1000000000u,ticksPerSecond=576000u;
     const auto seconds=nanoseconds/billion,remainder=nanoseconds%billion;
     if(seconds>std::numeric_limits<std::uint64_t>::max()/ticksPerSecond)return false;
     const auto ticks=seconds*ticksPerSecond+remainder*ticksPerSecond/billion;
+    return quantizeCounter49J(ticks,output);
+}
+inline bool hostNanosecondsToSourceTimestamp50ID(std::uint64_t nanoseconds,
+    std::uint32_t& timestamp) noexcept {
     ClockQuantization49J output{};
-    if(!quantizeCounter49J(ticks,output))return false;
+    if(!hostNanosecondsToSourceClockQuantization50ID(nanoseconds,output))return false;
     timestamp=output.uint32timestamp;return true;
 }
-inline bool sampleHostTimestamp50ID(HostMonotonicClock50ID& clock,
-    std::uint32_t& timestamp) noexcept {
+// One actual host sample and one shared lastNanoseconds commit. Callers must
+// borrow the application's live clock, not a copied or per-effect clock. The
+// output must be separate from that clock. Failure leaves both unchanged.
+inline bool sampleHostClockQuantization50ID(HostMonotonicClock50ID& clock,
+    ClockQuantization49J& output) noexcept {
     const auto elapsed=std::chrono::duration_cast<std::chrono::nanoseconds>(
         std::chrono::steady_clock::now()-clock.epoch).count();
     if(elapsed<0)return false;
     const auto ns=static_cast<std::uint64_t>(elapsed);
-    if(ns<clock.lastNanoseconds||!hostNanosecondsToSourceTimestamp50ID(ns,timestamp))return false;
-    clock.lastNanoseconds=ns;return true;
+    ClockQuantization49J next{};
+    if(ns<clock.lastNanoseconds||!hostNanosecondsToSourceClockQuantization50ID(ns,next))return false;
+    clock.lastNanoseconds=ns;output=next;return true;
+}
+inline bool sampleHostTimestamp50ID(HostMonotonicClock50ID& clock,
+    std::uint32_t& timestamp) noexcept {
+    ClockQuantization49J output{};
+    if(!sampleHostClockQuantization50ID(clock,output))return false;
+    timestamp=output.uint32timestamp;return true;
+}
+inline bool sampleHostFloatMilliseconds50ID(HostMonotonicClock50ID& clock,
+    float& milliseconds) noexcept {
+    ClockQuantization49J output{};
+    if(!sampleHostClockQuantization50ID(clock,output))return false;
+    // Preserve49J's separately rounded absolute binary32 sample. Never cast
+    // its saturated uint32 timestamp or substitute ideal/delta milliseconds.
+    std::memcpy(&milliseconds,&output.scaledMillisecondBits,sizeof(milliseconds));
+    return true;
 }
 inline bool applyHostLapClockOrRandom50ID(const LapEventRequest50ID& request,
     HostMonotonicClock50ID& clock,std::uint32_t& sharedRawRandom,

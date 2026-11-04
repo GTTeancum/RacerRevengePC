@@ -65,9 +65,10 @@ class OriginalLoadingTextureFc50LA final {
         if(!OriginalTextureBufferAssertions50LA::reach257750(sourceFC_==nullptr)){pc=0x2577A4;return false;}
         pc=0x2577D8;pending_.reset(new(std::nothrow) Buffer2592D0);
         if(!pending_){
-            // Actual mallocNULL skips2592D0, then still publishesNULL and
-            // returns normally. It is NOT an early synthetic allocation stop.
-            sourceFC_=nullptr;store2577F8Reached_=true;constructorReturned_=true;pc=0x257810;return true;
+            // Native allocation failure does not establish a NULL return from
+            // source2E8D90: its failure handler/retry/throw policy is unowned.
+            // Retain earlier effects and stop before constructor/publication.
+            return false;
         }
         auto& b=*pending_;pc=0x259314;
         // Request18:ceil(18/8)=3, bytes3<<7=384, sourcecapacity3<<3=24.

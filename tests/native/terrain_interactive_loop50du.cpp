@@ -142,6 +142,15 @@ void Context::run() {
    if(!polled){
     reportHost50DU(hostDiagnostic);throw std::runtime_error("window event pump failed");
    }
+   if(!originalUiActive){
+    // Revoke frontend-only button/stick/hold admission while another owner
+    // has this poll. Inactive observe reads no device data and emits nothing;
+    // place it before a canonical Results retained-input early continuation.
+    platform::OriginalUiControllerNavigation50LA::Events ignored;
+    require50DU(originalUiControllerNavigation.observe(input,false,ignored)&&
+        originalUiSecondControllerNavigation.observe(input,false,ignored,1),
+        "inactive frontend input latch retirement rejected");
+   }
    //One actual poll, one owner. The original frontend keeps its entire stream.
    //Canonical Results admits only its real current idle Root/sibling path;
    //no caller-supplied event, mode, key or acknowledgment enters the bridge.
@@ -334,6 +343,9 @@ void Context::run() {
     // The complete measured wall interval still advances PCM independently;
     // material timestamps retain their existing uncapped source clock.
     platform::OriginalUiMainSessionUpdate50KG update;update.elapsedSeconds=elapsed;
+    // The active/focus gate above applies to both edges and held levels.
+    // Course alone owns the original countdown; SDL repeat events are unused.
+    update.courseHorizontalHeld=originalUiControllerNavigation.courseHorizontalHeld();
     // This original-UI keyboard mapping has no original debug-button bindings.
     // Its four debug-query levels therefore remain actually released.
     const auto acceptedSource=originalMain.update(update,elapsedNanoseconds);
@@ -408,7 +420,7 @@ void Context::run() {
      if(!open&&event.code==8){
       original_pause_observation50LA::Owner::Diagnostic d;
       require50DU(sourcePauseObservation.openNativeAll8SpectatorMenu(event,d),"native spectator Pause opening failed");
-     }else if(open&&(event.code==12||event.code==14||event.code==2)){
+     }else if(open&&(event.code==12||event.code==14||event.code==2||event.code==15||event.code==13)){
       const auto result=event.code==2?sourcePauseObservation.continueRow0(event,record):
           sourcePauseObservation.pressNavigation1BD7C0(event,record);
       using Status=original_pause_observation50LA::Owner::NavigationResult::Status;
@@ -590,11 +602,84 @@ void Context::run() {
    const auto menuRevision=sessionMenu.revision();
    if(!sourcePauseParentAttached&&input.focused&&!input.minimized&&!input.activityLost&&!input.eventBudgetExhausted&&
        (!sourceCameraSession||!sourceCameraSession->pendingDisplayWork())){
-    const auto action=sessionMenu.poll(hostInput,!recoveryPaused&&s.phase==VehicleFramePhase49W::Ready);
+    // Native HUD page is available only with the SAME Application controls,
+    // actual one-human camera and all three genuinely bound HUD renderers.
+    // This does not activate the separate original spectator Pause Entity.
+    std::array<std::uint32_t,4> nativeHud{};
+    const auto nativeHudCurrent=[&](){
+     return humanCourseEnabled&&originalUiStarted&&!recoveryPaused&&s.phase==VehicleFramePhase49W::Ready&&sourceCameraSession&&
+         originalMainApplication.controlsProfile.get()==&controlPresets&&
+         originalMainApplication.profile&&originalMainApplication.profile->known&&
+         sourceTimeStatsRendering&&sourceTimeStats.owner&&sourceSpeedBoostRendering&&sourceSpeedBoost.owner&&
+         sourcePositionStatsRendering&&sourcePositionStatsHud&&originalAiSession.managerBound&&
+         originalAiSession.rankBound&&originalAiSession.retired40.bound&&
+         sourceCameraSession->observeNativeHumanHud(controlPresets,originalMainApplication.animationClock(),
+             originalMainApplication.profile->playerBits1125C,nativeHud);
+    };
+    const bool nativeHudAvailable=nativeHudCurrent();
+    sessionMenu.observeNativeHud(nativeHudAvailable?&nativeHud:nullptr);
+    // Borrow the SAME live provider mixer/group ledger and committed profile
+    // that initialized it, not selectedAudioSettings (legacy next-session UI).
+    const auto nativeAudioProfile=originalMainApplication.gameSettingsProfile;
+    auto* nativeAudioMixer=liveAudio->mixerForMaterialOwner();
+    auto* nativeAudioGroups=liveAudio->groupsForProviders();
+    std::array<std::uint32_t,4> nativeAudio{};
+    const auto nativeAudioCurrent=[&](){
+     return nativeHudCurrent()&&audioEnabled&&liveAudio->prepared()&&!liveAudio->closed()&&liveAudio->outputOpen()&&
+         nativeAudioProfile&&originalMainApplication.gameSettingsProfile==nativeAudioProfile&&
+         nativeAudioMixer&&liveAudio->mixerForMaterialOwner()==nativeAudioMixer&&
+         nativeAudioGroups&&liveAudio->groupsForProviders()==nativeAudioGroups&&
+         originalMainApplication.soundMode&&originalMainApplication.soundMode->ready()&&
+         rr::game::validOriginalSoundModeFields50KG(originalMainApplication.soundMode->fields())&&
+         nativeAudioMixer->originalSoundMode50KG()==originalMainApplication.soundMode.get()&&
+         std::uint32_t(originalMainApplication.soundMode->fields().profile1101C)==nativeAudioProfile->soundMode1101C&&
+         nativeAudioGroups->observeNativePauseAudio(*nativeAudioProfile,originalMainApplication.entities(),
+             *nativeAudioMixer,nativeAudio);
+    };
+    const bool nativeAudioAvailable=nativeAudioCurrent();
+    sessionMenu.observeNativeRaceAudio(nativeAudioAvailable?&nativeAudio:nullptr);
+    // nativeMenuCommand retains this poll's original intent before Results
+    // retirement or unavailable-checkpoint suppression cleared hostInput.
+    // HUD/live-audio admission uses it; no rejected host command is restored.
+    const auto action=sessionMenu.poll(hostInput,!recoveryPaused&&s.phase==VehicleFramePhase49W::Ready,
+        nativeMenuCommand);
     // Only accepted explicit native menu commands map to Application11C.
     // Focus/minimize/recovery/controller-loss suppression never writes it.
     if(menuWasOpen!=sessionMenu.open())
      originalMainApplication.setExplicitAnimationPause(sessionMenu.open());
+    if(action==platform::HostSessionMenu50IF::Result::HudPrevious||
+       action==platform::HostSessionMenu50IF::Result::HudNext){
+     // Consume synchronously once. No request survives a focus interruption,
+     // menu exit or world boundary; a stale owner fails before any mutation.
+     require50DU(nativeHudAvailable&&sessionMenu.page()==platform::HostSessionMenu50IF::Page::Hud&&
+         originalMainApplication.animationPaused()&&sourceCameraSession->adjustNativeHumanHud(
+             controlPresets,originalMainApplication.animationClock(),
+             originalMainApplication.profile->playerBits1125C,nativeHud,sessionMenu.nativeHudRow(),
+             action==platform::HostSessionMenu50IF::Result::HudNext),
+         "native Pause HUD preference owner rejected");
+     require50DU(nativeHudCurrent(),"native Pause HUD preference observation failed after commit");
+     sessionMenu.observeNativeHud(&nativeHud); //Actual post-store labels/revision.
+     // Existing resume forces a new HUD frame. Do not redraw the paused world
+     // or turn menu wall time into a simulation/animation step here.
+    }
+    if(action==platform::HostSessionMenu50IF::Result::RaceAudioPrevious||
+       action==platform::HostSessionMenu50IF::Result::RaceAudioNext||
+       action==platform::HostSessionMenu50IF::Result::RaceAudioDefaults){
+     const bool defaults=action==platform::HostSessionMenu50IF::Result::RaceAudioDefaults;
+     require50DU(nativeAudioAvailable&&sessionMenu.page()==platform::HostSessionMenu50IF::Page::RaceAudio&&
+         originalMainApplication.animationPaused()&&
+         (defaults?nativeAudioGroups->restoreNativePauseVolumes(
+             *nativeAudioProfile,originalMainApplication.entities(),*nativeAudioMixer,
+             originalMainApplication.animationClock(),nativeAudio):nativeAudioGroups->adjustNativePauseAudio(
+             *nativeAudioProfile,originalMainApplication.entities(),*nativeAudioMixer,
+             originalMainApplication.animationClock(),nativeAudio,sessionMenu.nativeRaceAudioRow(),
+             action==platform::HostSessionMenu50IF::Result::RaceAudioNext)),
+         "native Pause live audio owner rejected");
+     require50DU(nativeAudioCurrent(),"native Pause live audio observation failed after commit");
+     sessionMenu.observeNativeRaceAudio(&nativeAudio);
+     // Native Pause keeps audio paused. No mixer clock, source feedback,
+     // persistence or announcer begin/end is manufactured by this edit.
+    }
     selectedRacer60=sessionMenu.selectedRacer60();
     selectedAudioSettings=sessionMenu.selectedAudioSettings();
     selectedTrack=sessionMenu.selectedTrack();

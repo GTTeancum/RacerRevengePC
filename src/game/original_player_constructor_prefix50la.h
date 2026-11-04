@@ -305,6 +305,7 @@ class OriginalPlayerConstructorPrefix50LA final {
         if(controller)for(unsigned selector: {0u,1u,2u,5u})
             if(controller->mappingCounts[selector]!=0)return false; // Not a repeated/widened load.
         loadAttempted_=true;sourceInput_=input;++input->playerBorrows_;inputBorrowed_=true;
+        input->playerBorrowEverIssued_=true; // Cancellation cannot reopen the startup mapping interval.
         auto& a=*allocation_;a.word(0xffc,human); //1A05A0.
         logicalController_=controller;for(unsigned i=0;i<4;++i)a.known[0xff0+i]=0;
         if(!controller){pc=loadPC_=0x1a05e8;return false;} // Before diagnostic, not fake return.

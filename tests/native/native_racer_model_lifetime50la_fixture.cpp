@@ -1043,7 +1043,7 @@ void Owner::constructSourceEngineQuery2120B4(runtime_startup50fl::Fixture& actua
         "actual690 configuration source prefix stopped");
     failurePC_=sourceConstructorPC_=0x21219cu;
     const bool setup=racer_->scene190&&sourceQuery690_->setup21219C(*racer_,*racer_->scene190,sourceStack840_,
-        application_->collisionDirectory36B0F0_,application_->collisionName3E0730_,fileDiagnostic);
+        application_->observeCollisionDirectory36B0F0(),application_->collisionName3E0730_,fileDiagnostic);
     if(!setup&&sourceQuery690_->boundary_!=0x212190u)failurePC_=sourceQuery690_->boundary_;
     need(setup,"actual690 source COL/shape/result setup stopped");
     failurePC_=sourceConstructorPC_=0x2121b8u;r=sourceQuery690_->append2121B8(outside(objects),racer_->racer);
@@ -1102,7 +1102,7 @@ void Owner::constructSourceQuery6942121D0(runtime_startup50fl::Fixture& actual,
         "actual694 same-App named category setup stopped");
     failurePC_=sourceConstructorPC_=0x212240u;
     const bool setup=racer_->scene190&&sourceQuery694_->setup212240(*racer_,*racer_->scene190,sourceStack840_,
-        application_->collisionDirectory36B0F0_,application_->collisionName3E0730_,fileDiagnostic);
+        application_->observeCollisionDirectory36B0F0(),application_->collisionName3E0730_,fileDiagnostic);
     if(!setup&&sourceQuery694_->boundary_!=0x212238u)failurePC_=sourceQuery694_->boundary_;
     need(setup,"actual694 source COL/type0 setup stopped");
     failurePC_=sourceConstructorPC_=0x21224cu;
@@ -1361,7 +1361,7 @@ void Owner::constructSourceSecondaryContacts212720(runtime_startup50fl::Fixture&
         "actual364 same-App physics category stopped");
     failurePC_=sourceConstructorPC_=0x212788u;
     const bool setup=sourceQuery364_->setup212788(*racer_,scene,*sourceBody35C_,sourceStack840_,
-        application_->collisionDirectory36B0F0_,application_->collisionName3E0730_,fileDiagnostic);
+        application_->observeCollisionDirectory36B0F0(),application_->collisionName3E0730_,fileDiagnostic);
     if(!setup)failurePC_=sourceQuery364_->boundary_;
     need(setup,"actual364 source COL/type2 setup stopped");
     failurePC_=sourceConstructorPC_=0x212794u;

@@ -26,6 +26,11 @@ class OriginalRaceMusicManager50LA final {
         const std::shared_ptr<::original_race_hud_scope50LA::Registration>&);
     bool constructed()const noexcept;
     static bool noNativePreparation(const ::original_race_hud_scope50LA::Registration&)noexcept;
+    static bool freshAll8NativePrefix(const OriginalRaceConstructor50LA&,
+        const ::original_race_hud_scope50LA::Registration&)noexcept;
+    bool stageNativeLoadPrefix(OriginalRaceConstructor50LA&,
+        const std::shared_ptr<platform::OriginalApplicationAural50KG>&,
+        OriginalRaceMusicManagerDiagnostic50LA&)noexcept;
     bool acceptNativeChildren(OriginalRaceConstructor50LA&,
         const std::shared_ptr<platform::OriginalApplicationAural50KG>&,
         OriginalRaceMusicManagerDiagnostic50LA&)noexcept;

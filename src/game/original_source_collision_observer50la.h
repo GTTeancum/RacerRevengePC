@@ -16,10 +16,13 @@ class OriginalSourceCollisionObserver50LA final {
         const void* next00=nullptr;
         const void* zone04=nullptr;
         const void* method08=nullptr;
-        std::uint32_t field0C=0,field10=0,slot14=0;
+        std::uint32_t field0C=0,field10=0;
+        std::optional<std::uint32_t> slot14; //Known numeric source bits, if any; constructor explicitly writes zero.
         std::array<std::optional<std::uint32_t>,2> unknown18To1C{};
         std::array<std::uint32_t,4> center20{};
     } record_;
+    std::uint32_t* fogSlot14_=nullptr; //Typed Fog alternative; never a numeric ordinal or guest-pointer cast.
+    bool fogSlot14AliasWithdrawn_=false;
     Shared* shared_=nullptr;
     const void* group_=nullptr;
     bool entered_=false,lease_=false,returned_=false,nativeWithdrawn_=false;
@@ -38,6 +41,7 @@ class OriginalSourceCollisionObserver50LA final {
         const OriginalNativeListMethodCustody50LA* method=nullptr;
         std::array<std::uint32_t,4> center{};
         std::uint32_t slot=0,pc=0;
+        std::optional<bool> fogSelectedAddressNonNull; //Native typed-address witness only; not source slot14 or legacy ordinal.
         bool entered=false,methodRead=false,slotRead=false,nativeWithdrawn=false;
         std::uint8_t stores=0;
         Shared::SourceAssertionHistory emptyAssertion,methodAssertion,slotAssertion;
@@ -125,7 +129,7 @@ class OriginalSourceCollisionObserver50LA final {
         //280BF0,120190/1201F0 and the actual120200(-1) call, separately.
         if(detached_.entered||!actualOccurrence||!actualMember||!actualWorld||!actualApplication||actualPrimaryZone>=10u||
            !preflightNative()||!lease_||destroyEntered_||nativeWithdrawn_||
-           primary_.occurrence!=actualOccurrence||primary_.stores!=31u||primary_.nativeWithdrawn||
+           primary_.occurrence!=actualOccurrence||primary_.stores!=31u||primary_.fogSelectedAddressNonNull||primary_.nativeWithdrawn||
            !secondary_.returned||secondary_.nativeWithdrawn||!shared_)return false;
         DetachedCustody next;next.entered=true;next.occurrence=actualOccurrence;
         next.member=actualMember;next.count=secondary_.count;next.world=actualWorld;next.application=actualApplication;next.primaryZone=actualPrimaryZone;
@@ -255,7 +259,7 @@ class OriginalSourceCollisionObserver50LA final {
     }
     bool beginSecondary280BF0(const void* actualOccurrence)noexcept {
         if(secondary_.entered||!actualOccurrence||actualOccurrence!=primary_.occurrence||
-           primary_.stores!=31u||primary_.nativeWithdrawn||nativeWithdrawn_||!preflightNative())return false;
+           primary_.stores!=31u||primary_.fogSelectedAddressNonNull||primary_.nativeWithdrawn||nativeWithdrawn_||!preflightNative())return false;
         secondary_.entered=true;secondary_.occurrence=actualOccurrence;return true;
     }
     SecondaryLinkResult allocateSecondary105720(const void* actualSecondaryOccurrence)noexcept {
@@ -318,30 +322,118 @@ class OriginalSourceCollisionObserver50LA final {
     }
     std::uint32_t registrationPC()const noexcept {return primary_.pc;}
     bool registrationHistoryNative()const noexcept {
-        const auto& h=primary_;
+        const auto& h=primary_;const bool fog=h.fogSelectedAddressNonNull.has_value();
+        const bool typedSlot=fog&&(h.stores&4u);
+        if(!typedSlot&&(fogSlot14_||fogSlot14AliasWithdrawn_))return false;
+        if(typedSlot&&(record_.slot14||(fogSlot14AliasWithdrawn_?fogSlot14_!=nullptr:fogSlot14_==nullptr)||
+            (h.nativeWithdrawn&&!fogSlot14AliasWithdrawn_)))return false;
         if(!h.entered)return !secondary_.entered&&!h.occurrence&&!h.zone&&!h.method&&!h.slot&&!h.pc&&!h.methodRead&&!h.slotRead&&
-            !h.nativeWithdrawn&&!h.stores&&!h.emptyAssertion.entered&&!h.methodAssertion.entered&&!h.slotAssertion.entered;
+            !h.nativeWithdrawn&&!h.stores&&!h.emptyAssertion.entered&&!h.methodAssertion.entered&&!h.slotAssertion.entered&&!fog;
         if(!h.occurrence||!returned_||!Shared::sourceAssertionHistoryCurrent(h.emptyAssertion)||
            !Shared::sourceAssertionHistoryCurrent(h.methodAssertion)||!Shared::sourceAssertionHistoryCurrent(h.slotAssertion)||
            (h.methodRead&&!h.emptyAssertion.passed)||(h.slotRead&&(!h.methodRead||!h.method||!h.methodAssertion.passed))||
-           (!h.methodRead&&(h.method||h.methodAssertion.entered))||(!h.slotRead&&(h.slot||h.slotAssertion.entered))||
-           (h.stores!=0u&&h.stores!=31u))return false;
-        if(h.emptyAssertion.conditionRead&&!h.emptyAssertion.passed)return false; //Fresh zone04 was NULL.
+           (!h.methodRead&&(h.method||h.methodAssertion.entered))||
+           (!h.slotRead&&(h.slot||(h.slotAssertion.entered&&!fog)))||
+           (fog&&(!*h.fogSelectedAddressNonNull||h.slotRead||h.slot||!h.methodRead||!h.method||
+               !h.methodAssertion.passed||!h.slotAssertion.entered||secondary_.entered||detached_.entered)))return false;
+        if(fog){if(h.stores!=0u&&h.stores!=1u&&h.stores!=3u&&h.stores!=7u&&h.stores!=15u&&h.stores!=31u)return false;}
+        else if(h.stores!=0u&&h.stores!=31u)return false; //Legacy callers keep the prior atomic contract.
+        if(h.emptyAssertion.conditionRead&&!h.emptyAssertion.passed)return false;
         if(h.methodAssertion.conditionRead&&h.methodAssertion.passed!=(h.method!=nullptr))return false;
-        if(h.slotAssertion.conditionRead&&h.slotAssertion.passed!=(h.slot!=0u))return false;
+        if(h.slotAssertion.conditionRead&&h.slotAssertion.passed!=h.fogSelectedAddressNonNull.value_or(h.slot!=0u))return false;
         if(h.stores){
-            if(!h.zone||!h.method||!h.slot||!h.slotRead||!h.slotAssertion.passed||h.pc!=0x280bf0u)return false;
+            if(!h.zone||!h.method||!h.slotAssertion.passed)return false;
+            if(fog){
+                const std::uint32_t expected=h.stores==1u?0x280b94u:h.stores==3u?0x280b98u:
+                    h.stores==7u?0x280b9cu:h.stores==15u?0x280ba0u:0x280bf0u;
+                if(h.pc!=expected)return false;
+            }else if(!h.slot||!h.slotRead||h.pc!=0x280bf0u)return false;
         }else if(!h.emptyAssertion.passed){if(h.pc!=0x2809e8u&&h.pc!=0x280a40u)return false;}
         else if(!h.methodRead){if(h.pc!=0x280a74u)return false;}
         else if(!h.methodAssertion.passed){if(h.pc!=0x280a80u&&h.pc!=0x280ab8u)return false;}
-        else if(!h.slotRead){if(h.pc!=0x280ae8u)return false;}
+        else if(!h.slotRead&&!fog){if(h.pc!=0x280ae8u)return false;}
         else if(!h.slotAssertion.passed){if(h.pc!=0x280b08u&&h.pc!=0x280b40u)return false;}
-        else if(h.pc!=0x280b88u)return false;
-        //Primary source proof stays immutable. Only the independent exact
-        //secondary receipt may account for later head00/shared-pool changes.
-        return secondaryHistoryNative()&&record_.zone04==(h.stores?h.zone:nullptr)&&
-            record_.method08==(h.stores?h.method:nullptr)&&record_.slot14==(h.stores?h.slot:0u)&&
-            record_.center20==(h.stores?h.center:std::array<std::uint32_t,4>{{0,0,0,0x3f800000u}});
+        else if(h.pc!=(fog?0x280b70u:0x280b88u))return false;
+        return secondaryHistoryNative()&&record_.zone04==((h.stores&1u)?h.zone:nullptr)&&
+            record_.method08==((h.stores&2u)?h.method:nullptr)&&
+            (typedSlot?!record_.slot14:record_.slot14==((h.stores&4u)?h.slot:0u))&&
+            record_.center20==((h.stores&16u)?h.center:std::array<std::uint32_t,4>{{0,0,0,0x3f800000u}});
+    }
+    //Fog-only phased handoffs retain the SAME observer/occurrence and process
+    //assertion owners, while its caller records actual branch/call/return PCs.
+    bool enterFogRegistration2809C0(const void* occurrence,const void* zone,
+        const std::array<std::uint32_t,4>& center)noexcept {
+        if(primary_.entered||!occurrence||!zone||!returned_||!lease_||destroyEntered_||nativeWithdrawn_||!preflightNative())return false;
+        auto& h=primary_;h.entered=true;h.occurrence=occurrence;h.zone=zone;h.center=center;h.pc=0x2809e8u;return true;
+    }
+    bool beginFogEmptyAssertion2809E8()noexcept {
+        auto& h=primary_;if(!lease_||destroyEntered_||nativeWithdrawn_||h.nativeWithdrawn||
+            !h.entered||h.emptyAssertion.entered||h.pc!=0x2809e8u||!preflightNative())return false;
+        return Shared::beginSourceAssertion(1,h.emptyAssertion);
+    }
+    bool finishFogEmptyAssertion280A40()noexcept {
+        auto& h=primary_;if(!lease_||destroyEntered_||nativeWithdrawn_||h.nativeWithdrawn||
+            !h.emptyAssertion.ready||h.emptyAssertion.passed||!preflightNative())return false;
+        h.pc=0x280a40u;if(!Shared::finishSourceAssertion(h.emptyAssertion,record_.zone04==nullptr))return false;
+        h.pc=0x280a74u;return true;
+    }
+    bool retainFogMethod280A7C(const OriginalNativeListMethodCustody50LA* method)noexcept {
+        auto& h=primary_;if(!lease_||destroyEntered_||nativeWithdrawn_||h.nativeWithdrawn||
+            !h.emptyAssertion.passed||h.methodRead||h.pc!=0x280a74u||!preflightNative())return false;
+        h.method=method;h.methodRead=true;h.pc=0x280a80u;return true;
+    }
+    bool beginFogMethodAssertion280A80()noexcept {
+        auto& h=primary_;if(!lease_||destroyEntered_||nativeWithdrawn_||h.nativeWithdrawn||
+            !h.methodRead||h.methodAssertion.entered||h.pc!=0x280a80u||!preflightNative())return false;
+        return Shared::beginSourceAssertion(2,h.methodAssertion);
+    }
+    bool finishFogMethodAssertion280AB8()noexcept {
+        auto& h=primary_;if(!lease_||destroyEntered_||nativeWithdrawn_||h.nativeWithdrawn||
+            !h.methodAssertion.ready||h.methodAssertion.passed||!preflightNative())return false;
+        h.pc=0x280ab8u;if(!Shared::finishSourceAssertion(h.methodAssertion,h.method!=nullptr))return false;
+        h.pc=0x280ae8u;return true;
+    }
+    bool beginFogSlotAssertion280B08(const std::uint32_t* actualEntry)noexcept {
+        auto& h=primary_;if(!lease_||destroyEntered_||nativeWithdrawn_||h.nativeWithdrawn||
+            !actualEntry||!h.methodRead||!h.method||!h.methodAssertion.passed||h.slotRead||h.slot||
+            h.fogSelectedAddressNonNull||h.slotAssertion.entered||h.pc!=0x280ae8u||!preflightNative())return false;
+        //The trigger owns the exact typed alias and exclusive pending List
+        //reservation. Retain only nonnullness here; never narrow its address.
+        h.fogSelectedAddressNonNull=true;h.pc=0x280b08u;
+        return Shared::beginSourceAssertion(3,h.slotAssertion);
+    }
+    bool finishFogSlotAssertion280B40(const std::uint32_t* actualEntry)noexcept {
+        auto& h=primary_;if(!lease_||destroyEntered_||nativeWithdrawn_||h.nativeWithdrawn||
+            !actualEntry||h.fogSelectedAddressNonNull!=true||!h.slotAssertion.ready||h.slotAssertion.passed||!preflightNative())return false;
+        h.pc=0x280b40u;if(!Shared::finishSourceAssertion(h.slotAssertion,actualEntry!=nullptr))return false;
+        h.pc=0x280b70u;return true; //Caller still owns every method+24 argument, call and callee effect.
+    }
+    bool publishFogScalar280B90(std::uint32_t sourcePC,std::uint32_t* actualEntry=nullptr)noexcept {
+        auto& h=primary_;if(!lease_||destroyEntered_||nativeWithdrawn_||h.nativeWithdrawn||fogSlot14AliasWithdrawn_||
+            h.fogSelectedAddressNonNull!=true||!h.slotAssertion.passed||!h.zone||!h.method||
+            (sourcePC!=0x280b98u&&actualEntry)||!preflightNative())return false;
+        if(sourcePC==0x280b90u){if(h.stores||h.pc!=0x280b70u)return false;
+            record_.zone04=h.zone;h.stores=1;h.pc=0x280b94u;return true;}
+        if(sourcePC==0x280b94u){if(h.stores!=1u||h.pc!=0x280b94u)return false;
+            record_.method08=h.method;h.stores=3;h.pc=0x280b98u;return true;}
+        if(sourcePC==0x280b98u){if(h.stores!=3u||h.pc!=0x280b98u||!actualEntry)return false;
+            record_.slot14.reset();fogSlot14_=actualEntry;h.stores=7;h.pc=0x280b9cu;return true;}
+        if(sourcePC==0x280b9cu){if(h.stores!=7u||h.pc!=0x280b9cu)return false;
+            record_.next00=nullptr;h.stores=15;h.pc=0x280ba0u;return true;}
+        return false;
+    }
+    bool publishFogCenter280BBC(const std::array<std::uint32_t,4>& actualCenterV0)noexcept {
+        auto& h=primary_;if(!lease_||destroyEntered_||nativeWithdrawn_||h.nativeWithdrawn||fogSlot14AliasWithdrawn_||
+            h.fogSelectedAddressNonNull!=true||h.stores!=15u||h.pc!=0x280ba0u||
+            actualCenterV0!=h.center||!preflightNative())return false;
+        record_.center20=actualCenterV0;h.stores=31;h.pc=0x280bf0u;return true;
+    }
+    bool withdrawFogSlot14AliasNative(const void* actualOccurrence)noexcept {
+        auto& h=primary_;if(!actualOccurrence||actualOccurrence!=h.occurrence||h.fogSelectedAddressNonNull!=true||
+            !(h.stores&4u)||!preflightNative())return false;
+        if(fogSlot14AliasWithdrawn_)return !fogSlot14_;
+        fogSlot14_=nullptr;fogSlot14AliasWithdrawn_=true;
+        return true; //Native alias only; source stores and unknown numeric slot14 remain unchanged.
     }
     bool beginRegistration2809C0(const void* actualOccurrence,const void* actualZone,
         const std::array<std::uint32_t,4>& actualCenter)noexcept {
@@ -361,7 +453,7 @@ class OriginalSourceCollisionObserver50LA final {
     }
     bool recordSelection280B08(std::uint32_t actualSlot)noexcept {
         auto& h=primary_;
-        if(!h.entered||h.nativeWithdrawn||h.slotRead||h.pc!=0x280ae8u||!h.method||!preflightNative())return false;
+        if(!h.entered||h.nativeWithdrawn||h.slotRead||h.fogSelectedAddressNonNull||h.pc!=0x280ae8u||!h.method||!preflightNative())return false;
         h.slotRead=true;h.slot=actualSlot;h.pc=0x280b08u;
         if(!Shared::beginSourceAssertion(3,h.slotAssertion))return false;
         h.pc=0x280b40u;if(!Shared::finishSourceAssertion(h.slotAssertion,actualSlot!=0u))return false;
@@ -383,6 +475,7 @@ class OriginalSourceCollisionObserver50LA final {
         auto& h=primary_;
         if(!h.entered)return actualOccurrence==nullptr;
         if(detached_.entered||actualOccurrence!=h.occurrence||!preflightNative()||
+           ((h.fogSelectedAddressNonNull&&(h.stores&4u))&&!fogSlot14AliasWithdrawn_)||
            (secondary_.entered&&!secondary_.nativeWithdrawn))return false;
         //The COL owner must first cancel its exact pending/inserted method
         //receipt. This only releases native custody; source fields stay intact.
@@ -421,7 +514,7 @@ class OriginalSourceCollisionObserver50LA final {
            !vectorKnown_||(!primary_.entered&&record_.center20!=std::array<std::uint32_t,4>{{0,0,0,0x3f800000u}})||
            ((scalarMask_&1u)&&!secondary_.entered&&record_.next00)||((scalarMask_&2u)&&!primary_.entered&&record_.zone04)||
            ((scalarMask_&4u)&&!primary_.entered&&record_.method08)||((scalarMask_&8u)&&record_.field0C)||
-           ((scalarMask_&16u)&&record_.field10)||((scalarMask_&32u)&&!primary_.entered&&record_.slot14)||
+           ((scalarMask_&16u)&&record_.field10)||((scalarMask_&32u)&&!primary_.entered&&record_.slot14!=0u)||
            (returned_&&(scalarMask_!=63u||ctorPC_!=0x280920u)))return false;
         if(destroyEntered_){
             if(!returned_||!countDecremented_||!destroyReturned_||countBeforeDestroy_<2u||

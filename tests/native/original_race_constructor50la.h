@@ -388,6 +388,11 @@ class OriginalRaceConstructor50LA final {
     bool retireNativeWorldAndGroups(std::uint32_t&,const char*&)noexcept;
     bool pauseWorld1ACF50(bool)noexcept;
     bool pauseEntity142040(bool)noexcept;
+    // Actual retained Pause caller; native mixer transport remains distinct
+    // from source235500's SPU command queue. No public profile/gain setter.
+    bool adjustPauseAudio1BD7C0(const OriginalPauseStorage50LA&,
+        OriginalUiGameSettingsProfile50KG&,const OriginalApplicationAnimationClockView50KG&,
+        std::uint32_t,bool,bool&)noexcept;
     bool constructWorld1A6BC0(const original_main_entry50KG::Application&,
         std::shared_ptr<ra_cold_aggregate50LA::Owner>,std::uint32_t&)noexcept;
     bool populateResources1AA5A0(std::shared_ptr<assets::OriginalStandardMaterialDomain50LA> domain,

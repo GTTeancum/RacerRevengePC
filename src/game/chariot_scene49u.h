@@ -1,5 +1,7 @@
 #pragma once
 #include "vehicle_visual49r.h"
+#include <array>
+#include <cstdint>
 
 namespace rr::game::detail {
 // Internal leaves for the admitted21A660 transaction, not public atomic graph
@@ -34,6 +36,13 @@ bool inverseDirection49U(const SceneGraph49P&, SceneNodeIndex49P node,
 //scene owner and source getter cut. No graph refresh or getter receipt.
 bool cleanMatrixDirectionPrefix49U(const BodyMatrix48G&,const VisualVector49R&,
     SceneVectorContext49U&,VisualVector49R&)noexcept;
+//Pure28B9B0 XYZ projection for an authenticated ready source cache. The
+//caller owns the real refresh/control history. InputW, matrixW and VF9.W are
+//not read or represented: the original caller consumes only resultXYZ.
+//Stages follow28BA74/78/7C/80; pc identifies the first failed operation.
+//Output remains unchanged on failure. Final XYZ+0 is retained.
+bool cleanMatrixDirectionXYZPrefix49U(const BodyMatrix48G&,const VisualVector49R&,
+    std::array<float,3>& output,std::uint32_t& pc)noexcept;
 //Pure28BAB0 point arithmetic for an authenticated clean owner; W becomes1.
 bool cleanMatrixPointPrefix49U(const BodyMatrix48G&,const VisualVector49R&,
     SceneVectorContext49U&,VisualVector49R&)noexcept;

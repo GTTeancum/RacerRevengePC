@@ -1809,11 +1809,18 @@ void Context::run() {
    // a separate effect and has finished/retired before this race destination.
    require50DU(sourceCamera::initializeFreshNativeCameraVideoAlpha0(sourceVideo),
        "fresh native video alpha policy rejected");
-   sourceFadeOut=std::make_unique<platform::OriginalVideoBlockingNativeBackend>(renderer,host);
+   // Explicit existing native shader interpretation. These choices are NOT
+   // recovered source COLCLAMP/PABE/FBA state or a packet-completion receipt.
+   using FadePolicies=platform::NativeVideoPacketOverlayPolicies50LA;
+   const FadePolicies fadePolicies{FadePolicies::Rounding::signedFloor128,
+       FadePolicies::ColorRange::clamp8,FadePolicies::Pabe::zero,
+       FadePolicies::AlphaStore::packedSourceByte};
+   sourceFadeOut=std::make_unique<platform::OriginalVideoBlockingNativeBackend>(renderer,host,
+       platform::OriginalVideoNativeUse::blockingSourceLoops,fadePolicies);
    sourceFadeIn=std::make_unique<platform::OriginalVideoBlockingNativeBackend>(renderer,host,
-       platform::OriginalVideoNativeUse::asyncFrozenUnderlay25B5D0);
+       platform::OriginalVideoNativeUse::asyncFrozenUnderlay25B5D0,fadePolicies);
    if(humanCourseEnabled)sourceEndingFade=std::make_unique<platform::OriginalVideoBlockingNativeBackend>(renderer,host,
-       platform::OriginalVideoNativeUse::asyncFrozenUnderlay25B5D0);
+       platform::OriginalVideoNativeUse::asyncFrozenUnderlay25B5D0,fadePolicies);
    if(isMcTrack){
     requireMbRuntimeNavigation50MB();
     const auto pods=runtime_asset_paths50LB::resolve("work/native/project/disc/PODS");
@@ -2006,6 +2013,21 @@ void Context::run() {
    if(nativeGcWater||rcParticleRender||tbTrackParticles||gbParticleRender||mcParticleRender)
     require50DU(sourceCameraSession&&sourceCameraSession->bindGameplayFogRenderPhase(sourceFogRenderPhase),
         "actual selected render consumer fog phase binding rejected");
+   if(sourceConsumedPauseActivation&&consumedRaStage.race()){
+    // Separate ALL8 native contract on this actual prepared Camera/provider
+    // scope. Unavailable preparation acquires no source owner; row9 stays
+    // unsupported. A reached count/load failure retains its owner for cleanup.
+    std::uint32_t musicPC=0;
+    const auto musicPrefix=originalMainApplication.stageConsumedRaAll8MusicPrefixNative10C(
+        *sourceCameraSession,musicPC);
+    using MusicPrefix=original_main_entry50KG::Application::All8MusicPrefixStatus;
+    if(musicPrefix==MusicPrefix::failed){
+     std::cerr<<"all8_music_prefix_failed pc="<<musicPC<<'\n';
+     require50DU(false,"actual ALL8 counted music prefix stopped; partial owner retained");
+    }
+    if(musicPrefix==MusicPrefix::unavailable)
+     std::cerr<<"all8_music_prefix_unjoined pc="<<musicPC<<'\n';
+   }
    // Pause draw admission pins FINAL: finish only after every real HUD/camera
    // resource retain and population call above has completed.
    if(sourceConsumedPauseActivation&&consumedRaStage.race()&&!originalMainApplication.finishPauseDrawCold50LA(sourcePause)){

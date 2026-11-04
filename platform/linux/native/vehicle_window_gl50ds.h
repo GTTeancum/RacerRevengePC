@@ -1,6 +1,8 @@
 #include "../../../src/game/original_options_mutation_interlock50kg.h"
 #pragma once
 #include "vehicle_draw_gl50cv.h"
+#include "original_video_packet_cpu50la.h"
+#include "../../../src/game/original_video_blocking_color50la.h"
 #include "../../../src/game/original_racer_diffuse_camera50la.h"
 #include "vehicle_shader_gl50cz.h"
 #include "material_texture_gl50eb.h"
@@ -1035,6 +1037,45 @@ private:
     std::uint64_t generation_=0;
 };
 
+enum class NativeVideoPacketWrite50LA : std::uint8_t {none,clear,recopy,overlay};
+// Numeric observation only. This never grants source-frame, target or IRQ authority.
+struct NativeVideoPacketClearInfo50LA {
+    std::uint32_t width=0,height=0;
+    std::size_t rgbaBytes=0,gpuColorBytes=0;
+    OriginalVideoPacketCpuRenderer50LA::NativePolicies policies{};
+    std::uint64_t acceptedSerial=0; // Native command acceptance, not completion.
+    bool commandsAccepted=false;
+    std::uint64_t clearAncestorSerial=0; // Actual native clear ancestor, unchanged by recopy.
+    NativeVideoPacketWrite50LA lastWrite=NativeVideoPacketWrite50LA::none;
+};
+struct NativeVideoPacketSnapshotInfo50LA {
+    std::uint32_t width=0,height=0;
+    std::size_t rgbaBytes=0,gpuColorBytes=0; // Snapshot pair only; clear pair is separate.
+    OriginalVideoPacketCpuRenderer50LA::NativePolicies policies{};
+    std::uint64_t acceptedCaptureSerial=0,capturedImageSerial=0,clearAncestorSerial=0;
+    bool commandsAccepted=false; // Neither a source transfer nor GPU completion receipt.
+};
+
+// Explicit native interpretation of 2611CC's ALPHA operation. The original
+// packet does not establish COLCLAMP or PABE. No policy defaults to supported.
+struct NativeVideoPacketOverlayPolicies50LA {
+    enum class Rounding : std::uint8_t {unspecified,signedFloor128};
+    enum class ColorRange : std::uint8_t {unspecified,clamp8};
+    enum class Pabe : std::uint8_t {unspecified,zero};
+    enum class AlphaStore : std::uint8_t {unspecified,packedSourceByte};
+    Rounding rounding=Rounding::unspecified;
+    ColorRange colorRange=ColorRange::unspecified;
+    Pabe pabe=Pabe::unspecified;
+    AlphaStore alphaStore=AlphaStore::unspecified;
+};
+struct NativeVideoPacketOverlayInfo50LA {
+    NativeVideoPacketOverlayPolicies50LA policies{};
+    std::size_t gpuColorBytes=0;
+    std::uint64_t acceptedImageSerial=0,snapshotCaptureSerial=0;
+    std::uint32_t packedRgba=0; // Numeric native input, never a source producer receipt.
+    bool commandsAccepted=false,stillCurrent=false;
+};
+
 // Caller-owned desktop GL >=3.2. Window output requires a double-buffered,
 // nonstereo, nonmultisampled window surface; headless output does not.
 // Owns GPU storage; never creates/binds/releases a context or polls.
@@ -1061,6 +1102,63 @@ private:
 // storage. Readback output is borrowed only during its synchronous call.
 class VehicleWindowGl50DS final {
 public:
+    // Explicit cold opt-in to two additional private color targets. Packet
+    // extent comes from its actual decoder; no native display-mode substitution.
+    // Both missing GS states require explicit native policies. The byte ceiling
+    // covers two RGBA8 planes, excluding driver overhead. Preparation does not
+    // produce an image; a failed GL attempt retains names for renderer.close()
+    // and cannot be retried on this renderer. No ordinary startup allocation.
+    bool prepareNativeVideoPacketClear(const game::OriginalVideoClearPacket25CAD0Native50LA&,
+        OriginalVideoPacketCpuRenderer50LA::NativePolicies,std::size_t maximumGpuColorBytes,
+        VehicleWindowDiagnostic50DS&) noexcept;
+    // Exact 25CAD0 clear vocabulary only. Uses this renderer's actual context,
+    // writes only its unpublished packet color bank and restores changed state.
+    // Success is native command acceptance, not GPU/source/DMA/IRQ completion.
+    // Race/UI/window publication, history and source startup remain unchanged.
+    bool submitNativeVideoPacketClear(const game::OriginalVideoClearPacket25CAD0Native50LA&,
+        VehicleWindowDiagnostic50DS&) noexcept;
+    // Tight, bottom-row-first RGBA8, unlike the CPU image's top-row-first layout.
+    // Failure may partly change the caller buffer; the accepted bank is unchanged.
+    bool readNativeVideoPacketClearRgba(std::uint8_t*,std::size_t capacityBytes,
+        VehicleWindowDiagnostic50DS&) noexcept;
+    bool nativeVideoPacketClearInfo(NativeVideoPacketClearInfo50LA&) const noexcept;
+    // Native full-rectangle capture/recopy, based on the 262830/262C70 transfer
+    // operation, but using only this renderer's real packet-image ownership.
+    // Never substitutes native extents/bases into original Video fields.
+    // Explicit cold budget covers TWO additional RGBA8 planes; no image yet.
+    // Failed allocation retains names for close and cannot silently retry.
+    bool prepareNativeVideoPacketTransfers(std::size_t maximumSnapshotGpuColorBytes,
+        VehicleWindowDiagnostic50DS&) noexcept;
+    // Capture latest accepted packet image into a distinct unpublished snapshot
+    // bank. A later clear does not change it; a later explicit capture may replace it.
+    bool captureNativeVideoPacketImage(VehicleWindowDiagnostic50DS&) noexcept;
+    // Recopy the retained image into the unpublished packet-color bank. The
+    // snapshot remains unchanged across repeated recopies. No blending or swap.
+    // Advances only native image acceptance, retaining its actual clear ancestor.
+    bool recopyNativeVideoPacketImage(VehicleWindowDiagnostic50DS&) noexcept;
+    bool readNativeVideoPacketSnapshotRgba(std::uint8_t*,std::size_t capacityBytes,
+        VehicleWindowDiagnostic50DS&) noexcept;
+    bool nativeVideoPacketSnapshotInfo(NativeVideoPacketSnapshotInfo50LA&) const noexcept;
+    // Explicit cold compute path: actual desktop GL 4.5 core is required and
+    // checked, never assumed. Budget covers TWO additional RGBA8 textures.
+    // Uses prepared native packet/snapshot ownership; creates no source fade.
+    bool prepareNativeVideoPacketOverlay(NativeVideoPacketOverlayPolicies50LA,
+        std::size_t maximumOverlayGpuColorBytes,VehicleWindowDiagnostic50DS&) noexcept;
+    // Reads the retained snapshot anew; prior output enters it only through
+    // an explicit capture. Packed native bytes are R0/G8/B16/A24, not ARGB;
+    // all alpha bytes 0..255 are admitted
+    // under explicit saturation. No source 3E8 value or sample is fabricated.
+    // Produces a private native image only; no finish, swap, fade completion,
+    // mode, source FINISH, DMA or IRQ receipt. No raster state is changed.
+    bool overlayNativeVideoPacketSnapshot(std::uint32_t packedRgba,VehicleWindowDiagnostic50DS&) noexcept;
+    // Source-backed blocking-color math over explicit native numbers, then
+    // the same owned snapshot overlay. No clock, alpha advance, source sample,
+    // Video mutation or backend completion. The source IN path uses FROM RGB
+    // with current-start, not reversed endpoints. Native image info reports
+    // the resulting packed RGBA low word; source Q is deliberately unused.
+    bool overlayNativeVideoPacketBlockingColor(const game::OriginalVideoFadeColorCoefficients50LA&,
+        std::int32_t startAlpha,std::int32_t currentAlpha,VehicleWindowDiagnostic50DS&) noexcept;
+    bool nativeVideoPacketOverlayInfo(NativeVideoPacketOverlayInfo50LA&) const noexcept;
     VehicleWindowGl50DS() noexcept;
     // Call close before destroying the host/context. Like the host, unresolved
     // cleanup or wrong-context/thread destruction terminates; it never silently

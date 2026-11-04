@@ -16,6 +16,9 @@ namespace original_pause_observation50LA {
 class Owner final {
     using Camera=original_camera_session50KX::Session;
     using Track=ra_cold_sources50LA::DecodedSources;
+    // Exact consumed Race retained weakly alongside the world-owned Session.
+    // No extra source count or lifetime pin; each use revalidates custody.
+    std::weak_ptr<rr::game::OriginalRaceConstructor50LA> race_;
     std::weak_ptr<Camera> camera_;
     std::weak_ptr<const Track> track_;
     std::uint64_t cameraGeneration_=0;
@@ -53,6 +56,7 @@ public:
         if(cameraGeneration_||!application_||!camera||!track)return false;
         const auto pause=pause_.lock();const auto controls=controls_.lock();
         if(!pause||!controls||!raceIdentity(*camera,*track,*pause,*controls))return false;
+        race_=application_->sourceRace28COwner_;
         camera_=camera;track_=track;cameraGeneration_=camera->generation_;return true;
     }
     bool captureTitle(Diagnostic& d)const noexcept {
@@ -133,13 +137,13 @@ public:
         enum class Status : std::uint8_t {complete,owner,parent,actionUnavailable,audioUnavailable,childRoute};
         Status status=Status::owner;
         std::uint32_t sourcePC=0,originalReturn=0;
-        bool selectionChanged=false;
+        bool selectionChanged=false,settingsChanged=false;
         original_camera_cycle_audio50KX::Owner::Result audio=
             original_camera_cycle_audio50KX::Owner::Result::unprepared;
     };
-    // Bounded actual1BD7C0 up/down and ignored-event routes only. Parent
-    // admission remains mandatory; there is no host selection setter. Confirm
-    // and left/right settings actions reject before effects until joined.
+    // Bounded actual1BD7C0 navigation, HUD rows2..4 and audio rows5..8.
+    // Parent admission remains mandatory; no host selection/profile setter.
+    // Confirm actions other than the separate actual row0 close remain unjoined.
     NavigationResult pressNavigation1BD7C0(rr::game::InputEvent48Z& event,
         rr::game::DeviceButtonRecord48Y& record)const noexcept {
         using Result=NavigationResult;using Status=Result::Status;
@@ -177,7 +181,83 @@ public:
                 if(result.audio!=A::started&&result.audio!=A::unavailable&&result.audio!=A::muted){
                     lifecycleRejected_=true;result.status=Status::audioUnavailable;return result;
                 }
-            }else if(event.code==2u||event.code==15u||event.code==13u){
+            }else if(event.code==15u||event.code==13u){
+                const auto row=pause->selection880_;const bool right=event.code==13u;
+                if(row>=11)return result;
+                // Actual jump tables3ACBC0/3ACB90 ignore rows0/1/9/10.
+                if(row>=5&&row<=8){
+                    const auto settings=settings_.lock();
+                    const auto& race=application_->sourceRace28COwner_;
+                    constexpr std::uint32_t leftPC[]={0x1BDEB8,0x1BE004,0x1BE0B4,0x1BE164};
+                    constexpr std::uint32_t rightPC[]={0x1BE4B0,0x1BE600,0x1BE6B4,0x1BE768};
+                    result.sourcePC=right?rightPC[row-5]:leftPC[row-5];
+                    if(!attachedLifecycle(*camera,*pause)||!pause->active200_||!settings||
+                       application_->gameSettingsProfile!=settings||!application_->riderProfile||
+                       !race||race->profile_!=application_->riderProfile||
+                       application_->raceConstructorColdOwner50LA_.lock()!=race)return result;
+                    if(!race->adjustPauseAudio1BD7C0(*pause,*settings,application_->animationClock(),
+                        row-5,right,result.settingsChanged)){
+                        result.status=Status::actionUnavailable;return result;
+                    }
+                    // Actual profile/helper and ordered group setters precede
+                    // feedback. At a bound neither store is reached: badcall6.
+                    constexpr std::uint32_t leftChanged[]={0x1BDFDC,0x1BE08C,0x1BE13C,0x1BE1DC};
+                    constexpr std::uint32_t rightChanged[]={0x1BE5D8,0x1BE68C,0x1BE740,0x1BE7E4};
+                    constexpr std::uint32_t leftLimit[]={0x1BDFF4,0x1BE0A4,0x1BE154,0x1BE1F4};
+                    constexpr std::uint32_t rightLimit[]={0x1BE5F0,0x1BE6A4,0x1BE758,0x1BE7FC};
+                    result.sourcePC=result.settingsChanged?(right?rightChanged[row-5]:leftChanged[row-5]):
+                        (right?rightLimit[row-5]:leftLimit[row-5]);
+                    result.audio=camera->actual_.cycleAudio.dispatchPauseVolumeFeedback(
+                        result.settingsChanged?(right?4u:3u):6u);
+                    using A=original_camera_cycle_audio50KX::Owner::Result;
+                    if(result.audio!=A::started&&result.audio!=A::unavailable&&result.audio!=A::muted){
+                        lifecycleRejected_=true;result.status=Status::audioUnavailable;return result;
+                    }
+                }
+                if(row>=2&&row<=4){
+                    if(!attachedLifecycle(*camera,*pause)||!pause->active200_||
+                       pause->controller884_>=rr::game::controlPresetSlots49D)return result;
+                    auto& slot=controls->slots[pause->controller884_];
+                    if((row==2&&slot.field10F94>7)||(row==3&&slot.field10F9C>7))return result;
+                    std::uint32_t subtype=0;
+                    if(row==3){
+                        const auto profile=application_->profile;
+                        const auto owner=application_->riderProfile;
+                        const auto& race=application_->sourceRace28COwner_;
+                        if(!profile||!profile->known||!owner||!race||race->profile_!=owner||
+                           owner->commonProfile()!=profile.get())return result;
+                        // The consumed ALL8 Course route has an actual count1
+                        // profile even though its native humanCount34 is0.
+                        // Other counts reach17FCD0's real player+40 lookup;
+                        // no replacement for that unjoined owner is invented.
+                        if(((profile->playerBits1125C>>5)&3u)!=1u){
+                            result.status=Status::actionUnavailable;result.sourcePC=right?0x1BE2F8:0x1BDD00;return result;}
+                        rr::platform::OriginalUiRiderProfileOwner50KG::CourseRaceSelection current;
+                        if(!owner->courseRaceSnapshot(current)||current.subtype!=camera->actual_.launchKind11258)return result;
+                        subtype=current.subtype;
+                    }
+                    if(row==4){
+                        slot.field10FA4=slot.field10FA4?0u:1u; //1BDE98 /1BE490 whole-word store.
+                    }else if(row==3&&subtype==3){
+                        slot.field10F9C=slot.field10F9C?0u:6u; //1BDD4C/54 and1BE344/34C.
+                    }else{
+                        auto& value=row==2?slot.field10F94:slot.field10F9C;
+                        value+=right?1u:0xffffffffu; //Source store precedes signed wrap check.
+                        if(right){if(value>=8)value=0;}
+                        else if(std::bit_cast<std::int32_t>(value)<0)value=7;
+                    }
+                    result.settingsChanged=true;
+                    result.sourcePC=row==2?(right?0x1BE2C4:0x1BDCCC):
+                        row==3?(right?0x1BE448:0x1BDE50):(right?0x1BE4A0:0x1BDEA8);
+                    // Preserve the actual profile write if feedback rejects.
+                    // The terminal latch prevents replaying a partial callback.
+                    result.audio=camera->actual_.cycleAudio.dispatchPauseFeedback(right?4u:3u);
+                    using A=original_camera_cycle_audio50KX::Owner::Result;
+                    if(result.audio!=A::started&&result.audio!=A::unavailable&&result.audio!=A::muted){
+                        lifecycleRejected_=true;result.status=Status::audioUnavailable;return result;
+                    }
+                }
+            }else if(event.code==2u){
                 result.status=Status::actionUnavailable;result.sourcePC=0x1BD8BC;return result;
             }
         }
@@ -200,14 +280,29 @@ public:
         rr::game::OriginalPauseNativeResources50LA::Diagnostic&)const noexcept;
     bool resetNativePresentationClock()const noexcept;
     void unbind()noexcept {
-        camera_.reset();track_.reset();cameraGeneration_=0;lifecycleRejected_=false;
+        race_.reset();camera_.reset();track_.reset();cameraGeneration_=0;lifecycleRejected_=false;
         application_=nullptr;pause_.reset();controls_.reset();settings_.reset();
     }
 private:
     bool closeLifecycle1BE830(Diagnostic&)const noexcept;
+    bool retainedAttachedLifecycle(const Camera&,const rr::game::OriginalPauseStorage50LA&)const noexcept;
     bool attachedLifecycle(const Camera&,const rr::game::OriginalPauseStorage50LA&)const noexcept;
     bool raceIdentity(const Camera& c,const Track& track,
         const rr::game::OriginalPauseStorage50LA& p,const rr::game::ControlPresets49D& controls)const noexcept {
+        return retainedRaceIdentity(c,track,p,controls)&&
+            application_->consumedRaAll8CameraCustodyNative34Current(c);
+    }
+    bool retainedRaceIdentity(const Camera& c,const Track& track,
+        const rr::game::OriginalPauseStorage50LA& p,const rr::game::ControlPresets49D& controls)const noexcept {
+        // During bind there is no retained Race yet. Subsequent observations
+        // must retain that SAME actual28C owner, not a replacement with equal
+        // profile/map/generation. Lifetime comparison must remain valid after
+        // a gameplay failure, without dereferencing an unavailable Bank or
+        // demanding live Display work merely to retire an inactive Pause.
+        if(!application_)return false;
+        const auto& race=application_->sourceRace28COwner_;
+        if(!race||(cameraGeneration_&&race_.lock()!=race)||race->pause100_.get()!=&p||
+           !race->nativeCameraAdapter34LifetimeCurrent(c))return false;
         const auto& selection=track.freshSelection;
         return !c.closed_&&!c.abandoned_&&c.coldBound_&&c.generation_&&
             p.stage_==rr::game::OriginalPauseStorage50LA::Stage::derivedResources&&

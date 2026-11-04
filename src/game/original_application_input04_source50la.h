@@ -57,6 +57,16 @@ class OriginalApplicationInput04Source50LA final {
     bool startupReturnedWithNativeTransport_=false;
     std::uint32_t pc_=0;
     std::size_t completedControllers_=0,playerBorrows_=0;
+    //A cancelled later Player cannot make this input's startup interval cold
+    //again. This records only actual private borrower issuance, not readiness.
+    bool playerBorrowEverIssued_=false;
+    bool startupMappingsAttempted_=false,startupMappingsReturned_=false;
+    std::uint32_t startupMappingsPC_=0;
+    unsigned startupMappingCallsIssued_=0,startupMappingCallsReturned_=0,startupMappingWordsWritten_=0;
+    //Exact17CB84 variadic values, not SDL/host button constants. The caller's
+    //following -1 is item17 and is not read:127B84 caps each call at16 stores.
+    static constexpr std::array<std::uint32_t,16> startupMappingArguments17CB84_{
+        15,13,12,14,2,3,0,1,9,8,6,7,4,5,11,10};
     // ELF PT_LOAD zero-fill covers3E08E0. Static-reference research found
     //127FD0 writes and four direct callers; not exhaustive runtime evidence.
     //One process authority, never restarted for each App/Player or cancellation.
@@ -166,6 +176,55 @@ class OriginalApplicationInput04Source50LA final {
         //237430 then returns that 1 and 13FD78 takes its success branch.
         m.mappingPointerWritten=true;for(unsigned i=0;i<4;++i)x.known[0xcbc+i]=0;
         x.word(8,1);pc_=0x13fd98;startupReturnedWithNativeTransport_=true;return true;
+    }
+    bool startupMappingBytesCurrent(bool mapped)const noexcept {
+        if(!allocation_||!allocation_->mappingPointerWritten||!allocation_->mappingCBC)return false;
+        const auto& bytes=*allocation_->mappingCBC;
+        for(unsigned offset=0;offset<0x280;offset+=4){
+            const auto expected=mapped&&offset>=0x40&&offset<0xc0?
+                startupMappingArguments17CB84_[((offset-0x40)%0x40)/4]:0xffffffffu;
+            for(unsigned lane=0;lane<4;++lane)
+                if(bytes.known[offset+lane]!=255||bytes.data[offset+lane]!=std::uint8_t(expected>>(lane*8)))return false;
+        }
+        return true;
+    }
+    bool beforeStartupMappings17CB04(const original_main_entry50KG::Application& app)const noexcept {
+        if(thread_!=std::this_thread::get_id()||application_!=&app||nativeClosed_||
+           !startupReturnedWithNativeTransport_||!published04_||pc_!=0x13fd98||!allocation_||
+           !allocation_->mappingPointerWritten||playerBorrows_||playerBorrowEverIssued_||
+           startupMappingsAttempted_||startupMappingsReturned_||startupMappingCallsIssued_||
+           startupMappingCallsReturned_||startupMappingWordsWritten_)return false;
+        //Native history/knownness guard only. A genuine NULL publication is
+        //allowed to enter the call, then stops safely at its first source store.
+        return !allocation_->mappingCBC||startupMappingBytesCurrent(false);
+    }
+    bool applyStartupMappings17CB84(const original_main_entry50KG::Application& app)noexcept {
+        if(!beforeStartupMappings17CB04(app))return false;
+        startupMappingsAttempted_=true;startupMappingsPC_=0x17cb04;
+        for(unsigned row=0;row<2;++row){
+            //17CB64/74 use THIS published04 manager and its actual+CBC owner.
+            startupMappingsPC_=0x17cb84;++startupMappingCallsIssued_;
+            for(unsigned column=0;column<16;++column){
+                startupMappingsPC_=0x127b6c;
+                if(!allocation_->mappingCBC)return false; // Before source NULL+40 write.
+                //127B58..6C type2: receiver+40+(saved a2<<6)+column*4.
+                allocation_->mappingCBC->word(0x40+row*0x40+column*4,startupMappingArguments17CB84_[column]);
+                ++startupMappingWordsWritten_;
+            }
+            //127B84/8C reaches its16-entry limit, not the unread -1 sentinel.
+            //Native bool is custody outcome, not a fabricated127AD0 v0 value.
+            ++startupMappingCallsReturned_;startupMappingsPC_=0x17cb8c;
+        }
+        //Second increment/test and17CB98 delay slot finish the two-row loop.
+        //Leave17CB9C epilogue and17CBA8's startup return1 unexecuted.
+        startupMappingsPC_=0x17cb9c;startupMappingsReturned_=true;return true;
+    }
+    bool startupMappings17CB9CCurrent(const original_main_entry50KG::Application& app)const noexcept {
+        return thread_==std::this_thread::get_id()&&application_==&app&&!nativeClosed_&&
+            startupReturnedWithNativeTransport_&&published04_&&pc_==0x13fd98&&!playerBorrows_&&!playerBorrowEverIssued_&&
+            startupMappingsAttempted_&&startupMappingsReturned_&&startupMappingsPC_==0x17cb9c&&
+            startupMappingCallsIssued_==2&&startupMappingCallsReturned_==2&&startupMappingWordsWritten_==32&&
+            startupMappingBytesCurrent(true);
     }
     bool closeNative(const original_main_entry50KG::Application& app)noexcept {
         if(nativeClosed_)return true;if(application_!=&app||thread_!=std::this_thread::get_id())return false;

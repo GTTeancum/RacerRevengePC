@@ -81,12 +81,27 @@ private:
     bool loadSourceApplication(const OriginalUiArchive50KG&,
         OriginalStandardTextureResolver50LA&,
         std::shared_ptr<OriginalStandardProgramTable50LA>,OriginalUiMaterialDiagnostic50KG&) noexcept;
+    //Bounded same-owner17CAE8 only. No ScreenMT call or shared publication.
+    bool loadSourceDefault17CAE8(const OriginalUiArchive50KG&,
+        OriginalStandardTextureResolver50LA&,
+        std::shared_ptr<OriginalStandardProgramTable50LA>,OriginalUiMaterialDiagnostic50KG&) noexcept;
+    bool sourceDefault17CAE8Current(const OriginalUiArchive50KG&,
+        const std::shared_ptr<OriginalStandardProgramTable50LA>&)const noexcept;
+    //The independent next call uses the SAME pair and program owner. Even
+    //after its genuine close, shared/public readiness is a separate step.
+    bool loadSourceScreen17CAFC(const OriginalUiArchive50KG&,
+        OriginalStandardTextureResolver50LA&,
+        const std::shared_ptr<OriginalStandardProgramTable50LA>&,OriginalUiMaterialDiagnostic50KG&) noexcept;
+    bool sourceScreen17CAFCCurrent(const OriginalUiArchive50KG&,
+        const std::shared_ptr<OriginalStandardProgramTable50LA>&)const noexcept;
     bool loadSourceTemplate(bool,OriginalUiMaterialTemplateState50KG&,
         OriginalStandardTextureResolver50LA&,const OriginalStandardProgramTable50LA&,
         OriginalUiMaterialDiagnostic50KG&) noexcept;
     // A reached source prefix is owned even when publication fails. No local
     // next object, legacy parser fallback, or retry can erase/replay it.
     bool sourceAttempted_ = false;
+    bool sourceDefaultReturned17CAE8_=false;
+    bool sourceScreenAttempted17CAFC_=false,sourceScreenReturned17CAFC_=false;
     std::shared_ptr<OriginalUiMaterialTemplateStorage50KG> sourceStorage_;
     std::shared_ptr<const OriginalUiMaterialTemplateStorage50KG> storage_;
 };

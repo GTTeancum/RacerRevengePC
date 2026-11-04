@@ -543,6 +543,17 @@ private:
         if(!worldColdConstructed_||!worldApplication_||worldEntity_.reference00!=1)return false;
         std::memcpy(out.data(),worldApplication_->triggerInstanceOrigin4438D0_.data(),sizeof(out));return true;
     }
+    bool sourceTriggerLoadedDescriptorCurrentNative(const NativeTriggerDescriptor& d)const noexcept {
+        //Producer-only loaded-owner admission; cleanup preflights deliberately
+        //also accept withdrawn storage, which cannot authorize a fresh service.
+        if(!d.sourceDescriptorReturned||!d.sourceActionLogAttempted||!d.sourceActionReaderComplete||
+           d.sourceActionNativeWithdrawn||!d.sourceInstance||!d.sourceInstancePublished||
+           !preflightSourceTriggerInstanceNative(d)||!preflightSourceTriggerActionNative(d)||
+           !sourceTriggerGeometryCurrentNative(d,false))return false;
+        const auto& t=*d.sourceInstance;
+        return !t.nativeClosed_&&t.counted_&&t.enrolled_&&t.colliderEnrolled_&&t.colliderEntity()&&
+            t.constructed_&&t.setupReturned_&&!t.serviceEntered_&&!t.membershipNativeWithdrawn_;
+    }
     bool sourceTriggerGeometryCurrentNative(const NativeTriggerDescriptor& d,bool returned)const noexcept {
         if(!d.sourceInstance||!d.sourceInstancePublished||d.trigger00!=&d.sourceInstance->entity_||
            d.sourceInstance->application_!=worldApplication_.get()||
@@ -551,6 +562,173 @@ private:
         // The descriptor read survives a bounded refusal before callee entry.
         return d.sourceInstance->serviceGeometryReturned_==returned&&
             (!returned||d.sourceInstance->serviceEntered_);
+    }
+    bool refreshSourceTriggerFogGeometry2A0A80(NativeTriggerDescriptor& d,
+        g::OriginalTriggerFogGeometryPrefix50LA& history,std::uint32_t& pc)noexcept {
+        if(pc!=0x2a0a80||history.step||!history.historyCurrent()||!sourceTriggerLoadedDescriptorCurrentNative(d))return false;
+        const bool returned=d.sourceInstance->refreshFogService2A0A80(pc);
+        history=d.sourceInstance->fogGeometry_; //Pointer-free receipt also survives native instance disposal.
+        return returned;
+    }
+    bool sourceTriggerFogGeometryCurrentNative(const NativeTriggerDescriptor& d,
+        const g::OriginalTriggerFogGeometryPrefix50LA& history)const noexcept {
+        //Historical/live consistency, not positive fresh-entry permission.
+        //Cleanup can withdraw membership before the outer service is marked withdrawn.
+        return history.historyCurrent()&&sourceTriggerGeometryCurrentNative(d,history.step==22)&&
+            d.sourceInstance->serviceEntered_==(history.step!=0)&&d.sourceInstance->fogGeometry_==history;
+    }
+    bool beginSourceTriggerFogMembership120070(NativeTriggerDescriptor& d,const void* actualNode,
+        const g::OriginalTriggerFogGeometryPrefix50LA& geometry,
+        g::OriginalTriggerFogMembershipPrefix50LA& history,std::uint32_t& pc)noexcept {
+        if(pc!=0x2a0b0c||!actualNode||history.step||!history.historyCurrent()||geometry.step!=22||
+           !sourceTriggerFogGeometryCurrentNative(d,geometry)||!preflightSourceTriggerInstanceNative(d)||
+           !preflightSourceTriggerActionNative(d)||!d.sourceDescriptorReturned||!d.sourceActionReaderComplete||
+           d.sourceActionNativeWithdrawn||!worldApplication_||!worldApplication_->constructed_||worldApplication_->released_)return false;
+        const auto& t=*d.sourceInstance;
+        if(t.nativeClosed_||!t.counted_||!t.enrolled_||!t.colliderEnrolled_||!t.colliderEntity()||
+           !t.constructed_||!t.setupReturned_||t.membershipNativeWithdrawn_)return false;
+        //The aggregate authenticates actualNode against the exact retained4C4 slot immediately before this handoff.
+        const bool published=d.sourceInstance->beginFogServiceMembership120070(worldApplication_->garageObserverShared_,actualNode,pc);
+        history=d.sourceInstance->fogMembership_; //Copy partials too; no live pointers survive in this receipt.
+        return published;
+    }
+    bool sourceTriggerFogMembershipCurrentNative(const NativeTriggerDescriptor& d,
+        const g::OriginalTriggerFogMembershipPrefix50LA& history)const noexcept {
+        //Cleanup-compatible consistency is deliberately not fresh-entry permission.
+        return history.historyCurrent()&&d.sourceInstance&&d.sourceInstance->fogMembership_==history&&
+            d.sourceInstance->fogMembershipCurrentNative();
+    }
+    bool continueSourceTriggerFogBounds1200F0(NativeTriggerDescriptor& d,
+        const g::OriginalTriggerFogGeometryPrefix50LA& geometry,
+        const g::OriginalTriggerFogMembershipPrefix50LA& membership,
+        g::OriginalTriggerFogBoundsPrefix50LA& history,std::uint32_t& pc)noexcept {
+        if(pc!=0x1200f0||history.step||!history.historyCurrent()||geometry.step!=22||membership.step!=11||
+           !sourceTriggerFogGeometryCurrentNative(d,geometry)||!sourceTriggerFogMembershipCurrentNative(d,membership)||
+           !preflightSourceTriggerInstanceNative(d)||!preflightSourceTriggerActionNative(d)||
+           !d.sourceDescriptorReturned||!d.sourceActionReaderComplete||d.sourceActionNativeWithdrawn||
+           !worldApplication_||!worldApplication_->constructed_||worldApplication_->released_)return false;
+        const auto& t=*d.sourceInstance;
+        if(t.nativeClosed_||!t.counted_||!t.enrolled_||!t.colliderEnrolled_||!t.colliderEntity()||
+           !t.constructed_||!t.setupReturned_||t.membershipNativeWithdrawn_)return false;
+        const bool returned=d.sourceInstance->continueFogBoundsPrefix1200F0(pc);
+        history=d.sourceInstance->fogBounds_; //Own partials or exact tailStep100 return120170; never registration readiness.
+        return returned;
+    }
+    bool sourceTriggerFogBoundsCurrentNative(const NativeTriggerDescriptor& d,
+        const g::OriginalTriggerFogBoundsPrefix50LA& history)const noexcept {
+        return history.historyCurrent()&&d.sourceInstance&&d.sourceInstance->fogBounds_==history&&
+            d.sourceInstance->fogBoundsCurrentNative();
+    }
+    template<class ActualMethod>
+    bool continueSourceTriggerFogPrimary120170(NativeTriggerDescriptor& d,const void* node,
+        const g::OriginalTriggerFogBoundsPrefix50LA& bounds,g::OriginalTriggerFogPrimaryPrefix50LA& history,
+        ActualMethod&& actualMethod,std::uint32_t& pc)noexcept {
+        if(pc!=0x120170||history.step||!history.historyCurrent()||bounds.tailStep!=100||!node||
+           !sourceTriggerFogBoundsCurrentNative(d,bounds)||!preflightSourceTriggerInstanceNative(d)||
+           !preflightSourceTriggerActionNative(d)||!d.sourceDescriptorReturned||!d.sourceActionReaderComplete||
+           d.sourceActionNativeWithdrawn||!worldApplication_||!worldApplication_->constructed_||worldApplication_->released_)return false;
+        const auto& t=*d.sourceInstance;
+        if(t.nativeClosed_||!t.counted_||!t.enrolled_||!t.colliderEnrolled_||!t.constructed_||!t.setupReturned_||
+           t.membershipNativeWithdrawn_||t.fogMembershipNode_!=node)return false;
+        const bool returned=d.sourceInstance->continueFogPrimary120170(this,node,actualMethod,pc);
+        history=d.sourceInstance->fogPrimary_; //Copy every original partial; field publication/callee entry is not registration return.
+        return returned;
+    }
+    bool sourceTriggerFogPortalInputsOwnerNative(const NativeTriggerDescriptor& d,const void* cursor,
+        const g::OriginalWreckComponent50LA*& portal,
+        const std::array<std::array<std::uint32_t,4>,4>*& vertices)const noexcept {
+        if(!d.sourceInstance||!cursor)return false;
+        const auto& t=*d.sourceInstance;const auto& h=t.servicePrimary_;
+        const auto* method=t.fogPortalMethod_;
+        if(!sourceTriggerPrimaryInputsNative(d,&h,t.collider_.get())||!t.fogPortalGraphPin_||
+           t.fogPortalCustodyWithdrawn_||t.fogPortalHead_!=cursor||!method||method!=h.method||
+           method->world_!=this||method->application_!=worldApplication_.get()||
+           method->ordinal_<10u||method->ordinal_>=20u)return false;
+        const auto z=method->ordinal_-10u;const auto& root=sourceSearchNodes_[1][z];
+        if(!sourceTopologyMode_||sourceTopologyWithdrawn_||!root.owner||root.withdrawn||!root.published||
+           !sourceCollisionSlots4C4_||sourceCollisionSlots4C4_[z]!=root.owner.get()||
+           t.fogPortalZone_!=root.owner.get()||root.owner->portalLinks30.get()!=cursor||
+           !preflightSourceSearchNodeNative(root,z,true)||!sourcePortalWorldLinksCurrent(*root.owner,true,z))return false;
+        unsigned pins=0;for(const auto& b:sourceCollisionPortalBorrows_)if(b.registration==&h){
+            const auto token=b.token.lock();if(token&&token==t.fogPortalGraphPin_)++pins;}
+        if(pins!=1)return false;
+        std::size_t index=40;unsigned matches=0;
+        for(std::size_t i=0;i<40;++i)if(sourcePortalWorldLinks_[i/4][i%4].published==cursor){index=i;++matches;}
+        if(matches!=1||!(index&1u))return false; //Only the actual collision head, never visibility or an ordinal-as-address.
+        const auto& link=sourcePortalWorldLinks_[index/4][index%4];const auto& p=nativePortals_[index/4];
+        if(link.withdrawn||!link.attempted||link.pending||link.knownMask!=31u||link.from!=root.owner.get()||!link.to||
+           !p||sourcePortalFrames_[index/4].withdrawn||!p->sourceMode||!p->counted||!p->source.enrolled||
+           !p->attached||!p->source.constructorReturned||!p->source.loadReturned||p->source.copiedVertices!=4||
+           p->source.worldLinksProduced!=4||!p->source.connectA||!p->source.connectB)return false;
+        const auto from=index%4<2?*p->source.connectA:*p->source.connectB;
+        const auto to=index%4<2?*p->source.connectB:*p->source.connectA;
+        if(from!=z||to>=10||to==z)return false;
+        const auto& neighbor=sourceSearchNodes_[1][to];
+        if(!neighbor.owner||neighbor.withdrawn||!neighbor.published||link.to!=neighbor.owner.get()||
+           sourceCollisionSlots4C4_[to]!=neighbor.owner.get()||!preflightSourceSearchNodeNative(neighbor,to,true)||
+           link.published->neighbor04!=&neighbor.owner->entity||link.published->portal08!=&p->entity)return false;
+        portal=link.published->portal08;vertices=&p->source.vertices30;return true;
+    }
+    bool sourceTriggerFogPrimaryCurrentNative(const NativeTriggerDescriptor& d,
+        const g::OriginalTriggerFogPrimaryPrefix50LA& history)const noexcept {
+        if(!history.historyCurrent()||!d.sourceInstance||d.sourceInstance->fogPrimary_!=history||
+           !d.sourceInstance->fogPrimaryCurrentNative())return false;
+        const auto& t=*d.sourceInstance;
+        if(!history.portalHead.nativePinAcquired||t.fogPortalCustodyWithdrawn_)return true;
+        const auto& h=t.servicePrimary_;const auto* method=t.fogPortalMethod_;
+        if(!method||method!=h.method||method->ordinal_<10u||method->ordinal_>=20u||
+           method->world_!=this||method->application_!=worldApplication_.get())return false;
+        const auto z=method->ordinal_-10u;const auto& node=sourceSearchNodes_[1][z];
+        if(!sourceTopologyMode_||sourceTopologyWithdrawn_||!node.owner||node.withdrawn||!node.published||
+           !node.counted||!node.enrolled||!node.ordinalKnown||node.constructorMask!=511||
+           !sourceCollisionSlots4C4_||sourceCollisionSlots4C4_[z]!=node.owner.get()||
+           t.fogPortalZone_!=node.owner.get()||node.owner->nativeList34!=method||
+           !preflightSourceSearchNodeNative(node,z,true)||!sourcePortalWorldLinksCurrent(*node.owner,true,z))return false;
+        unsigned pins=0;for(const auto& b:sourceCollisionPortalBorrows_)if(b.registration==&h){
+            const auto token=b.token.lock();if(token&&token==t.fogPortalGraphPin_)++pins;}
+        if(pins!=1||(history.portalHead.headNull&&t.fogPortalHead_!=node.owner->portalLinks30.get()))return false;
+        if(history.portalInputs.step){
+            const g::OriginalWreckComponent50LA* portal=nullptr;
+            const std::array<std::array<std::uint32_t,4>,4>* vertices=nullptr;
+            if(!sourceTriggerFogPortalInputsOwnerNative(d,t.fogPortalHead_,portal,vertices)||
+               t.fogPortalOperandA0_!=portal||t.fogPortalVertices_!=vertices)return false;
+        }
+        return true;
+    }
+    bool sourceTriggerFogPortalHeadPinnedNative(const NativeTriggerDescriptor& d)const noexcept {
+        return d.sourceInstance&&bool(d.sourceInstance->fogPortalGraphPin_);
+    }
+    template<class ActualHead>
+    bool continueSourceTriggerFogPortalHead280BF0(NativeTriggerDescriptor& d,
+        g::OriginalTriggerFogPrimaryPrefix50LA& history,ActualHead&& actualHead,std::uint32_t& pc)noexcept {
+        if(pc!=0x280bf0||history.publication.step!=12||history.portalHead.step||
+           !sourceTriggerFogPrimaryCurrentNative(d,history)||!preflightSourceTriggerInstanceNative(d)||
+           !preflightSourceTriggerActionNative(d)||!d.sourceDescriptorReturned||!d.sourceActionReaderComplete||
+           d.sourceActionNativeWithdrawn||!worldApplication_||!worldApplication_->constructed_||worldApplication_->released_)return false;
+        const auto& t=*d.sourceInstance;
+        if(t.nativeClosed_||!t.counted_||!t.enrolled_||!t.colliderEnrolled_||t.membershipNativeWithdrawn_)return false;
+        const bool returned=d.sourceInstance->continueFogPortalHead280BF0(actualHead,pc);
+        history=d.sourceInstance->fogPrimary_; //Copy partial admission/read or actual portal return; no primary return.
+        return returned;
+    }
+    template<class ActualPortal>
+    bool continueSourceTriggerFogPortalInputs280C40(NativeTriggerDescriptor& d,
+        g::OriginalTriggerFogPrimaryPrefix50LA& history,ActualPortal&& actualPortal,std::uint32_t& pc)noexcept {
+        if(pc!=0x280c40||history.portalHead.step!=9||history.portalHead.headNull!=false||
+           history.portalInputs.nativeAdmissionAttempted||!sourceTriggerFogPrimaryCurrentNative(d,history)||
+           !preflightSourceTriggerInstanceNative(d)||!preflightSourceTriggerActionNative(d)||
+           !d.sourceDescriptorReturned||!d.sourceActionReaderComplete||d.sourceActionNativeWithdrawn||
+           !worldApplication_||!worldApplication_->constructed_||worldApplication_->released_)return false;
+        const auto& t=*d.sourceInstance;
+        if(t.nativeClosed_||!t.counted_||!t.enrolled_||!t.colliderEnrolled_||t.membershipNativeWithdrawn_)return false;
+        const bool returned=d.sourceInstance->continueFogPortalInputs280C40(actualPortal,pc);
+        history=d.sourceInstance->fogPrimary_; //Own inputs or refusal, not the generic overlap receipt.
+        return returned;
+    }
+    bool sourceTriggerFogPrimaryNodeCurrentNative(const NativeTriggerDescriptor& d,const void* node)const noexcept {
+        if(!d.sourceInstance||d.sourceInstance->fogMembershipNode_!=node)return false;
+        const auto& h=d.sourceInstance->servicePrimary_;
+        return !h.entered||(h.zone==node&&h.world==this);
     }
     bool refreshSourceTriggerGeometry2A0A80(NativeTriggerDescriptor& d,std::uint32_t& pc)noexcept {
         if(!preflightSourceTriggerInstanceNative(d)||!d.sourceInstance||!d.sourceInstancePublished||

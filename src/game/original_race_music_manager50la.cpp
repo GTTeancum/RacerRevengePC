@@ -13,6 +13,7 @@
 #include "../../platform/linux/native/original_ui_main_session50kg.h"
 #include "dynamic_impact_events50iw.h"
 #include "../../tests/native/live_audio50hf_fixture.h"
+#include "../../tests/native/native_ai_session50iv_fixture.h"
 #include <array>
 #include <bit>
 #include <cfenv>
@@ -105,6 +106,12 @@ struct OriginalRaceMusicManager50LA::Impl final {
             actual.generation_==component.sessionGeneration&&actual.music_==music&&actual.announcer_==announcer&&
             music&&announcer&&live128_12C_130==&music->state_&&nativeAnnouncerState==&announcer->state_;
     }
+    static bool freshMusicState(const Registration& scope)noexcept {
+        const auto* music=scope.music_;
+        return music&&!music->counters_.requests&&!music->counters_.resets&&!music->owned_&&!music->paused_&&
+            !music->fadePending_&&!music->playPending_&&!music->playbackRevision_&&
+            music->state_.timer128==0.f&&music->state_.mode12C==0&&music->state_.latch130==-1;
+    }
     Impl(std::shared_ptr<OriginalApplicationEntities50LA> app,std::uint64_t generation,
         const std::shared_ptr<Registration>& scope):application(std::move(app)),registration(scope) {
         if(!scope||scope->thread_!=thread||!application||application->nativeOwnerThread_!=thread||
@@ -115,9 +122,7 @@ struct OriginalRaceMusicManager50LA::Impl final {
         // Existing PCM/semantic preparation is native work, not this source
         // constructor. Admit only a genuinely unused music state; no reset of
         // an active/previous manager to manufacture its constructor values.
-        if(music->counters_.requests||music->counters_.resets||music->owned_||music->paused_||
-           music->fadePending_||music->playPending_||music->playbackRevision_||
-           music->state_.timer128!=0.f||music->state_.mode12C!=0||music->state_.latch130!=-1)return;
+        if(!freshMusicState(*scope))return;
         auto& authority=application->entityAuthority_;
         const auto key=std::uint64_t(reinterpret_cast<std::uintptr_t>(&component));
         if(!authority.reserveAdditional(1)||!authority.canEnroll(component,key))return;
@@ -161,7 +166,31 @@ bool OriginalRaceMusicManager50LA::noNativePreparation(
     return !scope.music_->attempted_&&!scope.announcer_->attempted_&&
         !scope.music_->mixer_&&!scope.announcer_->prepared_&&!scope.announcer_->mixer_;
 }
-bool OriginalRaceMusicManager50LA::acceptNativeChildren(OriginalRaceConstructor50LA& race,
+bool OriginalRaceMusicManager50LA::freshAll8NativePrefix(const OriginalRaceConstructor50LA& race,
+    const ::original_race_hud_scope50LA::Registration& scope)noexcept {
+    // Native admission BEFORE allocation/count/stores. These observations do
+    // not stand in for original child loads or the later FIFO/listener calls.
+    if(scope.thread_!=std::this_thread::get_id()||!scope.active_||
+       scope.race_.lock().get()!=&race||race.endHud_.lock().get()!=&scope||race.music10C_||
+       !scope.music_||!scope.announcer_||!scope.gameplay_||!Impl::freshMusicState(scope))return false;
+    const auto& music=*scope.music_;const auto& announcer=*scope.announcer_;
+    auto* mixer=scope.gameplay_->mixerForMaterialOwner();
+    if(!mixer||scope.gameplay_->groupsForProviders()!=race.raceAudio_||
+       music.mixer_!=mixer||announcer.mixer_!=mixer||
+       music.groups_!=race.raceAudio_||announcer.groups_!=race.raceAudio_||
+       announcer.episode_!=scope.gameplay_->sharedAnnouncer()||
+       !music.transportIdentity()||music.bank_.ready!=music.expectedReadyClips()||
+       !announcer.current()||announcer.episode_->active()||announcer.episode_->episode()||
+       announcer.playbackRevision_||announcer.cursor_.phase!=AnnouncerPhase50IE::Idle||
+       announcer.update_.phase!=AnnouncerUpdatePhase50IE::Idle)return false;
+    // The actual ALL8 shared queue stays untouched, including its ticket and
+    // logical capacity. Decline a used owner; never reset it to fake freshness.
+    if(!scope.events_||!scope.eventBindings_||!scope.eventBindings_->eventOwner33CBound)return false;
+    const auto& q=*scope.events_;
+    return !q.count150&&!q.lastTicket&&!q.dispatchIndex&&!q.flushing&&
+        !q.endFlushPending50LA()&&q.capacity154==32u;
+}
+bool OriginalRaceMusicManager50LA::stageNativeLoadPrefix(OriginalRaceConstructor50LA& race,
     const std::shared_ptr<platform::OriginalApplicationAural50KG>& actualAural,
     OriginalRaceMusicManagerDiagnostic50LA& d)noexcept {
     d={};if(!impl_)return Impl::stop(d,0x1a3c00,"Counted music manager absent");auto& p=*impl_;
@@ -190,6 +219,13 @@ bool OriginalRaceMusicManager50LA::acceptNativeChildren(OriginalRaceConstructor5
         // canonical Race118/120 group owner join them, not pointer equality.
         p.aural=actualAural;p.nativeInterface44=view.interfaceA0;p.loadCut=Impl::LoadCut::nativeChildren;
     }
+    d.sourcePC=0x1a3c34;return true; //38/44 only; child/listener/nativeReady not reached.
+}
+bool OriginalRaceMusicManager50LA::acceptNativeChildren(OriginalRaceConstructor50LA& race,
+    const std::shared_ptr<platform::OriginalApplicationAural50KG>& actualAural,
+    OriginalRaceMusicManagerDiagnostic50LA& d)noexcept {
+    if(!stageNativeLoadPrefix(race,actualAural,d))return false;
+    auto& p=*impl_;const auto scope=p.registration.lock();
     if(p.loadCut==Impl::LoadCut::nativeChildren){
         // EXPLICIT NATIVE BACKEND REPLACEMENT for the platform-specific
         // Music164 / soundC0 / Announcer168 IO interval. The retained exact
@@ -669,6 +705,36 @@ bool OriginalRaceMusicManager50LA::retireNativeDetached(OriginalRaceMusicManager
 }
 
 namespace original_main_entry50KG {
+Application::All8MusicPrefixStatus Application::stageConsumedRaAll8MusicPrefixNative10C(
+    original_camera_session50KX::Session& session,std::uint32_t& pc)const noexcept {
+    using S=All8MusicPrefixStatus;using Manager=rr::game::OriginalRaceMusicManager50LA;
+    pc=0x1a6c90;
+    // Genuine completed native services on the exact ALL8 Session. This
+    // private adapter does not assert a retail1A9240 return, promote Camera34,
+    // or call the separate human Camera/Music/world completion route.
+    if(!consumedRaAll8CameraCustodyNative34Current(session))return S::unavailable;
+    const auto race=sourceRace28COwner_;const auto scope=race->endHud_.lock();
+    if(race->music10C_)return S::failed; //One synchronous native entry, no replay/adoption.
+    if(!scope||scope->thread_!=std::this_thread::get_id()||!scope->active_||
+       scope->application_!=this||scope->race_.lock()!=race||
+       scope->generation_!=race->entity_.sessionGeneration||scope->bank_!=&session.actual_.bank||
+       !scope->manager_||&scope->manager_->manager!=&session.actual_.all8Manager||
+       scope->camera_||scope->published_||
+       !Manager::freshAll8NativePrefix(*race,*scope))return S::unavailable;
+    // Unsupported/missing/used native preparation above has no source effect.
+    // Once entered, real allocation/count/load failure is terminal to this
+    // publication attempt. Retain the actual partial owner for existing close.
+    try {
+        std::unique_ptr<Manager> next(new Manager(entitiesOwner_,race->entity_.sessionGeneration,scope));
+        if(!next->constructed()){pc=0x1a39f0;return S::failed;}
+        race->music10C_=std::move(next); //Actual1A6CAC publication BEFORE load38/44.
+    }catch(...){return S::failed;}
+    rr::game::OriginalRaceMusicManagerDiagnostic50LA d;
+    if(!race->music10C_->stageNativeLoadPrefix(*race,sourceAural00Owner_,d)){
+        pc=d.sourcePC;return S::failed;
+    }
+    pc=d.sourcePC;return S::publishedBeforeChildren;
+}
 bool Application::completeConsumedRaMusicNative10C(original_camera_session50KX::Session& session,
     std::uint32_t& pc)const noexcept {
     pc=0x1a6c90;

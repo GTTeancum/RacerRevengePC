@@ -321,11 +321,22 @@ private:
     bool registerAppStart17CAB8(std::shared_ptr<const OriginalUiArchive50KG>,
         OriginalStandardTextureDiagnostic50LA&)noexcept;
     std::shared_ptr<const OriginalUiArchive50KG> registeredAppStart17CAB8()const noexcept;
+    //Private native chronology check, including failed registration attempts.
+    //Not a source return, resource grant, or caller-set startup-ready flag.
+    bool nativeBeforeAppStart17CAB8()const noexcept;
     bool joinAppStartCanonicalMount(OriginalStandardTextureDiagnostic50LA&)noexcept;
     // Actual first17CAD4/2985B0 Mat_Stbl consumer only. It opens/reads/closes
     // its real source member and supplies bytes to the same canonical table.
     bool readAppStartNames17CAD4(std::vector<std::uint8_t>&,
-        OriginalStandardTextureDiagnostic50LA&)noexcept;
+        OriginalStandardTextureDiagnostic50LA&,bool retainTerminator=false)noexcept;
+    //Read-only custody of THIS actual DefaultMT open/getter/close stage.
+    //No completion setter, next-template operation or readiness publication.
+    bool sourceDefaultTemplate17CAE8Closed(
+        const std::shared_ptr<const OriginalUiArchive50KG>&)const noexcept;
+    //Read-only observation after the second genuine template close. This
+    //does not publish native storage or advance the next startup operation.
+    bool sourceScreenTemplate17CAFCClosed(
+        const std::shared_ptr<const OriginalUiArchive50KG>&)const noexcept;
     friend class OriginalUiMaterialTemplates50KG;
     // Exactly DefaultMT then ScreenMT after the reached first Mat_Stbl read.
     bool beginAppStartTemplate24AA10(bool screen,OriginalAppStartTemplateCache50KG&,

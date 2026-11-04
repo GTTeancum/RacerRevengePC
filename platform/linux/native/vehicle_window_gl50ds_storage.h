@@ -833,5 +833,68 @@ bool uiCoverageDisjointTraced=false;
     bool deleteName(U& name, void (*deleter)(I, const U*), VehicleWindowDiagnostic50DS& d) noexcept;
     bool deleteShaderName(U& name, bool program, VehicleWindowDiagnostic50DS& d) noexcept;
     bool cleanup(VehicleWindowDiagnostic50DS& d) noexcept;
+    // Appended native-only packet target ownership. No source receipt or public GLuint.
+    U nativeVideoPacketTargets50LA[2]{},nativeVideoPacketColors50LA[2]{};
+    I nativeVideoPacketWidth50LA=0,nativeVideoPacketHeight50LA=0;
+    std::size_t nativeVideoPacketRgbaBytes50LA=0;
+    OriginalVideoPacketCpuRenderer50LA::NativePolicies nativeVideoPacketPolicies50LA{};
+    std::uint64_t nativeVideoPacketSerial50LA=0;
+    std::uint8_t nativeVideoPacketPublished50LA=0;
+    bool nativeVideoPacketAttempted50LA=false,nativeVideoPacketReady50LA=false;
+    bool nativeVideoPacketImage50LA=false;
+    void (*nativeVideoColorMaski50LA)(U,std::uint8_t,std::uint8_t,std::uint8_t,std::uint8_t)=nullptr;
+    void (*nativeVideoGetBooleani50LA)(U,U,std::uint8_t*)=nullptr;
+    void (*nativeVideoEnablei50LA)(U,U)=nullptr;
+    void (*nativeVideoDisablei50LA)(U,U)=nullptr;
+    std::uint8_t (*nativeVideoIsEnabledi50LA)(U,U)=nullptr;
+    bool nativeVideoIndexedScissor50LA=false;
+    bool prepareNativeVideoPacketFunctions50LA() noexcept;
+    struct NativeVideoPacketSavedState50LA {
+        I draw=0,read=0,renderbuffer=0,enabled[4]{};
+        std::uint8_t colorMask[4]{};
+    };
+    bool nativeVideoPacketIdle50LA(VehicleWindowDiagnostic50DS&) const noexcept;
+    bool saveNativeVideoPacketState50LA(NativeVideoPacketSavedState50LA&) noexcept;
+    bool restoreNativeVideoPacketState50LA(const NativeVideoPacketSavedState50LA&) noexcept;
+    bool allocateNativeVideoPacketPair50LA(U (&targets)[2],U (&colors)[2]) noexcept;
+    bool deleteNativeVideoPacketTargets50LA(VehicleWindowDiagnostic50DS&) noexcept;
+    U nativeVideoSnapshotTargets50LA[2]{},nativeVideoSnapshotColors50LA[2]{};
+    bool nativeVideoSnapshotAttempted50LA=false,nativeVideoSnapshotReady50LA=false,nativeVideoSnapshotImage50LA=false;
+    std::uint8_t nativeVideoSnapshotPublished50LA=0;
+    std::uint64_t nativeVideoSnapshotSerial50LA=0,nativeVideoSnapshotImageSerial50LA=0;
+    std::uint64_t nativeVideoSnapshotClearSerial50LA=0,nativeVideoPacketClearAncestor50LA=0;
+    NativeVideoPacketWrite50LA nativeVideoPacketLastWrite50LA=NativeVideoPacketWrite50LA::none;
+    bool transferNativeVideoPacketImage50LA(U source,U destination) noexcept;
+    bool readNativeVideoPacketImage50LA(U target,std::uint8_t*,std::size_t,VehicleWindowDiagnostic50DS&) noexcept;
+    // Private native compute overlay resources. No sampler, FBO or source lease.
+    U nativeVideoOverlayTextures50LA[2]{},nativeVideoOverlayProgram50LA=0,nativeVideoOverlayShader50LA=0;
+    I nativeVideoOverlayExtent50LA=-1,nativeVideoOverlayRgba50LA=-1;
+    bool nativeVideoOverlayAttempted50LA=false,nativeVideoOverlayReady50LA=false;
+    NativeVideoPacketOverlayPolicies50LA nativeVideoOverlayPolicies50LA{};
+    std::uint64_t nativeVideoOverlayImageSerial50LA=0,nativeVideoOverlayCaptureSerial50LA=0;
+    U nativeVideoOverlayPackedRgba50LA=0;
+#if defined(_WIN32)
+#define RR_NATIVE_VIDEO_GL_CALL50LA __stdcall
+#else
+#define RR_NATIVE_VIDEO_GL_CALL50LA
+#endif
+    struct NativeVideoOverlayFunctions50LA {
+        void (RR_NATIVE_VIDEO_GL_CALL50LA *createTextures)(U,I,U*)=nullptr;
+        void (RR_NATIVE_VIDEO_GL_CALL50LA *textureStorage2D)(U,I,U,I,I)=nullptr;
+        void (RR_NATIVE_VIDEO_GL_CALL50LA *textureParameteri)(U,U,I)=nullptr;
+        void (RR_NATIVE_VIDEO_GL_CALL50LA *getTextureLevelParameteriv)(U,I,U,I*)=nullptr;
+        void (RR_NATIVE_VIDEO_GL_CALL50LA *getIntegeri)(U,U,I*)=nullptr;
+        void (RR_NATIVE_VIDEO_GL_CALL50LA *bindImageTexture)(U,U,I,std::uint8_t,I,U,U)=nullptr;
+        void (RR_NATIVE_VIDEO_GL_CALL50LA *uniform1ui)(I,U)=nullptr;
+        void (RR_NATIVE_VIDEO_GL_CALL50LA *dispatchCompute)(U,U,U)=nullptr;
+        void (RR_NATIVE_VIDEO_GL_CALL50LA *memoryBarrier)(U)=nullptr;
+    } nativeVideoOverlayGl50LA;
+#undef RR_NATIVE_VIDEO_GL_CALL50LA
+    struct NativeVideoOverlaySavedState50LA {I program=0,image[2][6]{};};
+    bool prepareNativeVideoOverlayFunctions50LA() noexcept;
+    bool allocateNativeVideoOverlay50LA() noexcept;
+    bool saveNativeVideoOverlayState50LA(NativeVideoOverlaySavedState50LA&) noexcept;
+    bool restoreNativeVideoOverlayState50LA(const NativeVideoOverlaySavedState50LA&) noexcept;
+    bool deleteNativeVideoOverlay50LA(VehicleWindowDiagnostic50DS&) noexcept;
 };
 } // namespace rr::platform

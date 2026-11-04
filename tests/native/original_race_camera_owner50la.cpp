@@ -89,6 +89,55 @@ bool Application::continueConsumedRaCamera1A9240(
     return race.cameraInitStep_==Step::nativePending||race.cameraInitStep_==Step::nativeReady;
 }
 
+bool Application::consumedRaAll8CameraCustodyNative34Current(
+    const original_camera_session50KX::Session& session)const noexcept {
+    using Step=rr::game::OriginalRaceConstructor50LA::CameraInitStep;
+    // The ordinary ALL8 factory supplies no Career/TA issuance. Derive custody
+    // from its actual world-owned unique Session, never from a matching key or
+    // a synthetic completion token. This function performs no source writes.
+    // Music10C is a separate owner: its presence or lexical provider revocation
+    // must not revoke camera custody or strand an active Pause during cleanup.
+    if(garageAudioOwnerThread_!=std::this_thread::get_id()||!session.onOwnerThread())return false;
+    try {
+        const auto& race=sourceRace28COwner_;
+        if(!race||raceConstructorColdOwner50LA_.lock()!=race||race->application_!=entitiesOwner_||
+           !riderProfile||race->profile_!=riderProfile||!race->nativeIntroWorldEntity()||
+           !race->ownsNativeCameraAdapter34(session)||
+           race->worldInitStep_!=rr::game::OriginalRaceConstructor50LA::WorldInitStep::camera||
+           race->cameraInitStep_!=Step::nativePending||race->cameraNativeAdapter34_||
+           (race->flags1B0KnownMask_&3u)!=3u||(race->flags1B0KnownValue_&3u)!=1u||race->field8C_||
+           session.nativeTaIssuance_||session.generation_!=race->entity_.sessionGeneration||
+           session.actual_.applicationEntities!=entitiesOwner_||
+           !session.actual_.applicationAnimation.sameOwner(animationClock())||
+           session.actual_.humanCount34||session.actual_.bank.count()!=8u||
+           session.closed_||session.abandoned_||!session.coldBound_||!session.readsBound_||
+           session.frameStage_==original_camera_session50KX::Session::FrameStage::failed||
+           !session.displayInputs_||!session.identitiesCurrent())return false;
+        // Preserve the actual legacy ALL8 countdown borrow. It is not the
+        // source constructor's Race94, and neither value is copied or changed.
+        // A future canonical timing join must explicitly revise this boundary.
+        if(&session.actual_.race94==&race->field94_)return false;
+        const auto& camera=race->camera34_;
+        if(!camera||camera->issuer_!=this||camera->entities_!=entitiesOwner_||
+           camera->phase_!=rr::game::OriginalFrontendCameraCold50LA::Phase::beforeViewport114A00||
+           !camera->coldRetirementPreflight(true).okay())return false;
+        const auto display=raceDisplayOwner50LA_.lock();
+        if(!display||display!=race->loadDisplay_||display->application_!=this||
+           !display->gameplayDisplayIdentityCurrent50LA()||!display->video_->host.current()||
+           &session.displayInputs_->renderer!=&display->renderer_||
+           &session.displayInputs_->rendererDispatch!=&display->dispatch_)return false;
+        // Observe the real completed native selection, not a fabricated return
+        // from2361C0/1A9240. The counted Camera34 remains at its source boundary.
+        return session.coldViewport_.complete()&&session.coldCameraSelected26F940_&&
+            session.viewport_.prepared&&session.viewport_.matricesReady&&
+            session.viewport_.sessionGeneration==session.generation_&&
+            session.viewport_.sceneKey==session.key(session.scene_)&&
+            session.display_.rendererCurrentScene0==&session.viewport_&&
+            session.selectedGameplayDisplay_.lock()==display&&display->selectedGameplayCamera0_==&session&&
+            display->gameplaySelectionRevision_&&display->gameplaySelectionRevision_!=UINT64_MAX;
+    }catch(...){return false;}
+}
+
 bool Application::bindConsumedRaCameraNative34(original_camera_session50KX::Session& session)const noexcept {
     using Step=rr::game::OriginalRaceConstructor50LA::CameraInitStep;
     if(garageAudioOwnerThread_!=std::this_thread::get_id()||

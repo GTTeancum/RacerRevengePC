@@ -78,11 +78,15 @@ class OriginalParticleSourceConfig50LA final {
     bool closeStack1573B0(D&)noexcept;
     bool closeEmitterStack1573B0(const void*,D&)noexcept;
     bool closeOwnedTextStack1573B0(bool,D&)noexcept;
-    bool emitterType8Returned_=false,emitterType0Returned_=false,emitterType1Returned_=false;
+    bool emitterType8Returned_=false,emitterType0Returned_=false,emitterType1Returned_=false,emitterType2Returned_=false,emitterType9Returned_=false,emitterType11Returned_=false,emitterType12Returned_=false;
     bool emitterPropertiesReturnedNative()const noexcept {
         if(emitterPropertyTarget_==0x15c330u)return emitterType0Returned_;
         if(emitterPropertyTarget_==0x15d560u)return emitterType1Returned_;
+        if(emitterPropertyTarget_==0x15dd00u)return emitterType2Returned_;
         if(emitterPropertyTarget_==0x15e6d0u)return emitterType8Returned_;
+        if(emitterPropertyTarget_==0x15ef70u)return emitterType9Returned_;
+        if(emitterPropertyTarget_==0x15fc10u)return emitterType11Returned_;
+        if(emitterPropertyTarget_==0x1602b0u)return emitterType12Returned_;
         return false;
     }
     bool checkEmitterGroupLookup161EA0(std::int32_t index,std::int32_t count)noexcept {
@@ -169,6 +173,36 @@ class OriginalParticleSourceConfig50LA final {
     std::array<std::size_t,2> type0NoiseKnownBytes_{{0,0}};
     std::array<std::uint8_t,2> type0NoiseWritten_{{0,0}};
     std::uint8_t type0NoiseReturned_=0;
+    bool type2GeneralReturned_=false,type2MovingReturned_=false;
+    std::optional<bool> type2GeneralFound_,type2MovingFound_;
+    std::array<std::array<char,128>,2> type2Range30_;
+    std::array<std::optional<bool>,2> type2RangeFound_;
+    std::array<std::size_t,2> type2RangeKnownBytes_{{0,0}};
+    std::array<std::uint8_t,2> type2RangeWritten_{{0,0}};
+    std::uint8_t type2RangeReturned_=0;
+    bool type9GeneralReturned_=false,type9SpreadReturned_=false;
+    std::optional<bool> type9GeneralFound_,type9SpreadFound_;
+    std::array<std::array<char,128>,2> type9Range30_;
+    std::array<std::optional<bool>,2> type9RangeFound_;
+    std::array<std::size_t,2> type9RangeKnownBytes_{{0,0}};
+    std::array<std::uint8_t,2> type9RangeWritten_{{0,0}};
+    std::uint8_t type9RangeReturned_=0;
+    bool type11GeneralReturned_=false,type11HeadReturned_=false,type11MovingReturned_=false;
+    std::optional<bool> type11GeneralFound_,type11HeadFound_,type11MovingFound_;
+    std::uint8_t type11ScalarCount_=0;
+    std::array<std::array<char,128>,2> type11Range30_;
+    std::array<std::optional<bool>,2> type11RangeFound_;
+    std::array<std::size_t,2> type11RangeKnownBytes_{{0,0}};
+    std::array<std::uint8_t,2> type11RangeWritten_{{0,0}};
+    std::uint8_t type11RangeReturned_=0;
+    bool type12GeneralReturned_=false,type12DistanceSquared_=false,type12ReciprocalWritten_=false;
+    std::optional<bool> type12GeneralFound_,type12OscillationEnabled_;
+    std::optional<std::uint32_t> type12DistanceInput_,type12SquaredBits_,type12ReciprocalBits_;
+    std::array<std::array<char,128>,2> type12Range30_;
+    std::array<std::optional<bool>,2> type12RangeFound_;
+    std::array<std::size_t,2> type12RangeKnownBytes_{{0,0}};
+    std::array<std::uint8_t,2> type12RangeWritten_{{0,0}};
+    std::uint8_t type12RangeReturned_=0,type12TailScalarCount_=0,type12OscillationMask_=0,type12FlagMask_=0;
     std::optional<bool> emitterGeneralFound_,emitterMinRangeFound_,emitterMaxRangeFound_;
     std::array<char,128> emitterMinRange30_,emitterMaxRange30_;
     std::size_t emitterMinRangeKnownBytes_=0,emitterMaxRangeKnownBytes_=0;
@@ -211,7 +245,7 @@ class OriginalParticleSourceConfig50LA final {
     bool readOwnedEmitterVector158C00(const char* key,std::size_t base,std::array<char,128>& input,
             std::size_t& bytes,std::optional<bool>& foundReceipt,std::uint8_t& written,
             std::array<std::uint32_t,0x260/4>& words,std::array<std::uint32_t,0x260/4>& known)noexcept {
-        if(occurrence_!=Occurrence::emitter15AE00||!emitterOwner_||(!emitterGeneralReturned_&&!commonGeneralReturned_)||
+        if(occurrence_!=Occurrence::emitter15AE00||!emitterOwner_||(!emitterGeneralReturned_&&!type2GeneralReturned_&&!type9GeneralReturned_&&!type11GeneralReturned_&&!type12GeneralReturned_&&!commonGeneralReturned_)||
            !ownedTextSectionForFieldCurrent()||foundReceipt||base+2>=words.size())return false;
         std::string_view value;bool found=false;
         if(!findOwnedTextField158240(key,value,found))return false;
@@ -307,6 +341,165 @@ class OriginalParticleSourceConfig50LA final {
         sourcePC_=0x15cca8u;return false; //Manager/group read is not yet joined; not callback return.
     }
 
+    bool beginType2Properties15DD00(const void* emitter,std::array<std::uint32_t,0x260/4>& words,
+                                  std::array<std::uint32_t,0x260/4>& known,D& d)noexcept {
+        d={};
+        if(occurrence_!=Occurrence::emitter15AE00||!emitter||emitterOwner_!=emitter||
+           emitterPropertiesAttempted_||!ownedTextConfigCurrent()||textSelectAttempted_)return false;
+        emitterPropertiesAttempted_=true;emitterPropertyTarget_=0x15dd00u;sourcePC_=0x15dd00u;
+        sourcePC_=0x15dd24u;bool selected=false;
+        if(!selectTextSection157D00("General Info",selected,d))return false;
+        type2GeneralReturned_=true;type2GeneralFound_=selected; //Source ignores selection result.
+        sourcePC_=0x15dd3cu;std::string_view value;bool found=false;
+        if(!findOwnedTextField158240("MovingEmitter",value,found))return false;
+        type2MovingFound_=found;std::int32_t actual=1;
+        if(found){if(!convertInteger158920(value,actual))return false;}
+        else sourcePC_=0x158b60u;
+        //158B30 writes the raw integer, not a normalized native boolean.
+        words[0x200/4]=static_cast<std::uint32_t>(actual);known[0x200/4]=0xffffffffu;
+        type2MovingReturned_=true;
+        for(std::size_t i=0;i<2;++i){
+            sourcePC_=i?0x15dd74u:0x15dd58u;
+            if(!readOwnedEmitterVector158C00(i?"MaxRange":"MinRange",(i?0x220:0x210)/4,
+                type2Range30_[i],type2RangeKnownBytes_[i],type2RangeFound_[i],
+                type2RangeWritten_[i],words,known))return false;
+            ++type2RangeReturned_;
+        }
+        sourcePC_=0x15dd80u;if(!beginCommonProperties15AEA0(words,known,d))return false;
+        sourcePC_=0x15dd88u;return false; //Owned manager/group continuation, not a callback return.
+    }
+
+    bool beginType9Properties15EF70(const void* emitter,std::array<std::uint32_t,0x260/4>& words,
+                                  std::array<std::uint32_t,0x260/4>& known,D& d)noexcept {
+        d={};
+        if(occurrence_!=Occurrence::emitter15AE00||!emitter||emitterOwner_!=emitter||
+           emitterPropertiesAttempted_||!ownedTextConfigCurrent()||textSelectAttempted_)return false;
+        emitterPropertiesAttempted_=true;emitterPropertyTarget_=0x15ef70u;sourcePC_=0x15ef70u;
+        sourcePC_=0x15ef94u;bool selected=false;
+        if(!selectTextSection157D00("General Info",selected,d))return false;
+        type9GeneralReturned_=true;type9GeneralFound_=selected; //Source ignores selection result.
+        for(std::size_t i=0;i<2;++i){
+            sourcePC_=i?0x15efccu:0x15efb0u;
+            if(!readOwnedEmitterVector158C00(i?"MaxRange":"MinRange",(i?0x210:0x200)/4,
+                type9Range30_[i],type9RangeKnownBytes_[i],type9RangeFound_[i],
+                type9RangeWritten_[i],words,known))return false;
+            ++type9RangeReturned_;
+        }
+        sourcePC_=0x15efe4u;std::string_view value;bool found=false;
+        if(!findOwnedTextField158240("ApplySpreadToVelocity",value,found))return false;
+        type9SpreadFound_=found;std::int32_t actual=1;
+        if(found){if(!convertInteger158920(value,actual))return false;}
+        else sourcePC_=0x158b60u;
+        //The raw signed getter result belongs at224, not subtype8's228.
+        words[0x224/4]=static_cast<std::uint32_t>(actual);known[0x224/4]=0xffffffffu;
+        type9SpreadReturned_=true;
+        sourcePC_=0x15eff0u;if(!beginCommonProperties15AEA0(words,known,d))return false;
+        sourcePC_=0x15eff8u;return false; //Owned velocity/group continuation, not callback return.
+    }
+
+    bool beginType11Properties15FC10(const void* emitter,std::array<std::uint32_t,0x260/4>& words,
+                                   std::array<std::uint32_t,0x260/4>& known,D& d)noexcept {
+        d={};
+        if(occurrence_!=Occurrence::emitter15AE00||!emitter||emitterOwner_!=emitter||
+           emitterPropertiesAttempted_||!ownedTextConfigCurrent()||textSelectAttempted_)return false;
+        emitterPropertiesAttempted_=true;emitterPropertyTarget_=0x15fc10u;sourcePC_=0x15fc10u;
+        sourcePC_=0x15fc34u;bool selected=false;
+        if(!selectTextSection157D00("General Info",selected,d))return false;
+        type11GeneralReturned_=true;type11GeneralFound_=selected; //Source ignores selection result.
+        struct Scalar {const char* key;std::uint32_t fallback,offset,call;};
+        constexpr Scalar fields[]={
+            {"MinStreamLength",0x40400000u,0x200,0x15fc50},
+            {"MaxStreamLength",0x40a00000u,0x204,0x15fc6c},
+            {"TailThickness",0x3f800000u,0x210,0x15fc88},
+            {"HeadThickness",0x40000000u,0x214,0x15fca4},
+            {"ParticleSeparationFactor",0x3fc00000u,0x208,0x15fcc0},
+            {"TailLifeModifier",0x3f19999au,0x20c,0x15fce0}};
+        for(const auto& field:fields){
+            sourcePC_=field.call;
+            if(!readEmitterScalar158B80(field.key,field.fallback,field.offset,words,known))return false;
+            ++type11ScalarCount_;
+        }
+        sourcePC_=0x15fcf8u;std::string_view value;bool found=false;
+        if(!findOwnedTextField158240("SuperbrightHead",value,found))return false;
+        type11HeadFound_=found;std::int32_t head=1;
+        if(found){if(!convertInteger158920(value,head))return false;}
+        else sourcePC_=0x158b60u;
+        words[0x218/4]=static_cast<std::uint32_t>(head);known[0x218/4]=0xffffffffu;type11HeadReturned_=true;
+        for(std::size_t i=0;i<2;++i){
+            sourcePC_=i?0x15fd30u:0x15fd14u;
+            if(!readOwnedEmitterVector158C00(i?"MaxRange":"MinRange",(i?0x230:0x220)/4,
+                type11Range30_[i],type11RangeKnownBytes_[i],type11RangeFound_[i],
+                type11RangeWritten_[i],words,known))return false;
+            ++type11RangeReturned_;
+        }
+        sourcePC_=0x15fd48u;
+        if(!findOwnedTextField158240("MovingEmitter",value,found))return false;
+        type11MovingFound_=found;std::int32_t moving=0;
+        if(found){if(!convertInteger158920(value,moving))return false;}
+        else sourcePC_=0x158b60u;
+        //Both158B30 destinations retain raw signed integers; do not normalize.
+        words[0x21c/4]=static_cast<std::uint32_t>(moving);known[0x21c/4]=0xffffffffu;type11MovingReturned_=true;
+        sourcePC_=0x15fd54u;if(!beginCommonProperties15AEA0(words,known,d))return false;
+        sourcePC_=0x15fd5cu;return false; //Owned group continuation, not callback return.
+    }
+
+    bool beginType12Properties1602B0(const void* emitter,std::array<std::uint32_t,0x260/4>& words,
+                                   std::array<std::uint32_t,0x260/4>& known,D& d)noexcept {
+        d={};
+        if(occurrence_!=Occurrence::emitter15AE00||!emitter||emitterOwner_!=emitter||
+           emitterPropertiesAttempted_||!ownedTextConfigCurrent()||textSelectAttempted_)return false;
+        emitterPropertiesAttempted_=true;emitterPropertyTarget_=0x1602b0u;sourcePC_=0x1602b0u;
+        sourcePC_=0x1602d4u;bool selected=false;
+        if(!selectTextSection157D00("General Info",selected,d))return false;
+        type12GeneralReturned_=true;type12GeneralFound_=selected;
+        for(std::size_t i=0;i<2;++i){
+            sourcePC_=i?0x16030cu:0x1602f0u;
+            if(!readOwnedEmitterVector158C00(i?"MaxRange":"MinRange",(i?0x210:0x200)/4,
+                type12Range30_[i],type12RangeKnownBytes_[i],type12RangeFound_[i],
+                type12RangeWritten_[i],words,known))return false;
+            ++type12RangeReturned_;
+        }
+        sourcePC_=0x160328u;
+        if(!readEmitterScalar158B80("DistanceToFade",0x43480000u,0x220,words,known))return false;
+        sourcePC_=0x160330u;type12DistanceInput_=words[0x220/4];
+        std::uint32_t squared=0;
+        const bool exact=exactMultiplySourceSingle(*type12DistanceInput_,*type12DistanceInput_,squared);
+        //The arithmetic helper is bit-exact only within its existing domain;
+        //retain this actual MUL instruction, not its other caller's15AFF8 PC.
+        sourcePC_=0x160344u;if(!exact)return false;
+        type12SquaredBits_=squared;
+        sourcePC_=0x16034cu;words[0x220/4]=squared;known[0x220/4]=0xffffffffu;type12DistanceSquared_=true;
+        sourcePC_=0x160354u;
+        const auto exponent=(squared>>23)&255u;
+        //Exact normal power-of-two reciprocals only. The default200 squares
+        //to40000, which remains at this division without a fabricated224 store.
+        if((squared&0x807fffffu)||exponent==0||exponent>=254)return false;
+        type12ReciprocalBits_=(254u-exponent)<<23;
+        sourcePC_=0x16036cu;sourcePC_=0x160370u; //Actual next getter call's delay store.
+        words[0x224/4]=*type12ReciprocalBits_;known[0x224/4]=0xffffffffu;type12ReciprocalWritten_=true;
+        if(!readEmitterScalar158B80("ParticlesInVolume",0x42c80000u,0x228,words,known))return false;
+        ++type12TailScalarCount_;sourcePC_=0x160388u;
+        if(!readEmitterScalar158B80("OscillationSpeed",0x41200000u,0x22c,words,known))return false;
+        ++type12TailScalarCount_;sourcePC_=0x1603a4u;
+        if(!readEmitterScalar158B80("OscillationMagnitude",0x3f800000u,0x234,words,known))return false;
+        ++type12TailScalarCount_;
+        sourcePC_=0x1603acu;sourcePC_=0x1603b0u;sourcePC_=0x1603b4u;sourcePC_=0x1603bcu;
+        //The bounded getters produce finite normal/zero values. Exact -1
+        //takes the source equality branch and leaves230/238/23C unknown.
+        type12OscillationEnabled_=words[0x22c/4]!=0xbf800000u;
+        sourcePC_=0x1603c4u;sourcePC_=0x1603c8u;
+        if(*type12OscillationEnabled_){
+            sourcePC_=0x1603ccu;words[0x230/4]=0;known[0x230/4]=0xffffffffu;type12OscillationMask_=1;
+            sourcePC_=0x1603d0u;words[0x238/4]=0;known[0x238/4]=0xffffffffu;type12OscillationMask_=3;
+            sourcePC_=0x1603e8u;words[0x23c/4]|=1u;known[0x23c/4]|=1u;type12OscillationMask_=7;
+        }
+        sourcePC_=0x1603f0u;if(!beginCommonProperties15AEA0(words,known,d))return false;
+        sourcePC_=0x1603f8u;if(known[0x198/4]!=0xffffffffu)return false;
+        sourcePC_=0x160404u;words[0x198/4]|=0x80u;type12FlagMask_=1;
+        sourcePC_=0x160410u;words[0x198/4]&=~8u;type12FlagMask_=3;
+        sourcePC_=0x160414u;return false; //Group continuation, then mandatory population remains bounded.
+    }
+
     bool beginType8Properties15E6D0(const void* emitter,std::array<std::uint32_t,0x260/4>& words,
                                   std::array<std::uint32_t,0x260/4>& known,D& d)noexcept {
         d={};
@@ -362,6 +555,15 @@ class OriginalParticleSourceConfig50LA final {
            commonPropertiesAttempted_)return false;
         if(emitterPropertyTarget_==0x15e6d0u){
             if(!emitterSpreadReturned_||!ownedTextSectionForFieldCurrent())return false;
+        }else if(emitterPropertyTarget_==0x1602b0u){
+            if(!type12OscillationEnabled_||type12TailScalarCount_!=3||
+               type12OscillationMask_!=(*type12OscillationEnabled_?7u:0u)||!ownedTextSectionForFieldCurrent())return false;
+        }else if(emitterPropertyTarget_==0x15fc10u){
+            if(!type11MovingReturned_||!ownedTextSectionForFieldCurrent())return false;
+        }else if(emitterPropertyTarget_==0x15ef70u){
+            if(!type9SpreadReturned_||!ownedTextSectionForFieldCurrent())return false;
+        }else if(emitterPropertyTarget_==0x15dd00u){
+            if(type2RangeReturned_!=2||!ownedTextSectionForFieldCurrent())return false;
         }else if(emitterPropertyTarget_==0x15c330u||emitterPropertyTarget_==0x15d560u){
             if(textSelectAttempted_||!ownedTextConfigCurrent())return false;
         }else return false;

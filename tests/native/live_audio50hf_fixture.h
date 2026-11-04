@@ -208,9 +208,10 @@ public:
             if(!coldStorage_&&!mixer_.initialize(voices_.data(),voices_.size(),sampleRate)) {
                 error="50HF bounded mixer initialization failed";return false;
             }
-            // The session owner supplies one immutable effective configuration.
+            // The session owner supplies the initial effective configuration.
             // Original reset defaults remain the default for other callers.
-            // Next-session menu edits never mutate this owner's restore target.
+            // Legacy next-session edits do not mutate this restore target;
+            // native live Pause changes it only with the actual shared profile.
             if(!groups_.initialize(mixer_,audioSettings)||
                !race_audio_groups50IC::bindGameplayCatalog(groups_,providerFirstVoice,playerRacer60==19).complete||
                !race_audio_groups50IC::bindProviderRange(groups_,

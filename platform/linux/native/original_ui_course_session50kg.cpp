@@ -6,6 +6,8 @@
 #include "original_ui_tournament_session50kg.h"
 #include "../../../src/game/original_ui_course_mode2_entry50kg.h"
 #include <cmath>
+#include <bit>
+#include <cfenv>
 #include <limits>
 #include <utility>
 #include "../../../src/assets/original_ui_course_background50kg.h"
@@ -70,6 +72,7 @@ struct OriginalUiCourseSession50KG::Storage {
     bool rendering=false,inOperation=false,updatePrepared=false,paused=false;
     float preparedDelta=0;
     std::array<bool,4> preparedDebug{};
+    std::array<bool,2> preparedHorizontalHeld{};
     std::array<std::string,6> planetNamesBA0;
     bool selectionRefreshCompleted=false;
     game::OriginalUiCourseWidgets50KG& widgets()noexcept{return *cold.resources->widgets();}
@@ -254,6 +257,41 @@ struct OriginalUiCourseSession50KG::Storage {
     static void overlay(void* context,std::uint8_t ordinal,const game::OriginalUiApertureRectangle50KG& r)noexcept{
         auto& s=*static_cast<Storage*>(context);
         if(!s.rendering||!s.collector.projectAperture(ordinal,r,s.faultDetail.draw))s.fault(S::draw,0x1D798C);
+    }
+    // Actual Course page update1DFEA0..1E00EC. Do not dispatch another
+    // input event: its0.65 initial timer would erase the source0.13 repeat.
+    // Nor gate this on row/input/aperture state. Row changes leave the timers
+    // intact, and expiry reads the current subtype14F4, including subtype3.
+    bool updateHeldCount1DFEA0(const std::array<bool,2>& held,float dt)noexcept{
+        if(!std::isfinite(state.repeatRight14D4)||!std::isfinite(state.repeatLeft14D8)){
+            fault(S::unsupportedState,0x1DFEA0);return false;
+        }
+        const bool right=state.repeatRight14D4>0&&held[1];
+        const bool left=!right&&state.repeatLeft14D8>0&&held[0];
+        if(!right&&!left){state.repeatRight14D4=0;state.repeatLeft14D8=0;return true;} //1E00E8/EC
+        // Native arithmetic admission only, not a source branch. Earlier
+        // update effects remain committed if the required rounding is absent.
+        if(std::fegetround()!=FE_TONEAREST){fault(S::unsupportedState,right?0x1DFEF8:0x1E001C);return false;}
+        auto& timer=right?state.repeatRight14D4:state.repeatLeft14D8;
+        volatile float remaining=timer-dt;
+        timer=remaining; //1DFF08/1E002C delay-slot store, including expiry.
+        if(timer>0)return true; //Right owns this tick even when it is not due.
+        if(state.subtypeSlot14F4==1||state.subtypeSlot14F4==2){
+            auto& count=state.subtypeSlot14F4==1?state.laps14EC:state.entrants14F0;
+            const std::uint32_t maximum=state.subtypeSlot14F4==1?25u:8u;
+            // Native Session admission retains these bounded source fields.
+            // Preserve the already reached timer store if custody is broken.
+            if(count<1||count>maximum){
+                fault(S::unsupportedState,state.subtypeSlot14F4==1?
+                    (right?0x1DFF1C:0x1E0040):(right?0x1DFF58:0x1E007C));return false;
+            }
+            if(right){++count;if(count>maximum)count=1;}
+            else{--count;if(!count)count=maximum;}
+            timer=std::bit_cast<float>(std::uint32_t{0x3E051EB8}); //One step, discard overshoot.
+        }
+        // Subtype3 still reaches audio without changing either count or
+        // resetting the expired timer. Both actual calls follow the writes.
+        return effect(right?4u:3u,right?0x1DFF9C:0x1E00C0);
     }
     bool updateWidgets(const std::vector<std::uint16_t>& order,float dt)noexcept{
         for(const auto id:order){const auto kind=widgets().state(id).kind;
@@ -597,12 +635,13 @@ S OriginalUiCourseSession50KG::prepareUpdateAudio(const OriginalUiMainSessionUpd
         if(!s->cold.audio->update(in.elapsedSeconds)){++s->state.audio.failed;s->fault(S::audio,0x234440);}
     }
     s->inOperation=false;if(s->state.faulted){d=s->faultDetail;return d.status;}
-    s->preparedDelta=in.elapsedSeconds;s->preparedDebug=in.debugChordHeld;s->updatePrepared=true;return result(d,S::ok);
+    s->preparedDelta=in.elapsedSeconds;s->preparedDebug=in.debugChordHeld;
+    s->preparedHorizontalHeld=in.courseHorizontalHeld;s->updatePrepared=true;return result(d,S::ok);
 }
 S OriginalUiCourseSession50KG::update(const OriginalUiMainSessionUpdate50KG& in,D& d)noexcept{
     d={};auto* s=storage_.get();if(!s)return result(d,S::notBound);
     if(!s->operational()||!s->updatePrepared||in.elapsedSeconds!=s->preparedDelta||in.paused!=s->paused||
-        !s->profileCurrent()||!s->lightCurrent()||!s->popupCurrent()||s->rendering||s->inOperation)return result(d,S::unsupportedState);
+        in.courseHorizontalHeld!=s->preparedHorizontalHeld||!s->profileCurrent()||!s->lightCurrent()||!s->popupCurrent()||s->rendering||s->inOperation)return result(d,S::unsupportedState);
     if(s->state.mode34==2&&(in.debugChordHeld!=s->preparedDebug||s->state.updates==std::numeric_limits<std::uint64_t>::max()))
         return result(d,S::invalidInput);
     s->updatePrepared=false;s->inOperation=true;
@@ -619,17 +658,28 @@ S OriginalUiCourseSession50KG::update(const OriginalUiMainSessionUpdate50KG& in,
         if(s->operational()&&s->state.pageShown)s->updateWidgets(*top,in.elapsedSeconds);
         ++s->state.updates;s->inOperation=false;if(s->state.faulted){d=s->faultDetail;return d.status;}return result(d,S::ok);
     }
+    // Same actual manager sibling order as mode2: ordinary widgets, the
+    // Course page38 body below, then OnTop widgets. Page2A6BB0 traverses only
+    // the page's children; it is not the manager's ordinary-widget traversal.
+    const auto* ordinary=s->widgets().order(false);const auto* top=s->widgets().order(true);
+    if(!ordinary||!top)s->fault(S::widget,0x2A6BB0);
+    else if(s->state.pageShown)s->updateWidgets(*ordinary,in.elapsedSeconds);
+    if(!s->operational()){s->inOperation=false;d=s->faultDetail;return d.status;}
     // Source1DFDF0: refresh on the third actual update, not a wall-time guess.
     // Native frontend performs a real GL finish and retained-bank rebind.
     if(s->state.deferred14D0){
         if(s->state.deferred14D0==1&&!s->selectionRefreshCompleted){s->inOperation=false;return result(d,S::unsupportedState,0x1DFE18);}
         --s->state.deferred14D0;if(!s->state.deferred14D0)s->selectionRefreshCompleted=false;
     }
+    // Source's first repeat pair follows deferred refresh and precedes the
+    // 2A6BB0 page-child update. The second pair14DC/14E0 is only armed by mode1,
+    // outside this Session's admitted modes0/2, and remains constructor zero.
+    if(!s->updateHeldCount1DFEA0(in.courseHorizontalHeld,in.elapsedSeconds)){
+        s->inOperation=false;d=s->faultDetail;return d.status;
+    }
     const auto saved=s->aperture.saveCourseUpdateDelta38(in.elapsedSeconds);
     if(!apertureOkay(saved)){s->faultDetail.aperture.status=saved;s->fault(S::aperture,0x1E02BC);}
-    const auto* ordinary=s->widgets().order(false);const auto* top=s->widgets().order(true);
-    if(!ordinary||!top)s->fault(S::widget,0x2A6BB0);
-    else if(s->operational()&&s->state.pageShown){s->updateWidgets(*ordinary,in.elapsedSeconds);if(s->operational())s->updateWidgets(*top,in.elapsedSeconds);}
+    if(s->operational()&&s->state.pageShown)s->updateWidgets(*top,in.elapsedSeconds);
     ++s->state.updates;s->inOperation=false;if(s->state.faulted){d=s->faultDetail;return d.status;}return result(d,S::ok);
 }
 S OriginalUiCourseSession50KG::render(const OriginalUiCourseDrawClock50KG& clock,D& d)noexcept{

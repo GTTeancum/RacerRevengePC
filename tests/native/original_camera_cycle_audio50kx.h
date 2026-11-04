@@ -2,6 +2,7 @@
 #include "race_audio50hq_fixture.h"
 #include <array>
 
+namespace original_pause_observation50LA {class Owner;}
 namespace original_camera_cycle_audio50KX {
 // Actual1A42C0->race10C+160 response emitter uses raceUI.ini and group124;
 //176DF0 calls1A4B90(key4)->292360(key4,flags1,a3=0). The native playback
@@ -9,6 +10,7 @@ namespace original_camera_cycle_audio50KX {
 //All other race/mixer owners and their ordering remain the existing services.
 class Owner final {
     friend class rr::platform::OriginalApplicationAural50KG;
+    friend class ::original_pause_observation50LA::Owner;
     rr::assets::AudioBank50HC bank_;
     rr::platform::AudioMixer50HD* mixer_=nullptr;
     rr::platform::RaceAudioGroups50IC* groups_=nullptr;
@@ -105,6 +107,16 @@ public:
         return dispatchPauseFeedback(originalId);
     }
 private:
+    // Only the actual Pause owner can request its volume feedback3/4/6.
+    // Badcall6 needs the existing full six-key emitter preparation, or the
+    // explicit muted policy. Camera-only/Pause2..4 preparation cannot fake it.
+    Result dispatchPauseVolumeFeedback(std::uint32_t originalId)noexcept {
+        if(originalId==3||originalId==4)return dispatchPauseFeedback(originalId);
+        if(closed_||originalId!=6)return Result::rejected;
+        if(muted_)return Result::muted;
+        if(!resultsFeedbackPrepared_)return Result::unprepared;
+        return dispatchKey(originalId);
+    }
     bool canStopResultsNative26D070(const rr::platform::AudioMixer50HD& mixer,
         const rr::platform::RaceAudioGroups50IC& groups)const noexcept {
         if(!attempted_||closed_||mixer.count()<=voice)return false;

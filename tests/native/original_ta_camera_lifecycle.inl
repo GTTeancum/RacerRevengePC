@@ -277,6 +277,7 @@ bool retireTaController()noexcept {
 }
 
 unsigned taExitReason_=0;
+OriginalCameraExitFadeRequest2AED60 taSkipFadeRequest_;
 OriginalVideoBlockingFade taSkipBlockingFade_;
 bool taSkipFadeFinished_=false;
 bool taFinishSkipFade()noexcept {
@@ -291,9 +292,12 @@ bool taFinishSkipFade()noexcept {
 }
 bool taSkipFade()noexcept {
     auto& app=*displayInputs_;
-    const auto request=requestOriginalCameraExitFade2AED60(app.fadeManagerA8,app.currentApplicationMode22C(),app.video,actual_.applicationClock);
+    const auto request=taSkipFadeRequest_.invoke(app.fadeManagerA8,app.currentApplicationMode22C(),app.video,actual_.applicationClock);
     if(request.status!=OriginalCameraStartStatus::complete)return taReject(request.sourcePC);
-    if(!app.fadeManagerA8&&(app.video.flags404Low6&1u)){
+    //176454 uses T0=1: only parent suppression/adjusted-zero skips260850.
+    //A260320 bit0 no-op still requires the immediate blocking child. Do not
+    //infer this disposition from flags left by another Video invocation.
+    if(request.sourcePC!=0x2aee60&&request.sourcePC!=0x2aee00){
         frameStage_=FrameStage::taSkipVideo;return true;
     }
     return taFinishSkipFade();
