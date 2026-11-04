@@ -6,6 +6,8 @@
 #include "pod_audio_owner50he_fixture.h"
 #include "race_audio_groups50ic_fixture.h"
 #include "selected_player_audio50ij_fixture.h"
+#include "native_player_speech_authoring50la.h"
+#include "native_player_speech_config_prefix50la.h"
 #include "../../src/game/original_human_engine_reset50lb.h"
 #include "../../platform/linux/native/audio_output50hd.h"
 #include "../../platform/linux/native/announcer_episode50ic.h"
@@ -13,6 +15,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
+#include <optional>
 #include <string>
 #include <thread>
 #include <vector>
@@ -77,6 +80,124 @@ class Owner final {
     // PodSpeechState or counts; construction writes the same root-owned fields.
     std::shared_ptr<rr::game::OriginalApplicationEntities50LA> speechEntities_;
     bool speechForwardBound_=false,speechConstructorAttempted_=false;
+    enum class NativeSpeechInputStatus : std::uint8_t {
+        notAttempted,ownerRejected,authoringRejected,nativeBindingRejected,captured
+    };
+    NativeSpeechInputStatus speechInputStatus_=NativeSpeechInputStatus::notAttempted;
+    native_player_speech50LA::Authoring::Diagnostic speechInputDiagnostic_;
+    std::unique_ptr<const native_player_speech50LA::Authoring> speechMountedAuthoring_;
+    std::optional<native_player_speech50LA::LoadPrefix> speechConfigPrefix_;
+    bool speechConfigAttempted_=false;
+    std::array<const native_player_speech50LA::Authoring::Event*,gameplay_audio50HE::cueCount> speechAuthoredEvents_{};
+    std::array<const rr::assets::AudioClip50HC*,gameplay_audio50HE::cueCount> speechNativeRecords_{};
+    bool nativeSpeechBindingsCurrent()const noexcept {
+        if(!speechMountedAuthoring_||speechInputStatus_!=NativeSpeechInputStatus::captured||
+           speechMountedAuthoring_->racer60()!=preparedRacer60_)return false;
+        for(std::size_t i=0;i<gameplay_audio50HE::cueCount;++i){
+            const auto bank=gameplay_audio50HE::catalog[i].bank;
+            if(bank!=rr::game::AudioBank50HE::PodCurses&&bank!=rr::game::AudioBank50HE::PodTaunts&&
+               bank!=rr::game::AudioBank50HE::PodSpecial)continue;
+            const auto& request=selected_.catalog[i];const auto* event=speechAuthoredEvents_[i];
+            const auto* record=speechNativeRecords_[i];
+            if(request.name.empty()){if(event||record||provider_.authored_[i]||provider_.ready_[i])return false;continue;}
+            if(!event||!record||!event->sectionPresent||!event->filename.present||
+               event->filename.text!=request.name||!event->isStream.present||event->isStream.text!="1"||
+               event->isLoop.present||event->isStereo.present||!request.stream||request.loop||request.stereo||
+               !event->metadata||bank_.find(request.name)!=record||!provider_.authored_[i]||
+               record->request.stream!=request.stream||record->request.loop!=request.loop||
+               record->request.stereo!=request.stereo||
+               provider_.ready_[i]!=(record->state==rr::assets::AudioAssetState50HC::ready))return false;
+            const auto& clip=provider_.clips_[i];const auto& pcm=record->pcm;
+            if(provider_.ready_[i]){
+                if(clip.samples!=pcm.samples.data()||clip.frames!=pcm.frames||clip.sampleRate!=pcm.sampleRate||
+                   clip.channels!=pcm.channels||clip.loopStart!=(pcm.hasEmbeddedLoop?pcm.loopStart:0u)||
+                   clip.loopEnd!=(pcm.hasEmbeddedLoop?pcm.loopEnd:0u))return false;
+            }else if(clip.samples||clip.frames||clip.sampleRate||clip.channels||clip.loopStart||clip.loopEnd)return false;
+        }
+        // Actual playback revision remains in the ONE Provider; no frozen
+        // revision, second voice, source channel claim or alternate PCM exists.
+        return true;
+    }
+    bool retainNativeHumanSpeechInputs2C1170(const ::original_main_entry50KG::Application& app,
+        const ::native_racer50HN::Bank& bank,std::uint64_t generation,
+        std::shared_ptr<const rr::assets::OriginalStandardArchiveProvider50LA> provider,
+        std::shared_ptr<const native_racer50HW::Rig> rig,
+        const rr::game::OriginalWreckComponent50LA& racer,
+        const rr::game::OriginalWreckComponent50LA* d48)noexcept {
+        if(speechInputStatus_!=NativeSpeechInputStatus::notAttempted)return false;
+        speechInputStatus_=NativeSpeechInputStatus::ownerRejected;
+        if(!nativeHumanSpeechProviderCurrent()||!speechForwardBound_||!speechConstructorAttempted_||
+           speechApplication_!=&app||speechBankOwner_!=&bank||speechGeneration_!=generation||
+           !speechEntities_||!rig||!provider||!groups_.coldNativePlayerSpeech_||
+           groups_.coldNativePlayerSpeech_->nativeExpectedRacer!=&racer||
+           &groups_.coldNativePlayerSpeech_->entity!=d48||
+           !groups_.nativePlayerSpeechBackingCurrent())return false;
+        const auto* selected=original_player_identity50IK::find(rig->podId);
+        if(!selected||selected->racer60!=preparedRacer60_||!groups_.coldNativePlayerSpeech_->nativeAural)return false;
+        auto metadata=groups_.coldNativePlayerSpeech_->nativeAural->retainedStreamMetadata();
+        speechInputStatus_=NativeSpeechInputStatus::authoringRejected;
+        auto authored=native_player_speech50LA::Authoring::capture(std::move(provider),std::move(rig),
+            std::move(metadata),speechInputDiagnostic_);
+        if(!authored)return false;
+        speechInputStatus_=NativeSpeechInputStatus::nativeBindingRejected;
+        const auto& counts=authored->counts();const auto& selectedCounts=selected_.speech;
+        if(counts!=std::array<std::uint8_t,9>{selectedCounts.lowDamage,selectedCounts.wallHit,selectedCounts.passed,
+            selectedCounts.attacked,selectedCounts.passing,selectedCounts.attacking,selectedCounts.death,
+            selectedCounts.win,selectedCounts.lose})return false;
+        decltype(speechAuthoredEvents_) events{};decltype(speechNativeRecords_) records{};
+        constexpr rr::game::AudioBank50HE banks[]={rr::game::AudioBank50HE::PodCurses,
+            rr::game::AudioBank50HE::PodTaunts,rr::game::AudioBank50HE::PodSpecial};
+        for(unsigned category=0;category<3;++category){const auto* rows=authored->category(category);
+            if(!rows)return false;
+            for(unsigned n=0;n<rows->count;++n){const auto& event=rows->events[n];
+                const auto index=gameplay_audio50HE::cueIndex({banks[category],event.id});
+                if(index>=gameplay_audio50HE::cueCount)return false;
+                const auto& request=selected_.catalog[index];
+                if(!event.sectionPresent){if(!request.name.empty()||provider_.authored_[index])return false;continue;}
+                if(event.filename.text!=request.name||request.name.empty()||!request.stream||request.loop||request.stereo||
+                   !provider_.authored_[index])return false;
+                const auto* record=bank_.find(request.name);if(!record)return false;
+                events[index]=&event;records[index]=record;
+            }
+        }
+        // Publish only immutable native inputs. No count/cursor/timer/source
+        // RNG store, Config/file handle, Event, Sound, or initialized receipt.
+        speechMountedAuthoring_=std::move(authored);speechAuthoredEvents_=events;speechNativeRecords_=records;
+        speechInputStatus_=NativeSpeechInputStatus::captured;
+        if(!nativeSpeechBindingsCurrent()){
+            speechAuthoredEvents_.fill(nullptr);speechNativeRecords_.fill(nullptr);speechMountedAuthoring_.reset();
+            speechInputStatus_=NativeSpeechInputStatus::nativeBindingRejected;return false;
+        }
+        return true;
+    }
+    bool beginNativeHumanSpeechConfig2C1190(const ::original_main_entry50KG::Application& app,
+        const ::native_racer50HN::Bank& bank,std::uint64_t generation,
+        const rr::game::OriginalAudioDirectorySource50LA& directory,
+        const rr::game::OriginalWreckComponent50LA& racer,
+        const rr::game::OriginalWreckComponent50LA* d48,std::uint32_t actualRacer60,
+        std::uint32_t& pc)noexcept {
+        if(speechConfigAttempted_||speechConfigPrefix_)return false;
+        if(!nativeHumanSpeechProviderCurrent()||!speechForwardBound_||!speechConstructorAttempted_||
+           speechApplication_!=&app||speechBankOwner_!=&bank||speechGeneration_!=generation||
+           speechInputStatus_!=NativeSpeechInputStatus::captured||!speechMountedAuthoring_||
+           speechMountedAuthoring_->racer60()!=actualRacer60||preparedRacer60_!=actualRacer60||
+           !groups_.coldNativePlayerSpeech_||
+           groups_.coldNativePlayerSpeech_->nativeExpectedRacer!=&racer||
+           &groups_.coldNativePlayerSpeech_->entity!=d48||
+           !groups_.nativePlayerSpeechBackingCurrent())return false;
+        speechConfigAttempted_=true;speechConfigPrefix_.emplace();
+        const bool filenameReturned=speechConfigPrefix_->begin2C1190(app,directory,&racer,d48,actualRacer60);
+        pc=speechConfigPrefix_->pc_;return filenameReturned;
+        // True means ONLY the constructor and bounded filename prefix returned.
+        // The source open1577D0, counts, RNG and2C1170 return remain pending.
+    }
+    void withdrawNativeSpeechInputs()noexcept {
+        // Abandon only native stack custody before its racer/D48 aliases die.
+        // No source Config destructor, close, or load-return effect is claimed.
+        if(speechConfigPrefix_){speechConfigPrefix_->abandonNative();speechConfigPrefix_.reset();}
+        speechAuthoredEvents_.fill(nullptr);speechNativeRecords_.fill(nullptr);speechMountedAuthoring_.reset();
+        // Attempt/result history is not reset and cannot authorize replay.
+    }
     bool nativeHumanSpeechProviderCurrent()const noexcept {
         if(!prepared_||closed_||!coldStorage_||coldStorageThread_!=std::this_thread::get_id()||
            coldStorageEpoch_!=mixer_.groupEpoch50IC()||!groups_.uses(mixer_)||
@@ -90,7 +211,7 @@ class Owner final {
             if(authored&&(provider_.voiceSlots_[i]!=gameplay_audio50HE::cueVoice(providerFirstVoice,i)||
                groups_.binding(provider_.voiceSlots_[i])!=rr::game::RaceAudioGroup50IC::Character11C))return false;
         }
-        return true;
+        return !speechMountedAuthoring_||nativeSpeechBindingsCurrent();
     }
     bool bindNativeHumanSpeechForward22A210(const ::original_main_entry50KG::Application& app,
         const ::native_racer50HN::Bank& bank,
@@ -143,6 +264,7 @@ class Owner final {
         if(!canWithdrawNativeHumanSpeechForward22A210(app,bank,generation))return false;
         speechApplication_=nullptr;speechBankOwner_=nullptr;speechGeneration_=0;
         humanSpeechCounts_=nullptr;humanSpeechState_=nullptr;humanSpeechRaw_=nullptr;
+        withdrawNativeSpeechInputs();
         speechForwardBound_=false;speechEntities_.reset();return true;
     }
     bool canRetireNativeHumanSpeech2C10B0(const ::original_main_entry50KG::Application& app,
@@ -164,6 +286,7 @@ class Owner final {
         // preflight. Revoke our borrowed state before its source backing dies.
         speechApplication_=nullptr;speechBankOwner_=nullptr;speechGeneration_=0;
         humanSpeechCounts_=nullptr;humanSpeechState_=nullptr;humanSpeechRaw_=nullptr;
+        withdrawNativeSpeechInputs();
         speechForwardBound_=false;speechEntities_.reset();
         if(groups_.coldNativePlayerSpeech_&&
            !groups_.retireNativePlayerSpeech2C10B0(this,racer,historicalD48))std::terminate();

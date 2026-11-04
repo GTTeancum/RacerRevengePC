@@ -225,7 +225,27 @@ bool OwnershipBridge::continueNativeBaseRacerSpeech22A1D0(original_camera_sessio
     // Native allocation refusal never manufactures guest NULL. A real
     // successful constructor publishes its exact owner before the load call.
     at(0x22a240u);at(0x22a24cu);at(0x2c1170u);
-    return false; // Exact pending load: no RNG, B4 snapshot, jukebox or attachment.
+    // Native input custody at the reached load boundary. Use the SAME mounted
+    // namespace and Resources-owned selected Rig, not loose extraction or the
+    // earlier independently prepared native catalog as source-loader success.
+    if(!op->domain_||op->application_->standardMaterialDomain()!=op->domain_||
+       !op->aggregate_->rosterMountComplete_||op->aggregate_->rosterMountDomain_!=op->domain_||
+       op->aggregate_->rosterMountApplication_!=op->application_||!op->resources_||
+       op->resources_->rigs_[0].get()!=model.actualRig())return false;
+    const auto& provider=op->domain_->archiveProvider3E1A70();
+    const std::shared_ptr<const native_racer50HW::Rig> rig(op->resources_,op->resources_->rigs_[0].get());
+    if(!c.audio_->retainNativeHumanSpeechInputs2C1170(*op->application_,*op->bank_,op->generation_,
+        provider,rig,racer.racer,made.entity))return false;
+    at(0x2c1190u);
+    // Use the actual21081C-published source+60 field on this SAME racer.
+    // Its210824-produced name1E0 and the host selected catalog are not this LW.
+    if(!racer.sourcePod60_||*racer.sourcePod60_!=session.actual_.racer60[0])return false;
+    auto prefixPC=pc;
+    const bool filenameReturned=c.audio_->beginNativeHumanSpeechConfig2C1190(*op->application_,*op->bank_,
+        op->generation_,op->application_->nativeAudioDirectory36AFE0(),racer.racer,made.entity,
+        *racer.sourcePod60_,prefixPC);
+    at(prefixPC);if(!filenameReturned)return false;
+    return false; //2C11C8: original Config open/file manager, RNG, B4 and attachment remain pending.
 }
 bool OwnershipBridge::retireNativePlayerSpeechCold(original_camera_session50KX::Session& session)noexcept {
     if(!session.onOwnerThread()||!camera_||camera_->session.get()!=&session||

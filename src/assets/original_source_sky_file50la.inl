@@ -10,15 +10,17 @@ bool OriginalSourceSkyFile50LA::sourceReadBoundsCurrentNative()const noexcept {
             row.before&&row.after&&*row.after==*row.before+row.copied;
         return true;
     };
-    if(!check(read_,4,1)||!check(countRead_,4,1)||!check(paletteOffsetRead_,4,1))return false;
+    //129320 initialized count7D8. Item128880 initialized header48 and every
+    //parsed receiver field; field0 is a distinct, uninitialized stack flags halfword.
+    if(!check(read_,4,1)||!check(countRead_,4,1,true)||!check(paletteOffsetRead_,4,1))return false;
     constexpr std::size_t sizes[3]={0x300,0x8000,0x10000};
     for(std::size_t i=0;i<3;++i)if(!check(paletteHeaderReads_[i],4,1)||!check(rawPaletteReads_[i],sizes[i],1))return false;
     for(const auto& pointer:followingPalettes_){if(!pointer)return false;const auto& row=*pointer;
         if(!check(row.offsetRead,4,1))return false;
         for(std::size_t i=0;i<3;++i)if(!check(row.headers[i],4,1)||!check(row.payloads[i],sizes[i],1))return false;}
     for(std::size_t i=0;i<(firstItem_?followingItems_.size()+1:0);++i){const auto* row=itemOccurrence(i);if(!row)return false;
-        if(!check(row->offsetRead,4,1)||!check(row->header48,4,1))return false;
-        for(std::size_t j=0;j<row->fields.size();++j)if(!check(row->fields[j],itemFieldSpec(j).size,1))return false;}
+        if(!check(row->offsetRead,4,1)||!check(row->header48,4,1,true))return false;
+        for(std::size_t j=0;j<row->fields.size();++j)if(!check(row->fields[j],itemFieldSpec(j).size,1,j!=0))return false;}
     for(std::size_t item=0;item<itemResourceSeeks_.size();++item){const auto& pointer=itemResourceSeeks_[item];if(!pointer)return false;
       for(std::size_t ordinal=0;ordinal<=pointer->resourceEntries.size();++ordinal){const auto* resource=resourceFileOccurrence(item,ordinal);if(!resource)return false;const auto& row=*resource;
         if(!check(row.resourceSizeA8,4,1)||!check(row.compressedPayloadSize,4,1,true)||
@@ -55,9 +57,10 @@ bool OriginalSourceSkyFile50LA::preflightNative()const noexcept {
        (read_.returned&&*read_.after!=*read_.before+read_.copied))return false;
     const Read4* previous=nullptr;
     for(const auto* row:{&read_,&countRead_,&paletteOffsetRead_}){
+        const auto items=row==&countRead_?(row->copied?1u:0u):row->copied/4;
         if(row->copied>4||(row->attempted&&(!openReturned_||!sourceHandle_||*sourceHandle_<0))||
            (row->returned&&(!row->attempted||!row->before||!row->after||!row->items))||
-           (row->items&&(!row->returned||*row->items!=row->copied/4))||
+           (row->items&&(!row->returned||*row->items!=items))||
            (row->returned&&*row->after!=*row->before+row->copied)||
            (row->attempted&&previous&&(!previous->returned||previous->items!=1u||row->before!=previous->after)))return false;
         previous=row;
@@ -165,14 +168,15 @@ bool OriginalSourceSkyFile50LA::preflightNative()const noexcept {
         const auto& read=item.header48;
         if(read.copied>4||(read.attempted&&(!item.parserEntered||read.before!=latest))||
            (read.returned&&(!read.attempted||!read.before||!read.after||!read.items))||
-           (read.items&&(!read.returned||*read.items!=read.copied/4))||
+           (read.items&&(!read.returned||*read.items!=(read.copied?1u:0u)))||
            (read.returned&&*read.after!=*read.before+read.copied))return false;
         if(read.after)latest=read.after;
         for(std::size_t i=0;i<item.fields.size();++i){const auto& field=item.fields[i];const auto spec=itemFieldSpec(i);
+            const auto items=i?(field.copied?1u:0u):field.copied/spec.size;
             if(field.copied>spec.size||(field.attempted&&(!item.parserEntered||!itemFieldRequired(item,i)||field.before!=latest||
                itemFieldPredecessor(item,i)!=1u))||
                (field.returned&&(!field.attempted||!field.before||!field.after||!field.items))||
-               (field.items&&(!field.returned||*field.items!=field.copied/spec.size))||
+               (field.items&&(!field.returned||*field.items!=items))||
                (field.returned&&*field.after!=*field.before+field.copied))return false;
             if(field.after)latest=field.after;
         }
@@ -395,7 +399,8 @@ bool OriginalSourceSkyFile50LA::readFirst4(D& d)noexcept {
 }
 bool OriginalSourceSkyFile50LA::readCount4(D& d)noexcept {
     if(!receiver_||read_.items!=1u)return fail(d,E::phase,0x129654);
-    return read4(countRead_,0x12965c,d);
+    //The sole caller admits constructor-zeroed receiver7D8 before this read.
+    return read4(countRead_,0x12965c,d,true);
 }
 bool OriginalSourceSkyFile50LA::readPaletteOffset4(D& d)noexcept {
     if(countRead_.items!=1u)return fail(d,E::phase,0x129684);
@@ -613,7 +618,8 @@ bool OriginalSourceSkyFile50LA::readItemHeader48(D& d,std::size_t occurrence)noe
     auto* selected=itemOccurrence(occurrence);
     if(occurrence!=followingItems_.size())return false;
     if(!selected||!selected->parserEntered||selected->nativeWithdrawn||!selected->receiver)return fail(d,E::phase,0x128a00);
-    return read4(selected->header48,0x128a08,d);
+    //The caller proves this occurrence's constructor-initialized receiver48.
+    return read4(selected->header48,0x128a08,d,true);
 }
 bool OriginalSourceSkyFile50LA::readItemField(std::size_t index,D& d,std::size_t occurrence)noexcept {
     auto* selected=itemOccurrence(occurrence);
@@ -626,7 +632,10 @@ bool OriginalSourceSkyFile50LA::readItemField(std::size_t index,D& d,std::size_t
     const bool returned=resolver_->readSourceBankMember12FB30(selectedRoot_,this,handle_,row.bytes.data(),spec.size,row.copied,d);
     row.after=resolver_->freshFileCapacity_->members150[handle_].cursor10;expectedCursor_=row.after;
     if(!returned){pc_=d.sourcePC?d.sourcePC:pc_;return false;}
-    if(row.copied&&row.copied<spec.size){row.pendingSourceItems=1;pc_=0x12ff34;return fail(d,E::unsupported,pc_);}
+    //Only index0 targets unknown stack bytes. All other destinations have
+    //source constructor bytes, checked by the caller before this occurrence.
+    //Keep the untouched receiver suffix; never read the unknown row.bytes tail.
+    if(index==0&&row.copied&&row.copied<spec.size){row.pendingSourceItems=1;pc_=0x12ff34;return fail(d,E::unsupported,pc_);}
     row.returned=true;row.items=row.copied?1u:0u;pc_=spec.resume;return true;
 }
 bool OriginalSourceSkyFile50LA::finishItemReads(D& d,std::size_t occurrence)noexcept {

@@ -1774,6 +1774,12 @@ bool OriginalStandardTextureResolver50LA::retireNativeRaceMounts1316A0(
             return fail(d,E::source,0x1316a0);
         for(std::size_t j=0;j<i;++j)if(lease.entries_[j].slot==entry.slot)
             return fail(d,E::source,0x1316a0);
+        // An original POD registration pins this exact native namespace until
+        // its numeric members/device and encoded owner have been withdrawn.
+        // Reject every generation, before any mount in this set is retired.
+        // Otherwise current() and exact handle close would lose their owner.
+        if(freshFileCapacity_->pod.root&&freshFileCapacity_->pod.mount==entry.slot)
+            return fail(d,E::phase,0x1316a0);
         // Existing validator is generic complete-directory/provenance logic:
         // matching names with unknown bank origin are NOT silently skipped.
         if(storage_&&storage_->provider&&!validateGarageBankRows12EAA0(entry.slot,entry.generation,d))return false;
@@ -3793,11 +3799,28 @@ bool OriginalStandardTextureResolver50LA::borrowSourceBankConfigNative(const voi
     else {if(s.courseNativeBorrowers<=1)return fail(d,E::phase,0);--s.courseNativeBorrowers;}
     return true;
 }
+bool OriginalStandardTextureResolver50LA::sourcePodBankCurrentNative(const void* root)const noexcept {
+    if(!freshFileCapacity_||!scratch_||!root)return false;
+    const auto& s=*freshFileCapacity_;const auto& pod=s.pod;
+    // Root can only be issued by the existing private original manager path.
+    // This predicate performs no enrollment, mode write, or source search.
+    if(pod.root!=root||!pod.attempted||!pod.registered||!pod.joined||pod.failed||
+       !pod.archive||!s.provider||!s.devices14||pod.device<0||pod.device>=s.deviceCount18||
+       pod.mount>=s.provider->mounts_.size())return false;
+    const auto& owner=*pod.root;
+    if(owner.thread_!=std::this_thread::get_id()||!owner.attempted_||!owner.acquired_||
+       !owner.joined_||owner.nativeClosed_||!owner.mode1Reached_||!owner.occurrence_||
+       owner.resolver_.get()!=this||owner.provider_!=s.provider||owner.archive_!=pod.archive)return false;
+    const auto& bank=*s.provider->mounts_[pod.mount];
+    const auto& device=s.devices14[pod.device];
+    return bank.active&&bank.generation==pod.generation&&device.name04&&
+        (device.flags0C&0x342u)==0x342u;
+}
 bool OriginalStandardTextureResolver50LA::openSourceBankMember131230(const void* root,const void* occurrence,
     const std::string& name,std::int32_t& handle,D& d)noexcept {
     d={};if(!freshFileCapacity_||!scratch_||!root||!occurrence||handle!=-1)return fail(d,E::phase,0x131230);auto& s=*freshFileCapacity_;
     if(!((s.courseRootOwner==root&&s.courseStage==FreshFileCapacity::CourseStage::joined)||
-         (s.track.root==root&&s.track.joined))||!s.members150||
+         (s.track.root==root&&s.track.joined)||sourcePodBankCurrentNative(root))||!s.members150||
        s.memberCount154<=0||s.cursor168< -1||s.cursor168>=s.memberCount154)return fail(d,E::phase,0x1315B0);
     ++s.cursor168;if(s.cursor168==s.memberCount154)s.cursor168=0;
     auto index=static_cast<std::int32_t>(s.cursor168);const auto start=index;bool found=false;
@@ -3814,9 +3837,12 @@ bool OriginalStandardTextureResolver50LA::openSourceBankMember131380(const void*
     if(!freshFileCapacity_||!scratch_||!root||!occurrence||handle!=-1)return fail(d,E::phase,0x131380);
     auto& s=*freshFileCapacity_;
     if(!((s.courseRootOwner==root&&s.courseStage==FreshFileCapacity::CourseStage::joined)||
-         (s.track.root==root&&s.track.joined))||!s.members150||
+         (s.track.root==root&&s.track.joined)||sourcePodBankCurrentNative(root))||!s.members150||
        index<0||index>=s.memberCount154)return fail(d,E::phase,0x131380);
-    if(s.members150[index].deviceID00!=(s.track.root==root?s.track.device:s.courseDevice)||!s.members150[index].originalMember)
+    const auto device=s.pod.root==root?s.pod.device:(s.track.root==root?s.track.device:s.courseDevice);
+    // Keep the global rotating search's actual winner. A different bank is
+    // an unsupported root here, never skipped in favor of a later POD row.
+    if(s.members150[index].deviceID00!=device||!s.members150[index].originalMember)
         return fail(d,E::phase,0x131380);
     return openExactSourceMember131380(occurrence,index,handle,d);
 }
@@ -3854,13 +3880,14 @@ bool OriginalStandardTextureResolver50LA::openExactSourceMember131380(const void
 bool OriginalStandardTextureResolver50LA::sourceBankMemberCurrent(const void* root,const void* occurrence,std::int32_t handle)const noexcept {
     if(!freshFileCapacity_||!scratch_||!root||!occurrence)return false;const auto& s=*freshFileCapacity_;
     if(!((s.courseRootOwner==root&&s.courseStage==FreshFileCapacity::CourseStage::joined)||
-         (s.track.root==root&&s.track.joined))||!s.members150||handle<0||handle>=s.memberCount154)return false;
+         (s.track.root==root&&s.track.joined)||sourcePodBankCurrentNative(root))||!s.members150||handle<0||handle>=s.memberCount154)return false;
     if(s.track.root==root){
         if(!s.provider||s.track.mount>=s.provider->mounts_.size())return false;
         const auto& bank=*s.provider->mounts_[s.track.mount];
         if(!bank.active||bank.generation!=s.track.generation)return false;
     }
-    const auto& member=s.members150[handle];return member.courseConfigOwner==occurrence&&member.deviceID00==(s.track.root==root?s.track.device:s.courseDevice)&&
+    const auto device=s.pod.root==root?s.pod.device:(s.track.root==root?s.track.device:s.courseDevice);
+    const auto& member=s.members150[handle];return member.courseConfigOwner==occurrence&&member.deviceID00==device&&
         (member.flags18&4)&&member.cursor10<=member.length14&&member.originalMember&&member.filename08;
 }
 bool OriginalStandardTextureResolver50LA::readSourceBankMember130560(const void* root,const void* occurrence,std::int32_t handle,

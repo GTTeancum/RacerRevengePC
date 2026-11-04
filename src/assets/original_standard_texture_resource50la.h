@@ -440,6 +440,9 @@ private:
     std::weak_ptr<OriginalLoadingFontSource50LA> loadingPstRoot_;
     const void* loadingPstFontEntry_=nullptr;
     OriginalUiMemberView50KG loadingPstExpected_{};
+    // Original manager-issued POD registration only; decoded native mounts
+    // never satisfy this same-root/encoded-owner/active-generation predicate.
+    bool sourcePodBankCurrentNative(const void*)const noexcept;
     bool openSourceBankMember131380(const void*,const void*,std::int32_t,std::int32_t&,OriginalStandardTextureDiagnostic50LA&)noexcept;
     bool openSourceBankMember131230(const void*,const void*,const std::string&,std::int32_t&,OriginalStandardTextureDiagnostic50LA&)noexcept;
     bool sourceBankMemberCurrent(const void*,const void*,std::int32_t)const noexcept;

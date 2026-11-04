@@ -267,6 +267,10 @@ Application::Application(std::shared_ptr<rr::game::HostMonotonicClock50ID> clock
         // In particular disabled Main, a host track option or an environment
         // override never fabricates17C9EC's separate predefined-track write0.
         sourceUseProfile2E0_=1;
+        // Same constructor writes the process audio directory at17C7BC/C0/C4.
+        // Retain exact writable-global custody, not an assumed native path.
+        require(sourceAudioDirectory36AFE0_.write17C7BC(*this),
+            "application original audio directory owner rejected");
         // Actual Application lifetime, before APPSTART IO or template consumers,
         // including direct entry and disabled Main. This is native ownership;
         // original13FB6C publication/12CEA0 registration are still unimplemented.

@@ -5701,6 +5701,10 @@ bool Owner::continueSourceSkyHeader129644(std::uint32_t& pc)noexcept {
     //The first header went to stack. This second read targets actual receiver7D8;
     //a NULL receiver cannot supply native storage and is bounded at the real call.
     if(!sourceSkyOwner_){at(0x129654);return false;}
+    //129320 stored zero before this sole count read. A positive EOF clamp
+    //returns item1 at12FF34 while preserving the constructor's unread suffix.
+    if(!sourceSkyConstructor288A50_.returned||sourceSkyConstructor288A50_.nullFields[6]!=0u||
+       sourceSkyOwner_->count7D8!=0u){at(0x129654);return false;}
     h.countReadAttempted=true;a::OriginalStandardTextureDiagnostic50LA d;
     const bool returned=sourceSkyFile_->readCount4(d);
     const auto& count=sourceSkyFile_->countRead_;
@@ -6854,10 +6858,16 @@ bool Owner::continueSourceSkyItemBody(std::uint32_t& pc,std::size_t occurrence)n
     }
     at(0x1297ec);at(0x1297f0);at(0x1297f4);h.parserModeA2=0;at(0x1289c0);h.parserEntered=true;at(0x1289e0);
     if(!owner)return false; //Original NULL receiver reaches this first SD, not a fabricated loader result.
+    const auto receiverBytesKnown=[&](std::size_t offset,std::size_t size){
+        if(!h.constructorReturned||offset>owner->known.size()||size>owner->known.size()-offset)return false;
+        for(std::size_t k=0;k<size;++k)if(!owner->known[offset+k])return false;
+        return true;
+    };
     if(!sourceSkyFile_->beginItemParser(owner->storage.get(),occurrence))return false;
     h.handle40=static_cast<std::uint64_t>(*sourceSkyFile_->sourceHandle_);
     for(std::size_t k=0;k<8;++k){owner->storage[0x40+k]=static_cast<std::uint8_t>(*h.handle40>>(k*8));owner->known[0x40+k]=true;}h.handleStored=true;
-    at(0x1289e4);at(0x1289e8);at(0x1289ec);if(!resolverCurrent())return false;at(0x1289f0);at(0x1289f4);at(0x1289f8);at(0x1289fc);at(0x128a00);at(0x128a04);h.headerAttempted=true;
+    at(0x1289e4);at(0x1289e8);at(0x1289ec);if(!resolverCurrent())return false;at(0x1289f0);at(0x1289f4);at(0x1289f8);at(0x1289fc);at(0x128a00);at(0x128a04);
+    if(!receiverBytesKnown(0x48,4)){at(0x128a00);return false;}h.headerAttempted=true;
     const bool returned=sourceSkyFile_->readItemHeader48(d,occurrence);const auto& read=sourceSkyFile_->itemOccurrence(occurrence)->header48;
     if(read.copied)std::memcpy(owner->storage.get()+0x48,read.bytes.data(),read.copied);h.headerCopied=read.copied;
     if(!returned){at(d.sourcePC?d.sourcePC:sourceSkyFile_->pc_);return false;}
@@ -6868,7 +6878,8 @@ bool Owner::continueSourceSkyItemBody(std::uint32_t& pc,std::size_t occurrence)n
     //XYZ reads. No flags-to4C store and no replacement of vector W.
     for(std::size_t i=0;i<17;++i){const auto spec=rr::assets::OriginalSourceSkyFile50LA::itemFieldSpec(i);
         if(!resolverCurrent()||!preflightSourceSkyItemsNative())return false;
-        at(spec.call);const bool fieldReturned=sourceSkyFile_->readItemField(i,d,occurrence);
+        at(spec.call);if(i&&!receiverBytesKnown(spec.destination,spec.size))return false;
+        const bool fieldReturned=sourceSkyFile_->readItemField(i,d,occurrence);
         const auto& field=sourceSkyFile_->itemOccurrence(occurrence)->fields[i];
         if(i&&field.copied){std::memcpy(owner->storage.get()+spec.destination,field.bytes.data(),field.copied);
             for(std::size_t k=0;k<field.copied;++k)owner->known[spec.destination+k]=true;}
@@ -6884,7 +6895,8 @@ bool Owner::continueSourceSkyItemBody(std::uint32_t& pc,std::size_t occurrence)n
     at(0x128b4c);at(0x128b50);at(0x128b54);
     const auto optionalRead=[&](std::size_t index){const auto spec=rr::assets::OriginalSourceSkyFile50LA::itemFieldSpec(index);
         if(!resolverCurrent()||!preflightSourceSkyItemsNative())return false;
-        at(spec.call);const bool returned=sourceSkyFile_->readItemField(index,d,occurrence);
+        at(spec.call);if(!receiverBytesKnown(spec.destination,spec.size))return false;
+        const bool returned=sourceSkyFile_->readItemField(index,d,occurrence);
         const auto& field=sourceSkyFile_->itemOccurrence(occurrence)->fields[index];
         if(field.copied){std::memcpy(owner->storage.get()+spec.destination,field.bytes.data(),field.copied);
             for(std::size_t k=0;k<field.copied;++k)owner->known[spec.destination+k]=true;}

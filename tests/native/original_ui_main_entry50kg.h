@@ -2,6 +2,7 @@
 #include "../../src/game/original_application_input04_source50la.h"
 #include "../../src/game/original_application_startup17c910_source50la.h"
 #include "../../src/game/original_application_video_source50la.h"
+#include "../../src/game/original_audio_directory_source50la.h"
 #pragma once
 #include "../../src/game/original_player_race_music_borrow50la.h"
 #include "../../platform/linux/native/native_beta_settings50kg.h"
@@ -568,6 +569,7 @@ private:
     // predefined-track17C9EC writes0 only AFTER its actual argv/298 producer;
     // native host CLI/environment are not that input and do not enable it.
     std::optional<std::uint32_t> sourceUseProfile2E0_;
+    rr::game::OriginalAudioDirectorySource50LA sourceAudioDirectory36AFE0_;
     // Genuine single-view1A9240 prefix and concrete Windows/Linux adapter.
     // Native accepted initialization is distinct from a retail2361C0 receipt.
     bool continueConsumedRaCamera1A9240(rr::game::OriginalRaceConstructor50LA&,std::uint32_t&)const noexcept;
@@ -1258,6 +1260,9 @@ public:
         rr::platform::OriginalUiTournamentPodReferences50KG&,
         rr::assets::OriginalStandardMaterialDiagnostic50LA&)const noexcept;
     std::shared_ptr<rr::assets::OriginalStandardMaterialDomain50LA> standardMaterialDomain() const;
+    const rr::game::OriginalAudioDirectorySource50LA& nativeAudioDirectory36AFE0()const noexcept {
+        return sourceAudioDirectory36AFE0_;
+    }
     // Cold factory only. Video must already have minted this application's
     // actual construction context; no caller-provided replacement or ready
     // flag can create a font domain. This does not load fonts or activate HUD.
