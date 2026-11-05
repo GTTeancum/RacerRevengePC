@@ -67,6 +67,7 @@ struct Context final {
     applicationClockType& applicationClock;
     using originalMainApplicationType = const original_main_entry50KG::Application;
     originalMainApplicationType& originalMainApplication;
+    rr::game::ControlPresets49D& controlPresets;
     using rendererType = rr::platform::VehicleWindowGl50DS;
     rendererType& renderer;
     using windowSwapsType = std::uint64_t;

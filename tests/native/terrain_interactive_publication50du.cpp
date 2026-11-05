@@ -2547,6 +2547,7 @@ void Context::run() {
    .originalUiSecondControllerNavigation=originalUiSecondControllerNavigation,
    .applicationClock=applicationClock,
    .originalMainApplication=originalMainApplication,
+   .controlPresets=controlPresets,
    .renderer=renderer,
    .windowSwaps=windowSwaps,
    .submittedDrawFrames=submittedDrawFrames,

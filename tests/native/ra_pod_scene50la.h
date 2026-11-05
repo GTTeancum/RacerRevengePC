@@ -42,6 +42,7 @@ class Owner {
     friend class rr::game::OriginalRaceConstructor50LA;
     friend class rr::game::OriginalRacePauseWorldAuthority50LA;
 protected:
+    using NativeListMethodCustody=g::OriginalNativeListMethodCustody50LA;
 // Inside ra_pod_scene50LA::Owner protected area; existing Application friend.
 // Copies the SAME genuine startup-owned vectors, no new constant owner.
 bool copySourceWorldStartDefaults(std::array<std::uint32_t,4>& origin,
@@ -1674,7 +1675,6 @@ struct SourcePortal230450State {
     };
     std::optional<NativePortalParameterRole3A0> nativePortalParameters3A0_;
     std::optional<SourcePortalParameter276590*> sourcePortal3A0_;
-    using NativeListMethodCustody=g::OriginalNativeListMethodCustody50LA;
     std::unique_ptr<NativeListMethodCustody*[]> nativeMethods4C8_,nativeMethods4CC_,nativeMethods4D0_,nativeMethods4D4_;
     std::size_t nativeMethodRowsInitialized_=0,nativeMethodZoneNext_=0;
     bool continueNativeMethodArrays272C78(const ra_cold_sources50LA::Owner&,std::uint32_t&)noexcept;
@@ -1800,6 +1800,8 @@ struct SourceSearchNode27F120 {
     bool exclusionAttempted=false,exclusionAllocationReturned=false,exclusionReturned=false;
     std::size_t exclusionProduced=0;
 };
+// Shared source node custody used by base portal consumers and derived loading.
+std::array<std::array<SourceSearchNode27F120,10>,2> sourceSearchNodes_;
 //Actual fresh272FC0 ownership, separate from the twenty zone method nodes.
 enum class SourceVisibilityEnvironmentCaller:std::uint8_t {unreached,particle1B4E2C,water274714};
 struct SourceVisibilityEnvironment272FC0 {

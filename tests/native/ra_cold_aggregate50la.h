@@ -1836,12 +1836,12 @@ struct SourceSkyItems129758 : SourceSkyItemState, SourceSkyItemLoopHistory {
 } sourceSkyItems129758_;
 struct SourceSkyLaterItem {SourceSkyItemState history;SourceSkyItemLoopHistory loop;std::unique_ptr<SourceSkyItemOwner> owner;};
 std::vector<std::unique_ptr<SourceSkyLaterItem>> sourceSkyLaterItems_;
-SourceSkyItemState& sourceItemHistory(std::size_t i)noexcept {return i?sourceSkyLaterItems_[i-1]->history:sourceSkyItems129758_;}
-const SourceSkyItemState& sourceItemHistory(std::size_t i)const noexcept {return i?sourceSkyLaterItems_[i-1]->history:sourceSkyItems129758_;}
+SourceSkyItemState& sourceItemHistory(std::size_t i)noexcept {if(i)return sourceSkyLaterItems_[i-1]->history;return sourceSkyItems129758_;}
+const SourceSkyItemState& sourceItemHistory(std::size_t i)const noexcept {if(i)return sourceSkyLaterItems_[i-1]->history;return sourceSkyItems129758_;}
 std::unique_ptr<SourceSkyItemOwner>& sourceItemOwner(std::size_t i)noexcept {return i?sourceSkyLaterItems_[i-1]->owner:sourceSkyFirstItem_;}
 const std::unique_ptr<SourceSkyItemOwner>& sourceItemOwner(std::size_t i)const noexcept {return i?sourceSkyLaterItems_[i-1]->owner:sourceSkyFirstItem_;}
-SourceSkyItemLoopHistory& sourceItemLoop(std::size_t i)noexcept {return i?sourceSkyLaterItems_[i-1]->loop:sourceSkyItems129758_;}
-const SourceSkyItemLoopHistory& sourceItemLoop(std::size_t i)const noexcept {return i?sourceSkyLaterItems_[i-1]->loop:sourceSkyItems129758_;}
+SourceSkyItemLoopHistory& sourceItemLoop(std::size_t i)noexcept {if(i)return sourceSkyLaterItems_[i-1]->loop;return sourceSkyItems129758_;}
+const SourceSkyItemLoopHistory& sourceItemLoop(std::size_t i)const noexcept {if(i)return sourceSkyLaterItems_[i-1]->loop;return sourceSkyItems129758_;}
 bool continueSourceSkyItemFailure128C8C(std::uint32_t&,std::size_t)noexcept;
 bool sourceSkyItemDriverActive_=false;
 struct SourceSkyPacketRow {
@@ -2483,7 +2483,6 @@ enum class SourcePortalGraphPhase:std::uint8_t {unreached,entered,bounded,return
 // Aggregate-private additions. Index0 visibility,1 collision; no legacy inline owner adoption.
 enum class SourceSearchNodesPhase:std::uint8_t {unreached,entered,bounded,returned,nativeClosed};
 SourceSearchNodesPhase sourceSearchNodesPhase_=SourceSearchNodesPhase::unreached;
-std::array<std::array<SourceSearchNode27F120,10>,2> sourceSearchNodes_;
 std::optional<std::uint32_t> sourceSearchNodeS0_;
 std::uint32_t sourceSearchNodesPC_=0x272a50;
 const SourceZone275C50* sourceSearchZonesIdentity_=nullptr;
