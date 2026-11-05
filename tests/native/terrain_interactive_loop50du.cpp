@@ -2416,7 +2416,9 @@ void Context::run() {
     captureCommitted();
    }
    if(captureRun.evidenceComplete()&&trackBaseline.complete()&&captureRun.videoHoldComplete()){
-    composePacket(false,input);sampleController();break;
+    composePacket(false,input);sampleController();
+    if(captureRun.takeNativeRestartRequest())restartRequested=true;
+    break;
    }
    const auto afterWork=monotonicNow50DU();
    if(allAiEnabled&&afterWork-lastAllAiStatusNs>=1000000000ull){

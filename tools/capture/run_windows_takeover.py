@@ -41,6 +41,8 @@ def main():
     parser.add_argument('--seconds', type=int, default=180)
     parser.add_argument('--camera-trace', action='store_true',
                         help='Log actual attached-camera poses without changing camera behavior')
+    parser.add_argument('--restart-once', action='store_true',
+                        help='Exercise native race teardown/rebuild after first race evidence; not Pause-menu input')
     args = parser.parse_args()
     if os.name != 'nt' or not 10 <= args.seconds <= 180:
         parser.error('Windows required; watchdog must be 10..180 seconds')
@@ -81,6 +83,8 @@ def main():
                RR_NATIVE_FIXED_WINDOW='1')
     if args.camera_trace:
         env['RR_CAMERA_POSE_TRACE'] = '1'
+    if args.restart_once:
+        env['RR_UNATTENDED_RESTART_ONCE'] = '1'
     command = [str(staged), '--assets', str(assets)]
     result = dict(command=command, route=args.route, watchdogSeconds=args.seconds,
                   sourceBuildReceipt=str(build / 'build-receipt.json'),
@@ -88,7 +92,7 @@ def main():
                   runtimeHashes={p.name: digest(output / p.name) for p in runtime},
                   nativeSaveDirectory=str(saves), audioCapturePath=str(output / 'audio.wav'),
                   visualVerified=False, audioVerified=False, hostInputUsed=False,
-                  cameraPoseTrace=args.camera_trace)
+                  cameraPoseTrace=args.camera_trace, nativeRestartOnce=args.restart_once)
     (output / 'launch.json').write_text(json.dumps(result, indent=2) + '\n')
     # Inherited process error mode prevents OS crash-dialog waits. Application
     # dialogs, if any, remain bounded by termination of this exact child handle.
@@ -133,8 +137,9 @@ def main():
                           live_ids == {lifecycle[0][1]} and
                           all(row[0] == lifecycle[0][1] and tuple(row[1:]) in owners for row in retained)))
         track = 'GA' if args.route.endswith('-ga') else 'MA' if args.route.endswith('-ma') else 'TA'
+        loading_sessions = [(1, 'UI'), (2, track)] + ([(3, track)] if args.restart_once else [])
         loading_files = [capture / f'loading-session-{session}' / f'loading-{code}-{frame}.ppm'
-                         for session, code in ((1, 'UI'), (2, track)) for frame in (1, 2)]
+                         for session, code in loading_sessions for frame in (1, 2)]
         loading_assets = re.findall(r'original_loading_assets background=(\S+) layout=(\S+) background_sha256=([0-9a-f]{64})', log_text)
         result['originalLoadingScreens'] = dict(assets=loading_assets,
             captures=[str(p) for p in loading_files],
@@ -146,6 +151,29 @@ def main():
             {row[0] for row in loading_assets} == {'LD_UI.PST', f'LD_{track}.PST'} and
             result.get('gameSummary', {}).get('completed') and
             result.get('gameSummary', {}).get('cleanup_complete'))
+        if args.restart_once:
+            restart = result.get('gameSummary', {}).get('native_restart_test', {})
+            first = restart.get('first_race') or {}
+            second = result.get('gameSummary', {}).get('track', {})
+            files = [first.get('image_file'), first.get('receipt_file'), first.get('baseline_file'),
+                     second.get('image_file'), second.get('receipt_file'),
+                     result.get('gameSummary', {}).get('baseline_file')]
+            result['nativeRestartVerified'] = bool(restart.get('issued') and
+                len(displays) == 3 and len(retained) == 2 and len(set(files)) == 6 and
+                all(path and inside(Path(path)).is_file() for path in files) and
+                second.get('image_file') == str(capture / 'race-session-3' / 'track-1.ppm'))
+            if result['nativeRestartVerified']:
+                before = json.loads(Path(first['receipt_file']).read_text())
+                after = json.loads(Path(second['receipt_file']).read_text())
+                result['nativeRestartVerified'] = bool(
+                    before.get('session') == 2 and after.get('session') == 3 and
+                    before.get('course_selection') == after.get('course_selection') and
+                    before.get('selected_rider') == after.get('selected_rider') and
+                    all(row.get('track') == track and row.get('race_phase') == 2 and
+                        row.get('settled') and row.get('window_swap_submitted') and
+                        row.get('world_ticks', 0) > 0 and 0 < row.get('race_seconds', 0) < 2
+                        for row in (before, after)))
+            result['routeCompleted'] = result['routeCompleted'] and result['nativeRestartVerified']
         (output / 'execution.json').write_text(json.dumps(result, indent=2) + '\n')
     print(json.dumps(result, indent=2))
     return 0 if result['routeCompleted'] else 1

@@ -57,6 +57,8 @@ class Run final {
  std::uint32_t wallSeconds_=180;
  std::array<std::filesystem::path,static_cast<std::size_t>(Stage::count)> images_{},receipts_{};
  std::filesystem::path baselineFile_;
+ bool restartOnce_=false,restartIssued_=false;
+ Json firstRaceEvidence_;
 public:
  Run(){
   const auto* directory=std::getenv("RR_WINDOW_CAPTURE_DIR");
@@ -67,6 +69,9 @@ public:
       std::string(route)=="main-occo20-course-sa"||std::string(route)=="main-dud04-course-ga"||std::string(route)=="main-ben02-course-ga"||std::string(route)=="main-alder10-course-ma"||std::string(route)=="main-ody11-course-ma"||std::string(route)=="main-gasgano07-course-sa"||std::string(route)=="main-mawhonic09-course-ra",
       "unsupported unattended original UI route");
   navigate_=route!=nullptr;
+  restartOnce_=option("RR_UNATTENDED_RESTART_ONCE");
+  require(!restartOnce_||(enabled_&&automatic_&&unattended_&&navigate_),
+      "native restart test requires an unattended automatic UI route");
   navigateOcco_=route&&std::string(route)=="main-occo20-course-sa";
   navigateDudGa_=route&&std::string(route)=="main-dud04-course-ga";
   navigateBenGa_=route&&std::string(route)=="main-ben02-course-ga";
@@ -144,7 +149,7 @@ public:
  }
  void noteBaseline(const Json& receipt){
   if(!enabled_)return;
-  const auto file=directory_/"track-fps-baseline.json";
+  const auto file=directory_/(restartIssued_?"track-fps-baseline-restarted.json":"track-fps-baseline.json");
   require(baselineFile_.empty()&&!std::filesystem::exists(file),"track baseline receipt would overwrite an existing file");
   std::ofstream output(file,std::ios::binary);require(bool(output),"cannot open track FPS baseline receipt");
   Json evidence=receipt;if(navigateGasganoSa_||navigateMawhonicRa_)evidence["test_profile"]=testProfileName();
@@ -157,12 +162,27 @@ public:
       !images_[static_cast<std::size_t>(Stage::course)].empty()&&
       !images_[static_cast<std::size_t>(Stage::race)].empty()&&!baselineFile_.empty();
  }
+ // Process-local native restart test. This consumes a completed first race
+ // observation, not a Pause-menu event or a claim that a new race is ready.
+ bool takeNativeRestartRequest(){
+  if(!restartOnce_||restartIssued_)return false;
+  require(evidenceComplete()&&videoHoldComplete(),"restart test requires completed first-race evidence");
+  const auto i=static_cast<std::size_t>(Stage::race);
+  firstRaceEvidence_={{"image_file",images_[i].string()},{"receipt_file",receipts_[i].string()},
+      {"baseline_file",baselineFile_.string()}};
+  images_[i].clear();receipts_[i].clear();baselineFile_.clear();baselineFinished_={};
+  restartIssued_=true;
+  std::cerr<<platformName<<"_native_restart_test_requested "<<firstRaceEvidence_.dump()<<'\n';
+  return true;
+ }
  // The outer application calls this only after normal owned session cleanup.
  void reportClosed(){
   if(!enabled_)return;
   Json receipt={{"evidence_mode",evidenceMode()},{"completed",evidenceComplete()&&videoHoldComplete()},
       {"video_hold_seconds",videoHoldSeconds_},{"video_hold_complete",videoHoldComplete()},
       {"cleanup_complete",true},{"timed_out",timeoutReported_},{"baseline_file",baselineFile_.string()}};
+  receipt["native_restart_test"]={{"requested",restartOnce_},{"issued",restartIssued_},
+      {"first_race",firstRaceEvidence_},{"pause_menu_tested",false}};
   if(navigateGasganoSa_||navigateMawhonicRa_)receipt["test_profile"]=testProfileName();
   for(const auto stage:{Stage::main,Stage::rider,Stage::course,Stage::race}){
    const auto i=static_cast<std::size_t>(stage);
