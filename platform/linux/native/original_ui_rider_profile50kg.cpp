@@ -666,7 +666,12 @@ bool OriginalUiRiderProfileOwner50KG::hallSnapshot(game::OriginalUiHallProfile50
 }
 bool OriginalUiRiderProfileOwner50KG::hallRecordSnapshot(std::uint32_t course,
     game::OriginalUiHallCourseRecords50KG& out) const noexcept {
-    if(!hallRecordsReady()||storage_->common->mode34!=5||course>=storage_->hallRecords.courses.size())return false;
+    if(!hallRecordsReady()||course>=storage_->hallRecords.courses.size())return false;
+    // Loading Screen1CADE0 reads these same records for its actual committed
+    // Course in mode0. This immutable observation does not enter Hall mode,
+    // change a record, or admit a race/renderer. Hall browsing remains mode5.
+    if(storage_->common->mode34!=5&&
+       !(storage_->common->mode34==0&&course==(storage_->packed1125F&15u)))return false;
     out=storage_->hallRecords.courses[course];return true;
 }
 bool OriginalUiRiderProfileOwner50KG::hallPlanetColors(std::uint32_t planet,

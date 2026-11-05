@@ -8,6 +8,7 @@ import ctypes
 import hashlib
 import json
 import os
+import re
 from pathlib import Path
 import shutil
 import subprocess
@@ -111,8 +112,33 @@ def main():
         summary = capture / 'window-evidence-summary.json'
         if summary.is_file():
             result['gameSummary'] = json.loads(summary.read_text())
+        log = output / 'RacerRevenge.log'
+        log_text = log.read_text(errors='replace') if log.is_file() else ''
+        displays = re.findall(r'native_player_display generation=(\d+) sdl_id=(\d+) video=(\S+) host=(\S+)', log_text)
+        retained = re.findall(r'native_player_window phase=retained sdl_id=(\d+) video=(\S+) host=(\S+)', log_text)
+        lifecycle = re.findall(r'native_window_lifetime phase=(created|destroyed) sdl_id=(\d+) window=(\S+)', log_text)
+        # The first Display is constructed before its window, hence SDL ID 0.
+        owners = {tuple(row[2:]) for row in displays}
+        live_ids = {row[1] for row in displays if row[1] != '0'}
+        result['windowContinuity'] = dict(displays=displays, retained=retained, lifecycle=lifecycle,
+            verified=bool(len(displays) >= 2 and len(owners) == 1 and retained and
+                          len(lifecycle) == 2 and lifecycle[0][0] == 'created' and
+                          lifecycle[1][0] == 'destroyed' and lifecycle[0][1] != '0' and
+                          lifecycle[0][1:] == lifecycle[1][1:] and
+                          live_ids == {lifecycle[0][1]} and
+                          all(row[0] == lifecycle[0][1] and tuple(row[1:]) in owners for row in retained)))
+        track = 'GA' if args.route.endswith('-ga') else 'MA' if args.route.endswith('-ma') else 'TA'
+        loading_files = [capture / f'loading-{code}-{frame}.ppm'
+                         for code in ('UI', track) for frame in (1, 2)]
+        loading_assets = re.findall(r'original_loading_assets background=(\S+) layout=(\S+) background_sha256=([0-9a-f]{64})', log_text)
+        result['originalLoadingScreens'] = dict(assets=loading_assets,
+            captures=[str(p) for p in loading_files],
+            captured=all(p.is_file() and p.stat().st_size > 32 for p in loading_files))
         result['routeCompleted'] = bool(result.get('exitCode') == 0 and
             not result.get('watchdogExpired', True) and
+            result['windowContinuity']['verified'] and
+            result['originalLoadingScreens']['captured'] and
+            {row[0] for row in loading_assets} == {'LD_UI.PST', f'LD_{track}.PST'} and
             result.get('gameSummary', {}).get('completed') and
             result.get('gameSummary', {}).get('cleanup_complete'))
         (output / 'execution.json').write_text(json.dumps(result, indent=2) + '\n')

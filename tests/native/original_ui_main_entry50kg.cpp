@@ -727,10 +727,15 @@ const char* Frontend::presentationPolicyName()const noexcept {
         }
     }
 
+static bool unattendedRiderPresentation50KG()noexcept {
+        const char* value=std::getenv("RR_UNATTENDED_CAPTURE");
+        return value&&std::strcmp(value,"1")==0;
+    }
+
 bool Frontend::available()const noexcept  {
         if(!presentationHost||!presentationNow||!presentationHost->hasWindow()||!presentationHost->current()||hostPaused()){std::fprintf(stderr,"original_rider_presentation_failure method=available site=1\n");return false;}
         const auto& info=presentationHost->info();
-        if(!info.focused||info.minimized||info.drawableWidth<=0||info.drawableHeight<=0){std::fprintf(stderr,"original_rider_presentation_failure method=available site=2\n");return false;}
+        if((!info.focused&&!unattendedRiderPresentation50KG())||info.minimized||info.drawableWidth<=0||info.drawableHeight<=0){std::fprintf(stderr,"original_rider_presentation_failure method=available site=2\n");return false;}
         if(!presentationActive)return riderPresentationPolicy==RiderPresentationPolicy::inactive;
         if(info.drawableWidth!=presentationWidth||info.drawableHeight!=presentationHeight){std::fprintf(stderr,"original_rider_presentation_failure method=available site=3\n");return false;}
         return (riderPresentationPolicy==RiderPresentationPolicy::driverSwapInterval1&&info.swapInterval==1)||
@@ -786,7 +791,8 @@ bool Frontend::end()noexcept  {
 bool Frontend::pollPresentationInput()noexcept {
         if(!presentationActive||!available()){std::fprintf(stderr,"original_rider_presentation_failure method=pollPresentationInput site=1\n");return false;}
         rr::platform::GameHostInput50ER input;rr::platform::GameHostDiagnostic50ER d;
-        if(!presentationHost->poll(input,d)||input.keys.quitRequested||input.keys.activityLost||
+        if(!presentationHost->poll(input,d)||input.keys.quitRequested||
+           (input.keys.activityLost&&!unattendedRiderPresentation50KG())||
            input.keys.resized||input.keys.eventBudgetExhausted||!available()){std::fprintf(stderr,"original_rider_presentation_failure method=pollPresentationInput site=2\n");return false;}
         return true;
     }

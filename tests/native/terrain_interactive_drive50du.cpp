@@ -150,7 +150,7 @@ int nativeApplicationMain50DU(int argc,char**argv){try{
  initializeControlPresets49D(*applicationControlsOwner);
  auto& applicationControls=*applicationControlsOwner;
  original_main_entry50KG::Application originalMainApplication(applicationClockOwner,applicationControlsOwner,
-     discEntry&&!headlessLive&&!captureRun.enabled());
+     discEntry&&!headlessLive);
  // Keep the actual Application alive while terminal exception cleanup retires
  // its source Aural/Pending/Light/backing. Session-local owners unwind FIRST.
  // Normal Course handoffs remain inside this scope and do not retire services.
@@ -282,7 +282,8 @@ int nativeApplicationMain50DU(int argc,char**argv){try{
  for(;;){
   if(captureRun.deadlineExpired())break;
   PlayerLoadingSession50DU playerLoading(originalMainApplication,
-      enterOriginalUi?"Preparing Main":"Preparing race");
+      enterOriginalUi?"Preparing Main":"Preparing race",
+      enterOriginalUi?"UI":rr::platform::hostTrackCode50IM(effectiveTrack));
   try{PlayerLoadingSession50DU::checkStop();}
   catch(const PlayerLoadingCancelled50DU&){break;}
   const auto exit=enterOriginalUi?
