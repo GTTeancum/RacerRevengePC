@@ -1,4 +1,5 @@
 bool Owner::preflightNativeWaterPoolInnerLoad()const noexcept {
+    if(!preflightNativeWaterPoolRowBacking())return false;
     using S=WaterPoolInnerLoadStop;using G=a::OriginalConfigProcessGlobals50LA;
     using A=SourceWaterConfig::NativeWaterPoolMaterial::RawAllocation;
     const auto& n=sourceWaterConfig_.nativeWaterPoolInnerLoad;
@@ -41,7 +42,13 @@ bool Owner::preflightNativeWaterPoolInnerLoad()const noexcept {
     if(n.zeroed){
         if(rows.payload.get()==object->payload.get()||rows.payload.get()==topology->payload.get())return false;
         const auto* bytes=static_cast<const std::uint8_t*>(rows.payload.get());
-        for(std::size_t i=0;i<rows.bytes;++i)if(bytes[i])return false;
+        const auto& row=sourceWaterConfig_.nativeWaterPoolRowBacking;
+        for(std::size_t i=0;i<rows.bytes;++i){
+            //Native aliases do not serialize host addresses into guest pointer lanes.
+            if((row.aliasStored[0]&&i>=12u&&i<16u)||(row.aliasStored[1]&&i>=8u&&i<12u))continue;
+            const auto expected=row.countStored&&i>=20u&&i<24u?std::uint8_t(*row.count>>(8u*(i-20u))):0u;
+            if(bytes[i]!=expected)return false;
+        }
     }
     return true;
 }
@@ -55,6 +62,7 @@ bool Owner::withdrawNativeWaterPoolInnerLoad()noexcept {
        constructorRacerWorldBorrows_||sourceParticleInvocationBorrowers_||!sourceWaterConfig_.nativeWithdrawn||
        !sourceWaterProviderInitializer_.world400NativeWithdrawn||!f.nativeWithdrawn||!f.file->nativeClosed())return false;
     auto& object=*sourceWaterProvider_->nativePool->nativeData->nativeTopology->firstRecord->firstInner;
+    if(!withdrawNativeWaterPoolRowBacking())return false;
     object.rows00=nullptr;object.rows.reset();n.retired=true;return true;
 }
 
