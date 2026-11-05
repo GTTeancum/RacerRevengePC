@@ -1,4 +1,5 @@
 bool Owner::preflightNativeWaterPoolRecordBacking()const noexcept {
+    if(!preflightNativeWaterPoolFirstElement())return false;
     using S=WaterPoolRecordBackingStop;using A=SourceWaterConfig::NativeWaterPoolMaterial::RawAllocation;
     using G=a::OriginalConfigProcessGlobals50LA;using E=g::OriginalWaterTopologyElements50LA;
     const auto& n=sourceWaterConfig_.nativeWaterPoolRecordBacking;

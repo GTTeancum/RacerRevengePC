@@ -485,6 +485,7 @@ bool OriginalWaterPoolSourceFile50LA::topologyReadHistoryNative()const noexcept 
 }
 #include "original_water_pool_index_reads50la.inl"
 #include "original_water_pool_record_read50la.inl"
+#include "original_water_pool_element_read50la.inl"
 bool OriginalWaterPoolSourceFile50LA::closeSource131040(D& d)noexcept {
     d={};const auto version=versionWordNative();
     if(sourceCloseAttempted_||nativeClosed_||!version||*version==2u||
@@ -500,7 +501,8 @@ bool OriginalWaterPoolSourceFile50LA::closeSource131040(D& d)noexcept {
 bool OriginalWaterPoolSourceFile50LA::historyNative(const void* poolIdentity)const noexcept {
     if(!poolIdentity||poolIdentity_!=poolIdentity||thread_!=std::this_thread::get_id()||
        !resolver_||!provider_||!track_||(nativeClosed_&&pinOwned_)||!materialReaderHistoryNative()||
-       !topologyReadHistoryNative()||!indexReadHistoryNative()||!firstTopologyRecordHistoryNative())return false;
+       !topologyReadHistoryNative()||!indexReadHistoryNative()||!firstTopologyRecordHistoryNative()||
+       !firstTopologyElementHistoryNative())return false;
     if(!searchReached_)return !pinOwned_&&nativeHandle_==-1&&!openAttempted_&&!openReturned_&&
         !searchReturned_&&!found_&&!sourceReturnV0_&&!outputHandleStored_&&!outputAssociationStored_&&
         !read_.attempted&&!countRead_.entered&&!sourceCloseAttempted_; //Bookkeeping allocation refusal.
@@ -618,7 +620,10 @@ bool OriginalWaterPoolSourceFile50LA::preflightNative(const void* poolIdentity)c
         for(const auto& r:materialReader_.reads)if(r.attempted)latestMaterial=&r;
         const IndexRead* latestIndex=nullptr;
         for(const auto& r:indexReader_.reads)if(r.attempted)latestIndex=&r;
-        if(firstTopologyRecord_.read.attempted){
+        if(firstTopologyElement_.read.attempted){
+            const auto& r=firstTopologyElement_.read;
+            if(!r.afterObserved||row.cursor10!=r.after.memberCursor10)return false;
+        }else if(firstTopologyRecord_.read.attempted){
             const auto& r=firstTopologyRecord_.read;
             if(!r.afterObserved||row.cursor10!=r.after.memberCursor10)return false;
         }else if(latestIndex){
