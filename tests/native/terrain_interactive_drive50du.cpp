@@ -283,7 +283,7 @@ int nativeApplicationMain50DU(int argc,char**argv){try{
   if(captureRun.deadlineExpired())break;
   PlayerLoadingSession50DU playerLoading(originalMainApplication,
       enterOriginalUi?"Preparing Main":"Preparing race",
-      enterOriginalUi?"UI":rr::platform::hostTrackCode50IM(effectiveTrack));
+      enterOriginalUi?"UI":rr::platform::hostTrackCode50IM(effectiveTrack),sessionIndex);
   try{PlayerLoadingSession50DU::checkStop();}
   catch(const PlayerLoadingCancelled50DU&){break;}
   const auto exit=enterOriginalUi?

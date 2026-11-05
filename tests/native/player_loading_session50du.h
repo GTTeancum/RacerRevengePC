@@ -16,6 +16,7 @@ class PlayerLoadingSession50DU final {
     rr::platform::loading_progress50DU::Observer previous_{};
     const char* stage_;
     const char* screenCode_;
+    std::uint64_t sessionIndex_;
     Clock::time_point nextPoll_{};
     bool installed_=false,finished_=false,quit_=false,failed_=false;
     std::optional<rr::platform::PlayerLoadingPresenter50DU> presenter_;
@@ -38,15 +39,15 @@ class PlayerLoadingSession50DU final {
             failed_=true;return;
         }
         quit_=quit_||close;
-        if(!presenter_)presenter_.emplace(video->host,application_.assetRoot,screenCode_,application_.riderProfile);
+        if(!presenter_)presenter_.emplace(video->host,application_.assetRoot,screenCode_,application_.riderProfile,sessionIndex_);
         if(!presenter_->draw(stage_,quit_)){
             if(!failed_)std::fprintf(stderr,"player_loading_present_failure\n");
             failed_=true;
         }
     }
 public:
-    PlayerLoadingSession50DU(const original_main_entry50KG::Application& application,const char* stage,const char* screenCode)
-        :application_(application),stage_(stage),screenCode_(screenCode) {
+    PlayerLoadingSession50DU(const original_main_entry50KG::Application& application,const char* stage,const char* screenCode,std::uint64_t sessionIndex)
+        :application_(application),stage_(stage),screenCode_(screenCode),sessionIndex_(sessionIndex) {
         if(!application.retainsPlayerWindow50DU())return;
         const auto video=application.playerVideo50DU();
         if(video&&video->host.created()){

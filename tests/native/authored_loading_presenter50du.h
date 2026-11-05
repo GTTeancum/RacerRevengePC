@@ -23,6 +23,7 @@ class PlayerLoadingPresenter50DU final {
     struct Image {I width=0,height=0;std::vector<unsigned char> rgba;};
     struct Animation {Image image;float x=0,y=0,endX=0,endY=0,width=0,height=0,seconds=0;bool loop=false;};
     GameHost50ER& host_;std::filesystem::path root_;std::string code_;
+    std::uint64_t sessionIndex_;
     std::shared_ptr<OriginalUiRiderProfileOwner50KG> profile_;
     Image background_;std::vector<Animation> animations_;std::vector<unsigned char> pixels_;
     struct Font {assets::OriginalUiFont50KG metrics;Image image;};
@@ -188,7 +189,7 @@ class PlayerLoadingPresenter50DU final {
         }
     }
 public:
-    PlayerLoadingPresenter50DU(GameHost50ER& host,const std::filesystem::path& root,const char* code,std::shared_ptr<OriginalUiRiderProfileOwner50KG> profile):host_(host),root_(root),code_(code),profile_(std::move(profile)){}
+    PlayerLoadingPresenter50DU(GameHost50ER& host,const std::filesystem::path& root,const char* code,std::shared_ptr<OriginalUiRiderProfileOwner50KG> profile,std::uint64_t sessionIndex):host_(host),root_(root),code_(code),sessionIndex_(sessionIndex),profile_(std::move(profile)){}
     bool draw(const char*,bool=false)noexcept try {
         if(!host_.created()||!host_.hasWindow()||!host_.current())return false;
         const auto info=host_.info();if(info.minimized||info.drawableWidth<=0||info.drawableHeight<=0)return true;
@@ -198,7 +199,9 @@ public:
         const bool capturing=capture&&*capture&&captures_<2&&(captures_==0||elapsed>=.5);
         std::vector<unsigned char> rgb;std::ofstream out;
         if(capturing){rgb.resize(static_cast<std::size_t>(info.drawableWidth)*info.drawableHeight*3);
-            const auto path=std::filesystem::path(capture)/("loading-"+code_+"-"+std::to_string(captures_+1)+".ppm");
+            const auto directory=std::filesystem::path(capture)/("loading-session-"+std::to_string(sessionIndex_+1));
+            if(captures_==0&&!std::filesystem::create_directory(directory))return false;
+            const auto path=directory/("loading-"+code_+"-"+std::to_string(captures_+1)+".ppm");
             if(std::filesystem::exists(path))return false;
             out.open(path,std::ios::binary);if(!out)return false;}
         I readFbo=0,drawFbo=0,texture=0,unpack=0;gl_.get(0x8CAA,&readFbo);gl_.get(0x8CA6,&drawFbo);gl_.get(0x8069,&texture);gl_.get(0x88EF,&unpack);
@@ -229,7 +232,7 @@ public:
         GameHostDiagnostic50ER diagnostic;okay=okay&&gl_.error()==0&&host_.swapWindow(diagnostic);
         if(okay&&capturing){out<<"P6\n"<<info.drawableWidth<<' '<<info.drawableHeight<<"\n255\n";
             for(I y=info.drawableHeight;y>0;--y)out.write(reinterpret_cast<const char*>(rgb.data()+(y-1)*info.drawableWidth*3),info.drawableWidth*3);
-            okay=bool(out);++captures_;}
+            out.close();okay=bool(out);if(okay)++captures_;}
         return okay;
     }catch(const std::exception& e){std::fprintf(stderr,"original_loading_failure=%s\n",e.what());return false;}
 };
