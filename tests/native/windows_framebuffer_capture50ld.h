@@ -57,12 +57,13 @@ class Run final {
  std::uint32_t wallSeconds_=180;
  std::array<std::filesystem::path,static_cast<std::size_t>(Stage::count)> images_{},receipts_{};
  std::filesystem::path baselineFile_;
- bool restartOnce_=false,restartIssued_=false;
+ bool restartOnce_=false,restartIssued_=false,logsOnly_=false;
  Json firstRaceEvidence_;
 public:
  Run(){
   const auto* directory=std::getenv("RR_WINDOW_CAPTURE_DIR");
   if(directory){require(*directory,"RR_WINDOW_CAPTURE_DIR must be a nonempty existing directory");directory_=directory;enabled_=true;}
+  logsOnly_=option("RR_EVIDENCE_LOGS_ONLY");
   automatic_=option("RR_WINDOW_CAPTURE_AUTO");unattended_=option("RR_UNATTENDED_CAPTURE");
   const auto* route=std::getenv("RR_UNATTENDED_UI_ROUTE");
   require(!route||std::string(route)=="main-rider-course-ta"||std::string(route)=="main-rider-course-sa"||
@@ -125,6 +126,7 @@ public:
       {"video_hold_seconds",videoHoldSeconds_},{"ui_route",navigateMawhonicRa_?"main-mawhonic09-course-ra":navigateGasganoSa_?"main-gasgano07-course-sa":navigateOdyMa_?"main-ody11-course-ma":navigateAlderMa_?"main-alder10-course-ma":navigateBenGa_?"main-ben02-course-ga":navigateDudGa_?"main-dud04-course-ga":navigateOcco_?"main-occo20-course-sa":navigateSa_?"main-rider-course-sa":navigate_?"main-rider-course-ta":"none"},{"wall_budget_seconds",unattended_?wallSeconds_:0},
       {"test_profile",testProfileName()},{"actual_focus_preserved",true},{"directory",directory_.string()}}.dump()<<'\n';
  }
+ bool logsOnly()const noexcept{return logsOnly_;}
  bool enabled()const noexcept{return enabled_;}
  bool automatic()const noexcept{return automatic_;}
  bool unattended()const noexcept{return unattended_;}
@@ -157,10 +159,10 @@ public:
   baselineFinished_=Clock::now();baselineFile_=file;
  }
  bool evidenceComplete()const noexcept{
-  return !timeoutReported_&&!images_[static_cast<std::size_t>(Stage::main)].empty()&&
-      !images_[static_cast<std::size_t>(Stage::rider)].empty()&&
-      !images_[static_cast<std::size_t>(Stage::course)].empty()&&
-      !images_[static_cast<std::size_t>(Stage::race)].empty()&&!baselineFile_.empty();
+  return !timeoutReported_&&!receipts_[static_cast<std::size_t>(Stage::main)].empty()&&
+      !receipts_[static_cast<std::size_t>(Stage::rider)].empty()&&
+      !receipts_[static_cast<std::size_t>(Stage::course)].empty()&&
+      !receipts_[static_cast<std::size_t>(Stage::race)].empty()&&!baselineFile_.empty();
  }
  // Process-local native restart test. This consumes a completed first race
  // observation, not a Pause-menu event or a claim that a new race is ready.
@@ -229,6 +231,7 @@ public:
  // authority. No renderer or host retains this cold owner's storage.
  template<class Swap> bool swapAndCapture(rr::platform::VehicleWindowGl50DS& renderer,
      rr::platform::GameHost50ER& host,bool capture,std::uint64_t swapSequence,Swap swap){
+  if(run_&&run_->logsOnly())capture=false;
 #if defined(__linux__)
   pending_={};
   rr::platform::VehicleWindowDiagnostic50DS diagnostic;
@@ -271,8 +274,10 @@ public:
   run_=&run;session_=sessionIndex+1;
   directory_=run.directory()/(std::string(role)+"-session-"+std::to_string(session_));
   require(std::filesystem::create_directory(directory_),"window capture session directory already exists; supply a fresh output directory");
-  rgba_.resize(static_cast<std::size_t>(width)*static_cast<std::size_t>(height)*4u);
-  row_.resize(static_cast<std::size_t>(width)*3u);
+  if(!run.logsOnly()){
+   rgba_.resize(static_cast<std::size_t>(width)*static_cast<std::size_t>(height)*4u);
+   row_.resize(static_cast<std::size_t>(width)*3u);
+  }
  }
  bool enabled()const noexcept{return run_!=nullptr;}
  std::uint64_t serial()const noexcept{return serial_;}
@@ -294,6 +299,22 @@ public:
      Stage stage,bool settled,Json details){
   require(run_&&serial_<64,"window capture owner is unavailable");
   const auto& info=host.info();
+  if(run_->logsOnly()){
+   require(host.created()&&host.hasWindow()&&!info.minimized,"log observation needs a live submitted window");
+   details["evidence_mode"]="native_logs_only";details["pixel_source"]="none";
+   details["image_file"]=nullptr;details["visual_verified"]=false;
+   details["physical_desktop_scanout_verified"]=false;
+   details["stage"]=stageName(stage);details["sequence"]=serial_+1;details["session"]=session_;
+   details["settled"]=settled;details["window_swap_submitted"]=true;
+   details["width"]=info.drawableWidth;details["height"]=info.drawableHeight;
+   const auto receiptFile=directory_/(std::string(stageName(stage))+"-"+std::to_string(serial_+1)+".json");
+   require(!std::filesystem::exists(receiptFile),"log receipt would overwrite evidence");
+   std::ofstream receipt(receiptFile,std::ios::binary);require(bool(receipt),"cannot open log receipt");
+   receipt<<details.dump(2)<<'\n';receipt.close();require(bool(receipt),"log receipt write failed");
+   run_->noteCapture(stage,settled,{},receiptFile);
+   ++serial_;if(settled)captured_[static_cast<std::size_t>(stage)]=true;requested_=false;
+   std::cerr<<platformName<<"_stage_observation "<<details.dump()<<'\n';return;
+  }
 #if defined(__linux__)
   const auto paired=pending_;pending_={}; // Consume once, even if file publication fails.
   require(paired.renderer==&renderer&&paired.host==&host&&host.created()&&host.current()&&

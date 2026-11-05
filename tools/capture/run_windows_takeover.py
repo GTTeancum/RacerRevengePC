@@ -38,6 +38,7 @@ def main():
     parser.add_argument('--route', choices=['main-dud04-course-ga', 'main-ben02-course-ga',
                         'main-alder10-course-ma', 'main-ody11-course-ma',
                         'main-rider-course-ta'], default='main-dud04-course-ga')
+    parser.add_argument('--logs-only', action='store_true', help='Record stage and timing receipts without pixel readback or image files')
     parser.add_argument('--seconds', type=int, default=180)
     parser.add_argument('--profile-performance', action='store_true',
                         help='Enable existing CPU/render/display phase measurements')
@@ -85,6 +86,8 @@ def main():
                RR_UNATTENDED_SECONDS=str(max(1, args.seconds - 5)),
                RR_ORIGINAL_AI_ALL_RACERS='0', RR_TRACK_FPS_BASELINE='1',
                RR_NATIVE_FIXED_WINDOW='1')
+    if args.logs_only:
+        env['RR_EVIDENCE_LOGS_ONLY'] = '1'
     if args.camera_trace:
         env['RR_CAMERA_POSE_TRACE'] = '1'
     if args.profile_performance or args.profile_gpu_stages:
@@ -99,7 +102,7 @@ def main():
                   executableSha256=digest(staged),
                   runtimeHashes={p.name: digest(output / p.name) for p in runtime},
                   nativeSaveDirectory=str(saves), audioCapturePath=str(output / 'audio.wav'),
-                  visualVerified=False, audioVerified=False, hostInputUsed=False,
+                  visualVerified=False, audioVerified=False, hostInputUsed=False, logsOnly=args.logs_only,
                   cameraPoseTrace=args.camera_trace, nativeRestartOnce=args.restart_once,
                   performanceProfiling=args.profile_performance or args.profile_gpu_stages,
                   serializedGpuStageProfiling=args.profile_gpu_stages)
@@ -157,7 +160,7 @@ def main():
         result['routeCompleted'] = bool(result.get('exitCode') == 0 and
             not result.get('watchdogExpired', True) and
             result['windowContinuity']['verified'] and
-            result['originalLoadingScreens']['captured'] and
+            (args.logs_only or result['originalLoadingScreens']['captured']) and
             {row[0] for row in loading_assets} == {'LD_UI.PST', f'LD_{track}.PST'} and
             result.get('gameSummary', {}).get('completed') and
             result.get('gameSummary', {}).get('cleanup_complete'))
@@ -168,10 +171,12 @@ def main():
             files = [first.get('image_file'), first.get('receipt_file'), first.get('baseline_file'),
                      second.get('image_file'), second.get('receipt_file'),
                      result.get('gameSummary', {}).get('baseline_file')]
+            if args.logs_only:
+                files = [first.get('receipt_file'), first.get('baseline_file'), second.get('receipt_file'), result.get('gameSummary', {}).get('baseline_file')]
             result['nativeRestartVerified'] = bool(restart.get('issued') and
-                len(displays) == 3 and len(retained) == 2 and len(set(files)) == 6 and
+                len(displays) == 3 and len(retained) == 2 and len(set(files)) == (4 if args.logs_only else 6) and
                 all(path and inside(Path(path)).is_file() for path in files) and
-                second.get('image_file') == str(capture / 'race-session-3' / 'track-1.ppm'))
+                second.get('receipt_file' if args.logs_only else 'image_file') == str(capture / 'race-session-3' / ('track-1.json' if args.logs_only else 'track-1.ppm')))
             if result['nativeRestartVerified']:
                 before = json.loads(Path(first['receipt_file']).read_text())
                 after = json.loads(Path(second['receipt_file']).read_text())
@@ -184,6 +189,9 @@ def main():
                         row.get('world_ticks', 0) > 0 and 0 < row.get('race_seconds', 0) < 2
                         for row in (before, after)))
             result['routeCompleted'] = result['routeCompleted'] and result['nativeRestartVerified']
+        if args.logs_only:
+            result['noImagesWritten'] = not any(p.suffix.lower() in {'.ppm', '.png', '.jpg', '.pending'} for p in output.rglob('*'))
+            result['routeCompleted'] = result['routeCompleted'] and result['noImagesWritten']
         (output / 'execution.json').write_text(json.dumps(result, indent=2) + '\n')
     print(json.dumps(result, indent=2))
     return 0 if result['routeCompleted'] else 1

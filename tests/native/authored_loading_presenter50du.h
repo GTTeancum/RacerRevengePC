@@ -196,7 +196,8 @@ public:
         if(!load()||gl_.error()!=0)return false;
         const auto elapsed=std::chrono::duration<double>(std::chrono::steady_clock::now()-start_).count();compose(elapsed);if(!composeText())return false;
         const char* capture=std::getenv("RR_WINDOW_CAPTURE_DIR");
-        const bool capturing=capture&&*capture&&captures_<2&&(captures_==0||elapsed>=.5);
+        const char* logsOnly=std::getenv("RR_EVIDENCE_LOGS_ONLY");
+        const bool capturing=!(logsOnly&&std::string(logsOnly)=="1")&&capture&&*capture&&captures_<2&&(captures_==0||elapsed>=.5);
         std::vector<unsigned char> rgb;std::ofstream out;
         if(capturing){rgb.resize(static_cast<std::size_t>(info.drawableWidth)*info.drawableHeight*3);
             const auto directory=std::filesystem::path(capture)/("loading-session-"+std::to_string(sessionIndex_+1));
