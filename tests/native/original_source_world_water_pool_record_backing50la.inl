@@ -1,5 +1,5 @@
 bool Owner::preflightNativeWaterPoolRecordBacking()const noexcept {
-    if(!preflightNativeWaterPoolFirstElement())return false;
+    if(!preflightNativeWaterPoolFirstElement()||!preflightNativeWaterPoolInnerObject())return false;
     using S=WaterPoolRecordBackingStop;using A=SourceWaterConfig::NativeWaterPoolMaterial::RawAllocation;
     using G=a::OriginalConfigProcessGlobals50LA;using E=g::OriginalWaterTopologyElements50LA;
     const auto& n=sourceWaterConfig_.nativeWaterPoolRecordBacking;
@@ -85,6 +85,7 @@ bool Owner::withdrawNativeWaterPoolRecordBacking()noexcept {
     if(nativeScbThread_!=std::this_thread::get_id()||runtimeCameraBorrows_||runtimeWorldBorrows_||
        constructorRacerWorldBorrows_||sourceParticleInvocationBorrowers_||!sourceWaterConfig_.nativeWithdrawn||
        !sourceWaterProviderInitializer_.world400NativeWithdrawn||!f.nativeWithdrawn||!f.file->nativeClosed())return false;
+    if(!withdrawNativeWaterPoolInnerObject())return false;
     auto& record=sourceWaterProvider_->nativePool->nativeData->nativeTopology->firstRecord;
     record->elements10=nullptr;record->objects08=nullptr;record->halfwords04=nullptr;
     record.reset();n.retired=true;return true; //Native withdrawal; no guest destructor receipt.

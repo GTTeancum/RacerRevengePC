@@ -132,6 +132,7 @@ public:
     enum class WaterPoolRecordBackingStop {none,capacity,ownerAllocation,sourceReentrancy,
         nativeReentrancy,payloadAllocation,elementConstruction,innerLoop2BADD8};
     enum class WaterPoolElementStop {none,serviceLoad,read,unknownHalfword,newEntry2E8D90,empty2BADFC};
+    enum class WaterPoolInnerObjectStop {none,nativeReentrancy,ownerAllocation,payloadAllocation,loader2998D0};
 private:
     std::shared_ptr<const g::OriginalRacerWorldBorrow50LA> mintConstructorRacerWorldBorrow(
         const std::shared_ptr<Owner>& self)noexcept;
@@ -737,6 +738,11 @@ struct SourceWaterPoolMaterialArrayOwner final {
     SourceWaterPoolMaterialArrayOwner& operator=(const SourceWaterPoolMaterialArrayOwner&)=delete;
 };
 struct SourceWaterPoolTopologyOwner;
+struct SourceWaterPoolRecordOwner;
+struct SourceWaterPoolInnerOwner final {
+    std::unique_ptr<void,NativeWaterArrayPayloadDelete> payload;
+    const SourceWaterPoolRecordOwner* record=nullptr;
+};
 struct SourceWaterPoolRecordOwner final {
     std::unique_ptr<void,NativeWaterArrayPayloadDelete> halfwords,objectWords;
     g::OriginalWaterTopologyElements50LA elements;
@@ -745,6 +751,9 @@ struct SourceWaterPoolRecordOwner final {
     const void* halfwords04=nullptr;
     const void* objects08=nullptr;
     const void* elements10=nullptr;
+    std::unique_ptr<SourceWaterPoolInnerOwner> firstInner;
+    const SourceWaterPoolInnerOwner* firstObjectSlot=nullptr;
+    ~SourceWaterPoolRecordOwner()noexcept {if(firstInner||firstObjectSlot)std::terminate();}
 };
 //20*T topology storage with explicit descendant custody.
 struct SourceWaterPoolTopologyOwner final {
@@ -1507,6 +1516,15 @@ struct SourceWaterConfig {
         std::optional<std::int32_t> halfword;
         a::OriginalStandardTextureDiagnostic50LA diagnostic{};
     } nativeWaterPoolFirstElement;
+    struct NativeWaterPoolInnerObject {
+        bool attempted=false,ownerAllocated=false,payloadAttempted=false,allocated=false;
+        bool constructed=false,aliasStored=false,retired=false;
+        WaterPoolInnerObjectStop stop=WaterPoolInnerObjectStop::none;
+        std::uint32_t pc=0;
+        std::optional<a::OriginalConfigProcessGlobals50LA::StdioIdentity> nativeReent;
+        const SourceWaterPoolRecordOwner* recordIdentity=nullptr;
+        const SourceWaterPoolInnerOwner* objectIdentity=nullptr;
+    } nativeWaterPoolInnerObject;
 } sourceWaterConfig_;
 std::unique_ptr<a::OriginalWaterSourceConfig50LA> sourceWaterConfigOwner_;
 bool continueSourceWaterConfig2B9314(std::uint32_t&)noexcept;
@@ -1558,6 +1576,8 @@ bool preflightNativeWaterPoolIndices()const noexcept;
 bool preflightNativeWaterPoolRecordCount()const noexcept;
 bool preflightNativeWaterPoolRecordBacking()const noexcept;
 bool preflightNativeWaterPoolFirstElement()const noexcept;
+bool preflightNativeWaterPoolInnerObject()const noexcept;
+bool withdrawNativeWaterPoolInnerObject()noexcept;
 bool withdrawNativeWaterPoolRecordBacking()noexcept;
 bool withdrawNativeWaterPoolIndices()noexcept;
 bool withdrawNativeWaterPoolTopologyBacking()noexcept;
@@ -3594,6 +3614,13 @@ public:
         a::OriginalStandardTextureDiagnostic50LA diagnostic{};
     };
     WaterPoolElementResult readFirstWaterPoolElementNativeOnly(WaterArrayBackingMode)noexcept;
+    struct WaterPoolInnerObjectResult {
+        enum class Status {refused,alreadyAttempted,nativeStopped,sourceBoundary};
+        Status status=Status::refused;WaterPoolInnerObjectStop stop=WaterPoolInnerObjectStop::none;
+        std::uint32_t pc=0,originalSourceStop=0;
+        bool allocated=false,constructed=false,aliasStored=false,retired=false;
+    };
+    WaterPoolInnerObjectResult constructFirstWaterPoolInnerNativeOnly(WaterArrayBackingMode)noexcept;
     bool constructWorldCold1B2870(const original_main_entry50KG::Application&,
         rr::platform::RaceAudioGroups50IC&,rr::platform::AudioMixer50HD&,std::uint64_t,std::uint32_t&)noexcept;
     bool prepareWorldPhysicsIndex270CDC(std::uint32_t& pc)noexcept {
