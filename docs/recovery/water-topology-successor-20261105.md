@@ -173,3 +173,47 @@ not runtime invocation of the new initialization API. A redundant GA route was
 not used as Water validation. The next index allocation/read work must preserve
 unknown raw bytes, T-1 iterations, distinct read observations and the last actual
 cursor on failure; it must not replace the existing topology-count receipt.
+
+## Nested topology reader and calculation boundary
+
+The hash-pinned extractor now includes299790,2998D0..299A90,133F80 and
+299420..29978C. Reproducible evidence is in
+`evidence/water-topology-complete-trace-20261105/trace.json` and `trace.txt`.
+Earlier exploratory inner traces are superseded for disassembly: generic
+Capstone incorrectly rendered EE LQC2/SQC2 as modern MIPS bit branches.
+The extractor now explicitly decodes those loads/stores and marks other COP2
+instructions undecoded. The six extractor tests pass, including vector-memory
+positive/negative offsets and opaque COP2 handling. No COP2 execution is claimed.
+
+The actual nested file layout is:
+
+-299908 reads one4-byte count into the zero-constructed12-byte object's+4.
+-29991C allocates24*count and29993C zero-fills that array before its loop.
+-For each24-byte row,299964 reads another4-byte count into stack+7C. This stack
+ destination is not initialized by this function before the first read. Short
+ reads therefore cannot be treated as a zero-extended count; later iterations
+ retain the preceding stack bytes.
+-299970 allocates16*N into row+0C.29998C and299998 store zeros at+10 and+4;
+ 2999A8 stores N at+14.2999B0 allocates32*N into row+8.
+-2999E0 reads N items of32 bytes into row+8. The following loop at299A0C reads
+ 12 bytes per item into16-byte-stride storage at row+0C. The fourth word of each
+ item is not file-initialized. Both arrays begin as raw, uninitialized storage.
+-299A38 calls299420 on that row before299A5C accumulates N into object+8.
+ The loader returns only at299A8C/90 after all rows complete.
+
+299420 is additional required work, not a no-op: it conditionally allocates
+row+10 through302E58, uses a distinct assertion guard/word, computes floating
+point values over overlapping32-byte records, and executes VU/COP2 operations.
+Its main loop uses N-2, followed by two unconditional tail calculations. Native
+admission must prove the required extents and known input lanes before those
+tails; zero/short inputs do not justify fabricating a successful loader return.
+The COP2 arithmetic and302E58 semantics still require recovery and validation.
+
+Runtime integration inspection also confirmed the existing native World route
+in original_world_water_none50la.inl accepts only the original selector `none`.
+The separate canonical non-none factory is reached through the source post-sky
+continuation, with authenticated Race8C, profile and Environment state. The new
+explicit native-success APIs have no runtime callers yet. A test that injects
+private fields or bypasses those prerequisites would not prove that pipeline.
+Owner-level runtime coverage must join that actual continuation and its preceding
+load stages. Existing GA captures remain evidence only for their exercised path.

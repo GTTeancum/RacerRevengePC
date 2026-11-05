@@ -42,6 +42,10 @@ class TraceTests(unittest.TestCase):
         self.assertEqual(ee_instruction(0x7BBF0040), 'lq $ra, 0x40($sp)')
         self.assertEqual(ee_instruction(0x70809E28), 'por $s3, $a0, $zero')
         self.assertEqual(ee_instruction(0x70000000), 'EE MMI (not decoded)')
+        self.assertEqual(ee_instruction(0xD8E40000), 'lqc2 $vf4, 0x0($a3)')
+        self.assertEqual(ee_instruction(0xF8660000), 'sqc2 $vf6, 0x0($v1)')
+        self.assertEqual(ee_instruction(0xD8E4FFF0), 'lqc2 $vf4, -0x10($a3)')
+        self.assertEqual(ee_instruction(0x4BC4216A), 'EE COP2 (not decoded)')
         self.assertIsNone(ee_instruction(0x0C0C15C0))
 
 

@@ -19,6 +19,10 @@ RANGES = {
     'topology_reader': (0x2BAB10, 0x2BAE2C),
     'malloc_wrapper': (0x305700, 0x305730),
     'malloc_prefix': (0x305980, 0x305AE0),
+    'topology_element_constructor': (0x133F80, 0x133FA0),
+    'topology_inner_constructor': (0x299790, 0x2997A4),
+    'topology_inner_loader': (0x2998D0, 0x299A94),
+    'topology_inner_finalize': (0x299420, 0x299790),
 }
 SOURCES = (
     'tests/native/ra_cold_aggregate50la.h',
@@ -71,6 +75,10 @@ def ee_instruction(word):
     imm = (word & 0xFFFF) - (0x10000 if word & 0x8000 else 0)
     if op in (0x1E, 0x1F):
         return f'{"lq" if op == 0x1E else "sq"} ${REG[rt]}, {imm:#x}(${REG[rs]})'
+    if op in (0x36, 0x3E):
+        return f'{"lqc2" if op == 0x36 else "sqc2"} $vf{rt}, {imm:#x}(${REG[rs]})'
+    if op == 0x12:
+        return 'EE COP2 (not decoded)'
     if op == 0x1C:
         # EE MMI3/POR. Other MMI words are deliberately left undecoded.
         if word & 0x7FF == 0x628:
