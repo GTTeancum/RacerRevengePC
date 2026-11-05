@@ -129,6 +129,12 @@ class OriginalWaterPoolSourceFile50LA final {
         std::uint64_t dataEpoch=0;std::uint32_t count=0;
         std::vector<IndexRead> reads;
     } indexReader_;
+    struct FirstTopologyRecordRead {
+        IndexRead read;
+        const void* topologyIdentity=nullptr;
+        const void* dataIdentity=nullptr;
+        std::uint64_t dataEpoch=0;
+    } firstTopologyRecord_;
     std::shared_ptr<OriginalStandardTextureResolver50LA> resolver_;
     std::shared_ptr<OriginalStandardArchiveProvider50LA> provider_;
     //This is admission's SAME service Track relation, not a presumed winner.
@@ -201,6 +207,8 @@ class OriginalWaterPoolSourceFile50LA final {
     bool indexReadHistoryNative()const noexcept;
     bool beginIndexReaderNative(const void*,const void*,std::uint64_t,std::uint32_t,D&)noexcept;
     bool readIndex12FB30(std::uint32_t,D&)noexcept;
+    bool firstTopologyRecordHistoryNative()const noexcept;
+    bool readFirstTopologyRecord12FB30(const void*,const void*,std::uint64_t,D&)noexcept;
     bool topologyReadHistoryNative()const noexcept; //Leaf: values and opaque identities only.
     bool readTopologyCount12FB30(const void* data,std::uint64_t dataEpoch,TopologyEntryKind,D&)noexcept;
     //Only the complete non-2 version branch can issue this source close.

@@ -310,3 +310,4 @@ Owner::WaterPoolDataResult Owner::constructWaterPoolDataNativeOnly(WaterArrayBac
 #include "original_source_world_water_pool_topology_backing50la.inl"
 
 #include "original_source_world_water_pool_indices50la.inl"
+#include "original_source_world_water_pool_record_count50la.inl"

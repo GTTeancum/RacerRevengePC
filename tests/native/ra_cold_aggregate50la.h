@@ -126,6 +126,7 @@ public:
         countCapacity,byteCapacity,requestMismatch,ownerAllocation,payloadAllocation,assertionGuard2BAB60};
     enum class WaterPoolIndexStop {none,sourceReentrancy,nativeReentrancy,ownerAllocation,
         storageAllocation,readerPreparation,countReload,serviceLoad,read,outerLoop2BAC3C};
+    enum class WaterPoolRecordCountStop {none,serviceLoad,read,malloc2BAC88,empty2BAE10};
 private:
     std::shared_ptr<const g::OriginalRacerWorldBorrow50LA> mintConstructorRacerWorldBorrow(
         const std::shared_ptr<Owner>& self)noexcept;
@@ -1458,6 +1459,16 @@ struct SourceWaterConfig {
         g::OriginalWaterIndexStorage50LA::Allocation storageResult=g::OriginalWaterIndexStorage50LA::Allocation::none;
         a::OriginalStandardTextureDiagnostic50LA diagnostic{};
     } nativeWaterPoolIndices;
+    struct NativeWaterPoolRecordCount {
+        bool attempted=false,serviceLoaded=false;
+        WaterPoolRecordCountStop stop=WaterPoolRecordCountStop::none;
+        std::uint32_t pc=0;
+        const NativeWaterPoolDataRole* dataRole=nullptr;
+        const SourceWaterPoolTopologyOwner* topologyIdentity=nullptr;
+        std::uint64_t dataEpoch=0;
+        std::optional<std::uint32_t> count;
+        a::OriginalStandardTextureDiagnostic50LA diagnostic{};
+    } nativeWaterPoolRecordCount;
 } sourceWaterConfig_;
 std::unique_ptr<a::OriginalWaterSourceConfig50LA> sourceWaterConfigOwner_;
 bool continueSourceWaterConfig2B9314(std::uint32_t&)noexcept;
@@ -1506,6 +1517,7 @@ static SourceWaterConfig::NativeWaterPoolMaterial::RawAllocation topologyRawAllo
     std::uint32_t,std::optional<a::OriginalConfigProcessGlobals50LA::StdioIdentity>,std::uint32_t callPC=0x2bab54u)noexcept;
 bool preflightNativeWaterPoolTopologyBacking()const noexcept;
 bool preflightNativeWaterPoolIndices()const noexcept;
+bool preflightNativeWaterPoolRecordCount()const noexcept;
 bool withdrawNativeWaterPoolIndices()noexcept;
 bool withdrawNativeWaterPoolTopologyBacking()noexcept;
 bool withdrawNativeWaterPoolData()noexcept; //After file cancellation, before Pool Entity retirement.
@@ -3520,6 +3532,13 @@ public:
         a::OriginalStandardTextureDiagnostic50LA diagnostic{};
     };
     WaterPoolIndexResult readWaterPoolIndicesNativeOnly(WaterArrayBackingMode)noexcept;
+    struct WaterPoolRecordCountResult {
+        enum class Status {refused,alreadyAttempted,nativeStopped,sourceBoundary};
+        Status status=Status::refused;WaterPoolRecordCountStop stop=WaterPoolRecordCountStop::none;
+        std::uint32_t pc=0;std::optional<std::uint32_t> count;
+        a::OriginalStandardTextureDiagnostic50LA diagnostic{};
+    };
+    WaterPoolRecordCountResult readFirstWaterPoolRecordNativeOnly(WaterArrayBackingMode)noexcept;
     bool constructWorldCold1B2870(const original_main_entry50KG::Application&,
         rr::platform::RaceAudioGroups50IC&,rr::platform::AudioMixer50HD&,std::uint64_t,std::uint32_t&)noexcept;
     bool prepareWorldPhysicsIndex270CDC(std::uint32_t& pc)noexcept {

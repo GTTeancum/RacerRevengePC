@@ -66,6 +66,7 @@ Owner::SourceWaterConfig::NativeWaterPoolMaterial::RawAllocation Owner::topology
 }
 
 bool Owner::preflightNativeWaterPoolTopologyBacking()const noexcept {
+    if(!preflightNativeWaterPoolRecordCount())return false;
     using S=WaterPoolTopologyBackingStop;using G=a::OriginalConfigProcessGlobals50LA;
     using A=SourceWaterConfig::NativeWaterPoolMaterial::RawAllocation;
     const auto& n=sourceWaterConfig_.nativeWaterPoolTopologyBacking;
@@ -137,7 +138,11 @@ bool Owner::preflightNativeWaterPoolTopologyBacking()const noexcept {
     if(init.zeroFillReturned){
         if(!backing||!backing->payload||backing->requestedBytes!=init.zeroedBytes)return false;
         const auto* bytes=static_cast<const std::uint8_t*>(backing->payload.get());
-        for(std::size_t i=0;i<init.zeroedBytes;++i)if(bytes[i])return false;
+        const auto& record=f.file->firstTopologyRecord_.read;
+        for(std::size_t i=0;i<init.zeroedBytes;++i){
+            const auto expected=i<record.copied?record.bytes[i]:std::uint8_t{0};
+            if(bytes[i]!=expected)return false;
+        }
     }
     return backing&&backing==n.backingIdentity&&data.topology28==backing&&backing->payload&&
         backing->dataOwner==&data&&backing->dataEpoch==n.dataEpoch&& &data.role==n.dataRole&&
