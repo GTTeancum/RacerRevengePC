@@ -490,8 +490,13 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
     const auto action=captureRoute.poll(snapshot,group,slot,
         windowCapture.captured(windows_capture50LD::Stage::main),windowCapture.captured(windows_capture50LD::Stage::rider),
         windowCapture.captured(windows_capture50LD::Stage::course),sourceAccepted,
-        courseCatalogPrepared&&(courseCorpusPresent||(captureRun.navigateMawhonicRa()&&mawhonicTargetReady))&&
-        raceRequested&&allAiEnabled&&mawhonicTargetReady,
+        // This only permits the harness to press Confirm. The normal input
+        // callback builds the actual selection from the retained profile and
+        // calls courseRaceDestination above; validateDispatch then requires
+        // its accepted result. Do not duplicate the obsolete all-AI/corpus
+        // restriction here: rooted direct-human tracks need neither.
+        courseCatalogPrepared&&raceRequested&&!courseColdLoad.pending()&&
+        renderer.initialized()&&mawhonicTargetReady,
         originalMain.sourceFrameGeneration,originalMain.submittedPublication);
     if(action>=0){originalMain.input(static_cast<std::uint8_t>(action));captureRoute.validateDispatch(originalMain.coordinator.snapshot());}
    }

@@ -74,7 +74,7 @@ def main():
                RR_WINDOW_CAPTURE_DIR=str(capture), RR_WINDOW_CAPTURE_AUTO='1',
                RR_UNATTENDED_CAPTURE='1', RR_UNATTENDED_UI_ROUTE=args.route,
                RR_UNATTENDED_SECONDS=str(max(1, args.seconds - 5)),
-               RR_ORIGINAL_AI_ALL_RACERS='1', RR_TRACK_FPS_BASELINE='1',
+               RR_ORIGINAL_AI_ALL_RACERS='0', RR_TRACK_FPS_BASELINE='1',
                RR_NATIVE_FIXED_WINDOW='1')
     command = [str(staged), '--assets', str(assets)]
     result = dict(command=command, route=args.route, watchdogSeconds=args.seconds,

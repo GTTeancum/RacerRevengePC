@@ -327,6 +327,11 @@ bool Application::finishNativeFrontendAudio(std::string& error)const noexcept {
     // selected localization, then Pending's real cache/strong-sample owners.
     // Supplied by the coordinated native language-services production join.
     if(!retireFrontendLanguageServices17C8A4(error))return false;
+    // Loading330 is a later Root sibling than Aural. Its real camera/list
+    // aliases must retire before102CD0, whose tail precondition is deliberate.
+    // Waiting for Application's destructor leaves Aural blocked by next14.
+    if(!retireNativeLoading330Prefix())
+        return garageBackingFailure(error,"Terminal loading-manager330 prefix still has live borrowers");
     if(sourceAural00Owner_){
         if(const auto pending=sourceAural00Owner_->nativeOutputPendingNamespace())
             if(!retirePendingWaves2668E0(pending,error))return false;

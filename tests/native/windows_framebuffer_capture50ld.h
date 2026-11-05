@@ -108,7 +108,13 @@ public:
   require(!navigate_||option("RR_TRACK_FPS_BASELINE"),"complete unattended UI evidence route requires RR_TRACK_FPS_BASELINE=1");
   if(unattended_){
    const auto* allAi=std::getenv("RR_ORIGINAL_AI_ALL_RACERS");
-   require(allAi&&std::string(allAi)=="1","unattended capture requires original AI for all racers, including camera slot 0");
+   // Rooted TA/GA/MA menu routes retain the real human Player0. This permits
+   // process-local menu navigation only; it neither supplies host input nor
+   // claims a race is ready. Course Confirm still uses its actual destination.
+   const bool directHumanRoute=allAi&&std::string(allAi)=="0"&&navigate_&&
+       !navigateSa_&&!navigateOcco_&&!navigateGasganoSa_&&!navigateMawhonicRa_;
+   require((allAi&&std::string(allAi)=="1")||directHumanRoute,
+       "unattended capture requires all-AI mode or an explicit supported direct-human menu route");
   }
   std::cerr<<platformName<<"_capture_run "<<Json{{"evidence_mode",evidenceMode()},{"automatic",automatic_},
       {"video_hold_seconds",videoHoldSeconds_},{"ui_route",navigateMawhonicRa_?"main-mawhonic09-course-ra":navigateGasganoSa_?"main-gasgano07-course-sa":navigateOdyMa_?"main-ody11-course-ma":navigateAlderMa_?"main-alder10-course-ma":navigateBenGa_?"main-ben02-course-ga":navigateDudGa_?"main-dud04-course-ga":navigateOcco_?"main-occo20-course-sa":navigateSa_?"main-rider-course-sa":navigate_?"main-rider-course-ta":"none"},{"wall_budget_seconds",unattended_?wallSeconds_:0},
