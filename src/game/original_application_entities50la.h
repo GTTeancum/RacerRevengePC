@@ -442,21 +442,67 @@ class OriginalApplicationEntities50LA final {
         return suffix<p.suffix36BEC0.size()&&actualTrackDirectory.size()<p.directory36BFD0.size()&&
             suffix<p.directory36BFD0.size()-actualTrackDirectory.size();
     }
-    //Only the first scalar words are joined at2B850C/2B8528. No claim is
-    //made about the other12 bytes of either global vector. These process
-    //lanes survive provider/World retirement and can be overwritten by later
-    //joined writers; they are not per-provider constructor constants.
+    //Same-App process lanes survive World/provider retirement. Reconstructed
+    //from the checked-in Water getter, startup-vector and native-Wake contracts.
+    //Unknown words stay unknown until their actual joined writer publishes.
     struct SourceWaterProcessScalars {
-        std::array<std::optional<std::uint32_t>,2> words; //443EC0,443ED0.
-        std::array<std::uint64_t,2> publications{}; //Native history only.
+        std::array<std::optional<std::uint32_t>,35> words;
+        std::array<std::uint64_t,35> publications{}; //Native history only.
+        std::array<bool,35> nativeAdapted{};
         bool unknown=false;
+        //Six source startup stores from constructor-table entry3CC5F4->3CB790.
+        //This is a bounded projection, not guest constructor execution.
+        static constexpr std::array<std::uint32_t,6> startupAddresses{
+            0x443eacu,0x443ebcu,0x443ec4u,0x443ec8u,0x443eccu,0x443edcu};
+        static constexpr std::array<std::uint32_t,6> startupStorePCs{
+            0x3cb84cu,0x3cb870u,0x3cb7d0u,0x3cb880u,0x3cb88cu,0x3cb8b4u};
+        SourceWaterProcessScalars()noexcept {
+            constexpr std::array<std::uint32_t,6> values{
+                32u,32u,0u,0x448ae000u,0xc0000000u,0x3f000000u};
+            for(std::size_t i=0;i<values.size();++i){words[24u+i]=values[i];publications[24u+i]=1u;}
+        }
     } sourceWaterProcessScalars_;
+    static constexpr std::array<std::array<std::size_t,4>,2> waterVectorLanesNative{{
+        {{0u,26u,27u,28u}},{{1u,5u,6u,29u}}}};
     void invalidateWaterProcessScalarsNative()noexcept {sourceWaterProcessScalars_.unknown=true;}
+    bool waterProcessScalarsCurrentNative()const noexcept {
+        return nativeOwnerThread_==std::this_thread::get_id()&&constructed_&&!released_&&
+            !sourceWaterProcessScalars_.unknown;
+    }
     bool waterConstructorScalarsAdmittedNative()const noexcept {
         const auto& p=sourceWaterProcessScalars_;
-        return nativeOwnerThread_==std::this_thread::get_id()&&constructed_&&!released_&&!p.unknown&&
+        return waterProcessScalarsCurrentNative()&&!p.nativeAdapted[0]&&!p.nativeAdapted[1]&&
             p.publications[0]!=std::numeric_limits<std::uint64_t>::max()&&
             p.publications[1]!=std::numeric_limits<std::uint64_t>::max();
+    }
+    bool waterLoadScalarAdmittedNative(std::size_t lane)const noexcept {
+        const auto& p=sourceWaterProcessScalars_;
+        return lane>=2u&&lane<24u&&waterProcessScalarsCurrentNative()&&!p.nativeAdapted[lane]&&
+            p.publications[lane]!=std::numeric_limits<std::uint64_t>::max();
+    }
+    bool waterScalarReadNative(std::size_t lane,std::uint32_t& value,std::uint64_t& publication)const noexcept {
+        const auto& p=sourceWaterProcessScalars_;
+        if(lane>=30u||!waterProcessScalarsCurrentNative()||p.nativeAdapted[lane]||
+           !p.words[lane]||!p.publications[lane])return false;
+        value=*p.words[lane];publication=p.publications[lane];return true;
+    }
+    bool waterVectorReadNative(std::size_t vector,std::array<std::uint32_t,4>& words,
+            std::array<std::uint64_t,4>& publications)const noexcept {
+        if(vector>=waterVectorLanesNative.size())return false;
+        std::array<std::uint32_t,4> values;std::array<std::uint64_t,4> versions;
+        for(std::size_t i=0;i<4u;++i)
+            if(!waterScalarReadNative(waterVectorLanesNative[vector][i],values[i],versions[i]))return false;
+        words=values;publications=versions;return true;
+    }
+    bool waterAdaptedLoadScalarAdmittedNative(std::size_t lane)const noexcept {
+        return (lane==4u||(lane>=30u&&lane<35u))&&waterProcessScalarsCurrentNative()&&
+            sourceWaterProcessScalars_.publications[lane]!=std::numeric_limits<std::uint64_t>::max();
+    }
+    bool waterAdaptedScalarReadNative(std::size_t lane,std::uint32_t& value,std::uint64_t& publication)const noexcept {
+        const auto& p=sourceWaterProcessScalars_;
+        if((lane!=4u&&(lane<30u||lane>=35u))||!waterProcessScalarsCurrentNative()||
+           !p.words[lane]||!p.publications[lane]||(lane!=4u&&!p.nativeAdapted[lane]))return false;
+        value=*p.words[lane];publication=p.publications[lane];return true;
     }
     //Actual startup BSS, joined only by2B8680..86B4. One process occurrence,
     //never reset by provider/World cancellation. Future unjoined aliases poison.

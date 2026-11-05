@@ -2,12 +2,13 @@
 //No source occurrence is issued merely by defining this adapter. The bounded
 //Model continuation supplies a synchronous issue(method,portal) only after its
 //new bounds28E230 receipt is returned. Existing COL callbacks stay separate.
-    template<class PhysicsState,class Issue>
+    template<class Wrapper,class Issue>
     g::OriginalSourcePhysicsModel50LA::Result withSourcePhysicsModelPrimary2809C0(
-        PhysicsState& h,Issue&& issue)noexcept {
+        Wrapper& wrapper,Issue&& issue)noexcept {
         using Model=g::OriginalSourcePhysicsModel50LA;
+        auto& h=wrapper.sourcePhysics;
         auto* const target=h.nestedModel.get();auto& config=h.configure166400;
-        if(!sourceStandardWrapperA0_||&sourceStandardWrapperA0_->sourcePhysics!=&h||
+        if(sourceStandardWrapperA0_!=&wrapper||
            !config.directMembershipReturned||!config.resultMembershipReturned||!config.modelObserverEntered||
            !target||target->nativeWithdrawn_||!target->model_||!h.bodyOwner||!h.bodyOwner->object_||
            target->base_!=h.bodyOwner.get()||!target->preflightNative())return {Model::Status::owner,0x2809c0u};

@@ -1615,7 +1615,7 @@ bool Owner::continueSourcePostParticleModels1AA194(std::uint32_t& pc)noexcept {
                                     &config,*config.modelObserverZone,config.modelObserverMode);
                                 if(h.nestedModel->modelObserver_.boundsReturned&&
                                    modelObserver.sourcePC==0x28e96cu){
-                                    const auto primary=withSourcePhysicsModelPrimary2809C0(h,[&](auto& method,auto& portal)noexcept {
+                                    const auto primary=withSourcePhysicsModelPrimary2809C0(*wrapper,[&](auto& method,auto& portal)noexcept {
                                         const auto primary=h.nestedModel->continueSourceModelPrimary2809C0(method);
                                         if(primary.status!=g::OriginalSourcePhysicsModel50LA::Status::bounded||
                                            primary.sourcePC!=0x280bf0u||!h.nestedModel->modelObserver_.primaryPublished)
