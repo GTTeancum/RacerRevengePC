@@ -72,6 +72,21 @@ bool Owner::preflightNativeWaterPoolTopologyBacking()const noexcept {
     const auto& t=sourceWaterConfig_.nativeWaterPoolTopologyCount;
     const auto& d=sourceWaterConfig_.nativeWaterPoolData;
     const auto& f=sourceWaterConfig_.nativeWaterPoolResource;
+    using Init=g::OriginalWaterTopologyInitialization50LA;
+    const auto& init=n.initialization;
+    if(!n.initializationAttempted){if(init!=Init{})return false;}
+    else {
+        if(!n.allocated||!n.aliasStored||!n.count)return false;
+        if(init.status==Init::Status::invalidGlobals){
+            auto expected=Init{};expected.status=Init::Status::invalidGlobals;expected.pc=0x2bab60u;
+            if(init!=expected)return false;
+        }else if(init.status==Init::Status::initialized){
+            if(init.pc!=0x2babe4u||!init.guardBefore||*init.guardBefore>1u||
+               init.assertionStored!=(*init.guardBefore==0u)||init.guardStored!=init.assertionStored||
+               init.assertionRead!=1u||!init.assertionCalled||init.assertionReturn!=0u||
+               !init.zeroFillReturned||init.zeroedBytes!=std::uint64_t(*n.count)*20ull)return false;
+        }else return false;
+    }
     const auto absent=[&]()noexcept {
         return !sourceWaterProvider_||!sourceWaterProvider_->nativePool||
             !sourceWaterProvider_->nativePool->nativeData||
@@ -119,6 +134,11 @@ bool Owner::preflightNativeWaterPoolTopologyBacking()const noexcept {
        !sourceWaterProvider_->nativePool->nativeData)return false;
     const auto& data=*sourceWaterProvider_->nativePool->nativeData;
     const auto* backing=data.nativeTopology.get();
+    if(init.zeroFillReturned){
+        if(!backing||!backing->payload||backing->requestedBytes!=init.zeroedBytes)return false;
+        const auto* bytes=static_cast<const std::uint8_t*>(backing->payload.get());
+        for(std::size_t i=0;i<init.zeroedBytes;++i)if(bytes[i])return false;
+    }
     return backing&&backing==n.backingIdentity&&data.topology28==backing&&backing->payload&&
         backing->dataOwner==&data&&backing->dataEpoch==n.dataEpoch&& &data.role==n.dataRole&&
         backing->count==*n.count&&backing->requestedBytes==request&&
@@ -203,4 +223,37 @@ Owner::WaterPoolTopologyBackingResult Owner::allocateWaterPoolTopologyNativeOnly
     n.pc=0x2bab60u;n.stop=S::assertionGuard2BAB60;
     return finish(Result::Status::sourceBoundary);
     //No assertion global read, zero fill, index allocation, file read or return.
+}
+
+
+g::OriginalWaterTopologyInitialization50LA Owner::initializeWaterPoolTopologyNativeOnly(WaterArrayBackingMode mode)noexcept {
+    using R=g::OriginalWaterTopologyInitialization50LA;
+    auto& n=sourceWaterConfig_.nativeWaterPoolTopologyBacking;
+    const auto& f=sourceWaterConfig_.nativeWaterPoolResource;
+    if(mode!=WaterArrayBackingMode::nativeSuccessBackingOnly||nativeScbThread_!=std::this_thread::get_id()||
+       runtimeCameraBorrows_||runtimeWorldBorrows_||constructorRacerWorldBorrows_||sourceParticleInvocationBorrowers_||
+       !preflightNativeWaterPoolDataHistory())return {};
+    if(n.initializationAttempted){auto result=n.initialization;result.status=R::Status::alreadyAttempted;return result;}
+    std::size_t poolCount=0,materialCount=0;
+    if(!sourceWaterPoolCountedNative(poolCount)||!sourceWaterPoolMaterialCountedNative(materialCount)||
+       !waterPoolInvocationCurrentNative()||!preflightSourceWaterConfigNative()||!preflightSourceWorldParticleCountNative()||
+       poolCount!=1u||!n.allocated||n.retired||!f.file||f.file->nativeClosed()||
+       f.file->nativeCloseAttempted_||f.file->sourceCloseAttempted_||!f.file->preflightNative(f.wholeRoleIdentity)||
+       !worldApplication_)return {};
+    auto& data=*sourceWaterProvider_->nativePool->nativeData;
+    auto& backing=*data.nativeTopology;
+    //Fresh current Data count LW2BABC8 and alias LW2BABCC must agree with
+    //the exact allocation validated above; read actual known bytes again.
+    const auto* bytes=static_cast<const std::uint8_t*>(data.payload.get());
+    std::uint32_t currentCount=0;
+    for(std::size_t i=0;i<4u;++i){
+        if(data.knownMask[0x1cu+i]!=255u)return {};
+        currentCount|=std::uint32_t(bytes[0x1cu+i])<<(8u*i);
+    }
+    if(currentCount!=backing.count||data.topology28!=&backing)return {};
+    n.initializationAttempted=true;
+    n.initialization=g::initializeOriginalWaterTopology50LA(worldApplication_->sourceWaterTopologyGlobals_,
+        backing.payload.get(),backing.requestedBytes,currentCount);
+    return n.initialization;
+    //Count reload/index malloc2BABE4/2BABE8 and delay2BABEC remain pending.
 }

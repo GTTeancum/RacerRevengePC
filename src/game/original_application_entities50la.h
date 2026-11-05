@@ -1,4 +1,5 @@
 #pragma once
+#include "original_water_topology_initialization50la.h"
 namespace ra_cold_roster50LA { class WreckBacking; }
 #include "original_wreck_constructor_vectors50la.h"
 namespace rr::game { class OriginalLoadingManager33050LA; }
@@ -511,6 +512,8 @@ class OriginalApplicationEntities50LA final {
         bool known=true;
     } sourceWaterInitializerGlobals_;
     void invalidateWaterInitializerGlobalsNative()noexcept {sourceWaterInitializerGlobals_.known=false;}
+    OriginalWaterTopologyGlobals50LA sourceWaterTopologyGlobals_;
+    void invalidateWaterTopologyGlobalsNative()noexcept {sourceWaterTopologyGlobals_.known=false;}
     // Native historical-use barrier, not a guest flag or readiness token.
     // All native value/reference consumers must use the observer below so
     // even a retired borrower prevents a late replay of the startup write.

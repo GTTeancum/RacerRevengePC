@@ -1422,6 +1422,8 @@ struct SourceWaterConfig {
         a::OriginalStandardTextureDiagnostic50LA diagnostic{};
     } nativeWaterPoolTopologyCount;
     struct NativeWaterPoolTopologyBacking {
+        bool initializationAttempted=false;
+        g::OriginalWaterTopologyInitialization50LA initialization;
         NativeWaterPoolMaterial::RawAllocation allocator;
         bool attempted=false,ownerAttempted=false,ownerPrepared=false,payloadAttempted=false;
         bool temporaryRetired=false,allocated=false,aliasStored=false,aliasRevoked=false,retired=false;
@@ -3485,6 +3487,7 @@ public:
         bool allocated=false,aliasStored=false,retired=false;
     };
     WaterPoolTopologyBackingResult allocateWaterPoolTopologyNativeOnly(WaterArrayBackingMode)noexcept;
+    g::OriginalWaterTopologyInitialization50LA initializeWaterPoolTopologyNativeOnly(WaterArrayBackingMode)noexcept;
     bool constructWorldCold1B2870(const original_main_entry50KG::Application&,
         rr::platform::RaceAudioGroups50IC&,rr::platform::AudioMixer50HD&,std::uint64_t,std::uint32_t&)noexcept;
     bool prepareWorldPhysicsIndex270CDC(std::uint32_t& pc)noexcept {

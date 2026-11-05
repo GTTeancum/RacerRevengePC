@@ -125,3 +125,41 @@ state investigation is retained in the private assertion-state.json beside the
 trace: both globals lie in ELF zero-fill memory, the nonnull assertion helper
 returns0 on either debug branch, and the superficially similar19B4BC writer is
 to433FC0 rather than443FC0. No assertion continuation is implemented yet.
+
+## Assertion and zero-fill continuation
+
+The authenticated native topology backing now has a separate one-shot
+initializeWaterPoolTopologyNativeOnly continuation. Its allocation record stays
+at its previous2BAB60 boundary; initialization retains a distinct result through
+2BABE4, before the index-array count load and malloc. The topology-count and
+original raw-allocator histories are not rewritten.
+
+OriginalApplicationEntities owns the distinct startup-zero topology pair
+3D670C/443FC0, independently of3D66F0/443EE8. World cancellation does not reset
+it; the explicit invalidator poisons knownness for unjoined writers. Only the
+joined0/0 and1/1 domain is admitted. The first initializer stores assertion1
+then guard1; later initializers preserve both. Its authenticated nonnull native
+allocation takes the133660 semantic return0 common to either debug36C100 branch.
+No debug value or guest pointer bits are fabricated.
+
+The native306478 equivalent zeroes exactly20*T bytes of owned topology backing,
+including zero length and every alignment. The original helper's SQ/SD/SB loops
+and return were inspected; private range words/hash are in memset-state.json
+beside the earlier trace. No normalized heap padding, index allocation or other
+Data lanes are initialized. A native preflight re-reads the current known Data
+count and authenticates the same +28 role; no admitted intervening writer exists
+between that check and the source-equivalent initialization effects.
+
+Data preflight now validates retained initialization results and, until later
+source writes are implemented, checks every live initialized byte remains zero.
+Retirement retains the result without dereferencing freed payload. Unknown or
+unsupported global state refuses before writes and remains a valid partial
+history for native cleanup. Repeated calls cannot initialize the same backing
+again. No production invocation or full Water loader return is claimed.
+
+water_topology_initialization_test.cpp passes MSVC /W4 /WX after correcting
+signed test literals:96 extent/alignment cases, including the maximum admitted
+count; repeated state; canaries; zero length; wrong extent/null/wrapped requests;
+and unknown/mismatched global refusal without mutations. The actual containing
+World translation unit also compiled successfully. Full build28 is running;
+its final receipt must be checked before any runtime validation or publication.
