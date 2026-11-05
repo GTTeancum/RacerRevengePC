@@ -45,7 +45,11 @@ class TraceTests(unittest.TestCase):
         self.assertEqual(ee_instruction(0xD8E40000), 'lqc2 $vf4, 0x0($a3)')
         self.assertEqual(ee_instruction(0xF8660000), 'sqc2 $vf6, 0x0($v1)')
         self.assertEqual(ee_instruction(0xD8E4FFF0), 'lqc2 $vf4, -0x10($a3)')
-        self.assertEqual(ee_instruction(0x4BC4216A), 'EE COP2 (not decoded)')
+        self.assertEqual(ee_instruction(0x4BC4216A), 'vmul.xyz vf5, vf4, vf4')
+        self.assertEqual(ee_instruction(0x4BC522FE), 'vopmula.xyz ACC, vf4, vf5')
+        self.assertEqual(ee_instruction(0x4BC429AE), 'vopmsub.xyz vf6, vf5, vf4')
+        self.assertEqual(ee_instruction(0x4A6503BE), 'vrsqrt Q, vf0.w, vf5.x')
+        self.assertEqual(ee_instruction(0x4BC4216B), 'EE COP2 (not decoded)')
         self.assertIsNone(ee_instruction(0x0C0C15C0))
 
 

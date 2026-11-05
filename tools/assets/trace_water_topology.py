@@ -23,6 +23,7 @@ RANGES = {
     'topology_inner_constructor': (0x299790, 0x2997A4),
     'topology_inner_loader': (0x2998D0, 0x299A94),
     'topology_inner_finalize': (0x299420, 0x299790),
+    'topology_inner_zero_allocator': (0x302E58, 0x302F48),
 }
 SOURCES = (
     'tests/native/ra_cold_aggregate50la.h',
@@ -68,6 +69,22 @@ def file_bytes_at(data, address, size):
 REG = ('zero at v0 v1 a0 a1 a2 a3 t0 t1 t2 t3 t4 t5 t6 t7 '
        's0 s1 s2 s3 s4 s5 s6 s7 t8 t9 k0 k1 gp sp fp ra').split()
 
+# Exact words already recovered in tools/gameplay/camera_view_oracle49f.h.
+# This is a disassembly whitelist, not an interpreter or hardware parity claim.
+WATER_VECTOR_WORDS = {
+    0x4BC4216A: 'vmul.xyz vf5, vf4, vf4',
+    0x4B000183: 'vaddw.x vf6, vf0, vf0',
+    0x4B05283D: 'vadday.x ACC, vf5, vf5',
+    0x4B05314A: 'vmaddz.x vf5, vf6, vf5',
+    0x4A6503BE: 'vrsqrt Q, vf0.w, vf5.x',
+    0x4A202180: 'vaddx.w vf6, vf4, vf0',
+    0x4A0003BF: 'vwaitq',
+    0x4BC0219C: 'vmulq.xyz vf6, vf4, Q',
+    0x4A2631AC: 'vsub.w vf6, vf6, vf6',
+    0x4BC522FE: 'vopmula.xyz ACC, vf4, vf5',
+    0x4BC429AE: 'vopmsub.xyz vf6, vf5, vf4',
+}
+
 
 def ee_instruction(word):
     """Override incompatible modern-MIPS interpretations of EE instructions."""
@@ -78,7 +95,7 @@ def ee_instruction(word):
     if op in (0x36, 0x3E):
         return f'{"lqc2" if op == 0x36 else "sqc2"} $vf{rt}, {imm:#x}(${REG[rs]})'
     if op == 0x12:
-        return 'EE COP2 (not decoded)'
+        return WATER_VECTOR_WORDS.get(word, 'EE COP2 (not decoded)')
     if op == 0x1C:
         # EE MMI3/POR. Other MMI words are deliberately left undecoded.
         if word & 0x7FF == 0x628:

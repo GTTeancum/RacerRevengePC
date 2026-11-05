@@ -217,3 +217,39 @@ explicit native-success APIs have no runtime callers yet. A test that injects
 private fields or bypasses those prerequisites would not prove that pipeline.
 Owner-level runtime coverage must join that actual continuation and its preceding
 load stages. Existing GA captures remain evidence only for their exercised path.
+
+## Recovered vector sequence and zero-allocation helper
+
+The exact COP2 words in299420 are also covered by the existing
+`tools/gameplay/camera_view_oracle49f.h` recovery. The trace extractor now
+labels that whitelist, while other COP2 words remain explicitly undecoded.
+The reproducible updated trace is
+`evidence/water-topology-vector-trace-20261105/trace.json`.
+Its six tests pass; these are disassembly tests, not numeric equivalence tests.
+
+299618..29963C normalizes the calculated XYZ using squared lanes, ACC sum,
+VRSQRT and VMULQ, with W copied by the actual VADDX.299644..29965C computes
+input cross normalized-result via VOPMULA/VOPMSUB;29965C..299680 normalizes
+that intermediate;299684..299698 crosses the intermediate with the input to
+replace the output. The two tail calculations repeat the cross/normalize/cross
+sequence without the preceding three-record scalar calculation. Existing camera
+and finishline numeric code offers reusable semantics and validation structure;
+it does not prove this Water call's input custody or universal PS2 float parity.
+The scratch SQC2 of vf0 at299434 writes (0,0,0,1), not four zero words. Likewise
+12-byte file reads leave the fourth lane of the16-byte input records unknown;
+full-vector loads/stores must not erase that distinction merely because the
+cross-product XYZ arithmetic does not consume W.
+
+302E58 captures the process reentrancy pointer and calls302E88. That helper
+multiplies the two requested factors, calls305990, then, on success, reads the
+chunk header at result-4, masks its flag bits and subtracts4 to obtain its clear
+extent. It uses small explicit word stores or306478 before returning. This is
+calloc-like original heap behavior, not another raw malloc followed by clearing
+only the requested size. Native success backing can provide requested zeroed
+bytes separately, but cannot assert the original chunk-header read or allocator
+return. For Water the factors are N and16. The full raw helper range through
+302F40 is now included in the hash-pinned extractor.
+
+Owner integration and native numeric implementation remain outstanding. These
+findings supply the required calculation order and distinguish raw input arrays
+from zero-initialized output storage; they do not establish a Water loader return.
