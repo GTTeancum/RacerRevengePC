@@ -1,4 +1,3 @@
-#include <cstdio>
 #include "original_ui_rider_draw_resources50kg.h"
 #include <cmath>
 #include <utility>
@@ -41,9 +40,7 @@ std::uint64_t imageIdentity(Archive id,const assets::OriginalUiMemberView50KG& m
         return (std::uint64_t(static_cast<std::uint8_t>(id)+1u)<<56)|(std::uint64_t(i+1u)<<32)|std::uint64_t(offset);
     return 0;
 }
-bool sameSampler(const MaterialTextureSampler50EB& a,const MaterialTextureSampler50EB& b) noexcept {
-    return a.minification==b.minification&&a.magnification==b.magnification&&a.s==b.s&&a.t==b.t;
-}
+
 std::uint32_t find(const std::vector<OriginalUiRiderMaterialBinding50KG>& list,const std::string& name) noexcept {
     for(std::size_t i=0;i<list.size();++i)if(same(list[i].registeredName,name))return static_cast<std::uint32_t>(i);
     return unresolved;
@@ -242,16 +239,11 @@ bool OriginalUiRiderDrawResources50KG::load(const OriginalUiRiderColdInput50KG& 
                 if(!decoded||!assets::prepareOriginalUiNativeMaterial50KG(pass,*decoded,policy,d.material))return fail(d,Error::material);
                 OriginalUiMaterialSpan50KG converted;
                 if(!convertOriginalUiMaterialSpan50KG(policy,{0,1,1,image,bank->textureCount()},converted))return fail(d,Error::material);
-                if(samplerSet[image]&&!sameSampler(s->samplers[image],converted.native.sampler)){
-                    const auto& old=s->samplers[image];const auto& next=converted.native.sampler;
-                    std::fprintf(stderr,"rider_sampler_conflict material=%s image=%u old=%u,%u,%u,%u requested=%u,%u,%u,%u\n",
-                        b.registeredName.c_str(),image,unsigned(old.minification),unsigned(old.magnification),unsigned(old.s),unsigned(old.t),
-                        unsigned(next.minification),unsigned(next.magnification),unsigned(next.s),unsigned(next.t));
-                    for(std::size_t previous=0;previous<i;++previous)for(auto priorImage:s->bindings[previous].images)
-                        if(priorImage==image)std::fprintf(stderr,"rider_sampler_prior material=%s\n",s->bindings[previous].registeredName.c_str());
-                    return fail(d,Error::samplerConflict);
-                }
-                samplerSet[image]=true;s->samplers[image]=converted.native.sampler;b.policies.push_back(policy);
+                // Image upload needs one deterministic default; authored sampler
+                // policy belongs to each material/span, not to the shared atlas.
+                // The Rider renderer binds and verifies its own sampler objects.
+                if(!samplerSet[image])s->samplers[image]=converted.native.sampler;
+                samplerSet[image]=true;b.policies.push_back(policy);
             }
         }
         for(bool set:samplerSet)if(!set)return fail(d,Error::resource);

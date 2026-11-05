@@ -297,8 +297,7 @@ bool OriginalUiRiderDrawContribution50KG::sharedPopupInputCurrent(const Original
            !s.registrationCurrent(final))return false;
         if(binding.image==unresolved){if(role!=0)return false;continue;}
         const auto* cpu=images->texture(binding.image);const auto* gpu=s.gpu->asset(binding.image);
-        if(!cpu||!gpu||!gpu->name||cpu->identity!=gpu->identity||
-           (s.gpu->riderSparse()&&!s.gpu->riderSamplerMatches(binding.image,binding.resourceSampler)))return false;
+        if(!cpu||!gpu||!gpu->name||cpu->identity!=gpu->identity)return false;
     }
     return true;
 }
@@ -465,8 +464,10 @@ bool OriginalUiRiderDrawContribution50KG::prepareBank(D& d) noexcept {
         for(const auto& binding:bindings)if(binding.image!=unresolved){
             if(binding.image>=samplers.size())return fail(d,E::bank);
             const auto& sampler=binding.resourceSampler;
-            if(assigned[binding.image]&&!samplerSame(samplers[binding.image],sampler))return fail(d,E::material);
-            samplers[binding.image]=sampler;assigned[binding.image]=true;
+            // Keep a stable upload default, while each authenticated prototype
+            // retains its own sampler for effective per-span GL binding.
+            if(!assigned[binding.image])samplers[binding.image]=sampler;
+            assigned[binding.image]=true;
         }
         for(bool known:assigned)if(!known)return fail(d,E::material);
         s.bindings=std::move(bindings);s.samplers=std::move(samplers);s.bankGeneration=s.backend->generation();
@@ -1410,8 +1411,7 @@ bool OriginalUiRiderDrawContribution50KG::residentSourceFrameCurrent(const Origi
            span.textureIndex!=binding.image||!samplerSame(s.states[i].sampler,binding.prototype->native.sampler))return false;
         first+=span.quadCount;if(binding.image==unresolved)continue;
         const auto* cpu=textures->texture(binding.image);const auto* gpu=s.gpu->asset(binding.image);
-        if(!cpu||!gpu||!gpu->name||cpu->identity!=gpu->identity||
-           (s.gpu->riderSparse()&&!s.gpu->riderSamplerMatches(binding.image,s.states[i].sampler)))return false;
+        if(!cpu||!gpu||!gpu->name||cpu->identity!=gpu->identity)return false;
     }
     return first==draw.quadCount;
 }

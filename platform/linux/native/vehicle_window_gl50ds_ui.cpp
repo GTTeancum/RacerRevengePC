@@ -641,7 +641,7 @@ bool VehicleWindowGl50DS::Storage::ensureGarageSamplers50KG()noexcept {
         // A partial creation owns its names until real cleanup, never replay it.
         for(U name:garageSamplers50KG)if(name)return fail(*diagnostic,VehicleWindowError50DS::material,"partial Garage sampler creation retained for cleanup");
         // bindSampler exists only after the unchanged advertised capability check.
-        // Ordinary startup and all non-Garage draws retain their original requirements.
+        // Created lazily for authenticated Garage or Rider material sampling.
         if(!gl.bindSampler)return fail(*diagnostic,VehicleWindowError50DS::context,"Garage per-material sampling requires advertised sampler objects");
         if(!load(gl.genSamplers,"glGenSamplers")||!load(gl.deleteSamplers,"glDeleteSamplers")||
            !load(gl.samplerParameteri,"glSamplerParameteri")||!load(gl.getSamplerParameteriv,"glGetSamplerParameteriv"))return false;
@@ -2222,6 +2222,9 @@ bool VehicleWindowGl50DS::submitOriginalUiImpl(const OriginalUiNativeDraw50KG& n
     if(sourceWorkStarted)*sourceWorkStarted=false;
     if (!initialized()) return fail(d, VehicleWindowError50DS::notInitialized, "renderer not initialized");
     auto& s = *storage_; const auto& input = native.draw;
+    // Rider's typed receipt authenticates each span's source policy. Shared
+    // images can be used by materials with different filters (e.g. popup fonts).
+    const bool perMaterialSamplers=garageBatch||riderReceiptChecked;
     if(s.menuRasterShared50KG&&(!s.menuRasterBackendActive50KG||!sourceRgba||garageBatch||
        &native!=s.menuRasterNative50KG||!s.menuRasterApplied50KG||s.menuRasterFailed50KG||
        input.canvasWidth!=float(s.menuRasterInputs50KG.viewport[2])||
@@ -2368,8 +2371,8 @@ bool VehicleWindowGl50DS::submitOriginalUiImpl(const OriginalUiNativeDraw50KG& n
             return fail(d, VehicleWindowError50DS::material, "original UI span lacks its real published texture");
         if(input.textures->riderSparse()){
             const auto* cpu=s.request.originalUiCpuTextures?s.request.originalUiCpuTextures->texture(span.textureIndex):nullptr;
-            if(!cpu||cpu->identity!=texture->identity||!input.textures->riderSamplerMatches(span.textureIndex,state.sampler))
-                return fail(d,VehicleWindowError50DS::material,"Rider actual textured span lacks exact resident identity/sampler");
+            if(!cpu||cpu->identity!=texture->identity)
+                return fail(d,VehicleWindowError50DS::material,"Rider actual textured span lacks exact resident identity");
         }
         if (span.textureIndex >= assets::maxMaterialTextureAssets50EA)
             return fail(d, VehicleWindowError50DS::material, "UI texture alpha metadata index out of bounds");
@@ -2475,12 +2478,13 @@ bool VehicleWindowGl50DS::submitOriginalUiImpl(const OriginalUiNativeDraw50KG& n
 
     s.diagnostic = &d;
     bool accepted = s.check("before original UI submission") &&
+        (!perMaterialSamplers || s.ensureGarageSamplers50KG()) &&
         ((sourceRgba && !publishSource) || s.request.output == VehicleWindowOutput50DS::headless || s.checkDefaultFramebuffer());
     const auto pending = static_cast<std::uint8_t>(s.uiPublished ^ 1u);
     if (accepted) {
-        // Ordinary spans still use immutable image parameters through sampler0.
-        // Only an authenticated canonical Garage batch uses the Window-owned
-        // per-policy sampler; image base/max levels remain separately immutable.
+        // Authenticated Rider and Garage spans use Window-owned per-policy
+        // samplers. Image base/max levels remain separately immutable.
+        // Other spans continue using the uploaded default through sampler0.
         // Cache this submission's exact image+sampler observations, never readiness.
         struct SamplerObservation { U image, sampler; I values[6]; };
         SamplerObservation observed[originalUiMaximumSpans50KG];
@@ -2491,8 +2495,8 @@ bool VehicleWindowGl50DS::submitOriginalUiImpl(const OriginalUiNativeDraw50KG& n
             if (input.spans[i].materialMode == OriginalUiMaterialMode50KG::untexturedVertexColor) continue;
             const auto& sampler = native.states[i].sampler;
             const U image = input.textures->texture(input.spans[i].textureIndex);
-            const U samplerName=garageBatch?s.garageSampler50KG(sampler):0;
-            if(garageBatch&&!samplerName){accepted=fail(d,VehicleWindowError50DS::material,"actual Garage span has no owned effective sampler");break;}
+            const U samplerName=perMaterialSamplers?s.garageSampler50KG(sampler):0;
+            if(perMaterialSamplers&&!samplerName){accepted=fail(d,VehicleWindowError50DS::material,"actual UI span has no owned effective sampler");break;}
             U observation = 0;
             while (observation < observedCount && (observed[observation].image != image||observed[observation].sampler!=samplerName)) ++observation;
             const bool firstObservation = observation == observedCount;
@@ -2501,11 +2505,11 @@ bool VehicleWindowGl50DS::submitOriginalUiImpl(const OriginalUiNativeDraw50KG& n
             if (firstObservation) {
                 actual.image = image;actual.sampler=samplerName;
                 s.gl.bindTexture(texture2D, image);
-                if(garageBatch){
+                if(perMaterialSamplers){
                     s.gl.bindSampler(0,samplerName);I bound=0;s.gl.getIntegerv(0x8919,&bound);
-                    accepted=s.check("verify actual Garage sampler binding");
+                    accepted=s.check("verify actual UI sampler binding");
                     if(accepted&&static_cast<U>(bound)!=samplerName)
-                        accepted=fail(d,VehicleWindowError50DS::material,"Garage sampler binding differs from its retained owner");
+                        accepted=fail(d,VehicleWindowError50DS::material,"UI sampler binding differs from its retained owner");
                 }
             }
             const I expected[] = {
@@ -2516,18 +2520,18 @@ bool VehicleWindowGl50DS::submitOriginalUiImpl(const OriginalUiNativeDraw50KG& n
             for (U p = 0; accepted && p < 6; ++p) {
                 if (firstObservation) {
                     actual.values[p] = -1;
-                    if(garageBatch&&p<4)s.gl.getSamplerParameteriv(samplerName,parameters[p],&actual.values[p]);
+                    if(perMaterialSamplers&&p<4)s.gl.getSamplerParameteriv(samplerName,parameters[p],&actual.values[p]);
                     else s.gl.getTexParameteriv(texture2D, parameters[p], &actual.values[p]);
                     accepted = s.check("verify per-span original UI sampler");
                 }
                 if (accepted && actual.values[p] != expected[p])
                     accepted = fail(d, VehicleWindowError50DS::material,
-                        garageBatch?"Garage span sampler/image parameters differ from actual retained owners":
+                        perMaterialSamplers?"UI span sampler/image parameters differ from actual retained owners":
                             "UI span source sampler differs from immutable bank texture parameters");
             }
             if (firstObservation && accepted) ++observedCount;
         }
-        if(garageBatch){s.gl.bindSampler(0,0);const bool restored=s.check("restore sampler0 after Garage binding preflight");accepted=accepted&&restored;}
+        if(perMaterialSamplers){s.gl.bindSampler(0,0);const bool restored=s.check("restore sampler0 after UI binding preflight");accepted=accepted&&restored;}
     }
     // Observation only, after authenticated frame/index/sampler preflight.
     // It cannot grant readiness, modify native diagnostics, or alter drawing.
@@ -2746,8 +2750,8 @@ bool VehicleWindowGl50DS::submitOriginalUiImpl(const OriginalUiNativeDraw50KG& n
             s.gl.uniform1i(s.uiSourceFogEnabledUniform, (particle || state.sourceFogEnabled) ? 1 : 0);
             s.gl.uniform1i(s.uiSourceAlphaTestUniform, (particle || state.sourceAlphaTestGreaterZero) ? 1 : 0);
             s.gl.bindTexture(texture2D, textured ? input.textures->texture(span.textureIndex) : 0);
-            const U sourceSampler=garageBatch&&textured?s.garageSampler50KG(state.sampler):0;
-            if(garageBatch)s.gl.bindSampler(0,sourceSampler);
+            const U sourceSampler=perMaterialSamplers&&textured?s.garageSampler50KG(state.sampler):0;
+            if(perMaterialSamplers)s.gl.bindSampler(0,sourceSampler);
             if(sourceRgba&&anyCoverage&&!coverageMixed&&state.coverage==OriginalUiCoverage50KG::fourSampleAa1){
                 if(i<firstCoveredAa1Span){
                     // All retained bounds in this AA1 span were proven empty.
@@ -2907,7 +2911,7 @@ bool VehicleWindowGl50DS::submitOriginalUiImpl(const OriginalUiNativeDraw50KG& n
     }
     // Also restore after rejected preflight, which never entered the draw body.
     // This precedes the sole return and never clears batch/GL failure history.
-    if(garageBatch){s.gl.bindSampler(0,0);const bool restored=s.check("restore sampler0 after Garage submission");accepted=accepted&&restored;}
+    if(perMaterialSamplers&&s.gl.bindSampler){s.gl.bindSampler(0,0);const bool restored=s.check("restore sampler0 after UI submission");accepted=accepted&&restored;}
     const auto stageTotalNs=Storage::uiCoverageNs(submitStageStart);
     if(anyCoverage&&stageTotalNs>=100000000ull&&s.uiCoverageSlowReports<8){++s.uiCoverageSlowReports;
         std::fprintf(stderr,"ui_coverage_slow_stages target=%llu total_wall_ns=%llu pre_draw_wall_ns=%llu ordered_draw_wall_ns=%llu resolve_wall_ns=%llu publication_wall_ns=%llu first_aa1_span=%u spans=%u prefix_draws=%u mixed_draws=%u empty_aa1_spans=%u promoted=%u promotion_wall_ns=%llu accepted=%u scope=cpu_stage_times_no_added_wait\n",
