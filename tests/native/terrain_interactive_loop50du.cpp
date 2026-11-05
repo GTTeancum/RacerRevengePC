@@ -36,9 +36,21 @@ void Context::run() {
    throw std::runtime_error(message.str());}
  };
 
+ // Optional nested observations; all entries are subsets of physics, never
+ // additional work to add to its total. No allocation or clock reads disabled.
+ phase_timing50GK::Totals simulationTotals[14]{};
+ struct SimulationScope {
+  phase_timing50GK::Totals* total;
+  phase_timing50GK::Sample before{};
+  SimulationScope(bool enabled,phase_timing50GK::Totals& value):total(enabled?&value:nullptr){
+   if(total)before=phase_timing50GK::readClocks();
+  }
+  ~SimulationScope(){if(total)total->record(before,phase_timing50GK::readClocks());}
+ };
  auto advanceOriginalAll8TwoPhaseFrame=[&](original_all8_frame::Schedule& schedule,
      original_all8_frame::AudioIntegrationPolicy audioPolicy,
      auto&& remainingRaceChildren){
+  SimulationScope totalTiming(phaseTiming.enabled,simulationTotals[13]);
   require50DU(originalAiEnabled&&nativeOriginalFleet&&originalAiHumanCount==(humanCourseEnabled?1u:0u)&&
       racerBank.count()==raceRacerCount,"two-phase entry requires the actual native roster and source manager");
   // The native AI policy services real D40/Aural owners without certifying
@@ -58,10 +70,11 @@ void Context::run() {
   while(schedule.stage()==original_all8_frame::Stage::RacerChildren){
    if(!schedule.advanceNextChildren(
        [&](std::size_t,std::size_t slot){
-        observeOriginalAiFleet(&schedule);
-        if(dynamicContactEnabled)projectDynamicActorsForSlot(slot);
+        {SimulationScope timing(phaseTiming.enabled,simulationTotals[0]);observeOriginalAiFleet(&schedule);}
+        if(dynamicContactEnabled){SimulationScope timing(phaseTiming.enabled,simulationTotals[1]);projectDynamicActorsForSlot(slot);}
         opponentFrame=slot!=0;return true;
        },[&](std::size_t,std::size_t slot){
+        SimulationScope timing(phaseTiming.enabled,simulationTotals[2]);
         return advanceFramePart(slot,NativeRacerFramePart::Children,.016f,60.f);
        }))return false;
   }
@@ -73,18 +86,21 @@ void Context::run() {
    // previous CCC inputs and the next AI frame's genuine reference owners.
    observeOriginalAiFleet(&schedule);updateOriginalAiPacking();
   }
-  if(!schedule.advanceRemainingChildren(std::forward<decltype(remainingRaceChildren)>(remainingRaceChildren)))return false;
+  {SimulationScope timing(phaseTiming.enabled,simulationTotals[3]);
+   if(!schedule.advanceRemainingChildren(std::forward<decltype(remainingRaceChildren)>(remainingRaceChildren)))return false;}
   while(schedule.stage()==original_all8_frame::Stage::Physics){
    if(!schedule.advanceNextPhysics(
        [&](std::size_t,std::size_t slot){
+        SimulationScope timing(phaseTiming.enabled,simulationTotals[4]);
         captureDynamicBeforeScheduledPhysics(schedule,slot);opponentFrame=slot!=0;return true;
        },[&](std::size_t,std::size_t slot,float factor,float scale){
+        SimulationScope timing(phaseTiming.enabled,simulationTotals[5]);
         return advanceFramePart(slot,NativeRacerFramePart::Physics,factor,scale);
        }))return false;
   }
   require50DU(schedule.stage()==original_all8_frame::Stage::Complete,
       "two-phase outer frame stopped before physics completion");
-  requireOriginalAiFleetReady();return true;
+  {SimulationScope timing(phaseTiming.enabled,simulationTotals[6]);requireOriginalAiFleetReady();}return true;
  };
 
  const auto withRace=[&](auto&& operation)->decltype(auto){
@@ -446,7 +462,7 @@ void Context::run() {
      hostClock.pause(monotonicNow50DU());forceSceneRender=true;suppressResumeKeys=true;
      lastStatusNs=monotonicNow50DU();lastStatusRenderCount=submittedDrawFrames;
      displayWallTotals.reportAndReset("original_pause_resume");
-     phaseTiming.resetInterval();renderDiagnostics.resetInterval();
+     phaseTiming.resetInterval();for(auto& total:simulationTotals)total={};renderDiagnostics.resetInterval();
     }
     if(open){
      discardTrackBaseline();
@@ -721,7 +737,7 @@ void Context::run() {
     // Menu wall time/frames are not part of gameplay FPS or phase intervals.
     lastStatusNs=monotonicNow50DU();lastStatusRenderCount=submittedDrawFrames;
     displayWallTotals.reportAndReset("menu_resume");
-    phaseTiming.resetInterval();renderDiagnostics.resetInterval();
+    phaseTiming.resetInterval();for(auto& total:simulationTotals)total={};renderDiagnostics.resetInterval();
    }
    if(hostInput.checkpointRequested&&!sessionMenu.open()){
     composePacket(false,input);sampleController();
@@ -1025,13 +1041,17 @@ void Context::run() {
             [&](original_all8_frame::Schedule& schedule){
              if(isRcTrack)requireMbRuntimeNavigation50MB();
              const auto frame=++sourceCameraTick;
+             {SimulationScope timing(phaseTiming.enabled,simulationTotals[7]);
              require50DU(sourceCameraSession->advanceSceneChild(frame,sourceCamera::Cut::afterAllRacerPrefixes,.016f).status==
                  sourceCamera::Status::sceneChildComplete,"original scene missed racer-prefix cut");
              advanceWorldAnimations();
              advanceNativeGcWater();
              advanceRcTrackParticles();
              advanceTbTrackParticles();
-             advanceOriginalAiManager(.016f,&schedule);
+             }
+             {SimulationScope timing(phaseTiming.enabled,simulationTotals[8]);
+             advanceOriginalAiManager(.016f,&schedule);}
+             SimulationScope cameraTiming(phaseTiming.enabled,simulationTotals[9]);
              if(sourceSpeedBoost.owner)sourceSpeedBoost.owner->invalidateNativeDraw();
              if(sourceDamage.owner)sourceDamage.owner->invalidateNativeDraw();
              if(sourceTimeStats.owner)
@@ -1116,6 +1136,7 @@ void Context::run() {
      // A failed native slot never participates through an abandoned snapshot.
      // Sealed results alone do not remove a Ready native vehicle from contacts.
      if(racerContactsEnabled){
+      SimulationScope timing(phaseTiming.enabled,simulationTotals[10]);
       std::array<bool,native_racer_contact50HW::maxRacers> contactParticipant{};
       std::array<native_racer_contact50HW::Pair,
           native_racer_contact50HW::maxRacers*(native_racer_contact50HW::maxRacers-1)> contactOrder{};
@@ -1162,7 +1183,8 @@ void Context::run() {
       require50DU(timing.status==race_mode1_host50ID::Status::AwaitHostCommit,
           "mode1 source timing boundary unresolved; accepted world not replayed");
      }
-     sampleRaceField();
+     {SimulationScope timing(phaseTiming.enabled,simulationTotals[11]);sampleRaceField();}
+     SimulationScope presentationTiming(phaseTiming.enabled,simulationTotals[12]);
      if(nativeOriginalFleet){
       publishOriginalAiStandings();
       if(audioEnabled)require50DU(withRace([&](auto& actualRace){return raceAudio->observe(actualRace);}).accepted,
@@ -2440,6 +2462,16 @@ void Context::run() {
           <<" wall_ns="<<total.wallNs<<" cpu_ns="<<total.cpuNs<<" max_wall_ns="<<total.maxWallNs
           <<" cpu_at_max_wall_ns="<<total.cpuAtMaxWallNs<<" cpu_at_max_valid="<<total.cpuAtMaxWallValid
           <<" clock_failure="<<total.clockFailure<<" overflow="<<total.overflow<<'\n';
+     }
+     constexpr const char* simulationNames[]={"fleet_observation","dynamic_projection","racer_children",
+         "remaining_children","physics_preparation","racer_physics","fleet_ready",
+         "scene_animation_particles","ai_manager","camera_and_hud","racer_contacts","sample_race_field",
+         "race_presentation","scheduled_total"};
+     for(std::size_t i=0;i<14;++i){const auto& total=simulationTotals[i];
+      std::cerr<<"simulation_subphase "<<simulationNames[i]<<" nested_under="<<(i==7||i==8||i==9?"remaining_children":"physics")<<" calls="<<total.calls
+          <<" wall_ns="<<total.wallNs<<" cpu_ns="<<total.cpuNs<<" max_wall_ns="<<total.maxWallNs
+          <<" clock_failure="<<total.clockFailure<<" overflow="<<total.overflow<<'\n';
+      simulationTotals[i]={};
      }
      displayWallTotals.reportAndReset("periodic");
      phaseTiming.resetInterval();

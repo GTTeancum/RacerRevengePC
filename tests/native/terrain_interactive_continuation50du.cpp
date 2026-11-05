@@ -1359,10 +1359,18 @@ SessionExit50DU Context::run() {
    else originalAiReads.observe(originalAiSession,slot,racerBank,racerFrameReads,*navigationMap,selectedOriginalAiMapMetadata);
   }
  };
+ // Manager passes only consume their current arena and stable shared owners.
+ // Preserve slot order and the boundaries between passes while avoiding the
+ // redundant player save/restore between peers. No callback may borrow another
+ // slot or retain an arena reference after it returns; visitAll restores on throw.
+ auto visitManagerRacers=[&](auto&& operation){
+  require50DU(racerBank.visitAll([&](std::size_t slot){operation(slot);return true;}),
+      "original manager batch visit rejected");
+ };
  auto rankOriginalAiFleet=[&](const original_all8_frame::Schedule* schedule=nullptr){
   observeOriginalAiFleet(schedule);
   require50DU(native_ai50IV::rank(originalAiSession,racerBank.count()),"original AI source rank/remaining boundary");
-  for(std::size_t slot=0;slot<racerBank.count();++slot)racerBank.visit(slot,[&](){
+  visitManagerRacers([&](std::size_t slot){
    //1B0700 is a write to the same canonical racer+C90+44 used by camera,
    //manager and later AI observations. A transient rank scratch is no owner.
    lapContinuity.timing.wordCD4=originalAiSession.rank[slot].retirementCD4;
@@ -1472,7 +1480,7 @@ SessionExit50DU Context::run() {
    return;
   }
   require50DU(managerClock==LapManagerClockStatus50ID::NeedRacerPass,"original AI manager clock boundary");
-  for(std::size_t slot=0;slot<racerBank.count();++slot)racerBank.visit(slot,[&](){
+  visitManagerRacers([&](std::size_t slot){
    LapTimingInput50ID input{factor,dynamicContactEnabled?dynamicMusicProfile.mode11258:2u,s.fields.vehicle58,static_cast<std::uint32_t>(slot),
        lapContinuity.state.vehicleCC8,s.fields.impactFlagsCD8};
    auto result=beginRacerLapTiming50ID(lapContinuity.timing,originalAiSession.manager,input,lapContinuity.timingCursor);
@@ -1495,7 +1503,7 @@ SessionExit50DU Context::run() {
    require50DU(result.status==LapTimingStatus50ID::Complete,"original AI timing continuation boundary");
   });
   rankOriginalAiFleet(schedule);
-  for(std::size_t slot=0;slot<racerBank.count();++slot)racerBank.visit(slot,[&](){
+  visitManagerRacers([&](std::size_t slot){
    if((s.fields.impactFlagsCD8&1u)&&(originalAiSession.manager.flags58&0x20u))return;
    if(!(s.fields.impactFlagsCD8&2u))return;
    require50DU(finishOriginalAiManagerRow(originalAiSession.manager.flags58,originalAiSettings1125C,
@@ -1507,7 +1515,7 @@ SessionExit50DU Context::run() {
   });
   std::array<OriginalAiGapRow,aiRaceRankCapacity50IV> rows{};
   std::array<float,aiRaceRankCapacity50IV> gaps{};
-  for(std::size_t slot=0;slot<racerBank.count();++slot)racerBank.visit(slot,[&](){
+  visitManagerRacers([&](std::size_t slot){
    rows[slot]={originalAiSession.rank[slot].placeCCC,static_cast<std::int32_t>(lapContinuity.state.vehicleCC8),
        s.fields.impactFlagsCD8,originalAiSession.rank[slot].remainingCC4,lapContinuity.timing.timeCB8,
        lapContinuity.timing.valueCBC};
@@ -1519,7 +1527,7 @@ SessionExit50DU Context::run() {
   //retail1B0A70 would otherwise end a zero-human field on its first frame.
   if(allAiEnabled)originalAiSession.manager.flags58=static_cast<std::uint8_t>(originalAiSession.manager.flags58|0x40u);
   std::array<OriginalHumanEndRow50KG,8> humanEndRows{};
-  for(std::size_t slot=0;slot<racerBank.count();++slot)racerBank.visit(slot,[&](){
+  visitManagerRacers([&](std::size_t slot){
    lapContinuity.timing.valueCBC=gaps[slot];
    if(humanCourseEnabled)humanEndRows[slot]={s.fields.vehicle58,lapContinuity.timing.wordCD4,
        s.fields.impactFlagsCD8,originalAiSession.rank[slot].placeCCC,lapContinuity.timing.valueCBC};
@@ -1530,7 +1538,7 @@ SessionExit50DU Context::run() {
    require50DU(ended.status==OriginalHumanEndStatus50KG::complete,"actual human source manager ending rejected");
    humanResultsActive=ended.ended;
   }
-  for(std::size_t slot=0;slot<racerBank.count();++slot)racerBank.visit(slot,[&](){
+  visitManagerRacers([&](std::size_t slot){
    s.fields.applicationByte58=originalAiSession.manager.flags58;
   });
  };
