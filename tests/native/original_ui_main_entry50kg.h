@@ -409,6 +409,9 @@ private:
     mutable std::array<bool,4> sourceCameraRenderLazyGuards_{};
     mutable std::array<std::int32_t,4> sourceCameraRenderLazyWords_{}; //3E00B0/B8/C0/C8.
     friend class rr::platform::OriginalApplicationAural50KG;
+    // The retained stream owner verifies this same Application resolver's
+    // shared ownership at lookup; raw pointer equality is not sufficient.
+    friend class rr::platform::OriginalStreamLibrarySource50LA;
     friend struct Video;
     friend struct Frontend;
     friend class rr::platform::OriginalUiCourseOwnedLifecycle50KG;
