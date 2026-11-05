@@ -12,6 +12,7 @@
 #include <memory>
 #include <new>
 namespace ra_pod_scene50LA {class Owner;}
+namespace ra_cold_aggregate50LA {class Owner;}
 namespace rr::game {
 //Pointer-free history of the distinct Fog-derived2A0A80 geometry prefix.
 //Narrow VU value proof and11F680 return are distinct from2A0A80/membership readiness.
@@ -1051,6 +1052,7 @@ struct OriginalTriggerFogPrimaryPrefix50LA {
 // from native allocation custody, including allocations not yet published.
 class OriginalWorldTriggerInstance50LA final {
     friend class ::ra_pod_scene50LA::Owner;
+    friend class ::ra_cold_aggregate50LA::Owner; //Same World loader validates retained trigger membership.
     using C=OriginalWreckComponent50LA;
     using B=OriginalCollisionBaseOwner50LA;
     using S=OriginalWreckComponentStatus50LA;

@@ -29,7 +29,7 @@ bool Owner::preflightNativeWaterPoolPathFormat()const noexcept {
        c->nativeArrayScalars_.signature||c->nativeArrayScalars_.completed!=3u||c->nativeArrayScalars_.pc!=0x2b9cecu||
        sourceWaterConfig_.nativeWaterArrayFormat.role!=NativeWaterArrayRole::poolPointers||
        !n.callIssued||!n.wrapperFrame||!n.directoryOwnerIdentity||
-       (!sourceWaterProvider274720_.nativeWithdrawn&&(!worldApplication_||n.directoryOwnerIdentity!=worldApplication_)))return false;
+       (!sourceWaterProvider274720_.nativeWithdrawn&&(!worldApplication_||n.directoryOwnerIdentity!=worldApplication_.get())))return false;
     if(!n.capturedReent)return n.phase==Phase::reent&&n.pc==0x308c98u&&noFile()&&
         !n.initializerReturned&&!n.localeReturned&&virginFrame(n.stdio)&&virginFrame(n.core)&&
         !n.scanCount&&!n.completed&&!n.copied&&noQueue()&&noStrings()&&noFinish();
@@ -137,7 +137,7 @@ Owner::WaterPoolPathFormatResult Owner::formatWaterPoolPathNativeOnly(WaterArray
     n.attempted=true;n.phase=Phase::reent;
     n.pc=0x2b9cec;n.pc=0x2b9cf0; //Exact immutable%s%s at3C0C28.
     n.pc=0x2b9cf4;n.pc=0x2b9cf8; //Unused t0=s0+4 is not consumed by this format.
-    n.pc=0x2b9cfc;n.pc=0x2b9d00;n.directoryOwnerIdentity=worldApplication_; //Pointer setup, no string read.
+    n.pc=0x2b9cfc;n.pc=0x2b9d00;n.directoryOwnerIdentity=worldApplication_.get(); //Pointer setup, no string read.
     n.pc=0x2b9d04;n.callIssued=true;n.pc=0x2b9d08;
     n.pc=0x308c90;n.pc=0x308c94;n.wrapperFrame=true; //224-byte frame.
     G::StdioIdentity captured;
