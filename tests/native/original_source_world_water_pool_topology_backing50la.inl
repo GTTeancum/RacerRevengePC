@@ -1,15 +1,15 @@
 //Native successor of the authenticated topology-count prefix. Original malloc
 //and its arena load do not return; native backing has a separate lifetime.
 Owner::SourceWaterConfig::NativeWaterPoolMaterial::RawAllocation Owner::topologyRawAllocationPrefix(
-    std::uint32_t request,std::optional<a::OriginalConfigProcessGlobals50LA::StdioIdentity> captured)noexcept {
+    std::uint32_t request,std::optional<a::OriginalConfigProcessGlobals50LA::StdioIdentity> captured,std::uint32_t callPC)noexcept {
     using G=a::OriginalConfigProcessGlobals50LA;
     using A=SourceWaterConfig::NativeWaterPoolMaterial::RawAllocation;using R=A::ReentStop;
     A x;
     const auto signWord=[](std::uint32_t v)noexcept {
         return v&0x80000000u?(0xffffffff00000000ull|std::uint64_t(v)):std::uint64_t(v);
     };
-    x.attempted=true;x.callIssued=true;x.pc=0x2bab54;x.callerReturnPC=0x2bab5cu;
-    x.pc=0x2bab58;x.requestedBytes=request;
+    x.attempted=true;x.callIssued=true;x.pc=callPC;x.callerReturnPC=callPC+8u;
+    x.pc=callPC+4u;x.requestedBytes=request;
     x.argumentA0=signWord(*x.requestedBytes);x.shiftDelay=true;
     x.pc=0x305700;x.argumentCopied=true;x.pc=0x305704;x.pc=0x305708;x.mallocFrame=true;x.pc=0x30570c;
     if(!captured){x.reentStop=R::unknown;return x;}

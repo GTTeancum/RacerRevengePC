@@ -483,6 +483,7 @@ bool OriginalWaterPoolSourceFile50LA::topologyReadHistoryNative()const noexcept 
     //No retired role dereferences, aggregate callbacks, cursor reconstruction
     //or source-return inference from initialized destination bytes.
 }
+#include "original_water_pool_index_reads50la.inl"
 bool OriginalWaterPoolSourceFile50LA::closeSource131040(D& d)noexcept {
     d={};const auto version=versionWordNative();
     if(sourceCloseAttempted_||nativeClosed_||!version||*version==2u||
@@ -498,7 +499,7 @@ bool OriginalWaterPoolSourceFile50LA::closeSource131040(D& d)noexcept {
 bool OriginalWaterPoolSourceFile50LA::historyNative(const void* poolIdentity)const noexcept {
     if(!poolIdentity||poolIdentity_!=poolIdentity||thread_!=std::this_thread::get_id()||
        !resolver_||!provider_||!track_||(nativeClosed_&&pinOwned_)||!materialReaderHistoryNative()||
-       !topologyReadHistoryNative())return false;
+       !topologyReadHistoryNative()||!indexReadHistoryNative())return false;
     if(!searchReached_)return !pinOwned_&&nativeHandle_==-1&&!openAttempted_&&!openReturned_&&
         !searchReturned_&&!found_&&!sourceReturnV0_&&!outputHandleStored_&&!outputAssociationStored_&&
         !read_.attempted&&!countRead_.entered&&!sourceCloseAttempted_; //Bookkeeping allocation refusal.
@@ -614,7 +615,11 @@ bool OriginalWaterPoolSourceFile50LA::preflightNative(const void* poolIdentity)c
         //left, not before+copied. Other files may freely change manager windows.
         const MaterialRead* latestMaterial=nullptr;
         for(const auto& r:materialReader_.reads)if(r.attempted)latestMaterial=&r;
-        if(topologyRead_.attempted){
+        const IndexRead* latestIndex=nullptr;
+        for(const auto& r:indexReader_.reads)if(r.attempted)latestIndex=&r;
+        if(latestIndex){
+            if(!latestIndex->afterObserved||row.cursor10!=latestIndex->after.memberCursor10)return false;
+        }else if(topologyRead_.attempted){
             //An attempted topology read supersedes all earlier tails, even
             //on helper refusal. Missing actual after means no close admission.
             if(!topologyRead_.afterObserved||row.cursor10!=topologyRead_.after.memberCursor10)return false;

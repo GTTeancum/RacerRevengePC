@@ -113,6 +113,22 @@ class OriginalWaterPoolSourceFile50LA final {
         ServiceObservation before,after;
         D preparationDiagnostic{},helperDiagnostic{},admissionDiagnostic{};
     };
+    struct IndexRead {
+        std::array<std::uint8_t,4> bytes{}; //Uncopied bytes are unknown, not guest zeroes.
+        bool entered=false,prepared=false,beforeObserved=false,attempted=false;
+        bool nativeReturned=false,afterObserved=false,resultAdmitted=false;
+        std::size_t copied=0,clampedAmount=0;
+        std::uint32_t ordinal=0,pc=0;
+        std::optional<std::int32_t> sourceItems;
+        ServiceObservation before,after;
+        D helperDiagnostic{},admissionDiagnostic{};
+    };
+    struct IndexReader {
+        bool entered=false,prepared=false;
+        const void* dataIdentity=nullptr;const void* arrayIdentity=nullptr;
+        std::uint64_t dataEpoch=0;std::uint32_t count=0;
+        std::vector<IndexRead> reads;
+    } indexReader_;
     std::shared_ptr<OriginalStandardTextureResolver50LA> resolver_;
     std::shared_ptr<OriginalStandardArchiveProvider50LA> provider_;
     //This is admission's SAME service Track relation, not a presumed winner.
@@ -182,6 +198,9 @@ class OriginalWaterPoolSourceFile50LA final {
     bool beginMaterialReaderNative(const void* material,const void* array,const void* data,
         std::uint64_t materialEpoch,std::uint64_t arrayEpoch,std::uint64_t dataEpoch,D&)noexcept;
     bool readMaterial12FB30(std::size_t ordinal,D&)noexcept;
+    bool indexReadHistoryNative()const noexcept;
+    bool beginIndexReaderNative(const void*,const void*,std::uint64_t,std::uint32_t,D&)noexcept;
+    bool readIndex12FB30(std::uint32_t,D&)noexcept;
     bool topologyReadHistoryNative()const noexcept; //Leaf: values and opaque identities only.
     bool readTopologyCount12FB30(const void* data,std::uint64_t dataEpoch,TopologyEntryKind,D&)noexcept;
     //Only the complete non-2 version branch can issue this source close.
