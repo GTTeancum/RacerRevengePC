@@ -1,3 +1,5 @@
+#include "../../../src/game/original_loading_manager33050la.h"
+#include <cstdio>
 #include "original_ui_garage_draw_contribution50kg.h"
 #include "original_ui_garage_session50kg.h"
 #include "original_ui_garage_audio_backing50kg.h"
@@ -1701,17 +1703,40 @@ bool Application::beginNativeFrontendRootAudio140CE0(Frontend& frontend,
     const auto backing=garageAudioBackingOwner_;const auto light=sourceLightManager426F60Owner_;
     const auto aural=sourceAural00Owner_;const auto scope=sharedUiScopeOwner_;
     const auto display=raceDisplayOwner50LA_.lock();const auto before=frontend.coordinator.snapshot();
-    if(frontend.materialApplicationOwner!=this||!garageAudioApplicationInputsCurrent()||
-       !backing||!backing->inputsCurrent(*this)||backing->failed_||backing->closed_||
-       backing->frontendOutputOwner_!=&frontend.audioOutput||backing->frontendOutputClosed_||
-       !aural||!light||!scope||!display||display->application_!=this||!display->canRetain()||
-       !frontend.coordinator.borrowsRenderer(display->renderer_)||
-       !sameCustodyShared(aural->entities_,entitiesOwner_)||!sameCustodyShared(light->entities_,entitiesOwner_)||
-       !sameCustodyShared(scope->application_,entitiesOwner_)||light->issuer_!=this||
-       !light->current()||!aural->current()||!aural->backendCurrent()||!nativeSourceAudioDispatcherCurrent(*aural)||
-       !before.active||before.faulted||before.quitRequested||before.deferredQueue||
-       before.updates!=frontend.lastAudioSequence||before.submissions!=before.updates||
-       before.updates==std::numeric_limits<std::uint64_t>::max())
+    const auto rejected=[](bool failed,const char* prerequisite) noexcept {
+        if(failed)std::fprintf(stderr,"frontend_root_audio_rejected prerequisite=%s\n",prerequisite);
+        return failed;
+    };
+    if(rejected(frontend.materialApplicationOwner!=this,"frontend.materialApplicationOwner!=this")||
+       rejected(!garageAudioApplicationInputsCurrent(),"!garageAudioApplicationInputsCurrent()")||
+       rejected(!backing,"!backing")||
+       rejected(!backing->inputsCurrent(*this),"!backing->inputsCurrent(*this)")||
+       rejected(backing->failed_,"backing->failed_")||
+       rejected(backing->closed_,"backing->closed_")||
+       rejected(backing->frontendOutputOwner_!=&frontend.audioOutput,"backing->frontendOutputOwner_!=&frontend.audioOutput")||
+       rejected(backing->frontendOutputClosed_,"backing->frontendOutputClosed_")||
+       rejected(!aural,"!aural")||
+       rejected(!light,"!light")||
+       rejected(!scope,"!scope")||
+       rejected(!display,"!display")||
+       rejected(display->application_!=this,"display->application_!=this")||
+       rejected(!display->canRetain(),"!display->canRetain()")||
+       rejected(!frontend.coordinator.borrowsRenderer(display->renderer_),"!frontend.coordinator.borrowsRenderer(display->renderer_)")||
+       rejected(!sameCustodyShared(aural->entities_,entitiesOwner_),"!sameCustodyShared(aural->entities_,entitiesOwner_)")||
+       rejected(!sameCustodyShared(light->entities_,entitiesOwner_),"!sameCustodyShared(light->entities_,entitiesOwner_)")||
+       rejected(!sameCustodyShared(scope->application_,entitiesOwner_),"!sameCustodyShared(scope->application_,entitiesOwner_)")||
+       rejected(light->issuer_!=this,"light->issuer_!=this")||
+       rejected(!light->current(),"!light->current()")||
+       rejected(!aural->current(),"!aural->current()")||
+       rejected(!aural->backendCurrent(),"!aural->backendCurrent()")||
+       rejected(!nativeSourceAudioDispatcherCurrent(*aural),"!nativeSourceAudioDispatcherCurrent(*aural)")||
+       rejected(!before.active,"!before.active")||
+       rejected(before.faulted,"before.faulted")||
+       rejected(before.quitRequested,"before.quitRequested")||
+       rejected(before.deferredQueue,"before.deferredQueue")||
+       rejected(before.updates!=frontend.lastAudioSequence,"before.updates!=frontend.lastAudioSequence")||
+       rejected(before.submissions!=before.updates,"before.submissions!=before.updates")||
+       rejected(before.updates==std::numeric_limits<std::uint64_t>::max(),"before.updates==std::numeric_limits<std::uint64_t>::max()"))
         return fail(0x140CE0,"Native frontend audio prefix lost its actual Root, display, output or dispatcher owner");
     // The concrete native coordinator below owns only these ordinary managers.
     // Garage has its own complete retained Root cursor and must never be serviced twice.
@@ -1733,14 +1758,19 @@ bool Application::beginNativeFrontendRootAudio140CE0(Frontend& frontend,
         return fail(0x140CE4,"Native frontend audio prefix requires this exact prepared capped source factor");
     C* const outer=entitiesOwner_->application26C();C* const root=entitiesOwner_->application10();
     C* const lightNode=&light->entity_;C* const auralNode=&aural->entity_;C* const dispatcher=&scope->dispatcher_;
+    // nativeSourceAudioDispatcherCurrent authenticated the optional, inactive
+    // process-owned loading manager and its exact links before this traversal.
+    const C* const loadingNode=sourceLoading330Owner_?&sourceLoading330Owner_->manager_:nullptr;
+    const C* const afterAural=loadingNode?loadingNode:dispatcher;
+    const C* const beforeDispatcher=loadingNode?loadingNode:auralNode;
     const auto eligible=[](const C& node)noexcept{return (node.flags29&0x0du)==1u&&(node.mask20&2u);};
     if(!outer||!root||outer->kind!=K::entity141300||root->kind!=K::entity141300||
        !scope->linked(*outer,nullptr)||outer->previous10||outer->next14||outer->firstChild18!=root||
        !(outer->descendants24&2u)||!scope->linked(*root,outer)||root->previous10||root->next14||
        !eligible(*root)||!(root->descendants24&2u)||root->firstChild18!=lightNode||
        !scope->linked(*lightNode,root)||lightNode->previous10||lightNode->next14!=auralNode||
-       !scope->linked(*auralNode,root)||auralNode->previous10!=lightNode||auralNode->next14!=dispatcher||
-       !scope->linked(*dispatcher,root)||dispatcher->previous10!=auralNode||dispatcher->next14||!eligible(*dispatcher))
+       !scope->linked(*auralNode,root)||auralNode->previous10!=lightNode||auralNode->next14!=afterAural||
+       !scope->linked(*dispatcher,root)||dispatcher->previous10!=beforeDispatcher||dispatcher->next14||!eligible(*dispatcher))
         return fail(0x141F00,"Native frontend audio prefix does not own the actual eligible Light/Aural/dispatcher chain");
     // Native bookkeeping begins only after all nonmutating ownership checks.
     // Real source effects below are never rolled back or retried after failure.

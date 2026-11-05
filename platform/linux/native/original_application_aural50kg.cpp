@@ -1,3 +1,5 @@
+#include "../../../src/game/original_loading_manager33050la.h"
+#include <cstdio>
 #include "original_application_aural50kg.h"
 #include "original_ui_garage_audio_backing50kg.h"
 #include "original_ui_light_manager_owner50kg.h"
@@ -516,18 +518,42 @@ bool OriginalApplicationAural50KG::initializeNative102DE0(Diagnostic& d)noexcept
     // Concrete native endpoint replaces only267910's platform bootstrap. The
     // source register/list/master effects below still execute on real owners.
     const auto b=issuer_->garageAudioBackingOwner_;
-    if(!b||!b->inputsCurrent(*issuer_)||b->failed_||b->stage_!=OriginalUiGarageAudioBacking50KG::Stage::transportPrepared||
-       b->mixer_.sampleRate()!=NativeSourceReverb50KG::nativeRate||
-       b->mixer_.mixedFrames()||b->transport_.ownsMusic_||b->transport_.paused_||
-       b->transport_.nativeGroupControlCount_||b->mixer_.auralMasterOwner_||b->mixer_.masterGain()!=1.f||
-       b->transport_.nativeWetOwner_||b->transport_.nativeWetProcessor_||b->transport_.nativeWetEpoch_||
-       b->transport_.nativeWetSetRawMasters_||b->transport_.nativeWetPlaySong_||b->transport_.nativeWetPlayEffect_||b->transport_.nativeWetPlayRider_||b->transport_.nativeWetPlayWatto_||b->transport_.nativeWetCanPublish_||b->transport_.nativeWetInterfaceRetired_||
-       !b->soundMode_||!b->soundMode_->ready()||b->soundMode_->fields().outputMode9900!=1||
-       b->soundMode_->fields().reverseAngle9918||b->soundMode_->revision()==std::numeric_limits<std::uint64_t>::max()||
-       !b->mixer_.canRecordControlChanges(2)||!b->transport_.prepared_||!b->transport_.nativeSourceMetadata_||
-       b->transport_.mixer_!=&b->mixer_||
-       b->transport_.mixerEpoch_!=b->mixer_.groupEpoch50IC()||
-       b->transport_.preparedSoundMode_!=b->soundMode_.get())
+    const auto rejected=[](bool failed,const char* prerequisite) noexcept {
+        if(failed)std::fprintf(stderr,"aural_native_startup_rejected prerequisite=%s\n",prerequisite);
+        return failed;
+    };
+    if(rejected(!b,"!b")||
+       rejected(!b->inputsCurrent(*issuer_),"!b->inputsCurrent(*issuer_)")||
+       rejected(b->failed_,"b->failed_")||
+       rejected(b->stage_!=OriginalUiGarageAudioBacking50KG::Stage::transportPrepared,"b->stage_!=OriginalUiGarageAudioBacking50KG::Stage::transportPrepared")||
+       rejected(b->mixer_.sampleRate()!=NativeSourceReverb50KG::nativeRate,"b->mixer_.sampleRate()!=NativeSourceReverb50KG::nativeRate")||
+       rejected(b->mixer_.mixedFrames(),"b->mixer_.mixedFrames()")||
+       rejected(b->transport_.ownsMusic_,"b->transport_.ownsMusic_")||
+       rejected(b->transport_.paused_,"b->transport_.paused_")||
+       rejected(b->transport_.nativeGroupControlCount_,"b->transport_.nativeGroupControlCount_")||
+       rejected(b->mixer_.auralMasterOwner_,"b->mixer_.auralMasterOwner_")||
+       rejected(b->mixer_.masterGain()!=1.f,"b->mixer_.masterGain()!=1.f")||
+       rejected(b->transport_.nativeWetOwner_,"b->transport_.nativeWetOwner_")||
+       rejected(b->transport_.nativeWetProcessor_,"b->transport_.nativeWetProcessor_")||
+       rejected(b->transport_.nativeWetEpoch_,"b->transport_.nativeWetEpoch_")||
+       rejected(b->transport_.nativeWetSetRawMasters_,"b->transport_.nativeWetSetRawMasters_")||
+       rejected(b->transport_.nativeWetPlaySong_,"b->transport_.nativeWetPlaySong_")||
+       rejected(b->transport_.nativeWetPlayEffect_,"b->transport_.nativeWetPlayEffect_")||
+       rejected(b->transport_.nativeWetPlayRider_,"b->transport_.nativeWetPlayRider_")||
+       rejected(b->transport_.nativeWetPlayWatto_,"b->transport_.nativeWetPlayWatto_")||
+       rejected(b->transport_.nativeWetCanPublish_,"b->transport_.nativeWetCanPublish_")||
+       rejected(b->transport_.nativeWetInterfaceRetired_,"b->transport_.nativeWetInterfaceRetired_")||
+       rejected(!b->soundMode_,"!b->soundMode_")||
+       rejected(!b->soundMode_->ready(),"!b->soundMode_->ready()")||
+       rejected(b->soundMode_->fields().outputMode9900!=1,"b->soundMode_->fields().outputMode9900!=1")||
+       rejected(b->soundMode_->fields().reverseAngle9918,"b->soundMode_->fields().reverseAngle9918")||
+       rejected(b->soundMode_->revision()==std::numeric_limits<std::uint64_t>::max(),"b->soundMode_->revision()==std::numeric_limits<std::uint64_t>::max()")||
+       rejected(!b->mixer_.canRecordControlChanges(2),"!b->mixer_.canRecordControlChanges(2)")||
+       rejected(!b->transport_.prepared_,"!b->transport_.prepared_")||
+       rejected(!b->transport_.nativeSourceMetadata_,"!b->transport_.nativeSourceMetadata_")||
+       rejected(b->transport_.mixer_!=&b->mixer_,"b->transport_.mixer_!=&b->mixer_")||
+       rejected(b->transport_.mixerEpoch_!=b->mixer_.groupEpoch50IC(),"b->transport_.mixerEpoch_!=b->mixer_.groupEpoch50IC()")||
+       rejected(b->transport_.preparedSoundMode_!=b->soundMode_.get(),"b->transport_.preparedSoundMode_!=b->soundMode_.get()"))
         return fail(d,Status::backend,0x232AA0);
     if(entities_->soundMasterSlotsInitialized_)return fail(d,Status::phase,0x232B18);
     for(std::size_t n=0;n<25;++n)if(entities_->soundGroups434A10_[n]||entities_->soundGroupReserved434A10_[n])
@@ -1157,12 +1183,36 @@ OriginalApplicationAural50KG::Observation OriginalApplicationAural50KG::inspect(
 namespace original_main_entry50KG {
 bool Application::nativeSourceAudioDispatcherCurrent(const rr::platform::OriginalApplicationAural50KG& aural)const noexcept {
     const auto& scope=sharedUiScopeOwner_;
-    if(!scope||sourceAural00Owner_.get()!=&aural||aural.issuer_!=this||
-       (aural.entities_!=entitiesOwner_||aural.entities_.owner_before(entitiesOwner_)||entitiesOwner_.owner_before(aural.entities_))||scope->issuer_!=this||
-       (scope->application_!=entitiesOwner_||scope->application_.owner_before(entitiesOwner_)||entitiesOwner_.owner_before(scope->application_))||!scope->live().okay()||!scope->dispatcherLive_)return false;
+    const auto rejected=[](bool failed,const char* prerequisite) noexcept {
+        if(failed)std::fprintf(stderr,"aural_dispatcher_rejected prerequisite=%s\n",prerequisite);
+        return failed;
+    };
+    if(rejected(!scope,"!scope")||
+       rejected(sourceAural00Owner_.get()!=&aural,"sourceAural00Owner_.get()!=&aural")||
+       rejected(aural.issuer_!=this,"aural.issuer_!=this")||
+       rejected((aural.entities_!=entitiesOwner_||aural.entities_.owner_before(entitiesOwner_)||entitiesOwner_.owner_before(aural.entities_)),"(aural.entities_!=entitiesOwner_||aural.entities_.owner_before(entitiesOwner_)||entitiesOwner_.owner_before(aural.entities_))")||
+       rejected(scope->issuer_!=this,"scope->issuer_!=this")||
+       rejected((scope->application_!=entitiesOwner_||scope->application_.owner_before(entitiesOwner_)||entitiesOwner_.owner_before(scope->application_)),"(scope->application_!=entitiesOwner_||scope->application_.owner_before(entitiesOwner_)||entitiesOwner_.owner_before(scope->application_))")||
+       rejected(!scope->live().okay(),"!scope->live().okay()")||
+       rejected(!scope->dispatcherLive_,"!scope->dispatcherLive_"))return false;
     const auto& dispatcher=scope->dispatcher_;
-    return dispatcher.parent1C==&entitiesOwner_->root10_&&dispatcher.previous10==&aural.entity_&&
-        aural.entity_.next14==&dispatcher&&scope->linked(dispatcher,&entitiesOwner_->root10_);
+    // The genuine loading manager330 is constructed before dispatcher startup.
+    // Its initialized frontend tree is inactive (1415A0), but remains linked
+    // between Aural and the dispatcher. Authenticate that exact owner rather
+    // than accepting an arbitrary intermediate entity or requiring adjacency.
+    const auto& loading=sourceLoading330Owner_;
+    const auto* predecessor=&aural.entity_;
+    if(loading){
+        if(loading->issuer_!=this||!loading->prefixRetained()||!loading->managerInitialized_||
+           !loading->managerAttached_||loading->manager_.previous10!=&aural.entity_||
+           aural.entity_.next14!=&loading->manager_||loading->manager_.next14!=&dispatcher||
+           !scope->linked(loading->manager_,&entitiesOwner_->root10_))return false;
+        predecessor=&loading->manager_;
+    }
+    return !rejected(dispatcher.parent1C!=&entitiesOwner_->root10_,"dispatcher.parent")&&
+        !rejected(dispatcher.previous10!=predecessor,"dispatcher.previous")&&
+        !rejected(predecessor->next14!=&dispatcher,"dispatcher.predecessor.next")&&
+        !rejected(!scope->linked(dispatcher,&entitiesOwner_->root10_),"dispatcher.linked");
 }
 bool Application::stageAuralCold13FE24(std::shared_ptr<rr::platform::OriginalApplicationAural50KG>& out,
     rr::platform::OriginalApplicationAural50KG::Diagnostic& d)const noexcept {

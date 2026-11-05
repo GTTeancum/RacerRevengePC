@@ -64,7 +64,12 @@ bool Application::prepareFrontendAudioOutput(Frontend& frontend,
         // can enter Main lighting. Reuse the source-owned Aural -> backing ->
         // native interface -> Light -> attach chain, never replay any constructor.
         Aural::Diagnostic prefix;
-        if(!stageAuralLightNativePrefix13FE24(request.sampleRate,prefix,error))return false;
+        if(!stageAuralLightNativePrefix13FE24(request.sampleRate,prefix,error)){
+            error="Aural/Light startup rejected: status="+
+                std::to_string(static_cast<unsigned>(prefix.status))+" sourcePC="+
+                std::to_string(prefix.sourcePC)+(error.empty()?std::string{}:" detail="+error);
+            return false;
+        }
         // Actual17CD84 invokes232EA0 on the initialized Aural interface,
         // before fonts328/dispatcher330 and every later Garage consumer.
         // Publish the existing authenticated APPSTART directory once at this

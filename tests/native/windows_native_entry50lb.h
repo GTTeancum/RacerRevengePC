@@ -12,6 +12,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <cwchar>
 #include <filesystem>
 #include <iostream>
@@ -143,10 +144,16 @@ inline void sessionMarker(const char* stage) {
         static_cast<unsigned long>(GetCurrentProcessId()));
 }
 inline void visibleFailure(const std::wstring& detail,const fs::path& log) noexcept {
+    // Explicit process-local test mode reports failure through the log and exit code.
+    const char* unattended=std::getenv("RR_UNATTENDED_CAPTURE");
+    if(unattended&&std::strcmp(unattended,"1")==0){
+        std::fprintf(stderr,"native_failure_dialog_suppressed=unattended_capture\n");
+        return;
+    }
     try {
         std::wstring message=detail;
-        if(!log.empty())message+=L"\n\nLog file (if startup could open it):\n"+log.native()+
-            L"\n\nAttach RacerRevenge.log in your conversation after closing the game. Review it before sharing; nothing is uploaded automatically.";
+        if(!log.empty())message+=L"\n\nLog file: RacerRevenge.log\nIn the same folder as the game EXE (if startup could open it)."
+            L"\n\nClose the game before opening or sharing the log. Nothing is uploaded automatically.";
         MessageBoxW(nullptr,message.c_str(),L"Racer Revenge - startup / session error",MB_OK|MB_ICONERROR|MB_SETFOREGROUND);
     }catch(...){MessageBoxW(nullptr,L"Racer Revenge could not finish startup. Check the original files and RacerRevenge.log in the game folder.",
         L"Racer Revenge",MB_OK|MB_ICONERROR);}

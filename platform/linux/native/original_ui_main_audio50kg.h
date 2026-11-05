@@ -19,7 +19,15 @@ namespace rr::platform {
 class OriginalUiGaragePodScene50KG;
 class OriginalUiGaragePageOwner50KG;
 class NativeSourceReverb50KG;
+// MSVC must know the inheritance model before forming the member callbacks
+// below. Otherwise an incomplete Aural uses 24-byte member pointers while a
+// completed Aural uses 8-byte pointers, changing Main and backing layouts
+// between translation units. Aural is final and has no base classes.
+#if defined(_MSC_VER)
+class __single_inheritance OriginalApplicationAural50KG;
+#else
 class OriginalApplicationAural50KG;
+#endif
 class OriginalUiGarageAudioBacking50KG;
 class OriginalUiGarageSession50KG;
 // Host-only frontend transport. The application supplies a DEDICATED freshly

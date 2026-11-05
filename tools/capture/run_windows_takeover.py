@@ -52,7 +52,8 @@ def main():
     for name in ['SLUS_202.68', 'APPSTART.RES', 'LOC.RES']:
         if not (assets / name).is_file():
             raise ValueError(f'Missing original asset: {name}')
-    runtime = [sdl, assets / 'avcodec-61.dll', assets / 'avutil-59.dll']
+    runtime = [sdl, assets / 'avcodec-61.dll', assets / 'avutil-59.dll',
+               assets / 'libwinpthread-1.dll']
     if sdl.name != 'SDL2.dll' or not all(p.is_file() for p in runtime):
         raise ValueError('SDL2 and the original installation codec DLLs are required')
     output.mkdir(parents=True, exist_ok=False)
@@ -60,6 +61,8 @@ def main():
     capture.mkdir()
     temporary = output / 'temp'
     temporary.mkdir()
+    saves = output / 'saves'
+    saves.mkdir()
     staged = output / 'RacerRevengePC.exe'
     shutil.copy2(executable, staged)
     for dll in runtime:
@@ -67,6 +70,7 @@ def main():
     env = {k: v for k, v in os.environ.items()
            if not k.upper().startswith(('RR_', 'SDL_', 'MESA_', 'LIBGL_'))}
     env.update(TEMP=str(temporary), TMP=str(temporary),
+               RR_NATIVE_SAVE_DIR=str(saves), RR_AUDIO_WAV=str(output / 'audio.wav'),
                RR_WINDOW_CAPTURE_DIR=str(capture), RR_WINDOW_CAPTURE_AUTO='1',
                RR_UNATTENDED_CAPTURE='1', RR_UNATTENDED_UI_ROUTE=args.route,
                RR_UNATTENDED_SECONDS=str(max(1, args.seconds - 5)),
@@ -77,6 +81,7 @@ def main():
                   sourceBuildReceipt=str(build / 'build-receipt.json'),
                   executableSha256=digest(staged),
                   runtimeHashes={p.name: digest(output / p.name) for p in runtime},
+                  nativeSaveDirectory=str(saves), audioCapturePath=str(output / 'audio.wav'),
                   visualVerified=False, audioVerified=False, hostInputUsed=False)
     (output / 'launch.json').write_text(json.dumps(result, indent=2) + '\n')
     # Inherited process error mode prevents OS crash-dialog waits. Application
