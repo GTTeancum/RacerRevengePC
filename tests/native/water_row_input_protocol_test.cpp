@@ -6,6 +6,7 @@
 #include <limits>
 #include <optional>
 #include <vector>
+#include "../../src/game/original_water_row_storage50la.h"
 // Isolated protocol fixture sharing the actual file-read methods and state. This does not
 // instantiate the production archive service or prove its runtime ownership.
 enum class E {phase,allocation,unsupported};
@@ -113,6 +114,33 @@ int main(){
     {
         F f;f.setup(0,0);assert(f.prepare(0,d)&&f.readRowInput12FB30(false,0,d));
         assert(f.rowInputs_.vertices.sourceItems==0&&f.rowInputsHistoryNative());
+    }
+    //Use the real buffers with the shared reader, checking that bookkeeping
+    //zeros never become known vertex bytes or normal padding.
+    for(unsigned available=0;available<=96u;++available){
+        F f;f.setup(3,available);rr::game::OriginalWaterRowStorage50LA storage;
+        assert(storage.allocateNormals(3)&&storage.allocateVertices());
+        assert(f.prepare(3,d)&&f.readRowInput12FB30(false,0,d));const auto& v=f.rowInputs_.vertices;
+        assert(storage.copyVertexPrefix(std::span(v.bytes).first(v.copied)));
+        for(unsigned i=0;i<96u;++i)assert(storage.vertexByte(i)==
+            (i<available?std::optional<std::uint8_t>(v.bytes[i]):std::nullopt));
+        for(unsigned i=0;i<3u;++i){
+            assert(f.readRowInput12FB30(true,i,d));const auto& r=f.rowInputs_.normals[i];
+            assert(storage.copyNormalPrefix(i,std::span(r.bytes).first(r.copied)));
+            for(unsigned j=0;j<16u;++j)assert(!storage.normalByte(i,j));
+        }
+    }
+    for(unsigned copied=0;copied<12u;++copied){
+        F f;f.setup(3,132);rr::game::OriginalWaterRowStorage50LA storage;
+        assert(storage.allocateNormals(3)&&storage.allocateVertices());
+        assert(f.prepare(3,d)&&f.readRowInput12FB30(false,0,d));const auto& v=f.rowInputs_.vertices;
+        assert(storage.copyVertexPrefix(std::span(v.bytes).first(v.copied)));
+        f.failAfter=copied;assert(!f.readRowInput12FB30(true,0,d));const auto& r=f.rowInputs_.normals[0];
+        assert(storage.copyNormalPrefix(0,std::span(r.bytes).first(r.copied)));
+        for(unsigned j=0;j<16u;++j)assert(storage.normalByte(0,j)==
+            (j<copied?std::optional<std::uint8_t>(r.bytes[j]):std::nullopt));
+        assert(r.after.memberCursor10==100u&&r.after.devices[0]==100u+copied);
+        assert(!storage.normalByte(1,0)&&!storage.outputIdentity()&&f.rowInputsHistoryNative());
     }
     std::puts("Row read protocol: bulk prefixes0..96, item returns, sequencing, partial failure, cursor mismatch and missing observation passed");
 }

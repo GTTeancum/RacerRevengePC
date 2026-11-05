@@ -136,6 +136,7 @@ public:
     enum class WaterPoolInnerObjectStop {none,nativeReentrancy,ownerAllocation,payloadAllocation,loader2998D0};
     enum class WaterPoolInnerLoadStop {none,serviceLoad,read,capacity,sourceReentrancy,
         nativeReentrancy,ownerAllocation,payloadAllocation,rowLoop299A60};
+    enum class WaterPoolRowInputStop {none,preparation,bulkService,bulkRead,normalService,normalRead,calculation299A38};
     enum class WaterPoolRowBackingStop {none,empty299A70,serviceLoad,read,unknownCount,capacity,
         ownerAllocation,sourceReentrancy,nativeReentrancy,payloadAllocation,bulkRead2999CC};
 private:
@@ -1575,6 +1576,13 @@ struct SourceWaterConfig {
         const SourceWaterPoolFirstRowOwner* ownerIdentity=nullptr;
         a::OriginalStandardTextureDiagnostic50LA diagnostic{};
     } nativeWaterPoolRowBacking;
+    struct NativeWaterPoolRowInput {
+        bool attempted=false,prepared=false,verticesLoaded=false,verticesCommitted=false;
+        WaterPoolRowInputStop stop=WaterPoolRowInputStop::none;
+        std::uint32_t pc=0,ordinal=0,normalsLoaded=0,normalsCommitted=0;
+        const SourceWaterPoolFirstRowOwner* rowIdentity=nullptr;
+        a::OriginalStandardTextureDiagnostic50LA diagnostic{};
+    } nativeWaterPoolRowInput;
 } sourceWaterConfig_;
 std::unique_ptr<a::OriginalWaterSourceConfig50LA> sourceWaterConfigOwner_;
 bool continueSourceWaterConfig2B9314(std::uint32_t&)noexcept;
@@ -1628,6 +1636,7 @@ bool preflightNativeWaterPoolRecordBacking()const noexcept;
 bool preflightNativeWaterPoolFirstElement()const noexcept;
 bool preflightNativeWaterPoolInnerObject()const noexcept;
 bool withdrawNativeWaterPoolInnerObject()noexcept;
+bool preflightNativeWaterPoolRowInput()const noexcept;
 bool preflightNativeWaterPoolRowBacking()const noexcept;
 bool withdrawNativeWaterPoolRowBacking()noexcept;
 bool preflightNativeWaterPoolInnerLoad()const noexcept;
@@ -3691,6 +3700,14 @@ public:
         a::OriginalStandardTextureDiagnostic50LA diagnostic{};
     };
     WaterPoolRowBackingResult prepareFirstWaterPoolRowNativeOnly(WaterArrayBackingMode)noexcept;
+    struct WaterPoolRowInputResult {
+        enum class Status {refused,alreadyAttempted,nativeStopped,sourceBoundary};
+        Status status=Status::refused;WaterPoolRowInputStop stop=WaterPoolRowInputStop::none;
+        std::uint32_t pc=0,ordinal=0,normalsCommitted=0;
+        bool verticesCommitted=false;
+        a::OriginalStandardTextureDiagnostic50LA diagnostic{};
+    };
+    WaterPoolRowInputResult readFirstWaterPoolRowNativeOnly(WaterArrayBackingMode)noexcept;
     bool constructWorldCold1B2870(const original_main_entry50KG::Application&,
         rr::platform::RaceAudioGroups50IC&,rr::platform::AudioMixer50HD&,std::uint64_t,std::uint32_t&)noexcept;
     bool prepareWorldPhysicsIndex270CDC(std::uint32_t& pc)noexcept {

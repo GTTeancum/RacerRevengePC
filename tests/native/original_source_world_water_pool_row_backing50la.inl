@@ -1,4 +1,5 @@
 bool Owner::preflightNativeWaterPoolRowBacking()const noexcept {
+    if(!preflightNativeWaterPoolRowInput())return false;
     using S=WaterPoolRowBackingStop;using G=a::OriginalConfigProcessGlobals50LA;
     using A=SourceWaterConfig::NativeWaterPoolMaterial::RawAllocation;
     const auto& n=sourceWaterConfig_.nativeWaterPoolRowBacking;
@@ -71,7 +72,8 @@ bool Owner::preflightNativeWaterPoolRowBacking()const noexcept {
     const auto& storage=owner->storage;
     if(bool(storage.normalsIdentity())!=n.aliasStored[0]||bool(storage.verticesIdentity())!=n.aliasStored[1]||
        owner->normals0C!=storage.normalsIdentity()||owner->vertices08!=storage.verticesIdentity()||storage.outputIdentity())return false;
-    if(storage.normalByte(0,0)||storage.vertexByte(0)||storage.outputXYZ(0))return false;
+    if(!sourceWaterConfig_.nativeWaterPoolRowInput.attempted&&
+       (storage.normalByte(0,0)||storage.vertexByte(0)||storage.outputXYZ(0)))return false;
     return true;
 }
 
