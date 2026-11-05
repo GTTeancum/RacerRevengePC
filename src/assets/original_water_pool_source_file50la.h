@@ -148,6 +148,7 @@ class OriginalWaterPoolSourceFile50LA final {
         const void* rowsIdentity=nullptr;
         std::uint64_t dataEpoch=0;
     } innerRowCount_;
+#include "original_water_pool_row_input_state50la.inl"
     std::shared_ptr<OriginalStandardTextureResolver50LA> resolver_;
     std::shared_ptr<OriginalStandardArchiveProvider50LA> provider_;
     //This is admission's SAME service Track relation, not a presumed winner.

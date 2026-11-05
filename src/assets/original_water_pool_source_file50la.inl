@@ -488,6 +488,7 @@ bool OriginalWaterPoolSourceFile50LA::topologyReadHistoryNative()const noexcept 
 #include "original_water_pool_element_read50la.inl"
 #include "original_water_pool_inner_count50la.inl"
 #include "original_water_pool_row_count50la.inl"
+#include "original_water_pool_row_inputs50la.inl"
 bool OriginalWaterPoolSourceFile50LA::closeSource131040(D& d)noexcept {
     d={};const auto version=versionWordNative();
     if(sourceCloseAttempted_||nativeClosed_||!version||*version==2u||
@@ -504,7 +505,7 @@ bool OriginalWaterPoolSourceFile50LA::historyNative(const void* poolIdentity)con
     if(!poolIdentity||poolIdentity_!=poolIdentity||thread_!=std::this_thread::get_id()||
        !resolver_||!provider_||!track_||(nativeClosed_&&pinOwned_)||!materialReaderHistoryNative()||
        !topologyReadHistoryNative()||!indexReadHistoryNative()||!firstTopologyRecordHistoryNative()||
-       !firstTopologyElementHistoryNative()||!innerCountHistoryNative()||!innerRowCountHistoryNative())return false;
+       !firstTopologyElementHistoryNative()||!innerCountHistoryNative()||!innerRowCountHistoryNative()||!rowInputsHistoryNative())return false;
     if(!searchReached_)return !pinOwned_&&nativeHandle_==-1&&!openAttempted_&&!openReturned_&&
         !searchReturned_&&!found_&&!sourceReturnV0_&&!outputHandleStored_&&!outputAssociationStored_&&
         !read_.attempted&&!countRead_.entered&&!sourceCloseAttempted_; //Bookkeeping allocation refusal.
@@ -622,7 +623,10 @@ bool OriginalWaterPoolSourceFile50LA::preflightNative(const void* poolIdentity)c
         for(const auto& r:materialReader_.reads)if(r.attempted)latestMaterial=&r;
         const IndexRead* latestIndex=nullptr;
         for(const auto& r:indexReader_.reads)if(r.attempted)latestIndex=&r;
-        if(innerRowCount_.read.attempted){
+        const RowInputRead* latestRow=latestRowInputReadNative();
+        if(latestRow){
+            if(!latestRow->afterObserved||row.cursor10!=latestRow->after.memberCursor10)return false;
+        }else if(innerRowCount_.read.attempted){
             const auto& r=innerRowCount_.read;
             if(!r.afterObserved||row.cursor10!=r.after.memberCursor10)return false;
         }else if(innerCount_.read.attempted){
