@@ -1,3 +1,4 @@
+#include "original_manager_fields.h"
 #include <functional>
 // Complete original lexical suffix; caller prefix outlives every owner below.
 #include "terrain_interactive_continuation50du.h"
@@ -1361,11 +1362,17 @@ SessionExit50DU Context::run() {
  };
  // Manager passes only consume their current arena and stable shared owners.
  // Preserve slot order and the boundaries between passes while avoiding the
- // redundant player save/restore between peers. No callback may borrow another
- // slot or retain an arena reference after it returns; visitAll restores on throw.
+ // whole-racer snapshots. No callback may borrow another
+ // slot or retain an arena reference after it returns; the field lease restores on throw.
+ original_manager_fields::Access managerFields;
+ bool managerFieldsReported=false;
  auto visitManagerRacers=[&](auto&& operation){
-  require50DU(racerBank.visitAll([&](std::size_t slot){operation(slot);return true;}),
-      "original manager batch visit rejected");
+  managerFields.visitAll(racerBank,s,lapContinuity,std::forward<decltype(operation)>(operation));
+  if(!managerFieldsReported){
+   std::fprintf(stderr,"native_manager_fields bytes_per_racer=%zu full_snapshot_bytes=%zu slots=%zu\n",
+       managerFields.bytesPerRacer(),racerBank.bytesPerRacer(),racerBank.count());
+   managerFieldsReported=true;
+  }
  };
  auto rankOriginalAiFleet=[&](const original_all8_frame::Schedule* schedule=nullptr){
   observeOriginalAiFleet(schedule);

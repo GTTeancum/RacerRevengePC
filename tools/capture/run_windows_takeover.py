@@ -38,7 +38,7 @@ def main():
     parser.add_argument('--route', choices=['main-dud04-course-ga', 'main-ben02-course-ga',
                         'main-alder10-course-ma', 'main-ody11-course-ma',
                         'main-rider-course-ta'], default='main-dud04-course-ga')
-    parser.add_argument('--logs-only', action='store_true', help='Record stage and timing receipts without pixel readback or image files')
+    parser.add_argument('--logs-only', action='store_true', default=True, help='Record stage and timing receipts without pixel readback or image files')
     parser.add_argument('--seconds', type=int, default=180)
     parser.add_argument('--profile-performance', action='store_true',
                         help='Enable existing CPU/render/display phase measurements')

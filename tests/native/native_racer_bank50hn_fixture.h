@@ -43,6 +43,7 @@ namespace original_main_entry50KG {class NativeCollectorFifo50LA;}
 
 namespace native_racer_model50LA {class Owner;}
 namespace native_racer50HN {class Bank;}
+namespace original_manager_fields {class Access;}
 namespace mb_source_trigger50MB {
 class Owner;
 // Minted only by the actual aggregate after all partial source owners retire.
@@ -63,6 +64,7 @@ public:
 namespace native_racer50HN {
 inline constexpr std::size_t maximumRacers=rr::game::maxHostRaceRacers50HT;
 class Bank {
+    friend class ::original_manager_fields::Access;
 public:
     class QueryReservation final {
         friend class Bank;friend class mb_source_trigger50MB::Owner;
@@ -303,7 +305,7 @@ private:
     }
     bool beginSourceQuery(const mb_source_trigger50MB::Owner& issuer,
         std::uint64_t generation,std::uint64_t serial,QueryReservation& token)noexcept {
-        if(retired_||!sealed_||pendingToken_||token.bank_||sourceIssuer_!=&issuer||
+        if(managerFieldsVisit_||retired_||!sealed_||pendingToken_||token.bank_||sourceIssuer_!=&issuer||
             generation!=sourceGeneration_||!serial||serial<=lastSourceSerial_||
             visitDepth_!=1||currentSlot_>=count_||retirementVisit_)return false;
         token.bank_=this;token.issuer_=&issuer;token.generation_=generation;
@@ -391,6 +393,7 @@ private:
     std::array<Slot,maximumRacers> slots_{};
     std::size_t bytes_=0,count_=0;
     bool sealed_=false,visiting_=false,readBlocked_=false,retired_=false;
+    bool managerFieldsVisit_=false; // A narrow manager lease cannot start a source query.
     void add(void* address,std::size_t bytes) {
         if(retired_||sealed_||!address||!bytes||bytes>std::numeric_limits<std::size_t>::max()-bytes_)
             throw std::runtime_error("invalid native racer owner span");
