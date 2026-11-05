@@ -39,6 +39,8 @@ def main():
                         'main-alder10-course-ma', 'main-ody11-course-ma',
                         'main-rider-course-ta'], default='main-dud04-course-ga')
     parser.add_argument('--seconds', type=int, default=180)
+    parser.add_argument('--camera-trace', action='store_true',
+                        help='Log actual attached-camera poses without changing camera behavior')
     args = parser.parse_args()
     if os.name != 'nt' or not 10 <= args.seconds <= 180:
         parser.error('Windows required; watchdog must be 10..180 seconds')
@@ -77,13 +79,16 @@ def main():
                RR_UNATTENDED_SECONDS=str(max(1, args.seconds - 5)),
                RR_ORIGINAL_AI_ALL_RACERS='0', RR_TRACK_FPS_BASELINE='1',
                RR_NATIVE_FIXED_WINDOW='1')
+    if args.camera_trace:
+        env['RR_CAMERA_POSE_TRACE'] = '1'
     command = [str(staged), '--assets', str(assets)]
     result = dict(command=command, route=args.route, watchdogSeconds=args.seconds,
                   sourceBuildReceipt=str(build / 'build-receipt.json'),
                   executableSha256=digest(staged),
                   runtimeHashes={p.name: digest(output / p.name) for p in runtime},
                   nativeSaveDirectory=str(saves), audioCapturePath=str(output / 'audio.wav'),
-                  visualVerified=False, audioVerified=False, hostInputUsed=False)
+                  visualVerified=False, audioVerified=False, hostInputUsed=False,
+                  cameraPoseTrace=args.camera_trace)
     (output / 'launch.json').write_text(json.dumps(result, indent=2) + '\n')
     # Inherited process error mode prevents OS crash-dialog waits. Application
     # dialogs, if any, remain bounded by termination of this exact child handle.

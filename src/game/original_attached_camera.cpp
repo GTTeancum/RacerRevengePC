@@ -6,6 +6,7 @@
 #include <cmath>
 #include <cstring>
 #include <cstdio>
+#include <cstdlib>
 #if defined(__SSE__)
 #include <xmmintrin.h>
 #endif
@@ -175,7 +176,21 @@ Result pose(C& c,const OriginalAttachedFrame& in,const SceneGraph49P& graph,G& g
     camera=shake(m,camera,c,rng);
     const V cameraUp=m.normalize(m.cross(right,look));
     if(!m.ok||!scalar(c.fov04))return fail(Status::arithmetic,0x13e3b0);
-    out.position=camera;out.look=look;out.up=cameraUp;out.fov=c.fov04;out.mode=0;++c.revision;return {};
+    out.position=camera;out.look=look;out.up=cameraUp;out.fov=c.fov04;out.mode=0;++c.revision;
+    // Opt-in observation of the actual source pose, before view publication.
+    // No camera parameters, scene transforms or RNG draws are changed.
+    static const bool trace=[](){const char* value=std::getenv("RR_CAMERA_POSE_TRACE");
+        return value&&std::strcmp(value,"1")==0;}();
+    if(trace&&(c.revision<5||(c.revision%64)==0))
+        std::fprintf(stderr,"original_attached_pose pod=%d revision=%llu body_node=%d model_node=%d "
+            "offset=%.9g,%.9g,%.9g model_position=%.9g,%.9g,%.9g "
+            "basis_x=%.9g,%.9g,%.9g basis_y=%.9g,%.9g,%.9g basis_z=%.9g,%.9g,%.9g "
+            "camera=%.9g,%.9g,%.9g look=%.9g,%.9g,%.9g up=%.9g,%.9g,%.9g fov=%.9g\n",
+            c.binding.pod60,static_cast<unsigned long long>(c.revision),body,model,
+            local[0],local[1],local[2],position.x,position.y,position.z,
+            w[0],w[1],w[2],w[4],w[5],w[6],w[8],w[9],w[10],
+            camera.x,camera.y,camera.z,look.x,look.y,look.z,cameraUp.x,cameraUp.y,cameraUp.z,c.fov04);
+    return {};
 }
 struct Slice {const char* data=nullptr;std::size_t size=0,offset=0;};
 Slice trim(Slice s) noexcept {while(s.size&&(s.data[0]==' '||s.data[0]=='\t'||s.data[0]=='\r')){++s.data;--s.size;++s.offset;}
