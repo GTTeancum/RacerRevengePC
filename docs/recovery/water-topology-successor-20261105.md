@@ -116,3 +116,12 @@ exact byte limits, negative/wrapped source words and sum-overflow cases. Logs
 are in build/water-topology-request-test. Full integrated build26 is running;
 its receipt is authoritative. Runtime execution of the newly admitted
 allocation/retirement branch has not been established.
+
+Full build26 subsequently compiled all614 units, linked and passed input-hash
+checks. Runs19/20 verified the rebuilt native Main-to-GA startup path and clean
+shutdown; that route does not invoke the new explicit Water backing API, so its
+allocation/retirement runtime coverage remains unestablished. The next assertion
+state investigation is retained in the private assertion-state.json beside the
+trace: both globals lie in ELF zero-fill memory, the nonnull assertion helper
+returns0 on either debug branch, and the superficially similar19B4BC writer is
+to433FC0 rather than443FC0. No assertion continuation is implemented yet.

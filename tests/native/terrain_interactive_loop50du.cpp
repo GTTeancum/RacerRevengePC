@@ -2246,10 +2246,13 @@ void Context::run() {
     // unfinished video sample are never eligible window images.
     const bool privateUnderlay=sourceCameraSession&&
         (sourceCameraSession->cameraMode()==5||sourceCameraSession->cameraMode()==0)&&!sourceMainBaseReady;
+    //The phase may switch before the first running HUD/image is published.
+    //Wait for one actual race second before calling this a settled capture.
     const bool captureWindowImage=host.hasWindow()&&!privateUnderlay&&
         !(sourceCameraSession&&(sourceCameraSession->blockingVideoPending()||sourceCameraSession->asyncVideoPending()))&&
         windowCapture.due(windows_capture50LD::Stage::race,
-            race.phase==race_session50HM::Phase::Racing&&(allAiEnabled||humanCourseEnabled)&&race.racerCount==raceRacerCount&&
+            race.phase==race_session50HM::Phase::Racing&&race.raceSeconds>=1.0f&&
+            (allAiEnabled||humanCourseEnabled)&&race.racerCount==raceRacerCount&&
             racerBank.count()==raceRacerCount&&rendererDiagnostic.trackDraws>0);
     // Discard BEFORE readback or observation: even a capture at the exact FPS
     // threshold must not complete an interval containing readback latency.
@@ -2384,7 +2387,8 @@ void Context::run() {
     // private restored-camera underlay or an in-progress original fade.
     const bool windowImage=host.hasWindow()&&(actualGameplayImageCompleted||!sourceCameraSession)&&
         !(sourceCameraSession&&(sourceCameraSession->blockingVideoPending()||sourceCameraSession->asyncVideoPending()));
-    const bool settledTrack=race.phase==race_session50HM::Phase::Racing&&(allAiEnabled||humanCourseEnabled)&&
+    const bool settledTrack=race.phase==race_session50HM::Phase::Racing&&race.raceSeconds>=1.0f&&
+            (allAiEnabled||humanCourseEnabled)&&
         race.racerCount==raceRacerCount&&racerBank.count()==raceRacerCount&&rendererDiagnostic.trackDraws>0;
 #if defined(__linux__)
     if(captureWindowImage&&windowImage){
