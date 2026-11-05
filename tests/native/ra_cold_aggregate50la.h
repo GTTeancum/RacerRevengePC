@@ -5,6 +5,7 @@
 #include "../../src/game/original_water_constructor_numeric50la.h"
 #include "../../src/game/original_water_opacity_numeric50la.h"
 #include "../../src/game/original_water_scale_numeric50la.h"
+#include "../../src/game/original_water_topology_request50la.h"
 #include "../../src/assets/original_source_sky_file50la.h"
 #include "../../src/assets/original_source_water_exists131a40.h"
 #include "../../src/assets/original_water_source_config50la.h"
@@ -120,6 +121,8 @@ public:
     enum class WaterPoolTopologyEntry {none,returnedFirstMaterial,nonpositiveCount};
     enum class WaterPoolTopologyStop {none,secondMaterialCall2BB1C4,service2BAB30,
         readPreparation,readHelper,readAdmission,mallocCall2BAB54};
+    enum class WaterPoolTopologyBackingStop {none,sourceReentrancy,nativeReentrancy,
+        countCapacity,byteCapacity,requestMismatch,ownerAllocation,payloadAllocation,assertionGuard2BAB60};
 private:
     std::shared_ptr<const g::OriginalRacerWorldBorrow50LA> mintConstructorRacerWorldBorrow(
         const std::shared_ptr<Owner>& self)noexcept;
@@ -724,16 +727,25 @@ struct SourceWaterPoolMaterialArrayOwner final {
     SourceWaterPoolMaterialArrayOwner(const SourceWaterPoolMaterialArrayOwner&)=delete;
     SourceWaterPoolMaterialArrayOwner& operator=(const SourceWaterPoolMaterialArrayOwner&)=delete;
 };
+//Raw20*T topology storage. No source zero-fill or nested records yet.
+struct SourceWaterPoolTopologyOwner final {
+    std::unique_ptr<void,NativeWaterArrayPayloadDelete> payload;
+    const SourceWaterPoolDataOwner* dataOwner=nullptr;
+    std::uint64_t dataEpoch=0;
+    std::uint32_t count=0,requestedBytes=0;
+};
 struct SourceWaterPoolDataOwner final {
     std::unique_ptr<void,NativeWaterArrayPayloadDelete> payload;
     NativeWaterPoolDataRole role;
     std::uint64_t reference00=0; //Only104900 acquires this source reference.
     std::array<std::uint8_t,0x30> knownMask{},knownBits{};
     std::unique_ptr<SourceWaterPoolMaterialArrayOwner> nativeMaterials;
+    std::unique_ptr<SourceWaterPoolTopologyOwner> nativeTopology;
+    const SourceWaterPoolTopologyOwner* topology28=nullptr; //Semantic alias, no guest pointer bits.
     struct MaterialArrayView {const NativeWaterPoolMaterialArrayRole* role;std::uint32_t offset;};
     std::optional<MaterialArrayView> materials10; //Only actual SW2BB1B8 publishes this alias.
     SourceWaterPoolDataOwner()noexcept=default;
-    ~SourceWaterPoolDataOwner()noexcept {if(reference00||nativeMaterials)std::terminate();}
+    ~SourceWaterPoolDataOwner()noexcept {if(reference00||nativeMaterials||nativeTopology||topology28)std::terminate();}
     SourceWaterPoolDataOwner(const SourceWaterPoolDataOwner&)=delete;
     SourceWaterPoolDataOwner& operator=(const SourceWaterPoolDataOwner&)=delete;
 };
@@ -1274,6 +1286,7 @@ struct SourceWaterConfig {
             std::optional<a::OriginalConfigProcessGlobals50LA::StdioIdentity> reent;
             bool argumentCopied=false,allocatorFrame=false,reentCopied=false,lockCalled=false,lockReturned=false;
             bool largeBranchIssued=false;std::optional<std::uint32_t> pendingDelayPC,pendingTargetPC;
+            bool operator==(const RawAllocation&)const noexcept=default;
         } raw;
         NativeWaterPoolData::Allocation child; //Separate scalar-new occurrence, not the raw malloc wrapper.
         struct Store {
@@ -1408,6 +1421,19 @@ struct SourceWaterConfig {
         std::uint32_t pendingCallPC=0,pendingDelayPC=0;
         a::OriginalStandardTextureDiagnostic50LA diagnostic{};
     } nativeWaterPoolTopologyCount;
+    struct NativeWaterPoolTopologyBacking {
+        NativeWaterPoolMaterial::RawAllocation allocator;
+        bool attempted=false,ownerAttempted=false,ownerPrepared=false,payloadAttempted=false;
+        bool temporaryRetired=false,allocated=false,aliasStored=false,aliasRevoked=false,retired=false;
+        WaterPoolTopologyBackingStop stop=WaterPoolTopologyBackingStop::none;
+        std::uint32_t pc=0;
+        const NativeWaterPoolDataRole* dataRole=nullptr;
+        const SourceWaterPoolTopologyOwner* backingIdentity=nullptr;
+        const a::OriginalWaterPoolSourceFile50LA* fileIdentity=nullptr;
+        std::uint64_t dataEpoch=0;
+        std::optional<std::uint32_t> count;
+        std::optional<a::OriginalConfigProcessGlobals50LA::StdioIdentity> nativeReent;
+    } nativeWaterPoolTopologyBacking;
 } sourceWaterConfig_;
 std::unique_ptr<a::OriginalWaterSourceConfig50LA> sourceWaterConfigOwner_;
 bool continueSourceWaterConfig2B9314(std::uint32_t&)noexcept;
@@ -1452,6 +1478,10 @@ bool preflightNativeWaterPoolResourceHistory()const noexcept;
 bool preflightNativeWaterPoolDataHistory()const noexcept; //History and exact live resource, no count recursion.
 bool preflightNativeWaterPoolTopologyHistory(std::array<std::uint8_t,4>& bytes)const noexcept;
 //Topology history is a value/opaque-identity leaf, including after retirement.
+static SourceWaterConfig::NativeWaterPoolMaterial::RawAllocation topologyRawAllocationPrefix(
+    std::uint32_t,std::optional<a::OriginalConfigProcessGlobals50LA::StdioIdentity>)noexcept;
+bool preflightNativeWaterPoolTopologyBacking()const noexcept;
+bool withdrawNativeWaterPoolTopologyBacking()noexcept;
 bool withdrawNativeWaterPoolData()noexcept; //After file cancellation, before Pool Entity retirement.
 bool sourceWaterPoolMaterialCountedNative(std::size_t&)const noexcept; //Local0/1 only; no combined-floor recursion.
 bool preflightNativeWaterPoolMaterialReaderHistory(std::array<std::uint8_t,0xd8>& masks,
@@ -3446,6 +3476,15 @@ public:
         a::OriginalStandardTextureDiagnostic50LA diagnostic{},preparationDiagnostic{},helperDiagnostic{},admissionDiagnostic{};
     };
     WaterPoolTopologyResult readWaterPoolTopologyCountNativeOnly(WaterArrayBackingMode)noexcept;
+    struct WaterPoolTopologyBackingResult {
+        enum class Status {refused,alreadyAttempted,nativeStopped,sourceBoundary};
+        Status status=Status::refused;
+        WaterPoolTopologyBackingStop stop=WaterPoolTopologyBackingStop::none;
+        std::uint32_t countPrefixPC=0,allocatorPC=0,adaptedPC=0;
+        std::optional<std::uint32_t> requestedBytes,normalizedChunk;
+        bool allocated=false,aliasStored=false,retired=false;
+    };
+    WaterPoolTopologyBackingResult allocateWaterPoolTopologyNativeOnly(WaterArrayBackingMode)noexcept;
     bool constructWorldCold1B2870(const original_main_entry50KG::Application&,
         rr::platform::RaceAudioGroups50IC&,rr::platform::AudioMixer50HD&,std::uint64_t,std::uint32_t&)noexcept;
     bool prepareWorldPhysicsIndex270CDC(std::uint32_t& pc)noexcept {

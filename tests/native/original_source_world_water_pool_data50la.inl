@@ -10,7 +10,7 @@ bool Owner::preflightNativeWaterPoolDataHistory()const noexcept {
     //leaf reads retained values/opaque identities only, never this validator
     //or a material/Pool/provider/World count callback.
     std::array<std::uint8_t,4> topologyBytes{};
-    if(!preflightNativeWaterPoolTopologyHistory(topologyBytes))return false;
+    if(!preflightNativeWaterPoolTopologyHistory(topologyBytes)||!preflightNativeWaterPoolTopologyBacking())return false;
     const auto virginLoad=[](const SourceWaterConfig::NativeWaterPoolResource::ServiceLoad& l)noexcept {
         return !l.attempted&&!l.resolved&&!l.pc&&!l.applicationIdentity&&!l.domainIdentity&&
             !l.resolverIdentity&&!l.providerIdentity&&!l.trackIdentity&&!l.trackMountIdentity&&
@@ -111,7 +111,8 @@ bool Owner::preflightNativeWaterPoolDataHistory()const noexcept {
         }else if(d.nativeMaterials||d.materials10||material.rawAllocated||material.rawRetired||material.arrayAliasRevoked)return false;
         const auto* bytes=static_cast<const std::uint8_t*>(d.payload.get());
         for(std::size_t i=0;i<0x30u;++i){
-            const bool known=i<12u||(i>=0x10u&&i<0x2cu&&!(material.arrayAliasStored&&i<0x14u));std::uint8_t bits=0;
+            const bool known=i<12u||(i>=0x10u&&i<0x2cu&&!(material.arrayAliasStored&&i<0x14u)&&
+                !(sourceWaterConfig_.nativeWaterPoolTopologyBacking.aliasStored&&i>=0x28u));std::uint8_t bits=0;
             if(i<8u)bits=i==0u?1u:0u;
             else if(i<12u)bits=std::uint8_t(0x3d48a0u>>((i-8u)*8u));
             else if(i>=0x14u&&i<0x18u)bits=n.countBytes[i-0x14u];
@@ -151,7 +152,8 @@ bool Owner::preflightNativeWaterPoolDataHistory()const noexcept {
 
 bool Owner::withdrawNativeWaterPoolData()noexcept {
     auto& n=sourceWaterConfig_.nativeWaterPoolData;
-    if(!preflightNativeWaterPoolDataHistory()||!withdrawNativeWaterPoolMaterial())return false;
+    if(!preflightNativeWaterPoolDataHistory()||!withdrawNativeWaterPoolTopologyBacking()||
+       !withdrawNativeWaterPoolMaterial())return false;
     if(!n.nativeAllocated||n.nativeRetired)return true;
     const auto& f=sourceWaterConfig_.nativeWaterPoolResource;
     if(!f.nativeWithdrawn||!f.file||!f.file->nativeClosed()||!sourceWaterProvider_||
@@ -303,3 +305,5 @@ Owner::WaterPoolDataResult Owner::constructWaterPoolDataNativeOnly(WaterArrayBac
 
 #include "original_source_world_water_pool_material50la.inl"
 #include "original_source_world_water_pool_topology_count50la.inl"
+
+#include "original_source_world_water_pool_topology_backing50la.inl"

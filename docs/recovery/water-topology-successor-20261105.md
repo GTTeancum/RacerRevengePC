@@ -78,3 +78,41 @@ the first material's nonzero texture arm, the topology inner object loader,
 subsequent caller work and final file/resource retirement must also be joined.
 The successful native GA race-start test uses the existing gameplay path and
 does not prove completion of this canonical source-owned Water path.
+
+## First allocation implementation
+
+allocateWaterPoolTopologyNativeOnly(nativeSuccessBackingOnly) now continues
+an authenticated topology-count history through a separate raw-malloc prefix
+and native success backing. The predecessor history stays at2BAB54; the new
+allocator record executes its call/delay and retains the reached reentrancy or
+arena-load boundary. It never records a successful original malloc return.
+The prefix uses the same verified raw allocator arithmetic and small/large-bin
+selection as the material-array adaptation, with its own fresh reentrancy
+capture and topology-specific caller return at2BAB5C.
+
+Native backing separately rechecks reentrancy and admits count/byte/request
+capacity. It owns exactly20*T uninitialized bytes, not the normalized heap
+chunk. Zero remains malloc(0); native NULL refuses the adaptation without
+inventing an original failure or coercing the request to one byte. There is no
+zero fill, index array, nested topology allocation or source file read yet.
+
+Data now owns distinct topology storage and a semantic +28 alias. Publishing
+that alias supersedes the constructor's known-zero lane without writing host
+pointer bits into guest bytes. Data history checks allocation/alias/lifetime
+state, including partial native refusals. Native terminal retirement requires
+the existing closed file and discharged borrowers, revokes the alias, and
+releases topology backing before material/Data cleanup. It does not claim
+original free/destructor execution or restore source bytes.
+
+The continuation stops before the assertion initialization byte read at2BAB60.
+Original assertion-state custody is the next prerequisite. This API remains an
+explicit source-owned adaptation with no automatic production caller. It does
+not establish a complete loader return or runtime Water behavior.
+
+Validation so far: the containing World translation unit compiled with MSVC
+before the final extraction of the request-admission helper. The final helper
+compiled with /W4 /WX and passed zero, all16384 supported positive counts,
+exact byte limits, negative/wrapped source words and sum-overflow cases. Logs
+are in build/water-topology-request-test. Full integrated build26 is running;
+its receipt is authoritative. Runtime execution of the newly admitted
+allocation/retirement branch has not been established.
