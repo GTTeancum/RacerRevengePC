@@ -13,6 +13,7 @@ namespace original_main_entry50KG { struct Application; }
 
 namespace ra_pod_scene50LA { class Owner; }
 namespace ra_cold_aggregate50LA { class Owner; }
+namespace ra_source_camera50LA { class OwnershipBridge; }
 namespace rr::platform { class RaceAudioGroups50IC;class OriginalApplicationAural50KG;class OriginalUiLightManagerOwner50KG; }
 namespace rr::game {
 class OriginalTunnelTrack50LA;
@@ -46,6 +47,9 @@ class OriginalApplicationEntityAuthority50LA final {
     friend class rr::platform::OriginalApplicationAural50KG;
     friend class ::ra_pod_scene50LA::Owner;
     friend class ::ra_cold_aggregate50LA::Owner;
+    // The same-session handling join checks its freshly constructed speech
+    // Entity's retirement authority before publishing the player's D48 alias.
+    friend class ::ra_source_camera50LA::OwnershipBridge;
     friend class OriginalPlayerConstructorPrefix50LA;
     using C=OriginalWreckComponent50LA;
     struct Entry { C* node=nullptr;std::uint64_t generation=0,key=0; };
