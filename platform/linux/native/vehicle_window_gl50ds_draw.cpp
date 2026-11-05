@@ -145,6 +145,14 @@ bool VehicleWindowGl50DS::Storage::retainedMesh(const game::VehicleDrawBatch50CO
                     return fail(d, VehicleWindowError50DS::material,
                         "source-color material mask differs from the retained actual material policy");
             }
+            // Bounded scalar research receipt: first observed component for
+            // each racer on this renderer thread. Not a runtime admission
+            // rule: later lighting, materials and sessions can differ.
+            static thread_local bool alphaObserved[8][maxComponents]{};
+            const char* alphaTrace = std::getenv("RR_TRACE_PHASES");
+            const bool traceAlpha = alphaTrace && alphaTrace[0] == '1' &&
+                part.sourceColorRacerSlot50LA < 8 &&
+                !alphaObserved[part.sourceColorRacerSlot50LA][c];
             for (U i = 0; i < part.spanCount; ++i) {
                 const auto& span = part.spans[i];
                 if (!span.index_count) continue;
@@ -155,7 +163,23 @@ bool VehicleWindowGl50DS::Storage::retainedMesh(const game::VehicleDrawBatch50CO
                         policy.sourceDiffuseCompressed50LA ? 1u : 0u))
                     return fail(d, VehicleWindowError50DS::material,
                         "source-color selected span differs from its retained material policy");
+                const auto& material = selected.materials[selected.materialOffsets[c] + span.material_index];
+                if (traceAlpha && material.policy.sourceSpecularPair50LA && part.vertices &&
+                    span.vertex_start <= part.vertexCount && span.vertex_count <= part.vertexCount - span.vertex_start) {
+                    unsigned minimum = 255, maximum = 0;
+                    for (U v = span.vertex_start; v < span.vertex_start + span.vertex_count; ++v) {
+                        const unsigned alpha = part.vertices[v].color[3];
+                        if (alpha < minimum) minimum = alpha;
+                        if (alpha > maximum) maximum = alpha;
+                    }
+                    std::fprintf(stderr, "racer_pair_alpha slot=%u component=%u material=%u span=%u vertices=%u min=%u max=%u base=%llu map2=%llu sequence=%llu\n",
+                        unsigned(part.sourceColorRacerSlot50LA), c, span.material_index, i, span.vertex_count, minimum, maximum,
+                        static_cast<unsigned long long>(material.textureIdentity50LA),
+                        static_cast<unsigned long long>(material.specularIdentity50LA),
+                        static_cast<unsigned long long>(part.sourceColorGraphicsSequence50LA));
+                }
             }
+            if (traceAlpha) alphaObserved[part.sourceColorRacerSlot50LA][c] = true;
         }
         d.component = maxComponents;
         d.material = assets::unresolvedMaterialTexture50EA;
