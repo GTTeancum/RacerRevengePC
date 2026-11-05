@@ -167,7 +167,7 @@ bool OriginalRaceMusicManager50LA::loadSourceMusicChild1A3C00(
 bool OriginalRaceMusicManager50LA::retireSourceMusicChildNative(
     OriginalRaceMusicManagerDiagnostic50LA& d)noexcept {
     if(!impl_||!impl_->sourceOnly)return false;auto& p=*impl_;
-    if(!p.counted&&!p.sourceChild&&!p.sourceGroups&&!p.sourceTail.events158)return true;
+    if(!p.counted&&!p.sourceChild&&!p.sourceGroups&&!p.sourceTail.events158&&!p.sourceTail.firstSound)return true;
     if(p.thread!=std::this_thread::get_id()||!p.componentCurrent())
         return Impl::stop(d,p.sourcePC,"Source music native retirement custody unavailable");
     if(p.sourceGroups&&p.sourceGroups->sourceMusicBorrower_!=this)
@@ -176,6 +176,26 @@ bool OriginalRaceMusicManager50LA::retireSourceMusicChildNative(
        !p.fields.events158||*p.fields.events158!=p.sourceTail.events158.get()||
        p.sourceTail.allocationReturn!=p.sourceTail.events158.get()))
         return Impl::stop(d,p.sourcePC,"Source event allocation native custody changed");
+    if(p.sourceTail.firstSound){auto& sound=*p.sourceTail.firstSound;auto& e=sound.entity;
+        //Native cancellation of an UNPUBLISHED partial2C20F0 object. No source
+        //slot10/2C2160/292940/291180 call, audio stop or serial rollback.
+        if(sound.nativeIssuer!=this||!p.sourceTail.soundAllocationReturned||
+           p.sourceTail.soundAllocationReturn!=&e||sound.constructorReturn||
+           !p.fields.childrenC0[0]||*p.fields.childrenC0[0]||
+           e.previous10||e.next14||e.firstChild18||e.parent1C||e.mask20||e.descendants24)
+            return Impl::stop(d,p.sourcePC,"Unpublished source sound native custody changed");
+        if(sound.counted){
+            if(e.kind!=OriginalWreckComponentKind50LA::soundEmitter2C20F0||e.reference00!=1u||
+               e.sessionGeneration!=p.component.sessionGeneration||
+               e.objectKey!=std::uint64_t(reinterpret_cast<std::uintptr_t>(&e))||
+               !p.application->objectCount423F60()||!p.application->entityAuthority_.canRetire(e))
+                return Impl::stop(d,p.sourcePC,"Counted source sound native retirement unavailable");
+            if(!p.application->entityAuthority_.retire(e))return false;
+            --e.reference00;--p.application->objectCount423F60();sound.counted=false;
+        }else if(e.reference00||e.objectKey||e.sessionGeneration||e.kind!=OriginalWreckComponentKind50LA::unbound)
+            return Impl::stop(d,p.sourcePC,"Uncounted source sound identity changed");
+        p.sourceTail.firstSound.reset();p.sourceTail.nativeSoundRetired=true;
+    }
     if(p.sourceChild){auto& child=*p.sourceChild;auto& e=child.entity;
         // Release the FileManager borrower before Config/array/child storage.
         // This native cancellation is not1573B0 and cannot restore mode170.

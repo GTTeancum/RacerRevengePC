@@ -12,6 +12,7 @@ bool Owner::preflightSourceWaterConfigNative()const noexcept {
     if(!config.preflightNative(r.constructorThis)||h.nativeWithdrawn!=config.nativeClosed_||
        h.openReturn!=config.openReturned_||bool(h.loaderReturn)!=config.destructorReturned_)return false;
     if(h.loaderReturn)return r.pc==0x2b0c74u;
+    if(h.openReturn&&*h.openReturn)return config.textReturned_&&r.pc==0x2b9354u;
     if(!config.attempted_)return r.pc==0x2b9324u;
     return r.pc==config.pc_;
 }
@@ -47,9 +48,13 @@ bool Owner::continueSourceWaterConfig2B9314(std::uint32_t& pc)noexcept {
         at(config.attempted_?config.pc_:(d.sourcePC?d.sourcePC:0x2b9324u));return false;
     }
     h.openReturn=config.openReturned_;at(0x2b932c);at(0x2b9330);
-    //Only genuine source false returns are implemented here. Text parsing
-    //and nonzero binary allocation are bounded inside their exact occurrence.
-    if(!h.openReturn||*h.openReturn)return false;
+    if(!h.openReturn)return false;
+    if(*h.openReturn){
+        at(0x2b934c);at(0x2b9350);at(0x2b9354);
+        return false; //Before distinct Water157D00("General Information").
+    }
+    //Only genuine source false returns reach this stack destructor. Binary
+    //allocation and failed-Water diagnostics keep their prior boundaries.
     at(0x2b9334);at(0x2b9338);at(0x2b933c);at(0x2b9340);
     if(!config.closeRejectedStack1573B0(d)){at(config.pc_);return false;}
     at(0x2b9344);at(0x2b9348);h.loaderReturn=0;

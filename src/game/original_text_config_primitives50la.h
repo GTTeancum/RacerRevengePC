@@ -8,14 +8,16 @@
 #include <new>
 #include <utility>
 
-namespace rr::assets {class OriginalParticleSourceConfig50LA;}
+namespace rr::assets {class OriginalParticleSourceConfig50LA;class OriginalWaterSourceConfig50LA;}
 namespace rr::platform {class OriginalWorldSourceConfig50LA;}
 namespace rr::game {
 class OriginalWreckSparksConfig50LA;
-// Private, UNJOINED primitives. No FileManager handle, open/read completion,
-// allocator receipt or Config parse success is manufactured by this class.
+// Private bounded primitives. Concrete Config owners join their own I/O.
+// No FileManager handle, open/read completion, allocator receipt or Config
+// parse success is manufactured by this class.
 class OriginalTextConfigPrimitives50LA final {
     friend class rr::assets::OriginalParticleSourceConfig50LA;
+    friend class rr::assets::OriginalWaterSourceConfig50LA;
     friend class OriginalWreckSparksConfig50LA;
     friend class rr::platform::OriginalWorldSourceConfig50LA;
     enum class Stop { complete, unknownByte, unknownCtype, nativeBounds, nativeStorage, needsAllocation,
@@ -93,8 +95,8 @@ class OriginalTextConfigPrimitives50LA final {
 
     // Pure suffix AFTER the real 130560 read. 'requested' is the original
     // min(remaining, limit-2), NOT read return length. Caller must supply the
-    // exact known-byte mask of the destination after the real read. No caller
-    // is integrated yet. 'nonzeroReadReturn' is not itself a read receipt.
+    // exact known-byte mask of the destination after the real read. Water now
+    // joins this suffix to its own read. The bool is not itself a read receipt.
     static Result lineSuffix12F1B4(Bytes& buffer, std::uint32_t requested,
                                   bool nonzeroReadReturn, std::uint32_t& cursor) noexcept {
         if(requested>=buffer.value.size())return {Stop::nativeBounds,0x12f1b4u,0};

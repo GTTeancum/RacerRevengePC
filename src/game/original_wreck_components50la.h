@@ -27,7 +27,8 @@ enum class OriginalWreckComponentKind50LA : std::uint8_t {
     smoker288C30,smokerEmitter288E90, //Appended source smoker identities; no update/emission admission.
     physicsObject1659C0, //Base PhysicsObject identity; no derived Racer/setup dispatch.
     speech2C1000, //Actual detached speech constructor; no Player or speech-load dispatch.
-    music2C0980 //Actual detached stream constructor; no playback/child dispatch admission.
+    music2C0980, //Actual detached stream constructor; no playback/child dispatch admission.
+    soundEmitter2C20F0 //Private source constructor prefix, not completed load/playback/dispatch.
 };
 struct OriginalWreckComponent50LA final {
     //1048F0 base constructor owns the actual64-bit reference at source00.

@@ -61,7 +61,8 @@ bool OriginalRaceMusicManager50LA::continueSourceMusicManager1A3C74(
     p.fields.wordA8=0u; //1A3C98.
     p.fields.wordAC=0x43e10000u; //1A3CA0, original float bits450.0.
     tail.soundOrdinal=0u;tail.soundLoopOwner=&p.component; //1A3CA4/A8.
-    return stop(0x1a3cac,"Original first sound allocation2E8D90/2C20F0 remains unissued");
-    //The source Session FIFO, sound setup, listener1A4620, manager1A3C00
-    //return and playback remain unjoined. Raw source backing is not nativeEvents.
+    p.sourcePC=0x1a3cac;
+    return constructSourceSound1A3CAC(app,race,d);
+    //Sound setup, listener1A4620, manager1A3C00 return and playback remain
+    //unjoined. The raw source event backing is never the native Session FIFO.
 }

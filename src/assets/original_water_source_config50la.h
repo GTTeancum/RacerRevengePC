@@ -2,6 +2,7 @@
 #include "original_standard_texture_resource50la.h"
 #include "original_standard_archive_provider50la.h"
 #include "original_config_process_globals50la.h"
+#include "../game/original_text_config_primitives50la.h"
 #include <array>
 #include <cstdint>
 #include <exception>
@@ -17,6 +18,7 @@ namespace rr::assets {
 class OriginalWaterSourceConfig50LA final {
     friend class ::ra_cold_aggregate50LA::Owner;
     using D=OriginalStandardTextureDiagnostic50LA;
+    using Text=rr::game::OriginalTextConfigPrimitives50LA;
     struct Source {
         std::int64_t file00=-1;
         std::uint32_t binary08=0,opened0C=0,mode10=0,count14=0,index18=0;
@@ -57,6 +59,35 @@ class OriginalWaterSourceConfig50LA final {
     std::optional<std::int64_t> allocationArgument_;
     bool seekAttempted_=false,seekReturned_=false,textCallReached_=false;
     bool rejectionCloseAttempted_=false,rejectionCloseReturned_=false;
+    Text::Table textTable_;
+    Text::Bytes textInput_,textLine_,textName_;
+    enum class TextPhase {unentered,reading,splitting,section,lookup,allocation,
+        copyName,tell,finishRow,duplicate,finishLast,returned};
+    TextPhase textPhase_=TextPhase::unentered;
+    bool textEntered_=false,textReturned_=false;
+    std::uint64_t textCompletedLines_=0,textReadCalls_=0;
+    std::uint32_t textLineOrdinal_=0;
+    struct TextRead {
+        bool attempted=false,transportReturned=false,returned=false,present=false;
+        std::optional<std::size_t> before,after;
+        std::uint32_t requested=0;std::size_t copied=0;
+    } textRead_;
+    std::optional<std::int32_t> textLookup_;
+    std::optional<std::uint64_t> textTell_;
+    std::uint32_t textAllocationsAttempted_=0,textAllocationsReturned_=0;
+    std::optional<Text::AllocationRequest> textAllocation_;
+    std::optional<OriginalConfigProcessGlobals50LA::StdioIdentity> textAllocationReent_;
+    enum class NativeAllocationStop {none,reentUnknown,sidecarRefused,backingRefused};
+    NativeAllocationStop textAllocationStop_=NativeAllocationStop::none;
+    void syncTextFields()noexcept {
+        source_.count14=textTable_.count14;source_.index18=textTable_.capacity18;
+        source_.text1C=textTable_.sourceStorage;
+    }
+    bool readTextLine12EE90(D&)noexcept;
+    bool lookupText157AF0(std::int32_t&)noexcept;
+    bool allocateTextBackingNative()noexcept;
+    bool parseText157500(D&)noexcept;
+    bool preflightTextNative()const noexcept;
     bool destructorEntered_=false,selectionCleared_=false,destructorReturned_=false;
     explicit OriginalWaterSourceConfig50LA(const void* receiver)noexcept:waterReceiver_(receiver){}
     bool begin1577D0(std::shared_ptr<OriginalStandardTextureResolver50LA>,

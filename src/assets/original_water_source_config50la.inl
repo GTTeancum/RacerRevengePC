@@ -91,7 +91,9 @@ bool OriginalWaterSourceConfig50LA::begin1577D0(
         if(!resolver_->seekSourceBankMember12F640(selectedRoot_,this,handle_,0,d)){
             pc_=d.sourcePC?d.sourcePC:pc_;return false;}
         expectedCursor_=0;seekReturned_=true;pc_=0x157abc;textCallReached_=true;
-        pc_=0x157500;return false; //Distinct Water text parser ownership is next.
+        pc_=0x157500;if(!parseText157500(d))return false;
+        pc_=0x157ac4;source_.field428=0;pc_=0x157ac8;openReturned_=true;
+        pc_=0x157ae0;return true;
     }
     pc_=0x15793c;source_.binary08=1;pc_=0x157950;
     if(!read12FB30(version_,4,0x157958,d))return false;
@@ -124,18 +126,21 @@ bool OriginalWaterSourceConfig50LA::closeRejectedStack1573B0(D& d)noexcept {
     pc_=0x1574f4;destructorReturned_=true;return true;
 }
 bool OriginalWaterSourceConfig50LA::preflightNative(const void* receiver)const noexcept {
+    if(!preflightTextNative())return false;
     const auto& s=source_;
     if(!receiver||waterReceiver_!=receiver||thread_!=std::this_thread::get_id()||s.name28[0]||
-       s.binary08>1u||s.opened0C>1u||s.mode10||s.index18||s.text1C||s.selected20||s.child24||
+       s.binary08>1u||s.opened0C>1u||s.mode10||
+       s.index18!=(textEntered_?textTable_.capacity18:0u)||
+       s.text1C!=(textEntered_?textTable_.sourceStorage:nullptr)||s.selected20||s.child24||
        s.field428||s.field42C||s.field430||s.field434||s.cacheCount438||s.names4CC||s.index4BC||
        s.indexBytes4C0||s.block4C4||s.field4C8)return false;
     for(const auto word:s.cache43C)if(word)return false;
     if((borrowed_&&!attempted_)||(searchReturned_&&(!before168_||!after168_))||
        (found_&&!searchReturned_)||managerReturned_!=bool(managerHandle_)||
-       (managerReturned_&&!searchReturned_)||(openReturned_&&(!managerReturned_||*openReturned_))||
+       (managerReturned_&&!searchReturned_)||(openReturned_&&(!managerReturned_||(*openReturned_&&!textReturned_)))||
        (destructorEntered_&&(!openReturned_||*openReturned_))||selectionCleared_!=destructorReturned_||
        destructorEntered_!=destructorReturned_||seekReturned_!=textCallReached_||
-       (seekReturned_&&!seekAttempted_)||rejectionCloseReturned_!=bool(openReturned_&&found_)||
+       (seekReturned_&&!seekAttempted_)||rejectionCloseReturned_!=bool(openReturned_&&!*openReturned_&&found_)||
        (rejectionCloseReturned_&&!rejectionCloseAttempted_))return false;
     if(before168_&&(*before168_<-1||*before168_>=memberCount_||rowsCompared_>std::uint32_t(memberCount_)))return false;
     if(searchReturned_){
@@ -149,7 +154,7 @@ bool OriginalWaterSourceConfig50LA::preflightNative(const void* receiver)const n
     if(magicTerminated_&&!magic_.returned)return false;
     if(magicCompare_&&!magicTerminated_)return false;
     if(s.binary08!=(magicCompare_&&!*magicCompare_?1u:0u))return false;
-    if(s.count14!=(countWord_&&*countWord_?*countWord_:0u))return false;
+    if(s.count14!=(textEntered_?textTable_.count14:countWord_.value_or(0u)))return false;
     std::optional<std::size_t> cursor;
     const Read* previous=nullptr;
     for(const auto* read:{&magic_,&version_,&count_}){
@@ -167,7 +172,8 @@ bool OriginalWaterSourceConfig50LA::preflightNative(const void* receiver)const n
     if(allocationLow32_&&(*allocationLow32_!=(*countWord_<<10u)||
        *allocationArgument_!=(*allocationLow32_<=0x7fffffffu?std::int64_t(*allocationLow32_):
            std::int64_t(*allocationLow32_)-0x100000000LL)))return false;
-    if(seekReturned_)cursor=0;if(expectedCursor_!=cursor)return false;
+    if(seekReturned_)cursor=0;if(textEntered_&&textRead_.after)cursor=textRead_.after;
+    if(expectedCursor_!=cursor)return false;
     if(nativeClosed_)return !borrowed_&&!resolver_&&!provider_&&!track_&&!selectedRoot_&&handle_==-1;
     if(!attempted_)return !borrowed_&&!resolver_&&!provider_&&!track_&&handle_==-1;
     if(!borrowed_||!resolver_||!provider_||!track_||!resolver_->freshFileCapacity_||!resolver_->scratch_)return false;
@@ -194,3 +200,5 @@ bool OriginalWaterSourceConfig50LA::abortNative(D& d)noexcept {
     //parser return or shared search/window rollback is claimed here.
     handle_=-1;selectedRoot_=nullptr;resolver_.reset();provider_.reset();track_.reset();nativeClosed_=true;return true;
 }
+
+#include "original_water_source_text50la.inl"

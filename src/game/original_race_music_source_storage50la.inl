@@ -136,6 +136,38 @@ struct Child final {
     Child()noexcept {} // Do not value-initialize unknown source stack buffers.
     Child(const Child&)=delete;Child& operator=(const Child&)=delete;
 };
+//Native backing for the first original0x250 SoundEmitter allocation. Reached
+//fields are optional so an incomplete constructor never invents zeroed bytes.
+struct Sound final {
+    OriginalWreckComponent50LA entity;
+    const OriginalRaceMusicManager50LA* nativeIssuer=nullptr;
+    bool counted=false,constructorEntered=false,emitterEntered=false,emitterReturned=false;
+    std::optional<std::uint32_t> dispatch08;
+    const OriginalWreckComponent50LA* emitterReturn=nullptr;
+    std::array<std::optional<std::uint32_t>,4> previous40;
+    std::array<std::optional<std::uint32_t>,28> configuration160;
+    std::optional<const OriginalWreckComponent50LA*> manager1D8,group30;
+    std::optional<const void*> sound1F0;
+    std::optional<std::uint32_t> flags158,trigger1DC,chance1E0,serial50,distance1D0,word1E8,word1EC;
+    std::optional<std::uint16_t> type1E4;
+    std::optional<std::uint8_t> nameFirst54;
+    std::uint8_t flags1D4KnownMask=0,flags1D4KnownValue=0;
+    bool assertionEntered=false;std::optional<std::uint32_t> assertionReturn;
+    const void* sharedEmitterIdentity=nullptr; //Same Application owner, not another process copy.
+    struct Vector {
+        std::optional<const void*> backing04;
+        std::optional<std::uint32_t> count00,growth08,capacity0C;
+        std::uint8_t flags10KnownMask=0,flags10KnownValue=0;
+        bool constructorEntered=false,constructorReturned=false;
+        const Vector* returnedThis=nullptr;
+    } vector200,vector214,vector228;
+    const Vector* initializeReceiver=nullptr;
+    std::optional<std::uint32_t> initializeInitial,initializeGrowth;
+    bool initialize293D10Entered=false; //Not the later allocator or a returned vector call.
+    std::optional<const OriginalWreckComponent50LA*> constructorReturn;
+    std::uint32_t pc=0x2c20f0;
+    Sound()noexcept {} //Source unknown buffers/fields are not filled with numeric defaults.
+};
 //Only the concrete manager's synchronous post-child continuation mutates this
 //record. It cannot be supplied as a readiness/attachment token by a caller.
 struct ManagerTail final {
@@ -148,6 +180,11 @@ struct ManagerTail final {
     bool allocationEntered=false,allocationReentRead=false,allocationReturned=false,eventsPublished=false,nativeEventsRetired=false;
     std::optional<std::uint32_t> soundOrdinal;
     OriginalWreckComponent50LA* soundLoopOwner=nullptr; //Retained source s2 identity at1A3CA8.
+    std::unique_ptr<Sound> firstSound; //UnpublishedC0[0] constructor prefix only.
+    std::optional<std::uint32_t> soundAllocationBytes;
+    const void* soundAllocationReturn=nullptr;
+    bool soundAllocationEntered=false,soundAllocationReentRead=false,soundAllocationReturned=false;
+    bool nativeSoundRetired=false;
 };
 
 }
