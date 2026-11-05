@@ -314,3 +314,4 @@ Owner::WaterPoolDataResult Owner::constructWaterPoolDataNativeOnly(WaterArrayBac
 #include "original_source_world_water_pool_record_backing50la.inl"
 #include "original_source_world_water_pool_first_element50la.inl"
 #include "original_source_world_water_pool_inner_object50la.inl"
+#include "original_source_world_water_pool_inner_load50la.inl"

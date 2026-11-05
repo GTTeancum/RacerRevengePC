@@ -133,6 +133,8 @@ public:
         nativeReentrancy,payloadAllocation,elementConstruction,innerLoop2BADD8};
     enum class WaterPoolElementStop {none,serviceLoad,read,unknownHalfword,newEntry2E8D90,empty2BADFC};
     enum class WaterPoolInnerObjectStop {none,nativeReentrancy,ownerAllocation,payloadAllocation,loader2998D0};
+    enum class WaterPoolInnerLoadStop {none,serviceLoad,read,capacity,sourceReentrancy,
+        nativeReentrancy,ownerAllocation,payloadAllocation,rowLoop299A60};
 private:
     std::shared_ptr<const g::OriginalRacerWorldBorrow50LA> mintConstructorRacerWorldBorrow(
         const std::shared_ptr<Owner>& self)noexcept;
@@ -739,9 +741,18 @@ struct SourceWaterPoolMaterialArrayOwner final {
 };
 struct SourceWaterPoolTopologyOwner;
 struct SourceWaterPoolRecordOwner;
+struct SourceWaterPoolInnerOwner;
+struct SourceWaterPoolInnerRowsOwner final {
+    std::unique_ptr<void,NativeWaterArrayPayloadDelete> payload;
+    const SourceWaterPoolInnerOwner* object=nullptr;
+    std::uint32_t count=0,bytes=0;
+};
 struct SourceWaterPoolInnerOwner final {
     std::unique_ptr<void,NativeWaterArrayPayloadDelete> payload;
     const SourceWaterPoolRecordOwner* record=nullptr;
+    std::unique_ptr<SourceWaterPoolInnerRowsOwner> rows;
+    const SourceWaterPoolInnerRowsOwner* rows00=nullptr;
+    ~SourceWaterPoolInnerOwner()noexcept {if(rows||rows00)std::terminate();}
 };
 struct SourceWaterPoolRecordOwner final {
     std::unique_ptr<void,NativeWaterArrayPayloadDelete> halfwords,objectWords;
@@ -1525,6 +1536,18 @@ struct SourceWaterConfig {
         const SourceWaterPoolRecordOwner* recordIdentity=nullptr;
         const SourceWaterPoolInnerOwner* objectIdentity=nullptr;
     } nativeWaterPoolInnerObject;
+    struct NativeWaterPoolInnerLoad {
+        bool attempted=false,serviceLoaded=false,ownerAllocated=false,payloadAttempted=false;
+        bool allocated=false,aliasStored=false,zeroed=false,retired=false;
+        WaterPoolInnerLoadStop stop=WaterPoolInnerLoadStop::none;
+        std::uint32_t pc=0;
+        std::optional<std::uint32_t> count;
+        NativeWaterPoolMaterial::RawAllocation raw;
+        std::optional<a::OriginalConfigProcessGlobals50LA::StdioIdentity> nativeReent;
+        const SourceWaterPoolInnerOwner* objectIdentity=nullptr;
+        const SourceWaterPoolInnerRowsOwner* rowsIdentity=nullptr;
+        a::OriginalStandardTextureDiagnostic50LA diagnostic{};
+    } nativeWaterPoolInnerLoad;
 } sourceWaterConfig_;
 std::unique_ptr<a::OriginalWaterSourceConfig50LA> sourceWaterConfigOwner_;
 bool continueSourceWaterConfig2B9314(std::uint32_t&)noexcept;
@@ -1578,6 +1601,8 @@ bool preflightNativeWaterPoolRecordBacking()const noexcept;
 bool preflightNativeWaterPoolFirstElement()const noexcept;
 bool preflightNativeWaterPoolInnerObject()const noexcept;
 bool withdrawNativeWaterPoolInnerObject()noexcept;
+bool preflightNativeWaterPoolInnerLoad()const noexcept;
+bool withdrawNativeWaterPoolInnerLoad()noexcept;
 bool withdrawNativeWaterPoolRecordBacking()noexcept;
 bool withdrawNativeWaterPoolIndices()noexcept;
 bool withdrawNativeWaterPoolTopologyBacking()noexcept;
@@ -3621,6 +3646,14 @@ public:
         bool allocated=false,constructed=false,aliasStored=false,retired=false;
     };
     WaterPoolInnerObjectResult constructFirstWaterPoolInnerNativeOnly(WaterArrayBackingMode)noexcept;
+    struct WaterPoolInnerLoadResult {
+        enum class Status {refused,alreadyAttempted,nativeStopped,sourceBoundary};
+        Status status=Status::refused;WaterPoolInnerLoadStop stop=WaterPoolInnerLoadStop::none;
+        std::uint32_t pc=0;std::optional<std::uint32_t> count;
+        bool allocated=false,zeroed=false,retired=false;
+        a::OriginalStandardTextureDiagnostic50LA diagnostic{};
+    };
+    WaterPoolInnerLoadResult loadFirstWaterPoolInnerNativeOnly(WaterArrayBackingMode)noexcept;
     bool constructWorldCold1B2870(const original_main_entry50KG::Application&,
         rr::platform::RaceAudioGroups50IC&,rr::platform::AudioMixer50HD&,std::uint64_t,std::uint32_t&)noexcept;
     bool prepareWorldPhysicsIndex270CDC(std::uint32_t& pc)noexcept {

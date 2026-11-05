@@ -1,4 +1,5 @@
 bool Owner::preflightNativeWaterPoolInnerObject()const noexcept {
+    if(!preflightNativeWaterPoolInnerLoad())return false;
     using S=WaterPoolInnerObjectStop;using G=a::OriginalConfigProcessGlobals50LA;
     const auto& n=sourceWaterConfig_.nativeWaterPoolInnerObject;
     const auto& element=sourceWaterConfig_.nativeWaterPoolFirstElement;
@@ -28,7 +29,13 @@ bool Owner::preflightNativeWaterPoolInnerObject()const noexcept {
        record->firstObjectSlot!=(n.aliasStored?&object:nullptr))return false;
     if(n.constructed){
         const auto* bytes=static_cast<const std::uint8_t*>(object.payload.get());
-        for(unsigned i=0;i<12u;++i)if(bytes[i])return false;
+        const auto& load=sourceWaterConfig_.nativeWaterPoolInnerLoad;
+        const auto& read=f.file->innerCount_.read;
+        for(unsigned i=0;i<12u;++i){
+            if(load.aliasStored&&i<4u)continue; //Semantic rows pointer: unknown guest bits.
+            const auto expected=i>=4u&&i<4u+read.copied?read.bytes[i-4u]:std::uint8_t{0};
+            if(bytes[i]!=expected)return false;
+        }
         if(object.payload.get()==record->objectWords.get()||object.payload.get()==record->halfwords.get()||
            object.payload.get()==topology->payload.get())return false;
     }
@@ -43,6 +50,7 @@ bool Owner::withdrawNativeWaterPoolInnerObject()noexcept {
     if(nativeScbThread_!=std::this_thread::get_id()||runtimeCameraBorrows_||runtimeWorldBorrows_||
        constructorRacerWorldBorrows_||sourceParticleInvocationBorrowers_||!sourceWaterConfig_.nativeWithdrawn||
        !sourceWaterProviderInitializer_.world400NativeWithdrawn||!f.nativeWithdrawn||!f.file->nativeClosed())return false;
+    if(!withdrawNativeWaterPoolInnerLoad())return false;
     auto& record=*sourceWaterProvider_->nativePool->nativeData->nativeTopology->firstRecord;
     record.firstObjectSlot=nullptr;record.firstInner.reset();n.retired=true;
     return true; //No original scalar-delete or owner-count event is inferred.
