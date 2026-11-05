@@ -163,3 +163,13 @@ count; repeated state; canaries; zero length; wrong extent/null/wrapped requests
 and unknown/mismatched global refusal without mutations. The actual containing
 World translation unit also compiled successfully. Full build28 is running;
 its final receipt must be checked before any runtime validation or publication.
+
+Build28 is now complete:614 units compiled, linked and input hashes remained
+stable. The final executable SHA256 is
+CE8F958F40DF54A710108B1455CBFAEEE488D2D9F305E50458B9006E918C801C.
+The final input hashes for the initialization helper, aggregate continuation
+and Application owner were rechecked. This proves integrated build readiness,
+not runtime invocation of the new initialization API. A redundant GA route was
+not used as Water validation. The next index allocation/read work must preserve
+unknown raw bytes, T-1 iterations, distinct read observations and the last actual
+cursor on failure; it must not replace the existing topology-count receipt.
