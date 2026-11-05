@@ -298,8 +298,6 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  require50DU(!originalUiStarted||allAiEnabled||directOriginalHuman,
      "recovered original profile entry requires its owned direct human or retained all-AI route");
  require50DU(!directOriginalHuman||!allAiEnabled,"direct human Course must not replace Player0 with AI");
- require50DU(!captureRun.enabled()||(!headlessLive&&raceEnabled&&allAiEnabled),
-     "Window track capture requires a real window and original AI for every racer");
  // Native device selection never changes original player/AI classes. ALL8
  // bypasses both human packet paths even if a physical device is attached.
  const char* inputDeviceSetting=std::getenv("RR_HUMAN_INPUT_DEVICE");
@@ -321,6 +319,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  // separate native roster, never the legacy one-AI diagnostic slice.
  // Every accepted human Course request cold-reloads, even the same selection.
  const bool humanCourseEnabled=courseRaceCold&&(isTaTrack||directOriginalHuman)&&!allAiEnabled;
+ require50DU(!captureRun.enabled()||(!headlessLive&&raceEnabled&&(allAiEnabled||humanCourseEnabled)),
+     "Window track capture requires a real window and an admitted original human or all-AI race");
  require50DU(!directOriginalHuman||!originalAiSetting||std::string(originalAiSetting)!="1",
      "direct human Course forbids the legacy first-slice AI override");
  const bool nativeOriginalFleet=allAiEnabled||humanCourseEnabled;

@@ -728,17 +728,17 @@ const char* Frontend::presentationPolicyName()const noexcept {
     }
 
 bool Frontend::available()const noexcept  {
-        if(!presentationHost||!presentationNow||!presentationHost->hasWindow()||!presentationHost->current()||hostPaused())return false;
+        if(!presentationHost||!presentationNow||!presentationHost->hasWindow()||!presentationHost->current()||hostPaused()){std::fprintf(stderr,"original_rider_presentation_failure method=available site=1\n");return false;}
         const auto& info=presentationHost->info();
-        if(!info.focused||info.minimized||info.drawableWidth<=0||info.drawableHeight<=0)return false;
+        if(!info.focused||info.minimized||info.drawableWidth<=0||info.drawableHeight<=0){std::fprintf(stderr,"original_rider_presentation_failure method=available site=2\n");return false;}
         if(!presentationActive)return riderPresentationPolicy==RiderPresentationPolicy::inactive;
-        if(info.drawableWidth!=presentationWidth||info.drawableHeight!=presentationHeight)return false;
+        if(info.drawableWidth!=presentationWidth||info.drawableHeight!=presentationHeight){std::fprintf(stderr,"original_rider_presentation_failure method=available site=3\n");return false;}
         return (riderPresentationPolicy==RiderPresentationPolicy::driverSwapInterval1&&info.swapInterval==1)||
             (riderPresentationPolicy==RiderPresentationPolicy::nativePcDeadline60Hz&&info.swapInterval==0);
     }
 
 bool Frontend::begin()noexcept  {
-        if(presentationActive||!available())return false;
+        if(presentationActive||!available()){std::fprintf(stderr,"original_rider_presentation_failure method=begin site=1\n");return false;}
         savedSwapInterval=presentationHost->info().swapInterval;
         presentationWidth=presentationHost->info().drawableWidth;
         presentationHeight=presentationHost->info().drawableHeight;
@@ -752,7 +752,7 @@ bool Frontend::begin()noexcept  {
         else {
             const bool swapControlFailure=d.error==rr::platform::GameHostError50ER::Window&&
                 d.window.error==rr::platform::WindowHostError50DQ::SwapIntervalFailure;
-            if(!presentationHost->setSwapInterval(savedSwapInterval,d))return false;
+            if(!presentationHost->setSwapInterval(savedSwapInterval,d)){std::fprintf(stderr,"original_rider_presentation_failure method=begin site=2\n");return false;}
             // Optional native-PC policy, never a fabricated interval1 result.
             // Wrong context/thread, nonzero saved intervals and unaccepted
             // audio/clock baselines cannot activate this alternate owner.
@@ -760,11 +760,11 @@ bool Frontend::begin()noexcept  {
                presentationHost->info().swapInterval!=0||!lastUpdateNanoseconds||
                original_ui_elapsed50LH::project(lastUpdateNanoseconds,presentationNow(),pendingUpdateColdNanoseconds).error!=
                    original_ui_elapsed50LH::Error::none){
-                presentationActive=false;riderPresentationPolicy=RiderPresentationPolicy::inactive;return false;
+                presentationActive=false;riderPresentationPolicy=RiderPresentationPolicy::inactive;{std::fprintf(stderr,"original_rider_presentation_failure method=begin site=3\n");return false;}
             }
             riderPresentationPolicy=RiderPresentationPolicy::nativePcDeadline60Hz;
         }
-        if(!available())return false;
+        if(!available()){std::fprintf(stderr,"original_rider_presentation_failure method=begin site=4\n");return false;}
         std::fprintf(stderr,"original_rider_presentation_begin policy=%s actual_interval=%d saved_interval=%d physical_scanout_measured=0\n",
             presentationPolicyName(),presentationHost->info().swapInterval,savedSwapInterval);
         return true;
@@ -773,7 +773,7 @@ bool Frontend::begin()noexcept  {
 bool Frontend::end()noexcept  {
         if(!presentationActive)return true;
         rr::platform::GameHostDiagnostic50ER d;
-        if(!presentationHost||!presentationHost->setSwapInterval(savedSwapInterval,d))return false;
+        if(!presentationHost||!presentationHost->setSwapInterval(savedSwapInterval,d)){std::fprintf(stderr,"original_rider_presentation_failure method=end site=1\n");return false;}
         std::fprintf(stderr,"original_rider_presentation_end policy=%s restored_interval=%d swap_calls=%llu completed_waits=%llu completed_wait_scope_ns=%llu physical_scanout_measured=0\n",
             presentationPolicyName(),presentationHost->info().swapInterval,
             static_cast<unsigned long long>(riderPresentationSwaps-presentationBeginSwaps),
@@ -784,54 +784,54 @@ bool Frontend::end()noexcept  {
     }
 
 bool Frontend::pollPresentationInput()noexcept {
-        if(!presentationActive||!available())return false;
+        if(!presentationActive||!available()){std::fprintf(stderr,"original_rider_presentation_failure method=pollPresentationInput site=1\n");return false;}
         rr::platform::GameHostInput50ER input;rr::platform::GameHostDiagnostic50ER d;
         if(!presentationHost->poll(input,d)||input.keys.quitRequested||input.keys.activityLost||
-           input.keys.resized||input.keys.eventBudgetExhausted||!available())return false;
+           input.keys.resized||input.keys.eventBudgetExhausted||!available()){std::fprintf(stderr,"original_rider_presentation_failure method=pollPresentationInput site=2\n");return false;}
         return true;
     }
 
 bool Frontend::waitBeforeSample()noexcept  {
-        if(!pollPresentationInput())return false;
+        if(!pollPresentationInput()){std::fprintf(stderr,"original_rider_presentation_failure method=waitBeforeSample site=1\n");return false;}
         // Driver policy retains its existing real swap wait. The opt-in
         // interval0 host policy waits BEFORE render, inside actual sample dt.
         if(riderPresentationPolicy==RiderPresentationPolicy::driverSwapInterval1)return true;
-        if(riderPresentationPolicy!=RiderPresentationPolicy::nativePcDeadline60Hz)return false;
+        if(riderPresentationPolicy!=RiderPresentationPolicy::nativePcDeadline60Hz){std::fprintf(stderr,"original_rider_presentation_failure method=waitBeforeSample site=2\n");return false;}
         using Error=original_ui_rider_pacing50LB::Error;
         const auto begin=presentationNow();
-        if(riderDeadline.beginWait(begin)!=Error::none)return false;
+        if(riderDeadline.beginWait(begin)!=Error::none){std::fprintf(stderr,"original_rider_presentation_failure method=waitBeforeSample site=3\n");return false;}
         for(;;){
-            if(!pollPresentationInput()||!checkpointAudio())return false;
+            if(!pollPresentationInput()||!checkpointAudio()){std::fprintf(stderr,"original_rider_presentation_failure method=waitBeforeSample site=4\n");return false;}
             const auto now=presentationNow();const auto observed=riderDeadline.observe(now);
-            if(observed.error!=Error::none)return false;
+            if(observed.error!=Error::none){std::fprintf(stderr,"original_rider_presentation_failure method=waitBeforeSample site=5\n");return false;}
             if(observed.due){
                 if(now<begin||now-begin>std::numeric_limits<std::uint64_t>::max()-presentationCompletedWaitNanoseconds||
                    presentationCompletedWaits==std::numeric_limits<std::uint64_t>::max()||
-                   riderDeadline.finishWait(now)!=Error::none)return false;
+                   riderDeadline.finishWait(now)!=Error::none){std::fprintf(stderr,"original_rider_presentation_failure method=waitBeforeSample site=6\n");return false;}
                 presentationCompletedWaitNanoseconds+=now-begin;++presentationCompletedWaits;return true;
             }
             // Sleep requests are at most1ms; oversleep remains real elapsed
             // work. All measured active time remains in the PCM accounting domain.
             try{std::this_thread::sleep_for(std::chrono::nanoseconds(observed.sleepNanoseconds));}
-            catch(...){return false;}
+            catch(...){{std::fprintf(stderr,"original_rider_presentation_failure method=waitBeforeSample site=7\n");return false;}}
         }
     }
 
 bool Frontend::materialClock(rr::platform::OriginalUiMainFrameClock50KG& out)noexcept  {
-        if(!presentationClock)return false;
-        try{out=sampleClock(*presentationClock,true);return true;}catch(...){return false;}
+        if(!presentationClock){std::fprintf(stderr,"original_rider_presentation_failure method=materialClock site=1\n");return false;}
+        try{out=sampleClock(*presentationClock,true);return true;}catch(...){{std::fprintf(stderr,"original_rider_presentation_failure method=materialClock site=2\n");return false;}}
     }
 
 bool Frontend::checkpointAudio()noexcept  {
-        if(!presentationActive||!available())return false;
+        if(!presentationActive||!available()){std::fprintf(stderr,"original_rider_presentation_failure method=checkpointAudio site=1\n");return false;}
         const auto now=presentationNow();
         // Blocking presentation requires an already accepted active baseline;
         // it cannot use the first/resumed-page zero-delta convention.
-        if(!lastUpdateNanoseconds)return false;
+        if(!lastUpdateNanoseconds){std::fprintf(stderr,"original_rider_presentation_failure method=checkpointAudio site=2\n");return false;}
         const auto interval=original_ui_elapsed50LH::project(lastUpdateNanoseconds,now,pendingUpdateColdNanoseconds);
-        if(interval.error!=original_ui_elapsed50LH::Error::none)return false;
+        if(interval.error!=original_ui_elapsed50LH::Error::none){std::fprintf(stderr,"original_rider_presentation_failure method=checkpointAudio site=3\n");return false;}
         rr::platform::AudioOutputDiagnostic50HD d;
-        if(!audioOutput.advanceAcceptedNanoseconds(interval.activeNanoseconds,d))return false;
+        if(!audioOutput.advanceAcceptedNanoseconds(interval.activeNanoseconds,d)){std::fprintf(stderr,"original_rider_presentation_failure method=checkpointAudio site=4\n");return false;}
         // These actual steady-clock intervals are mixed exactly once during
         // blocking native presentation. They are excluded from next page dt;
         // material timestamps retain their normal advancing application clock.
@@ -843,13 +843,13 @@ bool Frontend::checkpointAudio()noexcept  {
 bool Frontend::present(rr::platform::VehicleWindowGl50DS& renderer,
         const rr::platform::OriginalUiPrivatePublication50KP& image,
         rr::platform::VehicleWindowDiagnostic50DS& d)noexcept  {
-        if(!presentationActive||!available()||!image.completed()||!pollPresentationInput())return false;
+        if(!presentationActive||!available()||!image.completed()||!pollPresentationInput()){std::fprintf(stderr,"original_rider_presentation_failure method=present site=1\n");return false;}
         rr::platform::GameHostDiagnostic50ER hostDiagnostic;
         const auto& info=presentationHost->info();
-        if(info.drawableWidth!=image.width()||info.drawableHeight!=image.height())return false;
+        if(info.drawableWidth!=image.width()||info.drawableHeight!=image.height()){std::fprintf(stderr,"original_rider_presentation_failure method=present site=2\n");return false;}
         rr::platform::OriginalUiWindowBackBufferCopy copy;
         if(!renderer.copyOriginalUiPrivatePublicationToWindow(image,copy,d)||!copy.commandsAccepted()||
-           !presentationHost->swapWindow(hostDiagnostic))return false;
+           !presentationHost->swapWindow(hostDiagnostic)){std::fprintf(stderr,"original_rider_presentation_failure method=present site=3\n");return false;}
         ++riderPresentationSwaps;
         return checkpointAudio();
     }

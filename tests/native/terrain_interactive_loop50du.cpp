@@ -2249,7 +2249,7 @@ void Context::run() {
     const bool captureWindowImage=host.hasWindow()&&!privateUnderlay&&
         !(sourceCameraSession&&(sourceCameraSession->blockingVideoPending()||sourceCameraSession->asyncVideoPending()))&&
         windowCapture.due(windows_capture50LD::Stage::race,
-            race.phase==race_session50HM::Phase::Racing&&allAiEnabled&&race.racerCount==raceRacerCount&&
+            race.phase==race_session50HM::Phase::Racing&&(allAiEnabled||humanCourseEnabled)&&race.racerCount==raceRacerCount&&
             racerBank.count()==raceRacerCount&&rendererDiagnostic.trackDraws>0);
     // Discard BEFORE readback or observation: even a capture at the exact FPS
     // threshold must not complete an interval containing readback latency.
@@ -2384,7 +2384,7 @@ void Context::run() {
     // private restored-camera underlay or an in-progress original fade.
     const bool windowImage=host.hasWindow()&&(actualGameplayImageCompleted||!sourceCameraSession)&&
         !(sourceCameraSession&&(sourceCameraSession->blockingVideoPending()||sourceCameraSession->asyncVideoPending()));
-    const bool settledTrack=race.phase==race_session50HM::Phase::Racing&&allAiEnabled&&
+    const bool settledTrack=race.phase==race_session50HM::Phase::Racing&&(allAiEnabled||humanCourseEnabled)&&
         race.racerCount==raceRacerCount&&racerBank.count()==raceRacerCount&&rendererDiagnostic.trackDraws>0;
 #if defined(__linux__)
     if(captureWindowImage&&windowImage){
@@ -2395,7 +2395,7 @@ void Context::run() {
      J receipt={{"track",platform::hostTrackCode50IM(loadedTrack)},{"selected_rider",playerRacer60},
          {"world_ticks",completedFrames},{"render_commits",submittedDrawFrames},{"window_swaps",windowSwaps},
          {"race_phase",static_cast<unsigned>(race.phase)},{"race_seconds",race.raceSeconds},
-         {"original_ai_racers",racerBank.count()},{"human_racers",originalAiHumanCount},
+         {"original_ai_racers",originalAiOpponentCount},{"human_racers",originalAiHumanCount},
          {"track_draws",rendererDiagnostic.trackDraws},{"camera_mode",sourceCameraSession?static_cast<int>(sourceCameraSession->cameraMode()):-1}};
      if(originalMainApplication.riderProfile){
       original_course_targets50KX::Selection selection;

@@ -2185,9 +2185,10 @@ void Context::run() {
   require50DU(!baselineSetting||std::string(baselineSetting)=="0"||std::string(baselineSetting)=="1",
       "RR_TRACK_FPS_BASELINE must be 0 or 1");
   const bool baselineRequested=baselineSetting&&std::string(baselineSetting)=="1";
-  require50DU(!baselineRequested||(!headlessLive&&host.hasWindow()&&raceEnabled&&allAiEnabled&&
-      originalAiEnabled&&originalCameraEnabled&&racerBank.count()==raceRacerCount&&originalAiHumanCount==0&&!autoDriveEnabled),
-      "track FPS baseline requires eight original AI owners, including the followed racer, and the original camera window");
+  require50DU(!baselineRequested||(!headlessLive&&host.hasWindow()&&raceEnabled&&
+      (allAiEnabled||humanCourseEnabled)&&originalAiEnabled&&originalCameraEnabled&&
+      racerBank.count()==raceRacerCount&&originalAiHumanCount==(allAiEnabled?0u:1u)&&!autoDriveEnabled),
+      "track FPS measurement requires the admitted original fleet and camera window, without a host auto-driver");
   track_fps_baseline50LA::Baseline trackBaseline{baselineRequested};
   BaselineDisplayWall50DU baselineDisplayWall{phaseTiming.enabled&&baselineRequested};
   const auto discardTrackBaseline=[&]() noexcept {
@@ -2205,7 +2206,8 @@ void Context::run() {
        (input.focused||captureRun.unattended())&&
        observed.drawableWidth>0&&observed.drawableHeight>0&&
        observed.drawableWidth<=maximumWidth&&observed.drawableHeight<=maximumHeight&&
-       !autoDriveEnabled&&allAiHostDriverCalls==0&&allAiControllerSamples==0&&allAiKeyboardPackets==0;
+       !autoDriveEnabled&&allAiHostDriverCalls==0&&
+       (!allAiEnabled||(allAiControllerSamples==0&&allAiKeyboardPackets==0));
   };
   const auto observeTrackBaseline=[&](const platform::VehicleWindowDiagnostic50DS& display){
    if(!trackBaseline.enabled()||trackBaseline.complete())return;
@@ -2239,7 +2241,10 @@ void Context::run() {
        {"paused_menu_fade_intervals_discarded",true},{"capture_readback_and_disk_intervals_discarded",true},
        {"racer_count",racerBank.count()},{"original_ai_count",originalAiOpponentCount},
        {"human_count",originalAiHumanCount},{"followed_racer_slot",0},{"followed_racer60",playerRacer60},
-       {"all_original_ai",allAiEnabled},{"host_driver_calls",allAiHostDriverCalls},
+       {"all_original_ai",allAiEnabled},
+       {"race_configuration",humanCourseEnabled?"original_human_and_ai":"original_all_ai"},
+       {"input_counter_scope","controller dispatch calls and composed keyboard packets; zero required only for all-AI"},
+       {"host_driver_calls",allAiHostDriverCalls},
        {"controller_samples",allAiControllerSamples},{"keyboard_packets",allAiKeyboardPackets},
        {"native_pod_shadows",renderRequest.enableNativePodShadows},
        {"world_renderer",renderRequest.raStaticWorld?"native_ra_aggregate":"legacy_track_adapter"},
