@@ -66,7 +66,7 @@ Owner::SourceWaterConfig::NativeWaterPoolMaterial::RawAllocation Owner::topology
 }
 
 bool Owner::preflightNativeWaterPoolTopologyBacking()const noexcept {
-    if(!preflightNativeWaterPoolRecordCount())return false;
+    if(!preflightNativeWaterPoolRecordCount()||!preflightNativeWaterPoolRecordBacking())return false;
     using S=WaterPoolTopologyBackingStop;using G=a::OriginalConfigProcessGlobals50LA;
     using A=SourceWaterConfig::NativeWaterPoolMaterial::RawAllocation;
     const auto& n=sourceWaterConfig_.nativeWaterPoolTopologyBacking;
@@ -139,7 +139,10 @@ bool Owner::preflightNativeWaterPoolTopologyBacking()const noexcept {
         if(!backing||!backing->payload||backing->requestedBytes!=init.zeroedBytes)return false;
         const auto* bytes=static_cast<const std::uint8_t*>(backing->payload.get());
         const auto& record=f.file->firstTopologyRecord_.read;
+        const auto& aliases=sourceWaterConfig_.nativeWaterPoolRecordBacking.aliasStored;
         for(std::size_t i=0;i<init.zeroedBytes;++i){
+            if((aliases[0]&&i>=4u&&i<8u)||(aliases[1]&&i>=8u&&i<12u)||
+               (aliases[2]&&i>=16u&&i<20u))continue; //Semantic pointers, unknown guest words.
             const auto expected=i<record.copied?record.bytes[i]:std::uint8_t{0};
             if(bytes[i]!=expected)return false;
         }
@@ -151,7 +154,7 @@ bool Owner::preflightNativeWaterPoolTopologyBacking()const noexcept {
 }
 
 bool Owner::withdrawNativeWaterPoolTopologyBacking()noexcept {
-    if(!preflightNativeWaterPoolTopologyBacking())return false;
+    if(!preflightNativeWaterPoolTopologyBacking()||!withdrawNativeWaterPoolRecordBacking())return false;
     auto& n=sourceWaterConfig_.nativeWaterPoolTopologyBacking;
     if(!n.allocated||n.retired)return true;
     const auto& f=sourceWaterConfig_.nativeWaterPoolResource;
