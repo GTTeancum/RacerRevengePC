@@ -20,6 +20,7 @@ RANGES = {
     'malloc_wrapper': (0x305700, 0x305730),
     'malloc_prefix': (0x305980, 0x305AE0),
     'topology_element_constructor': (0x133F80, 0x133FA0),
+    'topology_array_constructor': (0x2E8990, 0x2E8ADC),
     'topology_inner_constructor': (0x299790, 0x2997A4),
     'topology_inner_loader': (0x2998D0, 0x299A94),
     'topology_inner_finalize': (0x299420, 0x299790),
