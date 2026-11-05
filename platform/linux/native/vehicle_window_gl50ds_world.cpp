@@ -1,4 +1,5 @@
 #include "vehicle_window_gl50ds_storage.h"
+#include "raster_shared_edge.h"
 #include "../../../tests/native/rc_crystal50rc.h"
 #include "../../../tests/native/rc_particle_visual50rc.h"
 #include "../../../tests/native/rc_particle_render50rc.h"
@@ -325,6 +326,47 @@ bool VehicleWindowGl50DS::Storage::drawCoveragePairGroup(U bank,U slot,U compone
         // byte shader and per-sample depth comparison can share one snapshot.
         constexpr U maximumRun=14;
         const U end=first+count;
+        const auto sharedEdge=[&](U firstA,U firstB) noexcept {
+            if(coverageDemand||!racerRasterCacheActive||slot!=racerRasterSlot||component!=racerRasterComponent||
+                slot>frameOpponentCount)return false;
+            const auto& batch=slot?frameOpponentBatches[slot-1]:framePlayerBatch;
+            if(component>=batch.componentCount)return false;
+            const auto& part=batch.component[component];
+            if(!part.indices||firstA>part.indexCount||part.indexCount-firstA<3||
+                firstB>part.indexCount||part.indexCount-firstB<3)return false;
+            const auto* a=part.indices+firstA;const auto* b=part.indices+firstB;
+            if(a[0]==a[1]||a[0]==a[2]||a[1]==a[2]||b[0]==b[1]||b[0]==b[2]||b[1]==b[2])return false;
+            U shared[2]{},matched=0,otherA=0,otherB=0;
+            for(U i=0;i<3;++i){
+                bool found=false;for(U j=0;j<3;++j)found|=a[i]==b[j];
+                if(found){if(matched==2)return false;shared[matched++]=a[i];}else otherA=a[i];
+            }
+            if(matched!=2)return false;
+            for(U j=0;j<3;++j)if(b[j]!=shared[0]&&b[j]!=shared[1])otherB=b[j];
+            const U indices[]={shared[0],shared[1],otherA,otherB};
+            raster_shared_edge::Point points[4];
+            for(U i=0;i<4;++i){
+                const auto& entry=racerRasterOperands[indices[i]%racerRasterOperands.size()];
+                // Reuse only already computed group operands; collisions or
+                // uncertain/clipped projections retain the old barrier.
+                if(!entry.occupied||entry.index!=indices[i]||!entry.finite||!entry.projectionReady)return false;
+                const auto& v=entry.operand;
+                if(v.clip[3]<=v.error[3]+0.0001)return false;
+                for(U axis=0;axis<3;++axis)if(std::abs(v.clip[axis])+v.error[axis]>=v.clip[3]-v.error[3])return false;
+                for(U axis=0;axis<2;++axis){
+                    const auto* q=entry.projectedQuotients.data()+axis*4;
+                    const double extent=axis?height:width;
+                    // Core GL3.2 requires at least four raster subpixel bits
+                    // (table6.37). Allow two minimum-precision grid steps in
+                    // addition to the full transform interval above.
+                    constexpr double rounding=1./8.;
+                    raster_shared_edge::Interval interval{(*std::min_element(q,q+4)+1)*extent*.5-rounding,
+                        (*std::max_element(q,q+4)+1)*extent*.5+rounding};
+                    (axis?points[i].y:points[i].x)=interval;
+                }
+            }
+            return raster_shared_edge::opposite(points[0],points[1],points[2],points[3]);
+        };
         const auto fullRegion=[&](const std::array<I,4>& r) noexcept {
             return r[0]==0&&r[1]==0&&r[2]==width&&r[3]==height;
         };
@@ -357,7 +399,7 @@ bool VehicleWindowGl50DS::Storage::drawCoveragePairGroup(U bank,U slot,U compone
                 bool disjoint=true;
                 for(U i=0;i<run;++i){const auto& old=regions[i];
                     if(next[0]<old[2]&&old[0]<next[2]&&next[1]<old[3]&&old[1]<next[3]){
-                        disjoint=false;break;
+                        if(!sharedEdge(first+i*3,first+run*3)){disjoint=false;break;}
                     }
                 }
                 if(!disjoint)break;
