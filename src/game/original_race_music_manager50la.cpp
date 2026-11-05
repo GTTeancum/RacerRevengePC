@@ -71,6 +71,7 @@ struct OriginalRaceMusicManager50LA::Impl final {
     const bool sourceOnly;
     RaceMusicState50IE source128_12C_130{}; // Used only by the distinct source occurrence.
     std::unique_ptr<original_race_music_source50LA::Child> sourceChild;
+    original_race_music_source50LA::ManagerTail sourceTail;
     platform::RaceAudioGroups50IC* sourceGroups=nullptr; // Private native lifetime borrow.
     bool sourceLoadAttempted=false;
     std::uint32_t sourcePC=0x1a3c00;
@@ -84,6 +85,7 @@ struct OriginalRaceMusicManager50LA::Impl final {
         float scalar138=.5f,scalar13C=.25f,scalar140=.5f,scalar144=.5f,scalar148=.5f,scalar14C=.5f;
         std::array<std::array<std::uint32_t,2>,7> pairsF0{};
         std::uint32_t word134=0,word150=0;
+        std::optional<std::uint32_t> word154,wordA8,wordAC; //Unwritten constructor lanes stay UNKNOWN.
         std::optional<const void*> events158; //Guest address stays unknown; nativeEvents is the explicit adapter.
     } fields;
     enum class LoadCut:std::uint8_t {count38,aural44,nativeChildren,nativeReady};
@@ -101,13 +103,29 @@ struct OriginalRaceMusicManager50LA::Impl final {
         d.sourcePC=pc;d.operation=why;return false;
     }
     bool componentCurrent()const noexcept {
-        return thread==std::this_thread::get_id()&&counted&&!closed&&application&&
+        if(!(thread==std::this_thread::get_id()&&counted&&!closed&&application&&
             application->application10()&&!application->attachmentLock423F58()&&
             component.kind==OriginalWreckComponentKind50LA::entity141300&&component.reference00==1&&
             component.sessionGeneration&&component.objectKey==std::uint64_t(reinterpret_cast<std::uintptr_t>(&component))&&
-            !component.parent1C&&!component.previous10&&!component.next14&&!component.firstChild18&&
-            !component.mask20&&!component.descendants24&&component.category28==0xffu&&
-            (component.flags29&15u)==3u&&application->entityAuthority_.canRetire(component);
+            !component.parent1C&&!component.previous10&&!component.next14&&
+            !component.mask20&&component.category28==0xffu&&(component.flags29&15u)==3u&&
+            application->entityAuthority_.canRetire(component)))return false;
+        if(sourceOnly&&sourceTail.attachmentReturned&&!sourceTail.nativeChildDetached){
+            if(!sourceChild||!sourceChild->counted||!fields.child164||
+               *fields.child164!=&sourceChild->entity)return false;
+            const auto& child=sourceChild->entity;
+            return sourceTail.returnedChild==&child&&component.firstChild18==&child&&
+                component.descendants24==2u&&child.parent1C==&component&&
+                !child.previous10&&!child.next14&&!child.firstChild18&&child.mask20==2u&&!child.descendants24&&
+                child.kind==OriginalWreckComponentKind50LA::music2C0980&&child.reference00==1u&&
+                !child.nativeFlags29&&child.category28==0xffu&&(child.flags29&15u)==3u&&
+                child.sessionGeneration==component.sessionGeneration&&
+                child.objectKey==std::uint64_t(reinterpret_cast<std::uintptr_t>(&child))&&
+                application->entityAuthority_.canRetire(child);
+        }
+        //Native backend occurrences and the original pre-attachment prefix
+        //retain their old detached/empty topology. No blanket relaxation.
+        return !component.firstChild18&&!component.descendants24;
     }
     bool providersCurrent(const Registration& actual)const noexcept {
         if(thread!=std::this_thread::get_id()||actual.thread_!=thread)return false;
@@ -152,7 +170,9 @@ struct OriginalRaceMusicManager50LA::Impl final {
         nativeAnnouncerState=sourceOnly?nullptr:&announcer->state_;
         // Exact1A3A14..ADC constructor store order.3CEE00 is this concrete
         // native type, never an executable guest pointer. No callbacks below.
-        fields.quad60.fill(0);fields.quad70.fill(0);fields.quad90.fill(0);
+        //1A3A18/20/28 are SQC2 vf0, NOT integer SQ zero: W is +1.0.
+        constexpr std::array<std::uint32_t,4> vf0{{0,0,0,0x3f800000u}};
+        fields.quad60=vf0;fields.quad70=vf0;fields.quad90=vf0;
         fields.track3C=nullptr;fields.child168=nullptr;
         for(auto& child:fields.childrenC0)child=nullptr;
         fields.child164=nullptr;fields.word15C=0;fields.word160=0;
@@ -170,6 +190,7 @@ struct OriginalRaceMusicManager50LA::Impl final {
 #include "original_race_music_config_open50la.inl"
 #include "original_race_music_metadata50la.inl"
 #include "original_race_music_config_retire50la.inl"
+#include "original_race_music_attachment50la.inl"
 #include "original_race_music_format50la.inl"
 OriginalRaceMusicManager50LA::OriginalRaceMusicManager50LA(
     std::shared_ptr<OriginalApplicationEntities50LA> app,std::uint64_t generation,

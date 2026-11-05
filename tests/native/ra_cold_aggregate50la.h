@@ -5,6 +5,7 @@
 #include "../../src/game/original_water_constructor_numeric50la.h"
 #include "../../src/assets/original_source_sky_file50la.h"
 #include "../../src/assets/original_source_water_exists131a40.h"
+#include "../../src/assets/original_water_source_config50la.h"
 #include "../../src/game/original_water_readback_layout50la.h"
 #include "../../src/assets/original_sky_palette_codec14cbe0_native50la.h"
 #include "../../src/game/original_world_particle_invocation50la.h"
@@ -705,6 +706,17 @@ struct SourceWaterProviderInitializer {
 } sourceWaterProviderInitializer_;
 bool continueSourceWaterProviderInitializer2B8550(std::uint32_t&)noexcept;
 bool preflightSourceWaterProviderInitializerNative()const noexcept;
+struct SourceWaterConfig {
+    bool constructAttempted=false,constructReturned=false,nativeBackingRefused=false;
+    bool openAttempted=false,nativeWithdrawn=false;
+    std::optional<bool> openReturn;
+    std::optional<std::uint32_t> loaderReturn;
+    std::uint8_t loaderRestoreMask=0;bool loaderStackReleased=false;
+} sourceWaterConfig_;
+std::unique_ptr<a::OriginalWaterSourceConfig50LA> sourceWaterConfigOwner_;
+bool continueSourceWaterConfig2B9314(std::uint32_t&)noexcept;
+bool preflightSourceWaterConfigNative()const noexcept;
+bool withdrawSourceWaterConfigNative()noexcept;
 
 //Distinct source3F8 custody. No prepared NativeSkyArray3F8 or image fixture.
 //Pointer slots are unknown until their actual source stores; only published slots may be read.

@@ -33,6 +33,7 @@ class OriginalSourcePsgFile50LA;
 class OriginalSourceCollisionFile50LA;
 class OriginalSourceSkyFile50LA;
 class OriginalSourceWaterExists131A40;
+class OriginalWaterSourceConfig50LA;
 class OriginalSourcePsgMissingLookup50LA;
 class OriginalLoadingTextureFc50LA;
 class MaterialTextureAssets50EA;
@@ -347,6 +348,7 @@ private:
     bool closeAppStartTemplate1573B0(bool success,
         OriginalStandardTextureDiagnostic50LA&)noexcept;
     friend class OriginalParticleSourceConfig50LA;
+    friend class OriginalWaterSourceConfig50LA;
     friend class ::rr::platform::OriginalUiCourseManagerConfig50KG;
     friend class ::rr::platform::OriginalLoadingLsiConfig50LA;
     friend class OriginalLoadingFontSource50LA;

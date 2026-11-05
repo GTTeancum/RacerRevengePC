@@ -4,6 +4,7 @@
 #include "original_particle_source_config50la.h"
 #include "original_source_sky_file50la.h"
 #include "original_source_water_exists131a40.h"
+#include "original_water_source_config50la.h"
 #include "original_pod_source_bank50la.h"
 #include "original_ra_track_source_file50la.h"
 #include "original_standard_texture_resource50la.h"
@@ -557,6 +558,7 @@ bool OriginalStandardTextureResolver50LA::restoreScratch132BD0(D& d)noexcept {
 // All fields below are private: no mount/lookup can turn capacity into a handle.
 struct OriginalStandardTextureResolver50LA::FreshFileCapacity {
     const OriginalSourceSkyFile50LA* sourceSkyFileBorrower=nullptr; //Distinct native sky occurrence pin.
+    const OriginalWaterSourceConfig50LA* waterConfigBorrower=nullptr; //Distinct2B9314 stack occurrence.
     const OriginalParticleSourceConfig50LA* particleConfigBorrower=nullptr; //Native lifetime, not guest state.
     // The actual fresh domain provider, retained before its first native mount.
     // Merely retaining this provider does not establish source history.
@@ -1769,7 +1771,7 @@ bool OriginalStandardTextureResolver50LA::validateGarageBankRows12EAA0(
 }
 bool OriginalStandardTextureResolver50LA::retireNativeRaceMounts1316A0(
     NativeRaceMountLease50LA& lease,D& d)noexcept {
-    if(freshFileCapacity_&&(freshFileCapacity_->streamLibraryOwner||freshFileCapacity_->musicOwner))return fail(d,E::phase,0);
+    if(freshFileCapacity_&&(freshFileCapacity_->streamLibraryOwner||freshFileCapacity_->musicOwner||freshFileCapacity_->waterConfigBorrower))return fail(d,E::phase,0);
     d={};
     if(lease.closed_)return true;
     if(lease.thread_!=std::this_thread::get_id()||!lease.provider_||
@@ -3895,7 +3897,13 @@ bool OriginalStandardTextureResolver50LA::openExactSourceMember131380(const void
         }
     }
     member.auxiliarySlot04=selected;
-    if(selected==-1)return finishOpen(); // Source open returns handle even with no auxiliary slot; reader bounds temporary-scratch branch.
+    if(selected==-1){
+        //Actual131554 diagnostic precedes131578. The new Water occurrence
+        //does not inherit the older adapter's omitted diagnostic completion.
+        if(s.waterConfigBorrower&&occurrence==s.waterConfigBorrower)
+            return fail(d,E::unsupported,0x131554);
+        return finishOpen(); //Existing other domains retain their established scope.
+    }
     auto& slot=scratch_->slots[selected];slot.status08=index;slot.offset10=-0x6000;scratch_->selected148=-1;return finishOpen();
 }
 bool OriginalStandardTextureResolver50LA::sourceBankMemberCurrent(const void* root,const void* occurrence,std::int32_t handle)const noexcept {
@@ -4012,7 +4020,7 @@ bool OriginalStandardTextureResolver50LA::closeSourceBankMember131040(const void
 }
 bool OriginalStandardTextureResolver50LA::retireSourceBankNative(const void* root,D& d)noexcept {
     d={};if(!freshFileCapacity_||!root)return fail(d,E::phase,0);
-    auto& s=*freshFileCapacity_;if(s.streamLibraryOwner||s.musicOwner||s.particleConfigBorrower||s.sourceSkyFileBorrower)return fail(d,E::phase,0);if(s.courseStage==FreshFileCapacity::CourseStage::none&&!s.courseRootOwner)return true;
+    auto& s=*freshFileCapacity_;if(s.streamLibraryOwner||s.musicOwner||s.particleConfigBorrower||s.sourceSkyFileBorrower||s.waterConfigBorrower)return fail(d,E::phase,0);if(s.courseStage==FreshFileCapacity::CourseStage::none&&!s.courseRootOwner)return true;
     if(s.courseRootOwner!=root)return fail(d,E::phase,0);
     if(s.courseStage==FreshFileCapacity::CourseStage::retired)return true;
     if(s.courseNativeBorrowers!=1)return fail(d,E::phase,0);
@@ -4406,4 +4414,5 @@ bool OriginalStandardTextureResolver50LA::registerLoadingIconBank12CEA0(std::sha
 #include "original_particle_source_config50la.inl"
 #include "original_source_sky_file50la.inl"
 #include "original_source_water_exists131a40.inl"
+#include "original_water_source_config50la.inl"
 }

@@ -136,4 +136,18 @@ struct Child final {
     Child()noexcept {} // Do not value-initialize unknown source stack buffers.
     Child(const Child&)=delete;Child& operator=(const Child&)=delete;
 };
+//Only the concrete manager's synchronous post-child continuation mutates this
+//record. It cannot be supplied as a readiness/attachment token by a caller.
+struct ManagerTail final {
+    OriginalWreckComponent50LA *parentArgument=nullptr,*childArgument=nullptr,*returnedChild=nullptr;
+    std::optional<std::uint32_t> maskArgument;
+    bool argumentsPrepared=false,attachmentEntered=false,attachmentReturned=false,nativeChildDetached=false;
+    std::unique_ptr<std::uint8_t[]> events158; //Exactly0x280 bytes; contents remain UNKNOWN.
+    std::optional<std::uint32_t> allocationBytes;
+    const void* allocationReturn=nullptr; //Typed native identity, never guest pointer bits.
+    bool allocationEntered=false,allocationReentRead=false,allocationReturned=false,eventsPublished=false,nativeEventsRetired=false;
+    std::optional<std::uint32_t> soundOrdinal;
+    OriginalWreckComponent50LA* soundLoopOwner=nullptr; //Retained source s2 identity at1A3CA8.
+};
+
 }

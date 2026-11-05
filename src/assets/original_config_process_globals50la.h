@@ -9,12 +9,14 @@ namespace rr::platform { class OriginalStreamLibrarySource50LA; }
 namespace rr::game { class OriginalRaceMusicManager50LA; }
 namespace rr::assets {
 class OriginalParticleSourceConfig50LA;
+class OriginalWaterSourceConfig50LA;
 class OriginalStreamLibraryFile50LA;
 // Closed native source domain, not a mirror of an arbitrary retained retail
 // process. Every newly admitted alias/writer must join this owner or poison its
 // knownness before execution. Neither Config nor Application construction resets it.
 class OriginalConfigProcessGlobals50LA final {
     friend class OriginalParticleSourceConfig50LA;
+    friend class OriginalWaterSourceConfig50LA;
     friend class OriginalStreamLibraryFile50LA;
     friend class rr::platform::OriginalStreamLibrarySource50LA;
     friend class rr::game::OriginalRaceMusicManager50LA;
@@ -51,9 +53,10 @@ class OriginalConfigProcessGlobals50LA final {
         StreamSprintfAccess()noexcept {} //User-provided: not an aggregate passkey.
     };
     class WaterSprintfAccess {
+        friend class OriginalWaterSourceConfig50LA;
         friend class ::ra_cold_aggregate50LA::Owner;
         friend class OriginalConfigProcessGlobals50LA;
-        WaterSprintfAccess()noexcept {} //Only the concrete World water caller.
+        WaterSprintfAccess()noexcept {} //Only concrete World Water and its distinct stack Config.
     };
     class MusicSprintfAccess {
         friend class rr::game::OriginalRaceMusicManager50LA;

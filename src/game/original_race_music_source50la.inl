@@ -157,20 +157,25 @@ bool OriginalRaceMusicManager50LA::loadSourceMusicChild1A3C00(
     child.flags74KnownMask|=1u; //2C0AC8 branch delay store.
     child.initialize2C0A60Return=&child.entity;child.initialize2C0A60Returned=true;
     child.pc=p.sourcePC=0x2c0af4; //Actual child-pointer return; no playback action.
-    //Stop before1A3C74 reloads child164 and1A3C78 prepares attachment args.
-    //No register preparation,141960 call or outer1A3C00 return is claimed.
-    return stop(0x1a3c74,"Original child load returned; manager attachment preparation remains unissued");
+    //The same concrete manager continues only after that genuine child return.
+    //Keep the child's last PC at its own return; the parent now owns1A3C74.
+    p.sourcePC=0x1a3c74;
+    return continueSourceMusicManager1A3C74(app,race,d);
     //Failed first open still stops before unimplemented2C0E40 conversion.
 }
 
 bool OriginalRaceMusicManager50LA::retireSourceMusicChildNative(
     OriginalRaceMusicManagerDiagnostic50LA& d)noexcept {
     if(!impl_||!impl_->sourceOnly)return false;auto& p=*impl_;
-    if(!p.counted&&!p.sourceChild&&!p.sourceGroups)return true;
+    if(!p.counted&&!p.sourceChild&&!p.sourceGroups&&!p.sourceTail.events158)return true;
     if(p.thread!=std::this_thread::get_id()||!p.componentCurrent())
         return Impl::stop(d,p.sourcePC,"Source music native retirement custody unavailable");
     if(p.sourceGroups&&p.sourceGroups->sourceMusicBorrower_!=this)
         return Impl::stop(d,p.sourcePC,"Source music group lifetime pin changed");
+    if(p.sourceTail.events158&&(!p.sourceTail.allocationReturned||!p.sourceTail.eventsPublished||
+       !p.fields.events158||*p.fields.events158!=p.sourceTail.events158.get()||
+       p.sourceTail.allocationReturn!=p.sourceTail.events158.get()))
+        return Impl::stop(d,p.sourcePC,"Source event allocation native custody changed");
     if(p.sourceChild){auto& child=*p.sourceChild;auto& e=child.entity;
         // Release the FileManager borrower before Config/array/child storage.
         // This native cancellation is not1573B0 and cannot restore mode170.
@@ -180,11 +185,20 @@ bool OriginalRaceMusicManager50LA::retireSourceMusicChildNative(
                 return Impl::stop(d,fd.sourcePC,"Source music file native cancellation unavailable");
             child.configFile.reset();
         }
+        if(p.sourceTail.attachmentReturned&&!p.sourceTail.nativeChildDetached){
+            //Native cancellation of this exact private topology, NOT a source
+            //1A3AF0/2C0A00 occurrence, playback stop or reference release.
+            const auto detached=p.application->entityAuthority_.detach(e,p.application->attachmentLock423F58());
+            if(detached.status!=OriginalWreckComponentStatus50LA::complete)
+                return Impl::stop(d,detached.sourcePC,"Source Music child native detachment unavailable");
+            p.sourceTail.nativeChildDetached=true; //detach preserves child mask20=2.
+        }
         if(child.counted){
             if(e.reference00!=1u||e.kind!=OriginalWreckComponentKind50LA::music2C0980||
                e.sessionGeneration!=p.component.sessionGeneration||
                e.objectKey!=std::uint64_t(reinterpret_cast<std::uintptr_t>(&e))||
-               e.previous10||e.next14||e.firstChild18||e.parent1C||e.mask20||e.descendants24||
+               e.previous10||e.next14||e.firstChild18||e.parent1C||
+               e.mask20!=(p.sourceTail.nativeChildDetached?2u:0u)||e.descendants24||
                !p.application->objectCount423F60()||!p.application->entityAuthority_.canRetire(e)||
                (child.published164&&(!p.fields.child164||*p.fields.child164!=&e)))
                 return Impl::stop(d,p.sourcePC,"Detached source stream cannot retire");
@@ -194,6 +208,12 @@ bool OriginalRaceMusicManager50LA::retireSourceMusicChildNative(
             --e.reference00;--p.application->objectCount423F60();child.counted=false;
         }
         p.fields.child164.reset();p.sourceChild.reset();
+    }
+    if(p.sourceTail.events158){
+        //Native disposal of this occurrence's raw allocation only. Preserve
+        //154/A8/AC as history; withdraw158 knownness, not a source NULL store.
+        p.sourceTail.events158.reset();p.sourceTail.nativeEventsRetired=true;
+        p.fields.events158.reset();
     }
     if(p.sourceGroups){p.sourceGroups->sourceMusicBorrower_=nullptr;p.sourceGroups=nullptr;}
     return true;

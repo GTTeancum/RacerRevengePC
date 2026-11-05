@@ -57,6 +57,9 @@ bool Owner::withdrawSourceWaterProviderNative()noexcept {
     //The public close path reaches this before its later combined floor.
     //Validate all still-owned source counts before decrementing any one.
     if(h.countAcquired&&!preflightSourceWorldParticleCountNative())return false;
+    //The fresh Water Config releases numeric file/Track custody first.
+    //Its source bytes/partial history remain retained; this is not1573B0.
+    if(!withdrawSourceWaterConfigNative())return false;
     //Withdraw the exact native World400 publication before freeing backing.
     //Unknown knowledge is not a source NULL store or unfinished destructor.
     auto& continuation=sourceWaterProviderInitializer_;

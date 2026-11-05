@@ -1,6 +1,7 @@
 //Included inside the actual World namespace. The returned source identity is
 //the counted Entity, not its native wrapper. No initializer return is admitted.
 bool Owner::preflightSourceWaterProviderInitializerNative()const noexcept {
+    if(!preflightSourceWaterConfigNative())return false;
     const auto& r=sourceWaterProviderInitializer_;const auto& n=sourceWaterProviderNumeric_;
     const auto& h=sourceWaterProvider274720_;const auto& f=sourceWaterFactory274570_;
     if(!r.entered){
@@ -100,7 +101,7 @@ bool Owner::preflightSourceWaterProviderInitializerNative()const noexcept {
     else if(r.extensionIsNull){if(r.pc!=0x308f08u)return false;}
     else if(!r.comparisonV0){if(r.pc!=0x308f34u&&r.pc!=0x308f3cu&&r.pc!=0x308f90u&&r.pc!=0x308f94u)return false;}
     else if(r.alternateLoaderEntered){if(r.pc!=0x2b0ca8u)return false;}
-    else if(r.filenameCopyReturned){if(r.pc!=0x2b9314u)return false;}
+    else if(r.filenameCopyReturned){if(!sourceWaterConfig_.constructAttempted&&r.pc!=0x2b9314u)return false;}
     else if(r.pc!=0x309230u||!f.pathLength||*f.pathLength<r.filename398.size())return false;
     if(r.world400NativeWithdrawn){if(worldWater400_||r.lightPin)return false;}
     if(h.nativeWithdrawn)return !r.lightPin&&(!r.world400Published||r.world400NativeWithdrawn);
@@ -229,7 +230,7 @@ bool Owner::continueSourceWaterProviderInitializer2B8550(std::uint32_t& pc)noexc
     if(length>=r.filename398.size())return false;
     std::memcpy(r.filename398.data(),f.path70.data(),length+1u);
     r.filename398Known=length+1u;r.filenameCopyReturned=true;
-    //Fresh stack Config157320 needs its own Water occurrence/transport.
-    //No Particle Config relabel, base return, aligned allocation or DMA join.
-    at(0x2b9314);return false;
+    at(0x2b9314);return continueSourceWaterConfig2B9314(pc);
 }
+
+#include "original_source_world_water_config50la.inl"
