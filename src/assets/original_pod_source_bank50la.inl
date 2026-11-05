@@ -1,5 +1,6 @@
 // Included inside rr::assets after the resolver's actual Fresh storage.
 bool OriginalStandardTextureResolver50LA::registerPodBank12CEA0(OriginalPodSourceBank50LA& root,D& d)noexcept {
+    if(freshFileCapacity_&&freshFileCapacity_->waterPoolFileBorrower)return fail(d,E::phase,0);
     d={};using C=FreshFileCapacity;
     if(!freshFileCapacity_||!scratch_||!root.archive_||!root.provider_||
        root.archive_->identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::sourcePod01)||
@@ -131,6 +132,7 @@ bool OriginalStandardTextureResolver50LA::registerPodBank12CEA0(OriginalPodSourc
     t.joined=true;return true;
 }
 bool OriginalStandardTextureResolver50LA::closePodBankNative(OriginalPodSourceBank50LA& root,D& d)noexcept {
+    if(freshFileCapacity_&&freshFileCapacity_->waterPoolFileBorrower)return fail(d,E::phase,0);
     d={};if(!freshFileCapacity_||!scratch_)return fail(d,E::phase,0);auto& s=*freshFileCapacity_;if(s.streamLibraryOwner||s.musicOwner)return fail(d,E::phase,0);auto& t=s.pod;
     if(!t.root)return !root.acquired_;
     if(t.root!=&root)return fail(d,E::phase,0);

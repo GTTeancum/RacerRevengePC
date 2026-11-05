@@ -1,5 +1,6 @@
 #pragma once
 #include <array>
+#include <mutex>
 #include <cstddef>
 #include <cstdint>
 #include <optional>
@@ -10,6 +11,7 @@ namespace rr::game { class OriginalRaceMusicManager50LA; }
 namespace rr::assets {
 class OriginalParticleSourceConfig50LA;
 class OriginalWaterSourceConfig50LA;
+class OriginalWaterPoolSourceFile50LA;
 class OriginalStreamLibraryFile50LA;
 // Closed native source domain, not a mirror of an arbitrary retained retail
 // process. Every newly admitted alias/writer must join this owner or poison its
@@ -17,6 +19,7 @@ class OriginalStreamLibraryFile50LA;
 class OriginalConfigProcessGlobals50LA final {
     friend class OriginalParticleSourceConfig50LA;
     friend class OriginalWaterSourceConfig50LA;
+    friend class OriginalWaterPoolSourceFile50LA;
     friend class OriginalStreamLibraryFile50LA;
     friend class rr::platform::OriginalStreamLibrarySource50LA;
     friend class rr::game::OriginalRaceMusicManager50LA;
@@ -54,6 +57,7 @@ class OriginalConfigProcessGlobals50LA final {
     };
     class WaterSprintfAccess {
         friend class OriginalWaterSourceConfig50LA;
+        friend class OriginalWaterPoolSourceFile50LA;
         friend class ::ra_cold_aggregate50LA::Owner;
         friend class OriginalConfigProcessGlobals50LA;
         WaterSprintfAccess()noexcept {} //Only concrete World Water and its distinct stack Config.
@@ -62,13 +66,61 @@ class OriginalConfigProcessGlobals50LA final {
         friend class rr::game::OriginalRaceMusicManager50LA;
         MusicSprintfAccess()noexcept {} //Only the actual retained Music manager.
     };
+    struct ListenerVector4349D0Startup {
+        std::array<std::uint32_t,4> words;
+        std::uint32_t producerPC;
+    };
+    static ListenerVector4349D0Startup produceListenerVector3CA250()noexcept {
+        //Selected local producers only, not a whole constructor-table return.
+        std::array<std::uint32_t,4> stack00;
+        stack00[0]=0u; //3CA254.
+        stack00[1]=0u; //3CA258.
+        const std::uint32_t v1=0x3f800000u; //3CA25C.
+        stack00[2]=0u; //3CA260.
+        stack00[3]=v1; //3CA268, after the unrelated stack10 store.
+        const auto a2=stack00; //3CA298 actual selected LQ.
+        return {a2,0x3ca2acu}; //Selected3CA2AC SQ to4349D0.
+    }
     struct State {
         //One process BSS guard3D6480/assertion442E80 for2684E0.
         bool streamIndexGuard8B10=false;std::uint32_t streamIndexAssertion442E80=0;
         bool streamIndexAssertionKnown=true,streamLookupAsciiKnown=true;
         //Loaded3C6391 ASCII table: bit0 marks exactly A..Z. Unknown writers
         //must poison this same lane; no host locale or per-lookup reset.
+        //Original read-only dispatch3C6670 and binary64 powers3C6558 share
+        //this process provenance for the bounded Water decimal fast path.
+        bool waterDecimalTablesKnown=true;
+        //Original unsigned64 division normalization tables3C70C0/3C6FC0.
+        bool waterIntegerDivisionTablesKnown=true;
+        //Same3C6391 image: full bytes for integer sign/digit/NUL classification,
+        //including masks8,4,3, rather than only the fold consumer's bit0.
+        bool waterIntegerCtypeKnown=true;
 
+        //Exact entry100008..100030 BSS clear covers3D65D0/D4/E0/E4 and
+        //4434C8/D0/E8/F0. A single closed-process history, NEVER per App/row.
+        //Ordinal0/1 are293D10 capacity/empty;2/3 are293990 capacity/empty.
+        //Native material projections invalidate BEFORE mutation; they cannot
+        //stand in for earlier source constructors or restore these values.
+        std::array<std::uint8_t,4> soundVectorGuards{};
+        std::array<std::uint32_t,4> soundVectorAssertions{};
+        //Same prospective closed-process BSS birth, not an executed startup
+        //receipt.102F28/48/4C/54 share these exact retained listener lanes.
+        //The native AppState listener adapter poisons before its guard read.
+        std::uint8_t listenerGuard3D5A34=0;
+        std::uint32_t listenerAssertion3DF4C0=0;
+        //Second pair shares the SAME irreversible listener gate. The native
+        //adapter's existing pre-first-read poison also precedes these writes.
+        std::uint8_t listenerWrapperGuard3D65C8=0;
+        std::uint32_t listenerWrapperAssertion4434B0=0;
+        //Fresh POST-WHOLE-STATIC-TABLE process domain:239C54 ->2EADE0
+        //->2E91F0 visits3CC55C ->3CA250 before returning to239C5C.
+        //Application17C650 is constructed EARLIER in that same table, so
+        //mere Application existence is NOT the origin proof. Later virtual
+        //23A0DC/17C910/17CCF0 startup remains unissued by this representation.
+        //Native lazy materialization is not guest startup execution/replay.
+        //All admitted runtime writers must join this SAME owner or poison
+        //listenerHistoryNative before acting; never seed from a native backend.
+        const ListenerVector4349D0Startup listenerVector4349D0=produceListenerVector3CA250();
         const std::thread::id thread=std::this_thread::get_id();
         // Startup100008..100030 clears4338B0, then ctor3C9010 table3CC4D0
         // writes(0,0,0,1) at3C906C. This owner exposes only its XYZ lanes.
@@ -131,11 +183,42 @@ class OriginalConfigProcessGlobals50LA final {
         std::size_t cursorCapacity=0;
         std::optional<std::size_t> cursor;
     };
+    //Native invalidation exists independently of State materialization so a
+    //legacy projection cannot select the creator thread of unrelated stdio/
+    //Config state. This gate contains no source bytes and never resets.
+    //A genuine continuation holds the gate through its source return/cut.
+    struct SoundVectorHistoryNative {std::mutex mutex;bool known=true;};
+    static SoundVectorHistoryNative& soundVectorHistoryNative()noexcept {
+        static SoundVectorHistoryNative history;return history;
+    }
+    struct ListenerHistoryNative {std::mutex mutex;bool known=true;};
+    static ListenerHistoryNative& listenerHistoryNative()noexcept {
+        static ListenerHistoryNative history;return history;
+    }
     static State& state()noexcept {static State value;return value;}
     static bool reentrancyCurrentNative()noexcept {
         const auto& s=state();return s.thread==std::this_thread::get_id()&&s.reentrancyKnown;
     }
 public:
+    //Loss of provenance only. This cannot set a guard, seed a source return,
+    //or restore knownness. Exclusion orders the whole genuine continuation
+    //before this poison, or makes it stop before its first shared guard read.
+    //The caller mutates projected rows only AFTER this method returns.
+    static void invalidateSoundEmitterVectorHistoryNative()noexcept {
+        auto& history=soundVectorHistoryNative();
+        const std::lock_guard<std::mutex> lock(history.mutex);history.known=false;
+    }
+    //Separate from vector history and State materialization. Native listener
+    //projection cannot choose State's creator thread or restore provenance.
+    //Covers3D5A34/3DF4C0,3D65C8/4434B0 and4349D0 source history.
+    //The existing native adapter poison precedes its full backend projection.
+    //Call BEFORE the first
+    //unjoined AppState guard read/write, even when its projected guard is
+    //already nonzero and no lazy store follows. Neither pair resets it.
+    static void invalidateListenerAssertionHistoryNative()noexcept {
+        auto& history=listenerHistoryNative();
+        const std::lock_guard<std::mutex> lock(history.mutex);history.known=false;
+    }
     // Native allocator adaptation admission for actual2E8B00->305728. The
     // concrete caller must still prove its allocation and remove every borrow.
     // This is not an EE allocator/free-list execution receipt.
@@ -144,10 +227,10 @@ private:
     // Mandatory boundary for any future admitted writer/indirect alias not
     // implemented by this owner. Knownness is never restored by a new Config.
     static void poisonUnjoinedAliasesNative()noexcept {
-        auto& s=state();s.vectorKnown=false;s.reentrancyKnown=false;s.cursorKnown=false;s.groupAssertionKnown=false;s.type0AssertionsKnown=false;s.groupLookupKnown=false;s.textureListKnown=false;s.textureLoadKnown=false;s.embeddedFCKnown=false;s.compressedBytesKnown=false;
+        auto& s=state();invalidateSoundEmitterVectorHistoryNative();invalidateListenerAssertionHistoryNative();s.vectorKnown=false;s.reentrancyKnown=false;s.cursorKnown=false;s.groupAssertionKnown=false;s.type0AssertionsKnown=false;s.groupLookupKnown=false;s.textureListKnown=false;s.textureLoadKnown=false;s.embeddedFCKnown=false;s.compressedBytesKnown=false;
         s.stdioInitializationKnown=false;s.standardFileFieldsKnown=false;s.glueKnown=false;
         s.standardFileReent54Known.fill(false);
-        s.streamIndexAssertionKnown=false;s.streamLookupAsciiKnown=false;
+        s.streamIndexAssertionKnown=false;s.streamLookupAsciiKnown=false;s.waterDecimalTablesKnown=false;s.waterIntegerDivisionTablesKnown=false;s.waterIntegerCtypeKnown=false;
         s.byteLimitKnown=false;s.fixedLocaleKnown=false;
     }
     // First step of EVERY Stream308C90 occurrence. Do not initialize the
@@ -282,6 +365,42 @@ private:
     static bool musicByte306108(const MusicSprintfAccess&,unsigned char byte,
         std::uint32_t& wide,std::int32_t& length,std::uint32_t& pc)noexcept {
         return streamByte306108(StreamSprintfAccess{},byte,wide,length,pc);
+    }
+    //Music and Water observe the SAME process tables. The Water-named lanes
+    //are existing shared provenance, not per-consumer flags or resettable data.
+    //The binary's WAX mapping is not immutability proof: every unjoined writer
+    //must use poisonUnjoinedAliasesNative before acting, for all consumers.
+    static bool musicCaseBit0Read(const MusicSprintfAccess&,std::uint8_t byte,
+                                 std::uint8_t& knownBit0,std::uint32_t&)noexcept {
+        const auto& s=state();
+        if(s.thread!=std::this_thread::get_id()||!s.streamLookupAsciiKnown||byte>127u)return false;
+        knownBit0=byte>='A'&&byte<='Z'?1u:0u;
+        return true; //Only bit0 is certified; all other source table bits remain unknown here.
+    }
+    static bool musicIntegerCtypeRead(const MusicSprintfAccess&,std::uint8_t byte,
+                                     std::uint8_t& value,std::uint32_t&)noexcept {
+        const auto& s=state();
+        if(s.thread!=std::this_thread::get_id()||!s.streamLookupAsciiKnown||!s.waterIntegerCtypeKnown)return false;
+        if(byte==0u)value=0x20u;
+        else if(byte=='+'||byte=='-')value=0x10u;
+        else if(byte>='0'&&byte<='9')value=0x04u;
+        else return false;
+        return true; //Exact closed-domain full bytes at3C6391+byte, no host locale.
+    }
+    enum class IntegerDivisionTable { remainder3C70C0,quotient3C6FC0 };
+    static bool musicIntegerDivisionTableRead(const MusicSprintfAccess&,IntegerDivisionTable table,
+        std::uint32_t index,std::uint8_t& value,std::uint32_t& pc)noexcept {
+        pc=table==IntegerDivisionTable::remainder3C70C0?0x30f384u:0x30ee74u;
+        const auto& s=state();
+        if(s.thread!=std::this_thread::get_id()||!s.waterIntegerDivisionTablesKnown||
+           (index!=8u&&index!=10u))return false;
+        value=4u;return true; //Separate original reads, even when both bytes equal4.
+    }
+    static bool captureMusicIntegerReent30AE84(const MusicSprintfAccess&,StdioIdentity& captured,
+                                              std::uint32_t& pc)noexcept {
+        const auto& s=state();pc=0x30ae84;
+        if(s.thread!=std::this_thread::get_id()||!s.reentrancyKnown||s.reent38544C!=StdioIdentity::reent385160)return false;
+        captured=s.reent38544C;pc=0x30ae88;return true;
     }
     //158A34 ->30AE70 reads38544C at30AE84 before the admitted decimal
     //30AC38 path. No integer result, errno write, or call return is minted here.

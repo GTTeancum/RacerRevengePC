@@ -65,10 +65,21 @@ bool Owner::preflightSourceWaterProviderMembersNative()const noexcept {
     for(std::size_t n=0;n<4;++n)
         if(m.embeddedWords[n]!=(m.formatReturned?std::optional<std::uint32_t>(n?0u:0xffffffffu):std::nullopt))return false;
     constexpr std::array<std::uint32_t,4> vf0{{0,0,0,0x3f800000u}};
-    for(const auto& vector:m.vectors)if(vector!=(m.formatReturned?std::optional<std::array<std::uint32_t,4>>(vf0):std::nullopt))return false;
+    for(std::size_t n=0;n<m.vectors.size();++n){
+        auto expected=m.formatReturned?std::optional<std::array<std::uint32_t,4>>(vf0):std::nullopt;
+        if(m.constructorVectors[n]!=expected)return false;
+        if((n==1u||n==2u)&&sourceWaterConfig_.waterVectorCopied[n-1u])expected=sourceWaterConfig_.waterVectorReads[n-1u];
+        if(m.vectors[n]!=expected)return false;
+    }
     for(std::size_t n=0;n<2;++n){
         if(m.integerArrayWritten[n]!=(m.formatReturned?15u:0u))return false;
-        for(const auto& lane:m.integerArrays[n])if(lane!=(m.formatReturned?std::optional<std::uint32_t>(0):std::nullopt))return false;
+        for(std::size_t lane=0;lane<4u;++lane){
+            const auto zero=m.formatReturned?std::optional<std::uint32_t>(0):std::nullopt;
+            if(m.integerConstructorZeros[n][lane]!=zero)return false;
+            const auto read=n==0u&&lane<3u?sourceWaterConfig_.envReads[lane]:
+                sourceWaterConfig_.colorTailReads[n==0u?0u:lane+1u];
+            if(m.integerArrays[n][lane]!=(read?read:zero))return false;
+        }
     }
     if(h.nativeWithdrawn||!m.pathPublication)return true;
     if(!worldApplication_)return false;const auto& p=worldApplication_->sourceWaterProcessPaths_;
@@ -142,20 +153,20 @@ bool Owner::continueSourceWaterProviderFormat308C90(std::uint32_t& pc)noexcept {
     for(std::size_t n=0;n<4;++n){at(embeddedPC[n]);m.embeddedWords[n]=n?0u:0xffffffffu;++m.embeddedWritten;}
     at(0x133f94);at(0x133f98);m.embeddedReturned=true;
     constexpr std::array<std::uint32_t,4> vf0{{0,0,0,0x3f800000u}};
-    at(0x2b83b8);m.vectors[0]=vf0;
+    at(0x2b83b8);m.vectors[0]=vf0;m.constructorVectors[0]=vf0;
     at(0x2b83d4);at(0x2b83d8);at(0x2e8860);
-    for(std::size_t n=1;n<=2;++n){at(0x2e88cc);at(0x2e88d0);at(0x1048e0);m.vectors[n]=vf0;
+    for(std::size_t n=1;n<=2;++n){at(0x2e88cc);at(0x2e88d0);at(0x1048e0);m.vectors[n]=vf0;m.constructorVectors[n]=vf0;
         at(0x1048e4);at(0x1048e8);at(0x2e88d8);at(0x2e88e0);}
     at(0x2e8984);at(0x2e8988);m.vectorArrayReturned=true;
     constexpr std::uint32_t vectorPC[4]={0x2b83e4,0x2b83f0,0x2b83fc,0x2b8408};
-    for(std::size_t n=0;n<4;++n){at(vectorPC[n]);m.vectors[n+3]=vf0;}
+    for(std::size_t n=0;n<4;++n){at(vectorPC[n]);m.vectors[n+3]=vf0;m.constructorVectors[n+3]=vf0;}
     at(0x2b8424);at(0x2b8428);at(0x2e8860);
     for(std::size_t n=0;n<2;++n){at(0x2e88cc);at(0x2e88d0);
         for(std::size_t lane=4;lane-->0;){at(0x2b8590u+4u*(3u-static_cast<std::uint32_t>(lane)));
-            m.integerArrays[n][lane]=0;m.integerArrayWritten[n]|=std::uint8_t(1u<<lane);}
+            m.integerArrays[n][lane]=0;m.integerConstructorZeros[n][lane]=0;m.integerArrayWritten[n]|=std::uint8_t(1u<<lane);}
         at(0x2b85a0);at(0x2b85a4);at(0x2e88d8);at(0x2e88e0);}
     at(0x2e8984);at(0x2e8988);m.zeroArrayReturned=true;
-    at(0x2b8434);m.vectors[7]=vf0;at(0x2b8440);m.vectors[8]=vf0;
+    at(0x2b8434);m.vectors[7]=vf0;m.constructorVectors[7]=vf0;at(0x2b8440);m.vectors[8]=vf0;m.constructorVectors[8]=vf0;
     //Raw MTC1 bit transfers only. No float evaluation/conversion/division.
     at(0x2b844c);m.rawF1=0xc0000000u;at(0x2b8458);m.rawF0=0x40000000u;
     const auto& args=*sourceWaterFactory274570_.arguments;

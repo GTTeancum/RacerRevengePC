@@ -159,9 +159,29 @@ private:
 #include "original_application_listener50kg.inl"
     using ListenerManager=game::OriginalRaceMusicManager50LA;
     using ListenerXYZ=std::array<std::uint32_t,3>;
-    enum class NativeListenerPhase:std::uint8_t {empty,constructing,ready,failed,retiring};
+    enum class NativeListenerPhase:std::uint8_t {empty,constructing,ready,failed,sourceReserved,retiring};
+    //Distinct genuine source102EF0 occurrence, retaining its partial state or
+    //actual later102F10/listener returns. Never native-adapter custody or a resettable lease.
+    struct SourceListenerReservation final {
+        const ListenerManager* issuer=nullptr; //Identity only, never dereferenced.
+        std::optional<std::uint32_t> before34,after34,index;
+        bool nativeWithdrawn=false;
+        const NativeListener290A90* wrapperIdentity=nullptr; //Historical102FC0 identity.
+        bool wrapperPublished=false,nativeWrapperRetired=false,nativeSlotBorrowWithdrawn=false;
+        bool wrapperAural00Bound=false;
+        //Native custody starts during2357A0 and remains here after return.
+        //Source04 then owns this exact identity logically; it is not a second
+        //native owner and the source-tagged wrapper destructor remains inert.
+        std::unique_ptr<NativeListenerBackend2357A0> backendPrefix;
+        const NativeListenerBackend2357A0* backendIdentity=nullptr; //Historical allocation identity.
+        bool backendPrefixRetained=false,nativeBackendRetired=false;
+        bool backendConstructorReturned=false,backendFactoryReturned=false,wrapperBackend04Published=false;
+        std::optional<std::uint32_t> initializerReturn,before48,after48,registrationReturn,listenerReturn;
+    } sourceListenerReservation_;
     NativeListenerPhase nativeListenerPhase_=NativeListenerPhase::empty;
     const ListenerManager* nativeListenerIssuer_=nullptr; // Identity only, never dereferenced.
+    //For a canceled source wrapper these native borrows may be withdrawn;
+    //its actual102FC0 store remains in sourceListenerReservation_ above.
     std::array<NativeListener290A90*,4> listeners4C_{};
     std::array<std::unique_ptr<NativeListener290A90>,4> nativeListenerOwners_{};
     bool listenerCustodyCurrent(bool allowIncomplete)const noexcept;

@@ -1,15 +1,16 @@
 //Included in the resolver TU after Fresh and the existing numeric I/O owner.
 bool OriginalWaterSourceConfig50LA::compareName308F00(std::string_view a,std::string_view b,bool& equal)noexcept {
+    auto& flowPC=fieldFlowPCNative();
     using G=OriginalConfigProcessGlobals50LA;const G::WaterSprintfAccess key;
     for(std::size_t i=0;;++i){
         const auto x=i<a.size()?static_cast<unsigned char>(a[i]):0u;
         const auto y=i<b.size()?static_cast<unsigned char>(b[i]):0u;
         std::int32_t fx=0,fy=0;
-        if(x){pc_=0x308f34;if(!G::waterFold308F00(key,x,fx,pc_))return false;
-            pc_=0x308f3c;if(!G::waterFold308F00(key,y,fy,pc_))return false;
+        if(x){flowPC=0x308f34;if(!G::waterFold308F00(key,x,fx,flowPC))return false;
+            flowPC=0x308f3c;if(!G::waterFold308F00(key,y,fy,flowPC))return false;
             if(fx==fy)continue;}
-        pc_=0x308f90;if(!G::waterFold308F00(key,x,fx,pc_))return false;
-        pc_=0x308f94;if(!G::waterFold308F00(key,y,fy,pc_))return false;
+        flowPC=0x308f90;if(!G::waterFold308F00(key,x,fx,flowPC))return false;
+        flowPC=0x308f94;if(!G::waterFold308F00(key,y,fy,flowPC))return false;
         equal=fx==fy;return true;
     }
 }
@@ -126,12 +127,13 @@ bool OriginalWaterSourceConfig50LA::closeRejectedStack1573B0(D& d)noexcept {
     pc_=0x1574f4;destructorReturned_=true;return true;
 }
 bool OriginalWaterSourceConfig50LA::preflightNative(const void* receiver)const noexcept {
-    if(!preflightTextNative())return false;
+    if(!preflightTextNative()||!preflightSectionNative()||!preflightFloatGettersNative()||!preflightIntegerGettersNative()||!preflightShaderGetterNative()||!preflightWakeSelectionNative()||!preflightWakeRetirementNative()||!preflightWakeLoadNative()||!preflightWakeGettersNative()||!preflightArraySelectionNative()||!preflightArrayRetirementNative()||!preflightArrayLoadNative()||!preflightArrayFilenameNative()||!preflightArrayScalarsNative())return false;
     const auto& s=source_;
-    if(!receiver||waterReceiver_!=receiver||thread_!=std::this_thread::get_id()||s.name28[0]||
+    if(!receiver||waterReceiver_!=receiver||thread_!=std::this_thread::get_id()||
        s.binary08>1u||s.opened0C>1u||s.mode10||
        s.index18!=(textEntered_?textTable_.capacity18:0u)||
-       s.text1C!=(textEntered_?textTable_.sourceStorage:nullptr)||s.selected20||s.child24||
+       s.text1C!=(textEntered_?textTable_.sourceStorage:nullptr)||
+       s.selected20!=currentSectionCountNative()||s.child24!=currentSectionChildNative()||
        s.field428||s.field42C||s.field430||s.field434||s.cacheCount438||s.names4CC||s.index4BC||
        s.indexBytes4C0||s.block4C4||s.field4C8)return false;
     for(const auto word:s.cache43C)if(word)return false;
@@ -173,6 +175,10 @@ bool OriginalWaterSourceConfig50LA::preflightNative(const void* receiver)const n
        *allocationArgument_!=(*allocationLow32_<=0x7fffffffu?std::int64_t(*allocationLow32_):
            std::int64_t(*allocationLow32_)-0x100000000LL)))return false;
     if(seekReturned_)cursor=0;if(textEntered_&&textRead_.after)cursor=textRead_.after;
+    if(sectionCursor_)cursor=sectionCursor_;if(wakeSelection_.cursor)cursor=wakeSelection_.cursor;
+    if(nativeWakeLoad_.cursor)cursor=nativeWakeLoad_.cursor;
+    if(nativeArraySelection_.cursor)cursor=nativeArraySelection_.cursor;
+    if(nativeArrayLoad_.cursor)cursor=nativeArrayLoad_.cursor;
     if(expectedCursor_!=cursor)return false;
     if(nativeClosed_)return !borrowed_&&!resolver_&&!provider_&&!track_&&!selectedRoot_&&handle_==-1;
     if(!attempted_)return !borrowed_&&!resolver_&&!provider_&&!track_&&handle_==-1;
@@ -202,3 +208,29 @@ bool OriginalWaterSourceConfig50LA::abortNative(D& d)noexcept {
 }
 
 #include "original_water_source_text50la.inl"
+
+#include "original_water_source_section50la.inl"
+
+#include "original_water_source_getter50la.inl"
+
+#include "original_water_source_integer50la.inl"
+
+#include "original_water_source_shader50la.inl"
+
+#include "original_water_source_wake50la.inl"
+
+#include "original_water_source_retirement50la.inl"
+
+#include "original_water_source_wake_load50la.inl"
+
+#include "original_water_source_wake_getters50la.inl"
+
+#include "original_water_source_array_selection50la.inl"
+
+#include "original_water_source_array_retirement50la.inl"
+
+#include "original_water_source_array_load50la.inl"
+
+#include "original_water_source_array_filename50la.inl"
+
+#include "original_water_source_array_scalars50la.inl"

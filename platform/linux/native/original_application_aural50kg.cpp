@@ -7,6 +7,7 @@
 #include <bit>
 #include <cfenv>
 #include "../../../src/game/body_scene48g.h"
+#include "../../../src/assets/original_config_process_globals50la.h"
 #include <cmath>
 #include <limits>
 namespace rr::platform {
@@ -66,14 +67,24 @@ bool OriginalApplicationAural50KG::listenerTerminalCleanupCurrent()const noexcep
     // A failed reservation remains poisoned, but after its real manager has
     // withdrawn no listener can be serviced or retried. Permit ONLY actual
     // output/Pending/final-Aural retirement through this private predicate.
-    return currentIncludingIncompleteListener()&&
-        nativeListenerPhase_==NativeListenerPhase::failed&&!nativeListenerIssuer_;
+    return currentIncludingIncompleteListener()&&!nativeListenerIssuer_&&
+        (nativeListenerPhase_==NativeListenerPhase::failed||
+         (nativeListenerPhase_==NativeListenerPhase::sourceReserved&&
+          sourceListenerReservation_.nativeWithdrawn&&!sourceListenerReservation_.issuer));
 }
 bool OriginalApplicationAural50KG::current()const noexcept {
     return currentIncludingIncompleteListener()&&listenerCustodyCurrent(false);
 }
 bool OriginalApplicationAural50KG::listenerCustodyCurrent(bool allowIncomplete)const noexcept {
     if(nativeListenerPhase_==NativeListenerPhase::retiring)return false;
+    const auto& source=sourceListenerReservation_;
+    if(nativeListenerPhase_!=NativeListenerPhase::sourceReserved&&
+       (source.issuer||source.before34||source.after34||source.index||source.nativeWithdrawn||
+        source.wrapperIdentity||source.wrapperPublished||source.nativeWrapperRetired||
+        source.nativeSlotBorrowWithdrawn||source.wrapperAural00Bound||source.backendPrefix||
+        source.backendIdentity||source.backendPrefixRetained||source.nativeBackendRetired||
+        source.backendConstructorReturned||source.backendFactoryReturned||source.wrapperBackend04Published||
+        source.initializerReturn||source.before48||source.after48||source.registrationReturn||source.listenerReturn))return false;
     for(std::size_t n=0;n<listeners4C_.size();++n){
         if(listeners4C_[n]!=nativeListenerOwners_[n].get())return false;
         if(n&&listeners4C_[n])return false; //Only genuine one-view registration joined.
@@ -90,6 +101,49 @@ bool OriginalApplicationAural50KG::listenerCustodyCurrent(bool allowIncomplete)c
     case NativeListenerPhase::failed:
         //Failed102F10 destroys/nulls any wrapper but does not undo102EF0.
         return allowIncomplete&&word34_<=1u&&!word48_&&!listeners4C_[0];
+    case NativeListenerPhase::sourceReserved:
+        //This phase remains separate from native ready even after genuine
+        //source initialization/registration/listener return. Native disposal
+        //retains the actual reserved34 and reached48; it never repairs counts.
+        if(!allowIncomplete||nativeListenerIssuer_||source.before34!=0u||
+           source.after34!=1u||source.index!=0u||word34_!=*source.after34||
+           (source.issuer?source.nativeWithdrawn:!source.nativeWithdrawn))return false;
+        if(source.initializerReturn==1u){
+            //No callback/fallible cut separates this supported positive suffix.
+            if(!source.wrapperBackend04Published||source.before48!=0u||source.after48!=1u||
+               source.registrationReturn!=1u||source.listenerReturn!=1u||word48_!=*source.after48)return false;
+        }else{
+            if((source.initializerReturn&&source.initializerReturn!=0u)||source.before48||source.after48||
+               source.registrationReturn||source.listenerReturn||word48_)return false;
+            //A genuine zero-bit factory result has no backend; unknown host
+            //allocation outcomes must not masquerade as this source return0.
+            if(source.initializerReturn==0u&&source.backendPrefixRetained)return false;
+        }
+        if(source.backendPrefixRetained){
+            if(!source.backendIdentity||!source.wrapperPublished||!source.wrapperAural00Bound)return false;
+            //No fallible boundary/callback separates constructor return,
+            //factory return and04 publication in the joined suffix.
+            if(source.backendConstructorReturned!=source.backendFactoryReturned||
+               source.backendFactoryReturned!=source.wrapperBackend04Published)return false;
+            if(source.nativeBackendRetired){
+                if(!source.nativeWithdrawn||source.backendPrefix||!source.nativeWrapperRetired)return false;
+                //Never dereference the retired historical backend identity.
+            }else if(source.nativeWithdrawn||source.backendPrefix.get()!=source.backendIdentity||
+                     (source.backendConstructorReturned?!source.backendPrefix->sourceConstructorCopiesCurrent():
+                                                        !source.backendPrefix->sourcePrefixBefore4349D0()))return false;
+        }else if(source.backendPrefix||source.backendIdentity||source.nativeBackendRetired||
+                 source.backendConstructorReturned||source.backendFactoryReturned||source.wrapperBackend04Published)return false;
+        if(!source.wrapperPublished)
+            return !source.wrapperIdentity&&!source.nativeWrapperRetired&&!source.wrapperAural00Bound&&
+                !source.nativeSlotBorrowWithdrawn&&!listeners4C_[0];
+        if(!source.wrapperIdentity)return false;
+        if(source.nativeWrapperRetired)
+            return source.nativeSlotBorrowWithdrawn&&source.nativeWithdrawn&&
+                !source.issuer&&!listeners4C_[0]; //Historical pointer is NEVER dereferenced.
+        return !source.nativeSlotBorrowWithdrawn&&!source.nativeWithdrawn&&source.issuer&&
+            listeners4C_[0]==source.wrapperIdentity&&source.wrapperIdentity->sourceCancellationBacking()&&
+            source.wrapperIdentity->sourceOwner00()==(source.wrapperAural00Bound?this:nullptr)&&
+            source.wrapperIdentity->backend04_==(source.wrapperBackend04Published?source.backendIdentity:nullptr);
     default:return false;
     }
 }
@@ -113,6 +167,9 @@ bool OriginalApplicationAural50KG::beginSingleRaceListener1A4620(
     nativeListenerIssuer_=&manager;nativeListenerPhase_=NativeListenerPhase::constructing;
     flags9CBit0_=true; //1A4678, preserve other bits in the existing projection.
     ++word34_; //102EF0: reserve actual index0 BEFORE allocation/assertion stores.
+    //This native adapter uses a projected per-App guard, not the authentic
+    //shared process owner. Irreversibly poison BEFORE even reading that copy.
+    assets::OriginalConfigProcessGlobals50LA::invalidateListenerAssertionHistoryNative();
     auto& app=*issuer_->state;
     if(!app.listenerGuard80C4){
         app.listenerAssertion3DF4C0=1u;app.listenerGuard80C4=1u; //102F48/4C.
@@ -155,7 +212,8 @@ bool OriginalApplicationAural50KG::beginSingleRaceListener1A4620(
 bool OriginalApplicationAural50KG::removeSingleRaceListener103040(
     const ListenerManager& manager,Diagnostic& d)noexcept {
     d={};
-    if(!currentIncludingIncompleteListener())return fail(d,Status::owner,0x103040);
+    if(!currentIncludingIncompleteListener()||nativeListenerPhase_==NativeListenerPhase::sourceReserved)
+        return fail(d,Status::owner,0x103040); //Source cancellation is not this native adapter.
     if(!nativeListenerIssuer_){d={Status::complete,0x1a4618};return true;} //Never began/already withdrawn.
     if(nativeListenerIssuer_!=&manager)return fail(d,Status::owner,0x103040);
     if(listeners4C_[0]){
@@ -1013,7 +1071,7 @@ bool OriginalApplicationAural50KG::retireNativeOrEmpty102CD0(Diagnostic& d)noexc
     if(retired_)return true;
     //Actual manager removal must withdraw its native issuer before App teardown.
     //Never destroy a listener still borrowed by a live same-source manager.
-    if(nativeListenerIssuer_||!currentIncludingIncompleteListener()||entity_.firstChild18||entity_.next14||!entities_->entityAuthority_.canRetire(entity_))return fail(d,Status::phase,0x102CD0);
+    if(nativeListenerIssuer_||sourceListenerReservation_.issuer||!currentIncludingIncompleteListener()||entity_.firstChild18||entity_.next14||!entities_->entityAuthority_.canRetire(entity_))return fail(d,Status::phase,0x102CD0);
     if(attached_?(entity_.parent1C!=&entities_->root10_):(entity_.parent1C||entity_.previous10))
         return fail(d,Status::topology,0x142590);
     // Final102CD0 owns every actually published typed slot, including partial

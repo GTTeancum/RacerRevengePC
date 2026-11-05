@@ -1,60 +1,63 @@
 //Private helpers of the SAME Water Config. No Particle/parser occurrence reuse.
-bool OriginalWaterSourceConfig50LA::readTextLine12EE90(D& d)noexcept {
+bool OriginalWaterSourceConfig50LA::readTextLine12EE90(Text::Bytes& input,TextRead& read,D& d,std::uint32_t* adaptedPC)noexcept {
+    //Only an explicit native-adapted caller supplies its own PC; source pc_ stays historical.
+    auto& flowPC=adaptedPC?*adaptedPC:pc_;
     d={};if(!borrowed_||handle_<0||!resolver_||
        !resolver_->sourceBankMemberCurrent(selectedRoot_,this,handle_))return fail(d,E::phase,0x12ee90);
-    textRead_={};auto& h=textRead_;h.attempted=true;++textReadCalls_;pc_=0x12ee90;
+    read={};auto& h=read;h.attempted=true;flowPC=0x12ee90;
     auto& member=resolver_->freshFileCapacity_->members150[handle_];
     h.before=member.cursor10;h.after=member.cursor10;
     if(!lineAssertions12EE90(handle_,resolver_->freshFileCapacity_->memberCount154,d)){
-        pc_=d.sourcePC;return false;}
+        flowPC=d.sourcePC;return false;}
     const auto remaining=member.length14-member.cursor10; //Original SUBU, then signed BGTZ.
     if(!remaining||(remaining&0x80000000u)){
-        pc_=0x12efbc;textInput_.put(0,0);h.returned=true;h.present=false;
-        expectedCursor_=h.after;pc_=0x157768;return true;
+        flowPC=0x12efbc;input.put(0,0);h.returned=true;h.present=false;
+        expectedCursor_=h.after;flowPC=0x12f280;return true;
     }
-    h.requested=std::min<std::uint32_t>(remaining,1022u);pc_=0x130560;
+    h.requested=std::min<std::uint32_t>(remaining,1022u);flowPC=0x130560;
     h.transportReturned=resolver_->readSourceBankMember130560(selectedRoot_,this,handle_,
-        textInput_.value.data(),h.requested,h.copied,false,d);
+        input.value.data(),h.requested,h.copied,false,d);
     //The source stack buffer persists. Never erase old known suffix bytes.
-    for(std::size_t i=0;i<h.copied;++i)textInput_.known[i]=true;
+    for(std::size_t i=0;i<h.copied;++i)input.known[i]=true;
     h.after=member.cursor10;expectedCursor_=h.after;
-    if(!h.transportReturned){pc_=d.sourcePC?d.sourcePC:pc_;return false;}
+    if(!h.transportReturned){flowPC=d.sourcePC?d.sourcePC:flowPC;return false;}
     //The immutable numeric backend's returned positive call owns its whole
     //requested span. This is a byte result, not a12FB30 fread item count.
-    if(h.copied!=h.requested){pc_=0x12f1b4;return fail(d,E::unsupported,pc_);}
+    if(h.copied!=h.requested){flowPC=0x12f1b4;return fail(d,E::unsupported,flowPC);}
     auto cursor=member.cursor10;
-    const auto suffix=Text::lineSuffix12F1B4(textInput_,h.requested,h.copied!=0,cursor);
-    pc_=suffix.pc;if(suffix.stop!=Text::Stop::complete)return false;
+    const auto suffix=Text::lineSuffix12F1B4(input,h.requested,h.copied!=0,cursor);
+    flowPC=suffix.pc;if(suffix.stop!=Text::Stop::complete)return false;
     member.cursor10=cursor;h.after=cursor;expectedCursor_=h.after;
-    h.present=h.copied!=0;h.returned=true;pc_=0x157768;return true;
+    h.present=h.copied!=0;h.returned=true;flowPC=0x12f280;return true;
 }
-bool OriginalWaterSourceConfig50LA::lookupText157AF0(std::int32_t& out)noexcept {
-    pc_=0x157c44;const auto& table=textTable_;
+bool OriginalWaterSourceConfig50LA::lookupText157AF0(const Text::Bytes& query,std::int32_t& out,std::uint32_t* adaptedPC)noexcept {
+    auto& flowPC=adaptedPC?*adaptedPC:pc_;
+    flowPC=0x157c44;const auto& table=textTable_;
     if(table.sourceCleaned||table.allocationPending||table.allocationFault)return false;
-    if(!table.count14||(table.count14&0x80000000u)){out=-1;pc_=0x157c90;return true;}
+    if(!table.count14||(table.count14&0x80000000u)){out=-1;flowPC=0x157c90;return true;}
     using G=OriginalConfigProcessGlobals50LA;const G::WaterSprintfAccess key;
     for(std::uint32_t index=0;index<table.count14;++index){
-        pc_=0x157c50;
+        flowPC=0x157c50;
         if(!table.rows||!table.sourceStorage||table.rows!=table.owned.get()||
            table.orphan||table.orphanStorage||index>=table.rowExtent)return false;
         const auto& row=table.rows[index].name0C;bool equal=false;
         for(std::size_t i=0;;++i){
-            pc_=i?0x308f60u:0x308f08u;
-            if(i>=textName_.value.size()||!textName_.known[i])return false;
-            const auto left=textName_.value[i];pc_=left?0x308f18u:0x308f80u;
+            flowPC=i?0x308f60u:0x308f08u;
+            if(i>=query.value.size()||!query.known[i])return false;
+            const auto left=query.value[i];flowPC=left?0x308f18u:0x308f80u;
             if(!row.known[i])return false;const auto right=row.value[i];std::int32_t a=0,b=0;
             if(left){
-                pc_=0x308f34;if(!G::waterFold308F00(key,left,a,pc_))return false;
-                pc_=0x308f3c;if(!G::waterFold308F00(key,right,b,pc_))return false;
+                flowPC=0x308f34;if(!G::waterFold308F00(key,left,a,flowPC))return false;
+                flowPC=0x308f3c;if(!G::waterFold308F00(key,right,b,flowPC))return false;
                 if(a==b)continue;
             }
-            pc_=0x308f90;if(!G::waterFold308F00(key,left,a,pc_))return false;
-            pc_=0x308f94;if(!G::waterFold308F00(key,right,b,pc_))return false;
+            flowPC=0x308f90;if(!G::waterFold308F00(key,left,a,flowPC))return false;
+            flowPC=0x308f94;if(!G::waterFold308F00(key,right,b,flowPC))return false;
             equal=a==b;break;
         }
-        if(equal){out=static_cast<std::int32_t>(index);pc_=0x157c70;return true;}
+        if(equal){out=static_cast<std::int32_t>(index);flowPC=0x157c70;return true;}
     }
-    out=-1;pc_=0x157c90;return true;
+    out=-1;flowPC=0x157c90;return true;
 }
 bool OriginalWaterSourceConfig50LA::allocateTextBackingNative()noexcept {
     auto& table=textTable_;
@@ -99,7 +102,7 @@ bool OriginalWaterSourceConfig50LA::parseText157500(D& d)noexcept {
     textEntered_=true;textLineOrdinal_=0;
     for(;;){
         textPhase_=TextPhase::reading;pc_=0x157760;
-        if(!readTextLine12EE90(d))return false;
+        ++textReadCalls_;if(!readTextLine12EE90(textInput_,textRead_,d))return false;pc_=0x157768;
         if(!textRead_.present){
             textPhase_=TextPhase::finishLast;
             const auto final=Text::finishLastRow157770(textTable_,textLineOrdinal_);syncTextFields();pc_=final.pc;
@@ -113,7 +116,7 @@ bool OriginalWaterSourceConfig50LA::parseText157500(D& d)noexcept {
             textPhase_=TextPhase::section;step=Text::sectionName157548(textLine_,textName_);pc_=step.pc;
             if(step.stop!=Text::Stop::complete)return false;
             textPhase_=TextPhase::lookup;std::int32_t found=-1;
-            if(!lookupText157AF0(found))return false;textLookup_=found;
+            if(!lookupText157AF0(textName_,found))return false;textLookup_=found;
             if(found!=-1){textPhase_=TextPhase::duplicate;pc_=0x1576d0;return false;}
             textPhase_=TextPhase::allocation;Text::AllocationRequest request;
             step=Text::prepareNewRow15758C(textTable_,request);syncTextFields();pc_=step.pc;

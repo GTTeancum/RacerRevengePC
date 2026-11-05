@@ -3,9 +3,12 @@
 #include "../../src/assets/original_particle_source_config50la.h"
 #include "../../src/assets/original_config_process_globals50la.h"
 #include "../../src/game/original_water_constructor_numeric50la.h"
+#include "../../src/game/original_water_opacity_numeric50la.h"
+#include "../../src/game/original_water_scale_numeric50la.h"
 #include "../../src/assets/original_source_sky_file50la.h"
 #include "../../src/assets/original_source_water_exists131a40.h"
 #include "../../src/assets/original_water_source_config50la.h"
+#include "../../src/assets/original_water_pool_source_file50la.h"
 #include "../../src/game/original_water_readback_layout50la.h"
 #include "../../src/assets/original_sky_palette_codec14cbe0_native50la.h"
 #include "../../src/game/original_world_particle_invocation50la.h"
@@ -40,6 +43,8 @@ namespace rr::game { class OriginalRacePauseWorldAuthority50LA; }
 #include "../../src/game/original_track_particle_cold50la.h"
 #include "../../src/game/original_gc_gameplay_lighting_candidate.h"
 #include <exception>
+#include <cstdlib>
+#include <new>
 #include <algorithm>
 #include <memory>
 #include <optional>
@@ -93,6 +98,29 @@ struct Diagnostic {
     std::string sky;
 };
 class Owner final : private ra_pod_scene50LA::Owner {
+public:
+    enum class WaterArrayBackingRefusal {none,countCapacity,byteCapacity,requestMismatch,
+        reentrancyUnknown,reentrancyUnsupported,sidecarAllocation,payloadAllocation};
+    enum class WaterPoolBackingRefusal {none,reentrancyUnknown,reentrancyUnsupported,
+        ownerAllocation,payloadAllocation};
+    enum class WaterPoolEntityRefusal {none,countCapacity,authorityCapacity,authorityAdmission};
+    enum class WaterPoolNameRefusal {none,nativeLowerNonAscii,nativeLowerTableUnknown,
+        nativeScratchAperture,nativeNameAperture};
+    enum class WaterPoolResourceStop {none,namePreparation,service2BB044,lookup132820,
+        missingDiagnostic2BB07C,service2BB0CC,read12FB30,unknownVersion2BB0E4,
+        resourceAllocation2BB12C,service2BB10C,close131040,entityDispatch2BB110};
+    enum class WaterPoolMaterialStop {none,rawSourceReentrancy,rawNativeReentrancy,
+        rawCountCapacity,rawByteCapacity,rawRequestMismatch,rawOwnerAllocation,rawSlotAllocation,
+        rawPayloadAllocation,childSourceReentrancy,childNativeReentrancy,childOwnerAllocation,
+        childPayloadAllocation,countCapacity,authorityCapacity,authorityAdmission,service2BF71C,readCall2BF730};
+    enum class WaterPoolDataStop {none,sourceReentrancy,nativeReentrancy,ownerAllocation,
+        payloadAllocation,service2BB18C,childCountRead,childAllocation2BB1B0,topologyCall2BB24C};
+    enum class WaterPoolMaterialReaderStop {none,receiptPreparation,serviceLoad,readPreparation,
+        readHelper,readAdmission,textureCall2BF928,callerOrdinal2BB220};
+    enum class WaterPoolTopologyEntry {none,returnedFirstMaterial,nonpositiveCount};
+    enum class WaterPoolTopologyStop {none,secondMaterialCall2BB1C4,service2BAB30,
+        readPreparation,readHelper,readAdmission,mallocCall2BAB54};
+private:
     std::shared_ptr<const g::OriginalRacerWorldBorrow50LA> mintConstructorRacerWorldBorrow(
         const std::shared_ptr<Owner>& self)noexcept;
     bool constructRuntimeSourceCamera(const original_main_entry50KG::Application&,
@@ -605,7 +633,155 @@ bool preflightSourceWaterFactoryNative()const noexcept;
 
 //Actual success-only274720 allocation role. World400 is published only after
 //the represented constructor returns this exact counted entity identity.
-struct SourceWaterProviderOwner {g::OriginalWreckComponent50LA entity;};
+//Private native backing only; never a source pointer/allocator return.
+enum class NativeWaterArrayRole {signaturePointers,poolPointers,zoneRaw};
+enum class NativeWaterZoneVtable {base3D36B0,derived3D20C0};
+struct NativeWaterArrayView {
+    NativeWaterArrayRole role;
+    std::uint64_t epoch;
+    std::uint32_t offset;
+};
+struct SourceWaterPoolOwner;
+struct NativeWaterArrayElementRole final {
+    enum class Kind {pool};
+    Kind kind=Kind::pool;
+    const SourceWaterPoolOwner* wholeOwner=nullptr;
+    const void* payloadIdentity=nullptr;
+    const g::OriginalWreckComponent50LA* entityFacet=nullptr;
+    std::uint64_t epoch=0,arrayEpoch=0,ordinal=0;
+    NativeWaterArrayElementRole()noexcept=default;
+    NativeWaterArrayElementRole(const NativeWaterArrayElementRole&)=delete;
+    NativeWaterArrayElementRole& operator=(const NativeWaterArrayElementRole&)=delete;
+};
+struct NativeWaterArraySlot {
+    const NativeWaterArrayElementRole* role=nullptr;
+    std::uint32_t offset=0;
+    bool known=false; //Default native metadata does NOT establish guest NULL bytes.
+};
+struct NativeWaterArrayPayloadDelete {void operator()(void* p)const noexcept {std::free(p);}};
+//WaterObjectData is a separate scalar0x30 Resource. Its role is neither
+//the Pool Entity nor a texture resource; no guest address is made from it.
+struct SourceWaterPoolDataOwner;
+struct NativeWaterPoolDataRole final {
+    const SourceWaterPoolDataOwner* nativeOwner=nullptr;
+    const SourceWaterPoolOwner* poolOwner=nullptr;
+    const void* payloadIdentity=nullptr;
+    std::uint64_t epoch=0;
+    NativeWaterPoolDataRole()noexcept=default;
+    NativeWaterPoolDataRole(const NativeWaterPoolDataRole&)=delete;
+    NativeWaterPoolDataRole& operator=(const NativeWaterPoolDataRole&)=delete;
+};
+//Distinct raw-malloc child-pointer array and first SoultreeMaterial. Host
+//layout is not EE layout. The canonical Entity is the semantic whole+0 facet.
+struct SourceWaterPoolMaterialOwner;
+struct SourceWaterPoolMaterialArrayOwner;
+struct NativeWaterPoolMaterialRole final {
+    const SourceWaterPoolMaterialOwner* nativeOwner=nullptr;
+    const SourceWaterPoolMaterialArrayOwner* arrayOwner=nullptr;
+    const void* payloadIdentity=nullptr;
+    const g::OriginalWreckComponent50LA* entityFacet=nullptr;
+    std::uint64_t epoch=0,arrayEpoch=0,ordinal=0;
+    NativeWaterPoolMaterialRole()noexcept=default;
+    NativeWaterPoolMaterialRole(const NativeWaterPoolMaterialRole&)=delete;
+    NativeWaterPoolMaterialRole& operator=(const NativeWaterPoolMaterialRole&)=delete;
+};
+struct SourceWaterPoolMaterialOwner final {
+    std::unique_ptr<void,NativeWaterArrayPayloadDelete> payload;
+    g::OriginalWreckComponent50LA entity;
+    NativeWaterPoolMaterialRole role;
+    struct View {const NativeWaterPoolMaterialRole* role;std::uint32_t offset;};
+    std::optional<View> wholeArgument,entityArgument;
+    bool authorityLive=false,countLive=false;
+    std::array<std::uint8_t,0xd8> knownMask{},knownBits{};
+    SourceWaterPoolMaterialOwner()noexcept=default;
+    ~SourceWaterPoolMaterialOwner()noexcept {
+        if(entity.reference00||authorityLive||countLive)std::terminate();
+    }
+    SourceWaterPoolMaterialOwner(const SourceWaterPoolMaterialOwner&)=delete;
+    SourceWaterPoolMaterialOwner& operator=(const SourceWaterPoolMaterialOwner&)=delete;
+};
+struct NativeWaterPoolMaterialArrayRole final {
+    const SourceWaterPoolMaterialArrayOwner* nativeOwner=nullptr;
+    const SourceWaterPoolDataOwner* dataOwner=nullptr;
+    const void* payloadIdentity=nullptr;
+    std::uint64_t epoch=0;
+    NativeWaterPoolMaterialArrayRole()noexcept=default;
+    NativeWaterPoolMaterialArrayRole(const NativeWaterPoolMaterialArrayRole&)=delete;
+    NativeWaterPoolMaterialArrayRole& operator=(const NativeWaterPoolMaterialArrayRole&)=delete;
+};
+struct NativeWaterPoolMaterialSlot {
+    const NativeWaterPoolMaterialRole* role=nullptr;
+    std::uint32_t offset=0;bool known=false; //Metadata default is NOT a guest NULL.
+};
+struct SourceWaterPoolMaterialArrayOwner final {
+    std::unique_ptr<void,NativeWaterArrayPayloadDelete> payload;
+    std::unique_ptr<NativeWaterPoolMaterialSlot[]> slots;
+    NativeWaterPoolMaterialArrayRole role;
+    std::uint32_t originalCount=0,requestedBytes=0,slotCapacity=0;
+    std::unique_ptr<SourceWaterPoolMaterialOwner> firstChild;
+    SourceWaterPoolMaterialArrayOwner()noexcept=default;
+    ~SourceWaterPoolMaterialArrayOwner()noexcept {if(firstChild)std::terminate();}
+    SourceWaterPoolMaterialArrayOwner(const SourceWaterPoolMaterialArrayOwner&)=delete;
+    SourceWaterPoolMaterialArrayOwner& operator=(const SourceWaterPoolMaterialArrayOwner&)=delete;
+};
+struct SourceWaterPoolDataOwner final {
+    std::unique_ptr<void,NativeWaterArrayPayloadDelete> payload;
+    NativeWaterPoolDataRole role;
+    std::uint64_t reference00=0; //Only104900 acquires this source reference.
+    std::array<std::uint8_t,0x30> knownMask{},knownBits{};
+    std::unique_ptr<SourceWaterPoolMaterialArrayOwner> nativeMaterials;
+    struct MaterialArrayView {const NativeWaterPoolMaterialArrayRole* role;std::uint32_t offset;};
+    std::optional<MaterialArrayView> materials10; //Only actual SW2BB1B8 publishes this alias.
+    SourceWaterPoolDataOwner()noexcept=default;
+    ~SourceWaterPoolDataOwner()noexcept {if(reference00||nativeMaterials)std::terminate();}
+    SourceWaterPoolDataOwner(const SourceWaterPoolDataOwner&)=delete;
+    SourceWaterPoolDataOwner& operator=(const SourceWaterPoolDataOwner&)=delete;
+};
+//Distinct scalar0x1D0 payload and stable canonical Entity facet. Host layout
+//is NOT the EE layout: the two semantic views explicitly carry offsets0/8.
+struct SourceWaterPoolOwner final {
+    std::unique_ptr<void,NativeWaterArrayPayloadDelete> payload;
+    g::OriginalWreckComponent50LA entity; //Fresh native defaults establish NO raw guest bytes.
+    NativeWaterArrayElementRole role;
+    struct View {const NativeWaterArrayElementRole* role;std::uint32_t offset;};
+    std::optional<View> wholeArgument,entityArgument;
+    std::unique_ptr<SourceWaterPoolDataOwner> nativeData;
+    struct DataView {const NativeWaterPoolDataRole* role;std::uint32_t offset;};
+    std::optional<DataView> data1B4; //Reached semantic pointer, not known guest bits.
+    std::array<std::uint8_t,0x1d0> knownMask{},knownBits{};
+    SourceWaterPoolOwner()noexcept=default;
+    SourceWaterPoolOwner(const SourceWaterPoolOwner&)=delete;
+    SourceWaterPoolOwner& operator=(const SourceWaterPoolOwner&)=delete;
+};
+struct NativeWaterArrayBacking {
+    std::unique_ptr<void,NativeWaterArrayPayloadDelete> payload;
+    std::unique_ptr<NativeWaterArraySlot[]> slots;
+    std::optional<NativeWaterArrayRole> role;
+    std::uint64_t epoch=0;
+    std::uint32_t originalCount=0,requestedBytes=0,effectiveBytes=0,slotCapacity=0;
+    std::optional<std::uint32_t> zoneCookieSize,zoneCookieCount; //Only actual projected stores establish bytes0..7.
+    std::uint32_t zoneElementsCompleted=0; //Only this completed prefix has known element bytes.
+    std::optional<NativeWaterZoneVtable> zoneCompletedVtable;
+};
+static constexpr std::uint32_t nativeWaterArrayMaxCount=16384u;
+static constexpr std::uint32_t nativeWaterArrayMaxBytes=1048576u;
+struct SourceWaterProviderOwner {
+    g::OriginalWreckComponent50LA entity;
+    std::optional<std::uint32_t> baseHeight3C; //Unwritten by constructor; first actual158B80 writes it.
+    std::optional<std::uint32_t> baseOpacity60; //Likewise unknown until fourth158B80 writes it.
+    std::array<std::optional<std::uint32_t>,4> channelScale98; //Actual constructor zeros, then getter writes.
+    std::array<std::optional<std::uint32_t>,5> framesPerSecond84; //Unknown until respective getter writes.
+    std::optional<std::uint32_t> baseDisplacement49C,numPools64; //Unknown until respective getter writes.
+    std::optional<std::uint32_t> numZones4A8; //Unknown until original NumZones getter.
+    std::optional<std::uint32_t> signatureWaves6C; //Same constructor2B0924 zero, then getter write.
+    //Unknown until supported native-adapted SD2B9884. Outer2B8AF0 is LATER
+    //than this nested loader, not a constructor value or prior-store receipt.
+    std::optional<std::uint64_t> nativePackedState2A0;
+    NativeWaterArrayBacking nativeArrayBacking; //Private, not Water+C8/+68/+D0 publication.
+    //Adapted current-field views only. Absence is NOT a source NULL value.
+    std::optional<NativeWaterArrayView> nativeArrayC8,nativeArray68,nativeArrayD0;
+    std::unique_ptr<SourceWaterPoolOwner> nativePool; //Retired before provider/array destruction.
+};
 std::unique_ptr<SourceWaterProviderOwner> sourceWaterProvider_;
 struct SourceWaterProvider274720 {
     bool allocationAttempted=false,allocationReturned=false,nativeAllocationRefused=false;
@@ -650,9 +826,11 @@ struct SourceWaterProviderMembers {
     std::array<std::optional<std::uint32_t>,4> embeddedWords;
     std::uint8_t embeddedWritten=0;
     //Offsets1E0,1F0,200,210,2B0,2C0,2D0,300,310. vf0 W is1.
-    std::array<std::optional<std::array<std::uint32_t,4>>,9> vectors;
+    std::array<std::optional<std::array<std::uint32_t,4>>,9> vectors; //Same object vectors, later full copies.
+    std::array<std::optional<std::array<std::uint32_t,4>>,9> constructorVectors; //Historical stores only.
     //2B8590 at2E0/2F0 is INTEGER zero, unlike vf0.
-    std::array<std::array<std::optional<std::uint32_t>,4>,2> integerArrays;
+    std::array<std::array<std::optional<std::uint32_t>,4>,2> integerArrays; //Same live color lanes, later source copies.
+    std::array<std::array<std::optional<std::uint32_t>,4>,2> integerConstructorZeros; //Historical2B8590 stores.
     std::array<std::uint8_t,2> integerArrayWritten{};
     std::optional<std::uint32_t> rawF0,rawF1;
     std::optional<std::uint32_t> field380,field384,fieldD8,field388,fieldE0,fieldDC;
@@ -712,11 +890,577 @@ struct SourceWaterConfig {
     std::optional<bool> openReturn;
     std::optional<std::uint32_t> loaderReturn;
     std::uint8_t loaderRestoreMask=0;bool loaderStackReleased=false;
+    bool gettersEntered=false;
+    std::optional<std::uint32_t> heightRead2B9380;
+    std::array<std::optional<std::uint64_t>,3> loadPublications; //443E90,443EE0,443B90.
+    bool opacityEntered=false;
+    std::optional<std::uint32_t> maxOpacityA40; //Actual loader stack slot, fifth getter destination.
+    std::optional<std::uint32_t> opacityRead2B93FC,maxRead2B9408,opacityReload2B9418;
+    std::optional<std::uint64_t> opacityPublication; //443ED4 at2B9414.
+    bool scalarTailEntered=false,opacitySubtractAttempted=false;
+    std::optional<std::uint32_t> opacityDifference,opacitySubtractClearMask;
+    std::optional<std::uint64_t> opacityRangePublication,wakeScalePublication; //443ED8,443B88.
+    bool colorGettersEntered=false;
+    std::array<std::optional<std::uint64_t>,6> colorPublications;
+    std::array<std::optional<std::uint64_t>,5> followingFloatPublications;
+    bool flagGettersEntered=false;
+    std::optional<std::uint64_t> renderInfinitePublication;
+    std::optional<std::uint32_t> lodBiasA44,lodRead2B96A8; //Actual stack slot and subsequent source read.
+    std::array<std::optional<std::uint64_t>,4> lodPublications;
+    bool shaderEntered=false;
+    a::OriginalWaterSourceConfig50LA::ShaderBytes shader140;
+    std::array<std::optional<std::uint32_t>,3> envReads;
+    std::array<std::optional<std::uint64_t>,3> envReadPublications;
+    bool alphaTailEntered=false,wakeFrothCallIssued=false,wakeSelectionEntered=false;
+    std::array<std::optional<std::uint32_t>,5> colorTailReads;
+    std::array<std::optional<std::uint64_t>,5> colorTailReadPublications;
+    std::array<std::optional<std::array<std::uint32_t,4>>,2> waterVectorReads;
+    std::array<std::optional<std::array<std::uint64_t,4>>,2> waterVectorReadPublications;
+    std::array<bool,2> waterVectorCopied{};
+    std::array<std::optional<std::uint64_t>,5> nativeWakeGetterPublications;
+    struct NativeWakePackedState {
+        bool attempted=false,stored=false;
+        std::uint32_t pc=0x2b9864u;
+        std::optional<std::uint32_t> alphaWord,f1Bits;
+        std::optional<std::uint64_t> alphaPublication,signExtended,mask,shifted,packed;
+    } nativeWakePacked;
+    struct NativeWakeScale {
+        bool attempted=false,numericAdmitted=false,stored=false;
+        std::uint32_t pc=0x2b9888u;
+        std::optional<std::uint32_t> input,f1Bits,product,localClearMask,signatureWaves;
+        std::optional<std::uint64_t> inputPublication,storePublication;
+        std::optional<bool> inputWasAdapted,skippedSignatureWaves;
+    } nativeWakeScale;
+    struct NativeWaterArrayPrefix {
+        bool attempted=false,callIssued=false;
+        std::uint32_t pc=0; //No arm is selected before this explicit native-only entry.
+        std::optional<bool> signatureArm,skippedPools;
+        std::array<std::optional<std::uint32_t>,4> stack820,stack830; //Current caller lanes, same source roles.
+        std::array<std::optional<std::uint32_t>,4> initialized820,initialized830; //Historical eight-store receipts.
+        std::uint8_t stackWrites=0;
+        std::optional<std::uint32_t> countWord,countPlusOne,requestedBytes;
+        std::optional<std::uint64_t> argumentA0;
+    } nativeWaterArrayPrefix;
+    struct NativeWaterAllocationEntry {
+        enum class ReentStop {none,unknown,unsupportedIdentity};
+        bool attempted=false,zones=false,zonesCallIssued=false;
+        std::uint32_t pc=0;
+        std::optional<std::uint32_t> zoneCount,zoneTimes8,zoneTimes9,zoneTimes36;
+        std::optional<std::uint64_t> zoneCountRegister;
+        std::optional<std::uint32_t> requestedBytes,callerReturnPC,effectiveBytes;
+        std::optional<std::uint64_t> argumentA0,effectiveArgument;
+        bool arrayFrame=false,operatorFrame=false,operatorFramePointer=false,mallocFrame=false;
+        std::uint8_t arraySaveMask=0,operatorSaveMask=0,mallocSaveMask=0,allocatorSaveMask=0;
+        bool zeroCoerced=false,allocatorFrame=false,reentCopied=false,lockCalled=false,lockReturned=false;
+        ReentStop reentStop=ReentStop::none;
+        std::optional<a::OriginalConfigProcessGlobals50LA::StdioIdentity> reent;
+        std::optional<std::uint32_t> sumWord,normalizedChunk,binIndex,arenaReadOffset,pendingBranchTarget;
+        std::optional<std::uint64_t> sumRegister,normalizedRegister;
+        std::optional<bool> minimumChunk,smallBin;
+    } nativeWaterAllocationEntry;
+    struct NativeWaterArrayBackingAdaptation {
+        bool attempted=false,boundsAdmitted=false,sidecarAttempted=false,sidecarPrepared=false;
+        bool temporarySidecarsRetired=false,payloadAttempted=false,nativeAllocated=false,nativeRetired=false;
+        WaterArrayBackingRefusal refusal=WaterArrayBackingRefusal::none;
+        std::optional<NativeWaterArrayRole> role;
+        std::optional<std::uint32_t> count,requestedBytes,effectiveBytes,slotCapacity,nativeResumePC;
+        std::optional<std::uint64_t> epoch;
+        std::optional<a::OriginalConfigProcessGlobals50LA::StdioIdentity> nativeAdmissionReent;
+    } nativeWaterArrayBacking;
+    struct NativeWaterArrayCaller {
+        bool attempted=false,nativeViewsRetired=false,pointerPublished=false;
+        std::uint32_t pc=0;
+        std::optional<NativeWaterArrayRole> role;
+        std::optional<std::uint64_t> ordinal,loopCountRegister;
+        std::optional<std::uint32_t> loopCount;
+        std::optional<bool> loopTaken;
+        bool formatCallIssued=false;
+        std::optional<std::uint32_t> formatStackOffset,formatLiteral,formatIndex,formatReturnPC;
+        bool wrapperEntered=false,wrapperReturned=false,wrapperFrame=false,wrapperStackReleased=false;
+        std::uint16_t wrapperSaveMask=0,wrapperRestoreMask=0;
+        std::optional<std::uint32_t> zoneConstructor,zoneDestructor,zoneSize,zoneCount;
+        std::optional<std::uint64_t> zoneCountRegister;
+        std::uint8_t cookieWrites=0,unwindStoreMask=0;
+        std::optional<std::uint32_t> elementOffset,unwindSize,unwindCount,unwindDestructor,initialOrdinalSlot;
+        bool constructorCallIssued=false;
+        std::optional<std::uint32_t> constructorFlag;
+    } nativeWaterArrayCaller;
+    struct NativeWaterZoneElements {
+        bool attempted=false,wrapperAlreadyReturned=false,wrapperReturnProjected=false,d0Published=false;
+        std::uint32_t pc=0,completed=0,bodiesEntered=0,baseReturns=0,constructorReturns=0,callsIssuedHere=0,repeatComparisons=0;
+        std::optional<std::uint32_t> count,wrapperOrdinal,nextElementOffset,lastElementOffset,lastOrdinal;
+        std::optional<std::uint8_t> lastFlagRead;
+        std::optional<NativeWaterZoneVtable> lastVtable;
+        std::uint8_t lastSaveMask=0,lastRestoreMask=0;
+        bool lastFrameReleased=false,wrapperStackReleased=false;
+        std::uint16_t wrapperRestoreMask=0;
+    } nativeWaterZoneElements;
+    struct NativeWaterArrayFormat {
+        enum class Phase {unentered,reent,stdio,locale,prefixScan,prefixCopy,digitCopy,nulScan,selectionEntry};
+        bool attempted=false,wrapperFrame=false,raSaved=false,raRestored=false,wrapperStackReleased=false;
+        bool initializerReturned=false,localeReturned=false,conversionRead=false,digitStored=false,flushCallIssued=false,terminated=false;
+        bool stdioFrame=false,coreFrame=false,flushFrame=false,writerFrame=false;
+        bool stdioStackReleased=false,coreStackReleased=false,flushStackReleased=false,writerStackReleased=false;
+        std::uint16_t stdioSaveMask=0,stdioRestoreMask=0,coreSaveMask=0,coreRestoreMask=0;
+        std::uint16_t flushSaveMask=0,flushRestoreMask=0,writerSaveMask=0,writerRestoreMask=0;
+        std::optional<std::uint32_t> uioCount,uioResidual,writerReturn,flushReturn;
+        bool configArgument=false,nameArgument=false,selectionCallIssued=false;
+        Phase phase=Phase::unentered;std::uint32_t pc=0;
+        std::optional<NativeWaterArrayRole> role;
+        std::optional<a::OriginalConfigProcessGlobals50LA::StdioIdentity> capturedReent,fileReent54;
+        std::optional<std::uint16_t> flags0C;
+        bool buffer10=false;
+        std::optional<std::uint32_t> bufferSize14,remaining08;
+        std::optional<std::size_t> cursor00;
+        std::optional<std::uint64_t> savedArgument;
+        std::uint8_t varargsSaveMask=0;
+        struct Scan {std::size_t offset=0;bool returned=false;
+            std::optional<std::int32_t> length;std::optional<std::uint32_t> wide;};
+        std::array<Scan,17> scans;
+        std::size_t scanCount=0,segmentCount=0,copied=0,known=0;
+        std::array<std::size_t,2> copiedSegments{};
+        std::array<char,17> output; //Only known prefix may be read; no assumed broader caller array.
+        std::optional<std::uint32_t> decimalArgument,formatterReturn,wrapperReturn,selectionReturnPC;
+        std::optional<unsigned char> digit;
+        const a::OriginalWaterSourceConfig50LA* configIdentity=nullptr;
+    } nativeWaterArrayFormat;
+    a::OriginalWaterSourceConfig50LA::ShaderBytes arrayFilename790; //Native copy aperture128, original t0=-1.
+    struct NativeWaterArrayScalars {
+        std::array<std::optional<std::uint32_t>,11> stackA48ToA70;
+        std::array<std::optional<std::uint32_t>,3> stackA74ToA7C;
+    } nativeWaterArrayScalars; //Initially unknown; only individual source getter stores publish words.
+    struct NativeWaterPoolPathFormat {
+        enum class Phase {unentered,reent,stdio,locale,scan,argument,copy,callerBoundary};
+        struct Frame {bool entered=false,released=false;std::uint16_t saves=0,restores=0;};
+        struct Scan {std::size_t offset=0;bool returned=false;
+            std::optional<std::int32_t> length;std::optional<std::uint32_t> wide;};
+        struct String {
+            bool consumed=false,strlenIssued=false,lengthProjected=false,enqueued=false,completed=false,copied=false;
+            std::optional<std::size_t> length,readWindowMax;
+            std::array<std::uint8_t,256> bytes; //Only the projected length+NUL snapshot is known.
+            std::size_t known=0;
+            std::optional<std::uint64_t> directoryPublication;
+            Frame flush,writer;
+            std::optional<std::uint32_t> writerReturn,flushReturn;
+        };
+        bool attempted=false,callIssued=false,wrapperFrame=false,raSaved=false,raRestored=false,wrapperReleased=false;
+        bool initializerReturned=false,localeReturned=false,buffer10=false,terminated=false,queueInitialized=false;
+        Phase phase=Phase::unentered;std::uint32_t pc=0;
+        const void* directoryOwnerIdentity=nullptr;
+        const void* savedDirectoryIdentity=nullptr;
+        const a::OriginalWaterSourceConfig50LA::ShaderBytes* savedFilenameIdentity=nullptr;
+        std::uint8_t varargsSaveMask=0;
+        std::optional<a::OriginalConfigProcessGlobals50LA::StdioIdentity> capturedReent,fileReent54;
+        std::optional<std::uint16_t> flags0C;
+        std::optional<std::uint32_t> bufferSize14,remaining08,cursor00,formatterCount,uioCount,uioResidual;
+        Frame stdio,core;
+        std::array<Scan,3> scans;std::array<String,2> strings;
+        std::size_t scanCount=0,completed=0,copied=0,known=0;
+        std::array<std::uint8_t,256> output940; //Conservative native window940..A3F; no original sprintf limit.
+        std::optional<std::uint32_t> formatterReturn,wrapperReturn;
+    } nativeWaterPoolPathFormat;
+    struct NativeWaterPoolAllocationEntry {
+        enum class ReentStop {none,unknown,unsupportedIdentity};
+        bool attempted=false,callIssued=false;std::uint32_t pc=0;
+        std::optional<std::uint32_t> requestedBytes,effectiveBytes,callerReturnPC;
+        std::optional<std::uint64_t> argumentA0,effectiveArgument;
+        bool operatorFrame=false,operatorFramePointer=false,nonzeroBranch=false,mallocFrame=false;
+        std::uint8_t operatorSaveMask=0,mallocSaveMask=0,allocatorSaveMask=0;
+        ReentStop reentStop=ReentStop::none;
+        std::optional<a::OriginalConfigProcessGlobals50LA::StdioIdentity> reent;
+        bool allocatorFrame=false,reentCopied=false,lockCalled=false,lockReturned=false;
+        std::optional<std::uint32_t> sumWord,normalizedChunk,arenaBase,arenaReadOffset,arenaReadAddress;
+        std::optional<std::uint64_t> sumRegister,normalizedRegister;
+        std::optional<bool> minimumChunk,smallBin;
+    } nativeWaterPoolAllocationEntry; //Value-only prefix; no new[]/cookie, heap value or allocation return.
+    struct NativeWaterPoolBacking {
+        bool attempted=false,ownerAttempted=false,ownerPrepared=false,temporaryOwnerRetired=false;
+        bool payloadAttempted=false,nativeAllocated=false,nativeRetired=false,viewsRetired=false;
+        WaterPoolBackingRefusal refusal=WaterPoolBackingRefusal::none;
+        std::optional<a::OriginalConfigProcessGlobals50LA::StdioIdentity> nativeAdmissionReent;
+        const Owner* aggregateIdentity=nullptr;
+        const SourceWaterProviderOwner* providerIdentity=nullptr;
+        std::optional<std::uint64_t> epoch,arrayEpoch,ordinal;
+        std::optional<std::uint32_t> requestedBytes,effectiveBytes;
+        //Separate adapted caller only. Never the original allocator's return.
+        std::uint32_t pc=0;
+        bool callerEntered=false,constructorCallIssued=false,wholeArgumentPassed=false;
+        std::optional<bool> nullBranchTaken;
+        std::optional<std::uint32_t> argumentA1,argumentA2,callerReturnPC;
+    } nativeWaterPoolBacking;
+    struct NativeWaterPoolEntity {
+        bool attempted=false,admitted=false;
+        WaterPoolEntityRefusal refusal=WaterPoolEntityRefusal::none;
+        std::uint32_t pc=0;
+        bool poolFrame=false,sceneCallIssued=false,sceneFrame=false,wholeSaved=false;
+        bool entityCallIssued=false,entityFrame=false,referenceCallIssued=false;
+        std::uint8_t poolSaveMask=0,sceneSaveMask=0,entitySaveMask=0,entityRestoreMask=0;
+        bool referenceDispatchStored=false,referenceAcquired=false,referenceReturned=false;
+        bool entityDispatchStored=false,countAcquired=false,enrolled=false,entityReturned=false,entityStackReleased=false;
+        bool authorityRetired=false,referenceRetired=false,countRetired=false;
+        std::optional<std::uint32_t> countBefore;
+        std::optional<std::uint64_t> session,key;
+        //Source-write history survives native storage retirement. Only the
+        //specified bytes/bits are known; unexecuted payload lanes stay unknown.
+        std::optional<std::uint16_t> header00;
+        std::optional<std::uint8_t> header02,category30;
+        std::uint8_t header03Mask=0,header03Bits=0,flags31Mask=0,flags31Bits=0,linksWritten=0;
+        bool mask28Stored=false,descendants2CStored=false;
+    } nativeWaterPoolEntity;
+    //Descendant history only: the Entity-prefix receipt above remains fixed
+    //at289420. Registry outcomes survive native withdrawal, including failures.
+    struct NativeWaterPoolScene {
+        bool attempted=false;
+        std::uint32_t pc=0;
+        const g::OriginalApplicationEntities50LA* applicationIdentity=nullptr;
+        const g::OriginalEntityTypeRegistry50LA* registryIdentity=nullptr;
+        const NativeWaterArrayElementRole* wholeRoleIdentity=nullptr;
+        std::uint8_t sceneDispatchMask=0,vectorsWritten=0,zeroWordsWritten=0;
+        std::uint8_t fillCalls=0,fillReturns=0,identityWordsWritten=0,xyzWordsWritten=0;
+        std::uint8_t flags190Mask=0,flags190Bits=0;
+        bool zero19CStored=false,header03Bit2Cleared=false,name38Stored=false,zero1A0Stored=false;
+        bool registryCallIssued=false,applicationRead=false,registryReturned=false;
+        std::optional<g::OriginalEntityTypeRegistry50LA::Status> registryStatus;
+        std::uint32_t registrySourcePC=0;
+        std::optional<std::uint32_t> registryCountBefore,registryCountAfter;
+        std::optional<std::uint8_t> returnedType;
+        bool type02Stored=false,category30Stored=false,zero1A4Stored=false;
+        std::uint8_t sceneFlags191Mask=0,sceneFlags191Bits=0,sceneRestoreMask=0;
+        bool sceneWholeSelected=false,sceneReturned=false,sceneStackReleased=false;
+        std::optional<std::uint32_t> sceneReturnPC,sceneReturnOffset;
+        std::uint8_t poolDispatchMask=0,poolHeader03Mask=0,poolHeader03Bits=0;
+        std::uint8_t poolZeroWordsWritten=0,poolFlags191Mask=0,poolFlags191Bits=0,poolRestoreMask=0;
+        bool poolWholeSelected=false,poolReturned=false,poolStackReleased=false;
+        std::optional<std::uint32_t> poolReturnPC,poolReturnOffset;
+    } nativeWaterPoolScene;
+    //Separate descendant receipt: no predecessor PC, Entity/reference/count,
+    //resource alias or source loader return is acquired by this bounded leaf.
+    struct NativeWaterPoolName {
+        enum class CopySource {none,formatter940,scratch60,slxLiteral3C0E80};
+        enum class CopyDestination {none,scratch60,whole};
+        struct Copy {
+            bool callIssued=false,projected=false,returned=false;
+            std::uint32_t callPC=0,helperEntry=0,returnPC=0;
+            CopySource source=CopySource::none;CopyDestination destination=CopyDestination::none;
+            std::size_t sourceOffset=0,destinationOffset=0,writeOffset=0,stored=0;
+            std::optional<std::size_t> resultOffset;
+            std::uint32_t frameBytes=0,nestedCopyCallPC=0,nestedCopyReturnPC=0;
+            std::uint8_t saveMask=0,restoreMask=0;
+            bool stackReleased=false,nestedCopyReturned=false;
+        };
+        bool attempted=false;WaterPoolNameRefusal refusal=WaterPoolNameRefusal::none;
+        std::uint32_t pc=0;
+        const NativeWaterArrayElementRole* wholeRoleIdentity=nullptr;
+        const g::OriginalWreckComponent50LA* canonicalEntityIdentity=nullptr;
+        const void* sourcePathIdentity=nullptr;
+        std::optional<std::uint64_t> session,key;
+        std::size_t countedAtEntry=0;std::uint64_t referenceAtEntry=0;
+        bool enrolledAtEntry=false,wholeArgument=false,pathArgument=false,loaderCallIssued=false;
+        std::optional<std::uint32_t> argumentA2,argumentA3,callerPathOffset,loaderCallerReturnPC;
+        bool loaderFrame=false,wholeInS0=false,pathInS1=false,flagInS4=false;
+        std::uint32_t loaderFrameBytes=0;std::uint8_t loaderSaveMask=0,loaderRestoreMask=0;
+        bool loaderStackReleased=false,loaderReturned=false;
+        bool entityIdentityCallIssued=false,entityIdentityReturned=false;
+        std::optional<std::uint32_t> entityArgumentOffset,entityResultOffset,entityIdentityReturnPC,scratchOffset;
+        Copy initialCopy,extensionCopy,nameCopy;
+        std::optional<std::size_t> initialLength,normalizedLength;
+        std::array<std::uint8_t,256> scratch60; //Only [0,scratchKnown) may be read.
+        std::size_t scratchKnown=0,lowerCalls=0,lowerReturns=0,lowerStores=0;
+        std::uint32_t lowerReadPC=0;bool lowerTerminatorRead=false;
+        std::optional<std::uint8_t> stoppedLowerInput;
+        bool dotCallIssued=false,dotReturned=false;
+        std::optional<std::uint32_t> dotArgument,dotReturnPC;
+        std::optional<std::size_t> lastDot;
+        bool normalized=false;
+        std::optional<std::size_t> extensionDestinationOffset,nameDestinationOffset;
+        std::optional<std::uint32_t> atWord;
+        std::optional<std::uint64_t> v0Register;
+    } nativeWaterPoolName;
+    //One-shot descendant of the immutable name receipt. This is a pending
+    //loader-local/file interval, never a Resource or completed Pool loader.
+    struct NativeWaterPoolResource {
+        struct ServiceLoad {
+            bool attempted=false,resolved=false;std::uint32_t pc=0;
+            const original_main_entry50KG::Application* applicationIdentity=nullptr;
+            const a::OriginalStandardMaterialDomain50LA* domainIdentity=nullptr;
+            const a::OriginalStandardTextureResolver50LA* resolverIdentity=nullptr;
+            const a::OriginalStandardArchiveProvider50LA* providerIdentity=nullptr;
+            const a::OriginalRaTrackSourceFile50LA* trackIdentity=nullptr;
+            const void* trackMountIdentity=nullptr;
+            std::size_t trackMount=static_cast<std::size_t>(-1);std::uint64_t trackGeneration=0;
+        } load2BB044,load2BB0CC,load2BB10C;
+        bool attempted=false;WaterPoolResourceStop stop=WaterPoolResourceStop::none;
+        std::uint32_t pc=0;
+        const NativeWaterArrayElementRole* wholeRoleIdentity=nullptr;
+        const g::OriginalWreckComponent50LA* canonicalEntityIdentity=nullptr;
+        const NativeWaterPoolName* loaderFrameIdentity=nullptr;
+        std::optional<std::uint64_t> session,key;
+        std::string exactName;bool namePrepared=false;
+        bool handleInitialized=false,associationInitialized=false,lookupCallIssued=false,lookupReturned=false;
+        std::optional<std::uint32_t> nameOffset,modeLiteral,handleOffset,associationOffset,lookupT1;
+        std::optional<std::int64_t> sourceHandle1E0;
+        std::optional<const void*> sourceAssociated1E8;
+        std::optional<std::int32_t> lookupV0;
+        bool handleOutputStored=false,associationOutputStored=false,coldBranch=false;
+        bool readCallIssued=false,readNativeReturned=false,readResultAdmitted=false;
+        std::optional<std::int64_t> readHandle;
+        std::optional<std::uint32_t> versionOffset,itemSize,itemCount;
+        bool versionLoaded=false,versionBranchExecuted=false;
+        std::optional<std::uint32_t> versionWord,allocationArgument;
+        std::optional<bool> versionTwo,closeHandleIsMinusOne;
+        bool closeCallIssued=false,closeSourceReturned=false;
+        a::OriginalStandardTextureDiagnostic50LA diagnostic{},nativeWithdrawalDiagnostic{};
+        bool nativeWithdrawalAttempted=false,nativeWithdrawn=false;
+        //Retain even a refused partial open/read and retain its history after
+        //close. Historical retained objects do not keep the logical pin live.
+        std::shared_ptr<a::OriginalWaterPoolSourceFile50LA> file;
+    } nativeWaterPoolResource;
+    //Independent descendant. The accepted file pc2BB12C and version read
+    //remain fixed; this allocator has its own original3059EC frontier.
+    struct NativeWaterPoolData {
+        struct Allocation {
+            bool attempted=false,callIssued=false;std::uint32_t pc=0;
+            std::optional<std::uint32_t> requestedBytes,effectiveBytes,callerReturnPC;
+            std::optional<std::uint64_t> argumentA0,effectiveArgument;
+            bool operatorFrame=false,operatorFramePointer=false,nonzeroBranch=false,mallocFrame=false;
+            std::uint8_t operatorSaveMask=0,mallocSaveMask=0,allocatorSaveMask=0;
+            enum class ReentStop {none,unknown,unsupportedIdentity};
+            ReentStop reentStop=ReentStop::none;
+            std::optional<a::OriginalConfigProcessGlobals50LA::StdioIdentity> reent;
+            bool allocatorFrame=false,reentCopied=false,lockCalled=false,lockReturned=false;
+            std::optional<std::uint32_t> sumWord,normalizedChunk,arenaBase,arenaReadOffset,arenaReadAddress;
+            std::optional<std::uint64_t> sumRegister,normalizedRegister;
+            std::optional<bool> minimumChunk,smallBin;
+        } allocator;
+        bool attempted=false;WaterPoolDataStop stop=WaterPoolDataStop::none;
+        std::uint32_t pc=0;
+        const NativeWaterArrayElementRole* poolRoleIdentity=nullptr;
+        const g::OriginalWreckComponent50LA* poolEntityIdentity=nullptr;
+        const a::OriginalWaterPoolSourceFile50LA* fileIdentity=nullptr;
+        const NativeWaterPoolDataRole* dataRoleIdentity=nullptr; //Historical after retirement.
+        std::optional<std::uint64_t> poolEpoch,dataEpoch;
+        std::optional<a::OriginalConfigProcessGlobals50LA::StdioIdentity> nativeAdmissionReent;
+        bool ownerAttempted=false,ownerPrepared=false,payloadAttempted=false,temporaryOwnerRetired=false;
+        bool nativeAllocated=false,nativeRetired=false,aliasRevoked=false,referenceRetired=false;
+        bool callerEntered=false,nonnullBranch=false,baseCallIssued=false,baseDispatchStored=false,
+            referenceAcquired=false,baseReturned=false,wholeSelected=false,aliasStored=false,aliasReloaded=false;
+        std::uint8_t derivedStores=0;
+        std::optional<std::uint32_t> baseReturnPC,resourceArgumentOffset,aliasOffset;
+        std::optional<std::int64_t> savedHandleS3;
+        NativeWaterPoolResource::ServiceLoad load2BB18C;
+        bool callerReadIssued=false,callerReadDelay=false,readResultAdmitted=false;
+        std::optional<std::uint32_t> destinationOffset,itemSize,itemCount;
+        std::array<std::uint8_t,4> countBytes{}; //Source-known only after constructor.
+        std::size_t copiedCountBytes=0;
+        bool countLoaded=false,countBranchExecuted=false,countBranchDelay=false;
+        std::optional<std::uint32_t> countWord;
+        std::optional<std::int64_t> signedCount; //Exact LW signed32 projection, no cast overflow.
+        std::optional<bool> nonpositive;
+        bool childPointerZeroRestored=false,topologyAliasReloaded=false,topologyHandleReloaded=false;
+        a::OriginalStandardTextureDiagnostic50LA diagnostic{};
+    } nativeWaterPoolData;
+    //One shot from the positive count boundary. Neither allocator receipt is
+    //rewritten when its independent native success backing advances or retires.
+    struct NativeWaterPoolMaterial {
+        struct RawAllocation {
+            enum class ReentStop {none,unknown,unsupportedIdentity};
+            bool attempted=false,callIssued=false,shiftDelay=false,mallocFrame=false;
+            std::uint32_t pc=0;std::uint8_t mallocSaveMask=0,allocatorSaveMask=0;
+            std::optional<std::uint32_t> requestedBytes,callerReturnPC,sumWord,normalizedChunk,
+                arenaBase,arenaReadOffset,arenaReadAddress,binScale,binIndex,binSelectionPC;
+            std::optional<std::uint64_t> argumentA0,sumRegister,normalizedRegister;
+            std::optional<bool> minimumChunk,smallBin;
+            ReentStop reentStop=ReentStop::none;
+            std::optional<a::OriginalConfigProcessGlobals50LA::StdioIdentity> reent;
+            bool argumentCopied=false,allocatorFrame=false,reentCopied=false,lockCalled=false,lockReturned=false;
+            bool largeBranchIssued=false;std::optional<std::uint32_t> pendingDelayPC,pendingTargetPC;
+        } raw;
+        NativeWaterPoolData::Allocation child; //Separate scalar-new occurrence, not the raw malloc wrapper.
+        struct Store {
+            std::uint32_t pc=0,offset=0,width=0;std::uint64_t word=0;std::uint8_t mask=0;
+        };
+        struct EmptyCopy {
+            bool callIssued=false,allAlignmentsProved=false,returned=false;
+            std::uint32_t callPC=0,delayPC=0,helperEntry=0,literal=0,destinationOffset=0,returnPC=0;
+            std::uint32_t storedBytes=0; //One byte only; no chosen guest alignment.
+        } constructorCopy,setupCopy;
+        bool attempted=false;WaterPoolMaterialStop stop=WaterPoolMaterialStop::none;
+        std::uint32_t pc=0;
+        const NativeWaterPoolDataRole* dataRoleIdentity=nullptr;
+        const a::OriginalWaterPoolSourceFile50LA* fileIdentity=nullptr;
+        const NativeWaterPoolMaterialArrayRole* arrayRoleIdentity=nullptr;
+        const NativeWaterPoolMaterialRole* childRoleIdentity=nullptr;
+        const g::OriginalWreckComponent50LA* entityIdentity=nullptr;
+        const original_main_entry50KG::Application* applicationIdentity=nullptr;
+        std::optional<std::uint32_t> originalCount;
+        std::optional<std::uint64_t> dataEpoch,arrayEpoch,childEpoch,session,key;
+        std::optional<a::OriginalConfigProcessGlobals50LA::StdioIdentity> rawAdmissionReent,childAdmissionReent;
+        bool rawOwnerAttempted=false,rawOwnerPrepared=false,slotsAttempted=false,slotsPrepared=false,
+            rawPayloadAttempted=false,rawTemporaryRetired=false,rawAllocated=false,rawRetired=false,
+            arrayAliasStored=false,arrayAliasRevoked=false;
+        bool loopBranchIssued=false,ordinalZeroed=false,countReloaded=false,loopCompared=false,
+            loopTaken=false,loopDelay=false;
+        std::optional<std::uint32_t> ordinal;
+        bool childOwnerAttempted=false,childOwnerPrepared=false,childPayloadAttempted=false,
+            childTemporaryRetired=false,childAllocated=false,childRetired=false;
+        bool constructorAdmitted=false,callerNonnull=false,constructorCallIssued=false,constructorDelay=false,
+            materialFrame=false,materialWholeSaved=false,entityCallIssued=false,entityDelay=false,entityFrame=false,
+            referenceCallIssued=false,referenceReturned=false,referenceAcquired=false,countAcquired=false,
+            enrolled=false,entityReturned=false,constructorReturned=false,constructorStackReleased=false;
+        std::uint8_t materialSaveMask=0,materialRestoreMask=0,entitySaveMask=0,entityRestoreMask=0;
+        std::optional<std::uint32_t> constructorA1,entityOffset,countBefore,constructorReturnPC;
+        std::array<Store,39> stores{};std::size_t storesWritten=0;
+        bool slotStored=false,slotRevoked=false,viewsRetired=false,authorityRetired=false,referenceRetired=false,countRetired=false;
+        bool setupSlotReloaded=false,setupCallIssued=false,setupDelay=false,setupFrame=false,setupIdentityCalled=false,
+            setupIdentityReturned=false,setupReturned=false,setupStackReleased=false;
+        std::uint8_t setupSaveMask=0,setupRestoreMask=0;
+        std::optional<std::uint32_t> setupArgument,setupReturnPC;
+        bool readerSlotReloaded=false,readerCallIssued=false,readerDelay=false,readerFrame=false,
+            readerWholeSelected=false,readerFlagPreserved=false;
+        std::uint8_t readerSaveMask=0;
+        std::optional<std::int64_t> readerHandle;
+        std::optional<std::uint32_t> readerFlag,readerReturnPC,destinationOffset,itemSize,itemCount;
+        NativeWaterPoolResource::ServiceLoad load2BF71C;
+        //Reader continuation belongs to the separate descendant below.
+    } nativeWaterPoolMaterial;
+    struct NativeWaterPoolMaterialReader {
+        struct Read {
+            bool reached=false,firstLoadRevalidated=false,argumentsInherited=false,
+                argumentsPrepared=false,prefixSynchronized=false;
+            //Read0 owns NO new source load. Its predecessor's2BF71C remains immutable.
+            NativeWaterPoolResource::ServiceLoad freshLoad;
+            std::uint32_t luiPC=0,destinationPC=0,sizePC=0,countPC=0;
+            std::uint32_t destinationOffset=0,itemSize=0,itemCount=0;
+            std::size_t copied=0;
+        };
+        bool attempted=false,filePrepared=false;
+        WaterPoolMaterialReaderStop stop=WaterPoolMaterialReaderStop::none;
+        std::uint32_t pc=0;
+        const a::OriginalWaterPoolSourceFile50LA* fileIdentity=nullptr;
+        const NativeWaterPoolDataRole* dataRoleIdentity=nullptr;
+        const NativeWaterPoolMaterialArrayRole* arrayRoleIdentity=nullptr;
+        const NativeWaterPoolMaterialRole* materialRoleIdentity=nullptr;
+        const g::OriginalWreckComponent50LA* entityIdentity=nullptr;
+        std::uint64_t dataEpoch=0,arrayEpoch=0,materialEpoch=0;
+        std::array<Read,18> reads;
+        bool word80Loaded=false,branch918=false,delay91C=false,branch920=false,delay924=false;
+        std::optional<std::uint32_t> word80;
+        std::optional<std::uint64_t> signedWord80;
+        std::optional<bool> zero80,zeroFlag;
+        bool selectorLoaded=false,rangeCompared=false,rangeBranch=false,rangeDelay=false;
+        std::optional<std::uint16_t> selector;
+        std::optional<bool> inRange;
+        bool tableBaseFormed=false,selectorShifted=false,tableAddressFormed=false,tableLoaded=false,
+            dispatchIssued=false,dispatchDelay=false;
+        std::optional<std::uint32_t> tableBase,tableAddress,tableTarget;
+        std::uint32_t caseSetPC=0,caseBranchPC=0,caseDelayPC=0,caseBranchTarget=0;
+        bool caseFallthrough=false;
+        std::optional<NativeWaterPoolMaterial::Store> b4Store;
+        std::array<std::uint32_t,4> restorePCs{};
+        bool returnIssued=false,returnDelay=false,frameReleased=false,returned=false;
+        std::uint32_t returnPC=0,returnDelayPC=0,releasedBytes=0,callerPC=0;
+        std::optional<std::int32_t> returnV0;
+        a::OriginalStandardTextureDiagnostic50LA diagnostic{};
+    } nativeWaterPoolMaterialReader;
+    //A descendant of either the returned first reader or the nonpositive
+    //Data-count branch. No allocator, Entity, reference or storage is owned.
+    struct NativeWaterPoolTopologyCount {
+        struct Save {
+            enum class Meaning {none,returnAddress,handle,dataRole,poolRole,ordinal};
+            std::uint32_t pc=0,offset=0;Meaning meaning=Meaning::none;
+            const void* roleIdentity=nullptr;
+            std::optional<std::uint64_t> low64; //Never fabricates upper SQ lanes or guest pointer bits.
+        };
+        bool attempted=false;WaterPoolTopologyEntry entry=WaterPoolTopologyEntry::none;
+        WaterPoolTopologyStop stop=WaterPoolTopologyStop::none;std::uint32_t pc=0;
+        const NativeWaterArrayElementRole* poolRoleIdentity=nullptr;
+        const NativeWaterPoolDataRole* dataRoleIdentity=nullptr;
+        const a::OriginalWaterPoolSourceFile50LA* fileIdentity=nullptr;
+        const NativeWaterPoolName* loaderFrameIdentity=nullptr;
+        std::uint64_t poolEpoch=0,dataEpoch=0;
+        bool ordinalIncremented=false,ordinalNop=false,countLoaded=false,
+            compared=false,loopBranch=false,loopDelay=false,exitBranch=false,aliasLoaded=false,handleReloaded=false;
+        std::optional<std::uint32_t> ordinal,countWord,countLoadOffset,aliasLoadPC;
+        std::uint32_t countLoadPC=0;
+        std::optional<std::int64_t> signedCount;
+        std::optional<std::uint64_t> countRegister;
+        std::optional<bool> loopTaken;
+        std::array<std::uint8_t,4> currentCountBytes{},currentCountMask{};
+        const NativeWaterPoolDataRole* argumentData=nullptr;
+        std::optional<std::int64_t> argumentHandle;
+        bool callIssued=false,callDelay=false,frame=false,wholeSelected=false;
+        std::uint32_t callPC=0,delayPC=0,entryPC=0,callerReturnPC=0,frameBytes=0;
+        std::optional<std::uint32_t> flag;
+        std::array<Save,5> saves{};
+        std::uint32_t serviceLuiPC=0;
+        NativeWaterPoolResource::ServiceLoad load2BAB30;
+        bool argumentsPrepared=false,prefixSynchronized=false,readResultAdmitted=false;
+        std::uint32_t destinationOffset=0,itemSize=0,itemCount=0;
+        std::array<std::uint8_t,4> topologyBytes{};
+        std::size_t copied=0;
+        bool topologyLoaded=false,shifted=false,added=false;
+        std::uint32_t topologyLoadPC=0,shiftPC=0,sumPC=0;
+        std::optional<std::uint32_t> topologyWord,shiftWord,sumWord;
+        std::optional<std::int64_t> signedTopology;
+        std::optional<std::uint64_t> topologyRegister,shiftRegister,sumRegister;
+        //This is descriptive math for an UNISSUED delay, not argumentA0.
+        std::optional<std::uint32_t> prospectiveRequestWord;
+        std::uint32_t pendingCallPC=0,pendingDelayPC=0;
+        a::OriginalStandardTextureDiagnostic50LA diagnostic{};
+    } nativeWaterPoolTopologyCount;
 } sourceWaterConfig_;
 std::unique_ptr<a::OriginalWaterSourceConfig50LA> sourceWaterConfigOwner_;
 bool continueSourceWaterConfig2B9314(std::uint32_t&)noexcept;
 bool preflightSourceWaterConfigNative()const noexcept;
 bool withdrawSourceWaterConfigNative()noexcept;
+bool continueSourceWaterGetters2B9370(std::uint32_t&)noexcept;
+bool preflightSourceWaterGettersNative()const noexcept;
+bool continueSourceWaterOpacity2B93D8(std::uint32_t&)noexcept;
+bool preflightSourceWaterOpacityNative()const noexcept;
+bool continueSourceWaterScalarTail2B9428(std::uint32_t&)noexcept;
+bool preflightSourceWaterScalarTailNative()const noexcept;
+bool continueSourceWaterColors2B9528(std::uint32_t&)noexcept;
+bool preflightSourceWaterColorsNative()const noexcept;
+bool continueSourceWaterFlags2B9670(std::uint32_t&)noexcept;
+bool preflightSourceWaterFlagsNative()const noexcept;
+bool continueSourceWaterShader2B9714(std::uint32_t&)noexcept;
+bool preflightSourceWaterShaderNative()const noexcept;
+bool continueSourceWaterAlpha2B9768(std::uint32_t&)noexcept;
+bool preflightSourceWaterAlphaNative()const noexcept;
+bool continueSourceWaterWake157D00(std::uint32_t&)noexcept;
+bool preflightSourceWaterWakeNative()const noexcept;
+bool preflightNativeWakeGetters()const noexcept;
+bool preflightNativeWakePacked()const noexcept;
+bool preflightNativeWakeScale()const noexcept;
+bool preflightNativeWaterArrayPrefix()const noexcept;
+bool preflightNativeWaterAllocationEntry()const noexcept;
+bool preflightNativeWaterArrayBacking()const noexcept;
+bool preflightNativeWaterArrayCaller()const noexcept;
+bool preflightNativeWaterZoneElements()const noexcept;
+bool preflightNativeWaterArrayFormat()const noexcept;
+bool preflightNativeWaterArraySelection()const noexcept;
+bool preflightNativeWaterArrayRetirement()const noexcept;
+bool preflightNativeWaterArrayLoad()const noexcept;
+bool preflightNativeWaterArrayFilename()const noexcept;
+bool preflightNativeWaterArrayScalars()const noexcept;
+bool preflightNativeWaterPoolPathFormat()const noexcept;
+bool preflightNativeWaterPoolAllocationEntry()const noexcept;
+bool sourceWaterPoolCountedNative(std::size_t&)const noexcept; //Local only: never calls combined count floor.
+bool preflightNativeWaterPoolSceneHistory()const noexcept; //Historical receipts, no shared-registry read.
+bool preflightNativeWaterPoolNameHistory()const noexcept; //Historical bytes only, never current ctype state.
+bool preflightNativeWaterPoolResourceHistory()const noexcept;
+bool preflightNativeWaterPoolDataHistory()const noexcept; //History and exact live resource, no count recursion.
+bool preflightNativeWaterPoolTopologyHistory(std::array<std::uint8_t,4>& bytes)const noexcept;
+//Topology history is a value/opaque-identity leaf, including after retirement.
+bool withdrawNativeWaterPoolData()noexcept; //After file cancellation, before Pool Entity retirement.
+bool sourceWaterPoolMaterialCountedNative(std::size_t&)const noexcept; //Local0/1 only; no combined-floor recursion.
+bool preflightNativeWaterPoolMaterialReaderHistory(std::array<std::uint8_t,0xd8>& masks,
+    std::array<std::uint8_t,0xd8>& bits)const noexcept; //No material/Pool/provider/floor callback; safe after retirement.
+bool withdrawNativeWaterPoolMaterial()noexcept; //First child, raw array, then existing Data withdrawal.
+bool waterPoolFileServiceCurrentNative()const noexcept; //Identity only, no shared table/search read.
+bool preflightNativeWaterPoolFileWithdrawal()const noexcept; //Exact live close/pin preflight, no count recursion.
+bool withdrawSourceWaterPoolNative()noexcept;
+bool waterPoolInvocationCurrentNative()const noexcept;
 
 //Distinct source3F8 custody. No prepared NativeSkyArray3F8 or image fixture.
 //Pointer slots are unknown until their actual source stores; only published slots may be read.
@@ -2427,6 +3171,282 @@ bool abortSourceWorldBuoysNative(std::uint32_t&)noexcept;
     }
 #include "original_source_world_physics_model_primary50la.inl"
 public:
+    //Explicit opt-in only. No normal source continuation calls this adapter.
+    //The result concerns native backing, never original heap/free completion.
+    enum class WaterBackingRetirementMode {nativeSuccessBackingOnly};
+    struct WaterBackingRetirementResult {
+        enum class Status {refused,alreadyAttempted,nativeAdmissionStopped,nativeRetired};
+        Status status=Status::refused;
+        bool dataRetired=false,tableRetired=false;
+        std::uint32_t originalSourceStop=0;
+        std::optional<std::uint32_t> adaptedResumePC;
+    };
+    WaterBackingRetirementResult retireWaterBackingNativeOnly(WaterBackingRetirementMode)noexcept;
+    enum class WaterWakeLoadMode {nativeRetiredBackingOnly};
+    struct WaterWakeLoadResult {
+        enum class Status {refused,alreadyAttempted,nativeAdmissionStopped,nativeLoaded};
+        Status status=Status::refused;
+        std::uint32_t originalSourceStop=0;
+        std::optional<std::uint32_t> adaptedPC;
+        bool nativeLoaded=false;
+    };
+    WaterWakeLoadResult loadWakeFrothNativeOnly(WaterWakeLoadMode)noexcept;
+    struct WaterWakeSettingsResult {
+        enum class Status {refused,alreadyAttempted,nativeAdmissionStopped,nativeCompleted};
+        Status status=Status::refused;
+        std::uint32_t originalSourceStop=0;
+        std::optional<std::uint32_t> adaptedPC;
+        std::size_t completed=0;
+    };
+    WaterWakeSettingsResult readWakeSettingsNativeOnly(WaterWakeLoadMode)noexcept;
+    struct WaterWakePackedResult {
+        enum class Status {refused,alreadyAttempted,nativeAdmissionStopped,nativeStored};
+        Status status=Status::refused;
+        std::uint32_t originalSourceStop=0;
+        std::optional<std::uint32_t> adaptedPC;
+        bool stored=false;
+    };
+    WaterWakePackedResult packWakeStateNativeOnly(WaterWakeLoadMode)noexcept;
+    struct WaterWakeScaleResult {
+        enum class Status {refused,alreadyAttempted,nativeAdmissionStopped,nativeContinued};
+        Status status=Status::refused;
+        std::uint32_t originalSourceStop=0;
+        std::optional<std::uint32_t> adaptedPC;
+        bool stored=false;
+        std::optional<bool> skippedSignatureWaves;
+    };
+    WaterWakeScaleResult scaleWakeRangeNativeOnly(WaterWakeLoadMode)noexcept;
+    struct WaterArrayPrefixResult {
+        enum class Status {refused,alreadyAttempted,nativeAdmissionStopped,nativeContinued};
+        Status status=Status::refused;
+        std::uint32_t originalSourceStop=0;
+        std::optional<std::uint32_t> adaptedPC,requestedBytes;
+        std::optional<bool> signatureArm,skippedPools;
+        bool callIssued=false; //Call and delay reached; callee body/return are still unjoined.
+    };
+    WaterArrayPrefixResult prepareWaterArraysNativeOnly(WaterWakeLoadMode)noexcept;
+    struct WaterAllocationEntryResult {
+        enum class Status {refused,alreadyAttempted,nativeAdmissionStopped,arenaBoundary};
+        Status status=Status::refused;
+        std::uint32_t originalSourceStop=0;
+        std::optional<std::uint32_t> adaptedPC,requestedBytes,effectiveBytes,arenaReadOffset,pendingBranchTarget;
+        bool zones=false;
+    };
+    WaterAllocationEntryResult enterWaterAllocationNativeOnly(WaterWakeLoadMode)noexcept;
+    enum class WaterArrayBackingMode {nativeSuccessBackingOnly};
+    struct WaterArrayBackingResult {
+        enum class Status {refused,alreadyAttempted,nativeAdmissionStopped,nativeAllocated};
+        Status status=Status::refused;
+        WaterArrayBackingRefusal refusal=WaterArrayBackingRefusal::none;
+        std::uint32_t originalSourceStop=0;
+        std::optional<std::uint32_t> allocatorStop,nativeResumePC,requestedBytes,effectiveBytes;
+        bool nativeAllocated=false;
+    };
+    WaterArrayBackingResult allocateWaterArrayBackingNativeOnly(WaterArrayBackingMode)noexcept;
+    struct WaterArrayCallerResult {
+        enum class Status {refused,alreadyAttempted,nativeAdmissionStopped,nativeContinued};
+        Status status=Status::refused;
+        std::uint32_t originalSourceStop=0;
+        std::optional<std::uint32_t> allocatorStop,adaptedPC;
+        bool pointerPublished=false,formatCallIssued=false,constructorCallIssued=false,wrapperReturned=false;
+    };
+    WaterArrayCallerResult resumeWaterArrayCallerNativeOnly(WaterArrayBackingMode)noexcept;
+    struct WaterZoneElementsResult {
+        enum class Status {refused,alreadyAttempted,nativeCompleted};
+        Status status=Status::refused;
+        std::uint32_t originalSourceStop=0,completed=0;
+        std::optional<std::uint32_t> allocatorStop,adaptedPC;
+        bool d0Published=false;
+    };
+    WaterZoneElementsResult constructWaterZoneElementsNativeOnly(WaterArrayBackingMode)noexcept;
+    struct WaterArrayFormatResult {
+        enum class Status {refused,alreadyAttempted,nativeAdmissionStopped,nativeSelectionEntry};
+        Status status=Status::refused;
+        std::uint32_t originalSourceStop=0;
+        std::optional<std::uint32_t> allocatorStop,adaptedPC,formatterReturn;
+        std::size_t knownOutputBytes=0;
+        bool selectionCallIssued=false;
+    };
+    WaterArrayFormatResult formatWaterArraySectionNativeOnly(WaterArrayBackingMode)noexcept;
+    struct WaterArraySelectionResult {
+        enum class Status {refused,alreadyAttempted,nativeAdmissionStopped,nativeHeapMetadataBoundary,nativeMissingReturn};
+        Status status=Status::refused;
+        std::uint32_t originalSourceStop=0;
+        std::optional<std::uint32_t> allocatorStop,adaptedPC;
+        std::optional<std::int32_t> index;
+        std::optional<bool> selectionReturn;
+        bool currentWakeRetained=false;
+    };
+    WaterArraySelectionResult selectWaterArraySectionNativeOnly(WaterArrayBackingMode)noexcept;
+    struct WaterArrayRetirementResult {
+        enum class Status {refused,alreadyAttempted,nativeAdmissionStopped,nativeRetired};
+        Status status=Status::refused;
+        std::uint32_t originalSourceStop=0;
+        std::optional<std::uint32_t> allocatorStop,selectionStop,adaptedResumePC;
+        bool dataRetired=false,tableRetired=false,countCleared=false,childCleared=false;
+    };
+    WaterArrayRetirementResult retireWaterArraySectionNativeOnly(WaterArrayBackingMode)noexcept;
+    struct WaterArrayLoadResult {
+        enum class Status {refused,alreadyAttempted,nativeAdmissionStopped,nativeCompleted};
+        Status status=Status::refused;
+        std::uint32_t originalSourceStop=0;
+        std::optional<std::uint32_t> allocatorStop,selectionStop,adaptedPC,nameLength;
+        std::optional<bool> nativeSelectionValue;
+        std::uint32_t counted=0,stored=0;
+    };
+    WaterArrayLoadResult loadWaterArraySectionNativeOnly(WaterArrayBackingMode)noexcept;
+    struct WaterArrayFilenameResult {
+        enum class Status {refused,alreadyAttempted,nativeAdmissionStopped,nativeCompleted};
+        Status status=Status::refused;
+        std::uint32_t originalSourceStop=0;
+        std::optional<std::uint32_t> allocatorStop,selectionStop,adaptedPC;
+        std::optional<bool> nativeGetterValue;
+        std::size_t knownOutputBytes=0;
+    };
+    WaterArrayFilenameResult readWaterArrayFilenameNativeOnly(WaterArrayBackingMode)noexcept;
+    struct WaterArrayScalarsResult {
+        enum class Status {refused,alreadyAttempted,nativeAdmissionStopped,nativeCompleted};
+        Status status=Status::refused;
+        std::uint32_t originalSourceStop=0;
+        std::optional<std::uint32_t> allocatorStop,selectionStop,adaptedPC;
+        std::optional<bool> signature;
+        std::size_t completed=0;
+    };
+    WaterArrayScalarsResult readWaterArrayScalarsNativeOnly(WaterArrayBackingMode)noexcept;
+    struct WaterPoolPathFormatResult {
+        enum class Status {refused,alreadyAttempted,nativeAdmissionStopped,nativeCallerBoundary};
+        Status status=Status::refused;
+        std::uint32_t originalSourceStop=0;
+        std::optional<std::uint32_t> allocatorStop,selectionStop,scalarStop,adaptedPC,formatterReturn;
+        std::size_t completedStrings=0,knownOutputBytes=0;
+    };
+    WaterPoolPathFormatResult formatWaterPoolPathNativeOnly(WaterArrayBackingMode)noexcept;
+    struct WaterPoolAllocationEntryResult {
+        enum class Status {refused,alreadyAttempted,nativeAdmissionStopped,arenaBoundary};
+        Status status=Status::refused;
+        std::uint32_t originalSourceStop=0;
+        std::optional<std::uint32_t> priorArrayAllocatorStop,selectionStop,formatterStop,adaptedPC;
+        std::optional<std::uint32_t> requestedBytes,normalizedChunk,pendingArenaReadAddress;
+    };
+    WaterPoolAllocationEntryResult enterWaterPoolAllocationNativeOnly(WaterArrayBackingMode)noexcept;
+    struct WaterPoolBackingResult {
+        enum class Status {refused,alreadyAttempted,nativeAdmissionStopped,nativeConstructorBoundary};
+        Status status=Status::refused;
+        WaterPoolBackingRefusal refusal=WaterPoolBackingRefusal::none;
+        std::uint32_t originalSourceStop=0,allocatorStop=0,formatterStop=0,adaptedPC=0;
+        std::optional<std::uint32_t> requestedBytes,effectiveBytes;
+        bool nativeAllocated=false,nativeRetired=false;
+    };
+    WaterPoolBackingResult allocateWaterPoolBackingNativeOnly(WaterArrayBackingMode)noexcept;
+    struct WaterPoolEntityResult {
+        enum class Status {refused,alreadyAttempted,nativeAdmissionStopped,nativeEntityBoundary};
+        Status status=Status::refused;
+        WaterPoolEntityRefusal refusal=WaterPoolEntityRefusal::none;
+        std::uint32_t originalSourceStop=0,allocatorStop=0,callerStop=0,adaptedPC=0;
+        bool referenceAcquired=false,countAcquired=false,enrolled=false,entityReturned=false,nativeRetired=false;
+    };
+    WaterPoolEntityResult constructWaterPoolEntityNativeOnly(WaterArrayBackingMode)noexcept;
+    struct WaterPoolSceneResult {
+        enum class Status {refused,alreadyAttempted,nativeRegistryStopped,nativePoolReturnBoundary};
+        Status status=Status::refused;
+        std::uint32_t originalSourceStop=0,allocatorStop=0,formatterStop=0,entityPrefixStop=0,adaptedPC=0;
+        bool registryCallIssued=false,registryReturned=false,sceneReturned=false,poolReturned=false,nativeRetired=false;
+        std::optional<g::OriginalEntityTypeRegistry50LA::Status> registryStatus;
+        std::uint32_t registrySourcePC=0;
+        std::optional<std::uint32_t> registryCountBefore,registryCountAfter,sceneReturnPC,poolReturnPC;
+        std::optional<std::uint8_t> returnedType;
+    };
+    WaterPoolSceneResult constructWaterPoolSceneNativeOnly(WaterArrayBackingMode)noexcept;
+    struct WaterPoolNameResult {
+        enum class Status {refused,alreadyAttempted,nativeAdmissionStopped,nativeResourceBoundary};
+        Status status=Status::refused;WaterPoolNameRefusal refusal=WaterPoolNameRefusal::none;
+        std::uint32_t originalSourceStop=0,allocatorStop=0,formatterStop=0,entityPrefixStop=0,sceneStop=0,adaptedPC=0;
+        std::size_t scratchKnown=0,lowerCalls=0,lowerStores=0,nameBytesWritten=0;
+        std::optional<std::size_t> initialLength,normalizedLength,lastDot;
+        bool normalized=false,nameCopied=false,nativeRetired=false;
+    };
+    WaterPoolNameResult constructWaterPoolNameNativeOnly(WaterArrayBackingMode)noexcept;
+    struct WaterPoolResourceResult {
+        enum class Status {refused,alreadyAttempted,nativeStopped,sourceBoundary};
+        Status status=Status::refused;WaterPoolResourceStop stop=WaterPoolResourceStop::none;
+        std::uint32_t originalSourceStop=0,allocatorStop=0,formatterStop=0,entityPrefixStop=0,
+            sceneStop=0,nameStop=0,adaptedPC=0;
+        std::optional<std::int32_t> lookupV0,readSourceItems,sourceCloseV0;
+        std::optional<std::int64_t> sourceHandle1E0;
+        std::optional<std::uint32_t> versionWord;
+        std::array<std::optional<std::uint8_t>,4> versionBytes{};
+        std::size_t copiedVersionBytes=0;
+        bool lookupReturned=false,readNativeReturned=false,readResultAdmitted=false,sourceCloseReturned=false,
+            nativeHandlePresent=false,nativeFileWithdrawn=false,nativePoolRetired=false;
+        a::OriginalStandardTextureDiagnostic50LA diagnostic{};
+    };
+    WaterPoolResourceResult acquireWaterPoolResourceNativeOnly(WaterArrayBackingMode)noexcept;
+    struct WaterPoolDataResult {
+        enum class Status {refused,alreadyAttempted,nativeStopped,sourceBoundary};
+        Status status=Status::refused;WaterPoolDataStop stop=WaterPoolDataStop::none;
+        std::uint32_t originalSourceStop=0,priorPoolAllocatorStop=0,fileStop=0,allocatorStop=0,adaptedPC=0;
+        std::optional<std::uint32_t> requestedBytes,normalizedChunk,pendingArenaAddress,countWord;
+        std::optional<std::int64_t> signedCount;
+        std::optional<std::int32_t> readSourceItems;
+        std::array<std::optional<std::uint8_t>,4> countBytes{};
+        std::size_t copiedCountBytes=0;
+        bool nativeAllocated=false,referenceAcquired=false,aliasStored=false,readAttempted=false,
+            readNativeReturned=false,readResultAdmitted=false,nativeRetired=false,aliasRevoked=false;
+        a::OriginalStandardTextureDiagnostic50LA diagnostic{};
+    };
+    WaterPoolDataResult constructWaterPoolDataNativeOnly(WaterArrayBackingMode)noexcept;
+    struct WaterPoolMaterialResult {
+        enum class Status {refused,alreadyAttempted,nativeStopped,sourceBoundary};
+        Status status=Status::refused;WaterPoolMaterialStop stop=WaterPoolMaterialStop::none;
+        std::uint32_t originalSourceStop=0,dataStop=0,rawAllocatorStop=0,childAllocatorStop=0,adaptedPC=0;
+        std::optional<std::uint32_t> countWord,rawRequestedBytes,rawNormalizedChunk,rawPendingArenaAddress,
+            rawPendingDelayPC,rawPendingTargetPC,childPendingArenaAddress;
+        std::optional<std::uint64_t> rawArgumentA0;
+        bool rawAllocated=false,arrayAliasStored=false,childAllocated=false,referenceAcquired=false,
+            countAcquired=false,constructorReturned=false,slotStored=false,setupReturned=false,
+            childRetired=false,rawRetired=false;
+    };
+    WaterPoolMaterialResult constructWaterPoolMaterialNativeOnly(WaterArrayBackingMode)noexcept;
+    struct WaterPoolMaterialReaderResult {
+        enum class Status {refused,alreadyAttempted,nativeStopped,sourceBoundary};
+        struct Read {
+            bool attempted=false,nativeReturned=false,afterObserved=false,resultAdmitted=false;
+            std::size_t copied=0,clampedAmount=0;
+            std::optional<std::uint32_t> beforeCursor,afterCursor;
+            std::optional<std::int32_t> sourceItems;
+            a::OriginalStandardTextureDiagnostic50LA helperDiagnostic{},admissionDiagnostic{};
+        };
+        Status status=Status::refused;WaterPoolMaterialReaderStop stop=WaterPoolMaterialReaderStop::none;
+        std::uint32_t originalSourceStop=0,materialPrefixStop=0,rawAllocatorStop=0,childAllocatorStop=0,adaptedPC=0;
+        std::array<Read,18> reads;
+        std::size_t requestedBytes=0,copiedBytes=0,admittedReturns=0;
+        std::optional<std::uint32_t> word80,tableTarget,b4StorePC,b4Word;
+        std::optional<std::uint16_t> selector;
+        std::optional<std::int32_t> returnV0;
+        bool returned=false,frameReleased=false;
+        a::OriginalStandardTextureDiagnostic50LA diagnostic{};
+    };
+    WaterPoolMaterialReaderResult readWaterPoolMaterialNativeOnly(WaterArrayBackingMode)noexcept;
+    struct WaterPoolTopologyResult {
+        enum class Status {refused,alreadyAttempted,nativeStopped,sourceBoundary};
+        Status status=Status::refused;WaterPoolTopologyEntry entry=WaterPoolTopologyEntry::none;
+        WaterPoolTopologyStop stop=WaterPoolTopologyStop::none;
+        std::uint32_t originalSourceStop=0,poolAllocatorStop=0,fileStop=0,dataStop=0,
+            materialStop=0,readerStop=0,adaptedPC=0,pendingCallPC=0,pendingDelayPC=0;
+        std::optional<std::uint32_t> ordinal,childCount,topologyWord,shiftWord,sumWord,prospectiveRequestWord;
+        std::optional<std::uint32_t> inheritedChildCount;
+        std::optional<std::int64_t> inheritedSignedChildCount;
+        std::optional<std::int64_t> signedChildCount,signedTopology;
+        std::optional<std::uint64_t> childCountRegister,topologyRegister,shiftRegister,sumRegister;
+        std::array<std::optional<std::uint8_t>,4> topologyBytes{};
+        bool callIssued=false,readAttempted=false,nativeReturned=false,afterObserved=false,resultAdmitted=false;
+        bool freshChildCountLoaded=false;
+        std::size_t copied=0,clampedAmount=0;
+        std::optional<std::uint32_t> beforeCursor,afterCursor;
+        std::optional<std::int32_t> sourceItems;
+        a::OriginalStandardTextureDiagnostic50LA diagnostic{},preparationDiagnostic{},helperDiagnostic{},admissionDiagnostic{};
+    };
+    WaterPoolTopologyResult readWaterPoolTopologyCountNativeOnly(WaterArrayBackingMode)noexcept;
     bool constructWorldCold1B2870(const original_main_entry50KG::Application&,
         rr::platform::RaceAudioGroups50IC&,rr::platform::AudioMixer50HD&,std::uint64_t,std::uint32_t&)noexcept;
     bool prepareWorldPhysicsIndex270CDC(std::uint32_t& pc)noexcept {

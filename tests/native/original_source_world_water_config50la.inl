@@ -1,5 +1,6 @@
 //Included after the initializer leaf in the actual World Owner namespace.
 bool Owner::preflightSourceWaterConfigNative()const noexcept {
+    if(!preflightSourceWaterGettersNative())return false;
     const auto& h=sourceWaterConfig_;const auto& r=sourceWaterProviderInitializer_;
     if(!h.constructAttempted)return !sourceWaterConfigOwner_&&!h.constructReturned&&!h.nativeBackingRefused&&
         !h.openAttempted&&!h.openReturn&&!h.loaderReturn&&!h.loaderRestoreMask&&!h.loaderStackReleased&&!h.nativeWithdrawn;
@@ -12,7 +13,11 @@ bool Owner::preflightSourceWaterConfigNative()const noexcept {
     if(!config.preflightNative(r.constructorThis)||h.nativeWithdrawn!=config.nativeClosed_||
        h.openReturn!=config.openReturned_||bool(h.loaderReturn)!=config.destructorReturned_)return false;
     if(h.loaderReturn)return r.pc==0x2b0c74u;
-    if(h.openReturn&&*h.openReturn)return config.textReturned_&&r.pc==0x2b9354u;
+    if(h.openReturn&&*h.openReturn){
+        if(!config.textReturned_)return false;
+        if(config.sectionReturn_)return h.gettersEntered||r.pc==0x2b9370u;
+        return r.pc==(config.sectionAttempted_?config.pc_:0x2b9354u);
+    }
     if(!config.attempted_)return r.pc==0x2b9324u;
     return r.pc==config.pc_;
 }
@@ -51,7 +56,11 @@ bool Owner::continueSourceWaterConfig2B9314(std::uint32_t& pc)noexcept {
     if(!h.openReturn)return false;
     if(*h.openReturn){
         at(0x2b934c);at(0x2b9350);at(0x2b9354);
-        return false; //Before distinct Water157D00("General Information").
+        if(!config.selectGeneralInformation157D00(d)){at(config.pc_);return false;}
+        //Water ignores selection's bool return. Missing and found sections
+        //both reach the real default-float getter, never a loader return.
+        at(0x2b935c);at(0x2b9360);at(0x2b9364);at(0x2b9368);at(0x2b936c);at(0x2b9370);
+        return continueSourceWaterGetters2B9370(pc);
     }
     //Only genuine source false returns reach this stack destructor. Binary
     //allocation and failed-Water diagnostics keep their prior boundaries.
@@ -64,3 +73,5 @@ bool Owner::continueSourceWaterConfig2B9314(std::uint32_t& pc)noexcept {
     at(0x2b0c64);at(0x2b0c68);at(0x2b0c6c);at(0x2b0c70);at(0x2b0c74);
     return false; //Before1336C0 diagnostic. No base/initializer/factory return.
 }
+
+#include "original_source_world_water_getters50la.inl"

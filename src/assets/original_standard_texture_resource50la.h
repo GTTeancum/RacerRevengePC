@@ -349,6 +349,12 @@ private:
         OriginalStandardTextureDiagnostic50LA&)noexcept;
     friend class OriginalParticleSourceConfig50LA;
     friend class OriginalWaterSourceConfig50LA;
+    friend class OriginalWaterPoolSourceFile50LA;
+    //Narrow same-service custody observation; no lookup, mutation or revision
+    //receipt. The mount allocation/generation is checked without provider I/O.
+    bool waterPoolTrackRelationNative(const OriginalRaTrackSourceFile50LA*,
+        const OriginalStandardArchiveProvider50LA*,const void*& mountIdentity,
+        std::size_t& mount,std::uint64_t& generation)const noexcept;
     friend class ::rr::platform::OriginalUiCourseManagerConfig50KG;
     friend class ::rr::platform::OriginalLoadingLsiConfig50LA;
     friend class OriginalLoadingFontSource50LA;

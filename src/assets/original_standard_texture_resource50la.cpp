@@ -5,6 +5,7 @@
 #include "original_source_sky_file50la.h"
 #include "original_source_water_exists131a40.h"
 #include "original_water_source_config50la.h"
+#include "original_water_pool_source_file50la.h"
 #include "original_pod_source_bank50la.h"
 #include "original_ra_track_source_file50la.h"
 #include "original_standard_texture_resource50la.h"
@@ -557,6 +558,9 @@ bool OriginalStandardTextureResolver50LA::restoreScratch132BD0(D& d)noexcept {
 // Native pointers/layout, not guest rows or a second canonical file namespace.
 // All fields below are private: no mount/lookup can turn capacity into a handle.
 struct OriginalStandardTextureResolver50LA::FreshFileCapacity {
+    //Conservative native one-occurrence/whole-table pin, NOT a source
+    //singleton or Resource reference. Independent of Water Config custody.
+    const OriginalWaterPoolSourceFile50LA* waterPoolFileBorrower=nullptr;
     const OriginalSourceSkyFile50LA* sourceSkyFileBorrower=nullptr; //Distinct native sky occurrence pin.
     const OriginalWaterSourceConfig50LA* waterConfigBorrower=nullptr; //Distinct2B9314 stack occurrence.
     const OriginalParticleSourceConfig50LA* particleConfigBorrower=nullptr; //Native lifetime, not guest state.
@@ -754,6 +758,7 @@ struct OriginalStandardTextureResolver50LA::FreshFileCapacity {
         row.payload18=0;row.tableBytes20=0;row.tableOffset1C=0;row.byte24=0;
     }
     ~FreshFileCapacity(){
+        if(waterPoolFileBorrower)std::terminate();
         if(!devices14&&failedCourseDevices){devices14=failedCourseDevices;deviceCount18=failedCourseDeviceCapacity;failedCourseDevices=nullptr;}
         if(!members150&&failedCourseMembers){members150=failedCourseMembers;memberCount154=failedCourseMemberCapacity;failedCourseMembers=nullptr;}
         // Bounded one-device12CA10 order, including reached first-file activation.
@@ -1352,7 +1357,7 @@ bool OriginalStandardTextureResolver50LA::sourceScreenTemplate17CAFCClosed(
 }
 OriginalStandardTextureResolver50LA::OriginalStandardTextureResolver50LA() noexcept=default;
 OriginalStandardTextureResolver50LA::~OriginalStandardTextureResolver50LA() {
-    if(freshFileCapacity_&&(freshFileCapacity_->streamLibraryOwner||freshFileCapacity_->musicOwner))std::terminate();
+    if(freshFileCapacity_&&(freshFileCapacity_->streamLibraryOwner||freshFileCapacity_->musicOwner||freshFileCapacity_->waterPoolFileBorrower))std::terminate();
     //Every cached live resource pins this resolver. Only cleared associations
     //can remain when the final resolver owner goes away.
     if(storage_)for(const auto& file:storage_->files)
@@ -1724,6 +1729,7 @@ bool OriginalStandardTextureResolver50LA::issueGarageBank(
 }
 bool OriginalStandardTextureResolver50LA::canRetireGarageBank12E5E0(
     const GarageBankLease50LA& lease,D& d) const noexcept {
+    if(freshFileCapacity_&&freshFileCapacity_->waterPoolFileBorrower)return fail(d,E::phase,0);
     if(freshFileCapacity_&&(freshFileCapacity_->streamLibraryOwner||freshFileCapacity_->musicOwner))return fail(d,E::phase,0);
     d={};const auto& provider=lease.provider_;
     if(lease.resolver_!=this||lease.thread_!=std::this_thread::get_id()||!storage_||!provider||
@@ -1771,6 +1777,7 @@ bool OriginalStandardTextureResolver50LA::validateGarageBankRows12EAA0(
 }
 bool OriginalStandardTextureResolver50LA::retireNativeRaceMounts1316A0(
     NativeRaceMountLease50LA& lease,D& d)noexcept {
+    if(freshFileCapacity_&&freshFileCapacity_->waterPoolFileBorrower)return fail(d,E::phase,0);
     if(freshFileCapacity_&&(freshFileCapacity_->streamLibraryOwner||freshFileCapacity_->musicOwner||freshFileCapacity_->waterConfigBorrower))return fail(d,E::phase,0);
     d={};
     if(lease.closed_)return true;
@@ -3548,6 +3555,7 @@ bool OriginalStandardTextureLifetime50LA::resetDemand14D180() noexcept {
 }
 bool OriginalStandardTextureResolver50LA::registerSourceBank12CEA0(
     std::shared_ptr<const OriginalUiArchive50KG> archive,const OriginalStandardArchiveProvider50LA* expectedProvider,const void* owner,SourceBankFamily family,bool& acquired,D& d)noexcept {
+    if(freshFileCapacity_&&freshFileCapacity_->waterPoolFileBorrower)return fail(d,E::phase,0);
     if(freshFileCapacity_&&(freshFileCapacity_->streamLibraryOwner||freshFileCapacity_->musicOwner))return fail(d,E::phase,0);
     d={};acquired=false;using Capacity=FreshFileCapacity;
     const auto identity=family==SourceBankFamily::course?OriginalUiArchiveId50KG::course:
@@ -3898,9 +3906,13 @@ bool OriginalStandardTextureResolver50LA::openExactSourceMember131380(const void
     }
     member.auxiliarySlot04=selected;
     if(selected==-1){
-        //Actual131554 diagnostic precedes131578. The new Water occurrence
-        //does not inherit the older adapter's omitted diagnostic completion.
-        if(s.waterConfigBorrower&&occurrence==s.waterConfigBorrower)
+        //Actual131554 diagnostic precedes131578. Water Config, Pool file and
+        //the distinct Announcer occurrence do not inherit the older adapter's
+        //omitted diagnostic completion.
+        if((s.waterConfigBorrower&&occurrence==s.waterConfigBorrower)||
+           (s.waterPoolFileBorrower&&occurrence==s.waterPoolFileBorrower)||
+           (s.musicOwner&&occurrence==s.musicOwner->config_&&
+            s.musicOwner->occurrence_==OriginalMusicSourceFile50LA::Occurrence::announcerPercentages2C5164))
             return fail(d,E::unsupported,0x131554);
         return finishOpen(); //Existing other domains retain their established scope.
     }
@@ -4019,6 +4031,7 @@ bool OriginalStandardTextureResolver50LA::closeSourceBankMember131040(const void
     member.courseConfigOwner=nullptr;d.sourceEffectsCommitted=true;return true;
 }
 bool OriginalStandardTextureResolver50LA::retireSourceBankNative(const void* root,D& d)noexcept {
+    if(freshFileCapacity_&&freshFileCapacity_->waterPoolFileBorrower)return fail(d,E::phase,0);
     d={};if(!freshFileCapacity_||!root)return fail(d,E::phase,0);
     auto& s=*freshFileCapacity_;if(s.streamLibraryOwner||s.musicOwner||s.particleConfigBorrower||s.sourceSkyFileBorrower||s.waterConfigBorrower)return fail(d,E::phase,0);if(s.courseStage==FreshFileCapacity::CourseStage::none&&!s.courseRootOwner)return true;
     if(s.courseRootOwner!=root)return fail(d,E::phase,0);
@@ -4265,6 +4278,7 @@ bool OriginalLoadingFontSource50LA::retireBank1CAD94(OriginalStandardTextureReso
 }
 bool OriginalStandardTextureResolver50LA::retireLoadingFontSource1CAD94(OriginalLoadingFontSource50LA& owner,
     LoadingFontsBankLease& lease,D& d)noexcept {
+    if(freshFileCapacity_&&freshFileCapacity_->waterPoolFileBorrower)return fail(d,E::phase,0);
     if(freshFileCapacity_&&(freshFileCapacity_->streamLibraryOwner||freshFileCapacity_->musicOwner))return fail(d,E::phase,0);
     d={};if(!sourceBankFamilyCurrent(&owner,SourceBankFamily::loadingFonts)||!owner.joined_||owner.nativeClosed_||owner.sourceRetired_||
        owner.thread_!=std::this_thread::get_id()||owner.celOccurrence_||owner.handle_!=-1||
@@ -4327,6 +4341,7 @@ bool OriginalLoadingFontSource50LA::closeNative(OriginalStandardTextureResolver5
 }
 bool OriginalStandardTextureResolver50LA::closeLoadingFontSourceNative(OriginalLoadingFontSource50LA& owner,
     LoadingFontsBankLease& lease,D& d)noexcept {
+    if(freshFileCapacity_&&freshFileCapacity_->waterPoolFileBorrower)return fail(d,E::phase,0);
     d={};if(owner.resolver_.get()!=this||owner.thread_!=std::this_thread::get_id()||owner.handle_!=-1||owner.celOccurrence_||
        (loadingPstFontEntry_&&loadingPstRoot_.lock().get()==&owner))return fail(d,E::phase,0);
     auto& bank=lease.bank_;
@@ -4415,4 +4430,5 @@ bool OriginalStandardTextureResolver50LA::registerLoadingIconBank12CEA0(std::sha
 #include "original_source_sky_file50la.inl"
 #include "original_source_water_exists131a40.inl"
 #include "original_water_source_config50la.inl"
+#include "original_water_pool_source_file50la.inl"
 }

@@ -2,6 +2,10 @@
 //can enter this success-only allocation/base-construction occurrence.
 bool Owner::sourceWaterProviderCountedNative(std::size_t& count)const noexcept {
     if(!preflightSourceWaterProviderMembersNative())return false;
+    //This result includes the distinct Pool and actually constructed first material.
+    //The combined World floor adds it ONCE; provider acquisition stays separate.
+    std::size_t poolCount=0,materialCount=0;
+    if(!sourceWaterPoolCountedNative(poolCount)||!sourceWaterPoolMaterialCountedNative(materialCount))return false;
     count=0;const auto& h=sourceWaterProvider274720_;
     if(h.zeroWordsWritten>h.zeroWords.size()||h.flags33Known>7u||
        (h.flags33Bits&~h.flags33Known))return false;
@@ -32,10 +36,10 @@ bool Owner::sourceWaterProviderCountedNative(std::size_t& count)const noexcept {
            h.flags33Bits!=(h.waterBaseEntered?3u:0u))return false;
     }else if(h.vtable08||h.query30||h.type32||h.flags33Known||h.flags33Bits||h.typeCallEntered)return false;
     if(h.formatCallEntered&&!sourceWaterProviderMembers_.entered&&h.pc!=0x308c90u)return false;
-    if(h.nativeWithdrawn)return !sourceWaterProvider_;
+    if(h.nativeWithdrawn)return !sourceWaterProvider_&&!poolCount&&!materialCount;
     if(!worldApplication_||nativeScbThread_!=std::this_thread::get_id()||
        worldApplication_->attachmentLock423F58()||bool(sourceWaterProvider_)!=h.allocationReturned)return false;
-    if(!sourceWaterProvider_)return !h.countAcquired;
+    if(!sourceWaterProvider_)return !h.countAcquired&&!poolCount&&!materialCount;
     const auto& e=sourceWaterProvider_->entity;const auto& authority=worldApplication_->entityAuthority_;
     if(e.parent1C||e.previous10||e.next14||e.firstChild18||e.mask20||e.descendants24||e.nativeFlags29)return false;
     if(h.countAcquired){
@@ -43,22 +47,31 @@ bool Owner::sourceWaterProviderCountedNative(std::size_t& count)const noexcept {
            e.objectKey!=key(&e)||e.sessionGeneration!=worldEntity_.sessionGeneration||
            e.category28!=0xffu||(e.flags29&15u)!=3u||!worldApplication_->objectCount423F60()||
            !authority.canRetire(e))return false;
-        count=1;
+        if(poolCount>std::numeric_limits<std::size_t>::max()-1u||
+           materialCount>std::numeric_limits<std::size_t>::max()-(1u+poolCount))return false;
+        count=1u+poolCount+materialCount; //No Resource/raw-array/requested-C count.
     }else{
         if(e.reference00||e.kind!=g::OriginalWreckComponentKind50LA::unbound||e.objectKey||e.sessionGeneration)return false;
         for(std::size_t i=0;i<authority.count_;++i)if(authority.entries_[i].node==&e)return false;
     }
-    return true;
+    return h.countAcquired||(!poolCount&&!materialCount);
 }
 bool Owner::withdrawSourceWaterProviderNative()noexcept {
+    const auto& pool=sourceWaterConfig_.nativeWaterPoolBacking;
+    //Do not broaden the predecessor's unentered/no-Pool no-op teardown.
+    //New custody gates apply only while this child still owns storage.
+    if(pool.nativeAllocated&&!pool.nativeRetired&&
+       (nativeScbThread_!=std::this_thread::get_id()||runtimeCameraBorrows_||runtimeWorldBorrows_||
+        constructorRacerWorldBorrows_||sourceParticleInvocationBorrowers_))return false;
     auto& h=sourceWaterProvider274720_;std::size_t count=0;
     if(!sourceWaterProviderCountedNative(count))return false;
     if(!h.allocationAttempted||h.nativeWithdrawn)return true;
     //The public close path reaches this before its later combined floor.
     //Validate all still-owned source counts before decrementing any one.
-    if(h.countAcquired&&!preflightSourceWorldParticleCountNative())return false;
+    if(count&&!preflightSourceWorldParticleCountNative())return false;
     //The fresh Water Config releases numeric file/Track custody first.
     //Its source bytes/partial history remain retained; this is not1573B0.
+    if(!preflightNativeWaterPoolFileWithdrawal())return false;
     if(!withdrawSourceWaterConfigNative())return false;
     //Withdraw the exact native World400 publication before freeing backing.
     //Unknown knowledge is not a source NULL store or unfinished destructor.
@@ -69,13 +82,26 @@ bool Owner::withdrawSourceWaterProviderNative()noexcept {
         worldWater400_.reset();continuation.world400NativeWithdrawn=true;
         continuation.lightPin.reset();
     }
+    //The detached partial Pool owns its own reference/count, never the array
+    //slot. Release it before provider count and pointer-array payload custody.
+    if(!withdrawSourceWaterPoolNative())return false;
     //No provider globals443B80/443CE8, callback or graph alias are published
     //by this prefix. Retire the exact count once; process scalar/guard effects stay.
     if(h.countAcquired){auto& e=sourceWaterProvider_->entity;
         if(!worldApplication_->entityAuthority_.retire(e))return false;
         --e.reference00;--worldApplication_->objectCount423F60();h.countRetiredNative=true;
     }
-    sourceWaterProvider_.reset();h.nativeWithdrawn=true;return true;
+    if(sourceWaterProvider_){
+        //Revoke private adapted views before backing retirement, not source NULL stores.
+        sourceWaterProvider_->nativeArrayC8.reset();sourceWaterProvider_->nativeArray68.reset();
+        sourceWaterProvider_->nativeArrayD0.reset();
+        if(sourceWaterConfig_.nativeWaterArrayCaller.attempted)
+            sourceWaterConfig_.nativeWaterArrayCaller.nativeViewsRetired=true;
+    }
+    sourceWaterProvider_.reset(); //Also retires private native array payload/sidecars once.
+    if(sourceWaterConfig_.nativeWaterArrayBacking.nativeAllocated)
+        sourceWaterConfig_.nativeWaterArrayBacking.nativeRetired=true;
+    h.nativeWithdrawn=true;return true;
 }
 bool Owner::continueSourceWaterProvider274720(std::uint32_t& pc)noexcept {
     auto& h=sourceWaterProvider274720_;const auto& factory=sourceWaterFactory274570_;
@@ -127,7 +153,11 @@ bool Owner::continueSourceWaterProvider274720(std::uint32_t& pc)noexcept {
         0x2b08e0,0x2b090c,0x2b0924,0x2b093c,0x2b0944,0x2b094c,0x2b0954,0x2b0960}};
     for(std::size_t n=0;n<stores.size();++n){
         if(n+1==stores.size())at(0x2b095c); //JAL's delay slot still storesCC.
-        at(stores[n]);h.zeroWords[n]=0;++h.zeroWordsWritten;
+        at(stores[n]);h.zeroWords[n]=0;
+        //The same live+98/+9C/+A0/+A4 lanes later passed to Config getters.
+        if(n>=17u&&n<=20u)sourceWaterProvider_->channelScale98[n-17u]=0;
+        if(n==16u)sourceWaterProvider_->signatureWaves6C=0;
+        ++h.zeroWordsWritten;
     }
     h.formatCallEntered=true;at(0x308c90);
     return continueSourceWaterProviderFormat308C90(pc);
