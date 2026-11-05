@@ -1,5 +1,6 @@
 #pragma once
 #include "original_water_topology_initialization50la.h"
+#include "original_water_row_assertion50la.h"
 namespace ra_cold_roster50LA { class WreckBacking; }
 #include "original_wreck_constructor_vectors50la.h"
 namespace rr::game { class OriginalLoadingManager33050LA; }
@@ -512,6 +513,8 @@ class OriginalApplicationEntities50LA final {
         bool known=true;
     } sourceWaterInitializerGlobals_;
     void invalidateWaterInitializerGlobalsNative()noexcept {sourceWaterInitializerGlobals_.known=false;}
+    OriginalWaterRowGlobals50LA sourceWaterRowGlobals_;
+    void invalidateWaterRowGlobalsNative()noexcept {sourceWaterRowGlobals_.known=false;}
     OriginalWaterTopologyGlobals50LA sourceWaterTopologyGlobals_;
     void invalidateWaterTopologyGlobalsNative()noexcept {sourceWaterTopologyGlobals_.known=false;}
     // Native historical-use barrier, not a guest flag or readiness token.

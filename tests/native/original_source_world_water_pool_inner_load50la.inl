@@ -46,6 +46,7 @@ bool Owner::preflightNativeWaterPoolInnerLoad()const noexcept {
         for(std::size_t i=0;i<rows.bytes;++i){
             //Native aliases do not serialize host addresses into guest pointer lanes.
             if((row.aliasStored[0]&&i>=12u&&i<16u)||(row.aliasStored[1]&&i>=8u&&i<12u))continue;
+            if(sourceWaterConfig_.nativeWaterPoolRowCalculation.aliasStored&&i>=16u&&i<20u)continue;
             const auto expected=row.countStored&&i>=20u&&i<24u?std::uint8_t(*row.count>>(8u*(i-20u))):0u;
             if(bytes[i]!=expected)return false;
         }

@@ -1,4 +1,5 @@
 bool Owner::preflightNativeWaterPoolRowInput()const noexcept {
+    if(!preflightNativeWaterPoolRowCalculation())return false;
     using S=WaterPoolRowInputStop;
     const auto& n=sourceWaterConfig_.nativeWaterPoolRowInput;
     const auto& b=sourceWaterConfig_.nativeWaterPoolRowBacking;
@@ -33,7 +34,8 @@ bool Owner::preflightNativeWaterPoolRowInput()const noexcept {
             if(i<inputs.normals.size()&&inputs.normals[i].attempted&&j<inputs.normals[i].copied)expected=inputs.normals[i].bytes[j];
             if(storage.normalByte(i,j)!=expected)return false;
         }
-        if(storage.outputIdentity()||storage.outputXYZ(0))return false;
+        if(!sourceWaterConfig_.nativeWaterPoolRowCalculation.attempted&&
+           (storage.outputIdentity()||storage.outputXYZ(0)))return false;
     }
     const auto noNormals=[&]()noexcept {return !n.ordinal&&!n.normalsLoaded&&!n.normalsCommitted;};
     if(n.stop==S::preparation)return n.pc==0x2999ccu&&!n.prepared&&!n.verticesLoaded&&!v.entered&&noNormals();

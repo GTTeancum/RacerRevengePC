@@ -1,3 +1,4 @@
+#include "../../src/game/original_water_row_assertion50la.h"
 #include "../../src/game/original_water_row_storage50la.h"
 #include <cassert>
 #include <cstdio>
@@ -30,7 +31,11 @@ int main(){
         if(i<2u)assert(!full.allocateOutput());
     }
     assert(!full.copyVertexPrefix(vertices)&&!full.copyNormalPrefix(0,normal));
-    assert(full.allocateOutput()&&full.calculateXYZ().prepared);
+    assert(full.allocateOutput());
+    rr::game::OriginalWaterRowGlobals50LA processGlobals;
+    const auto assertion=rr::game::admitOriginalWaterRowOutput50LA(processGlobals,full.outputIdentity());
+    assert(assertion.status==rr::game::OriginalWaterRowAssertion50LA::Status::accepted);
+    assert(full.calculateXYZ().prepared);
     assert(full.outputXYZ(0)==V({1,0,0})&&full.outputXYZ(1)==V{}&&full.outputXYZ(2)==V{});
     assert(!full.outputXYZ(3)&&!full.calculateXYZ().prepared);
     //A partial bulk read must not consume its unknown last UV byte.
