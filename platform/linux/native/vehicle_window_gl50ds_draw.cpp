@@ -1690,8 +1690,8 @@ bool VehicleWindowGl50DS::Storage::commit(void* context, std::uint8_t bank) noex
         }
         s.diagnostic->opponentIndex = maxVehicleWindowOpponents50DS;
         s.traceRaStage("opaque_opponents",stageStart);
-        if(s.request.raStaticWorld&&s.request.enableGameplayDisplayWallTiming)
-            std::fprintf(stderr,"ra_pair_batches scope=player_and_opaque_opponents runs=%llu triangles=%llu coalesced_triangles=%llu saved_bridges=%llu empty_triangles=%llu full_singletons=%llu\n",
+        if(s.request.enableGameplayDisplayWallTiming)
+            std::fprintf(stderr,"native_pair_batches scope=player_and_opaque_opponents runs=%llu triangles=%llu coalesced_triangles=%llu saved_bridges=%llu empty_triangles=%llu full_singletons=%llu\n",
                 static_cast<unsigned long long>(s.coveragePairRuns),
                 static_cast<unsigned long long>(s.coveragePairTriangles),
                 static_cast<unsigned long long>(s.coveragePairCoalescedTriangles),
