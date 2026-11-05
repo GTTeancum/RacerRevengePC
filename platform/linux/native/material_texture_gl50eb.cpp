@@ -5,6 +5,8 @@
 #include "../../../src/game/original_options_mutation_interlock50kg.h"
 #include "../../../tests/native/ra_cold_aggregate50la.h"
 #include <exception>
+#include <cstdio>
+#include <cstdlib>
 #include <limits>
 #include <new>
 #include <thread>
@@ -202,6 +204,22 @@ struct MaterialTextureGl50EB::Storage {
             if (width != static_cast<I>(input.width) || height != static_cast<I>(input.height) ||
                 format != static_cast<I>(rgba8))
                 return fail(d, MaterialTextureGlError50EB::storage, "GL texture size/format mismatch");
+            // Cold, opt-in scalar evidence for blend-path admission research.
+            // Inspect the bytes actually uploaded, never read back an image.
+            const char* trace = std::getenv("RR_TRACE_PHASES");
+            if (trace && trace[0] == '1') {
+                unsigned minimum = 255, maximum = 0;
+                std::size_t nonOpaque = 0;
+                for (std::size_t i = 3; i < input.rgba.size(); i += 4) {
+                    const unsigned alpha = input.rgba[i];
+                    if (alpha < minimum) minimum = alpha;
+                    if (alpha > maximum) maximum = alpha;
+                    nonOpaque += alpha != 255;
+                }
+                std::fprintf(stderr, "texture_alpha_upload identity=%llu index=%u width=%u height=%u min=%u max=%u nonopaque=%zu pixels=%zu\n",
+                    static_cast<unsigned long long>(bank.texture(t)->identity), t,
+                    input.width, input.height, minimum, maximum, nonOpaque, input.rgba.size()/4);
+            }
         }
         d.texture = assets::unresolvedMaterialTexture50EA;
         gl.bindTexture(texture2D, 0);
