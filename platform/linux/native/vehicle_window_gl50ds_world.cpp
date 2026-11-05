@@ -241,9 +241,10 @@ bool VehicleWindowGl50DS::Storage::drawCoveragePairTriangle(U bank,U first,U ima
         // without carrying state across spans or callbacks.
         if(firstCoverageSetup){coverageAa0();gl.disable(0x8DB9);gl.disable(0x0BE2);}
         // Later runs inherit disabled MULTISAMPLE from the checked tail.
-        if(request.raStaticWorld||request.track.rcCrystal||request.track.tbWorld){
-            gl.scissor(region[0],region[1],region[2]-region[0],region[3]-region[1]);gl.enable(0x0C11);
-        }else gl.disable(0x0C11);
+        // Racer payloads use the same world-space vertices and clip matrix on
+        // every track. Bound scratch clear and composition to the conservative
+        // run rectangle; uncertain projection already falls back to full size.
+        gl.scissor(region[0],region[1],region[2]-region[0],region[3]-region[1]);gl.enable(0x0C11);
         gl.bindFramebuffer(framebuffer,coverageLive.raster);
         // These private FBOs retain createCoverageExtent's selectors:
         // raster draws to attachments0/1; scene/snapshot draw/read0.
@@ -371,14 +372,20 @@ bool VehicleWindowGl50DS::Storage::drawCoveragePairGroup(U bank,U slot,U compone
             }
             // Singleton uses the same bridge and triangle count as before.
             // Full/uncertain clip fallback always remains its own run.
-            if(!sourceArrayRetained){
-                gl.getIntegerv(0x85B5,&sourceArray);
-                if(!check("retain source-pair vertex array for coverage group"))return false;
-                sourceArrayRetained=true;
+            if(coverageDemand){
+                if(!sourceArrayRetained){
+                    gl.getIntegerv(0x85B5,&sourceArray);
+                    if(!check("retain source-pair vertex array for coverage group"))return false;
+                    sourceArrayRetained=true;
+                }
+                if(!drawCoveragePairTriangle(bank,first,image,united,static_cast<U>(sourceArray),run,firstRun,firstCoverageSetup))return false;
+                // Only an accepted nonempty bridge authorizes setup reuse.
+                firstRun=false;firstCoverageSetup=false;
+            }else{
+                gl.textureBarrier();
+                drawGl.drawElementsBaseVertex(0x0004,static_cast<I>(run*3),0x1405,
+                    reinterpret_cast<const void*>(std::uintptr_t(first)*sizeof(U)),0);
             }
-            if(!drawCoveragePairTriangle(bank,first,image,united,static_cast<U>(sourceArray),run,firstRun,firstCoverageSetup))return false;
-            // Only an accepted nonempty bridge authorizes setup reuse.
-            firstRun=false;firstCoverageSetup=false;
             ++coveragePairRuns;coveragePairTriangles+=run;
             if(run>1)coveragePairCoalescedTriangles+=run;
             if(fullRegion(initial))++coveragePairFullSingletons;
@@ -1008,7 +1015,7 @@ bool VehicleWindowGl50DS::Storage::raTriangleOutsideNativeClip(U first) const no
 
 void VehicleWindowGl50DS::Storage::beginRacerRasterOperandGroup(U slot,U component,U first,U count)noexcept {
         racerRasterCacheActive=false;
-        if(!request.raStaticWorld||count<3)return;
+        if(count<3)return;
         for(auto& entry:racerRasterOperands)entry.occupied=false;
         racerRasterSlot=slot;racerRasterComponent=component;
         racerRasterFirst=first;racerRasterCount=count;
@@ -1101,7 +1108,7 @@ std::array<I,4> VehicleWindowGl50DS::Storage::raTriangleRasterRegion(U first)con
 
 std::array<I,4> VehicleWindowGl50DS::Storage::racerTriangleRasterRegion(U slot,U component,U first)const noexcept {
         const std::array<I,4> full{{0,0,width,height}};
-        if((!request.raStaticWorld&&!request.track.rcCrystal&&!request.track.tbWorld)||slot>frameOpponentCount)return full;
+        if(slot>frameOpponentCount)return full;
         const auto& batch=slot?frameOpponentBatches[slot-1]:framePlayerBatch;
         if(component>=batch.componentCount)return full;
         const auto& part=batch.component[component];

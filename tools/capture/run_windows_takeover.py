@@ -39,6 +39,10 @@ def main():
                         'main-alder10-course-ma', 'main-ody11-course-ma',
                         'main-rider-course-ta'], default='main-dud04-course-ga')
     parser.add_argument('--seconds', type=int, default=180)
+    parser.add_argument('--profile-performance', action='store_true',
+                        help='Enable existing CPU/render/display phase measurements')
+    parser.add_argument('--profile-gpu-stages', action='store_true',
+                        help='Serialize rendering stages for diagnosis; not production FPS measurement')
     parser.add_argument('--camera-trace', action='store_true',
                         help='Log actual attached-camera poses without changing camera behavior')
     parser.add_argument('--restart-once', action='store_true',
@@ -83,6 +87,10 @@ def main():
                RR_NATIVE_FIXED_WINDOW='1')
     if args.camera_trace:
         env['RR_CAMERA_POSE_TRACE'] = '1'
+    if args.profile_performance or args.profile_gpu_stages:
+        env.update(RR_TRACE_PHASES='1', RR_TRACE_RENDER='1')
+    if args.profile_gpu_stages:
+        env['RR_TRACE_GPU_STAGES'] = '1'
     if args.restart_once:
         env['RR_UNATTENDED_RESTART_ONCE'] = '1'
     command = [str(staged), '--assets', str(assets)]
@@ -92,7 +100,9 @@ def main():
                   runtimeHashes={p.name: digest(output / p.name) for p in runtime},
                   nativeSaveDirectory=str(saves), audioCapturePath=str(output / 'audio.wav'),
                   visualVerified=False, audioVerified=False, hostInputUsed=False,
-                  cameraPoseTrace=args.camera_trace, nativeRestartOnce=args.restart_once)
+                  cameraPoseTrace=args.camera_trace, nativeRestartOnce=args.restart_once,
+                  performanceProfiling=args.profile_performance or args.profile_gpu_stages,
+                  serializedGpuStageProfiling=args.profile_gpu_stages)
     (output / 'launch.json').write_text(json.dumps(result, indent=2) + '\n')
     # Inherited process error mode prevents OS crash-dialog waits. Application
     # dialogs, if any, remain bounded by termination of this exact child handle.

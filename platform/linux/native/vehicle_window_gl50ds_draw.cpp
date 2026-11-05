@@ -1,5 +1,7 @@
 #include "vehicle_window_gl50ds_storage.h"
 #include "../../../tests/native/ra_static_fire_visual50la.h"
+#include <cstdlib>
+#include <cstring>
 
 namespace rr::platform {
 void VehicleWindowGl50DS::Storage::acceptCompletedTrackVisibility() noexcept {
@@ -1403,21 +1405,13 @@ bool VehicleWindowGl50DS::Storage::drawSpecularSpan50LA(std::uint8_t bank, U slo
             // the optional GREATER0/KEEP test can only narrow that coverage.
             // Source sampling/clipping/depth remain the admitted native policy.
             if (accepted) {
-                if (coverageDemand) {
-                    // No callback or matrix/vertex mutation occurs inside
-                    // this synchronous group. End the scratch scope on failure
-                    // as well as success before another source owner can run.
-                    beginRacerRasterOperandGroup(slot,component,group.indexStart,group.indexCount);
-                    accepted = drawCoveragePairGroup(bank, slot, component,
-                        group.indexStart, group.indexCount, material->specularName50LA, firstCoverageSetup);
-                    endRacerRasterOperandGroup();
-                } else {
-                    for (U i = group.indexStart; i < group.indexStart + group.indexCount; i += 3) {
-                        gl.textureBarrier();
-                        drawGl.drawElementsBaseVertex(0x0004, 3, 0x1405,
-                            reinterpret_cast<const void*>(std::uintptr_t(i) * sizeof(U)), 0);
-                    }
-                }
+                // Both coverage routes share conservative disjoint runs. A
+                // single-sample texture barrier is sufficient for a run whose
+                // primitives cannot read or write one another's pixels.
+                beginRacerRasterOperandGroup(slot,component,group.indexStart,group.indexCount);
+                accepted = drawCoveragePairGroup(bank, slot, component,
+                    group.indexStart, group.indexCount, material->specularName50LA, firstCoverageSetup);
+                endRacerRasterOperandGroup();
                 // The AA1 route checks each scratch/copy/composition operation.
                 // Cold source topology bounds one MSCNT group to 3..16
                 // vertices, hence at most 14 ordered triangles. Poll errors
@@ -1639,9 +1633,18 @@ std::chrono::steady_clock::time_point VehicleWindowGl50DS::Storage::rendererStag
 
 void VehicleWindowGl50DS::Storage::traceRaStage(const char* stage,std::chrono::steady_clock::time_point& start,bool nested) noexcept {
         if(!request.enableGameplayDisplayWallTiming)return;
+        // Diagnostic only: serialize stage completion to locate GPU stalls.
+        // These timings include submission/wait overhead, not GPU timer-query
+        // durations, and this mode must not be used to claim production FPS.
+        static const bool completedStages=[](){const char* value=std::getenv("RR_TRACE_GPU_STAGES");
+            return value&&std::strcmp(value,"1")==0;}();
+        if(completedStages)gl.finish();
         const auto now=std::chrono::steady_clock::now();
         const auto elapsed=std::chrono::duration_cast<std::chrono::microseconds>(now-start).count();
-        if(request.raStaticWorld)
+        if(completedStages)
+            std::fprintf(stderr,"renderer_completed_stage name=%s nested_backend=%u wall_us=%lld\n",
+                stage,nested?1u:0u,static_cast<long long>(elapsed));
+        else if(request.raStaticWorld)
             std::fprintf(stderr,"ra_renderer_stage name=%s cpu_submission_wall_us=%lld\n",stage,static_cast<long long>(elapsed));
         else
             std::fprintf(stderr,"renderer_stage name=%s nested_backend=%u submission_wall_us=%lld\n",
