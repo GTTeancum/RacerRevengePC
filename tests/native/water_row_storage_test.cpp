@@ -50,6 +50,31 @@ int main(){
     S tails;assert(tails.allocateNormals(2)&&tails.allocateVertices()&&tails.copyVertexPrefix({}));
     assert(tails.copyNormalPrefix(0,normal)&&tails.copyNormalPrefix(1,normal)&&tails.allocateOutput());
     assert(tails.calculateXYZ().prepared&&tails.outputXYZ(0)==V{}&&tails.outputXYZ(1)==V{});
+    S one;assert(one.allocateNormals(1)&&one.allocateVertices());
+    assert(one.copyVertexPrefix(std::span(vertices).first(32))&&one.copyNormalPrefix(0,normal)&&one.allocateOutput());
+    assert(!one.calculateXYZ().prepared&&!one.outputXYZ(0)); //Two tails cannot fit.
+    S empty;
+    if(empty.allocateNormals(0)&&empty.allocateVertices()){
+        assert(empty.copyVertexPrefix({}));
+        if(empty.allocateOutput())assert(!empty.calculateXYZ().prepared);
+    } //Native malloc(0) may return null; neither outcome invents data.
+    assert(!empty.outputXYZ(0));
+    //Exercise every row at maximum capacity, across a long alternating strip.
+    constexpr unsigned capacity=16384u;
+    std::vector<std::uint8_t> strip(std::size_t(capacity)*32u,255u);
+    for(unsigned i=0;i<capacity;++i){
+        const float x=float(i/2u),z=float(i%2u);const auto at=std::size_t(i)*32u;
+        put(strip,at,x);put(strip,at+4u,0);put(strip,at+8u,z);
+        put(strip,at+24u,x);put(strip,at+28u,z);
+    }
+    S maximum;assert(maximum.allocateNormals(capacity)&&maximum.allocateVertices()&&maximum.copyVertexPrefix(strip));
+    for(unsigned i=0;i<capacity;++i)assert(maximum.copyNormalPrefix(i,normal));
+    assert(maximum.allocateOutput()&&maximum.calculateXYZ().prepared);
+    for(unsigned i=0;i<capacity;++i){
+        assert(maximum.outputXYZ(i)==(i+2u<capacity?V{1,0,0}:V{}));
+        assert(!maximum.normalByte(i,12));
+    }
+    assert(!maximum.outputXYZ(capacity)&&!maximum.vertexByte(strip.size()));
     S refused;assert(!refused.allocateNormals(16385)&&!refused.normalsIdentity());
     std::puts("Water row storage: binary layout to XYZ, short/EOF refusal, padding knownness and tails passed");
 }

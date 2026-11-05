@@ -25,6 +25,7 @@ RANGES = {
     'topology_inner_loader': (0x2998D0, 0x299A94),
     'topology_inner_finalize': (0x299420, 0x299790),
     'topology_inner_zero_allocator': (0x302E58, 0x302F48),
+    'file_read_items': (0x12FB30, 0x12FF68),
 }
 SOURCES = (
     'tests/native/ra_cold_aggregate50la.h',
@@ -91,6 +92,10 @@ def ee_instruction(word):
     """Override incompatible modern-MIPS interpretations of EE instructions."""
     op, rs, rt, rd = word >> 26, (word >> 21) & 31, (word >> 16) & 31, (word >> 11) & 31
     imm = (word & 0xFFFF) - (0x10000 if word & 0x8000 else 0)
+    if op == 0 and (word & 63) in (0x18, 0x19):
+        #EE MULT/MULTU also write the sign-extended low word to rd. Modern
+        #MIPS DSP disassembly incorrectly renders rd as an accumulator number.
+        return f'{"mult" if (word & 63) == 0x18 else "multu"} ${REG[rd]}, ${REG[rs]}, ${REG[rt]}'
     if op in (0x1E, 0x1F):
         return f'{"lq" if op == 0x1E else "sq"} ${REG[rt]}, {imm:#x}(${REG[rs]})'
     if op in (0x36, 0x3E):

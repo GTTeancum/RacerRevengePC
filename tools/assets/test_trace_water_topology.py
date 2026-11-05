@@ -38,6 +38,8 @@ class TraceTests(unittest.TestCase):
             inspect(elf_fixture())
 
     def test_ee_instructions_are_not_modern_mips_dsp(self):
+        self.assertEqual(ee_instruction(0x02511018), 'mult $v0, $s2, $s1')
+        self.assertEqual(ee_instruction(0x02511019), 'multu $v0, $s2, $s1')
         self.assertEqual(ee_instruction(0x7FBF0040), 'sq $ra, 0x40($sp)')
         self.assertEqual(ee_instruction(0x7BBF0040), 'lq $ra, 0x40($sp)')
         self.assertEqual(ee_instruction(0x70809E28), 'por $s3, $a0, $zero')
