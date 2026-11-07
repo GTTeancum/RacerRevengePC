@@ -118,3 +118,23 @@ display owner, course-RA camera issuance, captured timing). It needs either
 that pipeline per track or a host-driven adaptation that preserves career and
 record saving; tier-C race stages are comparable. Treat as the next dedicated
 effort.
+
+## Root cause for Results/end-of-race (Nov 7, verified in code)
+
+Tier-B consumed stages stop after race construction and world join
+(`original_consumed_ta_stage50du.h`: "Only this reached prefix. No complete
+slot30 load or App10 attachment"). The original slot30 race load is what
+creates the race children Results depends on: `camera34_` and
+`cameraNativeAdapter34_` (`bindConsumedRaCameraNative34`, which also checks
+issuance course == ra), `loadDisplay_` (`original_race_load_prefix50la.h`),
+`endHud_` (`original_race_hud_scope50la.cpp`), `pause100_`, `results104_`,
+F8 bars and the end-entry continuation (`endEntryStep_`). Only the RA human
+route (`raSession->constructHumanTournamentCold`) runs that load. Results on
+other tracks therefore requires porting slot30 race load per world (TA, MA,
+SA, GA, GC first; tier C after its stages exist), then relaxing the
+course==ra / world74_ checks in `original_results_update_schedule50la.cpp`,
+`original_results_human_root50la.cpp`, `original_results_roster_read50la.*`,
+`terrain_interactive_roster_cold50du.cpp` to the track's own world slot.
+Milestones, each testable: (1) slot30 load on TA with camera/display/end HUD;
+(2) Results on TA; (3) MA/SA/GA/GC; (4) tier-C stages + intro; (5) Results on
+tier C.
