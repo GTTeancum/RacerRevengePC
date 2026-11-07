@@ -705,8 +705,54 @@ void Context::run() {
     // nativeMenuCommand retains this poll's original intent before Results
     // retirement or unavailable-checkpoint suppression cleared hostInput.
     // HUD/live-audio admission uses it; no rejected host command is restored.
-    const auto action=sessionMenu.poll(hostInput,!recoveryPaused&&s.phase==VehicleFramePhase49W::Ready,
+    using MenuResult=platform::HostSessionMenu50IF::Result;
+    const bool originalPauseShown=sourcePauseObservation.hostOpen()&&sessionMenu.open()&&
+        sessionMenu.page()==platform::HostSessionMenu50IF::Page::Pause;
+    auto action=MenuResult::None;
+    if(!originalPauseShown)action=sessionMenu.poll(hostInput,!recoveryPaused&&s.phase==VehicleFramePhase49W::Ready,
         nativeMenuCommand);
+    else{
+     // Original Pause rows: 0 CONTINUE, 1 RESTART RACE, 2..4 HUD, 5..8
+     // volumes, 9 QUIT TO MAIN MENU, 10 QUIT. Same native owners as the
+     // host HUD/audio pages and the same session actions as its rows.
+     const auto in=sessionMenu.pollOriginalPause(hostInput);
+     if(in.up!=in.down)sourcePauseObservation.moveHostSelection(in.down);
+     const auto row=sourcePauseObservation.hostSelection();
+     if(in.left!=in.right&&row>=2&&row<=4&&nativeHudAvailable){
+      require50DU(originalMainApplication.animationPaused()&&sourceCameraSession->adjustNativeHumanHud(
+          controlPresets,originalMainApplication.animationClock(),
+          originalMainApplication.profile->playerBits1125C,nativeHud,row-2,in.right),
+          "original Pause HUD preference owner rejected");
+      require50DU(nativeHudCurrent(),"original Pause HUD preference observation failed after commit");
+      sessionMenu.observeNativeHud(&nativeHud);
+      sourcePauseObservation.hostSettingFeedback(true,in.right);
+     }
+     if(in.left!=in.right&&row>=5&&row<=8&&nativeAudioAvailable){
+      require50DU(originalMainApplication.animationPaused()&&nativeAudioGroups->adjustNativePauseAudio(
+          *nativeAudioProfile,originalMainApplication.entities(),*nativeAudioMixer,
+          originalMainApplication.animationClock(),nativeAudio,row-5,in.right),
+          "original Pause live audio owner rejected");
+      require50DU(nativeAudioCurrent(),"original Pause live audio observation failed after commit");
+      sessionMenu.observeNativeRaceAudio(&nativeAudio);
+      sourcePauseObservation.hostSettingFeedback(true,in.right);
+     }
+     const bool canResume=!recoveryPaused&&s.phase==VehicleFramePhase49W::Ready;
+     if((in.back||(in.confirm&&row==0))&&canResume)sessionMenu.closeExternal();
+     else if(in.confirm&&row==1)action=MenuResult::Restart;
+     else if(in.confirm&&row==9)action=MenuResult::ReturnOriginalMain;
+     else if(in.confirm&&row==10)action=MenuResult::Quit;
+    }
+    // Every-track original Pause follows the host Pause page's lifetime.
+    {
+     const bool wanted=sourcePauseObservation.hostBound()&&sessionMenu.open()&&
+         sessionMenu.page()==platform::HostSessionMenu50IF::Page::Pause;
+     if(wanted&&!sourcePauseObservation.hostOpen()){
+      if(!sourcePauseObservation.openHost()){
+       std::cerr<<"original_pause_host open_rejected; host menu retained\n";
+       sourcePauseObservation.unbind();
+      }
+     }else if(!wanted&&sourcePauseObservation.hostOpen())sourcePauseObservation.closeHost();
+    }
     // Only accepted explicit native menu commands map to Application11C.
     // Focus/minimize/recovery/controller-loss suppression never writes it.
     if(menuWasOpen!=sessionMenu.open())
@@ -814,7 +860,31 @@ void Context::run() {
     hostClock.pause(now);wasPaused=true;
     const bool drawable=!info.minimized&&info.drawableWidth>0&&info.drawableHeight>0&&
         info.drawableWidth<=maximumWidth&&info.drawableHeight<=maximumHeight;
-    if(drawable&&(sessionMenu.revision()!=drawnMenuRevision||
+    if(drawable&&sourcePauseObservation.hostOpen()){
+     // Animated original screen (opening slide, arrows): redraw every frame.
+     original_pause_observation50LA::Owner::Diagnostic pauseObservation;
+     OriginalPauseLayout50LA::Diagnostic pauseLayout;
+     OriginalPauseNativeResources50LA::Diagnostic pauseDraw;
+     const bool submitted=sourcePauseObservation.prepareHostPresentation(*sourcePause.drawing(),
+         pauseObservation,pauseLayout,pauseDraw)&&
+         renderer.submitRetainedOriginalPause(*sourcePause.drawing(),info.drawableWidth,info.drawableHeight,rendererDiagnostic);
+     if(submitted){
+      if(originalCameraEnabled){
+       phase_timing50GK::Scope completionTiming(phaseTiming,phase_timing50GK::Phase::CompletionWait);
+       const bool displayAccepted=renderer.completeGameplayDisplay(host,hostDiagnostic,completionDiagnostic);
+       completionTiming.finish();
+       displayWallTotals.record(true,displayAccepted,completionDiagnostic);
+       require50DU(displayAccepted,"original Pause actual displayed history completion failed");
+      }else if(host.hasWindow()&&!host.swapWindow(hostDiagnostic)){
+       reportHost50DU(hostDiagnostic);throw std::runtime_error("original Pause window swap failed");
+      }
+      menuImagePublished=true;drawnMenuRevision=0;
+     }else{
+      std::cerr<<"original_pause_host presentation_rejected layout_pc="<<pauseLayout.sourcePC
+          <<" observation_pc="<<pauseObservation.sourcePC<<"; host menu retained\n";
+      sourcePauseObservation.closeHost();sourcePauseObservation.unbind();drawnMenuRevision=0;
+     }
+    }else if(drawable&&(sessionMenu.revision()!=drawnMenuRevision||
        info.drawableWidth!=drawnMenuWidth||info.drawableHeight!=drawnMenuHeight||input.resized||capturePending)){
      const auto menu=sessionMenu.view(!recoveryPaused&&s.phase==VehicleFramePhase49W::Ready);
      if(!renderer.submitHostMenu(menu,info.drawableWidth,info.drawableHeight,rendererDiagnostic)){

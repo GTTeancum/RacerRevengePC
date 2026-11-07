@@ -116,6 +116,26 @@ public:
 
     // Called only for a focused, fully drained input snapshot. Escape/Enter
     // and row movement use fresh edges, never held keys or auto-repeat.
+    // Original Pause screen (every track): the same keyboard/pad edges this
+    // menu consumes, returned as navigation instead of host-page actions.
+    struct OriginalPauseInput { bool up=false,down=false,left=false,right=false,confirm=false,back=false; };
+    OriginalPauseInput pollOriginalPause(const GameHostInput50ER& input) noexcept {
+        OriginalPauseInput out;
+        if(!input.keys.focused||input.keys.minimized||input.keys.activityLost||
+           input.keys.eventBudgetExhausted||input.keys.quitRequested){controllerEdges_={};return out;}
+        auto key = input.keys.pressed;
+        constexpr unsigned scancodes[]={82,81,80,79,40,41};
+        for(unsigned i=0;i<6;++i)if(controllerEdges_[i])key[scancodes[i]]=1;
+        const bool controllerStart=controllerEdges_[6];
+        controllerEdges_={};
+        out.up=key[82]||key[26];out.down=key[81]||key[22];
+        out.left=key[80]||key[4];out.right=key[79]||key[7];
+        out.confirm=key[40]||key[88]||key[44];
+        out.back=key[41]||input.resumeRequested||controllerStart;
+        return out;
+    }
+    // Resume from the original Pause screen (its CONTINUE row or back).
+    void closeExternal() noexcept { if(page_!=Page::Closed)change(Page::Closed); }
     Result poll(const GameHostInput50ER& input, bool canResume,
         bool nativeOptionsCommandIntent=false) noexcept {
         // Final focus alone is insufficient: one drained batch can contain a

@@ -3504,6 +3504,10 @@ SessionExit50DU Context::run() {
    }
    sourcePauseParentAttached=false; // Actual close completed; native graph cleanup follows.
   }
+  // Every-track original Pause left open by Restart/Main/Quit: close its
+  // entity activity before the shared Pause retirement below.
+  if(sourcePauseObservation.hostOpen()&&!sourcePauseObservation.closeHost())
+   return closeRejected("original_pause_host_shutdown");
   // Retire the actual Pause GPU borrow and FINAL pin before any HUD material
   // releases. Keep the renderer/context live for PositionStats' own drains.
   if(!renderer.retireOriginalPauseDerived(rendererDiagnostic))return closeRejected("if(!renderer.retireOriginalPauseDerived(rendererDiagnostic))");

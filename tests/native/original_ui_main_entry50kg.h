@@ -1215,6 +1215,10 @@ public:
     // Source-only detached ownership. Definitions are in original_pause_entity50la.h.
     bool prewarmPauseCold50LA(original_pause_cold50LA::Owner&)const noexcept;
     bool loadConsumedPauseCold50LA(rr::game::OriginalRaceConstructor50LA&,original_pause_cold50LA::Owner&)const noexcept;
+    // Every-track human race: the same Pause storage/load sequence without a
+    // consumed RA race owner (session generation and launch subtype supplied).
+    bool loadHostRacePauseCold50LA(original_pause_cold50LA::Owner&,std::uint64_t sessionGeneration,
+        std::int32_t launchSubtype)const noexcept;
     bool finishPauseDrawCold50LA(original_pause_cold50LA::Owner&)const noexcept;
     std::shared_ptr<rr::game::OriginalPauseStorage50LA> constructPauseCold1A8AB0(
         std::uint64_t actualSessionGeneration)const noexcept;

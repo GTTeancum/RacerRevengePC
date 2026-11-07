@@ -702,6 +702,10 @@ void Context::run() {
        originalMainApplication.assetRoot,sessionIndex+1,sourceDamage),"direct human Damage source staging rejected");
    require50DU(sourcePositionStatsPrestage.stage(originalMainApplication,originalMainApplication.assetRoot,
        trackMaterialRequest.canonicalContext,sourcePositionStatsPrestageDiagnostic),"direct human PositionStats source staging rejected");
+   // Original Pause on every track: same cold sources as the RA route. A
+   // rejection keeps the host menu (logged), never stops the race.
+   if(!originalMainApplication.prewarmPauseCold50LA(sourcePause))
+    std::cerr<<"original_pause_host prewarm_rejected\n";
   }
   if(nativeModelDomain&&!isRaTrack){
    require50DU(trackMaterialRequest.canonicalDomain==nativeModelDomain,
@@ -1899,6 +1903,14 @@ void Context::run() {
     sourcePositionStatsRendering=renderer.bindOriginalPositionStats(sourcePositionStatsHud,rendererDiagnostic);
     if(!sourcePositionStatsRendering)reportRenderer50DU(rendererDiagnostic);
     require50DU(sourcePositionStatsRendering,"original PositionStats GPU source join rejected");
+    if(!isRaTrack){
+     rr::platform::OriginalUiRiderProfileOwner50KG::CourseRaceSelection course;
+     const bool selected=originalMainApplication.riderProfile&&
+         originalMainApplication.riderProfile->courseRaceSnapshot(course);
+     if(!selected||!originalMainApplication.loadHostRacePauseCold50LA(sourcePause,sessionIndex+1,
+         static_cast<std::int32_t>(course.subtype)))
+      std::cerr<<"original_pause_host load_rejected selected="<<selected<<"\n";
+    }
    }
    if(humanCourseEnabled){
     OriginalRaceHudDiagnostic50KG hudDiagnostic;
@@ -2051,6 +2063,18 @@ void Context::run() {
     require50DU(originalMainApplication.attachNativeConsumedRacePause(*consumedRaStage.race(),sourceCameraSession),
         "actual consumed race/Pause parent attachment rejected");
     sourcePauseParentAttached=true;
+   }
+   if(humanOriginalHud&&!isRaTrack&&sourcePause.storage()&&sourceCameraSession){
+    // Constructor17EA08 title IDs in actual track-ID order (as the loader).
+    constexpr std::size_t trackTitles[]={106,111,115,117,110,114,118,108,107,112,116,109,119};
+    rr::platform::OriginalUiRiderProfileOwner50KG::CourseRaceSelection course;
+    bool bound=originalMainApplication.riderProfile&&
+        originalMainApplication.riderProfile->courseRaceSnapshot(course)&&course.course<13&&
+        originalMainApplication.finishPauseDrawCold50LA(sourcePause)&&
+        renderer.bindOriginalPauseDerived(sourcePause.drawing(),rendererDiagnostic);
+    bound=bound&&sourcePauseObservation.bindHost(originalMainApplication,sourcePause.storage(),
+        sourceCameraSession,trackTitles[course.course]);
+    std::cerr<<"original_pause_host bound="<<bound<<" course="<<course.course<<" subtype="<<course.subtype<<"\n";
    }
    if(sourceSpeedBoost.owner){
     original_speed_boost_adapter50LA::Owner::Diagnostic adapterDiagnostic;

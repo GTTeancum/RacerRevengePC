@@ -25,6 +25,8 @@ class Owner final {
     std::weak_ptr<const Track> track_;
     std::uint64_t cameraGeneration_=0;
     mutable bool lifecycleRejected_=false;
+    // Every-track human race route: no consumed RA race; see bindHost.
+    bool host_=false;std::size_t hostTrackText_=0;
     const original_main_entry50KG::Application* application_=nullptr;
     std::weak_ptr<rr::game::OriginalPauseStorage50LA> pause_;
     std::weak_ptr<rr::game::ControlPresets49D> controls_;
@@ -271,6 +273,89 @@ public:
         result.status=routed.status==rr::game::EventRouteStatus48Z::Complete?Status::complete:Status::childRoute;
         result.sourcePC=0x1BE80C;result.originalReturn=routed.handled?1u:0u;return result;
     }
+    // Every-track human race route. The original Pause storage, layout and
+    // native draw are driven from the host race session instead of a consumed
+    // RA race entity: the host session owns world/clock pause, and row actions
+    // (resume, restart, HUD/audio settings, main menu, quit) map to its owners.
+    // trackTextId is the original track-ID title (17EA08 order).
+    bool bindHost(const original_main_entry50KG::Application& application,
+        const std::shared_ptr<rr::game::OriginalPauseStorage50LA>& pause,
+        const std::shared_ptr<Camera>& camera,std::size_t trackTextId)noexcept {
+        if(host_||cameraGeneration_||!camera||!camera->generation_||!bind(application,pause))return false;
+        camera_=camera;cameraGeneration_=camera->generation_;hostTrackText_=trackTextId;host_=true;return true;
+    }
+    bool hostBound()const noexcept{return host_;}
+    bool hostOpen()const noexcept{
+        const auto pause=pause_.lock();return host_&&pause&&pause->active200_;
+    }
+    std::uint32_t hostSelection()const noexcept{
+        const auto pause=pause_.lock();return pause?pause->selection880_:0u;
+    }
+    bool openHost()const noexcept {
+        const auto pause=pause_.lock();const auto camera=camera_.lock();
+        if(!host_||!pause||!camera||camera->generation_!=cameraGeneration_||pause->active200_||
+           pause->mode1F0_||!pause->entity_)return false;
+        pause->selection880_=0;pause->opening30_=.25f; //1BE8C8 opening slide.
+        camera->actual_.cycleAudio.dispatchPauseFeedback(2);
+        if(!pause->entity_->setActivity141630(true))return false;
+        pause->active200_=1;pause->controller884_=0; //The one human's controls slot.
+        return true;
+    }
+    bool closeHost()const noexcept {
+        const auto pause=pause_.lock();
+        if(!host_||!pause||!pause->active200_||!pause->entity_)return false;
+        pause->active200_=0;
+        return pause->entity_->setActivity141630(false);
+    }
+    // 1BD7C0 vertical navigation: rows 0..10 wrap, same feedback cues.
+    bool moveHostSelection(bool down)const noexcept {
+        const auto pause=pause_.lock();const auto camera=camera_.lock();
+        if(!host_||!pause||!camera||!pause->active200_||pause->selection880_>=11)return false;
+        if(down)pause->selection880_=pause->selection880_==10u?0u:pause->selection880_+1u;
+        else pause->selection880_=pause->selection880_?pause->selection880_-1u:10u;
+        camera->actual_.cycleAudio.dispatchPauseFeedback(down?4u:3u);
+        return true;
+    }
+    void hostSettingFeedback(bool changed,bool right)const noexcept {
+        if(const auto camera=camera_.lock())
+            camera->actual_.cycleAudio.dispatchPauseFeedback(changed?(right?4u:3u):6u);
+    }
+    // One retained camera view: resources, opening/arrow geometry, title and
+    // settings refresh, layout and native draw commands (1B9324/1BB010/1B9D84).
+    bool prepareHostPresentation(rr::game::OriginalPauseNativeDraw50LA& native,Diagnostic& observation,
+        rr::game::OriginalPauseLayout50LA::Diagnostic& layout,
+        rr::game::OriginalPauseNativeResources50LA::Diagnostic& draw)const noexcept {
+        observation={};layout={};draw={};if(native.frame_)native.frame_->prepared=false;
+        const auto pause=pause_.lock();const auto controls=controls_.lock();
+        const auto settings=settings_.lock();const auto camera=camera_.lock();
+        const auto profile=application_?application_->profile:nullptr;
+        if(!host_||!application_||!pause||!controls||!settings||!camera||!profile||native.owner_!=pause||
+           !native.current()||camera->generation_!=cameraGeneration_||!camera->publicationCount_||
+           !pause->active200_||application_->controlsProfile!=controls||
+           application_->gameSettingsProfile!=settings)return false;
+        if(!application_->beginUpdateClock140AC0())return false;
+        const auto views=camera->display_.cameraCount264?camera->display_.cameraCount264:1u;
+        bool complete=pause->demandResources1BAE00(views-1u,views,observation)&&
+            pause->advanceGeometry1B9324(application_->animationClock(),observation);
+        if(complete&&pause->mode1F0_!=0){layout.sourcePC=0x1B9C24;complete=false;}
+        if(complete){
+            const auto count=(profile->playerBits1125C>>5)&3u;
+            rr::game::OriginalPauseViewportScope50LA viewport(camera->viewport_,count>=2);
+            if(!viewport.valid_){layout.sourcePC=0x115A60;complete=false;}
+            rr::game::OriginalPauseLayout50LA::Commands derived,outer;
+            if(complete&&count){
+                if(rr::game::OriginalPauseLayout50LA::visible(*pause))
+                    complete=pause->refreshTitle1BB010(camera->raceFlags1B0_,hostTrackText_,observation)&&
+                        pause->refreshSettings1BB590(*controls,*settings,observation);
+                complete=complete&&rr::game::OriginalPauseLayout50LA::prepare1BB010(*pause,derived,layout);
+            }
+            complete=complete&&rr::game::OriginalPauseLayout50LA::prepareOuterTail1B9D84(
+                *pause,derived,profile->playerBits1125C,outer,layout)&&
+                native.prepareCommands(outer,camera->viewport_,camera->publicationCount_,draw);
+        }
+        const bool committed=application_->commitUpdateClock140D30();
+        return complete&&committed;
+    }
     // Explicit native spectator opening policy; the original human-device
     // acceptance1A87A0 is unavailable with the actual ALL8 humanCount34==0.
     bool openNativeAll8SpectatorMenu(const rr::game::InputEvent48Z&,Diagnostic&)const noexcept;
@@ -286,6 +371,7 @@ public:
         rr::game::OriginalPauseNativeResources50LA::Diagnostic&)const noexcept;
     bool resetNativePresentationClock()const noexcept;
     void unbind()noexcept {
+        host_=false;hostTrackText_=0;
         race_.reset();camera_.reset();track_.reset();cameraGeneration_=0;lifecycleRejected_=false;
         application_=nullptr;pause_.reset();controls_.reset();settings_.reset();
     }
