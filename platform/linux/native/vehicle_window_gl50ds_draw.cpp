@@ -1378,15 +1378,66 @@ bool VehicleWindowGl50DS::Storage::drawSpecularSpan50LA(std::uint8_t bank, U slo
                 }
             }
         }
+        // PC/Xbox fixed-function route: each source group keeps its original
+        // base-then-map-2 order, but map 2 is one GPU-blended draw (src RGB
+        // * DST_ALPHA + dst RGB, alpha replaced) instead of destination-
+        // feedback runs. The GPU orders overlapping fragments itself, so no
+        // texture barrier, feedback binding or pair proof is needed.
+        // The stored byte/128 alpha scale represents destination alpha only
+        // up to 127, which source MODULATE guarantees when every span vertex
+        // alpha is at most 64 (texture alpha 255 -> 127). Any other span keeps
+        // the byte-exact route rather than saturate.
+        const auto spanAlphaAdmitted = [&]() noexcept {
+            if (slot > frameOpponentCount) return false;
+            const auto& owner = slot ? frameOpponentBatches[slot - 1] : framePlayerBatch;
+            if (component >= owner.componentCount) return false;
+            const auto& part = owner.component[component];
+            if (!part.vertices || span.vertex_start > part.vertexCount ||
+                span.vertex_count > part.vertexCount - span.vertex_start) return false;
+            for (U v = span.vertex_start; v < span.vertex_start + span.vertex_count; ++v)
+                if (part.vertices[v].color[3] > 64) return false;
+            return true;
+        };
+        const bool fixedBlend = drawSecond && !coverageDemand && fixedSpecularBlend50LA &&
+            gl.blendFuncSeparate && spanAlphaAdmitted();
+        if (drawSecond && !coverageDemand && fixedSpecularBlend50LA && !fixedBlend) ++coveragePairExactFallbackSpans;
+        if (fixedBlend) {
+            gl.uniform1i(u.sourcePairFixedBlend50LA, 1);
+            gl.blendEquation(0x8006); // FUNC_ADD
+            for (U g = first; accepted && g < end; ++g) {
+                const auto& group = groups.groups[g];
+                gl.bindTexture(texture2D, material->name);
+                gl.uniform1i(u.sourcePairPass50LA, 1);
+                if (g == first || !sameFog)
+                    gl.uniform1i(u.sourcePairFog50LA, material->policy.sourceBaseFog50LA ? 1 : 0);
+                gl.depthMask(1);
+                drawGl.drawElementsBaseVertex(0x0004, static_cast<I>(group.indexCount), 0x1405,
+                    reinterpret_cast<const void*>(std::uintptr_t(group.indexStart) * sizeof(U)), 0);
+                gl.bindTexture(texture2D, material->specularName50LA);
+                gl.uniform1i(u.sourcePairPass50LA, 2);
+                if (!sameFog)
+                    gl.uniform1i(u.sourcePairFog50LA, material->policy.sourceSpecularFog50LA ? 1 : 0);
+                gl.depthMask(0); // Same linked position shader/VAO and LEQUAL coverage.
+                gl.enable(0x0BE2);
+                gl.blendFuncSeparate(0x0304, 1, 1, 0); // RGB: DST_ALPHA, ONE; A: ONE, ZERO
+                drawGl.drawElementsBaseVertex(0x0004, static_cast<I>(group.indexCount), 0x1405,
+                    reinterpret_cast<const void*>(std::uintptr_t(group.indexStart) * sizeof(U)), 0);
+                gl.disable(0x0BE2);
+                ++diagnostic->sourceSpecularBaseGroups50LA;
+                diagnostic->sourceSpecularSecondTriangles50LA += group.indexCount / 3;
+            }
+            accepted = check("draw fixed-function original source-pair groups");
+            gl.uniform1i(u.sourcePairFixedBlend50LA, 0);
+        }
         // Single-sample: one operand cache for the whole paired span. Vertex
         // positions are fixed for this draw, so batch planning and run
         // building reuse projections instead of recomputing per batch.
-        if (drawSecond && !coverageDemand && first < end) {
+        if (!fixedBlend && drawSecond && !coverageDemand && first < end) {
             const auto& last = groups.groups[end - 1];
             beginRacerRasterOperandGroup(slot, component, groups.groups[first].indexStart,
                 last.indexStart + last.indexCount - groups.groups[first].indexStart);
         }
-        for (U g = first; drawSecond && accepted && g < end; ++g) {
+        for (U g = first; !fixedBlend && drawSecond && accepted && g < end; ++g) {
             const U groupIndex = g;
             // Single-sample consecutive groups whose triangles provably share
             // no sample with another group's form one batch: one base draw of
@@ -1584,7 +1635,7 @@ bool VehicleWindowGl50DS::Storage::begin(void* context, std::uint8_t bank) noexc
         s.coveragePairRuns=s.coveragePairTriangles=s.coveragePairCoalescedTriangles=0;
         s.coveragePairEmptyTriangles=s.coveragePairFullSingletons=0;s.coveragePairBatchedGroups=0;
         s.coveragePairUnproven={};s.coveragePairUnprovenOperands=s.coveragePairBreakRegion=0;
-        s.coveragePairBreakCap=s.coveragePairBreakEnd=0;
+        s.coveragePairBreakCap=s.coveragePairBreakEnd=0;s.coveragePairExactFallbackSpans=0;
         // Same-context GL ordering protects buffer/target reuse after prior
         // commands, including aborted work. No mapping or cross-context sharing.
         s.gl.bindFramebuffer(framebuffer, s.coverageDemand ? s.coverageLive.scene[bank] : s.targets[bank]);
@@ -1735,6 +1786,9 @@ bool VehicleWindowGl50DS::Storage::commit(void* context, std::uint8_t bank) noex
                 static_cast<unsigned long long>(s.coveragePairBreakRegion),
                 static_cast<unsigned long long>(s.coveragePairBreakCap),
                 static_cast<unsigned long long>(s.coveragePairBreakEnd));
+        if(s.request.enableGameplayDisplayWallTiming)
+            std::fprintf(stderr,"native_fixed_specular enabled=%u exact_fallback_spans=%llu\n",
+                s.fixedSpecularBlend50LA?1u:0u,static_cast<unsigned long long>(s.coveragePairExactFallbackSpans));
         // Cable/HUD failure still aborts the unpublished combined frame.
         s.resetPodState();
         if (!s.drawCables(s.frameCables, s.cableTextureName)) return false;

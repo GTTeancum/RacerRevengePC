@@ -70,6 +70,7 @@ struct VehicleGlShaderUniforms50CZ {
     // the ordered source map-2 equation using the current destination byte A.
     std::int32_t sourcePairPass50LA = -1, sourcePairFog50LA = -1;
     std::int32_t sourcePairDestination50LA = -1, sourcePairAlphaTest50LA = -1;
+    std::int32_t sourcePairFixedBlend50LA = -1;
     // Independent static single-map RGBA path. Fog RGB is vec4.xyz in byte units (padding W=0);
     // the scalar byte fog attribute is interpolated screen-linearly. All four
     // locations are required even when this opt-in capability is disabled.

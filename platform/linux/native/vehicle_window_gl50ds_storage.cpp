@@ -1,4 +1,5 @@
 #include "vehicle_window_gl50ds_storage.h"
+#include <cstdlib>
 #include "../../../tests/native/ra_static_fire_visual50la.h"
 #include "../../../tests/native/rc_particle_visual50rc.h"
 #include "../../../tests/native/gb_particle_visual50gb.h"
@@ -841,6 +842,11 @@ bool VehicleWindowGl50DS::Storage::loadFunctions() noexcept {
         LOAD(gl, uniformMatrix4fv, UniformMatrix4fv); LOAD(gl, uniform1i, Uniform1i);
         LOAD(gl, uniform1f, Uniform1f); LOAD(gl, uniform4f, Uniform4f);
         LOAD(gl, blendFunc, BlendFunc); LOAD(gl, blendEquation, BlendEquation);
+        LOAD(gl, blendFuncSeparate, BlendFuncSeparate);
+        {
+            const char* exact = std::getenv("RR_EXACT_PS2_SPECULAR");
+            fixedSpecularBlend50LA = !(exact && exact[0] == '1' && !exact[1]);
+        }
         LOAD(gl, viewport, Viewport); LOAD(gl, enable, Enable); LOAD(gl, disable, Disable);
         LOAD(gl, depthFunc, DepthFunc); LOAD(gl, depthMask, DepthMask);
         LOAD(gl, depthRange, DepthRange); LOAD(gl, clearDepth, ClearDepth);

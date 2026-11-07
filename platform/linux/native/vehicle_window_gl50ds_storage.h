@@ -175,6 +175,7 @@ struct OwnerGl {
     void (*uniform4f)(I, float, float, float, float) = nullptr;
     void (*blendFunc)(U, U) = nullptr;
     void (*blendEquation)(U) = nullptr;
+    void (*blendFuncSeparate)(U, U, U, U) = nullptr; // core GL1.4
     // Resolved only for source-RGBA texture-feedback fallback after capability proof.
     void (*textureBarrier)() = nullptr;
     void (*clipControl)(U,U) = nullptr;
@@ -321,6 +322,12 @@ struct VehicleWindowGl50DS::Storage {
     };
     std::array<SpecularGeometry50LA, sourceBodyCount50LA> sourceSpecularGeometry50LA;
     bool hasSpecularPairs50LA = false, hasSingleDiffuse50LA = false;
+    // Single-sample paired bodies use fixed-function blending (src*DST_ALPHA
+    // + dst, alpha replaced; destination alpha kept in source byte/128 scale)
+    // instead of per-triangle destination feedback. The same split runs on
+    // NV2A-class hardware. RR_EXACT_PS2_SPECULAR=1 restores the byte-exact
+    // feedback route for comparison. AA coverage keeps its exact bridge.
+    bool fixedSpecularBlend50LA = true;
     std::unique_ptr<float[]> frameDiffuseFog50LA;
     std::unique_ptr<game::original_racer_diffuse50LA::Workspace> diffuseWorkspace50LA;
     game::OriginalRacerDiffuseCameraSnapshot50LA frameDiffuseCamera50LA;

@@ -15,6 +15,8 @@
     std::uint64_t coveragePairUnprovenOperands=0,coveragePairBreakRegion=0,
         coveragePairBreakCap=0,coveragePairBreakEnd=0;
     void classifyUnprovenPair(U slot,U component,U firstA,U firstB) noexcept;
+    // Paired spans that kept the exact feedback route because a vertex alpha exceeded 64.
+    std::uint64_t coveragePairExactFallbackSpans=0;
     struct CoverageExtent {
         U scene[2]{}, color[2]{}, depth[2]{};
         U snapshot=0, snapshotColor=0, raster=0, payload=0, rasterDepth=0;

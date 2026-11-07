@@ -74,6 +74,10 @@ uniform int sourceSingleAlphaTest50LA;
 uniform int sourcePairPass50LA;
 uniform int sourcePairFog50LA;
 uniform int sourcePairAlphaTest50LA;
+// 1: PC/Xbox fixed-function route. Destination alpha is stored in source
+// scale (byte/128) so GPU blending computes src*DST_ALPHA + dst without any
+// framebuffer read; map 2 replaces alpha through a separate alpha factor.
+uniform int sourcePairFixedBlend50LA;
 uniform sampler2D sourcePairDestination50LA;
 uniform vec4 nativeGcAmbient;
 uniform vec4 nativeGcDiffuse[3];
@@ -121,12 +125,21 @@ void main() {
                     return;
                 }
 #endif
+                if (sourcePairFixedBlend50LA != 0) {
+                    viewerOutput = vec4(sourceByte.rgb / 255.0, min(sourceByte.a / 128.0, 1.0));
+                    return;
+                }
                 // One triangle per barrier/draw. Read this fragment's current
                 // destination, never a whole-group snapshot or source alpha.
                 vec4 destinationByte = floor(clamp(texelFetch(sourcePairDestination50LA,
                     ivec2(gl_FragCoord.xy), 0) * 255.0, 0.0, 255.0) + 0.5);
                 sourceByte.rgb = clamp(floor(sourceByte.rgb * destinationByte.a / 128.0) +
                     destinationByte.rgb, 0.0, 255.0);
+            }
+            if (sourcePairFixedBlend50LA != 0) {
+                // Base pass: same RGB; alpha in source scale for the map-2 blend.
+                viewerOutput = vec4(sourceByte.rgb / 255.0, min(sourceByte.a / 128.0, 1.0));
+                return;
             }
             viewerOutput = sourceByte / 255.0; // Map 2 independently replaces A.
             return;
@@ -327,6 +340,7 @@ bool VehicleGlShader50CZ::initialize(VehicleGlShaderDiagnostic50CZ& diagnostic, 
     uniforms_.sourcePairFog50LA = gl_.getUniformLocation(program_, "sourcePairFog50LA");
     uniforms_.sourcePairDestination50LA = gl_.getUniformLocation(program_, "sourcePairDestination50LA");
     uniforms_.sourcePairAlphaTest50LA = gl_.getUniformLocation(program_, "sourcePairAlphaTest50LA");
+    uniforms_.sourcePairFixedBlend50LA = gl_.getUniformLocation(program_, "sourcePairFixedBlend50LA");
     uniforms_.nativeGcAmbient = gl_.getUniformLocation(program_, "nativeGcAmbient");
     constexpr const char* diffuseNames[] = {
         "nativeGcDiffuse[0]", "nativeGcDiffuse[1]", "nativeGcDiffuse[2]"
@@ -348,7 +362,7 @@ bool VehicleGlShader50CZ::initialize(VehicleGlShaderDiagnostic50CZ& diagnostic, 
         uniforms_.sourceSingleFogEnabled50LA < 0 || uniforms_.sourceSingleAlphaTest50LA < 0 ||
         uniforms_.sourcePairPass50LA < 0 ||
         uniforms_.sourcePairFog50LA < 0 || uniforms_.sourcePairDestination50LA < 0 ||
-        uniforms_.sourcePairAlphaTest50LA < 0 ||
+        uniforms_.sourcePairAlphaTest50LA < 0 || uniforms_.sourcePairFixedBlend50LA < 0 ||
         uniforms_.nativeGcAmbient < 0)
         return fail();
     ready_ = true;
