@@ -7,6 +7,7 @@
 #include "../../src/game/original_pod_collision_response_owner.h"
 #include "../../platform/linux/native/original_sound_mode50kg.h"
 #include <array>
+#include <cstdio>
 #include <memory>
 #include <iostream>
 #include "original_material_input_diagnostics50ln.h"
@@ -444,12 +445,27 @@ public:
         const rr::game::BoostParameters50FK& parameters,rr::game::BoostState50FK& state,
         rr::game::BoostDiagnostic50FK& diagnostic)noexcept {
         if(!ownsSlot(slot)||!frame.fields.nativeAiOwnersBound50IV||
-           frame.fields.vehicle58!=1u)return false;auto& r=racers_[slot];
+           frame.fields.vehicle58!=1u){
+            std::fprintf(stderr,"ai_thermal_rejected slot=%zu reason=owner owns=%d bound=%d vehicle58=%u\n",slot,
+                ownsSlot(slot),frame.fields.nativeAiOwnersBound50IV?1:0,static_cast<unsigned>(frame.fields.vehicle58));
+            return false;
+        }
+        auto& r=racers_[slot];
         rr::game::OriginalAiEmitterRacerInput observed;
-        if(!rr::game::readOriginalAiEmitterRacerInput(r.engine.identity,frame,bindings,state.speedRatio70,observed))return false;
+        if(!rr::game::readOriginalAiEmitterRacerInput(r.engine.identity,frame,bindings,state.speedRatio70,observed)){
+            std::fprintf(stderr,"ai_thermal_rejected slot=%zu reason=racer_input\n",slot);return false;
+        }
         const rr::game::OriginalAiEmitterBoostBackend backend{&r,attachBoost,startBoost};
-        return rr::game::advanceOriginalAiThermalWithD40(r.engine,observed,input,parameters,state,
-            backend,diagnostic).status==rr::game::OriginalAiEmitterStatus::complete;
+        const auto receipt=rr::game::advanceOriginalAiThermalWithD40(r.engine,observed,input,parameters,state,
+            backend,diagnostic);
+        if(receipt.skippedBoostSoundPC&&skippedBoostSoundLogs_<16){
+            ++skippedBoostSoundLogs_;
+            std::fprintf(stderr,"ai_boost_sound_skipped slot=%zu source_pc=0x%x\n",slot,receipt.skippedBoostSoundPC);
+        }
+        if(receipt.status!=rr::game::OriginalAiEmitterStatus::complete)
+            std::fprintf(stderr,"ai_thermal_rejected slot=%zu status=%u source_pc=0x%x\n",slot,
+                static_cast<unsigned>(receipt.status),receipt.sourcePC);
+        return receipt.status==rr::game::OriginalAiEmitterStatus::complete;
     }
     bool children(std::size_t slot,const rr::game::VehicleFrameState49W& frame,
         const rr::game::VehicleFrameBindings49W& bindings,const rr::game::BoostState50FK& thermal)noexcept {
@@ -563,6 +579,7 @@ private:
         if(result.status!=rr::game::AiLogicalSoundStatus::complete)return false;
         returned=true;return true;
     }
+    unsigned skippedBoostSoundLogs_=0;
     rr::game::OriginalHumanEngineResetOwner50LB* humanResetOwner_=nullptr;
     rr::game::OriginalPodCollisionResponseOwners::Emitter* humanResetD44_=nullptr;
     Channel humanMaterials_{};

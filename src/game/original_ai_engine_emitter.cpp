@@ -249,14 +249,16 @@ R advanceOriginalAiThermalWithD40(E& e,const OriginalAiEmitterRacerInput& frame,
         if(onset){
             //16DCB8 slotA8=16E200->179070, event4. The nonnull racer220 is
             //already the identity-bound current lease. No material1/2 lookup.
+            // A refused boost voice is a missing sound, never a stopped race:
+            // skip it (as an unavailable PS2 voice would) and keep the
+            // emitter usable. The caller reports skippedBoostSoundPC.
             if(e.boost228){
-                if(!sound(e.boost228,e.identity.session)||!backend.attach104140)
-                    return fail(e,r,S::boostAttach,0x179284u);
                 bool returned=false;
-                if(!backend.attach104140(backend.context,*e.boost228,frame.localPosition,
-                    frame.bodyVelocity70,0,450,returned))return fail(e,r,S::boostAttach,0x179284u);
-                if(returned&&(!backend.start233410||
-                    !backend.start233410(backend.context,*e.boost228,5)))return fail(e,r,S::boostStart,0x1792a0u);
+                if(!sound(e.boost228,e.identity.session)||!backend.attach104140||
+                   !backend.attach104140(backend.context,*e.boost228,frame.localPosition,
+                    frame.bodyVelocity70,0,450,returned))r.skippedBoostSoundPC=0x179284u;
+                else if(returned&&(!backend.start233410||
+                    !backend.start233410(backend.context,*e.boost228,5)))r.skippedBoostSoundPC=0x1792a0u;
             }
             e.flags22CLow4=static_cast<std::uint8_t>(e.flags22CLow4|2u);
         }else e.flags22CLow4=static_cast<std::uint8_t>(e.flags22CLow4&~2u);

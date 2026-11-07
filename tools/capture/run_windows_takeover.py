@@ -51,6 +51,8 @@ def main():
     parser.add_argument('--renderer-switch', action='append', default=[],
                         choices=['RR_EXACT_PS2_SPECULAR', 'RR_GPU_FINISH_EACH_FRAME'],
                         help='Set one renderer comparison switch to 1 (repeatable); recorded in execution.json')
+    parser.add_argument('--hold-throttle', action='store_true',
+                        help='Hold the human keyboard throttle once the race is green (launch test)')
     args = parser.parse_args()
     if os.name != 'nt' or not 10 <= args.seconds <= 180:
         parser.error('Windows required; watchdog must be 10..180 seconds')
@@ -93,6 +95,8 @@ def main():
         env['RR_EVIDENCE_LOGS_ONLY'] = '1'
     if args.camera_trace:
         env['RR_CAMERA_POSE_TRACE'] = '1'
+    if args.hold_throttle:
+        env['RR_TEST_HOLD_THROTTLE'] = '1'
     if args.profile_performance or args.profile_gpu_stages:
         env.update(RR_TRACE_PHASES='1', RR_TRACE_RENDER='1')
     if args.profile_gpu_stages:

@@ -135,6 +135,9 @@ struct OriginalAiEmitterReceipt {
     std::uint32_t sourcePC=0;
     std::size_t spatialWrites=0,positionSoundCalls=0,velocityNoopCalls=0,
         pitchCalls=0,pitchWrites=0,childCalls=0;
+    // Nonzero: the boost sound attach/start at this PC was refused and skipped.
+    // The thermal/boost state still advanced; the race is not stopped.
+    std::uint32_t skippedBoostSoundPC=0;
 };
 // Joins actual native sound fields, including its real registered PCM owner.
 // Does not claim original resource-factory/AuralScape setup has completed.

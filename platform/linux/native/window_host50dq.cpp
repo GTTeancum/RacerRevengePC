@@ -1,4 +1,5 @@
 #include "window_host50dq.h"
+#include <chrono>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -681,6 +682,17 @@ bool WindowHost50DQ::swap(WindowHostDiagnostic50DQ& d) noexcept {
     if (!created()) return fail(d, WindowHostError50DQ::NotCreated, "swap");
     if (!current()) return fail(d, WindowHostError50DQ::NotCurrent, "swap");
     state_->swapWindow(state_->window);
+    {
+        // Presentation-gap diagnostic: any interval over 50 ms between two
+        // swaps, wherever it occurs (menus, loading, intro, race). Bounded.
+        static std::chrono::steady_clock::time_point previous{};static unsigned lines=0;
+        const auto now=std::chrono::steady_clock::now();
+        if(previous!=std::chrono::steady_clock::time_point{}&&lines<200){
+            const double ms=std::chrono::duration<double,std::milli>(now-previous).count();
+            if(ms>50.0){++lines;std::fprintf(stderr,"swap_gap_ms=%.1f%c",ms,10);}
+        }
+        previous=now;
+    }
     return true;
 }
 bool WindowHost50DQ::setTitle(const char* title,WindowHostDiagnostic50DQ& d) noexcept {

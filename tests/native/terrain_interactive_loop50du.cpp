@@ -175,7 +175,9 @@ void Context::run() {
    commitCompletedTournament();
    {
     auto& hitch=frameHitch50DU;const auto now=FrameHitch50DU::Clock::now();
-    if(hitch.started&&hitchMs50DU(hitch.start,now)>100.0)
+    // Two frame budgets (33 ms); bounded so a sustained slowdown cannot flood.
+    static unsigned hitchLines50DU=0;
+    if(hitch.started&&hitchMs50DU(hitch.start,now)>33.0&&hitchLines50DU<200&&++hitchLines50DU)
      std::cerr<<"frame_hitch total_ms="<<hitchMs50DU(hitch.start,now)
          <<" input_audio_ms="<<hitchMs50DU(hitch.start,hitch.physics)
          <<" simulation_ms="<<hitchMs50DU(hitch.physics,hitch.render)
@@ -205,6 +207,16 @@ void Context::run() {
         <<(polled?"true":"false")<<"}\n";
    if(!polled){
     reportHost50DU(hostDiagnostic);throw std::runtime_error("window event pump failed");
+   }
+   {
+    // Unattended test only: hold keyboard throttle (W) once the race is green,
+    // so the human launch at the start light is exercised like a real player.
+    static const bool holdThrottle50DU=[]{const char* v=std::getenv("RR_TEST_HOLD_THROTTLE");return v&&std::string(v)=="1";}();
+    if(holdThrottle50DU&&captureRun.unattended()&&race.phase==race_session50HM::Phase::Racing){
+     constexpr std::size_t throttleW=26;
+     if(!hostInput.keys.down[throttleW])hostInput.keys.pressed[throttleW]=1;
+     hostInput.keys.down[throttleW]=1;
+    }
    }
    if(!originalUiActive){
     // Revoke frontend-only button/stick/hold admission while another owner
@@ -971,6 +983,22 @@ void Context::run() {
    platform::FixedStepPlan50DT plan{};
    require50DU(hostClock.plan(now,plan),"fixed-step host clock planning failed");
    addCounter50DU(discardedHostNs,plan.discardedNanoseconds);
+   {
+    // Green-light trace: first 3 race seconds (and the last countdown second),
+    // one line per host loop: wall interval, planned/discarded steps and the
+    // world tick reached. A frozen world shows as repeated tick values.
+    static std::uint64_t greenTracePrevNs50DU=0;static unsigned greenTraceLines50DU=0;
+    const bool window=(race.phase==race_session50HM::Phase::Racing&&race.raceSeconds<3.0)||
+        (race.phase==race_session50HM::Phase::Countdown&&race.countdownRemaining<=1.0);
+    if(window&&greenTraceLines50DU<400){
+     ++greenTraceLines50DU;
+     std::cerr<<"green_trace phase="<<static_cast<unsigned>(race.phase)<<" race_s="<<race.raceSeconds
+         <<" countdown="<<race.countdownRemaining<<" wall_ms="<<(greenTracePrevNs50DU?(now-greenTracePrevNs50DU)/1.0e6:0.0)
+         <<" steps="<<plan.steps<<" discarded_ms="<<plan.discardedNanoseconds/1.0e6
+         <<" tick="<<completedFrames<<" camera_gate="<<(sourceCameraSession?1:0)<<'\n';
+    }
+    greenTracePrevNs50DU=now;
+   }
    for(std::uint32_t step=0;step<plan.steps;++step){
     if(sourceCameraSession&&sourceCameraSession->pendingDisplayWork())break;
     // End each accepted root on every normal loop departure. A source skip
