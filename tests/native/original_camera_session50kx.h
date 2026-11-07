@@ -256,6 +256,7 @@ class Session final {
     friend struct ::interactive_loop50DU::Context;
     friend class rr::game::OriginalSessionF8Intro50LA;
     friend class ::original_race_hud_scope50LA::Registration;
+    friend class rr::game::OriginalRaceConstructor50LA; //TA counted Camera34 custody (issuance read only).
     friend struct ::original_main_entry50KG::Application;
     friend class ::original_main_entry50KG::RaceDisplayLifetime50LA;
     friend class ::gb_particle_render50GB::Owner;
@@ -678,6 +679,7 @@ class Session final {
     OriginalCameraViewportFields viewport_;
     bool coldCameraSelected26F940_=false;
     bool bindCountedRaceCameraNative34()noexcept;
+    bool canonicalCourseEndRoute()const noexcept;
     bool completeCountedRaceCameraNative34()noexcept;
     bool completeCountedRaceMusicNative10C(std::uint32_t&)noexcept;
     bool completeCountedRaceWorldNativePrefix1A9EE0(std::uint32_t&)noexcept;

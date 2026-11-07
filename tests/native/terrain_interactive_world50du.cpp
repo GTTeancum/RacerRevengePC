@@ -752,6 +752,8 @@ SessionExit50DU Context::run() {
       taSelected.mode34==2&&taSelected.subtype==1;
   // Actual174E48 gates: startup350 is zero; subtype2/3 never use authored cuts.
   // Keep ordinary Single Event and record/practice owners unchanged.
+  std::cerr<<"consumed_ta_gate launch="<<bool(consumedLaunch)<<" camera="<<originalCameraEnabled
+      <<" mode34="<<taSelected.mode34<<" subtype="<<taSelected.subtype<<" admitted="<<taAuthoredIntro<<"\n";
   if(consumedLaunch&&originalCameraEnabled&&taAuthoredIntro){
    openNativeVideo();
    originalMainApplication.appStart(originalMainApplication.assetRoot);

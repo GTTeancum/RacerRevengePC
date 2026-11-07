@@ -169,3 +169,49 @@ True milestone 1 work, in order:
 3. Add camera ownership for the Application-issued TA Session (own, lifetime,
    borrow) alongside the RA world-owned one.
 4. Widen end HUD, end clock, F8 and Pause parent to use that borrow.
+
+### Milestone 1 implemented (build86, not yet run)
+
+Correction to the scope note above: TA already ran `beginConsumedRaceLoad1A6AA0`,
+resources and the six race groups (`original_consumed_ta_stage50du.h`), so
+TA has `loadDisplay_`/`loadFifo_`/`raceAudio_`. Implemented:
+
+* 1A6BE0 on TA: `constructTaWorld1A6BC0` sets `soundReset`;
+  `constructConsumedTaRaceWorld1A6BC0` continues `continueConsumedRaWorldInit1A6BE0`
+  (Aural reset, low2, counted Camera34 prefix) like RA.
+  `worldResetPredecessor1A6BF0Current` has a TA world half.
+* Camera34 custody for the Application-issued TA Session:
+  `nativeCameraAdapter34LifetimeCurrent`/`ownsNativeCameraAdapter34` TA branch,
+  `Application::issuedCourseCameraSession50LA`, `Race::borrowRaceCamera34` and
+  `raceCameraCourse34` (one rule for RA and TA).
+* `Application::consumedTaCamera34Engaged`: TA binds Camera34 only for the
+  human-course Session whose race94 is the race's own `field94_`; other TA
+  Sessions keep the previous no-op. The canonical end root on TA additionally
+  needs a bound adapter, a live end HUD registration and the live native Root,
+  otherwise the previous end policy runs.
+* End HUD Scope, `stop1AD230`, `endStateCurrent` and the end-clock/fade borrows
+  use `borrowRaceCamera34`. `humanEndRace94` binds TA's race94.
+* Not changed: race-start fade-in (`advanceRaceFadeInPrefix`) stays RA-only;
+  the 1A7DD0 end dispatch still hands over to the host results panel
+  (Results is milestone 2); `completeCountedRaceWorldNativePrefix1A9EE0` and
+  music10C completion stay RA-only.
+
+### Build87 unattended results (Nov 7, logs only)
+
+* Build86 crashed at the TA restart: the widened Session revoke reached
+  `revokeConsumedRaCameraNative34` with no Race28C (TA Single Event has no
+  consumed race) and refused. Build87 makes TA revoke a no-op without
+  Race28C. Diagnostics added: `consumed_ta_gate` (world50du) and
+  `camera34_close_state` / `camera_abandon_rejected` (continuation shutdown).
+* `main-rider-course-ta` + restart: exit 0, route and restart verified,
+  62.5 FPS. Gate log: `mode34=0 subtype=1 admitted=0`, i.e. this route is
+  not a tournament, so the consumed TA stage and the new slot30 code do not
+  run on it.
+* `main-dud04-course-ga` + restart: exit 0, route and restart verified.
+  First race 45.8 FPS, second 61.5 FPS (cause of the first-race figure not
+  established).
+* RA: `main-mawhonic09-course-ra` is admitted only as all-AI with the
+  `mawhonic-ryloth` profile and then stops at "RA cold target/runtime readiness
+  is unavailable". No RA run was possible.
+* Not yet exercised by any run: TA tournament (mode34==2), i.e. the actual
+  milestone 1 path (1A6BE0 continuation, Camera34 bind, end HUD, end clock).

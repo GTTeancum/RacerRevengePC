@@ -8,20 +8,28 @@
 #include <bit>
 
 namespace original_camera_session50KX {
+// RA always; TA only once its counted Camera34 and end HUD are both bound.
+// An unengaged TA Session keeps the previous end policy below.
+bool Session::canonicalCourseEndRoute()const noexcept {
+    if(!nativeTaIssuance_)return false;
+    if(nativeTaIssuance_->course==OriginalCameraStartCourse::ra)return true;
+    return nativeTaIssuance_->course==OriginalCameraStartCourse::ta&&nativeTaIssuance_->issuer&&
+        nativeTaIssuance_->issuer->consumedTaCamera34Engaged(*this,true);
+}
 rr::game::OriginalHumanEndClockResult50KG Session::advanceCanonicalHumanEndRoot()noexcept {
     using S=rr::game::OriginalHumanEndClockStatus50KG;
     if(f8Intro_.ownerThread_!=std::this_thread::get_id())return {S::callerBoundary,0x1a7da0,0};
     const auto& issued=nativeTaIssuance_;std::uint32_t pause=0;
     // The immutable issuance's issuer is dereferenced only while its existing
     // Application animation lifetime observation is still current.
-    if(!issued||issued->course!=OriginalCameraStartCourse::ra||!issued->issuer||
+    if(!issued||!canonicalCourseEndRoute()||!issued->issuer||
        !actual_.applicationAnimation.readPause11C(pause))return {S::callerBoundary,0x1a7b94,0};
     return issued->issuer->advanceConsumedSessionEndClock1A7DA0(*this);
 }
 Result Session::advanceCanonicalRaceFadeInPrefix()noexcept {
     if(f8Intro_.ownerThread_!=std::this_thread::get_id())return {Status::owner,0x1a7bd0};
     const auto& issued=nativeTaIssuance_;std::uint32_t pause=0;
-    if(!issued||issued->course!=OriginalCameraStartCourse::ra||!issued->issuer||
+    if(!issued||!canonicalCourseEndRoute()||!issued->issuer||
        !actual_.applicationAnimation.readPause11C(pause))return {Status::owner,0x1a7b94};
     return issued->issuer->advanceConsumedSessionFadeIn1A7BD0(*this);
 }
@@ -29,7 +37,7 @@ rr::game::OriginalHumanEndClockResult50KG Session::advanceHumanEndRootWithOwners
     race_music50IE::Owner* music,source_announcer50IE::Owner* announcer)noexcept {
     using S=rr::game::OriginalHumanEndClockStatus50KG;
     if(f8Intro_.ownerThread_!=std::this_thread::get_id())return {S::callerBoundary,0x1a7da0,0};
-    if(nativeTaIssuance_&&nativeTaIssuance_->course==OriginalCameraStartCourse::ra){
+    if(canonicalCourseEndRoute()){
         if(!actual_.humanCount34||!coldBound_||abandoned_||pendingDisplayWork()||
            (frameStage_!=FrameStage::idle&&frameStage_!=FrameStage::published))
             return {S::callerBoundary,0x1a7da0,0};
@@ -95,10 +103,10 @@ bool Registration::endStateCurrent(const rr::game::OriginalRaceConstructor50LA& 
     const auto retained=race_.lock();
     if(retained.get()!=&race||application_->race28C()!=&race||application_->entities()!=race.application_||
        !race.counted_||race.rolledBack_||race.entity_.sessionGeneration!=generation_||
-       race.endHud_.lock().get()!=this||!race.world74_)return false;
+       race.endHud_.lock().get()!=this||!(race.world74_||race.taWorld74_))return false;
     const auto& issued=session.nativeTaIssuance_;
     if(!issued||issued->issuer!=application_||issued->generation!=generation_||
-       issued->course!=rr::game::OriginalCameraStartCourse::ra||!session.coldBound_||!session.readsBound_||
+       !race.raceCameraCourse34(issued->course)||!session.coldBound_||!session.readsBound_||
        session.closed_||session.abandoned_||session.generation_!=generation_||!session.displayInputs_||
        &session.actual_.bank!=bank_||&session.actual_.all8Manager!=&manager_->manager||
        &session.actual_.race94!=&race.field94_||session.actual_.humanCount34!=1u||
@@ -114,8 +122,7 @@ rr::game::OriginalHumanEndClockResult50KG Registration::advanceEndClock1A7DA0(
     const auto boundary=[](std::uint32_t pc)noexcept {return rr::game::OriginalHumanEndClockResult50KG{S::callerBoundary,pc,0};};
     if(!endStateCurrent(race,session)||!publication)return boundary(0x1a7da0);
     try {
-        const auto world=race.world74_;ra_cold_aggregate50LA::Diagnostic wd;
-        const auto actual=world->borrowRuntimeSourceCamera(world,wd);
+        const auto actual=race.borrowRaceCamera34();
         if(!actual||actual.get()!=&session)return boundary(0x1a7da0);
         std::uint32_t pause=0;
         if(!session.actual_.applicationAnimation.readPause11C(pause))return boundary(0x1a7b94);
@@ -181,8 +188,7 @@ original_camera_session50KX::Result Registration::advanceFadeIn1A7BD0(
     using S=original_camera_session50KX::Status;
     if(!endStateCurrent(race,session))return {S::owner,0x1a7bd0};
     try {
-        const auto world=race.world74_;ra_cold_aggregate50LA::Diagnostic wd;
-        const auto actual=world->borrowRuntimeSourceCamera(world,wd);
+        const auto actual=race.borrowRaceCamera34();
         if(!actual||actual.get()!=&session)return {S::owner,0x1a7bd0};
         auto& app=*session.displayInputs_;auto& video=app.video;
         if(session.endingFadeRequest_.pending()||

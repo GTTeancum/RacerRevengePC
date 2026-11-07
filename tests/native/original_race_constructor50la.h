@@ -264,6 +264,10 @@ class OriginalRaceConstructor50LA final {
     const ::original_camera_session50KX::Session* cameraNativeAdapter34_=nullptr;
     bool ownsNativeCameraAdapter34(const ::original_camera_session50KX::Session&)const noexcept;
     bool nativeCameraAdapter34LifetimeCurrent(const ::original_camera_session50KX::Session&)const noexcept;
+    // One rule for every RA/TA end-of-race user: RA borrows its world-owned
+    // Session; TA borrows the Application-issued Session bound as Camera34.
+    bool raceCameraCourse34(OriginalCameraStartCourse)const noexcept;
+    std::shared_ptr<::original_camera_session50KX::Session> borrowRaceCamera34()const noexcept;
     std::uint32_t field128_=3;
     //Actual HUD pointer slots, constructor-null then published only by the
     //reached1A8CC4 producer. Optional reset means native borrow unavailable,
@@ -519,6 +523,8 @@ public:
     // distinct typed world owner. Definitions follow the complete world types.
     const OriginalWreckComponent50LA* nativeIntroRaceEntity()const noexcept;
     const OriginalWreckComponent50LA* nativeIntroWorldEntity()const noexcept;
+    // Any counted world slot (RA aggregate or a TA/GC/MA/SA/GA prefix).
+    bool anyWorld()const noexcept{return world74_||taWorld74_||gcWorld74_||maWorld74_||saWorld74_||gaWorld74_;}
     const OriginalWreckComponent50LA* nativeIntroControllerSlot48()const noexcept {
         return nativeIntroRaceEntity()?nativeTaController48_:nullptr;
     }

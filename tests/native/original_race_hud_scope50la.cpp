@@ -34,11 +34,17 @@ Registration::Registration(const original_main_entry50KG::Application& applicati
      music_(music),announcer_(announcer),gameplay_(gameplay),engines_(engines),countdown_(countdown){}
 
 Scope::Scope(::interactive_continuation50DU::Context& actual,const native_racer50HN::Bank& bank)noexcept {
-    const auto& app=actual.originalMainApplication;const auto& race=actual.consumedRaStage.race();
+    const auto& app=actual.originalMainApplication;
+    // RA or TA consumed race, each checked against its own retained world.
+    const bool ta=!actual.consumedRaStage.race();
+    const auto& race=ta?actual.consumedTaStage.race():actual.consumedRaStage.race();
+    const bool worldCurrent=race&&(ta?
+        actual.taOriginalWorld&&!race->world74_&&race->taWorld74_==actual.taOriginalWorld:
+        actual.raWorld&&race->world74_==actual.raWorld);
     if(!race||race->resultsFeedbackThread_!=std::this_thread::get_id()||
        app.race28C()!=race.get()||!race->counted_||race->rolledBack_||
        !race->entity_.sessionGeneration||race->application_!=app.entities()||
-       !actual.raWorld||race->world74_!=actual.raWorld||!race->endHud_.expired())return;
+       !worldCurrent||!race->endHud_.expired())return;
     try {
         //The exact Context field is borrowed by Publication and Frame too.
         //It may not yet have loaded/constructed views: this registers lifetime
@@ -167,12 +173,11 @@ bool Registration::stop1AD230(const rr::game::OriginalRaceConstructor50LA& race)
     if(retained.get()!=&race||application_->race28C()!=&race||
        application_->entities()!=race.application_||!race.counted_||race.rolledBack_||
        race.entity_.sessionGeneration!=generation_||race.endHud_.lock().get()!=this||
-       !race.hudTextSlots_||!race.world74_)return false;
+       !race.hudTextSlots_||!(race.world74_||race.taWorld74_))return false;
     try {
         //This existing synchronous borrow retains actual world/query/model
-        //backing and prevents Camera/world closure during the HUD operation.
-        const auto world=race.world74_;ra_cold_aggregate50LA::Diagnostic wd;
-        const auto camera=world->borrowRuntimeSourceCamera(world,wd);
+        //backing (RA) or the issued Session (TA) during the HUD operation.
+        const auto camera=race.borrowRaceCamera34();
         if(!camera||camera.get()!=camera_)return false;
         if(!camera->coldBound_||!camera->readsBound_||camera->closed_||camera->abandoned_||
            camera->generation_!=generation_||&camera->actual_.bank!=bank_||
@@ -180,7 +185,7 @@ bool Registration::stop1AD230(const rr::game::OriginalRaceConstructor50LA& race)
            camera->actual_.humanCount34!=1u||(camera->raceFlags1B0_&3u)!=1u||
            !camera->nativeTaIssuance_||camera->nativeTaIssuance_->issuer!=application_||
            camera->nativeTaIssuance_->generation!=generation_||
-           camera->nativeTaIssuance_->course!=rr::game::OriginalCameraStartCourse::ra||
+           !race.raceCameraCourse34(camera->nativeTaIssuance_->course)||
            !camera->identitiesCurrent()||
            !camera->viewport_.prepared||camera->viewport_.sessionGeneration!=generation_||
            !hud_->loaded()||hud_->viewCount()!=1u)return false;

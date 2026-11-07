@@ -47,7 +47,9 @@ inline bool OriginalRaceConstructor50LA::constructTaWorld1A6BC0(
     if(!audio.constructNextCold2350D0(mixer,application_,entity_.sessionGeneration,RaceAudioGroup50IC::World4D8))return false;
     taWorldList500_=std::move(list);taWorldListCapacity504_=10;taWorldListGrowth508_=100000;taWorldListCount50C_=0;
     application_->worldRegistration434320_=0;taWorldMode524_=3;
-    taWorldPrefixComplete_=true;pc=0x1b2918;return true;
+    taWorldPrefixComplete_=true;
+    worldInitStep_=WorldInitStep::soundReset; //Same caller continues1A6BE0, as on RA.
+    pc=0x1b2918;return true;
 }
 inline bool OriginalRaceConstructor50LA::retireNativeTaWorldPrefix(std::uint32_t& pc)noexcept {
     pc=0x1b2870;
@@ -79,11 +81,18 @@ namespace original_main_entry50KG {
 inline bool Application::constructConsumedTaRaceWorld1A6BC0(rr::game::OriginalRaceConstructor50LA& owner,
     std::shared_ptr<ta_original_world50LE::Owner> world,std::uint32_t& pc)const noexcept {
     pc=0x1a6bc0;original_course_targets50KX::Selection selected;
-    if(raceConstructorColdOwner50LA_.lock().get()!=&owner||owner.application_!=entitiesOwner_||
+    if(garageAudioOwnerThread_!=std::this_thread::get_id()||
+       owner.resultsFeedbackThread_!=std::this_thread::get_id())return false;
+    if(sourceRace28COwner_.get()!=&owner||raceConstructorColdOwner50LA_.lock().get()!=&owner||owner.application_!=entitiesOwner_||
        owner.profile_!=riderProfile||!riderProfile||!riderProfile->courseRaceSnapshot(selected)||
        !original_course_targets50KX::same(selected,owner.launchSelection_))return false;
     const auto* target=original_course_targets50KX::target(selected);
     if(!target||target->track!=rr::platform::HostTrack50IM::TA)return false;
-    return owner.constructTaWorld1A6BC0(*this,std::move(world),pc);
+    if(owner.worldAttempted_){
+        // Native resumption never reconstructs or replays a reached prefix.
+        if(!world||world.get()!=owner.taWorld74_.get())return false;
+    }else if(!owner.constructTaWorld1A6BC0(*this,std::move(world),pc))return false;
+    // Slot30 prefix as on RA: sound reset, profile low2 and counted Camera34.
+    return continueConsumedRaWorldInit1A6BE0(owner,pc);
 }
 }

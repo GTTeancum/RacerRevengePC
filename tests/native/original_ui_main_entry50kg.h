@@ -581,6 +581,10 @@ private:
     // Used by the actual Pause borrower while the original1A9240 stays pending.
     bool consumedRaAll8CameraCustodyNative34Current(const original_camera_session50KX::Session&)const noexcept;
     bool bindConsumedRaCameraNative34(original_camera_session50KX::Session&)const noexcept;
+    // TA slot30: the counted Camera34 route is engaged only for the human
+    // course race whose race94 this Application-issued TA Session borrows.
+    // Any other TA Session keeps its previous (unbound) route unchanged.
+    bool consumedTaCamera34Engaged(const original_camera_session50KX::Session&,bool requireBound)const noexcept;
     bool completeConsumedRaCameraNative34(original_camera_session50KX::Session&)const noexcept;
     enum class All8MusicStatus:std::uint8_t {unavailable,nativeChildrenReady,failed};
     // Separate native ALL8 entry: actual counted10C and prepared PCM/Dax join,
@@ -1042,6 +1046,12 @@ private:
     //17C848/84C copies the six original bytes at3A8600 into36B420.
     const std::string fontDirectory36B420_="font\\";
 public:
+    // Borrow of the one Application-issued course Session (TA/MA/SA/GA/GC).
+    // Its root owner closes it explicitly; this never extends that lifetime
+    // beyond the synchronous caller.
+    std::shared_ptr<original_camera_session50KX::Session> issuedCourseCameraSession50LA()const noexcept {
+        return nativeTaCameraSession50LA_.lock();
+    }
     // Native allocation/custody only, replacing the existing canonical-TA
     // make_shared at its real root. Does not call the source constructor.
     std::shared_ptr<original_camera_session50KX::Session> createNativeTaCameraSession50LA(

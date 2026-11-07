@@ -317,18 +317,19 @@ SessionExit50DU Context::run() {
  // the Setup timer or reset94 here. Other routes retain their previous owner.
  // Keep physical storage alive through all nested borrowers and close/unwind;
  // this native shared reference does not retain its source counted authority.
- const auto humanEndRace94=humanCourseEnabled?consumedRaStage.race():
-     std::shared_ptr<OriginalRaceConstructor50LA>{};
+ const auto humanEndRace94=!humanCourseEnabled?std::shared_ptr<OriginalRaceConstructor50LA>{}:
+     consumedRaStage.race()?consumedRaStage.race():consumedTaStage.race();
  if(humanEndRace94){
   require50DU(humanEndRace94->resultsFeedbackThread_==std::this_thread::get_id()&&
-      this->nativeOriginalFleet&&this->isRaTrack&&
+      this->nativeOriginalFleet&&(this->isRaTrack||this->isTaTrack)&&
       this->originalMainApplication.race28C()==humanEndRace94.get()&&
       humanEndRace94->application_==this->originalMainApplication.entities()&&
       humanEndRace94->profile_==this->originalMainApplication.riderProfile&&
       humanEndRace94->counted_&&!humanEndRace94->rolledBack_&&humanEndRace94->constructorSuffix_&&
       humanEndRace94->entity_.sessionGeneration==this->sessionIndex+1&&
-      humanEndRace94->world74_&&humanEndRace94->world74_==this->raWorld,
-      "human RA ending94 requires its actual current consumed Race/Application/world");
+      (this->isRaTrack?humanEndRace94->world74_&&humanEndRace94->world74_==this->raWorld:
+          !humanEndRace94->world74_&&humanEndRace94->taWorld74_&&humanEndRace94->taWorld74_==this->taOriginalWorld),
+      "human ending94 requires its actual current consumed Race/Application/world");
  }
  auto& humanResultsCountdown=humanEndRace94?humanEndRace94->field94_:this->humanResultsCountdown;
  auto& humanResultsReady=this->humanResultsReady;
@@ -3560,7 +3561,23 @@ SessionExit50DU Context::run() {
    if(sourceEndingFade&&!sourceEndingFade->cancelAndRetire())return closeRejected("if(sourceEndingFade&&!sourceEndingFade->cancelAndRetire())");
    if(sourceFadeIn&&!sourceFadeIn->cancelAndRetire())return closeRejected("if(sourceFadeIn&&!sourceFadeIn->cancelAndRetire())");
    if(sourceFadeOut&&!sourceFadeOut->cancelAndRetire())return closeRejected("if(sourceFadeOut&&!sourceFadeOut->cancelAndRetire())");
-   if(sourceCameraSession&&sourceCameraSession->abandonAndCloseSpatial().status!=sourceCamera::Status::abandoned)return closeRejected("if(sourceCameraSession&&sourceCameraSession->abandonAndCloseSpatial().status!=sourceCamera::Status::abandoned)");
+   if(sourceCameraSession){
+    if(const auto* race=originalMainApplication.race28C()){
+     // Read-only Camera34 custody observation before abandonment.
+     std::cerr<<"camera34_close_state race28C=1 camera34="<<bool(race->camera34_)
+         <<" adapter_bound="<<(race->cameraNativeAdapter34_==sourceCameraSession.get())
+         <<" adapter_any="<<bool(race->cameraNativeAdapter34_)
+         <<" lifetime_current="<<race->nativeCameraAdapter34LifetimeCurrent(*sourceCameraSession)
+         <<" issued_current="<<(originalMainApplication.issuedCourseCameraSession50LA()==sourceCameraSession)
+         <<" step="<<static_cast<unsigned>(race->cameraInitStep_)<<"\n";
+    }else std::cerr<<"camera34_close_state race28C=0\n";
+    const auto abandoned=sourceCameraSession->abandonAndCloseSpatial();
+    if(abandoned.status!=sourceCamera::Status::abandoned){
+     std::cerr<<"camera_abandon_rejected status="<<static_cast<unsigned>(abandoned.status)
+         <<" source_pc=0x"<<std::hex<<abandoned.sourcePC<<std::dec<<"\n";
+     return closeRejected("if(sourceCameraSession&&sourceCameraSession->abandonAndCloseSpatial().status!=sourceCamera::Status::abandoned)");
+    }
+   }
    if(isRaTrack){
     sourceCameraSession.reset();
     if(raSession&&!raSession->retireBeforeBankDestruction(raSessionDiagnostic))return closeRejected("if(raSession&&!raSession->retireBeforeBankDestruction(raSessionDiagnostic))");

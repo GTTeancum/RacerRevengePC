@@ -104,9 +104,15 @@ inline bool OriginalRaceConstructor50LA::worldResetPredecessor1A6BF0Current()con
     // Same real seven empty2350D0 owners constructed before this exact call.
     // The Race's native provider mixer is not relabeled as Aural's interface.
     if(resultsFeedbackThread_!=std::this_thread::get_id()||worldInitStep_!=WorldInitStep::soundReset||
-       !nativeIntroWorldEntity()||!world74_||!raceAudio_||raceGroupCount_!=6||raceGroupsAttached_!=6||
-       world74_->worldAudio_!=raceAudio_||world74_->topologyAttempted_||world74_->worldPhysics3D4_||
-       world74_->worldCollisionObjects3CC_||!world74_->worldList500_||world74_->worldListCount50C_||
+       !nativeIntroWorldEntity()||!raceAudio_||raceGroupCount_!=6||raceGroupsAttached_!=6)return false;
+    // World-specific half: RA aggregate, or the TA counted prefix (which owns
+    // no topology/physics/collision objects and an empty source list500).
+    if(world74_){
+        if(world74_->worldAudio_!=raceAudio_||world74_->topologyAttempted_||world74_->worldPhysics3D4_||
+           world74_->worldCollisionObjects3CC_||!world74_->worldList500_||world74_->worldListCount50C_)return false;
+    }else if(!taWorld74_||!taWorldCounted_||!taWorldPrefixComplete_||!taWorldList500_||
+             taWorldListCount50C_||nativeTaController48_)return false;
+    if(
        raceAudio_->coldThread_!=std::this_thread::get_id()||!raceAudio_->coldStarted_||
        raceAudio_->coldRetiring_||raceAudio_->nativeBindingsRetired_||raceAudio_->coldNext_!=7||
        raceAudio_->coldApplication_!=application_||raceAudio_->coldSession_!=entity_.sessionGeneration||
@@ -145,7 +151,7 @@ inline bool Application::continueConsumedRaWorldInit1A6BE0(
        owner.resultsFeedbackThread_!=std::this_thread::get_id())return false;
     if(sourceRace28COwner_.get()!=&owner||raceConstructorColdOwner50LA_.lock().get()!=&owner||
        owner.application_!=entitiesOwner_||owner.profile_!=riderProfile||!riderProfile||
-       !owner.counted_||owner.rolledBack_||!owner.worldAttempted_||!owner.world74_||
+       !owner.counted_||owner.rolledBack_||!owner.worldAttempted_||!owner.anyWorld()||
        !owner.nativeIntroWorldEntity()||owner.worldInitStep_==Step::unreached||
        !entitiesOwner_||entitiesOwner_->attachmentLock423F58()||
        !entitiesOwner_->entityAuthority_.canRetire(owner.entity_))return false;
