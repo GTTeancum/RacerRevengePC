@@ -149,8 +149,12 @@ bool VehicleWindowGl50DS::Storage::retainedMesh(const game::VehicleDrawBatch50CO
             // each racer on this renderer thread. Not a runtime admission
             // rule: later lighting, materials and sessions can differ.
             static thread_local bool alphaObserved[8][maxComponents]{};
-            const char* alphaTrace = std::getenv("RR_TRACE_PHASES");
-            const bool traceAlpha = alphaTrace && alphaTrace[0] == '1' &&
+            // Process launch configuration; read once, not per racer component per frame.
+            static const bool alphaTraceRequested = [] {
+                const char* value = std::getenv("RR_TRACE_PHASES");
+                return value && value[0] == '1';
+            }();
+            const bool traceAlpha = alphaTraceRequested &&
                 part.sourceColorRacerSlot50LA < 8 &&
                 !alphaObserved[part.sourceColorRacerSlot50LA][c];
             for (U i = 0; i < part.spanCount; ++i) {

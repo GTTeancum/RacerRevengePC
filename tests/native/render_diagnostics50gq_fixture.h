@@ -15,7 +15,9 @@
 namespace render_diagnostics50GQ {
 enum class Subphase : std::uint8_t {
     DrawBank, VehicleProjection, HostCamera, SourceCables, HostHud,
-    DriverSubmit, Census, OpponentPreparation, Count
+    DriverSubmit, Census, OpponentPreparation,
+    // Nested inside OpponentPreparation; profiling rows only, never summed with it.
+    OpponentDrawBatch, OpponentLights, OpponentCables, OpponentBinder, OpponentFlame, Count
 };
 constexpr std::size_t subphaseCount = static_cast<std::size_t>(Subphase::Count);
 
@@ -29,6 +31,11 @@ inline const char* subphaseName(Subphase phase) noexcept {
     case Subphase::DriverSubmit: return "driver_submit";
     case Subphase::Census: return "census";
     case Subphase::OpponentPreparation: return "opponent_preparation";
+    case Subphase::OpponentDrawBatch: return "opponent_draw_batch";
+    case Subphase::OpponentLights: return "opponent_lights";
+    case Subphase::OpponentCables: return "opponent_cables";
+    case Subphase::OpponentBinder: return "opponent_binder";
+    case Subphase::OpponentFlame: return "opponent_flame";
     default: return "invalid";
     }
 }

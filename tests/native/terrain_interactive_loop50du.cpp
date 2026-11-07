@@ -4,6 +4,7 @@
 #include "original_results_native_frame50la.h"
 #include "../../src/game/original_race_f8_50la.h"
 #include "../../src/game/original_results104_50la.h"
+#include <optional>
 #include <sstream>
 
 namespace interactive_loop50DU {
@@ -1877,6 +1878,9 @@ void Context::run() {
        if(nativeSelectedLights)beginNativeLightDraw(static_cast<std::uint32_t>(racer),lightLease);
        const bool originalBodyColors=bool(nativeModelDomain)&&nativeSelectedLights;
        VehicleDrawBatchSourceColors50LA sourceColors;
+       // Profiling-only nested rows; each scope closes before the next sub-step.
+       std::optional<render_diagnostics50GQ::Scope> lightsTiming(std::in_place,renderDiagnostics,
+           render_diagnostics50GQ::Subphase::OpponentLights);
        if(originalBodyColors){
         if(!gcLightOwner.publishNativeDraw(lightLease,nativeLightingPolicy,gcDrawLights[racer],gcLightDiagnostic))
          nativeLightFailure("source body-color light publication rejected",static_cast<std::uint32_t>(racer),lightLease);
@@ -1893,16 +1897,23 @@ void Context::run() {
              "actual opponent lower model matrix packet owners unavailable");
         }
        }
+       lightsTiming.reset();
+       {render_diagnostics50GQ::Scope drawTiming(renderDiagnostics,render_diagnostics50GQ::Subphase::OpponentDrawBatch);
        require50DU(opponentDraw[index].prepare(s,x.bindings,drawWorkspace,opponentDiagnostic,
            originalBodyColors?&sourceColors:nullptr),
-           "actual opponent component projection failed");
+           "actual opponent component projection failed");}
+       lightsTiming.emplace(renderDiagnostics,render_diagnostics50GQ::Subphase::OpponentLights);
        if(nativeSelectedLights&&!originalBodyColors&&!gcLightOwner.publishNativeDraw(lightLease,
            nativeLightingPolicy,gcDrawLights[racer],gcLightDiagnostic))
         nativeLightFailure("publishNativeDraw rejected",static_cast<std::uint32_t>(racer),lightLease);
+       lightsTiming.reset();
+       {render_diagnostics50GQ::Scope cableTiming(renderDiagnostics,render_diagnostics50GQ::Subphase::OpponentCables);
        require50DU(buildPodCables50FD(s,x.bindings,racerCables[racer]->bindings(),cameraBackward,
-           opponentDraw[index].cables,cableWorkspace,cableDiagnostic),"actual opponent cable mesh failed");
+           opponentDraw[index].cables,cableWorkspace,cableDiagnostic),"actual opponent cable mesh failed");}
+       {render_diagnostics50GQ::Scope binderTiming(renderDiagnostics,render_diagnostics50GQ::Subphase::OpponentBinder);
        if(gameplayBinder.loaded())require50DU(gameplayBinder.stageRacer(static_cast<std::uint32_t>(racer),
-           s,x.bindings,cameraBackward,gcLightOwner),"actual opponent Binder attachment projection failed");
+           s,x.bindings,cameraBackward,gcLightOwner),"actual opponent Binder attachment projection failed");}
+       render_diagnostics50GQ::Scope flameTiming(renderDiagnostics,render_diagnostics50GQ::Subphase::OpponentFlame);
        EngineFlareDiagnostic50GV flareDiagnostic{};
        require50DU(advanceEngineFlare50GV(s,baseTail,coldFlame,
            static_cast<std::uint32_t>(submittedDrawFrames%0xffffffffull),opponentFlames[index],flareDiagnostic),

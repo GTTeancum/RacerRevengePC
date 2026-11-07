@@ -482,6 +482,8 @@ bool VehicleWindowGl50DS::submit(const game::VehicleDrawBatch50CO& batch,
         ~FlareSubmissionScope(){if(entered&&!accepted)owner.raLocalFlareFailed=true;}
     } flareSubmissionScope{s,flareEntered,flareSubmissionAccepted};
     if(!s.prepareRaWorldFrame(frame,d,flareEntered))return false;
+    // Profiling-only splits of validation_prepare (same sum, new sibling rows).
+    s.traceRaStage("validation_inputs",submissionStageStart,false);
     if (s.request.track.worldFog.enabled) {
         if (!frame.worldFogCamera)
             return fail(d, VehicleWindowError50DS::frame, "world fog requires explicit camera position");
@@ -520,7 +522,9 @@ bool VehicleWindowGl50DS::submit(const game::VehicleDrawBatch50CO& batch,
                 normalReceipts[i + 1])) return false;
         }
         d.opponentIndex = maxVehicleWindowOpponents50DS;
+        s.traceRaStage("validation_racers_lights",submissionStageStart,false);
         if (!s.prepareSpecularFrame50LA(batch, frame, d, normalReceipts) || !s.prepareRcCrystalFrame(frame,d)) return false;
+        s.traceRaStage("validation_specular",submissionStageStart,false);
     }
     if (bool(s.request.cables.textures) != bool(frame.cables))
         return fail(d, VehicleWindowError50DS::frame, "cable frame presence must match explicit cold cable request");
