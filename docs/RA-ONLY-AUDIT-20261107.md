@@ -106,3 +106,15 @@ branches select that loader, not a feature.
   consumed race's own world/session, Results104 load in the tier-B HUD
   collector window, and the finish -> Results open/frame drive that RA gets
   from `humanEndRace94` / `prepareNativeResultsFrame50LA`.
+
+## Build85 (installed, not yet played)
+
+Contains build84 (every-track original Pause) plus: original Pause on human RA
+races and native speech on all consumed races. Results on other tracks and
+tier-C race stages were NOT done: the Results subsystem is ~5,800 lines
+(display, record pages, career summary, winnings, roster pages, Hall record
+saving) driven by the RA native race display pipeline (root scheduler, race
+display owner, course-RA camera issuance, captured timing). It needs either
+that pipeline per track or a host-driven adaptation that preserves career and
+record saving; tier-C race stages are comparable. Treat as the next dedicated
+effort.
