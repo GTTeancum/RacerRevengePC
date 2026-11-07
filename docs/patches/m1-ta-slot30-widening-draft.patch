@@ -1,0 +1,154 @@
+diff --git a/tests/native/original_race_camera_owner50la.cpp b/tests/native/original_race_camera_owner50la.cpp
+index 5a0f5a7..9de22b8 100644
+--- a/tests/native/original_race_camera_owner50la.cpp
++++ b/tests/native/original_race_camera_owner50la.cpp
+@@ -38,7 +38,7 @@ bool Application::continueConsumedRaCamera1A9240(
+        race.resultsFeedbackThread_!=std::this_thread::get_id())return false;
+     if(sourceRace28COwner_.get()!=&race||raceConstructorColdOwner50LA_.lock().get()!=&race||
+        race.application_!=entitiesOwner_||race.profile_!=riderProfile||!riderProfile||
+-       !race.counted_||race.rolledBack_||!race.nativeIntroWorldEntity()||!race.world74_||
++       !race.counted_||race.rolledBack_||!race.nativeIntroWorldEntity()||!race.anyWorld()||
+        race.worldInitStep_!=rr::game::OriginalRaceConstructor50LA::WorldInitStep::camera||
+        !entitiesOwner_||entitiesOwner_->attachmentLock423F58()||
+        (race.flags1B0KnownMask_&3u)!=3u)return false;
+@@ -146,7 +146,8 @@ bool Application::bindConsumedRaCameraNative34(original_camera_session50KX::Sess
+     const auto race=sourceRace28COwner_;const auto& issued=session.nativeTaIssuance_;
+     if(!race||raceConstructorColdOwner50LA_.lock()!=race||race->application_!=entitiesOwner_||
+        race->profile_!=riderProfile||!race->ownsNativeCameraAdapter34(session)||
+-       !issued||issued->issuer!=this||issued->course!=rr::game::OriginalCameraStartCourse::ra||
++       !issued||issued->issuer!=this||(issued->course!=rr::game::OriginalCameraStartCourse::ra&&
++           issued->course!=rr::game::OriginalCameraStartCourse::ta)||
+        issued->generation!=race->entity_.sessionGeneration||session.generation_!=issued->generation||
+        session.actual_.applicationEntities!=entitiesOwner_||
+        !session.actual_.applicationAnimation.sameOwner(animationClock())||
+@@ -239,21 +240,24 @@ bool Application::retireConsumedRaCameraNative34(
+ namespace original_camera_session50KX {
+ bool Session::bindCountedRaceCameraNative34()noexcept {
+     if(f8Intro_.ownerThread_!=std::this_thread::get_id())return false;
+-    if(!nativeTaIssuance_||nativeTaIssuance_->course!=OriginalCameraStartCourse::ra)return true;
++    if(!nativeTaIssuance_||(nativeTaIssuance_->course!=OriginalCameraStartCourse::ra&&
++       nativeTaIssuance_->course!=OriginalCameraStartCourse::ta))return true;
+     std::uint32_t pause=0;
+     return nativeTaIssuance_->issuer&&actual_.applicationAnimation.readPause11C(pause)&&
+         nativeTaIssuance_->issuer->bindConsumedRaCameraNative34(*this);
+ }
+ bool Session::completeCountedRaceCameraNative34()noexcept {
+     if(f8Intro_.ownerThread_!=std::this_thread::get_id())return false;
+-    if(!nativeTaIssuance_||nativeTaIssuance_->course!=OriginalCameraStartCourse::ra)return true;
++    if(!nativeTaIssuance_||(nativeTaIssuance_->course!=OriginalCameraStartCourse::ra&&
++       nativeTaIssuance_->course!=OriginalCameraStartCourse::ta))return true;
+     std::uint32_t pause=0;
+     return nativeTaIssuance_->issuer&&actual_.applicationAnimation.readPause11C(pause)&&
+         nativeTaIssuance_->issuer->completeConsumedRaCameraNative34(*this);
+ }
+ bool Session::revokeCountedRaceCameraNative34()noexcept {
+     if(f8Intro_.ownerThread_!=std::this_thread::get_id())return false;
+-    if(!nativeTaIssuance_||nativeTaIssuance_->course!=OriginalCameraStartCourse::ra)return true;
++    if(!nativeTaIssuance_||(nativeTaIssuance_->course!=OriginalCameraStartCourse::ra&&
++       nativeTaIssuance_->course!=OriginalCameraStartCourse::ta))return true;
+     std::uint32_t pause=0;
+     return nativeTaIssuance_->issuer&&actual_.applicationAnimation.readPause11C(pause)&&
+         nativeTaIssuance_->issuer->revokeConsumedRaCameraNative34(*this);
+diff --git a/tests/native/original_race_constructor50la.h b/tests/native/original_race_constructor50la.h
+index d88cdf3..04e93a5 100644
+--- a/tests/native/original_race_constructor50la.h
++++ b/tests/native/original_race_constructor50la.h
+@@ -519,6 +519,8 @@ public:
+     // distinct typed world owner. Definitions follow the complete world types.
+     const OriginalWreckComponent50LA* nativeIntroRaceEntity()const noexcept;
+     const OriginalWreckComponent50LA* nativeIntroWorldEntity()const noexcept;
++    // Any counted world slot (RA aggregate or a TA/GC/MA/SA/GA prefix).
++    bool anyWorld()const noexcept{return world74_||taWorld74_||gcWorld74_||maWorld74_||saWorld74_||gaWorld74_;}
+     const OriginalWreckComponent50LA* nativeIntroControllerSlot48()const noexcept {
+         return nativeIntroRaceEntity()?nativeTaController48_:nullptr;
+     }
+diff --git a/tests/native/original_race_hud_scope50la.cpp b/tests/native/original_race_hud_scope50la.cpp
+index ee02c77..92ba337 100644
+--- a/tests/native/original_race_hud_scope50la.cpp
++++ b/tests/native/original_race_hud_scope50la.cpp
+@@ -34,11 +34,16 @@ Registration::Registration(const original_main_entry50KG::Application& applicati
+      music_(music),announcer_(announcer),gameplay_(gameplay),engines_(engines),countdown_(countdown){}
+ 
+ Scope::Scope(::interactive_continuation50DU::Context& actual,const native_racer50HN::Bank& bank)noexcept {
+-    const auto& app=actual.originalMainApplication;const auto& race=actual.consumedRaStage.race();
++    const auto& app=actual.originalMainApplication;
++    // RA or TA consumed race, each checked against its own retained world.
++    const auto race=actual.consumedRaStage.race()?actual.consumedRaStage.race():actual.consumedTaStage.race();
++    const bool worldCurrent=race&&(race==actual.consumedRaStage.race()?
++        actual.raWorld&&race->world74_==actual.raWorld:
++        actual.taOriginalWorld&&race->taWorld74_==actual.taOriginalWorld);
+     if(!race||race->resultsFeedbackThread_!=std::this_thread::get_id()||
+        app.race28C()!=race.get()||!race->counted_||race->rolledBack_||
+        !race->entity_.sessionGeneration||race->application_!=app.entities()||
+-       !actual.raWorld||race->world74_!=actual.raWorld||!race->endHud_.expired())return;
++       !worldCurrent||!race->endHud_.expired())return;
+     try {
+         //The exact Context field is borrowed by Publication and Frame too.
+         //It may not yet have loaded/constructed views: this registers lifetime
+diff --git a/tests/native/original_race_world_join50la.h b/tests/native/original_race_world_join50la.h
+index b15e54c..6387e79 100644
+--- a/tests/native/original_race_world_join50la.h
++++ b/tests/native/original_race_world_join50la.h
+@@ -145,7 +145,7 @@ inline bool Application::continueConsumedRaWorldInit1A6BE0(
+        owner.resultsFeedbackThread_!=std::this_thread::get_id())return false;
+     if(sourceRace28COwner_.get()!=&owner||raceConstructorColdOwner50LA_.lock().get()!=&owner||
+        owner.application_!=entitiesOwner_||owner.profile_!=riderProfile||!riderProfile||
+-       !owner.counted_||owner.rolledBack_||!owner.worldAttempted_||!owner.world74_||
++       !owner.counted_||owner.rolledBack_||!owner.worldAttempted_||!owner.anyWorld()||
+        !owner.nativeIntroWorldEntity()||owner.worldInitStep_==Step::unreached||
+        !entitiesOwner_||entitiesOwner_->attachmentLock423F58()||
+        !entitiesOwner_->entityAuthority_.canRetire(owner.entity_))return false;
+diff --git a/tests/native/original_ta_world_cold_prefix50la.h b/tests/native/original_ta_world_cold_prefix50la.h
+index 9eaa137..9fe3a7d 100644
+--- a/tests/native/original_ta_world_cold_prefix50la.h
++++ b/tests/native/original_ta_world_cold_prefix50la.h
+@@ -47,7 +47,9 @@ inline bool OriginalRaceConstructor50LA::constructTaWorld1A6BC0(
+     if(!audio.constructNextCold2350D0(mixer,application_,entity_.sessionGeneration,RaceAudioGroup50IC::World4D8))return false;
+     taWorldList500_=std::move(list);taWorldListCapacity504_=10;taWorldListGrowth508_=100000;taWorldListCount50C_=0;
+     application_->worldRegistration434320_=0;taWorldMode524_=3;
+-    taWorldPrefixComplete_=true;pc=0x1b2918;return true;
++    taWorldPrefixComplete_=true;
++    worldInitStep_=WorldInitStep::soundReset; //Same caller continues 1A6BE0 as RA.
++    pc=0x1b2918;return true;
+ }
+ inline bool OriginalRaceConstructor50LA::retireNativeTaWorldPrefix(std::uint32_t& pc)noexcept {
+     pc=0x1b2870;
+@@ -84,6 +86,8 @@ inline bool Application::constructConsumedTaRaceWorld1A6BC0(rr::game::OriginalRa
+        !original_course_targets50KX::same(selected,owner.launchSelection_))return false;
+     const auto* target=original_course_targets50KX::target(selected);
+     if(!target||target->track!=rr::platform::HostTrack50IM::TA)return false;
+-    return owner.constructTaWorld1A6BC0(*this,std::move(world),pc);
++    if(!owner.constructTaWorld1A6BC0(*this,std::move(world),pc))return false;
++    // Slot30 prefix as on RA: sound reset, profile low2 and counted Camera34.
++    return continueConsumedRaWorldInit1A6BE0(owner,pc);
+ }
+ }
+diff --git a/tests/native/terrain_interactive_continuation50du.cpp b/tests/native/terrain_interactive_continuation50du.cpp
+index 90e5648..cbcb826 100644
+--- a/tests/native/terrain_interactive_continuation50du.cpp
++++ b/tests/native/terrain_interactive_continuation50du.cpp
+@@ -317,18 +317,19 @@ SessionExit50DU Context::run() {
+  // the Setup timer or reset94 here. Other routes retain their previous owner.
+  // Keep physical storage alive through all nested borrowers and close/unwind;
+  // this native shared reference does not retain its source counted authority.
+- const auto humanEndRace94=humanCourseEnabled?consumedRaStage.race():
+-     std::shared_ptr<OriginalRaceConstructor50LA>{};
++ const auto humanEndRace94=!humanCourseEnabled?std::shared_ptr<OriginalRaceConstructor50LA>{}:
++     consumedRaStage.race()?consumedRaStage.race():consumedTaStage.race();
+  if(humanEndRace94){
+   require50DU(humanEndRace94->resultsFeedbackThread_==std::this_thread::get_id()&&
+-      this->nativeOriginalFleet&&this->isRaTrack&&
++      this->nativeOriginalFleet&&(this->isRaTrack||this->isTaTrack)&&
+       this->originalMainApplication.race28C()==humanEndRace94.get()&&
+       humanEndRace94->application_==this->originalMainApplication.entities()&&
+       humanEndRace94->profile_==this->originalMainApplication.riderProfile&&
+       humanEndRace94->counted_&&!humanEndRace94->rolledBack_&&humanEndRace94->constructorSuffix_&&
+       humanEndRace94->entity_.sessionGeneration==this->sessionIndex+1&&
+-      humanEndRace94->world74_&&humanEndRace94->world74_==this->raWorld,
+-      "human RA ending94 requires its actual current consumed Race/Application/world");
++      (this->isRaTrack?humanEndRace94->world74_&&humanEndRace94->world74_==this->raWorld:
++          humanEndRace94->taWorld74_&&humanEndRace94->taWorld74_==this->taOriginalWorld),
++      "human ending94 requires its actual current consumed Race/Application/world");
+  }
+  auto& humanResultsCountdown=humanEndRace94?humanEndRace94->field94_:this->humanResultsCountdown;
+  auto& humanResultsReady=this->humanResultsReady;

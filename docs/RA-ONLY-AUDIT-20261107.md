@@ -138,3 +138,34 @@ course==ra / world74_ checks in `original_results_update_schedule50la.cpp`,
 Milestones, each testable: (1) slot30 load on TA with camera/display/end HUD;
 (2) Results on TA; (3) MA/SA/GA/GC; (4) tier-C stages + intro; (5) Results on
 tier C.
+
+## Milestone 1 scope check (Nov 7): widening alone breaks TA
+
+A first pass widened the RA checks to TA (camera bind, world-init
+continuation, end-HUD scope, `humanEndRace94`). The code review that followed
+showed the widening cannot run on TA as it stands, so it was reverted. The draft
+is saved in `docs/patches/m1-ta-slot30-widening-draft.patch`. Reasons:
+
+* `worldResetPredecessor1A6BF0Current` (sound reset, 1A6BF0) needs the RA
+  aggregate's `worldAudio_` to equal the race's `raceAudio_`, with six attached
+  race groups and no TA intro emitter. TA never runs `beginConsumedRaceLoad1A6AA0`,
+  so it has no `loadDisplay_`, `loadFifo_` or `raceAudio_`, and its audio
+  groups carry TA intro authoring. Continuing TA world init would therefore
+  fail and reject TA race construction.
+* `ownsNativeCameraAdapter34` / `nativeCameraAdapter34LifetimeCurrent`
+  require the camera Session owned by `world74_->runtimeQueries_`. TA's Session
+  is issued by `Application::createNativeTaCameraSession50LA`. Widening the
+  Session-level course check turns TA's current no-op success into a failed
+  bind.
+* The end-HUD stop (`Registration::stop1AD230`), end clock, F8 bars, Pause
+  parent and Results input all borrow the camera via
+  `world74_->borrowRuntimeSourceCamera`. TA needs an equivalent borrow from
+  the Application-issued Session.
+
+True milestone 1 work, in order:
+1. Run `beginConsumedRaceLoad1A6AA0`, the resources step and the race groups
+   on TA, reconciled with TA's intro audio groups.
+2. Port the 1A6BF0 sound-reset predecessor to the TA world owner.
+3. Add camera ownership for the Application-issued TA Session (own, lifetime,
+   borrow) alongside the RA world-owned one.
+4. Widen end HUD, end clock, F8 and Pause parent to use that borrow.
