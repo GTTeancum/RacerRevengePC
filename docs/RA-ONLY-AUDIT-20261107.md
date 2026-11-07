@@ -69,3 +69,23 @@ branches select that loader, not a feature.
 2. Original Pause for human RA races (item 2).
 3. Original intro for tier C tracks (item 3).
 4. Native player speech on every track (item 4).
+
+## Implementation analysis (user asked for all items in one batch)
+
+* `consumedTaStage/MaStage/SaStage/GaStage/GcStage.race()` also construct an
+  `OriginalRaceConstructor50LA` (used as `nativeIntroRace`), so tiers A and B
+  both have an original race object. The RA-only items are gated on
+  `consumedRaStage.race()` specifically and additionally depend on RA world
+  data: `race.world74_` (RA aggregate), `original_results_roster50LA::Read`
+  over `ra_cold_roster50LA`, `completedWorldPrefixes(race)`, the RA native
+  F8 bars (`prepareNativeF8Frame50LA`) and `prepareNativeResultsFrame50LA`
+  (driven only under `sourceConsumedIntroActivation&&isRaTrack`).
+* Results on tier B therefore needs: widen the gates to any consumed race,
+  a roster adapter per tier-B world (or one over the native racer bank), the
+  world-prefix checks per world, and the F8/Results frame drive on those
+  tracks. The end clock (`humanEndRace94`) and speech hookup follow the same
+  widening.
+* Tier C (MB, SC, TC, RC, TB, GB, MC) has no consumed stage; intro and results
+  there require building those stages on the tier-B pattern.
+* RA human Pause: `humanResultsCold` hands `sourcePause` to the Results load;
+  the host Pause route needs a second Pause owner or a shared-storage join.
