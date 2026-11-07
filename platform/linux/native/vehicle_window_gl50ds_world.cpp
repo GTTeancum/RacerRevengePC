@@ -321,12 +321,13 @@ bool VehicleWindowGl50DS::Storage::drawCoveragePairGroup(U bank,U slot,U compone
         bool& firstCoverageSetup) noexcept {
         // Never cross the original base/map-2 MSCNT group boundary. A run
         // retains contiguous EBO order and admits only pairwise-disjoint
-        // conservative pixel rectangles. Thus no sample can consume another
+        // conservative pixel rectangles, or (single-sample only) a proven
+        // shared-edge or robust separating-line pair. No sample can consume another
         // run member's color/alpha or compete with its depth. The unchanged
         // byte shader and per-sample depth comparison can share one snapshot.
         constexpr U maximumRun=14;
         const U end=first+count;
-        const auto sharedEdge=[&](U firstA,U firstB) noexcept {
+        const auto separable=[&](U firstA,U firstB) noexcept {
             if(coverageDemand||!racerRasterCacheActive||slot!=racerRasterSlot||component!=racerRasterComponent||
                 slot>frameOpponentCount)return false;
             const auto& batch=slot?frameOpponentBatches[slot-1]:framePlayerBatch;
@@ -336,20 +337,11 @@ bool VehicleWindowGl50DS::Storage::drawCoveragePairGroup(U bank,U slot,U compone
                 firstB>part.indexCount||part.indexCount-firstB<3)return false;
             const auto* a=part.indices+firstA;const auto* b=part.indices+firstB;
             if(a[0]==a[1]||a[0]==a[2]||a[1]==a[2]||b[0]==b[1]||b[0]==b[2]||b[1]==b[2])return false;
-            U shared[2]{},matched=0,otherA=0,otherB=0;
-            for(U i=0;i<3;++i){
-                bool found=false;for(U j=0;j<3;++j)found|=a[i]==b[j];
-                if(found){if(matched==2)return false;shared[matched++]=a[i];}else otherA=a[i];
-            }
-            if(matched!=2)return false;
-            for(U j=0;j<3;++j)if(b[j]!=shared[0]&&b[j]!=shared[1])otherB=b[j];
-            const U indices[]={shared[0],shared[1],otherA,otherB};
-            raster_shared_edge::Point points[4];
-            for(U i=0;i<4;++i){
-                const auto& entry=racerRasterOperands[indices[i]%racerRasterOperands.size()];
+            const auto point=[&](U index,raster_shared_edge::Point& out) noexcept {
+                const auto& entry=racerRasterOperands[index%racerRasterOperands.size()];
                 // Reuse only already computed group operands; collisions or
                 // uncertain/clipped projections retain the old barrier.
-                if(!entry.occupied||entry.index!=indices[i]||!entry.finite||!entry.projectionReady)return false;
+                if(!entry.occupied||entry.index!=index||!entry.finite||!entry.projectionReady)return false;
                 const auto& v=entry.operand;
                 if(v.clip[3]<=v.error[3]+0.0001)return false;
                 for(U axis=0;axis<3;++axis)if(std::abs(v.clip[axis])+v.error[axis]>=v.clip[3]-v.error[3])return false;
@@ -362,10 +354,28 @@ bool VehicleWindowGl50DS::Storage::drawCoveragePairGroup(U bank,U slot,U compone
                     constexpr double rounding=1./8.;
                     raster_shared_edge::Interval interval{(*std::min_element(q,q+4)+1)*extent*.5-rounding,
                         (*std::max_element(q,q+4)+1)*extent*.5+rounding};
-                    (axis?points[i].y:points[i].x)=interval;
+                    (axis?out.y:out.x)=interval;
                 }
+                return true;
+            };
+            U shared[2]{},matched=0,otherA=0,otherB=0;
+            bool same[3][3]{};
+            for(U i=0;i<3;++i){
+                bool found=false;for(U j=0;j<3;++j)if(a[i]==b[j]){found=true;same[i][j]=true;}
+                if(found){if(matched==2)return false;shared[matched++]=a[i];}else otherA=a[i];
             }
-            return raster_shared_edge::opposite(points[0],points[1],points[2],points[3]);
+            if(matched==2){
+                for(U j=0;j<3;++j)if(b[j]!=shared[0]&&b[j]!=shared[1])otherB=b[j];
+                const U indices[]={shared[0],shared[1],otherA,otherB};
+                raster_shared_edge::Point points[4];
+                for(U i=0;i<4;++i)if(!point(indices[i],points[i]))return false;
+                return raster_shared_edge::opposite(points[0],points[1],points[2],points[3]);
+            }
+            // At most one identical vertex: a robust separating edge line,
+            // with any shared vertex clear of every pixel center.
+            raster_shared_edge::Point pa[3],pb[3];
+            for(U i=0;i<3;++i)if(!point(a[i],pa[i])||!point(b[i],pb[i]))return false;
+            return raster_shared_edge::separated(pa,pb,same);
         };
         const auto fullRegion=[&](const std::array<I,4>& r) noexcept {
             return r[0]==0&&r[1]==0&&r[2]==width&&r[3]==height;
@@ -399,7 +409,7 @@ bool VehicleWindowGl50DS::Storage::drawCoveragePairGroup(U bank,U slot,U compone
                 bool disjoint=true;
                 for(U i=0;i<run;++i){const auto& old=regions[i];
                     if(next[0]<old[2]&&old[0]<next[2]&&next[1]<old[3]&&old[1]<next[3]){
-                        if(!sharedEdge(first+i*3,first+run*3)){disjoint=false;break;}
+                        if(!separable(first+i*3,first+run*3)){disjoint=false;break;}
                     }
                 }
                 if(!disjoint)break;
