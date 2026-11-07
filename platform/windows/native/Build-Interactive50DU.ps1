@@ -286,7 +286,7 @@ try {
     WriteCompileProgress
     $exe = Join-Path $out 'rr_interactive_vehicle50du.exe'
     $linkRsp = Join-Path $out 'link.rsp'
-    $linkArgs = @('/NOLOGO', '/MACHINE:X64', '/SUBSYSTEM:CONSOLE', '/STACK:8388608', '/INCREMENTAL:NO', ('/OUT:' + (RspQuote $exe)))
+    $linkArgs = @('/NOLOGO', '/MACHINE:X64', '/SUBSYSTEM:WINDOWS', '/ENTRY:mainCRTStartup', '/STACK:8388608', '/INCREMENTAL:NO', ('/OUT:' + (RspQuote $exe)))
     $linkArgs += $objects | ForEach-Object { RspQuote $_ }
     $linkArgs += 'kernel32.lib'
     $linkArgs += 'user32.lib'
