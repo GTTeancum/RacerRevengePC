@@ -161,7 +161,17 @@ struct VehicleDrawSubmission50CM {
     OriginalRacerAggregateBounds50LA sourceAggregateBounds50LA{};
     std::array<float, 3> sourcePosition50LA{};
 };
+// Profiling-only wall-time accumulation for buildVehicleDraw50CM stages. The
+// caller owns it; a null pointer (the default) records nothing and changes no
+// arithmetic, ordering or result. Stages: scene/palette, positions, source
+// colors, normals, specular geometry/publication.
+struct VehicleDrawTiming50CM {
+    static constexpr unsigned stageCount = 5;
+    std::uint64_t calls = 0;
+    std::array<std::uint64_t, stageCount> ns{};
+};
 struct VehicleDrawWorkspace50CM {
+    VehicleDrawTiming50CM* timing = nullptr;
     SceneNode49P nodes[vehicleFrameNodeCount49W];
     ModelPalette49S palette;
     ModelPaletteWorkspace49S paletteWorkspace;

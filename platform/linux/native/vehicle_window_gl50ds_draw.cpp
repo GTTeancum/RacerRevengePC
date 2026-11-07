@@ -1378,6 +1378,14 @@ bool VehicleWindowGl50DS::Storage::drawSpecularSpan50LA(std::uint8_t bank, U slo
                 }
             }
         }
+        // Single-sample: one operand cache for the whole paired span. Vertex
+        // positions are fixed for this draw, so batch planning and run
+        // building reuse projections instead of recomputing per batch.
+        if (drawSecond && !coverageDemand && first < end) {
+            const auto& last = groups.groups[end - 1];
+            beginRacerRasterOperandGroup(slot, component, groups.groups[first].indexStart,
+                last.indexStart + last.indexCount - groups.groups[first].indexStart);
+        }
         for (U g = first; drawSecond && accepted && g < end; ++g) {
             const U groupIndex = g;
             // Single-sample consecutive groups whose triangles provably share
@@ -1386,13 +1394,8 @@ bool VehicleWindowGl50DS::Storage::drawSpecularSpan50LA(std::uint8_t bank, U slo
             // pixel still sees only its own group's base-then-map-2 order.
             // AA coverage and unproven groups remain exactly one source group.
             U batch = 1;
-            if (!coverageDemand) {
-                const auto& last = groups.groups[end - 1];
-                beginRacerRasterOperandGroup(slot, component, groups.groups[g].indexStart,
-                    last.indexStart + last.indexCount - groups.groups[g].indexStart);
+            if (!coverageDemand)
                 batch = planSeparableGroupBatch(slot, component, groups.groups.get(), g, end);
-                endRacerRasterOperandGroup();
-            }
             SpecularGroup50LA group = groups.groups[g];
             for (U k = 1; k < batch; ++k) group.indexCount += groups.groups[g + k].indexCount;
             coveragePairBatchedGroups += batch - 1;
@@ -1453,10 +1456,10 @@ bool VehicleWindowGl50DS::Storage::drawSpecularSpan50LA(std::uint8_t bank, U slo
                 // Both coverage routes share conservative disjoint runs. A
                 // single-sample texture barrier is sufficient for a run whose
                 // primitives cannot read or write one another's pixels.
-                beginRacerRasterOperandGroup(slot,component,group.indexStart,group.indexCount);
+                if (coverageDemand) beginRacerRasterOperandGroup(slot,component,group.indexStart,group.indexCount);
                 accepted = drawCoveragePairGroup(bank, slot, component,
                     group.indexStart, group.indexCount, material->specularName50LA, firstCoverageSetup);
-                endRacerRasterOperandGroup();
+                if (coverageDemand) endRacerRasterOperandGroup();
                 // The AA1 route checks each scratch/copy/composition operation.
                 // Cold source topology bounds one MSCNT group to 3..16
                 // vertices, hence at most 14 ordered triangles. Poll errors
@@ -1468,6 +1471,7 @@ bool VehicleWindowGl50DS::Storage::drawSpecularSpan50LA(std::uint8_t bank, U slo
                 if (accepted) diagnostic->sourceSpecularSecondTriangles50LA += group.indexCount / 3;
             }
         }
+        endRacerRasterOperandGroup();
         // Unbind the target even after failure, before any base/unrelated draw
         // or abort. Publication still belongs solely to the existing bank owner.
         unbindSpecularFeedback50LA();
@@ -1579,6 +1583,8 @@ bool VehicleWindowGl50DS::Storage::begin(void* context, std::uint8_t bank) noexc
         s.active = true;s.activeFrameBank=bank;
         s.coveragePairRuns=s.coveragePairTriangles=s.coveragePairCoalescedTriangles=0;
         s.coveragePairEmptyTriangles=s.coveragePairFullSingletons=0;s.coveragePairBatchedGroups=0;
+        s.coveragePairUnproven={};s.coveragePairUnprovenOperands=s.coveragePairBreakRegion=0;
+        s.coveragePairBreakCap=s.coveragePairBreakEnd=0;
         // Same-context GL ordering protects buffer/target reuse after prior
         // commands, including aborted work. No mapping or cross-context sharing.
         s.gl.bindFramebuffer(framebuffer, s.coverageDemand ? s.coverageLive.scene[bank] : s.targets[bank]);
@@ -1720,6 +1726,15 @@ bool VehicleWindowGl50DS::Storage::commit(void* context, std::uint8_t bank) noex
                 static_cast<unsigned long long>(s.coveragePairEmptyTriangles),
                 static_cast<unsigned long long>(s.coveragePairFullSingletons),
                 static_cast<unsigned long long>(s.coveragePairBatchedGroups));
+        if(s.request.enableGameplayDisplayWallTiming)
+            std::fprintf(stderr,"native_pair_breaks unproven_shared0=%llu unproven_shared1=%llu unproven_shared2=%llu unproven_operands=%llu region=%llu cap=%llu group_end=%llu\n",
+                static_cast<unsigned long long>(s.coveragePairUnproven[0]),
+                static_cast<unsigned long long>(s.coveragePairUnproven[1]),
+                static_cast<unsigned long long>(s.coveragePairUnproven[2]),
+                static_cast<unsigned long long>(s.coveragePairUnprovenOperands),
+                static_cast<unsigned long long>(s.coveragePairBreakRegion),
+                static_cast<unsigned long long>(s.coveragePairBreakCap),
+                static_cast<unsigned long long>(s.coveragePairBreakEnd));
         // Cable/HUD failure still aborts the unpublished combined frame.
         s.resetPodState();
         if (!s.drawCables(s.frameCables, s.cableTextureName)) return false;

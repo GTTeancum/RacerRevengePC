@@ -368,6 +368,25 @@ bool VehicleWindowGl50DS::Storage::racerTrianglesSeparable(U slot,U component,U 
         return raster_shared_edge::separated(pa,pb,same);
     }
 
+void VehicleWindowGl50DS::Storage::classifyUnprovenPair(U slot,U component,U firstA,U firstB) noexcept {
+        if(slot>frameOpponentCount)return;
+        const auto& batch=slot?frameOpponentBatches[slot-1]:framePlayerBatch;
+        if(component>=batch.componentCount)return;
+        const auto& part=batch.component[component];
+        if(!part.indices||firstA+3>part.indexCount||firstB+3>part.indexCount)return;
+        const auto* a=part.indices+firstA;const auto* b=part.indices+firstB;
+        U shared=0;bool operands=true;
+        for(U i=0;i<3;++i){
+            for(U j=0;j<3;++j)shared+=a[i]==b[j];
+            for(const U index:{a[i],b[i]}){
+                const auto& entry=racerRasterOperands[index%racerRasterOperands.size()];
+                operands=operands&&entry.occupied&&entry.index==index&&entry.finite&&entry.projectionReady;
+            }
+        }
+        if(!operands)++coveragePairUnprovenOperands;
+        else ++coveragePairUnproven[std::min<U>(shared,3)];
+    }
+
 bool VehicleWindowGl50DS::Storage::drawCoveragePairGroup(U bank,U slot,U component,U first,U count,U image,
         bool& firstCoverageSetup) noexcept {
         // Never cross the original base/map-2 MSCNT group boundary. A run
@@ -408,11 +427,12 @@ bool VehicleWindowGl50DS::Storage::drawCoveragePairGroup(U bank,U slot,U compone
                 pending=next;
                 // Flush before an empty primitive rather than create a hole
                 // in this contiguous source range. The next iteration skips it.
-                if(next[2]<=next[0]||next[3]<=next[1]||fullRegion(next))break;
+                if(next[2]<=next[0]||next[3]<=next[1]||fullRegion(next)){++coveragePairBreakRegion;break;}
                 bool disjoint=true;
                 for(U i=0;i<run;++i){const auto& old=regions[i];
                     if(next[0]<old[2]&&old[0]<next[2]&&next[1]<old[3]&&old[1]<next[3]){
-                        if(!racerTrianglesSeparable(slot,component,first+i*3,first+run*3)){disjoint=false;break;}
+                        if(!racerTrianglesSeparable(slot,component,first+i*3,first+run*3)){
+                            classifyUnprovenPair(slot,component,first+i*3,first+run*3);disjoint=false;break;}
                     }
                 }
                 if(!disjoint)break;
@@ -422,8 +442,14 @@ bool VehicleWindowGl50DS::Storage::drawCoveragePairGroup(U bank,U slot,U compone
                 const auto nextArea=summedArea+area(next);
                 // Avoid a sparse run expanding scratch/copy/composition work
                 // to an arbitrarily large rectangle. Extents are GL-limited.
-                if(area(candidate)>nextArea*2u)break;
+                // Only the AA bridge consumes the united rectangle; the
+                // single-sample run is one barrier plus one indexed draw.
+                if(coverageDemand&&area(candidate)>nextArea*2u)break;
                 regions[run++]=next;united=candidate;summedArea=nextArea;
+            }
+            if(!fullRegion(initial)){
+                if(run==maximumRun)++coveragePairBreakCap;
+                else if(first+run*3>=end)++coveragePairBreakEnd;
             }
             // Singleton uses the same bridge and triangle count as before.
             // Full/uncertain clip fallback always remains its own run.

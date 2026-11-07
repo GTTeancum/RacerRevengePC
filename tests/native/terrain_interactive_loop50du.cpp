@@ -1899,9 +1899,11 @@ void Context::run() {
        }
        lightsTiming.reset();
        {render_diagnostics50GQ::Scope drawTiming(renderDiagnostics,render_diagnostics50GQ::Subphase::OpponentDrawBatch);
-       require50DU(opponentDraw[index].prepare(s,x.bindings,drawWorkspace,opponentDiagnostic,
-           originalBodyColors?&sourceColors:nullptr),
-           "actual opponent component projection failed");}
+       drawWorkspace.timing=renderDiagnostics.enabled?&renderDiagnostics.opponentDrawTiming:nullptr;
+       const bool prepared=opponentDraw[index].prepare(s,x.bindings,drawWorkspace,opponentDiagnostic,
+           originalBodyColors?&sourceColors:nullptr);
+       drawWorkspace.timing=nullptr;
+       require50DU(prepared,"actual opponent component projection failed");}
        lightsTiming.emplace(renderDiagnostics,render_diagnostics50GQ::Subphase::OpponentLights);
        if(nativeSelectedLights&&!originalBodyColors&&!gcLightOwner.publishNativeDraw(lightLease,
            nativeLightingPolicy,gcDrawLights[racer],gcLightDiagnostic))
@@ -2504,6 +2506,10 @@ void Context::run() {
           <<" first_node="<<scene.firstNode<<" first_lane="<<scene.firstLane<<" first_bits_u32="<<scene.firstBits
           <<" mxcsr_available="<<scene.mxcsrAvailable<<" mxcsr_u32="<<scene.mxcsr<<'\n';
      }
+     {const auto& t=renderDiagnostics.opponentDrawTiming;
+      std::cerr<<"opponent_draw_stages component_calls="<<t.calls<<" scene_palette_ns="<<t.ns[0]
+          <<" positions_ns="<<t.ns[1]<<" source_colors_ns="<<t.ns[2]<<" normals_ns="<<t.ns[3]
+          <<" specular_publish_ns="<<t.ns[4]<<'\n';}
      const auto& scene=renderDiagnostics.latestScene;
      std::cerr<<"render_census samples="<<renderDiagnostics.sceneSamples
          <<" frames_with_subnormal="<<renderDiagnostics.sceneFramesWithSubnormal

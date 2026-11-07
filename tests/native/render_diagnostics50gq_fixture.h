@@ -3,6 +3,7 @@
 // canonical state writes, logging, heap storage, synchronization, or workers.
 #include "phase_timing50gk_fixture.h"
 #include "../../src/game/vehicle_frame49w.h"
+#include "../../src/game/vehicle_draw50cm.h"
 #include <cstring>
 #include <limits>
 #if defined(__SSE__) || (defined(_MSC_VER) && (defined(_M_X64) || (defined(_M_IX86_FP) && _M_IX86_FP >= 1)))
@@ -143,6 +144,8 @@ struct Interval {
     std::uint64_t sceneFramesWithNonfinite = 0;
     std::uint32_t maxSubnormalWords = 0;
     bool overflow = false;
+    // Attached to the shared draw workspace only around opponent batches.
+    rr::game::VehicleDrawTiming50CM opponentDrawTiming{};
 
     void observeScene(const rr::game::VehicleFrameState49W& state,
         std::uint64_t tick = 0) noexcept {
@@ -159,6 +162,7 @@ struct Interval {
     }
 
     void resetInterval() noexcept {
+        opponentDrawTiming = {};
         for (auto& total : totals) total = phase_timing50GK::Totals{};
         for (auto& scene : sceneAtMaxWall) scene = SceneSample{};
         latestScene = SceneSample{};

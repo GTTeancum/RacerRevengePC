@@ -1,4 +1,5 @@
 #include "vehicle_draw50cm.h"
+#include <chrono>
 #include "model_bounds49o.h"
 #include "native_gc_selected_lights_candidate.h"
 #include "original_racer_model_packets50la.h"
@@ -431,6 +432,16 @@ bool buildVehicleDraw50CM(const VehicleFrameState49W& state, const VehicleFrameB
         if (selection.paletteIds[i] != i || !belongsTo(state.nodes, selection.sourceNodes[i], root,state.sceneNodeCount))
             return reject(d, VehicleDrawError50CM::binding, i);
 
+    // Profiling-only stage clock; never consulted for any result.
+    auto stageStart = workspace.timing ? std::chrono::steady_clock::now() : std::chrono::steady_clock::time_point{};
+    const auto stage = [&](unsigned index) noexcept {
+        if (!workspace.timing) return;
+        const auto now = std::chrono::steady_clock::now();
+        workspace.timing->ns[index] += static_cast<std::uint64_t>(
+            std::chrono::duration_cast<std::chrono::nanoseconds>(now - stageStart).count());
+        stageStart = now;
+    };
+    if (workspace.timing) ++workspace.timing->calls;
     // The admitted scene count bounds every graph consumer below. Copy the
     // complete current scene, without copying unused capacity for each pod
     // component. Retain a private snapshot: palette getters mutate its caches.
@@ -454,12 +465,15 @@ bool buildVehicleDraw50CM(const VehicleFrameState49W& state, const VehicleFrameB
         rootWorld = &packet->matrixSlots[packet->modelMatrixIndex()];
         nodeWorld = rootWorld + 1;
     }
+    stage(0);
     if (!projectDrawPositions({mesh.localVertices, mesh.vertexCount},
         {nodeWorld, workspace.palette.entryCount},
         {workspace.positions, maxRigidVertices49S}, d.vertices))
         return reject(d, VehicleDrawError50CM::vertices);
+    stage(1);
     if (sourceColors && !prepareSourceColors(selection, mesh, *sourceColors, nodeWorld, packet, workspace, d))
         return false;
+    stage(2);
 
     // Use the exact current per-node palette already used for positions. The
     // inverse transpose preserves authored hard edges under scale and shear.
@@ -504,6 +518,7 @@ bool buildVehicleDraw50CM(const VehicleFrameState49W& state, const VehicleFrameB
             return reject(d, VehicleDrawError50CM::normals, vertex);
     }
 
+    stage(3);
     VehicleDrawSubmission50CM next{destination.vertices, mesh.vertexCount, mesh.indices,
         mesh.indexCount, mesh.spans, mesh.spanCount, {}};
     if (sourceColors && sourceColors->prepareSpecular50LA &&
@@ -548,6 +563,7 @@ bool buildVehicleDraw50CM(const VehicleFrameState49W& state, const VehicleFrameB
         next.sourceNormals = destination.sourceNormals;
         next.sourceNormalCount = mesh.vertexCount;
     }
+    stage(4);
     output = next;
     return true;
 }

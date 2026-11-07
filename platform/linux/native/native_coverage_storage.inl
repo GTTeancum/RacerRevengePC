@@ -8,6 +8,13 @@
     std::uint64_t coveragePairEmptyTriangles=0,coveragePairFullSingletons=0;
     // Source MSCNT groups drawn inside an earlier group's proven-disjoint batch.
     std::uint64_t coveragePairBatchedGroups=0;
+    // Profiling-only reasons a single-sample run ended: an unproven overlap
+    // (by identical-vertex count 0/1/2, or missing cached operands), an
+    // empty/full next region, the run cap, or the end of the group/batch.
+    std::array<std::uint64_t,4> coveragePairUnproven{};
+    std::uint64_t coveragePairUnprovenOperands=0,coveragePairBreakRegion=0,
+        coveragePairBreakCap=0,coveragePairBreakEnd=0;
+    void classifyUnprovenPair(U slot,U component,U firstA,U firstB) noexcept;
     struct CoverageExtent {
         U scene[2]{}, color[2]{}, depth[2]{};
         U snapshot=0, snapshotColor=0, raster=0, payload=0, rasterDepth=0;
