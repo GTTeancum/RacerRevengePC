@@ -363,20 +363,33 @@ bool AudioOutput50HD::advanceMicroseconds(AudioStereoProducer50HD& producer, std
         s.failed = true;
         return fail(d, AudioOutputError50HD::CaptureLimit, "audio.advance/RIFF 4 GiB limit");
     }
+    // Slow-part diagnostic: mix / capture write / device submit over 20 ms.
+    using DiagClock = std::chrono::steady_clock;
+    static unsigned slowAudioLines = 0;
+    const auto slow = [&](const char* part, DiagClock::time_point begin) {
+        const double ms = std::chrono::duration<double, std::milli>(DiagClock::now() - begin).count();
+        if (ms > 20.0 && slowAudioLines < 200) { ++slowAudioLines; std::fprintf(stderr, "audio_step_slow part=%s ms=%.1f%c", part, ms, 10); }
+    };
     while (remaining) {
         const auto frames = std::min<std::uint32_t>(remaining, blockFrames);
+        auto begin = DiagClock::now();
         if (!producer.mixStereo16(s.mixed.data(), frames)) {
             s.failed = true; return fail(d, AudioOutputError50HD::Mixer, "audio.advance/mix");
         }
+        slow("mix", begin);
         s.info.mixedFrames += frames;
         if (s.capture >= 0) {
+            begin = DiagClock::now();
             if (!writeAll(s.capture, s.mixed.data(), frames * 4)) {
                 s.failed = true;
                 return fail(d, AudioOutputError50HD::CaptureWrite, "audio.advance/WAV payload", std::strerror(errno));
             }
+            slow("capture_write", begin);
             s.info.capturedFrames += frames;
         }
+        begin = DiagClock::now();
         s.submit(frames, d);
+        slow("device_submit", begin);
         remaining -= frames;
     }
     return true;

@@ -553,21 +553,36 @@ private:
     }
     static bool startBoost(void* context,Sound& sound,std::uint32_t flags)noexcept {
         auto& r=*static_cast<Racer*>(context);
-        if(&sound!=&r.sounds[2]||!sound.nativeOwner||!sound.nativeSound)return false;
+        if(&sound!=&r.sounds[2]||!sound.nativeOwner||!sound.nativeSound){
+            std::fprintf(stderr,"ai_boost_start_refused reason=binding slot_sound=%d owner=%d native=%d\n",
+                &sound==&r.sounds[2],sound.nativeOwner!=nullptr,sound.nativeSound!=nullptr);return false;
+        }
         const auto result=rr::game::startAiLogicalSound233410(*sound.nativeOwner,*sound.nativeSound,flags);
+        if(result.status!=rr::game::AiLogicalSoundStatus::complete)
+            std::fprintf(stderr,"ai_boost_start_refused reason=start233410 status=%u source_pc=0x%x returned=%d\n",
+                static_cast<unsigned>(result.status),result.sourcePC,result.sourceReturned?1:0);
         return result.status==rr::game::AiLogicalSoundStatus::complete;
     }
     static bool attachBoost(void* context,Sound& sound,const rr::game::OriginalAiEmitterVector& position,
         const rr::game::OriginalAiEmitterVector&,float nearDistance,float farDistance,bool& returned)noexcept {
         auto& r=*static_cast<Racer*>(context);auto& owner=*r.owner;
-        if(&sound!=&r.sounds[2]||!owner.listenerReady_||!owner.mode_||!sound.nativeSound)return false;
+        if(&sound!=&r.sounds[2]||!owner.listenerReady_||!owner.mode_||!sound.nativeSound){
+            std::fprintf(stderr,"ai_boost_attach_refused reason=binding slot_sound=%d listener=%d mode=%d native=%d\n",
+                &sound==&r.sounds[2],owner.listenerReady_?1:0,owner.mode_!=nullptr,sound.nativeSound!=nullptr);return false;
+        }
         using namespace rr::game::original_ai_aural_detail;
         const auto& l=owner.listener_;const auto distanceXZ=distance(position.v[0],position.v[2],l.position[0],l.position[2]);
-        if(!std::isfinite(distanceXZ)||nearDistance!=0.f||farDistance!=450.f)return false;
+        if(!std::isfinite(distanceXZ)||nearDistance!=0.f||farDistance!=450.f){
+            std::fprintf(stderr,"ai_boost_attach_refused reason=distance distance=%g near=%g far=%g\n",
+                distanceXZ,nearDistance,farDistance);return false;
+        }
         returned=false;if(!(distanceXZ<farDistance))return true;
         float forward=0.f,target=0.f;
         if(!rr::game::originalAngle48G(l.forward[2],l.forward[0],forward)||
-           !rr::game::originalAngle48G(sub(position.v[2],l.position[2]),sub(position.v[0],l.position[0]),target))return false;
+           !rr::game::originalAngle48G(sub(position.v[2],l.position[2]),sub(position.v[0],l.position[0]),target)){
+            std::fprintf(stderr,"ai_boost_attach_refused reason=angle listener_fwd=%g,%g delta=%g,%g\n",
+                l.forward[0],l.forward[2],sub(position.v[0],l.position[0]),sub(position.v[2],l.position[2]));return false;
+        }
         const auto degrees=literal(0x42652ee1u);
         auto angle=static_cast<std::int32_t>(mul(target,degrees))-static_cast<std::int32_t>(mul(forward,degrees));
         if(angle>180)angle-=359;else if(angle< -180)angle+=359;
@@ -576,7 +591,10 @@ private:
             sub(100.f,mul(100.f,div(sub(distanceXZ,nearDistance),sub(farDistance,nearDistance))));
         const auto result=rr::game::spatialAiLogicalSound233AE0(*sound.nativeOwner,*sound.nativeSound,
             owner.mode_->fields(),attenuation,angle,l.position,false);
-        if(result.status!=rr::game::AiLogicalSoundStatus::complete)return false;
+        if(result.status!=rr::game::AiLogicalSoundStatus::complete){
+            std::fprintf(stderr,"ai_boost_attach_refused reason=spatial233AE0 status=%u source_pc=0x%x attenuation=%g angle=%d\n",
+                static_cast<unsigned>(result.status),result.sourcePC,attenuation,angle);return false;
+        }
         returned=true;return true;
     }
     unsigned skippedBoostSoundLogs_=0;

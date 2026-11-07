@@ -1,5 +1,6 @@
 // The original active host loop, separated without changing its lifetime owners.
 #include <cfenv>
+#include <xmmintrin.h>
 #include "terrain_interactive_loop50du.h"
 #include "original_race_f8_native_bars50la.h"
 #include "original_results_native_frame50la.h"
@@ -22,6 +23,7 @@ struct FrameHitch50DU {
     bool started = false;
 };
 FrameHitch50DU frameHitch50DU;
+float testRouteX50DU=0.f; // Last HUD gate direction; unattended steering test only.
 double hitchMs50DU(FrameHitch50DU::Clock::time_point a, FrameHitch50DU::Clock::time_point b) {
     if (a == FrameHitch50DU::Clock::time_point{} || b == FrameHitch50DU::Clock::time_point{} || b < a) return -1.0;
     return std::chrono::duration<double, std::milli>(b - a).count();
@@ -213,9 +215,18 @@ void Context::run() {
     // so the human launch at the start light is exercised like a real player.
     static const bool holdThrottle50DU=[]{const char* v=std::getenv("RR_TEST_HOLD_THROTTLE");return v&&std::string(v)=="1";}();
     if(holdThrottle50DU&&captureRun.unattended()&&race.phase==race_session50HM::Phase::Racing){
-     constexpr std::size_t throttleW=26;
+     constexpr std::size_t throttleW=26,steerLeft=80,steerRight=79;
      if(!hostInput.keys.down[throttleW])hostInput.keys.pressed[throttleW]=1;
      hostInput.keys.down[throttleW]=1;
+     // Steer toward the next authored gate (same vector as the HUD arrow).
+     static const float steerSign50DU=[]{const char* v=std::getenv("RR_TEST_STEER_INVERT");return v&&std::string(v)=="1"?-1.f:1.f;}();
+     const float route=steerSign50DU*testRouteX50DU;
+     const bool left=route< -0.08f,right=route>0.08f;
+     for(const auto [key,on]:{std::pair{steerLeft,left},std::pair{steerRight,right}}){
+      if(on&&!hostInput.keys.down[key])hostInput.keys.pressed[key]=1;
+      if(!on&&hostInput.keys.down[key])hostInput.keys.released[key]=1;
+      hostInput.keys.down[key]=on?1:0;
+     }
     }
    }
    if(!originalUiActive){
@@ -1003,7 +1014,17 @@ void Context::run() {
     if(sourceCameraSession&&sourceCameraSession->pendingDisplayWork())break;
     // End each accepted root on every normal loop departure. A source skip
     // retains its prepared publication until that same child call returns.
+    // Held-step diagnostic: any segment over 30 ms is logged by name.
+    auto heldLapPrev50DU=std::chrono::steady_clock::now();
+    const auto heldLap50DU=[&](const char* tag){
+     const auto t=std::chrono::steady_clock::now();
+     const double ms=std::chrono::duration<double,std::milli>(t-heldLapPrev50DU).count();
+     static unsigned heldLapLines50DU=0;
+     if(ms>30.0&&heldLapLines50DU<200){++heldLapLines50DU;std::cerr<<"held_step_slow segment="<<tag<<" ms="<<ms<<" tick="<<completedFrames<<"\n";}
+     heldLapPrev50DU=t;
+    };
     require50DU(beginTaRoot(),"actual TA Application root audio service rejected");
+    heldLap50DU("ta_root_begin");
     struct TaRootReturn {
      decltype(finishTaRoot)& finish;
      const std::optional<std::uint64_t>& suspended;
@@ -1055,7 +1076,9 @@ void Context::run() {
     bool cameraAllowsSimulation=true;
     if(sourceCameraSession){
      if(isRcTrack)requireMbRuntimeNavigation50MB();
+     heldLap50DU("before_start_gate");
      const auto gate=sourceCameraSession->advanceNativeStartGate(.016f);
+     heldLap50DU("start_gate");
      require50DU(gate.status==sourceCamera::Status::simulationAllowed||gate.status==sourceCamera::Status::startHeld,
          "original camera single native start gate rejected");
      cameraAllowsSimulation=gate.status==sourceCamera::Status::simulationAllowed;
@@ -1063,14 +1086,18 @@ void Context::run() {
       const auto frame=++sourceCameraTick;
       require50DU(sourceCameraSession->advanceSceneChild(frame,sourceCamera::Cut::heldBeforeStart,.016f).status==
           sourceCamera::Status::sceneChildComplete,"held original scene child rejected");
+      heldLap50DU("held_scene_child");
       advanceWorldAnimations();
       advanceNativeGcWater();
       advanceRcTrackParticles();
       advanceTbTrackParticles();
+      heldLap50DU("held_world_animation");
       if(sourceCameraSession->willUseFollowPose())
        require50DU(racerBank.visit(0,[&](){return refreshAnimatedCandidates();}),
           "Follow held frame actual animated collision refresh failed");
+      heldLap50DU("held_follow_refresh");
       const auto cameraChild=sourceCameraSession->advanceCameraChild(frame,sourceCamera::Cut::heldBeforeStart);
+      heldLap50DU("held_camera_child");
       if(cameraChild.status==sourceCamera::Status::videoPending){
        require50DU(sourceCameraSession->taSkipVideoPending()&&!suspendedTaCameraFrame,
            "only the actual TA synchronous skip may suspend a held camera frame");
@@ -1090,7 +1117,9 @@ void Context::run() {
       liveAudio->pause(false);if(mode1Enabled||dynamicContactEnabled)raceMusic->pause(false);
       if(!sourceCameraSession||sourceCameraSession->countdownInstalled())
        require50DU(withRace([&](auto& actualRace){return raceAudio->observe(actualRace);}).accepted,"countdown/result audio observation rejected");
+      heldLap50DU("countdown_audio_observe");
       updateOpponentAudio(); // Only countdown holds native vehicle updates.
+      heldLap50DU("countdown_opponent_audio");
       countdownTiming.finish(); // Keep countdown service disjoint from the actual shared mix/output.
       // Countdown has a real host clock while native vehicle bodies are held.
       // Advance the shared mixer ONCE; completed results keep normal world steps.
@@ -1098,7 +1127,9 @@ void Context::run() {
        phase_timing50GK::Scope audioTiming(phaseTiming,phase_timing50GK::Phase::AudioCommit);
        const auto beforeMix=liveAudio->mixedFrames();
        const bool mixed=liveAudio->committedStep(audioDiagnostic);
+       heldLap50DU("countdown_audio_mix");
        advanceSourceAudioWorld(beforeMix,true); //Actual countdown held route.
+       heldLap50DU("countdown_audio_world");
        require50DU(mixed,"native countdown/result audio step failed");
       }
      }
@@ -1111,7 +1142,9 @@ void Context::run() {
           *sourceCameraSession,resultsUpdate);
       require50DU(updated,resultsUpdate.operation?resultsUpdate.operation:
           "native held-root Results update rejected");
+      heldLap50DU("held_results_update");
       require50DU(finishTaRootWithResults(),"native held-root accepted Results capture rejected");
+      heldLap50DU("ta_root_finish");
      }
      // The final Intro pose must reach an actual displayed publication before
      // the next held tick may execute its exit/fade. Do not skip that image in
@@ -1823,6 +1856,7 @@ void Context::run() {
      const double length=std::sqrt(right*right+ahead*ahead);
      if(std::isfinite(length)&&length>0.0001){
       hud.routeValid=true;hud.routeX=static_cast<float>(right/length);
+      testRouteX50DU=hud.routeX; // Unattended steering test only.
       hud.routeY=static_cast<float>(ahead/length);
      }
     }
@@ -1832,9 +1866,18 @@ void Context::run() {
     require50DU(clearColor,"authored track clear color unavailable");
     hudTiming.finish();
     EngineFlareOutput50GV flameOutput{};EngineFlareDiagnostic50GV flameDiagnostic{};
-    require50DU(advanceEngineFlare50GV(s,baseTail,coldFlame,
-        static_cast<std::uint32_t>(submittedDrawFrames%0xffffffffull),flameOutput,flameDiagnostic),
-        "actual engine flame callback rejected");
+    const bool flameAccepted=advanceEngineFlare50GV(s,baseTail,coldFlame,
+        static_cast<std::uint32_t>(submittedDrawFrames%0xffffffffull),flameOutput,flameDiagnostic);
+    if(!flameAccepted)std::cerr<<"engine_flame_failure error="<<static_cast<unsigned>(flameDiagnostic.error)
+        <<" side="<<flameDiagnostic.side<<" source_pc=0x"<<std::hex<<flameDiagnostic.sourceStage<<std::dec
+        <<" rounding="<<std::fegetround()<<" mxcsr=0x"<<std::hex<<_mm_getcsr()<<std::dec
+        <<" thrust0="<<s.bodies.main.components.engine.localThrust[0].v[0]<<','<<s.bodies.main.components.engine.localThrust[0].v[1]
+        <<','<<s.bodies.main.components.engine.localThrust[0].v[2]
+        <<" thrust1="<<s.bodies.main.components.engine.localThrust[1].v[0]<<','<<s.bodies.main.components.engine.localThrust[1].v[1]
+        <<','<<s.bodies.main.components.engine.localThrust[1].v[2]
+        <<" steer="<<s.bodies.main.controls.player.raw.values[0]
+        <<" speed34="<<s.bodies.main.cachedSpeed34<<'\n';
+    require50DU(flameAccepted,"actual engine flame callback rejected");
     for(auto& uv:playerFlameUvs){
      const unsigned model=static_cast<unsigned>(uv.component)-1u;
      require50DU(model<flameOutput.modelCount,"source flame per-model instance unavailable");
@@ -2586,7 +2629,10 @@ void Context::run() {
     windowCapture.discardPendingWindowImage();
     captureCommitted();
    }
-   if(captureRun.evidenceComplete()&&trackBaseline.complete()&&captureRun.videoHoldComplete()){
+   // Unattended long-race test: keep racing until the wall budget ends.
+   static const bool raceFullBudget50DU=[]{const char* v=std::getenv("RR_TEST_RACE_FULL_BUDGET");return v&&std::string(v)=="1";}();
+   if(!(raceFullBudget50DU&&captureRun.unattended())&&
+      captureRun.evidenceComplete()&&trackBaseline.complete()&&captureRun.videoHoldComplete()){
     composePacket(false,input);sampleController();
     if(captureRun.takeNativeRestartRequest())restartRequested=true;
     break;

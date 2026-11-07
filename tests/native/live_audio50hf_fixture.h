@@ -1,4 +1,6 @@
 #pragma once
+#include <chrono>
+#include <cstdio>
 // Stable native client owner. This subscribes to source-backed gameplay fields;
 // its typed human reset fields are canonical, while the full retail emitter
 // scheduler remains unrepresented. No missing core provider is bypassed.
@@ -548,14 +550,23 @@ public:
     bool committedStep(rr::platform::AudioOutputDiagnostic50HD& diagnostic)noexcept {
         if(!outputOpen_||closed_)return fail(diagnostic,rr::platform::AudioOutputError50HD::NotOpen,"50HF.step","Audio output is not open");
         if(paused_)return fail(diagnostic,rr::platform::AudioOutputError50HD::InvalidRequest,"50HF.step","Paused audio must not advance the simulation sample clock");
+        using StepClock=std::chrono::steady_clock;static unsigned slowLines=0;
+        const auto slow=[&](const char* part,StepClock::time_point begin){
+            const double ms=std::chrono::duration<double,std::milli>(StepClock::now()-begin).count();
+            if(ms>20.0&&slowLines<200){++slowLines;std::fprintf(stderr,"audio_step_slow part=%s ms=%.1f%c",part,ms,10);}
+        };
+        auto begin=StepClock::now();
         if(!announcer_.pollCompletion()) {
             ++counters_.groupFailures;
             return fail(diagnostic,rr::platform::AudioOutputError50HD::Mixer,"50IC.episode","Shared announcer ownership rejected");
         }
+        slow("announcer_poll_before",begin);begin=StepClock::now();
         const bool mixed=output_.advanceMicroseconds(mixer_,stepMicroseconds,diagnostic);
+        slow("output_advance",begin);begin=StepClock::now();
         // A failed output write may still follow a completed real mix. Always
         // observe actual voice activity, without inventing a completed duration.
         const bool restored=announcer_.pollCompletion();
+        slow("announcer_poll_after",begin);
         if(!restored)++counters_.groupFailures;
         if(!mixed) {
             ++counters_.mixFailures;return false;

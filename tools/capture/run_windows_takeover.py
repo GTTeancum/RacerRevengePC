@@ -37,7 +37,7 @@ def main():
     parser.add_argument('--sdl', type=Path, required=True)
     parser.add_argument('--route', choices=['main-dud04-course-ga', 'main-ben02-course-ga',
                         'main-alder10-course-ma', 'main-ody11-course-ma',
-                        'main-rider-course-ta', 'main-tournament-course-ta'], default='main-dud04-course-ga')
+                        'main-rider-course-ta', 'main-tournament-course-ta', 'none'], default='main-dud04-course-ga')
     parser.add_argument('--logs-only', action='store_true', default=True, help='Record stage and timing receipts without pixel readback or image files')
     parser.add_argument('--seconds', type=int, default=180)
     parser.add_argument('--profile-performance', action='store_true',
@@ -51,11 +51,18 @@ def main():
     parser.add_argument('--renderer-switch', action='append', default=[],
                         choices=['RR_EXACT_PS2_SPECULAR', 'RR_GPU_FINISH_EACH_FRAME'],
                         help='Set one renderer comparison switch to 1 (repeatable); recorded in execution.json')
+    parser.add_argument('--track', default='TA', help='Direct-start track when --route none')
+    parser.add_argument('--all-ai', action='store_true',
+                        help='Original AI drives every pod, camera on pod 0 (spectator)')
+    parser.add_argument('--race-full', action='store_true',
+                        help='Keep racing until the watchdog budget instead of stopping after FPS evidence')
+    parser.add_argument('--steer-invert', action='store_true',
+                        help='Invert the test steering toward the next gate')
     parser.add_argument('--hold-throttle', action='store_true',
                         help='Hold the human keyboard throttle once the race is green (launch test)')
     args = parser.parse_args()
-    if os.name != 'nt' or not 10 <= args.seconds <= 180:
-        parser.error('Windows required; watchdog must be 10..180 seconds')
+    if os.name != 'nt' or not 10 <= args.seconds <= 300:
+        parser.error('Windows required; watchdog must be 10..300 seconds')
     build, output = inside(args.build), inside(args.output)
     assets, sdl = args.assets.resolve(), args.sdl.resolve()
     receipt = json.loads((build / 'build-receipt.json').read_text(encoding='utf-8-sig'))
@@ -97,6 +104,15 @@ def main():
         env['RR_CAMERA_POSE_TRACE'] = '1'
     if args.hold_throttle:
         env['RR_TEST_HOLD_THROTTLE'] = '1'
+    if args.steer_invert:
+        env['RR_TEST_STEER_INVERT'] = '1'
+    if args.race_full:
+        env['RR_TEST_RACE_FULL_BUDGET'] = '1'
+    if args.all_ai:
+        env['RR_ORIGINAL_AI_ALL_RACERS'] = '1'
+    if args.route == 'none':
+        env.pop('RR_UNATTENDED_UI_ROUTE', None)
+        env['RR_TRACK'] = args.track
     if args.profile_performance or args.profile_gpu_stages:
         env.update(RR_TRACE_PHASES='1', RR_TRACE_RENDER='1')
     if args.profile_gpu_stages:
