@@ -261,6 +261,21 @@ public:
             target_->track==loadedTrack&&selection_.rider==loadedRacer&&
             actual.courseRaceSnapshot(current)&&same(selection_,current)&&target(current)==target_;
     }
+    // Restart Race re-runs the SAME consumed race constructor. Mint an
+    // unclaimed launch for the next session only while the actual profile
+    // still holds this exact selection; never for a changed selection.
+    bool renewForRestart(std::uint64_t destroyedGeneration,std::unique_ptr<ConsumedLaunch>& result)const noexcept {
+        Selection current;
+        if(result||!profile_||!target_||destroyedGeneration!=nextGeneration_||
+           destroyedGeneration==std::numeric_limits<std::uint64_t>::max()||
+           !profile_->courseRaceSnapshot(current)||!same(selection_,current)||target(current)!=target_)return false;
+        std::unique_ptr<ConsumedLaunch> renewed;
+        try {renewed.reset(new ConsumedLaunch);}catch(...){return false;}
+        renewed->profile_=profile_;renewed->selection_=selection_;renewed->target_=target_;
+        renewed->nextGeneration_=destroyedGeneration+1;
+        result=std::move(renewed);return true;
+    }
+    bool targetsTrack(Track track)const noexcept{return target_&&target_->track==track;}
 };
 class ColdLoadRequest final {
     Selection selection_{};

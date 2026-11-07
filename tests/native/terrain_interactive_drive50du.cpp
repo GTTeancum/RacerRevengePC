@@ -295,6 +295,14 @@ int nativeApplicationMain50DU(int argc,char**argv){try{
       effectiveTrack,selectedTrack,trackAdmission,originalMainApplication,enterOriginalUi,applicationControls,directApplicationRandom,cameraStartup350,courseColdLoad,nativeWaterGlobals,captureRun,consumedCourseLaunch.get(),SessionServices50DU{&monotonicNow50DU,&reportHost50DU,&reportRenderer50DU});
   // Expire even on restart/return: only a new actual Course consumption can
   // create another owner. Stack unwinding also releases it on session failure.
+  // Exception: Restart Race of a consumed TA race re-runs the same consumed
+  // constructor (tournament intro/race owners), so it renews the launch.
+  std::unique_ptr<original_course_targets50KX::ConsumedLaunch> restartLaunch;
+  if(exit==SessionExit50DU::Restart&&consumedCourseLaunch&&
+     consumedCourseLaunch->targetsTrack(rr::platform::HostTrack50IM::TA)){
+   const bool renewed=consumedCourseLaunch->renewForRestart(sessionIndex+1,restartLaunch);
+   std::cerr<<"consumed_launch_restart track=TA renewed="<<renewed<<'\n';
+  }
   consumedCourseLaunch.reset();
   // Session renderer, GPU, audio and world owners are actually retired.
   // Normal player entry retains the SAME native host/context, not merely the
@@ -345,6 +353,7 @@ int nativeApplicationMain50DU(int argc,char**argv){try{
   enterOriginalUi=exit==SessionExit50DU::ReturnOriginalMain||exit==SessionExit50DU::ResultsHallReturn||exit==SessionExit50DU::PauseMenuReturn;
   require50DU(!enterOriginalUi||originalMainApplication.enabled,"original Main application owner unavailable");
   if(exit==SessionExit50DU::Restart){effectiveAudioSettings=selectedAudioSettings;effectiveTrack=selectedTrack;}
+  if(restartLaunch&&effectiveTrack==rr::platform::HostTrack50IM::TA)consumedCourseLaunch=std::move(restartLaunch);
   require50DU(sessionIndex<std::numeric_limits<std::uint64_t>::max()-1,"audio session index exhausted");
   ++sessionIndex;
   startAtMenu=false; // An explicit restart/start immediately enters its fresh session.

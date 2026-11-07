@@ -242,3 +242,17 @@ Results:
 * End HUD / end clock on TA not exercised: the human pod is not driven
   unattended and runs are capped at 180 s.
 * Regression: TA single + restart and GA + restart: exit 0, all races 62.5 FPS.
+
+### Build89: TA tournament restart (Nov 7, logs only)
+
+Restart Race dropped the consumed launch, so the restarted TA tournament race
+was built without its consumed race yet took the tournament cut path
+(0x174FA4). `ConsumedLaunch::renewForRestart` now mints an unclaimed launch for
+the next session when the profile still holds the same selection;
+`terrain_interactive_drive50du.cpp` applies it on Restart for TA only
+(`consumed_launch_restart track=TA renewed=1`). RA/MA/SA/GA/GC tournament
+restarts are unchanged and untested.
+
+* `main-tournament-course-ta` + restart: exit 0, route and restart verified,
+  both races consumed (Camera34 bound), 62.5 / 62.5 FPS.
+* TA single + restart, GA + restart: exit 0, 62.5 FPS in all races.
