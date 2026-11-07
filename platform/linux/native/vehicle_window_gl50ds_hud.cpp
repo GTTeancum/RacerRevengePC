@@ -18,6 +18,12 @@ std::uint64_t hostHudGlyph(char letter) noexcept {
     case '/': return hudGlyph(1,1,2,4,8,16,16);
     case ':': return hudGlyph(0,4,4,0,4,4,0);
     case '.': return hudGlyph(0,0,0,0,0,4,4);
+    case ';': return hudGlyph(0,4,4,0,4,4,8);
+    case ',': return hudGlyph(0,0,0,0,4,4,8);
+    case '-': return hudGlyph(0,0,0,31,0,0,0);
+    case '+': return hudGlyph(0,4,4,31,4,4,0);
+    case '!': return hudGlyph(4,4,4,4,4,0,4);
+    case 39: return hudGlyph(4,4,8,0,0,0,0); // apostrophe
     case 'D': return hudGlyph(30,17,17,17,17,17,30);
     case 'E': return hudGlyph(31,16,16,30,16,16,31);
     case 'G': return hudGlyph(14,17,16,23,17,17,14);

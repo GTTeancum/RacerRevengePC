@@ -1,9 +1,11 @@
 // The original active host loop, separated without changing its lifetime owners.
+#include <cfenv>
 #include "terrain_interactive_loop50du.h"
 #include "original_race_f8_native_bars50la.h"
 #include "original_results_native_frame50la.h"
 #include "../../src/game/original_race_f8_50la.h"
 #include "../../src/game/original_results104_50la.h"
+#include <chrono>
 #include <optional>
 #include <sstream>
 
@@ -11,6 +13,19 @@ namespace interactive_loop50DU {
 namespace recovery50FI=checkpoint_recovery50fi_fixture;
 using NativeRacerFramePart=interactive_frame50DU::Part;
 namespace {
+// Always-on hitch recorder: four clock reads per frame. A frame slower than
+// 100 ms writes one line splitting its wall time at the existing phase
+// boundaries (input/audio, simulation, render submit, completion/swap).
+struct FrameHitch50DU {
+    using Clock = std::chrono::steady_clock;
+    Clock::time_point start{}, physics{}, render{}, completion{};
+    bool started = false;
+};
+FrameHitch50DU frameHitch50DU;
+double hitchMs50DU(FrameHitch50DU::Clock::time_point a, FrameHitch50DU::Clock::time_point b) {
+    if (a == FrameHitch50DU::Clock::time_point{} || b == FrameHitch50DU::Clock::time_point{} || b < a) return -1.0;
+    return std::chrono::duration<double, std::milli>(b - a).count();
+}
 void require50DU(bool ok, const char* message) {
     if (!ok) throw std::runtime_error(message);
 }
@@ -29,6 +44,13 @@ void Context::run() {
  auto advanceOriginalAiManager=[&](float factor,const original_all8_frame::Schedule* schedule=nullptr){return advanceOriginalAiManagerCall(factor,schedule);};
 
  auto runNative=[&](auto&&fn,const char*label){
+  // Native arithmetic requires round-to-nearest (set once at session start).
+  // Host drivers/libraries may change the thread's FP mode between native
+  // calls; restore it and record each repair instead of failing a later leaf.
+  if(const int rounding=std::fegetround();rounding!=FE_TONEAREST){
+   std::cerr<<"fp_rounding_repaired before="<<label<<" mode="<<rounding<<'\n';
+   require50DU(std::fesetround(FE_TONEAREST)==0,"round-to-nearest restore failed");
+  }
   const bool ok=fn();addCounter50DU(nativeCalls);
   if(!ok){std::ostringstream message;message<<"native frame "<<completedFrames
    <<" "<<label<<" error="<<static_cast<unsigned>(x.diagnostic.error)
@@ -151,6 +173,17 @@ void Context::run() {
        "Results Hall post-poll request consumption rejected");
    if(resultsHallDeparture)break; // Actual closeWindow below; no fresh input/update.
    commitCompletedTournament();
+   {
+    auto& hitch=frameHitch50DU;const auto now=FrameHitch50DU::Clock::now();
+    if(hitch.started&&hitchMs50DU(hitch.start,now)>100.0)
+     std::cerr<<"frame_hitch total_ms="<<hitchMs50DU(hitch.start,now)
+         <<" input_audio_ms="<<hitchMs50DU(hitch.start,hitch.physics)
+         <<" simulation_ms="<<hitchMs50DU(hitch.physics,hitch.render)
+         <<" render_submit_ms="<<hitchMs50DU(hitch.render,hitch.completion)
+         <<" completion_swap_ms="<<hitchMs50DU(hitch.completion,now)
+         <<" tick="<<completedFrames<<'\n';
+    hitch={};hitch.start=now;hitch.started=true;
+   }
    phase_timing50GK::Scope inputTiming(phaseTiming,phase_timing50GK::Phase::Input);
    const bool traceFirstMainPoll=originalUiActive&&originalMain.traceStages&&
        !firstMainPollReported;
@@ -1028,6 +1061,7 @@ void Context::run() {
     if(sourceRaceHud.loaded()&&playerAdvancing)
      require50DU(sourceRaceHud.advanceAnimations29CDA0(.016f),"actual HUD animation update rejected");
     const auto nativeFrameAllocations=::allocations;
+    frameHitch50DU.physics=FrameHitch50DU::Clock::now();
     phase_timing50GK::Scope physicsTiming(phaseTiming,phase_timing50GK::Phase::Physics);
     if(playerAdvancing&&!sourceCameraSession){
      captureDynamicBeforeFrame(0);
@@ -1427,6 +1461,7 @@ void Context::run() {
        !(humanCourseEnabled&&sourceCameraSession->endingVideoCovered()&&!humanResultsReady)&&
        (plan.steps||input.resized||!presenter.hasPublished||capturePending||forceSceneRender||
         (sourceCameraSession&&renderedCameraPublication!=sourceCameraSession->publicationCount()))){
+    frameHitch50DU.render=FrameHitch50DU::Clock::now();
     phase_timing50GK::Scope renderTiming(phaseTiming,phase_timing50GK::Phase::RenderPrepareSubmit);
     if(sourcePauseParentAttached){
      original_pause_observation50LA::Owner::Diagnostic d;
@@ -2315,6 +2350,7 @@ void Context::run() {
      }else{
       // Includes history staging, existing GPU completion and the actual
       // window swap. This is not a GPU-only timer and adds no synchronization.
+      frameHitch50DU.completion=FrameHitch50DU::Clock::now();
       phase_timing50GK::Scope completionTiming(phaseTiming,phase_timing50GK::Phase::CompletionWait);
       const bool displayAccepted=windowCapture.swapAndCapture(renderer,host,captureWindowImage,windowSwaps+1,
           [&](){return renderer.completeGameplayDisplay(host,hostDiagnostic,completionDiagnostic);});

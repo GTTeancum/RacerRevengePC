@@ -1,4 +1,5 @@
 // Source-identical Children prefix; no owners are moved out of runSession.
+#include <cfenv>
 #include "terrain_interactive_frame_calls50du.h"
 #include "runtime_startup50fl_fixture.h"
 #include "native_ai_session50iv_fixture.h"
@@ -328,11 +329,25 @@ bool Context::advanceChildren(std::size_t actualRacerSlot,float preparedOuterFac
   else require50DU(liveAudio->boostAtBoundary(heldBoost,heating,boostState.vehicle64).okay(),
       "source boost audio event rejected");
  }
- runNative([&]{return sourceAiAudio?
+ runNative([&]{
+     const BoostState50FK boostBefore=boostState;
+     const bool boostAccepted=sourceAiAudio?
      originalAiAudio->thermal(actualRacerSlot,s,x.bindings,boostInput,boostParameters,boostState,boostDiagnostic):
      s.fields.vehicle58==1u?
      advanceAiThermal50IT(boostInput,boostParameters,boostState,boostState,boostDiagnostic):
-     advancePlayerBoost50FK(boostInput,boostParameters,boostState,boostState,boostDiagnostic);},"native boost controller");
+     advancePlayerBoost50FK(boostInput,boostParameters,boostState,boostState,boostDiagnostic);
+     // The shared vehicle diagnostic does not carry the boost leaf's own
+     // reason; record it, its inputs and the FP rounding mode before failing.
+     if(!boostAccepted)std::cerr<<"boost_failure slot="<<actualRacerSlot<<" error="<<static_cast<unsigned>(boostDiagnostic.error)
+         <<" stage="<<std::hex<<boostDiagnostic.sourceStage<<std::dec<<" rounding="<<std::fegetround()
+         <<" source_ai_audio="<<sourceAiAudio<<" vehicle58="<<s.fields.vehicle58
+         <<" frame_factor="<<boostInput.frameFactor<<" engine70="<<boostInput.engine70<<" engine74="<<boostInput.engine74
+         <<" speed34="<<boostInput.cachedSpeed34<<" flagsB9C="<<static_cast<unsigned>(boostInput.flagsB9C)
+         <<" profile34="<<boostInput.profile34<<" v64="<<boostBefore.vehicle64<<" v68="<<boostBefore.vehicle68
+         <<" duration6C="<<boostBefore.duration6C<<" ratio70="<<boostBefore.speedRatio70<<" heat7C="<<boostBefore.heat7C
+         <<" heat88="<<boostParameters.heatRate88<<" cool80="<<boostParameters.baseCooling80
+         <<" cool84="<<boostParameters.speedCooling84<<" diff5C="<<boostParameters.engineDifference5C<<'\n';
+     return boostAccepted;},"native boost controller");
  x.selectors.vehicle64=boostState.vehicle64;
  runNative([&]{return graphicsVehicleFrame49W(s,x.bindings,x.parameters,f::cut(PreservingCut49W::Base2176E0BeforeGraphics),x.workspace,x.diagnostic);},"persistent graphics");
  if(nativeSelectedLights){

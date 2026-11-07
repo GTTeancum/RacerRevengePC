@@ -1,3 +1,4 @@
+#include <cfenv>
 #include "terrain_interactive_setup50du.h"
 #include "original_native_world_water50la.h"
 #include <cstring>
@@ -2481,6 +2482,13 @@ SessionExit50DU Context::run() {
  }
  std::uint64_t submittedDrawFrames=0,windowSwaps=0,nativeCalls=0,discardedHostNs=0;
  auto runNative=[&](auto&&fn,const char*label){
+  // Native arithmetic requires round-to-nearest (set once at session start).
+  // Host drivers/libraries may change the thread's FP mode between native
+  // calls; restore it and record each repair instead of failing a later leaf.
+  if(const int rounding=std::fegetround();rounding!=FE_TONEAREST){
+   std::cerr<<"fp_rounding_repaired before="<<label<<" mode="<<rounding<<'\n';
+   require50DU(std::fesetround(FE_TONEAREST)==0,"round-to-nearest restore failed");
+  }
   const bool ok=fn();addCounter50DU(nativeCalls);
   if(!ok){std::ostringstream message;message<<"native frame "<<completedFrames
    <<" "<<label<<" error="<<static_cast<unsigned>(x.diagnostic.error)
