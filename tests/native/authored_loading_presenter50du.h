@@ -56,30 +56,31 @@ class PlayerLoadingPresenter50DU final {
         const auto begin=s.find_first_not_of(" \t\r\n\"");if(begin==std::string::npos)return {};
         return s.substr(begin,s.find_last_not_of(" \t\r\n\"")-begin+1);
     }
+    static bool loadTextRejected(int step)noexcept{std::fprintf(stderr,"original_loading_text_rejected step=%d\n",step);return false;}
     bool loadText() {
         if(code_=="UI")return true;
         OriginalUiRiderProfileOwner50KG::CourseRaceSelection selected;
         game::OriginalUiHallCourseRecords50KG records;
         if(!profile_||!profile_->courseRaceSnapshot(selected)||selected.course>=13||
-           !profile_->hallRecordSnapshot(selected.course,records))return false;
+           !profile_->hallRecordSnapshot(selected.course,records))return loadTextRejected(1);
         const auto seed=game::originalFreshCourseDescriptors50KG[selected.course];
-        if(code_!=std::string{seed.first,seed.second})return false;
+        if(code_!=std::string{seed.first,seed.second})return loadTextRejected(2);
         assets::OriginalUiArchive50KG loc,fontArchive;assets::OriginalUiArchiveDiagnostic50KG archiveDiagnostic;
         if(!loc.load(assets::OriginalUiArchiveId50KG::localization,read(root_/"LOC.RES",35925),archiveDiagnostic)||
-           !fontArchive.load(assets::OriginalUiArchiveId50KG::fonts,read(root_/"UI"/"UIFONTS.RES",44870),archiveDiagnostic))return false;
+           !fontArchive.load(assets::OriginalUiArchiveId50KG::fonts,read(root_/"UI"/"UIFONTS.RES",44870),archiveDiagnostic))return loadTextRejected(3);
         assets::OriginalUiEnglish50KG english;assets::OriginalUiLocalizationDiagnostic50KG localizationDiagnostic;
-        if(!assets::readOriginalUiEnglish50KG(loc,english,localizationDiagnostic))return false;
+        if(!assets::readOriginalUiEnglish50KG(loc,english,localizationDiagnostic))return loadTextRejected(4);
         const auto localized=[&](unsigned id)->std::string {const auto* entry=english.at(id);if(!entry)throw std::runtime_error("Original loading text ID missing");return entry->text;};
         // Constructor17EA08..17EEDC, actual track-ID order; not course menu order.
         constexpr unsigned titles[]={106,111,115,117,110,114,118,108,107,112,116,109,119};
         OriginalUiRiderProfileOwner50KG::TournamentTextMetadataSnapshot rival;
-        if(!profile_->tournamentTextMetadataSnapshot(static_cast<unsigned>(seed.rival11280),rival)||rival.racerName3C<0)return false;
+        if(!profile_->tournamentTextMetadataSnapshot(static_cast<unsigned>(seed.rival11280),rival)||rival.racerName3C<0)return loadTextRejected(5);
         //1CADE0: title/rival, then best lap, race, KOs and their actual record names.
         texts_.push_back({localized(titles[selected.course]),0,3,320,142});
         texts_.push_back({localized(129)+" "+localized(static_cast<unsigned>(rival.racerName3C)),1,3,320,186});
         std::array<char,9> lap{},race{};
         if(!game::originalUiHallTime18900050KG(records.lap102F0[0],lap)||
-           !game::originalUiHallTime18900050KG(records.race1033C[0],race))return false;
+           !game::originalUiHallTime18900050KG(records.race1033C[0],race))return loadTextRejected(6);
         const std::string values[]={lap.data(),race.data(),std::to_string(records.knockouts10388[0])};
         const auto name=[](const std::array<char,21>& bytes){const auto end=std::find(bytes.begin(),bytes.end(),'\0');if(end==bytes.end())throw std::runtime_error("Original loading record name lacks terminator");return std::string(bytes.begin(),end);};
         const std::string names[]={name(records.lapNames102FC[0]),name(records.raceNames10348[0]),name(records.knockoutNames10394[0])};

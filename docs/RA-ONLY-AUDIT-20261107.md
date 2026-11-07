@@ -215,3 +215,30 @@ TA has `loadDisplay_`/`loadFifo_`/`raceAudio_`. Implemented:
   is unavailable". No RA run was possible.
 * Not yet exercised by any run: TA tournament (mode34==2), i.e. the actual
   milestone 1 path (1A6BE0 continuation, Camera34 bind, end HUD, end clock).
+
+### Build88: TA tournament reached (Nov 7, logs only)
+
+New unattended route `main-tournament-course-ta` (`TournamentRoute` in
+`original_ui_capture_navigation50la.h`): Main slot3 (mode2) -> Rider19 ->
+Tournament Continue -> first tournament course (TA) -> Confirm.
+
+Fixes needed to reach and run the TA tournament race:
+* `hallRecordSnapshot` refused mode2, so the Loading Screen text failed before
+  every Tournament race (`original_loading_text_rejected step=1`).
+* `continueConsumedRaCamera1A9240` and `bindConsumedRaCameraNative34` still
+  required the RA world / course ra (lost from the build86 patch).
+* `arithmeticAdmitted()` (TA cut loading, 0x282CD0) was Linux-only and always
+  false on Windows: TA tournament intro cuts could never load on Windows.
+  Added the MSVC x64 MXCSR equivalent.
+
+Results:
+* TA tournament: consumed TA stage admitted (mode34=2), race built, Camera34
+  bound (`camera34_close_state ... adapter_bound=1 lifetime_current=1`), race
+  ran at 62.5 FPS, first-race shutdown passed.
+* Restart inside a TA tournament fails: the restarted session has no consumed
+  launch (no Race28C) but still takes the tournament cut path, rejected at
+  0x174FA4 (`original_camera_cold_rejected status=8`). Pre-existing gap, reachable
+  through Pause > Restart Race in a TA tournament.
+* End HUD / end clock on TA not exercised: the human pod is not driven
+  unattended and runs are capped at 180 s.
+* Regression: TA single + restart and GA + restart: exit 0, all races 62.5 FPS.

@@ -187,7 +187,8 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
   originalMain.activate(renderer);
   windows_capture50LD::Session windowCapture;
   windowCapture.prepare(captureRun,sessionIndex,maximumWidth,maximumHeight,"frontend");
-  original_ui_capture_navigation50LA::Route captureRoute(captureRun.navigate(),captureRun.navigateSa(),captureRun.navigateOcco(),captureRun.navigateDudGa(),captureRun.navigateBenGa(),captureRun.navigateAlderMa(),captureRun.navigateOdyMa(),captureRun.navigateGasganoSa(),captureRun.navigateMawhonicRa());
+  original_ui_capture_navigation50LA::TournamentRoute tournamentRoute(captureRun.navigateTournamentTa());
+  original_ui_capture_navigation50LA::Route captureRoute(captureRun.navigate()&&!captureRun.navigateTournamentTa(),captureRun.navigateSa(),captureRun.navigateOcco(),captureRun.navigateDudGa(),captureRun.navigateBenGa(),captureRun.navigateAlderMa(),captureRun.navigateOdyMa(),captureRun.navigateGasganoSa(),captureRun.navigateMawhonicRa());
   std::cerr<<"ORIGINAL MAIN COLD: dedicated frontend; no race corpus, racer, world, or gameplay renderer constructed.\n";
   auto reportUiState=[&](const char* reason){originalMain.report(reason,originalMainApplication,0,0);};
   bool capturePending=false;
@@ -459,6 +460,17 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
      if(currentRoute.screen!=12||currentRoute.page!=3)break;
      if(secondMenuEvents[event])originalMain.input(static_cast<std::uint8_t>(event),input.secondControllerPresence,1);
     }
+   }
+   if(tournamentRoute.enabled()){
+    require50DU(originalMain.inputCount==tournamentRoute.issuedActions(),"physical menu input interrupted unattended tournament route");
+    const auto snapshot=originalMain.coordinator.snapshot();
+    const auto* navigation=originalMain.navigation();
+    const auto group=navigation?navigation->controllerGroup[0]:0;
+    const auto slot=navigation&&group>0&&static_cast<std::size_t>(group)<navigation->groups.size()?
+        navigation->groups[group].selectedSlot:0;
+    const auto action=tournamentRoute.poll(snapshot,group,slot,
+        courseCatalogPrepared&&raceRequested&&!courseColdLoad.pending()&&renderer.initialized());
+    if(action>=0){originalMain.input(static_cast<std::uint8_t>(action));tournamentRoute.validateDispatch(originalMain.coordinator.snapshot());}
    }
    if(captureRoute.enabled()){
     require50DU(originalMain.inputCount==captureRoute.issuedActions(),"physical menu input interrupted unattended original UI route");

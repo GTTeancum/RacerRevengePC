@@ -7,6 +7,10 @@
 #if defined(__linux__) && defined(__GLIBC__) && defined(__x86_64__) && defined(__SSE2__)
 #include <xmmintrin.h>
 #include <fpu_control.h>
+#elif defined(_MSC_VER) && defined(_M_X64)
+#include <xmmintrin.h>
+#include <cfenv>
+#include <limits>
 #endif
 
 namespace rr::game::original_ta_cut_resource_candidate_detail {
@@ -24,6 +28,14 @@ inline bool arithmeticAdmitted()noexcept {
     // nearest/masked too, covering a possible libm use. No EE/VU parity claim.
     return (csr&0x0000e040u)==0&&(csr&0x00001f80u)==0x00001f80u&&
         (static_cast<unsigned>(cw)&0x0c00u)==0&&(static_cast<unsigned>(cw)&0x003fu)==0x003fu;
+#elif defined(_MSC_VER) && defined(_M_X64)
+    // Windows x64: every float operation is SSE (no x87 evaluation), so the
+    // same read-only MXCSR check is complete. Nearest, FTZ/DAZ off, all masked.
+    if(sizeof(float)!=4||!std::numeric_limits<float>::is_iec559||
+       std::numeric_limits<float>::radix!=2||std::numeric_limits<float>::digits!=24||
+       std::numeric_limits<float>::max_exponent!=128||std::fegetround()!=FE_TONEAREST)return false;
+    const auto csr=static_cast<std::uint32_t>(_mm_getcsr());
+    return (csr&0x0000e040u)==0&&(csr&0x00001f80u)==0x00001f80u;
 #else
     return false; // No unchecked portable/caller FP-mode promise.
 #endif

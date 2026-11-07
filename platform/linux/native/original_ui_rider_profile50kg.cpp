@@ -670,8 +670,10 @@ bool OriginalUiRiderProfileOwner50KG::hallRecordSnapshot(std::uint32_t course,
     // Loading Screen1CADE0 reads these same records for its actual committed
     // Course in mode0. This immutable observation does not enter Hall mode,
     // change a record, or admit a race/renderer. Hall browsing remains mode5.
+    // The same Loading Screen is reached from a Tournament (mode2) launch; it
+    // reads the identical committed-course records, so mode2 is admitted too.
     if(storage_->common->mode34!=5&&
-       !(storage_->common->mode34==0&&course==(storage_->packed1125F&15u)))return false;
+       !((storage_->common->mode34==0||storage_->common->mode34==2)&&course==(storage_->packed1125F&15u)))return false;
     out=storage_->hallRecords.courses[course];return true;
 }
 bool OriginalUiRiderProfileOwner50KG::hallPlanetColors(std::uint32_t planet,

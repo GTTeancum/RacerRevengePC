@@ -281,4 +281,83 @@ public:
         awaitingDispatch_=false;
     }
 };
+
+// Unattended fresh-profile Tournament route: Main slot3 (original mode2) ->
+// Rider19 Confirm -> Tournament Continue -> Course (first tournament course,
+// TA) Confirm. Emits only original Main Next3 and Confirm4 events; every
+// destination is admitted by the actual frontend, never selected here.
+class TournamentRoute final {
+    using Snapshot=rr::platform::OriginalUiFrontendSnapshot50KG;
+    using Life=rr::game::OriginalUiTransitionLifecycle50KG;
+    using Phase=rr::game::OriginalUiTransitionPhase50KG;
+    using Aperture=rr::game::OriginalUiApertureState50KG;
+    bool enabled_=false,awaitingDispatch_=false,awaitingMainMove_=false;
+    std::uint8_t mainMoves_=0,confirms_=0;
+    static void require(bool condition,const char* message){if(!condition)throw std::runtime_error(message);}
+    static bool same(rr::game::OriginalUiTransitionRoute50KG a,rr::game::OriginalUiTransitionRoute50KG b)noexcept{
+        return a.screen==b.screen&&a.page==b.page;
+    }
+    static bool idle(const Snapshot& s)noexcept{
+        const auto& t=s.transition;
+        return s.prepared&&s.active&&!s.faulted&&!s.quitRequested&&s.frameSubmitted&&!s.deferredQueue&&
+            t.bound&&!t.initialRestartPending&&!t.applicationRequestQueued&&t.lifecycle==Life::idle&&
+            t.phase==Phase::none&&s.route.page==1&&same(s.route,t.current)&&same(s.route,t.requested);
+    }
+    static bool settled(const Snapshot& s)noexcept{
+        if(s.route.screen==9){
+            const auto& m=s.tournament;
+            return idle(s)&&m.bound&&!m.faulted&&!m.quitRequested&&m.pageShown&&m.inputContainerShown&&
+                m.framePublished&&m.aperture.bound&&m.aperture.inputEnabled268&&m.aperture.state==Aperture::open;
+        }
+        return Route::settled(s);
+    }
+    // Screen expected before each Confirm: Main, Rider, Tournament, Course.
+    static constexpr std::uint8_t screens_[4]{4,5,9,6};
+public:
+    explicit TournamentRoute(bool enabled)noexcept:enabled_(enabled){}
+    bool enabled()const noexcept{return enabled_;}
+    std::uint8_t issuedActions()const noexcept{return static_cast<std::uint8_t>(mainMoves_+confirms_);}
+    bool actionsDispatched()const noexcept{return confirms_==4&&!awaitingDispatch_;}
+    // Return -1 while waiting, Main Next3, or Confirm4.
+    int poll(const Snapshot& s,std::int32_t mainGroup,std::int32_t mainSlot,bool courseReady){
+        if(!enabled_)return -1;
+        require(!awaitingDispatch_,"tournament route dispatch receipt was not verified");
+        require(!s.faulted&&!s.quitRequested,"tournament route original UI became unavailable");
+        if(confirms_==4)return -1;
+        const auto screen=screens_[confirms_];
+        const bool expected=s.route.screen==screen&&s.route.page==1&&s.switches==confirms_;
+        const bool outgoing=confirms_&&s.route.screen==screens_[confirms_-1]&&s.switches==confirms_-1u;
+        require(expected||outgoing,"tournament route left the bounded Main/Rider/Tournament/Course route");
+        if(!expected||!settled(s))return -1;
+        if(confirms_==0){
+            require(mainGroup==1&&mainSlot==1+mainMoves_,"tournament route Main selection diverged");
+            if(mainSlot<3){awaitingMainMove_=awaitingDispatch_=true;return 3;}
+        }else if(confirms_==1){
+            require(s.rider.rider4C4==19,"tournament route requires the fresh Rider19 entry");
+            if(!s.rider.selectedCharacterReady)return -1;
+        }else if(confirms_==3){
+            require(s.course.selectedCourse44==0&&s.course.selectedPlanet40==0,
+                "tournament route requires the first tournament course (TA)");
+            if(!courseReady)return -1;
+        }
+        awaitingDispatch_=true;return 4;
+    }
+    void validateDispatch(const Snapshot& s){
+        require(enabled_&&awaitingDispatch_,"tournament route has no pending dispatch receipt");
+        const auto& t=s.transition;
+        if(awaitingMainMove_){
+            require(!s.faulted&&s.route.screen==4&&same(t.current,s.route)&&same(t.requested,s.route),
+                "tournament route Main Next changed the route");
+            ++mainMoves_;awaitingMainMove_=awaitingDispatch_=false;return;
+        }
+        const auto source=screens_[confirms_];
+        // Course launch keeps Course as its requested route (as Route above).
+        const bool launch=confirms_==3;
+        require(!s.faulted&&!s.quitRequested&&s.route.screen==source&&t.bound&&same(t.current,s.route)&&
+            (launch?same(t.requested,s.route)&&t.lifecycle==Life::requestCourseExit:
+                !same(t.requested,s.route)&&t.lifecycle==Life::requestScreenExit)&&t.phase==Phase::none,
+            "tournament route original Confirm did not accept a destination");
+        ++confirms_;awaitingDispatch_=false;
+    }
+};
 }

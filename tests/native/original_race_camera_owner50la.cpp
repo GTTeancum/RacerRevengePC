@@ -64,7 +64,7 @@ bool Application::continueConsumedRaCamera1A9240(
        race.resultsFeedbackThread_!=std::this_thread::get_id())return false;
     if(sourceRace28COwner_.get()!=&race||raceConstructorColdOwner50LA_.lock().get()!=&race||
        race.application_!=entitiesOwner_||race.profile_!=riderProfile||!riderProfile||
-       !race.counted_||race.rolledBack_||!race.nativeIntroWorldEntity()||!race.world74_||
+       !race.counted_||race.rolledBack_||!race.nativeIntroWorldEntity()||!race.anyWorld()||
        race.worldInitStep_!=rr::game::OriginalRaceConstructor50LA::WorldInitStep::camera||
        !entitiesOwner_||entitiesOwner_->attachmentLock423F58()||
        (race.flags1B0KnownMask_&3u)!=3u)return false;
@@ -185,7 +185,7 @@ bool Application::bindConsumedRaCameraNative34(original_camera_session50KX::Sess
     const auto race=sourceRace28COwner_;const auto& issued=session.nativeTaIssuance_;
     if(!race||raceConstructorColdOwner50LA_.lock()!=race||race->application_!=entitiesOwner_||
        race->profile_!=riderProfile||!race->ownsNativeCameraAdapter34(session)||
-       !issued||issued->issuer!=this||issued->course!=rr::game::OriginalCameraStartCourse::ra||
+       !issued||issued->issuer!=this||!race->raceCameraCourse34(issued->course)||
        issued->generation!=race->entity_.sessionGeneration||session.generation_!=issued->generation||
        session.actual_.applicationEntities!=entitiesOwner_||
        !session.actual_.applicationAnimation.sameOwner(animationClock())||
