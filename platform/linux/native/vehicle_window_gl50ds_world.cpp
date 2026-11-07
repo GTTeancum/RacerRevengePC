@@ -1237,6 +1237,9 @@ std::array<I,4> VehicleWindowGl50DS::Storage::racerTriangleRasterRegion(U slot,U
         const auto& batch=slot?frameOpponentBatches[slot-1]:framePlayerBatch;
         if(component>=batch.componentCount)return full;
         const auto& part=batch.component[component];
+        // GPU-skinned parts publish no CPU positions: always uncertain, so any
+        // exact-route run keeps one barrier per triangle.
+        if(part.skin)return full;
         if(!part.vertices||!part.indices||first>part.indexCount||part.indexCount-first<3)return full;
         const bool cache=racerRasterCacheActive&&slot==racerRasterSlot&&component==racerRasterComponent&&
             first>=racerRasterFirst&&first-racerRasterFirst<=racerRasterCount&&

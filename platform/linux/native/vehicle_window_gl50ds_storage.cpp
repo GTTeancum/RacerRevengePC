@@ -211,11 +211,11 @@ bool VehicleWindowGl50DS::Storage::podMaterialUsesNormals(const VehicleWindowMat
 
 VehicleWindowGl50DS::Storage::RacerView VehicleWindowGl50DS::Storage::racerView(U archetype) const noexcept {
         if (!archetype) return {meshes, scenes, &resources, racerNormalBuffers, materials.get(),
-            materialOffsets, materialSummary, materialCount, cableTextureName, sourceSpecularGeometry50LA.data()};
+            materialOffsets, materialSummary, materialCount, cableTextureName, sourceSpecularGeometry50LA.data(), nullptr};
         const auto& source = racerArchetypes[archetype - 1];
         return {source.meshes, source.scenes, &source.resources, source.normalBuffers, source.materials.get(),
             source.materialOffsets, source.materialSummary, source.materialCount, source.cableTextureName,
-            source.specularGeometry50LA.data()};
+            source.specularGeometry50LA.data(), source.skin50LA};
     }
 
 bool VehicleWindowGl50DS::Storage::current(VehicleWindowDiagnostic50DS& d,
@@ -841,6 +841,7 @@ bool VehicleWindowGl50DS::Storage::loadFunctions() noexcept {
         LOAD(gl, getIntegerv, GetIntegerv); LOAD(gl, useProgram, UseProgram);
         LOAD(gl, uniformMatrix4fv, UniformMatrix4fv); LOAD(gl, uniform1i, Uniform1i);
         LOAD(gl, uniform1f, Uniform1f); LOAD(gl, uniform4f, Uniform4f);
+        LOAD(gl, uniform4fv, Uniform4fv); LOAD(gl, uniform3fv, Uniform3fv); LOAD(gl, uniform2fv, Uniform2fv);
         LOAD(gl, blendFunc, BlendFunc); LOAD(gl, blendEquation, BlendEquation);
         LOAD(gl, blendFuncSeparate, BlendFuncSeparate);
         {
@@ -1427,6 +1428,116 @@ bool VehicleWindowGl50DS::Storage::createSpecularUvBuffers50LA(U archetype, U bo
         return true;
     }
 
+bool VehicleWindowGl50DS::Storage::createRacerSkin50LA(RacerArchetype& archetype) noexcept {
+        // Cold only. A component that cannot satisfy every admission keeps the
+        // CPU vertex path; nothing here changes the CPU path's own buffers.
+        for (U c = 0; c < archetype.resources.componentCount; ++c) {
+            auto& skin = archetype.skin50LA[c];
+            skin = {};
+            const auto* mesh = archetype.meshes[c];
+            if (!mesh || !mesh->localVertices || !mesh->vertexTemplate || !mesh->semanticScene ||
+                !mesh->vertexCount || mesh->vertexCount > game::maxRigidVertices49S ||
+                !mesh->sourceNodeCount || mesh->sourceNodeCount > game::maxRigidPalette49S ||
+                mesh->spanCount > game::maxVehicleDrawSpans50CM) continue;
+            if (c >= 1 && c <= sourceBodyCount50LA && archetype.specularGeometry50LA[c - 1].singleDiffuse) continue;
+            const auto& scene = *mesh->semanticScene;
+            if (scene.lods.empty() || scene.lods[0].surfaces.size() != mesh->spanCount) continue;
+            const double q = scene.quantization[1];
+            if (!std::isfinite(q) || q <= 0.0) continue;
+            std::vector<VehicleGlSkinVertex50LA> vertices(mesh->vertexCount);
+            bool admitted = true;
+            U vertex = 0;
+            for (const auto& surface : scene.lods[0].surfaces) {
+                for (const auto& source : surface.vertices) {
+                    if (vertex >= mesh->vertexCount) { admitted = false; break; }
+                    const auto& local = mesh->localVertices[vertex];
+                    if (local.paletteIndex != source.bone || local.paletteIndex >= mesh->sourceNodeCount) {
+                        admitted = false; break;
+                    }
+                    game::original_racer_lighting50KM::CompressedNormal normal{};
+                    if (mesh->compressedNormals50LA && mesh->compressedNormalCount50LA == mesh->vertexCount &&
+                        mesh->compressedNormalScene50LA == &scene && mesh->compressedNormalQ50LA == q) {
+                        if (!mesh->compressedNormals50LA[vertex].valid) { admitted = false; break; }
+                        normal = mesh->compressedNormals50LA[vertex].value;
+                    } else if (!game::vehicle_draw_detail50LA::decodeCompressedNormal(source.normal_local, q, normal)) {
+                        admitted = false; break;
+                    }
+                    auto& out = vertices[vertex];
+                    for (U axis = 0; axis < 3; ++axis) {
+                        out.position[axis] = static_cast<float>(local.positionLocal[axis]);
+                        out.compressedNormal[axis] = static_cast<float>(normal[axis]);
+                        out.localNormal[axis] = static_cast<float>(source.normal_local[axis]);
+                        if (!std::isfinite(out.position[axis]) || !std::isfinite(out.localNormal[axis])) admitted = false;
+                    }
+                    out.bone = static_cast<float>(local.paletteIndex);
+                    std::memcpy(out.uv, mesh->vertexTemplate[vertex].uv, sizeof(out.uv));
+                    std::memcpy(out.color, mesh->vertexTemplate[vertex].color, sizeof(out.color));
+                    ++vertex;
+                }
+                if (!admitted) break;
+            }
+            if (!admitted || vertex != mesh->vertexCount) continue;
+            // Shadow-casting spans exactly as buildRacerPodShadows selects them.
+            for (U span = 0; span < mesh->spanCount; ++span) {
+                const auto& range = mesh->spans[span];
+                bool casts = true;
+                if (request.mode == VehicleWindowMode50DS::callerMaterialTextures && archetype.materials) {
+                    const auto& policy = archetype.materials[archetype.materialOffsets[c] + range.material_index].policy;
+                    casts = policy.blend == VehicleWindowBlend50DS::opaque && policy.depthWrite;
+                }
+                std::uint8_t maximumAlpha = 0;
+                for (U n = range.vertex_start; n < range.vertex_start + range.vertex_count && n < mesh->vertexCount; ++n) {
+                    maximumAlpha = std::max(maximumAlpha, mesh->vertexTemplate[n].color[3]);
+                    if (!casts) continue;
+                    const U bone = mesh->localVertices[n].paletteIndex;
+                    const double p[3] = {mesh->localVertices[n].positionLocal[0],
+                        mesh->localVertices[n].positionLocal[1], mesh->localVertices[n].positionLocal[2]};
+                    auto& b = skin.bounds[bone];
+                    for (U axis = 0; axis < 3; ++axis) {
+                        const float value = static_cast<float>(p[axis]);
+                        if (!skin.count[bone] || value < b[axis]) b[axis] = value;
+                        if (!skin.count[bone] || value > b[axis + 3]) b[axis + 3] = value;
+                    }
+                    skin.count[bone] += 1.0;
+                    for (U axis = 0; axis < 3; ++axis) skin.sum[bone][axis] += p[axis];
+                    skin.square[bone][0] += p[0] * p[0]; skin.square[bone][1] += p[0] * p[1];
+                    skin.square[bone][2] += p[0] * p[2]; skin.square[bone][3] += p[1] * p[1];
+                    skin.square[bone][4] += p[1] * p[2]; skin.square[bone][5] += p[2] * p[2];
+                }
+                skin.templateAlphaAdmitted[span] = maximumAlpha <= 64 ? 1 : 0;
+            }
+            gl.genBuffers(1, &skin.buffer);
+            drawGl.bindBuffer(arrayBuffer, skin.buffer);
+            gl.bufferData(arrayBuffer, static_cast<std::intptr_t>(vertices.size() * sizeof(VehicleGlSkinVertex50LA)),
+                vertices.data(), staticDraw);
+            if (!check("create static racer skin vertex buffer") || !skin.buffer)
+                return fail(*diagnostic, VehicleWindowError50DS::allocation, "racer skin vertex buffer");
+            for (auto& bank : archetype.resources.bank) {
+                drawGl.bindVertexArray(bank.vertexArray[c]);
+                drawGl.bindBuffer(arrayBuffer, skin.buffer);
+                constexpr I stride = sizeof(VehicleGlSkinVertex50LA);
+                const struct { U index; I size; U type; std::uint8_t normalized; std::size_t offset; } attributes[] = {
+                    {vehicleGlSkinPositionAttribute50LA, 3, floatType, 0, offsetof(VehicleGlSkinVertex50LA, position)},
+                    {vehicleGlSkinBoneAttribute50LA, 1, floatType, 0, offsetof(VehicleGlSkinVertex50LA, bone)},
+                    {vehicleGlSkinNormalAttribute50LA, 3, floatType, 0, offsetof(VehicleGlSkinVertex50LA, compressedNormal)},
+                    {vehicleGlSkinLocalNormalAttribute50LA, 3, floatType, 0, offsetof(VehicleGlSkinVertex50LA, localNormal)},
+                    {vehicleGlSkinUvAttribute50LA, 2, floatType, 0, offsetof(VehicleGlSkinVertex50LA, uv)},
+                    {vehicleGlSkinColorAttribute50LA, 4, 0x1401, 1, offsetof(VehicleGlSkinVertex50LA, color)},
+                };
+                for (const auto& attribute : attributes) {
+                    gl.enableVertexAttribArray(attribute.index);
+                    gl.vertexAttribPointer(attribute.index, attribute.size, attribute.type, attribute.normalized,
+                        stride, reinterpret_cast<const void*>(attribute.offset));
+                }
+                if (!check("bind racer skin attributes")) return false;
+            }
+            drawGl.bindVertexArray(0);
+            skin.boneCount = mesh->sourceNodeCount;
+            skin.eligible = true;
+        }
+        return true;
+    }
+
 bool VehicleWindowGl50DS::Storage::createRacerNormals(const VehicleGlResources50CV& geometry,
         U (&buffers)[2][maxComponents]) noexcept {
         // Keep the compatibility mesh and all UV/color bytes unchanged. Every
@@ -1938,6 +2049,7 @@ bool VehicleWindowGl50DS::Storage::initialize(const VehicleWindowRequest50DS& in
                 !createRacerNormals(racerArchetypes[i].resources, racerArchetypes[i].normalBuffers)) return false;
             for (U body = 0; body < sourceBodyCount50LA; ++body)
                 if (!createSpecularUvBuffers50LA(i + 1, body, racerArchetypes[i].specularGeometry50LA[body])) return false;
+            if (!createRacerSkin50LA(racerArchetypes[i])) return false;
         }
         if (
             !createStaticGeometry(input.track.mesh, trackVertexBuffer, trackIndexBuffer, trackVertexArray, trackIndexCount) ||

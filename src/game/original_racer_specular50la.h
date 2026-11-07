@@ -150,4 +150,58 @@ inline bool prepareOriginalRacerSpecular50LA(const VehicleDrawMesh50CM& mesh,
     output = next;
     return true;
 }
+// GPU vertex path: identical admission and per-model coefficients as
+// prepareOriginalRacerSpecular50LA, without the per-vertex UV loop. The
+// vertex shader evaluates 0.5 * (coefficients . normal) + 0.5 per vertex.
+inline bool prepareOriginalRacerSpecularCoefficients50LA(const VehicleDrawMesh50CM& mesh,
+    const VehicleDrawSubmission50CM& submission, const OriginalRacerSpecularRequest50LA& request,
+    const OriginalRacerModelDistanceFlags50LA& modelView,
+    original_racer_lighting50KM::SpecularMapDualInputs& coefficients,
+    OriginalRacerSpecularResult50LA& output) noexcept {
+    namespace light = original_racer_lighting50KM;
+    namespace detail = original_racer_specular_detail50LA;
+    if (!light::selection_detail::arithmeticReady() || !mesh.semanticScene ||
+        !mesh.vertexCount || mesh.vertexCount > maxRigidVertices49S ||
+        !mesh.spans || !mesh.spanCount || mesh.spanCount > maxVehicleDrawSpans50CM ||
+        mesh.sourceNodeCount <= 1 || mesh.sourceNodeCount > maxRigidPalette49S ||
+        !submission.sourceSpecularGeometry50LA || !submission.skin ||
+        submission.vertexCount != mesh.vertexCount || submission.indices != mesh.indices ||
+        submission.indexCount != mesh.indexCount || submission.spans != mesh.spans ||
+        submission.spanCount != mesh.spanCount ||
+        !detail::affine(submission.sourceRootWorld50LA.v) || !detail::affine(request.view.data()))
+        return false;
+    const auto& scene = *mesh.semanticScene;
+    if (scene.world_space || !scene.identity_matrix_palette || scene.lods.empty() ||
+        scene.nodes.size() != mesh.sourceNodeCount || scene.lods[0].surfaces.size() != mesh.spanCount)
+        return false;
+    const double authoredQ = scene.quantization[1];
+    if (!std::isfinite(authoredQ) || authoredQ <= 0.0 ||
+        authoredQ > static_cast<double>(std::numeric_limits<float>::max())) return false;
+    const float normalQ = static_cast<float>(authoredQ);
+    if (static_cast<double>(normalQ) != authoredQ) return false;
+    if (!std::isfinite(modelView.distance1BC) || modelView.distance1BC < 0.f ||
+        (modelView.flags20 & ~0x0202u)) return false;
+    OriginalRacerSpecularResult50LA next{};
+    next.distance1BC = modelView.distance1BC;
+    next.secondEnabled = modelView.secondEnabled();
+    light::SpecularMapDualInputs result{};
+    const auto& root = submission.sourceRootWorld50LA;
+    for (unsigned axis = 0; axis < 3; ++axis)
+        for (unsigned lane = 0; lane < 2; ++lane) {
+            float value = light::material_detail::mul(request.view[lane], root.v[axis * 4]);
+            if (!std::isfinite(value)) return false;
+            for (unsigned term = 1; term < 4; ++term) {
+                const float product = light::material_detail::mul(request.view[term * 4 + lane],
+                    root.v[axis * 4 + term]);
+                if (!std::isfinite(product)) return false;
+                value = light::material_detail::add(value, product);
+                if (!std::isfinite(value)) return false;
+            }
+            result.cameraNormalAxes[axis][lane] = light::material_detail::mul(value, normalQ);
+            if (!std::isfinite(result.cameraNormalAxes[axis][lane])) return false;
+        }
+    coefficients = result;
+    output = next;
+    return true;
+}
 } // namespace rr::game

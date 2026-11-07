@@ -109,11 +109,32 @@ struct VehicleDrawSelection50CM {
     const std::uint8_t* paletteIds = nullptr;
     std::uint32_t paletteCount = 0;
 };
+// GPU vertex path (PC/Xbox split). When a staging buffer carries a skin
+// record, buildVehicleDraw50CM publishes only per-part inputs: the current
+// palette matrices and, for source colours, the scaled selected light
+// directions and colour rows. The vertex shader evaluates position, diffuse
+// RGBA, map-2 UV and normal per vertex from a static cold vertex buffer.
+// vertices/sourceNormals are then NOT written and must not be consumed.
+struct VehicleDrawSkin50CM {
+    std::array<BodyMatrix48G, maxRigidPalette49S> bones{};
+    std::uint32_t boneCount = 0;
+    bool sourceColors = false;
+    // lightDirections[light][axis] = selected direction(axis, light) * normalQ.
+    std::array<std::array<float, 3>, 3> lightDirections{};
+    // colorRows[row][lane]: rows 0..2 per light, row 3 ambient (source vf9..12).
+    std::array<std::array<float, 4>, 4> colorRows{};
+    // Cold per-palette local AABB (min xyz, max xyz), filled once by the
+    // first build from the immutable local vertices; empty bones stay invalid.
+    std::array<std::array<float, 6>, maxRigidPalette49S> localBounds{};
+    std::array<bool, maxRigidPalette49S> boneUsed{};
+    bool localBoundsReady = false;
+};
 struct VehicleDrawBuffer50CM {
     assets::Vertex48B* vertices = nullptr;
     std::uint32_t capacity = 0;
     assets::WorldNormal50HK* sourceNormals = nullptr;
     std::uint32_t normalCapacity = 0;
+    VehicleDrawSkin50CM* skin = nullptr;
 };
 struct VehicleDrawSourceColors50LA {
     // Cold immutable semantic-material table: 0 retains legacy template
@@ -160,6 +181,8 @@ struct VehicleDrawSubmission50CM {
     BodyMatrix48G sourceRootWorld50LA{};
     OriginalRacerAggregateBounds50LA sourceAggregateBounds50LA{};
     std::array<float, 3> sourcePosition50LA{};
+    // Non-null: GPU vertex path; vertices/sourceNormals hold no current data.
+    const VehicleDrawSkin50CM* skin = nullptr;
 };
 // Profiling-only wall-time accumulation for buildVehicleDraw50CM stages. The
 // caller owns it; a null pointer (the default) records nothing and changes no

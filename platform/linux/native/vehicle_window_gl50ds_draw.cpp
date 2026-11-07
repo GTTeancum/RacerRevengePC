@@ -266,6 +266,12 @@ bool VehicleWindowGl50DS::Storage::validateOpponents(const game::VehicleDrawBatc
                             return fail(d, VehicleWindowError50DS::frame, "racers require disjoint live world-space vertex arrays");
                     }
                 }
+                if (part.skin) {
+                    if (!selected.skin50LA || !selected.skin50LA[c].eligible ||
+                        part.skin->boneCount != selected.skin50LA[c].boneCount)
+                        return fail(d, VehicleWindowError50DS::frame, "GPU-skinned opponent component is not admitted");
+                    continue;
+                }
                 for (U v = 0; v < part.vertexCount; ++v) {
                     for (float value : part.vertices[v].position)
                         if (!std::isfinite(value))
@@ -499,6 +505,13 @@ bool VehicleWindowGl50DS::Storage::prepareSpecularFrame50LA(const game::VehicleD
                 }
                 if(!selected.specular[bodySlot].enabled)continue;
                 game::OriginalRacerSpecularResult50LA result{};
+                if (body.skin) {
+                    if (!game::prepareOriginalRacerSpecularCoefficients50LA(*selected.meshes[c], body, actual, modelView,
+                        frameSpecularCoefficients50LA[slot][bodySlot], result))
+                        return fail(d, VehicleWindowError50DS::frame, "GPU-skinned body specular coefficients rejected");
+                    frameSpecularSecond50LA[slot][bodySlot] = result.secondEnabled;
+                    continue;
+                }
                 if (!game::prepareOriginalRacerSpecular50LA(*selected.meshes[c], body, actual, modelView,
                     frameSpecularUvs50LA.get() + uvSlot * game::maxRigidVertices49S, game::maxRigidVertices49S,
                     *specularWorkspace50LA, result))
@@ -531,6 +544,7 @@ bool VehicleWindowGl50DS::Storage::uploadSpecularUvs50LA(std::uint8_t bank, U sl
                 if(!check("upload actual current single diffuse fog bytes"))return false;
             }
             if(!body.enabled)continue;
+            if (slot && slot <= frameOpponentCount && frameOpponentBatches[slot - 1].component[c].skin) continue;
             if (!sourceBodyComponent50LA(c, selected.resources->componentCount))
                 return fail(*diagnostic, VehicleWindowError50DS::assets,
                     "source map-2 upload has no actual engine in this three/five-model pod");
@@ -555,6 +569,7 @@ bool VehicleWindowGl50DS::Storage::uploadRacerNormals(std::uint8_t bank, const g
         static constexpr assets::WorldNormal50HK absent[game::maxRigidVertices49S]{};
         for (U c = 0; c < batch.componentCount; ++c) {
             const auto& part = batch.component[c];
+            if (part.skin) continue; // the vertex shader derives normals from bones
             drawGl.bindBuffer(arrayBuffer, selected.normalBuffers[bank][c]);
             // A complete cold bank with no normal-dependent lighting keeps its
             // verified zero-filled attribute. CPU normals still feed source
@@ -777,7 +792,10 @@ bool VehicleWindowGl50DS::Storage::buildRacerPodShadows(const game::VehicleDrawB
                 }
                 if (casts) opaque |= std::uint64_t{1} << span;
             }
-            if (!buildNativePodShadow50HM(part, opaque, output[c])) {
+            const bool built = part.skin && selected.skin50LA && selected.skin50LA[c].eligible ?
+                racerSkinShadow50LA(part, selected.skin50LA[c], output[c]) :
+                buildNativePodShadow50HM(part, opaque, output[c]);
+            if (!built) {
                 diagnostic->component = c;
                 return fail(*diagnostic, VehicleWindowError50DS::assets, "native pod shadow source geometry rejected");
             }
@@ -969,6 +987,7 @@ void VehicleWindowGl50DS::Storage::resetPodState() noexcept {
         gl.uniform1i(u.effectMode, 0); gl.uniform1f(u.alphaScale, 1.f);
         gl.uniform1i(u.suppressDraw, 0); gl.uniform1i(u.useUvTransform, 0);
         gl.uniform1i(u.useLighting, 0);
+        gl.uniform1i(u.skinMode50LA, 0); gl.uniform1i(u.skinDiffuseSelected50LA, 0);
         resetNativeGcLighting();
     }
 
@@ -1392,6 +1411,20 @@ bool VehicleWindowGl50DS::Storage::drawSpecularSpan50LA(std::uint8_t bank, U slo
             const auto& owner = slot ? frameOpponentBatches[slot - 1] : framePlayerBatch;
             if (component >= owner.componentCount) return false;
             const auto& part = owner.component[component];
+            if (part.skin) {
+                // Selected source colour: alpha = round(ambient lane 3) when no
+                // light carries alpha; otherwise the cold template alpha decides.
+                const bool sourceSelected = part.skin->sourceColors && part.sourceColorMaterialModes50LA &&
+                    span.material_index < part.sourceColorMaterialCount50LA &&
+                    part.sourceColorMaterialModes50LA[span.material_index] == 1;
+                if (sourceSelected) {
+                    const auto& rows = part.skin->colorRows;
+                    return rows[0][3] == 0.f && rows[1][3] == 0.f && rows[2][3] == 0.f &&
+                        rows[3][3] >= 0.f && rows[3][3] <= 64.f;
+                }
+                return selected.skin50LA && ordinal < game::maxVehicleDrawSpans50CM &&
+                    selected.skin50LA[component].templateAlphaAdmitted[ordinal] != 0;
+            }
             if (!part.vertices || span.vertex_start > part.vertexCount ||
                 span.vertex_count > part.vertexCount - span.vertex_start) return false;
             for (U v = span.vertex_start; v < span.vertex_start + span.vertex_count; ++v)
@@ -1552,6 +1585,7 @@ bool VehicleWindowGl50DS::Storage::uploadRacer(std::uint8_t bank, const game::Ve
         // Every batch was structurally preflighted and matched to these exact
         // cold buffers before begin. Only the inactive bank is ever reused.
         for (U c = 0; c < selected.resources->componentCount; ++c) {
+            if (batch.component[c].skin) continue; // GPU vertex path: static skin VBO
             drawGl.bindBuffer(arrayBuffer, selected.resources->bank[bank].vertexBuffer[c]);
             // No deferred span consumes an all-opaque component. Upload the
             // complete current stream for every possible deferred consumer;
@@ -1573,6 +1607,8 @@ bool VehicleWindowGl50DS::Storage::drawOpaqueOpponent(std::uint8_t bank, U oppon
         for (U c = 0; c < selected.resources->componentCount; ++c) {
             drawGl.bindVertexArray(selected.resources->bank[bank].vertexArray[c]);
             drawGl.bindBuffer(elementBuffer, selected.resources->indices[c].buffer);
+            const auto& part = frameOpponentBatches[opponent].component[c];
+            if (!bindRacerSkin50LA(part, opponent + 1, c)) return false;
             for (U i = 0; i < selected.meshes[c]->spanCount; ++i) {
                 const auto& span = selected.meshes[c]->spans[i];
                 if (selected.materials) {
@@ -1582,6 +1618,7 @@ bool VehicleWindowGl50DS::Storage::drawOpaqueOpponent(std::uint8_t bank, U oppon
                         opponentMaterialUvs[opponent * opponentMaterialStride + material].value,
                         frameOpponentLights[opponent]->component(c))) return false;
                 }
+                selectRacerSkinSpan50LA(part, span.material_index);
                 if (!drawSpecularSpan50LA(bank, opponent + 1, archetype, c, i, span)) return false;
                 ++diagnostic->opponentOpaqueDraws;
                 diagnostic->opponentOpaqueIndices += span.index_count;
@@ -1608,15 +1645,19 @@ bool VehicleWindowGl50DS::Storage::drawTransparentPod(std::uint8_t bank, U oppon
                 const auto& span = selected.meshes[c]->spans[i];
                 const auto& material = selected.materials[selected.materialOffsets[c] + span.material_index];
                 if (material.policy.blend == VehicleWindowBlend50DS::opaque) continue;
+                const game::VehicleDrawSubmission50CM* part = opponent < maxVehicleWindowOpponents50DS ?
+                    &frameOpponentBatches[opponent].component[c] : nullptr;
                 if (!bound) {
                     drawGl.bindVertexArray(selected.resources->bank[bank].vertexArray[c]);
                     drawGl.bindBuffer(elementBuffer, selected.resources->indices[c].buffer);
+                    if (part && !bindRacerSkin50LA(*part, slot, c)) return false;
                     bound = true;
                 }
                 const float* uv = opponent < maxVehicleWindowOpponents50DS ?
                     opponentMaterialUvs[opponent * opponentMaterialStride +
                         selected.materialOffsets[c] + span.material_index].value : nullptr;
                 if (!applyPodMaterial(material, false, uv)) return false;
+                if (part) selectRacerSkinSpan50LA(*part, span.material_index);
                 drawGl.drawElementsBaseVertex(0x0004, static_cast<I>(span.index_count), 0x1405,
                     reinterpret_cast<const void*>(std::uintptr_t(span.index_start) * sizeof(U)), 0);
                 if (!check("draw deferred source pod effect span")) return false;
@@ -1626,6 +1667,152 @@ bool VehicleWindowGl50DS::Storage::drawTransparentPod(std::uint8_t bank, U oppon
         }
         resetPodState();
         return check("restore opaque state after deferred pod effects");
+    }
+
+bool VehicleWindowGl50DS::Storage::bindRacerSkin50LA(const game::VehicleDrawSubmission50CM& part,
+        U slot, U component) noexcept {
+        const auto& u = shader->uniforms();
+        if (!part.skin) { gl.uniform1i(u.skinMode50LA, 0); return true; }
+        const auto& skin = *part.skin;
+        if (!skin.boneCount || skin.boneCount > game::maxRigidPalette49S || !gl.uniform4fv ||
+            !gl.uniform3fv || !gl.uniform2fv)
+            return fail(*diagnostic, VehicleWindowError50DS::frame, "GPU skin inputs unavailable");
+        float rows[vehicleGlSkinBoneRows50LA * 4];
+        for (U bone = 0; bone < skin.boneCount; ++bone) {
+            const auto& m = skin.bones[bone].v;
+            for (U axis = 0; axis < 3; ++axis) {
+                float* row = rows + (bone * 3 + axis) * 4;
+                row[0] = m[axis]; row[1] = m[4 + axis]; row[2] = m[8 + axis]; row[3] = m[12 + axis];
+            }
+        }
+        gl.uniform4fv(u.skinBones50LA, static_cast<I>(skin.boneCount * 3), rows);
+        gl.uniform3fv(u.skinLightDirections50LA, 3, skin.lightDirections[0].data());
+        gl.uniform4fv(u.skinColorRows50LA, 4, skin.colorRows[0].data());
+        float specular[6]{};
+        if (component >= 1 && component <= sourceBodyCount50LA && slot <= maxVehicleWindowOpponents50DS) {
+            const auto& axes = frameSpecularCoefficients50LA[slot][component - 1].cameraNormalAxes;
+            for (U axis = 0; axis < 3; ++axis) { specular[axis * 2] = axes[axis][0]; specular[axis * 2 + 1] = axes[axis][1]; }
+        }
+        gl.uniform2fv(u.skinSpecular50LA, 3, specular);
+        gl.uniform1i(u.skinDiffuseSelected50LA, 0);
+        gl.uniform1i(u.skinMode50LA, 1);
+        return check("bind GPU skin inputs");
+    }
+
+void VehicleWindowGl50DS::Storage::selectRacerSkinSpan50LA(const game::VehicleDrawSubmission50CM& part,
+        U material) noexcept {
+        if (!part.skin) return;
+        const bool selected = part.skin->sourceColors && part.sourceColorMaterialModes50LA &&
+            material < part.sourceColorMaterialCount50LA && part.sourceColorMaterialModes50LA[material] == 1;
+        gl.uniform1i(shader->uniforms().skinDiffuseSelected50LA, selected ? 1 : 0);
+    }
+
+void VehicleWindowGl50DS::Storage::releaseRacerSkin50LA() noexcept {
+        const auto& u = shader->uniforms();
+        gl.uniform1i(u.skinMode50LA, 0); gl.uniform1i(u.skinDiffuseSelected50LA, 0);
+    }
+
+bool VehicleWindowGl50DS::Storage::racerSkinShadow50LA(const game::VehicleDrawSubmission50CM& part,
+        const RacerSkin50LA& cold, NativePodShadow50HM& output) const noexcept {
+        // Same footprint construction as buildNativePodShadow50HM, from exact
+        // per-bone moments (covariance) and transformed per-bone casting AABB
+        // corners (a superset of the extreme vertices for the min/max terms).
+        const auto& skin = *part.skin;
+        NativePodShadow50HM result{};
+        double low[3] = {INFINITY, INFINITY, INFINITY}, high[3] = {-INFINITY, -INFINITY, -INFINITY};
+        double samples = 0;
+        double sum[3] = {}, square[3][3] = {};
+        const auto corner = [&](const game::BodyMatrix48G& m, const std::array<float, 6>& b, unsigned k, double (&w)[3]) {
+            const double local[3] = {b[(k & 1) ? 3 : 0], b[(k & 2) ? 4 : 1], b[(k & 4) ? 5 : 2]};
+            for (unsigned axis = 0; axis < 3; ++axis)
+                w[axis] = local[0] * m.v[axis] + local[1] * m.v[4 + axis] + local[2] * m.v[8 + axis] + m.v[12 + axis];
+        };
+        for (U bone = 0; bone < skin.boneCount && bone < cold.boneCount; ++bone) {
+            const double n = cold.count[bone];
+            if (!n) continue;
+            const auto& m = skin.bones[bone];
+            for (unsigned k = 0; k < 8; ++k) {
+                double w[3]; corner(m, cold.bounds[bone], k, w);
+                for (unsigned axis = 0; axis < 3; ++axis) { low[axis] = std::min(low[axis], w[axis]); high[axis] = std::max(high[axis], w[axis]); }
+            }
+            // p = A x + t with A[a][k] = m[k*4 + a].
+            double A[3][3], t[3];
+            for (unsigned a = 0; a < 3; ++a) { t[a] = m.v[12 + a]; for (unsigned k = 0; k < 3; ++k) A[a][k] = m.v[k * 4 + a]; }
+            const auto& s1 = cold.sum[bone];
+            const auto& q = cold.square[bone];
+            const double S[3][3] = {{q[0], q[1], q[2]}, {q[1], q[3], q[4]}, {q[2], q[4], q[5]}};
+            double As[3] = {};
+            for (unsigned a = 0; a < 3; ++a) for (unsigned k = 0; k < 3; ++k) As[a] += A[a][k] * s1[k];
+            for (unsigned a = 0; a < 3; ++a) {
+                sum[a] += As[a] + n * t[a];
+                for (unsigned b = 0; b < 3; ++b) {
+                    double ASA = 0;
+                    for (unsigned k = 0; k < 3; ++k) for (unsigned l = 0; l < 3; ++l) ASA += A[a][k] * S[k][l] * A[b][l];
+                    square[a][b] += ASA + t[a] * As[b] + t[b] * As[a] + n * t[a] * t[b];
+                }
+            }
+            samples += n;
+        }
+        if (!samples) { output = result; return true; }
+        for (unsigned axis = 0; axis < 3; ++axis) if (!std::isfinite(low[axis]) || !std::isfinite(high[axis])) return false;
+        const double originX = (low[0] + high[0]) * .5, originY = high[1], originZ = (low[2] + high[2]) * .5;
+        // x = a.p + cx, z = b.p + cz.
+        const double a[3] = {1., -nativeShadowSlopeX50HM, 0.}, b[3] = {0., -nativeShadowSlopeZ50HM, 1.};
+        const double cx = nativeShadowSlopeX50HM * originY - originX, cz = nativeShadowSlopeZ50HM * originY - originZ;
+        const auto dot = [](const double (&u)[3], const double (&v)[3]) { return u[0] * v[0] + u[1] * v[1] + u[2] * v[2]; };
+        const auto quad = [&](const double (&u)[3], const double (&v)[3]) {
+            double r = 0; for (unsigned i = 0; i < 3; ++i) for (unsigned j = 0; j < 3; ++j) r += u[i] * square[i][j] * v[j]; return r;
+        };
+        const double sumX = dot(a, sum) + samples * cx, sumZ = dot(b, sum) + samples * cz;
+        const double sumXX = quad(a, a) + 2. * cx * dot(a, sum) + samples * cx * cx;
+        const double sumZZ = quad(b, b) + 2. * cz * dot(b, sum) + samples * cz * cz;
+        const double sumXZ = quad(a, b) + cx * dot(b, sum) + cz * dot(a, sum) + samples * cx * cz;
+        const double covarianceXX = sumXX - sumX * sumX / samples;
+        const double covarianceXZ = sumXZ - sumX * sumZ / samples;
+        const double covarianceZZ = sumZZ - sumZ * sumZ / samples;
+        const double angle = .5 * std::atan2(2. * covarianceXZ, covarianceXX - covarianceZZ);
+        const double uX = std::cos(angle), uZ = std::sin(angle);
+        double minU = INFINITY, maxU = -INFINITY, minV = INFINITY, maxV = -INFINITY;
+        for (U bone = 0; bone < skin.boneCount && bone < cold.boneCount; ++bone) {
+            if (!cold.count[bone]) continue;
+            for (unsigned k = 0; k < 8; ++k) {
+                double w[3]; corner(skin.bones[bone], cold.bounds[bone], k, w);
+                const double x = w[0] - originX - nativeShadowSlopeX50HM * (w[1] - originY);
+                const double z = w[2] - originZ - nativeShadowSlopeZ50HM * (w[1] - originY);
+                const double u = x * uX + z * uZ, v = -x * uZ + z * uX;
+                minU = std::min(minU, u); maxU = std::max(maxU, u); minV = std::min(minV, v); maxV = std::max(maxV, v);
+            }
+        }
+        const double radiusU = (maxU - minU) * .55, radiusV = (maxV - minV) * .55;
+        if (radiusU < 1e-4 || radiusV < 1e-4) { output = result; return true; }
+        const double midU = (minU + maxU) * .5, midV = (minV + maxV) * .5;
+        const double inverseU = 1. / (radiusU * radiusU), inverseV = 1. / (radiusV * radiusV);
+        const double values[8] = {
+            originX + midU * uX - midV * uZ, originY, originZ + midU * uZ + midV * uX,
+            std::clamp(8. * std::sqrt(radiusU * radiusV), 32., 256.),
+            uX * uX * inverseU + uZ * uZ * inverseV, uX * uZ * (inverseU - inverseV),
+            uZ * uZ * inverseU + uX * uX * inverseV, .48
+        };
+        for (unsigned i = 0; i < 8; ++i) {
+            if (!std::isfinite(values[i]) || std::abs(values[i]) > std::numeric_limits<float>::max()) return false;
+            (i < 4 ? result.centerAndReach[i] : result.shapeAndOpacity[i - 4]) = static_cast<float>(values[i]);
+        }
+        const double qxx = result.shapeAndOpacity[0], qxz = result.shapeAndOpacity[1], qzz = result.shapeAndOpacity[2];
+        if (!(qxx > 0. && qzz > 0. && qxx * qzz > qxz * qxz)) return false;
+        output = result;
+        return true;
+    }
+
+std::uint32_t VehicleWindowGl50DS::racerGpuSkinMask50LA(std::uint32_t archetype) const noexcept {
+        if (!initialized()) return 0;
+        const auto& s = *storage_;
+        if (!archetype || archetype > s.racerArchetypeCount || s.coverageDemand || !s.fixedSpecularBlend50LA ||
+            !s.gl.blendFuncSeparate || !s.gl.uniform4fv || !s.gl.uniform3fv || !s.gl.uniform2fv) return 0;
+        const auto& source = s.racerArchetypes[archetype - 1];
+        std::uint32_t mask = 0;
+        for (U c = 0; c < source.resources.componentCount; ++c)
+            if (source.skin50LA[c].eligible) mask |= 1u << c;
+        return mask;
     }
 
 bool VehicleWindowGl50DS::Storage::begin(void* context, std::uint8_t bank) noexcept {

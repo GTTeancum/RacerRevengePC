@@ -331,6 +331,95 @@ bool prepareSourceColors(const VehicleDrawSelection50CM& selection,
 }
 }
 
+namespace {
+// GPU vertex path: the same matrix admission as projectDrawPositions and the
+// same light/material admission as prepareSourceColors, but no per-vertex
+// loop. Publishes palette matrices and the per-part diffuse coefficients.
+bool prepareVehicleDrawSkin(const VehicleDrawSelection50CM& selection, const VehicleDrawMesh50CM& mesh,
+    const VehicleDrawSourceColors50LA* sourceColors, const BodyMatrix48G* nodeWorld,
+    const OriginalRacerModelPacket50LA* packet, std::uint32_t boneCount, VehicleDrawSkin50CM& skin,
+    VehicleDrawDiagnostic50CM& d) noexcept {
+    namespace light = original_racer_lighting50KM;
+    if (!boneCount || boneCount > maxRigidPalette49S || !nodeWorld)
+        return reject(d, VehicleDrawError50CM::vertices);
+    for (std::uint32_t bone = 0; bone < boneCount; ++bone) {
+        const auto& m = nodeWorld[bone];
+        for (float x : m.v) if (!std::isfinite(x)) return reject(d, VehicleDrawError50CM::vertices, bone);
+        if (m.v[3] != 0.f || m.v[7] != 0.f || m.v[11] != 0.f || m.v[15] != 1.f)
+            return reject(d, VehicleDrawError50CM::vertices, bone);
+    }
+    if (!skin.localBoundsReady) {
+        // Immutable local vertices: one cold pass per staging record.
+        for (auto& used : skin.boneUsed) used = false;
+        for (std::uint32_t i = 0; i < mesh.vertexCount; ++i) {
+            const auto& v = mesh.localVertices[i];
+            if (v.paletteIndex >= boneCount) return reject(d, VehicleDrawError50CM::vertices, i);
+            auto& b = skin.localBounds[v.paletteIndex];
+            for (unsigned axis = 0; axis < 3; ++axis) {
+                const float value = static_cast<float>(v.positionLocal[axis]);
+                if (!std::isfinite(value)) return reject(d, VehicleDrawError50CM::vertices, i);
+                if (!skin.boneUsed[v.paletteIndex] || value < b[axis]) b[axis] = value;
+                if (!skin.boneUsed[v.paletteIndex] || value > b[axis + 3]) b[axis + 3] = value;
+            }
+            skin.boneUsed[v.paletteIndex] = true;
+        }
+        skin.localBoundsReady = true;
+    }
+    for (std::uint32_t bone = 0; bone < boneCount; ++bone) skin.bones[bone] = nodeWorld[bone];
+    skin.boneCount = boneCount;
+    skin.sourceColors = false;
+    if (!sourceColors) return true;
+    const auto& input = *sourceColors;
+    if ((selection.component != VehicleDrawComponent50CM::leftEngine &&
+         selection.component != VehicleDrawComponent50CM::rightEngine &&
+         selection.component != VehicleDrawComponent50CM::bottomLeftEngine &&
+         selection.component != VehicleDrawComponent50CM::bottomRightEngine) ||
+        !input.materialModes || !input.materialCount || !input.selectedLights ||
+        !input.selectedLights->ready() || !mesh.semanticScene)
+        return reject(d, VehicleDrawError50CM::sourceColors);
+    const auto& scene = *mesh.semanticScene;
+    if (input.materialCount != scene.materials.size() || scene.world_space ||
+        !scene.identity_matrix_palette || scene.lods.empty() ||
+        scene.nodes.size() != boneCount || scene.lods[0].surfaces.size() != mesh.spanCount)
+        return reject(d, VehicleDrawError50CM::sourceColors);
+    const auto* selected = input.selectedLights->component(static_cast<unsigned>(selection.component));
+    if (!selected || !light::selection_detail::arithmeticReady())
+        return reject(d, VehicleDrawError50CM::sourceColors);
+    bool hasSelected = false;
+    for (std::uint32_t material = 0; material < input.materialCount; ++material) {
+        if (input.materialModes[material] > 1) return reject(d, VehicleDrawError50CM::sourceColors, material);
+        hasSelected = hasSelected || input.materialModes[material] == 1;
+    }
+    if (!hasSelected) return reject(d, VehicleDrawError50CM::sourceColors);
+    const double authoredQ = scene.quantization[1];
+    if (!std::isfinite(authoredQ) || authoredQ <= 0.0 ||
+        authoredQ > static_cast<double>(std::numeric_limits<float>::max()))
+        return reject(d, VehicleDrawError50CM::sourceColors);
+    const float normalQ = static_cast<float>(authoredQ);
+    if (static_cast<double>(normalQ) != authoredQ) return reject(d, VehicleDrawError50CM::sourceColors);
+    const auto direction = [&](unsigned row, unsigned lane) noexcept {
+        return packet ? packet->matrixSlots[0].v[4u * row + lane] : selected->directions[row][lane];
+    };
+    const auto diffuse = [&](unsigned row, unsigned lane) noexcept {
+        return packet ? packet->matrixSlots[1].v[4u * row + lane] : selected->diffuse[row][lane];
+    };
+    for (unsigned row = 0; row < 4; ++row)
+        for (unsigned lane = 0; lane < 4; ++lane) {
+            if (!std::isfinite(direction(row, lane)) || !std::isfinite(diffuse(row, lane)))
+                return reject(d, VehicleDrawError50CM::sourceColors);
+            skin.colorRows[row][lane] = diffuse(row, lane);
+        }
+    for (unsigned axis = 0; axis < 3; ++axis)
+        for (unsigned lane = 0; lane < 3; ++lane) {
+            const float value = light::material_detail::mul(direction(axis, lane), normalQ);
+            if (!std::isfinite(value)) return reject(d, VehicleDrawError50CM::sourceColors);
+            skin.lightDirections[lane][axis] = value;
+        }
+    skin.sourceColors = true;
+    return true;
+}
+}
+
 bool prepareVehicleDrawMesh50CM(const assets::Scene48D& scene, const assets::Mesh48B& mesh,
     RigidVertex49S* local, std::uint32_t capacity,
     VehicleDrawMesh50CM& output, VehicleDrawDiagnostic50CM& d) noexcept {
@@ -466,6 +555,11 @@ bool buildVehicleDraw50CM(const VehicleFrameState49W& state, const VehicleFrameB
         nodeWorld = rootWorld + 1;
     }
     stage(0);
+    const bool skinned = destination.skin != nullptr;
+    if (skinned) {
+        if (!prepareVehicleDrawSkin(selection, mesh, sourceColors, nodeWorld, packet,
+            workspace.palette.entryCount, *destination.skin, d)) return false;
+    } else {
     if (!projectDrawPositions({mesh.localVertices, mesh.vertexCount},
         {nodeWorld, workspace.palette.entryCount},
         {workspace.positions, maxRigidVertices49S}, d.vertices))
@@ -473,12 +567,13 @@ bool buildVehicleDraw50CM(const VehicleFrameState49W& state, const VehicleFrameB
     stage(1);
     if (sourceColors && !prepareSourceColors(selection, mesh, *sourceColors, nodeWorld, packet, workspace, d))
         return false;
+    }
     stage(2);
 
     // Use the exact current per-node palette already used for positions. The
     // inverse transpose preserves authored hard edges under scale and shear.
     // Finish all fallible work before publishing either output stream.
-    if (destination.sourceNormals) {
+    if (!skinned && destination.sourceNormals) {
         std::array<std::array<double, 16>, maxRigidPalette49S> matrices{};
         for (std::uint32_t bone = 0; bone < workspace.palette.entryCount; ++bone)
             for (std::uint32_t lane = 0; lane < 16; ++lane)
@@ -537,6 +632,30 @@ bool buildVehicleDraw50CM(const VehicleFrameState49W& state, const VehicleFrameB
         next.sourceColorPublication50LA = sourceColors->selectedLights->publication();
         next.sourceColorGraphicsSequence50LA = sourceColors->selectedLights->graphicsSequence();
         next.sourceColorRacerSlot50LA = sourceColors->selectedLights->racerSlot();
+    }
+    if (skinned) {
+        // Conservative display bounds: every used bone's local AABB corners.
+        const auto& skin = *destination.skin;
+        bool first = true;
+        for (std::uint32_t bone = 0; bone < skin.boneCount; ++bone) {
+            if (!skin.boneUsed[bone]) continue;
+            const auto& m = skin.bones[bone].v;
+            const auto& b = skin.localBounds[bone];
+            for (unsigned corner = 0; corner < 8; ++corner) {
+                const float local[3] = {b[(corner & 1) ? 3 : 0], b[(corner & 2) ? 4 : 1], b[(corner & 4) ? 5 : 2]};
+                for (unsigned axis = 0; axis < 3; ++axis) {
+                    const float value = local[0] * m[axis] + local[1] * m[4 + axis] +
+                        local[2] * m[8 + axis] + m[12 + axis];
+                    if (first || value < next.bounds.minimum[axis]) next.bounds.minimum[axis] = value;
+                    if (first || value > next.bounds.maximum[axis]) next.bounds.maximum[axis] = value;
+                }
+                first = false;
+            }
+        }
+        next.skin = destination.skin;
+        stage(4);
+        output = next;
+        return true;
     }
     for (std::uint32_t axis = 0; axis < 3; ++axis)
         next.bounds.minimum[axis] = next.bounds.maximum[axis] = workspace.positions[0].v[axis];

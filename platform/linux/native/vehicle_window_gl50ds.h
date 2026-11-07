@@ -1407,6 +1407,9 @@ public:
     // allocation, readback, swap, image publication change, or implicit timing.
     // Normal submit/window paths never call this barrier automatically.
     bool finishSubmittedWork(VehicleWindowDiagnostic50DS&) noexcept;
+    // Opponent components whose per-vertex work this renderer evaluates on
+    // the GPU (bit c = component c); zero for the player or exact/AA routes.
+    std::uint32_t racerGpuSkinMask50LA(std::uint32_t archetype) const noexcept;
     // Optional source/GPU-storage provenance of the retained accepted RA frame. Call at
     // capture selection, after excluding capture work from FPS measurement.
     // RR_RA_PIXEL_PROVENANCE=1 enables a bounded log and six fog buffer reads; no draws.

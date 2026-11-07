@@ -1899,6 +1899,8 @@ void Context::run() {
        }
        lightsTiming.reset();
        {render_diagnostics50GQ::Scope drawTiming(renderDiagnostics,render_diagnostics50GQ::Subphase::OpponentDrawBatch);
+       // Opponent archetype index is the racer slot (see the descriptor below).
+       opponentDraw[index].setGpuSkinMask(renderer.racerGpuSkinMask50LA(static_cast<std::uint32_t>(racer)));
        drawWorkspace.timing=renderDiagnostics.enabled?&renderDiagnostics.opponentDrawTiming:nullptr;
        const bool prepared=opponentDraw[index].prepare(s,x.bindings,drawWorkspace,opponentDiagnostic,
            originalBodyColors?&sourceColors:nullptr);

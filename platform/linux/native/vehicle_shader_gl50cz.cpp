@@ -27,6 +27,20 @@ in vec4 rrColor;
 in vec3 rrWorldNormal;
 in vec2 rrSpecularUv50LA;
 in float rrSourceFog50LA;
+in vec3 rrSkinPosition50LA;
+in float rrSkinBone50LA;
+in vec3 rrSkinNormal50LA;
+in vec3 rrSkinLocalNormal50LA;
+in vec2 rrSkinUv50LA;
+in vec4 rrSkinColor50LA;
+// GPU vertex path. Row r of palette entry b holds (m[r], m[4+r], m[8+r],
+// m[12+r]) of its row-vector BodyMatrix48G, so world = rows . (local, 1).
+uniform int skinMode50LA;
+uniform vec4 skinBones50LA[192];
+uniform vec3 skinLightDirections50LA[3];
+uniform vec4 skinColorRows50LA[4];
+uniform int skinDiffuseSelected50LA;
+uniform vec2 skinSpecular50LA[3];
 uniform mat4 worldViewProjection;
 uniform int useUvTransform;
 uniform vec4 uvScaleOffset;
@@ -38,6 +52,37 @@ noperspective out float sourceFog50LA;
 out vec3 viewerWorldPosition;
 out vec3 viewerWorldNormal;
 void main() {
+    if (skinMode50LA != 0) {
+        int b = 3 * int(rrSkinBone50LA + 0.5);
+        vec4 r0 = skinBones50LA[b], r1 = skinBones50LA[b + 1], r2 = skinBones50LA[b + 2];
+        vec4 local = vec4(rrSkinPosition50LA, 1.0);
+        vec3 world = vec3(dot(r0, local), dot(r1, local), dot(r2, local));
+        vec4 color = rrSkinColor50LA;
+        vec3 n = rrSkinNormal50LA;
+        if (skinDiffuseSelected50LA != 0) {
+            // Source normalAxes = scaled directions x palette basis, so each
+            // light amount is dot(direction, n through the same basis).
+            vec3 m = vec3(dot(r0.xyz, n), dot(r1.xyz, n), dot(r2.xyz, n));
+            // Source ADDAz 2^23 packing rounds to an integer (ties to even)
+            // after the ambient term and after each ordered light term.
+            vec4 packed = roundEven(skinColorRows50LA[3]);
+            for (int light = 0; light < 3; ++light)
+                packed = roundEven(packed + skinColorRows50LA[light] * max(dot(skinLightDirections50LA[light], m), 0.0));
+            color = clamp(packed, 0.0, 255.0) / 255.0;
+        }
+        vec2 map2 = skinSpecular50LA[0] * n.x + skinSpecular50LA[1] * n.y + skinSpecular50LA[2] * n.z;
+        mat3 basis = mat3(r0.xyz, r1.xyz, r2.xyz);
+        gl_Position = vec4(world, 1.0) * worldViewProjection;
+        viewerUv = useUvTransform != 0 ? rrSkinUv50LA * uvScaleOffset.xy + uvScaleOffset.zw : rrSkinUv50LA;
+        sourceSpecularUv50LA = map2 * 0.5 + 0.5;
+        viewerColor = color;
+        sourceColor = color;
+        sourceFog50LA = 255.0;
+        viewerWorldPosition = world;
+        // Positions use A = transpose(basis); normals use inverse(A)^T = inverse(basis).
+        viewerWorldNormal = inverse(basis) * rrSkinLocalNormal50LA;
+        return;
+    }
     gl_Position = vec4(rrPosition, 1.0) * worldViewProjection;
     viewerUv = useUvTransform != 0 ? rrUv * uvScaleOffset.xy + uvScaleOffset.zw : rrUv;
     sourceSpecularUv50LA = rrSpecularUv50LA;
@@ -299,6 +344,13 @@ bool VehicleGlShader50CZ::initialize(VehicleGlShaderDiagnostic50CZ& diagnostic, 
     if (!noGlError(diagnostic)) return fail();
     gl_.bindAttribLocation(program_, vehicleGlSourceFogAttribute50LA, "rrSourceFog50LA");
     if (!noGlError(diagnostic)) return fail();
+    gl_.bindAttribLocation(program_, vehicleGlSkinPositionAttribute50LA, "rrSkinPosition50LA");
+    gl_.bindAttribLocation(program_, vehicleGlSkinBoneAttribute50LA, "rrSkinBone50LA");
+    gl_.bindAttribLocation(program_, vehicleGlSkinNormalAttribute50LA, "rrSkinNormal50LA");
+    gl_.bindAttribLocation(program_, vehicleGlSkinLocalNormalAttribute50LA, "rrSkinLocalNormal50LA");
+    gl_.bindAttribLocation(program_, vehicleGlSkinUvAttribute50LA, "rrSkinUv50LA");
+    gl_.bindAttribLocation(program_, vehicleGlSkinColorAttribute50LA, "rrSkinColor50LA");
+    if (!noGlError(diagnostic)) return fail();
     gl_.bindFragDataLocation(program_, vehicleGlColorOutput50CZ, "viewerOutput");
     if (!noGlError(diagnostic)) return fail();
     if (coveragePayload) {
@@ -341,6 +393,12 @@ bool VehicleGlShader50CZ::initialize(VehicleGlShaderDiagnostic50CZ& diagnostic, 
     uniforms_.sourcePairDestination50LA = gl_.getUniformLocation(program_, "sourcePairDestination50LA");
     uniforms_.sourcePairAlphaTest50LA = gl_.getUniformLocation(program_, "sourcePairAlphaTest50LA");
     uniforms_.sourcePairFixedBlend50LA = gl_.getUniformLocation(program_, "sourcePairFixedBlend50LA");
+    uniforms_.skinMode50LA = gl_.getUniformLocation(program_, "skinMode50LA");
+    uniforms_.skinBones50LA = gl_.getUniformLocation(program_, "skinBones50LA");
+    uniforms_.skinLightDirections50LA = gl_.getUniformLocation(program_, "skinLightDirections50LA");
+    uniforms_.skinColorRows50LA = gl_.getUniformLocation(program_, "skinColorRows50LA");
+    uniforms_.skinDiffuseSelected50LA = gl_.getUniformLocation(program_, "skinDiffuseSelected50LA");
+    uniforms_.skinSpecular50LA = gl_.getUniformLocation(program_, "skinSpecular50LA");
     uniforms_.nativeGcAmbient = gl_.getUniformLocation(program_, "nativeGcAmbient");
     constexpr const char* diffuseNames[] = {
         "nativeGcDiffuse[0]", "nativeGcDiffuse[1]", "nativeGcDiffuse[2]"
@@ -363,6 +421,8 @@ bool VehicleGlShader50CZ::initialize(VehicleGlShaderDiagnostic50CZ& diagnostic, 
         uniforms_.sourcePairPass50LA < 0 ||
         uniforms_.sourcePairFog50LA < 0 || uniforms_.sourcePairDestination50LA < 0 ||
         uniforms_.sourcePairAlphaTest50LA < 0 || uniforms_.sourcePairFixedBlend50LA < 0 ||
+        uniforms_.skinMode50LA < 0 || uniforms_.skinBones50LA < 0 || uniforms_.skinLightDirections50LA < 0 ||
+        uniforms_.skinColorRows50LA < 0 || uniforms_.skinDiffuseSelected50LA < 0 || uniforms_.skinSpecular50LA < 0 ||
         uniforms_.nativeGcAmbient < 0)
         return fail();
     ready_ = true;

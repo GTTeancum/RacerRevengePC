@@ -36,16 +36,23 @@ public:
         rr::game::VehicleDrawBatchDiagnostic50CO& diagnostic,
         const rr::game::VehicleDrawBatchSourceColors50LA* sourceColors=nullptr) noexcept {
         if(!initialized_)return false;
+        // GPU vertex path per component, as admitted by the renderer.
+        for(unsigned component=0;component<input_.componentCount;++component)
+            input_.staging[component].skin=(skinMask_>>component)&1u?&skins_[component]:nullptr;
         valid_=rr::game::buildVehicleDrawBatch50CO(state,bindings,input_,batch_,workspace,diagnostic,sourceColors);
         return valid_;
     }
     const rr::game::VehicleDrawBatch50CO* batch()const noexcept{return valid_?&batch_:nullptr;}
+    // Components whose per-vertex work the renderer evaluates on the GPU.
+    void setGpuSkinMask(std::uint32_t mask)noexcept{skinMask_=mask;}
     rr::game::PodCableMesh50FD cables{};
 private:
     std::array<std::vector<rr::assets::Vertex48B>,rr::game::maxVehicleDrawComponents50CM> vertices_;
     std::array<std::vector<rr::assets::WorldNormal50HK>,rr::game::maxVehicleDrawComponents50CM> normals_;
     rr::game::VehicleDrawBatchInput50CO input_{};
     rr::game::VehicleDrawBatch50CO batch_{};
+    std::array<rr::game::VehicleDrawSkin50CM,rr::game::maxVehicleDrawComponents50CM> skins_{};
+    std::uint32_t skinMask_=0;
     bool initialized_=false,valid_=false;
 };
 }

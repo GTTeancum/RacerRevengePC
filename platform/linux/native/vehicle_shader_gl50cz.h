@@ -36,6 +36,26 @@ constexpr std::uint32_t vehicleGlNormalAttribute50CZ = 3;
 constexpr std::uint32_t vehicleGlSpecularUvAttribute50LA = 4;
 // Separate float scalar in source byte units [0,255], not a normalized color.
 constexpr std::uint32_t vehicleGlSourceFogAttribute50LA = 5;
+// GPU vertex path (static per archetype component): local position, palette
+// index, compressed source normal (raw int8 lanes as floats), local authored
+// normal, template UV and template RGBA. 52-byte stride.
+struct VehicleGlSkinVertex50LA {
+    float position[3];
+    float bone;
+    float compressedNormal[3];
+    float localNormal[3];
+    float uv[2];
+    std::uint8_t color[4];
+};
+static_assert(sizeof(VehicleGlSkinVertex50LA) == 52, "skin vertex stride");
+constexpr std::uint32_t vehicleGlSkinPositionAttribute50LA = 6;
+constexpr std::uint32_t vehicleGlSkinBoneAttribute50LA = 7;
+constexpr std::uint32_t vehicleGlSkinNormalAttribute50LA = 8;
+constexpr std::uint32_t vehicleGlSkinLocalNormalAttribute50LA = 9;
+constexpr std::uint32_t vehicleGlSkinUvAttribute50LA = 10;
+constexpr std::uint32_t vehicleGlSkinColorAttribute50LA = 11;
+// Three vec4 rows per palette entry (maxRigidPalette49S = 64).
+constexpr std::uint32_t vehicleGlSkinBoneRows50LA = 192;
 constexpr std::uint32_t vehicleGlColorOutput50CZ = 0;
 
 struct VehicleGlShaderUniforms50CZ {
@@ -71,6 +91,8 @@ struct VehicleGlShaderUniforms50CZ {
     std::int32_t sourcePairPass50LA = -1, sourcePairFog50LA = -1;
     std::int32_t sourcePairDestination50LA = -1, sourcePairAlphaTest50LA = -1;
     std::int32_t sourcePairFixedBlend50LA = -1;
+    std::int32_t skinMode50LA = -1, skinBones50LA = -1, skinLightDirections50LA = -1;
+    std::int32_t skinColorRows50LA = -1, skinDiffuseSelected50LA = -1, skinSpecular50LA = -1;
     // Independent static single-map RGBA path. Fog RGB is vec4.xyz in byte units (padding W=0);
     // the scalar byte fog attribute is interpolated screen-linearly. All four
     // locations are required even when this opt-in capability is disabled.

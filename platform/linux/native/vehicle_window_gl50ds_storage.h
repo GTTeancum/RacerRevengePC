@@ -173,6 +173,9 @@ struct OwnerGl {
     void (*uniform2i)(I, I, I) = nullptr;
     void (*uniform4i)(I, I, I, I, I) = nullptr;
     void (*uniform4f)(I, float, float, float, float) = nullptr;
+    void (*uniform4fv)(I, I, const float*) = nullptr;
+    void (*uniform3fv)(I, I, const float*) = nullptr;
+    void (*uniform2fv)(I, I, const float*) = nullptr;
     void (*blendFunc)(U, U) = nullptr;
     void (*blendEquation)(U) = nullptr;
     void (*blendFuncSeparate)(U, U, U, U) = nullptr; // core GL1.4
@@ -371,7 +374,22 @@ struct VehicleWindowGl50DS::Storage {
     };
     static bool podMaterialUsesNormals(const VehicleWindowMaterialBinding50DS& policy) noexcept;
     RacerMaterialSummary materialSummary[maxComponents]{};
+    // GPU vertex path cold data for one opponent archetype component: the
+    // static skin VBO (attached to both bank VAOs) and per-palette moments of
+    // the opaque shadow-casting vertices, so the native pod shadow footprint
+    // is computed from current bones instead of every transformed vertex.
+    struct RacerSkin50LA {
+        bool eligible = false;
+        U buffer = 0;
+        U boneCount = 0;
+        std::array<double, game::maxRigidPalette49S> count{};
+        std::array<std::array<double, 3>, game::maxRigidPalette49S> sum{};
+        std::array<std::array<double, 6>, game::maxRigidPalette49S> square{}; // xx xy xz yy yz zz
+        std::array<std::array<float, 6>, game::maxRigidPalette49S> bounds{};  // casting AABB
+        std::array<std::uint8_t, game::maxVehicleDrawSpans50CM> templateAlphaAdmitted{};
+    };
     struct RacerArchetype {
+        RacerSkin50LA skin50LA[maxComponents]{};
         const game::VehicleDrawMesh50CM* meshes[maxComponents]{};
         const assets::Scene48D* scenes[maxComponents]{};
         VehicleGlResources50CV resources{};
@@ -400,8 +418,18 @@ struct VehicleWindowGl50DS::Storage {
         U materialCount;
         U cableTextureName;
         const SpecularGeometry50LA* specular;
+        const RacerSkin50LA* skin50LA; // null for the player archetype
     };
     RacerView racerView(U archetype) const noexcept;
+    bool createRacerSkin50LA(RacerArchetype& archetype) noexcept;
+    // Per-frame map-2 coefficients for GPU-skinned opponent bodies.
+    game::original_racer_lighting50KM::SpecularMapDualInputs
+        frameSpecularCoefficients50LA[1 + maxVehicleWindowOpponents50DS][sourceBodyCount50LA]{};
+    bool bindRacerSkin50LA(const game::VehicleDrawSubmission50CM& part, U slot, U component) noexcept;
+    void releaseRacerSkin50LA() noexcept;
+    void selectRacerSkinSpan50LA(const game::VehicleDrawSubmission50CM& part, U material) noexcept;
+    bool racerSkinShadow50LA(const game::VehicleDrawSubmission50CM& part, const RacerSkin50LA& skin,
+        NativePodShadow50HM& output) const noexcept;
     std::uint64_t texturePublication = 0;
     std::unique_ptr<TrackSpan[]> trackSpans;
     U trackSpanCount = 0;
