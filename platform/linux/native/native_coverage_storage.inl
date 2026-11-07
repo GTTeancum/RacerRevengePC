@@ -6,6 +6,8 @@
     // Per-frame checked bridge submissions, not visible-pixel/GPU-time counts.
     std::uint64_t coveragePairRuns=0,coveragePairTriangles=0,coveragePairCoalescedTriangles=0;
     std::uint64_t coveragePairEmptyTriangles=0,coveragePairFullSingletons=0;
+    // Source MSCNT groups drawn inside an earlier group's proven-disjoint batch.
+    std::uint64_t coveragePairBatchedGroups=0;
     struct CoverageExtent {
         U scene[2]{}, color[2]{}, depth[2]{};
         U snapshot=0, snapshotColor=0, raster=0, payload=0, rasterDepth=0;
@@ -36,4 +38,9 @@
         bool firstRun,bool firstCoverageSetup) noexcept;
     bool drawCoveragePairGroup(U bank,U slot,U component,U first,U count,U image,
         bool& firstCoverageSetup) noexcept;
+    // Single-sample only. Returns how many consecutive groups starting at g
+    // (at least one) form one batch: contiguous elements, at most 64
+    // triangles, and every triangle pair from DIFFERENT groups rectangle-
+    // disjoint or proven separable. Within a group, run rules are unchanged.
+    U planSeparableGroupBatch(U slot,U component,const SpecularGroup50LA* groups,U g,U end) noexcept;
     bool resolveCoverage(U bank) noexcept;

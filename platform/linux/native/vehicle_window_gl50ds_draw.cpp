@@ -1379,15 +1379,32 @@ bool VehicleWindowGl50DS::Storage::drawSpecularSpan50LA(std::uint8_t bank, U slo
             }
         }
         for (U g = first; drawSecond && accepted && g < end; ++g) {
-            const auto& group = groups.groups[g];
+            const U groupIndex = g;
+            // Single-sample consecutive groups whose triangles provably share
+            // no sample with another group's form one batch: one base draw of
+            // their contiguous elements, then one map-2 run sequence. Each
+            // pixel still sees only its own group's base-then-map-2 order.
+            // AA coverage and unproven groups remain exactly one source group.
+            U batch = 1;
+            if (!coverageDemand) {
+                const auto& last = groups.groups[end - 1];
+                beginRacerRasterOperandGroup(slot, component, groups.groups[g].indexStart,
+                    last.indexStart + last.indexCount - groups.groups[g].indexStart);
+                batch = planSeparableGroupBatch(slot, component, groups.groups.get(), g, end);
+                endRacerRasterOperandGroup();
+            }
+            SpecularGroup50LA group = groups.groups[g];
+            for (U k = 1; k < batch; ++k) group.indexCount += groups.groups[g + k].indexCount;
+            coveragePairBatchedGroups += batch - 1;
+            g += batch - 1;
             // Original single32CC28/multi32D670 issue the ENTIRE MSCNT group
             // base before single32CD18/multi32D750 issue that group's map 2.
             // Several source strips can share the same group. Keep them joined.
             // Map 2 changes these states, so restore them for every paired
             // group. On the source distance-skip path only base draws follow;
             // their texture/uniform/depth state and unbound feedback persist.
-            if (drawSecond || g == first) {
-                if (g != first && !coverageDemand) {
+            if (drawSecond || groupIndex == first) {
+                if (groupIndex != first && !coverageDemand) {
                     gl.activeTexture(textureUnit0 + 1); gl.bindTexture(texture2D, 0);
                     gl.activeTexture(textureUnit0);
                 }
@@ -1395,7 +1412,7 @@ bool VehicleWindowGl50DS::Storage::drawSpecularSpan50LA(std::uint8_t bank, U slo
                 gl.uniform1i(u.sourcePairPass50LA, 1);
                 // Equal pass policies need one write per span. No command
                 // inside the group loop otherwise changes this uniform.
-                if (g == first || !sameFog)
+                if (groupIndex == first || !sameFog)
                     gl.uniform1i(u.sourcePairFog50LA, material->policy.sourceBaseFog50LA ? 1 : 0);
                 gl.depthMask(1);
             }
@@ -1404,12 +1421,12 @@ bool VehicleWindowGl50DS::Storage::drawSpecularSpan50LA(std::uint8_t bank, U slo
                 drawGl.drawElementsBaseVertex(0x0004, static_cast<I>(group.indexCount), 0x1405,
                     reinterpret_cast<const void*>(std::uintptr_t(group.indexStart) * sizeof(U)), 0);
                 accepted = check("draw complete original source-pair base group");
-                if (accepted) ++diagnostic->sourceSpecularBaseGroups50LA;
+                if (accepted) diagnostic->sourceSpecularBaseGroups50LA += batch;
             }
             // Original distance130/1000 skip retains the complete base draw.
             if (!accepted) continue;
             if (!drawSecond) {
-                ++diagnostic->sourceSpecularSkippedGroups50LA;
+                diagnostic->sourceSpecularSkippedGroups50LA += batch;
                 continue;
             }
             gl.bindTexture(texture2D, material->specularName50LA);
@@ -1561,7 +1578,7 @@ bool VehicleWindowGl50DS::Storage::begin(void* context, std::uint8_t bank) noexc
         auto stageStart=s.rendererStageNow();
         s.active = true;s.activeFrameBank=bank;
         s.coveragePairRuns=s.coveragePairTriangles=s.coveragePairCoalescedTriangles=0;
-        s.coveragePairEmptyTriangles=s.coveragePairFullSingletons=0;
+        s.coveragePairEmptyTriangles=s.coveragePairFullSingletons=0;s.coveragePairBatchedGroups=0;
         // Same-context GL ordering protects buffer/target reuse after prior
         // commands, including aborted work. No mapping or cross-context sharing.
         s.gl.bindFramebuffer(framebuffer, s.coverageDemand ? s.coverageLive.scene[bank] : s.targets[bank]);
@@ -1695,13 +1712,14 @@ bool VehicleWindowGl50DS::Storage::commit(void* context, std::uint8_t bank) noex
         s.diagnostic->opponentIndex = maxVehicleWindowOpponents50DS;
         s.traceRaStage("opaque_opponents",stageStart);
         if(s.request.enableGameplayDisplayWallTiming)
-            std::fprintf(stderr,"native_pair_batches scope=player_and_opaque_opponents runs=%llu triangles=%llu coalesced_triangles=%llu saved_bridges=%llu empty_triangles=%llu full_singletons=%llu\n",
+            std::fprintf(stderr,"native_pair_batches scope=player_and_opaque_opponents runs=%llu triangles=%llu coalesced_triangles=%llu saved_bridges=%llu empty_triangles=%llu full_singletons=%llu batched_groups=%llu\n",
                 static_cast<unsigned long long>(s.coveragePairRuns),
                 static_cast<unsigned long long>(s.coveragePairTriangles),
                 static_cast<unsigned long long>(s.coveragePairCoalescedTriangles),
                 static_cast<unsigned long long>(s.coveragePairTriangles-s.coveragePairRuns),
                 static_cast<unsigned long long>(s.coveragePairEmptyTriangles),
-                static_cast<unsigned long long>(s.coveragePairFullSingletons));
+                static_cast<unsigned long long>(s.coveragePairFullSingletons),
+                static_cast<unsigned long long>(s.coveragePairBatchedGroups));
         // Cable/HUD failure still aborts the unpublished combined frame.
         s.resetPodState();
         if (!s.drawCables(s.frameCables, s.cableTextureName)) return false;

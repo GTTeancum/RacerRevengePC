@@ -71,9 +71,11 @@
         U index=0;
         bool occupied=false,finite=false,projectionReady=false;
     };
-    // Scratch exists only within one synchronous source MSCNT group. It
-    // retains no resource pointer and is invalidated before every group.
-    mutable std::array<CachedNativeRasterVertex,32> racerRasterOperands{};
+    // Scratch exists only within one synchronous source MSCNT group or one
+    // proven-disjoint batch of consecutive groups. It retains no resource
+    // pointer and is invalidated before every group/batch. Sized so a bounded
+    // batch's consecutive vertex indices do not evict one another.
+    mutable std::array<CachedNativeRasterVertex,256> racerRasterOperands{};
     bool racerRasterCacheActive=false;
     U racerRasterSlot=0,racerRasterComponent=0,racerRasterFirst=0,racerRasterCount=0;
     void beginRacerRasterOperandGroup(U slot,U component,U first,U count)noexcept;
@@ -84,6 +86,10 @@
     std::array<I,4> nativeTriangleRasterRegion(const std::array<std::array<float,3>,3>& triangle)const noexcept;
     std::array<I,4> raTriangleRasterRegion(U first)const noexcept;
     std::array<I,4> racerTriangleRasterRegion(U slot,U component,U first)const noexcept;
+    // Single-sample only: the two cached, fully unclipped triangles at these
+    // element offsets provably cover no common sample (shared edge, or a
+    // robust separating line). False whenever proof is unavailable.
+    bool racerTrianglesSeparable(U slot,U component,U firstA,U firstB)const noexcept;
     // Capture-only attestation of existing GL attribute/storage, never a draw,
     // source replay, visibility test or pixel-winner claim. Six vertex reads
     // are bounded to the two explicitly requested source floor triangles.

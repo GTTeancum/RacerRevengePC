@@ -317,6 +317,57 @@ bool VehicleWindowGl50DS::Storage::drawCoveragePairTriangle(U bank,U first,U ima
         return accepted&&restored;
     }
 
+bool VehicleWindowGl50DS::Storage::racerTrianglesSeparable(U slot,U component,U firstA,U firstB)const noexcept {
+        if(coverageDemand||!racerRasterCacheActive||slot!=racerRasterSlot||component!=racerRasterComponent||
+            slot>frameOpponentCount)return false;
+        const auto& batch=slot?frameOpponentBatches[slot-1]:framePlayerBatch;
+        if(component>=batch.componentCount)return false;
+        const auto& part=batch.component[component];
+        if(!part.indices||firstA>part.indexCount||part.indexCount-firstA<3||
+            firstB>part.indexCount||part.indexCount-firstB<3)return false;
+        const auto* a=part.indices+firstA;const auto* b=part.indices+firstB;
+        if(a[0]==a[1]||a[0]==a[2]||a[1]==a[2]||b[0]==b[1]||b[0]==b[2]||b[1]==b[2])return false;
+        const auto point=[&](U index,raster_shared_edge::Point& out) noexcept {
+            const auto& entry=racerRasterOperands[index%racerRasterOperands.size()];
+            // Reuse only already computed group operands; collisions or
+            // uncertain/clipped projections retain the old barrier.
+            if(!entry.occupied||entry.index!=index||!entry.finite||!entry.projectionReady)return false;
+            const auto& v=entry.operand;
+            if(v.clip[3]<=v.error[3]+0.0001)return false;
+            for(U axis=0;axis<3;++axis)if(std::abs(v.clip[axis])+v.error[axis]>=v.clip[3]-v.error[3])return false;
+            for(U axis=0;axis<2;++axis){
+                const auto* q=entry.projectedQuotients.data()+axis*4;
+                const double extent=axis?height:width;
+                // Core GL3.2 requires at least four raster subpixel bits
+                // (table6.37). Allow two minimum-precision grid steps in
+                // addition to the full transform interval above.
+                constexpr double rounding=1./8.;
+                raster_shared_edge::Interval interval{(*std::min_element(q,q+4)+1)*extent*.5-rounding,
+                    (*std::max_element(q,q+4)+1)*extent*.5+rounding};
+                (axis?out.y:out.x)=interval;
+            }
+            return true;
+        };
+        U shared[2]{},matched=0,otherA=0,otherB=0;
+        bool same[3][3]{};
+        for(U i=0;i<3;++i){
+            bool found=false;for(U j=0;j<3;++j)if(a[i]==b[j]){found=true;same[i][j]=true;}
+            if(found){if(matched==2)return false;shared[matched++]=a[i];}else otherA=a[i];
+        }
+        if(matched==2){
+            for(U j=0;j<3;++j)if(b[j]!=shared[0]&&b[j]!=shared[1])otherB=b[j];
+            const U indices[]={shared[0],shared[1],otherA,otherB};
+            raster_shared_edge::Point points[4];
+            for(U i=0;i<4;++i)if(!point(indices[i],points[i]))return false;
+            return raster_shared_edge::opposite(points[0],points[1],points[2],points[3]);
+        }
+        // At most one identical vertex: a robust separating edge line,
+        // with any shared vertex clear of every pixel center.
+        raster_shared_edge::Point pa[3],pb[3];
+        for(U i=0;i<3;++i)if(!point(a[i],pa[i])||!point(b[i],pb[i]))return false;
+        return raster_shared_edge::separated(pa,pb,same);
+    }
+
 bool VehicleWindowGl50DS::Storage::drawCoveragePairGroup(U bank,U slot,U component,U first,U count,U image,
         bool& firstCoverageSetup) noexcept {
         // Never cross the original base/map-2 MSCNT group boundary. A run
@@ -325,58 +376,10 @@ bool VehicleWindowGl50DS::Storage::drawCoveragePairGroup(U bank,U slot,U compone
         // shared-edge or robust separating-line pair. No sample can consume another
         // run member's color/alpha or compete with its depth. The unchanged
         // byte shader and per-sample depth comparison can share one snapshot.
-        constexpr U maximumRun=14;
+        // A source group has at most 14 triangles; a single-sample batch of
+        // proven-disjoint groups has at most 64 (planSeparableGroupBatch).
+        constexpr U maximumRun=64;
         const U end=first+count;
-        const auto separable=[&](U firstA,U firstB) noexcept {
-            if(coverageDemand||!racerRasterCacheActive||slot!=racerRasterSlot||component!=racerRasterComponent||
-                slot>frameOpponentCount)return false;
-            const auto& batch=slot?frameOpponentBatches[slot-1]:framePlayerBatch;
-            if(component>=batch.componentCount)return false;
-            const auto& part=batch.component[component];
-            if(!part.indices||firstA>part.indexCount||part.indexCount-firstA<3||
-                firstB>part.indexCount||part.indexCount-firstB<3)return false;
-            const auto* a=part.indices+firstA;const auto* b=part.indices+firstB;
-            if(a[0]==a[1]||a[0]==a[2]||a[1]==a[2]||b[0]==b[1]||b[0]==b[2]||b[1]==b[2])return false;
-            const auto point=[&](U index,raster_shared_edge::Point& out) noexcept {
-                const auto& entry=racerRasterOperands[index%racerRasterOperands.size()];
-                // Reuse only already computed group operands; collisions or
-                // uncertain/clipped projections retain the old barrier.
-                if(!entry.occupied||entry.index!=index||!entry.finite||!entry.projectionReady)return false;
-                const auto& v=entry.operand;
-                if(v.clip[3]<=v.error[3]+0.0001)return false;
-                for(U axis=0;axis<3;++axis)if(std::abs(v.clip[axis])+v.error[axis]>=v.clip[3]-v.error[3])return false;
-                for(U axis=0;axis<2;++axis){
-                    const auto* q=entry.projectedQuotients.data()+axis*4;
-                    const double extent=axis?height:width;
-                    // Core GL3.2 requires at least four raster subpixel bits
-                    // (table6.37). Allow two minimum-precision grid steps in
-                    // addition to the full transform interval above.
-                    constexpr double rounding=1./8.;
-                    raster_shared_edge::Interval interval{(*std::min_element(q,q+4)+1)*extent*.5-rounding,
-                        (*std::max_element(q,q+4)+1)*extent*.5+rounding};
-                    (axis?out.y:out.x)=interval;
-                }
-                return true;
-            };
-            U shared[2]{},matched=0,otherA=0,otherB=0;
-            bool same[3][3]{};
-            for(U i=0;i<3;++i){
-                bool found=false;for(U j=0;j<3;++j)if(a[i]==b[j]){found=true;same[i][j]=true;}
-                if(found){if(matched==2)return false;shared[matched++]=a[i];}else otherA=a[i];
-            }
-            if(matched==2){
-                for(U j=0;j<3;++j)if(b[j]!=shared[0]&&b[j]!=shared[1])otherB=b[j];
-                const U indices[]={shared[0],shared[1],otherA,otherB};
-                raster_shared_edge::Point points[4];
-                for(U i=0;i<4;++i)if(!point(indices[i],points[i]))return false;
-                return raster_shared_edge::opposite(points[0],points[1],points[2],points[3]);
-            }
-            // At most one identical vertex: a robust separating edge line,
-            // with any shared vertex clear of every pixel center.
-            raster_shared_edge::Point pa[3],pb[3];
-            for(U i=0;i<3;++i)if(!point(a[i],pa[i])||!point(b[i],pb[i]))return false;
-            return raster_shared_edge::separated(pa,pb,same);
-        };
         const auto fullRegion=[&](const std::array<I,4>& r) noexcept {
             return r[0]==0&&r[1]==0&&r[2]==width&&r[3]==height;
         };
@@ -409,7 +412,7 @@ bool VehicleWindowGl50DS::Storage::drawCoveragePairGroup(U bank,U slot,U compone
                 bool disjoint=true;
                 for(U i=0;i<run;++i){const auto& old=regions[i];
                     if(next[0]<old[2]&&old[0]<next[2]&&next[1]<old[3]&&old[1]<next[3]){
-                        if(!separable(first+i*3,first+run*3)){disjoint=false;break;}
+                        if(!racerTrianglesSeparable(slot,component,first+i*3,first+run*3)){disjoint=false;break;}
                     }
                 }
                 if(!disjoint)break;
@@ -444,6 +447,50 @@ bool VehicleWindowGl50DS::Storage::drawCoveragePairGroup(U bank,U slot,U compone
             first+=run*3;
         }
         return true;
+    }
+
+U VehicleWindowGl50DS::Storage::planSeparableGroupBatch(U slot,U component,
+        const SpecularGroup50LA* groups,U g,U end) noexcept {
+        // Batching reorders a later group's base before an earlier group's
+        // map-2, so it is admitted only when no sample can belong to two
+        // groups: each pixel then sees exactly its one group's original order.
+        constexpr U maximumTriangles=64;
+        if(coverageDemand||g>=end||groups[g].indexCount%3||groups[g].indexCount/3>maximumTriangles)return 1;
+        const auto empty=[](const std::array<I,4>& r) noexcept {return r[2]<=r[0]||r[3]<=r[1];};
+        const auto full=[&](const std::array<I,4>& r) noexcept {
+            return r[0]==0&&r[1]==0&&r[2]==width&&r[3]==height;
+        };
+        std::array<std::array<I,4>,maximumTriangles> regions;
+        std::array<U,maximumTriangles> offsets;
+        U triangles=0;
+        for(U k=0;k<groups[g].indexCount/3;++k){
+            offsets[triangles]=groups[g].indexStart+3*k;
+            regions[triangles]=racerTriangleRasterRegion(slot,component,offsets[triangles]);
+            if(full(regions[triangles]))return 1;
+            ++triangles;
+        }
+        U count=1;
+        for(U next=g+1;next<end;++next){
+            const auto& previous=groups[next-1];const auto& candidate=groups[next];
+            if(candidate.indexStart!=previous.indexStart+previous.indexCount||candidate.indexCount%3||
+               candidate.indexCount/3>maximumTriangles-triangles)break;
+            const U earlier=triangles;U added=triangles;bool admitted=true;
+            for(U k=0;admitted&&k<candidate.indexCount/3;++k){
+                const U first=candidate.indexStart+3*k;
+                const auto region=racerTriangleRasterRegion(slot,component,first);
+                if(full(region)){admitted=false;break;}
+                if(!empty(region))
+                    for(U m=0;m<earlier;++m){
+                        const auto& old=regions[m];
+                        if(empty(old)||!(region[0]<old[2]&&old[0]<region[2]&&region[1]<old[3]&&old[1]<region[3]))continue;
+                        if(!racerTrianglesSeparable(slot,component,offsets[m],first)){admitted=false;break;}
+                    }
+                regions[added]=region;offsets[added]=first;++added;
+            }
+            if(!admitted)break;
+            triangles=added;++count;
+        }
+        return count;
     }
 
 bool VehicleWindowGl50DS::Storage::resolveCoverage(U bank) noexcept {
