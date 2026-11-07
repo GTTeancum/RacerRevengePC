@@ -2064,7 +2064,10 @@ void Context::run() {
         "actual consumed race/Pause parent attachment rejected");
     sourcePauseParentAttached=true;
    }
-   if(humanOriginalHud&&!isRaTrack&&sourcePause.storage()&&sourceCameraSession){
+   // RA human tournaments load the same Pause storage for Results (but never
+   // its draw); other tracks load it above. The all-AI spectator route keeps
+   // its own consumed-race Pause binding.
+   if(humanOriginalHud&&!sourceConsumedPauseActivation&&sourcePause.storage()&&sourceCameraSession){
     // Constructor17EA08 title IDs in actual track-ID order (as the loader).
     constexpr std::size_t trackTitles[]={106,111,115,117,110,114,118,108,107,112,116,109,119};
     rr::platform::OriginalUiRiderProfileOwner50KG::CourseRaceSelection course;

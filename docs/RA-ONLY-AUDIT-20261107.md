@@ -89,3 +89,20 @@ branches select that loader, not a feature.
   there require building those stages on the tier-B pattern.
 * RA human Pause: `humanResultsCold` hands `sourcePause` to the Results load;
   the host Pause route needs a second Pause owner or a shared-storage join.
+
+## Progress (Nov 7, same session, not yet built)
+
+* Done: native player speech joins any consumed race (RA/TA/MA/SA/GA/GC);
+  off RA a failed identity join logs `native_human_speech_join_unavailable`
+  and keeps the existing speech path.
+* Done: the host Pause route also binds on human RA races (it reuses the Pause
+  storage the RA human tournament already loads for Results; the all-AI
+  spectator route is unchanged).
+* Results design for tier B: `original_results_roster50LA::Read` rows come from
+  `original_position_stats_adapter50LA::Owner` + the racer Bank (available on
+  every track); only its identity checks bind `ra_cold_roster50LA::Operation`
+  and the RA aggregate (`raceWorldIdentity`, `completedWorldPrefixes`,
+  `loadedOperation*`). Next: a host Read variant validated against the
+  consumed race's own world/session, Results104 load in the tier-B HUD
+  collector window, and the finish -> Results open/frame drive that RA gets
+  from `humanEndRace94` / `prepareNativeResultsFrame50LA`.

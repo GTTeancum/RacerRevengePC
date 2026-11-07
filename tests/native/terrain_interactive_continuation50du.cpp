@@ -2370,8 +2370,19 @@ SessionExit50DU Context::run() {
        "NativeUndefinedCarryPolicy enabled; actual dust/smoke, spark and fire children share the scene pool.\n";
   }
   const auto retainActualSpeechOwners=[&](){
-   if(!audioEnabled||!originalUiStarted||!humanCourseEnabled||!consumedRaStage.race())return;
-   const auto& actualRace=consumedRaStage.race();
+   // Any consumed original race (RA, TA, MA, SA, GA, GC) publishes the same
+   // Application race28C and session generation the speech owners bind to.
+   const auto actualRace=consumedRaStage.race()?consumedRaStage.race():consumedTaStage.race()?consumedTaStage.race():
+       consumedMaStage.race()?consumedMaStage.race():consumedSaStage.race()?consumedSaStage.race():
+       consumedGaStage.race()?consumedGaStage.race():consumedGcStage.race();
+   if(!audioEnabled||!originalUiStarted||!humanCourseEnabled||!actualRace)return;
+   // RA keeps its fail-closed contract. Other consumed races join when their
+   // identities match and otherwise keep the existing speech path (logged).
+   if(actualRace!=consumedRaStage.race()&&!(originalMainApplication.race28C()==actualRace.get()&&
+      originalMainApplication.state&&&s.noiseOwner()==&originalMainApplication.state->sharedNoise308030)){
+    std::cerr<<"native_human_speech_join_unavailable session="<<actualRace->entity_.sessionGeneration<<'\n';
+    return;
+   }
    //This is the actual successful native speech producer, not Scope capture
    //or a future event's claim. All initialization draws already happened once.
    require50DU(originalMainApplication.race28C()==actualRace.get()&&originalMainApplication.state&&
