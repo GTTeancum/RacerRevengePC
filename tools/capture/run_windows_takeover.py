@@ -48,6 +48,9 @@ def main():
                         help='Log actual attached-camera poses without changing camera behavior')
     parser.add_argument('--restart-once', action='store_true',
                         help='Exercise native race teardown/rebuild after first race evidence; not Pause-menu input')
+    parser.add_argument('--renderer-switch', action='append', default=[],
+                        choices=['RR_EXACT_PS2_SPECULAR', 'RR_GPU_FINISH_EACH_FRAME'],
+                        help='Set one renderer comparison switch to 1 (repeatable); recorded in execution.json')
     args = parser.parse_args()
     if os.name != 'nt' or not 10 <= args.seconds <= 180:
         parser.error('Windows required; watchdog must be 10..180 seconds')
@@ -96,6 +99,8 @@ def main():
         env['RR_TRACE_GPU_STAGES'] = '1'
     if args.restart_once:
         env['RR_UNATTENDED_RESTART_ONCE'] = '1'
+    for switch in args.renderer_switch:
+        env[switch] = '1'
     command = [str(staged), '--assets', str(assets)]
     result = dict(command=command, route=args.route, watchdogSeconds=args.seconds,
                   sourceBuildReceipt=str(build / 'build-receipt.json'),
@@ -103,7 +108,7 @@ def main():
                   runtimeHashes={p.name: digest(output / p.name) for p in runtime},
                   nativeSaveDirectory=str(saves), audioCapturePath=str(output / 'audio.wav'),
                   visualVerified=False, audioVerified=False, hostInputUsed=False, logsOnly=args.logs_only,
-                  cameraPoseTrace=args.camera_trace, nativeRestartOnce=args.restart_once,
+                  cameraPoseTrace=args.camera_trace, nativeRestartOnce=args.restart_once, rendererSwitches=sorted(set(args.renderer_switch)),
                   performanceProfiling=args.profile_performance or args.profile_gpu_stages,
                   serializedGpuStageProfiling=args.profile_gpu_stages)
     (output / 'launch.json').write_text(json.dumps(result, indent=2) + '\n')

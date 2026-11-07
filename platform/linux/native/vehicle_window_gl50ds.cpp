@@ -1537,9 +1537,9 @@ bool VehicleWindowGl50DS::completeGameplayDisplayImpl(GameHost50ER& host,
     if(accepted){
         {
             GameplayDisplayWallScope50DS timing(s.request.enableGameplayDisplayWallTiming,d.gameplayFinishWall);
-            s.gl.finish();
+            if(s.finishEachGameplayFrame)s.gl.finish();else s.gl.flush();
         }
-        accepted=s.check("complete final gameplay image and staged history before display");
+        accepted=s.check("submit final gameplay image and staged history before display");
     }
     d.submittedWorkCompleted=accepted;
     s.diagnostic=nullptr;

@@ -846,6 +846,8 @@ bool VehicleWindowGl50DS::Storage::loadFunctions() noexcept {
         {
             const char* exact = std::getenv("RR_EXACT_PS2_SPECULAR");
             fixedSpecularBlend50LA = !(exact && exact[0] == '1' && !exact[1]);
+            const char* finish = std::getenv("RR_GPU_FINISH_EACH_FRAME");
+            finishEachGameplayFrame = finish && finish[0] == '1' && !finish[1];
         }
         LOAD(gl, viewport, Viewport); LOAD(gl, enable, Enable); LOAD(gl, disable, Disable);
         LOAD(gl, depthFunc, DepthFunc); LOAD(gl, depthMask, DepthMask);
@@ -854,7 +856,7 @@ bool VehicleWindowGl50DS::Storage::loadFunctions() noexcept {
         LOAD(gl, clearColor, ClearColor); LOAD(gl, clear, Clear);
         LOAD(gl, drawBuffer, DrawBuffer); LOAD(gl, readBuffer, ReadBuffer);
         LOAD(gl, pixelStorei, PixelStorei); LOAD(gl, readPixels, ReadPixels);
-        LOAD(gl, finish, Finish);
+        LOAD(gl, finish, Finish); LOAD(gl, flush, Flush);
         LOAD(gl, getString, GetString);
         // Host pause menus copy the retained race image between private FBOs
         // in headless mode too. Resolve before exposing either blit path.

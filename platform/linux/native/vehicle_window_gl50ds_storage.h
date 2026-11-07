@@ -216,6 +216,7 @@ struct OwnerGl {
     void (*pixelStorei)(U, I) = nullptr;
     void (*readPixels)(I, I, I, I, U, U, void*) = nullptr;
     void (*finish)() = nullptr;
+    void (*flush)() = nullptr;
     void (*garageFlush24C160)()=nullptr; //Lazy same-context core glFlush, no ordinary startup dependency.
     // Garage-only lazy GL3.2 core observation. Ordinary startup is unchanged.
     __GLsync* (*fenceSync)(U,U)=nullptr;
@@ -328,6 +329,12 @@ struct VehicleWindowGl50DS::Storage {
     // NV2A-class hardware. RR_EXACT_PS2_SPECULAR=1 restores the byte-exact
     // feedback route for comparison. AA coverage keeps its exact bridge.
     bool fixedSpecularBlend50LA = true;
+    // Gameplay display hands work to the GPU (glFlush) and swaps without a
+    // full CPU wait, so CPU preparation of the next frame overlaps GPU work.
+    // GL command order already covers every consumer of this frame; none of
+    // the completion bookkeeping reads GPU results back. Read-backs elsewhere
+    // block on their own. RR_GPU_FINISH_EACH_FRAME=1 restores the full wait.
+    bool finishEachGameplayFrame = false;
     std::unique_ptr<float[]> frameDiffuseFog50LA;
     std::unique_ptr<game::original_racer_diffuse50LA::Workspace> diffuseWorkspace50LA;
     game::OriginalRacerDiffuseCameraSnapshot50LA frameDiffuseCamera50LA;
