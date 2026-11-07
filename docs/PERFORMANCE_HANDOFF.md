@@ -1,3 +1,5 @@
+> Current handoff: [November 6, 2026](HANDOFF-20261106.md). No more images; current performance work and unfinished changes are recorded there.
+
 # Additional runtime verification: October 17, 2026, 11:39 p.m. EDT
 
 The same compiled checkpoint also passed a fresh normal-menu run through Anakin/Watchtower, real throttle, Pause, confirmed Restart, a fresh race countdown and player control, then Pause -> Original Main -> window close. Process exit0, no timeout. Two same-run screenshots were delivered. Full lap, finish/results and all-racer/all-track coverage remain unverified. Subsequent coverage runs must use a new racer/track pairing, prioritizing untested racers and tracks. This supersedes the pending Restart/return status below.
