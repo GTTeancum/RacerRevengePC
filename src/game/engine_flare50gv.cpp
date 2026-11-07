@@ -14,7 +14,15 @@ std::uint32_t bits(float value) noexcept { std::uint32_t word;std::memcpy(&word,
 bool finite(float value) noexcept {const auto word=bits(value),e=word&0x7f800000u;return e!=0x7f800000u&&(e||(word&0x7fffffu)==0);}
 struct Math {
     bool good=true;
-    float check(float value) noexcept {if(!finite(value))good=false;return value;}
+    // PS2 EE FPU results never denormalize: a subnormal result is flushed to
+    // a signed zero. The 5%-per-frame flame decay toward zero thrust reaches
+    // the subnormal range after ~1840 frames on IEEE hardware; flushing it
+    // reproduces the console value instead of rejecting the frame.
+    float check(float value) noexcept {
+        const auto word=bits(value);
+        if((word&0x7f800000u)==0&&(word&0x7fffffu))return fp(word&0x80000000u);
+        if(!finite(value))good=false;return value;
+    }
     float add(float a,float b) noexcept {volatile float v=a+b;return check(v);}
     float sub(float a,float b) noexcept {volatile float v=a-b;return check(v);}
     float mul(float a,float b) noexcept {volatile float v=a*b;return check(v);}

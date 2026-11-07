@@ -93,6 +93,10 @@ inline AiLogicalSoundReceipt spatialAiLogicalSound233AE0(
     const auto word=static_cast<std::int32_t>(pitch);
     if(word< -1||word>=16384){r.sourcePC=0x233d40u;return r;}
     if(s.channel2C<0){r.sourceReturned=true;r.sourcePC=0x233d50u;return r;}
+    // A one-shot that played to its end keeps its logical token until the
+    // next stop/start; its voice is no longer playing. Treat it as the idle
+    // channel above (as stop233670 does) instead of controlling a dead voice.
+    if(!owner.active(s)){s.channel2C=-1;r.sourceReturned=true;r.sourcePC=0x233d50u;return r;}
     // Positive-rate native backend. Zero/-1 source transport semantics need
     // their own backend handling; never substitute a clamped audible pitch.
     if(word<=0||owner.controlsSourceVolume(s,s.volume44,
