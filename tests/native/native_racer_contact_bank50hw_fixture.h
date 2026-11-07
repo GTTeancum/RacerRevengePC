@@ -3,6 +3,7 @@
 // Bank::visit in the shared arena; contact settings/resources are cold-bound
 // independently by native_racer_contact50HW::Owner.
 #include "native_racer_bank50hn_fixture.h"
+#include "native_contact_snapshots.h"
 #include "native_racer_contact50hw_fixture.h"
 #include "native_dynamic_contact_peers50iw_fixture.h"
 #include "../../src/game/vehicle_frame49w.h"
@@ -73,30 +74,11 @@ inline Status applyAtWorldBoundary(
     std::array<Body,maxRacers> before{},after{};
     std::array<bool,maxRacers> actualAi{},dynamicBound{};
     std::array<BodyContactListState48R,maxRacers> contactBefore{},contactAfter{};
+    SnapshotAccess snapshots(bank,live,bindings,parameters);
     for(std::size_t i=0;i<count;++i){
-        const bool valid=bank.visit(i,[&](){
-            const auto node=static_cast<int>(bindings.lifecycle.main190);
-            if(!validVehicleSceneCount49W(live,bindings)||node<0||
-               node>=static_cast<int>(live.sceneNodeCount))return false;
-            const auto& root=live.bodies.main.components.root;
-            actualAi[i]=live.fields.vehicle58==1u;
-            if(dynamicJoined){
-                dynamicBound[i]=live.fields.dynamicOwnersBound50IW;
-                // Preserve the signed source count bits, including unsupported
-                // negative states, without an unsigned-to-signed conversion.
-                std::memcpy(&contactBefore[i].count20C,&live.bodies.main.components.body20C,
-                    sizeof(contactBefore[i].count20C));
-                std::memcpy(contactBefore[i].slots210.data(),live.mainContactPartners210,
-                    sizeof(live.mainContactPartners210));
-            }
-            if((participates[i]||count==1)&&(live.phase!=VehicleFramePhase49W::Ready||
-               std::memcmp(&root.scene,&live.nodes[node].world100,sizeof(BodyMatrix48G))))return false;
-            before[i].physical.identity=identity[i];before[i].physical.body.state=root;
-            before[i].physical.body.parameters=parameters.bodies.main.body;
-            before[i].physical.body.localCenter=parameters.bodies.main.centerOffset;
-            before[i].material=material[i];return true;
-        });
-        if(!valid)return Status::InvalidInput;
+        if(!snapshots.gather(i,participates[i]||count==1,dynamicJoined,
+            before[i],actualAi[i],dynamicBound[i],contactBefore[i]))return Status::InvalidInput;
+        before[i].physical.identity=identity[i];before[i].material=material[i];
     }
     // Joined ownership admission precedes all response/list mutations. Every
     // participant remains a real active Ready racer, even when no pair hits.
@@ -147,39 +129,15 @@ inline Status applyAtWorldBoundary(
     // caller that changed a racer while collecting snapshots. No retained body
     // or scene pointer crosses a visit: only copied POD snapshots do.
     for(std::size_t i=0;i<count;++i)
-        if((participates[i]||count==1)&&!bank.visit(i,[&](){
-            if(live.phase!=VehicleFramePhase49W::Ready||
-               std::memcmp(&live.bodies.main.components.root,&before[i].physical.body.state,sizeof(RootBodyState48H)))
-                return false;
-            if(dynamicJoined&&(!bank.active(i)||!live.fields.dynamicOwnersBound50IW||
-               std::memcmp(&live.bodies.main.components.body20C,&contactBefore[i].count20C,sizeof(contactBefore[i].count20C))||
-               std::memcmp(live.mainContactPartners210,contactBefore[i].slots210.data(),sizeof(live.mainContactPartners210))))
-                return false;
-            return true;
-        }))
-            return Status::InvalidInput;
+        if((participates[i]||count==1)&&!snapshots.unchanged(i,
+            before[i].physical.body.state,contactBefore[i],dynamicJoined))return Status::InvalidInput;
     // All fallible work is over. Commit the exact two-body numerical response
     // fields, canonical238/23C and, only when joined, canonical20C/210; all ten210 slots preserve
     // their old bits unless a source append overwrites that slot. Transform,
     // position, quaternion, history and terrain stay intact.
-    const auto commit=[&](std::size_t i){bank.visit(i,[&](){
-        auto& dst=live.bodies.main.components.root;const auto& src=after[i].physical.body.state;
-        dst.body.velocity=src.body.velocity;dst.body.angularVelocity=src.body.angularVelocity;
-        dst.loads=src.loads;dst.positionCorrection1a0=src.positionCorrection1a0;
-        dst.rotationCorrection1b0=src.rotationCorrection1b0;
-        dst.accumulator1c0=src.accumulator1c0;dst.accumulator1d0=src.accumulator1d0;
-        // Canonical processed-body list is independent of20C/210 damage join.
-        // Its identities remain valid until the existing next root count-clear.
-        dst.callbackState238=src.callbackState238;
-        std::memcpy(dst.processedContactPartners23C,src.processedContactPartners23C,
-            sizeof(dst.processedContactPartners23C));
-        if(dynamicJoined){
-            std::memcpy(&live.bodies.main.components.body20C,&contactAfter[i].count20C,
-                sizeof(contactAfter[i].count20C));
-            std::memcpy(live.mainContactPartners210,contactAfter[i].slots210.data(),
-                sizeof(live.mainContactPartners210));
-        }
-    });};
+    const auto commit=[&](std::size_t i){
+        snapshots.commit(i,after[i].physical.body.state,contactAfter[i],dynamicJoined);
+    };
     for(std::size_t i=1;i<count;++i)if(participates[i])commit(i);if(participates[0])commit(0);
     receipt=staged;return Status::Complete;
 }
