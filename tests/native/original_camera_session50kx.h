@@ -1520,6 +1520,9 @@ public:
     const OriginalCameraViewportFields& viewport()const noexcept{return viewport_;}
     const TVCameraUpdateOutput49F& pose()const noexcept{return pose_;}
     bool nativeHudVisible()const noexcept{return !(uiFlags1E4_&1u);}
+    // The prepared 174EF4 death-camera identity the wreck owner rebinds its
+    // racer370/374 debris view to.
+    const OriginalDeathCameraIdentity50KG& deathIdentity()const noexcept{return death_.identity;}
     bool hasView()const noexcept{return publicationCount_!=0;}
     // Explicit shared-mixer consumed-step listener adaptation, not the omitted
     // retail music-update prefix/suffix. Never a render or End callback.
@@ -1977,14 +1980,15 @@ public:
             }
             // States3/4 enter the original death camera (177AB0, 22DC90), whose
             // every update aggregates the racer's real debris (22D4B0). Until
-            // that wreck provider exists the camera keeps its current mode on
-            // the frozen, hidden body (docs/pod-destruction-20261108.md).
-            if((current.racerState40==3||current.racerState40==4)&&!actual_.deathDebris){
+            // the wreck owner has bound this racer's debris view (the world
+            // boundary after the destroy commit) the camera keeps its current
+            // mode on the frozen, hidden body (docs/pod-destruction-20261108.md).
+            if((current.racerState40==3||current.racerState40==4)&&(!actual_.deathDebris||!actual_.deathDebris->count370)){
                 // No wreck provider yet: hold the current pose (published
                 // through the ordinary late tick/matrix/visibility stages).
                 frameStage_=FrameStage::lateTick;break;
             }
-            if((current.racerState40==3||current.racerState40==4)&&actual_.deathDebris){
+            if((current.racerState40==3||current.racerState40==4)&&actual_.deathDebris&&actual_.deathDebris->count370){
                 result_.retirement=retirementCursor_.begin({controller_,follow_,attached_,death_,deathChild_,
                     followChild_,attachedChild_,actual_.blur},current);
                 if(result_.retirement.status==OriginalRetirementCameraStatus50KG::needsDeathTransition177AB0){

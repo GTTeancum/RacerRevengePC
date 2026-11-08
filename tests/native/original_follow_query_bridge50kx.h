@@ -388,6 +388,9 @@ class QueryBridge {
         storage_.objects[deathIndex].shapeTag=0;
         deathCold_.identity120=deathIdentity;deathCold_.object120=&storage_.objects[deathIndex];
         deathCold_.geometry120=&geometry_[deathIndex];deathCold_.globalValid3E0730=&storage_.globalValid3E0730;
+        // Cold reservation of the death query's two first-use allocations.
+        deathCold_.reserved120=std::make_unique<OriginalDeathCameraQueryState>();
+        deathCold_.reservedD8=std::make_unique<std::uint32_t>(0u);
     }
 public:
     // Read-only identity of the existing immutable source constant; this grants

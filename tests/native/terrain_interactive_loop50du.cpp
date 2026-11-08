@@ -1,4 +1,6 @@
 // The original active host loop, separated without changing its lifetime owners.
+#include "native_wreck_debris_sim50pd.h"
+#include "native_wreck_debris_gpu50pd.h"
 #include <cfenv>
 #include "../../platform/linux/native/stall_watchdog50du.h"
 #include "../../src/game/ps2_float_mode50la.h"
@@ -315,6 +317,7 @@ void Context::run() {
      if(test.slot>=0&&!test.fired&&static_cast<std::size_t>(test.slot)<racerBank.count()&&
         race.raceSeconds>=test.seconds){
       test.fired=true;rr::game::nativeTestDestroyPending50PD[static_cast<std::size_t>(test.slot)]=true;
+      rr::game::nativeTestDestroyAttacker50PD[static_cast<std::size_t>(test.slot)]=test.attacker;
       std::cerr<<"test_destroy due slot="<<test.slot<<" race_seconds="<<race.raceSeconds<<'\n';
      }
    }
@@ -1433,6 +1436,64 @@ void Context::run() {
      // are Ready, before race observations and the single world audio mix.
      // A failed native slot never participates through an abandoned snapshot.
      // Sealed results alone do not remove a Ready native vehicle from contacts.
+     // Original 225C50 suffix of a destroy handler, at this world boundary:
+     // attacker CD0 kill credit (225F34) and the 1A46E0 music song chosen at
+     // the transition. The human's player-event CD0 is credited in the frame.
+     for(std::size_t slot=0;slot<racerBank.count()&&slot<rr::game::nativeDestroyedRacers50PD.size();++slot){
+      auto& destroyed=rr::game::nativeDestroyedRacers50PD[slot];
+      if(!destroyed.destroyed||destroyed.suffixApplied)continue;
+      destroyed.suffixApplied=true;
+      if(destroyed.killCreditPending){
+       const auto attacker=static_cast<std::size_t>(destroyed.attackerD30);
+       std::uint32_t kills=0;
+       racerBank.visit(attacker,[&](){++lapContinuity.timing.countCD0;kills=lapContinuity.timing.countCD0;});
+       std::cerr<<"kill_credit attacker="<<attacker<<" victim="<<slot<<" kills="<<kills<<'\n';
+      }
+      if(destroyed.musicSong){
+       int result=-1;bool requested=false;
+       if(raceMusic&&liveAudio->outputOpen()){
+        const auto receipt=raceMusic->request(destroyed.musicSong,0u,dynamicMusicProfile.mode11258);
+        result=static_cast<int>(receipt.result);requested=receipt.completed();
+       }
+       std::cerr<<"destroy_music song="<<destroyed.musicSong<<" victim="<<slot<<" requested="<<requested
+           <<" result="<<result<<" output_open="<<liveAudio->outputOpen()<<" owner="<<(raceMusic?1:0)<<'\n';
+      }
+     }
+     native_wreck_debris50PD::step(.016f);
+     // The camera racer's debris becomes the death camera's 22D4B0 view
+     // (rebound to the Session's prepared death identity) once it exists.
+     if(rr::game::nativeRacerDestroyed50PD(0)&&sourceCameraSession&&!native_wreck_debris50PD::cameraViewBound(0)){
+      const auto& identity=sourceCameraSession->deathIdentity();
+      const bool bound=native_wreck_debris50PD::bindCameraView(0,identity.sessionGeneration,identity.racerKey);
+      std::cerr<<"death_camera_debris bound="<<bound<<" pieces="<<native_wreck_debris50PD::cameraView().count
+          <<" collections="<<native_wreck_debris50PD::cameraView().view.count370<<'\n';
+     }
+     native_wreck_debris50PD::updateCameraView();
+     native_wreck_effects50PD::step(.016f);
+     {const auto& debris=native_wreck_debris50PD::sim();
+      if(!debris.pieces.empty()&&debris.steps%125==1){std::size_t settled=0;float lowest=1e30f,highest=-1e30f;
+       for(const auto& p:debris.pieces){settled+=p.settled;lowest=std::min(lowest,p.position.y);highest=std::max(highest,p.position.y);}
+       std::cerr<<"debris_state live="<<debris.pieces.size()<<" settled="<<settled<<" retired="<<debris.retired
+           <<" contacts="<<debris.contacts<<" y="<<lowest<<".."<<highest<<" steps="<<debris.steps
+           <<" queries="<<debris.queries<<" invalid="<<debris.invalid<<" capacity="<<debris.capacity
+           <<" unsupported="<<debris.unsupported;
+       for(const auto& p:debris.pieces){const float dx=p.position.x-p.spawn.x,dz=p.position.z-p.spawn.z;
+        std::cerr<<" ["<<p.racer<<'.'<<p.index<<(p.settled?" S":p.retired?" R":" F")<<" dy="<<p.position.y-p.spawn.y
+            <<" dh="<<std::sqrt(dx*dx+dz*dz)<<" c="<<p.contacts<<" last="<<p.lastContactStep
+            <<" v="<<std::sqrt(p.velocity.x*p.velocity.x+p.velocity.y*p.velocity.y+p.velocity.z*p.velocity.z)<<']';}
+       {const auto& fx=native_wreck_effects50PD::state();
+        std::cerr<<" effects particles="<<fx.particles.size()<<" emitters="<<fx.emitters.size()
+            <<" spawned="<<fx.spawned<<" dropped="<<fx.dropped;}
+       if(rr::game::nativeRacerDestroyed50PD(0)&&sourceCameraSession){
+        const auto& pose=sourceCameraSession->pose();const auto& view=native_wreck_debris50PD::cameraView();
+        float cx=0,cy=0,cz=0;std::size_t n=0;
+        for(std::size_t k=0;k<view.count;++k){const auto* m=view.nodes[k].localC0.v;cx+=m[12];cy+=m[13];cz+=m[14];++n;}
+        if(n){cx/=float(n);cy/=float(n);cz/=float(n);}
+        const float ex=pose.position.x-cx,ey=pose.position.y-cy,ez=pose.position.z-cz;
+        std::cerr<<" camera_mode="<<pose.mode
+            <<" camera_to_debris="<<std::sqrt(ex*ex+ey*ey+ez*ez)<<" camera_height="<<ey;
+       }
+       std::cerr<<'\n';}}
      if(racerContactsEnabled){
       SimulationScope timing(phaseTiming.enabled,simulationTotals[10]);
       std::array<bool,native_racer_contact50HW::maxRacers> contactParticipant{};
@@ -2064,6 +2125,46 @@ void Context::run() {
         humanOriginalHud?(hud.resultsPanelVisible?&hud:nullptr):
         sourceCameraSession&&!sourceCameraSession->nativeHudVisible()?nullptr:&hud};
     renderFrame.playerHiddenDestroyed50PD=playerDestroyed;
+    static std::array<platform::VehicleWindowDebrisInstance50DS,platform::maxVehicleWindowDebrisInstances50DS> debrisInstances50PD{};
+    static std::array<rr::assets::Vertex48B,platform::maxVehicleWindowEffectQuads50DS*4u> effectVertices50PD{};
+    if(sourceCameraSession&&native_wreck_effects50PD::state().cold&&!native_wreck_effects50PD::state().particles.empty()){
+     // Billboards face the presented camera (its eye and backward axis), not
+     // the pose target, which death-camera mode 0 leaves unwritten.
+     const auto sprites=native_wreck_effects50PD::camera({camera.eye[0],camera.eye[1],camera.eye[2]},
+         {camera.eye[0]-cameraBackward.v[0],camera.eye[1]-cameraBackward.v[1],camera.eye[2]-cameraBackward.v[2]},
+         {camera.up[0],camera.up[1],camera.up[2]});
+     std::uint32_t blended=0;
+     renderFrame.effectQuads=native_wreck_effects50PD::build(sprites,effectVertices50PD.data(),
+         platform::maxVehicleWindowEffectQuads50DS,blended);
+     renderFrame.effectBlendedQuads=blended;
+     renderFrame.effectVertices=renderFrame.effectQuads?effectVertices50PD.data():nullptr;
+    }
+    if(playerDestroyed&&native_wreck_debris50PD::cameraViewBound(0)){
+     // How squarely the presented camera looks at the player's debris.
+     static std::uint64_t debrisViewFrames=0;
+     if(++debrisViewFrames%125==1){
+      const auto& v=native_wreck_debris50PD::cameraView();float c[3]{};
+      for(std::size_t k=0;k<v.count;++k)for(unsigned a=0;a<3;++a)c[a]+=v.nodes[k].localC0.v[12+a]/float(v.count);
+      const float dx=c[0]-camera.eye[0],dy=c[1]-camera.eye[1],dz=c[2]-camera.eye[2];
+      const float distance=std::sqrt(dx*dx+dy*dy+dz*dz);
+      // Two independent checks: the presented camera's forward axis
+      // (-backward) and the death camera's own look output, against the
+      // direction to the debris (1 = dead centre, <0 = behind).
+      const float bx=-cameraBackward.v[0],by=-cameraBackward.v[1],bz=-cameraBackward.v[2];
+      const float bl=std::sqrt(bx*bx+by*by+bz*bz);
+      const auto& pose=sourceCameraSession->pose();
+      const float lx=pose.look.x,ly=pose.look.y,lz=pose.look.z,ll=std::sqrt(lx*lx+ly*ly+lz*lz);
+      const float forwardCos=distance>0.f&&bl>0.f?(dx*bx+dy*by+dz*bz)/(distance*bl):0.f;
+      const float lookCos=distance>0.f&&ll>0.f?(dx*lx+dy*ly+dz*lz)/(distance*ll):0.f;
+      std::cerr<<"death_camera_view frame="<<debrisViewFrames
+          <<" forward_cos="<<forwardCos<<" look_cos="<<lookCos<<" distance="<<distance
+          <<" eye="<<camera.eye[0]<<','<<camera.eye[1]<<','<<camera.eye[2]<<" debris="<<c[0]<<','<<c[1]<<','<<c[2]
+          <<" pose_mode="<<pose.mode<<'\n';
+     }
+    }
+    {const auto& g=native_wreck_debris50PD::gpu();
+     if(g.prepared){renderFrame.debrisCount=native_wreck_debris50PD::instances(debrisInstances50PD,g.firstPiece,g.pieceCount);
+      renderFrame.debris=renderFrame.debrisCount?debrisInstances50PD.data():nullptr;}}
     if(renderRequest.track.rcCrystal){
      // The actual retained RC crystal source consumes this same Session view
      // even when no racer material selects the specular-pair capability.

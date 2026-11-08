@@ -1,3 +1,5 @@
+#include "native_wreck_debris_sim50pd.h"
+#include "native_wreck_debris_gpu50pd.h"
 #include "../../src/game/native_destroyed_racers50pd.h"
 #include "original_manager_fields.h"
 #include <functional>
@@ -2342,7 +2344,10 @@ SessionExit50DU Context::run() {
       "native cold race activation is one-shot after Course input ownership ends");
   // Every activated race starts with its racers intact (Restart rebuilds them).
   rr::game::resetNativeDestroyedRacers50PD();
+  native_wreck_debris50PD::resetSim();
+  native_wreck_effects50PD::reset();
   rr::game::nativeTestDestroyPending50PD={};
+  rr::game::nativeTestDestroyAttacker50PD.fill(-1);
   for(auto& test:rr::game::nativeTestDestroys50PD)test.fired=false;
   if(!allAiEnabled){
    platform::SelectedControlInput50KY current{};
@@ -3755,6 +3760,9 @@ SessionExit50DU Context::run() {
     }
     if(texture->ownsResources())return closeRejected("if(texture->ownsResources())");
    }
+  }
+  if(!native_wreck_debris50PD::closeGpu(textureDiagnostic)){
+   std::cerr<<"debris texture cleanup error "<<static_cast<unsigned>(textureDiagnostic.error)<<'\n';clean=closeAccumulated("debris texture cleanup");
   }
   if(gpuTextures.ownsResources()&&!gpuTextures.close(textureDiagnostic)){
    std::cerr<<"texture cleanup error "<<static_cast<unsigned>(textureDiagnostic.error)<<'\n';clean=closeAccumulated("std::cerr<<\"texture cleanup error \"<<static_cast<unsigned>(textureDiagnostic.error)<<'\n';clean=false;");

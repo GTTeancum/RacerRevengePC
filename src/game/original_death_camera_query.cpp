@@ -231,7 +231,8 @@ S constructOriginalDeathCameraQuery22D8A8(OriginalDeathCameraQueryOwner& o,
     cold.attempted=true;cold.sourcePC=0x22d894u;
     //22D894 allocates the actual native query; failure keeps the preceding
     //scene removal and22D87C binding. It never publishes a fake readiness bit.
-    cold.allocation120.reset(new(std::nothrow) OriginalDeathCameraQueryState{});
+    if(cold.reserved120){cold.allocation120=std::move(cold.reserved120);*cold.allocation120=OriginalDeathCameraQueryState{};}
+    else cold.allocation120.reset(new(std::nothrow) OriginalDeathCameraQueryState{});
     if(!cold.allocation120)return S::Storage;
     auto& s=*cold.allocation120;auto& q=s.query120;
     auto& object=*cold.object120;auto& collection=o.mutableWorld.objects[o.object120-1u];
@@ -255,7 +256,8 @@ S constructOriginalDeathCameraQuery22D8A8(OriginalDeathCameraQueryOwner& o,
     s.owner9C=o.owner9C;s.callbackE4=0; //22D8C4/22D8CC
     object.filter.categories.mode=0; //124160(0)
     cold.sourcePC=0x124214u;
-    cold.categoryD8.reset(new(std::nothrow) std::uint32_t(*o.world.staticObjectMask3E0720));
+    if(cold.reservedD8){cold.categoryD8=std::move(cold.reservedD8);*cold.categoryD8=*o.world.staticObjectMask3E0720;}
+    else cold.categoryD8.reset(new(std::nothrow) std::uint32_t(*o.world.staticObjectMask3E0720));
     if(!cold.categoryD8)return S::Storage; //124170/3080C0; earlier writes survive
     object.filter.categories={cold.categoryD8.get(),1,1,0};
     s.staticCategoryMaskD8=*cold.categoryD8;

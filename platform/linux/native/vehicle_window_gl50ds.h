@@ -386,6 +386,27 @@ struct VehicleWindowRacerArchetype50DS {
     VehicleWindowMaterials50DS materials{};
     VehicleWindowCables50DS cables{};
 };
+// PC-native debris pieces of destroyed racers (docs/pod-destruction-20261108.md).
+// Cold: one piece-local mesh holding every loaded piece of every racer. Each
+// span names a caller-resolved GL texture (0 = untextured source colour);
+// each piece names its contiguous spans. Drawn unlit with the source colours.
+struct VehicleWindowDebrisSpan50DS { std::uint32_t indexStart = 0, indexCount = 0, texture = 0; };
+struct VehicleWindowDebrisPiece50DS { std::uint32_t firstSpan = 0, spanCount = 0; };
+struct VehicleWindowDebris50DS {
+    const assets::Mesh48B* mesh = nullptr;
+    const VehicleWindowDebrisSpan50DS* spans = nullptr;
+    std::uint32_t spanCount = 0;
+    const VehicleWindowDebrisPiece50DS* pieces = nullptr;
+    std::uint32_t pieceCount = 0;
+};
+// Per frame: one visible piece and its column-major piece-to-world matrix.
+struct VehicleWindowDebrisInstance50DS { std::uint32_t piece = 0; float world[16]{}; };
+inline constexpr std::uint32_t maxVehicleWindowDebrisInstances50DS = 512;
+// PC-native wreck particle sprites: one atlas texture (the caller's bank owns
+// the GL name), per frame world-space quads TL,BL,TR,BR (alpha-blended first,
+// back to front, then additive).
+struct VehicleWindowEffects50DS { std::uint32_t texture = 0; };
+inline constexpr std::uint32_t maxVehicleWindowEffectQuads50DS = 4096;
 struct VehicleWindowRequest50DS {
     // Actual display-sealed direct-transfer binding, retained through local HUD uploads.
     std::shared_ptr<const assets::OriginalNativeTextureUploadBinding50LA> originalUploadBinding;
@@ -480,6 +501,10 @@ struct VehicleWindowRequest50DS {
     const assets::MaterialTextureAssets50EA* gcParticleCpuTextures = nullptr;
     const MaterialTextureGl50EB* gcParticleTextures = nullptr;
     const assets::OriginalGcParticleMaterial50KG* gcParticleMaterial = nullptr;
+    // Optional cold debris pieces; absent mesh draws none.
+    VehicleWindowDebris50DS debris{};
+    // Optional wreck particle atlas; zero texture draws no effects.
+    VehicleWindowEffects50DS effects{};
 };
 // Dedicated frontend context. There is no vehicle/world asset slot and no
 // gameplay opt-in; construction cannot certify any race owner as prepared.
@@ -746,6 +771,13 @@ struct VehicleWindowFrame50DS {
     // The player racer is destroyed (original 28C6E0 hid its models): its
     // collapsed geometry casts no pod shadow.
     bool playerHiddenDestroyed50PD = false;
+    // Visible debris pieces this frame (borrowed through submit).
+    const VehicleWindowDebrisInstance50DS* debris = nullptr;
+    std::uint32_t debrisCount = 0;
+    // Wreck particle quads (4 vertices each); the first effectBlendedQuads
+    // are alpha-blended, the rest additive. Borrowed through submit.
+    const assets::Vertex48B* effectVertices = nullptr;
+    std::uint32_t effectQuads = 0, effectBlendedQuads = 0;
 };
 enum class VehicleWindowError50DS : std::uint8_t {
     none, alreadyOwned, request, assets, allocation, entryPoint, context,

@@ -1960,6 +1960,8 @@ bool VehicleWindowGl50DS::Storage::commit(void* context, std::uint8_t bank) noex
         }
         s.diagnostic->opponentIndex = maxVehicleWindowOpponents50DS;
         s.traceRaStage("opaque_opponents",stageStart);
+        // Debris pieces of destroyed racers, opaque, before cables/transparency.
+        if (!s.drawDebris()) return false;
         if(s.request.enableGameplayDisplayWallTiming)
             std::fprintf(stderr,"native_pair_batches scope=player_and_opaque_opponents runs=%llu triangles=%llu coalesced_triangles=%llu saved_bridges=%llu empty_triangles=%llu full_singletons=%llu batched_groups=%llu\n",
                 static_cast<unsigned long long>(s.coveragePairRuns),
@@ -2007,7 +2009,7 @@ bool VehicleWindowGl50DS::Storage::commit(void* context, std::uint8_t bank) noex
         s.diagnostic->opponentIndex = maxVehicleWindowOpponents50DS;
         s.resetPodState();
         s.traceRaStage("transparent_racers",stageStart);
-        if (!s.drawGameplayBinders() || !s.drawGcParticles()) return false;
+        if (!s.drawGameplayBinders() || !s.drawGcParticles() || !s.drawEffects()) return false;
         s.traceRaStage("binders_particles",stageStart);
         if (s.hasSpecularPairs50LA || s.hasSingleDiffuse50LA || s.request.track.rcCrystal || s.frameGameplayBinderCount) {
             // All body/crystal Ad consumers have completed. Current Binder/GC
@@ -2458,6 +2460,201 @@ bool VehicleWindowGl50DS::Storage::drawFxaa(std::uint8_t bank) noexcept {
         for(I i=0;i<clips;++i){const U c=0x3000+static_cast<U>(i);if(clipEnabled[i])gl.enable(c);else gl.disable(c);}
         const bool restored=check("restore native scene state after FXAA");
         return accepted&&restored;
+    }
+
+bool VehicleWindowGl50DS::Storage::hasDebrisResources() const noexcept {
+        return debrisVertexBuffer || debrisIndexBuffer || debrisVertexArray;
+    }
+
+bool VehicleWindowGl50DS::Storage::createDebris(const VehicleWindowDebris50DS& input) noexcept {
+        if (!input.mesh) return true;
+        const auto& mesh = *input.mesh;
+        if (mesh.vertices.empty() || mesh.indices.empty() || !input.spans || !input.spanCount ||
+            !input.pieces || !input.pieceCount || input.pieceCount > maxVehicleWindowDebrisInstances50DS * 4u)
+            return fail(*diagnostic, VehicleWindowError50DS::request, "debris mesh/spans/pieces incomplete");
+        for (const auto index : mesh.indices)
+            if (index >= mesh.vertices.size())
+                return fail(*diagnostic, VehicleWindowError50DS::indices, "debris index outside its vertices");
+        for (const auto& v : mesh.vertices)
+            for (float x : v.position) if (!std::isfinite(x))
+                return fail(*diagnostic, VehicleWindowError50DS::assets, "debris vertex position nonfinite");
+        for (U i = 0; i < input.spanCount; ++i) {
+            const auto& span = input.spans[i];
+            if (!span.indexCount || span.indexCount % 3u || span.indexStart > mesh.indices.size() ||
+                span.indexCount > mesh.indices.size() - span.indexStart)
+                return fail(*diagnostic, VehicleWindowError50DS::indices, "debris span outside the mesh");
+        }
+        for (U i = 0; i < input.pieceCount; ++i) {
+            const auto& piece = input.pieces[i];
+            if (!piece.spanCount || piece.firstSpan > input.spanCount || piece.spanCount > input.spanCount - piece.firstSpan)
+                return fail(*diagnostic, VehicleWindowError50DS::request, "debris piece spans outside the table");
+        }
+        try {
+            debrisSpans.assign(input.spans, input.spans + input.spanCount);
+            debrisPieces.assign(input.pieces, input.pieces + input.pieceCount);
+        } catch (...) { return fail(*diagnostic, VehicleWindowError50DS::allocation, "debris tables"); }
+        if (!createStaticGeometry(input.mesh, debrisVertexBuffer, debrisIndexBuffer, debrisVertexArray, debrisIndexCount))
+            return false;
+        std::fprintf(stderr, "native_debris_renderer pieces=%u spans=%u vertices=%zu indices=%zu\n",
+            static_cast<unsigned>(input.pieceCount), static_cast<unsigned>(input.spanCount),
+            mesh.vertices.size(), mesh.indices.size());
+        return check("finish cold debris resources");
+    }
+
+bool VehicleWindowGl50DS::Storage::drawDebris() noexcept {
+        if (!frameDebrisCount || !debrisVertexArray) return true;
+        // Same vehicle shader and attribute layout as the pods and sky; source
+        // colours unlit (effect mode 3), opaque, ordinary LESS depth.
+        resetPodState();
+        gl.enable(0x0B71); gl.depthFunc(0x0201); gl.depthMask(1); gl.disable(0x0BE2);
+        const auto& u = shader->uniforms();
+        gl.uniform1i(u.effectMode, 3); gl.uniform1i(u.useLighting, 0);
+        drawGl.bindVertexArray(debrisVertexArray);
+        drawGl.bindBuffer(elementBuffer, debrisIndexBuffer);
+        if (gl.bindSampler) gl.bindSampler(0, 0);
+        for (U n = 0; n < frameDebrisCount; ++n) {
+            const auto& instance = frameDebris[n];
+            if (instance.piece >= debrisPieces.size()) return fail(*diagnostic, VehicleWindowError50DS::frame, "debris instance piece");
+            // Column-major clip = matrix * world.
+            float m[16];
+            for (unsigned c = 0; c < 4; ++c) for (unsigned r = 0; r < 4; ++r) {
+                float sum = 0.f;
+                for (unsigned k = 0; k < 4; ++k) sum += matrix[k * 4 + r] * instance.world[c * 4 + k];
+                m[c * 4 + r] = sum;
+            }
+            gl.uniformMatrix4fv(u.worldViewProjection, 1, 0, m);
+            const auto& piece = debrisPieces[instance.piece];
+            for (U s = 0; s < piece.spanCount; ++s) {
+                const auto& span = debrisSpans[piece.firstSpan + s];
+                gl.activeTexture(textureUnit0); gl.bindTexture(texture2D, span.texture);
+                gl.uniform1i(u.useTexture, span.texture ? 1 : 0);
+                drawGl.drawElementsBaseVertex(0x0004, static_cast<I>(span.indexCount), 0x1405,
+                    reinterpret_cast<const void*>(std::uintptr_t(span.indexStart) * sizeof(U)), 0);
+            }
+            if (!check("draw debris piece")) return false;
+        }
+        if (++debrisDraws == 1 || debrisDraws % 3125 == 0)
+            std::fprintf(stderr, "native_debris draws=%llu pieces=%u\n",
+                static_cast<unsigned long long>(debrisDraws), static_cast<unsigned>(frameDebrisCount));
+        gl.uniformMatrix4fv(u.worldViewProjection, 1, 0, matrix);
+        gl.bindTexture(texture2D, 0);
+        resetPodState();
+        return check("restore world transform after debris");
+    }
+
+bool VehicleWindowGl50DS::Storage::hasEffectResources() const noexcept {
+        return effectVertexBuffer || effectIndexBuffer || effectVertexArray;
+    }
+
+bool VehicleWindowGl50DS::Storage::createEffects(const VehicleWindowEffects50DS& input) noexcept {
+        effectTexture = input.texture;
+        if (!input.texture) return true;
+        constexpr U quads = maxVehicleWindowEffectQuads50DS;
+        std::vector<U> indices;
+        try { indices.resize(std::size_t(quads) * 6u); }
+        catch (...) { return fail(*diagnostic, VehicleWindowError50DS::allocation, "effect indices"); }
+        for (U q = 0; q < quads; ++q) {
+            const U b = q * 4u; U* i = indices.data() + std::size_t(q) * 6u;
+            i[0] = b; i[1] = b + 1u; i[2] = b + 2u; i[3] = b + 2u; i[4] = b + 1u; i[5] = b + 3u;
+        }
+        gl.genBuffers(1, &effectVertexBuffer);
+        drawGl.bindBuffer(arrayBuffer, effectVertexBuffer);
+        gl.bufferData(arrayBuffer, static_cast<std::intptr_t>(std::size_t(quads) * 4u * sizeof(assets::Vertex48B)), nullptr, dynamicDraw);
+        if (!check("allocate effect quad vertices") || !effectVertexBuffer)
+            return fail(*diagnostic, VehicleWindowError50DS::allocation, "effect vertex buffer");
+        gl.genBuffers(1, &effectIndexBuffer);
+        drawGl.bindBuffer(arrayBuffer, effectIndexBuffer);
+        gl.bufferData(arrayBuffer, static_cast<std::intptr_t>(indices.size() * sizeof(U)), indices.data(), staticDraw);
+        if (!check("upload effect quad indices") || !effectIndexBuffer)
+            return fail(*diagnostic, VehicleWindowError50DS::allocation, "effect index buffer");
+        gl.genVertexArrays(1, &effectVertexArray);
+        drawGl.bindVertexArray(effectVertexArray);
+        drawGl.bindBuffer(arrayBuffer, effectVertexBuffer);
+        drawGl.bindBuffer(elementBuffer, effectIndexBuffer);
+        constexpr I sizes[] = {3, 2, 4};
+        constexpr std::uintptr_t offsets[] = {0, 12, 20};
+        for (U a = 0; a < 3; ++a) {
+            gl.enableVertexAttribArray(a);
+            gl.vertexAttribPointer(a, sizes[a], a == 2 ? unsignedByte : floatType,
+                a == 2 ? 1 : 0, 24, reinterpret_cast<const void*>(offsets[a]));
+        }
+        drawGl.bindVertexArray(0);
+        if (!check("create effect Vertex48B layout") || !effectVertexArray)
+            return fail(*diagnostic, VehicleWindowError50DS::allocation, "effect vertex array");
+        std::fprintf(stderr, "native_effects_renderer quads=%u texture=%u\n", static_cast<unsigned>(quads),
+            static_cast<unsigned>(input.texture));
+        return true;
+    }
+
+bool VehicleWindowGl50DS::Storage::drawEffects() noexcept {
+        if (!frameEffectQuads || !effectVertexArray || !effectTexture || !trackProgram) return true;
+        // Track program, unlit source colours, source alpha (effect mode 1):
+        // colour = vertex (128 = 1.0) x texel, alpha = vertex x texel on the
+        // PS2 128 scale. Depth tested, not written; destination alpha kept.
+        resetPodState();
+        gl.useProgram(trackProgram); gl.uniform1i(rcCrystalPassUniform, 0); gl.uniform1i(rcCrystalPayloadUniform, 0);
+        gl.uniformMatrix4fv(trackMatrixUniform, 1, 0, matrix);
+        gl.uniform1f(trackColorScaleUniform, 255.f / 128.f);
+        gl.uniform1i(trackUseTextureUniform, 1); gl.uniform1i(trackImageUniform, 0);
+        gl.uniform1i(trackDiscardZeroAlphaUniform, 1);
+        gl.uniform1f(trackAlphaReferenceUniform, 0.f);
+        gl.uniform1i(trackEffectModeUniform, 1);
+        gl.uniform1f(trackAlphaScaleUniform, (255.f / 128.f) * (255.f / 128.f));
+        gl.uniform1i(trackUnlitUniform, 1);
+        gl.uniform1i(trackUseSourceNormalsUniform, 0); gl.uniform1i(trackProjectionPassUniform, 0);
+        gl.uniform4f(trackUvTranslationUniform, 0.f, 0.f, 0.f, 0.f);
+        gl.uniform1i(nativeShadowEnabledUniform, 0); gl.uniform1i(nativeShadowOpponentCountUniform, 0);
+        const auto& fog = request.track.worldFog;
+        gl.uniform4f(worldFogCameraUniform, worldFogCamera[0], worldFogCamera[1], worldFogCamera[2], 0.f);
+        gl.uniform4f(worldFogColorUniform, fog.color[0], fog.color[1], fog.color[2], 1.f);
+        gl.uniform4f(worldFogRangeUniform, fog.start, fog.end, 0.f, 0.f);
+        gl.activeTexture(textureUnit0); gl.bindTexture(texture2D, effectTexture);
+        if (gl.bindSampler) gl.bindSampler(0, 0);
+        drawGl.bindVertexArray(effectVertexArray);
+        drawGl.bindBuffer(arrayBuffer, effectVertexBuffer);
+        drawGl.bufferSubData(arrayBuffer, 0,
+            static_cast<std::intptr_t>(std::size_t(frameEffectQuads) * 4u * sizeof(assets::Vertex48B)),
+            frameEffectVertices.data());
+        drawGl.bindBuffer(elementBuffer, effectIndexBuffer);
+        gl.enable(0x0BE2); gl.blendEquation(0x8006);
+        gl.enable(0x0B71); gl.depthFunc(0x0203); gl.depthMask(0); gl.disable(0x0B44);
+        gl.colorMask(1, 1, 1, 0);
+        bool accepted = check("bind effect state and upload quads");
+        if (accepted && frameEffectBlended) {
+            gl.uniform1i(worldFogEnabledUniform, fog.enabled ? 1 : 0);
+            gl.blendFunc(0x0302, 0x0303); // SRC_ALPHA, ONE_MINUS_SRC_ALPHA
+            drawGl.drawElementsBaseVertex(0x0004, static_cast<I>(frameEffectBlended * 6u), 0x1405, nullptr, 0);
+            accepted = check("draw blended effect quads");
+        }
+        if (accepted && frameEffectQuads > frameEffectBlended) {
+            gl.uniform1i(worldFogEnabledUniform, 0); // additive glow is not mixed toward the fog colour
+            gl.blendFunc(0x0302, 0x0001); // SRC_ALPHA, ONE
+            drawGl.drawElementsBaseVertex(0x0004, static_cast<I>((frameEffectQuads - frameEffectBlended) * 6u), 0x1405,
+                reinterpret_cast<const void*>(std::uintptr_t(frameEffectBlended) * 6u * sizeof(U)), 0);
+            accepted = check("draw additive effect quads");
+        }
+        if (accepted && (++effectDraws == 1 || effectDraws % 625 == 0))
+            std::fprintf(stderr, "native_effects draws=%llu quads=%u blended=%u\n",
+                static_cast<unsigned long long>(effectDraws), static_cast<unsigned>(frameEffectQuads),
+                static_cast<unsigned>(frameEffectBlended));
+        gl.colorMask(1, 1, 1, 1); gl.depthMask(1); gl.blendFunc(0x0302, 0x0303); gl.disable(0x0BE2);
+        drawGl.bindVertexArray(0); gl.bindTexture(texture2D, 0);
+        resetPodState();
+        return accepted && check("restore state after effects");
+    }
+
+bool VehicleWindowGl50DS::Storage::deleteEffectNames(VehicleWindowDiagnostic50DS& d) noexcept {
+        frameEffectQuads = 0; frameEffectBlended = 0; effectTexture = 0;
+        return deleteName(effectVertexArray, gl.deleteVertexArrays, d) &&
+            deleteName(effectVertexBuffer, gl.deleteBuffers, d) &&
+            deleteName(effectIndexBuffer, gl.deleteBuffers, d);
+    }
+
+bool VehicleWindowGl50DS::Storage::deleteDebrisNames(VehicleWindowDiagnostic50DS& d) noexcept {
+        debrisSpans.clear(); debrisPieces.clear(); frameDebrisCount = 0;
+        return deleteName(debrisVertexArray, gl.deleteVertexArrays, d) &&
+            deleteName(debrisVertexBuffer, gl.deleteBuffers, d) &&
+            deleteName(debrisIndexBuffer, gl.deleteBuffers, d);
     }
 
 bool VehicleWindowGl50DS::Storage::deleteFxaaNames(VehicleWindowDiagnostic50DS& d) noexcept {

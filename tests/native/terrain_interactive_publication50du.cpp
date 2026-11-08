@@ -1,4 +1,6 @@
 // Original publication scope and its local owners; no root-only hooks/readers.
+#include "native_wreck_debris_gpu50pd.h"
+#include "native_wreck_debris_sim50pd.h"
 #include "terrain_interactive_publication50du.h"
 #include "native_display_capacity50du.h"
 #include "original_race_hud_scope50la.h"
@@ -1664,6 +1666,17 @@ void Context::run() {
     });
    }
    renderRequest.racerArchetypes=raceOpponentCount?racerArchetypes.data():nullptr;renderRequest.racerArchetypeCount=raceOpponentCount;
+   // Wreckage pieces of every racer for the destroyed-racer debris pass.
+   std::string debrisLog;
+   {std::string effectsLog;
+    // Wreck particle effects: pod effect files and the selected track's
+    // sprite atlas. Optional: a rejected atlas only disables the effects.
+    const bool effects=racerRigs[0]&&native_wreck_debris50PD::loadEffects(trackSession->archive,*racerRigs[0],effectsLog)&&
+        native_wreck_debris50PD::prepareEffectsGpu(textureRequest,textureDiagnostic);
+    std::cerr<<"wreck_effects_cold ready="<<effects<<' '<<effectsLog<<'\n';}
+   require50DU(native_wreck_debris50PD::prepareGpu(textureRequest,textureDiagnostic,debrisLog),debrisLog.c_str());
+   native_wreck_debris50PD::bindRequest(renderRequest);
+   std::cerr<<"wreck_debris_gpu "<<debrisLog<<'\n';
   }
   if(gcAnimatedWorld){
    require50DU(gcDynamicWindow.createGpu(textureRequest,*gcAnimatedWorld,textureDiagnostic),"original GC dynamic texture upload failed");
@@ -1937,7 +1950,7 @@ void Context::run() {
         lapContinuity.timing,originalAiSession.manager,legacyRace,sessionRandom,sourceAttachedGlobals,
         applicationClock,controlPresets,nativeOrdinaryLaunch11258,dynamicProfile.game34,cameraStartup350,
         sourceBlur,poseHistory,boostState,sourceCameraCycleAudio,dynamicRacer60,originalAiHumanCount,
-        humanResultsCountdown,playerEnvironment.held,humanCourseEnabled?&sourceRaceHud:nullptr,nullptr,
+        humanResultsCountdown,playerEnvironment.held,humanCourseEnabled?&sourceRaceHud:nullptr,&native_wreck_debris50PD::cameraView().view,
         &startMusicContext,requestStartMusic,nativeRecordActor.get(),
         taIntroAuthoring?liveAudio->groupsForProviders():nullptr,taIntroAuthoring,requestIntroMusicFade,
         humanCourseEnabled?&playerEvents:nullptr};
@@ -1967,7 +1980,7 @@ void Context::run() {
        dynamicProfile.game34,cameraStartup350,
        gcLightOwner,zoneLifecycle,mainMembership,sourceBlur,*sourceFollowQueries,poseHistory,boostState,sourceCameraCycleAudio,
        dynamicRacer60,originalAiHumanCount,humanResultsCountdown,playerEnvironment.held,
-       humanCourseEnabled?&sourceRaceHud:nullptr,nullptr,
+       humanCourseEnabled?&sourceRaceHud:nullptr,&native_wreck_debris50PD::cameraView().view,
        trackMaterialRequest.canonicalDomain?originalMainApplication.entities():nullptr,
        trackMaterialRequest.canonicalDomain?trackMaterialRequest.canonicalDomain->materials382B38():nullptr,
        trackMaterialRequest.canonicalDomain?&originalMainApplication.materialDirectory36B970():nullptr,

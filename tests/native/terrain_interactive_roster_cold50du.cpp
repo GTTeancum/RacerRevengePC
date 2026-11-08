@@ -1,4 +1,5 @@
 // Authentic original allocation and roster operations; no owner relocation.
+#include "native_wreck_debris50pd.h"
 #include "terrain_interactive_roster_cold50du.h"
 #include "original_race_constructor50la.h"
 #include "original_results_roster_read50la.h"
@@ -172,8 +173,10 @@ void Context::run() const {
     racerCollisions[racer]=std::make_unique<native_racer_collision50HW::Owner>();
    });
    const auto archive=runtime_asset_paths50LB::resolve("work/native/project/disc/PODS")/id/(id+".RES");
+   std::vector<std::uint8_t> retainedRes;
    coldRacerStage50DU(id,"resource archive verification",[&](){
-    require50DU(pod_materials50ed_fixture::detail::sha256(f::readBytes(archive))==
+    retainedRes=f::readBytes(archive);
+    require50DU(pod_materials50ed_fixture::detail::sha256(retainedRes)==
         entry.at("resource_sha256").get<std::string>(),"original racer resource archive identity differs");
    });
    if(!racer)coldRacerStage50DU(id,"original display name",[&](){
@@ -187,6 +190,14 @@ void Context::run() const {
         {archive.string(),"Pods\\Pod"+id.substr(3)+"\\"},endpointPolicy,error);
     require50DU(collisionReady,error.empty()?"original racer collision load failed":error.c_str());
    });
+   // Wreckage pieces for the destroy handlers (2261B0/226750). Debris is
+   // optional presentation: a rejected piece is logged, never a load failure.
+   if(racerRigs[racer]){
+    std::string log;bool loaded=false;
+    try{loaded=native_wreck_debris50PD::loadRacer(racer,*racerRigs[racer],retainedRes,log);}
+    catch(const std::exception& e){log=e.what();}catch(...){log="unknown failure";}
+    std::cerr<<"wreck_debris_cold slot="<<racer<<" pod="<<id<<" inventoried="<<loaded<<' '<<log<<'\n';
+   }
    mainPairCapacity=std::max(mainPairCapacity,racerCollisions[racer]->main().rayCount);
    secondaryPairCapacity=std::max(secondaryPairCapacity,racerCollisions[racer]->secondary().rayCount);
   }

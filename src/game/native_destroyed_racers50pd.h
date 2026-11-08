@@ -25,6 +25,11 @@ struct NativeDestroyedRacer50PD {
     std::uint64_t frame=0;        // completed native frame of the transition
     std::uint64_t destroyedFrames=0;
     std::uint32_t attackerD30=0xffffffffu; // 225F04: kill credit target (manager index) or -1
+    // 225C50 suffix work applied at the next world boundary (other racers'
+    // arenas and the shared music owner are not borrowed inside a frame).
+    bool killCreditPending=false;      // 225F34: attacker CD0 += 1
+    std::uint32_t musicSong=0;         // 226184: 1A46E0(race10C, 17..19, 0); 0 = none
+    bool suffixApplied=false;
 };
 
 inline std::array<NativeDestroyedRacer50PD,8> nativeDestroyedRacers50PD{};
@@ -33,10 +38,10 @@ inline bool nativeRacerDestroyed50PD(std::size_t slot) noexcept {
     return slot<nativeDestroyedRacers50PD.size()&&nativeDestroyedRacers50PD[slot].destroyed;
 }
 
-// Unattended test only: RR_TEST_DESTROY="slot@seconds[,slot@seconds...]"
+// Unattended test only: RR_TEST_DESTROY="slot@seconds[:attacker][,...]"
 // sets the racer's canonical B9D bit0 once the race clock passes the time,
 // which makes 225C50 select the original 2261B0 explode handler.
-struct NativeTestDestroy50PD { int slot=-1; double seconds=0; bool fired=false; };
+struct NativeTestDestroy50PD { int slot=-1; double seconds=0; bool fired=false; int attacker=-1; };
 inline std::array<NativeTestDestroy50PD,8> nativeTestDestroys50PD=[]{
     std::array<NativeTestDestroy50PD,8> out{};
     const char* v=std::getenv("RR_TEST_DESTROY");
@@ -48,8 +53,10 @@ inline std::array<NativeTestDestroy50PD,8> nativeTestDestroys50PD=[]{
         const auto split=item.find('@');
         if(split!=std::string::npos){
             const int slot=std::atoi(item.substr(0,split).c_str());
-            const double seconds=std::atof(item.substr(split+1).c_str());
-            if(slot>=0&&slot<8&&seconds>=0)out[used++]={slot,seconds,false};
+            const auto colon=item.find(':',split);
+            const double seconds=std::atof(item.substr(split+1,colon==std::string::npos?std::string::npos:colon-split-1).c_str());
+            const int attacker=colon==std::string::npos?-1:std::atoi(item.substr(colon+1).c_str());
+            if(slot>=0&&slot<8&&seconds>=0&&attacker<8&&attacker!=slot)out[used++]={slot,seconds,false,attacker};
         }
         if(comma==std::string::npos)break;
         at=comma+1;
@@ -58,5 +65,8 @@ inline std::array<NativeTestDestroy50PD,8> nativeTestDestroys50PD=[]{
 }();
 // Set by the race loop for the slot whose test time has passed this tick.
 inline std::array<bool,8> nativeTestDestroyPending50PD{};
+// Optional attacker per pending slot (-1 none): the hook then also writes the
+// victim's D30 marker and D2C=2.0 as 22A37C..22A3B4 do for a racer hit.
+inline std::array<int,8> nativeTestDestroyAttacker50PD{-1,-1,-1,-1,-1,-1,-1,-1};
 
 } // namespace rr::game

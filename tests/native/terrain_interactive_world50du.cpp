@@ -1,4 +1,5 @@
 // Exact original suffix: world owners retire before the original early prefix.
+#include "native_wreck_debris_sim50pd.h"
 #include "terrain_interactive_world50du.h"
 #include "terrain_interactive_roster_cold50du.h"
 #include "ra_application_cold50la.h"
@@ -1228,6 +1229,7 @@ SessionExit50DU Context::run() {
      rcNavigationBorrow.sourceIdentity()==rcColdSources.get()),"RC final navigation/world borrow mismatch");
  if(!isMbTrack&&!isTcTrack&&!isRcTrack&&!isTbTrack&&!isGbTrack&&!isMcTrack)legacyGround.audit=J{};
  std::span<Type2StaticCandidate49X> candidates=isMcTrack?mcWorldBorrow->candidateStorage():isGbTrack?gbWorldBorrow->candidateStorage():isTbTrack?tbWorldBorrow->candidateStorage():isRcTrack?rcWorldBorrow->candidateStorage():isTcTrack?tcWorldBorrow->candidateStorage():isMbTrack?mbCollisionWorld->candidateStorage():std::span<Type2StaticCandidate49X>(preparedCandidates);
+ native_wreck_debris50PD::sim().track=candidates; // debris segment collision (borrowed for the race)
  std::span<const track_runtime_storage50IG::Binding> trackBindings=isMcTrack?mcWorldBorrow->bindingStorage():isGbTrack?gbWorldBorrow->bindingStorage():isTbTrack?tbWorldBorrow->bindingStorage():isRcTrack?rcWorldBorrow->bindingStorage():isTcTrack?tcWorldBorrow->bindingStorage():isMbTrack?mbCollisionWorld->bindingStorage():std::span<const track_runtime_storage50IG::Binding>(preparedBindings);
  coldLoadDiagnostics.begin("track_storage");
  // Cold, immovable, count-derived storage. Candidate order and every borrowed

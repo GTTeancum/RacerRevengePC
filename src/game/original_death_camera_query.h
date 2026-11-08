@@ -58,6 +58,12 @@ struct OriginalDeathCameraQueryOwner {
 struct OriginalDeathCameraQueryColdOwner {
     std::unique_ptr<OriginalDeathCameraQueryState> allocation120;
     std::unique_ptr<std::uint32_t> categoryD8;
+    // Native storage reservation for the two 22D894/124170 allocations, made
+    // with the bridge's cold storage so the death frame never allocates. They
+    // are unpublished: query120/D8 stay absent until 22D8A8 adopts them, and
+    // the adopted state is value-initialized exactly like a fresh allocation.
+    std::unique_ptr<OriginalDeathCameraQueryState> reserved120;
+    std::unique_ptr<std::uint32_t> reservedD8;
     CollectionObject50BX* object120=nullptr;
     OriginalCameraWorldGeometry* geometry120=nullptr;
     std::uint8_t* globalValid3E0730=nullptr;

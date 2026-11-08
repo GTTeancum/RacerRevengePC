@@ -721,6 +721,17 @@ bool VehicleWindowGl50DS::submit(const game::VehicleDrawBatch50CO& batch,
     s.pendingRaceCameraPublication=frame.sourceBodyCameraPublication50LA;
     s.width = frame.width; s.height = frame.height;
     s.frameCables = frame.cables;
+    if (frame.debrisCount > maxVehicleWindowDebrisInstances50DS || (frame.debrisCount && !frame.debris))
+        return fail(d, VehicleWindowError50DS::frame, "debris instance list outside capacity");
+    s.frameDebrisCount = frame.debrisCount;
+    for (U i = 0; i < frame.debrisCount; ++i) s.frameDebris[i] = frame.debris[i];
+    if (frame.effectQuads > maxVehicleWindowEffectQuads50DS || frame.effectBlendedQuads > frame.effectQuads ||
+        (frame.effectQuads && !frame.effectVertices))
+        return fail(d, VehicleWindowError50DS::frame, "effect quad list outside capacity");
+    s.frameEffectQuads = frame.effectQuads; s.frameEffectBlended = frame.effectBlendedQuads;
+    if (frame.effectQuads)
+        std::memcpy(s.frameEffectVertices.data(), frame.effectVertices,
+            std::size_t(frame.effectQuads) * 4u * sizeof(assets::Vertex48B));
     s.framePlayerHidden = frame.playerHiddenDestroyed50PD;
     s.frameGameplayBinders=frame.gameplayBinders;s.frameGameplayBinderCount=frame.gameplayBinderCount;
     s.frameGameplayBinderImage=frame.gameplayBinderFrame;
@@ -770,7 +781,7 @@ bool VehicleWindowGl50DS::submit(const game::VehicleDrawBatch50CO& batch,
             }
         }
     }
-    s.frameSet = false; s.framePlayerHidden = false; s.frameCables = nullptr; s.frameHostHud = false; s.diagnostic = nullptr;
+    s.frameSet = false; s.framePlayerHidden = false; s.frameDebrisCount = 0; s.frameEffectQuads = 0; s.frameEffectBlended = 0; s.frameCables = nullptr; s.frameHostHud = false; s.diagnostic = nullptr;
     if(s.raceHud)s.raceHud->frame=false;
     if(s.timeStats)s.timeStats->frame=false;
     if(s.positionStats)s.positionStats->frame=false;

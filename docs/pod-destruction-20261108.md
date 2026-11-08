@@ -127,8 +127,14 @@ missing; no debris rendering or zone-tag producer; death camera compiled but
 * Camera: states3/4 without a wreck provider hold the current pose (late
   tick/matrix/visibility) instead of the 177AB0/22DC90 death camera.
 * Human states1/2 (227370/227A40 limp phase) currently take 226750 directly.
-* Not yet: explosion particles (810/814/818), controller vibration, 79C
-  refresh, kill credit CD0 write, announcer 17..19, 1A64B0 race event.
+* Later in stage 1: controller vibration (2.0 s explode / 1.0 s wreck), kill
+  credit CD0 for both attacker kinds, the 17..19 kill song draw. Explosion
+  particles came in stage 2 (Effects below).
+* Still open (Nov 8): the human states 1/2 limp phase (needs the 218EFC
+  nonzero-state force path and the 1B64D0/1B6670 joint rebind); the kill
+  stinger songs 17..19 (mono VAGs; the music decoder is stereo-only, the
+  request returns UnsupportedEvent); the 79C query refresh; 1A64B0 race
+  event; the per-member break-off timing of debris groups (BreakRate).
 
 Stage 1 verification additions (Nov 8): the HUD standings check rejected an
 AI that completed its last lap after the human's race had ended (the source
@@ -153,3 +159,92 @@ finished or retired; the loop lists rows in source place order.
 5. Each piece keeps a one-node scene record (localC0 = pose) so the death
    camera's debris view (22D4B0) reads real piece positions (stage 3).
 6. Effects: group/piece smoke and fire (2CC060 and per-piece owners).
+
+## Stage 2 implementation (Nov 8, in progress)
+
+* Cold (`tests/native/native_wreck_debris50pd.h`): every racer's PHY
+  [Wreckage] inventory through the existing authenticated loader, each piece's
+  LOD0 mesh (bind matrices applied), spans/materials, authored placement and
+  Weight/Inertia; the collections' Drag/RateDamping/Restitution/Friction; the
+  pieces' base textures in one bank per racer. All 8 racers load on TA
+  (7 pieces each, 9 for POD08).
+* GPU (`native_wreck_debris_gpu50pd.h`, renderer `createDebris/drawDebris`):
+  one combined piece-local mesh, per-piece spans with textures, drawn per live
+  instance after the opaque opponents.
+* Launch (`native_wreck_debris_sim50pd.h spawn`): 22C6A0 placement (pod
+  translation + pod rotation x authored offset, pod orientation) and, for
+  2261B0, the 22CB9C tail: six shared-308030 draws, angular +-20.0, linear
+  x/z +-293.333 and y 0..293.333, plus the pod's velocity/angular velocity.
+* Motion follows the original force/settling laws (167250, 166400, 167640):
+  gravity = [Wreckage] Gravity x 32.2 on -Y; quadratic drag -Drag x speed^2;
+  rate damping -RateDamping x angular velocity; mass = Weight / 32.2, the
+  166400 box inertia; contact time ramps drag to 50 and rate damping to 200
+  over the second 2 s window; a piece stops below speed 10, spin 0.5, linear
+  acceleration 10 and angular acceleration 1 while in contact.
+* Contact is native, not the original 166E40/2CA840 spring solver: a
+  box-support segment against the track's static mesh candidates (front faces,
+  as 1082B0), pushed out only along the contact normal, Restitution for real
+  impacts and none below two steps of gravity (resting contact), Coulomb
+  Friction. A piece below every track collision bound is retired (not drawn).
+* Contact refinements (101e-101j): push-out only along the normal by the
+  remaining penetration after the post-contact velocity move (no downhill
+  creep); a contact skin and slop so a box on a slope keeps its contact; ground
+  friction halves spin per contact step; a contact within the last 0.25 s
+  counts as contact for the 167640 damping ramp and stop test.
+* Measured (101j, TA): player explosion at 12 s - all 7 pieces at rest within
+  4 s, 100-310 units from the wreck; AI explosion - 6 of 7 at rest within 6 s,
+  the seventh flew off the course edge and falls (retired below the track).
+
+## Stage 3 (wreck camera)
+
+* `CameraView` in `native_wreck_debris_sim50pd.h`: one root scene node per live
+  piece of the camera racer (slot 0), grouped by collection like racer370/374,
+  `flags29` bit0 set, `localC0` = the piece pose each world step. Bound at the
+  first world boundary after the human's destroy commit with the Session's
+  prepared death identity (`Session::deathIdentity()`), and passed to both
+  camera constructions as `ActualOwners::deathDebris`.
+* The Session holds its pose while the view is unbound (count370 == 0) and
+  otherwise takes the original 177AB0 transition, 1AD230 HUD stop and the
+  22DC90 per-frame death camera over the debris (22D4B0 weighted centroid,
+  radius 100).
+* The 22D894/124170 first-use query allocations are reserved with the
+  follow-query bridge's cold storage (`OriginalDeathCameraQueryColdOwner::
+  reserved120/reservedD8`) and adopted, value-initialized, at 22D8A8: the
+  death frame no longer allocates (101e failed the no-allocation frame rule).
+* Measured (101j, player explosion): state4 selects mode 3 - the camera starts
+  65 units behind the wreck and 20 up, aims at the debris and pulls back. Its
+  forward axis stays within 6-11 degrees of the debris centre (cos 0.98-0.995)
+  while it settles 456 units away and 42 units above; results follow as before.
+* Mode 3 publishes a look direction, not a target (out.mode 0); billboards and
+  diagnostics use the presented camera's eye/backward axes.
+
+## Effects (Nov 8)
+
+Original wiring (SLUS_202.68):
+
+* Racer constructor 212B5C..212C40: racer814 = `podExplWreckExplosion.emt`
+  (15E800 explosion class), racer810 = `podExplWreckSparks.emt` (15F100
+  sparks class); 212C44..212DBC: racer818[0..9] = 19BA50 damage emitters
+  over `podEmberFire.emt` / `podEmberSmoke.emt`. 2261B0 starts 814/810 at the
+  body position and the 818 entries above 0.4 at the explosion point 270.
+* Group frame 2CC824..2CC8E4: when a member's break flag (B0[i]) is set, the
+  group's C0 `podWreckSparks.emt` and C4 `podExplosion.emt` restart (88, 80);
+  otherwise both stop (84).
+* EmitSmoke pieces own MaxNumberOfDamageEmitters `podWreckSmoke.emt` /
+  `podFire.emt` damage emitters.
+* All ten effect files are in every pod archive (`particle\*.emt`); the sprite
+  atlas is the selected track's `particle\demoprt.prt/.pst` (each track has its
+  own tinted sheet; MB/MC/RC/GB use other PRT layouts).
+
+Native implementation (`tests/native/native_wreck_effects50pd.h`, renderer
+`createEffects/drawEffects`): EMT values parsed as authored; particle laws from
+the shared manager (161180: ms ages, Grows adds Growth*dt to size and Y,
+HasVelocity, Gravity 32.2 x multiplier, FramesPerSet animation) and render
+(62290: brightness 255 Glows / 64, x (1-age/life) when Fades, 128 scale,
+Additive = ONE blending). CPU world-space billboards (sparks as velocity
+streaks), alpha-blended back to front then additive, track program unlit with
+world fog on the blended ones. Native choices: a private random stream (the
+race's shared 308030 RNG is not consumed); the native debris separates at
+launch, so each group's sparks/explosion fire once then; every explosion
+starts the embers (no per-part damage gate); piece fire burns while the piece
+moves and piece smoke continues at its minimum rate after it settles.

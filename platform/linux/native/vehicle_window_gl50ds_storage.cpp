@@ -753,7 +753,7 @@ bool VehicleWindowGl50DS::Storage::hasGlResources() const noexcept {
         if(hasCoverageResources()||uiCoverage.owns())return true;
         if(hasRaceHudResources() || hasTimeStatsResources() || hasPositionStatsResources() || hasDamageResources() || hasPauseDerivedResources() || hasSpeedBoostResources())return true;
         if(hasDisplayFadeNames())return true;
-        if (hasGameplayBlurResources() || hasFxaaResources()) return true;
+        if (hasGameplayBlurResources() || hasFxaaResources() || hasDebrisResources() || hasEffectResources()) return true;
         if (shader && shader->hasResources()) return true;
         if (trackProgram || trackVertexShader || trackFragmentShader) return true;
         if (hostHudProgram || hostHudVertexShader || hostHudFragmentShader ||
@@ -2058,7 +2058,7 @@ bool VehicleWindowGl50DS::Storage::initialize(const VehicleWindowRequest50DS& in
             !createTrackProjection(input.track) ||
             !createStaticGeometry(input.sky.mesh, skyVertexBuffer, skyIndexBuffer, skyVertexArray, skyIndexCount) ||
             !createCableGeometry() || !createHostHud() || !createOriginalUi() ||
-            !createTargets() || !createGameplayBlur() || !createFxaa() || !createCoverageProgram() || !createRaWorld()) return false;
+            !createTargets() || !createGameplayBlur() || !createFxaa() || !createDebris(input.debris) || !createEffects(input.effects) || !createCoverageProgram() || !createRaWorld()) return false;
         VehicleGlHooks50CV hooks{};
         hooks.context = this; hooks.ready = ready; hooks.materialReady = materialReady;
         if(request.enableGameplayDisplayWallTiming)hooks.timingObserver=observePlayerTiming;
@@ -2245,6 +2245,8 @@ bool VehicleWindowGl50DS::Storage::cleanup(VehicleWindowDiagnostic50DS& d) noexc
         if(!deleteRaceHudNames(d))goto incomplete;
         if(!deleteGameplayBlurNames(d))goto incomplete;
         if(!deleteFxaaNames(d))goto incomplete;
+        if(!deleteDebrisNames(d))goto incomplete;
+        if(!deleteEffectNames(d))goto incomplete;
         if (shader && !shader->release(d.cleanupShader)) {
             if (!d.cleanupGlError) d.cleanupGlError = d.cleanupShader.glError ?
                 d.cleanupShader.glError : d.cleanupShader.cleanupGlError;

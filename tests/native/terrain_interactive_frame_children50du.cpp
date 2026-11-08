@@ -1,4 +1,6 @@
 // Source-identical Children prefix; no owners are moved out of runSession.
+#include "native_wreck_debris_sim50pd.h"
+#include "native_wreck_effects50pd.h"
 #include <cfenv>
 #include "terrain_interactive_frame_calls50du.h"
 #include "runtime_startup50fl_fixture.h"
@@ -9,6 +11,7 @@
 #include "original_ai_physical_recovery.h"
 #include "original_human_physical_recovery.h"
 #include "../../src/game/native_destroyed_racers50pd.h"
+#include <bit>
 #include "../../src/game/original_vehicle_damage50la.h"
 #include <cstring>
 #include "native_gc_water_session50kg_fixture.h"
@@ -59,6 +62,8 @@ bool Context::advanceChildren(std::size_t actualRacerSlot,float preparedOuterFac
   // 222714 sets for a deadly hit; 225C50 then selects 2261B0.
   rr::game::nativeTestDestroyPending50PD[actualRacerSlot]=false;
   s.fields.flagB9D0=true;
+  const int attacker=rr::game::nativeTestDestroyAttacker50PD[actualRacerSlot];
+  if(attacker>=0){poseHistory.markerD30=static_cast<std::uint32_t>(attacker);poseHistory.timerD2C=0x40000000u;}
   std::cerr<<"test_destroy armed slot="<<actualRacerSlot<<" frame="<<completedFrames<<'\n';
  }
  if(audioEnabled&&!sourceAiAudio&&!opponentFrame&&!raceSetupFrame)require50DU(advanceSpeechTimers50HG(.016f,lapContinuity.prefix,speechState),
@@ -815,9 +820,67 @@ bool Context::commitOriginalDestroyed(std::size_t actualRacerSlot,
    std::cerr<<"pod_destroyed_audio slot=0 human_debris_cue=1\n";
   }
  }
+ // 2265A0..2266C8 (22CA60 per collection, 22CB9C launch draws) for 2261B0;
+ // 226750's in-place activation (22C6A0) has no launch tail.
+ {const auto node=static_cast<std::uint32_t>(x.bindings.animation.bodyScene288);
+  const auto spawned=native_wreck_debris50PD::spawn(actualRacerSlot,explode,s.nodes[node].world100.v,
+      main.components.root.body.velocity.v,main.components.root.body.angularVelocity.v,s.noiseOwner().sharedRandomState);
+  {const auto& d=native_wreck_debris50PD::sim();
+   std::cerr<<"debris_spawn slot="<<actualRacerSlot<<" pieces="<<spawned<<" explode="<<explode
+       <<" track_floor="<<d.floor<<" track_ceiling="<<d.ceiling<<" mesh_candidates="<<d.meshCandidates
+       <<" compound="<<d.compoundCandidates<<" callback="<<d.callbackCandidates<<" other="<<d.otherCandidates;}
+  const auto& live=native_wreck_debris50PD::sim().pieces;const auto* w=s.nodes[node].world100.v;
+  for(std::size_t i=live.size()-spawned;i<live.size();++i){const auto& q=live[i];
+   std::cerr<<" ["<<q.index<<" off="<<q.position.x-w[12]<<','<<q.position.y-w[13]<<','<<q.position.z-w[14]
+       <<" r="<<q.radius<<" m="<<q.mass<<" i="<<q.inertia<<" drag="<<q.drag
+       <<" v="<<q.velocity.x<<','<<q.velocity.y<<','<<q.velocity.z<<']';}
+  std::cerr<<'\n';
+  native_wreck_effects50PD::destroyed(actualRacerSlot,explode,{w[12],w[13],w[14]},
+      {record.explosion270[0],record.explosion270[1],record.explosion270[2]});
+  const auto& effects=native_wreck_effects50PD::state();
+  std::cerr<<"wreck_effects_start slot="<<actualRacerSlot<<" emitters="<<effects.emitters.size()
+      <<" ready="<<effects.cold<<'\n';}
+ // 225EC8..226034 kill credit: a dispatched handler, D30 != -1 and 188FB0
+ // (profile,1)==0, i.e. two-player game34==2 or the one-hit option 10FE0==0.
+ // Race1B0 bit4 is not represented. Applied at the next world boundary.
+ record.killCreditPending=record.attackerD30!=0xffffffffu&&record.attackerD30<racerBank.count()&&
+     record.attackerD30!=actualRacerSlot&&(dynamicProfile.game34==2u||dynamicProfile.game10FE0==0u);
+ // The human's player-event projection of its CD0 (consumed by the tournament
+ // result, 1875C0) is a host object, credited here; the arena CD0 at the
+ // next world boundary.
+ if(record.killCreditPending&&record.attackerD30==0u&&humanCourseEnabled)++playerEvents.countCD0;
+ // 226054..226184: when the victim's D2C timer is positive (recently hit),
+ // the shared 308030 stream (lazy 3D6B30 seed, 3D6B38 guard) picks music
+ // song 17+int(3*u) for 1A46E0. Requested at the next world boundary.
+ {std::uint32_t timerBits=poseHistory.timerD2C;float timer=0.f;std::memcpy(&timer,&timerBits,4);
+  if(timer>0.f){
+   auto& random=sessionRandom;auto& raw=s.noiseOwner().sharedRandomState;
+   if(!random.seed.lazy80A8){random.seed.seed3D6B30=0;random.seed.lazy80A8=true;}
+   if(!random.seed.seed3D6B30){std::uint32_t stamp=0;
+    require50DU(sampleHostTimestamp50ID(applicationClock,stamp),"destroy music seed clock unavailable");
+    random.seed.seed3D6B30=stamp;raw=stamp;}
+   raw=raw*0x41c64e6du+0x3039u;
+   const auto drawn=static_cast<std::int32_t>(raw&0x7fffffffu);
+   volatile float unit=std::bit_cast<float>(0x30000000u)*static_cast<float>(drawn);
+   volatile float scaled=3.f*unit;
+   const auto song=static_cast<std::int32_t>(scaled)+17;
+   if(!random.range.lazy80AC){random.range.rangeCheck3D6B38=1;random.range.lazy80AC=true;}
+   require50DU(!random.range.rangeCheck3D6B38||(song>=17&&song<=19),"destroy music song outside 17..19 (226140 assertion)");
+   record.musicSong=static_cast<std::uint32_t>(song);
+  }}
+ // 226414..2264AC / 226824..2268BC: human (58==0, 3C==0) with the vibration
+ // option (11050 bit2): device virtual40 (238870, clear both) then virtual44
+ // (2388B0, both motors) for 2.0 s (explode) or 1.0 s (wreck in place).
+ if(human&&!s.fields.vehicle3C&&(dynamicConsumerFlags11050&4u)&&playerSource5C<2u){
+  auto& device=feedbackDevices[playerSource5C];
+  clearControllerFeedback50KZ(device,2);
+  require50DU(requestControllerFeedback50KZ(device,2,0u,explode?2.f:1.f),"destroyed racer vibration request rejected");
+  std::cerr<<"pod_destroyed_vibration seconds="<<(explode?2:1)<<" capable="<<device.capable<<'\n';
+ }
  std::cerr<<"pod_destroyed slot="<<actualRacerSlot<<" human="<<human<<" handler=0x"<<std::hex<<handler
      <<" dispatch=0x"<<decision.sourcePC<<std::dec<<" state40="<<main.vehicleState40
-     <<" frame="<<completedFrames<<" attacker="<<static_cast<std::int32_t>(record.attackerD30)<<" position="<<p.v[0]<<','<<p.v[1]<<','<<p.v[2]<<'\n';
+     <<" frame="<<completedFrames<<" attacker="<<static_cast<std::int32_t>(record.attackerD30)
+     <<" kill_credit="<<record.killCreditPending<<" music_song="<<record.musicSong<<" position="<<p.v[0]<<','<<p.v[1]<<','<<p.v[2]<<'\n';
  // The rest of this tick's racer frame does not run for a destroyed racer;
  // the next physics part only closes the phase.
  s.phase=VehicleFramePhase49W::AfterBodyChildren;
