@@ -603,6 +603,9 @@ struct VehicleWindowOpponent50DS {
     // Keep each owner paired with its own current/retained successful batch.
     // View-dependent distance/flags refresh even for retained stopped meshes.
     std::array<game::OriginalRacerModelPackets50LA*, 4> sourceBodyModelPackets50LA{};
+    // Original 2261B0/226750 hide every model of a destroyed racer (28C6E0).
+    // The entry stays in the fixed field; none of its geometry is drawn.
+    bool hiddenDestroyed50PD = false;
 };
 // Explicit HOST interface, independent of a native vehicle frame. Strings are
 // borrowed only during submitHostMenu; each must terminate within 48 ASCII
@@ -740,6 +743,9 @@ struct VehicleWindowFrame50DS {
     // or live end-flow admission follows from a successful native submission.
     const ::original_main_entry50KG::NativeF8BarPrefix50LA* nativeF8BarPrefix = nullptr;
     const ::original_main_entry50KG::NativeResultsFrame50LA* nativeResults = nullptr;
+    // The player racer is destroyed (original 28C6E0 hid its models): its
+    // collapsed geometry casts no pod shadow.
+    bool playerHiddenDestroyed50PD = false;
 };
 enum class VehicleWindowError50DS : std::uint8_t {
     none, alreadyOwned, request, assets, allocation, entryPoint, context,

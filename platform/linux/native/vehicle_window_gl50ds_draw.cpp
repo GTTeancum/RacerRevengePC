@@ -889,9 +889,10 @@ bool VehicleWindowGl50DS::Storage::ready(void* context, const VehicleGlResources
         for (auto& racer : s.podShadows)
             for (auto& shadow : racer) shadow = {};
         if (s.request.enableNativePodShadows) {
-            if (!s.buildRacerPodShadows(batch, 0, s.podShadows[0])) return false;
+            if (!s.framePlayerHidden && !s.buildRacerPodShadows(batch, 0, s.podShadows[0])) return false;
             for (U i = 0; i < s.frameOpponentCount; ++i) {
                 s.diagnostic->opponentIndex = i;
+                if (s.frameOpponentHidden[i]) { for (auto& v : s.podShadowOpponentBounds[i]) v = 0.f; continue; } // destroyed: no caster
                 if (!s.buildRacerPodShadows(s.frameOpponentBatches[i], s.frameOpponentArchetypes[i],
                     s.podShadows[i + 1])) return false;
                 if (!buildNativePodShadowReceiverBounds50HM(s.podShadows[i + 1], s.podShadowOpponentBounds[i]))
@@ -1954,6 +1955,7 @@ bool VehicleWindowGl50DS::Storage::commit(void* context, std::uint8_t bank) noex
         // racers join the player's pending framebuffer before ANY effects.
         for (U i = 0; i < s.frameOpponentCount; ++i) {
             s.diagnostic->opponentIndex = i;
+            if (s.frameOpponentHidden[i]) continue; // destroyed racer: models hidden
             if (!s.drawOpaqueOpponent(bank, i)) return false;
         }
         s.diagnostic->opponentIndex = maxVehicleWindowOpponents50DS;
@@ -1984,6 +1986,7 @@ bool VehicleWindowGl50DS::Storage::commit(void* context, std::uint8_t bank) noex
         if (!s.drawCables(s.frameCables, s.cableTextureName)) return false;
         for (U i = 0; i < s.frameOpponentCount; ++i) {
             s.diagnostic->opponentIndex = i;
+            if (s.frameOpponentHidden[i]) continue;
             if (!s.drawCables(s.frameOpponentCables[i],
                 s.racerView(s.frameOpponentArchetypes[i]).cableTextureName)) return false;
         }
@@ -1997,6 +2000,7 @@ bool VehicleWindowGl50DS::Storage::commit(void* context, std::uint8_t bank) noex
         if (!s.drawTransparentPod(bank)) return false;
         if (s.materials) for (U i = 0; i < s.frameOpponentCount; ++i) {
             s.diagnostic->opponentIndex = i;
+            if (s.frameOpponentHidden[i]) continue;
             if (!s.uploadRacer(bank, s.frameOpponentBatches[i], s.frameOpponentArchetypes[i], true) ||
                 !s.drawTransparentPod(bank, i)) return false;
         }

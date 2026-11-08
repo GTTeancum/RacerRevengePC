@@ -68,6 +68,14 @@ public:
         }
         meshes_[slot]=next;ready_[slot]=true;return true;
     }
+    // Destroyed racer: the original hides its models (28C6E0), including the
+    // Binder under them. Keep the published entry count and collapse its quads
+    // to one point so they cover no pixels.
+    bool hideRacer(std::uint32_t slot)noexcept {
+        if(slot>=8||!ready_[slot])return false;
+        for(auto& mesh:meshes_[slot])for(auto& v:mesh.vertices)for(unsigned k=0;k<3;++k)v.position[k]=mesh.vertices[0].position[k];
+        return true;
+    }
     bool bindRaceFrame(p::VehicleWindowFrame50DS& frame)const noexcept {
         if(!gpu_.initialized()||frame.opponentCount!=7)return false;
         for(bool ready:ready_)if(!ready)return false;

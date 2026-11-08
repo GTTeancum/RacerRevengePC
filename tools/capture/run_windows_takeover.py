@@ -67,6 +67,7 @@ def main():
     parser.add_argument('--maximized', action='store_true',
                         help='Open the (resizable, --window) test window maximized')
     parser.add_argument('--no-fxaa', action='store_true', help='Turn FXAA off for this run')
+    parser.add_argument('--destroy', help='Destroy racers during the race: slot@seconds[,slot@seconds] (0 = player)')
     parser.add_argument('--camera-cycle', action='store_true',
                         help='Tap the view key (C) 1 s after green and every 15 s (reaches the follow camera)')
     parser.add_argument('--ieee-subnormals', action='store_true',
@@ -126,6 +127,8 @@ def main():
         env['RR_VIDEO_MAXIMIZED'] = '1'
     if args.no_fxaa:
         env['RR_VIDEO_FXAA'] = '0'
+    if args.destroy:
+        env['RR_TEST_DESTROY'] = args.destroy
     if args.camera_cycle:
         env['RR_TEST_CAMERA_CYCLE'] = '1'
     if args.ieee_subnormals:

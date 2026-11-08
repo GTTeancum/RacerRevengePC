@@ -643,7 +643,13 @@ bool VehicleWindowGl50DS::submit(const game::VehicleDrawBatch50CO& batch,
                      (!i || hud.standings[i - 1].place <= row.place)) : row.place == i + 1;
                 if (row.racerIndex >= hud.standingsCount || seen[row.racerIndex] || !rankValid ||
                     !validHostHudName(row.displayName) || row.completedLaps > maxVehicleWindowCompletedLaps50DS ||
-                    row.finished != (row.completedLaps >= hud.raceLapTarget) ||
+                    (row.finished && row.completedLaps < hud.raceLapTarget) ||
+                    // Once the selected racer's race has ended (finish or
+                    // retirement), the source finish list (1B07B0) stops
+                    // growing; a racer completing its last lap after that is
+                    // genuinely not in it.
+                    (!row.finished && row.completedLaps >= hud.raceLapTarget &&
+                     !hud.raceFinished && !hud.raceRetirementCD4) ||
                     (!hud.standingsSourceRanks && row.finished && unfinishedSeen) || (hud.raceCountdown && row.completedLaps))
                     return fail(d, VehicleWindowError50DS::frame, "named standings order/name/lap/finish state rejected");
                 seen[row.racerIndex] = true;
@@ -692,6 +698,7 @@ bool VehicleWindowGl50DS::submit(const game::VehicleDrawBatch50CO& batch,
         s.frameOpponentLights[i] = &opponentLights[i];
         s.frameOpponentCables[i] = opponent.cables;
         s.frameOpponentArchetypes[i] = opponent.racerArchetype;
+        s.frameOpponentHidden[i] = opponent.hiddenDestroyed50PD;
         const auto selected = s.racerView(opponent.racerArchetype);
         for (U m = 0; m < selected.materialCount; ++m)
             s.opponentMaterialUvs[i * s.opponentMaterialStride + m] = {};
@@ -714,6 +721,7 @@ bool VehicleWindowGl50DS::submit(const game::VehicleDrawBatch50CO& batch,
     s.pendingRaceCameraPublication=frame.sourceBodyCameraPublication50LA;
     s.width = frame.width; s.height = frame.height;
     s.frameCables = frame.cables;
+    s.framePlayerHidden = frame.playerHiddenDestroyed50PD;
     s.frameGameplayBinders=frame.gameplayBinders;s.frameGameplayBinderCount=frame.gameplayBinderCount;
     s.frameGameplayBinderImage=frame.gameplayBinderFrame;
     s.frameGcParticles=frame.mcParticles?frame.mcParticles->rendererDraw():frame.gbParticles?frame.gbParticles->rendererDraw():(frame.rcParticles?frame.rcParticles->rendererDraw():frame.gcParticles);
@@ -762,7 +770,7 @@ bool VehicleWindowGl50DS::submit(const game::VehicleDrawBatch50CO& batch,
             }
         }
     }
-    s.frameSet = false; s.frameCables = nullptr; s.frameHostHud = false; s.diagnostic = nullptr;
+    s.frameSet = false; s.framePlayerHidden = false; s.frameCables = nullptr; s.frameHostHud = false; s.diagnostic = nullptr;
     if(s.raceHud)s.raceHud->frame=false;
     if(s.timeStats)s.timeStats->frame=false;
     if(s.positionStats)s.positionStats->frame=false;
@@ -779,6 +787,7 @@ bool VehicleWindowGl50DS::submit(const game::VehicleDrawBatch50CO& batch,
         s.frameOpponentBatches[i] = emptyVehicleBatch;
         s.frameOpponentCables[i] = nullptr;
         s.frameOpponentArchetypes[i] = 0;
+        s.frameOpponentHidden[i] = false;
     }
     s.frameOpponentCount = 0;
     if(accepted && s.displayedTarget==s.targets[s.published])

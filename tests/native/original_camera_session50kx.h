@@ -1975,7 +1975,16 @@ public:
                 if(ending.transitionCommitted)pose_.position=sceneBinding_.position180;
                 frameStage_=FrameStage::exitPose;break;
             }
-            if(current.racerState40==3||current.racerState40==4){
+            // States3/4 enter the original death camera (177AB0, 22DC90), whose
+            // every update aggregates the racer's real debris (22D4B0). Until
+            // that wreck provider exists the camera keeps its current mode on
+            // the frozen, hidden body (docs/pod-destruction-20261108.md).
+            if((current.racerState40==3||current.racerState40==4)&&!actual_.deathDebris){
+                // No wreck provider yet: hold the current pose (published
+                // through the ordinary late tick/matrix/visibility stages).
+                frameStage_=FrameStage::lateTick;break;
+            }
+            if((current.racerState40==3||current.racerState40==4)&&actual_.deathDebris){
                 result_.retirement=retirementCursor_.begin({controller_,follow_,attached_,death_,deathChild_,
                     followChild_,attachedChild_,actual_.blur},current);
                 if(result_.retirement.status==OriginalRetirementCameraStatus50KG::needsDeathTransition177AB0){

@@ -8,6 +8,9 @@
 #include "original_ai_audio_owner.h"
 #include "original_ai_physical_recovery.h"
 #include "original_human_physical_recovery.h"
+#include "../../src/game/native_destroyed_racers50pd.h"
+#include "../../src/game/original_vehicle_damage50la.h"
+#include <cstring>
 #include "native_gc_water_session50kg_fixture.h"
 #include "mc_particle_vehicle50mc.h"
 #include "lap_drive50gj_fixture.h"
@@ -47,6 +50,17 @@ bool Context::advanceChildren(std::size_t actualRacerSlot,float preparedOuterFac
  require50DU(!nativeSelectedLights||actualRacerSlot<gcGraphicsSequence.size(),
      "GC light update requires the actual native racer slot");
  finishDriverAppliedThisFrame=false;
+ // A destroyed racer (original state3/4) runs only its destroyed frame.
+ if(s.bodies.main.vehicleState40==3u||s.bodies.main.vehicleState40==4u)
+  return advanceDestroyedChildren(actualRacerSlot,preparedOuterFactor);
+ if(actualRacerSlot<rr::game::nativeTestDestroyPending50PD.size()&&
+    rr::game::nativeTestDestroyPending50PD[actualRacerSlot]){
+  // Unattended test only (RR_TEST_DESTROY): the canonical B9D bit0 that
+  // 222714 sets for a deadly hit; 225C50 then selects 2261B0.
+  rr::game::nativeTestDestroyPending50PD[actualRacerSlot]=false;
+  s.fields.flagB9D0=true;
+  std::cerr<<"test_destroy armed slot="<<actualRacerSlot<<" frame="<<completedFrames<<'\n';
+ }
  if(audioEnabled&&!sourceAiAudio&&!opponentFrame&&!raceSetupFrame)require50DU(advanceSpeechTimers50HG(.016f,lapContinuity.prefix,speechState),
      "native speech countdown failed");
  // The live path does not call fixture/oracle callbacks; retain a bounded
@@ -525,13 +539,12 @@ bool Context::advanceChildren(std::size_t actualRacerSlot,float preparedOuterFac
      decision,x.workspace,x.diagnostic);
  if(!damageReady&&x.diagnostic.error==VehicleFrameError49W::ExternalCut&&
     decision.status==ImpactTransitionStatus50C::unsupportedTransition){
-  addCounter50DU(nativeCalls);recoveryPaused=true;
-  if(originalAiEnabled){
-   std::cerr<<"ORIGINAL AI source-recovery boundary: kind=damage pc="<<std::hex
-       <<decision.sourcePC<<std::dec<<" phase="<<static_cast<unsigned>(s.phase)
-       <<"; no checkpoint prepared or session rebuilt.\n";
-   require50DU(false,"original AI single session reached native damage boundary");
-  }
+  addCounter50DU(nativeCalls);
+  // Original 225C50 dispatches the racer's destroy handler; the racer is
+  // retired for the rest of the race (no respawn). Original-AI sessions run
+  // that transition; the legacy host checkpoint path below is unchanged.
+  if(originalAiEnabled)return commitOriginalDestroyed(actualRacerSlot,decision,preparedOuterFactor);
+  recoveryPaused=true;
   if(opponentFrame)return false; // A failed AI never restarts the human session.
   recovery50FI::Plan nextCheckpoint{};recovery50FI::Diagnostic recoveryDiagnostic{};
   BodyMatrix48G groundedCheckpoint{};
@@ -706,6 +719,128 @@ bool Context::advanceChildren(std::size_t actualRacerSlot,float preparedOuterFac
  }
  if(sourceAiAudio)require50DU(originalAiAudio->children(actualRacerSlot,s,x.bindings,boostState),
      "native D48/D40 audio child service rejected");
+ return true;
+}
+
+// Original 228390 (plain effect tail): the same owner walk the ordinary frame
+// runs at 228B64, which 228764/228770 call directly for states 3/4.
+bool Context::stopDestroyedPlainEffects(const char* label) {
+ PlainEffectOwners50Q plainOwners{};
+ const SceneNodeIndex49P plainModels[]={x.bindings.visual.left1BC,x.bindings.visual.right1B8,
+     x.bindings.visual.bottomLeft1C4,x.bindings.visual.bottomRight1C0};
+ for(unsigned engine=0;engine<4;++engine)if(plainModels[engine]!=SceneNodeIndex49P::none)
+  for(unsigned array=0;array<3;++array){
+   const auto index=effectOwnerIndex[array][engine];
+   require50DU(index<nativeEffectCount,"destroyed plain effect owner bank does not match the racer");
+   const auto& owner=nativeEffects[index];plainOwners.slots[array*4+engine]={owner.id,owner.state.flags1D4};
+  }
+ const auto plain=inspectPlainEffectTail50Q(plainOwners);
+ require50DU(plain.status==PlainEffectStatus50Q::Complete,label);
+ return consumeEffects(plain.events,plain.count);
+}
+
+bool Context::commitOriginalDestroyed(std::size_t actualRacerSlot,
+    const ImpactTransitionResult50C& decision,float preparedOuterFactor) {
+ using namespace rr::game;
+ (void)preparedOuterFactor;
+ require50DU(actualRacerSlot<nativeDestroyedRacers50PD.size(),"destroyed racer slot outside the race field");
+ auto& record=nativeDestroyedRacers50PD[actualRacerSlot];
+ auto& main=s.bodies.main;
+ require50DU(!record.destroyed&&main.vehicleState40==0u,"destroy transition reached a racer already out");
+ const bool human=s.fields.vehicle58==0u;
+ std::uint32_t handler=0;
+ switch(decision.sourcePC){
+  case 0x225d10u:handler=0x2261b0u;break;                    // slot88 explode
+  case 0x225d9cu:case 0x225e28u:handler=0x226750u;break;     // slot8C wreck
+  // slot90/94: AI 227370/227A40 dispatch 226750 directly. The human
+  // states1/2 (one side lost, 2 s on 4C) are not built yet; the human
+  // takes the same 226750 wreck that their 4C expiry would reach.
+  case 0x225e7cu:case 0x225ec0u:handler=0x226750u;break;
+  default:
+   std::cerr<<"original destroy dispatch unknown pc="<<std::hex<<decision.sourcePC<<std::dec<<'\n';
+   require50DU(false,"original destroy dispatch site is not one of 225D10/225D9C/225E28/225E7C/225EC0");
+ }
+ const bool explode=handler==0x2261b0u;
+ // 2261C4/2272F0 state, 2261CC/22675C 4C=0, 2261D8 268=0.6f (0x3F19999A).
+ main.vehicleState40=explode?4u:3u;
+ record={};record.destroyed=true;record.handler=handler;record.decisionPC=decision.sourcePC;
+ record.state40=main.vehicleState40;record.timer4C=0.f;
+ {std::uint32_t bits=explode?0x3f19999au:0u;std::memcpy(&record.timer268,&bits,4);}
+ record.frame=completedFrames;
+ // 225F04: the victim's D30 names the racer that last hit it (2 s window
+ // via D2C). Its CD0 kill count and career/hall effects are not yet joined.
+ record.attackerD30=poseHistory.markerD30;
+ // 226288..2262A4: explosion point = body288 local XYZ (28B180) with Y+5.0f.
+ const auto& p=main.components.root.body.position;
+ {const auto node=static_cast<std::int32_t>(x.bindings.animation.bodyScene288);
+  require50DU(node>=0&&static_cast<std::uint32_t>(node)<s.sceneNodeCount,"destroyed racer body288 unavailable");
+  const auto* local=s.nodes[static_cast<std::uint32_t>(node)].localC0.v+12;
+  volatile float raised=local[1]+5.f;
+  record.explosion270[0]=local[0];record.explosion270[1]=raised;record.explosion270[2]=local[2];record.explosion270[3]=1.f;}
+ {
+  // 2261F8..226278 / 226780..226800: Stop84 on 808[0], 808[1], then 81C[0],
+  // 81C[1] when present. Both handlers do this before D40 virtual9C.
+  ImpactEffectEvent50B stops[4]{};std::size_t count=0;
+  const std::uint32_t pcs808[2]={0x226210u,0x226230u},pcs81C[2]={0x226258u,0x226278u};
+  for(unsigned i=0;i<2;++i)if(resetEffectBindings.owners808[i]){
+   stops[count].kind=ImpactEffectKind50B::Stop84;stops[count].sourcePC=pcs808[i];
+   stops[count].target=resetEffectBindings.owners808[i];++count;}
+  if(resetEffectBindings.table81CPresent)for(unsigned i=0;i<2;++i){
+   if(resetEffectBindings.controls81C[i])stopEffect50BC(*resetEffectBindings.controls81C[i]);
+   else if(resetEffectBindings.owners81C[i]){
+    stops[count].kind=ImpactEffectKind50B::Stop84;stops[count].sourcePC=pcs81C[i];
+    stops[count].target=resetEffectBindings.owners81C[i];++count;}
+  }
+  require50DU(consumeEffects(stops,count),"original destroy handler effect stops rejected");
+  // 2263F8 / 226808: D40 virtual9C. AI: 16DF70 wreck cue and engine/binder stop.
+  if(originalAiAudioEnabled&&s.fields.vehicle58==1u){
+   std::uint32_t cue=0;
+   require50DU(originalAiAudio->destroyed16DF70(actualRacerSlot,s,x.bindings,sessionRandom,
+       s.noiseOwner().sharedRandomState,applicationClock,cue),"original AI D40 16DF70 destroy audio rejected");
+   std::cerr<<"pod_destroyed_audio slot="<<actualRacerSlot<<" wreck_cue="<<cue<<'\n';
+  }else if(audioEnabled&&human&&liveAudio->outputOpen()){
+   // Human D40 virtual9C = 1A0060: v88/v84 stop the binder/engine loops,
+   // 2924A0(488) stops the p_event emitter, 292360(48C,1) plays p_debris cue1.
+   // Its D44 virtualA8, 4A8 random delay and 178B80 call are not joined.
+   using rr::game::AudioBank50HE;using rr::game::AudioOperation50HE;
+   auto apply=[&](AudioOperation50HE operation,AudioBank50HE bank,std::uint32_t key,std::uint32_t site){
+    rr::game::AudioCommand50HE command{};command.operation=operation;command.cue={bank,key};command.sourceSite=site;
+    return liveAudio->applySourceCommand(command);
+   };
+   apply(AudioOperation50HE::Stop,AudioBank50HE::PodEngine,2u,0x1a0088u);
+   apply(AudioOperation50HE::Stop,AudioBank50HE::PodEngine,1u,0x1a0098u);
+   apply(AudioOperation50HE::Stop,AudioBank50HE::PodEngine,3u,0x1a0098u);
+   for(std::uint32_t key=1;key<=6;++key)apply(AudioOperation50HE::Stop,AudioBank50HE::PodEvent,key,0x1a00b8u);
+   apply(AudioOperation50HE::Start,AudioBank50HE::PodDebris,1u,0x1a00ccu);
+   std::cerr<<"pod_destroyed_audio slot=0 human_debris_cue=1\n";
+  }
+ }
+ std::cerr<<"pod_destroyed slot="<<actualRacerSlot<<" human="<<human<<" handler=0x"<<std::hex<<handler
+     <<" dispatch=0x"<<decision.sourcePC<<std::dec<<" state40="<<main.vehicleState40
+     <<" frame="<<completedFrames<<" attacker="<<static_cast<std::int32_t>(record.attackerD30)<<" position="<<p.v[0]<<','<<p.v[1]<<','<<p.v[2]<<'\n';
+ // The rest of this tick's racer frame does not run for a destroyed racer;
+ // the next physics part only closes the phase.
+ s.phase=VehicleFramePhase49W::AfterBodyChildren;
+ return true;
+}
+
+bool Context::advanceDestroyedChildren(std::size_t actualRacerSlot,float preparedOuterFactor) {
+ using namespace rr::game;
+ require50DU(s.phase==VehicleFramePhase49W::Ready,"destroyed racer frame must begin Ready");
+ require50DU(actualRacerSlot<nativeDestroyedRacers50PD.size()&&nativeDestroyedRacers50PD[actualRacerSlot].destroyed,
+     "racer in state3/4 has no native destroy record");
+ auto& record=nativeDestroyedRacers50PD[actualRacerSlot];++record.destroyedFrames;
+ // 228764/228770 -> 228390, skipping controls, boost, animation, visual
+ // response, chariot, impacts, repair/effect/transition work and water.
+ require50DU(stopDestroyedPlainEffects("destroyed racer 228390 effect tail rejected"),
+     "destroyed racer effect stops rejected");
+ // 228BC4..228BE0: only state4 decrements 268 by the dispatched factor.
+ if(s.bodies.main.vehicleState40==4u)
+  require50DU(advanceOriginalExplosionTimer50LA(4u,preparedOuterFactor,record.timer268).okay(),
+      "destroyed racer 268 timer rejected");
+ // The schedule pairs each racer frame with this tick's dispatched factor.
+ s.bodies.main.frameFactor=preparedOuterFactor;
+ s.phase=VehicleFramePhase49W::AfterBodyChildren;
  return true;
 }
 } // namespace interactive_frame50DU

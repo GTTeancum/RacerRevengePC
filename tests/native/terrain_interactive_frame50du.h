@@ -547,5 +547,11 @@ private:
         bool sourceAiAudio,NativeCalls& runNative);
     bool advancePhysics(std::size_t actualRacerSlot,Part part,float liveSubstepScale,
         bool sourceAiAudio,NativeCalls& runNative);
+    // Original destroy transition (225C50 -> 2261B0/226750) and the state3/4
+    // frame (228764/228770 -> 228390). See docs/pod-destruction-20261108.md.
+    bool commitOriginalDestroyed(std::size_t actualRacerSlot,
+        const rr::game::ImpactTransitionResult50C& decision,float preparedOuterFactor);
+    bool advanceDestroyedChildren(std::size_t actualRacerSlot,float preparedOuterFactor);
+    bool stopDestroyedPlainEffects(const char* label);
 };
 } // namespace interactive_frame50DU

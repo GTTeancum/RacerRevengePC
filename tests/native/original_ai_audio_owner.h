@@ -1,4 +1,8 @@
 #pragma once
+#include "../../src/game/shared_random_owner50id.h"
+#include "../../src/game/lap_host_clock50id.h"
+#include <bit>
+#include <cstring>
 #include "opponent_engine_audio50hx_fixture.h"
 #include "original_ai_material_resources.h"
 #include "../../src/game/impact_effects50b.h"
@@ -479,6 +483,59 @@ public:
         return rr::game::advanceOriginalAiEngineEmitter16DA80(r.engine,observed,{}).status==
             rr::game::OriginalAiEmitterStatus::complete;
     }
+    // Original AI D40 virtual9C = 16DF70, reached from 2261B0 when the racer
+    // explodes. Picks one of D40+200's wreck cues (sounds[3..6]) from the shared
+    // 308030 stream with the lazy 3D6B30 seed and 3D6B38 range guard, plays it
+    // at the racer (104140 near 0, far 1200; start flags 6) unless already
+    // active, stops the engine (v84=16DBC0) and binder (v88=16DC10) loops and
+    // sets 22C bit2. Its 1A64B0 race event and 2C2810 D44 call are not joined.
+    bool destroyed16DF70(std::size_t slot,const rr::game::VehicleFrameState49W& frame,
+        const rr::game::VehicleFrameBindings49W& bindings,rr::game::SharedRandomOwner50ID& random,
+        std::uint32_t& sharedRaw308030,rr::game::HostMonotonicClock50ID& clock,std::uint32_t& cue)noexcept {
+        cue=0xffffffffu;
+        if(!ownsSlot(slot)||frame.fields.vehicle58!=1u)return false;
+        auto& r=racers_[slot];
+        if(r.engine.flags22CLow4&4u)return true; //16DF94: already dead.
+        // 16DFF8 22A180: body288 LOCAL XYZ, read directly (the destroy handler
+        // runs mid-frame, outside the phase-gated emitter input reader).
+        const auto node=static_cast<std::int32_t>(bindings.animation.bodyScene288);
+        if(node<0||static_cast<std::uint32_t>(node)>=frame.sceneNodeCount){
+            std::fprintf(stderr,"ai_wreck_audio_refused slot=%zu reason=body288\n",slot);return false;}
+        rr::game::OriginalAiEmitterVector position{{0,0,0,1}};
+        std::memcpy(position.v,frame.nodes[static_cast<std::uint32_t>(node)].localC0.v+12,12);
+        constexpr std::int32_t count=4; //D40+200 wreck list: PodWreck cues1..4.
+        if(!random.seed.lazy80A8){random.seed.seed3D6B30=0;random.seed.lazy80A8=true;}
+        if(!random.seed.seed3D6B30){
+            std::uint32_t stamp=0;if(!rr::game::sampleHostTimestamp50ID(clock,stamp))return false;
+            random.seed.seed3D6B30=stamp;sharedRaw308030=stamp; //101A50 then 308020.
+        }
+        sharedRaw308030=sharedRaw308030*0x41c64e6du+0x3039u; //308030
+        const auto drawn=static_cast<std::int32_t>(sharedRaw308030&0x7fffffffu);
+        volatile float unit=std::bit_cast<float>(0x30000000u)*static_cast<float>(drawn); //2^-31
+        volatile float scaled=static_cast<float>(count)*unit;
+        std::int32_t index=static_cast<std::int32_t>(scaled); //CVT.W.S toward zero.
+        if(!random.range.lazy80AC){random.range.rangeCheck3D6B38=1;random.range.lazy80AC=true;}
+        if(random.range.rangeCheck3D6B38&&(index<0||index>count-1))return false; //16E0E0 assertion.
+        if(index>count-1)index=count-1;if(index<0)index=0;
+        auto& sound=r.sounds[3+static_cast<std::size_t>(index)];cue=static_cast<std::uint32_t>(index);
+        if(sound.nativeOwner&&sound.nativeSound&&!sound.nativeOwner->active(*sound.nativeSound)){
+            bool returned=false;
+            if(attachPositional(r,sound,position,0.f,1200.f,returned)&&returned){
+                const auto started=rr::game::startAiLogicalSound233410(*sound.nativeOwner,*sound.nativeSound,6);
+                if(started.status!=rr::game::AiLogicalSoundStatus::complete)
+                    std::fprintf(stderr,"ai_wreck_sound_start_refused slot=%zu status=%u\n",slot,static_cast<unsigned>(started.status));
+            }
+        }
+        r.engine.flags22CLow4=static_cast<std::uint8_t>((r.engine.flags22CLow4&~4u)|4u);
+        const auto engine=rr::game::applyOriginalAiEmitterLifecycle(r.engine,rr::game::OriginalAiEmitterLifecycle::stopEngine16DBC0);
+        const auto binder=rr::game::applyOriginalAiEmitterLifecycle(r.engine,rr::game::OriginalAiEmitterLifecycle::stopBinder16DC10);
+        if(engine.status!=rr::game::OriginalAiEmitterStatus::complete||
+           binder.status!=rr::game::OriginalAiEmitterStatus::complete)
+            std::fprintf(stderr,"ai_wreck_audio_refused slot=%zu reason=lifecycle engine=%u/0x%x binder=%u/0x%x\n",slot,
+                static_cast<unsigned>(engine.status),engine.sourcePC,static_cast<unsigned>(binder.status),binder.sourcePC);
+        return engine.status==rr::game::OriginalAiEmitterStatus::complete&&
+            binder.status==rr::game::OriginalAiEmitterStatus::complete;
+    }
     bool mixBoundary(rr::game::CoupledNoiseContext49M& shared)noexcept {
         if(!prepared_||!activated_||!listenerReady_||!mode_)return false;
         last_=aural_.update(&listener_,1,mode_->fields(),shared);
@@ -562,6 +619,29 @@ private:
             std::fprintf(stderr,"ai_boost_start_refused reason=start233410 status=%u source_pc=0x%x returned=%d\n",
                 static_cast<unsigned>(result.status),result.sourcePC,result.sourceReturned?1:0);
         return result.status==rr::game::AiLogicalSoundStatus::complete;
+    }
+    // 104140 positional attach shared by the boost and wreck one-shots.
+    static bool attachPositional(Racer& r,Sound& sound,const rr::game::OriginalAiEmitterVector& position,
+        float nearDistance,float farDistance,bool& returned)noexcept {
+        auto& owner=*r.owner;returned=false;
+        if(!owner.listenerReady_||!owner.mode_||!sound.nativeSound||!sound.nativeOwner)return false;
+        using namespace rr::game::original_ai_aural_detail;
+        const auto& l=owner.listener_;const auto distanceXZ=distance(position.v[0],position.v[2],l.position[0],l.position[2]);
+        if(!std::isfinite(distanceXZ))return false;
+        if(!(distanceXZ<farDistance))return true;
+        float forward=0.f,target=0.f;
+        if(!rr::game::originalAngle48G(l.forward[2],l.forward[0],forward)||
+           !rr::game::originalAngle48G(sub(position.v[2],l.position[2]),sub(position.v[0],l.position[0]),target))return false;
+        const auto degrees=literal(0x42652ee1u);
+        auto angle=static_cast<std::int32_t>(mul(target,degrees))-static_cast<std::int32_t>(mul(forward,degrees));
+        if(angle>180)angle-=359;else if(angle< -180)angle+=359;
+        for(unsigned i=0;i<3;++i)sound.nativeSound->position60[i]=position.v[i];
+        const float attenuation=distanceXZ<=nearDistance?100.f:
+            sub(100.f,mul(100.f,div(sub(distanceXZ,nearDistance),sub(farDistance,nearDistance))));
+        const auto result=rr::game::spatialAiLogicalSound233AE0(*sound.nativeOwner,*sound.nativeSound,
+            owner.mode_->fields(),attenuation,angle,l.position,false);
+        if(result.status!=rr::game::AiLogicalSoundStatus::complete)return false;
+        returned=true;return true;
     }
     static bool attachBoost(void* context,Sound& sound,const rr::game::OriginalAiEmitterVector& position,
         const rr::game::OriginalAiEmitterVector&,float nearDistance,float farDistance,bool& returned)noexcept {

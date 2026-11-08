@@ -1,3 +1,4 @@
+#include "../../src/game/native_destroyed_racers50pd.h"
 #include "original_manager_fields.h"
 #include <functional>
 // Complete original lexical suffix; caller prefix outlives every owner below.
@@ -2339,6 +2340,10 @@ SessionExit50DU Context::run() {
   activateColdRace=[&](){
   require50DU(!originalUiActive&&race.phase==race_session50HM::Phase::Uninitialized,
       "native cold race activation is one-shot after Course input ownership ends");
+  // Every activated race starts with its racers intact (Restart rebuilds them).
+  rr::game::resetNativeDestroyedRacers50PD();
+  rr::game::nativeTestDestroyPending50PD={};
+  for(auto& test:rr::game::nativeTestDestroys50PD)test.fired=false;
   if(!allAiEnabled){
    platform::SelectedControlInput50KY current{};
    require50DU(platform::bindSelectedControlInput50KY(controlPresets,playerActionIndexFFC,playerSource5C,current)&&

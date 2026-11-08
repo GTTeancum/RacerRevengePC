@@ -43,6 +43,13 @@ bool Context::advancePhysics(std::size_t actualRacerSlot,Part part,float liveSub
  require50DU(part==NativeRacerFramePart::Physics&&
      s.phase==VehicleFramePhase49W::AfterBodyChildren,
      "physics suffix requires completed racer children");
+ // A destroyed racer (state3/4) has no body integration: its intact body is
+ // hidden and frozen; only the phase closes for the shared schedule.
+ if(s.bodies.main.vehicleState40==3u||s.bodies.main.vehicleState40==4u){
+  // Shared schedule contract: one consumed substep at this frame's factor.
+  s.bodies.main.schedule.count=1;s.bodies.main.substepIndex=1;
+  s.phase=VehicleFramePhase49W::Ready;return true;
+ }
  runNative([&]{return scheduleVehicleFrame49W(s,x.bindings,f::cut(PreservingCut49W::OtherChildrenAfter35C),liveSubstepScale,x.workspace,x.diagnostic);},"schedule");
  require50DU(s.bodies.main.schedule.count==1,"16ms diagnostic step requires one native substep");
 

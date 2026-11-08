@@ -482,6 +482,8 @@ struct VehicleWindowGl50DS::Storage {
     const game::PodCableMesh50FD* frameOpponentCables[maxVehicleWindowOpponents50DS]{};
     U frameOpponentCount = 0;
     U frameOpponentArchetypes[maxVehicleWindowOpponents50DS]{};
+    bool frameOpponentHidden[maxVehicleWindowOpponents50DS]{};
+    bool framePlayerHidden=false;
     std::unique_ptr<HostHudGeometry> hostHudGeometry;
     U hostHudProgram = 0, hostHudVertexShader = 0, hostHudFragmentShader = 0;
     U hostHudVertexBuffer = 0, hostHudIndexBuffer = 0, hostHudVertexArray = 0;

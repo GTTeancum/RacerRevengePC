@@ -2,6 +2,8 @@
 #include <cfenv>
 #include "../../platform/linux/native/stall_watchdog50du.h"
 #include "../../src/game/ps2_float_mode50la.h"
+#include "../../src/game/native_destroyed_racers50pd.h"
+#include <algorithm>
 #include <xmmintrin.h>
 #include "terrain_interactive_loop50du.h"
 #include "original_race_f8_native_bars50la.h"
@@ -305,6 +307,16 @@ void Context::run() {
          <<" activity_lost="<<hostInput.keys.activityLost<<" minimized="<<hostInput.keys.minimized<<"\n";
      holdLogged50DU=hold;
     }
+   }
+   if(captureRun.unattended()&&raceEnabled&&race.phase==race_session50HM::Phase::Racing){
+    // Unattended test only (RR_TEST_DESTROY): arm each configured racer once
+    // its race time passes; its next frame sets the canonical B9D bit0.
+    for(auto& test:rr::game::nativeTestDestroys50PD)
+     if(test.slot>=0&&!test.fired&&static_cast<std::size_t>(test.slot)<racerBank.count()&&
+        race.raceSeconds>=test.seconds){
+      test.fired=true;rr::game::nativeTestDestroyPending50PD[static_cast<std::size_t>(test.slot)]=true;
+      std::cerr<<"test_destroy due slot="<<test.slot<<" race_seconds="<<race.raceSeconds<<'\n';
+     }
    }
    if(!originalUiActive){
     // Revoke frontend-only button/stick/hold admission while another owner
@@ -1429,6 +1441,8 @@ void Context::run() {
       std::size_t contactPairCount=0;
       for(std::size_t racer=0;racer<racerBank.count();++racer)
        contactParticipant[racer]=racerBank.active(racer)&&
+           // A destroyed racer's 690/694/364 memberships are removed (2261B0/226750).
+           !rr::game::nativeRacerDestroyed50PD(racer)&&
            withRace([&](auto& actualRace){return race_session50HM::simulationAllowed(actualRace,static_cast<std::uint32_t>(racer));});
       for(std::size_t primary=0;primary<racerBank.count();++primary)if(contactParticipant[primary])
        for(std::size_t other=0;other<racerBank.count();++other)
@@ -1769,6 +1783,18 @@ void Context::run() {
         nativeLightingPolicy,gcDrawLights[0],gcLightDiagnostic))
      nativeLightFailure("publishNativeDraw rejected",0,lightLease);
     } //229EF4 semantic publication ends; only completed copied packet survives.
+    const bool playerDestroyed=rr::game::nativeRacerDestroyed50PD(0);
+    if(playerDestroyed){
+     // Original 28C6E0 hides every model of the destroyed racer. Collapse
+     // this frame's projected geometry (loop-owned staging) to one point so it
+     // covers no pixels; spans, indices and counts stay the retained mesh.
+     for(std::uint32_t c=0;c<next.componentCount;++c){
+      auto& part=next.component[c];
+      if(!part.vertices||!part.vertexCount)continue;
+      auto* vertices=const_cast<rr::assets::Vertex48B*>(part.vertices);
+      for(std::uint32_t v=1;v<part.vertexCount;++v)for(unsigned k=0;k<3;++k)vertices[v].position[k]=vertices[0].position[k];
+     }
+    }
     projectionTiming.finish();
     if(sourceFogRenderPhase.bound())require50DU(
         sourceFogRenderPhase.prepare(sourceCameraSession.get()).status==sourceCamera::Status::complete,
@@ -1892,10 +1918,17 @@ void Context::run() {
     }
     cameraTiming.finish();
     render_diagnostics50GQ::Scope cablesTiming(renderDiagnostics,render_diagnostics50GQ::Subphase::SourceCables);
-    runNative([&]{return buildPodCables50FD(s,x.bindings,playerCableBindings,cameraBackward,
-        cableMesh,cableWorkspace,cableDiagnostic);},"source cable mesh generation");
-    if(gameplayBinder.loaded())require50DU(gameplayBinder.stageRacer(0,s,x.bindings,cameraBackward,gcLightOwner),
-        "actual player Binder attachments or authored strip color unavailable");
+    if(!playerDestroyed){
+     runNative([&]{return buildPodCables50FD(s,x.bindings,playerCableBindings,cameraBackward,
+         cableMesh,cableWorkspace,cableDiagnostic);},"source cable mesh generation");
+     if(gameplayBinder.loaded())require50DU(gameplayBinder.stageRacer(0,s,x.bindings,cameraBackward,gcLightOwner),
+         "actual player Binder attachments or authored strip color unavailable");
+    }else{
+     // Destroyed: the cables hang from the hidden models. Keep the admitted
+     // 2/4-cable topology, collapsed to one point; hide the Binder likewise.
+     for(auto& vertex:cableMesh.vertices)for(unsigned k=0;k<3;++k)vertex.position[k]=cableMesh.vertices[0].position[k];
+     if(gameplayBinder.loaded())require50DU(gameplayBinder.hideRacer(0),"destroyed player Binder hide rejected");
+    }
     cablesTiming.finish();
     render_diagnostics50GQ::Scope hudTiming(renderDiagnostics,render_diagnostics50GQ::Subphase::HostHud);
     platform::VehicleWindowHostHud50DS hud{};
@@ -1966,6 +1999,22 @@ void Context::run() {
       row.completedLaps=source.observed.completedLaps;row.finished=source.finished;
       row.retirementCD4=source.retirementCD4;
      }
+     if(hud.standingsSourceRanks){
+      // Source places (1B0814) rank a retired racer behind every active one;
+      // the host distance order does not know retirement. List the rows in
+      // source place order, which the renderer requires to be ascending.
+      bool ascending=true;
+      for(std::uint32_t i=1;i<hud.standingsCount;++i)if(hud.standings[i-1].place>hud.standings[i].place)ascending=false;
+      if(!ascending){
+       static unsigned reorderLogs50PD=0;
+       if(reorderLogs50PD<3){++reorderLogs50PD;std::cerr<<"standings_source_order_applied places=";
+        for(std::uint32_t i=0;i<hud.standingsCount;++i)std::cerr<<hud.standings[i].racerIndex<<':'<<hud.standings[i].place
+            <<(hud.standings[i].retirementCD4?"R":"")<<(hud.standings[i].finished?"F":"")<<' ';
+        std::cerr<<'\n';}
+       std::stable_sort(hud.standings,hud.standings+hud.standingsCount,
+           [](const auto& a,const auto& b){return a.place<b.place;});
+      }
+     }
     }
     const auto routeTarget=navigationProgress.reset.vehicleC88;
     if(routeTarget<selectedMapCount50MB()){
@@ -2014,6 +2063,7 @@ void Context::run() {
         view.worldViewProjection,clearColor,&cableMesh,
         humanOriginalHud?(hud.resultsPanelVisible?&hud:nullptr):
         sourceCameraSession&&!sourceCameraSession->nativeHudVisible()?nullptr:&hud};
+    renderFrame.playerHiddenDestroyed50PD=playerDestroyed;
     if(renderRequest.track.rcCrystal){
      // The actual retained RC crystal source consumes this same Session view
      // even when no racer material selects the specular-pair capability.
@@ -2230,10 +2280,15 @@ void Context::run() {
        }
        opponentFlamePrepared[index]=true;
       };
-      if(racerBank.active(racer)){
+      // A destroyed racer (original 28C6E0 hid its models) keeps its last
+      // complete batch for the fixed field but is not prepared or drawn.
+      const bool destroyedRacer=rr::game::nativeRacerDestroyed50PD(racer);
+      if(racerBank.active(racer)&&!destroyedRacer){
        if(arenaLoaded)prepareActiveOpponent();
        else racerBank.visit(racer,prepareActiveOpponent);
       }
+      if(destroyedRacer&&gameplayBinder.loaded())
+       require50DU(gameplayBinder.hideRacer(static_cast<std::uint32_t>(racer)),"destroyed opponent Binder hide rejected");
       // A stopped native opponent retains its last complete display
       // batch, never a palette from an abandoned native source-cut state.
       if(!racerBank.active(racer))++nextRacePresentation.retainedStoppedOpponents;
@@ -2242,6 +2297,7 @@ void Context::run() {
       opponents[nextRacePresentation.submittedOpponents++]={opponentDraw[index].batch(),&opponentDraw[index].cables,
           opponentUvs[index].data(),static_cast<std::uint32_t>(opponentUvs[index].size()),
           static_cast<std::uint32_t>(racer)};
+      opponents[nextRacePresentation.submittedOpponents-1u].hiddenDestroyed50PD=destroyedRacer;
       if(racerVisuals[racer]&&racerVisuals[racer]->hasCanonicalBodyColors50LA()){
        opponents[nextRacePresentation.submittedOpponents-1u].sourceBodyModelPackets50LA=
            {{nativeLeftModels[racer]->modelPackets(),nativeRightModels[racer]->modelPackets()}};
