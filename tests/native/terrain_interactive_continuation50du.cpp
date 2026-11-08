@@ -1698,6 +1698,9 @@ SessionExit50DU Context::run() {
   }
   race.error=race_session50HM::Error::None;
  };
+ // Bound below once the camera session local exists (declared later for its
+ // teardown order); null until then, which keeps the body listener fallback.
+ const std::shared_ptr<original_camera_session50KX::Session>* audioListenerCamera50DU=nullptr;
  auto updateOpponentAudio=[&](){
   if(!audioEnabled||!raceEnabled)return;
   if(originalAiAudioEnabled){
@@ -1710,6 +1713,25 @@ SessionExit50DU Context::run() {
        "AI native listener orientation unavailable");
    for(unsigned axis=0;axis<3;++axis){listener.position[axis]=p.v[axis];listener.forward[axis]=orientation.v[8+axis];}
    listener.position[3]=listener.forward[3]=1.f;
+   {
+    // Original 1A4558..1A4588: the listener is the CAMERA (position/look),
+    // so the intro camera far from the grid hears distant engines quietly.
+    // The body listener above remains only when no camera view exists yet.
+    float cameraPosition[3],cameraLook[3];
+    const bool fromCamera=audioListenerCamera50DU&&*audioListenerCamera50DU&&(*audioListenerCamera50DU)->nativeAudioListenerPose(cameraPosition,cameraLook);
+    if(fromCamera)for(unsigned axis=0;axis<3;++axis){
+     listener.position[axis]=cameraPosition[axis];listener.forward[axis]=cameraLook[axis];}
+    static int listenerSource50DU=-1;
+    if(listenerSource50DU!=(fromCamera?1:0)){listenerSource50DU=fromCamera?1:0;
+     std::cerr<<"audio_listener source="<<(fromCamera?"camera":"player_body")<<" position="<<listener.position[0]<<','
+         <<listener.position[1]<<','<<listener.position[2]<<" player="<<p.v[0]<<','<<p.v[1]<<','<<p.v[2]<<"\n";}
+    static std::uint64_t listenerSamples50DU=0;
+    if(++listenerSamples50DU%312==0){
+     const double dx=double(listener.position[0])-p.v[0],dz=double(listener.position[2])-p.v[2];
+     std::cerr<<"audio_listener_stats source="<<(fromCamera?"camera":"player_body")
+         <<" listener_to_player_xz="<<std::sqrt(dx*dx+dz*dz)<<"\n";
+    }
+   }
    if(isRcTrack){
     require50DU(rcPositionalAudio&&rcPositionalAudio->ready()&&
         rcPositionalAudio->sourceIdentity()==rcColdSources.get(),
@@ -2613,13 +2635,19 @@ SessionExit50DU Context::run() {
   AnnouncerLeader50IE leader{};
   if(dynamicContactEnabled){
    require50DU(originalAiSession.rankBound,"dynamic audio needs actual original race rank");
+   // Original 2C4DA0 walks every manager row and keeps the LAST row whose
+   // place is 1 (no break, no uniqueness test). With no such row it keeps
+   // its FLT_MAX/1e-6 seeds, so the <10 s leader tail is simply false. The
+   // ranking 1B0814 can legitimately leave no place-1 row (e.g. a racer
+   // driving the wrong way); neither case stops the race.
    for(std::size_t slot=0;slot<racerBank.count();++slot)
     if(originalAiSession.rank[slot].placeCCC==1){
-     require50DU(!leader.exists,"original manager leader is not unique");
      leader.exists=true;leader.remainingDistance34=originalAiSession.rank[slot].remainingCC4;
      racerBank.visit(slot,[&](){leader.vehicle58=s.fields.vehicle58;leader.cachedSpeed34=m.cachedSpeed34;});
     }
-   require50DU(leader.exists,"original manager leader is unavailable");
+   static bool leaderAbsentLogged50DU=false;
+   if(!leader.exists&&!leaderAbsentLogged50DU){leaderAbsentLogged50DU=true;
+    std::cerr<<"announcer_leader absent=1 (no place-1 row; original 2C4DA0 tail is false)\n";}
   }else if(race.racerCount){
    const auto slot=race.ordered[0];leader.exists=true;
    leader.vehicle58=slot==0?0u:1u; // HOST role, not arena player-physics gate.
@@ -3322,6 +3350,7 @@ SessionExit50DU Context::run() {
  auto& sourceCameraAssets=isGbTrack?*gbSourceCameraAssets:isTbTrack?*tbSourceCameraAssets:isRcTrack?*rcSourceCameraAssets:legacySourceCameraAssets;
  std::unique_ptr<sourceCamera::DisplayInputs> sourceCameraDisplay;
  std::shared_ptr<sourceCamera::Session> sourceCameraSession;
+ audioListenerCamera50DU=&sourceCameraSession;
  bool ownedListenerCameraObserved=false;
  advanceOwnedListener=[&](std::uint64_t before,bool held,std::uint32_t& pc){
   // Preserve original lexical Camera/assets destruction order. This closure
@@ -3880,7 +3909,14 @@ SessionExit50DU Context::run() {
      auto* route=static_cast<HumanCameraInputRoute*>(opaque);
      if(!route||!route->player||!route->camera||!route->held)return {false,0};
      if(child==0)return playerEventChild49A(route->player,0,pressed,event,record);
-     if(child==1)return pressed?route->camera->press(*route->held,event,record):route->camera->release(*route->held,event,record);
+     if(child==1){
+      const auto routed=pressed?route->camera->press(*route->held,event,record):route->camera->release(*route->held,event,record);
+      if(pressed){const auto& in=route->camera->lastInput(); // Diagnostic: view-button outcome.
+       std::fprintf(stderr,"camera_view_press available=%u handled=%u status=%u operation=%u pc=0x%x mode=%d\n",
+           unsigned(routed.available),unsigned(routed.originalReturn),unsigned(in.status),unsigned(in.operation),
+           in.sourcePC,int(route->camera->cameraMode()));}
+      return routed;
+     }
      return {false,0};
     };
     require50DU(platform::bindSelectedCameraCycle50KY(controlPresets,0,humanControlInput),

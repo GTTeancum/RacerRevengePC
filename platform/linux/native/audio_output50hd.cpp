@@ -7,6 +7,7 @@
 #include <chrono>
 #include <cstddef>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <fcntl.h>
 #include <limits>
@@ -387,6 +388,10 @@ bool AudioOutput50HD::advanceMicroseconds(AudioStereoProducer50HD& producer, std
             slow("capture_write", begin);
             s.info.capturedFrames += frames;
         }
+        // Unattended tests: every sound is still mixed (and captured); only
+        // the speaker output is silenced. Never set for a player build.
+        static const bool muteOutput = [] { const char* v = std::getenv("RR_TEST_MUTE_OUTPUT"); return v && v[0] == '1' && !v[1]; }();
+        if (muteOutput) std::fill(s.mixed.begin(), s.mixed.begin() + static_cast<std::ptrdiff_t>(frames) * 2, std::int16_t{0});
         begin = DiagClock::now();
         s.submit(frames, d);
         slow("device_submit", begin);

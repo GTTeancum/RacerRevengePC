@@ -58,11 +58,25 @@ def main():
                         help='Keep racing until the watchdog budget instead of stopping after FPS evidence')
     parser.add_argument('--steer-invert', action='store_true',
                         help='Invert the test steering toward the next gate')
+    parser.add_argument('--input-device', choices=['keyboard', 'controller'],
+                        help='Force the human input device (controller uses the real connected pad)')
+    parser.add_argument('--pad-hold-a', action='store_true',
+                        help='Hold pad A through the green light (focused window), release 2 s after green')
+    parser.add_argument('--stop-start', action='store_true',
+                        help='With --hold-throttle: 4 s throttle / 3 s coast, repeating')
+    parser.add_argument('--maximized', action='store_true',
+                        help='Open the (resizable, --window) test window maximized')
+    parser.add_argument('--no-fxaa', action='store_true', help='Turn FXAA off for this run')
+    parser.add_argument('--camera-cycle', action='store_true',
+                        help='Tap the view key (C) 1 s after green and every 15 s (reaches the follow camera)')
+    parser.add_argument('--ieee-subnormals', action='store_true',
+                        help='Reproduction only: disable the PS2 no-subnormal float mode')
+    parser.add_argument('--window', help='Open a resizable window at WIDTHxHEIGHT (widescreen tests)')
     parser.add_argument('--hold-throttle', action='store_true',
                         help='Hold the human keyboard throttle once the race is green (launch test)')
     args = parser.parse_args()
-    if os.name != 'nt' or not 10 <= args.seconds <= 300:
-        parser.error('Windows required; watchdog must be 10..300 seconds')
+    if os.name != 'nt' or not 10 <= args.seconds <= 600:
+        parser.error('Windows required; watchdog must be 10..600 seconds')
     build, output = inside(args.build), inside(args.output)
     assets, sdl = args.assets.resolve(), args.sdl.resolve()
     receipt = json.loads((build / 'build-receipt.json').read_text(encoding='utf-8-sig'))
@@ -97,13 +111,32 @@ def main():
                RR_UNATTENDED_CAPTURE='1', RR_UNATTENDED_UI_ROUTE=args.route,
                RR_UNATTENDED_SECONDS=str(max(1, args.seconds - 5)),
                RR_ORIGINAL_AI_ALL_RACERS='0', RR_TRACK_FPS_BASELINE='1',
-               RR_NATIVE_FIXED_WINDOW='1')
+               RR_NATIVE_FIXED_WINDOW='1',
+               RR_TEST_MUTE_OUTPUT='1',  # Tests are silent; player builds are not.
+               RR_VIDEO_MAXIMIZED='0')  # Never cover the desktop unless asked.
     if args.logs_only:
         env['RR_EVIDENCE_LOGS_ONLY'] = '1'
     if args.camera_trace:
         env['RR_CAMERA_POSE_TRACE'] = '1'
     if args.hold_throttle:
         env['RR_TEST_HOLD_THROTTLE'] = '1'
+    if args.stop_start:
+        env['RR_TEST_STOP_START'] = '1'
+    if args.maximized:
+        env['RR_VIDEO_MAXIMIZED'] = '1'
+    if args.no_fxaa:
+        env['RR_VIDEO_FXAA'] = '0'
+    if args.camera_cycle:
+        env['RR_TEST_CAMERA_CYCLE'] = '1'
+    if args.ieee_subnormals:
+        env['RR_TEST_IEEE_SUBNORMALS'] = '1'
+    if args.pad_hold_a:
+        env['RR_TEST_PAD_HOLD_A'] = '1'
+    if args.window:
+        env['RR_TEST_WINDOW_SIZE'] = args.window
+        env['RR_NATIVE_FIXED_WINDOW'] = '0'
+    if args.input_device:
+        env['RR_HUMAN_INPUT_DEVICE'] = args.input_device
     if args.steer_invert:
         env['RR_TEST_STEER_INVERT'] = '1'
     if args.race_full:

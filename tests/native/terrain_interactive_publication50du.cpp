@@ -1,5 +1,6 @@
 // Original publication scope and its local owners; no root-only hooks/readers.
 #include "terrain_interactive_publication50du.h"
+#include "native_display_capacity50du.h"
 #include "original_race_hud_scope50la.h"
 #include "terrain_interactive_loop50du.h"
 #include "player_loading_session50du.h"
@@ -1171,11 +1172,11 @@ void Context::run() {
     std::cerr<<"GL "<<field<<": "<<(value?reinterpret_cast<const char*>(value):"unavailable")<<'\n';
    }
   }
-  #if defined(_WIN32)
-  constexpr std::int32_t maximumWidth=1280,maximumHeight=896;
-#else
-  constexpr std::int32_t maximumWidth=1280,maximumHeight=720;
-#endif
+  // Resizable/maximizable window: renderer capacity covers any attached
+  // monitor (bounded 4K). Larger drawables keep the existing oversize pause.
+  std::int32_t maximumWidth=1280,maximumHeight=896;
+  native_display_capacity50DU::capacity(1280,896,maximumWidth,maximumHeight);
+  std::cerr<<"native_render_capacity width="<<maximumWidth<<" height="<<maximumHeight<<"\n";
   rr::platform::loading_progress50DU::pulse("Allocating graphics targets");
   PlayerLoadingSession50DU::checkStop();
   platform::VehicleWindowRequest50DS renderRequest{};

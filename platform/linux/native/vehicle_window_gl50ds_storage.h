@@ -669,6 +669,7 @@ struct VehicleWindowGl50DS::Storage {
     std::uint64_t contextDrainGeneration = 0;
 
 #include "original_gameplay_blur_storage.inl"
+#include "native_fxaa_storage.inl"
 #include "native_coverage_storage.inl"
 bool uiCoverageDisjointTraced=false;
 #include "original_ui_coverage_storage.inl"

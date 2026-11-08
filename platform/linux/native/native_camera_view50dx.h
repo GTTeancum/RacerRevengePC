@@ -68,4 +68,12 @@ enum class NativeCameraViewError50DX : std::uint8_t {
 bool convertNativeCameraView50DX(const game::CameraViewOutput49F& source,
     const NativeCameraViewContract50DX& contract, NativeCameraMatrix50DX& output,
     NativeCameraViewError50DX& error) noexcept;
+
+// Native widescreen (Hor+). The original viewport targets a 4:3 display
+// (aspect1DC = 4/3 over 640x448). On an output of any other shape the
+// original vertical view is kept and the horizontal view widens: clip X is
+// scaled by (4/3) / (width/height). 1.0 at 4:3; 0.75 at 16:9. Every 3D world
+// draw and every CPU-projected 640x448 world layer must use this same factor.
+// RR_ORIGINAL_ASPECT=1 restores the previous stretched presentation.
+float nativeWidescreenScaleX50DX(std::int32_t width, std::int32_t height) noexcept;
 }

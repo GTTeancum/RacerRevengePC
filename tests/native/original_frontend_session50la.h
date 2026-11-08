@@ -1,4 +1,7 @@
 #pragma once
+#include <cstdio>
+#include <cstdlib>
+#include "native_display_capacity50du.h"
 #include <exception>
 #include "../../platform/linux/native/original_ui_controller_navigation50la.h"
 // Native original Main session. Included by50DU after its host diagnostics and
@@ -93,6 +96,16 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
   // Integer-sized host presentation; original Video and source UI remain unchanged.
   if(!headlessLive&&nativeVideo->width==640&&nativeVideo->height==448){
    window.width=1280;window.height=896;
+   // Player video setting (RacerRevengePC.ini WindowWidth/WindowHeight).
+   if(const char* size=std::getenv("RR_VIDEO_WINDOW_SIZE")){
+    int w=0,h=0;
+    if(std::sscanf(size,"%dx%d",&w,&h)==2&&w>=640&&h>=448&&w<=3840&&h<=2160){window.width=w;window.height=h;}
+   }
+  }
+  // Unattended test only: open the window at an explicit size (WxH).
+  if(const char* size=std::getenv("RR_TEST_WINDOW_SIZE");size&&captureRun.unattended()){
+   int w=0,h=0;
+   if(std::sscanf(size,"%dx%d",&w,&h)==2&&w>=640&&h>=448&&w<=3840&&h<=2160){window.width=w;window.height=h;}
   }
 #endif
   window.major=3;window.minor=2;window.profile=platform::WindowGlProfile50DQ::Core;
@@ -133,6 +146,11 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
   }
   maximumWidth=std::max(maximumWidth,initialDrawableWidth);
   maximumHeight=std::max(maximumHeight,initialDrawableHeight);
+  {  // Resizable/maximizable frontend window: cover any attached monitor.
+   std::int32_t displayWidth=0,displayHeight=0;
+   native_display_capacity50DU::capacity(maximumWidth,maximumHeight,displayWidth,displayHeight);
+   maximumWidth=displayWidth;maximumHeight=displayHeight;
+  }
   std::cerr<<"original_frontend_target_request "<<J{
       {"logical_width",nativeVideo->width},{"logical_height",nativeVideo->height},
       {"startup_drawable_width",initialDrawableWidth},{"startup_drawable_height",initialDrawableHeight},

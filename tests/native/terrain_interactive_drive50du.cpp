@@ -1,6 +1,7 @@
 // Replacement root prefix ONLY; nativeApplicationMain50DU/main body remains unchanged
 // except appending the three original services to the single runSession50DU call.
 #include "runtime_allocations50fl.h"
+#include "../../src/game/ps2_float_mode50la.h"
 #include "terrain_interactive_session50du.h"
 #include "json.hpp"
 #include "runtime_asset_paths50lb.h"
@@ -398,6 +399,8 @@ int nativeApplicationMain50DU(int argc,char**argv){try{
 }catch(const std::exception&e){std::cerr<<"interactive drive: "<<e.what()<<'\n';return 1;}}
 
 int main(int argc,char** argv){
+ // PS2 EE float rule (no subnormals) for the whole game thread.
+ rr::game::enforcePs2FloatMode50LA();
 #if defined(_WIN32)
  if(argc==1||(argc==3&&std::string(argv[1])=="--assets"))
   return windows_native_entry50LB::run(nativeApplicationMain50DU,argc,argv,argc==1);

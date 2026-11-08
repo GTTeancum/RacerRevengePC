@@ -256,3 +256,27 @@ restarts are unchanged and untested.
 * `main-tournament-course-ta` + restart: exit 0, route and restart verified,
   both races consumed (Camera34 bound), 62.5 / 62.5 FPS.
 * TA single + restart, GA + restart: exit 0, 62.5 FPS in all races.
+
+### Build99: source findings used (Nov 8, SLUS_202.68 disassembly)
+
+Read with `tools/diagnostics/ps2_disasm.py` / `ps2_xrefs.py` (Capstone).
+
+* Race input. Reader 1A1A20 reads axes, D-pad, throttle (preset 694) and
+  brake (690) as held state every frame. Gate 1B0B80 =
+  `(flags58&2) && !(flags58&1)` guards only the boost/repair/powerslide flag
+  reads. Nothing waits for a neutral pad at the green light, so the port's
+  controller latch no longer re-arms at countdown -> race (the 2 s freeze).
+* Engine-sound listener. Race music update 1A4440, 1A4558..1A4588, sets each
+  view's AuralScape listener through 1030B0 from the CAMERA (+180 position,
+  +190 look, +1A0 up). The AI engine loop reads that same listener: 1034F0
+  calls 290E10 (listener +10 position) and 103628 calls 290D70 (+20/+30). The
+  port fed the AI emitters the player body; it now uses the camera pose.
+* Announcer leader. 2C4DA0 seeds remaining=FLT_MAX, speed=1e-6, walks every
+  manager row and keeps the LAST row with place 1 (no break, no uniqueness
+  test). With none, FLT_MAX/1e-6 is not < 10, so the tail is false. The rank
+  pass 1B0814 can leave no place-1 row (a racer driving the wrong way did, in
+  an unattended run). The port stopped the race on both "no leader" and
+  "two leaders"; it now follows 2C4DA0.
+* Camera views. A fresh profile starts with preference 11030 = 5 (attached
+  camera). Triangle (preset row 6A4 = descriptor 0) cycles 5 -> follow 0 ->
+  follow presets -> 5 through 176DF0; keyboard C reaches the same action.

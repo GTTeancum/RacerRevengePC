@@ -1,6 +1,7 @@
 #include "native_camera_view50dx.h"
 #include <cfenv>
 #include <cmath>
+#include <cstdlib>
 #include <cstring>
 #include <limits>
 
@@ -35,6 +36,15 @@ bool coreLayout(const game::CameraViewOutput49F& source) noexcept {
             return false;
     return true;
 }
+}
+
+float nativeWidescreenScaleX50DX(std::int32_t width, std::int32_t height) noexcept {
+    static const bool originalAspect = [] {
+        const char* v = std::getenv("RR_ORIGINAL_ASPECT");
+        return v && v[0] == '1' && !v[1];
+    }();
+    if (originalAspect || width <= 0 || height <= 0) return 1.0f;
+    return static_cast<float>((4.0 * static_cast<double>(height)) / (3.0 * static_cast<double>(width)));
 }
 
 bool convertNativeCameraView50DX(const game::CameraViewOutput49F& source,
@@ -78,6 +88,18 @@ bool convertNativeCameraView50DX(const game::CameraViewOutput49F& source,
                 std::memcpy(&next.worldViewProjection[to], &source.combined[from], sizeof(float));
             }
         }
+    }
+    {
+        // Native widescreen: clip X coefficients (column 0) only. Y/Z/W and the
+        // original vertical field of view are unchanged.
+        const float scaleX = nativeWidescreenScaleX50DX(contract.width, contract.height);
+        if (scaleX != 1.0f)
+            for (unsigned row = 0; row < 4; ++row) {
+                volatile float scaled = next.worldViewProjection[row] * scaleX;
+                if (!std::isfinite(scaled))
+                    return fail(error, NativeCameraViewError50DX::matrixRange);
+                next.worldViewProjection[row] = scaled;
+            }
     }
     output = next;
     return true;

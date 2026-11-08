@@ -1,5 +1,7 @@
 // The original active host loop, separated without changing its lifetime owners.
 #include <cfenv>
+#include "../../platform/linux/native/stall_watchdog50du.h"
+#include "../../src/game/ps2_float_mode50la.h"
 #include <xmmintrin.h>
 #include "terrain_interactive_loop50du.h"
 #include "original_race_f8_native_bars50la.h"
@@ -39,9 +41,9 @@ void addCounter50DU(std::uint64_t& counter, std::uint64_t amount = 1) noexcept {
 
 void Context::run() {
  std::uint32_t resultsInputStopPC50LA=0; //Native diagnostic suppression, not source/input state.
- auto sampleController=[&](bool advanceFeedback=false){return sampleControllerCall(advanceFeedback);};
- auto composePacket=[&](bool live,const rr::platform::WindowInput50DQ& sampled,std::size_t actualRacerSlot=0){return composePacketCall(live,sampled,actualRacerSlot);};
- auto applyCourseInput=[&](std::size_t racerSlot=0){return applyCourseInputCall(racerSlot);};
+ auto sampleController=[&](bool advanceFeedback=false){stall_watchdog50DU::mark("sample_controller");return sampleControllerCall(advanceFeedback);};
+ auto composePacket=[&](bool live,const rr::platform::WindowInput50DQ& sampled,std::size_t actualRacerSlot=0){stall_watchdog50DU::mark("compose_packet");return composePacketCall(live,sampled,actualRacerSlot);};
+ auto applyCourseInput=[&](std::size_t racerSlot=0){stall_watchdog50DU::mark("apply_course_input");return applyCourseInputCall(racerSlot);};
  auto observeOriginalAiFleet=[&](const original_all8_frame::Schedule* schedule=nullptr){return observeOriginalAiFleetCall(schedule);};
  auto advanceOriginalAiManager=[&](float factor,const original_all8_frame::Schedule* schedule=nullptr){return advanceOriginalAiManagerCall(factor,schedule);};
 
@@ -53,6 +55,9 @@ void Context::run() {
    std::cerr<<"fp_rounding_repaired before="<<label<<" mode="<<rounding<<'\n';
    require50DU(std::fesetround(FE_TONEAREST)==0,"round-to-nearest restore failed");
   }
+  if(rr::game::enforcePs2FloatMode50LA())
+   std::cerr<<"fp_flush_mode_repaired before="<<label<<'\n';
+  stall_watchdog50DU::mark(label);
   const bool ok=fn();addCounter50DU(nativeCalls);
   if(!ok){std::ostringstream message;message<<"native frame "<<completedFrames
    <<" "<<label<<" error="<<static_cast<unsigned>(x.diagnostic.error)
@@ -176,6 +181,15 @@ void Context::run() {
    if(resultsHallDeparture)break; // Actual closeWindow below; no fresh input/update.
    commitCompletedTournament();
    {
+    {
+     static bool floatModeReported50DU=false;
+     if(!floatModeReported50DU){floatModeReported50DU=true;
+      std::cerr<<"ps2_float_mode game_thread_active_before_check="<<rr::game::ps2FloatModeActive50LA()<<'\n';}
+    }
+    if(rr::game::enforcePs2FloatMode50LA()){
+     static unsigned flushRepairs50DU=0;
+     if(flushRepairs50DU++<20)std::cerr<<"fp_flush_mode_repaired before=host_frame\n";
+    }
     auto& hitch=frameHitch50DU;const auto now=FrameHitch50DU::Clock::now();
     // Two frame budgets (33 ms); bounded so a sustained slowdown cannot flood.
     static unsigned hitchLines50DU=0;
@@ -200,7 +214,9 @@ void Context::run() {
     secondMainPollReported=true;
     std::cerr<<"original_ui_second_poll {\"phase\":\"enter\"}\n";
    }
+   stall_watchdog50DU::start();stall_watchdog50DU::mark("frame_poll");
    const bool polled=host.poll(hostInput,hostDiagnostic);
+   stall_watchdog50DU::mark("frame_after_poll");
    if(traceFirstMainPoll)
     std::cerr<<"original_ui_first_poll {\"phase\":\"return\",\"okay\":"
         <<(polled?"true":"false")<<"}\n";
@@ -211,13 +227,43 @@ void Context::run() {
     reportHost50DU(hostDiagnostic);throw std::runtime_error("window event pump failed");
    }
    {
+    // Unattended test only: a player holding pad A (accelerate) through the
+    // green light, with the window focused as when a person plays. A is held
+    // through the countdown and for 2 s of wall time after green, then let go.
+    static const bool padHoldA50DU=[]{const char* v=std::getenv("RR_TEST_PAD_HOLD_A");return v&&std::string(v)=="1";}();
+    static std::uint64_t padHoldGreenNs50DU=0;
+    if(padHoldA50DU&&captureRun.unattended()){
+     hostInput.keys.focused=true;hostInput.keys.activityLost=false;
+     auto& pad=hostInput.keys.controllers[0];
+     const auto nowNs=monotonicNow50DU();
+     if(race.phase==race_session50HM::Phase::Racing&&!padHoldGreenNs50DU)padHoldGreenNs50DU=nowNs;
+     const bool hold=race.phase==race_session50HM::Phase::Countdown||
+         (padHoldGreenNs50DU&&nowNs-padHoldGreenNs50DU<2000000000ull);
+     if(pad.connected){
+      if(hold&&!pad.buttons[0])pad.pressed[0]=1;
+      if(!hold&&pad.buttons[0])pad.released[0]=1;
+      pad.buttons[0]=hold?1:0;
+     }
+     static bool padHoldReported50DU=false;
+     if(!hold&&padHoldGreenNs50DU&&!padHoldReported50DU){padHoldReported50DU=true;std::cerr<<"test_pad_hold_a released\n";}
+    }
+   }
+   {
     // Unattended test only: hold keyboard throttle (W) once the race is green,
     // so the human launch at the start light is exercised like a real player.
     static const bool holdThrottle50DU=[]{const char* v=std::getenv("RR_TEST_HOLD_THROTTLE");return v&&std::string(v)=="1";}();
+    // Injected keys stand for a player at a focused window. The unattended
+    // window is never focused, and unfocused input releases every mapped key.
+    if(holdThrottle50DU&&captureRun.unattended()){hostInput.keys.focused=true;hostInput.keys.activityLost=false;}
     if(holdThrottle50DU&&captureRun.unattended()&&race.phase==race_session50HM::Phase::Racing){
      constexpr std::size_t throttleW=26,steerLeft=80,steerRight=79;
-     if(!hostInput.keys.down[throttleW])hostInput.keys.pressed[throttleW]=1;
-     hostInput.keys.down[throttleW]=1;
+     // RR_TEST_STOP_START=1: 4 s throttle, 3 s coast to a stop, repeating
+     // (stop-start driving into walls, as a player recovering from crashes).
+     static const bool stopStart50DU=[]{const char* v=std::getenv("RR_TEST_STOP_START");return v&&std::string(v)=="1";}();
+     const bool throttleOn=!stopStart50DU||((monotonicNow50DU()/1000000000ull)%7ull)<4ull;
+     if(throttleOn&&!hostInput.keys.down[throttleW])hostInput.keys.pressed[throttleW]=1;
+     if(!throttleOn&&hostInput.keys.down[throttleW])hostInput.keys.released[throttleW]=1;
+     hostInput.keys.down[throttleW]=throttleOn?1:0;
      // Steer toward the next authored gate (same vector as the HUD arrow).
      static const float steerSign50DU=[]{const char* v=std::getenv("RR_TEST_STEER_INVERT");return v&&std::string(v)=="1"?-1.f:1.f;}();
      const float route=steerSign50DU*testRouteX50DU;
@@ -227,6 +273,37 @@ void Context::run() {
       if(!on&&hostInput.keys.down[key])hostInput.keys.released[key]=1;
       hostInput.keys.down[key]=on?1:0;
      }
+    }
+   }
+   {
+    // Unattended test only: RR_TEST_CAMERA_CYCLE=1 taps the view key (C) 1 s
+    // after each green light and every 15 s after, for 150 ms each. A fresh
+    // test profile starts in the attached view (preference 5); players' saved
+    // profiles may use the follow camera (mode 0), which this reaches through
+    // the same keyboard camera-cycle binding a player uses.
+    static const bool cameraCycle50DU=[]{const char* v=std::getenv("RR_TEST_CAMERA_CYCLE");return v&&std::string(v)=="1";}();
+    static std::uint64_t cycleGreenNs50DU=0,cycleTapNs50DU=0;static unsigned cycleTaps50DU=0;
+    if(cameraCycle50DU&&captureRun.unattended()){
+     hostInput.keys.focused=true;hostInput.keys.activityLost=false; // As a focused player window.
+     constexpr std::size_t viewC=6;
+     const auto nowNs=monotonicNow50DU();
+     const bool racing=race.phase==race_session50HM::Phase::Racing;
+     if(!racing)cycleGreenNs50DU=0;else if(!cycleGreenNs50DU){cycleGreenNs50DU=nowNs;cycleTaps50DU=0;}
+     bool hold=false;
+     if(racing){
+      const auto since=nowNs-cycleGreenNs50DU;
+      const std::uint64_t due=1000000000ull+15000000000ull*cycleTaps50DU;
+      if(since>=due){cycleTapNs50DU=nowNs;++cycleTaps50DU;
+       std::cerr<<"test_camera_cycle tap="<<cycleTaps50DU<<" race_ms="<<since/1000000ull<<"\n";}
+      hold=cycleTapNs50DU&&nowNs-cycleTapNs50DU<150000000ull;
+     }
+     if(hold&&!hostInput.keys.down[viewC])hostInput.keys.pressed[viewC]=1;
+     if(!hold&&hostInput.keys.down[viewC])hostInput.keys.released[viewC]=1;
+     hostInput.keys.down[viewC]=hold?1:0;
+     static bool holdLogged50DU=false;
+     if(hold&&!holdLogged50DU)std::cerr<<"test_camera_cycle hold_start focused="<<hostInput.keys.focused
+         <<" activity_lost="<<hostInput.keys.activityLost<<" minimized="<<hostInput.keys.minimized<<"\n";
+     holdLogged50DU=hold;
     }
    }
    if(!originalUiActive){
@@ -249,7 +326,9 @@ void Context::run() {
    const auto& nativeMenuPad=input.controllers[0];
    const bool nativeMenuPadOpeningIntent=usePhysicalGameController&&input.gameControllersEnabled&&
        nativeMenuPad.connected&&nativeMenuPad.instanceId>=0&&
-       (nativeMenuPad.pressed[3]!=0||nativeMenuPad.pressed[6]!=0);
+       // Start opens the menu; Triangle (3) is Back only once a menu is open
+       // and otherwise belongs to the original camera view change.
+       (nativeMenuPad.pressed[6]!=0||(sessionMenu.open()&&nativeMenuPad.pressed[3]!=0));
    const bool nativeMenuCommand=hostInput.menuRequested||hostInput.pauseRequested||
        hostInput.resumeRequested||hostInput.restartRequested||hostInput.checkpointRequested||
        input.pressed[41]||nativeMenuPadOpeningIntent;
@@ -966,12 +1045,51 @@ void Context::run() {
     // physical pad has its own actual-instance/neutral latch below.
     platform::releaseSelectedKeyboard50KY(input,humanControlInput);
    }
+   // The countdown is not an input interruption (original 1A1A20 reads held
+   // pad state every frame); only a real pause/menu or focus loss is.
+   platform::selectedControllerCountdownHold50KY=!paused&&!humanControlsPermitted;
    composePacket(!paused&&humanControlsPermitted,input);
+   platform::selectedControllerCountdownHold50KY=false;
    // Native device-loss/reconnect policy holds the existing world clock. It
    // cannot call the still-unjoined original missing-controller popup.
    if(usePhysicalGameController&&(physicalControllerReceipt.status==
        platform::SelectedControllerStatus50KY::awaitingNeutral||physicalControllerReceipt.status==
        platform::SelectedControllerStatus50KY::unsupportedOriginalAction))paused=true;
+   {
+    // Hold diagnostic: log every change of the reason the world clock is held,
+    // with the controller's held buttons/axes, so a stall names its cause.
+    const auto& pad=input.controllers[0];
+    std::uint32_t reasons=0;
+    if((!input.focused||input.activityLost)&&!captureRun.unattended())reasons|=1u;
+    if(input.minimized)reasons|=2u;
+    if(input.eventBudgetExhausted)reasons|=4u;
+    if(info.drawableWidth<=0||info.drawableHeight<=0||oversize)reasons|=8u;
+    if(usePhysicalGameController&&humanControlsPermitted&&!pad.connected)reasons|=16u;
+    if(usePhysicalGameController&&humanControlsPermitted&&input.activityLost)reasons|=32u;
+    if(usePhysicalGameController&&physicalControllerReceipt.status==platform::SelectedControllerStatus50KY::awaitingNeutral)reasons|=64u;
+    if(usePhysicalGameController&&physicalControllerReceipt.status==platform::SelectedControllerStatus50KY::unsupportedOriginalAction)reasons|=128u;
+    static std::uint32_t lastReasons50DU=0;static unsigned holdLines50DU=0;
+    if(reasons!=lastReasons50DU&&holdLines50DU<400){
+     ++holdLines50DU;
+     std::cerr<<"world_hold reasons=0x"<<std::hex<<reasons<<std::dec
+         <<" focus_or_activity="<<((reasons&1u)?1:0)<<" minimized="<<((reasons&2u)?1:0)
+         <<" event_budget="<<((reasons&4u)?1:0)<<" drawable="<<((reasons&8u)?1:0)
+         <<" pad_disconnected="<<((reasons&16u)?1:0)<<" pad_activity_lost="<<((reasons&32u)?1:0)
+         <<" pad_awaiting_neutral="<<((reasons&64u)?1:0)<<" pad_unsupported_action="<<((reasons&128u)?1:0)
+         <<" controls_permitted="<<humanControlsPermitted<<" focused="<<input.focused
+         <<" activity_lost="<<input.activityLost<<" pad_connected="<<pad.connected
+         <<" race_phase="<<static_cast<unsigned>(race.phase)<<" tick="<<completedFrames<<" held=";
+     bool any=false;
+     for(std::size_t b=0;b<pad.buttons.size();++b)if(pad.buttons[b]){std::cerr<<(any?",":"")<<"b"<<b;any=true;}
+     for(std::size_t a=0;a<4;++a){const auto v=platform::controllerStickByte50KY(pad.axes[a]);
+      if(v<=102||v>=153){std::cerr<<(any?",":"")<<"axis"<<a<<"="<<static_cast<unsigned>(v);any=true;}}
+     for(std::size_t a=4;a<6;++a){const auto v=platform::controllerTriggerByte50KY(pad.axes[a]);
+      if(v>=26){std::cerr<<(any?",":"")<<"trigger"<<a<<"="<<static_cast<unsigned>(v);any=true;}}
+     if(!any)std::cerr<<"none";
+     std::cerr<<'\n';
+     lastReasons50DU=reasons;
+    }
+   }
    if(paused){
     discardTrackBaseline();
     if(sourceCameraSession&&!humanCourseEnabled)require50DU(sourceCameraInput.sample(input,false,sourceCameraDisplay->rootFlags228),
@@ -1012,6 +1130,7 @@ void Context::run() {
    }
    for(std::uint32_t step=0;step<plan.steps;++step){
     if(sourceCameraSession&&sourceCameraSession->pendingDisplayWork())break;
+    stall_watchdog50DU::mark("step_begin");
     // End each accepted root on every normal loop departure. A source skip
     // retains its prepared publication until that same child call returns.
     // Held-step diagnostic: any segment over 30 ms is logged by name.
@@ -1163,6 +1282,7 @@ void Context::run() {
       s.fields.applicationByte58=originalAiSession.manager.flags58;
      });
     }
+    stall_watchdog50DU::mark("step_after_countdown");
     const bool playerAdvancing=!raceEnabled||withRace([&](auto& actualRace){return race_session50HM::simulationAllowed(actualRace,0);});
     const bool playerControls=!raceEnabled||withRace([&](auto& actualRace){return race_session50HM::controlsAllowed(actualRace,0);});
     const bool playerFinishDriver=humanResultsActive&&(s.fields.impactFlagsCD8&1u);
@@ -1593,6 +1713,7 @@ void Context::run() {
        (plan.steps||input.resized||!presenter.hasPublished||capturePending||forceSceneRender||
         (sourceCameraSession&&renderedCameraPublication!=sourceCameraSession->publicationCount()))){
     frameHitch50DU.render=FrameHitch50DU::Clock::now();
+    stall_watchdog50DU::mark("render_frame");
     phase_timing50GK::Scope renderTiming(phaseTiming,phase_timing50GK::Phase::RenderPrepareSubmit);
     if(sourcePauseParentAttached){
      original_pause_observation50LA::Owner::Diagnostic d;
@@ -2492,6 +2613,7 @@ void Context::run() {
       // Includes history staging, existing GPU completion and the actual
       // window swap. This is not a GPU-only timer and adds no synchronization.
       frameHitch50DU.completion=FrameHitch50DU::Clock::now();
+      stall_watchdog50DU::mark("present_gameplay_frame");
       phase_timing50GK::Scope completionTiming(phaseTiming,phase_timing50GK::Phase::CompletionWait);
       const bool displayAccepted=windowCapture.swapAndCapture(renderer,host,captureWindowImage,windowSwaps+1,
           [&](){return renderer.completeGameplayDisplay(host,hostDiagnostic,completionDiagnostic);});

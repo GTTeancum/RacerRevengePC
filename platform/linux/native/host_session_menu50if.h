@@ -161,7 +161,10 @@ public:
             return Result::None;
         }
         if (page_ == Page::Closed) {
-            if (back || input.pauseRequested || controllerStart) change(Page::Pause);
+            // In a race only Start (or keyboard Escape) opens Pause. Triangle is
+            // the menu Back position but, in gameplay, preset0 action6A4
+            // (descriptor0 = Triangle) is the original camera view change.
+            if (input.keys.pressed[41] || input.pauseRequested || controllerStart) change(Page::Pause);
             return Result::None;
         }
         if (page_ == Page::Pause && (back || input.resumeRequested || controllerStart)) {

@@ -182,7 +182,21 @@ inline bool selectedControllerHeld50KY(const WindowGameController50DQ& input) no
 struct SelectedControllerLatch50KY {
     std::int32_t instanceId=-1;
     bool armed=false;
+    // A device was already bound this session: a different/reconnected one
+    // must return to neutral. The first device (the one that confirmed the
+    // race) is armed at once.
+    bool deviceSeen=false;
+    // Set while a host menu/pause holds input; on the next live frame every
+    // button still held from the menu is ignored until it is released, so a
+    // menu press (e.g. Triangle as Back) never becomes a gameplay press.
+    bool maskOnResume=false;
+    std::array<bool,16> masked{};
 };
+// Host loop sets this while the world runs but the countdown has not yet
+// admitted human controls. The original reader 1A1A20 reads held pad state
+// every frame with only the race-manager gate 1B0B80; the countdown is not an
+// input interruption, so it neither disarms nor masks the controller.
+inline bool selectedControllerCountdownHold50KY=false;
 enum class SelectedControllerStatus50KY : std::uint8_t {
     live,releasedDisconnected,releasedInactive,awaitingNeutral,unsupportedOriginalAction,invalidSnapshot
 };
@@ -190,16 +204,31 @@ struct SelectedControllerReceipt50KY {
     SelectedControllerStatus50KY status=SelectedControllerStatus50KY::releasedDisconnected;
     std::int32_t unsupportedCode=-1;
 };
+// interrupted: focus loss/minimize/activity loss (disarms; neutral required).
+// countdownHold: world running, controls not yet admitted (no disarm, no mask).
+// Otherwise an inactive frame is a host menu/pause (no disarm; mask on resume).
 inline bool composeSelectedControllerPacket50KY(const SelectedControlInput50KY& binding,
     const WindowGameController50DQ& input,bool enabled,SelectedControllerLatch50KY& latch,
-    game::DevicePacket48Y& out,SelectedControllerReceipt50KY& receipt) noexcept {
+    game::DevicePacket48Y& out,SelectedControllerReceipt50KY& receipt,
+    bool interrupted=true,bool countdownHold=false) noexcept {
     receipt={};
     game::DevicePacket48Y packet{};packet.bytes[2]=packet.bytes[3]=0xff;
     for(unsigned i=4;i<8;++i)packet.bytes[i]=128;
-    if(!input.connected){latch={};out=packet;return true;}
+    if(!input.connected){
+        const bool seen=latch.deviceSeen||latch.instanceId>=0;
+        latch={};latch.deviceSeen=seen;out=packet;return true;
+    }
     if(input.instanceId<0){receipt.status=SelectedControllerStatus50KY::invalidSnapshot;return false;}
-    if(latch.instanceId!=input.instanceId){latch.instanceId=input.instanceId;latch.armed=false;}
-    if(!enabled){latch.armed=false;receipt.status=SelectedControllerStatus50KY::releasedInactive;out=packet;return true;}
+    if(latch.instanceId!=input.instanceId){
+        const bool first=!latch.deviceSeen;
+        latch.instanceId=input.instanceId;latch.deviceSeen=true;latch.armed=first;
+        latch.maskOnResume=false;latch.masked={};
+    }
+    if(!enabled){
+        if(interrupted){latch.armed=false;latch.maskOnResume=false;latch.masked={};}
+        else if(!countdownHold)latch.maskOnResume=true;
+        receipt.status=SelectedControllerStatus50KY::releasedInactive;out=packet;return true;
+    }
     for(auto button:input.buttons)if(button>1){receipt.status=SelectedControllerStatus50KY::invalidSnapshot;return false;}
     if(input.axes[4]<0||input.axes[5]<0){receipt.status=SelectedControllerStatus50KY::invalidSnapshot;return false;}
     if(!latch.armed){
@@ -214,6 +243,14 @@ inline bool composeSelectedControllerPacket50KY(const SelectedControlInput50KY& 
     for(unsigned code=0;code<16;++code)if(buttonMap[code]>=0)
         values[code]=input.buttons[static_cast<unsigned>(buttonMap[code])]?255:0;
     values[4]=controllerTriggerByte50KY(input.axes[4]);values[5]=controllerTriggerByte50KY(input.axes[5]);
+    // Buttons held across a host menu are ignored until released (no edge).
+    if(latch.maskOnResume){
+        for(unsigned code=0;code<16;++code)latch.masked[code]=values[code]>=26;
+        latch.maskOnResume=false;
+    }
+    for(unsigned code=0;code<16;++code)if(latch.masked[code]){
+        if(values[code]>=26)values[code]=0;else latch.masked[code]=false;
+    }
     // Start is owned by the explicitly labeled native host pause/menu edge,
     // never by an invented original pause callback. Keep it out of gameplay.
     values[9]=0;

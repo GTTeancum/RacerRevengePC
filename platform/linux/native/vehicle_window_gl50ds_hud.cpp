@@ -1,4 +1,53 @@
 #include "vehicle_window_gl50ds_storage.h"
+#include <cstdio>
+#include <cstdlib>
+#include <vector>
+
+namespace rr::platform {
+namespace native_hud_margin50DS {
+// Native widescreen HUD: the original 640x448 HUD keeps its size (uniform
+// height scale) and each quad moves with its screen side. Left-third quads
+// go to the new left margin, right-third quads to the new right margin and
+// middle-third quads stay centred. RR_ORIGINAL_ASPECT=1 keeps the old box.
+inline double extraUnits(std::int32_t width,std::int32_t height) noexcept {
+    static const bool originalAspect=[]{const char* v=std::getenv("RR_ORIGINAL_ASPECT");return v&&v[0]=='1'&&!v[1];}();
+    if(originalAspect||width<=0||height<=0)return 0.0;
+    const double scale=std::min(double(width)/640.0,double(height)/448.0);
+    const double available=double(width)/scale;
+    return available>641.0?(available-640.0)*.5:0.0;
+}
+// Each draw packet (one text string, gleam or widget part) moves as a unit,
+// by the centre of its own extent, so no string or widget is ever split.
+template<class Packet>
+inline const assets::Vertex48B* anchor(std::vector<assets::Vertex48B>& scratch,
+    const assets::Vertex48B* vertices,std::uint32_t quads,const Packet* packets,std::uint32_t packetCount,
+    double extra,const char* layer) noexcept {
+    if(extra<=0.0||!vertices||!quads||!packets)return vertices;
+    try{scratch.assign(vertices,vertices+std::size_t(quads)*4);}catch(...){return vertices;}
+    float bounds[3][2]{{1e9f,-1e9f},{1e9f,-1e9f},{1e9f,-1e9f}};unsigned counts[3]{};
+    for(std::uint32_t p=0;p<packetCount;++p){
+        const auto first=std::uint32_t(packets[p].first),count=std::uint32_t(packets[p].count);
+        if(first>quads||count>quads-first||!count)continue;
+        float lo=1e9f,hi=-1e9f;
+        for(std::uint32_t q=first;q<first+count;++q)for(int i=0;i<4;++i){
+            const float x=scratch[std::size_t(q)*4+i].position[0];lo=std::min(lo,x);hi=std::max(hi,x);}
+        const float cx=(lo+hi)*.5f;
+        const int side=cx<640.f/3.f?0:(cx>1280.f/3.f?2:1);
+        const float dx=side==0?float(-extra):(side==2?float(extra):0.f);
+        for(std::uint32_t q=first;q<first+count;++q)for(int i=0;i<4;++i)scratch[std::size_t(q)*4+i].position[0]+=dx;
+        bounds[side][0]=std::min(bounds[side][0],lo);bounds[side][1]=std::max(bounds[side][1],hi);++counts[side];
+    }
+    // Diagnostic once per layer: original x extents of each group, so a
+    // widget split across groups is visible in the log.
+    static const char* reported[16]{};
+    bool seen=false;for(auto* r:reported)if(r==layer)seen=true;
+    if(!seen){for(auto*& r:reported)if(!r){r=layer;break;}
+        std::fprintf(stderr,"hud_margin layer=%s extra=%.1f left=%u[%.1f,%.1f] middle=%u[%.1f,%.1f] right=%u[%.1f,%.1f]\n",
+            layer,extra,counts[0],bounds[0][0],bounds[0][1],counts[1],bounds[1][0],bounds[1][1],counts[2],bounds[2][0],bounds[2][1]);}
+    return scratch.data();
+}
+}
+}
 
 namespace rr::platform {
 namespace vehicle_window_gl50ds_detail {
@@ -808,7 +857,8 @@ bool VehicleWindowGl50DS::Storage::drawRaceHud(U bank) noexcept {
     const double scale=std::min(double(width)/640.0,double(height)/448.0);
     const double ox=(width-640.0*scale)*.5,oy=(height-448.0*scale)*.5;
     gl.uniform4f(uiCanvasUniform,float(2*scale/width),float(-2*scale/height),float(2*ox/width-1),float(1-2*oy/height));
-    gl.scissor(I(std::floor(ox)),I(std::floor(oy)),I(std::ceil(ox+640*scale))-I(std::floor(ox)),
+    const double hudExtra=native_hud_margin50DS::extraUnits(width,height);
+    gl.scissor(hudExtra>0?0:I(std::floor(ox)),I(std::floor(oy)),hudExtra>0?I(width):I(std::ceil(ox+640*scale))-I(std::floor(ox)),
         I(std::ceil(oy+448*scale))-I(std::floor(oy)));gl.enable(0x0C11);
     gl.uniform1i(gcParticleModeUniform,0);gl.uniform1i(uiSourceCompositionUniform,1);
     gl.uniform1i(uiTexturedUniform,1);gl.uniform1i(uiSourceRasterUniform,0);gl.uniform1i(uiSourceFogEnabledUniform,0);
@@ -817,7 +867,7 @@ bool VehicleWindowGl50DS::Storage::drawRaceHud(U bank) noexcept {
         if(gl.bindSampler)gl.bindSampler(1,0);gl.bindTexture(texture2D,h.color);}
     gl.activeTexture(textureUnit0);if(gl.bindSampler)gl.bindSampler(0,0);
     drawGl.bindVertexArray(uiVertexArray);drawGl.bindBuffer(arrayBuffer,uiVertexBuffer);
-    drawGl.bufferSubData(arrayBuffer,0,std::intptr_t(h.quads)*4*sizeof(assets::Vertex48B),h.vertices.data());
+    {static thread_local std::vector<assets::Vertex48B> hudScratch;drawGl.bufferSubData(arrayBuffer,0,std::intptr_t(h.quads)*4*sizeof(assets::Vertex48B),native_hud_margin50DS::anchor(hudScratch,h.vertices.data(),std::uint32_t(h.quads),h.packets.data(),std::uint32_t(h.packetCount),hudExtra,"RaceHud"));}
     drawGl.bindBuffer(elementBuffer,uiIndexBuffer);
     bool okay=check("prepare authentic lap glyph/gleam source pass");
     constexpr U image[]={0,1,2,1,2,3,3};
@@ -1014,7 +1064,8 @@ bool VehicleWindowGl50DS::Storage::drawTimeStats(U bank) noexcept {
     const double scale=std::min(double(width)/640.0,double(height)/448.0);
     const double ox=(width-640.0*scale)*.5,oy=(height-448.0*scale)*.5;
     gl.uniform4f(uiCanvasUniform,float(2*scale/width),float(-2*scale/height),float(2*ox/width-1),float(1-2*oy/height));
-    gl.scissor(I(std::floor(ox)),I(std::floor(oy)),I(std::ceil(ox+640*scale))-I(std::floor(ox)),
+    const double hudExtra=native_hud_margin50DS::extraUnits(width,height);
+    gl.scissor(hudExtra>0?0:I(std::floor(ox)),I(std::floor(oy)),hudExtra>0?I(width):I(std::ceil(ox+640*scale))-I(std::floor(ox)),
         I(std::ceil(oy+448*scale))-I(std::floor(oy)));gl.enable(0x0C11);
     gl.uniform1i(gcParticleModeUniform,0);gl.uniform1i(uiSourceCompositionUniform,1);
     gl.uniform1i(uiTexturedUniform,1);gl.uniform1i(uiSourceRasterUniform,0);gl.uniform1i(uiSourceFogEnabledUniform,0);
@@ -1023,7 +1074,7 @@ bool VehicleWindowGl50DS::Storage::drawTimeStats(U bank) noexcept {
         if(gl.bindSampler)gl.bindSampler(1,0);gl.bindTexture(texture2D,h.color);}
     gl.activeTexture(textureUnit0);if(gl.bindSampler)gl.bindSampler(0,0);
     drawGl.bindVertexArray(uiVertexArray);drawGl.bindBuffer(arrayBuffer,uiVertexBuffer);
-    drawGl.bufferSubData(arrayBuffer,0,std::intptr_t(h.quads)*4*sizeof(assets::Vertex48B),h.vertices.data());
+    {static thread_local std::vector<assets::Vertex48B> hudScratch;drawGl.bufferSubData(arrayBuffer,0,std::intptr_t(h.quads)*4*sizeof(assets::Vertex48B),native_hud_margin50DS::anchor(hudScratch,h.vertices.data(),std::uint32_t(h.quads),h.packets.data(),std::uint32_t(h.packetCount),hudExtra,"TimeStats"));}
     drawGl.bindBuffer(elementBuffer,uiIndexBuffer);
     bool okay=check("prepare authentic TimeStats source pass");
 
@@ -1247,7 +1298,8 @@ bool VehicleWindowGl50DS::Storage::drawPositionStats(U bank) noexcept {
     const double scale=std::min(double(width)/640.0,double(height)/448.0);
     const double ox=(width-640.0*scale)*.5,oy=(height-448.0*scale)*.5;
     gl.uniform4f(uiCanvasUniform,float(2*scale/width),float(-2*scale/height),float(2*ox/width-1),float(1-2*oy/height));
-    gl.scissor(I(std::floor(ox)),I(std::floor(oy)),I(std::ceil(ox+640*scale))-I(std::floor(ox)),
+    const double hudExtra=native_hud_margin50DS::extraUnits(width,height);
+    gl.scissor(hudExtra>0?0:I(std::floor(ox)),I(std::floor(oy)),hudExtra>0?I(width):I(std::ceil(ox+640*scale))-I(std::floor(ox)),
         I(std::ceil(oy+448*scale))-I(std::floor(oy)));gl.enable(0x0C11);
     gl.uniform1i(gcParticleModeUniform,0);gl.uniform1i(uiSourceCompositionUniform,1);
     gl.uniform1i(uiTexturedUniform,1);gl.uniform1i(uiSourceRasterUniform,0);gl.uniform1i(uiSourceFogEnabledUniform,0);
@@ -1256,7 +1308,7 @@ bool VehicleWindowGl50DS::Storage::drawPositionStats(U bank) noexcept {
         if(gl.bindSampler)gl.bindSampler(1,0);gl.bindTexture(texture2D,h.color);}
     gl.activeTexture(textureUnit0);if(gl.bindSampler)gl.bindSampler(0,0);
     drawGl.bindVertexArray(uiVertexArray);drawGl.bindBuffer(arrayBuffer,uiVertexBuffer);
-    drawGl.bufferSubData(arrayBuffer,0,std::intptr_t(h.quads)*4*sizeof(assets::Vertex48B),h.vertices.data());
+    {static thread_local std::vector<assets::Vertex48B> hudScratch;drawGl.bufferSubData(arrayBuffer,0,std::intptr_t(h.quads)*4*sizeof(assets::Vertex48B),native_hud_margin50DS::anchor(hudScratch,h.vertices.data(),std::uint32_t(h.quads),h.packets.data(),std::uint32_t(h.packetCount),hudExtra,"PositionStats"));}
     drawGl.bindBuffer(elementBuffer,uiIndexBuffer);
     bool okay=check("prepare authentic PositionStats source pass");
 
@@ -1459,7 +1511,8 @@ bool VehicleWindowGl50DS::Storage::drawDamage(U bank) noexcept {
     const double scale=std::min(double(width)/640.0,double(height)/448.0);
     const double ox=(width-640.0*scale)*.5,oy=(height-448.0*scale)*.5;
     gl.uniform4f(uiCanvasUniform,float(2*scale/width),float(-2*scale/height),float(2*ox/width-1),float(1-2*oy/height));
-    gl.scissor(I(std::floor(ox)),I(std::floor(oy)),I(std::ceil(ox+640*scale))-I(std::floor(ox)),
+    const double hudExtra=native_hud_margin50DS::extraUnits(width,height);
+    gl.scissor(hudExtra>0?0:I(std::floor(ox)),I(std::floor(oy)),hudExtra>0?I(width):I(std::ceil(ox+640*scale))-I(std::floor(ox)),
         I(std::ceil(oy+448*scale))-I(std::floor(oy)));gl.enable(0x0C11);
     gl.uniform1i(gcParticleModeUniform,0);gl.uniform1i(uiSourceCompositionUniform,1);
     gl.uniform1i(uiTexturedUniform,1);gl.uniform1i(uiSourceRasterUniform,0);gl.uniform1i(uiSourceFogEnabledUniform,0);
@@ -1468,7 +1521,7 @@ bool VehicleWindowGl50DS::Storage::drawDamage(U bank) noexcept {
         if(gl.bindSampler)gl.bindSampler(1,0);gl.bindTexture(texture2D,h.color);}
     gl.activeTexture(textureUnit0);if(gl.bindSampler)gl.bindSampler(0,0);
     drawGl.bindVertexArray(uiVertexArray);drawGl.bindBuffer(arrayBuffer,uiVertexBuffer);
-    drawGl.bufferSubData(arrayBuffer,0,std::intptr_t(h.quads)*4*sizeof(assets::Vertex48B),h.vertices.data());
+    {static thread_local std::vector<assets::Vertex48B> hudScratch;drawGl.bufferSubData(arrayBuffer,0,std::intptr_t(h.quads)*4*sizeof(assets::Vertex48B),native_hud_margin50DS::anchor(hudScratch,h.vertices.data(),std::uint32_t(h.quads),h.packets.data(),std::uint32_t(h.packetCount),hudExtra,"Damage"));}
     drawGl.bindBuffer(elementBuffer,uiIndexBuffer);
     bool okay=check("prepare authentic Damage source pass");
 
@@ -1939,7 +1992,8 @@ bool VehicleWindowGl50DS::Storage::drawSpeedBoost(U bank) noexcept {
     const double scale=std::min(double(width)/640.0,double(height)/448.0);
     const double ox=(width-640.0*scale)*.5,oy=(height-448.0*scale)*.5;
     gl.uniform4f(uiCanvasUniform,float(2*scale/width),float(-2*scale/height),float(2*ox/width-1),float(1-2*oy/height));
-    gl.scissor(I(std::floor(ox)),I(std::floor(oy)),I(std::ceil(ox+640*scale))-I(std::floor(ox)),
+    const double hudExtra=native_hud_margin50DS::extraUnits(width,height);
+    gl.scissor(hudExtra>0?0:I(std::floor(ox)),I(std::floor(oy)),hudExtra>0?I(width):I(std::ceil(ox+640*scale))-I(std::floor(ox)),
         I(std::ceil(oy+448*scale))-I(std::floor(oy)));gl.enable(0x0C11);
     gl.uniform1i(gcParticleModeUniform,0);gl.uniform1i(uiSourceCompositionUniform,1);
     gl.uniform1i(uiTexturedUniform,1);gl.uniform1i(uiSourceRasterUniform,0);gl.uniform1i(uiSourceFogEnabledUniform,0);
@@ -1948,7 +2002,7 @@ bool VehicleWindowGl50DS::Storage::drawSpeedBoost(U bank) noexcept {
         if(gl.bindSampler)gl.bindSampler(1,0);gl.bindTexture(texture2D,h.color);}
     gl.activeTexture(textureUnit0);if(gl.bindSampler)gl.bindSampler(0,0);
     drawGl.bindVertexArray(uiVertexArray);drawGl.bindBuffer(arrayBuffer,uiVertexBuffer);
-    drawGl.bufferSubData(arrayBuffer,0,std::intptr_t(h.primitives)*4*sizeof(assets::Vertex48B),h.vertices.data());
+    {static thread_local std::vector<assets::Vertex48B> hudScratch;drawGl.bufferSubData(arrayBuffer,0,std::intptr_t(h.primitives)*4*sizeof(assets::Vertex48B),native_hud_margin50DS::anchor(hudScratch,h.vertices.data(),std::uint32_t(h.primitives),h.packets.data(),std::uint32_t(h.packetCount),hudExtra,"SpeedBoost"));}
     drawGl.bindBuffer(elementBuffer,uiIndexBuffer);
     bool okay=check("prepare authentic SpeedBoost source pass");
 

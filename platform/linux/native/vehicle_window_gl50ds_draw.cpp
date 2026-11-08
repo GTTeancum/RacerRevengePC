@@ -1,5 +1,8 @@
 #include "vehicle_window_gl50ds_storage.h"
 #include "../../../tests/native/ra_static_fire_visual50la.h"
+#include "native_fxaa_pass.h"
+#include <memory>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 
@@ -2017,6 +2020,9 @@ bool VehicleWindowGl50DS::Storage::commit(void* context, std::uint8_t bank) noex
         }
         if (!s.resolveCoverage(bank)) return false;
         s.traceRaStage("coverage_resolve",stageStart);
+        // PC-native FXAA smooths the completed 3D scene only; every HUD,
+        // Results, F8 and Pause layer below is drawn afterwards, unsmoothed.
+        if (!s.drawFxaa(bank)) return false;
         // 1AAE38/48/58/68 attach C8/CC/D0/C4 through141960 tail append;
         // 141D70 traverses firstChild18/next14. Preserve that HUD sibling order.
         // These explicit native joins do not claim recovered parent traversal.
@@ -2315,6 +2321,148 @@ bool VehicleWindowGl50DS::Storage::deleteGameplayBlurNames(VehicleWindowDiagnost
                 !deleteName(gameplayHistoryColors[b],gl.deleteTextures,d))return false;
         return deleteName(gameplaySceneTarget,gl.deleteFramebuffers,d) &&
             deleteName(gameplaySceneColor,gl.deleteTextures,d);
+    }
+
+bool VehicleWindowGl50DS::Storage::hasFxaaResources() const noexcept {
+        return fxaaSceneTarget || fxaaSceneColor || fxaaProgram || fxaaVertexShader ||
+            fxaaFragmentShader || fxaaVertexArray;
+    }
+
+bool VehicleWindowGl50DS::Storage::createFxaa() noexcept {
+        fxaaEnabled=native::fxaaRequested50DS();
+        std::fprintf(stderr,"native_fxaa requested=%u storage=%dx%d\n",fxaaEnabled?1u:0u,
+            static_cast<int>(maximumWidth),static_cast<int>(maximumHeight));
+        if(!fxaaEnabled)return true;
+        // Same cold maximum-size RGBA8 texture/FBO pair as the blur snapshot.
+        if(!createGameplayBlurTarget(fxaaSceneTarget,fxaaSceneColor))return false;
+        gl.activeTexture(textureUnit0);gl.bindTexture(texture2D,fxaaSceneColor);
+        gl.texParameteri(texture2D,0x2801,0x2601);gl.texParameteri(texture2D,0x2800,0x2601); // LINEAR
+        if(!check("select FXAA bilinear sampling"))return false;
+        diagnostic->shader.stage=VehicleGlShaderStage50CZ::vertex;
+        if(!compileTrackShader(0x8B31,native::fxaaNativeVertex,fxaaVertexShader))return false;
+        diagnostic->shader.stage=VehicleGlShaderStage50CZ::fragment;
+        if(!compileTrackShader(0x8B30,native::fxaaNativeFragment,fxaaFragmentShader))return false;
+        diagnostic->shader.stage=VehicleGlShaderStage50CZ::link;
+        fxaaProgram=shaderGl.createProgram();
+        if(!check("create FXAA program") || !fxaaProgram)
+            return fail(*diagnostic,VehicleWindowError50DS::shader,"zero FXAA program");
+        shaderGl.attachShader(fxaaProgram,fxaaVertexShader);
+        shaderGl.attachShader(fxaaProgram,fxaaFragmentShader);
+        shaderGl.bindFragDataLocation(fxaaProgram,vehicleGlColorOutput50CZ,"smoothedColor");
+        shaderGl.linkProgram(fxaaProgram);
+        I linked=0;shaderGl.getProgramiv(fxaaProgram,0x8B82,&linked);
+        if(!check("link FXAA program"))return false;
+        if(!linked){
+            shaderGl.getProgramInfoLog(fxaaProgram,static_cast<I>(sizeof(diagnostic->shader.log)),nullptr,diagnostic->shader.log);
+            diagnostic->shader.log[sizeof(diagnostic->shader.log)-1]='\0';
+            check("read FXAA program log");
+            return fail(*diagnostic,VehicleWindowError50DS::shader,"FXAA program link failed");
+        }
+        fxaaImageUniform=shaderGl.getUniformLocation(fxaaProgram,"sceneImage");
+        fxaaInverseSizeUniform=shaderGl.getUniformLocation(fxaaProgram,"inverseTextureSize");
+        fxaaMaximumUvUniform=shaderGl.getUniformLocation(fxaaProgram,"maximumUv");
+        if(!check("locate FXAA uniforms"))return false;
+        if(fxaaImageUniform<0 || fxaaInverseSizeUniform<0 || fxaaMaximumUvUniform<0)
+            return fail(*diagnostic,VehicleWindowError50DS::shader,"missing FXAA uniform");
+        gl.genVertexArrays(1,&fxaaVertexArray);
+        if(!check("allocate FXAA vertex array") || !fxaaVertexArray)
+            return fail(*diagnostic,VehicleWindowError50DS::allocation,"zero FXAA vertex array");
+        gl.bindTexture(texture2D,0);
+        diagnostic->shader.stage=VehicleGlShaderStage50CZ::none;
+        return check("finish cold FXAA resources");
+    }
+
+bool VehicleWindowGl50DS::Storage::drawFxaa(std::uint8_t bank) noexcept {
+        if(!fxaaEnabled)return true;
+        if(width<=0||height<=0||width>maximumWidth||height>maximumHeight)
+            return fail(*diagnostic,VehicleWindowError50DS::frame,"FXAA frame extent outside cold storage");
+        // Save every piece of state this pass touches; the HUD layers that
+        // follow see exactly the state the 3D scene left behind.
+        constexpr U capabilities[]={0x0BE2,0x0B71,0x0B90,0x0C11,0x0B44,0x8C89,0x0BF2,0x0BD0,0x8DB9,
+            0x8037,0x809D,0x80A0,0x809E};
+        constexpr U capabilityCount=sizeof(capabilities)/sizeof(capabilities[0]);
+        I enabled[capabilityCount]{};
+        for(U i=0;i<capabilityCount;++i)gl.getIntegerv(capabilities[i],&enabled[i]);
+        I clipEnabled[8]{};
+        const I clips=clipDistances<8?clipDistances:8;
+        for(I i=0;i<clips;++i)gl.getIntegerv(0x3000+static_cast<U>(i),&clipEnabled[i]);
+        I program=0,vertexArray=0,activeUnit=0,texture0=0,sampler0=0,drawTarget=0,readTarget=0;
+        I drawBufferName=0,readBufferName=0,viewport[4]{},colorWrite[4]{},depthWrite=0;
+        gl.getIntegerv(0x8B8D,&program);gl.getIntegerv(0x85B5,&vertexArray);
+        gl.getIntegerv(0x84E0,&activeUnit);
+        gl.activeTexture(textureUnit0);
+        gl.getIntegerv(0x8069,&texture0);if(gl.bindSampler)gl.getIntegerv(0x8919,&sampler0);
+        gl.getIntegerv(0x8CA6,&drawTarget);gl.getIntegerv(0x8CAA,&readTarget);
+        gl.getIntegerv(0x0C01,&drawBufferName);gl.getIntegerv(0x0C02,&readBufferName);
+        gl.getIntegerv(0x0BA2,viewport);gl.getIntegerv(0x0C23,colorWrite);gl.getIntegerv(0x0B72,&depthWrite);
+        if(!check("save native scene state before FXAA"))return false;
+        // Renderbuffer scene -> separate texture; the output is the same target.
+        gl.disable(0x0C11);gl.disable(0x8DB9);
+        gl.bindFramebuffer(readFramebuffer,targets[bank]);gl.readBuffer(colorAttachment);
+        gl.bindFramebuffer(drawFramebuffer,fxaaSceneTarget);gl.drawBuffer(colorAttachment);
+        gl.blitFramebuffer(0,0,width,height,0,0,width,height,colorBufferBit,0x2600);
+        bool accepted=check("snapshot completed 3D scene for FXAA");
+        if(accepted){
+            gl.bindFramebuffer(framebuffer,targets[bank]);gl.drawBuffer(colorAttachment);
+            gl.viewport(0,0,width,height);
+            for(U capability:capabilities)gl.disable(capability);
+            for(I i=0;i<clips;++i)gl.disable(0x3000+static_cast<U>(i));
+            gl.depthMask(0);gl.colorMask(1,1,1,1);gl.polygonMode(0x0408,0x1B02);
+            gl.useProgram(fxaaProgram);drawGl.bindVertexArray(fxaaVertexArray);
+            gl.bindTexture(texture2D,fxaaSceneColor);if(gl.bindSampler)gl.bindSampler(0,0);
+            const float inverse[2]={1.f/static_cast<float>(maximumWidth),1.f/static_cast<float>(maximumHeight)};
+            const float maximumUv[2]={(static_cast<float>(width)-.5f)*inverse[0],(static_cast<float>(height)-.5f)*inverse[1]};
+            gl.uniform1i(fxaaImageUniform,0);gl.uniform2fv(fxaaInverseSizeUniform,1,inverse);
+            gl.uniform2fv(fxaaMaximumUvUniform,1,maximumUv);
+            accepted=check("bind FXAA inputs");
+            if(accepted){gl.drawArrays(0x0004,0,3);accepted=check("draw FXAA");}
+            if(accepted&&(++fxaaDraws==1||fxaaDraws%3125==0))
+                std::fprintf(stderr,"native_fxaa draws=%llu extent=%dx%d\n",
+                    static_cast<unsigned long long>(fxaaDraws),static_cast<int>(width),static_cast<int>(height));
+            if(accepted&&fxaaDraws==1500){
+                // One-time measurement of the actual output (no image kept):
+                // how many pixels FXAA changed and by how much.
+                const std::size_t count=static_cast<std::size_t>(width)*static_cast<std::size_t>(height);
+                std::unique_ptr<std::uint8_t[]> before(new (std::nothrow) std::uint8_t[count*4]);
+                std::unique_ptr<std::uint8_t[]> after(new (std::nothrow) std::uint8_t[count*4]);
+                if(before&&after&&copyRgba(before.get(),fxaaSceneTarget,width,height)&&
+                   copyRgba(after.get(),targets[bank],width,height)){
+                    std::size_t changed=0;unsigned largest=0;unsigned long long total=0;
+                    for(std::size_t i=0;i<count;++i){
+                        unsigned delta=0;
+                        for(unsigned c=0;c<3;++c){const int d=int(after[i*4+c])-int(before[i*4+c]);delta=std::max(delta,unsigned(d<0?-d:d));}
+                        if(delta){++changed;total+=delta;largest=std::max(largest,delta);}
+                    }
+                    std::fprintf(stderr,"native_fxaa_check draw=%llu pixels=%zu changed=%zu changed_percent=%.2f mean_change=%.1f max_change=%u\n",
+                        static_cast<unsigned long long>(fxaaDraws),count,changed,100.0*double(changed)/double(count),
+                        changed?double(total)/double(changed):0.0,largest);
+                }else std::fprintf(stderr,"native_fxaa_check unavailable\n");
+                accepted=check("FXAA one-time output measurement");
+            }
+        }
+        // Restore regardless of the draw outcome.
+        gl.useProgram(static_cast<U>(program));drawGl.bindVertexArray(static_cast<U>(vertexArray));
+        gl.activeTexture(textureUnit0);gl.bindTexture(texture2D,static_cast<U>(texture0));
+        if(gl.bindSampler)gl.bindSampler(0,static_cast<U>(sampler0));
+        gl.activeTexture(static_cast<U>(activeUnit));
+        gl.bindFramebuffer(drawFramebuffer,static_cast<U>(drawTarget));gl.bindFramebuffer(readFramebuffer,static_cast<U>(readTarget));
+        gl.drawBuffer(static_cast<U>(drawBufferName));gl.readBuffer(static_cast<U>(readBufferName));
+        gl.viewport(viewport[0],viewport[1],viewport[2],viewport[3]);
+        gl.colorMask(colorWrite[0]?1:0,colorWrite[1]?1:0,colorWrite[2]?1:0,colorWrite[3]?1:0);
+        gl.depthMask(depthWrite?1:0);
+        for(U i=0;i<capabilityCount;++i){if(enabled[i])gl.enable(capabilities[i]);else gl.disable(capabilities[i]);}
+        for(I i=0;i<clips;++i){const U c=0x3000+static_cast<U>(i);if(clipEnabled[i])gl.enable(c);else gl.disable(c);}
+        const bool restored=check("restore native scene state after FXAA");
+        return accepted&&restored;
+    }
+
+bool VehicleWindowGl50DS::Storage::deleteFxaaNames(VehicleWindowDiagnostic50DS& d) noexcept {
+        return deleteShaderName(fxaaProgram,true,d) &&
+            deleteShaderName(fxaaVertexShader,false,d) &&
+            deleteShaderName(fxaaFragmentShader,false,d) &&
+            deleteName(fxaaVertexArray,gl.deleteVertexArrays,d) &&
+            deleteName(fxaaSceneTarget,gl.deleteFramebuffers,d) &&
+            deleteName(fxaaSceneColor,gl.deleteTextures,d);
     }
 
 } // namespace rr::platform

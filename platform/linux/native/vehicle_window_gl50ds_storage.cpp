@@ -753,7 +753,7 @@ bool VehicleWindowGl50DS::Storage::hasGlResources() const noexcept {
         if(hasCoverageResources()||uiCoverage.owns())return true;
         if(hasRaceHudResources() || hasTimeStatsResources() || hasPositionStatsResources() || hasDamageResources() || hasPauseDerivedResources() || hasSpeedBoostResources())return true;
         if(hasDisplayFadeNames())return true;
-        if (hasGameplayBlurResources()) return true;
+        if (hasGameplayBlurResources() || hasFxaaResources()) return true;
         if (shader && shader->hasResources()) return true;
         if (trackProgram || trackVertexShader || trackFragmentShader) return true;
         if (hostHudProgram || hostHudVertexShader || hostHudFragmentShader ||
@@ -2058,7 +2058,7 @@ bool VehicleWindowGl50DS::Storage::initialize(const VehicleWindowRequest50DS& in
             !createTrackProjection(input.track) ||
             !createStaticGeometry(input.sky.mesh, skyVertexBuffer, skyIndexBuffer, skyVertexArray, skyIndexCount) ||
             !createCableGeometry() || !createHostHud() || !createOriginalUi() ||
-            !createTargets() || !createGameplayBlur() || !createCoverageProgram() || !createRaWorld()) return false;
+            !createTargets() || !createGameplayBlur() || !createFxaa() || !createCoverageProgram() || !createRaWorld()) return false;
         VehicleGlHooks50CV hooks{};
         hooks.context = this; hooks.ready = ready; hooks.materialReady = materialReady;
         if(request.enableGameplayDisplayWallTiming)hooks.timingObserver=observePlayerTiming;
@@ -2199,7 +2199,7 @@ bool VehicleWindowGl50DS::Storage::cleanup(VehicleWindowDiagnostic50DS& d) noexc
         // Explicit source/display leases add a real completion obligation. Never
         // confuse a CPU generation increment or deferred GL deletion with it.
         if (hasNativeResultsResources() || hasNativeF8BarResources() || riderTextureBorrow || raWorld || raStaticFireOwner || rcParticleWindow || gbParticleWindow || mcParticleWindow || hasDisplayFadeNames() || uiCoverage.owns() || uiSourceLeaseWork || uiRetainedTarget || uiRetainedColor || uiBlendOldSnapshot ||
-            uiPromotedIncomingTarget || uiPromotedIncomingColor || hasGameplayBlurResources() || (hasRaceHudResources() || hasTimeStatsResources() || hasPositionStatsResources() || hasDamageResources() || hasPauseDerivedResources() || hasSpeedBoostResources())){
+            uiPromotedIncomingTarget || uiPromotedIncomingColor || hasGameplayBlurResources() || hasFxaaResources() || (hasRaceHudResources() || hasTimeStatsResources() || hasPositionStatsResources() || hasDamageResources() || hasPauseDerivedResources() || hasSpeedBoostResources())){
             gl.finish();const U error=drawGl.getError();
             if (error){nativeGlFaultObserved50KG=true;if(!d.cleanupGlError)d.cleanupGlError=error;d.cleanupIncomplete=true;
                 return fail(d,VehicleWindowError50DS::cleanup,"complete source leases before cleanup");}
@@ -2244,6 +2244,7 @@ bool VehicleWindowGl50DS::Storage::cleanup(VehicleWindowDiagnostic50DS& d) noexc
         if(!deleteTimeStatsNames(d))goto incomplete;
         if(!deleteRaceHudNames(d))goto incomplete;
         if(!deleteGameplayBlurNames(d))goto incomplete;
+        if(!deleteFxaaNames(d))goto incomplete;
         if (shader && !shader->release(d.cleanupShader)) {
             if (!d.cleanupGlError) d.cleanupGlError = d.cleanupShader.glError ?
                 d.cleanupShader.glError : d.cleanupShader.cleanupGlError;

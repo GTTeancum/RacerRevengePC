@@ -1,4 +1,6 @@
 #include <cfenv>
+#include "../../platform/linux/native/stall_watchdog50du.h"
+#include "../../src/game/ps2_float_mode50la.h"
 #include "terrain_interactive_setup50du.h"
 #include "original_native_world_water50la.h"
 #include <cstring>
@@ -2489,6 +2491,9 @@ SessionExit50DU Context::run() {
    std::cerr<<"fp_rounding_repaired before="<<label<<" mode="<<rounding<<'\n';
    require50DU(std::fesetround(FE_TONEAREST)==0,"round-to-nearest restore failed");
   }
+  if(rr::game::enforcePs2FloatMode50LA())
+   std::cerr<<"fp_flush_mode_repaired before="<<label<<'\n';
+  stall_watchdog50DU::mark(label);
   const bool ok=fn();addCounter50DU(nativeCalls);
   if(!ok){std::ostringstream message;message<<"native frame "<<completedFrames
    <<" "<<label<<" error="<<static_cast<unsigned>(x.diagnostic.error)
@@ -2635,6 +2640,7 @@ SessionExit50DU Context::run() {
    platform::GameHostDiagnostic50ER diagnostic{};platform::ControllerRumbleReceipt50KZ receipt{};
    // Source SDK send return values did not gate timer/counter writes. Keep
    // those committed prefixes on a native transport failure; never replay.
+   stall_watchdog50DU::mark("controller_rumble_submit");
    if(!feedbackHost->rumbleController50KZ(playerSource5C,feedbackPhysicalDevice.instanceId,
        bytes[0],bytes[1],receipt,diagnostic)){
     reportHost50DU(diagnostic);
@@ -2656,6 +2662,7 @@ SessionExit50DU Context::run() {
  auto stopFeedbackTransport=[&](){
   if(allAiEnabled||!feedbackHost||!usePhysicalGameController||!feedbackPhysicalDevice.connected)return;
   platform::GameHostDiagnostic50ER diagnostic{};platform::ControllerRumbleReceipt50KZ receipt{};
+  stall_watchdog50DU::mark("controller_rumble_stop");
   if(!feedbackHost->rumbleController50KZ(playerSource5C,feedbackPhysicalDevice.instanceId,
       0,0,receipt,diagnostic)){
    reportHost50DU(diagnostic);throw std::runtime_error("actual SDL controller pause stop failed");
@@ -2725,6 +2732,19 @@ SessionExit50DU Context::run() {
   logManualResetTransition("before_dispatch");
   const auto result=controllerActions.dispatch(eventContext,eventRecords,eventCallbacks);
   logManualResetTransition("after_dispatch");
+  if(humanControlInput.cameraCycleBound){ // Diagnostic: view-button delivery.
+   const auto& sampled=controller.deviceSample();
+   for(std::uint32_t i=0;i<sampled.transitionCount;++i){
+    const auto& transition=sampled.transitions[i];
+    if(transition.buttonCode!=static_cast<std::uint32_t>(humanControlInput.cameraCycleCode))continue;
+    std::cerr<<"camera_cycle_transition held="<<transition.held<<" context_mask="<<transition.contextMask
+        <<" dispatch_status="<<static_cast<unsigned>(result.dispatch.status)
+        <<" callbacks="<<result.dispatch.callbacksInvoked
+        <<" app_route="<<static_cast<unsigned>(applicationEvents.lastRoute.status)
+        <<" app_callbacks="<<applicationEvents.lastRoute.callbacksInvoked
+        <<" context1898="<<eventContext.mask1898<<" root_flags="<<static_cast<unsigned>(applicationEvents.rootFlags228)<<'\n';
+   }
+  }
   addCounter50DU(nativeCalls);
   if(result.status!=ControllerActionStatus50EC::Ok||!result.dispatchAttempted||
      result.dispatch.status!=EventDispatchStatus48Z::Complete){
@@ -2779,7 +2799,8 @@ SessionExit50DU Context::run() {
         <<"; disconnected/inactive input releases, reconnect requires neutral controls.\n";
    }
    const bool composed=platform::composeSelectedControllerPacket50KY(humanControlInput,physical,
-       live&&input.focused&&!input.minimized&&!input.activityLost,physicalControllerLatch,packet,physicalControllerReceipt);
+       live&&input.focused&&!input.minimized&&!input.activityLost,physicalControllerLatch,packet,physicalControllerReceipt,
+       !input.focused||input.minimized||input.activityLost,platform::selectedControllerCountdownHold50KY);
    if(physicalControllerReceipt.status==platform::SelectedControllerStatus50KY::unsupportedOriginalAction)
     std::cerr<<"native controller input unavailable: status="<<unsigned(physicalControllerReceipt.status)
        <<" original_descriptor="<<physicalControllerReceipt.unsupportedCode

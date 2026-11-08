@@ -1705,7 +1705,11 @@ bool VehicleWindowGl50DS::Storage::drawGcParticles() noexcept {
     for(U i=0;i<6;++i){I actual=-1;gl.getTexParameteriv(texture2D,parameters[i],&actual);
         if(!check("verify authentic GC particle sampler"))return false;
         if(actual!=expected[i])return fail(*diagnostic,VehicleWindowError50DS::material,"GC particle immutable sampler changed");}
-    gl.uniform4f(uiCanvasUniform,2.f/640.f,-2.f/448.f,-1.f,1.f);
+    {   // Native widescreen: source-projected 640x448 particles follow the
+        // same Hor+ factor as the 3D world, centred on the output.
+        const float scaleX=nativeWidescreenScaleX50DX(width,height);
+        gl.uniform4f(uiCanvasUniform,scaleX*2.f/640.f,-2.f/448.f,-scaleX,1.f);
+    }
     gl.uniform1i(uiSourceCompositionUniform,0);gl.uniform1i(uiSourceRasterUniform,0);
     gl.uniform1i(uiTexturedUniform,1);gl.uniform1i(uiImageUniform,0);
     gl.uniform1i(uiSourceFogEnabledUniform,1);gl.uniform1i(uiSourceAlphaTestUniform,1);

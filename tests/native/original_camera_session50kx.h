@@ -1,5 +1,8 @@
 #pragma once
 #include <bit>
+#include <cfenv>
+#include <cstdio>
+#include <xmmintrin.h>
 #include "../../src/assets/original_ta_cut_authoring_candidate.h"
 #include "../../src/game/original_ta_cut_resource_candidate.h"
 #include <optional>
@@ -2046,6 +2049,25 @@ public:
                 });
                 result_.stableFollow=r;result_.stableFollowAttempted=true;
                 result_.follow=r.pose;
+                {   // Diagnostic: per-frame follow camera (the lap-2 crash site).
+                    static std::uint64_t frames=0,blocked=0,subnormalSquares=0;static float minBlockedSquare=-1;
+                    ++frames;
+                    if(r.collision.cameraBlocked){++blocked;
+                        if(r.collision.speedSquaredSubnormal)++subnormalSquares;
+                        if(minBlockedSquare<0||r.collision.speedSquared<minBlockedSquare)minBlockedSquare=r.collision.speedSquared;}
+                    if(frames%312==0)std::fprintf(stderr,"follow_collision_stats frames=%llu camera_blocked=%llu"
+                        " blocked_speed_sq_subnormal=%llu min_blocked_speed_sq=%g\n",
+                        static_cast<unsigned long long>(frames),static_cast<unsigned long long>(blocked),
+                        static_cast<unsigned long long>(subnormalSquares),static_cast<double>(minBlockedSquare));
+                    if(r.status!=OriginalFollowRaceFrameStatus::complete)
+                        std::fprintf(stderr,"follow_camera_failure path=race_frame race_status=%u pose_status=%u pc=0x%x"
+                            " collision_status=%u collision_pc=0x%x bad_op=%u bad_role=%u bad_bits=0x%08x bad_ordinal=%u"
+                            " operations=%u rounding=%d mxcsr=0x%x\n",
+                            static_cast<unsigned>(r.status),static_cast<unsigned>(r.pose.status),r.pose.sourcePC,
+                            static_cast<unsigned>(r.collision.status),r.collision.sourcePC,r.collision.firstBadOp,
+                            r.collision.firstBadRole,r.collision.firstBadBits,r.collision.firstBadOrdinal,
+                            r.collision.operations,std::fegetround(),static_cast<unsigned>(_mm_getcsr()));
+                }
                 if(r.status!=OriginalFollowRaceFrameStatus::complete)return fail(Status::sourcePath,r.pose.sourcePC);
                 frameStage_=FrameStage::stableMatrix;break;
             }
@@ -2124,6 +2146,23 @@ public:
                     result=advanceOriginalFollowCameraView(follow_,subject,frameDelta_,raceFlags1B0_,sources,
                         actual_.followQueries.get()->pairOwner(),actual_.arena.noiseOwner(),pose_,scene_,matrices_,collision,
                         displayInputs_->rootFlags228,sceneFlags29_);
+                    {   // Diagnostic summary every 312 follow frames (about 5 s).
+                        static std::uint64_t frames=0,blocked=0,subnormalSquares=0;static float minBlockedSquare=-1;
+                        ++frames;
+                        if(collision.cameraBlocked){++blocked;
+                            if(collision.speedSquaredSubnormal)++subnormalSquares;
+                            if(minBlockedSquare<0||collision.speedSquared<minBlockedSquare)minBlockedSquare=collision.speedSquared;}
+                        if(frames%312==0)std::fprintf(stderr,"follow_collision_stats frames=%llu camera_blocked=%llu"
+                            " blocked_speed_sq_subnormal=%llu min_blocked_speed_sq=%g\n",
+                            static_cast<unsigned long long>(frames),static_cast<unsigned long long>(blocked),
+                            static_cast<unsigned long long>(subnormalSquares),static_cast<double>(minBlockedSquare));
+                    }
+                    if(result.status!=OriginalFollowStatus::ok)
+                        std::fprintf(stderr,"follow_camera_failure status=%u pc=0x%x collision_status=%u collision_pc=0x%x"
+                            " bad_op=%u bad_role=%u bad_bits=0x%08x bad_ordinal=%u operations=%u rounding=%d mxcsr=0x%x\n",
+                            static_cast<unsigned>(result.status),result.sourcePC,static_cast<unsigned>(collision.status),
+                            collision.sourcePC,collision.firstBadOp,collision.firstBadRole,collision.firstBadBits,
+                            collision.firstBadOrdinal,collision.operations,std::fegetround(),static_cast<unsigned>(_mm_getcsr()));
                     if(!actual_.followQueries.get()->commit())return OriginalFollowResult{OriginalFollowStatus::owner,0x17a870,0};
                     return result;
                 });
@@ -2411,6 +2450,17 @@ public:
     //The root independently runs real fade cancelAndRetire before this call.
     //A cleanup failure retains this owner for retry; video flags/alpha, race
     //flags, countdown, RNG and racer history remain exactly as abandoned.
+    // Original 1A4558..1A4588 (race music manager update 1A4440): each view's
+    // AuralScape listener is set through 1030B0 from that view's CAMERA scene
+    // (+180 position, +190 look, +1A0 up), not from the player's body. Read-only.
+    bool nativeAudioListenerPose(float (&position)[3],float (&look)[3])const noexcept {
+        if(closed_||abandoned_||!hasView())return false;
+        const float p[3]{pose_.position.x,pose_.position.y,pose_.position.z};
+        const float l[3]{scene_.look.x,scene_.look.y,scene_.look.z};
+        for(int i=0;i<3;++i)if(!std::isfinite(p[i])||!std::isfinite(l[i]))return false;
+        for(int i=0;i<3;++i){position[i]=p[i];look[i]=l[i];}
+        return true;
+    }
     Result abandonAndCloseSpatial(){
         if(constructorOnly_)return closeConstructorOnlyNative(true);
         if(!actual_.followQueries.get())return set(Status::owner);

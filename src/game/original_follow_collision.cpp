@@ -15,12 +15,17 @@ bool scalar(float f) noexcept {
 }
 struct Math {
     bool ok=true;
-    float keep(float f) noexcept {ok=ok&&scalar(f);return f;}
-    float add(float a,float b) noexcept {keep(a);keep(b);volatile float f=a+b;return keep(f);}
-    float sub(float a,float b) noexcept {keep(a);keep(b);volatile float f=a-b;return keep(f);}
-    float mul(float a,float b) noexcept {keep(a);keep(b);volatile float f=a*b;return keep(f);}
-    float div(float a,float b) noexcept {keep(a);keep(b);if(b==0){ok=false;return 0;}volatile float f=a/b;return keep(f);}
-    float root(float f) noexcept {keep(f);if(f<0){ok=false;return 0;}volatile float r=std::sqrt(f);return keep(r);}
+    // Diagnostic record of the first rejection; does not change any result.
+    std::uint8_t badOp=0,badRole=0;std::uint32_t badBits=0,badOrdinal=0,ordinal=0;
+    void reject(float f,std::uint8_t op,std::uint8_t role) noexcept {
+        if(ok){badOp=op;badRole=role;std::memcpy(&badBits,&f,4);badOrdinal=ordinal;}ok=false;
+    }
+    float keep(float f,std::uint8_t op=6,std::uint8_t role=3) noexcept {if(!scalar(f))reject(f,op,role);return f;}
+    float add(float a,float b) noexcept {++ordinal;keep(a,1,1);keep(b,1,2);volatile float f=a+b;return keep(f,1,3);}
+    float sub(float a,float b) noexcept {++ordinal;keep(a,2,1);keep(b,2,2);volatile float f=a-b;return keep(f,2,3);}
+    float mul(float a,float b) noexcept {++ordinal;keep(a,3,1);keep(b,3,2);volatile float f=a*b;return keep(f,3,3);}
+    float div(float a,float b) noexcept {++ordinal;keep(a,4,1);keep(b,4,2);if(b==0){reject(b,4,4);return 0;}volatile float f=a/b;return keep(f,4,3);}
+    float root(float f) noexcept {++ordinal;keep(f,5,1);if(f<0){reject(f,5,5);return 0;}volatile float r=std::sqrt(f);return keep(r,5,3);}
     V add(V a,V b) noexcept {return {add(a.x,b.x),add(a.y,b.y),add(a.z,b.z),1.f};}
     V sub(V a,V b) noexcept {return {sub(a.x,b.x),sub(a.y,b.y),sub(a.z,b.z),1.f};}
     V mul(float f,V a) noexcept {return {mul(f,a.x),mul(f,a.y),mul(f,a.z),1.f};}
@@ -101,6 +106,15 @@ struct Collision {
         if(!pair(target,first,first))return false;
         V chosen{};
         if(state.callback.hit114){
+            {   // Diagnostic observation only (separate arithmetic, no Math state).
+                const auto& v=sources.mainBodyVelocity70;
+                volatile float xx=v.x*v.x,yy=v.y*v.y,zz=v.z*v.z;
+                volatile float sum=xx+yy+zz;
+                std::uint32_t word=0;const float value=sum;std::memcpy(&word,&value,4);
+                result.cameraBlocked=true;result.speedSquared=value;
+                const auto subnormal=[](float f){std::uint32_t u;std::memcpy(&u,&f,4);return (u&0x7f800000u)==0&&(u&0x7fffffu)!=0;};
+                result.speedSquaredSubnormal=subnormal(xx)||subnormal(yy)||subnormal(zz)||subnormal(value);
+            }
             const float speed=math.length(sources.mainBodyVelocity70);
             if(speed<bits(0x4212aa7fu)||sources.selectedProfile34!=0){
                 const V delta=math.sub(target,eye);
@@ -154,7 +168,11 @@ S advanceOriginalFollowCollision17A870(const OriginalFollowCollisionInput& input
        !(graph.nodes[index].sceneFlags190&1u))return fail(result,S::Binding,0x28bab0u);
     if(std::fegetround()!=FE_TONEAREST)return fail(result,S::Arithmetic,0x17a870u);
     Collision calculation{input,sources,state,owner,result};
-    if(!calculation.run(graph.nodes[index].world100))return result.status==S::Complete?fail(result,S::Arithmetic,0x17a870u):result.status;
+    const bool ran=calculation.run(graph.nodes[index].world100);
+    result.firstBadOp=calculation.math.badOp;result.firstBadRole=calculation.math.badRole;
+    result.firstBadBits=calculation.math.badBits;result.firstBadOrdinal=calculation.math.badOrdinal;
+    result.operations=calculation.math.ordinal;
+    if(!ran)return result.status==S::Complete?fail(result,S::Arithmetic,0x17a870u):result.status;
     state=calculation.state;return S::Complete;
 }
 }

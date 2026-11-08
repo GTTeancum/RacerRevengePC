@@ -15,6 +15,7 @@
 #include <cstring>
 #include <cwchar>
 #include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <stdexcept>
 #include <string>
@@ -94,7 +95,7 @@ inline void cleanInheritedOverrides() {
     FreeEnvironmentStringsW(block);
     for(const auto& name:names)
         if(_wputenv_s(name.c_str(),L"")!=0)throw std::runtime_error("Cannot clear inherited diagnostic override");
-    if(_wputenv_s(L"RR_NATIVE_FIXED_WINDOW",L"1")!=0||
+    if(_wputenv_s(L"RR_NATIVE_FIXED_WINDOW",L"0")!=0||
        _wputenv_s(L"RR_ORIGINAL_RIDER_PRESENTATION",L"allow-native-pc-deadline60hz")!=0)
         throw std::runtime_error("Cannot set normal native presentation policy");
 }
@@ -166,6 +167,55 @@ inline std::wstring readableError(const char* text) {
     MultiByteToWideChar(CP_UTF8,MB_ERR_INVALID_CHARS,text,-1,result.data(),count);
     result.resize(static_cast<std::size_t>(count)-1);return result;
 }
+// Player video settings: RacerRevengePC.ini beside the EXE. Written with
+// defaults when absent; read before any window or renderer exists and
+// published as process settings. A value already set for this process (an
+// explicit diagnostic/test launch) is kept, never overridden by the file.
+inline void applyVideoSettings(const fs::path& directory) {
+    const auto ini=directory/L"RacerRevengePC.ini";
+    std::error_code error;bool created=false;
+    if(!fs::exists(ini,error)&&!error){
+        std::ofstream out(ini,std::ios::binary|std::ios::trunc);
+        out<<"; Racer Revenge PC video settings. Edit while the game is closed.\r\n"
+             "; Delete this file to restore the defaults.\r\n"
+             "[Video]\r\n"
+             "; 1 = open the window maximized. 0 = open it at WindowWidth x WindowHeight.\r\n"
+             "Maximized=1\r\n"
+             "; Window size when not maximized (640-3840 x 448-2160).\r\n"
+             "WindowWidth=1280\r\n"
+             "WindowHeight=896\r\n"
+             "; 1 = widescreen: a wider window shows more to the sides. 0 = original 4:3 picture.\r\n"
+             "Widescreen=1\r\n"
+             "; 1 = FXAA edge smoothing on the 3D scene (HUD and menus stay sharp). 0 = off.\r\n"
+             "FXAA=1\r\n";
+        out.close();created=!out.fail();
+        if(!created)std::cerr<<"video_settings_write_failed file="<<utf8Path(ini)<<" (defaults used)\n";
+    }
+    const auto read=[&](const wchar_t* key,const char* name,int fallback,int low,int high){
+        const int value=static_cast<int>(GetPrivateProfileIntW(L"Video",key,fallback,ini.c_str()));
+        if(value<low||value>high){
+            std::cerr<<"video_settings_invalid key="<<name<<" value="<<value<<" (default used)\n";
+            return fallback;
+        }
+        return value;
+    };
+    const int maximized=read(L"Maximized","Maximized",1,0,1),
+        width=read(L"WindowWidth","WindowWidth",1280,640,3840),
+        height=read(L"WindowHeight","WindowHeight",896,448,2160),
+        widescreen=read(L"Widescreen","Widescreen",1,0,1),fxaa=read(L"FXAA","FXAA",1,0,1);
+    const auto publish=[&](const char* name,const std::string& value){
+        if(std::getenv(name))return;
+        if(_putenv_s(name,value.c_str())!=0)throw std::runtime_error("Cannot apply video settings");
+    };
+    publish("RR_VIDEO_MAXIMIZED",maximized?"1":"0");
+    publish("RR_VIDEO_WINDOW_SIZE",std::to_string(width)+"x"+std::to_string(height));
+    if(!widescreen)publish("RR_ORIGINAL_ASPECT","1");
+    publish("RR_VIDEO_FXAA",fxaa?"1":"0");
+    const auto value=[](const char* name){const char* v=std::getenv(name);return std::string(v?v:"");};
+    std::cerr<<"video_settings file="<<utf8Path(ini)<<" created="<<created
+        <<" maximized="<<value("RR_VIDEO_MAXIMIZED")<<" window="<<value("RR_VIDEO_WINDOW_SIZE")
+        <<" widescreen="<<(value("RR_ORIGINAL_ASPECT")=="1"?0:1)<<" fxaa="<<value("RR_VIDEO_FXAA")<<'\n';
+}
 template<class Entry> int run(Entry entry,int argc,char** argv,bool automatic) {
     fs::path log;bool logging=false;FaultLogLifetime faultLifetime;
     try {
@@ -189,6 +239,7 @@ template<class Entry> int run(Entry entry,int argc,char** argv,bool automatic) {
         std::cerr<<"native_application_icon_resource=101 embedded=true\n";
 #endif
         std::cerr<<"rider_presentation="<<std::getenv("RR_ORIGINAL_RIDER_PRESENTATION")<<'\n';
+        applyVideoSettings(assets);
         // Exact wide directory only, never cwd/PATH search or fallback assets.
         // ASCII relative roots avoid the legacy narrow argv/environment seam.
         if(automatic&&!SetCurrentDirectoryW(assets.c_str()))throw std::runtime_error("Cannot open executable directory as original asset root");

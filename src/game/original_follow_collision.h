@@ -36,6 +36,15 @@ struct OriginalFollowCollisionResult {
     OriginalFollowCollisionVector position70{};
     std::size_t queryPairs=0;
     OriginalCameraWorldResult world{};
+    // Diagnostic only: first rejected scalar (op 1 add,2 sub,3 mul,4 div,
+    // 5 root,6 length/keep; role 1/2 operand, 3 result, 4 zero divisor,
+    // 5 negative root), its raw bits and the operation ordinal.
+    std::uint8_t firstBadOp=0,firstBadRole=0;
+    std::uint32_t firstBadBits=0,firstBadOrdinal=0,operations=0;
+    // Diagnostic only: camera blocked this frame (hit114), and on that path
+    // whether the body speed squared was subnormal, plus that squared value.
+    bool cameraBlocked=false,speedSquaredSubnormal=false;
+    float speedSquared=0;
 };
 // Complete17A870 using the concrete original camera pair-query owner. Right,
 // flatForward and Up are source copies but unused by this original helper;

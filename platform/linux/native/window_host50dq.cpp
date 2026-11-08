@@ -396,10 +396,18 @@ bool WindowHost50DQ::create(const WindowHostRequest50DQ& r, WindowHostDiagnostic
         if(!setMinimum||!setMaximum||!setSize||!restore)
             return sdlFail(WindowHostError50DQ::MissingEntryPoint,"fixed window size policy SDL entry points");
     }
+    // Player video setting (RacerRevengePC.ini Maximized): a resizable window
+    // opens maximized; r.width x r.height stays its restored size.
+    const char* maximizedSetting=std::getenv("RR_VIDEO_MAXIMIZED");
+    const bool maximized=!fixedWindow&&r.resizable&&maximizedSetting&&std::strcmp(maximizedSetting,"1")==0;
+    constexpr UInt windowMaximized=0x00000080u; // SDL_WINDOW_MAXIMIZED
     const UInt flags = windowOpenGl | windowShown |
-        (fixedWindow?0u:(windowHighDpi | (r.resizable ? windowResizable : 0u)));
+        (fixedWindow?0u:(windowHighDpi | (r.resizable ? windowResizable : 0u))) |
+        (maximized?windowMaximized:0u);
     s.window = s.createWindow(r.title, windowCentered, windowCentered, r.width, r.height, flags);
     if (!s.window) return sdlFail(WindowHostError50DQ::WindowFailure, "SDL_CreateWindow");
+    std::fprintf(stderr,"native_window_mode restored=%dx%d resizable=%d maximized=%d\n",
+        r.width,r.height,(!fixedWindow&&r.resizable)?1:0,maximized?1:0);
     if(fixedWindow){
         setMinimum(s.window,r.width,r.height);setMaximum(s.window,r.width,r.height);
         restore(s.window);setSize(s.window,r.width,r.height);
@@ -575,6 +583,14 @@ bool WindowHost50DQ::release(WindowHostDiagnostic50DQ& d) noexcept {
 std::uint32_t WindowHost50DQ::nativeWindowId50DU()const noexcept {
     return ownerThread()&&created()&&state_?state_->windowId:0;
 }
+namespace {
+// Host-call timing diagnostic: any SDL input/vibration call over 10 ms.
+void reportSlowHostCall50DQ(const char* call, std::chrono::steady_clock::time_point begin) noexcept {
+    static unsigned lines = 0;
+    const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - begin).count();
+    if (ms > 10.0 && lines < 200) { ++lines; std::fprintf(stderr, "host_call_slow call=%s ms=%.1f%c", call, ms, 10); }
+}
+}
 bool WindowHost50DQ::poll(WindowInput50DQ& input, WindowHostDiagnostic50DQ& d) noexcept {
     d = {};
     if (!ownerThread()) return fail(d, WindowHostError50DQ::WrongThread, "poll");
@@ -583,7 +599,9 @@ bool WindowHost50DQ::poll(WindowInput50DQ& input, WindowHostDiagnostic50DQ& d) n
     if(auto lease=sourcePadLease_.lock())if(lease->live_)
         for(unsigned i=0;i<2;++i)lease->observe(i,false,-1,false);
     SdlEvent events[windowEventBudget50DQ]{};
+    const auto pumpBegin = std::chrono::steady_clock::now();
     s.pumpEvents();
+    reportSlowHostCall50DQ("SDL_PumpEvents", pumpBegin);
     const Int count = s.peepEvents(events, static_cast<Int>(windowEventBudget50DQ), 2, 0, 0xffff);
     if (count < 0) return fail(d, WindowHostError50DQ::EventFailure, "SDL_PeepEvents", s.getError());
     input = {};
@@ -736,7 +754,10 @@ bool WindowHost50DQ::rumbleController50KZ(std::uint32_t slot,std::int32_t expect
     if(!s.controllerHasRumble(s.controllers[slot])){receipt.status=ControllerRumbleStatus50KZ::Unsupported;return true;}
     const auto low=static_cast<std::uint16_t>(static_cast<unsigned>(large)*257u);
     const auto high=static_cast<std::uint16_t>(small?65535u:0u);
-    if(s.controllerRumble(s.controllers[slot],low,high,(small||large)?100u:0u)!=0)
+    const auto rumbleBegin=std::chrono::steady_clock::now();
+    const auto rumbled=s.controllerRumble(s.controllers[slot],low,high,(small||large)?100u:0u);
+    reportSlowHostCall50DQ((small||large)?"SDL_GameControllerRumble":"SDL_GameControllerRumble_stop",rumbleBegin);
+    if(rumbled!=0)
         return fail(d,WindowHostError50DQ::ControllerFailure,"SDL_GameControllerRumble",s.getError());
     s.controllerRumbling[slot]=(small||large)!=0;
     receipt.status=ControllerRumbleStatus50KZ::Submitted;
