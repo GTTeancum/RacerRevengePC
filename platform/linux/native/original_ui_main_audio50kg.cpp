@@ -131,6 +131,15 @@ constexpr OriginalFile creditsOriginal{
 constexpr OriginalFile hallOfFameOriginal{
     "MUSIC/UI/GALLERY/GALLERY.VAG",709504,
     "de3e6947ec4e4dfe1cc35c599361342152d55ec6f3783675933e88745c82af3f",619024};
+// UIWin Song10/Song8 (STREAMS.JUK: 22050 Hz, 180832 / 147392 compressed bytes
+// per channel, durations 14.351746 / 11.697778, pitch1881). Each channel's
+// end block 11300 / 9210 yields 316428 / 257908 frames.
+constexpr OriginalFile winSong10Original{
+    "MUSIC/UI/SCREENS/TRPHY1.VAG",363680,
+    "4058a0d652ac635051274b0b4dd76c80fbcdde6c6a2391cc43202d032db451d0",316428};
+constexpr OriginalFile winSong8Original{
+    "MUSIC/UI/SCREENS/TRPHY2_3.VAG",296800,
+    "584d420ff73459b55248af9479a7055e0eee32108d87964dada3aa60e8dff411",257908};
 // UIACCEPT.INI exact events for default-unlocked ranges and retained additions.
 // Clegg and Mars keep their own original Event7..8 and17..18 identities.
 // These retained audio owners do not grant profile or Course admission.
@@ -407,10 +416,12 @@ bool OriginalUiMainAudio50KG::ordinaryVoiceOwnershipCurrent()const noexcept {
     if(!musicPlaybackRevision_){
         if(ownsMusic_||fading_||musicSong_||!pristine(music))return false;
     }else {
+        // Win's 234880 single play is the only non-looping music history.
+        const bool winVoice=winPrepared_&&(sameClip(music.voice.clip,win10Clip_)||sameClip(music.voice.clip,win8Clip_));
         if((ownsMusic_!=music.voice.active)||(!ownsMusic_&&(fading_||musicSong_))||
            !std::isfinite(musicGain_)||musicGain_<0.f||musicGain_>0.4f||
            !std::isfinite(music.voice.gain)||music.voice.gain<0.f||music.voice.gain>0.4f||
-           (ownsMusic_&&music.voice.gain!=musicGain_)||music.voice.pan!=0.f||!music.voice.loop)return false;
+           (ownsMusic_&&music.voice.gain!=musicGain_)||music.voice.pan!=0.f||music.voice.loop==winVoice)return false;
         // A stopped voice still borrows its real clip. Authenticate that
         // retained history too; never erase it to certify a fresh voice.
         const auto matchMusic=[&](const AudioClip50HD& clip,const assets::AudioPcm50HC& pcm,
@@ -424,7 +435,9 @@ bool OriginalUiMainAudio50KG::ordinaryVoiceOwnershipCurrent()const noexcept {
            !matchMusic(courseClip_,coursePcm_,courseOriginal,coursePrepared_,11,1.f)&&
            !matchMusic(garageClip_,garagePcm_,garageOriginal,true,6,OriginalUiGarageWattoAudio50KG::nativeRendererPitch)&&
            !matchMusic(creditsClip_,creditsPcm_,creditsOriginal,creditsPrepared_,12,1.f)&&
-           !matchMusic(hallOfFameClip_,hallOfFamePcm_,hallOfFameOriginal,hallOfFamePrepared_,5,1.f))return false;
+           !matchMusic(hallOfFameClip_,hallOfFamePcm_,hallOfFameOriginal,hallOfFamePrepared_,5,1.f)&&
+           !matchMusic(win10Clip_,win10Pcm_,winSong10Original,winPrepared_,10,1.f)&&
+           !matchMusic(win8Clip_,win8Pcm_,winSong8Original,winPrepared_,8,1.f))return false;
         if(fading_&&(!std::isfinite(fadeElapsed_)||fadeElapsed_<0.f||!std::isfinite(fadeStartGain_)||
            fadeStartGain_<0.f||fadeStartGain_>0.4f||fadeDuration_!=1.f||fadeRetireAt_!=1.35f))return false;
     }
@@ -694,6 +707,64 @@ bool OriginalUiMainAudio50KG::finalNativePcmRetirementCurrent()const noexcept {
     }
     return true;
 }
+bool OriginalUiMainAudio50KG::stoppedGarageHistoryPresent()const noexcept {
+    if(!mixer_||mixer_->count()!=garageSceneRequiredVoices||mixer_->groupEpoch50IC()!=mixerEpoch_)return false;
+    for(std::size_t slot=courseRequiredVoices;slot<garageSceneVoiceEnd;++slot){
+        AudioVoiceObservation50HD v;
+        if(!mixer_->inspectVoice(slot,v))return false;
+        if(v.playbackRevision||v.voice.clip.samples||v.voice.clip.frames)return true;
+    }
+    for(const auto& binding:garageAudio_.nativeVoices_)if(binding.retainsBacking())return true;
+    for(const auto& voice:garageDroidAudio_.retiredVoices_)if(voice.present||voice.pcm.retainsBacking())return true;
+    return false;
+}
+bool OriginalUiMainAudio50KG::canReleaseStoppedGarageHistory268300(
+    const OriginalAudioSampleCache50KG& cache)const noexcept {
+    // Only a normally retired (or never-entered) Garage behind a closed output.
+    // Failed-entry terminal families keep their own custody and never reach here.
+    if(!ordinaryOutputRetired_||finalNativePcmRetired_||
+       (garageSourceLifetime_!=GarageSourceLifetime::initialPrefix&&
+        garageSourceLifetime_!=GarageSourceLifetime::retired)||
+       !reconstructibleGarageRowsCurrent())return false;
+    // Same exact proof as final retirement: every Garage slot inactive and
+    // unreserved, no group control/routing claim, each stopped clip pinned by
+    // exactly one authenticated binding and no other PCM lease outstanding.
+    FinalNativePcmRetirement census;
+    if(!canRetireFinalNativePcm(cache,census))return false;
+    const auto& watto=garageAudio_;
+    if(watto.sourceGroup_||watto.sourceGroupAttempted_||watto.sourceGroupReleased_||!watto.canRevise(1))return false;
+    for(const auto& s:watto.sounds_)
+        if(s.source||s.latest!=OriginalUiGarageWattoAudio50KG::instanceCount||s.latestRevision||
+           s.latestToken!=-1||s.nativeSample.retainsBacking())return false;
+    const auto& droid=garageDroidAudio_;
+    if(droid.sourceSceneGroup_||droid.retired_||droid.nextActor_||droid.constructedSounds_||
+       droid.revision_>=std::numeric_limits<std::uint64_t>::max()-1)return false;
+    for(const auto& row:droid.rows_)
+        if(row.source||row.sound||row.played108||row.playbackRevision||
+           row.nativeSample.retainsBacking()||row.nativeVoice.retainsBacking())return false;
+    // Droid group bindings were already recycled at its retirement; the Watto
+    // range keeps its prepared unity bindings. Neither changes below.
+    for(std::size_t slot=courseRequiredVoices;slot<garageSceneVoiceEnd;++slot){
+        AudioVoiceObservation50HD v;
+        if(!mixer_->inspectVoice(slot,v)||v.voice.active||v.groupGain!=1.f||v.groupPaused||
+           v.groupKnown!=(slot<OriginalUiGarageDroidAudio50GN::firstVoice)||
+           mixer_->nativeSourceVoiceRoutes_[slot].count)return false;
+    }
+    return mixer_->canRecordControlChanges(1);
+}
+void OriginalUiMainAudio50KG::releaseStoppedGarageHistory268300Preflighted()noexcept {
+    // Caller (Aural268300) completed every rejecting check, including the
+    // census above. Raw Mixer borrows leave before any strong binding.
+    mixer_->releaseStoppedNativeGarageVoices268300Preflighted();
+    auto& watto=garageAudio_;
+    watto.soundIds_.fill(0);watto.playbackRevisions_.fill(0);
+    for(auto& binding:watto.nativeVoices_)binding={};
+    // No Sound/source handle survives (all latest tokens are -1), so the
+    // token space restarts exactly like the first cold construction.
+    watto.nextToken_=0;watto.retainedSourceRearm_=false;++watto.revision_;
+    auto& droid=garageDroidAudio_;
+    droid.retiredVoices_={};droid.retainedSceneRearmed_=false;++droid.revision_;
+}
 bool OriginalUiMainAudio50KG::beginRetainedGarageEntry(
     const std::shared_ptr<OriginalUiGarageSession50KG>& entry,std::string& error)noexcept {
     const auto fail=[&](const char* text)noexcept {try{error=text;}catch(...){error.clear();}return false;};
@@ -701,11 +772,14 @@ bool OriginalUiMainAudio50KG::beginRetainedGarageEntry(
     if(!entry||!backing||!retainedGarageOrdinaryCurrent()||!retainedGarageEntryCurrent()||paused_||!canRecordControlChange()||
        (garageSourceLifetime_!=GarageSourceLifetime::initialPrefix&&garageSourceLifetime_!=GarageSourceLifetime::retired)||
        !entry->nativeAudioConstructionIdentity(*backing->issuer_,*this,generation,epoch)||
-       epoch<=garageEntryEpoch_||entry->audio_.owner_before(backing)||backing.owner_before(entry->audio_))
+       entry->nativeAudioConstructionSerial()<=garageEntrySerial_||
+       entry->audio_.owner_before(backing)||backing.owner_before(entry->audio_))
         return fail("Garage source reconstruction requires a new actual root capsule/grant on the same retained transport");
-    // Generation is an actual source key and may be a reused address. Only
-    // the real monotonically issued Scope epoch orders separate lifetimes.
+    // Generation is an actual source key and may be a reused address. The
+    // scope epoch identifies the grant inside its own frontend scope; the
+    // process-wide manager serial orders separate lifetimes across scopes.
     garageEntryCustody_=entry;garageEntryGeneration_=generation;garageEntryEpoch_=epoch;
+    garageEntrySerial_=entry->nativeAudioConstructionSerial();
     garageSourceLifetime_=GarageSourceLifetime::constructing;noteControlChange();error.clear();return true;
 }
 bool OriginalUiMainAudio50KG::emptyGarageEntryFailureCurrent(
@@ -1527,6 +1601,84 @@ bool OriginalUiMainAudio50KG::prepareHallOfFameMenu(const std::filesystem::path&
     }catch(const std::exception& e){error=e.what();}
     catch(...){error="Hall of Fame music cold preparation failed";}
     return false;
+}
+bool OriginalUiMainAudio50KG::prepareWinMenu(const std::filesystem::path& audioRoot,
+    std::string& error) noexcept {
+    if(winAttempted_){error="Win music needs a fresh cold preparation";return false;}
+    winAttempted_=true;
+    try {
+        need(current()&&!paused_&&!ownsMusic_&&!mixer_->mixedFrames(),
+            "Win music requires the prepared cold frontend transport");
+        for(std::size_t i=0;i<mixer_->count();++i)
+            need(!mixer_->active(i),"Win music preparation cannot alter live playback");
+        authenticatedRead(audioRoot,"UI_MUSIC.JUK",1517,"4b814f8e4fec2fbcfa25807d5e147ecc164dbb0b0cb9ce5d064e2f3e3c89de98");
+        authenticatedRead(audioRoot,"UI_MUSIC.JUB",3623,"f97a5cbceec8056dfc9b277501087aaa54d86a0ccdc0c71cfde73522a048c661");
+        auto song10=decodeMenuStereo(authenticatedRead(audioRoot,winSong10Original.path,winSong10Original.bytes,winSong10Original.sha),
+            winSong10Original,180832);
+        auto song8=decodeMenuStereo(authenticatedRead(audioRoot,winSong8Original.path,winSong8Original.bytes,winSong8Original.sha),
+            winSong8Original,147392);
+        const AudioClip50HD clip10{song10.samples.data(),song10.frames,song10.sampleRate,song10.channels,0,0};
+        const AudioClip50HD clip8{song8.samples.data(),song8.frames,song8.sampleRate,song8.channels,0,0};
+        need(preparedClipMatches(clip10,song10,winSong10Original,2)&&preparedClipMatches(clip8,song8,winSong8Original,2),
+            "Original Win Song10/Song8 PCM metadata differs");
+        win10Pcm_=std::move(song10);win8Pcm_=std::move(song8);
+        win10Clip_={win10Pcm_.samples.data(),win10Pcm_.frames,win10Pcm_.sampleRate,win10Pcm_.channels,0,0};
+        win8Clip_={win8Pcm_.samples.data(),win8Pcm_.frames,win8Pcm_.sampleRate,win8Pcm_.channels,0,0};
+        winPrepared_=true;noteControlChange();error.clear();return true;
+    }catch(const std::exception& e){error=e.what();}
+    catch(...){error="Win music cold preparation failed";}
+    return false;
+}
+bool OriginalUiMainAudio50KG::winMenuReady() const noexcept {
+    // A wet-bound transport publishes Song10/Song8 through the same Aural song
+    // stream as every other menu song; the Aural publisher derives 234880's
+    // single play (mode1) from these two songs. Their STREAMS rows must be the
+    // authenticated ones, so a mismatch is "not ready", never a dry re-route.
+    if(!current()||!winPrepared_||
+       !preparedClipMatches(win10Clip_,win10Pcm_,winSong10Original,2)||
+       !preparedClipMatches(win8Clip_,win8Pcm_,winSong8Original,2))return false;
+    return !nativeWetOwner_||(nativeWetPlaySong_&&
+        nativeSongSourceCurrent(10u,win10Clip_)&&nativeSongSourceCurrent(8u,win8Clip_));
+}
+bool OriginalUiMainAudio50KG::canStartWinSong234880(std::uint32_t song) const noexcept {
+    if(!winMenuReady()||(song!=10&&song!=8)||paused_)return false;
+    const bool active=mixer_->active(musicVoice);
+    if(active&&(!ownsMusic_||mixer_->playbackRevision(musicVoice)!=musicPlaybackRevision_))return false;
+    // Optional immediate stop plus one play: up to two mixer and two transport changes.
+    return canRecordControlChange(2)&&mixer_->canRecordControlChanges(2)&&
+        canPlayEffectClip(1); // Same centered routing check, without an effect command.
+}
+bool OriginalUiMainAudio50KG::startWinSong234880(std::uint32_t song) noexcept {
+    if(!canStartWinSong234880(song))return false;
+    const auto& clip=song==10?win10Clip_:win8Clip_;
+    if(nativeWetOwner_){
+        // Wet path: the Aural song publisher replaces the outgoing music voice
+        // atomically (the 234440(0) stop and the 234170 start in one step, as
+        // startMusicLoop does for 234900). Songs 10/8 are published with
+        // stream+40 = 1, a single non-looping play from frame 0. A refused
+        // start leaves the outgoing music untouched.
+        if(!nativeWetPlaySong_||!(nativeWetOwner_->*nativeWetPlaySong_)(*this,song,clip,0.4f,1.f))return false;
+    }else{
+        // 234880 a2=1: 234440(stream,0.0) first stops the current stream at once.
+        if(ownsMusic_&&mixer_->active(musicVoice)){
+            mixer_->stop(musicVoice);ownsMusic_=false;fading_=false;musicSong_=0;musicGain_=0.f;noteControlChange();
+        }
+        // stream+40 = 1: a single, non-looping play from frame 0 (234170).
+        if(!mixer_->play(musicVoice,clip,0.4f,1.f,false,0.f))return false;
+    }
+    musicPlaybackRevision_=mixer_->playbackRevision(musicVoice);noteControlChange();
+    ownsMusic_=true;fading_=false;musicSong_=song;
+    musicGain_=0.4f;musicPitch_=1.f;fadeElapsed_=fadeDuration_=fadeRetireAt_=0.f;
+    return true;
+}
+bool OriginalUiMainAudio50KG::canFadeWinMusic234440() const noexcept {
+    return winMenuReady()&&!paused_&&canRecordControlChange()&&
+        ((!ownsMusic_&&!mixer_->active(musicVoice))||
+         (ownsMusic_&&mixer_->active(musicVoice)&&
+          mixer_->playbackRevision(musicVoice)==musicPlaybackRevision_));
+}
+bool OriginalUiMainAudio50KG::fadeWinMusic234440() noexcept {
+    return canFadeWinMusic234440()&&fadeMain(1.f);
 }
 bool OriginalUiMainAudio50KG::canRecordControlChange(std::uint64_t count) const noexcept {
     return !controlRevisionExhausted_&&count<=std::numeric_limits<std::uint64_t>::max()-controlRevision_;
@@ -2896,13 +3048,16 @@ const assets::OriginalStreamMetadataRow50KZ* OriginalUiMainAudio50KG::nativeSong
     struct Source {std::uint32_t song,ordinal,size;const char* name;const char* duration;};
     // UI_MUSIC.JUK/JUB were authenticated by this same retained Main. Ordinals
     // are original Streams.TXT positions, never invented stream/sample handles.
-    static constexpr std::array<Source,6> sources{{
+    static constexpr std::array<Source,8> sources{{
         {9,1692,219504,"music\\ui\\screens\\ui_main.vag","17.420952"},
         {6,1689,265328,"music\\ui\\screens\\wattoshp.vag","21.057777"},
         {7,1690,353744,"music\\ui\\screens\\ui_peopl.vag","28.074921"},
         {11,1694,223232,"music\\ui\\screens\\ui_trks.vag","17.716825"},
         {12,1695,561232,"music\\ui\\screens\\credits.vag","44.542221"},
-        {5,1688,353744,"music\\ui\\gallery\\gallery.vag","28.074921"}
+        {5,1688,353744,"music\\ui\\gallery\\gallery.vag","28.074921"},
+        // UIWin 234880 single plays (see winSong10Original/winSong8Original).
+        {10,1693,180832,"music\\ui\\screens\\trphy1.vag","14.351746"},
+        {8,1691,147392,"music\\ui\\screens\\trphy2_3.vag","11.697778"}
     }};
     const Source* source=nullptr;for(const auto& candidate:sources)if(candidate.song==song){source=&candidate;break;}
     if(!source)return nullptr;
@@ -2919,6 +3074,8 @@ const assets::OriginalStreamMetadataRow50KZ* OriginalUiMainAudio50KG::nativeSong
     case 11:retained=&courseClip_;valid=coursePrepared_&&preparedClipMatches(courseClip_,coursePcm_,courseOriginal,2);break;
     case 12:retained=&creditsClip_;valid=creditsPrepared_&&preparedClipMatches(creditsClip_,creditsPcm_,creditsOriginal,2);break;
     case 5:retained=&hallOfFameClip_;valid=hallOfFamePrepared_&&preparedClipMatches(hallOfFameClip_,hallOfFamePcm_,hallOfFameOriginal,2);break;
+    case 10:retained=&win10Clip_;valid=winPrepared_&&preparedClipMatches(win10Clip_,win10Pcm_,winSong10Original,2);break;
+    case 8:retained=&win8Clip_;valid=winPrepared_&&preparedClipMatches(win8Clip_,win8Pcm_,winSong8Original,2);break;
     default:return nullptr;
     }
     // Deliberately independent of latest musicSong_/playbackRevision: outgoing
@@ -3236,7 +3393,7 @@ void OriginalUiMainAudio50KG::reset() noexcept {
     //Never erase accepted controls or release/reuse their counted group slot.
     //Callers must retain the cold aggregate when its retirement preflight fails.
     if(nativeGroupControlCount_||nativeWetOwner_||nativeWetProcessor_||nativeWetEpoch_||nativeWetSetRawMasters_||nativeWetPlaySong_||nativeWetPlayEffect_||nativeWetPlayRider_||nativeWetPlayWatto_||nativeWetCanPublish_)std::terminate();
-    const bool changed=garagePrepared_||prepared_||riderPrepared_||coursePrepared_||creditsPrepared_||hallOfFamePrepared_||mixer_||ownsMusic_||ownsRiderConfirm_||fading_||paused_||musicSong_;
+    const bool changed=garagePrepared_||prepared_||riderPrepared_||coursePrepared_||creditsPrepared_||hallOfFamePrepared_||winPrepared_||mixer_||ownsMusic_||ownsRiderConfirm_||fading_||paused_||musicSong_;
     if (prepared_&&mixer_&&mixer_->groupEpoch50IC()==mixerEpoch_&&mixer_->count()==mixerCount_) {
         if (ownsMusic_&&mixer_->playbackRevision(musicVoice)==musicPlaybackRevision_) mixer_->stop(musicVoice);
         for (std::size_t i=0; i<availableEffectVoiceCount(); ++i){
@@ -3253,7 +3410,7 @@ void OriginalUiMainAudio50KG::reset() noexcept {
     garagePersistentBacking_.reset();garageEntryCustody_.reset();garageEntryGeneration_=garageEntryEpoch_=0;
     garageSourceLifetime_=GarageSourceLifetime::unbound;ordinaryOutputRetired_=false;
     finalNativePcmRetired_=false;finalNativePcmReceipt_={};
-    prepared_=false; riderPrepared_=false; coursePrepared_=false; creditsPrepared_=false; hallOfFamePrepared_=false; mixer_=nullptr;
+    prepared_=false; riderPrepared_=false; coursePrepared_=false; creditsPrepared_=false; hallOfFamePrepared_=false; winPrepared_=false; mixer_=nullptr;
     ownsMusic_=false; ownsRiderConfirm_=false; fading_=false; paused_=false; musicSong_=0;
     ownsEffect_.fill(false); musicGain_=0.f; musicPitch_=1.f;
     if(changed)noteControlChange();

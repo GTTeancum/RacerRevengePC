@@ -64,6 +64,16 @@ public:
     static bool tournamentBinder(const assets::OriginalUiArchive50KG& appStart,
         const assets::OriginalUiRiderBinderAssets50KG&,OriginalUiRiderMaterialFootprint50KG&,
         OriginalUiRiderMaterialLifetimeDiagnostic50KG&) noexcept;
+    // Authenticated UIUnlock domains (pod 9..23, pilot 24..38, binder).
+    static bool unlockPod(const assets::OriginalUiArchive50KG& appStart,
+        const assets::OriginalUiRiderPodAssets50KG&,OriginalUiRiderMaterialFootprint50KG&,
+        OriginalUiRiderMaterialLifetimeDiagnostic50KG&) noexcept;
+    static bool unlockCharacter(const assets::OriginalUiArchive50KG& appStart,
+        const assets::OriginalUiRiderCharacterAssets50KG&,OriginalUiRiderMaterialFootprint50KG&,
+        OriginalUiRiderMaterialLifetimeDiagnostic50KG&) noexcept;
+    static bool unlockBinder(const assets::OriginalUiArchive50KG& appStart,
+        const assets::OriginalUiRiderBinderAssets50KG&,OriginalUiRiderMaterialFootprint50KG&,
+        OriginalUiRiderMaterialLifetimeDiagnostic50KG&) noexcept;
     static bool character(const assets::OriginalUiArchive50KG& appStart,
         const assets::OriginalUiRiderCharacterAssets50KG&,OriginalUiRiderMaterialFootprint50KG&,
         OriginalUiRiderMaterialLifetimeDiagnostic50KG&) noexcept;

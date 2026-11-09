@@ -38,6 +38,7 @@ class OriginalRaceConstructor50LA final {
     friend class ::original_results_roster50LA::Read;
     friend class OriginalResults10450LA;
     friend class OriginalSimpleVCR50LA;
+    friend class ::native_race_replay50PD::Owner; //Common race recording/replay (race78, 90, 1A8, 1B0).
     friend class OriginalRaceMusicManager50LA;
     friend class OriginalRaceTimingManager50LA;
     friend class OriginalRaceRacerManager50LA;
@@ -172,6 +173,23 @@ class OriginalRaceConstructor50LA final {
     // Only partial/future detached native cancellation, NOT source teardown
     //1A6840, attachment1AB1A8, or permission to retire a live replay owner.
     bool retireNativeVcr78Detached(OriginalSimpleVCRDiagnostic50LA&)noexcept;
+    // Window close only, after the HUD scope revoked its registration: drops
+    // the suspended 1A7DD0/1A7E40/1AB520 invocation's saved locals so the
+    // detached VCR/F8/Results retirements can run. Effects already made on
+    // F8/Results/HUD/World stay; nothing is replayed or completed.
+    bool cancelNativeEndInvocation50PD(const char*& gate)noexcept {
+        if(resultsFeedbackThread_!=std::this_thread::get_id()){gate="end invocation cancel requires Race thread";return false;}
+        if(!endHud_.expired()){gate="end invocation cancel requires revoked HUD scope";return false;}
+        endEntryStep_=EndEntryStep::subtype;endEntryProfile_.reset();endEntrySubtype_=0;
+        endEntryF8_=nullptr;endEntryResults_=nullptr;
+        endDispatchPublication_.reset();endAcknowledgement20C_.reset();endDispatchReturned_=false;
+        endCallerCut_=EndCallerCut::owner78;endCallerVcr_=nullptr;endCallerMode_=0;
+        endCallerIndexS1_.reset();endReplayZoneC38_.reset();endReplayCenterC40_.reset();
+        endEntrySourceF20_.reset();endRootChildrenRead_=false;endRootEnrollmentSerial_=0;
+        endRootChildS0_=nullptr;endRootReturnS4_.reset();endMusicSource10C_=nullptr;
+        endWaitingPlaceScan_.reset();
+        return true;
+    }
     // Actual1A6CAC publication owns the counted manager BEFORE its load.
     // Empty native custody is not a source constructor-null10C assertion.
     std::unique_ptr<OriginalRaceMusicManager50LA> music10C_;

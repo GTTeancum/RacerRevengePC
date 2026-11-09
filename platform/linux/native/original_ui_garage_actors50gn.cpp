@@ -801,6 +801,24 @@ bool OriginalUiGarageActors50GN::retireFailedSampleAnimationManager101FE0(
     return retireAttachedAnimationManager101FE0(page,d);
 }
 
+bool OriginalUiGarageActors50GN::pageActorModelLiveCurrent(
+    const OriginalUiGaragePageOwner50KG& page,std::size_t ordinal,const R& model)const noexcept {
+    if(!storage_||ordinal>=game::garageActorCount50GN)return false;
+    const auto& s=*storage_;
+    if(!s.sourceSceneOwner||!scenePopulationCurrent2742F0(*s.sourceSceneOwner)||s.runtimeFailed||
+       s.toyRetiring||s.pageRetirement!=Storage::PageRetirement::none||s.pageRetirementOwner||
+       s.sourceSceneOwner->actorOwner3C8_!=this||!s.grant||
+       !s.grant->garageScenePageChildCurrent(page,*s.sourceSceneOwner,8,s.toyList3C8))return false;
+    const auto& actor=s.actors[ordinal];const auto* child=model.scene().modelEntity8();
+    const auto* next=ordinal+1<s.actors.size()?&s.actors[ordinal+1].entity290:nullptr;
+    return s.records34[ordinal]==&actor&&actor.sourceToy&&actor.sourceToy==s.assets->actor(ordinal)&&
+        actor.model.get()==&model&&actor.base.fields_.model04.has_value()&&
+        *actor.base.fields_.model04==model.scene().model()&&model.source()==actor.sourceToy->model.get()&&
+        actor.entity290.reference00==1&&actor.entity290.parent1C==&s.toyList3C8&&actor.entity290.next14==next&&
+        actor.entity290.previous10==(ordinal?&s.actors[ordinal-1].entity290:nullptr)&&
+        actor.entity290.mask20==2u&&child&&child->parent1C==&actor.entity290&&
+        !child->next14&&!child->previous10&&!child->firstChild18&&!child->mask20;
+}
 bool OriginalUiGarageActors50GN::pageActorModelRetirementCurrent(
     const OriginalUiGaragePageOwner50KG& page,std::size_t ordinal,const R& model)const noexcept {
     if(!storage_||ordinal>=game::garageActorCount50GN)return false;

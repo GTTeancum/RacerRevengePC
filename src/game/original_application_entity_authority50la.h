@@ -5,6 +5,8 @@ namespace original_camera_session50KX { class Session; }
 namespace original_main_entry50KG { struct Application; }
 #include "original_entity_chains50la.h"
 #include <array>
+#include <cstdint>
+#include <cstdlib>
 #include <exception>
 #include <vector>
 #include <limits>
@@ -72,6 +74,60 @@ class OriginalApplicationEntityAuthority50LA final {
     mutable Storage<unsigned char> visitScratch_;
     mutable Storage<VisitIndex> visitIndexScratch_;
     std::size_t count_=0;
+    // Host-side lookup index only (never source state): exact enrolled node
+    // pointer -> its CURRENT entries_/nodes_ row, maintained by enroll/retire/
+    // reserveAdditional, the only writers of those rows. Open addressing over
+    // a power-of-two table at least twice the row capacity; slot value is row+1
+    // (0 = empty). Allocation happens only where row storage itself grows.
+    template<class T,std::size_t N> struct IndexStorage {
+        std::array<T,N> initial{};
+        std::vector<T> expanded;
+        std::size_t size()const noexcept{return expanded.empty()?initial.size():expanded.size();}
+        T* data()noexcept{return expanded.empty()?initial.data():expanded.data();}
+        const T* data()const noexcept{return expanded.empty()?initial.data():expanded.data();}
+    };
+    IndexStorage<std::uint32_t,2*maxOriginalWreckComponents50LA> rowIndex_;
+    static std::size_t indexHash(const C* p,std::size_t mask)noexcept {
+        auto v=reinterpret_cast<std::uintptr_t>(p);
+        v^=v>>17;v*=static_cast<std::uintptr_t>(0x9E3779B97F4A7C15ull);v^=v>>29;
+        return static_cast<std::size_t>(v)&mask;
+    }
+    static void indexInsert(std::uint32_t* table,std::size_t size,const C* p,std::size_t row)noexcept {
+        const std::size_t mask=size-1;
+        for(std::size_t i=indexHash(p,mask);;i=(i+1)&mask)
+            if(!table[i]){table[i]=static_cast<std::uint32_t>(row+1);return;}
+    }
+    void indexRebuild()noexcept {
+        auto* table=rowIndex_.data();const std::size_t size=rowIndex_.size();
+        for(std::size_t i=0;i<size;++i)table[i]=0;
+        for(std::size_t i=0;i<count_;++i)indexInsert(table,size,nodes_[i],i);
+    }
+    static bool indexLegacy()noexcept {
+        static const bool on=[]{const char* v=std::getenv("RR_GARAGE_LEGACY_INDEX");return v&&v[0]=='1'&&!v[1];}();
+        return on;
+    }
+    static bool indexShadow()noexcept {
+        static const bool on=[]{const char* v=std::getenv("RR_GARAGE_PROOF_SHADOW");return v&&v[0]=='1'&&!v[1];}();
+        return on;
+    }
+    std::size_t linearRow(const C* p)const noexcept {
+        for(std::size_t i=0;i<count_;++i)if(entries_[i].node==p)return i;
+        return count_;
+    }
+    // Row of p among the first count_ rows, or count_ when not enrolled.
+    std::size_t rowOf(const C* p)const noexcept {
+        if(indexLegacy())return linearRow(p);
+        std::size_t result=count_;
+        if(p){
+            const auto* table=rowIndex_.data();const std::size_t mask=rowIndex_.size()-1;
+            for(std::size_t i=indexHash(p,mask);table[i];i=(i+1)&mask){
+                const std::size_t row=table[i]-1u;
+                if(row<count_&&nodes_[row]==p&&entries_[row].node==p){result=row;break;}
+            }
+        }
+        if(indexShadow()&&result!=linearRow(p))std::terminate();
+        return result;
+    }
     // Native cold-factory provenance only, not a guest field. Never reset by
     // retirement: a currently empty forest cannot prove no prior dispatcher.
     bool nonRootEnrollmentObserved_=false;
@@ -153,11 +209,78 @@ class OriginalApplicationEntityAuthority50LA final {
         }
         friend unsigned char* entityVisitScratch(const View& v)noexcept{return v.scratch();}
         friend bool domain(const View& v)noexcept{return v.valid();}
-        friend bool contains(const View& v,const C* p)noexcept {
-            for(std::size_t i=0;i<v.count;++i)if(v.objects[i]==p)return true;
+        bool forestProvenMemo()const noexcept{return authority&&authority->forestProven(*this);}
+        void forestRecordMemo()const noexcept{if(authority)authority->forestRecord(*this);}
+        friend bool entityForestProven(const View& v)noexcept{return v.forestProvenMemo();}
+        friend void entityForestRecord(const View& v)noexcept{v.forestRecordMemo();}
+        bool containsMember(const C* p)const noexcept {
+            // Same answer as the linear scan: a current View's objects ARE the
+            // authority's live rows, whose exact index rowOf() maintains.
+            if(authority&&objects==authority->nodes_.data()&&count==authority->count_)
+                return authority->rowOf(p)<count;
+            for(std::size_t i=0;i<count;++i)if(objects[i]==p)return true;
             return false;
         }
+        friend bool contains(const View& v,const C* p)noexcept{return v.containsMember(p);}
     };
+    // Exact host-side memo of the last PROVEN-VALID forest() result. Every
+    // field the full validation reads (Entry rows, node array/count/extents and
+    // each enrolled node's identity and link words) is retained; a later View
+    // is accepted without re-walking ONLY if all of them are bit-identical.
+    // Rejections are never memoized. Not a guest field or readiness flag.
+    struct ForestRow {
+        const C* node=nullptr;std::uint64_t entryGeneration=0,entryKey=0;
+        std::uint64_t reference=0,generation=0,key=0;
+        OriginalWreckComponentKind50LA kind=OriginalWreckComponentKind50LA::unbound;
+        const C* previous=nullptr;const C* next=nullptr;const C* first=nullptr;const C* parent=nullptr;
+    };
+    mutable std::vector<ForestRow> forestRows_;
+    mutable bool forestRecorded_=false;
+    mutable C* const* forestObjects_=nullptr;
+    mutable std::size_t forestCount_=0;
+    mutable std::array<std::size_t,4> forestExtents_{};
+    std::array<std::size_t,4> forestExtentsNow()const noexcept {
+        return {entries_.size(),nodes_.size(),visitScratch_.size(),visitIndexScratch_.size()};
+    }
+    bool forestRowsMatch(const View& v)const noexcept {
+        if(!forestRecorded_||v.authority!=this||v.objects!=forestObjects_||v.count!=forestCount_||
+           v.count!=count_||v.objects!=nodes_.data()||forestRows_.size()!=v.count||
+           forestExtents_!=forestExtentsNow())return false;
+        for(std::size_t i=0;i<v.count;++i){
+            const auto& r=forestRows_[i];const auto& e=entries_[i];const C* p=v.objects[i];
+            if(p!=r.node||e.node!=r.node||e.generation!=r.entryGeneration||e.key!=r.entryKey||
+               p->reference00!=r.reference||p->sessionGeneration!=r.generation||p->objectKey!=r.key||
+               p->kind!=r.kind||p->previous10!=r.previous||p->next14!=r.next||
+               p->firstChild18!=r.first||p->parent1C!=r.parent)return false;
+        }
+        return true;
+    }
+    bool forestProven(const View& v)const noexcept {
+        using Scope=EntityForestReadScope50LA;
+        if(Scope::depth&&Scope::provenAuthority==this&&Scope::provenObjects==v.objects&&
+           Scope::provenCount==v.count&&Scope::provenSerial==enrollmentSerial_&&
+           v.count==count_&&v.objects==nodes_.data())return true;
+        if(!forestRowsMatch(v))return false;
+        if(Scope::depth){Scope::provenAuthority=this;Scope::provenObjects=v.objects;
+            Scope::provenCount=v.count;Scope::provenSerial=enrollmentSerial_;}
+        return true;
+    }
+    void forestRecord(const View& v)const noexcept {
+        // Called only after a complete successful validation of this View.
+        forestRecorded_=false;
+        if(v.authority!=this||v.count!=count_||v.objects!=nodes_.data())return;
+        try{forestRows_.resize(v.count);}catch(...){return;}
+        for(std::size_t i=0;i<v.count;++i){
+            const auto& e=entries_[i];const C* p=v.objects[i];auto& r=forestRows_[i];
+            r.node=p;r.entryGeneration=e.generation;r.entryKey=e.key;r.reference=p->reference00;
+            r.generation=p->sessionGeneration;r.key=p->objectKey;r.kind=p->kind;
+            r.previous=p->previous10;r.next=p->next14;r.first=p->firstChild18;r.parent=p->parent1C;
+        }
+        forestObjects_=v.objects;forestCount_=v.count;forestExtents_=forestExtentsNow();forestRecorded_=true;
+        using Scope=EntityForestReadScope50LA;
+        if(Scope::depth){Scope::provenAuthority=this;Scope::provenObjects=v.objects;
+            Scope::provenCount=v.count;Scope::provenSerial=enrollmentSerial_;}
+    }
     View view()const noexcept{return {this,nodes_.data(),count_};}
     bool reserveAdditional(std::size_t additional)noexcept {
         // Source object counts are32-bit. No transient View survives this
@@ -171,13 +294,18 @@ class OriginalApplicationEntityAuthority50LA final {
             std::vector<C*> nodes;
             std::vector<unsigned char> scratch;
             std::vector<VisitIndex> index;
+            std::vector<std::uint32_t> rows;
             if(required>entries.max_size()||required>nodes.max_size()||required>scratch.max_size()||
-               required>index.max_size())return false;
+               required>index.max_size()||required>std::numeric_limits<std::uint32_t>::max()/4u)return false;
+            std::size_t indexSize=rowIndex_.size();while(indexSize<2*required)indexSize*=2;
             entries.resize(required);nodes.resize(required);scratch.resize(required);index.resize(required);
+            if(indexSize!=rowIndex_.size())rows.resize(indexSize);
             for(std::size_t i=0;i<count_;++i){entries[i]=entries_[i];nodes[i]=nodes_[i];}
-            // All four allocations succeeded before the first mutation.
+            // All allocations succeeded before the first mutation.
             entries_.expanded.swap(entries);nodes_.expanded.swap(nodes);visitScratch_.expanded.swap(scratch);
             visitIndexScratch_.expanded.swap(index);
+            if(!rows.empty())rowIndex_.expanded.swap(rows);
+            indexRebuild();
             return true;
         }catch(...){return false;}
     }
@@ -191,13 +319,14 @@ class OriginalApplicationEntityAuthority50LA final {
         if(!canEnroll(node,node.objectKey)||!node.reference00||!node.sessionGeneration||
            node.kind==OriginalWreckComponentKind50LA::unbound)return false;
         if(count_>=2)nonRootEnrollmentObserved_=true;
-        entries_[count_]={&node,node.sessionGeneration,node.objectKey};nodes_[count_++]=&node;++enrollmentSerial_;
+        entries_[count_]={&node,node.sessionGeneration,node.objectKey};nodes_[count_]=&node;
+        indexInsert(rowIndex_.data(),rowIndex_.size(),&node,count_);++count_;++enrollmentSerial_;
         return true;
     }
     bool canRetire(const C& node)const noexcept {
         if(node.reference00!=1)return false;
-        for(std::size_t i=0;i<count_;++i)if(entries_[i].node==&node)
-            return node.sessionGeneration==entries_[i].generation&&node.objectKey==entries_[i].key;
+        const std::size_t i=rowOf(&node);
+        if(i<count_)return node.sessionGeneration==entries_[i].generation&&node.objectKey==entries_[i].key;
         return false;
     }
     bool retire(C& node)noexcept {
@@ -206,10 +335,11 @@ class OriginalApplicationEntityAuthority50LA final {
         // The concrete owner checks its exact source teardown topology first.
         // Application142590 root release still retains dying-node parent links.
         if(node.reference00!=1)return false;
-        for(std::size_t i=0;i<count_;++i)if(entries_[i].node==&node){
+        const std::size_t i=rowOf(&node);
+        if(i<count_){
             if(node.sessionGeneration!=entries_[i].generation||node.objectKey!=entries_[i].key)return false;
             for(std::size_t j=i+1;j<count_;++j){entries_[j-1]=entries_[j];nodes_[j-1]=nodes_[j];}
-            entries_[--count_]={};nodes_[count_]=nullptr;return true;
+            entries_[--count_]={};nodes_[count_]=nullptr;indexRebuild();return true;
         }
         return false;
     }

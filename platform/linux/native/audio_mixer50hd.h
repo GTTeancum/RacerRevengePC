@@ -212,7 +212,10 @@ private:
     // Same retained Aural only. Quiescent native-domain admission is separate
     // from source268300, which itself has no active-voice guard. Never stops a
     // voice or clears persistent routing/DSP state to make admission succeed.
-    bool canResetNativeSourceMemory268300(const OriginalApplicationAural50KG&)const noexcept;
+    // releasingStoppedGarageClips: Main has already proven that the stopped
+    // Garage range clips are released in this same 268300 transaction.
+    bool canResetNativeSourceMemory268300(const OriginalApplicationAural50KG&,
+        bool releasingStoppedGarageClips=false)const noexcept;
     void resetNativeSourceMemoryPreflighted268300()noexcept;
     bool canStopNativeSource26D070(const OriginalApplicationAural50KG&,bool introOwnsPool)const noexcept;
     void stopNativeSourcePreflighted26D070()noexcept;
@@ -235,6 +238,10 @@ private:
     bool canRetireStoppedNativeGarageClips(const OriginalUiMainAudio50KG&,
         const AudioVoiceObservation50HD*,std::size_t)const noexcept;
     void retireStoppedNativeGarageClipsPreflighted()noexcept;
+    // 268300 counterpart: the stopped Garage range returns to constructor
+    // voice state (clip, cursor, envelope, routing gains, playback identity).
+    // Group binding presence/gain/pause and persistent routing bytes survive.
+    void releaseStoppedNativeGarageVoices268300Preflighted()noexcept;
     //A backend binding of the already-counted source group, NOT a second
     //group registry. Main alone supplies actual identity and native range.
     struct NativeGarageRoutingClaim {

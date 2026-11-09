@@ -152,6 +152,9 @@ bool Application::prepareFrontendMenuAudio(Frontend& frontend,
        !(retained&&main->creditsPrepared_?main->creditsMenuReady():main->prepareCreditsMenu(audioRoot,error)))return false;
     if(cold.hall&&
        !(retained&&main->hallOfFamePrepared_?main->hallOfFameMenuReady():main->prepareHallOfFameMenu(audioRoot,error)))return false;
+    // Optional UIWin Song10/Song8. A retained prepared copy is reused as is;
+    // readiness (which also refuses a wet-bound transport) is checked by Win.
+    if(cold.win&&!(retained&&main->winPrepared_)&&!main->prepareWinMenu(audioRoot,error))return false;
     error.clear();return true;
 }
 bool Application::frontendAudioClosedReceiptCurrent()const noexcept {

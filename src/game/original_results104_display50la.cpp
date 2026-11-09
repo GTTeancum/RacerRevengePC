@@ -7,6 +7,7 @@
 #include "../assets/original_standard_material_object50la.h"
 #include "../assets/original_application_localization50kg.h"
 #include "../assets/original_standard_texture_resource50la.h"
+#include <cstdio>
 #include <cmath>
 
 namespace rr::game {
@@ -285,8 +286,10 @@ bool OriginalResults10450LA::Impl::retainNativeOccurrence(std::size_t reference,
     // service per reached primitive, not per cached image. Do not double-service
     // here. Clean Text reaches this same path.
     NativeDisplayCapture::Packet packet;
-    if(!references.prepareNativePrimitive50LA(reference,nativeDisplay->receipt,packet.material,materialDiagnostic))
-        return stop(d,S::material,materialDiagnostic.sourcePC,"Results current FINAL native primitive projection incomplete");
+    if(!references.prepareNativePrimitive50LA(reference,nativeDisplay->receipt,packet.material,materialDiagnostic)){
+        std::fprintf(stderr,"results_primitive_rejected reference=%zu caller=%08x status=%u pc=%08x field=%s\n",reference,caller,
+            unsigned(materialDiagnostic.status),materialDiagnostic.sourcePC,materialDiagnostic.field?materialDiagnostic.field:"");
+        return stop(d,S::material,materialDiagnostic.sourcePC,"Results current FINAL native primitive projection incomplete");}
     const auto maximum=packet.material.hasTexture?packet.material.textured.maximumVertexAlpha:
         packet.material.untextured.maximumVertexAlpha;
     for(const auto& v:vertices)if(v.color[3]>maximum)
@@ -386,6 +389,9 @@ OriginalResults10450LA::DisplayCpuPrefix OriginalResults10450LA::captureNativeDe
     // issued generation, not an invalidated older cold seal. No source
     // population/history is replayed and no pin validity rule is relaxed.
     if(!table||!table->rebuildColdCollector14D440(p.domain->coldCollector_,p.materialDiagnostic)){
+        std::fprintf(stderr,"results_collector_rebuild_rejected table=%d status=%u pc=%08x row=%d field=%s\n",table?1:0,
+            unsigned(p.materialDiagnostic.status),p.materialDiagnostic.sourcePC,p.materialDiagnostic.row,
+            p.materialDiagnostic.field?p.materialDiagnostic.field:"");
         p.stop(d,Impl::S::material,0x14d440,"Results native capture collector snapshot");return DisplayCpuPrefix::none;}
     capture.receipt=p.domain->coldCollector14D440();
     capture.race=&race;capture.generation=p.component.sessionGeneration;capture.building=true;

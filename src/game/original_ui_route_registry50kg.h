@@ -48,7 +48,10 @@ struct OriginalUiPageFactory50KG {
     std::uint32_t factoryPC,constructorPC,vtableVA,inputPC;
     std::uint8_t variant; // Rider player index; options controller index.
 };
-inline constexpr std::array<OriginalUiPageFactory50KG,17> originalUiBoundedPageFactories50KG{{
+inline constexpr std::array<OriginalUiPageFactory50KG,19> originalUiBoundedPageFactories50KG{{
+    // UIWin page1: constructor 2076A0 and input 2089D0 are recovered; its
+    // factory and vtable addresses are not, so they stay 0 (unknown).
+    {7,1,"PodUIPageCircuitWin",      0,0x2076A0,0,0x2089D0,0},
     {4,1,"PodUIPageMain",            0x1CFB80,0x1E5400,0x3D11E0,0x1E5E00,0},
     {4,2,"PodUIPageLegal",           0x1CFB80,0x1E49C0,0x3D12B0,0x1E5130,0},
     {4,3,"PodUIPageOpening",         0x1CFB80,0x1D7C80,0x3D15F0,0x1D7DF0,0},
@@ -58,6 +61,7 @@ inline constexpr std::array<OriginalUiPageFactory50KG,17> originalUiBoundedPageF
     {5,2,"PodUIPageRiderSelect",     0x1CFF00,0x1E7AC0,0x3D1110,0x1EA460,1},
     {6,1,"PodUIPageCourseSelect",    0x1D0170,0x1D8D70,0x3D1450,0x1DEB90,0},
     {9,1,"PodUIPageStandings",       0x1D03E0,0x1ED7E0,0x3D0EF0,0x1F2310,0},
+    {10,1,"PodUIPageUnlock",         0x1D17D0,0x209A80,0x3D0620,0x20B480,0},
     {11,1,"PodUIPageHallOfFame",     0x1CF130,0x1E0650,0x3D1380,0x1E3F70,0},
     {12,1,"PodUIPageOptionsMenu",    0x1D0E30,0x1F8DD0,0x3D0AE0,0x1F9640,0},
     {12,2,"PodUIPageControllerConfig",0x1D0E30,0x1F2F60,0x3D0E20,0x1F3950,0},

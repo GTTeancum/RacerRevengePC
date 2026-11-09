@@ -1,6 +1,7 @@
 // Original publication scope and its local owners; no root-only hooks/readers.
 #include "native_wreck_debris_gpu50pd.h"
 #include "native_wreck_debris_sim50pd.h"
+#include "native_common_results50pd.h"
 #include "terrain_interactive_publication50du.h"
 #include "native_display_capacity50du.h"
 #include "original_race_hud_scope50la.h"
@@ -694,6 +695,7 @@ void Context::run() {
        nativeVideo,originalMainApplication);
    trackMaterialRequest.canonicalMaterialPath={&originalMainApplication.materialDirectory36B970()};
   }
+  bool commonRacePausePrewarmed=false;
   if(humanOriginalHud&&!isRaTrack){
    // Acquire every actual HUD and particle reference before the single final
    // whole-table population. All borrowers share the same Application domain.
@@ -709,6 +711,7 @@ void Context::run() {
    // rejection keeps the host menu (logged), never stops the race.
    if(!originalMainApplication.prewarmPauseCold50LA(sourcePause))
     std::cerr<<"original_pause_host prewarm_rejected\n";
+   else commonRacePausePrewarmed=true;
   }
   if(nativeModelDomain&&!isRaTrack){
    require50DU(trackMaterialRequest.canonicalDomain==nativeModelDomain,
@@ -853,6 +856,28 @@ void Context::run() {
        rc_particle_render50RC::Owner::retainedPayloadBytes(),rcParticleRenderDiagnostic);
    require50DU(renderPrepared,"RC actual numerical particle renderer rejected");
   }
+  // The original race load 1A8A40 runs for EVERY race (one race class,
+  // vtable 3CEE80): Pause100, then Results104 and F8, inside the racer
+  // population window (racer sources admitted, before the one combined
+  // population/collector). RA does it inside its own world join; TA's race
+  // does it here through its world's population hook.
+  if(commonRacePausePrewarmed&&humanCourseEnabled&&!allAiEnabled&&taOriginalWorld){
+   const auto commonRace=consumedTaStage.race();
+   if(commonRace)taOriginalWorld->beforeRacerPopulation=[&,commonRace]{
+    OriginalResults104Diagnostic50LA loadDiagnostic;
+    const bool loaded=originalMainApplication.loadHumanTournamentPauseResultsBeforeCollector50LA(
+        *commonRace,sourcePause,nullptr,dynamicRacer60,loadDiagnostic);
+    std::cerr<<"common_race_results_load loaded="<<loaded<<" pc="<<std::hex<<loadDiagnostic.sourcePC<<std::dec
+        <<" status="<<static_cast<unsigned>(loadDiagnostic.status)
+        <<" operation="<<(loadDiagnostic.operation?loadDiagnostic.operation:"")
+        <<" pause_storage="<<bool(sourcePause.storage())<<" pause_pc="<<std::hex<<sourcePause.storageDiagnostic.sourcePC
+        <<" pause_material_pc="<<sourcePause.storageDiagnostic.material.sourcePC<<std::dec
+        <<" pause_material_status="<<static_cast<unsigned>(sourcePause.storageDiagnostic.material.status)
+        <<" pause_object="<<sourcePause.storageDiagnostic.object<<'\n';
+    return true;
+   };
+   else std::cerr<<"common_race_results_load loaded=0 operation=no counted race on this course\n";
+  }
   const bool trackMaterialsLoaded=isRaTrack||(mcOriginalWorld?mcOriginalWorld->populateCanonicalRacers(trackMaterialRequest,mcRemainingPayloadBytes(),trackMaterialDiagnostic):gbOriginalWorld?
       gbOriginalWorld->populateCanonicalRacers(trackMaterialRequest,gbRemainingPayloadBytes(),trackMaterialDiagnostic):tbOriginalWorld?
       tbOriginalWorld->populateCanonicalRacers(trackMaterialRequest,tbRemainingPayloadBytes(),trackMaterialDiagnostic):rcOriginalWorld?
@@ -891,6 +916,7 @@ void Context::run() {
        <<" bank_texture="<<failure.bank.texture<<" bank_slot="<<failure.bank.slot
        <<" bank_offset="<<failure.bank.byteOffset<<" bank_detail="<<failure.bank.parserMessage<<'\n';
   }
+  if(taOriginalWorld)taOriginalWorld->beforeRacerPopulation=nullptr;
   require50DU(trackMaterialsLoaded,
       trackMaterialDiagnostic.message.empty()?"selected-track material load failed":trackMaterialDiagnostic.message.c_str());
   if(humanOriginalHud&&!isRaTrack){
@@ -1917,7 +1943,9 @@ void Context::run() {
     sourcePositionStatsRendering=renderer.bindOriginalPositionStats(sourcePositionStatsHud,rendererDiagnostic);
     if(!sourcePositionStatsRendering)reportRenderer50DU(rendererDiagnostic);
     require50DU(sourcePositionStatsRendering,"original PositionStats GPU source join rejected");
-    if(!isRaTrack){
+    // A race that already loaded Pause100 (the common race load above)
+    // shares that storage with the host Pause binding, as RA human races do.
+    if(!isRaTrack&&!sourcePause.storage()){
      rr::platform::OriginalUiRiderProfileOwner50KG::CourseRaceSelection course;
      const bool selected=originalMainApplication.riderProfile&&
          originalMainApplication.riderProfile->courseRaceSnapshot(course);
@@ -2146,6 +2174,16 @@ void Context::run() {
          <<" operation="<<(rootDiagnostic.operation?rootDiagnostic.operation:"owner")<<'\n';
      require50DU(false,"actual accepted-world human Results root publication rejected");
     }
+   }
+   // The common race (TA here): the same root after its own race load. A
+   // rejection keeps the host results panel and is logged, never fatal.
+   else if(consumedTaStage.race()&&humanCourseEnabled&&!allAiEnabled&&originalCameraEnabled&&sourcePause.storage()){
+    OriginalResults104Diagnostic50LA rootDiagnostic;
+    const bool published=originalMainApplication.publishNativeHumanResultsRoot50LA(*this,rootDiagnostic);
+    native_common_results50PD::state().rootPublished=published;
+    if(published)bindResultsFeedbackCall();
+    std::cerr<<"common_race_results_root published="<<published<<" pc="<<std::hex<<rootDiagnostic.sourcePC<<std::dec
+        <<" operation="<<(rootDiagnostic.operation?rootDiagnostic.operation:"")<<'\n';
    }
    installHumanCameraInput50DU();
    if(gcNativeWorldSelected){
@@ -2534,6 +2572,11 @@ void Context::run() {
   auto commitCompletedTournament=[&](){
    if(!tournamentResultArmed||tournamentResultCommitted||
       (originalAiSession.manager.flags58&3u)!=3u)return;
+   // 1AB5BC: behind the common race's original Results, 1875C0/187D80 run
+   // inside the acknowledgement (after Results is confirmed), not at the
+   // finish. The host-panel fallback keeps committing at the finish.
+   {const auto& common=native_common_results50PD::state();
+    if(common.rootPublished&&!common.fallback&&!common.acknowledged)return;}
    require50DU(humanCourseEnabled&&originalAiHumanCount==1&&racerBank.count()==8,
        "tournament result lost its original manager roster");
    std::array<rr::game::OriginalTournamentResultRacer50KG,8> rows{};

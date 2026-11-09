@@ -1,3 +1,4 @@
+#include <cstdio>
 #include "original_ui_garage_scene_emitters50kg.h"
 #include "original_ui_garage_pod_scene50kg.h"
 #include "original_ui_garage_page_owner50kg.h"
@@ -245,8 +246,10 @@ bool OriginalUiGaragePodScene50KG::updatePageEmitters27DFC0(
                     if(!prefix.okay())return fail(S::source,prefix.sourcePC);
                     bool skipped=false;
                     if(attachment){
-                        if(!row.modelPin||row.attachment74!=attachment||!visibility_)
-                            return fail(S::phase,0x15E198);
+                        if(!row.modelPin||row.attachment74!=attachment||!visibility_){
+                            std::fprintf(stderr,"garage_fire_attachment_rejected pc=15E198 pin=%d attachment=%d visibility=%d emitter=%u\n",int(bool(row.modelPin)),
+                                int(row.attachment74==attachment),int(bool(visibility_)),unsigned(ordinal));
+                            return fail(S::phase,0x15E198);}
                         if(!visibility_->skipFireObserver15E1B4(*this,*row.modelPin,
                             row.authenticatedSourceRow,*attachment,skipped,d))
                             return fail(S::source,d.sourcePC?d.sourcePC:0x15E1A4);

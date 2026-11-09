@@ -361,11 +361,16 @@ bool OriginalUiGarageScreenText50KG::loadColdSource2DFD90(
    //Admit only this exact Popup or typed Course PSM with its real complete
    //canonical mount provenance. Course's actual Config mount may retain an
    //earlier equal-byte allocation; no CPU resource receipt is adopted here.
-   //Ordinary Garage materials and the retained font atlas still require identity.
-   if((!courseOwner&&!coursePopupOwner&&!coursePage440Owner&&materialName!="venus16popup"&&materialName!="venus14popup")||
-      *mounted.member!=material.identity->name)return false;
+   //An ordinary Garage material is the same case after a race: the next
+   //frontend's Garage owns a fresh archive allocation of the same authentic
+   //archive while132820 still resolves the first equal-byte mount. Admit it
+   //only with that exact Garage archive provenance and complete equal bytes.
+   if(*mounted.member!=material.identity->name)return false;
+   const bool popup=materialName=="venus16popup"||materialName=="venus14popup";
+   const bool course=courseOwner||coursePopupOwner||coursePage440Owner;
    assets::OriginalStandardArchiveProvider50LA::MountView mount;
-   const auto* expected=assets::originalUiArchiveIdentity50KG((courseOwner||coursePopupOwner||coursePage440Owner)?assets::OriginalUiArchiveId50KG::course:assets::OriginalUiArchiveId50KG::controllerPopup);
+   const auto* expected=assets::originalUiArchiveIdentity50KG(course?assets::OriginalUiArchiveId50KG::course:
+       popup?assets::OriginalUiArchiveId50KG::controllerPopup:inputs.archive);
    return expected&&provider->mount(mounted.mount,mount)&&mount.archiveName&&mount.archiveSha256&&
     *mount.archiveName==expected->discPath&&*mount.archiveSha256==expected->sha256&&
     mount.archiveBytes==expected->bytes&&mount.memberCount==expected->memberCount&&

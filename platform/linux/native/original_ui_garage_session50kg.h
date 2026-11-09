@@ -266,6 +266,8 @@ class OriginalUiGarageSession50KG final {
     bool publishedOwnerCurrent(const Application&)const noexcept;
     bool nativeAudioConstructionIdentity(const Application&,const OriginalUiMainAudio50KG&,
         std::uint64_t&,std::uint64_t&)const noexcept;
+    // Process-wide manager lifetime order (scope epochs restart per frontend).
+    std::uint64_t nativeAudioConstructionSerial()const noexcept{return grant_?grant_->serial_:0;}
     bool nativeAudioRetirementIdentity(const Application&,const OriginalUiMainAudio50KG&,
         std::uint64_t,std::uint64_t)const noexcept;
     bool nativeAudioEmptyEntryFailureIdentity(const Application&,const OriginalUiMainAudio50KG&,

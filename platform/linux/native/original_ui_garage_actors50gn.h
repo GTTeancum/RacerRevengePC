@@ -165,6 +165,10 @@ private:
     bool retireAttachedToyList142590(const OriginalUiGaragePageOwner50KG&,D&)noexcept;
     bool retireAttachedAnimationManager101FE0(const OriginalUiGaragePageOwner50KG&,D&)noexcept;
     bool failedLateBorrowActorAudioCurrent(const OriginalUiGaragePageOwner50KG&)const noexcept;
+    // Live runtime counterpart of the retirement predicate below: the same
+    // actual actor/model/Entity identity while the whole population is
+    // attached in source order and no Page retirement has begun.
+    bool pageActorModelLiveCurrent(const OriginalUiGaragePageOwner50KG&,std::size_t,const R&)const noexcept;
     bool pageActorModelRetirementCurrent(const OriginalUiGaragePageOwner50KG&,
         std::size_t,const R&)const noexcept;
     // Cold-only cleanup; no GPU submission/retirement is asserted here.

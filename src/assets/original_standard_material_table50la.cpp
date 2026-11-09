@@ -591,9 +591,14 @@ bool OriginalStandardMaterialTable50LA::rebuildColdCollector14D440(
     OriginalStandardMaterialCollectorReceipt50LA& output,D& d) noexcept {
     d={};if(!storage_)return fail(d,S::unprepared,0x14D440u);
     auto& s=*storage_;
-    if(s.uiSharedHistoryOwner||s.nativeBindingPoisoned||s.nativeFifoPins||s.populationTerminal||s.populationActive||s.demandActive||s.collectorActive||demandTerminal())
+    if(s.uiSharedHistoryOwner||s.nativeBindingPoisoned||s.nativeFifoPins||s.populationTerminal||s.populationActive||s.demandActive||s.collectorActive||demandTerminal()){
+        d.field=s.uiSharedHistoryOwner?"collector rebuild: UI shared history owner":s.nativeBindingPoisoned?"collector rebuild: native binding poisoned":
+            s.nativeFifoPins?"collector rebuild: native FIFO pins":s.populationTerminal?"collector rebuild: population terminal":
+            s.populationActive?"collector rebuild: population active":s.demandActive?"collector rebuild: demand active":
+            s.collectorActive?"collector rebuild: collector active":"collector rebuild: demand terminal";
         return fail(d,S::phase,0x14D440u);
-    if(s.populationBound&&(!s.construction||!s.construction->live()))return fail(d,S::video,0x14D440u);
+    }
+    if(s.populationBound&&(!s.construction||!s.construction->live())){d.field="collector rebuild: construction not live";return fail(d,S::video,0x14D440u);}
     if(s.collectorGeneration==std::numeric_limits<std::uint64_t>::max())return fail(d,S::overflow,0x14D440u);
     struct Guard {bool& active;explicit Guard(bool& a):active(a){active=true;}~Guard(){active=false;}} guard(s.collectorActive);
     //29C3F0 clears all old nodes;29BEA0 clears every nonnull material's active

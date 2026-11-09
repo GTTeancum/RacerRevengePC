@@ -119,7 +119,13 @@ bool OriginalUiGarageDrawContribution50KG::prepareDrainModelPolicies24B130(D& d)
             if(!archive||!archive->loaded())return bankFailure(d,S::archive,0x24b130u,"retained screen archive");
             bool present=false;
             for(const auto& prior:input.archives)if(prior->identity()==archive->identity()){
-                if(prior!=archive)return bankFailure(d,S::archive,0x24b130u,"different live archive owners with one identity");
+                // After a race the next frontend's Garage loads a fresh copy
+                // of the same authenticated archive, while132820 keeps the
+                // first equal-byte mount as its lookup winner. ImageBank
+                // locates members by canonical identity and verifies pixels,
+                // so the identical authenticated copy is the same source.
+                if(prior!=archive&&(!prior->loaded()||prior->memberCount()!=archive->memberCount()))
+                    return bankFailure(d,S::archive,0x24b130u,"different live archive owners with one identity");
                 present=true;break;
             }
             if(!present){

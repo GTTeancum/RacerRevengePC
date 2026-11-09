@@ -115,6 +115,16 @@ inline bool Application::closeNativeConsumedRace(rr::game::OriginalRaceConstruct
     //not certify full142590 over unrepresented original children.
     if(!owner.retireF8Cold(gate)){d.status=S::phase;d.field=gate;return false;}
     if(!owner.retireNativePauseParent(gate)){d.status=S::phase;d.field=gate;return false;}
+    // Race78 (SimpleVCR) is a Race child too. A suspended end invocation keeps
+    // saved VCR/F8/Results identities; the window close drops them first.
+    if(!owner.cancelNativeEndInvocation50PD(gate)){d.status=S::phase;d.field=gate;return false;}
+    {
+        rr::game::OriginalSimpleVCRDiagnostic50LA vcr;
+        if(!owner.retireNativeVcr78Detached(vcr)){
+            d.status=S::phase;d.sourcePC=vcr.sourcePC;
+            d.field=vcr.operation?vcr.operation:"actual Race78 SimpleVCR native retirement";return false;
+        }
+    }
     // The same lexical provider scope must revoke before its borrowed state
     // or the counted music manager retires. Native cleanup, not1A3AF0 IO.
     if(!retireConsumedRaMusicNative10C(owner,pc)){

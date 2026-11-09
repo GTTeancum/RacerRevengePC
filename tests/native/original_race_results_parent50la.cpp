@@ -3,8 +3,12 @@
 #include "original_race_pause_world_authority50la.h"
 namespace rr::game {
 bool OriginalRaceConstructor50LA::canRetainPause100()const noexcept {
-    return counted_&&!rolledBack_&&!pause100_&&!results104_&&world74_&&OriginalRacePauseWorldAuthority50LA::current(
-        *world74_,application_,raceAudio_,entity_.sessionGeneration)&&
+    // 1A8AB0 runs inside every race's load. The RA world join keeps its
+    // stronger same-world authority; every other course's race only needs
+    // its counted world slot (constructed by the same 1A6BC0 step).
+    const bool world=world74_?OriginalRacePauseWorldAuthority50LA::current(
+        *world74_,application_,raceAudio_,entity_.sessionGeneration):anyWorld();
+    return counted_&&!rolledBack_&&!pause100_&&!results104_&&world&&
         loadPrefixReached_&&resourcesPrepared_&&raceGroupsAttached_==6;
 }
 bool OriginalRaceConstructor50LA::attachNativePauseParent()noexcept {

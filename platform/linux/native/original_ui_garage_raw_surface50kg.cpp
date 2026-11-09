@@ -1,5 +1,6 @@
 #include "original_ui_garage_raw_surface50kg.h"
 #include "original_ui_garage_model_resource50kg.h"
+#include "original_ui_garage_lowering_proof50kg.h"
 #include "../../../src/game/original_ui_lit_geometry50km.h"
 #include <algorithm>
 #include <utility>
@@ -157,7 +158,7 @@ bool OriginalUiGarageRawSurface50KG::describe(Metadata& out,D& d)const noexcept{
     d={S::complete,0x24640c,sourceOffset_};return true;
 }
 bool OriginalUiGarageRawSurface50KG::triangle(std::uint32_t ordinal,std::array<Vertex,3>& out,D& d)const noexcept{
-    if(!current()||ordinal>=triangles_.size())return fail(d,S::phase,0x24640c,sourceOffset_);
+    if((OriginalUiGarageLoweringProof50KG::provenRaw!=this&&!current())||ordinal>=triangles_.size())return fail(d,S::phase,0x24640c,sourceOffset_);
     const auto& t=triangles_[ordinal];std::array<Vertex,3> result{};
     for(unsigned i=0;i<3;++i){
         if(t[i]>=vertices_.size())return fail(d,S::source,0x24640c,sourceOffset_);

@@ -327,6 +327,17 @@ private:
     bool nativeResultsHallDeparting50LA()const noexcept;
     bool nativeResultsHallReceiverCurrent50LA()const noexcept;
     bool acceptNativeResultsHallReceiver50LA()const noexcept;
+    // 1AB5BC: the common race's acknowledgement request 17DE10(App,6,screen,1),
+    // appended to App10 like 1CA6F0's Hall request and consumed by the same
+    // departure/receiver lifecycle. The route is the original's decision.
+    bool commitRaceAcknowledgementTransfer50PD(rr::game::OriginalRaceConstructor50LA&,
+        const rr::game::OriginalRaceAckDestination50PD&)const noexcept;
+    // Receiver route of a retired-session 1AB5BC request; false otherwise.
+    bool nativeRaceReturnRoute50PD(std::uint32_t& screen,std::uint32_t& page)const noexcept;
+    bool acceptNativeRaceReturnReceiver50PD()const noexcept;
+    // 1AB680 / 1AB838: 1AC440(App28C) for the 1AB5BC record row, before 17DE10.
+    bool commitRaceAcknowledgementRecords1AC440_50PD(rr::game::OriginalRaceConstructor50LA&,
+        const rr::game::OriginalRaceAckDestination50PD&)const noexcept;
     bool resultsInputContinuationCurrent50LA()const noexcept;
     enum class ResultsBlockingInputOrigin50LA : std::uint32_t {
         summary=0x1c8f5c,tournament=0x1c98bc,nameDone=0x1ca778,hall=0x1ca678};
@@ -551,7 +562,10 @@ private:
     SharedUiBootResult prepareSharedDialogsInitial1B7BD0(
         const rr::platform::OriginalUiMainDrawResources50KG&,
         std::shared_ptr<const rr::assets::OriginalUiArchive50KG>,
-        rr::platform::VehicleWindowGl50DS&,std::string&)const noexcept;
+        rr::platform::VehicleWindowGl50DS&,std::string&,
+        // True only for a race-return lifetime whose FIRST manager is Garage13:
+        // its own Page1FB648 performs the 1B86D0 reorder, not Main1D7CF4.
+        bool firstManagerGarage=false)const noexcept;
     bool finishSharedUiDispatcherAfterBanks1B7140(std::string&)const noexcept;
     rr::game::OriginalUiEntityScope50KG::Result loadDispatcherGlobalWidgets2A35E0()const noexcept;
     // Executes only Display20/24 and proven zero global-row hide. The caller
@@ -650,6 +664,12 @@ private:
     // created until a complete Garage frame destination can own its lifetime.
     void prepareGarageDestinationResources1F241C(Frontend&,
         const rr::platform::OriginalUiTournamentRouteProposal50KG&,
+        rr::platform::OriginalUiGarageDestinationDiagnostic50KG&,
+        rr::platform::OriginalUiFrontendColdInterval50KG&)const noexcept;
+    // Shared selected-career resource admission (archives, pod, scene assets).
+    // Caller has already proved its origin: Tournament proposal or the retired
+    // race's 17DE10(App,6,13,1) request. Creates no counted manager.
+    void prepareGarageCareerResources1D1950(Frontend&,
         rr::platform::OriginalUiGarageDestinationDiagnostic50KG&,
         rr::platform::OriginalUiFrontendColdInterval50KG&)const noexcept;
     bool loadPreparedGarageManager1D1950(Frontend&,
@@ -1612,6 +1632,8 @@ struct Frontend : rr::platform::OriginalUiRiderPresentationHost50KG {
 private:
     bool nativeResultsHallEntry_=false;
     bool nativePauseMainEntry_=false,nativePauseCourseEntry_=false;
+    // 1AB5BC request receiver: first screen/page of this lifetime (0 = none).
+    std::uint8_t nativeRaceReturnScreen_=0,nativeRaceReturnPage_=0;
     using UploadLifetime=rr::assets::OriginalNativeFrontendUploadLifetime50LA;
     std::shared_ptr<UploadLifetime> uploadLifetime_;
     friend struct Application;

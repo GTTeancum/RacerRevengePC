@@ -863,10 +863,31 @@ bool OriginalStandardMaterialObject50LA::borrowResultsScreenFallback2475C0(
         OriginalStandardTextureRowView50LA row;OriginalStandardTextureResource50LA* actual=nullptr;
         if(!s.textures->row(pass.texture1A[0],row)||!row.references08||*row.references08<=0||
            row.object04!=&texture||!s.textures->resolve298E60(pass.texture1A[0],actual,d.texture)||actual!=&texture||
-           texture.construction_!=s.construction||!texture.resolver_||!texture.firstUiSourceCurrent())
+           texture.construction_!=s.construction||!texture.resolver_)
             return fail(d,E::texture,0x247648,"same actual fallback texture and first-source owner");
-        const auto& imageSource=texture.firstUiSource_;
-        const auto image=imageSource.archive->member(imageSource.ordinal);
+        // The texture's own UI-archive first source, or (a row first created
+        // through a non-UI registration, e.g. the Application font owner) the
+        // SAME member of the overlays archive this material's proof retained,
+        // admitted only with byte-identical original contents.
+        std::shared_ptr<const OriginalUiArchive50KG> imageArchive;OriginalUiMemberView50KG image{};
+        const void* imageProvider=nullptr;
+        if(texture.firstUiSourceCurrent()){
+            const auto& imageSource=texture.firstUiSource_;
+            imageArchive=imageSource.archive;image=imageArchive->member(imageSource.ordinal);
+            imageProvider=imageSource.providerIdentity;
+        }else{
+            const auto* ownName=texture.sourceMember();const auto* ownBytes=texture.originalBytes();
+            const auto& overlays=s.resultsFallback?s.resultsFallback->overlays_:s.pauseBackdropMissingPsm;
+            if(!ownName||!ownBytes||!overlays||!overlays->loaded()||
+               overlays->identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::overlays))
+                return fail(d,E::texture,0x247648,"same actual fallback texture and first-source owner");
+            image=overlays->find(*ownName);
+            if(!image.identity||!image.data||image.size!=ownBytes->size()||
+               std::memcmp(image.data,ownBytes->data(),image.size))
+                return fail(d,E::texture,0x247648,"fallback texture bytes differ from the overlays member");
+            imageArchive=overlays;
+            imageProvider=s.resultsFallback?static_cast<const void*>(s.resultsFallback->provider_.get()):nullptr;
+        }
         const auto* bytes=texture.originalBytes();const auto* name=texture.sourceMember();
         if(!name||!bytes||!image.identity||!image.data||image.size!=bytes->size())
             return fail(d,E::texture,0x24E880);
@@ -887,7 +908,7 @@ bool OriginalStandardMaterialObject50LA::borrowResultsScreenFallback2475C0(
                  (Provider::sameName(s.name00,R"(ui\textures\results2.psm)")&&held.provenance.sourceCallerPC==0x1B898C)))
                 return fail(d,E::source,0x1B8810,"actual retained shared-base backdrop construction");
             const auto original=archive->find(held.provenance.registeredName+".pst");
-            if(imageSource.archive->identity()!=archive->identity()||original.identity!=held.provenance.fallbackTexture||
+            if(imageArchive->identity()!=archive->identity()||original.identity!=held.provenance.fallbackTexture||
                original.identity!=image.identity||!original.data||original.size!=image.size||
                !Provider::sameName(*name,held.provenance.registeredName+".pst")||
                std::memcmp(original.data,image.data,image.size))
@@ -919,7 +940,7 @@ bool OriginalStandardMaterialObject50LA::borrowResultsScreenFallback2475C0(
                proof.overlays_->identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::overlays)||
                !Provider::sameName(s.name00,proof.name_+".psm")||proof.pstBytes_.empty()||
                !Provider::sameName(proof.pstMember_,proof.name_+".pst")||
-               imageSource.providerIdentity!=proof.provider_.get())
+               imageProvider!=static_cast<const void*>(proof.provider_.get()))
                 return fail(d,E::source,0x29B638,"actual first Results occurrence and resource owners");
             const auto* selectedArchive=proof.selectedArchive_.identity();
             const bool allowed=selectedArchive==originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::overlays)||
@@ -937,7 +958,7 @@ bool OriginalStandardMaterialObject50LA::borrowResultsScreenFallback2475C0(
                std::memcmp(bytes->data(),proof.pstBytes_.data(),bytes->size()))
                 return fail(d,E::source,0x29B638,"independent first material/resource selections and authentic PST bytes");
             provenance.origin=OriginalUiMaterialOrigin50KG::resultsCanonicalScreenMissingPsmFallback;
-            provenance.archive=imageSource.archive->identity();provenance.fallbackTexture=image.identity;
+            provenance.archive=imageArchive->identity();provenance.fallbackTexture=image.identity;
             provenance.fallbackConstructionArchive=selectedArchive;provenance.fallbackConstructionTexture=selected;
             provenance.sourceCallerPC=proof.caller_;provenance.registeredName=proof.name_;
             provenance.attemptedPsmMember=s.name00;provenance.creationPC=0x2475C0;
@@ -1163,9 +1184,34 @@ bool OriginalStandardMaterialObject50LA::serviceTexturePrototype29AC90(std::size
     rr::game::OriginalApplicationAnimationClockSample50KG leafTime;
     if(!clock.read(leafTime))return fail(d,E::phase,0x29A118);
     auto next=prototype->state_;next.frameCount=static_cast<std::uint32_t>(*count);
+    {
+        // 29A020 never validates the authored initial frame (medasmbrz.psm
+        // says 16 for its 12-frame ATM). Its first advance (seconds 0) takes
+        // the ordinary end-of-range branch: apply that same wrap here, before
+        // the shared helper's range admission. Later frames are unchanged.
+        const float frames=static_cast<float>(next.frameCount);
+        if(next.frameCount&&next.previousMilliseconds==0xffffffffu&&std::isfinite(next.phase)&&next.phase>=frames){
+            const float remainder=std::fmod(next.phase,frames);
+            if(next.config.reverseLoopOnEnd){
+                next.phase=static_cast<float>(next.frameCount-1)-remainder;next.reverseDirection=true;
+            }else if(next.config.loopOnEndToFrame!=-1&&next.config.loopOnEndToFrame<static_cast<std::int32_t>(next.frameCount)){
+                const float loopTo=static_cast<float>(next.config.loopOnEndToFrame);
+                const float span=static_cast<float>(static_cast<std::int32_t>(next.frameCount)-next.config.loopOnEndToFrame);
+                next.phase=loopTo+std::fmod(remainder,span);
+            }else next.phase=remainder;
+            if(!next.config.looping)next.stopped=true;
+            if(next.stopped)next.phase=frames-1.f;
+        }
+        if(next.frameCount&&!(next.config.initialFrame<frames))next.config.initialFrame=std::fmod(next.config.initialFrame,frames);
+    }
     std::uint32_t ordinal=0;
-    if(!rr::game::advanceOriginalUiTextureAnimation50KG(next,leafTime.current230,ordinal)||
-       !aggregate->frame102050(static_cast<std::int32_t>(ordinal)))return fail(d,E::arithmetic,0x29A020);
+    const bool advanced=rr::game::advanceOriginalUiTextureAnimation50KG(next,leafTime.current230,ordinal);
+    if(!advanced||!aggregate->frame102050(static_cast<std::int32_t>(ordinal))){
+        std::fprintf(stderr,"ui_texture_animation_rejected material=%s advanced=%d ordinal=%u count=%d phase=%g previous=%u now=%u fps=%g\n",
+            s.name00.c_str(),advanced?1:0,ordinal,*count,prototype->state_.phase,prototype->state_.previousMilliseconds,
+            leafTime.current230,prototype->state_.config.framesPerSecond);
+        return fail(d,E::arithmetic,0x29A020);
+    }
     rr::game::OriginalApplicationAnimationClockSample50KG leafCommit;
     if(!clock.read(leafCommit))return fail(d,E::phase,0x29A16C);
     next.previousMilliseconds=leafCommit.current230;

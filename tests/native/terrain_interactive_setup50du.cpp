@@ -1103,7 +1103,9 @@ SessionExit50DU Context::run() {
   auto* audioGroups=liveAudio->groupsForProviders();
   auto* sharedAnnouncer=liveAudio->sharedAnnouncer();
   require50DU(audioGroups&&sharedAnnouncer,"shared native audio group/episode owner unavailable");
-  if(originalCameraEnabled)require50DU(materialMixer&&(sourceConsumedPauseActivation&&consumedRaStage.race()?
+  // The race UI emitter (raceUI.ini keys 1..6) is common to every course; a
+  // human race's Results menu (common race or RA) dispatches all six.
+  if(originalCameraEnabled)require50DU(materialMixer&&((sourceConsumedPauseActivation&&consumedRaStage.race())||humanCourseEnabled?
       sourceCameraCycleAudio.prepareResultsFeedback(runtime_asset_paths50LB::resolve("work/native/project/disc"),
           audioRoot,*materialMixer,*audioGroups,audioError):
       sourceCameraCycleAudio.prepare(runtime_asset_paths50LB::resolve("work/native/project/disc"),

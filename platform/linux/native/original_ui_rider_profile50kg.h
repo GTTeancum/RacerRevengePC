@@ -14,6 +14,8 @@
 #include "../../../src/game/original_race_record_insertion50kg.h"
 #include "../../../src/game/original_race_record_qualification50kg.h"
 #include "../../../src/game/original_race_rival_qualification50kg.h"
+#include "../../../src/game/original_unlock_checks50pd.h"
+#include "../../../src/game/original_race_ack_route50pd.h"
 
 namespace original_results_roster50LA { class Read; }
 namespace original_main_entry50KG { struct Application; }
@@ -225,6 +227,16 @@ public:
         OriginalUiMainApplication50KG&,game::OriginalTournamentResultReceipt50KG&)noexcept;
     // Restart/leave must call this before destroying its real timing manager.
     void cancelTournamentResultForRace(const game::LapTimingManager50ID&) noexcept;
+    // Read-only facts for 187E30 and its grants: unlock words, 7E8, the
+    // selected course rival, diagonal medals, Hall defaults (7EC) and live
+    // records (102F0), gallery tier. Read after the 1875C0/187D80 commit.
+    bool unlockFacts187E30(game::OriginalUnlockFacts50PD&)const noexcept;
+    // 209C2C..209CC4: rivals of course orders 4..12 (signed byte
+    // P+11280+12*byte(P+100C4+40*o)) then pods 3,1,14,25,21,26. Bit p = pod p.
+    bool unlockSpritePods209BE0(std::uint32_t& mask)const noexcept;
+    // Read-only facts for the 1AB5BC destination rows (mode34, 187B10 order,
+    // 102CC, 7E4 bit0, M[C][C][12], 187E30). No store, route or save.
+    bool raceAcknowledgementFacts1AB5BC(game::OriginalRaceAckFacts50PD&)const noexcept;
 private:
     friend class ::ra_cold_aggregate50LA::Owner;
     //Actual1B44E8 synchronous byte read from THIS profile's same common owner.
@@ -332,6 +344,13 @@ private:
     bool commitSingleHumanHallRecords1AC440(const game::OriginalRaceRecordInsertionStage50KG&,
         OriginalSaveProfileOwner50KG& prepared,OriginalUiRiderProfileStamp50KG expected,
         OriginalUiRiderProfileStamp50KG& after)noexcept;
+    // 1AB5BC record row (1AB680 / 1AB838): the same single-human preparation,
+    // provenance and store as above in one synchronous call, for callers that
+    // cannot own the prepared save container. row0 must be this race's own
+    // manager row0 read immediately before; failure changes nothing.
+    bool commitSingleHumanRaceRecords1AC440(const game::OriginalRaceRecordRacerObservation50KG& row0,
+        std::uint8_t race1B0,OriginalUiRiderProfileStamp50KG expected,OriginalUiRiderProfileStamp50KG& after,
+        game::OriginalRaceRecordInsertionStage50KG::Diagnostic&)noexcept;
     // Actual Results1CA6E4 bit store, not persistence or a save acknowledgement.
     bool markResultsHallDirty1CA6E4(OriginalUiRiderProfileStamp50KG expected)noexcept;
     bool commitRacerManager1AD520(const CourseRaceSelection& expected,CourseRaceSelection& actual)noexcept;
@@ -347,12 +366,27 @@ private:
     bool initializeStartupProfile(std::shared_ptr<OriginalUiMainProfile50KG>,
         std::shared_ptr<const assets::OriginalUiArchive50KG>,std::uint32_t testRider,
         OriginalUiRiderProfileDiagnostic50KG&,bool gasganoSc=false,bool tzidikTc=false,bool scorchRc=false,bool sebulbaTb=false,bool kraidGb=false,bool youngAnakinMc=false,std::uint32_t mcRider=1) noexcept;
+    friend class OriginalUiUnlockSession50PD;
+    friend class OriginalUiWinSession50PD;
+    // 20B480: grant ONE check (187F40/187FF0/188050/1880D0/188150/1881D0/
+    // 1882B0, or 188440(P,N) for the gallery). Exact preimage stamp only.
+    bool grantUnlock20B480(std::size_t check,std::uint32_t galleryTier,
+        OriginalUiRiderProfileStamp50KG expected,OriginalUiRiderProfileStamp50KG& after)noexcept;
+    // 1AB878/1AB8DC: non-tournament acknowledgement 100BC bit0 store. The
+    // tournament row's 1AB648 store is part of commitTournamentRaceResult.
+    bool markAcknowledgementSavePending1AB648(OriginalUiRiderProfileStamp50KG expected,
+        OriginalUiRiderProfileStamp50KG& after)noexcept;
     friend class OriginalUiHallOfFameSession50KG;
     bool hallSnapshotForMode(std::uint32_t prospectiveMode,game::OriginalUiHallProfile50KG&) const noexcept;
     bool commitHallPlanet(std::uint32_t planet,OriginalUiRiderProfileStamp50KG) noexcept;
     bool commitHallBack(std::uint16_t selectedSlot,const game::OriginalUiRouteDecision50KG&,
         OriginalUiRiderProfileStamp50KG) noexcept;
     bool commitHallRender(OriginalUiRiderProfileStamp50KG) noexcept;
+    // Hall page reads in its own live mode: mode5 (Options) or mode2 (the
+    // tournament race-return Hall, entered by 1AB5BC's 17DE10(6,11,1) with
+    // no mode write). Mode5 results equal hallRecordSnapshot/hallPlanetColors.
+    bool hallBrowseRecordSnapshot(std::uint32_t course,game::OriginalUiHallCourseRecords50KG&) const noexcept;
+    bool hallBrowsePlanetColors(std::uint32_t planet,OriginalUiCourseProfileColors50KG&) const noexcept;
     friend class OriginalUiTournamentSession50KG;
     friend class OriginalUiCourseSession50KG;
     bool commitRiderConfirmToCourse(const game::OriginalUiRouteDecision50KG&,OriginalUiRiderProfileStamp50KG)noexcept;

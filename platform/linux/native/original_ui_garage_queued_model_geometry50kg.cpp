@@ -1,14 +1,97 @@
 #include "vehicle_window_gl50ds.h"
 #include "original_ui_garage_draw_contribution50kg.h"
 #include "original_ui_garage_model_resource50kg.h"
+#include "original_ui_garage_lowering_proof50kg.h"
 #include "../../../tests/native/original_ui_main_entry50kg.h"
 #include "../../../tests/native/original_native_collector_fifo50la.h"
+#include <algorithm>
+#include <condition_variable>
+#include <cstdio>
+#include <cstdlib>
+#include <exception>
 #include <cstring>
+#include <functional>
+#include <mutex>
+#include <vector>
+#include <xmmintrin.h>
 #include <limits>
 #include <thread>
 #include <utility>
 
 namespace rr::platform {
+bool loweringSerialOnly50KG()noexcept;
+namespace {
+// Host worker pool for the pure per-triangle numeric pass (never source state).
+// Workers run the SAME projection functions on contiguous triangle ranges with
+// the caller's SSE control word (rounding, FTZ/DAZ); the caller then appends
+// every triangle's packet in source order and applies the unchanged per-
+// triangle capacity check and first-failure report exactly as the serial loop.
+class LoweringPool50KG {
+public:
+    static LoweringPool50KG* instance()noexcept{
+        static LoweringPool50KG* pool=[]()->LoweringPool50KG*{
+            const char* v=std::getenv("RR_GARAGE_LEGACY_PARALLEL");
+            if(v&&v[0]=='1'&&!v[1])return nullptr;
+            // Up to 11 workers (12 threads with the caller), leaving cores for
+            // the driver, audio and window threads on the target 16-thread host.
+            unsigned n=std::thread::hardware_concurrency();n=n>1?std::min(n-1,11u):0u;
+            if(!n)return nullptr;
+            try{return new LoweringPool50KG(n);}catch(...){return nullptr;}
+        }();
+        return pool;
+    }
+    unsigned workers()const noexcept{return static_cast<unsigned>(threads_.size());}
+    // Runs job(chunk) for chunk in [0,count), on the workers and this thread.
+    void run(unsigned count,const std::function<void(unsigned)>& job){
+        {std::lock_guard<std::mutex> lock(mutex_);job_=&job;count_=count;next_=0;finished_=0;++generation_;}
+        wake_.notify_all();
+        work();
+        std::unique_lock<std::mutex> lock(mutex_);
+        done_.wait(lock,[&]{return finished_==count_;});
+        job_=nullptr;
+    }
+private:
+    explicit LoweringPool50KG(unsigned n){
+        for(unsigned i=0;i<n;++i)threads_.emplace_back([this]{loop();});
+    }
+    void loop(){
+        unsigned seen=0;
+        for(;;){
+            {std::unique_lock<std::mutex> lock(mutex_);wake_.wait(lock,[&]{return generation_!=seen;});seen=generation_;}
+            work();
+        }
+    }
+    void work(){
+        for(;;){
+            unsigned chunk;const std::function<void(unsigned)>* job;
+            {std::lock_guard<std::mutex> lock(mutex_);if(!job_||next_>=count_)return;chunk=next_++;job=job_;}
+            (*job)(chunk);
+            {std::lock_guard<std::mutex> lock(mutex_);if(++finished_==count_)done_.notify_all();}
+        }
+    }
+    std::vector<std::thread> threads_;
+    std::mutex mutex_;std::condition_variable wake_,done_;
+    const std::function<void(unsigned)>* job_=nullptr;
+    unsigned count_=0,next_=0,finished_=0,generation_=0;
+};
+bool loweringParallelShadow50KG()noexcept{
+    static const bool on=[]{const char* v=std::getenv("RR_GARAGE_PROOF_SHADOW");return v&&v[0]=='1'&&!v[1];}();
+    return on;
+}
+[[noreturn]] void loweringParallelMismatch50KG()noexcept{
+    std::fprintf(stderr,"garage_parallel_lowering_shadow MISMATCH\n");std::fflush(stderr);std::terminate();
+}
+void loweringParallelCompared50KG(std::uint32_t triangles)noexcept{
+    static unsigned long long total=0,surfaces=0;total+=triangles;
+    if(!(++surfaces%500))std::fprintf(stderr,"garage_parallel_lowering_shadow surfaces=%llu triangles=%llu mismatches=0\n",surfaces,total);
+}
+template<class Diag> struct LoweringChunk50KG {
+    std::uint32_t first=0,last=0,failedAt=0;bool failed=false,allocationFailed=false;
+    Diag failure{};
+    std::vector<std::uint32_t> quads;
+    std::vector<assets::Vertex48B> vertices;std::vector<std::array<float,3>> stq;std::vector<float> rasterW,fog;
+};
+}
 bool OriginalUiGarageDrawContribution50KG::lowerQueuedModel24B26C(
     std::size_t ordinal,const OriginalUiGarageModelLowering50KG::Context& context,
     OriginalUiGarageOwnedModelGeometry50KG& out,assets::OriginalStandardMaterialDiagnostic50LA& d)const noexcept {
@@ -124,8 +207,98 @@ bool OriginalUiGarageDrawContribution50KG::lowerQueuedModel24B26C(
         if(!lower.prepare(raw,static_cast<std::uint32_t>(record.packetIndex),*packet,family,context,numeric))
             return lowerFailure();
         OriginalUiGarageOwnedModelGeometry50KG next;
-        if(!lower.readTriangleCount(next.sourceTriangleCount)||next.sourceTriangleCount!=metadata.triangleCount)
+        if(!lower.readTriangleCount(next.sourceTriangleCount)||next.sourceTriangleCount!=metadata.triangleCount||
+           !lower.current()||!raw->current())
             return fail(S::phase,0x24b4a0,"actual complete triangle extent");
+        // Pure numeric pass bracketed by the full checks above and below.
+        const OriginalUiGarageLoweringProof50KG proof(&lower,raw.get());
+        {   // Capacity only: one unclipped triangle is one four-vertex unit.
+            const std::size_t expected=std::min<std::size_t>(std::size_t(next.sourceTriangleCount)*4u,
+                std::size_t(originalUiMaximumSourceQuads50KM)*4u);
+            next.vertices.reserve(expected);next.stq.reserve(expected);
+            next.rasterW.reserve(expected);next.fog.reserve(expected);
+        }
+        auto* pool=next.sourceTriangleCount>=256u&&!loweringSerialOnly50KG()?LoweringPool50KG::instance():nullptr;
+        if(pool){
+            using Chunk=LoweringChunk50KG<Lower::Diagnostic>;
+            // Up to three chunks per thread (at least 64 triangles each), claimed
+            // dynamically, so clipped/cheap ranges do not leave threads idle.
+            // Chunking never changes output: the merge below is in source order.
+            const unsigned count=std::min<unsigned>(3u*(pool->workers()+1u),(next.sourceTriangleCount+63u)/64u);
+            std::vector<Chunk> chunks(count);
+            for(unsigned c=0;c<count;++c){
+                chunks[c].first=static_cast<std::uint32_t>(std::uint64_t(next.sourceTriangleCount)*c/count);
+                chunks[c].last=static_cast<std::uint32_t>(std::uint64_t(next.sourceTriangleCount)*(c+1)/count);
+                const std::size_t n=chunks[c].last-chunks[c].first;
+                chunks[c].quads.reserve(n);chunks[c].vertices.reserve(n*4);chunks[c].stq.reserve(n*4);
+                chunks[c].rasterW.reserve(n*4);chunks[c].fog.reserve(n*4);
+            }
+            const unsigned csr=_mm_getcsr();
+            const std::function<void(unsigned)> job=[&,csr](unsigned c){
+                const unsigned saved=_mm_getcsr();_mm_setcsr(csr);
+                // The same bracket proof as the caller's: it is held across this run.
+                const OriginalUiGarageLoweringProof50KG workerProof(&lower,raw.get());
+                auto& k=chunks[c];
+                try{
+                for(std::uint32_t triangle=k.first;triangle<k.last;++triangle){
+                    OriginalUiGaragePrelitPacket50KG polygon;Lower::Diagnostic diagnostic;
+                    if(!lower.projectTriangle(triangle,polygon,diagnostic)){k.failed=true;k.failedAt=triangle;k.failure=diagnostic;break;}
+                    const auto quads=std::min<std::uint32_t>(polygon.quadCount,7u);
+                    const auto count=quads*4u;
+                    k.quads.push_back(polygon.quadCount);
+                    k.vertices.insert(k.vertices.end(),polygon.vertices.begin(),polygon.vertices.begin()+count);
+                    k.stq.insert(k.stq.end(),polygon.stq.begin(),polygon.stq.begin()+count);
+                    k.rasterW.insert(k.rasterW.end(),polygon.rasterW.begin(),polygon.rasterW.begin()+count);
+                    k.fog.insert(k.fog.end(),polygon.fog.begin(),polygon.fog.begin()+count);
+                }
+                }catch(...){k.allocationFailed=true;}
+                _mm_setcsr(saved);
+            };
+            pool->run(count,job);
+            // Source-order merge with the serial loop's exact checks and reports.
+            for(const auto& k:chunks)if(k.allocationFailed)
+                return fail(S::allocation,0x24b26c,"queued model geometry allocation");
+            for(const auto& k:chunks){
+                std::size_t at=0;
+                for(std::uint32_t triangle=k.first;triangle<k.last;++triangle){
+                    d.slot=triangle;
+                    if(k.failed&&triangle==k.failedAt){numeric=k.failure;return lowerFailure();}
+                    const auto quads=k.quads[triangle-k.first];
+                    if(quads>originalUiMaximumSourceQuads50KM-next.quadCount)
+                        return fail(S::overflow,0x24b50c,"unchanged whole-frame model geometry capacity");
+                    if(!quads)++next.clippedTriangleCount;
+                    const auto count=std::size_t(quads)*4u;
+                    next.vertices.insert(next.vertices.end(),k.vertices.begin()+at,k.vertices.begin()+at+count);
+                    next.stq.insert(next.stq.end(),k.stq.begin()+at,k.stq.begin()+at+count);
+                    next.rasterW.insert(next.rasterW.end(),k.rasterW.begin()+at,k.rasterW.begin()+at+count);
+                    next.fog.insert(next.fog.end(),k.fog.begin()+at,k.fog.begin()+at+count);
+                    next.quadCount+=quads;at+=count;
+                }
+            }
+            if(loweringParallelShadow50KG()){
+                // Off by default (RR_GARAGE_PROOF_SHADOW=1): the serial pass on this
+                // thread must reproduce every merged stream byte for byte.
+                std::vector<assets::Vertex48B> v;std::vector<std::array<float,3>> q;std::vector<float> w,f;
+                std::uint32_t quads=0,clipped=0;
+                for(std::uint32_t triangle=0;triangle<next.sourceTriangleCount;++triangle){
+                    OriginalUiGaragePrelitPacket50KG polygon;Lower::Diagnostic diagnostic;
+                    if(!lower.projectTriangle(triangle,polygon,diagnostic))loweringParallelMismatch50KG();
+                    if(!polygon.quadCount)++clipped;
+                    const auto count=polygon.quadCount*4u;
+                    v.insert(v.end(),polygon.vertices.begin(),polygon.vertices.begin()+count);
+                    q.insert(q.end(),polygon.stq.begin(),polygon.stq.begin()+count);
+                    w.insert(w.end(),polygon.rasterW.begin(),polygon.rasterW.begin()+count);
+                    f.insert(f.end(),polygon.fog.begin(),polygon.fog.begin()+count);
+                    quads+=polygon.quadCount;
+                }
+                if(quads!=next.quadCount||clipped!=next.clippedTriangleCount||v.size()!=next.vertices.size()||
+                   (!v.empty()&&(std::memcmp(v.data(),next.vertices.data(),v.size()*sizeof(v[0]))||
+                    std::memcmp(q.data(),next.stq.data(),q.size()*sizeof(q[0]))||
+                    std::memcmp(w.data(),next.rasterW.data(),w.size()*sizeof(float))||
+                    std::memcmp(f.data(),next.fog.data(),f.size()*sizeof(float)))))loweringParallelMismatch50KG();
+                loweringParallelCompared50KG(next.sourceTriangleCount);
+            }
+        }else
         for(std::uint32_t triangle=0;triangle<next.sourceTriangleCount;++triangle){
             d.slot=triangle;OriginalUiGaragePrelitPacket50KG polygon;
             if(!lower.projectTriangle(triangle,polygon,numeric))return lowerFailure();
@@ -139,7 +312,7 @@ bool OriginalUiGarageDrawContribution50KG::lowerQueuedModel24B26C(
             next.fog.insert(next.fog.end(),polygon.fog.begin(),polygon.fog.begin()+count);
             next.quadCount+=polygon.quadCount;
         }
-        if(!lower.current()||model.nativeGaragePacketRevision()!=record.matrixRevision||
+        if(!lower.current()||!raw->current()||model.nativeGaragePacketRevision()!=record.matrixRevision||
            !model.nativeGarageFifoPins_||record.epoch!=fifo->epoch04_||
            next.vertices.size()!=std::size_t(next.quadCount)*4u||next.stq.size()!=next.vertices.size()||
            next.rasterW.size()!=next.vertices.size()||next.fog.size()!=next.vertices.size())

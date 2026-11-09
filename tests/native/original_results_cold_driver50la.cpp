@@ -32,20 +32,28 @@ bool Application::loadPauseResultsBeforeCollectorImpl50LA(
         diagnostic.status=status;diagnostic.sourcePC=pc;diagnostic.operation=why;return false;
     };
     std::uint32_t allocationPC=0x1A8AE8u;
+    const bool commonRace=!operation; // no RA roster Operation: the common race
     try {
         if(sourceRace28COwner_.get()!=&race||race.application_!=entitiesOwner_||
-           race.profile_!=riderProfile||!race.world74_||race.results104_||!videoOwner_||
+           race.profile_!=riderProfile||!race.anyWorld()||race.results104_||!videoOwner_||
            !Video::materialConstructionPinLive(*videoOwner_)||!materialContextOwner_||
            !materialContextOwner_->live()||materialContextOwner_->videoIdentity()!=videoOwner_.get()||
            materialContextOwner_->materialApplication()!=materialApplication||
            !standardMaterialDomainOwner_||!standardMaterialDomainOwner_->prepared())
             return fail(Status::owner,0x1A8AB0u,"same consumed Race/Application/Video required");
-        const auto prefix=original_results_roster50LA::Read::completedWorldPrefixes(race);
         const auto table=standardMaterialDomainOwner_->materials382B38();
         const auto provider=standardMaterialDomainOwner_->archiveProvider3E1A70();
-        if(!prefix.staticWorld||!prefix.staticModelResources||!prefix.staticModelObservers||
-           !prefix.runtimeQueryWorldOwners||!prefix.trackParticleManager||
-           prefix.staticWorldImages||prefix.staticWorldDrawPlan||!table||!provider||!provider->sealed()||
+        // The RA world join has its own load order to respect; every other
+        // course's world is already loaded when its race loads (1A8A40 runs
+        // for every race). Both must precede the one combined collector.
+        if(race.world74_){
+            const auto prefix=original_results_roster50LA::Read::completedWorldPrefixes(race);
+            if(!prefix.staticWorld||!prefix.staticModelResources||!prefix.staticModelObservers||
+               !prefix.runtimeQueryWorldOwners||!prefix.trackParticleManager||
+               prefix.staticWorldImages||prefix.staticWorldDrawPlan)
+                return fail(Status::phase,0x1A8AB0u,"connected loading must precede the combined collector");
+        }
+        if(!table||!provider||!provider->sealed()||
            table->coldCollectorCurrent(standardMaterialDomainOwner_->coldCollector14D440()))
             return fail(Status::phase,0x1A8AB0u,"connected loading must precede the combined collector");
         original_results_roster50LA::Read roster(*this,race,std::move(operation),actualHumanRacer60);
@@ -104,6 +112,13 @@ bool Application::loadPauseResultsBeforeCollectorImpl50LA(
                 return fail(Status::owner,0x1AAF54u,"F8 lost same cold roster/pre-collector custody");
             if(!race.attachF8Cold1AAF54())
                 return fail(Status::phase,0x1AAF54u,"F8 actual cold Race child attachment rejected");
+        }
+        // The race's SimpleVCR (race78, 1A6DF4) is part of every race's load;
+        // the end dispatch 1AB520 reads it. The common race produces it here.
+        if(commonRace){
+            rr::game::OriginalSimpleVCRDiagnostic50LA vcr;
+            if(!race.constructVcr78At1A6DF4(vcr))
+                return fail(Status::source,vcr.sourcePC,vcr.operation?vcr.operation:"Race78 SimpleVCR load rejected");
         }
         return true;
     }catch(const std::bad_alloc&){return fail(Status::allocation,allocationPC,"cold UI allocation failed; reached prefix retained");}

@@ -49,7 +49,12 @@ def main():
     parser.add_argument('--restart-once', action='store_true',
                         help='Exercise native race teardown/rebuild after first race evidence; not Pause-menu input')
     parser.add_argument('--renderer-switch', action='append', default=[],
-                        choices=['RR_EXACT_PS2_SPECULAR', 'RR_GPU_FINISH_EACH_FRAME'],
+                        choices=['RR_EXACT_PS2_SPECULAR', 'RR_GPU_FINISH_EACH_FRAME',
+                                 'RR_TRACE_ORIGINAL_UI_STAGES',
+                                 'RR_GARAGE_PROOF_SHADOW', 'RR_GARAGE_KERNEL_SHADOW',
+                                 'RR_GARAGE_LEGACY_INDEX', 'RR_GARAGE_LEGACY_FINISH',
+                                 'RR_GARAGE_LEGACY_PARALLEL', 'RR_GARAGE_LEGACY_BLEND',
+                                 'RR_GARAGE_COVERAGE_PER_TRIANGLE', 'RR_GARAGE_COVERAGE_VERIFY'],
                         help='Set one renderer comparison switch to 1 (repeatable); recorded in execution.json')
     parser.add_argument('--track', default='TA', help='Direct-start track when --route none')
     parser.add_argument('--all-ai', action='store_true',
@@ -70,6 +75,8 @@ def main():
     parser.add_argument('--destroy', help='Destroy racers during the race: slot@seconds[,slot@seconds] (0 = player)')
     parser.add_argument('--camera-cycle', action='store_true',
                         help='Tap the view key (C) 1 s after green and every 15 s (reaches the follow camera)')
+    parser.add_argument('--results-confirm', type=float, default=0.0,
+                        help='Tap Enter every N seconds once the Results replay is running (0 = off)')
     parser.add_argument('--ieee-subnormals', action='store_true',
                         help='Reproduction only: disable the PS2 no-subnormal float mode')
     parser.add_argument('--window', help='Open a resizable window at WIDTHxHEIGHT (widescreen tests)')
@@ -129,6 +136,8 @@ def main():
         env['RR_VIDEO_FXAA'] = '0'
     if args.destroy:
         env['RR_TEST_DESTROY'] = args.destroy
+    if args.results_confirm:
+        env['RR_TEST_RESULTS_CONFIRM'] = str(args.results_confirm)
     if args.camera_cycle:
         env['RR_TEST_CAMERA_CYCLE'] = '1'
     if args.ieee_subnormals:

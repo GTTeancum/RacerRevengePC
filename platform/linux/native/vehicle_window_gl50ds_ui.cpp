@@ -1,3 +1,7 @@
+#include <cstdio>
+#include <chrono>
+#include <cstdlib>
+#include <type_traits>
 #include "vehicle_window_gl50ds_storage.h"
 #include "original_ui_garage_draw_contribution50kg.h"
 #include "original_ui_shared_dialogs50kg.h"
@@ -6,8 +10,463 @@
 #include "original_ui_coverage_batch50kg.h"
 #include "original_ui_coverage_disjoint50kg.h"
 #include "original_ui_rider_draw_contribution50kg.h"
+#include <vector>
 
 namespace rr::platform {
+bool VehicleWindowGl50DS::Storage::waitGarageTargetFence50KG()noexcept {
+    // Exactly the completion the former glFinish established, observed later.
+    if(!garageTargetFence50KG)return true;
+    auto* fence=garageTargetFence50KG;garageTargetFence50KG=nullptr;
+    bool waited=false;
+    if(gl.clientWaitSync)for(;;){
+        const U r=gl.clientWaitSync(fence,1u,1000000000ull); //SYNC_FLUSH_COMMANDS_BIT, 1 s
+        if(r==0x911Au||r==0x911Cu){waited=true;break;}   //ALREADY_SIGNALED / CONDITION_SATISFIED
+        if(r!=0x911Bu)break;                               //not TIMEOUT_EXPIRED: WAIT_FAILED
+    }
+    if(!waited&&gl.finish)gl.finish();
+    if(gl.deleteSync)gl.deleteSync(fence);
+    return true;
+}
+namespace {
+// Original UI fragment program (shared by the main UI program and the
+// Garage dual-source specular variant, which adds RR_UI_DUAL_SOURCE_SPECULAR).
+constexpr const char* originalUiFragmentSource50KG = R"GLSL(
+in vec2 uiUv;
+noperspective in vec3 uiSourceStq;
+uniform int uiSourceRaster;
+noperspective in vec4 uiColor;
+noperspective in float uiParticleFog;
+uniform sampler2D uiImage;
+uniform float uiAlphaScale;
+uniform int uiTextured;
+uniform int uiSourceFogEnabled;
+uniform int uiSourceAlphaTest;
+uniform vec4 uiParticleFogColor;
+#ifndef RR_UI_COHERENT_FRAMEBUFFER_FETCH
+uniform sampler2D uiSourceTarget;
+#endif
+uniform int uiSourceComposition;
+uniform int uiCoveragePayload;
+uniform int uiSourceBlend;
+uniform int gcParticleMode;
+#ifdef RR_UI_COHERENT_FRAMEBUFFER_FETCH
+inout vec4 viewerOutput;
+#else
+out vec4 viewerOutput;
+#endif
+#ifdef RR_UI_DUAL_SOURCE_SPECULAR
+out vec4 uiSpecularFactor;
+#endif
+void main() {
+    if (uiSourceComposition != 0) {
+        // Explicit native byte representation. Native GL sampling/interpolation
+        // remains separately documented; no PS2 rasterizer/device is executed.
+        vec4 vertexByte=clamp(uiColor*255.0,0.0,255.0);
+        vec2 sampleUv=uiUv;
+        // Q was separately rounded by the original packet/clipper. Do not
+        // replace this division with semantic UV perspective interpolation.
+        if(uiSourceRaster==2)sampleUv=uiSourceStq.xy/uiSourceStq.z;
+        vec4 source=uiTextured!=0 ?
+            floor(clamp(texture(uiImage,sampleUv)*255.0*vertexByte/128.0,0.0,255.0)) :
+            floor(vertexByte);
+        if (uiSourceAlphaTest!=0 && source.a<1.0) discard;
+        if (uiSourceFogEnabled!=0) {
+            float f=clamp(uiParticleFog*256.0,0.0,255.0);
+            source.rgb=floor((source.rgb*f+uiParticleFogColor.rgb*255.0*(255.0-f))/256.0);
+        }
+        // Float scratch stores exact byte payload, including A=0. Negative A
+        // is reserved for uncovered samples by the private raster clear.
+        if(uiCoveragePayload!=0){viewerOutput=source;return;}
+#ifdef RR_UI_DUAL_SOURCE_SPECULAR
+        // Garage PC/Xbox fixed-function destination-alpha specular (ALPHA
+        // A=0 B=2 C=1 D=2: Cs*Ad/128 + Cd). Every source triangle is issued
+        // twice in a row; the GPU blends RGB as src*DST_ALPHA + dst. Copy one
+        // adds Cs*Ad/255 and keeps A (alpha factors ONE, 1-SRC1_ALPHA with
+        // src A=0, SRC1 A=0); copy two adds Cs*(127/128)*Ad/255 and replaces
+        // A with source A (SRC1 A=1). Together: Cs*Ad/128 from the same Ad,
+        // in API primitive order, with no framebuffer read.
+        if (uiSourceBlend==-3) {
+            bool second=(gl_PrimitiveID&1)!=0;
+            viewerOutput=vec4(second ? source.rgb*(127.0/128.0) : source.rgb, second ? source.a : 0.0)/255.0;
+            uiSpecularFactor=vec4(0.0,0.0,0.0,second ? 1.0 : 0.0);
+            return;
+        }
+#endif
+        vec3 result=source.rgb;
+        if (uiSourceBlend<0) {
+            // Fixed-function ADD form of ALPHA modes 2/4/6 (no destination
+            // term inside the product): emit only floor(Cs*coefficient/128);
+            // the blender adds Cd and clamps. Admitted only after this GPU's
+            // exhaustive readback self-test proved min(255,term+Cd) for every
+            // term 0..511 and Cd 0..255. Same coefficients as below.
+            float coefficient=uiSourceBlend==-4 ? 255.0 : uiSourceBlend==-6 ? 64.0 : source.a;
+            result=floor(source.rgb*coefficient/128.0);
+        } else if (uiSourceBlend!=0) {
+            // Opaque spans never enter this destination-fetch branch.
+#ifdef RR_UI_COHERENT_FRAMEBUFFER_FETCH
+            // Coherent EXT fetch observes prior writes in API primitive order,
+            // including overlapping triangles within this indexed span draw.
+            vec4 destination=floor(viewerOutput*255.0+0.5);
+#else
+            // ARB_texture_barrier: feedback uses one actual triangle per draw,
+            // one same-pixel read/write per texel, with a barrier before each.
+            vec4 destination=floor(texelFetch(uiSourceTarget,ivec2(gl_FragCoord.xy),0)*255.0+0.5);
+#endif
+            float coefficient=uiSourceBlend==3 ? destination.a : uiSourceBlend==4 ? 255.0 :
+                uiSourceBlend==6 ? 64.0 : source.a;
+            // Exact shadow ALPHA A=2 selects zero, B=1 selects destination.
+            // Floor the signed product before adding Cd, as for other ALPHA
+            // modes; never replace the original shadow texture or source A.
+            vec3 difference=uiSourceBlend==5 ? -destination.rgb :
+                uiSourceBlend==1 ? source.rgb-destination.rgb : source.rgb;
+            result=floor(difference*coefficient/128.0)+destination.rgb;
+        }
+        // ALPHA changes RGB only. Every surviving fragment replaces stored A;
+        // it never accumulates source-over alpha or clamps a FIX255 factor to1.
+        viewerOutput=vec4(clamp(result,0.0,255.0),source.a)/255.0;
+        return;
+    }
+    if (uiTextured != 0) {
+        vec4 raw = texture(uiImage, uiUv) * uiColor;
+        // MODULATE clamps before blend, not after addition to destination RGB.
+        viewerOutput = vec4(clamp(raw.rgb * (255.0 / 128.0), 0.0, 1.0),
+            clamp(raw.a * uiAlphaScale, 0.0, 1.0));
+        // Actual DefaultMT ATE/GREATER/AREF0/KEEP. Source MODULATE alpha
+        // is byte-quantized before the test: values below one byte fail.
+        if (uiSourceAlphaTest != 0 && raw.a * (255.0 * 255.0 / 128.0) < 1.0) discard;
+        if (uiSourceFogEnabled != 0) {
+            // Source F is a byte, with both fog weights divided by256.
+            // Fog changes RGB only; A/128 remains the blend coefficient.
+            viewerOutput.rgb = viewerOutput.rgb * uiParticleFog +
+                uiParticleFogColor.rgb * (255.0 / 256.0 - uiParticleFog);
+        }
+        if(gcParticleMode!=0) {
+            //Source MODULATE A is byte-quantized/clamped before both ALPHA
+            //and independent destination-A replacement. Never store A/128
+            //into a framebuffer whose source byte representation is A/255.
+            float sourceAlphaByte=floor(clamp(raw.a*(255.0*255.0/128.0),0.0,255.0));
+            if(gcParticleMode==3) {
+                viewerOutput=vec4(0.0,0.0,0.0,sourceAlphaByte/255.0);
+            } else if(gcParticleMode==2) {
+                //ONE/ONE permits genuine glow coefficients above1 without
+                //SRC_ALPHA clamp. Positive fixed-target additive saturation
+                //is unchanged if premultiplied source exceeds framebuffer1.
+                viewerOutput.rgb*=sourceAlphaByte/128.0;
+                viewerOutput.a=1.0;
+            } else viewerOutput.a=sourceAlphaByte/128.0;
+        }
+    } else {
+        // TME=0 uses raw interpolated vertex color without texture modulation.
+        // Nonopaque A/128 uses one 255/128 scale; RGB retains its raw /255.
+        viewerOutput = vec4(uiColor.rgb, clamp(uiColor.a * uiAlphaScale, 0.0, 1.0));
+    }
+}
+)GLSL";
+}
+namespace {
+// Host scheduling scratch for the source-RGBA destination-feedback fallback
+// (no coherent framebuffer fetch). Each blended source triangle reads its own
+// pixel's destination through a texture after a texture barrier. Two triangles
+// whose conservative pixel regions do not intersect cannot observe or alter
+// each other's pixels, so they may share one barrier+draw; every pair whose
+// regions do intersect keeps its original relative order. The per-pixel
+// fragment sequence (blend inputs, depth tests and writes) is therefore
+// identical to the one-triangle-per-draw order. Regions are the existing
+// conservative coverage bounds (one-pixel halo), widened to 4x4 tiles.
+struct UiFeedbackBatches50KG {
+    static constexpr int tile=4,tilesX=640/tile,tilesY=448/tile;
+    std::vector<std::uint32_t> tileStamp,tileBatch;std::uint32_t stamp=0;
+    std::vector<std::uint32_t> batchOf,offsets,scratch;
+    std::vector<std::uint32_t> rangeFirst,rangeCount; // index ranges, all spans
+    std::vector<std::uint32_t> spanFirst,spanCount;    // per span into ranges
+};
+thread_local UiFeedbackBatches50KG uiFeedbackBatches50KG;
+// Exact fixed-function blending for the destination-free additive source
+// ALPHA modes (2: Cs*As, 4: Cs*255, 6: Cs*64, each /128 floored, plus Cd).
+// The shader then emits only the floored product term and GL blending
+// (ONE,ONE / ONE,ZERO, FUNC_ADD) adds Cd on the RGBA8 target. Additions of
+// nonnegative terms clamp identically in any grouping, and one indexed draw
+// keeps API primitive order per pixel, so no destination fetch/barrier is
+// needed. Admitted only when this process's exhaustive GPU readback proves
+// stored = min(255,term+Cd) for every term 0..511 and Cd 0..255 on all three
+// colour channels and stored A = source A (log-only result). Off with
+// RR_GARAGE_LEGACY_BLEND=1. Never used for coverage (AA1) spans.
+struct GarageFixedAdditive50KG {
+    bool attempted=false,passed=false;
+    static bool legacy()noexcept{static const bool on=[]{const char* v=std::getenv("RR_GARAGE_LEGACY_BLEND");return v&&v[0]=='1'&&!v[1];}();return on;}
+    template<class S> void selfTest(S& s)noexcept{
+        if(attempted)return;attempted=true;
+        if(legacy()){std::fprintf(stderr,"garage_fixed_additive_selftest skipped=legacy_switch admitted=0\n");return;}
+        const auto get=[&](const char* n)noexcept{return s.request.procAddress(s.request.context,n);};
+        using FI=void(*)(U,I*);using FB=void(*)(U,std::uint8_t*);using FE=std::uint8_t(*)(U);using FU=void(*)(U);
+        using F2=void(*)(U,U);using F4=void(*)(U,U,U,U);using FN=void(*)(I,U*);using FD=void(*)(I,const U*);
+        auto getIntegerv=reinterpret_cast<FI>(get("glGetIntegerv"));auto getBooleanv=reinterpret_cast<FB>(get("glGetBooleanv"));
+        auto isEnabled=reinterpret_cast<FE>(get("glIsEnabled"));auto enable=reinterpret_cast<FU>(get("glEnable"));
+        auto disable=reinterpret_cast<FU>(get("glDisable"));auto genTextures=reinterpret_cast<FN>(get("glGenTextures"));
+        auto deleteTextures=reinterpret_cast<FD>(get("glDeleteTextures"));auto bindTexture=reinterpret_cast<F2>(get("glBindTexture"));
+        auto activeTexture=reinterpret_cast<FU>(get("glActiveTexture"));
+        auto texImage2D=reinterpret_cast<void(*)(U,I,I,I,I,I,U,U,const void*)>(get("glTexImage2D"));
+        auto texParameteri=reinterpret_cast<void(*)(U,U,I)>(get("glTexParameteri"));
+        auto genFramebuffers=reinterpret_cast<FN>(get("glGenFramebuffers"));auto deleteFramebuffers=reinterpret_cast<FD>(get("glDeleteFramebuffers"));
+        auto bindFramebuffer=reinterpret_cast<F2>(get("glBindFramebuffer"));
+        auto framebufferTexture2D=reinterpret_cast<void(*)(U,U,U,U,I)>(get("glFramebufferTexture2D"));
+        auto checkFramebufferStatus=reinterpret_cast<U(*)(U)>(get("glCheckFramebufferStatus"));
+        auto drawBuffer=reinterpret_cast<FU>(get("glDrawBuffer"));auto readBuffer=reinterpret_cast<FU>(get("glReadBuffer"));
+        auto viewport=reinterpret_cast<void(*)(I,I,I,I)>(get("glViewport"));auto useProgram=reinterpret_cast<FU>(get("glUseProgram"));
+        auto genVertexArrays=reinterpret_cast<FN>(get("glGenVertexArrays"));auto deleteVertexArrays=reinterpret_cast<FD>(get("glDeleteVertexArrays"));
+        auto bindVertexArray=reinterpret_cast<FU>(get("glBindVertexArray"));auto drawArrays=reinterpret_cast<void(*)(U,I,I)>(get("glDrawArrays"));
+        auto blendFuncSeparate=reinterpret_cast<F4>(get("glBlendFuncSeparate"));auto blendEquationSeparate=reinterpret_cast<F2>(get("glBlendEquationSeparate"));
+        auto colorMask=reinterpret_cast<void(*)(std::uint8_t,std::uint8_t,std::uint8_t,std::uint8_t)>(get("glColorMask"));
+        auto pixelStorei=reinterpret_cast<void(*)(U,I)>(get("glPixelStorei"));
+        auto readPixels=reinterpret_cast<void(*)(I,I,I,I,U,U,void*)>(get("glReadPixels"));auto bindBuffer=reinterpret_cast<F2>(get("glBindBuffer"));
+        auto createShader=reinterpret_cast<U(*)(U)>(get("glCreateShader"));
+        auto shaderSource=reinterpret_cast<void(*)(U,I,const char* const*,const I*)>(get("glShaderSource"));
+        auto compileShader=reinterpret_cast<FU>(get("glCompileShader"));auto getShaderiv=reinterpret_cast<void(*)(U,U,I*)>(get("glGetShaderiv"));
+        auto createProgram=reinterpret_cast<U(*)()>(get("glCreateProgram"));auto attachShader=reinterpret_cast<F2>(get("glAttachShader"));
+        auto linkProgram=reinterpret_cast<FU>(get("glLinkProgram"));auto getProgramiv=reinterpret_cast<void(*)(U,U,I*)>(get("glGetProgramiv"));
+        auto deleteShader=reinterpret_cast<FU>(get("glDeleteShader"));auto deleteProgram=reinterpret_cast<FU>(get("glDeleteProgram"));
+        auto bindFragDataLocation=reinterpret_cast<void(*)(U,U,const char*)>(get("glBindFragDataLocation"));
+        if(!getIntegerv||!getBooleanv||!isEnabled||!enable||!disable||!genTextures||!deleteTextures||!bindTexture||!activeTexture||
+           !texImage2D||!texParameteri||!genFramebuffers||!deleteFramebuffers||!bindFramebuffer||!framebufferTexture2D||
+           !checkFramebufferStatus||!drawBuffer||!readBuffer||!viewport||!useProgram||!genVertexArrays||!deleteVertexArrays||
+           !bindVertexArray||!drawArrays||!blendFuncSeparate||!blendEquationSeparate||!colorMask||!pixelStorei||!readPixels||
+           !bindBuffer||!createShader||!shaderSource||!compileShader||!getShaderiv||!createProgram||!attachShader||!linkProgram||
+           !getProgramiv||!deleteShader||!deleteProgram||!bindFragDataLocation){
+            std::fprintf(stderr,"garage_fixed_additive_selftest entry_points=missing admitted=0\n");return;}
+        constexpr int W=256,H=512;
+        // Saved state (everything this test touches).
+        I drawFb=0,readFb=0,vp[4]{},program=0,vao=0,active=0,tex0=0,unpackBuf=0,packBuf=0,unpackAlign=4,packAlign=4;
+        I srcRgb=1,dstRgb=0,srcA=1,dstA=0,eqRgb=0x8006,eqA=0x8006;std::uint8_t mask[4]{1,1,1,1};
+        getIntegerv(0x8CA6,&drawFb);getIntegerv(0x8CAA,&readFb);getIntegerv(0x0BA2,vp);getIntegerv(0x8B8D,&program);
+        getIntegerv(0x85B5,&vao);getIntegerv(0x84E0,&active);getIntegerv(0x88EF,&unpackBuf);getIntegerv(0x88ED,&packBuf);
+        getIntegerv(0x0CF5,&unpackAlign);getIntegerv(0x0D05,&packAlign);getIntegerv(0x80C9,&srcRgb);getIntegerv(0x80C8,&dstRgb);
+        getIntegerv(0x80CB,&srcA);getIntegerv(0x80CA,&dstA);getIntegerv(0x8009,&eqRgb);getIntegerv(0x883D,&eqA);getBooleanv(0x0C23,mask);
+        activeTexture(0x84C0);getIntegerv(0x8069,&tex0);
+        const U caps[6]{0x0BE2,0x0B71,0x0C11,0x0B90,0x0B44,0x8C89};std::uint8_t capOn[6]{};
+        for(int c=0;c<6;++c)capOn[c]=isEnabled(caps[c]);
+        std::vector<std::uint8_t> init(std::size_t(W)*H*4),out(std::size_t(W)*H*4);
+        for(int y=0;y<H;++y)for(int x=0;x<W;++x){auto* p=&init[(std::size_t(y)*W+x)*4];
+            p[0]=std::uint8_t(x);p[1]=std::uint8_t(255-x);p[2]=std::uint8_t((x*37+11)&255);p[3]=std::uint8_t((x*5+y)&255);}
+        static constexpr const char* vs="#version 150 core\nvoid main(){vec2 p=vec2(float((gl_VertexID<<1)&2),float(gl_VertexID&2));gl_Position=vec4(p*2.0-1.0,0.0,1.0);}\n";
+        // Same output expression as the UI shader: vec4(clamp(result,0,255),source.a)/255.
+        static constexpr const char* fs="#version 150 core\nout vec4 viewerOutput;\nvoid main(){ivec2 p=ivec2(gl_FragCoord.xy);"
+            "vec3 result=vec3(float(p.y));vec4 source=vec4(0.0,0.0,0.0,float((p.x*7+p.y*3)&255));"
+            "viewerOutput=vec4(clamp(result,0.0,255.0),source.a)/255.0;}\n";
+        U texture=0,fbo=0,array=0,v=0,f=0,prog=0;bool okay=true;
+        genTextures(1,&texture);bindTexture(0x0DE1,texture);
+        texParameteri(0x0DE1,0x2801,0x2600);texParameteri(0x0DE1,0x2800,0x2600);
+        texParameteri(0x0DE1,0x813C,0);texParameteri(0x0DE1,0x813D,0);
+        bindBuffer(0x88EC,0);bindBuffer(0x88EB,0);pixelStorei(0x0CF5,1);pixelStorei(0x0D05,1);
+        texImage2D(0x0DE1,0,0x8058,W,H,0,0x1908,0x1401,init.data());
+        genFramebuffers(1,&fbo);bindFramebuffer(0x8D40,fbo);framebufferTexture2D(0x8D40,0x8CE0,0x0DE1,texture,0);
+        drawBuffer(0x8CE0);readBuffer(0x8CE0);
+        okay=checkFramebufferStatus(0x8D40)==0x8CD5;
+        v=createShader(0x8B31);f=createShader(0x8B30);shaderSource(v,1,&vs,nullptr);shaderSource(f,1,&fs,nullptr);
+        compileShader(v);compileShader(f);I cv=0,cf=0,linked=0;getShaderiv(v,0x8B81,&cv);getShaderiv(f,0x8B81,&cf);
+        prog=createProgram();attachShader(prog,v);attachShader(prog,f);bindFragDataLocation(prog,0,"viewerOutput");
+        linkProgram(prog);getProgramiv(prog,0x8B82,&linked);okay=okay&&cv&&cf&&linked;
+        std::size_t mismatches=0,checked=0;
+        if(okay){
+            genVertexArrays(1,&array);bindVertexArray(array);useProgram(prog);viewport(0,0,W,H);
+            for(int c=1;c<6;++c)disable(caps[c]);colorMask(1,1,1,1);
+            enable(0x0BE2);blendEquationSeparate(0x8006,0x8006);blendFuncSeparate(1,1,1,0);
+            drawArrays(0x0004,0,3);
+            readPixels(0,0,W,H,0x1908,0x1401,out.data());
+            for(int y=0;y<H;++y)for(int x=0;x<W;++x){const auto* p=&out[(std::size_t(y)*W+x)*4];const auto* q=&init[(std::size_t(y)*W+x)*4];
+                for(int ch=0;ch<3;++ch){++checked;if(p[ch]!=std::min(255,y+int(q[ch])))++mismatches;}
+                ++checked;if(p[3]!=std::uint8_t((x*7+y*3)&255))++mismatches;}
+        }
+        // Restore every saved binding and capability.
+        bindFramebuffer(0x8CA9,U(drawFb));bindFramebuffer(0x8CA8,U(readFb));viewport(vp[0],vp[1],vp[2],vp[3]);
+        useProgram(U(program));bindVertexArray(U(vao));activeTexture(0x84C0);bindTexture(0x0DE1,U(tex0));activeTexture(U(active));
+        bindBuffer(0x88EC,U(unpackBuf));bindBuffer(0x88EB,U(packBuf));pixelStorei(0x0CF5,unpackAlign);pixelStorei(0x0D05,packAlign);
+        blendFuncSeparate(U(srcRgb),U(dstRgb),U(srcA),U(dstA));blendEquationSeparate(U(eqRgb),U(eqA));
+        colorMask(mask[0],mask[1],mask[2],mask[3]);
+        for(int c=0;c<6;++c){if(capOn[c])enable(caps[c]);else disable(caps[c]);}
+        if(array)deleteVertexArrays(1,&array);if(prog)deleteProgram(prog);if(v)deleteShader(v);if(f)deleteShader(f);
+        if(fbo)deleteFramebuffers(1,&fbo);if(texture)deleteTextures(1,&texture);
+        passed=okay&&checked==std::size_t(W)*H*4&&mismatches==0;
+        std::fprintf(stderr,"garage_fixed_additive_selftest terms=0..%d destinations=0..%d channels=4 compared=%zu mismatches=%zu setup=%u admitted=%u\n",
+            H-1,W-1,checked,mismatches,unsigned(okay),unsigned(passed));
+    }
+};
+thread_local GarageFixedAdditive50KG garageFixedAdditive50KG;
+bool garageFixedAdditiveBlend50KG(OriginalUiBlend50KG b)noexcept{
+    return b==OriginalUiBlend50KG::additive||b==OriginalUiBlend50KG::fixed255Additive||b==OriginalUiBlend50KG::fixed64Additive;
+}
+// PC/Xbox fixed-function Garage destination-alpha specular (user-approved
+// PC-native blending, the Garage counterpart of the race "fixed-function
+// map-2 blend"). Default on; RR_EXACT_PS2_SPECULAR=1 (the race switch) or
+// RR_GARAGE_LEGACY_BLEND=1 keeps the byte-exact per-triangle feedback path.
+// Exact: min(255, Cd + floor(Cs*Ad/128)), A = As. Fixed: each triangle is
+// drawn twice (see RR_UI_DUAL_SOURCE_SPECULAR in the UI fragment program);
+// GPU blending computes Cd + Cs*Ad/255 + Cs*(127/128)*Ad/255 with rounding,
+// so RGB may differ from exact by the readback-measured maximum (expected 1)
+// and stored A is unchanged. Admitted only if this process's readback over
+// every Cs 0..255 x Ad 0..255 (12 Cd values each) shows A exact and RGB
+// within 2. Never used for coverage (AA1) spans.
+struct GarageFixedSpecular50KG {
+    bool attempted=false,passed=false;int maxDifference=-1;
+    std::uint64_t draws=0,triangles=0;
+    U program=0,builtFor=0;const void* builtStorage=nullptr;bool buildFailed=false;
+    I canvas=-1,image=-1,alpha=-1,textured=-1,fogColor=-1,raster=-1,particle=-1,fogEnabled=-1,alphaTest=-1,
+        composition=-1,target=-1,blend=-1,payload=-1;
+    static bool exact()noexcept{static const bool on=[]{const char* v=std::getenv("RR_EXACT_PS2_SPECULAR");return v&&v[0]=='1'&&!v[1];}();return on;}
+    template<class S> bool ready(const S& s)const noexcept{
+        return passed&&program&&builtStorage==&s&&builtFor==s.uiProgram&&s.uiProgram;
+    }
+    template<class S> void prepare(S& s)noexcept{
+        selfTest(s);
+        if(!passed||!s.uiProgram||!s.uiVertexShader||s.uiSourceCoherentFramebufferFetch)return;
+        if(builtStorage==&s&&builtFor==s.uiProgram&&(program||buildFailed))return;
+        // A different Storage/UI program: the previous variant (if any) belongs
+        // to that owner's lifetime and is never deleted from here.
+        program=0;buildFailed=true;builtStorage=&s;builtFor=s.uiProgram;
+        const auto get=[&](const char* n)noexcept{return s.request.procAddress(s.request.context,n);};
+        auto bindIndexed=reinterpret_cast<void(*)(U,U,U,const char*)>(get("glBindFragDataLocationIndexed"));
+        if(!bindIndexed){std::fprintf(stderr,"garage_fixed_specular_variant entry_point=missing ready=0\n");return;}
+        const char* sources[]={"#version 150 core\n#define RR_UI_DUAL_SOURCE_SPECULAR 1\n",originalUiFragmentSource50KG};
+        const U fragment=s.shaderGl.createShader(0x8B30);if(!fragment)return;
+        s.shaderGl.shaderSource(fragment,2,sources,nullptr);s.shaderGl.compileShader(fragment);
+        I compiled=0;s.shaderGl.getShaderiv(fragment,0x8B81,&compiled);
+        if(!compiled){char log[512]{};s.shaderGl.getShaderInfoLog(fragment,sizeof(log),nullptr,log);
+            std::fprintf(stderr,"garage_fixed_specular_variant compile=0 log=%.400s ready=0\n",log);s.shaderGl.deleteShader(fragment);return;}
+        const U p=s.shaderGl.createProgram();if(!p){s.shaderGl.deleteShader(fragment);return;}
+        s.shaderGl.attachShader(p,s.uiVertexShader);s.shaderGl.attachShader(p,fragment);
+        const char* attributes[]={"rrPosition","rrUv","rrColor","rrParticleFog","rrSourceRasterW","rrSourceStq"};
+        for(U a=0;a<6;++a)s.shaderGl.bindAttribLocation(p,a,attributes[a]);
+        bindIndexed(p,vehicleGlColorOutput50CZ,0,"viewerOutput");bindIndexed(p,vehicleGlColorOutput50CZ,1,"uiSpecularFactor");
+        s.shaderGl.linkProgram(p);I linked=0;s.shaderGl.getProgramiv(p,0x8B82,&linked);
+        s.shaderGl.deleteShader(fragment); // stays alive while attached
+        if(!linked){char log[512]{};s.shaderGl.getProgramInfoLog(p,sizeof(log),nullptr,log);
+            std::fprintf(stderr,"garage_fixed_specular_variant link=0 log=%.400s ready=0\n",log);s.shaderGl.deleteProgram(p);return;}
+        const auto at=[&](const char* n)noexcept{return s.shaderGl.getUniformLocation(p,n);};
+        canvas=at("canvasToClip");image=at("uiImage");alpha=at("uiAlphaScale");textured=at("uiTextured");
+        fogColor=at("uiParticleFogColor");raster=at("uiSourceRaster");particle=at("gcParticleMode");
+        fogEnabled=at("uiSourceFogEnabled");alphaTest=at("uiSourceAlphaTest");composition=at("uiSourceComposition");
+        target=at("uiSourceTarget");blend=at("uiSourceBlend");payload=at("uiCoveragePayload");
+        const bool located=canvas>=0&&image>=0&&textured>=0&&fogColor>=0&&raster>=0&&fogEnabled>=0&&alphaTest>=0&&
+            composition>=0&&blend>=0&&payload>=0;
+        const U error=s.drawGl.getError();
+        if(!located||error){std::fprintf(stderr,"garage_fixed_specular_variant uniforms=%u gl_error=%u ready=0\n",unsigned(located),error);
+            s.shaderGl.deleteProgram(p);return;}
+        program=p;buildFailed=false;
+        std::fprintf(stderr,"garage_fixed_specular_variant program=%u ready=1\n",p);
+    }
+    template<class S> void selfTest(S& s)noexcept{
+        if(attempted)return;attempted=true;
+        if(exact()||GarageFixedAdditive50KG::legacy()){
+            std::fprintf(stderr,"garage_fixed_specular_selftest skipped=exact_switch admitted=0\n");return;}
+        const auto get=[&](const char* n)noexcept{return s.request.procAddress(s.request.context,n);};
+        using FI=void(*)(U,I*);using FB=void(*)(U,std::uint8_t*);using FE=std::uint8_t(*)(U);using FU=void(*)(U);
+        using F2=void(*)(U,U);using F4=void(*)(U,U,U,U);using FN=void(*)(I,U*);using FD=void(*)(I,const U*);
+        auto getIntegerv=reinterpret_cast<FI>(get("glGetIntegerv"));auto getBooleanv=reinterpret_cast<FB>(get("glGetBooleanv"));
+        auto isEnabled=reinterpret_cast<FE>(get("glIsEnabled"));auto enable=reinterpret_cast<FU>(get("glEnable"));
+        auto disable=reinterpret_cast<FU>(get("glDisable"));auto genTextures=reinterpret_cast<FN>(get("glGenTextures"));
+        auto deleteTextures=reinterpret_cast<FD>(get("glDeleteTextures"));auto bindTexture=reinterpret_cast<F2>(get("glBindTexture"));
+        auto activeTexture=reinterpret_cast<FU>(get("glActiveTexture"));
+        auto texImage2D=reinterpret_cast<void(*)(U,I,I,I,I,I,U,U,const void*)>(get("glTexImage2D"));
+        auto texParameteri=reinterpret_cast<void(*)(U,U,I)>(get("glTexParameteri"));
+        auto genFramebuffers=reinterpret_cast<FN>(get("glGenFramebuffers"));auto deleteFramebuffers=reinterpret_cast<FD>(get("glDeleteFramebuffers"));
+        auto bindFramebuffer=reinterpret_cast<F2>(get("glBindFramebuffer"));
+        auto framebufferTexture2D=reinterpret_cast<void(*)(U,U,U,U,I)>(get("glFramebufferTexture2D"));
+        auto checkFramebufferStatus=reinterpret_cast<U(*)(U)>(get("glCheckFramebufferStatus"));
+        auto drawBuffer=reinterpret_cast<FU>(get("glDrawBuffer"));auto readBuffer=reinterpret_cast<FU>(get("glReadBuffer"));
+        auto viewport=reinterpret_cast<void(*)(I,I,I,I)>(get("glViewport"));auto useProgram=reinterpret_cast<FU>(get("glUseProgram"));
+        auto genVertexArrays=reinterpret_cast<FN>(get("glGenVertexArrays"));auto deleteVertexArrays=reinterpret_cast<FD>(get("glDeleteVertexArrays"));
+        auto bindVertexArray=reinterpret_cast<FU>(get("glBindVertexArray"));auto drawArrays=reinterpret_cast<void(*)(U,I,I)>(get("glDrawArrays"));
+        auto blendFuncSeparate=reinterpret_cast<F4>(get("glBlendFuncSeparate"));auto blendEquationSeparate=reinterpret_cast<F2>(get("glBlendEquationSeparate"));
+        auto colorMask=reinterpret_cast<void(*)(std::uint8_t,std::uint8_t,std::uint8_t,std::uint8_t)>(get("glColorMask"));
+        auto pixelStorei=reinterpret_cast<void(*)(U,I)>(get("glPixelStorei"));
+        auto readPixels=reinterpret_cast<void(*)(I,I,I,I,U,U,void*)>(get("glReadPixels"));auto bindBuffer=reinterpret_cast<F2>(get("glBindBuffer"));
+        auto createShader=reinterpret_cast<U(*)(U)>(get("glCreateShader"));
+        auto shaderSource=reinterpret_cast<void(*)(U,I,const char* const*,const I*)>(get("glShaderSource"));
+        auto compileShader=reinterpret_cast<FU>(get("glCompileShader"));auto getShaderiv=reinterpret_cast<void(*)(U,U,I*)>(get("glGetShaderiv"));
+        auto createProgram=reinterpret_cast<U(*)()>(get("glCreateProgram"));auto attachShader=reinterpret_cast<F2>(get("glAttachShader"));
+        auto linkProgram=reinterpret_cast<FU>(get("glLinkProgram"));auto getProgramiv=reinterpret_cast<void(*)(U,U,I*)>(get("glGetProgramiv"));
+        auto deleteShader=reinterpret_cast<FU>(get("glDeleteShader"));auto deleteProgram=reinterpret_cast<FU>(get("glDeleteProgram"));
+        auto bindIndexed=reinterpret_cast<void(*)(U,U,U,const char*)>(get("glBindFragDataLocationIndexed"));
+        if(!getIntegerv||!getBooleanv||!isEnabled||!enable||!disable||!genTextures||!deleteTextures||!bindTexture||!activeTexture||
+           !texImage2D||!texParameteri||!genFramebuffers||!deleteFramebuffers||!bindFramebuffer||!framebufferTexture2D||
+           !checkFramebufferStatus||!drawBuffer||!readBuffer||!viewport||!useProgram||!genVertexArrays||!deleteVertexArrays||
+           !bindVertexArray||!drawArrays||!blendFuncSeparate||!blendEquationSeparate||!colorMask||!pixelStorei||!readPixels||
+           !bindBuffer||!createShader||!shaderSource||!compileShader||!getShaderiv||!createProgram||!attachShader||!linkProgram||
+           !getProgramiv||!deleteShader||!deleteProgram||!bindIndexed){
+            std::fprintf(stderr,"garage_fixed_specular_selftest entry_points=missing admitted=0\n");return;}
+        // x = Cs (R: x, G: 255-x, B: odd permutation of x), y&255 = Ad, band
+        // y>>8 selects one of four Cd patterns; As is a separate pattern.
+        constexpr int W=256,H=1024;
+        I drawFb=0,readFb=0,vp[4]{},program0=0,vao=0,active=0,tex0=0,unpackBuf=0,packBuf=0,unpackAlign=4,packAlign=4;
+        I srcRgb=1,dstRgb=0,srcA=1,dstA=0,eqRgb=0x8006,eqA=0x8006;std::uint8_t mask[4]{1,1,1,1};
+        getIntegerv(0x8CA6,&drawFb);getIntegerv(0x8CAA,&readFb);getIntegerv(0x0BA2,vp);getIntegerv(0x8B8D,&program0);
+        getIntegerv(0x85B5,&vao);getIntegerv(0x84E0,&active);getIntegerv(0x88EF,&unpackBuf);getIntegerv(0x88ED,&packBuf);
+        getIntegerv(0x0CF5,&unpackAlign);getIntegerv(0x0D05,&packAlign);getIntegerv(0x80C9,&srcRgb);getIntegerv(0x80C8,&dstRgb);
+        getIntegerv(0x80CB,&srcA);getIntegerv(0x80CA,&dstA);getIntegerv(0x8009,&eqRgb);getIntegerv(0x883D,&eqA);getBooleanv(0x0C23,mask);
+        activeTexture(0x84C0);getIntegerv(0x8069,&tex0);
+        const U caps[6]{0x0BE2,0x0B71,0x0C11,0x0B90,0x0B44,0x8C89};std::uint8_t capOn[6]{};
+        for(int c=0;c<6;++c)capOn[c]=isEnabled(caps[c]);
+        const auto cdOf=[](int x,int y,int ch)noexcept{const int band=y>>8;
+            return (x*(3+2*ch)+(y&255)*(5+4*band)+band*61+ch*29)&255;};
+        std::vector<std::uint8_t> init(std::size_t(W)*H*4),out(std::size_t(W)*H*4);
+        for(int y=0;y<H;++y)for(int x=0;x<W;++x){auto* p=&init[(std::size_t(y)*W+x)*4];
+            for(int ch=0;ch<3;++ch)p[ch]=std::uint8_t(cdOf(x,y,ch));p[3]=std::uint8_t(y&255);}
+        static constexpr const char* vs="#version 150 core\nvoid main(){int k=gl_VertexID%3;vec2 p=vec2(float((k<<1)&2),float(k&2));gl_Position=vec4(p*2.0-1.0,0.0,1.0);}\n";
+        // Same output expressions as the RR_UI_DUAL_SOURCE_SPECULAR branch.
+        static constexpr const char* fs="#version 150 core\nout vec4 viewerOutput;\nout vec4 uiSpecularFactor;\nvoid main(){ivec2 p=ivec2(gl_FragCoord.xy);"
+            "vec4 source=vec4(float(p.x),float(255-p.x),float((p.x*37+11)&255),float((p.x*7+p.y*3)&255));"
+            "bool second=(gl_PrimitiveID&1)!=0;"
+            "viewerOutput=vec4(second ? source.rgb*(127.0/128.0) : source.rgb, second ? source.a : 0.0)/255.0;"
+            "uiSpecularFactor=vec4(0.0,0.0,0.0,second ? 1.0 : 0.0);}\n";
+        U texture=0,fbo=0,array=0,v=0,f=0,prog=0;bool okay=true;
+        genTextures(1,&texture);bindTexture(0x0DE1,texture);
+        texParameteri(0x0DE1,0x2801,0x2600);texParameteri(0x0DE1,0x2800,0x2600);
+        texParameteri(0x0DE1,0x813C,0);texParameteri(0x0DE1,0x813D,0);
+        bindBuffer(0x88EC,0);bindBuffer(0x88EB,0);pixelStorei(0x0CF5,1);pixelStorei(0x0D05,1);
+        texImage2D(0x0DE1,0,0x8058,W,H,0,0x1908,0x1401,init.data());
+        genFramebuffers(1,&fbo);bindFramebuffer(0x8D40,fbo);framebufferTexture2D(0x8D40,0x8CE0,0x0DE1,texture,0);
+        drawBuffer(0x8CE0);readBuffer(0x8CE0);
+        okay=checkFramebufferStatus(0x8D40)==0x8CD5;
+        v=createShader(0x8B31);f=createShader(0x8B30);shaderSource(v,1,&vs,nullptr);shaderSource(f,1,&fs,nullptr);
+        compileShader(v);compileShader(f);I cv=0,cf=0,linked=0;getShaderiv(v,0x8B81,&cv);getShaderiv(f,0x8B81,&cf);
+        prog=createProgram();attachShader(prog,v);attachShader(prog,f);
+        bindIndexed(prog,0,0,"viewerOutput");bindIndexed(prog,0,1,"uiSpecularFactor");
+        linkProgram(prog);getProgramiv(prog,0x8B82,&linked);okay=okay&&cv&&cf&&linked;
+        std::size_t checked=0,differing=0,alphaMismatch=0,plus=0,minus=0;int worst=0;
+        if(okay){
+            genVertexArrays(1,&array);bindVertexArray(array);useProgram(prog);viewport(0,0,W,H);
+            for(int c=1;c<6;++c)disable(caps[c]);colorMask(1,1,1,1);
+            enable(0x0BE2);blendEquationSeparate(0x8006,0x8006);
+            blendFuncSeparate(0x0304,1,1,0x88FB); // RGB: DST_ALPHA, ONE; A: ONE, ONE_MINUS_SRC1_ALPHA
+            drawArrays(0x0004,0,6);
+            readPixels(0,0,W,H,0x1908,0x1401,out.data());
+            for(int y=0;y<H;++y)for(int x=0;x<W;++x){const auto* p=&out[(std::size_t(y)*W+x)*4];
+                const int ad=y&255;const int cs[3]{x,255-x,(x*37+11)&255};
+                for(int ch=0;ch<3;++ch){++checked;
+                    const int expected=std::min(255,cdOf(x,y,ch)+cs[ch]*ad/128);const int diff=int(p[ch])-expected;
+                    if(diff){++differing;if(diff>0)++plus;else ++minus;}
+                    worst=std::max(worst,diff<0?-diff:diff);}
+                ++checked;if(p[3]!=std::uint8_t((x*7+y*3)&255))++alphaMismatch;}
+        }
+        bindFramebuffer(0x8CA9,U(drawFb));bindFramebuffer(0x8CA8,U(readFb));viewport(vp[0],vp[1],vp[2],vp[3]);
+        useProgram(U(program0));bindVertexArray(U(vao));activeTexture(0x84C0);bindTexture(0x0DE1,U(tex0));activeTexture(U(active));
+        bindBuffer(0x88EC,U(unpackBuf));bindBuffer(0x88EB,U(packBuf));pixelStorei(0x0CF5,unpackAlign);pixelStorei(0x0D05,packAlign);
+        blendFuncSeparate(U(srcRgb),U(dstRgb),U(srcA),U(dstA));blendEquationSeparate(U(eqRgb),U(eqA));
+        colorMask(mask[0],mask[1],mask[2],mask[3]);
+        for(int c=0;c<6;++c){if(capOn[c])enable(caps[c]);else disable(caps[c]);}
+        if(array)deleteVertexArrays(1,&array);if(prog)deleteProgram(prog);if(v)deleteShader(v);if(f)deleteShader(f);
+        if(fbo)deleteFramebuffers(1,&fbo);if(texture)deleteTextures(1,&texture);
+        maxDifference=okay?worst:-1;
+        passed=okay&&checked==std::size_t(W)*H*4&&alphaMismatch==0&&worst<=2;
+        std::fprintf(stderr,"garage_fixed_specular_selftest cs=0..255 ad=0..255 cd_patterns=12 compared=%zu rgb_differing=%zu above=%zu below=%zu max_rgb_difference=%d alpha_mismatches=%zu setup=%u admitted=%u\n",
+            checked,differing,plus,minus,worst,alphaMismatch,unsigned(okay),unsigned(passed));
+    }
+};
+thread_local GarageFixedSpecular50KG garageFixedSpecular50KG;
+// Hot per-vertex validation helpers (same results as std::isfinite and
+// std::floor(x)==x; the latter only for 0 <= x < 2^31, where truncation is floor).
+inline bool uiFinite50KG(float v)noexcept{std::uint32_t b;std::memcpy(&b,&v,sizeof b);return (b&0x7f800000u)!=0x7f800000u;}
+inline bool uiNonnegativeIntegral50KG(float v)noexcept{return float(std::int32_t(v))==v;}
+}
 void VehicleWindowGl50DS::Storage::clearMenuRasterLease50KG()noexcept {
         menuRasterShared50KG=nullptr;menuRasterOwner50KG=nullptr;menuRasterInputs50KG={};
         menuRasterEpoch50KG=menuRasterInvocation50KG=menuRasterDisplay50KG=0;
@@ -80,112 +539,7 @@ void main() {
             "#version 150 core\n"
             "#extension GL_EXT_shader_framebuffer_fetch : require\n"
             "#define RR_UI_COHERENT_FRAMEBUFFER_FETCH 1\n";
-        constexpr const char* fragmentSource = R"GLSL(
-in vec2 uiUv;
-noperspective in vec3 uiSourceStq;
-uniform int uiSourceRaster;
-noperspective in vec4 uiColor;
-noperspective in float uiParticleFog;
-uniform sampler2D uiImage;
-uniform float uiAlphaScale;
-uniform int uiTextured;
-uniform int uiSourceFogEnabled;
-uniform int uiSourceAlphaTest;
-uniform vec4 uiParticleFogColor;
-#ifndef RR_UI_COHERENT_FRAMEBUFFER_FETCH
-uniform sampler2D uiSourceTarget;
-#endif
-uniform int uiSourceComposition;
-uniform int uiCoveragePayload;
-uniform int uiSourceBlend;
-uniform int gcParticleMode;
-#ifdef RR_UI_COHERENT_FRAMEBUFFER_FETCH
-inout vec4 viewerOutput;
-#else
-out vec4 viewerOutput;
-#endif
-void main() {
-    if (uiSourceComposition != 0) {
-        // Explicit native byte representation. Native GL sampling/interpolation
-        // remains separately documented; no PS2 rasterizer/device is executed.
-        vec4 vertexByte=clamp(uiColor*255.0,0.0,255.0);
-        vec2 sampleUv=uiUv;
-        // Q was separately rounded by the original packet/clipper. Do not
-        // replace this division with semantic UV perspective interpolation.
-        if(uiSourceRaster==2)sampleUv=uiSourceStq.xy/uiSourceStq.z;
-        vec4 source=uiTextured!=0 ?
-            floor(clamp(texture(uiImage,sampleUv)*255.0*vertexByte/128.0,0.0,255.0)) :
-            floor(vertexByte);
-        if (uiSourceAlphaTest!=0 && source.a<1.0) discard;
-        if (uiSourceFogEnabled!=0) {
-            float f=clamp(uiParticleFog*256.0,0.0,255.0);
-            source.rgb=floor((source.rgb*f+uiParticleFogColor.rgb*255.0*(255.0-f))/256.0);
-        }
-        // Float scratch stores exact byte payload, including A=0. Negative A
-        // is reserved for uncovered samples by the private raster clear.
-        if(uiCoveragePayload!=0){viewerOutput=source;return;}
-        vec3 result=source.rgb;
-        if (uiSourceBlend!=0) {
-            // Opaque spans never enter this destination-fetch branch.
-#ifdef RR_UI_COHERENT_FRAMEBUFFER_FETCH
-            // Coherent EXT fetch observes prior writes in API primitive order,
-            // including overlapping triangles within this indexed span draw.
-            vec4 destination=floor(viewerOutput*255.0+0.5);
-#else
-            // ARB_texture_barrier: feedback uses one actual triangle per draw,
-            // one same-pixel read/write per texel, with a barrier before each.
-            vec4 destination=floor(texelFetch(uiSourceTarget,ivec2(gl_FragCoord.xy),0)*255.0+0.5);
-#endif
-            float coefficient=uiSourceBlend==3 ? destination.a : uiSourceBlend==4 ? 255.0 :
-                uiSourceBlend==6 ? 64.0 : source.a;
-            // Exact shadow ALPHA A=2 selects zero, B=1 selects destination.
-            // Floor the signed product before adding Cd, as for other ALPHA
-            // modes; never replace the original shadow texture or source A.
-            vec3 difference=uiSourceBlend==5 ? -destination.rgb :
-                uiSourceBlend==1 ? source.rgb-destination.rgb : source.rgb;
-            result=floor(difference*coefficient/128.0)+destination.rgb;
-        }
-        // ALPHA changes RGB only. Every surviving fragment replaces stored A;
-        // it never accumulates source-over alpha or clamps a FIX255 factor to1.
-        viewerOutput=vec4(clamp(result,0.0,255.0),source.a)/255.0;
-        return;
-    }
-    if (uiTextured != 0) {
-        vec4 raw = texture(uiImage, uiUv) * uiColor;
-        // MODULATE clamps before blend, not after addition to destination RGB.
-        viewerOutput = vec4(clamp(raw.rgb * (255.0 / 128.0), 0.0, 1.0),
-            clamp(raw.a * uiAlphaScale, 0.0, 1.0));
-        // Actual DefaultMT ATE/GREATER/AREF0/KEEP. Source MODULATE alpha
-        // is byte-quantized before the test: values below one byte fail.
-        if (uiSourceAlphaTest != 0 && raw.a * (255.0 * 255.0 / 128.0) < 1.0) discard;
-        if (uiSourceFogEnabled != 0) {
-            // Source F is a byte, with both fog weights divided by256.
-            // Fog changes RGB only; A/128 remains the blend coefficient.
-            viewerOutput.rgb = viewerOutput.rgb * uiParticleFog +
-                uiParticleFogColor.rgb * (255.0 / 256.0 - uiParticleFog);
-        }
-        if(gcParticleMode!=0) {
-            //Source MODULATE A is byte-quantized/clamped before both ALPHA
-            //and independent destination-A replacement. Never store A/128
-            //into a framebuffer whose source byte representation is A/255.
-            float sourceAlphaByte=floor(clamp(raw.a*(255.0*255.0/128.0),0.0,255.0));
-            if(gcParticleMode==3) {
-                viewerOutput=vec4(0.0,0.0,0.0,sourceAlphaByte/255.0);
-            } else if(gcParticleMode==2) {
-                //ONE/ONE permits genuine glow coefficients above1 without
-                //SRC_ALPHA clamp. Positive fixed-target additive saturation
-                //is unchanged if premultiplied source exceeds framebuffer1.
-                viewerOutput.rgb*=sourceAlphaByte/128.0;
-                viewerOutput.a=1.0;
-            } else viewerOutput.a=sourceAlphaByte/128.0;
-        }
-    } else {
-        // TME=0 uses raw interpolated vertex color without texture modulation.
-        // Nonopaque A/128 uses one 255/128 scale; RGB retains its raw /255.
-        viewerOutput = vec4(uiColor.rgb, clamp(uiColor.a * uiAlphaScale, 0.0, 1.0));
-    }
-}
-)GLSL";
+        const char* const fragmentSource = originalUiFragmentSource50KG;
         const auto compile = [&](U type, const char* source, U& name, const char* prefix=nullptr) noexcept {
             name = shaderGl.createShader(type);
             if (!check("create original UI shader")) return false;
@@ -749,8 +1103,9 @@ bool VehicleWindowGl50DS::Storage::prepareUiCoverageRaw()noexcept {
         gl.getIntegerv(0x821B,&major);gl.getIntegerv(0x8D57,&samples);gl.getIntegerv(0x910E,&colorSamples);
         gl.getIntegerv(0x910F,&depthSamples);gl.getIntegerv(0x8872,&units);gl.getIntegerv(0x0D33,&limit);
         if(!check("query demand-bound UI four-sample limits"))return false;
-        if(major<4||samples<4||colorSamples<4||depthSamples<4||units<5||limit<640)
-            return fail(*diagnostic,VehicleWindowError50DS::limits,"UI AA1 requires GL4, five texture units and exact four samples; no fallback");
+        if(major<4||samples<4||colorSamples<4||depthSamples<4||units<5||limit<640){
+            std::fprintf(stderr,"ui_aa1_limits major=%d samples=%d color=%d depth=%d units=%d limit=%d\n",int(major),int(samples),int(colorSamples),int(depthSamples),int(units),int(limit));
+            return fail(*diagnostic,VehicleWindowError50DS::limits,"UI AA1 requires GL4, five texture units and exact four samples; no fallback");}
         if(!load(gl.texImage2DMultisample,"glTexImage2DMultisample")||!load(gl.clearBufferfv,"glClearBufferfv")||
             !load(gl.genTextures,"glGenTextures")||!load(gl.deleteTextures,"glDeleteTextures")||
             !load(gl.texImage2D,"glTexImage2D")||!load(gl.texParameteri,"glTexParameteri")||
@@ -1998,6 +2353,7 @@ bool VehicleWindowGl50DS::releaseGarageSourcePrelude50KG(const OriginalUiSourceO
        s.active||s.frameSet||s.diagnostic||!s.current(d))return false;
     //Retire only this native source-target work. Failed GL completion retains
     //the exact owner; it cannot be hidden by dropping the SourceOwner pointer.
+    s.waitGarageTargetFence50KG();
     s.diagnostic=&d;bool okay=s.check("before Garage source prelude retirement");
     if(okay){s.gl.finish();okay=s.check("retire actual Garage source-target work");}
     s.diagnostic=nullptr;
@@ -2014,6 +2370,7 @@ bool VehicleWindowGl50DS::pollOriginalRenderer245030(bool& complete,VehicleWindo
     auto& s=*storage_;if(!s.current(d,nullptr,s.menuRasterShared50KG))return false;
     if(!s.frontendOnly||s.active||s.frameSet||s.diagnostic||s.garagePollFence50KG||s.nativeGlFaultObserved50KG)
         return fail(d,VehicleWindowError50DS::frame,"Garage poll requires idle current frontend without a failed poll");
+    s.waitGarageTargetFence50KG(); // The prior target is complete, as after its former glFinish.
     s.diagnostic=&d;
     const bool loaded=(s.gl.fenceSync||s.load(s.gl.fenceSync,"glFenceSync"))&&
         (s.gl.getSynciv||s.load(s.gl.getSynciv,"glGetSynciv"))&&
@@ -2055,7 +2412,21 @@ bool VehicleWindowGl50DS::completeGarageSourceTarget140A38(
     if(!s.current(d)||s.active||s.frameSet||s.diagnostic||s.garagePreludeFailed50KG||
        s.garageCompletedPublication50KG||!s.uiSourceTarget||!s.uiSourceTargetGeneration)
         return fail(d,VehicleWindowError50DS::frame,"Garage target completion requires the same idle actual context");
-    s.diagnostic=&d;s.gl.finish();const bool okay=s.check("complete actual Garage Root render target");
+    s.diagnostic=&d;
+    {   // Mark completion with a fence instead of a CPU-blocking glFinish. GL
+        // executes this context's later commands after the target's, and the
+        // marker is waited before any later CPU observation (see storage).
+        static const bool legacyFinish=[]{const char* v=std::getenv("RR_GARAGE_LEGACY_FINISH");return v&&v[0]=='1'&&!v[1];}();
+        const auto lookup=[&s](auto& pointer,const char* name){
+            if(!pointer)pointer=reinterpret_cast<std::remove_reference_t<decltype(pointer)>>(s.request.procAddress(s.request.context,name));
+            return pointer!=nullptr;};
+        s.waitGarageTargetFence50KG();
+        const bool fenced=!legacyFinish&&s.gl.flush&&lookup(s.gl.fenceSync,"glFenceSync")&&
+            lookup(s.gl.clientWaitSync,"glClientWaitSync")&&lookup(s.gl.deleteSync,"glDeleteSync");
+        if(fenced)s.garageTargetFence50KG=s.gl.fenceSync(0x9117u,0u); //SYNC_GPU_COMMANDS_COMPLETE
+        if(s.garageTargetFence50KG)s.gl.flush();else s.gl.finish();
+    }
+    const bool okay=s.check("complete actual Garage Root render target");
     if(okay){s.garageCompletedPublication50KG=draw.publication_;s.garageCompletedTarget50KG=s.uiSourceTargetGeneration;}
     else s.garagePreludeFailed50KG=true;
     d.submittedWorkCompleted=okay;s.diagnostic=nullptr;return okay;
@@ -2117,6 +2488,7 @@ bool VehicleWindowGl50DS::retireOriginalUiSourceOwner(
     if (s.active || s.frameSet || s.diagnostic ||
         (s.uiSourceFrameOwner && s.uiSourceFrameOwner!=&owner))
         return fail(d,VehicleWindowError50DS::frame,"source UI retirement requires idle matching live owner");
+    s.waitGarageTargetFence50KG();
     s.diagnostic=&d;
     bool accepted=s.check("before explicit source UI owner retirement");
     if (accepted){
@@ -2182,6 +2554,8 @@ bool VehicleWindowGl50DS::submitGarageCollectorBatch24B26C(
     // No frame creates additional sampler names once this bounded owner is published.
     s.diagnostic=&d;const bool samplers=s.ensureGarageSamplers50KG();s.diagnostic=nullptr;
     if(!samplers)return false;
+    garageFixedAdditive50KG.selfTest(s); // once per process, before any Garage batch state
+    garageFixedSpecular50KG.prepare(s);  // self-test once per process; variant per UI program
     if(!draw.drainBatchCanonical_->beginGarageBatch(draw,*this))
         return fail(d,VehicleWindowError50DS::material,"actual Garage batch binding transaction rejected");
     bool started=false;
@@ -2266,7 +2640,7 @@ bool VehicleWindowGl50DS::submitOriginalUiImpl(const OriginalUiNativeDraw50KG& n
         (!input.textures && input.texturePublication != 0))
         return fail(d, VehicleWindowError50DS::material, "original UI texture publication/context/thread changed");
     for (float value : input.clearRgba)
-        if (!std::isfinite(value) || value < 0.f || value > 1.f)
+        if (!uiFinite50KG(value) || value < 0.f || value > 1.f)
             return fail(d, VehicleWindowError50DS::frame, "invalid original UI clear color");
     if (input.clearRgba[3] != 1.f)
         return fail(d, VehicleWindowError50DS::frame, "original UI presentation alpha must be opaque");
@@ -2274,12 +2648,12 @@ bool VehicleWindowGl50DS::submitOriginalUiImpl(const OriginalUiNativeDraw50KG& n
         return fail(d, VehicleWindowError50DS::noImage, "requested original UI race backdrop is unavailable");
     for (U i = 0; i < input.quadCount * 4; ++i) {
         const auto& v = input.vertices[i];
-        for (float value : v.position) if (!std::isfinite(value))
+        for (float value : v.position) if (!uiFinite50KG(value))
             return fail(d, VehicleWindowError50DS::frame, "nonfinite original UI position");
-        for (float value : v.uv) if (!std::isfinite(value))
+        for (float value : v.uv) if (!uiFinite50KG(value))
             return fail(d, VehicleWindowError50DS::frame, "nonfinite original UI UV");
         if (v.position[2] < 0.f || v.position[2] > 16777215.f ||
-            std::floor(v.position[2]) != v.position[2] || v.color[3] > 128)
+            !uiNonnegativeIntegral50KG(v.position[2]) || v.color[3] > 128)
             return fail(d, VehicleWindowError50DS::frame, "UI requires original 24-bit packet depth and raw alpha <=128");
     }
     if ((native.sourcePacketStq == nullptr) != (native.sourcePacketStqCount == 0) ||
@@ -2313,9 +2687,15 @@ bool VehicleWindowGl50DS::submitOriginalUiImpl(const OriginalUiNativeDraw50KG& n
             state.depth!=OriginalUiDepth50KG::greaterEqual || !state.depthWrite ||
             !state.sourceFogEnabled || !state.sourceAlphaTestGreaterZero))
             return fail(d,VehicleWindowError50DS::material,"shadow requires actual typed source-RGBA policy");
+        // UIWin trophy pass2 (prepareOriginalUiWinTrophySpecularMaterial50PD) is the one
+        // admitted destination-alpha specular that authors zWriteDisabled=0 and
+        // alphaTestOnOff=0; its depth mask and alpha test are carried per span.
+        const bool depthWritingDestinationSpecular=specular&&
+            span.blend==OriginalUiBlend50KG::destinationAlphaAdditive&&state.depthWrite&&!state.sourceAlphaTestGreaterZero;
         if ((specular && !sourceRgba) || specularBlend!=specular ||
-            (specular && (state.depth!=OriginalUiDepth50KG::greaterEqual || state.depthWrite!=fixed64Specular ||
-                !state.sourceFogEnabled || !state.sourceAlphaTestGreaterZero)))
+            (specular && (state.depth!=OriginalUiDepth50KG::greaterEqual ||
+                (state.depthWrite!=fixed64Specular&&!depthWritingDestinationSpecular) ||
+                !state.sourceFogEnabled || (!state.sourceAlphaTestGreaterZero&&!depthWritingDestinationSpecular))))
             return fail(d,VehicleWindowError50DS::material,"specular requires actual typed source-RGBA policy");
         const bool textured = span.materialMode == OriginalUiMaterialMode50KG::texturedModulate || particle || sourceRaster;
         const bool untextured = span.materialMode == OriginalUiMaterialMode50KG::untexturedVertexColor;
@@ -2394,7 +2774,7 @@ bool VehicleWindowGl50DS::submitOriginalUiImpl(const OriginalUiNativeDraw50KG& n
         (native.particleFog && native.particleFogCount != input.quadCount * 4))
         return fail(d, VehicleWindowError50DS::frame, "invalid particle fog stream bounds");
     for (U i = 0; i < native.particleFogCount; ++i)
-        if (!std::isfinite(native.particleFog[i]) || native.particleFog[i] < 0.f ||
+        if (!uiFinite50KG(native.particleFog[i]) || native.particleFog[i] < 0.f ||
             native.particleFog[i] > 255.f / 256.f)
             return fail(d, VehicleWindowError50DS::frame, "invalid source particle fog coefficient");
     if ((native.sourceRasterW == nullptr) != (native.sourceRasterWCount == 0) ||
@@ -2403,12 +2783,12 @@ bool VehicleWindowGl50DS::submitOriginalUiImpl(const OriginalUiNativeDraw50KG& n
         return fail(d, VehicleWindowError50DS::frame, "invalid or missing source perspective W stream");
     for (U i = 0; i < native.sourcePacketStqCount; ++i) {
         const auto& stq = native.sourcePacketStq[i];
-        if (!std::isfinite(stq[0]) || !std::isfinite(stq[1]) || !std::isfinite(stq[2]) || stq[2] <= 0.f ||
-            !std::isfinite(stq[0] / stq[2]) || !std::isfinite(stq[1] / stq[2]))
+        if (!uiFinite50KG(stq[0]) || !uiFinite50KG(stq[1]) || !uiFinite50KG(stq[2]) || stq[2] <= 0.f ||
+            !uiFinite50KG(stq[0] / stq[2]) || !uiFinite50KG(stq[1] / stq[2]))
             return fail(d, VehicleWindowError50DS::frame, "invalid original packet STQ sampling range");
     }
     for (U i = 0; i < native.sourceRasterWCount; ++i)
-        if (!std::isfinite(native.sourceRasterW[i]) || native.sourceRasterW[i] <= 0.f)
+        if (!uiFinite50KG(native.sourceRasterW[i]) || native.sourceRasterW[i] <= 0.f)
             return fail(d, VehicleWindowError50DS::frame, "source perspective W must be finite and positive");
     for (U i = 0; i < input.spanCount; ++i) {
         const auto& span = input.spans[i]; const auto& state = native.states[i];
@@ -2416,13 +2796,13 @@ bool VehicleWindowGl50DS::submitOriginalUiImpl(const OriginalUiNativeDraw50KG& n
         if (!particle && !state.sourceFogEnabled) continue;
         for (U v = span.firstQuad * 4; v < (span.firstQuad + span.quadCount) * 4; ++v) {
             const float f = native.particleFog[v];
-            if ((particle && f > 254.f / 256.f) || (!particle && std::floor(f * 256.f) != f * 256.f) ||
+            if ((particle && f > 254.f / 256.f) || (!particle && !uiNonnegativeIntegral50KG(f * 256.f)) ||
                 (span.materialMode==OriginalUiMaterialMode50KG::sourceSpecularMapCompressed && f!=255.f/256.f))
                 return fail(d, VehicleWindowError50DS::frame, "fog stream does not match source program byte domain");
         }
     }
     for (float value : native.particleFogColor)
-        if (!std::isfinite(value) || value < 0.f || value > 1.f)
+        if (!uiFinite50KG(value) || value < 0.f || value > 1.f)
             return fail(d, VehicleWindowError50DS::frame, "invalid authored particle fog color");
 
     U sourceIndexCount = 0;
@@ -2474,6 +2854,92 @@ bool VehicleWindowGl50DS::submitOriginalUiImpl(const OriginalUiNativeDraw50KG& n
                 if(!region.empty()){firstCoveredAa1Span=si;break;}
             }
         }
+    }
+
+    // Exact feedback batching (see UiFeedbackBatches50KG). Only spans that will
+    // take the per-triangle barrier fallback are reordered, before the index
+    // upload; a span that cannot be scheduled keeps its original stream.
+    const bool fixedAdditive=garageBatch&&sourceRgba&&!s.uiSourceCoherentFramebufferFetch&&
+        garageFixedAdditive50KG.passed&&!GarageFixedAdditive50KG::legacy();
+    // Fixed-function destination-alpha specular (GarageFixedSpecular50KG):
+    // each admitted span's retained triangles are appended once more as
+    // consecutive copy pairs after the source stream, inside the same
+    // bounded index storage. A span that does not fit keeps the exact path.
+    const bool fixedSpecular=garageBatch&&sourceRgba&&!s.uiSourceCoherentFramebufferFetch&&
+        garageFixedSpecular50KG.ready(s);
+    thread_local std::vector<std::uint32_t> specularFirst,specularCount;
+    U extendedIndexCount=sourceIndexCount;
+    if(fixedSpecular){
+        try{specularFirst.assign(input.spanCount,0u);specularCount.assign(input.spanCount,0u);}
+        catch(...){specularCount.clear();}
+        constexpr U capacity=originalUiMaximumSourceQuads50KM*6;
+        for(U si=0;si<input.spanCount&&specularCount.size()==input.spanCount;++si){
+            const auto& span=input.spans[si];const auto& state=native.states[si];
+            if(span.blend!=OriginalUiBlend50KG::destinationAlphaAdditive||
+               state.coverage==OriginalUiCoverage50KG::fourSampleAa1||(anyCoverage&&si>=firstCoveredAa1Span))continue;
+            const auto& range=s.uiSourceIndices->spans[si];
+            if(!range.indexCount||range.indexCount%3||range.indexCount>(capacity-extendedIndexCount)/2)continue;
+            specularFirst[si]=extendedIndexCount;specularCount[si]=range.indexCount*2;
+            for(U t=0;t<range.indexCount;t+=3)for(U copy=0;copy<2;++copy)for(U k=0;k<3;++k)
+                s.uiSourceIndices->indices[extendedIndexCount++]=s.uiSourceIndices->indices[range.firstIndex+t+k];
+        }
+    }
+    const auto specularSpan=[&](U si)noexcept{return fixedSpecular&&si<specularCount.size()&&specularCount[si]!=0;};
+    bool feedbackBatches=false;auto& fb=uiFeedbackBatches50KG;
+    if(sourceRgba&&!s.uiSourceCoherentFramebufferFetch){
+        try{
+            if(fb.tileStamp.size()!=std::size_t(fb.tilesX*fb.tilesY)){
+                fb.tileStamp.assign(std::size_t(fb.tilesX*fb.tilesY),0u);fb.tileBatch.assign(std::size_t(fb.tilesX*fb.tilesY),0u);fb.stamp=0;}
+            fb.spanFirst.assign(input.spanCount,0u);fb.spanCount.assign(input.spanCount,0u);
+            fb.rangeFirst.clear();fb.rangeCount.clear();feedbackBatches=true;
+        }catch(...){feedbackBatches=false;}
+    }
+    for(U si=0;feedbackBatches&&si<input.spanCount;++si){
+        const auto& span=input.spans[si];const auto& state=native.states[si];
+        if(span.blend==OriginalUiBlend50KG::opaque||state.coverage==OriginalUiCoverage50KG::fourSampleAa1||
+           (anyCoverage&&si>=firstCoveredAa1Span))continue;
+        if(fixedAdditive&&garageFixedAdditiveBlend50KG(span.blend))continue; // one fixed-function draw, original order
+        if(specularSpan(si))continue; // one doubled fixed-function draw, original order
+        const auto& range=s.uiSourceIndices->spans[si];const U triangles=range.indexCount/3;
+        if(triangles<2)continue;
+        const bool raster=span.materialMode==OriginalUiMaterialMode50KG::sourceDiffuse||
+            span.materialMode==OriginalUiMaterialMode50KG::sourceDiffuseCompressed||
+            span.materialMode==OriginalUiMaterialMode50KG::sourceSpecularMapCompressed||
+            span.materialMode==OriginalUiMaterialMode50KG::sourcePrelitCompressed;
+        try{fb.batchOf.resize(triangles);fb.scratch.resize(range.indexCount);}catch(...){continue;}
+        if(++fb.stamp==0){std::fill(fb.tileStamp.begin(),fb.tileStamp.end(),0u);fb.stamp=1;}
+        bool scheduled=true;std::uint32_t batches=0;
+        for(U t=0;t<triangles;++t){
+            const U at=range.firstIndex+3*t;
+            const U ia=s.uiSourceIndices->indices[at],ib=s.uiSourceIndices->indices[at+1],ic=s.uiSourceIndices->indices[at+2];
+            OriginalUiCoverageBounds50KG r;
+            if(ia>=input.quadCount*4||ib>=input.quadCount*4||ic>=input.quadCount*4||
+               !originalUiCoverageBounds50KG(input.vertices[ia],input.vertices[ib],input.vertices[ic],r)){scheduled=false;break;}
+            if(raster&&(!originalUiCoverageRasterWBounded50KG(native.sourceRasterW[ia])||
+               !originalUiCoverageRasterWBounded50KG(native.sourceRasterW[ib])||
+               !originalUiCoverageRasterWBounded50KG(native.sourceRasterW[ic])))r={0,0,640,448};
+            std::uint32_t batch=0;
+            if(!r.empty()){
+                const int x0=r.x/fb.tile,x1=(r.x+r.width-1)/fb.tile,y0=r.y/fb.tile,y1=(r.y+r.height-1)/fb.tile;
+                for(int y=y0;y<=y1;++y)for(int x=x0;x<=x1;++x){const auto c=std::size_t(y*fb.tilesX+x);
+                    if(fb.tileStamp[c]==fb.stamp&&fb.tileBatch[c]>batch)batch=fb.tileBatch[c];}
+                for(int y=y0;y<=y1;++y)for(int x=x0;x<=x1;++x){const auto c=std::size_t(y*fb.tilesX+x);
+                    fb.tileStamp[c]=fb.stamp;fb.tileBatch[c]=batch+1;}
+            }
+            fb.batchOf[t]=batch;if(batch+1>batches)batches=batch+1;
+        }
+        if(!scheduled||batches>=triangles)continue; // original per-triangle order
+        try{fb.offsets.assign(std::size_t(batches)+1,0u);
+            fb.rangeFirst.reserve(fb.rangeFirst.size()+batches);fb.rangeCount.reserve(fb.rangeCount.size()+batches);}
+        catch(...){continue;}
+        for(U t=0;t<triangles;++t)++fb.offsets[fb.batchOf[t]+1];
+        for(std::uint32_t b=0;b<batches;++b)fb.offsets[b+1]+=fb.offsets[b];
+        fb.spanFirst[si]=static_cast<std::uint32_t>(fb.rangeFirst.size());fb.spanCount[si]=batches;
+        for(std::uint32_t b=0;b<batches;++b){
+            fb.rangeFirst.push_back(range.firstIndex+3*fb.offsets[b]);fb.rangeCount.push_back(3*(fb.offsets[b+1]-fb.offsets[b]));}
+        for(U t=0;t<triangles;++t){const auto slot=fb.offsets[fb.batchOf[t]]++;
+            for(U k=0;k<3;++k)fb.scratch[3*slot+k]=s.uiSourceIndices->indices[range.firstIndex+3*t+k];}
+        for(U k=0;k<range.indexCount;++k)s.uiSourceIndices->indices[range.firstIndex+k]=fb.scratch[k];
     }
 
     s.diagnostic = &d;
@@ -2650,8 +3116,9 @@ bool VehicleWindowGl50DS::submitOriginalUiImpl(const OriginalUiNativeDraw50KG& n
         s.gl.scissor(sx, sy, ex - sx, ey - sy); s.gl.enable(0x0C11);
         s.resetNativeGcLighting();
         s.gl.enable(0x0B71); s.gl.useProgram(s.uiProgram);
-        s.gl.uniform4f(s.uiCanvasUniform,float(2.0*scale/rasterWidth),float(-2.0*scale/rasterHeight),
-            float(2.0*ox/rasterWidth-1.0),float(1.0-2.0*oy/rasterHeight));
+        const float canvasToClip[4]{float(2.0*scale/rasterWidth),float(-2.0*scale/rasterHeight),
+            float(2.0*ox/rasterWidth-1.0),float(1.0-2.0*oy/rasterHeight)};
+        s.gl.uniform4f(s.uiCanvasUniform,canvasToClip[0],canvasToClip[1],canvasToClip[2],canvasToClip[3]);
         if(s.menuRasterShared50KG&&!s.check("reapply same native menu source raster before spans")){
             s.menuRasterFailed50KG=true;s.diagnostic=nullptr;return false;
         }
@@ -2709,7 +3176,7 @@ bool VehicleWindowGl50DS::submitOriginalUiImpl(const OriginalUiNativeDraw50KG& n
         }
         s.drawGl.bindBuffer(elementBuffer, sourceRgba ? s.uiSourceIndexBuffer : s.uiIndexBuffer);
         if (sourceRgba)
-            s.drawGl.bufferSubData(elementBuffer, 0, std::intptr_t(sourceIndexCount) * sizeof(U),
+            s.drawGl.bufferSubData(elementBuffer, 0, std::intptr_t(extendedIndexCount) * sizeof(U),
                 s.uiSourceIndices->indices);
         accepted = s.check("prepare authenticated original UI frame") && accepted;
         // No material representative has bound before this point. Read-only
@@ -2776,6 +3243,33 @@ bool VehicleWindowGl50DS::submitOriginalUiImpl(const OriginalUiNativeDraw50KG& n
                 const bool opaqueBatch=originalUiCoverageOpaqueBatch50KG(span,state);
                 OriginalUiCoverageBounds50KG spanRegion;
                 accepted=s.beginUiCoverageSpan(state.coverage==OriginalUiCoverage50KG::fourSampleAa1,sourceBlend);
+                // Non-opaque ranges: consecutive source triangles whose
+                // conservative regions (half-open, halo included) are pairwise
+                // disjoint share one scratch clear/raster/snapshot/compose
+                // range over their union rectangle. No sample is touched by two
+                // triangles of one range, uncovered union samples keep the
+                // cleared A=-1 and are discarded, and every overlapping pair
+                // stays in separate ranges in source order: per-sample results
+                // equal one range per triangle. RR_GARAGE_COVERAGE_PER_TRIANGLE=1
+                // restores one range per triangle.
+                static const bool perTriangle=[]{const char* v=std::getenv("RR_GARAGE_COVERAGE_PER_TRIANGLE");return v&&v[0]=='1'&&!v[1];}();
+                // Verification harness, off by default (RR_GARAGE_COVERAGE_VERIFY=1):
+                // every non-opaque coverage span is drawn one range per triangle,
+                // resolved and read back, the sample domain is restored, the span
+                // is drawn batched, and both resolved images are compared byte-for-
+                // byte. The batched result is kept.
+                static const bool verifyBatches=[]{const char* v=std::getenv("RR_GARAGE_COVERAGE_VERIFY");return v&&v[0]=='1'&&!v[1];}();
+                constexpr U batchCap=64;
+                OriginalUiCoverageBounds50KG batchRects[batchCap],batchBounds;U batchCount=0,batchFirst=0;std::uint64_t batchArea=0;
+                const auto flushBatch=[&]()noexcept{
+                    if(batchCount&&accepted){
+                        accepted=s.drawUiCoverageRange(state.coverage==OriginalUiCoverage50KG::fourSampleAa1,
+                            batchFirst,3*batchCount,image,depth,state.depthWrite,sourceBlend,false,batchBounds,sourceSampler);
+                        if(accepted)++draws;
+                    }
+                    batchCount=0;batchArea=0;batchBounds={};
+                };
+                const auto runSpan=[&](bool allowJoin)noexcept{
                 for(U index=range.firstIndex;accepted&&index<range.firstIndex+range.indexCount;index+=3){
                     const U ia=s.uiSourceIndices->indices[index],ib=s.uiSourceIndices->indices[index+1],
                         ic=s.uiSourceIndices->indices[index+2];
@@ -2794,7 +3288,7 @@ bool VehicleWindowGl50DS::submitOriginalUiImpl(const OriginalUiNativeDraw50KG& n
                     }
                     // Only a clipped-empty conservative region omits GPU work.
                     // Source order, indices, coverage, ALPHA and depth stay intact.
-                    if(region.empty())continue;
+                    if(region.empty()){flushBatch();continue;} // keeps every range contiguous
                     if(opaqueBatch){
                         if(spanRegion.empty())spanRegion=region;
                         else {const I right=std::max(spanRegion.x+spanRegion.width,region.x+region.width);
@@ -2802,10 +3296,76 @@ bool VehicleWindowGl50DS::submitOriginalUiImpl(const OriginalUiNativeDraw50KG& n
                             spanRegion.x=std::min(spanRegion.x,region.x);spanRegion.y=std::min(spanRegion.y,region.y);
                             spanRegion.width=right-spanRegion.x;spanRegion.height=top-spanRegion.y;}
                     }else{
-                        accepted=s.drawUiCoverageRange(state.coverage==OriginalUiCoverage50KG::fourSampleAa1,
-                            index,3,image,depth,state.depthWrite,sourceBlend,false,region,sourceSampler);if(accepted)++draws;
+                        const std::uint64_t area=std::uint64_t(region.width)*region.height;
+                        OriginalUiCoverageBounds50KG joined=region;
+                        bool join=allowJoin&&batchCount>0&&batchCount<batchCap&&batchFirst+3*batchCount==index;
+                        for(U k=0;join&&k<batchCount;++k){const auto& a=batchRects[k];
+                            if(region.x<a.x+a.width&&a.x<region.x+region.width&&
+                               region.y<a.y+a.height&&a.y<region.y+region.height)join=false;}
+                        if(join){
+                            const I right=std::max(batchBounds.x+batchBounds.width,region.x+region.width);
+                            const I top=std::max(batchBounds.y+batchBounds.height,region.y+region.height);
+                            joined.x=std::min(batchBounds.x,region.x);joined.y=std::min(batchBounds.y,region.y);
+                            joined.width=right-joined.x;joined.height=top-joined.y;
+                            // Bound the extra scratch/compose area of the union.
+                            if(std::uint64_t(joined.width)*joined.height>2*(batchArea+area)+16384u)join=false;
+                        }
+                        if(!join){flushBatch();if(!accepted)break;joined=region;batchFirst=index;}
+                        batchBounds=joined;batchRects[batchCount++]=region;batchArea+=area;
                     }
                 }
+                if(!opaqueBatch)flushBatch();
+                };
+                if(verifyBatches&&!opaqueBatch&&accepted){
+                    struct Verify{const void* owner=nullptr;bool ready=false,failed=false;
+                        U save=0,saveColor=0,saveDepth=0,resolve=0,resolveColor=0;std::vector<std::uint8_t> a,b;};
+                    thread_local Verify v;
+                    if(v.owner!=&s){v=Verify{};v.owner=&s;}
+                    if(!v.ready&&!v.failed){
+                        v.failed=true;
+                        try{v.a.resize(640u*448u*4u);v.b.resize(640u*448u*4u);}catch(...){}
+                        if(v.b.size()==640u*448u*4u&&
+                           s.coverageFramebuffer(v.save)&&s.coverageTextureStorage(v.saveColor,rgba8,640,448,true,colorAttachment)&&
+                           s.coverageTextureStorage(v.saveDepth,depth24,640,448,true,depthAttachment)){
+                            s.gl.drawBuffer(colorAttachment);s.gl.readBuffer(colorAttachment);
+                            if(s.coverageComplete()&&s.coverageFramebuffer(v.resolve)&&
+                               s.coverageTextureStorage(v.resolveColor,rgba8,640,448,false,colorAttachment)){
+                                s.gl.drawBuffer(colorAttachment);s.gl.readBuffer(colorAttachment);
+                                if(s.coverageComplete()){v.ready=true;v.failed=false;}
+                            }
+                        }
+                        s.gl.bindFramebuffer(framebuffer,s.uiCoverage.scene);
+                        std::fprintf(stderr,"garage_coverage_verify_setup ready=%u\n",unsigned(v.ready));
+                    }
+                    if(v.ready){
+                        const auto blit=[&](U from,U to,U bits)noexcept{
+                            s.gl.disable(0x0C11);
+                            s.gl.bindFramebuffer(readFramebuffer,from);s.gl.bindFramebuffer(drawFramebuffer,to);
+                            s.gl.blitFramebuffer(0,0,640,448,0,0,640,448,bits,0x2600);
+                            s.gl.bindFramebuffer(framebuffer,s.uiCoverage.scene);s.gl.enable(0x0C11);
+                        };
+                        const auto read=[&](std::vector<std::uint8_t>& out)noexcept{
+                            blit(s.uiCoverage.scene,v.resolve,colorBufferBit);
+                            s.gl.bindFramebuffer(readFramebuffer,v.resolve);s.drawGl.bindBuffer(0x88EB,0);
+                            s.gl.readPixels(0,0,640,448,rgba,unsignedByte,out.data());
+                            s.gl.bindFramebuffer(framebuffer,s.uiCoverage.scene);
+                        };
+                        blit(s.uiCoverage.scene,v.save,colorBufferBit|depthBufferBit);
+                        const U before=draws;runSpan(false);const U single=draws-before;
+                        if(accepted){
+                            read(v.a);
+                            blit(v.save,s.uiCoverage.scene,colorBufferBit|depthBufferBit);
+                            spanRegion={};const U mid=draws;runSpan(true);const U batched=draws-mid;
+                            if(accepted){
+                                read(v.b);std::size_t differing=0;
+                                for(std::size_t k=0;k<v.a.size();++k)differing+=v.a[k]!=v.b[k];
+                                std::fprintf(stderr,"garage_coverage_verify span=%u aa1=%u blend=%d triangles=%u ranges_per_triangle=%u ranges_batched=%u differing_bytes=%zu\n",
+                                    i,unsigned(state.coverage==OriginalUiCoverage50KG::fourSampleAa1),sourceBlend,range.indexCount/3,single,batched,differing);
+                            }
+                        }
+                        accepted=s.check("garage coverage verification")&&accepted;
+                    }else runSpan(!perTriangle);
+                }else runSpan(!perTriangle);
                 if(accepted&&opaqueBatch&&!spanRegion.empty()){
                     // Uniform opaque AA0 GE/GREATER writing span: source-order
                     // center-depth reduction selects the same surviving payload
@@ -2820,7 +3380,9 @@ bool VehicleWindowGl50DS::submitOriginalUiImpl(const OriginalUiNativeDraw50KG& n
                 // Coherent fetch reads the framebuffer directly. Fallback
                 // opaque writes unbind destination RGBA; only fallback feedback
                 // requires one real triangle and texture barrier per draw.
-                const bool feedback=span.blend!=OriginalUiBlend50KG::opaque;
+                const bool fixedSpan=fixedAdditive&&garageFixedAdditiveBlend50KG(span.blend);
+                const bool doubledSpecular=specularSpan(i);
+                const bool feedback=span.blend!=OriginalUiBlend50KG::opaque&&!fixedSpan&&!doubledSpecular;
                 if(!s.uiSourceCoherentFramebufferFetch){
                     s.gl.activeTexture(textureUnit0+1);
                     s.gl.bindTexture(texture2D,feedback?s.uiSourceColor:0);
@@ -2829,13 +3391,58 @@ bool VehicleWindowGl50DS::submitOriginalUiImpl(const OriginalUiNativeDraw50KG& n
                 const auto& range=s.uiSourceIndices->spans[i];
                 const U sourceTriangles=range.indexCount/3;
                 U sourceDraws=0;
-                if(s.uiSourceCoherentFramebufferFetch || !feedback){
+                if(doubledSpecular){
+                    // PC/Xbox fixed-function specular (GarageFixedSpecular50KG):
+                    // one draw of the consecutive copy pairs, same VAO/texture/
+                    // sampler/depth state, through the dual-source variant.
+                    auto& v=garageFixedSpecular50KG;
+                    s.gl.useProgram(v.program);
+                    s.gl.uniform4f(v.canvas,canvasToClip[0],canvasToClip[1],canvasToClip[2],canvasToClip[3]);
+                    s.gl.uniform1i(v.image,0);if(v.alpha>=0)s.gl.uniform1f(v.alpha,span.alphaScale);
+                    s.gl.uniform1i(v.textured,textured?1:0);
+                    s.gl.uniform4f(v.fogColor,native.particleFogColor[0],native.particleFogColor[1],native.particleFogColor[2],1.f);
+                    s.gl.uniform1i(v.raster,sourceRaster?(state.sourcePacketStq?2:1):0);
+                    if(v.particle>=0)s.gl.uniform1i(v.particle,0);
+                    s.gl.uniform1i(v.fogEnabled,(particle||state.sourceFogEnabled)?1:0);
+                    s.gl.uniform1i(v.alphaTest,(particle||state.sourceAlphaTestGreaterZero)?1:0);
+                    s.gl.uniform1i(v.composition,1);s.gl.uniform1i(v.payload,0);
+                    if(v.target>=0)s.gl.uniform1i(v.target,1);
+                    s.gl.uniform1i(v.blend,-3);
+                    s.gl.enable(0x0BE2);s.gl.blendEquation(0x8006);
+                    s.gl.blendFuncSeparate(0x0304,1,1,0x88FB); // RGB: DST_ALPHA, ONE; A: ONE, ONE_MINUS_SRC1_ALPHA
+                    s.drawGl.drawElementsBaseVertex(0x0004,static_cast<I>(specularCount[i]),0x1405,
+                        reinterpret_cast<const void*>(std::uintptr_t(specularFirst[i])*sizeof(U)),0);
+                    s.gl.disable(0x0BE2);s.gl.useProgram(s.uiProgram);sourceDraws=1;
+                    ++v.draws;v.triangles+=range.indexCount/3;
+                    if(v.draws==1||v.draws%2000==0)
+                        std::fprintf(stderr,"garage_fixed_specular_draws draws=%llu triangles=%llu max_rgb_difference=%d\n",
+                            (unsigned long long)v.draws,(unsigned long long)v.triangles,v.maxDifference);
+                }else if(fixedSpan){
+                    // Exact fixed-function ADD (see GarageFixedAdditive50KG):
+                    // shader emits the floored product; blender adds Cd.
+                    if(range.indexCount){
+                        s.gl.uniform1i(s.uiSourceBlendUniform,-sourceBlend);
+                        s.gl.enable(0x0BE2);s.gl.blendEquation(0x8006);s.gl.blendFuncSeparate(1,1,1,0);
+                        s.drawGl.drawElementsBaseVertex(0x0004,static_cast<I>(range.indexCount),0x1405,
+                            reinterpret_cast<const void*>(std::uintptr_t(range.firstIndex)*sizeof(U)),0);
+                        s.gl.disable(0x0BE2);sourceDraws=1;
+                    }
+                }else if(s.uiSourceCoherentFramebufferFetch || !feedback){
                     // Only retained original triples enter the batched draw;
                     // discarded equal-XY halves are never submitted to GL.
                     if(range.indexCount){
                         s.drawGl.drawElementsBaseVertex(0x0004,static_cast<I>(range.indexCount),0x1405,
                             reinterpret_cast<const void*>(std::uintptr_t(range.firstIndex)*sizeof(U)),0);
                         sourceDraws=1;
+                    }
+                }else if(feedbackBatches&&fb.spanCount[i]){
+                    // Region-disjoint triangle batches, one barrier each.
+                    for(std::uint32_t b=0;b<fb.spanCount[i];++b){
+                        const auto k=fb.spanFirst[i]+b;
+                        s.gl.textureBarrier();++d.originalUiTextureBarriers;
+                        s.drawGl.drawElementsBaseVertex(0x0004,static_cast<I>(fb.rangeCount[k]),0x1405,
+                            reinterpret_cast<const void*>(std::uintptr_t(fb.rangeFirst[k])*sizeof(U)),0);
+                        ++sourceDraws;
                     }
                 }else{
                     for(U index=range.firstIndex;index<range.firstIndex+range.indexCount;index+=3){

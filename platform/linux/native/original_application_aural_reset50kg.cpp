@@ -1,3 +1,4 @@
+#include <cstdio>
 #include "original_application_aural50kg.h"
 #include "original_audio_pending_waves50kg.h"
 #include "original_ui_main_audio50kg.h"
@@ -223,7 +224,7 @@ bool OriginalApplicationAural50KG::stopResultsNative26D070(
     d={Status::complete,0x26d1f0};return true;
 }
 bool AudioMixer50HD::canResetNativeSourceMemory268300(
-    const OriginalApplicationAural50KG& owner)const noexcept {
+    const OriginalApplicationAural50KG& owner,bool releasingStoppedGarageClips)const noexcept {
     // Caller has already fenced its immutable owner thread and actual Main.
     if(!nativeSourceWetProcessor_||
        !nativeSourceWetProcessorCurrent(owner,*nativeSourceWetProcessor_)||
@@ -235,9 +236,10 @@ bool AudioMixer50HD::canResetNativeSourceMemory268300(
     for(std::size_t n=0;n<count_;++n)
         if(voices_[n].active||nativeSourceVoiceRoutes_[n].count)return false;
     for(const auto& cell:nativeSourceRoutes_.cells_)if(cell.reserved)return false;
-    // No attempt to reclaim a stopped Garage PCM borrow as if it were a
-    // source stop. Its existing exact final-retirement receipt is NOT reused.
-    for(std::size_t n=OriginalUiMainAudio50KG::courseRequiredVoices;
+    // A stopped Garage PCM borrow is never reclaimed as if it were a source
+    // stop. Only Main's exact stopped-history release in this same transaction
+    // (already preflighted by the caller) may leave such clips here.
+    if(!releasingStoppedGarageClips)for(std::size_t n=OriginalUiMainAudio50KG::courseRequiredVoices;
         n<OriginalUiMainAudio50KG::garageSceneVoiceEnd;++n){const auto& clip=voices_[n].clip;
         if(clip.samples||clip.frames||clip.sampleRate||clip.channels||clip.loopStart||clip.loopEnd)return false;
     }
@@ -275,6 +277,15 @@ bool OriginalApplicationAural50KG::resetNativeMemory268300(
     if(!pending||!pending->current()||pending->issuer_!=issuer_||
        pending->authority_.lock().get()!=entities_.get()||pending->nativeUnresolvedSceneAbortRevision_)
         return fail(d,Status::owner,0x268300);
+    auto* const cache=pending->nativeSamples_.get();
+    // Original268300 ClearMemory discards every loaded sample, including a
+    // finished Garage's. Native: its stopped voices release their clips and
+    // PCM bindings here, but only from the exact closed-output retired state.
+    const bool releaseGarage=main.stoppedGarageHistoryPresent();
+    if(releaseGarage&&(!closedOutput||!cache||!main.canReleaseStoppedGarageHistory268300(*cache))){
+        std::fprintf(stderr,"aural_reset_268300_rejected garage_history_unreleasable closed_output=%d cache=%d\n",
+            int(closedOutput),int(cache!=nullptr));
+        return fail(d,Status::unsupportedNativeReset,0x268300);}
     // This is explicitly a bounded native supported domain, NOT an original
     // condition or evidence that268300/its caller tests a positive RPC return.
     if(i.raceIntroLease||i.streamRetirementAuthorized||
@@ -284,8 +295,10 @@ bool OriginalApplicationAural50KG::resetNativeMemory268300(
        (main.garageSourceLifetime_!=OriginalUiMainAudio50KG::GarageSourceLifetime::initialPrefix&&
         main.garageSourceLifetime_!=OriginalUiMainAudio50KG::GarageSourceLifetime::retired)||
        main.finalNativePcmRetired_||main.nativeGroupControlCount_||main.pendingNativeGroupControls()||
-       !main.canRecordControlChange(1)||!i.mixer->canResetNativeSourceMemory268300(*this))
-        return fail(d,Status::unsupportedNativeReset,0x268300);
+       !main.canRecordControlChange(1)||!i.mixer->canRecordControlChanges(2)||!i.mixer->canResetNativeSourceMemory268300(*this,releaseGarage)){
+        std::fprintf(stderr,"aural_reset_268300_rejected garage_lifetime=%d garage_custody_expired=%d mixer_ready=%d\n",
+            int(main.garageSourceLifetime_),int(main.garageEntryCustody_.expired()),int(i.mixer->canResetNativeSourceMemory268300(*this,releaseGarage)));
+        return fail(d,Status::unsupportedNativeReset,0x268300);}
     //268300 does not release source Group/listener/emitter registrations or
     // pending98A4 rows. In particular1A6BF0 is AFTER the six Race groups and
     // World's seventh2350D0 group, all with actual count48=0 at this cut.
@@ -310,9 +323,11 @@ bool OriginalApplicationAural50KG::resetNativeMemory268300(
     for(std::size_t n=0;n<references.size();++n)
         if(references[n]&&(!i.streamSlots[n].occupied||references[n]!=i.streamSlots[n].generation))
             return fail(d,Status::owner,0x268300);
-    auto* const cache=pending->nativeSamples_.get();
-    if(cache&&!cache->canRetireNativeBacking())
-        return fail(d,Status::unsupportedNativeReset,0x268300);
+    // With a Garage release, Main's preflight already took the exact census:
+    // the canonical backing plus each stopped voice's one binding, no other.
+    if(cache&&!releaseGarage&&!cache->canRetireNativeBacking()){
+        std::fprintf(stderr,"aural_reset_268300_rejected outstanding_pcm_lease=1\n");
+        return fail(d,Status::unsupportedNativeReset,0x268300);}
     if(!cache)for(const auto& row:pending->rows_)if(row.resolvedNativeSample)
         return fail(d,Status::unsupportedNativeReset,0x268300);
 
@@ -323,6 +338,8 @@ bool OriginalApplicationAural50KG::resetNativeMemory268300(
     // Native cache lifetime replaces DF0/380 sample-index metadata, not a
     // fabricated200-row integer/SPU table. Invalidate handles before channels;
     // retain backing until the later source988C free/clear position.
+    // Raw Mixer clips leave before their strong Garage bindings are dropped.
+    if(releaseGarage)main.releaseStoppedGarageHistory268300Preflighted();
     if(cache)++cache->generation_; //268310..324, generation cannot wrap.
     i.mixer->resetNativeSourceMemoryPreflighted268300(); //268328..3EC.
     for(std::size_t n=0;n<i.streamSlots.size();++n){

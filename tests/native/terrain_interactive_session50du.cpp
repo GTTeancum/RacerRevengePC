@@ -723,7 +723,10 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
    windowRequest.width=1280;windowRequest.height=896;
   }
 #endif
-  windowRequest.major=3;windowRequest.minor=2;
+  // GL4.0 core first: the UI AA1 coverage pass (Garage models) uses
+  // gl_SampleID. Drivers that return exactly the requested version (AMD)
+  // would otherwise give 3.2. 3.2 core remains the fallback for all races.
+  windowRequest.major=4;windowRequest.minor=0;
   windowRequest.profile=rr::platform::WindowGlProfile50DQ::Core;
   windowRequest.samples=requestedWindowSamples;windowRequest.swapInterval=0;windowRequest.resizable=true;
   // Frontend navigation borrows actual SDL button edges independently of
@@ -736,7 +739,11 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   }
   hostRequest.headless={rr::platform::OffscreenGlPlatform50DC::MesaSurfaceless,nativeVideo->width,nativeVideo->height,3,2,rr::platform::OffscreenGlProfile50DC::Core,8,8,8,8,24,0,0};
   if(!host.create(hostRequest,hostDiagnostic)){
-   reportHost50DU(hostDiagnostic);throw std::runtime_error("window/context creation failed");
+   std::cerr<<"native_window_gl4_unavailable retrying=3.2\n";
+   windowRequest.major=3;windowRequest.minor=2;hostDiagnostic={};
+   if(!host.create(hostRequest,hostDiagnostic)){
+    reportHost50DU(hostDiagnostic);throw std::runtime_error("window/context creation failed");
+   }
   }
  };
  // First usable scope is the explicit muted consumed ALL8 RA spectator route.

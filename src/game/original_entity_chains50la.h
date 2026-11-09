@@ -1,7 +1,32 @@
 #pragma once
 #include "original_wreck_components50la.h"
+#include <cstddef>
+#include <cstdint>
 
 namespace rr::game {
+// Host-side read scope for the native forest assertion. Place it ONLY at the
+// top of a const currentness predicate: nothing can mutate the forest while
+// such a predicate evaluates, so its first full proof (for the same Application
+// authority, node array, count and enrollment serial) is reused until the
+// outermost scope ends. Rejections are never reused. Not source state.
+struct EntityForestReadScope50LA final {
+    static inline thread_local std::uint32_t depth=0;
+    static inline thread_local const void* provenAuthority=nullptr;
+    static inline thread_local const void* provenObjects=nullptr;
+    static inline thread_local std::size_t provenCount=0;
+    static inline thread_local std::uint64_t provenSerial=0;
+    // Same-predicate memo of one Garage Scope's "any retiring flag" summary.
+    static inline thread_local const void* retiringOwner=nullptr;
+    static inline thread_local bool retiringAny=false;
+    // Identity of the current outermost read-only evaluation. It changes every
+    // time a new outermost scope opens, so a value memoized under one id can
+    // never be reused by a later evaluation (see the Garage Page memo).
+    static inline thread_local std::uint64_t evaluation=0;
+    EntityForestReadScope50LA()noexcept{if(!depth++){provenAuthority=nullptr;retiringOwner=nullptr;++evaluation;}}
+    ~EntityForestReadScope50LA(){if(!--depth){provenAuthority=nullptr;retiringOwner=nullptr;}}
+    EntityForestReadScope50LA(const EntityForestReadScope50LA&)=delete;
+    EntityForestReadScope50LA& operator=(const EntityForestReadScope50LA&)=delete;
+};
 namespace original_entity_chain_detail50LA {
 using namespace original_wreck_component_detail50LA;
 // Validate the complete borrowed topology before any source store. No copied
@@ -21,8 +46,13 @@ inline bool walk(const Domain& d,const C* first,const C* parent,
     return true;
 }
 inline unsigned char* entityVisitScratch(const OriginalWreckComponentDomain50LA&) noexcept {return nullptr;}
+// Host-side memo for the native forest assertion only (never source state).
+// A plain borrowed domain has no retained proof; the Application View keeps an
+// exact field snapshot of its last proven-valid forest (see the authority).
+template<class Domain> inline bool entityForestProven(const Domain&) noexcept {return false;}
+template<class Domain> inline void entityForestRecord(const Domain&) noexcept {}
 template<class Domain>
-inline bool forest(const Domain& d) noexcept {
+inline bool forestFull(const Domain& d) noexcept {
     if(!domain(d))return false;
     unsigned char legacySeen[maxOriginalWreckComponents50LA]{};
     auto* seen=entityVisitScratch(d); //Private Application View supplies its reserved extent.
@@ -34,6 +64,13 @@ inline bool forest(const Domain& d) noexcept {
     }
     for(std::size_t i=0;i<d.count;++i)if(!seen[i])return false;
     return true;
+}
+// Only a proven-valid result is ever reused; every rejection is recomputed.
+template<class Domain>
+inline bool forest(const Domain& d) noexcept {
+    if(entityForestProven(d))return true;
+    if(!forestFull(d))return false;
+    entityForestRecord(d);return true;
 }
 inline bool incoming(const C& head,const C& destination) noexcept {
     if(head.parent1C||head.previous10)return false;

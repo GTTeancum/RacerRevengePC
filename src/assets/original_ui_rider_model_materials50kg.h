@@ -46,6 +46,17 @@ public:
         std::shared_ptr<const OriginalUiArchive50KG> podTextures,
         const OriginalUiMaterialRuntime50KG&,const OriginalUiIpumTextureCache50KG*,
         OriginalUiRiderModelMaterialDiagnostic50KG&) noexcept;
+    // Separate authenticated UIUnlock entries (pod widgets 9..23 with UIPODTEX,
+    // pilot widgets 24..38 with UIUnlock-local textures).
+    bool loadUnlockPod(std::shared_ptr<const OriginalUiRiderPodAssets50KG>,
+        std::shared_ptr<const OriginalUiArchive50KG> appStart,
+        std::shared_ptr<const OriginalUiArchive50KG> podTextures,
+        const OriginalUiMaterialRuntime50KG&,const OriginalUiIpumTextureCache50KG*,
+        OriginalUiRiderModelMaterialDiagnostic50KG&) noexcept;
+    bool loadUnlockCharacter(std::shared_ptr<const OriginalUiRiderCharacterAssets50KG>,
+        std::shared_ptr<const OriginalUiArchive50KG> unlock,std::shared_ptr<const OriginalUiArchive50KG> appStart,
+        const OriginalUiMaterialRuntime50KG&,const OriginalUiIpumTextureCache50KG*,
+        OriginalUiRiderModelMaterialDiagnostic50KG&) noexcept;
     bool loaded() const noexcept;
     std::uint32_t materialCount() const noexcept;
     std::uint32_t passCount(std::uint32_t material) const noexcept;
@@ -56,7 +67,7 @@ private:
         std::shared_ptr<const OriginalUiArchive50KG>,std::shared_ptr<const OriginalUiArchive50KG>,
         std::shared_ptr<const OriginalUiArchive50KG> podTextures,
         const OriginalUiMaterialRuntime50KG&,const OriginalUiIpumTextureCache50KG*,
-        OriginalUiRiderModelMaterialDiagnostic50KG&,bool tournament=false) noexcept;
+        OriginalUiRiderModelMaterialDiagnostic50KG&,bool tournament=false,bool unlock=false) noexcept;
     struct Storage;std::unique_ptr<Storage> storage_;
 };
 }

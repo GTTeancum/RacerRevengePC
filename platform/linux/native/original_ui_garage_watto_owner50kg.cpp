@@ -469,7 +469,7 @@ bool OriginalUiGarageWattoOwner50KG::normalModelObserverRetirementCurrent(
 bool OriginalUiGarageWattoOwner50KG::constructorSubtreeCurrent()const noexcept {
     return subtreeCurrent(true);
 }
-bool OriginalUiGarageWattoOwner50KG::subtreeCurrent(bool constructorOnly)const noexcept {
+bool OriginalUiGarageWattoOwner50KG::subtreeCurrent(bool constructorOnly)const noexcept {rr::game::EntityForestReadScope50LA forestReadScope50LA;
     if(!storage_)return false;const auto& s=*storage_;
     if((s.failed&&(constructorOnly||(!s.entryAttempted&&!s.activationAttempted90)||!s.constructorReturned1D46B8))||
        s.closed||!s.type34||*s.type34!=15||!s.responseCategoriesLoaded||

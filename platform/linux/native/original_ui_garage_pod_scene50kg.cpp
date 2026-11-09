@@ -237,7 +237,7 @@ bool OriginalUiGaragePodScene50KG::prepareVisibility2729E0(
     populationStage_=PopulationStage::visibility;return true;
 }
 bool OriginalUiGaragePodScene50KG::sourceRowIdentityCurrent(
-    const OriginalUiGarageDroidAudio50GN& backend,std::size_t ordinal,bool registered)const noexcept {
+    const OriginalUiGarageDroidAudio50GN& backend,std::size_t ordinal,bool registered)const noexcept {rr::game::EntityForestReadScope50LA forestReadScope50LA;
     if(!constructed_||!groupLive_||backend_!=&backend||backend.sourceSceneGroup_!=this||
        !grant_||!grant_->sceneSoundGroupCurrent(group4D8_.entity,group4D8_.slot40_)||
        !pendingWaves_||!pendingWaves_->current()||ordinal>=group4D8_.count48_||

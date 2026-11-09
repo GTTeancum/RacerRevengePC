@@ -38,7 +38,7 @@ OriginalUiGarageDrawContribution50KG::~OriginalUiGarageDrawContribution50KG()noe
     if(shared47COwner_||shared47CEpoch_||shared470FirstPassOwner_||shared470FirstPassEpoch_||shared470ThirdPassOwner_||shared470ThirdPassEpoch_||frame_.owner_||textureCoordinator_||(drainGpu_&&drainGpu_->ownsResources())||
        (renderer_&&renderer_->ownsRenderPrelude(*this,publication_)))std::terminate();
 }
-bool OriginalUiGarageDrawContribution50KG::identityCurrent()const noexcept {
+bool OriginalUiGarageDrawContribution50KG::identityCurrent()const noexcept {rr::game::EntityForestReadScope50LA forestReadScope50LA;
     const auto s=session_.lock();::original_ui_source_timing50LH::Sample sample;std::uint64_t serial=0;
     return nativeRetirementPhase_==NativeRetirementPhase::notStarted&&s&&renderer_&&renderer_->currentFor(issuer_)&&s->issuer_==issuer_&&
         s->renderCustodyCurrent140230(publication_)&&s->page_==page_&&
@@ -204,7 +204,7 @@ bool OriginalUiGarageDrawContribution50KG::rejectRenderCallback(Diagnostic& d,st
         static_cast<unsigned>(node.flags29),static_cast<unsigned long long>(node.reference00),parentRole,static_cast<unsigned long long>(publication_));
     return fail(d,pc);
 }
-bool OriginalUiGarageCameraFrame50KG::current()const noexcept {
+bool OriginalUiGarageCameraFrame50KG::current()const noexcept {rr::game::EntityForestReadScope50LA forestReadScope50LA;
     if(!cursor_||cursor_->phase_==OriginalUiGarageDrawContribution50KG::Phase::unavailable||
        !cursor_->identityCurrent())return false;
     const auto& display=*cursor_->renderer_->display_;

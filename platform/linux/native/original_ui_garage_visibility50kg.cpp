@@ -1,3 +1,4 @@
+#include <cstdio>
 #include "../../../src/game/original_selected_array_guards27ed40.h"
 #include "../../../src/game/original_camera_observer_assertions50kg.h"
 #include "original_ui_garage_visibility50kg.h"
@@ -850,8 +851,11 @@ bool OriginalUiGarageVisibility50KG::skipFireObserver15E1B4(
     const Storage::Observer* held=nullptr;
     for(std::size_t i=0;i<actorCount;++i){const auto& candidate=s.observers[staticCount+i];
         if(candidate&&candidate->model.get()==&model){
-            if(!pageActorObserverCurrent(*s.attachedPage,*scene.actorOwner3C8_,i,model))
-                return R::fail(d,S::phase,0x15E198);
+            if(!pageActorObserverLive(*s.attachedPage,*scene.actorOwner3C8_,i,model)){
+                std::fprintf(stderr,"garage_fire_observer_rejected pc=15E198 actor=%u live=%d fields=%d\n",unsigned(i),
+                    int(scene.actorOwner3C8_->pageActorModelLiveCurrent(*s.attachedPage,i,model)),
+                    int(pageActorObserverFields(i,model)));
+                return R::fail(d,S::phase,0x15E198);}
             held=candidate.get();break;
         }
     }
@@ -1314,7 +1318,7 @@ bool OriginalUiGarageVisibility50KG::finishSearchNode2805F0(
     d.sourcePC=0x28069C;return true;
 }
 
-bool OriginalUiGarageVisibility50KG::current()const noexcept {
+bool OriginalUiGarageVisibility50KG::current()const noexcept {rr::game::EntityForestReadScope50LA forestReadScope50LA;
     if(!storage_||closed_||!sceneSearchListArraysCurrent272E38())return false;
     const auto& s=*storage_;
     if(sourceSceneOwner_&&!defaultZoneObserverCurrent272F90())return false;
@@ -2163,6 +2167,22 @@ bool OriginalUiGarageVisibility50KG::pageActorObserverCurrent(
        !sourceSceneOwner_||sourceSceneOwner_->actorOwner3C8_!=&owner||
        sourceSceneOwner_->visibility_.get()!=this||
        !owner.pageActorModelRetirementCurrent(page,ordinal,model))return false;
+    return pageActorObserverFields(ordinal,model);
+}
+bool OriginalUiGarageVisibility50KG::pageActorObserverLive(
+    const OriginalUiGaragePageOwner50KG& page,const OriginalUiGarageActors50GN& owner,
+    std::size_t ordinal,const R& model)const noexcept {
+    // The same retained Observer fields as the retirement path, but for an
+    // attached live actor during ordinary Page updates (15E198 reads it every
+    // fire visit). The retirement-ordered actor predicate cannot hold here.
+    if(!current()||ordinal>=actorCount||storage_->attachedPage!=&page||
+       !sourceSceneOwner_||sourceSceneOwner_->actorOwner3C8_!=&owner||
+       sourceSceneOwner_->visibility_.get()!=this||
+       !owner.pageActorModelLiveCurrent(page,ordinal,model))return false;
+    return pageActorObserverFields(ordinal,model);
+}
+bool OriginalUiGarageVisibility50KG::pageActorObserverFields(std::size_t ordinal,const R& model)const noexcept {
+    if(!storage_||ordinal>=actorCount)return false;
     const auto slot=staticCount+ordinal;
     const auto& s=*storage_;const auto& held=s.observers[slot];
     const auto& row=s.primary4C0.registrations[slot];auto* shared=s.grant->observerShared();

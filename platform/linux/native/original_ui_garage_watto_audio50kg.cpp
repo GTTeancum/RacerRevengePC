@@ -143,7 +143,7 @@ bool OriginalUiGarageWattoAudio50KG::nativeSampleLeasesEmpty()const noexcept {
  for(const auto& binding:nativeVoices_)if(binding.retainsBacking())return false;
  return true;
 }
-bool OriginalUiGarageWattoAudio50KG::current() const noexcept {
+bool OriginalUiGarageWattoAudio50KG::current() const noexcept {rr::game::EntityForestReadScope50LA forestReadScope50LA;
  if(!prepared_||poisoned_||!mixer_||!metadata_||!metadata_->prepared()||!canRevise(0)||
   mixer_->groupEpoch50IC()!=epoch_||mixer_->count()!=frontendVoices_||mixer_->sampleRate()!=rate_||
   mixer_->requiresVoiceGroupGains50IC()||mixer_->masterGain()!=1.f||mixer_->originalSoundMode50KG()!=mode_||!mode_||!mode_->ready()||!mixer_->canRecordControlChanges())return false;

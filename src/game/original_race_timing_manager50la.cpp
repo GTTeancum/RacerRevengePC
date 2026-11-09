@@ -218,6 +218,13 @@ bool OriginalRaceConstructor50LA::readResultsManagerFlags58(
     d={};d.status=OriginalResults104Diagnostic50LA::Status::owner;d.sourcePC=0x1c2124;
     d.operation="actual Race B4 manager flags58";
     if(resultsFeedbackThread_!=std::this_thread::get_id())return false;
+    if(!timingB4_&&!world74_&&anyWorld()&&ownsNativeCameraAdapter34(session)){
+        // Common race: no counted 1AF7F0 object; the one native Setup
+        // manager borrowed by the end scope IS this race's B4 timing state.
+        const auto scope=endHud_.lock();
+        if(!scope||!scope->endStateCurrent(*this,session)||!scope->manager_)return false;
+        value=static_cast<std::uint8_t>(scope->manager_->manager.flags58);d={};return true;
+    }
     if(!timingB4_||!ownsNativeCameraAdapter34(session))return false;
     const auto scope=endHud_.lock();
     if(!scope||!scope->endStateCurrent(*this,session)||!scope->bank_||!scope->manager_||

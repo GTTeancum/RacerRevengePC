@@ -22,6 +22,8 @@ struct OriginalUiHallOfFameSession50KG::Storage {
  OriginalUiMainProfile50KG coldCommon{},liveCommon{};OriginalUiRiderProfileStamp50KG coldStamp{},liveStamp{},pendingStamp{};
  game::OriginalUiHallPlan50KG pending;OriginalUiMainSessionUpdate50KG prepared{};
  bool entryCommitted=false,backCommitted=false,inOperation=false,rendering=false,updatePrepared=false,paused=false,sourceClosing=false,sourceTornDown=false;
+ bool confirmPending=false,confirmCommitted=false;
+ std::uint32_t entryMode=5; // 5 Options entry; 2 tournament race return (unchanged P+34).
  std::uint64_t serial=0;
  bool operational()const noexcept{return !state.faulted&&!state.quitRequested&&!sourceClosing&&!sourceTornDown;}
  auto transition()const noexcept{return cold.externalTransition->snapshot();}
@@ -75,31 +77,41 @@ S OriginalUiHallOfFameSession50KG::bind(const OriginalUiHallSessionCold50KG&cold
  if(!cold.resources||!cold.resources->loaded()||!cold.resources->widgets()||!cold.resources->camera()||!cold.resources->exitText()||!cold.resources->exitText()->prepared()||!cold.hallArchive||cold.hallArchive->identity()!=assets::originalUiArchiveIdentity50KG(assets::OriginalUiArchiveId50KG::hallOfFame))return result(d,S::resource);
  if(!cold.externalTransition||cold.externalTransition->snapshot().bound||!cold.profile||!cold.profile->hallRecordsReady()||!cold.commonProfile||!cold.commonProfile->known||cold.profile->commonProfile()!=cold.commonProfile.get()||!cold.application||!cold.application->known||(cold.application->globalFlags228&4)||cold.application->transportE00!=-1)return result(d,S::profile);
  if((cold.audioMode!=OriginalUiMainAudioMode50KG::muted&&cold.audioMode!=OriginalUiMainAudioMode50KG::enabled)||(cold.audioMode==OriginalUiMainAudioMode50KG::muted?bool(cold.audio):!cold.audio||!cold.audio->hallOfFameMenuReady()))return result(d,S::audio);
- try{auto s=std::make_unique<Storage>();s->cold=cold;s->coldCommon=*cold.commonProfile;s->coldStamp=cold.profile->stamp();game::OriginalUiHallProfile50KG view;game::OriginalUiHallPlan50KG plan;
-  assets::OriginalUiPageDiagnostic50KG parse;if(s->controller.bind(cold.hallArchive,parse)!=MS::ok||!s->controller.initialState(s->nav)||!cold.profile->hallSnapshotForMode(5,view)||s->controller.phase(s->nav,HP::entry74,view,plan)!=MS::ok)return result(d,S::profile);
+ const bool raceReturn=cold.origin==OriginalUiHallEntryOrigin50KG::tournamentRaceReturn;
+ if((!raceReturn&&cold.origin!=OriginalUiHallEntryOrigin50KG::options)||(raceReturn&&cold.commonProfile->mode34!=2))return result(d,S::profile);
+ const std::uint32_t entryMode=raceReturn?2u:5u;
+ try{auto s=std::make_unique<Storage>();s->cold=cold;s->coldCommon=*cold.commonProfile;s->coldStamp=cold.profile->stamp();s->entryMode=entryMode;s->state.entryMode34=entryMode;game::OriginalUiHallProfile50KG view;game::OriginalUiHallPlan50KG plan;
+  assets::OriginalUiPageDiagnostic50KG parse;if(s->controller.bind(cold.hallArchive,parse)!=MS::ok||!s->controller.initialState(s->nav)||!cold.profile->hallSnapshotForMode(entryMode,view)||s->controller.phase(s->nav,HP::entry74,view,plan)!=MS::ok)return result(d,S::profile);
   if(!s->collector.bindFrame(cold.resources,cold.gpu,d.draw))return result(d,S::draw);
   game::OriginalUiApertureCallbacks50KG cb;cb.context=s.get();cb.available=&Storage::available;cb.hook=&Storage::hook;cb.submitOverlay=&Storage::overlay;
   if(s->aperture.bindHallOfFame(cold.hallArchive,cb,d.aperture)!=AS::ok)return result(d,S::aperture);
   s->state.bound=true;storage_=std::move(s);return result(d,S::ok);
  }catch(...){return result(d,S::resource);}
 }
-bool OriginalUiHallOfFameSession50KG::acceptEntryProfileCommit()noexcept{auto*s=storage_.get();if(!s||!s->operational()||s->entryCommitted||s->inOperation||!s->process())return false;auto expected=s->coldCommon;if(expected.mode34!=5){expected.previousMode38=expected.mode34;expected.mode34=5;}auto st=s->cold.profile->stamp();if(!common(expected,*s->cold.commonProfile)||st.generation!=s->coldStamp.generation||st.mode34!=5)return false;s->liveCommon=expected;s->liveStamp=st;s->entryCommitted=true;return true;}
+bool OriginalUiHallOfFameSession50KG::acceptEntryProfileCommit()noexcept{auto*s=storage_.get();if(!s||!s->operational()||s->entryCommitted||s->inOperation||!s->process())return false;
+ if(s->entryMode==2){
+  // 17DE10(App,6,11,1) -> 17DB80/ld_ui writes no mode: the common profile and
+  // rider-profile generation must be exactly those seen at bind.
+  const auto st=s->cold.profile->stamp();
+  if(!common(s->coldCommon,*s->cold.commonProfile)||s->coldCommon.mode34!=2||st.generation!=s->coldStamp.generation||st.mode34!=2)return false;
+  s->liveCommon=s->coldCommon;s->liveStamp=st;s->entryCommitted=true;return true;}
+ auto expected=s->coldCommon;if(expected.mode34!=5){expected.previousMode38=expected.mode34;expected.mode34=5;}auto st=s->cold.profile->stamp();if(!common(expected,*s->cold.commonProfile)||st.generation!=s->coldStamp.generation||st.mode34!=5)return false;s->liveCommon=expected;s->liveStamp=st;s->entryCommitted=true;return true;}
 S OriginalUiHallOfFameSession50KG::notifyTransition(const game::OriginalUiTransitionNotification50KG&e,D&d)noexcept{
  d={};auto*s=storage_.get();if(!s)return result(d,S::notBound);if(!s->operational()||s->inOperation||!s->profileCurrent()||e.route.screen!=11||e.route.page!=1)return result(d,S::unsupportedState,e.sourcePC);
  const auto t=s->transition();if(!t.bound||e.lifecycle!=t.lifecycle||e.phase!=t.phase||!((t.current.screen==11&&t.current.page==1)||(t.requested.screen==11&&t.requested.page==1)))return result(d,S::transition,e.sourcePC);
- s->state.framePublished=false;s->state.backProposalPending=false;s->inOperation=true;
+ s->state.framePublished=false;s->state.backProposalPending=false;s->confirmPending=false;s->inOperation=true;
  switch(e.kind){case N::requestedPage90:s->phase(HP::requestedPage90,e.sourcePC);s->state.pageShown=true;break;case N::previousPage94:s->phase(HP::previousPage94,e.sourcePC);s->state.pageShown=false;break;case N::pageEntry74:s->phase(HP::entry74,e.sourcePC);break;case N::managerEntry84:break;case N::beginTransition7C:if(!okay(s->aperture.beginTransition7C(e.phase)))s->fault(S::aperture,e.sourcePC);break;case N::pageAuxiliary1C:s->state.inputContainerShown=false;break;case N::pageAuxiliary24:s->state.inputContainerShown=true;break;}
  s->inOperation=false;if(s->state.faulted){d=s->faultDetail;return d.status;}return result(d,S::ok);
 }
 game::OriginalUiTransitionCompletion50KG OriginalUiHallOfFameSession50KG::pollCompletion(game::OriginalUiTransitionRoute50KG r,game::OriginalUiTransitionPhase50KG p)const noexcept{const auto*s=storage_.get();if(!s||!s->operational()||s->inOperation||!s->profileCurrent()||r.screen!=11||r.page!=1)return game::OriginalUiTransitionCompletion50KG::unavailable;const auto t=s->transition();if(!s->currentPage()||t.phase!=p)return game::OriginalUiTransitionCompletion50KG::unavailable;return s->aperture.pollCompletion(r,p);}
 const game::OriginalUiTransitionOwner50KG* OriginalUiHallOfFameSession50KG::externalLifecycleOwner()const noexcept{return storage_?storage_->cold.externalTransition.get():nullptr;}
 bool OriginalUiHallOfFameSession50KG::ownsPreparedPage(std::uint8_t p)const noexcept{return storage_&&storage_->operational()&&!storage_->inOperation&&p==1;}
-bool OriginalUiHallOfFameSession50KG::canBeginMovement()const noexcept{const auto*s=storage_.get();return s&&s->operational()&&!s->inOperation&&!s->updatePrepared&&s->profileCurrent()&&s->idle()&&s->state.pageShown&&s->state.inputContainerShown&&s->state.framePublished&&s->aperture.snapshot().inputEnabled268&&!s->state.videoPaused84&&!s->state.movementPresentationPending&&!s->nav.deferred1460&&!s->state.backProposalPending;}
+bool OriginalUiHallOfFameSession50KG::canBeginMovement()const noexcept{const auto*s=storage_.get();return s&&s->operational()&&!s->inOperation&&!s->updatePrepared&&s->profileCurrent()&&s->idle()&&s->state.pageShown&&s->state.inputContainerShown&&s->state.framePublished&&s->aperture.snapshot().inputEnabled268&&!s->state.videoPaused84&&!s->state.movementPresentationPending&&!s->nav.deferred1460&&!s->state.backProposalPending&&!s->confirmPending;}
 bool OriginalUiHallOfFameSession50KG::movementInProgress()const noexcept{return storage_&&storage_->operational()&&(storage_->nav.deferred1460>0||storage_->state.movementPresentationPending);}
 bool OriginalUiHallOfFameSession50KG::completeMovementPresentation()noexcept{auto*s=storage_.get();if(!s||!s->operational()||s->inOperation||s->updatePrepared||!s->state.movementPresentationPending||s->nav.deferred1460||s->state.videoPaused84)return false;s->state.movementPresentationPending=false;return true;}
 S OriginalUiHallOfFameSession50KG::input(const OriginalUiMainSessionInput50KG&in,OriginalUiHallSessionInputReceipt50KG&r,D&d)noexcept{
  d={};r={};auto*s=storage_.get();if(!s)return result(d,S::notBound);if(!s->operational())return result(d,s->state.quitRequested?S::quit:S::faulted);if(s->inOperation||s->updatePrepared||in.controller>1||in.originalInput>15)return result(d,S::invalidInput);
- const bool movementReady=canBeginMovement();s->state.backProposalPending=false;s->backCommitted=false;
+ const bool movementReady=canBeginMovement();s->state.backProposalPending=false;s->backCommitted=false;s->confirmPending=false;s->confirmCommitted=false;
  r.containerReached=s->currentPage()&&s->state.pageShown&&s->state.inputContainerShown;
  if(!r.containerReached||!s->aperture.snapshot().inputEnabled268||in.popupActive||in.sourceInputBlocked||movementInProgress())return result(d,r.status=S::noChange);
  if(!s->profileCurrent())return result(d,r.status=S::profile);
@@ -107,6 +119,19 @@ S OriginalUiHallOfFameSession50KG::input(const OriginalUiMainSessionInput50KG&in
  game::OriginalUiHallProfile50KG view;game::OriginalUiHallPlan50KG plan;if(!s->cold.profile->hallSnapshot(view))return result(d,r.status=S::profile);
  r.pageCallbackRan=true;auto status=s->controller.input(s->nav,in.controller,static_cast<assets::OriginalUiMovementInput50KG>(in.originalInput),true,true,view,plan);r.pageAccepted=plan.pageAccepted;
  if(status!=MS::ok&&status!=MS::noChange&&status!=MS::unavailable)return result(d,r.status=S::widget);
+ if(plan.confirmRequested){
+  r.confirmRoute=plan.confirmRoute;
+  if(plan.confirmRoute==game::OriginalUiHallConfirmRoute50KG::ending){
+   // STAND-IN: 1E40A0 (1468=1, doors close, B8 1E4980 -> 17DE10(App,0x28,3,0))
+   // has no native end-scene receiver yet. Nothing is committed: no sound1,
+   // no close; the page stays open and input remains live.
+   r.routeProposal={this,0,plan.confirm,s->liveStamp};return result(d,r.status=S::unavailableDestination,0x1E40A0);}
+  if(plan.confirmRoute!=game::OriginalUiHallConfirmRoute50KG::assertion){
+   if(!s->idle()||!s->soundReady(1)||!game::originalUiHallConfirmShape50KG(plan.confirm))return result(d,r.status=S::unavailableDestination);
+   s->pending=plan;s->pendingStamp=s->liveStamp;s->confirmPending=true;++s->serial;if(!s->serial)++s->serial;
+   r.routeProposal={this,s->serial,plan.confirm,s->pendingStamp};return result(d,r.status=S::confirmProposed);}
+  // assertion: falls through to apply(): sound1 + flush only.
+ }
  if(plan.backRequested){if(!s->idle()||!s->soundReady(5)||!game::originalUiHallBackShape50KG(plan.back))return result(d,r.status=S::unavailableDestination);s->pending=plan;s->pendingStamp=s->liveStamp;s->state.backProposalPending=true;++s->serial;if(!s->serial)++s->serial;r.routeProposal={this,s->serial,plan.back,s->pendingStamp};return result(d,r.status=S::backProposed);}
  if(status==MS::noChange)return result(d,r.status=S::noChange);
  s->state.framePublished=false;s->inOperation=true;const bool applied=s->apply(plan);s->inOperation=false;if(!applied){s->fault(S::widget,0x1E3F70);d=s->faultDetail;return r.status=d.status;}
@@ -115,20 +140,41 @@ S OriginalUiHallOfFameSession50KG::input(const OriginalUiMainSessionInput50KG&in
 bool OriginalUiHallOfFameSession50KG::routeProposalCurrent(const OriginalUiHallRouteProposal50KG&p)const noexcept{const auto*s=storage_.get();if(!s||!s->operational()||s->inOperation||s->updatePrepared||s->backCommitted||!s->state.backProposalPending||p.source!=this||!p.serial||p.serial!=s->serial||!stamp(p.profileStamp,s->pendingStamp)||!stamp(p.profileStamp,s->liveStamp)||!s->profileCurrent()||!s->idle()||!decision(p.decision,s->pending.back)||!s->soundReady(5))return false;game::OriginalUiHallProfile50KG view;game::OriginalUiHallPlan50KG expected;return s->cold.profile->hallSnapshot(view)&&s->controller.input(s->nav,0,assets::OriginalUiMovementInput50KG(6),true,true,view,expected)==MS::unavailable&&expected.backRequested&&decision(expected.back,p.decision);}
 bool OriginalUiHallOfFameSession50KG::commitBack(const OriginalUiHallRouteProposal50KG&p,const game::OriginalUiRouteDecision50KG&admitted)noexcept{if(!routeProposalCurrent(p)||!admitted.admitted||admitted.blockers)return false;auto expected=p.decision;expected.admitted=true;expected.blockers=0;expected.action=game::OriginalUiRouteAction50KG::request;if(!decision(expected,admitted))return false;auto&s=*storage_;if(!s.cold.profile->commitHallBack(admitted.selectedSlot,admitted,s.liveStamp))return false;s.liveStamp=s.cold.profile->stamp();s.backCommitted=true;return true;}
 S OriginalUiHallOfFameSession50KG::notifyRouteAccepted(const OriginalUiHallRouteProposal50KG&p,D&d)noexcept{d={};auto*s=storage_.get();if(!s)return result(d,S::notBound);if(!s->operational()||s->inOperation||s->updatePrepared||!s->backCommitted||!s->state.backProposalPending||p.source!=this||p.serial!=s->serial||!decision(p.decision,s->pending.back)||!stamp(p.profileStamp,s->pendingStamp)||!s->profileCurrent())return result(d,S::invalidInput);const auto t=s->transition();if(!s->currentPage()||t.requested.screen!=12||t.requested.page!=1||t.lifecycle!=Life::requestScreenExit||t.phase!=game::OriginalUiTransitionPhase50KG::none||t.applicationRequestQueued||t.initialRestartPending)return result(d,S::transition);s->state.framePublished=false;s->state.backProposalPending=false;if(!s->sound(5)){s->fault(S::audio,0x1E4280);return result(d,S::audio);}return result(d,S::ok);}
-S OriginalUiHallOfFameSession50KG::prepareUpdateAudio(const OriginalUiMainSessionUpdate50KG&in,D&d)noexcept{d={};auto*s=storage_.get();if(!s)return result(d,S::notBound);if(!s->operational())return result(d,S::faulted);if(s->inOperation||s->updatePrepared||!s->currentPage()||!s->profileCurrent()||!std::isfinite(in.elapsedSeconds)||in.elapsedSeconds<0||in.elapsedSeconds>1||(in.paused&&in.elapsedSeconds!=0))return result(d,S::invalidInput);s->state.framePublished=false;s->state.backProposalPending=false;s->paused=in.paused;if(!s->muted()){s->cold.audio->pause(in.paused);if(!s->cold.audio->update(in.elapsedSeconds)){s->fault(S::audio,0x234440);return result(d,S::audio);}}s->prepared=in;s->updatePrepared=true;return result(d,S::ok);}
+bool OriginalUiHallOfFameSession50KG::confirmProposalCurrent(const OriginalUiHallRouteProposal50KG&p)const noexcept{const auto*s=storage_.get();
+ if(!s||!s->operational()||s->inOperation||s->updatePrepared||s->confirmCommitted||!s->confirmPending||p.source!=this||!p.serial||p.serial!=s->serial||
+    !stamp(p.profileStamp,s->pendingStamp)||!stamp(p.profileStamp,s->liveStamp)||!s->profileCurrent()||!s->idle()||
+    !s->pending.confirmRequested||!decision(p.decision,s->pending.confirm)||!game::originalUiHallConfirmShape50KG(p.decision)||!s->soundReady(1))return false;
+ // Same live table again (1E3FC0 reads P+34/102CC/187B10/187E30 at the press).
+ game::OriginalUiHallProfile50KG view;game::OriginalUiHallPlan50KG expected;
+ return s->cold.profile->hallSnapshot(view)&&s->controller.input(s->nav,0,assets::OriginalUiMovementInput50KG(4),true,true,view,expected)==MS::unavailable&&
+  expected.confirmRequested&&decision(expected.confirm,p.decision);}
+bool OriginalUiHallOfFameSession50KG::commitConfirm(const OriginalUiHallRouteProposal50KG&p,const game::OriginalUiRouteDecision50KG&admitted)noexcept{
+ if(!confirmProposalCurrent(p)||!admitted.admitted||admitted.blockers)return false;auto expected=p.decision;expected.admitted=true;expected.blockers=0;expected.action=game::OriginalUiRouteAction50KG::request;
+ if(!decision(expected,admitted))return false;storage_->confirmCommitted=true;return true;}
+S OriginalUiHallOfFameSession50KG::notifyConfirmAccepted(const OriginalUiHallRouteProposal50KG&p,D&d)noexcept{d={};auto*s=storage_.get();if(!s)return result(d,S::notBound);
+ if(!s->operational()||s->inOperation||s->updatePrepared||!s->confirmCommitted||!s->confirmPending||p.source!=this||p.serial!=s->serial||!decision(p.decision,s->pending.confirm)||!stamp(p.profileStamp,s->pendingStamp)||!s->profileCurrent())return result(d,S::invalidInput);
+ const auto t=s->transition();if(!s->currentPage()||t.requested.screen!=p.decision.request.targetScreen||t.requested.page!=p.decision.request.targetPage||t.lifecycle!=Life::requestScreenExit||t.phase!=game::OriginalUiTransitionPhase50KG::none||t.applicationRequestQueued||t.initialRestartPending)return result(d,S::transition);
+ s->state.framePublished=false;s->confirmPending=false;if(!s->sound(1)){s->fault(S::audio,0x1E41E4);return result(d,S::audio);}return result(d,S::ok);}
+S OriginalUiHallOfFameSession50KG::prepareUpdateAudio(const OriginalUiMainSessionUpdate50KG&in,D&d)noexcept{d={};auto*s=storage_.get();if(!s)return result(d,S::notBound);if(!s->operational())return result(d,S::faulted);if(s->inOperation||s->updatePrepared||!s->currentPage()||!s->profileCurrent()||!std::isfinite(in.elapsedSeconds)||in.elapsedSeconds<0||in.elapsedSeconds>1||(in.paused&&in.elapsedSeconds!=0))return result(d,S::invalidInput);s->state.framePublished=false;s->state.backProposalPending=false;s->confirmPending=false;s->paused=in.paused;if(!s->muted()){s->cold.audio->pause(in.paused);if(!s->cold.audio->update(in.elapsedSeconds)){s->fault(S::audio,0x234440);return result(d,S::audio);}}s->prepared=in;s->updatePrepared=true;return result(d,S::ok);}
 S OriginalUiHallOfFameSession50KG::update(const OriginalUiMainSessionUpdate50KG&in,D&d)noexcept{d={};auto*s=storage_.get();if(!s)return result(d,S::notBound);if(!s->operational())return result(d,S::faulted);if(s->inOperation||!s->currentPage()||!s->profileCurrent()||!s->updatePrepared||in.elapsedSeconds!=s->prepared.elapsedSeconds||in.paused!=s->prepared.paused||in.debugChordHeld!=s->prepared.debugChordHeld)return result(d,S::invalidInput);s->updatePrepared=false;s->inOperation=true;game::OriginalUiHallPlan50KG plan;bool ok=true;
  // Source1E45C0 performs page deferred/video/delta work before generic2A6BB0.
  if(s->state.pageShown)ok=s->controller.update(s->nav,in.elapsedSeconds,plan)==MS::ok&&s->apply(plan);
  if(ok)ok=s->updateWidgets(false)&&s->updateWidgets(true);s->inOperation=false;if(!ok){s->fault(S::widget,0x1E45C0);d=s->faultDetail;return d.status;}++s->state.updateCount;return result(d,S::ok);}
-S OriginalUiHallOfFameSession50KG::render(const OriginalUiMainFrameClock50KG&clock,D&d)noexcept{d={};auto*s=storage_.get();if(!s)return result(d,S::notBound);if(!s->operational())return result(d,S::faulted);if(s->inOperation||s->updatePrepared||!s->currentPage()||!s->profileCurrent()||!s->state.updateCount||!s->state.pageShown||!s->state.cameraActive||s->state.movementPresentationPending||(s->paused&&clock.advanceAnimations))return result(d,S::invalidInput);s->state.framePublished=false;s->state.backProposalPending=false;s->inOperation=s->rendering=true;
- game::OriginalUiHallCourseRecords50KG row;bool ok=s->cold.profile->hallRecordSnapshot(s->state.courseIndex,row);OriginalUiHallPageInput50KG page{s->state.courseIndex,s->state.planetIndex,s->aperture.snapshot().state==game::OriginalUiApertureState50KG::open,&row};
- OriginalUiCourseProfileColors50KG colors;if(ok)ok=s->cold.profile->hallPlanetColors(s->state.planetIndex,colors);if(ok){page.colorsKnown=true;page.primaryColor79C=colors.primary79C;page.secondaryColor7A0=colors.secondary7A0;}
+S OriginalUiHallOfFameSession50KG::render(const OriginalUiMainFrameClock50KG&clock,D&d)noexcept{d={};auto*s=storage_.get();if(!s)return result(d,S::notBound);if(!s->operational())return result(d,S::faulted);if(s->inOperation||s->updatePrepared||!s->currentPage()||!s->profileCurrent()||!s->state.updateCount||!s->state.pageShown||!s->state.cameraActive||s->state.movementPresentationPending||(s->paused&&clock.advanceAnimations))return result(d,S::invalidInput);s->state.framePublished=false;s->state.backProposalPending=false;s->confirmPending=false;s->inOperation=s->rendering=true;
+ game::OriginalUiHallCourseRecords50KG row;bool ok=s->cold.profile->hallBrowseRecordSnapshot(s->state.courseIndex,row);OriginalUiHallPageInput50KG page{s->state.courseIndex,s->state.planetIndex,s->aperture.snapshot().state==game::OriginalUiApertureState50KG::open,&row};
+ OriginalUiCourseProfileColors50KG colors;if(ok)ok=s->cold.profile->hallBrowsePlanetColors(s->state.planetIndex,colors);if(ok){page.colorsKnown=true;page.primaryColor79C=colors.primary79C;page.secondaryColor7A0=colors.secondary7A0;}
+ // 1E2010/1E2860/1E30A8: skipped in mode5. Otherwise, when the shown control's
+ // CourseIndex equals 1125F&15, row r of each category is drawn 0xCCCCCC if
+ // its first- or second-human rank equals r+1.
+ if(ok&&s->entryMode!=5){game::OriginalUiHallProfile50KG view;ok=s->cold.profile->hallSnapshot(view);
+  if(ok&&view.mode34!=5&&s->state.courseIndex==view.raceCourse1125F)
+   for(std::size_t c=0;c<3;++c)for(std::uint32_t r=0;r<3;++r)page.newRecordRow[c*3+r]=view.ranks11260[c]==r+1||view.ranks1126C[c]==r+1;}
  if(ok)ok=s->collector.begin({clock.known,clock.advanceAnimations,clock.milliseconds,clock.applicationAnimation},s->state.planetIndex,d.draw)&&s->collector.projectOrdinaryWidgets(true,d.draw)&&s->collector.projectPage(page,s->state.pageShown,d.draw);
  if(ok&&s->state.pageShown){ok=s->cold.profile->commitHallRender(s->liveStamp);if(ok)s->liveStamp=s->cold.profile->stamp();}
  if(ok)ok=okay(s->aperture.render48(s->transition().lifecycle))&&!s->state.faulted;
  if(ok)ok=s->collector.projectPrompts(s->nav.inputFlags42C,d.draw)&&s->collector.projectOnTopWidgets(true,d.draw)&&s->collector.drain(d.draw);
  s->inOperation=s->rendering=false;if(!ok){if(s->state.faulted){d=s->faultDetail;return d.status;}s->fault(S::draw,0x1E3EF0);return result(d,S::draw,0x1E3EF0);}s->state.framePublished=true;++s->state.renderCount;return result(d,S::ok);}
-OriginalUiHallSessionSnapshot50KG OriginalUiHallOfFameSession50KG::snapshot()const noexcept{if(!storage_)return {};auto out=storage_->state;out.transition=storage_->transition();out.aperture=storage_->aperture.snapshot();out.deferred1460=storage_->nav.deferred1460;out.promptMask42C=storage_->nav.inputFlags42C;return out;}
+OriginalUiHallSessionSnapshot50KG OriginalUiHallOfFameSession50KG::snapshot()const noexcept{if(!storage_)return {};auto out=storage_->state;out.transition=storage_->transition();out.aperture=storage_->aperture.snapshot();out.deferred1460=storage_->nav.deferred1460;out.promptMask42C=storage_->nav.inputFlags42C;out.confirmProposalPending=storage_->confirmPending;out.entryMode34=storage_->entryMode;return out;}
 const game::OriginalUiHallState50KG* OriginalUiHallOfFameSession50KG::navigationState()const noexcept{return storage_?&storage_->nav:nullptr;}
 const OriginalUiNativeDraw50KG* OriginalUiHallOfFameSession50KG::draw()const noexcept{return storage_&&storage_->operational()&&storage_->state.framePublished&&!storage_->inOperation&&!storage_->updatePrepared&&storage_->currentPage()?storage_->collector.draw():nullptr;}
 const OriginalUiSourceFrame50KM* OriginalUiHallOfFameSession50KG::sourceFrame()const noexcept{return storage_&&storage_->operational()&&storage_->state.framePublished&&!storage_->inOperation&&!storage_->updatePrepared&&storage_->currentPage()?storage_->collector.sourceFrame():nullptr;}

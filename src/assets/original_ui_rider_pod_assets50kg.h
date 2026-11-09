@@ -38,6 +38,10 @@ public:
     // closed: they do not borrow another pod or fabricate an unlock.
     bool loadTournament(std::shared_ptr<const OriginalUiArchive50KG>,
         std::uint32_t career,OriginalUiRiderPodDiagnostic50KG&) noexcept;
+    // Separate archive gate: UIUnlock widgets 9..23 from UI/UIUnlock/Widgets.Dat
+    // (geometry UI/Geometry/NN.psg in UIUNLOCK; textures from UIPODTEX/UIUNLOCK).
+    bool loadUnlock(std::shared_ptr<const OriginalUiArchive50KG>,std::uint16_t widgetId,
+        OriginalUiRiderPodDiagnostic50KG&) noexcept;
     bool loaded() const noexcept;
     std::uint16_t widgetId() const noexcept;
     const OriginalUiRiderPodConfig50KG* config() const noexcept;
@@ -49,7 +53,7 @@ public:
     std::shared_ptr<const OriginalUiArchive50KG> archive() const noexcept;
 private:
     bool loadImpl(std::shared_ptr<const OriginalUiArchive50KG>,std::uint16_t,
-        bool tournament,OriginalUiRiderPodDiagnostic50KG&) noexcept;
+        bool tournament,OriginalUiRiderPodDiagnostic50KG&,bool unlock=false) noexcept;
     struct Storage;
     std::unique_ptr<Storage> storage_;
 };

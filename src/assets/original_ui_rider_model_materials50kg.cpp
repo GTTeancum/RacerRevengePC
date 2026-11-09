@@ -48,14 +48,39 @@ bool OriginalUiRiderModelMaterials50KG::loadTournamentPod(
     const auto* scene=model->scene();
     return load(std::move(model),scene,archive,std::move(app),std::move(podTextures),runtime,cache,d,true);
 }
+bool OriginalUiRiderModelMaterials50KG::loadUnlockPod(
+    std::shared_ptr<const OriginalUiRiderPodAssets50KG> model,
+    std::shared_ptr<const OriginalUiArchive50KG> app,
+    std::shared_ptr<const OriginalUiArchive50KG> podTextures,const OriginalUiMaterialRuntime50KG& runtime,
+    const OriginalUiIpumTextureCache50KG* cache,D& d) noexcept {
+    d={};const auto archive=model?model->archive():nullptr;
+    if(!model||!model->loaded()||!archive||!archive->loaded()||
+       archive->identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::unlock)||
+       model->widgetSource()!=archive->find("UI/UIUnlock/Widgets.Dat").identity||
+       model->widgetId()<9||model->widgetId()>23||!podTextures||!podTextures->loaded()||
+       podTextures->identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::podTextures))return fail(d,E::input);
+    const auto* scene=model->scene();
+    return load(std::move(model),scene,archive,std::move(app),std::move(podTextures),runtime,cache,d,false,true);
+}
+bool OriginalUiRiderModelMaterials50KG::loadUnlockCharacter(
+    std::shared_ptr<const OriginalUiRiderCharacterAssets50KG> model,
+    std::shared_ptr<const OriginalUiArchive50KG> unlock,std::shared_ptr<const OriginalUiArchive50KG> app,
+    const OriginalUiMaterialRuntime50KG& runtime,const OriginalUiIpumTextureCache50KG* cache,D& d) noexcept {
+    d={};if(!model||!model->loaded()||!unlock||!unlock->loaded()||
+       unlock->identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::unlock)||
+       model->widgetSource()!=unlock->find("UI/UIUnlock/Widgets.Dat").identity||
+       model->widgetId()<24||model->widgetId()>38)return fail(d,E::input);
+    const auto* scene=model->scene();
+    return load(std::move(model),scene,std::move(unlock),std::move(app),nullptr,runtime,cache,d,false,true);
+}
 bool OriginalUiRiderModelMaterials50KG::load(std::shared_ptr<const void> model,const Scene48D* scene,
     std::shared_ptr<const OriginalUiArchive50KG> rider,std::shared_ptr<const OriginalUiArchive50KG> app,
     std::shared_ptr<const OriginalUiArchive50KG> podTextures,
-    const OriginalUiMaterialRuntime50KG& runtime,const OriginalUiIpumTextureCache50KG* cache,D& d,bool tournament) noexcept {
+    const OriginalUiMaterialRuntime50KG& runtime,const OriginalUiIpumTextureCache50KG* cache,D& d,bool tournament,bool unlock) noexcept {
     d={};if(storage_)return fail(d,E::alreadyLoaded);
     if(!model||!scene||scene->materials.empty()||scene->materials.size()>256||!rider||!app||
         !rider->loaded()||!app->loaded()||
-        rider->identity()!=originalUiArchiveIdentity50KG(tournament?OriginalUiArchiveId50KG::tournament:OriginalUiArchiveId50KG::rider)||
+        rider->identity()!=originalUiArchiveIdentity50KG(unlock?OriginalUiArchiveId50KG::unlock:tournament?OriginalUiArchiveId50KG::tournament:OriginalUiArchiveId50KG::rider)||
         app->identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::appStart))return fail(d,E::input);
     try {
         auto next=std::make_unique<Storage>();next->model=std::move(model);

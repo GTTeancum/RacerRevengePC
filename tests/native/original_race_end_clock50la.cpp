@@ -1,3 +1,4 @@
+#include <cstdio>
 #include "original_camera_session50kx.h"
 #include "original_race_constructor50la.h"
 #include "original_race_hud_scope50la.h"
@@ -191,6 +192,14 @@ original_camera_session50KX::Result Registration::advanceFadeIn1A7BD0(
         const auto actual=race.borrowRaceCamera34();
         if(!actual||actual.get()!=&session)return {S::owner,0x1a7bd0};
         auto& app=*session.displayInputs_;auto& video=app.video;
+        {static int reported=-1;const int key=video.flags404Low6|(video.covered3DC<<8)|(app.fadeManagerA8<<12)|
+            ((race.flags1B0KnownValue_&8u)?1<<20:0)|(session.endingFadeRequest_.pending()?1<<21:0)|
+            (session.retainedFadeInRequestPending50LA()?1<<22:0);
+         if(key!=reported){reported=key;std::fprintf(stderr,
+            "fade_in_1a7bd0 flags404=%02x covered=%u manager=%u race_bit3=%d ending_pending=%d retained_in=%d\n",
+            unsigned(video.flags404Low6),unsigned(video.covered3DC),unsigned(app.fadeManagerA8),
+            (race.flags1B0KnownValue_&8u)?1:0,session.endingFadeRequest_.pending()?1:0,
+            session.retainedFadeInRequestPending50LA()?1:0);}}
         if(session.endingFadeRequest_.pending()||
            (session.retainedFadeInRequestPending50LA()&&app.fadeManagerA8!=8))return session.set(S::owner,0x2ae93c);
         if((video.flags404Low6&3u)&&!(video.flags404Low6&4u)&&

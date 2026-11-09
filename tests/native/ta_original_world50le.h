@@ -11,6 +11,7 @@
 #include "../../src/assets/original_ui_atm50kg.h"
 #include "../../src/assets/world_normals50hk.h"
 #include <algorithm>
+#include <functional>
 #include <charconv>
 #include <iterator>
 #include <limits>
@@ -324,6 +325,12 @@ class Owner final {
 public:
     Owner()=default;Owner(const Owner&)=delete;Owner& operator=(const Owner&)=delete;
     bool loaded()const noexcept{return bool(storage_);}
+    // Optional caller step inside the one racer population window: after the
+    // racer material/texture sources are admitted, before the combined
+    // population (whose collector closes cold registration). The original
+    // race load 1A8A40 (Pause100/Results104/F8) belongs here. It returns
+    // false only for a failure that leaves the shared table unusable.
+    std::function<bool()> beforeRacerPopulation;
     const a::Mesh48B* mesh()const noexcept{return storage_?&storage_->mesh:nullptr;}
     const std::vector<a::WorldNormal50HK>* normals()const noexcept{return storage_?&storage_->normals:nullptr;}
     const a::MaterialTextureAssets50EA* bank()const noexcept{return storage_?&storage_->bank:nullptr;}
@@ -388,6 +395,10 @@ public:
                         *request.canonicalMaterialPath.actualPrefix36B970,*provider,materials,textures,d.racerSource),
                     "Original TA canonical racer material/texture closure rejected");
             shared::need(request.canonicalDomain->appendOriginalSources(materials,textures,d.canonical),"Original TA canonical racer source admission rejected");
+            if(beforeRacerPopulation){
+                d.stage="ta_original_race_load";
+                shared::need(beforeRacerPopulation(),"Original TA race load before population rejected");
+            }
             d.stage="ta_original_racer_population";
             shared::need(request.canonicalDomain->populate(request.canonicalContext,d.canonical),"Original TA canonical racer population rejected");
             return true;

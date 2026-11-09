@@ -4,6 +4,9 @@
 #include "original_racer_model_scene50la.h"
 #include "original_racer_animation_cold50la.h"
 #include <algorithm>
+#include <cstdint>
+#include <cstdlib>
+#include <exception>
 #include <vector>
 #include <memory>
 #include <limits>
@@ -106,7 +109,81 @@ private:
     std::size_t managerName194Known_=0;
     std::uint64_t managerName194Generation_=0,managerName194Epoch_=0;
     struct GarageChild {C* node;K kind;bool model;bool characterRetiring=false;bool wattoAnimationRetiring=false;bool soundGroupRetiring=false;std::int32_t soundGroupSlot=-1;bool wattoWidgetRetiring=false;bool wattoEmitterRetiring=false;bool staticListRetiring=false;bool toyListRetiring=false;};
-    std::vector<GarageChild> garageChildren_;
+    // The same ordered vector of GarageChild rows, plus a host-side exact
+    // node -> FIRST-matching-row index (never source state). Rows are added
+    // only by push_back and removed only by erase, which rebuilds the index.
+    // Callers may change a row's retiring flags in place, never its node.
+    class GarageChildLedger {
+        std::vector<GarageChild> rows_;
+        std::vector<std::uint32_t> index_; // power of two >= 2*capacity, row+1 (0 empty)
+        static std::size_t hash(const C* p,std::size_t mask)noexcept {
+            auto v=reinterpret_cast<std::uintptr_t>(p);
+            v^=v>>17;v*=static_cast<std::uintptr_t>(0x9E3779B97F4A7C15ull);v^=v>>29;
+            return static_cast<std::size_t>(v)&mask;
+        }
+        static bool legacy()noexcept {
+            static const bool on=[]{const char* v=std::getenv("RR_GARAGE_LEGACY_INDEX");return v&&v[0]=='1'&&!v[1];}();
+            return on;
+        }
+        static bool shadow()noexcept {
+            static const bool on=[]{const char* v=std::getenv("RR_GARAGE_PROOF_SHADOW");return v&&v[0]=='1'&&!v[1];}();
+            return on;
+        }
+        void insert(std::size_t row)noexcept {
+            const C* p=rows_[row].node;
+            const std::size_t mask=index_.size()-1;
+            for(std::size_t i=hash(p,mask);;i=(i+1)&mask){
+                if(!index_[i]){index_[i]=static_cast<std::uint32_t>(row+1);return;}
+                if(rows_[index_[i]-1u].node==p)return; // keep the FIRST matching row
+            }
+        }
+        void rebuild(){
+            std::size_t size=16;while(size<2*rows_.capacity())size*=2;
+            if(index_.size()!=size)index_.assign(size,0u);else std::fill(index_.begin(),index_.end(),0u);
+            for(std::size_t i=0;i<rows_.size();++i)insert(i);
+        }
+        const GarageChild* linear(const C* p)const noexcept {
+            for(const auto& row:rows_)if(row.node==p)return &row;
+            return nullptr;
+        }
+    public:
+        using iterator=std::vector<GarageChild>::iterator;
+        using const_iterator=std::vector<GarageChild>::const_iterator;
+        iterator begin()noexcept{return rows_.begin();}
+        iterator end()noexcept{return rows_.end();}
+        const_iterator begin()const noexcept{return rows_.begin();}
+        const_iterator end()const noexcept{return rows_.end();}
+        std::size_t size()const noexcept{return rows_.size();}
+        std::size_t capacity()const noexcept{return rows_.capacity();}
+        bool empty()const noexcept{return rows_.empty();}
+        GarageChild& operator[](std::size_t i)noexcept{return rows_[i];}
+        const GarageChild& operator[](std::size_t i)const noexcept{return rows_[i];}
+        void reserve(std::size_t n){rows_.reserve(n);rebuild();}
+        void push_back(const GarageChild& row){
+            const bool grows=rows_.size()==rows_.capacity();
+            rows_.push_back(row);
+            if(grows||index_.size()<2*rows_.capacity())rebuild();else insert(rows_.size()-1);
+        }
+        iterator erase(iterator at){
+            const auto offset=at-rows_.begin();
+            rows_.erase(at);rebuild();return rows_.begin()+offset;
+        }
+        // Exactly the first row whose node is p, as the linear scan finds.
+        const GarageChild* find(const C* p)const noexcept {
+            if(legacy())return linear(p);
+            const GarageChild* result=nullptr;
+            if(!index_.empty()){
+                const std::size_t mask=index_.size()-1;
+                for(std::size_t i=hash(p,mask);index_[i];i=(i+1)&mask){
+                    const std::size_t row=index_[i]-1u;
+                    if(row<rows_.size()&&rows_[row].node==p){result=&rows_[row];break;}
+                }
+            }
+            if(shadow()&&result!=linear(p))std::terminate();
+            return result;
+        }
+    };
+    GarageChildLedger garageChildren_;
     // Private native identity/last-reference ledgers, not source fields or
     // construction/readiness substitutes. Payload owners retain their bytes.
     struct PageSceneChild {
@@ -174,6 +251,14 @@ private:
 
 
     std::uint64_t scopeGeneration_=0,managerGeneration_=0,managerEpoch_=0;
+    // managerEpoch_ is per scope (0 also means "no manager yet" here). A
+    // process-lived native owner (Garage audio transport) outlives scopes:
+    // each frontend after a race builds a new scope that restarts at epoch1.
+    // managerSerial_ orders manager lifetimes across ALL scopes; it is issued
+    // with every epoch advance, never reset or reused.
+    std::uint64_t managerSerial_=0;
+    static std::uint64_t& processManagerSerial()noexcept{static std::uint64_t value=0;return value;}
+    void advanceManagerEpoch()noexcept{++managerEpoch_;managerSerial_=++processManagerSerial();}
     bool dispatcherLive_=false,managerLive_=false,managerPublished_=false,closed_=false;
     // Actual2A35A4 detach precedes child142590 while manager ref remains1.
     bool managerForestRetiring_=false;
@@ -338,7 +423,33 @@ private:
             out=std::move(n);return {Status::complete,0x17C21C};
         }catch(...){return {Status::allocation,0x17C1C4};}
     }
+    // True iff ANY retiring flag tested by ownedGarageChild() (directly or via
+    // typedPageSceneChildRetiring()) is set, for any node. While none is, every
+    // early rejection there is false and only its garageChildren_ row decides.
+    bool anyOwnedGarageChildRetiringFlag()const noexcept {
+        if(garageSceneRetiring_||garageVisibilityRootRetiring_||garagePageRetiring_||managerSearchNodeRetiring_||
+           sceneEmitterListLedger_.retiring||pageRouter_.retiring||sceneParticle_.retiring)return true;
+        for(const bool b:garageVisibilityNodeRetiring_)if(b)return true;
+        for(const auto& x:sceneEmitters_)if(x.retiring)return true;
+        for(const auto& x:sceneCollisions_)if(x.retiring)return true;
+        for(const auto& x:sceneLights_)if(x.retiring)return true;
+        for(const auto& x:sceneFog_)if(x.retiring)return true;
+        for(const auto& x:pageControls_)if(x.retiring)return true;
+        for(const auto& x:pageGroups_)if(x.retiring)return true;
+        for(const auto& row:widgetRows_){if(row.retiring)return true;for(const auto& child:row.children)if(child.retiring)return true;}
+        for(const bool b:managerFogRetiring_)if(b)return true;
+        for(const bool b:managerUiLightsRetiring_)if(b)return true;
+        return false;
+    }
+    bool ownedGarageChildRetiringAny()const noexcept {
+        using Scope=EntityForestReadScope50LA;
+        if(Scope::depth&&Scope::retiringOwner==this)return Scope::retiringAny;
+        const bool any=anyOwnedGarageChildRetiringFlag();
+        if(Scope::depth){Scope::retiringOwner=this;Scope::retiringAny=any;}
+        return any;
+    }
     bool ownedGarageChild(const C& c)const noexcept {
+        if(ownedGarageChildRetiringAny()){
         if(garageScene_==&c&&garageSceneRetiring_)return false;
         if(typedPageSceneChildRetiring(c))return false;
         if(garagePageRetiring_&&garagePage_==&c)return false;
@@ -349,8 +460,10 @@ private:
         for(std::size_t i=0;i<3;++i)if(managerFog_[i]==&c&&managerFogRetiring_[i])return false;
         for(std::size_t i=0;i<2;++i)if(managerUiLights_[i]==&c&&managerUiLightsRetiring_[i])return false;
         if(managerSearchNodeRetiring_&&managerSearchNode_==&c)return false;
-        for(const auto& p:garageChildren_)if(p.node==&c)return !p.characterRetiring&&!p.wattoAnimationRetiring&&!p.soundGroupRetiring&&!p.wattoWidgetRetiring&&!p.wattoEmitterRetiring&&!p.staticListRetiring&&!p.toyListRetiring&&c.sessionGeneration==managerGeneration_&&
-            c.kind==p.kind&&c.objectKey==key(&c)&&c.reference00==1;
+        }
+        if(const auto* row=garageChildren_.find(&c)){const auto& p=*row;
+            return !p.characterRetiring&&!p.wattoAnimationRetiring&&!p.soundGroupRetiring&&!p.wattoWidgetRetiring&&!p.wattoEmitterRetiring&&!p.staticListRetiring&&!p.toyListRetiring&&c.sessionGeneration==managerGeneration_&&
+            c.kind==p.kind&&c.objectKey==key(&c)&&c.reference00==1;}
         return false;
     }
     Result reserveGarageChildren(std::uint64_t generation,std::size_t count)noexcept {
@@ -647,7 +760,7 @@ private:
         garageChildren_.push_back({&c,K::soundGroup2350D0,false,false,false,false,static_cast<std::int32_t>(slot)});
         slotOut=static_cast<std::int32_t>(slot);return {Status::complete,0x2351F0};
     }
-    bool wattoSoundGroupCurrent(std::uint64_t generation,const C& c,std::int32_t slot)const noexcept {
+    bool wattoSoundGroupCurrent(std::uint64_t generation,const C& c,std::int32_t slot)const noexcept {EntityForestReadScope50LA forestReadScope50LA;
         if(!live().okay()||!managerLive_||generation!=managerGeneration_||!ownedGarageChild(c)||
            c.kind!=K::soundGroup2350D0||slot<0||static_cast<std::size_t>(slot)>=application_->soundGroups434A10_.size()||
            application_->soundGroups434A10_[slot]!=&c)return false;
@@ -1136,7 +1249,7 @@ private:
     bool widgetRowCurrent(std::uint64_t generation,const Widget1Owner* owner,std::size_t row,const C& outer)const noexcept {
         return !managerPublished_&&widgetRowIdentityCurrent(generation,owner,row,outer);
     }
-    bool widgetRowIdentityCurrent(std::uint64_t generation,const Widget1Owner* owner,std::size_t row,const C& outer)const noexcept {
+    bool widgetRowIdentityCurrent(std::uint64_t generation,const Widget1Owner* owner,std::size_t row,const C& outer)const noexcept {EntityForestReadScope50LA forestReadScope50LA;
         if(!live().okay()||!managerLive_||generation!=managerGeneration_||
            !owner||owner!=managerWidget1Owner_||row>=widgetRows_.size())return false;
         const auto& r=widgetRows_[row];
@@ -2782,12 +2895,12 @@ private:
     bool garagePageCurrent(std::uint64_t generation,const PageOwner* owner,const C& c)const noexcept {
         return !garagePageAttached_&&garagePageOwnedCurrent(generation,owner,c);
     }
-    bool garageAttachedPageCurrent(std::uint64_t generation,const PageOwner* owner,const C& c)const noexcept {
+    bool garageAttachedPageCurrent(std::uint64_t generation,const PageOwner* owner,const C& c)const noexcept {EntityForestReadScope50LA forestReadScope50LA;
         return garagePageAttached_&&garagePageOwnedCurrent(generation,owner,c);
     }
     // Exact authored manager child chain. No caller-provided child count,
     // ready bit, OnTop omission or replacement subtree establishes this.
-    bool populatedGarageManagerForestCurrent(std::uint64_t generation,bool withPage)const noexcept {
+    bool populatedGarageManagerForestCurrent(std::uint64_t generation,bool withPage)const noexcept {EntityForestReadScope50LA forestReadScope50LA;
         if(!live().okay()||!managerLive_||managerRetiring_||generation!=managerGeneration_||
            !managerSearchOwner_||!managerUiLightsOwner_||!managerFogOwner_||!managerWidget1Owner_||
            managerSearchNodeRetiring_||managerSearchNodeRetired_||managerSearchPayloadReleased_||
@@ -2889,7 +3002,7 @@ private:
         dispatcherCurrentManagerGeneration30_=generation;
         return {Status::complete,0x1B8274};
     }
-    bool publishedPopulatedGarageManagerCurrent(std::uint64_t generation)const noexcept {
+    bool publishedPopulatedGarageManagerCurrent(std::uint64_t generation)const noexcept {EntityForestReadScope50LA forestReadScope50LA;
         return managerPublished_&&!managerForestRetiring_&&
             dispatcherCurrentManager30_==&manager_&&dispatcherCurrentManagerGeneration30_==generation&&
             populatedGarageManagerForestCurrent(generation,true);
@@ -4361,7 +4474,7 @@ private:
         next->priorEpoch_=managerEpoch_;next->epoch_=managerEpoch_+1;
         next->countBefore_=application_->objectCount423F60_;
         // All allocations and registry capacity precede the first source count.
-        manager_.~C();new(&manager_) C;++managerEpoch_;
+        manager_.~C();new(&manager_) C;advanceManagerEpoch();
         courseConstruction_=next.get();
         const auto init=initializeOriginalWreckComponent50LA(manager_,K::uiCourseManager1D0070,
             generation,key(&manager_),true,application_->objectCount423F60_);
@@ -4514,7 +4627,7 @@ private:
         next->priorEpoch_=managerEpoch_;next->epoch_=managerEpoch_+1;
         next->countBefore_=application_->objectCount423F60_;
         // All allocations and registry capacity precede the first source count.
-        manager_.~C();new(&manager_) C;++managerEpoch_;
+        manager_.~C();new(&manager_) C;advanceManagerEpoch();
         optionsConstruction_=next.get();
         const auto init=initializeOriginalWreckComponent50LA(manager_,K::uiOptionsManager1D0470,
             generation,key(&manager_),true,application_->objectCount423F60_);
@@ -4543,7 +4656,7 @@ private:
         if(!application_->entityAuthority_.canEnroll(manager_,key(&manager_)))return {Status::capacity,0x1B823C};
         completedManagerPage1413E0_=nullptr;
         completedManagerPageGeneration_=completedManagerPageEpoch_=0;
-        manager_.~C();new(&manager_) C;managerGeneration_=generation;++managerEpoch_;
+        manager_.~C();new(&manager_) C;managerGeneration_=generation;advanceManagerEpoch();
         const auto init=initializeOriginalWreckComponent50LA(manager_,K::uiGarageManager1D1860,
             generation,key(&manager_),true,application_->objectCount423F60_);
         if(init.status!=OriginalWreckComponentStatus50LA::complete||!application_->entityAuthority_.enroll(manager_))
@@ -4616,9 +4729,11 @@ public:
         friend class rr::platform::OriginalUiGarageVisibility50KG;
         std::shared_ptr<OriginalUiEntityScope50KG> scope_;
         std::uint64_t generation_=0,epoch_=0;
+        // Process-wide manager lifetime order for process-lived native owners.
+        std::uint64_t serial_=0;
         GarageConstructionGrant(std::shared_ptr<OriginalUiEntityScope50KG> s,std::uint64_t g)
-            :scope_(std::move(s)),generation_(g),epoch_(scope_->managerEpoch_){}
-        bool current()const noexcept{return scope_&&scope_->live().okay()&&scope_->managerLive_&&
+            :scope_(std::move(s)),generation_(g),epoch_(scope_->managerEpoch_),serial_(scope_->managerSerial_){}
+        bool current()const noexcept{EntityForestReadScope50LA forestReadScope50LA;return scope_&&scope_->live().okay()&&scope_->managerLive_&&
             scope_->manager_.kind==K::uiGarageManager1D1860&&generation_==scope_->managerGeneration_&&epoch_==scope_->managerEpoch_;}
         std::shared_ptr<OriginalApplicationEntities50LA> application()const noexcept{return current()?scope_->application_:nullptr;}
         const ::original_main_entry50KG::Application* issuer()const noexcept{return current()?scope_->issuer_:nullptr;}
@@ -4645,7 +4760,7 @@ public:
         bool garageManagerPageRetired1413E0(const PageOwner* historical)const noexcept {
             return current()&&scope_->garageManagerPageRetired1413E0(generation_,historical);
         }
-        bool garageAttachedPageCurrent(const PageOwner& owner,const C& c)const noexcept {
+        bool garageAttachedPageCurrent(const PageOwner& owner,const C& c)const noexcept {EntityForestReadScope50LA forestReadScope50LA;
             return current()&&scope_->garageAttachedPageCurrent(generation_,&owner,c);
         }
         Result activateGaragePageForest141630(const PageOwner& owner,C& c)noexcept {
@@ -5210,7 +5325,7 @@ public:
         bool garageTextOverlayCurrent(const Widget1Owner* widget,const TextOverlayOwner* owner,const C& outer,const C& child)const noexcept {
             return current()&&scope_->garageTextOverlayCurrent(generation_,widget,owner,outer,child);
         }
-        bool garageTextOverlayIdentityCurrent(const Widget1Owner* widget,const TextOverlayOwner* owner,const C& outer,const C& child)const noexcept {
+        bool garageTextOverlayIdentityCurrent(const Widget1Owner* widget,const TextOverlayOwner* owner,const C& outer,const C& child)const noexcept {EntityForestReadScope50LA forestReadScope50LA;
             return current()&&scope_->garageTextOverlayIdentityCurrent(generation_,widget,owner,outer,child);
         }
         Result hideGarageWidget1_1CD908(const Widget1Owner* widget,C& outer,C& child)noexcept {
@@ -5515,7 +5630,7 @@ public:
             if(!current())return {Status::generation,0x2350D0};
             return scope_->constructWattoSoundGroup2350D0(generation_,c,slot);
         }
-        bool wattoSoundGroupCurrent(const C& c,std::int32_t slot)const noexcept {
+        bool wattoSoundGroupCurrent(const C& c,std::int32_t slot)const noexcept {EntityForestReadScope50LA forestReadScope50LA;
             return current()&&scope_->wattoSoundGroupCurrent(generation_,c,slot);
         }
         bool noteWattoSoundInsert235270(const C& c,std::int32_t slot)noexcept {

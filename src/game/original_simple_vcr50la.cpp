@@ -1,6 +1,8 @@
 #include "original_simple_vcr50la.h"
 #include "original_application_entities50la.h"
 #include "../../tests/native/original_race_constructor50la.h"
+#include <algorithm>
+#include <cmath>
 #include <cstring>
 #include <bit>
 #include <exception>
@@ -17,15 +19,20 @@ struct OriginalSimpleVCR50LA::Impl final {
     bool counted=false,closed=false,setupAttempted=false,setupComplete=false;
     //287430 writes these words. B0 bits0/6 remain UNKNOWN until a reached
     //writer; no zero-fill of the absent lanes is exposed as source knowledge.
-    std::uint32_t word30=0,word34=0,word38=0,word3C=0,word40=0,word44=0;
+    // +30 record time, +34 play time, +38 last applied play time, +3C/+54
+    // the two bracketing frame times, +40 keyframe gate, +44 sample timer.
+    float time30=0,play34=0,last38=0,prev3C=0,keyframe40=0,sample44=0;
     float scalar48=1.f,scalar4C=0x1.111112p-4f,scalar50=1.f;
-    std::uint32_t word54=0,word58=0x80000000u;
+    float next54=0;std::uint32_t header58=0x80000000u;
     std::unique_ptr<std::uint8_t[]> buffer5C,bufferB8;
     std::uint8_t* cursor60=nullptr;
     std::uint8_t* cursor64=nullptr;
     std::uint32_t word68=0,word6C=0,word70=0,word74=0;
     std::uint32_t capacity78=0,attempted7C=0,count80=0;
-    std::unique_ptr<std::uint32_t*[]> pointers84,pointers88;
+    // Class-0 channels address a binary32 word; class-1 channels one byte.
+    std::unique_ptr<void*[]> pointers84,pointers88;
+    std::uint32_t keyframes=0,deltas=0,escapes=0,framesRead=0; //Native diagnostics only.
+    std::unique_ptr<std::uint32_t[]> nativeWords;std::unique_ptr<std::uint8_t[]> nativeBytes;
     std::unique_ptr<std::uint32_t[]> words8C,enabled90,kind94,wordA0,wordA8,wordA4;
     std::unique_ptr<float[]> scale98,inverse9C;
     std::unique_ptr<std::uint8_t[]> bytesAC;
@@ -67,9 +74,161 @@ struct OriginalSimpleVCR50LA::Impl final {
         //287BE0 never clears count80/attempted7C or registrations. It resets
         //playback/buffer cursors and bit5, preserving all other known lanes.
         flagsB0Value=std::uint8_t(flagsB0Value&~0x20u);
-        word74=0;word30=0;word40=0;word44=0;word34=0;word54=0;word58=0x80000000u;
+        word74=0;time30=0;keyframe40=0;sample44=0;play34=0;next54=0;header58=0x80000000u;
         word68=capacity78*4u+8u;word6C=capacity78*5u+8u;word70=0;
         cursor60=buffer5C.get();cursor64=(flagsB0Value&1u)?bufferB8.get():buffer5C.get();
+    }
+    bool bit(std::uint8_t mask)const noexcept {return (flagsB0Value&mask)!=0;}
+    void setBit(std::uint8_t mask,bool value)noexcept {
+        flagsB0Value=std::uint8_t(value?(flagsB0Value|mask):(flagsB0Value&~mask));
+        flagsB0Known=std::uint8_t(flagsB0Known|mask);
+    }
+    // Write bounds: [buffer5C, buffer5C+bytesB4). Every store is checked.
+    bool writable(std::size_t bytes)const noexcept {
+        const auto* base=buffer5C.get();
+        return base&&cursor60>=base&&std::size_t(cursor60-base)+bytes<=bytesB4;
+    }
+    const std::uint8_t* readBase()const noexcept {return (flagsB0Value&1u)?bufferB8.get():buffer5C.get();}
+    bool readable(std::size_t bytes)const noexcept {
+        const auto* base=readBase();
+        return base&&cursor64>=base&&std::size_t(cursor64-base)+bytes<=bytesB4;
+    }
+    void put(const void* bytes,std::size_t count)noexcept {
+        std::memcpy(cursor60,bytes,count);cursor60+=count;word74+=std::uint32_t(count);word70+=std::uint32_t(count);
+    }
+    static float f(std::uint32_t w)noexcept {return std::bit_cast<float>(w);}
+    static std::uint32_t w(float v)noexcept {return std::bit_cast<std::uint32_t>(v);}
+    std::uint32_t source(std::uint32_t i)const noexcept {
+        std::uint32_t v;std::memcpy(&v,pointers84[i],4);return v;
+    }
+    // 3062C0(cursor,{-1000.0,0x80000000|70},8): trailer, cursor NOT advanced.
+    void trailer()noexcept {
+        const std::uint32_t t[2]={0xc479c000u,0x80000000u|word70};
+        std::memcpy(cursor60,t,8);
+    }
+    void full()noexcept {if(!bit(0x80u))setBit(0x80u,true);} //287FF4 prints once.
+    // 287DD0.
+    void keyframe()noexcept {
+        if(!(word74+word68+8u<bytesB4)){full();return;}
+        if(!writable(std::size_t(word68)+8u))return; //Native fence; source size bound above.
+        const std::uint32_t header[2]={w(time30),0x80000000u|word70};
+        word70=0;put(header,8);
+        for(std::uint32_t i=0;i<count80;++i){
+            if(words8C[i]==0u){
+                const auto v=source(i);put(&v,4);wordA0[i]=v;
+            }else if(words8C[i]==1u)put(pointers84[i],1);
+        }
+        trailer();++keyframes;
+    }
+    // 288030.
+    void delta()noexcept {
+        if(!(word74+word6C+8u<bytesB4)){full();return;}
+        if(!writable(std::size_t(word6C)+8u))return;
+        const std::uint32_t header[2]={w(time30),word70};
+        word70=0;put(header,8);
+        for(std::uint32_t i=0;i<count80;++i){
+            if(words8C[i]==0u){
+                const float v=f(source(i));
+                const float d=v-f(wordA0[i]);
+                const float scaled=d*scale98[i];
+                const float sign=d<0.f?-1.f:1.f;
+                // CVT.W.S truncates toward zero.
+                const float rounded=scaled+0.5f*sign;
+                std::int32_t q=0;
+                const bool finite=rounded==rounded&&rounded<2147483520.f&&rounded>-2147483520.f;
+                if(finite)q=static_cast<std::int32_t>(rounded);
+                if(!finite||q>=0x7f||q<-0x7f){
+                    const std::uint8_t escape=0x7fu;put(&escape,1);
+                    const auto raw=w(v);put(&raw,4);wordA0[i]=raw;++escapes;
+                }else{
+                    const auto byte=static_cast<std::uint8_t>(static_cast<std::int8_t>(q));put(&byte,1);
+                    wordA0[i]=w((v+float(q)*inverse9C[i])-d); //2882B8/BC order.
+                }
+            }else if(words8C[i]==1u)put(pointers84[i],1);
+        }
+        trailer();++deltas;
+    }
+    // 2883B0. Returns true at the trailer (end of the recording).
+    bool readFrame()noexcept {
+        if(!readable(8))return true; //Native fence: never read past the buffer.
+        std::uint32_t peek[2];std::memcpy(peek,cursor64,8);
+        if(f(peek[0])==-1000.f)return true;
+        prev3C=next54;next54=f(peek[0]);header58=peek[1];cursor64+=8;++framesRead;
+        const bool key=(header58&0x80000000u)!=0;
+        for(std::uint32_t i=0;i<count80;++i){
+            if(words8C[i]==0u){
+                wordA4[i]=wordA8[i];
+                if(key){
+                    if(!readable(4))return true;
+                    std::memcpy(&wordA8[i],cursor64,4);cursor64+=4;
+                    if(!(header58&0x7fffffffu))wordA4[i]=wordA8[i];
+                }else{
+                    if(!readable(1))return true;
+                    const auto q=static_cast<std::int8_t>(*cursor64);cursor64+=1;
+                    if(q==0x7f){
+                        if(!readable(4))return true;
+                        std::memcpy(&wordA8[i],cursor64,4);cursor64+=4;
+                    }else wordA8[i]=w(f(wordA8[i])+float(q)*inverse9C[i]);
+                }
+            }else if(words8C[i]==1u){
+                if(!readable(1))return true;
+                bytesAC[i]=*cursor64;cursor64+=1;
+            }
+        }
+        return false;
+    }
+    // 14FD00: slerp without renormalization; dot >= 1 copies q0.
+    static void slerp(const float* q0,const float* q1,float t,float* out)noexcept {
+        float dot=q0[1]*q1[1]+q0[2]*q1[2]+q0[3]*q1[3]+q0[0]*q1[0];
+        float sign=1.f;
+        if(dot<0.f){sign=-1.f;dot=-dot;}
+        if(!(dot<1.f)){for(int k=0;k<4;++k)out[k]=q0[k];return;}
+        const float theta=std::acos(dot);
+        const float inv=1.f/std::sin(theta);
+        const float b=sign*(inv*std::sin(t*theta));
+        const float a=inv*std::sin(theta-t*theta);
+        for(int k=0;k<4;++k)out[k]=q0[k]*a+q1[k]*b;
+    }
+    void store(std::uint32_t i,std::uint32_t value)noexcept {std::memcpy(pointers88[i],&value,4);}
+    // 288670.
+    void play(float dt)noexcept {
+        if(bit(0x08u)){
+            const float before=play34;reset();
+            play34=std::max(before-dt*scalar50,0.f);
+        }else play34+=dt*scalar50;
+        if(bit(0x20u))return;
+        if(last38==play34)return;
+        last38=play34;
+        while(!bit(0x20u)&&!(play34<next54))setBit(0x20u,readFrame());
+        if(next54==prev3C)return;
+        const float t=(play34-prev3C)/(next54-prev3C);
+        for(std::uint32_t i=0;i<count80;++i){
+            if(!pointers88[i]||!enabled90[i])continue;
+            const auto mode=kind94[i];
+            if(mode==3u){
+                if(i+3u>=count80)return; //Native fence for a malformed quad.
+                float q0[4],q1[4],out[4];
+                for(int k=0;k<4;++k){q0[k]=f(wordA4[i+k]);q1[k]=f(wordA8[i+k]);}
+                slerp(q0,q1,t,out);
+                for(std::uint32_t k=0;k<4;++k)if(pointers88[i+k])store(i+k,w(out[k]));
+                i+=3u;continue;
+            }
+            const float a=f(wordA4[i]),b=f(wordA8[i]);
+            const bool lerp=mode==0u||(mode==1u&&!(b<=a))||(mode==2u&&b<a);
+            if(lerp&&words8C[i]==0u){store(i,w(a+t*(b-a)));continue;}
+            if(words8C[i]==1u)std::memcpy(pointers88[i],&bytesAC[i],1);
+            else store(i,wordA8[i]);
+        }
+    }
+    std::int32_t add(void* source,void* destination,std::uint32_t cls,std::uint32_t interpolation,
+        float scale,std::uint32_t enabled,bool checkScale)noexcept {
+        ++attempted7C;
+        if((checkScale&&scale<=0.f)||count80>=capacity78||bit(0x10u)||!source)return -1;
+        const auto i=count80;
+        pointers84[i]=source;pointers88[i]=destination?destination:source;
+        words8C[i]=cls;enabled90[i]=enabled;kind94[i]=interpolation;
+        scale98[i]=scale;inverse9C[i]=1.f/scale;
+        ++count80;return std::int32_t(i);
     }
 };
 
@@ -97,8 +256,8 @@ bool OriginalSimpleVCR50LA::setup287710(std::uint32_t capacity,std::uint32_t byt
         //Uninitialized allocation is intentional where original malloc writes
         //nothing. Preserve source allocation/store/zero order, including8C/AC.
         d.sourcePC=0x287740;p.buffer5C.reset(new std::uint8_t[bytes]);
-        d.sourcePC=0x287750;p.pointers84.reset(new std::uint32_t*[capacity]);
-        d.sourcePC=0x287760;p.pointers88.reset(new std::uint32_t*[capacity]);
+        d.sourcePC=0x287750;p.pointers84.reset(new void*[capacity]);
+        d.sourcePC=0x287760;p.pointers88.reset(new void*[capacity]);
         d.sourcePC=0x287770;p.words8C.reset(new std::uint32_t[capacity]);
         std::memset(p.buffer5C.get(),0,bytes); //287784.
         if(backup){
@@ -234,8 +393,68 @@ bool OriginalSimpleVCR50LA::closeDetached2875A0(OriginalSimpleVCRDiagnostic50LA&
     p.words8C.reset();p.enabled90.reset();p.kind94.reset();p.scale98.reset();
     p.inverse9C.reset();p.wordA0.reset();p.wordA8.reset();p.bytesAC.reset();p.wordA4.reset();
     p.cursor60=nullptr;p.cursor64=nullptr;p.registeredRace90=nullptr; //Native borrow withdrawal.
+    p.nativeWords.reset();p.nativeBytes.reset(); //After the channel arrays above.
     if(p.counted)--p.application->objectCount423F60(); //2876D0 ->1413E0.
     p.closed=true;d.sourcePC=0x287700;return true;
+}
+std::int32_t OriginalSimpleVCR50LA::addChannel2878F0(std::uint32_t* source,std::uint32_t* destination,
+    std::uint32_t interpolation94,float scale,std::uint32_t enabled90)noexcept {
+    if(!impl_||!impl_->current()||!impl_->setupComplete)return -1;
+    return impl_->add(source,destination,0u,interpolation94,scale,enabled90,true);
+}
+bool OriginalSimpleVCR50LA::reserveNativeChannelBacking(std::size_t words,std::size_t bytes,
+    std::uint32_t*& wordBase,std::uint8_t*& byteBase)noexcept {
+    wordBase=nullptr;byteBase=nullptr;
+    if(!impl_||!impl_->current()||!impl_->setupComplete||impl_->nativeWords||impl_->nativeBytes||
+       !words||!bytes||words>4096u||bytes>4096u)return false;
+    try {
+        impl_->nativeWords.reset(new std::uint32_t[words]());
+        impl_->nativeBytes.reset(new std::uint8_t[bytes]());
+    }catch(...){impl_->nativeWords.reset();impl_->nativeBytes.reset();return false;}
+    wordBase=impl_->nativeWords.get();byteBase=impl_->nativeBytes.get();return true;
+}
+std::int32_t OriginalSimpleVCR50LA::addByteChannel287A30(std::uint8_t* source,std::uint8_t* destination,
+    std::uint32_t enabled90)noexcept {
+    if(!impl_||!impl_->current()||!impl_->setupComplete)return -1;
+    return impl_->add(source,destination,1u,4u,1.f,enabled90,false);
+}
+bool OriginalSimpleVCR50LA::setRate287C80(float rate,OriginalSimpleVCRDiagnostic50LA& d)noexcept {
+    d={};if(!impl_||!impl_->current()||!impl_->setupComplete)
+        return Impl::stop(d,0x287c80,"Actual initialized SimpleVCR owner absent");
+    impl_->scalar50=rate;d.sourcePC=0x287c84;return true;
+}
+bool OriginalSimpleVCR50LA::update287C90(float dt,bool paused11C,OriginalSimpleVCRDiagnostic50LA& d)noexcept {
+    d={};if(!impl_||!impl_->current()||!impl_->setupComplete)
+        return Impl::stop(d,0x287c90,"Actual initialized SimpleVCR owner absent");
+    auto& p=*impl_;
+    if(paused11C){d.sourcePC=0x287cd8;return true;}
+    p.setBit(0x10u,true); //287CE0..CF4: registration closes at the first update.
+    if(p.bit(0x02u)){
+        p.time30+=dt;
+        if(p.keyframe40==0.f){p.keyframe();p.sample44=p.scalar4C;}
+        else if(p.sample44<=0.f){p.delta();p.sample44=p.scalar4C;}
+        p.keyframe40-=dt;p.sample44-=dt;
+    }
+    if(p.bit(0x04u))p.play(dt);
+    d.sourcePC=0x287db0;return true;
+}
+bool OriginalSimpleVCR50LA::recordSampleDue()const noexcept {
+    if(!impl_||!impl_->current()||!impl_->setupComplete)return false;
+    const auto& p=*impl_;
+    return p.bit(0x02u)&&(p.keyframe40==0.f||p.sample44<=0.f);
+}
+bool OriginalSimpleVCR50LA::setPlayback(bool clearRecord,OriginalSimpleVCRDiagnostic50LA& d)noexcept {
+    d={};if(!impl_||!impl_->current()||!impl_->setupComplete)
+        return Impl::stop(d,0x1abb44,"Actual initialized SimpleVCR owner absent");
+    if(clearRecord)impl_->setBit(0x02u,false);
+    impl_->setBit(0x04u,true);d.sourcePC=0x1abb68;return true;
+}
+OriginalSimpleVCR50LA::State OriginalSimpleVCR50LA::state()const noexcept {
+    State s;if(!impl_)return s;const auto& p=*impl_;
+    s.recording=p.bit(0x02u);s.playing=p.bit(0x04u);s.ended=p.bit(0x20u);s.full=p.bit(0x80u);
+    s.channels=p.count80;s.bytesUsed=p.word74;s.capacityBytes=p.bytesB4;
+    s.keyframes=p.keyframes;s.deltas=p.deltas;s.escapes=p.escapes;s.framesRead=p.framesRead;
+    s.time30=p.time30;s.play34=p.play34;return s;
 }
 
 bool OriginalRaceConstructor50LA::constructVcr78At1A6DF4(

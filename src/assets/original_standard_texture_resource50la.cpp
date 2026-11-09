@@ -1382,13 +1382,31 @@ bool OriginalStandardTextureResolver50LA::bindGarageStaticIpumCache24E880(
     if(!storage_||!storage_->provider||!storage_->provider->sealed()||!cache||!cache->loaded()||
        !archive||!archive->loaded()||!archive->identity())return fail(d,E::phase,0x24E880);
     try {
-        auto next=storage_->garageIpum;bool found=false;
+        // Leases minted for an earlier Garage's image cache die with that
+        // Garage (source UI manager destroy frees its textures). Withdraw one
+        // from new issuance only when its sole other holders are tombstoned
+        // files of a retired bank (12E5E0 keeps their lease as history, which
+        // stays untouched). A live resource/file borrower keeps it here and
+        // the retained-identity check below still refuses the mismatch.
+        std::vector<std::shared_ptr<const OriginalStandardGarageIpumLease50KG>> next;
+        next.reserve(storage_->garageIpum.size());
+        for(const auto& old:storage_->garageIpum){
+            if(old&&(old->cache!=cache||!old->current())){
+                long retiredHolders=0;
+                for(const auto& file:storage_->files)if(file->retired&&file->garageIpum==old)++retiredHolders;
+                if(old.use_count()==1+retiredHolders)continue;
+            }
+            next.push_back(old);
+        }
+        bool found=false;
         const auto count=OriginalUiIpumTextureCache50KG::garageCatalogSourceCount();
-        if(!count||count>11)return fail(d,E::source,0x24E880);
+        // The catalog lists 11 base sources plus one per career pod archive;
+        // a single Garage binds at most 11 leases (checked below).
+        if(!count||count>64){std::fprintf(stderr,"garage_static_ipum_rejected count=%zu\n",count);return fail(d,E::source,0x24E880);}
         for(std::size_t i=0;i<count;++i){
             if(OriginalUiIpumTextureCache50KG::garageSourceArchive(i)!=archive->identity())continue;
             found=true;const auto* name=OriginalUiIpumTextureCache50KG::garageSourceMember(i);
-            if(!name)return fail(d,E::source,0x24E880);
+            if(!name){std::fprintf(stderr,"garage_static_ipum_rejected name_missing=%zu\n",i);return fail(d,E::source,0x24E880);}
             const auto member=archive->find(name);
             const auto* texture=cache->textureFor(member,0,member.size);
             const auto* provenance=cache->provenanceFor(member,0,member.size);
@@ -1404,14 +1422,27 @@ bool OriginalStandardTextureResolver50LA::bindGarageStaticIpumCache24E880(
                !storage_->provider->mount(actual.mount,mount)||!mount.archiveSha256||
                *mount.archiveSha256!=archive->identity()->sha256||mount.archiveBytes!=archive->identity()->bytes||
                !actual.bankGeneration||actual.revision!=storage_->provider->revision()||!actual.data||
-               actual.size!=member.size||std::memcmp(actual.data,member.data,member.size))
-                return fail(d,E::source,0x24E880);
+               actual.size!=member.size||std::memcmp(actual.data,member.data,member.size)){
+                const auto lookup=storage_->provider->lookup132820(name,actual);
+                const bool mounted=lookup==OriginalStandardArchiveProvider50LA::Lookup::present&&storage_->provider->mount(actual.mount,mount);
+                std::fprintf(stderr,"garage_static_ipum_rejected member=%s data=%d texture=%d provenance=%d in_process=%d policy=%d pst_sha=%d archive_sha=%d "
+                    "shape=%d lookup=%d mount=%d mount_sha=%d bank=%d revision=%d size=%d\n",name,int(member.identity&&member.data),int(texture!=nullptr),
+                    int(provenance!=nullptr),int(provenance&&provenance->decodedInProcess),
+                    int(provenance&&provenance->colorPolicyKind==OriginalUiIpumColorPolicy50KG::original50FcRgb5Texa255Aem1),
+                    int(provenance&&member.identity&&provenance->sourcePstSha256==member.identity->sha256),
+                    int(provenance&&provenance->sourceArchiveSha256==archive->identity()->sha256),
+                    int(texture&&texture->revision==1&&!texture->flags&&texture->kind==2&&!texture->mips.empty()&&texture->mips.size()<=5&&provenance&&provenance->mipCount==texture->mips.size()),
+                    int(lookup),int(mounted),int(mounted&&mount.archiveSha256&&*mount.archiveSha256==archive->identity()->sha256&&mount.archiveBytes==archive->identity()->bytes),
+                    int(actual.bankGeneration!=0),int(actual.revision==storage_->provider->revision()),int(actual.size==member.size));
+                return fail(d,E::source,0x24E880);}
             bool retained=false;
             for(const auto& old:next)if(old&&old->archive->identity()==archive->identity()&&
                 same(old->provenance->sourceMember,provenance->sourceMember)){
                 if(!old->current()||old->archive!=archive||old->cache!=cache||old->member.identity!=member.identity||
-                   old->member.data!=member.data||old->texture!=texture||old->provenance!=provenance)
-                    return fail(d,E::phase,0x24E880);
+                   old->member.data!=member.data||old->texture!=texture||old->provenance!=provenance){
+                    std::fprintf(stderr,"garage_static_ipum_rejected stale_lease member=%s same_cache=%d borrowers=%ld\n",
+                        name,int(old->cache==cache),long(old.use_count())-2);
+                    return fail(d,E::phase,0x24E880);}
                 retained=true;break;
             }
             if(retained)continue;
@@ -1420,7 +1451,7 @@ bool OriginalStandardTextureResolver50LA::bindGarageStaticIpumCache24E880(
             lease->cache=cache;lease->archive=archive;lease->member=member;
             lease->texture=texture;lease->provenance=provenance;next.push_back(std::move(lease));
         }
-        if(!found)return fail(d,E::source,0x24E880);
+        if(!found){std::fprintf(stderr,"garage_static_ipum_rejected not_found archive=%s count=%zu\n",archive->identity()->discPath,count);return fail(d,E::source,0x24E880);}
         storage_->garageIpum=std::move(next);return true;
     }catch(...){return fail(d,E::allocation,0x24E880);}
 }

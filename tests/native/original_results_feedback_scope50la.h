@@ -50,6 +50,11 @@ class Scope final {
     std::shared_ptr<Registration> registration_;
     explicit Scope(::interactive_continuation50DU::Context&,
         const native_racer50HN::Bank&)noexcept;
+    // The common race loads Results104 during publication, after this
+    // Scope's construction; it binds once that load has completed.
+    void bindAfterPublication(::interactive_continuation50DU::Context&,
+        const native_racer50HN::Bank&)noexcept;
+    void attach(::interactive_continuation50DU::Context&,const native_racer50HN::Bank&)noexcept;
     void revoke()noexcept;
 public:
     Scope(const Scope&)=delete;

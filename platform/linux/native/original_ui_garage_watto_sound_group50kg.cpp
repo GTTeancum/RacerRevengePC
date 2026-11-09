@@ -35,7 +35,7 @@ bool OriginalUiGarageWattoSoundGroup50KG::constructGroup2350D0(
  }
  attached_=true;error.clear();return true;
 }
-bool OriginalUiGarageWattoSoundGroup50KG::current()const noexcept {
+bool OriginalUiGarageWattoSoundGroup50KG::current()const noexcept {rr::game::EntityForestReadScope50LA forestReadScope50LA;
  if(!constructed_||retired_||poisoned_||!attached_||!grant_||!main_||!audio_||
   !grant_->wattoSoundGroupCurrent(entity_,slot40_)||entity_.parent1C!=widget_||entity_.firstChild18||
   !enabled30_||volume38_!=100||state44_||growth50_!=16||!allocated58_||!members4C_||

@@ -6,6 +6,9 @@
 #include "original_ui_garage_scene_particles50kg.h"
 #include "original_ui_garage_renderer_lease50kg.h"
 #include <cfenv>
+#include <cstdio>
+#include <cstdlib>
+#include <exception>
 #include <limits>
 #include <cmath>
 #include "original_ui_garage_static_models50kg.h"
@@ -40,7 +43,7 @@ OriginalUiGaragePageOwner50KG::~OriginalUiGaragePageOwner50KG()noexcept {
 bool OriginalUiGaragePageOwner50KG::fail(Diagnostic& d,Status status,std::uint32_t pc)const noexcept {
     d.status=status;d.sourcePC=pc;d.sourceEffectsCommitted=entityLive_;return false;
 }
-bool OriginalUiGaragePageOwner50KG::inputsCurrent()const noexcept {
+bool OriginalUiGaragePageOwner50KG::inputsCurrent()const noexcept {rr::game::EntityForestReadScope50LA forestReadScope50LA;
     return ownerThread_==std::this_thread::get_id()&&issuer_&&grant_&&grant_->current()&&
         grant_->issuer()==issuer_&&sameOwner(authority_,grant_->application())&&
         sameOwner(authority_,issuer_->entities())&&widgets_&&fog_&&
@@ -98,7 +101,39 @@ bool OriginalUiGaragePageOwner50KG::prepare1F9FF0(const RootInputs& in,Diagnosti
     stage_=Stage::constructed;pendingPC_=0x1FA2EC;d.sourceEffectsCommitted=true;
     d.sourcePC=0x1FA168;return true;
 }
-bool OriginalUiGaragePageOwner50KG::currentConstructor()const noexcept {
+namespace {
+// Same-evaluation memo (host only, never source state). Inside ONE outermost
+// const currentness predicate (one EntityForestReadScope50LA evaluation id),
+// nothing can write the Page/Widget/Grant/Scope/Entity state these predicates
+// read: every scope-opening function is a const predicate, the owners they
+// read have no mutable members except the authority's own forest memo and
+// scratch, and no predicate in the chain calls a mutating operation. The
+// source chains call currentConstructor up to seven times and
+// sourceEntryReturned1FAE00 twice per evaluation (garageManagerLoadedCurrent).
+// Only a proven-true result is reused, and only under the same evaluation id
+// for the same Page. RR_GARAGE_PROOF_SHADOW=1 recomputes every reuse and
+// terminates on any disagreement.
+struct PageEvaluationMemo50KG {
+    std::uint64_t evaluation=0;const void* page=nullptr;bool proven=false;
+};
+thread_local PageEvaluationMemo50KG pageConstructorMemo50KG,pageEntryReturnedMemo50KG;
+bool pageMemoShadow50KG()noexcept{
+    static const bool on=[]{const char* v=std::getenv("RR_GARAGE_PROOF_SHADOW");return v&&v[0]=='1'&&!v[1];}();
+    return on;
+}
+template<class F> bool pageEvaluationMemo50KG(PageEvaluationMemo50KG& m,const void* page,const char* site,F&& full)noexcept{
+    using Scope=rr::game::EntityForestReadScope50LA;
+    const bool hit=Scope::depth>1&&m.proven&&m.evaluation==Scope::evaluation&&m.page==page;
+    if(hit&&!pageMemoShadow50KG())return true;
+    const bool value=full();
+    if(hit&&!value){std::fprintf(stderr,"garage_proof_shadow_mismatch site=%s\n",site);std::fflush(stderr);std::terminate();}
+    if(hit){static thread_local unsigned long long hits=0;
+        if(!(++hits%200000))std::fprintf(stderr,"garage_page_memo_shadow site=%s compared_reuses=%llu mismatches=0\n",site,hits);}
+    m.evaluation=Scope::evaluation;m.page=page;m.proven=value;return value;
+}
+}
+bool OriginalUiGaragePageOwner50KG::currentConstructor()const noexcept {rr::game::EntityForestReadScope50LA forestReadScope50LA;
+    return pageEvaluationMemo50KG(pageConstructorMemo50KG,this,"page_currentConstructor",[&]()noexcept{
     if(!entityLive_||entityRefReleased_||entityCountReleased_||!inputsCurrent()||
        !(managerAttached1D1C40_?grant_->garageAttachedPageCurrent(*this,entity_):
             grant_->garagePageCurrent(this,entity_))||quadCount_!=129||textCount_!=2||
@@ -109,6 +144,7 @@ bool OriginalUiGaragePageOwner50KG::currentConstructor()const noexcept {
         stage_==Stage::wattoBorrowed||stage_==Stage::costTextLoading||stage_==Stage::costTextLoaded||
         stage_==Stage::backgroundLoading||stage_==Stage::backgroundLoaded||
         stage_==Stage::presentationLoading||stage_==Stage::presentationLoaded;
+    });
 }
 bool OriginalUiGaragePageOwner50KG::retainSharedColdResources(std::shared_ptr<const PageData> data,
     std::shared_ptr<const OriginalUiGarageSharedPageDrawOwner50KG> draw,Diagnostic& d)noexcept {
@@ -699,7 +735,7 @@ bool OriginalUiGaragePageOwner50KG::continueSharedCollections1D6DAC(Diagnostic& 
 bool OriginalUiGaragePageOwner50KG::sharedCollectionsCurrent()const noexcept {
     return sharedCollectionsPayloadCurrent()&&grant_->garagePageCollectionsCurrent(*this);
 }
-bool OriginalUiGaragePageOwner50KG::sharedCollectionsPayloadCurrent()const noexcept {
+bool OriginalUiGaragePageOwner50KG::sharedCollectionsPayloadCurrent()const noexcept {rr::game::EntityForestReadScope50LA forestReadScope50LA;
     //The exact retained payload survives the following Scene/Camera appends.
     //The construction-only Scope query additionally requires Router.next14=0;
     //keep that admission strict instead of falsely using it after1B48A0.
@@ -896,7 +932,7 @@ bool OriginalUiGaragePageOwner50KG::preflightSceneAttachment1B48A0(Diagnostic& d
     //itself nor certifies Camera1FB620, later1B4CA0, input or Page readiness.
     d.sourceEffectsCommitted=scenePageAttachCursor_!=0;d.sourcePC=0x1B48A0;return true;
 }
-bool OriginalUiGaragePageOwner50KG::sceneAttachmentPrefixCurrent1B48A0()const noexcept {
+bool OriginalUiGaragePageOwner50KG::sceneAttachmentPrefixCurrent1B48A0()const noexcept {rr::game::EntityForestReadScope50LA forestReadScope50LA;
     if(!currentConstructor()||!scene4C0_||sceneBacking_.get()!=scene4C0_||!scenePageBorrowCaptured_||
        scenePageAttachCursor_!=scenePageChildren_.size()||!grant_||!grant_->current())return false;
     for(std::size_t i=0;i<scenePageChildren_.size();++i)if(!scenePageChildren_[i]||
@@ -1011,7 +1047,7 @@ bool OriginalUiGaragePageOwner50KG::continueLateSceneAttachments1FB648(
     //readiness follow merely from these actual source child attachments.
     d.sourceEffectsCommitted=true;d.sourcePC=0x1B4DB8;return true;
 }
-bool OriginalUiGaragePageOwner50KG::lateSceneAttachmentsCurrent1FB64C()const noexcept {
+bool OriginalUiGaragePageOwner50KG::lateSceneAttachmentsCurrent1FB64C()const noexcept {rr::game::EntityForestReadScope50LA forestReadScope50LA;
     if(!sceneAttachmentPrefixCurrent1B48A0()||cameraHandoffPhase_!=3||!sharedCamera_||
        !grant_->garagePageCameraCurrent(*this,*sharedCamera_)||!cameraRegistrationCurrent1FB608()||
        !sceneLateBorrowCaptured_||sceneLateAttachCursor_!=sceneLateChildren_.size()||sceneLateRetiredCount_)
@@ -1139,7 +1175,7 @@ bool OriginalUiGaragePageOwner50KG::continueLoadReturn1FAA88(
     if(!sourceLoadReturned1FAAC8())return fail(d,Status::phase,0x1FAAC8);
     d.sourceEffectsCommitted=true;d.sourcePC=0x1FAAC8;return true;
 }
-bool OriginalUiGaragePageOwner50KG::sourceLoadReturned1FAAC8()const noexcept {
+bool OriginalUiGaragePageOwner50KG::sourceLoadReturned1FAAC8()const noexcept {rr::game::EntityForestReadScope50LA forestReadScope50LA;
     return loadReturnPhase_==LoadReturnPhase::returned&&currentConstructor()&&
         sharedCollectionsPayloadCurrent()&&scene4C0_&&scene4C0_->sourceLoadReturned1FB59C()&&
         lateSceneAttachmentsCurrent1FB64C()&&
@@ -1575,11 +1611,13 @@ bool OriginalUiGaragePageOwner50KG::entryCameraActivationReturned115724()const n
         sameOwner(sharedCameraDisplay_->sourceSelectedCamera0_,sharedCamera_)&&
         sharedCamera_->fields_.count210==sharedCameraDisplay_->sourceBufferCount0C_+std::uint32_t{1};
 }
-bool OriginalUiGaragePageOwner50KG::sourceEntryReturned1FAE00()const noexcept {
+bool OriginalUiGaragePageOwner50KG::sourceEntryReturned1FAE00()const noexcept {rr::game::EntityForestReadScope50LA forestReadScope50LA;
+    return pageEvaluationMemo50KG(pageEntryReturnedMemo50KG,this,"page_sourceEntryReturned1FAE00",[&]()noexcept{
     return entryPhase_==EntryPhase::returned&&managerAttached1D1C40_&&
         sourceLoadReturned1FAAC8()&&entryProfileCurrent()&&entryAppearanceStep_==18&&
         entryStatCount_==6&&entryExplicitWidget_==6&&entryCameraStep_==5&&
         watto33B0_&&wattoEntryBindingCurrent1FAC08(*watto33B0_);
+    });
 }
 bool OriginalUiGaragePageOwner50KG::continueEntry1FAAF0(Diagnostic& d)noexcept {
     d={};

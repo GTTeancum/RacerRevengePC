@@ -1,4 +1,5 @@
 #pragma once
+#include <new>
 #include <bit>
 #include <cfenv>
 #include <cstdio>
@@ -227,7 +228,10 @@ enum class Cut : std::uint8_t {
     // Source-ordered numeric camera placement after every actual racer prefix
     // and before the first1A8390/219810 physics suffix. Never claim prefixes ran
     // from a callback return: all eight actual49W phase/factor fields are read.
-    afterAllRacerPrefixes
+    afterAllRacerPrefixes,
+    // Results replay (racer +3C = 1): every racer is Ready and posed from the
+    // race78 playback; no racer frame or physics step runs this tick.
+    replayPose
 };
 enum class Status : std::uint8_t {
     complete,sceneChildComplete,framePublished,startHeld,simulationAllowed,
@@ -1186,7 +1190,7 @@ class Session final {
         if(!identitiesCurrent())return false;
         if(cut==Cut::heldBeforeStart&&(actual_.all8Manager.flags58&2u))return false;
         for(std::size_t i=0;i<actual_.bank.count();++i){
-            const auto expected=cut==Cut::heldBeforeStart?Phase::Ready:Phase::AfterBodyChildren;
+            const auto expected=cut==Cut::afterAllRacerPrefixes?Phase::AfterBodyChildren:Phase::Ready;
             if(actual_.bank.read(i,reads_.phase)!=expected)return false;
             if(cut==Cut::afterAllRacerPrefixes&&
                !same(actual_.bank.read(i,reads_.frameFactor),frameDelta_))return false;
@@ -2376,6 +2380,20 @@ public:
         if(result_.start.status!=OriginalCameraStartStatus::complete)return set(Status::sourcePath,result_.start.sourcePC);
         const auto accepted=endingClockCursor_.afterVideoFadeRequest();
         return set(accepted.status==OriginalHumanEndClockStatus50KG::advanced?Status::complete:Status::sourcePath,accepted.sourcePC);
+    }
+    // Common-race restart behind the Results (1AC8E0 sets race1B0 bit3, the
+    // next 1A7BD0 fades the restarted scene in again). The original repeats
+    // its fade-in; rearm the one-shot fade-in request/async owners once every
+    // earlier fade (intro fade-in, ending fade-out) has fully finished.
+    bool rearmFadeInAfterRestart50PD()noexcept {
+        if(f8Intro_.ownerThread_!=std::this_thread::get_id()||abandoned_||!displayInputs_)return false;
+        if(fadeInRequestConsumer_!=FadeInRequestConsumer::none||fadeInRequest_.pending()||
+           taSkipFadeInRequest_.pending()||endingFadeRequest_.pending()||
+           (asyncFade_.started()&&!asyncFade_.complete())||(taSkipAsyncFade_.started()&&!taSkipAsyncFade_.complete())||
+           (endingFadeRequested_&&!endingFade_.complete())||displayInputs_->fadeManagerA8==8)return false;
+        fadeInRequest_.~OriginalVideoAsyncRequest50LA();::new(static_cast<void*>(&fadeInRequest_))OriginalVideoAsyncRequest50LA();
+        asyncFade_.~AsyncRetainedFade();::new(static_cast<void*>(&asyncFade_))AsyncRetainedFade();
+        fadeInRequested_=false;return true;
     }
     bool endingFadeQueued()const noexcept {
         return actual_.humanCount34&&displayInputs_&&displayInputs_->fadeManagerA8==7;

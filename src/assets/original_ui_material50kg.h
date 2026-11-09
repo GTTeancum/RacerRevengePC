@@ -122,7 +122,11 @@ enum class OriginalUiMaterialOrigin50KG : std::uint8_t {
     memoryCardCanonicalScreenMissingPsmFallback,
     // Existing actual Results first-construction history, not an F8 caller
     // recipe and not the distinct Race HUD1A8DD4 font provenance.
-    resultsCanonicalScreenMissingPsmFallback
+    resultsCanonicalScreenMissingPsmFallback,
+    // UIUnlock 209BF4 -> inherited page constructor1D63B0 prompts.
+    unlockPromptMissingPsmFallback,
+    // UIWin load2077F0 -> inherited page constructor1D63B0 prompts.
+    winPromptMissingPsmFallback
 };
 struct OriginalUiMaterialProvenance50KG {
     OriginalUiMaterialOrigin50KG origin = OriginalUiMaterialOrigin50KG::authoredPsm;
@@ -281,6 +285,12 @@ bool readOriginalUiHallNameBlurFallbackMaterial50KG(const OriginalUiArchive50KG&
     const OriginalUiMaterialRuntime50KG&,OriginalUiMaterial50KG&,OriginalUiMaterialDiagnostic50KG&) noexcept;
 bool readOriginalUiHallPromptFallbackMaterial50KG(const OriginalUiArchive50KG&,
     const OriginalUiArchive50KG&,OriginalUiMainPrompt50KG,
+    const OriginalUiMaterialTemplates50KG&,OriginalUiTemplate50KG,
+    const OriginalUiMaterialRuntime50KG&,OriginalUiMaterial50KG&,OriginalUiMaterialDiagnostic50KG&) noexcept;
+// UIUnlock init209BF4 calls the shared page constructor1D63B0. Its cross and
+// triangle use OVERLAYS, square/circle the UIUnlock-local PSTs; no PSM exists.
+bool readOriginalUiUnlockPromptFallbackMaterial50KG(const OriginalUiArchive50KG& unlock,
+    const OriginalUiArchive50KG& overlays,OriginalUiMainPrompt50KG,
     const OriginalUiMaterialTemplates50KG&,OriginalUiTemplate50KG,
     const OriginalUiMaterialRuntime50KG&,OriginalUiMaterial50KG&,OriginalUiMaterialDiagnostic50KG&) noexcept;
 // Blank Hall widgets17/18 still construct one capacity0 ScreenText and resolve

@@ -108,7 +108,8 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
    if(std::sscanf(size,"%dx%d",&w,&h)==2&&w>=640&&h>=448&&w<=3840&&h<=2160){window.width=w;window.height=h;}
   }
 #endif
-  window.major=3;window.minor=2;window.profile=platform::WindowGlProfile50DQ::Core;
+  // GL4.0 core first (UI AA1 / Garage models use gl_SampleID); 3.2 fallback.
+  window.major=4;window.minor=0;window.profile=platform::WindowGlProfile50DQ::Core;
   window.samples=0;window.swapInterval=0;window.resizable=true;
   // Physical menu devices belong to this actual frontend window. There is no
   // racer/control owner in this session, including the ALL8 launch route.
@@ -121,7 +122,11 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
    require50DU(originalMainApplication.retainsPlayerWindow50DU()&&host.hasWindow()&&host.current(),
        "original frontend requires the same retained current player window");
   }else if(!host.create(hostRequest,hostDiagnostic)){
-   reportHost50DU(hostDiagnostic);throw std::runtime_error("original frontend host creation failed");
+   std::cerr<<"native_window_gl4_unavailable retrying=3.2\n";
+   window.major=3;window.minor=2;hostDiagnostic={};
+   if(!host.create(hostRequest,hostDiagnostic)){
+    reportHost50DU(hostDiagnostic);throw std::runtime_error("original frontend host creation failed");
+   }
   }
   rr::platform::loading_progress50DU::pulse("Preparing Main");
 #if defined(_WIN32)
@@ -205,7 +210,10 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
   originalMain.activate(renderer);
   windows_capture50LD::Session windowCapture;
   windowCapture.prepare(captureRun,sessionIndex,maximumWidth,maximumHeight,"frontend");
-  original_ui_capture_navigation50LA::TournamentRoute tournamentRoute(captureRun.navigateTournamentTa());
+  // A frontend opened by a race's 1AB5BC request starts in its Garage.
+  const bool raceReturnGarage=originalMain.coordinator.snapshot().route.screen==13;
+  original_ui_capture_navigation50LA::TournamentRoute tournamentRoute(captureRun.navigateTournamentTa()&&!raceReturnGarage);
+  original_ui_capture_navigation50LA::TournamentReturnRoute tournamentReturnRoute(captureRun.navigateTournamentTa()&&raceReturnGarage);
   original_ui_capture_navigation50LA::Route captureRoute(captureRun.navigate()&&!captureRun.navigateTournamentTa(),captureRun.navigateSa(),captureRun.navigateOcco(),captureRun.navigateDudGa(),captureRun.navigateBenGa(),captureRun.navigateAlderMa(),captureRun.navigateOdyMa(),captureRun.navigateGasganoSa(),captureRun.navigateMawhonicRa());
   std::cerr<<"ORIGINAL MAIN COLD: dedicated frontend; no race corpus, racer, world, or gameplay renderer constructed.\n";
   auto reportUiState=[&](const char* reason){originalMain.report(reason,originalMainApplication,0,0);};
@@ -358,6 +366,7 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
   rr::platform::loading_progress50DU::finish();
   PlayerLoadingSession50DU::checkStop();
   for(;;){
+   const auto frontendIterationStart=std::chrono::steady_clock::now();
    if(captureRun.deadlineExpired()){originalMain.requestQuit();break;}
    const bool tracePoll=originalMain.traceStages&&tracePolls<2;
    if(tracePoll)std::cerr<<"original_ui_frontend_poll {\"poll\":"<<tracePolls+1
@@ -425,7 +434,7 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
        "original frontend physical controller snapshot invalid");
    // Separate physical identity and release-to-arm lifetime for port two.
    // An inactive Controls2 route disarms it; keyboard always remains port zero.
-   const auto secondInputRoute=originalMain.coordinator.snapshot().route;
+   const auto secondInputRoute=originalMain.coordinator.route();
    require50DU(originalUiSecondControllerNavigation.observe(input,active&&
        secondInputRoute.screen==12&&secondInputRoute.page==3,secondMenuEvents,1),
        "original frontend second physical controller snapshot invalid");
@@ -435,7 +444,7 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
     originalMain.lastUpdateNanoseconds=0;captureCommitted();
     std::this_thread::sleep_for(std::chrono::milliseconds(8));continue;
    }
-   const auto route=originalMain.coordinator.snapshot().route;
+   const auto route=originalMain.coordinator.route();
    const bool gameOptions=route.screen==12&&route.page==4;
    const bool memoryCard=route.screen==12&&route.page==5;
    const bool controls=route.screen==12&&(route.page==2||route.page==3);
@@ -474,7 +483,7 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
    if(secondInputRoute.screen==12&&secondInputRoute.page==3&&
       input.secondControllerPresence==platform::WindowControllerPresence50DQ::Present)
     for(const unsigned event:{0u,1u,2u,3u,4u,5u,7u,6u}){
-     const auto currentRoute=originalMain.coordinator.snapshot().route;
+     const auto currentRoute=originalMain.coordinator.route();
      if(currentRoute.screen!=12||currentRoute.page!=3)break;
      if(secondMenuEvents[event])originalMain.input(static_cast<std::uint8_t>(event),input.secondControllerPresence,1);
     }
@@ -489,6 +498,14 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
     const auto action=tournamentRoute.poll(snapshot,group,slot,
         courseCatalogPrepared&&raceRequested&&!courseColdLoad.pending()&&renderer.initialized());
     if(action>=0){originalMain.input(static_cast<std::uint8_t>(action));tournamentRoute.validateDispatch(originalMain.coordinator.snapshot());}
+   }
+   if(tournamentReturnRoute.enabled()){
+    require50DU(originalMain.inputCount==tournamentReturnRoute.issuedActions(),"physical menu input interrupted unattended tournament return route");
+    const auto action=tournamentReturnRoute.poll(originalMain.coordinator.snapshot(),
+        courseCatalogPrepared&&raceRequested&&!courseColdLoad.pending()&&renderer.initialized());
+    if(action>=0){
+     std::cerr<<"tournament_return_route action="<<action<<" screen="<<unsigned(originalMain.coordinator.snapshot().route.screen)<<'\n';
+     originalMain.input(static_cast<std::uint8_t>(action));tournamentReturnRoute.validateDispatch(originalMain.coordinator.snapshot());}
    }
    if(captureRoute.enabled()){
     require50DU(originalMain.inputCount==captureRoute.issuedActions(),"physical menu input interrupted unattended original UI route");
@@ -543,7 +560,7 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
 #if defined(_WIN32)
    // Change-only human navigation diagnostics, not a per-frame timing trace.
    {
-    const auto observed=originalMain.coordinator.snapshot();
+    const auto observed=originalMain.coordinator.snapshotWithoutGarageRuntime();
     const std::array<std::int64_t,6> selection{{observed.route.screen,observed.route.page,
         observed.rider.rider4C4,observed.rider.slot4C8,
         observed.course.selectedCourse44,observed.course.selectedPlanet40}};
@@ -555,8 +572,8 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
     }
    }
 #endif
-   if(!originalMain.coordinator.snapshot().rider.deferred4EC){
-    const auto snapshot=originalMain.coordinator.snapshot();
+   if(!originalMain.coordinator.snapshotWithoutGarageRuntime().rider.deferred4EC){
+    const auto snapshot=originalMain.coordinator.snapshotWithoutGarageRuntime();
     const auto stage=snapshot.route.screen==4?windows_capture50LD::Stage::main:
         snapshot.route.screen==5?windows_capture50LD::Stage::rider:
         snapshot.route.screen==6?windows_capture50LD::Stage::course:windows_capture50LD::Stage::other;
@@ -600,7 +617,7 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
     }
    }
    originalMain.commitDeferred(renderer);
-   const auto nextRoute=originalMain.coordinator.snapshot().route;
+   const auto nextRoute=originalMain.coordinator.route();
    if(!courseCatalogPrepared&&nextRoute.screen==6&&nextRoute.page==1){
     // Cold readiness work is outside noexcept source input callbacks. Missing
     // resources disable race Confirm; malformed existing roster remains fatal.
@@ -640,7 +657,14 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
         <<" rider="<<selected.rider<<" outgoing_world_ticks=0 frontend_only=1\n";
     break;
    }
-   std::this_thread::sleep_for(std::chrono::milliseconds(8));
+   // Host idle between frontend polls (swap interval 0). Every other screen
+   // keeps its fixed 8 ms rest. The Garage only rests for whatever part of
+   // the same 8 ms its own frame has not already spent, so a slow Garage
+   // frame is not lengthened by a full extra rest. Source timing is measured.
+   if(nextRoute.screen==13&&nextRoute.page==1){
+    const auto spent=std::chrono::steady_clock::now()-frontendIterationStart;
+    if(spent<std::chrono::milliseconds(8))std::this_thread::sleep_for(std::chrono::milliseconds(8)-spent);
+   }else std::this_thread::sleep_for(std::chrono::milliseconds(8));
   }
   require50DU(terminalInputError==0,"original frontend input stream failed");
  }catch(...){

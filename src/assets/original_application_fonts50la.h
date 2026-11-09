@@ -5,6 +5,8 @@
 #include "original_loading_font_source50la.h"
 #include <new>
 #include <array>
+#include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <exception>
 #include <memory>
@@ -63,6 +65,20 @@ public:
         OriginalUiMemberView50KG cel_,pst_;
         std::int16_t texture408_=-1;
         const OriginalStandardTextureResource50LA* texture_=nullptr;
+        // Host memo of the last proven-equal PST byte comparison in
+        // currentResource281F90 (never source state). Both sides are proven
+        // immutable for as long as these exact extents exist: pst_ is written
+        // only before publication and points into archive_'s decoded buffer,
+        // which OriginalUiArchive50KG publishes once and never rewrites; the
+        // resolver File byte vector is assigned only when its File is created
+        // and is otherwise only swapped empty (irreversible), and Files are
+        // never destroyed before their resolver. Same vector/data/size and
+        // same PST data/size therefore means the same bytes.
+        mutable const std::vector<std::uint8_t>* provenPstBytes_=nullptr;
+        mutable const std::uint8_t* provenPstBytesData_=nullptr;
+        mutable const std::uint8_t* provenPstData_=nullptr;
+        mutable std::size_t provenPstSize_=0;
+        mutable const OriginalStandardTextureResource50LA* provenPstResource_=nullptr;
         explicit Entry(std::shared_ptr<OriginalStandardMaterialDomain50LA> domain,
             std::shared_ptr<const OriginalStandardMaterialContext50LA> context,
             std::shared_ptr<const OriginalUiArchive50KG> archive)
@@ -228,7 +244,19 @@ private:
            !resource||!resource->constructed24DA30()||resource->animated102070()||
            !resource->references00()||*resource->references00()<=0)return false;
         const auto* bytes=resource->originalBytes();
-        return bytes&&bytes->size()==font.pst_.size&&!std::memcmp(bytes->data(),font.pst_.data,font.pst_.size);
+        if(!bytes||bytes->size()!=font.pst_.size)return false;
+        // Every check above still runs on each call; only the byte compare of
+        // two proven-immutable extents (see Entry::provenPstBytes_) is reused.
+        // RR_GARAGE_PROOF_SHADOW=1 compares anyway and terminates on mismatch.
+        const bool proven=font.pst_.size&&font.provenPstBytes_==bytes&&font.provenPstBytesData_==bytes->data()&&
+            font.provenPstData_==font.pst_.data&&font.provenPstSize_==font.pst_.size&&font.provenPstResource_==resource;
+        static const bool shadow=[]{const char* v=std::getenv("RR_GARAGE_PROOF_SHADOW");return v&&v[0]=='1'&&!v[1];}();
+        if(proven&&!shadow)return true;
+        const bool same=!std::memcmp(bytes->data(),font.pst_.data,font.pst_.size);
+        if(proven&&!same){std::fprintf(stderr,"garage_proof_shadow_mismatch site=font_currentResource281F90\n");std::fflush(stderr);std::terminate();}
+        if(same&&font.pst_.size){font.provenPstBytes_=bytes;font.provenPstBytesData_=bytes->data();
+            font.provenPstData_=font.pst_.data;font.provenPstSize_=font.pst_.size;font.provenPstResource_=resource;}
+        return same;
     }
     // Only Application supplies its actual mutable36B970 and constant36B420.
     // Exact TimeStats193A0C two-name/reload0 subset of282430. Input is the

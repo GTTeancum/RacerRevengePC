@@ -156,7 +156,7 @@ bool Application::loadPreparedGarageManager1D1950(Frontend& frontend,
     out=garageCustodyOwner_;return true;
 }
 bool Application::garageManagerLoadedCurrent(const Frontend& frontend,
-    const rr::platform::OriginalUiGarageSession50KG& s)const noexcept {
+    const rr::platform::OriginalUiGarageSession50KG& s)const noexcept {rr::game::EntityForestReadScope50LA forestReadScope50LA;
     using S=rr::platform::OriginalUiGarageSession50KG;
     const auto display=frontend.garageTransferDisplay_.lock();
     // Observe the actual retained binding, not coordinator readiness: that
@@ -172,7 +172,7 @@ bool Application::garageManagerLoadedCurrent(const Frontend& frontend,
         frontend.coordinator.borrowsRenderer(display->renderer_);
 }
 bool Application::observeGarageRuntime50KG(const Frontend& frontend,
-    const rr::platform::OriginalUiGarageSession50KG& s,rr::platform::OriginalUiGarageNativeState50KG& out)const noexcept {
+    const rr::platform::OriginalUiGarageSession50KG& s,rr::platform::OriginalUiGarageNativeState50KG& out)const noexcept {rr::game::EntityForestReadScope50LA forestReadScope50LA;
     using S=rr::platform::OriginalUiGarageSession50KG;
     out={};if(s.issuer_!=this||s.ownerThread_!=std::this_thread::get_id())return false;
     const bool retired=s.closed_&&s.normalFrontend_==&frontend&&

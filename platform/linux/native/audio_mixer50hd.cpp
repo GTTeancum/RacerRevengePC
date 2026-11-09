@@ -479,6 +479,18 @@ void AudioMixer50HD::retireStoppedNativeGarageClipsPreflighted()noexcept {
     for(std::size_t slot=OriginalUiMainAudio50KG::courseRequiredVoices;
         slot<OriginalUiMainAudio50KG::garageSceneVoiceEnd;++slot)voices_[slot].clip={};
 }
+void AudioMixer50HD::releaseStoppedNativeGarageVoices268300Preflighted()noexcept {
+    // Main proved every slot inactive, unreserved and owned stopped history.
+    // Playback identities come from the monotonic control revision, so a
+    // zeroed slot can never alias a later play. Group binding state and the
+    // persistent source-slot routing bytes are not part of this release.
+    for(std::size_t slot=OriginalUiMainAudio50KG::courseRequiredVoices;
+        slot<OriginalUiMainAudio50KG::garageSceneVoiceEnd;++slot){
+        voices_[slot]={};playbackRevisions_[slot]=0;
+        originalLeft50KG_[slot]=originalRight50KG_[slot]=1.0f;
+    }
+    noteControlChange();
+}
 bool AudioMixer50HD::canServiceNativeSourceVoices267CB0(
     const OriginalApplicationAural50KG& owner,float factor)const noexcept {
     if(!std::isfinite(factor)||factor<0.f||!nativeSourceWetProcessor_||

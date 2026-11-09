@@ -1,5 +1,6 @@
 #include "original_ui_main_entry50kg.h"
 #include "original_race_constructor50la.h"
+#include "../../src/game/original_loading_manager33050la.h"
 #include "../../src/game/event_dispatch48z.h"
 #include "../../platform/linux/native/original_ui_shared_dialogs50kg.h"
 #include "../../platform/linux/native/original_ui_main_session50kg.h"
@@ -34,18 +35,57 @@ bool Application::passResultsProcessPredecessors50LA(const rr::game::OriginalRac
     }
     const auto light=sourceLightManager426F60Owner_;const auto aural=sourceAural00Owner_;
     const auto scope=sharedUiScopeOwner_;
-    if(!light||!light->current()||!aural||!aural->current()||!scope||scope->issuer_!=this||
-       scope->application_!=entitiesOwner_||!scope->live().okay()||!scope->dispatcherLive_||
-       !nativeSourceAudioDispatcherCurrent(*aural))
+    // The frontend closes its UI dispatcher (1B7140) when a race starts; the
+    // race then follows Aural directly. A live dispatcher keeps its own order.
+    const bool scopeLive=scope&&scope->issuer_==this&&scope->application_==entitiesOwner_&&
+        scope->live().okay()&&scope->dispatcherLive_&&aural&&nativeSourceAudioDispatcherCurrent(*aural);
+    const bool dispatcherClosed=scope&&scope->issuer_==this&&scope->application_==entitiesOwner_&&
+        !scope->dispatcherLive_;
+    if(!light||!light->current()||!aural||!aural->current()||(!scopeLive&&!dispatcherClosed)){
+        static bool reported=false;
+        if(!reported){reported=true;
+            std::fprintf(stderr,"results_predecessors light=%d light_current=%d aural=%d aural_current=%d scope=%d"
+                " scope_live=%d dispatcher_live=%d\n",bool(light),light&&light->current(),
+                bool(aural),aural&&aural->current(),bool(scope),scope&&scope->live().okay(),scope&&scope->dispatcherLive_);}
         return stop(S::owner,0x142350,"Actual retained Light/Aural/dispatcher prefix unavailable");
+    }
     const auto& l=light->entity_;const auto& a=aural->entity_;const auto& dispatcher=scope->dispatcher_;
     const bool attached=race.entity_.parent1C==root;
-    if((!attached&&(race.entity_.parent1C||race.entity_.previous10||race.entity_.next14||event))||
-       root->firstChild18!=&l||l.parent1C!=root||l.previous10||l.next14!=&a||
-       a.parent1C!=root||a.previous10!=&l||a.next14!=&dispatcher||dispatcher.parent1C!=root||
-       dispatcher.previous10!=&a||dispatcher.next14!=(attached?&race.entity_:nullptr)||
-       (attached&&race.entity_.previous10!=&dispatcher))
-        return stop(S::owner,0x142350,"Actual Light -> Aural -> dispatcher -> Race order differs");
+    if(scopeLive){
+        if((!attached&&(race.entity_.parent1C||race.entity_.previous10||race.entity_.next14||event))||
+           root->firstChild18!=&l||l.parent1C!=root||l.previous10||l.next14!=&a||
+           a.parent1C!=root||a.previous10!=&l||a.next14!=&dispatcher||dispatcher.parent1C!=root||
+           dispatcher.previous10!=&a||dispatcher.next14!=(attached?&race.entity_:nullptr)||
+           (attached&&race.entity_.previous10!=&dispatcher))
+            return stop(S::owner,0x142350,"Actual Light -> Aural -> dispatcher -> Race order differs");
+    }
+    // Without the dispatcher, the genuine loading manager330 (its frontend
+    // tree inactive) may still follow Aural; the Race comes after it.
+    const rr::game::OriginalWreckComponent50LA* last=&a;
+    if(!scopeLive&&sourceLoading330Owner_&&a.next14==&sourceLoading330Owner_->manager_){
+        const auto& m=sourceLoading330Owner_->manager_;
+        if(m.parent1C!=root||m.previous10!=&a)
+            return stop(S::owner,0x142350,"Actual loading manager330 is not Aural's root sibling");
+        if((m.flags29&1u)&&!(m.flags29&8u))
+            return stop(S::incomplete,0x1423b4,"Active loading manager330 callback precedes Results; unsupported");
+        last=&m;
+    }
+    if(!scopeLive&&((!attached&&(race.entity_.parent1C||race.entity_.previous10||race.entity_.next14||event))||
+           root->firstChild18!=&l||l.parent1C!=root||l.previous10||l.next14!=&a||
+           a.parent1C!=root||a.previous10!=&l||last->next14!=(attached?&race.entity_:nullptr)||
+           (attached&&race.entity_.previous10!=last))){
+        static bool reported=false;
+        if(!reported){reported=true;
+            std::fprintf(stderr,"results_root_children attached=%d race_parent=%d race_prev=%d race_next=%d order=",
+                attached,race.entity_.parent1C!=nullptr,race.entity_.previous10!=nullptr,race.entity_.next14!=nullptr);
+            for(const auto* c=root->firstChild18;c;c=c->next14)
+                std::fprintf(stderr,"%s,",c==&l?"light":c==&a?"aural":c==&dispatcher?"dispatcher":
+                    c==&race.entity_?"race":c==nativeTaRootController_?"ta_root_controller":
+                    (sourceLoading330Owner_&&c==&sourceLoading330Owner_->manager_)?"loading330":
+                    c==race.nativeIntroRaceEntity()?"intro_race":c==race.nativeIntroWorldEntity()?"intro_world":"other");
+            std::fprintf(stderr,"\n");}
+        return stop(S::owner,0x142350,"Actual Light -> Aural -> Race order differs");
+    }
     const auto eligible=[](const rr::game::OriginalWreckComponent50LA& c)noexcept {
         return (c.flags29&1u)&&!(c.flags29&8u);
     };
@@ -84,7 +124,7 @@ bool Application::passResultsProcessPredecessors50LA(const rr::game::OriginalRac
     //1B715C installs3CF310; +64 is literally142350. The persistent two
     //dialogs normally retain Entity flags3: inactivity is NOT Entity-disable.
     //Authenticate the real current process state and each typed retained node.
-    if(eligible(dispatcher)&&(dispatcher.descendants24&0x400u)){
+    if(scopeLive&&eligible(dispatcher)&&(dispatcher.descendants24&0x400u)){
         for(auto* child=dispatcher.firstChild18;child;child=child->next14){
             if(!eligible(*child))continue;
             const auto process=state;

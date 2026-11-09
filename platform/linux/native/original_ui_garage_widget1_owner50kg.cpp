@@ -82,14 +82,14 @@ bool OriginalUiGarageWidget1Owner50KG::threadCurrent()const noexcept {
     return ownerThread_==std::this_thread::get_id()&&
         (!authority_||authority_->nativeOwnerThread_==ownerThread_);
 }
-bool OriginalUiGarageWidget1Owner50KG::identityCurrent()const noexcept {
+bool OriginalUiGarageWidget1Owner50KG::identityCurrent()const noexcept {rr::game::EntityForestReadScope50LA forestReadScope50LA;
     if(!threadCurrent())return false;
     return bound_&&!detachedReleased_&&authority_&&authority_->constructed_&&!authority_->released_&&
         grant_&&grant_->current()&&grant_->stillBorrowingGarageWidget1Owner(this)&&
         issuer_==grant_->issuer()&&sameOwner(authority_,grant_->application())&&
         fog_&&fog_->widgetCustodyCurrentFor(this)&&sameOwner(grant_,fog_->grant_)&&issuer_==fog_->issuer_;
 }
-bool OriginalUiGarageWidget1Owner50KG::rowFieldsCurrent(std::size_t index)const noexcept {
+bool OriginalUiGarageWidget1Owner50KG::rowFieldsCurrent(std::size_t index)const noexcept {rr::game::EntityForestReadScope50LA forestReadScope50LA;
     if(index>=rows_.size())return false;const auto& r=rows_[index];
     if(!r.reached)return !r.outer&&!r.movement&&!r.watto&&!r.wattoEntity&&!r.constructed&&!r.stored&&!r.empty;
     if(index==9){
@@ -231,7 +231,7 @@ bool OriginalUiGarageWidget1Owner50KG::updateTextOuter141ED0(const C& outer,
  }
  updateReturned_=true;d.sourcePC=0x141F80;return true;
 }
-bool OriginalUiGarageWidget1Owner50KG::fieldsCurrent()const noexcept {
+bool OriginalUiGarageWidget1Owner50KG::fieldsCurrent()const noexcept {rr::game::EntityForestReadScope50LA forestReadScope50LA;
     if(cursor_>rows_.size()||(coldDatReleased_&&cursor_!=rows_.size()))return false;
     if(countKnown_&&count158_!=22)return false;
     if(tableKnown_&&(!countKnown_||(!tableReleased_&&(!managerTable154_||source154Identity_!=
@@ -268,7 +268,7 @@ bool OriginalUiGarageWidget1Owner50KG::rowCompleteCurrent(std::size_t index,bool
     if(index>=rows_.size()||!identityCurrent()||!fieldsCurrent())return false;
     return rowCompleteAfterFieldsCurrent(index,authoredOnly);
 }
-bool OriginalUiGarageWidget1Owner50KG::rowCompleteAfterFieldsCurrent(std::size_t index,bool authoredOnly)const noexcept {
+bool OriginalUiGarageWidget1Owner50KG::rowCompleteAfterFieldsCurrent(std::size_t index,bool authoredOnly)const noexcept {rr::game::EntityForestReadScope50LA forestReadScope50LA;
     if(index>=rows_.size())return false;const auto& r=rows_[index];
     if(r.empty)return r.stored;
     if(!r.constructed||r.retiring||r.entityRetired||!r.wantsKnown||(authoredOnly&&!r.hidden)||!r.stored||!r.published||!r.attached)return false;
@@ -311,7 +311,7 @@ bool OriginalUiGarageWidget1Owner50KG::currentColdComplete()const noexcept {
     for(std::size_t i=0;i<rows_.size();++i)if(!rowCompleteAfterFieldsCurrent(i,true))return false;
     return true;
 }
-bool OriginalUiGarageWidget1Owner50KG::pageCustodyIdentityCurrent(const Page& page)const noexcept {
+bool OriginalUiGarageWidget1Owner50KG::pageCustodyIdentityCurrent(const Page& page)const noexcept {rr::game::EntityForestReadScope50LA forestReadScope50LA;
     if(!threadCurrent()||retirementStarted_||cursor_!=rows_.size()||!coldDatReleased_||
        (runtimePage_&&runtimePage_!=&page)||!identityCurrent()||!fieldsCurrent()||
        page.ownerThread_!=ownerThread_||page.issuer_!=issuer_||page.widgets_.get()!=this||
@@ -321,7 +321,7 @@ bool OriginalUiGarageWidget1Owner50KG::pageCustodyIdentityCurrent(const Page& pa
        !grant_->garageAttachedPageCurrent(page,page.entity_)||page.entryAppearanceStep_>18)return false;
     return true;
 }
-bool OriginalUiGarageWidget1Owner50KG::pageEntryCustodyCurrent(const Page& page)const noexcept {
+bool OriginalUiGarageWidget1Owner50KG::pageEntryCustodyCurrent(const Page& page)const noexcept {rr::game::EntityForestReadScope50LA forestReadScope50LA;
     if(!pageCustodyIdentityCurrent(page))return false;
     if(page.entryPhase_==Page::EntryPhase::notEntered||page.entryPhase_==Page::EntryPhase::profilePending)
         return pageActivationCustodyCurrent(page);

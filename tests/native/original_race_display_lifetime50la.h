@@ -287,6 +287,10 @@ class RaceDisplayLifetime50LA final : public std::enable_shared_from_this<RaceDi
     // Native creation/service provenance only. Neither is a source Video frame.
     bool frontendCreated_=false,localizationServiceActive_=false,localizationServiceFaulted_=false;
     bool positionStatsTextureLeaseActive_=false;
+    // Results104/F8 renderer leases (their own textures/polygons) pinned on
+    // this display. They retire with the Race after PositionStats, so its
+    // final-pin check counts them separately.
+    std::uint32_t uiRendererLeasePins50PD_=0;
     RaceDisplayLifetime50LA(std::shared_ptr<Video> video,std::uint64_t generation,const Application& application,
         std::shared_ptr<rr::assets::OriginalStandardTextureLifetime50LA> textureLifetime)
         :application_(&application),applicationLifetime_(application.animationClock()),textureLifetime_(std::move(textureLifetime)),video_(std::move(video)),generation_(generation) {
@@ -345,8 +349,8 @@ class RaceDisplayLifetime50LA final : public std::enable_shared_from_this<RaceDi
         invalidateGameplayCameraObservation50LA();
         //The independent16-primitive lease must already have retired. Observe
         //actual backing pins, not a caller's assertion of primitive completion.
-        return positionStatsTextureLeaseActive_&&renderer_.sessionDependentPins50LA_==1&&
-            video_->host.sessionDependentPins50LA_==1;
+        return positionStatsTextureLeaseActive_&&renderer_.sessionDependentPins50LA_==1u+uiRendererLeasePins50PD_&&
+            video_->host.sessionDependentPins50LA_==1u+uiRendererLeasePins50PD_;
     }
     bool canRetain()const noexcept {
         return ownerThread()&&!retiring_&&video_->originalMain&&created_&&renderer_.initialized()&&
@@ -398,6 +402,8 @@ class RaceDisplayLifetime50LA final : public std::enable_shared_from_this<RaceDi
     void pin()noexcept {
         ++renderer_.sessionDependentPins50LA_;++video_->host.sessionDependentPins50LA_;
     }
+    void pinUiRendererLease50PD()noexcept {pin();++uiRendererLeasePins50PD_;}
+    void unpinUiRendererLease50PD()noexcept {if(!uiRendererLeasePins50PD_)std::terminate();--uiRendererLeasePins50PD_;unpin();}
     void unpin()noexcept {
         if(!ownerThread()||!renderer_.sessionDependentPins50LA_||
            !video_->host.sessionDependentPins50LA_)std::terminate();

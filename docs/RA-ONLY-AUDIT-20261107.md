@@ -280,3 +280,31 @@ Read with `tools/diagnostics/ps2_disasm.py` / `ps2_xrefs.py` (Capstone).
 * Camera views. A fresh profile starts with preference 11030 = 5 (attached
   camera). Triangle (preset row 6A4 = descriptor 0) cycles 5 -> follow 0 ->
   follow presets -> 5 through 176DF0; keyboard C reaches the same action.
+
+## Correction from the original executable (Nov 8, 2026)
+
+The "per track" conclusions above came from the port's own wiring, not from
+SLUS_202.68. Verified in the executable:
+
+* One race class for every course: constructor 1A65C0 ("PodRaceEvent",
+  called from the race launch code at 17C16C and 17D678) installs vtable
+  3CEE80. That table is the ONLY data reference to the race load 1A8A40
+  (3CEE80+74), so no per-track race class or override exists.
+* 1A8A40 unconditionally constructs, in order: Pause100 (1BA130, 0x8F0),
+  Results104 (1BE940 + load 1BEEB0, 0x18C0), then the HUD children (189450,
+  18FF80, 193100, 196F20, 18C550/18C6F0, 7x 29C850...). Its only race-data
+  branch is race1B0 (mode flags); no course/track id is read.
+* 1BEEB0 (Results load) uses only common UI assets: icon_sqr/tri/x/cir,
+  denmarkbold16ingame / eurostileboldbold13ingame fonts, medasmgld/slv/brz
+  medals, %02d_fsm racer portraits, localized text 1AA/1AC, CHEATS ENABLED!.
+  No track member.
+* End dispatch 1A7DD0/1A7E18 branches on application 11258 (launch mode) and
+  race1B0, not on the track.
+* race+74 is one world class (1B2870, 0x550 bytes) constructed by the race
+  constructor for every course. The port's separate `world74_` (RA) /
+  `taWorld74_` / `gcWorld74_` / `maWorld74_` / `saWorld74_` / `gaWorld74_`
+  types are a port-side split; Results/Pause gate on the RA one only.
+
+Consequence: the original Results screen is one common menu. The faithful
+route is one common race load (Pause100 + Results104 + HUD children) for every
+human race, with Results reading the race's own roster, not a per-track port.

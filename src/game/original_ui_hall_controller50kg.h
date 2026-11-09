@@ -3,6 +3,12 @@
 #include "original_ui_options_menu_controller50kg.h"
 namespace rr::game {
 enum class OriginalUiHallPhase50KG : std::uint8_t {requestedPage90,previousPage94,entry74,openingAC,openedB0,closingB4,closedB8};
+// Hall Cross destinations. win/unlock/garage/course are page vtable+A0 screen
+// requests (11/1 -> N/1). ending is 1E40A0: page1468=1, 4B4=3, 268=0, close
+// doors (vtable+B4); closed B8 hook 1E4980 then calls 17DE10(App,0x28,3,0).
+// assertion is PodUIPages.cpp:2989 ("didn't finish the last track in a
+// circuit"); with 133660 disabled it reaches only sound1 at 1E41E4.
+enum class OriginalUiHallConfirmRoute50KG : std::uint8_t {none,win,ending,unlock,garage,course,assertion};
 struct OriginalUiHallState50KG {
     OriginalUiNavigation50KG navigation{};
     bool loaded=false;
@@ -25,6 +31,10 @@ struct OriginalUiHallPlan50KG {
     std::uint32_t soundId=0,soundPC=0,flushPC=0;
     bool backRequested=false;OriginalUiRouteDecision50KG back{};
     bool saveUpdateDelta=false;float updateDelta=0;
+    // 1E3FC0..1E41C8 Cross (event4, 42C bit0). The route request precedes
+    // sound1 (1E41E4) and its flush (1E41FC), as Back's does.
+    bool confirmRequested=false;OriginalUiHallConfirmRoute50KG confirmRoute=OriginalUiHallConfirmRoute50KG::none;
+    OriginalUiRouteDecision50KG confirm{};
 };
 class OriginalUiHallOfFameController50KG final {
 public:
@@ -43,4 +53,7 @@ public:
 private:struct Storage;std::unique_ptr<Storage> storage_;
 };
 bool originalUiHallBackShape50KG(const OriginalUiRouteDecision50KG&) noexcept;
+// Exact Cross screen-request shape: 11/1 -> 7/1 (1E4048 or 1E40EC), 10/1
+// (1E418C), 13/1 (1E41AC) or 6/1 (1E41C4, non-tournament); no profile write.
+bool originalUiHallConfirmShape50KG(const OriginalUiRouteDecision50KG&) noexcept;
 }

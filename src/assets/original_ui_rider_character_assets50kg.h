@@ -45,6 +45,9 @@ public:
     OriginalUiRiderCharacterAssets50KG& operator=(const OriginalUiRiderCharacterAssets50KG&)=delete;
     bool load(std::shared_ptr<const OriginalUiArchive50KG>,std::uint16_t widgetId,
         OriginalUiRiderCharacterAssetDiagnostic50KG&) noexcept;
+    // Separate archive gate: UIUnlock widgets 24..38 from UI/UIUnlock/Widgets.Dat.
+    bool loadUnlock(std::shared_ptr<const OriginalUiArchive50KG>,std::uint16_t widgetId,
+        OriginalUiRiderCharacterAssetDiagnostic50KG&) noexcept;
     bool loaded() const noexcept;
     std::uint16_t widgetId() const noexcept;
     const std::string* baseName() const noexcept;
@@ -61,6 +64,8 @@ public:
     const OriginalUiRiderCharacterMotion50KG* motion(std::size_t ordinal) const noexcept;
     const OriginalUiRiderCharacterMotion50KG* findMotion(const std::string& name) const noexcept;
 private:
+    bool loadImpl(std::shared_ptr<const OriginalUiArchive50KG>,std::uint16_t,bool unlock,
+        OriginalUiRiderCharacterAssetDiagnostic50KG&) noexcept;
     struct Storage;
     std::unique_ptr<Storage> storage_;
 };

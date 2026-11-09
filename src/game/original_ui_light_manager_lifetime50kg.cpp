@@ -51,7 +51,8 @@ bool OriginalUiLightManagerLifetime50KG::beginUiManager(const assets::OriginalUi
     if(activeUi_||nativeGameplayGeneration_||managerGeneration_==std::numeric_limits<std::uint64_t>::max())
         return fail(d,Error::phase,0x1CCD88);
     const auto* identity=archive.identity();
-    if(!archive.loaded()||!(same(identity,Archive::mainMenu)||same(identity,Archive::options)||same(identity,Archive::rider)||same(identity,Archive::course)||same(identity,Archive::hallOfFame)||same(identity,Archive::tournament)||same(identity,Archive::garage)))
+    if(!archive.loaded()||!(same(identity,Archive::mainMenu)||same(identity,Archive::options)||same(identity,Archive::rider)||same(identity,Archive::course)||same(identity,Archive::hallOfFame)||same(identity,Archive::tournament)||same(identity,Archive::garage)||
+       same(identity,Archive::unlock)||same(identity,Archive::win)))
         return fail(d,Error::archive,0x1CCD88);
     if(!enteredFirstMain_&&!same(identity,Archive::mainMenu))return fail(d,Error::phase,0x140084);
     const auto* ui=member(Archive::rider,"UI\\UIRider\\ui.dat");
@@ -75,6 +76,17 @@ bool OriginalUiLightManagerLifetime50KG::beginUiManager(const assets::OriginalUi
     if(same(identity,Archive::tournament)&&(!tournamentUi||
        !member(Archive::tournament,"UI\\UITourn\\Widgets.Dat")||
        !member(Archive::tournament,"UI\\UITourn\\standing.dat")))return fail(d,Error::archive,0x1CCD88);
+    // UIUnlock (10) and UIWin (7): their own screen managers, reached after a
+    // race acknowledgement or a Hall/Win successor. Same authenticated page
+    // closure check as the Hall; no new cache history or light registry.
+    if(same(identity,Archive::unlock)&&
+       (!member(Archive::unlock,"UI\\UIUnlock\\ui.dat")||
+        !member(Archive::unlock,"UI\\UIUnlock\\Widgets.Dat")||
+        !member(Archive::unlock,"UI\\UIUnlock\\unlock.dat")))return fail(d,Error::archive,0x1CCD88);
+    if(same(identity,Archive::win)&&
+       (!member(Archive::win,"UI\\UIWin\\ui.dat")||
+        !member(Archive::win,"UI\\UIWin\\Widgets.Dat")||
+        !member(Archive::win,"UI\\UIWin\\win.dat")))return fail(d,Error::archive,0x1CCD88);
     const auto* garageUi=member(Archive::garage,"UI\\UIGarage\\ui.dat");
     const auto* garageScene=member(Archive::garage,"ui\\UIGarage\\garage.scn");
     if(same(identity,Archive::garage)&&(!garageUi||!garageScene||

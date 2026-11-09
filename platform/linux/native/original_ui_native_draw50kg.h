@@ -114,6 +114,8 @@ private:
     friend class OriginalUiHallDrawContribution50KG;
     friend class OriginalUiTournamentDrawContribution50KG;
     friend class OriginalUiGarageDrawContribution50KG;
+    friend class OriginalUiUnlockDrawContribution50PD;
+    friend class OriginalUiWinDrawContribution50PD;
     friend class VehicleWindowGl50DS;
     OriginalUiSourceOwner50KM() noexcept=default;
     virtual bool beginSourceSubmission(std::uint64_t,const VehicleWindowGl50DS&) const noexcept=0;
@@ -139,6 +141,8 @@ private:
     friend class OriginalUiHallDrawContribution50KG;
     friend class OriginalUiTournamentDrawContribution50KG;
     friend class OriginalUiGarageDrawContribution50KG;
+    friend class OriginalUiUnlockDrawContribution50PD;
+    friend class OriginalUiWinDrawContribution50PD;
     friend class VehicleWindowGl50DS;
     OriginalUiSourceFrame50KM() noexcept=default;
     OriginalUiSourceFrame50KM(const OriginalUiSourceFrame50KM&)=delete;

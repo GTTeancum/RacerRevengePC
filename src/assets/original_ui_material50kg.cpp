@@ -1,6 +1,7 @@
 #include "original_ui_material50kg.h"
 #include "original_ui_screen_assets50kg.h"
 #include "original_ui_controls_specmap50kg.h"
+#include "original_ui_win_material50pd.h"
 #include "original_standard_material_object50la.h"
 #include "original_standard_material_table50la.h"
 #include "original_standard_material_animation50la.h"
@@ -355,6 +356,30 @@ bool sourceIdentityKnown(const OriginalUiMaterialPass50KG& pass) {
         for(std::size_t i=0;i<4;++i){
             const auto& source=promptSources[i];
             const auto archive=i<2?OriginalUiArchiveId50KG::overlays:OriginalUiArchiveId50KG::hallOfFame;
+            if(p.archive==originalUiArchiveIdentity50KG(archive)&&p.sourceCallerPC==source.callPC&&
+                p.registeredName==source.registeredName&&p.attemptedPsmMember==source.psm&&
+                pass.textureName==source.texture&&p.fallbackTexture==catalogMember(archive,source.member))return true;
+        }
+        return false;
+    }
+    if(p.origin==OriginalUiMaterialOrigin50KG::unlockPromptMissingPsmFallback){
+        if(p.fallbackWidgetSource||
+            p.fallbackPageSource!=catalogMember(OriginalUiArchiveId50KG::unlock,"UI\\UIUnlock\\unlock.dat"))return false;
+        for(std::size_t i=0;i<4;++i){
+            const auto& source=promptSources[i];
+            const auto archive=i<2?OriginalUiArchiveId50KG::overlays:OriginalUiArchiveId50KG::unlock;
+            if(p.archive==originalUiArchiveIdentity50KG(archive)&&p.sourceCallerPC==source.callPC&&
+                p.registeredName==source.registeredName&&p.attemptedPsmMember==source.psm&&
+                pass.textureName==source.texture&&p.fallbackTexture==catalogMember(archive,source.member))return true;
+        }
+        return false;
+    }
+    if(p.origin==OriginalUiMaterialOrigin50KG::winPromptMissingPsmFallback){
+        if(p.fallbackWidgetSource||
+            p.fallbackPageSource!=catalogMember(OriginalUiArchiveId50KG::win,"UI\\UIWin\\win.dat"))return false;
+        for(std::size_t i=0;i<4;++i){
+            const auto& source=promptSources[i];
+            const auto archive=i<2?OriginalUiArchiveId50KG::overlays:OriginalUiArchiveId50KG::win;
             if(p.archive==originalUiArchiveIdentity50KG(archive)&&p.sourceCallerPC==source.callPC&&
                 p.registeredName==source.registeredName&&p.attemptedPsmMember==source.psm&&
                 pass.textureName==source.texture&&p.fallbackTexture==catalogMember(archive,source.member))return true;
@@ -1206,6 +1231,32 @@ bool readOriginalUiHallPromptFallbackMaterial50KG(const OriginalUiArchive50KG& h
         auto result=screenTextureFallback(p,source.texture,*inherited,runtime);output=std::move(result);return true;
     }catch(...){d.error=Error::allocation;return false;}
 }
+bool readOriginalUiUnlockPromptFallbackMaterial50KG(const OriginalUiArchive50KG& unlock,
+    const OriginalUiArchive50KG& overlays,OriginalUiMainPrompt50KG prompt,
+    const OriginalUiMaterialTemplates50KG& templates,OriginalUiTemplate50KG owner,
+    const OriginalUiMaterialRuntime50KG& runtime,OriginalUiMaterial50KG& output,
+    OriginalUiMaterialDiagnostic50KG& d) noexcept {
+    d={};
+    try {
+        if(!unlock.loaded()||unlock.identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::unlock)||
+            !overlays.loaded()||overlays.identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::overlays))
+            return fail(d,Error::archive,"authenticated UIUnlock and OVERLAYS",0x209BF4);
+        const auto index=static_cast<std::size_t>(prompt);
+        if(index>=4)return fail(d,Error::fallbackSource,"original shared UIUnlock page prompt");
+        const auto& source=promptSources[index];const auto* inherited=templates.get(owner);
+        if(owner!=OriginalUiTemplate50KG::screenMt||!inherited||!runtime.overrideKnown)
+            return fail(d,Error::templateOwner,"explicit ScreenTexture ScreenMT/runtime owner",0x2df10c);
+        const auto& textureOwner=index<2?overlays:unlock;
+        const auto texture=textureOwner.find(source.member);const auto page=unlock.find("UI\\UIUnlock\\unlock.dat");
+        if(!texture.identity||!texture.data||texture.size!=texture.identity->bytes||!page.identity||
+            overlays.find(source.psm).identity||unlock.find(source.psm).identity||(index<2&&unlock.find(source.member).identity))
+            return fail(d,Error::fallbackSource,"actual shared/local UIUnlock prompt and absent PSM",source.callPC);
+        OriginalUiMaterialProvenance50KG p;p.origin=OriginalUiMaterialOrigin50KG::unlockPromptMissingPsmFallback;
+        p.archive=textureOwner.identity();p.fallbackTexture=texture.identity;p.fallbackPageSource=page.identity;
+        p.sourceCallerPC=source.callPC;p.registeredName=source.registeredName;p.attemptedPsmMember=source.psm;p.creationPC=0x2475c0;
+        auto result=screenTextureFallback(p,source.texture,*inherited,runtime);output=std::move(result);return true;
+    }catch(...){d.error=Error::allocation;return false;}
+}
 bool readOriginalUiHallFontFallbackMaterial50KG(const OriginalUiArchive50KG& hall,
     const OriginalUiArchive50KG& fonts,const OriginalUiMaterialTemplates50KG& templates,
     OriginalUiTemplate50KG owner,const OriginalUiMaterialRuntime50KG& runtime,
@@ -1272,14 +1323,15 @@ static bool prepareOriginalUiOneMapMaterial50KM(const OriginalUiMaterialPass50KG
     bool authenticatedGarageAa1 = false,
     const OriginalStandardMaterialObject50LA* authenticatedGarageScreen = nullptr,
     const OriginalStandardMaterialObject50LA* authenticatedF8Screen = nullptr,
-    const OriginalStandardMaterialObject50LA* authenticatedResultsScreen = nullptr) noexcept {
+    const OriginalStandardMaterialObject50LA* authenticatedResultsScreen = nullptr,
+    bool authenticatedWinTrophySpecular = false) noexcept {
     d = {}; d.pass = pass.pass;
     try {
         if (pass.textureCount == 0)
             return fail(d, Error::untexturedAdapterRequired, "zero-map requires untextured material policy", 0x2474b8u);
         const bool programMatches = litProgram ?
             ((same(pass.microprogram, "Diffuse") || same(pass.microprogram, "DiffuseCompressed") ||
-              ((authenticatedRiderSpecular || authenticatedGarageLit) && same(pass.microprogram,"SpecularMapCompressed")) ||
+              ((authenticatedRiderSpecular || authenticatedGarageLit || authenticatedWinTrophySpecular) && same(pass.microprogram,"SpecularMapCompressed")) ||
               (authenticatedGaragePrelit && same(pass.microprogram,"PreLitCompressed"))) &&
              pass.provenance.origin == OriginalUiMaterialOrigin50KG::authoredPsm &&
              pass.inheritedTemplate == catalogMember(OriginalUiArchiveId50KG::appStart,
@@ -1398,6 +1450,12 @@ static bool prepareOriginalUiOneMapMaterial50KM(const OriginalUiMaterialPass50KG
             if(!expect(Field::alphaBlendingOnOff,1)||!expect(Field::inputColorA,0)||
                 !expect(Field::inputColorB,2)||!expect(Field::inputAlphaC,1)||
                 !expect(Field::inputColorD,1))return false;
+            policy.blend=OriginalUiMaterialBlend50KG::destinationAlphaAdditive;
+        } else if (authenticatedWinTrophySpecular) {
+            // UIWin trophy pass2 authors zWriteDisabled=0: Z writes stay on.
+            if (!expect(Field::alphaBlendingOnOff,1) || !expect(Field::inputColorA,0) ||
+                !expect(Field::inputColorB,2) || !expect(Field::inputAlphaC,1) ||
+                !expect(Field::inputColorD,1) || !expect(Field::zWriteDisabled,0))return false;
             policy.blend=OriginalUiMaterialBlend50KG::destinationAlphaAdditive;
         } else if (authenticatedRiderSpecular || (authenticatedGarageLit && same(pass.microprogram,"SpecularMapCompressed"))) {
             if (!expect(Field::alphaBlendingOnOff,1) || !expect(Field::inputColorA,0) ||
@@ -2213,6 +2271,67 @@ bool prepareOriginalUiTournamentPodSpecularMaterial50KM(const OriginalUiMaterial
         OriginalUiRider19SpecularMaterial50KM next;
         if (!prepareOriginalUiOneMapMaterial50KM(pass,*texture,next.material.raster,d,true,
             next.material.fogEnabled,next.material.alphaTestGreaterZero,false,false,true,false,false,character))return false;
+        next.material.program=OriginalUiLitProgram50KM::specularMapCompressed;
+        next.images=&images;next.imageIndex=imageIndex;next.imageIdentity=image->identity;
+        output=next;return true;
+    } catch (...) {d.error=Error::allocation;return false;}
+}
+bool readOriginalUiWinPromptFallbackMaterial50PD(const OriginalUiArchive50KG& win,
+    const OriginalUiArchive50KG& overlays,OriginalUiMainPrompt50KG prompt,
+    const OriginalUiMaterialTemplates50KG& templates,OriginalUiTemplate50KG owner,
+    const OriginalUiMaterialRuntime50KG& runtime,OriginalUiMaterial50KG& output,
+    OriginalUiMaterialDiagnostic50KG& d) noexcept {
+    d={};
+    try {
+        if(!win.loaded()||win.identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::win)||
+            !overlays.loaded()||overlays.identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::overlays))
+            return fail(d,Error::archive,"authenticated UIWin and OVERLAYS",0x2077F0);
+        const auto index=static_cast<std::size_t>(prompt);
+        if(index>=4)return fail(d,Error::fallbackSource,"original shared UIWin page prompt");
+        const auto& source=promptSources[index];const auto* inherited=templates.get(owner);
+        if(owner!=OriginalUiTemplate50KG::screenMt||!inherited||!runtime.overrideKnown)
+            return fail(d,Error::templateOwner,"explicit ScreenTexture ScreenMT/runtime owner",0x2df10c);
+        const auto& textureOwner=index<2?overlays:win;
+        const auto texture=textureOwner.find(source.member);const auto page=win.find("UI\\UIWin\\win.dat");
+        if(!texture.identity||!texture.data||texture.size!=texture.identity->bytes||!page.identity||
+            overlays.find(source.psm).identity||win.find(source.psm).identity||(index<2&&win.find(source.member).identity))
+            return fail(d,Error::fallbackSource,"actual shared/local UIWin prompt and absent PSM",source.callPC);
+        OriginalUiMaterialProvenance50KG p;p.origin=OriginalUiMaterialOrigin50KG::winPromptMissingPsmFallback;
+        p.archive=textureOwner.identity();p.fallbackTexture=texture.identity;p.fallbackPageSource=page.identity;
+        p.sourceCallerPC=source.callPC;p.registeredName=source.registeredName;p.attemptedPsmMember=source.psm;p.creationPC=0x2475c0;
+        auto result=screenTextureFallback(p,source.texture,*inherited,runtime);output=std::move(result);return true;
+    }catch(...){d.error=Error::allocation;return false;}
+}
+bool prepareOriginalUiWinTrophySpecularMaterial50PD(const OriginalUiMaterialPass50KG& pass,
+    const OriginalUiScreenAssets50KG& images,std::uint32_t imageIndex,
+    OriginalUiRider19SpecularMaterial50KM& output,OriginalUiMaterialDiagnostic50KG& d) noexcept {
+    d={};d.pass=pass.pass;
+    try {
+        constexpr const char* trophies[]{"shinyBeveled","shinyBeveled_2nd","shinyBeveled_3rd","orb01","orb02",
+            "Ring01","Ring01_2nd","Ring01_3rd","Base01","Base01_2nd","Base01_3rd"};
+        bool trophy=false;
+        for(const auto* name:trophies){const auto member=std::string("ui\\textures\\")+name+".psm";
+            trophy|=pass.identity&&pass.identity==catalogMember(OriginalUiArchiveId50KG::win,member.c_str());}
+        if(!trophy||pass.pass!=2||!same(pass.microprogram,"SpecularMapCompressed")||!same(pass.textureName,"specmap1")||
+            pass.gs[Field::alphaTestOnOff].value!=0||pass.gs[Field::zWriteDisabled].value!=0||
+            pass.gs[Field::inputAlphaC].value!=1)
+            return fail(d,Error::profile,"actual UIWin trophy depth-writing specular pass2",0x2476a0u);
+        const auto* member=catalogMember(OriginalUiArchiveId50KG::win,"ui\\textures\\specmap1.pst");
+        const auto* source=images.sourceProvenance(imageIndex);
+        const auto* texture=images.decodedTexture(imageIndex);
+        const auto* bank=images.textures();const auto* image=bank?bank->texture(imageIndex):nullptr;
+        if (!images.loaded() || !member || !source || !texture || !image || images.ipumProvenance(imageIndex) ||
+            source->memberIdentity!=member || source->celIdentity || source->pstOffset!=0 ||
+            source->pstBytes!=member->bytes || texture->kind!=1 || texture->mips.size()!=1)
+            return fail(d,Error::texture,"authenticated original UIWin specmap1 image",0x24e880u);
+        const auto& mip=texture->mips.front();
+        if (mip.width!=256 || mip.height!=256 || image->texture.width!=mip.width ||
+            image->texture.height!=mip.height || image->texture.rgba!=mip.rgba)
+            return fail(d,Error::texture,"published UIWin specmap1 image");
+        OriginalUiRider19SpecularMaterial50KM next;
+        if (!prepareOriginalUiOneMapMaterial50KM(pass,*texture,next.material.raster,d,true,
+            next.material.fogEnabled,next.material.alphaTestGreaterZero,false,false,false,false,false,false,false,
+            false,false,false,false,false,nullptr,nullptr,false,nullptr,nullptr,nullptr,true))return false;
         next.material.program=OriginalUiLitProgram50KM::specularMapCompressed;
         next.images=&images;next.imageIndex=imageIndex;next.imageIdentity=image->identity;
         output=next;return true;

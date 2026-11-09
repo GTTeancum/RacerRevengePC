@@ -1,6 +1,7 @@
 #include "original_results_feedback_scope50la.h"
 #include "terrain_interactive_continuation50du.h"
 #include "original_consumed_ra_stage50du.h"
+#include "original_consumed_ta_stage50du.h"
 #include "original_race_constructor50la.h"
 #include "../../src/game/controller_feedback50kz.h"
 #include <utility>
@@ -14,16 +15,23 @@ Registration::Registration(const original_main_entry50KG::Application& applicati
      generation_(race->entity_.sessionGeneration),bank_(&bank),devices_(&devices){}
 
 Scope::Scope(::interactive_continuation50DU::Context& actual,
+    const native_racer50HN::Bank& bank)noexcept {attach(actual,bank);}
+void Scope::bindAfterPublication(::interactive_continuation50DU::Context& actual,
+    const native_racer50HN::Bank& bank)noexcept {if(!registration_)attach(actual,bank);}
+void Scope::attach(::interactive_continuation50DU::Context& actual,
     const native_racer50HN::Bank& bank)noexcept {
     const auto& application=actual.originalMainApplication;
-    const auto& race=actual.consumedRaStage.race();
+    // RA's world join or the common race (TA) with its own counted world.
+    const bool raRace=bool(actual.consumedRaStage.race());
+    const auto& race=raRace?actual.consumedRaStage.race():actual.consumedTaStage.race();
     // This is only an additional Results borrow. Legacy/non-RA paths keep
     // their previous behavior, with NO registration, rather than acquiring
     // a surrogate Race/manager or changing startup admission.
     if(!race||race->resultsFeedbackThread_!=std::this_thread::get_id()||
        application.race28C()!=race.get()||!race->counted_||race->rolledBack_||
        !race->entity_.sessionGeneration||race->application_!=application.entities()||
-       !actual.raWorld||race->world74_!=actual.raWorld||!race->results104_||
+       (raRace?(!actual.raWorld||race->world74_!=actual.raWorld):
+           (race->world74_||!actual.taOriginalWorld||race->taWorld74_!=actual.taOriginalWorld))||!race->results104_||
        !race->resultsFeedback_.expired())return;
     try {
         // Construction uses precisely the borrowed setup array forwarded to

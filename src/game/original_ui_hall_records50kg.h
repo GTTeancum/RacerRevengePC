@@ -17,6 +17,16 @@ struct OriginalUiHallProfile50KG {
     std::uint8_t packed1125E=0,availability11018=0;
     bool bit0_7E4=false;
     std::array<std::uint8_t,13> courseOrder100C4{};
+    // Tournament (mode34 2) race-return facts; all zero for the mode5 view.
+    // Read live from the same profile on every snapshot, never cached.
+    std::uint32_t order187B10=0;        // 1E4764 opening slot = order+1; 1E4000 confirm
+    std::uint32_t boundary102CC=0;      // 1E3FF4
+    std::uint8_t finalMedal1938=0;      // 1E4094 M[100C0][100C0][order]
+    bool unlockPending187E30=false;     // 1E416C
+    std::uint8_t raceCourse1125F=0;     // 1E2038 low nibble of 1125F
+    // 1E2050/1E28A0/1E30E8 first-human ranks 11260/64/68 and 1E2068/1E28B8/
+    // 1E3100 second-human ranks 1126C/70/74 (lap, race, knockouts).
+    std::array<std::uint32_t,3> ranks11260{},ranks1126C{};
 };
 struct OriginalUiHallRecords50KG {
     std::array<OriginalUiHallCourseRecords50KG,13> courses{};

@@ -26,7 +26,7 @@ bool OriginalUiGarageTextOverlay50KG::fail(D& d,S s,std::uint32_t pc)noexcept {
  if(phase_==Phase::loading)phase_=Phase::failed;
  return false;
 }
-bool OriginalUiGarageTextOverlay50KG::identityCurrent()const noexcept {
+bool OriginalUiGarageTextOverlay50KG::identityCurrent()const noexcept {rr::game::EntityForestReadScope50LA forestReadScope50LA;
  if(ownerThread_!=std::this_thread::get_id()||!authorityThread(authority_))return false;
  std::uint32_t pause=0;
  if(!lifetime_.readPause11C(pause)||!issuer_||!sameOwner(authority_,issuer_->entities())||
@@ -37,13 +37,13 @@ bool OriginalUiGarageTextOverlay50KG::identityCurrent()const noexcept {
 bool OriginalUiGarageTextOverlay50KG::payloadCurrent()const noexcept {
  return payloadOwnerAndResourcesCurrent()&&lineInputsCurrent();
 }
-bool OriginalUiGarageTextOverlay50KG::payloadOwnerAndResourcesCurrent()const noexcept {
+bool OriginalUiGarageTextOverlay50KG::payloadOwnerAndResourcesCurrent()const noexcept {rr::game::EntityForestReadScope50LA forestReadScope50LA;
  return identityCurrent()&&phase_==Phase::loaded&&screenText30_&&font34_&&
   screenText30_->phase_==Text::Phase::coldLoaded&&screenText30_->coldInputsCurrent()&&
   sameOwner(font34_,screenText30_->font4C_)&&scene8C_==nullptr;
 }
 bool OriginalUiGarageTextOverlay50KG::payloadCurrentAfterWidgetFields(
- const Widget& actualWidget,const C& actualOuter)const noexcept {
+ const Widget& actualWidget,const C& actualOuter)const noexcept {rr::game::EntityForestReadScope50LA forestReadScope50LA;
  // Preserve this leaf's complete independent identity/resource proof. The
  // Widget row caller supplied its exact owner and outer in the same readonly
  // pass; reject either mismatch before the unchanged local line-input scan.
@@ -52,7 +52,7 @@ bool OriginalUiGarageTextOverlay50KG::payloadCurrentAfterWidgetFields(
  return actualWidget.lineInputsAfterFieldsCurrent(this,actualOuter,fontInput_,materialInput_,capacityInput_,dynamic)&&
   dynamic==dynamicCaller_;
 }
-bool OriginalUiGarageTextOverlay50KG::lineInputsCurrent()const noexcept {
+bool OriginalUiGarageTextOverlay50KG::lineInputsCurrent()const noexcept {rr::game::EntityForestReadScope50LA forestReadScope50LA;
  bool dynamic=false;
  return widget_&&outer_&&widget_->lineInputsCurrent(this,*outer_,fontInput_,materialInput_,capacityInput_,dynamic)&&
   dynamic==dynamicCaller_;

@@ -314,6 +314,7 @@ class TournamentRoute final {
     // Screen expected before each Confirm: Main, Rider, Tournament, Course.
     static constexpr std::uint8_t screens_[4]{4,5,9,6};
 public:
+    static bool settledPublic(const Snapshot& s)noexcept{return settled(s);}
     explicit TournamentRoute(bool enabled)noexcept:enabled_(enabled){}
     bool enabled()const noexcept{return enabled_;}
     std::uint8_t issuedActions()const noexcept{return static_cast<std::uint8_t>(mainMoves_+confirms_);}
@@ -358,6 +359,72 @@ public:
                 !same(t.requested,s.route)&&t.lifecycle==Life::requestScreenExit)&&t.phase==Phase::none,
             "tournament route original Confirm did not accept a destination");
         ++confirms_;awaitingDispatch_=false;
+    }
+};
+// The same unattended tournament run AFTER a race: the 1AB5BC request opened
+// the Garage as this frontend's first screen. Garage Back (event 6, 1FE158)
+// requests Tournament 9/1, whose Continue (4) opens Course 6/1, whose Confirm
+// (4) launches the next tournament race. Same dispatch-receipt discipline.
+class TournamentReturnRoute final {
+    using Snapshot=rr::platform::OriginalUiFrontendSnapshot50KG;
+    using Life=rr::game::OriginalUiTransitionLifecycle50KG;
+    using Phase=rr::game::OriginalUiTransitionPhase50KG;
+    using Aperture=rr::game::OriginalUiApertureState50KG;
+    bool enabled_=false,awaitingDispatch_=false;
+    std::uint8_t actions_=0;
+    static void require(bool condition,const char* message){if(!condition)throw std::runtime_error(message);}
+    static bool same(rr::game::OriginalUiTransitionRoute50KG a,rr::game::OriginalUiTransitionRoute50KG b)noexcept{
+        return a.screen==b.screen&&a.page==b.page;
+    }
+    static bool garageSettled(const Snapshot& s)noexcept{
+        const auto& a=s.garageAperture;
+        return s.prepared&&s.active&&!s.faulted&&!s.quitRequested&&s.frameSubmitted&&!s.deferredQueue&&
+            s.route.screen==13&&s.route.page==1&&s.garageLoaded&&s.garageRootReturned&&s.garageTimingCommitted&&
+            s.garageTargetPublished&&a.bound&&a.inputEnabled268&&a.state==Aperture::open&&
+            // The Page's own opening slide (manager lifecycle 4, transition 1)
+            // must have finished: the source ignores Back until 16C/170 are 0.
+            s.garageManagerLifecycle==0&&s.garageManagerTransition==0;
+    }
+    // Screen expected before each action: Garage, Tournament, Course.
+    static constexpr std::uint8_t screens_[3]{13,9,6};
+public:
+    explicit TournamentReturnRoute(bool enabled)noexcept:enabled_(enabled){}
+    bool enabled()const noexcept{return enabled_;}
+    std::uint8_t issuedActions()const noexcept{return actions_;}
+    bool actionsDispatched()const noexcept{return actions_==3&&!awaitingDispatch_;}
+    // Return -1 while waiting, Back6 in the Garage, else Confirm4.
+    int poll(const Snapshot& s,bool courseReady){
+        if(!enabled_)return -1;
+        require(!awaitingDispatch_,"tournament return route dispatch receipt was not verified");
+        require(!s.faulted&&!s.quitRequested,"tournament return route original UI became unavailable");
+        if(actions_==3)return -1;
+        const auto screen=screens_[actions_];
+        const bool expected=s.route.screen==screen&&s.route.page==1&&s.switches==actions_;
+        const bool outgoing=actions_&&s.route.screen==screens_[actions_-1]&&s.switches==actions_-1u;
+        require(expected||outgoing,"tournament return route left the bounded Garage/Tournament/Course route");
+        if(!expected)return -1;
+        if(actions_==0){if(!garageSettled(s))return -1;awaitingDispatch_=true;return 6;}
+        if(!TournamentRoute::settledPublic(s))return -1;
+        if(actions_==2){
+            require(s.course.mode34==2,"tournament return route Course left tournament mode");
+            if(!courseReady)return -1;
+        }
+        awaitingDispatch_=true;return 4;
+    }
+    void validateDispatch(const Snapshot& s){
+        require(enabled_&&awaitingDispatch_,"tournament return route has no pending dispatch receipt");
+        if(actions_==0){
+            // The Garage page bypasses the transition owner: its Back writes
+            // manager pending 9/1 and lifecycle 6 (1D6178) for its own tick.
+            require(!s.faulted&&!s.quitRequested&&s.route.screen==13,"tournament return route Garage Back faulted");
+            ++actions_;awaitingDispatch_=false;return;
+        }
+        const auto& t=s.transition;const bool launch=actions_==2;
+        require(!s.faulted&&!s.quitRequested&&s.route.screen==screens_[actions_]&&t.bound&&same(t.current,s.route)&&
+            (launch?same(t.requested,s.route)&&t.lifecycle==Life::requestCourseExit:
+                !same(t.requested,s.route)&&t.lifecycle==Life::requestScreenExit)&&t.phase==Phase::none,
+            "tournament return route original Confirm did not accept a destination");
+        ++actions_;awaitingDispatch_=false;
     }
 };
 }

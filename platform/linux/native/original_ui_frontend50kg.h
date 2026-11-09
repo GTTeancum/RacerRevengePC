@@ -68,6 +68,10 @@ struct OriginalUiFrontendDiagnostic50KG {
     MaterialTextureGlDiagnostic50EB gpu{};
     VehicleWindowDiagnostic50DS renderer{};
     game::OriginalUiTransitionStatus50KG transition=game::OriginalUiTransitionStatus50KG::ok;
+    // Race-return (1AB5BC receiver) and screen 7/10 sessions: reached source
+    // PC and a static reason for the first refusal.
+    std::uint32_t raceReturnSourcePC=0;
+    const char* raceReturnDetail=nullptr;
 };
 // Native application presentation/audio owner. The window implementation uses
 // verified driver swap-interval1, or an explicitly requested native PC deadline
@@ -96,6 +100,9 @@ struct OriginalUiFrontendCold50KG {
     // Optional concrete Rider inputs. Missing any leaves Main's genuine Rider
     // action unavailable; a cache flag or remembered rider is not readiness.
     std::shared_ptr<const assets::OriginalUiArchive50KG> rider,backgrounds,podTextures,course,tournament;
+    // Optional original UIUNLOCK/UIWIN archives (screens 10 and 7), reached
+    // only through a race acknowledgement 1AB5BC request or their successors.
+    std::shared_ptr<const assets::OriginalUiArchive50KG> unlock,win;
     std::shared_ptr<const assets::OriginalUiIpumTextureCache50KG> riderIpumCache;
     std::shared_ptr<OriginalUiRiderProfileOwner50KG> riderProfile;
     std::shared_ptr<const OriginalUiCourseRaceDestination50KG> courseRaceDestination;
@@ -267,6 +274,12 @@ public:
     OriginalUiFrontendStatus50KG retireGarageBeforeClose(OriginalUiFrontendDiagnostic50KG&) noexcept;
     void requestQuit() noexcept;
     OriginalUiFrontendSnapshot50KG snapshot() const noexcept;
+    // Same values as snapshot() except that the garage* fields stay default:
+    // the Garage runtime observation is skipped. For host callers that never
+    // read a garage* field. route() is snapshot().route alone.
+    // RR_GARAGE_PROOF_SHADOW=1 compares both against snapshot().
+    OriginalUiFrontendSnapshot50KG snapshotWithoutGarageRuntime() const noexcept;
+    game::OriginalUiTransitionRoute50KG route() const noexcept;
     const OriginalUiMainSession50KG* mainSession() const noexcept;
     const OriginalUiOptionsSession50KG* optionsSession() const noexcept;
     const OriginalUiRiderSession50KG* riderSession() const noexcept;
@@ -299,6 +312,12 @@ private:
     OriginalUiFrontendStatus50KG prepareNativePauseCourse(
         const OriginalUiFrontendCold50KG&,const std::shared_ptr<OriginalUiPauseCourseOrigin50LA>&,
         OriginalUiFrontendDiagnostic50KG&)noexcept;
+    // 1AB5BC -> 17DE10(App,6,screen,1) receiver: the retired race's request
+    // opens screen/page as the FIRST screen of this lifetime (17DB80 with no
+    // UI manager builds one through ld_ui). The profile mode is retained.
+    OriginalUiFrontendStatus50KG prepareNativeRaceReturn(
+        const OriginalUiFrontendCold50KG&,const ::original_main_entry50KG::Application&,
+        std::uint8_t screen,std::uint8_t page,OriginalUiFrontendDiagnostic50KG&)noexcept;
     OriginalUiFrontendStatus50KG prepareInitialNative(
         const OriginalUiFrontendCold50KG&,const ::original_main_entry50KG::Application*,
         const std::shared_ptr<OriginalUiPauseCourseOrigin50LA>&,

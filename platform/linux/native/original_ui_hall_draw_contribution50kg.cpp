@@ -265,7 +265,18 @@ bool OriginalUiHallDrawContribution50KG::projectAperture(std::uint8_t ordinal,
 bool OriginalUiHallDrawContribution50KG::projectPrompts(std::uint32_t mask,Diagnostic& d) noexcept {
     d={};if(!storage_)return fail(d,Error::notBound);auto& s=*storage_;
     if(!s.active||!s.page||!s.pageShown||s.apertureCount!=2||s.prompts||s.top||s.failed||s.finished)return fail(d,Error::sourceOrder);
-    if(mask!=0&&mask!=2)return fail(d,Error::input,0x1D7A44);
+    // 1E4870: mode5 stores 42C=2 (Triangle/Back); every other mode stores 1
+    // (Cross/confirm). 1D7A10 draws +2A0 for bit0 and +300 for bit1 at the
+    // base page defaults (1D6874: 484,378; tri 397,378). Hall never moves them.
+    if(mask!=0&&mask!=1&&mask!=2)return fail(d,Error::input,0x1D7A44);
+    if(mask&1){const auto m=s.resources->materialIndex("ui/textures/icon_x");
+        if(m>=s.resources->materials()->size())return fail(d,Error::material);
+        const auto& b=(*s.resources->materials())[m];if(b.images.size()!=1)return fail(d,Error::material);
+        const auto* atlas=s.resources->textures()->texture(b.images[0]);if(!atlas)return fail(d,Error::geometry);
+        const float w=float(atlas->texture.width),h=float(atlas->texture.height);game::OriginalUiOverlayQuad50KG q;
+        q.materialName="icon_x";q.authoredDepth=1;q.sourcePC=0x1D7A2C;
+        q.vertices={{{484,378,0,0},{484+w,378,1,0},{484,378+h,0,1},{484+w,378+h,1,1}}};
+        if(!append(q,m,16777214.f,Segment::prompts,0,d)){s.failed=true;return false;}}
     if(mask&2){const auto m=s.resources->materialIndex("ui/textures/icon_tri");
         if(m>=s.resources->materials()->size())return fail(d,Error::material);
         const auto& b=(*s.resources->materials())[m];if(b.images.size()!=1)return fail(d,Error::material);

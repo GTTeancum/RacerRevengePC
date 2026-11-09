@@ -747,7 +747,7 @@ bool VehicleWindowGl50DS::Storage::hasGlResources() const noexcept {
             nativeVideoSnapshotTargets50LA[b]||nativeVideoSnapshotColors50LA[b])return true;
         if(hasNativeResultsResources())return true;
         if(hasNativeF8BarResources())return true;
-        if(garagePollFence50KG)return true;
+        if(garagePollFence50KG||garageTargetFence50KG)return true;
         for(U name:garageSamplers50KG)if(name)return true;
         if(hasRaWorldResources())return true;
         if(hasCoverageResources()||uiCoverage.owns())return true;
@@ -2195,6 +2195,13 @@ bool VehicleWindowGl50DS::Storage::cleanup(VehicleWindowDiagnostic50DS& d) noexc
             if(alive){gl.deleteSync(garagePollFence50KG);error=drawGl.getError();
                 if(error){d.cleanupIncomplete=true;d.cleanupGlError=error;return false;}}
             garagePollFence50KG=nullptr;
+        }
+        // The last Garage target's completion marker: the same wait the former
+        // completion glFinish performed, then its release.
+        if(garageTargetFence50KG){
+            waitGarageTargetFence50KG();
+            const U error=drawGl.getError();
+            if(error){d.cleanupIncomplete=true;d.cleanupGlError=error;return false;}
         }
         // Explicit source/display leases add a real completion obligation. Never
         // confuse a CPU generation increment or deferred GL deletion with it.

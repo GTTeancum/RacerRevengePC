@@ -84,7 +84,22 @@ bool Read::finalHumanProfileChanged()const {
 bool Read::current(std::size_t& count)const noexcept {
     count=0;
     try {
-        if(!application_||!race_||!operation_)return false;
+        if(!application_||!race_)return false;
+        if(!operation_){
+            // The common race (every course but the RA world join): no RA
+            // roster Operation exists. The original loader reads only the
+            // race manager's count (manager30) and each racer's 60 through
+            // 1AF330; here those are the race's launch entrants and its actual
+            // racer60 list. The race must be the application's live race.
+            const auto& race=*race_;
+            if(!humanRacer60_||application_->sourceRace28COwner_.get()!=race_||!race.counted_||
+               race.rolledBack_||race.world74_||!race.anyWorld()||!race.profile_||
+               race.application_!=application_->entitiesOwner_||race.profile_!=application_->riderProfile||
+               race.profile_->stamp().generation!=humanProfileGeneration_)return false;
+            const std::size_t n=race.launchSelection_.entrants;
+            if(!n||n>8u)return false;
+            count=n;return true;
+        }
         return currentBank(count);
     }catch(...){return false;}
 }

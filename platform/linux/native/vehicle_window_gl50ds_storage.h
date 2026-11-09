@@ -226,6 +226,7 @@ struct OwnerGl {
     void (*getSynciv)(__GLsync*,U,I,I*,I*)=nullptr;
     std::uint8_t (*isSync)(__GLsync*)=nullptr;
     void (*deleteSync)(__GLsync*)=nullptr;
+    U (*clientWaitSync)(__GLsync*,U,std::uint64_t)=nullptr;
     // Dormant blend-only lookup; normal renderer creation is unchanged.
     void (*drawArrays)(U,I,I) = nullptr;
     const unsigned char* (*getString)(U) = nullptr;
@@ -647,6 +648,12 @@ struct VehicleWindowGl50DS::Storage {
     bool initialized = false, active = false, frameSet = false, imageCommitted = false;
     bool frontendOnly = false;
     __GLsync* garagePollFence50KG=nullptr;
+    // Completion marker of the last Garage source target (instead of a CPU
+    // glFinish at completion). It is waited and released before the next
+    // renderer poll, prelude clear/release, owner retirement or completion, so
+    // every CPU observation sees the same completed prior target as before.
+    __GLsync* garageTargetFence50KG=nullptr;
+    bool waitGarageTargetFence50KG()noexcept;
     // This native raster lease is independent of guest Camera/Garage prelude
     // authority and source-frame image acceptance. It survives failed GL work.
     const OriginalUiSharedDialogs50KG* menuRasterShared50KG=nullptr;

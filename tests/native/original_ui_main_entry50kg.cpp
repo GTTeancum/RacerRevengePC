@@ -676,7 +676,7 @@ bool Frontend::uploadLifetimeLive(const UploadLifetime& token)noexcept {
 void Frontend::reportStageRange(const char* stage,StageClock::time_point start,StageClock::time_point end,bool okay,
         const rr::platform::VehicleWindowDiagnostic50DS* renderer) const {
         const auto elapsed=std::chrono::duration_cast<std::chrono::nanoseconds>(end-start).count();
-        const auto snapshot=coordinator.snapshot();const auto& route=snapshot.route;
+        const auto snapshot=coordinator.snapshotWithoutGarageRuntime();const auto& route=snapshot.route;
         stageHistory[nextStageObservation]={stage,start,end,frameCount,snapshot.updates,route.screen,route.page,okay};
         nextStageObservation=(nextStageObservation+1)%stageHistory.size();
         if(stageObservationCount<stageHistory.size())++stageObservationCount;
@@ -896,12 +896,19 @@ void Frontend::prepare(const Application& application,const std::shared_ptr<Vide
         std::shared_ptr<const rr::platform::OriginalUiCourseRaceDestination50KG> raceDestination,
         std::uint64_t (*nativeNow)()noexcept,std::uint64_t nativeSessionIndex) {
         require(!materialApplicationOwner,"frontend material directory already entered");
-        nativeResultsHallEntry_=bool(application.resultsHallTransfer50LA_);
+        {std::uint32_t raceScreen=0,racePage=0;
+         const bool raceReturn=application.nativeRaceReturnRoute50PD(raceScreen,racePage);
+         require(!raceReturn||(raceScreen<=255u&&racePage<=255u),"race return route out of range");
+         nativeRaceReturnScreen_=raceReturn?static_cast<std::uint8_t>(raceScreen):0;
+         nativeRaceReturnPage_=raceReturn?static_cast<std::uint8_t>(racePage):0;
+         // A 1AB5BC request has its own receiver; only 1CA6F0's is the Hall's.
+         nativeResultsHallEntry_=bool(application.resultsHallTransfer50LA_)&&!raceReturn;}
         nativePauseMainEntry_=application.nativePauseMainReceiverCurrent50LA();
         nativePauseCourseEntry_=application.nativePauseCourseReceiverCurrent50LA();
         require(!application.pauseMenuTransfer50LA_||(nativePauseMainEntry_!=nativePauseCourseEntry_),
             "Pause receiver requires an exact retired-session request");
         require(!(nativeResultsHallEntry_&&(nativePauseMainEntry_||nativePauseCourseEntry_)),"competing native receiver requests");
+        require(!(nativeRaceReturnScreen_&&(nativePauseMainEntry_||nativePauseCourseEntry_)),"competing native race-return receiver requests");
         require(!nativePauseMainEntry_||application.nativePauseMainReceiverCurrent50LA(),
             "Pause Main receiver requires exact post-batch, post-session request");
         require(!nativeResultsHallEntry_||application.nativeResultsHallReceiverCurrent50LA(),
@@ -916,6 +923,13 @@ void Frontend::prepare(const Application& application,const std::shared_ptr<Vide
         cold.mainMenu=readArchive(application.assetRoot,Id::mainMenu);
         cold.options=readArchive(application.assetRoot,Id::options);
         cold.hall=readArchive(application.assetRoot,Id::hallOfFame);
+        // Optional original screens 10/7; absent archives keep only them unavailable.
+        for(const auto id:{Id::unlock,Id::win}){
+            const auto* identity=rr::assets::originalUiArchiveIdentity50KG(id);
+            require(identity,"original Unlock/Win archive identity missing");
+            if(std::filesystem::exists(application.assetRoot/std::filesystem::path(identity->discPath)))
+                (id==Id::unlock?cold.unlock:cold.win)=readArchive(application.assetRoot,id);
+        }
         cold.fonts=readArchive(application.assetRoot,Id::fonts);
         cold.controllerPopup=readArchive(application.assetRoot,Id::controllerPopup);
         cold.overlays=readArchive(application.assetRoot,Id::overlays);
@@ -1064,6 +1078,8 @@ void Frontend::prepare(const Application& application,const std::shared_ptr<Vide
         const auto prepared=nativePauseCourseEntry_?
             coordinator.prepareNativePauseCourse(cold,application.pauseCourseReceiverOrigin50LA(*this),diagnostic):
             nativeResultsHallEntry_?coordinator.prepareNativeResultsHall(cold,application,diagnostic):
+            nativeRaceReturnScreen_?coordinator.prepareNativeRaceReturn(cold,application,
+                nativeRaceReturnScreen_,nativeRaceReturnPage_,diagnostic):
             coordinator.prepare(cold,diagnostic);
         if(prepared!=Status::ok)fail("preparation");
         require(coordinator.bindGarageDestinationRoot50KG(*this),"original UI same-Root destination binding failed");
@@ -1081,6 +1097,9 @@ void Frontend::activate(rr::platform::VehicleWindowGl50DS& renderer) {
              materialApplicationOwner->nativePauseMainReceiverCurrent50LA())))fail("Pause menu receiver currentness");
         if(nativeResultsHallEntry_&&(!materialApplicationOwner||
            !materialApplicationOwner->nativeResultsHallReceiverCurrent50LA()))fail("Results Hall receiver currentness");
+        if(nativeRaceReturnScreen_){std::uint32_t screen=0,page=0;
+            if(!materialApplicationOwner||!materialApplicationOwner->nativeRaceReturnRoute50PD(screen,page)||
+               screen!=nativeRaceReturnScreen_||page!=nativeRaceReturnPage_)fail("race return receiver currentness");}
         std::string languageError;
         if(!materialApplicationOwner||!materialApplicationOwner->prepareFrontendLanguageServices(*this,renderer,languageError))
             throw std::runtime_error("original UI language startup rejected: "+languageError);
@@ -1089,6 +1108,28 @@ void Frontend::activate(rr::platform::VehicleWindowGl50DS& renderer) {
         if(coordinator.activate(renderer,diagnostic)!=Status::ok)fail("activation");
         if(nativeResultsHallEntry_&&!materialApplicationOwner->acceptNativeResultsHallReceiver50LA())
             fail("Results Hall actual entry commit");
+        // 1AB5BC race return: the coordinator has entered the real Garage13,
+        // Hall11, Win7 or Unlock10 manager as this lifetime's first screen;
+        // consume the request.
+        if(nativeRaceReturnScreen_&&!materialApplicationOwner->acceptNativeRaceReturnReceiver50PD())
+            fail("race return first-screen actual entry commit");
+        if(nativeRaceReturnScreen_==13){
+            // The original application timer (140C50) runs continuously
+            // through 17DE10 and ld_ui, whose loading frames use the same
+            // loop: the Garage's first frame has a real frame interval, not
+            // this native frontend's fresh-lifetime zero delta. Commit one
+            // timestamp at the end of activation (the Garage cold load is
+            // already behind it); the first update measures from here.
+            require(presentationNow&&!lastUpdateNanoseconds&&!sourceDispatchActiveNanoseconds&&
+                nativeRootAudioPhase_==NativeRootAudioPhase::absent&&!nativeRootAudioPublication_,
+                "Garage race return clock continuation requires a fresh frontend clock");
+            const auto now=presentationNow();
+            original_ui_source_timing50LH::Sample primed;
+            require(now&&sourceDispatchTiming.prepare(now,true,primed)&&sourceDispatchTiming.commit(),
+                "Garage race return clock continuation rejected");
+            lastUpdateNanoseconds=now;sourceDispatchActiveNanoseconds=now;pendingUpdateColdNanoseconds=0;
+            nativeRootAudioPublication_=1; // The committed continuation timestamp.
+        }
         if((nativePauseMainEntry_||nativePauseCourseEntry_)&&
            !materialApplicationOwner->acceptNativePauseMenuReceiver50LA(*this,renderer))
             fail("Pause actual destination entry commit");
@@ -1166,7 +1207,7 @@ std::string Frontend::garageRuntimeFailureText() const {
 
 Frontend::Status Frontend::input(std::uint8_t sourceInput,rr::platform::WindowControllerPresence50DQ presence,
         std::uint8_t controller) {
-        const auto current=coordinator.snapshot().route;
+        const auto current=coordinator.route();
         const bool nativeCard=current.screen==12&&current.page==5;
         // Match the authored Memory Card artwork: Square/R LOAD, Circle/Tab SAVE.
         // The bounded page returns unavailableStorage for both, not an operation intent.
@@ -1476,7 +1517,7 @@ rr::platform::OriginalUiFrontendUpdateReceipt50KG Frontend::update(
         const rr::platform::OriginalUiMainSessionUpdate50KG& in,std::uint64_t elapsedNanoseconds) {
         rr::platform::OriginalUiFrontendUpdateReceipt50KG receipt;
         const auto updateStart=stageStart();
-        const bool garageRoot=coordinator.snapshot().route.screen==13;
+        const bool garageRoot=coordinator.route().screen==13;
         const bool sourceAudio=materialApplicationOwner&&materialApplicationOwner->garageAudioBackingOwner_;
         const bool ordinarySourceAudio=sourceAudio&&!garageRoot;
         original_ui_source_timing50LH::PublicationView garageTiming;
@@ -1485,11 +1526,15 @@ rr::platform::OriginalUiFrontendUpdateReceipt50KG Frontend::update(
             // Root13 owns its real Light/Aural/dispatcher traversal. Capture
             // THIS prepared publication before it commits; do not invoke the
             // ordinary-manager prefix or manufacture another audio sample.
-            require(sourceAudio&&nativeRootAudioPhase_==NativeRootAudioPhase::returned&&
+            // A Garage-first race return has no preceding ordinary manager:
+            // its very first update is this Garage Root's publication 1.
+            const bool firstGarageFrame=nativeRootAudioPhase_==NativeRootAudioPhase::absent&&
+                nativeRootAudioPublication_==1&&!lastAudioSequence;
+            require(sourceAudio&&(firstGarageFrame||(nativeRootAudioPhase_==NativeRootAudioPhase::returned&&
                 nativeRootAudioPublication_!=std::numeric_limits<std::uint64_t>::max()&&
-                lastAudioSequence!=std::numeric_limits<std::uint64_t>::max()&&
+                lastAudioSequence!=std::numeric_limits<std::uint64_t>::max()))&&
                 sourceDispatchTiming.retainPublication(garageTiming)&&
-                garageTiming.sameOwner(nativeRootAudioTiming_)&&
+                (firstGarageFrame||garageTiming.sameOwner(nativeRootAudioTiming_))&&
                 garageTiming.readPrepared(garageSample,garagePublication)&&
                 garagePublication==nativeRootAudioPublication_+1&&
                 garageSample.updateSeconds==in.elapsedSeconds,
@@ -1499,7 +1544,7 @@ rr::platform::OriginalUiFrontendUpdateReceipt50KG Frontend::update(
         if(ordinarySourceAudio&&!materialApplicationOwner->beginNativeFrontendRootAudio140CE0(*this,in,diagnostic,rootAudioError)){
             reportStage("source_update",updateStart,false);throw std::runtime_error(rootAudioError);
         }
-        const auto beforeUpdateRoute=coordinator.snapshot();
+        const auto beforeUpdateRoute=coordinator.snapshotWithoutGarageRuntime();
         bool updated=coordinator.update(in,receipt,diagnostic)==Status::ok&&receipt.accepted&&receipt.sequence==lastAudioSequence+1;
         if(ordinarySourceAudio&&updated)
             updated=materialApplicationOwner->finishNativeFrontendRootAudio140CFC(*this,receipt,diagnostic,rootAudioError);
@@ -1522,7 +1567,7 @@ rr::platform::OriginalUiFrontendUpdateReceipt50KG Frontend::update(
         // Memory Card Back completes asynchronously: its accepted return is
         // emitted by update, not by the Escape input receipt. Clear page-only
         // Save/Load help on that actual request while retaining real warnings.
-        const auto afterUpdateRoute=coordinator.snapshot();
+        const auto afterUpdateRoute=coordinator.snapshotWithoutGarageRuntime();
         if(beforeUpdateRoute.route.screen==12&&beforeUpdateRoute.route.page==5&&
             beforeUpdateRoute.transition.requested.screen==12&&beforeUpdateRoute.transition.requested.page==5&&
             (afterUpdateRoute.transition.requested.screen!=12||afterUpdateRoute.transition.requested.page!=5)){
@@ -1599,7 +1644,7 @@ bool Frontend::closeUi() noexcept {
         const auto status=coordinator.close(diagnostic);
         if(status!=Status::ok&&status!=Status::noChange)return false;
         if(materialApplicationOwner&&!materialApplicationOwner->withdrawCourseRaLoadingPrefix50LA(*this))return false;
-        if(nativeResultsHallEntry_&&materialApplicationOwner&&
+        if((nativeResultsHallEntry_||nativeRaceReturnScreen_)&&materialApplicationOwner&&
            !materialApplicationOwner->cancelNativeResultsHallTransfer50LA())return false;
         if((nativePauseMainEntry_||nativePauseCourseEntry_)&&materialApplicationOwner&&
            !materialApplicationOwner->cancelNativePauseMenuTransfer50LA())return false;
@@ -1613,7 +1658,7 @@ bool Frontend::closeAudio() noexcept {
     }
 
 const rr::game::OriginalUiNavigation50KG* Frontend::navigation() const noexcept {
-        const auto route=coordinator.snapshot().route;
+        const auto route=coordinator.route();
         if(route.screen==4&&route.page==1){
             const auto* resources=coordinator.mainResources();
             return resources&&resources->manager()?resources->manager()->navigation(1):nullptr;

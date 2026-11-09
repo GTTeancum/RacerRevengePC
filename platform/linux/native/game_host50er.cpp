@@ -1,3 +1,4 @@
+#include "test_results_input50pd.h"
 #include "player_session_gl_reset50du.h"
 #include "game_host50er.h"
 #include "original_spectator_menu_input50la.h"
@@ -347,6 +348,9 @@ bool GameHost50ER::poll(GameHostInput50ER& input, GameHostDiagnostic50ER& d) noe
             !input.keys.quitRequested && !input.keys.pressed[41] && !input.keys.down[41];
         refreshInfo();
         retainSharedDialogPoll50KG(input);
+        {auto& test=testResultsInput50PD(); //Unattended test only; inert otherwise.
+         if(test.focus){input.keys.focused=true;input.keys.activityLost=false;}
+         if(test.enter){input.keys.pressed[40]=1;input.keys.down[40]=1;test.enter=false;}}
         resultsInput50LA_.observeWindow(input.keys,info_.inputConnected,resultsLoadingBarrier);
         resultsPollDestination50LA_=&input;
         return true;

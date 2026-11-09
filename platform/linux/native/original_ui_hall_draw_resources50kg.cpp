@@ -222,8 +222,10 @@ bool OriginalUiHallDrawResources50KG::projectPage(const OriginalUiHallPageInput5
   packet.materialIndex=headerMaterial;packet.sourcePC=0x1e184c;packet.objectOffset=0x820;}
  constexpr std::uint32_t pcs[3][3]={{0x1e22e0,0x1e22f8,0x1e2310},{0x1e2b34,0x1e2b50,0x1e2b6c},{0x1e337c,0x1e3398,0x1e33b4}};
  constexpr std::uint16_t offsets[]={0x890,0xc80,0x1070};
+ //1E2130/1E21F8/1E22C0 (and the race/knockout copies): 133F20(...,0xCCCCCC).
+ const auto highlight=game::originalUiTextPacketColor50KG(0xCCCCCCu,255);
  for(std::size_t category=0;category<3;++category)for(std::size_t rank=0;rank<3;++rank)for(std::size_t column=0;column<3;++column){auto& packet=s.pagePackets[s.pageCount++];packet={};
-  packet.text=&s.rowGeometry[(category*3+rank)*3+column];packet.packetColor=color;packet.materialIndex=textMaterial;packet.sourcePC=pcs[category][column];
+  packet.text=&s.rowGeometry[(category*3+rank)*3+column];packet.packetColor=in.newRecordRow[category*3+rank]?highlight:color;packet.materialIndex=textMaterial;packet.sourcePC=pcs[category][column];
   packet.objectOffset=static_cast<std::uint16_t>(offsets[column]+(category*3+rank)*0x70);}
  return true;
 }

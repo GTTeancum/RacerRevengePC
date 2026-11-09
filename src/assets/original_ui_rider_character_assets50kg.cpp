@@ -39,14 +39,24 @@ OriginalUiRiderCharacterAssets50KG::OriginalUiRiderCharacterAssets50KG() noexcep
 OriginalUiRiderCharacterAssets50KG::~OriginalUiRiderCharacterAssets50KG()=default;
 bool OriginalUiRiderCharacterAssets50KG::load(std::shared_ptr<const OriginalUiArchive50KG> archive,
     std::uint16_t widget,OriginalUiRiderCharacterAssetDiagnostic50KG& d) noexcept {
+    return loadImpl(std::move(archive),widget,false,d);
+}
+bool OriginalUiRiderCharacterAssets50KG::loadUnlock(std::shared_ptr<const OriginalUiArchive50KG> archive,
+    std::uint16_t widget,OriginalUiRiderCharacterAssetDiagnostic50KG& d) noexcept {
+    // UIUnlock Soultree_Character widgets 24..38 (control factory 20A850).
+    d={};if(widget<24||widget>38)return fail(d,E::widget,0x20A850);
+    return loadImpl(std::move(archive),widget,true,d);
+}
+bool OriginalUiRiderCharacterAssets50KG::loadImpl(std::shared_ptr<const OriginalUiArchive50KG> archive,
+    std::uint16_t widget,bool unlock,OriginalUiRiderCharacterAssetDiagnostic50KG& d) noexcept {
     d={};
     if (storage_) return fail(d,E::alreadyLoaded,0x1D22A0);
     if (!archive || !archive->loaded() || !archive->identity() ||
-        archive->identity()->id!=OriginalUiArchiveId50KG::rider) return fail(d,E::archive,0x1D22A0);
+        archive->identity()->id!=(unlock?OriginalUiArchiveId50KG::unlock:OriginalUiArchiveId50KG::rider)) return fail(d,E::archive,0x1D22A0);
     try {
         auto next=std::make_unique<Storage>();next->archive=std::move(archive);next->widget=widget;
         OriginalUiDat50KG widgets,mcf;
-        if (!readOriginalUiDat50KG(*next->archive,"UI/UIRider/Widgets.Dat",widgets,d.text,
+        if (!readOriginalUiDat50KG(*next->archive,unlock?"UI/UIUnlock/Widgets.Dat":"UI/UIRider/Widgets.Dat",widgets,d.text,
                 OriginalUiRepeatedKeyPolicy50KG::preserveInOrder)) return fail(d,E::widget,0x1D2120);
         const auto* section=widgets.section("Widget "+std::to_string(widget));
         if (!section) return fail(d,E::widget,0x1D2120);

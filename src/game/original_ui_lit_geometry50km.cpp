@@ -357,6 +357,27 @@ Status projectOriginalUiKraidColoredSurface50KM(
     // clipper consumes generated packet colors, including on the bit4 branch.
     return projectSceneSurface(*scene,lod,surface,palette,context,radialFog,false,true,output,work);
 }
+// UIUnlock Soultree_Character34 (22c) / 35 (23c): the SAME authenticated PSG
+// bytes (identical size and SHA-256 in UIUNLOCK and UIRIDER), same kernel bounds.
+Status projectOriginalUiUnlockColoredSurface50PD(
+    const assets::OriginalUiRiderCharacterAssets50KG& owner,std::uint32_t lod,
+    std::uint32_t surface,std::uint32_t passIndex,const std::string& microprogram,
+    const ModelPalette49S& palette,const OriginalUiLitContext50KM& context,bool radialFog,
+    OriginalUiLitSurfaceOutput50KM& output,OriginalUiLitGeometryWorkspace50KM& work) noexcept {
+    const auto* identity=owner.geometrySource();const auto* scene=owner.scene();
+    const bool knire=owner.widgetId()==34,kraid=owner.widgetId()==35;
+    if(!owner.loaded()||(!knire&&!kraid)||!identity||!identity->sha256||
+        identity->bytes!=(knire?84424u:99072u)||std::strcmp(identity->sha256,knire?
+        "1e240e3c96bab3cf54b20ba8b482ab58a3e38685c62484c9ad6542d2314a4868":
+        "7ac6249f6219fcd2d8e779fc322f2b3de7cd8cccd5625b9bf30dbe66f2c2b2ba")||
+        !scene||lod!=0||surface!=1||passIndex!=0||microprogram!="DiffuseCompressed"||
+        scene->nodes.size()!=(knire?18u:26u)||scene->lods.size()!=1||scene->lods[0].surfaces.size()!=3||
+        scene->materials.size()!=3||scene->materials[1]!=(knire?"22c_2":"23c_2"))return Status::unsupportedScene;
+    const auto& original=scene->lods[0].surfaces[1];
+    if(original.component_word!=0x10f||!original.has_original_colors||
+        original.material_index!=1||original.vertices.size()!=(knire?923u:1850u))return Status::unsupportedScene;
+    return projectSceneSurface(*scene,lod,surface,palette,context,radialFog,false,true,output,work);
+}
 Status projectOriginalUiSpecularMapCompressedSurface50KM(const assets::Scene48D& scene,
     std::uint32_t lod,std::uint32_t surface,const ModelPalette49S& palette,
     const OriginalUiLitContext50KM& context,

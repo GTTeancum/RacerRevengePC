@@ -7,10 +7,22 @@
 
 namespace rr::game::garage_prelit50KG {
 namespace {
+#if defined(_MSC_VER)&&!defined(__clang__)&&!defined(RR_GARAGE_VOLATILE_KERNELS)
+// MSVC /fp:strict (the Windows build) already rounds every float operation to
+// IEEE single, in source order, without reassociation; fp_contract(off) also
+// rules out fused multiply-add. A volatile spill adds nothing but memory
+// traffic there. Other compilers keep the volatile barrier.
+#pragma fp_contract(off)
+float add(float a,float b) noexcept {return a+b;}
+float sub(float a,float b) noexcept {return a-b;}
+float mul(float a,float b) noexcept {return a*b;}
+float div(float a,float b) noexcept {return a/b;}
+#else
 float add(float a,float b) noexcept {volatile float r=a+b;return r;}
 float sub(float a,float b) noexcept {volatile float r=a-b;return r;}
 float mul(float a,float b) noexcept {volatile float r=a*b;return r;}
 float div(float a,float b) noexcept {volatile float r=a/b;return r;}
+#endif
 bool ready() noexcept {
     return sizeof(float)==4&&std::numeric_limits<float>::is_iec559&&
         std::numeric_limits<float>::digits==24&&std::fegetround()==FE_TONEAREST;

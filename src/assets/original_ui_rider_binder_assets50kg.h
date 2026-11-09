@@ -28,6 +28,10 @@ public:
     bool loadTournament(std::shared_ptr<const OriginalUiArchive50KG> tournament,
         std::shared_ptr<const OriginalUiArchive50KG> appStart,
         const OriginalUiMaterialRuntime50KG&,OriginalUiRiderBinderAssetDiagnostic50KG&) noexcept;
+    // Separate authenticated UIUnlock binder.psm/binder.atm owner.
+    bool loadUnlock(std::shared_ptr<const OriginalUiArchive50KG> unlock,
+        std::shared_ptr<const OriginalUiArchive50KG> appStart,
+        const OriginalUiMaterialRuntime50KG&,OriginalUiRiderBinderAssetDiagnostic50KG&) noexcept;
     bool loaded() const noexcept;
     const OriginalUiMaterialPass50KG* pass() const noexcept;
     const OriginalUiAtm50KG* animation() const noexcept;
@@ -36,7 +40,7 @@ public:
 private:
     bool loadImpl(std::shared_ptr<const OriginalUiArchive50KG>,
         std::shared_ptr<const OriginalUiArchive50KG>,const OriginalUiMaterialRuntime50KG&,
-        OriginalUiRiderBinderAssetDiagnostic50KG&,bool tournament) noexcept;
+        OriginalUiRiderBinderAssetDiagnostic50KG&,bool tournament,bool unlock=false) noexcept;
     struct Storage;
     std::unique_ptr<Storage> storage_;
 };

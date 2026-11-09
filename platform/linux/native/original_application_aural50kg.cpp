@@ -15,6 +15,10 @@
 namespace rr::platform {
 using K=game::OriginalWreckComponentKind50LA;
 namespace {
+// UI_MUSIC songs started by 234880 (stream+40 = mode1, single play): UIWin
+// Song10 trphy1.vag and Song8 trphy2_3.vag (208810). Every other Main song is
+// started by 234900 (mode4, loop). Mirrored in original_ui_main_audio50kg.cpp.
+constexpr bool songPlaysOnce234880(std::uint32_t song)noexcept {return song==10u||song==8u;}
 template<class T> bool same(const std::shared_ptr<T>& a,const std::shared_ptr<T>& b)noexcept {
     return a&&b&&a.get()==b.get()&&!a.owner_before(b)&&!b.owner_before(a);
 }
@@ -925,7 +929,10 @@ bool OriginalApplicationAural50KG::prepareNativeStreamStart(OriginalUiMainAudio5
     std::array<NativeInterface::StreamSlot,8>& next,AudioMixer50HD::NativeSourceStreamStart50KG& start)const noexcept {
     if(!nativeStreamSlotsCurrent()||(**interfaceA0_).raceIntroLease||(**interfaceA0_).main.get()!=&main)return false;
     const bool music=kind==NativeInterface::StreamKind::song;
-    if(loop!=music||clip.channels!=(music?2u:1u))return false;
+    // Songs loop (234900 mode4) except UIWin Song10/Song8, which 234880 plays
+    // once (mode1). All non-song streams are single plays.
+    const bool expectedLoop=music&&!songPlaysOnce234880(ordinal);
+    if(loop!=expectedLoop||clip.channels!=(music?2u:1u))return false;
     const auto* row=music?main.nativeSongSourceCurrent(ordinal,clip):
         kind==NativeInterface::StreamKind::riderConfirm?main.nativeRiderSourceCurrent(ordinal,clip):
         kind==NativeInterface::StreamKind::watto?main.nativeWattoStreamSourceCurrent(ordinal,clip):nullptr;
@@ -963,7 +970,10 @@ void OriginalApplicationAural50KG::commitNativeStreamSlots(
 bool OriginalApplicationAural50KG::playNativeMainSong234170(OriginalUiMainAudio50KG& main,
     std::uint32_t song,const AudioClip50HD& clip,float gain,float pitch)const noexcept {
     std::array<NativeInterface::StreamSlot,8> next;AudioMixer50HD::NativeSourceStreamStart50KG start;
-    if(!prepareNativeStreamStart(main,NativeInterface::StreamKind::song,song,clip,true,next,start))return false;
+    // 234170 passes loop=(stream+40==4) to 269650: 234900 writes mode4 (loop),
+    // 234880 writes mode1 (single play). Only UIWin Song10/Song8 use 234880.
+    const bool loop=!songPlaysOnce234880(song);
+    if(!prepareNativeStreamStart(main,NativeInterface::StreamKind::song,song,clip,loop,next,start))return false;
     auto& i=**interfaceA0_;
     // Existing actual Main native bus policy: Song gain40% on dry master1.
     // This does not invent original UI Group+50/registry3 or a command25.

@@ -479,6 +479,9 @@ bool OriginalUiSharedDialogs50KG::reappend1B86D0(const OriginalUiGaragePageOwner
     }
     if(reorderStep_==3){d.entity=scope_->reappendSharedDialog1B86D0(*this,1,controller47C_.entity);
         if(!d.entity.okay())return fail(d,Status::owner,d.entity.sourcePC);reorderStep_=4;}
+    // The first manager attached to this dispatcher (Main1D7CF4, or a race
+    // return's Garage1FB648) establishes the menu topology later managers use.
+    initialMainAttached_=true;
     ++completedReorders_;reorderedPage_=&page;reorderedGrant_=page.grant_;reorderingPage_=nullptr;reorderStep_=0;d.sourceEffectsCommitted=true;d.sourcePC=0x1B872C;return true;
 }
 bool OriginalUiSharedDialogs50KG::advance4702048F0(float delta,Diagnostic& d)noexcept {
@@ -1003,7 +1006,7 @@ bool Application::sharedUiRetirementReceiptCurrent17C1D8()const noexcept {
 Application::SharedUiBootResult Application::prepareSharedDialogsInitial1B7BD0(
  const rr::platform::OriginalUiMainDrawResources50KG& mainBank,
  std::shared_ptr<const rr::assets::OriginalUiArchive50KG> popup,
- rr::platform::VehicleWindowGl50DS& renderer,std::string& error)const noexcept {
+ rr::platform::VehicleWindowGl50DS& renderer,std::string& error,bool firstManagerGarage)const noexcept {
  using Owner=rr::platform::OriginalUiSharedDialogs50KG;
  const auto resources=mainBank.controllerPopup();
  error.clear();
@@ -1125,7 +1128,11 @@ Application::SharedUiBootResult Application::prepareSharedDialogsInitial1B7BD0(
   Owner::Diagnostic d;
   if(!owner->bindInitial1B7BD0(sharedUiScopeOwner_,state,std::move(in),d)||!owner->load470203D40(d)||
      !owner->construct47C2054D0(d)||!owner->bindLoaded47C2055B0(resources,d)||
-     !owner->bootstrapInitialHistoryFromMain(mainBank,d)||!owner->reappendInitialMain1D7CF4(d)){
+     !owner->bootstrapInitialHistoryFromMain(mainBank,d)||
+     // Main1D7CF4 performs the initial 1B86D0 reorder and 1E5038/44 writes.
+     // A Garage-first lifetime has no Main constructor: its Page1FB648 does
+     // the reorder itself, and no Main-only enable pair is written.
+     (!firstManagerGarage&&!owner->reappendInitialMain1D7CF4(d))){
    error="Actual shared UI prefix retained at source PC "+std::to_string(d.sourcePC);return SharedUiBootResult::failed;}
   return SharedUiBootResult::complete;
  }catch(...){error="Shared UI boot allocation failed; actual committed prefixes retained";return SharedUiBootResult::failed;}

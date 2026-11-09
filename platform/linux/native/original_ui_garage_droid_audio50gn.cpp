@@ -83,7 +83,7 @@ bool OriginalUiGarageDroidAudio50GN::nativeSampleLeasesEmpty()const noexcept {
  for(const auto& row:rows_)if(row.nativeSample.retainsBacking()||row.nativeVoice.retainsBacking())return false;
  return true;
 }
-bool OriginalUiGarageDroidAudio50GN::current()const noexcept {
+bool OriginalUiGarageDroidAudio50GN::current()const noexcept {rr::game::EntityForestReadScope50LA forestReadScope50LA;
  if(!prepared_||poisoned_||!assets_||assets_->clips.size()!=soundCount||assets_->ready!=soundCount||nextActor_>10||constructedSounds_>soundCount||!mixer_||mixer_->groupEpoch50IC()!=epoch_||mixer_->count()!=requiredFrontendVoices||mixer_->sampleRate()!=outputRate_||mixer_->originalSoundMode50KG()!=mode_||
     !revision_||revision_==std::numeric_limits<std::uint64_t>::max()||!mixer_->canRecordControlChanges()||mixer_->masterGain()!=1.f||mixer_->requiresVoiceGroupGains50IC())return false;
  const auto* mode=mixer_->originalSoundMode50KG();game::OriginalSoundRouting50KG routing;

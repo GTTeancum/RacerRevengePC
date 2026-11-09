@@ -198,6 +198,24 @@ Status OriginalUiApertureOwner50KG::beginGarageDeferredCloseAtUpdate38() noexcep
     state_.state=State::closing;state_.inputEnabled268=false;
     emit(Hook::closingB4,0x1FE980,0x1FAFC0);return Status::ok;
 }
+Status OriginalUiApertureOwner50KG::bindUnlock(
+    std::shared_ptr<const assets::OriginalUiArchive50KG> archive,
+    const OriginalUiApertureCallbacks50KG& callbacks,OriginalUiApertureDiagnostic50KG& d) noexcept {
+    return bindPageImpl(std::move(archive),callbacks,false,false,1,d,false,false,false,false,false,true);
+}
+Status OriginalUiApertureOwner50KG::saveUnlockUpdateDelta38(float delta) noexcept {
+    if(!state_.bound)return Status::notBound;if(!unlock_)return Status::invalidPhase;
+    return saveUpdateDelta38(delta); //20CA34, before child update2A6BB0.
+}
+Status OriginalUiApertureOwner50KG::bindCircuitWin(
+    std::shared_ptr<const assets::OriginalUiArchive50KG> archive,
+    const OriginalUiApertureCallbacks50KG& callbacks,OriginalUiApertureDiagnostic50KG& d) noexcept {
+    return bindPageImpl(std::move(archive),callbacks,false,false,1,d,false,false,false,false,false,false,true);
+}
+Status OriginalUiApertureOwner50KG::saveCircuitWinUpdateDelta38(float delta) noexcept {
+    if(!state_.bound)return Status::notBound;if(!win_)return Status::invalidPhase;
+    return saveUpdateDelta38(delta); //209A74 delay slot, before child update2A6BB0.
+}
 bool OriginalUiApertureOwner50KG::garageAperturePredicate(Phase phase) const noexcept {
     if(inOperation_||!garage_||!state_.bound)return false;
     OperationScope operation(inOperation_);if(!available())return false;
@@ -207,7 +225,7 @@ bool OriginalUiApertureOwner50KG::garageAperturePredicate(Phase phase) const noe
 Status OriginalUiApertureOwner50KG::bindPageImpl(
     std::shared_ptr<const assets::OriginalUiArchive50KG> archive,
     const OriginalUiApertureCallbacks50KG& supplied,bool entryOnly,bool optionsMenu,std::uint8_t page,
-    OriginalUiApertureDiagnostic50KG& d,bool rider,bool course,bool tournament,bool hallOfFame,bool garage) noexcept {
+    OriginalUiApertureDiagnostic50KG& d,bool rider,bool course,bool tournament,bool hallOfFame,bool garage,bool unlock,bool win) noexcept {
     static_assert(sizeof(float)==4 && std::numeric_limits<float>::is_iec559,
         "Original aperture requires IEEE binary32");
     d={};
@@ -216,7 +234,7 @@ Status OriginalUiApertureOwner50KG::bindPageImpl(
     OperationScope operation(inOperation_);
     const auto callbacks=supplied;
     if (!archive || !archive->loaded() || !archive->identity() ||
-        archive->identity()->id!=(garage?assets::OriginalUiArchiveId50KG::garage:hallOfFame?assets::OriginalUiArchiveId50KG::hallOfFame:tournament?assets::OriginalUiArchiveId50KG::tournament:course?assets::OriginalUiArchiveId50KG::course:rider?assets::OriginalUiArchiveId50KG::rider:optionsMenu?assets::OriginalUiArchiveId50KG::options:assets::OriginalUiArchiveId50KG::mainMenu))
+        archive->identity()->id!=(win?assets::OriginalUiArchiveId50KG::win:unlock?assets::OriginalUiArchiveId50KG::unlock:garage?assets::OriginalUiArchiveId50KG::garage:hallOfFame?assets::OriginalUiArchiveId50KG::hallOfFame:tournament?assets::OriginalUiArchiveId50KG::tournament:course?assets::OriginalUiArchiveId50KG::course:rider?assets::OriginalUiArchiveId50KG::rider:optionsMenu?assets::OriginalUiArchiveId50KG::options:assets::OriginalUiArchiveId50KG::mainMenu))
         return fail(d,Status::invalidArchive);
     if (!dependencies(callbacks)) return fail(d,Status::missingDependency);
     if (!dependenciesAvailable(callbacks)) return fail(d,Status::unavailable);
@@ -224,7 +242,7 @@ Status OriginalUiApertureOwner50KG::bindPageImpl(
     try {
         assets::OriginalUiDat50KG indexDat,pageDat;
         assets::OriginalUiPageIndex50KG index;
-        const std::string directory=garage?"UI/UIGarage/":hallOfFame?"UI/UIHOF/":tournament?"UI/UITourn/":course?"UI/UICourse/":rider?"UI/UIRider/":optionsMenu?"UI/UIOption/":"UI/UIMain/";
+        const std::string directory=win?"UI/UIWin/":unlock?"UI/UIUnlock/":garage?"UI/UIGarage/":hallOfFame?"UI/UIHOF/":tournament?"UI/UITourn/":course?"UI/UICourse/":rider?"UI/UIRider/":optionsMenu?"UI/UIOption/":"UI/UIMain/";
         if (!assets::readOriginalUiDat50KG(*archive,directory+"ui.dat",indexDat,d.parse) ||
             !assets::readOriginalUiPageIndex50KG(indexDat,index,d.parse))
             return fail(d,Status::parseFailure,d.parse.sourcePC);
@@ -269,7 +287,7 @@ Status OriginalUiApertureOwner50KG::bindPageImpl(
         // 2A5CCC's 1). Only the non-Closed config branch 1D654C writes it to 1.
         next.inputEnabled268=!config.startClosed;
         // No source update sample or rendered primitive is fabricated at bind.
-        archive_=std::move(archive);config_=config;callbacks_=callbacks;state_=next;entryOnly_=entryOnly;optionsMenu_=optionsMenu;optionsPage_=page;rider_=rider;course_=course;tournament_=tournament;hallOfFame_=hallOfFame;garage_=garage;
+        archive_=std::move(archive);config_=config;callbacks_=callbacks;state_=next;entryOnly_=entryOnly;optionsMenu_=optionsMenu;optionsPage_=page;rider_=rider;course_=course;tournament_=tournament;hallOfFame_=hallOfFame;garage_=garage;unlock_=unlock;win_=win;
         return fail(d,Status::ok);
     } catch (const std::bad_alloc&) { return fail(d,Status::allocation); }
     catch (...) { return fail(d,Status::parseFailure); }
@@ -291,7 +309,7 @@ Status OriginalUiApertureOwner50KG::beginTransition7C(Phase phase) noexcept {
         if(course_||tournament_)return Status::noChange; // actual1E0460 / 1F2E30 entry is no-op
         if (state_.state==State::open || state_.state==State::opening) return Status::noChange;
         state_.state=State::opening;
-        emit(Hook::openingAC,0x1D750C,garage_?0x1FAF10:hallOfFame_?0x1E46B0:rider_?0x1E9E70:optionsMenu_?(optionsPage_==5?0x1D7520:optionsPage_==6?0x1F8850:optionsPage_==4?0x1F5BF0:optionsPage_==2||optionsPage_==3?0x1F44A0:0x1F9D20):0x1E66C0);
+        emit(Hook::openingAC,0x1D750C,win_?0x208810:unlock_?0x20B3E0:garage_?0x1FAF10:hallOfFame_?0x1E46B0:rider_?0x1E9E70:optionsMenu_?(optionsPage_==5?0x1D7520:optionsPage_==6?0x1F8850:optionsPage_==4?0x1F5BF0:optionsPage_==2||optionsPage_==3?0x1F44A0:0x1F9D20):0x1E66C0);
         return Status::ok;
     }
     if (phase==Phase::exit) {
@@ -299,7 +317,7 @@ Status OriginalUiApertureOwner50KG::beginTransition7C(Phase phase) noexcept {
         if (entryOnly_) return Status::unavailable;
         if (state_.state==State::closed || state_.state==State::closing) return Status::noChange;
         state_.state=State::closing;state_.inputEnabled268=false;
-        emit(Hook::closingB4,tournament_?0x1F2E7C:course_?0x1E04AC:rider_?0x1ED130:0x1D74B4,hallOfFame_?0x1E4900:tournament_?0x1EEBE0:course_?0x1DAA70:rider_?0x1EA360:optionsMenu_?(optionsPage_==5?0x1D74D0:optionsPage_==6?0x1F8910:optionsPage_==4?0x1F5DD0:optionsPage_==2||optionsPage_==3?0x1F45C0:0x1F9ED0):0x1E6960);
+        emit(Hook::closingB4,tournament_?0x1F2E7C:course_?0x1E04AC:rider_?0x1ED130:0x1D74B4,win_?0x208950:unlock_?0x20B420:hallOfFame_?0x1E4900:tournament_?0x1EEBE0:course_?0x1DAA70:rider_?0x1EA360:optionsMenu_?(optionsPage_==5?0x1D74D0:optionsPage_==6?0x1F8910:optionsPage_==4?0x1F5DD0:optionsPage_==2||optionsPage_==3?0x1F45C0:0x1F9ED0):0x1E6960);
         return Status::ok;
     }
     // Native rejection instead of executing the source bad-transition assert.
@@ -319,7 +337,7 @@ Status OriginalUiApertureOwner50KG::saveRiderUpdateDelta38(float actualDelta) no
     return saveUpdateDelta38(actualDelta);
 }
 Status OriginalUiApertureOwner50KG::saveMainUpdateDelta38(float actualDelta) noexcept {
-    if(optionsMenu_||rider_||course_||tournament_||hallOfFame_||garage_)return Status::invalidPhase;
+    if(optionsMenu_||rider_||course_||tournament_||hallOfFame_||garage_||unlock_||win_)return Status::invalidPhase;
     return saveUpdateDelta38(actualDelta);
 }
 Status OriginalUiApertureOwner50KG::saveOptionsMenuUpdateDelta38(float actualDelta) noexcept {
@@ -386,12 +404,12 @@ Status OriginalUiApertureOwner50KG::render48(Life lifecycle) noexcept {
     } else if (closing) {
         state_.bottom28C=bottom;state_.top284=top;
         if (state_.bottom28C<=224 && state_.top284>=224)
-            emit(Hook::closingThresholdB8,0x1D7630,garage_?0x1FB0C0:hallOfFame_?0x1E4980:tournament_?0x1EEC30:course_?0x1DAAC0:rider_?0x1EA3E0:optionsMenu_?(optionsPage_==5?0x1D79F0:optionsPage_==6?0x1F8980:optionsPage_==4?0x1F5F30:optionsPage_==2||optionsPage_==3?0x1F45E0:0x1F9FE0):0x1E6A50);
+            emit(Hook::closingThresholdB8,0x1D7630,win_?0x2089C0:unlock_?0x20B470:garage_?0x1FB0C0:hallOfFame_?0x1E4980:tournament_?0x1EEC30:course_?0x1DAAC0:rider_?0x1EA3E0:optionsMenu_?(optionsPage_==5?0x1D79F0:optionsPage_==6?0x1F8980:optionsPage_==4?0x1F5F30:optionsPage_==2||optionsPage_==3?0x1F45E0:0x1F9FE0):0x1E6A50);
         // Deliberately retain closing here, including a crossed endpoint.
     } else if (opening && openEndpoint) {
         state_.top284=config_.openSize274;state_.bottom28C=448-config_.openSize274;
         state_.state=State::open;state_.inputEnabled268=true;
-        emit(Hook::openedB0,0x1D7698,garage_?0x1FAF70:hallOfFame_?0x1E4870:tournament_?0x1EEBA0:course_?0x1DA950:rider_?0x1EA090:optionsMenu_?(optionsPage_==5?0x1D79E0:optionsPage_==6?0x1F8870:optionsPage_==4?0x1F5D20:optionsPage_==2||optionsPage_==3?0x1F44E0:0x1F9E20):0x1E68F0);
+        emit(Hook::openedB0,0x1D7698,win_?0x208900:unlock_?0x20B400:garage_?0x1FAF70:hallOfFame_?0x1E4870:tournament_?0x1EEBA0:course_?0x1DA950:rider_?0x1EA090:optionsMenu_?(optionsPage_==5?0x1D79E0:optionsPage_==6?0x1F8870:optionsPage_==4?0x1F5D20:optionsPage_==2||optionsPage_==3?0x1F44E0:0x1F9E20):0x1E68F0);
     } else if (opening) {
         state_.bottom28C=bottom;state_.top284=top;
         // Source has no opening post-step threshold check or callback.
@@ -411,7 +429,7 @@ Completion OriginalUiApertureOwner50KG::pollCompletion(
     OriginalUiTransitionRoute50KG route,Phase phase) const noexcept {
     // Garage1FE7C0 also tests actual panel4D8 at1FEA60; this leaf cannot certify it.
     if (garage_) return Completion::unavailable;
-    if (inOperation_ || !state_.bound || route.screen!=(hallOfFame_?11:tournament_?9:course_?6:rider_?5:optionsMenu_?12:4) || route.page!=((rider_||optionsMenu_)?optionsPage_:1))
+    if (inOperation_ || !state_.bound || route.screen!=(win_?7:unlock_?10:hallOfFame_?11:tournament_?9:course_?6:rider_?5:optionsMenu_?12:4) || route.page!=((rider_||optionsMenu_)?optionsPage_:1))
         return Completion::unavailable;
     OperationScope operation(inOperation_);
     if (!available()) return Completion::unavailable;

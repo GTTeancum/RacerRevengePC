@@ -46,7 +46,7 @@ bool OriginalUiGarageUiLights50KG::identityCurrent()const noexcept {
         manager_->uiLightsOwner_==this&&manager_->issuer_==issuer_&&sameOwner(application_,manager_->entities_)&&
         provider_&&provider_->sealed()&&provider_->revision()==providerRevision_;
 }
-bool OriginalUiGarageUiLights50KG::current()const noexcept {
+bool OriginalUiGarageUiLights50KG::current()const noexcept {rr::game::EntityForestReadScope50LA forestReadScope50LA;
     if(!complete_||!identityCurrent()||!scopeCurrent()||!descriptors29C_)return false;
     for(std::size_t i=0;i<2;++i){if(!lights_[i])return false;const auto& l=*lights_[i];
         if(!lightIdentity(l)||!l.typed||!l.configured||!l.registered||!l.attached||l.retiring||l.retired||l.entity.reference00!=1||

@@ -126,7 +126,7 @@ bool RaceF8RendererLease50LA::closeResources198510(rr::game::OriginalRaceF850LA&
     }
     p.textures40.reset();p.nativeImageCache.reset();p.fonts.reset();p.sourceData.reset();p.context.reset();p.domain.reset();
     // Real resource releases have finished; release only this native pin.
-    display_->unpin();pinned_=false;display_.reset();fifo_.reset();source_=nullptr;
+    display_->unpinUiRendererLease50PD();pinned_=false;display_.reset();fifo_.reset();source_=nullptr;
     d.sourcePC=0x1985e0;return true;
 }
 bool Application::retainConsumedF8Renderer50LA(D& d)const noexcept {
@@ -136,7 +136,7 @@ bool Application::retainConsumedF8Renderer50LA(D& d)const noexcept {
     const auto race=sourceRace28COwner_;const auto display=raceDisplayOwner50LA_.lock();
     const auto fifo=nativeCollectorFifoOwner_;
     if(!race||race->application_!=entitiesOwner_||!race->counted_||race->rolledBack_||
-       !race->world74_||!race->f8Attached_||!race->f8Owner_||race->f8Source_!=race->f8Owner_.get()||
+       !race->anyWorld()||!race->f8Attached_||!race->f8Owner_||race->f8Source_!=race->f8Owner_.get()||
        !display||race->loadDisplay_!=display||display->application_!=this||
        display->generation_!=raceDisplayGeneration50LA_||!display->gameplayDisplayIdentityCurrent50LA()||
        !display->canRetain()||!fifo||race->loadFifo_!=fifo||!f8RendererFifoCurrent50LA(*fifo))
@@ -147,14 +147,17 @@ bool Application::retainConsumedF8Renderer50LA(D& d)const noexcept {
         return reject(d,0x198510,"F8 actual unbound loaded resource owner");
     for(std::size_t i=0;i<4;++i)if(!p.polygonCurrent(i)||p.polygons30[i]->nativePacketPins)
         return reject(d,0x2e1980,"F8 actual unborrowed polygon resources");
+    // RA: its world join's Session; every other course: the race's Camera34.
     const auto world=race->world74_;ra_cold_aggregate50LA::Diagnostic wd;
-    const auto camera=world->borrowRuntimeSourceCamera(world,wd);
+    std::shared_ptr<const original_camera_session50KX::Session> borrowed;
+    if(world)borrowed=world->borrowRuntimeSourceCamera(world,wd);
+    const auto* camera=world?borrowed.get():race->cameraNativeAdapter34_;
     std::array<std::int32_t,4> rectangle{};std::uint64_t revision=0;
     if(!camera||camera->generation_!=race->entity_.sessionGeneration||
        camera->actual_.applicationEntities!=entitiesOwner_||camera->actual_.humanCount34!=1||
        !camera->nativeTaIssuance_||camera->nativeTaIssuance_->issuer!=this||
        camera->nativeTaIssuance_->generation!=camera->generation_||
-       camera->nativeTaIssuance_->course!=rr::game::OriginalCameraStartCourse::ra||
+       (world&&camera->nativeTaIssuance_->course!=rr::game::OriginalCameraStartCourse::ra)||
        !display->readGameplayViewport115990(*camera,rectangle,revision))
         return reject(d,0x26f940,"F8 real selected RA Camera required for native resource custody");
     try {
@@ -162,7 +165,7 @@ bool Application::retainConsumedF8Renderer50LA(D& d)const noexcept {
         // strand a Display pin or trigger a pretend resource retirement.
         auto lease=std::shared_ptr<RaceF8RendererLease50LA>(new RaceF8RendererLease50LA(display,fifo,*this,f8));
         if(!display->canRetain())return reject(d,0x141dc8,"F8 Display changed before native pin");
-        display->pin();lease->pinned_=true;p.rendererLease=std::move(lease);
+        display->pinUiRendererLease50PD();lease->pinned_=true;p.rendererLease=std::move(lease);
         return true;
     }catch(...){return reject(d,0x198510,"F8 native renderer custody allocation failed");}
 }
@@ -257,7 +260,7 @@ bool ResultsRendererLease50LA::releaseAfterResources(ResultsD& d)noexcept {
     rr::platform::VehicleWindowDiagnostic50DS renderer;
     if(!display_->renderer_.retireNativeResultsResources50LA(renderer))
         return resultsLeaseReject(d,0x1b8730,"Results native owned image/scratch cleanup incomplete");
-    display_->unpin();pinned_=false;display_.reset();fifo_.reset();source_=nullptr;return true;
+    display_->unpinUiRendererLease50PD();pinned_=false;display_.reset();fifo_.reset();source_=nullptr;return true;
 }
 bool Application::retainConsumedResultsRenderer50LA(ResultsD& d)const noexcept {
     d={};
@@ -266,7 +269,7 @@ bool Application::retainConsumedResultsRenderer50LA(ResultsD& d)const noexcept {
     const auto race=sourceRace28COwner_;const auto display=raceDisplayOwner50LA_.lock();
     const auto fifo=nativeCollectorFifoOwner_;
     if(!race||race->resultsFeedbackThread_!=std::this_thread::get_id()||race->application_!=entitiesOwner_||
-       !race->counted_||race->rolledBack_||!race->world74_||!race->results104_||
+       !race->counted_||race->rolledBack_||!race->anyWorld()||!race->results104_||
        !display||race->loadDisplay_!=display||display->application_!=this||
        display->generation_!=raceDisplayGeneration50LA_||!display->gameplayDisplayIdentityCurrent50LA()||
        !display->canRetain()||!fifo||race->loadFifo_!=fifo||!resultsRendererFifoCurrent50LA(*fifo))
@@ -283,7 +286,7 @@ bool Application::retainConsumedResultsRenderer50LA(ResultsD& d)const noexcept {
     try {
         auto lease=std::shared_ptr<ResultsRendererLease50LA>(new ResultsRendererLease50LA(display,fifo,*this,source));
         if(!display->canRetain())return resultsLeaseReject(d,0x1bec40,"Results Display changed before native pin");
-        display->pin();lease->pinned_=true;p.rendererLease=std::move(lease);return true;
+        display->pinUiRendererLease50PD();lease->pinned_=true;p.rendererLease=std::move(lease);return true;
     }catch(...){return resultsLeaseReject(d,0x1bec40,"Results renderer custody allocation failed");}
 }
 }

@@ -3,6 +3,7 @@
 #include "../../tests/native/original_race_constructor50la.h"
 #include "../../tests/native/original_race_hud_scope50la.h"
 #include "../../tests/native/original_position_stats_adapter50la.h"
+#include "../../tests/native/native_common_results50pd.h"
 #include <array>
 #include <optional>
 #include <thread>
@@ -360,6 +361,15 @@ void OriginalRaceConstructor50LA::continuePreAck1AB520(
             //TriggerList2DC320 table3D5230 slot80=2DCC70. No generic virtual
             //return or use of a copied trigger descriptor is admitted.
             scan.cut=Cut::worldResetStopped;scan.stoppedPC=0x1ac8f8;
+            if(!world74_){
+                // Common race: this course's own native world owners perform
+                // the 1AC8E0 World74 leaves (2DCC70 / 161F60 / 2702E0).
+                const char* why=nullptr;auto& hook=native_common_results50PD::state().restartWorld;
+                if(!anyWorld()||!hook||!hook(why)){
+                    stop(S::incomplete,scan.stoppedPC,why?why:"Native common-race world restart unavailable");return;
+                }
+                scan.cut=Cut::pause;break;
+            }
             if(!endWorldCurrentNative()){
                 stop(S::owner,scan.stoppedPC,"Actual same-Race restart World74 unavailable");return;
             }
@@ -402,6 +412,11 @@ void OriginalRaceConstructor50LA::continuePreAck1AB520(
         }
         case Cut::musicFade: {
             scan.cut=Cut::musicFadeStopped;scan.stoppedPC=0x1ac964;
+            if(!world74_&&!music10C_){
+                //1AC960 1A4AB0(race10C, 1.0): the common race's music is the
+                // native race music owner; restartWorld restored its level.
+                scan.cut=Cut::particleBoundary;break;
+            }
             const auto scope=endHud_.lock();OriginalRaceMusicManagerDiagnostic50LA md;
             if(!scope||!music10C_){
                 stop(S::owner,scan.stoppedPC,"Actual restart music10C owner unavailable");return;
@@ -412,6 +427,12 @@ void OriginalRaceConstructor50LA::continuePreAck1AB520(
             scan.cut=Cut::particleBoundary;break;
         }
         case Cut::particleBoundary:
+            if(!world74_){
+                //161F60 and 2702E0 ran in the native world restart above;
+                //1AC994 then clears Race90 after the World return.
+                scan.stoppedPC=0x1ac994;field90_=0;
+                scan.cut=Cut::racerRestart;break;
+            }
             scan.cut=Cut::particleStopped;scan.stoppedPC=0x1ac96c;
             if(!endWorldCurrentNative()){
                 stop(S::owner,scan.stoppedPC,"Actual restart World4A0 owner unavailable");return;
@@ -437,6 +458,22 @@ void OriginalRaceConstructor50LA::continuePreAck1AB520(
             //1AC8E0 A1, which is zero for THIS1ABAD8 Results call (delay1ABADC).
             // Claim before any16E830 mutation; never replay a reached AI row.
             scan.cut=Cut::racerRestartStopped;scan.stoppedPC=0x1ac998;
+            if(!world74_){
+                // 1AEA70/1AED30 racer restart, then 1ABAE8..1ABB68: every
+                // racer +3C = 1 with 229F80, VCR bit1 off / bit2 on. The
+                // native replay owner poses the racers from race78 from now.
+                //1ACB7C, 1AC8E0's tail on both paths: race1B0 bit3 = 1, so the
+                // next race update (1A7BD0) fades the restarted scene back in.
+                flags1B0KnownValue_=std::uint8_t(flags1B0KnownValue_|8u);
+                flags1B0KnownMask_=std::uint8_t(flags1B0KnownMask_|8u);
+                const char* why=nullptr;auto& hook=native_common_results50PD::state().beginReplay;
+                if(!hook||!hook(why)){
+                    stop(S::incomplete,scan.stoppedPC,why?why:"Native common-race replay start unavailable");return;
+                }
+                native_common_results50PD::state().replayActive=true;
+                endDispatchReturned_=true;
+                stop(S::callerReturned,0x1abe48,"Common race: Results replay started from race78");return;
+            }
             const auto scope=endHud_.lock();
             if(!endWorldCurrentNative()||!scope||!racerB0_){
                 stop(S::owner,scan.stoppedPC,"Actual same-Race native B0/World/Scope unavailable");return;

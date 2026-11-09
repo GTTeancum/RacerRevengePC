@@ -1,6 +1,10 @@
 // The original active host loop, separated without changing its lifetime owners.
 #include "native_wreck_debris_sim50pd.h"
 #include "native_wreck_debris_gpu50pd.h"
+#include "native_common_results50pd.h"
+#include "native_race_replay50pd.h"
+#include "../../platform/linux/native/test_results_input50pd.h"
+#include "../../src/game/original_race_end_entry50la.h"
 #include <cfenv>
 #include "../../platform/linux/native/stall_watchdog50du.h"
 #include "../../src/game/ps2_float_mode50la.h"
@@ -20,6 +24,8 @@ namespace interactive_loop50DU {
 namespace recovery50FI=checkpoint_recovery50fi_fixture;
 using NativeRacerFramePart=interactive_frame50DU::Part;
 namespace {
+std::uint64_t replayFrames50PD=0;bool replayCameraReported50PD=false;std::uint32_t replayRecordLogged50PD=0,replayResultsPC50PD=0xffffffffu; //Results replay log cadence.
+const char* replayDrawReported50PD=nullptr;bool replayDrawLogged50PD=false;unsigned replayF8Reported50PD=0;
 // Always-on hitch recorder: four clock reads per frame. A frame slower than
 // 100 ms writes one line splitting its wall time at the existing phase
 // boundaries (input/audio, simulation, render submit, completion/swap).
@@ -253,6 +259,28 @@ void Context::run() {
     }
    }
    {
+    // Unattended test only: RR_TEST_RESULTS_CONFIRM=N taps Enter (150 ms)
+    // every N seconds once the common-race Results replay is running, as a
+    // player confirming the Results pages at a focused window.
+    static const float resultsConfirm50PD=[]{const char* v=std::getenv("RR_TEST_RESULTS_CONFIRM");return v?static_cast<float>(std::atof(v)):0.f;}();
+    static std::uint64_t confirmStartNs50PD=0;static unsigned confirmTaps50PD=0;
+    auto& testResults50PD=rr::platform::testResultsInput50PD();
+    testResults50PD.focus=false;
+    if(resultsConfirm50PD>0.f&&captureRun.unattended()&&native_common_results50PD::state().replayActive){
+     // Applied by the host at its next poll, before the Results observe it.
+     testResults50PD.focus=true;
+     const auto nowNs=monotonicNow50DU();
+     if(!confirmStartNs50PD)confirmStartNs50PD=nowNs;
+     const auto period=static_cast<std::uint64_t>(resultsConfirm50PD*1e9f);
+     const auto elapsed=nowNs-confirmStartNs50PD;
+     const bool on=period&&elapsed>=period&&elapsed%period<150000000ull;
+     static bool confirmOn50PD=false;
+     if(on&&!confirmOn50PD){testResults50PD.enter=true;
+      std::cerr<<"test_results_confirm tap="<<++confirmTaps50PD<<'\n';}
+     confirmOn50PD=on;
+    }
+   }
+   {
     // Unattended test only: hold keyboard throttle (W) once the race is green,
     // so the human launch at the start light is exercised like a real player.
     static const bool holdThrottle50DU=[]{const char* v=std::getenv("RR_TEST_HOLD_THROTTLE");return v&&std::string(v)=="1";}();
@@ -359,6 +387,13 @@ void Context::run() {
    const bool resultsInputOkay=(originalUiActive||nativeModalOwnsInput)?true:
        originalMainApplication.pressConsumedResults1C8C30(host,resultsInputDiagnostic);
    const bool resultsInputClaimed=host.retireResultsEdges50LA(hostInput);
+   if(native_common_results50PD::state().replayActive&&(resultsInputDiagnostic.operation||!resultsInputOkay)){
+    static const char* reportedInput=nullptr;
+    if(resultsInputDiagnostic.operation!=reportedInput){reportedInput=resultsInputDiagnostic.operation;
+     std::cerr<<"race_replay results_input okay="<<resultsInputOkay<<" claimed="<<resultsInputClaimed<<" pc="<<std::hex
+         <<resultsInputDiagnostic.sourcePC<<std::dec<<" operation="<<(resultsInputDiagnostic.operation?resultsInputDiagnostic.operation:"")
+         <<" modal="<<nativeModalOwnsInput<<" ui="<<originalUiActive<<'\n';}
+   }
    if(originalMainApplication.resultsDonePending50LA()){
     require50DU(resultsInputClaimed,"Results handoff did not retire exact synchronous output");
     hostClock.pause(monotonicNow50DU());discardTrackBaseline();continue;
@@ -1187,14 +1222,165 @@ void Context::run() {
     if(humanCourseEnabled&&humanResultsActive){
      // Issued RA reads its actual registered providers only at their source
      // cuts AFTER98/94 stores. Other routes preserve the old snapshot policy.
-     auto ending=sourceCameraSession->advanceHumanEndRootWithOwners(.016f,
-         raceMusic.get(),sourceAnnouncer.get());
+     // Results replay frames: the end clock already reached 1A7DD0; the
+     // race update goes straight to the Results/replay tail each frame.
+     const bool replayFrame50PD=native_common_results50PD::state().replayActive&&!native_common_results50PD::state().fallback;
+     auto ending=replayFrame50PD?OriginalHumanEndClockResult50KG{OriginalHumanEndClockStatus50KG::needOriginalEndDispatch1A7DD0}:
+         sourceCameraSession->advanceHumanEndRootWithOwners(.016f,raceMusic.get(),sourceAnnouncer.get());
      if(ending.status==OriginalHumanEndClockStatus50KG::needFade2AED60){
       require50DU(sourceCameraSession->requestHumanEndFade(ending.fadeMilliseconds).status==sourceCamera::Status::complete,
           "human ending deferred video request did not return");
      }else if(ending.status==OriginalHumanEndClockStatus50KG::needOriginalEndDispatch1A7DD0){
-      require50DU(sourceCameraSession->endingVideoCovered()&&!sourceCameraSession->pendingDisplayWork(),
+      // A Results replay frame follows 1AC8E0's restart and its own fade-in.
+      require50DU(replayFrame50PD||(sourceCameraSession->endingVideoCovered()&&!sourceCameraSession->pendingDisplayWork()),
           "native Results requires genuine ending-clock and displayed-fade completion");
+      // The common race whose original Results root was published enters the
+      // original end entry 1A7DD0 (F8 visibility, Results activation 1A7E18,
+      // HUD stop 1AD230, 1AB520) and keeps resuming it each frame. A hard stop
+      // falls back to the host panel below, logged.
+      auto& common=native_common_results50PD::state();
+      auto& replay=native_race_replay50PD::owner();
+      if(common.rootPublished&&!common.fallback&&common.replayActive){
+       // Results replay frame: 287C90 playback, 1A8158 loop at the end, every
+       // racer posed from race78 (racer +3C = 1 skips its own update), then
+       // the camera and world children as in an ordinary race tick.
+       const char* why=nullptr;
+       // 1A7BD0..1A7C18 of this race update: the restart left race1B0 bit3
+       // set; the canonical fade-in prefix requests and services the fade.
+       {const auto fade=originalMainApplication.advanceConsumedSessionFadeIn1A7BD0(*sourceCameraSession);
+        static unsigned reportedFade=0xffu;
+        if(static_cast<unsigned>(fade.status)!=reportedFade){reportedFade=static_cast<unsigned>(fade.status);
+         std::cerr<<"race_replay fade_in status="<<reportedFade<<" pc="<<std::hex<<fade.sourcePC<<std::dec
+             <<" covered="<<sourceCameraSession->endingVideoCovered()<<'\n';}}
+       require50DU(replay.step(.016f,false,why),why?why:"race78 playback step rejected");
+       if(replay.ended()){
+        require50DU(!common.restartWorld||common.restartWorld(why),why?why:"replay loop world restart rejected");
+        require50DU(replay.loop(why),why?why:"race78 replay loop rejected");
+        std::cerr<<"race_replay loop="<<replay.stats().loops<<'\n';
+       }
+       require50DU(racerBank.visitAll([&](std::size_t slot){return replay.apply(slot,s,x.bindings);}),
+           replay.stats().lastRejection?replay.stats().lastRejection:"race78 replay pose rejected");
+       const auto frame=++sourceCameraTick;
+       const auto scene=sourceCameraSession->advanceSceneChild(frame,sourceCamera::Cut::replayPose,.016f);
+       advanceWorldAnimations();advanceNativeGcWater();advanceRcTrackParticles();advanceTbTrackParticles();
+       const auto cameraChild=scene.status==sourceCamera::Status::sceneChildComplete?
+           sourceCameraSession->advanceCameraChild(frame,sourceCamera::Cut::replayPose):scene;
+       if(cameraChild.status==sourceCamera::Status::framePublished){
+        publishSourceCameraFog();
+        // The Results update (1C8AE0) and its draw capture follow this
+        // replay frame's returned Camera, as on every race tick.
+        rr::game::OriginalResults104Diagnostic50LA resultsUpdate;
+        const bool updated=originalMainApplication.updateNativeResultsAfterRace50LA(*sourceCameraSession,resultsUpdate);
+        const bool captured=updated&&finishTaRootWithResults();
+        if(!updated||!captured||replayFrames50PD<=3||replayFrames50PD%120==0){
+         if(!updated||!captured||resultsUpdate.sourcePC!=replayResultsPC50PD)
+          std::cerr<<"race_replay results updated="<<updated<<" captured="<<captured<<" pc="<<std::hex
+              <<resultsUpdate.sourcePC<<std::dec<<" status="<<static_cast<unsigned>(resultsUpdate.status)
+              <<" operation="<<(resultsUpdate.operation?resultsUpdate.operation:"")<<'\n';
+         replayResultsPC50PD=resultsUpdate.sourcePC;
+        }
+       }
+       // 1A7B40 re-enters 1A7DD0..1AB520 every update; 1AB5B0 reads +20C.
+       {rr::game::OriginalRaceEndEntryDiagnostic50LA ack;
+        originalMainApplication.continueConsumedRaceEndEntry1A7DD0(ack);
+        {static const char* reportedAck=nullptr;
+         if(ack.operation!=reportedAck){reportedAck=ack.operation;
+          std::cerr<<"race_replay end_entry status="<<static_cast<unsigned>(ack.status)<<" pc="<<std::hex<<ack.sourcePC<<std::dec
+              <<" ack_read="<<ack.acknowledgement20CRead<<" ack="<<ack.observedAcknowledgement20C
+              <<" operation="<<(ack.operation?ack.operation:"")<<'\n';}}
+        if(ack.acknowledgement20CRead&&ack.observedAcknowledgement20C&&!common.acknowledged){
+         common.acknowledged=true;
+         std::cerr<<"race_replay acknowledged value="<<ack.observedAcknowledgement20C<<" pc="<<std::hex<<ack.sourcePC<<std::dec
+             <<" operation="<<(ack.operation?ack.operation:"")<<'\n';
+         // 1AB5BC (App2E0 is 1 outside the predefined-track debug boot).
+         // Tournament: s1 = 187B10, 1875C0 + 187D80 + the 1AB648 save bit
+         // (one transaction below), then 26D070, which the Results confirm's
+         // tournament branch already reached for these voices.
+         commitCompletedTournament();
+         rr::game::OriginalRaceAckFacts50PD facts;
+         require50DU(originalMainApplication.riderProfile&&
+             originalMainApplication.riderProfile->raceAcknowledgementFacts1AB5BC(facts),
+             "1AB5BC acknowledgement profile facts unavailable");
+         const auto destination=rr::game::originalRaceAckDestination1AB5BC(facts);
+         common.route=destination;common.routeChosen=true;
+         std::cerr<<"race_ack route="<<rr::game::originalRaceAckRouteName50PD(destination.route)
+             <<" flags="<<destination.flags<<" screen="<<destination.screen<<" page="<<destination.page
+             <<" pc="<<std::hex<<destination.sourcePC<<std::dec<<" mode34="<<facts.mode34
+             <<" order="<<facts.order187B10<<" boundary102CC="<<facts.boundary102CC<<" record7E4="<<facts.record7E4
+             <<" final_medal="<<unsigned(facts.finalMedal)<<" unlock187E30="<<facts.unlockPending187E30<<'\n';
+         // Native receivers exist for these destinations; the others keep
+         // the Results replay running (no request) until their screens exist.
+         // Tournament (mode34==2) only: Garage13, Hall11, Unlock10, and Win7
+         // (its 234880 single-play trophy music uses the same Aural song
+         // stream as every other menu song). The ending row (17DE10
+         // App,0x24,3,0) and the mode0 Hall/Unlock/Course rows stay
+         // unreceived and logged.
+         using AckRoute=rr::game::OriginalRaceAckRoute50PD;
+         const bool tournamentScreen=destination.tournament&&destination.flags==6u&&destination.page==1u;
+         const bool received=destination.route==AckRoute::garage||
+             (tournamentScreen&&(destination.route==AckRoute::hall||destination.route==AckRoute::unlock||
+              destination.route==AckRoute::win));
+         if(received){
+          const auto& owned=originalMainApplication.sourceRace28COwner_;
+          // 1AB680: 1AC440 immediately precedes the 17DE10 Hall request.
+          if(destination.insertRecords1AC440)
+           require50DU(owned&&originalMainApplication.commitRaceAcknowledgementRecords1AC440_50PD(*owned,destination),
+               "1AB5BC 1AC440 record insertion rejected");
+          require50DU(owned&&originalMainApplication.commitRaceAcknowledgementTransfer50PD(*owned,destination),
+              "1AB5BC 17DE10 request rejected");
+          std::cerr<<"race_ack request queued screen="<<destination.screen<<'\n';
+         }else std::cerr<<"race_ack receiver_unavailable route="<<rr::game::originalRaceAckRouteName50PD(destination.route)<<'\n';
+        }}
+       // The race keeps its audio world running behind the Results (music,
+       // announcer, UI feedback, pending fades), as the completed-scene hold.
+       if(audioEnabled){
+        // The display effect service pauses audio while a fade runs; this
+        // real replay tick resumes it, as the countdown tick does.
+        liveAudio->pause(false);if(mode1Enabled||dynamicContactEnabled)raceMusic->pause(false);
+       }
+       if(audioEnabled&&liveAudio->outputOpen()){
+        phase_timing50GK::Scope audioTiming(phaseTiming,phase_timing50GK::Phase::AudioCommit);
+        const auto beforeMix=liveAudio->mixedFrames();
+        const bool mixed=liveAudio->committedStep(audioDiagnostic);
+        advanceSourceAudioWorld(beforeMix,true);
+        if(!mixed)std::cerr<<"race_replay audio_error="<<static_cast<unsigned>(audioDiagnostic.error)<<'\n';
+        require50DU(mixed,"native Results replay audio step failed");
+       }
+       ++replayFrames50PD;
+       if(replayFrames50PD<=3||replayFrames50PD%120==0||cameraChild.status!=sourceCamera::Status::framePublished){
+        const auto& pose=s.nodes[static_cast<unsigned>(x.bindings.lifecycle.main190)].world100;
+        const auto st=replay.playTime();
+        if(replayFrames50PD<=3||replayFrames50PD%120==0||!replayCameraReported50PD){
+         std::cerr<<"race_replay play="<<st<<" frames="<<replayFrames50PD<<" applied="<<replay.stats().applied
+             <<" loops="<<replay.stats().loops<<" scene="<<static_cast<unsigned>(scene.status)
+             <<" camera="<<static_cast<unsigned>(cameraChild.status)<<" camera_pc="<<std::hex<<cameraChild.sourcePC<<std::dec
+             <<" player=("<<pose.v[12]<<','<<pose.v[13]<<','<<pose.v[14]<<")\n";
+         if(cameraChild.status!=sourceCamera::Status::framePublished)replayCameraReported50PD=true;
+        }
+       }
+       forceSceneRender=true;break;
+      }
+      if(common.rootPublished&&!common.fallback){
+       rr::game::OriginalRaceEndEntryDiagnostic50LA endDiagnostic;
+       originalMainApplication.continueConsumedRaceEndEntry1A7DD0(endDiagnostic);
+       using EndStatus=rr::game::OriginalRaceEndEntryDiagnostic50LA::Status;
+       const bool changed=common.lastPC!=endDiagnostic.sourcePC||common.lastStatus!=static_cast<std::uint8_t>(endDiagnostic.status);
+       ++common.endCalls;common.endActive=true;
+       common.lastPC=endDiagnostic.sourcePC;common.lastStatus=static_cast<std::uint8_t>(endDiagnostic.status);
+       common.lastOperation=endDiagnostic.operation;
+       if(changed||common.endCalls<=3||common.endCalls%120==0)
+        std::cerr<<"common_race_end_entry call="<<common.endCalls<<" status="<<static_cast<unsigned>(endDiagnostic.status)
+            <<" pc="<<std::hex<<endDiagnostic.sourcePC<<std::dec
+            <<" f8="<<endDiagnostic.f8VisibilityCommitted<<" results="<<endDiagnostic.resultsActivationCommitted
+            <<" hud_stop="<<endDiagnostic.hudStopCommitted<<" ack_read="<<endDiagnostic.acknowledgement20CRead
+            <<" waiting="<<endDiagnostic.waitingBit5Committed<<" dispatch_returned="<<endDiagnostic.dispatchReturned1AB520
+            <<" operation="<<(endDiagnostic.operation?endDiagnostic.operation:"")<<'\n';
+       if(endDiagnostic.status==EndStatus::incomplete||endDiagnostic.status==EndStatus::callerReturned){
+        forceSceneRender=true;break;
+       }
+       common.fallback=true;
+       std::cerr<<"common_race_end_entry fallback=host_panel\n";
+      }
       // Explicit native presentation substitution at1A7DD0, before the
       // source launch1 UI199770/race104 virtual+20, HUD-stop1AD230 and
       // race virtual+78 dispatch.1AD230 is not a Results implementation.
@@ -1435,6 +1621,67 @@ void Context::run() {
      // Exactly one host contact pass after all successful native participants
      // are Ready, before race observations and the single world audio mix.
      // A failed native slot never participates through an abandoned snapshot.
+     // Common race recording (race78). 1AD9A0 channels bind once the Results
+     // root (and with it race78) exists; 1AFE30 starts recording at GO (the
+     // timing manager's racing bit); 287C90 then runs every fixed step.
+     {auto& common=native_common_results50PD::state();auto& replay=native_race_replay50PD::owner();
+      const auto& race=originalMainApplication.sourceRace28COwner_;
+      if(common.rootPublished&&race&&native_race_replay50PD::Owner::commonRace(*race)&&sourceCameraSession){
+       const char* why=nullptr;
+       if(replay.phase()==native_race_replay50PD::Owner::Phase::idle){
+        std::array<native_race_replay50PD::RacerTraits,native_race_replay50PD::maxRacers> traits{};
+        const auto count=std::min<std::size_t>(racerBank.count(),traits.size());
+        require50DU(racerBank.visitAll([&](std::size_t slot){
+            if(slot<traits.size())traits[slot]={s.fields.vehicle58==1u,x.configurationEntryNonzero,
+                x.bindings.visual.extra1C0Present,x.bindings.visual.extra1C4Present};return true;}),
+            "race78 channel traits read rejected");
+        const bool bound=replay.bind(race,traits.data(),count,why);
+        std::cerr<<"race_replay bind="<<bound<<" racers="<<count<<" why="<<(why?why:"")<<'\n';
+        if(!bound)common.fallback=true;
+        common.restartWorld=[](const char*& reason){
+         // TA's world has no RA trigger list or physics index: its native
+         // world restart is the particle/animation clear below.
+         reason=nullptr;native_wreck_effects50PD::reset();return true;};
+        common.beginReplay=[this](const char*& reason){
+         replayFrames50PD=0;replayCameraReported50PD=false;
+         // The original race no longer opens its Pause once finished
+         // (1A7CDC). Retire the host Pause drawing so Results' own 14D440
+         // collector rebuild is not blocked by the Pause admission's pin.
+         if(sourcePauseObservation.hostOpen())sourcePauseObservation.closeHost();
+         if(sourcePauseObservation.hostBound())sourcePauseObservation.unbind();
+         {rr::platform::VehicleWindowDiagnostic50DS pauseRetire;
+          if(!renderer.retireOriginalPauseDerived(pauseRetire)||!sourcePause.retireDrawing()){
+           reason="host Pause drawing retirement at Results start rejected";return false;}}
+         const bool rearmed=sourceCameraSession&&sourceCameraSession->rearmFadeInAfterRestart50PD();
+         std::cerr<<"race_replay fade_in_rearmed="<<rearmed<<'\n';
+         const bool begun=native_race_replay50PD::owner().beginReplay(reason);
+         const auto& owned=originalMainApplication.sourceRace28COwner_;
+         const auto st=owned?native_race_replay50PD::Owner::vcrState(*owned):rr::game::OriginalSimpleVCR50LA::State{};
+         std::cerr<<"race_replay begin="<<begun<<" channels="<<st.channels<<" bytes="<<st.bytesUsed<<"/"<<st.capacityBytes
+             <<" keyframes="<<st.keyframes<<" deltas="<<st.deltas<<" escapes="<<st.escapes<<" full="<<st.full
+             <<" recorded="<<st.time30<<" native_samples="<<native_race_replay50PD::owner().stats().nativeSamples
+             <<" why="<<(reason?reason:"")<<'\n';
+         return begun;};
+       }
+       if(replay.phase()==native_race_replay50PD::Owner::Phase::bound&&(originalAiSession.manager.flags58&2u)){
+        const bool started=replay.startRecording(why);
+        std::cerr<<"race_replay record="<<started<<" why="<<(why?why:"")<<'\n';
+        if(!started)common.fallback=true;
+       }
+       if(replay.phase()==native_race_replay50PD::Owner::Phase::recording){
+        if(replay.captureDue())
+         require50DU(racerBank.visitAll([&](std::size_t slot){return replay.capture(slot,s,x.bindings);}),
+             replay.stats().lastRejection?replay.stats().lastRejection:"race78 capture rejected");
+        require50DU(replay.step(.016f,false,why),why?why:"race78 record step rejected");
+        const auto st=native_race_replay50PD::Owner::vcrState(*race);
+        const auto written=st.keyframes+st.deltas;
+        if(written!=replayRecordLogged50PD&&(written==1||written%75==0)){replayRecordLogged50PD=written;
+         const auto& pose=s.nodes[static_cast<unsigned>(x.bindings.lifecycle.main190)].world100;
+         std::cerr<<"race_replay rec="<<st.time30<<" frames="<<st.keyframes+st.deltas<<" bytes="<<st.bytesUsed
+             <<" escapes="<<st.escapes<<" full="<<st.full<<" player=("<<pose.v[12]<<','<<pose.v[13]<<','<<pose.v[14]<<")\n";
+        }
+       }
+      }}
      // Sealed results alone do not remove a Ready native vehicle from contacts.
      // Original 225C50 suffix of a destroy handler, at this world boundary:
      // attacker CD0 kill credit (225F34) and the 1A46E0 music song chosen at
@@ -1784,7 +2031,8 @@ void Context::run() {
    if((sourceCameraSession?sourceCameraSession->hasView():completedFrames!=0)&&
        (!originalManualResetGraphicsDue||gcGraphicsSequence[0]>=originalManualResetGraphicsDue)&&
        !(sourceCameraSession&&(sourceCameraSession->blockingVideoPending()||sourceCameraSession->asyncVideoPending()))&&
-       !(humanCourseEnabled&&sourceCameraSession->endingVideoCovered()&&!humanResultsReady)&&
+       !(humanCourseEnabled&&sourceCameraSession->endingVideoCovered()&&!humanResultsReady&&
+         !native_common_results50PD::state().replayActive)&&
        (plan.steps||input.resized||!presenter.hasPublished||capturePending||forceSceneRender||
         (sourceCameraSession&&renderedCameraPublication!=sourceCameraSession->publicationCount()))){
     frameHitch50DU.render=FrameHitch50DU::Clock::now();
@@ -2196,9 +2444,12 @@ void Context::run() {
      }
      }
     }
-    if(sourceRaceHudRendering&&sourceCameraSession&&sourceCameraSession->nativeHudVisible())
+    // Results replay: race1B0 bit4 and the 1AD230 HUD stop skip every race
+    // HUD display (18BBB0 and its siblings test bit4 / uiFlags before drawing).
+    const bool replayHud50PD=native_common_results50PD::state().replayActive;
+    if(sourceRaceHudRendering&&sourceCameraSession&&sourceCameraSession->nativeHudVisible()&&!replayHud50PD)
      renderFrame.originalRaceHud=&sourceRaceHud;
-    if(sourceSpeedBoostRendering&&sourceCameraSession){
+    if(sourceSpeedBoostRendering&&sourceCameraSession&&!replayHud50PD){
      OriginalSpeedBoostNativeFrame50LA speedFrame;
      original_speed_boost_adapter50LA::Owner::Diagnostic adapterDiagnostic;
      OriginalSpeedBoostDiagnostic50LA speedDiagnostic;
@@ -2210,7 +2461,7 @@ void Context::run() {
      require50DU(prepared,"original Speed/Boost display preparation rejected");
      renderFrame.originalSpeedBoost=sourceSpeedBoost.owner.get();
     }
-    if(sourceTimeStatsRendering&&sourceCameraSession&&originalAiSession.managerBound&&
+    if(sourceTimeStatsRendering&&sourceCameraSession&&!replayHud50PD&&originalAiSession.managerBound&&
        originalAiSession.rankBound&&originalAiSession.retired40.bound){
      OriginalTimeStatsNativeFrame50LA timeFrame;
      original_time_stats_adapter50LA::Owner::Diagnostic adapterDiagnostic;
@@ -2221,7 +2472,7 @@ void Context::run() {
          "original TimeStats display preparation rejected");
      renderFrame.originalTimeStats=sourceTimeStats.owner.get();
     }
-    if(sourceDamageRendering&&sourceCameraSession){
+    if(sourceDamageRendering&&sourceCameraSession&&!replayHud50PD){
      OriginalDamageNativeFrame50LA damageFrame;
      OriginalDamageObservation50LA::Diagnostic observation;
      const bool captured=sourceDamageObservation.capture(damageFrame,observation);
@@ -2234,7 +2485,7 @@ void Context::run() {
      require50DU(prepared,"original Damage display preparation rejected");
      renderFrame.originalDamage=sourceDamage.owner.get();
     }
-    if(sourcePositionStatsRendering&&sourceCameraSession&&originalAiSession.managerBound&&
+    if(sourcePositionStatsRendering&&sourceCameraSession&&!replayHud50PD&&originalAiSession.managerBound&&
        originalAiSession.rankBound&&originalAiSession.retired40.bound){
      if(isRcTrack)requireMbRuntimeNavigation50MB();
      const bool prepared=sourcePositionStatsHud->prepareNativeDisplay(originalMainApplication,
@@ -2364,7 +2615,9 @@ void Context::run() {
            opponentDraw[index].cables,cableWorkspace,cableDiagnostic),"actual opponent cable mesh failed");}
        {render_diagnostics50GQ::Scope binderTiming(renderDiagnostics,render_diagnostics50GQ::Subphase::OpponentBinder);
        if(gameplayBinder.loaded())require50DU(gameplayBinder.stageRacer(static_cast<std::uint32_t>(racer),
-           s,x.bindings,cameraBackward,gcLightOwner),"actual opponent Binder attachment projection failed");}
+           s,x.bindings,cameraBackward,gcLightOwner)||(std::cerr<<"opponent_binder_rejected racer="<<racer
+               <<" status="<<gameplayBinder.lastFailure<<" state40="<<s.bodies.main.vehicleState40
+               <<" phase="<<static_cast<unsigned>(s.phase)<<"\n",false),"actual opponent Binder attachment projection failed");}
        render_diagnostics50GQ::Scope flameTiming(renderDiagnostics,render_diagnostics50GQ::Subphase::OpponentFlame);
        EngineFlareDiagnostic50GV flareDiagnostic{};
        require50DU(advanceEngineFlare50GV(s,baseTail,coldFlame,
@@ -2580,18 +2833,30 @@ void Context::run() {
     // Frame was constructed earlier and remains unmoved through destruction.
     std::unique_ptr<original_main_entry50KG::NativeF8BarPrefix50LA> nativeF8Frame;
     std::unique_ptr<original_main_entry50KG::NativeResultsFrame50LA> nativeResultsFrame;
-    if(sourceConsumedIntroActivation&&isRaTrack&&sourceCameraSession){
+    const bool commonResultsDraw=native_common_results50PD::state().replayActive;
+    if(((sourceConsumedIntroActivation&&isRaTrack)||commonResultsDraw)&&sourceCameraSession){
      rr::game::OriginalResults104Diagnostic50LA results;
-     require50DU(originalMainApplication.prepareNativeResultsFrame50LA(*sourceCameraSession,
-         renderFrame,nativeResultsFrame,results),results.operation?results.operation:"native Results Frame rejected");
+     const bool preparedResults=originalMainApplication.prepareNativeResultsFrame50LA(*sourceCameraSession,
+         renderFrame,nativeResultsFrame,results);
+     if(!preparedResults&&!(sourceConsumedIntroActivation&&isRaTrack)){
+      if(results.operation!=replayDrawReported50PD){replayDrawReported50PD=results.operation;
+       std::cerr<<"race_replay results_frame_rejected pc="<<std::hex<<results.sourcePC<<std::dec
+           <<" operation="<<(results.operation?results.operation:"")<<'\n';}
+     }else require50DU(preparedResults,results.operation?results.operation:"native Results Frame rejected");
+     if(commonResultsDraw&&preparedResults&&!nativeResultsFrame&&results.operation!=replayDrawReported50PD){
+      replayDrawReported50PD=results.operation;
+      std::cerr<<"race_replay results_frame none="<<(results.operation?results.operation:"")<<'\n';}
+     if(commonResultsDraw&&nativeResultsFrame&&!replayDrawLogged50PD){replayDrawLogged50PD=true;
+      std::cerr<<"race_replay results_frame prepared=1\n";}
     }
-    if(sourceConsumedIntroActivation&&isRaTrack){
+    if((sourceConsumedIntroActivation&&isRaTrack)||commonResultsDraw){
      OriginalRaceF8Diagnostic50LA f8;
      const bool prepared=sourceCameraSession&&sourceCameraSession->prepareNativeF8Frame50LA(renderFrame,nativeF8Frame,f8);
-     if(!prepared)std::cerr<<"F8_NATIVE_FRAME_REJECT source_pc="<<f8.sourcePC
+     if(!prepared&&(isRaTrack||!replayF8Reported50PD++))std::cerr<<"F8_NATIVE_FRAME_REJECT source_pc="<<f8.sourcePC
          <<" operation="<<(f8.operation?f8.operation:"actual Session missing")
          <<" source_effects="<<f8.sourceEffectsCommitted<<'\n';
-     require50DU(prepared,"actual RA native F8 Frame preparation rejected");
+     if(!prepared&&!(sourceConsumedIntroActivation&&isRaTrack)){}
+     else require50DU(prepared,"actual RA native F8 Frame preparation rejected");
     }
     render_diagnostics50GQ::Scope submitTiming(renderDiagnostics,render_diagnostics50GQ::Subphase::DriverSubmit);
     bool submitted=false;
@@ -2791,6 +3056,16 @@ void Context::run() {
           completionDiagnostic.gameplayWindowSwapSubmitted)observeTrackBaseline(completionDiagnostic);
      }
      renderedCameraPublication=sourceCameraSession->publicationCount();
+     // Results replay: the restart's 1A7BD0 fade-in (manager 8) is serviced
+     // after this actual completed gameplay publication of the restarted scene.
+     if(native_common_results50PD::state().replayActive&&actualGameplayImageCompleted&&
+        sourceCameraSession->pendingDisplayWork()){
+      const auto fade=originalMainApplication.advanceConsumedSessionFadeIn1A7BD0(*sourceCameraSession);
+      static unsigned reportedPresentedFade=0xffu;
+      if(static_cast<unsigned>(fade.status)!=reportedPresentedFade){reportedPresentedFade=static_cast<unsigned>(fade.status);
+       std::cerr<<"race_replay fade_in_presented status="<<reportedPresentedFade<<" pc="<<std::hex<<fade.sourcePC<<std::dec
+           <<" pending="<<sourceCameraSession->pendingDisplayWork()<<'\n';}
+     }
      if(humanCourseEnabled&&sourceCameraSession->endingFadeQueued()){
       require50DU(actualGameplayImageCompleted&&
           sourceCameraSession->advanceHumanEndFadeManager().status==sourceCamera::Status::complete,

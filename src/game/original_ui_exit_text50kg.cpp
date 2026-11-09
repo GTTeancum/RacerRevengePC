@@ -14,6 +14,10 @@ bool pageSource(OriginalUiTransitionRoute50KG route,Archive& id,const char*& dir
     if(route.screen==13 && route.page==1){id=Archive::garage;directory="UI/UIGarage/";return true;}
     if(route.screen==9 && route.page==1){id=Archive::tournament;directory="UI/UITourn/";return true;}
     if(route.screen==11 && route.page==1){id=Archive::hallOfFame;directory="UI/UIHOF/";return true;}
+    // UIUnlock 209BF4 -> shared constructor1D63B0, same +440 ScreenText.
+    if(route.screen==10 && route.page==1){id=Archive::unlock;directory="UI/UIUnlock/";return true;}
+    // UIWin load2077F0 -> shared constructor1D63B0, same +440 ScreenText.
+    if(route.screen==7 && route.page==1){id=Archive::win;directory="UI/UIWin/";return true;}
     if(route.screen==4 && route.page==1){id=Archive::mainMenu;directory="UI/UIMain/";return true;}
     if(route.screen==12 && (route.page>=1 && route.page<=6)){id=Archive::options;directory="UI/UIOption/";return true;}
     if(route.screen==5 && (route.page==1 || route.page==2)){id=Archive::rider;directory="UI/UIRider/";return true;}

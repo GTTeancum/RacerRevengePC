@@ -38,6 +38,10 @@ struct OriginalUiHallPageInput50KG {
  bool showPlanetHeader=true;
  const game::OriginalUiHallCourseRecords50KG* records=nullptr;
  bool colorsKnown=false;std::uint32_t primaryColor79C=0,secondaryColor7A0=0;
+ // 1E2010..1E3368 (mode34 != 5 only): rows [category*3+rank] of the race's
+ // course whose 11260../1126C.. rank equals rank+1 are recoloured 0xCCCCCC
+ // by 133F20 after 1E33F0 applied 79C. All false in the mode5 Hall.
+ std::array<bool,9> newRecordRow{};
 };
 struct OriginalUiHallPagePacket50KG {
  const game::OriginalUiOverlayQuad50KG* quad=nullptr;

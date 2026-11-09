@@ -52,6 +52,7 @@ public:
     // Called while the ACTUAL slot is visited, after its completed graphics
     // update. Output is retained if that native opponent later stops, matching
     // the harness's explicit last-complete geometry policy, not retail parity.
+    unsigned lastFailure=0; //Native diagnostic: last project Status (100 = shade).
     bool stageRacer(std::uint32_t slot,const g::VehicleFrameState49W& state,
         const g::VehicleFrameBindings49W& frame,const g::Vector3_48C& cameraBackward,
         const g::original_gc_gameplay_lighting_candidate::Owner&)noexcept {
@@ -63,8 +64,9 @@ public:
         std::array<core::Mesh,2> next{};
         for(unsigned pair=0;pair<source_.bindingCount(slot);++pair){
             g::OriginalUiRiderBinderQuad50KG quad;
-            if(core::project(state,frame,*source_.bindings(slot,pair),camera,quad,workspace_)!=core::Status::complete||
-                core::shade(quad,*color,next[pair])!=core::Status::complete)return false;
+            const auto projected=core::project(state,frame,*source_.bindings(slot,pair),camera,quad,workspace_);
+            if(projected!=core::Status::complete){lastFailure=static_cast<unsigned>(projected);return false;}
+            if(core::shade(quad,*color,next[pair])!=core::Status::complete){lastFailure=100u;return false;}
         }
         meshes_[slot]=next;ready_[slot]=true;return true;
     }

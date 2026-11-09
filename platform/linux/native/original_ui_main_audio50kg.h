@@ -170,6 +170,9 @@ class OriginalUiMainAudio50KG final : public AudioStereoProducer50HD {
     std::weak_ptr<OriginalUiGarageAudioBacking50KG> garagePersistentBacking_;
     std::weak_ptr<OriginalUiGarageSession50KG> garageEntryCustody_;
     std::uint64_t garageEntryGeneration_=0,garageEntryEpoch_=0;
+    // Scope epochs restart in each frontend after a race; this process-wide
+    // manager serial orders separate Garage entries on this retained transport.
+    std::uint64_t garageEntrySerial_=0;
     bool bindRetainedGarageTransport(const std::shared_ptr<OriginalUiGarageAudioBacking50KG>&,std::string&)noexcept;
     bool beginRetainedGarageEntry(const std::shared_ptr<OriginalUiGarageSession50KG>&,std::string&)noexcept;
     // Exact failed base-cache prefix only. Native retirement is distinct from
@@ -256,6 +259,16 @@ class OriginalUiMainAudio50KG final : public AudioStereoProducer50HD {
     bool canRetireFinalNativePcm(const OriginalAudioSampleCache50KG&,FinalNativePcmRetirement&)const noexcept;
     void retireFinalNativePcmPreflighted(const FinalNativePcmRetirement&)noexcept;
     bool finalNativePcmRetirementCurrent()const noexcept;
+    // Source268300 rewinds all SPU sample memory (RPC35 ClearMemory) at every
+    // race load; a retired Garage keeps nothing across it and the next Garage
+    // loads its waves again. Native counterpart: once the frontend output is
+    // closed, a normally retired Garage's stopped Watto/Droid voices give up
+    // their raw clips, strong PCM bindings and stopped-voice history, leaving
+    // the persistent transports in the same cold state as the first entry.
+    // Not final retirement: Main, output rebind and later Garages stay usable.
+    bool stoppedGarageHistoryPresent()const noexcept;
+    bool canReleaseStoppedGarageHistory268300(const OriginalAudioSampleCache50KG&)const noexcept;
+    void releaseStoppedGarageHistory268300Preflighted()noexcept;
     bool retainedGarageEntryCurrent()const noexcept;
     bool reconstructibleGarageRowsCurrent()const noexcept;
     bool silentGarageVoiceRangesCurrent()const noexcept;
@@ -472,6 +485,19 @@ public:
     bool fadeHallOfFameMusic() noexcept;
     // Credits opening1F8850 ->234900(stream,12,1); closing1F8910
     // ->234440(stream,1.0). Replaces/fades the same frontend music voice.
+    // Optional UIWin (screen 7) music, cold only: Song10 trphy1.vag (circuit 1)
+    // and Song8 trphy2_3.vag (circuit 2), both authenticated original files.
+    bool prepareWinMenu(const std::filesystem::path& audioRoot, std::string& error) noexcept;
+    // Prepared AND playable. The Aural wet stream path admits only looping
+    // songs, so a wet-bound transport reports false: Win stays unavailable.
+    bool winMenuReady() const noexcept;
+    // Win opening 208810 -> 234880(stream,song,1): 234440(stream,0.0) immediate
+    // stop of the current music, then ONE non-looping play of song 10 or 8.
+    bool canStartWinSong234880(std::uint32_t song) const noexcept;
+    bool startWinSong234880(std::uint32_t song) noexcept;
+    // Win closing 208950 -> 234440(stream,1.0) on whatever music is owned.
+    bool canFadeWinMusic234440() const noexcept;
+    bool fadeWinMusic234440() noexcept;
     bool canStartCreditsLoop12() const noexcept;
     bool startCreditsLoop12() noexcept;
     bool canFadeCreditsMusic() const noexcept;
@@ -635,6 +661,9 @@ private:
     AudioClip50HD creditsClip_{};
     assets::AudioPcm50HC hallOfFamePcm_{};
     AudioClip50HD hallOfFameClip_{};
+    bool winAttempted_ = false, winPrepared_ = false;
+    assets::AudioPcm50HC win10Pcm_{}, win8Pcm_{};
+    AudioClip50HD win10Clip_{}, win8Clip_{};
     std::array<assets::AudioPcm50HC, riderConfirmClipCount> riderConfirmPcm_{};
     std::array<AudioClip50HD, riderConfirmClipCount> riderConfirmClips_{};
     std::uint64_t riderConfirmPlaybackRevision_ = 0;

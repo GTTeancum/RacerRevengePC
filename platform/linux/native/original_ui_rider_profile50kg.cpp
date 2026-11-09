@@ -140,6 +140,9 @@ struct OriginalUiRiderProfileOwner50KG::Storage {
     std::array<std::int32_t,27> racerNames3C{};
     std::array<TrackTextRow,13> trackText{};
     game::OriginalUiHallRecords50KG hallRecords{};
+    // 1801D0 ends with memcpy(P+7EC, P+102F0, 0xC78) at 1858EC: the fresh
+    // default table, retained for the 187F90/1880F0/188170 comparisons.
+    game::OriginalUiHallRecords50KG defaultHall7EC{};
     // Unknown until the genuine1AC440 store leaf executes. Single-human
     // writes11260/64/68 only; no synthetic zeroes for second-human ranks.
     std::optional<game::OriginalRaceRecordInsertionStage50KG::Ranks> hallRanks11260;
@@ -443,7 +446,7 @@ bool OriginalUiRiderProfileOwner50KG::initializeHallRecordsAtApplicationStartup(
     if(!game::initializeOriginalUiHallRecords50KG(english,next,records))
         return fail(d,records.error==game::OriginalUiHallRecordsDiagnostic50KG::Error::localization?Error::archive:Error::range,records.sourcePC);
     if(!storage_->saveProfile.recordFreshHall(next))return fail(d,Error::allocation,0x1801D0);
-    storage_->hallRecords=next;
+    storage_->hallRecords=next;storage_->defaultHall7EC=next;
     storage_->hallRecordsInitialized=true;++storage_->generation;
     loadNativeBetaProgressAtStartup();return true;
 }
@@ -642,6 +645,22 @@ bool OriginalUiRiderProfileOwner50KG::commitSingleHumanHallRecords1AC440(
     after={s.generation,s.common->mode34};
     return true;
 }
+bool OriginalUiRiderProfileOwner50KG::commitSingleHumanRaceRecords1AC440(
+    const game::OriginalRaceRecordRacerObservation50KG& row0,std::uint8_t race1B0,
+    OriginalUiRiderProfileStamp50KG expected,OriginalUiRiderProfileStamp50KG& after,
+    game::OriginalRaceRecordInsertionStage50KG::Diagnostic& d)noexcept {
+    using Stage=game::OriginalRaceRecordInsertionStage50KG;
+    d={Stage::Status::profile,0x1ac440u};
+    if(!storage_||expected.generation!=storage_->generation||!storage_->common||
+       expected.mode34!=storage_->common->mode34)return false;
+    std::optional<Stage> stage;
+    if(!prepareSingleHumanRecordInsertion1AC440(row0,race1B0,stage,d)||!stage||
+       stage->secondHumanRanks()||stage->profileMode34()!=expected.mode34)return false;
+    std::unique_ptr<OriginalSaveProfileOwner50KG> prepared;
+    if(!prepareHallRecordProvenance1AC440(*stage,prepared)||!prepared){d={Stage::Status::profile,0x1ac440u};return false;}
+    if(!commitSingleHumanHallRecords1AC440(*stage,*prepared,expected,after)){d={Stage::Status::profile,0x1ac440u};return false;}
+    d={Stage::Status::ok,0x1ac8bcu};return true; // prepared releases the displaced descendant here.
+}
 bool OriginalUiRiderProfileOwner50KG::markResultsHallDirty1CA6E4(
     OriginalUiRiderProfileStamp50KG expected)noexcept {
     if(!storage_||!storage_->readable()||expected.mode34!=0u||
@@ -655,11 +674,25 @@ bool OriginalUiRiderProfileOwner50KG::markResultsHallDirty1CA6E4(
 }
 bool OriginalUiRiderProfileOwner50KG::hallSnapshotForMode(std::uint32_t mode,
     game::OriginalUiHallProfile50KG& out) const noexcept {
-    if(!hallRecordsReady()||mode!=5)return false;
+    if(!hallRecordsReady()||(mode!=5&&mode!=2))return false;
     const auto& s=*storage_;game::OriginalUiHallProfile50KG p;
     p.ownerReady=true;p.mode34=mode;p.remembered6EC=s.rememberedHall6EC;
     p.packed1125E=s.packed1125E;p.availability11018=s.common->availability11018;
-    p.bit0_7E4=s.bit0_7E4;p.courseOrder100C4=s.courseOrder100C4;out=p;return true;
+    p.bit0_7E4=s.bit0_7E4;p.courseOrder100C4=s.courseOrder100C4;
+    if(mode==2){
+        // No prospective mode2: 1AB5BC's 17DE10(6,11,1) leaves P+34 alone.
+        game::OriginalRaceAckFacts50PD f;
+        if(s.common->mode34!=2u||!raceAcknowledgementFacts1AB5BC(f)||f.mode34!=2u)return false;
+        p.order187B10=f.order187B10;p.boundary102CC=f.boundary102CC;
+        p.finalMedal1938=f.finalMedal;p.unlockPending187E30=f.unlockPending187E30;
+        p.raceCourse1125F=static_cast<std::uint8_t>(s.packed1125F&15u);
+        //11260/64/68 are the last 1AC440 rank stores. 1126C/70/74 are cleared
+        // with them at race start (1A77E0/1A7804, 1ACCB0/1ACCD4) and written only
+        // by the two-human 1AC440 branch, which no native race reaches: zero.
+        if(s.hallRanks11260)p.ranks11260={s.hallRanks11260->lap11260,
+            s.hallRanks11260->race11264,s.hallRanks11260->knockouts11268};
+    }
+    out=p;return true;
 }
 bool OriginalUiRiderProfileOwner50KG::hallSnapshot(game::OriginalUiHallProfile50KG& out) const noexcept {
     return hallRecordsReady()&&hallSnapshotForMode(storage_->common->mode34,out);
@@ -681,9 +714,23 @@ bool OriginalUiRiderProfileOwner50KG::hallPlanetColors(std::uint32_t planet,
     if(!hallRecordsReady()||storage_->common->mode34!=5||planet>=storage_->planetColors.size())return false;
     out=storage_->planetColors[planet];return true;
 }
+bool OriginalUiRiderProfileOwner50KG::hallBrowseRecordSnapshot(std::uint32_t course,
+    game::OriginalUiHallCourseRecords50KG& out) const noexcept {
+    if(!hallRecordsReady()||(storage_->common->mode34!=5&&storage_->common->mode34!=2)||
+       course>=storage_->hallRecords.courses.size())return false;
+    out=storage_->hallRecords.courses[course];return true;
+}
+bool OriginalUiRiderProfileOwner50KG::hallBrowsePlanetColors(std::uint32_t planet,
+    OriginalUiCourseProfileColors50KG& out) const noexcept {
+    //1E3438 reads P+79C+planet*12 in every mode.
+    if(!hallRecordsReady()||(storage_->common->mode34!=5&&storage_->common->mode34!=2)||
+       planet>=storage_->planetColors.size())return false;
+    out=storage_->planetColors[planet];return true;
+}
 bool OriginalUiRiderProfileOwner50KG::commitHallPlanet(std::uint32_t planet,
     OriginalUiRiderProfileStamp50KG expected) noexcept {
-    if(!hallRecordsReady()||storage_->common->mode34!=5||expected.mode34!=5||
+    if(!hallRecordsReady()||(storage_->common->mode34!=5&&storage_->common->mode34!=2)||
+       expected.mode34!=storage_->common->mode34||
        expected.generation!=storage_->generation||planet>=storage_->planetColors.size()||
        storage_->generation==std::numeric_limits<std::uint64_t>::max())return false;
     //1E4834 opening,1E43D0 next,1E4470 previous. Preserve lower five bits.
@@ -708,7 +755,8 @@ bool OriginalUiRiderProfileOwner50KG::commitHallBack(std::uint16_t slot,
     storage_->rememberedHall6EC=slot;++storage_->generation;return true;
 }
 bool OriginalUiRiderProfileOwner50KG::commitHallRender(OriginalUiRiderProfileStamp50KG expected) noexcept {
-    if(!hallRecordsReady()||storage_->common->mode34!=5||expected.mode34!=5||
+    if(!hallRecordsReady()||(storage_->common->mode34!=5&&storage_->common->mode34!=2)||
+       expected.mode34!=storage_->common->mode34||
        expected.generation!=storage_->generation||storage_->generation==std::numeric_limits<std::uint64_t>::max())return false;
     //1E3F40..1E3F4C clears only profile7E4 bit0 after genuine page render.
     storage_->bit0_7E4=false;++storage_->generation;return true;
@@ -945,6 +993,83 @@ bool OriginalUiRiderProfileOwner50KG::resultsSelectedOrder187B10(std::uint32_t& 
     for(std::size_t i=0;i<s.courseOrder100C4.size();++i)
         if(s.courseOrder100C4[i]==selected){order=static_cast<std::uint32_t>(i);break;}
     out=order;return true;
+}
+bool OriginalUiRiderProfileOwner50KG::unlockFacts187E30(game::OriginalUnlockFacts50PD& out)const noexcept {
+    if(!storage_||!storage_->readable()||!hallRecordsReady())return false;
+    const auto& s=*storage_;const auto track=std::uint32_t(s.packed1125F&15u);
+    if(track>=s.trackText.size()||s.comparison100C0>=s.tournament.careers.size())return false;
+    game::OriginalUnlockFacts50PD f;
+    f.unlock10FAC=s.unlock10FAC;f.word7E8=s.word7E8;f.rival11280=s.trackText[track].rival11280;
+    f.career100C0=s.comparison100C0;
+    if(!resultsSelectedOrder187B10(f.order187B10))return false;
+    for(std::size_t c=0;c<s.tournament.careers.size();++c)
+        f.diagonalMedals[c]=s.tournament.careers[c].pods[c].medals1938;
+    for(std::size_t i=0;i<13;++i){
+        const auto& d=s.defaultHall7EC.courses[i];const auto& l=s.hallRecords.courses[i];
+        f.defaultLap7EC[i]=d.lap102F0[0];f.liveLap102F0[i]=l.lap102F0[0];
+        f.defaultRace838[i]=d.race1033C[0];f.liveRace1033C[i]=l.race1033C[0];
+        f.defaultKnockouts884[i]=d.knockouts10388[0];f.liveKnockouts10388[i]=l.knockouts10388[0];
+    }
+    f.availability11018=s.common->availability11018;
+    out=f;return true;
+}
+bool OriginalUiRiderProfileOwner50KG::unlockSpritePods209BE0(std::uint32_t& out)const noexcept {
+    if(!storage_||!storage_->readable())return false;
+    const auto& s=*storage_;std::uint32_t mask=0;
+    for(std::size_t o=4;o<=12;++o){
+        if(o>=s.courseOrder100C4.size())return false;
+        const auto course=std::size_t(s.courseOrder100C4[o]);
+        if(course>=s.trackText.size())return false;
+        const auto rival=s.trackText[course].rival11280;
+        if(rival<1||rival>26)return false;
+        mask|=1u<<rival;
+    }
+    for(const auto pod:{3u,1u,14u,25u,21u,26u})mask|=1u<<pod;
+    out=mask;return true;
+}
+bool OriginalUiRiderProfileOwner50KG::raceAcknowledgementFacts1AB5BC(game::OriginalRaceAckFacts50PD& out)const noexcept {
+    game::OriginalUnlockFacts50PD u;
+    if(!unlockFacts187E30(u))return false;
+    const auto& s=*storage_;
+    game::OriginalRaceAckFacts50PD f;
+    f.mode34=s.common->mode34;f.order187B10=u.order187B10;f.boundary102CC=s.tournament.tournamentBoundary102CC;
+    f.record7E4=s.bit0_7E4;
+    //1AB730 reads M[C][C][s1] with s1 = order; only taken when order+1 == 13.
+    f.finalMedal=u.order187B10<13?u.diagonalMedals[u.career100C0][u.order187B10]:0;
+    f.unlockPending187E30=game::evaluateOriginalUnlocks187E30(u).any();
+    out=f;return true;
+}
+bool OriginalUiRiderProfileOwner50KG::grantUnlock20B480(std::size_t check,std::uint32_t galleryTier,
+    OriginalUiRiderProfileStamp50KG expected,OriginalUiRiderProfileStamp50KG& after)noexcept {
+    if(!storage_||!storage_->readable()||check>=8||expected.generation!=storage_->generation||
+       expected.mode34!=storage_->common->mode34||
+       storage_->generation==std::numeric_limits<std::uint64_t>::max())return false;
+    game::OriginalUnlockFacts50PD f;
+    if(!unlockFacts187E30(f))return false;
+    // The page grants only a check it found pending at its activation; a
+    // grant is refused unless that check is still pending on this profile.
+    const auto pending=game::evaluateOriginalUnlocks187E30(f);
+    if(!pending.pending[check])return false;
+    auto& s=*storage_;
+    if(check==7){
+        if(galleryTier!=pending.galleryTier)return false;
+        //188440: byte11018 = (byte & ~0x60) | ((N & 3) << 5).
+        s.common->availability11018=static_cast<std::uint8_t>((s.common->availability11018&0x9fu)|((galleryTier&3u)<<5));
+    }else{
+        const auto pod=game::originalUnlockPod50PD(f,check);
+        if(pod<0||pod>=27)return false;
+        s.unlock10FAC[std::size_t(pod)]=1u;
+    }
+    ++s.generation;after={s.generation,s.common->mode34};
+    if(s.betaSettings&&(s.betaSettings->flags11050&1u))(void)saveNativeBetaProgress();
+    return true;
+}
+bool OriginalUiRiderProfileOwner50KG::markAcknowledgementSavePending1AB648(
+    OriginalUiRiderProfileStamp50KG expected,OriginalUiRiderProfileStamp50KG& after)noexcept {
+    if(!storage_||!storage_->readable()||expected.generation!=storage_->generation||
+       expected.mode34!=storage_->common->mode34||storage_->common->mode34==2u)return false;
+    storage_->saveProfile.markDirty1AB648();
+    after={storage_->generation,storage_->common->mode34};return true;
 }
 bool OriginalUiRiderProfileOwner50KG::resultsNextCourseTitle187480(std::int32_t& out)const noexcept {
     std::uint8_t progress=0;if(!resultsCareerProgress219C(progress))return false;

@@ -1,7 +1,11 @@
 #include "original_audio_directory50kx.h"
 #include "material_audio50hi.h"
+#include <cstdlib>
 #include <cstring>
+#include <exception>
 #include <new>
+#include <string_view>
+#include <unordered_map>
 #include <utility>
 
 namespace rr::assets {
@@ -104,6 +108,11 @@ const ParameterField48F* authoredFilename(const ParameterDocument48F& p,
 
 struct OriginalAudioDirectory50KX::Storage {
     std::array<OriginalAudioDirectoryRow50KX, originalAudioDirectoryRows50KX> rows;
+    // Host lookup index built once after the complete manifest is accepted:
+    // exact lowercase sourceName -> row. Names are unique (duplicateName is
+    // rejected above), so this is the same row the linear find() returns.
+    // Views point into rows' immutable sourceName strings.
+    std::unordered_map<std::string_view, std::size_t> byName;
 };
 OriginalAudioDirectory50KX::OriginalAudioDirectory50KX() noexcept = default;
 OriginalAudioDirectory50KX::~OriginalAudioDirectory50KX() = default;
@@ -149,6 +158,9 @@ bool OriginalAudioDirectory50KX::prepare(const OriginalUiArchive50KG& archive,
             ++count;
         }
         if (count != next->rows.size()) return fail(diagnostic, Status::manifestCount, count);
+        next->byName.reserve(next->rows.size());
+        for (std::size_t i = 0; i < next->rows.size(); ++i)
+            next->byName.emplace(std::string_view(next->rows[i].sourceName), i);
         storage_ = std::move(next);
         return true;
     } catch (const std::bad_alloc&) { return fail(diagnostic, Status::allocation); }
@@ -162,7 +174,24 @@ const OriginalAudioDirectoryRow50KX* OriginalAudioDirectory50KX::row(std::size_t
     return storage_ && index < storage_->rows.size() ? &storage_->rows[index] : nullptr;
 }
 const OriginalAudioDirectoryRow50KX* OriginalAudioDirectory50KX::find(std::string_view name) const noexcept {
-    if (storage_) for (const auto& row : storage_->rows)
+    if (!storage_) return nullptr;
+    // ASCII-lowercase the query (sameSourceName's exact fold) and look it up.
+    char lowered[128];
+    if (name.size() <= sizeof lowered) {
+        for (std::size_t i = 0; i < name.size(); ++i)
+            lowered[i] = static_cast<char>(lowerAscii(static_cast<unsigned char>(name[i])));
+        const auto at = storage_->byName.find(std::string_view(lowered, name.size()));
+        const OriginalAudioDirectoryRow50KX* found = at == storage_->byName.end() ? nullptr : &storage_->rows[at->second];
+        static const bool shadow = [] { const char* v = std::getenv("RR_GARAGE_PROOF_SHADOW"); return v && v[0] == '1' && !v[1]; }();
+        if (shadow) {
+            const OriginalAudioDirectoryRow50KX* linear = nullptr;
+            for (const auto& row : storage_->rows)
+                if (sameSourceName(name, row.sourceName)) { linear = &row; break; }
+            if (linear != found) std::terminate();
+        }
+        return found;
+    }
+    for (const auto& row : storage_->rows)
         if (sameSourceName(name, row.sourceName)) return &row;
     return nullptr;
 }

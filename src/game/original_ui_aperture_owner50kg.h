@@ -190,6 +190,18 @@ public:
     // pollCompletion deliberately returns unavailable for Garage. The session
     // must additionally apply literal1FEA60 to actual panel4D8.
     bool garageAperturePredicate(OriginalUiTransitionPhase50KG) const noexcept;
+    // Genuine UIUnlock10/1 (unlock.dat: OpenSize69, Time0.5, Closed) with the
+    // inherited 1D74B4/1D750C begin and page hooks 20B3E0/20B400/20B420/20B470.
+    OriginalUiApertureStatus50KG bindUnlock(std::shared_ptr<const assets::OriginalUiArchive50KG>,
+        const OriginalUiApertureCallbacks50KG&,OriginalUiApertureDiagnostic50KG&) noexcept;
+    // 20CA30 stores dt at page+298 before jumping to 2A6BB0.
+    OriginalUiApertureStatus50KG saveUnlockUpdateDelta38(float actualDelta) noexcept;
+    // Genuine UIWin7/1 (win.dat: OpenSize69, Time0.5, Closed) with the
+    // inherited 1D74B4/1D750C begin and page hooks 208810/208900/208950/2089C0.
+    OriginalUiApertureStatus50KG bindCircuitWin(std::shared_ptr<const assets::OriginalUiArchive50KG>,
+        const OriginalUiApertureCallbacks50KG&,OriginalUiApertureDiagnostic50KG&) noexcept;
+    // 209A70 stores dt at page+298 before jumping to 2A6BB0.
+    OriginalUiApertureStatus50KG saveCircuitWinUpdateDelta38(float actualDelta) noexcept;
     OriginalUiApertureSnapshot50KG snapshot() const noexcept { return state_; }
     const OriginalUiApertureConfig50KG* config() const noexcept {
         return state_.bound?&config_:nullptr;
@@ -235,13 +247,13 @@ private:
     OriginalUiApertureCallbacks50KG callbacks_{};
     mutable bool inOperation_=false;
     bool entryOnly_=false;
-    bool optionsMenu_=false,rider_=false,course_=false,tournament_=false,hallOfFame_=false,garage_=false;
+    bool optionsMenu_=false,rider_=false,course_=false,tournament_=false,hallOfFame_=false,garage_=false,unlock_=false,win_=false;
     mutable bool tournamentExitRequested4060_=false;
     std::uint8_t optionsPage_=1;
     OriginalUiApertureStatus50KG bindPageImpl(
         std::shared_ptr<const assets::OriginalUiArchive50KG>,
         const OriginalUiApertureCallbacks50KG&,bool entryOnly,bool optionsMenu,std::uint8_t page,
-        OriginalUiApertureDiagnostic50KG&,bool rider=false,bool course=false,bool tournament=false,bool hallOfFame=false,bool garage=false) noexcept;
+        OriginalUiApertureDiagnostic50KG&,bool rider=false,bool course=false,bool tournament=false,bool hallOfFame=false,bool garage=false,bool unlock=false,bool win=false) noexcept;
     OriginalUiApertureStatus50KG saveUpdateDelta38(float actualDelta) noexcept;
     bool available() const noexcept;
     void emit(OriginalUiApertureHookKind50KG,std::uint32_t callPC,

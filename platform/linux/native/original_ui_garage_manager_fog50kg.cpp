@@ -19,7 +19,7 @@ OriginalUiGarageManagerFog50KG::~OriginalUiGarageManagerFog50KG()noexcept {
 OriginalUiGarageManagerFog50KG::C* OriginalUiGarageManagerFog50KG::entity(std::size_t i)const noexcept {
     return i==0?(fog_?&fog_->entity:nullptr):i==1?(off_?&off_->entity:nullptr):i==2?(on_?&on_->entity:nullptr):nullptr;
 }
-bool OriginalUiGarageManagerFog50KG::identityCurrent()const noexcept {
+bool OriginalUiGarageManagerFog50KG::identityCurrent()const noexcept {rr::game::EntityForestReadScope50LA forestReadScope50LA;
     return bound_&&!payloadReleased_&&grant_&&grant_->current()&&
         grant_->stillBorrowingGarageManagerFogOwner(this)&&issuer_==grant_->issuer()&&
         lights_&&lights_->current()&&sameOwner(grant_,lights_->grant_)&&issuer_==lights_->issuer_;

@@ -1037,6 +1037,9 @@ struct Context final {
     zoneCountType& zoneCount;
     using zoneLifecycleType = rr::game::ZoneLifecycle50CL;
     zoneLifecycleType& zoneLifecycle;
+    // Binds the Results controller-feedback owner once the common race has
+    // loaded its Results (during publication, after the owner's Scope).
+    BorrowedCall<void()> bindResultsFeedbackCall;
     void run();
 };
 } // namespace interactive_publication50DU

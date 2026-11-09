@@ -102,6 +102,9 @@ class OriginalUiGarageVisibility50KG final {
 
     bool pageActorObserverCurrent(const OriginalUiGaragePageOwner50KG&,
         const OriginalUiGarageActors50GN&,std::size_t,const R&)const noexcept;
+    bool pageActorObserverLive(const OriginalUiGaragePageOwner50KG&,
+        const OriginalUiGarageActors50GN&,std::size_t,const R&)const noexcept;
+    bool pageActorObserverFields(std::size_t,const R&)const noexcept;
     bool preflightPageActorObserver28976C(const OriginalUiGaragePageOwner50KG&,
         const OriginalUiGarageActors50GN&,std::size_t,const R&)const noexcept;
     bool retirePageActorObserver28976C(const OriginalUiGaragePageOwner50KG&,

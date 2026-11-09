@@ -5,8 +5,15 @@
 
 namespace rr::game::garage_specular50KG {
 namespace {
+#if defined(_MSC_VER)&&!defined(__clang__)&&!defined(RR_GARAGE_VOLATILE_KERNELS)
+// See original_ui_garage_prelit50kg.cpp: /fp:strict + fp_contract(off).
+#pragma fp_contract(off)
+float add(float a,float b)noexcept{return a+b;}
+float mul(float a,float b)noexcept{return a*b;}
+#else
 float add(float a,float b)noexcept{volatile float r=a+b;return r;}
 float mul(float a,float b)noexcept{volatile float r=a*b;return r;}
+#endif
 Status map(OriginalUiLitGeometryStatus50KM s)noexcept{
     return s==OriginalUiLitGeometryStatus50KM::complete?Status::complete:
         s==OriginalUiLitGeometryStatus50KM::arithmetic?Status::arithmetic:Status::input;

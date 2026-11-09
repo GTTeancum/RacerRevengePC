@@ -1,4 +1,6 @@
 #include "native_wreck_debris_sim50pd.h"
+#include "native_common_results50pd.h"
+#include "native_race_replay50pd.h"
 #include "native_wreck_debris_gpu50pd.h"
 #include "../../src/game/native_destroyed_racers50pd.h"
 #include "original_manager_fields.h"
@@ -2346,6 +2348,7 @@ SessionExit50DU Context::run() {
   rr::game::resetNativeDestroyedRacers50PD();
   native_wreck_debris50PD::resetSim();
   native_wreck_effects50PD::reset();
+  native_common_results50PD::reset();native_race_replay50PD::owner().reset();
   rr::game::nativeTestDestroyPending50PD={};
   rr::game::nativeTestDestroyAttacker50PD.fill(-1);
   for(auto& test:rr::game::nativeTestDestroys50PD)test.fired=false;
@@ -3445,9 +3448,20 @@ SessionExit50DU Context::run() {
   std::string error;
   if(!nativeIntroRace()||!sourceCameraSession||!nativeIntroController()||
      !originalMainApplication.finishNativeTaRaceRoot140CFC(*nativeIntroRace(),
-       *nativeIntroController(),taRootPublication,error))return false;
+       *nativeIntroController(),taRootPublication,error)){
+   static bool rootReported=false;
+   if(native_common_results50PD::state().replayActive&&!rootReported&&(rootReported=true))
+    std::cerr<<"race_replay root_finish_rejected error="<<error<<'\n';
+   return false;
+  }
   rr::game::OriginalResults104Diagnostic50LA results;
   const bool captured=originalMainApplication.captureNativeResultsAfterRoot50LA(*sourceCameraSession,results);
+  if(native_common_results50PD::state().replayActive&&(!captured||results.operation)){
+   static const char* reported=nullptr;
+   if(results.operation!=reported){reported=results.operation;
+    std::cerr<<"race_replay results_capture captured="<<captured<<" pc="<<std::hex<<results.sourcePC<<std::dec
+        <<" status="<<static_cast<unsigned>(results.status)<<" operation="<<(results.operation?results.operation:"")<<'\n';}
+  }
   // Commit the same real prepared sample even when a bounded capture rejects;
   // it must not remain available for a replay or a later fabricated Frame.
   const bool committed=taRootTiming.commit();taRootActive=false;
@@ -3623,6 +3637,18 @@ SessionExit50DU Context::run() {
    }
    if(!isRcTrack&&!nativeTaParticles.close())return closeRejected("if(!nativeTaParticles.close())");
    if(renderer.initialized()&&!renderer.clearGameplayBlurStrengths(rendererDiagnostic))return closeRejected("if(renderer.initialized()&&!renderer.clearGameplayBlurStrengths(rendererDiagnostic))");
+  }
+  // Common race: its Results104/F8 renderer leases pin the renderer. RA's
+  // session retires its race UI before this point; the other courses retire
+  // the race's root, F8 and Pause/Results here (idempotent in the later
+  // closeNativeConsumedRace), while the renderer and FIFO are still live.
+  if(const auto& race=originalMainApplication.sourceRace28COwner_;
+     race&&native_race_replay50PD::Owner::commonRace(*race)&&race->results104_){
+   if(originalMainApplication.resultsInputContinuation50LA_)return closeRejected("common race Results input still pending");
+   const char* gate=nullptr;
+   if(!race->detachNativeHumanResultsRoot50LA(gate))return closeRejected(gate?gate:"common race Results root detach");
+   if(!race->retireF8Cold(gate))return closeRejected(gate?gate:"common race F8 renderer retirement");
+   if(!race->retireNativePauseParent(gate))return closeRejected(gate?gate:"common race Results renderer retirement");
   }
   // The coordinator retires Rider source owners through its live renderer,
   // then closes the renderer before releasing session/texture owners. A host
@@ -3873,7 +3899,12 @@ SessionExit50DU Context::run() {
    sourcePauseTrack.reset();raRuntime.reset();
    if(!consumedRaStage.close())return closeRejected("if(!consumedRaStage.close())");
   }
-  if(consumedTaStage.race()&&!consumedTaStage.close())return closeRejected("TA consumed race/world retirement");
+  if(consumedTaStage.race()&&!consumedTaStage.close()){
+   const auto* field=consumedTaStage.closeMaterialDiagnostic.field;
+   std::cerr<<"ta_close_rejected field="<<(field?field:"")<<" pc="<<std::hex
+       <<consumedTaStage.closeMaterialDiagnostic.sourcePC<<std::dec<<'\n';
+   return closeRejected("TA consumed race/world retirement");
+  }
   if(consumedGcStage.race()&&!consumedGcStage.close())return closeRejected("GC consumed race/world retirement");
   if(consumedGaStage.race()&&!consumedGaStage.close())return closeRejected("GA consumed race/world retirement");
   if(consumedSaStage.race()&&!consumedSaStage.close())return closeRejected("SA consumed race/world retirement");
@@ -4050,6 +4081,7 @@ SessionExit50DU Context::run() {
         <<" human_course="<<humanCourseEnabled<<" physical_controller="<<usePhysicalGameController<<'\n';
    }else require50DU(sourceCameraInput.bind(*sourceCameraSession,controlPresets),"original camera input bind rejected");
   };
+  auto bindResultsFeedback=[&](){sourceResultsFeedback.bindAfterPublication(*this,racerBank);};
   interactive_publication50DU::Context publicationContext50DU{
    .acceptedRacePresentation=acceptedRacePresentation,
    .accountRcParticleRegistryCall=interactive_frame50DU::BorrowedCall<void()>{accountRcParticleRegistry},
@@ -4583,6 +4615,7 @@ SessionExit50DU Context::run() {
    .x=x,
    .zoneCount=zoneCount,
    .zoneLifecycle=zoneLifecycle,
+   .bindResultsFeedbackCall=interactive_frame50DU::BorrowedCall<void()>{bindResultsFeedback},
   };
   publicationContext50DU.run();
  }catch(...){
@@ -4751,11 +4784,17 @@ void Registration::continuePreAck1AB520(rr::game::OriginalRaceConstructor50LA& r
     const auto retained=race_.lock();
     if(retained.get()!=&race||application_->race28C()!=&race||application_->entities()!=race.application_||
        !race.counted_||race.rolledBack_||race.entity_.sessionGeneration!=generation_||
-       race.endHud_.lock().get()!=this||!race.world74_)return;
+       race.endHud_.lock().get()!=this||!race.anyWorld())return;
     try {
-        const auto world=race.world74_;ra_cold_aggregate50LA::Diagnostic wd;
-        const auto camera=world->borrowRuntimeSourceCamera(world,wd);
-        if(!camera||camera.get()!=camera_||&camera->actual_.bank!=bank_||
+        // RA: the camera is its world join's retained Session. Every other
+        // course's race reaches the same 1AB520 through its own camera link.
+        std::shared_ptr<original_camera_session50KX::Session> borrowed;
+        const original_camera_session50KX::Session* camera=nullptr;
+        if(race.world74_){
+            const auto world=race.world74_;ra_cold_aggregate50LA::Diagnostic wd;
+            borrowed=world->borrowRuntimeSourceCamera(world,wd);camera=borrowed.get();
+        }else camera=race.cameraNativeAdapter34_;
+        if(!camera||camera!=camera_||&camera->actual_.bank!=bank_||
            camera->actual_.raceHud!=hud_||camera->generation_!=generation_||
            camera->actual_.applicationEntities!=race.application_)return;
         //No new permanent observer or shadow rows. The same existing private

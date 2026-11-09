@@ -57,6 +57,7 @@ class Run final {
  std::uint32_t wallSeconds_=180;
  std::array<std::filesystem::path,static_cast<std::size_t>(Stage::count)> images_{},receipts_{};
  std::filesystem::path baselineFile_;
+ std::uint32_t laterRaceBaselines_=0;
  bool restartOnce_=false,restartIssued_=false,logsOnly_=false;
  Json firstRaceEvidence_;
 public:
@@ -154,6 +155,16 @@ public:
  }
  void noteBaseline(const Json& receipt){
   if(!enabled_)return;
+  // A later race in the same process (Results -> Garage/Course -> race) keeps
+  // the first race's baseline as the evidence receipt and records its own
+  // measurement beside it under a new numbered name; nothing is overwritten.
+  if(!baselineFile_.empty()&&!restartIssued_){
+   const auto later=directory_/("track-fps-baseline-race"+std::to_string(laterRaceBaselines_+2)+".json");
+   require(!std::filesystem::exists(later),"track baseline receipt would overwrite an existing file");
+   std::ofstream output(later,std::ios::binary);require(bool(output),"cannot open track FPS baseline receipt");
+   output<<receipt.dump(2)<<'\n';output.close();require(bool(output),"track FPS baseline receipt write failed");
+   ++laterRaceBaselines_;return;
+  }
   const auto file=directory_/(restartIssued_?"track-fps-baseline-restarted.json":"track-fps-baseline.json");
   require(baselineFile_.empty()&&!std::filesystem::exists(file),"track baseline receipt would overwrite an existing file");
   std::ofstream output(file,std::ios::binary);require(bool(output),"cannot open track FPS baseline receipt");

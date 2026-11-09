@@ -6,6 +6,7 @@
 #include <vector>
 #include <thread>
 #include "original_ui_material50kg.h"
+#include "original_ui_archive50kg.h"
 namespace rr::game { class OriginalResults10450LA; }
 namespace rr::assets {
 class OriginalStandardMaterialDomain50LA;
@@ -80,6 +81,10 @@ private:
     };
     const std::thread::id nativeImageThread_=std::this_thread::get_id();
     std::vector<NativeImageCache> nativeImages_;
+    // Member identities over a resolved texture's own original bytes, for a
+    // standalone PST the resolver took from a non-UI archive (a course RES).
+    // Owned for this object's lifetime: image caches keep raw pointers.
+    std::vector<std::unique_ptr<OriginalUiMemberIdentity50KG>> nativeResourceMembers_;
     struct Source {Role role{};std::uint32_t caller=0,offset=0;std::size_t ordinal=0;const char* directory=nullptr;const char* name=nullptr;bool missingPsm=false;};
     Source source(std::size_t)const noexcept;
     std::shared_ptr<OriginalStandardMaterialDomain50LA> domain_;

@@ -124,6 +124,12 @@ OriginalUiLitGeometryStatus50KM projectOriginalUiKraidColoredSurface50KM(
     std::uint32_t surface,std::uint32_t passIndex,const std::string& microprogram,
     const ModelPalette49S&,const OriginalUiLitContext50KM&,bool computeRadialFog,
     OriginalUiLitSurfaceOutput50KM&,OriginalUiLitGeometryWorkspace50KM&) noexcept;
+// UIUnlock widgets34 (22c) and35 (23c): same authenticated PSG bytes and bounds.
+OriginalUiLitGeometryStatus50KM projectOriginalUiUnlockColoredSurface50PD(
+    const assets::OriginalUiRiderCharacterAssets50KG&,std::uint32_t lod,
+    std::uint32_t surface,std::uint32_t passIndex,const std::string& microprogram,
+    const ModelPalette49S&,const OriginalUiLitContext50KM&,bool computeRadialFog,
+    OriginalUiLitSurfaceOutput50KM&,OriginalUiLitGeometryWorkspace50KM&) noexcept;
 // Separate original SpecularMapCompressed entry: same real per-node position
 // and diffuse-light rows, but source model/root camera-normal UVs. The original
 // program emits F=255 even when the model's radial-fog bit is set. This bounded

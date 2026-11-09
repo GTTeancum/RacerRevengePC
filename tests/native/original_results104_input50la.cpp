@@ -17,7 +17,7 @@ namespace original_main_entry50KG {
 #include "original_pause_input50la.inl"
 struct NativeResultsInputContinuation50LA {
     std::shared_ptr<rr::game::OriginalRaceConstructor50LA> race;
-    std::shared_ptr<original_camera_session50KX::Session> camera;
+    std::shared_ptr<const original_camera_session50KX::Session> camera; //Common race: non-owning alias.
     std::shared_ptr<Video> video;
     std::shared_ptr<RaceDisplayLifetime50LA> display;
     std::shared_ptr<original_race_hud_scope50LA::Registration> scope;
@@ -64,14 +64,17 @@ bool Application::suspendResultsBlockingInput50LA(rr::game::OriginalResults10450
     if(garageAudioOwnerThread_!=std::this_thread::get_id()||resultsInputContinuation50LA_||
        (origin!=ResultsBlockingInputOrigin50LA::summary&&origin!=ResultsBlockingInputOrigin50LA::tournament&&
         origin!=ResultsBlockingInputOrigin50LA::nameDone&&origin!=ResultsBlockingInputOrigin50LA::hall)||
-       sourceRace28COwner_.get()!=&race||race.results104_.get()!=&results||!race.world74_||
+       sourceRace28COwner_.get()!=&race||race.results104_.get()!=&results||!race.anyWorld()||
        !videoOwner_||&videoOwner_->host!=&host||nativeTaRootEntered_||nativeTaRootAborted_||
        !nativeTaRootPublication_||nativeTaRootRace_!=&race)return false;
     try {
         const auto display=raceDisplayOwner50LA_.lock();
         const auto scope=race.endHud_.lock();
         ra_cold_aggregate50LA::Diagnostic wd;
-        auto camera=race.world74_->borrowRuntimeSourceCamera(race.world74_,wd);
+        std::shared_ptr<const original_camera_session50KX::Session> camera;
+        if(race.world74_)camera=race.world74_->borrowRuntimeSourceCamera(race.world74_,wd);
+        else if(race.cameraNativeAdapter34_==&observed)
+            camera=std::shared_ptr<const original_camera_session50KX::Session>(std::shared_ptr<void>{},&observed);
         rr::game::OriginalResults104Diagnostic50LA d;
         if(!display||!display->canRetain()||display->application_!=this||display->video_!=videoOwner_||
            !camera||camera.get()!=&observed||!camera->displayInputs_||camera->abandoned_||
@@ -206,11 +209,14 @@ bool Registration::pressResults1C8C30(rr::game::OriginalRaceConstructor50LA& rac
     if(retained.get()!=&race||application_->race28C()!=&race||
        application_->entities()!=race.application_||!race.counted_||race.rolledBack_||
        race.entity_.sessionGeneration!=generation_||race.endHud_.lock().get()!=this||
-       !race.world74_||!race.results104_)return false;
+       !race.anyWorld()||!race.results104_)return false;
     try {
+        // RA: its world join's Session; every other course: the race's Camera34.
         const auto world=race.world74_;ra_cold_aggregate50LA::Diagnostic wd;
-        const auto camera=world->borrowRuntimeSourceCamera(world,wd);
-        if(!camera||camera.get()!=camera_||&camera->actual_.bank!=bank_||
+        std::shared_ptr<const original_camera_session50KX::Session> borrowed;
+        if(world)borrowed=world->borrowRuntimeSourceCamera(world,wd);
+        const auto* camera=world?borrowed.get():race.cameraNativeAdapter34_;
+        if(!camera||camera!=camera_||&camera->actual_.bank!=bank_||
            camera->actual_.raceHud!=hud_||camera->generation_!=generation_||
            camera->actual_.applicationEntities!=race.application_)return false;
         original_position_stats_adapter50LA::Owner observer;

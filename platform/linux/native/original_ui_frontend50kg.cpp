@@ -2,6 +2,9 @@
 #include "original_ui_garage_draw_contribution50kg.h"
 #include "original_ui_garage_session50kg.h"
 #include "original_ui_shared_dialogs50kg.h"
+#include "original_ui_win_session50pd.h"
+#include "original_ui_unlock_session50pd.h"
+#include "../../../src/game/original_ui_unlock_models50pd.h"
 #include "../../../tests/native/original_ui_main_entry50kg.h"
 #include "../../../tests/native/original_race_display_lifetime50la.h"
 // Source-reviewed bounded Course/Tournament integration; runtime acceptance is pending.
@@ -15,6 +18,8 @@
 #include <thread>
 #include <array>
 #include <cstdio>
+#include <cstdlib>
+#include <exception>
 #include <algorithm>
 #include "../../../src/assets/original_ui_course_background50kg.h"
 #include <new>
@@ -40,6 +45,28 @@ using HallStatus=OriginalUiHallSessionStatus50KG;
 using RiderStatus=OriginalUiRiderSessionStatus50KG;
 using CourseStatus=OriginalUiCourseSessionStatus50KG;
 using TournamentStatus=OriginalUiTournamentSessionStatus50KG;
+using WinStatus=OriginalUiWinSessionStatus50PD;
+using UnlockStatus=OriginalUiUnlockSessionStatus50PD;
+using UnlockNext=game::OriginalUiUnlockNext50PD;
+// UIWin's menu-audio leaves on the frontend's sole Main transport. Each
+// method forwards to exactly one OriginalUiMainAudio50KG operation.
+class WinAudioAdapter50PD final : public OriginalUiWinAudio50PD {
+public:
+    explicit WinAudioAdapter50PD(std::shared_ptr<OriginalUiMainAudio50KG> a) noexcept:audio_(std::move(a)){}
+    bool winMenuReady() const noexcept override {return audio_&&audio_->winMenuReady();}
+    bool canStartSong234880(std::uint32_t song) const noexcept override {return audio_&&audio_->canStartWinSong234880(song);}
+    bool startSong234880(std::uint32_t song) noexcept override {return audio_&&audio_->startWinSong234880(song);}
+    bool canFadeMusic234440() const noexcept override {return audio_&&audio_->canFadeWinMusic234440();}
+    bool fadeMusic234440(float seconds) noexcept override {return seconds==1.f&&audio_&&audio_->fadeWinMusic234440();}
+    // 292360(UImgr+40,1,1,0): UIEVENTS select (event1), then 267BE0.
+    bool canPlaySelect292360() const noexcept override {return audio_&&audio_->canPlayMenuEffect(1);}
+    bool playSelect292360() noexcept override {return audio_&&audio_->playMenuEffect(1);}
+    void pause(bool value) noexcept override {if(audio_)audio_->pause(value);}
+    bool update(float seconds) noexcept override {return audio_&&audio_->update(seconds);}
+    const OriginalUiMainAudio50KG* transport() const noexcept {return audio_.get();}
+private:
+    std::shared_ptr<OriginalUiMainAudio50KG> audio_;
+};
 // Default-unlocked Rider -> Course -> Back, with the shared audio owner.
 // Native race requests admit only the independently owned 2/4/10/11/12/15/19/20 domain.
 // Real archive, profile, popup visibility and resource predicates remain required.
@@ -135,6 +162,23 @@ struct OriginalUiFrontend50KG::Storage {
     const ::original_main_entry50KG::Application* nativeHallRoot=nullptr;
     OriginalUiMainProfile50KG nativeHallPreimage{};
     OriginalUiRiderProfileStamp50KG nativeHallStamp{};
+    // Retired race's 17DE10(App,6,13,1) receiver: Garage13 is this lifetime's
+    // FIRST manager. garageRestoration then holds a session-less Main bank
+    // (renderer creation bank, 1B7BD0 popup source and Garage-exit restore).
+    const ::original_main_entry50KG::Application* nativeGarageRoot=nullptr;
+    OriginalUiRiderProfileStamp50KG nativeGarageStamp{};
+    // Retired race's 17DE10(App,6,11|7|10,1) receiver: Hall (tournament mode),
+    // Win or Unlock is this lifetime's FIRST manager. raceReturnBoot is the
+    // session-less Main bank that boots the shared dialogs/dispatcher
+    // (1B7BD0) exactly as the Garage-first lifetime does; it is released once
+    // the first screen's own bank is bound. A later Garage13 keeps the
+    // retiring screen's bank as garageRestoration, as Tournament->Garage does.
+    const ::original_main_entry50KG::Application* nativeRaceReturnRoot=nullptr;
+    Route nativeRaceReturnRoute{};
+    OriginalUiRiderProfileStamp50KG nativeRaceReturnStamp{};
+    struct Manager;
+    std::unique_ptr<Manager> raceReturnBoot;
+    std::shared_ptr<WinAudioAdapter50PD> winAudio;
     struct Manager {
         Storage* owner=nullptr;
         // Cold screen identity, never used as a replacement for the manager's
@@ -168,11 +212,22 @@ struct OriginalUiFrontend50KG::Storage {
         std::unique_ptr<OriginalUiRiderSession50KG> rider;
         std::unique_ptr<OriginalUiCourseSession50KG> course;
         std::unique_ptr<OriginalUiTournamentSession50KG> tournament;
+        std::shared_ptr<OriginalUiWinDrawResources50PD> winResources;
+        std::unique_ptr<OriginalUiWinSession50PD> win;
+        std::shared_ptr<OriginalUiUnlockDrawResources50PD> unlockResources;
+        std::unique_ptr<OriginalUiUnlockSession50PD> unlock;
+        bool winRetired=false,unlockRetired=false;
+        // Garage13 requested by Hall/Win/Unlock (not Tournament): the exact
+        // source session and its proposal serial, as garageOrigin is for 9/1.
+        const void* garageOriginSource=nullptr;std::uint64_t garageOriginSerial=0;
         // Manager13 is the actual counted Root Session, not a synthetic
         // Transition owner or an immutable SourceFrame recipe.
         std::shared_ptr<OriginalUiGarageSession50KG> garage;
         OriginalUiTournamentRouteProposal50KG garageOrigin{};
         bool garageResourcesPrepared=false,garageEntryAttempted=false,garageRetired=false;
+        // Session-less Main CPU/GPU bank for a Garage-first lifetime. Never
+        // active, never bound to a Transition; only a renderer/popup owner.
+        bool garageBoot=false;
         std::shared_ptr<const OriginalUiGarageSession50KG> garageReturnOrigin;
         bool riderRetired=false,optionsRetired=false,hallRetired=false,mainRetired=false,tournamentRetired=false;
         // Owned by this SAME logical Manager, never a parallel source manager.
@@ -359,6 +414,8 @@ struct OriginalUiFrontend50KG::Storage {
         }
         bool ownsRoute(Route route) const noexcept {
             if(garage)return same(route,{13,1})&&same(initialRoute,{13,1});
+            if(win)return route.screen==initialRoute.screen&&win->ownsPreparedPage(route.page);
+            if(unlock)return route.screen==initialRoute.screen&&unlock->ownsPreparedPage(route.page);
             return route.screen==initialRoute.screen&&
                 (main?same(route,{4,1}):options?options->ownsPreparedPage(route.page):hall?hall->ownsPreparedPage(route.page):rider?rider->ownsPreparedPage(route.page):course?course->ownsPreparedPage(route.page):tournament&&tournament->ownsPreparedPage(route.page));
         }
@@ -367,9 +424,14 @@ struct OriginalUiFrontend50KG::Storage {
             if(course){const auto bank=publishedCourseBank?publishedCourseBank:course->bank();return bank&&bank->images()?bank->images()->textures():nullptr;}
             if(rider){const auto bank=publishedRiderBank?publishedRiderBank:rider->bank();return bank&&bank->images()?bank->images()->textures():nullptr;}
             if(hallResources)return hallResources->textures();
+            if(winResources)return winResources->textures();
+            if(unlockResources)return unlockResources->textures();
             return mainResources?mainResources->textures():(optionsResources?optionsResources->textures():nullptr);
         }
         bool prepared() const noexcept {
+            if(garageBoot)return owner&&!transition&&!main&&!options&&!hall&&!rider&&!course&&!tournament&&!garage&&
+                mainResources&&mainResources->loaded()&&gpu&&publication&&textures()&&gpu->initialized()&&
+                gpu->validBorrow(owner->cold.textureRequest.context,owner->cold.textureRequest.isCurrent,publication);
             if(garage){
                 const auto* frontend=owner?owner->garageDestinationFrontend:nullptr;
                 return frontend&&frontend->materialApplicationOwner&&same(initialRoute,{13,1})&&
@@ -409,10 +471,22 @@ struct OriginalUiFrontend50KG::Storage {
                     tournamentResources->current()&&tournamentWidgets->loaded()&&tournament->externalLifecycleOwner()==transition.get()&&
                     tournament->ownsPreparedPage(1)&&tournamentWidgets->exitText()&&tournamentWidgets->exitText()->prepared();
             }
+            if(same(initialRoute,{7,1})&&win&&winResources&&!main&&!options&&!hall&&!rider&&!course&&!tournament&&!unlock){
+                const auto v=win->snapshot();return v.bound&&!v.faulted&&!v.quitRequested&&winResources->loaded()&&
+                    win->externalLifecycleOwner()==transition.get()&&win->ownsPreparedPage(1)&&
+                    winResources->exitText()&&winResources->exitText()->prepared();
+            }
+            if(same(initialRoute,{10,1})&&unlock&&unlockResources&&!main&&!options&&!hall&&!rider&&!course&&!tournament&&!win){
+                const auto v=unlock->snapshot();return v.bound&&!v.faulted&&!v.quitRequested&&unlockResources->loaded()&&
+                    unlock->externalLifecycleOwner()==transition.get()&&unlock->ownsPreparedPage(1)&&
+                    unlockResources->exitText()&&unlockResources->exitText()->prepared();
+            }
             return false;
         }
-        game::OriginalUiApertureSnapshot50KG aperture() const noexcept {return main?main->snapshot().aperture:options?options->snapshot().aperture:hall?hall->snapshot().aperture:rider?rider->snapshot().aperture:course?course->snapshot().aperture:tournament?tournament->snapshot().aperture:game::OriginalUiApertureSnapshot50KG{};}
-        const OriginalUiNativeDraw50KG* draw() const noexcept {return main?main->draw():(options?options->draw():hall?hall->draw():course?course->draw():tournament?tournament->draw():nullptr);}
+        game::OriginalUiApertureSnapshot50KG aperture() const noexcept {
+            if(win)return win->snapshot().aperture;if(unlock)return unlock->snapshot().aperture;
+            return main?main->snapshot().aperture:options?options->snapshot().aperture:hall?hall->snapshot().aperture:rider?rider->snapshot().aperture:course?course->snapshot().aperture:tournament?tournament->snapshot().aperture:game::OriginalUiApertureSnapshot50KG{};}
+        const OriginalUiNativeDraw50KG* draw() const noexcept {if(win)return win->draw();if(unlock)return unlock->draw();return main?main->draw():(options?options->draw():hall?hall->draw():course?course->draw():tournament?tournament->draw():nullptr);}
     };
     OriginalUiFrontendCold50KG cold;
     // The containing native Frontend outlives this coordinator. The actual
@@ -467,6 +541,10 @@ struct OriginalUiFrontend50KG::Storage {
     OriginalUiRiderRouteProposal50KG riderProposal{};
     OriginalUiCourseRouteProposal50KG courseProposal{};
     OriginalUiTournamentRouteProposal50KG tournamentProposal{};
+    // hallProposal carries a Cross (1E3FC0) request when hallConfirm is set.
+    bool hallConfirm=false;
+    OriginalUiWinRouteProposal50PD winProposal{};
+    OriginalUiUnlockRouteProposal50PD unlockProposal{};
     OriginalUiMainProfile50KG mainProfileProposal{};
     std::uint64_t updates=0,renders=0,submissions=0,switches=0,renderedUpdate=0,submittedUpdate=0;
     Diagnostic failure{};
@@ -613,10 +691,46 @@ struct OriginalUiFrontend50KG::Storage {
             // widen courseInputsReady(): no next race is invented at progress13.
             (!career.cardFlag100BC||career.nativeBetaStorage)&&(career.progress219C&31u)<=13u;
     }
+    // Native Root owning this lifetime (race-return receiver before activation,
+    // the bound Garage destination Frontend's Root afterwards).
+    const ::original_main_entry50KG::Application* rootApplication()const noexcept {
+        if(garageDestinationFrontend&&garageDestinationFrontend->materialApplicationOwner)
+            return garageDestinationFrontend->materialApplicationOwner;
+        return nativeRaceReturnRoot;
+    }
+    bool winInputsReady() const noexcept {
+        using Id=assets::OriginalUiArchiveId50KG;
+        return archive(cold.win,Id::win)&&archive(cold.backgrounds,Id::backgrounds)&&cold.riderProfile&&
+            cold.riderProfile->initialized()&&cold.riderProfile->commonProfile()==cold.profile.get()&&
+            cold.profile&&cold.profile->known&&cold.profile->mode34==2&&
+            (cold.audioMode==OriginalUiMainAudioMode50KG::muted?!cold.audio:
+             cold.audioMode==OriginalUiMainAudioMode50KG::enabled&&cold.audio&&cold.audio->winMenuReady());
+    }
+    bool unlockInputsReady() const noexcept {
+        using Id=assets::OriginalUiArchiveId50KG;
+        return archive(cold.unlock,Id::unlock)&&archive(cold.backgrounds,Id::backgrounds)&&
+            archive(cold.podTextures,Id::podTextures)&&cold.riderIpumCache&&cold.riderIpumCache->loaded()&&
+            cold.riderProfile&&cold.riderProfile->initialized()&&cold.riderProfile->hallRecordsReady()&&
+            cold.riderProfile->commonProfile()==cold.profile.get()&&cold.profile&&cold.profile->known&&
+            (cold.audioMode==OriginalUiMainAudioMode50KG::muted?!cold.audio:
+             cold.audioMode==OriginalUiMainAudioMode50KG::enabled&&cold.audio&&cold.audio->riderMenuReady());
+    }
+    const void* garageRequestSource(const Manager& m)const noexcept {
+        return m.hall?static_cast<const void*>(m.hall.get()):m.win?static_cast<const void*>(m.win.get()):
+            m.unlock?static_cast<const void*>(m.unlock.get()):nullptr;
+    }
     bool garageActive()const noexcept {return active&&active->garage&&same(active->initialRoute,{13,1});}
     bool garageBankCurrent()const noexcept {
         const auto* m=garageRestoration.get();
-        return m&&m->tournament&&m->tournamentRetired&&m->publishedTournamentBank&&m->textures()&&m->gpu&&
+        // Tournament->Garage keeps the retired Tournament bank; a Garage-first
+        // race return keeps its session-less Main boot bank; Hall/Win/Unlock->
+        // Garage keep that retired screen's bank. Each is the exact renderer
+        // bank the Garage Draw restores on release.
+        const bool tournamentBank=m&&m->tournament&&m->tournamentRetired&&m->publishedTournamentBank;
+        const bool bootBank=m&&m->garageBoot&&m->mainResources&&!m->main&&!m->transition;
+        const bool screenBank=m&&((m->hall&&m->hallRetired&&m->hallResources)||(m->win&&m->winRetired&&m->winResources)||
+            (m->unlock&&m->unlockRetired&&m->unlockResources));
+        return (tournamentBank||bootBank||screenBank)&&m->textures()&&m->gpu&&
             m->publication&&m->gpu->initialized()&&m->gpu->validBorrow(cold.textureRequest.context,
                 cold.textureRequest.isCurrent,m->publication)&&bank==m;
     }
@@ -631,14 +745,21 @@ struct OriginalUiFrontend50KG::Storage {
             active->transition->snapshot().bound&&active->ownsRoute(active->transition->snapshot().current);
     }
     bool destination(Route route) const noexcept {
-        if(same(route,{13,1}))return pending&&same(pending->initialRoute,route)&&
-            pending->garageResourcesPrepared&&!pending->garage&&!pending->transition&&active&&active->tournament&&
-            pending->garageOrigin.source==active->tournament.get()&&pending->garageOrigin.serial&&processReady();
+        if(same(route,{13,1})){
+            if(!pending||!same(pending->initialRoute,route)||!pending->garageResourcesPrepared||pending->garage||
+               pending->transition||!active||!processReady())return false;
+            if(active->tournament)return pending->garageOrigin.source==active->tournament.get()&&pending->garageOrigin.serial;
+            const void* source=garageRequestSource(*active);
+            return source&&pending->garageOriginSource==source&&pending->garageOriginSerial;
+        }
         return pending&&same(pending->initialRoute,route)&&pending->prepared()&&!pending->transition->snapshot().bound&&processReady();
     }
     bool sourceProposalCurrent() const noexcept {
+        if(active&&active->win)return active->win->routeProposalCurrent(winProposal);
+        if(active&&active->unlock)return active->unlock->routeProposalCurrent(unlockProposal);
         return active&&(active->main?active->main->routeProposalCurrent(mainProposal):active->options?
-            active->options->routeProposalCurrent(optionsProposal):active->hall?active->hall->routeProposalCurrent(hallProposal):active->rider?active->rider->routeProposalCurrent(riderProposal):
+            active->options->routeProposalCurrent(optionsProposal):active->hall?(hallConfirm?active->hall->confirmProposalCurrent(hallProposal):
+            active->hall->routeProposalCurrent(hallProposal)):active->rider?active->rider->routeProposalCurrent(riderProposal):
             active->course?active->course->routeProposalCurrent(courseProposal):active->tournament&&active->tournament->routeProposalCurrent(tournamentProposal));
     }
     static bool admit(void* p,const game::OriginalUiScreenFactory50KG& screen,
@@ -651,6 +772,14 @@ struct OriginalUiFrontend50KG::Storage {
                 &page==game::findOriginalUiBoundedPageFactory50KG(m.initialRoute.screen,m.initialRoute.page);
         if(&m!=s.active.get()||!s.sourceCurrent()||!s.sourceProposalCurrent())return false;
         if(kind==Admission::page){
+            if(m.unlock){
+                // 20B654 re-show: vtable+A4 page request 10/1 -> 10/1 in this same manager.
+                const auto& r=s.unlockProposal.decision.request;
+                return !s.pending&&s.unlockProposal.next==UnlockNext::reshow&&
+                    r.kind==game::OriginalUiRouteKind50KG::changePage&&same(m.currentRoute(),{10,1})&&
+                    r.targetScreen==10&&r.targetPage==1&&m.ownsRoute({10,1})&&
+                    &screen==game::findOriginalUiScreenFactory50KG(10)&&&page==game::findOriginalUiBoundedPageFactory50KG(10,1);
+            }
             if(!m.options||s.pending||!optionsPageShape(s.optionsProposal.decision))return false;
             const auto& r=s.optionsProposal.decision.request;
             return same(m.currentRoute(),{r.sourceScreen,r.sourcePage})&&m.ownsRoute({r.targetScreen,r.targetPage})&&
@@ -662,7 +791,10 @@ struct OriginalUiFrontend50KG::Storage {
             static_cast<std::uint8_t>(s.mainProposal.decision.routeArgument)}:m.rider?
             Route{s.riderProposal.decision.request.targetScreen,s.riderProposal.decision.request.targetPage}:m.course?
             Route{s.courseProposal.decision.request.targetScreen,s.courseProposal.decision.request.targetPage}:m.tournament?
-            Route{s.tournamentProposal.decision.request.targetScreen,s.tournamentProposal.decision.request.targetPage}:m.hall?Route{12,1}:
+            Route{s.tournamentProposal.decision.request.targetScreen,s.tournamentProposal.decision.request.targetPage}:
+            m.hall?(s.hallConfirm?Route{s.hallProposal.decision.request.targetScreen,s.hallProposal.decision.request.targetPage}:Route{12,1}):
+            m.win?Route{s.winProposal.decision.request.targetScreen,s.winProposal.decision.request.targetPage}:
+            m.unlock?Route{s.unlockProposal.decision.request.targetScreen,s.unlockProposal.decision.request.targetPage}:
             Route{s.optionsProposal.decision.request.targetScreen,s.optionsProposal.decision.request.targetPage};
         return s.destination(target)&& &screen==game::findOriginalUiScreenFactory50KG(target.screen)&&
             &page==game::findOriginalUiBoundedPageFactory50KG(target.screen,target.page);
@@ -679,6 +811,12 @@ struct OriginalUiFrontend50KG::Storage {
             event.lifecycle!=t.lifecycle||event.phase!=t.phase||!m.ownsRoute(event.route)){
             s.fault(d,Status::transition,event.sourcePC);return;
         }
+        if(m.win||m.unlock){
+            OriginalUiWinSessionDiagnostic50PD wd;OriginalUiUnlockSessionDiagnostic50PD ud;
+            const bool done=m.win?m.win->notifyTransition(event,wd)==WinStatus::ok:m.unlock->notifyTransition(event,ud)==UnlockStatus::ok;
+            if(!done)s.fault(d,Status::session,m.win?(wd.sourcePC?wd.sourcePC:event.sourcePC):(ud.sourcePC?ud.sourcePC:event.sourcePC));
+            return;
+        }
         const bool okay=m.main?m.main->notifyTransition(event,d.main)==MainStatus::ok:m.options?
             m.options->notifyTransition(event,d.options)==OptionsStatus::ok:m.hall?m.hall->notifyTransition(event,d.hall)==HallStatus::ok:m.rider?m.rider->notifyTransition(event,d.rider)==RiderStatus::ok:
             m.course?m.course->notifyTransition(event,d.course)==CourseStatus::ok:m.tournament&&m.tournament->notifyTransition(event,d.tournament)==TournamentStatus::ok;
@@ -689,6 +827,8 @@ struct OriginalUiFrontend50KG::Storage {
         const auto t=m.transition->snapshot();
         if(s.faulted||s.quit||&m!=s.active.get()||!s.sourceCurrent()||!same(route,t.current)||phase!=t.phase)
             return game::OriginalUiTransitionCompletion50KG::unavailable;
+        if(m.win)return m.win->pollCompletion(route,phase);
+        if(m.unlock)return m.unlock->pollCompletion(route,phase);
         return m.main?m.main->pollCompletion(route,phase):m.options?m.options->pollCompletion(route,phase):m.hall?m.hall->pollCompletion(route,phase):m.rider?m.rider->pollCompletion(route,phase):m.course?m.course->pollCompletion(route,phase):m.tournament->pollCompletion(route,phase);
     }
     static bool commitMain(void* p,const game::OriginalUiMainDecision50KG& decision) noexcept {
@@ -750,6 +890,40 @@ struct OriginalUiFrontend50KG::Storage {
     }
     static bool commitOptions(void* p,const game::OriginalUiRouteDecision50KG& decision) noexcept {
         auto& m=*static_cast<Manager*>(p);auto& s=*m.owner;
+        const auto admittedRequest=[&](const game::OriginalUiRouteDecision50KG& proposed)noexcept {
+            return decision.admitted&&!decision.blockers&&decision.action==game::OriginalUiRouteAction50KG::request&&
+                sameRouteProposal(decision,proposed);
+        };
+        if(m.hall&&s.hallConfirm){
+            // Tournament Cross 1E3FC0: Win7/Unlock10/Garage13 with no profile write.
+            const auto& proposed=s.hallProposal.decision;const Route target{proposed.request.targetScreen,proposed.request.targetPage};
+            if(s.faulted||s.quit||&m!=s.active.get()||!s.sourceCurrent()||!s.processReady()||!s.destination(target)||
+               !m.hall->confirmProposalCurrent(s.hallProposal)||!game::originalUiHallConfirmShape50KG(decision)||
+               !admittedRequest(proposed)||(same(target,{13,1})&&s.pending->garageOriginSerial!=s.hallProposal.serial))return false;
+            return m.hall->commitConfirm(s.hallProposal,decision);
+        }
+        if(m.win){
+            // 2089D0 Cross: 10/1 (208A28) or 13/1 (208A48). The page writes no profile field.
+            const auto& proposed=s.winProposal.decision;const auto& r=decision.request;
+            const Route target{r.targetScreen,r.targetPage};
+            return !s.faulted&&!s.quit&&&m==s.active.get()&&s.sourceCurrent()&&s.processReady()&&
+                m.win->routeProposalCurrent(s.winProposal)&&admittedRequest(proposed)&&
+                r.kind==game::OriginalUiRouteKind50KG::changeScreen&&r.sourceScreen==7&&r.sourcePage==1&&
+                (same(target,{10,1})||same(target,{13,1}))&&decision.inputPC==0x2089D0&&!decision.profileChanges.count&&
+                s.destination(target)&&(!same(target,{13,1})||s.pending->garageOriginSerial==s.winProposal.serial);
+        }
+        if(m.unlock){
+            // 20B480 Cross: the admitted commit performs the 20B4B0 grant.
+            const auto& proposed=s.unlockProposal.decision;const auto& r=decision.request;
+            const bool reshow=s.unlockProposal.next==UnlockNext::reshow;
+            if(s.faulted||s.quit||&m!=s.active.get()||!s.sourceCurrent()||!s.processReady()||
+               !m.unlock->routeProposalCurrent(s.unlockProposal)||!admittedRequest(proposed)||
+               !game::originalUiUnlockRouteShape50PD(decision,s.unlockProposal.next))return false;
+            if(reshow){if(s.pending||!m.ownsRoute({r.targetScreen,r.targetPage}))return false;}
+            else if(!same({r.targetScreen,r.targetPage},{13,1})||!s.destination({13,1})||
+                s.pending->garageOriginSerial!=s.unlockProposal.serial)return false;
+            return m.unlock->commitRoute(s.unlockProposal,decision);
+        }
         if(m.hall){
             return !s.faulted&&!s.quit&&&m==s.active.get()&&s.sourceCurrent()&&s.processReady()&&
                 s.destination({12,1})&&m.hall->routeProposalCurrent(s.hallProposal)&&
@@ -927,11 +1101,39 @@ struct OriginalUiFrontend50KG::Storage {
         game::OriginalUiTransitionCallbacks50KG c;c.context=&m;c.admitDestination=&admit;c.notify=&notify;
         c.pollCompletion=&poll;c.admitCourseLaunch=&admitCourse;c.commitMainSelection=&commitMain;c.commitRouteSelection=&commitOptions;c.queueApplication=&enqueue;return c;
     }
+    // Garage-first lifetime: the authentic Main resource bank WITHOUT a Main
+    // session/Transition. It supplies the renderer's creation bank, the
+    // 1B7BD0 controller-popup/history source, and the Garage-exit restore.
+    bool buildGarageBoot(std::unique_ptr<Manager>& out,Diagnostic& d) noexcept {
+        if(out||!cold.application||cold.application->controllerPopupResources||cold.application->sharedDialogs){
+            result(d,Status::invalidInput);return false;}
+        try {
+            out=std::make_unique<Manager>();auto& m=*out;m.owner=this;m.initialRoute={0,0};m.garageBoot=true;
+            OriginalUiMainColdInput50KG input;input.appStart=cold.appStart;input.mainMenu=cold.mainMenu;
+            input.fonts=cold.fonts;input.controllerPopup=cold.controllerPopup;input.overlays=cold.overlays;
+            input.english=&english;input.runtime=cold.runtime;input.video=cold.video;
+            m.mainResources=std::make_shared<OriginalUiMainDrawResources50KG>();
+            if(!m.mainResources->load(input,d.main.draw)){result(d,Status::resource);return false;}
+            const auto* samplers=m.mainResources->samplers();
+            if(!samplers||!m.textures()){result(d,Status::resource);return false;}
+            m.gpuSamplers=*samplers;
+            m.gpu=std::make_shared<MaterialTextureGl50EB>();auto request=cold.textureRequest;
+            request.samplers=samplers->data();request.samplerCount=static_cast<std::uint32_t>(samplers->size());
+            if(!m.gpu->create(request,*m.textures(),d.gpu)){result(d,Status::gpu);return false;}
+            m.publication=m.gpu->publicationToken();
+            if(!m.prepared()){result(d,Status::resource);return false;}return true;
+        }catch(const std::bad_alloc&){result(d,Status::allocation);return false;}
+        catch(...){result(d,Status::resource);return false;}
+    }
     bool build(std::unique_ptr<Manager>& out,Route route,Diagnostic& d,std::uint32_t prospectiveMode=0) noexcept {
         if(out){result(d,Status::invalidInput);return false;}
         const bool initialNativeHall=nativeHallRoot && &out==&active && !active&&!activated&&!renderer;
         const bool initialNativePauseCourse=nativePauseCourseOrigin && &out==&active &&
             !active&&!activated&&!renderer&&!nativeHallRoot;
+        // 1AB5BC receiver's FIRST manager: built before any renderer exists.
+        const bool initialRaceReturn=nativeRaceReturnRoot && &out==&active && !active&&!activated&&!renderer&&
+            same(route,nativeRaceReturnRoute)&&!nativeHallRoot&&!nativePauseCourseOrigin;
+        const bool rgbaReady=renderer&&renderer->originalUiSourceRgbaAvailable();
         try {
             out=std::make_unique<Manager>();auto& m=*out;m.owner=this;m.initialRoute=route;
             m.transition=std::make_shared<game::OriginalUiTransitionOwner50KG>();
@@ -960,8 +1162,10 @@ struct OriginalUiFrontend50KG::Storage {
                 if(!m.optionsResources->load(input,d.optionsResources)){result(d,Status::resource);return false;}
                 samplers=m.optionsResources->samplers();
             }else if(same(route,{11,1})){
-                if(!hallInputsReady()||prospectiveMode!=5||
-                   (!initialNativeHall&&(!renderer||!renderer->originalUiSourceRgbaAvailable()))){
+                // Options Hall is mode5; the 1AB5BC tournament Hall keeps mode2.
+                const bool raceReturnHall=initialRaceReturn&&prospectiveMode==2&&cold.profile&&cold.profile->mode34==2;
+                if(!hallInputsReady()||(!raceReturnHall&&prospectiveMode!=5)||
+                   (!initialNativeHall&&!raceReturnHall&&!rgbaReady)){
                     result(d,Status::unavailableDestination);return false;}
                 OriginalUiHallColdInput50KG input;input.appStart=cold.appStart;input.hall=cold.hall;input.fonts=cold.fonts;
                 input.controllerPopup=cold.controllerPopup;input.overlays=cold.overlays;input.english=&english;input.runtime=cold.runtime;
@@ -1085,6 +1289,41 @@ struct OriginalUiFrontend50KG::Storage {
                    m.tournament->prepareBank(d.tournament)!=TournamentStatus::ok||!m.tournament->bank()){
                     result(d,Status::session);return false;}
                 m.publishedTournamentBank=m.tournament->bank();samplers=m.tournament->samplers();
+            }else if(same(route,{7,1})){
+                // Win: 1AB5BC first screen, or Hall Cross (1E4048/1E40EC).
+                const bool fromHall=active&&active->hall&&same(active->currentRoute(),{11,1})&&hallConfirm&&
+                    active->hall->confirmProposalCurrent(hallProposal)&&hallProposal.decision.request.targetScreen==7;
+                if(!winInputsReady()||prospectiveMode!=2||(!initialRaceReturn&&!fromHall)||(!initialRaceReturn&&!rgbaReady)){
+                    result(d,Status::unavailableDestination);return false;}
+                OriginalUiWinColdInput50PD input;input.appStart=cold.appStart;input.win=cold.win;input.fonts=cold.fonts;
+                input.controllerPopup=cold.controllerPopup;input.overlays=cold.overlays;input.backgrounds=cold.backgrounds;
+                input.english=&english;input.runtime=cold.runtime;
+                input.video={cold.video.lifetime,cold.video.width,cold.video.height,cold.video.colorBits,cold.video.packetZMaximum,cold.video.zBufferFormat};
+                m.winResources=std::make_shared<OriginalUiWinDrawResources50PD>();
+                OriginalUiWinDrawDiagnostic50PD wd;
+                if(!m.winResources->load(input,wd)){result(d,Status::resource,wd.sourcePC);return false;}
+                samplers=m.winResources->samplers();
+            }else if(same(route,{10,1})){
+                // Unlock: 1AB5BC first screen, Hall Cross (1E418C) or Win Cross (208A28).
+                const bool fromHall=active&&active->hall&&same(active->currentRoute(),{11,1})&&hallConfirm&&
+                    active->hall->confirmProposalCurrent(hallProposal)&&hallProposal.decision.request.targetScreen==10;
+                const bool fromWin=active&&active->win&&same(active->currentRoute(),{7,1})&&
+                    active->win->routeProposalCurrent(winProposal)&&winProposal.decision.request.targetScreen==10;
+                game::OriginalUnlockFacts50PD facts;std::uint32_t spritePods=0;
+                if(!unlockInputsReady()||prospectiveMode!=2||!cold.profile||cold.profile->mode34!=2||
+                   (!initialRaceReturn&&!fromHall&&!fromWin)||(!initialRaceReturn&&!rgbaReady)||
+                   !cold.riderProfile->unlockFacts187E30(facts)||!cold.riderProfile->unlockSpritePods209BE0(spritePods)){
+                    result(d,Status::unavailableDestination);return false;}
+                OriginalUiUnlockColdInput50PD input;input.appStart=cold.appStart;input.unlock=cold.unlock;input.fonts=cold.fonts;
+                input.backgrounds=cold.backgrounds;input.controllerPopup=cold.controllerPopup;input.overlays=cold.overlays;
+                input.english=&english;input.runtime=cold.runtime;
+                input.video={cold.video.lifetime,cold.video.width,cold.video.height,cold.video.colorBits,cold.video.packetZMaximum,cold.video.zBufferFormat};
+                input.podTextures=cold.podTextures;input.ipumCache=cold.riderIpumCache.get();
+                input.candidatePods=game::originalUiUnlockCandidatePods50PD(facts);input.spritePods=spritePods;
+                m.unlockResources=std::make_shared<OriginalUiUnlockDrawResources50PD>();
+                OriginalUiUnlockDrawDiagnostic50PD ud;
+                if(!m.unlockResources->load(input,ud)){result(d,Status::resource,ud.sourcePC);return false;}
+                samplers=m.unlockResources->samplers();
             }else {result(d,Status::unavailableDestination);return false;}
             if(!samplers||!m.textures()){result(d,Status::resource);return false;}
             m.gpuSamplers=*samplers;
@@ -1115,8 +1354,33 @@ struct OriginalUiFrontend50KG::Storage {
                 OriginalUiHallSessionCold50KG input;input.resources=m.hallResources;input.gpu=m.gpu;input.hallArchive=cold.hall;
                 input.profile=cold.riderProfile;input.commonProfile=cold.profile;input.application=cold.application;
                 input.audioMode=cold.audioMode;input.audio=cold.audio;input.externalTransition=m.transition;
+                input.origin=initialRaceReturn&&prospectiveMode==2?OriginalUiHallEntryOrigin50KG::tournamentRaceReturn:
+                    OriginalUiHallEntryOrigin50KG::options;
                 m.hall=std::make_unique<OriginalUiHallOfFameSession50KG>();
                 if(m.hall->bind(input,d.hall)!=HallStatus::ok){result(d,Status::session);return false;}
+            }else if(m.winResources){
+                if(cold.audioMode==OriginalUiMainAudioMode50KG::enabled&&
+                   (!winAudio||winAudio->transport()!=cold.audio.get()))
+                    winAudio=std::make_shared<WinAudioAdapter50PD>(cold.audio);
+                OriginalUiWinSessionCold50PD input;input.resources=m.winResources;input.gpu=m.gpu;input.winArchive=cold.win;
+                input.profile=cold.riderProfile;input.commonProfile=cold.profile;input.application=cold.application;
+                input.audioMode=cold.audioMode;
+                if(cold.audioMode==OriginalUiMainAudioMode50KG::enabled)input.audio=winAudio;
+                input.externalTransition=m.transition;
+                m.win=std::make_unique<OriginalUiWinSession50PD>();OriginalUiWinSessionDiagnostic50PD wd;
+                if(m.win->bind(input,wd)!=WinStatus::ok){result(d,Status::session,wd.sourcePC);return false;}
+            }else if(m.unlockResources){
+                // Actual Application+344 (constructor-initialized normal-UI scalar,
+                // the same producer the Garage loader borrows); nonzero is refused.
+                const auto* root=rootApplication();
+                if(!root||root->garageAudioOwnerThread_!=std::this_thread::get_id()||root->state!=cold.application){
+                    result(d,Status::invalidInput,0x20AE68);return false;}
+                OriginalUiUnlockSessionCold50PD input;input.resources=m.unlockResources;input.gpu=m.gpu;input.unlockArchive=cold.unlock;
+                input.english=&english;input.profile=cold.riderProfile;input.commonProfile=cold.profile;input.application=cold.application;
+                input.application344=root->sourceBuildUiResFiles344_;
+                input.audioMode=cold.audioMode;input.audio=cold.audio;input.externalTransition=m.transition;
+                m.unlock=std::make_unique<OriginalUiUnlockSession50PD>();OriginalUiUnlockSessionDiagnostic50PD ud;
+                if(m.unlock->bind(input,ud)!=UnlockStatus::ok){result(d,Status::session,ud.sourcePC);return false;}
             }else if(m.tournament){
                 if(m.tournament->bindPublishedBank(m.gpu,d.tournament)!=TournamentStatus::ok){result(d,Status::session);return false;}
             }else if(m.course){
@@ -1189,6 +1453,14 @@ struct OriginalUiFrontend50KG::Storage {
         if(m.tournament&&!m.tournamentRetired){
             if(m.tournament->teardownSource(renderer,d.tournament)!=TournamentStatus::ok){result(d,Status::cleanup);return false;}
             m.tournamentRetired=true;
+        }
+        if(m.win&&!m.winRetired){OriginalUiWinSessionDiagnostic50PD wd;
+            if(m.win->teardownSource(renderer,wd)!=WinStatus::ok){result(d,Status::cleanup,wd.sourcePC);return false;}
+            m.winRetired=true;
+        }
+        if(m.unlock&&!m.unlockRetired){OriginalUiUnlockSessionDiagnostic50PD ud;
+            if(m.unlock->teardownSource(renderer,ud)!=UnlockStatus::ok){result(d,Status::cleanup,ud.sourcePC);return false;}
+            m.unlockRetired=true;
         }
         if(!m.rider||m.riderRetired)return true;
         // The private session path obtains actual renderer retirement and
@@ -1327,6 +1599,7 @@ struct OriginalUiFrontend50KG::Storage {
             m->garage.reset();
         }
         m->main.reset();m->options.reset();m->hall.reset();m->rider.reset();m->course.reset();m->tournament.reset(); // No further callback can reach them.
+        m->win.reset();m->unlock.reset();
         if(m->gpu&&!m->gpu->close(d.gpu))return false;
         if(m->riderStagedGpu&&!m->riderStagedGpu->close(d.gpu))return false;
         if(m->riderRetiredGpu&&!m->riderRetiredGpu->close(d.gpu))return false;
@@ -1346,6 +1619,28 @@ struct OriginalUiFrontend50KG::Storage {
         receipt.coldInterval.nanoseconds=elapsed>0?static_cast<std::uint64_t>(elapsed):0;
         return okay;
     }
+    // Hall/Win/Unlock screen request 13/1: the same selected-career resource
+    // admission the race-return Garage uses (1D1950), then a placeholder that
+    // names its exact source session/proposal. The counted Garage manager is
+    // loaded only in commitDeferred, after this source has retired.
+    bool prepareGarageFromScreen(std::uint64_t serial,std::uint32_t sourcePC,
+        OriginalUiFrontendInputReceipt50KG& receipt,Diagnostic& d) noexcept {
+        receipt.requested={13,1};d.garage={};d.garage.proposalSerial=serial;d.garage.requestSourcePC=sourcePC;
+        const void* source=active?garageRequestSource(*active):nullptr;std::uint32_t pause=0;
+        if(pending||!source||!serial||!cold.profile||cold.profile->mode34!=2||!cold.application->sharedDialogs||
+           !cold.application->sharedDialogs->loadedCurrent()||!cold.applicationAnimation.readPause11C(pause)||
+           !garageDestinationFrontend||!garageDestinationFrontend->materialApplicationOwner){
+            d.garage.status=OriginalUiGarageDestinationStatus50KG::rootOwner;d.garage.pendingSourcePC=0x1B823C;return false;
+        }
+        auto& frontend=*garageDestinationFrontend;
+        frontend.materialApplicationOwner->prepareGarageCareerResources1D1950(frontend,d.garage,receipt.coldInterval);
+        if(d.garage.status!=OriginalUiGarageDestinationStatus50KG::resourcesPrepared)return false;
+        try{
+            pending=std::make_unique<Manager>();pending->owner=this;pending->initialRoute={13,1};
+            pending->garageResourcesPrepared=true;pending->garageOriginSource=source;pending->garageOriginSerial=serial;
+        }catch(...){pending.reset();return false;}
+        return true;
+    }
 };
 OriginalUiFrontend50KG::OriginalUiFrontend50KG() noexcept=default;
 OriginalUiFrontend50KG::~OriginalUiFrontend50KG() noexcept {
@@ -1360,6 +1655,8 @@ OriginalUiFrontend50KG::~OriginalUiFrontend50KG() noexcept {
             (manager->main&&manager->main->sourceTeardownPending())||
             (manager->rider&&manager->rider->sourceTeardownPending())||
             (manager->tournament&&manager->tournament->sourceTeardownPending())||
+            (manager->win&&manager->win->sourceTeardownPending())||
+            (manager->unlock&&manager->unlock->sourceTeardownPending())||
             (manager->options&&manager->options->sourceTeardownPending()))){
             // Terminal misuse after omitted/failed explicit close. Keep the
             // Manager callback context, session, ledger and every cold/GPU/
@@ -1383,6 +1680,60 @@ Status OriginalUiFrontend50KG::prepareNativeResultsHall(const OriginalUiFrontend
        !root.videoOwner_->host.created()||!cold.profile||cold.profile->mode34!=0u)
         return result(d,Status::invalidInput);
     return prepareInitialNative(cold,&root,{},d);
+}
+Status OriginalUiFrontend50KG::prepareNativeRaceReturn(const OriginalUiFrontendCold50KG& cold,
+    const ::original_main_entry50KG::Application& root,std::uint8_t screen,std::uint8_t page,Diagnostic& d)noexcept {
+    d={};
+    const auto reject=[&](Status status,std::uint32_t pc,const char* detail)noexcept {
+        result(d,status,pc);d.raceReturnSourcePC=pc;d.raceReturnDetail=detail;return status;
+    };
+    // The caller's route must be the retained transfer's own route, read now.
+    std::uint32_t actualScreen=0,actualPage=0;
+    if(!root.nativeRaceReturnRoute50PD(actualScreen,actualPage)||actualScreen!=screen||actualPage!=page)
+        return reject(Status::invalidInput,0x17DE10,"race return route is not the retained 1AB5BC request");
+    // Common receiver identity: same Root/profile/Video/light owners, race retired.
+    if(root.garageAudioOwnerThread_!=std::this_thread::get_id()||root.sourceRace28COwner_||
+       root.resultsInputContinuation50LA_||cold.profile!=root.profile||cold.application!=root.state||
+       !cold.riderProfile||!cold.riderProfile->initialized()||cold.riderProfile!=root.riderProfile||
+       cold.riderProfile->commonProfile()!=cold.profile.get()||cold.lightManager!=root.lightManager||!root.videoOwner_||
+       cold.video.lifetime.get()!=root.videoOwner_.get()||!root.videoOwner_->originalMain||
+       !root.videoOwner_->host.created()||!cold.profile)
+        return reject(Status::invalidInput,0x17DE10,"race return requires the same retired Root receiver owners");
+    switch((std::uint32_t(screen)<<8)|page){
+    case (13u<<8)|1u: {
+        // UIGarage page1 as the FIRST screen (tournament mode only). Its only
+        // exit is Continue -> Tournament9/1; a failed earlier Garage source
+        // prefix is never replayed, so refuse before any owner is built.
+        if(cold.profile->mode34!=2u)
+            return reject(Status::invalidInput,0x1D1CD0,"Garage race return requires tournament mode34==2");
+        if(root.garageCustodyOwner_||root.garageCustodyAttempted_)
+            return reject(Status::unavailableDestination,0x1D1950,"Garage race return: retained Garage source prefix");
+        if(cold.audioMode!=OriginalUiMainAudioMode50KG::enabled||!root.garageAudioBackingOwner_)
+            return reject(Status::unavailableDestination,0x1B823C,"Garage race return requires the Root Garage audio backing");
+        if(cold.application&&cold.application->controllerPopupResources)
+            return reject(Status::unavailableDestination,0x1B7BD0,"Garage race return: legacy controller popup owner blocks the shared UI boot");
+        const auto status=prepareInitialNative(cold,&root,{},d);
+        if(status!=Status::ok&&!d.raceReturnDetail){d.raceReturnSourcePC=d.sourcePC;d.raceReturnDetail="Garage race return preparation failed";}
+        return status;
+    }
+    case (11u<<8)|1u: case (7u<<8)|1u: case (10u<<8)|1u: {
+        // Tournament Hall (1AB698), Win (1AB6FC/1AB758) or Unlock (1AB7F8) as
+        // the FIRST screen. Each can later request Garage13, whose entry needs
+        // the shared dialogs/dispatcher this lifetime boots like Garage-first.
+        // The mode0 Hall/Unlock rows (1AB884/1AB8E8) have no native receiver.
+        if(cold.profile->mode34!=2u)
+            return reject(Status::unavailableDestination,0x17DE10,"Hall/Win/Unlock race return is native only in tournament mode34==2");
+        if(cold.application&&cold.application->controllerPopupResources)
+            return reject(Status::unavailableDestination,0x1B7BD0,"race return: legacy controller popup owner blocks the shared UI boot");
+        const auto status=prepareInitialNative(cold,&root,{},d);
+        if(status!=Status::ok&&!d.raceReturnDetail){d.raceReturnSourcePC=d.sourcePC;
+            d.raceReturnDetail=screen==11?"Hall race return preparation failed":screen==7?"Win race return preparation failed":
+                "Unlock race return preparation failed";}
+        return status;
+    }
+    // Ending (17DE10 App,0x24,3,0) and the mode0 rows have no receiver.
+    default:return reject(Status::unavailableDestination,0x17DE10,"race return route has no native receiver yet");
+    }
 }
 Status OriginalUiFrontend50KG::prepareNativePauseCourse(const OriginalUiFrontendCold50KG& cold,
     const std::shared_ptr<OriginalUiPauseCourseOrigin50LA>& origin,Diagnostic& d)noexcept {
@@ -1412,6 +1763,14 @@ Status OriginalUiFrontend50KG::prepareInitialNative(const OriginalUiFrontendCold
     const std::shared_ptr<OriginalUiPauseCourseOrigin50LA>& pauseOrigin,Diagnostic& d)noexcept {
     d={};if(storage_)return result(d,Status::alreadyPrepared);
     if(nativeHall&&pauseOrigin)return result(d,Status::invalidInput);
+    // Only an acknowledgement (1AB5BC) transfer reports a race-return route;
+    // the 1CA6F0 Results Hall transfer never does. Route 13/1 = Garage-first.
+    std::uint32_t raceScreen=0,racePage=0;
+    const bool raceReturn=nativeHall&&nativeHall->nativeRaceReturnRoute50PD(raceScreen,racePage);
+    const bool garageFirst=raceReturn&&raceScreen==13&&racePage==1;
+    // Hall11 (tournament), Win7, Unlock10 first screens; see prepareNativeRaceReturn.
+    const bool screenFirst=raceReturn&&racePage==1&&(raceScreen==11||raceScreen==7||raceScreen==10);
+    if(raceReturn&&!garageFirst&&!screenFirst)return result(d,Status::unavailableDestination,0x17DE10);
     using Id=assets::OriginalUiArchiveId50KG;
     if(!archive(cold.appStart,Id::appStart)||!archive(cold.mainMenu,Id::mainMenu)||!archive(cold.options,Id::options)||
         !archive(cold.fonts,Id::fonts)||!archive(cold.controllerPopup,Id::controllerPopup)||!archive(cold.overlays,Id::overlays)||
@@ -1455,6 +1814,34 @@ Status OriginalUiFrontend50KG::prepareInitialNative(const OriginalUiFrontendCold
         storage_=std::make_unique<Storage>();auto& s=*storage_;Operation operation(s.inOperation);s.cold=cold;
         if(!s.processReady())return s.fault(d,Status::invalidInput);
         s.nativePauseCourseOrigin=pauseOrigin;
+        if(garageFirst){
+            if(!cold.profile||cold.profile->mode34!=2)return s.fault(d,Status::invalidInput,0x1D1CD0);
+            s.nativeGarageRoot=nativeHall;s.nativeGarageStamp=cold.riderProfile->stamp();
+            if(!assets::readOriginalUiEnglish50KG(*cold.localization,s.english,d.localization))return s.fault(d,Status::localization);
+            // Continue's only destination is Tournament9/1: prove it can build
+            // before committing to a first screen with no other exit.
+            OriginalUiRiderProfileOwner50KG::TournamentCareerSnapshot career;game::OriginalUiCourseRememberedProfile50KG remembered;
+            if(!cold.riderProfile->selectedTournamentCourseSnapshot(career,remembered)||!s.tournamentInputsReady(career.career100C0))
+                return s.fault(d,Status::unavailableDestination,0x17DE10);
+            if(!s.buildGarageBoot(s.garageRestoration,d))return s.fault(d,d.status);
+            // Garage placeholder: resources and the real 1D1950 load follow at
+            // activate, after the renderer/shared UI exist (as at commitDeferred).
+            s.active=std::make_unique<Storage::Manager>();s.active->owner=&s;s.active->initialRoute={13,1};
+            s.prepared=true;return result(d,Status::ok);
+        }
+        if(screenFirst){
+            if(!cold.profile||cold.profile->mode34!=2)return s.fault(d,Status::invalidInput,0x17DE10);
+            const Route first{static_cast<std::uint8_t>(raceScreen),1};
+            s.nativeRaceReturnRoot=nativeHall;s.nativeRaceReturnRoute=first;s.nativeRaceReturnStamp=cold.riderProfile->stamp();
+            if(!assets::readOriginalUiEnglish50KG(*cold.localization,s.english,d.localization))return s.fault(d,Status::localization);
+            // Shared-dialog boot bank (same session-less Main bank as Garage-first).
+            if(!s.buildGarageBoot(s.raceReturnBoot,d))return s.fault(d,d.status);
+            if(!s.build(s.active,first,d,2))return s.fault(d,d.status==Status::ok?Status::session:d.status,d.sourcePC);
+            // Cold preparation writes no profile field (Unlock grants only on Cross).
+            if(cold.riderProfile->stamp().generation!=s.nativeRaceReturnStamp.generation||cold.profile->mode34!=2)
+                return s.fault(d,Status::invalidInput,0x17DE10);
+            s.prepared=true;return result(d,Status::ok);
+        }
         if(nativeHall){
             s.nativeHallRoot=nativeHall;s.nativeHallPreimage=*cold.profile;
             s.nativeHallStamp=cold.riderProfile->stamp();
@@ -1647,8 +2034,12 @@ Status OriginalUiFrontend50KG::configureRendererRequest(VehicleWindowRequest50DS
     if(s->inOperation||s->garageTextureDraw)return result(d,Status::busy);if(s->faulted){d=s->failure;return d.status;}
     if(!s->prepared)return result(d,Status::notPrepared);
     if(s->activated||s->closing||s->quit)return result(d,Status::busy);
-    if(request.context!=s->cold.textureRequest.context||request.isCurrent!=s->cold.textureRequest.isCurrent||!s->active->prepared())return result(d,Status::invalidInput);
-    request.enableOriginalUi=true;request.originalUiCpuTextures=s->active->textures();request.originalUiTextures=s->active->gpu.get();
+    // Garage-first: the Garage loads only after activation, so the renderer is
+    // created with the session-less Main boot bank it later restores.
+    const auto* bankOwner=s->nativeGarageRoot?s->garageRestoration.get():s->active.get();
+    if(request.context!=s->cold.textureRequest.context||request.isCurrent!=s->cold.textureRequest.isCurrent||
+       !bankOwner||!bankOwner->prepared())return result(d,Status::invalidInput);
+    request.enableOriginalUi=true;request.originalUiCpuTextures=bankOwner->textures();request.originalUiTextures=bankOwner->gpu.get();
     //Main and Options each submit a complete sealed source-RGBA bank, so
     //shared popup joins preserve destination-alpha and material history.
     //Allocating its target is capability preparation, not page admission.
@@ -1670,15 +2061,32 @@ bool OriginalUiFrontend50KG::bindGarageDestinationRoot50KG(
 bool OriginalUiFrontend50KG::prepareSharedDialogsInitial(const ::original_main_entry50KG::Application& root,
  VehicleWindowGl50DS& renderer,Diagnostic& d)noexcept {
  d={};auto* s=storage_.get();if(!s||!s->prepared||s->activated||s->renderer||s->inOperation||s->faulted||s->closing||s->quit||
-    !s->active||!s->active->main||!s->active->mainResources||!s->active->prepared()||s->cold.application!=root.state){
+    s->cold.application!=root.state){result(d,Status::notPrepared);return false;}
+ // Garage-first: the session-less Main boot bank supplies the popup/history
+ // source; no Main session exists to bind the shared menu.
+ // Every race-return first screen (Garage13, Hall11, Win7, Unlock10) has no
+ // Main manager: its session-less Main boot bank is the 1B7BD0 source.
+ const bool garageFirst=s->nativeGarageRoot!=nullptr;
+ const bool screenFirst=s->nativeRaceReturnRoot!=nullptr;
+ const bool bootFirst=garageFirst||screenFirst;
+ const auto* boot=garageFirst?s->garageRestoration.get():s->raceReturnBoot.get();
+ if(bootFirst?((garageFirst?s->nativeGarageRoot:s->nativeRaceReturnRoot)!=&root||(garageFirst&&screenFirst)||
+               !boot||!boot->garageBoot||!boot->mainResources||!boot->prepared()||(screenFirst&&(!s->active||!s->active->prepared()))):
+    (!s->active||!s->active->main||!s->active->mainResources||!s->active->prepared())){
   result(d,Status::notPrepared);return false;}
  if(s->cold.application->sharedDialogs){result(d,Status::busy);return false;}
  std::string error;
- const auto resultValue=root.prepareSharedDialogsInitial1B7BD0(*s->active->mainResources,
-  s->cold.controllerPopup,renderer,error);
- if(resultValue==::original_main_entry50KG::Application::SharedUiBootResult::failed){
+ // No Main1D7CF4 reorder/enable pair for a non-Main first manager. Garage's
+ // Page1FB648 performs the 1B86D0 reorder itself; Hall/Win/Unlock perform none.
+ const auto resultValue=root.prepareSharedDialogsInitial1B7BD0(bootFirst?*boot->mainResources:*s->active->mainResources,
+  s->cold.controllerPopup,renderer,error,bootFirst);
+ if(resultValue==::original_main_entry50KG::Application::SharedUiBootResult::failed||
+    (bootFirst&&resultValue!=::original_main_entry50KG::Application::SharedUiBootResult::complete)){
+  // Garage has no dialog-less mode: its manager entry requires the dispatcher,
+  // and every tournament race-return screen can reach the Garage.
   std::fprintf(stderr,"original_shared_ui_initialization_failed detail=%s\n",error.c_str());
   s->fault(d,Status::cleanup,0x1B7BD0);return false;}
+ if(bootFirst){result(d,Status::ok);return true;}
  if(resultValue==::original_main_entry50KG::Application::SharedUiBootResult::complete){
   const auto shared=s->cold.application->sharedDialogs;
   if(!shared||shared->inputs_.root!=&root||
@@ -1698,6 +2106,65 @@ Status OriginalUiFrontend50KG::activate(VehicleWindowGl50DS& renderer,Diagnostic
     if(!s->prepared)return result(d,Status::notPrepared);
     if(s->activated||s->renderer||s->closing||s->quit)return result(d,Status::busy);
     Operation operation(s->inOperation);
+    if(s->nativeGarageRoot){
+        // Same order as Tournament->Garage commitDeferred: bank bound, NO UI
+        // light lease (the Garage's own426F60 owner requires it absent), then
+        // the real resource admission and1D1950 load with entry custody.
+        const auto& root=*s->nativeGarageRoot;const auto display=root.raceDisplayOwner50LA_.lock();
+        std::uint32_t screen=0,page=0;
+        if(root.garageAudioOwnerThread_!=std::this_thread::get_id()||root.sourceRace28COwner_||
+           root.resultsInputContinuation50LA_||!root.nativeRaceReturnRoute50PD(screen,page)||screen!=13||page!=1||
+           !root.videoOwner_||s->cold.video.lifetime.get()!=root.videoOwner_.get()||
+           s->cold.lightManager!=root.lightManager||root.profile!=s->cold.profile||root.state!=s->cold.application||
+           root.riderProfile!=s->cold.riderProfile||s->cold.profile->mode34!=2||
+           s->cold.riderProfile->stamp().generation!=s->nativeGarageStamp.generation||
+           !display||!display->frontendOwnerCurrent50KG()||&display->renderer_!=&renderer||
+           !s->cold.application->sharedDialogs||!s->cold.application->sharedDialogs->loadedCurrent()||
+           !s->garageRestoration||!s->garageRestoration->garageBoot||s->pending||s->retiring||!s->active||
+           !same(s->active->initialRoute,{13,1})||s->active->garage||s->active->garageEntryAttempted||
+           !s->garageDestinationFrontend||s->garageDestinationFrontend->materialApplicationOwner!=&root||s->lightManagerEntered)
+            return s->fault(d,Status::invalidInput,0x17DE10);
+        s->renderer=&renderer; // Cleanup target before any renderer/source effect.
+        auto& boot=*s->garageRestoration;
+        if(!boot.prepared()||!renderer.originalUiSourceRgbaAvailable()||
+           !renderer.bindOriginalUiTextures(*boot.textures(),*boot.gpu,d.renderer))return s->fault(d,Status::renderer);
+        s->bank=&boot;
+        auto& frontend=*s->garageDestinationFrontend;
+        OriginalUiFrontendColdInterval50KG cold; // Activation is already host cold time.
+        d.garage.requestSourcePC=0x17DE10;
+        frontend.materialApplicationOwner->prepareGarageCareerResources1D1950(frontend,d.garage,cold);
+        if(d.garage.status!=OriginalUiGarageDestinationStatus50KG::resourcesPrepared)
+            return s->fault(d,Status::unavailableDestination,d.garage.pendingSourcePC);
+        s->active->garageResourcesPrepared=true;
+        // Transfer/source-image/texture services require an activated owner.
+        s->activated=true;
+        s->active->garageEntryAttempted=true;s->garageOperation=Storage::GarageOperation::entry;
+        const bool loaded=frontend.materialApplicationOwner->loadPreparedGarageManager1D1950(
+            frontend,s->cold.fonts,s->active->garage,d.garageRuntime,d.garageDetail);
+        s->garageOperation=Storage::GarageOperation::none;
+        if(!loaded||!s->active->prepared())return s->fault(d,Status::session,d.garageRuntime.sourcePC);
+        return result(d,Status::ok);
+    }
+    if(s->nativeRaceReturnRoot){
+        // Same receiver identity as Garage-first; the shared dialogs were booted
+        // from raceReturnBoot. The first screen enters its own light manager.
+        const auto& root=*s->nativeRaceReturnRoot;const auto display=root.raceDisplayOwner50LA_.lock();
+        std::uint32_t screen=0,page=0;
+        if(root.garageAudioOwnerThread_!=std::this_thread::get_id()||root.sourceRace28COwner_||
+           root.resultsInputContinuation50LA_||!root.nativeRaceReturnRoute50PD(screen,page)||
+           screen!=s->nativeRaceReturnRoute.screen||page!=s->nativeRaceReturnRoute.page||
+           !root.videoOwner_||s->cold.video.lifetime.get()!=root.videoOwner_.get()||
+           s->cold.lightManager!=root.lightManager||root.profile!=s->cold.profile||root.state!=s->cold.application||
+           root.riderProfile!=s->cold.riderProfile||s->cold.profile->mode34!=2||
+           s->cold.riderProfile->stamp().generation!=s->nativeRaceReturnStamp.generation||
+           !display||!display->frontendOwnerCurrent50KG()||&display->renderer_!=&renderer||
+           !s->cold.application->sharedDialogs||!s->cold.application->sharedDialogs->loadedCurrent()||
+           !s->raceReturnBoot||!s->raceReturnBoot->garageBoot||s->garageRestoration||s->pending||s->retiring||
+           !s->active||!same(s->active->initialRoute,s->nativeRaceReturnRoute)||
+           !(s->active->hall||s->active->win||s->active->unlock)||
+           !s->garageDestinationFrontend||s->garageDestinationFrontend->materialApplicationOwner!=&root||s->lightManagerEntered)
+            return s->fault(d,Status::invalidInput,0x17DE10);
+    }
     if(s->nativeHallRoot){
         const auto& root=*s->nativeHallRoot;
         if(root.garageAudioOwnerThread_!=std::this_thread::get_id())return s->fault(d,Status::invalidInput);
@@ -1724,7 +2191,11 @@ Status OriginalUiFrontend50KG::activate(VehicleWindowGl50DS& renderer,Diagnostic
     }
     s->renderer=&renderer; // Native receiver custody precedes retaining this cleanup target.
     if(!s->active->prepared()||!renderer.originalUiSourceRgbaAvailable()||!renderer.bindOriginalUiTextures(*s->active->textures(),*s->active->gpu,d.renderer))return s->fault(d,Status::renderer);
-    if(!s->enterLightManager(*(s->nativePauseCourseOrigin?s->cold.course:s->nativeHallRoot?s->cold.hall:s->cold.mainMenu),d))return s->fault(d,Status::session,d.lightManager.sourcePC);
+    const auto& firstArchive=s->nativeRaceReturnRoot?(s->active->hall?s->cold.hall:s->active->win?s->cold.win:s->cold.unlock):
+        s->nativePauseCourseOrigin?s->cold.course:s->nativeHallRoot?s->cold.hall:s->cold.mainMenu;
+    if(!firstArchive||!s->enterLightManager(*firstArchive,d))return s->fault(d,Status::session,d.lightManager.sourcePC);
+    if(s->nativeRaceReturnRoot&&s->active->hall&&!s->active->hall->acceptEntryProfileCommit())
+        return s->fault(d,Status::session,0x17DE10); // Mode2: 17DB80/ld_ui writes no mode.
     if(s->nativeHallRoot){
         // Same existing Hall entry commit: previous mode then5, never a
         // synthetic generation refresh, Options selection or Main setup.
@@ -1733,10 +2204,15 @@ Status OriginalUiFrontend50KG::activate(VehicleWindowGl50DS& renderer,Diagnostic
         if(!s->active->hall->acceptEntryProfileCommit())return s->fault(d,Status::session);
     }
     s->bank=s->active.get();s->activating=s->active.get();
-    const auto initial=s->nativePauseCourseOrigin?Route{6,1}:s->nativeHallRoot?Route{11,1}:Route{4,1};
+    const auto initial=s->nativeRaceReturnRoot?s->nativeRaceReturnRoute:
+        s->nativePauseCourseOrigin?Route{6,1}:s->nativeHallRoot?Route{11,1}:Route{4,1};
     d.transition=s->active->transition->bindInitialPage(initial.screen,initial.page,s->callbacks(*s->active));s->activating=nullptr;
     if(d.transition!=Transition::ok||s->faulted)return s->fault(d,Status::transition,0x2A3C10);
-    s->activated=true;return result(d,Status::ok);
+    s->activated=true;
+    // The boot bank was never bound to the renderer; the shared dialogs own
+    // their popup resources. Retire its CPU/GPU owner now.
+    if(s->raceReturnBoot&&!s->release(s->raceReturnBoot,d))return s->fault(d,Status::cleanup);
+    return result(d,Status::ok);
 }
 Status OriginalUiFrontend50KG::input(const OriginalUiMainSessionInput50KG& input,
     OriginalUiFrontendInputReceipt50KG& receipt,Diagnostic& d) noexcept {
@@ -1768,7 +2244,7 @@ Status OriginalUiFrontend50KG::input(const OriginalUiMainSessionInput50KG& input
     if(s->queued||s->updates!=s->submittedUpdate)return result(d,Status::busy);
     Operation operation(s->inOperation);s->frameRendered=false;s->frameSubmitted=false;
     if(!s->sourceCurrent()||!s->processReady())return s->fault(d,Status::session);
-    receipt.source=s->active->currentRoute();s->mainProposal={};s->optionsProposal={};s->hallProposal={};s->riderProposal={};s->courseProposal={};s->tournamentProposal={};
+    receipt.source=s->active->currentRoute();s->mainProposal={};s->optionsProposal={};s->hallProposal={};s->riderProposal={};s->courseProposal={};s->tournamentProposal={};s->hallConfirm=false;s->winProposal={};s->unlockProposal={};
     if(s->active->main){
         const auto status=s->active->main->input(input,receipt.main,d.main);
         if(status==MainStatus::routeProposed){
@@ -1853,7 +2329,32 @@ Status OriginalUiFrontend50KG::input(const OriginalUiMainSessionInput50KG& input
             if(!s->renderer->releaseRetainedOriginalUiSource(d.renderer)||!s->cold.riderPresentation->end())return s->fault(d,Status::cleanup);
             s->riderOldImage={};
         }
-        if(status==HallStatus::backProposed){
+        if(status==HallStatus::confirmProposed){
+            // Tournament Cross 1E3FC0: Win7 / Unlock10 / Garage13 screen request.
+            s->hallProposal=receipt.hall.routeProposal;s->hallConfirm=true;const auto& proposal=s->hallProposal.decision;
+            const Route target{proposal.request.targetScreen,proposal.request.targetPage};
+            if(s->pending||!game::originalUiHallConfirmShape50KG(proposal)||!s->active->hall->confirmProposalCurrent(s->hallProposal))
+                return s->fault(d,Status::transition,0x1E3FC0);
+            const bool ready=same(target,{13,1})?s->prepareGarageFromScreen(s->hallProposal.serial,proposal.request.sourcePC,receipt,d):
+                same(target,{7,1})?s->winInputsReady()&&s->prepareDestination(target,receipt,d,2):
+                same(target,{10,1})?s->unlockInputsReady()&&s->prepareDestination(target,receipt,d,2):
+                false; // 6/1 (1E41C4) is non-tournament only; unreachable from the mode2 Hall.
+            if(!ready){s->hallConfirm=false;s->hallProposal={};
+                return s->faulted?d.status:result(d,receipt.status=Status::unavailableDestination,proposal.request.sourcePC);}
+            if(!s->active->hall->confirmProposalCurrent(s->hallProposal))return s->fault(d,Status::transition,0x1E3FC0);
+            auto admitted=proposal;
+            if(admitted.admitted||admitted.action!=game::OriginalUiRouteAction50KG::unavailable||
+               admitted.blockers!=static_cast<std::uint32_t>(game::OriginalUiRouteBlocker50KG::destinationOwner))return s->fault(d,Status::transition);
+            admitted.admitted=true;admitted.blockers=0;admitted.action=game::OriginalUiRouteAction50KG::request;
+            d.transition=s->active->transition->requestRouteDecision(admitted);
+            if(d.transition!=Transition::ok||s->active->hall->notifyConfirmAccepted(s->hallProposal,d.hall)!=HallStatus::ok)
+                return s->fault(d,Status::transition,proposal.request.sourcePC);
+        }else if(status==HallStatus::unavailableDestination&&receipt.hall.confirmRoute==game::OriginalUiHallConfirmRoute50KG::ending){
+            // STAND-IN (session side): 1E40A0 end scene 17DE10(App,0x28,3,0) has
+            // no native receiver; nothing is committed and the page stays open.
+            d.raceReturnSourcePC=0x1E40A0;d.raceReturnDetail="Hall Cross end scene has no native receiver";
+            return result(d,receipt.status=Status::unavailableDestination,0x1E40A0);
+        }else if(status==HallStatus::backProposed){
             s->hallProposal=receipt.hall.routeProposal;const auto& proposal=s->hallProposal.decision;
             if(s->pending||!game::originalUiHallBackShape50KG(proposal)||!s->active->hall->routeProposalCurrent(s->hallProposal))
                 return s->fault(d,Status::transition);
@@ -1869,6 +2370,61 @@ Status OriginalUiFrontend50KG::input(const OriginalUiMainSessionInput50KG& input
         }else if(status!=HallStatus::ok&&status!=HallStatus::noChange&&status!=HallStatus::unavailableDestination)
             return s->fault(d,Status::session,d.hall.sourcePC);
         else return result(d,receipt.status=status==HallStatus::ok?Status::ok:status==HallStatus::noChange?Status::noChange:Status::unavailableDestination);
+    }else if(s->active->win){
+        OriginalUiWinSessionInputReceipt50PD wr;OriginalUiWinSessionDiagnostic50PD wd;
+        const auto status=s->active->win->input(input,wr,wd);
+        if(status==WinStatus::routeProposed){
+            // 2089D0 Cross: Unlock10 (208A28) when 187E30 is pending, else Garage13 (208A48).
+            s->winProposal=wr.routeProposal;const auto& proposal=s->winProposal.decision;const auto& r=proposal.request;
+            const Route target{r.targetScreen,r.targetPage};
+            if(s->pending||!s->active->win->routeProposalCurrent(s->winProposal)||
+               r.kind!=game::OriginalUiRouteKind50KG::changeScreen||r.sourceScreen!=7||r.sourcePage!=1||
+               (!same(target,{10,1})&&!same(target,{13,1}))||proposal.inputPC!=0x2089D0||proposal.profileChanges.count)
+                return s->fault(d,Status::transition,0x2089D0);
+            const bool ready=same(target,{13,1})?s->prepareGarageFromScreen(s->winProposal.serial,r.sourcePC,receipt,d):
+                s->unlockInputsReady()&&s->prepareDestination(target,receipt,d,2);
+            if(!ready){s->winProposal={};return s->faulted?d.status:result(d,receipt.status=Status::unavailableDestination,r.sourcePC);}
+            if(!s->active->win->routeProposalCurrent(s->winProposal))return s->fault(d,Status::transition,0x2089D0);
+            auto admitted=proposal;
+            if(admitted.admitted||admitted.blockers!=static_cast<std::uint32_t>(game::OriginalUiRouteBlocker50KG::destinationOwner))
+                return s->fault(d,Status::transition,0x2089D0);
+            admitted.admitted=true;admitted.blockers=0;admitted.action=game::OriginalUiRouteAction50KG::request;
+            d.transition=s->active->transition->requestRouteDecision(admitted);
+            if(d.transition!=Transition::ok||s->active->win->notifyRouteAccepted(s->winProposal,wd)!=WinStatus::ok)
+                return s->fault(d,Status::transition,r.sourcePC);
+        }else{
+            const auto mapped=status==WinStatus::ok?Status::ok:status==WinStatus::noChange?Status::noChange:
+                status==WinStatus::unavailableDestination?Status::unavailableDestination:Status::session;
+            if(mapped==Status::session)return s->fault(d,mapped,wd.sourcePC);return result(d,receipt.status=mapped,wd.sourcePC);
+        }
+    }else if(s->active->unlock){
+        OriginalUiUnlockSessionInputReceipt50PD ur;OriginalUiUnlockSessionDiagnostic50PD ud;
+        const auto status=s->active->unlock->input(input,ur,ud);
+        if(status==UnlockStatus::routeProposed){
+            s->unlockProposal=ur.routeProposal;const auto& proposal=s->unlockProposal.decision;const auto& r=proposal.request;
+            const bool reshow=s->unlockProposal.next==UnlockNext::reshow;
+            if(s->pending||!s->active->unlock->routeProposalCurrent(s->unlockProposal)||
+               !game::originalUiUnlockRouteShape50PD(proposal,s->unlockProposal.next))
+                return s->fault(d,Status::transition,0x20B480);
+            bool ready=false;
+            if(reshow)ready=s->active->ownsRoute({10,1}); // Same manager, page vtable+A4 (20B654).
+            else if(r.targetScreen==13)ready=s->prepareGarageFromScreen(s->unlockProposal.serial,r.sourcePC,receipt,d);
+            // else 6/1 (20B6B0, mode34!=2): STAND-IN refusal, Course is not reachable from Unlock natively.
+            if(!ready){s->unlockProposal={};return s->faulted?d.status:result(d,receipt.status=Status::unavailableDestination,r.sourcePC);}
+            if(!s->active->unlock->routeProposalCurrent(s->unlockProposal))return s->fault(d,Status::transition,0x20B480);
+            auto admitted=proposal;
+            if(admitted.admitted||admitted.action!=game::OriginalUiRouteAction50KG::unavailable||
+               admitted.blockers!=static_cast<std::uint32_t>(game::OriginalUiRouteBlocker50KG::destinationOwner))
+                return s->fault(d,Status::transition,0x20B480);
+            admitted.admitted=true;admitted.blockers=0;admitted.action=game::OriginalUiRouteAction50KG::request;
+            d.transition=s->active->transition->requestRouteDecision(admitted);
+            if(d.transition!=Transition::ok||s->active->unlock->notifyRouteAccepted(s->unlockProposal,ud)!=UnlockStatus::ok)
+                return s->fault(d,Status::transition,r.sourcePC);
+        }else{
+            const auto mapped=status==UnlockStatus::ok?Status::ok:status==UnlockStatus::noChange?Status::noChange:
+                status==UnlockStatus::unavailableDestination?Status::unavailableDestination:Status::session;
+            if(mapped==Status::session)return s->fault(d,mapped,ud.sourcePC);return result(d,receipt.status=mapped,ud.sourcePC);
+        }
     }else if(s->active->rider){
         const auto status=s->active->rider->input(input,receipt.rider,d.rider);
         if(status==RiderStatus::moveProposed){
@@ -2032,7 +2588,7 @@ Status OriginalUiFrontend50KG::input(const OriginalUiMainSessionInput50KG& input
         }
     }else return s->fault(d,Status::session);
     receipt.routeAccepted=true;receipt.requested=s->active->transition->snapshot().requested;
-    s->mainProposal={};s->optionsProposal={};s->hallProposal={};s->riderProposal={};s->courseProposal={};s->tournamentProposal={};return result(d,receipt.status=Status::routeAccepted);
+    s->mainProposal={};s->optionsProposal={};s->hallProposal={};s->riderProposal={};s->courseProposal={};s->tournamentProposal={};s->hallConfirm=false;s->winProposal={};s->unlockProposal={};return result(d,receipt.status=Status::routeAccepted);
 }
 Status OriginalUiFrontend50KG::update(const OriginalUiMainSessionUpdate50KG& input,
     OriginalUiFrontendUpdateReceipt50KG& receipt,Diagnostic& d) noexcept {
@@ -2078,7 +2634,9 @@ Status OriginalUiFrontend50KG::update(const OriginalUiMainSessionUpdate50KG& inp
            !s->publishResidentBank(*m.textures(),*m.gpu,d,receipt.coldInterval))return s->fault(d,Status::renderer,0x1DFE18);
         if(m.course->completeSelectionRefresh(d.course)!=CourseStatus::ok)return s->fault(d,Status::session,0x1DFE58);
     }
-    const bool prepared=m.main?m.main->prepareUpdateAudio(input,d.main)==MainStatus::ok:m.options?
+    OriginalUiWinSessionDiagnostic50PD wd;OriginalUiUnlockSessionDiagnostic50PD ud;
+    const bool prepared=m.win?m.win->prepareUpdateAudio(input,wd)==WinStatus::ok:
+        m.unlock?m.unlock->prepareUpdateAudio(input,ud)==UnlockStatus::ok:m.main?m.main->prepareUpdateAudio(input,d.main)==MainStatus::ok:m.options?
         m.options->prepareUpdateAudio(input,d.options)==OptionsStatus::ok:m.hall?m.hall->prepareUpdateAudio(input,d.hall)==HallStatus::ok:m.rider?m.rider->prepareUpdateAudio(input,d.rider)==RiderStatus::ok:
         m.course?m.course->prepareUpdateAudio(input,d.course)==CourseStatus::ok:m.tournament&&m.tournament->prepareUpdateAudio(input,d.tournament)==TournamentStatus::ok;
     if(!prepared)return s->fault(d,Status::session,0x234440);
@@ -2086,10 +2644,11 @@ Status OriginalUiFrontend50KG::update(const OriginalUiMainSessionUpdate50KG& inp
     if(s->faulted)return s->fault(d,Status::session);
     if(d.transition!=Transition::ok&&d.transition!=Transition::noChange&&d.transition!=Transition::pending&&d.transition!=Transition::queued)
         return s->fault(d,Status::transition,0x2A3C80);
-    const bool updated=m.main?m.main->update(input,d.main)==MainStatus::ok:m.options?
+    const bool updated=m.win?m.win->update(input,wd)==WinStatus::ok:
+        m.unlock?m.unlock->update(input,ud)==UnlockStatus::ok:m.main?m.main->update(input,d.main)==MainStatus::ok:m.options?
         m.options->update(input,d.options)==OptionsStatus::ok:m.hall?m.hall->update(input,d.hall)==HallStatus::ok:m.rider?m.rider->update(input,d.rider)==RiderStatus::ok:
         m.course?m.course->update(input,d.course)==CourseStatus::ok:m.tournament&&m.tournament->update(input,d.tournament)==TournamentStatus::ok;
-    if(!updated)return s->fault(d,Status::session);
+    if(!updated)return s->fault(d,Status::session,m.win?wd.sourcePC:m.unlock?ud.sourcePC:0);
     if(const auto shared=s->cold.application->sharedDialogs;shared&&!m.main&&!m.options&&!m.rider){
         // Main/Options/Rider already run the same470 call immediately before their
         // real47C update. Other native managers must not freeze global state.
@@ -2154,6 +2713,13 @@ Status OriginalUiFrontend50KG::render(const OriginalUiMainFrameClock50KG& clock,
         if(!m.main&&!m.options&&!m.rider&&s->cold.application->controllerPopupState.active3CC)
             return s->fault(d,Status::session,0x206420);
     }
+    if(m.win||m.unlock){
+        OriginalUiWinSessionDiagnostic50PD wd;OriginalUiUnlockSessionDiagnostic50PD ud;
+        const bool done=m.win?m.win->render(clock,wd)==WinStatus::ok&&m.win->sourceFrame():
+            m.unlock->render(clock,ud)==UnlockStatus::ok&&m.unlock->sourceFrame();
+        if(!done)return s->fault(d,Status::session,m.win?wd.sourcePC:ud.sourcePC);
+        s->renderedUpdate=s->updates;++s->renders;s->frameRendered=true;return result(d,Status::ok);
+    }
     const bool rendered=m.main?m.main->render(clock,d.main)==MainStatus::ok:m.options?
         m.options->render({clock.known,clock.advanceAnimations,clock.milliseconds,clock.applicationAnimation},d.options)==OptionsStatus::ok:
         m.hall?m.hall->render(renderClock,d.hall)==HallStatus::ok:m.rider?m.rider->render({renderClock.known,renderClock.advanceAnimations,renderClock.milliseconds,renderClock.applicationAnimation},d.rider)==RiderStatus::ok:
@@ -2191,7 +2757,9 @@ Status OriginalUiFrontend50KG::submit(VehicleWindowGl50DS& renderer,std::int32_t
         }else if(!renderer.submitOriginalUiSourceRgba(*frame,width,height,d.renderer)||!d.renderer.originalUiAccepted)
             return s->fault(d,Status::renderer);
         s->riderWidth=width;s->riderHeight=height;
-    }else if(s->active->options||s->active->main||s->active->tournament){const auto* frame=s->active->options?s->active->options->sourceFrame():s->active->main?s->active->main->sourceFrame():s->active->tournament->sourceFrame();
+    }else if(s->active->options||s->active->main||s->active->tournament||s->active->win||s->active->unlock){
+        const auto* frame=s->active->options?s->active->options->sourceFrame():s->active->main?s->active->main->sourceFrame():
+            s->active->win?s->active->win->sourceFrame():s->active->unlock?s->active->unlock->sourceFrame():s->active->tournament->sourceFrame();
         if(!frame||!renderer.submitOriginalUiSourceRgba(*frame,width,height,d.renderer)||!d.renderer.originalUiAccepted)
             return s->fault(d,Status::renderer);
     }else{const auto* draw=s->active->draw();
@@ -2241,6 +2809,7 @@ Status OriginalUiFrontend50KG::commitDeferred(VehicleWindowGl50DS& renderer,
         s->queued=false;s->queue={};s->frameRendered=false;s->frameSubmitted=false;s->renderedUpdate=s->updates;
         ++s->switches;
         if(!s->release(s->retiring,d)||!s->release(s->garageRestoration,d))return s->fault(d,Status::cleanup);
+        s->nativeGarageRoot=nullptr; // Its boot bank has retired with the Garage.
         return result(d,Status::ok);
     }
     if(s->inOperation||s->garageTextureDraw)return result(d,Status::busy);if(s->faulted){d=s->failure;return d.status;}
@@ -2268,13 +2837,17 @@ Status OriginalUiFrontend50KG::commitDeferred(VehicleWindowGl50DS& renderer,
     if(!old.applicationRequestQueued||old.lifecycle!=Life::queueScreen||!same(old.requested,target)||!s->destination(target))return s->fault(d,Status::transition);
     if(!s->ownsLightManager())return s->fault(d,Status::session,0x148110);
     if(same(target,{13,1})){
-        if(!s->pending->garageResourcesPrepared||s->pending->garage||s->garageRestoration||!s->active->tournament||
+        // Source screen: Tournament9 (1F241C) or Hall11/Win7/Unlock10 (1D1950
+        // resources prepared at their Cross). Each retires the same way.
+        const bool screenSource=s->active->hall||s->active->win||s->active->unlock;
+        if(!s->pending->garageResourcesPrepared||s->pending->garage||s->garageRestoration||
+           !(s->active->tournament||screenSource)||(screenSource&&!s->cold.application->sharedDialogs)||
            !s->garageDestinationFrontend||!s->garageDestinationFrontend->materialApplicationOwner)
             return s->fault(d,Status::transition,0x1B823C);
         if(!s->drainBankWork(d,receipt.bankDrain)||!s->retireSource(*s->active,d)||!s->releaseLightManager(d))
             return s->fault(d,Status::cleanup,0x2A3510);
         // Immutable bank survives source teardown. It is NOT a second live
-        // Tournament Session and never supplies Garage geometry or history.
+        // source Session and never supplies Garage geometry or history.
         s->garageRestoration=std::move(s->active);s->active=std::move(s->pending);s->bank=s->garageRestoration.get();
         s->queued=false;s->queue={};s->frameRendered=false;s->frameSubmitted=false;s->renderedUpdate=s->updates;
         s->active->garageEntryAttempted=true;s->garageOperation=Storage::GarageOperation::entry;
@@ -2290,7 +2863,8 @@ Status OriginalUiFrontend50KG::commitDeferred(VehicleWindowGl50DS& renderer,
         ++s->switches;return result(d,Status::ok);
     }
     const auto* destinationArchive=s->pending->main?s->cold.mainMenu.get():
-        (s->pending->options?s->cold.options.get():s->pending->hall?s->cold.hall.get():s->pending->rider?s->cold.rider.get():s->pending->course?s->cold.course.get():s->pending->tournament?s->cold.tournament.get():nullptr);
+        (s->pending->options?s->cold.options.get():s->pending->hall?s->cold.hall.get():
+         s->pending->win?s->cold.win.get():s->pending->unlock?s->cold.unlock.get():s->pending->rider?s->cold.rider.get():s->pending->course?s->cold.course.get():s->pending->tournament?s->cold.tournament.get():nullptr);
     if(!destinationArchive)return s->fault(d,Status::unavailableDestination,0x1CCD88);
     if(s->pending->rider){
         const auto* demand=s->pending->rider->residencyDemand();
@@ -2459,6 +3033,7 @@ Status OriginalUiFrontend50KG::close(Diagnostic& d) noexcept {
         if(!s->release(s->pending,d))return result(d,Status::cleanup);
         if(!s->release(s->active,d))return result(d,Status::cleanup);
         if(!s->release(s->garageRestoration,d))return result(d,Status::cleanup);
+        if(!s->release(s->raceReturnBoot,d))return result(d,Status::cleanup);
         // Cleanup retries retain this lease until every renderer/session/GPU
         // consumer is gone. Per-manager release above must not touch it.
         if(!s->releaseLightManager(d))return result(d,Status::cleanup,d.lightManager.sourcePC);
@@ -2485,9 +3060,63 @@ void OriginalUiFrontend50KG::requestQuit() noexcept {
     auto* s=storage_.get();if(!s||s->inOperation||(s->garageTextureDraw&&!s->garageActive()))return;
     s->quit=true;s->frameRendered=false;s->frameSubmitted=false;
     if(s->active){if(s->active->main)s->active->main->requestQuit();if(s->active->options)s->active->options->requestQuit();if(s->active->hall)s->active->hall->requestQuit();
-        if(s->active->rider)s->active->rider->requestQuit();if(s->active->course)s->active->course->requestQuit();if(s->active->tournament)s->active->tournament->requestQuit();}
+        if(s->active->rider)s->active->rider->requestQuit();if(s->active->course)s->active->course->requestQuit();if(s->active->tournament)s->active->tournament->requestQuit();
+        if(s->active->win)s->active->win->requestQuit();if(s->active->unlock)s->active->unlock->requestQuit();}
 }
-OriginalUiFrontendSnapshot50KG OriginalUiFrontend50KG::snapshot() const noexcept {
+namespace {
+// Off by default (RR_GARAGE_PROOF_SHADOW=1): every Garage-free snapshot/route
+// read is also taken through the full snapshot() and must agree field by field.
+bool frontendSnapshotShadow50KG()noexcept{
+    static const bool on=[]{const char* v=std::getenv("RR_GARAGE_PROOF_SHADOW");return v&&v[0]=='1'&&!v[1];}();
+    return on;
+}
+thread_local bool frontendFullSnapshot50KG=false;
+bool sameRoute50KG(game::OriginalUiTransitionRoute50KG a,game::OriginalUiTransitionRoute50KG b)noexcept{
+    return a.screen==b.screen&&a.page==b.page;
+}
+void requireSameGarageFreeSnapshot50KG(const OriginalUiFrontendSnapshot50KG& a,const OriginalUiFrontendSnapshot50KG& b)noexcept{
+    const auto& t=a.transition;const auto& u=b.transition;
+    const bool same=a.prepared==b.prepared&&a.active==b.active&&a.faulted==b.faulted&&a.quitRequested==b.quitRequested&&
+        a.deferredQueue==b.deferredQueue&&a.frameSubmitted==b.frameSubmitted&&a.courseLaunchReady==b.courseLaunchReady&&
+        sameRoute50KG(a.route,b.route)&&sameRoute50KG(a.preparedDestination,b.preparedDestination)&&
+        t.bound==u.bound&&sameRoute50KG(t.current,u.current)&&sameRoute50KG(t.requested,u.requested)&&
+        t.lifecycle==u.lifecycle&&t.phase==u.phase&&t.applicationRequestQueued==u.applicationRequestQueued&&
+        t.initialRestartPending==u.initialRestartPending&&
+        a.updates==b.updates&&a.renders==b.renders&&a.submissions==b.submissions&&a.switches==b.switches&&
+        a.lightCacheState==b.lightCacheState&&a.lightManagerGeneration==b.lightManagerGeneration&&
+        a.lightManagerEntered==b.lightManagerEntered&&
+        a.rider.deferred4EC==b.rider.deferred4EC&&a.rider.rider4C4==b.rider.rider4C4&&a.rider.slot4C8==b.rider.slot4C8&&
+        a.course.selectedCourse44==b.course.selectedCourse44&&a.course.selectedPlanet40==b.course.selectedPlanet40;
+    if(!same){std::fprintf(stderr,"garage_proof_shadow_mismatch site=frontend_snapshot_without_garage\n");std::fflush(stderr);std::terminate();}
+}
+}
+OriginalUiFrontendSnapshot50KG OriginalUiFrontend50KG::snapshot() const noexcept {rr::game::EntityForestReadScope50LA forestReadScope50LA;
+    const bool outer=frontendFullSnapshot50KG;frontendFullSnapshot50KG=true;
+    auto out=snapshotWithoutGarageRuntime();frontendFullSnapshot50KG=outer;
+    const auto* s=storage_.get();if(!s)return out;
+    if(s->garageActive()&&s->garageDestinationFrontend&&s->garageDestinationFrontend->materialApplicationOwner){
+        OriginalUiGarageNativeState50KG actual;
+        if(s->garageDestinationFrontend->materialApplicationOwner->observeGarageRuntime50KG(*s->garageDestinationFrontend,*s->active->garage,actual)){
+            out.garageLoaded=actual.loaded;out.garageRootReturned=actual.rootReturned;out.garageTimingCommitted=actual.timingCommitted;
+            out.garageTargetPublished=actual.targetPublished;out.garagePublication=actual.publication;
+            out.garageManagerLifecycle=actual.managerLifecycle;out.garageManagerTransition=actual.managerTransition;
+            out.garageSelectedStat=actual.selectedStat;out.garageAperture=actual.aperture;
+        }
+    }
+    return out;
+}
+game::OriginalUiTransitionRoute50KG OriginalUiFrontend50KG::route() const noexcept {
+    const auto* s=storage_.get();
+    const auto out=s&&s->active?s->active->currentRoute():game::OriginalUiTransitionRoute50KG{};
+    if(frontendSnapshotShadow50KG()&&!frontendFullSnapshot50KG&&!sameRoute50KG(out,snapshot().route)){
+        std::fprintf(stderr,"garage_proof_shadow_mismatch site=frontend_route\n");std::fflush(stderr);std::terminate();}
+    return out;
+}
+OriginalUiFrontendSnapshot50KG OriginalUiFrontend50KG::snapshotWithoutGarageRuntime() const noexcept {rr::game::EntityForestReadScope50LA forestReadScope50LA;
+    if(frontendSnapshotShadow50KG()&&!frontendFullSnapshot50KG){
+        frontendFullSnapshot50KG=true;const auto light=snapshotWithoutGarageRuntime();frontendFullSnapshot50KG=false;
+        requireSameGarageFreeSnapshot50KG(light,snapshot());return light;
+    }
     OriginalUiFrontendSnapshot50KG out;const auto* s=storage_.get();if(!s)return out;
     out.prepared=s->prepared;out.active=s->activated;out.faulted=s->faulted;out.quitRequested=s->quit;
     out.courseLaunchReady=s->courseLaunchReady;out.deferredQueue=s->queued;out.frameSubmitted=s->frameSubmitted;out.queuedRequest=s->queue;
@@ -2498,15 +3127,6 @@ OriginalUiFrontendSnapshot50KG OriginalUiFrontend50KG::snapshot() const noexcept
     if(s->active){out.route=s->active->currentRoute();if(s->active->transition)out.transition=s->active->transition->snapshot();
         if(s->active->main)out.main=s->active->main->snapshot();if(s->active->options)out.options=s->active->options->snapshot();if(s->active->hall)out.hall=s->active->hall->snapshot();
         if(s->active->rider)out.rider=s->active->rider->snapshot();if(s->active->course)out.course=s->active->course->snapshot();if(s->active->tournament)out.tournament=s->active->tournament->snapshot();}
-    if(s->garageActive()&&s->garageDestinationFrontend&&s->garageDestinationFrontend->materialApplicationOwner){
-        OriginalUiGarageNativeState50KG actual;
-        if(s->garageDestinationFrontend->materialApplicationOwner->observeGarageRuntime50KG(*s->garageDestinationFrontend,*s->active->garage,actual)){
-            out.garageLoaded=actual.loaded;out.garageRootReturned=actual.rootReturned;out.garageTimingCommitted=actual.timingCommitted;
-            out.garageTargetPublished=actual.targetPublished;out.garagePublication=actual.publication;
-            out.garageManagerLifecycle=actual.managerLifecycle;out.garageManagerTransition=actual.managerTransition;
-            out.garageSelectedStat=actual.selectedStat;out.garageAperture=actual.aperture;
-        }
-    }
     if(s->pending)out.preparedDestination=s->pending->initialRoute;return out;
 }
 const OriginalUiMainSession50KG* OriginalUiFrontend50KG::mainSession() const noexcept {return storage_&&storage_->active?storage_->active->main.get():nullptr;}

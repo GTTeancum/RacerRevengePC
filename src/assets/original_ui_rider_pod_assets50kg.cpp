@@ -45,16 +45,24 @@ bool OriginalUiRiderPodAssets50KG::loadTournament(
     if(career>=27||!widgets[career])return fail(d,E::widget,0x1EEC94);
     return loadImpl(std::move(archive),widgets[career],true,d);
 }
+bool OriginalUiRiderPodAssets50KG::loadUnlock(
+    std::shared_ptr<const OriginalUiArchive50KG> archive,std::uint16_t widget,
+    OriginalUiRiderPodDiagnostic50KG& d) noexcept {
+    // UIUnlock User_Rotate widgets 9..23 (control factory 20A850 copies 1E9AC0).
+    d={};if(storage_)return fail(d,E::alreadyLoaded,0x1D3590);
+    if(widget<9||widget>23)return fail(d,E::widget,0x20A850);
+    return loadImpl(std::move(archive),widget,false,d,true);
+}
 bool OriginalUiRiderPodAssets50KG::loadImpl(
     std::shared_ptr<const OriginalUiArchive50KG> archive,std::uint16_t widget,
-    bool tournament,OriginalUiRiderPodDiagnostic50KG& d) noexcept {
+    bool tournament,OriginalUiRiderPodDiagnostic50KG& d,bool unlock) noexcept {
     d={};if (storage_) return fail(d,E::alreadyLoaded,0x1D3590);
     if (!archive||!archive->loaded()||!archive->identity()||
-        archive->identity()->id!=(tournament?OriginalUiArchiveId50KG::tournament:OriginalUiArchiveId50KG::rider)) return fail(d,E::archive,0x1D3590);
+        archive->identity()->id!=(unlock?OriginalUiArchiveId50KG::unlock:tournament?OriginalUiArchiveId50KG::tournament:OriginalUiArchiveId50KG::rider)) return fail(d,E::archive,0x1D3590);
     try {
         auto next=std::make_unique<Storage>();next->archive=std::move(archive);next->widget=widget;
         OriginalUiDat50KG widgets;
-        if (!readOriginalUiDat50KG(*next->archive,tournament?"UI/UITourn/Widgets.Dat":"UI/UIRider/Widgets.Dat",widgets,d.text,
+        if (!readOriginalUiDat50KG(*next->archive,unlock?"UI/UIUnlock/Widgets.Dat":tournament?"UI/UITourn/Widgets.Dat":"UI/UIRider/Widgets.Dat",widgets,d.text,
             OriginalUiRepeatedKeyPolicy50KG::preserveInOrder)) return fail(d,E::widget,0x1D31D0);
         next->widgetSource=widgets.identity();
         const auto* section=widgets.section("Widget "+std::to_string(widget));

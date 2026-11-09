@@ -209,7 +209,7 @@ bool OriginalUiGarageSession50KG::releaseManagerPageTable2A3B04(D& d)noexcept {
     if(!step.okay())std::terminate();
     managerPageTableReleased2A3B04_=true;d.sourcePC=0x2A3B04;return true;
 }
-bool OriginalUiGarageSession50KG::renderCustodyCurrent140230(std::uint64_t serial)const noexcept {
+bool OriginalUiGarageSession50KG::renderCustodyCurrent140230(std::uint64_t serial)const noexcept {rr::game::EntityForestReadScope50LA forestReadScope50LA;
     std::uint32_t pause=0;
     if(!issuerLifetime_.readPause11C(pause)||!issuer_||!sameRoot(*issuer_)||!serial||
        !scope_||!grant_||!scope_->publishedPopulatedGarageManagerCurrent(grant_->generation_)||
@@ -959,7 +959,7 @@ bool OriginalUiGarageSession50KG::constructionCurrent(const Application& root)co
         podScene_->currentPrefix()&&podScene_->visibility_==visibility_&&
         (!visibility_?!actorsAttempted_:visibility_->matchesColdConstruction(grant_,sceneAssets_))));
 }
-bool OriginalUiGarageSession50KG::publishedOwnerCurrent(const Application& root)const noexcept {
+bool OriginalUiGarageSession50KG::publishedOwnerCurrent(const Application& root)const noexcept {rr::game::EntityForestReadScope50LA forestReadScope50LA;
     // Native retained custody, not a new load or frame-return receipt. The
     // real Search/render histories survive their calls and must not be zeroed
     // to reuse the detached-construction predicate after manager publication.
@@ -1945,12 +1945,29 @@ bool Application::continueGarageRootUpdate140CE0(Frontend& frontend,
         return c&&c->kind==K::entity141300&&c->sessionGeneration==generation&&c->reference00==1&&
             c->objectKey==static_cast<std::uint64_t>(reinterpret_cast<std::uintptr_t>(c));
     };
+    // The process loading manager 330 (17CE2C) is a later Root sibling than
+    // Aural. A first-boot dispatcher precedes it; a successor dispatcher
+    // (rebuilt after a race, 17C1D8) is appended after it. Exactly that one
+    // retained sibling may sit between Aural and the dispatcher.
+    C* const loading=sourceLoading330Owner_&&sourceLoading330Owner_->managerAttached_?
+        &sourceLoading330Owner_->manager_:nullptr;
+    const bool auralThenDispatcher=auralNode->next14==dispatcher||
+        (loading&&auralNode->next14==loading&&loading->next14==dispatcher&&scope.linked(*loading,root));
     if(!actualRoot(outer)||!actualRoot(root)||!scope.linked(*outer,nullptr)||
        outer->previous10||outer->next14||outer->firstChild18!=root||
        !scope.linked(*root,outer)||root->previous10||root->firstChild18!=lightNode||
        !scope.linked(*lightNode,root)||lightNode->previous10||lightNode->next14!=auralNode||
-       !scope.linked(*auralNode,root)||auralNode->next14!=dispatcher||!scope.linked(*dispatcher,root))
-        return stop(0x140CF4,"Garage Root's actual enrolled intrusive links do not match its retained native owners");
+       !scope.linked(*auralNode,root)||!auralThenDispatcher||!scope.linked(*dispatcher,root)){
+        std::fprintf(stderr,"garage_root_links outer=%d root=%d outer_linked=%d outer_sib=%d outer_first_root=%d root_linked=%d root_prev=%d root_first_light=%d light_linked=%d light_prev=%d light_next_aural=%d aural_linked=%d aural_next_dispatcher=%d dispatcher_linked=%d\n",
+            int(actualRoot(outer)),int(actualRoot(root)),int(outer&&scope.linked(*outer,nullptr)),int(outer&&(outer->previous10||outer->next14)),
+            int(outer&&outer->firstChild18==root),int(root&&outer&&scope.linked(*root,outer)),int(root&&root->previous10!=nullptr),
+            int(root&&root->firstChild18==lightNode),int(root&&scope.linked(*lightNode,root)),int(lightNode->previous10!=nullptr),
+            int(lightNode->next14==auralNode),int(root&&scope.linked(*auralNode,root)),int(auralNode->next14==dispatcher),
+            int(root&&scope.linked(*dispatcher,root)));
+        if(root)for(const C* c=root->firstChild18;c;c=c->next14)
+            std::fprintf(stderr,"garage_root_child kind=%u light=%d aural=%d dispatcher=%d refs=%u gen_root=%d\n",unsigned(c->kind),
+                int(c==lightNode),int(c==auralNode),int(c==dispatcher),unsigned(c->reference00),int(c->sessionGeneration==generation));
+        return stop(0x140CF4,"Garage Root's actual enrolled intrusive links do not match its retained native owners");}
     original_ui_source_timing50LH::Sample sample;std::uint64_t serial=0;
     if(!s.runtimeFrame_->timing_.readPrepared(sample,serial)||serial!=s.runtimeFrame_->publication_)
         return stop(0x140CE4,"Garage Root lost the same prepared source factor before publishing23C");
@@ -2241,18 +2258,7 @@ void Application::prepareGarageDestinationResources1F241C(Frontend& frontend,
     rr::platform::OriginalUiGarageDestinationDiagnostic50KG& d,
     rr::platform::OriginalUiFrontendColdInterval50KG& cold)const noexcept {
     using S=rr::platform::OriginalUiGarageDestinationStatus50KG;
-    using SceneAssets=rr::assets::OriginalUiGarageSceneAssets50KG;
-    using Id=rr::assets::OriginalUiArchiveId50KG;
     d={};d.proposalSerial=proposal.serial;d.requestSourcePC=0x1F241C;
-    // Host-only cold observation. No SourceTiming sample, callback service or
-    // drain occurs here. An already measured receipt cannot be overwritten.
-    struct ColdSpan {
-        rr::platform::OriginalUiFrontendColdInterval50KG& out;bool active=false;
-        void start()noexcept{active=true;out.measured=true;out.begin=std::chrono::steady_clock::now();}
-        ~ColdSpan(){if(active){out.end=std::chrono::steady_clock::now();
-            const auto n=std::chrono::duration_cast<std::chrono::nanoseconds>(out.end-out.begin).count();
-            out.nanoseconds=n>0?static_cast<std::uint64_t>(n):0;}}
-    } interval{cold};
     try {
         if(cold.measured||garageAudioOwnerThread_!=std::this_thread::get_id()||
            frontend.materialApplicationOwner!=this||!frontend.uploadLifetime_||
@@ -2270,12 +2276,44 @@ void Application::prepareGarageDestinationResources1F241C(Frontend& frontend,
            request.sourcePage!=1||request.targetScreen!=13||request.targetPage!=1||request.sourcePC!=0x1F241C){
             d.status=S::origin;d.pendingSourcePC=0x1F241C;return;
         }
+        // Tournament-only: the proposal's rider must be the selected career.
         rr::platform::OriginalUiRiderProfileOwner50KG::GarageProfileSnapshot selected;
         if(riderProfile->commonProfile()!=profile.get()||!riderProfile->selectedGarageProfileSnapshot(selected)||
+           decision.selectedRider!=selected.career.career100C0){
+            d.status=S::profile;d.pendingSourcePC=0x1D1CD0;return;
+        }
+    }catch(...){d.status=S::allocation;return;}
+    prepareGarageCareerResources1D1950(frontend,d,cold);
+}
+void Application::prepareGarageCareerResources1D1950(Frontend& frontend,
+    rr::platform::OriginalUiGarageDestinationDiagnostic50KG& d,
+    rr::platform::OriginalUiFrontendColdInterval50KG& cold)const noexcept {
+    using S=rr::platform::OriginalUiGarageDestinationStatus50KG;
+    using SceneAssets=rr::assets::OriginalUiGarageSceneAssets50KG;
+    using Id=rr::assets::OriginalUiArchiveId50KG;
+    // Caller owns origin admission and has set proposalSerial/requestSourcePC.
+    const auto serial=d.proposalSerial;const auto requestPC=d.requestSourcePC;
+    d.status=S::notRequested;d.pendingSourcePC=0;
+    // Host-only cold observation. No SourceTiming sample, callback service or
+    // drain occurs here. An already measured receipt cannot be overwritten.
+    struct ColdSpan {
+        rr::platform::OriginalUiFrontendColdInterval50KG& out;bool active=false;
+        void start()noexcept{active=true;out.measured=true;out.begin=std::chrono::steady_clock::now();}
+        ~ColdSpan(){if(active){out.end=std::chrono::steady_clock::now();
+            const auto n=std::chrono::duration_cast<std::chrono::nanoseconds>(out.end-out.begin).count();
+            out.nanoseconds=n>0?static_cast<std::uint64_t>(n):0;}}
+    } interval{cold};
+    try {
+        if(cold.measured||garageAudioOwnerThread_!=std::this_thread::get_id()||
+           frontend.materialApplicationOwner!=this||!frontend.uploadLifetime_||
+           !Frontend::uploadLifetimeLive(*frontend.uploadLifetime_)){
+            d.status=S::rootOwner;d.pendingSourcePC=0x1B823C;return;
+        }
+        rr::platform::OriginalUiRiderProfileOwner50KG::GarageProfileSnapshot selected;
+        if(!riderProfile||riderProfile->commonProfile()!=profile.get()||!riderProfile->selectedGarageProfileSnapshot(selected)||
            selected.career.career100C0>=frontend.garageCareerResources_.size()||
            !rr::assets::originalUiGaragePodArchive50KG(selected.career.career100C0)||
-           selected.career.stamp.mode34!=2||
-           decision.selectedRider!=selected.career.career100C0){
+           selected.career.stamp.mode34!=2){
             d.status=S::profile;d.pendingSourcePC=0x1D1CD0;return;
         }
         if(garageCustodyOwner_||garageCustodyAttempted_){
@@ -2305,7 +2343,7 @@ void Application::prepareGarageDestinationResources1F241C(Frontend& frontend,
         } retain{retained,frontend,d};
         if(frontend.garageDestinationAssetsAttempted_){
             if(!frontend.garageDestinationAssets_){
-                d=frontend.garageDestinationFailure_;d.proposalSerial=proposal.serial;return;
+                d=frontend.garageDestinationFailure_;d.proposalSerial=serial;d.requestSourcePC=requestPC;return;
             }
         }else{
             interval.start();frontend.garageDestinationAssetsAttempted_=true;
@@ -2339,7 +2377,7 @@ void Application::prepareGarageDestinationResources1F241C(Frontend& frontend,
     if(frontend.garageDestinationAssetsAttempted_&&!frontend.garageDestinationAssets_){
         try{frontend.garageDestinationFailure_=d;}
         catch(...){frontend.garageDestinationFailure_.status=S::allocation;
-            frontend.garageDestinationFailure_.requestSourcePC=0x1F241C;
+            frontend.garageDestinationFailure_.requestSourcePC=requestPC;
             frontend.garageDestinationFailure_.pendingSourcePC=d.pendingSourcePC;}
     }
 }

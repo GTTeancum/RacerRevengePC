@@ -298,12 +298,43 @@ bool OriginalResultsPrimitiveReferences50LA::decodeCurrentNativeImage50LA(std::s
         if(!domain_->textures383400()->row(map.textureToken,row)||!row.references08||*row.references08<=0||!row.object04)
             return fail(d,S::texture,0x298E60);
         const auto* root=row.object04;
-        if(root->construction_!=context_||root->resolver_!=domain_->resolver3E1A70())
-            return fail(d,S::texture,0x24E880);
+        if(root->construction_!=context_||root->resolver_!=domain_->resolver3E1A70()){
+            d.field=root->construction_!=context_?"Results primitive texture: other construction context":"Results primitive texture: other resolver";
+            return fail(d,S::texture,0x24E880);}
         std::shared_ptr<const OriginalUiArchive50KG> archive;OriginalUiMemberView50KG member;
         std::size_t offset=0,extent=0;
-        if(!root->borrowResultsUiPstImage50LA(*map.texture,archive,member,offset,extent))
-            return fail(d,S::texture,0x24E880);
+        bool resourceSource=false;
+        if(!root->borrowResultsUiPstImage50LA(*map.texture,archive,member,offset,extent)){
+            // This standalone PST's row was first created through a non-UI
+            // registration (e.g. the Application font owner), so it carries no
+            // UI first source. Use the SAME member of the overlays archive when
+            // its bytes are identical (the Results material proof uses that
+            // member too); otherwise decode the resource's own original bytes.
+            const auto* name=root->sourceMember();const auto* bytes=root->originalBytes();
+            std::size_t begin=0,length=0;
+            if(map.texture!=root||root->aggregate_||root->atmChild_||root->animated102070()||
+               root->sourceFormat_!=OriginalStandardTextureSourceFormat50LA::pstIndexed||
+               !name||!bytes||bytes->empty()||!root->pstExtent24E880(begin,length)||
+               !length||begin>bytes->size()||length>bytes->size()-begin||
+               bytes->size()>std::numeric_limits<std::uint32_t>::max()){
+                d.field="Results primitive texture: not a borrowed UI PST image";return fail(d,S::texture,0x24E880);}
+            const auto overlaid=overlays_&&overlays_->loaded()?overlays_->find(*name):OriginalUiMemberView50KG{};
+            if(overlaid.identity&&overlaid.data&&overlaid.size==bytes->size()&&
+               !std::memcmp(overlaid.data,bytes->data(),bytes->size())){
+                archive=overlays_;member=overlaid;
+            }else{
+                const OriginalUiMemberIdentity50KG* identityOf=nullptr;
+                for(const auto& held:nativeResourceMembers_)
+                    if(held->name==name->c_str()&&held->bytes==bytes->size()){identityOf=held.get();break;}
+                if(!identityOf){
+                    nativeResourceMembers_.push_back(std::make_unique<OriginalUiMemberIdentity50KG>(
+                        OriginalUiMemberIdentity50KG{name->c_str(),0u,static_cast<std::uint32_t>(bytes->size()),nullptr}));
+                    identityOf=nativeResourceMembers_.back().get();
+                }
+                member={identityOf,bytes->data(),bytes->size()};
+            }
+            offset=begin;extent=length;resourceSource=true;
+        }
         const bool animated=root->animated102070();
         const auto* count=animated?root->frameCount20():nullptr;
         if(animated&&(!count||*count<=0))return fail(d,S::texture,0x102050);
@@ -315,7 +346,8 @@ bool OriginalResultsPrimitiveReferences50LA::decodeCurrentNativeImage50LA(std::s
             const auto* child=animated?root->frame102050(static_cast<std::int32_t>(i)):root;
             std::shared_ptr<const OriginalUiArchive50KG> childArchive;OriginalUiMemberView50KG childMember;
             std::size_t begin=0,length=0;
-            if(!child||!root->borrowResultsUiPstImage50LA(*child,childArchive,childMember,begin,length)||
+            if(resourceSource&&child==root){childArchive=archive;childMember=member;begin=offset;length=extent;}
+            else if(!child||!root->borrowResultsUiPstImage50LA(*child,childArchive,childMember,begin,length)||
                childArchive!=archive||childArchive.owner_before(archive)||archive.owner_before(childArchive)||
                childMember.identity!=member.identity||childMember.data!=member.data||childMember.size!=member.size)
                 return fail(d,S::texture,0x102050);
@@ -334,15 +366,15 @@ bool OriginalResultsPrimitiveReferences50LA::decodeCurrentNativeImage50LA(std::s
             std::vector<OriginalUiImageSource50KG> sources;sources.reserve(imageCount);
             for(std::size_t i=0;i<imageCount;++i)sources.push_back({i,member,identity.offsets[i],identity.extents[i],{}});
             auto fresh=std::make_shared<OriginalUiScreenAssets50KG>();OriginalUiScreenAssetDiagnostic50KG decoded;
-            if(!fresh->load(sources,decoded))return fail(d,S::texture,0x24E880);
+            if(!fresh->load(sources,decoded)){d.field="Results primitive texture: decode";return fail(d,S::texture,0x24E880);}
             // All actual ATM frames are retained; frame selection still comes
             // from the real current prototype, never native time or frame0.
             for(std::size_t i=0;i<imageCount;++i){
                 const auto* image=fresh->decodedTexture(static_cast<std::uint32_t>(i));const auto* child=identity.children[i];
                 if(!image||image->mips.empty()||!child->sourceWidth14()||!child->sourceHeight18()||
                    image->mips.back().width!=static_cast<std::uint32_t>(*child->sourceWidth14())||
-                   image->mips.back().height!=static_cast<std::uint32_t>(*child->sourceHeight18()))
-                    return fail(d,S::texture,0x24E880);
+                   image->mips.back().height!=static_cast<std::uint32_t>(*child->sourceHeight18())){
+                    d.field="Results primitive texture: decoded size";return fail(d,S::texture,0x24E880);}
             }
             identity.images=fresh;bank=fresh;
             OriginalStandardMaterialMapBindingView50LA after;
