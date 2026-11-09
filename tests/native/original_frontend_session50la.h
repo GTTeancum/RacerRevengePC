@@ -61,7 +61,7 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
    if(retired!=rr::platform::OriginalUiFrontendStatus50KG::ok&&
       retired!=rr::platform::OriginalUiFrontendStatus50KG::noChange){
     std::cerr<<"original frontend Garage retirement source="<<originalMain.diagnostic.sourcePC
-        <<" status="<<static_cast<unsigned>(retired)<<'\n';return false;
+        <<" status="<<static_cast<unsigned>(retired)<<" detail="<<originalMain.diagnostic.garageDetail<<'\n';return false;
    }
   }
   // Retire only the actual empty process collector. Queued source records,
@@ -365,9 +365,29 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
 #endif
   rr::platform::loading_progress50DU::finish();
   PlayerLoadingSession50DU::checkStop();
+  // A race-return Garage's teardown needs its first Root frame (its scene,
+  // droid routing and page retirement start there). A close request that
+  // arrives before that frame is honoured right after it: one frame.
+  bool closeAfterGarageFirstFrame=false;
+  const auto garageFirstFramePending=[&]()noexcept{return raceReturnGarage&&originalMain.frameCount==0;};
   for(;;){
    const auto frontendIterationStart=std::chrono::steady_clock::now();
-   if(captureRun.deadlineExpired()){originalMain.requestQuit();break;}
+   if(closeAfterGarageFirstFrame&&!garageFirstFramePending()){
+    std::cerr<<"frontend_close_after_garage_first_frame\n";originalMain.requestQuit();break;}
+   if(captureRun.deadlineExpired()&&!closeAfterGarageFirstFrame){
+    if(!garageFirstFramePending()){originalMain.requestQuit();break;}
+    closeAfterGarageFirstFrame=true;
+   }
+   // Test only: RR_TEST_CLOSE_GARAGE_AT_FRAME=N requests a window close at
+   // native frame N of a race-return Garage (0 = before its first frame).
+   if(raceReturnGarage&&captureRun.unattended()&&!closeAfterGarageFirstFrame){
+    static const long closeAt=[]{const char* v=std::getenv("RR_TEST_CLOSE_GARAGE_AT_FRAME");return v&&*v?std::strtol(v,nullptr,10):-1L;}();
+    if(closeAt>=0&&originalMain.frameCount>=static_cast<std::uint64_t>(closeAt)){
+     std::cerr<<"test_close_garage_at_frame frame="<<originalMain.frameCount<<'\n';
+     if(!garageFirstFramePending()){originalMain.requestQuit();break;}
+     closeAfterGarageFirstFrame=true;
+    }
+   }
    const bool tracePoll=originalMain.traceStages&&tracePolls<2;
    if(tracePoll)std::cerr<<"original_ui_frontend_poll {\"poll\":"<<tracePolls+1
        <<",\"phase\":\"enter\"}\n";
@@ -381,7 +401,8 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
     reportHost50DU(hostDiagnostic);throw std::runtime_error("original frontend event pump failed");
    }
    if(hostInput.inputError){terminalInputError=hostInput.inputError;std::cerr<<"stdin input error "<<terminalInputError<<'\n';}
-   if(input.quitRequested){originalMain.requestQuit();reportUiState("quit");break;}
+   if(input.quitRequested&&!garageFirstFramePending()){originalMain.requestQuit();reportUiState("quit");break;}
+   if(input.quitRequested)closeAfterGarageFirstFrame=true;
    windowCapture.request(input);
    capturePending=capturePending||hostInput.captureRequested;
    if(hostInput.pauseRequested)originalMain.setHostPaused(true);

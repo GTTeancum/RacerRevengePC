@@ -1980,6 +1980,14 @@ bool OriginalUiMainAudio50KG::nativeSceneWetLifetimeCurrent(const OriginalUiGara
     }
     return false;
 }
+bool OriginalUiMainAudio50KG::nativeSceneWetControlQueued(const OriginalUiGaragePodScene50KG& scene)const noexcept {
+    for(std::size_t n=0;n<nativeGroupControlCount_;++n){const auto& c=nativeGroupControls_[n];
+        // Routing is applied at the scene's first Root audio frame; before
+        // that the queued control has carried no droid voice.
+        if(c&&c->kind==NativeGroupControlKind::scene&&c->scene.get()==&scene)return c->routingApplied;
+    }
+    return false;
+}
 bool OriginalUiMainAudio50KG::liveGarageVoiceRangesCurrent()const noexcept {
     if(!nativeWetInterfaceCurrent()||mixerCount_!=garageSceneRequiredVoices)return false;
     bool watto=false,scene=false;

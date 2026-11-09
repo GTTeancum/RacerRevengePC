@@ -1517,8 +1517,10 @@ bool OriginalUiGarageSession50KG::retireNormalChildren142590(D& d,std::string& e
     auto& fog=*widgets_->fog_;auto& lights=*fog.lights_;auto& search=*lights.search_;
     if(normalRetirementPhase_==P::managerDetached){
         OriginalUiGaragePageOwner50KG::Diagnostic pd;
-        if(!page_||!page_->beginRetirement142590(pd))
-            return fail(pd.sourcePC?pd.sourcePC:0x142590,"Normal Garage Page/Scene retirement is pending; exact forest retained");
+        if(!page_||!page_->beginRetirement142590(pd)){
+            std::fprintf(stderr,"garage_page_retirement_pending page=%d status=%u pc=%x stage=%u\n",int(page_!=nullptr),
+                unsigned(pd.status),unsigned(pd.sourcePC),page_?unsigned(page_->stage_):0u);
+            return fail(pd.sourcePC?pd.sourcePC:0x142590,"Normal Garage Page/Scene retirement is pending; exact forest retained");}
         // Scene4C0 was freed by its Page owner. Clear only our native borrow.
         podScene_=nullptr;normalRetirementPhase_=P::pageRetired;
     }

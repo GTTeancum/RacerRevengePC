@@ -76,6 +76,8 @@ class OriginalUiMainAudio50KG final : public AudioStereoProducer50HD {
     bool publishNativeWattoSample(OriginalUiGarageWattoAudio50KG&,std::size_t sound,std::size_t slot,const AudioClip50HD&)noexcept;
     bool publishNativeSceneSample(OriginalUiGarageDroidAudio50GN&,std::size_t ordinal,const AudioClip50HD&)noexcept;
     bool nativeSceneWetLifetimeCurrent(const OriginalUiGaragePodScene50KG&)const noexcept;
+    // True once a wet group control was queued for this scene (live or not).
+    bool nativeSceneWetControlQueued(const OriginalUiGaragePodScene50KG&)const noexcept;
     bool liveGarageVoiceRangesCurrent()const noexcept;
     bool ownedStoppedGarageClipHistoryCurrent()const noexcept;
     bool wattoConstructionHistoryCurrent(const OriginalUiGarageWattoSoundGroup50KG&)const noexcept;

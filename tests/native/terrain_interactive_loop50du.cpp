@@ -20,6 +20,9 @@
 #include <optional>
 #include <sstream>
 
+// Diagnostic-only GPU vertex check switch, defined in vehicle_draw50cm.cpp.
+namespace rr::game { extern bool vehicleDrawSkinReference50CM; }
+
 namespace interactive_loop50DU {
 namespace recovery50FI=checkpoint_recovery50fi_fixture;
 using NativeRacerFramePart=interactive_frame50DU::Part;
@@ -2054,6 +2057,24 @@ void Context::run() {
     VehicleDrawBatchInput50CO drawInput{};
     require50DU(playerDrawAssets.batchInput(bank,ModelPalettePhase49S::selectedRenderPreparation,
         ModelPaletteSceneState49S::completeCurrentScene,drawInput),"native draw bank preparation failed");
+    {
+     // GPU vertex path for the player pod (archetype 0), as admitted by the
+     // renderer. One skin record per CPU bank: a retained published batch
+     // keeps reading the other bank. Local bounds are rebuilt every frame
+     // (one cheap pass), so no record outlives a model change. A destroyed
+     // player keeps the CPU path, whose collapse below hides the model.
+     static std::array<std::array<rr::game::VehicleDrawSkin50CM,rr::game::maxVehicleDrawComponents50CM>,2> playerSkins50LA;
+     const std::uint32_t playerSkinMask=rr::game::nativeRacerDestroyed50PD(0)?0u:renderer.racerGpuSkinMask50LA(0);
+     for(std::uint32_t c=0;c<drawInput.componentCount&&c<rr::game::maxVehicleDrawComponents50CM;++c){
+      auto& skin=playerSkins50LA[bank&1u][c];
+      skin.localBoundsReady=false;
+      drawInput.staging[c].skin=(playerSkinMask>>c)&1u?&skin:nullptr;
+     }
+     // Diagnostic-only GPU/CPU vertex comparison every N rendered frames.
+     static const std::uint64_t vertexCheckInterval=[]{const char* v=std::getenv("RR_GPU_POD_VERTEX_CHECK");
+      const long long n=v?std::atoll(v):0;return n>0?static_cast<std::uint64_t>(n):0ull;}();
+     rr::game::vehicleDrawSkinReference50CM=vertexCheckInterval&&submittedDrawFrames%vertexCheckInterval==0;
+    }
     bankTiming.finish();
     render_diagnostics50GQ::Scope projectionTiming(renderDiagnostics,render_diagnostics50GQ::Subphase::VehicleProjection);
     VehicleDrawBatch50CO next{};VehicleDrawBatchDiagnostic50CO drawDiagnostic{};

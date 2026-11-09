@@ -2,6 +2,9 @@
 #include "../../../tests/native/ra_static_fire_visual50la.h"
 #include "native_fxaa_pass.h"
 #include <memory>
+#include <algorithm>
+#include <cmath>
+#include <vector>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -117,6 +120,9 @@ bool VehicleWindowGl50DS::Storage::retainedMesh(const game::VehicleDrawBatch50CO
             if (part.indices != mesh.indices || part.indexCount != mesh.indexCount ||
                 part.spans != mesh.spans || part.spanCount != mesh.spanCount || part.vertexCount != mesh.vertexCount)
                 return fail(d, VehicleWindowError50DS::assets, "batch is not the retained prepared mesh");
+            if (part.skin && (!selected.skin50LA || !selected.skin50LA[c].eligible ||
+                part.skin->boneCount != selected.skin50LA[c].boneCount))
+                return fail(d, VehicleWindowError50DS::frame, "GPU-skinned racer component is not admitted");
             // Full semantic material identity, including unused entries, is
             // retained with the generated RGB. A subset mask must not relabel
             // imported RGB as source color or route generated RGB to legacy.
@@ -513,6 +519,14 @@ bool VehicleWindowGl50DS::Storage::prepareSpecularFrame50LA(const game::VehicleD
                         frameSpecularCoefficients50LA[slot][bodySlot], result))
                         return fail(d, VehicleWindowError50DS::frame, "GPU-skinned body specular coefficients rejected");
                     frameSpecularSecond50LA[slot][bodySlot] = result.secondEnabled;
+                    // Check frame only: CPU map-2 reference for the GPU readback.
+                    // Skinned bodies never upload this slot's CPU UV stream.
+                    game::OriginalRacerSpecularResult50LA reference{};
+                    if (gpuSkinCheck50LA.requested && body.sourceNormals &&
+                        !game::prepareOriginalRacerSpecular50LA(*selected.meshes[c], body, actual, modelView,
+                            frameSpecularUvs50LA.get() + uvSlot * game::maxRigidVertices49S, game::maxRigidVertices49S,
+                            *specularWorkspace50LA, reference))
+                        return fail(d, VehicleWindowError50DS::frame, "GPU vertex check map-2 reference rejected");
                     continue;
                 }
                 if (!game::prepareOriginalRacerSpecular50LA(*selected.meshes[c], body, actual, modelView,
@@ -547,7 +561,8 @@ bool VehicleWindowGl50DS::Storage::uploadSpecularUvs50LA(std::uint8_t bank, U sl
                 if(!check("upload actual current single diffuse fog bytes"))return false;
             }
             if(!body.enabled)continue;
-            if (slot && slot <= frameOpponentCount && frameOpponentBatches[slot - 1].component[c].skin) continue;
+            if (slot <= frameOpponentCount && c < (slot ? frameOpponentBatches[slot - 1] : framePlayerBatch).componentCount &&
+                (slot ? frameOpponentBatches[slot - 1] : framePlayerBatch).component[c].skin) continue;
             if (!sourceBodyComponent50LA(c, selected.resources->componentCount))
                 return fail(*diagnostic, VehicleWindowError50DS::assets,
                     "source map-2 upload has no actual engine in this three/five-model pod");
@@ -1579,6 +1594,13 @@ bool VehicleWindowGl50DS::Storage::drawSpan50LA(void* context, game::VehicleDraw
         const U c = componentIndex(component);
         if (!s.active || c >= s.resources.componentCount || baseVertex)
             return fail(*s.diagnostic, VehicleWindowError50DS::assets, "invalid owned body-pair span draw");
+        // Player GPU vertex path: 50CV bound this component's VAO (which also
+        // carries the static skin stream); publish its per-part inputs once.
+        if (c < s.framePlayerBatch.componentCount) {
+            const auto& part = s.framePlayerBatch.component[c];
+            if (!ordinal && !s.bindRacerSkin50LA(part, 0, c)) return false;
+            s.selectRacerSkinSpan50LA(part, span.material_index);
+        }
         return s.drawSpecularSpan50LA(static_cast<std::uint8_t>(s.published ^ 1u), 0, 0, c, ordinal, span);
     }
 
@@ -1650,7 +1672,8 @@ bool VehicleWindowGl50DS::Storage::drawTransparentPod(std::uint8_t bank, U oppon
                 const auto& material = selected.materials[selected.materialOffsets[c] + span.material_index];
                 if (material.policy.blend == VehicleWindowBlend50DS::opaque) continue;
                 const game::VehicleDrawSubmission50CM* part = opponent < maxVehicleWindowOpponents50DS ?
-                    &frameOpponentBatches[opponent].component[c] : nullptr;
+                    &frameOpponentBatches[opponent].component[c] :
+                    c < framePlayerBatch.componentCount ? &framePlayerBatch.component[c] : nullptr;
                 if (!bound) {
                     drawGl.bindVertexArray(selected.resources->bank[bank].vertexArray[c]);
                     drawGl.bindBuffer(elementBuffer, selected.resources->indices[c].buffer);
@@ -1810,13 +1833,216 @@ bool VehicleWindowGl50DS::Storage::racerSkinShadow50LA(const game::VehicleDrawSu
 std::uint32_t VehicleWindowGl50DS::racerGpuSkinMask50LA(std::uint32_t archetype) const noexcept {
         if (!initialized()) return 0;
         const auto& s = *storage_;
-        if (!archetype || archetype > s.racerArchetypeCount || s.coverageDemand || !s.fixedSpecularBlend50LA ||
+        // Archetype 0 is the player pod; RR_CPU_POD_VERTICES=1 disables every pod.
+        if (s.cpuPodVertices50LA || archetype > s.racerArchetypeCount || s.coverageDemand || !s.fixedSpecularBlend50LA ||
             !s.gl.blendFuncSeparate || !s.gl.uniform4fv || !s.gl.uniform3fv || !s.gl.uniform2fv) return 0;
-        const auto& source = s.racerArchetypes[archetype - 1];
+        const auto selected = s.racerView(archetype);
+        if (!selected.skin50LA) return 0;
         std::uint32_t mask = 0;
-        for (U c = 0; c < source.resources.componentCount; ++c)
-            if (source.skin50LA[c].eligible) mask |= 1u << c;
+        for (U c = 0; c < selected.resources->componentCount; ++c)
+            if (selected.skin50LA[c].eligible) mask |= 1u << c;
         return mask;
+    }
+
+namespace {
+// Transform-feedback record of the GPU vertex check, in varying order.
+constexpr const char* gpuSkinCheckVaryings50LA[] = {"viewerWorldPosition", "viewerColor", "viewerUv",
+    "sourceSpecularUv50LA", "viewerWorldNormal"};
+constexpr unsigned gpuSkinCheckFloats50LA = 3 + 4 + 2 + 2 + 3;
+constexpr std::uint32_t transformFeedbackBuffer50LA = 0x8C8E, rasterizerDiscard50LA = 0x8C89;
+}
+
+bool VehicleWindowGl50DS::Storage::prepareGpuSkinCheck50LA() noexcept {
+        auto& k = gpuSkinCheck50LA;
+        if (k.attempted) return k.ready;
+        k.attempted = true;
+        const auto proc = [&](const char* name) noexcept { return request.procAddress(request.context, name); };
+        k.transformFeedbackVaryings = reinterpret_cast<decltype(k.transformFeedbackVaryings)>(proc("glTransformFeedbackVaryings"));
+        k.bindBufferBase = reinterpret_cast<decltype(k.bindBufferBase)>(proc("glBindBufferBase"));
+        k.beginTransformFeedback = reinterpret_cast<decltype(k.beginTransformFeedback)>(proc("glBeginTransformFeedback"));
+        k.endTransformFeedback = reinterpret_cast<decltype(k.endTransformFeedback)>(proc("glEndTransformFeedback"));
+        k.drawArrays = reinterpret_cast<decltype(k.drawArrays)>(proc("glDrawArrays"));
+        const auto refuse = [&](const char* why) noexcept {
+            for (unsigned i = 0; i < 16 && drawGl.getError(); ++i) {}
+            std::fprintf(stderr, "gpu_pod_vertex_check unavailable reason=%s\n", why);
+            return false;
+        };
+        if (!k.transformFeedbackVaryings || !k.bindBufferBase || !k.beginTransformFeedback ||
+            !k.endTransformFeedback || !k.drawArrays || !gl.getBufferSubData) return refuse("entry_points");
+        // The same vertex program text as the draw shader, captured instead of rasterized.
+        const char* source = vehicleGlVertexSource50CZ();
+        k.vertexShader = shaderGl.createShader(0x8B31);
+        if (!k.vertexShader) return refuse("create_shader");
+        shaderGl.shaderSource(k.vertexShader, 1, &source, nullptr);
+        shaderGl.compileShader(k.vertexShader);
+        std::int32_t status = 0;
+        shaderGl.getShaderiv(k.vertexShader, 0x8B81, &status);
+        if (!status) return refuse("compile");
+        k.program = shaderGl.createProgram();
+        if (!k.program) return refuse("create_program");
+        shaderGl.attachShader(k.program, k.vertexShader);
+        const struct { U index; const char* name; } attributes[] = {
+            {vehicleGlPositionAttribute50CZ, "rrPosition"}, {vehicleGlUvAttribute50CZ, "rrUv"},
+            {vehicleGlColorAttribute50CZ, "rrColor"}, {vehicleGlNormalAttribute50CZ, "rrWorldNormal"},
+            {vehicleGlSpecularUvAttribute50LA, "rrSpecularUv50LA"}, {vehicleGlSourceFogAttribute50LA, "rrSourceFog50LA"},
+            {vehicleGlSkinPositionAttribute50LA, "rrSkinPosition50LA"}, {vehicleGlSkinBoneAttribute50LA, "rrSkinBone50LA"},
+            {vehicleGlSkinNormalAttribute50LA, "rrSkinNormal50LA"}, {vehicleGlSkinLocalNormalAttribute50LA, "rrSkinLocalNormal50LA"},
+            {vehicleGlSkinUvAttribute50LA, "rrSkinUv50LA"}, {vehicleGlSkinColorAttribute50LA, "rrSkinColor50LA"}};
+        for (const auto& a : attributes) shaderGl.bindAttribLocation(k.program, a.index, a.name);
+        k.transformFeedbackVaryings(k.program, 5, gpuSkinCheckVaryings50LA, 0x8C8C /*INTERLEAVED_ATTRIBS*/);
+        shaderGl.linkProgram(k.program);
+        shaderGl.getProgramiv(k.program, 0x8B82, &status);
+        if (!status) return refuse("link");
+        k.bones = shaderGl.getUniformLocation(k.program, "skinBones50LA");
+        k.lights = shaderGl.getUniformLocation(k.program, "skinLightDirections50LA");
+        k.colors = shaderGl.getUniformLocation(k.program, "skinColorRows50LA");
+        k.selected = shaderGl.getUniformLocation(k.program, "skinDiffuseSelected50LA");
+        k.specular = shaderGl.getUniformLocation(k.program, "skinSpecular50LA");
+        k.mode = shaderGl.getUniformLocation(k.program, "skinMode50LA");
+        k.uvTransform = shaderGl.getUniformLocation(k.program, "useUvTransform");
+        if (k.bones < 0 || k.lights < 0 || k.colors < 0 || k.selected < 0 || k.specular < 0 || k.mode < 0)
+            return refuse("uniforms");
+        gl.genBuffers(1, &k.buffer);
+        if (!k.buffer) return refuse("buffer");
+        drawGl.bindBuffer(transformFeedbackBuffer50LA, k.buffer);
+        gl.bufferData(transformFeedbackBuffer50LA,
+            static_cast<std::intptr_t>(std::size_t(game::maxRigidVertices49S) * gpuSkinCheckFloats50LA * sizeof(float)),
+            nullptr, 0x88E1 /*STREAM_READ*/);
+        drawGl.bindBuffer(transformFeedbackBuffer50LA, 0);
+        if (drawGl.getError()) return refuse("gl_error");
+        k.ready = true;
+        std::fprintf(stderr, "gpu_pod_vertex_check ready capture=transform_feedback floats_per_vertex=%u\n",
+            gpuSkinCheckFloats50LA);
+        return true;
+    }
+
+bool VehicleWindowGl50DS::Storage::checkGpuSkin50LA(std::uint8_t bank) noexcept {
+        // Diagnostic only. Reference parts exist only on loop check frames: a
+        // skinned part that also carries CPU vertices and normals.
+        auto& k = gpuSkinCheck50LA;
+        bool any = false;
+        for (U slot = 0; slot <= frameOpponentCount && !any; ++slot) {
+            const auto& batch = slot ? frameOpponentBatches[slot - 1] : framePlayerBatch;
+            for (U c = 0; c < batch.componentCount; ++c)
+                any = any || (batch.component[c].skin && batch.component[c].sourceNormals);
+        }
+        if (!any || !prepareGpuSkinCheck50LA()) return true;
+        static thread_local std::vector<float> captured;
+        captured.resize(std::size_t(game::maxRigidVertices49S) * gpuSkinCheckFloats50LA);
+        std::uint64_t parts = 0, vertices = 0, colorMismatches = 0, map2Vertices = 0;
+        double position = 0, positionRelative = 0, color = 0, uv = 0, map2 = 0, normalDegrees = 0;
+        U worstSlot = 0, worstComponent = 0;
+        gl.useProgram(k.program);
+        gl.uniform1i(k.mode, 1);
+        if (k.uvTransform >= 0) gl.uniform1i(k.uvTransform, 0);
+        k.bindBufferBase(transformFeedbackBuffer50LA, 0, k.buffer);
+        gl.enable(rasterizerDiscard50LA);
+        for (U slot = 0; slot <= frameOpponentCount; ++slot) {
+            if (slot ? frameOpponentHidden[slot - 1] : framePlayerHidden) continue;
+            const auto& batch = slot ? frameOpponentBatches[slot - 1] : framePlayerBatch;
+            const auto selected = racerView(slot ? frameOpponentArchetypes[slot - 1] : 0);
+            for (U c = 0; c < batch.componentCount && c < selected.resources->componentCount; ++c) {
+                const auto& part = batch.component[c];
+                if (!part.skin || !part.sourceNormals || !part.vertices ||
+                    part.sourceNormalCount != part.vertexCount || !part.vertexCount ||
+                    part.vertexCount > game::maxRigidVertices49S) continue;
+                const auto& skin = *part.skin;
+                float rows[vehicleGlSkinBoneRows50LA * 4];
+                for (U bone = 0; bone < skin.boneCount; ++bone)
+                    for (U axis = 0; axis < 3; ++axis) {
+                        float* row = rows + (bone * 3 + axis) * 4;
+                        const auto& m = skin.bones[bone].v;
+                        row[0] = m[axis]; row[1] = m[4 + axis]; row[2] = m[8 + axis]; row[3] = m[12 + axis];
+                    }
+                gl.uniform4fv(k.bones, static_cast<I>(skin.boneCount * 3), rows);
+                gl.uniform3fv(k.lights, 3, skin.lightDirections[0].data());
+                gl.uniform4fv(k.colors, 4, skin.colorRows[0].data());
+                float specular[6]{};
+                const bool body = c >= 1 && c <= sourceBodyCount50LA;
+                if (body)
+                    for (U axis = 0; axis < 3; ++axis) {
+                        specular[axis * 2] = frameSpecularCoefficients50LA[slot][c - 1].cameraNormalAxes[axis][0];
+                        specular[axis * 2 + 1] = frameSpecularCoefficients50LA[slot][c - 1].cameraNormalAxes[axis][1];
+                    }
+                gl.uniform2fv(k.specular, 3, specular);
+                drawGl.bindVertexArray(selected.resources->bank[bank].vertexArray[c]);
+                k.beginTransformFeedback(0 /*POINTS*/);
+                for (U i = 0; i < part.spanCount; ++i) {
+                    const auto& span = part.spans[i];
+                    const bool diffuse = skin.sourceColors && part.sourceColorMaterialModes50LA &&
+                        span.material_index < part.sourceColorMaterialCount50LA &&
+                        part.sourceColorMaterialModes50LA[span.material_index] == 1;
+                    gl.uniform1i(k.selected, diffuse ? 1 : 0);
+                    k.drawArrays(0, static_cast<I>(span.vertex_start), static_cast<I>(span.vertex_count));
+                }
+                k.endTransformFeedback();
+                drawGl.bindBuffer(transformFeedbackBuffer50LA, k.buffer);
+                gl.getBufferSubData(transformFeedbackBuffer50LA, 0,
+                    static_cast<std::intptr_t>(std::size_t(part.vertexCount) * gpuSkinCheckFloats50LA * sizeof(float)),
+                    captured.data());
+                const std::array<float, 2>* map2Reference = body && selected.specular[c - 1].enabled &&
+                    frameSpecularUvs50LA ? frameSpecularUvs50LA.get() +
+                    (slot * sourceBodyCount50LA + c - 1) * game::maxRigidVertices49S : nullptr;
+                ++parts;
+                for (U v = 0; v < part.vertexCount; ++v) {
+                    const float* g = captured.data() + std::size_t(v) * gpuSkinCheckFloats50LA;
+                    const auto& cpu = part.vertices[v];
+                    for (U axis = 0; axis < 3; ++axis) {
+                        const double delta = std::abs(double(g[axis]) - cpu.position[axis]);
+                        if (delta > position) { position = delta; worstSlot = slot; worstComponent = c; }
+                        positionRelative = std::max(positionRelative, delta / std::max(1.0, std::abs(double(cpu.position[axis]))));
+                    }
+                    double colorDelta = 0;
+                    for (U lane = 0; lane < 4; ++lane)
+                        colorDelta = std::max(colorDelta, std::abs(std::nearbyint(double(g[3 + lane]) * 255.0) - cpu.color[lane]));
+                    color = std::max(color, colorDelta);
+                    if (colorDelta > 0) ++colorMismatches;
+                    for (U lane = 0; lane < 2; ++lane) uv = std::max(uv, std::abs(double(g[7 + lane]) - cpu.uv[lane]));
+                    if (map2Reference) {
+                        for (U lane = 0; lane < 2; ++lane)
+                            map2 = std::max(map2, std::abs(double(g[9 + lane]) - map2Reference[v][lane]));
+                        ++map2Vertices;
+                    }
+                    const auto& n = part.sourceNormals[v].xyz;
+                    const double cpuLength = std::sqrt(double(n[0]) * n[0] + double(n[1]) * n[1] + double(n[2]) * n[2]);
+                    const double gpuLength = std::sqrt(double(g[11]) * g[11] + double(g[12]) * g[12] + double(g[13]) * g[13]);
+                    if (cpuLength > 0 && gpuLength > 0) {
+                        const double dot = (double(g[11]) * n[0] + double(g[12]) * n[1] + double(g[13]) * n[2]) /
+                            (cpuLength * gpuLength);
+                        normalDegrees = std::max(normalDegrees, std::acos(std::clamp(dot, -1.0, 1.0)) * 57.29577951308232);
+                    }
+                }
+                vertices += part.vertexCount;
+            }
+        }
+        gl.disable(rasterizerDiscard50LA);
+        k.bindBufferBase(transformFeedbackBuffer50LA, 0, 0);
+        drawGl.bindBuffer(transformFeedbackBuffer50LA, 0);
+        drawGl.bindVertexArray(0);
+        gl.useProgram(shader->program());
+        if (const U error = drawGl.getError()) {
+            for (unsigned i = 0; i < 16 && drawGl.getError(); ++i) {}
+            std::fprintf(stderr, "gpu_pod_vertex_check gl_error=0x%x (check disabled)\n", error);
+            k.requested = false;
+            return true;
+        }
+        ++k.frames; k.parts += parts; k.vertices += vertices; k.colorMismatches += colorMismatches;
+        k.map2Vertices += map2Vertices;
+        k.position = std::max(k.position, position); k.positionRelative = std::max(k.positionRelative, positionRelative);
+        k.color = std::max(k.color, color); k.uv = std::max(k.uv, uv); k.map2 = std::max(k.map2, map2);
+        k.normalDegrees = std::max(k.normalDegrees, normalDegrees);
+        std::fprintf(stderr, "gpu_pod_vertex_check frame=%llu parts=%llu vertices=%llu max_position=%.9g max_position_rel=%.3g"
+            " worst_slot=%u worst_component=%u max_color_steps=%.0f color_mismatch_vertices=%llu max_uv=%.3g"
+            " map2_vertices=%llu max_map2_uv=%.3g max_normal_deg=%.4g | total frames=%llu parts=%llu vertices=%llu"
+            " max_position=%.9g max_position_rel=%.3g max_color_steps=%.0f color_mismatch_vertices=%llu max_uv=%.3g"
+            " max_map2_uv=%.3g max_normal_deg=%.4g\n",
+            static_cast<unsigned long long>(k.frames), static_cast<unsigned long long>(parts),
+            static_cast<unsigned long long>(vertices), position, positionRelative, worstSlot, worstComponent, color,
+            static_cast<unsigned long long>(colorMismatches), uv, static_cast<unsigned long long>(map2Vertices), map2,
+            normalDegrees, static_cast<unsigned long long>(k.frames), static_cast<unsigned long long>(k.parts),
+            static_cast<unsigned long long>(k.vertices), k.position, k.positionRelative, k.color,
+            static_cast<unsigned long long>(k.colorMismatches), k.uv, k.map2, k.normalDegrees);
+        return true;
     }
 
 bool VehicleWindowGl50DS::Storage::begin(void* context, std::uint8_t bank) noexcept {
@@ -1950,6 +2176,9 @@ bool VehicleWindowGl50DS::Storage::commit(void* context, std::uint8_t bank) noex
         auto& s = *static_cast<Storage*>(context);
         if (!s.active || bank != (s.published ^ 1u)) return false;
         s.traceRaStage("player_draw",s.rendererPlayerStageStart);
+        // The player's last skinned component must not leave skin mode bound.
+        s.gl.useProgram(s.shader->program()); s.releaseRacerSkin50LA();
+        if (s.gpuSkinCheck50LA.requested && !s.checkGpuSkin50LA(bank)) return false;
         auto stageStart=s.rendererStageNow();
         // One transaction and one clear/sky/track pass. Other actual opaque
         // racers join the player's pending framebuffer before ANY effects.

@@ -54,7 +54,8 @@ def main():
                                  'RR_GARAGE_PROOF_SHADOW', 'RR_GARAGE_KERNEL_SHADOW',
                                  'RR_GARAGE_LEGACY_INDEX', 'RR_GARAGE_LEGACY_FINISH',
                                  'RR_GARAGE_LEGACY_PARALLEL', 'RR_GARAGE_LEGACY_BLEND',
-                                 'RR_GARAGE_COVERAGE_PER_TRIANGLE', 'RR_GARAGE_COVERAGE_VERIFY'],
+                                 'RR_GARAGE_COVERAGE_PER_TRIANGLE', 'RR_GARAGE_COVERAGE_VERIFY',
+                                 'RR_CPU_POD_VERTICES'],
                         help='Set one renderer comparison switch to 1 (repeatable); recorded in execution.json')
     parser.add_argument('--track', default='TA', help='Direct-start track when --route none')
     parser.add_argument('--all-ai', action='store_true',
@@ -82,6 +83,10 @@ def main():
     parser.add_argument('--window', help='Open a resizable window at WIDTHxHEIGHT (widescreen tests)')
     parser.add_argument('--hold-throttle', action='store_true',
                         help='Hold the human keyboard throttle once the race is green (launch test)')
+    parser.add_argument('--garage-close-frame', type=int, default=-1,
+                        help='Test only: close the window at native frame N of a race-return Garage (0 = before its first frame)')
+    parser.add_argument('--gpu-vertex-check', type=int, default=0,
+                        help='Diagnostic: compare GPU pod vertices with the CPU reference every N rendered frames')
     args = parser.parse_args()
     if os.name != 'nt' or not 10 <= args.seconds <= 600:
         parser.error('Windows required; watchdog must be 10..600 seconds')
@@ -142,6 +147,10 @@ def main():
         env['RR_TEST_CAMERA_CYCLE'] = '1'
     if args.ieee_subnormals:
         env['RR_TEST_IEEE_SUBNORMALS'] = '1'
+    if args.garage_close_frame >= 0:
+        env['RR_TEST_CLOSE_GARAGE_AT_FRAME'] = str(args.garage_close_frame)
+    if args.gpu_vertex_check > 0:
+        env['RR_GPU_POD_VERTEX_CHECK'] = str(args.gpu_vertex_check)
     if args.pad_hold_a:
         env['RR_TEST_PAD_HOLD_A'] = '1'
     if args.window:

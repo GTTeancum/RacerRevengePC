@@ -419,10 +419,33 @@ struct VehicleWindowGl50DS::Storage {
         U materialCount;
         U cableTextureName;
         const SpecularGeometry50LA* specular;
-        const RacerSkin50LA* skin50LA; // null for the player archetype
+        const RacerSkin50LA* skin50LA; // player (archetype 0) or opponent archetype cold skins
     };
     RacerView racerView(U archetype) const noexcept;
-    bool createRacerSkin50LA(RacerArchetype& archetype) noexcept;
+    // Player pod (archetype 0) GPU vertex path cold data, same rules as opponents.
+    RacerSkin50LA playerSkin50LA[maxComponents]{};
+    // RR_CPU_POD_VERTICES=1 keeps every pod on the CPU vertex path (comparison).
+    bool cpuPodVertices50LA = false;
+    bool createRacerSkin50LA(const game::VehicleDrawMesh50CM* const* meshes, VehicleGlResources50CV& resources,
+        const Material* materials, const U* materialOffsets, const SpecularGeometry50LA* specular,
+        RacerSkin50LA* skins) noexcept;
+    // RR_GPU_POD_VERTEX_CHECK (diagnostic only): on frames where the loop also
+    // ran the CPU reference, read back GPU-evaluated skinned vertices through
+    // transform feedback of the same vertex program and log the differences.
+    struct GpuSkinCheck50LA {
+        bool requested = false, attempted = false, ready = false;
+        U program = 0, vertexShader = 0, buffer = 0;
+        I bones = -1, lights = -1, colors = -1, selected = -1, specular = -1, mode = -1, uvTransform = -1;
+        void (*transformFeedbackVaryings)(U, I, const char* const*, U) = nullptr;
+        void (*bindBufferBase)(U, U, U) = nullptr;
+        void (*beginTransformFeedback)(U) = nullptr;
+        void (*endTransformFeedback)() = nullptr;
+        void (*drawArrays)(U, I, I) = nullptr;
+        std::uint64_t frames = 0, parts = 0, vertices = 0, colorMismatches = 0, map2Vertices = 0;
+        double position = 0, positionRelative = 0, color = 0, uv = 0, map2 = 0, normalDegrees = 0;
+    } gpuSkinCheck50LA;
+    bool prepareGpuSkinCheck50LA() noexcept;
+    bool checkGpuSkin50LA(std::uint8_t bank) noexcept;
     // Per-frame map-2 coefficients for GPU-skinned opponent bodies.
     game::original_racer_lighting50KM::SpecularMapDualInputs
         frameSpecularCoefficients50LA[1 + maxVehicleWindowOpponents50DS][sourceBodyCount50LA]{};

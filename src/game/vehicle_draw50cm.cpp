@@ -13,6 +13,10 @@
 #endif
 
 namespace rr::game {
+// Diagnostic-only (RR_GPU_POD_VERTEX_CHECK): while true, GPU-skinned parts
+// also run the CPU vertex reference. Set per frame by the render loop on its
+// own thread; declared at the single consumer without a shared header.
+bool vehicleDrawSkinReference50CM = false;
 namespace {
 bool reject(VehicleDrawDiagnostic50CM& d, VehicleDrawError50CM error,
     std::uint32_t item = 0) noexcept {
@@ -556,10 +560,14 @@ bool buildVehicleDraw50CM(const VehicleFrameState49W& state, const VehicleFrameB
     }
     stage(0);
     const bool skinned = destination.skin != nullptr;
+    // Diagnostic-only GPU vertex check: a skinned part also runs the CPU
+    // reference and publishes its vertices/normals beside the skin record.
+    const bool reference = skinned && vehicleDrawSkinReference50CM;
     if (skinned) {
         if (!prepareVehicleDrawSkin(selection, mesh, sourceColors, nodeWorld, packet,
             workspace.palette.entryCount, *destination.skin, d)) return false;
-    } else {
+    }
+    if (!skinned || reference) {
     if (!projectDrawPositions({mesh.localVertices, mesh.vertexCount},
         {nodeWorld, workspace.palette.entryCount},
         {workspace.positions, maxRigidVertices49S}, d.vertices))
@@ -573,7 +581,7 @@ bool buildVehicleDraw50CM(const VehicleFrameState49W& state, const VehicleFrameB
     // Use the exact current per-node palette already used for positions. The
     // inverse transpose preserves authored hard edges under scale and shear.
     // Finish all fallible work before publishing either output stream.
-    if (!skinned && destination.sourceNormals) {
+    if ((!skinned || reference) && destination.sourceNormals) {
         std::array<std::array<double, 16>, maxRigidPalette49S> matrices{};
         for (std::uint32_t bone = 0; bone < workspace.palette.entryCount; ++bone)
             for (std::uint32_t lane = 0; lane < 16; ++lane)
@@ -653,10 +661,14 @@ bool buildVehicleDraw50CM(const VehicleFrameState49W& state, const VehicleFrameB
             }
         }
         next.skin = destination.skin;
-        stage(4);
-        output = next;
-        return true;
+        if (!reference) {
+            stage(4);
+            output = next;
+            return true;
+        }
     }
+    // A check frame keeps the skinned conservative bounds (no camera change).
+    const assets::Bounds48B skinnedBounds = next.bounds;
     for (std::uint32_t axis = 0; axis < 3; ++axis)
         next.bounds.minimum[axis] = next.bounds.maximum[axis] = workspace.positions[0].v[axis];
     for (std::uint32_t n = 0; n < mesh.vertexCount; ++n) {
@@ -682,6 +694,7 @@ bool buildVehicleDraw50CM(const VehicleFrameState49W& state, const VehicleFrameB
         next.sourceNormals = destination.sourceNormals;
         next.sourceNormalCount = mesh.vertexCount;
     }
+    if (skinned) next.bounds = skinnedBounds;
     stage(4);
     output = next;
     return true;

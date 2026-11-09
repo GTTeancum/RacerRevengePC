@@ -338,9 +338,16 @@ bool OriginalUiGarageDroidAudio50GN::preflightSourceSceneRetirement2353D0(
  const OriginalUiGaragePodScene50KG& scene)const noexcept {
  if(sourceSceneGroup_!=&scene||sourceSceneGroupReleased_||!resolvedRowsCurrent()||paused_||
     nextActor_!=10||constructedSounds_!=soundCount||revision_>=std::numeric_limits<std::uint64_t>::max()-1||
-    !mixer_->canRecordControlChanges(soundCount+1))return false;
+    !mixer_->canRecordControlChanges(soundCount+1)){
+  std::fprintf(stderr,"garage_droid_preflight_rejected group=%d released=%d rows=%d paused=%d next=%u sounds=%u\n",
+   int(sourceSceneGroup_==&scene),int(sourceSceneGroupReleased_),int(resolvedRowsCurrent()),int(paused_),
+   unsigned(nextActor_),unsigned(constructedSounds_));
+  return false;}
  const bool live=scene.main_&&scene.main_->nativeSceneWetLifetimeCurrent(scene);
- if(scene.main_&&scene.main_->nativeWetProcessor_&&!live)return false;
+ // A wet-bound scene whose group control was queued must still be live. A
+ // scene closed before its first Root frame never queued one: then the
+ // non-live checks below must prove that no droid sound was ever started.
+ if(scene.main_&&scene.main_->nativeWetProcessor_&&!live&&scene.main_->nativeSceneWetControlQueued(scene))return false;
  for(std::size_t i=0;i<soundCount;++i){const auto& row=rows_[i];
   const auto& source=scene.group4D8_.sounds_[i];AudioVoiceObservation50HD voice;
   if(!source||!scene.sourceRowIdentityCurrent(*this,i,true)||source->reference00!=1||
@@ -348,10 +355,22 @@ bool OriginalUiGarageDroidAudio50GN::preflightSourceSceneRetirement2353D0(
      source->nativeSound!=row.sound||!row.sound||row.sound->owner!=&logical_||row.sound->slot!=firstVoice+i||
      !mixer_->inspectVoice(firstVoice+i,voice)||
      (row.played108?voice.playbackRevision!=row.playbackRevision:
-      (voice.playbackRevision&&!retainedStoppedVoiceCurrent(i))))return false;
+      (voice.playbackRevision&&!retainedStoppedVoiceCurrent(i)))){
+   std::fprintf(stderr,"garage_droid_row_rejected row=%zu source=%d identity=%d ref=%u pending=%d sample=%d sound=%d slot=%d inspect=%d played=%d voice_rev=%llu row_rev=%llu\n",
+    i,int(bool(source)),int(source&&scene.sourceRowIdentityCurrent(*this,i,true)),source?unsigned(source->reference00):0u,
+    int(source&&source->sampleContinuationPending),int(source&&source->nativeSample28&&source->nativeSample28->current()),
+    int(source&&source->nativeSound==row.sound&&row.sound&&row.sound->owner==&logical_),int(row.sound&&row.sound->slot==firstVoice+i),
+    int(mixer_->inspectVoice(firstVoice+i,voice)),int(row.played108),
+    (unsigned long long)voice.playbackRevision,(unsigned long long)row.playbackRevision);
+   return false;}
   if(!live&&(row.played108||row.playbackRevision||row.nativeVoice.retainsBacking()||
      row.sound->channel2C!=-1||row.sound->elapsedBits24||row.sound->word7C||
-     voice.voice.active||voice.voice.clip.samples||voice.voice.clip.frames||voice.voice.sourceFrame!=0.0))return false;
+     voice.voice.active||voice.voice.clip.samples||voice.voice.clip.frames||voice.voice.sourceFrame!=0.0)){
+   std::fprintf(stderr,"garage_droid_row_unplayed_rejected row=%zu played=%d rev=%llu backing=%d channel=%d elapsed=%u word7c=%u active=%d samples=%d frames=%llu source_frame=%f\n",
+    i,int(row.played108),(unsigned long long)row.playbackRevision,int(row.nativeVoice.retainsBacking()),int(row.sound->channel2C),
+    unsigned(row.sound->elapsedBits24),unsigned(row.sound->word7C),int(voice.voice.active),int(voice.voice.clip.samples!=nullptr),
+    (unsigned long long)voice.voice.clip.frames,double(voice.voice.sourceFrame));
+   return false;}
   if(live&&row.played108){AudioClip50HD owned;
    if(!row.nativeVoice.clipForRetainedVoice(this,owned)||!sameClip(voice.voice.clip,owned)||
       row.sound->revision!=row.playbackRevision||!row.playbackRevision||

@@ -957,7 +957,14 @@ bool OriginalUiGarageActors50GN::retireAttachedToyList142590(
        !s.application||!s.application->known||!s.motionLibrary||!s.files||
        (s.pendingFrame&&!failedSampleRetirementCurrent(page))||s.nextRuntimeChild||s.sequence.servicing_||!s.managerLive||!s.managerPublished||
        s.grant->animationManager()!=&s.manager49C||s.manager49C.toys38!=&s.toyList3C8||
-       (s.pageRetirementOwner&&s.pageRetirementOwner!=&page))return fail(d,S::phase,0x142590);
+       (s.pageRetirementOwner&&s.pageRetirementOwner!=&page)){
+        std::fprintf(stderr,"garage_actor_retire_rejected closed=%d failed=%d runtime_failed=%d ordered=%d scene=%d grant=%d visibility=%d inputs=%d audio=%d droids=%d droid_preflight=%d app=%d pending_frame=%d next_child=%d servicing=%d manager_live=%d manager_pub=%d\n",
+            int(s.closed),int(s.failed),int(s.runtimeFailed),int(s.sourceOrdered),int(s.sourceSceneOwner!=nullptr),
+            int(s.grant&&s.grant->current()),int(bool(s.visibility)),int(bool(s.rootInputs)),int(bool(s.audio)),int(bool(s.droids)),
+            int(s.droids&&s.sourceSceneOwner&&s.droids->preflightSourceSceneRetirement2353D0(*s.sourceSceneOwner)),
+            int(s.application&&s.application->known),int(bool(s.pendingFrame)),int(s.nextRuntimeChild!=nullptr),
+            int(s.sequence.servicing_),int(s.managerLive),int(s.managerPublished));
+        return fail(d,S::phase,0x142590);}
     // The native source callbacks are quiescent. Do not erase a pending tick,
     // stop a Sound, or reset Main's mixer to manufacture a teardown predecessor.
     if(s.pageRetirement<=Phase::listReference){

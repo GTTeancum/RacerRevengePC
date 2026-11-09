@@ -211,7 +211,8 @@ bool VehicleWindowGl50DS::Storage::podMaterialUsesNormals(const VehicleWindowMat
 
 VehicleWindowGl50DS::Storage::RacerView VehicleWindowGl50DS::Storage::racerView(U archetype) const noexcept {
         if (!archetype) return {meshes, scenes, &resources, racerNormalBuffers, materials.get(),
-            materialOffsets, materialSummary, materialCount, cableTextureName, sourceSpecularGeometry50LA.data(), nullptr};
+            materialOffsets, materialSummary, materialCount, cableTextureName, sourceSpecularGeometry50LA.data(),
+            playerSkin50LA};
         const auto& source = racerArchetypes[archetype - 1];
         return {source.meshes, source.scenes, &source.resources, source.normalBuffers, source.materials.get(),
             source.materialOffsets, source.materialSummary, source.materialCount, source.cableTextureName,
@@ -849,6 +850,10 @@ bool VehicleWindowGl50DS::Storage::loadFunctions() noexcept {
             fixedSpecularBlend50LA = !(exact && exact[0] == '1' && !exact[1]);
             const char* finish = std::getenv("RR_GPU_FINISH_EACH_FRAME");
             finishEachGameplayFrame = finish && finish[0] == '1' && !finish[1];
+            const char* cpuPods = std::getenv("RR_CPU_POD_VERTICES");
+            cpuPodVertices50LA = cpuPods && cpuPods[0] == '1' && !cpuPods[1];
+            const char* vertexCheck = std::getenv("RR_GPU_POD_VERTEX_CHECK");
+            gpuSkinCheck50LA.requested = vertexCheck && std::atoll(vertexCheck) > 0;
         }
         LOAD(gl, viewport, Viewport); LOAD(gl, enable, Enable); LOAD(gl, disable, Disable);
         LOAD(gl, depthFunc, DepthFunc); LOAD(gl, depthMask, DepthMask);
@@ -1428,18 +1433,21 @@ bool VehicleWindowGl50DS::Storage::createSpecularUvBuffers50LA(U archetype, U bo
         return true;
     }
 
-bool VehicleWindowGl50DS::Storage::createRacerSkin50LA(RacerArchetype& archetype) noexcept {
+bool VehicleWindowGl50DS::Storage::createRacerSkin50LA(const game::VehicleDrawMesh50CM* const* meshes,
+        VehicleGlResources50CV& resources, const Material* materials, const U* materialOffsets,
+        const SpecularGeometry50LA* specular, RacerSkin50LA* skins) noexcept {
         // Cold only. A component that cannot satisfy every admission keeps the
         // CPU vertex path; nothing here changes the CPU path's own buffers.
-        for (U c = 0; c < archetype.resources.componentCount; ++c) {
-            auto& skin = archetype.skin50LA[c];
+        // Shared by the player pod (archetype 0) and every opponent archetype.
+        for (U c = 0; c < resources.componentCount; ++c) {
+            auto& skin = skins[c];
             skin = {};
-            const auto* mesh = archetype.meshes[c];
+            const auto* mesh = meshes[c];
             if (!mesh || !mesh->localVertices || !mesh->vertexTemplate || !mesh->semanticScene ||
                 !mesh->vertexCount || mesh->vertexCount > game::maxRigidVertices49S ||
                 !mesh->sourceNodeCount || mesh->sourceNodeCount > game::maxRigidPalette49S ||
                 mesh->spanCount > game::maxVehicleDrawSpans50CM) continue;
-            if (c >= 1 && c <= sourceBodyCount50LA && archetype.specularGeometry50LA[c - 1].singleDiffuse) continue;
+            if (c >= 1 && c <= sourceBodyCount50LA && specular[c - 1].singleDiffuse) continue;
             const auto& scene = *mesh->semanticScene;
             if (scene.lods.empty() || scene.lods[0].surfaces.size() != mesh->spanCount) continue;
             const double q = scene.quantization[1];
@@ -1481,8 +1489,8 @@ bool VehicleWindowGl50DS::Storage::createRacerSkin50LA(RacerArchetype& archetype
             for (U span = 0; span < mesh->spanCount; ++span) {
                 const auto& range = mesh->spans[span];
                 bool casts = true;
-                if (request.mode == VehicleWindowMode50DS::callerMaterialTextures && archetype.materials) {
-                    const auto& policy = archetype.materials[archetype.materialOffsets[c] + range.material_index].policy;
+                if (request.mode == VehicleWindowMode50DS::callerMaterialTextures && materials) {
+                    const auto& policy = materials[materialOffsets[c] + range.material_index].policy;
                     casts = policy.blend == VehicleWindowBlend50DS::opaque && policy.depthWrite;
                 }
                 std::uint8_t maximumAlpha = 0;
@@ -1512,7 +1520,7 @@ bool VehicleWindowGl50DS::Storage::createRacerSkin50LA(RacerArchetype& archetype
                 vertices.data(), staticDraw);
             if (!check("create static racer skin vertex buffer") || !skin.buffer)
                 return fail(*diagnostic, VehicleWindowError50DS::allocation, "racer skin vertex buffer");
-            for (auto& bank : archetype.resources.bank) {
+            for (auto& bank : resources.bank) {
                 drawGl.bindVertexArray(bank.vertexArray[c]);
                 drawGl.bindBuffer(arrayBuffer, skin.buffer);
                 constexpr I stride = sizeof(VehicleGlSkinVertex50LA);
@@ -2049,8 +2057,12 @@ bool VehicleWindowGl50DS::Storage::initialize(const VehicleWindowRequest50DS& in
                 !createRacerNormals(racerArchetypes[i].resources, racerArchetypes[i].normalBuffers)) return false;
             for (U body = 0; body < sourceBodyCount50LA; ++body)
                 if (!createSpecularUvBuffers50LA(i + 1, body, racerArchetypes[i].specularGeometry50LA[body])) return false;
-            if (!createRacerSkin50LA(racerArchetypes[i])) return false;
+            auto& archetype = racerArchetypes[i];
+            if (!createRacerSkin50LA(archetype.meshes, archetype.resources, archetype.materials.get(),
+                archetype.materialOffsets, archetype.specularGeometry50LA.data(), archetype.skin50LA)) return false;
         }
+        if (!createRacerSkin50LA(meshes, resources, materials.get(), materialOffsets,
+            sourceSpecularGeometry50LA.data(), playerSkin50LA)) return false;
         if (
             !createStaticGeometry(input.track.mesh, trackVertexBuffer, trackIndexBuffer, trackVertexArray, trackIndexCount) ||
             !createWorldNormals(input.track, trackNormalBuffer, trackVertexArray) ||
@@ -2063,7 +2075,11 @@ bool VehicleWindowGl50DS::Storage::initialize(const VehicleWindowRequest50DS& in
         hooks.context = this; hooks.ready = ready; hooks.materialReady = materialReady;
         if(request.enableGameplayDisplayWallTiming)hooks.timingObserver=observePlayerTiming;
         hooks.begin = begin; hooks.bindMaterial = bindMaterial; hooks.commit = commit; hooks.abort = abort;
-        if (hasSpecularPairs50LA || hasSingleDiffuse50LA) hooks.drawSpan = drawSpan50LA;
+        // The player's GPU vertex path binds its per-part inputs in this hook,
+        // which otherwise issues the same single indexed draw as 50CV.
+        bool playerSkinned = false;
+        for (U c = 0; c < resources.componentCount; ++c) playerSkinned = playerSkinned || playerSkin50LA[c].eligible;
+        if (hasSpecularPairs50LA || hasSingleDiffuse50LA || playerSkinned) hooks.drawSpan = drawSpan50LA;
         adapter.reset(new (std::nothrow) VehicleGlBackend50CV(drawGl, resources, hooks, published));
         if (!adapter) return fail(*diagnostic, VehicleWindowError50DS::allocation, "allocate 50CV adapter");
         if (request.output == VehicleWindowOutput50DS::defaultBackBuffer)
@@ -2310,7 +2326,14 @@ bool VehicleWindowGl50DS::Storage::cleanup(VehicleWindowDiagnostic50DS& d) noexc
                     if (!deleteName(normal, gl.deleteBuffers, d)) goto incomplete;
             for (auto& index : resources.indices)
                 if (!deleteName(index.buffer, gl.deleteBuffers, d)) goto incomplete;
+            for (auto& skin : playerSkin50LA)
+                if (!deleteName(skin.buffer, gl.deleteBuffers, d)) goto incomplete;
+            if (!deleteName(gpuSkinCheck50LA.buffer, gl.deleteBuffers, d)) goto incomplete;
+            if (gpuSkinCheck50LA.program) { shaderGl.deleteProgram(gpuSkinCheck50LA.program); gpuSkinCheck50LA.program = 0; }
+            if (gpuSkinCheck50LA.vertexShader) { shaderGl.deleteShader(gpuSkinCheck50LA.vertexShader); gpuSkinCheck50LA.vertexShader = 0; }
             for (auto& archetype : racerArchetypes) {
+                for (auto& skin : archetype.skin50LA)
+                    if (!deleteName(skin.buffer, gl.deleteBuffers, d)) goto incomplete;
                 for (auto& body : archetype.specularGeometry50LA) {
                     for (auto& buffer : body.buffers)if (!deleteName(buffer, gl.deleteBuffers, d)) goto incomplete;
                     for (auto& buffer : body.fogBuffers)if (!deleteName(buffer, gl.deleteBuffers, d)) goto incomplete;

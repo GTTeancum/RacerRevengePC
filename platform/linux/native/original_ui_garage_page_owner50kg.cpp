@@ -1909,7 +1909,13 @@ bool OriginalUiGaragePageOwner50KG::beginRetirement142590(Diagnostic& d)noexcept
     //Native continuation after an actual last-reference dispatch never
     //replays142590 or its already completed child callbacks.
     if(stage_==Stage::pageRefReleased)return continuePayloadRetirement1FA170(d);
-    if(!currentConstructor())return fail(d,Status::phase,0x142590);
+    if(!currentConstructor()){
+        std::fprintf(stderr,"garage_page_retire_rejected live=%d ref=%d count=%d inputs=%d attached=%d page_current=%d quads=%u texts=%u shared_text=%d cost_text=%d vtable=%d stage=%u\n",
+            int(entityLive_),int(entityRefReleased_),int(entityCountReleased_),int(inputsCurrent()),int(managerAttached1D1C40_),
+            int(managerAttached1D1C40_?grant_->garageAttachedPageCurrent(*this,entity_):grant_->garagePageCurrent(this,entity_)),
+            unsigned(quadCount_),unsigned(textCount_),int(bool(sharedText440_.value)),int(bool(costText3340_.value)),int(vtable_==0x3D0A10),unsigned(stage_));
+        return fail(d,Status::phase,0x142590);
+    }
     if(scenePageAttachCursor_){
         if(scenePageAttachCursor_!=scenePageChildren_.size()||sceneLateAttachCursor_!=sceneLateChildren_.size())
             return fail(d,Status::childRetirementPending,0x1425B8);
