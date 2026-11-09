@@ -1,5 +1,6 @@
 // Original publication scope and its local owners; no root-only hooks/readers.
 #include "native_wreck_debris_gpu50pd.h"
+#include "../../platform/linux/native/loading_progress_step113a.h"
 #include "native_wreck_debris_sim50pd.h"
 #include "native_common_results50pd.h"
 #include "terrain_interactive_publication50du.h"
@@ -2216,6 +2217,8 @@ void Context::run() {
   };
   if(!originalUiActive)prepareSourceCamera();
   if(originalUiActive)originalMain.activate(renderer);
+  // Original 1A77A4: after overlays.res (race HUD) and the race managers.
+  rr::platform::loading_progress50DU::step(.1f,0x1a77a4);
   // Renderer owns its cold GPU copy; release CPU-only track staging promptly.
   if(!headlessLive)trackMesh=rr::assets::Mesh48B{}; // Capture-only VM geometry evidence.
   materialOwner.reset();
@@ -2601,6 +2604,8 @@ void Context::run() {
        <<" advanced="<<receipt.careerAdvanced<<" retired="<<receipt.retired
        <<" prize="<<receipt.prize<<" bonus="<<receipt.killBonus<<'\n';
   };
+  // Original 1A78DC: last step, after 2AED60 camera fade and 232EC0 flush.
+  rr::platform::loading_progress50DU::step(.1f,0x1a78dc);
   rr::platform::loading_progress50DU::finish();
   PlayerLoadingSession50DU::checkStop();
   coldLoadDiagnostics.complete();

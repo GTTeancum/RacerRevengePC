@@ -13,6 +13,7 @@
 #include <filesystem>
 #include <fstream>
 #include <map>
+#include <optional>
 #include <sstream>
 
 namespace rr::platform {
@@ -26,6 +27,12 @@ class PlayerLoadingPresenter50DU final {
     std::uint64_t sessionIndex_;
     std::shared_ptr<OriginalUiRiderProfileOwner50KG> profile_;
     Image background_;std::vector<Animation> animations_;std::vector<unsigned char> pixels_;
+    // LD_ICON animations 4..6: ProgressBar (no alpha blend), then its
+    // BlankBar/BlankBar2 overlays, drawn in animation order after1..3.
+    // LD_UI has no ProgressBar, so 1CC900's named lookups find nothing there.
+    struct Fixed {Image image;float x=0,y=0,width=0,height=0;bool alpha=true;};
+    std::optional<Fixed> bar_;std::vector<Fixed> overlays_;
+    float progress3C_=0.f;bool stepped_=false;
     struct Font {assets::OriginalUiFont50KG metrics;Image image;};
     std::array<Font,2> fonts_;
     struct Text {std::string bytes;unsigned font=0,justify=0;float x=0,y=0;};
@@ -148,8 +155,7 @@ class PlayerLoadingPresenter50DU final {
             if(line.front()=='['&&line.back()==']'){section=line.substr(1,line.size()-2);continue;}
             const auto equal=line.find('=');if(equal==std::string::npos)return false;
             if(!sections[section].emplace(trim(line.substr(0,equal)),trim(line.substr(equal+1))).second)return false;}
-        // First three source animations are horizontal moving lines. Keep the
-        // authored background's empty bar; do not invent progress percentages.
+        // First three source animations are horizontal moving lines.
         for(unsigned i=1;i<=3;++i){const auto& fields=sections.at("Animation"+std::to_string(i));
             if(fields.at("StartFrame")!="1"||fields.at("EndFrame")!="1"||fields.at("AlphaBlendingOn")!="T"||
                fields.at("InputColorA")!="0"||fields.at("InputColorB")!="1"||fields.at("InputAlphaC")!="0"||fields.at("InputColorD")!="1")return false;
@@ -161,6 +167,24 @@ class PlayerLoadingPresenter50DU final {
             a.width=std::stof(fields.at("StartSizeX"));a.height=std::stof(fields.at("StartSizeY"));
             a.seconds=std::stof(fields.at("MoveTime"));a.loop=fields.at("LoopMovement")=="T";
             if(a.seconds<=0||a.width<=0||a.height<=0)return false;animations_.push_back(std::move(a));}
+        // 2CE104..2CE264: MoveTime/SizeTime 0 leave zero velocity, so the
+        // current position/size stay at StartPos/StartSize until 1CC900 sets them.
+        const unsigned animationCount=static_cast<unsigned>(std::stoul(sections.at("General").at("NumberOfAnimations")));
+        if(animationCount!=(menu?3u:6u))return false;
+        for(unsigned i=4;i<=animationCount;++i){const auto& fields=sections.at("Animation"+std::to_string(i));
+            const auto& name=fields.at("ReferenceName");const auto& frame=fields.at("StartFrame");
+            const bool expected=(i==4&&name=="ProgressBar"&&frame=="4")||(i==5&&name=="BlankBar"&&frame=="2")||(i==6&&name=="BlankBar2"&&frame=="3");
+            if(!expected||fields.at("EndFrame")!=frame||fields.at("InputColorA")!="0"||fields.at("InputColorB")!="1"||
+               fields.at("InputAlphaC")!="0"||fields.at("InputColorD")!="1"||std::stof(fields.at("MoveTime"))!=0.f||
+               std::stof(fields.at("SizeTime"))!=0.f)return false;
+            std::vector<unsigned char> encoded;assets::Texture48E texture;
+            if(!assets::extractResMember48C(archive,"frame0"+frame+".pst",encoded,error)||!assets::decodeTexture48E(encoded,texture,error)||texture.mips.empty())return false;
+            auto& mip=texture.mips.back();Fixed f;f.image={static_cast<I>(mip.width),static_cast<I>(mip.height),std::move(mip.rgba)};
+            f.x=std::stof(fields.at("StartPosX"));f.y=std::stof(fields.at("StartPosY"));
+            f.width=std::stof(fields.at("StartSizeX"));f.height=std::stof(fields.at("StartSizeY"));
+            f.alpha=fields.at("AlphaBlendingOn")=="T";
+            if(f.width<=0||f.height<=0||(i==4)==f.alpha)return false;
+            if(i==4)bar_=std::move(f);else overlays_.push_back(std::move(f));}
 #define RR_LOAD(member,name) gl_.member=reinterpret_cast<decltype(gl_.member)>(host_.procAddress(name));if(!gl_.member)return false
         RR_LOAD(get,"glGetIntegerv");RR_LOAD(genTextures,"glGenTextures");RR_LOAD(deleteTextures,"glDeleteTextures");
         RR_LOAD(bindTexture,"glBindTexture");RR_LOAD(parameter,"glTexParameteri");RR_LOAD(image,"glTexImage2D");
@@ -174,23 +198,38 @@ class PlayerLoadingPresenter50DU final {
         std::fprintf(stderr,"original_loading_assets background=LD_%s.PST layout=%s background_sha256=%s\n",code_.c_str(),menu?"LD_UI.LSI":"LD_ICON.LSI",hash);
         return true;
     }
+    // Positions are sprite centres. Blend (Cs-Cd)*As/128+Cd, or a plain copy.
+    void blit(const Image& image,double left,double top,double width,double height,bool blend) {
+        const I x0=std::max(0,static_cast<I>(std::ceil(left))),y0=std::max(0,static_cast<I>(std::ceil(top)));
+        const I x1=std::min(640,static_cast<I>(std::ceil(left+width))),y1=std::min(448,static_cast<I>(std::ceil(top+height)));
+        for(I y=y0;y<y1;++y)for(I x=x0;x<x1;++x){
+            const I sx=std::clamp(static_cast<I>((x+.5-left)*image.width/width),0,image.width-1);
+            const I sy=std::clamp(static_cast<I>((y+.5-top)*image.height/height),0,image.height-1);
+            const auto source=(sy*image.width+sx)*4,dest=(y*640+x)*4;
+            const I alpha=blend?std::min<I>(128,image.rgba[source+3]):128;
+            for(I c=0;c<3;++c)pixels_[dest+c]=static_cast<unsigned char>((image.rgba[source+c]*alpha+pixels_[dest+c]*(128-alpha))/128);
+        }
+    }
     void compose(double elapsed) {
         pixels_=background_.rgba;
         for(const auto& a:animations_){const double fraction=a.loop?std::fmod(elapsed,a.seconds)/a.seconds:std::min(1.,elapsed/a.seconds);
-            const double left=a.x+(a.endX-a.x)*fraction-a.width*.5,top=a.y+(a.endY-a.y)*fraction-a.height*.5;
-            const I x0=std::max(0,static_cast<I>(std::ceil(left))),y0=std::max(0,static_cast<I>(std::ceil(top)));
-            const I x1=std::min(640,static_cast<I>(std::ceil(left+a.width))),y1=std::min(448,static_cast<I>(std::ceil(top+a.height)));
-            for(I y=y0;y<y1;++y)for(I x=x0;x<x1;++x){
-                const I sx=std::clamp(static_cast<I>((x+.5-left)*a.image.width/a.width),0,a.image.width-1);
-                const I sy=std::clamp(static_cast<I>((y+.5-top)*a.image.height/a.height),0,a.image.height-1);
-                const auto source=(sy*a.image.width+sx)*4,dest=(y*640+x)*4;
-                const I alpha=std::min<I>(128,a.image.rgba[source+3]);
-                for(I c=0;c<3;++c)pixels_[dest+c]=static_cast<unsigned char>((a.image.rgba[source+c]*alpha+pixels_[dest+c]*(128-alpha))/128);
+            blit(a.image,a.x+(a.endX-a.x)*fraction-a.width*.5,a.y+(a.endY-a.y)*fraction-a.height*.5,a.width,a.height,true);}
+        if(bar_){float x=bar_->x,y=bar_->y,width=bar_->width,height=bar_->height;
+            if(stepped_){
+                // 1CC900: below 1.0, width=333*p and x=153.5+width/2; else
+                // 333 at x=320. 2CEBC0/2CE9D0 receive truncated integers.
+                const float w=progress3C_<1.f?333.f*progress3C_:333.f;
+                const float centre=progress3C_<1.f?153.5f+w/2.f:320.f;
+                width=static_cast<float>(static_cast<I>(w));height=16.f;
+                x=static_cast<float>(static_cast<I>(centre));y=379.f;
             }
-        }
+            if(width>0)blit(bar_->image,x-width*.5,y-height*.5,width,height,bar_->alpha);}
+        for(const auto& f:overlays_)blit(f.image,f.x-f.width*.5,f.y-f.height*.5,f.width,f.height,f.alpha);
     }
 public:
     PlayerLoadingPresenter50DU(GameHost50ER& host,const std::filesystem::path& root,const char* code,std::shared_ptr<OriginalUiRiderProfileOwner50KG> profile,std::uint64_t sessionIndex):host_(host),root_(root),code_(code),sessionIndex_(sessionIndex),profile_(std::move(profile)){}
+    // Loading-screen +3C after an original 1CC900 call.
+    void progress(float total)noexcept {progress3C_=total;stepped_=true;}
     bool draw(const char*,bool=false)noexcept try {
         if(!host_.created()||!host_.hasWindow()||!host_.current())return false;
         const auto info=host_.info();if(info.minimized||info.drawableWidth<=0||info.drawableHeight<=0)return true;

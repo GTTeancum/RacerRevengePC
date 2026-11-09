@@ -1,4 +1,5 @@
 #include <cfenv>
+#include "../../platform/linux/native/loading_progress_step113a.h"
 #include "../../platform/linux/native/stall_watchdog50du.h"
 #include "../../src/game/ps2_float_mode50la.h"
 #include "terrain_interactive_setup50du.h"
@@ -1353,6 +1354,9 @@ SessionExit50DU Context::run() {
        result.status==pod_audio50HE::DispatchStatus::CompletedUnavailable,result.originalV0};
   };
  }
+ // Original 1A6CEC follows the race music manager (1A39F0/1A3C00). Here after the
+ // race audio/music block, which a muted run skips; the original always loads it.
+ rr::platform::loading_progress50DU::step(.1f,0x1a6cec);
  rr::platform::loading_progress50DU::pulse("Preparing navigation");
  coldLoadDiagnostics.begin("navigation_runtime");
  TrackNavigationDiagnostic50EU navigationDiagnostic{};
@@ -1694,6 +1698,8 @@ SessionExit50DU Context::run() {
  std::uint64_t terrainQueries=0,terrainHitFrames=0,terrainSupportedFrames=0;
  const VehicleLiveQueryContext50EQ mainLiveQuery{zoneLifecycle,liveWorld,mainMembership,membershipWork,mainQueryRef};
  const VehicleLiveQueryContext50EQ secondaryLiveQuery{zoneLifecycle,liveWorld,secondaryMembership,membershipWork,secondaryQueryRef};
+ // Original 1A7164: after the .spl AI/map splines (2A1260) and portal index 1ACF70.
+ rr::platform::loading_progress50DU::step(.1f,0x1a7164);
  std::uint64_t mainCrossedPortals=0,secondaryCrossedPortals=0;
  std::uint64_t reportedGcTriggerDispatches=0; // shared world observations, outside racer bank
  auto acceptLiveQuery=[&](const VehicleLiveQueryResult50EQ& attempt,

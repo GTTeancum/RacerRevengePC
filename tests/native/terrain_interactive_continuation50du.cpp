@@ -1,4 +1,5 @@
 #include "native_wreck_debris_sim50pd.h"
+#include "../../platform/linux/native/loading_progress_step113a.h"
 #include "native_common_results50pd.h"
 #include "native_race_replay50pd.h"
 #include "native_wreck_debris_gpu50pd.h"
@@ -767,6 +768,9 @@ SessionExit50DU Context::run() {
  using NativeRacerFramePart=interactive_frame50DU::Part;
  // The earlier same display/audio stage outlives Bank/Join and their retained
  // native model owners on unwind. RA opens that same Video context below.
+ // Original 1A6EC4 follows the SimpleVCR replay setup (287430/287710/2878F0). The
+ // port records replays natively with no load-time owner; stand-in point.
+ rr::platform::loading_progress50DU::step(.1f,0x1a6ec4);
  rr::platform::loading_progress50DU::pulse("Preparing race owners");
  original_main_entry50KG::SpeedBoostColdResult50LA sourceSpeedBoost;
  original_main_entry50KG::TimeStatsColdResult50LA sourceTimeStats;
@@ -2175,6 +2179,8 @@ SessionExit50DU Context::run() {
    .nativeHumanAudio=audioEnabled&&originalUiStarted&&consumedRaStage.race()?liveAudio.get():nullptr,
    .nativeHumanSpeechCounts=&speechCounts,
   }.run();
+ // Original 1A7450: after racers/pods (1750A0/1752D0) and audio\announce.res.
+ rr::platform::loading_progress50DU::step(.1f,0x1a7450);
  // Bind once to the selected authenticated map representation. Placement is
  // shared across human/opponents; no per-racer track dispatch or null fallback.
  source_grid50IG::SelectedMapGrid selectedGridNavigation;

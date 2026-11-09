@@ -1,5 +1,6 @@
 // Exact original suffix: world owners retire before the original early prefix.
 #include "native_wreck_debris_sim50pd.h"
+#include "../../platform/linux/native/loading_progress_step113a.h"
 #include "terrain_interactive_world50du.h"
 #include "terrain_interactive_roster_cold50du.h"
 #include "ra_application_cold50la.h"
@@ -863,6 +864,8 @@ SessionExit50DU Context::run() {
   }
  }
 
+ // Original 1AA1B8: after 1A9EE0 loads tracks\<track> (world, objects, lights).
+ rr::platform::loading_progress50DU::step(.1f,0x1aa1b8);
  rr::platform::loading_progress50DU::pulse("Preparing terrain");
  coldLoadDiagnostics.begin("ground_query");
  const auto& actualHeight=isRaTrack?raRuntime->source.height:ground.height;
@@ -1234,6 +1237,8 @@ SessionExit50DU Context::run() {
  coldLoadDiagnostics.begin("track_storage");
  // Cold, immovable, count-derived storage. Candidate order and every borrowed
  // source mesh/radius remain owned above; publication checks complete coverage.
+ // Original 1AA23C follows the geometry\ buoy/finish-line load; stand-in: after static collision.
+ rr::platform::loading_progress50DU::step(.1f,0x1aa23c);
  rr::platform::loading_progress50DU::pulse("Preparing track storage");
  track_runtime_storage50IG::Owner trackStorageOwner;
  track_runtime_storage50IG::Diagnostic trackStorageDiagnostic{};
@@ -1281,6 +1286,8 @@ SessionExit50DU Context::run() {
  std::array<std::unique_ptr<track_runtime_storage50IG::Membership>,gc_trigger_authoring50IN::count> gcTriggerMembership;
  if(gcTriggerActions)for(auto& membership:gcTriggerMembership)
   membership=std::make_unique<track_runtime_storage50IG::Membership>(trackCounts.membership);
+ // Original 1AA27C (after 1AA250, before anim\); stand-in: after track storage.
+ rr::platform::loading_progress50DU::step(.1f,0x1aa27c);
  rr::platform::loading_progress50DU::pulse("Preparing physics");
  coldLoadDiagnostics.begin("physics_navigation_setup");
  const auto terrainOwnerCount=trackCounts.terrain;
@@ -1475,6 +1482,8 @@ SessionExit50DU Context::run() {
    stackCount=std::max({stackCount,required.mainStack,required.secondaryStack});
   });
  }
+ // Original 1A6DEC: after 1A9EE0 returns and 114770/1A95B0; stand-in: end of world/collision.
+ rr::platform::loading_progress50DU::step(.1f,0x1a6dec);
  // This complete lexical suffix owns query/navigation/audio/input resources.
  // It retires synchronously before the unchanged early cold owners below unwind.
  interactive_setup50DU::Context setup50DU{

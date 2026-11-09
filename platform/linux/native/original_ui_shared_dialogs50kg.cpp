@@ -1,4 +1,5 @@
 #include "original_ui_shared_dialogs50kg.h"
+#include "loading_progress_step113a.h"
 #include "../../../src/game/original_ui_controller_popup_geometry50kg.h"
 #include "original_ui_shared_dialog_material_history50kg.h"
 #include "original_ui_main_session50kg.h"
@@ -1123,12 +1124,16 @@ Application::SharedUiBootResult Application::prepareSharedDialogsInitial1B7BD0(
    error="Actual UI audio initializer retained failure at source PC "+std::to_string(audioInitializer.sourcePC);
    return SharedUiBootResult::failed;
   }
+  // Original 1B73A0: after 1B7340 and 232C70.
+  rr::platform::loading_progress50DU::step(.1f,0x1b73a0);
 
   rr::assets::OriginalStandardMaterialDiagnostic50LA collectorInitializer;
   if(!constructUiCollector1B73BC(collectorInitializer)){
    error="Actual first UI collector retained failure at source PC "+std::to_string(collectorInitializer.sourcePC);
    return SharedUiBootResult::failed;
   }
+  // Original 1B7450: after 1B73BC and ui\uifonts.res.
+  rr::platform::loading_progress50DU::step(.1f,0x1b7450);
   //2A35E0 source missing-file return precedes shared470/47C construction.
   const auto globals=loadDispatcherGlobalWidgets2A35E0();
   if(!globals.okay()){
@@ -1150,6 +1155,8 @@ Application::SharedUiBootResult Application::prepareSharedDialogsInitial1B7BD0(
      // the reorder itself, and no Main-only enable pair is written.
      (!firstManagerGarage&&!owner->reappendInitialMain1D7CF4(d))){
    error="Actual shared UI prefix retained at source PC "+std::to_string(d.sourcePC);return SharedUiBootResult::failed;}
+  // Original 1B7CE8: after ui\contpop.res (203D40/2054D0/2055B0).
+  rr::platform::loading_progress50DU::step(.2f,0x1b7ce8);
   return SharedUiBootResult::complete;
  }catch(...){error="Shared UI boot allocation failed; actual committed prefixes retained";return SharedUiBootResult::failed;}
 }

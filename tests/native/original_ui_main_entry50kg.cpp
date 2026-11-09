@@ -1,6 +1,7 @@
 // Non-template native frontend implementation. Keep ownership and layout in
 // the shared declaration header; each body below has one program definition.
 #include "original_ui_main_entry50kg.h"
+#include "../../platform/linux/native/loading_progress_step113a.h"
 #include "../../src/game/original_loading_manager33050la.h"
 #include "original_race_display_lifetime50la.h"
 #include "original_native_video_packet_invocation50la.inl"
@@ -972,8 +973,13 @@ void Frontend::prepare(const Application& application,const std::shared_ptr<Vide
             if(std::filesystem::exists(application.assetRoot/std::filesystem::path(tournamentIdentity->discPath)))
                 cold.tournament=readArchive(application.assetRoot,Id::tournament);
             else std::cerr<<"Original Tournament archive absent; Tournament destination remains unavailable.\n";
+            // Original 1B74E0 (ui\uibkg.res open) and 1B7618 (its %s%02d_bkg images).
             cold.backgrounds=readArchive(application.assetRoot,Id::backgrounds);
+            rr::platform::loading_progress50DU::step(.1f,0x1b74e0);
+            rr::platform::loading_progress50DU::step(.1f,0x1b7618);
             cold.podTextures=readArchive(application.assetRoot,Id::podTextures);
+            // Original 1B7860: after ui\uipodtex.res.
+            rr::platform::loading_progress50DU::step(.2f,0x1b7860);
             auto cache=std::make_shared<Cache>();
             rr::assets::OriginalUiIpumCacheDiagnostic50KG cacheDiagnostic;
             if(application.decodeRiderImagesInProcess){
@@ -1075,6 +1081,9 @@ void Frontend::prepare(const Application& application,const std::shared_ptr<Vide
             std::cerr<<"Original UI audio device="<<rr::platform::audioDeviceStatusName50HD(info.deviceStatus)
                 <<" capture="<<info.captureActive<<" rate="<<info.sampleRate<<" detail="<<info.deviceDetail.data()<<'\n';
         }
+        // Original 1B7B54: after ui_music.juk and UIevents.ini (muted runs skip the
+        // port's audio block above; the original always loads them).
+        rr::platform::loading_progress50DU::step(.1f,0x1b7b54);
         const auto prepared=nativePauseCourseEntry_?
             coordinator.prepareNativePauseCourse(cold,application.pauseCourseReceiverOrigin50LA(*this),diagnostic):
             nativeResultsHallEntry_?coordinator.prepareNativeResultsHall(cold,application,diagnostic):

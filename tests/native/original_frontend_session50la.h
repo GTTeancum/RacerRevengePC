@@ -1,5 +1,6 @@
 #pragma once
 #include <cstdio>
+#include "../../platform/linux/native/loading_progress_step113a.h"
 #include <cstdlib>
 #include "native_display_capacity50du.h"
 #include <exception>
@@ -367,6 +368,8 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
 #if defined(_WIN32)
   std::array<std::int64_t,6> loggedSelection{{-1,-1,-1,-1,-1,-1}};
 #endif
+  // Original 1B7D98 (after 2AE5E0..2AED10), the last menu step; stand-in: end of activation.
+  rr::platform::loading_progress50DU::step(.1f,0x1b7d98);
   rr::platform::loading_progress50DU::finish();
   PlayerLoadingSession50DU::checkStop();
   // A race-return Garage's teardown needs its first Root frame (its scene,
