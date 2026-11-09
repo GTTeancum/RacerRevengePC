@@ -85,6 +85,12 @@ def main():
                         help='Hold the human keyboard throttle once the race is green (launch test)')
     parser.add_argument('--garage-close-frame', type=int, default=-1,
                         help='Test only: close the window at native frame N of a race-return Garage (0 = before its first frame)')
+    parser.add_argument('--repair', action='store_true',
+                        help='With --hold-throttle: hold the repair key (R) 2 s of every 6 s')
+    parser.add_argument('--unstick', action='store_true',
+                        help='With --hold-throttle: tap the manual reset key (T) when the pod is wedged for 3 s')
+    parser.add_argument('--seed-save', type=Path,
+                        help='Test only: copy this prepared native progress file (progress-v1.bin format) into the run save directory before launch')
     parser.add_argument('--gpu-vertex-check', type=int, default=0,
                         help='Diagnostic: compare GPU pod vertices with the CPU reference every N rendered frames')
     args = parser.parse_args()
@@ -112,6 +118,11 @@ def main():
     temporary.mkdir()
     saves = output / 'saves'
     saves.mkdir()
+    if args.seed_save:
+        seed = args.seed_save.resolve()
+        if not seed.is_file():
+            raise ValueError(f'Missing seed save: {seed}')
+        shutil.copy2(seed, saves / 'progress-v1.bin')
     staged = output / 'RacerRevengePC.exe'
     shutil.copy2(executable, staged)
     for dll in runtime:
@@ -133,6 +144,10 @@ def main():
         env['RR_CAMERA_POSE_TRACE'] = '1'
     if args.hold_throttle:
         env['RR_TEST_HOLD_THROTTLE'] = '1'
+    if args.repair:
+        env['RR_TEST_REPAIR'] = '1'
+    if args.unstick:
+        env['RR_TEST_UNSTICK'] = '1'
     if args.stop_start:
         env['RR_TEST_STOP_START'] = '1'
     if args.maximized:

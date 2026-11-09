@@ -486,13 +486,23 @@ bool OriginalUiSharedDialogs50KG::reappend1B86D0(const OriginalUiGaragePageOwner
 }
 bool OriginalUiSharedDialogs50KG::advance4702048F0(float delta,Diagnostic& d)noexcept {
  d={};if(menuMainDraw_||menuOptionsDraw_||menuRiderDraw_||menuUpdateFailedOwner_||menuUpdateAborted_)return fail(d,Status::phase,0x2048F0);
+ // A race-return Hall11/Win7/Unlock10 first screen boots 470/47C (1B7BD0)
+ // but, unlike Main 1D7CF4 or Garage 1FB648, performs no 1B86D0 reappend:
+ // neither entity is under the dispatcher yet, so its child update 2048F0
+ // is not reached until a later manager (the Garage) attaches them.
+ // STAND-IN: the port boots these per frontend; the original keeps them.
+ if(!initialMainAttached_&&!reorderStep_&&loadedCurrent()&&
+    dialog470_.entity.parent1C!=&scope_->dispatcher_&&controller47C_.entity.parent1C!=&scope_->dispatcher_){
+  d.sourcePC=0x2048F0;return true;}
  return advance470Body2048F0(delta,d);
 }
 bool OriginalUiSharedDialogs50KG::advance470Body2048F0(float delta,Diagnostic& d)noexcept {
  d={};if(popup47CDraw_||nativePopup47CFifoPins_||firstPass470Draw_||demand470Pending_||thirdPass470Draw_||nativeWarning470FifoPins_||nativeMenuWarning470Pins_||menuMainDraw_||menuOptionsDraw_||menuRiderDraw_||menuUpdateFailedOwner_||menuUpdateAborted_)return fail(d,Status::phase,0x2048F0);
  if(!loadedCurrent()||!std::isfinite(delta)||delta<0||
-    dialog470_.entity.parent1C!=&scope_->dispatcher_||controller47C_.entity.parent1C!=&scope_->dispatcher_)
-  return fail(d,Status::owner,0x2048F0);
+    dialog470_.entity.parent1C!=&scope_->dispatcher_||controller47C_.entity.parent1C!=&scope_->dispatcher_){
+  std::fprintf(stderr,"shared_dialog_470 owner loaded=%d parent470=%d parent47C=%d\n",int(loadedCurrent()),
+   int(dialog470_.entity.parent1C==&scope_->dispatcher_),int(controller47C_.entity.parent1C==&scope_->dispatcher_));
+  return fail(d,Status::owner,0x2048F0);}
  auto& host=inputs_.video->host;
  if(!host.ownerThread()||!host.created()||!host.current()||!host.sharedDialogPollCurrent50KG_||
     !host.sharedDialogPollRevision50KG_)return fail(d,Status::source,0x204914);
@@ -649,7 +659,13 @@ bool OriginalUiSharedDialogs50KG::demand470Body204A00(Diagnostic& d)noexcept {
  demand470Pending_=false;d.sourceEffectsCommitted=demand470Effects_;d.sourcePC=0x204A9C;return true;
 }
 bool OriginalUiSharedDialogs50KG::invisible470204AC0(Diagnostic& d)const noexcept {
- d={};if(!loadedCurrent()||update470Pending_||!update470Count_){d.status=Status::phase;d.sourcePC=0x204AC0;return false;}
+ d={};
+ // Not yet under the dispatcher (race-return Hall/Win/Unlock first screen,
+ // see advance4702048F0): the draw traversal does not reach 204AC0 either.
+ if(!initialMainAttached_&&!reorderStep_&&!update470Count_&&!update470Pending_&&loadedCurrent()&&
+    dialog470_.entity.parent1C!=&scope_->dispatcher_&&controller47C_.entity.parent1C!=&scope_->dispatcher_){
+  d.sourcePC=0x204AC0;return true;}
+ if(!loadedCurrent()||update470Pending_||!update470Count_){d.status=Status::phase;d.sourcePC=0x204AC0;return false;}
  const auto& host=inputs_.video->host;const auto app=application_.lock();
  if(!host.ownerThread()||!host.created()||!host.current()||!host.sharedDialogPollCurrent50KG_||
     update470PollRevision_>host.sharedDialogPollRevision50KG_){d.status=Status::source;d.sourcePC=0x204AC0;return false;}

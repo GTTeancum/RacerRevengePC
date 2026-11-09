@@ -384,3 +384,14 @@ from it: not implemented (logged, unreceived).
 
 Garage speed: ~17 FPS (fixed-function specular per the Nov 7 approval,
 RR_EXACT_PS2_SPECULAR=1 restores exact). User: menu speed does not matter.
+
+## Parked (Nov 9): after-race screen testing, branch parked/after-race-screens
+
+Stopped at the user's request ("mark for later"). Work in progress, not
+verified: prepared-save scenarios (work\scratch\gen_save.py, work\scratch\saves)
+to reach Unlock (Clegg pending), Hall (slow TA records) and Win (GA finale,
+course order 3? check), fixes in Unlock/Win resources, GA camera hold, the
+capture route. Logs: evidence\u111*, w111*, t111r-o*, h112*. Track launch
+survey t111r: 11 of 12 tracks load into a race from Course (RA stops in its
+loading prefix); none was run through Results. No screen (Unlock/Win/Hall)
+had been reached yet when stopped.

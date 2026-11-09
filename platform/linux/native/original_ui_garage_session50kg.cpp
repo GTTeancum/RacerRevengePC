@@ -1743,7 +1743,8 @@ bool Application::beginNativeFrontendRootAudio140CE0(Frontend& frontend,
     // The concrete native coordinator below owns only these ordinary managers.
     // Garage has its own complete retained Root cursor and must never be serviced twice.
     if((before.route.screen!=4&&before.route.screen!=5&&before.route.screen!=6&&
-        before.route.screen!=9&&before.route.screen!=12&&before.route.screen!=11)||
+        before.route.screen!=9&&before.route.screen!=12&&before.route.screen!=11&&
+        before.route.screen!=7&&before.route.screen!=10)||   // UIWin 7, UIUnlock 10
        (garageCustodyOwner_&&garageCustodyOwner_->runtimeRootPhase_!=
           rr::platform::OriginalUiGarageSession50KG::RootRuntimePhase::notStarted))
         return fail(0x140CE0,"Native ordinary manager cannot consume a Garage Root publication");

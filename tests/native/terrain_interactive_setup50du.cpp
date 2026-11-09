@@ -1149,7 +1149,9 @@ SessionExit50DU Context::run() {
        *materialMixer,*audioGroups,audioError,dynamicContactEnabled&&!practiceMusicOnly,
        dynamicContactEnabled?race_music50IE::TimedVolumePolicy50IW::NativeLinearSharedMix:
            race_music50IE::TimedVolumePolicy50IW::StrictSourceBoundary,practiceMusicOnly,
-       isTaTrack&&originalCameraEnabled&&nativeOrdinaryLaunch11258==1u&&
+       // Song 25 is the intro camera's 1756D0 -> 1A46E0(25,0) on every
+       // course that runs the tournament intro, not a TA-only track song.
+       originalCameraEnabled&&nativeOrdinaryLaunch11258==1u&&
            (dynamicProfile.game34==2u||cameraStartup350!=0)),
        audioError.empty()?"source music cold preparation failed; explicit fallback RR_RACE_MODE=2":audioError.c_str());
    require50DU(sourceAnnouncer->prepared()&&raceMusic->bank().ready==
@@ -1302,8 +1304,10 @@ SessionExit50DU Context::run() {
        race_audio_groups50IC::bindProviderRange(*audioGroups,
        race_audio_groups50IC::ProviderRole::EngineBinderBoost,160,32),
        "AI source sound group binding rejected");
-   require50DU(originalAiAudio->prepare(sources,audioRoot,liveAudio->bank(),*materialMixer,
-       sessionIndex+1,originalAiSettings1125C,audioError),audioError.empty()?"AI audio preparation rejected":audioError.c_str());
+   // Evaluate before reading the message (argument order is unspecified).
+   const bool aiAudioPrepared=originalAiAudio->prepare(sources,audioRoot,liveAudio->bank(),*materialMixer,
+       sessionIndex+1,originalAiSettings1125C,audioError);
+   require50DU(aiAudioPrepared,audioError.empty()?"AI audio preparation rejected":audioError.c_str());
    if(humanCourseEnabled){
     // Same stable native slot0 identity convention as the real seven AI rows;
     // this binds the human reset/material fields and its genuine D44 row0.

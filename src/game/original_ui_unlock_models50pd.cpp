@@ -1,10 +1,14 @@
 #include "original_ui_unlock_models50pd.h"
+#include <cstdio>
 #include <utility>
 
 namespace rr::game {
 namespace {
 using E=OriginalUiUnlockModelError50PD;using D=OriginalUiUnlockModelDiagnostic50PD;using O=OriginalUiControlOperation50KG;
-bool fail(D& d,E e,std::uint32_t pc=0) noexcept {d.error=e;d.sourcePC=pc;return false;}
+// Failure receipts carry the source line to the log (diagnostic only).
+bool failAt(int line,D& d,E e,std::uint32_t pc=0) noexcept {d.error=e;d.sourcePC=pc;
+    std::fprintf(stderr,"unlock_models failure line=%d error=%u pc=%x\n",line,unsigned(e),pc);return false;}
+#define fail(...) failAt(__LINE__,__VA_ARGS__)
 bool podWidget(std::uint16_t id) noexcept {return id>=9&&id<=23;}
 bool characterWidget(std::uint16_t id) noexcept {return id>=24&&id<=38;}
 }

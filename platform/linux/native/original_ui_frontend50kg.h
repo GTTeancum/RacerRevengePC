@@ -214,6 +214,11 @@ struct OriginalUiFrontendSnapshot50KG {
     std::uint64_t garagePublication=0;
     std::uint32_t garageManagerLifecycle=0,garageManagerTransition=0,garageSelectedStat=0;
     game::OriginalUiApertureSnapshot50KG garageAperture{};
+    // Win7 / Unlock10 page state (observation only; unattended route and logs).
+    bool winBound=false,unlockBound=false,screenPageShown=false,screenInputShown=false,screenFramePublished=false;
+    game::OriginalUiApertureSnapshot50KG screenAperture{};
+    std::int32_t unlockPod2D40=-1;std::uint32_t unlockActivations=0;std::uint64_t unlockGrants=0;
+    std::int32_t unlockFirstPending=-1;std::uint32_t winCircuit=0,winPlace=0,winCareer=0;
 };
 // Concrete native Main4/1 <-> Options12/{1,2,3,4}, plus Rider5/1 for
 // authenticated Rider selection: mode0 Confirm -> bounded Course6/1; mode2

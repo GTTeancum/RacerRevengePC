@@ -1887,6 +1887,20 @@ void Frontend::report(const char* reason,const Application& application,std::uin
                 <<",\"input_events\":"<<inputCount<<",\"unavailable_destinations\":"<<unavailableCount;
             reportRiderProfile();std::cerr<<"}\n";return;
         }
+        if(snapshot.route.screen==7||snapshot.route.screen==10){
+            // UIWin 7 / UIUnlock 10: page state from the frontend snapshot.
+            std::cerr<<"original_"<<(snapshot.route.screen==7?"win":"unlock")<<"_state {\"reason\":\""<<reason<<"\",\"screen\":"
+                <<unsigned(snapshot.route.screen)<<",\"page\":"<<unsigned(snapshot.route.page)
+                <<",\"page_shown\":"<<(snapshot.screenPageShown?"true":"false")<<",\"input_shown\":"<<(snapshot.screenInputShown?"true":"false")
+                <<",\"aperture_state\":"<<unsigned(snapshot.screenAperture.state)<<",\"input_enabled\":"<<(snapshot.screenAperture.inputEnabled268?"true":"false")
+                <<",\"unlock_pod\":"<<snapshot.unlockPod2D40<<",\"unlock_first_pending\":"<<snapshot.unlockFirstPending
+                <<",\"unlock_activations\":"<<snapshot.unlockActivations<<",\"unlock_grants\":"<<snapshot.unlockGrants
+                <<",\"win_circuit\":"<<snapshot.winCircuit<<",\"win_place\":"<<snapshot.winPlace<<",\"win_career\":"<<snapshot.winCareer
+                <<",\"audio_music_song\":"<<(audioOutput.transport()?audioOutput.transport()->activeMusicSong():0)
+                <<",\"updates\":"<<snapshot.updates<<",\"renders\":"<<snapshot.renders<<",\"submitted\":"<<snapshot.submissions
+                <<",\"input_events\":"<<inputCount<<",\"unavailable_destinations\":"<<unavailableCount;
+            reportRiderProfile();std::cerr<<"}\n";return;
+        }
         const auto* optionsResources=coordinator.optionsResources();
         const auto* nav=navigation();require(nav,"original UI live navigation missing");
         const auto group=nav->controllerGroup[0];

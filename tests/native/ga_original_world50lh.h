@@ -11,6 +11,7 @@
 #include "../../src/assets/world_normals50hk.h"
 #include <algorithm>
 #include <charconv>
+#include <functional>
 #include <iterator>
 #include <limits>
 #include <map>
@@ -358,6 +359,10 @@ public:
     const std::vector<a::TrackProjectedUv>* projectionUvs()const noexcept{return storage_?&storage_->projectionUvs:nullptr;}
 
     bool load(const Bytes& original,const a::World48F& world,Diagnostic& d)noexcept;
+    // Runs inside populateCanonicalRacers after the racer sources are admitted
+    // and before the single population, as on TA: the original race load
+    // 1A8A40 (Pause100 / Results104 / F8) runs for every race.
+    std::function<bool()> beforeRacerPopulation;
 
     // Same Application-owned domain as the actual installed racers. This does
     // not register synthetic static models or claim source render dispatch for
@@ -388,6 +393,10 @@ public:
                         *request.canonicalMaterialPath.actualPrefix36B970,*provider,materials,textures,d.racerSource),
                     "Original GA canonical racer material/texture closure rejected");
             shared::need(request.canonicalDomain->appendOriginalSources(materials,textures,d.canonical),"Original GA canonical racer source admission rejected");
+            if(beforeRacerPopulation){
+                d.stage="ga_original_race_load";
+                shared::need(beforeRacerPopulation(),"Original GA race load before population rejected");
+            }
             d.stage="ga_original_racer_population";
             shared::need(request.canonicalDomain->populate(request.canonicalContext,d.canonical),"Original GA canonical racer population rejected");
             return true;

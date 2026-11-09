@@ -4,6 +4,7 @@
 #include "../../../src/assets/original_ui_win_material50pd.h"
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 #include <map>
 #include <utility>
 
@@ -11,7 +12,9 @@ namespace rr::platform {
 namespace {
 using Error=OriginalUiWinDrawError50PD;using Diagnostic=OriginalUiWinDrawDiagnostic50PD;using Archive=assets::OriginalUiArchiveId50KG;
 using Kind=OriginalUiWinMaterialKind50PD;constexpr auto unresolved=assets::unresolvedMaterialTexture50EA;
-bool fail(Diagnostic& d,Error e,std::uint32_t pc=0)noexcept{d.error=e;if(pc)d.sourcePC=pc;return false;}
+// Failure receipts carry the source line to the log (diagnostic only).
+bool failAt(int line,Diagnostic& d,Error e,std::uint32_t pc=0)noexcept{d.error=e;if(pc)d.sourcePC=pc;std::fprintf(stderr,"win_draw_resources failure line=%d error=%u pc=%x\n",line,unsigned(e),pc);return false;}
+#define fail(...) failAt(__LINE__,__VA_ARGS__)
 char fold(char c)noexcept{return c=='\\'?'/':c>='A'&&c<='Z'?char(c+32):c;}
 bool same(const std::string& a,const std::string& b)noexcept{if(a.size()!=b.size())return false;for(std::size_t i=0;i<a.size();++i)if(fold(a[i])!=fold(b[i]))return false;return true;}
 std::string normalized(std::string s){for(auto& c:s)c=fold(c);return s;}
@@ -181,7 +184,11 @@ bool OriginalUiWinDrawResources50PD::load(const OriginalUiWinColdInput50PD& in,D
             if(token!=3235)return fail(d,Error::registry,0x298724);
             for(auto& b:s->bindings){const auto it=ranks.find(normalized(b.registeredName));if(it==ranks.end()||!it->second)return fail(d,Error::registry,0x298724);b.registryToken=it->second;}}
         auto originalImages=std::make_shared<assets::OriginalUiScreenAssets50KG>();
-        if(!originalImages->load(sources,d.resource))return fail(d,Error::resource,0x24DA30);
+        if(!originalImages->load(sources,d.resource)){
+            const auto& r=d.resource;const auto image=r.image<sources.size()&&sources[r.image].member.identity?sources[r.image].member.identity->name:"?";
+            std::fprintf(stderr,"win_draw_resources page images error=%u image=%zu member=%s texture=%s/%s\n",
+                unsigned(r.error),r.image,image,r.texture.code.c_str(),r.texture.detail.c_str());
+            return fail(d,Error::resource,0x24DA30);}
         assets::OriginalUiImageBankInput50KG bankInput;bankInput.archives={in.appStart,in.win,in.fonts,in.controllerPopup,in.overlays,in.backgrounds};bankInput.owners={originalImages};
         assets::OriginalUiImageBankDiagnostic50KG bankDiagnostic;if(!s->imageBank.load(bankInput,bankDiagnostic))return fail(d,Error::resource);
         for(std::uint32_t i=0;i<sources.size();++i){const auto* map=s->imageBank.mapping(0,i);if(!map||map->combinedIndex!=i)return fail(d,Error::resource);}

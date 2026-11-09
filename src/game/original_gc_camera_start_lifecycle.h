@@ -84,10 +84,10 @@ inline GcStartFrameReceipt advanceOriginalGcCameraStartFrame(
     if(!bank.racerCount||bank.racerCount>8)return result;
     for(std::size_t i=0;i<bank.racerCount;++i)if(racerEffects.racers[i].racerKey!=bank.racers[i].racerKey)return result;
     result.status=GcStartFrameStatus::requiresOtherSourcePath;
-    if((context.sourceControllerCutCountA8!=0&&!(context.sourceControllerCutCountA8==3&&owner.mode44==7))||(context.sourceLaunchKind11258<1||context.sourceLaunchKind11258>3)||
+    if((context.sourceControllerCutCountA8!=0&&owner.mode44!=7)||(context.sourceLaunchKind11258<1||context.sourceLaunchKind11258>3)||
         (owner.mode44!=4&&owner.mode44!=7)||(frame.raceFlags1B0&3u)!=1u||frame.racerState40!=0||
         (frame.raceFlags1B0&0x10)||((frame.raceStateFlags58&1)&&frame.racerCD4==0)||
-        (owner.flags62&0x80)||owner.shakeRemaining94>=0)return result;
+        (owner.flags62&0x80))return result;
     if(owner.mode44==7&&start.complete240){result.status=GcStartFrameStatus::needsOriginalExit;return result;}
     result.status=GcStartFrameStatus::unsupportedNumericDomain;
     if(std::fegetround()!=FE_TONEAREST||!d::scalar(frame.elapsed)||frame.elapsed<0||
@@ -103,6 +103,23 @@ inline GcStartFrameReceipt advanceOriginalGcCameraStartFrame(
         if(nextOwner.cutRemaining90==0)nextOwner.cutRemaining90=-1;
         else {const float remaining=d::sub(nextOwner.cutRemaining90,frame.elapsed);
             if(!d::scalar(remaining))return result;nextOwner.cutRemaining90=remaining<=0?0:remaining;}
+    }else if(nextOwner.shakeRemaining94>=0){
+        // 175E44..175F4C camera-shake blur timer (delay A0, strength 75 or
+        // 80*94/98 when decaying). Modes 4/7 reach neither mode0/5 terminal call.
+        if(!d::scalar(nextOwner.shakeDelayA0))return result;
+        if(nextOwner.shakeDelayA0>0){nextOwner.shakeDelayA0=d::sub(nextOwner.shakeDelayA0,frame.elapsed);
+            if(!d::scalar(nextOwner.shakeDelayA0))return result;}
+        else{
+            strength=75;
+            if(nextOwner.shakeDecayingA9){
+                if(!d::scalar(nextOwner.shakeDuration98)||nextOwner.shakeDuration98==0)return result;
+                if(!d::strength(d::mul(80,d::div(nextOwner.shakeRemaining94,nextOwner.shakeDuration98)),strength))return result;
+            }
+            requestGameplayBlur(nextPending,strength,0,0);requested=true;
+            if(nextOwner.shakeRemaining94==0){nextOwner.shakeRemaining94=-1;nextOwner.shakeDuration98=0;}
+            else{const float remaining=d::sub(nextOwner.shakeRemaining94,frame.elapsed);
+                if(!d::scalar(remaining))return result;nextOwner.shakeRemaining94=remaining<=0?0:remaining;}
+        }
     }
     nextOwner.flags63Low5=static_cast<std::uint8_t>(nextOwner.flags63Low5&~0x18u);
     //176290..1762F4: no procedural route, or actual event type2, selects

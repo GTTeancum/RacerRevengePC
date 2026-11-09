@@ -1,5 +1,6 @@
 #include "original_ui_course_background50kg.h"
 #include "original_ui_hall_background50kg.h"
+#include "original_ui_unlock_background50pd.h"
 #include "original_ui_controls_specmap50kg.h"
 #include "original_ui_screen_assets50kg.h"
 #include <new>
@@ -78,6 +79,9 @@ bool OriginalUiScreenAssets50KG::load(const std::vector<OriginalUiImageSource50K
             }else if(!s.cel.identity&&!s.pstOffset&&s.pstBytes==s.member.size&&
                 isOriginalUiHallBackground50KG(s.member)){
                 if(!decodeOriginalUiHallBackground50KG(s.member,decoded,d.texture))return fail(d,Error::texture,i);
+            }else if(!s.cel.identity&&!s.pstOffset&&s.pstBytes==s.member.size&&
+                isOriginalUiUnlockBackground50PD(s.member)){
+                if(!decodeOriginalUiUnlockBackground50PD(s.member,decoded,d.texture))return fail(d,Error::texture,i);
             }else if(!s.cel.identity&&!s.pstOffset&&s.pstBytes==s.member.size&&isOriginalUiControlsSpecmap50KG(s.member.identity)){
                 if(!decodeOriginalUiControlsSpecmap50KG(s.member,decoded,d.texture))return fail(d,Error::texture,i);
             }else if(!decodeTexture48E(pst,decoded,d.texture))return fail(d,Error::texture,i);

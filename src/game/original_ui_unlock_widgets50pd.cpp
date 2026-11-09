@@ -179,7 +179,14 @@ bool OriginalUiUnlockWidgets50PD::projectText(std::uint16_t id,std::size_t line,
     std::int32_t height,bool shown,OriginalUiUnlockTextProjection50PD& out,D& d) noexcept {
     d={};d.widget=id;const auto* text=textDescriptor(id);if(!text)return fail(d,E::text);
     OriginalUiUnlockTextProjection50PD p;p.descriptor=text;
-    if(!positionOriginalUiText50KG({text,line,fontHeight,width,height},p.position))return fail(d,E::text);
+    // As the text geometry: SetText (2A9DE0) writes the live strings, so the
+    // position's empty-line justification gate observes the live dynamic line,
+    // not the initially empty authored descriptor line.
+    if(dynamicText(id)){
+        try{auto positioned=*text;positioned.lines=storage_->dynamic[id];
+            if(!positionOriginalUiText50KG({&positioned,line,fontHeight,width,height},p.position))return fail(d,E::text);
+        }catch(...){return fail(d,E::text);}
+    }else if(!positionOriginalUiText50KG({text,line,fontHeight,width,height},p.position))return fail(d,E::text);
     const auto status=storage_->textWidgets[id].projectLine(line,p.line,shown);
     if(status!=T::ok)return fail(d,status==T::hidden?E::hidden:E::text);
     if(dynamicText(id)){if(line>=storage_->dynamic[id].size())return fail(d,E::text);p.text=&storage_->dynamic[id][line];}

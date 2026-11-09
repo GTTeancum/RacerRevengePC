@@ -861,9 +861,11 @@ void Context::run() {
   // population window (racer sources admitted, before the one combined
   // population/collector). RA does it inside its own world join; TA's race
   // does it here through its world's population hook.
-  if(commonRacePausePrewarmed&&humanCourseEnabled&&!allAiEnabled&&taOriginalWorld){
-   const auto commonRace=consumedTaStage.race();
-   if(commonRace)taOriginalWorld->beforeRacerPopulation=[&,commonRace]{
+  if(commonRacePausePrewarmed&&humanCourseEnabled&&!allAiEnabled&&(taOriginalWorld||gaOriginalWorld)){
+   // TA and GA: each world's population hook runs the same race load.
+   const auto commonRace=taOriginalWorld?consumedTaStage.race():consumedGaStage.race();
+   auto& populationHook=taOriginalWorld?taOriginalWorld->beforeRacerPopulation:gaOriginalWorld->beforeRacerPopulation;
+   if(commonRace)populationHook=[&,commonRace]{
     OriginalResults104Diagnostic50LA loadDiagnostic;
     const bool loaded=originalMainApplication.loadHumanTournamentPauseResultsBeforeCollector50LA(
         *commonRace,sourcePause,nullptr,dynamicRacer60,loadDiagnostic);

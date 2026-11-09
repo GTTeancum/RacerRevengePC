@@ -39,6 +39,7 @@ struct FrameHitch50DU {
 };
 FrameHitch50DU frameHitch50DU;
 float testRouteX50DU=0.f; // Last HUD gate direction; unattended steering test only.
+float testPositionX50DU=0.f,testPositionZ50DU=0.f; // Last player position; unattended unstick test only.
 double hitchMs50DU(FrameHitch50DU::Clock::time_point a, FrameHitch50DU::Clock::time_point b) {
     if (a == FrameHitch50DU::Clock::time_point{} || b == FrameHitch50DU::Clock::time_point{} || b < a) return -1.0;
     return std::chrono::duration<double, std::milli>(b - a).count();
@@ -295,18 +296,47 @@ void Context::run() {
      // RR_TEST_STOP_START=1: 4 s throttle, 3 s coast to a stop, repeating
      // (stop-start driving into walls, as a player recovering from crashes).
      static const bool stopStart50DU=[]{const char* v=std::getenv("RR_TEST_STOP_START");return v&&std::string(v)=="1";}();
-     const bool throttleOn=!stopStart50DU||((monotonicNow50DU()/1000000000ull)%7ull)<4ull;
+     bool throttleOn=!stopStart50DU||((monotonicNow50DU()/1000000000ull)%7ull)<4ull;
+     // Steer toward the next authored gate (same vector as the HUD arrow).
+     static const float steerSign50DU=[]{const char* v=std::getenv("RR_TEST_STEER_INVERT");return v&&std::string(v)=="1"?-1.f:1.f;}();
+     float route=steerSign50DU*testRouteX50DU;
+     // RR_TEST_UNSTICK=1: when wedged (moved under 40 units in 3 s) the bot
+     // taps the player's manual reset key (T, 150 ms), as a player would.
+     static const bool unstick50DU=[]{const char* v=std::getenv("RR_TEST_UNSTICK");return v&&std::string(v)=="1";}();
+     static std::uint64_t stuckCheckNs50DU=0,resetUntilNs50DU=0;static float stuckX50DU=0,stuckZ50DU=0;
+     if(unstick50DU){
+      constexpr std::size_t resetT=23;
+      const auto nowNs=monotonicNow50DU();
+      if(!stuckCheckNs50DU){stuckCheckNs50DU=nowNs;stuckX50DU=testPositionX50DU;stuckZ50DU=testPositionZ50DU;}
+      if(nowNs>=stuckCheckNs50DU+3000000000ull){
+       const float dx=testPositionX50DU-stuckX50DU,dz=testPositionZ50DU-stuckZ50DU;
+       if(dx*dx+dz*dz<40.f*40.f){resetUntilNs50DU=nowNs+150000000ull;
+        std::cerr<<"test_unstick reset x="<<testPositionX50DU<<" z="<<testPositionZ50DU<<'\n';}
+       stuckCheckNs50DU=nowNs;stuckX50DU=testPositionX50DU;stuckZ50DU=testPositionZ50DU;
+      }
+      const bool tap=nowNs<resetUntilNs50DU;
+      if(tap&&!hostInput.keys.down[resetT])hostInput.keys.pressed[resetT]=1;
+      if(!tap&&hostInput.keys.down[resetT])hostInput.keys.released[resetT]=1;
+      hostInput.keys.down[resetT]=tap?1:0;
+     }
      if(throttleOn&&!hostInput.keys.down[throttleW])hostInput.keys.pressed[throttleW]=1;
      if(!throttleOn&&hostInput.keys.down[throttleW])hostInput.keys.released[throttleW]=1;
      hostInput.keys.down[throttleW]=throttleOn?1:0;
-     // Steer toward the next authored gate (same vector as the HUD arrow).
-     static const float steerSign50DU=[]{const char* v=std::getenv("RR_TEST_STEER_INVERT");return v&&std::string(v)=="1"?-1.f:1.f;}();
-     const float route=steerSign50DU*testRouteX50DU;
      const bool left=route< -0.08f,right=route>0.08f;
      for(const auto [key,on]:{std::pair{steerLeft,left},std::pair{steerRight,right}}){
       if(on&&!hostInput.keys.down[key])hostInput.keys.pressed[key]=1;
       if(!on&&hostInput.keys.down[key])hostInput.keys.released[key]=1;
       hostInput.keys.down[key]=on?1:0;
+     }
+     // RR_TEST_REPAIR=1: hold the player's repair key (R) 2 s of every 6 s,
+     // as a player keeping a scraped pod alive (the bot cannot read damage).
+     static const bool repair50DU=[]{const char* v=std::getenv("RR_TEST_REPAIR");return v&&std::string(v)=="1";}();
+     if(repair50DU){
+      constexpr std::size_t repairR=21;
+      const bool on=((monotonicNow50DU()/1000000000ull)%6ull)<2ull;
+      if(on&&!hostInput.keys.down[repairR])hostInput.keys.pressed[repairR]=1;
+      if(!on&&hostInput.keys.down[repairR])hostInput.keys.released[repairR]=1;
+      hostInput.keys.down[repairR]=on?1:0;
      }
     }
    }
@@ -1428,6 +1458,9 @@ void Context::run() {
        hostClock.pause(monotonicNow50DU());
        break;
       }
+      if(cameraChild.status!=sourceCamera::Status::framePublished)
+       std::cerr<<"held_camera_child_rejected status="<<static_cast<unsigned>(cameraChild.status)<<" pc="<<std::hex
+           <<cameraChild.sourcePC<<std::dec<<" frame="<<frame<<'\n';
       require50DU(cameraChild.status==sourceCamera::Status::framePublished,"held original camera child rejected");
       publishSourceCameraFog();forceSceneRender=true;
      }
@@ -2357,6 +2390,7 @@ void Context::run() {
      if(std::isfinite(length)&&length>0.0001){
       hud.routeValid=true;hud.routeX=static_cast<float>(right/length);
       testRouteX50DU=hud.routeX; // Unattended steering test only.
+      testPositionX50DU=static_cast<float>(position.v[0]);testPositionZ50DU=static_cast<float>(position.v[2]);
       hud.routeY=static_cast<float>(ahead/length);
      }
     }

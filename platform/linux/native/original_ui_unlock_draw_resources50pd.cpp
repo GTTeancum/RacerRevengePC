@@ -2,13 +2,16 @@
 #include "original_ui_material_adapter50kg.h"
 #include "original_ui_unlock_model_material50pd.h"
 #include <cmath>
+#include <cstdio>
 #include <utility>
 
 namespace rr::platform {
 namespace {
 using Error=OriginalUiUnlockDrawError50PD;using Diagnostic=OriginalUiUnlockDrawDiagnostic50PD;using Archive=assets::OriginalUiArchiveId50KG;
 constexpr auto unresolved=assets::unresolvedMaterialTexture50EA;
-bool fail(Diagnostic& d,Error e,std::uint32_t pc=0) noexcept {d.error=e;d.sourcePC=pc;return false;}
+// Failure receipts carry the source line to the log (diagnostic only).
+bool failAt(int line,Diagnostic& d,Error e,std::uint32_t pc=0) noexcept {d.error=e;d.sourcePC=pc;std::fprintf(stderr,"unlock_draw_resources failure line=%d error=%u pc=%x\n",line,unsigned(e),pc);return false;}
+#define fail(...) failAt(__LINE__,__VA_ARGS__)
 char fold(char c) noexcept {return c=='\\'?'/':c>='A'&&c<='Z'?char(c+32):c;}
 bool same(const std::string& a,const std::string& b) noexcept {
     if(a.size()!=b.size())return false;for(std::size_t i=0;i<a.size();++i)if(fold(a[i])!=fold(b[i]))return false;return true;
@@ -209,7 +212,11 @@ bool OriginalUiUnlockDrawResources50PD::load(const OriginalUiUnlockColdInput50PD
         }
         if(!registry(in.appStart->find("AppStart/Mat_Stbl.txt"),s->bindings))return fail(d,Error::registry,0x298724);
         auto originalImages=std::make_shared<assets::OriginalUiScreenAssets50KG>();
-        if(!originalImages->load(sources,d.resource))return fail(d,Error::resource);
+        if(!originalImages->load(sources,d.resource)){
+            const auto& r=d.resource;const auto image=r.image<sources.size()&&sources[r.image].member.identity?sources[r.image].member.identity->name:"?";
+            std::fprintf(stderr,"unlock_draw_resources page images error=%u image=%zu member=%s bytes=%zu texture=%s/%s\n",
+                unsigned(r.error),r.image,image,r.image<sources.size()?sources[r.image].pstBytes:0,r.texture.code.c_str(),r.texture.detail.c_str());
+            return fail(d,Error::resource);}
         assets::OriginalUiImageBankInput50KG bankInput;
         bankInput.archives={in.appStart,in.unlock,in.fonts,in.backgrounds,in.controllerPopup,in.overlays};bankInput.owners={originalImages};
         if(in.podTextures)bankInput.archives.push_back(in.podTextures);

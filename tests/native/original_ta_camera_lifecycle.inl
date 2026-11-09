@@ -201,7 +201,7 @@ bool nextTaCut1756D0()noexcept {
 }
 bool taTimerPrefix()noexcept {
     namespace d=original_race_camera_detail;
-    if(controller_.shakeRemaining94>=0||!d::scalar(frameDelta_)||frameDelta_<0)return taReject(0x175d70);
+    if(!d::scalar(frameDelta_)||frameDelta_<0)return taReject(0x175d70);
     if(controller_.cooldown8C>0){controller_.cooldown8C=d::sub(controller_.cooldown8C,frameDelta_);
         if(!d::scalar(controller_.cooldown8C))return taReject(0x175d98);}
     if(controller_.cutRemaining90>=0){
@@ -210,6 +210,28 @@ bool taTimerPrefix()noexcept {
         if(controller_.cutRemaining90==0)controller_.cutRemaining90=-1;
         else{const float left=d::sub(controller_.cutRemaining90,frameDelta_);if(!d::scalar(left))return taReject(0x175df4);
             controller_.cutRemaining90=left<=0?0:left;}
+    }else if(controller_.shakeRemaining94>=0){
+        // 175E44..175F4C: the camera-shake blur timer (set by a course shake
+        // action, e.g. during an intro cut). Delay A0 first, then strength 75,
+        // or 80*94/98 when decaying (A9 bit1); at zero 94=-1, 98=0 and the
+        // mode0/5 shake factors clear (17BB60 / 13E530). The intro camera is
+        // mode 4/7 here, which reaches neither call.
+        if(!d::scalar(controller_.shakeDelayA0))return taReject(0x175e58);
+        if(controller_.shakeDelayA0>0){controller_.shakeDelayA0=d::sub(controller_.shakeDelayA0,frameDelta_);
+            if(!d::scalar(controller_.shakeDelayA0))return taReject(0x175e6c);}
+        else{
+            std::int32_t strength=75;
+            if(controller_.shakeDecayingA9){
+                if(!d::scalar(controller_.shakeDuration98)||controller_.shakeDuration98==0)return taReject(0x175e9c);
+                if(!d::strength(d::mul(80,d::div(controller_.shakeRemaining94,controller_.shakeDuration98)),strength))return taReject(0x175eb8);
+            }
+            requestGameplayBlur(actual_.blur,strength,0,0);
+            if(controller_.shakeRemaining94==0){
+                if(controller_.mode44==0||controller_.mode44==5)return taReject(0x175ef8); // ordinary-camera path, not this intro
+                controller_.shakeRemaining94=-1;controller_.shakeDuration98=0;
+            }else{const float left=d::sub(controller_.shakeRemaining94,frameDelta_);if(!d::scalar(left))return taReject(0x175f38);
+                controller_.shakeRemaining94=left<=0?0:left;}
+        }
     }
     controller_.flags63Low5&=static_cast<std::uint8_t>(~0x18u);return true;
 }

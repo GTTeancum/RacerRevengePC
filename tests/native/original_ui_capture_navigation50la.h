@@ -1,6 +1,7 @@
 #pragma once
 #include "../../platform/linux/native/original_ui_frontend50kg.h"
 #include <cstdint>
+#include <cstdio>
 #include <stdexcept>
 
 // Opt-in native window evidence navigation only. This owner emits the same
@@ -291,8 +292,8 @@ class TournamentRoute final {
     using Life=rr::game::OriginalUiTransitionLifecycle50KG;
     using Phase=rr::game::OriginalUiTransitionPhase50KG;
     using Aperture=rr::game::OriginalUiApertureState50KG;
-    bool enabled_=false,awaitingDispatch_=false,awaitingMainMove_=false;
-    std::uint8_t mainMoves_=0,confirms_=0;
+    bool enabled_=false,awaitingDispatch_=false,awaitingMainMove_=false,courseLogged_=false;
+    std::uint8_t mainMoves_=0,confirms_=0,firstSlot_=0;
     static void require(bool condition,const char* message){if(!condition)throw std::runtime_error(message);}
     static bool same(rr::game::OriginalUiTransitionRoute50KG a,rr::game::OriginalUiTransitionRoute50KG b)noexcept{
         return a.screen==b.screen&&a.page==b.page;
@@ -331,15 +332,21 @@ public:
         require(expected||outgoing,"tournament route left the bounded Main/Rider/Tournament/Course route");
         if(!expected||!settled(s))return -1;
         if(confirms_==0){
-            require(mainGroup==1&&mainSlot==1+mainMoves_,"tournament route Main selection diverged");
+            // Main opens on the profile's saved slot (6E0, 1 when fresh).
+            if(!mainMoves_&&!firstSlot_)firstSlot_=std::uint8_t(mainSlot);
+            require(mainGroup==1&&firstSlot_>=1&&firstSlot_<=3&&mainSlot==firstSlot_+mainMoves_,"tournament route Main selection diverged");
             if(mainSlot<3){awaitingMainMove_=awaitingDispatch_=true;return 3;}
         }else if(confirms_==1){
             require(s.rider.rider4C4==19,"tournament route requires the fresh Rider19 entry");
             if(!s.rider.selectedCharacterReady)return -1;
         }else if(confirms_==3){
-            require(s.course.selectedCourse44==0&&s.course.selectedPlanet40==0,
-                "tournament route requires the first tournament course (TA)");
+            // Whatever course the profile's career progress selects (the
+            // mode2 Course entry places it); this route never moves it.
+            require(s.course.mode34==2,"tournament route Course left tournament mode");
             if(!courseReady)return -1;
+            if(!courseLogged_){courseLogged_=true;
+                std::fprintf(stderr,"tournament_route course planet=%u course=%u\n",
+                    unsigned(s.course.selectedPlanet40),unsigned(s.course.selectedCourse44));}
         }
         awaitingDispatch_=true;return 4;
     }
@@ -362,20 +369,27 @@ public:
     }
 };
 // The same unattended tournament run AFTER a race: the 1AB5BC request opened
-// the Garage as this frontend's first screen. Garage Back (event 6, 1FE158)
-// requests Tournament 9/1, whose Continue (4) opens Course 6/1, whose Confirm
-// (4) launches the next tournament race. Same dispatch-receipt discipline.
+// Hall11, Win7, Unlock10 or Garage13 as this frontend's first screen. Each
+// Hall/Win/Unlock page takes Cross (4) and goes wherever the frontend admits
+// (Win/Unlock/Garage, or an Unlock re-show); once in the Garage, Back (event
+// 6, 1FE158) requests Tournament 9/1, whose Continue (4) opens Course 6/1,
+// whose Confirm (4) launches the next tournament race. Every destination is
+// the frontend's own; this route only presses and waits for the screen.
 class TournamentReturnRoute final {
     using Snapshot=rr::platform::OriginalUiFrontendSnapshot50KG;
     using Life=rr::game::OriginalUiTransitionLifecycle50KG;
     using Phase=rr::game::OriginalUiTransitionPhase50KG;
     using Aperture=rr::game::OriginalUiApertureState50KG;
-    bool enabled_=false,awaitingDispatch_=false;
-    std::uint8_t actions_=0;
+    bool enabled_=false,awaitingDispatch_=false,waitingChange_=false;
+    std::uint8_t actions_=0,garageActions_=0,leadActions_=0;
+    std::uint64_t switchesAtAction_=0,pollsSinceAction_=0;
+    std::uint32_t activationsAtAction_=0;
+    std::uint8_t screenAtAction_=0;
     static void require(bool condition,const char* message){if(!condition)throw std::runtime_error(message);}
     static bool same(rr::game::OriginalUiTransitionRoute50KG a,rr::game::OriginalUiTransitionRoute50KG b)noexcept{
         return a.screen==b.screen&&a.page==b.page;
     }
+    static bool lead(std::uint8_t screen)noexcept{return screen==11||screen==7||screen==10;}
     static bool garageSettled(const Snapshot& s)noexcept{
         const auto& a=s.garageAperture;
         return s.prepared&&s.active&&!s.faulted&&!s.quitRequested&&s.frameSubmitted&&!s.deferredQueue&&
@@ -385,27 +399,71 @@ class TournamentReturnRoute final {
             // must have finished: the source ignores Back until 16C/170 are 0.
             s.garageManagerLifecycle==0&&s.garageManagerTransition==0;
     }
-    // Screen expected before each action: Garage, Tournament, Course.
+    // Hall/Win/Unlock: idle manager, page and input container shown, a
+    // published frame and an open aperture accepting input.
+    static bool leadSettled(const Snapshot& s)noexcept{
+        const auto& t=s.transition;
+        if(!(s.prepared&&s.active&&!s.faulted&&!s.quitRequested&&s.frameSubmitted&&!s.deferredQueue&&
+             t.bound&&!t.applicationRequestQueued&&t.lifecycle==Life::idle&&t.phase==Phase::none&&
+             s.route.page==1&&same(s.route,t.current)&&same(s.route,t.requested)))return false;
+        if(s.route.screen==11){const auto& h=s.hall;
+            return h.bound&&!h.faulted&&!h.quitRequested&&h.pageShown&&h.inputContainerShown&&h.framePublished&&
+                !h.confirmProposalPending&&h.aperture.bound&&h.aperture.inputEnabled268&&h.aperture.state==Aperture::open;}
+        const bool bound=s.route.screen==7?s.winBound:s.unlockBound;
+        return bound&&s.screenPageShown&&s.screenInputShown&&s.screenFramePublished&&
+            s.screenAperture.bound&&s.screenAperture.inputEnabled268&&s.screenAperture.state==Aperture::open;
+    }
+    // Screen expected before each Garage-stage action: Garage, Tournament, Course.
     static constexpr std::uint8_t screens_[3]{13,9,6};
 public:
+    static constexpr std::uint8_t maximumLeadActions=8;
     explicit TournamentReturnRoute(bool enabled)noexcept:enabled_(enabled){}
     bool enabled()const noexcept{return enabled_;}
     std::uint8_t issuedActions()const noexcept{return actions_;}
-    bool actionsDispatched()const noexcept{return actions_==3&&!awaitingDispatch_;}
-    // Return -1 while waiting, Back6 in the Garage, else Confirm4.
+    bool actionsDispatched()const noexcept{return garageActions_==3&&!awaitingDispatch_;}
+    // Return -1 while waiting, Back6 in the Garage, else Cross/Confirm4.
     int poll(const Snapshot& s,bool courseReady){
         if(!enabled_)return -1;
         require(!awaitingDispatch_,"tournament return route dispatch receipt was not verified");
         require(!s.faulted&&!s.quitRequested,"tournament return route original UI became unavailable");
-        if(actions_==3)return -1;
-        const auto screen=screens_[actions_];
-        const bool expected=s.route.screen==screen&&s.route.page==1&&s.switches==actions_;
-        const bool outgoing=actions_&&s.route.screen==screens_[actions_-1]&&s.switches==actions_-1u;
-        require(expected||outgoing,"tournament return route left the bounded Garage/Tournament/Course route");
-        if(!expected)return -1;
-        if(actions_==0){if(!garageSettled(s))return -1;awaitingDispatch_=true;return 6;}
+        if(garageActions_==3)return -1;
+        if(waitingChange_){
+            // The pressed screen must leave (switch count) or, for an Unlock
+            // re-show, activate its page again.
+            const bool changed=s.switches!=switchesAtAction_||
+                (screenAtAction_==10&&s.route.screen==10&&s.unlockActivations!=activationsAtAction_);
+            if(!changed){
+                // An accepted press always changes screen or re-shows; a press
+                // that changed nothing for ~10 s is reported and repeated.
+                if(lead(screenAtAction_)&&++pollsSinceAction_==600){
+                    std::fprintf(stderr,"tournament_return_route no_change screen=%u lifecycle=%u; repeating\n",
+                        unsigned(s.route.screen),unsigned(s.transition.lifecycle));
+                    waitingChange_=false;
+                }
+                return -1;
+            }
+            waitingChange_=false;
+            std::fprintf(stderr,"tournament_return_route arrived screen=%u page=%u switches=%llu\n",
+                unsigned(s.route.screen),unsigned(s.route.page),static_cast<unsigned long long>(s.switches));
+        }
+        const auto screen=s.route.screen;
+        if(lead(screen)){
+            require(garageActions_==0,"tournament return route returned to Hall/Win/Unlock after the Garage");
+            require(leadActions_<maximumLeadActions,"tournament return route: too many Hall/Win/Unlock presses");
+            if(!leadSettled(s))return -1;
+            if(screen==10)std::fprintf(stderr,"tournament_return_route unlock pod=%d first_pending=%d activations=%u grants=%llu\n",
+                s.unlockPod2D40,s.unlockFirstPending,s.unlockActivations,static_cast<unsigned long long>(s.unlockGrants));
+            if(screen==7)std::fprintf(stderr,"tournament_return_route win circuit=%u place=%u career=%u\n",
+                s.winCircuit,s.winPlace,s.winCareer);
+            if(screen==11)std::fprintf(stderr,"tournament_return_route hall mode=%u course=%u planet=%u\n",
+                s.hall.entryMode34,s.hall.courseIndex,s.hall.planetIndex);
+            ++leadActions_;awaitingDispatch_=true;return 4;
+        }
+        if(garageActions_&&screen!=screens_[garageActions_]&&screen==screens_[garageActions_-1])return -1;
+        require(screen==screens_[garageActions_],"tournament return route left the bounded Hall/Win/Unlock/Garage/Tournament/Course route");
+        if(garageActions_==0){if(!garageSettled(s))return -1;awaitingDispatch_=true;return 6;}
         if(!TournamentRoute::settledPublic(s))return -1;
-        if(actions_==2){
+        if(garageActions_==2){
             require(s.course.mode34==2,"tournament return route Course left tournament mode");
             if(!courseReady)return -1;
         }
@@ -413,18 +471,29 @@ public:
     }
     void validateDispatch(const Snapshot& s){
         require(enabled_&&awaitingDispatch_,"tournament return route has no pending dispatch receipt");
-        if(actions_==0){
+        require(!s.faulted&&!s.quitRequested,"tournament return route press faulted the original UI");
+        ++actions_;awaitingDispatch_=false;
+        if(lead(s.route.screen)&&garageActions_==0){
+            const auto& t=s.transition;
+            std::fprintf(stderr,"tournament_return_route cross screen=%u lifecycle=%u requested=%u/%u\n",
+                unsigned(s.route.screen),unsigned(t.lifecycle),unsigned(t.requested.screen),unsigned(t.requested.page));
+            waitingChange_=true;pollsSinceAction_=0;switchesAtAction_=s.switches;
+            activationsAtAction_=s.unlockActivations;screenAtAction_=s.route.screen;return;
+        }
+        if(garageActions_==0){
             // The Garage page bypasses the transition owner: its Back writes
             // manager pending 9/1 and lifecycle 6 (1D6178) for its own tick.
-            require(!s.faulted&&!s.quitRequested&&s.route.screen==13,"tournament return route Garage Back faulted");
-            ++actions_;awaitingDispatch_=false;return;
+            require(s.route.screen==13,"tournament return route Garage Back faulted");
+        }else{
+            const auto& t=s.transition;const bool launch=garageActions_==2;
+            require(s.route.screen==screens_[garageActions_]&&t.bound&&same(t.current,s.route)&&
+                (launch?same(t.requested,s.route)&&t.lifecycle==Life::requestCourseExit:
+                    !same(t.requested,s.route)&&t.lifecycle==Life::requestScreenExit)&&t.phase==Phase::none,
+                "tournament return route original Confirm did not accept a destination");
         }
-        const auto& t=s.transition;const bool launch=actions_==2;
-        require(!s.faulted&&!s.quitRequested&&s.route.screen==screens_[actions_]&&t.bound&&same(t.current,s.route)&&
-            (launch?same(t.requested,s.route)&&t.lifecycle==Life::requestCourseExit:
-                !same(t.requested,s.route)&&t.lifecycle==Life::requestScreenExit)&&t.phase==Phase::none,
-            "tournament return route original Confirm did not accept a destination");
-        ++actions_;awaitingDispatch_=false;
+        ++garageActions_;
+        if(garageActions_<3){waitingChange_=true;pollsSinceAction_=0;switchesAtAction_=s.switches;
+            activationsAtAction_=s.unlockActivations;screenAtAction_=s.route.screen;}
     }
 };
 }

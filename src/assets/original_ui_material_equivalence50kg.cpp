@@ -27,7 +27,9 @@ const OriginalUiArchiveIdentity50KG* memberArchive(const OriginalUiMemberIdentit
         OriginalUiArchiveId50KG::backgrounds,OriginalUiArchiveId50KG::controllerPopup,
         OriginalUiArchiveId50KG::course,OriginalUiArchiveId50KG::rider,
         OriginalUiArchiveId50KG::options,OriginalUiArchiveId50KG::podTextures,
-        OriginalUiArchiveId50KG::hallOfFame,OriginalUiArchiveId50KG::tournament};
+        OriginalUiArchiveId50KG::hallOfFame,OriginalUiArchiveId50KG::tournament,
+        // UIUnlock 10 and UIWin 7 own their authored PSM/PST members too.
+        OriginalUiArchiveId50KG::unlock,OriginalUiArchiveId50KG::win};
     for(auto id:ids){const auto* a=originalUiArchiveIdentity50KG(id);if(!a)continue;
         for(std::size_t i=0;i<a->memberCount;++i)if(originalUiMemberIdentity50KG(id,i)==member)return a;
     }

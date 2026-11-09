@@ -131,14 +131,24 @@ private:
     // get replaced or receive a new identity. Successful partial work is kept.
     bool appendGarageArchive12CEA0(const std::shared_ptr<const OriginalUiArchive50KG>&,
         OriginalUiIpumCacheDiagnostic50KG&) const noexcept;
+    // UIUnlock (20A850 pod/pilot population) carries the SAME IPUM pilot PSTs
+    // as UIRIDER: byte-identical members of its own archive. Each Rider
+    // additional record whose member UIUNLOCK holds with the identical hash is
+    // decoded in process from the UIUNLOCK member (its own provenance; never
+    // rebound to the Rider member). Already-published slots are kept.
+    bool appendUnlockArchive20A850(const std::shared_ptr<const OriginalUiArchive50KG>&,
+        OriginalUiIpumCacheDiagnostic50KG&) const noexcept;
+    // unlock=false: garageSources[index] into garage_; unlock=true: the
+    // UIUNLOCK copy of additionalSources[index] into unlock_.
     bool loadGarageOriginalImpl(std::size_t,std::shared_ptr<const OriginalUiArchive50KG>,
         OriginalUiIpumCacheDiagnostic50KG&,const DecodeHooks48C*,const TextureLimits48E&,
-        std::size_t retainedByteCeiling) const noexcept;
+        std::size_t retainedByteCeiling,bool unlock=false) const noexcept;
     struct Storage;
     std::unique_ptr<Storage> storage_;
     std::array<std::unique_ptr<Storage>,originalUiIpumAdditionalCapacity50KG> additional_{};
     // Logical constness: fixed-address immutable publications are appended,
     // never mutated. Existing Rider/static canonical leases remain valid.
     mutable std::array<std::unique_ptr<Storage>,33> garage_{};
+    mutable std::array<std::unique_ptr<Storage>,originalUiIpumAdditionalCapacity50KG> unlock_{};
 };
 } // namespace rr::assets

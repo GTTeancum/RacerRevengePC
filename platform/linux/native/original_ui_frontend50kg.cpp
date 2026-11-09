@@ -1314,6 +1314,14 @@ struct OriginalUiFrontend50KG::Storage {
                    (!initialRaceReturn&&!fromHall&&!fromWin)||(!initialRaceReturn&&!rgbaReady)||
                    !cold.riderProfile->unlockFacts187E30(facts)||!cold.riderProfile->unlockSpritePods209BE0(spritePods)){
                     result(d,Status::unavailableDestination);return false;}
+                // UIUNLOCK's own copies of the IPUM pilot PSTs (byte-identical
+                // to UIRIDER's), decoded in process before the 20A850 population.
+                {assets::OriginalUiIpumCacheDiagnostic50KG cacheDiagnostic;
+                 if(!cold.riderIpumCache||!cold.riderIpumCache->appendUnlockArchive20A850(cold.unlock,cacheDiagnostic)){
+                    std::fprintf(stderr,"unlock_ipum_append failed error=%u source=%zu mip=%zu detail=%s\n",
+                        static_cast<unsigned>(cacheDiagnostic.error),cacheDiagnostic.sourceIndex,cacheDiagnostic.mip,
+                        cacheDiagnostic.detail.c_str());
+                    result(d,Status::resource,0x20A850);return false;}}
                 OriginalUiUnlockColdInput50PD input;input.appStart=cold.appStart;input.unlock=cold.unlock;input.fonts=cold.fonts;
                 input.backgrounds=cold.backgrounds;input.controllerPopup=cold.controllerPopup;input.overlays=cold.overlays;
                 input.english=&english;input.runtime=cold.runtime;
@@ -1368,7 +1376,7 @@ struct OriginalUiFrontend50KG::Storage {
                 if(cold.audioMode==OriginalUiMainAudioMode50KG::enabled)input.audio=winAudio;
                 input.externalTransition=m.transition;
                 m.win=std::make_unique<OriginalUiWinSession50PD>();OriginalUiWinSessionDiagnostic50PD wd;
-                if(m.win->bind(input,wd)!=WinStatus::ok){result(d,Status::session,wd.sourcePC);return false;}
+                if(m.win->bind(input,wd)!=WinStatus::ok){std::fprintf(stderr,"win_session bind failed status=%u pc=%x\n",unsigned(wd.status),wd.sourcePC);result(d,Status::session,wd.sourcePC);return false;}
             }else if(m.unlockResources){
                 // Actual Application+344 (constructor-initialized normal-UI scalar,
                 // the same producer the Garage loader borrows); nonzero is refused.
@@ -1380,7 +1388,7 @@ struct OriginalUiFrontend50KG::Storage {
                 input.application344=root->sourceBuildUiResFiles344_;
                 input.audioMode=cold.audioMode;input.audio=cold.audio;input.externalTransition=m.transition;
                 m.unlock=std::make_unique<OriginalUiUnlockSession50PD>();OriginalUiUnlockSessionDiagnostic50PD ud;
-                if(m.unlock->bind(input,ud)!=UnlockStatus::ok){result(d,Status::session,ud.sourcePC);return false;}
+                if(m.unlock->bind(input,ud)!=UnlockStatus::ok){std::fprintf(stderr,"unlock_session bind failed status=%u pc=%x models=%u/%x aperture=%u\n",unsigned(ud.status),ud.sourcePC,unsigned(ud.resource.models.error),ud.resource.models.sourcePC,unsigned(ud.aperture.status));result(d,Status::session,ud.sourcePC);return false;}
             }else if(m.tournament){
                 if(m.tournament->bindPublishedBank(m.gpu,d.tournament)!=TournamentStatus::ok){result(d,Status::session);return false;}
             }else if(m.course){
@@ -2653,7 +2661,9 @@ Status OriginalUiFrontend50KG::update(const OriginalUiMainSessionUpdate50KG& inp
         // Main/Options/Rider already run the same470 call immediately before their
         // real47C update. Other native managers must not freeze global state.
         OriginalUiSharedDialogs50KG::Diagnostic sd;
-        if(!shared->advance4702048F0(input.elapsedSeconds,sd))return s->fault(d,Status::session,sd.sourcePC);
+        if(!shared->advance4702048F0(input.elapsedSeconds,sd)){
+            std::fprintf(stderr,"shared_dialog_470_update failed status=%u pc=%x screen=%u\n",unsigned(sd.status),sd.sourcePC,unsigned(m.currentRoute().screen));
+            return s->fault(d,Status::session,sd.sourcePC);}
         game::OriginalUiControllerPopupPlan50KG plan;
         if(game::OriginalUiControllerPopup50KG::update(s->cold.application->controllerPopupState,input.elapsedSeconds,plan)!=
            game::OriginalUiControllerPopupStatus50KG::ok)return s->fault(d,Status::session,0x206420);
@@ -3126,7 +3136,13 @@ OriginalUiFrontendSnapshot50KG OriginalUiFrontend50KG::snapshotWithoutGarageRunt
     out.lightManagerEntered=s->ownsLightManager();
     if(s->active){out.route=s->active->currentRoute();if(s->active->transition)out.transition=s->active->transition->snapshot();
         if(s->active->main)out.main=s->active->main->snapshot();if(s->active->options)out.options=s->active->options->snapshot();if(s->active->hall)out.hall=s->active->hall->snapshot();
-        if(s->active->rider)out.rider=s->active->rider->snapshot();if(s->active->course)out.course=s->active->course->snapshot();if(s->active->tournament)out.tournament=s->active->tournament->snapshot();}
+        if(s->active->rider)out.rider=s->active->rider->snapshot();if(s->active->course)out.course=s->active->course->snapshot();if(s->active->tournament)out.tournament=s->active->tournament->snapshot();
+        if(s->active->win){const auto w=s->active->win->snapshot();out.winBound=w.bound;out.screenPageShown=w.pageShown;
+            out.screenInputShown=w.inputContainerShown;out.screenFramePublished=w.framePublished;out.screenAperture=w.aperture;
+            out.winCircuit=w.circuit.circuit;out.winPlace=w.circuit.place;out.winCareer=w.career;}
+        if(s->active->unlock){const auto u=s->active->unlock->snapshot();out.unlockBound=u.bound;out.screenPageShown=u.pageShown;
+            out.screenInputShown=u.inputContainerShown;out.screenFramePublished=u.framePublished;out.screenAperture=u.aperture;
+            out.unlockPod2D40=u.pod2D40;out.unlockActivations=u.activations;out.unlockGrants=u.grants;out.unlockFirstPending=u.pending.first();}}
     if(s->pending)out.preparedDestination=s->pending->initialRoute;return out;
 }
 const OriginalUiMainSession50KG* OriginalUiFrontend50KG::mainSession() const noexcept {return storage_&&storage_->active?storage_->active->main.get():nullptr;}

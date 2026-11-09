@@ -1252,7 +1252,7 @@ class Session final {
         //175D70 common prefix on the frame whose already-completed7C exits.
         //The intro helper deliberately returns before consuming this prefix.
         namespace d=original_race_camera_detail;
-        if(controller_.mode44!=7||!start_.complete240||controller_.shakeRemaining94>=0||
+        if(controller_.mode44!=7||!start_.complete240||
            !d::scalar(frameDelta_)||frameDelta_<0||!d::scalar(controller_.cooldown8C)||
            !d::scalar(controller_.cutRemaining90))return false;
         auto next=controller_;auto blur=actual_.blur;
@@ -1263,6 +1263,22 @@ class Session final {
             if(next.cutRemaining90==0)next.cutRemaining90=-1;
             else {const float remaining=d::sub(next.cutRemaining90,frameDelta_);
                 if(!d::scalar(remaining))return false;next.cutRemaining90=remaining<=0?0:remaining;}
+        }else if(next.shakeRemaining94>=0){
+            // 175E44..175F4C shake blur timer, as in the intro timer prefix.
+            // Mode 7 reaches neither mode0/5 terminal call.
+            if(!d::scalar(next.shakeDelayA0))return false;
+            if(next.shakeDelayA0>0){next.shakeDelayA0=d::sub(next.shakeDelayA0,frameDelta_);if(!d::scalar(next.shakeDelayA0))return false;}
+            else{
+                std::int32_t strength=75;
+                if(next.shakeDecayingA9){
+                    if(!d::scalar(next.shakeDuration98)||next.shakeDuration98==0)return false;
+                    if(!d::strength(d::mul(80,d::div(next.shakeRemaining94,next.shakeDuration98)),strength))return false;
+                }
+                requestGameplayBlur(blur,strength,0,0);
+                if(next.shakeRemaining94==0){next.shakeRemaining94=-1;next.shakeDuration98=0;}
+                else{const float remaining=d::sub(next.shakeRemaining94,frameDelta_);
+                    if(!d::scalar(remaining))return false;next.shakeRemaining94=remaining<=0?0:remaining;}
+            }
         }
         next.flags63Low5=static_cast<std::uint8_t>(next.flags63Low5&~0x18u);
         controller_=next;actual_.blur=blur;return true;
@@ -1930,12 +1946,16 @@ public:
             if(result_.start.status!=OriginalCameraStartStatus::complete)return set(Status::renderer,result_.start.sourcePC);
             frameStage_=FrameStage::cameraUpdate;break;
         case FrameStage::cameraUpdate:{
-            StableRaceCameraFrame current;if(!stableFrame(current))return fail(Status::sourcePath,0x175d70);
+            StableRaceCameraFrame current;if(!stableFrame(current)){std::fputs("intro_camera_stable_frame_refused\n",stderr);return fail(Status::sourcePath,0x175d70);}
             if(taPositive_&&(controller_.mode44==4||(controller_.mode44==7&&(controller_.flags62&0x80u)))){
                 if(current.racerState40!=0||(current.raceFlags1B0&3u)!=1u||
-                   (current.raceFlags1B0&0x10u)||((current.raceStateFlags58&1u)&&current.racerCD4==0))
-                    return fail(Status::sourcePath,0x175d70);
-                if(!advanceTaCut175D70())return fail(Status::sourcePath,taFailurePC_);
+                   (current.raceFlags1B0&0x10u)||((current.raceStateFlags58&1u)&&current.racerCD4==0)){
+                    std::fprintf(stderr,"intro_camera_frame_refused racer40=%u race1B0=%u flags58=%u racerCD4=%u mode44=%u\n",
+                        unsigned(current.racerState40),unsigned(current.raceFlags1B0),unsigned(current.raceStateFlags58),
+                        unsigned(current.racerCD4),unsigned(controller_.mode44));
+                    return fail(Status::sourcePath,0x175d70);}
+                if(!advanceTaCut175D70()){std::fprintf(stderr,"intro_camera_cut_refused pc=%x\n",taFailurePC_);
+                    return fail(Status::sourcePath,taFailurePC_);}
                 if(frameStage_==FrameStage::exit)break;
                 if(frameStage_==FrameStage::taSkipVideo)return set(Status::videoPending,0x260850);
                 frameStage_=FrameStage::lateTick;break;
@@ -1955,7 +1975,7 @@ public:
                     if(!completionPrefix())return fail(Status::numeric,0x175d70);
                     frameStage_=FrameStage::exit;break;
                 }
-                if(r.status!=GcStartFrameStatus::posePublished)return fail(Status::sourcePath,0x175d70);
+                if(r.status!=GcStartFrameStatus::posePublished){std::fprintf(stderr,"intro_camera_start_frame status=%u mode44=%u flags62=%u\n",unsigned(r.status),unsigned(controller_.mode44),unsigned(controller_.flags62));return fail(Status::sourcePath,0x175d70);}
                 if(r.activatedStartCamera){
                     //Temporary value projection is discarded. The actual AE8
                     //entry stores land in all eight real banked base tails.

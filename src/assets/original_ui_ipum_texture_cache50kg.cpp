@@ -805,6 +805,37 @@ bool OriginalUiIpumTextureCache50KG::appendGarageArchive12CEA0(
     }catch(const std::bad_alloc&){return fail(d,Error::allocation);}
     catch(...){return fail(d,Error::unexpectedFailure);}
 }
+bool OriginalUiIpumTextureCache50KG::appendUnlockArchive20A850(
+    const std::shared_ptr<const OriginalUiArchive50KG>& archive,OriginalUiIpumCacheDiagnostic50KG& d)const noexcept {
+    d={};
+    try {
+    if(!archive||!archive->loaded()||archive->identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::unlock)||
+       !additionalCatalogValid())return fail(d,Error::archive);
+    std::size_t retainedLimit=0,bytes=0;
+    if(!completeGarageCatalogRetainedLimit(retainedLimit))return fail(d,Error::cacheUnavailable);
+    for(const auto& record:additionalSources)
+        if(!sourceRetainedBytes(record.sourceMips,record.mipCount,bytes)||!addRetainedBytes(retainedLimit,bytes))
+            return fail(d,Error::limit);
+    const TextureLimits48E nativeLimits; // Per-source decoder limits stay unchanged.
+    for(std::size_t i=0;i<additionalSourceCount;++i){
+        const auto& record=additionalSources[i];
+        const auto source=archive->find(record.member);
+        // Only members UIUNLOCK actually holds with the Rider record's exact bytes.
+        if(!source.identity||source.identity->bytes!=record.sourceBytes||
+           std::strcmp(source.identity->sha256,record.sourceSha256))continue;
+        d={};d.sourceIndex=i;
+        if(const auto& existing=unlock_[i]){
+            if(existing->archive!=archive||source.identity!=existing->source.identity||
+               source.data!=existing->source.data||source.size!=existing->source.size||
+               !existing->evidence.decodedInProcess)return fail(d,Error::source);
+            continue;
+        }
+        if(!loadGarageOriginalImpl(i,archive,d,nullptr,nativeLimits,retainedLimit,true))return false;
+    }
+    d={};return true;
+    }catch(const std::bad_alloc&){return fail(d,Error::allocation);}
+    catch(...){return fail(d,Error::unexpectedFailure);}
+}
 bool OriginalUiIpumTextureCache50KG::loadGarageOriginal(std::size_t sourceIndex,std::shared_ptr<const OriginalUiArchive50KG> archive,
     OriginalUiIpumCacheDiagnostic50KG& d,
     const DecodeHooks48C* hooks,const TextureLimits48E& limits) noexcept {
@@ -813,12 +844,31 @@ bool OriginalUiIpumTextureCache50KG::loadGarageOriginal(std::size_t sourceIndex,
 }
 bool OriginalUiIpumTextureCache50KG::loadGarageOriginalImpl(std::size_t sourceIndex,std::shared_ptr<const OriginalUiArchive50KG> archive,
     OriginalUiIpumCacheDiagnostic50KG& d,
-    const DecodeHooks48C* hooks,const TextureLimits48E& limits,std::size_t retainedByteCeiling) const noexcept {
+    const DecodeHooks48C* hooks,const TextureLimits48E& limits,std::size_t retainedByteCeiling,bool unlock) const noexcept {
     d={};d.sourceIndex=sourceIndex;
     try {
-        if(!garageCatalogValid()||sourceIndex>=garageSourceCount)return fail(d,Error::cacheUnavailable);
-        if(garage_[sourceIndex])return fail(d,Error::alreadyLoaded);
-        const auto& binding=garageSources[sourceIndex];const auto& record=binding.source;
+        GarageSourceRecord binding{};
+        if(unlock){
+            // The UIUNLOCK member of the same name, required byte-identical to
+            // the Rider record (name, size and SHA-256 of the catalog member).
+            if(!additionalCatalogValid()||sourceIndex>=additionalSourceCount)return fail(d,Error::cacheUnavailable);
+            if(unlock_[sourceIndex])return fail(d,Error::alreadyLoaded);
+            const auto* unlockArchive=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::unlock);
+            if(!unlockArchive||!archive||!archive->loaded()||archive->identity()!=unlockArchive)return fail(d,Error::archive);
+            const auto& record=additionalSources[sourceIndex];
+            std::size_t index=archive->memberCount();
+            for(std::size_t i=0;i<archive->memberCount();++i){const auto view=archive->member(i);
+                if(view.identity&&!std::strcmp(view.identity->name,record.member)){index=i;break;}}
+            const auto* member=index<archive->memberCount()?originalUiMemberIdentity50KG(OriginalUiArchiveId50KG::unlock,index):nullptr;
+            if(!member||member->bytes!=record.sourceBytes||std::strcmp(member->sha256,record.sourceSha256))return fail(d,Error::source);
+            binding.archive=OriginalUiArchiveId50KG::unlock;binding.memberIndex=index;
+            binding.archiveSha=unlockArchive->sha256;binding.source=record;
+        }else{
+            if(!garageCatalogValid()||sourceIndex>=garageSourceCount)return fail(d,Error::cacheUnavailable);
+            if(garage_[sourceIndex])return fail(d,Error::alreadyLoaded);
+            binding=garageSources[sourceIndex];
+        }
+        const auto& record=binding.source;
         if(!archive||!archive->loaded()||archive->identity()!=originalUiArchiveIdentity50KG(binding.archive)||
            archive->member(binding.memberIndex).identity!=originalUiMemberIdentity50KG(binding.archive,binding.memberIndex))return fail(d,Error::archive);
         std::vector<std::vector<std::uint8_t>> retained;
@@ -845,6 +895,10 @@ bool OriginalUiIpumTextureCache50KG::loadGarageOriginalImpl(std::size_t sourceIn
         for(const auto& existing:additional_)
             if(existing&&!addRetainedBytes(d.retainedBytes,existing->decodedBytes))return fail(d,Error::limit);
         for(const auto& existing:garage_)
+            if(existing&&!addRetainedBytes(d.retainedBytes,existing->decodedBytes))return fail(d,Error::limit);
+        // The Unlock copies have their own budget (the caller's ceiling adds
+        // the whole Rider additional corpus); the Garage corpus proof is unchanged.
+        if(unlock)for(const auto& existing:unlock_)
             if(existing&&!addRetainedBytes(d.retainedBytes,existing->decodedBytes))return fail(d,Error::limit);
         std::size_t totalDecodedBytes=d.retainedBytes;
         if(!addRetainedBytes(totalDecodedBytes,retainedDecodedBytes)||
@@ -918,7 +972,7 @@ bool OriginalUiIpumTextureCache50KG::loadGarageOriginalImpl(std::size_t sourceIn
         }
         texture.base_rrtex=retained.back();
         if(cancelled(hooks))return fail(d,Error::cancelled,mipCount-1);
-        garage_[sourceIndex]=std::move(next);return true;
+        (unlock?unlock_[sourceIndex]:garage_[sourceIndex])=std::move(next);return true;
     }catch(const std::bad_alloc&){return fail(d,Error::allocation);}
     catch(...){return fail(d,Error::unexpectedFailure);}
 }
@@ -926,6 +980,7 @@ bool OriginalUiIpumTextureCache50KG::loaded() const noexcept {
     if(storage_)return true;
     for(const auto& entry:additional_)if(entry)return true;
     for(const auto& entry:garage_)if(entry)return true;
+    for(const auto& entry:unlock_)if(entry)return true;
     return false;
 }
 OriginalUiIpumColorPolicy50KG OriginalUiIpumTextureCache50KG::colorPolicy() const noexcept {
@@ -940,6 +995,7 @@ const Texture48E* OriginalUiIpumTextureCache50KG::textureFor(const OriginalUiMem
     if(matches(storage_.get()))return &storage_->texture;
     for(const auto& entry:additional_)if(matches(entry.get()))return &entry->texture;
     for(const auto& entry:garage_)if(matches(entry.get()))return &entry->texture;
+    for(const auto& entry:unlock_)if(matches(entry.get()))return &entry->texture;
     return nullptr;
 }
 const OriginalUiIpumProvenance50KG* OriginalUiIpumTextureCache50KG::provenance() const noexcept {
@@ -974,6 +1030,7 @@ const OriginalUiIpumProvenance50KG* OriginalUiIpumTextureCache50KG::provenanceFo
     if(matches(storage_.get()))return &storage_->evidence;
     for(const auto& entry:additional_)if(matches(entry.get()))return &entry->evidence;
     for(const auto& entry:garage_)if(matches(entry.get()))return &entry->evidence;
+    for(const auto& entry:unlock_)if(matches(entry.get()))return &entry->evidence;
     return nullptr;
 }
 } // namespace rr::assets

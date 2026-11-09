@@ -210,10 +210,14 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
   originalMain.activate(renderer);
   windows_capture50LD::Session windowCapture;
   windowCapture.prepare(captureRun,sessionIndex,maximumWidth,maximumHeight,"frontend");
-  // A frontend opened by a race's 1AB5BC request starts in its Garage.
-  const bool raceReturnGarage=originalMain.coordinator.snapshot().route.screen==13;
-  original_ui_capture_navigation50LA::TournamentRoute tournamentRoute(captureRun.navigateTournamentTa()&&!raceReturnGarage);
-  original_ui_capture_navigation50LA::TournamentReturnRoute tournamentReturnRoute(captureRun.navigateTournamentTa()&&raceReturnGarage);
+  // A frontend opened by a race's 1AB5BC request starts in its Garage, or in
+  // the tournament Hall11 / Win7 / Unlock10 that leads on to it.
+  const auto firstScreen=originalMain.coordinator.snapshot().route.screen;
+  const bool raceReturnGarage=firstScreen==13;
+  const bool raceReturnScreen=raceReturnGarage||firstScreen==11||firstScreen==7||firstScreen==10;
+  if(raceReturnScreen)std::cerr<<"frontend_race_return first_screen="<<unsigned(firstScreen)<<'\n';
+  original_ui_capture_navigation50LA::TournamentRoute tournamentRoute(captureRun.navigateTournamentTa()&&!raceReturnScreen);
+  original_ui_capture_navigation50LA::TournamentReturnRoute tournamentReturnRoute(captureRun.navigateTournamentTa()&&raceReturnScreen);
   original_ui_capture_navigation50LA::Route captureRoute(captureRun.navigate()&&!captureRun.navigateTournamentTa(),captureRun.navigateSa(),captureRun.navigateOcco(),captureRun.navigateDudGa(),captureRun.navigateBenGa(),captureRun.navigateAlderMa(),captureRun.navigateOdyMa(),captureRun.navigateGasganoSa(),captureRun.navigateMawhonicRa());
   std::cerr<<"ORIGINAL MAIN COLD: dedicated frontend; no race corpus, racer, world, or gameplay renderer constructed.\n";
   auto reportUiState=[&](const char* reason){originalMain.report(reason,originalMainApplication,0,0);};

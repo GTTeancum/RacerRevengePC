@@ -1762,6 +1762,16 @@ bool prepareOriginalUiControlsSpecularMaterial50KG(const OriginalUiMaterialPass5
     }catch(...){d.error=Error::allocation;return false;}
 }
 namespace {
+// UIUnlock (20A850) builds the same pod/pilot widgets as Rider Select from its
+// own UIUNLOCK.RES members: the identical PSM/PST bytes under that archive's
+// identities. The model gates below accept the PSM's own archive (Rider or
+// Unlock) and then require every texture member from that same archive.
+OriginalUiArchiveId50KG modelArchive(const OriginalUiMaterialPass50KG& pass) {
+    const auto* unlock=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::unlock);
+    if(unlock&&pass.identity)for(std::size_t i=0;i<unlock->memberCount;++i)
+        if(originalUiMemberIdentity50KG(unlock->id,i)==pass.identity)return OriginalUiArchiveId50KG::unlock;
+    return OriginalUiArchiveId50KG::rider;
+}
 // Finite original identities only. A name/suffix or compatible layout cannot
 // authorize a different rider, member, or replacement image.
 // Clegg03 identities match the retained04 material states; these historical
@@ -1780,20 +1790,20 @@ const char* unlockedIpumName(const OriginalUiMaterialPass50KG& pass) {
     if(!pass.identity)return nullptr;
     for(const auto* name:names){
         const auto member=std::string("ui\\textures\\")+name+".psm";
-        if(pass.identity==catalogMember(OriginalUiArchiveId50KG::rider,member.c_str()))return name;
+        if(pass.identity==catalogMember(modelArchive(pass),member.c_str()))return name;
     }
     return nullptr;
 }
 const char* unlockedShadowName(const OriginalUiMaterialPass50KG& pass) {
     // Original26_shdw.psm is byte-identical to25_shdw.psm and names25_shdw.pst.
     // Preserve that authored cross-rider source rather than substituting26_shdw.pst.
-    if(pass.identity&&pass.identity==catalogMember(OriginalUiArchiveId50KG::rider,"ui\\textures\\26_shdw.psm"))return "25_shdw";
+    if(pass.identity&&pass.identity==catalogMember(modelArchive(pass),"ui\\textures\\26_shdw.psm"))return "25_shdw";
     constexpr const char* names[]{"02_shdw","03_shdw","04_shdw","07_shdw","10_shdw","11_shdw","12_shdw","15_shdw","19_shdw","20_shdw","09_shdw","23_shdw","24_shdw",
         "01_shdw","08_shdw","14_shdw","16_shdw","17_shdw","18_shdw","21_shdw","22_shdw","25_shdw"};
     if(!pass.identity)return nullptr;
     for(const auto* name:names){
         const auto member=std::string("ui\\textures\\")+name+".psm";
-        if(pass.identity==catalogMember(OriginalUiArchiveId50KG::rider,member.c_str()))return name;
+        if(pass.identity==catalogMember(modelArchive(pass),member.c_str()))return name;
     }
     return nullptr;
 }
@@ -1804,7 +1814,7 @@ const char* unlockedBodyName(const OriginalUiMaterialPass50KG& pass) {
     if(!pass.identity)return nullptr;
     for(const auto* name:names){
         const auto member=std::string("ui\\textures\\")+name+".psm";
-        if(pass.identity==catalogMember(OriginalUiArchiveId50KG::rider,member.c_str()))return name;
+        if(pass.identity==catalogMember(modelArchive(pass),member.c_str()))return name;
     }
     return nullptr;
 }
@@ -1823,12 +1833,12 @@ bool prepareOriginalUiRider19IpumMaterial50KM(const OriginalUiMaterialPass50KG& 
         if(!name||pass.pass!=1||!same(pass.microprogram,"DiffuseCompressed")||!same(pass.textureName,name))
             return fail(d,Error::profile,"canonical unlocked Rider IPUM first diffuse pass",0x2476a0u);
         const auto memberName=std::string("ui\\textures\\")+name+".pst";
-        const auto* member=catalogMember(OriginalUiArchiveId50KG::rider,memberName.c_str());
+        const auto* member=catalogMember(modelArchive(pass),memberName.c_str());
         if (!images.loaded() || !source || !ipum || !texture || !image || !member ||
             source->memberIdentity != member || source->celIdentity || source->pstOffset != 0 ||
             source->pstBytes != member->bytes || ipum->sourcePstSha256 != member->sha256 ||
             !same(ipum->sourceMember,member->name) ||
-            ipum->sourceArchiveSha256 != originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::rider)->sha256 ||
+            ipum->sourceArchiveSha256 != originalUiArchiveIdentity50KG(modelArchive(pass))->sha256 ||
             ipum->colorPolicyKind != OriginalUiIpumColorPolicy50KG::original50FcRgb5Texa255Aem1 ||
             !ipum->mipCount || ipum->mipCount > originalUiIpumMipCount50KG ||
             texture->mips.size() != ipum->mipCount)
@@ -1865,16 +1875,16 @@ bool prepareOriginalUiAa1IpumMaterial50KM(const OriginalUiMaterialPass50KG& pass
         const auto* image = bank ? bank->texture(imageIndex) : nullptr;
         const auto* name=pass.textureName.c_str();
         const auto psmName=std::string("ui\\textures\\")+name+".psm";
-        if(!*name||pass.identity!=catalogMember(OriginalUiArchiveId50KG::rider,psmName.c_str())||
+        if(!*name||pass.identity!=catalogMember(modelArchive(pass),psmName.c_str())||
            pass.pass!=1||!same(pass.microprogram,"DiffuseCompressed"))
             return fail(d,Error::profile,"authenticated UI IPUM AA1 first diffuse pass",0x2476a0u);
         const auto memberName=std::string("ui\\textures\\")+name+".pst";
-        const auto* member=catalogMember(OriginalUiArchiveId50KG::rider,memberName.c_str());
+        const auto* member=catalogMember(modelArchive(pass),memberName.c_str());
         if (!images.loaded() || !source || !ipum || !texture || !image || !member ||
             source->memberIdentity != member || source->celIdentity || source->pstOffset != 0 ||
             source->pstBytes != member->bytes || ipum->sourcePstSha256 != member->sha256 ||
             !same(ipum->sourceMember,member->name) ||
-            ipum->sourceArchiveSha256 != originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::rider)->sha256 ||
+            ipum->sourceArchiveSha256 != originalUiArchiveIdentity50KG(modelArchive(pass))->sha256 ||
             ipum->colorPolicyKind != OriginalUiIpumColorPolicy50KG::original50FcRgb5Texa255Aem1 ||
             !ipum->mipCount || ipum->mipCount > originalUiIpumMipCount50KG ||
             texture->mips.size() != ipum->mipCount)
@@ -1944,9 +1954,9 @@ bool prepareOriginalUiRider17CutoutMaterial50KM(const OriginalUiMaterialPass50KG
     OriginalUiRider17CutoutMaterial50KM& output,OriginalUiMaterialDiagnostic50KG& d) noexcept {
     d={};d.pass=pass.pass;
     try {
-        const auto* psm=catalogMember(OriginalUiArchiveId50KG::rider,"ui\\textures\\17_3.psm");
+        const auto* psm=catalogMember(modelArchive(pass),"ui\\textures\\17_3.psm");
         if(!psm || pass.identity!=psm ||
-            pass.provenance.archive!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::rider) ||
+            pass.provenance.archive!=originalUiArchiveIdentity50KG(modelArchive(pass)) ||
             pass.provenance.origin!=OriginalUiMaterialOrigin50KG::authoredPsm ||
             pass.pass!=1 || !same(pass.microprogram,"DiffuseCompressed") || !same(pass.textureName,"17_3") ||
             !same(pass.shaderPassGroup,"none") || pass.enabled!=1 || pass.textureCount!=1 || pass.textureCoordinateIndex!=0 ||
@@ -1995,9 +2005,9 @@ bool prepareOriginalUiRiderWindowMaterial50KM(const OriginalUiMaterialPass50KG& 
     OriginalUiRiderWindowMaterial50KM& output,OriginalUiMaterialDiagnostic50KG& d) noexcept {
     d={};d.pass=pass.pass;
     try {
-        const bool character=pass.identity&&pass.identity==catalogMember(OriginalUiArchiveId50KG::rider,"ui\\textures\\12c_4.psm");
+        const bool character=pass.identity&&pass.identity==catalogMember(modelArchive(pass),"ui\\textures\\12c_4.psm");
         const auto* name=character?"12c_4":"pod_wndw";
-        if ((!character&&pass.identity!=catalogMember(OriginalUiArchiveId50KG::rider,"ui\\textures\\pod_wndw.psm")) ||
+        if ((!character&&pass.identity!=catalogMember(modelArchive(pass),"ui\\textures\\pod_wndw.psm")) ||
             (pass.pass!=1 && pass.pass!=3) || !same(pass.microprogram,"DiffuseCompressed") ||
             !same(pass.textureName,name) || pass.gs[Field::alphaBlendingOnOff].value!=1 ||
             pass.gs[Field::inputColorA].value!=0 || pass.gs[Field::inputColorB].value!=1 ||
@@ -2005,7 +2015,7 @@ bool prepareOriginalUiRiderWindowMaterial50KM(const OriginalUiMaterialPass50KG& 
             pass.gs[Field::alphaTestOnOff].value!=1 || pass.gs[Field::foggingOnOff].value!=1 ||
             pass.gs[Field::depthTestMethod].value!=2 || pass.gs[Field::zWriteDisabled].value!=0)
             return fail(d,Error::profile,"actual pod_wndw/12c_4 DiffuseCompressed pass1 or3",0x2476a0u);
-        const auto* member=catalogMember(OriginalUiArchiveId50KG::rider,
+        const auto* member=catalogMember(modelArchive(pass),
             character?"ui\\textures\\12c_4.pst":"ui\\textures\\pod_wndw.pst");
         const auto* source=images.sourceProvenance(imageIndex);
         const auto* texture=images.decodedTexture(imageIndex);
@@ -2047,7 +2057,7 @@ bool prepareOriginalUiRider19ShadowMaterial50KM(const OriginalUiMaterialPass50KG
             return fail(d,Error::profile,"actual default-unlocked Rider shadow attenuation pass1",0x2476a0u);
         // Exact canonical PSM selects its corresponding original PST.
         const auto memberName=std::string("ui\\textures\\")+name+".pst";
-        const auto* member=catalogMember(OriginalUiArchiveId50KG::rider,memberName.c_str());
+        const auto* member=catalogMember(modelArchive(pass),memberName.c_str());
         const auto* source=images.sourceProvenance(imageIndex);
         const auto* texture=images.decodedTexture(imageIndex);
         const auto* bank=images.textures();const auto* image=bank?bank->texture(imageIndex):nullptr;
@@ -2075,12 +2085,12 @@ bool prepareOriginalUiRider19SpecularMaterial50KM(const OriginalUiMaterialPass50
         if (!pass.identity)return fail(d,Error::profile,"canonical Rider specular PSM identity",0x2476a0u);
         // Original03c_3/08c_3 pass2 has the same authored FIX64/depth-writing
         // specular state as12c_4. Its single-mip diffuse passes stay generic.
-        const bool character=pass.identity==catalogMember(OriginalUiArchiveId50KG::rider,"ui\\textures\\12c_4.psm") ||
-            pass.identity==catalogMember(OriginalUiArchiveId50KG::rider,"ui\\textures\\03c_3.psm") ||
-            pass.identity==catalogMember(OriginalUiArchiveId50KG::rider,"ui\\textures\\08c_3.psm");
+        const bool character=pass.identity==catalogMember(modelArchive(pass),"ui\\textures\\12c_4.psm") ||
+            pass.identity==catalogMember(modelArchive(pass),"ui\\textures\\03c_3.psm") ||
+            pass.identity==catalogMember(modelArchive(pass),"ui\\textures\\08c_3.psm");
         const auto* bodyName=unlockedBodyName(pass);
         const bool original19=bodyName&&(same(bodyName,"19_1")||same(bodyName,"19_2"));
-        const bool window=pass.identity==catalogMember(OriginalUiArchiveId50KG::rider,"ui\\textures\\pod_wndw.psm");
+        const bool window=pass.identity==catalogMember(modelArchive(pass),"ui\\textures\\pod_wndw.psm");
         if ((!bodyName&&!window&&!character) || pass.pass!=2 || !same(pass.microprogram,"SpecularMapCompressed") ||
             !same(pass.textureName,"specmap1") ||
             ((bodyName||window)&&pass.gs[Field::inputAlphaC].value!=(window?2:1)) ||
@@ -2100,7 +2110,7 @@ bool prepareOriginalUiRider19SpecularMaterial50KM(const OriginalUiMaterialPass50
             pass.gs[Field::processingMethodWhenFailedInAlphaTest].value!=0 ||
             pass.gs[Field::depthTestMethod].value!=2))
             return fail(d,Error::profile,"actual unlocked body specular fog alpha-test depth state",0x2476a0u);
-        const auto* member=catalogMember(OriginalUiArchiveId50KG::rider,"ui\\textures\\specmap1.pst");
+        const auto* member=catalogMember(modelArchive(pass),"ui\\textures\\specmap1.pst");
         const auto* source=images.sourceProvenance(imageIndex);
         const auto* texture=images.decodedTexture(imageIndex);
         const auto* bank=images.textures();const auto* image=bank?bank->texture(imageIndex):nullptr;

@@ -5,6 +5,7 @@
 #include "../../../src/assets/original_ui_material_binding50kg.h"
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 #include <cstring>
 #include <limits>
 #include <utility>
@@ -14,7 +15,9 @@ namespace {
 using Error=OriginalUiUnlockContributionError50PD;using Diagnostic=OriginalUiUnlockContributionDiagnostic50PD;
 using Segment=OriginalUiUnlockSegment50PD;
 constexpr auto unresolved=assets::unresolvedMaterialTexture50EA;
-bool fail(Diagnostic& d,Error e,std::uint32_t pc=0) noexcept {d.error=e;d.sourcePC=pc;return false;}
+// Failure receipts carry the source line to the log (diagnostic only).
+bool failAt(int line,Diagnostic& d,Error e,std::uint32_t pc=0) noexcept {d.error=e;d.sourcePC=pc;std::fprintf(stderr,"unlock_draw failure line=%d error=%u pc=%x\n",line,unsigned(e),pc);return false;}
+#define fail(...) failAt(__LINE__,__VA_ARGS__)
 bool unlockGalleryIdentity(const assets::OriginalUiMemberIdentity50KG* member) noexcept {
     if(!member)return false;
     const auto* archive=assets::originalUiArchiveIdentity50KG(assets::OriginalUiArchiveId50KG::unlock);if(!archive)return false;
@@ -70,8 +73,10 @@ struct OriginalUiUnlockDrawContribution50PD::Storage {
             const auto& pass=b.material.passes[0];assets::OriginalUiMaterialEquivalenceKey50KG key;
             assets::OriginalUiMaterialEquivalenceDiagnostic50KG keyDetail;assets::OriginalUiMaterialBindingDiagnostic50KG detail;
             const auto* source=b.images.empty()?nullptr:resources->images()->sourceProvenance(b.images[0]);
-            if(!assets::prepareOriginalUiMaterialEquivalence50KG(pass,source,key,keyDetail)||!history[i].initialize(key,detail))
-                return fail(d,Error::material,keyDetail.sourcePC?keyDetail.sourcePC:detail.sourcePC);
+            if(!assets::prepareOriginalUiMaterialEquivalence50KG(pass,source,key,keyDetail)||!history[i].initialize(key,detail)){
+                std::fprintf(stderr,"unlock_draw equivalence binding=%zu name=%s pass=%u field=%s error=%u pc=%x\n",i,b.registeredName.c_str(),
+                    unsigned(pass.pass),keyDetail.field?keyDetail.field:"",unsigned(keyDetail.error),keyDetail.sourcePC);
+                return fail(d,Error::material,keyDetail.sourcePC?keyDetail.sourcePC:detail.sourcePC);}
             sequence.push_back(static_cast<std::uint32_t>(i));
         }
         std::sort(sequence.begin(),sequence.end(),[&](std::uint32_t a,std::uint32_t b){
@@ -198,7 +203,11 @@ bool OriginalUiUnlockDrawContribution50PD::widgets(bool top,bool shown,Diagnosti
                     if(d.widgets.error==game::OriginalUiUnlockWidgetError50PD::hidden)continue;return fail(d,Error::projection);}
                 if(live.line.scale!=1||live.line.rotation!=0||live.line.packetColor[3]>128||
                    live.position.positionedX!=line.position.positionedX||live.position.positionedY!=line.position.positionedY||
-                   lineIndex>=descriptor->lines.size()||!live.text)return fail(d,Error::projection);
+                   lineIndex>=descriptor->lines.size()||!live.text){
+                    std::fprintf(stderr,"unlock_draw text widget=%u line=%zu/%zu scale=%g rotation=%g alpha=%u x=%g/%g y=%g/%g text=%d\n",
+                        unsigned(id),lineIndex,descriptor->lines.size(),live.line.scale,live.line.rotation,unsigned(live.line.packetColor[3]),
+                        double(live.position.positionedX),double(line.position.positionedX),double(live.position.positionedY),double(line.position.positionedY),int(bool(live.text)));
+                    return fail(d,Error::projection);}
                 if(!appendText(line.glyphs,live.line.packetColor,z,material,0x2E0A30,segment,id,d))return false;
             }
         }else if(bank->iconDescriptor(id)){

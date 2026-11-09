@@ -5,6 +5,7 @@
 #include "../../../src/assets/original_ui_material_binding50kg.h"
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 #include <limits>
 #include <utility>
 
@@ -13,7 +14,9 @@ namespace {
 using Error=OriginalUiWinContributionError50PD;using Diagnostic=OriginalUiWinContributionDiagnostic50PD;
 using Segment=OriginalUiWinSegment50PD;using Kind=OriginalUiWinMaterialKind50PD;
 constexpr auto unresolved=assets::unresolvedMaterialTexture50EA;
-bool fail(Diagnostic& d,Error e,std::uint32_t pc=0)noexcept{d.error=e;if(pc)d.sourcePC=pc;return false;}
+// Failure receipts carry the source line to the log (diagnostic only).
+bool failAt(int line,Diagnostic& d,Error e,std::uint32_t pc=0)noexcept{d.error=e;if(pc)d.sourcePC=pc;std::fprintf(stderr,"win_draw failure line=%d error=%u pc=%x\n",line,unsigned(e),pc);return false;}
+#define fail(...) failAt(__LINE__,__VA_ARGS__)
 struct Packet {std::uint32_t firstQuad=0,quadCount=0,material=0,image=0,frame=0,ordinal=0,pc=0;std::uint16_t widget=0;Segment segment=Segment::ordinaryWidgets;};
 }
 struct OriginalUiWinDrawContribution50PD::Storage {

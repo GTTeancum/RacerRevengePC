@@ -173,7 +173,15 @@ bool OriginalUiLightManagerOwner50KG::nativeProjectionBridge(OriginalUiLightMana
     const Scalar& producer,ProjectionOperation operation,
     const assets::OriginalUiArchiveIdentity50KG* identity,std::uint64_t generation)noexcept {
     if(!owner||owner->scalar_.get()!=&producer||producer.concreteBorrower_!=owner||
-       producer.concreteProjection_!=&nativeProjectionBridge||!owner->current())return false;
+       producer.concreteProjection_!=&nativeProjectionBridge||!owner->current()){
+        // Diagnostic only: which term of current() refused the projection.
+        if(owner){const auto& o=*owner;
+            std::fprintf(stderr,"light_projection refused op=%u constructed=%d retired=%d source=%d registry=%d cacheA4=%d fieldA8=%d ui=%d gameplay=%llu ra=%d inputsEmpty=%d issuer=%d garageCustody=%d courseZone=%d zones=%d/%d count90=%u lights=%d/%d\n",
+                unsigned(operation),int(o.constructed_),int(o.retired_),int(bool(o.sourceIdentity())),int(o.registryCurrent()),int(bool(o.cacheA4_)),int(o.fieldA8_),
+                int(bool(o.nativeProjectionUi_)),static_cast<unsigned long long>(o.nativeProjectionGameplayGeneration_),int(bool(o.raZones_)),
+                int(o.nativeProjectionInputsEmpty()),int(bool(o.issuer_)),int(o.issuer_&&o.issuer_->garageCustodyOwner_),int(bool(o.courseZoneOwner_)),
+                int(o.zonesAttempted_),int(o.zonesComplete_),unsigned(o.count90_),int(bool(o.uiLightsOwner_)),int(bool(o.sceneLightsOwner_)));}
+        return false;}
     if(operation==ProjectionOperation::observe)return !identity&&!generation;
     if(!owner->nativeProjectionInputsEmpty())return false;
     // The callback is private to the scalar's real producer methods. Its exact
@@ -186,7 +194,9 @@ bool OriginalUiLightManagerOwner50KG::nativeProjectionBridge(OriginalUiLightMana
            generation!=owner->nativeProjectionUiGeneration_+1)return false;
         using Id=assets::OriginalUiArchiveId50KG;
         bool admitted=false;
-        for(const auto id:{Id::mainMenu,Id::options,Id::rider,Id::course,Id::hallOfFame,Id::tournament})
+        // UIUnlock 10 / UIWin 7 are ordinary UI managers too (the scalar
+        // producer already admits both archives at 1CCD88).
+        for(const auto id:{Id::mainMenu,Id::options,Id::rider,Id::course,Id::hallOfFame,Id::tournament,Id::unlock,Id::win})
             if(identity==assets::originalUiArchiveIdentity50KG(id)){admitted=true;break;}
         // Concrete Garage uses its own counted UI/Scene source producers. It
         // cannot borrow the ordinary rendering projection as those producers.
