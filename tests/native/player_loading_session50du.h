@@ -120,7 +120,7 @@ public:
                 const auto video=self.application_.playerVideo50DU();
                 if(video&&video->host.created()&&!self.quit_&&!self.failed_){
                     rr::platform::GameHostDiagnostic50ER diagnostic;
-                    if(!video->host.setWindowTitle("Racer Revenge",diagnostic))self.failed_=true;
+                    if(!video->host.setWindowTitle("Star Wars: Racer Revenge",diagnostic))self.failed_=true;
                     self.application_.showBetaPersistenceStatus();
                 }
             }};

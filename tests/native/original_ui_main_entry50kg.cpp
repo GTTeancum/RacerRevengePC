@@ -1097,7 +1097,7 @@ void Frontend::prepare(const Application& application,const std::shared_ptr<Vide
 
 void Frontend::showBetaSettingsStatus() const noexcept {
         if(materialApplicationOwner)materialApplicationOwner->showBetaPersistenceStatus(
-            "Racer Revenge | Original UI | Arrows select/change | Enter confirm | R defaults | Esc back");
+            "Star Wars: Racer Revenge");
     }
 
 void Frontend::activate(rr::platform::VehicleWindowGl50DS& renderer) {
@@ -1235,7 +1235,7 @@ Frontend::Status Frontend::input(std::uint8_t sourceInput,rr::platform::WindowCo
             if(sourceInput==6){
                 nativeBetaLoadPending=false;
                 materialApplicationOwner->showBetaPersistenceStatus(
-                    "Racer Revenge | Native beta profile file | R Load | Tab Save | Esc Back");
+                    "Star Wars: Racer Revenge");
                 return Status::noChange;
             }
             if(sourceInput!=nativeLoadInput)return Status::noChange;
@@ -1252,7 +1252,7 @@ Frontend::Status Frontend::input(std::uint8_t sourceInput,rr::platform::WindowCo
         accountColdInterval(receipt.coldInterval);
         if(receipt.routeAccepted&&receipt.requested.screen==12&&receipt.requested.page==5)
             materialApplicationOwner->showBetaPersistenceStatus(
-                "Racer Revenge | Native beta profile file (not memory card) | R Load | Tab Save | Esc Back");
+                "Star Wars: Racer Revenge");
         if(nativeCard&&controller==0&&status==Status::unavailableDestination&&
             receipt.options.pageAccepted&&(sourceInput==nativeLoadInput||sourceInput==nativeSaveInput)){
             const auto* session=coordinator.optionsSession();
@@ -1262,16 +1262,16 @@ Frontend::Status Frontend::input(std::uint8_t sourceInput,rr::platform::WindowCo
                 if(sourceInput==nativeLoadInput&&!nativeBetaLoadPending){
                     nativeBetaLoadPending=true;
                     materialApplicationOwner->showBetaPersistenceStatus(
-                        "Racer Revenge | Load replaces unsaved profile changes | R Confirm Load | Esc Cancel");
+                        "Star Wars: Racer Revenge");
                     return Status::ok;
                 }
                 nativeBetaLoadPending=false;
                 const bool completed=profile&&(sourceInput==nativeSaveInput?profile->saveNativeBetaProgress():
                     profile->reloadNativeBetaProgressFromMenu());
                 materialApplicationOwner->showBetaPersistenceStatus(completed?
-                    (sourceInput==nativeSaveInput?"Racer Revenge | Native beta profile SAVED | R Load | Tab Save | Esc Back":
-                        "Racer Revenge | Native beta profile LOADED | R Load | Tab Save | Esc Back"):
-                    "Racer Revenge | Native beta profile operation FAILED | Current session retained | Esc Back");
+                    (sourceInput==nativeSaveInput?"Star Wars: Racer Revenge":
+                        "Star Wars: Racer Revenge"):
+                    "Star Wars: Racer Revenge");
                 std::cerr<<"BETA PROFILE: "<<(sourceInput==nativeSaveInput?"manual save":"manual load")
                     <<(completed?" completed":" failed; no successful save/load claimed")<<'\n';
                 return Status::ok;
@@ -2442,7 +2442,7 @@ void Application::showBetaPersistenceStatus(const char* normalTitle) const noexc
     if(!normalTitle&&!settingsFailed&&!progressFailed)return;
     rr::platform::GameHostDiagnostic50ER d;
     try {
-        std::string title=normalTitle?normalTitle:"Racer Revenge";
+        std::string title=normalTitle?normalTitle:"Star Wars: Racer Revenge";
         if(settingsFailed)title+=betaSettingsStatus==Result::durabilityUnknown?
             " | SETTINGS SAVE UNCONFIRMED":" | SETTINGS NOT SAVED";
         if(progressFailed)title+=progress==Progress::durabilityUnknown?
@@ -2450,7 +2450,7 @@ void Application::showBetaPersistenceStatus(const char* normalTitle) const noexc
         if(!videoOwner_->host.setWindowTitle(title.c_str(),d))
             std::cerr<<"BETA SAVE: native window status unavailable.\n";
     }catch(...){
-        videoOwner_->host.setWindowTitle("Racer Revenge | SAVE STATUS UNAVAILABLE - check application log",d);
+        videoOwner_->host.setWindowTitle("Star Wars: Racer Revenge | SAVE STATUS UNAVAILABLE - check application log",d);
     }
 }
 

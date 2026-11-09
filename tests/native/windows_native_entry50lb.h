@@ -155,9 +155,9 @@ inline void visibleFailure(const std::wstring& detail,const fs::path& log) noexc
         std::wstring message=detail;
         if(!log.empty())message+=L"\n\nLog file: RacerRevenge.log\nIn the same folder as the game EXE (if startup could open it)."
             L"\n\nClose the game before opening or sharing the log. Nothing is uploaded automatically.";
-        MessageBoxW(nullptr,message.c_str(),L"Racer Revenge - startup / session error",MB_OK|MB_ICONERROR|MB_SETFOREGROUND);
-    }catch(...){MessageBoxW(nullptr,L"Racer Revenge could not finish startup. Check the original files and RacerRevenge.log in the game folder.",
-        L"Racer Revenge",MB_OK|MB_ICONERROR);}
+        MessageBoxW(nullptr,message.c_str(),L"Star Wars: Racer Revenge - startup / session error",MB_OK|MB_ICONERROR|MB_SETFOREGROUND);
+    }catch(...){MessageBoxW(nullptr,L"Star Wars: Racer Revenge could not finish startup. Check the original files and RacerRevenge.log in the game folder.",
+        L"Star Wars: Racer Revenge",MB_OK|MB_ICONERROR);}
 }
 inline std::wstring readableError(const char* text) {
     if(!text)return L"Unknown native startup error.";

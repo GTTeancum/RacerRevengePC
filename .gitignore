@@ -74,3 +74,4 @@ __pycache__/
 
 # Local icon source image (user-supplied)
 /racer-revenge-icon.png
+/platform/windows/resources/racer-revenge.ico

@@ -712,10 +712,10 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   rr::platform::GameHostRequest50ER hostRequest{};
   hostRequest.mode=headlessLive?rr::platform::GameHostMode50ER::HeadlessLive:rr::platform::GameHostMode50ER::Window;
   auto& windowRequest=hostRequest.window;
-  windowRequest.title=raceEnabled?"Racer Revenge | Native race | W/S + Up/Down | F5 restart | Esc menu":
-      "Racer Revenge native development drive | W/S + Up/Down | F5 restart | Esc menu";
-  if(isGaTrack)windowRequest.title="Racer Revenge | GA | Player 1 + 7 original AI | Esc pause/menu";
-  if(originalUiActive)windowRequest.title="Racer Revenge | Original UI | Arrows select/change | Enter confirm | R defaults | Esc back";
+  windowRequest.title=raceEnabled?"Star Wars: Racer Revenge":
+      "Star Wars: Racer Revenge";
+  if(isGaTrack)windowRequest.title="Star Wars: Racer Revenge";
+  if(originalUiActive)windowRequest.title="Star Wars: Racer Revenge";
   windowRequest.width=nativeVideo->width;windowRequest.height=nativeVideo->height;
 #if defined(_WIN32)
   // Presentation only: the retained source Video stays 640x448.

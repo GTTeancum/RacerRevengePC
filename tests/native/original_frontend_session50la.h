@@ -91,7 +91,7 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
   platform::GameHostRequest50ER hostRequest;
   hostRequest.mode=headlessLive?platform::GameHostMode50ER::HeadlessLive:platform::GameHostMode50ER::Window;
   auto& window=hostRequest.window;
-  window.title="Racer Revenge | Original UI | Arrows select/change | Enter confirm | R defaults | Esc back";
+  window.title="Star Wars: Racer Revenge";
   window.width=nativeVideo->width;window.height=nativeVideo->height;
 #if defined(_WIN32)
   // Integer-sized host presentation; original Video and source UI remain unchanged.
