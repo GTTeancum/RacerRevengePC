@@ -1,5 +1,6 @@
 // New reconstruction after rollback; source-only, unverified.
 #include "original_ui_rider_profile50kg.h"
+#include <cstdio>
 #include "../../../src/game/original_course_descriptor50kg.h"
 #include "original_save_profile_owner50kg.h"
 #include "original_save_native_read_stage50kg.h"
@@ -103,6 +104,10 @@ struct OriginalUiRiderProfileOwner50KG::Storage {
     // Source17FFB0 owns all27x27 rows, including off-diagonal AI abilities.
     game::OriginalTournamentProfile50KG tournament{};
     bool tournamentResultArmed=false;
+    // Native generation bumps made by the race-end stores 1AB598 (7E4) and
+    // 1AB5A8 (7E8) while a launch is armed. In the original these run in the
+    // same 1AB520 pass just before 1875C0, so they never invalidate it.
+    std::uint64_t tournamentEndStoreBumps=0;
     OriginalUiRiderProfileStamp50KG tournamentLaunchStamp{};
     CourseRaceSelection tournamentLaunchSelection{};
     const game::LapTimingManager50ID* tournamentLaunchManager=nullptr;
@@ -571,7 +576,7 @@ bool OriginalUiRiderProfileOwner50KG::storeEndRecordBit1AB598(
     //1AB578 masksV0 bit0;1AB598 is the DELAY SLOT before1ABE70 starts.
     //Only this represented bit changes. Opaque upper7E4 bits stay untouched.
     s.bit0_7E4=value; //The source store occurs even when its value is unchanged.
-    if(changed)++s.generation; //Native mutation version, never a guest store counter.
+    if(changed){++s.generation;if(s.tournamentResultArmed)++s.tournamentEndStoreBumps;} //Native mutation version, never a guest store counter.
     after={s.generation,s.common->mode34};return true;
 }
 bool OriginalUiRiderProfileOwner50KG::storeEndRivalWord1AB5A8(
@@ -585,7 +590,7 @@ bool OriginalUiRiderProfileOwner50KG::storeEndRivalWord1AB5A8(
        query.rival11280()!=s.trackText[course].rival11280||
        (changed&&s.generation==std::numeric_limits<std::uint64_t>::max()))return false;
     s.word7E8=value; //Full source word store, even when unchanged, AFTER1ABE70.
-    if(changed)++s.generation;
+    if(changed){++s.generation;if(s.tournamentResultArmed)++s.tournamentEndStoreBumps;}
     after={s.generation,s.common->mode34};return true;
 }
 bool OriginalUiRiderProfileOwner50KG::recordInsertionIdentityCurrent(
@@ -643,6 +648,9 @@ bool OriginalUiRiderProfileOwner50KG::commitSingleHumanHallRecords1AC440(
     s.saveProfile.hallRecordDescendant_.swap(prepared.hallRecordDescendant_);
     ++s.generation; // Preflight rejects MAX; consumes this exact stage once.
     after={s.generation,s.common->mode34};
+    // Native autosave (as the tournament result and unlock grants): the new
+    // Hall rows persist even if the session ends before the next save point.
+    if(s.betaSettings&&(s.betaSettings->flags11050&1u))(void)saveNativeBetaProgress();
     return true;
 }
 bool OriginalUiRiderProfileOwner50KG::commitSingleHumanRaceRecords1AC440(
@@ -1271,7 +1279,7 @@ bool OriginalUiRiderProfileOwner50KG::armTournamentResultForCommittedRace(const 
        !application.known||(manager.flags58&3u)!=2u)return false;
     CourseRaceSelection actual;
     if(!courseRaceSnapshot(actual)||!sameCourseRace(actual,selection))return false;
-    storage_->tournamentResultArmed=true;storage_->tournamentLaunchStamp=expected;storage_->tournamentLaunchSelection=selection;
+    storage_->tournamentResultArmed=true;storage_->tournamentEndStoreBumps=0;storage_->tournamentLaunchStamp=expected;storage_->tournamentLaunchSelection=selection;
     storage_->tournamentLaunchManager=&manager;storage_->tournamentLaunchApplication=&application;return true;
 }
 bool OriginalUiRiderProfileOwner50KG::commitTournamentRaceResult(const game::LapTimingManager50ID& manager,
@@ -1279,7 +1287,14 @@ bool OriginalUiRiderProfileOwner50KG::commitTournamentRaceResult(const game::Lap
     const CourseRaceSelection& launch,OriginalUiRiderProfileStamp50KG expected,
     OriginalUiMainApplication50KG& application,game::OriginalTournamentResultReceipt50KG& receipt)noexcept{
     receipt={};
-    if(!storage_||!storage_->readable()||storage_->common->mode34!=2||expected.mode34!=2||expected.generation!=storage_->generation||
+    if(storage_)std::fprintf(stderr,"tournament_commit_check expected_gen=%llu bumps=%llu gen=%llu armed=%d launch_gen=%llu manager=%d app=%d flags58=%u count=%zu entrants=%u pod=%u rider=%u class=%u\n",
+        static_cast<unsigned long long>(expected.generation),static_cast<unsigned long long>(storage_->tournamentEndStoreBumps),
+        static_cast<unsigned long long>(storage_->generation),int(storage_->tournamentResultArmed),
+        static_cast<unsigned long long>(storage_->tournamentLaunchStamp.generation),int(storage_->tournamentLaunchManager==&manager),
+        int(storage_->tournamentLaunchApplication==&application),unsigned(manager.flags58),count,unsigned(launch.entrants),
+        racers?unsigned(racers[0].pod60):0u,unsigned(launch.rider),racers?unsigned(racers[0].class58):0u);
+    if(!storage_||!storage_->readable()||storage_->common->mode34!=2||expected.mode34!=2||
+       expected.generation+storage_->tournamentEndStoreBumps!=storage_->generation||
        storage_->generation==std::numeric_limits<std::uint64_t>::max()||!storage_->tournamentResultArmed||!application.known||
        storage_->tournamentLaunchStamp.generation!=expected.generation||storage_->tournamentLaunchStamp.mode34!=expected.mode34||
        storage_->tournamentLaunchManager!=&manager||storage_->tournamentLaunchApplication!=&application||
@@ -1290,7 +1305,8 @@ bool OriginalUiRiderProfileOwner50KG::commitTournamentRaceResult(const game::Lap
     if(!courseRaceSnapshot(current)||!sameCourseRace(current,launch))return false;
     receipt=game::applyOriginalTournamentResult50KG(storage_->tournament,storage_->comparison100C0,storage_->packed1125F,
         racers,count,humans,storage_->common->availability11018,application.rawRandom308030);
-    if(receipt.status!=game::OriginalTournamentResultStatus50KG::complete)return false;
+    if(receipt.status!=game::OriginalTournamentResultStatus50KG::complete){
+        std::fprintf(stderr,"tournament_commit_receipt status=%u pc=%x\n",unsigned(receipt.status),receipt.sourcePC);return false;}
     storage_->saveProfile.markDirty1AB648(); //actual1AB648 AFTER187D80.
     storage_->tournamentResultArmed=false;storage_->tournamentLaunchManager=nullptr;storage_->tournamentLaunchApplication=nullptr;
     ++storage_->generation;
@@ -1466,7 +1482,7 @@ bool OriginalUiRiderProfileOwner50KG::storeResultsNoTime1CA4DC(
     auto& s=*storage_;
     //1CA4C4..4DC reads, clears and sets bit0; all other actual bits survive.
     s.common->flags11054=std::uint8_t((s.common->flags11054&0xfeu)|1u);
-    ++s.generation; // Native observer invalidation, not a persistence receipt.
+    ++s.generation;if(s.tournamentResultArmed)++s.tournamentEndStoreBumps; // Results store before 1AB5BC. // Native observer invalidation, not a persistence receipt.
     return true;
 }
 bool OriginalUiRiderProfileOwner50KG::storeResultsName1CA528(std::uint32_t mode,
@@ -1482,7 +1498,7 @@ bool OriginalUiRiderProfileOwner50KG::storeResultsName1CA528(std::uint32_t mode,
         target=&names.careerNames_[s.comparison100C0]; //1CA514..528.
     }else target=&names.playerNames_[mode==3u?0u:1u]; //1CA544/1CA56C.
     if(!target->replaceCString(name))return false;
-    ++s.generation; // Native observer invalidation, never a source save receipt.
+    ++s.generation;if(s.tournamentResultArmed)++s.tournamentEndStoreBumps; // Results store before 1AB5BC. // Native observer invalidation, never a source save receipt.
     return true;
 }
 bool OriginalUiRiderProfileOwner50KG::playerName10F68(std::uint32_t player,

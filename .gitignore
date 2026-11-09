@@ -71,3 +71,6 @@ __pycache__/
 /tools/gameplay/query_fixture48i.h
 /tools/gameplay/query_fixtures48h.h
 /tools/gameplay/terrain_query_fixtures48j.h
+
+# Local icon source image (user-supplied)
+/racer-revenge-icon.png

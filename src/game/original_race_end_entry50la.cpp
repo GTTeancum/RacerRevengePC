@@ -181,6 +181,11 @@ void OriginalRaceConstructor50LA::continueEndEntryPrefix1A7DD0(
         // update tail (1A7F58.., the 1A8158 replay loop) is the native loop's.
         const auto* derived=results104_&&results104_->impl_&&results104_->impl_->derived?&*results104_->impl_->derived:nullptr;
         if(!derived){stop(S::owner,0x1ab5b0,"Actual Results20C read unavailable");return;}
+        // The same 1AB5B0 read the RA branch retains; the 1AB5BC rows (1AC440)
+        // check this observed acknowledgement.
+        // Retained only once nonzero: the Results input borrow requires the
+        // unread state while the replay waits for the confirm.
+        if(derived->acknowledgement20C)endAcknowledgement20C_=derived->acknowledgement20C;
         stop(S::callerReturned,derived->acknowledgement20C?0x1ab5bc:0x1abe48,
             derived->acknowledgement20C?"Common race: Results acknowledged (1AB5BC)":"Common race: Results replay running");
         d.acknowledgement20CRead=true;d.observedAcknowledgement20C=derived->acknowledgement20C;return;

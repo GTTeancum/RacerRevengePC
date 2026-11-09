@@ -262,30 +262,36 @@ bool Application::commitRaceAcknowledgementRecords1AC440_50PD(rr::game::Original
        !riderProfile||!profile||riderProfile->commonProfile()!=profile.get()||race.profile_!=riderProfile||
        route.route!=rr::game::OriginalRaceAckRoute50PD::hall||!route.insertRecords1AC440||
        !race.endAcknowledgement20C_||!*race.endAcknowledgement20C_||!race.counted_||race.rolledBack_||
-       !race.results104_||!standardMaterialDomainOwner_||!riderProfile->hallRecordsReady())return false;
+       !race.results104_||!standardMaterialDomainOwner_||!riderProfile->hallRecordsReady()){
+        std::fprintf(stderr,"ack_1ac440_refused line=%d thread=%d hallTransfer=%d inputContinuation=%d race=%d enabled=%d profile=%d route=%d ack=%d counted=%d results=%d domain=%d hall=%d\n",__LINE__,
+            int(garageAudioOwnerThread_==std::this_thread::get_id()),int(bool(resultsHallTransfer50LA_)),int(bool(resultsInputContinuation50LA_)),
+            int(sourceRace28COwner_.get()==&race),int(enabled),int(riderProfile&&profile&&riderProfile->commonProfile()==profile.get()&&race.profile_==riderProfile),
+            int(route.route==rr::game::OriginalRaceAckRoute50PD::hall&&route.insertRecords1AC440),int(race.endAcknowledgement20C_&&*race.endAcknowledgement20C_),
+            int(race.counted_&&!race.rolledBack_),int(bool(race.results104_)),int(bool(standardMaterialDomainOwner_)),int(riderProfile&&riderProfile->hallRecordsReady()));
+        return false;}
     // The row must still be the live 1AB5BC decision (P+34, 102CC, 7E4 bit0).
     rr::game::OriginalRaceAckFacts50PD facts;
-    if(!riderProfile->raceAcknowledgementFacts1AB5BC(facts)||!facts.record7E4)return false;
+    if(!riderProfile->raceAcknowledgementFacts1AB5BC(facts)||!facts.record7E4){std::fprintf(stderr,"ack_1ac440_refused line=%d\n",__LINE__);return false;}
     const auto live=rr::game::originalRaceAckDestination1AB5BC(facts);
-    if(live.route!=route.route||live.sourcePC!=route.sourcePC||!live.insertRecords1AC440)return false;
+    if(live.route!=route.route||live.sourcePC!=route.sourcePC||!live.insertRecords1AC440){std::fprintf(stderr,"ack_1ac440_refused line=%d\n",__LINE__);return false;}
     //1AC4EC: race1B0 low2 == 1. The two-human 1AC5B4 branch is not reached natively.
-    if((race.flags1B0KnownMask_&3u)!=3u||(race.flags1B0KnownValue_&3u)!=1u)return false;
+    if((race.flags1B0KnownMask_&3u)!=3u||(race.flags1B0KnownValue_&3u)!=1u){std::fprintf(stderr,"ack_1ac440_refused line=%d\n",__LINE__);return false;}
     try {
         const auto scope=race.endHud_.lock();
         if(!scope||scope->thread_!=std::this_thread::get_id()||!scope->active_||!scope->published_||
            !scope->hud_||!scope->manager_||!scope->bank_||!scope->camera_||scope->race_.lock().get()!=&race||
-           scope->application_!=this||race.entity_.sessionGeneration!=scope->generation_||!race.anyWorld())return false;
+           scope->application_!=this||race.entity_.sessionGeneration!=scope->generation_||!race.anyWorld()){std::fprintf(stderr,"ack_1ac440_refused line=%d\n",__LINE__);return false;}
         std::shared_ptr<const original_camera_session50KX::Session> borrowed;
         const original_camera_session50KX::Session* camera=nullptr;
         if(race.world74_){ra_cold_aggregate50LA::Diagnostic wd;
             borrowed=race.world74_->borrowRuntimeSourceCamera(race.world74_,wd);camera=borrowed.get();}
         else camera=race.cameraNativeAdapter34_;
         if(!camera||camera!=scope->camera_||&camera->actual_.bank!=scope->bank_||camera->actual_.raceHud!=scope->hud_||
-           camera->generation_!=scope->generation_||camera->actual_.applicationEntities!=race.application_)return false;
+           camera->generation_!=scope->generation_||camera->actual_.applicationEntities!=race.application_){std::fprintf(stderr,"ack_1ac440_refused line=%d\n",__LINE__);return false;}
         using Observation=original_position_stats_adapter50LA::Owner;
         Observation observer;Observation::Diagnostic observed;
         if(!observer.bind(*camera,*scope->manager_,observed)||
-           !race.results104_->endDispatchOwnerCurrent1AB520(race,observer))return false;
+           !race.results104_->endDispatchOwnerCurrent1AB520(race,observer)){std::fprintf(stderr,"ack_1ac440_refused line=%d\n",__LINE__);return false;}
         // Results itself was loaded from this same canonical domain (1BEEB0).
         const auto* materials=standardMaterialDomainOwner_->materials382B38().get();
         const auto generation=race.entity_.sessionGeneration;
@@ -297,22 +303,23 @@ bool Application::commitRaceAcknowledgementRecords1AC440_50PD(rr::game::Original
            row.publication!=current.publication||
            !observer.readResultsBestLapCB4(row,values.bestLapCB4,observed)||
            !observer.readResultsRaceTimeCB8(row,values.timeCB8,observed)||
-           !observer.readResultsObservedTimingCD0(row,values.countCD0,observed))return false;
+           !observer.readResultsObservedTimingCD0(row,values.countCD0,observed)){std::fprintf(stderr,"ack_1ac440_refused line=%d\n",__LINE__);return false;}
         // Rows still current; nothing runs between this check and the store.
-        if(!observer.resultsRowsCurrent(race.application_.get(),materials,generation,current.publication))return false;
+        if(!observer.resultsRowsCurrent(race.application_.get(),materials,generation,current.publication)){std::fprintf(stderr,"ack_1ac440_refused line=%d\n",__LINE__);return false;}
         rr::game::OriginalRaceRecordInsertionStage50KG::Diagnostic insertion;
         const auto before=riderProfile->stamp();
-        if(before.mode34!=facts.mode34)return false;
+        if(before.mode34!=facts.mode34){std::fprintf(stderr,"ack_1ac440_refused line=%d\n",__LINE__);return false;}
         rr::platform::OriginalUiRiderProfileStamp50KG after;
         if(!riderProfile->commitSingleHumanRaceRecords1AC440(values,1u,before,after,insertion)||
-           after.generation!=before.generation+1u||after.mode34!=before.mode34)return false;
+           after.generation!=before.generation+1u||after.mode34!=before.mode34){std::fprintf(stderr,"ack_1ac440_refused line=%d insertion=%u/%x\n",__LINE__,
+            unsigned(insertion.status),insertion.sourcePC);return false;}
         if(race.endEntryProfile_&&race.endEntryProfile_->generation==before.generation&&
            race.endEntryProfile_->mode34==before.mode34)race.endEntryProfile_=after;
         //1AB848..1AB878: non-tournament 100BC bit0 store AFTER 1AC440. The
         // tournament row's 1AB648 store already ran in commitTournamentRaceResult.
         if(facts.mode34!=2u&&route.savePending1AB648){
             rr::platform::OriginalUiRiderProfileStamp50KG saved;
-            if(!riderProfile->markAcknowledgementSavePending1AB648(after,saved))return false;
+            if(!riderProfile->markAcknowledgementSavePending1AB648(after,saved)){std::fprintf(stderr,"ack_1ac440_refused line=%d\n",__LINE__);return false;}
         }
         return true;
     }catch(...){return false;}
