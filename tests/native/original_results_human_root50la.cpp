@@ -1,6 +1,11 @@
 #include "terrain_interactive_publication50du.h"
 #include "original_consumed_ra_stage50du.h"
 #include "original_consumed_ta_stage50du.h"
+#include "original_consumed_ga_stage50du.h"
+#include "original_consumed_sa_stage50du.h"
+#include "original_consumed_ma_stage50du.h"
+#include "original_consumed_gc_stage50du.h"
+#include "native_common_race50pd.h"
 #include "original_race_constructor50la.h"
 #include "original_race_hud_scope50la.h"
 #include "original_position_stats_adapter50la.h"
@@ -19,18 +24,28 @@ bool Application::publishNativeHumanResultsRoot50LA(::interactive_publication50D
     //17D6A0. Only the actual Publication calls after its successful HUD bind.
     if(garageAudioOwnerThread_!=std::this_thread::get_id())
         return reject("Native human root requires Application owner thread");
-    if(&actual.originalMainApplication!=this||(!actual.sourceConsumedIntroActivation&&!actual.consumedTaStage.race())||
+    if(&actual.originalMainApplication!=this||(!actual.sourceConsumedIntroActivation&&!native_common_race50PD::race(actual))||
        !actual.humanCourseEnabled)return reject("Native human root requires an actual accepted human race Publication");
     try {
         // The same root for every race (1A8A40/17D6A0 are common). RA keeps
-        // its world join; TA uses its own counted world and camera (the
-        // other courses join once their race camera link exists).
+        // its world join; TA/GA/SA/MA/GC use their own counted world and
+        // their course camera.
         const bool raRace=bool(actual.consumedRaStage.race());
-        const auto& selected=raRace?actual.consumedRaStage.race():actual.consumedTaStage.race();
+        const auto& selected=raRace?actual.consumedRaStage.race():native_common_race50PD::race(actual);
         const auto race=sourceRace28COwner_;
         const auto camera=actual.sourceCameraSession;const auto display=raceDisplayOwner50LA_.lock();
         const bool worldCurrent=raRace?actual.raWorld&&race&&race->world74_==actual.raWorld:
-            race&&!race->world74_&&actual.taOriginalWorld&&race->taWorld74_==actual.taOriginalWorld;
+            race&&!race->world74_&&(race->taWorld74_?actual.taOriginalWorld&&race->taWorld74_==actual.taOriginalWorld:
+                native_common_race50PD::worldCurrent(actual,*race));
+        if(!race||race!=selected||raceConstructorColdOwner50LA_.lock()!=race)
+            return reject("Native human root: selected course race is not the Application race");
+        if(!worldCurrent)return reject("Native human root: race course world is not the running world");
+        if(!camera||race->cameraNativeAdapter34_!=camera.get())
+            return reject("Native human root: race Camera34 adapter is not the course camera Session");
+        if(!race->ownsNativeCameraAdapter34(*camera))return reject("Native human root: race does not own its Camera34 Session");
+        if(race->cameraInitStep_!=rr::game::OriginalRaceConstructor50LA::CameraInitStep::nativeReady)
+            return reject("Native human root: race Camera34 not native-ready");
+        if(!display||display!=race->loadDisplay_)return reject("Native human root: race display owner absent");
         if(!race||race!=selected||raceConstructorColdOwner50LA_.lock()!=race||
            race->resultsFeedbackThread_!=std::this_thread::get_id()||race->profile_!=riderProfile||
            !riderProfile||race->application_!=entitiesOwner_||!race->counted_||race->rolledBack_||
@@ -51,7 +66,8 @@ bool Application::publishNativeHumanResultsRoot50LA(::interactive_publication50D
                !prefix.staticModelObservers||!prefix.runtimeQueryWorldOwners||!prefix.trackParticleManager)
                 return reject("Native human root requires the RA world's own prepared Camera");
         }
-        const auto course=raRace?rr::game::OriginalCameraStartCourse::ra:rr::game::OriginalCameraStartCourse::ta;
+        // The course Session issued for the world this race holds.
+        const auto course=raRace?rr::game::OriginalCameraStartCourse::ra:native_common_race50PD::course(*race);
         if(camera->closed_||camera->abandoned_||!camera->coldBound_||!camera->readsBound_||
            !camera->nativeTaIssuance_||camera->nativeTaIssuance_->issuer!=this||
            camera->nativeTaIssuance_->course!=course||

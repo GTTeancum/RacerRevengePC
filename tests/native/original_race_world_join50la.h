@@ -110,8 +110,16 @@ inline bool OriginalRaceConstructor50LA::worldResetPredecessor1A6BF0Current()con
     if(world74_){
         if(world74_->worldAudio_!=raceAudio_||world74_->topologyAttempted_||world74_->worldPhysics3D4_||
            world74_->worldCollisionObjects3CC_||!world74_->worldList500_||world74_->worldListCount50C_)return false;
-    }else if(!taWorld74_||!taWorldCounted_||!taWorldPrefixComplete_||!taWorldList500_||
-             taWorldListCount50C_||nativeTaController48_)return false;
+    }else{
+        // The non-RA course world prefix (TA/GA/SA/MA/GC): counted, complete,
+        // an empty source list500 and no controller in slot48 yet.
+        const bool prefix=taWorld74_?taWorldCounted_&&taWorldPrefixComplete_&&taWorldList500_&&!taWorldListCount50C_:
+            gaWorld74_?gaWorldCounted_&&gaWorldPrefixComplete_&&gaWorldList500_&&!gaWorldListCount50C_:
+            saWorld74_?saWorldCounted_&&saWorldPrefixComplete_&&saWorldList500_&&!saWorldListCount50C_:
+            maWorld74_?maWorldCounted_&&maWorldPrefixComplete_&&maWorldList500_&&!maWorldListCount50C_:
+            gcWorld74_?gcWorldCounted_&&gcWorldPrefixComplete_&&gcWorldList500_&&!gcWorldListCount50C_:false;
+        if(!prefix||nativeTaController48_)return false;
+    }
     if(
        raceAudio_->coldThread_!=std::this_thread::get_id()||!raceAudio_->coldStarted_||
        raceAudio_->coldRetiring_||raceAudio_->nativeBindingsRetired_||raceAudio_->coldNext_!=7||

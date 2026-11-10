@@ -157,14 +157,19 @@ class OriginalResultsHostInput50LA final {
         invalidate();
         if(revision_==std::numeric_limits<std::uint64_t>::max())return;
         ++revision_;
-        const bool active=input.focused&&!input.minimized&&!input.activityLost&&
-            !input.eventBudgetExhausted&&!input.quitRequested&&!loadingBarrier;
+        // The native after-load barrier (keys/sticks still held from loading
+        // or a blocking fade) only withholds edges. It is not a disconnected
+        // device: 1B9FE0's 239C10 read is the pad connection state, so the
+        // Results "insert controller" text must not follow the barrier.
+        const bool present=input.focused&&!input.minimized&&!input.activityLost&&
+            !input.eventBudgetExhausted&&!input.quitRequested;
+        const bool active=present&&!loadingBarrier;
         // Logical native UI device0 owns keyboard plus mapped physical port0.
         // Port1 exists ONLY for the actual second physical controller. These
         // are host availability observations, never PS2 connection receipts.
-        available_[0]=active&&(actualKeyboardConnected||
+        available_[0]=present&&(actualKeyboardConnected||
             (input.gameControllersEnabled&&input.controllers[0].connected));
-        available_[1]=active&&input.gameControllersEnabled&&input.controllers[1].connected;
+        available_[1]=present&&input.gameControllersEnabled&&input.controllers[1].connected;
         const auto& keys=keys_;const auto& buttons=buttons_;const auto& codes=codes_;
         for(auto key:keys)if(input.down[key]>1||input.pressed[key]>1||input.released[key]>1){interrupt();return;}
         std::array<std::array<bool,5>,2> edges{};

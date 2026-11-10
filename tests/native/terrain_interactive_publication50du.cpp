@@ -3,6 +3,7 @@
 #include "../../platform/linux/native/loading_progress_step113a.h"
 #include "native_wreck_debris_sim50pd.h"
 #include "native_common_results50pd.h"
+#include "native_common_race50pd.h"
 #include "terrain_interactive_publication50du.h"
 #include "native_display_capacity50du.h"
 #include "original_race_hud_scope50la.h"
@@ -862,10 +863,12 @@ void Context::run() {
   // population window (racer sources admitted, before the one combined
   // population/collector). RA does it inside its own world join; TA's race
   // does it here through its world's population hook.
-  if(commonRacePausePrewarmed&&humanCourseEnabled&&!allAiEnabled&&(taOriginalWorld||gaOriginalWorld)){
-   // TA and GA: each world's population hook runs the same race load.
-   const auto commonRace=taOriginalWorld?consumedTaStage.race():consumedGaStage.race();
-   auto& populationHook=taOriginalWorld?taOriginalWorld->beforeRacerPopulation:gaOriginalWorld->beforeRacerPopulation;
+  if(commonRacePausePrewarmed&&humanCourseEnabled&&!allAiEnabled&&(taOriginalWorld||gaOriginalWorld||saOriginalWorld||maOriginalWorld)){
+   // TA, GA, SA, MA: each world's population hook runs the same race load.
+   const auto commonRace=native_common_race50PD::race(*this);
+   auto& populationHook=taOriginalWorld?taOriginalWorld->beforeRacerPopulation:
+       gaOriginalWorld?gaOriginalWorld->beforeRacerPopulation:
+       saOriginalWorld?saOriginalWorld->beforeRacerPopulation:maOriginalWorld->beforeRacerPopulation;
    if(commonRace)populationHook=[&,commonRace]{
     OriginalResults104Diagnostic50LA loadDiagnostic;
     const bool loaded=originalMainApplication.loadHumanTournamentPauseResultsBeforeCollector50LA(
@@ -920,6 +923,9 @@ void Context::run() {
        <<" bank_offset="<<failure.bank.byteOffset<<" bank_detail="<<failure.bank.parserMessage<<'\n';
   }
   if(taOriginalWorld)taOriginalWorld->beforeRacerPopulation=nullptr;
+  if(gaOriginalWorld)gaOriginalWorld->beforeRacerPopulation=nullptr;
+  if(saOriginalWorld)saOriginalWorld->beforeRacerPopulation=nullptr;
+  if(maOriginalWorld)maOriginalWorld->beforeRacerPopulation=nullptr;
   require50DU(trackMaterialsLoaded,
       trackMaterialDiagnostic.message.empty()?"selected-track material load failed":trackMaterialDiagnostic.message.c_str());
   if(humanOriginalHud&&!isRaTrack){
@@ -2178,9 +2184,9 @@ void Context::run() {
      require50DU(false,"actual accepted-world human Results root publication rejected");
     }
    }
-   // The common race (TA here): the same root after its own race load. A
-   // rejection keeps the host results panel and is logged, never fatal.
-   else if(consumedTaStage.race()&&humanCourseEnabled&&!allAiEnabled&&originalCameraEnabled&&sourcePause.storage()){
+   // The common race (TA/GA/SA/MA/GC): the same root after its own race
+   // load. A rejection keeps the host results panel and is logged, never fatal.
+   else if(native_common_race50PD::race(*this)&&humanCourseEnabled&&!allAiEnabled&&originalCameraEnabled&&sourcePause.storage()){
     OriginalResults104Diagnostic50LA rootDiagnostic;
     const bool published=originalMainApplication.publishNativeHumanResultsRoot50LA(*this,rootDiagnostic);
     native_common_results50PD::state().rootPublished=published;

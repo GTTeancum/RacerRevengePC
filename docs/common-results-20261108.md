@@ -395,3 +395,78 @@ capture route. Logs: evidence\u111*, w111*, t111r-o*, h112*. Track launch
 survey t111r: 11 of 12 tracks load into a race from Course (RA stops in its
 loading prefix); none was run through Results. No screen (Unlock/Win/Hall)
 had been reached yet when stopped.
+
+## To-do (user reports, Nov 9)
+
+- Game picture sits at the top of the 1280x896 window with a black band
+  only at the bottom (widescreen on). It should be centred (or fill).
+  Seen during a GA tournament Results replay, build 116e.
+
+## Progress 7 (Nov 10, builds 116a-116g, not installed, not committed): Results on every consumed course
+
+The common Results path is no longer TA-only. One helper
+(`tests/native/native_common_race50pd.h`) selects THE consumed race of the
+running course (TA/GA/SA/MA/GC) and checks it against its own course world
+through the race's public world backings; TA keeps its older TA expression.
+Changes:
+
+* World init: the GA/SA/MA/GC world constructors (`original_*_world_cold_prefix50la.h`)
+  now continue into the same 1A6BE0 slot30 prefix as RA/TA (268300 sound
+  reset, profile low2, counted Camera34 1A9240). `worldResetPredecessor1A6BF0Current`
+  accepts any counted non-RA course world prefix.
+* Camera34 (`original_race_camera_owner50la.cpp`): lifetime/ownership/course/
+  borrow and the Session bind/complete/revoke accept the issued course
+  Session of whichever course world the race holds (was TA only).
+* End clock, HUD scope, Results feedback scope, human Results root
+  (`original_race_end_clock50la.cpp`, `original_race_hud_scope50la.cpp`,
+  `original_results_feedback_scope50la.cpp`, `original_results_human_root50la.cpp`):
+  same race selection and world check. The root rejection is now split
+  into named reasons.
+* Race 94 countdown (`terrain_interactive_continuation50du.cpp`): every
+  consumed course race owns it; GA/SA/MA/GC fall back to the old owner
+  (logged `common_race_ending94`) if the race is not current, RA/TA keep
+  the fatal check.
+* Race load hook: MA/SA worlds (`original_single_pass_world50lm.inl`) get the
+  same before-population hook as TA/GA; publication installs it for
+  TA/GA/SA/MA and clears all four afterwards.
+
+Verified (muted unattended logs): SA and MA tournament races (player wrecked
+at 12 s): original Results + race78 replay -> confirm -> 1AB5BC Garage ->
+Tournament -> next race, 3 races each in 240 s. GA (all opponents knocked
+out at 3 s, player 1st): Results replay -> confirm -> 1AB5BC Win (order 3,
+102CC=1) -> Win screen (circuit 1, place 1, trophy1) -> Cross -> Unlock
+(Clegg, then gallery tier) -> Garage -> Tournament -> Course. With a new
+GA lap record 1AB5BC chooses Hall first (as the original); build 116h:
+Hall -> Cross -> Win -> Unlock x2 -> Garage -> Tournament -> Course.
+
+Fixes found on the way:
+* Win screen models: one-node PSGs (the trophies/stars) carry no matrix
+  palette trailer; the Win loader required the multi-node identity palette
+  and refused every trophy (`src/game/original_ui_win_scene50pd.cpp`).
+* "PLEASE INSERT CONTROLLER ONE" over the Results (user report): the
+  native after-load input barrier made 1B9FE0 see device 0 as unplugged
+  (`original_results_host_input50la.h`); availability now follows only
+  focus/connection, the barrier still withholds edges. The barrier's pad
+  test used +-4096 on every axis, so a physical pad resting slightly
+  off-centre held it shut (~65 s, 13 swallowed confirms); it now uses the
+  game's own held test (48X stick deadband, trigger threshold)
+  (`game_host50er.cpp`).
+
+* Hall -> Win: the Win session froze its profile stamp when the frontend
+  opened; the Hall's record/name writes then made it refuse the page. It
+  now takes its baseline at its own page request, before the page is shown
+  (2084C0 reads the profile at entry) (`original_ui_win_session50pd.cpp`).
+
+Regression (116g): TA 600 s loop 7 races, 0 rejections (6 acknowledged,
+the 7th still in its Results replay at 600 s); TA Hall save: Hall ->
+Garage -> Tournament -> Course.
+
+Not working yet:
+* GB (order 7): stops before the race, "original camera cold source join
+  rejected". TC (order 12): "AI source emitter construction/setup rejected".
+  Both have no consumed original race object at all (tier C: no race
+  stage, no counted course world in the race, no issued course camera, no
+  intro data), so the Results path cannot start there. Multi-day each.
+* RA (order 4, the race after the GA finale) still stops in its Course
+  loading prefix.
+* Win screen trophy music (song 10) is not confirmed by the logs.

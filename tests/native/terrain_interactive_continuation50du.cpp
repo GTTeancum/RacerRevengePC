@@ -1,6 +1,7 @@
 #include "native_wreck_debris_sim50pd.h"
 #include "../../platform/linux/native/loading_progress_step113a.h"
 #include "native_common_results50pd.h"
+#include "native_common_race50pd.h"
 #include "native_race_replay50pd.h"
 #include "native_wreck_debris_gpu50pd.h"
 #include "../../src/game/native_destroyed_racers50pd.h"
@@ -323,20 +324,29 @@ SessionExit50DU Context::run() {
  // the Setup timer or reset94 here. Other routes retain their previous owner.
  // Keep physical storage alive through all nested borrowers and close/unwind;
  // this native shared reference does not retain its source counted authority.
- const auto humanEndRace94=!humanCourseEnabled?std::shared_ptr<OriginalRaceConstructor50LA>{}:
-     consumedRaStage.race()?consumedRaStage.race():consumedTaStage.race();
- if(humanEndRace94){
-  require50DU(humanEndRace94->resultsFeedbackThread_==std::this_thread::get_id()&&
-      this->nativeOriginalFleet&&(this->isRaTrack||this->isTaTrack)&&
-      this->originalMainApplication.race28C()==humanEndRace94.get()&&
-      humanEndRace94->application_==this->originalMainApplication.entities()&&
-      humanEndRace94->profile_==this->originalMainApplication.riderProfile&&
-      humanEndRace94->counted_&&!humanEndRace94->rolledBack_&&humanEndRace94->constructorSuffix_&&
-      humanEndRace94->entity_.sessionGeneration==this->sessionIndex+1&&
-      (this->isRaTrack?humanEndRace94->world74_&&humanEndRace94->world74_==this->raWorld:
-          !humanEndRace94->world74_&&humanEndRace94->taWorld74_&&humanEndRace94->taWorld74_==this->taOriginalWorld),
+ const auto humanEndRace94Candidate=!humanCourseEnabled?std::shared_ptr<OriginalRaceConstructor50LA>{}:
+     consumedRaStage.race()?consumedRaStage.race():native_common_race50PD::race(*this);
+ const auto humanEndRace94Current=[&](const OriginalRaceConstructor50LA& race){
+  return race.resultsFeedbackThread_==std::this_thread::get_id()&&this->nativeOriginalFleet&&
+      this->originalMainApplication.race28C()==&race&&
+      race.application_==this->originalMainApplication.entities()&&
+      race.profile_==this->originalMainApplication.riderProfile&&
+      race.counted_&&!race.rolledBack_&&race.constructorSuffix_&&
+      race.entity_.sessionGeneration==this->sessionIndex+1&&
+      (this->isRaTrack?race.world74_&&race.world74_==this->raWorld:
+          !race.world74_&&(race.taWorld74_?race.taWorld74_==this->taOriginalWorld:
+              native_common_race50PD::worldCurrent(*this,race)));
+ };
+ // RA and TA keep their fail-closed contract. The other consumed course
+ // races (GA/SA/MA/GC, the same race class) use the race's own 94 when it
+ // is current, else the previous owner (logged).
+ const bool humanEndRace94Strict=humanEndRace94Candidate&&(this->isRaTrack||this->isTaTrack);
+ if(humanEndRace94Strict)
+  require50DU(humanEndRace94Current(*humanEndRace94Candidate),
       "human ending94 requires its actual current consumed Race/Application/world");
- }
+ const auto humanEndRace94=humanEndRace94Candidate&&(humanEndRace94Strict||humanEndRace94Current(*humanEndRace94Candidate))?
+     humanEndRace94Candidate:std::shared_ptr<OriginalRaceConstructor50LA>{};
+ if(humanEndRace94Candidate&&!humanEndRace94)std::cerr<<"common_race_ending94 owner=previous reason=race not current\n";
  auto& humanResultsCountdown=humanEndRace94?humanEndRace94->field94_:this->humanResultsCountdown;
  auto& humanResultsReady=this->humanResultsReady;
  auto& initial=this->initial;

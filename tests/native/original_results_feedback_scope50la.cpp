@@ -2,7 +2,12 @@
 #include "terrain_interactive_continuation50du.h"
 #include "original_consumed_ra_stage50du.h"
 #include "original_consumed_ta_stage50du.h"
+#include "original_consumed_ga_stage50du.h"
+#include "original_consumed_sa_stage50du.h"
+#include "original_consumed_ma_stage50du.h"
+#include "original_consumed_gc_stage50du.h"
 #include "original_race_constructor50la.h"
+#include "native_common_race50pd.h"
 #include "../../src/game/controller_feedback50kz.h"
 #include <utility>
 
@@ -21,9 +26,9 @@ void Scope::bindAfterPublication(::interactive_continuation50DU::Context& actual
 void Scope::attach(::interactive_continuation50DU::Context& actual,
     const native_racer50HN::Bank& bank)noexcept {
     const auto& application=actual.originalMainApplication;
-    // RA's world join or the common race (TA) with its own counted world.
+    // RA's world join or the common race (TA/GA/SA/MA/GC) with its own counted world.
     const bool raRace=bool(actual.consumedRaStage.race());
-    const auto& race=raRace?actual.consumedRaStage.race():actual.consumedTaStage.race();
+    const auto& race=raRace?actual.consumedRaStage.race():native_common_race50PD::race(actual);
     // This is only an additional Results borrow. Legacy/non-RA paths keep
     // their previous behavior, with NO registration, rather than acquiring
     // a surrogate Race/manager or changing startup admission.
@@ -31,7 +36,8 @@ void Scope::attach(::interactive_continuation50DU::Context& actual,
        application.race28C()!=race.get()||!race->counted_||race->rolledBack_||
        !race->entity_.sessionGeneration||race->application_!=application.entities()||
        (raRace?(!actual.raWorld||race->world74_!=actual.raWorld):
-           (race->world74_||!actual.taOriginalWorld||race->taWorld74_!=actual.taOriginalWorld))||!race->results104_||
+           (race->world74_||(race->taWorld74_?!actual.taOriginalWorld||race->taWorld74_!=actual.taOriginalWorld:
+               !native_common_race50PD::worldCurrent(actual,*race))))||!race->results104_||
        !race->resultsFeedback_.expired())return;
     try {
         // Construction uses precisely the borrowed setup array forwarded to

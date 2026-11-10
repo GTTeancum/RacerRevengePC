@@ -419,6 +419,16 @@ void Context::run() {
    rr::game::OriginalResults104Diagnostic50LA resultsInputDiagnostic;
    const bool resultsInputOkay=(originalUiActive||nativeModalOwnsInput)?true:
        originalMainApplication.pressConsumedResults1C8C30(host,resultsInputDiagnostic);
+   if(native_common_results50PD::state().replayActive&&nativeModalOwnsInput){
+    static unsigned reportedModal=0xffffffffu;
+    const unsigned modal=unsigned(sessionMenu.open())|unsigned(resultsUi.confirming())<<1|
+        unsigned(humanResultsReady)<<2|unsigned(sourcePauseParentAttached)<<3|
+        unsigned(originalMainApplication.animationPaused())<<4|unsigned(nativeMenuCommand)<<5;
+    if(modal!=reportedModal){reportedModal=modal;
+     std::cerr<<"race_replay results_input modal_owner menu="<<(modal&1u)<<" host_confirm="<<((modal>>1)&1u)
+         <<" host_results="<<((modal>>2)&1u)<<" pause_parent="<<((modal>>3)&1u)<<" paused="<<((modal>>4)&1u)
+         <<" menu_command="<<((modal>>5)&1u)<<'\n';}
+   }
    const bool resultsInputClaimed=host.retireResultsEdges50LA(hostInput);
    if(native_common_results50PD::state().replayActive&&(resultsInputDiagnostic.operation||!resultsInputOkay)){
     static const char* reportedInput=nullptr;

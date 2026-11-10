@@ -2,8 +2,10 @@
 #include "player_session_gl_reset50du.h"
 #include "game_host50er.h"
 #include "original_spectator_menu_input50la.h"
+#include "selected_control_input50ky.h"
 #include "vehicle_window_gl50ds.h"
 #include <exception>
+#include <cstdio>
 
 #if defined(__linux__)
 #include <cerrno>
@@ -329,11 +331,20 @@ bool GameHost50ER::poll(GameHostInput50ER& input, GameHostDiagnostic50ER& d) noe
             bool held=input.keys.eventBudgetExhausted;
             for(const auto key:input.keys.down)held=held||key!=0;
             for(const auto key:input.keys.pressed)held=held||key!=0;
+            // Pads: the game's own held test (48X central stick deadband and
+            // trigger threshold), so a stick resting slightly off-centre is
+            // neutral here exactly as it is to the controls themselves.
             for(const auto& controller:input.keys.controllers)if(controller.connected){
-                for(const auto button:controller.buttons)held=held||button!=0;
                 for(const auto button:controller.pressed)held=held||button!=0;
-                for(const auto axis:controller.axes)held=held||axis>4096||axis< -4096;
+                held=held||selectedControllerHeld50KY(controller);
             }
+            if(held){static unsigned reportedHeld=0;if(reportedHeld++<4){
+                int key=-1;for(std::size_t k=0;k<input.keys.down.size();++k)if(input.keys.down[k]||input.keys.pressed[k]){key=int(k);break;}
+                int pad=-1,axis=-1;for(std::size_t c=0;c<input.keys.controllers.size();++c){const auto& controller=input.keys.controllers[c];
+                    if(!controller.connected)continue;for(std::size_t a=0;a<controller.axes.size();++a)
+                        if(controller.axes[a]>4096||controller.axes[a]< -4096){pad=int(c);axis=int(a);}
+                    for(std::size_t b=0;b<controller.buttons.size();++b)if(controller.buttons[b]||controller.pressed[b]){pad=int(c);axis=100+int(b);}}
+                std::fprintf(stderr,"input_barrier held key=%d pad=%d axis_or_button=%d budget=%d\n",key,pad,axis,int(input.keys.eventBudgetExhausted));}}
             loadingInputBarrier50DU_=held;
             input.keys.down.fill(0);input.keys.pressed.fill(0);input.keys.released.fill(0);
             for(auto& controller:input.keys.controllers){
@@ -352,6 +363,11 @@ bool GameHost50ER::poll(GameHostInput50ER& input, GameHostDiagnostic50ER& d) noe
          if(test.focus){input.keys.focused=true;input.keys.activityLost=false;}
          if(test.enter){input.keys.pressed[40]=1;input.keys.down[40]=1;test.enter=false;}}
         resultsInput50LA_.observeWindow(input.keys,info_.inputConnected,resultsLoadingBarrier);
+        {static int reportedAvailable=-1;const int available=resultsInput50LA_.available_[0]?1:0;
+         if(available!=reportedAvailable){reportedAvailable=available;
+          std::fprintf(stderr,"results_device0 available=%d focused=%d minimized=%d activity_lost=%d budget=%d keyboard=%d loading_barrier=%d\n",
+              available,int(input.keys.focused),int(input.keys.minimized),int(input.keys.activityLost),
+              int(input.keys.eventBudgetExhausted),int(info_.inputConnected),int(resultsLoadingBarrier));}}
         resultsPollDestination50LA_=&input;
         return true;
     }

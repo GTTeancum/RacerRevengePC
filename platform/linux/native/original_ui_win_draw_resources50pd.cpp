@@ -97,7 +97,11 @@ bool OriginalUiWinDrawResources50PD::load(const OriginalUiWinColdInput50PD& in,D
            !game::prepareOriginalUiWinLighting50PD(*in.win,s->lights,d.scene)||
            !game::prepareOriginalUiWinLitContext50PD(s->render,s->lights,s->lit))return fail(d,Error::scene,d.scene.sourcePC);
         for(std::uint16_t id=9;id<=14;++id){const auto* cfg=s->page.rotateConfig(id);d.widgetId=id;
-            if(!cfg||!s->models[id-9].load(in.win,id,*cfg,d.scene))return fail(d,Error::model,d.scene.sourcePC);}
+            if(!cfg||!s->models[id-9].load(in.win,id,*cfg,d.scene)){
+                std::fprintf(stderr,"win_draw_resources model widget=%u stem=%s hierarchy_error=%u geometry_error=%s/%s\n",
+                    unsigned(id),cfg?cfg->stem.c_str():"",unsigned(d.scene.hierarchy.code),
+                    d.scene.geometry.code.c_str(),d.scene.geometry.detail.c_str());
+                return fail(d,Error::model,d.scene.sourcePC);}}
         if(!s->templates.load(*in.appStart,d.material))return fail(d,Error::material,0x17CAE8);
         std::vector<assets::OriginalUiImageSource50KG> sources;
         const auto addSource=[&](const assets::OriginalUiImageSource50KG& x)->std::uint32_t{

@@ -49,7 +49,9 @@ inline bool OriginalRaceConstructor50LA::constructGaWorld1A6BC0(
     if(!audio.constructNextCold2350D0(mixer,application_,entity_.sessionGeneration,RaceAudioGroup50IC::World4D8))return false;
     gaWorldList500_=std::move(list);gaWorldListCapacity504_=10;gaWorldListGrowth508_=100000;gaWorldListCount50C_=0;
     application_->worldRegistration434320_=0;gaWorldMode524_=3;
-    gaWorldPrefixComplete_=true;pc=0x1b2918;return true;
+    gaWorldPrefixComplete_=true;
+    worldInitStep_=WorldInitStep::soundReset; //Same caller continues 1A6BE0, as on RA/TA.
+    pc=0x1b2918;return true;
 }
 inline bool OriginalRaceConstructor50LA::retireNativeGaWorldPrefix(std::uint32_t& pc)noexcept {
     pc=0x1b2870;
@@ -86,6 +88,13 @@ inline bool Application::constructConsumedGaRaceWorld1A6BC0(rr::game::OriginalRa
        !original_course_targets50KX::same(selected,owner.launchSelection_))return false;
     const auto* target=original_course_targets50KX::target(selected);
     if(!target||target->track!=rr::platform::HostTrack50IM::GA)return false;
-    return owner.constructGaWorld1A6BC0(*this,std::move(world),pc);
+    // One race class (1A65C0) on every course: the world constructor 1A6BC0
+    // continues into the same slot30 prefix 1A6BE0 (sound reset, profile
+    // low2, counted Camera34) as on RA and TA.
+    if(owner.worldAttempted_){
+        // Native resumption never reconstructs or replays a reached prefix.
+        if(!world||world.get()!=owner.gaWorld74_.get())return false;
+    }else if(!owner.constructGaWorld1A6BC0(*this,std::move(world),pc))return false;
+    return continueConsumedRaWorldInit1A6BE0(owner,pc);
 }
 }

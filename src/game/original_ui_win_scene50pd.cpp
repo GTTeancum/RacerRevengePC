@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <cfenv>
 #include <cmath>
+#include <cstdio>
 #include <cstring>
 #include <new>
 #include <utility>
@@ -164,11 +165,23 @@ bool OriginalUiWinModel50PD::load(std::shared_ptr<const assets::OriginalUiArchiv
         auto s=std::make_unique<Storage>();s->archive=std::move(archive);s->widget=widget;s->config=config;
         s->member=s->archive->find("UI/Geometry/"+config.stem+".psg");
         if(!s->member.identity||!s->member.data)return fail(d,0x1D35C4);
-        if(!assets::readPsgHierarchy49O(s->member.data,s->member.size,s->hierarchy,d.hierarchy)||s->hierarchy.nodeCount!=1)return fail(d,0x1D35C4);
+        if(!assets::readPsgHierarchy49O(s->member.data,s->member.size,s->hierarchy,d.hierarchy)||s->hierarchy.nodeCount!=1){
+            std::fprintf(stderr,"win_model hierarchy widget=%u stem=%s nodes=%u\n",unsigned(widget),config.stem.c_str(),unsigned(s->hierarchy.nodeCount));
+            return fail(d,0x1D35C4);}
         const std::vector<std::uint8_t> bytes(s->member.data,s->member.data+s->member.size);
-        if(!assets::decodeScene48D(bytes,s->scene,d.geometry)||s->scene.nodes.size()!=1||s->scene.world_space||
-           !s->scene.identity_matrix_palette||s->scene.lods.size()!=1||s->scene.lods[0].surfaces.empty())return fail(d,0x1D35C4);
-        for(const auto& surface:s->scene.lods[0].surfaces)if(surface.has_original_colors||surface.material_index>=s->scene.materials.size())return fail(d,0x1D35C4);
+        const bool decoded=assets::decodeScene48D(bytes,s->scene,d.geometry);
+        if(!decoded||s->scene.nodes.size()!=1||s->scene.world_space||
+           s->scene.identity_matrix_palette||s->scene.lods.size()!=1||s->scene.lods[0].surfaces.empty()){
+            std::fprintf(stderr,"win_model shape widget=%u stem=%s decoded=%d nodes=%zu world_space=%d identity_palette=%d lods=%zu surfaces=%zu\n",
+                unsigned(widget),config.stem.c_str(),int(decoded),s->scene.nodes.size(),int(s->scene.world_space),
+                int(s->scene.identity_matrix_palette),s->scene.lods.size(),s->scene.lods.empty()?std::size_t(0):s->scene.lods[0].surfaces.size());
+            return fail(d,0x1D35C4);
+        }
+        for(const auto& surface:s->scene.lods[0].surfaces)if(surface.has_original_colors||surface.material_index>=s->scene.materials.size()){
+            std::fprintf(stderr,"win_model surface widget=%u stem=%s original_colors=%d material=%u of %zu\n",unsigned(widget),
+                config.stem.c_str(),int(surface.has_original_colors),unsigned(surface.material_index),s->scene.materials.size());
+            return fail(d,0x1D35C4);
+        }
         storage_=std::move(s);d={};return true;
     }catch(...){return fail(d,0x1D3590);}
 }
@@ -210,7 +223,9 @@ bool OriginalUiWinModel50PD::project(std::uint32_t surfaceIndex,bool specular,co
     if(!storage_||!storage_->attached)return status(LS::input);d.widget=storage_->widget;
     if(!original_racer_lighting50KM::selection_detail::arithmeticReady())return status(LS::arithmetic);
     const auto& scene=storage_->scene;
-    if(scene.world_space||!scene.identity_matrix_palette||scene.nodes.size()!=1||palette.entryCount!=1||
+    // A one-node PSG has no matrix-palette trailer (the decoder records an
+    // identity palette only for multi-node models): row0 is the model itself.
+    if(scene.world_space||scene.identity_matrix_palette||scene.nodes.size()!=1||palette.entryCount!=1||
        scene.lods.size()!=1||surfaceIndex>=scene.lods[0].surfaces.size()||scene.quantization[2]!=scene.quantization[3]||
        scene.quantization[4]!=0||scene.quantization[5]!=0||scene.quantization[6]!=0)return status(LS::unsupportedScene);
     const auto& surface=scene.lods[0].surfaces[surfaceIndex];const auto triangles=surface.indices.size()/3;

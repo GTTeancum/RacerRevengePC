@@ -14,6 +14,7 @@
 #include <limits>
 #include <map>
 #include <memory>
+#include <functional>
 
 // Proposal only; not compiled or live-joined. Static ATM initial frame only.
 // Runtime identities for unpinned IPUM pixels are not independent output pins.

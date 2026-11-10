@@ -1,6 +1,7 @@
 #include "original_ui_win_session50pd.h"
 #include "../../../src/game/original_unlock_checks50pd.h"
 #include <cmath>
+#include <cstdio>
 #include <limits>
 
 namespace rr::platform {
@@ -105,7 +106,18 @@ S OriginalUiWinSession50PD::bind(const OriginalUiWinSessionCold50PD& cold,D& d)n
 }
 S OriginalUiWinSession50PD::notifyTransition(const game::OriginalUiTransitionNotification50KG& e,D& d)noexcept{
     d={};auto* s=storage_.get();if(!s)return result(d,S::notBound);
-    if(!s->operational()||s->inOperation||!s->profileCurrent()||e.route.screen!=7||e.route.page!=1)return result(d,S::unsupportedState,e.sourcePC);
+    // The page reads the profile at its own entry (2084C0). A screen shown
+    // before it in the same frontend (the tournament Hall of Fame: record
+    // insertion and name entry) legitimately changes the profile, so the
+    // not-yet-shown page takes its profile baseline at its page request.
+    if(e.kind==N::requestedPage90&&!s->state.pageShown&&s->operational()&&!s->inOperation&&
+       s->process()&&s->cold.commonProfile->mode34==2&&e.route.screen==7&&e.route.page==1)
+        s->coldStamp=s->cold.profile->stamp();
+    if(!s->operational()||s->inOperation||!s->profileCurrent()||e.route.screen!=7||e.route.page!=1){
+        std::fprintf(stderr,"win_session notify_rejected kind=%u operational=%d in_operation=%d profile_current=%d route=%u/%u page_shown=%d\n",
+            unsigned(e.kind),int(s->operational()),int(s->inOperation),int(s->profileCurrent()),unsigned(e.route.screen),unsigned(e.route.page),
+            int(s->state.pageShown));
+        return result(d,S::unsupportedState,e.sourcePC);}
     const auto t=s->transition();
     if(!t.bound||e.lifecycle!=t.lifecycle||e.phase!=t.phase||!((t.current.screen==7&&t.current.page==1)||(t.requested.screen==7&&t.requested.page==1)))return result(d,S::transition,e.sourcePC);
     s->state.framePublished=false;s->state.routeProposalPending=false;s->inOperation=true;

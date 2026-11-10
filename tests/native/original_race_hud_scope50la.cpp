@@ -1,4 +1,5 @@
 #include "original_race_hud_scope50la.h"
+#include "native_common_race50pd.h"
 #include "terrain_interactive_continuation50du.h"
 #include "terrain_interactive_publication50du.h"
 #include "original_consumed_ra_stage50du.h"
@@ -36,10 +37,13 @@ Registration::Registration(const original_main_entry50KG::Application& applicati
 Scope::Scope(::interactive_continuation50DU::Context& actual,const native_racer50HN::Bank& bank)noexcept {
     const auto& app=actual.originalMainApplication;
     // RA or TA consumed race, each checked against its own retained world.
+    // The other consumed course races (GA/SA/MA/GC, same race class) are
+    // checked against their own course world the same way.
     const bool ta=!actual.consumedRaStage.race();
-    const auto& race=ta?actual.consumedTaStage.race():actual.consumedRaStage.race();
+    const auto& race=ta?native_common_race50PD::race(actual):actual.consumedRaStage.race();
     const bool worldCurrent=race&&(ta?
-        actual.taOriginalWorld&&!race->world74_&&race->taWorld74_==actual.taOriginalWorld:
+        !race->world74_&&(race->taWorld74_?actual.taOriginalWorld&&race->taWorld74_==actual.taOriginalWorld:
+            native_common_race50PD::worldCurrent(actual,*race)):
         actual.raWorld&&race->world74_==actual.raWorld);
     if(!race||race->resultsFeedbackThread_!=std::this_thread::get_id()||
        app.race28C()!=race.get()||!race->counted_||race->rolledBack_||
@@ -173,7 +177,7 @@ bool Registration::stop1AD230(const rr::game::OriginalRaceConstructor50LA& race)
     if(retained.get()!=&race||application_->race28C()!=&race||
        application_->entities()!=race.application_||!race.counted_||race.rolledBack_||
        race.entity_.sessionGeneration!=generation_||race.endHud_.lock().get()!=this||
-       !race.hudTextSlots_||!(race.world74_||race.taWorld74_))return false;
+       !race.hudTextSlots_||!race.anyWorld())return false;
     try {
         //This existing synchronous borrow retains actual world/query/model
         //backing (RA) or the issued Session (TA) during the HUD operation.
