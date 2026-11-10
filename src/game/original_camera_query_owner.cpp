@@ -1,5 +1,6 @@
 #include "original_camera_query_owner.h"
 #include "query_prepare48o.h"
+#include <cstdio>
 #include <cfenv>
 #include <cmath>
 #include <cstring>
@@ -151,11 +152,16 @@ bool prepareRegistration(OriginalCameraQueryPairOwner& o,bool sphere,bool attach
     if(attach){const auto storage=m.storage;
         out.registration=attachLiveZoneMembership50EN(*o.lifecycle,*o.liveWorld,m,storage,ref,zone,ZoneMethod50CL::Second,0.f,b,*o.liveWorkspace);
     }else out.registration=updateLiveZoneMembership50EN(*o.lifecycle,*o.liveWorld,m,b,*o.liveWorkspace);
-    if(out.registration.status!=LiveZoneStatus50EN::Complete){fail(out,S::LiveRegistration,attach?0x120070u:0x120230u);return false;}
+    if(out.registration.status!=LiveZoneStatus50EN::Complete){
+        std::fprintf(stderr,"camera_zone_registration_rejected sphere=%d attach=%d status=%d\n",int(sphere),int(attach),int(out.registration.status));
+        fail(out,S::LiveRegistration,attach?0x120070u:0x120230u);return false;}
     ++out.updatesCommitted;
     if(!m.attached||m.object!=ref||m.method!=ZoneMethod50CL::Second||m.lastShapeTag!=b.bounds.shapeTag||
        (!attach&&(before==std::numeric_limits<std::uint64_t>::max()||m.revision!=before+1u))||
        std::memcmp(&m.lastShapeWorld,&b.bounds.shapeWorld,sizeof m.lastShapeWorld)){
+        std::fprintf(stderr,"camera_zone_binding_rejected sphere=%d attached=%d object=%d method=%d tag=%d revision=%d shape=%d\n",
+            int(sphere),int(m.attached),int(m.object==ref),int(m.method==ZoneMethod50CL::Second),int(m.lastShapeTag==b.bounds.shapeTag),
+            int(attach||m.revision==before+1u),int(!std::memcmp(&m.lastShapeWorld,&b.bounds.shapeWorld,sizeof m.lastShapeWorld)));
         fail(out,S::Binding,0x120230u);return false;
     }
     auto& object=o.mutableWorld.objects[ref-1];object.cachedCenter=m.bounds.cachedCenter;object.cachedRadius=m.bounds.cachedRadius;

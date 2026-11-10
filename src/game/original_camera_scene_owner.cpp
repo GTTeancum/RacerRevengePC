@@ -276,12 +276,20 @@ struct Transaction {
                 else {p.minimumDistanceC=p.maximumDistance10=distance;
                     if(!insertSecondary(edge,distance))return false;}
             }else if(found){
-                //281320 writes head=found.next. Outside a head removal that
-                // would strand other live records. Keep that domain explicit.
-                if(found!=work.links[0].next){result.status=Status::UnsupportedLinkRemoval;return false;}
+                //281320 writes head=found.next: the original drops found AND
+                // every record ahead of it from this list (those earlier ones
+                // stay registered as stale pool records for the race). Native:
+                // the same resulting list; the dropped records are also
+                // unregistered, so none outlives this membership's storage.
                 p.minimumDistanceC=0;p.maximumDistance10=std::numeric_limits<float>::max();
                 const auto next=work.links[found-1u].next;
-                if(!removeSecondary(found))return false;work.links[0].next=next;
+                for(auto ref=work.links[0].next;ref;){
+                    const auto after=work.links[ref-1u].next;
+                    if(!removeSecondary(ref))return false;
+                    if(ref==found)break;
+                    ref=after;
+                }
+                work.links[0].next=next;
             }
         }
         return true;
