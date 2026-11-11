@@ -192,7 +192,7 @@ private:
         std::array<std::string_view,3> cameraValues;
     };
     const Specification* specification_=nullptr;
-    inline static constexpr std::array<Specification,7> specifications_{{
+    inline static constexpr std::array<Specification,8> specifications_{{
         {"TA","TRACKS/TA.RES","b491e34bf6cbd27869d5b9dc8db394b101ebaf4ac7f5e0d44fcca33a00d41ab8",
          3334562,383,3,39,{346,119},{381,380},
          {"22e1afe07f5f34033b63a75fa8b5c2a30f49869f57cfa96926ba5c51eba9bf50","1a325c68bbccaa8dfa94f87a8d1dcb743d029c59d96771797ce7045135cf6a0f"},
@@ -220,7 +220,11 @@ private:
         {"MB","TRACKS/MB.RES","6aae7d59981cae6c741b14e147021960fdb4d8e68e21c217a446f779d3c821ca",
          4421779,487,2,37,{238,88},{485,484},
          {"1ce76eba38a94afb4a9e0ecaf82b7416781fef75480683299f734747b46638e4","c28784d774a7a1d65fe118d3e94d5c3c7aa8bff490ee81bfaeeb0e7adfc58d90"},
-         {57,159,0},{107,209,0},{121,223,0},{133,235,0},{56,85,0},{36,37,0},{"1","3",""}}
+         {57,159,0},{107,209,0},{121,223,0},{133,235,0},{56,85,0},{36,37,0},{"1","3",""}},
+        {"SC","TRACKS/SC.RES","8305641f0ac8fefeae6603145ad4f8441612e41926751ff853170763e66dfa4d",
+         2974353,984,3,38,{343,117},{982,981},
+         {"a74d454fd671470aa9f4a507a026369973936999535f39606ce84595c3dc9d1f","a59dc183ec92b00a2cd0e7940f66552207074b10ceba9ffb61461f7eeed529c8"},
+         {57,160,263},{108,211,314},{122,225,328},{134,237,340},{56,85,114},{21,22,23},{"1","2","3"}}
     }};
     inline static constexpr std::array<const char*,2> memberNames_{{"audio\\introAud.ini","audio\\scrptLns.ini"}};
 };

@@ -1,4 +1,5 @@
 #include "native_last_failure50pd.h"
+#include "native_course_archive_release50pd.h"
 #include "native_wreck_debris_sim50pd.h"
 #include "../../platform/linux/native/loading_progress_step113a.h"
 #include "native_common_results50pd.h"
@@ -31,6 +32,7 @@
 #include "original_consumed_gc_stage50du.h"
 #include "original_consumed_ma_stage50du.h"
 #include "original_consumed_mb_stage50du.h"
+#include "original_consumed_sc_stage50du.h"
 #include "original_consumed_sa_stage50du.h"
 #include "original_consumed_ta_stage50du.h"
 #include "original_native_ta_root_audio50la.h"
@@ -188,6 +190,7 @@ SessionExit50DU Context::run() {
  auto& consumedGcStage=this->consumedGcStage;
  auto& consumedMaStage=this->consumedMaStage;
  auto& consumedMbStage=this->consumedMbStage;
+ auto& consumedScStage=this->consumedScStage;
  auto& consumedRaStage=this->consumedRaStage;
  auto& consumedSaStage=this->consumedSaStage;
  auto& consumedTaStage=this->consumedTaStage;
@@ -382,6 +385,7 @@ SessionExit50DU Context::run() {
  auto& m=this->m;
  auto& maOriginalDisc=this->maOriginalDisc;
  auto& maOriginalWorld=this->maOriginalWorld;
+ auto& scOriginalWorld=this->scOriginalWorld;
  auto& maTriggerActions=this->maTriggerActions;
  auto& maTriggerAuthoring=this->maTriggerAuthoring;
  auto& maTriggerMembership=this->maTriggerMembership;
@@ -2428,7 +2432,7 @@ SessionExit50DU Context::run() {
    // Any consumed original race (RA, TA, MA, SA, GA, GC) publishes the same
    // Application race28C and session generation the speech owners bind to.
    const auto actualRace=consumedRaStage.race()?consumedRaStage.race():consumedTaStage.race()?consumedTaStage.race():
-       consumedMaStage.race()?consumedMaStage.race():consumedMbStage.race()?consumedMbStage.race():consumedSaStage.race()?consumedSaStage.race():
+       consumedMaStage.race()?consumedMaStage.race():consumedMbStage.race()?consumedMbStage.race():consumedScStage.race()?consumedScStage.race():consumedSaStage.race()?consumedSaStage.race():
        consumedGaStage.race()?consumedGaStage.race():consumedGcStage.race();
    if(!audioEnabled||!originalUiStarted||!humanCourseEnabled||!actualRace)return;
    // Consumed races join when their identities match and otherwise keep the
@@ -2721,13 +2725,9 @@ SessionExit50DU Context::run() {
   require50DU(saOriginalWorld&&saOriginalWorld->mesh(),"retained SA original mesh publication missing");
   trackMesh=*saOriginalWorld->mesh();
  }
- std::unique_ptr<sc_original_world50LM::Owner> scOriginalWorld;
  if(scOriginalDisc){
-  scOriginalWorld=std::make_unique<sc_original_world50LM::Owner>();
-  sc_original_world50LM::Diagnostic diagnostic;
-  const bool loaded=scOriginalWorld->load(runtime_startup50fl::readBytes(trackSession->archive),actualWorld,diagnostic);
-  require50DU(loaded,diagnostic.message.empty()?"SC original static world rejected":diagnostic.message.c_str());
-  require50DU(scOriginalWorld->mesh(),"SC original mesh publication missing");
+  // Decoded in the world stage (before counted audio) and retained there.
+  require50DU(scOriginalWorld&&scOriginalWorld->mesh(),"retained SC original mesh publication missing");
   trackMesh=*scOriginalWorld->mesh();
  }
  std::shared_ptr<tb_original_world50LM::Owner> tbOriginalWorld;
@@ -3427,6 +3427,7 @@ SessionExit50DU Context::run() {
       consumedRaStage.race()?consumedRaStage.race().get():
       consumedMaStage.race()?consumedMaStage.race().get():
       consumedMbStage.race()?consumedMbStage.race().get():
+      consumedScStage.race()?consumedScStage.race().get():
       consumedSaStage.race()?consumedSaStage.race().get():
       consumedGaStage.race()?consumedGaStage.race().get():consumedGcStage.race().get();
  };
@@ -3936,6 +3937,10 @@ SessionExit50DU Context::run() {
   if(consumedSaStage.race()&&!consumedSaStage.close())return closeRejected("SA consumed race/world retirement");
   if(consumedMaStage.race()&&!consumedMaStage.close())return closeRejected("MA consumed race/world retirement");
   if(consumedMbStage.race()&&!consumedMbStage.close())return closeRejected("MB consumed race/world retirement");
+  if(consumedScStage.race()&&!consumedScStage.close())return closeRejected("SC consumed race/world retirement");
+  // Original race unload releases the course's track bank (1316A0). A
+  // refusal (a live borrower of its files) keeps the bank active, logged.
+  native_course_archive_release50PD::holder().release();
   if(!sourcePause.close())return closeRejected("if(!sourcePause.close())");
   if(!sourceDisplayLifetime->beginCloseAfterDependents())return closeRejected("if(!sourceDisplayLifetime->beginCloseAfterDependents())");
   if(!originalMainApplication.retainsPlayerWindow50DU()&&host.ownsResources()&&!host.close(hostDiagnostic)){
@@ -4168,6 +4173,7 @@ SessionExit50DU Context::run() {
    .consumedGcStage=consumedGcStage,
    .consumedMaStage=consumedMaStage,
    .consumedMbStage=consumedMbStage,
+   .consumedScStage=consumedScStage,
    .consumedRaStage=consumedRaStage,
    .consumedSaStage=consumedSaStage,
    .consumedTaStage=consumedTaStage,

@@ -1843,8 +1843,13 @@ bool OriginalStandardTextureResolver50LA::retireNativeRaceMounts1316A0(
         if(storage_)for(const auto& file:storage_->files)if(file->bank==entry.slot){
             if(file->pstBorrowers||!file->cached.expired()||file->animation||
                !file->geometry.expired()||!file->payloadGeometry.expired()||
-               !file->collision.expired()||!file->ipumImages.expired()||file->garageIpum)
+               !file->collision.expired()||!file->ipumImages.expired()||file->garageIpum){
+                std::fprintf(stderr,"race_mount_release_refused member=%s pst=%d cached=%d anim=%d geometry=%d payload=%d collision=%d ipum=%d garage=%d\n",
+                    file->member.c_str(),file->pstBorrowers?1:0,!file->cached.expired()?1:0,file->animation?1:0,
+                    !file->geometry.expired()?1:0,!file->payloadGeometry.expired()?1:0,!file->collision.expired()?1:0,
+                    !file->ipumImages.expired()?1:0,file->garageIpum?1:0);
                 return fail(d,E::source,0x1316a0);
+            }
             if(!file->retired&&file->bankGeneration!=entry.generation)
                 return fail(d,E::source,0x1316a0);
         }

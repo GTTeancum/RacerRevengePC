@@ -17,6 +17,7 @@ namespace tb_cold_sources50LA { class Owner; }
 namespace gb_cold_sources50LA { class Owner; }
 namespace mc_cold_sources50LA { class Owner; }
 namespace ra_cold_aggregate50LA { class Owner; }
+namespace native_course_archive_release50PD { struct Holder; }
 namespace rr::platform {class OriginalUiGarageDrawContribution50KG; class OriginalUiFrontend50KG;}
 namespace rr::assets {
 class OriginalArchiveStagedReader50LA;
@@ -28,6 +29,7 @@ class NativeRaceMountLease50LA final {
     friend class OriginalStandardArchiveProvider50LA;
     friend class OriginalStandardTextureResolver50LA;
     friend class ::ra_cold_aggregate50LA::Owner;
+    friend struct ::native_course_archive_release50PD::Holder; //Course track bank released at race end.
     struct Entry {std::size_t slot=0;std::uint64_t generation=0;const void* identity=nullptr;};
     std::shared_ptr<OriginalStandardArchiveProvider50LA> provider_;
     std::array<Entry,64> entries_{};

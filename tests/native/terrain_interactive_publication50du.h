@@ -9,6 +9,7 @@ namespace original_consumed_ga_stage50DU { class Owner; }
 namespace original_consumed_gc_stage50DU { class Owner; }
 namespace original_consumed_ma_stage50DU { class Owner; }
 namespace original_consumed_mb_stage50DU { class Owner; }
+namespace original_consumed_sc_stage50DU { class Owner; }
 namespace original_consumed_sa_stage50DU { class Owner; }
 namespace original_consumed_ta_stage50DU { class Owner; }
 
@@ -125,6 +126,8 @@ struct Context final {
     consumedMaStageType& consumedMaStage;
     using consumedMbStageType = original_consumed_mb_stage50DU::Owner;
     consumedMbStageType& consumedMbStage;
+    using consumedScStageType = original_consumed_sc_stage50DU::Owner;
+    consumedScStageType& consumedScStage;
     using consumedRaStageType = original_consumed_ra_stage50DU::Owner;
     consumedRaStageType& consumedRaStage;
     using consumedSaStageType = original_consumed_sa_stage50DU::Owner;
@@ -743,7 +746,7 @@ struct Context final {
     scLavaUvType& scLavaUv;
     using scOriginalDiscType = const bool;
     scOriginalDiscType& scOriginalDisc;
-    using scOriginalWorldType = std::unique_ptr<sc_original_world50LM::Owner>;
+    using scOriginalWorldType = std::shared_ptr<sc_original_world50LM::Owner>;
     scOriginalWorldType& scOriginalWorld;
     using scTriggerActionsType = std::unique_ptr<sc_trigger_actions::Owner>;
     scTriggerActionsType& scTriggerActions;

@@ -22,6 +22,7 @@
 #include "original_consumed_gc_stage50du.h"
 #include "original_consumed_ma_stage50du.h"
 #include "original_consumed_mb_stage50du.h"
+#include "original_consumed_sc_stage50du.h"
 #include "original_consumed_sa_stage50du.h"
 #include "original_consumed_ta_stage50du.h"
 #include "rc_positional_sound50rc.h"
@@ -191,6 +192,7 @@ SessionExit50DU Context::run() {
  auto& consumedGcStage=this->consumedGcStage;
  auto& consumedMaStage=this->consumedMaStage;
  auto& consumedMbStage=this->consumedMbStage;
+ auto& consumedScStage=this->consumedScStage;
  auto& consumedRaStage=this->consumedRaStage;
  auto& consumedSaStage=this->consumedSaStage;
  auto& consumedTaStage=this->consumedTaStage;
@@ -304,6 +306,7 @@ SessionExit50DU Context::run() {
  auto& m=this->m;
  auto& maOriginalDisc=this->maOriginalDisc;
  auto& maOriginalWorld=this->maOriginalWorld;
+ auto& scOriginalWorld=this->scOriginalWorld;
  auto& maTriggerActions=this->maTriggerActions;
  auto& maTriggerAuthoring=this->maTriggerAuthoring;
  auto& maTriggerCandidateFirst=this->maTriggerCandidateFirst;
@@ -1059,7 +1062,7 @@ SessionExit50DU Context::run() {
  std::unique_ptr<gc_gate_audio50IN::Owner> gaGateAudio,gcGateAudio;
  SpeechPosition50HG audioListener{};bool audioListenerReady=false;
  std::uint64_t speechEvents=0,speechCues=0,announcerRequestsUnjoined=0;
- if((consumedRaStage.race()||consumedTaStage.race()||consumedMaStage.race()||consumedMbStage.race()||consumedSaStage.race()||consumedGaStage.race()||consumedGcStage.race())&&!audioEnabled)require50DU(liveAudio->finishCountedMutedGroups(loadedAudioSettings),
+ if((consumedRaStage.race()||consumedTaStage.race()||consumedMaStage.race()||consumedMbStage.race()||consumedScStage.race()||consumedSaStage.race()||consumedGaStage.race()||consumedGcStage.race())&&!audioEnabled)require50DU(liveAudio->finishCountedMutedGroups(loadedAudioSettings),
      "actual counted muted audio group settings rejected");
  if(originalCameraEnabled&&!audioEnabled)require50DU(sourceCameraCycleAudio.prepareMuted(),
      "explicit muted camera cycle owner rejected");
@@ -3096,6 +3099,7 @@ SessionExit50DU Context::run() {
   .consumedGcStage=consumedGcStage,
   .consumedMaStage=consumedMaStage,
   .consumedMbStage=consumedMbStage,
+  .consumedScStage=consumedScStage,
   .consumedRaStage=consumedRaStage,
   .consumedSaStage=consumedSaStage,
   .consumedTaStage=consumedTaStage,
@@ -3262,6 +3266,7 @@ SessionExit50DU Context::run() {
   .m=m,
   .maOriginalDisc=maOriginalDisc,
   .maOriginalWorld=maOriginalWorld,
+  .scOriginalWorld=scOriginalWorld,
   .maTriggerActions=maTriggerActions,
   .maTriggerAuthoring=maTriggerAuthoring,
   .maTriggerMembership=maTriggerMembership,

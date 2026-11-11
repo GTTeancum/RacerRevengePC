@@ -395,6 +395,16 @@ class OriginalRaceConstructor50LA final {
     bool constructMbWorld1A6BC0(const original_main_entry50KG::Application&,
         std::shared_ptr<mb_original_world50LM::Owner>,std::uint32_t&)noexcept;
     bool retireNativeMbWorldPrefix(std::uint32_t&)noexcept;
+    // Independently typed SC static backing and actual counted1B2870 prefix (same as GC).
+    std::shared_ptr<sc_original_world50LM::Owner> scWorld74_;
+    OriginalWreckComponent50LA scWorldEntity_;
+    bool scWorldCounted_=false,scWorldPrefixComplete_=false;
+    std::uint32_t scWorldMode30_=0,scUseEnvironment35C_=0,scWorldMode524_=0;
+    std::unique_ptr<OriginalWreckComponent50LA*[]> scWorldList500_;
+    std::uint32_t scWorldListCapacity504_=0,scWorldListGrowth508_=0,scWorldListCount50C_=0;
+    bool constructScWorld1A6BC0(const original_main_entry50KG::Application&,
+        std::shared_ptr<sc_original_world50LM::Owner>,std::uint32_t&)noexcept;
+    bool retireNativeScWorldPrefix(std::uint32_t&)noexcept;
     // Independently typed SA static backing and actual counted1B2870 prefix.
     // Runtime query/water owners remain their real caller-owned objects; this
     // prefix does not claim slot30 load or fabricate collision topology.
@@ -552,7 +562,7 @@ public:
     const OriginalWreckComponent50LA* nativeIntroRaceEntity()const noexcept;
     const OriginalWreckComponent50LA* nativeIntroWorldEntity()const noexcept;
     // Any counted world slot (RA aggregate or a TA/GC/MA/SA/GA prefix).
-    bool anyWorld()const noexcept{return world74_||taWorld74_||gcWorld74_||maWorld74_||mbWorld74_||saWorld74_||gaWorld74_;}
+    bool anyWorld()const noexcept{return world74_||taWorld74_||gcWorld74_||maWorld74_||mbWorld74_||scWorld74_||saWorld74_||gaWorld74_;}
     const OriginalWreckComponent50LA* nativeIntroControllerSlot48()const noexcept {
         return nativeIntroRaceEntity()?nativeTaController48_:nullptr;
     }
@@ -594,6 +604,9 @@ public:
     const gc_original_world50LM::Owner* nativeGcWorldBacking()const noexcept {
         return nativeIntroWorldEntity()==&gcWorldEntity_?gcWorld74_.get():nullptr;
     }
+    const sc_original_world50LM::Owner* nativeScWorldBacking()const noexcept {
+        return nativeIntroWorldEntity()==&scWorldEntity_?scWorld74_.get():nullptr;
+    }
     const mb_original_world50LM::Owner* nativeMbWorldBacking()const noexcept {
         return nativeIntroWorldEntity()==&mbWorldEntity_?mbWorld74_.get():nullptr;
     }
@@ -610,7 +623,7 @@ public:
     // acquired its seventh group, its own explicit rollback must run first.
     bool rollbackNativeRaceGroupsFailure(std::uint32_t& sourcePC)noexcept {
         sourcePC=0x1a6b5c;
-        if(world74_||taWorld74_||taWorldCounted_||gcWorld74_||gcWorldCounted_||maWorld74_||maWorldCounted_||mbWorld74_||mbWorldCounted_||saWorld74_||saWorldCounted_||gaWorld74_||gaWorldCounted_||nativeTaController48_)return false;
+        if(world74_||taWorld74_||taWorldCounted_||gcWorld74_||gcWorldCounted_||maWorld74_||maWorldCounted_||mbWorld74_||mbWorldCounted_||scWorld74_||scWorldCounted_||saWorld74_||saWorldCounted_||gaWorld74_||gaWorldCounted_||nativeTaController48_)return false;
         if(!raceAudio_)return raceGroupCount_==0;
         auto& audio=*raceAudio_;
         if(!counted_||rolledBack_||application_->attachmentLock423F58()||
@@ -651,7 +664,7 @@ public:
         sourcePC=0x1a65cc;
         if(rolledBack_)return true;
         if(!counted_){rolledBack_=true;return true;}
-        if(sourcePlayerMusicBorrows_||camera34_||cameraNativeAdapter34_||!endHud_.expired()||pause100_||results104_||f8Owner_||f8Attached_||vcr78Owner_||vcr78Source_||music10C_||timingB4_||racerB0_||mapB8_||nativeRootAttached_||world74_||taWorld74_||taWorldCounted_||gcWorld74_||gcWorldCounted_||maWorld74_||maWorldCounted_||mbWorld74_||mbWorldCounted_||saWorld74_||saWorldCounted_||gaWorld74_||gaWorldCounted_||nativeTaController48_||loadDisplay_||loadFifo_||raceAudio_||raceGroupCount_||!detachedPrefix()||application_->attachmentLock423F58()||
+        if(sourcePlayerMusicBorrows_||camera34_||cameraNativeAdapter34_||!endHud_.expired()||pause100_||results104_||f8Owner_||f8Attached_||vcr78Owner_||vcr78Source_||music10C_||timingB4_||racerB0_||mapB8_||nativeRootAttached_||world74_||taWorld74_||taWorldCounted_||gcWorld74_||gcWorldCounted_||maWorld74_||maWorldCounted_||mbWorld74_||mbWorldCounted_||scWorld74_||scWorldCounted_||saWorld74_||saWorldCounted_||gaWorld74_||gaWorldCounted_||nativeTaController48_||loadDisplay_||loadFifo_||raceAudio_||raceGroupCount_||!detachedPrefix()||application_->attachmentLock423F58()||
            !application_->objectCount423F60()||!application_->entityAuthority_.retire(entity_))return false;
         --entity_.reference00;--application_->objectCount423F60();
         rolledBack_=true;profile_.reset();resourceContext_.reset();resourceDomain_.reset();return true;

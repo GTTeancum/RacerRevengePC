@@ -109,6 +109,8 @@ bool taRestoreStartLane()noexcept {
        actual_.actualRadarMapB8!=nativeTaIssuance_->saMap)return taReject(0x2a2880);
     if(nativeTaIssuance_&&nativeTaIssuance_->course==OriginalCameraStartCourse::ma&&
        actual_.actualRadarMapB8!=nativeTaIssuance_->maMap)return taReject(0x2a2880);
+    if(nativeTaIssuance_&&nativeTaIssuance_->course==OriginalCameraStartCourse::sc&&
+       actual_.actualRadarMapB8!=nativeTaIssuance_->scMap)return taReject(0x2a2880);
     if(nativeTaIssuance_&&nativeTaIssuance_->course==OriginalCameraStartCourse::mb){
         //2A2880 on MB's own retained map view (same grid helper as the B8 map).
         if(actual_.actualRadarMapB8||!nativeTaIssuance_->mbMap.sameOwner(actual_.actualRadarMapMb)||
@@ -118,7 +120,8 @@ bool taRestoreStartLane()noexcept {
        nativeTaIssuance_->course!=OriginalCameraStartCourse::gc&&
        nativeTaIssuance_->course!=OriginalCameraStartCourse::sa&&
        nativeTaIssuance_->course!=OriginalCameraStartCourse::ma&&
-       nativeTaIssuance_->course!=OriginalCameraStartCourse::ga)||
+       nativeTaIssuance_->course!=OriginalCameraStartCourse::ga&&
+       nativeTaIssuance_->course!=OriginalCameraStartCourse::sc)||
        !actual_.actualRadarMapB8||!source_grid50IG::prepare(*actual_.actualRadarMapB8,0,grid))return taReject(0x2a2880);
     OriginalTaCutVector4Candidate point,look;
     for(unsigned i=0;i<4;++i){std::memcpy(&point[i],&grid.position[i],4);std::memcpy(&look[i],&grid.heading[i],4);}

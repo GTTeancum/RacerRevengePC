@@ -18,7 +18,7 @@ inline bool prepareOriginalTaIntroPcm50LA(
     }
     try{
         std::vector<assets::AudioRequest50HC> requests;requests.reserve(authoring->eventCount());
-        if(!authoring->eventCount()||authoring->eventCount()>3||(authoring->trackId()!="TA"&&authoring->trackId()!="RA"&&authoring->trackId()!="GC"&&authoring->trackId()!="SA"&&authoring->trackId()!="MA"&&authoring->trackId()!="GA"&&authoring->trackId()!="MB")){error="Original race intro event count is outside authenticated race catalog";return false;}
+        if(!authoring->eventCount()||authoring->eventCount()>3||(authoring->trackId()!="TA"&&authoring->trackId()!="RA"&&authoring->trackId()!="GC"&&authoring->trackId()!="SA"&&authoring->trackId()!="MA"&&authoring->trackId()!="GA"&&authoring->trackId()!="MB"&&authoring->trackId()!="SC")){error="Original race intro event count is outside authenticated race catalog";return false;}
         for(unsigned id=1;id<=authoring->eventCount();++id){const auto* event=authoring->event(id);
             if(!event||event->eventId!=id||
                event->factoryFlags!=2||!event->isStream||event->isStereo||event->isLoop||

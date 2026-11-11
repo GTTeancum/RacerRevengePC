@@ -18,6 +18,7 @@ namespace original_main_entry50KG { struct Application; }
 namespace ra_crowd_image50LA { class Verifier; }
 namespace ra_tga_source50LA { class Verifier; }
 namespace ra_cold_aggregate50LA { class Owner; }
+namespace native_course_archive_release50PD { struct Holder; }
 namespace rr::platform { class OriginalLoadingLsiConfig50LA; class OriginalUiCourseManagerConfig50KG; class OriginalUiGarageSession50KG; class OriginalUiGarageActors50GN; class OriginalUiGarageWattoOwner50KG; }
 namespace rr::game { class OriginalRacerModelSceneOwner50LA; class OriginalLoadingScreen40Mode0LA; class OriginalRacerAnimationCold50LA; class OriginalTimeStats50LA; class OriginalSpeedBoost50LA; class OriginalDamage50LA; class OriginalPositionStatsHud50LA; class OriginalPauseStorage50LA; class OriginalRaceF850LA; class OriginalResults10450LA; }
 namespace rr::assets {
@@ -254,6 +255,7 @@ public:
     void clearGeometry1327D0(const OriginalStandardModelGeometry50LA*) noexcept;
 private:
     friend class ::ra_cold_aggregate50LA::Owner;
+    friend struct ::native_course_archive_release50PD::Holder;
     // Native scoped1316A0 mapping: exact producer-issued RA banks only,
     // after real borrowers retire. Preserves process/serial UI mount backing.
     bool retireNativeRaceMounts1316A0(NativeRaceMountLease50LA&,

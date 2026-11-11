@@ -10,6 +10,7 @@
 #include "../../src/assets/world_normals50hk.h"
 #include <algorithm>
 #include <charconv>
+#include <functional>
 #include <iterator>
 #include <limits>
 #include <map>

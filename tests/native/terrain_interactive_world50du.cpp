@@ -271,11 +271,13 @@ SessionExit50DU Context::run() {
  original_consumed_sa_stage50DU::Owner consumedSaStage(originalMainApplication,*liveAudio);
  original_consumed_ma_stage50DU::Owner consumedMaStage(originalMainApplication,*liveAudio);
  original_consumed_mb_stage50DU::Owner consumedMbStage(originalMainApplication,*liveAudio);
+ original_consumed_sc_stage50DU::Owner consumedScStage(originalMainApplication,*liveAudio);
  std::shared_ptr<ta_original_world50LE::Owner> taOriginalWorld;
  std::shared_ptr<gc_original_world50LM::Owner> gcOriginalWorld;
  std::shared_ptr<ga_original_world50LH::Owner> gaOriginalWorld;
  std::shared_ptr<sa_original_world50LM::Owner> saOriginalWorld;
  std::shared_ptr<ma_original_world50LM::Owner> maOriginalWorld;
+ std::shared_ptr<sc_original_world50LM::Owner> scOriginalWorld;
  original_pause_cold50LA::Owner sourcePause;
  original_pause_observation50LA::Owner sourcePauseObservation;
  std::shared_ptr<const ra_cold_sources50LA::DecodedSources> sourcePauseTrack;
@@ -837,6 +839,30 @@ SessionExit50DU Context::run() {
       *sourceModelRenderGlobals,mbOriginalWorld,d,pc);
   if(!ready)std::cerr<<"consumed_mb_prefix_rejected source_pc="<<pc<<" material_pc="<<d.sourcePC<<'\n';
   require50DU(ready,"actual consumed MB race/world constructor prefix rejected");
+ }
+
+ // SC: the same one race class (1A65C0) and counted course world (1A6BC0).
+ // The SC visual world is decoded here (it used to be decoded later in the
+ // continuation), before counted audio, as every consumed course's is.
+ if(scOriginalDisc){
+  scOriginalWorld=std::make_shared<sc_original_world50LM::Owner>();
+  sc_original_world50LM::Diagnostic diagnostic;
+  const bool loaded=scOriginalWorld->load(runtime_startup50fl::readBytes(trackSession->archive),actualWorld,diagnostic);
+  require50DU(loaded,diagnostic.message.empty()?"SC original static world rejected":diagnostic.message.c_str());
+  require50DU(scOriginalWorld->mesh(),"SC original mesh publication missing");
+  if(consumedLaunch&&originalCameraEnabled&&humanCourseEnabled&&dynamicProfile.game34==2&&nativeOrdinaryLaunch11258==1){
+   openNativeVideo();originalMainApplication.appStart(originalMainApplication.assetRoot);
+   originalMainApplication.enterGameplayMaterialDirectory17D7A0();
+   const auto context=nativeVideo->standardMaterialConstructionContext(nativeVideo,originalMainApplication);
+   const auto domain=originalMainApplication.standardMaterialDomain();
+   require50DU(context&&domain&&domain->prepared(),"SC counted race material context unavailable");
+   if(!sourceModelRenderGlobals)sourceModelRenderGlobals=std::make_unique<OriginalRacerModelRenderGlobals50LA>(nativeOrdinaryLaunch11258);
+   rr::assets::OriginalStandardMaterialDiagnostic50LA d;std::uint32_t pc=0;
+   const bool ready=consumedScStage.begin(*consumedLaunch,sessionIndex+1,playerRacer60,
+       *sourceModelRenderGlobals,scOriginalWorld,d,pc);
+   if(!ready)std::cerr<<"consumed_sc_prefix_rejected source_pc="<<pc<<" material_pc="<<d.sourcePC<<'\n';
+   require50DU(ready,"actual consumed SC race/world constructor prefix rejected");
+  }
  }
 
  // Preserve the one actual SA static owner across source prefix and rendering.
@@ -1538,6 +1564,7 @@ SessionExit50DU Context::run() {
   .consumedGcStage=consumedGcStage,
   .consumedMaStage=consumedMaStage,
   .consumedMbStage=consumedMbStage,
+  .consumedScStage=consumedScStage,
   .consumedRaStage=consumedRaStage,
   .consumedSaStage=consumedSaStage,
   .consumedTaStage=consumedTaStage,
@@ -1651,6 +1678,7 @@ SessionExit50DU Context::run() {
   .m=m,
   .maOriginalDisc=maOriginalDisc,
   .maOriginalWorld=maOriginalWorld,
+  .scOriginalWorld=scOriginalWorld,
   .maTriggerActions=maTriggerActions,
   .maTriggerAuthoring=maTriggerAuthoring,
   .maTriggerCandidateFirst=maTriggerCandidateFirst,

@@ -52,7 +52,7 @@ inline bool RaceAudioGroups50IC::prepareColdTaIntroConstruction(
     const std::shared_ptr<const assets::OriginalTaIntroAuthoringCandidate>& authoring,
     std::shared_ptr<const OriginalApplicationAural50KG>& manager)const noexcept {
     if(!current()||!groups_.initialized||!coldTaIntroGroupIdentity()||
-       coldNext_!=game::raceAudioGroupCount50IC||!authoring||!authoring->eventCount()||authoring->eventCount()>3||(authoring->trackId()!="TA"&&authoring->trackId()!="RA"&&authoring->trackId()!="GC"&&authoring->trackId()!="SA"&&authoring->trackId()!="MA"&&authoring->trackId()!="GA"&&authoring->trackId()!="MB")||
+       coldNext_!=game::raceAudioGroupCount50IC||!authoring||!authoring->eventCount()||authoring->eventCount()>3||(authoring->trackId()!="TA"&&authoring->trackId()!="RA"&&authoring->trackId()!="GC"&&authoring->trackId()!="SA"&&authoring->trackId()!="MA"&&authoring->trackId()!="GA"&&authoring->trackId()!="MB"&&authoring->trackId()!="SC")||
        !authoring->providerOwner()||!authoring->metadataOwner()||
        !authoring->providerOwner()->sealed()||
        authoring->providerOwner()->revision()!=authoring->capturedProviderRevision())return false;
