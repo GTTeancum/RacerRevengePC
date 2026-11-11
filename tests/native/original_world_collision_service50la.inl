@@ -14,7 +14,12 @@ bool Owner::beginNativeCollisionPrefix2743B0(ra_static_model_cold50LA::Owner& mo
        candidates.source_!=worldCollisionObjects3CC_->source_||
        worldCollisionResources_->candidates_.get()!=&candidates||
        !worldCollisionResources_->resolver_||!candidates.prepared_||
-       candidates.candidates_.size()<178u||candidates.bindings_.size()<178u)return false;
+       candidates.candidates_.size()<178u||candidates.bindings_.size()<178u){
+        std::fprintf(stderr,"ra_collision_prefix_rejected step=owners app=%d objects=%d resources=%d queries=%d models=%d candidates=%d\n",
+            worldApplication_?1:0,(worldCollisionObjects3CC_&&!worldCollisionObjects3CC_->sourceMode_)?1:0,
+            worldCollisionResources_?1:0,(runtimeQueries_&&runtimeQueries_->actual_&&runtimeQueries_->actual_->recovery&&runtimeQueries_->storage_.get())?1:0,
+            models.canClose()?1:0,(candidates.prepared_&&candidates.candidates_.size()>=178u)?1:0);
+        return false;}
     auto& bridge=*runtimeQueries_;auto& storage=*bridge.storage_.get();
     const auto& actual=*bridge.actual_;
     g::OriginalRaceFogFields* fog=nullptr;
@@ -25,7 +30,15 @@ bool Owner::beginNativeCollisionPrefix2743B0(ra_static_model_cold50LA::Owner& mo
        actual.main.collisionTypeTag!=candidates.names_.collisionTypeTag||
        &storage.globalValid3E0730!=&worldApplication_->collisionGlobalValid3E0730_||
        !worldApplication_->observeCollisionDirectory36B0F0().empty()||
-       worldApplication_->attachmentLock423F58())return false;
+       worldApplication_->attachmentLock423F58()){
+        std::fprintf(stderr,"ra_collision_prefix_rejected step=state fog=%d recovery=%d prepared=%d category=%d tag=%d global=%d directory_empty=%d lock=%d\n",
+            bridge.readNativeColdFog273C30(*worldApplication_,*candidates.source_,worldEntity_.sessionGeneration,fog)?1:0,
+            actual.recovery==bridge.inputs_.recovery?1:0,actual.recovery->storagePrepared?1:0,
+            actual.recovery->globals.movementCategory3E0720==actual.main.materialMask?1:0,
+            actual.main.collisionTypeTag==candidates.names_.collisionTypeTag?1:0,
+            &storage.globalValid3E0730==&worldApplication_->collisionGlobalValid3E0730_?1:0,
+            worldApplication_->observeCollisionDirectory36B0F0().empty()?1:0,worldApplication_->attachmentLock423F58()?1:0);
+        return false;}
     auto& objects=*worldCollisionObjects3CC_;
     const auto* data=objects.source_->sourcesDecoded();
     if(!data||data->collisions.size()!=178u||data->world.instances.size()!=1261u||

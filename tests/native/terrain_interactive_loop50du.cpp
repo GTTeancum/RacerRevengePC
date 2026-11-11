@@ -1,4 +1,5 @@
 // The original active host loop, separated without changing its lifetime owners.
+#include "native_last_failure50pd.h"
 #include "native_wreck_debris_sim50pd.h"
 #include "native_wreck_debris_gpu50pd.h"
 #include "native_common_results50pd.h"
@@ -45,7 +46,7 @@ double hitchMs50DU(FrameHitch50DU::Clock::time_point a, FrameHitch50DU::Clock::t
     return std::chrono::duration<double, std::milli>(b - a).count();
 }
 void require50DU(bool ok, const char* message) {
-    if (!ok) throw std::runtime_error(message);
+    if(!ok){native_last_failure50PD::record(message);std::cerr<<"require_failed "<<(message?message:"")<<std::endl;throw std::runtime_error(message);}
 }
 void addCounter50DU(std::uint64_t& counter, std::uint64_t amount = 1) noexcept {
     const auto room = std::numeric_limits<std::uint64_t>::max() - counter;

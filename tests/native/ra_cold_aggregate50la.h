@@ -3980,9 +3980,9 @@ public:
             auto view=std::unique_ptr<NativeRuntimeView>(new NativeRuntimeView{
                 *source_->sourcesDecoded(),*candidates_->staticBindings(),*runtimeQueries_->storage_.get(),
                 candidates_->candidates_,*lighting_});
-            ++runtimeWorldBorrows_;
+            ++runtimeWorldBorrows_;++runtimeViewBorrows_;
             return std::shared_ptr<NativeRuntimeView>(view.release(),[self](NativeRuntimeView* value)noexcept{
-                delete value;--self->runtimeWorldBorrows_;
+                delete value;--self->runtimeViewBorrows_;--self->runtimeWorldBorrows_;
             });
         }catch(...){d.failure="RA native runtime borrow allocation failed";return {};}
     }

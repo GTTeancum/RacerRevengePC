@@ -1,4 +1,5 @@
 // Authentic RA decode/authoring/query-storage prefix, original owners retained.
+#include "native_last_failure50pd.h"
 #include "ra_application_cold50la.h"
 #include "original_ui_main_entry50kg.h"
 #include "ra_cold_roster_operation50la.h"
@@ -18,7 +19,7 @@ namespace interactive_ra_cold50DU {
 using namespace rr::game;
 namespace {
 void require50DU(bool ok, const char* message) {
-    if(!ok){std::cerr<<"require_failed "<<(message?message:"")<<std::endl;throw std::runtime_error(message);}
+    if(!ok){native_last_failure50PD::record(message);std::cerr<<"require_failed "<<(message?message:"")<<std::endl;throw std::runtime_error(message);}
 }
 }
 void Context::run() const {

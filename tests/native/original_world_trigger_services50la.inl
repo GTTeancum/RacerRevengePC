@@ -52,7 +52,7 @@ bool Owner::continueNativeTriggerServices274E90(const original_main_entry50KG::A
        !nativeParticleList3D8_||nativeParticleList3D8_->sourceMode||!nativeParticleList3D8_->serviceComplete||
        nativeParticleList3D8_->serviceTerminal||!nativeSceneInfo270900Current(app,pc)||
        !world_||!world_->modelPrefixes_||!world_->domain_||!world_->imagePublication_||
-       !runtimeQueries_||runtimeCameraBorrows_||runtimeWorldBorrows_||!worldApplication_||
+       !runtimeQueries_||!nativeTrackLoadBorrowsAdmitted()||!worldApplication_||
        worldApplication_->attachmentLock423F58())return false;
     const auto display=runtimeQueries_->nativeColdModelDisplay274160(*worldApplication_,*source_,worldEntity_.sessionGeneration);
     std::array<std::int32_t,4> rectangle{};std::uint64_t revision=0;

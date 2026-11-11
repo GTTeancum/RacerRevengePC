@@ -1,4 +1,5 @@
 // Original publication scope and its local owners; no root-only hooks/readers.
+#include "native_last_failure50pd.h"
 #include "native_wreck_debris_gpu50pd.h"
 #include "../../platform/linux/native/loading_progress_step113a.h"
 #include "native_wreck_debris_sim50pd.h"
@@ -55,7 +56,7 @@ using interactive_loop50DU::GameplayDisplayWallTotals50DU;
 using J=nlohmann::json;
 namespace {
 void require50DU(bool ok,const char* message) {
-    if(!ok){std::cerr<<"require_failed "<<(message?message:"")<<std::endl;throw std::runtime_error(message);}
+    if(!ok){native_last_failure50PD::record(message);std::cerr<<"require_failed "<<(message?message:"")<<std::endl;throw std::runtime_error(message);}
 }
 template<class Operation>
 decltype(auto) coldRacerStage50DU(const std::string& podId,const char* stage,
@@ -2191,6 +2192,12 @@ void Context::run() {
      std::cerr<<"native_human_results_root_rejected pc="<<rootDiagnostic.sourcePC
          <<" operation="<<(rootDiagnostic.operation?rootDiagnostic.operation:"owner")<<'\n';
      require50DU(false,"actual accepted-world human Results root publication rejected");
+    }
+    // RA's Results/replay/acknowledgement then run on the one common race-end
+    // path (the original has one race class; 1A7DD0..1AB520 read no track id).
+    if(humanCourseEnabled&&!allAiEnabled){
+     native_common_results50PD::state().rootPublished=true;bindResultsFeedbackCall();
+     std::cerr<<"common_race_results_root published=1 course=ra\n";
     }
    }
    // The common race (TA/GA/SA/MA/GC): the same root after its own race

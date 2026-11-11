@@ -32,7 +32,6 @@ bool Application::loadPauseResultsBeforeCollectorImpl50LA(
         diagnostic.status=status;diagnostic.sourcePC=pc;diagnostic.operation=why;return false;
     };
     std::uint32_t allocationPC=0x1A8AE8u;
-    const bool commonRace=!operation; // no RA roster Operation: the common race
     try {
         if(sourceRace28COwner_.get()!=&race||race.application_!=entitiesOwner_||
            race.profile_!=riderProfile||!race.anyWorld()||race.results104_||!videoOwner_||
@@ -114,8 +113,9 @@ bool Application::loadPauseResultsBeforeCollectorImpl50LA(
                 return fail(Status::phase,0x1AAF54u,"F8 actual cold Race child attachment rejected");
         }
         // The race's SimpleVCR (race78, 1A6DF4) is part of every race's load;
-        // the end dispatch 1AB520 reads it. The common race produces it here.
-        if(commonRace){
+        // the end dispatch 1AB520 reads it. Every race produces it here (RA
+        // included: 1A6DF4 reads no track id).
+        {
             rr::game::OriginalSimpleVCRDiagnostic50LA vcr;
             if(!race.constructVcr78At1A6DF4(vcr))
                 return fail(Status::source,vcr.sourcePC,vcr.operation?vcr.operation:"Race78 SimpleVCR load rejected");

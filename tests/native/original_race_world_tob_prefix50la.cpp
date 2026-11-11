@@ -1964,7 +1964,7 @@ bool Owner::continueNativeFog273C30(const original_main_entry50KG::Application& 
     if(nativeScbThread_!=std::this_thread::get_id()||nativeScbRevoked_||!source_||
        !nativeSceneInfo270900Current(app,pc)||nativeDirectionalColorNext_!=10u||
        nativeRemainderNext_!=168u||!runtimeQueries_||!worldApplication_||
-       runtimeCameraBorrows_||runtimeWorldBorrows_){
+       !nativeTrackLoadBorrowsAdmitted()){
         std::fprintf(stderr,"ra_fog_entry directional=%u remainder=%zu/%zu queries=%d app=%d camera_borrows=%zu world_borrows=%zu",
             unsigned(nativeDirectionalColorNext_),std::size_t(nativeRemainderNext_),nativeRemainder_.size(),runtimeQueries_?1:0,
             worldApplication_?1:0,std::size_t(runtimeCameraBorrows_),std::size_t(runtimeWorldBorrows_));
@@ -2020,7 +2020,7 @@ bool Owner::continueNativeParticleManager1B4DC0(const original_main_entry50KG::A
        !nativeFogLoadComplete_||!nativeSceneInfo270900Current(app,pc)||!runtimeQueries_||
        !runtimeQueries_->camera_||runtimeQueries_->camera_->particles!=trackParticles_||
        runtimeQueries_->camera_->generation!=trackParticleGeneration_||
-       runtimeCameraBorrows_||runtimeWorldBorrows_||!particles_||particles_->source_!=source_||
+       !nativeTrackLoadBorrowsAdmitted()||!particles_||particles_->source_!=source_||
        trackParticleHostApplication_!=&app||trackParticleApplication_!=worldApplication_||
        trackParticleGeneration_!=worldEntity_.sessionGeneration||!trackParticleDomain_||
        trackParticleDomain_!=app.standardMaterialDomain()||!world_||world_->domain_!=trackParticleDomain_||
@@ -2045,7 +2045,7 @@ bool Owner::continueNativeInstances1AA194(const original_main_entry50KG::Applica
         if(nativeScbThread_!=std::this_thread::get_id()||nativeScbRevoked_||!source_||
            !nativeParticleManagerComplete_||nativeParticleManager4A0_!=trackParticles_.get()||
            !nativeSceneInfo270900Current(app,pc)||!app.state||!runtimeQueries_||
-           runtimeCameraBorrows_||runtimeWorldBorrows_)return fbad(19);
+           !nativeTrackLoadBorrowsAdmitted())return fbad(19);
         g::OriginalRaceFogFields* fog=nullptr;
         if(!runtimeQueries_->readNativeColdFog273C30(*worldApplication_,*source_,
             worldEntity_.sessionGeneration,fog)||!nativeFogCustodyCurrent(fog))return fbad(20);
@@ -3581,7 +3581,7 @@ bool Owner::continueNativeStandardModels274160(const original_main_entry50KG::Ap
            !nativeSceneInfo270900Current(app,pc)||!world_||world_->closed_||world_->source_!=source_||
            !world_->rendererPublication_||!world_->imagePublication_||!world_->modelPrefixes_||
            !world_->domain_||!world_->context_||!world_->context_->live()||
-           runtimeCameraBorrows_||runtimeWorldBorrows_||!runtimeQueries_)return false;
+           !nativeTrackLoadBorrowsAdmitted()||!runtimeQueries_)return false;
         g::OriginalRaceFogFields* fog=nullptr;
         if(!runtimeQueries_->readNativeColdFog273C30(*worldApplication_,*source_,
             worldEntity_.sessionGeneration,fog)||!nativeFogCustodyCurrent(fog))return false;

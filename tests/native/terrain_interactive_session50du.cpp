@@ -1,4 +1,5 @@
 // Initial fixture/corpus/audio prefix only; world owners live in the next stage.
+#include "native_last_failure50pd.h"
 #include "terrain_interactive_session50du.h"
 #include "terrain_interactive_world50du.h"
 #include "terrain_interactive_loop_types50du.h"
@@ -62,7 +63,7 @@ using interactive_loop50DU::RacerContactTotals50HV;
 using interactive_loop50DU::RacePresentation50HZ;
 namespace {
 void require50DU(bool ok, const char* message) {
-    if(!ok){std::cerr<<"require_failed "<<(message?message:"")<<std::endl;throw std::runtime_error(message);}
+    if(!ok){native_last_failure50PD::record(message);std::cerr<<"require_failed "<<(message?message:"")<<std::endl;throw std::runtime_error(message);}
 }
 // Cold startup only: add resource identity/stage without changing successful
 // operations. Keep the original exception nested and its detail in what().

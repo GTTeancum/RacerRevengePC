@@ -174,7 +174,7 @@ void OriginalRaceConstructor50LA::continueEndEntryPrefix1A7DD0(
         }
         endEntryStep_=EndEntryStep::dispatch;
     }
-    if(endDispatchReturned_&&!world74_){
+    if(endDispatchReturned_){ //Every race (RA included) re-enters 1A7DD0..1AB520 each update.
         // Common race: every race update re-enters 1A7DD0..1AB520, whose
         // 1AB5B0 reads Results+20C. Zero (bit5 already set) returns at
         // 1AB924; nonzero takes the acknowledgement branch 1AB5BC. The race
@@ -190,9 +190,6 @@ void OriginalRaceConstructor50LA::continueEndEntryPrefix1A7DD0(
             derived->acknowledgement20C?"Common race: Results acknowledged (1AB5BC)":"Common race: Results replay running");
         d.acknowledgement20CRead=true;d.observedAcknowledgement20C=derived->acknowledgement20C;return;
     }
-    if(endDispatchReturned_){
-        reached();continueEndCaller1A7E40(d);return;
-    }
     //Actual Race vtable+78 is1AB520. Its supported pre-ack prefix is private and
     //uncalled from the live loop; this is not genuine end admission.
     if(!results104_||current.subtype!=1u){
@@ -202,10 +199,7 @@ void OriginalRaceConstructor50LA::continueEndEntryPrefix1A7DD0(
     const auto scope=endHud_.lock();
     if(!scope){stop(S::owner,0x1a7e34,"Actual end-prefix lifetime was revoked; prior effects retained");return;}
     scope->continuePreAck1AB520(*this,d);
-    if(endDispatchReturned_&&!world74_)return; //Common race: d already says callerReturned.
-    if(endDispatchReturned_){
-        reached();continueEndCaller1A7E40(d);
-    }
+    if(endDispatchReturned_)return; //d already says callerReturned (replay started).
 }
 
 void OriginalRaceConstructor50LA::continueEndCaller1A7E40(

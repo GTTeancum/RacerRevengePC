@@ -48,8 +48,13 @@ class Owner final {
         if(attempted_||!candidates||!candidates->prepared_||!resolver||!resolver->prepared())return false;
         attempted_=true;candidates_=std::move(candidates);resolver_=std::move(resolver);
         const auto& source=*candidates_->source_->sourcesDecoded();
-        if(source.collisions.size()!=178||candidates_->radii_.size()!=candidates_->candidates_.size()||
-           candidates_->candidates_.size()<178||candidates_->bindings_.size()<178)return false;
+        if(source.collisions.size()!=178||candidates_->radii_.size()!=178u||
+           candidates_->candidates_.size()<178||candidates_->bindings_.size()!=candidates_->candidates_.size())return false;
+        // Rows past the 178 static collisions are the race's later-appended
+        // trigger candidates (no static radii, no COL member): admitted only
+        // as genuine trigger bindings, never as collision resources.
+        for(std::size_t i=178;i<candidates_->candidates_.size();++i)
+            if(!candidates_->bindings_[i].trigger||candidates_->bindings_[i].candidate!=&candidates_->candidates_[i])return false;
         try {
             rows_.resize(178);
             for(std::size_t i=0;i<178;++i){const auto& original=source.collisions[i];

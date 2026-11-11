@@ -1,5 +1,6 @@
 // Replacement root prefix ONLY; nativeApplicationMain50DU/main body remains unchanged
 // except appending the three original services to the single runSession50DU call.
+#include "native_last_failure50pd.h"
 #include "runtime_allocations50fl.h"
 #include "../../src/game/ps2_float_mode50la.h"
 #include "terrain_interactive_session50du.h"
@@ -45,7 +46,7 @@ namespace recovery50FI=checkpoint_recovery50fi_fixture;
 
 namespace {
 void require50DU(bool ok, const char* message) {
-    if (!ok) throw std::runtime_error(message);
+    if(!ok){native_last_failure50PD::record(message);std::cerr<<"require_failed "<<(message?message:"")<<std::endl;throw std::runtime_error(message);}
 }
 std::uint64_t monotonicNow50DU() noexcept {
     using Clock = std::chrono::steady_clock;
@@ -384,7 +385,7 @@ int nativeApplicationMain50DU(int argc,char**argv){try{
    // Do not let the strict source-owner destructor hide the first failure,
    // and never release live backing merely to make exception unwinding pass.
    try{std::rethrow_exception(originalFailure);}
-   catch(const std::exception& e){std::cerr<<"interactive drive original failure: "<<e.what()<<'\n';}
+   catch(const std::exception& e){native_last_failure50PD::record(e.what());std::cerr<<"interactive drive original failure: "<<e.what()<<'\n';}
    catch(...){std::cerr<<"interactive drive original failure: non-standard exception\n";}
    std::cerr<<"terminal frontend source retirement unresolved: "<<terminalError
        <<"; retaining actual owners by terminating\n";

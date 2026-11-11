@@ -37,7 +37,8 @@ def main():
     parser.add_argument('--sdl', type=Path, required=True)
     parser.add_argument('--route', choices=['main-dud04-course-ga', 'main-ben02-course-ga',
                         'main-alder10-course-ma', 'main-ody11-course-ma',
-                        'main-rider-course-ta', 'main-tournament-course-ta', 'none'], default='main-dud04-course-ga')
+                        'main-rider-course-ta', 'main-tournament-course-ta',
+                        'main-mawhonic09-course-ra', 'none'], default='main-dud04-course-ga')
     parser.add_argument('--logs-only', action='store_true', default=True, help='Record stage and timing receipts without pixel readback or image files')
     parser.add_argument('--seconds', type=int, default=180)
     parser.add_argument('--profile-performance', action='store_true',
@@ -179,6 +180,11 @@ def main():
         env['RR_TEST_RACE_FULL_BUDGET'] = '1'
     if args.all_ai:
         env['RR_ORIGINAL_AI_ALL_RACERS'] = '1'
+    if args.route == 'main-mawhonic09-course-ra':
+        # Normal-mode (mode 0) RA route: its explicit Mawhonic/Ryloth test
+        # profile requires all eight original AI racers (see Run-Ryloth-FPS.cmd).
+        env.update(RR_ORIGINAL_TEST_PROFILE='mawhonic-ryloth', RR_ORIGINAL_AI_ALL_RACERS='1',
+                   RR_ORIGINAL_RIDER_PREVIEWS='3,7,9,23,24')
     if args.route == 'none':
         env.pop('RR_UNATTENDED_UI_ROUTE', None)
         env['RR_TRACK'] = args.track
@@ -243,7 +249,8 @@ def main():
                           lifecycle[0][1:] == lifecycle[1][1:] and
                           live_ids == {lifecycle[0][1]} and
                           all(row[0] == lifecycle[0][1] and tuple(row[1:]) in owners for row in retained)))
-        track = 'GA' if args.route.endswith('-ga') else 'MA' if args.route.endswith('-ma') else 'TA'
+        track = ('GA' if args.route.endswith('-ga') else 'MA' if args.route.endswith('-ma') else
+                 'RA' if args.route.endswith('-ra') else 'TA')
         loading_sessions = [(1, 'UI'), (2, track)] + ([(3, track)] if args.restart_once else [])
         loading_files = [capture / f'loading-session-{session}' / f'loading-{code}-{frame}.ppm'
                          for session, code in loading_sessions for frame in (1, 2)]

@@ -193,7 +193,10 @@ bool Owner::nativeSceneRoles270900Current(const ra_cold_sources50LA::Owner& sour
     //Before its producer, null3D4 is unproduced, not source-null knowledge.
     if((worldPhysics3D4_&&(!livePhysicsIndexComplete_||
           !worldPhysics3D4_->currentForSource(source)))||
-       worldCollisionObjects3CC_||worldCollisionResources_||
+       //3CC is admitted only as the native slot8C (1B4EC0) pair built in
+       //continueNativeSceneInfo270900: non-source objects WITH their resources.
+       (worldCollisionObjects3CC_&&(worldCollisionObjects3CC_->sourceMode_||!worldCollisionResources_))||
+       (!worldCollisionObjects3CC_&&worldCollisionResources_)||
        !runtimeQueries_->queriesConstructed_||!runtimeQueries_->actual_||!runtimeQueries_->follow_||
        !runtimeQueries_->cameraBankCurrent())return false;
     //27B834 defaults StaticType to Standard. The source27C110 PhysicsObject
@@ -349,6 +352,61 @@ bool Owner::continueNativeSceneInfo270900(const original_main_entry50KG::Applica
     //adoption binds existing counted parents before downstream readers; it
     //does not certify prior270FD0 or full2710F0 callback execution.
     if(!publishNativeModelParents2710F0(pc))return false;
+    //270D14 slot8C: most-derived RA vtable3CF110 holds 1B4EC0 (base3D2BB8
+    //holds271230): World+3CC collision objects, one 27BB40 group per zone.
+    //Then the native resolver rows for the same 178 COL members, which the
+    //1AA244/2743B0 +128 collision service loads.
+    if(!worldCollisionObjects3CC_){
+        nativeSlot8CActive_=true;
+        const bool objects=ra_pod_scene50LA::Owner::prepareWorldCollisionObjects271230(source_,pc);
+        rr::assets::OriginalStandardTextureDiagnostic50LA resources;
+        const auto domain=app.standardMaterialDomain();
+        const bool prepared=objects&&domain&&domain->prepared()&&candidates_&&
+            ra_pod_scene50LA::Owner::prepareWorldCollisionResources(candidates_,domain->resolver3E1A70(),resources);
+        nativeSlot8CActive_=false;
+        if(!prepared){
+            std::fprintf(stderr,"ra_collision_objects_1b4ec0_rejected objects=%d pc=%x texture_status=%u texture_pc=%x",
+                objects?1:0,unsigned(pc),unsigned(resources.status),unsigned(resources.sourcePC));
+            std::fputc(10,stderr);
+            if(objects&&worldCollisionObjects3CC_){
+                const auto* src=worldCollisionObjects3CC_->source_?worldCollisionObjects3CC_->source_->sourcesDecoded():nullptr;
+                std::size_t wrappers=0,typed=0,collision04=0,descriptors=0,decoded=0,orderOk=0,zoneOk=0;
+                for(const auto& zone:worldCollisionObjects3CC_->zones_)for(const auto& w:zone.entries34){
+                    ++wrappers;if(w.type00==1)++typed;if(w.collision04)++collision04;if(w.descriptor08)++descriptors;
+                    if(w.decodedCollision){if(src&&decoded<src->collisions.size()&&w.decodedCollision==&src->collisions[decoded])++orderOk;
+                        if(w.descriptor08&&w.decodedCollision->zone==w.descriptor08->source->zone&&
+                           w.decodedCollision->ordinal==w.descriptor08->source->ordinal)++zoneOk;++decoded;}
+                }
+                std::fprintf(stderr,"ra_3cc wrappers=%zu type1=%zu collision04=%zu descriptors=%zu decoded=%zu order_ok=%zu zone_ok=%zu source_collisions=%zu same_source=%d cand_prepared=%d resolver_prepared=%d",
+                    wrappers,typed,collision04,descriptors,decoded,orderOk,zoneOk,src?src->collisions.size():0,
+                    candidates_&&candidates_->decodedSource()==src?1:0,candidates_&&candidates_->prepared_?1:0,
+                    domain&&domain->resolver3E1A70()&&domain->resolver3E1A70()->prepared()?1:0);
+                std::fputc(10,stderr);
+                std::fprintf(stderr,"ra_3cc_gate resources_owner=%d world_audio=%d world_cold=%d radii=%zu candidates=%zu bindings=%zu",
+                    worldCollisionResources_?1:0,worldAudio_?1:0,worldColdConstructed_?1:0,
+                    candidates_->radii_.size(),candidates_->candidates_.size(),candidates_->bindings_.size());
+                std::fputc(10,stderr);
+                if(src&&candidates_->candidates_.size()>=178&&candidates_->bindings_.size()>=178&&candidates_->radii_.size()>=178){
+                    std::size_t bad=0;int first=-1,why=0;
+                    for(std::size_t i=0;i<178;++i){const auto& original=src->collisions[i];
+                        const auto& candidate=candidates_->candidates_[i];const auto& radius=candidates_->radii_[i];
+                        const auto& binding=candidates_->bindings_[i];int r=0;
+                        if(binding.originalOwner!=i)r=1;else if(binding.candidate!=&candidate)r=2;
+                        else if(binding.animated||binding.trigger)r=3;
+                        else if(candidate.candidate.collision.geometry.mesh!=&original.mesh)r=4;
+                        else if(candidate.nodeRadii!=radius.values.data()||candidate.nodeRadiusCount!=radius.values.size())r=5;
+                        else if(radius.values.size()!=original.mesh.nodes.size())r=6;
+                        else if(original.mesh.reverse_mode)r=7;
+                        if(r){++bad;if(first<0){first=int(i);why=r;}}
+                    }
+                    std::fprintf(stderr,"ra_3cc_rows bad=%zu first=%d reason=%d",bad,first,why);
+                }
+                std::fputc(10,stderr);
+            }
+            return false;
+        }
+        pc=0x270d1c;
+    }
     pc=0x270e9c;
     const auto* environment=uniqueBlock(doc,"environment");bool unique=true;
     if(!environment||uniqueField(*environment,"ambientcolorflashminidletime",unique)||!unique)return false;

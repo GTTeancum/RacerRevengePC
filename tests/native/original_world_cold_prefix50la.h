@@ -43,7 +43,7 @@ inline bool Owner::prepareWorldCollisionObjects271230(
     std::shared_ptr<const ra_cold_sources50LA::Owner> source,std::uint32_t& pc)noexcept {
     pc=0;
     if(!worldColdConstructed_||!worldList500_||!worldPhysics3D4_||worldCollisionObjects3CC_||sourceCollisionObjectsAttempted_||
-       topologyAttempted_||!worldApplication_||worldApplication_->attachmentLock423F58()||
+       (topologyAttempted_&&!nativeSlot8CRoute())||!worldApplication_||worldApplication_->attachmentLock423F58()||
        !worldAudio_||worldAudio_->coldThread_!=std::this_thread::get_id())return fail(pc,0x271230);
     auto& authority=worldApplication_->entityAuthority_;
     if(worldApplication_->objectCount423F60()>std::numeric_limits<std::uint32_t>::max()-10||
@@ -166,7 +166,7 @@ inline bool Owner::releaseWorldCollisionObjects27BB80(std::uint32_t& pc)noexcept
 inline bool Owner::prepareWorldCollisionResources(std::shared_ptr<ra_static_candidates50LA::Owner> candidates,
     std::shared_ptr<rr::assets::OriginalStandardTextureResolver50LA> resolver,
     rr::assets::OriginalStandardTextureDiagnostic50LA& d)noexcept {
-    if(!worldColdConstructed_||!worldCollisionObjects3CC_||worldCollisionObjects3CC_->sourceMode_||worldCollisionResources_||topologyAttempted_||
+    if(!worldColdConstructed_||!worldCollisionObjects3CC_||worldCollisionObjects3CC_->sourceMode_||worldCollisionResources_||(topologyAttempted_&&!nativeSlot8CRoute())||
        !worldAudio_||worldAudio_->coldThread_!=std::this_thread::get_id())return false;
     // Join the actual3CC wrappers to the SAME retained decoded source. Matching
     // filenames/counts from another aggregate cannot authorize these shapes.

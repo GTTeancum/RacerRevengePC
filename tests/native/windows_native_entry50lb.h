@@ -7,6 +7,8 @@
 #define WIN32_LEAN_AND_MEAN
 #endif
 #include <windows.h>
+#include "native_last_failure50pd.h"
+#include <exception>
 #include <io.h>
 #include <fcntl.h>
 #include <cstdint>
@@ -216,11 +218,26 @@ inline void applyVideoSettings(const fs::path& directory) {
         <<" maximized="<<value("RR_VIDEO_MAXIMIZED")<<" window="<<value("RR_VIDEO_WINDOW_SIZE")
         <<" widescreen="<<(value("RR_ORIGINAL_ASPECT")=="1"?0:1)<<" fxaa="<<value("RR_VIDEO_FXAA")<<'\n';
 }
+inline fs::path& terminateLogPath()noexcept{static fs::path path;return path;}
+// A failure that ends in std::terminate (strict retained-owner guards during
+// unwinding) reports its last recorded reason instead of closing silently.
+[[noreturn]] inline void reportTerminate()noexcept {
+    const char* reason=native_last_failure50PD::last();
+    std::fprintf(stderr,"native_terminate last_failure=%s\n",reason?reason:"(none recorded)");
+    sessionMarker("SESSION END exit=terminate");std::fflush(stderr);
+    try {
+        visibleFailure(L"The game stopped while loading or running a race:\n"+
+            (reason?readableError(reason):std::wstring(L"unknown native failure"))+
+            L"\n\nRacerRevenge.log contains the details.",terminateLogPath());
+    }catch(...){}
+    std::abort();
+}
 template<class Entry> int run(Entry entry,int argc,char** argv,bool automatic) {
     fs::path log;bool logging=false;FaultLogLifetime faultLifetime;
     try {
         const auto assets=executableDirectory();log=assets/L"RacerRevenge.log";
         redirectToLog(log);logging=true;sessionMarker("SESSION START");
+        terminateLogPath()=log;std::set_terminate(&reportTerminate);
         std::cerr<<"build_id="<<RR_WINDOWS_BUILD_ID<<" compiled="<<__DATE__<<" "<<__TIME__<<'\n';
         std::cerr<<"native_player_entry="<<(automatic?"doubleclick":"explicit_assets")<<" executable_directory="<<utf8Path(assets)
             <<" window=1280x896 source_canvas=640x448 telemetry=false\n";

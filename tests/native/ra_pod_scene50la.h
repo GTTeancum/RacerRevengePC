@@ -331,6 +331,13 @@ private:
 
     bool prepareWorldCollisionResources(std::shared_ptr<ra_static_candidates50LA::Owner>,
         std::shared_ptr<rr::assets::OriginalStandardTextureResolver50LA>,rr::assets::OriginalStandardTextureDiagnostic50LA&)noexcept;
+    // Set only while the native 1A9EE0 SceneInfo (270900) runs its slot 8C
+    // (RA 1B4EC0: World+3CC collision objects) right after 270CDC. The port
+    // built the 2729E0 topology natively at cold, before this load; 3CC does
+    // not reference that topology, so that earlier construction is admitted
+    // there (and nowhere else).
+    bool nativeSlot8CActive_=false;
+    bool nativeSlot8CRoute()const noexcept{return nativeSlot8CActive_;}
     // Actual transient World3C8 ToyList on the authenticated RA no-Animations
     // branch. No toy records, pointer array, manager or surrogate count owner.
 // Replace NativeEmptyToyList3C8 declaration, retaining its single unique_ptr holder.
@@ -1580,6 +1587,24 @@ std::array<std::uint8_t,10> sourceSaturation44Known{},sourceSaturation48Known{};
     std::size_t constructorRacerWorldBorrows_=0;
     // SAME aggregate-issued leases, also read by scene light retirement.
     std::size_t runtimeCameraBorrows_=0,runtimeWorldBorrows_=0;
+    // Of runtimeWorldBorrows_, the whole-race NativeRuntimeView leases
+    // (source, static bindings, runtime query storage, candidates, lighting).
+    std::size_t runtimeViewBorrows_=0;
+    // Native 1A9EE0 continuation services 273C30 (fog), 1B4DC0 (particle
+    // manager), 1AA194/274080 (instances) and 274160 (standard models) store
+    // only World+3AC/3EC/3F0/3F4/35C/4A0/3DC/3E0/354, the instance-master
+    // global and their own new owners (SLUS_202.68 273C30..273F7C,
+    // 1B4DC0..1B4EB4, 274080..274158, 274160..274248). The later 274370
+    // (particle services: World+354/+3FC), 274E90 (trigger services:
+    // World+4B8 and the trigger list's own observers/children), 274570
+    // (no-water: World+35C/+400) and 274AE0 (sky: World+3F8 and its own
+    // palette owner) are admitted on the same terms. None writes the
+    // NativeRuntimeView's objects, and they run at race load before the
+    // race loop reads it. That view alone is admitted; a camera borrow or any
+    // other world borrow (source lease, racer lease) still refuses.
+    bool nativeTrackLoadBorrowsAdmitted()const noexcept {
+        return !runtimeCameraBorrows_&&runtimeWorldBorrows_==runtimeViewBorrows_;
+    }
     Entity worldEntity_;
     std::shared_ptr<g::OriginalApplicationEntities50LA> worldApplication_;
     // Native collision storage can precede the counted world prefix. Retain

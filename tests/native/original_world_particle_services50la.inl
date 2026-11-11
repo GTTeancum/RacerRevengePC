@@ -10,7 +10,7 @@ bool Owner::continueNativeParticleServices274370(const original_main_entry50KG::
        !nativeCollisionAnimationDirectory1AA2A0_||app.modelDirectory36B860()!="anim\\"||
        !nativeEmptyAnimations2713E0Complete_||nativeEmptyToyList3C8_||
        !nativeSceneInfo270900Current(app,pc)||!worldApplication_||
-       worldApplication_->attachmentLock423F58()||runtimeCameraBorrows_||runtimeWorldBorrows_||
+       worldApplication_->attachmentLock423F58()||!nativeTrackLoadBorrowsAdmitted()||
        !world_||!world_->modelPrefixes_||world_->closed_||world_->source_!=source_||
        !world_->domain_||!world_->context_||!world_->context_->live()||
        !runtimeQueries_||!particles_||particles_->closed_||!particles_->decoded_||

@@ -1,4 +1,5 @@
 // Cold stage bodies retain their original order and borrowed execution arena.
+#include "native_last_failure50pd.h"
 #include "terrain_interactive_cold_owners50du.h"
 #include "original_ui_main_entry50kg.h"
 #include "runtime_startup50fl_fixture.h"
@@ -53,7 +54,7 @@
 namespace interactive_cold50DU {
 namespace {
 void require50DU(bool ok,const char* message) {
-    if(!ok){std::cerr<<"require_failed "<<(message?message:"")<<std::endl;throw std::runtime_error(message);}
+    if(!ok){native_last_failure50PD::record(message);std::cerr<<"require_failed "<<(message?message:"")<<std::endl;throw std::runtime_error(message);}
 }
 template<class Operation>
 decltype(auto) coldRacerStage50DU(const std::string& podId,const char* stage,

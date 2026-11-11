@@ -79,7 +79,8 @@ public:
         const char* lastRejection=nullptr;
     };
     // A course without the RA world join (its race uses the native owners).
-    static bool commonRace(const OriginalRaceConstructor50LA& race)noexcept{return !race.world74_;}
+    // Every consumed race records race78 (RA's world74_ race included).
+    static bool commonRace(const OriginalRaceConstructor50LA&)noexcept{return true;}
     static OriginalSimpleVCR50LA::State vcrState(const OriginalRaceConstructor50LA& race)noexcept{
         return race.vcr78Source_?race.vcr78Source_->state():OriginalSimpleVCR50LA::State{};
     }

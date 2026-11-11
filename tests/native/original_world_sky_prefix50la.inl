@@ -147,7 +147,7 @@ bool Owner::continueNativeSky274AE0(const original_main_entry50KG::Application& 
        !nativeTriggerList3D0_||!nativeTriggerList3D0_->serviceComplete||
        nativeTriggerList3D0_->serviceTerminal||!nativeSceneInfo270900Current(app,pc)||
        !world_||!world_->domain_||!world_->imagePublication_||!runtimeQueries_||
-       runtimeCameraBorrows_||runtimeWorldBorrows_||!worldApplication_||
+       !nativeTrackLoadBorrowsAdmitted()||!worldApplication_||
        worldApplication_->attachmentLock423F58()||!source_||!skyImages_||
        !skyImages_->mesh()||!skyImages_->bank()||!app.riderProfile)return false;
     const auto* profile=app.riderProfile->commonProfile();

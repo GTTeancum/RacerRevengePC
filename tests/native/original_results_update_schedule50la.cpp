@@ -106,7 +106,7 @@ bool Application::updateNativeResultsAfterRace50LA(const original_camera_session
     // Common race: 1AB520 returned with the race78 playback on. The race
     // keeps updating (1A7B40) and the Results update follows every replay
     // frame, as the original Results run over the replay.
-    const bool commonReplay=!race->world74_&&race->endDispatchReturned_&&
+    const bool commonReplay=race->endDispatchReturned_&&
         native_common_results50PD::state().replayActive;
     if(!commonReplay&&(race->endEntryStep_!=Race::EndEntryStep::subtype||race->endEntryProfile_||
        race->endDispatchPublication_||race->endDispatchReturned_))

@@ -458,7 +458,10 @@ void OriginalRaceConstructor50LA::continuePreAck1AB520(
             //1AC8E0 A1, which is zero for THIS1ABAD8 Results call (delay1ABADC).
             // Claim before any16E830 mutation; never replay a reached AI row.
             scan.cut=Cut::racerRestartStopped;scan.stoppedPC=0x1ac998;
-            if(!world74_){
+            // Every race, RA's world74_ race included: the 1AEA70/1AED30 racer
+            // restart is the native replay owner's race78 posing (RA's own
+            // separate native 1AED30 body reset was never joined).
+            {
                 // 1AEA70/1AED30 racer restart, then 1ABAE8..1ABB68: every
                 // racer +3C = 1 with 229F80, VCR bit1 off / bit2 on. The
                 // native replay owner poses the racers from race78 from now.
@@ -474,18 +477,6 @@ void OriginalRaceConstructor50LA::continuePreAck1AB520(
                 endDispatchReturned_=true;
                 stop(S::callerReturned,0x1abe48,"Common race: Results replay started from race78");return;
             }
-            const auto scope=endHud_.lock();
-            if(!endWorldCurrentNative()||!scope||!racerB0_){
-                stop(S::owner,scan.stoppedPC,"Actual same-Race native B0/World/Scope unavailable");return;
-            }
-            if(!scope->restartRacerScalars1AEA70(*this,0u,scan.stoppedPC)){
-                stop(S::incomplete,scan.stoppedPC,
-                    "Actual B0 restart stopped; reached AI scalar resets retained before placement dependency");return;
-            }
-            // The current bounded callee never reaches1AEA70's return. A
-            // future implementation must join the real1AED30 successor here.
-            scan.stoppedPC=0x1ac9a8;
-            stop(S::incomplete,scan.stoppedPC,"Actual B0 returned; separate1AED30 body reset remains unjoined");return;
         }
         }
     }

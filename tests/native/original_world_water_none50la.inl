@@ -47,7 +47,7 @@ bool Owner::continueNativeWater274570(const original_main_entry50KG::Application
     if(nativeScbThread_!=std::this_thread::get_id()||nativeScbRevoked_||
        !nativeSceneInfo270900Current(app,pc)||!source_||!source_->sourcesDecoded()||
        !app.riderProfile||!worldApplication_||worldApplication_->attachmentLock423F58()||
-       runtimeCameraBorrows_||runtimeWorldBorrows_)return false;
+       !nativeTrackLoadBorrowsAdmitted())return false;
     const auto* profile=app.riderProfile->commonProfile();
     rr::platform::OriginalUiRiderProfileOwner50KG::CourseRaceSelection selected;
     if(!profile||!profile->known||!app.riderProfile->courseRaceSnapshot(selected)||

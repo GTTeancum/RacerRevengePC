@@ -1,4 +1,5 @@
 // Authentic original allocation and roster operations; no owner relocation.
+#include "native_last_failure50pd.h"
 #include "native_wreck_debris50pd.h"
 #include "terrain_interactive_roster_cold50du.h"
 #include "original_race_constructor50la.h"
@@ -29,7 +30,7 @@ namespace f=runtime_startup50fl;
 using namespace rr::game;
 namespace {
 void require50DU(bool ok, const char* message) {
-    if(!ok){std::cerr<<"require_failed "<<(message?message:"")<<std::endl;throw std::runtime_error(message);}
+    if(!ok){native_last_failure50PD::record(message);std::cerr<<"require_failed "<<(message?message:"")<<std::endl;throw std::runtime_error(message);}
 }
 // Cold startup only: add resource identity/stage without changing successful
 // operations. Keep the original exception nested and its detail in what().
