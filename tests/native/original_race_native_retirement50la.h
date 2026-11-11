@@ -19,7 +19,7 @@ inline bool OriginalRaceConstructor50LA::retireNativeWorldAndGroups(std::uint32_
        !application_->entityAuthority_.canRetire(entity_)||raceGroupCount_>6||
        raceGroupsAttached_>raceGroupCount_||
        entity_.firstChild18!=(raceGroupsAttached_?raceGroups_[0]:nullptr))return false;
-    if(raceAudio_&&(raceGroupCount_||raceAudio_->coldStarted_||world74_||gcWorld74_||gaWorld74_||maWorld74_||saWorld74_)){
+    if(raceAudio_&&(raceGroupCount_||raceAudio_->coldStarted_||world74_||gcWorld74_||gaWorld74_||maWorld74_||mbWorld74_||saWorld74_)){
         auto& audio=*raceAudio_;
         gate="race audio canonical identity/epoch/thread";
         if(audio.coldApplication_!=application_||audio.coldSession_!=entity_.sessionGeneration||
@@ -41,7 +41,7 @@ inline bool OriginalRaceConstructor50LA::retireNativeWorldAndGroups(std::uint32_
         // provider preparation is handled by the same actual membership ledger.
         gate="native stopped voice membership retirement";
         if(audio.mixer_&&!audio.retireNativeVoiceBindings())return false;
-    }else if(raceGroupCount_||world74_||taWorld74_||gcWorld74_||gaWorld74_||maWorld74_||saWorld74_){gate="missing audio owner with acquired race children";return false;}
+    }else if(raceGroupCount_||world74_||taWorld74_||gcWorld74_||gaWorld74_||maWorld74_||mbWorld74_||saWorld74_){gate="missing audio owner with acquired race children";return false;}
     if(world74_){
         // Actual aggregate borrows, renderer publication, runtime topology and
         // resource gates remain authoritative. Failure retains this same owner.
@@ -61,6 +61,10 @@ inline bool OriginalRaceConstructor50LA::retireNativeWorldAndGroups(std::uint32_
     if(maWorld74_||maWorldCounted_){
         gate="actual MA counted world-prefix retirement";
         if(!retireNativeMaWorldPrefix(pc))return false;
+    }
+    if(mbWorld74_||mbWorldCounted_){
+        gate="actual MB counted world-prefix retirement";
+        if(!retireNativeMbWorldPrefix(pc))return false;
     }
     if(saWorld74_||saWorldCounted_){
         gate="actual SA counted world-prefix retirement";

@@ -206,6 +206,7 @@
 #include "original_consumed_gc_stage50du.h" // Distinct actual GC counted prefix.
 #include "original_consumed_ta_stage50du.h" // Genuine TA race/world audio ownership.
 #include "original_consumed_ma_stage50du.h" // Actual selected-track counted prefix.
+#include "original_consumed_mb_stage50du.h"
 #include "original_consumed_sa_stage50du.h" // Actual selected-track counted prefix.
 #include "original_consumed_ga_stage50du.h" // Actual selected-track counted prefix.
 #include "original_native_ta_root_audio50la.h"

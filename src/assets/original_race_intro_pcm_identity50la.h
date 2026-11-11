@@ -6,7 +6,9 @@ namespace rr::assets {
 // Exact original-disc race-intro VAG identities. No PCM pack, path substitution,
 // caller-issued readiness or generated sound data. End-career tracks excluded.
 struct OriginalRaceIntroPcmIdentity50LA {std::string_view filename;std::uint64_t bytes;std::string_view sha256;std::uint32_t sampleRate;};
-inline constexpr std::array<OriginalRaceIntroPcmIdentity50LA,15> originalRaceIntroPcmCatalog50LA{{
+inline constexpr std::array<OriginalRaceIntroPcmIdentity50LA,17> originalRaceIntroPcmCatalog50LA{{
+    {"speech\\Dax\\Tracks\\MonCal\\daxmcb19.vag",143680,"03efcacaf0849c34d9fc91fca1d3b957df109efce6959875747bfbd2beea10b1",22050},
+    {"speech\\Dax\\Tracks\\MonCal\\daxmcb20.vag",189792,"aad15f5c2ad921ebff0e233f10d1d173bd225960c3d69febbfff6daa3701d889",22050},
     {"speech\\Dax\\Tracks\\Gamorr\\daxgma09.vag",212416,"470460b7657587482491263fc7688348484cbea7b29b99b20b6a5e722e8afabf",22050},
     {"speech\\Dax\\Tracks\\Gamorr\\daxgma10.vag",169184,"e37897ef497771db332dce08936ff0ea84d7dc61813c10c6bada7689ea733280",22050},
     {"speech\\Dax\\Tracks\\Sullust\\daxsta29.vag",78736,"f30599245bfbfae9489f0a9270c1fbcbd474e6b52634fcb562b24f683e5fc935",22050},

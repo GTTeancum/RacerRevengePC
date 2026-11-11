@@ -57,13 +57,18 @@ inline bool Owner::constructRuntimeTrackParticleManager(
         const auto matches=[&](const char* member,const std::vector<std::uint8_t>& bytes){
             a::OriginalStandardArchiveProvider50LA::MemberView selected;
             a::OriginalStandardArchiveProvider50LA::MountView mount;
-            return provider->lookup132820(member,selected)==a::OriginalStandardArchiveProvider50LA::Lookup::present&&
-                provider->mount(selected.mount,mount)&&mount.archiveSha256&&
-                *mount.archiveSha256==ra_cold_sources50LA::archiveSha&&mount.archiveBytes==4604561u&&
-                mount.memberCount==1010u&&selected.member&&selected.data&&
-                ra_compressed_scene::detail::normalized(*selected.member)==ra_compressed_scene::detail::normalized(member)&&
-                selected.revision==world_->providerRevision_&&selected.size==bytes.size()&&
-                !std::memcmp(selected.data,bytes.data(),bytes.size());
+            if(provider->lookup132820(member,selected)!=a::OriginalStandardArchiveProvider50LA::Lookup::present||
+               !provider->mount(selected.mount,mount)||!selected.member||!selected.data||
+               ra_compressed_scene::detail::normalized(*selected.member)!=ra_compressed_scene::detail::normalized(member)||
+               selected.revision!=world_->providerRevision_||selected.size!=bytes.size()||
+               std::memcmp(selected.data,bytes.data(),bytes.size()))return false;
+            // "present" means every active mount holding this name has identical
+            // bytes (132820). An earlier race's still-mounted track bank (RA
+            // after GA) may win the lookup with a byte-identical member; the
+            // bytes compared are RA's own authenticated source members.
+            if(mount.archiveSha256&&*mount.archiveSha256==ra_cold_sources50LA::archiveSha)
+                return mount.archiveBytes==4604561u&&mount.memberCount==1010u;
+            return true;
         };
         if(!matches("particle\\demoprt.prt",*prt)||!matches("particle\\demoprt.psm",*psm)||
            !matches("particle\\demoprt.pst",*pst))

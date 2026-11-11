@@ -14,6 +14,7 @@ namespace pod_cables50fd_fixture { class Owner; }
 namespace original_consumed_ga_stage50DU { class Owner; }
 namespace original_consumed_gc_stage50DU { class Owner; }
 namespace original_consumed_ma_stage50DU { class Owner; }
+namespace original_consumed_mb_stage50DU { class Owner; }
 namespace original_consumed_sa_stage50DU { class Owner; }
 namespace original_consumed_ta_stage50DU { class Owner; }
 namespace gb_positional_sound50GB { class Owner; }
@@ -193,6 +194,8 @@ struct Context final {
     consumedGcStageType& consumedGcStage;
     using consumedMaStageType = original_consumed_ma_stage50DU::Owner;
     consumedMaStageType& consumedMaStage;
+    using consumedMbStageType = original_consumed_mb_stage50DU::Owner;
+    consumedMbStageType& consumedMbStage;
     using consumedRaStageType = original_consumed_ra_stage50DU::Owner;
     consumedRaStageType& consumedRaStage;
     using consumedSaStageType = original_consumed_sa_stage50DU::Owner;
@@ -557,7 +560,7 @@ struct Context final {
     mbMapViewType& mbMapView;
     using mbOriginalDiscType = const bool;
     mbOriginalDiscType& mbOriginalDisc;
-    using mbOriginalWorldType = std::unique_ptr<mb_original_world50LM::Owner>;
+    using mbOriginalWorldType = std::shared_ptr<mb_original_world50LM::Owner>;
     mbOriginalWorldType& mbOriginalWorld;
     using mbSourceTriggersType = std::unique_ptr<mb_source_trigger50MB::Owner>;
     mbSourceTriggersType& mbSourceTriggers;

@@ -30,6 +30,7 @@
 #include "original_consumed_ga_stage50du.h"
 #include "original_consumed_gc_stage50du.h"
 #include "original_consumed_ma_stage50du.h"
+#include "original_consumed_mb_stage50du.h"
 #include "original_consumed_sa_stage50du.h"
 #include "original_consumed_ta_stage50du.h"
 #include "original_native_ta_root_audio50la.h"
@@ -186,6 +187,7 @@ SessionExit50DU Context::run() {
  auto& consumedGaStage=this->consumedGaStage;
  auto& consumedGcStage=this->consumedGcStage;
  auto& consumedMaStage=this->consumedMaStage;
+ auto& consumedMbStage=this->consumedMbStage;
  auto& consumedRaStage=this->consumedRaStage;
  auto& consumedSaStage=this->consumedSaStage;
  auto& consumedTaStage=this->consumedTaStage;
@@ -2426,7 +2428,7 @@ SessionExit50DU Context::run() {
    // Any consumed original race (RA, TA, MA, SA, GA, GC) publishes the same
    // Application race28C and session generation the speech owners bind to.
    const auto actualRace=consumedRaStage.race()?consumedRaStage.race():consumedTaStage.race()?consumedTaStage.race():
-       consumedMaStage.race()?consumedMaStage.race():consumedSaStage.race()?consumedSaStage.race():
+       consumedMaStage.race()?consumedMaStage.race():consumedMbStage.race()?consumedMbStage.race():consumedSaStage.race()?consumedSaStage.race():
        consumedGaStage.race()?consumedGaStage.race():consumedGcStage.race();
    if(!audioEnabled||!originalUiStarted||!humanCourseEnabled||!actualRace)return;
    // Consumed races join when their identities match and otherwise keep the
@@ -3424,6 +3426,7 @@ SessionExit50DU Context::run() {
   return consumedTaStage.race()?consumedTaStage.race().get():
       consumedRaStage.race()?consumedRaStage.race().get():
       consumedMaStage.race()?consumedMaStage.race().get():
+      consumedMbStage.race()?consumedMbStage.race().get():
       consumedSaStage.race()?consumedSaStage.race().get():
       consumedGaStage.race()?consumedGaStage.race().get():consumedGcStage.race().get();
  };
@@ -3932,6 +3935,7 @@ SessionExit50DU Context::run() {
   if(consumedGaStage.race()&&!consumedGaStage.close())return closeRejected("GA consumed race/world retirement");
   if(consumedSaStage.race()&&!consumedSaStage.close())return closeRejected("SA consumed race/world retirement");
   if(consumedMaStage.race()&&!consumedMaStage.close())return closeRejected("MA consumed race/world retirement");
+  if(consumedMbStage.race()&&!consumedMbStage.close())return closeRejected("MB consumed race/world retirement");
   if(!sourcePause.close())return closeRejected("if(!sourcePause.close())");
   if(!sourceDisplayLifetime->beginCloseAfterDependents())return closeRejected("if(!sourceDisplayLifetime->beginCloseAfterDependents())");
   if(!originalMainApplication.retainsPlayerWindow50DU()&&host.ownsResources()&&!host.close(hostDiagnostic)){
@@ -4163,6 +4167,7 @@ SessionExit50DU Context::run() {
    .consumedGaStage=consumedGaStage,
    .consumedGcStage=consumedGcStage,
    .consumedMaStage=consumedMaStage,
+   .consumedMbStage=consumedMbStage,
    .consumedRaStage=consumedRaStage,
    .consumedSaStage=consumedSaStage,
    .consumedTaStage=consumedTaStage,

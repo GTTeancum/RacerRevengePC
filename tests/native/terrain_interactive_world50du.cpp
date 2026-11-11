@@ -270,6 +270,7 @@ SessionExit50DU Context::run() {
  original_consumed_ga_stage50DU::Owner consumedGaStage(originalMainApplication,*liveAudio);
  original_consumed_sa_stage50DU::Owner consumedSaStage(originalMainApplication,*liveAudio);
  original_consumed_ma_stage50DU::Owner consumedMaStage(originalMainApplication,*liveAudio);
+ original_consumed_mb_stage50DU::Owner consumedMbStage(originalMainApplication,*liveAudio);
  std::shared_ptr<ta_original_world50LE::Owner> taOriginalWorld;
  std::shared_ptr<gc_original_world50LM::Owner> gcOriginalWorld;
  std::shared_ptr<ga_original_world50LH::Owner> gaOriginalWorld;
@@ -691,7 +692,7 @@ SessionExit50DU Context::run() {
   const bool prepared=scGround->prepare(scColdSources,{4,16,32,64},x.assets.phy,trackSession->gridRank,error);
   require50DU(prepared,error.empty()?"SC same-source collision owners rejected":error.c_str());
  }
- std::unique_ptr<mb_original_world50LM::Owner> mbOriginalWorld;
+ std::shared_ptr<mb_original_world50LM::Owner> mbOriginalWorld;
  std::shared_ptr<mb_collision_world50MB::Owner> mbCollisionWorld;
  mb_navigation50MB::Owner mbNavigation;
  std::unique_ptr<mb_source_trigger50MB::Owner> mbSourceTriggers;
@@ -706,7 +707,7 @@ SessionExit50DU Context::run() {
       "MB navigation exceeds existing native cold payload allowance");
   mbNavigationPayload=navigationPayload;
   mbStorageLimits.coldPayloadBytes-=navigationPayload;
-  mbOriginalWorld=std::make_unique<mb_original_world50LM::Owner>();
+  mbOriginalWorld=std::make_shared<mb_original_world50LM::Owner>();
   {
    auto raw=runtime_startup50fl::readBytes(trackSession->archive);
    require50DU(raw.size()==mb_original_world50LM::archiveBytes&&
@@ -818,6 +819,24 @@ SessionExit50DU Context::run() {
    if(!ready)std::cerr<<"consumed_ma_prefix_rejected source_pc="<<pc<<" material_pc="<<d.sourcePC<<'\n';
    require50DU(ready,"actual consumed MA race/world constructor prefix rejected");
   }
+ }
+
+ // MB: the same one race class (1A65C0) and counted course world (1A6BC0)
+ // on the MB static owner loaded above, as on MA.
+ if(mbOriginalWorld&&mbOriginalWorld->loaded()&&consumedLaunch&&originalCameraEnabled&&humanCourseEnabled&&
+    dynamicProfile.game34==2&&nativeOrdinaryLaunch11258==1){
+  require50DU(mbOriginalWorld->mesh(),"MB original mesh publication missing");
+  openNativeVideo();originalMainApplication.appStart(originalMainApplication.assetRoot);
+  originalMainApplication.enterGameplayMaterialDirectory17D7A0();
+  const auto context=nativeVideo->standardMaterialConstructionContext(nativeVideo,originalMainApplication);
+  const auto domain=originalMainApplication.standardMaterialDomain();
+  require50DU(context&&domain&&domain->prepared(),"MB counted race material context unavailable");
+  if(!sourceModelRenderGlobals)sourceModelRenderGlobals=std::make_unique<OriginalRacerModelRenderGlobals50LA>(nativeOrdinaryLaunch11258);
+  rr::assets::OriginalStandardMaterialDiagnostic50LA d;std::uint32_t pc=0;
+  const bool ready=consumedMbStage.begin(*consumedLaunch,sessionIndex+1,playerRacer60,
+      *sourceModelRenderGlobals,mbOriginalWorld,d,pc);
+  if(!ready)std::cerr<<"consumed_mb_prefix_rejected source_pc="<<pc<<" material_pc="<<d.sourcePC<<'\n';
+  require50DU(ready,"actual consumed MB race/world constructor prefix rejected");
  }
 
  // Preserve the one actual SA static owner across source prefix and rendering.
@@ -1518,6 +1537,7 @@ SessionExit50DU Context::run() {
   .consumedGaStage=consumedGaStage,
   .consumedGcStage=consumedGcStage,
   .consumedMaStage=consumedMaStage,
+  .consumedMbStage=consumedMbStage,
   .consumedRaStage=consumedRaStage,
   .consumedSaStage=consumedSaStage,
   .consumedTaStage=consumedTaStage,

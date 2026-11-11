@@ -5,6 +5,7 @@
 #include "original_gc_world_cold_prefix50la.h"
 #include "original_ga_world_cold_prefix50la.h"
 #include "original_ma_world_cold_prefix50la.h"
+#include "original_mb_world_cold_prefix50la.h"
 #include "original_sa_world_cold_prefix50la.h"
 
 namespace rr::game {
@@ -13,18 +14,18 @@ inline const OriginalWreckComponent50LA* OriginalRaceConstructor50LA::nativeIntr
     const auto* selected=original_course_targets50KX::target(launchSelection_);
     if(!selected)return nullptr;
     if(selected->track==rr::platform::HostTrack50IM::TA){
-        if(gaWorld74_||gaWorldCounted_||maWorld74_||maWorldCounted_||saWorld74_||saWorldCounted_||gcWorld74_||gcWorldCounted_||world74_||!taWorld74_||!taWorldCounted_||!taWorldPrefixComplete_)return nullptr;
+        if(gaWorld74_||gaWorldCounted_||maWorld74_||maWorldCounted_||mbWorld74_||mbWorldCounted_||saWorld74_||saWorldCounted_||gcWorld74_||gcWorldCounted_||world74_||!taWorld74_||!taWorldCounted_||!taWorldPrefixComplete_)return nullptr;
         return &taWorldEntity_;
     }
     if(selected->track==rr::platform::HostTrack50IM::RA){
-        if(gaWorld74_||gaWorldCounted_||maWorld74_||maWorldCounted_||saWorld74_||saWorldCounted_||gcWorld74_||gcWorldCounted_||taWorld74_||taWorldCounted_||!world74_||!world74_->worldColdConstructed_||
+        if(gaWorld74_||gaWorldCounted_||maWorld74_||maWorldCounted_||mbWorld74_||mbWorldCounted_||saWorld74_||saWorldCounted_||gcWorld74_||gcWorldCounted_||taWorld74_||taWorldCounted_||!world74_||!world74_->worldColdConstructed_||
            world74_->worldApplication_!=application_||world74_->topologyClosed_||
            world74_->worldEntity_.reference00!=1||
            world74_->worldEntity_.sessionGeneration!=entity_.sessionGeneration)return nullptr;
         return &world74_->worldEntity_;
     }
     if(selected->track==rr::platform::HostTrack50IM::GC){
-        if(gaWorld74_||gaWorldCounted_||maWorld74_||maWorldCounted_||saWorld74_||saWorldCounted_||world74_||taWorld74_||taWorldCounted_||!gcWorld74_||!gcWorldCounted_||
+        if(gaWorld74_||gaWorldCounted_||maWorld74_||maWorldCounted_||mbWorld74_||mbWorldCounted_||saWorld74_||saWorldCounted_||world74_||taWorld74_||taWorldCounted_||!gcWorld74_||!gcWorldCounted_||
            !gcWorldPrefixComplete_||gcWorldEntity_.reference00!=1||
            gcWorldEntity_.sessionGeneration!=entity_.sessionGeneration||
            !application_->entityAuthority_.canRetire(gcWorldEntity_))return nullptr;
@@ -32,7 +33,7 @@ inline const OriginalWreckComponent50LA* OriginalRaceConstructor50LA::nativeIntr
     }
     if(selected->track==rr::platform::HostTrack50IM::MA){
         if(gaWorld74_||gaWorldCounted_||world74_||taWorld74_||taWorldCounted_||gcWorld74_||gcWorldCounted_||
-           saWorld74_||saWorldCounted_||!maWorld74_||!maWorldCounted_||
+           saWorld74_||saWorldCounted_||mbWorld74_||mbWorldCounted_||!maWorld74_||!maWorldCounted_||
            !maWorldPrefixComplete_||maWorldEntity_.reference00!=1||
            maWorldEntity_.sessionGeneration!=entity_.sessionGeneration||
            !application_->entityAuthority_.canRetire(maWorldEntity_))return nullptr;
@@ -40,7 +41,7 @@ inline const OriginalWreckComponent50LA* OriginalRaceConstructor50LA::nativeIntr
     }
     if(selected->track==rr::platform::HostTrack50IM::SA){
         if(gaWorld74_||gaWorldCounted_||world74_||taWorld74_||taWorldCounted_||gcWorld74_||gcWorldCounted_||
-           maWorld74_||maWorldCounted_||!saWorld74_||!saWorldCounted_||
+           maWorld74_||maWorldCounted_||mbWorld74_||mbWorldCounted_||!saWorld74_||!saWorldCounted_||
            !saWorldPrefixComplete_||saWorldEntity_.reference00!=1||
            saWorldEntity_.sessionGeneration!=entity_.sessionGeneration||
            !application_->entityAuthority_.canRetire(saWorldEntity_))return nullptr;
@@ -48,11 +49,19 @@ inline const OriginalWreckComponent50LA* OriginalRaceConstructor50LA::nativeIntr
     }
     if(selected->track==rr::platform::HostTrack50IM::GA){
         if(world74_||taWorld74_||taWorldCounted_||gcWorld74_||gcWorldCounted_||
-           maWorld74_||maWorldCounted_||saWorld74_||saWorldCounted_||
+           maWorld74_||maWorldCounted_||mbWorld74_||mbWorldCounted_||saWorld74_||saWorldCounted_||
            !gaWorld74_||!gaWorldCounted_||!gaWorldPrefixComplete_||gaWorldEntity_.reference00!=1||
            gaWorldEntity_.sessionGeneration!=entity_.sessionGeneration||
            !application_->entityAuthority_.canRetire(gaWorldEntity_))return nullptr;
         return &gaWorldEntity_;
+    }
+    if(selected->track==rr::platform::HostTrack50IM::MB){
+        if(gaWorld74_||gaWorldCounted_||world74_||taWorld74_||taWorldCounted_||gcWorld74_||gcWorldCounted_||
+           saWorld74_||saWorldCounted_||maWorld74_||maWorldCounted_||!mbWorld74_||!mbWorldCounted_||
+           !mbWorldPrefixComplete_||mbWorldEntity_.reference00!=1||
+           mbWorldEntity_.sessionGeneration!=entity_.sessionGeneration||
+           !application_->entityAuthority_.canRetire(mbWorldEntity_))return nullptr;
+        return &mbWorldEntity_;
     }
     return nullptr;
 }
@@ -64,7 +73,7 @@ inline bool OriginalRaceConstructor50LA::constructWorld1A6BC0(
     std::uint32_t& pc)noexcept {
     pc=0x1a6bc0;
     if(!counted_||rolledBack_||!constructorSuffix_||!loadPrefixReached_||!resourcesPrepared_||
-       worldAttempted_||gaWorld74_||gaWorldCounted_||maWorld74_||maWorldCounted_||saWorld74_||saWorldCounted_||world74_||taWorld74_||taWorldCounted_||gcWorld74_||gcWorldCounted_||!world||!raceAudio_||raceGroupCount_!=6||raceGroupsAttached_!=6||
+       worldAttempted_||gaWorld74_||gaWorldCounted_||maWorld74_||maWorldCounted_||mbWorld74_||mbWorldCounted_||saWorld74_||saWorldCounted_||world74_||taWorld74_||taWorldCounted_||gcWorld74_||gcWorldCounted_||!world||!raceAudio_||raceGroupCount_!=6||raceGroupsAttached_!=6||
        world->worldColdAttempted_||world->worldColdConstructed_||world->worldApplication_||
        raceAudio_->coldApplication_!=application_||raceAudio_->coldSession_!=entity_.sessionGeneration||
        raceAudio_->coldThread_!=std::this_thread::get_id()||!raceAudio_->coldMixer_||
@@ -87,6 +96,7 @@ inline bool OriginalRaceConstructor50LA::rollbackNativeRaceWorldFailure(std::uin
     pc=0x1a6bc0;
     if(gaWorld74_||gaWorldCounted_)return retireNativeGaWorldPrefix(pc);
     if(maWorld74_||maWorldCounted_)return retireNativeMaWorldPrefix(pc);
+    if(mbWorld74_||mbWorldCounted_)return retireNativeMbWorldPrefix(pc);
     if(saWorld74_||saWorldCounted_)return retireNativeSaWorldPrefix(pc);
     if(gcWorld74_||gcWorldCounted_)return retireNativeGcWorldPrefix(pc);
     if(taWorld74_||taWorldCounted_)return retireNativeTaWorldPrefix(pc);
@@ -117,6 +127,7 @@ inline bool OriginalRaceConstructor50LA::worldResetPredecessor1A6BF0Current()con
             gaWorld74_?gaWorldCounted_&&gaWorldPrefixComplete_&&gaWorldList500_&&!gaWorldListCount50C_:
             saWorld74_?saWorldCounted_&&saWorldPrefixComplete_&&saWorldList500_&&!saWorldListCount50C_:
             maWorld74_?maWorldCounted_&&maWorldPrefixComplete_&&maWorldList500_&&!maWorldListCount50C_:
+            mbWorld74_?mbWorldCounted_&&mbWorldPrefixComplete_&&mbWorldList500_&&!mbWorldListCount50C_:
             gcWorld74_?gcWorldCounted_&&gcWorldPrefixComplete_&&gcWorldList500_&&!gcWorldListCount50C_:false;
         if(!prefix||nativeTaController48_)return false;
     }

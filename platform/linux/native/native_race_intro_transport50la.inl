@@ -86,7 +86,7 @@ std::unique_ptr<NativeRaceIntroTransport50LA> NativeRaceIntroTransport50LA::crea
     std::size_t first,std::size_t count,
     std::shared_ptr<const assets::OriginalTaIntroAuthoringCandidate> authoring,
     std::shared_ptr<const assets::AudioBank50HC> bank)noexcept {
-    if(!aural||!authoring||!authoring->eventCount()||authoring->eventCount()>3||(authoring->trackId()!="TA"&&authoring->trackId()!="RA"&&authoring->trackId()!="GC"&&authoring->trackId()!="SA"&&authoring->trackId()!="MA"&&authoring->trackId()!="GA")||!bank||
+    if(!aural||!authoring||!authoring->eventCount()||authoring->eventCount()>3||(authoring->trackId()!="TA"&&authoring->trackId()!="RA"&&authoring->trackId()!="GC"&&authoring->trackId()!="SA"&&authoring->trackId()!="MA"&&authoring->trackId()!="GA"&&authoring->trackId()!="MB")||!bank||
        bank->clips.size()!=authoring->eventCount()||bank->ready!=authoring->eventCount()||bank->missing||bank->invalid||bank->unsupported||first!=originalTaIntroFirstVoice50HD||count!=originalTaIntroVoices50HD||
        first>=mixer.count()||count>mixer.count()-first||
        !mixer.requiresVoiceGroupGains50IC()||mixer.nativeRaceIntroTransport_||mixer.nativeSourceWetProcessor_||

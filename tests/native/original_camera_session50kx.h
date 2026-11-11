@@ -71,6 +71,7 @@ namespace gc_original_world50LM { class Owner; }
 namespace ga_original_world50LH { class Owner; }
 namespace sa_original_world50LM { class Owner; }
 namespace ma_original_world50LM { class Owner; }
+namespace mb_original_world50LM { class Owner; }
 namespace rr::game { class OriginalRaceConstructor50LA; class OriginalFrontendCameraCold50LA; }
 namespace original_time_stats_adapter50LA { class Owner; }
 namespace original_speed_boost_adapter50LA { class Owner; }
@@ -83,7 +84,7 @@ namespace original_camera_session50KX {
 inline std::string_view introTrackId(rr::game::OriginalCameraStartCourse course)noexcept {
  using C=rr::game::OriginalCameraStartCourse;
  switch(course){
- case C::ta:return "TA";case C::ra:return "RA";case C::gc:return "GC";case C::ga:return "GA";case C::sa:return "SA";case C::ma:return "MA";default:return {};
+ case C::ta:return "TA";case C::ra:return "RA";case C::gc:return "GC";case C::ga:return "GA";case C::sa:return "SA";case C::ma:return "MA";case C::mb:return "MB";default:return {};
 
  }
 }
@@ -459,6 +460,10 @@ class Session final {
         const OriginalRaceConstructor50LA* maRace=nullptr;
         const ma_original_world50LM::Owner* maWorld=nullptr;
         const TrackNavigation50EU* maMap=nullptr;
+        // MB keeps its retained radar/start map as a view (no B8 pointer).
+        const OriginalRaceConstructor50LA* mbRace=nullptr;
+        const mb_original_world50LM::Owner* mbWorld=nullptr;
+        TrackNavigationView50EU mbMap{};
         const OriginalRaceConstructor50LA* gaRace=nullptr;
         const ga_original_world50LH::Owner* gaWorld=nullptr;
         const TrackNavigation50EU* gaMap=nullptr;
