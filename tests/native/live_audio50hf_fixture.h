@@ -451,8 +451,15 @@ public:
             // Original reset defaults remain the default for other callers.
             // Legacy next-session edits do not mutate this restore target;
             // native live Pause changes it only with the actual shared profile.
+            // The extra speech slots (catalog keys past the 60 base keys, voices
+            // 152+) join their source voice-volume group whenever this racer's
+            // selected catalog authors one of them (Anakin 19 always did; Watto 25
+            // fills two), not by racer number.
+            bool selectedExtraSpeech=playerRacer60==19;
+            for(std::size_t i=gameplay_audio50HE::legacyCueCount;i<selected_.catalog.size();++i)
+                if(!selected_.catalog[i].name.empty())selectedExtraSpeech=true;
             if(!groups_.initialize(mixer_,audioSettings)||
-               !race_audio_groups50IC::bindGameplayCatalog(groups_,providerFirstVoice,playerRacer60==19).complete||
+               !race_audio_groups50IC::bindGameplayCatalog(groups_,providerFirstVoice,selectedExtraSpeech).complete||
                !race_audio_groups50IC::bindProviderRange(groups_,
                    race_audio_groups50IC::ProviderRole::LapPodEvent,lapFirstVoice,lapVoiceCount)) {
                 error="50IC source group ownership initialization failed";return false;

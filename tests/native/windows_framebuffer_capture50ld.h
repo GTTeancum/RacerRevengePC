@@ -100,8 +100,9 @@ public:
 #if defined(__linux__)
    const std::uint32_t maximum=navigateMawhonicRa_?1200u:300u;
 #else
-   // Full-race test runs (three laps plus load and intro) need up to 600.
-   const std::uint32_t maximum=600u;
+   // Full-race test runs (three laps plus load and intro) need up to 600;
+   // chained-course runs (one course's win, then the next course) up to 1800.
+   const std::uint32_t maximum=1800u;
 #endif
    std::uint32_t value=0;
    for(const char* p=seconds;*p;++p){require(*p>='0'&&*p<='9'&&value<=maximum,"invalid unattended wall budget");value=value*10u+std::uint32_t(*p-'0');}

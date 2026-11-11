@@ -24,6 +24,8 @@ const std::shared_ptr<Race>& race(const Context& a) noexcept {
     if(a.consumedMbStage.race())return a.consumedMbStage.race();
     if(a.consumedScStage.race())return a.consumedScStage.race();
     if(a.consumedGbStage.race())return a.consumedGbStage.race();
+    if(a.consumedRcStage.race())return a.consumedRcStage.race();
+    if(a.consumedTcStage.race())return a.consumedTcStage.race();
     return a.consumedGcStage.race();
 }
 
@@ -36,6 +38,8 @@ inline Course course(const Race& r) noexcept {
     if(r.nativeMbWorldBacking())return Course::mb;
     if(r.nativeScWorldBacking())return Course::sc;
     if(r.nativeGbWorldBacking())return Course::gb;
+    if(r.nativeRcWorldBacking())return Course::rc;
+    if(r.nativeTcWorldBacking())return Course::tc;
     if(r.nativeGcWorldBacking())return Course::gc;
     return Course::unspecified;
 }
@@ -51,6 +55,8 @@ bool worldCurrent(const Context& a,const Race& r) noexcept {
     if(const auto* w=r.nativeMbWorldBacking())return a.mbOriginalWorld&&w==a.mbOriginalWorld.get();
     if(const auto* w=r.nativeScWorldBacking())return a.scOriginalWorld&&w==a.scOriginalWorld.get();
     if(const auto* w=r.nativeGbWorldBacking())return a.gbOriginalWorld&&w==a.gbOriginalWorld.get();
+    if(const auto* w=r.nativeRcWorldBacking())return a.rcOriginalWorld&&w==a.rcOriginalWorld.get();
+    if(const auto* w=r.nativeTcWorldBacking())return a.tcOriginalWorld&&w==a.tcOriginalWorld.get();
     if(const auto* w=r.nativeGcWorldBacking())return a.gcOriginalWorld&&w==a.gcOriginalWorld.get();
     if(const auto* w=r.nativeTaWorldBacking())return a.taOriginalWorld&&w==a.taOriginalWorld.get();
     return false;

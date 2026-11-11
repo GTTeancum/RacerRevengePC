@@ -289,6 +289,14 @@ public:
     // requests its own model bounds/root/normals for single-map fog or map2.
     // The optional lower pair is complete or absent; failure preserves output.
     bool hasCanonicalBodyColors50LA()const noexcept {return canonicalRightBound_&&!canonicalBodyColorModes50LA_.empty();}
+    // A bound body material drawn through the source single-diffuse map program
+    // (its fog comes from the gameplay fog preparation of the current camera).
+    bool hasCanonicalSingleDiffuse50LA()const noexcept {
+        if(!hasCanonicalBodyColors50LA())return false;
+        for(const auto& component:windowBindings_)for(const auto& binding:component)
+            if(binding.sourceSingleDiffuseRgba50LA)return true;
+        return false;
+    }
     bool canonicalEngineSourceColors50LA(const g::NativeGcSelectedLightsCandidate& lights,
         std::uint32_t actualRacerSlot,g::VehicleDrawBatchSourceColors50LA& output)const noexcept;
     rr::platform::VehicleWindowMaterials50DS windowMaterials(const rr::platform::MaterialTextureGl50EB* gpu,

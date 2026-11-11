@@ -88,6 +88,10 @@ struct Context final {
     consumedScStageType& consumedScStage;
     using consumedGbStageType = original_consumed_gb_stage50DU::Owner;
     consumedGbStageType& consumedGbStage;
+    using consumedRcStageType = original_consumed_rc_stage50DU::Owner;
+    consumedRcStageType& consumedRcStage;
+    using consumedTcStageType = original_consumed_tc_stage50DU::Owner;
+    consumedTcStageType& consumedTcStage;
     using consumedRaStageType = original_consumed_ra_stage50DU::Owner;
     consumedRaStageType& consumedRaStage;
     using consumedSaStageType = original_consumed_sa_stage50DU::Owner;
@@ -202,6 +206,10 @@ struct Context final {
     gbNavigationOwnerType& gbNavigationOwner;
     using gbOriginalWorldType = std::shared_ptr<gb_original_world50LM::Owner>;
     gbOriginalWorldType& gbOriginalWorld;
+    using rcOriginalWorldType = std::shared_ptr<rc_original_world50LM::Owner>;
+    rcOriginalWorldType& rcOriginalWorld;
+    using tcOriginalWorldType = std::shared_ptr<tc_original_world50LM::Owner>;
+    tcOriginalWorldType& tcOriginalWorld;
     using gbParticleAttachmentsType = std::shared_ptr<gb_particle_attachments50GB::Owner>;
     gbParticleAttachmentsType& gbParticleAttachments;
     using gbParticleAuthoringType = std::shared_ptr<gb_particle_authoring50GB::Owner>;

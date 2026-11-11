@@ -5,6 +5,7 @@
 #include "../../platform/linux/native/audio_mixer50hd.h"
 #include "../../platform/linux/native/race_audio_groups50ic.h"
 #include "../../platform/linux/native/original_sound_mode50kg.h"
+#include "native_results_world_stop26d070.h"
 #include <filesystem>
 #include <memory>
 #include <thread>
@@ -20,7 +21,7 @@ inline constexpr const char* filename="sfx/race/bigdoor.vag";
 inline constexpr const char* sourceSha="d06f02f4e58684bdf39ca66999daea436bd34d0b35df0bad1ea1b413bdc6c746";
 static_assert(voice<p::audioMaximumVoices50HD);
 struct Counters {std::uint64_t requests=0,starts=0,culled=0,rejected=0;};
-class Owner final {
+class Owner final : public native_results_world_stop26D070::Owner {
  std::shared_ptr<const source::Owner> source_;
  a::AudioBank50HC bank_;p::AudioClip50HD clip_{};
  p::AudioMixer50HD* mixer_=nullptr;p::RaceAudioGroups50IC* groups_=nullptr;
@@ -85,6 +86,18 @@ public:
    observed.voice.clip.samples==clip_.samples&&observed.voice.clip.frames==clip_.frames;
  }
  bool prepared()const noexcept{return destinationCurrent();}
+ // Results 26D070: the door sound is claimed only while its own playback is
+ // active; a never-played or finished door sound has nothing to stop.
+ bool ownsActiveVoice26D070()const noexcept {
+  return played_&&mixer_&&mixer_->playbackRevision(voice)==revision_&&mixer_->active(voice);
+ }
+ bool canStopResults26D070(const p::AudioMixer50HD& mixer,const p::RaceAudioGroups50IC& groups)const noexcept override {
+  return thread_==std::this_thread::get_id()&&prepared_&&!closed_&&mixer_==&mixer&&groups_==&groups&&
+   transport()&&mixer.canRecordControlChanges(1);
+ }
+ std::size_t resultsStopCount26D070()const noexcept override {return ownsActiveVoice26D070()?1u:0u;}
+ std::size_t resultsStopVoice26D070(std::size_t)const noexcept override {return voice;}
+ void stopResultsPreflighted26D070()noexcept override {if(ownsActiveVoice26D070())mixer_->stop(voice);}
  const source::Owner* sourceIdentity()const noexcept{return source_.get();}
  const a::AudioBank50HC& bank()const noexcept{return bank_;}
  const Counters& counters()const noexcept{return counters_;}

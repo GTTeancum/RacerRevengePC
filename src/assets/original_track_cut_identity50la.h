@@ -1,5 +1,5 @@
 #pragma once
-// Bounded TA/RA/GC/SA/MA/GA/MB/SC/GB identity/layout catalog from the supplied original RES members.
+// Bounded TA/RA/GC/SA/MA/GA/MB/SC/GB/RC/TC identity/layout catalog from the supplied original RES members.
 // Other track families remain outside this integration boundary.
 // Digests identify bytes; no curves, PCM, or runtime assets are embedded.
 #include <array>
@@ -22,7 +22,7 @@ struct OriginalTrackCutIdentity50LA {
  std::array<OriginalTrackMemberIdentity50LA,2> introMembers;
  std::array<OriginalTrackIntroEventIdentity50LA,6> events;
 };
-inline constexpr std::array<OriginalTrackCutIdentity50LA,9> originalTrackCutIdentities50LA{{
+inline constexpr std::array<OriginalTrackCutIdentity50LA,11> originalTrackCutIdentities50LA{{
  {"TA","TRACKS/TA.RES","b491e34bf6cbd27869d5b9dc8db394b101ebaf4ac7f5e0d44fcca33a00d41ab8",3334562,383,3,3256,
   {{{"tracks\\ta.tob",13887,0,"11e4c4909bf866fee626977c970d9907d4f191c29eeff32bddd162f173916f6b"},{"tracks\\ta01.vub",53488,376,"ad0a75b4e37e7e21f3fa29162c00dc4bc482b2f2d04066e5255edbd49a41147c"},{"tracks\\ta02.vub",17528,377,"ba15e426727250fdf7d25a0c7378d5323624a7504eb79cd9792eadd85f079e05"},{"tracks\\ta03.vub",17528,378,"fe7f6b12b3ddcb695f39b47d0a4e9cb89847e9639461d0b8ca03d4c05ed78456"}}},
   {{461,151,151}},{{9,5,6}},{{3109,3158,3207}},
@@ -68,6 +68,16 @@ inline constexpr std::array<OriginalTrackCutIdentity50LA,9> originalTrackCutIden
   {{176,301,101,176}},{{2,6,3,10}},{{4503,4552,4601,4650}},
   2,{{{"audio\\introAud.ini",238,1047,"aabe2a0edae88ecd40b6b9a3475f53712c1ba1bb7910c0b0434da95baf23268a"},{"audio\\scrptLns.ini",88,1046,"c28784d774a7a1d65fe118d3e94d5c3c7aa8bff490ee81bfaeeb0e7adfc58d90"}}},
   {{{57,37,56,1,107,121,133},{159,37,85,1,209,223,235}}}},
+ {"RC","TRACKS/RC.RES","ce1b41b845935210c288c86d76b3ae0b99f198fb2c29190889c005631c7d2a8b",4655141,1121,5,19491,
+  {{{"tracks\\rc.tob",124930,0,"71b1f9609c0a6ce84d71ff69355d9cfcbc8771eb7ddb8876473b4fddd6e23e6d"},{"tracks\\rc01.vub",25648,1112,"5a6ec5b979149b0b8ef9e646ff35cad3c9306c9b18ca2623a43c98c47806ac30"},{"tracks\\rc02.vub",37248,1113,"3cb3d2a90120e81b7291b2bbb3bdbaa7ffa86a4ba5d770f72c97cba7acea54c5"},{"tracks\\rc03.vub",31448,1114,"5d426ff05f682a64231bf03093ce097a40cab3bddc9ad408f5fd50182fd131b6"},{"tracks\\rc04.vub",18108,1115,"d5e0b85fdb4f436920c045b4b751bcad8652ae5d5a9f5c39208fbd81df60b8d0"},{"tracks\\rc05.vub",22168,1116,"e4cef85ecae9d493dd1e404f48c2af51685159a94099d292b8440853ec7212e7"}}},
+  {{221,321,271,156,191}},{{1,6,13,4,8}},{{19245,19294,19343,19393,19442}},
+  3,{{{"audio\\introAud.ini",340,1119,"50a0837c37e985fb6fa55041d9198838b33b49f1325fae919209f9f38319f8fb"},{"audio\\scrptLns.ini",121,1118,"459d8eaf30df82d889f0c1c4fc13fcd157dc0050cc2ecb0424c5af66e5e93641"}}},
+  {{{57,37,56,1,107,121,133},{159,37,85,3,209,223,235},{261,37,116,3,311,325,337}}}},
+ {"TC","TRACKS/TC.RES","7b5486f4029dabe137919127c879faef92b8bd2fb9df5c0d1a1d122e92731490",3607868,509,3,7515,
+  {{{"tracks\\tc.tob",25512,0,"e080f96e2657e1331ac1f829faa880a5e984ebf1c5fab393daa6539534dd0573"},{"tracks\\tc01.vub",23560,502,"512b5a39715eaa20dac372de3288ac618148b5067829f6cbfac2866e55bfbf55"},{"tracks\\tc02.vub",34000,503,"85aa2f68e4390e4363b8d1a551975800d2078d6328a144af4295295945c0a71c"},{"tracks\\tc03.vub",25300,504,"b81d49c0466617778b6626c092d20a3fca570eb4d8331c5ab59555c127804095"}}},
+  {{203,293,218}},{{1,11,5}},{{7367,7416,7466}},
+  3,{{{"audio\\introAud.ini",346,507,"45cd6a12b36aee70edefddd0b3b8f808878117ca35af237aa2438173d990ca13"},{"audio\\scrptLns.ini",117,506,"88aa20cdf0a8352baab8edad438f825115098cf0f463f4ec1e3090d30cbedc73"}}},
+  {{{57,39,56,1,109,123,135},{161,39,85,1,213,227,239},{265,39,114,1,317,331,343}}}},
 }};
 inline const OriginalTrackCutIdentity50LA* originalTrackCutIdentity50LA(std::string_view id)noexcept {
  for(const auto& row:originalTrackCutIdentities50LA)if(id==row.trackId)return &row;

@@ -442,8 +442,12 @@ private:
             if(!old.active){
                 // A RES caller cannot acquire retirement authority over a
                 // different typed backing on reactivation, even if bytes match.
+                // The typed course sources (RC/TB/GB/MC) were already proved
+                // identical to this mount's own backing above, and a TA mount's
+                // encoded binding stays with the mount and is re-verified by
+                // retainTaEncodedInput; only a UI archive is refused here.
                 // Reject BEFORE active/generation/revision mutation.
-                if(nativeRace&&(old.ui||old.rcSource||old.tbSource||old.gbSource||old.mcSource||old.taEncoded))
+                if(nativeRace&&old.ui)
                     return fail(d,Status::identity);
                 if(revision_==std::numeric_limits<std::uint64_t>::max()||
                    old.generation==std::numeric_limits<std::uint64_t>::max())

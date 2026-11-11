@@ -11,6 +11,8 @@ namespace original_consumed_ma_stage50DU { class Owner; }
 namespace original_consumed_mb_stage50DU { class Owner; }
 namespace original_consumed_sc_stage50DU { class Owner; }
 namespace original_consumed_gb_stage50DU { class Owner; }
+namespace original_consumed_rc_stage50DU { class Owner; }
+namespace original_consumed_tc_stage50DU { class Owner; }
 namespace original_consumed_sa_stage50DU { class Owner; }
 namespace original_consumed_ta_stage50DU { class Owner; }
 
@@ -131,6 +133,10 @@ struct Context final {
     consumedScStageType& consumedScStage;
     using consumedGbStageType = original_consumed_gb_stage50DU::Owner;
     consumedGbStageType& consumedGbStage;
+    using consumedRcStageType = original_consumed_rc_stage50DU::Owner;
+    consumedRcStageType& consumedRcStage;
+    using consumedTcStageType = original_consumed_tc_stage50DU::Owner;
+    consumedTcStageType& consumedTcStage;
     using consumedRaStageType = original_consumed_ra_stage50DU::Owner;
     consumedRaStageType& consumedRaStage;
     using consumedSaStageType = original_consumed_sa_stage50DU::Owner;
@@ -980,7 +986,7 @@ struct Context final {
     tcMapViewType& tcMapView;
     using tcOriginalDiscType = const bool;
     tcOriginalDiscType& tcOriginalDisc;
-    using tcOriginalWorldType = std::unique_ptr<tc_original_world50LM::Owner>;
+    using tcOriginalWorldType = std::shared_ptr<tc_original_world50LM::Owner>;
     tcOriginalWorldType& tcOriginalWorld;
     using tcRaceType = race_session50HM::TcSession;
     tcRaceType& tcRace;

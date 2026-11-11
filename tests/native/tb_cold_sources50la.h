@@ -232,8 +232,12 @@ public:
   for(const auto& e:archive_->entries())add(n,2*std::max<std::size_t>(15,e.name.size())+1);
   add(n,256);return n;
  }
+ // lease (optional): the race session's course-archive lease. A fresh mount
+ // or a reactivation of this same source's released mount is recorded in it,
+ // so the bank is released at race end (1316A0) like every course's.
  bool mountCanonicalArchive(a::OriginalStandardArchiveProvider50LA& provider,std::size_t availableAdditionalPayloadBytes,
-     a::OriginalStandardArchiveProvider50LA::Diagnostic& d)const noexcept {
+     a::OriginalStandardArchiveProvider50LA::Diagnostic& d,
+     a::NativeRaceMountLease50LA* lease=nullptr)const noexcept {
   using Provider=a::OriginalStandardArchiveProvider50LA;d={};
   auto self=weak_from_this().lock();if(!ready()||!self)return Provider::fail(d,Provider::Status::identity);
   // A verified same-source mount already owns every descriptor/member. This
@@ -243,7 +247,12 @@ public:
   if(!reuseCanonicalSource(provider,existing,d))return false;
   if(existing){
    if(existing.get()!=this)return Provider::fail(d,Provider::Status::identity);
-   d={};return true;
+   // Still active: the same mount stays (no new record). Released at an
+   // earlier race end: fall through and reactivate it through commit with
+   // identical rows from this same source.
+   bool active=false;
+   for(const auto& mount:provider.mounts_)if(Provider::sameName(mount->name,"TRACKS/TB.RES"))active=mount->active;
+   if(active){d={};return true;}
   }
   if(canonicalMountReservationBytes()>availableAdditionalPayloadBytes)return Provider::fail(d,Provider::Status::capacity);
   try {auto next=std::make_unique<Provider::Mount>();next->name="TRACKS/TB.RES";next->digest=archiveSha;next->archiveBytes=archiveBytes;
@@ -251,7 +260,7 @@ public:
    for(std::size_t i=0;i<archiveEntries;++i){const auto m=archive_->member(i);d.ordinal=i;
     if(!m.identity||!m.data||m.size!=m.identity->bytes||!Provider::nameOkay(m.identity->name))return Provider::fail(d,Provider::Status::identity);
     next->rows.push_back({m.identity->name,m.data,m.size,m.identity->logical_offset});}
-   return provider.commit(std::move(next),d);
+   return provider.commit(std::move(next),d,lease);
   }catch(...){return Provider::fail(d,Provider::Status::allocation);}
  }
  bool close()noexcept {

@@ -3,6 +3,7 @@
 #include "../../src/assets/audio_assets50hc.h"
 #include "../../platform/linux/native/audio_mixer50hd.h"
 #include "../../platform/linux/native/race_audio_groups50ic.h"
+#include "native_results_world_stop26d070.h"
 #include <array>
 #include <filesystem>
 #include <memory>
@@ -21,7 +22,7 @@ inline constexpr std::array<Original,2> originals{{
  {"sfx/race/beambrk2.vag",16960,"0d29f90b84b6e1e291cf29abcf9ad9a23c5339d2f153db1df752392a6c1f1b6c",29568},
  {"sfx/race/latichit.vag",21184,"085cbfc5f33e5b246716fe05eb54671be4dd8823d15bc291a61918449c3c7a79",36960}
 }};
-class Owner final {
+class Owner final : public native_results_world_stop26D070::Owner {
  std::shared_ptr<const tc_trigger_authoring50TC::Owner> source_;
  a::AudioBank50HC bank_;std::array<p::AudioClip50HD,2> clips_{};
  p::AudioMixer50HD* mixer_=nullptr;p::RaceAudioGroups50IC* groups_=nullptr;
@@ -91,5 +92,25 @@ public:
   closed_=true;return true;
  }
  bool prepared()const noexcept{return ownership();}
+ // Results 26D070: each of the two trigger Sounds is claimed only while its
+ // own one-shot playback (this owner's PCM) is still active on its voice.
+ bool ownsActive26D070(std::size_t i)const noexcept {
+  if(i>=2||!played_[i]||!mixer_||!mixer_->active(firstVoice+i))return false;
+  p::AudioVoiceObservation50HD observed{};
+  return mixer_->inspectVoice(firstVoice+i,observed)&&observed.voice.clip.samples==clips_[i].samples;
+ }
+ bool canStopResults26D070(const p::AudioMixer50HD& mixer,const p::RaceAudioGroups50IC& groups)const noexcept override {
+  return ownership()&&mixer_==&mixer&&groups_==&groups&&mixer.canRecordControlChanges(2);
+ }
+ std::size_t resultsStopCount26D070()const noexcept override {
+  return std::size_t(ownsActive26D070(0))+std::size_t(ownsActive26D070(1));
+ }
+ std::size_t resultsStopVoice26D070(std::size_t n)const noexcept override {
+  for(std::size_t i=0;i<2;++i)if(ownsActive26D070(i)){if(!n)return firstVoice+i;--n;}
+  return p::audioMaximumVoices50HD;
+ }
+ void stopResultsPreflighted26D070()noexcept override {
+  for(std::size_t i=0;i<2;++i)if(ownsActive26D070(i))mixer_->stop(firstVoice+i);
+ }
 };
 }

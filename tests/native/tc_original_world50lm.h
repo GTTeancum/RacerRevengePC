@@ -9,6 +9,7 @@
 #include "../../src/assets/original_standard_ipum_framing50la.h"
 #include "../../src/assets/original_ui_atm50kg.h"
 #include "../../src/assets/world_normals50hk.h"
+#include <functional>
 #include <algorithm>
 #include <charconv>
 #include <iterator>

@@ -357,11 +357,14 @@ public:
     // Both actual TA mount producers use this one complete decoded mount plus
     // immutable encoded-input binding. Original commit/revision semantics stay
     // with the existing provider; no alternate service or namespace is created.
+    // lease (optional): the race session's course-archive lease, so the TA
+    // bank is released at race end (1316A0) like every course's.
     bool mountCanonicalArchive(a::OriginalStandardArchiveProvider50LA& provider,
-        a::OriginalStandardArchiveProvider50LA::Diagnostic& d)noexcept {
+        a::OriginalStandardArchiveProvider50LA::Diagnostic& d,
+        a::NativeRaceMountLease50LA* lease=nullptr)noexcept {
         if(!storage_||!storage_->encodedInput){d={};d.status=a::OriginalStandardArchiveProvider50LA::Status::input;return false;}
         try {
-            return provider.mountAuthenticatedRes("TRACKS/TA.RES",archiveSha,archiveBytes,storage_->archive,d)&&
+            return provider.mountAuthenticatedRes("TRACKS/TA.RES",archiveSha,archiveBytes,storage_->archive,d,lease)&&
                 provider.retainTaEncodedInput(storage_->archive,storage_->encodedInput,d);
         }catch(...){d={};d.status=a::OriginalStandardArchiveProvider50LA::Status::allocation;return false;}
     }

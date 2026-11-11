@@ -2,6 +2,7 @@
 #include "gb_application_cold50gb.h"
 #include "original_ui_main_entry50kg.h"
 #include "gb_cold_sources50la.h"
+#include "native_course_archive_release50pd.h"
 #include "gb_original_world50lm.h"
 #include "gb_trigger_authoring50gb.h"
 #include "gb_collision_world50gb.h"
@@ -121,7 +122,8 @@ void GbColdPrefix::run() const {
   const auto mountReservation=gbColdSources->canonicalMountReservationBytes();reserveGbEarly(mountReservation);
   rr::assets::OriginalStandardArchiveProvider50LA::Diagnostic mounted;
   rr::assets::OriginalStandardTextureDiagnostic50LA textureDiagnostic;
-  require50DU(gbColdSources->mountCanonicalArchive(*provider,mountReservation,mounted)&&provider->sealNativeMounts(mounted)&&
+  require50DU(gbColdSources->mountCanonicalArchive(*provider,mountReservation,mounted,
+      native_course_archive_release50PD::holder().begin(provider,domain->resolver3E1A70()))&&provider->sealNativeMounts(mounted)&&
       domain->resolver3E1A70()->bindProvider3E1A70(provider,textureDiagnostic),"GB canonical original archive mount rejected");
   // The quota is an allotment, not an assumed std::vector growth factor.
   constexpr std::size_t registryQuota=2u*originalGcParticleCapacity50KG*sizeof(OriginalGcParticleEmitterState50KG);

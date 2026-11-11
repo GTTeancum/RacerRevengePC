@@ -80,11 +80,14 @@ inline bool ready() noexcept {
         std::numeric_limits<float>::digits != 24 ||
         std::numeric_limits<float>::max_exponent != 128 ||
         std::fegetround() != FE_TONEAREST) return false;
-    // Require native gradual underflow rather than silently inheriting FTZ/DAZ.
+    // Either IEEE gradual underflow, or the PS2 rule the game thread runs
+    // under (ps2_float_mode50la.h: FTZ|DAZ): the console's VU and FPU never
+    // produce or read subnormals. A mode that still produces subnormals is refused.
     volatile float tiny = std::numeric_limits<float>::denorm_min();
     volatile float normal = std::numeric_limits<float>::min();
     volatile float one = 1.f, half = .5f;
-    return bits(mul(tiny, one)) == 1u && bits(mul(normal, half)) == 0x00400000u;
+    const auto subnormalIn = bits(mul(tiny, one)), subnormalOut = bits(mul(normal, half));
+    return (subnormalIn == 1u && subnormalOut == 0x00400000u) || (subnormalIn == 0u && subnormalOut == 0u);
 #endif
 }
 struct Math {

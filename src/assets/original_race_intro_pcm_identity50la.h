@@ -6,9 +6,15 @@ namespace rr::assets {
 // Exact original-disc race-intro VAG identities. No PCM pack, path substitution,
 // caller-issued readiness or generated sound data. End-career tracks excluded.
 struct OriginalRaceIntroPcmIdentity50LA {std::string_view filename;std::uint64_t bytes;std::string_view sha256;std::uint32_t sampleRate;};
-inline constexpr std::array<OriginalRaceIntroPcmIdentity50LA,22> originalRaceIntroPcmCatalog50LA{{
+inline constexpr std::array<OriginalRaceIntroPcmIdentity50LA,28> originalRaceIntroPcmCatalog50LA{{
     {"speech\\Dax\\Tracks\\Gamorr\\daxgmb11.vag",186080,"d03771a10d3979d6b7a1c8ddbdf5bd3359b470a93079091702d3325a1c702840",22050},
     {"speech\\Dax\\Tracks\\Gamorr\\daxgmb12.vag",114944,"95d363507743dbfedf2e1d4d7d7f0eeedd57006077cbe215ae4cecc74fb65b3e",22050},
+    {"speech\\Dax\\Tracks\\Ryloth\\daxryc41.vag",88128,"56d3e11c8939999a0bd461e80fa3c5309550c451af3fec4f5e599b221f367478",22050},
+    {"speech\\Dax\\Tracks\\Ryloth\\daxryc42.vag",228896,"031e589f2f4856c8db52c094bff75ea8ff637bd897e76aaa731e257265593fb1",22050},
+    {"speech\\Dax\\Tracks\\Ryloth\\daxryc43.vag",145568,"5ae63346f868c9c7ee0c21de2eb74caff05bcff93518d0d9ab246771805f7560",22050},
+    {"speech\\Dax\\Tracks\\Tatooine\\daxtab06.vag",193632,"a247a7bbf6b24f5b7d0333518f3d71d7801173c566160253264a37f0f904cb6e",22050},
+    {"speech\\Dax\\Tracks\\Tatooine\\daxtab07.vag",85616,"392674414b80d9620664017c51ddcd834bb5dadbcbd43c1001b458ccc716be46",22050},
+    {"speech\\Dax\\Tracks\\Tatooine\\daxtab08.vag",76736,"13ef9f5ede455b927f3983a5464c42239ee2200d8975dc7da27ed9f3b867e05d",22050},
     {"speech\\Dax\\Tracks\\Sullust\\daxstc34.vag",136064,"f597788ae2c0bd2d1b240a62918d17c6c86199d4fdfdd5bf17b80acafe86cd58",22050},
     {"speech\\Dax\\Tracks\\Sullust\\daxstc35.vag",73680,"01490966f669e4f671587fea87aea3967986397aba033a3dbd2eb9edad0c553f",22050},
     {"speech\\Dax\\Tracks\\Sullust\\daxstc36.vag",28368,"8403f40e0cfef678e4c98f6987fd092b610c2c801695d45581b376c991a301cc",22050},

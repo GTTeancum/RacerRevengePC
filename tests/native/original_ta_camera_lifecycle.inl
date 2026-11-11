@@ -111,7 +111,13 @@ bool taRestoreStartLane()noexcept {
        actual_.actualRadarMapB8!=nativeTaIssuance_->maMap)return taReject(0x2a2880);
     if(nativeTaIssuance_&&nativeTaIssuance_->course==OriginalCameraStartCourse::sc&&
        actual_.actualRadarMapB8!=nativeTaIssuance_->scMap)return taReject(0x2a2880);
-    if(nativeTaIssuance_&&nativeTaIssuance_->course==OriginalCameraStartCourse::gb){
+    if(nativeTaIssuance_&&nativeTaIssuance_->course==OriginalCameraStartCourse::rc&&
+       actual_.actualRadarMapB8!=nativeTaIssuance_->rcMap)return taReject(0x2a2880);
+    if(nativeTaIssuance_&&nativeTaIssuance_->course==OriginalCameraStartCourse::tc){
+        //2A2880 on TC's own retained map view (its 268-node Map role).
+        if(actual_.actualRadarMapB8||!nativeTaIssuance_->tcMap.sameOwner(actual_.actualRadarMapTc)||
+           !source_grid50IG::prepare(actual_.actualRadarMapTc,0,grid))return taReject(0x2a2880);
+    }else if(nativeTaIssuance_&&nativeTaIssuance_->course==OriginalCameraStartCourse::gb){
         //2A2880 on GB's own retained map view (its 213-node Map role).
         if(actual_.actualRadarMapB8||!nativeTaIssuance_->gbMap.sameOwner(actual_.actualRadarMapGb)||
            !source_grid50IG::prepare(actual_.actualRadarMapGb,0,grid))return taReject(0x2a2880);
@@ -125,7 +131,8 @@ bool taRestoreStartLane()noexcept {
        nativeTaIssuance_->course!=OriginalCameraStartCourse::sa&&
        nativeTaIssuance_->course!=OriginalCameraStartCourse::ma&&
        nativeTaIssuance_->course!=OriginalCameraStartCourse::ga&&
-       nativeTaIssuance_->course!=OriginalCameraStartCourse::sc)||
+       nativeTaIssuance_->course!=OriginalCameraStartCourse::sc&&
+       nativeTaIssuance_->course!=OriginalCameraStartCourse::rc)||
        !actual_.actualRadarMapB8||!source_grid50IG::prepare(*actual_.actualRadarMapB8,0,grid))return taReject(0x2a2880);
     OriginalTaCutVector4Candidate point,look;
     for(unsigned i=0;i<4;++i){std::memcpy(&point[i],&grid.position[i],4);std::memcpy(&look[i],&grid.heading[i],4);}

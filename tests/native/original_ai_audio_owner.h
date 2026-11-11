@@ -1,4 +1,5 @@
 #pragma once
+#include "native_results_world_stop26d070.h"
 #include "../../src/game/shared_random_owner50id.h"
 #include "../../src/game/lap_host_clock50id.h"
 #include <bit>
@@ -99,6 +100,9 @@ class Owner final {
     static constexpr std::size_t maximumWorldSoundStops26D070=4;
     std::array<rr::platform::LogicalAudioOwner*,maximumWorldSoundStops26D070> worldSoundStops26D070_{};
     std::size_t worldSoundStopCount26D070_=0;
+    // Course one-shot World4D8 owners (GB door PodSound, TC trigger Sounds).
+    std::array<native_results_world_stop26D070::Owner*,maximumWorldSoundStops26D070> worldOwnerStops26D070_{};
+    std::size_t worldOwnerStopCount26D070_=0;
     bool canStopResultsWorld26D070(const rr::platform::AudioMixer50HD&,
         const rr::platform::RaceAudioGroups50IC&)const noexcept;
     std::size_t resultsWorldStopCount26D070()const noexcept;
@@ -590,8 +594,15 @@ public:
             if(worldSoundStops26D070_[n]==&transport)return false;
         worldSoundStops26D070_[worldSoundStopCount26D070_++]=&transport;return true;
     }
+    bool registerResultsWorldSound26D070(native_results_world_stop26D070::Owner& owner)noexcept {
+        if(worldOwnerStopCount26D070_>=maximumWorldSoundStops26D070)return false;
+        for(std::size_t n=0;n<worldOwnerStopCount26D070_;++n)
+            if(worldOwnerStops26D070_[n]==&owner)return false;
+        worldOwnerStops26D070_[worldOwnerStopCount26D070_++]=&owner;return true;
+    }
     void close()noexcept {
         worldSoundStops26D070_.fill(nullptr);worldSoundStopCount26D070_=0; // Before those owners retire.
+        worldOwnerStops26D070_.fill(nullptr);worldOwnerStopCount26D070_=0;
         revokeNativeSpeechReceipt(); // Before any provider/borrowed-owner teardown.
         // Close every public update admission before any borrowed sound is
         // retired. Preserve the reached speech preparation for actual voice stops.

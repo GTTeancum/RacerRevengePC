@@ -11,10 +11,74 @@ import os
 import re
 from pathlib import Path
 import shutil
+import struct
 import subprocess
 import time
+import zlib
 
 ROOT = Path(__file__).resolve().parents[2]
+
+# The 23 original racer ids (no pods 5, 6, 13).
+ORIGINAL_RACERS = [r for r in range(1, 27) if r not in (5, 6, 13)]
+# Free Play routes start from a fresh profile (Main slot 1, Rider19), so a
+# seeded racer applies to the tournament route only.
+PLAYER_RACER_ROUTES = ('main-tournament-course-ta',)
+
+
+# Tournament course order (career progress219C) -> course code.
+TOURNAMENT_ORDER = ('TA', 'SA', 'MA', 'GA', 'RA', 'TB', 'MB', 'GB', 'SC', 'MC', 'GC', 'RC', 'TC')
+
+
+def seeded_tournament_track(data):
+    """Course code the seed sends a tournament run to: the Tournament-remembered
+    racer's (6FC) own career progress. None if the file is not readable."""
+    try:
+        u32 = lambda at: struct.unpack_from('<I', data, at)[0]
+        if u32(0) != 0x42505252 or u32(4) != 1:
+            return None
+        unlock = 16 + 12
+        remembered = unlock + 27 * 4 * 2
+        careers = remembered + 4 * 4 + 7 * 4
+        career_size = 16 + 27 * (6 + 13 + 13) * 4
+        racer = u32(remembered + 4 * 3)
+        progress = u32(careers + racer * career_size + 12)
+        return TOURNAMENT_ORDER[progress] if 0 <= progress < len(TOURNAMENT_ORDER) else None
+    except (struct.error, IndexError):
+        return None
+
+
+def seed_player_racer(data, racer):
+    """Return progress-v1.bin bytes in which `racer` is unlocked, remembered
+    for Free Play (6F0) and Tournament (6FC), and has reached the same
+    tournament course as the seed's Anakin19 career (progress byte and that
+    career's own diagonal medals). Layout: saveNativeBetaProgress in
+    platform/linux/native/original_ui_rider_profile50kg.cpp. Only fields the
+    game's own unlock grant and Rider Confirm write are touched (unlock10FAC,
+    remembered); hidden0730 stays as the game left it. The physics identity
+    word is kept, so the seed must be a file the game itself wrote."""
+    d = bytearray(data)
+    u32 = lambda at: struct.unpack_from('<I', d, at)[0]
+    put = lambda at, v: struct.pack_into('<I', d, at, v)
+    if u32(0) != 0x42505252 or u32(4) != 1 or u32(8) != len(d) - 16 or \
+            u32(12) != zlib.crc32(bytes(d[16:])) & 0xffffffff:
+        raise ValueError('Seed save is not an intact progress-v1 file')
+    unlock = 16 + 12
+    remembered = unlock + 27 * 4 * 2
+    careers = remembered + 4 * 4 + 7 * 4
+    pod_size = (6 + 13 + 13) * 4
+    career_size = 16 + 27 * pod_size
+    career = lambda c: careers + c * career_size
+    medal = lambda c, p, o: career(c) + 16 + p * pod_size + 24 + o * 4
+    put(unlock + 4 * racer, 1)
+    put(remembered + 4 * 0, racer)  # 6F0, mode0 Free Play
+    put(remembered + 4 * 3, racer)  # 6FC, mode2 Tournament
+    if racer != 19:
+        put(career(racer) + 12, u32(career(19) + 12))  # progress219C
+        for o in range(13):
+            put(medal(racer, racer, o), u32(medal(19, 19, o)))
+    put(8, len(d) - 16)
+    put(12, zlib.crc32(bytes(d[16:])) & 0xffffffff)
+    return bytes(d)
 
 
 def digest(path):
@@ -92,11 +156,20 @@ def main():
                         help='With --hold-throttle: tap the manual reset key (T) when the pod is wedged for 3 s')
     parser.add_argument('--seed-save', type=Path,
                         help='Test only: copy this prepared native progress file (progress-v1.bin format) into the run save directory before launch')
+    parser.add_argument('--player-racer', type=int, choices=ORIGINAL_RACERS,
+                        help='Test only: unlock and remember this original racer in the seeded save '
+                             '(requires --seed-save; main-tournament-course-ta only). The game '
+                             'loads it through its own Rider screen; the route only checks it opened on it')
     parser.add_argument('--gpu-vertex-check', type=int, default=0,
                         help='Diagnostic: compare GPU pod vertices with the CPU reference every N rendered frames')
     args = parser.parse_args()
-    if os.name != 'nt' or not 10 <= args.seconds <= 600:
-        parser.error('Windows required; watchdog must be 10..600 seconds')
+    if os.name != 'nt' or not 10 <= args.seconds <= 1800:
+        parser.error('Windows required; watchdog must be 10..1800 seconds (chained-course runs need up to 30 min)')
+    if args.player_racer is not None:
+        if not args.seed_save:
+            parser.error('--player-racer needs --seed-save: a progress file the game itself wrote')
+        if args.route not in PLAYER_RACER_ROUTES:
+            parser.error('--player-racer works only with --route ' + ' / '.join(PLAYER_RACER_ROUTES))
     build, output = inside(args.build), inside(args.output)
     assets, sdl = args.assets.resolve(), args.sdl.resolve()
     receipt = json.loads((build / 'build-receipt.json').read_text(encoding='utf-8-sig'))
@@ -123,7 +196,10 @@ def main():
         seed = args.seed_save.resolve()
         if not seed.is_file():
             raise ValueError(f'Missing seed save: {seed}')
-        shutil.copy2(seed, saves / 'progress-v1.bin')
+        if args.player_racer is None:
+            shutil.copy2(seed, saves / 'progress-v1.bin')
+        else:
+            (saves / 'progress-v1.bin').write_bytes(seed_player_racer(seed.read_bytes(), args.player_racer))
     staged = output / 'RacerRevengePC.exe'
     shutil.copy2(executable, staged)
     for dll in runtime:
@@ -174,6 +250,8 @@ def main():
         env['RR_NATIVE_FIXED_WINDOW'] = '0'
     if args.input_device:
         env['RR_HUMAN_INPUT_DEVICE'] = args.input_device
+    if args.player_racer is not None:
+        env['RR_TEST_PLAYER_RACER'] = str(args.player_racer)
     if args.steer_invert:
         env['RR_TEST_STEER_INVERT'] = '1'
     if args.race_full:
@@ -197,7 +275,7 @@ def main():
     for switch in args.renderer_switch:
         env[switch] = '1'
     command = [str(staged), '--assets', str(assets)]
-    result = dict(command=command, route=args.route, watchdogSeconds=args.seconds,
+    result = dict(command=command, route=args.route, playerRacer=args.player_racer, watchdogSeconds=args.seconds,
                   sourceBuildReceipt=str(build / 'build-receipt.json'),
                   executableSha256=digest(staged),
                   runtimeHashes={p.name: digest(output / p.name) for p in runtime},
@@ -251,6 +329,10 @@ def main():
                           all(row[0] == lifecycle[0][1] and tuple(row[1:]) in owners for row in retained)))
         track = ('GA' if args.route.endswith('-ga') else 'MA' if args.route.endswith('-ma') else
                  'RA' if args.route.endswith('-ra') else 'TA')
+        # A seeded tournament run goes to the course the seed's career reached.
+        if args.route == 'main-tournament-course-ta' and args.seed_save:
+            track = seeded_tournament_track((saves / 'progress-v1.bin').read_bytes()) or track
+        result['expectedTrack'] = track
         loading_sessions = [(1, 'UI'), (2, track)] + ([(3, track)] if args.restart_once else [])
         loading_files = [capture / f'loading-session-{session}' / f'loading-{code}-{frame}.ppm'
                          for session, code in loading_sessions for frame in (1, 2)]

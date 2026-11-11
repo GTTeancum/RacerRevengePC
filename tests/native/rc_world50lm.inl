@@ -312,7 +312,9 @@ public:
     // Incremental crystal payload only; source, ordinary scene/mesh/image storage
     // and allocator bookkeeping are separate existing owner charges.
     static constexpr std::size_t additionalRawReservationBytes()noexcept{
-        return 4*sizeof(CrystalSource)+79*sizeof(CrystalPlacement)+4*(128+65)+
+        // Each crystal identity: member name and 64-hex sha as std::string. The
+        // string allocator may round capacity up (MSVC: 64 -> 79), so 128 each.
+        return 4*sizeof(CrystalSource)+79*sizeof(CrystalPlacement)+4*(128+128)+
             776*sizeof(rr::game::original_track_environment50RC::Vertex)+
             430*sizeof(a::SceneRawVertex48D)+sizeof(a::SceneRawSurface48D);
     }
@@ -446,7 +448,7 @@ public:
                         shared::need(next->crystalSources.size()<4,"RC crystal source descriptor overflow");
                         CrystalSource retained;retained.member=entry->name;retained.sourceSha=crystal->sha;
                         const auto identityBytes=retained.member.capacity()+1+retained.sourceSha.capacity()+1;
-                        shared::need(retained.member.capacity()+1<=128&&retained.sourceSha.capacity()+1<=65&&
+                        shared::need(retained.member.capacity()+1<=128&&retained.sourceSha.capacity()+1<=128&&
                             identityBytes<=availableRawPayloadBytes-next->rawPayloadBytes,
                             "RC crystal identity allocation exceeds reservation");
                         next->rawPayloadBytes+=identityBytes;
@@ -547,6 +549,11 @@ public:
     // not register synthetic static models or claim source render dispatch for
     // the native world above. Mounting the real complete RC namespace preserves
     // the provider's local resource lookup before genuine racer population.
+    // Runs inside populateCanonicalRacers after the racer sources are admitted
+    // and before the single population, as on every consumed course: the
+    // original race load 1A8A40 (Pause100 / Results104 / F8).
+    std::function<bool()> beforeRacerPopulation;
+
     bool populateCanonicalRacers(const tm::Request& request,std::size_t availableAdditionalPayloadBytes,tm::Diagnostic& d)noexcept{
         try{
             d={};shared::need(storage_&&!storage_->canonicalAttempted,"RC canonical population requires fresh native source owner");
@@ -572,6 +579,10 @@ public:
                         *request.canonicalMaterialPath.actualPrefix36B970,*provider,materials,textures,d.racerSource),
                     "Original RC canonical racer material/texture closure rejected");
             shared::need(request.canonicalDomain->appendOriginalSources(materials,textures,d.canonical),"Original RC canonical racer source admission rejected");
+            if(beforeRacerPopulation){
+                d.stage="rc_original_race_load";
+                shared::need(beforeRacerPopulation(),"Original RC race load before population rejected");
+            }
             d.stage="rc_original_racer_population";
             shared::need(request.canonicalDomain->populate(request.canonicalContext,d.canonical),"Original RC canonical racer population rejected");
             return true;

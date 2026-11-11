@@ -228,7 +228,13 @@ inline void native_original_ai_audio::Owner::stopResultsAuxiliaryPreflighted26D0
 inline bool native_original_ai_audio::Owner::canStopResultsWorld26D070(
     const rr::platform::AudioMixer50HD& mixer,
     const rr::platform::RaceAudioGroups50IC& groups)const noexcept {
-    if(!worldSoundStopCount26D070_||worldSoundStopCount26D070_>maximumWorldSoundStops26D070)return false;
+    if((!worldSoundStopCount26D070_&&!worldOwnerStopCount26D070_)||worldSoundStopCount26D070_>maximumWorldSoundStops26D070||
+       worldOwnerStopCount26D070_>maximumWorldSoundStops26D070)return false;
+    for(std::size_t n=0;n<worldOwnerStopCount26D070_;++n){const auto* o=worldOwnerStops26D070_[n];
+        if(!o||!o->canStopResults26D070(mixer,groups))return false;
+        for(std::size_t j=0;j<o->resultsStopCount26D070();++j)
+            if(groups.binding(o->resultsStopVoice26D070(j))!=rr::game::RaceAudioGroup50IC::World4D8)return false;
+    }
     for(std::size_t n=0;n<worldSoundStopCount26D070_;++n){const auto* t=worldSoundStops26D070_[n];
         if(!t||!t->canStopResultsNative26D070(mixer))return false;
         // Only the course's own World4D8 range; never another group's voice.
@@ -241,6 +247,8 @@ inline std::size_t native_original_ai_audio::Owner::resultsWorldStopCount26D070(
     std::size_t count=0;
     for(std::size_t n=0;n<worldSoundStopCount26D070_&&n<maximumWorldSoundStops26D070;++n)
         if(worldSoundStops26D070_[n])count+=worldSoundStops26D070_[n]->resultsStopCount26D070();
+    for(std::size_t n=0;n<worldOwnerStopCount26D070_&&n<maximumWorldSoundStops26D070;++n)
+        if(worldOwnerStops26D070_[n])count+=worldOwnerStops26D070_[n]->resultsStopCount26D070();
     return count;
 }
 inline std::size_t native_original_ai_audio::Owner::resultsWorldStopVoice26D070(
@@ -251,6 +259,12 @@ inline std::size_t native_original_ai_audio::Owner::resultsWorldStopVoice26D070(
         if(ordinal<count)return t->resultsStopVoice26D070(ordinal);
         ordinal-=count;
     }
+    for(std::size_t n=0;n<worldOwnerStopCount26D070_&&n<maximumWorldSoundStops26D070;++n){
+        const auto* o=worldOwnerStops26D070_[n];if(!o)continue;
+        const auto count=o->resultsStopCount26D070();
+        if(ordinal<count)return o->resultsStopVoice26D070(ordinal);
+        ordinal-=count;
+    }
     return rr::platform::audioMaximumVoices50HD;
 }
 inline void native_original_ai_audio::Owner::stopResultsWorldPreflighted26D070()noexcept {
@@ -258,4 +272,6 @@ inline void native_original_ai_audio::Owner::stopResultsWorldPreflighted26D070()
     // releases the slot through its normal path.
     for(std::size_t n=0;n<worldSoundStopCount26D070_&&n<maximumWorldSoundStops26D070;++n)
         if(worldSoundStops26D070_[n])worldSoundStops26D070_[n]->stopResultsNativePreflighted26D070();
+    for(std::size_t n=0;n<worldOwnerStopCount26D070_&&n<maximumWorldSoundStops26D070;++n)
+        if(worldOwnerStops26D070_[n])worldOwnerStops26D070_[n]->stopResultsPreflighted26D070();
 }

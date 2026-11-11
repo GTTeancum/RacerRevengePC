@@ -235,8 +235,12 @@ public:
   add(n,3u*(196652u+128u)+1024u);
   add(n,256);return n;
  }
+ // lease (optional): the race session's course-archive lease. A fresh mount
+ // or a reactivation of this same source's released mount is recorded in it,
+ // so the bank is released at race end (1316A0) like every course's.
  bool mountCanonicalArchive(a::OriginalStandardArchiveProvider50LA& provider,std::size_t availableAdditionalPayloadBytes,
-     a::OriginalStandardArchiveProvider50LA::Diagnostic& d)const noexcept {
+     a::OriginalStandardArchiveProvider50LA::Diagnostic& d,
+     a::NativeRaceMountLease50LA* lease=nullptr)const noexcept {
   using Provider=a::OriginalStandardArchiveProvider50LA;d={};
   auto self=weak_from_this().lock();if(!ready()||!self)return Provider::fail(d,Provider::Status::identity);
   // A verified same-source mount already owns every descriptor/member. This
@@ -246,7 +250,12 @@ public:
   if(!reuseCanonicalSource(provider,existing,d))return false;
   if(existing){
    if(existing.get()!=this)return Provider::fail(d,Provider::Status::identity);
-   d={};return true;
+   // Still active: the same mount stays (no new record). Released at an
+   // earlier race end: fall through and reactivate it through commit with
+   // identical rows from this same source.
+   bool active=false;
+   for(const auto& mount:provider.mounts_)if(Provider::sameName(mount->name,"TRACKS/RC.RES"))active=mount->active;
+   if(active){d={};return true;}
   }
   if(canonicalMountReservationBytes()>availableAdditionalPayloadBytes)return Provider::fail(d,Provider::Status::capacity);
   try {auto next=std::make_unique<Provider::Mount>();next->name="TRACKS/RC.RES";next->digest=archiveSha;next->archiveBytes=archiveBytes;
@@ -279,7 +288,7 @@ public:
      return Provider::fail(d,Provider::Status::identity);
     next->rcSpecmapEarlierMount=m;next->rcSpecmapEarlierOrdinal=pi;next->rcSpecmapOrdinal=ri;
    }
-   return provider.commit(std::move(next),d);
+   return provider.commit(std::move(next),d,lease);
   }catch(...){return Provider::fail(d,Provider::Status::allocation);}
  }
  bool close()noexcept {

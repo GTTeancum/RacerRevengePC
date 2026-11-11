@@ -1824,8 +1824,11 @@ bool OriginalStandardTextureResolver50LA::retireNativeRaceMounts1316A0(
     for(std::size_t i=0;i<lease.count_;++i){const auto& entry=lease.entries_[i];
         if(entry.slot>=provider.mounts_.size())return fail(d,E::source,0x1316a0);
         const auto& mount=*provider.mounts_[entry.slot];
-        if(entry.identity!=&mount||!mount.active||mount.generation!=entry.generation||
-           mount.ui||mount.rcSource||mount.tbSource||mount.gbSource||mount.mcSource||mount.taEncoded)
+        // A recorded course mount is released whatever backs it (plain RES,
+        // a typed RC/TB/GB/MC compact source, or TA's encoded binding): the
+        // provider keeps that backing, so a later race reactivates the same
+        // rows. A UI archive is never a race mount.
+        if(entry.identity!=&mount||!mount.active||mount.generation!=entry.generation||mount.ui)
             return fail(d,E::source,0x1316a0);
         for(std::size_t j=0;j<i;++j)if(lease.entries_[j].slot==entry.slot)
             return fail(d,E::source,0x1316a0);

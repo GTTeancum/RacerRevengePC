@@ -34,6 +34,8 @@
 #include "original_consumed_mb_stage50du.h"
 #include "original_consumed_sc_stage50du.h"
 #include "original_consumed_gb_stage50du.h"
+#include "original_consumed_rc_stage50du.h"
+#include "original_consumed_tc_stage50du.h"
 #include "original_consumed_sa_stage50du.h"
 #include "original_consumed_ta_stage50du.h"
 #include "original_native_ta_root_audio50la.h"
@@ -193,6 +195,8 @@ SessionExit50DU Context::run() {
  auto& consumedMbStage=this->consumedMbStage;
  auto& consumedScStage=this->consumedScStage;
  auto& consumedGbStage=this->consumedGbStage;
+ auto& consumedRcStage=this->consumedRcStage;
+ auto& consumedTcStage=this->consumedTcStage;
  auto& consumedRaStage=this->consumedRaStage;
  auto& consumedSaStage=this->consumedSaStage;
  auto& consumedTaStage=this->consumedTaStage;
@@ -388,6 +392,8 @@ SessionExit50DU Context::run() {
  auto& maOriginalDisc=this->maOriginalDisc;
  auto& maOriginalWorld=this->maOriginalWorld;
  auto& scOriginalWorld=this->scOriginalWorld;
+ auto& rcOriginalWorld=this->rcOriginalWorld;
+ auto& tcOriginalWorld=this->tcOriginalWorld;
  auto& maTriggerActions=this->maTriggerActions;
  auto& maTriggerAuthoring=this->maTriggerAuthoring;
  auto& maTriggerMembership=this->maTriggerMembership;
@@ -2434,7 +2440,7 @@ SessionExit50DU Context::run() {
    // Any consumed original race (RA, TA, MA, SA, GA, GC) publishes the same
    // Application race28C and session generation the speech owners bind to.
    const auto actualRace=consumedRaStage.race()?consumedRaStage.race():consumedTaStage.race()?consumedTaStage.race():
-       consumedMaStage.race()?consumedMaStage.race():consumedMbStage.race()?consumedMbStage.race():consumedScStage.race()?consumedScStage.race():consumedGbStage.race()?consumedGbStage.race():consumedSaStage.race()?consumedSaStage.race():
+       consumedMaStage.race()?consumedMaStage.race():consumedMbStage.race()?consumedMbStage.race():consumedScStage.race()?consumedScStage.race():consumedGbStage.race()?consumedGbStage.race():consumedRcStage.race()?consumedRcStage.race():consumedTcStage.race()?consumedTcStage.race():consumedSaStage.race()?consumedSaStage.race():
        consumedGaStage.race()?consumedGaStage.race():consumedGcStage.race();
    if(!audioEnabled||!originalUiStarted||!humanCourseEnabled||!actualRace)return;
    // Consumed races join when their identities match and otherwise keep the
@@ -2742,26 +2748,16 @@ SessionExit50DU Context::run() {
   require50DU(tbOriginalWorld->mesh(),"TB original mesh publication missing");
   trackMesh=*tbOriginalWorld->mesh();
  }
- std::shared_ptr<rc_original_world50LM::Owner> rcOriginalWorld;
+ // RC and TC worlds are built in the world stage (before counted audio); the
+ // RC raw crystal reservation was booked there once.
  if(isRcTrack){
-  require50DU(rcColdSources&&rcColdSources->ready()&&rcColdSources->world().parameters.original_bytes==actualWorld.parameters.original_bytes,
-      "RC visual source/world identity differs");
-  const auto rawReservation=rc_original_world50LM::Owner::additionalRawReservationBytes();
-  reserveRcAdditionalPayload(rawReservation,"RC crystal raw reservation exceeds remaining payload");
-  rcOriginalWorld=std::make_shared<rc_original_world50LM::Owner>();
-  rc_original_world50LM::Diagnostic diagnostic;
-  const bool loaded=rcOriginalWorld->load(rcColdSources,rawReservation,diagnostic);
-  require50DU(loaded,diagnostic.message.empty()?"RC original world rejected":diagnostic.message.c_str());
-  require50DU(rcOriginalWorld->mesh(),"RC original mesh publication missing");
+  require50DU(rcOriginalWorld&&rcOriginalWorld->mesh()&&rcColdSources&&
+      rcColdSources->world().parameters.original_bytes==actualWorld.parameters.original_bytes,
+      "retained RC original mesh publication missing");
   trackMesh=*rcOriginalWorld->mesh();
  }
- std::unique_ptr<tc_original_world50LM::Owner> tcOriginalWorld;
  if(tcOriginalDisc){
-  tcOriginalWorld=std::make_unique<tc_original_world50LM::Owner>();
-  tc_original_world50LM::Diagnostic diagnostic;
-  const bool loaded=tcOriginalWorld->load(runtime_startup50fl::readBytes(trackSession->archive),actualWorld,diagnostic);
-  require50DU(loaded,diagnostic.message.empty()?"TC original static world rejected":diagnostic.message.c_str());
-  require50DU(tcOriginalWorld->mesh(),"TC original mesh publication missing");
+  require50DU(tcOriginalWorld&&tcOriginalWorld->mesh(),"retained TC original mesh publication missing");
   trackMesh=*tcOriginalWorld->mesh();
  }
  if(mbOriginalDisc){
@@ -3431,6 +3427,8 @@ SessionExit50DU Context::run() {
       consumedMbStage.race()?consumedMbStage.race().get():
       consumedScStage.race()?consumedScStage.race().get():
       consumedGbStage.race()?consumedGbStage.race().get():
+      consumedRcStage.race()?consumedRcStage.race().get():
+      consumedTcStage.race()?consumedTcStage.race().get():
       consumedSaStage.race()?consumedSaStage.race().get():
       consumedGaStage.race()?consumedGaStage.race().get():consumedGcStage.race().get();
  };
@@ -3942,6 +3940,8 @@ SessionExit50DU Context::run() {
   if(consumedMbStage.race()&&!consumedMbStage.close())return closeRejected("MB consumed race/world retirement");
   if(consumedScStage.race()&&!consumedScStage.close())return closeRejected("SC consumed race/world retirement");
   if(consumedGbStage.race()&&!consumedGbStage.close())return closeRejected("GB consumed race/world retirement");
+  if(consumedRcStage.race()&&!consumedRcStage.close())return closeRejected("RC consumed race/world retirement");
+  if(consumedTcStage.race()&&!consumedTcStage.close())return closeRejected("TC consumed race/world retirement");
   // Original race unload releases the course's track bank (1316A0). A
   // refusal (a live borrower of its files) keeps the bank active, logged.
   native_course_archive_release50PD::holder().release();
@@ -4179,6 +4179,8 @@ SessionExit50DU Context::run() {
    .consumedMbStage=consumedMbStage,
    .consumedScStage=consumedScStage,
    .consumedGbStage=consumedGbStage,
+   .consumedRcStage=consumedRcStage,
+   .consumedTcStage=consumedTcStage,
    .consumedRaStage=consumedRaStage,
    .consumedSaStage=consumedSaStage,
    .consumedTaStage=consumedTaStage,

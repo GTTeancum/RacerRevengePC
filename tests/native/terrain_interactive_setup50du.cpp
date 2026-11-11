@@ -24,6 +24,8 @@
 #include "original_consumed_mb_stage50du.h"
 #include "original_consumed_sc_stage50du.h"
 #include "original_consumed_gb_stage50du.h"
+#include "original_consumed_rc_stage50du.h"
+#include "original_consumed_tc_stage50du.h"
 #include "original_consumed_sa_stage50du.h"
 #include "original_consumed_ta_stage50du.h"
 #include "rc_positional_sound50rc.h"
@@ -195,6 +197,8 @@ SessionExit50DU Context::run() {
  auto& consumedMbStage=this->consumedMbStage;
  auto& consumedScStage=this->consumedScStage;
  auto& consumedGbStage=this->consumedGbStage;
+ auto& consumedRcStage=this->consumedRcStage;
+ auto& consumedTcStage=this->consumedTcStage;
  auto& consumedRaStage=this->consumedRaStage;
  auto& consumedSaStage=this->consumedSaStage;
  auto& consumedTaStage=this->consumedTaStage;
@@ -252,6 +256,8 @@ SessionExit50DU Context::run() {
  auto& gbNavigation=this->gbNavigation;
  auto& gbNavigationOwner=this->gbNavigationOwner;
  auto& gbOriginalWorld=this->gbOriginalWorld;
+ auto& rcOriginalWorld=this->rcOriginalWorld;
+ auto& tcOriginalWorld=this->tcOriginalWorld;
  auto& gbParticleAttachments=this->gbParticleAttachments;
  auto& gbParticleAuthoring=this->gbParticleAuthoring;
  auto& gbParticleRender=this->gbParticleRender;
@@ -1064,7 +1070,7 @@ SessionExit50DU Context::run() {
  std::unique_ptr<gc_gate_audio50IN::Owner> gaGateAudio,gcGateAudio;
  SpeechPosition50HG audioListener{};bool audioListenerReady=false;
  std::uint64_t speechEvents=0,speechCues=0,announcerRequestsUnjoined=0;
- if((consumedRaStage.race()||consumedTaStage.race()||consumedMaStage.race()||consumedMbStage.race()||consumedScStage.race()||consumedSaStage.race()||consumedGaStage.race()||consumedGcStage.race())&&!audioEnabled)require50DU(liveAudio->finishCountedMutedGroups(loadedAudioSettings),
+ if((consumedRaStage.race()||consumedTaStage.race()||consumedMaStage.race()||consumedMbStage.race()||consumedScStage.race()||consumedRcStage.race()||consumedSaStage.race()||consumedGaStage.race()||consumedGcStage.race())&&!audioEnabled)require50DU(liveAudio->finishCountedMutedGroups(loadedAudioSettings),
      "actual counted muted audio group settings rejected");
  if(originalCameraEnabled&&!audioEnabled)require50DU(sourceCameraCycleAudio.prepareMuted(),
      "explicit muted camera cycle owner rejected");
@@ -1289,7 +1295,15 @@ SessionExit50DU Context::run() {
    require50DU(prepared,audioError.empty()?"GB positional audio preparation rejected":audioError.c_str());
    require50DU(originalAiAudio->registerResultsWorldSound26D070(gbPositionalAudio->resultsWorldTransport26D070()),
        "GB positional audio Results stop registration rejected");
+   // The door PodSound (voice126) is a World4D8 one-shot the Results stop covers too.
+   require50DU(gbPodSound&&originalAiAudio->registerResultsWorldSound26D070(*gbPodSound),
+       "GB door sound Results stop registration rejected");
    std::cerr<<"gb_native_audio ambient_rows=4 ambient_scheduling=unsupported positional_rows=49 native_transport_slots=24\n";
+  }
+  if(isTcTrack&&originalAiAudioEnabled){
+   // TC's two trigger Sounds (voices126-127, World4D8) for the Results stop.
+   require50DU(tcGlobalSound&&originalAiAudio->registerResultsWorldSound26D070(*tcGlobalSound),
+       "TC trigger sound Results stop registration rejected");
   }
  coldLoadDiagnostics.begin("audio_roster_banks");
   if(raceEnabled&&!originalAiAudioEnabled){
@@ -3111,6 +3125,8 @@ SessionExit50DU Context::run() {
   .consumedMbStage=consumedMbStage,
   .consumedScStage=consumedScStage,
   .consumedGbStage=consumedGbStage,
+  .consumedRcStage=consumedRcStage,
+  .consumedTcStage=consumedTcStage,
   .consumedRaStage=consumedRaStage,
   .consumedSaStage=consumedSaStage,
   .consumedTaStage=consumedTaStage,
@@ -3206,6 +3222,8 @@ SessionExit50DU Context::run() {
   .gbNavigation=gbNavigation,
   .gbNavigationOwner=gbNavigationOwner,
   .gbOriginalWorld=gbOriginalWorld,
+  .rcOriginalWorld=rcOriginalWorld,
+  .tcOriginalWorld=tcOriginalWorld,
   .gbParticleAttachments=gbParticleAttachments,
   .gbParticleAuthoring=gbParticleAuthoring,
   .gbParticleRender=gbParticleRender,

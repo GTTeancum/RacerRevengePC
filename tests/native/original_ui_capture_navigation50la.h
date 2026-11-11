@@ -2,6 +2,7 @@
 #include "../../platform/linux/native/original_ui_frontend50kg.h"
 #include <cstdint>
 #include <cstdio>
+#include <cstdlib>
 #include <stdexcept>
 
 // Opt-in native window evidence navigation only. This owner emits the same
@@ -13,6 +14,21 @@
 // missing destination. The caller owns the explicit native-window unattended opt-in,
 // shared wall-time deadline, actual framebuffer capture, and normal teardown.
 namespace original_ui_capture_navigation50LA {
+// Test only: the racer the seeded save remembers for this run
+// (run_windows_takeover.py --player-racer N sets RR_TEST_PLAYER_RACER).
+// TournamentRoute never selects it; it only checks that the original Rider
+// screen opened on it. Unset means the fresh profile's own Rider19.
+inline std::uint32_t expectedEntryRider50LA() {
+    const char* value=std::getenv("RR_TEST_PLAYER_RACER");
+    if(!value||!*value)return 19;
+    std::uint32_t n=0;
+    for(const char* p=value;*p;++p){
+        if(*p<'0'||*p>'9'||n>26)throw std::runtime_error("RR_TEST_PLAYER_RACER must be an original racer id 1..26");
+        n=n*10u+std::uint32_t(*p-'0');
+    }
+    if(n<1||n>26||n==5||n==6||n==13)throw std::runtime_error("RR_TEST_PLAYER_RACER is not an original racer id");
+    return n;
+}
 class Route final {
     using Snapshot=rr::platform::OriginalUiFrontendSnapshot50KG;
     using Life=rr::game::OriginalUiTransitionLifecycle50KG;
@@ -337,7 +353,10 @@ public:
             require(mainGroup==1&&firstSlot_>=1&&firstSlot_<=3&&mainSlot==firstSlot_+mainMoves_,"tournament route Main selection diverged");
             if(mainSlot<3){awaitingMainMove_=awaitingDispatch_=true;return 3;}
         }else if(confirms_==1){
-            require(s.rider.rider4C4==19,"tournament route requires the fresh Rider19 entry");
+            // Rider opens on the profile's remembered tournament racer (6FC):
+            // 19 when fresh, or the seeded --player-racer. Never moved here.
+            require(s.rider.rider4C4==expectedEntryRider50LA(),
+                "tournament route Rider did not open on the profile's remembered racer");
             if(!s.rider.selectedCharacterReady)return -1;
         }else if(confirms_==3){
             // Whatever course the profile's career progress selects (the

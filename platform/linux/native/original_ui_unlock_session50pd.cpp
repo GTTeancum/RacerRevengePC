@@ -1,5 +1,6 @@
 #include "original_ui_unlock_session50pd.h"
 #include <cmath>
+#include <cstdio>
 #include <limits>
 
 namespace rr::platform {
@@ -162,6 +163,14 @@ S OriginalUiUnlockSession50PD::bind(const OriginalUiUnlockSessionCold50PD& cold,
 }
 S OriginalUiUnlockSession50PD::notifyTransition(const game::OriginalUiTransitionNotification50KG& e,D& d) noexcept {
     d={};auto* s=storage_.get();if(!s)return result(d,S::notBound);
+    // The page reads the profile at its own entry (20AE40). A screen shown
+    // before it in the same frontend (the tournament Hall of Fame: record
+    // insertion and name entry) legitimately changes the profile, so the
+    // not-yet-shown page takes its profile baseline at its page request, as
+    // the Win page does.
+    if(e.kind==N::requestedPage90&&!s->state.pageShown&&s->operational()&&!s->inOperation&&
+       s->process()&&e.route.screen==10&&e.route.page==1)
+        s->liveStamp=s->cold.profile->stamp();
     if(!s->operational()||s->inOperation||!s->profileCurrent()||e.route.screen!=10||e.route.page!=1)return result(d,S::unsupportedState,e.sourcePC);
     const auto t=s->transition();
     if(!t.bound||e.lifecycle!=t.lifecycle||e.phase!=t.phase||!((t.current.screen==10&&t.current.page==1)||(t.requested.screen==10&&t.requested.page==1)))

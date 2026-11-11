@@ -8,7 +8,7 @@ inline bool OriginalRaceConstructor50LA::constructGcWorld1A6BC0(
     std::shared_ptr<gc_original_world50LM::Owner> world,std::uint32_t& pc)noexcept {
     pc=0x1a6bc0;
     if(!counted_||rolledBack_||!constructorSuffix_||!loadPrefixReached_||!resourcesPrepared_||
-       worldAttempted_||gbWorld74_||gbWorldCounted_||gaWorld74_||gaWorldCounted_||maWorld74_||maWorldCounted_||mbWorld74_||mbWorldCounted_||scWorld74_||scWorldCounted_||saWorld74_||saWorldCounted_||world74_||taWorld74_||taWorldCounted_||gcWorld74_||gcWorldCounted_||!world||!world->loaded()||
+       worldAttempted_||gbWorld74_||gbWorldCounted_||rcWorld74_||rcWorldCounted_||tcWorld74_||tcWorldCounted_||gaWorld74_||gaWorldCounted_||maWorld74_||maWorldCounted_||mbWorld74_||mbWorldCounted_||scWorld74_||scWorldCounted_||saWorld74_||saWorldCounted_||world74_||taWorld74_||taWorldCounted_||gcWorld74_||gcWorldCounted_||!world||!world->loaded()||
        !world->mesh()||!world->bank()||!application_||app.entities()!=application_||
        application_->attachmentLock423F58()||!raceAudio_||raceGroupCount_!=6||raceGroupsAttached_!=6)
         return false;
