@@ -12,13 +12,14 @@ static_assert(sizeof(float)==4&&std::numeric_limits<float>::is_iec559&&
               std::numeric_limits<float>::digits==24,"RA trigger observer binary32");
 namespace ra_pod_scene50LA {
 bool Owner::nativeTriggerObserverCurrent(std::size_t i)const noexcept {
-    if(!nativeTriggerList3D0_||nativeTriggerList3D0_->sourceMode||i>=2u)return false;
+    const auto obad=[&](int tag)noexcept{std::fprintf(stderr,"ra_trigger_observer_current_false i=%zu tag=%d",i,tag);std::fputc(10,stderr);return false;};
+    if(!nativeTriggerList3D0_||nativeTriggerList3D0_->sourceMode||i>=2u)return obad(1);
     const auto& list=*nativeTriggerList3D0_;const auto* o=list.observers[i].get();
     if(!o||o->retiring||!runtimeQueries_||runtimeQueries_->sceneOwner_!=this||
        !sceneApplication_||sceneApplication_!=worldApplication_||!list.actions||
        list.actions->lease_||!list.candidates||runtimeQueries_->candidates_!=list.candidates||
        !nativeCollisionListsCurrent()||!runtimeQueries_->triggerMembership_[i]||
-       list.candidates->candidates_.size()<180u||list.actions->group_.triggers.size()<2u)return false;
+       list.candidates->candidates_.size()<180u||list.actions->group_.triggers.size()<2u)return obad(2);
     const auto* s=runtimeQueries_->storage_.get();const auto* m=runtimeQueries_->triggerMembership_[i].get();
     if(!s||o->storageBorrow!=s||o->membershipBorrow!=m||!s->borrowedWorldLease||
        !m->state.attached||m->state.object!=179u+i||m->state.method!=g::ZoneMethod50CL::First||
@@ -27,7 +28,7 @@ bool Owner::nativeTriggerObserverCurrent(std::size_t i)const noexcept {
        m->links.size()!=m->entries.size()||!m->links.size()||
        s->registries.size()!=20u||s->lifecycle.storage.registries!=s->registries.data()||
        s->lifecycle.storage.registrations!=s->registrations.data()||s->registrations.size()<=178u+i||
-       s->candidates.size()<=178u+i||s->candidates[178u+i]!=&list.candidates->candidates_[178u+i])return false;
+       s->candidates.size()<=178u+i||s->candidates[178u+i]!=&list.candidates->candidates_[178u+i])return obad(3);
     const auto& pair=list.actions->nativeEntities_[i];
     const auto& candidate=list.candidates->candidates_[178u+i];
     if(!pair.triggerCounted||!pair.colliderCounted||!pair.attached||
@@ -36,7 +37,7 @@ bool Owner::nativeTriggerObserverCurrent(std::size_t i)const noexcept {
        pair.collider.nativeFlags29!=&candidate.candidate.collision.filter.flags31||
        !sceneApplication_->entityAuthority_.canRetire(pair.collider)||
        candidate.nativeTriggers!=&list.actions->group_||candidate.nativeTriggerIndex!=i||
-       candidate.shapeType!=5u||candidate.candidate.collision.shapeType!=5u)return false;
+       candidate.shapeType!=5u||candidate.candidate.collision.shapeType!=5u)return obad(4);
     const auto validEntry=[&](std::size_t n){
         if(n>=m->entries.size()||!m->entries[n].used)return false;
         const auto zone=m->links[n].zone;if(!zone||zone>10u)return false;
@@ -53,44 +54,44 @@ bool Owner::nativeTriggerObserverCurrent(std::size_t i)const noexcept {
     if(!validEntry(0)||m->links[0].zone!=4u||m->entries[0].portal||
        s->registrations[178u+i].owner!=m->entries[0].registration.owner||
        s->registrations[178u+i].slot!=m->entries[0].registration.slot||
-       s->registrations[178u+i].encodedObject!=m->entries[0].registration.encodedObject)return false;
+       s->registrations[178u+i].encodedObject!=m->entries[0].registration.encodedObject)return obad(5);
     const auto& pool=sceneApplication_->garageObserverShared_;
-    if(o->temporaryConstructed&&!pool.owns(&o->temporary))return false;
-    if(o->persistentConstructed&&!pool.owns(&o->persistent))return false;
+    if(o->temporaryConstructed&&!pool.owns(&o->temporary))return obad(6);
+    if(o->persistentConstructed&&!pool.owns(&o->persistent))return obad(7);
     if(o->complete&&(!o->persistentConstructed||o->temporaryConstructed||
        o->persistent.child04!=&collision4C4_[3].entity||
        o->persistent.method08!=collision4C4_[3].nativeList34||
-       o->persistent.slot14!=m->entries[0].registration.slot))return false;
+       o->persistent.slot14!=m->entries[0].registration.slot))return obad(8);
     std::size_t visited=0;
     for(auto ref=m->links[0].next;ref;ref=m->links[ref-1u].next){
-        if(++visited>m->entries.size()||ref==1u||ref>m->entries.size()||!validEntry(ref-1u))return false;
+        if(++visited>m->entries.size()||ref==1u||ref>m->entries.size()||!validEntry(ref-1u))return obad(9);
     }
     std::size_t used=0;for(std::size_t n=1;n<m->entries.size();++n)if(m->entries[n].used)++used;
-    if(used!=visited)return false;
+    if(used!=visited)return obad(10);
     for(std::size_t n=0;n<o->links.size();++n){const auto& owned=o->links[n];
         if(!owned.link||!o->persistentConstructed||!pool.ownsLink(&o->persistent,owned.link)||
-           !owned.membershipIndex||!validEntry(owned.membershipIndex))return false;
+           !owned.membershipIndex||!validEntry(owned.membershipIndex))return obad(11);
         for(std::size_t j=0;j<n;++j)if(o->links[j].link==owned.link||
-            o->links[j].membershipIndex==owned.membershipIndex)return false;
+            o->links[j].membershipIndex==owned.membershipIndex)return obad(12);
         const auto& e=m->entries[owned.membershipIndex];const auto z=m->links[owned.membershipIndex].zone;
         if(!e.portal||e.portal>nativePortals_.size()||!nativePortals_[e.portal-1u]||
            owned.link->method08||owned.link->collisionMethod08!=collision4C4_[z-1u].nativeList34||
            owned.link->child04!=&collision4C4_[z-1u].entity||
            owned.link->portal0C!=&nativePortals_[e.portal-1u]->entity||
-           owned.link->slot14!=e.registration.slot)return false;
+           owned.link->slot14!=e.registration.slot)return obad(13);
         std::uint32_t bits=0;std::memcpy(&bits,&e.distance10,4);
-        if(owned.link->distance10!=bits)return false;
+        if(owned.link->distance10!=bits)return obad(14);
     }
     if(o->complete){
-        if(o->links.size()!=visited)return false;
+        if(o->links.size()!=visited)return obad(15);
         auto* link=o->persistent.next00;auto ref=m->links[0].next;
         for(std::size_t n=0;n<visited;++n){
             const NativeTriggerObserver::Secondary* found=nullptr;
             for(const auto& owned:o->links)if(owned.link==link)found=&owned;
-            if(!found||!ref||found->membershipIndex!=ref-1u)return false;
+            if(!found||!ref||found->membershipIndex!=ref-1u)return obad(16);
             link=link->next00;ref=m->links[ref-1u].next;
         }
-        if(link||ref)return false;
+        if(link||ref)return obad(17);
     }
     return true;
 }
@@ -102,16 +103,27 @@ bool Owner::configureNativeTriggerObserver2A0A80(std::size_t i,std::uint32_t& pc
        runtimeQueries_->nativeFifoPins_||runtimeQueries_->triggerQueryActive_||
        runtimeQueries_->sharedOwnerLease_||runtimeQueries_->sharedRoleViews_||
        (runtimeQueries_->endCandidateProducer_&&runtimeQueries_->endCandidateProducer_->inCall)||
-       sceneApplication_->attachmentLock423F58()||std::fegetround()!=FE_TONEAREST)return false;
+       sceneApplication_->attachmentLock423F58()||std::fegetround()!=FE_TONEAREST){
+        std::fprintf(stderr,"ra_trigger_observer_rejected step=entry list=%d queries=%d scene=%d closed=%d fifo=%d query_active=%d lease=%d roles=%d lock=%d round=%d",
+            nativeTriggerList3D0_&&!nativeTriggerList3D0_->sourceMode?1:0,runtimeQueries_?1:0,
+            runtimeQueries_&&runtimeQueries_->sceneOwner_==this?1:0,runtimeQueries_&&(runtimeQueries_->closed_||runtimeQueries_->terminal_)?1:0,
+            runtimeQueries_?int(runtimeQueries_->nativeFifoPins_):-1,runtimeQueries_&&runtimeQueries_->triggerQueryActive_?1:0,
+            runtimeQueries_?int(runtimeQueries_->sharedOwnerLease_):-1,runtimeQueries_?int(runtimeQueries_->sharedRoleViews_):-1,
+            sceneApplication_&&sceneApplication_->attachmentLock423F58()?1:0,std::fegetround()==FE_TONEAREST?1:0);
+        std::fputc(10,stderr);return false;}
     auto& list=*nativeTriggerList3D0_;
     if(list.observers[i]){if(list.observers[i]->complete){pc=0x2a0b1c;return nativeTriggerObserverCurrent(i);}return false;}
     if(!list.authoring||!list.authoring->sources()||!list.candidates||!list.actions||
-       !runtimeQueries_->triggerMembership_[i])return false;
+       !runtimeQueries_->triggerMembership_[i]){
+        std::fprintf(stderr,"ra_trigger_observer_rejected step=owners i=%zu membership=%d",i,runtimeQueries_->triggerMembership_[i]?1:0);
+        std::fputc(10,stderr);return false;}
     auto* s=runtimeQueries_->storage_.get();auto& m=*runtimeQueries_->triggerMembership_[i];
     try{list.observers[i]=std::make_unique<NativeTriggerObserver>();}catch(...){return false;}
     auto& o=*list.observers[i];o.attempted=true;o.storageBorrow=s;o.membershipBorrow=&m;
     o.membershipRevision=m.state.revision;
     const auto reject=[&](std::uint32_t at){pc=at;o.failurePC=at;
+        std::fprintf(stderr,"ra_trigger_observer_rejected step=reject i=%zu pc=%x revision=%u",i,unsigned(at),unsigned(m.state.revision));
+        std::fputc(10,stderr);
         // Before acquiring any source resource there is no runtime borrow to
         // preserve. Invalid-admission/allocation failures still retire safely.
         if(!o.temporaryConstructed&&!o.persistentConstructed&&o.links.empty()){
@@ -121,10 +133,19 @@ bool Owner::configureNativeTriggerObserver2A0A80(std::size_t i,std::uint32_t& pc
     if(!nativeTriggerObserverCurrent(i)||!s||m.state.revision!=2u)return reject(pc);
     const auto& authored=(*list.authoring->sources())[i];
     const auto& candidate=list.candidates->candidates_[178u+i];const auto& c=candidate.candidate.collision;
+    std::fprintf(stderr,"ra_trigger_observer_inputs i=%zu zone=%u radius=%g c_radius=%g cached=%g shape=%u category=%u flags=%u identity=%u expected=%u m00=%g m12=%g center=%g/%g cx=%g bx=%g",
+        i,unsigned(authored.zone),double(authored.sphere.radius),double(c.sphere.radius),double(m.state.bounds.cachedRadius),
+        unsigned(m.state.lastShapeTag),unsigned(c.filter.categoryA4),unsigned(c.filter.flagsF8&0x3fu),unsigned(c.filter.identity),
+        unsigned(ra_trigger_actions50LA::firstTriggerIdentity+i),double(c.geometry.worldMatrix.v[0]),double(c.geometry.worldMatrix.v[12]),
+        double(authored.sphere.center.v[0]),double(authored.sphere.center.v[1]),double(c.sphere.center.v[0]),double(m.state.bounds.center.v[0]));
+    std::fputc(10,stderr);
     if(authored.zone!=4u||!std::isfinite(authored.sphere.radius)||authored.sphere.radius<=0.f||
        c.sphere.radius!=authored.sphere.radius||m.state.bounds.cachedRadius!=authored.sphere.radius||
        m.state.lastShapeTag!=5u||c.filter.categoryA4!=8u||
-       (c.filter.flagsF8&0x3fu)!=6u||c.filter.identity!=ra_trigger_actions50LA::firstTriggerIdentity+i)return reject(pc);
+       //Bit4 is the per-query visited mark (1226A4/1226E8 candidate
+       //collection), already set by the race's setup-frame queries; it is
+       //not authored trigger state. The authored lanes (bits0..3,5) are 6.
+       (c.filter.flagsF8&0x2fu)!=6u||c.filter.identity!=ra_trigger_actions50LA::firstTriggerIdentity+i)return reject(pc);
     // 11F680(shape5) would copy actual trigger50 matrix into shape10 and
     // transform the source sphere center. The SAME native candidate already
     // owns that immutable identity placement. Adopt it, never replay geometry,

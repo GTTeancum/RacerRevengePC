@@ -3109,7 +3109,8 @@ bool OriginalStandardTextureResource50LA::construct24DA30(
         sourceKind_=entry.kind;
         if(tga){
             OriginalTextureAllocationHistory50LA::invalidateCounterNativeProjection();
-            OriginalTextureBufferAssertions50LA::invalidateNativeProjection();
+            //No 442CD0/guard8A64 write: 257750 is their only reader/writer (SLUS_202.68
+            //257760..257784; no other access in .text), so the buffer-assertion history stays known.
             //250F10/14,251038/40: dimensions and actual format before allocation.
             width14_=height18_=static_cast<std::int32_t>(tgaWidth);
             // Both250F7C..98 (1555) and250F9C..B8 (8888) preserve
@@ -3162,7 +3163,8 @@ bool OriginalStandardTextureResource50LA::construct24DA30(
         if(!loadingPstFile_){
             OriginalTextureAllocationHistory50LA::invalidateCounterNativeProjection();
             OriginalTextureAllocationHistory50LA::invalidateVersionNativeProjection();
-            OriginalTextureBufferAssertions50LA::invalidateNativeProjection();
+            //No 442CD0/guard8A64 write: 257750 is their only reader/writer (SLUS_202.68
+            //257760..257784; no other access in .text), so the buffer-assertion history stays known.
         }
         if(entry.kind==2&&garageImage&&!child){
             // Static table loader uses flags2: every actual authored mip is

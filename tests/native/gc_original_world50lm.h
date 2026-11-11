@@ -8,6 +8,7 @@
 #include "../../src/assets/original_ui_atm50kg.h"
 #include "../../src/assets/world_normals50hk.h"
 #include <algorithm>
+#include <functional>
 #include <charconv>
 #include <iterator>
 #include <limits>

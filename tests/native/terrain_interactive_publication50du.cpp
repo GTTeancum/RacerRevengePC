@@ -864,12 +864,13 @@ void Context::run() {
   // population window (racer sources admitted, before the one combined
   // population/collector). RA does it inside its own world join; TA's race
   // does it here through its world's population hook.
-  if(commonRacePausePrewarmed&&humanCourseEnabled&&!allAiEnabled&&(taOriginalWorld||gaOriginalWorld||saOriginalWorld||maOriginalWorld)){
-   // TA, GA, SA, MA: each world's population hook runs the same race load.
+  if(commonRacePausePrewarmed&&humanCourseEnabled&&!allAiEnabled&&(taOriginalWorld||gaOriginalWorld||saOriginalWorld||maOriginalWorld||gcOriginalWorld)){
+   // TA, GA, SA, MA, GC: each world's population hook runs the same race load.
    const auto commonRace=native_common_race50PD::race(*this);
    auto& populationHook=taOriginalWorld?taOriginalWorld->beforeRacerPopulation:
        gaOriginalWorld?gaOriginalWorld->beforeRacerPopulation:
-       saOriginalWorld?saOriginalWorld->beforeRacerPopulation:maOriginalWorld->beforeRacerPopulation;
+       saOriginalWorld?saOriginalWorld->beforeRacerPopulation:
+       maOriginalWorld?maOriginalWorld->beforeRacerPopulation:gcOriginalWorld->beforeRacerPopulation;
    if(commonRace)populationHook=[&,commonRace]{
     OriginalResults104Diagnostic50LA loadDiagnostic;
     const bool loaded=originalMainApplication.loadHumanTournamentPauseResultsBeforeCollector50LA(
@@ -927,6 +928,7 @@ void Context::run() {
   if(gaOriginalWorld)gaOriginalWorld->beforeRacerPopulation=nullptr;
   if(saOriginalWorld)saOriginalWorld->beforeRacerPopulation=nullptr;
   if(maOriginalWorld)maOriginalWorld->beforeRacerPopulation=nullptr;
+  if(gcOriginalWorld)gcOriginalWorld->beforeRacerPopulation=nullptr;
   require50DU(trackMaterialsLoaded,
       trackMaterialDiagnostic.message.empty()?"selected-track material load failed":trackMaterialDiagnostic.message.c_str());
   if(humanOriginalHud&&!isRaTrack){
@@ -2015,7 +2017,8 @@ void Context::run() {
          <<" aggregate="<<text(raSessionDiagnostic.aggregate.failure)
          <<" queries="<<text(raSessionDiagnostic.aggregate.runtimeQueries.message)
          <<" camera_status="<<static_cast<unsigned>(raSessionDiagnostic.aggregate.runtimeQueries.camera.status)
-         <<" camera_pc="<<std::hex<<raSessionDiagnostic.aggregate.runtimeQueries.camera.sourcePC<<std::dec<<'\n';
+         <<" camera_pc="<<std::hex<<raSessionDiagnostic.aggregate.runtimeQueries.camera.sourcePC<<std::dec
+         <<" follow="<<(raWorld&&raWorld->nativeFollowQueries()?text(raWorld->nativeFollowQueries()->diagnostic().message):"")<<'\n';
     }
     require50DU(bool(sourceCameraSession),"same-owner RA camera preparation rejected");
    }else{

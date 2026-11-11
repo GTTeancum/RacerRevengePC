@@ -11,8 +11,13 @@ using S=OriginalAiEmitterStatus;using R=OriginalAiEmitterReceipt;
 float bits(std::uint32_t word) noexcept {float f;std::memcpy(&f,&word,4);return f;}
 bool scalar(float value) noexcept {std::uint32_t u;std::memcpy(&u,&value,4);
     const auto e=u&0x7f800000u;return e!=0x7f800000u&&(e!=0||(u&0x7fffffu)==0);}
+// pod60 is the original racer id (Pod%02d, constructor 21079C/21081C/210820),
+// not a row count: the 23 retail racers use ids 1..26 without 5, 6 and 13
+// (POD24/25/26 race in the third tournament tier). Same set as the original
+// catalog in original_player_identity50ik_fixture.h.
+bool racerId(std::uint32_t id) noexcept {return id>=1&&id<=26&&id!=5&&id!=6&&id!=13;}
 bool identity(const OriginalAiEmitterIdentity& i) noexcept {
-    return i.session&&i.racer&&i.mainBody&&i.emitterD40&&i.managerOrdinal<8&&i.pod60>0&&i.pod60<=23;
+    return i.session&&i.racer&&i.mainBody&&i.emitterD40&&i.managerOrdinal<8&&racerId(i.pod60);
 }
 bool same(const OriginalAiEmitterIdentity& a,const OriginalAiEmitterIdentity& b) noexcept {
     return a.session==b.session&&a.racer==b.racer&&a.mainBody==b.mainBody&&

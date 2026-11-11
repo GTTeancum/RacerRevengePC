@@ -1601,9 +1601,13 @@ bool VehicleWindowGl50DS::Storage::validateParticleDraw(const game::OriginalGcPa
     //Bind particles to the exact same current49F matrix as opaque gameplay.
     //50DX changes only packing and Z: this duplicate native arithmetic is a
     //preflight comparison, not a second camera or guessed view reconstruction.
+    //Native widescreen scales the world matrix's clip-X column (50DX); the
+    //source-projected particle quads take the same factor in drawGcParticles.
+    const float widescreenX=nativeWidescreenScaleX50DX(frame.width,frame.height);
     for(U row=0;row<4;++row)for(U col=0;col<4;++col){
         float expected=draw->sourceCombined[row*4+col];
         if(col==2){volatile float twice=2.f*expected;volatile float z=twice-draw->sourceCombined[row*4+3];expected=z;}
+        if(col==0&&widescreenX!=1.f){volatile float scaled=expected*widescreenX;expected=scaled;}
         if(!std::isfinite(expected)||expected!=frame.worldViewProjection[col*4+row])
             return fail(d,VehicleWindowError50DS::frame,"GC particle/world camera projection mismatch");
     }

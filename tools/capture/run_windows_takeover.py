@@ -50,7 +50,7 @@ def main():
     parser.add_argument('--restart-once', action='store_true',
                         help='Exercise native race teardown/rebuild after first race evidence; not Pause-menu input')
     parser.add_argument('--renderer-switch', action='append', default=[],
-                        choices=['RR_EXACT_PS2_SPECULAR', 'RR_GPU_FINISH_EACH_FRAME',
+                        choices=['RR_EXACT_PS2_SPECULAR', 'RR_GPU_FINISH_EACH_FRAME', 'RR_RA_OWNED_PREPARATION', 'RR_ORIGINAL_ASPECT',
                                  'RR_TRACE_ORIGINAL_UI_STAGES',
                                  'RR_GARAGE_PROOF_SHADOW', 'RR_GARAGE_KERNEL_SHADOW',
                                  'RR_GARAGE_LEGACY_INDEX', 'RR_GARAGE_LEGACY_FINISH',

@@ -273,6 +273,20 @@ bool Application::completeConsumedRaWorldNativePrefix1A9EE0(
         if(!race->continueNativeTrackAfterWater(*this,tailPC)||tailPC!=0x1aa508){
             std::fprintf(stderr,"ra_native_track_after_water_stopped pc=%x",unsigned(tailPC));
             std::fputc(10,stderr);pc=tailPC;return false;}
+        // 1A9EE0 returned (1AA508). The camera controller load that follows
+        // (1A6D98 -> 1A95B0 -> 174DF0) now runs on the Session's existing
+        // never-adopted native staging, the same 174DF0/174A30 path every
+        // other course uses (it already carries RA's 78/7C children). The
+        // separate source-adopted owned preparation below stays fenced: it
+        // was never completed past 2C1170 and is not entered.
+        {
+            static const bool ownedPreparation=[]{const char* v=std::getenv("RR_RA_OWNED_PREPARATION");
+                return v&&std::string(v)=="1";}();
+            if(!ownedPreparation){
+                std::fprintf(stderr,"ra_native_track_load_complete pc=1aa508 controller_load=existing_native_staging");
+                std::fputc(10,stderr);pc=0x1a6d98;return true;
+            }
+        }
         // Source constructor30 is zero, but the complete original reachable
         // writer history is NOT established here. Do not read field30_ as
         // authority, skip114770, or claim1A95B0/174DF0 returned. The native
@@ -309,39 +323,41 @@ bool Application::completeConsumedRaWorldNativePrefix1A9EE0(
            !session.nativeIntroFirstChildCurrent())return false;
         // Native late custody of process330 constructor/resources only. The
         // prefix ends BEFORE114A00; it cannot satisfy1CC900 or load return.
-        if(!stageNativeLoading330Prefix(pc))return false;
+        if(!stageNativeLoading330Prefix(pc)){std::fprintf(stderr,"ra_owned_preparation_stopped line=%d pc=%x",326,unsigned(pc));std::fputc(10,stderr);return false;}
         session.nativeRaOwnedPreparationAttempted_=true;
         //One-shot SAME-controller source prefix under explicit native adoption.
         //Not proof that the still-unjoined Race30/1A95B0 caller reached here.
-        if(!session.beginSameControllerLoad174DF0(race.get(),race->camera34_.get(),race->field8C_,pc))return false;
+        if(!session.beginSameControllerLoad174DF0(race.get(),race->camera34_.get(),race->field8C_,pc)){std::fprintf(stderr,"ra_owned_preparation_stopped line=%d pc=%x",330,unsigned(pc));std::fputc(10,stderr);return false;}
         std::uint32_t actualWorldCount=0;
         if(!race->readSameControllerWorldCount174E48(session,actualWorldCount,pc)){
             controller.nativeLoadPrefixPC=pc;return false;
         }
-        if(!session.publishSameControllerWorldCount174E58(actualWorldCount,pc))return false;
+        if(!session.publishSameControllerWorldCount174E58(actualWorldCount,pc)){std::fprintf(stderr,"ra_owned_preparation_stopped line=%d pc=%x",335,unsigned(pc));std::fputc(10,stderr);return false;}
         //Original profile reads occur AFTER raw A8 publication. Do not eagerly
         //require mode/App350 on subtype2/3, or App350 when mode==2.
         std::uint32_t subtype=0,mode=0;std::int32_t process350=0;
         pc=controller.nativeLoadPrefixPC=0x174e6c;
-        if(!riderProfile->resultsSubtype11258(subtype)||subtype!=session.actual_.launchKind11258)return false;
+        if(!riderProfile->resultsSubtype11258(subtype)||subtype!=session.actual_.launchKind11258){std::fprintf(stderr,"ra_owned_preparation_stopped line=%d pc=%x",340,unsigned(pc));std::fputc(10,stderr);return false;}
         if(subtype==1u){
             pc=controller.nativeLoadPrefixPC=0x174e90;
             const auto* common=riderProfile->commonProfile();
-            if(!common||!common->known||common->mode34!=session.actual_.configuration34)return false;
+            if(!common||!common->known||common->mode34!=session.actual_.configuration34){std::fprintf(stderr,"ra_owned_preparation_stopped line=%d pc=%x",344,unsigned(pc));std::fputc(10,stderr);return false;}
             mode=common->mode34;
             if(mode!=2u){pc=controller.nativeLoadPrefixPC=0x174e9c;process350=session.actual_.application350;}
         }
-        if(!session.finishSameControllerProfile174EC0(subtype,mode,process350,pc))return false;
-        if(!session.adoptNativeCamera6468(pc))return false;
-        if(!session.adoptNativeAttached6CAnd70(pc))return false;
-        if(!session.completeNativeControllerChildren177750(pc))return false;
+        if(!session.finishSameControllerProfile174EC0(subtype,mode,process350,pc)){std::fprintf(stderr,"ra_owned_preparation_stopped line=%d pc=%x",348,unsigned(pc));std::fputc(10,stderr);return false;}
+        if(!session.adoptNativeCamera6468(pc)){std::fprintf(stderr,"ra_owned_preparation_stopped line=%d pc=%x",349,unsigned(pc));std::fputc(10,stderr);return false;}
+        if(!session.adoptNativeAttached6CAnd70(pc)){std::fprintf(stderr,"ra_owned_preparation_stopped line=%d pc=%x",350,unsigned(pc));std::fputc(10,stderr);return false;}
+        if(!session.completeNativeControllerChildren177750(pc)){std::fprintf(stderr,"ra_owned_preparation_stopped line=%d pc=%x",351,unsigned(pc));std::fputc(10,stderr);return false;}
         //Separate explicit native adaptation of the SAME existing first
         //racer, NOT source fallthrough or proof of1A6D98/1A95B0 reachability.
         //No a2/a3 caller operands are invented: this prefix stops before them.
-        if(!session.actual_.bank.visit(0,[&](){return session.adoptNativeRacerCamera1750A0(pc);}))return false;
+        //Outside any Bank visit: 1750A0's adoption reads the retained slot0
+        //scalars through Bank::read, which refuses (throws) inside a visit.
+        if(!session.adoptNativeRacerCamera1750A0(pc)){std::fprintf(stderr,"ra_owned_preparation_stopped line=%d pc=%x",357,unsigned(pc));std::fputc(10,stderr);return false;}
         //Explicit native loader adoption, after the actual same-World water
         //return. It never turns planned cold arrays into source publications.
-        if(!session.nativeWreckOwner_||!race->stageNativeFirstWreckLoad(*this,session,*session.nativeWreckOwner_,pc))return false;
+        if(!session.nativeWreckOwner_||!race->stageNativeFirstWreckLoad(*this,session,*session.nativeWreckOwner_,pc)){std::fprintf(stderr,"ra_owned_preparation_stopped line=%d pc=%x",360,unsigned(pc));std::fputc(10,stderr);return false;}
         // The actual base receiver's shared+98 now reaches a real detached
         // D48 constructor/publication, but remains pending at2C1170. No load,
         // attachment, Player+9C/D40 ownership or full+98 return is inferred.

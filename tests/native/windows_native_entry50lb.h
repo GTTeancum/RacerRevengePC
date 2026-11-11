@@ -224,6 +224,14 @@ inline fs::path& terminateLogPath()noexcept{static fs::path path;return path;}
 [[noreturn]] inline void reportTerminate()noexcept {
     const char* reason=native_last_failure50PD::last();
     std::fprintf(stderr,"native_terminate last_failure=%s\n",reason?reason:"(none recorded)");
+    {   // Return addresses as module offsets (resolve with the link map).
+        void* frames[48]{};const auto count=CaptureStackBackTrace(0,48,frames,nullptr);
+        const auto base=reinterpret_cast<std::uintptr_t>(GetModuleHandleW(nullptr));
+        std::fprintf(stderr,"native_terminate_stack base=%p",reinterpret_cast<void*>(base));
+        for(unsigned i=0;i<count;++i)std::fprintf(stderr," +%llx",
+            static_cast<unsigned long long>(reinterpret_cast<std::uintptr_t>(frames[i])-base));
+        std::fputc('\n',stderr);
+    }
     sessionMarker("SESSION END exit=terminate");std::fflush(stderr);
     try {
         visibleFailure(L"The game stopped while loading or running a race:\n"+

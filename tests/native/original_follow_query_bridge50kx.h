@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <array>
 #include <bit>
+#include <cstdio>
 #include <cstring>
 #include <limits>
 #include <stdexcept>
@@ -299,20 +300,21 @@ class QueryBridge {
     // world's nonzero-identity admission. Every reserved row must be an actual
     // constructed piece query before the full camera extent is published.
     bool wreckRecordsReady() const noexcept {
+        const auto wbad=[&](int tag,std::size_t piece)noexcept{std::fprintf(stderr,"follow_wreck_records_rejected piece=%zu of=%zu tag=%d",piece,wreck_.size(),tag);std::fputc(10,stderr);return false;};
         for(std::size_t i=0;i<wreck_.size();++i){
-            const auto& b=wreck_[i];if(!b.owner||!b.assets||!b.assets->prepared()||!b.owner->constructed())return false;
+            const auto& b=wreck_[i];if(!b.owner||!b.assets||!b.assets->prepared()||!b.owner->constructed())return wbad(1,i);
             const auto& w=b.owner->worldBinding();
             if(w.objects!=storage_.objects.data()||w.states!=storage_.source.data()||
                w.copies!=copies_.data()||w.geometry!=geometry_.data()||
                w.lifecycle!=&storage_.lifecycle||w.world!=&storage_.world||
                w.workspace!=&storage_.membershipWork||w.objectCount!=storage_.count.objects||
-               w.globalValid3E0730!=&storage_.globalValid3E0730)return false;
+               w.globalValid3E0730!=&storage_.globalValid3E0730)return wbad(2,i);
             for(unsigned q=0;q<3;++q){
                 const auto ref=static_cast<CollectionRef50BX>(storage_.count.wreckFirstQuery+i*3u+q);
                 if(!b.owner->coherent(q)||b.owner->ref(q)!=ref||w.identities[q]!=b.identities[q]||
-                   storage_.objects[ref-1u].identity!=b.identities[q])return false;
+                   storage_.objects[ref-1u].identity!=b.identities[q])return wbad(3,i);
                 for(std::size_t other=0;other<storage_.count.objects;++other)
-                    if(other!=ref-1u&&storage_.objects[other].identity==b.identities[q])return false;
+                    if(other!=ref-1u&&storage_.objects[other].identity==b.identities[q])return wbad(4,i);
             }
             const auto index=b.owner->ref(1)-1u;const auto& shape=b.owner->query(1).type0;
             std::size_t extent=0;
@@ -323,7 +325,7 @@ class QueryBridge {
             if(!mesh||!meshExtent(*mesh,extent)||extent>wreckMeshStackCapacity_||extent>meshStack_.size()||
                geometry_[index].mesh!=mesh||geometry_[index].compound||
                !geometry_[index].hasResponseCallbackE8||
-               std::memcmp(geometry_[index].world.v,shape.composed00.v,sizeof shape.composed00.v))return false;
+               std::memcmp(geometry_[index].world.v,shape.composed00.v,sizeof shape.composed00.v))return wbad(5,i);
         }
         return true;
     }

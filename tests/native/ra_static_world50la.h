@@ -140,11 +140,17 @@ private:
            !a::extractResMember48C(data->archive,row.name,bytes,d.decode)||bytes.size()!=row.bytes)return false;
         a::OriginalStandardArchiveProvider50LA::MemberView selected;
         a::OriginalStandardArchiveProvider50LA::MountView mount;
-        return provider->lookup132820(row.name,selected)==a::OriginalStandardArchiveProvider50LA::Lookup::present&&
-            provider->mount(selected.mount,mount)&&mount.archiveSha256&&*mount.archiveSha256==ra_cold_sources50LA::archiveSha&&
-            mount.archiveBytes==4604561&&mount.memberCount==1010&&selected.data&&selected.member&&
-            normalized(*selected.member)==normalized(row.name)&&selected.size==bytes.size()&&
-            !std::memcmp(selected.data,bytes.data(),bytes.size());
+        if(provider->lookup132820(row.name,selected)!=a::OriginalStandardArchiveProvider50LA::Lookup::present||
+           !provider->mount(selected.mount,mount)||!selected.data||!selected.member||
+           normalized(*selected.member)!=normalized(row.name)||selected.size!=bytes.size()||
+           std::memcmp(selected.data,bytes.data(),bytes.size()))return false;
+        // A lookup is "present" only when every active mount holding this
+        // name has identical bytes (132820). The winner may be an earlier
+        // race's still-mounted track bank (RA loaded after GA): its member is
+        // byte-identical to RA's own, which the source archive authenticates.
+        if(mount.archiveSha256&&*mount.archiveSha256==ra_cold_sources50LA::archiveSha)
+            return mount.archiveBytes==4604561&&mount.memberCount==1010;
+        return true;
     }
     bool retainPsmSources(const a::Scene48D& scene,Diagnostic& d){
         for(const auto& name:scene.materials){
