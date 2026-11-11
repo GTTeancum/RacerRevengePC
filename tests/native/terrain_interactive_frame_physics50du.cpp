@@ -329,7 +329,9 @@ bool Context::advancePhysics(std::size_t actualRacerSlot,Part part,float liveSub
       s.fields.damage7D4,s.fields.damage7DC};
   const auto damageReceipt=updateEngineDamageAudio50IA(damageInput,engineDamage,
       engineDamage,s.noiseOwner().sharedRandomState);
-  require50DU(damageReceipt.okay(),"original engine damage modulation rejected");
+  require50DU(damageReceipt.okay(),damageReceipt.status==EngineDamageStatus50IA::RandomRange?
+      "original engine damage modulation rejected (random range)":
+      "original engine damage modulation rejected (input or curve state)");
   ++engineDamageUpdates;engineDamageDraws+=damageReceipt.randomDraws;
   if(damageReceipt.damageDipStarted)++engineDamageDips;
   if(damageReceipt.returnStarted)++engineDamageReturns;

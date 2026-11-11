@@ -41,12 +41,24 @@ inline bool valid(const EngineDamageState50IA&s)noexcept {
 // Original shared308030 owner. Preserve raw32; mask only its returned value.
 // Native callers already own the initialized RNG used by physics/materials/
 // speech. Never seed or replace it with a private audio generator.
+// The R5900 FPU rounds CVT.S.W and MUL.S toward zero, so the source's
+// span*(2^-31*float(low31)) is always below span. Host nearest-even rounds 64
+// of the 2^31 low31 values up to span (about 1 draw in 33 million), which
+// breached the source assertion and stopped a GA race. This draw therefore
+// narrows both steps toward zero, as the original hardware does. Every step
+// is exact in binary64 first: low31 needs 31 bits, span*x at most 29.
+inline float towardZero(double exact)noexcept {
+    volatile float narrowed=static_cast<float>(exact);float value=narrowed;
+    if(static_cast<double>(value)>exact)value=std::nextafter(value,0.f);
+    return value;
+}
 inline bool draw(std::uint32_t&raw,unsigned span,unsigned base,unsigned&value)noexcept {
     raw=raw*0x41c64e6du+0x3039u;
-    volatile float integer=static_cast<float>(raw&0x7fffffffu);
-    const float scaled=mul(static_cast<float>(span),mul(0x1p-31f,integer));
-    // A rare float rounding to span breaches the source assertion. Reject it,
-    // retaining caller state/RNG, rather than choosing a different variant.
+    const float integer=towardZero(static_cast<double>(raw&0x7fffffffu));
+    const float unit=mul(0x1p-31f,integer); // Power-of-two scale: exact.
+    const float scaled=towardZero(static_cast<double>(span)*static_cast<double>(unit));
+    // Unreachable with toward-zero narrowing; kept as the source assertion's
+    // bound, refusing rather than choosing a different variant.
     if(!finite(scaled)||scaled<0.f||scaled>=static_cast<float>(span))return false;
     value=base+static_cast<unsigned>(scaled);return true;
 }
