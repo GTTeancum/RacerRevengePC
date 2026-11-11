@@ -18,7 +18,7 @@ namespace interactive_ra_cold50DU {
 using namespace rr::game;
 namespace {
 void require50DU(bool ok, const char* message) {
-    if (!ok) throw std::runtime_error(message);
+    if(!ok){std::cerr<<"require_failed "<<(message?message:"")<<std::endl;throw std::runtime_error(message);}
 }
 }
 void Context::run() const {

@@ -55,7 +55,7 @@ using interactive_loop50DU::GameplayDisplayWallTotals50DU;
 using J=nlohmann::json;
 namespace {
 void require50DU(bool ok,const char* message) {
-    if(!ok)throw std::runtime_error(message);
+    if(!ok){std::cerr<<"require_failed "<<(message?message:"")<<std::endl;throw std::runtime_error(message);}
 }
 template<class Operation>
 decltype(auto) coldRacerStage50DU(const std::string& podId,const char* stage,
@@ -2007,6 +2007,15 @@ void Context::run() {
          "actual RA intro audio177750 construction rejected");
     }
     sourceCameraSession=raSession->prepareAndBorrowCamera(raSessionDiagnostic);
+    if(!sourceCameraSession){
+     const auto text=[](const char* p){return p?p:"";};
+     std::cerr<<"RA camera preparation failure="<<text(raSessionDiagnostic.failure)
+         <<" operation="<<text(raSessionDiagnostic.operation)
+         <<" aggregate="<<text(raSessionDiagnostic.aggregate.failure)
+         <<" queries="<<text(raSessionDiagnostic.aggregate.runtimeQueries.message)
+         <<" camera_status="<<static_cast<unsigned>(raSessionDiagnostic.aggregate.runtimeQueries.camera.status)
+         <<" camera_pc="<<std::hex<<raSessionDiagnostic.aggregate.runtimeQueries.camera.sourcePC<<std::dec<<'\n';
+    }
     require50DU(bool(sourceCameraSession),"same-owner RA camera preparation rejected");
    }else{
    requireMbRuntimeNavigation50MB();

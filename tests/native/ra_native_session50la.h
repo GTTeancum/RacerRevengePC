@@ -141,6 +141,11 @@ private:
             if(!aggregate_->prepareStaticWorld(application_.standardMaterialDomain(),std::move(context),path,d.aggregate))return false;
             d.operation="actual scene particle manager";
             if(!aggregate_->constructRuntimeTrackParticleManager(application_,generation_,d.aggregate))return false;
+            // The four TOB particle emitters (27CA70, sourceA1=1) of the same
+            // Application/session; the native track load's 2722F0 descriptor
+            // reader requires them. Their constructor stage had no caller.
+            d.operation="actual detached TOB particle emitters";
+            if(!aggregate_->constructDetachedParticlePrefixes(application_.entities(),generation_,d.aggregate))return false;
             d.operation="static model constructors";
             if(!aggregate_->constructStaticModelPrefixes(application_,d.aggregate)||
                !aggregate_->completeStaticModelResourcesAndPlacement(d.aggregate)||
@@ -169,6 +174,10 @@ private:
             // HOST staging adaptation: source Pause100 then Results104 acquire
             // before the one combined image/collector plan; no second collector.
             if(pause){
+                // The RES-mounted world images must be resolvable when the race
+                // load's whole-table 2DF144 population runs (as in the original).
+                d.operation="RA world image sources before the race load";
+                if(!aggregate_->prepareStaticWorldImageSources(crowdImages,d.aggregate))return false;
                 d.operation="same counted race Pause100 then Results104 loading";
                 const bool loaded=actualHumanRacer60?
                     application_.loadHumanTournamentPauseResultsBeforeCollector50LA(

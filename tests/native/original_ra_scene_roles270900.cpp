@@ -2,6 +2,7 @@
 #include "ra_cold_aggregate50la.h"
 #include "original_world_cold_prefix50la.h"
 #include <cstdint>
+#include <cstdio>
 #include <cstring>
 #include <limits>
 #include <thread>
@@ -306,12 +307,17 @@ bool Owner::continueNativeSceneInfo270900(const original_main_entry50KG::Applica
     if(read.document!=&doc||read.sceneInfo!=uniqueBlock(doc,"sceneinfo"))return false;
     if(read.next==Read::sceneName){
         pc=0x2709bc;bool unique=true;const auto* name=uniqueField(*read.sceneInfo,"scenename",unique);
-        //158240(-1) copies actual source text. Our immutable alias admits the
-        //real bounded RA spelling only, never inventing a missing name/default.
-        if(!unique||!name||name->value.empty()||name->value.size()>=260u||
-           name->value.find('\0')!=std::string::npos)return false;
-        for(std::size_t i=0;i<name->value.size();++i)worldText244_[i]=static_cast<std::uint8_t>(name->value[i]);
-        worldText244_[name->value.size()]=0; //Bounded actual158240 write; tail bytes remain unknown.
+        //158240(-1) copies actual source text. The actual RA SceneInfo has NO
+        //SceneName (only NumPortals/NumZones; same finding as the verified
+        //source-config reader, original_world_source_config50la.h): the binary
+        //missing branch leaves World244 untouched. A present name must still
+        //be the bounded real spelling.
+        if(!unique)return false;
+        if(name){
+            if(name->value.empty()||name->value.size()>=260u||name->value.find('\0')!=std::string::npos)return false;
+            for(std::size_t i=0;i<name->value.size();++i)worldText244_[i]=static_cast<std::uint8_t>(name->value[i]);
+            worldText244_[name->value.size()]=0; //Bounded actual158240 write; tail bytes remain unknown.
+        }
         read.name244=name;read.next=Read::portals;
     }
     if(read.next==Read::portals){
@@ -369,12 +375,14 @@ bool Owner::nativeSceneInfo270900Current(const original_main_entry50KG::Applicat
        read.environmentVisibilityBackend!=lighting_.get())return false;
     if(!worldZones34C_||*worldZones34C_!=static_cast<std::uint32_t>(read.authoredZones34C)||
        !worldPortals358_||*worldPortals358_!=static_cast<std::uint32_t>(read.authoredPortals358))return false;
-    if(!read.name244||read.name244->value.size()>=worldText244_.size())return false;
-    for(std::size_t i=0;i<read.name244->value.size();++i)
-        if(!worldText244_[i]||*worldText244_[i]!=static_cast<std::uint8_t>(read.name244->value[i]))return false;
-    if(!worldText244_[read.name244->value.size()]||*worldText244_[read.name244->value.size()])return false;
+    if(read.name244){ //Absent SceneName: World244 was left untouched (binary 158240).
+        if(read.name244->value.size()>=worldText244_.size())return false;
+        for(std::size_t i=0;i<read.name244->value.size();++i)
+            if(!worldText244_[i]||*worldText244_[i]!=static_cast<std::uint8_t>(read.name244->value[i]))return false;
+        if(!worldText244_[read.name244->value.size()]||*worldText244_[read.name244->value.size()])return false;
+    }
     bool unique=true;
-    if(read.name244!=uniqueField(*read.sceneInfo,"scenename",unique)||!unique||!read.name244)return false;
+    if(read.name244!=uniqueField(*read.sceneInfo,"scenename",unique)||!unique)return false;
     std::int32_t portals=0,zones=1,environmentNode=0;
     if(!integer158B30(*read.sceneInfo,"numportals",0,portals)||portals!=read.authoredPortals358||
        !integer158B30(*read.sceneInfo,"numzones",1,zones)||zones!=read.authoredZones34C||

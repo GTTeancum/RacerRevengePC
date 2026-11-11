@@ -37,7 +37,7 @@
 namespace interactive_cold50DU {
 namespace {
 void require50DU(bool ok,const char* message) {
-    if(!ok)throw std::runtime_error(message);
+    if(!ok){std::cerr<<"require_failed "<<(message?message:"")<<std::endl;throw std::runtime_error(message);}
 }
 template<class Operation>
 decltype(auto) coldRacerStage50DU(const std::string& podId,const char* stage,

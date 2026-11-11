@@ -53,7 +53,7 @@
 namespace interactive_cold50DU {
 namespace {
 void require50DU(bool ok,const char* message) {
-    if(!ok)throw std::runtime_error(message);
+    if(!ok){std::cerr<<"require_failed "<<(message?message:"")<<std::endl;throw std::runtime_error(message);}
 }
 template<class Operation>
 decltype(auto) coldRacerStage50DU(const std::string& podId,const char* stage,
@@ -190,8 +190,11 @@ void OwnersContext::run() {
    if((sourceConsumedPauseActivation||humanResultsCold)&&consumedRaStage.race())
     require50DU(originalMainApplication.prewarmPauseCold50LA(sourcePause),
        "actual Pause canonical prewarm rejected");
-   require50DU(raWorld->mountRetainedRuntimeRosterArchives(originalMainApplication,raDiagnostic),
-       raDiagnostic.failure?raDiagnostic.failure:"RA roster archive mounting rejected");
+   {const bool mounted=raWorld->mountRetainedRuntimeRosterArchives(originalMainApplication,raDiagnostic);
+    if(!mounted)std::cerr<<"ra_roster_mount_rejected failure="<<(raDiagnostic.failure?raDiagnostic.failure:"")
+        <<" slot="<<raDiagnostic.rosterSlot<<" mount_status="<<static_cast<unsigned>(raDiagnostic.rosterMount.status)
+        <<" mount="<<raDiagnostic.rosterMount.mount<<" ordinal="<<raDiagnostic.rosterMount.ordinal<<'\n';
+    require50DU(mounted,raDiagnostic.failure?raDiagnostic.failure:"RA roster archive mounting rejected");}
    std::array<std::vector<std::uint8_t>,6> crowdImages;
    if(!runtime_asset_paths50LB::configuredRoot("RR_ORIGINAL_ASSET_ROOT").empty())
     require50DU(raWorld->decodeCrowdImages(crowdImages,raDiagnostic),
@@ -228,7 +231,10 @@ void OwnersContext::run() {
       <<" roster="<<text(raSessionDiagnostic.roster.failure)
       <<" roster_stage="<<text(raSessionDiagnostic.roster.stage)
       <<" slot="<<raSessionDiagnostic.roster.slot
-      <<" detail="<<raSessionDiagnostic.roster.detail<<'\n';
+      <<" detail="<<raSessionDiagnostic.roster.detail
+      <<" results="<<text(raSessionDiagnostic.results.operation)
+      <<" results_pc="<<std::hex<<raSessionDiagnostic.results.sourcePC<<std::dec
+      <<" results_status="<<static_cast<unsigned>(raSessionDiagnostic.results.status)<<'\n';
     const auto& material=raSessionDiagnostic.aggregate.world.material;
     rr::assets::OriginalStandardMaterialRowView50LA materialRow;
     rr::assets::OriginalStandardTextureRowView50LA textureRow;

@@ -635,12 +635,8 @@ void Context::run() {
      const auto* target=courseTargets.admits(selected);
      require50DU(courseRaceCold&&!courseRaceLaunched&&target&&(selected.laps==3||humanCourseEnabled),
          "Course queue selected an unavailable native destination");
-     if(target&&target->track==original_course_targets50KX::Track::RA){
-      std::uint32_t sourcePC=0;
-      const bool complete=originalMain.advanceCourseRaLoadingPrefix50LA(sourcePC);
-      if(!complete)std::cerr<<"original_course_loading_prefix_stopped source="<<sourcePC<<'\n';
-      require50DU(complete,"original RA Course loading prefix stopped before pending activation");
-     }
+     // RA uses the same typed cold-load exit as every other course; the former
+     // RA-only loading prefix always stopped at 1465D0 and had no consumer.
      // Even an unchanged track/rider must rebuild: this retained UI path
      // prepared its race groups before any new Options Accept. Never retune
      // those live groups or reuse their stale ducking restore configuration.

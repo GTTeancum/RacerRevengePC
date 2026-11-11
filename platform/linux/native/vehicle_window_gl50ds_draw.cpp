@@ -2305,6 +2305,12 @@ bool VehicleWindowGl50DS::Storage::copyToWindow(I copyWidth,I copyHeight) noexce
         // No atomicity claim for default framebuffer writes. On any later
         // error the host must not swap this potentially partial back buffer.
         diagnostic->defaultFramebufferMayBeModified = true;
+        {   // Presentation size receipt: one line whenever the copied extent changes.
+            static I lastWidth=-1,lastHeight=-1;
+            if(copyWidth!=lastWidth||copyHeight!=lastHeight){lastWidth=copyWidth;lastHeight=copyHeight;
+                std::fprintf(stderr,"window_copy_extent width=%d height=%d storage=%dx%d\n",
+                    int(copyWidth),int(copyHeight),int(width),int(height));}
+        }
         gl.blitFramebuffer(0, 0, copyWidth, copyHeight, 0, 0, copyWidth, copyHeight, colorBufferBit, 0x2600); // NEAREST
         if (!check("blit vehicle color to default back buffer")) return false;
         gl.bindFramebuffer(framebuffer, 0);

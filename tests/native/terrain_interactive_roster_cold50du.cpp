@@ -29,7 +29,7 @@ namespace f=runtime_startup50fl;
 using namespace rr::game;
 namespace {
 void require50DU(bool ok, const char* message) {
-    if (!ok) throw std::runtime_error(message);
+    if(!ok){std::cerr<<"require_failed "<<(message?message:"")<<std::endl;throw std::runtime_error(message);}
 }
 // Cold startup only: add resource identity/stage without changing successful
 // operations. Keep the original exception nested and its detail in what().

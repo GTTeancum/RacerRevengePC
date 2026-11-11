@@ -670,12 +670,10 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
         selected.rider==7&&selected.course==11&&selected.planet==4&&selected.laps==3&&selected.entrants==8,
         "Gasgano/SA capture rejected a mismatched original Course handoff");
     const auto* target=courseTargets.admits(selected);
-    if(target&&target->track==original_course_targets50KX::Track::RA){
-     std::uint32_t sourcePC=0;
-     const bool complete=originalMain.advanceCourseRaLoadingPrefix50LA(sourcePC);
-     if(!complete)std::cerr<<"original_course_loading_prefix_stopped source="<<sourcePC<<'\n';
-     require50DU(complete,"original RA Course loading prefix stopped before pending activation");
-    }
+    // RA leaves Course through the same typed cold-load exit as every other
+    // course (the original 1465C0 Course exit reads no track id). The former
+    // RA-only loading prefix (advanceCourseRaLoadingPrefix50LA) always stopped
+    // at 1465D0 and nothing consumed it, so it is not called here.
     require50DU(target&&(target->track==original_course_targets50KX::Track::RA||
        directHumanTargetSupported(target->track)||courseCorpusPresent)&&
         courseTargetModeSupported(target->track)&&(!allAiEnabled||selected.laps==3)&&

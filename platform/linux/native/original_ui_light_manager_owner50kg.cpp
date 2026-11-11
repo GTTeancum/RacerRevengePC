@@ -14,6 +14,7 @@
 #include <limits>
 #include <initializer_list>
 #include "original_ui_light_manager_source_portal_guards50la.h"
+#include <new>
 namespace rr::platform {
 using K=game::OriginalWreckComponentKind50LA;
 //24BD7C consumes these renderer-global rows once from the actual singleton.
@@ -949,10 +950,21 @@ bool OriginalUiLightManagerOwner50KG::incrementRaAmbient149300(
 bool OriginalUiLightManagerOwner50KG::appendRaAmbient148F30(
     const ::ra_cold_aggregate50LA::Owner& world,const C& light,Diagnostic& d)noexcept {
     d={};
+    // Constructor-derived zero registry (no frontend screen registered a UI
+    // light this process, e.g. Course entered without the Garage): 149188's
+    // capacity<count+1 is true for 0/0, so 149198 sets capacity=count+10 and
+    // allocates before 1491AC publishes (same as the source-mode ambient).
+    const bool zeroRegistry=!capacity98_&&!registry9C_&&!registryWritten_&&!registryFailed_&&!count94_;
     if(!raZonesReleasePreflight()||raZones_->world!=&world||!registryCurrent()||raZones_->firstAmbient||count94_||
-       !zonesComplete_||count90_!=10u||(!capacity98_||capacity98_>190u||capacity98_%10u)||raRegistryGrowthFailed_||!registry9C_||
+       !zonesComplete_||count90_!=10u||(!zeroRegistry&&(!capacity98_||capacity98_>190u||capacity98_%10u))||
+       raRegistryGrowthFailed_||(!zeroRegistry&&!registry9C_)||
        !world.nativeAmbientLightCurrent(&light)||!world.nativeAmbientLight_->configured||
        world.nativeAmbientLight_->registered||light.parent1C)return fail(d,Status::phase,0x148f30);
+    if(zeroRegistry){
+        capacity98_=10u;
+        registry9C_.reset(new(std::nothrow) const C*[10]);
+        if(!registry9C_){registryFailed_=true;return fail(d,Status::allocation,0x1491c0);}
+    }
     //First actual Ambient: source half RGB50, alpha overwritten to64 in manager.
     //149000 zone0 propagates both real arrays. Canonical rendering rows untouched.
     const Words ambient{{0x42480000u,0x42480000u,0x42480000u,0x42800000u}};

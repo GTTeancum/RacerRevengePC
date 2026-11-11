@@ -4195,6 +4195,19 @@ public:
     }
     // Caller supplies only actual pinned root-produced crowd RRTEX bytes.
     // This stage may construct canonical CPU resources, never a draw route.
+    // RA human Tournament race load only: admit the world's image sources
+    // before Pause100/Results104 (their 2DF144 populates the whole texture
+    // table). prepareStaticWorldImages below then populates as before.
+    bool prepareStaticWorldImageSources(const std::array<std::vector<std::uint8_t>,6>& actualCrowdRrtex,
+        Diagnostic& d)noexcept {
+        d={};d.stage=Stage::staticWorldImages;
+        if(sourceTrackNativeAttempted_||terminal_||closed_||worldImagesAttempted_||!prefix_.staticWorld||
+           prefix_.staticWorldImages||!world_)
+            return fail(d,"RA world image sources require the staged world before image population");
+        if(!world_->prepareImageSources(actualCrowdRrtex,d.world))
+            return fail(d,"RA world image source admission failed");
+        return true;
+    }
     bool prepareStaticWorldImages(const std::array<std::vector<std::uint8_t>,6>& actualCrowdRrtex,
         Diagnostic& d)noexcept {
         // Retained racer rows must have their real resource/ref/source prefix

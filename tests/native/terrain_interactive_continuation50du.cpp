@@ -89,7 +89,7 @@ using StartMusicContext=interactive_publication50DU::StartMusicContext;
 using J=nlohmann::json;
 namespace {
 void require50DU(bool ok, const char* message) {
-    if (!ok) throw std::runtime_error(message);
+    if(!ok){std::cerr<<"require_failed "<<(message?message:"")<<std::endl;throw std::runtime_error(message);}
 }
 // Cold startup only: add resource identity/stage without changing successful
 // operations. Keep the original exception nested and its detail in what().
@@ -2428,18 +2428,24 @@ SessionExit50DU Context::run() {
        consumedMaStage.race()?consumedMaStage.race():consumedSaStage.race()?consumedSaStage.race():
        consumedGaStage.race()?consumedGaStage.race():consumedGcStage.race();
    if(!audioEnabled||!originalUiStarted||!humanCourseEnabled||!actualRace)return;
-   // RA keeps its fail-closed contract. Other consumed races join when their
-   // identities match and otherwise keep the existing speech path (logged).
-   if(actualRace!=consumedRaStage.race()&&!(originalMainApplication.race28C()==actualRace.get()&&
+   // Consumed races join when their identities match and otherwise keep the
+   // existing speech path (logged).
+   if(!(originalMainApplication.race28C()==actualRace.get()&&
       originalMainApplication.state&&&s.noiseOwner()==&originalMainApplication.state->sharedNoise308030)){
-    std::cerr<<"native_human_speech_join_unavailable session="<<actualRace->entity_.sessionGeneration<<'\n';
+    std::cerr<<"native_human_speech_join_unavailable session="<<actualRace->entity_.sessionGeneration
+        <<" ra="<<(actualRace==consumedRaStage.race())<<" race28C="<<(originalMainApplication.race28C()==actualRace.get())
+        <<" state="<<bool(originalMainApplication.state)
+        <<" noise="<<(originalMainApplication.state&&&s.noiseOwner()==&originalMainApplication.state->sharedNoise308030)<<'\n';
     return;
    }
    //This is the actual successful native speech producer, not Scope capture
    //or a future event's claim. All initialization draws already happened once.
-   require50DU(originalMainApplication.race28C()==actualRace.get()&&originalMainApplication.state&&
-       &s.noiseOwner()==&originalMainApplication.state->sharedNoise308030&&
-       liveAudio->retainNativeHumanSpeechInitialization(originalMainApplication,racerBank,
+   // RA's human cold roster load already bound the native player speech
+   // forward (22A210) and ran 2C1000 through the same live audio owner
+   // (NativePlayerLoadCaller50LA); that owner refuses a second retain.
+   const bool raForwardBound=actualRace==consumedRaStage.race()&&!allAiEnabled;
+   if(raForwardBound)std::cerr<<"native_human_speech ra_forward_bound_by_cold_roster=1\n";
+   require50DU(raForwardBound||liveAudio->retainNativeHumanSpeechInitialization(originalMainApplication,racerBank,
            actualRace->entity_.sessionGeneration,playerRacer60,speechCounts,speechState,
            originalMainApplication.state->rawRandom308030),
        "actual human speech initializer/provider/App/Bank identity unavailable");

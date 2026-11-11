@@ -14,6 +14,7 @@
 #include "../../platform/linux/native/original_ui_main_session50kg.h"
 #include "../../platform/linux/native/original_ui_garage_scene_setup50kg.h"
 #include "original_source_world_cscamera_history50la.h"
+#include <cstdio>
 #include <cstring>
 #include <thread>
 
@@ -148,57 +149,61 @@ bool OriginalRaceConstructor50LA::continueNativeTrackAfterScb(
     const original_main_entry50KG::Application& app,std::uint32_t& pc)noexcept {
     using Step=NativeTrackLoadStep;
     pc=0x1aa078;
+    const auto bad=[&](int line)noexcept{std::fprintf(stderr,"ra_track_after_scb_rejected line=%d step=%u pc=%x",line,unsigned(nativeTrackLoadStep_),unsigned(pc));std::fputc(10,stderr);return false;};
     if(resultsFeedbackThread_!=std::this_thread::get_id()||!nativeIntroWorldEntity()||
-       !world74_||!profile_)return false;
+       !world74_||!profile_)return bad(152);
     if(nativeTrackLoadStep_==Step::nativeAdaptedA4||nativeTrackLoadStep_==Step::tobRetired||
        nativeTrackLoadStep_==Step::aub||nativeTrackLoadStep_==Step::aubRetired||
        nativeTrackLoadStep_==Step::nativeAdaptedReturn)return continueNativeTrackAfterTob(app,pc);
     if(nativeTrackLoadStep_==Step::scb){
-        if(!world74_->continueNativeSceneInfo270900(app,pc))return false;
+        if(!world74_->continueNativeSceneInfo270900(app,pc))return bad(157);
         nativeTrackLoadStep_=Step::sceneInfo;
     }
     if(nativeTrackLoadStep_==Step::sceneInfo){
-        if(!world74_->withdrawNativeScb34_271C10(app,pc))return false;
+        if(!world74_->withdrawNativeScb34_271C10(app,pc))return bad(161);
         nativeTrackLoadStep_=Step::scbRetired;
     }
-    if(nativeTrackLoadStep_!=Step::scbRetired&&nativeTrackLoadStep_!=Step::tob)return false;
-    if(!world74_->continueNativeTob1B4330(app,*profile_,pc))return false;
+    if(nativeTrackLoadStep_!=Step::scbRetired&&nativeTrackLoadStep_!=Step::tob)return bad(164);
+    if(!world74_->continueNativeTob1B4330(app,*profile_,pc))return bad(165);
     nativeTrackLoadStep_=Step::tob;
-    if(!world74_->continueNativeTerrain271370(app,pc))return false;
+    if(!world74_->continueNativeTerrain271370(app,pc))return bad(167);
     if(!world74_->nativeEmptyAnimations2713E0Complete_){
-        if(!world74_->loadNativeEmptyAnimations2713E0(*world74_->nativeTob34_->document,pc))return false;
+        if(!world74_->loadNativeEmptyAnimations2713E0(*world74_->nativeTob34_->document,pc))return bad(169);
         world74_->nativeEmptyAnimations2713E0Complete_=true;
     }
-    if(!world74_->continueNativeTriggers1B5000(app,pc))return false;
-    if(!world74_->continueNativePhysicsObjects2718C0(app,pc))return false;
+    if(!world74_->continueNativeTriggers1B5000(app,pc))return bad(172);
+    if(!world74_->continueNativePhysicsObjects2718C0(app,pc))return bad(173);
     pc=0x271d64;
     if(!world74_->runtimeQueries_||!world74_->runtimeQueries_->camera_||
        world74_->runtimeQueries_->camera_->session.get()!=cameraNativeAdapter34_||
-       !cameraNativeAdapter34_||!ownsNativeCameraAdapter34(*cameraNativeAdapter34_))return false;
-    if(!world74_->continueNativeCsCameras272380(app,*cameraNativeAdapter34_,pc))return false;
+       !cameraNativeAdapter34_||!ownsNativeCameraAdapter34(*cameraNativeAdapter34_))return bad(177);
+    if(!world74_->continueNativeCsCameras272380(app,*cameraNativeAdapter34_,pc))return bad(178);
     const bool completed=world74_->continueNativeSunFlareRead1B46E0(app,*profile_,pc);
     if(completed)return true;
-    if(pc!=0x2c5c34||!loadDisplay_)return false;
-    const auto camera=world74_->borrowNativeLoadCamera(world74_,*cameraNativeAdapter34_);
-    if(!camera||camera.get()!=cameraNativeAdapter34_||!ownsNativeCameraAdapter34(*camera))return false;
+    if(pc!=0x2c5c34||!loadDisplay_)return bad(181);
+    auto camera=world74_->borrowNativeLoadCamera(world74_,*cameraNativeAdapter34_);
+    if(!camera||camera.get()!=cameraNativeAdapter34_||!ownsNativeCameraAdapter34(*camera))return bad(183);
     if(world74_->buildNativeSunFlarePacket2E6060(app,*loadDisplay_,*camera,pc))return true;
-    if(pc!=0x2c5c44)return false;
+    if(pc!=0x2c5c44)return bad(185);
     if(world74_->loadNativeSunFlareResources2C5C44(app,pc))return true;
-    if(pc!=0x2c5cb4)return false;
+    if(pc!=0x2c5cb4)return bad(187);
     if(world74_->loadNativeSunFlareDepth2C5CF0(app,*loadDisplay_,*camera,pc))return true;
-    if(pc!=0x2720d0)return false;
+    if(pc!=0x2720d0)return bad(189);
     if(world74_->loadNativeSunFlareSaturation2720D0(app,pc))return true;
-    if(pc!=0x271d88)return false;
+    if(pc!=0x271d88)return bad(191);
     if(world74_->loadNativeParticleDescriptors2722F0(app,pc))return true;
-    if(pc!=0x271d98)return false;
+    if(pc!=0x271d98)return bad(193);
     if(world74_->loadNativeEmptyBuoys1B5090(app,pc))return true;
-    if(pc!=0x271da8)return false;
+    if(pc!=0x271da8)return bad(195);
     if(world74_->loadNativeStaticModelParams271A00(app,pc))return true;
     if(pc!=0x271db0||!world74_->nativeStaticModelParamEffectsComplete_||
-       world74_->nativeStaticModelParamsNext_!=673)return false;
+       world74_->nativeStaticModelParamsNext_!=673)return bad(198);
     //271DB0 li v0,1;271DBC returns this represented native-adapted A4 route.
     //No claim that earlier270900/fullWorld source services all ran.
     nativeTrackLoadStep_=Step::nativeAdaptedA4;
+    // The sun-flare load borrow ends with those loads (A4 returned). The
+    // following 2729E0/273C30 services require no live camera/world borrow.
+    camera.reset();
     return continueNativeTrackAfterTob(app,pc);
 }
 }
@@ -1139,7 +1144,17 @@ bool Owner::loadNativeParticleDescriptors2722F0(const original_main_entry50KG::A
        !nativeTob34_||!nativeTob34_->document||!nativeSceneInfo270900Current(app,pc)||
        !particles_||!particles_->decoded_||particles_->closed_||particles_->source_!=source_||
        particles_->application_!=worldApplication_||particles_->generation_!=worldEntity_.sessionGeneration||
-       particles_->constructed_!=4||!worldApplication_||worldApplication_->attachmentLock423F58())return false;
+       particles_->constructed_!=4||!worldApplication_||worldApplication_->attachmentLock423F58()){
+        std::fprintf(stderr,"ra_particle_descriptors_rejected pc=%x revoked=%d flares=%d tob=%d particles=%d decoded=%d closed=%d source=%d app=%d gen=%d constructed=%d lock=%d",
+            unsigned(pc),nativeScbRevoked_?1:0,
+            (nativeSunFlares_&&!nativeSunFlares_->sourceMode&&nativeSunFlares_->owner&&
+             nativeSunFlares_->owner->nextLoad==NativeSunFlare::Load::saturationComplete)?1:0,(nativeTob34_&&nativeTob34_->document)?1:0,particles_?1:0,
+            particles_&&particles_->decoded_?1:0,particles_&&particles_->closed_?1:0,particles_&&particles_->source_==source_?1:0,
+            particles_&&particles_->application_==worldApplication_?1:0,
+            particles_&&particles_->generation_==worldEntity_.sessionGeneration?1:0,
+            particles_?int(particles_->constructed_):-1,
+            worldApplication_&&worldApplication_->attachmentLock423F58()?1:0);
+        std::fputc(10,stderr);return false;}
     try {
         if(!nativeParticleList3D8_){
             //Actual first entry of this NEW native metadata domain. Existing
@@ -1852,83 +1867,84 @@ namespace ra_cold_aggregate50LA {
 bool Owner::continueNativeZoneServices2729E0(const original_main_entry50KG::Application& app,
     std::uint32_t& pc)noexcept {
     pc=0x1aa13c;
+    const auto zbad=[&](int tag)noexcept{std::fprintf(stderr,"ra_zone_services_rejected tag=%d pc=%x portal=%zu method=%u point=%zu remainder=%zu",tag,unsigned(pc),std::size_t(nativePortalNext_),unsigned(nativeMethodZoneNext_),std::size_t(nativePointNext_),std::size_t(nativeRemainderNext_));std::fputc(10,stderr);return false;};
     if(nativeScbThread_!=std::this_thread::get_id()||nativeScbRevoked_||!nativeAubRoleRetired272930_||
        nativeAub38_||!nativeSceneInfo270900Current(app,pc)||!source_||
        !nativeSceneRoles270900Current(*source_,pc)||!lighting_||
        !nativeSceneInfo270900_||nativeSceneInfo270900_->authoredZones34C!=10||
-       sceneApplication_!=worldApplication_||sceneGeneration_!=worldEntity_.sessionGeneration)return false;
+       sceneApplication_!=worldApplication_||sceneGeneration_!=worldEntity_.sessionGeneration)return zbad(1);
     //Explicit native already-populated topology adoption replaces destructive
     //272A14/1C and4C0/4C4 reallocation. SAME real counted container and twenty
     //zone nodes/backing aliases; never duplicate, reset membership or recount.
     //Their native construction already ran; do NOT call that a fresh retail
     //2729E0 execution or advance past later zone-method services yet.
     if(container4BC_.kind!=g::OriginalWreckComponentKind50LA::entity141300||
-       !container4BC_.reference00||!topologyConstructed_||topologyClosed_||!canCloseTopology())return false;
+       !container4BC_.reference00||!topologyConstructed_||topologyClosed_||!canCloseTopology())return zbad(2);
     for(std::size_t i=0;i<10;++i){const auto& visible=visibility4C0_[i];const auto& collision=collision4C4_[i];
         if(!visible.constructed||!visible.attached||!collision.constructed||!collision.attached||
            visible.collectionBacking!=&visibilityRows_[i]||collision.collectionBacking!=&collisionRows_[i]||
-           visible.ordinal48!=i||collision.ordinal48!=i)return false;
+           visible.ordinal48!=i||collision.ordinal48!=i)return zbad(3);
     }
     nativeZoneTopologyPrefix272A48_=true;
     using Manager=rr::platform::OriginalUiLightManagerOwner50KG;Manager::Diagnostic diagnostic;
     pc=0x272a48;
     if(!Manager::bindRaWorldZones272A48(app,*this,lighting_,nativeRaLightZones_,diagnostic)){
-        pc=diagnostic.sourcePC;return false;
+        pc=diagnostic.sourcePC;return zbad(4);
     }
-    if(!continueNativeZoneExclusions272A58(*source_,pc))return false;
+    if(!continueNativeZoneExclusions272A58(*source_,pc))return zbad(5);
     while(nativePortalNext_<nativePortals_.size()){
         const auto ordinal=nativePortalNext_;
         if(!continueNativePortal230450(*source_,ordinal,pc)||
-           !continueNativePortalWorldLinks272B80(ordinal,pc))return false;
+           !continueNativePortalWorldLinks272B80(ordinal,pc))return zbad(6);
         auto& portal=*nativePortals_[ordinal];
-        if(portal.worldLinksPublished!=4u||!canCloseTopology())return false;
+        if(portal.worldLinksPublished!=4u||!canCloseTopology())return zbad(7);
         const auto& zones=portal.authored->zones;
         if(!nativeRaLightZones_->linkRaPortal148D00(*this,ordinal,portal.entity,container4BC_,
-            zones[0]-1u,zones[1]-1u,diagnostic)){pc=diagnostic.sourcePC;return false;}
+            zones[0]-1u,zones[1]-1u,diagnostic)){pc=diagnostic.sourcePC;return zbad(8);}
         portal.lightLinksComplete=true;++nativePortalNext_; //272C60/68/6C/70.
     }
-    if(!continueNativeMethodArrays272C78(*source_,pc))return false;
+    if(!continueNativeMethodArrays272C78(*source_,pc))return zbad(9);
     while(nativeMethodZoneNext_<10u){const auto z=nativeMethodZoneNext_;
         if(!prepareNativeMethodRow272E80(z,pc)||
            !continueNativeVisibilityList(*source_,z*2u,pc)||
            !continueNativeCollisionList(*source_,z*2u,pc)||
            !continueNativeVisibilityList(*source_,z*2u+1u,pc)||
-           !continueNativeCollisionList(*source_,z*2u+1u,pc))return false;
+           !continueNativeCollisionList(*source_,z*2u+1u,pc))return zbad(10);
         ++nativeMethodZoneNext_; //272F14, only AFTER both actual method calls.
     }
-    if(!continueNativeEnvironmentAliases272FC0(*source_,pc))return false;
-    if(!continueNativeDefaultObserver272F48(pc))return false;
+    if(!continueNativeEnvironmentAliases272FC0(*source_,pc))return zbad(11);
+    if(!continueNativeDefaultObserver272F48(pc))return zbad(12);
     //272F74's v0=1 and272FAC epilogue complete the represented native-adapted
     //+FC route. This is NOT proof of unrepresented270900 or full1A9EE0.
-    if(!adoptNativeLightWrappers273AA0(*source_,pc))return false;
-    if(!nativeRaLightZones_||!continueNativeAmbientLight(*this,*nativeRaLightZones_,pc))return false;
-    if(!continueNativeDirectionalLight(*this,*source_,*nativeRaLightZones_,pc))return false;
+    if(!adoptNativeLightWrappers273AA0(*source_,pc))return zbad(13);
+    if(!nativeRaLightZones_||!continueNativeAmbientLight(*this,*nativeRaLightZones_,pc))return zbad(14);
+    if(!continueNativeDirectionalLight(*this,*source_,*nativeRaLightZones_,pc))return zbad(15);
     //The exact same source Root material service/context, not a map capture or
     //SunFlare ScreenMT substitution.14AB30 uses DefaultMT through150450.
     if(!world_||world_->domain_!=rosterMountDomain_||!world_->context_||!world_->context_->live()||
-       !rosterMountDomain_||app.standardMaterialDomain()!=rosterMountDomain_)return false;
+       !rosterMountDomain_||app.standardMaterialDomain()!=rosterMountDomain_)return zbad(16);
     const auto context=world_->context_;const auto table=rosterMountDomain_->materials382B38();
     if(!table||!context->materialApplication()||!table->screenApplicationMatches(*context->materialApplication())||
-       !context->applicationAnimationClock().sameOwner(app.animationClock()))return false;
+       !context->applicationAnimationClock().sameOwner(app.animationClock()))return zbad(17);
     while(nativePointNext_<nativePoints_.size()){
         const auto index=nativePointNext_;
         if(!continueNativeLocalPrimary(index,*this,*source_,*nativeRaLightZones_,pc)||
            !continueNativeLocalFlare(index,table,app.materialDirectory36B970(),pc)||
-           !continueNativeLocalFlareObserver(index,pc)||!completeNativeLocalPoint(index,pc))return false;
+           !continueNativeLocalFlareObserver(index,pc)||!completeNativeLocalPoint(index,pc))return zbad(18);
         ++nativePointNext_; //Only after actual source row attachment273B98.
     }
     while(nativeRemainderNext_<nativeRemainder_.size()){
-        if(!continueNativeRemainingLight(nativeRemainderNext_,*this,*source_,*nativeRaLightZones_,pc))return false;
+        if(!continueNativeRemainingLight(nativeRemainderNext_,*this,*source_,*nativeRaLightZones_,pc))return zbad(19);
         ++nativeRemainderNext_; //Source order includes Ambient173..175.
     }
-    if(!nativeLightList3A8_||nativeLightList3A8_->colorsLoaded!=10u)return false;
+    if(!nativeLightList3A8_||nativeLightList3A8_->colorsLoaded!=10u)return zbad(20);
     while(nativeDirectionalColorNext_<10u){const auto zone=nativeDirectionalColorNext_;
         const auto& color=nativeLightList3A8_->colors3C[zone];
-        pc=0x273bdc;if(!color.lanes[0])return false;
+        pc=0x273bdc;if(!color.lanes[0])return zbad(21);
         //Source273BE0 uses x<-255, including authored-256 sentinel.
         if(!(*color.lanes[0]<-255.f)){
             rr::platform::OriginalUiLightManagerOwner50KG::Diagnostic detail;
-            if(!nativeRaLightZones_->applyRaDirectionalColor1498A0(*this,zone,detail)){pc=detail.sourcePC;return false;}
+            if(!nativeRaLightZones_->applyRaDirectionalColor1498A0(*this,zone,detail)){pc=detail.sourcePC;return zbad(22);}
         }
         ++nativeDirectionalColorNext_;
     }
@@ -1938,36 +1954,41 @@ bool Owner::continueNativeZoneServices2729E0(const original_main_entry50KG::Appl
 }
 bool Owner::continueNativeFog273C30(const original_main_entry50KG::Application& app,
     std::uint32_t& pc)noexcept {
+    const auto fbad=[&](int tag)noexcept{std::fprintf(stderr,"ra_fog_chain_rejected tag=%d pc=%x",tag,unsigned(pc));std::fputc(10,stderr);return false;};
     pc=0x1aa158;
     //Fresh source fog is a distinct lifetime even after descriptor273F70
     //retirement, genuine NULL-descriptor return or native cancellation.
     //Never use a descriptor pointer's disappearance to authorize adoption.
     if(sourceFogPhase_!=SourceFogPhase::unreached||sourceFogTransfer_||sourceFogTransferBorrowers_||
-       (nativeFogDescriptor3AC_&&nativeFogDescriptor3AC_->sourceMode))return false;
+       (nativeFogDescriptor3AC_&&nativeFogDescriptor3AC_->sourceMode))return fbad(1);
     if(nativeScbThread_!=std::this_thread::get_id()||nativeScbRevoked_||!source_||
        !nativeSceneInfo270900Current(app,pc)||nativeDirectionalColorNext_!=10u||
        nativeRemainderNext_!=168u||!runtimeQueries_||!worldApplication_||
-       runtimeCameraBorrows_||runtimeWorldBorrows_)return false;
+       runtimeCameraBorrows_||runtimeWorldBorrows_){
+        std::fprintf(stderr,"ra_fog_entry directional=%u remainder=%zu/%zu queries=%d app=%d camera_borrows=%zu world_borrows=%zu",
+            unsigned(nativeDirectionalColorNext_),std::size_t(nativeRemainderNext_),nativeRemainder_.size(),runtimeQueries_?1:0,
+            worldApplication_?1:0,std::size_t(runtimeCameraBorrows_),std::size_t(runtimeWorldBorrows_));
+        std::fputc(10,stderr);return fbad(2);}
     g::OriginalRaceFogFields* actual=nullptr;
     pc=0x273c30;
     if(!runtimeQueries_->readNativeColdFog273C30(*worldApplication_,*source_,
-        worldEntity_.sessionGeneration,actual)||!actual)return false;
+        worldEntity_.sessionGeneration,actual)||!actual)return fbad(3);
     if(nativeFogLoadComplete_){
-        if(nativeFogDescriptor3AC_||!nativeFogCustodyCurrent(actual))return false;
+        if(nativeFogDescriptor3AC_||!nativeFogCustodyCurrent(actual))return fbad(4);
         return continueNativeParticleManager1B4DC0(app,pc);
     }
-    if(nativeFogLoadAttempted_)return false; //Failed partial effects never replay.
-    const auto* decoded=source_->sourcesDecoded();if(!decoded)return false;
+    if(nativeFogLoadAttempted_)return fbad(5); //Failed partial effects never replay.
+    const auto* decoded=source_->sourcesDecoded();if(!decoded)return fbad(6);
     const auto& doc=decoded->world.parameters;
     const rr::assets::ParameterBlock48F* block=nullptr;
     for(const auto& candidate:doc.blocks)if(candidate.name=="fog"){
-        if(block)return false;block=&candidate;
+        if(block)return fbad(7);block=&candidate;
     }
-    if(doc.original_bytes.size()!=540795u||!block||block->offset!=38500u||block->fields.size()!=3u)return false;
+    if(doc.original_bytes.size()!=540795u||!block||block->offset!=38500u||block->fields.size()!=3u)return fbad(8);
     const auto& c=block->fields[0];const auto& h=block->fields[1];const auto& v=block->fields[2];
     if(c.name!="colorrgb"||c.value!="180,180,165"||c.value_offset!=38633u||
        h.name!="haziness"||h.value!=".5"||h.value_offset!=38648u||
-       v.name!="visibility"||v.value!=".9"||v.value_offset!=38645u)return false;
+       v.name!="visibility"||v.value!=".9"||v.value_offset!=38645u)return fbad(9);
     // Actual authored Fog is present. This is a new native immutable-authoring
     // custody, NOT a receipt for earlier270B10/278570 or a null3AC reset.
     nativeFogLoadAttempted_=true;
@@ -1979,19 +2000,20 @@ bool Owner::continueNativeFog273C30(const original_main_entry50KG::Application& 
         // were computed before Session allocation and restored by coldViewport.
         // Adopt them, never replay arithmetic or claim original FCSR semantics.
         pc=0x273cac;
-        if(!constructNativeFog273CAC(*actual,pc)||!allocateNativeFogBuffer13E780(pc))return false;
+        if(!constructNativeFog273CAC(*actual,pc)||!allocateNativeFogBuffer13E780(pc))return fbad(10);
         pc=0x13e99c;
         if(!runtimeQueries_->publishNativeColdFog13E99C(*worldApplication_,*source_,
-            worldEntity_.sessionGeneration,*actual))return false;
-        if(!initializeNativeFogOff13F890(pc)||!bindNativeFogOn13F9C0(pc))return false;
+            worldEntity_.sessionGeneration,*actual))return fbad(11);
+        if(!initializeNativeFogOff13F890(pc)||!bindNativeFogOn13F9C0(pc))return fbad(12);
         //273F70/7C withdraws this actual native descriptor role only. No other
         //authenticated source bytes, native fog owner or camera state retires.
         pc=0x273f70;nativeFogDescriptor3AC_.reset();nativeFogLoadComplete_=true;
         return continueNativeParticleManager1B4DC0(app,pc); //273F94 return1; continue actual+114.
-    }catch(...){return false;} //All reached allocations/counts remain owned.
+    }catch(...){return fbad(13);} //All reached allocations/counts remain owned.
 }
 bool Owner::continueNativeParticleManager1B4DC0(const original_main_entry50KG::Application& app,
     std::uint32_t& pc)noexcept {
+    const auto fbad=[&](int tag)noexcept{std::fprintf(stderr,"ra_fog_chain_rejected tag=%d pc=%x",tag,unsigned(pc));std::fputc(10,stderr);return false;};
     try {
     pc=0x1aa180;
     if(nativeScbThread_!=std::this_thread::get_id()||nativeScbRevoked_||!source_||
@@ -2003,29 +2025,30 @@ bool Owner::continueNativeParticleManager1B4DC0(const original_main_entry50KG::A
        trackParticleGeneration_!=worldEntity_.sessionGeneration||!trackParticleDomain_||
        trackParticleDomain_!=app.standardMaterialDomain()||!world_||world_->domain_!=trackParticleDomain_||
        !world_->context_||!world_->context_->live()||!trackParticles_||!trackParticles_->prepared()||
-       trackParticles_->material150()->table382B38()!=trackParticleDomain_->materials382B38().get())return false;
+       trackParticles_->material150()->table382B38()!=trackParticleDomain_->materials382B38().get())return fbad(14);
     g::OriginalRaceFogFields* actualFog=nullptr;
     if(!runtimeQueries_->readNativeColdFog273C30(*worldApplication_,*source_,
-        worldEntity_.sessionGeneration,actualFog)||!nativeFogCustodyCurrent(actualFog))return false;
-    const auto* prt=particles_->originalMember(2);if(!prt)return false;
-    if(!completeNativeParticleManager1B4DC0(*source_,*prt,pc))return false;
+        worldEntity_.sessionGeneration,actualFog)||!nativeFogCustodyCurrent(actualFog))return fbad(15);
+    const auto* prt=particles_->originalMember(2);if(!prt)return fbad(16);
+    if(!completeNativeParticleManager1B4DC0(*source_,*prt,pc))return fbad(17);
     //1B4E74's successful pointer result follows the represented native-adapted
     //160E00 route, not prepared()==return. Caller resumes at1AA194, before
     //the actual Application330/+30 control branch and World+118.
     return continueNativeInstances1AA194(app,pc);
-    }catch(...){return false;} //Retain reached ownership; never rely on string SSO.
+    }catch(...){return fbad(18);} //Retain reached ownership; never rely on string SSO.
 }
 bool Owner::continueNativeInstances1AA194(const original_main_entry50KG::Application& app,
     std::uint32_t& pc)noexcept {
+    const auto fbad=[&](int tag)noexcept{std::fprintf(stderr,"ra_fog_chain_rejected tag=%d pc=%x",tag,unsigned(pc));std::fputc(10,stderr);return false;};
     pc=0x1aa194;
     try {
         if(nativeScbThread_!=std::this_thread::get_id()||nativeScbRevoked_||!source_||
            !nativeParticleManagerComplete_||nativeParticleManager4A0_!=trackParticles_.get()||
            !nativeSceneInfo270900Current(app,pc)||!app.state||!runtimeQueries_||
-           runtimeCameraBorrows_||runtimeWorldBorrows_)return false;
+           runtimeCameraBorrows_||runtimeWorldBorrows_)return fbad(19);
         g::OriginalRaceFogFields* fog=nullptr;
         if(!runtimeQueries_->readNativeColdFog273C30(*worldApplication_,*source_,
-            worldEntity_.sessionGeneration,fog)||!nativeFogCustodyCurrent(fog))return false;
+            worldEntity_.sessionGeneration,fog)||!nativeFogCustodyCurrent(fog))return fbad(20);
         if(!nativeGeometryDirectory1AA1DC_){
             //Same explicit native bounded-progress policy as the earlier
             //1A9EE0 prefix replaces Application330. Neither unknown330/+30
@@ -2033,10 +2056,10 @@ bool Owner::continueNativeInstances1AA194(const original_main_entry50KG::Applica
             //below DOES target the existing Application namespace owner.
             pc=0x1aa1c0;app.modelDirectory36B860()="geometry\\";
             nativeGeometryDirectory1AA1DC_=true;
-        }else if(app.modelDirectory36B860()!=(nativeCollisionAnimationDirectory1AA2A0_?"anim\\":"geometry\\"))return false;
-        if(!completeNativeEmptyInstances274080(*source_,app.state,pc))return false;
+        }else if(app.modelDirectory36B860()!=(nativeCollisionAnimationDirectory1AA2A0_?"anim\\":"geometry\\"))return fbad(21);
+        if(!completeNativeEmptyInstances274080(*source_,app.state,pc))return fbad(22);
         return continueNativeStandardModels274160(app,pc);
-    }catch(...){return false;} //Retain actual directory/owner effects; no rollback or reset.
+    }catch(...){return fbad(23);} //Retain actual directory/owner effects; no rollback or reset.
 }
 bool Owner::retireNativeRaLightZones148110()noexcept {
     if(!nativeRaLightZones_)return true;

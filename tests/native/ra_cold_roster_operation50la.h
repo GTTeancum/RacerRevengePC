@@ -554,12 +554,22 @@ inline bool Owner::mountRetainedRuntimeRosterArchives(
                 return fail(d,"actual roster archive mount rejected; earlier mounts retained");
         }
         if(!provider->sealNativeMounts(d.rosterMount))return fail(d,"actual roster namespace sealing rejected");
+        // Same seal-then-bind order as every other course world: the wreck COL
+        // members below resolve through the resolver's provider. A Garage visit
+        // used to be the only earlier binder, so a race entered straight from
+        // Course (no Garage this process) had none. Same domain provider only;
+        // the later RA static world bind accepts this identical provider.
+        {rr::assets::OriginalStandardTextureDiagnostic50LA binding;
+         if(!domain->resolver3E1A70()||!domain->resolver3E1A70()->bindProvider3E1A70(provider,binding))
+            return fail(d,"actual resolver/provider binding before wreck sources rejected");}
         // Bind SAME retained inventories only after the actual archive mounts
         // and seal. Earlier capacity reservation deliberately lacked this proof.
         std::string wreckError;
         const auto& wreckBacking=runtimeQueries_->rosterResources_->wreckBacking_;
-        if(!wreckBacking||!wreckBacking->bindMountedSources(app.entities(),domain,wreckError))
+        if(!wreckBacking||!wreckBacking->bindMountedSources(app.entities(),domain,wreckError)){
+            std::cerr<<"ra_wreck_binding_rejected backing="<<bool(wreckBacking)<<" error="<<wreckError<<'\n';
             return fail(d,"wreck mounted model-source binding rejected; prefix retained");
+        }
         rosterMountComplete_=true;return true;
     }catch(...){return fail(d,"roster archive exception; actual partial provider retained");}
 }

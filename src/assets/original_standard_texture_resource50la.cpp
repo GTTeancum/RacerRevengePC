@@ -1911,12 +1911,19 @@ bool OriginalStandardTextureResolver50LA::bindModelMember(const std::string& nam
     }
     if(kind==OriginalStandardModelFileKind50LA::colType0||kind==OriginalStandardModelFileKind50LA::colType2){
         using Provider=OriginalStandardArchiveProvider50LA;Provider::MemberView actual;
-        if(!storage_->provider||!storage_->provider->sealed()||
-           storage_->provider->lookup132820(name,actual)!=Provider::Lookup::present)
+        const auto lookup=storage_->provider&&storage_->provider->sealed()?
+            storage_->provider->lookup132820(name,actual):Provider::Lookup::unknown;
+        if(lookup!=Provider::Lookup::present){
+            std::fprintf(stderr,"model_member_bind_rejected name=%s reason=unresolved provider=%d sealed=%d lookup=%d\n",
+                name.c_str(),storage_->provider?1:0,storage_->provider&&storage_->provider->sealed()?1:0,int(lookup));
             return fail(d,E::unresolved,0x132820);
+        }
         if(!actual.member||!same(name,*actual.member)||!actual.data||actual.size!=bytes.size()||
-           actual.revision!=storage_->provider->revision()||!std::equal(bytes.begin(),bytes.end(),actual.data))
+           actual.revision!=storage_->provider->revision()||!std::equal(bytes.begin(),bytes.end(),actual.data)){
+            std::fprintf(stderr,"model_member_bind_rejected name=%s reason=source size=%zu expected=%zu\n",
+                name.c_str(),actual.size,bytes.size());
             return fail(d,E::source,0x132820);
+        }
     }
     const auto fileKind=kind==OriginalStandardModelFileKind50LA::mcf?
         Storage::FileKind::mcf:kind==OriginalStandardModelFileKind50LA::psg?
@@ -1924,7 +1931,11 @@ bool OriginalStandardTextureResolver50LA::bindModelMember(const std::string& nam
         Storage::FileKind::colType0:Storage::FileKind::colType2;
     for(std::size_t i=0;i<storage_->files.size();++i){const auto& file=*storage_->files[i];
         if(file.retired||!same(file.member,name))continue;
-        if(file.kind!=fileKind||file.bytes!=bytes)return fail(d,E::duplicateSource,0x132820);
+        if(file.kind!=fileKind||file.bytes!=bytes){
+            std::fprintf(stderr,"model_member_bind_rejected name=%s reason=duplicate kind=%d/%d size=%zu/%zu\n",
+                name.c_str(),int(file.kind),int(fileKind),file.bytes.size(),bytes.size());
+            return fail(d,E::duplicateSource,0x132820);
+        }
         out={this,i};d.source=i;return true;
     }
     if(storage_->files.size()>=32768||bytes.size()>8u*1024u*1024u||
@@ -2422,8 +2433,29 @@ bool OriginalStandardTextureResolver50LA::resolve24DADC(
         }
         Provider::MemberView found;
         auto lookup=provider->lookup132820(pst,found);
-        if(lookup==Provider::Lookup::present)return resolvePositive(pst,0x24DAF8,&found);
-        if(lookup!=Provider::Lookup::absent)return fail(d,E::unresolved,0x24DAF8);
+        if(lookup==Provider::Lookup::present){
+            const bool positive=resolvePositive(pst,0x24DAF8,&found);
+            if(!positive){
+                std::fprintf(stderr,"texture_resolve_rejected name=%s lookup=present mount=%zu archive=%s size=%zu status=%u entries=%zu\n",
+                    pst.c_str(),found.mount,found.mount<provider->mounts_.size()?provider->mounts_[found.mount]->name.c_str():"?",
+                    found.size,unsigned(d.status),storage_->entries.size());
+                for(std::size_t m=0;m<provider->mounts_.size();++m)
+                    std::fprintf(stderr,"texture_resolve_mount %zu %s active=%d rows=%zu\n",m,provider->mounts_[m]->name.c_str(),
+                        provider->mounts_[m]->active?1:0,provider->mounts_[m]->rows.size());
+                for(const auto& entry:storage_->entries)if(entry.file&&entry.file->member.find("camdroid")!=std::string::npos)
+                    std::fprintf(stderr,"texture_resolve_entry %s retired=%d loadingRa=%d\n",entry.file->member.c_str(),
+                        entry.file->retired?1:0,entry.file->loadingRa?1:0);
+            }
+            return positive;
+        }
+        if(lookup!=Provider::Lookup::absent){
+            std::fprintf(stderr,"texture_resolve_rejected name=%s lookup=unknown\n",pst.c_str());
+            for(std::size_t m=0;m<provider->mounts_.size();++m){const auto& mount=*provider->mounts_[m];
+                for(const auto& row:mount.rows)if(Provider::sameName(row.name,pst))
+                    std::fprintf(stderr,"texture_resolve_candidate mount=%zu archive=%s active=%d size=%zu\n",
+                        m,mount.name.c_str(),mount.active?1:0,row.size);}
+            return fail(d,E::unresolved,0x24DAF8);
+        }
         //24DB10..60 rewrites the same last dot to.ipu. A present IPU must
         //stop here even when an admitted TGA exists; no substitute image.
         const auto dot2=pst.find_last_of('.');

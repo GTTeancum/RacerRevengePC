@@ -7,6 +7,7 @@
 #include <array>
 #include "../../src/game/original_native_collision_categories.h"
 #include <cstring>
+#include <cstdio>
 #include "original_source_particle_config_invocation50la.inl"
 #include <cstdio>
 #include <string>
@@ -258,14 +259,20 @@ bool Application::completeConsumedRaWorldNativePrefix1A9EE0(
         //withdrawal. Reviewed same-owner SceneInfo adoption precedes that cut.
         //Only the represented native-adapted1A9EE0 route may return here.
         //Actual Race30/114770 and1A95B0 remain separate owner obligations.
-        if(!race->continueNativeTrackAfterScb(*this,pc))return false;
+        if(!race->continueNativeTrackAfterScb(*this,pc)){
+            std::fprintf(stderr,"ra_native_track_load_stopped pc=%x step=%u",unsigned(pc),unsigned(race->nativeTrackLoadStep_));
+            std::fputc(10,stderr);return false;}
         pc=0x1a6d98;
         // Native preparation only. The orchestration's bool is not a loader
         // completion token: demand its exact retained terminal cursor AND
         // the completed same-owner tail observation before touching Session.
-        if(race->nativeTrackLoadStep_!=Step::nativeAdaptedReturn)return false;
+        if(race->nativeTrackLoadStep_!=Step::nativeAdaptedReturn){
+            std::fprintf(stderr,"ra_native_track_load_step_unfinished step=%u",unsigned(race->nativeTrackLoadStep_));
+            std::fputc(10,stderr);return false;}
         std::uint32_t tailPC=0;
-        if(!race->continueNativeTrackAfterWater(*this,tailPC)||tailPC!=0x1aa508){pc=tailPC;return false;}
+        if(!race->continueNativeTrackAfterWater(*this,tailPC)||tailPC!=0x1aa508){
+            std::fprintf(stderr,"ra_native_track_after_water_stopped pc=%x",unsigned(tailPC));
+            std::fputc(10,stderr);pc=tailPC;return false;}
         // Source constructor30 is zero, but the complete original reachable
         // writer history is NOT established here. Do not read field30_ as
         // authority, skip114770, or claim1A95B0/174DF0 returned. The native

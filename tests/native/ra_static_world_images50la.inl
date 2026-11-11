@@ -37,6 +37,7 @@ private:
     std::shared_ptr<const a::OriginalStandardIpumImageSet50LA> crowdImages_;
     a::OriginalStandardMaterialCollectorReceipt50LA imageCollector_;
     bool imagesAttempted_=false,imagesComplete_=false;
+    bool imageSourcesAttempted_=false,imageSourcesStaged_=false;
 
     bool selectImageSource(ColdFamily& family,Diagnostic& d) {
         const auto& provider=domain_->archiveProvider3E1A70();
@@ -136,8 +137,17 @@ private:
         }
         return a::encodeTextureLevel48E(image.mips.front(),image.baseRrtex,d.decode)||reject(d,"canonical TGA image framing");
     }
-    bool prepareImages(const std::array<std::vector<std::uint8_t>,6>& actualCrowdRrtex,Diagnostic& d)noexcept {
-        d={};if(!staged_||closed_||imagesAttempted_)return reject(d,"world image stage phase");imagesAttempted_=true;
+public:
+    // Image SOURCE admission only (resolver corpus + crowd IPUM staging), no
+    // population/collector. The original resolves these images straight from
+    // the mounted RA RES at any lookup; the port's resolver needs them
+    // admitted first. The RA human Tournament race load (Pause100/Results104,
+    // whose 2DF144 populates the WHOLE texture table, world rows included)
+    // runs between world staging and prepareImages, so it calls this first.
+    // prepareImages() still performs it itself when nothing called it.
+    bool prepareImageSources(const std::array<std::vector<std::uint8_t>,6>& actualCrowdRrtex,Diagnostic& d)noexcept {
+        d={};if(!staged_||closed_||imagesAttempted_||imageSourcesAttempted_)return reject(d,"world image source stage phase");
+        imageSourcesAttempted_=true;
         try{
             const auto& provider=domain_->archiveProvider3E1A70();const auto& resolver=domain_->resolver3E1A70();
             if(!context_->live()||!provider->sealed()||provider->revision()!=providerRevision_)
@@ -191,6 +201,18 @@ private:
                !ra_crowd_image50LA::Verifier::verifyRaSixMip4(*resolver,crowdSource,crowdCompressed_,actualCrowdRrtex,crowdImages_,d.crowd)||
                !ra_crowd_image50LA::Verifier::bindVerifiedRaSix(*resolver,crowdImages_,context_,d.material.texture))
                 return reject(d,"actual six-frame stage/lease/context rejected");
+            imageSourcesStaged_=true;return true;
+        }catch(...){return reject(d,"world image source admission failed; actual prefixes retained");}
+    }
+    bool prepareImages(const std::array<std::vector<std::uint8_t>,6>& actualCrowdRrtex,Diagnostic& d)noexcept {
+        d={};if(!staged_||closed_||imagesAttempted_)return reject(d,"world image stage phase");
+        if(!imageSourcesAttempted_&&!prepareImageSources(actualCrowdRrtex,d)){imagesAttempted_=true;return false;}
+        imagesAttempted_=true;
+        if(!imageSourcesStaged_)return reject(d,"world image sources were not admitted");
+        try{
+            const auto& provider=domain_->archiveProvider3E1A70();
+            if(!context_->live()||!provider->sealed()||provider->revision()!=providerRevision_)
+                return reject(d,"image stage actual context/provider changed");
             // One terminal whole-domain phase. No later hidden registration or
             // rebuild, and no rollback of genuine partial constructor effects.
             if(!domain_->populate(context_,d.material))return reject(d,"canonical whole-domain population failed");
