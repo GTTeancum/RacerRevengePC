@@ -245,6 +245,11 @@ public:
     std::shared_ptr<const gb_cold_sources50LA::Owner> sourceOwner()const noexcept{return storage_?storage_->source:nullptr;}
     bool load(std::shared_ptr<const gb_cold_sources50LA::Owner> sourceOwner,Diagnostic& d)noexcept;
 
+    // Runs inside populateCanonicalRacers after the racer sources are admitted
+    // and before the single population, as on every consumed course: the
+    // original race load 1A8A40 (Pause100 / Results104 / F8).
+    std::function<bool()> beforeRacerPopulation;
+
     // Same Application-owned domain as the actual installed racers. This does
     // not register synthetic static models or claim source render dispatch for
     // the native world above. Mounting the real complete GB namespace preserves
@@ -274,6 +279,10 @@ public:
                         *request.canonicalMaterialPath.actualPrefix36B970,*provider,materials,textures,d.racerSource),
                     "Original GB canonical racer material/texture closure rejected");
             shared::need(request.canonicalDomain->appendOriginalSources(materials,textures,d.canonical),"Original GB canonical racer source admission rejected");
+            if(beforeRacerPopulation){
+                d.stage="gb_original_race_load";
+                shared::need(beforeRacerPopulation(),"Original GB race load before population rejected");
+            }
             d.stage="gb_original_racer_population";
             shared::need(request.canonicalDomain->populate(request.canonicalContext,d.canonical),"Original GB canonical racer population rejected");
             return true;

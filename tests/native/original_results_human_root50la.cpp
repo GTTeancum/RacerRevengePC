@@ -6,6 +6,7 @@
 #include "original_consumed_ma_stage50du.h"
 #include "original_consumed_mb_stage50du.h"
 #include "original_consumed_sc_stage50du.h"
+#include "original_consumed_gb_stage50du.h"
 #include "original_consumed_gc_stage50du.h"
 #include "native_common_race50pd.h"
 #include "original_race_constructor50la.h"

@@ -92,6 +92,18 @@ class Owner final {
     std::size_t resultsAuxiliaryStopCount26D070()const noexcept;
     std::size_t resultsAuxiliaryStopVoice26D070(std::size_t)const noexcept;
     void stopResultsAuxiliaryPreflighted26D070()noexcept;
+    // Course world-sound transports: the fixed-position World4D8 owners of
+    // GB/RC/TB/MC. Original 26D070 stops every voice, these included, so
+    // Aural claims and stops them with the other typed owners. The root
+    // registers each cold; close() clears the list before they retire.
+    static constexpr std::size_t maximumWorldSoundStops26D070=4;
+    std::array<rr::platform::LogicalAudioOwner*,maximumWorldSoundStops26D070> worldSoundStops26D070_{};
+    std::size_t worldSoundStopCount26D070_=0;
+    bool canStopResultsWorld26D070(const rr::platform::AudioMixer50HD&,
+        const rr::platform::RaceAudioGroups50IC&)const noexcept;
+    std::size_t resultsWorldStopCount26D070()const noexcept;
+    std::size_t resultsWorldStopVoice26D070(std::size_t)const noexcept;
+    void stopResultsWorldPreflighted26D070()noexcept;
     bool canStopResultsEngines26D070(const rr::platform::AudioMixer50HD&,
         const rr::platform::RaceAudioGroups50IC&,std::uint64_t)const noexcept;
     // Separate zero-human domain. Never relax the existing human Course gate.
@@ -571,7 +583,15 @@ public:
         field24C=materialD44_.resetField24C(r.materialD44,r.engine);
         if(!field24C)return false;flags22C=&r.engine.flags22CLow4;return true;
     }
+    // Cold only, before the race; one entry per course world-sound owner.
+    bool registerResultsWorldSound26D070(rr::platform::LogicalAudioOwner& transport)noexcept {
+        if(worldSoundStopCount26D070_>=maximumWorldSoundStops26D070)return false;
+        for(std::size_t n=0;n<worldSoundStopCount26D070_;++n)
+            if(worldSoundStops26D070_[n]==&transport)return false;
+        worldSoundStops26D070_[worldSoundStopCount26D070_++]=&transport;return true;
+    }
     void close()noexcept {
+        worldSoundStops26D070_.fill(nullptr);worldSoundStopCount26D070_=0; // Before those owners retire.
         revokeNativeSpeechReceipt(); // Before any provider/borrowed-owner teardown.
         // Close every public update admission before any borrowed sound is
         // retired. Preserve the reached speech preparation for actual voice stops.

@@ -16,6 +16,7 @@ namespace original_consumed_gc_stage50DU { class Owner; }
 namespace original_consumed_ma_stage50DU { class Owner; }
 namespace original_consumed_mb_stage50DU { class Owner; }
 namespace original_consumed_sc_stage50DU { class Owner; }
+namespace original_consumed_gb_stage50DU { class Owner; }
 namespace original_consumed_sa_stage50DU { class Owner; }
 namespace original_consumed_ta_stage50DU { class Owner; }
 namespace gb_positional_sound50GB { class Owner; }
@@ -199,6 +200,8 @@ struct Context final {
     consumedMbStageType& consumedMbStage;
     using consumedScStageType = original_consumed_sc_stage50DU::Owner;
     consumedScStageType& consumedScStage;
+    using consumedGbStageType = original_consumed_gb_stage50DU::Owner;
+    consumedGbStageType& consumedGbStage;
     using consumedRaStageType = original_consumed_ra_stage50DU::Owner;
     consumedRaStageType& consumedRaStage;
     using consumedSaStageType = original_consumed_sa_stage50DU::Owner;

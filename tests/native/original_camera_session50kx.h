@@ -8,6 +8,7 @@
 #include "../../src/game/original_ta_cut_resource_candidate.h"
 #include <optional>
 #include "source_grid50ig_fixture.h"
+#include "source_grid50gb_fixture.h"
 #include <string_view>
 #include "../../platform/linux/native/race_audio_groups50ic.h"
 #include "../../src/assets/original_ta_intro_authoring_candidate.h"
@@ -73,6 +74,7 @@ namespace sa_original_world50LM { class Owner; }
 namespace ma_original_world50LM { class Owner; }
 namespace mb_original_world50LM { class Owner; }
 namespace sc_original_world50LM { class Owner; }
+namespace gb_original_world50LM { class Owner; }
 namespace rr::game { class OriginalRaceConstructor50LA; class OriginalFrontendCameraCold50LA; }
 namespace original_time_stats_adapter50LA { class Owner; }
 namespace original_speed_boost_adapter50LA { class Owner; }
@@ -85,7 +87,7 @@ namespace original_camera_session50KX {
 inline std::string_view introTrackId(rr::game::OriginalCameraStartCourse course)noexcept {
  using C=rr::game::OriginalCameraStartCourse;
  switch(course){
- case C::ta:return "TA";case C::ra:return "RA";case C::gc:return "GC";case C::ga:return "GA";case C::sa:return "SA";case C::ma:return "MA";case C::mb:return "MB";case C::sc:return "SC";default:return {};
+ case C::ta:return "TA";case C::ra:return "RA";case C::gc:return "GC";case C::ga:return "GA";case C::sa:return "SA";case C::ma:return "MA";case C::mb:return "MB";case C::sc:return "SC";case C::gb:return "GB";default:return {};
 
  }
 }
@@ -469,6 +471,10 @@ class Session final {
         const OriginalRaceConstructor50LA* scRace=nullptr;
         const sc_original_world50LM::Owner* scWorld=nullptr;
         const TrackNavigation50EU* scMap=nullptr;
+        // GB keeps its retained radar/start map as its own view (no B8 pointer).
+        const OriginalRaceConstructor50LA* gbRace=nullptr;
+        const gb_original_world50LM::Owner* gbWorld=nullptr;
+        TrackNavigationView50GB gbMap{};
         const OriginalRaceConstructor50LA* gaRace=nullptr;
         const ga_original_world50LH::Owner* gaWorld=nullptr;
         const TrackNavigation50EU* gaMap=nullptr;

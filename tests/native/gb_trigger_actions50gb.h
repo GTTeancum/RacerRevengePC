@@ -235,11 +235,16 @@ public:
   if(!preparedSourceFor(*source_)){group_.actionsFailed=true;return reject(Status::Unprepared);}
   return true;
  }
- bool preparedSourceFor(const source::Owner& authored)const noexcept {
+ // soundDestination=false skips only the PodSound mixer/voice re-validation
+ // (its full shared race-audio check is costly). Per-query geometry admission
+ // uses that form; the PodSound play path still runs its own complete check
+ // (readyFor/playEntering) before any sound starts, and cold/world-service
+ // admission keeps the full form.
+ bool preparedSourceFor(const source::Owner& authored,bool soundDestination=true)const noexcept {
   return thread()&&!closed_&&sourcePrepared_&&terminal_==Status::Complete&&source_.get()==&authored&&authored.ready()&&
    !group_.actionsFailed&&group_.actions.context==this&&group_.actions.preflight==&preflightHook&&
    group_.actions.resume==&resumeHook&&animations_&&animations_->stagedSourceReady()&&
-   animations_->coldSource()==authored.coldSource()&&sounds_&&sounds_->sourceIdentity()==&authored&&sounds_->prepared()&&
+   animations_->coldSource()==authored.coldSource()&&sounds_&&sounds_->sourceIdentity()==&authored&&(!soundDestination||sounds_->prepared())&&
    particles_&&particles_->sourceOwner()&&particles_->sourceOwner()->sourceOwner()==authored.coldSource()&&targetsCurrent();
  }
  // Stages the actual eight-racer roster and source PLAYER/AI main690 lists.
@@ -272,7 +277,7 @@ private:
  // This observation cannot open query or world-service admission.
  bool observePrepared(std::uint32_t collider,const g::Type2ResourceView49X& resource,
   const g::BodyMatrix48G& world)noexcept {
-  if(!thread()||!source_||!preparedSourceFor(*source_)||!identitiesBound_||servicing_||
+  if(!thread()||!source_||!preparedSourceFor(*source_,false)||!identitiesBound_||servicing_||
      (lease_?(!group_.queryActive||lease_->queryCollider!=collider):!queryIdle())||
      !resource.nodes||!resource.nodeCount||!resource.rays||!resource.rayCount||
      (resource.root&g::type2Leaf49X)||resource.root>=resource.nodeCount||
@@ -288,6 +293,12 @@ public:
   return thread()&&!retiring_&&!closed_&&queryBinding_&&renderer_&&renderer_->ready()&&
    renderer_->runtimeOwner()==particles_.get()&&source_&&preparedSourceFor(*source_)&&identitiesBound_&&
    animations_->ready()&&sounds_->prepared()&&group_.ready&&!group_.actionsFailed;
+ }
+ // ready() without the PodSound destination re-validation; see preparedSourceFor.
+ bool queryReady()const noexcept {
+  return thread()&&!retiring_&&!closed_&&queryBinding_&&renderer_&&renderer_->ready()&&
+   renderer_->runtimeOwner()==particles_.get()&&source_&&preparedSourceFor(*source_,false)&&identitiesBound_&&
+   animations_->ready()&&group_.ready&&!group_.actionsFailed;
  }
  bool animationRetired()const noexcept{return !animations_||animations_->bindingRetired();}
  bool particleIdle()const noexcept{return !particles_||!particles_->visiting_;}

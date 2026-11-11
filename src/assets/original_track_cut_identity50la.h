@@ -1,5 +1,5 @@
 #pragma once
-// Bounded TA/RA/GC/SA/MA/GA/MB/SC identity/layout catalog from the supplied original RES members.
+// Bounded TA/RA/GC/SA/MA/GA/MB/SC/GB identity/layout catalog from the supplied original RES members.
 // Other track families remain outside this integration boundary.
 // Digests identify bytes; no curves, PCM, or runtime assets are embedded.
 #include <array>
@@ -22,7 +22,7 @@ struct OriginalTrackCutIdentity50LA {
  std::array<OriginalTrackMemberIdentity50LA,2> introMembers;
  std::array<OriginalTrackIntroEventIdentity50LA,6> events;
 };
-inline constexpr std::array<OriginalTrackCutIdentity50LA,8> originalTrackCutIdentities50LA{{
+inline constexpr std::array<OriginalTrackCutIdentity50LA,9> originalTrackCutIdentities50LA{{
  {"TA","TRACKS/TA.RES","b491e34bf6cbd27869d5b9dc8db394b101ebaf4ac7f5e0d44fcca33a00d41ab8",3334562,383,3,3256,
   {{{"tracks\\ta.tob",13887,0,"11e4c4909bf866fee626977c970d9907d4f191c29eeff32bddd162f173916f6b"},{"tracks\\ta01.vub",53488,376,"ad0a75b4e37e7e21f3fa29162c00dc4bc482b2f2d04066e5255edbd49a41147c"},{"tracks\\ta02.vub",17528,377,"ba15e426727250fdf7d25a0c7378d5323624a7504eb79cd9792eadd85f079e05"},{"tracks\\ta03.vub",17528,378,"fe7f6b12b3ddcb695f39b47d0a4e9cb89847e9639461d0b8ca03d4c05ed78456"}}},
   {{461,151,151}},{{9,5,6}},{{3109,3158,3207}},
@@ -63,6 +63,11 @@ inline constexpr std::array<OriginalTrackCutIdentity50LA,8> originalTrackCutIden
   {{351,201,81}},{{11,3,17}},{{10026,10076,10125}},
   3,{{{"audio\\introAud.ini",343,982,"a74d454fd671470aa9f4a507a026369973936999535f39606ce84595c3dc9d1f"},{"audio\\scrptLns.ini",117,981,"a59dc183ec92b00a2cd0e7940f66552207074b10ceba9ffb61461f7eeed529c8"}}},
   {{{57,38,56,1,108,122,134},{160,38,85,1,211,225,237},{263,38,114,1,314,328,340}}}},
+ {"GB","TRACKS/GB.RES","e92af24305431dc5a96cebb5ebcf89159adb6d371045b2c5424dacd1f74b7d99",4088586,1049,4,4700,
+  {{{"tracks\\gb.tob",20617,0,"96469b3953b18d940bd0c8772758c68a75a69c3375b49ef98b966901c2e598d1"},{"tracks\\gb01.vub",20428,1041,"29c8a5a5e61a63dc74ac7bd70a733396d873110064875919035085b9c559aa00"},{"tracks\\gb02.vub",34928,1042,"3eb277f5ffbf8685d581c03b6bd5ee4a533ec76a07d1d3e9a8e8c798d2546fb9"},{"tracks\\gb03.vub",11728,1043,"8cf2f5f2cd111b69a61e9bf11dc731e609161348db4da13163293c400b30522b"},{"tracks\\gb04.vub",20428,1044,"06a1e6767139604b8c2d56115e164143731ed42a2d3c94a1ad124964dec740e5"}}},
+  {{176,301,101,176}},{{2,6,3,10}},{{4503,4552,4601,4650}},
+  2,{{{"audio\\introAud.ini",238,1047,"aabe2a0edae88ecd40b6b9a3475f53712c1ba1bb7910c0b0434da95baf23268a"},{"audio\\scrptLns.ini",88,1046,"c28784d774a7a1d65fe118d3e94d5c3c7aa8bff490ee81bfaeeb0e7adfc58d90"}}},
+  {{{57,37,56,1,107,121,133},{159,37,85,1,209,223,235}}}},
 }};
 inline const OriginalTrackCutIdentity50LA* originalTrackCutIdentity50LA(std::string_view id)noexcept {
  for(const auto& row:originalTrackCutIdentities50LA)if(id==row.trackId)return &row;

@@ -121,6 +121,8 @@ public:
   }catch(const std::exception& e){blocked_=true;error=e.what();return false;}
  }
  bool ready()const noexcept{return ready_&&!blocked_&&!closed_&&current();}
+ // This owner's World4D8 transport, for the Results 26D070 typed stop claim only.
+ p::LogicalAudioOwner& resultsWorldTransport26D070()noexcept{return logical_;}
  const mc_cold_sources50LA::Owner* sourceIdentity()const noexcept{return source_.get();}
  const std::array<Descriptor,descriptorCount>& descriptors()const noexcept{return rows_;}
  bool uses(const p::AudioMixer50HD& mixer,const p::RaceAudioGroups50IC& groups)const noexcept{return ready()&&mixer_==&mixer&&groups_==&groups;}

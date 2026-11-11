@@ -21,7 +21,7 @@ inline bool RaceAudioGroups50IC::taIntroExistingBindingsCurrent()const noexcept 
 inline RaceAudioGroups50IC::TaIntroConstructionResult
 RaceAudioGroups50IC::constructTaIntroEvents177750(
     std::shared_ptr<const assets::OriginalTaIntroAuthoringCandidate> authoring)noexcept {
-    if(!authoring||!authoring->eventCount()||authoring->eventCount()>3||(authoring->trackId()!="TA"&&authoring->trackId()!="RA"&&authoring->trackId()!="GC"&&authoring->trackId()!="SA"&&authoring->trackId()!="MA"&&authoring->trackId()!="GA"&&authoring->trackId()!="MB"&&authoring->trackId()!="SC"))return TaIntroConstructionResult::rejected;
+    if(!authoring||!authoring->eventCount()||authoring->eventCount()>3||(authoring->trackId()!="TA"&&authoring->trackId()!="RA"&&authoring->trackId()!="GC"&&authoring->trackId()!="SA"&&authoring->trackId()!="MA"&&authoring->trackId()!="GA"&&authoring->trackId()!="MB"&&authoring->trackId()!="SC"&&authoring->trackId()!="GB"))return TaIntroConstructionResult::rejected;
     const auto events=authoring->eventCount();
     if(!coldTaIntroEmitter_){
         if(!constructDetachedColdTaIntroEmitter177750(std::move(authoring)))

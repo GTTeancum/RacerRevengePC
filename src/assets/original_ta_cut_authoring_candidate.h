@@ -140,7 +140,7 @@ public:
         std::string_view trackId,const Input* input,std::size_t memberCount,Status& status) noexcept {
         using namespace ta_cut_authoring_candidate_detail;
         status = Status::input;
-        if(!input||(trackId!="TA"&&trackId!="RA"&&trackId!="GC"&&trackId!="SA"&&trackId!="MA"&&trackId!="GA"&&trackId!="MB"&&trackId!="SC"))return nullptr;
+        if(!input||(trackId!="TA"&&trackId!="RA"&&trackId!="GC"&&trackId!="SA"&&trackId!="MA"&&trackId!="GA"&&trackId!="MB"&&trackId!="SC"&&trackId!="GB"))return nullptr;
         const auto* identity=originalTrackCutIdentity50LA(trackId);
         if(!identity||identity->cutCount!=((trackId=="TA"||trackId=="SC")?3u:trackId=="RA"?7u:(trackId=="SA"||trackId=="GA"||trackId=="MB")?5u:4u)||
            memberCount!=static_cast<std::size_t>(identity->cutCount)+1u)return nullptr;

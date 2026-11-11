@@ -224,3 +224,38 @@ inline void native_original_ai_audio::Owner::stopResultsAuxiliaryPreflighted26D0
     // No233670/2933D0: source channel/elapsed/selected-drive/cached slope,
     // D48 speech cursors/cooldowns, emitter/duck state and PCM owners survive.
 }
+
+inline bool native_original_ai_audio::Owner::canStopResultsWorld26D070(
+    const rr::platform::AudioMixer50HD& mixer,
+    const rr::platform::RaceAudioGroups50IC& groups)const noexcept {
+    if(!worldSoundStopCount26D070_||worldSoundStopCount26D070_>maximumWorldSoundStops26D070)return false;
+    for(std::size_t n=0;n<worldSoundStopCount26D070_;++n){const auto* t=worldSoundStops26D070_[n];
+        if(!t||!t->canStopResultsNative26D070(mixer))return false;
+        // Only the course's own World4D8 range; never another group's voice.
+        for(std::size_t j=0;j<t->resultsStopCount26D070();++j)
+            if(groups.binding(t->resultsStopVoice26D070(j))!=rr::game::RaceAudioGroup50IC::World4D8)return false;
+    }
+    return mixer.canRecordControlChanges(resultsWorldStopCount26D070());
+}
+inline std::size_t native_original_ai_audio::Owner::resultsWorldStopCount26D070()const noexcept {
+    std::size_t count=0;
+    for(std::size_t n=0;n<worldSoundStopCount26D070_&&n<maximumWorldSoundStops26D070;++n)
+        if(worldSoundStops26D070_[n])count+=worldSoundStops26D070_[n]->resultsStopCount26D070();
+    return count;
+}
+inline std::size_t native_original_ai_audio::Owner::resultsWorldStopVoice26D070(
+    std::size_t ordinal)const noexcept {
+    for(std::size_t n=0;n<worldSoundStopCount26D070_&&n<maximumWorldSoundStops26D070;++n){
+        const auto* t=worldSoundStops26D070_[n];if(!t)continue;
+        const auto count=t->resultsStopCount26D070();
+        if(ordinal<count)return t->resultsStopVoice26D070(ordinal);
+        ordinal-=count;
+    }
+    return rr::platform::audioMaximumVoices50HD;
+}
+inline void native_original_ai_audio::Owner::stopResultsWorldPreflighted26D070()noexcept {
+    // Stops PCM only; each owner's next service sees its sound inactive and
+    // releases the slot through its normal path.
+    for(std::size_t n=0;n<worldSoundStopCount26D070_&&n<maximumWorldSoundStops26D070;++n)
+        if(worldSoundStops26D070_[n])worldSoundStops26D070_[n]->stopResultsNativePreflighted26D070();
+}

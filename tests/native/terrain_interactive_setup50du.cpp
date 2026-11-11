@@ -23,6 +23,7 @@
 #include "original_consumed_ma_stage50du.h"
 #include "original_consumed_mb_stage50du.h"
 #include "original_consumed_sc_stage50du.h"
+#include "original_consumed_gb_stage50du.h"
 #include "original_consumed_sa_stage50du.h"
 #include "original_consumed_ta_stage50du.h"
 #include "rc_positional_sound50rc.h"
@@ -193,6 +194,7 @@ SessionExit50DU Context::run() {
  auto& consumedMaStage=this->consumedMaStage;
  auto& consumedMbStage=this->consumedMbStage;
  auto& consumedScStage=this->consumedScStage;
+ auto& consumedGbStage=this->consumedGbStage;
  auto& consumedRaStage=this->consumedRaStage;
  auto& consumedSaStage=this->consumedSaStage;
  auto& consumedTaStage=this->consumedTaStage;
@@ -1239,6 +1241,8 @@ SessionExit50DU Context::run() {
    const bool prepared=rcPositionalAudio->prepare(rcColdSources,*materialAudio,audioRoot,
        *materialMixer,*audioGroups,audioError);
    require50DU(prepared,audioError.empty()?"RC positional audio preparation rejected":audioError.c_str());
+   require50DU(originalAiAudio->registerResultsWorldSound26D070(rcPositionalAudio->resultsWorldTransport26D070()),
+       "RC positional audio Results stop registration rejected");
   }
   if(isTbTrack){
    require50DU(nativeOriginalFleet&&humanCourseEnabled&&originalAiAudioEnabled&&tbLiveAudioPrepared&&
@@ -1253,6 +1257,8 @@ SessionExit50DU Context::run() {
    const bool prepared=tbPositionalAudio->prepare(tbColdSources,*materialAudio,audioRoot,
        *materialMixer,*audioGroups,audioError);
    require50DU(prepared,audioError.empty()?"TB positional audio preparation rejected":audioError.c_str());
+   require50DU(originalAiAudio->registerResultsWorldSound26D070(tbPositionalAudio->resultsWorldTransport26D070()),
+       "TB positional audio Results stop registration rejected");
   }
   if(isMcTrack){
    require50DU(nativeOriginalFleet&&humanCourseEnabled&&originalAiAudioEnabled&&
@@ -1263,6 +1269,8 @@ SessionExit50DU Context::run() {
    const bool prepared=mcPositionalAudio->prepare(mcColdSources,audioRoot,*materialMixer,*audioGroups,audioError);
    require50DU(prepared&&mcPositionalAudio->uses(*materialMixer,*audioGroups),
        audioError.empty()?"MC positional audio preparation rejected":audioError.c_str());
+   require50DU(originalAiAudio->registerResultsWorldSound26D070(mcPositionalAudio->resultsWorldTransport26D070()),
+       "MC positional audio Results stop registration rejected");
    reserveMcAudioPayload(mcPositionalAudio->retainedPayloadBytes(),
        "MC actual positional audio retained payload exceeds remaining ledger");
   }
@@ -1279,6 +1287,8 @@ SessionExit50DU Context::run() {
    const bool prepared=gbPositionalAudio->prepare(gbColdSources,*materialAudio,audioRoot,
        *materialMixer,*audioGroups,audioError);
    require50DU(prepared,audioError.empty()?"GB positional audio preparation rejected":audioError.c_str());
+   require50DU(originalAiAudio->registerResultsWorldSound26D070(gbPositionalAudio->resultsWorldTransport26D070()),
+       "GB positional audio Results stop registration rejected");
    std::cerr<<"gb_native_audio ambient_rows=4 ambient_scheduling=unsupported positional_rows=49 native_transport_slots=24\n";
   }
  coldLoadDiagnostics.begin("audio_roster_banks");
@@ -3100,6 +3110,7 @@ SessionExit50DU Context::run() {
   .consumedMaStage=consumedMaStage,
   .consumedMbStage=consumedMbStage,
   .consumedScStage=consumedScStage,
+  .consumedGbStage=consumedGbStage,
   .consumedRaStage=consumedRaStage,
   .consumedSaStage=consumedSaStage,
   .consumedTaStage=consumedTaStage,

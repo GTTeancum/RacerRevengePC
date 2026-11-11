@@ -139,7 +139,9 @@ public:
   try{const bool accepted=std::invoke(std::forward<Operation>(operation),*storage);
    const auto p=a.group_.contact.phase;
    if(!accepted||a.group_.actionsFailed||(p!=g::SourceTriggerContactPhase50GB::Idle&&p!=g::SourceTriggerContactPhase50GB::Complete))return failQuery();
-   return a.ready();
+   // A dispatched contact may have started the PodSound: re-validate its
+   // destination in full. Otherwise the cheaper query admission form suffices.
+   return p==g::SourceTriggerContactPhase50GB::Complete?a.ready():a.queryReady();
   }catch(...){return failQuery();}
  }
  bool observePrepared(std::uint32_t collider,const g::Type2ResourceView49X& resource,const g::BodyMatrix48G& matrix)noexcept {

@@ -6,7 +6,10 @@
 #include "gb_collision_world50gb.h"
 #include "native_racer_bank50hn_fixture.h"
 #include "../../src/game/original_gc_gameplay_lighting_candidate.h"
+#include <algorithm>
+#include <iterator>
 #include <thread>
+#include <vector>
 namespace gb_animation_binding50GB {
 namespace g=rr::game;namespace lighting=g::original_gc_gameplay_lighting_candidate;
 namespace runtime=gb_animation_runtime50GB;namespace rt=track_runtime_storage50IG;
@@ -65,12 +68,46 @@ class Binding final {
    !bank_->visiting_&&!bank_->readBlocked_&&!bank_->visitDepth_&&!bank_->pendingToken_&&!bank_->retirementVisit_&&
    !bank_->nativeFifoPins_&&!bank_->gbAnimationVisit_&&(!sealed||bank_->count_>=2);
  }
+ //Host-side sorted copy of the sealed Bank's span list, built once at cold
+ //activation. A sealed Bank's spans never change (add() refuses after seal),
+ //so lookups give the same answers as the full scans, in log time. Used only
+ //while it still describes the very same sealed span list; otherwise scan.
+ struct SortedSpan {std::uintptr_t first;std::size_t bytes;};
+ std::vector<SortedSpan> sortedSpans_;
+ const native_racer50HN::Bank* sortedBank_=nullptr;const void* sortedData_=nullptr;
+ bool sortedCurrent()const noexcept {
+  return bank_&&bank_->sealed_&&sortedBank_==bank_&&sortedData_==static_cast<const void*>(bank_->spans_.data())&&
+   sortedSpans_.size()==bank_->spans_.size()&&!sortedSpans_.empty();
+ }
+ void buildSortedSpans() {
+  sortedSpans_.clear();sortedBank_=nullptr;sortedData_=nullptr;
+  if(!bank_||!bank_->sealed_)return;
+  sortedSpans_.reserve(bank_->spans_.size());
+  for(const auto& s:bank_->spans_)sortedSpans_.push_back({reinterpret_cast<std::uintptr_t>(s.address),s.bytes});
+  std::sort(sortedSpans_.begin(),sortedSpans_.end(),[](const SortedSpan& a,const SortedSpan& b){return a.first<b.first;});
+  //Bank::add() already refuses overlap; confirm before relying on ordering.
+  for(std::size_t i=1;i<sortedSpans_.size();++i)
+   if(sortedSpans_[i-1].first+sortedSpans_[i-1].bytes>sortedSpans_[i].first){sortedSpans_.clear();return;}
+  sortedBank_=bank_;sortedData_=bank_->spans_.data();
+ }
  bool exactSpan(const void* p,std::size_t bytes)const noexcept {
-  if(!bytes)return true;for(const auto& s:bank_->spans_)if(s.address==p&&s.bytes==bytes)return true;return false;
+  if(!bytes)return true;
+  if(sortedCurrent()){const auto first=reinterpret_cast<std::uintptr_t>(p);
+   const auto it=std::lower_bound(sortedSpans_.begin(),sortedSpans_.end(),first,
+       [](const SortedSpan& s,std::uintptr_t v){return s.first<v;});
+   return it!=sortedSpans_.end()&&it->first==first&&it->bytes==bytes;}
+  for(const auto& s:bank_->spans_)if(s.address==p&&s.bytes==bytes)return true;return false;
  }
  bool disjointBank(const void* p,std::size_t bytes)const noexcept {
   if(!bytes)return true;const auto first=reinterpret_cast<std::uintptr_t>(p);
   if(!p||bytes>std::numeric_limits<std::uintptr_t>::max()-first)return false;
+  if(sortedCurrent()){
+   //Last span starting before p+bytes is the only one that can overlap:
+   //spans are disjoint, so their ends are ordered like their starts.
+   const auto it=std::lower_bound(sortedSpans_.begin(),sortedSpans_.end(),first+bytes,
+       [](const SortedSpan& s,std::uintptr_t v){return s.first<v;});
+   if(it==sortedSpans_.begin())return true;
+   const auto& s=*std::prev(it);return !(first<s.first+s.bytes);}
   for(const auto& s:bank_->spans_){const auto other=reinterpret_cast<std::uintptr_t>(s.address);
    if(first<other+s.bytes&&other<first+bytes)return false;}return true;
  }
@@ -201,6 +238,7 @@ public:
  bool activateSealedBank(Diagnostic& d)noexcept {
   d={};try{if(!thread()||failed_||!bankIdle(true)||bankActivated_||!collision_||!collision_->actualIdle()||
       bank_->count_!=visual_[0].membership.object-2u)return fail(d,"GB actual sealed Bank/lighting racer count mismatch",0);
+   buildSortedSpans();
    if(!allPeers([&](std::size_t){for(std::size_t i=0;i<runtime::ownerCount;++i)if(!memberIdentity(i))return false;return true;},d))
     return fail(d,"GB genuine cold membership snapshot identity rejected",0);
    if(!collision_->currentPublication())return fail(d,"GB sealed Bank current global publication rejected",0);

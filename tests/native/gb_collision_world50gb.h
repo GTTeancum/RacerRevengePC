@@ -53,7 +53,7 @@ class Owner final : public std::enable_shared_from_this<Owner> {
  bool sameOwners()const noexcept {
   return thread()&&source_&&source_->ready()&&ground_&&ground_->coldSource()==source_.get()&&triggers_&&triggers_->ready()&&
    triggers_->coldSource()==source_.get()&&actions_&&actions_->sourceOwner()==triggers_.get()&&
-   actions_->preparedSourceFor(*triggers_)&&animations_&&
+   actions_->preparedSourceFor(*triggers_,false)&&animations_&&
    actions_->animationOwner()==animations_.get()&&animations_->coldSource()==source_.get();
  }
  bool actualIdle()const noexcept {return thread()&&!queryBorrows_&&(!actions_||actions_->queryIdle())&&
@@ -270,7 +270,7 @@ public:
  bool geometryReady()const noexcept{return phase_==Phase::Ready&&generation_&&!publicationBlocked_&&sameOwners()&&storage_&&storage_->get()&&animations_->ready()&&!actions_->nativeGroup().actionsFailed&&currentPublication();}
  // Dynamic readiness is genuine ActionOwner destination admission. It may
  // remain true during a held action query; query() separately requires idle.
- bool queryReady()const noexcept{return geometryReady()&&actions_->ready()&&actions_->nativeGroup().ready&&
+ bool queryReady()const noexcept{return geometryReady()&&actions_->queryReady()&&actions_->nativeGroup().ready&&
   !actions_->nativeGroup().actionsFailed;}
  bool animationPending()const noexcept{return phase_==Phase::AnimationPending&&sameOwners()&&storage_&&storage_->get();}
  bool beginRetirement()noexcept {

@@ -111,7 +111,11 @@ bool taRestoreStartLane()noexcept {
        actual_.actualRadarMapB8!=nativeTaIssuance_->maMap)return taReject(0x2a2880);
     if(nativeTaIssuance_&&nativeTaIssuance_->course==OriginalCameraStartCourse::sc&&
        actual_.actualRadarMapB8!=nativeTaIssuance_->scMap)return taReject(0x2a2880);
-    if(nativeTaIssuance_&&nativeTaIssuance_->course==OriginalCameraStartCourse::mb){
+    if(nativeTaIssuance_&&nativeTaIssuance_->course==OriginalCameraStartCourse::gb){
+        //2A2880 on GB's own retained map view (its 213-node Map role).
+        if(actual_.actualRadarMapB8||!nativeTaIssuance_->gbMap.sameOwner(actual_.actualRadarMapGb)||
+           !source_grid50IG::prepare(actual_.actualRadarMapGb,0,grid))return taReject(0x2a2880);
+    }else if(nativeTaIssuance_&&nativeTaIssuance_->course==OriginalCameraStartCourse::mb){
         //2A2880 on MB's own retained map view (same grid helper as the B8 map).
         if(actual_.actualRadarMapB8||!nativeTaIssuance_->mbMap.sameOwner(actual_.actualRadarMapMb)||
            !source_grid50IG::prepare(actual_.actualRadarMapMb,0,grid))return taReject(0x2a2880);

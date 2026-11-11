@@ -272,6 +272,7 @@ SessionExit50DU Context::run() {
  original_consumed_ma_stage50DU::Owner consumedMaStage(originalMainApplication,*liveAudio);
  original_consumed_mb_stage50DU::Owner consumedMbStage(originalMainApplication,*liveAudio);
  original_consumed_sc_stage50DU::Owner consumedScStage(originalMainApplication,*liveAudio);
+ original_consumed_gb_stage50DU::Owner consumedGbStage(originalMainApplication,*liveAudio);
  std::shared_ptr<ta_original_world50LE::Owner> taOriginalWorld;
  std::shared_ptr<gc_original_world50LM::Owner> gcOriginalWorld;
  std::shared_ptr<ga_original_world50LH::Owner> gaOriginalWorld;
@@ -863,6 +864,33 @@ SessionExit50DU Context::run() {
    if(!ready)std::cerr<<"consumed_sc_prefix_rejected source_pc="<<pc<<" material_pc="<<d.sourcePC<<'\n';
    require50DU(ready,"actual consumed SC race/world constructor prefix rejected");
   }
+ }
+
+ // GB: the same one race class (1A65C0) and counted course world (1A6BC0) on
+ // the GB static owner its cold sources already built above.
+ if(isGbTrack&&gbOriginalWorld&&gbOriginalWorld->loaded()&&consumedLaunch&&originalCameraEnabled&&humanCourseEnabled&&
+    dynamicProfile.game34==2&&nativeOrdinaryLaunch11258==1){
+  require50DU(gbOriginalWorld->mesh(),"GB original mesh publication missing");
+  openNativeVideo();originalMainApplication.appStart(originalMainApplication.assetRoot);
+  originalMainApplication.enterGameplayMaterialDirectory17D7A0();
+  const auto context=nativeVideo->standardMaterialConstructionContext(nativeVideo,originalMainApplication);
+  const auto domain=originalMainApplication.standardMaterialDomain();
+  require50DU(context&&domain&&domain->prepared(),"GB counted race material context unavailable");
+  if(!sourceModelRenderGlobals)sourceModelRenderGlobals=std::make_unique<OriginalRacerModelRenderGlobals50LA>(nativeOrdinaryLaunch11258);
+  rr::assets::OriginalStandardMaterialDiagnostic50LA d;std::uint32_t pc=0;
+  const bool ready=consumedGbStage.begin(*consumedLaunch,sessionIndex+1,playerRacer60,
+      *sourceModelRenderGlobals,gbOriginalWorld,d,pc);
+  if(!ready)std::cerr<<"consumed_gb_prefix_rejected source_pc="<<pc<<" material_pc="<<d.sourcePC<<'\n';
+  require50DU(ready,"actual consumed GB race/world constructor prefix rejected");
+ }
+ // GB's trigger sound (HUGEDOOR on World4D8) and its trigger actions join the
+ // world after the race object and its seventh group exist (original order).
+ // Without a consumed race this is the same uncounted prepare as before.
+ if(isGbTrack){
+  prepareGbPodSound(gbTriggerAuthoring);
+  gbTriggerActions=std::make_shared<gb_trigger_actions50GB::Owner>();
+  require50DU(gbTriggerActions->prepare(gbTriggerAuthoring,gbAnimationRuntime,gbPodSound,gbParticleRuntime,
+      gb_trigger_actions50GB::Owner::maximumAdditionalPayloadBytes()),"GB genuine animation/sound/particle action destinations rejected");
  }
 
  // Preserve the one actual SA static owner across source prefix and rendering.
@@ -1565,6 +1593,7 @@ SessionExit50DU Context::run() {
   .consumedMaStage=consumedMaStage,
   .consumedMbStage=consumedMbStage,
   .consumedScStage=consumedScStage,
+  .consumedGbStage=consumedGbStage,
   .consumedRaStage=consumedRaStage,
   .consumedSaStage=consumedSaStage,
   .consumedTaStage=consumedTaStage,

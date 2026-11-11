@@ -37,6 +37,7 @@ bool OriginalRaceConstructor50LA::ownsNativeCameraAdapter34(
             maWorld74_?maWorldCounted_&&maWorldPrefixComplete_:
             mbWorld74_?mbWorldCounted_&&mbWorldPrefixComplete_:
             scWorld74_?scWorldCounted_&&scWorldPrefixComplete_:
+            gbWorld74_?gbWorldCounted_&&gbWorldPrefixComplete_:
             gcWorld74_?gcWorldCounted_&&gcWorldPrefixComplete_:false;
         return counted&&!session.closed_&&!session.abandoned_;
     }
@@ -54,6 +55,7 @@ bool OriginalRaceConstructor50LA::raceCameraCourse34(OriginalCameraStartCourse c
     if(maWorld74_)return course==OriginalCameraStartCourse::ma;
     if(mbWorld74_)return course==OriginalCameraStartCourse::mb;
     if(scWorld74_)return course==OriginalCameraStartCourse::sc;
+    if(gbWorld74_)return course==OriginalCameraStartCourse::gb;
     if(gcWorld74_)return course==OriginalCameraStartCourse::gc;
     return false;
 }

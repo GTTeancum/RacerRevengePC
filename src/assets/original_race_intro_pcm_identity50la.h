@@ -6,7 +6,9 @@ namespace rr::assets {
 // Exact original-disc race-intro VAG identities. No PCM pack, path substitution,
 // caller-issued readiness or generated sound data. End-career tracks excluded.
 struct OriginalRaceIntroPcmIdentity50LA {std::string_view filename;std::uint64_t bytes;std::string_view sha256;std::uint32_t sampleRate;};
-inline constexpr std::array<OriginalRaceIntroPcmIdentity50LA,20> originalRaceIntroPcmCatalog50LA{{
+inline constexpr std::array<OriginalRaceIntroPcmIdentity50LA,22> originalRaceIntroPcmCatalog50LA{{
+    {"speech\\Dax\\Tracks\\Gamorr\\daxgmb11.vag",186080,"d03771a10d3979d6b7a1c8ddbdf5bd3359b470a93079091702d3325a1c702840",22050},
+    {"speech\\Dax\\Tracks\\Gamorr\\daxgmb12.vag",114944,"95d363507743dbfedf2e1d4d7d7f0eeedd57006077cbe215ae4cecc74fb65b3e",22050},
     {"speech\\Dax\\Tracks\\Sullust\\daxstc34.vag",136064,"f597788ae2c0bd2d1b240a62918d17c6c86199d4fdfdd5bf17b80acafe86cd58",22050},
     {"speech\\Dax\\Tracks\\Sullust\\daxstc35.vag",73680,"01490966f669e4f671587fea87aea3967986397aba033a3dbd2eb9edad0c553f",22050},
     {"speech\\Dax\\Tracks\\Sullust\\daxstc36.vag",28368,"8403f40e0cfef678e4c98f6987fd092b610c2c801695d45581b376c991a301cc",22050},

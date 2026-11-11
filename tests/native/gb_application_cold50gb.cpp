@@ -99,7 +99,6 @@ void GbColdPrefix::run() const {
   require50DU(gbNavigation.prepare(gbColdSources,gbNavigationDiagnostic),"GB authentic213/257 navigation source rejected");
   gbTriggerAuthoring=std::make_shared<gb_trigger_authoring50GB::Owner>();std::string error;
   require50DU(gbTriggerAuthoring->decode(gbColdSources,error),error.empty()?"GB eighteen source triggers rejected":error.c_str());
-  prepareGbPodSound(gbTriggerAuthoring);
   gbAnimationSource=std::make_shared<gb_animation_source50GB::Owner>();gb_animation_source50GB::Diagnostic animationSourceDiagnostic;
   require50DU(gbAnimationSource->decode(gbColdSources,s.animationShared.libm,
       gb_animation_source50GB::Owner::maximumAdditionalPayloadBytes(),animationSourceDiagnostic),"GB four authentic animation sources rejected");
@@ -142,9 +141,9 @@ void GbColdPrefix::run() const {
       originalMainApplication.state,nativeWaterGlobals,originalMainApplication.animationClock(),sessionIndex+1,registryQuota,
       registryQuota+gb_particle_runtime50GB::Owner::retainedPayloadBytes(),gbParticleRuntimeDiagnostic),
       "GB genuine shared Main particle runtime staging rejected");
-  gbTriggerActions=std::make_shared<gb_trigger_actions50GB::Owner>();
-  require50DU(gbTriggerActions->prepare(gbTriggerAuthoring,gbAnimationRuntime,gbPodSound,gbParticleRuntime,
-      gb_trigger_actions50GB::Owner::maximumAdditionalPayloadBytes()),"GB genuine animation/sound/particle action destinations rejected");
+  // PodSound (HUGEDOOR, World4D8) and the trigger actions that use it are
+  // attached after the race and its counted world exist (world stage), as in
+  // the original: 1A6B5C groups -> 1A6BC0 world (26FCF8 World4D8) -> sounds.
   gbCollisionWorld=std::make_shared<gb_collision_world50GB::Owner>();
   require50DU(gbCollisionWorld->prepareGround(gbColdSources,{4,16,32,64},x.assets.phy,trackSession->gridRank,
       gbExternalPayloadReservation,trackStorageLimits,error),error.empty()?"GB genuine615-placed Ground rejected":error.c_str());

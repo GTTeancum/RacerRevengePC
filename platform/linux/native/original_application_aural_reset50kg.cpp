@@ -149,9 +149,14 @@ bool OriginalApplicationAural50KG::stopResultsNative26D070(
     const auto auxiliaryCount=auxiliary?engines.resultsAuxiliaryStopCount26D070():0u;
     const auto lapCount=lap?gameplay.resultsLapStopCount26D070():0u;
     const auto countdownCount=countdownAdmitted?countdown->resultsCountdownStopCount26D070():0u;
-    if(auxiliaryCount>audioMaximumVoices50HD||lapCount>audioMaximumVoices50HD||
+    // Course world-sound owners (fixed-position World4D8 loops). Optional like
+    // the auxiliary rows: unadmitted owners get no claims, so any of their
+    // voices still active is refused by the residual-active fence below.
+    const bool world=engines.canStopResultsWorld26D070(*groups.mixer_,groups);
+    const auto worldCount=world?engines.resultsWorldStopCount26D070():0u;
+    if(auxiliaryCount>audioMaximumVoices50HD||lapCount>audioMaximumVoices50HD||worldCount>audioMaximumVoices50HD||
        !groups.mixer_->canRecordControlChanges(3u+(intro?intro->count_:0u)+
-           (all8?0u: ::gameplay_audio50HE::cueCount)+engines.resultsEngineStopCount26D070()+auxiliaryCount+lapCount+countdownCount))
+           (all8?0u: ::gameplay_audio50HE::cueCount)+engines.resultsEngineStopCount26D070()+auxiliaryCount+lapCount+countdownCount+worldCount))
         return fail(d,Status::backend,0x26d070);
     const auto announcerSlot=announcer.resultsStopVoice26D070();
     if(announcerSlot>=groups.count_||announcerSlot==::race_music50IE::voice||
@@ -177,6 +182,8 @@ bool OriginalApplicationAural50KG::stopResultsNative26D070(
         if(!claim(gameplay.resultsLapStopVoice26D070(n)))return fail(d,Status::owner,0x26d070);
     for(std::size_t n=0;n<countdownCount;++n)
         if(!claim(countdown->resultsCountdownStopVoice26D070(n)))return fail(d,Status::owner,0x26d070);
+    for(std::size_t n=0;n<worldCount;++n)
+        if(!claim(engines.resultsWorldStopVoice26D070(n)))return fail(d,Status::owner,0x26d070);
     for(std::size_t slot=0;slot<groups.count_;++slot){
         const bool typedIntro=intro&&slot>=intro->first_&&slot-intro->first_<intro->count_;
         const bool typedProvider=typed[slot];
@@ -212,6 +219,7 @@ bool OriginalApplicationAural50KG::stopResultsNative26D070(
     if(auxiliary)engines.stopResultsAuxiliaryPreflighted26D070();
     if(lap)gameplay.stopResultsLapPreflighted26D070();
     if(countdownAdmitted)countdown->stopResultsCountdownPreflighted26D070();
+    if(world)engines.stopResultsWorldPreflighted26D070();
     i.mixer->stopNativeSourcePreflighted26D070();
     main.noteControlChange();
     if(closed){
