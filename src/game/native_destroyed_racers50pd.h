@@ -7,10 +7,16 @@
 // and the native bookkeeping needed by host owners (hide, logging). Reset at
 // every cold race activation; Restart Race rebuilds the racers (the original
 // restores them through 1AEA70 -> virtual78(a1=1) -> 228110).
+#include "../assets/original_phy_cursor50la.h"
 #include <array>
+#include <bit>
+#include <cmath>
 #include <cstdint>
 #include <cstdlib>
+#include <optional>
 #include <string>
+#include <string_view>
+#include <vector>
 
 namespace rr::game {
 
@@ -40,6 +46,54 @@ struct NativeDestroyedRacer50PD {
 };
 
 inline std::array<NativeDestroyedRacer50PD,8> nativeDestroyedRacers50PD{};
+
+// Racer +50 "explosive wreck speed" per race slot, host-side (the native
+// frame state does not carry racer +50). Original: 20F6C4 zeroes it; the
+// handling loader reads [Collisions] ExplosiveWreckSpeed at 2159E8..2159F4
+// (158A70: a missing key leaves the field unchanged) and 215A10..215A28
+// multiplies it by 1.46666 (0x3FBBBB84, mph to ft/s) with the R5900 FPU,
+// which rounds toward zero. Read by 225C50 (225CCC..225CEC) and 2289BC.
+// Filled from each racer's own loaded PHY at cold race activation; this is
+// the one place that defines the table.
+struct NativeExplosiveWreckSpeed50PD {
+    bool loaded=false;
+    bool keyPresent=false;
+    std::uint32_t authoredBits=0;  // the PHY value as parsed (mph)
+    std::uint32_t speed50Bits=0;   // racer +50 after 215A28 (ft/s)
+};
+inline std::array<NativeExplosiveWreckSpeed50PD,8> nativeExplosiveWreckSpeeds50PD{};
+// R5900 mul.s: the binary32 product rounded toward zero. The double product
+// of two binary32 values is exact, so one directed narrowing reproduces it.
+inline float r5900Multiply50PD(float a,float b) noexcept {
+    const double exact=static_cast<double>(a)*static_cast<double>(b);
+    float rounded=static_cast<float>(exact);
+    if(std::fabs(static_cast<double>(rounded))>std::fabs(exact))rounded=std::nextafter(rounded,0.f);
+    return rounded;
+}
+// Refuses (returns false, slot left unloaded) when the slot is outside the
+// table, the PHY has no [Collisions] section (the source would keep the
+// previous section selected, which is not represented) or the value does not
+// parse. A missing key keeps the 20F6C4 zero, as 158A70 does.
+inline bool loadNativeExplosiveWreckSpeed50PD(std::size_t slot,const std::vector<std::uint8_t>& phy) noexcept {
+    if(slot>=nativeExplosiveWreckSpeeds50PD.size())return false;
+    auto& entry=nativeExplosiveWreckSpeeds50PD[slot];entry={};
+    std::string_view selected;
+    rr::assets::OriginalPhyCursor50LA cursor(phy,selected);
+    bool present=false;
+    if(!cursor.select157D00("Collisions",present)||!present)return false;
+    std::optional<float> authored;
+    if(!cursor.float158A70("ExplosiveWreckSpeed",authored))return false;
+    const float value=authored?*authored:0.f;
+    if(!std::isfinite(value))return false;
+    const float speed=r5900Multiply50PD(value,std::bit_cast<float>(0x3fbbbb84u));
+    if(!std::isfinite(speed))return false;
+    entry.keyPresent=authored.has_value();
+    entry.authoredBits=std::bit_cast<std::uint32_t>(value);
+    entry.speed50Bits=std::bit_cast<std::uint32_t>(speed);
+    entry.loaded=true;
+    return true;
+}
+inline void resetNativeExplosiveWreckSpeeds50PD() noexcept { nativeExplosiveWreckSpeeds50PD={}; }
 inline void resetNativeDestroyedRacers50PD() noexcept { nativeDestroyedRacers50PD={}; }
 inline bool nativeRacerDestroyed50PD(std::size_t slot) noexcept {
     return slot<nativeDestroyedRacers50PD.size()&&nativeDestroyedRacers50PD[slot].destroyed;
@@ -49,7 +103,7 @@ inline bool nativeRacerDestroyed50PD(std::size_t slot) noexcept {
 // sets the racer's canonical B9D bit0 once the race clock passes the time,
 // which makes 225C50 select the original 2261B0 explode handler. ":w"
 // instead dispatches 225C50's 225D9C site (slot 8C, 226750 wreck in place).
-struct NativeTestDestroy50PD { int slot=-1; double seconds=0; bool fired=false; int attacker=-1; bool wreck=false; int limp=0; };
+struct NativeTestDestroy50PD { int slot=-1; double seconds=0; bool fired=false; int attacker=-1; bool wreck=false; int limp=0; bool limpReset=false; };
 inline std::array<NativeTestDestroy50PD,8> nativeTestDestroys50PD=[]{
     std::array<NativeTestDestroy50PD,8> out{};
     const char* v=std::getenv("RR_TEST_DESTROY");
@@ -60,6 +114,10 @@ inline std::array<NativeTestDestroy50PD,8> nativeTestDestroys50PD=[]{
         auto item=text.substr(at,comma==std::string::npos?std::string::npos:comma-at);
         const auto wreckTag=item.find(":w");const bool wreck=wreckTag!=std::string::npos;
         if(wreck)item.erase(wreckTag,2);
+        // ":reset": also tap the manual reset key 0.5 s into the limp (test of
+        // 1A1750, which calls 2255B0 with no state test).
+        const auto resetTag=item.find(":reset");const bool limpReset=resetTag!=std::string::npos;
+        if(limpReset)item.erase(resetTag,6);
         // ":left"/":right": the human's 225E7C/225EC0 dispatch (slot 90/94).
         int limp=0;
         for(const auto& tag:{std::pair<const char*,int>{":left",1},{":right",2}}){
@@ -72,7 +130,7 @@ inline std::array<NativeTestDestroy50PD,8> nativeTestDestroys50PD=[]{
             const auto colon=item.find(':',split);
             const double seconds=std::atof(item.substr(split+1,colon==std::string::npos?std::string::npos:colon-split-1).c_str());
             const int attacker=colon==std::string::npos?-1:std::atoi(item.substr(colon+1).c_str());
-            if(slot>=0&&slot<8&&seconds>=0&&attacker<8&&attacker!=slot)out[used++]={slot,seconds,false,attacker,wreck,limp};
+            if(slot>=0&&slot<8&&seconds>=0&&attacker<8&&attacker!=slot)out[used++]={slot,seconds,false,attacker,wreck,limp,limpReset};
         }
         if(comma==std::string::npos)break;
         at=comma+1;
@@ -83,6 +141,8 @@ inline std::array<NativeTestDestroy50PD,8> nativeTestDestroys50PD=[]{
 inline std::array<bool,8> nativeTestDestroyPending50PD{};
 inline std::array<bool,8> nativeTestDestroyWreck50PD{};
 inline std::array<int,8> nativeTestDestroyLimp50PD{};
+// ":reset" armed for the human: the loop taps the manual reset key once.
+inline bool nativeTestLimpResetArmed50PD=false;
 // Optional attacker per pending slot (-1 none): the hook then also writes the
 // victim's D30 marker and D2C=2.0 as 22A37C..22A3B4 do for a racer hit.
 inline std::array<int,8> nativeTestDestroyAttacker50PD{-1,-1,-1,-1,-1,-1,-1,-1};

@@ -550,11 +550,12 @@ bool Context::advanceChildren(std::size_t actualRacerSlot,float preparedOuterFac
  OptionalProbeOwners50P optionalOwners{}; // Development topology has no optional dust owner.
  OptionalProbeResult50P optional{};
  runNative([&]{return optionalProbeVehicleImpacts50P(s,x.bindings,optionalOwners,optional,x.workspace,x.diagnostic);},"explicit absent optional dust-owner context");runNative([&]{return consumeEffects(optional.events,optional.count);},"consume dust stop controls");ImpactTransitionResult50C decision{};
- // racer+50 "ExplosiveWreckSpeed": 85 (every pod PHY) x 1.46666 at
- // 215A28 = 124.6661 ft/s. STAND-IN: the decoded value, not yet read from
- // this racer's own cold entity field (explosiveWreckSpeed50_), which the
- // frame cannot reach yet. Used by 225C50 (225CCC..225CEC) and 2289BC.
- constexpr std::uint32_t wreckSpeed50Bits=0x42f9550bu;
+ // racer+50 "ExplosiveWreckSpeed" (2159E8..215A28), read at race
+ // activation from this racer's own loaded PHY. Used by 225C50
+ // (225CCC..225CEC) and the 2289BC limp countdown.
+ require50DU(actualRacerSlot<rr::game::nativeExplosiveWreckSpeeds50PD.size()&&
+     rr::game::nativeExplosiveWreckSpeeds50PD[actualRacerSlot].loaded,"racer +50 explosive wreck speed not loaded for this racer");
+ const std::uint32_t wreckSpeed50Bits=rr::game::nativeExplosiveWreckSpeeds50PD[actualRacerSlot].speed50Bits;
  const bool damageReady=decideVehicleImpacts50P(s,x.bindings,wreckSpeed50Bits,
      decision,x.workspace,x.diagnostic);
  bool limpContinued=false;
@@ -624,8 +625,15 @@ bool Context::advanceChildren(std::size_t actualRacerSlot,float preparedOuterFac
   const auto countdown=rr::game::advanceOriginalDetachedDamage50LA(s.bodies.main.vehicleState40,s.fields.vehicle3C,
       preparedOuterFactor,impact,std::bit_cast<float>(wreckSpeed50Bits),limp.limp4C);
   const auto& p=s.bodies.main.components.root.body.position;
+  // The cockpit tether: 1B66D0's world anchors from this frame's physics
+  // (A on the cockpit at the surviving hitch, B on the main body at the
+  // surviving engine) against the 1B6670 length.
+  const auto& joint=s.bodies.joint;
+  const float tx=joint.worldAnchor80.v[0]-joint.worldAnchor90.v[0],ty=joint.worldAnchor80.v[1]-joint.worldAnchor90.v[1],
+      tz=joint.worldAnchor80.v[2]-joint.worldAnchor90.v[2];
   std::cerr<<"pod_limp frame="<<limp.limpFrames<<" state40="<<s.bodies.main.vehicleState40<<" t4C="<<limp.limp4C
       <<" ba8="<<impact<<" speed="<<s.bodies.main.cachedSpeed34<<" pos="<<p.v[0]<<','<<p.v[1]<<','<<p.v[2]
+      <<" tether="<<std::sqrt(tx*tx+ty*ty+tz*tz)<<" tether_len="<<joint.length4C
       <<" status="<<static_cast<unsigned>(countdown.status)<<'\n';
   if(countdown.status==rr::game::OriginalVehicleDamageStatus50LA::destructionRequired){
    std::cerr<<"pod_limp_exit reason="<<(countdown.sourcePC==0x228a30u?"impact88":limp.limp4C<=0.f?"timer":"impact8C")
@@ -940,11 +948,18 @@ bool Context::commitOriginalDestroyed(std::size_t actualRacerSlot,
    native_wreck_effects50PD::destroyed(actualRacerSlot,false,{w[12],w[13],w[14]},{w[12],w[13],w[14]});
    const auto& live=native_wreck_debris50PD::sim().pieces;
    std::cerr<<"debris_spawn_limp slot="<<actualRacerSlot<<" collections=0x"<<std::hex
-       <<native_wreck_debris50PD::sim().activeCollections[actualRacerSlot%8u]<<std::dec<<" pieces="<<spawned;
+       <<native_wreck_debris50PD::sim().activeCollections[actualRacerSlot%8u]<<std::dec<<" pieces="<<spawned
+       <<" groups="<<native_wreck_debris50PD::sim().groupCount;
    for(std::size_t i=first;i<live.size();++i){const auto& q=live[i];
     std::cerr<<" ["<<q.index<<" at="<<q.position.x<<','<<q.position.y<<','<<q.position.z
         <<" v="<<q.velocity.x<<','<<q.velocity.y<<','<<q.velocity.z<<" wz="<<q.angular.z<<']';}
    std::cerr<<'\n';}
+  // 2279C4..227A24: the 79C refresh. NOT REPRESENTED: its outputs 698/69C
+  // (122350) are the racer's zone records that the racer constructor hands
+  // to each wreck collection (212A40..212A68 -> 22BFD0) for the pieces'
+  // world queries; the native debris contact queries the whole track's
+  // collision candidates instead, so nothing in the port reads them.
+  std::cerr<<"pod_limp_query79c slot="<<actualRacerSlot<<" represented=0 consumer=22BFD0_wreck_zone\n";
   // The suffix runs at limp entry (s1 = 1 after the handler, 225EC8 onward).
   applySuffix();
   std::cerr<<"pod_limp_enter slot="<<actualRacerSlot<<" side="<<(left?"left":"right")<<" state40="<<side
@@ -1036,6 +1051,7 @@ bool Context::commitOriginalDestroyed(std::size_t actualRacerSlot,
       limpEscalation&&!explode?s.bodies.secondary.root.body.angularVelocity.v:nullptr,&skippedActive);
   {const auto& d=native_wreck_debris50PD::sim();
    std::cerr<<"debris_spawn slot="<<actualRacerSlot<<" pieces="<<spawned<<" explode="<<explode<<" skipped_active="<<skippedActive
+       <<" groups="<<d.groupCount
        <<" track_floor="<<d.floor<<" track_ceiling="<<d.ceiling<<" mesh_candidates="<<d.meshCandidates
        <<" compound="<<d.compoundCandidates<<" callback="<<d.callbackCandidates<<" other="<<d.otherCandidates;}
   const auto& live=native_wreck_debris50PD::sim().pieces;const auto* w=s.nodes[node].world100.v;
@@ -1050,6 +1066,9 @@ bool Context::commitOriginalDestroyed(std::size_t actualRacerSlot,
   std::cerr<<"wreck_effects_start slot="<<actualRacerSlot<<" emitters="<<effects.emitters.size()
       <<" embers_launched="<<effects.embersLaunched
       <<" ready="<<effects.cold<<'\n';}
+ // The same 79C refresh tail ends 2261B0/226750; not represented (see the
+ // limp entry above).
+ std::cerr<<"pod_destroyed_query79c slot="<<actualRacerSlot<<" represented=0\n";
  if(!limpEscalation)applySuffix();
  // 226414..2264AC / 226824..2268BC: human (58==0, 3C==0) with the vibration
  // option (11050 bit2): device virtual40 (238870, clear both) then virtual44

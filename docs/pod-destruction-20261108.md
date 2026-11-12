@@ -248,3 +248,41 @@ race's shared 308030 RNG is not consumed); the native debris separates at
 launch, so each group's sparks/explosion fire once then; every explosion
 starts the embers (no per-part damage gate); piece fire burns while the piece
 moves and piece smoke continues at its minimum rate after it settles.
+
+## Build 128 (Nov 12): threshold, stage E, wreck groups
+
+* Racer +50 explosive wreck speed is read at race activation from each
+  racer's own loaded PHY ([Collisions] ExplosiveWreckSpeed, 2159E8..215A28,
+  x 0x3FBBBB84 rounded toward zero as the R5900 does) into the host table in
+  `src/game/native_destroyed_racers50pd.h`; 225C50 and the 2289BC limp
+  countdown read it (`racer_wreck_speed50` log; every pod: 85 mph =
+  124.666 ft/s, 0x42F9550B).
+* Stage E: the 79C refresh is logged as not represented (its 698/69C outputs
+  feed only the wreck collections' world queries, 212A40..212A68 -> 22BFD0,
+  which the native debris contact does not use). Manual reset admits states
+  1/2 (1A1750 has no state test); in a one-human race the human is retired at
+  limp entry, the manager's ended bit (1B0A70) is set at once, and the source
+  reset gate (manager58 bit0 clear) and the port's input both refuse it.
+  Race end: retirement ends the race immediately (1B0A70 allGone), race94 =
+  6 s, so Results follow ~6 s after the limp entry, after the 2 s limp and
+  the wreck. A fresh race activation carries the cold-built tether
+  (`joint_restore`). Per-frame `pod_limp ... tether= tether_len=`.
+* Stage F1-F4 (`tests/native/native_wreck_debris_sim50pd.h`): 226750 and
+  the limp build host-side groups (2CA020/2CA190/2CA480/2CA620) for every
+  collection with two or more pieces whose loaded pieces match its authored
+  list; the primary carries the attached members; the member loop
+  (2CADDC..2CB3E4) tests touching members once per frame on the shared
+  308030 stream, and a break applies the 2CAEE8..2CB340 kick, detach and
+  recompute in source order. The explosion has no groups (22CAD8).
+* F3 (`native_wreck_effects50pd.h`): the explode-path group bursts are gone;
+  a group's C0/C4 restart at the root on the first latched member, one per
+  frame, while members are attached (2CC7F8..2CC8E4), otherwise stop;
+  released members' smoke/fire start the step after the break.
+* Stand-ins (flagged in code): the group contact is the native probe run
+  for the root and each attached member with a lever-arm response, not the
+  original DC spring/impulse solver (166E40/2964C0, stage F5, not built); the
+  break test's peak impulse counts only impacts faster than the resting
+  threshold; group rotational inertia is the mean of the 2CA620 diagonal.
+* Shutdown: a close arriving during a display fade (race-start fade-in,
+  Results fade-in) cancels the fade before the renderer retirements it
+  would otherwise block (the 127d/127t TB and MA terminate at the time limit).

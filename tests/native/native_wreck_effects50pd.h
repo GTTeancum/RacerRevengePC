@@ -10,7 +10,11 @@
 //  * racer818[0..9] = podEmberFire.emt / podEmberSmoke.emt damage emitters,
 //    those above 0.4 started at the explosion point racer270;
 //  * each wreck group's C0 podWreckSparks / C4 podExplosion restart when a
-//    member breaks off (2CC824..2CC884);
+//    member breaks off (2CC7F8..2CC8E4): the first latched member, one per
+//    frame, while members are attached, at the root's position; otherwise
+//    both stop. An explosion's groups are deactivated (22CAD8) and never fire;
+//  * attached members' damage emitters stay off until their release (2CB8F0
+//    starts them from the member's own frame, the frame after the break);
 //  * pieces with EmitSmoke own podWreckSmoke / podFire damage emitters.
 // Particle laws follow the shared manager (161180): age in ms, Grows adds
 // Growth*dt to size and Y, HasVelocity integrates, Gravity subtracts
@@ -19,9 +23,8 @@
 // Fades, alpha/brightness on the PS2 128 scale; Additive selects ONE blending.
 //
 // Native, not original: CPU billboards in world space; a private random
-// stream (effects never draw from the race's shared 308030 RNG); the debris
-// separates at launch, so group sparks/explosions fire once per group then;
-// embers launch from the private stream (D5: the source draws their direction,
+// stream (effects never draw from the race's shared 308030 RNG, including the
+// 15AD50 emitter-reset draw of a mode-2 group restart); embers launch from the private stream (D5: the source draws their direction,
 // gate and life from 308030); piece fire
 // burns while the piece moves, piece smoke continues at its minimum rate.
 #include "native_wreck_debris_sim50pd.h"
@@ -31,6 +34,7 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>
+#include <iostream>
 #include <string>
 #include <vector>
 
@@ -81,6 +85,7 @@ struct Emitter {
     V3 position{},previous{};
     float age=0,carry=0;
     std::int32_t piece=-1; // sim piece index it follows, or -1
+    std::int32_t group=-1; // sim wreck group whose C0/C4 this is, or -1
     std::uint32_t counter=0;
     bool alive=false;
     // 19BA50 PodEmberParticleEmitter: moves itself (19BF30) and carries its
@@ -202,10 +207,43 @@ inline void reset() noexcept { auto& s=state();s.particles.clear();s.emitters.cl
 inline float unit(State& s) noexcept { s.random=s.random*1664525u+1013904223u;return float(s.random>>8)*(1.f/16777216.f); }
 inline float lerp(float a,float b,float t) noexcept { return a+(b-a)*t; }
 
-inline void start(Effect effect,const V3& position,std::int32_t piece=-1) noexcept {
+inline void start(Effect effect,const V3& position,std::int32_t piece=-1,std::int32_t group=-1) noexcept {
     auto& s=state();if(!s.cold||!s.definitions[effect].parsed)return;
     if(s.emitters.size()>=maxEmitters){++s.dropped;return;}
-    Emitter e;e.effect=effect;e.position=e.previous=position;e.piece=piece;e.alive=true;s.emitters.push_back(e);
+    Emitter e;e.effect=effect;e.position=e.previous=position;e.piece=piece;e.group=group;e.alive=true;s.emitters.push_back(e);
+}
+inline std::uint64_t groupRestarts=0;
+// 2CC7F8..2CC8E4 per group frame, and the released members' 2CB8F0 damage
+// emitters (podWreckSmoke/podFire) from the frame after their break.
+inline void groupEffects() noexcept {
+    auto& s=state();auto& d=native_wreck_debris50PD::sim();
+    const auto& cold=native_wreck_debris50PD::cold();
+    for(std::size_t i=0;i<d.pieces.size();++i){
+        auto& p=d.pieces[i];
+        if(p.effectsStarted||p.attached||!p.releasedStep||p.releasedStep>=d.steps||p.racer>=cold.racers.size())continue;
+        const auto& racer=cold.racers[p.racer];if(p.index>=racer.pieces.size())continue;
+        p.effectsStarted=true;
+        if(!racer.pieces[p.index].emitSmoke)continue;
+        const V3 at{p.position.x,p.position.y,p.position.z};
+        start(pieceSmoke,at,std::int32_t(i));start(pieceFire,at,std::int32_t(i));
+        std::cerr<<"piece_fx start piece="<<p.racer<<'.'<<p.index<<" step="<<d.steps<<" released="<<p.releasedStep<<'\n';
+    }
+    if(!s.definitions[groupSparks].parsed||!s.definitions[groupExplosion].parsed)return; // 2CC7F8: both must exist
+    for(std::size_t gi=0;gi<d.groupCount;++gi){
+        auto& g=d.groups[gi];if(!g.active||g.root>=d.pieces.size())continue;
+        const auto& root=d.pieces[g.root];if(root.retired)continue;
+        std::int32_t latched=-1;
+        if(g.attached38)for(std::size_t i=0;i<g.capacity34;++i)if(g.latchB0[i]){latched=std::int32_t(i);break;}
+        // Stop84 both (or, before a restart, the 88 reset of the running ones).
+        for(auto& e:s.emitters)if(e.alive&&e.group==std::int32_t(gi))e.alive=false;
+        if(latched<0)continue;
+        g.latchB0[std::size_t(latched)]=false;
+        const V3 at{root.position.x,root.position.y,root.position.z};
+        start(groupSparks,at,std::int32_t(g.root),std::int32_t(gi));start(groupExplosion,at,std::int32_t(g.root),std::int32_t(gi));
+        ++groupRestarts;
+        std::cerr<<"group_fx slot="<<g.racer<<" c="<<g.collection+1<<" restart member="<<latched<<" step="<<d.steps
+            <<" attached38="<<g.attached38<<'\n';
+    }
 }
 
 inline void emitOne(State& s,Emitter& e,const Definition& d,float distance,std::int32_t effect=-1) noexcept {
@@ -253,6 +291,7 @@ inline void emitOne(State& s,Emitter& e,const Definition& d,float distance,std::
 // piece take its position; particles age and move by the manager laws.
 inline void step(float dt) noexcept {
     auto& s=state();if(!s.cold)return;++s.steps;
+    groupEffects();
     const auto& pieces=native_wreck_debris50PD::sim().pieces;
     for(auto& e:s.emitters){
         if(!e.alive)continue;
@@ -337,8 +376,10 @@ inline void step(float dt) noexcept {
 }
 
 // Destroy handlers: 2261B0 (explode) starts 814/810 at the body and the
-// embers at the explosion point; each launched collection fires its group
-// sparks/explosion; EmitSmoke pieces get smoke and fire.
+// embers at the explosion point; EmitSmoke pieces get smoke and fire, except
+// attached group members (theirs start at release). No group sparks or
+// explosion here: an explosion's groups are deactivated (22CAD8, 2CC9C0) and
+// a wreck's fire only on a break (groupEffects).
 inline void destroyed(std::size_t slot,bool explode,const V3& body,const V3& explosion) noexcept {
     auto& s=state();if(!s.cold)return;
     if(explode){
@@ -365,13 +406,9 @@ inline void destroyed(std::size_t slot,bool explode,const V3& body,const V3& exp
     auto& pieces=native_wreck_debris50PD::sim().pieces;
     if(slot>=cold.racers.size())return;
     const auto& racer=cold.racers[slot];
-    std::array<bool,16> groupStarted{};
     for(std::size_t i=0;i<pieces.size();++i){
-        auto& p=pieces[i];if(p.racer!=slot||p.index>=racer.pieces.size()||p.effectsStarted)continue;
+        auto& p=pieces[i];if(p.racer!=slot||p.index>=racer.pieces.size()||p.effectsStarted||p.attached)continue;
         const auto& piece=racer.pieces[p.index];const V3 at{p.position.x,p.position.y,p.position.z};
-        if(explode&&piece.collection<groupStarted.size()&&!groupStarted[piece.collection]){
-            groupStarted[piece.collection]=true;start(groupSparks,at);start(groupExplosion,at);
-        }
         if(piece.emitSmoke){start(pieceSmoke,at,std::int32_t(i));start(pieceFire,at,std::int32_t(i));}
         p.effectsStarted=true;
     }

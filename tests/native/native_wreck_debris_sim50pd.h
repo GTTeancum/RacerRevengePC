@@ -19,6 +19,17 @@
 // Ground contact is a native box-support segment test against the track's
 // static mesh candidates (front faces only, as 1082B0) with restitution and
 // Coulomb friction, not the original 166E40/2CA840 spring/impulse solver.
+//
+// Wreck groups (2CA020/2CA190/2CA480/2CA620/2CA840/2CA2F0): for 226750 and the
+// 227370/227A40 limp, each collection with two or more pieces is one body
+// (the primary's) carrying its attached members at their authored offsets;
+// members break off by BreakRate/BreakScale on the shared 308030 stream.
+// STAND-IN (until the original solver is ported): the group's contact is the
+// same native probe, run for the root and for each attached member, with a
+// lever-arm response on the group body; the break test's peak impulse
+// velocity change counts only impacts faster than the resting threshold, in
+// place of the 1C0 impulse part of the original DC spring response; the
+// group's rotational inertia is the mean of the 2CA620 diagonal.
 // A piece below every track collision bound can never land again; it is
 // retired (no longer simulated or drawn) instead of falling forever.
 #include "native_wreck_debris50pd.h"
@@ -31,6 +42,7 @@
 #include <bit>
 #include <cmath>
 #include <cstdint>
+#include <iostream>
 #include <span>
 #include <vector>
 
@@ -73,9 +85,36 @@ struct LivePiece {
     Vec position,velocity,angular,spawn;
     Quat orientation;
     float radius=1.f,mass=1.f,inertia=1.f,drag=0.f,rateDamping=0.f,contactTime=0.f;
+    Vec inertiaDiag{1.f,1.f,1.f};  // 166400 box diagonal (inertia is its mean)
     std::uint32_t contacts=0,lastContactStep=0;
     bool settled=false,retired=false;
     bool effectsStarted=false; // piece smoke/fire already started (limp pieces)
+    // Wreck group (2CA020): root = the group's primary piece (its body is the
+    // group body); attached = a member riding the root (body disabled).
+    std::int32_t group=-1;
+    bool groupRoot=false,attached=false;
+    // 2CA2F0 released this step: its own frame (and its 160/164 damage
+    // emitters) start from the next step.
+    std::uint64_t releasedStep=0;
+};
+// Host-side wreck group, field order of 2CA020/2CA190 (group +30..+B0).
+// One place defines this layout; storage is reserved, frames never allocate.
+inline constexpr std::size_t maxGroupMembers=15,maxGroups=40;
+struct Group {
+    bool active=false;
+    std::size_t racer=0,collection=0;
+    std::size_t root=0;                                   // live index of the primary (40)
+    std::uint32_t registered30=0,capacity34=0,attached38=0;
+    std::array<std::size_t,maxGroupMembers> member{};     // 44[] live indices
+    std::array<Vec,maxGroupMembers> offset48{};           // piece.50 - primary.50 (unrotated)
+    std::array<float,maxGroupMembers> breakRateA4{},breakScaleA8{};
+    std::array<bool,maxGroupMembers> attachedA0{},latchB0{},touched{};
+    float savedMass4C=0.f;Vec savedInertia60{};           // the primary's own mass / inertia diagonal
+    float mass26C=0.f;Vec inertiaDiag{};float inertiaMean=1.f; // 2CA620 aggregate
+    Vec center1E0{};                                      // root-local centre of mass offset
+    Vec peakC0{};                                         // per-axis peak impulse velocity change this frame
+    Vec peakRaw{};                                        // same, every approaching contact (diagnostic)
+    std::uint64_t draws=0,tests=0,breaks=0;
 };
 struct Sim {
     std::vector<LivePiece> pieces;
@@ -92,6 +131,9 @@ struct Sim {
     // Per racer: [Wreckage] collections already activated by 227370/227A40
     // (flags29 bit0). 2261B0 (22659C..) and 226750 (2269CC..) skip them.
     std::array<std::uint32_t,8> activeCollections{};
+    std::array<Group,maxGroups> groups{};
+    std::size_t groupCount=0;
+    std::uint64_t groupRefusals=0,rngDraws=0;
 };
 inline Sim& sim() noexcept { static Sim owner; return owner; }
 // Capacity is reserved at race activation: frames never allocate.
@@ -102,6 +144,7 @@ inline void resetSim() {
     auto& s=sim();s.pieces.clear();s.pieces.reserve(maxLivePieces);
     s.steps=0;s.contacts=0;s.queries=0;s.invalid=0;s.capacity=0;s.unsupported=0;s.retired=0;s.summarized=false;
     s.activeCollections={};
+    s.groups={};s.groupCount=0;s.groupRefusals=0;s.rngDraws=0;
 }
 // Lowest/highest point any static mesh candidate's bounding sphere reaches.
 inline void summarizeTrack(Sim& s) noexcept {
@@ -139,8 +182,86 @@ inline void tunePiece(LivePiece& live,const Piece& piece,const rr::game::Origina
     const float scale=(piece.inertia>0.f?piece.inertia:1.f)*live.mass/12.f;
     const float mean=scale*((y*y+z*z)+(x*x+z*z)+(x*x+y*y))/3.f;
     live.inertia=mean>1e-4f?mean:live.mass;
+    live.inertiaDiag=mean>1e-4f?Vec{scale*(y*y+z*z),scale*(x*x+z*z),scale*(x*x+y*y)}:Vec{live.mass,live.mass,live.mass};
     live.drag=tuning?tuning->drag:0.f;live.rateDamping=tuning?tuning->rateDamping:0.f;
     live.radius=std::max(.5f,.5f*std::max(x,std::max(y,z)));
+}
+
+inline Vec cross(Vec a,Vec b){return {a.y*b.z-a.z*b.y,a.z*b.x-a.x*b.z,a.x*b.y-a.y*b.x};}
+inline Vec rotate(Quat q,Vec v){float m[16];toMatrix(q,{},m);
+    return {m[0]*v.x+m[4]*v.y+m[8]*v.z,m[1]*v.x+m[5]*v.y+m[9]*v.z,m[2]*v.x+m[6]*v.y+m[10]*v.z};}
+inline bool finite(Vec v){return std::isfinite(v.x)&&std::isfinite(v.y)&&std::isfinite(v.z);}
+
+// 2CA620: the group body's mass, centre and inertia from the primary's saved
+// values plus every attached member. Source order: 1E0 starts at the saved 50
+// (zero), += each attached offset; mass += m_i; per axis I += I_i + o*(m*o)
+// (diagonal only, as written); 1E0 *= 1/(30 + 1) with the REGISTERED count.
+// Native: the body's rotational response uses the mean of that diagonal
+// (isotropic, as tunePiece does for one piece).
+inline bool recomputeGroup2CA620(Sim& s,Group& g) noexcept {
+    float mass=g.savedMass4C;Vec inertia=g.savedInertia60;Vec center{};
+    for(std::size_t i=0;i<g.capacity34;++i){
+        if(!g.attachedA0[i]||g.member[i]>=s.pieces.size())continue;
+        const auto& m=s.pieces[g.member[i]];const Vec o=g.offset48[i];
+        center=center+o;mass+=m.mass;
+        inertia={inertia.x+m.inertiaDiag.x+o.x*(m.mass*o.x),inertia.y+m.inertiaDiag.y+o.y*(m.mass*o.y),
+                 inertia.z+m.inertiaDiag.z+o.z*(m.mass*o.z)};
+    }
+    const float divide=1.f/static_cast<float>(g.registered30+1u);center=center*divide;
+    const float mean=(inertia.x+inertia.y+inertia.z)/3.f;
+    if(!std::isfinite(mass)||!(mass>0.f)||!finite(center)||!finite(inertia)||!(mean>0.f)){
+        ++s.groupRefusals;std::cerr<<"debris_group_refused racer="<<g.racer<<" c="<<g.collection+1<<" reason=2CA620_nonfinite\n";
+        return false;}
+    g.mass26C=mass;g.inertiaDiag=inertia;g.inertiaMean=mean;g.center1E0=center;
+    return true;
+}
+// 22C2B0 -> 2CC060 -> 2CA020 bind, 22C310 -> 2CA190 register, then (22C6A0
+// tail) 2CA480 attach every member and 2CA620. The collection's pieces are
+// live indices [first, first+count) in source order, piece 0 the primary.
+// A collection whose loaded pieces differ from its authored list is never
+// grouped (a missing piece would change its root or a member): refused, logged.
+inline std::int32_t bindGroup(Sim& s,std::size_t slot,std::size_t collection,std::size_t first,std::size_t count,
+    std::size_t authored) {
+    if(count<2)return -1;                       // one-piece collection: capacity 0, no group frame
+    if(count!=authored||count-1>maxGroupMembers||s.groupCount>=maxGroups||first+count>s.pieces.size()){
+        ++s.groupRefusals;
+        std::cerr<<"debris_group_refused racer="<<slot<<" c="<<collection+1<<" loaded="<<count<<" authored="<<authored
+            <<" groups="<<s.groupCount<<'\n';
+        return -1;
+    }
+    const auto& racer=cold().racers[slot];
+    auto& g=s.groups[s.groupCount];g=Group{};
+    g.racer=slot;g.collection=collection;g.root=first;g.capacity34=static_cast<std::uint32_t>(count-1);
+    auto& root=s.pieces[first];
+    g.savedMass4C=root.mass;g.savedInertia60=root.inertiaDiag;
+    const auto& a0=racer.pieces[root.index].authored50;
+    for(std::size_t k=1;k<count;++k){                // 2CA190: the primary is skipped
+        auto& m=s.pieces[first+k];const auto& piece=racer.pieces[m.index];
+        const std::size_t i=k-1;
+        g.member[i]=first+k;g.breakRateA4[i]=piece.breakRate;g.breakScaleA8[i]=piece.breakScale;
+        g.offset48[i]={piece.authored50[0]-a0[0],piece.authored50[1]-a0[1],piece.authored50[2]-a0[2]};
+        ++g.registered30;
+        g.attachedA0[i]=true;                        // 2CA480
+        m.attached=true;m.group=static_cast<std::int32_t>(s.groupCount);m.velocity={};m.angular={};
+    }
+    root.groupRoot=true;root.group=static_cast<std::int32_t>(s.groupCount);
+    if(!recomputeGroup2CA620(s,g)){
+        for(std::size_t k=0;k<count;++k){auto& p=s.pieces[first+k];p.group=-1;p.groupRoot=p.attached=false;}
+        g=Group{};return -1;
+    }
+    g.active=true;
+    std::cerr<<"debris_group slot="<<slot<<" c="<<collection+1<<" root="<<root.index<<" members="<<g.registered30
+        <<" mass="<<g.mass26C<<" com="<<g.center1E0.x<<','<<g.center1E0.y<<','<<g.center1E0.z<<" inertia="<<g.inertiaMean;
+    for(std::size_t i=0;i<g.capacity34;++i)std::cerr<<" [m"<<i<<" rate="<<g.breakRateA4[i]<<" scale="<<g.breakScaleA8[i]
+        <<" off="<<g.offset48[i].x<<','<<g.offset48[i].y<<','<<g.offset48[i].z<<']';
+    std::cerr<<'\n';
+    return static_cast<std::int32_t>(s.groupCount++);
+}
+inline std::size_t authoredPieces(std::size_t slot,std::size_t collection) noexcept {
+    const auto& racer=cold().racers[slot];
+    if(!racer.inventory)return 0;
+    const auto& authoring=racer.inventory->authoring();
+    return collection<authoring.collections.size()?authoring.collections[collection].pieces.size():0;
 }
 
 // Spawns every loaded piece of the racer. bodyWorld is the pod's body288 world
@@ -176,12 +297,10 @@ inline std::size_t spawn(std::size_t slot,bool explode,const float* bodyWorld,
             live.velocity=Vec{velocity[0],velocity[1],velocity[2]}+Vec{lx,ly,lz}*velocityScale;
             live.angular=Vec{angular[0],angular[1],angular[2]}+jitterAngular;
         }else{
-            // 226750 (226A70..226BAC): rigid-body point velocity at the piece,
-            // 70 + (A0 x r) with r = piece - body position; rate = 340+B0.
-            // Native: the source writes this to each collection's FIRST piece
-            // and the rest ride its group until break-off (2CA480/2CA620, not
-            // simulated); every piece takes its own point velocity here, which
-            // is what a rigid group carries before it breaks.
+            // 226750 (226A70..226BAC): the FIRST piece of each collection gets
+            // the rigid-body point velocity 70 + (A0 x r), r = piece - body
+            // position, rate = 340+B0. The other pieces are group members
+            // (2CA480): attached, bodies off, riding the primary (bindGroup).
             const Vec r{live.position.x-bodyPosition[0],live.position.y-bodyPosition[1],live.position.z-bodyPosition[2]};
             const Vec w{worldAngularA0[0],worldAngularA0[1],worldAngularA0[2]};
             const Vec spin{w.y*r.z-w.z*r.y,w.z*r.x-w.x*r.z,w.x*r.y-w.y*r.x};
@@ -197,6 +316,18 @@ inline std::size_t spawn(std::size_t slot,bool explode,const float* bodyWorld,
         if(s.pieces.size()>=maxLivePieces)break;
         s.pieces.push_back(live);++spawned;
     }
+    // 226750 -> 22C6A0 tail per collection: 2CA480 + 2CA620. 2261B0 -> 22CA60
+    // instead detaches every piece and deactivates the group (22CAD8), so an
+    // explosion has no groups.
+    if(!explode){
+        const std::size_t first=s.pieces.size()-spawned;
+        for(std::size_t i=first;i<s.pieces.size();){
+            const auto collection=racer.pieces[s.pieces[i].index].collection;std::size_t n=0;
+            while(i+n<s.pieces.size()&&racer.pieces[s.pieces[i+n].index].collection==collection)++n;
+            bindGroup(s,slot,collection,i,n,authoredPieces(slot,collection));
+            i+=n;
+        }
+    }
     return spawned;
 }
 
@@ -205,8 +336,8 @@ inline std::size_t spawn(std::size_t slot,bool explode,const float* bodyWorld,
 // piece 0 takes the lost engine model's world pose (28ADD0/28A090) and the
 // pod's point velocity at that engine, 70 + A0 x (engine - container194),
 // with rate B0 + (0,0, sign*7.0*u) from ONE shared 308030 draw (227684).
-// Native: the collection's other pieces stand at their authored places with
-// the same point velocity until the group break-off simulation exists.
+// The collection's other pieces stand at their 22C6A0 places as attached
+// group members (2CA480); from the next step they ride piece 0.
 struct LimpCollection { std::size_t collection=0; const float* engineWorld=nullptr; float sign=1.f; };
 inline std::size_t spawnLimp(std::size_t slot,const LimpCollection* list,std::size_t count,const float* bodyWorld,
     const float* velocity,const float* angular,const float* worldAngularA0,const float* container,
@@ -225,7 +356,7 @@ inline std::size_t spawnLimp(std::size_t slot,const LimpCollection* list,std::si
         const Vec w{worldAngularA0[0],worldAngularA0[1],worldAngularA0[2]};
         const Vec point=Vec{velocity[0],velocity[1],velocity[2]}+Vec{w.y*r.z-w.z*r.y,w.z*r.x-w.x*r.z,w.x*r.y-w.y*r.x};
         const Vec rate=Vec{angular[0],angular[1],angular[2]}+Vec{0.f,0.f,static_cast<float>(spinZ)};
-        bool first=true;
+        bool first=true;const std::size_t collectionFirst=s.pieces.size();
         for(std::size_t i=0;i<racer.pieces.size();++i){
             const auto& piece=racer.pieces[i];if(piece.collection!=entry.collection)continue;
             if(s.pieces.size()>=maxLivePieces)return spawned;
@@ -242,6 +373,7 @@ inline std::size_t spawnLimp(std::size_t slot,const LimpCollection* list,std::si
             live.velocity=point;live.angular=first?rate:Vec{angular[0],angular[1],angular[2]};
             s.pieces.push_back(live);++spawned;first=false;
         }
+        bindGroup(s,slot,entry.collection,collectionFirst,s.pieces.size()-collectionFirst,authoredPieces(slot,entry.collection));
         s.activeCollections[slot]|=1u<<entry.collection;
     }
     return spawned;
@@ -285,92 +417,281 @@ inline bool segmentHit(Sim& s,Vec from,Vec to,rr::game::CollisionContact48I& hit
     return found;
 }
 
-// One native step for every live piece.
-inline void step(float dt) noexcept {
-    auto& s=sim();if(s.pieces.empty())return;++s.steps;
-    auto& c=cold();
+// Native box-support contact probe for one body at its pose (shared by free
+// pieces, group roots and attached members). Fills the hit plane and the
+// support distance; returns whether the box touches it this step.
+struct Probe { bool touching=false; Vec normal{0.f,1.f,0.f},point{}; float need=0.f,above=0.f,below=0.f; };
+inline Probe probeBody(Sim& s,const Piece& piece,Vec position,Quat orientation,Vec moved) noexcept {
+    Probe r;
+    r.below=support(piece,orientation,{0.f,-1.f,0.f});
+    r.above=support(piece,orientation,{0.f,1.f,0.f});
+    const float skin=.5f+.25f*r.below;
+    constexpr float contactSlop=.5f;
+    rr::game::CollisionContact48I hit{};
+    if(segmentHit(s,position+Vec{0.f,r.above,0.f},moved-Vec{0.f,r.below+skin,0.f},hit)){
+        Vec normal{hit.normal.v[0],hit.normal.v[1],hit.normal.v[2]};
+        const float n=std::sqrt(dot(normal,normal));r.normal=n>0.f?normal*(1.f/n):Vec{0,1,0};
+        r.point={hit.point.v[0],hit.point.v[1],hit.point.v[2]};
+        r.need=support(piece,orientation,r.normal*-1.f);
+        r.touching=dot(moved-r.point,r.normal)<r.need+contactSlop;
+    }
+    return r;
+}
+
+// 167640 settling shared by free pieces and group roots.
+inline void settle(Sim& s,LivePiece& p,const rr::game::OriginalWreckTuning50LA* tuning,bool touching,
+    Vec oldVelocity,Vec oldAngular,float dt) noexcept {
     constexpr float window=2.f,finalDrag=50.f,finalRate=200.f; // 22C5xx piece defaults (130/10C/108)
     constexpr float stopSpeed=10.f,stopSpin=.5f,stopAcceleration=10.f,stopAngularAcceleration=1.f; // 134..140
-    for(auto& p:s.pieces){
-        if(p.settled||p.retired)continue;
-        const auto& racer=c.racers[p.racer];
-        const auto& piece=racer.pieces[p.index];
-        const auto* tuning=piece.collection<racer.tuning.size()?&racer.tuning[piece.collection]:nullptr;
-        const Vec oldVelocity=p.velocity,oldAngular=p.angular;
-        // 167250: gravity, then quadratic drag and rate damping (implicit so a
-        // large settling drag never reverses the motion).
-        p.velocity.y-=std::fabs(racer.gravityAcceleration)*dt;
-        {const float speed=std::sqrt(dot(p.velocity,p.velocity));
-         p.velocity=p.velocity*(1.f/(1.f+std::max(p.drag,0.f)/p.mass*speed*dt));}
-        p.angular=p.angular*(1.f/(1.f+std::max(p.rateDamping,0.f)/p.inertia*dt));
-        // Box-support probe: from the top of the piece to below its lowest point
-        // after this step's motion (plus a contact skin, so a box resting on a
-        // slope keeps seeing the plane under its centre every step).
-        const float below=support(piece,p.orientation,{0.f,-1.f,0.f});
-        const float above=support(piece,p.orientation,{0.f,1.f,0.f});
-        const float skin=.5f+.25f*below;
-        constexpr float contactSlop=.5f;
-        const Vec moved=p.position+p.velocity*dt;
-        rr::game::CollisionContact48I hit{};
-        bool touching=false;
-        Vec normal{0.f,1.f,0.f},point{};float need=0.f;
-        if(segmentHit(s,p.position+Vec{0.f,above,0.f},moved-Vec{0.f,below+skin,0.f},hit)){
-            normal={hit.normal.v[0],hit.normal.v[1],hit.normal.v[2]};
-            const float n=std::sqrt(dot(normal,normal));normal=n>0.f?normal*(1.f/n):Vec{0,1,0};
-            point={hit.point.v[0],hit.point.v[1],hit.point.v[2]};
-            need=support(piece,p.orientation,normal*-1.f);
-            touching=dot(moved-point,normal)<need+contactSlop;
+    // The original's spring contact stays set while a piece rests or skids;
+    // these impulse contacts can skip steps on a slope, so a contact within
+    // the last 0.25 s still counts as contact.
+    const bool inContact=touching||(p.lastContactStep&&float(s.steps-p.lastContactStep)*dt<=.25f);
+    p.contactTime=inContact?std::min(p.contactTime+dt,2.f*window):std::max(p.contactTime-dt,0.f);
+    {const float fraction=std::clamp((p.contactTime-window)/window,0.f,1.f);
+     const float baseDrag=tuning?tuning->drag:0.f,baseRate=tuning?tuning->rateDamping:0.f;
+     p.drag=baseDrag+(finalDrag-baseDrag)*fraction;p.rateDamping=baseRate+(finalRate-baseRate)*fraction;}
+    const float speed=std::sqrt(dot(p.velocity,p.velocity)),spin=std::sqrt(dot(p.angular,p.angular));
+    const Vec dv=p.velocity-oldVelocity,dw=p.angular-oldAngular;
+    const float acceleration=std::sqrt(dot(dv,dv))/dt,angularAcceleration=std::sqrt(dot(dw,dw))/dt;
+    if(inContact&&speed<stopSpeed&&spin<stopSpin&&acceleration<stopAcceleration&&angularAcceleration<stopAngularAcceleration){
+        p.settled=true;p.velocity={};p.angular={};
+    }
+}
+inline Quat integrate(Quat q,Vec w,float dt) noexcept {
+    // q += 0.5 * (0,w) * q * dt.
+    const Quat dq=multiply({w.x,w.y,w.z,0.f},q);
+    return normalized({q.x+.5f*dq.x*dt,q.y+.5f*dq.y*dt,q.z+.5f*dq.z*dt,q.w+.5f*dq.w*dt});
+}
+
+// One free (ungrouped or released) piece.
+inline void stepFree(Sim& s,LivePiece& p,float dt) noexcept {
+    const auto& racer=cold().racers[p.racer];
+    const auto& piece=racer.pieces[p.index];
+    const auto* tuning=piece.collection<racer.tuning.size()?&racer.tuning[piece.collection]:nullptr;
+    const Vec oldVelocity=p.velocity,oldAngular=p.angular;
+    // 167250: gravity, then quadratic drag and rate damping (implicit so a
+    // large settling drag never reverses the motion).
+    p.velocity.y-=std::fabs(racer.gravityAcceleration)*dt;
+    {const float speed=std::sqrt(dot(p.velocity,p.velocity));
+     p.velocity=p.velocity*(1.f/(1.f+std::max(p.drag,0.f)/p.mass*speed*dt));}
+    p.angular=p.angular*(1.f/(1.f+std::max(p.rateDamping,0.f)/p.inertia*dt));
+    // Box-support probe: from the top of the piece to below its lowest point
+    // after this step's motion (plus a contact skin, so a box resting on a
+    // slope keeps seeing the plane under its centre every step).
+    const Vec moved=p.position+p.velocity*dt;
+    const Probe c=probeBody(s,piece,p.position,p.orientation,moved);
+    if(c.touching){
+        ++s.contacts;++p.contacts;p.lastContactStep=static_cast<std::uint32_t>(s.steps);
+        const float into=dot(p.velocity,c.normal);
+        // Within the slop counts as touching (settling); only a move that
+        // would penetrate gets the contact response, so nothing hovers.
+        if(into<0.f&&dot(moved-c.point,c.normal)<c.need){
+            // Resting contact: an approach slower than two steps of gravity
+            // is absorbed (no micro-bounce), larger impacts use Restitution.
+            const float restingSpeed=2.f*std::fabs(racer.gravityAcceleration)*dt;
+            const float restitution=-into<=restingSpeed?0.f:tuning?std::clamp(tuning->restitution,0.f,1.f):.3f;
+            const float friction=tuning?std::max(tuning->friction,0.f):.5f;
+            const Vec normalPart=c.normal*into,tangent=p.velocity-normalPart;
+            const float tangentSpeed=std::sqrt(dot(tangent,tangent));
+            const float impulse=(1.f+restitution)*-into;
+            const float slow=tangentSpeed>0.f?std::max(0.f,1.f-friction*impulse/tangentSpeed):0.f;
+            p.velocity=normalPart*(-restitution)+tangent*slow;
+            // Ground friction torque: a tumbling piece loses spin on every contact
+            // step (native; spin otherwise re-feeds small bounces on slopes).
+            p.angular=p.angular*std::max(0.f,1.f-std::min(1.f,friction*.5f));
         }
-        if(touching){
-            ++s.contacts;++p.contacts;p.lastContactStep=static_cast<std::uint32_t>(s.steps);
-            const float into=dot(p.velocity,normal);
-            // Within the slop counts as touching (settling); only a move that
-            // would penetrate gets the contact response, so nothing hovers.
-            if(into<0.f&&dot(moved-point,normal)<need){
-                // Resting contact: an approach slower than two steps of gravity
-                // is absorbed (no micro-bounce), larger impacts use Restitution.
-                const float restingSpeed=2.f*std::fabs(racer.gravityAcceleration)*dt;
-                const float restitution=-into<=restingSpeed?0.f:tuning?std::clamp(tuning->restitution,0.f,1.f):.3f;
-                const float friction=tuning?std::max(tuning->friction,0.f):.5f;
-                const Vec normalPart=normal*into,tangent=p.velocity-normalPart;
-                const float tangentSpeed=std::sqrt(dot(tangent,tangent));
-                const float impulse=(1.f+restitution)*-into;
-                const float slow=tangentSpeed>0.f?std::max(0.f,1.f-friction*impulse/tangentSpeed):0.f;
-                p.velocity=normalPart*(-restitution)+tangent*slow;
-                // Ground friction torque: a tumbling piece loses spin on every contact
-                // step (native; spin otherwise re-feeds small bounces on slopes).
-                p.angular=p.angular*std::max(0.f,1.f-std::min(1.f,friction*.5f));
+        // Move with the post-contact velocity, then push out only along the
+        // normal by the remaining penetration (no downhill creep at rest).
+        const Vec next=p.position+p.velocity*dt;
+        const float gap=dot(next-c.point,c.normal);
+        p.position=gap<c.need?next+c.normal*(c.need-gap):next;
+    }else p.position=moved;
+    settle(s,p,tuning,c.touching,oldVelocity,oldAngular,dt);
+    p.orientation=integrate(p.orientation,p.angular,dt);
+    if(!std::isfinite(p.position.x)||!std::isfinite(p.position.y)||!std::isfinite(p.position.z)||
+       p.position.y+c.above<s.floor){
+        p.retired=true;++s.retired;p.velocity={};p.angular={};
+    }
+}
+
+// 2CA840 nonflight frame of one group: the root body carries the primary and
+// every attached member. Forces (167250) act on the aggregate mass; the root
+// and then each attached member are probed at their own poses and every
+// response acts on the root body, with its lever arm about the centre 1E0.
+// Native contact (as for free pieces), NOT the original DC spring/impulse
+// solver (166E40/2964C0): the per-axis peak C0 counts only impacts faster
+// than the resting threshold, standing in for 1C0's impulse part.
+inline void stepGroupBody(Sim& s,Group& g,float dt) noexcept {
+    auto& root=s.pieces[g.root];
+    const auto& racer=cold().racers[root.racer];
+    const auto* tuning=g.collection<racer.tuning.size()?&racer.tuning[g.collection]:nullptr;
+    g.touched={};g.peakC0={};g.peakRaw={};
+    g.attached38=0;for(std::size_t i=0;i<g.capacity34;++i)g.attached38+=g.attachedA0[i];
+    if(root.settled||root.retired)return;                  // root disabled (204 = 0): 2CA8F0 skip
+    const float M=g.mass26C,I=g.inertiaMean;
+    const Vec oldVelocity=root.velocity,oldAngular=root.angular;
+    Vec v=root.velocity,w=root.angular;
+    const Vec center=root.position+rotate(root.orientation,g.center1E0);
+    v.y-=std::fabs(racer.gravityAcceleration)*dt;
+    {const float speed=std::sqrt(dot(v,v));v=v*(1.f/(1.f+std::max(root.drag,0.f)/M*speed*dt));}
+    w=w*(1.f/(1.f+std::max(root.rateDamping,0.f)/I*dt));
+    const float restingSpeed=2.f*std::fabs(racer.gravityAcceleration)*dt;
+    const float restitutionAuthored=tuning?std::clamp(tuning->restitution,0.f,1.f):.3f;
+    const float friction=tuning?std::max(tuning->friction,0.f):.5f;
+    Vec shift{};bool touching=false;
+    auto respond=[&](const LivePiece& body,std::int32_t member){
+        const auto& piece=racer.pieces[body.index];
+        const Vec arm=body.position-center;
+        const Vec moved=body.position+(v+cross(w,arm))*dt;
+        const Probe c=probeBody(s,piece,body.position,body.orientation,moved);
+        if(!c.touching)return;
+        touching=true;++s.contacts;
+        if(member>=0)g.touched[static_cast<std::size_t>(member)]=true; // member DC.3C
+        const Vec pointVelocity=v+cross(w,arm);
+        const float into=dot(pointVelocity,c.normal);
+        if(into<0.f&&dot(moved-c.point,c.normal)<c.need){
+            const float restitution=-into<=restingSpeed?0.f:restitutionAuthored;
+            const Vec r=body.position-c.normal*c.need-center;   // the box's support point
+            const Vec rn=cross(r,c.normal);
+            const float kn=1.f/M+dot(rn,rn)/I;
+            const float jn=(1.f+restitution)*-into/kn;
+            Vec dv=c.normal*(jn/M),dw=rn*(jn/I);
+            const Vec tangent=pointVelocity-c.normal*into;
+            const float tangentSpeed=std::sqrt(dot(tangent,tangent));
+            if(tangentSpeed>0.f){
+                const Vec t=tangent*(1.f/tangentSpeed);const Vec rt=cross(r,t);
+                const float kt=1.f/M+dot(rt,rt)/I;const float jt=std::min(friction*jn,tangentSpeed/kt);
+                dv=dv-t*(jt/M);dw=dw-rt*(jt/I);
             }
-            // Move with the post-contact velocity, then push out only along the
-            // normal by the remaining penetration (no downhill creep at rest).
-            const Vec next=p.position+p.velocity*dt;
-            const float gap=dot(next-point,normal);
-            p.position=gap<need?next+normal*(need-gap):next;
-        }else p.position=moved;
-        // 167640 settling. The original's spring contact stays set while a
-        // piece rests or skids; these impulse contacts can skip steps on a
-        // slope, so a contact within the last 0.25 s still counts as contact.
-        const bool inContact=touching||(p.lastContactStep&&float(s.steps-p.lastContactStep)*dt<=.25f);
-        p.contactTime=inContact?std::min(p.contactTime+dt,2.f*window):std::max(p.contactTime-dt,0.f);
-        {const float fraction=std::clamp((p.contactTime-window)/window,0.f,1.f);
-         const float baseDrag=tuning?tuning->drag:0.f,baseRate=tuning?tuning->rateDamping:0.f;
-         p.drag=baseDrag+(finalDrag-baseDrag)*fraction;p.rateDamping=baseRate+(finalRate-baseRate)*fraction;}
-        const float speed=std::sqrt(dot(p.velocity,p.velocity)),spin=std::sqrt(dot(p.angular,p.angular));
-        const Vec dv=p.velocity-oldVelocity,dw=p.angular-oldAngular;
-        const float acceleration=std::sqrt(dot(dv,dv))/dt,angularAcceleration=std::sqrt(dot(dw,dw))/dt;
-        if(inContact&&speed<stopSpeed&&spin<stopSpin&&acceleration<stopAcceleration&&angularAcceleration<stopAngularAcceleration){
-            p.settled=true;p.velocity={};p.angular={};
+            v=v+dv;w=w+dw;
+            g.peakRaw={std::max(g.peakRaw.x,std::fabs(dv.x)),std::max(g.peakRaw.y,std::fabs(dv.y)),std::max(g.peakRaw.z,std::fabs(dv.z))};
+            if(-into>restingSpeed)
+                g.peakC0={std::max(g.peakC0.x,std::fabs(dv.x)),std::max(g.peakC0.y,std::fabs(dv.y)),std::max(g.peakC0.z,std::fabs(dv.z))};
+            // Same native ground spin loss per contact step as a free piece.
+            w=w*std::max(0.f,1.f-std::min(1.f,friction*.5f));
         }
-        // Orientation: q += 0.5 * (0,w) * q * dt.
-        const Quat spinQ{p.angular.x,p.angular.y,p.angular.z,0.f};
-        const Quat dq=multiply(spinQ,p.orientation);
-        p.orientation=normalized({p.orientation.x+.5f*dq.x*dt,p.orientation.y+.5f*dq.y*dt,
-            p.orientation.z+.5f*dq.z*dt,p.orientation.w+.5f*dq.w*dt});
-        if(!std::isfinite(p.position.x)||!std::isfinite(p.position.y)||!std::isfinite(p.position.z)||
-           p.position.y+above<s.floor){
-            p.retired=true;++s.retired;p.velocity={};p.angular={};
+        const Vec next=body.position+(v+cross(w,arm))*dt+shift;
+        const float gap=dot(next-c.point,c.normal);
+        if(gap<c.need)shift=shift+c.normal*(c.need-gap);
+    };
+    respond(root,-1);
+    for(std::size_t i=0;i<g.capacity34;++i)
+        if(g.attachedA0[i]&&g.member[i]<s.pieces.size())respond(s.pieces[g.member[i]],static_cast<std::int32_t>(i));
+    if(touching)root.lastContactStep=static_cast<std::uint32_t>(s.steps);
+    if(touching)++root.contacts;
+    // Integrate about the centre, then place the primary's origin.
+    const Vec nextCenter=center+v*dt+shift;
+    root.orientation=integrate(root.orientation,w,dt);
+    root.position=nextCenter-rotate(root.orientation,g.center1E0);
+    root.velocity=v;root.angular=w;
+    settle(s,root,tuning,touching,oldVelocity,oldAngular,dt);
+    const float above=support(racer.pieces[root.index],root.orientation,{0.f,1.f,0.f});
+    if(!finite(root.position)||root.position.y+above<s.floor){
+        root.retired=true;++s.retired;root.velocity={};root.angular={};
+        for(std::size_t i=0;i<g.capacity34;++i)if(g.attachedA0[i]&&g.member[i]<s.pieces.size()){
+            auto& m=s.pieces[g.member[i]];m.retired=true;++s.retired;}
+    }
+}
+
+// 2CAEE8..2CB340: member i breaks off, in source order. Each break sees the
+// root's velocity and mass as changed by the earlier breaks this frame.
+inline void breakMember(Sim& s,Group& g,std::size_t i,std::uint32_t& sharedRaw,std::uint64_t frame) noexcept {
+    auto& root=s.pieces[g.root];auto& m=s.pieces[g.member[i]];
+    const Vec off=g.offset48[i];
+    // 2CAF44..2CAF58: the VU0 outer product of the root's B0 with the
+    // UNROTATED authored offset (source quirk, copied as written).
+    const Vec vp=cross(root.angular,off)+root.velocity;
+    const float speed=std::sqrt(dot(root.velocity,root.velocity));          // root 34
+    const float u1=drawUnit(sharedRaw),u2=drawUnit(sharedRaw),u3=drawUnit(sharedRaw);
+    const float scaleJ=speed*.5f*g.breakScaleA8[i];                          // 444238 = 0.5
+    const Vec J{scaleJ*u1,scaleJ*u2,scaleJ*u3};
+    const float rootInverse=1.f/g.mass26C,memberInverse=1.f/m.mass;          // 270s (root: current aggregate)
+    const float k=1.f/(rootInverse+memberInverse),fm=k*memberInverse,fr=rootInverse*k;
+    const Vec rootBefore=root.velocity;const float massBefore=g.mass26C;
+    m.velocity=vp+J*fm;root.velocity=root.velocity-J*fr;
+    const float u4=drawUnit(sharedRaw),u5=drawUnit(sharedRaw),u6=drawUnit(sharedRaw);
+    const float scaleS=25.f*g.breakScaleA8[i];                               // 444240 = 25.0
+    const Vec S{scaleS*u4,scaleS*u5,scaleS*u6};
+    m.angular=root.angular+S*fm;root.angular=root.angular-S*fr;
+    s.rngDraws+=6;g.draws+=6;++g.breaks;
+    // 2CB308 member body enabled; 2CA2F0 detach: own contact, own frame from
+    // the next frame (mask20 |= 2), A0[i] = 0, then 2CA620.
+    m.attached=false;m.group=-1;m.releasedStep=s.steps;m.settled=false;m.contactTime=0.f;
+    g.attachedA0[i]=false;
+    recomputeGroup2CA620(s,g);
+    const Vec jm=(m.velocity-vp)*m.mass,jr=(rootBefore-root.velocity)*massBefore;
+    const Vec gap=jm-jr;const float jLength=std::sqrt(dot(J,J));
+    std::cerr<<"debris_break slot="<<g.racer<<" c="<<g.collection+1<<" i="<<i<<" step="<<frame
+        <<" v_point="<<vp.x<<','<<vp.y<<','<<vp.z<<" v_member="<<m.velocity.x<<','<<m.velocity.y<<','<<m.velocity.z
+        <<" v_root="<<rootBefore.x<<','<<rootBefore.y<<','<<rootBefore.z<<"->"<<root.velocity.x<<','<<root.velocity.y<<','<<root.velocity.z
+        <<" w_member="<<m.angular.x<<','<<m.angular.y<<','<<m.angular.z
+        <<" mass="<<massBefore<<"->"<<g.mass26C<<" com="<<g.center1E0.x<<','<<g.center1E0.y<<','<<g.center1E0.z
+        <<" draws="<<u1<<','<<u2<<','<<u3<<','<<u4<<','<<u5<<','<<u6
+        <<" momentum_err="<<(jLength>0.f?std::sqrt(dot(gap,gap))/(jLength*m.mass):0.f)<<'\n';
+}
+
+// 2CADDC..2CB3E4: the member loop, once per group frame. A member touching
+// something this frame breaks with probability min(0.02 |C0|, 1) x BreakRate
+// (one shared 308030 draw per touching attached member); otherwise it takes
+// the root's rotation and root + R x offset48 (2CB348..2CB3CC).
+inline void stepGroupMembers(Sim& s,Group& g,std::uint32_t& sharedRaw) noexcept {
+    auto& root=s.pieces[g.root];
+    if(root.settled||root.retired)return;
+    const float peak=std::sqrt(dot(g.peakC0,g.peakC0));
+    const float scaled=std::min(std::bit_cast<float>(0x3ca3d70au)*peak,1.f);
+    for(std::size_t i=0;i<g.capacity34;++i){
+        if(!g.attachedA0[i]||g.member[i]>=s.pieces.size())continue;
+        g.latchB0[i]=false;
+        if(g.touched[i]){
+            const float u=drawUnit(sharedRaw);++s.rngDraws;++g.draws;++g.tests;
+            const float p=scaled*g.breakRateA4[i];
+            if(u<p)g.latchB0[i]=true;
+            std::cerr<<"debris_break_test slot="<<g.racer<<" c="<<g.collection+1<<" i="<<i<<" step="<<s.steps
+                <<" peak_dv_raw="<<std::sqrt(dot(g.peakRaw,g.peakRaw))<<" peak_dv_impact="<<peak<<" s="<<scaled
+                <<" u="<<u<<" p="<<p<<" break="<<g.latchB0[i]<<'\n';
+        }
+        if(g.latchB0[i]){breakMember(s,g,i,sharedRaw,s.steps);continue;}
+        auto& m=s.pieces[g.member[i]];
+        m.orientation=root.orientation;m.position=root.position+rotate(root.orientation,g.offset48[i]);
+        m.velocity=root.velocity+cross(root.angular,rotate(root.orientation,g.offset48[i]));m.angular=root.angular;
+    }
+}
+
+// One native step for every live piece. Free pieces (their own 2CB8F0
+// frames) run first, then each group's frame, as the collection's child
+// list orders pieces before the group. sharedRaw is the race's 308030 stream.
+inline void step(float dt,std::uint32_t& sharedRaw) noexcept {
+    auto& s=sim();if(s.pieces.empty())return;++s.steps;
+    const auto drawsBefore=s.rngDraws;std::uint64_t tests=0,breaks=0;
+    for(auto& p:s.pieces){
+        if(p.settled||p.retired||p.attached||p.groupRoot)continue;
+        if(p.releasedStep==s.steps)continue;                  // released this step: from the next
+        stepFree(s,p,dt);
+    }
+    for(std::size_t gi=0;gi<s.groupCount;++gi){
+        auto& g=s.groups[gi];if(!g.active||g.root>=s.pieces.size())continue;
+        const auto t0=g.tests,b0=g.breaks;
+        stepGroupBody(s,g,dt);
+        stepGroupMembers(s,g,sharedRaw);
+        tests+=g.tests-t0;breaks+=g.breaks-b0;
+        if(s.steps%15==1&&!s.pieces[g.root].settled){
+            const auto& root=s.pieces[g.root];float offsetError=0.f,rotationDot=1.f;std::uint32_t attached=0;
+            for(std::size_t i=0;i<g.capacity34;++i){if(!g.attachedA0[i])continue;++attached;
+                const auto& m=s.pieces[g.member[i]];const Vec want=root.position+rotate(root.orientation,g.offset48[i]);
+                const Vec e=m.position-want;offsetError=std::max(offsetError,std::sqrt(dot(e,e)));
+                const float d=std::fabs(m.orientation.x*root.orientation.x+m.orientation.y*root.orientation.y+
+                    m.orientation.z*root.orientation.z+m.orientation.w*root.orientation.w);
+                rotationDot=std::min(rotationDot,d);}
+            std::cerr<<"debris_group_pose slot="<<g.racer<<" c="<<g.collection+1<<" step="<<s.steps
+                <<" root="<<root.position.x<<','<<root.position.y<<','<<root.position.z
+                <<" v="<<root.velocity.x<<','<<root.velocity.y<<','<<root.velocity.z
+                <<" w="<<root.angular.x<<','<<root.angular.y<<','<<root.angular.z<<" attached="<<attached
+                <<" max_offset_err="<<offsetError<<" min_rot_dot="<<rotationDot<<" mass="<<g.mass26C<<'\n';
         }
     }
+    if(s.rngDraws!=drawsBefore)
+        std::cerr<<"debris_rng step="<<s.steps<<" draws="<<s.rngDraws-drawsBefore<<" expected="<<tests+6*breaks<<'\n';
 }
 
 // Renderer instances for every live piece (capped by the renderer capacity).

@@ -2386,6 +2386,26 @@ SessionExit50DU Context::run() {
   native_wreck_effects50PD::reset();
   native_common_results50PD::reset();native_race_replay50PD::owner().reset();
   rr::game::nativeTestDestroyPending50PD={};
+  rr::game::nativeTestLimpResetArmed50PD=false;
+  // Racer +50 (215A28) from each racer's own loaded PHY, and the 228110
+  // restart restore check: a fresh race session must carry the cold-built
+  // cockpit tether (anchors and length), not the one a limp rebound.
+  rr::game::resetNativeExplosiveWreckSpeeds50PD();
+  for(std::size_t slot=0;slot<racerBank.count();++slot){
+   require50DU(slot<racerRigs.size()&&racerRigs[slot],"racer +50 explosive wreck speed: racer PHY rig absent");
+   require50DU(rr::game::loadNativeExplosiveWreckSpeed50PD(slot,racerRigs[slot]->phy),
+       "racer +50 explosive wreck speed: PHY [Collisions] ExplosiveWreckSpeed rejected");
+   const auto& w=rr::game::nativeExplosiveWreckSpeeds50PD[slot];
+   std::cerr<<"racer_wreck_speed50 slot="<<slot<<" pod="<<racerRigs[slot]->podId<<" key="<<w.keyPresent
+       <<" authored="<<std::bit_cast<float>(w.authoredBits)<<" speed50="<<std::bit_cast<float>(w.speed50Bits)
+       <<" bits=0x"<<std::hex<<w.speed50Bits<<std::dec<<'\n';
+  }
+  racerBank.visit(0,[&](){
+   const auto& j=s.bodies.joint;
+   std::cerr<<"joint_restore slot=0 state40="<<s.bodies.main.vehicleState40<<" anchorA="<<j.localAnchor60.v[0]<<','
+       <<j.localAnchor60.v[1]<<','<<j.localAnchor60.v[2]<<" anchorB="<<j.localAnchor70.v[0]<<','<<j.localAnchor70.v[1]<<','
+       <<j.localAnchor70.v[2]<<" bodyB="<<j.bodyBPresent48<<" length="<<j.length4C<<" cockpit838="<<s.bodies.vehicle838<<'\n';
+  });
   rr::game::nativeTestDestroyAttacker50PD.fill(-1);
   for(auto& test:rr::game::nativeTestDestroys50PD)test.fired=false;
   if(!allAiEnabled){
@@ -3607,6 +3627,14 @@ SessionExit50DU Context::run() {
    return closeRejected("original_pause_host_shutdown");
   // Retire the actual Pause GPU borrow and FINAL pin before any HUD material
   // releases. Keep the renderer/context live for PositionStats' own drains.
+  // A display fade (blocking 262C70/262D80, or the async underlay) holds the
+  // renderer exclusively until it is retired, and every renderer retirement
+  // below (Pause, PositionStats' 244D60 drains) is refused while it does.
+  // A close that arrives mid-fade (race-start fade-in, Results fade-in)
+  // cancels it first; the later camera-tail cancelAndRetire calls then see
+  // it already retired. Host shutdown order only: no source state changes.
+  for(auto* fade:{sourceEndingFade.get(),sourceFadeIn.get(),sourceFadeOut.get()})
+   if(fade&&!fade->cancelAndRetire())return closeRejected("display fade cancel before renderer retirement");
   if(!renderer.retireOriginalPauseDerived(rendererDiagnostic))return closeRejected("if(!renderer.retireOriginalPauseDerived(rendererDiagnostic))");
   if(!sourcePause.retireDrawing())return closeRejected("if(!sourcePause.retireDrawing())");
   if(sourcePositionStatsResources.owner&&
@@ -4033,7 +4061,13 @@ SessionExit50DU Context::run() {
      };
      if(!originalRecoveryEnabled||!originalResetGround||!originalAiAudio||!racerCables[0]||
         !sourceCameraSession||!sourceCameraSession->ready()||humanBaseUndertrack.pending||
-        s.phase!=VehicleFramePhase49W::Ready||s.fields.vehicle58||s.fields.vehicle3C||m.vehicleState40||
+        s.phase!=VehicleFramePhase49W::Ready||s.fields.vehicle58||s.fields.vehicle3C||
+        // 1A1750..1A17B8 calls 2255B0 with no state test: a limping pod
+        // (states 1/2) resets and stays limping. States 3/4 keep the guard:
+        // the destroyed racer frame (228390) is not a reset owner here, and
+        // whether the source input routine still reaches 1A1750 then is not
+        // established.
+        (m.vehicleState40!=0u&&m.vehicleState40!=1u&&m.vehicleState40!=2u)||
         originalManualResetSerial==std::numeric_limits<std::uint64_t>::max()||
         gcGraphicsSequence[0]==std::numeric_limits<std::uint64_t>::max()||
         (originalHumanRecovery.stage!=native_original_human_recovery::Stage::Idle&&

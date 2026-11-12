@@ -341,6 +341,25 @@ void Context::run() {
      }
     }
    }
+   if(captureRun.unattended()){
+    // RR_TEST_DESTROY=0@N:left|right:reset: tap the manual reset key (T,
+    // 150 ms) once, 30 limp frames (0.5 s) after the human's limp entry.
+    static std::uint64_t limpResetUntilNs50PD=0;
+    if(rr::game::nativeTestLimpResetArmed50PD&&rr::game::nativeDestroyedRacers50PD[0].limping&&
+       rr::game::nativeDestroyedRacers50PD[0].limpFrames>=30u){
+     rr::game::nativeTestLimpResetArmed50PD=false;limpResetUntilNs50PD=monotonicNow50DU()+150000000ull;
+     std::cerr<<"test_limp_reset tap limp_frames="<<rr::game::nativeDestroyedRacers50PD[0].limpFrames<<'\n';
+    }
+    if(limpResetUntilNs50PD){
+     hostInput.keys.focused=true;hostInput.keys.activityLost=false;
+     constexpr std::size_t resetT=23;
+     const bool tap=monotonicNow50DU()<limpResetUntilNs50PD;
+     if(tap&&!hostInput.keys.down[resetT])hostInput.keys.pressed[resetT]=1;
+     if(!tap&&hostInput.keys.down[resetT])hostInput.keys.released[resetT]=1;
+     hostInput.keys.down[resetT]=tap?1:0;
+     if(!tap)limpResetUntilNs50PD=0;
+    }
+   }
    {
     // Unattended test only: RR_TEST_CAMERA_CYCLE=1 taps the view key (C) 1 s
     // after each green light and every 15 s after, for 150 ms each. A fresh
@@ -382,6 +401,7 @@ void Context::run() {
       rr::game::nativeTestDestroyAttacker50PD[static_cast<std::size_t>(test.slot)]=test.attacker;
       rr::game::nativeTestDestroyWreck50PD[static_cast<std::size_t>(test.slot)]=test.wreck;
       rr::game::nativeTestDestroyLimp50PD[static_cast<std::size_t>(test.slot)]=test.limp;
+      if(test.slot==0&&test.limp&&test.limpReset)rr::game::nativeTestLimpResetArmed50PD=true;
       std::cerr<<"test_destroy due slot="<<test.slot<<" race_seconds="<<race.raceSeconds<<'\n';
      }
    }
@@ -1761,7 +1781,9 @@ void Context::run() {
            <<" result="<<result<<" output_open="<<liveAudio->outputOpen()<<" owner="<<(raceMusic?1:0)<<'\n';
       }
      }
-     native_wreck_debris50PD::step(.016f);
+     // Wreck groups' break tests and kicks draw from the race's shared 308030
+     // stream (2CAE80.., 2CAF94..); the free pieces draw nothing.
+     racerBank.visit(0,[&](){native_wreck_debris50PD::step(.016f,s.noiseOwner().sharedRandomState);});
      // The camera racer's debris becomes the death camera's 22D4B0 view
      // (rebound to the Session's prepared death identity) once it exists.
      if(rr::game::nativeRacerDestroyed50PD(0)&&sourceCameraSession&&!native_wreck_debris50PD::cameraViewBound(0)){
