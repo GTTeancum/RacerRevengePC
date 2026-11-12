@@ -8,6 +8,8 @@
 #include "original_consumed_mb_stage50du.h"
 #include "original_consumed_sc_stage50du.h"
 #include "original_consumed_gb_stage50du.h"
+#include "original_consumed_mc_stage50du.h"
+#include "original_consumed_tb_stage50du.h"
 #include "original_consumed_rc_stage50du.h"
 #include "original_consumed_tc_stage50du.h"
 #include "original_consumed_sa_stage50du.h"
@@ -110,7 +112,7 @@ void Registration::observeConstructed1A8CC4(::interactive_publication50DU::Conte
     //construction must withdraw fresh-null knownness too, never gain a Scope.
     const std::shared_ptr<rr::game::OriginalRaceConstructor50LA>* selected=nullptr;
     for(const auto* candidate:{&actual.consumedRaStage.race(),&actual.consumedTaStage.race(),
-        &actual.consumedMaStage.race(),&actual.consumedMbStage.race(),&actual.consumedScStage.race(),&actual.consumedGbStage.race(),&actual.consumedRcStage.race(),&actual.consumedTcStage.race(),&actual.consumedSaStage.race(),
+        &actual.consumedMaStage.race(),&actual.consumedMbStage.race(),&actual.consumedScStage.race(),&actual.consumedGbStage.race(),&actual.consumedRcStage.race(),&actual.consumedTcStage.race(),&actual.consumedMcStage.race(),&actual.consumedTbStage.race(),&actual.consumedSaStage.race(),
         &actual.consumedGaStage.race(),&actual.consumedGcStage.race()}){
         if(candidate->get()==published){selected=candidate;break;}
     }

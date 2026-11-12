@@ -415,6 +415,26 @@ class OriginalRaceConstructor50LA final {
     bool constructGbWorld1A6BC0(const original_main_entry50KG::Application&,
         std::shared_ptr<gb_original_world50LM::Owner>,std::uint32_t&)noexcept;
     bool retireNativeGbWorldPrefix(std::uint32_t&)noexcept;
+    // Independently typed MC static backing and actual counted1B2870 prefix (same as MB).
+    std::shared_ptr<mc_original_world50LM::Owner> mcWorld74_;
+    OriginalWreckComponent50LA mcWorldEntity_;
+    bool mcWorldCounted_=false,mcWorldPrefixComplete_=false;
+    std::uint32_t mcWorldMode30_=0,mcUseEnvironment35C_=0,mcWorldMode524_=0;
+    std::unique_ptr<OriginalWreckComponent50LA*[]> mcWorldList500_;
+    std::uint32_t mcWorldListCapacity504_=0,mcWorldListGrowth508_=0,mcWorldListCount50C_=0;
+    bool constructMcWorld1A6BC0(const original_main_entry50KG::Application&,
+        std::shared_ptr<mc_original_world50LM::Owner>,std::uint32_t&)noexcept;
+    bool retireNativeMcWorldPrefix(std::uint32_t&)noexcept;
+    // Independently typed TB static backing and actual counted1B2870 prefix (same as MB).
+    std::shared_ptr<tb_original_world50LM::Owner> tbWorld74_;
+    OriginalWreckComponent50LA tbWorldEntity_;
+    bool tbWorldCounted_=false,tbWorldPrefixComplete_=false;
+    std::uint32_t tbWorldMode30_=0,tbUseEnvironment35C_=0,tbWorldMode524_=0;
+    std::unique_ptr<OriginalWreckComponent50LA*[]> tbWorldList500_;
+    std::uint32_t tbWorldListCapacity504_=0,tbWorldListGrowth508_=0,tbWorldListCount50C_=0;
+    bool constructTbWorld1A6BC0(const original_main_entry50KG::Application&,
+        std::shared_ptr<tb_original_world50LM::Owner>,std::uint32_t&)noexcept;
+    bool retireNativeTbWorldPrefix(std::uint32_t&)noexcept;
     // Independently typed RC static backing and actual counted1B2870 prefix (same as MB).
     std::shared_ptr<rc_original_world50LM::Owner> rcWorld74_;
     OriginalWreckComponent50LA rcWorldEntity_;
@@ -592,7 +612,7 @@ public:
     const OriginalWreckComponent50LA* nativeIntroRaceEntity()const noexcept;
     const OriginalWreckComponent50LA* nativeIntroWorldEntity()const noexcept;
     // Any counted world slot (RA aggregate or a TA/GC/MA/SA/GA prefix).
-    bool anyWorld()const noexcept{return world74_||taWorld74_||gcWorld74_||maWorld74_||mbWorld74_||scWorld74_||gbWorld74_||rcWorld74_||tcWorld74_||saWorld74_||gaWorld74_;}
+    bool anyWorld()const noexcept{return world74_||taWorld74_||gcWorld74_||maWorld74_||mbWorld74_||scWorld74_||gbWorld74_||rcWorld74_||tcWorld74_||mcWorld74_||tbWorld74_||saWorld74_||gaWorld74_;}
     const OriginalWreckComponent50LA* nativeIntroControllerSlot48()const noexcept {
         return nativeIntroRaceEntity()?nativeTaController48_:nullptr;
     }
@@ -637,6 +657,12 @@ public:
     const gb_original_world50LM::Owner* nativeGbWorldBacking()const noexcept {
         return nativeIntroWorldEntity()==&gbWorldEntity_?gbWorld74_.get():nullptr;
     }
+    const mc_original_world50LM::Owner* nativeMcWorldBacking()const noexcept {
+        return nativeIntroWorldEntity()==&mcWorldEntity_?mcWorld74_.get():nullptr;
+    }
+    const tb_original_world50LM::Owner* nativeTbWorldBacking()const noexcept {
+        return nativeIntroWorldEntity()==&tbWorldEntity_?tbWorld74_.get():nullptr;
+    }
     const rc_original_world50LM::Owner* nativeRcWorldBacking()const noexcept {
         return nativeIntroWorldEntity()==&rcWorldEntity_?rcWorld74_.get():nullptr;
     }
@@ -662,7 +688,7 @@ public:
     // acquired its seventh group, its own explicit rollback must run first.
     bool rollbackNativeRaceGroupsFailure(std::uint32_t& sourcePC)noexcept {
         sourcePC=0x1a6b5c;
-        if(world74_||taWorld74_||taWorldCounted_||gcWorld74_||gcWorldCounted_||maWorld74_||maWorldCounted_||mbWorld74_||mbWorldCounted_||scWorld74_||scWorldCounted_||gbWorld74_||gbWorldCounted_||rcWorld74_||rcWorldCounted_||tcWorld74_||tcWorldCounted_||saWorld74_||saWorldCounted_||gaWorld74_||gaWorldCounted_||nativeTaController48_)return false;
+        if(world74_||taWorld74_||taWorldCounted_||gcWorld74_||gcWorldCounted_||maWorld74_||maWorldCounted_||mbWorld74_||mbWorldCounted_||scWorld74_||scWorldCounted_||gbWorld74_||gbWorldCounted_||rcWorld74_||rcWorldCounted_||tcWorld74_||tcWorldCounted_||mcWorld74_||mcWorldCounted_||tbWorld74_||tbWorldCounted_||saWorld74_||saWorldCounted_||gaWorld74_||gaWorldCounted_||nativeTaController48_)return false;
         if(!raceAudio_)return raceGroupCount_==0;
         auto& audio=*raceAudio_;
         if(!counted_||rolledBack_||application_->attachmentLock423F58()||
@@ -703,7 +729,7 @@ public:
         sourcePC=0x1a65cc;
         if(rolledBack_)return true;
         if(!counted_){rolledBack_=true;return true;}
-        if(sourcePlayerMusicBorrows_||camera34_||cameraNativeAdapter34_||!endHud_.expired()||pause100_||results104_||f8Owner_||f8Attached_||vcr78Owner_||vcr78Source_||music10C_||timingB4_||racerB0_||mapB8_||nativeRootAttached_||world74_||taWorld74_||taWorldCounted_||gcWorld74_||gcWorldCounted_||maWorld74_||maWorldCounted_||mbWorld74_||mbWorldCounted_||scWorld74_||scWorldCounted_||gbWorld74_||gbWorldCounted_||rcWorld74_||rcWorldCounted_||tcWorld74_||tcWorldCounted_||saWorld74_||saWorldCounted_||gaWorld74_||gaWorldCounted_||nativeTaController48_||loadDisplay_||loadFifo_||raceAudio_||raceGroupCount_||!detachedPrefix()||application_->attachmentLock423F58()||
+        if(sourcePlayerMusicBorrows_||camera34_||cameraNativeAdapter34_||!endHud_.expired()||pause100_||results104_||f8Owner_||f8Attached_||vcr78Owner_||vcr78Source_||music10C_||timingB4_||racerB0_||mapB8_||nativeRootAttached_||world74_||taWorld74_||taWorldCounted_||gcWorld74_||gcWorldCounted_||maWorld74_||maWorldCounted_||mbWorld74_||mbWorldCounted_||scWorld74_||scWorldCounted_||gbWorld74_||gbWorldCounted_||rcWorld74_||rcWorldCounted_||tcWorld74_||tcWorldCounted_||mcWorld74_||mcWorldCounted_||tbWorld74_||tbWorldCounted_||saWorld74_||saWorldCounted_||gaWorld74_||gaWorldCounted_||nativeTaController48_||loadDisplay_||loadFifo_||raceAudio_||raceGroupCount_||!detachedPrefix()||application_->attachmentLock423F58()||
            !application_->objectCount423F60()||!application_->entityAuthority_.retire(entity_))return false;
         --entity_.reference00;--application_->objectCount423F60();
         rolledBack_=true;profile_.reset();resourceContext_.reset();resourceDomain_.reset();return true;

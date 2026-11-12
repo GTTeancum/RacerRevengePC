@@ -34,6 +34,8 @@
 #include "original_consumed_mb_stage50du.h"
 #include "original_consumed_sc_stage50du.h"
 #include "original_consumed_gb_stage50du.h"
+#include "original_consumed_mc_stage50du.h"
+#include "original_consumed_tb_stage50du.h"
 #include "original_consumed_rc_stage50du.h"
 #include "original_consumed_tc_stage50du.h"
 #include "original_consumed_sa_stage50du.h"
@@ -205,6 +207,8 @@ void Context::run() {
  auto& consumedMbStage=this->consumedMbStage;
  auto& consumedScStage=this->consumedScStage;
  auto& consumedGbStage=this->consumedGbStage;
+ auto& consumedMcStage=this->consumedMcStage;
+ auto& consumedTbStage=this->consumedTbStage;
  auto& consumedRcStage=this->consumedRcStage;
  auto& consumedTcStage=this->consumedTcStage;
  auto& consumedRaStage=this->consumedRaStage;
@@ -765,7 +769,8 @@ void Context::run() {
    const auto reservation=tbColdSources->canonicalMountReservationBytes();
    reserveTbAdditionalPayload(reservation,"TB canonical mount reservation exceeds remaining payload");
    rr::assets::OriginalStandardArchiveProvider50LA::Diagnostic mounted;
-   require50DU(provider&&tbColdSources->mountCanonicalArchive(*provider,reservation,mounted)&&
+   require50DU(provider&&tbColdSources->mountCanonicalArchive(*provider,reservation,mounted,
+       native_course_archive_release50PD::holder().begin(provider,trackMaterialRequest.canonicalDomain->resolver3E1A70()))&&
        provider->sealNativeMounts(mounted)&&
        trackMaterialRequest.canonicalDomain->resolver3E1A70()->bindProvider3E1A70(provider,trackMaterialDiagnostic.canonical.texture),
        "TB same-source canonical mount/seal/bind rejected");
@@ -878,7 +883,7 @@ void Context::run() {
   // population window (racer sources admitted, before the one combined
   // population/collector). RA does it inside its own world join; TA's race
   // does it here through its world's population hook.
-  if(commonRacePausePrewarmed&&humanCourseEnabled&&!allAiEnabled&&(taOriginalWorld||gaOriginalWorld||saOriginalWorld||maOriginalWorld||gcOriginalWorld||(mbOriginalWorld&&consumedMbStage.race())||(scOriginalWorld&&consumedScStage.race())||(gbOriginalWorld&&consumedGbStage.race())||(rcOriginalWorld&&consumedRcStage.race())||(tcOriginalWorld&&consumedTcStage.race()))){
+  if(commonRacePausePrewarmed&&humanCourseEnabled&&!allAiEnabled&&(taOriginalWorld||gaOriginalWorld||saOriginalWorld||maOriginalWorld||gcOriginalWorld||(mbOriginalWorld&&consumedMbStage.race())||(scOriginalWorld&&consumedScStage.race())||(gbOriginalWorld&&consumedGbStage.race())||(rcOriginalWorld&&consumedRcStage.race())||(tcOriginalWorld&&consumedTcStage.race())||(mcOriginalWorld&&consumedMcStage.race())||(tbOriginalWorld&&consumedTbStage.race()))){
    // TA, GA, SA, MA, GC, MB: each world's population hook runs the same race load.
    const auto commonRace=native_common_race50PD::race(*this);
    auto& populationHook=taOriginalWorld?taOriginalWorld->beforeRacerPopulation:
@@ -888,7 +893,8 @@ void Context::run() {
        gcOriginalWorld?gcOriginalWorld->beforeRacerPopulation:
        mbOriginalWorld?mbOriginalWorld->beforeRacerPopulation:
        scOriginalWorld?scOriginalWorld->beforeRacerPopulation:gbOriginalWorld?gbOriginalWorld->beforeRacerPopulation:
-       rcOriginalWorld?rcOriginalWorld->beforeRacerPopulation:tcOriginalWorld->beforeRacerPopulation;
+       rcOriginalWorld?rcOriginalWorld->beforeRacerPopulation:tcOriginalWorld?tcOriginalWorld->beforeRacerPopulation:
+       mcOriginalWorld?mcOriginalWorld->beforeRacerPopulation:tbOriginalWorld->beforeRacerPopulation;
    if(commonRace)populationHook=[&,commonRace]{
     OriginalResults104Diagnostic50LA loadDiagnostic;
     const bool loaded=originalMainApplication.loadHumanTournamentPauseResultsBeforeCollector50LA(
@@ -950,6 +956,8 @@ void Context::run() {
   if(mbOriginalWorld)mbOriginalWorld->beforeRacerPopulation=nullptr;
   if(scOriginalWorld)scOriginalWorld->beforeRacerPopulation=nullptr;
   if(gbOriginalWorld)gbOriginalWorld->beforeRacerPopulation=nullptr;
+  if(mcOriginalWorld)mcOriginalWorld->beforeRacerPopulation=nullptr;
+  if(tbOriginalWorld)tbOriginalWorld->beforeRacerPopulation=nullptr;
   if(rcOriginalWorld)rcOriginalWorld->beforeRacerPopulation=nullptr;
   if(tcOriginalWorld)tcOriginalWorld->beforeRacerPopulation=nullptr;
   require50DU(trackMaterialsLoaded,
@@ -1998,7 +2006,7 @@ void Context::run() {
         originalMainApplication.materialRuntime,hudDiagnostic),"actual original race HUD resources rejected");
    }
    for(std::size_t slot=0;slot<sourceCameraCables.size();++slot)sourceCameraCables[slot]=racerCables[slot].get();
-   if(consumedTaStage.race()||consumedMaStage.race()||consumedMbStage.race()||consumedScStage.race()||consumedGbStage.race()||consumedRcStage.race()||consumedTcStage.race()||consumedSaStage.race()||consumedGaStage.race()||consumedGcStage.race()||sourceConsumedIntroActivation){
+   if(consumedTaStage.race()||consumedMaStage.race()||consumedMbStage.race()||consumedScStage.race()||consumedGbStage.race()||consumedRcStage.race()||consumedTcStage.race()||consumedMcStage.race()||consumedTbStage.race()||consumedSaStage.race()||consumedGaStage.race()||consumedGcStage.race()||sourceConsumedIntroActivation){
     taIntroAuthoring=originalMainApplication.retainNativeTaIntroAuthoring50LA();
     require50DU(bool(taIntroAuthoring),"actual selected-track intro authoring custody rejected");
     const char* suppliedAudioRoot=std::getenv("RR_AUDIO_ROOT");
@@ -2074,7 +2082,7 @@ void Context::run() {
        directOriginalHuman&&isMcTrack?mcMapView:TrackNavigationView50MC{},
        &startMusicContext,requestStartMusic,nativeRecordActor.get(),
        taIntroAuthoring?liveAudio->groupsForProviders():nullptr,taIntroAuthoring,requestIntroMusicFade};
-   if((isTaTrack||consumedMaStage.race()||consumedMbStage.race()||consumedScStage.race()||consumedGbStage.race()||consumedRcStage.race()||consumedTcStage.race()||consumedSaStage.race()||consumedGaStage.race()||consumedGcStage.race())&&trackMaterialRequest.canonicalDomain){
+   if((isTaTrack||consumedMaStage.race()||consumedMbStage.race()||consumedScStage.race()||consumedGbStage.race()||consumedRcStage.race()||consumedTcStage.race()||consumedMcStage.race()||consumedTbStage.race()||consumedSaStage.race()||consumedGaStage.race()||consumedGcStage.race())&&trackMaterialRequest.canonicalDomain){
     sourceCameraSession=isTaTrack?originalMainApplication.createNativeTaCameraSession50LA(sourceCameraActual,sourceCameraAssets):
         isMaTrack?originalMainApplication.createNativeMaCameraSession50LA(sourceCameraActual,sourceCameraAssets):
         isMbTrack?originalMainApplication.createNativeMbCameraSession50LA(sourceCameraActual,sourceCameraAssets):
@@ -2082,6 +2090,8 @@ void Context::run() {
         isGbTrack?originalMainApplication.createNativeGbCameraSession50LA(sourceCameraActual,sourceCameraAssets):
         isRcTrack?originalMainApplication.createNativeRcCameraSession50LA(sourceCameraActual,sourceCameraAssets):
         isTcTrack?originalMainApplication.createNativeTcCameraSession50LA(sourceCameraActual,sourceCameraAssets):
+        isTbTrack?originalMainApplication.createNativeTbCameraSession50LA(sourceCameraActual,sourceCameraAssets):
+        isMcTrack?originalMainApplication.createNativeMcCameraSession50LA(sourceCameraActual,*mcSourceCameraAssets):
         isSaTrack?originalMainApplication.createNativeSaCameraSession50LA(sourceCameraActual,sourceCameraAssets):
         isGaTrack?originalMainApplication.createNativeGaCameraSession50LA(sourceCameraActual,sourceCameraAssets):
         originalMainApplication.createNativeGcCameraSession50LA(sourceCameraActual,sourceCameraAssets);

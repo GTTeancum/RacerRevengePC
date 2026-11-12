@@ -6,7 +6,7 @@ namespace rr::assets {
 // Exact original-disc race-intro VAG identities. No PCM pack, path substitution,
 // caller-issued readiness or generated sound data. End-career tracks excluded.
 struct OriginalRaceIntroPcmIdentity50LA {std::string_view filename;std::uint64_t bytes;std::string_view sha256;std::uint32_t sampleRate;};
-inline constexpr std::array<OriginalRaceIntroPcmIdentity50LA,28> originalRaceIntroPcmCatalog50LA{{
+inline constexpr std::array<OriginalRaceIntroPcmIdentity50LA,35> originalRaceIntroPcmCatalog50LA{{
     {"speech\\Dax\\Tracks\\Gamorr\\daxgmb11.vag",186080,"d03771a10d3979d6b7a1c8ddbdf5bd3359b470a93079091702d3325a1c702840",22050},
     {"speech\\Dax\\Tracks\\Gamorr\\daxgmb12.vag",114944,"95d363507743dbfedf2e1d4d7d7f0eeedd57006077cbe215ae4cecc74fb65b3e",22050},
     {"speech\\Dax\\Tracks\\Ryloth\\daxryc41.vag",88128,"56d3e11c8939999a0bd461e80fa3c5309550c451af3fec4f5e599b221f367478",22050},
@@ -15,6 +15,13 @@ inline constexpr std::array<OriginalRaceIntroPcmIdentity50LA,28> originalRaceInt
     {"speech\\Dax\\Tracks\\Tatooine\\daxtab06.vag",193632,"a247a7bbf6b24f5b7d0333518f3d71d7801173c566160253264a37f0f904cb6e",22050},
     {"speech\\Dax\\Tracks\\Tatooine\\daxtab07.vag",85616,"392674414b80d9620664017c51ddcd834bb5dadbcbd43c1001b458ccc716be46",22050},
     {"speech\\Dax\\Tracks\\Tatooine\\daxtab08.vag",76736,"13ef9f5ede455b927f3983a5464c42239ee2200d8975dc7da27ed9f3b867e05d",22050},
+    {"speech\\Dax\\Tracks\\MonCal\\daxmcb21.vag",166336,"27c03885fadea8a5aec52eb027f9122744a0cab0d7b98ca4e66d9f4872d592a7",22050},
+    {"speech\\Dax\\Tracks\\MonCal\\daxmcb22.vag",283392,"2d7a434a1f2fd6540c1593932c7a11375a9bf8ef7498fadf894ea221ac91eca0",22050},
+    {"speech\\Dax\\Tracks\\Tatooine\\daxtab01.vag",155680,"4c1ead552d8e9a59f448bf4746f103655055f448af66f7013e550f52286b2c32",22050},
+    {"speech\\Dax\\Tracks\\Tatooine\\daxtab02.vag",56192,"00765f7d44c7b5ec73be98a374de78f753278618cccd596b1d2a011c6a0e3197",22050},
+    {"speech\\Dax\\Tracks\\Tatooine\\daxtab03.vag",72400,"54056b105a5d670dd6baa4eaf7ae09dad3c8352430f2da9402d9b32cac2e7a11",22050},
+    {"speech\\Dax\\Tracks\\Tatooine\\daxtab04.vag",73520,"bd6e740b146867c2997b7d1e3406f8a726d62136a58794ca63a1707da89b2dc2",22050},
+    {"speech\\Dax\\Tracks\\Tatooine\\daxtab05.vag",26656,"3c1a233cead032bdbce398605f17022a2752e1ed90bc0c3d9c9138fe9c76fa78",22050},
     {"speech\\Dax\\Tracks\\Sullust\\daxstc34.vag",136064,"f597788ae2c0bd2d1b240a62918d17c6c86199d4fdfdd5bf17b80acafe86cd58",22050},
     {"speech\\Dax\\Tracks\\Sullust\\daxstc35.vag",73680,"01490966f669e4f671587fea87aea3967986397aba033a3dbd2eb9edad0c553f",22050},
     {"speech\\Dax\\Tracks\\Sullust\\daxstc36.vag",28368,"8403f40e0cfef678e4c98f6987fd092b610c2c801695d45581b376c991a301cc",22050},

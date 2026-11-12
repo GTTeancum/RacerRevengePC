@@ -1365,7 +1365,17 @@ static bool prepareOriginalUiOneMapMaterial50KM(const OriginalUiMaterialPass50KG
              pass.provenance.origin==OriginalUiMaterialOrigin50KG::memoryCardCanonicalScreenMissingPsmFallback) &&
             !pass.identity && pass.pass==1 && pass.provenance.creationPC==0x2475C0 &&
             pass.authored.values.empty() && pass.authored.name.empty();
-        if ((!sourceIdentityKnown(pass) && !canonicalGarageScreen && !canonicalF8Screen && !canonicalResultsScreen) || !pass.inheritedTemplate || !programMatches ||
+        // Garage selected-pod model row with no PSM (only 26E.PSG: 26_3): the
+        // 2475C0 one-pass DefaultMT material on its boot-resident UIPODTEX image,
+        // built only by readOriginalUiGarageSelectedPodFallbackMaterial50KG. It
+        // is admitted only by the actual Garage lit-model consumer.
+        const bool canonicalGaragePod=authenticatedGarageLit && litProgram &&
+            pass.provenance.origin==OriginalUiMaterialOrigin50KG::authoredPsm &&
+            !pass.identity && pass.pass==1 && pass.provenance.creationPC==0x2475C0 &&
+            pass.provenance.fallbackTexture &&
+            pass.provenance.archive==originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::podTextures) &&
+            pass.authored.values.empty() && pass.authored.name.empty();
+        if ((!sourceIdentityKnown(pass) && !canonicalGarageScreen && !canonicalF8Screen && !canonicalResultsScreen && !canonicalGaragePod) || !pass.inheritedTemplate || !programMatches ||
             pass.enabled != 1 || pass.textureCount != 1 || pass.textureCoordinateIndex != 0)
             return fail(d, Error::profile, authenticatedGaragePrelit ? "authored Garage DefaultMT PreLitCompressed" :
                 litProgram ? "authored DefaultMT Diffuse/Compressed" :
@@ -2601,6 +2611,40 @@ bool readOriginalDamageFallbackMaterial50LA(
         p.registeredName=base;p.attemptedPsmMember=base+".psm";p.creationPC=0x2475C0;
         auto next=screenTextureFallback(p,"dmgradar",*inherited,runtime);
         output=std::move(next);return true;
+    }catch(...){d.error=Error::allocation;return false;}
+}
+
+// 29B638 -> 2475C0 for a Garage selected-career MODEL row that 26E7D4
+// retained with DefaultMT3833E8. The image is the boot-resident UIPODTEX
+// "%s%02d_%d" texture (1B7698..1B7790). NULL document: template values only.
+// Declared locally by original_ui_garage_model_materials50kg.cpp until the
+// next batched original_ui_material50kg.h rebuild moves it to the header.
+bool readOriginalUiGarageSelectedPodFallbackMaterial50KG(
+    const OriginalUiArchive50KG& podTextures,const std::string& stem,
+    const OriginalUiMaterialTemplates50KG& templates,
+    const OriginalUiMaterialRuntime50KG& runtime,OriginalUiMaterial50KG& output,
+    OriginalUiMaterialDiagnostic50KG& d) noexcept {
+    d={};
+    try {
+        if(!podTextures.loaded()||podTextures.identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::podTextures))
+            return fail(d,Error::archive,"authenticated boot-resident UIPODTEX",0x1B7648u);
+        const auto* inherited=templates.get(OriginalUiTemplate50KG::defaultMt);
+        if(!inherited||!runtime.overrideKnown)
+            return fail(d,Error::templateOwner,"actual model DefaultMT/runtime",0x2475ECu);
+        const bool shape=stem.size()==4&&stem[0]>='0'&&stem[0]<='9'&&stem[1]>='0'&&stem[1]<='9'&&
+            stem[2]=='_'&&stem[3]>='1'&&stem[3]<='4';
+        const std::uint32_t career=shape?std::uint32_t(stem[0]-'0')*10u+std::uint32_t(stem[1]-'0'):0u;
+        if(!shape||career<1||career>26)
+            return fail(d,Error::fallbackSource,"boot-resident UIPODTEX %s%02d_%d name",0x1B76D0u);
+        const std::string base=std::string("ui\\textures\\")+stem;
+        const auto texture=podTextures.find(base+".pst");
+        if(!texture.identity||!texture.data||texture.size!=texture.identity->bytes||podTextures.find(base+".psm").identity)
+            return fail(d,Error::fallbackSource,"boot-resident UIPODTEX PST and absent PSM",0x1B7704u);
+        // origin stays authoredPsm (no enum change, see PLAN.md); identity stays null.
+        OriginalUiMaterialProvenance50KG p;
+        p.archive=podTextures.identity();p.fallbackTexture=texture.identity;
+        p.registeredName=base;p.attemptedPsmMember=base+".psm";p.creationPC=0x2475C0;
+        output=screenTextureFallback(p,stem.c_str(),*inherited,runtime);return true;
     }catch(...){d.error=Error::allocation;return false;}
 }
 

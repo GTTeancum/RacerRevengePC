@@ -2,6 +2,7 @@
 #include "mc_application_cold50mc.h"
 #include "original_ui_main_entry50kg.h"
 #include "mc_cold_sources50la.h"
+#include "native_course_archive_release50pd.h"
 #include "mc_original_world50lm.h"
 #include "mc_trigger_authoring50mc.h"
 #include "mc_collision_world50mc.h"
@@ -113,7 +114,8 @@ void McColdPrefix::run() const {
   {const bool mcPrepared=(mcOriginalWorld->load(mcColdSources,worldDiagnostic));require50DU(mcPrepared,worldDiagnostic.message.c_str());}
   const auto mountReservation=mcColdSources->canonicalMountReservationBytes();reserveMcEarly(mountReservation);
   rr::assets::OriginalStandardArchiveProvider50LA::Diagnostic mounted;rr::assets::OriginalStandardTextureDiagnostic50LA textureDiagnostic;
-  require50DU(mcColdSources->mountCanonicalArchive(*provider,mountReservation,mounted)&&provider->sealNativeMounts(mounted)&&
+  require50DU(mcColdSources->mountCanonicalArchive(*provider,mountReservation,mounted,
+   native_course_archive_release50PD::holder().begin(provider,domain->resolver3E1A70()))&&provider->sealNativeMounts(mounted)&&
    domain->resolver3E1A70()->bindProvider3E1A70(provider,textureDiagnostic),"MC canonical original archive mount rejected");
   // Source-specific original40 descriptor bank, distinct real Main manager.
   reserveMcEarly(mc_particle_source50MC::Owner::maximumAdditionalPayloadBytes()+128u);

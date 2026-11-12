@@ -19,7 +19,7 @@ inline bool OriginalRaceConstructor50LA::retireNativeWorldAndGroups(std::uint32_
        !application_->entityAuthority_.canRetire(entity_)||raceGroupCount_>6||
        raceGroupsAttached_>raceGroupCount_||
        entity_.firstChild18!=(raceGroupsAttached_?raceGroups_[0]:nullptr))return false;
-    if(raceAudio_&&(raceGroupCount_||raceAudio_->coldStarted_||world74_||gcWorld74_||gaWorld74_||maWorld74_||mbWorld74_||scWorld74_||gbWorld74_||rcWorld74_||tcWorld74_||saWorld74_)){
+    if(raceAudio_&&(raceGroupCount_||raceAudio_->coldStarted_||world74_||gcWorld74_||gaWorld74_||maWorld74_||mbWorld74_||scWorld74_||gbWorld74_||rcWorld74_||tcWorld74_||mcWorld74_||tbWorld74_||saWorld74_)){
         auto& audio=*raceAudio_;
         gate="race audio canonical identity/epoch/thread";
         if(audio.coldApplication_!=application_||audio.coldSession_!=entity_.sessionGeneration||
@@ -41,7 +41,7 @@ inline bool OriginalRaceConstructor50LA::retireNativeWorldAndGroups(std::uint32_
         // provider preparation is handled by the same actual membership ledger.
         gate="native stopped voice membership retirement";
         if(audio.mixer_&&!audio.retireNativeVoiceBindings())return false;
-    }else if(raceGroupCount_||world74_||taWorld74_||gcWorld74_||gaWorld74_||maWorld74_||mbWorld74_||scWorld74_||gbWorld74_||rcWorld74_||tcWorld74_||saWorld74_){gate="missing audio owner with acquired race children";return false;}
+    }else if(raceGroupCount_||world74_||taWorld74_||gcWorld74_||gaWorld74_||maWorld74_||mbWorld74_||scWorld74_||gbWorld74_||rcWorld74_||tcWorld74_||mcWorld74_||tbWorld74_||saWorld74_){gate="missing audio owner with acquired race children";return false;}
     if(world74_){
         // Actual aggregate borrows, renderer publication, runtime topology and
         // resource gates remain authoritative. Failure retains this same owner.
@@ -73,6 +73,14 @@ inline bool OriginalRaceConstructor50LA::retireNativeWorldAndGroups(std::uint32_
     if(gbWorld74_||gbWorldCounted_){
         gate="actual GB counted world-prefix retirement";
         if(!retireNativeGbWorldPrefix(pc))return false;
+    }
+    if(mcWorld74_||mcWorldCounted_){
+        gate="actual MC counted world-prefix retirement";
+        if(!retireNativeMcWorldPrefix(pc))return false;
+    }
+    if(tbWorld74_||tbWorldCounted_){
+        gate="actual TB counted world-prefix retirement";
+        if(!retireNativeTbWorldPrefix(pc))return false;
     }
     if(rcWorld74_||rcWorldCounted_){
         gate="actual RC counted world-prefix retirement";

@@ -113,7 +113,16 @@ bool taRestoreStartLane()noexcept {
        actual_.actualRadarMapB8!=nativeTaIssuance_->scMap)return taReject(0x2a2880);
     if(nativeTaIssuance_&&nativeTaIssuance_->course==OriginalCameraStartCourse::rc&&
        actual_.actualRadarMapB8!=nativeTaIssuance_->rcMap)return taReject(0x2a2880);
-    if(nativeTaIssuance_&&nativeTaIssuance_->course==OriginalCameraStartCourse::tc){
+    if(nativeTaIssuance_&&nativeTaIssuance_->course==OriginalCameraStartCourse::tb){
+        //2A2880 on TB's own retained map view (its 270-node Map role).
+        if(actual_.actualRadarMapB8||!nativeTaIssuance_->tbMap.sameOwner(actual_.actualRadarMapTb)||
+           !source_grid50IG::prepare(actual_.actualRadarMapTb,0,grid))return taReject(0x2a2880);
+    }else if(nativeTaIssuance_&&nativeTaIssuance_->course==OriginalCameraStartCourse::mc){
+        //2A2880 on MC's own retained map view (173-node Map role, the same MC source).
+        if(actual_.actualRadarMapB8||!nativeTaIssuance_->mcMap.sameOwner(actual_.actualRadarMapMc)||
+           actual_.actualRadarMapMc.sourceIdentity()!=nativeTaIssuance_->mcSource||
+           !source_grid50IG::prepare(actual_.actualRadarMapMc,0,grid))return taReject(0x2a2880);
+    }else if(nativeTaIssuance_&&nativeTaIssuance_->course==OriginalCameraStartCourse::tc){
         //2A2880 on TC's own retained map view (its 268-node Map role).
         if(actual_.actualRadarMapB8||!nativeTaIssuance_->tcMap.sameOwner(actual_.actualRadarMapTc)||
            !source_grid50IG::prepare(actual_.actualRadarMapTc,0,grid))return taReject(0x2a2880);

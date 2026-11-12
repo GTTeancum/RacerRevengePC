@@ -305,6 +305,9 @@ class OriginalUiGarageSession50KG final {
     std::shared_ptr<game::OriginalUiEntityScope50KG> scope_;
     std::shared_ptr<Resources> resources_;
     std::shared_ptr<const SceneAssets> sceneAssets_;
+    // Boot-resident UIPODTEX images (1B7648..1B7834) that THIS selected PSG
+    // names and neither Garage archive carries. Null for every career but 26.
+    std::shared_ptr<const assets::OriginalUiArchive50KG> residentPodTextures_;
     std::shared_ptr<const assets::OriginalUiGarageWattoAssets50KG> wattoAssets_;
     std::shared_ptr<OriginalUiGarageVisibility50KG> visibility_;
     //The genuine Page owns source4C0. This is only its typed current borrow.

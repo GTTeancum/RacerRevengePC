@@ -10,6 +10,8 @@
 #include "source_grid50ig_fixture.h"
 #include "source_grid50gb_fixture.h"
 #include "source_grid50tc_fixture.h"
+#include "source_grid50tb_fixture.h"
+#include "source_grid50mc_fixture.h"
 #include <string_view>
 #include "../../platform/linux/native/race_audio_groups50ic.h"
 #include "../../src/assets/original_ta_intro_authoring_candidate.h"
@@ -76,6 +78,9 @@ namespace ma_original_world50LM { class Owner; }
 namespace mb_original_world50LM { class Owner; }
 namespace sc_original_world50LM { class Owner; }
 namespace gb_original_world50LM { class Owner; }
+namespace mc_cold_sources50LA { class Owner; }
+namespace tb_original_world50LM { class Owner; }
+namespace mc_original_world50LM { class Owner; }
 namespace rc_original_world50LM { class Owner; }
 namespace tc_original_world50LM { class Owner; }
 namespace rr::game { class OriginalRaceConstructor50LA; class OriginalFrontendCameraCold50LA; }
@@ -90,7 +95,7 @@ namespace original_camera_session50KX {
 inline std::string_view introTrackId(rr::game::OriginalCameraStartCourse course)noexcept {
  using C=rr::game::OriginalCameraStartCourse;
  switch(course){
- case C::ta:return "TA";case C::ra:return "RA";case C::gc:return "GC";case C::ga:return "GA";case C::sa:return "SA";case C::ma:return "MA";case C::mb:return "MB";case C::sc:return "SC";case C::gb:return "GB";case C::rc:return "RC";case C::tc:return "TC";default:return {};
+ case C::ta:return "TA";case C::ra:return "RA";case C::gc:return "GC";case C::ga:return "GA";case C::sa:return "SA";case C::ma:return "MA";case C::mb:return "MB";case C::sc:return "SC";case C::gb:return "GB";case C::rc:return "RC";case C::tc:return "TC";case C::mc:return "MC";case C::tb:return "TB";default:return {};
 
  }
 }
@@ -486,6 +491,15 @@ class Session final {
         const OriginalRaceConstructor50LA* tcRace=nullptr;
         const tc_original_world50LM::Owner* tcWorld=nullptr;
         TrackNavigationView50TC tcMap{};
+        // TB keeps its retained 270-node map as its own view (no B8 pointer).
+        const OriginalRaceConstructor50LA* tbRace=nullptr;
+        const tb_original_world50LM::Owner* tbWorld=nullptr;
+        TrackNavigationView50TB tbMap{};
+        // MC: its own 173-node map view, bound to the same MC cold source as its camera assets.
+        const OriginalRaceConstructor50LA* mcRace=nullptr;
+        const mc_original_world50LM::Owner* mcWorld=nullptr;
+        TrackNavigationView50MC mcMap{};
+        const mc_cold_sources50LA::Owner* mcSource=nullptr;
         const OriginalRaceConstructor50LA* gaRace=nullptr;
         const ga_original_world50LH::Owner* gaWorld=nullptr;
         const TrackNavigation50EU* gaMap=nullptr;

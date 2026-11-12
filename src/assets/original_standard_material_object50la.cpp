@@ -1772,6 +1772,62 @@ bool OriginalStandardMaterialObject50LA::construct29B550(std::int32_t row,const 
             pass.state30=std::move(state); //247678. No parameters/animation path.
             s.constructed=true;return true;
         }
+        if(!s.source&&!tournamentMissingPsm&&!speedBoostMissingPsm&&!damageMissingPsm&&!pauseBackdropMissingPsm&&
+           templates&&association&&association==templates->get(OriginalUiTemplate50KG::defaultMt)){
+            // 29B630 handle==-1 -> 29B640..6A4 -> pass vtable+18 = 2475C0 for a
+            // MODEL row. 26E7D4 retained it with DefaultMT3833E8 and 2475EC..610
+            // uses that row association (ScreenMT3833F0 only when it is null).
+            // Admitted caller: the Garage selected-career model (1D1E38 141960 ->
+            // 26EE1C) whose PSG names a boot-resident UIPODTEX image that neither
+            // UIGARAGE.RES nor NNE.RES carries a PSM for (only 26E.PSG: 26_3).
+            const auto& provider=input.positiveConstructionProvider_;
+            if(!provider||!provider->sealed()||!input.construction||!input.construction->live()||
+               !input.construction->materialApplication()||
+               &input.construction->materialApplication()->templates()!=templates.get())
+                return fail(d,E::templates,0x2475F8,"Garage selected model DefaultMT fallback owners");
+            // 1B7698..1B7790 preloads "%s%02d_%d" for careers1..26, maps1..4.
+            // Every bound is checked on the canonical name before substr.
+            const std::string prefix="ui\\textures\\";
+            constexpr std::size_t stemBytes=4; // "NN_j"
+            if(s.name00.size()!=prefix.size()+stemBytes+4||s.name00.compare(0,prefix.size(),prefix)!=0||
+               s.name00.compare(prefix.size()+stemBytes,4,".psm")!=0)
+                return fail(d,E::source,0x29B628,"unresolved PSM; missing-file fallback not established");
+            const auto stem=s.name00.substr(prefix.size(),stemBytes);
+            const bool shape=stem[0]>='0'&&stem[0]<='9'&&stem[1]>='0'&&stem[1]<='9'&&stem[2]=='_'&&
+                stem[3]>='1'&&stem[3]<='4';
+            const std::uint32_t career=shape?std::uint32_t(stem[0]-'0')*10u+std::uint32_t(stem[1]-'0'):0u;
+            const auto* selected=career>=1&&career<=26?originalUiGaragePodArchive50KG(career):nullptr;
+            if(!shape||!selected)
+                return fail(d,E::source,0x29B628,"unresolved PSM; missing-file fallback not established");
+            // The SAME sealed namespace must hold this career's own E archive
+            // and must genuinely lack the PSM (the 29B628 open failed).
+            bool selectedMounted=false;
+            for(std::size_t m=0;m<provider->mountCount();++m){
+                OriginalStandardArchiveProvider50LA::MountView mount;
+                if(provider->mount(m,mount)&&mount.archiveSha256&&*mount.archiveSha256==selected->sha256&&
+                   mount.archiveBytes==selected->bytes)selectedMounted=true;
+            }
+            OriginalStandardArchiveProvider50LA::MemberView absent;
+            if(!selectedMounted||provider->lookup132820(s.name00,absent)!=OriginalStandardArchiveProvider50LA::Lookup::absent)
+                return fail(d,E::source,0x29B638,"Garage selected model absent-PSM proof");
+            s.templates=std::move(templates);s.programs=input.actualPrograms382B70;
+            s.textures=input.actualTextures383400;s.construction=input.construction;
+            s.count48=1;s.passes4C[0]=std::make_unique<Storage::Pass>(); //29B674..690: one 0x38 owner.
+            auto& pass=*s.passes4C[0];pass.constructionTemplate=association;
+            if(!s.programs||!s.programs->prepared()||
+                !s.programs->find298C80(association->microprogram,pass.program18,d.program))
+                return fail(d,E::program,0x247620);
+            pass.mapCount20=1; //247630; flags21 remain2 and UV1E remains0.
+            if(!s.textures||!s.textures->prepared()||
+                !s.textures->bindMaterialContext(s.construction,d.texture)||
+                !s.textures->acquire299330AndRetain298A30(prefix+stem,pass.texture1A[0],d.texture))
+                return fail(d,E::texture,0x247648);
+            const OriginalUiDatSection50KG noAttributes{}; //247670 NULL document; template values only.
+            auto state=std::make_unique<OriginalStandardMaterialState50LA>();
+            if(!singleState(noAttributes,*association,s.construction.get(),*state,d))return false;
+            pass.state30=std::move(state); //247678.
+            s.constructed=true;return true;
+        }
         if(damageMissingPsm)return fail(d,E::source,0x29B638,"PSM contradicts Damage absence proof");
         if(pauseBackdropMissingPsm)return fail(d,E::source,0x29B638,"PSM contradicts Pause backdrop absence proof");
         if(speedBoostMissingPsm)return fail(d,E::source,0x29B638,"PSM contradicts Speed/Boost absence proof");

@@ -11,6 +11,8 @@ namespace original_consumed_ma_stage50DU { class Owner; }
 namespace original_consumed_mb_stage50DU { class Owner; }
 namespace original_consumed_sc_stage50DU { class Owner; }
 namespace original_consumed_gb_stage50DU { class Owner; }
+namespace original_consumed_mc_stage50DU { class Owner; }
+namespace original_consumed_tb_stage50DU { class Owner; }
 namespace original_consumed_rc_stage50DU { class Owner; }
 namespace original_consumed_tc_stage50DU { class Owner; }
 namespace original_consumed_sa_stage50DU { class Owner; }
@@ -133,6 +135,10 @@ struct Context final {
     consumedScStageType& consumedScStage;
     using consumedGbStageType = original_consumed_gb_stage50DU::Owner;
     consumedGbStageType& consumedGbStage;
+    using consumedMcStageType = original_consumed_mc_stage50DU::Owner;
+    consumedMcStageType& consumedMcStage;
+    using consumedTbStageType = original_consumed_tb_stage50DU::Owner;
+    consumedTbStageType& consumedTbStage;
     using consumedRcStageType = original_consumed_rc_stage50DU::Owner;
     consumedRcStageType& consumedRcStage;
     using consumedTcStageType = original_consumed_tc_stage50DU::Owner;

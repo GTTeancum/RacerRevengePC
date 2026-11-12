@@ -24,6 +24,8 @@
 #include "original_consumed_mb_stage50du.h"
 #include "original_consumed_sc_stage50du.h"
 #include "original_consumed_gb_stage50du.h"
+#include "original_consumed_mc_stage50du.h"
+#include "original_consumed_tb_stage50du.h"
 #include "original_consumed_rc_stage50du.h"
 #include "original_consumed_tc_stage50du.h"
 #include "original_consumed_sa_stage50du.h"
@@ -197,6 +199,8 @@ SessionExit50DU Context::run() {
  auto& consumedMbStage=this->consumedMbStage;
  auto& consumedScStage=this->consumedScStage;
  auto& consumedGbStage=this->consumedGbStage;
+ auto& consumedMcStage=this->consumedMcStage;
+ auto& consumedTbStage=this->consumedTbStage;
  auto& consumedRcStage=this->consumedRcStage;
  auto& consumedTcStage=this->consumedTcStage;
  auto& consumedRaStage=this->consumedRaStage;
@@ -256,6 +260,7 @@ SessionExit50DU Context::run() {
  auto& gbNavigation=this->gbNavigation;
  auto& gbNavigationOwner=this->gbNavigationOwner;
  auto& gbOriginalWorld=this->gbOriginalWorld;
+ auto& tbOriginalWorld=this->tbOriginalWorld;
  auto& rcOriginalWorld=this->rcOriginalWorld;
  auto& tcOriginalWorld=this->tcOriginalWorld;
  auto& gbParticleAttachments=this->gbParticleAttachments;
@@ -1070,7 +1075,7 @@ SessionExit50DU Context::run() {
  std::unique_ptr<gc_gate_audio50IN::Owner> gaGateAudio,gcGateAudio;
  SpeechPosition50HG audioListener{};bool audioListenerReady=false;
  std::uint64_t speechEvents=0,speechCues=0,announcerRequestsUnjoined=0;
- if((consumedRaStage.race()||consumedTaStage.race()||consumedMaStage.race()||consumedMbStage.race()||consumedScStage.race()||consumedRcStage.race()||consumedSaStage.race()||consumedGaStage.race()||consumedGcStage.race())&&!audioEnabled)require50DU(liveAudio->finishCountedMutedGroups(loadedAudioSettings),
+ if((consumedRaStage.race()||consumedTaStage.race()||consumedMaStage.race()||consumedMbStage.race()||consumedScStage.race()||consumedRcStage.race()||consumedMcStage.race()||consumedSaStage.race()||consumedGaStage.race()||consumedGcStage.race())&&!audioEnabled)require50DU(liveAudio->finishCountedMutedGroups(loadedAudioSettings),
      "actual counted muted audio group settings rejected");
  if(originalCameraEnabled&&!audioEnabled)require50DU(sourceCameraCycleAudio.prepareMuted(),
      "explicit muted camera cycle owner rejected");
@@ -1265,6 +1270,9 @@ SessionExit50DU Context::run() {
    require50DU(prepared,audioError.empty()?"TB positional audio preparation rejected":audioError.c_str());
    require50DU(originalAiAudio->registerResultsWorldSound26D070(tbPositionalAudio->resultsWorldTransport26D070()),
        "TB positional audio Results stop registration rejected");
+   // The door PodSound (voice126) is a World4D8 one-shot the Results stop covers too.
+   require50DU(tbPodSound&&originalAiAudio->registerResultsWorldSound26D070(*tbPodSound),
+       "TB door sound Results stop registration rejected");
   }
   if(isMcTrack){
    require50DU(nativeOriginalFleet&&humanCourseEnabled&&originalAiAudioEnabled&&
@@ -3125,6 +3133,8 @@ SessionExit50DU Context::run() {
   .consumedMbStage=consumedMbStage,
   .consumedScStage=consumedScStage,
   .consumedGbStage=consumedGbStage,
+  .consumedMcStage=consumedMcStage,
+  .consumedTbStage=consumedTbStage,
   .consumedRcStage=consumedRcStage,
   .consumedTcStage=consumedTcStage,
   .consumedRaStage=consumedRaStage,
@@ -3222,6 +3232,7 @@ SessionExit50DU Context::run() {
   .gbNavigation=gbNavigation,
   .gbNavigationOwner=gbNavigationOwner,
   .gbOriginalWorld=gbOriginalWorld,
+  .tbOriginalWorld=tbOriginalWorld,
   .rcOriginalWorld=rcOriginalWorld,
   .tcOriginalWorld=tcOriginalWorld,
   .gbParticleAttachments=gbParticleAttachments,

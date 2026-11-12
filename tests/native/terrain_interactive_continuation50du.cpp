@@ -34,6 +34,8 @@
 #include "original_consumed_mb_stage50du.h"
 #include "original_consumed_sc_stage50du.h"
 #include "original_consumed_gb_stage50du.h"
+#include "original_consumed_mc_stage50du.h"
+#include "original_consumed_tb_stage50du.h"
 #include "original_consumed_rc_stage50du.h"
 #include "original_consumed_tc_stage50du.h"
 #include "original_consumed_sa_stage50du.h"
@@ -195,6 +197,8 @@ SessionExit50DU Context::run() {
  auto& consumedMbStage=this->consumedMbStage;
  auto& consumedScStage=this->consumedScStage;
  auto& consumedGbStage=this->consumedGbStage;
+ auto& consumedMcStage=this->consumedMcStage;
+ auto& consumedTbStage=this->consumedTbStage;
  auto& consumedRcStage=this->consumedRcStage;
  auto& consumedTcStage=this->consumedTcStage;
  auto& consumedRaStage=this->consumedRaStage;
@@ -394,6 +398,7 @@ SessionExit50DU Context::run() {
  auto& scOriginalWorld=this->scOriginalWorld;
  auto& rcOriginalWorld=this->rcOriginalWorld;
  auto& tcOriginalWorld=this->tcOriginalWorld;
+ auto& tbOriginalWorld=this->tbOriginalWorld;
  auto& maTriggerActions=this->maTriggerActions;
  auto& maTriggerAuthoring=this->maTriggerAuthoring;
  auto& maTriggerMembership=this->maTriggerMembership;
@@ -2440,7 +2445,7 @@ SessionExit50DU Context::run() {
    // Any consumed original race (RA, TA, MA, SA, GA, GC) publishes the same
    // Application race28C and session generation the speech owners bind to.
    const auto actualRace=consumedRaStage.race()?consumedRaStage.race():consumedTaStage.race()?consumedTaStage.race():
-       consumedMaStage.race()?consumedMaStage.race():consumedMbStage.race()?consumedMbStage.race():consumedScStage.race()?consumedScStage.race():consumedGbStage.race()?consumedGbStage.race():consumedRcStage.race()?consumedRcStage.race():consumedTcStage.race()?consumedTcStage.race():consumedSaStage.race()?consumedSaStage.race():
+       consumedMaStage.race()?consumedMaStage.race():consumedMbStage.race()?consumedMbStage.race():consumedScStage.race()?consumedScStage.race():consumedGbStage.race()?consumedGbStage.race():consumedRcStage.race()?consumedRcStage.race():consumedTcStage.race()?consumedTcStage.race():consumedMcStage.race()?consumedMcStage.race():consumedTbStage.race()?consumedTbStage.race():consumedSaStage.race()?consumedSaStage.race():
        consumedGaStage.race()?consumedGaStage.race():consumedGcStage.race();
    if(!audioEnabled||!originalUiStarted||!humanCourseEnabled||!actualRace)return;
    // Consumed races join when their identities match and otherwise keep the
@@ -2738,14 +2743,11 @@ SessionExit50DU Context::run() {
   require50DU(scOriginalWorld&&scOriginalWorld->mesh(),"retained SC original mesh publication missing");
   trackMesh=*scOriginalWorld->mesh();
  }
- std::shared_ptr<tb_original_world50LM::Owner> tbOriginalWorld;
+ // The TB world is built in the world stage (before counted audio).
  if(isTbTrack){
-  require50DU(tbColdSources&&tbColdSources->ready()&&tbColdSources->world().parameters.original_bytes==actualWorld.parameters.original_bytes,
-      "TB actual compact source missing or world source differs");
-  tbOriginalWorld=std::make_shared<tb_original_world50LM::Owner>();tb_original_world50LM::Diagnostic diagnostic;
-  const bool loaded=tbOriginalWorld->load(tbColdSources,diagnostic);
-  require50DU(loaded,diagnostic.message.empty()?"TB original world rejected":diagnostic.message.c_str());
-  require50DU(tbOriginalWorld->mesh(),"TB original mesh publication missing");
+  require50DU(tbOriginalWorld&&tbOriginalWorld->mesh()&&tbColdSources&&
+      tbColdSources->world().parameters.original_bytes==actualWorld.parameters.original_bytes,
+      "retained TB original mesh publication missing");
   trackMesh=*tbOriginalWorld->mesh();
  }
  // RC and TC worlds are built in the world stage (before counted audio); the
@@ -3427,6 +3429,8 @@ SessionExit50DU Context::run() {
       consumedMbStage.race()?consumedMbStage.race().get():
       consumedScStage.race()?consumedScStage.race().get():
       consumedGbStage.race()?consumedGbStage.race().get():
+      consumedMcStage.race()?consumedMcStage.race().get():
+      consumedTbStage.race()?consumedTbStage.race().get():
       consumedRcStage.race()?consumedRcStage.race().get():
       consumedTcStage.race()?consumedTcStage.race().get():
       consumedSaStage.race()?consumedSaStage.race().get():
@@ -3940,6 +3944,8 @@ SessionExit50DU Context::run() {
   if(consumedMbStage.race()&&!consumedMbStage.close())return closeRejected("MB consumed race/world retirement");
   if(consumedScStage.race()&&!consumedScStage.close())return closeRejected("SC consumed race/world retirement");
   if(consumedGbStage.race()&&!consumedGbStage.close())return closeRejected("GB consumed race/world retirement");
+  if(consumedMcStage.race()&&!consumedMcStage.close())return closeRejected("MC consumed race/world retirement");
+  if(consumedTbStage.race()&&!consumedTbStage.close())return closeRejected("TB consumed race/world retirement");
   if(consumedRcStage.race()&&!consumedRcStage.close())return closeRejected("RC consumed race/world retirement");
   if(consumedTcStage.race()&&!consumedTcStage.close())return closeRejected("TC consumed race/world retirement");
   // Original race unload releases the course's track bank (1316A0). A
@@ -4179,6 +4185,8 @@ SessionExit50DU Context::run() {
    .consumedMbStage=consumedMbStage,
    .consumedScStage=consumedScStage,
    .consumedGbStage=consumedGbStage,
+   .consumedMcStage=consumedMcStage,
+   .consumedTbStage=consumedTbStage,
    .consumedRcStage=consumedRcStage,
    .consumedTcStage=consumedTcStage,
    .consumedRaStage=consumedRaStage,

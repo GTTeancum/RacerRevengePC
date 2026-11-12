@@ -51,7 +51,8 @@ bool custodyFailure(std::string& error,const char* text)noexcept {
 //open here; material refs and14D370/29E340/14D440 happen at their actual calls.
 bool appendGarageBankSources(const std::shared_ptr<const rr::assets::OriginalUiArchive50KG>& archive,
     const std::shared_ptr<rr::assets::OriginalStandardMaterialDomain50LA>& domain,
-    rr::assets::OriginalStandardMaterialDiagnostic50LA& d,bool* domainAppendStarted=nullptr)noexcept {
+    rr::assets::OriginalStandardMaterialDiagnostic50LA& d,bool* domainAppendStarted=nullptr,
+    const std::vector<std::string>* residentTextures=nullptr)noexcept {
     namespace a=rr::assets;using Provider=a::OriginalStandardArchiveProvider50LA;
     if(domainAppendStarted)*domainAppendStarted=false;
     d={};const auto provider=domain?domain->archiveProvider3E1A70():nullptr;
@@ -109,6 +110,9 @@ bool appendGarageBankSources(const std::shared_ptr<const rr::assets::OriginalUiA
             }
             materials.push_back(std::move(source));
         }
+        //Missing-PSM fallback rows (2475C0) read the image of the same name;
+        //for the selected pod it is the boot-resident UIPODTEX image.
+        if(residentTextures)for(const auto& name:*residentTextures)if(!texture(name))return false;
         //All source gathering above owns only local vectors. This records the
         //actual call boundary, not readiness or presumed atomic publication.
         if(domainAppendStarted)*domainAppendStarted=true;
@@ -2672,13 +2676,36 @@ bool Application::prepareGarageManagerEntry1D1950(Frontend& frontend,
         const auto resolver=standardMaterialDomainOwner_->resolver3E1A70();
         rr::assets::OriginalStandardArchiveProvider50LA::Diagnostic archiveDiagnostic;
         rr::assets::OriginalStandardTextureDiagnostic50LA bank;
+        //1B7648..1B7834 left every UIPODTEX "%s%02d_%d" image resident in
+        //texture383400 for the whole UI lifetime; the native table has no
+        //boot-resident rows. The SAME authenticated UIPODTEX bytes join THIS
+        //selected namespace only when the selected PSG names one of them and
+        //neither Garage archive carries it (of 23 careers, only 26E.PSG: 26_3).
+        std::shared_ptr<const rr::assets::OriginalUiArchive50KG> residentPodTextures;
+        std::vector<std::string> residentPodTextureNames;
+        if(selectedArchive){
+            const auto* pod=custody.sceneAssets_->selectedPod();
+            const auto* scene=pod&&pod->model?pod->model->scene():nullptr;
+            const auto garageArchive=custody.sceneAssets_->archive();
+            if(scene&&garageArchive)for(const auto& name:scene->materials){
+                if(name.empty()||name.size()>63)continue;
+                const std::string base="ui\\textures\\"+name;
+                if(selectedArchive->find(base+".psm").identity||garageArchive->find(base+".psm").identity||
+                   selectedArchive->find(base+".pst").identity)continue;
+                if(!residentPodTextures)residentPodTextures=readArchive(assetRoot,rr::assets::OriginalUiArchiveId50KG::podTextures);
+                if(!residentPodTextures||!residentPodTextures->find(base+".pst").identity){residentPodTextures.reset();residentPodTextureNames.clear();break;}
+                residentPodTextureNames.push_back(base);
+            }
+        }
         if(!selectedArchive||!provider||!resolver||
            !provider->mountAuthenticatedUi(selectedArchive,archiveDiagnostic)||
+           (residentPodTextures&&!provider->mountAuthenticatedUi(residentPodTextures,archiveDiagnostic))||
            !provider->sealNativeMounts(archiveDiagnostic)||!resolver->bindProvider3E1A70(provider,bank)){
             diagnostic.texture=bank;
             return retainedFailure(Status::source,bank.sourcePC?bank.sourcePC:0x1D1D68,
                 "Garage selected19E source bank opening failed; actual prefix retained");
         }
+        custody.residentPodTextures_=residentPodTextures;
         custody.selectedBankLease_=std::make_unique<rr::assets::OriginalStandardTextureResolver50LA::GarageBankLease50LA>();
         if(!resolver->issueGarageSelectedBank1D1D68(provider,selectedArchive,*custody.selectedBankLease_,bank)){
             diagnostic.texture=bank;return retainedFailure(Status::source,bank.sourcePC?bank.sourcePC:0x1D1D68,
@@ -2693,7 +2720,8 @@ bool Application::prepareGarageManagerEntry1D1950(Frontend& frontend,
             diagnostic.texture=bank;return retainedFailure(Status::texture,bank.sourcePC?bank.sourcePC:0x24E880,
                 "Garage selected exact static IPUM source binding failed; bank retained");
         }
-        if(!appendGarageBankSources(selectedArchive,standardMaterialDomainOwner_,diagnostic))
+        if(!appendGarageBankSources(selectedArchive,standardMaterialDomainOwner_,diagnostic,nullptr,
+               residentPodTextures?&residentPodTextureNames:nullptr))
             return retainedFailure(diagnostic.status,diagnostic.sourcePC,"Garage selected immutable source corpus failed; bank retained");
         if(!custody.prepareManagerSelected1D1CD0(diagnostic))
             return retainedFailure(diagnostic.status,diagnostic.sourcePC,"Garage selected model constructor failed after actual transfer entry; prefix retained");

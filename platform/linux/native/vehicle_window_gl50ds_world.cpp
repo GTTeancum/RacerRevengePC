@@ -318,7 +318,10 @@ bool VehicleWindowGl50DS::Storage::drawCoveragePairTriangle(U bank,U first,U ima
     }
 
 bool VehicleWindowGl50DS::Storage::racerTrianglesSeparable(U slot,U component,U firstA,U firstB)const noexcept {
-        if(coverageDemand||!racerRasterCacheActive||slot!=racerRasterSlot||component!=racerRasterComponent||
+        // The coverage bridge rasterizes its payload single-sample (coverageAa0,
+        // pixel centers) exactly as the single-sample route does, so the same
+        // pixel-center separation proof admits a run there too.
+        if(!racerRasterCacheActive||slot!=racerRasterSlot||component!=racerRasterComponent||
             slot>frameOpponentCount)return false;
         const auto& batch=slot?frameOpponentBatches[slot-1]:framePlayerBatch;
         if(component>=batch.componentCount)return false;
@@ -391,8 +394,8 @@ bool VehicleWindowGl50DS::Storage::drawCoveragePairGroup(U bank,U slot,U compone
         bool& firstCoverageSetup) noexcept {
         // Never cross the original base/map-2 MSCNT group boundary. A run
         // retains contiguous EBO order and admits only pairwise-disjoint
-        // conservative pixel rectangles, or (single-sample only) a proven
-        // shared-edge or robust separating-line pair. No sample can consume another
+        // conservative pixel rectangles, or a proven shared-edge or robust
+        // separating-line pair at pixel centers (the coverage payload is AA0). No sample can consume another
         // run member's color/alpha or compete with its depth. The unchanged
         // byte shader and per-sample depth comparison can share one snapshot.
         // A source group has at most 14 triangles; a single-sample batch of
@@ -1817,9 +1820,9 @@ std::array<I,4> VehicleWindowGl50DS::Storage::rcTriangleRegion(U first)const noe
         return nativeTriangleRasterRegion(triangle);
     }
 
-bool VehicleWindowGl50DS::Storage::drawRcCrystalTriangle(U bank,U first,U pass,U image,const std::array<I,4>& region)noexcept {
-        ++diagnostic->rcCrystalTriangles;
-        if(region[2]<=region[0]||region[3]<=region[1]){++diagnostic->rcCrystalEmptyTriangles;return true;}
+bool VehicleWindowGl50DS::Storage::drawRcCrystalTriangle(U bank,U first,U pass,U image,const std::array<I,4>& region,U triangleCount)noexcept {
+        diagnostic->rcCrystalTriangles+=triangleCount;
+        if(region[2]<=region[0]||region[3]<=region[1]){diagnostic->rcCrystalEmptyTriangles+=triangleCount;return true;}
         if(region==std::array<I,4>{{0,0,width,height}})++diagnostic->rcCrystalFullRectangles;
         if(!coverageDemand||!coverageLive.raster||!coverageLive.snapshot||!rcCrystalPrepared||pass<1||pass>2)
             return fail(*diagnostic,VehicleWindowError50DS::frame,"RC crystal actual coverage resources unavailable");
@@ -1830,7 +1833,7 @@ bool VehicleWindowGl50DS::Storage::drawRcCrystalTriangle(U bank,U first,U pass,U
         gl.useProgram(trackProgram);gl.uniform1i(rcCrystalPayloadUniform,1);
         gl.activeTexture(textureUnit0);gl.bindTexture(texture2D,image);drawGl.bindVertexArray(trackVertexArray);
         bool accepted=check("bind RC AA0 source byte/depth payload");
-        if(accepted){drawGl.drawElementsBaseVertex(0x0004,3,0x1405,reinterpret_cast<const void*>(std::uintptr_t(first)*sizeof(U)),0);
+        if(accepted){drawGl.drawElementsBaseVertex(0x0004,static_cast<I>(triangleCount*3),0x1405,reinterpret_cast<const void*>(std::uintptr_t(first)*sizeof(U)),0);
             accepted=check("raster actual ordered RC crystal triangle");}
         if(accepted){
             if(gl.copyImageSubData)gl.copyImageSubData(coverageLive.color[bank],coverageTexture,0,
@@ -1863,7 +1866,39 @@ bool VehicleWindowGl50DS::Storage::drawRcCrystalTriangle(U bank,U first,U pass,U
 
 bool VehicleWindowGl50DS::Storage::drawRcCrystalRange(U bank,U first,U count,U pass,U image)noexcept {
         if(count%3)return fail(*diagnostic,VehicleWindowError50DS::indices,"RC crystal triangle extent");
-        for(U i=first;i<first+count;i+=3)if(!drawRcCrystalTriangle(bank,i,pass,image,rcTriangleRegion(i)))return false;
+        // Same rule as the pod pair bridge: a run keeps the contiguous index
+        // order and holds only triangles whose conservative pixel rectangles are
+        // pairwise disjoint, so no member can read another's destination or
+        // depth. One scratch clear, raster, copy and composition per run; each
+        // pixel's result is the one the per-triangle bridge produces.
+        constexpr U maximumRun=64;
+        const U end=first+count;
+        const auto area=[](const std::array<I,4>& r) noexcept -> std::uint64_t {
+            return std::uint64_t(r[2]-r[0])*std::uint64_t(r[3]-r[1]);};
+        const auto full=[&](const std::array<I,4>& r) noexcept {return r==std::array<I,4>{{0,0,width,height}};};
+        const auto empty=[](const std::array<I,4>& r) noexcept {return r[2]<=r[0]||r[3]<=r[1];};
+        while(first<end){
+            const auto initial=rcTriangleRegion(first);
+            if(empty(initial)||full(initial)){if(!drawRcCrystalTriangle(bank,first,pass,image,initial,1))return false;first+=3;continue;}
+            std::array<std::array<I,4>,maximumRun> regions;regions[0]=initial;auto united=initial;
+            std::uint64_t summed=area(initial);U run=1;
+            while(run<maximumRun&&first+run*3<end){
+                const auto next=rcTriangleRegion(first+run*3);
+                if(empty(next)||full(next))break;
+                bool disjoint=true;
+                for(U i=0;i<run&&disjoint;++i){const auto& old=regions[i];
+                    disjoint=!(next[0]<old[2]&&old[0]<next[2]&&next[1]<old[3]&&old[1]<next[3]);}
+                if(!disjoint)break;
+                auto candidate=united;
+                for(U axis=0;axis<2;++axis){candidate[axis]=std::min(candidate[axis],next[axis]);
+                    candidate[axis+2]=std::max(candidate[axis+2],next[axis+2]);}
+                // Do not let a sparse run grow the scratch/copy/composition area.
+                if(area(candidate)>(summed+area(next))*2u)break;
+                regions[run++]=next;united=candidate;summed+=area(next);
+            }
+            if(!drawRcCrystalTriangle(bank,first,pass,image,united,run))return false;
+            first+=run*3;
+        }
         return true;
     }
 

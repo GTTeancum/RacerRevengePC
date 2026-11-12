@@ -533,7 +533,12 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
         courseCatalogPrepared&&raceRequested&&!courseColdLoad.pending()&&renderer.initialized());
     if(action>=0){
      std::cerr<<"tournament_return_route action="<<action<<" screen="<<unsigned(originalMain.coordinator.snapshot().route.screen)<<'\n';
-     originalMain.input(static_cast<std::uint8_t>(action));tournamentReturnRoute.validateDispatch(originalMain.coordinator.snapshot());}
+     const auto status=originalMain.input(static_cast<std::uint8_t>(action));
+     const bool ending=status==platform::OriginalUiFrontendStatus50KG::unavailableDestination&&
+         originalMain.diagnostic.sourcePC==0x1E40A0&&originalMain.diagnostic.hall.sourcePC==0x1E40A0;
+     tournamentReturnRoute.validateDispatch(originalMain.coordinator.snapshot());
+     if(ending){tournamentReturnRoute.reachEnding(originalMain.coordinator.snapshot());
+      originalMain.requestQuit();reportUiState("tournament_ending");break;}}
    }
    if(captureRoute.enabled()){
     require50DU(originalMain.inputCount==captureRoute.issuedActions(),"physical menu input interrupted unattended original UI route");

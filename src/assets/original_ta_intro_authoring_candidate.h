@@ -17,6 +17,11 @@
 #include <vector>
 
 namespace rr::assets {
+// Largest authenticated original intro NumEvents (TB introAud.ini: 5). The
+// original keeps intro events in a growable ContainerList (292650/2941F0);
+// this is the port's fixed host bound for every intro event array, checked
+// against every catalogue row at compile time.
+inline constexpr std::size_t originalRaceIntroEventsMax50LA=5;
 class OriginalTaIntroAuthoringCandidate final {
 public:
     using Provider=OriginalStandardArchiveProvider50LA;
@@ -180,7 +185,7 @@ private:
     std::shared_ptr<const Provider> provider_;
     std::shared_ptr<const Metadata> metadata_;
     std::array<std::vector<std::uint8_t>,2> bytes_;
-    std::array<Event,3> events_{};
+    std::array<Event,originalRaceIntroEventsMax50LA> events_{};
     std::size_t capturedMount_=static_cast<std::size_t>(-1);
     std::uint64_t capturedGeneration_=0,capturedRevision_=0;
     struct Specification {
@@ -188,11 +193,11 @@ private:
         std::size_t archiveBytes,memberCount;unsigned eventCount;std::size_t filenameLength;
         std::array<std::size_t,2> memberSizes,memberOrdinals;
         std::array<const char*,2> memberDigests;
-        std::array<std::size_t,3> filenameOffsets,streamOffsets,stereoOffsets,loopOffsets,cameraOffsets,metadataIndices;
-        std::array<std::string_view,3> cameraValues;
+        std::array<std::size_t,originalRaceIntroEventsMax50LA> filenameOffsets,streamOffsets,stereoOffsets,loopOffsets,cameraOffsets,metadataIndices;
+        std::array<std::string_view,originalRaceIntroEventsMax50LA> cameraValues;
     };
     const Specification* specification_=nullptr;
-    inline static constexpr std::array<Specification,11> specifications_{{
+    inline static constexpr std::array<Specification,13> specifications_{{
         {"TA","TRACKS/TA.RES","b491e34bf6cbd27869d5b9dc8db394b101ebaf4ac7f5e0d44fcca33a00d41ab8",
          3334562,383,3,39,{346,119},{381,380},
          {"22e1afe07f5f34033b63a75fa8b5c2a30f49869f57cfa96926ba5c51eba9bf50","1a325c68bbccaa8dfa94f87a8d1dcb743d029c59d96771797ce7045135cf6a0f"},
@@ -237,6 +242,14 @@ private:
          3607868,509,3,39,{346,117},{507,506},
          {"45cd6a12b36aee70edefddd0b3b8f808878117ca35af237aa2438173d990ca13","88aa20cdf0a8352baab8edad438f825115098cf0f463f4ec1e3090d30cbedc73"},
          {57,161,265},{109,213,317},{123,227,331},{135,239,343},{56,85,114},{15,13,14},{"1","3","4"}},
+        {"MC","TRACKS/MC.RES","f8854752f639676257d44e33479a0c31c047a17e4cd592d02f483ad593179c81",
+         3822171,432,2,37,{238,88},{430,429},
+         {"fe01f53fb25282782610823d5cfacfa1ccac754342beca2b9837dfb01d24d67d","c28784d774a7a1d65fe118d3e94d5c3c7aa8bff490ee81bfaeeb0e7adfc58d90"},
+         {57,159,0},{107,209,0},{121,223,0},{133,235,0},{56,85,0},{38,39,0},{"1","3",""}},
+        {"TB","TRACKS/TB.RES","1188206d7b1f64910c119192829fc357b9d4a9f021d64e8a2b7561f2c113a09b",
+         3749557,1465,5,39,{556,175},{1463,1462},
+         {"bd83e5412da7cbf14f979c17c0002c798f477848ed0af38883197dfdc2320423","5197d42995287097b6d1f5981db602c5e7e148891392566427ff4b14f1bd22fc"},
+         {57,161,265,369,473},{109,213,317,421,525},{123,227,331,435,539},{135,239,343,447,551},{56,85,114,143,172},{8,9,10,11,12},{"1","2","3","4","5"}},
     }};
     inline static constexpr std::array<const char*,2> memberNames_{{"audio\\introAud.ini","audio\\scrptLns.ini"}};
 };

@@ -65,6 +65,7 @@ bool OriginalUiGarageDrawContribution50KG::prepareDrainModelPolicies24B130(D& d)
         models.reserve(resources.population_.size());policies.reserve(resources.population_.size());
         assets::OriginalUiImageBankInput50KG input;
         input.archives={drainAppStart_,session->sceneAssets_->archive(),session->sceneAssets_->selectedArchive()};
+        if(session->residentPodTextures_)input.archives.push_back(session->residentPodTextures_);
         input.ipumCache=drainIpum_.get();input.owners.reserve(resources.population_.size());
         const auto* selected=session->sceneAssets_->selectedPod();
         if(!selected||!selected->model)return bankFailure(d,S::source,0x1d1cd0u,"actual selected19E source");
@@ -83,7 +84,8 @@ bool OriginalUiGarageDrawContribution50KG::prepareDrainModelPolicies24B130(D& d)
             assets::OriginalUiGarageModelMaterialDiagnostic50KG md;bool loaded=false;
             if(i==0){
                 if(model->source()!=selected->model.get())return bankFailure(d,S::source,0x1d1cd0u,"actual selected model population position");
-                loaded=policy->loadSelected(session->sceneAssets_,drainAppStart_,issuer_->materialRuntime,drainIpum_.get(),md);
+                loaded=policy->loadSelected(session->sceneAssets_,drainAppStart_,issuer_->materialRuntime,drainIpum_.get(),md,
+                    session->residentPodTextures_);
             }else if(i==1){
                 if(model->source()->source.identity!=session->wattoAssets_->geometrySource()||
                    model->source()->archive!=session->sceneAssets_->archive())

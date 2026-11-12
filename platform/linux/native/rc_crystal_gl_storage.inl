@@ -27,5 +27,5 @@
     bool prepareRcCrystalFrame(const VehicleWindowFrame50DS& frame,VehicleWindowDiagnostic50DS& d)noexcept;
     bool uploadRcCrystalUvs()noexcept;
     std::array<I,4> rcTriangleRegion(U first)const noexcept;
-    bool drawRcCrystalTriangle(U bank,U first,U pass,U image,const std::array<I,4>& region)noexcept;
+    bool drawRcCrystalTriangle(U bank,U first,U pass,U image,const std::array<I,4>& region,U triangleCount)noexcept;
     bool drawRcCrystalRange(U bank,U first,U count,U pass,U image)noexcept;

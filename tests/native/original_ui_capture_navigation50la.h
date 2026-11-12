@@ -399,7 +399,7 @@ class TournamentReturnRoute final {
     using Life=rr::game::OriginalUiTransitionLifecycle50KG;
     using Phase=rr::game::OriginalUiTransitionPhase50KG;
     using Aperture=rr::game::OriginalUiApertureState50KG;
-    bool enabled_=false,awaitingDispatch_=false,waitingChange_=false;
+    bool enabled_=false,awaitingDispatch_=false,waitingChange_=false,ending_=false;
     std::uint8_t actions_=0,garageActions_=0,leadActions_=0;
     std::uint64_t switchesAtAction_=0,pollsSinceAction_=0;
     std::uint32_t activationsAtAction_=0;
@@ -440,9 +440,19 @@ public:
     bool enabled()const noexcept{return enabled_;}
     std::uint8_t issuedActions()const noexcept{return actions_;}
     bool actionsDispatched()const noexcept{return garageActions_==3&&!awaitingDispatch_;}
+    // Hall Cross after the last tournament course (order 12, 102CC set, 1st
+    // place) is the original 1E40A0 end scene (17DE10 App,0x28,3,0), not a
+    // page screen request; the port has no end-scene receiver yet and keeps
+    // the Hall open. That is the route's end: there is no Garage after it.
+    void reachEnding(const Snapshot& s){
+        require(enabled_&&!awaitingDispatch_&&garageActions_==0&&s.route.screen==11,
+            "tournament return route ending outside the Hall");
+        std::fprintf(stderr,"tournament_return_route ending source_pc=1e40a0 screen=11; end scene not native, stopping\n");
+        ending_=true;waitingChange_=false;
+    }
     // Return -1 while waiting, Back6 in the Garage, else Cross/Confirm4.
     int poll(const Snapshot& s,bool courseReady){
-        if(!enabled_)return -1;
+        if(!enabled_||ending_)return -1;
         require(!awaitingDispatch_,"tournament return route dispatch receipt was not verified");
         require(!s.faulted&&!s.quitRequested,"tournament return route original UI became unavailable");
         if(garageActions_==3)return -1;

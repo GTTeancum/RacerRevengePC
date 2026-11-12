@@ -38,6 +38,8 @@ bool OriginalRaceConstructor50LA::ownsNativeCameraAdapter34(
             mbWorld74_?mbWorldCounted_&&mbWorldPrefixComplete_:
             scWorld74_?scWorldCounted_&&scWorldPrefixComplete_:
             gbWorld74_?gbWorldCounted_&&gbWorldPrefixComplete_:
+            mcWorld74_?mcWorldCounted_&&mcWorldPrefixComplete_:
+            tbWorld74_?tbWorldCounted_&&tbWorldPrefixComplete_:
             rcWorld74_?rcWorldCounted_&&rcWorldPrefixComplete_:
             tcWorld74_?tcWorldCounted_&&tcWorldPrefixComplete_:
             gcWorld74_?gcWorldCounted_&&gcWorldPrefixComplete_:false;
@@ -58,6 +60,8 @@ bool OriginalRaceConstructor50LA::raceCameraCourse34(OriginalCameraStartCourse c
     if(mbWorld74_)return course==OriginalCameraStartCourse::mb;
     if(scWorld74_)return course==OriginalCameraStartCourse::sc;
     if(gbWorld74_)return course==OriginalCameraStartCourse::gb;
+    if(mcWorld74_)return course==OriginalCameraStartCourse::mc;
+    if(tbWorld74_)return course==OriginalCameraStartCourse::tb;
     if(rcWorld74_)return course==OriginalCameraStartCourse::rc;
     if(tcWorld74_)return course==OriginalCameraStartCourse::tc;
     if(gcWorld74_)return course==OriginalCameraStartCourse::gc;

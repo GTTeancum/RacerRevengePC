@@ -1,6 +1,10 @@
 #include "original_ui_garage_model_materials50kg.h"
 #include <utility>
 namespace rr::assets {
+// Defined in original_ui_material50kg.cpp (2475C0 model-row recipe).
+bool readOriginalUiGarageSelectedPodFallbackMaterial50KG(const OriginalUiArchive50KG&,const std::string&,
+    const OriginalUiMaterialTemplates50KG&,const OriginalUiMaterialRuntime50KG&,OriginalUiMaterial50KG&,
+    OriginalUiMaterialDiagnostic50KG&) noexcept;
 namespace {
 using D=OriginalUiGarageModelMaterialDiagnostic50KG;using E=OriginalUiGarageModelMaterialError50KG;
 using K=OriginalUiGarageMaterialKind50KG;
@@ -16,7 +20,7 @@ bool authentic(const std::shared_ptr<const OriginalUiArchive50KG>& a,OriginalUiA
 }
 struct OriginalUiGarageModelMaterials50KG::Storage {
     std::shared_ptr<const void> modelPin;
-    std::shared_ptr<const OriginalUiArchive50KG> archive,appStart;
+    std::shared_ptr<const OriginalUiArchive50KG> archive,appStart,residentPodTextures;
     const OriginalUiMemberIdentity50KG* modelIdentity=nullptr;
     K kind=K::absent;std::size_t ordinal=0;
     std::vector<std::vector<OriginalUiGarageModelMaterialPass50KG>> materials;
@@ -40,10 +44,11 @@ bool OriginalUiGarageModelMaterials50KG::loadActor(std::shared_ptr<const Origina
 }
 bool OriginalUiGarageModelMaterials50KG::loadSelected(std::shared_ptr<const OriginalUiGarageSceneAssets50KG> a,
     std::shared_ptr<const OriginalUiArchive50KG> app,const OriginalUiMaterialRuntime50KG& runtime,
-    const OriginalUiIpumTextureCache50KG* cache,D& d)noexcept{
+    const OriginalUiIpumTextureCache50KG* cache,D& d,std::shared_ptr<const OriginalUiArchive50KG> residentPodTextures)noexcept{
     d={};const auto* row=a?a->selectedPod():nullptr;
     if(!a||!a->loaded()||!row||!row->model)return fail(d,E::input);
-    const auto m=row->model;return load(std::move(a),m->scene(),m->source.identity,K::selected19E,0,m->archive,std::move(app),runtime,cache,d);
+    const auto m=row->model;return load(std::move(a),m->scene(),m->source.identity,K::selected19E,0,m->archive,std::move(app),runtime,cache,d,
+        std::move(residentPodTextures));
 }
 bool OriginalUiGarageModelMaterials50KG::loadWatto(std::shared_ptr<const OriginalUiGarageWattoAssets50KG> a,
     std::shared_ptr<const OriginalUiArchive50KG> garage,std::shared_ptr<const OriginalUiArchive50KG> app,
@@ -57,8 +62,11 @@ bool OriginalUiGarageModelMaterials50KG::loadWatto(std::shared_ptr<const Origina
 bool OriginalUiGarageModelMaterials50KG::load(std::shared_ptr<const void> pin,const Scene48D* scene,
     const OriginalUiMemberIdentity50KG* identity,K kind,std::size_t ordinal,
     std::shared_ptr<const OriginalUiArchive50KG> archive,std::shared_ptr<const OriginalUiArchive50KG> app,
-    const OriginalUiMaterialRuntime50KG& runtime,const OriginalUiIpumTextureCache50KG* cache,D& d)noexcept{
+    const OriginalUiMaterialRuntime50KG& runtime,const OriginalUiIpumTextureCache50KG* cache,D& d,
+    std::shared_ptr<const OriginalUiArchive50KG> residentPodTextures)noexcept{
     d={};if(storage_)return fail(d,E::alreadyLoaded);
+    if(residentPodTextures&&(kind!=K::selected19E||!authentic(residentPodTextures,OriginalUiArchiveId50KG::podTextures)))
+        return fail(d,E::input);
     if(!pin||!scene||!identity||scene->materials.empty()||scene->materials.size()>256||kind==K::absent||
        (kind==K::selected19E?(!archive||!archive->identity()||
         originalUiGaragePodCareer50KG(archive->identity()->id)<0||!authentic(archive,archive->identity()->id)):
@@ -66,7 +74,7 @@ bool OriginalUiGarageModelMaterials50KG::load(std::shared_ptr<const void> pin,co
        !authentic(app,OriginalUiArchiveId50KG::appStart))return fail(d,E::input);
     try {
         auto n=std::make_unique<Storage>();n->modelPin=std::move(pin);n->archive=std::move(archive);n->appStart=std::move(app);
-        n->modelIdentity=identity;n->kind=kind;n->ordinal=ordinal;
+        n->modelIdentity=identity;n->kind=kind;n->ordinal=ordinal;n->residentPodTextures=std::move(residentPodTextures);
         OriginalUiMaterialTemplates50KG templates;
         if(!templates.load(*n->appStart,d.materialDetail))return fail(d,E::material);
         n->materials.resize(scene->materials.size());std::vector<OriginalUiImageSource50KG> sources;
@@ -74,16 +82,24 @@ bool OriginalUiGarageModelMaterials50KG::load(std::shared_ptr<const void> pin,co
             d.material=static_cast<std::uint32_t>(m);const auto& name=scene->materials[m];
             if(!basename(name))return fail(d,E::material);
             OriginalUiMaterial50KG material;
-            if(!readOriginalUiMaterial50KG(*n->archive,"ui/textures/"+name+".psm",templates,
-                OriginalUiTemplate50KG::defaultMt,runtime,material,d.materialDetail))return fail(d,E::material);
+            const auto base="ui/textures/"+name;
+            // 29B630 handle -1 in the selected namespace: only a boot-resident
+            // UIPODTEX image (1B7698..1B7790) has the 2475C0 DefaultMT owner.
+            const bool resident=n->residentPodTextures&&!n->archive->find(base+".psm").identity&&
+                !n->archive->find(base+".pst").identity;
+            if(resident?!readOriginalUiGarageSelectedPodFallbackMaterial50KG(*n->residentPodTextures,name,templates,
+                    runtime,material,d.materialDetail):
+               !readOriginalUiMaterial50KG(*n->archive,base+".psm",templates,
+                    OriginalUiTemplate50KG::defaultMt,runtime,material,d.materialDetail))return fail(d,E::material);
+            const auto& images=resident?*n->residentPodTextures:*n->archive;
             auto& passes=n->materials[m];passes.reserve(material.passes.size());
             for(std::size_t p=0;p<material.passes.size();++p){
                 d.pass=static_cast<std::uint32_t>(p);OriginalUiGarageModelMaterialPass50KG pass;pass.source=std::move(material.passes[p]);
                 if(pass.source.textureCount==1){
                     if(!basename(pass.source.textureName))return fail(d,E::texture);
                     const auto prefix="ui/textures/"+pass.source.textureName;
-                    if(n->archive->find(prefix+".atm").identity)return fail(d,E::animatedTexture);
-                    const auto member=n->archive->find(prefix+".pst");
+                    if(images.find(prefix+".atm").identity)return fail(d,E::animatedTexture);
+                    const auto member=images.find(prefix+".pst");
                     if(!member.identity||!member.data)return fail(d,E::texture);
                     std::size_t i=0;for(;i<sources.size();++i)if(sources[i].member.identity==member.identity)break;
                     if(i==sources.size()){
@@ -199,13 +215,23 @@ bool prepareOriginalUiGarageLitMaterial50KG(const OriginalUiGarageModelMaterials
            !row || !images || !images->loaded())
             return fail(d,Error::profile,"actual Garage model material and image owner",0x26EA0Cu);
         const auto& pass=row->source;d.pass=pass.pass;
-        if(!pass.identity || pass.identity!=archive->find(pass.identity->name).identity ||
+        // 2475C0 selected-model owner: no PSM identity, one DefaultMT map whose
+        // image is the boot-resident UIPODTEX member recorded at construction.
+        const auto* resident=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::podTextures);
+        const bool fallback=selected&&!pass.identity&&resident&&pass.provenance.creationPC==0x2475C0u&&
+            pass.provenance.archive==resident&&pass.provenance.fallbackTexture&&
+            pass.provenance.origin==OriginalUiMaterialOrigin50KG::authoredPsm&&
+            pass.pass==1&&passIndex==0&&same(pass.microprogram,"DiffuseCompressed")&&pass.textureCount==1;
+        if(!fallback&&(!pass.identity || pass.identity!=archive->find(pass.identity->name).identity ||
            pass.pass!=passIndex+1 ||
            (!same(pass.microprogram,"Diffuse") && !same(pass.microprogram,"DiffuseCompressed") &&
-            !same(pass.microprogram,"SpecularMapCompressed")) || pass.textureCount!=1)
+            !same(pass.microprogram,"SpecularMapCompressed")) || pass.textureCount!=1))
             return fail(d,Error::profile,"authored Garage diffuse/specular pass",0x2476A0u);
         const auto memberName=std::string("ui\\textures\\")+pass.textureName+".pst";
-        const auto* member=archive->find(memberName).identity;
+        const auto* member=fallback?pass.provenance.fallbackTexture:archive->find(memberName).identity;
+        if(fallback&&(!member->name||!same(std::string(member->name),memberName.c_str())))
+            return fail(d,Error::texture,"boot-resident UIPODTEX member of the 2475C0 owner",0x24E880u);
+        const auto* imageArchive=fallback?resident:archive->identity();
         const auto* source=images->sourceProvenance(row->imageIndex);
         const auto* texture=images->decodedTexture(row->imageIndex);
         const auto* ipum=images->ipumProvenance(row->imageIndex);
@@ -216,7 +242,7 @@ bool prepareOriginalUiGarageLitMaterial50KG(const OriginalUiGarageModelMaterials
             return fail(d,Error::texture,"exact Garage source PST and retained mip owner",0x24E880u);
         if(texture->kind==2){
             if(!ipum || ipum->sourcePstSha256!=member->sha256 || !same(ipum->sourceMember,member->name) ||
-               ipum->sourceArchiveSha256!=archive->identity()->sha256 ||
+               ipum->sourceArchiveSha256!=imageArchive->sha256 ||
                ipum->colorPolicyKind!=OriginalUiIpumColorPolicy50KG::original50FcRgb5Texa255Aem1 ||
                ipum->mipCount!=texture->mips.size())
                 return fail(d,Error::texture,"authenticated Garage IPUM color/mip provenance",0x24E880u);

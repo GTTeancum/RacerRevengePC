@@ -334,7 +334,7 @@ private:
     // friends only. Intentionally uncalled. Genuine canonical
     // Announcer120 membership; no voice/play/service or controller attachment.
     std::unique_ptr<NativeRaceIntroTransport50LA> taIntroTransport_;
-    std::array<NativeRaceIntroTransport50LA::Playback,3> taIntroLatest_{};
+    std::array<NativeRaceIntroTransport50LA::Playback,assets::originalRaceIntroEventsMax50LA> taIntroLatest_{};
     bool taIntroLive_=false;
     bool taIntroConstructionAdmission_=false;
     std::size_t taIntroFirstVoice_=0,taIntroVoiceCount_=0;
@@ -438,7 +438,7 @@ private:
         bool constructed=false,loaded=false,enabled30=false,allocated58=false;
         // Native lifetime only; Sound reference00 remains1. Actual canonical
         // slot occupancy already bars Aural102CD0/interface retirement.
-        std::array<std::unique_ptr<ColdSound>,3> taIntroSounds;
+        std::array<std::unique_ptr<ColdSound>,assets::originalRaceIntroEventsMax50LA> taIntroSounds;
         std::shared_ptr<const assets::OriginalTaIntroAuthoringCandidate> taIntroAuthoring;
         std::shared_ptr<const OriginalApplicationAural50KG> taIntroManager;
         bool taIntroStarted=false,taIntroConstructed=false; // Historical begun vs all-authored-events-complete.
@@ -465,7 +465,7 @@ private:
         std::unique_ptr<Event*[]> members204;
         std::uint32_t growth208=0,capacity20C=0;
         bool allocated210=false;
-        std::array<std::unique_ptr<Event>,3> ownedEvents;
+        std::array<std::unique_ptr<Event>,assets::originalRaceIntroEventsMax50LA> ownedEvents;
         std::unique_ptr<Event> pendingEvent; // Native retained292650 in-flight allocation.
         bool configured=false,nativeAppendAborted=false;
         game::OriginalWreckComponent50LA* controllerParent=nullptr;

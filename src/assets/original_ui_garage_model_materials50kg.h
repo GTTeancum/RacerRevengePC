@@ -36,9 +36,12 @@ public:
     bool loadActor(std::shared_ptr<const OriginalUiGarageSceneAssets50KG>,std::size_t,
         std::shared_ptr<const OriginalUiArchive50KG> appStart,const OriginalUiMaterialRuntime50KG&,
         const OriginalUiIpumTextureCache50KG*,OriginalUiGarageModelMaterialDiagnostic50KG&) noexcept;
+    // residentPodTextures: boot-resident UIPODTEX (1B7648..1B7834), supplied
+    // only when the selected PSG names one of its images (26E.PSG: 26_3).
     bool loadSelected(std::shared_ptr<const OriginalUiGarageSceneAssets50KG>,
         std::shared_ptr<const OriginalUiArchive50KG> appStart,const OriginalUiMaterialRuntime50KG&,
-        const OriginalUiIpumTextureCache50KG*,OriginalUiGarageModelMaterialDiagnostic50KG&) noexcept;
+        const OriginalUiIpumTextureCache50KG*,OriginalUiGarageModelMaterialDiagnostic50KG&,
+        std::shared_ptr<const OriginalUiArchive50KG> residentPodTextures=nullptr) noexcept;
     bool loadWatto(std::shared_ptr<const OriginalUiGarageWattoAssets50KG>,
         std::shared_ptr<const OriginalUiArchive50KG> garage,std::shared_ptr<const OriginalUiArchive50KG> appStart,
         const OriginalUiMaterialRuntime50KG&,const OriginalUiIpumTextureCache50KG*,
@@ -56,7 +59,8 @@ private:
     bool load(std::shared_ptr<const void>,const Scene48D*,const OriginalUiMemberIdentity50KG*,
         OriginalUiGarageMaterialKind50KG,std::size_t,std::shared_ptr<const OriginalUiArchive50KG>,
         std::shared_ptr<const OriginalUiArchive50KG>,const OriginalUiMaterialRuntime50KG&,
-        const OriginalUiIpumTextureCache50KG*,OriginalUiGarageModelMaterialDiagnostic50KG&) noexcept;
+        const OriginalUiIpumTextureCache50KG*,OriginalUiGarageModelMaterialDiagnostic50KG&,
+        std::shared_ptr<const OriginalUiArchive50KG> residentPodTextures=nullptr) noexcept;
     struct Storage;std::unique_ptr<Storage> storage_;
 };
 }

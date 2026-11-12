@@ -537,6 +537,11 @@ public:
     // not register synthetic static models or claim source render dispatch for
     // the native world above. Mounting the real complete TB namespace preserves
     // the provider's local resource lookup before genuine racer population.
+    // Runs inside populateCanonicalRacers after the racer sources are admitted
+    // and before the single population, as on every consumed course: the
+    // original race load 1A8A40 (Pause100 / Results104 / F8).
+    std::function<bool()> beforeRacerPopulation;
+
     bool populateCanonicalRacers(const tm::Request& request,std::size_t availableAdditionalPayloadBytes,tm::Diagnostic& d)noexcept{
         try{
             d={};shared::need(storage_&&!storage_->canonicalAttempted,"TB canonical population requires fresh native source owner");
@@ -562,6 +567,10 @@ public:
                         *request.canonicalMaterialPath.actualPrefix36B970,*provider,materials,textures,d.racerSource),
                     "Original TB canonical racer material/texture closure rejected");
             shared::need(request.canonicalDomain->appendOriginalSources(materials,textures,d.canonical),"Original TB canonical racer source admission rejected");
+            if(beforeRacerPopulation){
+                d.stage="tb_original_race_load";
+                shared::need(beforeRacerPopulation(),"Original TB race load before population rejected");
+            }
             d.stage="tb_original_racer_population";
             shared::need(request.canonicalDomain->populate(request.canonicalContext,d.canonical),"Original TB canonical racer population rejected");
             return true;

@@ -88,6 +88,10 @@ struct Context final {
     consumedScStageType& consumedScStage;
     using consumedGbStageType = original_consumed_gb_stage50DU::Owner;
     consumedGbStageType& consumedGbStage;
+    using consumedMcStageType = original_consumed_mc_stage50DU::Owner;
+    consumedMcStageType& consumedMcStage;
+    using consumedTbStageType = original_consumed_tb_stage50DU::Owner;
+    consumedTbStageType& consumedTbStage;
     using consumedRcStageType = original_consumed_rc_stage50DU::Owner;
     consumedRcStageType& consumedRcStage;
     using consumedTcStageType = original_consumed_tc_stage50DU::Owner;
@@ -206,6 +210,8 @@ struct Context final {
     gbNavigationOwnerType& gbNavigationOwner;
     using gbOriginalWorldType = std::shared_ptr<gb_original_world50LM::Owner>;
     gbOriginalWorldType& gbOriginalWorld;
+    using tbOriginalWorldType = std::shared_ptr<tb_original_world50LM::Owner>;
+    tbOriginalWorldType& tbOriginalWorld;
     using rcOriginalWorldType = std::shared_ptr<rc_original_world50LM::Owner>;
     rcOriginalWorldType& rcOriginalWorld;
     using tcOriginalWorldType = std::shared_ptr<tc_original_world50LM::Owner>;

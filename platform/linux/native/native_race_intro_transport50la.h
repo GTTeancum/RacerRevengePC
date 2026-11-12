@@ -46,8 +46,8 @@ private:
     struct Assets {
         std::shared_ptr<const assets::OriginalTaIntroAuthoringCandidate> authoring;
         std::shared_ptr<const assets::AudioBank50HC> bank;
-        std::array<const assets::AudioClip50HC*,3> pcm{};
-        std::array<AudioClip50HD,3> clips{};
+        std::array<const assets::AudioClip50HC*,assets::originalRaceIntroEventsMax50LA> pcm{};
+        std::array<AudioClip50HD,assets::originalRaceIntroEventsMax50LA> clips{};
         const assets::OriginalStreamMetadataRow50KZ* source(unsigned,const AudioClip50HD&)const noexcept;
     };
     struct Instance {

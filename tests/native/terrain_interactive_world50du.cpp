@@ -273,6 +273,8 @@ SessionExit50DU Context::run() {
  original_consumed_mb_stage50DU::Owner consumedMbStage(originalMainApplication,*liveAudio);
  original_consumed_sc_stage50DU::Owner consumedScStage(originalMainApplication,*liveAudio);
  original_consumed_gb_stage50DU::Owner consumedGbStage(originalMainApplication,*liveAudio);
+ original_consumed_mc_stage50DU::Owner consumedMcStage(originalMainApplication,*liveAudio);
+ original_consumed_tb_stage50DU::Owner consumedTbStage(originalMainApplication,*liveAudio);
  original_consumed_rc_stage50DU::Owner consumedRcStage(originalMainApplication,*liveAudio);
  original_consumed_tc_stage50DU::Owner consumedTcStage(originalMainApplication,*liveAudio);
  std::shared_ptr<ta_original_world50LE::Owner> taOriginalWorld;
@@ -283,6 +285,7 @@ SessionExit50DU Context::run() {
  std::shared_ptr<sc_original_world50LM::Owner> scOriginalWorld;
  std::shared_ptr<rc_original_world50LM::Owner> rcOriginalWorld;
  std::shared_ptr<tc_original_world50LM::Owner> tcOriginalWorld;
+ std::shared_ptr<tb_original_world50LM::Owner> tbOriginalWorld;
  original_pause_cold50LA::Owner sourcePause;
  original_pause_observation50LA::Owner sourcePauseObservation;
  std::shared_ptr<const ra_cold_sources50LA::DecodedSources> sourcePauseTrack;
@@ -539,7 +542,6 @@ SessionExit50DU Context::run() {
   tbTriggerAuthoring=std::make_shared<tb_trigger_authoring50TB::Owner>();
   const bool triggerReady=tbTriggerAuthoring->decode(tbColdSources,error);
   require50DU(triggerReady,error.empty()?"TB authenticated trigger source rejected":error.c_str());
-  prepareTbPodSound(tbTriggerAuthoring);
   tbDoorSource=std::make_shared<tb_door_motion50TB::SourceOwner>();tb_door_motion50TB::Diagnostic doorSourceDiagnostic;
   const bool sourceReady=tbDoorSource->decode(tbColdSources,s.animationShared.libm,
       tb_door_motion50TB::SourceOwner::maximumAdditionalPayloadBytes(),doorSourceDiagnostic);
@@ -551,8 +553,8 @@ SessionExit50DU Context::run() {
   tbDoorBinding=std::make_unique<tb_door_binding50TB::Binding>();
   const bool visualAttached=tbDoorBinding->beginVisual(tbDoorRuntime,tbLightOwner,tbDoorBindingDiagnostic);
   require50DU(visualAttached,tbDoorBindingDiagnostic.message.empty()?"TB actual door visual prefix rejected":tbDoorBindingDiagnostic.message.c_str());
-  tbTriggerActions=std::make_shared<tb_trigger_actions50TB::Owner>();
-  require50DU(tbTriggerActions->prepare(tbTriggerAuthoring,tbDoorRuntime,tbPodSound),"TB actual ordered action owner preparation rejected");
+  // TB's door PodSound (shared live audio) and the trigger actions are prepared
+  // below with the other course world sounds, after the race object.
  }
  std::shared_ptr<const rc_cold_sources50LA::Owner> rcColdSources;
  std::shared_ptr<rr::game::original_gc_gameplay_lighting_candidate::Owner> rcLightOwner;
@@ -925,8 +927,50 @@ SessionExit50DU Context::run() {
   }
  }
 
+ // MC: the same one race class (1A65C0) and counted course world (1A6BC0) on
+ // the MC static owner its cold sources already built above.
+ if(isMcTrack&&mcOriginalWorld&&mcOriginalWorld->loaded()){
+  require50DU(mcOriginalWorld->mesh(),"MC original mesh publication missing");
+  if(consumedLaunch&&originalCameraEnabled&&humanCourseEnabled&&dynamicProfile.game34==2&&nativeOrdinaryLaunch11258==1){
+   openNativeVideo();originalMainApplication.appStart(originalMainApplication.assetRoot);
+   originalMainApplication.enterGameplayMaterialDirectory17D7A0();
+   const auto context=nativeVideo->standardMaterialConstructionContext(nativeVideo,originalMainApplication);
+   const auto domain=originalMainApplication.standardMaterialDomain();
+   require50DU(context&&domain&&domain->prepared(),"MC counted race material context unavailable");
+   if(!sourceModelRenderGlobals)sourceModelRenderGlobals=std::make_unique<OriginalRacerModelRenderGlobals50LA>(nativeOrdinaryLaunch11258);
+   rr::assets::OriginalStandardMaterialDiagnostic50LA d;std::uint32_t pc=0;
+   const bool ready=consumedMcStage.begin(*consumedLaunch,sessionIndex+1,playerRacer60,
+       *sourceModelRenderGlobals,mcOriginalWorld,d,pc);
+   if(!ready)std::cerr<<"consumed_mc_prefix_rejected source_pc="<<pc<<" material_pc="<<d.sourcePC<<'\n';
+   require50DU(ready,"actual consumed MC race/world constructor prefix rejected");
+  }
+ }
+ // TB: its visual world is built from its retained compact source here (it
+ // used to be built later in the continuation), before counted audio.
+ if(isTbTrack){
+  require50DU(tbColdSources&&tbColdSources->ready()&&tbColdSources->world().parameters.original_bytes==actualWorld.parameters.original_bytes,
+      "TB actual compact source missing or world source differs");
+  tbOriginalWorld=std::make_shared<tb_original_world50LM::Owner>();tb_original_world50LM::Diagnostic diagnostic;
+  const bool loaded=tbOriginalWorld->load(tbColdSources,diagnostic);
+  require50DU(loaded,diagnostic.message.empty()?"TB original world rejected":diagnostic.message.c_str());
+  require50DU(tbOriginalWorld->mesh(),"TB original mesh publication missing");
+  if(consumedLaunch&&originalCameraEnabled&&humanCourseEnabled&&dynamicProfile.game34==2&&nativeOrdinaryLaunch11258==1){
+   openNativeVideo();originalMainApplication.appStart(originalMainApplication.assetRoot);
+   originalMainApplication.enterGameplayMaterialDirectory17D7A0();
+   const auto context=nativeVideo->standardMaterialConstructionContext(nativeVideo,originalMainApplication);
+   const auto domain=originalMainApplication.standardMaterialDomain();
+   require50DU(context&&domain&&domain->prepared(),"TB counted race material context unavailable");
+   if(!sourceModelRenderGlobals)sourceModelRenderGlobals=std::make_unique<OriginalRacerModelRenderGlobals50LA>(nativeOrdinaryLaunch11258);
+   rr::assets::OriginalStandardMaterialDiagnostic50LA d;std::uint32_t pc=0;
+   const bool ready=consumedTbStage.begin(*consumedLaunch,sessionIndex+1,playerRacer60,
+       *sourceModelRenderGlobals,tbOriginalWorld,d,pc);
+   if(!ready)std::cerr<<"consumed_tb_prefix_rejected source_pc="<<pc<<" material_pc="<<d.sourcePC<<'\n';
+   require50DU(ready,"actual consumed TB race/world constructor prefix rejected");
+  }
+ }
+
  // Course world sounds that a course prepares before the shared audio load
- // (GB's door PodSound, TC's two trigger Sounds; TB will join here). In the
+ // (GB's and TB's door PodSounds, TC's two trigger Sounds). In the
  // original they belong to the World4D8 group, which exists only after the
  // race object and its world (1A6B5C -> 1A6BC0 -> 26FCF8). So they are
  // prepared here, after every consumed-course stage above. When no consumed
@@ -936,6 +980,11 @@ SessionExit50DU Context::run() {
   gbTriggerActions=std::make_shared<gb_trigger_actions50GB::Owner>();
   require50DU(gbTriggerActions->prepare(gbTriggerAuthoring,gbAnimationRuntime,gbPodSound,gbParticleRuntime,
       gb_trigger_actions50GB::Owner::maximumAdditionalPayloadBytes()),"GB genuine animation/sound/particle action destinations rejected");
+ }
+ if(isTbTrack){
+  prepareTbPodSound(tbTriggerAuthoring);
+  tbTriggerActions=std::make_shared<tb_trigger_actions50TB::Owner>();
+  require50DU(tbTriggerActions->prepare(tbTriggerAuthoring,tbDoorRuntime,tbPodSound),"TB actual ordered action owner preparation rejected");
  }
  if(isTcTrack){
   // Same live audio owner/settings as the later material/engine/camera joins.
@@ -1663,6 +1712,8 @@ SessionExit50DU Context::run() {
   .consumedMbStage=consumedMbStage,
   .consumedScStage=consumedScStage,
   .consumedGbStage=consumedGbStage,
+  .consumedMcStage=consumedMcStage,
+  .consumedTbStage=consumedTbStage,
   .consumedRcStage=consumedRcStage,
   .consumedTcStage=consumedTcStage,
   .consumedRaStage=consumedRaStage,
@@ -1722,6 +1773,7 @@ SessionExit50DU Context::run() {
   .gbNavigation=gbNavigation,
   .gbNavigationOwner=gbNavigationOwner,
   .gbOriginalWorld=gbOriginalWorld,
+  .tbOriginalWorld=tbOriginalWorld,
   .rcOriginalWorld=rcOriginalWorld,
   .tcOriginalWorld=tcOriginalWorld,
   .gbParticleAttachments=gbParticleAttachments,

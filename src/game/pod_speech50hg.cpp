@@ -187,7 +187,8 @@ AudioEventStatus50HE trackIntroSpeech50HG(std::uint32_t config34,std::uint32_t c
     if(!camera||camera>lineCount)return AudioEventStatus50HE::Input;
     const auto& line=lines[camera-1];
     if(line.eventKey<0){count=0;return AudioEventStatus50HE::Complete;}
-    if(line.eventKey<1||line.eventKey>3||line.span>15)return AudioEventStatus50HE::Input;
+    if(line.eventKey<1||line.eventKey>5||line.span>15) // 5: largest original intro NumEvents (TB); 175980 tests sign only.
+       return AudioEventStatus50HE::Input;
     if(!commands||!capacity)return AudioEventStatus50HE::Capacity;
     commands[0]={AudioOperation50HE::Start,{AudioBank50HE::TrackIntro,static_cast<std::uint32_t>(line.eventKey)},
         1.f,1.f,false,0x175998};
