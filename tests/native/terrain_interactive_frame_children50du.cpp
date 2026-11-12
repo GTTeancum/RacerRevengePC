@@ -576,6 +576,10 @@ bool Context::advanceChildren(std::size_t actualRacerSlot,float preparedOuterFac
   const ImpactTransitionResult50C forced=side==1?
       ImpactTransitionResult50C{ImpactTransitionStatus50C::unsupportedTransition,0x225e7cu,0x90u,0x227370u}:
       ImpactTransitionResult50C{ImpactTransitionStatus50C::unsupportedTransition,0x225ec0u,0x94u,0x227a40u};
+  // 227370/227A40 limp only a human: an AI (58 != 0) is sent to 226750,
+  // state 3, exactly as the real dispatch below (isLimpEntry excludes AI and
+  // that racer's frame ends with its destroy commit). Only a limp continues.
+  if(!isLimpEntry(forced))return commitOriginalDestroyed(actualRacerSlot,forced,preparedOuterFactor);
   require50DU(commitOriginalDestroyed(actualRacerSlot,forced,preparedOuterFactor),"test limp entry rejected");
   limpContinued=true;
  }
