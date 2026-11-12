@@ -1,5 +1,10 @@
 # Track-route audit (RA-only and tiered behaviour), November 7, 2026
 
+> **Governing rule (2026-11-12):** one common path for every course and every
+> pod, differing only by loaded data
+> (`D:\Programming\GitHub\RacerRevengePC\CLAUDE.md`). Every RA-only, tiered or
+> per-track branch listed here is a port stand-in to retire, not a design.
+
 Scope: every branch on `isRaTrack`, `consumedRaStage.race()`,
 `sourceConsumedPauseActivation`, `humanResultsCold` and
 `canonicalTournamentGrid` in `tests/native/terrain_interactive_*.cpp`
@@ -55,13 +60,19 @@ route only. Build84's host Pause route (`bindHost`) does not use it.
   (`renderRequest.enableNativePodShadows=!isRaTrack`). Original shadows are not
   recovered for any track.
 
-## Legitimate per-track branches (no action)
+## Per-track loader branches (stand-ins, retire into one path)
 
 World, sky, ground, collision queries and gates, navigation maps, runtime
 triggers, static candidates, material audio track selection, lighting
 selection, track materials/normals/textures, live-zone membership and follow
-queries. Each track loads its own original data through its own loader; the
-branches select that loader, not a feature.
+queries. In the port each track loads its data through its own loader, and the
+branches select that loader.
+
+**Corrected 2026-11-12:** this was earlier marked "legitimate, no action". It
+is not. The original has one race-load path that reads each track's data (see
+the note near the end of this file: no per-track race class or override
+exists). Per-track loaders are port stand-ins to retire into one common loader
+driven by track data. See `D:\Programming\GitHub\RacerRevengePC\CLAUDE.md`.
 
 ## Suggested order
 
