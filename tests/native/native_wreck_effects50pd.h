@@ -21,10 +21,12 @@
 // Native, not original: CPU billboards in world space; a private random
 // stream (effects never draw from the race's shared 308030 RNG); the debris
 // separates at launch, so group sparks/explosions fire once per group then;
-// every exploding racer's embers start (no per-part damage gate); piece fire
+// embers launch from the private stream (D5: the source draws their direction,
+// gate and life from 308030); piece fire
 // burns while the piece moves, piece smoke continues at its minimum rate.
 #include "native_wreck_debris_sim50pd.h"
 #include <algorithm>
+#include <bit>
 #include <array>
 #include <cmath>
 #include <cstdint>
@@ -47,7 +49,7 @@ struct Definition {
     bool mirrorX=false,mirrorY=false,applySpread=true;
     float framesPerSet=-1.f;
     std::int32_t emitMode=0;
-    float delay=0.f,oneShot=0.f,deathTime=0.f;
+    float delay=0.f,oneShot=0.f,deathTime=0.f,maxDeathTime=0.f;
     float minEmitRate=0.f,maxEmitRate=0.f,particlesToDistance=0.f;
     float minLife=0.f,maxLife=0.f,minSize=0.f,maxSize=0.f;
     float streamMin=0.f,streamMax=0.f,separation=1.5f;
@@ -81,6 +83,11 @@ struct Emitter {
     std::int32_t piece=-1; // sim piece index it follows, or -1
     std::uint32_t counter=0;
     bool alive=false;
+    // 19BA50 PodEmberParticleEmitter: moves itself (19BF30) and carries its
+    // 330 podEmberSmoke child, which follows the ember's previous point.
+    bool ballistic=false;
+    V3 velocity{},smokePosition{},smokePrevious{};
+    float life=0,smokeCarry=0;
 };
 inline constexpr std::size_t maxParticles=4096,maxEmitters=192;
 struct State {
@@ -89,7 +96,7 @@ struct State {
     std::vector<Particle> particles;
     std::vector<Emitter> emitters;
     std::uint32_t random=0x2545f491u;
-    std::uint64_t spawned=0,dropped=0,steps=0;
+    std::uint64_t spawned=0,dropped=0,steps=0,embersLaunched=0;
     bool cold=false;
 };
 inline State& state() noexcept { static State owner; return owner; }
@@ -143,6 +150,7 @@ inline Definition readDefinition(const std::vector<std::uint8_t>& bytes,Kind kin
     triple(e,g,"minimumvelocitynoise",d.minNoise);triple(e,g,"maximumvelocitynoise",d.maxNoise);
     number(e,g,"gravitymultiplier",d.gravity);integer(e,g,"emitmode",d.emitMode);
     number(e,g,"delaytime",d.delay);number(e,g,"oneshottime",d.oneShot);number(e,g,"mindeathtime",d.deathTime);
+    number(e,g,"maxdeathtime",d.maxDeathTime);
     number(e,g,"minimumemitrate",d.minEmitRate);number(e,g,"maximumemitrate",d.maxEmitRate);
     number(e,g,"particlestodistanceratio",d.particlesToDistance);
     number(e,g,"minimumlife",d.minLife);number(e,g,"maximumlife",d.maxLife);
@@ -200,11 +208,11 @@ inline void start(Effect effect,const V3& position,std::int32_t piece=-1) noexce
     Emitter e;e.effect=effect;e.position=e.previous=position;e.piece=piece;e.alive=true;s.emitters.push_back(e);
 }
 
-inline void emitOne(State& s,Emitter& e,const Definition& d,float distance) noexcept {
+inline void emitOne(State& s,Emitter& e,const Definition& d,float distance,std::int32_t effect=-1) noexcept {
     if(s.particles.size()>=maxParticles){++s.dropped;return;}
     const auto* g=d.group>=0&&std::size_t(d.group)<s.atlas.groups.size()?&s.atlas.groups[std::size_t(d.group)]:nullptr;
     if(!g||g->last<g->first)return;
-    Particle p;p.effect=e.effect;++e.counter;
+    Particle p;p.effect=effect>=0?static_cast<std::uint8_t>(effect):e.effect;++e.counter;
     const float rx=unit(s),ry=unit(s),rz=unit(s);
     p.position=e.position;p.size=d.size;p.growth=d.grows?d.growth:0.f;p.life=d.life;
     const std::int32_t frames=g->last-g->first+1;
@@ -233,6 +241,9 @@ inline void emitOne(State& s,Emitter& e,const Definition& d,float distance) noex
         if(d.maxSize>d.minSize&&d.minSize>0.f)p.size=lerp(d.minSize,d.maxSize,unit(s));
         (void)distance;break;}
     }
+    // 19C520..19C528: an ember drops its fire at its previous point with the
+    // constant zero velocity 434F50.
+    if(e.ballistic&&d.kind==Kind::fire){p.position=e.previous;p.velocity={0.f,0.f,0.f};}
     p.age=d.ageAtBirth*p.life;
     p.mirrorX=d.mirrorX&&unit(s)>.5f;p.mirrorY=d.mirrorY&&unit(s)>.5f;
     s.particles.push_back(p);++s.spawned;
@@ -246,6 +257,37 @@ inline void step(float dt) noexcept {
     for(auto& e:s.emitters){
         if(!e.alive)continue;
         const auto& d=s.definitions[e.effect];
+        if(e.ballistic){
+            // 19BF74..19BFF4: alive while 340 <= 344 (age within its life),
+            // then Stop84 and virtual18.
+            if(!(e.age<=e.life)){e.alive=false;continue;}
+            e.age+=dt;
+            // 19C01C..19C098: 40 = 30, 30 += 60*dt, then 60.y -= 96.6f*dt.
+            const float fall=std::bit_cast<float>(0x42c13334u)*dt;
+            e.previous=e.position;
+            for(unsigned k=0;k<3;++k)e.position[k]+=e.velocity[k]*dt;
+            e.velocity[1]-=fall;
+            e.carry+=d.rate*dt;const float fires=std::floor(e.carry);e.carry-=fires;
+            for(std::int32_t n=0;n<std::int32_t(fires);++n)emitOne(s,e,d,0.f);
+            // 19C0A8..19C188: the smoke child takes the ember's previous point
+            // through three filters of time constant 0.005 s (gain
+            // min(dt,0.005)/0.005, i.e. 1 at the world step), then 15ACB0.
+            const auto& smoke=s.definitions[emberSmoke];
+            if(smoke.parsed){
+                const float gain=std::min(dt,.005f)/.005f;
+                e.smokePrevious=e.smokePosition;
+                for(unsigned k=0;k<3;++k)e.smokePosition[k]+=gain*(e.previous[k]-e.smokePosition[k]);
+                const float dx=e.smokePosition[0]-e.smokePrevious[0],dy=e.smokePosition[1]-e.smokePrevious[1],
+                    dz=e.smokePosition[2]-e.smokePrevious[2];
+                float rate=smoke.rate+(dt>0.f?std::sqrt(dx*dx+dy*dy+dz*dz)/dt*smoke.particlesToDistance:0.f);
+                if(smoke.maxEmitRate>0.f)rate=std::clamp(rate,smoke.minEmitRate,smoke.maxEmitRate);
+                e.smokeCarry+=rate*dt;const float puffs=std::floor(e.smokeCarry);e.smokeCarry-=puffs;
+                Emitter child=e;child.ballistic=false;child.effect=emberSmoke;
+                child.position=e.smokePosition;child.previous=e.smokePrevious;
+                for(std::int32_t n=0;n<std::int32_t(puffs);++n)emitOne(s,child,smoke,0.f);
+            }
+            continue;
+        }
         e.previous=e.position;bool moving=true;
         if(e.piece>=0){
             if(std::size_t(e.piece)>=pieces.size()||pieces[std::size_t(e.piece)].retired){e.alive=false;continue;}
@@ -300,7 +342,24 @@ inline void step(float dt) noexcept {
 inline void destroyed(std::size_t slot,bool explode,const V3& body,const V3& explosion) noexcept {
     auto& s=state();if(!s.cold)return;
     if(explode){
-        start(wreckExplosion,body);start(wreckSparks,body);start(emberFire,explosion);start(emberSmoke,explosion);
+        start(wreckExplosion,body);start(wreckSparks,body);
+        // 818[0..9] (2263A4..2263EC): entries whose 370 > 0.4 launch from 270
+        // (19C780): 60 = 360 * 117.333f (80 mph), 360 = (2r-1, r, 2r-1) drawn
+        // at construction (19BE48..19BED8), 370 = r (19CC24), life 344 =
+        // lerp(MinDeathTime, MaxDeathTime, r) (19C834..19C854).
+        const auto& fire=s.definitions[emberFire];
+        if(fire.parsed)for(unsigned i=0;i<10;++i){
+            const float dx=2.f*unit(s)-1.f,dy=unit(s),dz=2.f*unit(s)-1.f,gate=unit(s);
+            if(!(gate>.4f))continue;
+            if(s.emitters.size()>=maxEmitters){++s.dropped;continue;}
+            const float speed=std::bit_cast<float>(0x42eaaa65u);
+            const float maximum=fire.maxDeathTime>0.f?fire.maxDeathTime:fire.deathTime;
+            Emitter e;e.effect=emberFire;e.alive=true;e.ballistic=true;
+            e.position=e.previous=e.smokePosition=e.smokePrevious=explosion;
+            e.velocity={dx*speed,dy*speed,dz*speed};
+            e.life=lerp(fire.deathTime,maximum,unit(s));
+            s.emitters.push_back(e);++s.embersLaunched;
+        }
     }
     const auto& cold=native_wreck_debris50PD::cold();
     const auto& pieces=native_wreck_debris50PD::sim().pieces;

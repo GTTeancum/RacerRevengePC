@@ -1348,8 +1348,36 @@ bool VehicleWindowGl50DS::Storage::applyPodMaterial(const Material& material, bo
         return check("bind explicit vehicle material blend and UV policy");
     }
 
-bool VehicleWindowGl50DS::Storage::drawSpecularSpan50LA(std::uint8_t bank, U slot, U archetype, U component,
-        U ordinal, const assets::SceneSpan48D& span) noexcept {
+bool VehicleWindowGl50DS::Storage::specularSpanAlphaAdmitted50LA(U slot, U archetype, U component, U ordinal,
+        const assets::SceneSpan48D& span) const noexcept {
+        const auto selected = racerView(archetype);
+        if (slot > frameOpponentCount) return false;
+        const auto& owner = slot ? frameOpponentBatches[slot - 1] : framePlayerBatch;
+        if (component >= owner.componentCount) return false;
+        const auto& part = owner.component[component];
+        if (part.skin) {
+            // Selected source colour: alpha = round(ambient lane 3) when no
+            // light carries alpha; otherwise the cold template alpha decides.
+            const bool sourceSelected = part.skin->sourceColors && part.sourceColorMaterialModes50LA &&
+                span.material_index < part.sourceColorMaterialCount50LA &&
+                part.sourceColorMaterialModes50LA[span.material_index] == 1;
+            if (sourceSelected) {
+                const auto& rows = part.skin->colorRows;
+                return rows[0][3] == 0.f && rows[1][3] == 0.f && rows[2][3] == 0.f &&
+                    rows[3][3] >= 0.f && rows[3][3] <= 64.f;
+            }
+            return selected.skin50LA && ordinal < game::maxVehicleDrawSpans50CM &&
+                selected.skin50LA[component].templateAlphaAdmitted[ordinal] != 0;
+        }
+        if (!part.vertices || span.vertex_start > part.vertexCount ||
+            span.vertex_count > part.vertexCount - span.vertex_start) return false;
+        for (U v = span.vertex_start; v < span.vertex_start + span.vertex_count; ++v)
+            if (part.vertices[v].color[3] > 64) return false;
+        return true;
+    }
+
+bool VehicleWindowGl50DS::Storage::drawSpecularSpanRoute50LA(std::uint8_t bank, U slot, U archetype, U component,
+        U ordinal, const assets::SceneSpan48D& span, int route) noexcept {
         const auto selected = racerView(archetype);
         const Material* material = selected.materials ?
             &selected.materials[selected.materialOffsets[component] + span.material_index] : nullptr;
@@ -1425,34 +1453,19 @@ bool VehicleWindowGl50DS::Storage::drawSpecularSpan50LA(std::uint8_t bank, U slo
         // up to 127, which source MODULATE guarantees when every span vertex
         // alpha is at most 64 (texture alpha 255 -> 127). Any other span keeps
         // the byte-exact route rather than saturate.
-        const auto spanAlphaAdmitted = [&]() noexcept {
-            if (slot > frameOpponentCount) return false;
-            const auto& owner = slot ? frameOpponentBatches[slot - 1] : framePlayerBatch;
-            if (component >= owner.componentCount) return false;
-            const auto& part = owner.component[component];
-            if (part.skin) {
-                // Selected source colour: alpha = round(ambient lane 3) when no
-                // light carries alpha; otherwise the cold template alpha decides.
-                const bool sourceSelected = part.skin->sourceColors && part.sourceColorMaterialModes50LA &&
-                    span.material_index < part.sourceColorMaterialCount50LA &&
-                    part.sourceColorMaterialModes50LA[span.material_index] == 1;
-                if (sourceSelected) {
-                    const auto& rows = part.skin->colorRows;
-                    return rows[0][3] == 0.f && rows[1][3] == 0.f && rows[2][3] == 0.f &&
-                        rows[3][3] >= 0.f && rows[3][3] <= 64.f;
-                }
-                return selected.skin50LA && ordinal < game::maxVehicleDrawSpans50CM &&
-                    selected.skin50LA[component].templateAlphaAdmitted[ordinal] != 0;
-            }
-            if (!part.vertices || span.vertex_start > part.vertexCount ||
-                span.vertex_count > part.vertexCount - span.vertex_start) return false;
-            for (U v = span.vertex_start; v < span.vertex_start + span.vertex_count; ++v)
-                if (part.vertices[v].color[3] > 64) return false;
-            return true;
-        };
-        const bool fixedBlend = drawSecond && !coverageDemand && fixedSpecularBlend50LA &&
-            gl.blendFuncSeparate && spanAlphaAdmitted();
-        if (drawSecond && !coverageDemand && fixedSpecularBlend50LA && !fixedBlend) ++coveragePairExactFallbackSpans;
+        // Under AA1 coverage the bridge rasterizes this map 2 single-sample
+        // (pixel-center coverage, every covered sample composed, per-sample
+        // depth against the center depth). With MULTISAMPLE disabled the
+        // fixed-function draw has that same coverage and depth rule, and the
+        // GPU blend is per sample. Route 1/2 force one route (test A/B only).
+        const bool fixedAdmitted = drawSecond && fixedSpecularBlend50LA && gl.blendFuncSeparate &&
+            specularSpanAlphaAdmitted50LA(slot, archetype, component, ordinal, span);
+        const bool fixedBlend = route == 1 ? false : route == 2 ? fixedAdmitted :
+            fixedAdmitted && (!coverageDemand || coverageFixedSpecular50LA);
+        if (route == 2 && !fixedBlend)
+            return fail(*diagnostic, VehicleWindowError50DS::assets, "forced fixed pair route not admitted");
+        if (drawSecond && fixedSpecularBlend50LA && !fixedAdmitted) ++coveragePairExactFallbackSpans;
+        if (fixedBlend && coverageDemand) ++coveragePairFixedSpans;
         if (fixedBlend) {
             gl.uniform1i(u.sourcePairFixedBlend50LA, 1);
             gl.blendEquation(0x8006); // FUNC_ADD
@@ -1465,6 +1478,9 @@ bool VehicleWindowGl50DS::Storage::drawSpecularSpan50LA(std::uint8_t bank, U slo
                 gl.depthMask(1);
                 drawGl.drawElementsBaseVertex(0x0004, static_cast<I>(group.indexCount), 0x1405,
                     reinterpret_cast<const void*>(std::uintptr_t(group.indexStart) * sizeof(U)), 0);
+                // Same point as the bridge's first-setup: AA0 sample policy and
+                // no sRGB before the first map 2; later bases inherit it.
+                if (coverageDemand && g == first) { coverageAa0(); gl.disable(0x8DB9); }
                 gl.bindTexture(texture2D, material->specularName50LA);
                 gl.uniform1i(u.sourcePairPass50LA, 2);
                 if (!sameFog)
@@ -1586,6 +1602,13 @@ bool VehicleWindowGl50DS::Storage::drawSpecularSpan50LA(std::uint8_t bank, U slo
         gl.uniform1i(u.sourceSingleAlphaTest50LA,0); gl.depthMask(1);
         const bool restored = check("restore state after original body source pair");
         return accepted && restored;
+    }
+
+bool VehicleWindowGl50DS::Storage::drawSpecularSpan50LA(std::uint8_t bank, U slot, U archetype, U component,
+        U ordinal, const assets::SceneSpan48D& span) noexcept {
+        if (pairCompare.enabled && coverageDemand && pairCompareEligible(slot, archetype, component, ordinal, span))
+            return pairCompareSpan(bank, slot, archetype, component, ordinal, span);
+        return drawSpecularSpanRoute50LA(bank, slot, archetype, component, ordinal, span, 0);
     }
 
 bool VehicleWindowGl50DS::Storage::drawSpan50LA(void* context, game::VehicleDrawComponent50CM component,
@@ -1834,7 +1857,11 @@ std::uint32_t VehicleWindowGl50DS::racerGpuSkinMask50LA(std::uint32_t archetype)
         if (!initialized()) return 0;
         const auto& s = *storage_;
         // Archetype 0 is the player pod; RR_CPU_POD_VERTICES=1 disables every pod.
-        if (s.cpuPodVertices50LA || archetype > s.racerArchetypeCount || s.coverageDemand || !s.fixedSpecularBlend50LA ||
+        // AA1 coverage: with the fixed-function map 2 admitted, no paired span
+        // needs CPU positions; any span the alpha rule still refuses keeps
+        // the bridge with a full (uncertain) region, which is exact, only slower.
+        if (s.cpuPodVertices50LA || archetype > s.racerArchetypeCount ||
+            (s.coverageDemand && !s.coverageFixedSpecular50LA) || !s.fixedSpecularBlend50LA ||
             !s.gl.blendFuncSeparate || !s.gl.uniform4fv || !s.gl.uniform3fv || !s.gl.uniform2fv) return 0;
         const auto selected = s.racerView(archetype);
         if (!selected.skin50LA) return 0;
@@ -2210,8 +2237,9 @@ bool VehicleWindowGl50DS::Storage::commit(void* context, std::uint8_t bank) noex
                 static_cast<unsigned long long>(s.coveragePairBreakCap),
                 static_cast<unsigned long long>(s.coveragePairBreakEnd));
         if(s.request.enableGameplayDisplayWallTiming)
-            std::fprintf(stderr,"native_fixed_specular enabled=%u exact_fallback_spans=%llu\n",
-                s.fixedSpecularBlend50LA?1u:0u,static_cast<unsigned long long>(s.coveragePairExactFallbackSpans));
+            std::fprintf(stderr,"native_fixed_specular enabled=%u exact_fallback_spans=%llu coverage_fixed=%u coverage_fixed_spans=%llu\n",
+                s.fixedSpecularBlend50LA?1u:0u,static_cast<unsigned long long>(s.coveragePairExactFallbackSpans),
+                s.coverageFixedSpecular50LA?1u:0u,static_cast<unsigned long long>(s.coveragePairFixedSpans));
         // Cable/HUD failure still aborts the unpublished combined frame.
         s.resetPodState();
         if (!s.drawCables(s.frameCables, s.cableTextureName)) return false;

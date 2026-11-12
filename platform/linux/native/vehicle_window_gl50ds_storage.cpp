@@ -848,6 +848,15 @@ bool VehicleWindowGl50DS::Storage::loadFunctions() noexcept {
         {
             const char* exact = std::getenv("RR_EXACT_PS2_SPECULAR");
             fixedSpecularBlend50LA = !(exact && exact[0] == '1' && !exact[1]);
+            // Test-only: under AA1 coverage the fixed-function map 2 is NOT
+            // byte-identical to the per-sample bridge (pair_route_compare:
+            // 1-LSB rounding and edge-sample coverage). The bridge stays the
+            // route; RR_COVERAGE_PAIR_FIXED=1 selects the fixed blend (and GPU
+            // pod skinning) only for measurement.
+            const char* fixedCoverage = std::getenv("RR_COVERAGE_PAIR_FIXED");
+            coverageFixedSpecular50LA = fixedCoverage && fixedCoverage[0] == '1' && !fixedCoverage[1];
+            const char* compare = std::getenv("RR_TEST_PAIR_ROUTE_COMPARE");
+            pairCompare.enabled = compare && compare[0] == '1' && !compare[1];
             const char* finish = std::getenv("RR_GPU_FINISH_EACH_FRAME");
             finishEachGameplayFrame = finish && finish[0] == '1' && !finish[1];
             const char* cpuPods = std::getenv("RR_CPU_POD_VERTICES");

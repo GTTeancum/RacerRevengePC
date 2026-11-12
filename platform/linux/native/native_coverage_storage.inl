@@ -17,6 +17,32 @@
     void classifyUnprovenPair(U slot,U component,U firstA,U firstB) noexcept;
     // Paired spans that kept the exact feedback route because a vertex alpha exceeded 64.
     std::uint64_t coveragePairExactFallbackSpans=0;
+    // Paired map-2 spans drawn by the fixed-function blend under coverage.
+    std::uint64_t coveragePairFixedSpans=0;
+    // Under coverage, admitted paired spans take the fixed-function map-2
+    // blend with MULTISAMPLE off (as the bridge payload is AA0). RR_COVERAGE_PAIR_BRIDGE=1
+    // keeps every paired span on the per-sample bridge (before/after A/B).
+    bool coverageFixedSpecular50LA=true;
+    // Test-only A/B pixel proof (RR_TEST_PAIR_ROUTE_COMPARE=1): one admitted
+    // paired span every few frames is drawn by the per-sample bridge and again
+    // by the fixed-function route from the same restored four-sample colour
+    // and depth. The two results are compared per sample on the GPU, the
+    // one-byte-per-pixel verdict is read into host memory and only counts are
+    // logged. No image is written anywhere; the live frame keeps the fixed result.
+    struct PairRouteCompare {
+        bool enabled=false,failed=false;
+        U colorPre=0,depthPre=0,colorBridge=0,colorFixed=0;
+        U resultTexture=0,resultFramebuffer=0,program=0,vertex=0,fragment=0;
+        I width=0,height=0;
+        std::vector<std::uint8_t> host; // exactly width*height*4, owned here
+        std::uint64_t frame=0,eligibleThisFrame=0,eligibleLastFrame=0;
+        std::uint64_t compared=0,mismatchedPixels=0,touchedPixels=0,mismatchedSamples=0,maxDelta=0;
+    } pairCompare;
+    bool pairCompareEligible(U slot,U archetype,U component,U ordinal,const assets::SceneSpan48D& span) noexcept;
+    bool pairCompareResources() noexcept;
+    bool pairCompareTexture(U& name,U format) noexcept;
+    bool pairCompareSpan(std::uint8_t bank,U slot,U archetype,U component,U ordinal,const assets::SceneSpan48D& span) noexcept;
+    bool pairCompareEvaluate(std::uint8_t bank,U slot,U component,U ordinal) noexcept;
     struct CoverageExtent {
         U scene[2]{}, color[2]{}, depth[2]{};
         U snapshot=0, snapshotColor=0, raster=0, payload=0, rasterDepth=0;

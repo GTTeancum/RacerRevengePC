@@ -23,6 +23,58 @@ bool sameSpan(const OriginalUiMaterialSpan50KG& expected,const OriginalUiSpan50K
         b.sampler.s==n.sampler.s&&b.sampler.t==n.sampler.t&&b.sourceFogEnabled==n.sourceFogEnabled&&
         b.sourceAlphaTestGreaterZero==n.sourceAlphaTestGreaterZero&&b.sourcePacketStq==n.sourcePacketStq;
 }
+bool sameFolded(const char* a,const std::string& b)noexcept {
+    if(!a)return false;std::size_t i=0;
+    for(;a[i]&&i<b.size();++i){
+        const auto fold=[](unsigned char c){return c>='A'&&c<='Z'?static_cast<unsigned char>(c+('a'-'A')):c;};
+        if(fold(static_cast<unsigned char>(a[i]))!=fold(static_cast<unsigned char>(b[i])))return false;
+    }
+    return !a[i]&&i==b.size();
+}
+// 29B638 handle==-1 -> 2475C0 one-map owner of a Garage selected-pod MODEL row
+// (26E7D4 association DefaultMT3833E8; only 26E.PSG: 26_3). The original model
+// path never reads a PSM document: 24B1A0 reads pass+18/+20/+21/+1A, 249610 the
+// texture resource, and 249BA0 compares pass+18/1A/1C/1E/1F/20/21 and the +30
+// packet. The authored-bytes proof is therefore replaced, for this owner only,
+// by its actual constructed pass plus the UIPODTEX image the policy recorded.
+// Read-only: every value is observed through existing const views.
+bool garageSelectedPodFallback2475C0(const assets::OriginalStandardMaterialObject50LA& material,
+    const assets::OriginalStandardMaterialPassView50LA& view,std::int16_t textureToken,
+    const assets::OriginalStandardTextureResource50LA* texture,
+    const assets::OriginalUiGarageModelMaterials50KG& policy,const assets::OriginalUiMaterialPass50KG& authored,
+    const assets::OriginalUiMemberView50KG& image)noexcept {
+    const auto* pod=assets::originalUiArchiveIdentity50KG(assets::OriginalUiArchiveId50KG::podTextures);
+    const auto& p=authored.provenance;
+    // Policy side: exactly the pass readOriginalUiGarageSelectedPodFallbackMaterial50KG built.
+    if(policy.kind()!=assets::OriginalUiGarageMaterialKind50KG::selected19E||!pod||
+       authored.identity||authored.pass!=1||authored.textureCount!=1||authored.textureCoordinateIndex!=0||
+       authored.enabled!=1||p.origin!=assets::OriginalUiMaterialOrigin50KG::authoredPsm||
+       p.creationPC!=0x2475C0u||p.archive!=pod||!p.fallbackTexture||!p.fallbackTexture->name||
+       !authored.authored.values.empty()||!authored.authored.name.empty()||
+       !authored.inheritedTemplate||!authored.inheritedTemplate->name||
+       std::strcmp(authored.inheritedTemplate->name,"AppStart\\DefaultMT.psm")!=0)
+        return false;
+    // Representative side: constructed with no source, by none of the screen
+    // fallbacks, under its DefaultMT association, as ONE pass with ONE map.
+    const auto* name=material.name00();const auto* count=material.passCount48();
+    if(!material.constructed29B550()||material.source()||material.tournamentFallbackProvenance()||
+       material.speedBoostFallbackProvenance()||material.damageFallbackProvenance()||
+       material.pauseBackdropFallbackProvenance()||!name||!sameFolded(name->c_str(),p.attemptedPsmMember)||
+       !count||*count!=1||!view.constructionTemplate||
+       view.constructionTemplate->identity!=authored.inheritedTemplate||
+       !view.mapCount20||*view.mapCount20!=1||!view.flags21||*view.flags21!=2u||
+       !view.uv1E||(*view.uv1E)[0]||(*view.uv1E)[1]||!view.texture1A||(*view.texture1A)[0]<0||
+       (*view.texture1A)[1]!=-1||(*view.texture1A)[0]!=textureToken||
+       (view.parameterMask24&&*view.parameterMask24)||(view.parameterCount28&&*view.parameterCount28)||
+       view.parameters34||view.animation10||view.textureAnimation10||
+       !view.state30||view.state30->contextCount()!=1u)
+        return false;
+    // Image side: the bound texture IS the UIPODTEX member recorded at 2475C0.
+    // authenticateImage already proved its bytes equal this bank member.
+    const auto* member=texture?texture->sourceMember():nullptr;
+    return texture&&member&&sameFolded(p.fallbackTexture->name,*member)&&
+        image.identity==p.fallbackTexture&&image.data&&image.size==p.fallbackTexture->bytes;
+}
 }
 OriginalUiGarageCanonicalSubmission50KG::~OriginalUiGarageCanonicalSubmission50KG(){
     if(sharedHistory_){const auto keep=sharedHistory_;keep->cancelGarage(*this,pending_||attempted_);}
@@ -136,12 +188,20 @@ bool OriginalUiGarageCanonicalSubmission50KG::stageModelPass(std::shared_ptr<con
         const auto repPass=static_cast<std::uint32_t>(map.representative.pass);
         const auto* authored=policy->pass(repSlot,repPass);
         const auto archive=policy->archive();const auto* source=map.representative.material->source();
-        const auto* original=source?source->originalBytes():nullptr;
-        const auto member=archive&&authored&&authored->source.identity?archive->find(authored->source.identity->name):assets::OriginalUiMemberView50KG{};
         assets::OriginalStandardMaterialPassView50LA view;
-        if(!authored||!member.identity||member.identity!=authored->source.identity||!original||
-           original->size()!=member.size||!member.data||std::memcmp(original->data(),member.data,member.size)!=0||
-           !map.representative.material->pass4C(repPass,view)||!view.constructionTemplate||
+        if(source){
+            const auto* original=source->originalBytes();
+            const auto member=archive&&authored&&authored->source.identity?archive->find(authored->source.identity->name):assets::OriginalUiMemberView50KG{};
+            if(!authored||!member.identity||member.identity!=authored->source.identity||!original||
+               original->size()!=member.size||!member.data||std::memcmp(original->data(),member.data,member.size)!=0)
+                return reject(d,S::reference,0x249BA0);
+        }else if(!authored||!map.representative.material->pass4C(repPass,view)||
+            !garageSelectedPodFallback2475C0(*map.representative.material,view,map.textureToken,map.texture,
+                *policy,authored->source,bank_->sourceMember(binding.textureIndex))){
+            d.field="actual Garage selected-pod 2475C0 DefaultMT owner";
+            return reject(d,S::reference,0x2475C0);
+        }
+        if(!map.representative.material->pass4C(repPass,view)||!view.constructionTemplate||
            view.constructionTemplate->identity!=authored->source.inheritedTemplate||!view.uv1E||
            (*view.uv1E)[0]!=authored->source.textureCoordinateIndex||!view.flags21||
            bool(*view.flags21&2u)!=bool(authored->source.enabled)||

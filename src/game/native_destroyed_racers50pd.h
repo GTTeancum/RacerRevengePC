@@ -38,10 +38,11 @@ inline bool nativeRacerDestroyed50PD(std::size_t slot) noexcept {
     return slot<nativeDestroyedRacers50PD.size()&&nativeDestroyedRacers50PD[slot].destroyed;
 }
 
-// Unattended test only: RR_TEST_DESTROY="slot@seconds[:attacker][,...]"
+// Unattended test only: RR_TEST_DESTROY="slot@seconds[:attacker][:w][,...]"
 // sets the racer's canonical B9D bit0 once the race clock passes the time,
-// which makes 225C50 select the original 2261B0 explode handler.
-struct NativeTestDestroy50PD { int slot=-1; double seconds=0; bool fired=false; int attacker=-1; };
+// which makes 225C50 select the original 2261B0 explode handler. ":w"
+// instead dispatches 225C50's 225D9C site (slot 8C, 226750 wreck in place).
+struct NativeTestDestroy50PD { int slot=-1; double seconds=0; bool fired=false; int attacker=-1; bool wreck=false; };
 inline std::array<NativeTestDestroy50PD,8> nativeTestDestroys50PD=[]{
     std::array<NativeTestDestroy50PD,8> out{};
     const char* v=std::getenv("RR_TEST_DESTROY");
@@ -49,14 +50,16 @@ inline std::array<NativeTestDestroy50PD,8> nativeTestDestroys50PD=[]{
     std::string text(v);std::size_t at=0,used=0;
     while(at<text.size()&&used<out.size()){
         const auto comma=text.find(',',at);
-        const auto item=text.substr(at,comma==std::string::npos?std::string::npos:comma-at);
+        auto item=text.substr(at,comma==std::string::npos?std::string::npos:comma-at);
+        const auto wreckTag=item.find(":w");const bool wreck=wreckTag!=std::string::npos;
+        if(wreck)item.erase(wreckTag,2);
         const auto split=item.find('@');
         if(split!=std::string::npos){
             const int slot=std::atoi(item.substr(0,split).c_str());
             const auto colon=item.find(':',split);
             const double seconds=std::atof(item.substr(split+1,colon==std::string::npos?std::string::npos:colon-split-1).c_str());
             const int attacker=colon==std::string::npos?-1:std::atoi(item.substr(colon+1).c_str());
-            if(slot>=0&&slot<8&&seconds>=0&&attacker<8&&attacker!=slot)out[used++]={slot,seconds,false,attacker};
+            if(slot>=0&&slot<8&&seconds>=0&&attacker<8&&attacker!=slot)out[used++]={slot,seconds,false,attacker,wreck};
         }
         if(comma==std::string::npos)break;
         at=comma+1;
@@ -65,6 +68,7 @@ inline std::array<NativeTestDestroy50PD,8> nativeTestDestroys50PD=[]{
 }();
 // Set by the race loop for the slot whose test time has passed this tick.
 inline std::array<bool,8> nativeTestDestroyPending50PD{};
+inline std::array<bool,8> nativeTestDestroyWreck50PD{};
 // Optional attacker per pending slot (-1 none): the hook then also writes the
 // victim's D30 marker and D2C=2.0 as 22A37C..22A3B4 do for a racer hit.
 inline std::array<int,8> nativeTestDestroyAttacker50PD{-1,-1,-1,-1,-1,-1,-1,-1};

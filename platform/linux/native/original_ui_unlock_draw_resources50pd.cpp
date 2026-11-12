@@ -44,7 +44,15 @@ bool registry(const assets::OriginalUiMemberView50KG& t,std::vector<OriginalUiUn
         const auto start=cursor;while(cursor<t.size&&!delim(t.data[cursor]))++cursor;
         for(std::size_t i=0;i<b.size();++i){auto& row=b[i];if(row.registeredName.size()!=cursor-start)continue;
             std::size_t j=0;for(;j<row.registeredName.size()&&fold(char(t.data[start+j]))==fold(row.registeredName[j]);++j){}
-            if(j!=row.registeredName.size())continue;if(found[i])return false;
+            if(j!=row.registeredName.size())continue;
+            if(found[i]){
+                // 298C80 returns the FIRST matching token. Admit only the two
+                // authenticated later occurrences (same rule as the Rider row
+                // owner): Mars Guo's 08c_3 (pod 8) and Watto's pod_wndw (pod 25).
+                // The first token stays; nothing else is accepted.
+                const bool mars=same(row.registeredName,"ui/textures/08c_3")&&row.registryToken==2386&&token==2387&&start==55274;
+                const bool window=same(row.registeredName,"ui/textures/pod_wndw")&&row.registryToken==2490&&token==3221&&start==70650;
+                if(!mars&&!window)return false;continue;}
             found[i]=true;row.registryToken=token;row.registryIdentity=t.identity;}
         ++token;
     }

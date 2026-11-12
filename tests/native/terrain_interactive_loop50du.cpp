@@ -380,6 +380,7 @@ void Context::run() {
         race.raceSeconds>=test.seconds){
       test.fired=true;rr::game::nativeTestDestroyPending50PD[static_cast<std::size_t>(test.slot)]=true;
       rr::game::nativeTestDestroyAttacker50PD[static_cast<std::size_t>(test.slot)]=test.attacker;
+      rr::game::nativeTestDestroyWreck50PD[static_cast<std::size_t>(test.slot)]=test.wreck;
       std::cerr<<"test_destroy due slot="<<test.slot<<" race_seconds="<<race.raceSeconds<<'\n';
      }
    }
@@ -1590,6 +1591,16 @@ void Context::run() {
              if(sourceCameraSession->willUseFollowPose())
               require50DU(racerBank.visit(0,[&](){return refreshAnimatedCandidates();}),
                  "Follow actual animated collision refresh failed");
+             // 177AB0 cuts to 22DC90 on the destroy frame itself: the human's
+             // debris (spawned inside this tick's racer prefix) is handed to
+             // the death camera before this camera child, so no hold frame runs.
+             if(rr::game::nativeRacerDestroyed50PD(0)&&!native_wreck_debris50PD::cameraViewBound(0)){
+              const auto& identity=sourceCameraSession->deathIdentity();
+              const bool bound=native_wreck_debris50PD::bindCameraView(0,identity.sessionGeneration,identity.racerKey);
+              if(bound)native_wreck_debris50PD::updateCameraView();
+              std::cerr<<"death_camera_debris bound="<<bound<<" pieces="<<native_wreck_debris50PD::cameraView().count
+                  <<" collections="<<native_wreck_debris50PD::cameraView().view.count370<<" at=camera_child frame="<<frame<<'\n';
+             }
              const auto cameraChild=sourceCameraSession->advanceCameraChild(frame,sourceCamera::Cut::afterAllRacerPrefixes);
              if(cameraChild.status!=sourceCamera::Status::framePublished){
               const auto progress=sourceCameraSession->nativeStartProgress();
@@ -1760,6 +1771,11 @@ void Context::run() {
      }
      native_wreck_debris50PD::updateCameraView();
      native_wreck_effects50PD::step(.016f);
+     {const auto& fx=native_wreck_effects50PD::state();std::size_t embers=0;float low=1e30f,high=-1e30f,reach=0.f;
+      for(const auto& e:fx.emitters)if(e.alive&&e.ballistic){++embers;low=std::min(low,e.position[1]);high=std::max(high,e.position[1]);
+       reach=std::max(reach,std::hypot(e.velocity[0],e.velocity[2]));}
+      if(embers&&fx.steps%15==1)std::cerr<<"wreck_embers step="<<fx.steps<<" alive="<<embers<<" y="<<low<<".."<<high
+          <<" max_horizontal_speed="<<reach<<" launched_total="<<fx.embersLaunched<<'\n';}
      {const auto& debris=native_wreck_debris50PD::sim();
       if(!debris.pieces.empty()&&debris.steps%125==1){std::size_t settled=0;float lowest=1e30f,highest=-1e30f;
        for(const auto& p:debris.pieces){settled+=p.settled;lowest=std::min(lowest,p.position.y);highest=std::max(highest,p.position.y);}

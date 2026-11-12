@@ -14,7 +14,9 @@ namespace rr::platform {
 #include "vehicle_window_gl50ds_local_flare.inl"
 bool VehicleWindowGl50DS::Storage::hasCoverageResources() const noexcept {
         return coverageLive.owns()||coverageSpare.owns()||coverageProgram||
-            coverageVertex||coverageFragment||coverageArray;
+            coverageVertex||coverageFragment||coverageArray||pairCompare.colorPre||pairCompare.depthPre||
+            pairCompare.colorBridge||pairCompare.colorFixed||pairCompare.resultTexture||
+            pairCompare.resultFramebuffer||pairCompare.program||pairCompare.vertex||pairCompare.fragment;
     }
 
 bool VehicleWindowGl50DS::Storage::checkCoverageSupport(I major,I minor) noexcept {
@@ -70,7 +72,12 @@ bool VehicleWindowGl50DS::Storage::deleteCoverageExtent(CoverageExtent& e,Vehicl
 bool VehicleWindowGl50DS::Storage::deleteCoverageResources(VehicleWindowDiagnostic50DS& d) noexcept {
         return deleteCoverageExtent(coverageSpare,d)&&deleteCoverageExtent(coverageLive,d)&&
             deleteShaderName(coverageProgram,true,d)&&deleteShaderName(coverageVertex,false,d)&&
-            deleteShaderName(coverageFragment,false,d)&&deleteName(coverageArray,gl.deleteVertexArrays,d);
+            deleteShaderName(coverageFragment,false,d)&&deleteName(coverageArray,gl.deleteVertexArrays,d)&&
+            deleteName(pairCompare.colorPre,gl.deleteTextures,d)&&deleteName(pairCompare.depthPre,gl.deleteTextures,d)&&
+            deleteName(pairCompare.colorBridge,gl.deleteTextures,d)&&deleteName(pairCompare.colorFixed,gl.deleteTextures,d)&&
+            deleteName(pairCompare.resultTexture,gl.deleteTextures,d)&&deleteName(pairCompare.resultFramebuffer,gl.deleteFramebuffers,d)&&
+            deleteShaderName(pairCompare.program,true,d)&&deleteShaderName(pairCompare.vertex,false,d)&&
+            deleteShaderName(pairCompare.fragment,false,d);
     }
 
 bool VehicleWindowGl50DS::Storage::coverageTextureStorage(U& name,U format,I w,I h,bool multi,U attachment) noexcept {
@@ -145,6 +152,8 @@ bool VehicleWindowGl50DS::Storage::createCoverageExtent(CoverageExtent& e) noexc
 
 bool VehicleWindowGl50DS::Storage::prepareCoverageExtent() noexcept {
         if(!coverageDemand)return true;
+        if(pairCompare.enabled){pairCompare.eligibleLastFrame=pairCompare.eligibleThisFrame;
+            pairCompare.eligibleThisFrame=0;++pairCompare.frame;}
         // Called before backend submission, never from a draw callback. The
         // spare set retains partial allocations or failed retirements for retry.
         if(!deleteCoverageExtent(coverageSpare,*diagnostic))return false;
@@ -159,6 +168,259 @@ bool VehicleWindowGl50DS::Storage::prepareCoverageExtent() noexcept {
         std::swap(coverageLive,coverageSpare);
         // Published single-sample banks are independent of both extent sets.
         return deleteCoverageExtent(coverageSpare,*diagnostic);
+    }
+
+// ---- Test-only pair-route A/B proof (RR_TEST_PAIR_ROUTE_COMPARE=1) ----
+// Only private compare names are written: four 4-sample images, one
+// single-sample verdict image and one host vector sized exactly
+// width*height*4 for that verdict. The live scene receives the fixed
+// result, which is what the normal route would have drawn.
+bool VehicleWindowGl50DS::Storage::pairCompareEligible(U slot,U archetype,U component,U ordinal,
+        const assets::SceneSpan48D& span) noexcept {
+        auto& c=pairCompare;
+        if(c.failed||!gl.blitFramebuffer||!gl.readPixels||!coverageArray)return false;
+        if(component<1||component>sourceBodyCount50LA||slot>frameOpponentCount)return false;
+        const auto selected=racerView(archetype);
+        if(!selected.materials||!selected.resources||!sourceBodyComponent50LA(component,selected.resources->componentCount))return false;
+        const auto& material=selected.materials[selected.materialOffsets[component]+span.material_index];
+        if(!material.policy.sourceSpecularPair50LA)return false;
+        if(selected.specular[component-1].singleDiffuse&&!frameDiffuseSelected50LA[slot][component-1])return false;
+        if(!frameSpecularSecond50LA[slot][component-1]||!fixedSpecularBlend50LA||!gl.blendFuncSeparate)return false;
+        if(!specularSpanAlphaAdmitted50LA(slot,archetype,component,ordinal,span))return false;
+        // One sampled span every eighth frame, rotating through last
+        // frame's admitted spans so every pod/component/span is visited.
+        constexpr std::uint64_t interval=8;
+        const auto index=c.eligibleThisFrame++;
+        if(c.frame%interval)return false;
+        const auto population=c.eligibleLastFrame?c.eligibleLastFrame:1;
+        return index==(c.frame/interval)%population;
+    }
+
+bool VehicleWindowGl50DS::Storage::pairCompareTexture(U& name,U format) noexcept {
+        gl.genTextures(1,&name);
+        if(!check("allocate pair compare image name")||!name)return false;
+        gl.activeTexture(textureUnit0);gl.bindTexture(coverageTexture,name);
+        gl.texImage2DMultisample(coverageTexture,4,format,width,height,1);
+        gl.bindTexture(coverageTexture,0);
+        return check("allocate pair compare four-sample image");
+    }
+
+bool VehicleWindowGl50DS::Storage::pairCompareResources() noexcept {
+        auto& c=pairCompare;
+        if(c.program&&c.resultFramebuffer&&c.width==width&&c.height==height&&
+           coverageLive.width==width&&coverageLive.height==height)return true;
+        if(coverageLive.width!=width||coverageLive.height!=height||width<=0||height<=0)return false;
+        auto& d=*diagnostic;
+        if(!deleteName(c.colorPre,gl.deleteTextures,d)||!deleteName(c.depthPre,gl.deleteTextures,d)||
+           !deleteName(c.colorBridge,gl.deleteTextures,d)||!deleteName(c.colorFixed,gl.deleteTextures,d)||
+           !deleteName(c.resultTexture,gl.deleteTextures,d)||!deleteName(c.resultFramebuffer,gl.deleteFramebuffers,d))return false;
+        c.width=c.height=0;
+        if(!c.program){
+            constexpr const char* vertex=R"GLSL(#version 400 core
+void main(){
+    vec2 p=vec2((gl_VertexID<<1)&2,gl_VertexID&2);
+    gl_Position=vec4(p*2.0-1.0,0.0,1.0);
+}
+)GLSL";
+            constexpr const char* fragment=R"GLSL(#version 400 core
+uniform sampler2DMS bridgeImage;
+uniform sampler2DMS fixedImage;
+uniform sampler2DMS priorImage;
+uniform int probe;
+out vec4 verdict;
+void main(){
+    ivec2 p=ivec2(gl_FragCoord.xy);
+    // probe 1..3: report sample 0 of bridge/fixed/prior unchanged.
+    if(probe==1){verdict=texelFetch(bridgeImage,p,0);return;}
+    if(probe==2){verdict=texelFetch(fixedImage,p,0);return;}
+    if(probe==3){verdict=texelFetch(priorImage,p,0);return;}
+    float differ=0.0,alphaDiffer=0.0,bridged=0.0,fixedChanged=0.0,delta=0.0;
+    for(int s=0;s<4;++s){
+        vec4 a=floor(texelFetch(bridgeImage,p,s)*255.0+0.5);
+        vec4 b=floor(texelFetch(fixedImage,p,s)*255.0+0.5);
+        vec4 c=floor(texelFetch(priorImage,p,s)*255.0+0.5);
+        // Colour must match byte for byte. Stored alpha is counted apart:
+        // the fixed route keeps destination alpha at byte/128 for its blend.
+        if(any(notEqual(a.rgb,b.rgb)))differ+=1.0;
+        if(a.a!=b.a)alphaDiffer+=1.0;
+        if(any(notEqual(a,c)))bridged+=1.0;
+        if(any(notEqual(b,c)))fixedChanged+=1.0;
+        vec3 e=abs(a.rgb-b.rgb);delta=max(delta,max(e.r,max(e.g,e.b)));
+    }
+    verdict=vec4(differ,bridged+16.0*fixedChanged,delta,alphaDiffer)/255.0;
+}
+)GLSL";
+            if(!compileTrackShader(0x8B31,vertex,c.vertex)||!compileTrackShader(0x8B30,fragment,c.fragment))return false;
+            c.program=shaderGl.createProgram();
+            if(!check("allocate pair compare program")||!c.program)return false;
+            shaderGl.attachShader(c.program,c.vertex);shaderGl.attachShader(c.program,c.fragment);
+            shaderGl.bindFragDataLocation(c.program,0,"verdict");shaderGl.linkProgram(c.program);
+            I linked=0;shaderGl.getProgramiv(c.program,0x8B82,&linked);
+            if(!check("link pair compare program")||!linked)return false;
+            const I bridge=shaderGl.getUniformLocation(c.program,"bridgeImage");
+            const I fixed=shaderGl.getUniformLocation(c.program,"fixedImage");
+            const I prior=shaderGl.getUniformLocation(c.program,"priorImage");
+            if(!check("locate pair compare inputs")||bridge<0||fixed<0||prior<0)return false;
+            gl.useProgram(c.program);gl.uniform1i(bridge,0);gl.uniform1i(fixed,1);gl.uniform1i(prior,2);
+            if(!check("initialize pair compare samplers"))return false;
+        }
+        if(!pairCompareTexture(c.colorPre,rgba8)||!pairCompareTexture(c.depthPre,depth24)||
+           !pairCompareTexture(c.colorBridge,rgba8)||!pairCompareTexture(c.colorFixed,rgba8))return false;
+        gl.genTextures(1,&c.resultTexture);
+        if(!check("allocate pair compare verdict name")||!c.resultTexture)return false;
+        gl.activeTexture(textureUnit0);gl.bindTexture(texture2D,c.resultTexture);
+        gl.texParameteri(texture2D,0x2801,0x2600);gl.texParameteri(texture2D,0x2800,0x2600);
+        gl.texParameteri(texture2D,0x813C,0);gl.texParameteri(texture2D,0x813D,0);
+        drawGl.bindBuffer(0x88EC,0);
+        gl.texImage2D(texture2D,0,static_cast<I>(rgba8),width,height,0,rgba,unsignedByte,nullptr);
+        gl.bindTexture(texture2D,0);
+        if(!check("allocate pair compare verdict image"))return false;
+        gl.genFramebuffers(1,&c.resultFramebuffer);
+        if(!check("allocate pair compare framebuffer name")||!c.resultFramebuffer)return false;
+        gl.bindFramebuffer(framebuffer,c.resultFramebuffer);
+        gl.framebufferTexture2D(framebuffer,colorAttachment,texture2D,c.resultTexture,0);
+        gl.drawBuffer(colorAttachment);gl.readBuffer(colorAttachment);
+        const U status=gl.checkFramebufferStatus(framebuffer);
+        if(!check("verify pair compare framebuffer")||status!=framebufferComplete)return false;
+        try{c.host.assign(std::size_t(width)*std::size_t(height)*4u,0);}catch(...){return false;}
+        c.width=width;c.height=height;
+        return true;
+    }
+
+bool VehicleWindowGl50DS::Storage::pairCompareSpan(std::uint8_t bank,U slot,U archetype,U component,U ordinal,
+        const assets::SceneSpan48D& span) noexcept {
+        auto& c=pairCompare;
+        // Retain every binding/capability this proof touches; restore it
+        // exactly before each source draw and after the verdict.
+        struct Saved{I draw=0,read=0,program=0,array=0,active=0,pack=0,unpack=0,alignment=4;I viewport[4]{};
+            I caps[7]{};I images[3]{};I flat=0;I samplers[3]{};} saved;
+        constexpr U caps[7]={0x0BE2,0x0B71,0x0C11,0x0B90,0x0B44,0x809D,0x8DB9};
+        const auto retain=[&]() noexcept {
+            gl.getIntegerv(0x8CA6,&saved.draw);gl.getIntegerv(0x8CAA,&saved.read);
+            gl.getIntegerv(0x8B8D,&saved.program);gl.getIntegerv(0x85B5,&saved.array);
+            gl.getIntegerv(0x84E0,&saved.active);gl.getIntegerv(0x88ED,&saved.pack);
+            gl.getIntegerv(0x88EF,&saved.unpack);
+            gl.getIntegerv(0x0D05,&saved.alignment);gl.getIntegerv(0x0BA2,saved.viewport);
+            for(U i=0;i<7;++i)gl.getIntegerv(caps[i],&saved.caps[i]);
+            for(U i=0;i<3;++i){gl.activeTexture(textureUnit0+i);gl.getIntegerv(0x9104,&saved.images[i]);
+                if(i==0)gl.getIntegerv(0x8069,&saved.flat);
+                if(gl.bindSampler)gl.getIntegerv(0x8919,&saved.samplers[i]);}
+            gl.activeTexture(static_cast<U>(saved.active));
+            return check("retain state for pair compare");
+        };
+        const auto restore=[&]() noexcept {
+            for(U i=0;i<3;++i){gl.activeTexture(textureUnit0+i);gl.bindTexture(coverageTexture,static_cast<U>(saved.images[i]));
+                if(i==0)gl.bindTexture(texture2D,static_cast<U>(saved.flat));
+                if(gl.bindSampler)gl.bindSampler(i,static_cast<U>(saved.samplers[i]));}
+            gl.activeTexture(static_cast<U>(saved.active));
+            gl.bindFramebuffer(drawFramebuffer,static_cast<U>(saved.draw));gl.bindFramebuffer(readFramebuffer,static_cast<U>(saved.read));
+            gl.useProgram(static_cast<U>(saved.program));drawGl.bindVertexArray(static_cast<U>(saved.array));
+            drawGl.bindBuffer(pixelPackBuffer,static_cast<U>(saved.pack));drawGl.bindBuffer(0x88EC,static_cast<U>(saved.unpack));
+            gl.pixelStorei(0x0D05,saved.alignment);
+            gl.viewport(saved.viewport[0],saved.viewport[1],saved.viewport[2],saved.viewport[3]);
+            for(U i=0;i<7;++i){if(saved.caps[i])gl.enable(caps[i]);else gl.disable(caps[i]);}
+            return check("restore state after pair compare");
+        };
+        // The private compare framebuffer is re-pointed at one owned image
+        // set at a time; every blit is a same-size, same-format four-sample
+        // copy (the bridge's own GL4.0 transfer), with scissor/sRGB off.
+        const U scene=coverageLive.scene[bank];
+        const auto attach=[&](U color,U depth) noexcept {
+            gl.bindFramebuffer(framebuffer,c.resultFramebuffer);
+            gl.framebufferTexture2D(framebuffer,colorAttachment,coverageTexture,color,0);
+            gl.framebufferTexture2D(framebuffer,depthAttachment,coverageTexture,depth,0);
+        };
+        const auto blit=[&](U from,U to,U bits) noexcept {
+            gl.bindFramebuffer(readFramebuffer,from);gl.bindFramebuffer(drawFramebuffer,to);
+            gl.blitFramebuffer(0,0,width,height,0,0,width,height,bits,0x2600);
+        };
+        constexpr U colorBits=0x4000,depthBits=0x0100;
+        if(!retain())return false;
+        const bool ready=pairCompareResources()&&scene;
+        if(!restore())return false;
+        if(!ready){
+            c.failed=true;
+            std::fprintf(stderr,"pair_route_compare unavailable width=%d height=%d\n",width,height);
+            return drawSpecularSpanRoute50LA(bank,slot,archetype,component,ordinal,span,0);
+        }
+        gl.disable(0x0C11);gl.disable(0x8DB9);
+        attach(c.colorPre,c.depthPre);blit(scene,c.resultFramebuffer,colorBits|depthBits);
+        if(!check("retain destination before pair compare")||!restore())return false;
+        // The route drawn last is the live one: the normal choice for this span.
+        const int live=coverageFixedSpecular50LA?2:1,first=3-live;
+        if(!drawSpecularSpanRoute50LA(bank,slot,archetype,component,ordinal,span,first))return false;
+        gl.disable(0x0C11);gl.disable(0x8DB9);
+        attach(first==1?c.colorBridge:c.colorFixed,c.depthPre);blit(scene,c.resultFramebuffer,colorBits);
+        attach(c.colorPre,c.depthPre);blit(c.resultFramebuffer,scene,colorBits|depthBits);
+        if(!check("restore destination between pair routes")||!restore())return false;
+        if(!drawSpecularSpanRoute50LA(bank,slot,archetype,component,ordinal,span,live))return false;
+        // Retain the state the live route left, compare, then put it back.
+        if(!retain())return false;
+        gl.disable(0x0C11);gl.disable(0x8DB9);
+        attach(live==2?c.colorFixed:c.colorBridge,c.depthPre);blit(scene,c.resultFramebuffer,colorBits);
+        const bool copied=check("retain live pair result");
+        const bool evaluated=copied&&pairCompareEvaluate(bank,slot,component,ordinal);
+        const bool restored=restore();
+        return evaluated&&restored;
+    }
+
+bool VehicleWindowGl50DS::Storage::pairCompareEvaluate(std::uint8_t,U slot,U component,U ordinal) noexcept {
+        auto& c=pairCompare;
+        gl.bindFramebuffer(framebuffer,c.resultFramebuffer);
+        gl.framebufferTexture2D(framebuffer,depthAttachment,coverageTexture,0,0);
+        gl.framebufferTexture2D(framebuffer,colorAttachment,texture2D,c.resultTexture,0);
+        gl.viewport(0,0,width,height);
+        constexpr U off[7]={0x0BE2,0x0B71,0x0C11,0x0B90,0x0B44,0x809D,0x8DB9};
+        for(const U cap:off)gl.disable(cap);
+        gl.useProgram(c.program);drawGl.bindVertexArray(coverageArray);
+        const U images[3]={c.colorBridge,c.colorFixed,c.colorPre};
+        for(U i=0;i<3;++i){gl.activeTexture(textureUnit0+i);if(gl.bindSampler)gl.bindSampler(i,0);
+            gl.bindTexture(coverageTexture,images[i]);}
+        const I probe=shaderGl.getUniformLocation(c.program,"probe");
+        if(probe>=0)gl.uniform1i(probe,0);
+        if(!check("bind pair compare inputs"))return false;
+        gl.drawArrays(0x0004,0,3);
+        drawGl.bindBuffer(pixelPackBuffer,0);gl.pixelStorei(0x0D05,4);
+        const std::size_t bytes=std::size_t(width)*std::size_t(height)*4u;
+        if(c.host.size()!=bytes||c.width!=width||c.height!=height)return false;
+        gl.readPixels(0,0,width,height,rgba,unsignedByte,c.host.data());
+        if(!check("read pair compare verdict"))return false;
+        std::uint64_t touched=0,mismatched=0,samples=0,bridged=0,fixedChanged=0,alphaOnly=0;unsigned delta=0;
+        std::size_t firstMismatch=0;
+        for(std::size_t i=0;i<bytes;i+=4){
+            const auto differ=c.host[i],touch=c.host[i+1],d=c.host[i+2];
+            if(touch)++touched;
+            if(touch&15u)++bridged;
+            if(touch>>4)++fixedChanged;
+            if(differ){if(!mismatched)firstMismatch=i/4;++mismatched;samples+=differ;}
+            else if(c.host[i+3])++alphaOnly;
+            if(d>delta)delta=d;
+        }
+        // First differing pixel: sample 0 of bridge, fixed and prior, read
+        // one pixel at a time into a fixed local array.
+        unsigned char values[3][4]{};
+        if(mismatched&&probe>=0){
+            const I x=static_cast<I>(firstMismatch%std::size_t(width)),y=static_cast<I>(firstMismatch/std::size_t(width));
+            for(I m=1;m<=3;++m){gl.uniform1i(probe,m);gl.drawArrays(0x0004,0,3);
+                gl.readPixels(x,y,1,1,rgba,unsignedByte,values[m-1]);}
+            gl.uniform1i(probe,0);
+            if(!check("read pair compare probe"))return false;
+            std::fprintf(stderr,"pair_route_compare_probe x=%d y=%d bridge=%u,%u,%u,%u fixed=%u,%u,%u,%u prior=%u,%u,%u,%u\n",x,y,
+                values[0][0],values[0][1],values[0][2],values[0][3],values[1][0],values[1][1],values[1][2],values[1][3],
+                values[2][0],values[2][1],values[2][2],values[2][3]);
+        }
+        ++c.compared;c.touchedPixels+=touched;c.mismatchedPixels+=mismatched;c.mismatchedSamples+=samples;
+        if(delta>c.maxDelta)c.maxDelta=delta;
+        std::fprintf(stderr,"pair_route_compare n=%llu frame=%llu slot=%u component=%u span=%u touched_pixels=%llu "
+            "bridge_changed=%llu fixed_changed=%llu alpha_only_pixels=%llu "
+            "rgb_mismatched_pixels=%llu rgb_mismatched_samples=%llu rgb_max_delta=%u total_touched=%llu total_rgb_mismatched=%llu total_rgb_max_delta=%llu\n",
+            static_cast<unsigned long long>(c.compared),static_cast<unsigned long long>(c.frame),slot,component,ordinal,
+            static_cast<unsigned long long>(touched),static_cast<unsigned long long>(bridged),
+            static_cast<unsigned long long>(fixedChanged),static_cast<unsigned long long>(alphaOnly),
+            static_cast<unsigned long long>(mismatched),
+            static_cast<unsigned long long>(samples),delta,static_cast<unsigned long long>(c.touchedPixels),
+            static_cast<unsigned long long>(c.mismatchedPixels),static_cast<unsigned long long>(c.maxDelta));
+        return true;
     }
 
 bool VehicleWindowGl50DS::Storage::createCoverageProgram() noexcept {

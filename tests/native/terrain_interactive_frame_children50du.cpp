@@ -64,7 +64,15 @@ bool Context::advanceChildren(std::size_t actualRacerSlot,float preparedOuterFac
   s.fields.flagB9D0=true;
   const int attacker=rr::game::nativeTestDestroyAttacker50PD[actualRacerSlot];
   if(attacker>=0){poseHistory.markerD30=static_cast<std::uint32_t>(attacker);poseHistory.timerD2C=0x40000000u;}
-  std::cerr<<"test_destroy armed slot="<<actualRacerSlot<<" frame="<<completedFrames<<'\n';
+  std::cerr<<"test_destroy armed slot="<<actualRacerSlot<<" frame="<<completedFrames
+      <<" wreck="<<rr::game::nativeTestDestroyWreck50PD[actualRacerSlot]<<'\n';
+  if(rr::game::nativeTestDestroyWreck50PD[actualRacerSlot]&&originalAiEnabled){
+   // Test-only: the 225D9C dispatch of 225C50 (slot 8C, 226750) in place of
+   // the B9D explode bit; no damage word is written.
+   rr::game::nativeTestDestroyWreck50PD[actualRacerSlot]=false;s.fields.flagB9D0=false;
+   const ImpactTransitionResult50C forced{ImpactTransitionStatus50C::unsupportedTransition,0x225d9cu,0x8cu,0x226750u};
+   return commitOriginalDestroyed(actualRacerSlot,forced,preparedOuterFactor);
+  }
  }
  if(audioEnabled&&!sourceAiAudio&&!opponentFrame&&!raceSetupFrame)require50DU(advanceSpeechTimers50HG(.016f,lapContinuity.prefix,speechState),
      "native speech countdown failed");
@@ -824,7 +832,8 @@ bool Context::commitOriginalDestroyed(std::size_t actualRacerSlot,
  // 226750's in-place activation (22C6A0) has no launch tail.
  {const auto node=static_cast<std::uint32_t>(x.bindings.animation.bodyScene288);
   const auto spawned=native_wreck_debris50PD::spawn(actualRacerSlot,explode,s.nodes[node].world100.v,
-      main.components.root.body.velocity.v,main.components.root.body.angularVelocity.v,s.noiseOwner().sharedRandomState);
+      main.components.root.body.velocity.v,main.components.root.body.angularVelocity.v,
+      main.components.root.worldAngularVelocityA0.v,main.components.root.body.position.v,s.noiseOwner().sharedRandomState);
   {const auto& d=native_wreck_debris50PD::sim();
    std::cerr<<"debris_spawn slot="<<actualRacerSlot<<" pieces="<<spawned<<" explode="<<explode
        <<" track_floor="<<d.floor<<" track_ceiling="<<d.ceiling<<" mesh_candidates="<<d.meshCandidates
@@ -839,6 +848,7 @@ bool Context::commitOriginalDestroyed(std::size_t actualRacerSlot,
       {record.explosion270[0],record.explosion270[1],record.explosion270[2]});
   const auto& effects=native_wreck_effects50PD::state();
   std::cerr<<"wreck_effects_start slot="<<actualRacerSlot<<" emitters="<<effects.emitters.size()
+      <<" embers_launched="<<effects.embersLaunched
       <<" ready="<<effects.cold<<'\n';}
  // 225EC8..226034 kill credit: a dispatched handler, D30 != -1 and 188FB0
  // (profile,1)==0, i.e. two-player game34==2 or the one-hit option 10FE0==0.

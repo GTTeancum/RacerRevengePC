@@ -881,6 +881,13 @@ bool uiCoverageDisjointTraced=false;
         const game::original_racer_lighting50KM::LightMatrices* selectedLights = nullptr) noexcept;
     bool drawSpecularSpan50LA(std::uint8_t bank, U slot, U archetype, U component,
         U ordinal, const assets::SceneSpan48D& span) noexcept;
+    // route: 0 = the normal choice, 1 = force the per-sample bridge, 2 = force
+    // the fixed-function blend (test-only A/B proof; refused when not admitted).
+    bool drawSpecularSpanRoute50LA(std::uint8_t bank, U slot, U archetype, U component,
+        U ordinal, const assets::SceneSpan48D& span, int route) noexcept;
+    // Every vertex alpha of this paired span keeps destination alpha <= 127.
+    bool specularSpanAlphaAdmitted50LA(U slot, U archetype, U component, U ordinal,
+        const assets::SceneSpan48D& span) const noexcept;
     static bool drawSpan50LA(void* context, game::VehicleDrawComponent50CM component,
         U ordinal, const assets::SceneSpan48D& span, I baseVertex) noexcept;
     bool uploadRacer(std::uint8_t bank, const game::VehicleDrawBatch50CO& batch,

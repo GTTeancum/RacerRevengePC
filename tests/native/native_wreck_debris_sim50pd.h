@@ -139,9 +139,12 @@ inline void tunePiece(LivePiece& live,const Piece& piece,const rr::game::Origina
 }
 
 // Spawns every loaded piece of the racer. bodyWorld is the pod's body288 world
-// matrix; velocity/angular are its rigid-body velocities. Returns pieces spawned.
+// matrix; velocity/angular are its rigid-body velocities (340+70/+B0),
+// worldAngularA0/bodyPosition its 340+A0 world rate and body position.
+// Returns pieces spawned.
 inline std::size_t spawn(std::size_t slot,bool explode,const float* bodyWorld,
-    const float* velocity,const float* angular,std::uint32_t& sharedRaw) {
+    const float* velocity,const float* angular,const float* worldAngularA0,const float* bodyPosition,
+    std::uint32_t& sharedRaw) {
     auto& c=cold();if(slot>=c.racers.size())return 0;
     auto& s=sim();summarizeTrack(s);
     const auto& racer=c.racers[slot];
@@ -165,7 +168,16 @@ inline std::size_t spawn(std::size_t slot,bool explode,const float* bodyWorld,
             live.velocity=Vec{velocity[0],velocity[1],velocity[2]}+Vec{lx,ly,lz}*velocityScale;
             live.angular=Vec{angular[0],angular[1],angular[2]}+jitterAngular;
         }else{
-            live.velocity=Vec{velocity[0],velocity[1],velocity[2]};
+            // 226750 (226A70..226BAC): rigid-body point velocity at the piece,
+            // 70 + (A0 x r) with r = piece - body position; rate = 340+B0.
+            // Native: the source writes this to each collection's FIRST piece
+            // and the rest ride its group until break-off (2CA480/2CA620, not
+            // simulated); every piece takes its own point velocity here, which
+            // is what a rigid group carries before it breaks.
+            const Vec r{live.position.x-bodyPosition[0],live.position.y-bodyPosition[1],live.position.z-bodyPosition[2]};
+            const Vec w{worldAngularA0[0],worldAngularA0[1],worldAngularA0[2]};
+            const Vec spin{w.y*r.z-w.z*r.y,w.z*r.x-w.x*r.z,w.x*r.y-w.y*r.x};
+            live.velocity=Vec{velocity[0],velocity[1],velocity[2]}+spin;
             live.angular=Vec{angular[0],angular[1],angular[2]};
         }
         if(s.pieces.size()>=maxLivePieces)break;
