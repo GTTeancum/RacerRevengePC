@@ -1425,6 +1425,11 @@ SessionExit50DU Context::run() {
  if(!isMbTrack&&!isTcTrack&&!isRcTrack&&!isTbTrack&&!isGbTrack&&!isMcTrack)legacyGround.audit=J{};
  std::span<Type2StaticCandidate49X> candidates=isMcTrack?mcWorldBorrow->candidateStorage():isGbTrack?gbWorldBorrow->candidateStorage():isTbTrack?tbWorldBorrow->candidateStorage():isRcTrack?rcWorldBorrow->candidateStorage():isTcTrack?tcWorldBorrow->candidateStorage():isMbTrack?mbCollisionWorld->candidateStorage():std::span<Type2StaticCandidate49X>(preparedCandidates);
  native_wreck_debris50PD::sim().track=candidates; // debris segment collision (borrowed for the race)
+ // F5 wreck E0 detectors use the same static-query type tags and 3E0728/
+ // 3E0718/3E0720 masks as the live pod query (one-time filter allocation).
+ native_wreck_debris50PD::f5::bindWorld(query.collisionTypeTag,query.groupTypeTag,query.skipMask,query.dynamicMask,query.materialMask);
+ std::cerr<<"debris_f5_world type="<<unsigned(query.collisionTypeTag)<<" group="<<unsigned(query.groupTypeTag)
+     <<" skip="<<query.skipMask<<" dynamic="<<query.dynamicMask<<" material="<<query.materialMask<<" candidates="<<candidates.size()<<'\n';
  std::span<const track_runtime_storage50IG::Binding> trackBindings=isMcTrack?mcWorldBorrow->bindingStorage():isGbTrack?gbWorldBorrow->bindingStorage():isTbTrack?tbWorldBorrow->bindingStorage():isRcTrack?rcWorldBorrow->bindingStorage():isTcTrack?tcWorldBorrow->bindingStorage():isMbTrack?mbCollisionWorld->bindingStorage():std::span<const track_runtime_storage50IG::Binding>(preparedBindings);
  coldLoadDiagnostics.begin("track_storage");
  // Cold, immovable, count-derived storage. Candidate order and every borrowed

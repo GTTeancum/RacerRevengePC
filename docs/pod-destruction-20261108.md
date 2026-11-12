@@ -283,6 +283,32 @@ moves and piece smoke continues at its minimum rate after it settles.
   original DC spring/impulse solver (166E40/2964C0, stage F5, not built); the
   break test's peak impulse counts only impacts faster than the resting
   threshold; group rotational inertia is the mean of the 2CA620 diagonal.
+* Stage F5 (build 128d, `tests/native/native_wreck_group_contact50pd.h`):
+  a group's body now runs the original 2CA840 nonflight solver. Each frame
+  the root's and every attached member's D8 detector runs its own E0 (the
+  piece's m.COL type2 rays) at its pose through the 49X/50CC shape2 query
+  and the 294BB0/2963E0 callback (50 records per DC); each substep (max
+  1/60) applies 167250 forces, the 2964C0 generated-record response of the
+  root DC and then every member DC to the root body (296884 depth, 296F10
+  contact velocity, 297610 impact with restitution 0 and penetration
+  correction 0.005, 297390 friction by `frX` material, [0] = Friction),
+  keeps the per-axis largest |1C0| in the primary's C0 and integrates with
+  167C40; then 166C60 movement and 167640 settling on the root DC.3C. The
+  break test reads the member's own DC.3C and the primary C0, and the kick
+  uses the root's local B0, its 167250 speed and current inverse mass.
+  2CA620 now sets the full diagonal inertia through the 14E910 inverse.
+  Measured (RC, wreck in place): resting contact leaves C0 at about
+  0.02-0.8 ft/s, i.e. a 0.01-1.6 % break chance per frame at rest.
+  Stand-ins (flagged in code): candidate order is the track storage order
+  pre-selected by sphere gap (not the zone SearchList walk), groups/triggers
+  are not dispatched, 166C60's E8 ray is the native segment query (with the E8 PHYSICSBODY/WATER exclusion), debris
+  water is not modelled, the getters' exact rounding is not reproduced, and
+  a group without a usable E0 (none seen) falls back to the old native probe.
+  Free and released pieces still use the native box probe.
+* Limp input (128d): the human's 217DE0 controls now receive the racer's own
+  state40, so in the 227370/227A40 limp steering is halved and biased, the
+  B7C/B80 actions are skipped (no drive) and the dual-stick brake is off, as
+  218336..2187F0 do. The input reader 1A1A20 has no state gate.
 * Shutdown: a close arriving during a display fade (race-start fade-in,
   Results fade-in) cancels the fade before the renderer retirements it
   would otherwise block (the 127d/127t TB and MA terminate at the time limit).

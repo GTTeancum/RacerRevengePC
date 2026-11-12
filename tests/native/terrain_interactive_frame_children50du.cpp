@@ -339,6 +339,11 @@ bool Context::advanceChildren(std::size_t actualRacerSlot,float preparedOuterFac
      s.nodes[static_cast<unsigned>(x.bindings.animation.bodyScene288)].localC0.v+12,12);
  addCounter50DU(navigationCA0Copies);
  PostPlayerAt217DE0_49K post{};post.player=s.bodies.main.controls.player;post.bindingContext.configurationEntryNonzero=x.configurationEntryNonzero;
+ // 217DE0 reads the racer's own state40: in the 227370/227A40 limp (1/2)
+ // steering is halved and biased (218578..2185C4), the B7C/B80 actions are
+ // skipped (218618/218754, both drives 0 at 2187E0) and the dual-stick brake
+ // is disabled (21836C). The human input reader 1A1A20 has no state gate.
+ post.bindingContext.vehicleState40=s.bodies.main.vehicleState40;
  if(s.fields.vehicle58==1u){
   runNative([&]{return bindAiVehicleFrame50IV(s,x.bindings,x.parameters,x.workspace,x.diagnostic);},"original AI native binding");
   if(m.components.bindings.aeroBrakeEC==1.f&&m.controls.player.raw.values[0]!=0.f)
