@@ -362,17 +362,18 @@ inline void destroyed(std::size_t slot,bool explode,const V3& body,const V3& exp
         }
     }
     const auto& cold=native_wreck_debris50PD::cold();
-    const auto& pieces=native_wreck_debris50PD::sim().pieces;
+    auto& pieces=native_wreck_debris50PD::sim().pieces;
     if(slot>=cold.racers.size())return;
     const auto& racer=cold.racers[slot];
     std::array<bool,16> groupStarted{};
     for(std::size_t i=0;i<pieces.size();++i){
-        const auto& p=pieces[i];if(p.racer!=slot||p.index>=racer.pieces.size())continue;
+        auto& p=pieces[i];if(p.racer!=slot||p.index>=racer.pieces.size()||p.effectsStarted)continue;
         const auto& piece=racer.pieces[p.index];const V3 at{p.position.x,p.position.y,p.position.z};
         if(explode&&piece.collection<groupStarted.size()&&!groupStarted[piece.collection]){
             groupStarted[piece.collection]=true;start(groupSparks,at);start(groupExplosion,at);
         }
         if(piece.emitSmoke){start(pieceSmoke,at,std::int32_t(i));start(pieceFire,at,std::int32_t(i));}
+        p.effectsStarted=true;
     }
 }
 

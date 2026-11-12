@@ -75,6 +75,7 @@ struct LivePiece {
     float radius=1.f,mass=1.f,inertia=1.f,drag=0.f,rateDamping=0.f,contactTime=0.f;
     std::uint32_t contacts=0,lastContactStep=0;
     bool settled=false,retired=false;
+    bool effectsStarted=false; // piece smoke/fire already started (limp pieces)
 };
 struct Sim {
     std::vector<LivePiece> pieces;
@@ -88,6 +89,9 @@ struct Sim {
     bool summarized=false;
     float floor=0.f,ceiling=0.f;
     std::uint32_t meshCandidates=0,callbackCandidates=0,compoundCandidates=0,otherCandidates=0;
+    // Per racer: [Wreckage] collections already activated by 227370/227A40
+    // (flags29 bit0). 2261B0 (22659C..) and 226750 (2269CC..) skip them.
+    std::array<std::uint32_t,8> activeCollections{};
 };
 inline Sim& sim() noexcept { static Sim owner; return owner; }
 // Capacity is reserved at race activation: frames never allocate.
@@ -97,6 +101,7 @@ inline void resetSim() {
     resetCameraView();
     auto& s=sim();s.pieces.clear();s.pieces.reserve(maxLivePieces);
     s.steps=0;s.contacts=0;s.queries=0;s.invalid=0;s.capacity=0;s.unsupported=0;s.retired=0;s.summarized=false;
+    s.activeCollections={};
 }
 // Lowest/highest point any static mesh candidate's bounding sphere reaches.
 inline void summarizeTrack(Sim& s) noexcept {
@@ -144,7 +149,8 @@ inline void tunePiece(LivePiece& live,const Piece& piece,const rr::game::Origina
 // Returns pieces spawned.
 inline std::size_t spawn(std::size_t slot,bool explode,const float* bodyWorld,
     const float* velocity,const float* angular,const float* worldAngularA0,const float* bodyPosition,
-    std::uint32_t& sharedRaw) {
+    std::uint32_t& sharedRaw,const float* cockpitVelocity=nullptr,const float* cockpitAngular=nullptr,
+    std::size_t* skippedActive=nullptr) {
     auto& c=cold();if(slot>=c.racers.size())return 0;
     auto& s=sim();summarizeTrack(s);
     const auto& racer=c.racers[slot];
@@ -154,6 +160,8 @@ inline std::size_t spawn(std::size_t slot,bool explode,const float* bodyWorld,
     std::size_t spawned=0;
     for(std::size_t i=0;i<racer.pieces.size();++i){
         const auto& piece=racer.pieces[i];
+        if(slot<s.activeCollections.size()&&piece.collection<32u&&((s.activeCollections[slot]>>piece.collection)&1u)){
+            if(skippedActive)++*skippedActive;continue;}
         LivePiece live;live.racer=slot;live.index=i;live.orientation=orientation;
         const auto& a=piece.authored50;
         const Vec offset{a[0]*bodyWorld[0]+a[1]*bodyWorld[4]+a[2]*bodyWorld[8],
@@ -179,9 +187,62 @@ inline std::size_t spawn(std::size_t slot,bool explode,const float* bodyWorld,
             const Vec spin{w.y*r.z-w.z*r.y,w.z*r.x-w.x*r.z,w.x*r.y-w.y*r.x};
             live.velocity=Vec{velocity[0],velocity[1],velocity[2]}+spin;
             live.angular=Vec{angular[0],angular[1],angular[2]};
+            // 226AD8..226B34: after a limp (states1/2) the cockpit collection
+            // 374[0] takes the physical cockpit 35C's own 70/B0 instead.
+            if(cockpitVelocity&&cockpitAngular&&piece.collection==0u){
+                live.velocity=Vec{cockpitVelocity[0],cockpitVelocity[1],cockpitVelocity[2]};
+                live.angular=Vec{cockpitAngular[0],cockpitAngular[1],cockpitAngular[2]};
+            }
         }
         if(s.pieces.size()>=maxLivePieces)break;
         s.pieces.push_back(live);++spawned;
+    }
+    return spawned;
+}
+
+// 227370/227A40 rows 11..20: activate the lost side's collections in place.
+// Per collection (in 374 order: 374[1]+374[3] left, 374[2]+374[4] right):
+// piece 0 takes the lost engine model's world pose (28ADD0/28A090) and the
+// pod's point velocity at that engine, 70 + A0 x (engine - container194),
+// with rate B0 + (0,0, sign*7.0*u) from ONE shared 308030 draw (227684).
+// Native: the collection's other pieces stand at their authored places with
+// the same point velocity until the group break-off simulation exists.
+struct LimpCollection { std::size_t collection=0; const float* engineWorld=nullptr; float sign=1.f; };
+inline std::size_t spawnLimp(std::size_t slot,const LimpCollection* list,std::size_t count,const float* bodyWorld,
+    const float* velocity,const float* angular,const float* worldAngularA0,const float* container,
+    std::uint32_t& sharedRaw,std::size_t& firstSpawned) {
+    auto& c=cold();firstSpawned=sim().pieces.size();if(slot>=c.racers.size())return 0;
+    auto& s=sim();summarizeTrack(s);
+    const auto& racer=c.racers[slot];
+    const float kick=std::bit_cast<float>(0x40e00000u);
+    std::size_t spawned=0;
+    for(std::size_t k=0;k<count;++k){
+        const auto& entry=list[k];
+        if(entry.collection>=racer.tuning.size()||entry.collection>4u||!entry.engineWorld)continue;
+        const float u=drawUnit(sharedRaw);volatile float spinZ=entry.sign*kick*u;
+        const Vec origin{entry.engineWorld[12],entry.engineWorld[13],entry.engineWorld[14]};
+        const Vec r{origin.x-container[0],origin.y-container[1],origin.z-container[2]};
+        const Vec w{worldAngularA0[0],worldAngularA0[1],worldAngularA0[2]};
+        const Vec point=Vec{velocity[0],velocity[1],velocity[2]}+Vec{w.y*r.z-w.z*r.y,w.z*r.x-w.x*r.z,w.x*r.y-w.y*r.x};
+        const Vec rate=Vec{angular[0],angular[1],angular[2]}+Vec{0.f,0.f,static_cast<float>(spinZ)};
+        bool first=true;
+        for(std::size_t i=0;i<racer.pieces.size();++i){
+            const auto& piece=racer.pieces[i];if(piece.collection!=entry.collection)continue;
+            if(s.pieces.size()>=maxLivePieces)return spawned;
+            LivePiece live;live.racer=slot;live.index=i;
+            if(first){live.orientation=fromBasis(entry.engineWorld);live.position=origin;}
+            else{
+                live.orientation=fromBasis(bodyWorld);const auto& a=piece.authored50;
+                live.position=Vec{bodyWorld[12]+a[0]*bodyWorld[0]+a[1]*bodyWorld[4]+a[2]*bodyWorld[8],
+                    bodyWorld[13]+a[0]*bodyWorld[1]+a[1]*bodyWorld[5]+a[2]*bodyWorld[9],
+                    bodyWorld[14]+a[0]*bodyWorld[2]+a[1]*bodyWorld[6]+a[2]*bodyWorld[10]};
+            }
+            live.spawn=live.position;
+            tunePiece(live,piece,&racer.tuning[entry.collection]);
+            live.velocity=point;live.angular=first?rate:Vec{angular[0],angular[1],angular[2]};
+            s.pieces.push_back(live);++spawned;first=false;
+        }
+        s.activeCollections[slot]|=1u<<entry.collection;
     }
     return spawned;
 }

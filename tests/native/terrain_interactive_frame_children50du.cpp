@@ -550,7 +550,12 @@ bool Context::advanceChildren(std::size_t actualRacerSlot,float preparedOuterFac
  OptionalProbeOwners50P optionalOwners{}; // Development topology has no optional dust owner.
  OptionalProbeResult50P optional{};
  runNative([&]{return optionalProbeVehicleImpacts50P(s,x.bindings,optionalOwners,optional,x.workspace,x.diagnostic);},"explicit absent optional dust-owner context");runNative([&]{return consumeEffects(optional.events,optional.count);},"consume dust stop controls");ImpactTransitionResult50C decision{};
- const bool damageReady=decideVehicleImpacts50P(s,x.bindings,0x3f800000u,
+ // racer+50 "ExplosiveWreckSpeed": 85 (every pod PHY) x 1.46666 at
+ // 215A28 = 124.6661 ft/s. STAND-IN: the decoded value, not yet read from
+ // this racer's own cold entity field (explosiveWreckSpeed50_), which the
+ // frame cannot reach yet. Used by 225C50 (225CCC..225CEC) and 2289BC.
+ constexpr std::uint32_t wreckSpeed50Bits=0x42f9550bu;
+ const bool damageReady=decideVehicleImpacts50P(s,x.bindings,wreckSpeed50Bits,
      decision,x.workspace,x.diagnostic);
  bool limpContinued=false;
  const auto isLimpEntry=[&](const ImpactTransitionResult50C& d){
@@ -580,7 +585,7 @@ bool Context::advanceChildren(std::size_t actualRacerSlot,float preparedOuterFac
    // completed again at state1/2, where 2288EC no longer runs 225C50.
    require50DU(commitOriginalDestroyed(actualRacerSlot,decision,preparedOuterFactor),"limp entry rejected");
    ImpactTransitionResult50C after{};
-   limpContinued=decideVehicleImpacts50P(s,x.bindings,0x3f800000u,after,x.workspace,x.diagnostic)&&
+   limpContinued=decideVehicleImpacts50P(s,x.bindings,wreckSpeed50Bits,after,x.workspace,x.diagnostic)&&
        after.status==ImpactTransitionStatus50C::noTransition;
    require50DU(limpContinued,"limp entry impact block did not complete at state1/2");
   }else{
@@ -617,7 +622,7 @@ bool Context::advanceChildren(std::size_t actualRacerSlot,float preparedOuterFac
   auto& limp=rr::game::nativeDestroyedRacers50PD[actualRacerSlot];++limp.limpFrames;
   float impact=0.f;std::memcpy(&impact,&s.fields.impactBA0.v[2],4);
   const auto countdown=rr::game::advanceOriginalDetachedDamage50LA(s.bodies.main.vehicleState40,s.fields.vehicle3C,
-      preparedOuterFactor,impact,std::bit_cast<float>(0x3f800000u),limp.limp4C);
+      preparedOuterFactor,impact,std::bit_cast<float>(wreckSpeed50Bits),limp.limp4C);
   const auto& p=s.bodies.main.components.root.body.position;
   std::cerr<<"pod_limp frame="<<limp.limpFrames<<" state40="<<s.bodies.main.vehicleState40<<" t4C="<<limp.limp4C
       <<" ba8="<<impact<<" speed="<<s.bodies.main.cachedSpeed34<<" pos="<<p.v[0]<<','<<p.v[1]<<','<<p.v[2]
@@ -913,6 +918,33 @@ bool Context::commitOriginalDestroyed(std::size_t actualRacerSlot,
        s.bodies.mainSphere.angularVelocityB0W,s.bodies.secondary);         // 22799C..2279BC
    std::cerr<<"pod_limp_joint side="<<(left?"left":"right")<<" hitch="<<hitch.v[0]<<','<<hitch.v[1]<<','<<hitch.v[2]
        <<" engine="<<engine.v[0]<<','<<engine.v[1]<<','<<engine.v[2]<<" length858="<<*length<<'\n';}
+  // Rows 11..20: the lost side's [Wreckage] collections fly off from the
+  // engine models (374[1]/374[3] left, 374[2]/374[4] right; 227D88 negates
+  // the kick for 374[2] only).
+  {const auto& v=x.bindings.visual;const auto& l=x.bindings.lifecycle;
+   const SceneNodeIndex49P models[2]={left?v.left1BC:v.right1B8,left?v.bottomLeft1C4:v.bottomRight1C0};
+   const std::size_t collections[2]={left?1u:2u,left?3u:4u};const float signs[2]={left?1.f:-1.f,1.f};
+   native_wreck_debris50PD::LimpCollection list[2]{};std::size_t count=0;
+   for(unsigned k=0;k<2;++k){const auto n=static_cast<std::int32_t>(models[k]);
+    if(models[k]==SceneNodeIndex49P::none)continue;
+    require50DU(n>=0&&static_cast<std::uint32_t>(n)<s.sceneNodeCount,"limp engine model outside the racer graph");
+    list[count++]={collections[k],s.nodes[static_cast<std::uint32_t>(n)].world100.v,signs[k]};}
+   const auto body=static_cast<std::uint32_t>(x.bindings.animation.bodyScene288);
+   const auto container=static_cast<std::uint32_t>(l.container194);
+   require50DU(body<s.sceneNodeCount&&container<s.sceneNodeCount,"limp body/container node unavailable");
+   std::size_t first=0;
+   const auto spawned=native_wreck_debris50PD::spawnLimp(actualRacerSlot,list,count,s.nodes[body].world100.v,
+       main.components.root.body.velocity.v,main.components.root.body.angularVelocity.v,
+       main.components.root.worldAngularVelocityA0.v,s.nodes[container].world100.v+12,s.noiseOwner().sharedRandomState,first);
+   const auto* w=s.nodes[body].world100.v;
+   native_wreck_effects50PD::destroyed(actualRacerSlot,false,{w[12],w[13],w[14]},{w[12],w[13],w[14]});
+   const auto& live=native_wreck_debris50PD::sim().pieces;
+   std::cerr<<"debris_spawn_limp slot="<<actualRacerSlot<<" collections=0x"<<std::hex
+       <<native_wreck_debris50PD::sim().activeCollections[actualRacerSlot%8u]<<std::dec<<" pieces="<<spawned;
+   for(std::size_t i=first;i<live.size();++i){const auto& q=live[i];
+    std::cerr<<" ["<<q.index<<" at="<<q.position.x<<','<<q.position.y<<','<<q.position.z
+        <<" v="<<q.velocity.x<<','<<q.velocity.y<<','<<q.velocity.z<<" wz="<<q.angular.z<<']';}
+   std::cerr<<'\n';}
   // The suffix runs at limp entry (s1 = 1 after the handler, 225EC8 onward).
   applySuffix();
   std::cerr<<"pod_limp_enter slot="<<actualRacerSlot<<" side="<<(left?"left":"right")<<" state40="<<side
@@ -996,11 +1028,14 @@ bool Context::commitOriginalDestroyed(std::size_t actualRacerSlot,
  // 2265A0..2266C8 (22CA60 per collection, 22CB9C launch draws) for 2261B0;
  // 226750's in-place activation (22C6A0) has no launch tail.
  {const auto node=static_cast<std::uint32_t>(x.bindings.animation.bodyScene288);
+  std::size_t skippedActive=0;
   const auto spawned=native_wreck_debris50PD::spawn(actualRacerSlot,explode,s.nodes[node].world100.v,
       main.components.root.body.velocity.v,main.components.root.body.angularVelocity.v,
-      main.components.root.worldAngularVelocityA0.v,main.components.root.body.position.v,s.noiseOwner().sharedRandomState);
+      main.components.root.worldAngularVelocityA0.v,main.components.root.body.position.v,s.noiseOwner().sharedRandomState,
+      limpEscalation&&!explode?s.bodies.secondary.root.body.velocity.v:nullptr,
+      limpEscalation&&!explode?s.bodies.secondary.root.body.angularVelocity.v:nullptr,&skippedActive);
   {const auto& d=native_wreck_debris50PD::sim();
-   std::cerr<<"debris_spawn slot="<<actualRacerSlot<<" pieces="<<spawned<<" explode="<<explode
+   std::cerr<<"debris_spawn slot="<<actualRacerSlot<<" pieces="<<spawned<<" explode="<<explode<<" skipped_active="<<skippedActive
        <<" track_floor="<<d.floor<<" track_ceiling="<<d.ceiling<<" mesh_candidates="<<d.meshCandidates
        <<" compound="<<d.compoundCandidates<<" callback="<<d.callbackCandidates<<" other="<<d.otherCandidates;}
   const auto& live=native_wreck_debris50PD::sim().pieces;const auto* w=s.nodes[node].world100.v;
