@@ -133,10 +133,26 @@ class Owner final {
         if(!live()||!selectionCurrentForSourceHuman()||std::this_thread::get_id()!=sourceHumansThread_||
            sourceHumansPhase_!=SourceHumansPhase::selected||!sourcePodNamesWritten_||sourcePodMountAttempted_||
            !sourceHumanPlayer_||!sourceSelectedHumanPod_||!sourceHumanDomain_||!archive||!archive->loaded())return false;
-        // Only actual gameplay POD01 has an authenticated input catalog here.
-        // Other selected source IDs are NOT remapped to Garage or POD01.
-        if(*sourceSelectedHumanPod_!=1)return false;
-        const auto* identity=rr::assets::originalUiArchiveIdentity50KG(rr::assets::OriginalUiArchiveId50KG::sourcePod01);
+        // 1AE0A4 mounts whatever pod 1ADFF4 selected, by its formatted path.
+        // The authenticated catalog row is found by that same disc path; a pod
+        // without an authenticated gameplay-archive row is refused, never
+        // remapped to Garage or another pod.
+        const rr::assets::OriginalUiArchiveIdentity50KG* identity=nullptr;
+        for(unsigned ordinal=0;ordinal<256u;++ordinal){
+            const auto* row=rr::assets::originalUiArchiveIdentity50KG(static_cast<rr::assets::OriginalUiArchiveId50KG>(ordinal));
+            if(!row)break;
+            const char* path=row->discPath;std::size_t n=0;bool same=true;
+            for(;path&&path[n]&&n<sourcePodPath_.size();++n){
+                auto a=static_cast<unsigned char>(path[n]),b=static_cast<unsigned char>(sourcePodPath_[n]);
+                if(a=='/')a='\\';if(b=='/')b='\\';
+                if(a>='A'&&a<='Z')a=static_cast<unsigned char>(a+('a'-'A'));
+                if(b>='A'&&b<='Z')b=static_cast<unsigned char>(b+('a'-'A'));
+                if(a!=b){same=false;break;}
+            }
+            if(!path||!same||path[n]||n!=sourcePodPath_.size())continue;
+            if(identity)return false;
+            identity=row;
+        }
         if(!identity||archive->identity()!=identity)return false;
         const auto resolver=sourceHumanDomain_->resolver3E1A70();
         const auto provider=sourceHumanDomain_->archiveProvider3E1A70();

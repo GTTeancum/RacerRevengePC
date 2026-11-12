@@ -17,9 +17,12 @@ models, materials), never in which code runs. The port must do the same.
 - **No per-pod code paths.** All 8 pods (player and AI) load through the same pod load
   (2129C0) and the same wreck-piece chain (165E90). Pod differences come from that pod's
   files (piece counts 7 or 9, PHY values such as the explosive-wreck speed at +50,
-  materials). No fix may be keyed to one pod or one pilot (for example "only the Vader
-  DefaultMT 26_3 substitute"); if one pod exposes a gap, fix the general rule the original
-  uses for every pod.
+  materials). No fix may be keyed to one pod or one pilot (for example the hand-written
+  pod-load exceptions for pods 02, 09, 12, 18, 19, 20, 22 and 25 listed in
+  `D:\Programming\GitHub\RacerRevengePC\work\scratch\branch-inventory\PLAN.md`); if one pod
+  exposes a gap, fix the general rule the original uses for every pod. Where the original
+  itself keys on a racer (for example the AI steering boost for racers 4, 8, 18 and 23),
+  the port does the same.
 - **Human versus AI** differences are allowed only where the original branches on them
   (for example the human manager tail 1AE120, the human-only limp, vibration).
 - **Plans are written once, for all courses and all pods.** A course or pod may be used to

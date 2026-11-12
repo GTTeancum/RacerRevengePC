@@ -622,8 +622,8 @@ void Visual::bindCanonicalEngineModels(const std::array<CanonicalEngineModelInpu
         bool useOriginalBodyColors50LA) {
         namespace s=visual_detail::shared;
         namespace p=rr::platform;
-        s::need(componentCount==3u||(componentCount==5u&&podId=="POD02"),
-            "Canonical optional engine pairs require the actual POD02 five-model family");
+        s::need(componentCount==3u||componentCount==5u,
+            "Canonical optional engine pairs require a three- or five-model family");
         const unsigned engineCount=componentCount==5u?4u:2u;
         for(unsigned engine=0;engine<4;++engine){
             const auto& input=models[engine];
@@ -1100,7 +1100,7 @@ bool Visual::canonicalEngineSourceColors50LA(const g::NativeGcSelectedLightsCand
             static_cast<std::uint32_t>(canonicalLeftBodyColorModes50LA_.size()),&lights};
         next.component[left].prepareSpecular50LA=true;
         if(componentCount==5u){
-            if(podId!="POD02"||!canonicalLowerBound_[0]||!canonicalLowerBound_[1])return false;
+            if(!canonicalLowerBound_[0]||!canonicalLowerBound_[1])return false;
             for(unsigned lower=0;lower<2;++lower){
                 const unsigned component=lower+3u;
                 const auto& modes=canonicalLowerBodyColorModes50LA_[lower];

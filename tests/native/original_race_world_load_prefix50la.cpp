@@ -473,7 +473,7 @@ bool OwnershipBridge::retireNativeRetainedWreckCold(original_camera_session50KX:
     // Never bypass real source memberships; close rejects any attached tail.
     try {if(!session.actual_.bank.visit(0,[&](){return follow_->close();}))return false;}
     catch(...){return false;}
-    if(!backing.retireNativeSourcePrefix(storage_.get()->world))return false;
+    if(!backing.retireNativeSourcePrefixAll(storage_.get()->world))return false;
     if(!backing.retireNativeColdQueries(&storage_.get()->world))return false;
     // Any actual query publications have already passed their concrete source
     // destructor. The untouched later pieces remain cold-only cancellation.
@@ -481,7 +481,10 @@ bool OwnershipBridge::retireNativeRetainedWreckCold(original_camera_session50KX:
     for(std::size_t i=0;i<follow_->wreck_.size();++i)follow_->wreck_[i]={};
     if(!backing.releaseNativeColdBacking())return false;
     inputs_.wreck.clear();
-    if(nativeWreckZoneOwner_){
+    if(podZonesHeld_){
+        if(!podTrack_||!podTrack_->releaseWreckZones(*this))return false;
+        podZonesHeld_=false;podTrack_=nullptr;
+    }else if(nativeWreckZoneOwner_){
         if(!nativeWreckZoneOwner_->releaseNativeWreckFirstZones(this))return false;
         nativeWreckZoneOwner_=nullptr;
     }
@@ -507,8 +510,10 @@ bool OriginalRaceConstructor50LA::stageNativeFirstWreckLoad(
     if(!state||!bridge.nativeFirstWreckApplicationCurrent(session,app))return false;
     // Synchronous borrow of this SAME live App state. No copied seed/facade,
     // no retained raw pointer, and failure never rolls back consumed draws.
-    return bridge.stageNativeFirstWreckLoad(session,*this,*world74_,heights,app.materialDirectory36B970(),
-        app.particleDirectory36B530(),*world74_->worldWater3FC_,state->rawRandom308030,pc);
+    // PodLoad for every slot in manager order; this track's data through the
+    // one provider interface (original_pod_load50pl.h).
+    return bridge.loadPodRosterFromScene2129C0(session,*this,*world74_,*world74_->worldWater3FC_,heights,
+        app.materialDirectory36B970(),app.particleDirectory36B530(),state->rawRandom308030,pc);
 }
 }
 namespace ra_source_camera50LA {
@@ -573,194 +578,7 @@ bool OwnershipBridge::readNativeHandlingConfiguration215434(original_camera_sess
     if(index>=g::controlPresetSlots49D)return false;
     out=session.actual_.preferences.slots[index].configuration11040;return true;
 }
-bool OwnershipBridge::stageNativeFirstWreckLoad(original_camera_session50KX::Session& session,
-    const g::OriginalRaceConstructor50LA& race,ra_pod_scene50LA::Owner& world,const g::UndertrackPhysicsDomain50EW& heights,const std::string& directory,
-    const std::string& actualParticleDirectory36B530,const void* actualWorld3FC,std::uint32_t& actualRawRandom,std::uint32_t& pc)noexcept {
-    try {
-        if(!session.onOwnerThread()||!camera_||camera_->session.get()!=&session||
-           session.nativeWreckOwner_!=this||!cameraBankCurrent()||closed_||terminal_||cameraPrepareTerminal_||
-           !nativeWreckPrepared_||nativeWreckRetired_||!session.identitiesCurrent()||
-           !session.nativeRacerCamera1750A0_.prefixComplete||session.nativeRacerCamera1750A0_.revoked||
-           session.nativeRacerCamera1750A0_.pc!=0x1750f8||session.actual_.actualHeightDomain!=&heights||
-           session.actual_.actualMaterialDirectory36B970!=&directory||!rosterResources_||
-           !rosterResources_->wreckBacking_||!follow_||follow_->attempted_||follow_->closed_)return false;
-        return session.actual_.bank.visit(0,[&](){
-            auto& backing=*rosterResources_->wreckBacking_;
-            if(!session.actual_.actualChariotModels)return false;
-            auto* nativeModel=(*session.actual_.actualChariotModels)[0].get();
-            auto* phy=nativeModel?nativePhyOwnerCurrent(session,*nativeModel):nullptr;
-            auto& actualRacer=session.racerEntities_[0];
-            if(!phy||actualRacer.nativePhyLoad_)return false;
-            if(session.actual_.humanCount34&&!bindNativePlayerLoad1A0848(session,*nativeModel))return false;
-            //Forward bind to the genuine pre-existing cold occurrence. Earlier
-            //Wreck inventory reads remain explicitly native-adapted; no fake
-            //210A48 open or2129AC selection history is manufactured here.
-            actualRacer.nativePhyLoad_=phy;
-            if(!backing.loadNativeFirstRacerSource(actualRacer,heights,directory,actualWorld3FC,pc))return false;
-            g::OriginalWreckSetupZones50LA zones;g::CollectionRef50BX visibility=0,collision=0;
-            if(nativeWreckZoneOwner_||!world.retainNativeWreckFirstZones(this,
-                session.racerEntities_[0].racer.sessionGeneration,zones,visibility,collision))return false;
-            nativeWreckZoneOwner_=&world;
-            // Any setup rejection retains this exact borrow and constructor
-            // prefix until real source-aware retirement; never retry/replay.
-            if(!backing.setupNativeBody(0,zones,pc))return false;
-            if(!backing.loadNativeQueryChildren(0,pc))return false;
-            //Actual retained Application directory, not an authored filename
-            //guess or a copied source value. Preserve earlier query effects if
-            //this native resource-lookup admission cannot be established.
-            if(actualParticleDirectory36B530!="particle\\")return false;
-            if(!world.retainNativeWreckParticles(this,session.actual_.actualTrackParticles4A0))return false;
-            //Existing immutable HOST category namespace, not a fabricated guest
-            //4342A8 word or an independent literal category table.
-            const auto& water=g::OriginalNativeCollisionCategories::bindings[5];
-            if(std::strcmp(water.name,"WATER")||water.bit!=g::OriginalNativeCollisionCategories::water)return false;
-            if(!backing.loadNativeEffects(0,*nativeWreckParticles_,water.bit,pc))return false;
-            if(!backing.loadNativeRemainingCollectionPieces(zones,heights,directory,*nativeWreckParticles_,water.bit,pc))return false;
-            if(!backing.loadNativeCollectionGroup(pc))return false;
-            if(!backing.deactivateNativeCollectionLoad(pc)||!backing.appendNativeCollectionToRacer(pc))return false;
-            //Actual same selected Bank690/694 owners, not Wreck replacements.
-            //Native immutable projection refresh is admitted before each source
-            //list mutation; no active collector/role view may retain old words.
-            if(sharedOwnerLease_||sharedRoleViews_||nativeFifoPins_||triggerQueryActive_||sharedEffectsStopped_||
-               !actual_||!actual_->recovery||!storage_.get()||!storage_.get()->sharedRoster_)return false;
-            std::array<storage::Storage::SharedRosterObject*,storage::Storage::rosterRoles> rows{};
-            if(!sharedColdRowsCurrent(0,rows)||rows[0]->canonicalFilter!=&actual_->mainFilter||
-               rows[3]->canonicalFilter!=&actual_->recovery->podFilter||
-               rows[3]->bodyA0!=session.racerEntities_[0].body340||!rows[3]->bodyA0||
-               rows[0]->collision!=rows[3]->collision||!bodyIdentities_[0].collision||
-               rows[0]->collision!=bodyIdentities_[0].collision||
-               rows[0]->type2Resource!=&bodyIdentities_[0].collision->main()||
-               actual_->main.resource!=rows[0]->type2Resource||
-               !rows[0]->identity||!rows[3]->identity||rows[0]->identity==rows[3]->identity)return false;
-            const auto actual694=rows[3]->identity;
-            auto appendMain690=[&](std::uint32_t actualE4)->bool {
-                auto& row=*rows[0];auto& canonical=actual_->mainFilter;auto& s=*storage_.get();
-                if(!actualE4||!row.coldFilter||!row.coldFilter->matches(canonical)||
-                   row.canonicalFilter!=&canonical||row.identity!=canonical.identity||!row.reservedRef||
-                   row.reservedRef>s.count.objects||row.effectRevision==std::numeric_limits<std::uint64_t>::max())return false;
-                auto& object=s.objects[row.reservedRef-1u];const bool published=object.identity!=0;
-                if(published){const auto& prior=row.coldFilter->view;
-                    if(object.identity!=row.identity||object.filter.categoryA4!=prior.categoryA4||
-                       object.filter.acceptMaskB8!=prior.acceptMaskB8||object.filter.flags31!=prior.flags31)return false;
-                    for(unsigned i=0;i<2u;++i){const auto& a=object.filter.identities[i];const auto& b=prior.identities[i];
-                        if(a.values!=b.values||a.capacity!=b.capacity||a.count!=b.count||a.mode!=b.mode)return false;}
-                    const auto& a=object.filter.categories;const auto& b=prior.categories;
-                    if(a.values!=b.values||a.capacity!=b.capacity||a.count!=b.count||a.mode!=b.mode)return false;
-                }
-                const auto& words=canonical.identityLists[0].identities;
-                if(std::find(words.begin(),words.end(),actualE4)!=words.end())return true; //123EE4 duplicate branch
-                //Prepare native projection and realloc lowering without changing
-                //the one actual Bank filter. A rejection retains prior E0 work.
-                auto nextCanonical=canonical;auto& nextWords=nextCanonical.identityLists[0].identities;
-                const auto hole=std::find(nextWords.begin(),nextWords.end(),0u);
-                const bool fillHole=hole!=nextWords.end();const auto holeIndex=static_cast<std::size_t>(hole-nextWords.begin());
-                if(fillHole)*hole=actualE4;else {
-                    if(nextWords.size()>=static_cast<std::size_t>(std::numeric_limits<std::int32_t>::max()))return false;
-                    nextWords.push_back(actualE4);
-                }
-                auto nextProjection=std::make_unique<const storage::Storage::SharedColdFilter>(nextCanonical);
-                if(fillHole)canonical.identityLists[0].identities[holeIndex]=actualE4; //123F30, original C0 pointer unchanged
-                else canonical.identityLists[0].identities.swap(nextWords); //123F5C..7C native realloc lowering
-                row.coldFilter=std::move(nextProjection);
-                if(published)object.filter=row.coldFilter->view; //same actual published collector owner only
-                ++row.effectRevision;return true;
-            };
-            for(;;){
-                if(!backing.bindNativeRacerExclusions(actual694,appendMain690,pc))return false;
-                if(pc==0x212b50u){
-                    if(!backing.loadNativeRacer814810(pc))return false;
-                    if(!backing.loadNativeRacer818(actualParticleDirectory36B530,actualRawRandom,pc))return false;
-                    if(!rosterResources_->rigs_[0])return false;
-                    //Same real forward parser owner and retained PHY. End
-                    //this reader lease before any nested handling borrower.
-                    auto* model=nativeModel;
-                    if(!model||model->actualRig()!=rosterResources_->rigs_[0].get()||
-                       nativePhyOwnerCurrent(session,*model)!=phy||actualRacer.nativePhyLoad_!=phy)return false;
-                    {
-                        auto reader=phy->borrow(model->nativePhyContext_,rosterResources_->rigs_[0]->phy);
-                        if(!reader||!backing.beginNativeHandling2146(reader,pc))return false;
-                    }
-                    const bool physical=model->continueNativePhysical214710(session.racerEntities_[0],
-                        rosterResources_->rigs_[0]->phy,pc);
-                    backing.sourcePC_=pc; //Same reached continuation, including a retained failed prefix.
-                    if(!physical)return false;
-                    const bool repulsor=model->continueNativeRepulsor214894(session.racerEntities_[0],
-                        rosterResources_->rigs_[0]->phy,*this,pc);
-                    backing.sourcePC_=pc;
-                    if(!repulsor)return false;
-                    const bool handling=model->continueNativeAeroEngine214954(session.racerEntities_[0],
-                        rosterResources_->rigs_[0]->phy,session,race,*this,pc);
-                    backing.sourcePC_=pc;
-                    if(!handling)return false;
-                    const bool animation=model->continueNativeAnimationContact2154D8(session.racerEntities_[0],
-                        rosterResources_->rigs_[0]->phy,session,*this,pc);
-                    backing.sourcePC_=pc;
-                    if(!animation||!model->nativeHandlingStack_||!nativeHandlingInputOwnerCurrent(session,*model))return false;
-                    //Same collection cohort, Config selection and2146 stack.
-                    //Each22C310 finishes before its own22C610; no reordered
-                    //whole-roster pass or reconstructed temporary bodies.
-                    bool wreck=false;
-                    {
-                        auto reader=phy->borrow(model->nativePhyContext_,rosterResources_->rigs_[0]->phy);
-                        if(!reader||nativePhyOwnerCurrent(session,*model)!=reader.owner())return false;
-                        wreck=backing.continueNativeWreck215AF8(session.racerEntities_[0],reader,
-                            model->nativeHandlingStack_->gravity47C,pc);
-                    }
-                    backing.sourcePC_=model->failurePC_=session.racerEntities_[0].nativePostEmberPC_=pc;
-                    if(!wreck||pc!=0x215bb8u)return false;
-                    model->nativeWreckTuningComplete_=true;
-                    const bool returned=model->continueNativeHandling215BB8(session.racerEntities_[0],
-                        rosterResources_->rigs_[0]->phy,session,race,*this,pc);
-                    backing.sourcePC_=pc;
-                    if(!returned||pc!=0x216034u)return false;
-                    //The current native Cables adapter is the retained owner
-                    //of the later source allocations, not a replacement254.
-                    //Stay in this exact mutable Bank visit: never enter the
-                    //inactive wrapper that reparses PHY or nests a visit.
-                    if(!nativeHandlingInputOwnerCurrent(session,*model)||
-                       session.actual_.actualCables!=&camera_->cables||
-                       !camera_->cablePins[0]||!camera_->cables[0]||
-                       session.actual_.racer60[0]!=session.identity_[0].pod60){
-                        pc=backing.sourcePC_=model->failurePC_=
-                            session.racerEntities_[0].nativePostEmberPC_=0x212df0u;
-                        return false;
-                    }
-                    const bool outer=camera_->cables[0]->continueNativeOuter212DF0(
-                        session.racerEntities_[0],*model,session.actual_.applicationEntities,
-                        session.actual_.racer60[0],pc);
-                    //Retain every reached native/source effect, including a
-                    //failed partial material/strip/cable owner. No retry of
-                    //the one-shot handling or loader prefix is authorized.
-                    backing.sourcePC_=model->failurePC_=
-                        session.racerEntities_[0].nativePostEmberPC_=pc;
-                    if(!outer||pc!=0x212e10u||
-                       !camera_->cables[0]->nativeOuterReturned_||
-                       camera_->cables[0]->nativeOuterResult_.sourcePC!=pc||
-                       !nativeHandlingInputOwnerCurrent(session,*model))return false;
-                    const bool spin=model->continueNativeSpin212ED0(session.racerEntities_[0],pc);
-                    backing.sourcePC_=model->failurePC_=session.racerEntities_[0].nativePostEmberPC_=pc;
-                    if(!spin||pc!=0x212e18u)return false;
-                    const bool tail=continueNativeOuterStorage212E18(session,*model,pc);
-                    backing.sourcePC_=model->failurePC_=session.racerEntities_[0].nativePostEmberPC_=pc;
-                    // Only real native close permits the typed outer return.
-                    // The forward human caller now consumes the SAME current
-                    // Aero steering. Keep outer PCs separate from caller PCs.
-                    if(!tail)return false;
-                    if(!session.actual_.humanCount34)return true;
-                    if(!continueNativePlayerReturn1A0850(session,*model,pc))return false;
-                    if(!continueNativePlayerResources1AE104(session,*model,race,pc))return false;
-                    return continueNativeBaseRacerSpeech22A1D0(session,*model,race,pc);
-                }
-                if(pc!=0x2129e0u||!backing.loadNativeNextCollectionPrefix(heights,directory,pc)||
-                   !backing.setupNativeBody(0,zones,pc)||!backing.loadNativeQueryChildren(0,pc)||
-                   !backing.loadNativeEffects(0,*nativeWreckParticles_,water.bit,pc)||
-                   !backing.loadNativeRemainingCollectionPieces(zones,heights,directory,*nativeWreckParticles_,water.bit,pc)||
-                   !backing.loadNativeCollectionGroup(pc)||!backing.deactivateNativeCollectionLoad(pc)||
-                   !backing.appendNativeCollectionToRacer(pc))return false;
-            }
-        });
-    }catch(...){return false;}
-}
+// 2129C0 per-racer load moved to original_pod_load50pl.cpp (PodLoad, every slot).
 }
 
 namespace ra_pod_scene50LA {

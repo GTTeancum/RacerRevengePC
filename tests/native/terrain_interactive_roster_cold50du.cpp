@@ -127,8 +127,6 @@ void Context::run() const {
   }();
   require50DU(roster.at("player_index")==0&&roster.at("racers").size()==raceRacerCapacity,
       "original roster candidate must contain eight distinct source identities");
-  require50DU(directOriginalInputs||roster.at("racers").at(0).at("pod_id")=="POD01",
-      "retained original roster player identity differs");
   if(courseRaceCold&&!directOriginalInputs){
    std::string rosterError;
    const bool selected=original_course_roster50KG::selectPreparedRider(".",rosterRoot,roster,playerRacer60,rosterError);

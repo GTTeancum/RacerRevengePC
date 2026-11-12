@@ -60,37 +60,24 @@ Rig::Rig(const std::filesystem::path& repository,const std::filesystem::path& po
             need(identity&&pod_materials50ed_fixture::detail::sha256(phy)==identity->phySha256,
                 "Original disc PHY identity differs");
             name=value(setup,"pod setup","name");
-            // Join the original UI selection comments to this pod's own
-            // authenticated speech prefix, preserving POD19's original Event39.
-            const auto speech=read("audio/speech/"+lower(podId)+"/taunts.ini");
-            need(pod_materials50ed_fixture::detail::sha256(speech)==identity->tauntsSha256,
-                "Original disc name speech identity differs");
-            const auto speechIni=ini(speech);std::set<std::string> prefixes;
-            const auto speechPath="speech/"+lower(podId)+"/";
-            for(const auto& section:speechIni)for(const auto& item:section.second)if(item.first=="filename"){
-                const auto clip=lower(item.second);
-                need(clip.compare(0,speechPath.size(),speechPath)==0&&clip.size()>speechPath.size()+3,
-                    "Original disc name speech path differs");
-                prefixes.insert(clip.substr(speechPath.size(),3));
-            }
-            need(prefixes.size()==1,"Original disc name speech prefix is ambiguous");
-            const auto speechPrefix=*prefixes.begin();
+            // Original1E7C74..1E7E80 fills the UIACCEPT first-event table at
+            // +5428+4*racer60 (counts at +53BC+4*racer60); 1EA764..1EA780 plays
+            // Event(first+random). The racer-keyed table is the original's own
+            // data; the name is the UIACCEPT comment that heads that event.
+            static constexpr unsigned firstUiAcceptEvent[27]{0,1,5,7,9,11,13,15,17,19,21,23,25,27,29,31,33,35,37,39,44,46,50,52,54,56,60};
+            need(identity->racer60<27&&firstUiAcceptEvent[identity->racer60]!=0,
+                "Original UI first-event table has no row for this racer");
             const auto disc=resourceFile.parent_path().parent_path().parent_path();
             const auto ui=f::readBytes(disc/"AUDIO/UIACCEPT.INI");
             need(pod_materials50ed_fixture::detail::sha256(ui)=="245b0bd530e6797637ac72bbf2de8f101f3b1da280e00e8fc24e4b4930d79f3b",
                 "Original UI selection names differ");
-            const std::string text(ui.begin(),ui.end());std::string comment,section;
+            const auto eventSection="[event"+std::to_string(firstUiAcceptEvent[identity->racer60])+"]";
+            const std::string text(ui.begin(),ui.end());std::string comment;
             for(std::size_t at=0;at<text.size();){auto end=text.find('\n',at);if(end==std::string::npos)end=text.size();
                 const auto line=trim(text.substr(at,end-at));at=end+1;
                 if(line.empty())continue;
                 if(line.front()==';'){comment=trim(line.substr(1));continue;}
-                if(line.front()=='['){section=lower(line);continue;}
-                const auto equal=line.find('=');if(equal==std::string::npos||lower(trim(line.substr(0,equal)))!="filename")continue;
-                const auto clip=lower(trim(line.substr(equal+1)));
-                const bool matches=podId=="POD19"?(speechPrefix=="an2"&&section=="[event39]"):
-                    clip.compare(0,10+speechPrefix.size(),"speech/ui/"+speechPrefix)==0&&
-                    clip.compare(10+speechPrefix.size(),3,"sel")==0;
-                if(matches){need(!comment.empty()&&(displayName.empty()||displayName==comment),
+                if(line.front()=='['&&lower(line)==eventSection){need(!comment.empty()&&displayName.empty(),
                     "Original UI speech/name association ambiguous");displayName=comment;}
             }
             need(!displayName.empty(),"Original UI name unavailable for this pod");
@@ -101,11 +88,10 @@ Rig::Rig(const std::filesystem::path& repository,const std::filesystem::path& po
         const bool bottomL=authoredSetup.count("bottomleftengine")!=0;
         const bool bottomR=authoredSetup.count("bottomrightengine")!=0;
         need(bottomL==bottomR,"Roster partial bottom-engine topology unavailable");
-        if(bottomL){
-            need(podId=="POD02"&&value(setup,"pod setup","enginemotion")=="5",
-                "Roster optional engine topology requires original POD02 EngineMotion5");
-            modelCount=5;
-        }
+        // Original211470..211488 loads the bottom pair only when this pod's
+        // [Pod Setup] BottomLeftEngine key is present (EngineMotion is a
+        // separate PHY value read at214700, authored 5 for every pod).
+        if(bottomL)modelCount=5;
         const char* suffixes[]={"engineleft","engineright","brakeleft","brakeright","forward","back","mid","enginerightmid","engineleftmid"};
         const unsigned motionModels[]={left,right,chariot,chariot,chariot,chariot,chariot,right,left};
         std::uint32_t next=0;
@@ -134,91 +120,14 @@ Rig::Rig(const std::filesystem::path& repository,const std::filesystem::path& po
                 const auto vutMember=content+lower(value(config,"general info","vutfilename"));
                 vut[model]=read(vutMember);
                 auto& bd=bindingDiagnostics[model];
-                // Authentic POD09 englt1.vut lists damage04..07, while its PSG
-                // owns damage00..03. Original153248..15325C logs and skips these
-                // four absent names; it never maps them onto the existing four.
-                // Other selected models retain the strict historical admission.
-                const bool originalMissingDamage=podId=="POD09"&&model==left;
-                const bool originalMissingBinder=podId=="POD12"&&model==left;
-                const bool originalWrongBinder=podId=="POD20"&&model==right;
-                const bool originalWrongFlames=podId=="POD19"&&model==left;
-                const bool originalMissingBrakes=podId=="POD22"&&model==chariot;
-                const bool originalMissingSpin=podId=="POD25"&&(model==left||model==right);
-                if(originalMissingSpin){
-                    // Original153248 skips the missing spin LHS, never aliases another node.
-                    need(members.at(vutMember).digest==(model==left?
-                        "2ba86dd85c18b029ecb5fd0f066ebfa0eafc97d1a1964b9fbbe3e22beee7334a":
-                        "0d44b65eebc5244e7cc01487ec2beb4ab90e4bd8c976869e403f8aae873d0c62")&&
-                        members.at(psgMember).digest==(model==left?
-                        "e06dc530b91da318441f9e3ec89ac9cfcdd1fd957d618f9623de1a0be428bebc":
-                        "a89d8932d6ebad3e0b21aae38e15a8387c037d7b0e22e853b23990aeeae6305d"),
-                        "POD25 missing-spin projection requires genuine own PSG/VUT");
-                }
-                if(originalMissingDamage){
-                    need(vutMember==base+"englt1.vut"&&psgMember==base+"englt1.psg"&&
-                        members.at(vutMember).digest=="af57258b551e3a52223ac2d70bb6b6403c5586242b884088413668525154982f"&&
-                        members.at(psgMember).digest=="d6282f412bf96e20e06c57261a3c31ce2073f467e3b95d1716bfc04ac969d12f",
-                        "source missing-name admission requires original POD09 left-engine PSG/VUT identities");
-                }
-                // Authentic POD12 spells its VUT key binderleftt1; the PSG
-                // owns binderleft1. Preserve original153248..15325C's skip,
-                // rather than repairing the name or manufacturing a node.
-                if(originalMissingBinder){
-                    need(vutMember==base+"englt1.vut"&&psgMember==base+"englt1.psg"&&
-                        members.at(vutMember).digest=="cb7148c2199a65c9a6378f0d3c8a14e646359925700bea4133dc94389db38894"&&
-                        members.at(psgMember).digest=="bbd1a0452fecc07503104461c73d60e2d086b728ae04765e5c1cd57d4c1cdcb2",
-                        "source missing-name admission requires original POD12 left-engine PSG/VUT identities");
-                }
-                if(originalWrongBinder){
-                    need(vutMember==base+"engrt1.vut"&&psgMember==base+"engrt1.psg"&&
-                        members.at(vutMember).digest=="b50ef5b5ac03ca6aac484fd4b67364b7b435701d796fc3053a1a43f7d968da65"&&
-                        members.at(psgMember).digest=="be9a0b394caf482167db3fbdb9080476eebdb818b7458dd3c0924e58d25e116f",
-                        "source missing-name admission requires original POD20 right-engine PSG/VUT identities");
-                }
-                // Authentic POD19 left VUT lists engrtflame01/02 at181/208,
-                // but its PSG owns engltflame01/02. Original153248..15325C
-                // skips these absent lookup keys; it never aliases the real
-                // left flame rows or changes their unlisted flags.
-                if(originalWrongFlames){
-                    need(vutMember==base+"englt1.vut"&&psgMember==base+"englt1.psg"&&
-                        members.at(vutMember).digest=="37e4cd4e0fff2472b2a045ef5da8a8e4ca02d1775e7c0d9afbca4affa3ae3524"&&
-                        members.at(psgMember).digest=="a5f24cf472e3f52f989cc053236865503c0f6d838a3ce9a18c3b555c0b524b9e",
-                        "source missing-name admission requires original POD19 left-engine PSG/VUT identities");
-                }
-                // Authentic POD22 chariot VUT lists brklt02/brkrt02 at34/87,
-                // absent from its18-node PSG. Original153248..15325C diagnoses
-                // and skips these lines without manufacturing or renaming nodes.
-                if(originalMissingBrakes){
-                    need(vutMember==base+"chariot.vut"&&psgMember==base+"chariot.psg"&&
-                        members.at(vutMember).digest=="19beab314060e135cf5828a8556e7f656399ae1dc2ba321907f766dd47cac018"&&
-                        members.at(psgMember).digest=="b03565147c13202d46cd925134625587e7bd23058ab01499770416a5ef143839",
-                        "source missing-name admission requires original POD22 chariot PSG/VUT identities");
-                }
-                const bool originalMalformedHand=podId=="POD18"&&model==chariot;
-                std::size_t bindingBytes=vut[model].size();
-                if(originalMalformedHand){
-                    need(vutMember==base+"chariot.vut"&&psgMember==base+"chariot.psg",
-                        "POD18 original VUT projection role differs");
-                    bindingBytes=sebulba18ChariotVutPrefix(psg[model],vut[model]);
-                }
-                const auto missing=(originalMissingDamage||originalMissingBinder||originalWrongBinder||originalWrongFlames||originalMissingBrakes||originalMissingSpin)?a::MotionBindingMissingNode49O::sourceDiagnosticSkip:
-                    a::MotionBindingMissingNode49O::reject;
+                // Original153238..15325C: every VUT LHS absent from this model's
+                // PSG is diagnosed and skipped, for every pod and model. It never
+                // renames, aliases or manufactures a node; text and hierarchy
+                // admission stay strict. bd records the skipped count/offset.
                 if(!a::readMotionNodeBindings49O(hierarchy[model],reinterpret_cast<const char*>(vut[model].data()),
-                    bindingBytes,localRows[model],bd,missing))
+                    vut[model].size(),localRows[model],bd,a::MotionBindingMissingNode49O::sourceDiagnosticSkip))
                     need(false,"native VUT admission: "+vutMember+" error="+bindingErrorName(bd.error)+
                         " byte="+std::to_string(bd.offset)+" skippedUnknown="+std::to_string(bd.skippedUnknownNodes));
-                if(originalMalformedHand){
-                    need(bd.skippedUnknownNodes==0,"POD18 valid VUT prefix unexpectedly skipped a node");
-                    bd.skippedUnknownNodes=1;bd.firstUnknownOffset=352;
-                }
-                need(bd.skippedUnknownNodes==(originalMissingDamage?4u:(originalWrongFlames||originalMissingBrakes)?2u:(originalMissingBinder||originalWrongBinder||originalMalformedHand||originalMissingSpin)?1u:0u)&&
-                    (!originalMalformedHand||bd.firstUnknownOffset==352u)&&
-                    (!originalMissingDamage||bd.firstUnknownOffset==57u)&&
-                    (!originalWrongFlames||bd.firstUnknownOffset==181u)&&
-                    (!originalMissingBrakes||bd.firstUnknownOffset==34u)&&
-                    (!(originalMissingBinder||originalWrongBinder)||bd.firstUnknownOffset==15u),
-                    "native VUT source missing-name count differs: "+vutMember+" skippedUnknown="+
-                    std::to_string(bd.skippedUnknownNodes)+" firstByte="+std::to_string(bd.firstUnknownOffset));
                 rows[model]=localRows[model];
                 for(unsigned n=0;n<rows[model].count;++n)
                     rows[model].rows[n].sceneNode=static_cast<std::uint8_t>(sourceNodes[model][localRows[model].rows[n].sceneNode]);

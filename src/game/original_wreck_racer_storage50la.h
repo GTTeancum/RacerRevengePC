@@ -22,6 +22,15 @@ namespace ra_cold_roster50LA { class WreckBacking; class NativeWreckEffectChildr
 
 namespace rr::game {
 class OriginalWreckRacerStorage50LA;
+// One borrowed warm-model creator candidate (26E9F0..26EA10 prototype1C).
+// Supplied by the caller only from models THIS racer actually holds (its own
+// chariot/engine scenes); never retained past the call. Earlier wreck pieces of
+// the same racer are found by the storage itself.
+struct OriginalWreckWarmCreator50LA {
+    const OriginalRacerModelSceneOwner50LA* scene=nullptr;
+    const rr::assets::OriginalStandardMaterialReferences50LA* materials=nullptr;
+    SceneGraph49P graph{};
+};
 // Addresses of the actual caller fields, not optional copied context values.
 //22BFD0 forwards its resource argument and particle-parent argument to2CB5A0.
 struct OriginalWreckPieceEffectInputs50LA {
@@ -60,6 +69,7 @@ struct OriginalWreckPieceProgress50LA {
     bool e4ConstructorAttempted=false,e4PrefixRetired=false,e4PublicationAttempted=false;
     bool e8ConstructorAttempted=false,e8PrefixRetired=false,mutualConstructionAttempted=false;
     bool retirementAttempted=false,freshModelLoadAttempted=false,modelAppendAttempted=false,pieceSetupAttempted=false;
+    bool warmModelLoadAttempted=false; //One-shot26E9F0 continuation; never replayed.
     OriginalWreckConstructorPrefixResult50LA prefixResult{};
     // Completed piece receipt is never overwritten by collection retirement.
     OriginalWreckPrefixRetirementResult50LA retirementResult{};
@@ -2025,11 +2035,17 @@ OriginalWreckPrefixRetirementResult50LA retirePieceBeforeE0Core(
                n->reference00!=1u||n->sessionGeneration!=racer.sessionGeneration)return false;
             anchors[d.count++]=n;previous=n;
         }
-        //Collection0 follows actual7FC; later collections follow the previous
-        //actual appended collection. No synthetic root-only cleanup case.
+        //212AAC appends at the racer's ACTUAL tail. 210770 has already appended
+        //7FC and then its models, bodies, collision and contact owners before
+        //2129C0 (210C40..2125D0, 141960 each), so collection0 follows whatever
+        //is last. Later collections follow the previous appended collection:
+        //nothing else joins the racer between them. The 7FC particle parent
+        //must still be a direct child (pieces' effects hang under it).
         const auto ordinal=storage_->nativeCollectionCursor;
-        auto* expectedPrevious=ordinal?&storage_->collections[ordinal-1u].collectionComponent_:c.pieces_[0].effectParent_;
-        if(!c.sourceSlots38_||previous!=expectedPrevious||!previous)return false;
+        bool parentSeen=false;
+        for(auto* n=racer.firstChild18;n;n=n->next14)parentSeen=parentSeen||n==c.pieces_[0].effectParent_;
+        if(!c.sourceSlots38_||!previous||!c.pieces_[0].effectParent_||!parentSeen||
+           (ordinal&&previous!=&storage_->collections[ordinal-1u].collectionComponent_))return false;
         c.nativeRacerAppendAttempted_=true;
         const auto r=appendOriginalWreckComponent50LA(d,racer,c.collectionComponent_,0xffffffffu,*storage_->actualAttachmentLock423F58);
         pc=c.nativeGroupPC_=r.sourcePC;if(r.status!=OriginalWreckComponentStatus50LA::complete)return false;
@@ -4228,6 +4244,102 @@ public:
         //165CD4 returns before165CF0 appends this exact model. Body/gravity,
         // initial query histories, effects and publication remain unreached.
         return finish(S::modelAppendRequired,0x165cf0u);
+    }
+    // Continue ONLY this actual occurrence already stopped at the warm26E9F0
+    // hit (its PSG geometry is already associated). 26E9F0 publishes1B4,
+    // 26E9F4..26EA00 retain104960, 26EA10 prototype=geometry.1C, then (a2=0)
+    // 26EA88: 191 bit1 -> 26EA9C virtual98(this,prototype.child184); children
+    // -> 26EB10 virtual98(this,prototype); childless -> 26EAC4. Then 26EB44
+    // material clone, 26EBBC virtualB0=2406E0, 26EE9C row table, 240740.
+    // The prototype is resolved through the geometry's own prototype1C, only
+    // among this racer's earlier pieces or the caller's own creators.
+    OriginalWreckConstructorPrefixResult50LA loadWarmModelOccurrence26E9F0(
+        std::size_t collectionIndex,std::size_t pieceIndex,std::uint64_t sessionGeneration,std::uint64_t racerKey,
+        rr::assets::OriginalStandardMaterialDomain50LA& application,
+        const OriginalWreckWarmCreator50LA* external,std::size_t externalCount)noexcept {
+        using S=OriginalWreckConstructorPrefixStatus50LA;
+        OriginalWreckConstructorPrefixResult50LA rejected;
+        if(!sourceIdentityBound()||collectionIndex>=storage_->count||(externalCount&&!external))return rejected;
+        auto& collection=storage_->collections[collectionIndex];
+        if(pieceIndex>=collection.sourceSlots38_||!collection.ordered38_||collection.retirementAttempted_)return rejected;
+        auto& piece=collection.pieces_[pieceIndex];auto& progress=piece.progress_;
+        if(collection.ordered38_[pieceIndex]!=&piece||!progress.constructorAttempted||
+           progress.retirementAttempted||progress.pieceRetired||progress.freshModelLoadAttempted||
+           progress.warmModelLoadAttempted||sessionGeneration!=storage_->sessionGeneration||
+           racerKey!=storage_->racerKey||progress.prefixResult.status!=S::warmModelRequired||
+           progress.prefixResult.sourcePC!=0x26e9f0u||!application.prepared()||
+           application.resolver3E1A70().get()!=storage_->inventory->modelResolverIdentity()||
+           application.materials382B38().get()!=storage_->inventory->modelMaterialsIdentity())return rejected;
+        auto& owner=piece.modelOwner_;auto& fields=owner.fields();
+        if(owner.rowsLoaded_||piece.modelMaterials_.started()||piece.modelGeometry_||
+           fields.geometry1B4||fields.sourceRows1B8||fields.packets1F0)return rejected;
+        // The association must still be the same warm hit at this boundary.
+        rr::assets::OriginalStandardModelFileView50LA source;rr::assets::OriginalStandardTextureDiagnostic50LA td;
+        if(!application.resolver3E1A70()->modelFile(piece.assets_->modelFileIdentity(),source,td)||
+           !source.bytes||!source.member||!source.geometry240110||
+           *source.bytes!=*piece.assets_->standardModelPayload()->originalBytes())return rejected;
+        const auto* prototype=source.geometry240110->prototype1C();
+        const auto* payload=source.geometry240110->payload();
+        if(!prototype||prototype==&owner||!payload||!payload->originalBytes()||
+           *payload->originalBytes()!=*piece.assets_->standardModelPayload()->originalBytes())return rejected;
+        const OriginalRacerModelSceneOwner50LA* protoScene=nullptr;
+        const rr::assets::OriginalStandardMaterialReferences50LA* protoMaterials=nullptr;
+        SceneGraph49P protoGraph{};
+        for(std::size_t ci=0;ci<storage_->count&&!protoScene;++ci){auto& c=storage_->collections[ci];
+            for(std::size_t pi=0;pi<c.sourceSlots38_&&!protoScene;++pi){auto& other=c.pieces_[pi];
+                if(&other==&piece||&other.modelOwner_!=prototype)continue;
+                if(other.modelGeometry_!=source.geometry240110||!other.modelMaterials_.complete())return rejected;
+                protoScene=&other.modelOwner_;protoMaterials=&other.modelMaterials_;protoGraph=other.assets_->graph();}}
+        for(std::size_t i=0;i<externalCount&&!protoScene;++i)
+            if(external[i].scene==prototype){
+                if(!external[i].materials||!external[i].materials->complete()||!external[i].graph.nodes)return rejected;
+                protoScene=external[i].scene;protoMaterials=external[i].materials;protoGraph=external[i].graph;}
+        if(!protoScene)return rejected; //Not a creator this racer holds: no prototype authority.
+        // Row capacity: the prototype's rows must equal this piece's authored rows.
+        if(protoScene->binding_.sourceRowCount!=piece.sceneCount_||!piece.sceneCount_||
+           piece.sceneCount_>rr::assets::maxModelNodes49O)return rejected;
+        progress.warmModelLoadAttempted=true;
+        auto finish=[&](S status,std::uint32_t pc){
+            progress.prefixResult={status,pc,storage_->prefixDomain.count,true};return progress.prefixResult;};
+        auto& domain=storage_->prefixDomain;
+        auto collectRows=[&]()->bool {
+            for(std::size_t row=0;row<piece.sceneCount_;++row){
+                auto* actual=owner.wreckRowStorage(static_cast<std::uint32_t>(row));
+                if(!actual||!actual->reference00)continue;
+                piece.componentSlots_[1u+row]=actual;
+                bool present=false;for(std::size_t i=0;i<domain.count;++i)present=present||domain.objects[i]==actual;
+                if(present)continue;
+                if(domain.count>=storage_->prefixComponents.size())return false; //Refused before the write.
+                storage_->prefixComponents[domain.count++]=actual;
+            }
+            return true;
+        };
+        // 26E9F0 publish, 26E9F4..26EA00 retain (signed64, association re-checked inside).
+        piece.modelGeometry_=source.geometry240110;source.geometry240110.reset();
+        fields.geometry1B4=piece.modelGeometry_.get();
+        rr::assets::OriginalStandardResourceDiagnostic50LA rd;
+        if(!piece.modelGeometry_->retain104960(&owner,rd))return finish(S::modelLoadRequired,rd.sourcePC?rd.sourcePC:0x26ea00u);
+        auto graph=piece.assets_->graph();
+        OriginalRacerModelSceneOwner50LA::R rows;
+        const bool separatePrototype=(protoScene->model_.flags191&2u)!=0;
+        if(!separatePrototype&&piece.sceneCount_==1u)
+            rows=owner.loadWarmChildlessRows26EAC4(graph,*protoScene,protoGraph);   //26EAC4
+        else rows=owner.loadWarmHierarchy26EA28(graph,*protoScene,protoGraph);      //26EA9C / 26EB10
+        if(!collectRows())return finish(S::capacity,0x28e5f0u);
+        if(!rows.okay())return finish(S::components,rows.sourcePC);
+        rr::assets::OriginalStandardMaterialDiagnostic50LA md;
+        const bool cloned=piece.modelMaterials_.clone26EB44(*protoMaterials,md);
+        if(piece.modelMaterials_.started()){
+            fields.materialCount1C0=static_cast<std::int32_t>(*piece.modelMaterials_.count1C0());
+            fields.materials1C4=piece.modelMaterials_.allocationBase1C4();}
+        if(!cloned)return finish(S::modelLoadRequired,md.sourcePC?md.sourcePC:0x26eb44u);
+        auto step=owner.copyParameters2406E0(*protoScene);                              //26EBBC virtualB0
+        if(!step.okay())return finish(S::modelLoadRequired,step.sourcePC);
+        step=owner.allocateSourceRowTable26EE9C();                                      //26EBC4 -> 26EE9C
+        if(!step.okay())return finish(S::modelLoadRequired,step.sourcePC);
+        const auto packets=piece.modelPackets_.construct240740(owner,*piece.modelGeometry_,false);
+        if(!packets.okay())return finish(S::modelLoadRequired,packets.sourcePC);
+        return finish(S::modelAppendRequired,0x165cf0u); //Same receipt as the fresh26EE1C loader.
     }
     OriginalWreckConstructorPrefixResult50LA constructFirstOrderedPrefix(
         const OriginalWreckConstructorPrefixBinding50LA& binding)noexcept {

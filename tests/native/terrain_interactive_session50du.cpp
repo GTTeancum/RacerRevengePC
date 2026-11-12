@@ -369,8 +369,9 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   return selected;
  }();
  // Source21079C retains constructor a1;21081C stores vehicle60 and210820/24
- // formats the original Pod%02d resource prefix. Native bank slot0 is a role.
- const bool playerUsesRosterRig=nativeOriginalFleet||playerRacer60!=1u;
+ // formats the original Pod%02d resource prefix. Native bank slot0 is a role:
+ // it always takes its own roster rig, whatever pod the player selected.
+ const bool playerUsesRosterRig=true;
  const bool originalCameraEnabled=nativeOriginalFleet&&originalAiEnabled&&raceEnabled&&
      playerUsesRosterRig&&nativeSelectedLights&&!checkpointInput;
  // This bounded source2255B0 join requires the actual original-AI roster,

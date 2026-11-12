@@ -453,9 +453,10 @@ public:
             // native live Pause changes it only with the actual shared profile.
             // The extra speech slots (catalog keys past the 60 base keys, voices
             // 152+) join their source voice-volume group whenever this racer's
-            // selected catalog authors one of them (Anakin 19 always did; Watto 25
-            // fills two), not by racer number.
-            bool selectedExtraSpeech=playerRacer60==19;
+            // selected catalog authors one of them (POD19's own sounds.ini sums
+            // curses 24 and special 11, filling keys 20..24 and 10..11; Watto 25
+            // fills two), never by racer number.
+            bool selectedExtraSpeech=false;
             for(std::size_t i=gameplay_audio50HE::legacyCueCount;i<selected_.catalog.size();++i)
                 if(!selected_.catalog[i].name.empty())selectedExtraSpeech=true;
             if(!groups_.initialize(mixer_,audioSettings)||

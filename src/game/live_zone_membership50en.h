@@ -128,7 +128,9 @@ LiveZoneResult50EN removeLiveZoneMembership50EN(ZoneLifecycle50CL&,
 // and portal caches; workspace may change. Existing first-block capacity and
 // source LIFO registry slots are retained. Cyclic crossing walks are bounded by
 // an explicit finite world-derived visit limit. Source281320 assigns head from
-// the removed node even when a searched match is not head; that non-head removal
-// is an explicit UnsupportedLinkRemoval boundary rather than orphaning live
-// registrations or silently replacing original pointer semantics.
+// the removed node even when the searched match is not head: the original drops
+// the match AND every record ahead of it from that list. The update reproduces
+// that resulting list and also unregisters the dropped records, so none outlives
+// this membership's storage. This update no longer returns UnsupportedLinkRemoval;
+// the status value remains only for existing callers and checks.
 }

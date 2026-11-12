@@ -246,8 +246,8 @@ public:
         const a::OriginalStandardModelGeometry50LA& geometry,
         const a::OriginalStandardMaterialReferences50LA& references,
         const a::OriginalStandardMaterialDomain50LA& domain) {
-        visual_detail::shared::need(podId=="POD02"&&componentCount==5,
-            "Canonical bottom-left engine requires the actual POD02 five-model family");
+        visual_detail::shared::need(componentCount==5,
+            "Canonical bottom-left engine requires the pod's authored bottom-engine pair");
         bindCanonicalEngineBaseMap(model,geometry,references,domain,
             g::VehicleDrawComponent50CM::bottomLeftEngine,lowerModelIndex_[0],
             lowerPsg_[0].member,lowerPsg_[0].sha256,canonicalLowerBound_[0]);
@@ -257,8 +257,8 @@ public:
         const a::OriginalStandardModelGeometry50LA& geometry,
         const a::OriginalStandardMaterialReferences50LA& references,
         const a::OriginalStandardMaterialDomain50LA& domain) {
-        visual_detail::shared::need(podId=="POD02"&&componentCount==5,
-            "Canonical bottom-right engine requires the actual POD02 five-model family");
+        visual_detail::shared::need(componentCount==5,
+            "Canonical bottom-right engine requires the pod's authored bottom-engine pair");
         bindCanonicalEngineBaseMap(model,geometry,references,domain,
             g::VehicleDrawComponent50CM::bottomRightEngine,lowerModelIndex_[1],
             lowerPsg_[1].member,lowerPsg_[1].sha256,canonicalLowerBound_[1]);

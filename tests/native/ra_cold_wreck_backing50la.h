@@ -104,10 +104,23 @@ private:
     };
     std::array<FreshSourcePrefix,8> freshSources_{};
     bool freshSourceSelected_=false,freshSourceRetired_=false;
-    bool sourceAttempted_=false,sourceWithdrawn_=false;
-    std::uint32_t sourcePC_=0x2129c0;
-    rr::game::OriginalRacerEntityCold50LA* sourceRacer_=nullptr;
-    std::unique_ptr<NativeWreckEffectChildren> nativeEffects_;
+    // sourceAttempted_: the native (non-fresh) 2129C0 chronology was entered
+    // for at least one slot. Each slot then keeps its own cursor, racer and
+    // effect children: one PodLoad per racer, in manager order (humans 1ADF80,
+    // then AIs 1AE3CC). The slot index is checked against racerCount_ on every
+    // entry; no slot borrows another slot's storage.
+    bool sourceAttempted_=false;
+    struct NativeSlot {
+        bool attempted=false,withdrawn=false;
+        std::uint32_t pc=0x2129c0u;
+        rr::game::OriginalRacerEntityCold50LA* racer=nullptr;
+        std::unique_ptr<NativeWreckEffectChildren> effects;
+        // Borrowed warm creators (this racer's own chariot/engine scenes) for
+        // 26E9F0. Set by the bridge before the slot's load, cleared after it.
+        std::array<rr::game::OriginalWreckWarmCreator50LA,4> warm{};
+        std::size_t warmCount=0;
+    };
+    std::array<NativeSlot,8> native_{};
 
     static rr::game::OriginalWreckInventoryEndpointPolicy50LA endpointPolicy() noexcept {
         // COL contains XYZ only. This explicit HOST opaque-W policy matches
@@ -123,19 +136,20 @@ private:
     }
     // Called only after the real Race70 copy of same World's admitted NONE
     // provider. Native backing adoption does not emulate guest malloc failure.
-    bool loadNativeFirstRacerSource(rr::game::OriginalRacerEntityCold50LA& racer,
+    bool loadNativeFirstRacerSource(std::size_t slot,rr::game::OriginalRacerEntityCold50LA& racer,
         const rr::game::UndertrackPhysicsDomain50EW& heights,
         const std::string& materialDirectory,const void* actualWorld3FC,std::uint32_t& pc)noexcept {
+        if(slot>=racerCount_||slot>=native_.size())return false;auto& n=native_[slot];
         using namespace rr::game;using S=OriginalWreckConstructorPrefixStatus50LA;
-        pc=sourcePC_;
-        if(thread_!=std::this_thread::get_id()||closed_||retiring_||freshSourceSelected_||sourceAttempted_||
+        pc=n.pc;
+        if(thread_!=std::this_thread::get_id()||closed_||retiring_||freshSourceSelected_||n.attempted||
            !queriesPrepared_||!identitiesBound_||!application_||application_->released_||
-           !domain_||!modelSourcesBound_||!storage_[0]||racers_[0]!=&racer.racer||
+           !domain_||!modelSourcesBound_||!storage_[slot]||racers_[slot]!=&racer.racer||
            racer.nativeWreckLoadAttempted_||racer.sourceTerrain330_||racer.sourceWater334_||actualWorld3FC||
            !racer.prepared()||racer.racer.sessionGeneration!=generation_||
            heights.water334!=UndertrackHeightOwner50EW::Absent||heights.waterProvider334)
             return false;
-        sourceAttempted_=true;sourceRacer_=&racer;racer.nativeWreckLoadAttempted_=true;
+        sourceAttempted_=true;n.attempted=true;n.racer=&racer;racer.nativeWreckLoadAttempted_=true;
         try {
             //Actual210804 alias under this private same-Race70 native load
             //adaptation; not permission to replay the full210770 constructor.
@@ -143,7 +157,7 @@ private:
             //World3FC, admitted null by actual constructor+Water NONE branch.
             racer.sourceTerrain330_.emplace(static_cast<const OriginalWreckTerrainProvider50LA*>(actualWorld3FC));
             racer.sourceWater334_.emplace(heights.waterProvider334);
-            auto& owner=*storage_[0];auto& app=*application_;
+            auto& owner=*storage_[slot];auto& app=*application_;
             OriginalWreckConstructorGlobalViews50LA globals;
             globals.bodyVector433AD0=app.bodyOrigin433AD0_.data();
             globals.pieceVector433B10=app.wreckAssetVectors_.zero433B10.data();
@@ -151,261 +165,328 @@ private:
             globals.reset.quaternion382B60=app.bodyQuaternion382B60_.data();
             if(!owner.bindNativeConstructorGlobalViews(globals,app.gravityOrigin4431C0_.data()))return false;
             std::uint32_t count=0;
-            pc=sourcePC_=0x2129c0;
+            pc=n.pc=0x2129c0;
             if(!owner.nativeWreckCount158920(count))return false;
             racer.sourceWreckCount370_=count;
-            pc=sourcePC_=0x2129cc;
+            pc=n.pc=0x2129cc;
             const auto* array=owner.nativeArray374Backing();if(!array)return false;
-            pc=sourcePC_=0x2129d4;racer.sourceWreck374_=array;racer.sourceWreck374Published_=true;
-            pc=sourcePC_=0x212a2c;
+            pc=n.pc=0x2129d4;racer.sourceWreck374_=array;racer.sourceWreck374Published_=true;
+            pc=n.pc=0x212a2c;
             if(!owner.constructNativeCollection22BF00(0,app.objectCount423F60(),
                 app.attachmentLock423F58(),app.types383408()))return false;
-            pc=sourcePC_=0x212a4c;
+            pc=n.pc=0x212a4c;
             if(!owner.publishNativeCollection212A4C(0))return false;
             racer.sourceWreck374Slots_=1;
-            pc=sourcePC_=0x212a90;
+            pc=n.pc=0x212a90;
             auto result=owner.loadNativeOccurrencePiece22BFD0(0,&*racer.sourceWater334_,heights.waterGlobals);
-            pc=sourcePC_=result.sourcePC;
-            if(result.status!=S::modelLoadRequired||result.sourcePC!=0x26ee1cu)return false;
-            result=owner.loadFreshModelOccurrence26EE1C(0,0,generation_,racer.racer.objectKey,*domain_,{&materialDirectory});
-            pc=sourcePC_=result.sourcePC;if(result.status!=S::modelAppendRequired)return false;
+            pc=n.pc=result.sourcePC;
+            if(result.status==S::warmModelRequired&&result.sourcePC==0x26e9f0u)
+                result=owner.loadWarmModelOccurrence26E9F0(0,0,generation_,racer.racer.objectKey,*domain_,n.warm.data(),n.warmCount);
+            else if(result.status==S::modelLoadRequired&&result.sourcePC==0x26ee1cu)
+                result=owner.loadFreshModelOccurrence26EE1C(0,0,generation_,racer.racer.objectKey,*domain_,{&materialDirectory});
+            else return false;
+            pc=n.pc=result.sourcePC;if(result.status!=S::modelAppendRequired)return false;
             result=owner.appendOccurrenceModel165CF0(0,0,generation_,racer.racer.objectKey);
-            pc=sourcePC_=result.sourcePC;
+            pc=n.pc=result.sourcePC;
             //165E90 still requires actual B4/B8 world AND zone-field owners.
             //No chosen host zone, source D0, or camera286D20 is fabricated.
             return result.status==S::pieceSetupRequired&&result.sourcePC==0x165e90u;
         }catch(...){return false;}
     }
-    bool loadNativeNextCollectionPrefix(const rr::game::UndertrackPhysicsDomain50EW& heights,
+    bool loadNativeNextCollectionPrefix(std::size_t slot,const rr::game::UndertrackPhysicsDomain50EW& heights,
         const std::string& materialDirectory,std::uint32_t& pc)noexcept {
+        if(slot>=racerCount_||slot>=native_.size())return false;auto& n=native_[slot];
         using S=rr::game::OriginalWreckConstructorPrefixStatus50LA;
-        pc=sourcePC_;
-        if(thread_!=std::this_thread::get_id()||closed_||retiring_||sourceWithdrawn_||sourcePC_!=0x2129e0u||
-           !sourceRacer_||sourceRacer_->nativeWreckWithdrawn_||!storage_[0]||!application_||application_->released_||
-           !domain_||!sourceRacer_->sourceWater334_||!sourceRacer_->sourceWreckCount370_||
-           !storage_[0]->nativeSource374AliasCurrent(sourceRacer_->sourceWreck374_,
-               *sourceRacer_->sourceWreckCount370_,sourceRacer_->sourceWreck374Slots_))return false;
+        pc=n.pc;
+        if(thread_!=std::this_thread::get_id()||closed_||retiring_||n.withdrawn||n.pc!=0x2129e0u||
+           !n.racer||n.racer->nativeWreckWithdrawn_||!storage_[slot]||!application_||application_->released_||
+           !domain_||!n.racer->sourceWater334_||!n.racer->sourceWreckCount370_||
+           !storage_[slot]->nativeSource374AliasCurrent(n.racer->sourceWreck374_,
+               *n.racer->sourceWreckCount370_,n.racer->sourceWreck374Slots_))return false;
         try {
-            auto& owner=*storage_[0];auto& app=*application_;const auto ci=owner.nativeCollectionOrdinal()+1u;
-            if(ci!=sourceRacer_->sourceWreck374Slots_||ci>=*sourceRacer_->sourceWreckCount370_)return false;
-            pc=sourcePC_=0x212a2cu;
+            auto& owner=*storage_[slot];auto& app=*application_;const auto ci=owner.nativeCollectionOrdinal()+1u;
+            if(ci!=n.racer->sourceWreck374Slots_||ci>=*n.racer->sourceWreckCount370_)return false;
+            pc=n.pc=0x212a2cu;
             if(!owner.constructNativeCollection22BF00(ci,app.objectCount423F60(),app.attachmentLock423F58(),app.types383408()))return false;
-            pc=sourcePC_=0x212a4cu;if(!owner.publishNativeCollection212A4C(ci))return false;
-            ++sourceRacer_->sourceWreck374Slots_; //only the actual new source store
-            pc=sourcePC_=0x212a90u;
-            auto r=owner.loadNativeOccurrencePiece22BFD0(0,&*sourceRacer_->sourceWater334_,heights.waterGlobals);
-            pc=sourcePC_=r.sourcePC;if(r.status!=S::modelLoadRequired||r.sourcePC!=0x26ee1cu)return false;
-            r=owner.loadFreshModelOccurrence26EE1C(ci,0,generation_,sourceRacer_->racer.objectKey,*domain_,{&materialDirectory});
-            pc=sourcePC_=r.sourcePC;if(r.status!=S::modelAppendRequired)return false;
-            r=owner.appendOccurrenceModel165CF0(ci,0,generation_,sourceRacer_->racer.objectKey);
-            pc=sourcePC_=r.sourcePC;return r.status==S::pieceSetupRequired&&r.sourcePC==0x165e90u;
+            pc=n.pc=0x212a4cu;if(!owner.publishNativeCollection212A4C(ci))return false;
+            ++n.racer->sourceWreck374Slots_; //only the actual new source store
+            pc=n.pc=0x212a90u;
+            auto r=owner.loadNativeOccurrencePiece22BFD0(0,&*n.racer->sourceWater334_,heights.waterGlobals);
+            pc=n.pc=r.sourcePC;
+            if(r.status==S::warmModelRequired&&r.sourcePC==0x26e9f0u)
+                r=owner.loadWarmModelOccurrence26E9F0(ci,0,generation_,n.racer->racer.objectKey,*domain_,n.warm.data(),n.warmCount);
+            else if(r.status==S::modelLoadRequired&&r.sourcePC==0x26ee1cu)
+                r=owner.loadFreshModelOccurrence26EE1C(ci,0,generation_,n.racer->racer.objectKey,*domain_,{&materialDirectory});
+            else return false;
+            pc=n.pc=r.sourcePC;if(r.status!=S::modelAppendRequired)return false;
+            r=owner.appendOccurrenceModel165CF0(ci,0,generation_,n.racer->racer.objectKey);
+            pc=n.pc=r.sourcePC;return r.status==S::pieceSetupRequired&&r.sourcePC==0x165e90u;
         }catch(...){return false;}
     }
-    bool setupNativeBody(std::size_t pieceIndex,const rr::game::OriginalWreckSetupZones50LA& zones,std::uint32_t& pc)noexcept {
+    bool setupNativeBody(std::size_t slot,std::size_t pieceIndex,const rr::game::OriginalWreckSetupZones50LA& zones,std::uint32_t& pc)noexcept {
+        if(slot>=racerCount_||slot>=native_.size())return false;auto& n=native_[slot];
         using S=rr::game::OriginalWreckConstructorPrefixStatus50LA;
-        pc=sourcePC_;
-        if(thread_!=std::this_thread::get_id()||closed_||retiring_||sourceWithdrawn_||
-           !sourceAttempted_||sourcePC_!=0x165e90||!sourceRacer_||!storage_[0]||
-           sourceRacer_->nativeWreckWithdrawn_||!sourceRacer_->sourceWreckCount370_||
-           !storage_[0]->nativeSource374AliasCurrent(sourceRacer_->sourceWreck374_,
-               *sourceRacer_->sourceWreckCount370_,sourceRacer_->sourceWreck374Slots_))return false;
-        const auto r=storage_[0]->setupOccurrenceBody165E90(storage_[0]->nativeCollectionOrdinal(),pieceIndex,generation_,sourceRacer_->racer.objectKey,zones);
-        pc=sourcePC_=r.sourcePC;
+        pc=n.pc;
+        if(thread_!=std::this_thread::get_id()||closed_||retiring_||n.withdrawn||
+           !n.attempted||n.pc!=0x165e90||!n.racer||!storage_[slot]||
+           n.racer->nativeWreckWithdrawn_||!n.racer->sourceWreckCount370_||
+           !storage_[slot]->nativeSource374AliasCurrent(n.racer->sourceWreck374_,
+               *n.racer->sourceWreckCount370_,n.racer->sourceWreck374Slots_))return false;
+        const auto r=storage_[slot]->setupOccurrenceBody165E90(storage_[slot]->nativeCollectionOrdinal(),pieceIndex,generation_,n.racer->racer.objectKey,zones);
+        pc=n.pc=r.sourcePC;
         return r.status==S::publishedLifetimeRequired&&r.sourcePC==0x166018;
     }
-    bool loadNativeQueryChildren(std::size_t pieceIndex,std::uint32_t& pc)noexcept {
+    bool loadNativeQueryChildren(std::size_t slot,std::size_t pieceIndex,std::uint32_t& pc)noexcept {
+        if(slot>=racerCount_||slot>=native_.size())return false;auto& n=native_[slot];
         using namespace rr::game;using S=OriginalWreckConstructorPrefixStatus50LA;
-        pc=sourcePC_;
-        if(thread_!=std::this_thread::get_id()||closed_||retiring_||sourceWithdrawn_||
-           !sourceAttempted_||sourcePC_!=0x166018||!sourceRacer_||!storage_[0]||!application_||
-           application_->released_||!domain_||!modelSourcesBound_||sourceRacer_->nativeWreckWithdrawn_||
-           !sourceRacer_->sourceTerrain330_||*sourceRacer_->sourceTerrain330_)return false;
-        auto& owner=*storage_[0];
-        auto result=owner.constructOccurrenceE0To11BBC0(owner.nativeCollectionOrdinal(),pieceIndex);pc=sourcePC_=result.sourcePC;
+        pc=n.pc;
+        if(thread_!=std::this_thread::get_id()||closed_||retiring_||n.withdrawn||
+           !n.attempted||n.pc!=0x166018||!n.racer||!storage_[slot]||!application_||
+           application_->released_||!domain_||!modelSourcesBound_||n.racer->nativeWreckWithdrawn_||
+           !n.racer->sourceTerrain330_||*n.racer->sourceTerrain330_)return false;
+        auto& owner=*storage_[slot];
+        auto result=owner.constructOccurrenceE0To11BBC0(owner.nativeCollectionOrdinal(),pieceIndex);pc=n.pc=result.sourcePC;
         if(result.status!=S::queryPublicationRequired)return false;
-        result=owner.publishNativeOccurrenceE0(pieceIndex);pc=sourcePC_=result.sourcePC;
+        result=owner.publishNativeOccurrenceE0(pieceIndex);pc=n.pc=result.sourcePC;
         if(result.status!=S::contactConstructorRequired)return false;
         result=owner.constructNativeOccurrenceContact(pieceIndex,application_->detectorOrigin443550_.data(),
-            application_->springZero4435A0_.data(),&*sourceRacer_->sourceTerrain330_);
-        pc=sourcePC_=result.sourcePC;if(result.status!=S::e4ConstructorRequired)return false;
+            application_->springZero4435A0_.data(),&*n.racer->sourceTerrain330_);
+        pc=n.pc=result.sourcePC;if(result.status!=S::e4ConstructorRequired)return false;
         rr::assets::OriginalStandardTextureDiagnostic50LA diagnostic;
         result=owner.constructOccurrenceE4ToPreparation(owner.nativeCollectionOrdinal(),pieceIndex,*domain_,diagnostic);
-        pc=sourcePC_=result.sourcePC;if(result.status!=S::e4PreparationRequired)return false;
-        result=owner.preparePublishAppendOccurrenceE4(owner.nativeCollectionOrdinal(),pieceIndex);pc=sourcePC_=result.sourcePC;
+        pc=n.pc=result.sourcePC;if(result.status!=S::e4PreparationRequired)return false;
+        result=owner.preparePublishAppendOccurrenceE4(owner.nativeCollectionOrdinal(),pieceIndex);pc=n.pc=result.sourcePC;
         if(result.status!=S::e8ConstructorRequired)return false;
-        result=owner.constructOccurrenceE8ToMutualFilters(owner.nativeCollectionOrdinal(),pieceIndex);pc=sourcePC_=result.sourcePC;
+        result=owner.constructOccurrenceE8ToMutualFilters(owner.nativeCollectionOrdinal(),pieceIndex);pc=n.pc=result.sourcePC;
         return result.status==S::mutualFiltersRequired&&result.sourcePC==0x166390;
     }
-    bool loadNativeEffects(std::size_t pieceIndex,rr::game::OriginalTrackParticleCold50LA& manager,
+    bool loadNativeEffects(std::size_t slot,std::size_t pieceIndex,rr::game::OriginalTrackParticleCold50LA& manager,
         const std::uint32_t& water,std::uint32_t& pc)noexcept {
-        pc=sourcePC_;
-        if(thread_!=std::this_thread::get_id()||closed_||retiring_||sourceWithdrawn_||
-           !sourceRacer_||!storage_[0]||sourcePC_!=0x166390||!application_||application_->released_||
+        if(slot>=racerCount_||slot>=native_.size())return false;auto& n=native_[slot];
+        pc=n.pc;
+        if(thread_!=std::this_thread::get_id()||closed_||retiring_||n.withdrawn||
+           !n.racer||!storage_[slot]||n.pc!=0x166390||!application_||application_->released_||
            !domain_||!domain_->archiveProvider3E1A70()||
-           sourceRacer_->particles4A0_!=manager.particles()||!sourceRacer_->sourceParticle7FC_||
-           *sourceRacer_->sourceParticle7FC_!=&sourceRacer_->particle7FC||!manager.material150()||
+           n.racer->particles4A0_!=manager.particles()||!n.racer->sourceParticle7FC_||
+           *n.racer->sourceParticle7FC_!=&n.racer->particle7FC||!manager.material150()||
            manager.material150()->table382B38()!=domain_->materials382B38().get())return false;
         try {
-            if(!nativeEffects_)nativeEffects_=std::make_unique<NativeWreckEffectChildren>();
-            const bool result=nativeEffects_->load(*storage_[0],*application_,*sourceRacer_,manager,&*sourceRacer_->sourceParticle7FC_,
+            if(!n.effects)n.effects=std::make_unique<NativeWreckEffectChildren>();
+            const bool result=n.effects->load(*storage_[slot],*application_,*n.racer,manager,&*n.racer->sourceParticle7FC_,
                 *domain_->archiveProvider3E1A70(),water,pieceIndex,pc);
-            sourcePC_=pc;return result;
+            n.pc=pc;return result;
         }catch(...){return false;}
     }
     // Continue only the genuine22C25C/260 cursor after the previous WATER
     // suffix. No next collection/group or alternate primary body is inferred.
-    bool loadNativeRemainingCollectionPieces(const rr::game::OriginalWreckSetupZones50LA& zones,
+    bool loadNativeRemainingCollectionPieces(std::size_t slot,const rr::game::OriginalWreckSetupZones50LA& zones,
         const rr::game::UndertrackPhysicsDomain50EW& heights,const std::string& materialDirectory,
         rr::game::OriginalTrackParticleCold50LA& manager,const std::uint32_t& water,
         std::uint32_t& pc)noexcept {
+        if(slot>=racerCount_||slot>=native_.size())return false;auto& n=native_[slot];
         using S=rr::game::OriginalWreckConstructorPrefixStatus50LA;
-        pc=sourcePC_;
-        if(thread_!=std::this_thread::get_id()||closed_||retiring_||sourceWithdrawn_||
-           !sourceRacer_||!storage_[0]||!domain_||!nativeEffects_||!sourceRacer_->sourceWater334_||
-           sourceRacer_->nativeWreckWithdrawn_)return false;
+        pc=n.pc;
+        if(thread_!=std::this_thread::get_id()||closed_||retiring_||n.withdrawn||
+           !n.racer||!storage_[slot]||!domain_||!n.effects||!n.racer->sourceWater334_||
+           n.racer->nativeWreckWithdrawn_)return false;
         try {
-            auto& owner=*storage_[0];
-            while(sourcePC_==0x22c0a0u){
+            auto& owner=*storage_[slot];
+            while(n.pc==0x22c0a0u){
                 const auto* collection=owner.collection(owner.nativeCollectionOrdinal());if(!collection)return false;
                 const auto pi=collection->completedPieceConstructorCount();
                 if(!pi||pi>=collection->plannedPieceCount()||
                    collection->reachedSourcePieceSlotCount()!=pi)return false;
-                auto r=owner.loadNativeOccurrencePiece22BFD0(pi,&*sourceRacer_->sourceWater334_,heights.waterGlobals);
-                pc=sourcePC_=r.sourcePC;if(r.status!=S::modelLoadRequired||r.sourcePC!=0x26ee1cu)return false;
-                r=owner.loadFreshModelOccurrence26EE1C(owner.nativeCollectionOrdinal(),pi,generation_,sourceRacer_->racer.objectKey,*domain_,{&materialDirectory});
-                pc=sourcePC_=r.sourcePC;if(r.status!=S::modelAppendRequired)return false;
-                r=owner.appendOccurrenceModel165CF0(owner.nativeCollectionOrdinal(),pi,generation_,sourceRacer_->racer.objectKey);
-                pc=sourcePC_=r.sourcePC;if(r.status!=S::pieceSetupRequired)return false;
-                if(!setupNativeBody(pi,zones,pc)||!loadNativeQueryChildren(pi,pc)||
-                   !loadNativeEffects(pi,manager,water,pc))return false;
+                auto r=owner.loadNativeOccurrencePiece22BFD0(pi,&*n.racer->sourceWater334_,heights.waterGlobals);
+                pc=n.pc=r.sourcePC;
+                if(r.status==S::warmModelRequired&&r.sourcePC==0x26e9f0u)
+                    r=owner.loadWarmModelOccurrence26E9F0(owner.nativeCollectionOrdinal(),pi,generation_,n.racer->racer.objectKey,*domain_,n.warm.data(),n.warmCount);
+                else if(r.status==S::modelLoadRequired&&r.sourcePC==0x26ee1cu)
+                    r=owner.loadFreshModelOccurrence26EE1C(owner.nativeCollectionOrdinal(),pi,generation_,n.racer->racer.objectKey,*domain_,{&materialDirectory});
+                else return false;
+                pc=n.pc=r.sourcePC;if(r.status!=S::modelAppendRequired)return false;
+                r=owner.appendOccurrenceModel165CF0(owner.nativeCollectionOrdinal(),pi,generation_,n.racer->racer.objectKey);
+                pc=n.pc=r.sourcePC;if(r.status!=S::pieceSetupRequired)return false;
+                if(!setupNativeBody(slot,pi,zones,pc)||!loadNativeQueryChildren(slot,pi,pc)||
+                   !loadNativeEffects(slot,pi,manager,water,pc))return false;
             }
-            return sourcePC_==0x22c278u; //group remains required, never ready
+            return n.pc==0x22c278u; //group remains required, never ready
         }catch(...){return false;}
     }
-    bool loadNativeCollectionGroup(std::uint32_t& pc)noexcept {
-        pc=sourcePC_;
-        if(thread_!=std::this_thread::get_id()||closed_||retiring_||sourceWithdrawn_||
-           sourcePC_!=0x22c278u||!sourceRacer_||!storage_[0]||!nativeEffects_||
+    bool loadNativeCollectionGroup(std::size_t slot,std::uint32_t& pc)noexcept {
+        if(slot>=racerCount_||slot>=native_.size())return false;auto& n=native_[slot];
+        pc=n.pc;
+        if(thread_!=std::this_thread::get_id()||closed_||retiring_||n.withdrawn||
+           n.pc!=0x22c278u||!n.racer||!storage_[slot]||!n.effects||
            !application_||application_->released_||!domain_||!domain_->archiveProvider3E1A70()||
-           sourceRacer_->nativeWreckWithdrawn_)return false;
-        if(!storage_[0]->constructNativeGroup22C278(application_->groupOrigin4441F0_.data(),pc)){
-            sourcePC_=pc;return false;
+           n.racer->nativeWreckWithdrawn_)return false;
+        if(!storage_[slot]->constructNativeGroup22C278(application_->groupOrigin4441F0_.data(),pc)){
+            n.pc=pc;return false;
         }
-        const bool done=nativeEffects_->loadGroup(*storage_[0],*application_,*domain_->archiveProvider3E1A70(),pc);
-        sourcePC_=pc;return done;
+        const bool done=n.effects->loadGroup(*storage_[slot],*application_,*domain_->archiveProvider3E1A70(),pc);
+        n.pc=pc;return done;
     }
-    bool deactivateNativeCollectionLoad(std::uint32_t& pc)noexcept {
-        pc=sourcePC_;
-        if(thread_!=std::this_thread::get_id()||closed_||retiring_||sourceWithdrawn_||
-           sourcePC_!=0x22c2c8u||!sourceRacer_||sourceRacer_->nativeWreckWithdrawn_||
-           !storage_[0]||!nativeEffects_)return false;
-        const bool done=nativeEffects_->deactivateLoad22CE10(*storage_[0],pc);
-        sourcePC_=pc;return done;
+    bool deactivateNativeCollectionLoad(std::size_t slot,std::uint32_t& pc)noexcept {
+        if(slot>=racerCount_||slot>=native_.size())return false;auto& n=native_[slot];
+        pc=n.pc;
+        if(thread_!=std::this_thread::get_id()||closed_||retiring_||n.withdrawn||
+           n.pc!=0x22c2c8u||!n.racer||n.racer->nativeWreckWithdrawn_||
+           !storage_[slot]||!n.effects)return false;
+        const bool done=n.effects->deactivateLoad22CE10(*storage_[slot],pc);
+        n.pc=pc;return done;
     }
-    bool appendNativeCollectionToRacer(std::uint32_t& pc)noexcept {
-        pc=sourcePC_;
-        if(thread_!=std::this_thread::get_id()||closed_||retiring_||sourceWithdrawn_||
-           sourcePC_!=0x212a98u||!sourceRacer_||sourceRacer_->nativeWreckWithdrawn_||!storage_[0]||
-           !sourceRacer_->prepared()||!application_||application_->released_||
-           sourceRacer_->actualCounter423F60()!=&application_->objectCount423F60()||
-           sourceRacer_->actualLock423F58()!=&application_->attachmentLock423F58())return false;
-        const bool done=storage_[0]->appendNativeCollection212AAC(sourceRacer_->racer,pc);sourcePC_=pc;return done;
+    bool appendNativeCollectionToRacer(std::size_t slot,std::uint32_t& pc)noexcept {
+        if(slot>=racerCount_||slot>=native_.size())return false;auto& n=native_[slot];
+        pc=n.pc;
+        if(thread_!=std::this_thread::get_id()||closed_||retiring_||n.withdrawn||
+           n.pc!=0x212a98u||!n.racer||n.racer->nativeWreckWithdrawn_||!storage_[slot]||
+           !n.racer->prepared()||!application_||application_->released_||
+           n.racer->actualCounter423F60()!=&application_->objectCount423F60()||
+           n.racer->actualLock423F58()!=&application_->attachmentLock423F58())return false;
+        const bool done=storage_[slot]->appendNativeCollection212AAC(n.racer->racer,pc);n.pc=pc;return done;
     }
-    template<class AppendMain690> bool bindNativeRacerExclusions(std::uint32_t actual694,
+    template<class AppendMain690> bool bindNativeRacerExclusions(std::size_t slot,std::uint32_t actual694,
         AppendMain690&& appendMain690,std::uint32_t& pc)noexcept {
-        pc=sourcePC_;
-        if(thread_!=std::this_thread::get_id()||closed_||retiring_||sourceWithdrawn_||
-           sourcePC_!=0x212abcu||!sourceRacer_||sourceRacer_->nativeWreckWithdrawn_||!storage_[0])return false;
+        if(slot>=racerCount_||slot>=native_.size())return false;auto& n=native_[slot];
+        pc=n.pc;
+        if(thread_!=std::this_thread::get_id()||closed_||retiring_||n.withdrawn||
+           n.pc!=0x212abcu||!n.racer||n.racer->nativeWreckWithdrawn_||!storage_[slot])return false;
         try {
-            auto& owner=*storage_[0];const auto* c=owner.collection(owner.nativeCollectionOrdinal());
+            auto& owner=*storage_[slot];const auto* c=owner.collection(owner.nativeCollectionOrdinal());
             if(!c||c->reachedSourcePieceSlotCount()!=c->completedPieceConstructorCount())return false;
             for(std::size_t pi=0;pi<c->reachedSourcePieceSlotCount();++pi){std::uint32_t actualE4=0;
-                if(!owner.appendNativeOwnPodExclusion(pi,actual694,actualE4,pc)){sourcePC_=pc;return false;}
-                sourcePC_=pc;
+                if(!owner.appendNativeOwnPodExclusion(pi,actual694,actualE4,pc)){n.pc=pc;return false;}
+                n.pc=pc;
                 if(!appendMain690(actualE4))return false;
-                if(!owner.commitNativeMain690Exclusion(pi,pc)){sourcePC_=pc;return false;}
-                sourcePC_=pc;
+                if(!owner.commitNativeMain690Exclusion(pi,pc)){n.pc=pc;return false;}
+                n.pc=pc;
             }
-            return sourcePC_==0x2129e0u||sourcePC_==0x212b50u;
+            return n.pc==0x2129e0u||n.pc==0x212b50u;
         }catch(...){return false;}
     }
-    bool continueNativeWreck215AF8(rr::game::OriginalRacerEntityCold50LA& actualRacer,
+    bool continueNativeWreck215AF8(std::size_t slot,rr::game::OriginalRacerEntityCold50LA& actualRacer,
         rr::assets::NativePhyLoad50LA::Reader& phy,
         std::optional<float>& gravity47C,std::uint32_t& pc)noexcept {
-        if(pc!=0x215af8u||sourcePC_!=pc||actualRacer.nativePostEmberPC_!=pc||
+        if(slot>=racerCount_||slot>=native_.size())return false;auto& n=native_[slot];
+        if(pc!=0x215af8u||n.pc!=pc||actualRacer.nativePostEmberPC_!=pc||
            !phy||!actualRacer.nativePhyLoad_||phy.owner()!=actualRacer.nativePhyLoad_)return false;
-        if(thread_!=std::this_thread::get_id()||closed_||retiring_||sourceWithdrawn_||
-           !sourceAttempted_||freshSourceSelected_||!identitiesBound_||!modelSourcesBound_||
-           !actualRacer.prepared()||actualRacer.racer.sessionGeneration!=generation_||racers_[0]!=&actualRacer.racer||
-           sourceRacer_!=&actualRacer||actualRacer.nativeWreckWithdrawn_||!storage_[0]||
+        if(thread_!=std::this_thread::get_id()||closed_||retiring_||n.withdrawn||
+           !n.attempted||freshSourceSelected_||!identitiesBound_||!modelSourcesBound_||
+           !actualRacer.prepared()||actualRacer.racer.sessionGeneration!=generation_||racers_[slot]!=&actualRacer.racer||
+           n.racer!=&actualRacer||actualRacer.nativeWreckWithdrawn_||!storage_[slot]||
            !application_||application_->released_||!domain_||!actualRacer.sourceWreckCount370_||
-           !storage_[0]->nativeSource374AliasCurrent(actualRacer.sourceWreck374_,
+           !storage_[slot]->nativeSource374AliasCurrent(actualRacer.sourceWreck374_,
                *actualRacer.sourceWreckCount370_,actualRacer.sourceWreck374Slots_))return false;
-        const bool done=storage_[0]->continueNativeTuning215AF8(phy.cursor(),gravity47C,pc);
-        sourcePC_=pc;return done;
+        const bool done=storage_[slot]->continueNativeTuning215AF8(phy.cursor(),gravity47C,pc);
+        n.pc=pc;return done;
     }
-    bool loadNativeRacer814810(std::uint32_t& pc)noexcept {
-        pc=sourcePC_;
-        if(thread_!=std::this_thread::get_id()||closed_||retiring_||sourceWithdrawn_||sourcePC_!=0x212b50u||
-           !sourceRacer_||sourceRacer_->nativeWreckWithdrawn_||!storage_[0]||!nativeEffects_||
+    bool loadNativeRacer814810(std::size_t slot,std::uint32_t& pc)noexcept {
+        if(slot>=racerCount_||slot>=native_.size())return false;auto& n=native_[slot];
+        pc=n.pc;
+        if(thread_!=std::this_thread::get_id()||closed_||retiring_||n.withdrawn||n.pc!=0x212b50u||
+           !n.racer||n.racer->nativeWreckWithdrawn_||!storage_[slot]||!n.effects||
            !application_||application_->released_||!domain_||!domain_->archiveProvider3E1A70()||
-           !sourceRacer_->sourceParticle7FC_||*sourceRacer_->sourceParticle7FC_!=&sourceRacer_->particle7FC||
-           sourceRacer_->sourceRacerExplosion814_||sourceRacer_->sourceRacerSparks810_)return false;
+           !n.racer->sourceParticle7FC_||*n.racer->sourceParticle7FC_!=&n.racer->particle7FC||
+           n.racer->sourceRacerExplosion814_||n.racer->sourceRacerSparks810_)return false;
         auto publish=[&](bool explosion,rr::game::OriginalWreckComponent50LA* actual){
-            auto& alias=explosion?sourceRacer_->sourceRacerExplosion814_:sourceRacer_->sourceRacerSparks810_;
+            auto& alias=explosion?n.racer->sourceRacerExplosion814_:n.racer->sourceRacerSparks810_;
             if(!actual||alias)return false;alias=actual;return true;
         };
-        const bool done=nativeEffects_->loadRacer814810(*storage_[0],*application_,*domain_->archiveProvider3E1A70(),publish,pc);
-        sourcePC_=pc;return done;
+        const bool done=n.effects->loadRacer814810(*storage_[slot],*application_,*domain_->archiveProvider3E1A70(),publish,pc);
+        n.pc=pc;return done;
     }
-    bool loadNativeRacer818(const std::string& directory,std::uint32_t& actualRaw,std::uint32_t& pc)noexcept{
-        pc=sourcePC_;
-        if(thread_!=std::this_thread::get_id()||closed_||retiring_||sourceWithdrawn_||sourcePC_!=0x212c44u||
-           !sourceRacer_||sourceRacer_->nativeWreckWithdrawn_||!storage_[0]||!nativeEffects_||
+    bool loadNativeRacer818(std::size_t slot,const std::string& directory,std::uint32_t& actualRaw,std::uint32_t& pc)noexcept{
+        if(slot>=racerCount_||slot>=native_.size())return false;auto& n=native_[slot];
+        pc=n.pc;
+        if(thread_!=std::this_thread::get_id()||closed_||retiring_||n.withdrawn||n.pc!=0x212c44u||
+           !n.racer||n.racer->nativeWreckWithdrawn_||!storage_[slot]||!n.effects||
            !application_||application_->released_||!domain_||!domain_->archiveProvider3E1A70()||
-           !sourceRacer_->slots818_||sourceRacer_->nativeSource818Published_||
-           !sourceRacer_->sourceParticle7FC_||*sourceRacer_->sourceParticle7FC_!=&sourceRacer_->particle7FC)return false;
-        for(const auto* slot:*sourceRacer_->slots818_)if(slot)return false;
+           !n.racer->slots818_||n.racer->nativeSource818Published_||
+           !n.racer->sourceParticle7FC_||*n.racer->sourceParticle7FC_!=&n.racer->particle7FC)return false;
+        for(const auto* slot:*n.racer->slots818_)if(slot)return false;
         auto publish=[&](std::size_t i,rr::game::OriginalWreckComponent50LA* actual){
-            if(!actual||i!=sourceRacer_->nativeSource818Published_||i>=sourceRacer_->slots818_->size()||
-               (*sourceRacer_->slots818_)[i])return false;
-            (*sourceRacer_->slots818_)[i]=actual;++sourceRacer_->nativeSource818Published_;return true;
+            if(!actual||i!=n.racer->nativeSource818Published_||i>=n.racer->slots818_->size()||
+               (*n.racer->slots818_)[i])return false;
+            (*n.racer->slots818_)[i]=actual;++n.racer->nativeSource818Published_;return true;
         };
-        const bool done=nativeEffects_->loadRacer818(*storage_[0],*application_,*domain_->archiveProvider3E1A70(),directory,actualRaw,publish,pc);
-        sourcePC_=pc;return done;
+        const bool done=n.effects->loadRacer818(*storage_[slot],*application_,*domain_->archiveProvider3E1A70(),directory,actualRaw,publish,pc);
+        n.pc=pc;return done;
     }
-    bool beginNativeHandling2146(rr::assets::NativePhyLoad50LA::Reader& phy,std::uint32_t& pc)noexcept{
-        pc=sourcePC_;
-        if(thread_!=std::this_thread::get_id()||closed_||retiring_||sourceWithdrawn_||sourcePC_!=0x212dc8u||
-           !sourceRacer_||sourceRacer_->nativeWreckWithdrawn_||!nativeEffects_||!nativeEffects_->emberComplete_||
-           !application_||application_->released_||!sourceRacer_->slots818_||
-           !nativeEffects_->emberAliasesCurrent(sourceRacer_->slots818_->data(),sourceRacer_->nativeSource818Published_))return false;
-        const bool done=sourceRacer_->beginNativeHandling2146(phy,pc);sourcePC_=pc;return done;
+    bool beginNativeHandling2146(std::size_t slot,rr::assets::NativePhyLoad50LA::Reader& phy,std::uint32_t& pc)noexcept{
+        if(slot>=racerCount_||slot>=native_.size())return false;auto& n=native_[slot];
+        pc=n.pc;
+        if(thread_!=std::this_thread::get_id()||closed_||retiring_||n.withdrawn||n.pc!=0x212dc8u||
+           !n.racer||n.racer->nativeWreckWithdrawn_||!n.effects||!n.effects->emberComplete_||
+           !application_||application_->released_||!n.racer->slots818_||
+           !n.effects->emberAliasesCurrent(n.racer->slots818_->data(),n.racer->nativeSource818Published_))return false;
+        const bool done=n.racer->beginNativeHandling2146(phy,pc);n.pc=pc;return done;
     }
-    bool retireNativeSourcePrefix(const rr::game::LiveZoneWorld50EN& world)noexcept {
+    bool retireNativeSourcePrefix(std::size_t slot,const rr::game::LiveZoneWorld50EN& world)noexcept {
+        if(slot>=racerCount_||slot>=native_.size())return false;auto& n=native_[slot];
         if(thread_!=std::this_thread::get_id())return false;
-        if(!sourceAttempted_||sourceWithdrawn_)return true;
-        if(!sourceRacer_||!storage_[0]||!application_||application_->released_||
-           sourceRacer_->racer.sessionGeneration!=generation_||sourceRacer_->racer.reference00!=1u||
-           sourceRacer_->racer.objectKey!=storage_[0]->racerKey()||
-           &sourceRacer_->racer!=racers_[0]||!sourceRacer_->nativeWreckLoadAttempted_)return false;
-        if(sourceRacer_->sourceWreck374Published_&&(!sourceRacer_->sourceWreckCount370_||
-           !storage_[0]->nativeSource374AliasCurrent(sourceRacer_->sourceWreck374_,
-               *sourceRacer_->sourceWreckCount370_,sourceRacer_->sourceWreck374Slots_)))return false;
-        if(nativeEffects_&&!nativeEffects_->racerTailAliasesCurrent(sourceRacer_->sourceRacerExplosion814_,
-            sourceRacer_->sourceRacerSparks810_))return false;
-        if(nativeEffects_&&(!sourceRacer_->slots818_||!nativeEffects_->emberAliasesCurrent(
-            sourceRacer_->slots818_->data(),sourceRacer_->nativeSource818Published_)))return false;
+        if(!n.attempted||n.withdrawn)return true;
+        if(!n.racer||!storage_[slot]||!application_||application_->released_||
+           n.racer->racer.sessionGeneration!=generation_||n.racer->racer.reference00!=1u||
+           n.racer->racer.objectKey!=storage_[slot]->racerKey()||
+           &n.racer->racer!=racers_[slot]||!n.racer->nativeWreckLoadAttempted_)return false;
+        if(n.racer->sourceWreck374Published_&&(!n.racer->sourceWreckCount370_||
+           !storage_[slot]->nativeSource374AliasCurrent(n.racer->sourceWreck374_,
+               *n.racer->sourceWreckCount370_,n.racer->sourceWreck374Slots_)))return false;
+        if(n.effects&&!n.effects->racerTailAliasesCurrent(n.racer->sourceRacerExplosion814_,
+            n.racer->sourceRacerSparks810_))return false;
+        if(n.effects&&(!n.racer->slots818_||!n.effects->emberAliasesCurrent(
+            n.racer->slots818_->data(),n.racer->nativeSource818Published_)))return false;
         //Once212AAC made this the real Racer tail, source1424E0 retires
         //collection BEFORE earlier7FC children. Keep effect native backing,
         //model attachment history and manager facade alive across that order.
-        if(nativeEffects_&&!nativeEffects_->retireDetachedTail(*storage_[0]))return false;
-        if(!storage_[0]->retireNativeCollectionPieceSourcePrefix(world))return false;
-        if(nativeEffects_&&!nativeEffects_->retireExternal())return false;
+        if(n.effects&&!n.effects->retireDetachedTail(*storage_[slot]))return false;
+        if(!storage_[slot]->retireNativeCollectionPieceSourcePrefix(world))return false;
+        if(n.effects&&!n.effects->retireExternal())return false;
         //Withdraw borrow admission, not source words: preserve370/374 and slot
         //history exactly. No future consumer may dereference its dying array.
-        sourceRacer_->nativeWreckWithdrawn_=true;sourceRacer_=nullptr;
-        sourceWithdrawn_=true;return true;
+        n.racer->nativeWreckWithdrawn_=true;n.racer=nullptr;
+        n.withdrawn=true;return true;
+    }
+    // Retire every slot whose native load was entered, highest slot first
+    // (AIs before humans: the reverse of the 1ADF80/1AE3CC load order). Each
+    // slot preflights inside its own retire; a refusal stops before mutation
+    // of any later slot.
+    bool retireNativeSourcePrefixAll(const rr::game::LiveZoneWorld50EN& world)noexcept {
+        if(thread_!=std::this_thread::get_id())return false;
+        for(std::size_t i=racerCount_;i-->0;)
+            if(!retireNativeSourcePrefix(i,world))return false;
+        return true;
+    }
+    // Borrow this racer's own warm creators for 26E9F0. Count is bounded by
+    // the fixed lane; a longer list is refused, never truncated.
+    bool bindNativeWarmCreators(std::size_t slot,const rr::game::OriginalWreckWarmCreator50LA* creators,
+        std::size_t count)noexcept {
+        if(thread_!=std::this_thread::get_id()||slot>=racerCount_||slot>=native_.size())return false;
+        auto& n=native_[slot];
+        if(n.attempted||n.warmCount||count>n.warm.size()||(count&&!creators))return false;
+        for(std::size_t i=0;i<count;++i){if(!creators[i].scene)return false;n.warm[i]=creators[i];}
+        n.warmCount=count;return true;
+    }
+    void releaseNativeWarmCreators(std::size_t slot)noexcept {
+        if(slot>=native_.size())return;
+        native_[slot].warm={};native_[slot].warmCount=0;
+    }
+    // Read-only diagnostic: where this slot's 2129C0 chain currently stands.
+    bool nativeWreckCursor(std::size_t slot,std::size_t& collection,std::size_t& piece,
+        unsigned& status,std::uint32_t& pc)const noexcept {
+        collection=piece=0;status=0;pc=0;
+        if(slot>=racerCount_||slot>=native_.size()||!storage_[slot])return false;
+        const auto& owner=*storage_[slot];pc=native_[slot].pc;
+        collection=owner.nativeCollectionOrdinal();
+        const auto* c=owner.collection(collection);if(!c)return true;
+        piece=c->reachedSourcePieceSlotCount();
+        const auto* p=piece?c->piece(piece-1u):nullptr;
+        if(p)status=static_cast<unsigned>(p->sourceProgress().prefixResult.status);
+        if(piece)--piece;
+        return true;
+    }
+    std::size_t nativeRacerCount()const noexcept{return racerCount_;}
+    std::size_t nativeSlotPieces(std::size_t slot)const noexcept {
+        return slot<spans_.size()&&slot<racerCount_?spans_[slot].count:0u;
     }
     //Fresh source chronology is distinct from the late native Follow adapter.
     //Identity adoption is native custody only; no query preparation or330/334
@@ -1923,11 +2004,12 @@ private:
     bool releaseNativeColdBacking() noexcept {
         if(thread_!=std::this_thread::get_id())return false;
         if(closed_)return true;
-        if(!queriesRetired_||(sourceAttempted_&&!sourceWithdrawn_)||(freshSourceSelected_&&!freshSourceRetired_))return false;
+        if(!queriesRetired_||(freshSourceSelected_&&!freshSourceRetired_))return false;
+        for(const auto& n:native_)if(n.attempted&&!n.withdrawn)return false;
         for(const auto& owner:storage_)if(owner&&!owner->canReleaseNativeColdBacking())return false;
         closed_=true;reservations_.clear();racers_.fill(nullptr);
         for(auto& owner:storage_)owner.reset();
-        nativeEffects_.reset(); //All external refs and piece array borrows genuinely retired.
+        for(auto& n:native_)n.effects.reset(); //All external refs and piece array borrows genuinely retired.
         for(auto& state:freshSources_)state.effects.reset(); //After every piece field borrow is destroyed.
         for(auto& inventory:inventories_)inventory.reset();
         return true;

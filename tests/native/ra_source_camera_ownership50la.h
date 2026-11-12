@@ -50,6 +50,8 @@ namespace native_racer_model50LA { class Owner; }
 namespace ra_cold_roster50LA { class Resources; class Operation; class FreshExecutionArena; }
 namespace ra_static_lighting50LA { class Binding; }
 namespace ra_static_fog50LA { class Binding; }
+#include "original_pod_load50pl.h"
+namespace original_pod_load50PL { class SceneTrackData50PL; }
 namespace ra_source_camera50LA {
 namespace g=rr::game;
 namespace storage=track_runtime_storage50IG;
@@ -1925,8 +1927,31 @@ class OwnershipBridge final {
         native_racer_model50LA::Owner&,const g::OriginalRaceConstructor50LA&,std::uint32_t&)noexcept;
     bool continueNativeOuterStorage212E18(original_camera_session50KX::Session&,
         native_racer_model50LA::Owner&,std::uint32_t&)noexcept;
-    bool stageNativeFirstWreckLoad(original_camera_session50KX::Session&,
-        const g::OriginalRaceConstructor50LA&,::ra_pod_scene50LA::Owner&,const g::UndertrackPhysicsDomain50EW&,const std::string&,const std::string&,const void*,std::uint32_t&,std::uint32_t&)noexcept;
+    // PodLoad (original_pod_load50pl.cpp): 2129C0 for every slot in 1AE280
+    // manager order, track-side inputs only through TrackDataProvider50PL.
+    friend class ::original_pod_load50PL::SceneTrackData50PL;
+    bool loadPodRosterFromScene2129C0(original_camera_session50KX::Session&,const g::OriginalRaceConstructor50LA&,
+        ::ra_pod_scene50LA::Owner&,const void* water3FC,const g::UndertrackPhysicsDomain50EW&,const std::string&,
+        const std::string&,std::uint32_t&,std::uint32_t&)noexcept;
+    bool loadPodRoster2129C0(original_camera_session50KX::Session&,const g::OriginalRaceConstructor50LA&,
+        ::original_pod_load50PL::TrackDataProvider50PL&,const g::UndertrackPhysicsDomain50EW&,const std::string&,
+        const std::string&,std::uint32_t&,std::uint32_t&)noexcept;
+    bool loadPodRacer2129C0(std::size_t slot,original_camera_session50KX::Session&,const g::OriginalRaceConstructor50LA&,
+        const g::OriginalWreckSetupZones50LA&,const g::UndertrackPhysicsDomain50EW&,const std::string&,
+        const std::string&,const void*,std::uint32_t&,std::uint32_t&)noexcept;
+    bool podSceneRetainZones(::ra_pod_scene50LA::Owner&,std::uint64_t,g::OriginalWreckSetupZones50LA&,
+        g::CollectionRef50BX&,g::CollectionRef50BX&)noexcept;
+    bool podSceneReleaseZones(::ra_pod_scene50LA::Owner&)noexcept;
+    bool podSceneRetainParticles(::ra_pod_scene50LA::Owner&,g::OriginalTrackParticleCold50LA*)noexcept;
+    bool podWarmCreators(original_camera_session50KX::Session&,std::size_t slot,
+        std::array<g::OriginalWreckWarmCreator50LA,4>&,std::size_t&)const noexcept;
+    // Roster-wide 4C0[0]/4C4[0] borrow (1AE4B0) and the zone fields 165E90 reads.
+    bool podRosterAttempted_=false,podZonesHeld_=false;
+    ::original_pod_load50PL::TrackDataProvider50PL* podTrack_=nullptr;
+    std::unique_ptr<::original_pod_load50PL::TrackDataProvider50PL> podTrackStorage_; //Provider lifetime spans the zone borrow.
+    g::OriginalWreckSetupZones50LA podZones_{};
+    g::CollectionRef50BX podVisibility_=0,podCollision_=0;
+    std::array<bool,8> podAiHandlingStopped_{}; //STAND-IN: AI 16E5F4 handling not written.
 
     bool retireNativeRetainedWreckCold(original_camera_session50KX::Session&)noexcept;
 

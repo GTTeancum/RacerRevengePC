@@ -32,20 +32,6 @@ inline std::string trim(std::string text){
     if(text.size()>=2&&text.front()=='"'&&text.back()=='"')text=text.substr(1,text.size()-2);
     return text;
 }
-// Exact original153228/153238 lookup precedes RHS parsing. The final POD18
-// token is absent, so15325C skips it without changing the real right-hand row.
-inline std::size_t sebulba18ChariotVutPrefix(const std::vector<std::uint8_t>& psg,
-    const std::vector<std::uint8_t>& vut) {
-    using pod_materials50ed_fixture::detail::sha256;
-    need(psg.size()==102228&&sha256(psg)==
-        "534f672fc5042e8ed3e0daa3e1dc54cd37cf7ddb672b1ed192ac8de46293033c"&&
-        vut.size()==377&&sha256(vut)==
-        "8079e29977d35277b865781fb0ffd2917b3fe1a9f12d4346665f31f45e22ab1d",
-        "POD18 chariot VUT projection requires complete original PSG/VUT");
-    need(std::string(vut.begin()+352,vut.end())=="r_hand_dummy_hand_dummy\r\n",
-        "POD18 original skipped-token boundary differs");
-    return 352;
-}
 inline const char* bindingErrorName(a::MotionBindingError49O error) noexcept {
     switch(error){
         case a::MotionBindingError49O::none:return "none";
@@ -308,21 +294,23 @@ public:
             need(shoulder!=Index::none&&shoulder!=roots[chariot],"Roster original shoulder parent");
             return ChariotIkChainBinding49T{shoulder,elbow,wrist,target};
         };
-        // Original211A54..211B3C independently guards each wrist/parent chain.
-        // POD20 has neither hand nor target: retain absent bindings, with no
-        // dummy nodes, synthetic IK records, or constructor/libm side effects.
-        const bool absentHands=podId=="POD20";
+        // Original211A54..211B3C independently guards each wrist/parent chain:
+        // a wrist (handlt/handrt) absent from this pod's chariot PSG leaves that
+        // hand without a28EB90 record (+208/+20C stay null), for every pod.
+        // No dummy nodes, synthetic IK records, or constructor/libm effects.
+        // One hand present and one absent needs the per-record constructor and
+        // is refused here rather than paired with an absent chain.
+        const bool leftWrist=find(chariot,"handlt")!=Index::none;
+        const bool rightWrist=find(chariot,"handrt")!=Index::none;
+        const bool absentHands=!leftWrist&&!rightWrist;
         if(retainedScenes){
             if constexpr(!std::is_same_v<ChariotModelConstruction,std::nullptr_t>)
                 chariotModel->bindColdWrists(animation.hands,hands,animation.handRecords);
         }else if(absentHands){
-            need(pod_materials50ed_fixture::detail::sha256(psg[chariot])=="136b0690d569ef1ed641055534371f9e99a02ac7d0a33599683f5c6d170c9ca3"&&
-                find(chariot,"handlt")==Index::none&&find(chariot,"handrt")==Index::none&&
-                find(chariot,"l_hand_dummy")==Index::none&&find(chariot,"r_hand_dummy")==Index::none,
-                "Roster original POD20 absent hand/target identities");
             const ChariotIkChainBinding49T absent{Index::none,Index::none,Index::none,Index::none};
             animation.hands={absent,absent};animation.handRecords=nullptr;
         }else{
+            need(leftWrist&&rightWrist,"Roster single-wrist chariot requires per-record 28EB90 construction");
             animation.hands={chain("handlt","l_hand_dummy"),chain("handrt","r_hand_dummy")};animation.handRecords=&hands;
         }
         state.animation={};

@@ -1178,14 +1178,21 @@ private:
     // contain sampled motion/placement. Copy its actual local/bounds/flags and
     // allocate siblings BEFORE children, then enumerate28C400 into actual1B8
     // order. The genuine geometry104960/material26EB90 owners run separately.
-    // Bounded same-layout source branches: separate->separate26EA28 and
-    // non-childless direct->direct26EB10. Childless remains its exact API above.
+    // Bounded source branches: separate->separate26EA28, non-childless
+    // direct->direct26EB10, and26EA9C: a direct (a2=0) user whose prototype is
+    // a separate-root model (191 bit1), e.g. a wreck piece warm-hitting the
+    // racer's own chariot. 26EA9C runs virtual98(this,prototype.child184): the
+    // source root is the prototype's distinct root row, the destination is this
+    // model's row0, and no1A0 copy follows (only the a2=1 path26EA44 copies it).
+    // Childless direct->direct remains its exact API above.
     R loadWarmHierarchy26EA28(const SceneGraph49P& graph,
         const OriginalRacerModelSceneOwner50LA& prototype,
         const SceneGraph49P& prototypeGraph)noexcept {
+        const bool selectedChild26EA9C=rootMode_==RootMode::direct&&
+            prototype.rootMode_==RootMode::separate&&(prototype.model_.flags191&2u);
         if(!modelConstructorComplete_||rowsLoaded_||referenceReleased_||released_||
-           &prototype==this||rootMode_!=prototype.rootMode_||!prototype.rowsLoaded_||
-           prototype.referenceReleased_||prototype.released_||binding_.sourceRowCount<2||
+           &prototype==this||(rootMode_!=prototype.rootMode_&&!selectedChild26EA9C)||!prototype.rowsLoaded_||
+           prototype.referenceReleased_||prototype.released_||(!selectedChild26EA9C&&binding_.sourceRowCount<2)||
            binding_.sourceRowCount!=prototype.binding_.sourceRowCount||
            binding_.sessionGeneration!=prototype.binding_.sessionGeneration||
            binding_.actualObjectCount423F60!=prototype.binding_.actualObjectCount423F60||
@@ -1199,7 +1206,7 @@ private:
            (rootMode_==RootMode::separate?
               (at(graph,root->sceneIndex).parent180!=model_.sceneIndex||!(prototype.model_.flags191&2u)):
               (!directRootPrepared_||directRowsStarted_||at(graph,model_.sceneIndex).parent180!=none||
-               (prototype.model_.flags191&2u))))return {S::hierarchy,0x28e5d0u};
+               (!selectedChild26EA9C&&(prototype.model_.flags191&2u)))))return {S::hierarchy,0x28e5d0u};
         //28C400 appends ALL immediate children, then their children in source
         // sibling order, recursively repeating the same two-level procedure.
         std::array<const O*,rr::assets::maxModelNodes49O> originals{};

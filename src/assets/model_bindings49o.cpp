@@ -71,7 +71,20 @@ bool readMotionNodeBindings49O(const PsgHierarchyView49O& view,
         // bound and every identifier, hierarchy and unknown-node check.
         while(end>start&&text[end-1]==' ')--end;
         std::size_t sep=start;while(sep<end&&text[sep]!='=')++sep;
-        if(sep==end||!identifier(text+start,sep-start))return fail(MotionBindingError49O::line,start);
+        if(!identifier(text+start,sep-start))return fail(MotionBindingError49O::line,start);
+        if(sep==end){
+            // Original153228 strtok("=,") takes the whole line as LHS and
+            //153238 looks it up BEFORE any RHS token is read. An absent LHS
+            // takes153248..15325C (diagnose, skip), for every model. A line
+            // with no '=' whose LHS IS a node has no source RHS: refuse.
+            std::uint32_t row=0;for(;row<result.count;++row)if(equal(result.rows[row].name,text+start,sep-start))break;
+            if(row!=result.count||missingNode==MotionBindingMissingNode49O::reject)
+                return fail(MotionBindingError49O::line,start);
+            if(!diagnostic.skippedUnknownNodes)diagnostic.firstUnknownOffset=start;
+            ++diagnostic.skippedUnknownNodes;
+            if(p<bytes)++p;
+            continue;
+        }
         std::size_t comma=sep+1;while(comma<end&&text[comma]!=',')++comma;
         if(!identifier(text+sep+1,comma-sep-1))return fail(MotionBindingError49O::line,sep+1);
         if(comma<end&&!identifier(text+comma+1,end-comma-1))return fail(MotionBindingError49O::line,comma+1);

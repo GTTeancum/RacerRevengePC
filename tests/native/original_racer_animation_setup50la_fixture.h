@@ -117,20 +117,8 @@ inline Input readInput1538B0(const Rig& rig,unsigned model,const Archive& archiv
     need(selected==canonical(rig.psgMembers[model]),"original SLT selects another Rig PSG");
     input.archiveDigest=archive.digest();input.mirrorMember=c.directory190+c.mirrorE8;input.vutMember=c.directory190+c.vut98;
     input.mirror=archive.lookup(input.mirrorMember);input.vut=archive.lookup(input.vutMember);
-    if(rig.podId=="POD18"&&model==Rig::chariot){
-        // The live canonical Setup reads its own archive-backed input, rather
-        // than Rig::load's already projected bindings. Apply the same exact
-        // source-proved unknown-LHS skip before the unchanged strict parser.
-        need(archive.digest()=="db065fdd6dd1c8dc9996191a07ff549f2fad1706701b69cbc881a470812834a1"&&
-            canonical(input.vutMember)=="pods\\pod18\\chariot.vut"&&
-            canonical(rig.psgMembers[model])=="pods\\pod18\\chariot.psg"&&input.vut,
-            "POD18 live VUT projection requires original archive and chariot role");
-        const auto prefix=native_racer50HW::rig_detail::sebulba18ChariotVutPrefix(*psg,*input.vut);
-        need(*input.vut==rig.vut[model],"POD18 live VUT differs from retained original Rig bytes");
-        // Only this transient parsing input is projected. Rig and both real
-        // archive owners retain the complete original 377-byte member.
-        input.vut->resize(prefix);
-    }
+    // The complete archive VUT goes to prepareTables154140 unprojected: its
+    //153228..15325C rule skips any absent LHS, including a line with no '='.
     return input;
 }
 }

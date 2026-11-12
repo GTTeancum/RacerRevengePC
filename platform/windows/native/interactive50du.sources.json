@@ -619,6 +619,7 @@
     "tests/native/original_race_end_clock50la.cpp",
     "tests/native/original_race_camera_owner50la.cpp",
     "tests/native/original_race_world_load_prefix50la.cpp",
+    "tests/native/original_pod_load50pl.cpp",
     "tests/native/original_race_world_tob_prefix50la.cpp",
     "tests/native/original_ra_scene_roles270900.cpp"
   ],
