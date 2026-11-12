@@ -73,6 +73,8 @@ bool Context::advanceChildren(std::size_t actualRacerSlot,float preparedOuterFac
    const ImpactTransitionResult50C forced{ImpactTransitionStatus50C::unsupportedTransition,0x225d9cu,0x8cu,0x226750u};
    return commitOriginalDestroyed(actualRacerSlot,forced,preparedOuterFactor);
   }
+  // ":left"/":right" stay pending until this frame's 225C50 point below.
+  if(rr::game::nativeTestDestroyLimp50PD[actualRacerSlot])s.fields.flagB9D0=false;
  }
  if(audioEnabled&&!sourceAiAudio&&!opponentFrame&&!raceSetupFrame)require50DU(advanceSpeechTimers50HG(.016f,lapContinuity.prefix,speechState),
      "native speech countdown failed");
@@ -550,12 +552,38 @@ bool Context::advanceChildren(std::size_t actualRacerSlot,float preparedOuterFac
  runNative([&]{return optionalProbeVehicleImpacts50P(s,x.bindings,optionalOwners,optional,x.workspace,x.diagnostic);},"explicit absent optional dust-owner context");runNative([&]{return consumeEffects(optional.events,optional.count);},"consume dust stop controls");ImpactTransitionResult50C decision{};
  const bool damageReady=decideVehicleImpacts50P(s,x.bindings,0x3f800000u,
      decision,x.workspace,x.diagnostic);
+ bool limpContinued=false;
+ const auto isLimpEntry=[&](const ImpactTransitionResult50C& d){
+  return originalAiEnabled&&(d.sourcePC==0x225e7cu||d.sourcePC==0x225ec0u)&&!s.fields.vehicle58&&!s.fields.vehicle3C;};
+ if(damageReady&&actualRacerSlot<rr::game::nativeTestDestroyLimp50PD.size()&&
+    rr::game::nativeTestDestroyLimp50PD[actualRacerSlot]&&originalAiEnabled&&!s.bodies.main.vehicleState40){
+  // Test-only: this frame's 225C50 takes its 225E7C (slot90, 227370, left
+  // lost) or 225EC0 (slot94, 227A40, right lost) site, so the real suffix
+  // runs. Provenance: the original's own debug input 1A17EC calls 90/94.
+  const int side=rr::game::nativeTestDestroyLimp50PD[actualRacerSlot];
+  rr::game::nativeTestDestroyLimp50PD[actualRacerSlot]=0;
+  const ImpactTransitionResult50C forced=side==1?
+      ImpactTransitionResult50C{ImpactTransitionStatus50C::unsupportedTransition,0x225e7cu,0x90u,0x227370u}:
+      ImpactTransitionResult50C{ImpactTransitionStatus50C::unsupportedTransition,0x225ec0u,0x94u,0x227a40u};
+  require50DU(commitOriginalDestroyed(actualRacerSlot,forced,preparedOuterFactor),"test limp entry rejected");
+  limpContinued=true;
+ }
  if(!damageReady&&x.diagnostic.error==VehicleFrameError49W::ExternalCut&&
     decision.status==ImpactTransitionStatus50C::unsupportedTransition){
   addCounter50DU(nativeCalls);
   // Original 225C50 dispatches the racer's destroy handler; the racer is
   // retired for the rest of the race (no respawn). Original-AI sessions run
   // that transition; the legacy host checkpoint path below is unchanged.
+  if(isLimpEntry(decision)){
+   // 227370/227A40 return to 225C50, whose suffix runs; 228620 then goes on
+   // with this same frame (2289BC countdown onward). The impact block is
+   // completed again at state1/2, where 2288EC no longer runs 225C50.
+   require50DU(commitOriginalDestroyed(actualRacerSlot,decision,preparedOuterFactor),"limp entry rejected");
+   ImpactTransitionResult50C after{};
+   limpContinued=decideVehicleImpacts50P(s,x.bindings,0x3f800000u,after,x.workspace,x.diagnostic)&&
+       after.status==ImpactTransitionStatus50C::noTransition;
+   require50DU(limpContinued,"limp entry impact block did not complete at state1/2");
+  }else{
   if(originalAiEnabled)return commitOriginalDestroyed(actualRacerSlot,decision,preparedOuterFactor);
   recoveryPaused=true;
   if(opponentFrame)return false; // A failed AI never restarts the human session.
@@ -577,8 +605,32 @@ bool Context::advanceChildren(std::size_t actualRacerSlot,float preparedOuterFac
             <<". Last committed image retained; F5/restart returns to grid.\n";
   }
   return false;
+  }
  }
- runNative([&]{return damageReady;},"ordinary damage decision");
+ runNative([&]{return damageReady||limpContinued;},"ordinary damage decision");
+ // 2289BC..228A90 (human, 3C==0, states1/2): 4C -= dt; |BA8| > threshold
+ // -> 2261B0, > threshold/2 or 4C <= 0 -> 226750, both without 225C50's
+ // suffix. The threshold is the same racer value the state-0 decision uses.
+ if((s.bodies.main.vehicleState40==1u||s.bodies.main.vehicleState40==2u)&&!s.fields.vehicle58&&!s.fields.vehicle3C){
+  require50DU(actualRacerSlot<rr::game::nativeDestroyedRacers50PD.size()&&
+      rr::game::nativeDestroyedRacers50PD[actualRacerSlot].limping,"limping racer has no native limp record");
+  auto& limp=rr::game::nativeDestroyedRacers50PD[actualRacerSlot];++limp.limpFrames;
+  float impact=0.f;std::memcpy(&impact,&s.fields.impactBA0.v[2],4);
+  const auto countdown=rr::game::advanceOriginalDetachedDamage50LA(s.bodies.main.vehicleState40,s.fields.vehicle3C,
+      preparedOuterFactor,impact,std::bit_cast<float>(0x3f800000u),limp.limp4C);
+  const auto& p=s.bodies.main.components.root.body.position;
+  std::cerr<<"pod_limp frame="<<limp.limpFrames<<" state40="<<s.bodies.main.vehicleState40<<" t4C="<<limp.limp4C
+      <<" ba8="<<impact<<" speed="<<s.bodies.main.cachedSpeed34<<" pos="<<p.v[0]<<','<<p.v[1]<<','<<p.v[2]
+      <<" status="<<static_cast<unsigned>(countdown.status)<<'\n';
+  if(countdown.status==rr::game::OriginalVehicleDamageStatus50LA::destructionRequired){
+   std::cerr<<"pod_limp_exit reason="<<(countdown.sourcePC==0x228a30u?"impact88":limp.limp4C<=0.f?"timer":"impact8C")
+       <<" handler=0x"<<std::hex<<countdown.originalTarget<<std::dec<<" after_frames="<<limp.limpFrames<<'\n';
+   const ImpactTransitionResult50C escalation{ImpactTransitionStatus50C::unsupportedTransition,countdown.sourcePC,
+       countdown.vtableSlot,countdown.originalTarget};
+   return commitOriginalDestroyed(actualRacerSlot,escalation,preparedOuterFactor);
+  }
+  require50DU(countdown.status==rr::game::OriginalVehicleDamageStatus50LA::complete,"original 2289BC limp countdown rejected");
+ }
  }
  require50DU(s.phase==VehicleFramePhase49W::AfterImpactBlock,"source impact outer skip continuation unavailable");
  if(isMcTrack){
@@ -759,15 +811,126 @@ bool Context::commitOriginalDestroyed(std::size_t actualRacerSlot,
  require50DU(actualRacerSlot<nativeDestroyedRacers50PD.size(),"destroyed racer slot outside the race field");
  auto& record=nativeDestroyedRacers50PD[actualRacerSlot];
  auto& main=s.bodies.main;
- require50DU(!record.destroyed&&main.vehicleState40==0u,"destroy transition reached a racer already out");
  const bool human=s.fields.vehicle58==0u;
+ // 228A30/228A84: the limp countdown's escalation (no 225C50 suffix).
+ const bool limpEscalation=decision.sourcePC==0x228a30u||decision.sourcePC==0x228a84u;
+ if(limpEscalation)require50DU(record.limping&&!record.destroyed&&(main.vehicleState40==1u||main.vehicleState40==2u),
+     "limp escalation reached a racer that is not limping");
+ else require50DU(!record.destroyed&&!record.limping&&main.vehicleState40==0u,"destroy transition reached a racer already out");
+ // 225EC8..226184: the 225C50 suffix after a dispatched handler.
+ auto applySuffix=[&](){
+  // 225EC8..226034 kill credit: a dispatched handler, D30 != -1 and 188FB0
+  // (profile,1)==0, i.e. two-player game34==2 or the one-hit option 10FE0==0.
+  // Race1B0 bit4 is not represented. Applied at the next world boundary.
+  record.killCreditPending=record.attackerD30!=0xffffffffu&&record.attackerD30<racerBank.count()&&
+      record.attackerD30!=actualRacerSlot&&(dynamicProfile.game34==2u||dynamicProfile.game10FE0==0u);
+  // The human's player-event projection of its CD0 (consumed by the tournament
+  // result, 1875C0) is a host object, credited here; the arena CD0 at the
+  // next world boundary.
+  if(record.killCreditPending&&record.attackerD30==0u&&humanCourseEnabled)++playerEvents.countCD0;
+  // 226054..226184: when the victim's D2C timer is positive (recently hit),
+  // the shared 308030 stream (lazy 3D6B30 seed, 3D6B38 guard) picks music
+  // song 17+int(3*u) for 1A46E0. Requested at the next world boundary.
+  {std::uint32_t timerBits=poseHistory.timerD2C;float timer=0.f;std::memcpy(&timer,&timerBits,4);
+   if(timer>0.f){
+    auto& random=sessionRandom;auto& raw=s.noiseOwner().sharedRandomState;
+    if(!random.seed.lazy80A8){random.seed.seed3D6B30=0;random.seed.lazy80A8=true;}
+    if(!random.seed.seed3D6B30){std::uint32_t stamp=0;
+     require50DU(sampleHostTimestamp50ID(applicationClock,stamp),"destroy music seed clock unavailable");
+     random.seed.seed3D6B30=stamp;raw=stamp;}
+    raw=raw*0x41c64e6du+0x3039u;
+    const auto drawn=static_cast<std::int32_t>(raw&0x7fffffffu);
+    volatile float unit=std::bit_cast<float>(0x30000000u)*static_cast<float>(drawn);
+    volatile float scaled=3.f*unit;
+    const auto song=static_cast<std::int32_t>(scaled)+17;
+    if(!random.range.lazy80AC){random.range.rangeCheck3D6B38=1;random.range.lazy80AC=true;}
+    require50DU(!random.range.rangeCheck3D6B38||(song>=17&&song<=19),"destroy music song outside 17..19 (226140 assertion)");
+    record.musicSong=static_cast<std::uint32_t>(song);
+   }}
+ };
+ // 227370 (225E7C, slot90) / 227A40 (225EC0, slot94) for the local human:
+ // the pod loses one side and keeps racing (states1/2). The AI (58 != 0)
+ // takes 226750 directly (2273A0/227A70).
+ if((decision.sourcePC==0x225e7cu||decision.sourcePC==0x225ec0u)&&human&&!s.fields.vehicle3C){
+  const bool left=decision.sourcePC==0x225e7cu;
+  const std::uint32_t side=left?1u:2u;
+  record={};record.limping=true;record.limpState40=side;record.frame=completedFrames;record.limpFrame=completedFrames;
+  record.decisionPC=decision.sourcePC;record.handler=left?0x227370u:0x227a40u;
+  record.attackerD30=poseHistory.markerD30;
+  // 2273C4/2273C8 (227A94/227A98): 40 = 1/2, 4C = 2.0f.
+  main.vehicleState40=side;record.state40=side;record.limp4C=std::bit_cast<float>(0x40000000u);
+  // 2273EC..227430 (227ABC..227B00): Stop84 on the LOST side's 808 and 81C only.
+  {ImpactEffectEvent50B stops[2]{};std::size_t count=0;const unsigned i=left?0u:1u;
+   if(resetEffectBindings.owners808[i]){stops[count].kind=ImpactEffectKind50B::Stop84;
+    stops[count].sourcePC=left?0x227400u:0x227ad0u;stops[count].target=resetEffectBindings.owners808[i];++count;}
+   if(resetEffectBindings.table81CPresent){
+    if(resetEffectBindings.controls81C[i])stopEffect50BC(*resetEffectBindings.controls81C[i]);
+    else if(resetEffectBindings.owners81C[i]){stops[count].kind=ImpactEffectKind50B::Stop84;
+     stops[count].sourcePC=left?0x227428u:0x227af8u;stops[count].target=resetEffectBindings.owners81C[i];++count;}}
+   require50DU(consumeEffects(stops,count),"limp entry lost-side effect stops rejected");}
+  // 227434..2274CC: human, 3C==0, vibration option: 0.5 s on both motors.
+  if(!s.fields.vehicle3C&&(dynamicConsumerFlags11050&4u)&&playerSource5C<2u){
+   auto& device=feedbackDevices[playerSource5C];clearControllerFeedback50KZ(device,2);
+   require50DU(requestControllerFeedback50KZ(device,2,0u,.5f),"limp entry vibration request rejected");}
+  // 2274D0 (227BA0): 48 = 0 (no Binder, no detached-cable path). The port's
+  // only writer of 48 is its 20F6B4 constructor, which stores 0, so the field
+  // already holds 0 here; an unconstructed 48 has no owner, so refuse.
+  require50DU(s.fields.cableMode48.sourceConstructed(),"limp entry racer field 48 is not constructed");
+  // 227920..2279BC (227FF4..228090): the cockpit becomes the physical body on
+  // one tether, from the surviving side's hitch to its engine.
+  {using namespace rr::game::detail;
+   const SceneGraph49P g{s.nodes,s.sceneNodeCount};const auto& l=x.bindings.lifecycle;
+   const SceneNodeIndex49P engineNode=left?l.right1B8:l.left1BC,hitchNode=left?l.rightCable1E4:l.leftCable1E0;
+   for(const auto n:{engineNode,hitchNode,l.main190,l.model1B4,l.physical19C})
+    require50DU(static_cast<std::int32_t>(n)>=0&&static_cast<std::uint32_t>(n)<s.sceneNodeCount,"limp entry scene node outside the racer graph");
+   s.bodies.vehicle838=1u;s.lifecycle.vehicle83C=0u;                 // 227920/227928
+   SceneVectorContext49U scratch{0};VisualVector49R engine{},hitch{};
+   require50DU(position49U(g,engineNode,l.main190,scratch,engine)&&     // 22793C: surviving engine rel 190
+       position49U(g,hitchNode,l.model1B4,scratch,hitch),"limp entry tether anchors unavailable"); // 22794C: hitch rel 1B4
+   const float* length=s.fields.length858.value();
+   require50DU(length&&std::isfinite(*length),"limp entry tether length 858 unavailable");
+   PodSphereBody49L cockpit{};makeSecondarySphereBody49M(s.bodies.secondary,x.parameters.bodies.secondary,cockpit);
+   PodSphereBody49L body{};
+   {const auto& m=s.bodies.main;const auto& lanes=s.bodies.mainSphere;SecondaryBodyState49M view{};
+    view.root=m.components.root;view.scenePresent=m.domain.sceneAttached;view.sceneFlags190=lanes.sceneFlags190;
+    view.velocity70W=lanes.velocity70W;view.angularVelocityB0W=lanes.angularVelocityB0W;view.force180W=lanes.force180W;
+    view.torque190W=lanes.torque190W;SecondaryBodyParameters49M par{};par.body=x.parameters.bodies.main.body;
+    par.centerOffset=x.parameters.bodies.main.centerOffset;par.centerOffsetW=x.parameters.bodies.mainSphere.centerOffsetW;
+    std::memcpy(par.inverseInertiaExtra,x.parameters.bodies.mainSphere.inverseInertiaExtra,sizeof par.inverseInertiaExtra);
+    makeSecondarySphereBody49M(view,par,body);}
+   PodSphereVector49L a{},b{};std::memcpy(a.v,hitch.v,sizeof a.v);std::memcpy(b.v,engine.v,sizeof b.v);
+   require50DU(setupPodSphereA49L(s.bodies.joint,cockpit,a)&&setupPodSphereB49L(s.bodies.joint,&body,b,*length),
+       "limp entry 1B64D0/1B6670 tether rebind rejected");                 // 22795C/227970
+   require50DU(copyLocal49U(g,l.physical19C,s.nodes[static_cast<std::uint32_t>(l.model1B4)].localC0),
+       "limp entry 28B3E0 cockpit pose copy rejected");                    // 227980
+   // The secondary body's scene view is the 19C node itself (body+288):
+   // republish it as the frame's own projection does after a scene write.
+   {const auto& node=s.nodes[static_cast<std::uint32_t>(l.physical19C)];
+    s.bodies.secondary.root.scene=node.world100;
+    s.bodies.secondary.sceneFlags190=(s.bodies.secondary.sceneFlags190&0xffffff00u)|node.sceneFlags190;}
+   resetSecondaryActivation49V(s.bodies.secondary,s.secondarySupplement,x.parameters.activation); // 227988 (35C vAC)
+   copySecondaryMainVelocities49V(s.bodies.main.components.root,s.bodies.mainSphere.velocity70W,
+       s.bodies.mainSphere.angularVelocityB0W,s.bodies.secondary);         // 22799C..2279BC
+   std::cerr<<"pod_limp_joint side="<<(left?"left":"right")<<" hitch="<<hitch.v[0]<<','<<hitch.v[1]<<','<<hitch.v[2]
+       <<" engine="<<engine.v[0]<<','<<engine.v[1]<<','<<engine.v[2]<<" length858="<<*length<<'\n';}
+  // The suffix runs at limp entry (s1 = 1 after the handler, 225EC8 onward).
+  applySuffix();
+  std::cerr<<"pod_limp_enter slot="<<actualRacerSlot<<" side="<<(left?"left":"right")<<" state40="<<side
+      <<" t4C="<<record.limp4C<<" frame="<<completedFrames<<" attacker="<<static_cast<std::int32_t>(record.attackerD30)
+      <<" kill_credit="<<record.killCreditPending<<" music_song="<<record.musicSong<<'\n';
+  // The caller continues 228620 with this same frame.
+  return true;
+ }
+ const NativeDestroyedRacer50PD limp=record;
  std::uint32_t handler=0;
  switch(decision.sourcePC){
+  case 0x228a30u:handler=0x2261b0u;break;                    // limp 4C/BA8 -> slot88
+  case 0x228a84u:handler=0x226750u;break;                    // limp 4C/BA8 -> slot8C
   case 0x225d10u:handler=0x2261b0u;break;                    // slot88 explode
   case 0x225d9cu:case 0x225e28u:handler=0x226750u;break;     // slot8C wreck
-  // slot90/94: AI 227370/227A40 dispatch 226750 directly. The human
-  // states1/2 (one side lost, 2 s on 4C) are not built yet; the human
-  // takes the same 226750 wreck that their 4C expiry would reach.
+  // slot90/94: AI 227370/227A40 dispatch 226750 directly (the human
+  // limps instead, handled above before this switch).
+
   case 0x225e7cu:case 0x225ec0u:handler=0x226750u;break;
   default:
    std::cerr<<"original destroy dispatch unknown pc="<<std::hex<<decision.sourcePC<<std::dec<<'\n';
@@ -777,12 +940,14 @@ bool Context::commitOriginalDestroyed(std::size_t actualRacerSlot,
  // 2261C4/2272F0 state, 2261CC/22675C 4C=0, 2261D8 268=0.6f (0x3F19999A).
  main.vehicleState40=explode?4u:3u;
  record={};record.destroyed=true;record.handler=handler;record.decisionPC=decision.sourcePC;
+ if(limpEscalation){record.limpState40=limp.limpState40;record.limpFrame=limp.limpFrame;record.limpFrames=limp.limpFrames;
+  record.attackerD30=limp.attackerD30;record.suffixApplied=true;}
  record.state40=main.vehicleState40;record.timer4C=0.f;
  {std::uint32_t bits=explode?0x3f19999au:0u;std::memcpy(&record.timer268,&bits,4);}
  record.frame=completedFrames;
  // 225F04: the victim's D30 names the racer that last hit it (2 s window
  // via D2C). Its CD0 kill count and career/hall effects are not yet joined.
- record.attackerD30=poseHistory.markerD30;
+ if(!limpEscalation)record.attackerD30=poseHistory.markerD30;
  // 226288..2262A4: explosion point = body288 local XYZ (28B180) with Y+5.0f.
  const auto& p=main.components.root.body.position;
  {const auto node=static_cast<std::int32_t>(x.bindings.animation.bodyScene288);
@@ -850,34 +1015,7 @@ bool Context::commitOriginalDestroyed(std::size_t actualRacerSlot,
   std::cerr<<"wreck_effects_start slot="<<actualRacerSlot<<" emitters="<<effects.emitters.size()
       <<" embers_launched="<<effects.embersLaunched
       <<" ready="<<effects.cold<<'\n';}
- // 225EC8..226034 kill credit: a dispatched handler, D30 != -1 and 188FB0
- // (profile,1)==0, i.e. two-player game34==2 or the one-hit option 10FE0==0.
- // Race1B0 bit4 is not represented. Applied at the next world boundary.
- record.killCreditPending=record.attackerD30!=0xffffffffu&&record.attackerD30<racerBank.count()&&
-     record.attackerD30!=actualRacerSlot&&(dynamicProfile.game34==2u||dynamicProfile.game10FE0==0u);
- // The human's player-event projection of its CD0 (consumed by the tournament
- // result, 1875C0) is a host object, credited here; the arena CD0 at the
- // next world boundary.
- if(record.killCreditPending&&record.attackerD30==0u&&humanCourseEnabled)++playerEvents.countCD0;
- // 226054..226184: when the victim's D2C timer is positive (recently hit),
- // the shared 308030 stream (lazy 3D6B30 seed, 3D6B38 guard) picks music
- // song 17+int(3*u) for 1A46E0. Requested at the next world boundary.
- {std::uint32_t timerBits=poseHistory.timerD2C;float timer=0.f;std::memcpy(&timer,&timerBits,4);
-  if(timer>0.f){
-   auto& random=sessionRandom;auto& raw=s.noiseOwner().sharedRandomState;
-   if(!random.seed.lazy80A8){random.seed.seed3D6B30=0;random.seed.lazy80A8=true;}
-   if(!random.seed.seed3D6B30){std::uint32_t stamp=0;
-    require50DU(sampleHostTimestamp50ID(applicationClock,stamp),"destroy music seed clock unavailable");
-    random.seed.seed3D6B30=stamp;raw=stamp;}
-   raw=raw*0x41c64e6du+0x3039u;
-   const auto drawn=static_cast<std::int32_t>(raw&0x7fffffffu);
-   volatile float unit=std::bit_cast<float>(0x30000000u)*static_cast<float>(drawn);
-   volatile float scaled=3.f*unit;
-   const auto song=static_cast<std::int32_t>(scaled)+17;
-   if(!random.range.lazy80AC){random.range.rangeCheck3D6B38=1;random.range.lazy80AC=true;}
-   require50DU(!random.range.rangeCheck3D6B38||(song>=17&&song<=19),"destroy music song outside 17..19 (226140 assertion)");
-   record.musicSong=static_cast<std::uint32_t>(song);
-  }}
+ if(!limpEscalation)applySuffix();
  // 226414..2264AC / 226824..2268BC: human (58==0, 3C==0) with the vibration
  // option (11050 bit2): device virtual40 (238870, clear both) then virtual44
  // (2388B0, both motors) for 2.0 s (explode) or 1.0 s (wreck in place).

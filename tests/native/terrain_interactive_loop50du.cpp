@@ -381,6 +381,7 @@ void Context::run() {
       test.fired=true;rr::game::nativeTestDestroyPending50PD[static_cast<std::size_t>(test.slot)]=true;
       rr::game::nativeTestDestroyAttacker50PD[static_cast<std::size_t>(test.slot)]=test.attacker;
       rr::game::nativeTestDestroyWreck50PD[static_cast<std::size_t>(test.slot)]=test.wreck;
+      rr::game::nativeTestDestroyLimp50PD[static_cast<std::size_t>(test.slot)]=test.limp;
       std::cerr<<"test_destroy due slot="<<test.slot<<" race_seconds="<<race.raceSeconds<<'\n';
      }
    }
@@ -1742,7 +1743,7 @@ void Context::run() {
      // the transition. The human's player-event CD0 is credited in the frame.
      for(std::size_t slot=0;slot<racerBank.count()&&slot<rr::game::nativeDestroyedRacers50PD.size();++slot){
       auto& destroyed=rr::game::nativeDestroyedRacers50PD[slot];
-      if(!destroyed.destroyed||destroyed.suffixApplied)continue;
+      if((!destroyed.destroyed&&!destroyed.limping)||destroyed.suffixApplied)continue;
       destroyed.suffixApplied=true;
       if(destroyed.killCreditPending){
        const auto attacker=static_cast<std::size_t>(destroyed.attackerD30);
@@ -2120,7 +2121,12 @@ void Context::run() {
      // (one cheap pass), so no record outlives a model change. A destroyed
      // player keeps the CPU path, whose collapse below hides the model.
      static std::array<std::array<rr::game::VehicleDrawSkin50CM,rr::game::maxVehicleDrawComponents50CM>,2> playerSkins50LA;
-     const std::uint32_t playerSkinMask=rr::game::nativeRacerDestroyed50PD(0)?0u:renderer.racerGpuSkinMask50LA(0);
+     // 227370/227A40 hide the lost side's engines (28C6E0 on 1BC+1C4 or
+     // 1B8+1C0 = components 1+3 or 2+4); their geometry is collapsed below,
+     // which needs CPU vertices, so those components leave the GPU skin path.
+     const std::uint32_t limpState=s.bodies.main.vehicleState40==1u||s.bodies.main.vehicleState40==2u?s.bodies.main.vehicleState40:0u;
+     const std::uint32_t limpHidden=limpState==1u?((1u<<1)|(1u<<3)):limpState==2u?((1u<<2)|(1u<<4)):0u;
+     const std::uint32_t playerSkinMask=rr::game::nativeRacerDestroyed50PD(0)?0u:(renderer.racerGpuSkinMask50LA(0)&~limpHidden);
      for(std::uint32_t c=0;c<drawInput.componentCount&&c<rr::game::maxVehicleDrawComponents50CM;++c){
       auto& skin=playerSkins50LA[bank&1u][c];
       skin.localBoundsReady=false;
@@ -2170,6 +2176,22 @@ void Context::run() {
      nativeLightFailure("publishNativeDraw rejected",0,lightLease);
     } //229EF4 semantic publication ends; only completed copied packet survives.
     const bool playerDestroyed=rr::game::nativeRacerDestroyed50PD(0);
+    const std::uint32_t limpDrawState=!playerDestroyed&&(s.bodies.main.vehicleState40==1u||s.bodies.main.vehicleState40==2u)?
+        s.bodies.main.vehicleState40:0u;
+    std::uint32_t limpHiddenDrawn=0;
+    if(limpDrawState){
+     // 2274E0/2274F4 (227BB0/227BC4): only the lost side's engine models hide.
+     const std::uint32_t hiddenMask=limpDrawState==1u?((1u<<1)|(1u<<3)):((1u<<2)|(1u<<4));
+     for(std::uint32_t c=0;c<next.componentCount&&c<32u;++c){
+      if(!((hiddenMask>>c)&1u))continue;
+      auto& part=next.component[c];
+      require50DU(!part.skin,"limp hidden engine still on the GPU skin path");
+      if(!part.vertices||!part.vertexCount)continue;
+      auto* vertices=const_cast<rr::assets::Vertex48B*>(part.vertices);
+      for(std::uint32_t v=1;v<part.vertexCount;++v)for(unsigned k=0;k<3;++k)vertices[v].position[k]=vertices[0].position[k];
+      limpHiddenDrawn|=1u<<c;
+     }
+    }
     if(playerDestroyed){
      // Original 28C6E0 hides every model of the destroyed racer. Collapse
      // this frame's projected geometry (loop-owned staging) to one point so it
@@ -2307,8 +2329,22 @@ void Context::run() {
     if(!playerDestroyed){
      runNative([&]{return buildPodCables50FD(s,x.bindings,playerCableBindings,cameraBackward,
          cableMesh,cableWorkspace,cableDiagnostic);},"source cable mesh generation");
-     if(gameplayBinder.loaded())require50DU(gameplayBinder.stageRacer(0,s,x.bindings,cameraBackward,gcLightOwner),
+     // 229D20: the Binder draws only while 48 != 0; 227370/227A40 clear 48.
+     if(gameplayBinder.loaded()){
+      if(limpDrawState)require50DU(gameplayBinder.hideRacer(0),"limping player Binder hide rejected");
+      else require50DU(gameplayBinder.stageRacer(0,s,x.bindings,cameraBackward,gcLightOwner),
          "actual player Binder attachments or authored strip color unavailable");
+     }
+     if(limpDrawState){
+      std::uint32_t cablesDrawn=0;
+      for(std::uint32_t side=0;side<cableMesh.cableCount&&side<4u;++side){
+       const auto& first=cableMesh.vertices[side*18u];const auto& last=cableMesh.vertices[side*18u+17u];
+       if(first.position[0]!=last.position[0]||first.position[1]!=last.position[1]||first.position[2]!=last.position[2])cablesDrawn|=1u<<side;
+      }
+      static std::uint64_t limpDrawFrames=0;++limpDrawFrames;
+      std::cerr<<"limp_draw frame="<<limpDrawFrames<<" state40="<<limpDrawState<<" hidden_components=0x"<<std::hex<<limpHiddenDrawn
+          <<" cables_drawn=0x"<<cablesDrawn<<std::dec<<" binder="<<(gameplayBinder.loaded()?"hidden":"absent")<<'\n';
+     }
     }else{
      // Destroyed: the cables hang from the hidden models. Keep the admitted
      // 2/4-cable topology, collapsed to one point; hide the Binder likewise.

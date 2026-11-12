@@ -48,7 +48,10 @@ bool buildPodCables50FD(const VehicleFrameState49W& state,
     d={};
     if(state.phase!=VehicleFramePhase49W::Ready && state.phase!=VehicleFramePhase49W::PostGraphics)
         return reject(d,PodCableError50FD::phase);
-    if(state.bodies.main.vehicleState40!=0)return reject(d,PodCableError50FD::unsupportedState);
+    // 224720: states3/4 disable every cable; states1/2 (one side lost) keep
+    // the surviving side's cables (224B54.. setEnabled(i, state1 ? i%2 : !(i%2))).
+    const auto vehicleState=state.bodies.main.vehicleState40;
+    if(vehicleState>2u)return reject(d,PodCableError50FD::unsupportedState);
     if(std::fegetround()!=FE_TONEAREST)return reject(d,PodCableError50FD::roundingMode);
     for(float v:cameraForward.v)if(!std::isfinite(v))return reject(d,PodCableError50FD::input);
     if(cameraForward.v[0]==0.f&&cameraForward.v[1]==0.f&&cameraForward.v[2]==0.f)
@@ -85,6 +88,8 @@ bool buildPodCables50FD(const VehicleFrameState49W& state,
     const float speed=f.keep(state.bodies.main.cachedSpeed34);
     float yScale=f.add(1.f,f.div(f.mul(f.sub(speed,0.f),-1.f),fromBits(0x4392aa7fu)));
     if(yScale<0.f)yScale=0.f;else if(yScale>1.f)yScale=1.f;
+    // 224A78: a nonzero state uses the fixed low endpoint (0) instead of the speed blend.
+    if(vehicleState)yScale=0.f;
     const auto& model=w.nodes[static_cast<std::uint32_t>(b.model1B4)].world100;
     V chariotTangent{},engineTangent{};
     for(unsigned c=0;c<3;++c) {
@@ -143,6 +148,13 @@ bool buildPodCables50FD(const VehicleFrameState49W& state,
         }
     }
     if(!f.valid)return reject(d,PodCableError50FD::arithmetic);
+    // Disabled (lost-side) cables draw nothing: collapse their 18 vertices.
+    if(vehicleState)for(unsigned side=0;side<cable.cableCount;++side){
+        const bool enabled=vehicleState==1u?(side%2u)!=0u:(side%2u)==0u;
+        if(enabled)continue;
+        auto* first=w.next.vertices+side*18u;
+        for(unsigned k=1;k<18u;++k)for(unsigned c=0;c<3;++c)first[k].position[c]=first[0].position[c];
+    }
     for(unsigned c=0;c<3;++c)w.next.bounds.minimum[c]=w.next.bounds.maximum[c]=w.next.vertices[0].position[c];
     const auto vertexCount=cable.cableCount*podCableVerticesPerCable50FD;
     for(unsigned i=0;i<vertexCount;++i)for(unsigned c=0;c<3;++c) {

@@ -65,7 +65,7 @@ bool admit(const S&s,const VehicleFrameBindings49W&b,VehicleFrameDiagnostic49W&d
  if(m.probe124Present!=bool(b.terrainWater50JC)||
     (b.terrainWater50JC&&(!s.terrainProbe.enabled||!coherentTerrainWater50JC(*b.terrainWater50JC))))
   return fail(d,E::Admission,0x1b18b4);
- if(std::fegetround()!=FE_TONEAREST||s.fields.vehicle58>1u||(s.fields.vehicle58==1u&&!s.fields.nativeAiOwnersBound50IV)||s.fields.vehicle3C||s.fields.vehicle834||c.main.vehicleState40||c.main.applicationActive11C||m.body320!=1||m.bodyChildCount||b.mainDomain.firstComponentChildPresent18||m.sceneObserverCount||!m.sceneAttached||m.sceneHasParent||!m.bodyEnabled||!m.secondBodyPresent||m.override3C||m.resetRequested||m.probe120Present||z.body320!=1||z.registrationMask!=2||z.bodyChildCount||b.secondaryDomain.firstComponentChildPresent18||z.sceneObserverCount||z.sceneHasParent||!c.secondary.scenePresent||!c.secondary.enabled||s.shape.type88||(s.shape.registrationE0&&!b.podLiveQuery50IZ)||!emptyRoute(b.mainDomain)||!emptyRoute(b.secondaryDomain))return fail(d,E::Admission,0);
+ if(std::fegetround()!=FE_TONEAREST||s.fields.vehicle58>1u||(s.fields.vehicle58==1u&&!s.fields.nativeAiOwnersBound50IV)||s.fields.vehicle3C||s.fields.vehicle834||(c.main.vehicleState40&&(c.main.vehicleState40>2u||s.fields.vehicle58))||c.main.applicationActive11C||m.body320!=1||m.bodyChildCount||b.mainDomain.firstComponentChildPresent18||m.sceneObserverCount||!m.sceneAttached||m.sceneHasParent||!m.bodyEnabled||!m.secondBodyPresent||m.override3C||m.resetRequested||m.probe120Present||z.body320!=1||z.registrationMask!=2||z.bodyChildCount||b.secondaryDomain.firstComponentChildPresent18||z.sceneObserverCount||z.sceneHasParent||!c.secondary.scenePresent||!c.secondary.enabled||s.shape.type88||(s.shape.registrationE0&&!b.podLiveQuery50IZ)||!emptyRoute(b.mainDomain)||!emptyRoute(b.secondaryDomain))return fail(d,E::Admission,0);
  if(b.podLiveQuery50IZ&&!coherentPodLiveQuery50IZ(s.shape,*b.podLiveQuery50IZ))
   return fail(d,E::Admission,0x12023cu);
  const SceneGraph49P g{const_cast<SceneNode49P*>(s.nodes),s.sceneNodeCount};
@@ -277,7 +277,7 @@ bool readVehicleFrame49W(S&s,const VehicleFrameBindings49W&b,const FrameReader49
 bool bindVehicleFrame49W(S&s,const VehicleFrameBindings49W&b,const VehicleFrameParameters49W&p,const PreservingStage49W&cut,const PostPlayerAt217DE0_49K&x,VehicleFrameWorkspace49W&w,VehicleFrameDiagnostic49W&d) noexcept {
  if(s.fields.vehicle58)return fail(d,E::Admission,0x217de0);
  if(!start(s,b,P::PostPlayer,w,d)||!preserving(cut,PreservingCut49W::PlayerAndBaseBefore217DE0,d))return false;
- if(!(s.bodies.main.controls.player.flagsB9C&0x80u)||!(x.player.flagsB9C&0x80u)||x.bindingContext.vehicleState40||x.bindingContext.mode58Nonzero)return fail(d,E::Admission,0x217de0);
+ if(!(s.bodies.main.controls.player.flagsB9C&0x80u)||!(x.player.flagsB9C&0x80u)||x.bindingContext.vehicleState40>2u||x.bindingContext.mode58Nonzero)return fail(d,E::Admission,0x217de0);
  auto&m=w.next.bodies.main;auto&c=m.controls.bound.control;if(!noiseContinuation(s,w.next,d))return false;RR_VEHICLE_FRAME49W_STAGE(0x217de0);if(!noiseContinuation(s,w.next,d))return false;
  if(!shapePlayerControlChannels48X(x.player.raw,c.shaping.smoothedChannel0D28,ControlShapeMode48V::Nonlinear,c.shaping)||!stepControlRateFilter48B(c.shaping.targets,c.filtered,p.rates,m.frameFactor,c.filtered))return fail(d,E::Input,0x217de0);
  auto input=x.bindingContext;input.source7D0=s.fields.damage7D0;input.source7D4=s.fields.damage7D4;input.filtered=c.filtered;input.bodyCachedSpeed34=m.cachedSpeed34;input.actionB7C=x.player.actionB7C;input.actionB80=x.player.actionB80;input.flagsB9C=x.player.flagsB9C;
@@ -872,6 +872,8 @@ bool decideVehicleImpacts50P(S&s,const VehicleFrameBindings49W&b,std::uint32_t t
  std::memcpy(&input.impactBA8,&r.fields.impactBA0.v[2],4);std::memcpy(&input.threshold50,&thresholdBits,4);
  //225CF8 consumes bit0 only: this is a bit representative, not a raw B9D byte.
  input.flagsB9D=static_cast<std::uint32_t>(r.fields.flagB9D0);
+ //2288EC: 225C50 runs only at state0; states1/2 keep their 227370/227A40 result.
+ if(r.bodies.main.vehicleState40){decision={ImpactTransitionStatus50C::noTransition,0x2288ecu,0,0};return commit(s,w,d,P::AfterImpactBlock);}
  if(!noiseContinuation(s,w.next,d))return false;RR_VEHICLE_FRAME49W_STAGE(0x228904);if(!noiseContinuation(s,w.next,d))return false;decision=inspectImpactTransition50C(input);
  if(decision.status!=ImpactTransitionStatus50C::noTransition)return fail(d,decision.status==ImpactTransitionStatus50C::arithmetic?E::Arithmetic:E::ExternalCut,decision.sourcePC);
  return commit(s,w,d,P::AfterImpactBlock);
