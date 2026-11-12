@@ -304,7 +304,31 @@ moves and piece smoke continues at its minimum rate after it settles.
   are not dispatched, 166C60's E8 ray is the native segment query (with the E8 PHYSICSBODY/WATER exclusion), debris
   water is not modelled, the getters' exact rounding is not reproduced, and
   a group without a usable E0 (none seen) falls back to the old native probe.
-  Free and released pieces still use the native box probe.
+  (Free and released pieces moved to the original frame in 128g, below.)
+* Build 128g/128h (Nov 12): free pieces (explosion pieces, one-piece
+  collections, released group members) run the original 2CB8F0 -> 166E40
+  frame on their own D0: the 166790 swept flight while 34 && 38 (22C6A0 sets
+  both; 22CA60 sets piece[0].34 only, so an explosion's engine primaries start
+  nonflight), otherwise the 166F8C nonflight solver shared with the groups,
+  the 11C airborne timer (38 = 1 after 0.5 s without DC.3C) and 167640
+  settling. Flight hits: |v.n| < 50 clears 38; while set, the velocity is
+  reflected with Restitution, the spin set from normalize(n x (v' - p)) x
+  118 x 114 x speed34, the origin mirrored across the surface.
+  Stand-ins (item list in work/scratch/destroy-standins/PLAN.md):
+  a) the D8 candidate order is now the 121920 zone walk over each piece's own
+     shadow zone membership (attached in the destroyed racer's primary zone,
+     120230 update before each detect, pass 1 first lists with the one-read
+     quirk, pass 2 second lists); RA keeps the storage order; fallback 443108 is
+     0; c) 166C60 and the 166790 loop use the original type3 E8 query (two-way
+     filter, shape0 meshes and compound1) on a storage-order candidate mirror;
+     d) 167250's wet suffix (2B10F0 at D0.60; drag 1 x speed^2, spin damping
+     200, lift 0.5 x mass x g) on GC/MC; e) the 28B9B0/28BBB0 final +0. b)
+     groups/triggers stay skipped (counted: `trigger_reach`); f) the first
+     failing 167640 stop test is logged once per second (`debris_rest_gate`).
+  Still native: 16-hit cap on the 166790 loop, D0.60 before the first 167C40,
+  extents for 118 from the decoded LOD0 mesh bounds, the E8 candidate effects
+  and F8 writes kept in debris scratch, Y < 0 deactivation (2CB974) replaced by
+  the below-every-track-bound retire, splash/dust not modelled.
 * Limp input (128d): the human's 217DE0 controls now receive the racer's own
   state40, so in the 227370/227A40 limp steering is halved and biased, the
   B7C/B80 actions are skipped (no drive) and the dual-stick brake is off, as

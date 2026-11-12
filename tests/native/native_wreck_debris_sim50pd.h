@@ -16,9 +16,14 @@
 // 167640 settling (contact time toward 2 x 2.0 s, drag lerped to 50 and rate
 // damping to 200 over the second window, stop below speed 10, spin 0.5,
 // linear acceleration 10 and angular acceleration 1 while in contact).
-// Ground contact is a native box-support segment test against the track's
-// static mesh candidates (front faces only, as 1082B0) with restitution and
-// Coulomb friction, not the original 166E40/2CA840 spring/impulse solver.
+// Free pieces (explosion pieces, one-piece collections, released members) run
+// the original 2CB8F0 -> 166E40 piece frame on their own D0 (stepFreeOriginal):
+// the 166790 swept flight while 34 && 38, otherwise the 166F8C nonflight
+// solver shared with the groups (E0 detector, 2964C0, 167C40, 166C60), the
+// 11C airborne timer and 167640 settling. STAND-IN fallback (logged), only
+// for a piece without a usable E0 or whose original frame is refused: the
+// native box-support segment test against the track's static mesh candidates
+// (front faces only, as 1082B0) with restitution and Coulomb friction.
 //
 // Wreck groups (2CA020/2CA190/2CA480/2CA620/2CA840/2CA2F0): for 226750 and the
 // 227370/227A40 limp, each collection with two or more pieces is one body
@@ -101,6 +106,14 @@ struct LivePiece {
     std::uint64_t releasedStep=0;
     // The piece's E0 (m.COL type2 rays) for the original group detector.
     const rr::game::Type2ResourceView49X* e0=nullptr;
+    // Free piece on the original 166E40 frame (its own D0 in Sim::bodies at
+    // the same live index). 34/38 flight enable/airborne (22C6A0/22CA60),
+    // 11C airborne time, 120 flight delay (165AFC), 110/114/118 the 22C310
+    // Restitution, FrictionTorqueScale and 166400 1/|extent|.
+    bool original=false;
+    std::uint32_t flight34=0,flight38=0;
+    float airborne11C=0.f,flightDelay120=.5f;
+    float restitution110=0.f,frictionTorqueScale114=1.f,inverseExtent118=1.f;
 };
 // Host-side wreck group, field order of 2CA020/2CA190 (group +30..+B0).
 // One place defines this layout; storage is reserved, frames never allocate.
@@ -145,10 +158,15 @@ struct Sim {
     std::array<Group,maxGroups> groups{};
     std::size_t groupCount=0;
     std::uint64_t groupRefusals=0,rngDraws=0;
+    // Free pieces on the original 166E40 frame: one D0 per live index
+    // (bodies[i] belongs to pieces[i] only; reserved, never allocated per frame).
+    std::array<f5::Body,512> bodies{};
+    std::uint64_t pieceFlightSteps=0,pieceNonflightSteps=0,pieceFlightHits=0,pieceRefusals=0;
 };
 inline Sim& sim() noexcept { static Sim owner; return owner; }
 // Capacity is reserved at race activation: frames never allocate.
 inline constexpr std::size_t maxLivePieces=512;
+static_assert(maxLivePieces<=std::tuple_size_v<decltype(Sim::bodies)>);
 inline void resetCameraView() noexcept;
 inline void resetSim() {
     resetCameraView();
@@ -156,6 +174,8 @@ inline void resetSim() {
     s.steps=0;s.contacts=0;s.queries=0;s.invalid=0;s.capacity=0;s.unsupported=0;s.retired=0;s.summarized=false;
     s.activeCollections={};
     s.groups={};s.groupCount=0;s.groupRefusals=0;s.rngDraws=0;
+    s.pieceFlightSteps=s.pieceNonflightSteps=s.pieceFlightHits=s.pieceRefusals=0;
+    f5::stats()=f5::Stats{};
 }
 // Lowest/highest point any static mesh candidate's bounding sphere reaches.
 inline void summarizeTrack(Sim& s) noexcept {
@@ -233,38 +253,59 @@ inline bool recomputeGroup2CA620(Sim& s,Group& g) noexcept {
     g.mass26C=mass;g.inertiaDiag=inertia;g.inertiaMean=mean;g.center1E0=center;
     return true;
 }
+// The piece's own E0 (m.COL type2 rays), or null when it has none usable.
+inline const rr::game::Type2ResourceView49X* pieceE0(const LivePiece& p) noexcept {
+    if(p.racer>=cold().racers.size())return nullptr;
+    const auto& racer=cold().racers[p.racer];
+    if(!racer.inventory||p.index>=racer.pieces.size())return nullptr;
+    const auto& piece=racer.pieces[p.index];
+    const auto* a=racer.inventory->pieceAssets(piece.collection,piece.piece);
+    if(!a)return nullptr;const auto& v=a->queryE0();
+    return v.rays&&v.rayCount&&v.rayCount<=f5::maxRays?&v:nullptr;
+}
+// One piece's D0/DC fields as the 22C6A0 activation leaves them: pose, the
+// given world velocity 70 and LOCAL angular velocity B0, the 1653C0 limits,
+// mass, the 295A40/22C310 DC tuning and the 22C310 drag/rate damping.
+inline bool initOriginalBody(f5::Body& b,const LivePiece& p,Vec velocity,Vec localB0,
+    const rr::game::OriginalWreckTuning50LA* tuning) noexcept {
+    b=f5::Body{};
+    toMatrix(p.orientation,p.position,b.root.scene.v);
+    if(!rr::game::matrixToQuaternion48G(b.root.scene,b.root.body.orientation))return false;
+    // D0.60 = the model origin (read by 167250's water test before the first
+    // 167C40). STAND-IN: its value after 22C6A0 is unproven; the activation
+    // pose's origin is used.
+    b.root.body.position={{p.position.x,p.position.y,p.position.z}};
+    // Fresh E8 state: vf0 vectors (W = 1), selected fraction 1.
+    for(auto* v:{&b.e8.worldCenter,&b.e8.queryCenter,&b.e8.result00,&b.e8.result10,&b.e8.selectedNormal,
+        &b.e8.selectedPoint,&b.e8.selectedCorrection})v->v[3]=1.f;
+    b.root.body.velocity={{velocity.x,velocity.y,velocity.z}};
+    b.root.body.angularVelocity={{localB0.x,localB0.y,localB0.z}};
+    auto& q=b.parameters;
+    q.linearAccelerationLimitSquared=std::bit_cast<float>(0x4963d240u);q.angularAccelerationLimitSquared=std::bit_cast<float>(0x48742400u);
+    q.linearVelocityLimitSquared=std::bit_cast<float>(0x468e6200u);q.angularVelocityLimitSquared=std::bit_cast<float>(0x441c4000u);
+    for(unsigned i=0;i<3;++i){q.translationEnabled[i]=true;q.rotationEnabled[i]=true;}
+    q.mass=p.mass;q.inverseMass=1.f/p.mass;
+    f5::tuneDc(b,tuning?tuning->friction:0.f);
+    b.dragEC=b.baseDrag100=tuning?tuning->drag:0.f;b.rateDampingF0=b.baseRateDamping104=tuning?tuning->rateDamping:0.f;
+    return true;
+}
 // F5: bind the group's original root body (2CA020 primary D0, 2CA480 member
 // DC.30 := root D0). Every piece needs its own E0; otherwise the group keeps
 // the native stand-in contact (logged).
 inline void setupOriginalBody(Sim& s,Group& g) noexcept {
     const auto& racer=cold().racers[g.racer];
-    auto e0Of=[&](const LivePiece& p)->const rr::game::Type2ResourceView49X*{
-        if(!racer.inventory||p.index>=racer.pieces.size())return nullptr;
-        const auto& piece=racer.pieces[p.index];
-        const auto* a=racer.inventory->pieceAssets(piece.collection,piece.piece);
-        if(!a)return nullptr;const auto& v=a->queryE0();
-        return v.rays&&v.rayCount&&v.rayCount<=f5::maxRays?&v:nullptr;
-    };
     const char* reason=nullptr;
     if(!f5::world().bound)reason="query_world_unbound";
     auto& root=s.pieces[g.root];
-    if(!reason&&!(root.e0=e0Of(root)))reason="root_e0";
-    for(std::size_t i=0;!reason&&i<g.capacity34;++i)if(!(s.pieces[g.member[i]].e0=e0Of(s.pieces[g.member[i]])))reason="member_e0";
+    if(!reason&&!(root.e0=pieceE0(root)))reason="root_e0";
+    for(std::size_t i=0;!reason&&i<g.capacity34;++i)if(!(s.pieces[g.member[i]].e0=pieceE0(s.pieces[g.member[i]])))reason="member_e0";
     if(reason){std::cerr<<"debris_group_solver slot="<<g.racer<<" c="<<g.collection+1<<" solver=native_standin reason="<<reason<<'\n';return;}
     const auto* tuning=g.collection<racer.tuning.size()?&racer.tuning[g.collection]:nullptr;
-    auto& b=g.body;b=f5::Body{};
-    toMatrix(root.orientation,root.position,b.root.scene.v);
-    if(!rr::game::matrixToQuaternion48G(b.root.scene,b.root.body.orientation)){
+    auto& b=g.body;
+    // 340+B0 (local), as 226750/227370 copy it.
+    if(!initOriginalBody(b,root,root.velocity,root.angular,tuning)){
         std::cerr<<"debris_group_solver slot="<<g.racer<<" c="<<g.collection+1<<" solver=native_standin reason=orientation\n";return;}
-    b.root.body.velocity={{root.velocity.x,root.velocity.y,root.velocity.z}};
-    b.root.body.angularVelocity={{root.angular.x,root.angular.y,root.angular.z}}; // 340+B0 (local), as 226750/227370 copy it
     auto& q=b.parameters;
-    q.linearAccelerationLimitSquared=std::bit_cast<float>(0x4963d240u);q.angularAccelerationLimitSquared=std::bit_cast<float>(0x48742400u);
-    q.linearVelocityLimitSquared=std::bit_cast<float>(0x468e6200u);q.angularVelocityLimitSquared=std::bit_cast<float>(0x441c4000u);
-    for(unsigned i=0;i<3;++i){q.translationEnabled[i]=true;q.rotationEnabled[i]=true;}
-    q.mass=root.mass;q.inverseMass=1.f/root.mass;
-    f5::tuneDc(b,tuning?tuning->friction:0.f);
-    b.dragEC=b.baseDrag100=tuning?tuning->drag:0.f;b.rateDampingF0=b.baseRateDamping104=tuning?tuning->rateDamping:0.f;
     for(float& v:g.savedInertiaMatrix60.v)v=0.f;
     g.savedInertiaMatrix60.v[0]=root.inertiaDiag.x;g.savedInertiaMatrix60.v[5]=root.inertiaDiag.y;g.savedInertiaMatrix60.v[10]=root.inertiaDiag.z;g.savedInertiaMatrix60.v[15]=1.f;
     g.original=true;
@@ -272,6 +313,44 @@ inline void setupOriginalBody(Sim& s,Group& g) noexcept {
     std::cerr<<"debris_group_solver slot="<<g.racer<<" c="<<g.collection+1<<" solver=original root_rays="<<root.e0->rayCount
         <<" inv_inertia="<<q.inverseInertiaColumns[0].v[0]<<','<<q.inverseInertiaColumns[1].v[1]<<','<<q.inverseInertiaColumns[2].v[2]
         <<" friction="<<b.frictionByMaterial[0]<<'\n';
+}
+// A free piece (explosion piece, one-piece collection, released member) on
+// its own original D0 for the 166E40 frame. velocity is world (70), localB0
+// the body-local angular velocity (B0). The 166400 mass and diagonal inertia
+// (inverse by 14E910) with the constructor's zero centre 1E0. Without a usable
+// E0 or query world the piece keeps the native box probe (STAND-IN, logged).
+inline bool setupPieceBody(Sim& s,std::size_t live,Vec velocity,Vec localB0,const char* route) noexcept {
+    if(live>=s.pieces.size()||live>=s.bodies.size()){++s.pieceRefusals;
+        std::cerr<<"debris_piece_solver live="<<live<<" solver=native_standin reason=body_capacity\n";return false;}
+    auto& p=s.pieces[live];p.original=false;
+    const auto& racer=cold().racers[p.racer];const auto& piece=racer.pieces[p.index];
+    const auto* tuning=piece.collection<racer.tuning.size()?&racer.tuning[piece.collection]:nullptr;
+    const char* reason=nullptr;
+    if(!f5::world().bound)reason="query_world_unbound";
+    else if(!(p.e0=pieceE0(p)))reason="piece_e0";
+    auto& b=s.bodies[live];
+    if(!reason&&!initOriginalBody(b,p,velocity,localB0,tuning))reason="orientation";
+    if(!reason){
+        rr::game::BodyMatrix48G inertia{};inertia.v[0]=p.inertiaDiag.x;inertia.v[5]=p.inertiaDiag.y;inertia.v[10]=p.inertiaDiag.z;inertia.v[15]=1.f;
+        if(!f5::applyMassInertia(b,p.mass,inertia,rr::game::Vector3_48C{{0.f,0.f,0.f}}))reason="inverse_14E910";
+    }
+    if(reason){++s.pieceRefusals;
+        std::cerr<<"debris_piece_solver slot="<<p.racer<<" piece="<<p.index<<" route="<<route<<" solver=native_standin reason="<<reason<<'\n';
+        return false;}
+    // 166400 1664B8..16652C: 118 = 1/sqrt(x*x + y*y + z*z) of the full model
+    // extents (default 1 when zero). STAND-IN extents: the decoded LOD0 mesh
+    // bounds (the same bounds tunePiece uses), not the 28D670 node bounds.
+    {const auto& bb=piece.mesh.bounds;
+     const float x=bb.maximum[0]-bb.minimum[0],y=bb.maximum[1]-bb.minimum[1],z=bb.maximum[2]-bb.minimum[2];
+     volatile float xx=x*x,yy=y*y,zz=z*z,xy=xx+yy,sum=xy+zz;const float extent=std::sqrt(static_cast<float>(sum));
+     p.inverseExtent118=extent>0.f?1.f/extent:1.f;}
+    p.restitution110=tuning?tuning->restitution:0.f;p.frictionTorqueScale114=tuning?tuning->frictionTorqueScale:1.f;
+    p.airborne11C=0.f;p.flightDelay120=.5f;p.settled=false;p.contactTime=0.f;
+    p.original=true;
+    std::cerr<<"debris_piece_solver slot="<<p.racer<<" piece="<<p.index<<" route="<<route<<" solver=original rays="<<p.e0->rayCount
+        <<" flight="<<p.flight34<<p.flight38<<" e110="<<p.restitution110<<" k114="<<p.frictionTorqueScale114
+        <<" inv118="<<p.inverseExtent118<<'\n';
+    return true;
 }
 // 22C2B0 -> 2CC060 -> 2CA020 bind, 22C310 -> 2CA190 register, then (22C6A0
 // tail) 2CA480 attach every member and 2CA620. The collection's pieces are
@@ -323,6 +402,19 @@ inline std::size_t authoredPieces(std::size_t slot,std::size_t collection) noexc
     return collection<authoring.collections.size()?authoring.collections[collection].pieces.size():0;
 }
 
+// 22C6A0 -> 120070(E0, zone, mask 2) for every new piece [first, end): the
+// shadow zone membership starts in the destroyed racer's primary zone. Zone 0
+// (unknown) or a refusal keeps the storage-order stand-in for that piece.
+inline void attachZones(Sim& s,std::size_t first,rr::game::CollectionRef50BX zone) noexcept {
+    std::size_t attached=0,refused=0;
+    for(std::size_t i=first;i<s.pieces.size();++i){
+        const auto* e0=pieceE0(s.pieces[i]);if(!e0||!zone){++refused;continue;}
+        rr::game::BodyMatrix48G world{};toMatrix(s.pieces[i].orientation,s.pieces[i].position,world.v);
+        (zones::attach(i,zone,*e0,world)?attached:refused)++;
+    }
+    std::cerr<<"debris_zone_walk attach zone="<<zone<<" pieces="<<attached<<" standin="<<refused
+        <<" bound="<<zones::walk().bound<<'\n';
+}
 // Spawns every loaded piece of the racer. bodyWorld is the pod's body288 world
 // matrix; velocity/angular are its rigid-body velocities (340+70/+B0),
 // worldAngularA0/bodyPosition its 340+A0 world rate and body position.
@@ -330,7 +422,7 @@ inline std::size_t authoredPieces(std::size_t slot,std::size_t collection) noexc
 inline std::size_t spawn(std::size_t slot,bool explode,const float* bodyWorld,
     const float* velocity,const float* angular,const float* worldAngularA0,const float* bodyPosition,
     std::uint32_t& sharedRaw,const float* cockpitVelocity=nullptr,const float* cockpitAngular=nullptr,
-    std::size_t* skippedActive=nullptr) {
+    std::size_t* skippedActive=nullptr,rr::game::CollectionRef50BX primaryZone=0) {
     auto& c=cold();if(slot>=c.racers.size())return 0;
     auto& s=sim();summarizeTrack(s);
     const auto& racer=c.racers[slot];
@@ -372,20 +464,31 @@ inline std::size_t spawn(std::size_t slot,bool explode,const float* bodyWorld,
                 live.angular=Vec{cockpitAngular[0],cockpitAngular[1],cockpitAngular[2]};
             }
         }
+        // 22C6A0 (22C9B0..22CA00): every piece 34 = 38 = 1, then for a
+        // collection of two or more pieces piece[0] 34 = 38 = 0; 22CA60
+        // (22CAEC..22CB00) then sets piece[0].34 = 1 again (38 stays 0).
+        const bool primaryOfGroup=piece.piece==0&&authoredPieces(slot,piece.collection)>=2;
+        live.flight34=primaryOfGroup&&!explode?0u:1u;live.flight38=primaryOfGroup?0u:1u;
         if(s.pieces.size()>=maxLivePieces)break;
         s.pieces.push_back(live);++spawned;
     }
     // 226750 -> 22C6A0 tail per collection: 2CA480 + 2CA620. 2261B0 -> 22CA60
     // instead detaches every piece and deactivates the group (22CAD8), so an
     // explosion has no groups.
+    const std::size_t first=s.pieces.size()-spawned;
     if(!explode){
-        const std::size_t first=s.pieces.size()-spawned;
         for(std::size_t i=first;i<s.pieces.size();){
             const auto collection=racer.pieces[s.pieces[i].index].collection;std::size_t n=0;
             while(i+n<s.pieces.size()&&racer.pieces[s.pieces[i+n].index].collection==collection)++n;
             bindGroup(s,slot,collection,i,n,authoredPieces(slot,collection));
             i+=n;
         }
+    }
+    attachZones(s,first,primaryZone);
+    // Every piece outside a group runs its own 2CB8F0 -> 166E40 frame.
+    for(std::size_t i=first;i<s.pieces.size();++i){
+        const auto& p=s.pieces[i];if(p.attached||p.groupRoot)continue;
+        setupPieceBody(s,i,p.velocity,p.angular,explode?"explode":"wreck");
     }
     return spawned;
 }
@@ -400,7 +503,7 @@ inline std::size_t spawn(std::size_t slot,bool explode,const float* bodyWorld,
 struct LimpCollection { std::size_t collection=0; const float* engineWorld=nullptr; float sign=1.f; };
 inline std::size_t spawnLimp(std::size_t slot,const LimpCollection* list,std::size_t count,const float* bodyWorld,
     const float* velocity,const float* angular,const float* worldAngularA0,const float* container,
-    std::uint32_t& sharedRaw,std::size_t& firstSpawned) {
+    std::uint32_t& sharedRaw,std::size_t& firstSpawned,rr::game::CollectionRef50BX primaryZone=0) {
     auto& c=cold();firstSpawned=sim().pieces.size();if(slot>=c.racers.size())return 0;
     auto& s=sim();summarizeTrack(s);
     const auto& racer=c.racers[slot];
@@ -430,9 +533,17 @@ inline std::size_t spawnLimp(std::size_t slot,const LimpCollection* list,std::si
             live.spawn=live.position;
             tunePiece(live,piece,&racer.tuning[entry.collection]);
             live.velocity=point;live.angular=first?rate:Vec{angular[0],angular[1],angular[2]};
+            // 22C6A0 flags (see spawn): piece[0] of a 2+ piece collection 0/0.
+            const bool primaryOfGroup=piece.piece==0&&authoredPieces(slot,entry.collection)>=2;
+            live.flight34=live.flight38=primaryOfGroup?0u:1u;
             s.pieces.push_back(live);++spawned;first=false;
         }
         bindGroup(s,slot,entry.collection,collectionFirst,s.pieces.size()-collectionFirst,authoredPieces(slot,entry.collection));
+        attachZones(s,collectionFirst,primaryZone);
+        for(std::size_t i=collectionFirst;i<s.pieces.size();++i){
+            const auto& p=s.pieces[i];if(p.attached||p.groupRoot)continue;
+            setupPieceBody(s,i,p.velocity,p.angular,"limp");
+        }
         s.activeCollections[slot]|=1u<<entry.collection;
     }
     return spawned;
@@ -672,6 +783,28 @@ inline void syncRootPose(LivePiece& root,const f5::Body& b) noexcept {
     root.velocity={b.root.body.velocity.v[0],b.root.body.velocity.v[1],b.root.body.velocity.v[2]};
     const auto& a=b.root.worldAngularVelocityA0.v;root.angular={a[0],a[1],a[2]};
 }
+// 166C60 movement correction of a D0's model origin (one E8 type3 query,
+// previous80 -> current90; a hit moves the origin to point + 1.0 x normal and
+// 80 := corrected, a miss 80 := current; velocity untouched). The query is the
+// original type3 kernel (f5::queryMove). A refused query keeps the position
+// (counted, logged once). The extra zero-length guard is native (a zero
+// segment cannot hit). Returns whether it corrected.
+inline bool movement166C60(Sim&,f5::Body& b,std::uint32_t identity) noexcept {
+    auto& tr=b.root.scene.v;const Vec current{tr[12],tr[13],tr[14]};
+    if(b.previous80[0]==0.f&&b.previous80[1]==0.f&&b.previous80[2]==0.f)b.previous80={current.x,current.y,current.z,1.f};
+    const Vec previous{b.previous80[0],b.previous80[1],b.previous80[2]};
+    const Vec d=current-previous;
+    rr::game::Vector3_48C point{},normal{};
+    const int hit=dot(d,d)>0.f?f5::queryMove({{previous.x,previous.y,previous.z}},{{current.x,current.y,current.z}},
+        identity,b.e8,point,normal):0;
+    if(hit==1){
+        volatile float cx=normal.v[0]*1.f,cy=normal.v[1]*1.f,cz=normal.v[2]*1.f; // 106790: 433B60 = 1.0 x normal
+        const Vec corrected{point.v[0]+cx,point.v[1]+cy,point.v[2]+cz};
+        tr[12]=corrected.x;tr[13]=corrected.y;tr[14]=corrected.z;b.previous80={corrected.x,corrected.y,corrected.z,1.f};
+        return true;
+    }
+    b.previous80={current.x,current.y,current.z,1.f};return false;
+}
 inline void stepGroupOriginal(Sim& s,Group& g,float dt) noexcept {
     auto& root=s.pieces[g.root];auto& b=g.body;auto& ws=f5::workspace();
     const auto& racer=cold().racers[root.racer];
@@ -682,12 +815,12 @@ inline void stepGroupOriginal(Sim& s,Group& g,float dt) noexcept {
     // D8 detectors: the root, then every attached member at its attached pose.
     std::array<rr::game::BodyMatrix48G,maxGroupMembers> memberScene{};
     f5::freshDc(ws.dc[0]);
-    if(!f5::detect(*root.e0,b.root.scene,wreckIdentity(g,0),ws.dc[0],s.track)){refuseOriginal(s,g,"root_detector");return;}
+    if(!f5::detect(*root.e0,b.root.scene,wreckIdentity(g,0),ws.dc[0],s.track,g.root)){refuseOriginal(s,g,"root_detector");return;}
     for(std::size_t i=0;i<g.capacity34;++i){
         if(!g.attachedA0[i]||g.member[i]>=s.pieces.size())continue;
         const auto& m=s.pieces[g.member[i]];toMatrix(m.orientation,m.position,memberScene[i].v);
         f5::freshDc(ws.dc[i+1]);
-        if(!m.e0||!f5::detect(*m.e0,memberScene[i],wreckIdentity(g,i+1),ws.dc[i+1],s.track)){refuseOriginal(s,g,"member_detector");return;}
+        if(!m.e0||!f5::detect(*m.e0,memberScene[i],wreckIdentity(g,i+1),ws.dc[i+1],s.track,g.member[i])){refuseOriginal(s,g,"member_detector");return;}
         ++g.attached38;
     }
     b.impulseC0={};                                         // 2CAA78: 4441F0 XYZ = 0
@@ -708,21 +841,25 @@ inline void stepGroupOriginal(Sim& s,Group& g,float dt) noexcept {
         volatile float next=elapsed+step;elapsed=next;
         volatile float left=dt-elapsed;step=rr::game::detail::scalarMin48O(maximum,left);
     }
-    // 166C60 movement correction of the primary's model origin. STAND-IN: the
-    // E8 type3 segment query is the native segment query (segmentHit).
-    {
-        auto& tr=b.root.scene.v;const Vec current{tr[12],tr[13],tr[14]};
-        if(b.previous80[0]==0.f&&b.previous80[1]==0.f&&b.previous80[2]==0.f)b.previous80={current.x,current.y,current.z,1.f};
-        const Vec previous{b.previous80[0],b.previous80[1],b.previous80[2]};
-        rr::game::CollisionContact48I hit{};const Vec d=current-previous;
-        using Cat=rr::game::OriginalNativeCollisionCategories;
-        if(dot(d,d)>0.f&&segmentHit(s,previous,current,hit,Cat::physicsBody|Cat::water)){
-            const Vec corrected{hit.point.v[0]+hit.normal.v[0],hit.point.v[1]+hit.normal.v[1],hit.point.v[2]+hit.normal.v[2]}; // 433B60 = 1.0
-            tr[12]=corrected.x;tr[13]=corrected.y;tr[14]=corrected.z;b.previous80={corrected.x,corrected.y,corrected.z,1.f};
-            std::cerr<<"debris_group_movement slot="<<g.racer<<" c="<<g.collection+1<<" step="<<s.steps<<" corrected\n";
-        }else b.previous80={current.x,current.y,current.z,1.f};
-    }
+    if(movement166C60(s,b,wreckIdentity(g,0)|0x00080000u))
+        std::cerr<<"debris_group_movement slot="<<g.racer<<" c="<<g.collection+1<<" step="<<s.steps<<" corrected\n";
     if(!f5::settle(b,ws.dc[0].state,dt)){refuseOriginal(s,g,"settle_167640");return;}
+    // Diagnostic (stand-in item f, log only): once per second while the root
+    // is still enabled, the first 167640 stop test that fails (speed < 10,
+    // spin < 0.5, |124| < 10, |128| < 1, then DC.3C) and the root DC's record
+    // materials (friction applies on material 0 only).
+    if(b.enabled204&&s.steps%60==0){
+        const auto& w=b.root.body.angularVelocity.v;const float spin=std::sqrt(w[0]*w[0]+w[1]*w[1]+w[2]*w[2]);
+        const char* gate=!(b.cachedSpeed34<b.stopSpeed134)?"speed":!(spin<b.stopAngularSpeed138)?"spin":
+            !(b.measured124<b.stopLinearAcceleration13C)?"a124":!(b.measured128<b.stopAngularAcceleration140)?"a128":
+            !ws.dc[0].state.contact3C?"contact":"none";
+        std::uint32_t m0=0,other=0;
+        for(std::int32_t r=0;r<ws.dc[0].state.generatedCount84&&r<std::int32_t(ws.dc[0].records.size());++r)
+            (ws.dc[0].records[std::size_t(r)].material4C==0?m0:other)++;
+        std::cerr<<"debris_rest_gate slot="<<g.racer<<" c="<<g.collection+1<<" step="<<s.steps<<" fails="<<gate
+            <<" speed="<<b.cachedSpeed34<<" spin="<<spin<<" a124="<<b.measured124<<" a128="<<b.measured128
+            <<" dc3c="<<ws.dc[0].state.contact3C<<" t12c="<<b.contactTime12C<<" records_m0="<<m0<<" records_other="<<other<<'\n';
+    }
     for(std::size_t i=0;i<g.capacity34;++i)if(g.attachedA0[i])g.touched[i]=ws.dc[i+1].state.contact3C!=0u; // member DC.3C
     syncRootPose(root,b);
     if(ws.dc[0].state.contact3C){root.lastContactStep=static_cast<std::uint32_t>(s.steps);++root.contacts;++s.contacts;}
@@ -733,6 +870,122 @@ inline void stepGroupOriginal(Sim& s,Group& g,float dt) noexcept {
         for(std::size_t i=0;i<g.capacity34;++i)if(g.attachedA0[i]&&g.member[i]<s.pieces.size()){
             auto& m=s.pieces[g.member[i]];m.retired=true;++s.retired;}
     }
+}
+
+inline std::uint32_t pieceIdentity(const LivePiece& p) noexcept {
+    return 0xf5e00000u|(static_cast<std::uint32_t>(p.racer&7u)<<12)|static_cast<std::uint32_t>(p.index&0xfffu);
+}
+// A free piece whose original frame was refused continues on the native box
+// probe from its current original state (logged).
+inline void refusePiece(Sim& s,LivePiece& p,const f5::Body& b,const char* stage) noexcept {
+    ++s.pieceRefusals;p.original=false;
+    syncRootPose(p,b);
+    std::cerr<<"debris_piece_solver slot="<<p.racer<<" piece="<<p.index<<" solver=native_standin reason="<<stage
+        <<" step="<<s.steps<<'\n';
+}
+// 166790 flight: 167250 forces, ONE full-dt 167C40 integration, DC.3C = 0, then
+// the repeated E8 movement query from the pre-integration origin to the current
+// one. Each hit sets DC.3C and A0 = normal; |v.n| < 50 (433B58) clears 38;
+// while 38 stays set the velocity is reflected with Restitution (110), the
+// spin becomes normalize(n x (v' - p)) in body-local, scaled by 118 x (114 x
+// speed34); the origin is mirrored to current + 2 max((hit - current).n,
+// 0.025) n. The E8 query is the original type3 kernel (f5::queryMove, its
+// own stand-ins listed there). STAND-INS: 28BBB0 is the rotation transpose;
+// the source loop has no cap, this one stops after 16 hits (logged); a
+// refused query ends the loop as a miss (counted, logged once).
+inline bool pieceFlight166790(Sim& s,LivePiece& p,f5::Body& b,rr::game::SpringRecordState48N& dc,float dt) noexcept {
+    const auto& racer=cold().racers[p.racer];
+    auto& tr=b.root.scene.v;const Vec before{tr[12],tr[13],tr[14]};
+    if(!f5::forces(b,b.parameters.mass,racer.gravityAcceleration))return false;
+    if(!f5::integrate(b,dt))return false;
+    dc.contact3C=0;
+    for(unsigned loop=0;;++loop){
+        const Vec current{tr[12],tr[13],tr[14]};const Vec d=current-before;const float cur[3]={current.x,current.y,current.z};
+        rr::game::Vector3_48C hitPoint{},hitNormal{};
+        const int found=dot(d,d)>0.f?f5::queryMove({{before.x,before.y,before.z}},{{current.x,current.y,current.z}},
+            pieceIdentity(p)|0x00080000u,b.e8,hitPoint,hitNormal):0;
+        if(found!=1)return true;                                     // miss, or refused (counted, logged once)
+        if(loop>=16){std::cerr<<"debris_piece_flight_cap slot="<<p.racer<<" piece="<<p.index<<" step="<<s.steps<<'\n';return true;}
+        ++s.pieceFlightHits;dc.contact3C=1;
+        f5::detail::Math m;
+        const f5::V3 n=hitNormal;
+        auto& v=b.root.body.velocity;
+        const float normalSpeed=std::fabs(m.dot(n,v));
+        if(normalSpeed<50.f){
+            p.flight38=0;
+            std::cerr<<"debris_piece_flight slot="<<p.racer<<" piece="<<p.index<<" step="<<s.steps<<" landed normal_speed="<<normalSpeed
+                <<" y="<<current.y<<'\n';
+        }
+        if(p.flight38){
+            const float along=m.dot(v,n);                                   // 106E70(v, n)
+            f5::V3 projected{};for(unsigned i=0;i<3;++i)projected.v[i]=m.mul(along,n.v[i]);
+            const float rebound=-m.add(1.f,p.restitution110);
+            for(unsigned i=0;i<3;++i){b.impulseC0.v[i]=m.mul(rebound,projected.v[i]);v.v[i]=m.add(v.v[i],b.impulseC0.v[i]);}
+            f5::V3 tangent{};for(unsigned i=0;i<3;++i)tangent.v[i]=m.sub(v.v[i],projected.v[i]); // v' - p (source order)
+            const f5::V3 spin=m.normalize(m.cross(n,tangent));
+            const f5::V3 local=m.inverseDirection(b.root.scene,spin);
+            const float scale=m.mul(p.inverseExtent118,m.mul(p.frictionTorqueScale114,b.cachedSpeed34));
+            for(unsigned i=0;i<3;++i)b.root.body.angularVelocity.v[i]=m.mul(local.v[i],scale);
+        }
+        f5::V3 delta{};for(unsigned i=0;i<3;++i)delta.v[i]=m.sub(hitPoint.v[i],cur[i]);
+        const float distance=rr::game::detail::scalarMax48O(m.dot(delta,n),std::bit_cast<float>(0x3ccccccdu)); // 433B50
+        const float twice=m.mul(2.f,distance);
+        for(unsigned i=0;i<3;++i)tr[12+i]=m.add(cur[i],m.mul(twice,n.v[i]));
+        if(!m.valid)return false;
+    }
+}
+// 2CB8F0 -> 166E40 for one free piece: 124/128 = 0; disabled bodies skip;
+// 34 && 38 take the 166790 flight; otherwise 166F8C: the piece's own D8/E0
+// detector, substeps of at most 1/60 (433B68) of 167250 forces, its own DC
+// 2964C0 response, the per-axis |1C0| retention into C0, 167C40 and the
+// 124/128 maxima, then 166C60 and, when 34 is set, the 11C airborne timer
+// (reset on DC.3C, 38 = 1 once 11C > 120). 167640 settling closes both.
+inline void stepFreeOriginal(Sim& s,LivePiece& p,f5::Body& b,float dt) noexcept {
+    if(!b.enabled204){p.settled=true;return;}
+    const auto& racer=cold().racers[p.racer];
+    b.measured124=0.f;b.measured128=0.f;
+    auto& dc=f5::workspace().dc[0];
+    if(p.flight34&&p.flight38){
+        ++s.pieceFlightSteps;
+        if(!pieceFlight166790(s,p,b,dc.state,dt)){refusePiece(s,p,b,"flight_166790");return;}
+    }else{
+        ++s.pieceNonflightSteps;
+        f5::freshDc(dc);
+        const std::uint32_t identity=pieceIdentity(p);
+        if(!p.e0||!f5::detect(*p.e0,b.root.scene,identity,dc,s.track,static_cast<std::size_t>(&p-s.pieces.data()))){refusePiece(s,p,b,"detector_295630");return;}
+        b.impulseC0={};                                              // 166FC4: 433B10
+        const float maximum=std::bit_cast<float>(0x3c888889u);      // 433B68 = 1/60
+        float elapsed=0.f,step=rr::game::detail::scalarMin48O(dt,maximum);
+        while(elapsed<dt){
+            if(!(step>0.f)){refusePiece(s,p,b,"substep");return;}
+            if(!f5::forces(b,b.parameters.mass,racer.gravityAcceleration)){refusePiece(s,p,b,"forces_167250");return;}
+            if(!f5::respond(b,dc,b.root.scene)){refusePiece(s,p,b,"response_2964C0");return;}
+            f5::retain(b);
+            if(!f5::integrate(b,step)){refusePiece(s,p,b,"integrate_167C40");return;}
+            volatile float next=elapsed+step;elapsed=next;
+            volatile float left=dt-elapsed;step=rr::game::detail::scalarMin48O(maximum,left);
+        }
+        movement166C60(s,b,identity|0x00080000u);
+        if(p.flight34){                                              // 1671C8..167214
+            if(dc.state.contact3C)p.airborne11C=0.f;
+            else{volatile float t=p.airborne11C+dt;p.airborne11C=t;}
+            if(!(p.airborne11C<=p.flightDelay120)){
+                p.flight38=1;
+                std::cerr<<"debris_piece_flight slot="<<p.racer<<" piece="<<p.index<<" step="<<s.steps<<" airborne t="<<p.airborne11C<<'\n';
+            }
+        }
+    }
+    if(!f5::settle(b,dc.state,dt,p.flight34,p.flight38)){refusePiece(s,p,b,"settle_167640");return;}
+    syncRootPose(p,b);
+    if(dc.state.contact3C){p.lastContactStep=static_cast<std::uint32_t>(s.steps);++p.contacts;++s.contacts;}
+    if(!b.enabled204){
+        p.settled=true;p.velocity={};p.angular={};
+        std::cerr<<"debris_piece_settled slot="<<p.racer<<" piece="<<p.index<<" step="<<s.steps
+            <<" pos="<<p.position.x<<','<<p.position.y<<','<<p.position.z<<" moved="<<std::sqrt(dot(p.position-p.spawn,p.position-p.spawn))<<'\n';
+    }
+    // STAND-IN retire (as stepFree): below every track collision bound.
+    const float above=support(racer.pieces[p.index],p.orientation,{0.f,1.f,0.f});
+    if(!finite(p.position)||p.position.y+above<s.floor){p.retired=true;++s.retired;p.velocity={};p.angular={};}
 }
 
 // 2CAEE8..2CB340: member i breaks off, in source order. Each break sees the
@@ -759,16 +1012,20 @@ inline void breakMember(Sim& s,Group& g,std::size_t i,std::uint32_t& sharedRaw,s
     const Vec S{scaleS*u4,scaleS*u5,scaleS*u6};
     const Vec memberB0=rootW+S*fm,rootB0=rootW-S*fr;
     if(g.original){
-        // The member's B0 is local to its (attached) pose; the native free
-        // piece integrates a world rate, so it is rotated by that pose.
+        // The member's B0 is local to its attached pose (the root's rotation).
+        // Its own D0 starts from that pose for its 166E40 frame; if that is
+        // refused, the native free piece integrates the world rate.
         m.angular=rotate(m.orientation,memberB0);
         auto& rb=g.body.root.body;rb.velocity={{rootAfter.x,rootAfter.y,rootAfter.z}};rb.angularVelocity={{rootB0.x,rootB0.y,rootB0.z}};
         root.angular=rotate(root.orientation,rootB0);
     }else{m.angular=memberB0;root.angular=rootB0;}
     s.rngDraws+=6;g.draws+=6;++g.breaks;
     // 2CB308 member body enabled; 2CA2F0 detach: own contact, own frame from
-    // the next frame (mask20 |= 2), A0[i] = 0, then 2CA620.
+    // the next frame (mask20 |= 2), A0[i] = 0, then 2CA620. The member keeps
+    // 34 = 38 = 1 from 22C6A0: it starts on the 166790 flight path.
     m.attached=false;m.group=-1;m.releasedStep=s.steps;m.settled=false;m.contactTime=0.f;
+    m.flight34=m.flight38=1u;
+    if(g.original)setupPieceBody(s,g.member[i],m.velocity,memberB0,"release");
     g.attachedA0[i]=false;
     recomputeGroup2CA620(s,g);
     const Vec jm=(m.velocity-vp)*m.mass,jr=(rootBefore-root.velocity)*massBefore;
@@ -817,10 +1074,12 @@ inline void stepGroupMembers(Sim& s,Group& g,std::uint32_t& sharedRaw) noexcept 
 inline void step(float dt,std::uint32_t& sharedRaw) noexcept {
     auto& s=sim();if(s.pieces.empty())return;++s.steps;
     const auto drawsBefore=s.rngDraws;std::uint64_t tests=0,breaks=0;
-    for(auto& p:s.pieces){
+    for(std::size_t i=0;i<s.pieces.size();++i){
+        auto& p=s.pieces[i];
         if(p.settled||p.retired||p.attached||p.groupRoot)continue;
         if(p.releasedStep==s.steps)continue;                  // released this step: from the next
-        stepFree(s,p,dt);
+        if(p.original&&i<s.bodies.size())stepFreeOriginal(s,p,s.bodies[i],dt);
+        else stepFree(s,p,dt);
     }
     for(std::size_t gi=0;gi<s.groupCount;++gi){
         auto& g=s.groups[gi];if(!g.active||g.root>=s.pieces.size())continue;
@@ -849,6 +1108,18 @@ inline void step(float dt,std::uint32_t& sharedRaw) noexcept {
                 <<" dc3c="<<f5::workspace().dc[0].state.contact3C<<'\n';
         }
     }
+    for(std::size_t i=0;i<s.pieces.size()&&i<zones::maxPieces;++i)
+        if(s.pieces[i].retired&&zones::membership(i))zones::remove(i);              // 120290 at retirement
+    if(s.steps%300==0){const auto& st=f5::stats();const auto& zw=zones::walk();
+        std::cerr<<"debris_zone_walk step="<<s.steps<<" bound="<<zw.bound<<" attaches="<<zw.attaches<<" attach_refused="<<zw.attachRefused
+            <<" updates="<<zw.updates<<" update_refused="<<zw.updateRefused<<" walks="<<zw.walks<<" visits="<<zw.visits
+            <<" pass2="<<zw.pass2<<" query_objects="<<zw.queryObjects<<" refused="<<zw.refused<<" standin="<<zw.standinWalks
+            <<" sampled_duplicates="<<zw.duplicates<<" sampled_storage_only="<<zw.storageOnly<<" sampled_walk_only="<<zw.walkOnly<<'\n';const auto& mq=f5::moveQuery();
+        std::cerr<<"debris_f5_stats step="<<s.steps<<" e0_queries="<<st.queries<<" e0_refused="<<st.refused<<" records="<<st.records
+            <<" saturated="<<st.saturated<<" e8_calls="<<mq.calls<<" e8_hits="<<mq.hits<<" e8_refused="<<mq.failures
+            <<" water_queries="<<st.waterQueries<<" water_wet="<<st.waterWet<<" water_entries="<<st.waterEntries
+            <<" water_refused="<<st.waterRefused<<" trigger_reach="<<st.triggerReach<<" piece_flight="<<s.pieceFlightSteps
+            <<" piece_nonflight="<<s.pieceNonflightSteps<<" piece_refusals="<<s.pieceRefusals<<'\n';}
     if(s.rngDraws!=drawsBefore)
         std::cerr<<"debris_rng step="<<s.steps<<" draws="<<s.rngDraws-drawsBefore<<" expected="<<tests+6*breaks<<'\n';
 }

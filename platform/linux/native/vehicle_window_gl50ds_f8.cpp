@@ -2,6 +2,9 @@
 #include "../../../tests/native/original_race_f8_native_bars50la.h"
 #include "../../../src/game/original_results104_storage50la.h"
 #include "../../../src/assets/original_standard_material_domain50la.h"
+#include <array>
+#include <cstdio>
+#include <cstdlib>
 
 namespace rr::platform {
 bool VehicleWindowGl50DS::retireNativeResultsResources50LA(VehicleWindowDiagnostic50DS& d)noexcept {
@@ -176,8 +179,12 @@ bool VehicleWindowGl50DS::Storage::drawNativeResultsPackets(U bank)noexcept {
     const double scale=std::min(double(width)/640.0,double(height)/448.0);
     const double ox=(width-640.0*scale)*.5,oy=(height-448.0*scale)*.5;
     gl.uniform4f(uiCanvasUniform,float(2*scale/width),float(-2*scale/height),float(2*ox/width-1),float(1-2*oy/height));
-    gl.scissor(I(std::floor(ox)),I(std::floor(oy)),I(std::ceil(ox+640*scale))-I(std::floor(ox)),
-        I(std::ceil(oy+448*scale))-I(std::floor(oy)));gl.enable(0x0C11);
+    const I canvasX=I(std::floor(ox)),canvasY=I(std::floor(oy)),canvasW=I(std::ceil(ox+640*scale))-canvasX,
+        canvasH=I(std::ceil(oy+448*scale))-canvasY;
+    gl.scissor(canvasX,canvasY,canvasW,canvasH);gl.enable(0x0C11);
+    static const bool originalAspect=[]{const char* v=std::getenv("RR_ORIGINAL_ASPECT");return v&&v[0]=='1'&&!v[1];}();
+    static I loggedWidth=0,loggedHeight=0;
+    bool loggedBars=loggedWidth==width&&loggedHeight==height;
     gl.uniform1i(gcParticleModeUniform,0);gl.uniform1i(uiSourceCompositionUniform,1);
     gl.uniform1i(uiSourceRasterUniform,0);gl.uniform1i(uiSourceFogEnabledUniform,0);
     gl.uniform1i(uiSourceAlphaTestUniform,0);gl.uniform1i(uiCoveragePayloadUniform,0);
@@ -194,10 +201,30 @@ bool VehicleWindowGl50DS::Storage::drawNativeResultsPackets(U bank)noexcept {
         gl.depthMask((packet.hasTexture?packet.textured.depthWrite:packet.untextured.depthWrite)?1:0);
         gl.uniform1i(uiSourceBlendUniform,static_cast<I>(blend));gl.uniform1i(uiTexturedUniform,packet.hasTexture?1:0);
         gl.bindTexture(texture2D,packet.hasTexture?nativeResultsVariants[packet.variant]->textures.texture(0):0);
+        // 1B8DB0/1B8E10 LetterBoxPause bars (+38 bottom at y 448, +3C top at
+        // y 0): the only untextured 4-vertex Results quads with every x at 0
+        // or 640. On the PS2 they span the whole 640x448 screen, so the canvas
+        // edges map to the window edges here (identity at an exact 10:7
+        // window); animated ordinates (383, 65, ...) stay canvas-relative.
+        // RR_ORIGINAL_ASPECT=1 (the widescreen switch) keeps them in the canvas.
+        bool bar=!originalAspect&&!packet.hasTexture&&packet.vertices.size()==4;
+        for(std::size_t k=0;bar&&k<4;++k){const float x=packet.vertices[k].position[0];bar=x==0.f||x==640.f;}
+        std::array<assets::Vertex48B,4> edge{};
+        if(bar){
+            for(std::size_t k=0;k<4;++k){edge[k]=packet.vertices[k];auto& p=edge[k].position;
+                p[0]=p[0]==0.f?float(-ox/scale):float((width-ox)/scale);
+                if(p[1]==0.f)p[1]=float(-oy/scale);else if(p[1]==448.f)p[1]=float((height-oy)/scale);}
+            gl.scissor(0,0,width,height);
+        }
         // Upload this occurrence immediately; source packet order is retained
         // even when another occurrence shares its image/sampler variant.
-        drawGl.bufferSubData(arrayBuffer,0,std::intptr_t(packet.vertices.size()*sizeof(assets::Vertex48B)),packet.vertices.data());
+        drawGl.bufferSubData(arrayBuffer,0,std::intptr_t(packet.vertices.size()*sizeof(assets::Vertex48B)),
+            bar?static_cast<const void*>(edge.data()):static_cast<const void*>(packet.vertices.data()));
         okay=check("upload Results native occurrence geometry");
+        if(bar&&!loggedBars){loggedBars=true;loggedWidth=width;loggedHeight=height;
+            std::fprintf(stderr,"results_letterbox_bar window=%dx%d scale=%.4f ox=%.1f oy=%.1f x=%.2f..%.2f y=%.2f,%.2f blend=%d alpha=%d\n",
+                int(width),int(height),scale,ox,oy,edge[0].position[0],edge[1].position[0],edge[0].position[1],edge[2].position[1],
+                int(blend),int(edge[0].color[3]));}
         const U indices=U(packet.vertices.size()/4)*6;
         if(okay&&uiSourceCoherentFramebufferFetch){
             drawGl.drawElementsBaseVertex(0x0004,I(indices),0x1405,nullptr,0);
@@ -205,6 +232,7 @@ bool VehicleWindowGl50DS::Storage::drawNativeResultsPackets(U bank)noexcept {
         }else for(U i=0;okay&&i<indices;i+=3){gl.textureBarrier();
             drawGl.drawElementsBaseVertex(0x0004,3,0x1405,reinterpret_cast<const void*>(std::uintptr_t(i)*sizeof(U)),0);
             okay=check("draw Results native ordered source-alpha triangle");}
+        if(bar)gl.scissor(canvasX,canvasY,canvasW,canvasH);    // the next packet keeps the canvas
     }
     if(!uiSourceCoherentFramebufferFetch){gl.activeTexture(textureUnit0+1);gl.bindTexture(texture2D,0);gl.activeTexture(textureUnit0);}
     gl.bindTexture(texture2D,0);gl.disable(0x0C11);gl.disable(0x0BE2);

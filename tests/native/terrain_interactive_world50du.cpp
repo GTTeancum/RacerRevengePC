@@ -1428,6 +1428,15 @@ SessionExit50DU Context::run() {
  // F5 wreck E0 detectors use the same static-query type tags and 3E0728/
  // 3E0718/3E0720 masks as the live pod query (one-time filter allocation).
  native_wreck_debris50PD::f5::bindWorld(query.collisionTypeTag,query.groupTypeTag,query.skipMask,query.dynamicMask,query.materialMask);
+ {const bool e8=native_wreck_debris50PD::f5::bindMoveQuery(candidates);
+  std::cerr<<"debris_f5_e8 bound="<<e8<<" candidates="<<native_wreck_debris50PD::f5::moveQuery().mirror.size()<<'\n';}
+ // 167250 water: debris pieces borrow the racer's vehicle334 provider, i.e.
+ // this race's selected runtime water owner (GC/MC); null elsewhere.
+ {auto& w=native_wreck_debris50PD::f5::world();w.waterContext=selectedRuntimeWater;
+  w.waterQuery=selectedRuntimeWater?+[](const void* c,float (&p)[3])noexcept{
+      return static_cast<const native_water_runtime50JC::Owner*>(c)->query(p);}:nullptr;
+  std::cerr<<"debris_f5_water bound="<<(selectedRuntimeWater!=nullptr)<<" source334="
+      <<(actualHeight.sourceDomain.water334==UndertrackHeightOwner50EW::Present)<<'\n';}
  std::cerr<<"debris_f5_world type="<<unsigned(query.collisionTypeTag)<<" group="<<unsigned(query.groupTypeTag)
      <<" skip="<<query.skipMask<<" dynamic="<<query.dynamicMask<<" material="<<query.materialMask<<" candidates="<<candidates.size()<<'\n';
  std::span<const track_runtime_storage50IG::Binding> trackBindings=isMcTrack?mcWorldBorrow->bindingStorage():isGbTrack?gbWorldBorrow->bindingStorage():isTbTrack?tbWorldBorrow->bindingStorage():isRcTrack?rcWorldBorrow->bindingStorage():isTcTrack?tcWorldBorrow->bindingStorage():isMbTrack?mbCollisionWorld->bindingStorage():std::span<const track_runtime_storage50IG::Binding>(preparedBindings);
@@ -1454,6 +1463,17 @@ SessionExit50DU Context::run() {
      trackStorageDiagnostic.message.c_str());
  auto& trackStorage=isMcTrack?*mcWorldBorrow->storage():isGbTrack?*gbWorldBorrow->storage():isTbTrack?*tbWorldBorrow->storage():isRcTrack?*rcWorldBorrow->storage():isTcTrack?*tcWorldBorrow->storage():isMbTrack?*mbCollisionWorld->storage():isRaTrack?raRuntime->storage:*trackStorageOwner.get();
  const auto& trackCounts=trackStorage.count;
+ // Debris item a: the wreck pieces' 121920 zone walk reads this storage's
+ // zone SearchLists (read-only) through a private shadow membership. Bound
+ // only when every storage candidate is exactly the debris track span entry
+ // (ref - 1 -> sim().track index); RA keeps the storage-order stand-in.
+ {bool same=!isRaTrack&&trackCounts.terrain<=candidates.size();
+  for(std::size_t i=0;same&&i<trackCounts.terrain;++i)same=trackStorage.candidates[i]==&candidates[i];
+  const bool zoneWalk=same&&native_wreck_debris50PD::zones::bind(trackStorage.zones.data(),trackCounts.zones,
+      trackStorage.trees.data(),trackCounts.methods,trackCounts.terrain,trackStorage.world,trackCounts.membership);
+  if(!zoneWalk)native_wreck_debris50PD::zones::walk()=native_wreck_debris50PD::zones::Walk{};
+  std::cerr<<"debris_zone_walk bind="<<zoneWalk<<" same_candidates="<<same<<" zones="<<trackCounts.zones
+      <<" methods="<<trackCounts.methods<<" terrain="<<trackCounts.terrain<<" membership="<<trackCounts.membership<<'\n';}
  const auto tcMapView=tcNavigation.map();
  const auto tcAiView=tcNavigation.ai();
  const auto tcMapMetadata=tcNavigation.mapMetadata();

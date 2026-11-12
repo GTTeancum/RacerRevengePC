@@ -834,6 +834,20 @@ bool Context::commitOriginalDestroyed(std::size_t actualRacerSlot,
  auto& record=nativeDestroyedRacers50PD[actualRacerSlot];
  auto& main=s.bodies.main;
  const bool human=s.fields.vehicle58==0u;
+ // 2261B0/226750/227370 pass racer+690 -> +E0 -> +4 (the main E0's primary
+ // zone) to 22C6A0/22CA60. Use the banked main membership only when its last
+ // shape world is this racer's (its E0 sits on the pod body); otherwise 0
+ // (the debris keeps the storage-order stand-in), logged either way.
+ auto debrisPrimaryZone=[&](const float* bodyWorld)->CollectionRef50BX{
+  const CollectionRef50BX zone=mainMembership.attached&&mainMembership.storage.links&&mainMembership.storage.capacity?
+      mainMembership.storage.links[0].zone:0u;
+  const auto& m=mainMembership.lastShapeWorld.v;
+  const float dx=m[12]-bodyWorld[12],dy=m[13]-bodyWorld[13],dz=m[14]-bodyWorld[14];
+  const float gap=std::sqrt(dx*dx+dy*dy+dz*dz);
+  const bool own=zone&&gap<50.f;
+  std::cerr<<"debris_zone_capture slot="<<actualRacerSlot<<" zone="<<zone<<" shape_gap="<<gap<<" used="<<own<<'\n';
+  return own?zone:0u;
+ };
  // 228A30/228A84: the limp countdown's escalation (no 225C50 suffix).
  const bool limpEscalation=decision.sourcePC==0x228a30u||decision.sourcePC==0x228a84u;
  if(limpEscalation)require50DU(record.limping&&!record.destroyed&&(main.vehicleState40==1u||main.vehicleState40==2u),
@@ -952,7 +966,8 @@ bool Context::commitOriginalDestroyed(std::size_t actualRacerSlot,
    std::size_t first=0;
    const auto spawned=native_wreck_debris50PD::spawnLimp(actualRacerSlot,list,count,s.nodes[body].world100.v,
        main.components.root.body.velocity.v,main.components.root.body.angularVelocity.v,
-       main.components.root.worldAngularVelocityA0.v,s.nodes[container].world100.v+12,s.noiseOwner().sharedRandomState,first);
+       main.components.root.worldAngularVelocityA0.v,s.nodes[container].world100.v+12,s.noiseOwner().sharedRandomState,first,
+       debrisPrimaryZone(s.nodes[body].world100.v));
    const auto* w=s.nodes[body].world100.v;
    native_wreck_effects50PD::destroyed(actualRacerSlot,false,{w[12],w[13],w[14]},{w[12],w[13],w[14]});
    const auto& live=native_wreck_debris50PD::sim().pieces;
@@ -1057,7 +1072,8 @@ bool Context::commitOriginalDestroyed(std::size_t actualRacerSlot,
       main.components.root.body.velocity.v,main.components.root.body.angularVelocity.v,
       main.components.root.worldAngularVelocityA0.v,main.components.root.body.position.v,s.noiseOwner().sharedRandomState,
       limpEscalation&&!explode?s.bodies.secondary.root.body.velocity.v:nullptr,
-      limpEscalation&&!explode?s.bodies.secondary.root.body.angularVelocity.v:nullptr,&skippedActive);
+      limpEscalation&&!explode?s.bodies.secondary.root.body.angularVelocity.v:nullptr,&skippedActive,
+      debrisPrimaryZone(s.nodes[node].world100.v));
   {const auto& d=native_wreck_debris50PD::sim();
    std::cerr<<"debris_spawn slot="<<actualRacerSlot<<" pieces="<<spawned<<" explode="<<explode<<" skipped_active="<<skippedActive
        <<" groups="<<d.groupCount
