@@ -81,6 +81,37 @@ struct RaceFrameRecorder50AU {
     std::uint32_t racesReported=0; // process-wide race ordinal
 };
 RaceFrameRecorder50AU raceFrames50AU;
+// Step split (measurement only; host memory, no game state). Always on: two
+// steady_clock reads per existing simulationTotals scope. A step runs from the
+// start of one scheduled_total scope to the start of the next, so the scopes
+// that follow a step and are not nested in it (racer contacts, race field,
+// presentation) count toward that step. The slowest step of each 5 s window
+// and its split are printed on the window_submit_fps line, for every course.
+struct StepSplit50GG {
+    static constexpr std::size_t parts=14,totalIndex=13,none=parts;
+    const phase_timing50GK::Totals* base=nullptr; // run()'s simulationTotals[parts]
+    std::array<double,parts> current{},worst{};
+    double worstTotal=0.0,sumTotal=0.0;
+    std::uint64_t steps=0;bool open=false;
+    std::size_t indexOf(const phase_timing50GK::Totals* p) const noexcept {
+        if(!base||p<base||p>=base+parts)return none;
+        return static_cast<std::size_t>(p-base);
+    }
+    void add(std::size_t i,FrameHitch50DU::Clock::time_point a,FrameHitch50DU::Clock::time_point b) noexcept {
+        if(i>=parts||!open||b<a)return; // bounds check before the write
+        current[i]+=std::chrono::duration<double,std::milli>(b-a).count();
+    }
+    void endStep() noexcept {
+        if(open){
+            const double total=current[13]+current[10]+current[11]+current[12];
+            ++steps;sumTotal+=total;
+            if(total>worstTotal){worstTotal=total;worst=current;}
+        }
+        current={};open=true;
+    }
+    void resetWindow() noexcept {worst={};worstTotal=0.0;sumTotal=0.0;steps=0;}
+};
+StepSplit50GG stepSplit50GG;
 void resetRaceFrameSession50AU() noexcept {
     auto& r=raceFrames50AU;
     r.count=0;r.full=false;r.active=false;r.totalMs=0.0;r.worstMs=0.0;r.catchupSteps=0;r.discardedAtStartNs=0;
@@ -196,13 +227,21 @@ void Context::run() {
  // Optional nested observations; all entries are subsets of physics, never
  // additional work to add to its total. No allocation or clock reads disabled.
  phase_timing50GK::Totals simulationTotals[14]{};
+ static_assert(sizeof simulationTotals/sizeof simulationTotals[0]==StepSplit50GG::parts,"step split layout");
+ stepSplit50GG=StepSplit50GG{};stepSplit50GG.base=simulationTotals;
+ struct BaseRelease {~BaseRelease(){stepSplit50GG.base=nullptr;}} stepSplitBaseRelease; // no dangling base after run()
  struct SimulationScope {
   phase_timing50GK::Totals* total;
   phase_timing50GK::Sample before{};
-  SimulationScope(bool enabled,phase_timing50GK::Totals& value):total(enabled?&value:nullptr){
+  std::size_t splitIndex;FrameHitch50DU::Clock::time_point splitStart;
+  SimulationScope(bool enabled,phase_timing50GK::Totals& value):total(enabled?&value:nullptr),
+      splitIndex(stepSplit50GG.indexOf(&value)){
+   if(splitIndex==StepSplit50GG::totalIndex)stepSplit50GG.endStep();
+   splitStart=FrameHitch50DU::Clock::now();
    if(total)before=phase_timing50GK::readClocks();
   }
-  ~SimulationScope(){if(total)total->record(before,phase_timing50GK::readClocks());}
+  ~SimulationScope(){if(total)total->record(before,phase_timing50GK::readClocks());
+   stepSplit50GG.add(splitIndex,splitStart,FrameHitch50DU::Clock::now());}
  };
  auto advanceOriginalAll8TwoPhaseFrame=[&](original_all8_frame::Schedule& schedule,
      original_all8_frame::AudioIntegrationPolicy audioPolicy,
@@ -3601,7 +3640,14 @@ void Context::run() {
              <<" dropped host ms "<<discardedHostNs/1000000
              <<" frame_ms_buckets <=17/<=20/<=25/<=33/<=50/>50 "<<raceFrames50AU.buckets[0]<<'/'<<raceFrames50AU.buckets[1]
              <<'/'<<raceFrames50AU.buckets[2]<<'/'<<raceFrames50AU.buckets[3]<<'/'<<raceFrames50AU.buckets[4]
-             <<'/'<<raceFrames50AU.buckets[5]<<" worst_ms "<<raceFrames50AU.intervalWorstMs<<'\n';
+             <<'/'<<raceFrames50AU.buckets[5]<<" worst_ms "<<raceFrames50AU.intervalWorstMs;
+    {const auto& split=stepSplit50GG;const auto& w=split.worst;
+     std::cerr<<" step_ms steps/avg/worst "<<split.steps<<'/'<<(split.steps?split.sumTotal/double(split.steps):0.0)
+         <<'/'<<split.worstTotal
+         <<" worst_step children/racer_physics/world_service/ai_manager/camera/contacts/field/presentation/fleet_other "
+         <<w[2]<<'/'<<w[5]<<'/'<<w[7]<<'/'<<w[8]<<'/'<<w[9]<<'/'<<w[10]<<'/'<<w[11]<<'/'<<w[12]
+         <<'/'<<(w[0]+w[1]+w[4]+w[6])<<'\n';}
+    stepSplit50GG.resetWindow();
     raceFrames50AU.buckets={};raceFrames50AU.intervalWorstMs=0.0;
     if(audioEnabled){
      const auto ai=liveAudio->info();
