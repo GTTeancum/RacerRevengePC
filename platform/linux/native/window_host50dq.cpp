@@ -1,4 +1,5 @@
 #include "window_host50dq.h"
+#include "window_swap_stats50au.h"
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
@@ -694,6 +695,15 @@ bool WindowHost50DQ::poll(WindowInput50DQ& input, WindowHostDiagnostic50DQ& d) n
     }
     return true;
 }
+namespace {
+// Host-side swap counters (window_swap_stats50au.h). Owner thread only.
+std::uint64_t swapTotal50AU=0;
+double swapMaxGapMs50AU=0.0;
+}
+std::uint64_t windowSwapTotal50AU() noexcept {return swapTotal50AU;}
+double windowSwapTakeMaxGapMs50AU() noexcept {
+    const double value=swapMaxGapMs50AU;swapMaxGapMs50AU=0.0;return value;
+}
 bool WindowHost50DQ::swap(WindowHostDiagnostic50DQ& d) noexcept {
     d = {};
     if (!ownerThread()) return fail(d, WindowHostError50DQ::WrongThread, "swap");
@@ -705,11 +715,12 @@ bool WindowHost50DQ::swap(WindowHostDiagnostic50DQ& d) noexcept {
         // swaps, wherever it occurs (menus, loading, intro, race). Bounded.
         static std::chrono::steady_clock::time_point previous{};static unsigned lines=0;
         const auto now=std::chrono::steady_clock::now();
-        if(previous!=std::chrono::steady_clock::time_point{}&&lines<200){
+        if(previous!=std::chrono::steady_clock::time_point{}){
             const double ms=std::chrono::duration<double,std::milli>(now-previous).count();
-            if(ms>50.0){++lines;std::fprintf(stderr,"swap_gap_ms=%.1f%c",ms,10);}
+            if(ms>swapMaxGapMs50AU)swapMaxGapMs50AU=ms;
+            if(ms>50.0&&lines<200){++lines;std::fprintf(stderr,"swap_gap_ms=%.1f%c",ms,10);}
         }
-        previous=now;
+        previous=now;++swapTotal50AU;
     }
     return true;
 }

@@ -481,6 +481,7 @@ bool OwnershipBridge::retireNativeRetainedWreckCold(original_camera_session50KX:
     for(std::size_t i=0;i<follow_->wreck_.size();++i)follow_->wreck_[i]={};
     if(!backing.releaseNativeColdBacking())return false;
     inputs_.wreck.clear();
+    podExclusions_.reset(); //The pieces whose E4 the lanes named have retired.
     if(podZonesHeld_){
         if(!podTrack_||!podTrack_->releaseWreckZones(*this))return false;
         podZonesHeld_=false;podTrack_=nullptr;

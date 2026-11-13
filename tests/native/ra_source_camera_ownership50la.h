@@ -1952,6 +1952,7 @@ class OwnershipBridge final {
     g::OriginalWreckSetupZones50LA podZones_{};
     g::CollectionRef50BX podVisibility_=0,podCollision_=0;
     std::array<bool,8> podAiHandlingStopped_{}; //STAND-IN: AI 16E5F4 handling not written.
+    ::original_pod_load50PL::RacerExclusionLanes50PL podExclusions_; //212ABC per-racer 690 lanes (one layout, pod_load50pl.h).
 
     bool retireNativeRetainedWreckCold(original_camera_session50KX::Session&)noexcept;
 
@@ -2369,6 +2370,13 @@ class OwnershipBridge final {
             bankIdentity_->raWorldLifetime_.get()==pin.get()&&bankIdentity_->sealed_&&
             bankIdentity_->count_==inputs_.collisionRoster.size()&&!bankIdentity_->visiting_&&!bankIdentity_->readBlocked_;
     }
+    // Every course saves the racer frame without the process-shared motion and
+    // 308030 noise (one layout: rr::game::RacerSharedFrameLayout50GB).
+    bool frameLanesRegistered(const g::VehicleFrameState49W& frame)const noexcept {
+        using L=g::RacerSharedFrameLayout50GB;const auto* b=reinterpret_cast<const unsigned char*>(&frame);
+        return registeredRange(b,L::motionBegin)&&registeredRange(b+L::motionEnd,L::noiseBegin-L::motionEnd)&&
+            registeredRange(b+L::noiseEnd,sizeof(frame)-L::noiseEnd);
+    }
     bool registeredRange(const void* address,std::size_t bytes)const noexcept {
         const auto first=reinterpret_cast<std::uintptr_t>(address);
         for(const auto& span:bankIdentity_->spans_){
@@ -2393,7 +2401,7 @@ class OwnershipBridge final {
         constexpr auto noise=offsetof(g::VehicleFrameState49W,noise);
         constexpr auto after=noise+sizeof(g::CoupledNoiseContext49M);
         const auto* bytes=reinterpret_cast<const unsigned char*>(&frame);
-        return a.humanCount<=1u&&a.humanCount==inputs_.humanCount&&registeredRange(bytes,noise)&&registeredRange(bytes+after,sizeof(frame)-after)&&
+        return a.humanCount<=1u&&a.humanCount==inputs_.humanCount&&frameLanesRegistered(frame)&&
             registeredRange(&a.bindings,sizeof(a.bindings))&&registeredRange(&a.parameters,sizeof(a.parameters))&&
             registeredRange(&a.selectors,sizeof(a.selectors))&&
             registeredRange(&a.ai,sizeof(a.ai))&&registeredRange(&a.history,sizeof(a.history))&&
@@ -2435,7 +2443,8 @@ class OwnershipBridge final {
         constexpr auto noise=offsetof(g::VehicleFrameState49W,noise);
         constexpr auto after=noise+sizeof(g::CoupledNoiseContext49M);
         const auto* frame=reinterpret_cast<const unsigned char*>(&actual_->frame);
-        if(!registeredRange(frame,noise)||!registeredRange(frame+after,sizeof(actual_->frame)-after))
+        (void)frame;(void)after;
+        if(!frameLanesRegistered(actual_->frame))
             return fail(d,"actual frame lanes are not registered with this Bank");
         if(gridArena_&&(&gridArena_->bindings!=&bindings||&gridArena_->parameters!=&parameters))
             return fail(d,"actual pod arena differs from retained grid arena");

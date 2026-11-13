@@ -19,7 +19,7 @@ inline bool Cables::continueNativeOuter212DF0(g::OriginalRacerEntityCold50LA& ra
        !racer.prepared()||racer.nativeWreckWithdrawn_||!racer.color260_||
        racer.mode3C_!=0u||racer.cableMaterialMode3C!=0||
        !chariot.finishedFor(racer)||chariot.modelRole_!=Rig::chariot||
-       chariot.rig_!=sourceRig_||chariot.slot_!=0u||!chariot.bank_||!chariot.arena_||
+       chariot.rig_!=sourceRig_||chariot.slot_>=8u||!chariot.bank_||!chariot.arena_||
        chariot.application_!=app||chariot.generation_!=racer.racer.sessionGeneration||
        chariot.handlingRoute_!=native_racer_model50LA::Owner::HandlingRoute::legacy||
        racer.actualCounter423F60()!=&app->objectCount423F60()||
@@ -37,7 +37,7 @@ inline bool Cables::continueNativeOuter212DF0(g::OriginalRacerEntityCold50LA& ra
     const auto ownerCurrent=[&](const native_racer_model50LA::Owner* model,unsigned role,
         const g::OriginalRacerModelSceneOwner50LA* scene)noexcept {
         return model&&scene&&model->modelRole_==role&&model->rig_==sourceRig_&&
-            model->bank_==chariot.bank_&&model->arena_==chariot.arena_&&model->slot_==0u&&
+            model->bank_==chariot.bank_&&model->arena_==chariot.arena_&&model->slot_==chariot.slot_&&
             model->generation_==chariot.generation_&&model->application_==app&&
             model->domain_==chariot.domain_&&model->finishedFor(racer)&&model->modelScene()==scene&&
             scene->model()&&scene->model()->sceneIndex==sourceRig_->roots[role]&&

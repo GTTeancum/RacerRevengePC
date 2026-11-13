@@ -359,7 +359,16 @@ class OriginalWreckRacerStorage50LA final {
         const SpringVector4_48N* actualGravityVector4431C0=nullptr;
         std::uint32_t* actualObjectCount423F60=nullptr;
         const std::uint32_t* actualAttachmentLock423F58=nullptr;
-        std::array<OriginalWreckComponent50LA*,maxOriginalWreckComponents50LA> prefixComponents{};
+        // Every component this racer's wreck chain constructs. Sized once at
+        // adoption from the racer's real authored count (totalComponents);
+        // every append is checked against size() before the write.
+        struct PrefixRows {
+            std::unique_ptr<OriginalWreckComponent50LA*[]> rows;std::size_t capacity=0;
+            OriginalWreckComponent50LA*& operator[](std::size_t i)noexcept{return rows[i];}
+            OriginalWreckComponent50LA* operator[](std::size_t i)const noexcept{return rows[i];}
+            OriginalWreckComponent50LA** data()noexcept{return rows.get();}
+            std::size_t size()const noexcept{return capacity;}
+        } prefixComponents;
         OriginalWreckComponentDomain50LA prefixDomain{};
         std::unique_ptr<OriginalWreckCollectionStorage50LA[]> collections;
         std::unique_ptr<OriginalWreckCollectionStorage50LA*[]> ordered374;
@@ -410,7 +419,7 @@ class OriginalWreckRacerStorage50LA final {
             linked=linked->next14;
         }
         if(linked)return nullptr;
-        std::array<OriginalWreckComponent50LA*,maxOriginalWreckComponents50LA> live{};
+        OriginalWreckDomainRows50LA live;if(!liveRows(live))return nullptr;
         OriginalWreckComponentDomain50LA domain{};
         if(!liveRetirementDomain(live,domain)||
            !original_wreck_component_detail50LA::domain(storage_->prefixDomain))return nullptr;
@@ -459,8 +468,14 @@ class OriginalWreckRacerStorage50LA final {
     // Borrow every live canonical Entity from retained occurrence backing.
     // Zero-reference source history stays retained but cannot enter a live domain.
     // The model owner joins its own Entity; its PSG rows retire separately.
+    // Rows for a live domain over this racer: its real component count plus
+    // the two outside racer anchors (racer, its pre-existing tail child).
+    bool liveRows(OriginalWreckDomainRows50LA& rows)const noexcept {
+        return storage_&&storage_->totalComponents<=std::numeric_limits<std::size_t>::max()-2u&&
+            sizeOriginalWreckDomainRows50LA(rows,storage_->totalComponents+2u);
+    }
     bool liveRetirementDomain(
-        std::array<OriginalWreckComponent50LA*,maxOriginalWreckComponents50LA>& rows,
+        OriginalWreckDomainRows50LA& rows,
         OriginalWreckComponentDomain50LA& out,
         const OriginalWreckPieceStorage50LA* excludedModel=nullptr)const noexcept {
         if(!sourceIdentityBound())return false;
@@ -1340,7 +1355,7 @@ OriginalWreckPrefixRetirementResult50LA retirePieceBeforeE0Core(
     }
     // Build a current outside domain without rewriting zero-ref historical
     // model/PSG kinds. Retired rows are deliberately not live Entity members.
-    std::array<OriginalWreckComponent50LA*,maxOriginalWreckComponents50LA> objects{};
+    OriginalWreckDomainRows50LA objects;if(!liveRows(objects))return rejected;
     OriginalWreckComponentDomain50LA outside{storage_->sessionGeneration,objects.data(),0};
     auto add=[&](OriginalWreckComponent50LA* c){
         if(!c||!c->reference00)return true;
@@ -1390,9 +1405,9 @@ OriginalWreckPrefixRetirementResult50LA retirePieceBeforeE0Core(
     auto graph=p.assets_->graph();
     if(model){
         const auto& entity=owner.uiScopeModelEntity8();
-        std::array<OriginalWreckComponent50LA*,maxOriginalWreckComponents50LA> joinedObjects{};
+        OriginalWreckDomainRows50LA joinedObjects;if(!liveRows(joinedObjects))return rejected;
         OriginalWreckComponentDomain50LA joined{};
-        if(!owner.joinDomain(outside,joinedObjects,joined)||
+        if(!owner.joinDomain(outside,joinedObjects.data(),joinedObjects.size(),joined)||
            entity.reference00!=1u||entity.kind!=K::model2403A0||entity.firstChild18||
            p.componentSlots_[1]!=&entity||entity.previous10||((freshBody?d0Linked:bodyCut)?entity.next14!=&d0:entity.next14!=nullptr)||
            (root.firstChild18?root.firstChild18!=&entity||entity.parent1C!=&root:entity.parent1C!=nullptr)||
@@ -1690,7 +1705,7 @@ OriginalWreckPrefixRetirementResult50LA retirePieceBeforeE0Core(
            c.nativeGroupAttempted_||c.source3C_||c.retirementAttempted_||
            c.group_.allocated_!=c.count_-1u||
            !storage_->actualObjectCount423F60||*storage_->actualObjectCount423F60==std::numeric_limits<std::uint32_t>::max()||
-           storage_->prefixDomain.count>=maxOriginalWreckComponents50LA)return false;
+           storage_->prefixDomain.count>=storage_->prefixComponents.size())return false;
         for(std::size_t i=0;i<count;++i)
             if(c.ordered38_[i]!=&c.pieces_[i]||!c.pieces_[i].progress_.appended22C1B8||
                c.pieces_[i].progress_.pieceRetired||!c.pieces_[i].effectInputsStillBound())return false;
@@ -1873,7 +1888,7 @@ OriginalWreckPrefixRetirementResult50LA retirePieceBeforeE0Core(
                p.progress_.retirementAttempted||!p.effectInputsStillBound())return false;
         }
         if(c.pieces_[c.count_-1u].progress_.prefixResult.status!=OriginalWreckConstructorPrefixStatus50LA::groupConstructorRequired||
-           storage_->prefixDomain.count>=maxOriginalWreckComponents50LA)return false;
+           storage_->prefixDomain.count>=storage_->prefixComponents.size())return false;
         c.nativeGroupAttempted_=true;
         auto& g=c.groupComponent_;
         const auto r=initializeOriginalWreckComponent50LA(g,OriginalWreckComponentKind50LA::group2CBFC0,
@@ -2219,7 +2234,7 @@ OriginalWreckPrefixRetirementResult50LA retirePieceBeforeE0Core(
            !storage_->nativeGravity4431C0)return false;
         auto& c=storage_->collections[ordinal];
         if(c.constructorAttempted_||c.retirementAttempted_||storage_->nativePublished374!=ordinal||
-           storage_->prefixDomain.count>=maxOriginalWreckComponents50LA)return false;
+           storage_->prefixDomain.count>=storage_->prefixComponents.size())return false;
         if(ordinal){const auto& prior=storage_->collections[ordinal-1u];
             if(storage_->nativeCollectionCursor+1u!=ordinal||!prior.nativeRacerAppended_||
                prior.nativeRacerExclusionFailed_||prior.nativeRacerExclusionCursor_!=prior.sourceCount30_||
@@ -2528,7 +2543,7 @@ OriginalWreckPrefixRetirementResult50LA retirePieceBeforeE0Core(
            !p.sourceModel14C_||*p.sourceModel14C_!=&p.modelOwner_.model_||
            !p.sourceBodyD0_||*p.sourceBodyD0_!=p.componentSlots_[body]||
            !p.sourceGravityD4_||*p.sourceGravityD4_!=p.componentSlots_[body+1u]||
-           !p.freshBody_.filename60||p.sourceE0_||storage_->prefixDomain.count==maxOriginalWreckComponents50LA)return {};
+           !p.freshBody_.filename60||p.sourceE0_||storage_->prefixDomain.count>=storage_->prefixComponents.size())return {};
         const std::array<OriginalWreckComponent50LA*,3> slots{{p.componentSlots_[body+2u],p.componentSlots_[body+5u],p.componentSlots_[body+6u]}};
         if(!p.queries_.reserveFreshE0Backing(p.queryOwner_,world,*p.componentSlots_[1],slots))return {};
         progress.e0ConstructorAttempted=true;
@@ -3185,7 +3200,7 @@ OriginalWreckPrefixRetirementResult50LA retirePieceBeforeE0Core(
            e8.parent1C||e8.previous10||e8.next14||e8.firstChild18)return {};
         progress.e8ConstructorAttempted=true;
         auto finish=[&](S status,std::uint32_t pc){progress.prefixResult={status,pc,storage_->prefixDomain.count,true};return progress.prefixResult;};
-        if(storage_->prefixDomain.count>=maxOriginalWreckComponents50LA)return finish(S::capacity,0x1662e4u);
+        if(storage_->prefixDomain.count>=storage_->prefixComponents.size())return finish(S::capacity,0x1662e4u);
         //Native preallocated component backing is not guestmalloc equivalence.
         //Counted/header cuts remain distinct from sourceE8 publication166300.
         p.queries_.beginFreshE8Header11B190(p.sourceE8_);
@@ -3272,7 +3287,7 @@ OriginalWreckPrefixRetirementResult50LA retirePieceBeforeE0Core(
         if(!dot)return finish(S::stopped,0x166248u);--dot;
         if(dot+sizeof("f.col")>scratch.size())return finish(S::stopped,0x166248u);
         std::memcpy(scratch.data()+dot,"f.col",sizeof("f.col")); //Actual3A7678, not E0 m.col replay.
-        if(storage_->prefixDomain.count>=maxOriginalWreckComponents50LA)return finish(S::capacity,0x166250u);
+        if(storage_->prefixDomain.count>=storage_->prefixComponents.size())return finish(S::capacity,0x166250u);
         p.queries_.beginFreshE4Header11B190(p.sourceE4_);
         const auto initialized=initializeOriginalWreckComponent50LA(e4,K::collision11B190,storage_->sessionGeneration,
             static_cast<std::uint64_t>(reinterpret_cast<std::uintptr_t>(&e4)),true,*storage_->actualObjectCount423F60);
@@ -3310,7 +3325,7 @@ OriginalWreckPrefixRetirementResult50LA retirePieceBeforeE0Core(
            p.physical_.contactBody30!=&p.physical_.body||
            d8.reference00||d8.kind!=K::unbound||d8.objectKey||d8.parent1C||d8.previous10||d8.next14||d8.firstChild18||
            p.sourceD8_||p.detector_.constructed||
-           storage_->prefixDomain.count>=maxOriginalWreckComponents50LA||
+           storage_->prefixDomain.count>=storage_->prefixComponents.size()||
            !original_wreck_component_detail50LA::domain(storage_->prefixDomain))return {};
         f.attempted=true;f.origin443550=&actual443550;f.local433B10=&actual433B10;f.terrain330Field=actualTerrain330Field;
         auto finish=[&](S status,std::uint32_t pc){progress.prefixResult={status,pc,storage_->prefixDomain.count,true};return progress.prefixResult;};
@@ -3365,7 +3380,7 @@ OriginalWreckPrefixRetirementResult50LA retirePieceBeforeE0Core(
            e0.parent1C!=&root||e0.next14||!progress.e0FreshAppended||
            dc.reference00||dc.kind!=K::unbound||dc.objectKey||dc.parent1C||dc.previous10||dc.next14||dc.firstChild18||
            p.physical_.contactConstructorFieldsApplied||
-           storage_->prefixDomain.count>=maxOriginalWreckComponents50LA||
+           storage_->prefixDomain.count>=storage_->prefixComponents.size()||
            !original_wreck_component_detail50LA::domain(storage_->prefixDomain))return {};
         Type2ResourceView49X resource;
         if(!p.queries_.borrowFreshE0PointResource(p.modelOwner_.model_,e0,resource)||
@@ -3553,7 +3568,7 @@ OriginalWreckPrefixRetirementResult50LA retirePieceBeforeE0Core(
            *zones.visibilityZoneField>zones.visibility4C0->portals.zoneCount||
            !*zones.collisionZoneField||*zones.collisionZoneField>zones.collisionLifecycle->zoneCount||
            *zones.collisionZoneField>zones.collision4C4->zoneCount||
-           storage_->prefixDomain.count+2u>maxOriginalWreckComponents50LA)return {};
+           storage_->prefixDomain.count+2u>storage_->prefixComponents.size())return {};
         progress.pieceSetupAttempted=true;p.freshBody_.attempted=true;
         auto finish=[&](S status,std::uint32_t pc){
             progress.prefixResult={status,pc,storage_->prefixDomain.count,true};return progress.prefixResult;
@@ -3873,6 +3888,9 @@ OriginalWreckPrefixRetirementResult50LA retirePieceBeforeE0Core(
                 }
                 if(!nativeUnbound)next->ordered374[c]=&collection;
             }
+            if(next->totalComponents>(std::numeric_limits<std::size_t>::max()-2u)/sizeof(void*))return fail(S::capacity);
+            next->prefixComponents.rows=std::make_unique<OriginalWreckComponent50LA*[]>(next->totalComponents);
+            next->prefixComponents.capacity=next->totalComponents;
             // All allocations/identity checks finish before ownership transfer.
             // No original bytes, model transforms or runtime globals changed.
             // Exclusive cold adoption restages this SAME graph allocation as
@@ -4055,7 +4073,7 @@ private:
                previous.e8PrefixRetired||previous.e4PrefixRetired||previous.contactSuffixRetired||previous.e0PrefixRetired||
                !previous.appended22C1B8||previous.prefixResult.status!=S::nextPieceRequired||
                previous.prefixResult.sourcePC!=0x22c0a0u)return out;
-            std::array<OriginalWreckComponent50LA*,maxOriginalWreckComponents50LA> live{};
+            OriginalWreckDomainRows50LA live;if(!liveRows(live))return out;
             OriginalWreckComponentDomain50LA current{};
             if(!liveRetirementDomain(live,current))return out;
         }else if(collection.constructorAttempted_&&!collection.nativeConstructorOnly_)return out;
@@ -4071,9 +4089,10 @@ private:
         // Retained canonical history is never reset or silently truncated.
         const auto existing=storage_->prefixDomain.count;
         const auto collectionRows=pieceIndex?0u:1u;
-        if(existing>maxOriginalWreckComponents50LA||
-           piece.componentCount_>maxOriginalWreckComponents50LA-existing||
-           collectionRows>maxOriginalWreckComponents50LA-existing-piece.componentCount_){
+        const auto prefixCapacity=storage_->prefixComponents.size();
+        if(existing>prefixCapacity||
+           piece.componentCount_>prefixCapacity-existing||
+           collectionRows>prefixCapacity-existing-piece.componentCount_){
             out.status=S::capacity;out.sourcePC=0x22c0a0u;return out;
         }
         if(pieceIndex&&(binding.actualObjectCount423F60!=storage_->actualObjectCount423F60||
@@ -4438,7 +4457,7 @@ public:
            *zones.visibilityZoneField>zones.visibility4C0->portals.zoneCount||
            !*zones.collisionZoneField||*zones.collisionZoneField>zones.collisionLifecycle->zoneCount||
            *zones.collisionZoneField>zones.collision4C4->zoneCount||piece.setupZonesBound_||
-           storage_->prefixDomain.count+2u>maxOriginalWreckComponents50LA)return rejected;
+           storage_->prefixDomain.count+2u>storage_->prefixComponents.size())return rejected;
         progress.pieceSetupAttempted=true;
         auto finish=[&](S status,std::uint32_t pc){
             progress.prefixResult={status,pc,storage_->prefixDomain.count,true};return progress.prefixResult;
@@ -4504,7 +4523,7 @@ public:
            *piece.sourceBodyD0_!=piece.componentSlots_[1u+piece.sceneCount_]||!piece.sourceGravityD4_||
            *piece.sourceGravityD4_!=piece.componentSlots_[2u+piece.sceneCount_]))return rejected;
         if(!piece.queries_.canConstructE0Prefix11B190()||
-           storage_->prefixDomain.count==maxOriginalWreckComponents50LA)return rejected;
+           storage_->prefixDomain.count>=storage_->prefixComponents.size())return rejected;
         auto& e0=*piece.componentSlots_[3u+piece.sceneCount_];
         progress.e0ConstructorAttempted=true;
         auto finish=[&](S status,std::uint32_t pc){
@@ -4558,7 +4577,7 @@ public:
            progress.prefixResult.status!=S::contactConstructorRequired||progress.prefixResult.sourcePC!=0x1660a0u||
            !binding.actualVector443550||!binding.actualVector4435A0||!binding.actualTerrain330Field||
            !storage_->actualObjectCount423F60||!storage_->actualAttachmentLock423F58||
-           *storage_->actualAttachmentLock423F58||storage_->prefixDomain.count+2u>maxOriginalWreckComponents50LA)return rejected;
+           *storage_->actualAttachmentLock423F58||storage_->prefixDomain.count+2u>storage_->prefixComponents.size())return rejected;
         auto& piece=*selected;auto& p=piece.physical_;
         const auto body=1u+piece.sceneCount_;auto& dc=*piece.componentSlots_[body+3u];
         auto& d8=*piece.componentSlots_[body+4u];auto& root=*piece.componentSlots_[0];
@@ -4650,7 +4669,7 @@ public:
            !storage_->actualObjectCount423F60||!application.prepared()||
            application.resolver3E1A70().get()!=storage_->inventory->modelResolverIdentity()||
            !storage_->actualAttachmentLock423F58||*storage_->actualAttachmentLock423F58||
-           storage_->prefixDomain.count==maxOriginalWreckComponents50LA||
+           storage_->prefixDomain.count>=storage_->prefixComponents.size()||
            !original_wreck_component_detail50LA::domain(storage_->prefixDomain))return rejected;
         auto& piece=*selected;const auto body=1u+piece.sceneCount_;
         auto& e4=*piece.componentSlots_[body+5u];
@@ -4709,7 +4728,7 @@ public:
         if(!sourceIdentityBound()||progress.e8ConstructorAttempted||progress.e4PrefixRetired||progress.retirementAttempted||
            progress.prefixResult.status!=S::e8ConstructorRequired||progress.prefixResult.sourcePC!=0x1662e4u||
            !storage_->actualObjectCount423F60||!storage_->actualAttachmentLock423F58||*storage_->actualAttachmentLock423F58||
-           storage_->prefixDomain.count==maxOriginalWreckComponents50LA||
+           storage_->prefixDomain.count>=storage_->prefixComponents.size()||
            *storage_->actualObjectCount423F60==std::numeric_limits<std::uint32_t>::max()||
            !original_wreck_component_detail50LA::domain(storage_->prefixDomain))return rejected;
         auto& piece=*selected;auto& e8=*piece.componentSlots_[7u+piece.sceneCount_];
@@ -5227,7 +5246,7 @@ public:
             progress.prefixResult.status!=S::effectSplashFailed&&progress.prefixResult.status!=S::collectionFiltersRequired&&progress.prefixResult.status!=S::collectionFiltersFailed&&
             progress.prefixResult.status!=S::nextPieceRequired&&progress.prefixResult.status!=S::groupConstructorRequired)||
            !storage_->prefixDomain.count)return false;
-        std::array<OriginalWreckComponent50LA*,maxOriginalWreckComponents50LA> live{};
+        OriginalWreckDomainRows50LA live;if(!liveRows(live))return false;
         OriginalWreckComponentDomain50LA domain{};
         if(!liveRetirementDomain(live,domain))return false;
         auto& piece=*selected;const auto body=1u+piece.sceneCount_;
@@ -5261,7 +5280,7 @@ public:
             progress.prefixResult.status!=S::effectSplashFailed&&progress.prefixResult.status!=S::collectionFiltersRequired&&progress.prefixResult.status!=S::collectionFiltersFailed&&
             progress.prefixResult.status!=S::nextPieceRequired&&progress.prefixResult.status!=S::groupConstructorRequired))return false;
         auto& piece=*selected;const auto body=1u+piece.sceneCount_;
-        std::array<OriginalWreckComponent50LA*,maxOriginalWreckComponents50LA> live{};
+        OriginalWreckDomainRows50LA live;if(!liveRows(live))return false;
         OriginalWreckComponentDomain50LA domain{storage_->sessionGeneration,live.data(),0};
         if(!liveRetirementDomain(live,domain))return false;
         auto& root=*piece.componentSlots_[0];auto& d8=*piece.componentSlots_[body+4u];auto& e4=*piece.componentSlots_[body+5u];
@@ -5314,7 +5333,7 @@ public:
             progress.prefixResult.status!=S::nextPieceRequired&&progress.prefixResult.status!=S::groupConstructorRequired)||
            !storage_->prefixDomain.count)return false;
         auto& piece=*selected;const auto body=1u+piece.sceneCount_;
-        std::array<OriginalWreckComponent50LA*,maxOriginalWreckComponents50LA> liveObjects{};
+        OriginalWreckDomainRows50LA liveObjects;if(!liveRows(liveObjects))return false;
         OriginalWreckComponentDomain50LA liveDomain{storage_->sessionGeneration,liveObjects.data(),0};
         if(!liveRetirementDomain(liveObjects,liveDomain))return false;
         auto& root=*piece.componentSlots_[0];auto& e0=*piece.componentSlots_[body+2u];
@@ -5373,7 +5392,7 @@ public:
             progress.prefixResult.status!=S::nextPieceRequired&&progress.prefixResult.status!=S::groupConstructorRequired)||
            !storage_->prefixDomain.count)return false;
         auto& piece=*selected;const auto body=1u+piece.sceneCount_;
-        std::array<OriginalWreckComponent50LA*,maxOriginalWreckComponents50LA> live{};
+        OriginalWreckDomainRows50LA live;if(!liveRows(live))return false;
         OriginalWreckComponentDomain50LA domain{storage_->sessionGeneration,live.data(),0};
         if(!liveRetirementDomain(live,domain))return false;
         auto& root=*piece.componentSlots_[0];auto& gravity=*piece.componentSlots_[body+1u];
@@ -5458,7 +5477,7 @@ public:
         // No generic source destructor is admitted: only this exact private,
         // pre-E4 constructor route has known NULL body28C and the
         // one-target gravity allocation represented by gravity_.
-        std::array<OriginalWreckComponent50LA*,maxOriginalWreckComponents50LA> liveObjects{};
+        OriginalWreckDomainRows50LA liveObjects;if(!liveRows(liveObjects)){out.status=S::topology;return out;}
         OriginalWreckComponentDomain50LA liveDomain{storage_->sessionGeneration,liveObjects.data(),0};
         if(!liveRetirementDomain(liveObjects,liveDomain)||
            (progress.appended22C1B8?
@@ -5522,13 +5541,13 @@ public:
            piece.queries_.modelSceneIdentity().value||!piece.modelGeometry_||
            !piece.modelGeometry_->constructed240110()||!piece.modelMaterials_.complete()||
            !piece.modelPackets_.constructed240740())return rejected;
-        std::array<OriginalWreckComponent50LA*,maxOriginalWreckComponents50LA> completeObjects{};
+        OriginalWreckDomainRows50LA completeObjects;if(!liveRows(completeObjects))return rejected;
         OriginalWreckComponentDomain50LA completeDomain{};
         if(!liveRetirementDomain(completeObjects,completeDomain))return rejected;
         auto graph=piece.assets_->graph();
         // The canonical model owner adds its own Entity once. Retired D0/D4
         // and owned PSG rows do not belong in its live outside Entity domain.
-        std::array<OriginalWreckComponent50LA*,maxOriginalWreckComponents50LA> outsideObjects{};
+        OriginalWreckDomainRows50LA outsideObjects;if(!liveRows(outsideObjects))return rejected;
         OriginalWreckComponentDomain50LA outside{};
         if(!liveRetirementDomain(outsideObjects,outside,&piece))return rejected;
         auto scene=piece.modelOwner_.preflightScene2896D0(graph);

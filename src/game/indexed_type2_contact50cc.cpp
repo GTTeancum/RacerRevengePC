@@ -1,4 +1,5 @@
 #include "indexed_type2_contact50cc.h"
+#include "collision_mesh_admission50cc.h"
 #include "type2_triangle_axes49x.h"
 #include "native_gate_geometry50kg.h"
 #include <algorithm>
@@ -304,17 +305,10 @@ Status validate(const Type2StaticQuery49X& q,const Type2StaticCandidate49X* cand
         const auto candidateVisitBound=(resource.nodeCount+resource.rayCount)*(mesh->nodes.size()+mesh->faces.size());
         if(candidateVisitBound>std::numeric_limits<std::size_t>::max()-aggregateVisitBound)return Status::InvalidInput;
         aggregateVisitBound+=candidateVisitBound;
-        for(std::size_t j=0;j<mesh->nodes.size();++j){
-            const auto& n=mesh->nodes[j];
-            if(!std::isfinite(radii[j])||radii[j]<0.f||!std::isfinite(n.volume)||
-               !finite(vector(n.center))||!finite(vector(n.half)))return Status::InvalidInput;
-            for(unsigned k=0;k<3;++k)if(n.half[k]<0.f)return Status::InvalidInput;
-            for(auto t:n.children){const auto index=t&~assets::collision_mesh_leaf48i;
-                if((t&assets::collision_mesh_leaf48i)?index>=mesh->faces.size():index>=mesh->nodes.size())return Status::InvalidInput;
-            }
-        }
-        for(const auto& vertex:mesh->vertices)if(!finite(vector(vertex)))return Status::InvalidInput;
-        for(const auto& face:mesh->faces)for(auto index:face.vertices)if(index>=mesh->vertices.size())return Status::InvalidInput;
+        // Node/vertex/face walk: the mesh and its radii are cold-owned and
+        // immutable for the session, so a pass is cached per mesh per session
+        // scope (collision_mesh_admission50cc.h). Same answer as the walk.
+        if(!collisionMeshContentsAdmitted50CC(*mesh,radii,radiusCount))return Status::InvalidInput;
         return Status::Complete;
     };
     for(std::size_t i=0;i<count;++i){
@@ -445,6 +439,21 @@ static Type2StaticStatus49X runIndexedType2Contacts50CC(const Type2StaticQuery49
     if(count>std::numeric_limits<std::size_t>::max()-result.candidateCount)return Status::InvalidInput;
     result.candidateCount+=count;
     auto currentCategory=continuation&&continuation->previous?continuation->currentCategory:query.initialCurrentCategory;
+    // Last-seen position per owner handle (host stack memory, local to this
+    // call, so a nested query cannot disturb it). It gives the same nearest
+    // earlier equal handle as the backward scan below, without O(count^2).
+    // Small queries, very large ones and huge owner tables keep the scan.
+    constexpr std::size_t lastSeenSlots=2048;   // power of two, 16 KB
+    constexpr std::uint32_t lastSeenEmpty=0xffffffffu;
+    struct LastSeenSlot {std::uint32_t handle,position;};
+    LastSeenSlot lastSeen[lastSeenSlots];
+    const bool lastSeenUsed=count>32&&count<=lastSeenSlots/2&&ownerCount<lastSeenEmpty;
+    std::size_t lastSeenMask=0;
+    if(lastSeenUsed){
+        std::size_t slots=64;while(slots<2*count)slots<<=1; // at most half full
+        lastSeenMask=slots-1;
+        for(std::size_t i=0;i<slots;++i)lastSeen[i]={lastSeenEmpty,0u};
+    }
     for(std::size_t candidateIndex=0;candidateIndex<count;++candidateIndex){
         const auto& candidate=candidates[indices[candidateIndex]];const auto& c=candidate.candidate.collision;
         auto& effect=w.effects[candidateIndex];effect.identity=c.filter.identity;effect.flagsF8=c.filter.flagsF8;
@@ -453,7 +462,14 @@ static Type2StaticStatus49X runIndexedType2Contacts50CC(const Type2StaticQuery49
         if(continuation&&continuation->currentEffect)std::memcpy(&effect,continuation->currentEffect,sizeof effect);
         // Repeated handles identify one physical owner; earlier writes must be
         // visible on its next visit even though caller's owner table is const.
-        for(std::size_t previous=candidateIndex;previous>0;--previous)
+        if(lastSeenUsed){
+            // validate() proved indices[i]<ownerCount<lastSeenEmpty.
+            const auto handle=static_cast<std::uint32_t>(indices[candidateIndex]);
+            std::size_t slot=static_cast<std::size_t>(handle*2654435761u)&lastSeenMask;
+            while(lastSeen[slot].handle!=lastSeenEmpty&&lastSeen[slot].handle!=handle)slot=(slot+1)&lastSeenMask;
+            if(lastSeen[slot].handle==handle)effect=w.effects[lastSeen[slot].position];
+            lastSeen[slot]={handle,static_cast<std::uint32_t>(candidateIndex)};
+        }else for(std::size_t previous=candidateIndex;previous>0;--previous)
             if(indices[previous-1]==indices[candidateIndex]){
                 effect=w.effects[previous-1];break;
             }

@@ -355,7 +355,7 @@ public:
                 right_[slot]->bindSibling(*left_[slot]);
                 chariot_[slot]->bindChariotSiblings(*right_[slot],*left_[slot],bottomRight_[slot].get(),bottomLeft_[slot].get());
                 rig.install(s,x.bindings,x.handRecords,right_[slot].get(),left_[slot].get(),chariot_[slot].get(),
-                    bottomRight_[slot].get(),bottomLeft_[slot].get());
+                    bottomRight_[slot].get(),bottomLeft_[slot].get(),true); //Shared motion is process-wide.
                 const bool aiOwned=slot>=arena_.humanCount;
                 auto selection=arena_.selection;
                 if(arena_.humanCount){

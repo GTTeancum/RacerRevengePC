@@ -1,6 +1,7 @@
 #pragma once
 #include <cstddef>
 #include <cstdint>
+#include <vector>
 
 namespace rr::game {
 
@@ -55,7 +56,16 @@ struct OriginalWreckComponent50LA final {
     OriginalWreckComponent50LA(const OriginalWreckComponent50LA&)=delete;
     OriginalWreckComponent50LA& operator=(const OriginalWreckComponent50LA&)=delete;
 };
+// Allocation-free capacity of the generic fixed component arrays. It is NOT
+// a limit on a domain: a racer's wreck chain is sized from its real count
+// (OriginalWreckDomainRows50LA below), never from this value.
 inline constexpr std::size_t maxOriginalWreckComponents50LA=64;
+// Rows backing one live component domain whose size comes from real data.
+// The caller sizes it before use; writers refuse past size().
+using OriginalWreckDomainRows50LA=std::vector<OriginalWreckComponent50LA*>;
+inline bool sizeOriginalWreckDomainRows50LA(OriginalWreckDomainRows50LA& rows,std::size_t n)noexcept {
+    try{rows.assign(n,nullptr);return true;}catch(...){rows.clear();return false;}
+}
 // Borrow of stable canonical component addresses, not an additional forest.
 // Include real outside ancestors when141960 must propagate through them.
 struct OriginalWreckComponentDomain50LA {
@@ -82,7 +92,8 @@ inline bool effectControlIdentityBound(const C& c) noexcept {
     }
 }
 inline bool domain(const D& d) noexcept {
-    if(!d.sessionGeneration||!d.objects||!d.count||d.count>maxOriginalWreckComponents50LA)return false;
+    // No fixed size limit: the domain's backing was sized by its owner.
+    if(!d.sessionGeneration||!d.objects||!d.count)return false;
     for(std::size_t i=0;i<d.count;++i){
         const auto* p=d.objects[i];
         if(!p||!p->reference00||!p->objectKey||p->sessionGeneration!=d.sessionGeneration||

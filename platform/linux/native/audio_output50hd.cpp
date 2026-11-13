@@ -5,13 +5,18 @@
 #include <bit>
 #include <cerrno>
 #include <chrono>
+#include <condition_variable>
 #include <cstddef>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <fcntl.h>
+#include <exception>
 #include <limits>
+#include <memory>
+#include <mutex>
 #include <new>
+#include <thread>
 #if defined(_WIN32)
 #include <SDL_audio.h>
 #include <io.h>
@@ -135,6 +140,95 @@ bool writeAll(int fd, const void* bytes, std::size_t size) noexcept {
     }
     return true;
 }
+// Background WAV payload writer (test capture only: RR_AUDIO_WAV). The game
+// thread copies each committed PCM block into this fixed host-side ring; one
+// writer thread appends the ring to the file strictly in order with the same
+// writeAll. A full ring makes the game thread wait for space (logged as
+// capture_ring_wait); nothing is ever dropped, so the file is byte-for-byte the
+// one the synchronous writer produced. Header and length stay on close().
+class CaptureWriter {
+public:
+    // 2^20 frames of PCM16 stereo = 4 MiB, about 21.8 s at 48 kHz.
+    static constexpr std::size_t ringFrames = std::size_t{1} << 20;
+    static_assert(blockFrames <= ringFrames, "one mixed block must fit the capture ring");
+    CaptureWriter() = default;
+    CaptureWriter(const CaptureWriter&) = delete;
+    CaptureWriter& operator=(const CaptureWriter&) = delete;
+    ~CaptureWriter() { finish(); }
+    // Returns false (no thread, no ring) when either cannot be created; the
+    // caller then keeps writing synchronously.
+    bool start(int fd) noexcept {
+        ring_.reset(new (std::nothrow) std::int16_t[ringFrames * 2]);
+        if (!ring_) return false;
+        fd_ = fd;
+        try { thread_ = std::thread([this] { run(); }); }
+        catch (...) { ring_.reset(); fd_ = -1; return false; }
+        started_ = true;
+        return true;
+    }
+    // Game thread. Copies frames into the ring, waiting while it is full.
+    // Returns false once the writer has failed; error receives its errno.
+    bool push(const std::int16_t* pcm, std::size_t frames, double& waitedMs, int& error) noexcept {
+        waitedMs = 0.0; error = 0;
+        if (frames > ringFrames) { error = EINVAL; return false; } // never true: blockFrames <= ringFrames
+        std::unique_lock<std::mutex> lock(mutex_);
+        if (failed_) { error = error_; return false; }
+        if (tail_ - head_ + frames > ringFrames) {
+            const auto begin = std::chrono::steady_clock::now();
+            ++waits_;
+            spaceReady_.wait(lock, [&] { return failed_ || tail_ - head_ + frames <= ringFrames; });
+            waitedMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - begin).count();
+            if (failed_) { error = error_; return false; }
+        }
+        // Bounds: tail_-head_+frames <= ringFrames, so [tail_, tail_+frames)
+        // never overlaps the unread range the writer may be copying out.
+        const auto offset = static_cast<std::size_t>(tail_ % ringFrames);
+        const auto first = std::min(frames, ringFrames - offset);
+        std::memcpy(ring_.get() + offset * 2, pcm, first * 4);
+        if (frames > first) std::memcpy(ring_.get(), pcm + first * 2, (frames - first) * 4);
+        tail_ += frames;
+        lock.unlock();
+        dataReady_.notify_one();
+        return true;
+    }
+    // Game thread. Drains everything pushed, then joins the writer.
+    void finish() noexcept {
+        if (!started_) return;
+        { std::lock_guard<std::mutex> lock(mutex_); stop_ = true; }
+        dataReady_.notify_one();
+        try { thread_.join(); } catch (...) { std::terminate(); } // a live writer must not outlive its fd
+        started_ = false;
+    }
+    // Valid after finish().
+    bool failed() const noexcept { return failed_; }
+    int error() const noexcept { return error_; }
+    std::uint64_t writtenFrames() const noexcept { return written_; }
+    std::uint64_t waits() const noexcept { return waits_; }
+private:
+    void run() noexcept {
+        std::unique_lock<std::mutex> lock(mutex_);
+        for (;;) {
+            dataReady_.wait(lock, [&] { return stop_ || tail_ != head_; });
+            if (tail_ == head_) return; // stop_ and fully drained
+            const auto offset = static_cast<std::size_t>(head_ % ringFrames);
+            const auto frames = static_cast<std::size_t>(std::min<std::uint64_t>(tail_ - head_, ringFrames - offset));
+            lock.unlock();
+            const bool ok = writeAll(fd_, ring_.get() + offset * 2, frames * 4);
+            const int writeError = errno;
+            lock.lock();
+            if (!ok) { failed_ = true; error_ = writeError; spaceReady_.notify_all(); return; }
+            head_ += frames; written_ += frames;
+            spaceReady_.notify_all();
+        }
+    }
+    std::unique_ptr<std::int16_t[]> ring_;
+    std::mutex mutex_;
+    std::condition_variable dataReady_, spaceReady_;
+    std::uint64_t head_ = 0, tail_ = 0, written_ = 0, waits_ = 0; // frames
+    bool stop_ = false, failed_ = false, started_ = false;
+    int error_ = 0, fd_ = -1;
+    std::thread thread_;
+};
 }
 const char* audioDeviceStatusName50HD(AudioDeviceStatus50HD status) noexcept {
     switch (status) {
@@ -151,6 +245,8 @@ struct AudioOutput50HD::State {
     native_library50win::Handle library = nullptr;
     std::uint32_t device = 0;
     int capture = -1;
+    // Background payload writer for capture; null means synchronous writes.
+    std::unique_ptr<CaptureWriter> captureWriter;
     bool subsystemOwned = false, started = false, failed = false;
     // Retain only device configuration, never the caller's borrowed WAV path.
     AudioOutputRequest50HD deviceRequest{};
@@ -328,6 +424,10 @@ bool AudioOutput50HD::open(const AudioOutputRequest50HD& request,
             closeCapture(s.capture); delete state_; state_ = nullptr; return false;
         }
         s.info.captureActive = true;
+        // Header bytes above stay synchronous; payload goes to the writer
+        // thread. If it cannot start, capture stays synchronous (same bytes).
+        s.captureWriter.reset(new (std::nothrow) CaptureWriter);
+        if (s.captureWriter && !s.captureWriter->start(s.capture)) s.captureWriter.reset();
     }
     if (request.tryDevice) s.prepareDevice(request);
     return true;
@@ -381,11 +481,26 @@ bool AudioOutput50HD::advanceMicroseconds(AudioStereoProducer50HD& producer, std
         s.info.mixedFrames += frames;
         if (s.capture >= 0) {
             begin = DiagClock::now();
-            if (!writeAll(s.capture, s.mixed.data(), frames * 4)) {
-                s.failed = true;
-                return fail(d, AudioOutputError50HD::CaptureWrite, "audio.advance/WAV payload", std::strerror(errno));
+            if (s.captureWriter) {
+                // Copy before the mute below, exactly like the synchronous write.
+                double waitedMs = 0.0; int error = 0;
+                if (!s.captureWriter->push(s.mixed.data(), frames, waitedMs, error)) {
+                    s.failed = true;
+                    return fail(d, AudioOutputError50HD::CaptureWrite, "audio.advance/WAV payload", std::strerror(error));
+                }
+                static unsigned ringWaitLines = 0;
+                if (waitedMs > 0.0 && ringWaitLines < 200) {
+                    ++ringWaitLines;
+                    std::fprintf(stderr, "capture_ring_wait ms=%.1f%c", waitedMs, 10);
+                }
+                slow("capture_enqueue", begin);
+            } else {
+                if (!writeAll(s.capture, s.mixed.data(), frames * 4)) {
+                    s.failed = true;
+                    return fail(d, AudioOutputError50HD::CaptureWrite, "audio.advance/WAV payload", std::strerror(errno));
+                }
+                slow("capture_write", begin);
             }
-            slow("capture_write", begin);
             s.info.capturedFrames += frames;
         }
         // Unattended tests: every sound is still mixed (and captured); only
@@ -427,11 +542,25 @@ bool AudioOutput50HD::close(AudioOutputDiagnostic50HD& d) noexcept {
     if (!state_) return true;
     auto& s = *state_;
     s.releaseDevice();
-    finalInfo_ = info();
     bool ok = true;
+    if (s.captureWriter) {
+        // Drain every pushed block to the file, then join, before the header.
+        s.captureWriter->finish();
+        if (s.captureWriter->waits())
+            std::fprintf(stderr, "capture_ring_wait total_waits=%llu%c",
+                         static_cast<unsigned long long>(s.captureWriter->waits()), 10);
+        if (s.captureWriter->failed()) {
+            ok = fail(d, AudioOutputError50HD::CaptureWrite, "audio.close/WAV payload",
+                      std::strerror(s.captureWriter->error()));
+            // Advertise only fully written frames, as the synchronous path did.
+            s.info.capturedFrames = s.captureWriter->writtenFrames();
+        }
+        s.captureWriter.reset();
+    }
+    finalInfo_ = info();
     if (s.capture >= 0) {
         const auto header = wavHeader(s.info.sampleRate, s.info.capturedFrames);
-        if (!seekCaptureStart(s.capture) || !writeAll(s.capture, header.data(), header.size()))
+        if ((!seekCaptureStart(s.capture) || !writeAll(s.capture, header.data(), header.size())) && ok)
             ok = fail(d, AudioOutputError50HD::CaptureFinalize, "audio.close/WAV header", std::strerror(errno));
         // A failed partial write is excluded from RIFF's advertised data range.
         if (!truncateCapture(s.capture, 44 + s.info.capturedFrames * 4) && ok)

@@ -55,8 +55,14 @@ template<class Domain>
 inline bool forestFull(const Domain& d) noexcept {
     if(!domain(d))return false;
     unsigned char legacySeen[maxOriginalWreckComponents50LA]{};
+    std::vector<unsigned char> sizedSeen; //Domain larger than the fixed scratch: sized from its real count.
     auto* seen=entityVisitScratch(d); //Private Application View supplies its reserved extent.
-    if(!seen){if(d.count>maxOriginalWreckComponents50LA)return false;seen=legacySeen;}
+    if(!seen){
+        if(d.count>maxOriginalWreckComponents50LA){
+            try{sizedSeen.assign(d.count,0);}catch(...){return false;}
+            seen=sizedSeen.data();
+        }else seen=legacySeen;
+    }
     for(std::size_t i=0;i<d.count;++i)seen[i]=0;
     for(std::size_t i=0;i<d.count;++i){
         const auto* p=d.objects[i];

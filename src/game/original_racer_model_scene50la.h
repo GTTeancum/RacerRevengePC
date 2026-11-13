@@ -2156,7 +2156,21 @@ private:
         const OriginalRacerModelSceneOwner50LA* secondSibling=nullptr,
         const OriginalRacerModelSceneOwner50LA* thirdSibling=nullptr,
         const OriginalRacerModelSceneOwner50LA* fourthSibling=nullptr)const noexcept {
+        return joinDomain(outside,list.data(),list.size(),joined,sibling,secondSibling,thirdSibling,fourthSibling);
+    }
+    // Caller-sized rows (a racer wreck chain sizes them from its real count).
+    // Every write below is within `capacity`, checked first.
+    bool joinDomain(const OriginalWreckComponentDomain50LA& outside,
+        C** listRows,std::size_t capacity,
+        OriginalWreckComponentDomain50LA& joined,
+        const OriginalRacerModelSceneOwner50LA* sibling=nullptr,
+        const OriginalRacerModelSceneOwner50LA* secondSibling=nullptr,
+        const OriginalRacerModelSceneOwner50LA* thirdSibling=nullptr,
+        const OriginalRacerModelSceneOwner50LA* fourthSibling=nullptr)const noexcept {
         using namespace original_wreck_component_detail50LA;
+        if(!listRows||!capacity)return false;
+        struct Rows{C** p;std::size_t n;std::size_t size()const noexcept{return n;}
+            C*& operator[](std::size_t i)const noexcept{return p[i];}C** data()const noexcept{return p;}} list{listRows,capacity};
         const std::array<const OriginalRacerModelSceneOwner50LA*,4> peers{{
             sibling,secondSibling,thirdSibling,fourthSibling}};
         std::size_t added=1u;bool ended=false;
@@ -2166,7 +2180,7 @@ private:
             for(std::size_t j=0;j<i;++j)if(peers[j]==peers[i])return false;
             ++added;
         }
-        if(outside.sessionGeneration!=binding_.sessionGeneration||outside.count>list.size()-added||
+        if(outside.sessionGeneration!=binding_.sessionGeneration||added>list.size()||outside.count>list.size()-added||
            (outside.count&&!original_wreck_component_detail50LA::domain(outside)))return false;
         // At most four bounded real peers supply their private canonical Entity8. This
         // borrow adds no object, reference, alias repair or mutable accessor.

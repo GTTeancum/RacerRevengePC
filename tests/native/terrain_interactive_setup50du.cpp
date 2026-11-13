@@ -7,6 +7,7 @@
 #include "original_native_world_water50la.h"
 #include <cstring>
 #include "../../src/game/indexed_type2_contact50cc.h"
+#include "../../src/game/collision_mesh_admission50cc.h"
 #include "../../src/game/compound_query50ij.h"
 #include "terrain_interactive_continuation50du.h"
 #include "terrain_interactive_frame50du.h"
@@ -565,6 +566,11 @@ SessionExit50DU Context::run() {
  auto& tuning=this->tuning;
  auto& usePhysicalGameController=this->usePhysicalGameController;
  auto& x=this->x;
+ // Collision mesh admission cache lives exactly as long as this race session:
+ // declared before every session-local owner, so it closes after they are
+ // destroyed. Track/world candidates are owned outside and outlive it.
+ // Host memory only; see collision_mesh_admission50cc.h.
+ rr::game::CollisionAdmissionScope50CC collisionAdmissionScope50CC;
  // The actual guards remain early; these views have no destructor action.
  struct ArmedFlagView { bool& armed; };
  ArmedFlagView tbDoorPrefixGuard{tbDoorPrefixArmed},tcGatePrefixGuard{tcGatePrefixArmed};

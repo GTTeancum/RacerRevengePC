@@ -5,7 +5,7 @@ bool Owner::continueNativeSpin212ED0(g::OriginalRacerEntityCold50LA& actualRacer
     if(nativeSpinAttempted_){pc=nativeSpinPC_;return false;}
     if(pc!=0x212e10u||failurePC_!=pc||actualRacer.nativePostEmberPC_!=pc||
        modelRole_!=Rig::chariot||!nativeHandlingReturned_||
-       handlingRoute_!=HandlingRoute::legacy||!bank_||!fixture_||!arena_||!rig_||slot_!=0u||
+       handlingRoute_!=HandlingRoute::legacy||!bank_||!fixture_||!arena_||!rig_||slot_>=8u||
        !application_||!application_->application10()||!finishedFor(actualRacer)||
        !actualRacer.prepared()||actualRacer.nativeWreckWithdrawn_||
        !actualRacer.nativePostEmberAttempted_||!actualRacer.nativeDispatch20F390Known_||

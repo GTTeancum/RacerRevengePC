@@ -32,14 +32,16 @@ class Retirement final {
     static bool actualArena(const native_racer50HN::Bank& bank,
         const rr::game::VehicleFrameState49W& frame,const rr::game::VehicleFrameBindings49W& bindings,
         const rr::game::VehicleFrameParameters49W& parameters) noexcept {
-        using Frame=rr::game::VehicleFrameState49W;
-        constexpr auto offset=offsetof(Frame,noise),end=offset+sizeof(rr::game::CoupledNoiseContext49M);
-        static_assert(std::is_standard_layout_v<Frame>&&end<=sizeof(Frame));
-        const auto* bytes=reinterpret_cast<const unsigned char*>(&frame);
-        // The actual admitted registration is either the whole POD frame or
-        // the exact two source-shared-noise-excluding spans, never a snapshot.
-        const bool frameRegistered=exactSpan(bank,&frame,sizeof(frame))||
-            (exactSpan(bank,bytes,offset)&&exactSpan(bank,bytes+end,sizeof(Frame)-end));
+        // Every course saves the racer frame without the process-shared motion
+        // and 308030 noise (one rule, original_shared_rng50iu.h), as GB/MC do.
+        const bool frameRegistered=rr::game::racerFrameSharedExclusion50GB(frame,
+            [&](const void* p,std::size_t bytes){return exactSpan(bank,p,bytes);},
+            [&](const void* p,std::size_t bytes){
+                const auto begin=reinterpret_cast<std::uintptr_t>(p),finish=begin+bytes;
+                for(const auto& span:bank.spans_){const auto other=reinterpret_cast<std::uintptr_t>(span.address);
+                    if(begin<other+span.bytes&&other<finish)return false;}
+                return true;
+            });
         return frameRegistered&&exactSpan(bank,&bindings,sizeof(bindings))&&
             exactSpan(bank,&parameters,sizeof(parameters));
     }

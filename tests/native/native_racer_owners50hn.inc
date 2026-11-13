@@ -6,9 +6,10 @@
 //
 // Canonical frame includes both rigid bodies, complete graph/animation/visual,
 // filter histories, joint, ground follow, damage, own serial RNG and source libm.
-if(isGbTrack||isMcTrack)registerRacerFrameExceptSharedMotionAndNoise50GB(racerBank,s);
-else if(originalAiEnabled)registerRacerFrameExceptSharedNoise50IU(racerBank,s);
-else racerBank.owner(s);
+// Every course: the original keeps animation shared motion (4332F0/433478/
+// 433468 statics) and the 308030 noise once for the whole game, never per
+// racer, so neither is in a racer's saved frame (formerly GB/MC only).
+registerRacerFrameExceptSharedMotionAndNoise50GB(racerBank,s);
 racerBank.owner(originalAi);
 racerBank.owner(originalAiReceipt);
 if(originalRecoveryEnabled){

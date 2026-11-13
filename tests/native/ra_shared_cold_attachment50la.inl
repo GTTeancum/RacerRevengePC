@@ -59,7 +59,8 @@
         constexpr auto noise=offsetof(g::VehicleFrameState49W,noise);
         constexpr auto after=noise+sizeof(g::CoupledNoiseContext49M);
         const auto* bytes=reinterpret_cast<const unsigned char*>(&actual_->frame);
-        if(!registeredRange(bytes,noise)||!registeredRange(bytes+after,sizeof(actual_->frame)-after)||
+        (void)bytes;(void)after;(void)noise;
+        if(!frameLanesRegistered(actual_->frame)||
            (gridArena_&&(&gridArena_->bindings!=&bindings||&gridArena_->parameters!=&parameters)))
             return fail(d,"actual shared POD frame/parameter backing differs");
         bool complete=false;

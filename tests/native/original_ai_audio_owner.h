@@ -315,9 +315,14 @@ public:
         rr::game::PodSpeechState50HG* actualHumanState=nullptr)noexcept {
         if(!speechPrepared_||speechInitialized_)return false;
         if(firstAiSlot_==1u){
-            if(!actualHumanCounts||!actualHumanState||
-               rr::game::initializePodSpeech50HG(*actualHumanCounts,actualSharedRaw,*actualHumanState)!=
+            if(!actualHumanCounts||!actualHumanState)return false;
+            // The player's own 2C1170 (pod load, 2C1300) may already have drawn
+            // this SAME D48's cursors at their source position; never redraw.
+            const bool drawn=actualHumanState->initialized;
+            if(!drawn&&rr::game::initializePodSpeech50HG(*actualHumanCounts,actualSharedRaw,*actualHumanState)!=
                rr::game::PodSpeechStatus50HG::Complete)return false;
+            std::fprintf(stderr,"speech_cursor_init human=%s ai=%zu",drawn?"pod_load_2c1300":"all_eight",
+                racerCount_>firstAiSlot_?racerCount_-firstAiSlot_:0u);std::fputc(10,stderr);
         }else if(actualHumanCounts||actualHumanState)return false;
         for(std::size_t slot=firstAiSlot_;slot<racerCount_;++slot){auto& r=racers_[slot];
             if(rr::game::initializePodSpeech50HG(r.speechCounts,actualSharedRaw,r.speech)!=

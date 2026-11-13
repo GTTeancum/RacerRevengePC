@@ -66,7 +66,7 @@ inline bool Operation::constructConstructorSlot(native_racer50HN::Bank& actualBa
             right_[slot]->bindSibling(*left_[slot]);
             chariot_[slot]->bindChariotSiblings(*right_[slot],*left_[slot],bottomRight_[slot].get(),bottomLeft_[slot].get());
             rig.install(s,x.bindings,x.handRecords,right_[slot].get(),left_[slot].get(),chariot_[slot].get(),
-                bottomRight_[slot].get(),bottomLeft_[slot].get());
+                bottomRight_[slot].get(),bottomLeft_[slot].get(),true); //Shared motion is process-wide.
             d.stage="immutable source handling and native metadata reservation";
             chariot_[slot]->reserveSourceHandlingBefore2146(x);
             // No main authored handling, AI, grid, terrain setup, recovery,

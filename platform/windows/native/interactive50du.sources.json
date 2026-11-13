@@ -175,6 +175,7 @@
     "src/game/vehicle_candidates50ca.cpp",
     "src/game/candidate_handles50cb.cpp",
     "src/game/indexed_type2_contact50cc.cpp",
+    "src/game/collision_mesh_admission50cc.cpp",
     "src/game/vehicle_indexed_main50cd.cpp",
     "src/game/vehicle_indexed_secondary50cd.cpp",
     "src/game/collection_projection50cf.cpp",

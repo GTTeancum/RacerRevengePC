@@ -8,9 +8,14 @@
 #include "../../src/game/original_race_end_entry50la.h"
 #include <cfenv>
 #include "../../platform/linux/native/stall_watchdog50du.h"
+#include "../../platform/linux/native/window_swap_stats50au.h"
 #include "../../src/game/ps2_float_mode50la.h"
 #include "../../src/game/native_destroyed_racers50pd.h"
+#include "../../src/game/collision_mesh_admission50cc.h"
 #include <algorithm>
+#include <array>
+#include <cstdio>
+#include <functional>
 #include <xmmintrin.h>
 #include "terrain_interactive_loop50du.h"
 #include "original_race_f8_native_bars50la.h"
@@ -52,10 +57,117 @@ void addCounter50DU(std::uint64_t& counter, std::uint64_t amount = 1) noexcept {
     const auto room = std::numeric_limits<std::uint64_t>::max() - counter;
     counter += std::min(room, amount);
 }
+// Exact race frame recorder (measurement only; host memory, no game state).
+// A frame is the wall time between two loop frame boundaries (the frame_hitch
+// point) across which the gameplay window_swaps counter advanced, so loop
+// iterations that did not present (fade waits, pauses) fold into the frame
+// that did. Frames are recorded while race.phase is Racing; one
+// race_fps_summary line is printed when Racing ends (or the loop exits).
+// Camera fade presents are not gameplay swaps; they are counted separately
+// from WindowHost50DQ::swap (window_swap_stats50au.h) as fade_swaps.
+struct RaceFrameRecorder50AU {
+    static constexpr std::size_t capacity=65536; // about 17 minutes at 62 FPS
+    std::array<float,capacity> frameMs{};
+    std::array<float,capacity> scratch{};
+    std::size_t count=0;
+    bool full=false,active=false;
+    double totalMs=0.0,worstMs=0.0;
+    std::uint64_t catchupSteps=0,discardedAtStartNs=0;
+    std::uint64_t fadeSwaps=0;double fadeMaxGapMs=0.0;
+    bool marked=false;FrameHitch50DU::Clock::time_point markTime{};
+    std::uint64_t markSwaps=0,markTicks=0;
+    // window_submit_fps interval: <=17/<=20/<=25/<=33/<=50/>50 ms, all phases.
+    std::array<std::uint64_t,6> buckets{};double intervalWorstMs=0.0;
+    std::uint32_t racesReported=0; // process-wide race ordinal
+};
+RaceFrameRecorder50AU raceFrames50AU;
+void resetRaceFrameSession50AU() noexcept {
+    auto& r=raceFrames50AU;
+    r.count=0;r.full=false;r.active=false;r.totalMs=0.0;r.worstMs=0.0;r.catchupSteps=0;r.discardedAtStartNs=0;
+    r.fadeSwaps=0;r.fadeMaxGapMs=0.0;r.marked=false;r.markTime={};r.markSwaps=0;r.markTicks=0;
+    r.buckets={};r.intervalWorstMs=0.0;
+}
+void noteFadeSwaps50AU(std::uint64_t swaps,double maxGapMs) noexcept {
+    auto& r=raceFrames50AU;
+    addCounter50DU(r.fadeSwaps,swaps);
+    if(maxGapMs>r.fadeMaxGapMs)r.fadeMaxGapMs=maxGapMs;
+}
+void reportRaceFrames50AU(const char* track,std::uint64_t discardedNs) {
+    auto& r=raceFrames50AU;
+    const std::size_t n=r.count;
+    const double avgFps=n&&r.totalMs>0.0?double(n)*1000.0/r.totalMs:0.0;
+    // Slowest window of consecutive frames lasting at least 5 s. A race
+    // shorter than 5 s reports its whole-race average instead.
+    double min5s=avgFps;bool anyWindow=false;
+    {double sum=0.0;std::size_t j=0;
+     for(std::size_t i=0;i<n;++i){
+      while(j<n&&sum<5000.0)sum+=r.frameMs[j++];
+      if(sum<5000.0)break;
+      const double fps=double(j-i)*1000.0/sum;
+      if(!anyWindow||fps<min5s){min5s=fps;anyWindow=true;}
+      sum-=r.frameMs[i];
+     }}
+    // 1% / 0.1% lows: FPS over the mean of the slowest 1% / 0.1% of frames.
+    double low1=0.0,low01=0.0;
+    if(n){
+     std::copy_n(r.frameMs.begin(),n,r.scratch.begin());
+     const std::size_t k1=std::max<std::size_t>(1,n/100),k01=std::max<std::size_t>(1,n/1000);
+     auto* first=r.scratch.data();
+     std::nth_element(first,first+(k1-1),first+n,std::greater<float>());
+     double sum1=0.0;for(std::size_t i=0;i<k1;++i)sum1+=first[i];
+     std::nth_element(first,first+(k01-1),first+k1,std::greater<float>());
+     double sum01=0.0;for(std::size_t i=0;i<k01;++i)sum01+=first[i];
+     low1=sum1>0.0?double(k1)*1000.0/sum1:0.0;low01=sum01>0.0?double(k01)*1000.0/sum01:0.0;
+    }
+    const double droppedMs=discardedNs>=r.discardedAtStartNs?double(discardedNs-r.discardedAtStartNs)/1.0e6:0.0;
+    char line[512];
+    std::snprintf(line,sizeof line,"race_fps_summary track=%s race=%u frames=%zu avg_fps=%.1f min_5s_fps=%.1f"
+        " low1_fps=%.1f low01_fps=%.1f worst_ms=%.1f catchup_steps=%llu dropped_ms=%.1f fade_swaps=%llu"
+        " fade_max_gap_ms=%.1f recorder_full=%d\n",track?track:"unknown",++r.racesReported,n,avgFps,min5s,low1,low01,
+        r.worstMs,static_cast<unsigned long long>(r.catchupSteps),droppedMs,static_cast<unsigned long long>(r.fadeSwaps),
+        r.fadeMaxGapMs,r.full?1:0);
+    std::cerr<<line;
+    rr::game::reportCollisionAdmission50CC("race_end"); // Step A counters, same moment
+    r.active=false;r.count=0;r.full=false;r.totalMs=0.0;r.worstMs=0.0;r.catchupSteps=0;
+    r.fadeSwaps=0;r.fadeMaxGapMs=0.0; // the next race's fades start fresh
+}
+// Called once per loop iteration at the frame_hitch point.
+void observeFrameBoundary50AU(FrameHitch50DU::Clock::time_point now,std::uint64_t swaps,std::uint64_t ticks,
+    bool racing,std::uint64_t discardedNs,const char* track) {
+    auto& r=raceFrames50AU;
+    if(!r.marked){r.marked=true;r.markTime=now;r.markSwaps=swaps;r.markTicks=ticks;}
+    else if(swaps!=r.markSwaps){
+     const std::uint64_t frames=swaps>r.markSwaps?swaps-r.markSwaps:1;
+     const std::uint64_t ticksDone=ticks>=r.markTicks?ticks-r.markTicks:0;
+     const double totalMs=hitchMs50DU(r.markTime,now);
+     const double perFrame=totalMs>=0.0?totalMs/double(frames):0.0;
+     const unsigned bucket=perFrame<=17.0?0u:perFrame<=20.0?1u:perFrame<=25.0?2u:perFrame<=33.0?3u:perFrame<=50.0?4u:5u;
+     addCounter50DU(r.buckets[bucket],frames);
+     if(perFrame>r.intervalWorstMs)r.intervalWorstMs=perFrame;
+     if(racing&&r.active){
+      bool stored=true;
+      for(std::uint64_t f=0;f<frames;++f){
+       if(r.count>=RaceFrameRecorder50AU::capacity){ // bounds check before the write
+        if(!r.full){r.full=true;std::cerr<<"race_fps_recorder_full capacity="<<RaceFrameRecorder50AU::capacity
+            <<" track="<<(track?track:"unknown")<<" (recording stopped for this race)\n";}
+        stored=false;break;
+       }
+       r.frameMs[r.count++]=static_cast<float>(perFrame);r.totalMs+=perFrame;
+       if(perFrame>r.worstMs)r.worstMs=perFrame;
+      }
+      if(stored&&ticksDone>frames)addCounter50DU(r.catchupSteps,ticksDone-frames);
+     }
+     r.markTime=now;r.markSwaps=swaps;r.markTicks=ticks;
+    }
+    if(racing&&!r.active){
+     r.active=true;r.count=0;r.full=false;r.totalMs=0.0;r.worstMs=0.0;r.catchupSteps=0;r.discardedAtStartNs=discardedNs;
+    }else if(!racing&&r.active)reportRaceFrames50AU(track,discardedNs);
+}
 } // namespace
 
 void Context::run() {
  std::uint32_t resultsInputStopPC50LA=0; //Native diagnostic suppression, not source/input state.
+ resetRaceFrameSession50AU(); // measurement only; one recorder per race session
  auto sampleController=[&](bool advanceFeedback=false){stall_watchdog50DU::mark("sample_controller");return sampleControllerCall(advanceFeedback);};
  auto composePacket=[&](bool live,const rr::platform::WindowInput50DQ& sampled,std::size_t actualRacerSlot=0){stall_watchdog50DU::mark("compose_packet");return composePacketCall(live,sampled,actualRacerSlot);};
  auto applyCourseInput=[&](std::size_t racerSlot=0){stall_watchdog50DU::mark("apply_course_input");return applyCourseInputCall(racerSlot);};
@@ -215,6 +327,8 @@ void Context::run() {
          <<" render_submit_ms="<<hitchMs50DU(hitch.render,hitch.completion)
          <<" completion_swap_ms="<<hitchMs50DU(hitch.completion,now)
          <<" tick="<<completedFrames<<'\n';
+    observeFrameBoundary50AU(now,windowSwaps,completedFrames,race.phase==race_session50HM::Phase::Racing,
+        discardedHostNs,rr::platform::hostTrackCode50IM(selectedTrack));
     hitch={};hitch.start=now;hitch.started=true;
    }
    phase_timing50GK::Scope inputTiming(phaseTiming,phase_timing50GK::Phase::Input);
@@ -795,8 +909,12 @@ void Context::run() {
     const bool asynchronous=sourceCameraSession->asyncVideoPending();
     const bool endingFade=sourceCameraSession->endingVideoPending();
     auto* asyncBackend=endingFade?sourceEndingFade.get():sourceFadeIn.get();
+    // Measurement only: swaps made by the fade backend inside this advance.
+    const auto fadeSwapsBefore50AU=rr::platform::windowSwapTotal50AU();
+    (void)rr::platform::windowSwapTakeMaxGapMs50AU(); // drop gaps of earlier (gameplay) swaps
     const auto result=asynchronous?sourceCameraSession->advanceAsyncVideo(asyncBackend):
         sourceCameraSession->advanceBlockingVideo(sourceFadeOut.get());
+    noteFadeSwaps50AU(rr::platform::windowSwapTotal50AU()-fadeSwapsBefore50AU,rr::platform::windowSwapTakeMaxGapMs50AU());
     require50DU((asynchronous?asyncBackend->phase():sourceFadeOut->phase())!=platform::OriginalVideoNativePhase::failed,
         "original camera display backend failed with ownership retained");
     require50DU(result.status==sourceCamera::Status::complete||result.status==sourceCamera::Status::videoPending,
@@ -3480,7 +3598,11 @@ void Context::run() {
              <<" dormant_or_active_body_spacing "<<std::sqrt(bodyDistanceSquared)
              <<" rendered_spacing "<<std::sqrt(renderDistanceSquared)
              <<" engine_pair_spacing "<<std::sqrt(enginePairSquared)
-             <<" dropped host ms "<<discardedHostNs/1000000<<'\n';
+             <<" dropped host ms "<<discardedHostNs/1000000
+             <<" frame_ms_buckets <=17/<=20/<=25/<=33/<=50/>50 "<<raceFrames50AU.buckets[0]<<'/'<<raceFrames50AU.buckets[1]
+             <<'/'<<raceFrames50AU.buckets[2]<<'/'<<raceFrames50AU.buckets[3]<<'/'<<raceFrames50AU.buckets[4]
+             <<'/'<<raceFrames50AU.buckets[5]<<" worst_ms "<<raceFrames50AU.intervalWorstMs<<'\n';
+    raceFrames50AU.buckets={};raceFrames50AU.intervalWorstMs=0.0;
     if(audioEnabled){
      const auto ai=liveAudio->info();
      std::cerr<<"audio ready/active/starts/mixed_frames/captured_frames/underruns "
@@ -3602,5 +3724,7 @@ void Context::run() {
         std::min(maximumSleepNs,plan.waitNanoseconds-workNs)));
    }
   }
+ // A session that leaves the loop while still Racing reports what it recorded.
+ if(raceFrames50AU.active)reportRaceFrames50AU(rr::platform::hostTrackCode50IM(selectedTrack),discardedHostNs);
 }
 } // namespace interactive_loop50DU

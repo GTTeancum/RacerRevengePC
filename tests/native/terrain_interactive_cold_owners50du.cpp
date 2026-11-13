@@ -300,9 +300,8 @@ void OwnersContext::run() {
      nativeChariotModels[racer]->bindChariotSiblings(*nativeRightModels[racer],*nativeLeftModels[racer],
          nativeBottomRightModels[racer].get(),nativeBottomLeftModels[racer].get());
      rig.install(s,x.bindings,x.handRecords,nativeRightModels[racer].get(),nativeLeftModels[racer].get(),
-         nativeChariotModels[racer].get(),nativeBottomRightModels[racer].get(),nativeBottomLeftModels[racer].get(),isGbTrack||isMcTrack);
-    }else if(isGbTrack||isMcTrack)rig.install(s,x.bindings,x.handRecords,nullptr,nullptr,nullptr,nullptr,nullptr,true);
-    else rig.install(s,x.bindings,x.handRecords);
+         nativeChariotModels[racer].get(),nativeBottomRightModels[racer].get(),nativeBottomLeftModels[racer].get(),true);
+    }else rig.install(s,x.bindings,x.handRecords,nullptr,nullptr,nullptr,nullptr,nullptr,true); //Shared motion is process-wide on every course.
    });
    auto racerSelection=selection;
    // The actual human preset/configuration belongs to slot0. AI construction

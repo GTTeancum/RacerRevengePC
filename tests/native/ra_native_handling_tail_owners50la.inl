@@ -245,7 +245,18 @@ bool OwnershipBridge::continueNativeBaseRacerSpeech22A1D0(original_camera_sessio
         op->generation_,op->application_->nativeAudioDirectory36AFE0(),racer.racer,made.entity,
         *racer.sourcePod60_,prefixPC);
     at(prefixPC);if(!filenameReturned)return false;
-    return false; //2C11C8: original Config open/file manager, RNG, B4 and attachment remain pending.
+    // 2C11C8..2C12FC Config open and the nine count reads: the authored counts
+    // were captured from the same mounted INI above and must equal the bound
+    // ones (retainNativeHumanSpeechInputs2C1170 refuses otherwise).
+    // 2C1300..2C1914: the six cursor draws, at this source position.
+    at(0x2c1300u);
+    if(!op->application_->state||&op->application_->state->rawRandom308030!=&op->application_->state->sharedNoise308030.sharedRandomState||
+       !c.audio_->initializeNativeHumanSpeechCursors2C1300(*op->application_,*op->bank_,op->generation_,
+        op->application_->state->rawRandom308030))return false;
+    // STAND-IN (flagged): 2C1918.. (three event banks 2E8D90/2921C0/2925A0 and
+    // the B4 attachment) stay with the native live-audio owner, which already
+    // holds this D48's banks. The player's load continues to the AI pods.
+    at(0x2c1918u);return true;
 }
 bool OwnershipBridge::retireNativePlayerSpeechCold(original_camera_session50KX::Session& session)noexcept {
     if(!session.onOwnerThread()||!camera_||camera_->session.get()!=&session||
@@ -347,16 +358,17 @@ bool OwnershipBridge::publishNativeHandlingDifference21600C(original_camera_sess
 bool OwnershipBridge::continueNativeOuterStorage212E18(original_camera_session50KX::Session& session,
     native_racer_model50LA::Owner& model,std::uint32_t& pc)noexcept {
     auto* op=nativeHandlingOperationCurrent(session,model);
-    if(!op||model.slot_!=0u||!model.finishedFor(session.racerEntities_[0])||
+    const std::size_t slot=model.slot_; //This racer's own slot (Bank visit), every slot alike.
+    if(!op||slot>=8u||slot>=session.racerEntities_.size()||!model.finishedFor(session.racerEntities_[slot])||
        !model.nativeHandlingReturned_||!model.nativeSpinReturned_||
        model.nativeSpinPC_!=0x212e18u||!model.nativeHandlingStack_||
        !camera_||session.actual_.actualCables!=&camera_->cables||
-       !camera_->cablePins[0]||!camera_->cables[0]||
-       !camera_->cables[0]->nativeOuterReturned_||
-       camera_->cables[0]->nativeOuterResult_.sourcePC!=0x212e10u||
+       !camera_->cablePins[slot]||!camera_->cables[slot]||
+       !camera_->cables[slot]->nativeOuterReturned_||
+       camera_->cables[slot]->nativeOuterResult_.sourcePC!=0x212e10u||
        &session.actual_.racerTiming!=&op->arena_.lap.timing||
        &session.actual_.bindings!=&op->arena_.live.bindings)return false;
-    auto& racer=session.racerEntities_[0];auto& h=racer.nativeOuterStorage_;
+    auto& racer=session.racerEntities_[slot];auto& h=racer.nativeOuterStorage_;
     auto* phy=nativePhyOwnerCurrent(session,model);
     if(!phy||racer.nativePhyLoad_!=phy)return false;
     if(h.attempted){pc=h.pc;return false;} //Completed effects are never replayed.

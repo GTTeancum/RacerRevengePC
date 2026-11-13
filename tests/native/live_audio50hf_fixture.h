@@ -193,6 +193,19 @@ class Owner final {
         // True means ONLY the constructor and bounded filename prefix returned.
         // The source open1577D0, counts, RNG and2C1170 return remain pending.
     }
+    // 2C1300..2C1914 in the player's own 2C1170: the six rotating cursor draws
+    // of THIS D48, at their source position (after the 2C11F0.. counts, before
+    // any AI pod), on the bound counts/state and the same raw 308030 word.
+    // One writer: the later all-eight initializer skips an initialized human.
+    bool initializeNativeHumanSpeechCursors2C1300(const ::original_main_entry50KG::Application& app,
+        const ::native_racer50HN::Bank& bank,std::uint64_t generation,std::uint32_t& actualRaw)noexcept {
+        if(!nativeHumanSpeechProviderCurrent()||!speechForwardBound_||!speechConstructorAttempted_||
+           speechApplication_!=&app||speechBankOwner_!=&bank||speechGeneration_!=generation||
+           humanSpeechRaw_!=&actualRaw||!humanSpeechCounts_||!humanSpeechState_||humanSpeechState_->initialized||
+           speechInputStatus_!=NativeSpeechInputStatus::captured||!speechConfigPrefix_)return false;
+        return rr::game::initializePodSpeech50HG(*humanSpeechCounts_,actualRaw,*humanSpeechState_)==
+            rr::game::PodSpeechStatus50HG::Complete;
+    }
     void withdrawNativeSpeechInputs()noexcept {
         // Abandon only native stack custody before its racer/D48 aliases die.
         // No source Config destructor, close, or load-return effect is claimed.

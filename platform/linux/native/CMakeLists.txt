@@ -463,6 +463,7 @@ add_library(rr_native_gameplay50dj STATIC
   "${RR_ROOT}/src/game/vehicle_candidates50ca.cpp"
   "${RR_ROOT}/src/game/candidate_handles50cb.cpp"
   "${RR_ROOT}/src/game/indexed_type2_contact50cc.cpp"
+  "${RR_ROOT}/src/game/collision_mesh_admission50cc.cpp"
   "${RR_ROOT}/src/game/vehicle_indexed_main50cd.cpp"
   "${RR_ROOT}/src/game/vehicle_indexed_secondary50cd.cpp"
   "${RR_ROOT}/src/game/collection_projection50cf.cpp"

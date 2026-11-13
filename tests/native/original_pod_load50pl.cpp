@@ -119,8 +119,10 @@ bool OwnershipBridge::loadPodRoster2129C0(original_camera_session50KX::Session& 
                 std::fputc(10,stderr);return false;
             }
             ++loaded;
-            std::fprintf(stderr,"pod_load_racer slot=%zu human=%d pieces=%zu pc=%x%s",slot,int(slot<humans),
-                backing.nativeSlotPieces(slot),unsigned(pc),podAiHandlingStopped_[slot]?" handling=native_standin":"");
+            const auto* lane=podExclusions_.lane(slot);
+            std::fprintf(stderr,"pod_load_racer slot=%zu human=%d pieces=%zu lane690=%zu/%zu pc=%x%s",slot,int(slot<humans),
+                backing.nativeSlotPieces(slot),lane?lane->count:0u,lane?lane->capacity:0u,unsigned(pc),
+                podAiHandlingStopped_[slot]?" handling=native_standin":"");
             std::fputc(10,stderr);
         }
         std::fprintf(stderr,"pod_load_complete racers=%zu pieces=%zu",loaded,pieces);std::fputc(10,stderr);
@@ -195,59 +197,38 @@ bool OwnershipBridge::loadPodRacer2129C0(std::size_t slot,original_camera_sessio
             //list mutation; no active collector/role view may retain old words.
             auto refuse=[&](int why){std::fprintf(stderr,"pod_load_exclusion_refused slot=%zu reason=%d",slot,why);std::fputc(10,stderr);return false;};
             if(sharedOwnerLease_||sharedRoleViews_||nativeFifoPins_||triggerQueryActive_||sharedEffectsStopped_)return refuse(1);
-            if(!actual_)return refuse(2);if(!actual_->recovery)return refuse(21);if(!storage_.get())return refuse(22);if(!storage_.get()->sharedRoster_)return refuse(23);
-            std::array<storage::Storage::SharedRosterObject*,storage::Storage::rosterRoles> rows{};
-            if(!sharedColdRowsCurrent(slot,rows))return refuse(3);
-            if(rows[0]->canonicalFilter!=&actual_->mainFilter||rows[3]->canonicalFilter!=&actual_->recovery->podFilter)return refuse(4);
-            if(rows[3]->bodyA0!=session.racerEntities_[slot].body340||!rows[3]->bodyA0)return refuse(5);
-            if(rows[0]->collision!=rows[3]->collision||!bodyIdentities_[slot].collision||
-               rows[0]->collision!=bodyIdentities_[slot].collision)return refuse(6);
-            if(rows[0]->type2Resource!=&bodyIdentities_[slot].collision->main()||
-               actual_->main.resource!=rows[0]->type2Resource)return refuse(7);
-            if(!rows[0]->identity||!rows[3]->identity||rows[0]->identity==rows[3]->identity)return refuse(8);
-            const auto actual694=rows[3]->identity;
+            if(!actual_)return refuse(2);if(!actual_->recovery)return refuse(21);
+            // This racer's own 690/694 owners, read inside its own Bank visit:
+            // the live main filter (identity and banked list 0) and the 694
+            // pod filter. Nothing here writes them; 212ABC's 690 additions go
+            // to this racer's fixed lane (podExclusions_), never the live list.
+            const auto& main690=actual_->mainFilter;const auto& pod694=actual_->recovery->podFilter;
+            if(session.actual_.bank.currentSlot_!=slot)return refuse(3);
+            if(!main690.identity||main690.identity!=bodyIdentities_[slot].main)return refuse(4);
+            if(!pod694.identity||pod694.identity!=actual_->recovery->globals.identity[0]||
+               pod694.identity==main690.identity)return refuse(5);
+            const auto& list0=main690.identityLists[0];
+            if(list0.mode!=1||list0.identities.empty())return refuse(6);
+            const auto actual694=pod694.identity;
+            if(!podExclusions_.lane(slot)){
+                if(!podExclusions_.size(slot,main690.identity,actual694,list0.identities.data(),
+                    list0.identities.size(),backing.nativeSlotPieces(slot)))return refuse(7);
+                std::fprintf(stderr,"pod_load_exclusion_lane slot=%zu base=%zu capacity=%zu own694=%08x shared694=%zu",
+                    slot,list0.identities.size(),podExclusions_.lane(slot)->capacity,unsigned(actual694),
+                    podExclusions_.shared694(slot));std::fputc(10,stderr);
+            }else if(podExclusions_.lane(slot)->own694!=actual694||podExclusions_.lane(slot)->own690!=main690.identity)return refuse(8);
             auto appendMain690=[&](std::uint32_t actualE4)->bool {
-                auto& row=*rows[0];auto& canonical=actual_->mainFilter;auto& s=*storage_.get();
-                if(!actualE4||!row.coldFilter||!row.coldFilter->matches(canonical)||
-                   row.canonicalFilter!=&canonical||row.identity!=canonical.identity||!row.reservedRef||
-                   row.reservedRef>s.count.objects||row.effectRevision==std::numeric_limits<std::uint64_t>::max())return refuse(20);
-                auto& object=s.objects[row.reservedRef-1u];const bool published=object.identity!=0;
-                if(published){const auto& prior=row.coldFilter->view;
-                    if(object.identity!=row.identity||object.filter.categoryA4!=prior.categoryA4||
-                       object.filter.acceptMaskB8!=prior.acceptMaskB8||object.filter.flags31!=prior.flags31)return false;
-                    for(unsigned i=0;i<2u;++i){const auto& a=object.filter.identities[i];const auto& b=prior.identities[i];
-                        if(a.values!=b.values||a.capacity!=b.capacity||a.count!=b.count||a.mode!=b.mode)return false;}
-                    const auto& a=object.filter.categories;const auto& b=prior.categories;
-                    if(a.values!=b.values||a.capacity!=b.capacity||a.count!=b.count||a.mode!=b.mode)return false;
-                }
-                const auto& words=canonical.identityLists[0].identities;
-                if(std::find(words.begin(),words.end(),actualE4)!=words.end())return true; //123EE4 duplicate branch
-                //Prepare native projection and realloc lowering without changing
-                //the one actual Bank filter. A rejection retains prior E0 work.
-                auto nextCanonical=canonical;auto& nextWords=nextCanonical.identityLists[0].identities;
-                const auto hole=std::find(nextWords.begin(),nextWords.end(),0u);
-                const bool fillHole=hole!=nextWords.end();const auto holeIndex=static_cast<std::size_t>(hole-nextWords.begin());
-                if(fillHole)*hole=actualE4;else {
-                    if(nextWords.size()>=static_cast<std::size_t>(std::numeric_limits<std::int32_t>::max()))return false;
-                    nextWords.push_back(actualE4);
-                }
-                auto nextProjection=std::make_unique<const storage::Storage::SharedColdFilter>(nextCanonical);
-                if(fillHole)canonical.identityLists[0].identities[holeIndex]=actualE4; //123F30, original C0 pointer unchanged
-                else canonical.identityLists[0].identities.swap(nextWords); //123F5C..7C native realloc lowering
-                row.coldFilter=std::move(nextProjection);
-                if(published)object.filter=row.coldFilter->view; //same actual published collector owner only
-                ++row.effectRevision;return true;
-            };
-            for(;;){
+                if(!podExclusions_.append690(slot,actualE4))return refuse(20);
+                return true;
+            };            for(;;){
                 if(!backing.bindNativeRacerExclusions(slot,actual694,appendMain690,pc))return refuse(100);
                 if(pc==0x212b50u){
                     if(!backing.loadNativeRacer814810(slot,pc))return false;
                     if(!backing.loadNativeRacer818(slot,actualParticleDirectory36B530,actualRawRandom,pc))return false;
-                    // STAND-IN (flagged): the AI branch 16E450 -> 16E5F4 reads the AI
-                    // configuration in place of 215434 and is not written yet. An AI
-                    // slot stops here, after its whole wreck part (212A2C..212DC8),
-                    // and keeps its native handling owner.
-                    if(!human){podAiHandlingStopped_[slot]=true;return pc==0x212dc8u;}
+                    // The 2129C0 tail is the same code for human and AI (16E5F4 calls
+                    // 210770 -> 2129C0 exactly as 1A0848 does). The only differences
+                    // are data: +58 (vehicle58) makes the AI skip 215434/214FC4, and
+                    // the engine step already branches on it.
                     if(!rosterResources_->rigs_[slot])return false;
                     //Same real forward parser owner and retained PHY. End
                     //this reader lease before any nested handling borrower.
@@ -324,17 +305,31 @@ bool OwnershipBridge::loadPodRacer2129C0(std::size_t slot,original_camera_sessio
                     // The forward human caller now consumes the SAME current
                     // Aero steering. Keep outer PCs separate from caller PCs.
                     if(!tail)return false;
-                    if(!human)return true;
+                    if(!human){
+                        // 16E5FC returns with no further work; 1AE3CC continues at 1AE4CC
+                        // with the same 1AA5A0 resource pair the human uses (14D370/29E340).
+                        rr::assets::OriginalStandardMaterialDiagnostic50LA resources{};
+                        if(!race.populateNativeReturnedPlayerResources1AA5A0(resources))return false;
+                        // STAND-IN (flagged): from 1AE4D8 on (AI+98 = 173970: 22A1D0 speech,
+                        // sound object 16DA00/103FD0), the D44 row, 2C2230 and 2169C0 grid
+                        // placement stay with the native AI audio owner and roster cold.
+                        pc=backing.native_[slot].pc=0x1ae4d8u;
+                        podAiHandlingStopped_[slot]=true;return true;
+                    }
                     if(!continueNativePlayerReturn1A0850(session,*model,pc))return false;
                     if(!continueNativePlayerResources1AE104(session,*model,race,pc))return false;
                     return continueNativeBaseRacerSpeech22A1D0(session,*model,race,pc);
                 }
-                if(pc!=0x2129e0u||!backing.loadNativeNextCollectionPrefix(slot,heights,directory,pc)||
-                   !backing.setupNativeBody(slot,0,zones,pc)||!backing.loadNativeQueryChildren(slot,0,pc)||
-                   !backing.loadNativeEffects(slot,0,*nativeWreckParticles_,water.bit,pc)||
-                   !backing.loadNativeRemainingCollectionPieces(slot,zones,heights,directory,*nativeWreckParticles_,water.bit,pc)||
-                   !backing.loadNativeCollectionGroup(slot,pc)||!backing.deactivateNativeCollectionLoad(slot,pc)||
-                   !backing.appendNativeCollectionToRacer(slot,pc))return false;
+                // Next [Wreckage] PartN (2129E0 loop). Each refusal names its step.
+                auto step=[&](int at,bool ok){
+                    if(!ok){std::fprintf(stderr,"pod_load_collection_step_refused slot=%zu step=%d pc=%x",slot,at,unsigned(pc));std::fputc(10,stderr);}
+                    return ok;};
+                if(!step(0,pc==0x2129e0u)||!step(1,backing.loadNativeNextCollectionPrefix(slot,heights,directory,pc))||
+                   !step(2,backing.setupNativeBody(slot,0,zones,pc))||!step(3,backing.loadNativeQueryChildren(slot,0,pc))||
+                   !step(4,backing.loadNativeEffects(slot,0,*nativeWreckParticles_,water.bit,pc))||
+                   !step(5,backing.loadNativeRemainingCollectionPieces(slot,zones,heights,directory,*nativeWreckParticles_,water.bit,pc))||
+                   !step(6,backing.loadNativeCollectionGroup(slot,pc))||!step(7,backing.deactivateNativeCollectionLoad(slot,pc))||
+                   !step(8,backing.appendNativeCollectionToRacer(slot,pc)))return false;
             }
         });
     }catch(...){return false;}
