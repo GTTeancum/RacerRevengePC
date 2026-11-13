@@ -2,8 +2,8 @@
     bool sharedPodContextOwned(const g::PodLiveQueryContext50IZ* context)const noexcept {
         const auto* s=storage_.get();if(!context||!s||!s->sharedRoster_||!podParameters_)return false;
         for(std::size_t slot=0;slot<s->sharedRoster_->count;++slot){
-            const auto& row=s->sharedRoster_->objects[slot*storage::Storage::rosterRoles+
-                static_cast<std::size_t>(storage::Storage::RosterRole::pod694)];
+            //Stage S-2: rows only through the one storage accessor.
+            const auto* row=const_cast<storage::Storage*>(s)->row(slot,storage::Storage::RosterRole::pod694).row;
             if(row&&row->podContext&&context==&*row->podContext)
                 return context->source==&podParameters_->shape&&
                     &context->live.lifecycle==&s->lifecycle&& &context->live.world==&s->world&&
@@ -30,12 +30,13 @@
            !q.recovery->sourcePrepared||q.recovery->selectedSource!=ids.collision)return false;
         const g::CollisionFilter48J* filters[]={&q.mainFilter,&q.secondaryFilter,&q.terrain.metadata.filter,
             &q.recovery->podFilter,&q.movement->filter};
-        for(std::size_t i=0;i<rows.size();++i){const auto& row=s->sharedRoster_->objects[slot*rows.size()+i];
+        for(std::size_t i=0;i<rows.size();++i){
+            auto* row=const_cast<storage::Storage*>(s)->row(slot,static_cast<storage::Storage::RosterRole>(i)).row;
             if(!row||row->slot!=slot||static_cast<std::size_t>(row->role)!=i||!row->coldBound||
                row->collision!=ids.collision||row->generation!=staged.generation||!row->coldFilter||
                row->canonicalFilter!=filters[i]||row->identity!=filters[i]->identity||
                !row->coldFilter->matches(*filters[i])||!row->reservedRef||row->reservedRef>s->count.objects)return false;
-            rows[i]=row.get();
+            rows[i]=row;
         }
         return rows[0]->type2Resource==q.main.resource&&rows[1]->type2Resource==q.secondary.resource&&
             ((retirementOnly&&rows[2]->nativeTerrainCut!=storage::Storage::SharedRosterObject::NativeTerrainCut::none)?
@@ -80,32 +81,20 @@
                 fail(d,"shared POD context requires actual fresh selected shape and empty source binding");return;}
             //Actual row storage was budgeted by sizeof(SharedRosterObject).
             //It outlives this pointer in EVERY saved slot until Bank retirement.
-            pod.podContext.emplace(g::PodLiveQueryContext50IZ{{s->lifecycle,s->world,pod.membership.state,
-                s->membershipWork,pod.reservedRef},&parameters.shape});
+            //Stage S-2: the row producer lives in Storage (one layout owner).
+            const auto* context=s->bindRowPodContext(slot,parameters.shape);
+            if(!context){fail(d,"shared POD row context producer refused");return;}
             podBindings_=&bindings;podParameters_=&parameters;podHumanCount_=humanCount;
-            bindings.podLiveQuery50IZ=&*pod.podContext;podBindingInstalled_[slot]=true;complete=true;
+            bindings.podLiveQuery50IZ=context;podBindingInstalled_[slot]=true;complete=true;
         });return complete;}catch(...){return fail(d,"shared POD context binding exception; real saved prefix retained");}
     }
     bool publishSharedColdGridRole(storage::Storage::SharedRosterObject& row,
         const g::LiveZoneBounds50EN& bounds)noexcept {
-        auto& s=*storage_.get();const auto& member=row.membership.state;
-        if(!row.coldBound||!row.coldFilter||!row.canonicalFilter||
-           !row.coldFilter->matches(*row.canonicalFilter)||!row.reservedRef||row.reservedRef>s.count.objects||
-           row.role>storage::Storage::RosterRole::terrain348||!member.attached||member.object!=row.reservedRef||
-           member.lastShapeTag!=2u||member.lastType2Resource!=row.type2Resource||
-           bounds.type2Resource!=row.type2Resource||s.objects[row.reservedRef-1u].identity||
-           row.effectRevision==std::numeric_limits<std::uint64_t>::max())return false;
-        g::CollisionSphere48J sphere{};std::memcpy(sphere.center.v,bounds.bounds.cachedCenter.v,12);
-        sphere.radius=bounds.bounds.cachedRadius;
-        auto projected=g::projectCollectionObject50CF(*row.canonicalFilter,sphere,actual_->main.collisionTypeTag,2u,
-            std::bit_cast<std::uint32_t>(bounds.bounds.cachedCenter.v[3]));
-        if(!projected.valid||projected.object.identity!=row.identity)return false;
-        projected.object.filter=row.coldFilter->view; //Own genuine cold list backing, never Bank-restored vectors.
-        s.objects[row.reservedRef-1u]=projected.object;s.source[row.reservedRef-1u]=projected.state;
-        ++row.effectRevision;
-        //No extent/head/query activation:694/7A4 and all other roster roles
-        //still require their actual producers before collector admission.
-        return true;
+        //Stage S-2: the grid publication producer lives in Storage. No extent,
+        //head or query activation: 694/7A4 and the other roster roles still
+        //require their actual producers before collector admission.
+        auto* s=storage_.get();
+        return s&&actual_&&s->publishRowGridRole(row.slot,row.role,bounds,actual_->main.collisionTypeTag);
     }
     bool retireSharedGrid(native_racer50HN::Bank& bank,std::size_t slot,Diagnostic& d)noexcept {
         d={};auto* s=storage_.get();
@@ -124,18 +113,10 @@
         try {bank.visit(slot,[&](){
             std::array<storage::Storage::SharedRosterObject*,storage::Storage::rosterRoles> rows{};
             if(!sharedColdRowsCurrent(slot,rows,true)){d.message="actual shared grid retirement owner differs";return;}
-            for(unsigned i=0;i<3;++i){auto& row=*rows[i];auto& object=s->objects[row.reservedRef-1u];
-                if((object.identity&&object.identity!=row.identity)||
-                   (row.membership.state.attached&&row.membership.state.object!=row.reservedRef)||
-                   row.effectRevision==std::numeric_limits<std::uint64_t>::max()){
-                    d.message="shared grid removal identity/revision differs";return;}
-                if(g::removeLiveZoneMembership50EN(s->lifecycle,s->world,row.membership.state,
-                    s->membershipWork).status!=g::LiveZoneStatus50EN::Complete){
-                    d.message="actual shared grid removal incomplete; prefix retained";return;}
-                //Only this actual removed row's native descriptor is retired.
-                //Prior successful removals remain committed on later failure.
-                if(object.identity){object={};s->source[row.reservedRef-1u]={};++row.effectRevision;}
-            }
+            //Stage S-2: the row retirement producer lives in Storage. Only each
+            //actually removed row's descriptor is retired; earlier successful
+            //removals stay committed on a later failure.
+            if(const char* refused=s->retireRowGridRoles(slot)){d.message=refused;return;}
             complete=true;
         });
         if(complete)gridRetirementRequired_[slot]=false;

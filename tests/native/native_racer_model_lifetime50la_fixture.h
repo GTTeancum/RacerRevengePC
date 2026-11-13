@@ -568,6 +568,14 @@ public:
     unsigned modelRole()const noexcept{return modelRole_;}
     const Rig* actualRig()const noexcept{return rig_;}
     std::uint64_t sessionGeneration()const noexcept{return generation_;}
+    //Stage S-3 (body694.md 4.1): read-only view of the chariot's racer340
+    //(211F6C) body for the 694 row on every course. No ownership transfer;
+    //null unless this is the open chariot owner and the body is this session's.
+    const g::OriginalRacerMainBodyOwner50LA* coldMainBody340()const noexcept {
+        if(modelRole_!=Rig::chariot||closed_||!body340_)return nullptr;
+        const auto& entity=body340_->entity();
+        return entity.reference00&&entity.sessionGeneration==generation_?body340_.get():nullptr;
+    }
     std::uint32_t failurePC()const noexcept{return failurePC_;}
     bool finished1538B0()const noexcept{return finished_&&!closed_;}
     bool resourcesComplete1538B0()const noexcept{return resourcesComplete_&&!closed_;}

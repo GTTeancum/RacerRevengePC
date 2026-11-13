@@ -632,6 +632,10 @@ SessionExit50DU Context::run() {
   std::string why;
   require50DU(undertrack_owners50ew_fixture::prepareStorage(recoveryQueryOwners,globals,
       trackCounts.membership,why),why.empty()?"actual694/7A4 cold storage rejected":why.c_str());
+  // Legacy layout: the storage accessor lends these two memberships as rows 3/4.
+  require50DU(!trackCounts.podQuery||trackStorage.bindLegacyRecoveryRows(recoveryQueryOwners.memberships[0],
+      recoveryQueryOwners.storage(0),recoveryQueryOwners.memberships[1],recoveryQueryOwners.storage(1)),
+      "actual694/7A4 legacy query rows rejected");
   // Source212918..21299C reciprocal first-list exclusions. Sizes/backing are
   // fixed before bank sealing; selected identities are filled once per racer.
   qfilter.identityLists[0].mode=secondaryFilter.identityLists[0].mode=1;
@@ -646,6 +650,13 @@ SessionExit50DU Context::run() {
   movement.filter.flagsF8=static_cast<std::uint8_t>((movement.filter.flagsF8&0xc0u)|2u);
   movement.filter.categoryModeD4=0;movement.filter.categoryMasks={Categories::staticObject};
   for(auto& list:movement.filter.identityLists){list.mode=1;list.identities.clear();}
+  // Port stand-in (track_runtime_storage50IG::sizeRosterPodExclusionStandIn):
+  // the other-pod694 exclusion list of 690/364/7A4, sized here before the
+  // Bank seals; unbanked (same for every racer), filled once at the cold roster.
+  require50DU(track_runtime_storage50IG::sizeRosterPodExclusionStandIn(qfilter)&&
+      track_runtime_storage50IG::sizeRosterPodExclusionStandIn(secondaryFilter)&&
+      track_runtime_storage50IG::sizeRosterPodExclusionStandIn(movement.filter),
+      "roster pod694 exclusion stand-in sizing rejected");
   movement.copied40=movement.copied50={{0.f,0.f,0.f,1.f}};
  }
 
@@ -661,6 +672,13 @@ SessionExit50DU Context::run() {
  auto& zoneScratch=trackStorage.registrationScratch;
  auto& zoneLifecycle=trackStorage.lifecycle;auto& zoneQueue=trackStorage.queue;
  auto& liveWorld=trackStorage.world;
+ // The live racer's 690/364/348/694/7A4 rows, in role order, through the one
+ // storage accessor. The five per-course closers below are port stand-ins
+ // (common-path rule): one closer over all rows replaces them at the switch.
+ auto removeCurrentQueryRows=[&](auto& remove){
+  return trackStorage.forEachPresentRow([&](std::size_t,track_runtime_storage50IG::RosterRole,
+      track_runtime_storage50IG::RosterRowRef& queryRow){return bool(remove(*queryRow.state,queryRow.ref));});
+ };
  bool rcCollisionCleanupDone=!isRcTrack;
  auto closeRcCurrentCollision=[&]() noexcept -> bool {
   if(!isRcTrack)return true;
@@ -671,11 +689,7 @@ SessionExit50DU Context::run() {
    const auto result=removeLiveZoneMembership50EN(zoneLifecycle,liveWorld,state,trackStorage.membershipWork);
    return result.status==LiveZoneStatus50EN::Complete&&!state.attached&&!state.object;
   };
-  if(!remove(trackStorage.mainMembership.state,trackCounts.mainQuery)||
-     !remove(trackStorage.secondaryMembership.state,trackCounts.secondaryQuery)||
-     !remove(trackStorage.terrainMembership.state,trackCounts.terrainQuery)||
-     !remove(recoveryQueryOwners.memberships[0],trackCounts.podQuery)||
-     !remove(recoveryQueryOwners.memberships[1],trackCounts.movementQuery))return false;
+  if(!removeCurrentQueryRows(remove))return false;
   s.shape.registrationE0=0;
   for(std::size_t i=0;i<rc_trigger_authoring::count;++i){
    auto* membership=rcWorldBorrow->triggerMembership(i);
@@ -696,11 +710,7 @@ SessionExit50DU Context::run() {
    const auto r=removeLiveZoneMembership50EN(zoneLifecycle,liveWorld,state,trackStorage.membershipWork);
    return r.status==LiveZoneStatus50EN::Complete&&!state.attached&&!state.object;
   };
-  if(!remove(trackStorage.mainMembership.state,trackCounts.mainQuery)||
-     !remove(trackStorage.secondaryMembership.state,trackCounts.secondaryQuery)||
-     !remove(trackStorage.terrainMembership.state,trackCounts.terrainQuery)||
-     !remove(recoveryQueryOwners.memberships[0],trackCounts.podQuery)||
-     !remove(recoveryQueryOwners.memberships[1],trackCounts.movementQuery))return false;
+  if(!removeCurrentQueryRows(remove))return false;
   s.shape.registrationE0=0;
   for(std::size_t i=0;i<21;++i){auto* member=mcWorldBorrow->triggerMembership(i);
    if(!member||!remove(member->state,static_cast<CollectionRef50BX>(90+i)))return false;}
@@ -719,11 +729,7 @@ SessionExit50DU Context::run() {
    const auto r=removeLiveZoneMembership50EN(zoneLifecycle,liveWorld,state,trackStorage.membershipWork);
    return r.status==LiveZoneStatus50EN::Complete&&!state.attached&&!state.object;
   };
-  if(!remove(trackStorage.mainMembership.state,trackCounts.mainQuery)||
-     !remove(trackStorage.secondaryMembership.state,trackCounts.secondaryQuery)||
-     !remove(trackStorage.terrainMembership.state,trackCounts.terrainQuery)||
-     !remove(recoveryQueryOwners.memberships[0],trackCounts.podQuery)||
-     !remove(recoveryQueryOwners.memberships[1],trackCounts.movementQuery))return false;
+  if(!removeCurrentQueryRows(remove))return false;
   s.shape.registrationE0=0;
   for(std::size_t i=0;i<18;++i){auto* member=gbWorldBorrow->triggerMembership(i);
    if(!member||!remove(member->state,static_cast<CollectionRef50BX>(616+i)))return false;}
@@ -743,11 +749,7 @@ SessionExit50DU Context::run() {
    const auto result=removeLiveZoneMembership50EN(zoneLifecycle,liveWorld,state,trackStorage.membershipWork);
    return result.status==LiveZoneStatus50EN::Complete&&!state.attached&&!state.object;
   };
-  if(!remove(trackStorage.mainMembership.state,trackCounts.mainQuery)||
-     !remove(trackStorage.secondaryMembership.state,trackCounts.secondaryQuery)||
-     !remove(trackStorage.terrainMembership.state,trackCounts.terrainQuery)||
-     !remove(recoveryQueryOwners.memberships[0],trackCounts.podQuery)||
-     !remove(recoveryQueryOwners.memberships[1],trackCounts.movementQuery))return false;
+  if(!removeCurrentQueryRows(remove))return false;
   s.shape.registrationE0=0;
   for(std::size_t i=0;i<tb_trigger_authoring50TB::count;++i){
    auto* membership=tbWorldBorrow->triggerMembership(i);
@@ -768,11 +770,7 @@ SessionExit50DU Context::run() {
    const auto result=removeLiveZoneMembership50EN(zoneLifecycle,liveWorld,state,trackStorage.membershipWork);
    return result.status==LiveZoneStatus50EN::Complete&&!state.attached&&!state.object;
   };
-  if(!remove(trackStorage.mainMembership.state,trackCounts.mainQuery)||
-     !remove(trackStorage.secondaryMembership.state,trackCounts.secondaryQuery)||
-     !remove(trackStorage.terrainMembership.state,trackCounts.terrainQuery)||
-     !remove(recoveryQueryOwners.memberships[0],trackCounts.podQuery)||
-     !remove(recoveryQueryOwners.memberships[1],trackCounts.movementQuery))return false;
+  if(!removeCurrentQueryRows(remove))return false;
   s.shape.registrationE0=0;
   for(std::size_t i=0;i<tc_trigger_authoring50TC::count;++i){
    auto* membership=tcWorldBorrow->triggerMembership(i);
@@ -1557,29 +1555,37 @@ SessionExit50DU Context::run() {
  require50DU(live_terrain_probe50fr::initialize(terrainLiveOwner,terrainOwner.initial.segment),"initialize actual single-pair terrain owner");
  const PodLiveQueryContext50IZ recoveryPodLive{{zoneLifecycle,liveWorld,
      recoveryQueryOwners.memberships[0],membershipWork,trackCounts.podQuery},&x.parameters.shape};
+ using QueryRole50DU=track_runtime_storage50IG::RosterRole;
  auto recoveryBorrowedQueries=[&](){
+  //Current racer's own 690/348 rows from the one storage accessor. An empty
+  //row leaves the field null and the undertrack join refuses it.
+  const auto mainRow=trackStorage.currentRow(QueryRole50DU::main690);
+  const auto terrainRow=trackStorage.currentRow(QueryRole50DU::terrain348);
   undertrack_owners50ew_fixture::BorrowedQueries q{};
-  q.main690=&query;q.mainMembership=&mainMembership;q.mainStorage=mainMembershipStorage;q.mainRef=mainQueryRef;
+  q.main690=&query;q.mainMembership=mainRow.state;q.mainStorage=mainRow.storage;q.mainRef=mainRow.ref;
   q.movement7A4=&movement;q.movementEndpoints=endpoints;q.movementMetadata=endpointScenes;q.movementSource=&movementSource;
   q.terrain348=&terrainOwner.initial;q.terrainResource=&terrainLiveOwner.resource;q.terrainMetadata=&terrainOwner.metadata;
-  q.terrainMembership=&terrainMembership;q.terrainStorage=terrainMembershipStorage;q.terrainRef=terrainQueryRef;
+  q.terrainMembership=terrainRow.state;q.terrainStorage=terrainRow.storage;q.terrainRef=terrainRow.ref;
   return q;
  };
  auto recoveryQueries=[&](){return recoveryQueryOwners.binding(recoveryBorrowedQueries(),
-     {trackCounts.podQuery,trackCounts.movementQuery});};
+     {trackStorage.currentRow(QueryRole50DU::pod694).ref,trackStorage.currentRow(QueryRole50DU::movement7A4).ref});};
  auto publishRecoveryQueries=[&](){
   if(!originalRecoveryEnabled)return true;
-  if(!recoveryQueryOwners.sourcePrepared||!recoveryQueryOwners.memberships[0].attached||
-     !recoveryQueryOwners.memberships[1].attached||s.shape.registrationE0!=trackCounts.podQuery)return false;
+  const auto podRow=trackStorage.currentRow(QueryRole50DU::pod694);
+  const auto movementRow=trackStorage.currentRow(QueryRole50DU::movement7A4);
+  if(!podRow||!movementRow)return false;
+  if(!recoveryQueryOwners.sourcePrepared||!podRow.state->attached||
+     !movementRow.state->attached||s.shape.registrationE0!=podRow.ref)return false;
   CollisionSphere48J sphere{};std::memcpy(sphere.center.v,s.shape.center60.v,sizeof sphere.center.v);sphere.radius=s.shape.radius80;
   const auto pod=projectCollectionObject50CF(recoveryQueryOwners.podFilter,sphere,query.collisionTypeTag,0,
       std::bit_cast<std::uint32_t>(s.shape.center60.v[3]));
   const auto ray=projectCollectionObject50CF(movement.filter,recoveryQueryOwners.movementSphere,
       movement.collisionTypeTag,recoveryQueryOwners.movementTag,
-      std::bit_cast<std::uint32_t>(recoveryQueryOwners.memberships[1].bounds.cachedCenter.v[3]));
+      std::bit_cast<std::uint32_t>(movementRow.state->bounds.cachedCenter.v[3]));
   if(!pod.valid||!ray.valid)return false;
   const CollectionProjection50CF* projection[]{&pod,&ray};
-  const CollectionRef50BX refs[]{trackCounts.podQuery,trackCounts.movementQuery};
+  const CollectionRef50BX refs[]{podRow.ref,movementRow.ref}; //row() proves 1..count.objects
   for(unsigned i=0;i<2;++i){const auto index=refs[i]-1u;collectionObjects[index]=projection[i]->object;
    collectionSource[index].flagsF8=projection[i]->state.flagsF8;
    collectionSource[index].cachedCenter=projection[i]->state.cachedCenter;
@@ -1715,11 +1721,17 @@ SessionExit50DU Context::run() {
      "source initial spring matrix and sphere preparation");
  // Source grid-start1AE578..1AE594 uses collision4C4[0], the first actual zone.
  // Collision registration120070 passes overlap radius0, independently of cache.
- if(!isRaTrack)require50DU(reportMembership(attachLiveZoneMembership50EN(zoneLifecycle,liveWorld,mainMembership,
-     mainMembershipStorage,mainQueryRef,initialCollisionZone,ZoneMethod50CL::Second,0.0f,mainInitialBounds,membershipWork),
+ // Cold, live racer (slot 0) rows through the one storage accessor. The
+ // !isRaTrack gates are port stand-ins (common-path rule).
+ const auto coldMainRow=trackStorage.row(0,QueryRole50DU::main690);
+ const auto coldSecondaryRow=trackStorage.row(0,QueryRole50DU::secondary364);
+ const auto coldTerrainRow=trackStorage.row(0,QueryRole50DU::terrain348);
+ require50DU(bool(coldMainRow)&&bool(coldSecondaryRow)&&bool(coldTerrainRow),"actual cold 690/364/348 query rows unavailable");
+ if(!isRaTrack)require50DU(reportMembership(attachLiveZoneMembership50EN(zoneLifecycle,liveWorld,*coldMainRow.state,
+     coldMainRow.storage,coldMainRow.ref,initialCollisionZone,ZoneMethod50CL::Second,0.0f,mainInitialBounds,membershipWork),
      "main initial attachment"),"attach main live spring membership");
- if(!isRaTrack)require50DU(reportMembership(attachLiveZoneMembership50EN(zoneLifecycle,liveWorld,secondaryMembership,
-     secondaryMembershipStorage,secondaryQueryRef,initialCollisionZone,ZoneMethod50CL::Second,0.0f,secondaryInitialBounds,membershipWork),
+ if(!isRaTrack)require50DU(reportMembership(attachLiveZoneMembership50EN(zoneLifecycle,liveWorld,*coldSecondaryRow.state,
+     coldSecondaryRow.storage,coldSecondaryRow.ref,initialCollisionZone,ZoneMethod50CL::Second,0.0f,secondaryInitialBounds,membershipWork),
      "secondary initial attachment"),"attach secondary live spring membership");
 
  TerrainPrepareInput48M coldTerrainInput{};
@@ -1730,8 +1742,8 @@ SessionExit50DU Context::run() {
  require50DU(prepareTerrainSinglePair48M(coldTerrainInput,coldTerrainPrepared)==TerrainPrepareStatus48M::QueryReady,
      "prepare initial authored terrain query bounds");
  const auto terrainInitialBounds=live_terrain_probe50fr::bounds(terrainLiveOwner,coldTerrainPrepared);
- if(!isRaTrack)require50DU(reportMembership(attachLiveZoneMembership50EN(zoneLifecycle,liveWorld,terrainMembership,
-     terrainMembershipStorage,terrainQueryRef,initialCollisionZone,ZoneMethod50CL::Second,0.f,
+ if(!isRaTrack)require50DU(reportMembership(attachLiveZoneMembership50EN(zoneLifecycle,liveWorld,*coldTerrainRow.state,
+     coldTerrainRow.storage,coldTerrainRow.ref,initialCollisionZone,ZoneMethod50CL::Second,0.f,
      terrainInitialBounds,membershipWork),"terrain initial attachment"),"attach terrain probe membership");
  std::vector<std::uint32_t> terrainStack(stackCount);
  live_terrain_probe50fr::Context terrainContext{zoneLifecycle,liveWorld,terrainMembership,membershipWork,
@@ -1800,7 +1812,7 @@ SessionExit50DU Context::run() {
  auto* mergedIds=trackStorage.mergedIds.data();auto* secondIds=trackStorage.secondIds.data();
  auto* resolveScratch=trackStorage.resolveScratch.data();auto* ownerHandles=trackStorage.handles.data();
  auto& collectionInput=trackStorage.collectionInput;
- collectionInput.zoneLinks=mainMembership.storage.links;collectionInput.zoneLinkCount=mainMembership.storage.capacity;collectionInput.zoneHead=1;collectionInput.query=mainQueryRef;
+ collectionInput.zoneLinks=coldMainRow.state->storage.links;collectionInput.zoneLinkCount=coldMainRow.state->storage.capacity;collectionInput.zoneHead=1;collectionInput.query=coldMainRow.ref;
  collectionInput.bounds.shapeTag=2;collectionInput.type2Resource=query.resource;collectionInput.directTypeTag=query.collisionTypeTag;collectionInput.groupTypeTag=query.groupTypeTag;
  auto collectionInitial=trackStorage.initialCollection();
  auto collectionWork=trackStorage.collectionWorkspace();
@@ -1873,43 +1885,50 @@ SessionExit50DU Context::run() {
  auto projectRegistered=[&](){
   //50CL keeps method descriptors current after each explicit registry change.
   for(std::size_t i=0;i<terrainOwnerCount;++i){const auto&owner=candidates[i].candidate.collision;auto projected=projectCollectionObject50CF(owner.filter,owner.sphere,owner.typeTag,candidates[i].shapeType,0);if(!projected.valid)return false;collectionObjects[i]=projected.object;collectionSource[i]=projected.state;}
-  if(!mainMembership.attached||!secondaryMembership.attached||
-     mainMembership.object!=mainQueryRef||secondaryMembership.object!=secondaryQueryRef||
-     mainMembership.lastShapeTag!=2||secondaryMembership.lastShapeTag!=2||
-     mainMembership.lastType2Resource!=query.resource||
-     secondaryMembership.lastType2Resource!=secondaryQuery.resource)return false;
+  //Current racer's 690/364/348 rows through the one storage accessor.
+  const auto mainRow=trackStorage.currentRow(QueryRole50DU::main690);
+  const auto secondaryRow=trackStorage.currentRow(QueryRole50DU::secondary364);
+  const auto terrainRow=trackStorage.currentRow(QueryRole50DU::terrain348);
+  if(!mainRow||!secondaryRow||!terrainRow)return false;
+  const auto& mainLive=*mainRow.state;const auto& secondaryLive=*secondaryRow.state;const auto& terrainLive=*terrainRow.state;
+  if(!mainLive.attached||!secondaryLive.attached||
+     mainLive.object!=mainRow.ref||secondaryLive.object!=secondaryRow.ref||
+     mainLive.lastShapeTag!=2||secondaryLive.lastShapeTag!=2||
+     mainLive.lastType2Resource!=query.resource||
+     secondaryLive.lastType2Resource!=secondaryQuery.resource)return false;
   // Outer219AF0/219B14 consumes the prior accepted matrix/sphere and E0.
   //1223E4 calls1202E0 directly; fresh11FE50/11F680/120230 belongs only to
   // the later spring prefix. Secondary will reuse this exact collected list.
   LiveZoneBounds50EN collectionBounds{};collectionBounds.bounds.shapeTag=2;
-  collectionBounds.bounds.shapeWorld=mainMembership.lastShapeWorld;
-  collectionBounds.bounds.cachedCenter=mainMembership.bounds.cachedCenter;
-  collectionBounds.bounds.cachedRadius=mainMembership.bounds.cachedRadius;
+  collectionBounds.bounds.shapeWorld=mainLive.lastShapeWorld;
+  collectionBounds.bounds.cachedCenter=mainLive.bounds.cachedCenter;
+  collectionBounds.bounds.cachedRadius=mainLive.bounds.cachedRadius;
   collectionBounds.type2Resource=query.resource;
   CollisionSphere48J mainCollectionSphere{},secondaryCollectionSphere{};
   for(unsigned i=0;i<3;++i){
-   mainCollectionSphere.center.v[i]=mainMembership.bounds.cachedCenter.v[i];
-   secondaryCollectionSphere.center.v[i]=secondaryMembership.bounds.cachedCenter.v[i];
+   mainCollectionSphere.center.v[i]=mainLive.bounds.cachedCenter.v[i];
+   secondaryCollectionSphere.center.v[i]=secondaryLive.bounds.cachedCenter.v[i];
   }
-  mainCollectionSphere.radius=mainMembership.bounds.cachedRadius;
-  secondaryCollectionSphere.radius=secondaryMembership.bounds.cachedRadius;
+  mainCollectionSphere.radius=mainLive.bounds.cachedRadius;
+  secondaryCollectionSphere.radius=secondaryLive.bounds.cachedRadius;
   const auto mainProjection=projectCollectionObject50CF(qfilter,mainCollectionSphere,query.collisionTypeTag,2,
       std::bit_cast<std::uint32_t>(collectionBounds.bounds.cachedCenter.v[3]));
   const auto secondaryProjection=projectCollectionObject50CF(secondaryFilter,secondaryCollectionSphere,
-      secondaryQuery.collisionTypeTag,2,std::bit_cast<std::uint32_t>(secondaryMembership.bounds.cachedCenter.v[3]));
+      secondaryQuery.collisionTypeTag,2,std::bit_cast<std::uint32_t>(secondaryLive.bounds.cachedCenter.v[3]));
   CollisionSphere48J terrainCollectionSphere{};
-  for(unsigned i=0;i<3;++i)terrainCollectionSphere.center.v[i]=terrainMembership.bounds.cachedCenter.v[i];
-  terrainCollectionSphere.radius=terrainMembership.bounds.cachedRadius;
+  for(unsigned i=0;i<3;++i)terrainCollectionSphere.center.v[i]=terrainLive.bounds.cachedCenter.v[i];
+  terrainCollectionSphere.radius=terrainLive.bounds.cachedRadius;
   const auto terrainProjection=projectCollectionObject50CF(terrainOwner.metadata.filter,
       terrainCollectionSphere,terrainOwner.metadata.collisionTypeTag,2,
-      std::bit_cast<std::uint32_t>(terrainMembership.bounds.cachedCenter.v[3]));
+      std::bit_cast<std::uint32_t>(terrainLive.bounds.cachedCenter.v[3]));
   if(!mainProjection.valid||!secondaryProjection.valid||!terrainProjection.valid)return false;
-  collectionObjects[terrainQueryRef-1]=terrainProjection.object;
-  collectionSource[terrainQueryRef-1]=terrainProjection.state;
-  collectionObjects[mainQueryRef-1]=mainProjection.object;collectionSource[mainQueryRef-1]=mainProjection.state;
-  collectionObjects[secondaryQueryRef-1]=secondaryProjection.object;collectionSource[secondaryQueryRef-1]=secondaryProjection.state;
+  //Row refs are proven 1..count.objects by row(); these index collector backing of that size.
+  collectionObjects[terrainRow.ref-1]=terrainProjection.object;
+  collectionSource[terrainRow.ref-1]=terrainProjection.state;
+  collectionObjects[mainRow.ref-1]=mainProjection.object;collectionSource[mainRow.ref-1]=mainProjection.state;
+  collectionObjects[secondaryRow.ref-1]=secondaryProjection.object;collectionSource[secondaryRow.ref-1]=secondaryProjection.state;
   if(!publishRecoveryQueries())return false;
-  collectionInput.zoneLinks=mainMembership.storage.links;collectionInput.zoneLinkCount=mainMembership.storage.capacity;
+  collectionInput.zoneLinks=mainLive.storage.links;collectionInput.zoneLinkCount=mainLive.storage.capacity;
   collectionInput.zoneHead=1;collectionInput.bounds=collectionBounds.bounds;
   collectionInput.initialCurrentIdentity=query.initialQueryCurrentIdentity;
   //Native representation publication, not an original query effect. Only
@@ -1929,13 +1948,23 @@ SessionExit50DU Context::run() {
   if(resolveCandidateHandles50CB(mergedIds,result.count,ownerHandles,terrainOwnerCount,resolveScratch,track_runtime_storage50IG::sourceSelectionCapacity,registeredIndices,trackCounts.selected)!=CandidateHandleStatus50CB::Complete)return false;
   if(resolveCandidateHandles50CB(secondIds,result.second.count,ownerHandles,terrainOwnerCount,resolveScratch,track_runtime_storage50IG::sourceSelectionCapacity,probeIndices,trackCounts.selected)!=CandidateHandleStatus50CB::Complete)return false;
   probeCount=static_cast<std::size_t>(result.second.count);
-  terrainOwner.metadata.filter.flagsF8=collectionSecond[terrainQueryRef-1].flagsF8;
+  //F8 copy-back through the one storage accessor; projectRegistered above
+  //already refused an empty 690/364/348 row and publishRecoveryQueries 694/7A4.
+  const auto mainRow=trackStorage.currentRow(QueryRole50DU::main690);
+  const auto secondaryRow=trackStorage.currentRow(QueryRole50DU::secondary364);
+  const auto terrainRow=trackStorage.currentRow(QueryRole50DU::terrain348);
+  if(!mainRow||!secondaryRow||!terrainRow)return false;
+  terrainOwner.metadata.filter.flagsF8=collectionSecond[terrainRow.ref-1].flagsF8;
   registeredCount=static_cast<std::size_t>(result.count);peakCollected=std::max(peakCollected,registeredCount);addCounter50DU(collectedCalls);
   for(std::size_t i=0;i<terrainOwnerCount;++i)candidates[i].candidate.collision.filter.flagsF8=collectionSecond[i].flagsF8;
-  qfilter.flagsF8=collectionSecond[mainQueryRef-1].flagsF8;
-  secondaryFilter.flagsF8=collectionSecond[secondaryQueryRef-1].flagsF8;query.initialQueryCurrentIdentity=result.second.currentIdentity;
-  if(originalRecoveryEnabled){recoveryQueryOwners.podFilter.flagsF8=collectionSecond[trackCounts.podQuery-1u].flagsF8;
-   movement.filter.flagsF8=collectionSecond[trackCounts.movementQuery-1u].flagsF8;}
+  qfilter.flagsF8=collectionSecond[mainRow.ref-1].flagsF8;
+  secondaryFilter.flagsF8=collectionSecond[secondaryRow.ref-1].flagsF8;query.initialQueryCurrentIdentity=result.second.currentIdentity;
+  if(originalRecoveryEnabled){
+   const auto podRow=trackStorage.currentRow(QueryRole50DU::pod694);
+   const auto movementRow=trackStorage.currentRow(QueryRole50DU::movement7A4);
+   if(!podRow||!movementRow)return false;
+   recoveryQueryOwners.podFilter.flagsF8=collectionSecond[podRow.ref-1u].flagsF8;
+   movement.filter.flagsF8=collectionSecond[movementRow.ref-1u].flagsF8;}
   if(sourceFollowQueries&&!sourceFollowQueries->publishCollection(collectionSecond,collectionInput.objectCount))return false;
   std::memcpy(treeSource,treeSecond,trackCounts.methods*sizeof(*treeSource));return true;
  };
@@ -1944,7 +1973,7 @@ SessionExit50DU Context::run() {
  //geometry/animation, and refuses pending registrations rather than draining
  //them at a guessed source point. RA has no GC/GA animated candidate producer.
  std::unique_ptr<EndQueryBridge::EndCandidateProducer> ownedEndCandidateProducer;
- if(isRaTrack){
+ if(isRaTrack){ //port stand-in (common-path rule): every course gets this producer in step R.
   auto runtime=raWorld->runtimeQueries_;
   require50DU(runtime&&runtime->storage_.get()==&trackStorage&&runtime->actual_&&
       &runtime->actual_->frame==&s && &runtime->actual_->main==&query &&
@@ -1967,8 +1996,15 @@ SessionExit50DU Context::run() {
    for(std::size_t i=0;i<terrainOwnerCount;++i)
     if(trackStorage.candidates[i]!=&candidates[i])return;
    auto input=collectionInput;
+   //Current racer's five rows through the one storage accessor (refused empty).
+   const auto mainRow=trackStorage.currentRow(QueryRole50DU::main690);
+   const auto secondaryRow=trackStorage.currentRow(QueryRole50DU::secondary364);
+   const auto terrainRow=trackStorage.currentRow(QueryRole50DU::terrain348);
+   const auto podRow=trackStorage.currentRow(QueryRole50DU::pod694);
+   const auto movementRow=trackStorage.currentRow(QueryRole50DU::movement7A4);
+   if(!mainRow||!secondaryRow||!terrainRow||(originalRecoveryEnabled&&(!podRow||!movementRow)))return;
    //Actual219AD4/219AE4 dereference, not a stale cold collectionInput resource.
-   input.query=mainQueryRef;input.type2Resource=query.resource;
+   input.query=mainRow.ref;input.type2Resource=query.resource;
    input.directTypeTag=query.collisionTypeTag;input.groupTypeTag=query.groupTypeTag;
    const auto publish=[&](const CandidateCollectionBuffers50BX& accepted,
                           const CandidateCollectionResult50BX& result){
@@ -1976,13 +2012,13 @@ SessionExit50DU Context::run() {
     //No late merge transaction can roll back the first query's F8/current/tree.
     for(std::size_t i=0;i<terrainOwnerCount;++i)
      candidates[i].candidate.collision.filter.flagsF8=accepted.objects[i].flagsF8;
-    terrainOwner.metadata.filter.flagsF8=accepted.objects[terrainQueryRef-1].flagsF8;
-    qfilter.flagsF8=accepted.objects[mainQueryRef-1].flagsF8;
-    secondaryFilter.flagsF8=accepted.objects[secondaryQueryRef-1].flagsF8;
+    terrainOwner.metadata.filter.flagsF8=accepted.objects[terrainRow.ref-1].flagsF8;
+    qfilter.flagsF8=accepted.objects[mainRow.ref-1].flagsF8;
+    secondaryFilter.flagsF8=accepted.objects[secondaryRow.ref-1].flagsF8;
     query.initialQueryCurrentIdentity=result.currentIdentity;
     if(originalRecoveryEnabled){
-     recoveryQueryOwners.podFilter.flagsF8=accepted.objects[trackCounts.podQuery-1u].flagsF8;
-     movement.filter.flagsF8=accepted.objects[trackCounts.movementQuery-1u].flagsF8;
+     recoveryQueryOwners.podFilter.flagsF8=accepted.objects[podRow.ref-1u].flagsF8;
+     movement.filter.flagsF8=accepted.objects[movementRow.ref-1u].flagsF8;
     }
     //Keep actual compact source aliases in step with accepted native effects;
     //no geometry callback, registration or query is replayed to rebuild them.
@@ -1999,8 +2035,8 @@ SessionExit50DU Context::run() {
    if(!publish(collectionWork.first,first))return;
    //219AF8 re-reads the same main358/query38 owner. No fresh spring/cache step.
    out.stoppedPC=0x219b14;
-   if(query.resource!=input.type2Resource||!mainMembership.attached||
-      mainMembership.object!=mainQueryRef||mainMembership.lastType2Resource!=query.resource)return;
+   if(query.resource!=input.type2Resource||!mainRow.state->attached||
+      mainRow.state->object!=mainRow.ref||mainRow.state->lastType2Resource!=query.resource)return;
    input.methodMask=1;input.skipSphere=false;input.ignoreGroups=false;
    input.initialCurrentIdentity=first.currentIdentity;input.initialActiveTree=first.activeTree;
    CandidateCollectionState50BX afterFirst{};

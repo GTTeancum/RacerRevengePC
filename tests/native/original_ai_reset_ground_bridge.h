@@ -120,10 +120,11 @@ class GroundBridge {
             primary.encodedObject==actual.encodedObject&&primary.encodedObject==(ref<<2u);
     }
     bool spring(const Type2StaticQuery49X& query,const CollisionFilter48J& filter,
-        storage::Membership& owner,CollectionRef50BX ref) const noexcept {
-        const auto& m=owner.state;
+        const storage::RosterRowRef& row) const noexcept {
+        if(!row)return false;
+        const auto& m=*row.state;
         return query.filter==&filter&&query.resource&&m.lastType2Resource==query.resource&&
-            membership(m,ref,owner.storage(),2u)&&
+            membership(m,row.ref,row.storage,2u)&&
             !std::memcmp(query.worldMatrix.v,m.lastShapeWorld.v,sizeof query.worldMatrix.v)&&
             !std::memcmp(query.sphere.center.v,m.bounds.cachedCenter.v,sizeof query.sphere.center.v)&&
             !std::memcmp(&query.sphere.radius,&m.bounds.cachedRadius,sizeof query.sphere.radius);
@@ -144,7 +145,15 @@ class GroundBridge {
     bool refreshRecords() noexcept {
         const auto& n=storage_.count;
         const auto active=storage_.collectionInput.objectCount;
+        //The AI slot's own five rows through the one storage accessor (current
+        //banked racer; this callback runs inside that AI's visit).
+        const auto mainRow=storage_.currentRow(storage::RosterRole::main690);
+        const auto secondaryRow=storage_.currentRow(storage::RosterRole::secondary364);
+        const auto terrainRow=storage_.currentRow(storage::RosterRole::terrain348);
+        const auto podRow=storage_.currentRow(storage::RosterRole::pod694);
+        const auto movementRow=storage_.currentRow(storage::RosterRole::movement7A4);
         if(!layout()||storage_.queue.count||(active!=n.movementQuery&&active!=n.objects)||
+           !mainRow||!secondaryRow||!terrainRow||!podRow||!movementRow||
            !recovery_.storagePrepared||!recovery_.sourcePrepared||!recovery_.selectedSource||
            !recovery_.selectedSource->prepared()||
            main_.resource!=&recovery_.selectedSource->main()||
@@ -154,12 +163,12 @@ class GroundBridge {
            recovery_.podFilter.identity!=recovery_.globals.identity[0]||
            movement_.filter.identity!=recovery_.globals.identity[1]||recovery_.movementTag!=3u||
            frame_.shape.type88!=0u||(recovery_.podFilter.categoryA4&floorMask_)||
-           !spring(main_,mainFilter_,storage_.mainMembership,n.mainQuery)||
-           !spring(secondary_,secondaryFilter_,storage_.secondaryMembership,n.secondaryQuery)||
-           !membership(storage_.terrainMembership.state,n.terrainQuery,storage_.terrainMembership.storage(),2u)||
-           !membership(recovery_.memberships[0],n.podQuery,recovery_.storage(0),0u)||
-           !membership(recovery_.memberships[1],n.movementQuery,recovery_.storage(1),3u)||
-           frame_.shape.registrationE0!=(recovery_.memberships[0].attached?n.podQuery:0u))
+           !spring(main_,mainFilter_,mainRow)||
+           !spring(secondary_,secondaryFilter_,secondaryRow)||
+           !membership(*terrainRow.state,terrainRow.ref,terrainRow.storage,2u)||
+           !membership(*podRow.state,podRow.ref,podRow.storage,0u)||
+           !membership(*movementRow.state,movementRow.ref,movementRow.storage,3u)||
+           frame_.shape.registrationE0!=(podRow.state->attached?podRow.ref:0u))
             return fail("AI reset world, actual query owner, or registration publication differs",0x216ea8u);
         for(std::size_t i=0;i<n.terrain;++i){
             const auto* candidate=storage_.candidates[i];
@@ -172,16 +181,16 @@ class GroundBridge {
                 candidate->shapeType,std::bit_cast<std::uint32_t>(storage_.source[i].cachedCenter.v[3]),
                 candidate->shapeType==0u?&actual.geometry:nullptr))return false;
         }
-        if(!stageMembership(n.mainQuery,mainFilter_,main_.collisionTypeTag,storage_.mainMembership.state,2u)||
-           !stageMembership(n.secondaryQuery,secondaryFilter_,secondary_.collisionTypeTag,storage_.secondaryMembership.state,2u)||
-           !stageMembership(n.terrainQuery,terrain_.filter,terrain_.collisionTypeTag,storage_.terrainMembership.state,2u))return false;
+        if(!stageMembership(mainRow.ref,mainFilter_,main_.collisionTypeTag,*mainRow.state,2u)||
+           !stageMembership(secondaryRow.ref,secondaryFilter_,secondary_.collisionTypeTag,*secondaryRow.state,2u)||
+           !stageMembership(terrainRow.ref,terrain_.filter,terrain_.collisionTypeTag,*terrainRow.state,2u))return false;
         CollisionSphere48J podSphere{};std::memcpy(podSphere.center.v,frame_.shape.center60.v,sizeof podSphere.center.v);
         podSphere.radius=frame_.shape.radius80;
         podGeometry_={&recovery_.selectedSource->mainTarget().mesh,frame_.shape.composed00,recovery_.podFilter.identity};
-        if(!stage(n.podQuery,recovery_.podFilter,podSphere,recovery_.globals.collisionTypeTag,0u,
+        if(!stage(podRow.ref,recovery_.podFilter,podSphere,recovery_.globals.collisionTypeTag,0u,
                 std::bit_cast<std::uint32_t>(frame_.shape.center60.v[3]),&podGeometry_)||
-           !stage(n.movementQuery,movement_.filter,recovery_.movementSphere,movement_.collisionTypeTag,
-                recovery_.movementTag,std::bit_cast<std::uint32_t>(recovery_.memberships[1].bounds.cachedCenter.v[3])))return false;
+           !stage(movementRow.ref,movement_.filter,recovery_.movementSphere,movement_.collisionTypeTag,
+                recovery_.movementTag,std::bit_cast<std::uint32_t>(movementRow.state->bounds.cachedCenter.v[3])))return false;
         const bool canonicalTail=n.cameraSphere&&active==n.objects;
         if(canonicalTail){
             CollectionRef50BX rejected=0;
@@ -224,11 +233,15 @@ class GroundBridge {
             storage_.candidates[i]->candidate.collision.filter.flagsF8=flags;
             storage_.movement[i].collision.filter.flagsF8=flags;
         }
-        mainFilter_.flagsF8=storage_.source[n.mainQuery-1u].flagsF8;
-        secondaryFilter_.flagsF8=storage_.source[n.secondaryQuery-1u].flagsF8;
-        terrain_.filter.flagsF8=storage_.source[n.terrainQuery-1u].flagsF8;
-        recovery_.podFilter.flagsF8=storage_.source[n.podQuery-1u].flagsF8;
-        movement_.filter.flagsF8=storage_.source[n.movementQuery-1u].flagsF8;
+        //Current racer's rows; an unresolvable row is refused (lane left as is),
+        //never indexed. refreshRecords already required all five this call.
+        const auto copy=[&](storage::RosterRole role,std::uint8_t& lane) noexcept {
+            const auto row=storage_.currentRow(role);if(row)lane=storage_.source[row.ref-1u].flagsF8;};
+        copy(storage::RosterRole::main690,mainFilter_.flagsF8);
+        copy(storage::RosterRole::secondary364,secondaryFilter_.flagsF8);
+        copy(storage::RosterRole::terrain348,terrain_.filter.flagsF8);
+        copy(storage::RosterRole::pod694,recovery_.podFilter.flagsF8);
+        copy(storage::RosterRole::movement7A4,movement_.filter.flagsF8);
         // treeSource is passed directly to124CB0, so accepted SearchList
         // cursor/flags16 writes already reside in the actual method owners.
     }

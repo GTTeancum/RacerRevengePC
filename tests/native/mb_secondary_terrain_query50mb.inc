@@ -1,4 +1,5 @@
 // Included after the real secondary scene getter; retain the same collected list.
+// Stage S: secondaryRowLive is this racer's own 364 row (frame_physics, one accessor).
 require50DU(mbSourceTriggers&&mbCollisionWorld&&mbCollisionWorld->ready()&&
     mbCollisionWorld->storage()==&trackStorage&&
     &mbCollisionWorld->world()==&liveWorld&&
@@ -13,7 +14,7 @@ SourceType2QueryOwners50MB mbQueryOwners{secondaryQuery,secondaryFilter,si,secon
 mb_source_trigger50MB::QueryBorrow mbBorrow{s,x.bindings,x.parameters,navigationProgress,
     nullptr,nullptr,s.fields.vehicle58==1u?originalAi.racer60:playerRacer60};
 const auto mbReceipt=mbSourceTriggers->query(actualRacerSlot,true,mbBorrow,secondaryAdmission,
-    secondaryLiveQuery,mbQueryOwners,registeredIndices,registeredCount,sw,sd);
+    secondaryRowLive,mbQueryOwners,registeredIndices,registeredCount,sw,sd);
 addCounter50DU(nativeCalls);
 if(mbReceipt.live.prefixCommitted)
     addCounter50DU(secondaryCrossedPortals,static_cast<std::uint64_t>(mbReceipt.live.prefix.crossedPortals));

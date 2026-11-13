@@ -288,8 +288,25 @@ void OwnersContext::run() {
    };
    require50DU(native_racer_identities50PL::allocate(racerBank.count(),available,racerIdentities.data(),
        racerIdentities.size()),"racer identity allocation exhausted or conflicts with a course owner");
+   // Port stand-in (track_runtime_storage50IG::writeRosterPodExclusionStandIn):
+   // every racer's 690/364/7A4 excludes all roster racers' 694, written once
+   // here into the unbanked list sized before seal (same list for every racer).
+   if(originalRecoveryEnabled){
+    require50DU(racerBank.count()<=track_runtime_storage50IG::Storage::maximumRoster&&
+        racerBank.count()<=racerIdentities.size(),"roster exceeds pod694 exclusion stand-in capacity");
+    std::array<std::uint32_t,track_runtime_storage50IG::Storage::maximumRoster> pods{};
+    for(std::size_t racer=0;racer<racerBank.count();++racer)pods[racer]=racerIdentities[racer].pod;
+    require50DU(track_runtime_storage50IG::writeRosterPodExclusionStandIn(qfilter,pods.data(),racerBank.count())&&
+        track_runtime_storage50IG::writeRosterPodExclusionStandIn(secondaryFilter,pods.data(),racerBank.count())&&
+        track_runtime_storage50IG::writeRosterPodExclusionStandIn(movement.filter,pods.data(),racerBank.count()),
+        "roster pod694 exclusion stand-in write rejected");
+    std::cerr<<"pod694_exclusion_standin racers="<<racerBank.count()<<" route=legacy\n";
+   }
   }
+  // !isRaTrack: port stand-in (common-path rule); RA claims in its own constructor visit.
   if(!isRaTrack)for(std::size_t racer=playerUsesRosterRig?0u:1u;racer<racerBank.count();++racer)racerBank.visit(racer,[&](){
+   // This slot's first cold visit: the banked roster-slot lane names it from now on.
+   require50DU(this->trackStorage.claimRosterSlot(racer),"actual track storage roster slot claim rejected");
    const auto& rig=*racerRigs[racer];const auto& collision=*racerCollisions[racer];
    coldRacerStage50DU(rig.podId,"rig installation",[&](){
     require50DU(completedFrames==0&&m.frameFactor==0.f,"original racer installation requires fresh state");
@@ -321,7 +338,12 @@ void OwnersContext::run() {
          nativeBottomRightModels[racer].get(),nativeBottomLeftModels[racer].get());
      rig.install(s,x.bindings,x.handRecords,nativeRightModels[racer].get(),nativeLeftModels[racer].get(),
          nativeChariotModels[racer].get(),nativeBottomRightModels[racer].get(),nativeBottomLeftModels[racer].get(),true);
-    }else rig.install(s,x.bindings,x.handRecords,nullptr,nullptr,nullptr,nullptr,nullptr,true); //Shared motion is process-wide on every course.
+    }else{
+     // Port stand-in (body694.md 4.6): no chariot model owner, so no racer340
+     // body for the 694 row. Refused on the shared layout; legacy unchanged.
+     require50DU(!this->trackStorage.sharedLayout(),"shared roster layout requires the native chariot racer340 body owner");
+     rig.install(s,x.bindings,x.handRecords,nullptr,nullptr,nullptr,nullptr,nullptr,true); //Shared motion is process-wide on every course.
+    }
    });
    auto racerSelection=selection;
    // The actual human preset/configuration belongs to slot0. AI construction
@@ -435,6 +457,10 @@ void OwnersContext::run() {
         terrainLiveOwner,ownProbe,probeError);
     require50DU(probeInstalled,probeError.empty()?"original racer cold probe installation failed":probeError.c_str());
    });
+   // Stage S-2: the same Storage row producers RA's bridge calls, inside this
+   // racer's own cold visit. Legacy layout: no rows, no effect.
+   require50DU(this->trackStorage.constructRowTerrain(racer,collision,ownProbe.initial.segment),
+       "actual per-row348 resource constructor rejected");
    if(originalRecoveryEnabled){
     std::string recoveryError;
     require50DU(undertrack_owners50ew_fixture::bindSelectedCold(recoveryQueryOwners,
@@ -449,6 +475,21 @@ void OwnersContext::run() {
     qfilter.identityLists[0].identities={secondaryFilter.identity,recoveryQueryOwners.podFilter.identity,
         movement.filter.identity,terrainOwner.metadata.filter.identity};
     secondaryFilter.identityLists[0].identities={qfilter.identity,recoveryQueryOwners.podFilter.identity,movement.filter.identity};
+    {// Stage S-2/S-3: this racer's five rows through the one Storage producer.
+     // The 694 body is this racer's racer340 (211F6C), built by the shared rig
+     // install above; Storage admits it (body694.md). Legacy layout: no effect.
+     track_runtime_storage50IG::Storage::RowColdInputs in{};
+     in.collision=&collision;
+     in.identities={ids.main,ids.secondary,ids.terrain,ids.pod,ids.movement};
+     in.filters={&qfilter,&secondaryFilter,&terrainOwner.metadata.filter,
+         &recoveryQueryOwners.podFilter,&movement.filter};
+     in.mainResource=&collision.main();in.secondaryResource=&collision.secondary();
+     in.podShape=&collision.mainTarget().source;in.authoredTerrain=&ownProbe.initial;
+     in.podBody=nativeChariotModels[racer]?nativeChariotModels[racer]->coldMainBody340():nullptr;
+     in.frame=&s;in.authoredShape=&x.parameters.shape;
+     in.sessionGeneration=static_cast<std::uint64_t>(sessionIndex+1);
+     require50DU(this->trackStorage.bindRowColdOwners(racer,in),"actual shared per-role constructor binding rejected");
+    }
     require50DU(native_original_ai_recovery::bindColdModels(s,x.bindings,rebaseModels,rebaseModelCount,
         originalRecoveryModels),"actual selected reset model-bound owners rejected");
     x.bindings.podLiveQuery50IZ=&recoveryPodLive;

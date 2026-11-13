@@ -1,5 +1,6 @@
 // Included only in advanceFramePart's real PostWorld main-query branch.
 // All locals below refer to the current authentic Bank visit, including slot0.
+// Stage S: mainRowLive is this racer's own 690 row (frame_physics, one accessor).
 require50DU(mbSourceTriggers&&mbCollisionWorld&&mbCollisionWorld->ready()&&
     mbCollisionWorld->storage()==&trackStorage&&
     &mbCollisionWorld->world()==&liveWorld&&
@@ -16,7 +17,7 @@ const auto mbRacer60=s.fields.vehicle58==1u?originalAi.racer60:playerRacer60;
 const auto mbExecute=[&](native_source_trigger_reset50MB::Owners* physical){
     mb_source_trigger50MB::QueryBorrow borrow{s,x.bindings,x.parameters,navigationProgress,
         physical,physical?originalRecoveryWorkspace.get():nullptr,mbRacer60};
-    return mbSourceTriggers->query(actualRacerSlot,false,borrow,admission,mainLiveQuery,
+    return mbSourceTriggers->query(actualRacerSlot,false,borrow,admission,mainRowLive,
         mbQueryOwners,registeredIndices,registeredCount,workspace,destination);
 };
 SourceType2QueryReceipt50MB mbReceipt;

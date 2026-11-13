@@ -2826,6 +2826,16 @@ void Context::run() {
     if(gaAnimatedWorld)require50DU(gaDynamicWindow.bindFrame(renderFrame,*gaAnimatedWorld),"original GA dynamic frame publication failed");
     if(isTcTrack)require50DU(tcGateRuntime&&tcDynamicWindow.bindFrame(renderFrame,*tcGateRuntime),"TC actual gate dynamic frame publication failed");
     if(isTbTrack)require50DU(tbDoorRuntime&&tbDynamicWindow.bindFrame(renderFrame,*tbDoorRuntime),"TB actual door dynamic frame publication failed");
+    // Animated-world visual vertices are drawing work (original 241280 at
+    // draw time): project them once per shown frame, after however many
+    // catch-up steps ran, from the node worlds those steps left. Keyed on
+    // "this course's animated world has a CPU-projected mesh", which today is
+    // MC and GB; GC/GA/SA/TB/TC still project inside their step (port
+    // stand-in, to retire the same way).
+    if(mcAnimationRuntime){mc_animation_runtime50MC::Diagnostic drawDiagnostic;
+     require50DU(mcAnimationRuntime->prepareDraw(drawDiagnostic),drawDiagnostic.message.empty()?"MC animated draw projection rejected":drawDiagnostic.message.c_str());}
+    if(gbAnimationRuntime){gb_animation_runtime50GB::Diagnostic drawDiagnostic;
+     require50DU(gbAnimationRuntime->prepareDraw(drawDiagnostic),drawDiagnostic.message.empty()?"GB animated draw projection rejected":drawDiagnostic.message.c_str());}
     if(isMcTrack)require50DU(mcAnimationRuntime&&mcDynamicWindow.bindFrame(renderFrame,*mcAnimationRuntime),"MC actual14-animation dynamic frame publication rejected");
     if(isGbTrack)require50DU(gbAnimationRuntime&&gbDynamicWindow.bindFrame(renderFrame,*gbAnimationRuntime),"GB actual four-animation dynamic frame publication failed");
     if(gaAtm.loaded())require50DU(gaAtm.bindFrame(renderFrame),"original GA ATM frame selection rejected");

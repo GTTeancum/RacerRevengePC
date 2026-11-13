@@ -194,6 +194,32 @@ bool VehicleWindowGl50DS::Storage::drawNativeResultsPackets(U bank)noexcept {
     gl.activeTexture(textureUnit0);if(gl.bindSampler)gl.bindSampler(0,0);
     drawGl.bindVertexArray(uiVertexArray);drawGl.bindBuffer(arrayBuffer,uiVertexBuffer);drawGl.bindBuffer(elementBuffer,uiIndexBuffer);
     bool okay=check("prepare Results native ordered packet lowering");
+    {   // Diagnostic receipt (fault 3, visual-faults NOTES): one line per packet
+        // whenever the packet list's shape changes, so a muted logs-only run
+        // shows whether the bottom-bar prompt icons/titles (canvas y 382..405)
+        // are lowered at all, and whether they precede the opaque bar
+        // (untextured, y 383..448) that the loop below draws in list order.
+        // Read-only: no GL call, no state change, bounded by the packet count.
+        static std::size_t loggedCount=0;static float loggedSignature=-1.f;
+        float signature=0.f;
+        for(const auto& packet:nativeResultsPackets)
+            for(const auto& v:packet.vertices)signature+=v.position[1]+(packet.hasTexture?0.5f:0.f);
+        if(nativeResultsPackets.size()!=loggedCount||signature!=loggedSignature){
+            loggedCount=nativeResultsPackets.size();loggedSignature=signature;
+            std::fprintf(stderr,"results_packet_list count=%zu\n",nativeResultsPackets.size());
+            for(std::size_t i=0;i<nativeResultsPackets.size();++i){const auto& packet=nativeResultsPackets[i];
+                float x0=1e9f,x1=-1e9f,y0=1e9f,y1=-1e9f;
+                for(const auto& v:packet.vertices){x0=std::min(x0,v.position[0]);x1=std::max(x1,v.position[0]);
+                    y0=std::min(y0,v.position[1]);y1=std::max(y1,v.position[1]);}
+                const int blend=int(packet.hasTexture?packet.textured.blend:packet.untextured.blend);
+                const int depth=int(packet.hasTexture?packet.textured.depthMethod:packet.untextured.depthMethod);
+                const int zwrite=(packet.hasTexture?packet.textured.depthWrite:packet.untextured.depthWrite)?1:0;
+                std::fprintf(stderr,"results_packet i=%zu textured=%d variant=%zu quads=%zu x=%.1f..%.1f y=%.1f..%.1f blend=%d depth=%d zwrite=%d alpha0=%d\n",
+                    i,packet.hasTexture?1:0,packet.variant,packet.vertices.size()/4,x0,x1,y0,y1,blend,depth,zwrite,
+                    packet.vertices.empty()?-1:int(packet.vertices[0].color[3]));
+            }
+        }
+    }
     for(const auto& packet:nativeResultsPackets){if(!okay)break;
         const auto depth=packet.hasTexture?packet.textured.depthMethod:packet.untextured.depthMethod;
         const auto blend=packet.hasTexture?packet.textured.blend:packet.untextured.blend;

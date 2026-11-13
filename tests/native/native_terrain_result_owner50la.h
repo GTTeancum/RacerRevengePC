@@ -4,6 +4,7 @@
 #include "../../src/game/original_wreck_type2_owners50la.h"
 
 namespace ra_source_camera50LA {class OwnershipBridge;}
+namespace track_runtime_storage50IG {struct Storage;}
 namespace rr::game {class OriginalRacerTerrainQueryOwner50LA;}
 namespace native_terrain_result50LA {
 //Separate native representation of the one-pair11C3F0 result90 allocation.
@@ -12,6 +13,8 @@ namespace native_terrain_result50LA {
 //backing is value-initialized only for C++ safety and is not readable authority.
 class Owner {
     friend class ra_source_camera50LA::OwnershipBridge;
+    //Stage S-2: the per-slot row producers live in Storage (one layout owner).
+    friend struct ::track_runtime_storage50IG::Storage;
     friend class rr::game::OriginalRacerTerrainQueryOwner50LA;
     friend class native_repulsor_payload50LA::Owner;
     //Source-only borrow. Fixed legacy arrays below are NEVER constructed or

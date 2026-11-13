@@ -1,5 +1,6 @@
 #include "original_death_camera50kg.h"
 #include "scalar_minmax48o.h"
+#include <array>
 #include <cfenv>
 #include <cmath>
 #include <cstring>
@@ -79,14 +80,27 @@ bool storage(C& c,const OriginalDeathCameraSubject50KG& subject,
     Span writable[4];for(unsigned i=0;i<4;++i){if(!span(writes[i].data,writes[i].bytes,1,writable[i]))return false;
         for(unsigned j=0;j<i;++j)if(overlap(writable[i],writable[j]))return false;}
     if(!admitOriginalDeathCameraQueryStorage(q,writes,4,nullptr,0))return false;
+    // Each admit call re-proves the WHOLE query world (every object, filter
+    // and mesh) disjoint from the query owner's write
+    // set, then checks its extra reads. The world and write set do not change
+    // inside this function, so batch the borrowed reads: up to 32 per admit
+    // call (the admit limit) instead of one call per read. Same accept/reject
+    // result; the null/alignment/overflow and local-write checks of each read
+    // still run immediately, before any dereference that depends on it.
+    std::array<OriginalCameraOwnerSpan,32> pending{};std::size_t pendingCount=0;
+    auto flush=[&]() noexcept {
+        if(!pendingCount)return true;
+        const bool ok=admitOriginalDeathCameraQueryStorage(q,nullptr,0,pending.data(),pendingCount);
+        pendingCount=0;return ok;
+    };
     auto read=[&](const void* p,std::size_t count,std::size_t width) noexcept {
         Span s;if(!span(p,count,width,s))return false;
         for(const auto& w:writable)if(overlap(s,w))return false;
-        const OriginalCameraOwnerSpan borrowed{p,count*width};
-        return admitOriginalDeathCameraQueryStorage(q,nullptr,0,&borrowed,1);
+        if(pendingCount==pending.size()&&!flush())return false;
+        pending[pendingCount++]={p,count*width};return true;
     };
     if(!read(&subject,1,sizeof subject)||!read(subject.graph,1,sizeof *subject.graph))return false;
-    if(!debrisView)return true;
+    if(!debrisView)return flush();
     if(debrisView->count370>static_cast<std::size_t>(std::numeric_limits<std::int32_t>::max()))return false;
     if(!read(debrisView,1,sizeof *debrisView)||
        !read(debrisView->collections374,debrisView->count370,sizeof(OriginalDeathPieceCollection50KG)))return false;
@@ -103,7 +117,7 @@ bool storage(C& c,const OriginalDeathCameraSubject50KG& subject,
             if(!read(piece.graph->nodes,piece.graph->count,sizeof(SceneNode49P)))return false;
         }
     }
-    return true;
+    return flush();
 }
 
 bool debris(C& c,const OriginalDeathCameraDebrisView50KG& d,float dt,Math& m,R& r) noexcept {

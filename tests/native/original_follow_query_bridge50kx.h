@@ -147,7 +147,7 @@ class QueryBridge {
             storage_.world.zoneCount==n.zones;
     }
     std::size_t nonCameraCount() const noexcept {
-        return storage_.count.terrain+storage::runtimeDynamicReferenceReserve+storage_.count.recoveryReferences;
+        return storage_.activeExtent(false); //One place defines the non-camera extent.
     }
     static bool member(const LiveZoneMembership50EN& membership,CollectionRef50BX ref,
         const storage::Storage& s,std::uint32_t shapeTag=2) noexcept {
@@ -169,9 +169,16 @@ class QueryBridge {
             !std::memcmp(query.sphere.center.v,membership.bounds.cachedCenter.v,sizeof query.sphere.center.v)&&
             !std::memcmp(&query.sphere.radius,&membership.bounds.cachedRadius,sizeof query.sphere.radius);
     }
+    //Current racer's row through the one storage accessor. Stage B P1 keeps
+    //the banked current slot (bank0 = slot 0); Stage C1 fixes the Follow slot.
+    storage::RosterRowRef queryRow(storage::RosterRole role) const noexcept {
+        return storage_.currentRow(role);
+    }
     bool recoveryBindings() const noexcept {
         if(!recovery_)return true;
         const auto& actual=*recovery_;const auto& shape=frame_->shape;
+        const auto podRow=queryRow(storage::RosterRole::pod694),movementRow=queryRow(storage::RosterRole::movement7A4);
+        if(!podRow||!movementRow)return false;
         if(!actual.storagePrepared||!actual.sourcePrepared||!actual.selectedSource||
            !actual.selectedSource->prepared()||main_.resource!=&actual.selectedSource->main()||
            secondary_.resource!=&actual.selectedSource->secondary()||
@@ -179,13 +186,14 @@ class QueryBridge {
            movement_->collisionTypeTag!=main_.collisionTypeTag||movement_->pairCount!=1u||
            actual.podFilter.identity!=actual.globals.identity[0]||
            movement_->filter.identity!=actual.globals.identity[1]||
-           shape.type88!=0||shape.registrationE0!=storage_.count.podQuery||actual.movementTag!=3||
-           !member(actual.memberships[0],storage_.count.podQuery,storage_,0)||
-           !member(actual.memberships[1],storage_.count.movementQuery,storage_,3))return false;
-        for(unsigned i=0;i<2;++i){const auto& m=actual.memberships[i];
+           shape.type88!=0||shape.registrationE0!=podRow.ref||actual.movementTag!=3||
+           !member(*podRow.state,podRow.ref,storage_,0)||
+           !member(*movementRow.state,movementRow.ref,storage_,3))return false;
+        const LiveZoneMembership50EN* const rows[2]={podRow.state,movementRow.state};
+        for(unsigned i=0;i<2;++i){const auto& m=*rows[i];
             if(m.storage.links!=actual.links[i].data()||m.storage.entries!=actual.entries[i].data()||
                m.storage.capacity!=actual.links[i].size()||m.storage.capacity!=actual.entries[i].size())return false;}
-        const auto& pod=actual.memberships[0];const auto& movement=actual.memberships[1];
+        const auto& pod=*podRow.state;const auto& movement=*movementRow.state;
         std::size_t extent=0;
         return meshExtent(actual.selectedSource->mainTarget().mesh,extent)&&
             extent<=recoveryMeshStackCapacity_&&extent<=meshStack_.size()&&
@@ -225,6 +233,8 @@ class QueryBridge {
     bool publishRecovery() noexcept {
         if(!recovery_)return true;
         const auto& actual=*recovery_;const auto& shape=frame_->shape;
+        const auto podRow=queryRow(storage::RosterRole::pod694),movementRow=queryRow(storage::RosterRole::movement7A4);
+        if(!podRow||!movementRow)return false;
         CollisionSphere48J podSphere{};
         std::memcpy(podSphere.center.v,shape.center60.v,sizeof podSphere.center.v);
         podSphere.radius=shape.radius80;
@@ -232,9 +242,9 @@ class QueryBridge {
             actual.globals.collisionTypeTag,shape.type88,std::bit_cast<std::uint32_t>(shape.center60.v[3]));
         const auto movement=projectCollectionObject50CF(movement_->filter,actual.movementSphere,
             movement_->collisionTypeTag,actual.movementTag,
-            std::bit_cast<std::uint32_t>(actual.memberships[1].bounds.cachedCenter.v[3]));
+            std::bit_cast<std::uint32_t>(movementRow.state->bounds.cachedCenter.v[3]));
         if(!pod.valid||!movement.valid)return false;
-        const auto podIndex=storage_.count.podQuery-1u,movementIndex=storage_.count.movementQuery-1u;
+        const auto podIndex=podRow.ref-1u,movementIndex=movementRow.ref-1u; //row() proves 1..count.objects
         project(podIndex,pod,actual.podCopied40,actual.podCopied50);
         project(movementIndex,movement,movement_->copied40,movement_->copied50);
         //11B350 leaves this actual694 response E8 null. Its original type0
@@ -243,13 +253,17 @@ class QueryBridge {
         geometry_[podIndex]={&actual.selectedSource->mainTarget().mesh,shape.composed00,nullptr,false};
         //7A4 remains its actual query-only type3 object. Its filter is not
         // altered to hide it:121B68 may still set F8 bit4 before eligibility.
-        geometry_[movementIndex]={};geometry_[movementIndex].world=actual.memberships[1].lastShapeWorld;
+        geometry_[movementIndex]={};geometry_[movementIndex].world=movementRow.state->lastShapeWorld;
         return true;
     }
     bool refreshRecords() noexcept {
-        if(!bindings()||!springBinding(main_,storage_.mainMembership.state,storage_.count.mainQuery)||
-           !springBinding(secondary_,storage_.secondaryMembership.state,storage_.count.secondaryQuery)||
-           !member(storage_.terrainMembership.state,storage_.count.terrainQuery,storage_))
+        const auto mainRow=queryRow(storage::RosterRole::main690);
+        const auto secondaryRow=queryRow(storage::RosterRole::secondary364);
+        const auto terrainRow=queryRow(storage::RosterRole::terrain348);
+        if(!bindings()||!mainRow||!secondaryRow||!terrainRow||
+           !springBinding(main_,*mainRow.state,mainRow.ref)||
+           !springBinding(secondary_,*secondaryRow.state,secondaryRow.ref)||
+           !member(*terrainRow.state,terrainRow.ref,storage_))
             return fail("Follow query actual690/secondary/terrain binding differs",0x1751d4u);
         if(!recoveryBindings())
             return fail("Follow query actual694/7A4 owner, canonical bounds or cold mesh extent differs",0x126f40u);
@@ -286,11 +300,11 @@ class QueryBridge {
             geometry_[i]={collision.geometry.mesh,collision.geometry.worldMatrix,candidate.compound,
                 collision.hasResponseCallbackE8};
         }
-        if(!publishQuery(storage_.count.mainQuery,mainFilter_,storage_.mainMembership.state,
+        if(!publishQuery(mainRow.ref,mainFilter_,*mainRow.state,
                 main_.collisionTypeTag,main_.copied40,main_.copied50)||
-           !publishQuery(storage_.count.secondaryQuery,secondaryFilter_,storage_.secondaryMembership.state,
+           !publishQuery(secondaryRow.ref,secondaryFilter_,*secondaryRow.state,
                 secondary_.collisionTypeTag,secondary_.copied40,secondary_.copied50)||
-           !publishQuery(storage_.count.terrainQuery,terrain_.filter,storage_.terrainMembership.state,
+           !publishQuery(terrainRow.ref,terrain_.filter,*terrainRow.state,
                 terrain_.collisionTypeTag,terrain_.copied40,terrain_.copied50)||!publishRecovery())
             return fail("Follow query actual query projection rejected",0x120e70u);
         return true;
@@ -552,7 +566,9 @@ public:
         if(storage_.collectionInput.objectCount!=nonCameraCount())
             return fail("Follow query initial bank0 publication rejected",0x179a80u);
         if(!refreshRecords())return false;
-        const auto& mainMembership=storage_.mainMembership.state;
+        const auto mainRow=queryRow(storage::RosterRole::main690);
+        if(!mainRow)return fail("Follow query actual690 row unavailable",0x179a80u);
+        const auto& mainMembership=*mainRow.state;
         //1751F4 passes racer690+60,1751FC passes its actual primary E0->4.
         // Preserve all four cache lanes; never use racer body origin or a
         // position-to-zone guess. The springBinding check authenticates XYZ.
@@ -613,11 +629,19 @@ public:
         for(std::size_t i=0;i<storage_.count.terrain;++i)
             if(!storage_.candidates[i]||storage_.objects[i].identity!=storage_.candidates[i]->candidate.collision.filter.identity)
                 return fail("Follow query candidate owner changed during lease",0x121b68u);
+        //Current racer's five rows through the one storage accessor; refs are
+        //proven 1..count.objects before any index below.
+        const auto mainRow=queryRow(storage::RosterRole::main690);
+        const auto secondaryRow=queryRow(storage::RosterRole::secondary364);
+        const auto terrainRow=queryRow(storage::RosterRole::terrain348);
+        const auto podRow=queryRow(storage::RosterRole::pod694),movementRow=queryRow(storage::RosterRole::movement7A4);
+        if(!mainRow||!secondaryRow||!terrainRow||(recovery_&&(!podRow||!movementRow)))
+            return fail("Follow query actual query row unavailable during lease",0x121b68u);
         if(recovery_&&(!recoveryBindings()||
-           storage_.objects[storage_.count.podQuery-1u].identity!=recovery_->podFilter.identity||
-           storage_.objects[storage_.count.movementQuery-1u].identity!=movement_->filter.identity||
-           geometry_[storage_.count.podQuery-1u].mesh!=&recovery_->selectedSource->mainTarget().mesh||
-           std::memcmp(geometry_[storage_.count.podQuery-1u].world.v,frame_->shape.composed00.v,
+           storage_.objects[podRow.ref-1u].identity!=recovery_->podFilter.identity||
+           storage_.objects[movementRow.ref-1u].identity!=movement_->filter.identity||
+           geometry_[podRow.ref-1u].mesh!=&recovery_->selectedSource->mainTarget().mesh||
+           std::memcmp(geometry_[podRow.ref-1u].world.v,frame_->shape.composed00.v,
                sizeof frame_->shape.composed00.v)))
             return fail("Follow query actual694/7A4 owner changed during lease",0x121b68u);
         for(std::size_t i=0;i<storage_.count.terrain;++i){
@@ -628,14 +652,14 @@ public:
             movement.filter.flagsF8=actual.filter.flagsF8;
             movement.copied40=actual.copied40;movement.copied50=actual.copied50;
         }
-        mainFilter_.flagsF8=storage_.source[storage_.count.mainQuery-1u].flagsF8;
-        secondaryFilter_.flagsF8=storage_.source[storage_.count.secondaryQuery-1u].flagsF8;
-        terrain_.filter.flagsF8=storage_.source[storage_.count.terrainQuery-1u].flagsF8;
-        commitCopies(storage_.count.mainQuery-1u,main_.copied40,main_.copied50);
-        commitCopies(storage_.count.secondaryQuery-1u,secondary_.copied40,secondary_.copied50);
-        commitCopies(storage_.count.terrainQuery-1u,terrain_.copied40,terrain_.copied50);
+        mainFilter_.flagsF8=storage_.source[mainRow.ref-1u].flagsF8;
+        secondaryFilter_.flagsF8=storage_.source[secondaryRow.ref-1u].flagsF8;
+        terrain_.filter.flagsF8=storage_.source[terrainRow.ref-1u].flagsF8;
+        commitCopies(mainRow.ref-1u,main_.copied40,main_.copied50);
+        commitCopies(secondaryRow.ref-1u,secondary_.copied40,secondary_.copied50);
+        commitCopies(terrainRow.ref-1u,terrain_.copied40,terrain_.copied50);
         if(recovery_){
-            const auto pod=storage_.count.podQuery-1u,movement=storage_.count.movementQuery-1u;
+            const auto pod=podRow.ref-1u,movement=movementRow.ref-1u;
             recovery_->podFilter.flagsF8=storage_.source[pod].flagsF8;
             movement_->filter.flagsF8=storage_.source[movement].flagsF8;
             commitCopies(pod,recovery_->podCopied40,recovery_->podCopied50);

@@ -54,6 +54,23 @@ bool Context::advancePhysics(std::size_t actualRacerSlot,Part part,float liveSub
  require50DU(s.bodies.main.schedule.count==1,"16ms diagnostic step requires one native substep");
 
  runNative([&]{return beginVehicleSubstep49W(s,x.bindings,x.selectors,x.workspace,x.diagnostic);},"native selector");
+ // Stage S (consumers.md B4): this racer's own 690/364/348 rows come from the
+ // one storage accessor at the point of use, never from a reference bound once
+ // at cold. Legacy layout: the same members and refs as the former bindings.
+ using QueryRoleS=track_runtime_storage50IG::RosterRole;
+ const auto mainRowNow=trackStorage.currentRow(QueryRoleS::main690);
+ const auto secondaryRowNow=trackStorage.currentRow(QueryRoleS::secondary364);
+ const auto terrainRowNow=trackStorage.currentRow(QueryRoleS::terrain348);
+ require50DU(mainRowNow&&secondaryRowNow&&terrainRowNow,"actual racer 690/364/348 query rows unavailable");
+ auto& mainRowMember=*mainRowNow.state;auto& secondaryRowMember=*secondaryRowNow.state;
+ const VehicleLiveQueryContext50EQ mainRowLive{mainLiveQuery.lifecycle,mainLiveQuery.world,
+     mainRowMember,mainLiveQuery.workspace,mainRowNow.ref};
+ const VehicleLiveQueryContext50EQ secondaryRowLive{secondaryLiveQuery.lifecycle,secondaryLiveQuery.world,
+     secondaryRowMember,secondaryLiveQuery.workspace,secondaryRowNow.ref};
+ live_terrain_probe50fr::Context terrainRowContext{terrainContext.lifecycle,terrainContext.world,
+     *terrainRowNow.state,terrainContext.membershipWork,terrainRowNow.ref,terrainContext.targets,
+     terrainContext.targetCount,terrainContext.selected,terrainContext.selectedCapacity,terrainContext.queryWork,
+     terrainContext.effects,terrainContext.effectCapacity};
  // The C80 lease spans the actual synchronous query only. It is released
  // on both normal and exceptional exits before any Bank switch or observation.
  auto withRaTriggerLease=[&](auto&& queryOperation){
@@ -133,7 +150,7 @@ bool Context::advancePhysics(std::size_t actualRacerSlot,Part part,float liveSub
   const bool accepted=mcQueryBinding->query(actualRacerSlot,secondary,[&](track_runtime_storage50IG::Storage& actual){
    if(&actual!=&trackStorage)return false;entered=true;result=queryOperation();
    if(result.status==VehicleLiveQueryStatus50EQ::Complete&&result.prefixCommitted){
-    const auto& source=secondary?secondaryQuery:query;const auto& member=secondary?secondaryMembership:mainMembership;
+    const auto& source=secondary?secondaryQuery:query;const auto& member=secondary?secondaryRowMember:mainRowMember;
     if(!mcQueryBinding->observePrepared(source.filter->identity,*source.resource,member.lastShapeWorld))return false;
    }
    return result.status==VehicleLiveQueryStatus50EQ::Complete;
@@ -149,7 +166,7 @@ bool Context::advancePhysics(std::size_t actualRacerSlot,Part part,float liveSub
   const bool accepted=gbQueryBinding->query(actualRacerSlot,secondary,[&](track_runtime_storage50IG::Storage& actual){
    if(&actual!=&trackStorage)return false;entered=true;result=queryOperation();
    if(result.status==VehicleLiveQueryStatus50EQ::Complete&&result.prefixCommitted){
-    const auto& source=secondary?secondaryQuery:query;const auto& member=secondary?secondaryMembership:mainMembership;
+    const auto& source=secondary?secondaryQuery:query;const auto& member=secondary?secondaryRowMember:mainRowMember;
     if(!gbQueryBinding->observePrepared(source.filter->identity,*source.resource,member.lastShapeWorld))return false;
    }
    return result.status==VehicleLiveQueryStatus50EQ::Complete;
@@ -174,7 +191,7 @@ bool Context::advancePhysics(std::size_t actualRacerSlot,Part part,float liveSub
  MainStaticDetectorAdmission50H admission{};
  const auto* detectorPolicy=trackStorage.nativeDetectorPolicy();
  require50DU(detectorPolicy&&detectorPolicy->admission(false,s,x.bindings,query,spring,settings,
-     mainMembership,mainQueryRef,admission),"actual registered native main detector policy unavailable");
+     mainRowMember,mainRowNow.ref,admission),"actual registered native main detector policy unavailable");
  runNative(collectRegistered,"ordered prepared-list vehicle candidates");
  if(isMbTrack){
 #include "mb_main_terrain_query50mb.inc"
@@ -190,7 +207,7 @@ bool Context::advancePhysics(std::size_t actualRacerSlot,Part part,float liveSub
  sa_trigger_actions::ActionLease mainSaLease{qfilter.identity,&navigationProgress.reset.vehicleC80};
  if(maTriggerActions)require50DU(maTriggerActions->beginQuery(mainMaLease),"MA main trigger arena lease unavailable");
  if(saTriggerActions)require50DU(saTriggerActions->beginQuery(mainSaLease),"SA main trigger arena lease unavailable");
- const auto mainQueryAttempt=withMcTriggerLease(false,[&](){return withGbTriggerLease(false,[&](){return withTbTriggerLease(qfilter.identity,[&](){return withRcTriggerLease([&](){return withTcTriggerLease(qfilter.identity,[&](){return withScTriggerLease([&](){return withRaTriggerLease([&](){return queryMainLiveIndexedStaticVehicle50EQ(s,x.bindings,admission,mainLiveQuery,query,candidates.data(),candidates.size(),registeredIndices,registeredCount,initial,workspace,destination,queryResult);});});});});});});});
+ const auto mainQueryAttempt=withMcTriggerLease(false,[&](){return withGbTriggerLease(false,[&](){return withTbTriggerLease(qfilter.identity,[&](){return withRcTriggerLease([&](){return withTcTriggerLease(qfilter.identity,[&](){return withScTriggerLease([&](){return withRaTriggerLease([&](){return queryMainLiveIndexedStaticVehicle50EQ(s,x.bindings,admission,mainRowLive,query,candidates.data(),candidates.size(),registeredIndices,registeredCount,initial,workspace,destination,queryResult);});});});});});});});
  if(isRaTrack&&mainQueryAttempt.prefixCommitted)
   require50DU(raWorld->observeRuntimeTriggerPoses(racerBank,actualRacerSlot,raDiagnostic),
       "RA committed query pose observation rejected");
@@ -200,7 +217,7 @@ bool Context::advancePhysics(std::size_t actualRacerSlot,Part part,float liveSub
  if(saTriggerActions)require50DU(saTriggerActions->endQuery(),"SA main trigger action failed after contact commit");
  if(!isTcTrack&&!isGbTrack&&!isMcTrack&&mainQueryAttempt.status==VehicleLiveQueryStatus50EQ::PrefixRejected&&
     recoverPortalBoundary(mainQueryAttempt.prefix,"main")){addCounter50DU(nativeCalls);return false;}
- runNative([&]{return acceptLiveQuery(mainQueryAttempt,query,mainMembership,mainCrossedPortals,"main");},
+ runNative([&]{return acceptLiveQuery(mainQueryAttempt,query,mainRowMember,mainCrossedPortals,"main");},
      "registered main terrain query");
  require50DU(collisionNormalMode.acceptCompleted(queryResult.normalModeWrite),"source collision normal-mode binding unavailable");
  runNative([&]{return commitCandidateEffects(effects);},"commit main query candidate effects");qfilter.flagsF8=queryResult.queryFlagsF8;query.initialQueryCurrentIdentity=queryResult.currentCandidateIdentity;initial.selected=queryResult.selected;
@@ -210,8 +227,8 @@ bool Context::advancePhysics(std::size_t actualRacerSlot,Part part,float liveSub
  if(s.bodies.vehicle838){
  MainStaticDetectorAdmission50H secondaryAdmission{};
  require50DU(detectorPolicy->admission(true,s,x.bindings,secondaryQuery,secondarySpring,secondarySettings,
-     secondaryMembership,secondaryQueryRef,secondaryAdmission),"actual registered native secondary detector policy unavailable");
- runNative([&]{return prepareSecondaryLiveQueryScene50EQ(s,x.bindings,secondaryAdmission,secondaryLiveQuery,x.workspace)==SecondaryQuerySceneStatus50J::Ready;},"registered original secondary scene getter");
+     secondaryRowMember,secondaryRowNow.ref,secondaryAdmission),"actual registered native secondary detector policy unavailable");
+ runNative([&]{return prepareSecondaryLiveQueryScene50EQ(s,x.bindings,secondaryAdmission,secondaryRowLive,x.workspace)==SecondaryQuerySceneStatus50J::Ready;},"registered original secondary scene getter");
  // Secondary uses the same first-substep merged list, without recollection.
 
  if(isMbTrack){
@@ -228,7 +245,7 @@ bool Context::advancePhysics(std::size_t actualRacerSlot,Part part,float liveSub
  sa_trigger_actions::ActionLease secondarySaLease{qfilter.identity,&navigationProgress.reset.vehicleC80};
  if(maTriggerActions)require50DU(maTriggerActions->beginQuery(secondaryMaLease),"MA secondary trigger arena lease unavailable");
  if(saTriggerActions)require50DU(saTriggerActions->beginQuery(secondarySaLease),"SA secondary trigger arena lease unavailable");
- const auto secondaryQueryAttempt=withMcTriggerLease(true,[&](){return withGbTriggerLease(true,[&](){return withTbTriggerLease(secondaryFilter.identity,[&](){return withRcTriggerLease([&](){return withTcTriggerLease(secondaryFilter.identity,[&](){return withScTriggerLease([&](){return withRaTriggerLease([&](){return querySecondaryLiveIndexedStaticVehicle50EQ(s,x.bindings,secondaryAdmission,secondaryLiveQuery,secondaryQuery,candidates.data(),candidates.size(),registeredIndices,registeredCount,si,sw,sd,secondaryResult);});});});});});});});
+ const auto secondaryQueryAttempt=withMcTriggerLease(true,[&](){return withGbTriggerLease(true,[&](){return withTbTriggerLease(secondaryFilter.identity,[&](){return withRcTriggerLease([&](){return withTcTriggerLease(secondaryFilter.identity,[&](){return withScTriggerLease([&](){return withRaTriggerLease([&](){return querySecondaryLiveIndexedStaticVehicle50EQ(s,x.bindings,secondaryAdmission,secondaryRowLive,secondaryQuery,candidates.data(),candidates.size(),registeredIndices,registeredCount,si,sw,sd,secondaryResult);});});});});});});});
  if(isRaTrack&&secondaryQueryAttempt.prefixCommitted)
   require50DU(raWorld->observeRuntimeTriggerPoses(racerBank,actualRacerSlot,raDiagnostic),
       "RA committed query pose observation rejected");
@@ -238,7 +255,7 @@ bool Context::advancePhysics(std::size_t actualRacerSlot,Part part,float liveSub
  if(saTriggerActions)require50DU(saTriggerActions->endQuery(),"SA secondary trigger action failed after contact commit");
  if(!isTcTrack&&!isGbTrack&&!isMcTrack&&secondaryQueryAttempt.status==VehicleLiveQueryStatus50EQ::PrefixRejected&&
     recoverPortalBoundary(secondaryQueryAttempt.prefix,"secondary")){addCounter50DU(nativeCalls);return false;}
- runNative([&]{return acceptLiveQuery(secondaryQueryAttempt,secondaryQuery,secondaryMembership,secondaryCrossedPortals,"secondary");},
+ runNative([&]{return acceptLiveQuery(secondaryQueryAttempt,secondaryQuery,secondaryRowMember,secondaryCrossedPortals,"secondary");},
      "registered secondary terrain query");
  require50DU(collisionNormalMode.acceptCompleted(secondaryResult.normalModeWrite),"source collision normal-mode binding unavailable");
  runNative([&]{return commitCandidateEffects(sde);},"commit secondary query candidate effects");secondaryFilter.flagsF8=secondaryResult.queryFlagsF8;secondaryQuery.initialQueryCurrentIdentity=secondaryResult.currentCandidateIdentity;si.selected=secondaryResult.selected;
@@ -250,7 +267,7 @@ bool Context::advancePhysics(std::size_t actualRacerSlot,Part part,float liveSub
  runNative([&]{return prepareVehicleTerrain50FP(s,x.bindings,x.parameters,terrainOwner.initial.segment,
      terrainPrepared,x.workspace,x.diagnostic);},"prepare enabled native terrain probe");
  const auto terrainAttempt=live_terrain_probe50fr::query(terrainLiveOwner,terrainPrepared,
-     terrainOwner.metadata,terrainContext,probeIndices,probeCount,terrainResult);
+     terrainOwner.metadata,terrainRowContext,probeIndices,probeCount,terrainResult);
  if(terrainAttempt.prefixCommitted&&originalRecoveryEnabled){
   terrainOwner.initial.segment.worldMatrix=terrainPrepared.segment.worldMatrix;
   terrainOwner.initial.sphere=terrainPrepared.sphere;
@@ -306,10 +323,13 @@ bool Context::advancePhysics(std::size_t actualRacerSlot,Part part,float liveSub
   LiveZoneBounds50EN bounds{};bounds.bounds.shapeTag=3;bounds.bounds.pairCount=1;
   bounds.bounds.endpoints=endpoints;bounds.bounds.endpointCount=2;
   bounds.bounds.endpointScenes=endpointScenes;bounds.bounds.endpointSceneCount=2;
+  // Stage S: this racer's own 7A4 row through the one storage accessor.
+  const auto movementRowNow=trackStorage.currentRow(QueryRoleS::movement7A4);
+  require50DU(bool(movementRowNow),"actual racer 7A4 query row unavailable");
   runNative([&]{return updateLiveZoneMembership50EN(zoneLifecycle,liveWorld,
-      recoveryQueryOwners.memberships[1],bounds,membershipWork).status==LiveZoneStatus50EN::Complete;},
+      *movementRowNow.state,bounds,membershipWork).status==LiveZoneStatus50EN::Complete;},
       "source registered7A4 movement update");
-  const auto& cached=recoveryQueryOwners.memberships[1].bounds;
+  const auto& cached=movementRowNow.state->bounds;
   for(unsigned axis=0;axis<3;++axis)recoveryQueryOwners.movementSphere.center.v[axis]=cached.cachedCenter.v[axis];
   recoveryQueryOwners.movementSphere.radius=cached.cachedRadius;
  }

@@ -39,11 +39,17 @@ auto placeOpponentAtGrid50HN=[&](std::size_t racer){
   require50DU(native_racer50HN::groundGridPose(ground,requested,
       x.parameters.visual.verticalLimit7EC,groundStack.data(),groundStack.size(),
       grounded),"AI grid has no actual ground hit");
-  require50DU(removeLiveZoneMembership50EN(zoneLifecycle,liveWorld,mainMembership,
+  // Stage S: this racer's own 690/364/348 rows through the one storage
+  // accessor (legacy layout: the same members and refs as before).
+  const auto gridMainRow=trackStorage.currentRow(track_runtime_storage50IG::RosterRole::main690);
+  const auto gridSecondaryRow=trackStorage.currentRow(track_runtime_storage50IG::RosterRole::secondary364);
+  const auto gridTerrainRow=trackStorage.currentRow(track_runtime_storage50IG::RosterRole::terrain348);
+  require50DU(gridMainRow&&gridSecondaryRow&&gridTerrainRow,"AI grid query rows unavailable");
+  require50DU(removeLiveZoneMembership50EN(zoneLifecycle,liveWorld,*gridMainRow.state,
       membershipWork).status==LiveZoneStatus50EN::Complete,"AI main grid detach failed");
-  require50DU(removeLiveZoneMembership50EN(zoneLifecycle,liveWorld,secondaryMembership,
+  require50DU(removeLiveZoneMembership50EN(zoneLifecycle,liveWorld,*gridSecondaryRow.state,
       membershipWork).status==LiveZoneStatus50EN::Complete,"AI secondary grid detach failed");
-  require50DU(removeLiveZoneMembership50EN(zoneLifecycle,liveWorld,terrainMembership,
+  require50DU(removeLiveZoneMembership50EN(zoneLifecycle,liveWorld,*gridTerrainRow.state,
       membershipWork).status==LiveZoneStatus50EN::Complete,"AI terrain grid detach failed");
   require50DU(native_racer50HN::placeColdGrid(s,x.bindings,grounded,rebaseModels,rebaseModelCount,
       poseHistory),"native cold AI grid placement failed");
@@ -52,11 +58,11 @@ auto placeOpponentAtGrid50HN=[&](std::size_t racer){
       mainBounds)&&prepareQueryCache(secondaryQuery,
       s.nodes[static_cast<unsigned>(x.bindings.lifecycle.physical19C)].world100,secondaryBounds),
       "AI cold spring cache preparation failed");
-  require50DU(attachLiveZoneMembership50EN(zoneLifecycle,liveWorld,mainMembership,
-      mainMembershipStorage,mainQueryRef,initialCollisionZone,ZoneMethod50CL::Second,0.f,
+  require50DU(attachLiveZoneMembership50EN(zoneLifecycle,liveWorld,*gridMainRow.state,
+      gridMainRow.storage,gridMainRow.ref,initialCollisionZone,ZoneMethod50CL::Second,0.f,
       mainBounds,membershipWork).status==LiveZoneStatus50EN::Complete,"AI main grid attach failed");
-  require50DU(attachLiveZoneMembership50EN(zoneLifecycle,liveWorld,secondaryMembership,
-      secondaryMembershipStorage,secondaryQueryRef,initialCollisionZone,ZoneMethod50CL::Second,0.f,
+  require50DU(attachLiveZoneMembership50EN(zoneLifecycle,liveWorld,*gridSecondaryRow.state,
+      gridSecondaryRow.storage,gridSecondaryRow.ref,initialCollisionZone,ZoneMethod50CL::Second,0.f,
       secondaryBounds,membershipWork).status==LiveZoneStatus50EN::Complete,"AI secondary grid attach failed");
   TerrainPrepareInput48M terrainInput{};terrainInput.state=terrainOwner.initial;
   terrainInput.scene=s.nodes[static_cast<unsigned>(x.bindings.lifecycle.main190)].world100;
@@ -65,8 +71,8 @@ auto placeOpponentAtGrid50HN=[&](std::size_t racer){
   require50DU(prepareTerrainSinglePair48M(terrainInput,terrainPrepared)==TerrainPrepareStatus48M::QueryReady,
       "AI cold terrain cache preparation failed");
   const auto terrainBounds=live_terrain_probe50fr::bounds(terrainLiveOwner,terrainPrepared);
-  require50DU(attachLiveZoneMembership50EN(zoneLifecycle,liveWorld,terrainMembership,
-      terrainMembershipStorage,terrainQueryRef,initialCollisionZone,ZoneMethod50CL::Second,0.f,
+  require50DU(attachLiveZoneMembership50EN(zoneLifecycle,liveWorld,*gridTerrainRow.state,
+      gridTerrainRow.storage,gridTerrainRow.ref,initialCollisionZone,ZoneMethod50CL::Second,0.f,
       terrainBounds,membershipWork).status==LiveZoneStatus50EN::Complete,"AI terrain grid attach failed");
   if(allAiEnabled||(humanCourseEnabled&&racer!=0)){
    // Genuine AI controls are initialized separately for every actual slot.

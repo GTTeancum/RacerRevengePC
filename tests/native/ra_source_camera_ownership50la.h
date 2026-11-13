@@ -148,8 +148,10 @@ class OwnershipBridge final {
         const auto lane=secondary?1u:0u;
         if(!s->sharedRoster_){
             if(policy->sharedWorld_||policy->sharedRetired_)return false;
-            member=secondary?&s->secondaryMembership.state:&s->mainMembership.state;
-            ref=secondary?s->count.secondaryQuery:s->count.mainQuery;row=nullptr;
+            //Legacy layout: the live racer copy's row via the one storage accessor.
+            const auto live=s->currentRow(secondary?storage::RosterRole::secondary364:storage::RosterRole::main690);
+            if(!live)return false;
+            member=live.state;ref=live.ref;row=nullptr;
             return policy->entries_[lane].membership==member&&policy->entries_[lane].ref==ref;
         }
         const auto pin=bankLifetime_.lock();const auto* producer=endCandidateProducer_;
@@ -1091,19 +1093,13 @@ class OwnershipBridge final {
            actual_->main.resource!=&collision->main()||actual_->secondary.resource!=&collision->secondary()||
            actual_->mainFilter.identity!=bodyIdentities_[slot].main||
            actual_->secondaryFilter.identity!=bodyIdentities_[slot].secondary||
-           body.canonicalNumericAddress()!=&actual_->frame.bodies.main||!body.scene288()||
-           !body.scene288()->constructed||body.scene288()->released||!entity.reference00||
-           !entity.objectKey||
-           entity.kind!=g::OriginalWreckComponentKind50LA::body167920||!entity.sessionGeneration||
-           body.scene288()->entity().sessionGeneration!=entity.sessionGeneration||
            !registeredRange(&actual_->frame.shape,sizeof(actual_->frame.shape))||
            !registeredRange(&actual_->frame.bodies.main.components.body20C,sizeof(std::uint32_t))||
            !registeredRange(actual_->frame.mainContactPartners210,sizeof(actual_->frame.mainContactPartners210)))return false;
         const auto& shape=collision->mainTarget().source;
-        const auto& authored=parameters.shape;
-        if(std::memcmp(shape.local40.v,authored.local40.v,sizeof(shape.local40.v))||
-           std::memcmp(shape.rootCenter.v,authored.rootCenter.v,sizeof(shape.rootCenter.v))||
-           std::memcmp(shape.rootHalf.v,authored.rootHalf.v,sizeof(shape.rootHalf.v)))return false;
+        //Stage S-3: the body/shape admission is the one Storage check every
+        //course runs (body694.md 4.1). RA keeps only its Bank/arena proofs here.
+        if(!storage::Storage::podBodyAdmissible(body,actual_->frame,shape,parameters.shape,0u))return false;
         //The native fresh694 owner now retains the genuine constructor's
         //response lane:2121F8 calls11B190, whose11B350 stores nullE8.
         //No mutable response registration is exposed for this native owner.
@@ -1167,64 +1163,15 @@ class OwnershipBridge final {
            !authored.prepared||!actual_->terrain.prepared||
            !registeredRange(&actual_->terrain.initial,sizeof(actual_->terrain.initial))||
            !live_terrain_probe50fr::matches(actual_->terrainLive,actual_->terrain.initial))return false;
-        auto& row=s->sharedRoster_->objects[slot*storage::Storage::rosterRoles+
-            static_cast<std::size_t>(storage::Storage::RosterRole::terrain348)];
         const auto& ids=bodyIdentities_[slot];const auto& installed=actual_->terrain.initial.segment;
-        if(!row||row->collision!=ids.collision||row->slot!=slot||row->coldBound||
-           !row->terrainResource||row->terrainResource->initialized||
-           !row->terrainResult90||row->terrainResult90->constructed_||row->terrainResult90->revoked_||
-           actual_->main.resource!=&ids.collision->main()||
+        if(!ids.collision||actual_->main.resource!=&ids.collision->main()||
            authored.metadata.filter.identity!=ids.terrain||actual_->terrain.metadata.filter.identity!=ids.terrain||
            std::memcmp(installed.first.v,authored.initial.segment.first.v,16)||
            std::memcmp(installed.second.v,authored.initial.segment.second.v,16)||
            std::memcmp(installed.worldMatrix.v,authored.initial.segment.worldMatrix.v,64))return false;
-        //Genuine immutable resource constructor immediately after the actual
-        //cold348 install, from the still-live authored segment, NOT a saved
-        //frame snapshot. rays points into this retained row's own pair.
-        if(!live_terrain_probe50fr::initialize(*row->terrainResource,authored.initial.segment))return false;
-        //Same actual one-pair cold producer:11C5B4..11C6E4 constructs a
-        //SEPARATE result90, before later11DD00 reset. Retained unbanked per-row
-        //storage is already charged by sizeof to the unchanged native budget.
-        return row->terrainResult90->construct();
-    }
-    std::array<bool,storage::Storage::maximumRoster> sharedFilterAttempted_{};
-    bool constructSharedColdFilters(std::size_t slot,
-        const std::array<storage::Storage::SharedRosterObject*,storage::Storage::rosterRoles>& rows)noexcept {
-        auto& allocation=*storage_.get()->sharedRoster_;
-        if(slot>=allocation.count||sharedFilterAttempted_[slot])return false;
-        //All actual scalar/list schema is still at the same successful cold
-        //constructor cut. This is not a later per-frame snapshot producer.
-        const auto& q=*actual_;const g::CollisionFilter48J* filters[]={&q.mainFilter,&q.secondaryFilter,
-            &q.terrain.metadata.filter,&q.recovery->podFilter,&q.movement->filter};
-        const std::uint32_t expected0[]={q.secondaryFilter.identity,q.recovery->podFilter.identity,
-            q.movement->filter.identity,q.terrain.metadata.filter.identity};
-        const std::uint32_t expected1[]={q.mainFilter.identity,q.recovery->podFilter.identity,q.movement->filter.identity};
-        const std::uint32_t expected3[]={q.mainFilter.identity,q.movement->filter.identity,q.terrain.metadata.filter.identity};
-        const std::uint32_t* expected[]={expected0,expected1,nullptr,expected3,nullptr};
-        const std::size_t sizes[]={4,3,0,3,0};
-        std::size_t payload=0;
-        for(std::size_t i=0;i<rows.size();++i){
-            const auto& f=*filters[i];const auto& first=f.identityLists[0];
-            if(!rows[i]||rows[i]->coldFilter||rows[i]->coldBound||first.identities.size()!=sizes[i]||
-               first.mode!=1||f.identityLists[1].mode!=1||!f.identityLists[1].identities.empty())return false;
-            for(std::size_t n=0;n<sizes[i];++n)if(first.identities[n]!=expected[i][n])return false;
-            std::size_t bytes=sizeof(storage::Storage::SharedColdFilter);
-            for(const auto n:{first.identities.size(),f.identityLists[1].identities.size(),f.categoryMasks.size()}){
-                if(n>static_cast<std::size_t>(std::numeric_limits<std::int32_t>::max())||
-                   n>(std::numeric_limits<std::size_t>::max()-bytes)/sizeof(std::uint32_t))return false;
-                bytes+=n*sizeof(std::uint32_t);
-            }
-            if(bytes>allocation.coldPayloadRemaining||payload>allocation.coldPayloadRemaining-bytes)return false;
-            payload+=bytes;
-        }
-        //Reserve exact actual payload before allocation; partial construction
-        //retains its reservation and terminal attempt, never retries/duplicates.
-        sharedFilterAttempted_[slot]=true;allocation.coldPayloadRemaining-=payload;
-        try {
-            for(std::size_t i=0;i<rows.size();++i)
-                rows[i]->coldFilter=std::make_unique<const storage::Storage::SharedColdFilter>(*filters[i]);
-            return true;
-        }catch(...){return false;}
+        //Stage S-2: the row producer lives in Storage (one layout owner); this
+        //bridge only proves the RA arena and visit. Same producer on every course.
+        return s->constructRowTerrain(slot,*ids.collision,authored.initial.segment);
     }
     bool bindSharedColdOwners(std::size_t slot,
         const terrain_probe_authoring50fq_fixture::Owner& authored)noexcept {
@@ -1236,60 +1183,32 @@ class OwnershipBridge final {
            slot>=inputs_.collisionRoster.size()||!actual_||!actual_->recovery||!actual_->movement||
            terminal_||closed_||s->sharedRoster_->retired||!authored.prepared)return false;
         auto& q=*actual_;const auto& ids=bodyIdentities_[slot];const auto& staged=stagedPods694_[slot];
-        if(!staged.bodyA0||staged.collision!=ids.collision||!staged.generation||
+        if(!ids.collision||!staged.bodyA0||staged.collision!=ids.collision||!staged.generation||
            q.recovery->selectedSource!=ids.collision||!q.recovery->sourcePrepared||
            q.main.resource!=&ids.collision->main()||q.secondary.resource!=&ids.collision->secondary()||
            !q.terrain.prepared||!live_terrain_probe50fr::matches(q.terrainLive,q.terrain.initial)||
            std::memcmp(q.terrain.initial.segment.first.v,authored.initial.segment.first.v,16)||
            std::memcmp(q.terrain.initial.segment.second.v,authored.initial.segment.second.v,16)||
-           std::memcmp(q.terrain.initial.segment.worldMatrix.v,authored.initial.segment.worldMatrix.v,64))return false;
-        const std::uint32_t identities[]={ids.main,ids.secondary,ids.terrain,ids.pod,ids.movement};
-        g::CollisionFilter48J* filters[]={&q.mainFilter,&q.secondaryFilter,&q.terrain.metadata.filter,
-            &q.recovery->podFilter,&q.movement->filter};
-        std::array<storage::Storage::SharedRosterObject*,storage::Storage::rosterRoles> rows{};
-        for(std::size_t i=0;i<rows.size();++i){
-            auto& row=s->sharedRoster_->objects[slot*rows.size()+i];
-            if(!row||row->slot!=slot||static_cast<std::size_t>(row->role)!=i||
-               row->collision!=ids.collision||row->coldBound||row->identity||
-               row->membership.state.attached||row->membership.state.object||
-               !identities[i]||filters[i]->identity!=identities[i])return false;
-            for(std::size_t j=0;j<i;++j)if(identities[i]==identities[j])return false;
-            rows[i]=row.get();
-        }
-        auto& terrain=*rows[static_cast<std::size_t>(storage::Storage::RosterRole::terrain348)];
-        if(!terrain.terrainResource||!terrain.terrainResource->initialized||
-           !terrain.terrainResult90||!terrain.terrainResult90->constructed_||terrain.terrainResult90->revoked_||
-           !live_terrain_probe50fr::matches(*terrain.terrainResource,authored.initial)||
+           std::memcmp(q.terrain.initial.segment.worldMatrix.v,authored.initial.segment.worldMatrix.v,64)||
            authored.metadata.filter.identity!=ids.terrain)return false;
-        if(!constructSharedColdFilters(slot,rows))return false;
-        //Reuse the exact earlier producer's retained identity; never rebase
-        //this to arena.terrainLive or initialize it again during observation.
-        for(std::size_t i=0;i<rows.size();++i){
-            auto& row=*rows[i];row.identity=identities[i];row.canonicalFilter=filters[i];
-            row.generation=staged.generation;row.coldBound=true;
-        }
-        rows[0]->type2Resource=&ids.collision->main();rows[1]->type2Resource=&ids.collision->secondary();
-        terrain.type2Resource=&terrain.terrainResource->resource;
-        //21207C/1B11FC binds348+128 to this genuine main340 owner. Native
-        //cold custody is delayed here, not a replay of Entity construction.
-        //No World3FC/400 auxiliary pointer is inferred from this positive bind.
-        terrain.nativeTerrainBody128=staged.bodyA0;
-        rows[3]->type0Resource=staged.shape;rows[3]->bodyA0=staged.bodyA0;
-        //7A4 endpoints/metadata are a later actual FreshRecovery producer.
-        //No shape, attachment, query publication or revision is invented here.
-        return true;
+        //Stage S-2: the five-row cold producer lives in Storage; the bridge
+        //supplies this racer's own owners (RA native694 body and generation).
+        storage::Storage::RowColdInputs in{};
+        in.collision=ids.collision;
+        in.identities={ids.main,ids.secondary,ids.terrain,ids.pod,ids.movement};
+        in.filters={&q.mainFilter,&q.secondaryFilter,&q.terrain.metadata.filter,
+            &q.recovery->podFilter,&q.movement->filter};
+        in.mainResource=&ids.collision->main();in.secondaryResource=&ids.collision->secondary();
+        //Shape and body were admitted against parameters.shape by the same
+        //Storage check at staging; the row producer runs it again here.
+        in.podShape=staged.shape;in.podBody=staged.bodyA0;in.frame=&q.frame;
+        in.authoredShape=staged.shape;in.sessionGeneration=staged.generation;
+        in.authoredTerrain=&authored.initial;
+        return s->bindRowColdOwners(slot,in);
     }
     void revokeSharedColdOwners(std::size_t slot)noexcept {
-        auto* s=storage_.get();if(!s||!s->sharedRoster_||slot>=s->sharedRoster_->count)return;
-        for(std::size_t i=0;i<storage::Storage::rosterRoles;++i){
-            auto& row=s->sharedRoster_->objects[slot*storage::Storage::rosterRoles+i];
-            if(!row)continue;
-            row->canonicalFilter=nullptr;row->bodyA0=nullptr;
-            row->nativeTerrainBody128=nullptr;row->coldBound=false;
-            if(row->terrainResult90)row->terrainResult90->revoke();
-            //Immutable resource backing stays retained until actual World
-            //retirement. No membership removal or live source zeroing occurs.
-        }
+        //Stage S-2: Storage owns the row custody it withdraws.
+        if(auto* s=storage_.get())s->revokeRowColdOwners(slot);
     }
     //Private Stage C registration seam, still uncalled. It does not issue a
     //Bank pin or query view; later shared registration must prove all shared
@@ -2054,16 +1973,29 @@ class OwnershipBridge final {
         try {
             const auto* source=candidates?candidates->decodedSource():nullptr;
             const auto* bindings=candidates?candidates->staticBindings():nullptr;
-            if(!source||!bindings||source->collisions.size()!=178u||bindings->size()!=(candidates->triggerActions_?180u:178u)||
+            //Stage S: admission from the track's own data, not RA counts. The
+            //static prefix is every loaded COL owner; authored triggers follow
+            //it, each in its own authored zone of this world, at most the
+            //bridge's fixed trigger-membership capacity.
+            const auto* triggerSources=candidates&&candidates->triggerActions_&&candidates->triggerSource_?
+                candidates->triggerSource_->sources():nullptr;
+            const std::size_t staticCount=source?source->collisions.size():0u;
+            const std::size_t triggerCount=bindings&&bindings->size()>=staticCount?bindings->size()-staticCount:0u;
+            if(!source||!bindings||!staticCount||bindings->size()<staticCount||
+               (candidates->triggerActions_?(!triggerSources||triggerCount!=triggerSources->size()||
+                   triggerCount>triggerMembership_.size()):triggerCount!=0u)||
                input.humanCount>1u||input.humanCount>input.collisionRoster.size()||input.collisionRoster.empty()||input.collisionRoster.size()>8u||
                input.wreck.size()>(storage::runtimeSearchSlotLimit-8u)/3u)
-                return fail(d,"actual RA static source and bounded original collision roster required");
+                return fail(d,"actual static source, authored trigger owners and bounded original collision roster required");
             for(std::size_t i=0;i<bindings->size();++i){const auto& b=(*bindings)[i];
-                if(!b.candidate||b.animated||b.trigger!=(i>=178u)||
-                   (i>=178u&&(!b.candidate->raOriginalTriggerSegments||b.authoredZone!=4u||
+                const bool trigger=i>=staticCount;
+                if(!b.candidate||b.animated||b.trigger!=trigger||
+                   (trigger&&(!b.candidate->raOriginalTriggerSegments||!b.authoredZone||
+                    b.authoredZone>source->world.zones.size()||
+                    b.authoredZone!=(*triggerSources)[i-staticCount].zone||
                     b.candidate->nativeTriggers!=&candidates->triggerActions_->nativeGroup()||
-                    b.candidate->nativeTriggerIndex!=i-178u)))
-                    return fail(d,"RA requires original static prefix then its two authored trigger owners");
+                    b.candidate->nativeTriggerIndex!=i-staticCount)))
+                    return fail(d,"original static prefix then its authored trigger owners required");
             }
             if(input.recovery&&(input.recovery->storagePrepared||input.recovery->sourcePrepared))
                 return fail(d,"recovery reservation requires its fresh actual owner before world-sized allocation");
@@ -2160,12 +2092,19 @@ class OwnershipBridge final {
             if(!prepared)return fail(d,"RA runtime static/query storage construction failed");
             storageConstructed_=true;
             if(candidates_->triggerActions_){auto& s=*storage_.get();
-                for(std::size_t i=0;i<2;++i){
+                //Trigger i sits right after the static prefix (ref = static+1+i),
+                //count and capacity proven by the admission above.
+                const std::size_t triggers=bindings->size()-source->collisions.size();
+                if(triggers>triggerMembership_.size()||s.count.terrain!=bindings->size())
+                    return fail(d,"authored trigger memberships exceed their fixed capacity");
+                for(std::size_t i=0;i<triggers;++i){
+                    const std::size_t ref=source->collisions.size()+1u+i;
+                    if(!ref||ref>s.count.terrain||ref>s.count.objects)return fail(d,"authored trigger ref out of storage bounds");
                     triggerMembership_[i]=std::make_unique<storage::Membership>(s.count.membership);
                     auto& m=*triggerMembership_[i];const auto& authored=(*candidates_->triggerSource_->sources())[i];
                     const auto bounds=ra_trigger_candidates50LA::bounds(authored);
                     if(g::attachLiveZoneMembership50EN(s.lifecycle,s.world,m.state,m.storage(),
-                        static_cast<g::CollectionRef50BX>(179u+i),authored.zone,g::ZoneMethod50CL::First,0.f,
+                        static_cast<g::CollectionRef50BX>(ref),authored.zone,g::ZoneMethod50CL::First,0.f,
                         bounds,s.membershipWork).status!=g::LiveZoneStatus50EN::Complete||
                        g::updateLiveZoneMembership50EN(s.lifecycle,s.world,m.state,bounds,s.membershipWork).status!=
                         g::LiveZoneStatus50EN::Complete)return fail(d,"RA original trigger membership rejected");
@@ -2555,12 +2494,18 @@ class OwnershipBridge final {
                         rows[i]->effectRevision==std::numeric_limits<std::uint64_t>::max()){
                         fail(d,"shared grid requires its genuinely unpublished constructor rows");return;}
                 }
-                auto& mainMember=shared?rows[0]->membership:storage.mainMembership;
-                auto& secondaryMember=shared?rows[1]->membership:storage.secondaryMembership;
-                auto& terrainMember=shared?rows[2]->membership:storage.terrainMembership;
-                const auto mainRef=shared?rows[0]->reservedRef:storage.count.mainQuery;
-                const auto secondaryRef=shared?rows[1]->reservedRef:storage.count.secondaryQuery;
-                const auto terrainRef=shared?rows[2]->reservedRef:storage.count.terrainQuery;
+                //This slot's 690/364/348 rows through the one storage accessor
+                //(legacy: the live visited copy; shared: the slot's own rows).
+                const auto pick=[&](storage::RosterRole role){
+                    return shared?storage.row(slot,role):storage.currentRow(role);};
+                const auto mainView=pick(storage::RosterRole::main690);
+                const auto secondaryView=pick(storage::RosterRole::secondary364);
+                const auto terrainView=pick(storage::RosterRole::terrain348);
+                if(!mainView||!secondaryView||!terrainView||(shared&&(mainView.row!=rows[0]||
+                   secondaryView.row!=rows[1]||terrainView.row!=rows[2]))){
+                    fail(d,"actual grid query rows unavailable");return;}
+                auto& mainMember=*mainView.state;auto& secondaryMember=*secondaryView.state;auto& terrainMember=*terrainView.state;
+                const auto mainRef=mainView.ref,secondaryRef=secondaryView.ref,terrainRef=terrainView.ref;
                 const auto main=static_cast<unsigned>(a.bindings.lifecycle.main190);
                 const auto physical=static_cast<unsigned>(a.bindings.lifecycle.physical19C);
                 if(q.recovery&&!shared&&a.bindings.podLiveQuery50IZ!=podContext_.get()){
@@ -2603,7 +2548,7 @@ class OwnershipBridge final {
                     fail(d,"actual RA collision ground probe rejected");return;}
                 gridRetirementRequired_[slot]=true;
                 for(auto* membership:{&mainMember,&secondaryMember,&terrainMember})
-                    if(g::removeLiveZoneMembership50EN(storage.lifecycle,storage.world,membership->state,
+                    if(g::removeLiveZoneMembership50EN(storage.lifecycle,storage.world,*membership,
                         storage.membershipWork).status!=g::LiveZoneStatus50EN::Complete){
                         fail(d,"RA grid detach incomplete; actual partial effects retained");return;}
                 if(!native_racer50HN::placeColdGrid(state,a.bindings,grounded,rig.rebaseModels,rig.modelCount,a.history)){
@@ -2613,12 +2558,12 @@ class OwnershipBridge final {
                    !prepareGridQuery(q.secondary,state.nodes[physical].world100,secondaryBounds)){
                     fail(d,"actual grid query cache construction rejected");return;}
                 // Source1AE588/1AE590 ->2169C0 chooses first genuine C34 ref1.
-                if(g::attachLiveZoneMembership50EN(storage.lifecycle,storage.world,mainMember.state,
-                    mainMember.storage(),mainRef,1,g::ZoneMethod50CL::Second,0.f,
+                if(g::attachLiveZoneMembership50EN(storage.lifecycle,storage.world,mainMember,
+                    mainView.storage,mainRef,1,g::ZoneMethod50CL::Second,0.f,
                     mainBounds,storage.membershipWork).status!=g::LiveZoneStatus50EN::Complete||
                    (shared&&!publishSharedColdGridRole(*rows[0],mainBounds))||
-                   g::attachLiveZoneMembership50EN(storage.lifecycle,storage.world,secondaryMember.state,
-                    secondaryMember.storage(),secondaryRef,1,g::ZoneMethod50CL::Second,0.f,
+                   g::attachLiveZoneMembership50EN(storage.lifecycle,storage.world,secondaryMember,
+                    secondaryView.storage,secondaryRef,1,g::ZoneMethod50CL::Second,0.f,
                     secondaryBounds,storage.membershipWork).status!=g::LiveZoneStatus50EN::Complete||
                    (shared&&!publishSharedColdGridRole(*rows[1],secondaryBounds))){
                     fail(d,"RA grid body attachment incomplete; actual effects retained");return;}
@@ -2628,17 +2573,17 @@ class OwnershipBridge final {
                 if(g::prepareTerrainSinglePair48M(terrain,prepared)!=g::TerrainPrepareStatus48M::QueryReady){
                     fail(d,"actual grid terrain cache rejected");return;}
                 const auto bounds=live_terrain_probe50fr::bounds(shared?*rows[2]->terrainResource:q.terrainLive,prepared);
-                if(g::attachLiveZoneMembership50EN(storage.lifecycle,storage.world,terrainMember.state,
-                    terrainMember.storage(),terrainRef,1,g::ZoneMethod50CL::Second,0.f,
+                if(g::attachLiveZoneMembership50EN(storage.lifecycle,storage.world,terrainMember,
+                    terrainView.storage,terrainRef,1,g::ZoneMethod50CL::Second,0.f,
                     bounds,storage.membershipWork).status!=g::LiveZoneStatus50EN::Complete||
                    (shared&&!publishSharedColdGridRole(*rows[2],bounds))){
                     fail(d,"RA grid terrain attachment incomplete; actual effects retained");return;}
                 auto& receipt=gridCompletion_[slot];
                 receipt.main=state.nodes[main].world100;receipt.physical=state.nodes[physical].world100;
                 receipt.mainResource=q.main.resource;receipt.secondaryResource=q.secondary.resource;
-                receipt.mainRevision=mainMember.state.revision;
-                receipt.secondaryRevision=secondaryMember.state.revision;
-                receipt.terrainRevision=terrainMember.state.revision;
+                receipt.mainRevision=mainMember.revision;
+                receipt.secondaryRevision=secondaryMember.revision;
+                receipt.terrainRevision=terrainMember.revision;
                 if(candidates_->triggerActions_&&!observeTriggerPoses(d))return;
                 complete=true;
             });
@@ -2670,12 +2615,17 @@ class OwnershipBridge final {
     }
     undertrack_owners50ew_fixture::BorrowedQueries recoveryBorrows()noexcept {
         auto& a=*actual_;auto& s=*storage_.get();auto& r=*freshRecovery_;
+        //Legacy fresh route only (called inside the slot's visit): the live
+        //copy's 690/348 rows through the one storage accessor. An empty row
+        //leaves the field null and the undertrack join refuses it.
+        const auto mainRow=s.currentRow(storage::RosterRole::main690);
+        const auto terrainRow=s.currentRow(storage::RosterRole::terrain348);
         undertrack_owners50ew_fixture::BorrowedQueries q{};
-        q.main690=&a.main;q.mainMembership=&s.mainMembership.state;
-        q.mainStorage=s.mainMembership.storage();q.mainRef=s.count.mainQuery;
+        q.main690=&a.main;q.mainMembership=mainRow.state;
+        q.mainStorage=mainRow.storage;q.mainRef=mainRow.ref;
         q.movement7A4=a.movement;q.movementEndpoints=r.endpoints;q.movementMetadata=r.metadata;q.movementSource=&r.source;
         q.terrain348=&a.terrain.initial;q.terrainResource=&a.terrainLive.resource;q.terrainMetadata=&a.terrain.metadata;
-        q.terrainMembership=&s.terrainMembership.state;q.terrainStorage=s.terrainMembership.storage();q.terrainRef=s.count.terrainQuery;
+        q.terrainMembership=terrainRow.state;q.terrainStorage=terrainRow.storage;q.terrainRef=terrainRow.ref;
         return q;
     }
     bool attachFresh(native_racer50HN::Bank& bank,std::size_t slot,
@@ -2723,9 +2673,18 @@ class OwnershipBridge final {
                 std::array<storage::Storage::SharedRosterObject*,storage::Storage::rosterRoles> sharedRows{};
                 if(shared&&!sharedColdRowsCurrent(slot,sharedRows)){
                     fail(d,"actual shared fresh role ownership differs");return;}
-                auto& mainMember=shared?sharedRows[0]->membership:s.mainMembership;
-                auto& secondaryMember=shared?sharedRows[1]->membership:s.secondaryMembership;
-                auto& terrainMember=shared?sharedRows[2]->membership:s.terrainMembership;
+                //This slot's five rows through the one storage accessor (legacy:
+                //the live visited copy; shared: the slot's own, same as sharedRows).
+                const auto pick=[&](storage::RosterRole role){
+                    return shared?s.row(slot,role):s.currentRow(role);};
+                const auto mainView=pick(storage::RosterRole::main690);
+                const auto secondaryView=pick(storage::RosterRole::secondary364);
+                const auto terrainView=pick(storage::RosterRole::terrain348);
+                if(!mainView||!secondaryView||!terrainView||(shared&&(mainView.row!=sharedRows[0]||
+                   secondaryView.row!=sharedRows[1]||terrainView.row!=sharedRows[2]))){
+                    fail(d,"actual fresh query rows unavailable");return;}
+                const auto& mainMember=*mainView.state;const auto& secondaryMember=*secondaryView.state;
+                const auto& terrainMember=*terrainView.state;
                 if(shared&&(!sharedRows[3]->podContext||a.bindings.podLiveQuery50IZ!=&*sharedRows[3]->podContext)){
                     fail(d,"actual per-slot saved POD context differs before visibility");return;}
                 if(q.recovery&&!shared&&a.bindings.podLiveQuery50IZ!=podContext_.get()){
@@ -2739,9 +2698,9 @@ class OwnershipBridge final {
                    q.main.resource!=proof.mainResource||q.secondary.resource!=proof.secondaryResource||
                    std::memcmp(&proof.main,&f.nodes[main].world100,sizeof(proof.main))||
                    std::memcmp(&proof.physical,&f.nodes[physical].world100,sizeof(proof.physical))||
-                   !mainMember.state.attached||!secondaryMember.state.attached||!terrainMember.state.attached||
-                   mainMember.state.revision!=proof.mainRevision||
-                   secondaryMember.state.revision!=proof.secondaryRevision||terrainMember.state.revision!=proof.terrainRevision){
+                   !mainMember.attached||!secondaryMember.attached||!terrainMember.attached||
+                   mainMember.revision!=proof.mainRevision||
+                   secondaryMember.revision!=proof.secondaryRevision||terrainMember.revision!=proof.terrainRevision){
                     fail(d,"actual final placement changed before fresh attachment");return;}
                 const native_racer_collision50HW::Owner* selected=nullptr;
                 for(const auto* owner:inputs_.collisionRoster)
@@ -2757,10 +2716,13 @@ class OwnershipBridge final {
                     fail(d,"actual selected694 authoring differs from source owner");return;}
                 if(recovery){
                     auto& r=*q.recovery;
-                    auto& podMember=shared?sharedRows[3]->membership.state:r.memberships[0];
-                    auto& movementMember=shared?sharedRows[4]->membership.state:r.memberships[1];
-                    const auto podRef=shared?sharedRows[3]->reservedRef:s.count.podQuery;
-                    const auto movementRef=shared?sharedRows[4]->reservedRef:s.count.movementQuery;
+                    const auto podView=pick(storage::RosterRole::pod694);
+                    const auto movementView=pick(storage::RosterRole::movement7A4);
+                    if(!podView||!movementView||(shared&&(podView.row!=sharedRows[3]||movementView.row!=sharedRows[4]))||
+                       (!shared&&(podView.state!=&r.memberships[0]||movementView.state!=&r.memberships[1]))){
+                        fail(d,"actual selected recovery or reserved collection rows differ");return;}
+                    const auto& podMember=*podView.state;const auto& movementMember=*movementView.state;
+                    const auto podRef=podView.ref,movementRef=movementView.ref;
                     if(!r.sourcePrepared||!r.selectedSource||!r.selectedSource->prepared()||
                        q.main.resource!=&r.selectedSource->main()||q.secondary.resource!=&r.selectedSource->secondary()||
                        r.selectedSource->binding().archivePath!=a.rigs[slot]->resourceFile.string()||
@@ -2790,8 +2752,11 @@ class OwnershipBridge final {
                     if(shared){
                         if(!attachSharedFreshQueries(sharedRows,slot,d))return;
                     }else {
+                    const auto podView=pick(storage::RosterRole::pod694);
+                    const auto movementView=pick(storage::RosterRole::movement7A4);
+                    if(!podView||!movementView){fail(d,"actual fresh694/7A4 rows unavailable");return;}
                     if(!undertrack_owners50ew_fixture::attachFreshQueries(r,f,a.bindings,a.parameters,recoveryBorrows(),
-                        {s.count.podQuery,s.count.movementQuery},s.lifecycle,s.world,s.membershipWork,1,
+                        {podView.ref,movementView.ref},s.lifecycle,s.world,s.membershipWork,1,
                         slot<a.humanCount?undertrack_owners50ew_fixture::ColdQueryRole50LH::humanPlayer:
                             undertrack_owners50ew_fixture::ColdQueryRole50LH::originalAi)){
                         fail(d,"actual fresh694/7A4 attachment incomplete");return;}
@@ -2801,10 +2766,10 @@ class OwnershipBridge final {
                         std::bit_cast<std::uint32_t>(f.shape.center60.v[3]));
                     const auto movement=g::projectCollectionObject50CF(q.movement->filter,r.movementSphere,
                         q.movement->collisionTypeTag,r.movementTag,
-                        std::bit_cast<std::uint32_t>(r.memberships[1].bounds.cachedCenter.v[3]));
+                        std::bit_cast<std::uint32_t>(movementView.state->bounds.cachedCenter.v[3]));
                     if(!pod.valid||!movement.valid){fail(d,"actual recovery projection rejected");return;}
                     const g::CollectionProjection50CF* rows[]{&pod,&movement};
-                    const g::CollectionRef50BX refs[]{s.count.podQuery,s.count.movementQuery};
+                    const g::CollectionRef50BX refs[]{podView.ref,movementView.ref}; //row() proves 1..count.objects
                     for(unsigned i=0;i<2;++i){const auto index=refs[i]-1u;s.objects[index]=rows[i]->object;
                         s.source[index].flagsF8=rows[i]->state.flagsF8;s.source[index].cachedCenter=rows[i]->state.cachedCenter;
                         s.source[index].cachedRadius=rows[i]->state.cachedRadius;}
@@ -2829,9 +2794,11 @@ class OwnershipBridge final {
             bool complete=false;
             bank.visit(slot,[&](){auto& s=*storage_.get();auto& q=*actual_;
                 if(q.recovery){auto& r=*q.recovery;
-                    const g::CollectionRef50BX refs[]{s.count.podQuery,s.count.movementQuery};
-                    for(unsigned i=0;i<2;++i){const auto ref=refs[i];
-                        if(!ref||ref>s.objects.size()||
+                    //Legacy layout: the live visited copy's 694/7A4 rows via the one accessor.
+                    const storage::RosterRowRef views[]{s.currentRow(storage::RosterRole::pod694),
+                        s.currentRow(storage::RosterRole::movement7A4)};
+                    for(unsigned i=0;i<2;++i){const auto ref=views[i].ref;
+                        if(!views[i]||views[i].state!=&r.memberships[i]||ref>s.objects.size()||
                            (s.objects[ref-1].identity&&s.objects[ref-1].identity!=r.globals.identity[i])||
                            (r.memberships[i].attached&&r.memberships[i].object!=ref)||
                            (!i&&q.frame.shape.registrationE0&&q.frame.shape.registrationE0!=ref)){
@@ -2867,12 +2834,15 @@ class OwnershipBridge final {
         try {
             bool complete=false;
             bank.visit(slot,[&](){auto& s=*storage_.get();
-                for(auto* membership:{&s.mainMembership,&s.secondaryMembership,&s.terrainMembership})
-                    if(g::removeLiveZoneMembership50EN(s.lifecycle,s.world,membership->state,
+                //The visited copy's 690/364/348 rows via the one storage accessor.
+                const storage::RosterRowRef views[]{s.currentRow(storage::RosterRole::main690),
+                    s.currentRow(storage::RosterRole::secondary364),s.currentRow(storage::RosterRole::terrain348)};
+                for(const auto& view:views)if(!view){d.message="actual RA grid query rows unavailable";return;}
+                for(const auto& view:views)
+                    if(g::removeLiveZoneMembership50EN(s.lifecycle,s.world,*view.state,
                         s.membershipWork).status!=g::LiveZoneStatus50EN::Complete){
                         d.message="actual RA grid removal incomplete; retry with same Bank and backing";return;}
-                if(s.mainMembership.state.attached||s.secondaryMembership.state.attached||
-                   s.terrainMembership.state.attached){d.message="actual grid memberships remain attached";return;}
+                for(const auto& view:views)if(view.state->attached){d.message="actual grid memberships remain attached";return;}
                 complete=true;
             });
             if(complete)gridRetirementRequired_[slot]=false;

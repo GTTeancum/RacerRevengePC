@@ -55,6 +55,8 @@ class Owner final {
  const ::gb_animation_binding50GB::Binding* binding_=nullptr;
  const std::thread::id thread_=std::this_thread::get_id();
  bool attempted_=false,failed_=false,publicationReady_=false,servicing_=false;
+ //Owners whose pose moved since the last shown frame. Host-side only.
+ std::array<bool,ownerCount> visualPending_{};
  static g::BodyMatrix48G identity()noexcept {g::BodyMatrix48G m{};for(unsigned i=0;i<16;i+=5)m.v[i]=1.f;return m;}
  bool fail(Diagnostic& d,const char* text,std::uint32_t pc){failed_=true;publicationReady_=false;d.sourcePC=pc;d.message=text;return false;}
  static float add(float a,float b)noexcept {volatile float r=a+b;return r;}
@@ -165,7 +167,10 @@ class Owner final {
    if(!g::sampleModelMotionTime50IG(s.motion,s.bindings,q.current34,graph(i),shared,workspace_,d.motion))return fail(d,"GB direct source-time sample rejected",0x154480);
    if(!state_[i].motionLoops&&q.current34>s.motion.duration){q.stopped10=1;q.current34=0.f;}
   }
-  return project(i,d);
+  //Original 101728 moves only the animation nodes here; the visual vertices
+  //are transformed when the model is drawn (241280 palette rows -> VU). The
+  //native CPU projection of the same node worlds runs in prepareDraw().
+  visualPending_[i]=true;return true;
  }
  bool serviceRandom(std::uint32_t timestamp,std::uint32_t& raw,g::SharedRandomOwner50ID& random,Diagnostic& d){
   if(!random.seed.lazy80A8){random.seed.seed3D6B30=0;random.seed.lazy80A8=true;}
@@ -228,6 +233,20 @@ public:
     return fail(d,"GB runtime exact extent/retained budget rejected",0);
    d={};return true;
   }catch(const std::exception& e){failed_=true;d.message=e.what();return false;}
+ }
+ //Once per shown frame, before the dynamic window binds this mesh: project
+ //every owner that moved since the last shown frame from its CURRENT node
+ //worlds (the same lazy 2897B0 getter the step's visual/collision refresh
+ //already used), then the aggregate bounds. Game state is not read or written
+ //beyond those already-refreshed node worlds; 2-4 catch-up steps no longer
+ //each project vertices that only the last of them would show.
+ bool prepareDraw(Diagnostic& d)noexcept {
+  try{d={};if(!ready()||servicing_||thread_!=std::this_thread::get_id())return fail(d,"GB draw projection outside ready owner thread",0x241280);
+   bool any=false;
+   for(std::size_t i=0;i<ownerCount;++i){if(!visualPending_[i])continue;d.owner=i;
+    if(!project(i,d))return false;visualPending_[i]=false;any=true;}
+   if(any)updateMeshBounds();return true;
+  }catch(...){failed_=true;publicationReady_=false;return false;}
  }
  bool activateSequence(std::size_t i)noexcept {
   if(!ready()||servicing_||(i!=0&&i!=2))return false;auto& q=state_[i].sequence;q.active90=true;q.nextSequenceA0=q.nextMotionA8=-1;return true;

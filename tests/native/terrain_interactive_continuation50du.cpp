@@ -1290,6 +1290,9 @@ SessionExit50DU Context::run() {
  // Course can reuse this exact cold roster after leaving the frontend.
  // Construct its owners now at the real Rig.install, including UI-active
  // startup; never replay construction over the installed graph at Course.
+ // Port stand-in (common-path rule, body694.md 4.6): the course list decides
+ // whether racer340 bodies exist; the data rule is camera enabled and
+ // Application started. On the shared layout a missing body refuses at cold.
  if((isTaTrack||isSaTrack||isRaTrack||directOriginalHuman)&&originalCameraEnabled&&originalMainApplication.enabled){
   originalMainApplication.appStart(originalMainApplication.assetRoot);
   nativeModelDomain=originalMainApplication.standardMaterialDomain();
@@ -3875,6 +3878,17 @@ SessionExit50DU Context::run() {
   // installed models and may already have canonical flame borrows. Close
   // those same bank slots while the actual Video host remains available;
   // later local destruction is an idempotent no-op, never the first release.
+  // Stage S-3 (body694.md 4.3): every course withdraws each slot's roster rows
+  // (racer340 borrows) before any model closes its body; a row still holding a
+  // body is refused here. Legacy layout: no rows, no effect.
+  for(std::size_t slot=0;slot<nativeChariotModels.size()&&slot<track_runtime_storage50IG::Storage::maximumRoster;++slot){
+   trackStorage.revokeRowColdOwners(slot);
+   const auto* model=nativeChariotModels[slot].get();
+   if(model&&trackStorage.rowsHoldBody(model->coldMainBody340())){
+    std::cerr<<"roster row still holds racer340 slot="<<slot<<'\n';
+    return closeRejected("roster_row_body_retirement");
+   }
+  }
   for(std::size_t slot=nativeRightModels.size();slot>0;--slot){
    // Later aliases retire in reverse source order on Session close,
    // Course/restart and frontend/partial-load/exception unwind alike.

@@ -315,10 +315,28 @@ public:
         try {
             auto& x=arena_.live;auto& s=x.state;auto& q=*r.actual_;
             const auto& rig=*resources_->rigs_[slot];const auto& collision=*resources_->collisions_[slot];
+            if(slot==0){
+                //Port stand-in (track_runtime_storage50IG::writeRosterPodExclusionStandIn):
+                //every racer's 690/364/7A4 excludes all roster racers' 694, written
+                //once before the first slot's visit into the unbanked list sized
+                //before seal. Every slot's 694 id is reserved at storage construction.
+                d.stage="roster pod694 exclusion stand-in";
+                std::array<std::uint32_t,track_runtime_storage50IG::Storage::maximumRoster> pods{};
+                need(q.movement&&resources_->racerCount_<=pods.size(),"roster exceeds pod694 exclusion stand-in capacity");
+                for(std::size_t i=0;i<resources_->racerCount_;++i)pods[i]=r.bodyIdentities_[i].pod;
+                need(track_runtime_storage50IG::writeRosterPodExclusionStandIn(q.mainFilter,pods.data(),resources_->racerCount_)&&
+                    track_runtime_storage50IG::writeRosterPodExclusionStandIn(q.secondaryFilter,pods.data(),resources_->racerCount_)&&
+                    track_runtime_storage50IG::writeRosterPodExclusionStandIn(q.movement->filter,pods.data(),resources_->racerCount_),
+                    "roster pod694 exclusion stand-in write rejected");
+                std::cerr<<"pod694_exclusion_standin racers="<<resources_->racerCount_<<" route=ra\n";
+            }
             actualBank.visit(slot,[&](){
                 need(s.phase==g::VehicleFramePhase49W::Ready&&s.bodies.main.frameFactor==0.f&&
                     !q.recovery->sourcePrepared&&!s.shape.registrationE0,
                     "actual initial Ready/recovery constructor state required");
+                //This slot's first cold visit: the banked roster-slot lane names it from now on.
+                d.stage="track storage roster slot claim";
+                need(r.storage_.get()&&r.storage_.get()->claimRosterSlot(slot),"actual track storage roster slot claim rejected");
                 if(slot==0u&&arena_.humanCount){
                     d.stage="native human load caller";
                     need(armNativePlayerLoad(),"actual cold Player input/caller ownership differs");

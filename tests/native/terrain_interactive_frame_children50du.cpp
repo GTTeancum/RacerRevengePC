@@ -123,7 +123,11 @@ bool Context::advanceChildren(std::size_t actualRacerSlot,float preparedOuterFac
    return static_cast<const native_dynamic_contact50IW::Registry*>(context)->bodyIdentityForManagerIndex(slot);
   };
   aiInput.raceFields=&originalAiSession.fields[originalAi.managerIndexFE0];aiInput.timing=&lapContinuity.timing;
-  aiInput.actualZoneOrdinal48=mainMembership.storage.links[0].zone?mainMembership.storage.links[0].zone-1u:0u;
+  // Stage S: this racer's own 690 row through the one storage accessor (legacy: same member).
+  const auto aiMainRow=trackStorage.currentRow(track_runtime_storage50IG::RosterRole::main690);
+  const CollectionRef50BX aiMainZone=aiMainRow&&aiMainRow.state->storage.links&&aiMainRow.state->storage.capacity?
+      aiMainRow.state->storage.links[0].zone:0u;
+  aiInput.actualZoneOrdinal48=aiMainZone?aiMainZone-1u:0u;
   aiInput.managerHumanCount34=originalAiHumanCount;
   aiInput.raceCountdown94=humanCourseEnabled?&humanResultsCountdown:nullptr;
   // Consumers here read1125C low byte; the native roster owns the complete
@@ -135,7 +139,7 @@ bool Context::advanceChildren(std::size_t actualRacerSlot,float preparedOuterFac
   else if constexpr(std::is_same_v<Input,AiRuntimeInput50TC>)aiInput.aiTrackLength3C=tcAiMetadata.trackLength3C();
   else if constexpr(std::is_same_v<Input,AiRuntimeInput50MB>)aiInput.aiTrackLength3C=mbAiMetadata.trackLength3C();
   else aiInput.aiTrackLength3C=selectedOriginalAiMetadata.trackLength3C;
-  aiInput.raceOwnersBound=originalAiSession.rankBound&&mainMembership.storage.links[0].zone!=0;
+  aiInput.raceOwnersBound=originalAiSession.rankBound&&aiMainZone!=0;
   return driveOriginalAi50IV(s,x.bindings,x.parameters,navigationProgress,navigationCA0,
       lapContinuity.state.vehicleCC8,boostState,originalAi,aiInput,originalAiReceipt);
   };
@@ -839,9 +843,13 @@ bool Context::commitOriginalDestroyed(std::size_t actualRacerSlot,
  // shape world is this racer's (its E0 sits on the pod body); otherwise 0
  // (the debris keeps the storage-order stand-in), logged either way.
  auto debrisPrimaryZone=[&](const float* bodyWorld)->CollectionRef50BX{
-  const CollectionRef50BX zone=mainMembership.attached&&mainMembership.storage.links&&mainMembership.storage.capacity?
-      mainMembership.storage.links[0].zone:0u;
-  const auto& m=mainMembership.lastShapeWorld.v;
+  // Stage S: this racer's own 690 row through the one storage accessor (legacy: same member).
+  const auto debrisMainRow=trackStorage.currentRow(track_runtime_storage50IG::RosterRole::main690);
+  if(!debrisMainRow){std::cerr<<"debris_zone_capture slot="<<actualRacerSlot<<" row=absent used=0\n";return 0u;}
+  const auto& mainRowMember=*debrisMainRow.state;
+  const CollectionRef50BX zone=mainRowMember.attached&&mainRowMember.storage.links&&mainRowMember.storage.capacity?
+      mainRowMember.storage.links[0].zone:0u;
+  const auto& m=mainRowMember.lastShapeWorld.v;
   const float dx=m[12]-bodyWorld[12],dy=m[13]-bodyWorld[13],dz=m[14]-bodyWorld[14];
   const float gap=std::sqrt(dx*dx+dy*dy+dz*dz);
   const bool own=zone&&gap<50.f;
