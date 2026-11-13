@@ -1,0 +1,22 @@
+{
+ "psg": {
+  "files": 5877,
+  "unique": 5700,
+  "identical": 5877,
+  "dup": 177
+ },
+ "pst": {
+  "files": 1115,
+  "unique": 886,
+  "identical": 1115,
+  "dup": 229
+ },
+ "psm": {
+  "files": 2438,
+  "unique": 1876,
+  "identical": 2438,
+  "canonical": 833,
+  "raw_lines_kept": 1605,
+  "dup": 562
+ }
+}

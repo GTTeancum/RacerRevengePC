@@ -1,0 +1,6 @@
+course 0: {'psg_own_reader_ok': 179, 'psg_static_decoder_ok': 179, 'psg_negative_normal_triangles': 0, 'psg_scene_decoder_ok': 179, 'psm_ok': 20, 'pst_ok': 20}
+course 1: {'psg_own_reader_ok': 363, 'psg_static_decoder_ok': 363, 'psg_negative_normal_triangles': 0, 'psg_scene_decoder_ok': 363, 'psm_ok': 32, 'pst_ok': 32}
+course 2: {'psg_own_reader_ok': 192, 'psg_static_decoder_ok': 192, 'psg_negative_normal_triangles': 0, 'psg_scene_decoder_ok': 192, 'psm_ok': 30, 'pst_ok': 30}
+course 3: {'psg_own_reader_ok': 352, 'psg_static_decoder_ok': 352, 'psg_negative_normal_triangles': 0, 'psg_scene_decoder_ok': 352, 'psm_ok': 26, 'pst_ok': 26}
+course 4: {'psg_own_reader_ok': 26, 'psg_static_decoder_ok': 25, 'psg_negative_normal_triangles': 0, 'psg_scene_decoder_ok': 25, 'psm_ok': 7, 'pst_ok': 7}
+   FAIL ('ka_g02_02_te187.psg', 'recovered winding disagrees with stored normals')

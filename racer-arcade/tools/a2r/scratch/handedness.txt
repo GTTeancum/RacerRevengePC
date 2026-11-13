@@ -1,0 +1,34 @@
+code motion side peak_frac joint largest_joint_dx body_mean_dx   (dx < 0 = toward -x)
+ANA GMOT_ANA_L_crash_N_ANA             L 0.07 27  -0.127  -0.005
+ANA GMOT_ANA_R_crash_N_ANA             R 0.60 27  -0.145  -0.006
+ANA GMOT_ANA_L_pro_N_ANA               L 0.47 26  -0.355  -0.035
+ANA GMOT_ANA_R_pro_N_ANA               R 0.47 16  +0.376  +0.034
+ANA GMOT_ANA_L_chira_N_ANA             L 0.20 17  +0.126  +0.003
+ANA GMOT_ANA_R_chira_N_ANA             R 0.20 27  -0.126  -0.003
+ANA GMOT_Y_ANA_L_contact_N_ANA         L 0.00 16  +0.125  +0.000
+ANA GMOT_Y_ANA_R_contact_N_ANA         R 0.00 16  +0.125  +0.000
+BEN GMOT_BEN_L_crash_N_BEN             L 0.23 10  -0.129  -0.007
+BEN GMOT_BEN_R_crash_N_BEN             R 0.23 16  +0.129  +0.006
+BEN GMOT_BEN_L_pro_N_BEN               L 0.28 10  -0.263  -0.035
+BEN GMOT_BEN_R_pro_N_BEN               R 0.28 16  +0.263  +0.035
+BEN GMOT_BEN_L_chira_N_BEN             L 0.45 10  -0.257  -0.028
+BEN GMOT_BEN_R_chira_N_BEN             R 0.45 16  +0.258  +0.028
+BEN GMOT_Y_BEN_L_contact_N_BEN         L 0.07 15  -0.071  -0.002
+BEN GMOT_Y_BEN_R_contact_N_BEN         R 0.67 15  -0.071  -0.001
+GAS GMOT_GAS_L_crash_N_GAS             L 0.13 27  -0.193  -0.016
+GAS GMOT_GAS_R_crash_N_GAS             R 0.13 15  +0.188  +0.015
+GAS GMOT_GAS_L_pro_N_GAS               L 0.28 33  -0.318  -0.043
+GAS GMOT_GAS_R_pro_N_GAS               R 0.28 21  +0.314  +0.042
+GAS GMOT_GAS_L_chira_N_GAS             L 0.33 15  +0.158  +0.009
+GAS GMOT_GAS_R_chira_N_GAS             R 0.33 27  -0.162  -0.010
+GAS GMOT_Y_GAS_L_contact_N_GAS         L 0.13 33  -0.086  -0.002
+GAS GMOT_Y_GAS_R_contact_N_GAS         R 0.15 21  +0.085  +0.002
+SEB GMOT_SEB_L_crash_N_SEB             L 0.22 58  -0.534  -0.014
+SEB GMOT_SEB_R_crash_N_SEB             R 0.22 34  +0.534  +0.014
+SEB GMOT_SEB_L_pro_N_SEB               L 0.32 58  -0.438  -0.028
+SEB GMOT_SEB_R_pro_N_SEB               R 0.32 34  +0.438  +0.028
+SEB GMOT_SEB_L_chira_N_SEB             L 0.30 34  +0.408  +0.008
+SEB GMOT_SEB_R_chira_N_SEB             R 0.28 58  -0.408  -0.008
+SEB GMOT_Y_SEB_L_contact_N_SEB         L 0.00 34  +0.407  +0.000
+SEB GMOT_Y_SEB_R_contact_N_SEB         R 0.00 34  +0.407  +0.000
+motions that move sideways: 32; "L" toward -x / "R" toward +x: 22

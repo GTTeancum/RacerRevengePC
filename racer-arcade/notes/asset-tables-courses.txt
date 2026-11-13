@@ -1,0 +1,2404 @@
+# Per-course asset lists (tools\dump_assets.py). Course index = argument of f_0C142DDA.
+# course table @0C3E4B30 (12B: landscape, collision, stat), landscape @0C3E7FF8 (52B),
+# collision @0C3E4ACC (12B: block, root ptr, size), STAT via f_0C142D98, music via @0C3E8AC8
+
+## course 0  SA_COURSE2
+  landscape 0: texset 11, objects 1238,-1,-1,-1 / 1239, sky-ish table idx 0, floats (2400.0, 2600.0), 104, callbacks 0C146460 0C147078 0C1477C4
+  collision 0:
+    mask:0E000000  size 0018EAA0  collision (root struct at mask:0E18EA90)
+  STAT 0: RAM struct @0C3C2B64
+  music stream 20:
+    mask:0A000000  size 00B730C0  stream
+  landscape textures (texset 11 list A):
+    mask:02251820  size 00055554  texture 1975 512x256 texhead 000100C1 00E502C1
+    mask:020540E0  size 0002AAAA  texture 1950 256x256 texhead 000100C1 00E402C1
+    mask:0207EBA0  size 0002AAAA  texture 1951 256x256 texhead 000100C1 00E402C1
+    mask:020D1740  size 0002AAAA  texture 1964 256x256 texhead 000100C1 00E442C1
+    mask:020FC200  size 0002AAAA  texture 1965 256x256 texhead 000100C1 00E442C1
+    mask:02126CC0  size 0002AAAA  texture 1966 256x256 texhead 000100C1 00E442C1
+    mask:02151780  size 0002AAAA  texture 1967 256x256 texhead 000100C1 00E442C1
+    mask:021917A0  size 0002AAAA  texture 1969 256x256 texhead 000100C1 00E442C1
+    mask:021BC260  size 0002AAAA  texture 1970 256x256 texhead 000100C1 00E442C1
+    mask:021E6D20  size 0002AAAA  texture 1971 256x256 texhead 000100C1 00E442C1
+    mask:022117E0  size 0002AAAA  texture 1972 256x256 texhead 000100C1 00E402C1
+    mask:022B2B80  size 0002AAAA  texture 1984 256x256 texhead 000100C1 00E402C1
+    mask:022DD640  size 0002AAAA  texture 1985 256x256 texhead 000100C1 00E402C1
+    mask:0217C240  size 00015554  texture 1968 256x128 texhead 000100C1 00DC02C1
+    mask:020B6C40  size 0000AAAA  texture 1960 128x128 texhead 000100C1 00DB02C1
+    mask:0223C2A0  size 0000AAAA  texture 1973 128x128 texhead 000100C1 00DB02C1
+    mask:02246D60  size 0000AAAA  texture 1974 128x128 texhead 000100C1 00DB02C1
+    mask:020C41C0  size 0000AAA8  texture 1962 256x64 texhead 000100C1 00D402C1
+    mask:0202F4A0  size 00005554  texture 1927 128x64 texhead 000100C1 00D302C1
+    mask:020354C0  size 00005554  texture 1929 128x64 texhead 000100C1 00D302C1
+    mask:020289A0  size 00002AAA  texture 1922 64x64 texhead 000100C1 00D202C1
+    mask:0203AA20  size 00002AAA  texture 1930 64x64 texhead 000100C1 00D202C1
+    mask:0203D4E0  size 00002AAA  texture 1931 64x64 texhead 000100C1 00D202C1
+    mask:0203FFA0  size 00002AAA  texture 1932 64x64 texhead 000100C1 00D202C1
+    mask:0204CB40  size 00002AAA  texture 1945 64x64 texhead 000100C1 00D202C1
+    mask:020AA120  size 00002AAA  texture 1953 64x64 texhead 000100C1 00D202C1
+    mask:020AE140  size 00002AAA  texture 1955 64x64 texhead 000100C1 00D202C1
+    mask:020B0C00  size 00002AAA  texture 1956 64x64 texhead 000100C1 00D202C1
+    mask:020C1700  size 00002AAA  texture 1961 64x64 texhead 000100C1 00D202C1
+    mask:020CEC80  size 00002AAA  texture 1963 64x64 texhead 000100C1 00D202C1
+    mask:022A6D80  size 00002AAA  texture 1976 64x64 texhead 000100C1 00D202C1
+    mask:022AA5C0  size 00002AAA  texture 1979 64x64 texhead 000100C1 00D202C1
+    mask:022AD080  size 00002AAA  texture 1980 64x64 texhead 000100C1 00D202C1
+    mask:022B00C0  size 00002AAA  texture 1983 64x64 texhead 000100C1 00D202C1
+    mask:0202BF20  size 00001554  texture 1924 64x32 texhead 000100C1 00CA02C1
+    mask:0202D480  size 00001554  texture 1925 64x32 texhead 000100C1 00CA02C1
+    mask:02043520  size 00001554  texture 1934 64x32 texhead 000100C1 04CA02C1
+    mask:02044A80  size 00001554  texture 1935 64x32 texhead 000100C1 04CA02C1
+    mask:02045FE0  size 00001554  texture 1936 64x32 texhead 000100C1 04CA02C1
+    mask:0204F600  size 00001554  texture 1946 64x32 texhead 000100C1 00CA02C1
+    mask:02050B60  size 00001554  texture 1947 64x32 texhead 000100C1 00CA02C1
+    mask:020520C0  size 00001554  texture 1948 64x32 texhead 000100C1 00CA02C1
+    mask:020ACBE0  size 00001554  texture 1954 64x32 texhead 000100C1 00CA02C1
+    mask:020B4180  size 00001554  texture 1958 64x32 texhead 000100C1 00CA02C1
+    mask:020B56E0  size 00001554  texture 1959 64x32 texhead 000100C1 00CA02C1
+    mask:0202B460  size 00000AAA  texture 1923 32x32 texhead 000100C1 00C902C1
+    mask:0202E9E0  size 00000AAA  texture 1926 32x32 texhead 000100C1 04C902C1
+    mask:02034A00  size 00000AAA  texture 1928 32x32 texhead 000100C1 00C902C1
+    mask:02042A60  size 00000AAA  texture 1933 32x32 texhead 000100C1 00C902C1
+    mask:02047540  size 00000AAA  texture 1937 32x32 texhead 000100C1 00C902C1
+    mask:02048000  size 00000AAA  texture 1938 32x32 texhead 000100C1 00C902C1
+    mask:02048AC0  size 00000AAA  texture 1939 32x32 texhead 000100C1 00C902C1
+    mask:02049580  size 00000AAA  texture 1940 32x32 texhead 000100C1 04C902C1
+    mask:0204A040  size 00000AAA  texture 1941 32x32 texhead 000100C1 04C902C1
+    mask:0204AB00  size 00000AAA  texture 1942 32x32 texhead 000100C1 04C902C1
+    mask:0204B5C0  size 00000AAA  texture 1943 32x32 texhead 000100C1 04C902C1
+    mask:0204C080  size 00000AAA  texture 1944 32x32 texhead 000100C1 04C902C1
+    mask:02053620  size 00000AAA  texture 1949 32x32 texhead 000100C1 00C902C1
+    mask:020A9660  size 00000AAA  texture 1952 32x32 texhead 000100C1 00C902C1
+    mask:020B36C0  size 00000AAA  texture 1957 32x32 texhead 000100C1 00C902C1
+    mask:022A9840  size 00000AAA  texture 1977 32x32 texhead 000100C1 00C902C1
+    mask:022AA300  size 000002AA  texture 1978 16x16 texhead 000100C1 00C002C1
+    mask:022AFB40  size 000002AA  texture 1981 16x16 texhead 000100C1 00C002C1
+    mask:022AFE00  size 000002AA  texture 1982 16x16 texhead 000100C1 00C002C1
+  landscape object 1238 -> 257 models
+    (none)         size 00000000  model 3794 geometry
+    mask:03938040  size 00000488  model 3794 attributes(n=24)
+    mask:039384E0  size 00000AE8  model 3796 geometry
+    (none)         size 00000000  model 3796 attributes(n=0)
+    mask:03938FE0  size 00000CDC  model 3797 geometry
+    (none)         size 00000000  model 3797 attributes(n=0)
+    mask:03939CC0  size 00000D24  model 3798 geometry
+    (none)         size 00000000  model 3798 attributes(n=0)
+    mask:0393AA00  size 00000774  model 3799 geometry
+    (none)         size 00000000  model 3799 attributes(n=0)
+    mask:0393B180  size 00000D44  model 3800 geometry
+    (none)         size 00000000  model 3800 attributes(n=0)
+    mask:0393BEE0  size 00000C9C  model 3801 geometry
+    (none)         size 00000000  model 3801 attributes(n=0)
+    mask:0393CB80  size 00000CF4  model 3802 geometry
+    (none)         size 00000000  model 3802 attributes(n=0)
+    mask:0393D880  size 00000DCC  model 3803 geometry
+    (none)         size 00000000  model 3803 attributes(n=0)
+    mask:0393E660  size 00000BBC  model 3804 geometry
+    (none)         size 00000000  model 3804 attributes(n=0)
+    mask:0393F220  size 00000D8C  model 3805 geometry
+    (none)         size 00000000  model 3805 attributes(n=0)
+    mask:0393FFC0  size 00000A2C  model 3806 geometry
+    (none)         size 00000000  model 3806 attributes(n=0)
+    mask:03940A00  size 00000C08  model 3807 geometry
+    (none)         size 00000000  model 3807 attributes(n=0)
+    mask:03941620  size 000009C8  model 3808 geometry
+    (none)         size 00000000  model 3808 attributes(n=0)
+    mask:03942000  size 00000B18  model 3809 geometry
+    (none)         size 00000000  model 3809 attributes(n=0)
+    mask:03942B20  size 00001494  model 3810 geometry
+    (none)         size 00000000  model 3810 attributes(n=0)
+    mask:03943FC0  size 000016BC  model 3811 geometry
+    (none)         size 00000000  model 3811 attributes(n=0)
+    mask:03945680  size 00000E64  model 3812 geometry
+    (none)         size 00000000  model 3812 attributes(n=0)
+    mask:03946500  size 00000700  model 3813 geometry
+    (none)         size 00000000  model 3813 attributes(n=0)
+    mask:03946C00  size 000009A0  model 3814 geometry
+    (none)         size 00000000  model 3814 attributes(n=0)
+    mask:039475A0  size 00000A28  model 3815 geometry
+    (none)         size 00000000  model 3815 attributes(n=0)
+    mask:03947FE0  size 00000C20  model 3816 geometry
+    (none)         size 00000000  model 3816 attributes(n=0)
+    mask:03948C00  size 00000BC8  model 3817 geometry
+    (none)         size 00000000  model 3817 attributes(n=0)
+    mask:039497E0  size 000008B0  model 3818 geometry
+    (none)         size 00000000  model 3818 attributes(n=0)
+    mask:0394A0A0  size 00000910  model 3819 geometry
+    (none)         size 00000000  model 3819 attributes(n=0)
+    mask:0394A9C0  size 00000A28  model 3820 geometry
+    (none)         size 00000000  model 3820 attributes(n=0)
+    mask:0394B400  size 00000A40  model 3821 geometry
+    (none)         size 00000000  model 3821 attributes(n=0)
+    mask:0394BE40  size 000008E0  model 3822 geometry
+    (none)         size 00000000  model 3822 attributes(n=0)
+    mask:0394C720  size 00000884  model 3823 geometry
+    (none)         size 00000000  model 3823 attributes(n=0)
+    mask:0394CFC0  size 000005F8  model 3824 geometry
+    (none)         size 00000000  model 3824 attributes(n=0)
+    mask:0394D5C0  size 00000B00  model 3825 geometry
+    (none)         size 00000000  model 3825 attributes(n=0)
+    mask:0394E0C0  size 00000AE8  model 3826 geometry
+    (none)         size 00000000  model 3826 attributes(n=0)
+    mask:0394EBC0  size 00000AD0  model 3827 geometry
+    (none)         size 00000000  model 3827 attributes(n=0)
+    mask:0394F6A0  size 000005C8  model 3828 geometry
+    (none)         size 00000000  model 3828 attributes(n=0)
+    mask:0394FC80  size 00000958  model 3829 geometry
+    (none)         size 00000000  model 3829 attributes(n=0)
+    mask:039505E0  size 00000CDC  model 3830 geometry
+    (none)         size 00000000  model 3830 attributes(n=0)
+    mask:039512C0  size 00000C50  model 3831 geometry
+    (none)         size 00000000  model 3831 attributes(n=0)
+    mask:03951F20  size 00000A64  model 3832 geometry
+    (none)         size 00000000  model 3832 attributes(n=0)
+    mask:039529A0  size 00000C40  model 3833 geometry
+    (none)         size 00000000  model 3833 attributes(n=0)
+    mask:039535E0  size 00000D48  model 3834 geometry
+    (none)         size 00000000  model 3834 attributes(n=0)
+    mask:03954340  size 00000AC4  model 3835 geometry
+    (none)         size 00000000  model 3835 attributes(n=0)
+    mask:03954E20  size 00000D1C  model 3836 geometry
+    (none)         size 00000000  model 3836 attributes(n=0)
+    mask:03955B40  size 0000080C  model 3837 geometry
+    (none)         size 00000000  model 3837 attributes(n=0)
+    mask:03956360  size 00000870  model 3838 geometry
+    (none)         size 00000000  model 3838 attributes(n=0)
+    mask:03956BE0  size 000007F8  model 3839 geometry
+    (none)         size 00000000  model 3839 attributes(n=0)
+    mask:039573E0  size 00000930  model 3840 geometry
+    (none)         size 00000000  model 3840 attributes(n=0)
+    mask:03957D20  size 00000AF8  model 3841 geometry
+    (none)         size 00000000  model 3841 attributes(n=0)
+    mask:03958820  size 000007F8  model 3842 geometry
+    (none)         size 00000000  model 3842 attributes(n=0)
+    mask:03959020  size 00000978  model 3843 geometry
+    (none)         size 00000000  model 3843 attributes(n=0)
+    mask:039599A0  size 00000990  model 3844 geometry
+    (none)         size 00000000  model 3844 attributes(n=0)
+    mask:0395A340  size 00000BB8  model 3845 geometry
+    (none)         size 00000000  model 3845 attributes(n=0)
+    mask:0395AF00  size 00000F48  model 3846 geometry
+    (none)         size 00000000  model 3846 attributes(n=0)
+    mask:0395BE60  size 00001710  model 3847 geometry
+    (none)         size 00000000  model 3847 attributes(n=0)
+    mask:0395D580  size 00001518  model 3848 geometry
+    (none)         size 00000000  model 3848 attributes(n=0)
+    mask:0395EAA0  size 00001770  model 3849 geometry
+    (none)         size 00000000  model 3849 attributes(n=0)
+    mask:03960220  size 00001230  model 3850 geometry
+    (none)         size 00000000  model 3850 attributes(n=0)
+    mask:03961460  size 00000D80  model 3851 geometry
+    (none)         size 00000000  model 3851 attributes(n=0)
+    mask:039621E0  size 00000990  model 3852 geometry
+    (none)         size 00000000  model 3852 attributes(n=0)
+    mask:03962B80  size 000009D8  model 3853 geometry
+    (none)         size 00000000  model 3853 attributes(n=0)
+    mask:03963560  size 00001AD0  model 3854 geometry
+    (none)         size 00000000  model 3854 attributes(n=0)
+    mask:03965040  size 00003300  model 3855 geometry
+    (none)         size 00000000  model 3855 attributes(n=0)
+    mask:03968340  size 00001440  model 3856 geometry
+    (none)         size 00000000  model 3856 attributes(n=0)
+    mask:03969780  size 00001A10  model 3857 geometry
+    (none)         size 00000000  model 3857 attributes(n=0)
+    mask:0396B1A0  size 00001608  model 3858 geometry
+    (none)         size 00000000  model 3858 attributes(n=0)
+    mask:0396C7C0  size 00001260  model 3859 geometry
+    (none)         size 00000000  model 3859 attributes(n=0)
+    mask:0396DA20  size 00000EB8  model 3860 geometry
+    (none)         size 00000000  model 3860 attributes(n=0)
+    mask:0396E8E0  size 000009C0  model 3861 geometry
+    (none)         size 00000000  model 3861 attributes(n=0)
+    mask:0396F2A0  size 00000A50  model 3862 geometry
+    (none)         size 00000000  model 3862 attributes(n=0)
+    mask:0396FD00  size 000007B0  model 3863 geometry
+    (none)         size 00000000  model 3863 attributes(n=0)
+    mask:039704C0  size 00000930  model 3864 geometry
+    (none)         size 00000000  model 3864 attributes(n=0)
+    mask:03970E00  size 00000A38  model 3865 geometry
+    (none)         size 00000000  model 3865 attributes(n=0)
+    mask:03971840  size 000008A0  model 3866 geometry
+    (none)         size 00000000  model 3866 attributes(n=0)
+    mask:039720E0  size 00000768  model 3867 geometry
+    (none)         size 00000000  model 3867 attributes(n=0)
+    mask:03972860  size 00000960  model 3868 geometry
+    (none)         size 00000000  model 3868 attributes(n=0)
+    mask:039731C0  size 00000768  model 3869 geometry
+    (none)         size 00000000  model 3869 attributes(n=0)
+    mask:03973940  size 00000B40  model 3870 geometry
+    (none)         size 00000000  model 3870 attributes(n=0)
+    mask:03974480  size 00000BD0  model 3871 geometry
+    (none)         size 00000000  model 3871 attributes(n=0)
+    mask:03975060  size 000010F8  model 3872 geometry
+    (none)         size 00000000  model 3872 attributes(n=0)
+    mask:03976160  size 000015C0  model 3873 geometry
+    (none)         size 00000000  model 3873 attributes(n=0)
+    mask:03977720  size 00002790  model 3874 geometry
+    (none)         size 00000000  model 3874 attributes(n=0)
+    mask:03979EC0  size 00002BF8  model 3875 geometry
+    (none)         size 00000000  model 3875 attributes(n=0)
+    mask:0397CAC0  size 000024D8  model 3876 geometry
+    (none)         size 00000000  model 3876 attributes(n=0)
+    mask:0397EFA0  size 00000900  model 3877 geometry
+    (none)         size 00000000  model 3877 attributes(n=0)
+    mask:0397F8A0  size 00000738  model 3878 geometry
+    (none)         size 00000000  model 3878 attributes(n=0)
+    mask:0397FFE0  size 000007E0  model 3879 geometry
+    (none)         size 00000000  model 3879 attributes(n=0)
+    mask:039807C0  size 00003F18  model 3880 geometry
+    (none)         size 00000000  model 3880 attributes(n=0)
+    mask:039846E0  size 00004ED8  model 3881 geometry
+    (none)         size 00000000  model 3881 attributes(n=0)
+    mask:039895C0  size 00001710  model 3882 geometry
+    (none)         size 00000000  model 3882 attributes(n=0)
+    mask:0398ACE0  size 00001818  model 3883 geometry
+    (none)         size 00000000  model 3883 attributes(n=0)
+    mask:0398C500  size 00001788  model 3884 geometry
+    (none)         size 00000000  model 3884 attributes(n=0)
+    mask:0398DCA0  size 00000828  model 3885 geometry
+    (none)         size 00000000  model 3885 attributes(n=0)
+    mask:0398E4E0  size 00000780  model 3886 geometry
+    (none)         size 00000000  model 3886 attributes(n=0)
+    mask:0398EC60  size 000013F8  model 3887 geometry
+    (none)         size 00000000  model 3887 attributes(n=0)
+    mask:03990060  size 00002070  model 3888 geometry
+    (none)         size 00000000  model 3888 attributes(n=0)
+    mask:039920E0  size 00001B78  model 3889 geometry
+    (none)         size 00000000  model 3889 attributes(n=0)
+    mask:03993C60  size 000007C8  model 3890 geometry
+    (none)         size 00000000  model 3890 attributes(n=0)
+    mask:03994440  size 000014A0  model 3891 geometry
+    (none)         size 00000000  model 3891 attributes(n=0)
+    mask:039958E0  size 000030A8  model 3892 geometry
+    (none)         size 00000000  model 3892 attributes(n=0)
+    mask:039989A0  size 00000810  model 3893 geometry
+    (none)         size 00000000  model 3893 attributes(n=0)
+    mask:039991C0  size 000008A0  model 3894 geometry
+    (none)         size 00000000  model 3894 attributes(n=0)
+    mask:03999A60  size 00001290  model 3895 geometry
+    (none)         size 00000000  model 3895 attributes(n=0)
+    mask:0399AD00  size 00001860  model 3896 geometry
+    (none)         size 00000000  model 3896 attributes(n=0)
+    mask:0399C560  size 000016C8  model 3897 geometry
+    (none)         size 00000000  model 3897 attributes(n=0)
+    mask:0399DC40  size 000011A0  model 3898 geometry
+    (none)         size 00000000  model 3898 attributes(n=0)
+    mask:0399EDE0  size 000009C0  model 3899 geometry
+    (none)         size 00000000  model 3899 attributes(n=0)
+    mask:0399F7A0  size 000008B8  model 3900 geometry
+    (none)         size 00000000  model 3900 attributes(n=0)
+    mask:039A0060  size 00000840  model 3901 geometry
+    (none)         size 00000000  model 3901 attributes(n=0)
+    mask:039A08A0  size 00000888  model 3902 geometry
+    (none)         size 00000000  model 3902 attributes(n=0)
+    mask:039A1140  size 00000E28  model 3903 geometry
+    (none)         size 00000000  model 3903 attributes(n=0)
+    mask:039A1F80  size 00001D88  model 3904 geometry
+    (none)         size 00000000  model 3904 attributes(n=0)
+    mask:039A3D20  size 000022E0  model 3905 geometry
+    (none)         size 00000000  model 3905 attributes(n=0)
+    mask:039A6000  size 00002BB0  model 3906 geometry
+    (none)         size 00000000  model 3906 attributes(n=0)
+    mask:039A8BC0  size 00001C38  model 3907 geometry
+    (none)         size 00000000  model 3907 attributes(n=0)
+    mask:039AA800  size 00001578  model 3908 geometry
+    (none)         size 00000000  model 3908 attributes(n=0)
+    mask:039ABD80  size 00000918  model 3909 geometry
+    (none)         size 00000000  model 3909 attributes(n=0)
+    mask:039AC6A0  size 00000BA0  model 3910 geometry
+    (none)         size 00000000  model 3910 attributes(n=0)
+    mask:039AD240  size 00000990  model 3911 geometry
+    (none)         size 00000000  model 3911 attributes(n=0)
+    mask:039ADBE0  size 00000A94  model 3912 geometry
+    (none)         size 00000000  model 3912 attributes(n=0)
+    mask:039AE680  size 00000C9C  model 3913 geometry
+    (none)         size 00000000  model 3913 attributes(n=0)
+    mask:039AF320  size 00000BF8  model 3914 geometry
+    (none)         size 00000000  model 3914 attributes(n=0)
+    mask:039AFF20  size 00000BFC  model 3915 geometry
+    (none)         size 00000000  model 3915 attributes(n=0)
+    mask:039B0B20  size 00000D04  model 3916 geometry
+    (none)         size 00000000  model 3916 attributes(n=0)
+    mask:039B1840  size 00000F2C  model 3917 geometry
+    (none)         size 00000000  model 3917 attributes(n=0)
+    mask:039B2780  size 00001184  model 3918 geometry
+    (none)         size 00000000  model 3918 attributes(n=0)
+    mask:039B3920  size 00000C8C  model 3919 geometry
+    (none)         size 00000000  model 3919 attributes(n=0)
+    mask:039B45C0  size 0000074C  model 3920 geometry
+    (none)         size 00000000  model 3920 attributes(n=0)
+    mask:039B4D20  size 00000ADC  model 3921 geometry
+    (none)         size 00000000  model 3921 attributes(n=0)
+    mask:039B5800  size 00000A34  model 3922 geometry
+    (none)         size 00000000  model 3922 attributes(n=0)
+    mask:039B6240  size 00000974  model 3923 geometry
+    (none)         size 00000000  model 3923 attributes(n=0)
+    mask:039B6BC0  size 00000A34  model 3924 geometry
+    (none)         size 00000000  model 3924 attributes(n=0)
+    mask:039B7600  size 00000A7C  model 3925 geometry
+    (none)         size 00000000  model 3925 attributes(n=0)
+    mask:039B8080  size 00003704  model 3926 geometry
+    (none)         size 00000000  model 3926 attributes(n=0)
+    mask:039BB7A0  size 0000122C  model 3927 geometry
+    (none)         size 00000000  model 3927 attributes(n=0)
+    mask:039BC9E0  size 00000AC4  model 3928 geometry
+    (none)         size 00000000  model 3928 attributes(n=0)
+    mask:039BD4C0  size 000010AC  model 3929 geometry
+    (none)         size 00000000  model 3929 attributes(n=0)
+    mask:039BE580  size 0000392C  model 3930 geometry
+    (none)         size 00000000  model 3930 attributes(n=0)
+    mask:039C1EC0  size 00000974  model 3931 geometry
+    (none)         size 00000000  model 3931 attributes(n=0)
+    mask:039C2840  size 00000914  model 3932 geometry
+    (none)         size 00000000  model 3932 attributes(n=0)
+    mask:039C3160  size 000009A4  model 3933 geometry
+    (none)         size 00000000  model 3933 attributes(n=0)
+    mask:039C3B20  size 00000ADC  model 3934 geometry
+    (none)         size 00000000  model 3934 attributes(n=0)
+    mask:039C4600  size 000008B4  model 3935 geometry
+    (none)         size 00000000  model 3935 attributes(n=0)
+    mask:039C4EC0  size 0000092C  model 3936 geometry
+    (none)         size 00000000  model 3936 attributes(n=0)
+    mask:039C5800  size 00000EE0  model 3937 geometry
+    (none)         size 00000000  model 3937 attributes(n=0)
+    mask:039C66E0  size 00001120  model 3938 geometry
+    (none)         size 00000000  model 3938 attributes(n=0)
+    mask:039C7800  size 00001630  model 3939 geometry
+    (none)         size 00000000  model 3939 attributes(n=0)
+    mask:039C8E40  size 00000D34  model 3940 geometry
+    (none)         size 00000000  model 3940 attributes(n=0)
+    mask:039C9B80  size 000008D4  model 3941 geometry
+    (none)         size 00000000  model 3941 attributes(n=0)
+    mask:039CA460  size 00000694  model 3942 geometry
+    (none)         size 00000000  model 3942 attributes(n=0)
+    mask:039CAB00  size 00000754  model 3943 geometry
+    (none)         size 00000000  model 3943 attributes(n=0)
+    mask:039CB260  size 00000454  model 3944 geometry
+    (none)         size 00000000  model 3944 attributes(n=0)
+    mask:039CB6C0  size 0000073C  model 3945 geometry
+    (none)         size 00000000  model 3945 attributes(n=0)
+    mask:039CBE00  size 000003F4  model 3946 geometry
+    (none)         size 00000000  model 3946 attributes(n=0)
+    mask:039CC200  size 000006AC  model 3947 geometry
+    (none)         size 00000000  model 3947 attributes(n=0)
+    mask:039CC8C0  size 00000694  model 3948 geometry
+    (none)         size 00000000  model 3948 attributes(n=0)
+    mask:039CCF60  size 000006AC  model 3949 geometry
+    (none)         size 00000000  model 3949 attributes(n=0)
+    mask:039CD620  size 00000694  model 3950 geometry
+    (none)         size 00000000  model 3950 attributes(n=0)
+    mask:039CDCC0  size 00000754  model 3951 geometry
+    (none)         size 00000000  model 3951 attributes(n=0)
+    mask:039CE420  size 00000424  model 3952 geometry
+    (none)         size 00000000  model 3952 attributes(n=0)
+    mask:039CE860  size 00000724  model 3953 geometry
+    (none)         size 00000000  model 3953 attributes(n=0)
+    mask:039CEFA0  size 000006AC  model 3954 geometry
+    (none)         size 00000000  model 3954 attributes(n=0)
+    mask:039CF660  size 00000694  model 3955 geometry
+    (none)         size 00000000  model 3955 attributes(n=0)
+    mask:039CFD00  size 000006AC  model 3956 geometry
+    (none)         size 00000000  model 3956 attributes(n=0)
+    mask:039D03C0  size 00000694  model 3957 geometry
+    (none)         size 00000000  model 3957 attributes(n=0)
+    mask:039D0A60  size 00000754  model 3958 geometry
+    (none)         size 00000000  model 3958 attributes(n=0)
+    mask:039D11C0  size 000003F4  model 3959 geometry
+    (none)         size 00000000  model 3959 attributes(n=0)
+    mask:039D15C0  size 00000754  model 3960 geometry
+    (none)         size 00000000  model 3960 attributes(n=0)
+    mask:039D1D20  size 000006AC  model 3961 geometry
+    (none)         size 00000000  model 3961 attributes(n=0)
+    mask:039D23E0  size 00000694  model 3962 geometry
+    (none)         size 00000000  model 3962 attributes(n=0)
+    mask:039D2A80  size 000006AC  model 3963 geometry
+    (none)         size 00000000  model 3963 attributes(n=0)
+    mask:039D3140  size 00000694  model 3964 geometry
+    (none)         size 00000000  model 3964 attributes(n=0)
+    mask:039D37E0  size 000006AC  model 3965 geometry
+    (none)         size 00000000  model 3965 attributes(n=0)
+    mask:039D3EA0  size 00000694  model 3966 geometry
+    (none)         size 00000000  model 3966 attributes(n=0)
+    mask:039D4540  size 00000754  model 3967 geometry
+    (none)         size 00000000  model 3967 attributes(n=0)
+    mask:039D4CA0  size 000003F4  model 3968 geometry
+    (none)         size 00000000  model 3968 attributes(n=0)
+    mask:039D50A0  size 00000754  model 3969 geometry
+    (none)         size 00000000  model 3969 attributes(n=0)
+    mask:039D5800  size 000006AC  model 3970 geometry
+    (none)         size 00000000  model 3970 attributes(n=0)
+    mask:039D5EC0  size 00000694  model 3971 geometry
+    (none)         size 00000000  model 3971 attributes(n=0)
+    mask:039D6560  size 000006AC  model 3972 geometry
+    (none)         size 00000000  model 3972 attributes(n=0)
+    mask:039D6C20  size 00000A24  model 3973 geometry
+    (none)         size 00000000  model 3973 attributes(n=0)
+    mask:039D7660  size 000003F4  model 3974 geometry
+    (none)         size 00000000  model 3974 attributes(n=0)
+    mask:039D7A60  size 000006AC  model 3975 geometry
+    (none)         size 00000000  model 3975 attributes(n=0)
+    mask:039D8120  size 00000780  model 3976 geometry
+    (none)         size 00000000  model 3976 attributes(n=0)
+    mask:039D88A0  size 000005D0  model 3977 geometry
+    (none)         size 00000000  model 3977 attributes(n=0)
+    mask:039D8E80  size 00000750  model 3978 geometry
+    (none)         size 00000000  model 3978 attributes(n=0)
+    mask:039D95E0  size 000009A8  model 3979 geometry
+    (none)         size 00000000  model 3979 attributes(n=0)
+    mask:039D9FA0  size 00000E98  model 3980 geometry
+    (none)         size 00000000  model 3980 attributes(n=0)
+    mask:039DAE40  size 00000948  model 3981 geometry
+    (none)         size 00000000  model 3981 attributes(n=0)
+    mask:039DB7A0  size 000008E8  model 3982 geometry
+    (none)         size 00000000  model 3982 attributes(n=0)
+    mask:039DC0A0  size 000014E0  model 3983 geometry
+    (none)         size 00000000  model 3983 attributes(n=0)
+    mask:039DD580  size 000030B8  model 3984 geometry
+    (none)         size 00000000  model 3984 attributes(n=0)
+    mask:039E0640  size 00001D24  model 3985 geometry
+    (none)         size 00000000  model 3985 attributes(n=0)
+    mask:039E2380  size 000010C4  model 3986 geometry
+    (none)         size 00000000  model 3986 attributes(n=0)
+    mask:039E3460  size 000017C8  model 3987 geometry
+    (none)         size 00000000  model 3987 attributes(n=0)
+    mask:039E4C40  size 00001AB0  model 3988 geometry
+    (none)         size 00000000  model 3988 attributes(n=0)
+    mask:039E6700  size 000010D8  model 3989 geometry
+    (none)         size 00000000  model 3989 attributes(n=0)
+    mask:039E77E0  size 00002050  model 3990 geometry
+    (none)         size 00000000  model 3990 attributes(n=0)
+    mask:039E9840  size 00000E3C  model 3991 geometry
+    (none)         size 00000000  model 3991 attributes(n=0)
+    mask:039EA680  size 00000E98  model 3992 geometry
+    (none)         size 00000000  model 3992 attributes(n=0)
+    mask:039EB520  size 00001A38  model 3993 geometry
+    (none)         size 00000000  model 3993 attributes(n=0)
+    mask:039ECF60  size 00000840  model 3994 geometry
+    (none)         size 00000000  model 3994 attributes(n=0)
+    mask:039ED7A0  size 000011E4  model 3995 geometry
+    (none)         size 00000000  model 3995 attributes(n=0)
+    mask:039EE9A0  size 000033D0  model 3996 geometry
+    (none)         size 00000000  model 3996 attributes(n=0)
+    mask:039F1D80  size 00001BD0  model 3997 geometry
+    (none)         size 00000000  model 3997 attributes(n=0)
+    mask:039F3960  size 00001ED4  model 3998 geometry
+    (none)         size 00000000  model 3998 attributes(n=0)
+    mask:039F5840  size 00001DF8  model 3999 geometry
+    (none)         size 00000000  model 3999 attributes(n=0)
+    mask:039F7640  size 00000E50  model 4000 geometry
+    (none)         size 00000000  model 4000 attributes(n=0)
+    mask:039F84A0  size 00001978  model 4001 geometry
+    (none)         size 00000000  model 4001 attributes(n=0)
+    mask:039F9E20  size 00001D50  model 4002 geometry
+    (none)         size 00000000  model 4002 attributes(n=0)
+    mask:039FBB80  size 00002008  model 4003 geometry
+    (none)         size 00000000  model 4003 attributes(n=0)
+    mask:039FDBA0  size 00000DC4  model 4004 geometry
+    (none)         size 00000000  model 4004 attributes(n=0)
+    mask:039FE980  size 00000C44  model 4005 geometry
+    (none)         size 00000000  model 4005 attributes(n=0)
+    mask:039FF5E0  size 00000A94  model 4006 geometry
+    (none)         size 00000000  model 4006 attributes(n=0)
+    mask:03A00080  size 00000C14  model 4007 geometry
+    (none)         size 00000000  model 4007 attributes(n=0)
+    mask:03A00CA0  size 000013AC  model 4008 geometry
+    (none)         size 00000000  model 4008 attributes(n=0)
+    mask:03A02060  size 00000720  model 4009 geometry
+    (none)         size 00000000  model 4009 attributes(n=0)
+    mask:03A02780  size 00000798  model 4010 geometry
+    (none)         size 00000000  model 4010 attributes(n=0)
+    mask:03A02F20  size 00000768  model 4011 geometry
+    (none)         size 00000000  model 4011 attributes(n=0)
+    mask:03A036A0  size 000006A8  model 4012 geometry
+    (none)         size 00000000  model 4012 attributes(n=0)
+    mask:03A03D60  size 000015D4  model 4013 geometry
+    (none)         size 00000000  model 4013 attributes(n=0)
+    mask:03A05340  size 00000E54  model 4014 geometry
+    (none)         size 00000000  model 4014 attributes(n=0)
+    mask:03A061A0  size 00000768  model 4015 geometry
+    (none)         size 00000000  model 4015 attributes(n=0)
+    mask:03A06920  size 000007C8  model 4016 geometry
+    (none)         size 00000000  model 4016 attributes(n=0)
+    mask:03A07100  size 00000840  model 4017 geometry
+    (none)         size 00000000  model 4017 attributes(n=0)
+    mask:03A07940  size 000007C8  model 4018 geometry
+    (none)         size 00000000  model 4018 attributes(n=0)
+    mask:03A08120  size 00000644  model 4019 geometry
+    (none)         size 00000000  model 4019 attributes(n=0)
+    mask:03A08780  size 00000C74  model 4020 geometry
+    (none)         size 00000000  model 4020 attributes(n=0)
+    mask:03A09400  size 00000C2C  model 4021 geometry
+    (none)         size 00000000  model 4021 attributes(n=0)
+    mask:03A0A040  size 00000AEC  model 4022 geometry
+    (none)         size 00000000  model 4022 attributes(n=0)
+    mask:03A0AB40  size 00000B08  model 4023 geometry
+    (none)         size 00000000  model 4023 attributes(n=0)
+    mask:03A0B660  size 00000C0C  model 4024 geometry
+    (none)         size 00000000  model 4024 attributes(n=0)
+    mask:03A0C280  size 00000F3C  model 4025 geometry
+    (none)         size 00000000  model 4025 attributes(n=0)
+    mask:03A0D1C0  size 00001460  model 4026 geometry
+    (none)         size 00000000  model 4026 attributes(n=0)
+    mask:03A0E620  size 000012CC  model 4027 geometry
+    (none)         size 00000000  model 4027 attributes(n=0)
+    mask:03A0F900  size 00000BF4  model 4028 geometry
+    (none)         size 00000000  model 4028 attributes(n=0)
+    mask:03A10500  size 00000D58  model 4029 geometry
+    (none)         size 00000000  model 4029 attributes(n=0)
+    mask:03A11260  size 00000C94  model 4030 geometry
+    (none)         size 00000000  model 4030 attributes(n=0)
+    mask:03A11F00  size 00000A48  model 4031 geometry
+    (none)         size 00000000  model 4031 attributes(n=0)
+    mask:03A12960  size 000009F8  model 4032 geometry
+    (none)         size 00000000  model 4032 attributes(n=0)
+    mask:03A13360  size 00000E5C  model 4033 geometry
+    (none)         size 00000000  model 4033 attributes(n=0)
+    mask:03A141C0  size 00000BF4  model 4034 geometry
+    (none)         size 00000000  model 4034 attributes(n=0)
+    mask:03A14DC0  size 00000B04  model 4035 geometry
+    (none)         size 00000000  model 4035 attributes(n=0)
+    mask:03A158E0  size 00000D54  model 4036 geometry
+    (none)         size 00000000  model 4036 attributes(n=0)
+    mask:03A16640  size 00000E44  model 4037 geometry
+    (none)         size 00000000  model 4037 attributes(n=0)
+    mask:03A174A0  size 00000EC4  model 4038 geometry
+    (none)         size 00000000  model 4038 attributes(n=0)
+    mask:03A18380  size 00000640  model 4039 geometry
+    (none)         size 00000000  model 4039 attributes(n=0)
+    mask:03A189C0  size 00000C84  model 4040 geometry
+    (none)         size 00000000  model 4040 attributes(n=0)
+    mask:03A19660  size 00000C54  model 4041 geometry
+    (none)         size 00000000  model 4041 attributes(n=0)
+    mask:03A1A2C0  size 00000B7C  model 4042 geometry
+    (none)         size 00000000  model 4042 attributes(n=0)
+    mask:03A1AE40  size 00000B34  model 4043 geometry
+    (none)         size 00000000  model 4043 attributes(n=0)
+    mask:03A1B980  size 00000A8C  model 4044 geometry
+    (none)         size 00000000  model 4044 attributes(n=0)
+    mask:03A1C420  size 00000C64  model 4045 geometry
+    (none)         size 00000000  model 4045 attributes(n=0)
+    mask:03A1D0A0  size 00000B8C  model 4046 geometry
+    (none)         size 00000000  model 4046 attributes(n=0)
+    mask:03A1DC40  size 00000BF4  model 4047 geometry
+    (none)         size 00000000  model 4047 attributes(n=0)
+    mask:03A1E840  size 00000964  model 4048 geometry
+    (none)         size 00000000  model 4048 attributes(n=0)
+    mask:03A1F1C0  size 00000D84  model 4049 geometry
+    (none)         size 00000000  model 4049 attributes(n=0)
+    mask:03A1FF60  size 00000B34  model 4050 geometry
+    (none)         size 00000000  model 4050 attributes(n=0)
+    mask:03A20AA0  size 000009E4  model 4051 geometry
+    (none)         size 00000000  model 4051 attributes(n=0)
+  landscape object 1239 -> 1 models
+    mask:03A214A0  size 000055D4  model 4052 geometry
+    mask:03A26A80  size 00000068  model 4052 attributes(n=2)
+
+## course 1  ETTI4
+  landscape 1: texset E0, objects E120,-1,-1,-1 / E121, sky-ish table idx 2, floats (1800.0, 1900.0), 32, callbacks 0C1466F0 0C14738A 0C14783C
+  collision 1:
+    eprom:00C80000 size 00131080  collision (root struct at eprom:00DB105C)
+  STAT 1: RAM struct @0C3E4AA8
+  music stream 6:
+    mask:067449C0  size 00451340  stream
+  landscape textures (texset E0 list A):
+    eprom:0059C800 size 000AAAAA  texture E174 512x512 texhead 000100C1 00ED02C1
+    eprom:00571D40 size 0002AAAA  texture E173 256x256 texhead 000100C1 04E402C1
+    eprom:006472C0 size 0002AAAA  texture E175 256x256 texhead 000100C1 00E402C1
+    eprom:004CC6C0 size 00015554  texture E154 256x128 texhead 000100C1 00DC42C1
+    eprom:004FC720 size 00015554  texture E160 256x128 texhead 000100C1 00DC42C1
+    eprom:00511C80 size 00015554  texture E161 256x128 texhead 000100C1 00DC42C1
+    eprom:00534780 size 00015554  texture E167 256x128 texhead 000100C1 00DC02C1
+    eprom:0068F320 size 00015554  texture E180 256x128 texhead 000100C1 00DC02C1
+    eprom:006A4880 size 00015554  texture E181 256x128 texhead 000100C1 00DC02C1
+    eprom:004E1C20 size 0000AAAA  texture E155 128x128 texhead 000100C1 00DB02C1
+    eprom:004EF1A0 size 0000AAAA  texture E157 128x128 texhead 000100C1 00DB02C1
+    eprom:00551D00 size 0000AAAA  texture E170 128x128 texhead 000100C1 00DB02C1
+    eprom:0055C7C0 size 0000AAAA  texture E171 128x128 texhead 000100C1 00DB02C1
+    eprom:00567280 size 0000AAAA  texture E172 128x128 texhead 000100C1 00DB02C1
+    eprom:00674840 size 0000AAAA  texture E177 128x128 texhead 000100C1 00DB02C1
+    eprom:00684860 size 0000AAAA  texture E179 128x128 texhead 000100C1 00DB02C1
+    eprom:00529CA0 size 00005554  texture E164 128x64 texhead 000100C1 00D302C1
+    eprom:0054C7A0 size 00005554  texture E169 128x64 texhead 000100C1 00D302C1
+    eprom:0067F300 size 00005554  texture E178 128x64 texhead 000100C1 00D302C1
+    eprom:0052F200 size 00002AAA  texture E165 64x64 texhead 000100C1 00D202C1
+    eprom:00531CC0 size 00002AAA  texture E166 64x64 texhead 000100C1 00D202C1
+    eprom:00549CE0 size 00002AAA  texture E168 64x64 texhead 000100C1 00D202C1
+    eprom:00671D80 size 00002AAA  texture E176 64x64 texhead 000100C1 00D242C1
+    eprom:004EC6E0 size 00002AA8  texture E156 128x32 texhead 000100C1 00CB02C1
+    eprom:004F9C60 size 00001554  texture E158 64x32 texhead 000100C1 00CA02C1
+    eprom:004FB1C0 size 00001554  texture E159 64x32 texhead 000100C1 00CA02C1
+    eprom:005271E0 size 00001554  texture E162 64x32 texhead 000100C1 00CA02C1
+    eprom:00528740 size 00001554  texture E163 64x32 texhead 000100C1 00CA02C1
+    eprom:006B9DE0 size 00000AAA  texture E182 32x32 texhead 000100C1 00C902C1
+  landscape object E120 -> 183 models
+    (none)         size 00000000  model E416 geometry
+    eprom:009908C0 size 00000A58  model E416 attributes(n=55)
+    eprom:00991320 size 000000C8  model E418 geometry
+    (none)         size 00000000  model E418 attributes(n=0)
+    eprom:00991400 size 000000F8  model E419 geometry
+    (none)         size 00000000  model E419 attributes(n=0)
+    eprom:00991500 size 000000F8  model E420 geometry
+    (none)         size 00000000  model E420 attributes(n=0)
+    eprom:00991600 size 000000C8  model E421 geometry
+    (none)         size 00000000  model E421 attributes(n=0)
+    eprom:009916E0 size 000000F8  model E422 geometry
+    (none)         size 00000000  model E422 attributes(n=0)
+    eprom:009917E0 size 000000F8  model E423 geometry
+    (none)         size 00000000  model E423 attributes(n=0)
+    eprom:009918E0 size 000000F8  model E424 geometry
+    (none)         size 00000000  model E424 attributes(n=0)
+    eprom:009919E0 size 000000C8  model E425 geometry
+    (none)         size 00000000  model E425 attributes(n=0)
+    eprom:00991AC0 size 000000F8  model E426 geometry
+    (none)         size 00000000  model E426 attributes(n=0)
+    eprom:00991BC0 size 000000F8  model E427 geometry
+    (none)         size 00000000  model E427 attributes(n=0)
+    eprom:00991CC0 size 000000C8  model E428 geometry
+    (none)         size 00000000  model E428 attributes(n=0)
+    eprom:00991DA0 size 000000F8  model E429 geometry
+    (none)         size 00000000  model E429 attributes(n=0)
+    eprom:00991EA0 size 000000F8  model E430 geometry
+    (none)         size 00000000  model E430 attributes(n=0)
+    eprom:00991FA0 size 000000F8  model E432 geometry
+    (none)         size 00000000  model E432 attributes(n=0)
+    eprom:009920A0 size 000000B0  model E433 geometry
+    (none)         size 00000000  model E433 attributes(n=0)
+    eprom:00992160 size 000000F8  model E434 geometry
+    (none)         size 00000000  model E434 attributes(n=0)
+    eprom:00992260 size 00000394  model E435 geometry
+    (none)         size 00000000  model E435 attributes(n=0)
+    eprom:00992600 size 000005A0  model E436 geometry
+    (none)         size 00000000  model E436 attributes(n=0)
+    eprom:00992BA0 size 000005B8  model E437 geometry
+    (none)         size 00000000  model E437 attributes(n=0)
+    eprom:00993160 size 000003F0  model E438 geometry
+    (none)         size 00000000  model E438 attributes(n=0)
+    eprom:00993560 size 00000330  model E439 geometry
+    (none)         size 00000000  model E439 attributes(n=0)
+    eprom:009938A0 size 000000B0  model E440 geometry
+    (none)         size 00000000  model E440 attributes(n=0)
+    eprom:00993960 size 000000F8  model E441 geometry
+    (none)         size 00000000  model E441 attributes(n=0)
+    eprom:00993A60 size 000000F8  model E442 geometry
+    (none)         size 00000000  model E442 attributes(n=0)
+    eprom:00993B60 size 000000B0  model E443 geometry
+    (none)         size 00000000  model E443 attributes(n=0)
+    eprom:00993C20 size 000000F8  model E444 geometry
+    (none)         size 00000000  model E444 attributes(n=0)
+    eprom:00993D20 size 00000110  model E446 geometry
+    (none)         size 00000000  model E446 attributes(n=0)
+    eprom:00993E40 size 000000F8  model E447 geometry
+    (none)         size 00000000  model E447 attributes(n=0)
+    eprom:00993F40 size 00000244  model E448 geometry
+    (none)         size 00000000  model E448 attributes(n=0)
+    eprom:009941A0 size 00000484  model E449 geometry
+    (none)         size 00000000  model E449 attributes(n=0)
+    eprom:00994640 size 0000086C  model E450 geometry
+    (none)         size 00000000  model E450 attributes(n=0)
+    eprom:00994EC0 size 00001320  model E451 geometry
+    (none)         size 00000000  model E451 attributes(n=0)
+    eprom:009961E0 size 00000F00  model E452 geometry
+    (none)         size 00000000  model E452 attributes(n=0)
+    eprom:009970E0 size 0000086C  model E453 geometry
+    (none)         size 00000000  model E453 attributes(n=0)
+    eprom:00997960 size 000008CC  model E454 geometry
+    (none)         size 00000000  model E454 attributes(n=0)
+    eprom:00998240 size 00000630  model E455 geometry
+    (none)         size 00000000  model E455 attributes(n=0)
+    eprom:00998880 size 00000110  model E456 geometry
+    (none)         size 00000000  model E456 attributes(n=0)
+    eprom:009989A0 size 000000F8  model E457 geometry
+    (none)         size 00000000  model E457 attributes(n=0)
+    eprom:00998AA0 size 00000128  model E458 geometry
+    (none)         size 00000000  model E458 attributes(n=0)
+    eprom:00998BE0 size 0000019C  model E460 geometry
+    (none)         size 00000000  model E460 attributes(n=0)
+    eprom:00998D80 size 000001E4  model E461 geometry
+    (none)         size 00000000  model E461 attributes(n=0)
+    eprom:00998F80 size 00000330  model E462 geometry
+    (none)         size 00000000  model E462 attributes(n=0)
+    eprom:009992C0 size 0000095C  model E463 geometry
+    (none)         size 00000000  model E463 attributes(n=0)
+    eprom:00999C20 size 00002F0C  model E464 geometry
+    (none)         size 00000000  model E464 attributes(n=0)
+    eprom:0099CB40 size 00003E68  model E465 geometry
+    (none)         size 00000000  model E465 attributes(n=0)
+    eprom:009A09C0 size 00003D24  model E466 geometry
+    (none)         size 00000000  model E466 attributes(n=0)
+    eprom:009A4700 size 00004A38  model E467 geometry
+    (none)         size 00000000  model E467 attributes(n=0)
+    eprom:009A9140 size 00003C94  model E468 geometry
+    (none)         size 00000000  model E468 attributes(n=0)
+    eprom:009ACDE0 size 00001210  model E469 geometry
+    (none)         size 00000000  model E469 attributes(n=0)
+    eprom:009AE000 size 00000AF8  model E470 geometry
+    (none)         size 00000000  model E470 attributes(n=0)
+    eprom:009AEB00 size 00000318  model E471 geometry
+    (none)         size 00000000  model E471 attributes(n=0)
+    eprom:009AEE20 size 00000128  model E472 geometry
+    (none)         size 00000000  model E472 attributes(n=0)
+    eprom:009AEF60 size 0000016C  model E474 geometry
+    (none)         size 00000000  model E474 attributes(n=0)
+    eprom:009AF0E0 size 000007E0  model E475 geometry
+    (none)         size 00000000  model E475 attributes(n=0)
+    eprom:009AF8C0 size 00000948  model E476 geometry
+    (none)         size 00000000  model E476 attributes(n=0)
+    eprom:009B0220 size 00001558  model E477 geometry
+    (none)         size 00000000  model E477 attributes(n=0)
+    eprom:009B1780 size 00003AF8  model E478 geometry
+    (none)         size 00000000  model E478 attributes(n=0)
+    eprom:009B5280 size 00000EF4  model E479 geometry
+    (none)         size 00000000  model E479 attributes(n=0)
+    eprom:009B6180 size 000035FC  model E480 geometry
+    (none)         size 00000000  model E480 attributes(n=0)
+    eprom:009B9780 size 00000A4C  model E481 geometry
+    (none)         size 00000000  model E481 attributes(n=0)
+    eprom:009BA1E0 size 000017E0  model E482 geometry
+    (none)         size 00000000  model E482 attributes(n=0)
+    eprom:009BB9C0 size 00002C08  model E483 geometry
+    (none)         size 00000000  model E483 attributes(n=0)
+    eprom:009BE5E0 size 00002EA0  model E484 geometry
+    (none)         size 00000000  model E484 attributes(n=0)
+    eprom:009C1480 size 000005E8  model E485 geometry
+    (none)         size 00000000  model E485 attributes(n=0)
+    eprom:009C1A80 size 000000F8  model E486 geometry
+    (none)         size 00000000  model E486 attributes(n=0)
+    eprom:009C1B80 size 00000364  model E488 geometry
+    (none)         size 00000000  model E488 attributes(n=0)
+    eprom:009C1F00 size 00000960  model E489 geometry
+    (none)         size 00000000  model E489 attributes(n=0)
+    eprom:009C2860 size 00000CEC  model E490 geometry
+    (none)         size 00000000  model E490 attributes(n=0)
+    eprom:009C3560 size 00002794  model E491 geometry
+    (none)         size 00000000  model E491 attributes(n=0)
+    eprom:009C5D00 size 000018DC  model E492 geometry
+    (none)         size 00000000  model E492 attributes(n=0)
+    eprom:009C75E0 size 00006754  model E493 geometry
+    (none)         size 00000000  model E493 attributes(n=0)
+    eprom:009CDD40 size 00007954  model E494 geometry
+    (none)         size 00000000  model E494 attributes(n=0)
+    eprom:009D56A0 size 00004A44  model E495 geometry
+    (none)         size 00000000  model E495 attributes(n=0)
+    eprom:009DA100 size 0000016C  model E496 geometry
+    (none)         size 00000000  model E496 attributes(n=0)
+    eprom:009DA280 size 00000918  model E497 geometry
+    (none)         size 00000000  model E497 attributes(n=0)
+    eprom:009DABA0 size 00002DCC  model E498 geometry
+    (none)         size 00000000  model E498 attributes(n=0)
+    eprom:009DD980 size 000007C8  model E499 geometry
+    (none)         size 00000000  model E499 attributes(n=0)
+    eprom:009DE160 size 000000F8  model E500 geometry
+    (none)         size 00000000  model E500 attributes(n=0)
+    eprom:009DE260 size 00000480  model E502 geometry
+    (none)         size 00000000  model E502 attributes(n=0)
+    eprom:009DE6E0 size 00000DC4  model E503 geometry
+    (none)         size 00000000  model E503 attributes(n=0)
+    eprom:009DF4C0 size 00002CD8  model E504 geometry
+    (none)         size 00000000  model E504 attributes(n=0)
+    eprom:009E21A0 size 0000265C  model E505 geometry
+    (none)         size 00000000  model E505 attributes(n=0)
+    eprom:009E4800 size 00000B20  model E506 geometry
+    (none)         size 00000000  model E506 attributes(n=0)
+    eprom:009E5320 size 00002194  model E507 geometry
+    (none)         size 00000000  model E507 attributes(n=0)
+    eprom:009E74C0 size 000074A8  model E508 geometry
+    (none)         size 00000000  model E508 attributes(n=0)
+    eprom:009EE980 size 00004F9C  model E509 geometry
+    (none)         size 00000000  model E509 attributes(n=0)
+    eprom:009F3920 size 000019D0  model E510 geometry
+    (none)         size 00000000  model E510 attributes(n=0)
+    eprom:009F5300 size 00001FF8  model E511 geometry
+    (none)         size 00000000  model E511 attributes(n=0)
+    eprom:009F7300 size 000033D4  model E512 geometry
+    (none)         size 00000000  model E512 attributes(n=0)
+    eprom:009FA6E0 size 00000570  model E513 geometry
+    (none)         size 00000000  model E513 attributes(n=0)
+    eprom:009FAC60 size 00000128  model E514 geometry
+    (none)         size 00000000  model E514 attributes(n=0)
+    eprom:009FADA0 size 000007E0  model E516 geometry
+    (none)         size 00000000  model E516 attributes(n=0)
+    eprom:009FB580 size 000020C0  model E517 geometry
+    (none)         size 00000000  model E517 attributes(n=0)
+    eprom:009FD640 size 00001C60  model E518 geometry
+    (none)         size 00000000  model E518 attributes(n=0)
+    eprom:009FF2A0 size 0000053C  model E519 geometry
+    (none)         size 00000000  model E519 attributes(n=0)
+    eprom:009FF7E0 size 00000AAC  model E520 geometry
+    (none)         size 00000000  model E520 attributes(n=0)
+    eprom:00A002A0 size 000001E4  model E521 geometry
+    (none)         size 00000000  model E521 attributes(n=0)
+    eprom:00A004A0 size 000001E4  model E522 geometry
+    (none)         size 00000000  model E522 attributes(n=0)
+    eprom:00A006A0 size 00003500  model E523 geometry
+    (none)         size 00000000  model E523 attributes(n=0)
+    eprom:00A03BA0 size 00008FF8  model E524 geometry
+    (none)         size 00000000  model E524 attributes(n=0)
+    eprom:00A0CBA0 size 0000458C  model E525 geometry
+    (none)         size 00000000  model E525 attributes(n=0)
+    eprom:00A11140 size 00000750  model E526 geometry
+    (none)         size 00000000  model E526 attributes(n=0)
+    eprom:00A118A0 size 000001E4  model E527 geometry
+    (none)         size 00000000  model E527 attributes(n=0)
+    eprom:00A11AA0 size 000000F8  model E528 geometry
+    (none)         size 00000000  model E528 attributes(n=0)
+    eprom:00A11BA0 size 00000660  model E530 geometry
+    (none)         size 00000000  model E530 attributes(n=0)
+    eprom:00A12200 size 00001AC0  model E531 geometry
+    (none)         size 00000000  model E531 attributes(n=0)
+    eprom:00A13CC0 size 00002848  model E532 geometry
+    (none)         size 00000000  model E532 attributes(n=0)
+    eprom:00A16520 size 00000B50  model E533 geometry
+    (none)         size 00000000  model E533 attributes(n=0)
+    eprom:00A17080 size 00000880  model E534 geometry
+    (none)         size 00000000  model E534 attributes(n=0)
+    eprom:00A17900 size 000001FC  model E535 geometry
+    (none)         size 00000000  model E535 attributes(n=0)
+    eprom:00A17B00 size 00001B28  model E536 geometry
+    (none)         size 00000000  model E536 attributes(n=0)
+    eprom:00A19640 size 00001CE0  model E537 geometry
+    (none)         size 00000000  model E537 attributes(n=0)
+    eprom:00A1B320 size 00004C7C  model E538 geometry
+    (none)         size 00000000  model E538 attributes(n=0)
+    eprom:00A1FFA0 size 000001FC  model E539 geometry
+    (none)         size 00000000  model E539 attributes(n=0)
+    eprom:00A201A0 size 000001E4  model E540 geometry
+    (none)         size 00000000  model E540 attributes(n=0)
+    eprom:00A203A0 size 0000016C  model E541 geometry
+    (none)         size 00000000  model E541 attributes(n=0)
+    eprom:00A20520 size 000000F8  model E542 geometry
+    (none)         size 00000000  model E542 attributes(n=0)
+    eprom:00A20620 size 000006DC  model E544 geometry
+    (none)         size 00000000  model E544 attributes(n=0)
+    eprom:00A20D00 size 00000DF4  model E545 geometry
+    (none)         size 00000000  model E545 attributes(n=0)
+    eprom:00A21B00 size 000026F0  model E546 geometry
+    (none)         size 00000000  model E546 attributes(n=0)
+    eprom:00A24200 size 00006BE4  model E547 geometry
+    (none)         size 00000000  model E547 attributes(n=0)
+    eprom:00A2AE00 size 00009618  model E548 geometry
+    (none)         size 00000000  model E548 attributes(n=0)
+    eprom:00A34420 size 000103C0  model E549 geometry
+    (none)         size 00000000  model E549 attributes(n=0)
+    eprom:00A447E0 size 000041D4  model E550 geometry
+    (none)         size 00000000  model E550 attributes(n=0)
+    eprom:00A489C0 size 00002F98  model E551 geometry
+    (none)         size 00000000  model E551 attributes(n=0)
+    eprom:00A4B960 size 00001498  model E552 geometry
+    (none)         size 00000000  model E552 attributes(n=0)
+    eprom:00A4CE00 size 00000244  model E553 geometry
+    (none)         size 00000000  model E553 attributes(n=0)
+    eprom:00A4D060 size 000001FC  model E554 geometry
+    (none)         size 00000000  model E554 attributes(n=0)
+    eprom:00A4D260 size 000001E4  model E555 geometry
+    (none)         size 00000000  model E555 attributes(n=0)
+    eprom:00A4D460 size 00000128  model E556 geometry
+    (none)         size 00000000  model E556 attributes(n=0)
+    eprom:00A4D5A0 size 0000040C  model E558 geometry
+    (none)         size 00000000  model E558 attributes(n=0)
+    eprom:00A4D9C0 size 00000B44  model E559 geometry
+    (none)         size 00000000  model E559 attributes(n=0)
+    eprom:00A4E520 size 00000C78  model E560 geometry
+    (none)         size 00000000  model E560 attributes(n=0)
+    eprom:00A4F1A0 size 000009EC  model E561 geometry
+    (none)         size 00000000  model E561 attributes(n=0)
+    eprom:00A4FBA0 size 000001E4  model E562 geometry
+    (none)         size 00000000  model E562 attributes(n=0)
+    eprom:00A4FDA0 size 00000AD8  model E563 geometry
+    (none)         size 00000000  model E563 attributes(n=0)
+    eprom:00A50880 size 000006E0  model E564 geometry
+    (none)         size 00000000  model E564 attributes(n=0)
+    eprom:00A50F60 size 000001FC  model E565 geometry
+    (none)         size 00000000  model E565 attributes(n=0)
+    eprom:00A51160 size 000001E4  model E566 geometry
+    (none)         size 00000000  model E566 attributes(n=0)
+    eprom:00A51360 size 00000244  model E567 geometry
+    (none)         size 00000000  model E567 attributes(n=0)
+    eprom:00A515C0 size 000001FC  model E568 geometry
+    (none)         size 00000000  model E568 attributes(n=0)
+    eprom:00A517C0 size 000001E4  model E569 geometry
+    (none)         size 00000000  model E569 attributes(n=0)
+    eprom:00A519C0 size 00000128  model E570 geometry
+    (none)         size 00000000  model E570 attributes(n=0)
+    eprom:00A51B00 size 000000C8  model E572 geometry
+    (none)         size 00000000  model E572 attributes(n=0)
+    eprom:00A51BE0 size 00000754  model E573 geometry
+    (none)         size 00000000  model E573 attributes(n=0)
+    eprom:00A52340 size 00000CA4  model E574 geometry
+    (none)         size 00000000  model E574 attributes(n=0)
+    eprom:00A53000 size 00000344  model E575 geometry
+    (none)         size 00000000  model E575 attributes(n=0)
+    eprom:00A53360 size 00000184  model E576 geometry
+    (none)         size 00000000  model E576 attributes(n=0)
+    eprom:00A53500 size 000001B4  model E577 geometry
+    (none)         size 00000000  model E577 attributes(n=0)
+    eprom:00A536C0 size 000001B4  model E578 geometry
+    (none)         size 00000000  model E578 attributes(n=0)
+    eprom:00A53880 size 0000016C  model E579 geometry
+    (none)         size 00000000  model E579 attributes(n=0)
+    eprom:00A53A00 size 00000184  model E580 geometry
+    (none)         size 00000000  model E580 attributes(n=0)
+    eprom:00A53BA0 size 000001B4  model E581 geometry
+    (none)         size 00000000  model E581 attributes(n=0)
+    eprom:00A53D60 size 0000016C  model E582 geometry
+    (none)         size 00000000  model E582 attributes(n=0)
+    eprom:00A53EE0 size 00000184  model E583 geometry
+    (none)         size 00000000  model E583 attributes(n=0)
+    eprom:00A54080 size 000000F8  model E584 geometry
+    (none)         size 00000000  model E584 attributes(n=0)
+    eprom:00A54180 size 000000F8  model E586 geometry
+    (none)         size 00000000  model E586 attributes(n=0)
+    eprom:00A54280 size 00000570  model E587 geometry
+    (none)         size 00000000  model E587 attributes(n=0)
+    eprom:00A54800 size 000003C0  model E588 geometry
+    (none)         size 00000000  model E588 attributes(n=0)
+    eprom:00A54BC0 size 000000F8  model E589 geometry
+    (none)         size 00000000  model E589 attributes(n=0)
+    eprom:00A54CC0 size 000000B0  model E590 geometry
+    (none)         size 00000000  model E590 attributes(n=0)
+    eprom:00A54D80 size 000000F8  model E591 geometry
+    (none)         size 00000000  model E591 attributes(n=0)
+    eprom:00A54E80 size 000000F8  model E592 geometry
+    (none)         size 00000000  model E592 attributes(n=0)
+    eprom:00A54F80 size 000000F8  model E593 geometry
+    (none)         size 00000000  model E593 attributes(n=0)
+    eprom:00A55080 size 000000B0  model E594 geometry
+    (none)         size 00000000  model E594 attributes(n=0)
+    eprom:00A55140 size 000000F8  model E595 geometry
+    (none)         size 00000000  model E595 attributes(n=0)
+    eprom:00A55240 size 000000F8  model E596 geometry
+    (none)         size 00000000  model E596 attributes(n=0)
+    eprom:00A55340 size 000000B0  model E597 geometry
+    (none)         size 00000000  model E597 attributes(n=0)
+    eprom:00A55400 size 000000F8  model E598 geometry
+    (none)         size 00000000  model E598 attributes(n=0)
+    eprom:00A55500 size 00000110  model E600 geometry
+    (none)         size 00000000  model E600 attributes(n=0)
+    eprom:00A55620 size 000000F8  model E601 geometry
+    (none)         size 00000000  model E601 attributes(n=0)
+    eprom:00A55720 size 00000128  model E602 geometry
+    (none)         size 00000000  model E602 attributes(n=0)
+    eprom:00A55860 size 00000110  model E603 geometry
+    (none)         size 00000000  model E603 attributes(n=0)
+    eprom:00A55980 size 000000F8  model E604 geometry
+    (none)         size 00000000  model E604 attributes(n=0)
+    eprom:00A55A80 size 00000128  model E605 geometry
+    (none)         size 00000000  model E605 attributes(n=0)
+    eprom:00A55BC0 size 00000128  model E606 geometry
+    (none)         size 00000000  model E606 attributes(n=0)
+    eprom:00A55D00 size 00000110  model E607 geometry
+    (none)         size 00000000  model E607 attributes(n=0)
+    eprom:00A55E20 size 000000F8  model E608 geometry
+    (none)         size 00000000  model E608 attributes(n=0)
+    eprom:00A55F20 size 00000128  model E609 geometry
+    (none)         size 00000000  model E609 attributes(n=0)
+    eprom:00A56060 size 00000110  model E610 geometry
+    (none)         size 00000000  model E610 attributes(n=0)
+    eprom:00A56180 size 000000F8  model E611 geometry
+    (none)         size 00000000  model E611 attributes(n=0)
+    eprom:00A56280 size 00000128  model E612 geometry
+    (none)         size 00000000  model E612 attributes(n=0)
+  landscape object E121 -> 1 models
+    eprom:00A563C0 size 00001A7C  model E614 geometry
+    eprom:00A57E40 size 00000038  model E614 attributes(n=1)
+
+## course 2  MALASTARE
+  landscape 2: texset 15, objects E119,-1,-1,-1 / 1274, sky-ish table idx 4, floats (1000.0, 1200.0), 70, callbacks 0C14693A 0C147296 0C147858
+  collision 2:
+    mask:0E620120  size 0016A5A0  collision (root struct at mask:0E78A6A0)
+  STAT 2: none
+  music stream 19:
+    mask:09000000  size 00D502C0  stream
+  landscape textures (texset 15 list A):
+    mask:02ACBCE0  size 0002AAAA  texture 2118 256x256 texhead 000100C1 00E402C1
+    mask:02AF67A0  size 00015554  texture 2119 256x128 texhead 000100C1 00DC02C1
+    mask:02B252A0  size 00015554  texture 2124 256x128 texhead 000100C1 00DC02C1
+    mask:02B3A800  size 00015554  texture 2125 256x128 texhead 000100C1 00DC02C1
+    mask:02BA13A0  size 00015554  texture 2140 256x128 texhead 000100C1 00DC02C1
+    mask:02BB6900  size 00015554  texture 2141 256x128 texhead 000100C1 00DC02C1
+    mask:02AB9200  size 0000AAAA  texture 2115 128x128 texhead 000100C1 00DB02C1
+    mask:02B0BD00  size 0000AAAA  texture 2120 128x128 texhead 000100C1 00DB02C1
+    mask:02B167C0  size 0000AAAA  texture 2121 128x128 texhead 000100C1 00DB02C1
+    mask:02B52820  size 0000AAAA  texture 2128 128x128 texhead 000100C1 00DB02C1
+    mask:02B5D2E0  size 0000AAAA  texture 2129 128x128 texhead 080100C1 00DB02C1
+    mask:02B6BDC0  size 0000AAAA  texture 2132 128x128 texhead 000100C1 00DB02C1
+    mask:02B76880  size 0000AAAA  texture 2133 128x128 texhead 000100C1 00DB02C1
+    mask:02B81340  size 0000AAAA  texture 2134 128x128 texhead 000100C1 00DB02C1
+    mask:02B8BE00  size 0000AAAA  texture 2135 128x128 texhead 000100C1 00DB02C1
+    mask:02BCBE60  size 0000AAAA  texture 2142 128x128 texhead 000100C1 00DB02C1
+    mask:02AB3CA0  size 00005554  texture 2114 128x64 texhead 0F0100C1 00D302C1
+    mask:02AC3CC0  size 00005554  texture 2116 128x64 texhead 0F0100C1 00D302C1
+    mask:02B968C0  size 00005554  texture 2136 128x64 texhead 080100C1 00D302C1
+    mask:02AAD1A0  size 00002AAA  texture 2109 64x64 texhead 000100C1 04D202C1
+    mask:02B21280  size 00002AAA  texture 2122 64x64 texhead 000100C1 00D202C1
+    mask:02B67DA0  size 00002AAA  texture 2130 64x64 texhead 000100C1 00D202C1
+    mask:02B9BE20  size 00002AAA  texture 2137 64x64 texhead 000100C1 00D202C1
+    mask:02AC9220  size 00002AA8  texture 2117 128x32 texhead 0C0100C1 00CB02C1
+    mask:02AB11E0  size 00001554  texture 2112 64x32 texhead 000100C1 00CA02C1
+    mask:02AB2740  size 00001554  texture 2113 64x32 texhead 000100C1 00CA02C1
+    mask:02B23D40  size 00001554  texture 2123 64x32 texhead 000100C1 00CA02C1
+    mask:02B4FD60  size 00001554  texture 2126 64x32 texhead 000100C1 00CA02C1
+    mask:02B512C0  size 00001554  texture 2127 64x32 texhead 000100C1 00CA02C1
+    mask:02B6A860  size 00001554  texture 2131 64x32 texhead 000100C1 00CA02C1
+    mask:02B9E8E0  size 00001554  texture 2138 64x32 texhead 000100C1 00CA02C1
+    mask:02B9FE40  size 00001554  texture 2139 64x32 texhead 0C0100C1 00CA02C1
+    mask:02AAFC60  size 00000AAA  texture 2110 32x32 texhead 000100C1 04C902C1
+    mask:02AB0720  size 00000AAA  texture 2111 32x32 texhead 000100C1 04C902C1
+  landscape object E119 -> 270 models
+    (none)         size 00000000  model E120 geometry
+    eprom:008A25A0 size 00001298  model E120 attributes(n=99)
+    eprom:008A3840 size 00002F4C  model E122 geometry
+    (none)         size 00000000  model E122 attributes(n=0)
+    eprom:008A67A0 size 00003A2C  model E123 geometry
+    (none)         size 00000000  model E123 attributes(n=0)
+    eprom:008AA1E0 size 000034BC  model E124 geometry
+    (none)         size 00000000  model E124 attributes(n=0)
+    eprom:008AD6A0 size 0000348C  model E125 geometry
+    (none)         size 00000000  model E125 attributes(n=0)
+    eprom:008B0B40 size 0000141C  model E126 geometry
+    (none)         size 00000000  model E126 attributes(n=0)
+    eprom:008B1F60 size 000007BC  model E127 geometry
+    (none)         size 00000000  model E127 attributes(n=0)
+    eprom:008B2720 size 00000BAC  model E128 geometry
+    (none)         size 00000000  model E128 attributes(n=0)
+    eprom:008B32E0 size 0000096C  model E129 geometry
+    (none)         size 00000000  model E129 attributes(n=0)
+    eprom:008B3C60 size 0000315C  model E130 geometry
+    (none)         size 00000000  model E130 attributes(n=0)
+    eprom:008B6DC0 size 00003054  model E131 geometry
+    (none)         size 00000000  model E131 attributes(n=0)
+    eprom:008B9E20 size 00000B7C  model E132 geometry
+    (none)         size 00000000  model E132 attributes(n=0)
+    eprom:008BA9A0 size 00000B7C  model E133 geometry
+    (none)         size 00000000  model E133 attributes(n=0)
+    eprom:008BB520 size 0000084C  model E134 geometry
+    (none)         size 00000000  model E134 attributes(n=0)
+    eprom:008BBD80 size 00000864  model E135 geometry
+    (none)         size 00000000  model E135 attributes(n=0)
+    eprom:008BC600 size 00000744  model E136 geometry
+    (none)         size 00000000  model E136 attributes(n=0)
+    eprom:008BCD60 size 000007BC  model E137 geometry
+    (none)         size 00000000  model E137 attributes(n=0)
+    eprom:008BD520 size 00000864  model E138 geometry
+    (none)         size 00000000  model E138 attributes(n=0)
+    eprom:008BDDA0 size 0000078C  model E139 geometry
+    (none)         size 00000000  model E139 attributes(n=0)
+    eprom:008BE540 size 000007BC  model E140 geometry
+    (none)         size 00000000  model E140 attributes(n=0)
+    eprom:008BED00 size 000007BC  model E141 geometry
+    (none)         size 00000000  model E141 attributes(n=0)
+    eprom:008BF4C0 size 00000774  model E142 geometry
+    (none)         size 00000000  model E142 attributes(n=0)
+    eprom:008BFC40 size 0000078C  model E143 geometry
+    (none)         size 00000000  model E143 attributes(n=0)
+    eprom:008C03E0 size 000007A4  model E144 geometry
+    (none)         size 00000000  model E144 attributes(n=0)
+    eprom:008C0BA0 size 000008DC  model E145 geometry
+    (none)         size 00000000  model E145 attributes(n=0)
+    eprom:008C1480 size 000007A4  model E146 geometry
+    (none)         size 00000000  model E146 attributes(n=0)
+    eprom:008C1C40 size 000008C4  model E147 geometry
+    (none)         size 00000000  model E147 attributes(n=0)
+    eprom:008C2520 size 000007D4  model E148 geometry
+    (none)         size 00000000  model E148 attributes(n=0)
+    eprom:008C2D00 size 0000093C  model E149 geometry
+    (none)         size 00000000  model E149 attributes(n=0)
+    eprom:008C3640 size 00000774  model E150 geometry
+    (none)         size 00000000  model E150 attributes(n=0)
+    eprom:008C3DC0 size 0000090C  model E151 geometry
+    (none)         size 00000000  model E151 attributes(n=0)
+    eprom:008C46E0 size 0000084C  model E152 geometry
+    (none)         size 00000000  model E152 attributes(n=0)
+    eprom:008C4F40 size 000009B4  model E153 geometry
+    (none)         size 00000000  model E153 attributes(n=0)
+    eprom:008C5900 size 000007A4  model E154 geometry
+    (none)         size 00000000  model E154 attributes(n=0)
+    eprom:008C60C0 size 0000084C  model E155 geometry
+    (none)         size 00000000  model E155 attributes(n=0)
+    eprom:008C6920 size 0000078C  model E156 geometry
+    (none)         size 00000000  model E156 attributes(n=0)
+    eprom:008C70C0 size 00000864  model E157 geometry
+    (none)         size 00000000  model E157 attributes(n=0)
+    eprom:008C7940 size 000007BC  model E158 geometry
+    (none)         size 00000000  model E158 attributes(n=0)
+    eprom:008C8100 size 000007BC  model E159 geometry
+    (none)         size 00000000  model E159 attributes(n=0)
+    eprom:008C88C0 size 0000078C  model E160 geometry
+    (none)         size 00000000  model E160 attributes(n=0)
+    eprom:008C9060 size 0000078C  model E161 geometry
+    (none)         size 00000000  model E161 attributes(n=0)
+    eprom:008C9800 size 000007BC  model E162 geometry
+    (none)         size 00000000  model E162 attributes(n=0)
+    eprom:008C9FC0 size 000007BC  model E163 geometry
+    (none)         size 00000000  model E163 attributes(n=0)
+    eprom:008CA780 size 0000078C  model E164 geometry
+    (none)         size 00000000  model E164 attributes(n=0)
+    eprom:008CAF20 size 0000078C  model E165 geometry
+    (none)         size 00000000  model E165 attributes(n=0)
+    eprom:008CB6C0 size 000007BC  model E166 geometry
+    (none)         size 00000000  model E166 attributes(n=0)
+    eprom:008CBE80 size 0000081C  model E167 geometry
+    (none)         size 00000000  model E167 attributes(n=0)
+    eprom:008CC6A0 size 00000B64  model E168 geometry
+    (none)         size 00000000  model E168 attributes(n=0)
+    eprom:008CD220 size 00000C24  model E169 geometry
+    (none)         size 00000000  model E169 attributes(n=0)
+    eprom:008CDE60 size 00000A14  model E170 geometry
+    (none)         size 00000000  model E170 attributes(n=0)
+    eprom:008CE880 size 000008DC  model E171 geometry
+    (none)         size 00000000  model E171 attributes(n=0)
+    eprom:008CF160 size 000007A4  model E172 geometry
+    (none)         size 00000000  model E172 attributes(n=0)
+    eprom:008CF920 size 000005DC  model E173 geometry
+    (none)         size 00000000  model E173 attributes(n=0)
+    eprom:008CFF00 size 00002D9C  model E174 geometry
+    (none)         size 00000000  model E174 attributes(n=0)
+    eprom:008D2CA0 size 0000240C  model E175 geometry
+    (none)         size 00000000  model E175 attributes(n=0)
+    eprom:008D50C0 size 0000072C  model E176 geometry
+    (none)         size 00000000  model E176 attributes(n=0)
+    eprom:008D5800 size 00000984  model E177 geometry
+    (none)         size 00000000  model E177 attributes(n=0)
+    eprom:008D61A0 size 0000069C  model E178 geometry
+    (none)         size 00000000  model E178 attributes(n=0)
+    eprom:008D6840 size 000006B4  model E179 geometry
+    (none)         size 00000000  model E179 attributes(n=0)
+    eprom:008D6F00 size 0000054C  model E180 geometry
+    (none)         size 00000000  model E180 attributes(n=0)
+    eprom:008D7460 size 000005AC  model E181 geometry
+    (none)         size 00000000  model E181 attributes(n=0)
+    eprom:008D7A20 size 000033FC  model E182 geometry
+    (none)         size 00000000  model E182 attributes(n=0)
+    eprom:008DAE20 size 000034D4  model E183 geometry
+    (none)         size 00000000  model E183 attributes(n=0)
+    eprom:008DE300 size 0000084C  model E184 geometry
+    (none)         size 00000000  model E184 attributes(n=0)
+    eprom:008DEB60 size 00003324  model E185 geometry
+    (none)         size 00000000  model E185 attributes(n=0)
+    eprom:008E1EA0 size 000007BC  model E186 geometry
+    (none)         size 00000000  model E186 attributes(n=0)
+    eprom:008E2660 size 000005DC  model E187 geometry
+    (none)         size 00000000  model E187 attributes(n=0)
+    eprom:008E2C40 size 00000834  model E188 geometry
+    (none)         size 00000000  model E188 attributes(n=0)
+    eprom:008E3480 size 00000624  model E189 geometry
+    (none)         size 00000000  model E189 attributes(n=0)
+    eprom:008E3AC0 size 0000120C  model E190 geometry
+    (none)         size 00000000  model E190 attributes(n=0)
+    eprom:008E4CE0 size 000009B4  model E191 geometry
+    (none)         size 00000000  model E191 attributes(n=0)
+    eprom:008E56A0 size 00000624  model E192 geometry
+    (none)         size 00000000  model E192 attributes(n=0)
+    eprom:008E5CE0 size 00000E04  model E193 geometry
+    (none)         size 00000000  model E193 attributes(n=0)
+    eprom:008E6B00 size 00000834  model E194 geometry
+    (none)         size 00000000  model E194 attributes(n=0)
+    eprom:008E7340 size 00000A2C  model E195 geometry
+    (none)         size 00000000  model E195 attributes(n=0)
+    eprom:008E7D80 size 0000111C  model E196 geometry
+    (none)         size 00000000  model E196 attributes(n=0)
+    eprom:008E8EA0 size 000011DC  model E197 geometry
+    (none)         size 00000000  model E197 attributes(n=0)
+    eprom:008EA080 size 00000EDC  model E198 geometry
+    (none)         size 00000000  model E198 attributes(n=0)
+    eprom:008EAF60 size 00000A5C  model E199 geometry
+    (none)         size 00000000  model E199 attributes(n=0)
+    eprom:008EB9C0 size 00001AC4  model E200 geometry
+    (none)         size 00000000  model E200 attributes(n=0)
+    eprom:008ED4A0 size 0000114C  model E201 geometry
+    (none)         size 00000000  model E201 attributes(n=0)
+    eprom:008EE600 size 00000CCC  model E202 geometry
+    (none)         size 00000000  model E202 attributes(n=0)
+    eprom:008EF2E0 size 000015CC  model E203 geometry
+    (none)         size 00000000  model E203 attributes(n=0)
+    eprom:008F08C0 size 000010D4  model E204 geometry
+    (none)         size 00000000  model E204 attributes(n=0)
+    eprom:008F19A0 size 0000177C  model E205 geometry
+    (none)         size 00000000  model E205 attributes(n=0)
+    eprom:008F3120 size 0000195C  model E206 geometry
+    (none)         size 00000000  model E206 attributes(n=0)
+    eprom:008F4A80 size 000014F4  model E207 geometry
+    (none)         size 00000000  model E207 attributes(n=0)
+    eprom:008F5F80 size 0000144C  model E208 geometry
+    (none)         size 00000000  model E208 attributes(n=0)
+    eprom:008F73E0 size 00000D5C  model E209 geometry
+    (none)         size 00000000  model E209 attributes(n=0)
+    eprom:008F8140 size 0000141C  model E210 geometry
+    (none)         size 00000000  model E210 attributes(n=0)
+    eprom:008F9560 size 00000F24  model E211 geometry
+    (none)         size 00000000  model E211 attributes(n=0)
+    eprom:008FA4A0 size 00000EDC  model E212 geometry
+    (none)         size 00000000  model E212 attributes(n=0)
+    eprom:008FB380 size 000016A4  model E213 geometry
+    (none)         size 00000000  model E213 attributes(n=0)
+    eprom:008FCA40 size 0000102C  model E214 geometry
+    (none)         size 00000000  model E214 attributes(n=0)
+    eprom:008FDA80 size 0000147C  model E215 geometry
+    (none)         size 00000000  model E215 attributes(n=0)
+    eprom:008FEF00 size 000018E4  model E216 geometry
+    (none)         size 00000000  model E216 attributes(n=0)
+    eprom:00900800 size 00000FCC  model E217 geometry
+    (none)         size 00000000  model E217 attributes(n=0)
+    eprom:009017E0 size 0000156C  model E218 geometry
+    (none)         size 00000000  model E218 attributes(n=0)
+    eprom:00902D60 size 00001A34  model E219 geometry
+    (none)         size 00000000  model E219 attributes(n=0)
+    eprom:009047A0 size 00001374  model E220 geometry
+    (none)         size 00000000  model E220 attributes(n=0)
+    eprom:00905B20 size 0000180C  model E221 geometry
+    (none)         size 00000000  model E221 attributes(n=0)
+    eprom:00907340 size 000009FC  model E222 geometry
+    (none)         size 00000000  model E222 attributes(n=0)
+    eprom:00907D40 size 00000C3C  model E223 geometry
+    (none)         size 00000000  model E223 attributes(n=0)
+    eprom:00908980 size 00000714  model E224 geometry
+    (none)         size 00000000  model E224 attributes(n=0)
+    eprom:009090A0 size 00000714  model E225 geometry
+    (none)         size 00000000  model E225 attributes(n=0)
+    eprom:009097C0 size 000007D4  model E226 geometry
+    (none)         size 00000000  model E226 attributes(n=0)
+    eprom:00909FA0 size 00000864  model E227 geometry
+    (none)         size 00000000  model E227 attributes(n=0)
+    eprom:0090A820 size 0000087C  model E228 geometry
+    (none)         size 00000000  model E228 attributes(n=0)
+    eprom:0090B0A0 size 00000AEC  model E229 geometry
+    (none)         size 00000000  model E229 attributes(n=0)
+    eprom:0090BBA0 size 000007D4  model E230 geometry
+    (none)         size 00000000  model E230 attributes(n=0)
+    eprom:0090C380 size 00000BDC  model E231 geometry
+    (none)         size 00000000  model E231 attributes(n=0)
+    eprom:0090CF60 size 0000084C  model E232 geometry
+    (none)         size 00000000  model E232 attributes(n=0)
+    eprom:0090D7C0 size 00000B4C  model E233 geometry
+    (none)         size 00000000  model E233 attributes(n=0)
+    eprom:0090E320 size 000007D4  model E234 geometry
+    (none)         size 00000000  model E234 attributes(n=0)
+    eprom:0090EB00 size 00000B04  model E235 geometry
+    (none)         size 00000000  model E235 attributes(n=0)
+    eprom:0090F620 size 00000834  model E236 geometry
+    (none)         size 00000000  model E236 attributes(n=0)
+    eprom:0090FE60 size 00000B4C  model E237 geometry
+    (none)         size 00000000  model E237 attributes(n=0)
+    eprom:009109C0 size 000007BC  model E238 geometry
+    (none)         size 00000000  model E238 attributes(n=0)
+    eprom:00911180 size 00000A74  model E239 geometry
+    (none)         size 00000000  model E239 attributes(n=0)
+    eprom:00911C00 size 0000084C  model E240 geometry
+    (none)         size 00000000  model E240 attributes(n=0)
+    eprom:00912460 size 00000A44  model E241 geometry
+    (none)         size 00000000  model E241 attributes(n=0)
+    eprom:00912EC0 size 000007D4  model E242 geometry
+    (none)         size 00000000  model E242 attributes(n=0)
+    eprom:009136A0 size 00000B94  model E243 geometry
+    (none)         size 00000000  model E243 attributes(n=0)
+    eprom:00914240 size 0000081C  model E244 geometry
+    (none)         size 00000000  model E244 attributes(n=0)
+    eprom:00914A60 size 00000ABC  model E245 geometry
+    (none)         size 00000000  model E245 attributes(n=0)
+    eprom:00915520 size 000007BC  model E246 geometry
+    (none)         size 00000000  model E246 attributes(n=0)
+    eprom:00915CE0 size 00000A8C  model E247 geometry
+    (none)         size 00000000  model E247 attributes(n=0)
+    eprom:00916780 size 000008C4  model E248 geometry
+    (none)         size 00000000  model E248 attributes(n=0)
+    eprom:00917060 size 00000C0C  model E249 geometry
+    (none)         size 00000000  model E249 attributes(n=0)
+    eprom:00917C80 size 000007EC  model E250 geometry
+    (none)         size 00000000  model E250 attributes(n=0)
+    eprom:00918480 size 00000B1C  model E251 geometry
+    (none)         size 00000000  model E251 attributes(n=0)
+    eprom:00918FA0 size 0000090C  model E252 geometry
+    (none)         size 00000000  model E252 attributes(n=0)
+    eprom:009198C0 size 000009CC  model E253 geometry
+    (none)         size 00000000  model E253 attributes(n=0)
+    eprom:0091A2A0 size 000009B4  model E254 geometry
+    (none)         size 00000000  model E254 attributes(n=0)
+    eprom:0091AC60 size 00000A44  model E255 geometry
+    (none)         size 00000000  model E255 attributes(n=0)
+    eprom:0091B6C0 size 00000864  model E256 geometry
+    (none)         size 00000000  model E256 attributes(n=0)
+    eprom:0091BF40 size 00000B64  model E257 geometry
+    (none)         size 00000000  model E257 attributes(n=0)
+    eprom:0091CAC0 size 0000135C  model E258 geometry
+    (none)         size 00000000  model E258 attributes(n=0)
+    eprom:0091DE20 size 00001404  model E259 geometry
+    (none)         size 00000000  model E259 attributes(n=0)
+    eprom:0091F240 size 0000063C  model E260 geometry
+    (none)         size 00000000  model E260 attributes(n=0)
+    eprom:0091F880 size 00000654  model E261 geometry
+    (none)         size 00000000  model E261 attributes(n=0)
+    eprom:0091FEE0 size 000005C4  model E262 geometry
+    (none)         size 00000000  model E262 attributes(n=0)
+    eprom:009204C0 size 000005C4  model E263 geometry
+    (none)         size 00000000  model E263 attributes(n=0)
+    eprom:00920AA0 size 000005AC  model E264 geometry
+    (none)         size 00000000  model E264 attributes(n=0)
+    eprom:00921060 size 00000564  model E265 geometry
+    (none)         size 00000000  model E265 attributes(n=0)
+    eprom:009215E0 size 0000066C  model E266 geometry
+    (none)         size 00000000  model E266 attributes(n=0)
+    eprom:00921C60 size 00000594  model E267 geometry
+    (none)         size 00000000  model E267 attributes(n=0)
+    eprom:00922200 size 0000057C  model E268 geometry
+    (none)         size 00000000  model E268 attributes(n=0)
+    eprom:00922780 size 000005AC  model E269 geometry
+    (none)         size 00000000  model E269 attributes(n=0)
+    eprom:00922D40 size 00000624  model E270 geometry
+    (none)         size 00000000  model E270 attributes(n=0)
+    eprom:00923380 size 00000594  model E271 geometry
+    (none)         size 00000000  model E271 attributes(n=0)
+    eprom:00923920 size 00000594  model E272 geometry
+    (none)         size 00000000  model E272 attributes(n=0)
+    eprom:00923EC0 size 000005C4  model E273 geometry
+    (none)         size 00000000  model E273 attributes(n=0)
+    eprom:009244A0 size 00000594  model E274 geometry
+    (none)         size 00000000  model E274 attributes(n=0)
+    eprom:00924A40 size 00000564  model E275 geometry
+    (none)         size 00000000  model E275 attributes(n=0)
+    eprom:00924FC0 size 000005F4  model E276 geometry
+    (none)         size 00000000  model E276 attributes(n=0)
+    eprom:009255C0 size 000005C4  model E277 geometry
+    (none)         size 00000000  model E277 attributes(n=0)
+    eprom:00925BA0 size 00000594  model E278 geometry
+    (none)         size 00000000  model E278 attributes(n=0)
+    eprom:00926140 size 00000564  model E279 geometry
+    (none)         size 00000000  model E279 attributes(n=0)
+    eprom:009266C0 size 00000594  model E280 geometry
+    (none)         size 00000000  model E280 attributes(n=0)
+    eprom:00926C60 size 000005C4  model E281 geometry
+    (none)         size 00000000  model E281 attributes(n=0)
+    eprom:00927240 size 000005C4  model E282 geometry
+    (none)         size 00000000  model E282 attributes(n=0)
+    eprom:00927820 size 00000564  model E283 geometry
+    (none)         size 00000000  model E283 attributes(n=0)
+    eprom:00927DA0 size 00000684  model E284 geometry
+    (none)         size 00000000  model E284 attributes(n=0)
+    eprom:00928440 size 000005F4  model E285 geometry
+    (none)         size 00000000  model E285 attributes(n=0)
+    eprom:00928A40 size 00000564  model E286 geometry
+    (none)         size 00000000  model E286 attributes(n=0)
+    eprom:00928FC0 size 00000534  model E287 geometry
+    (none)         size 00000000  model E287 attributes(n=0)
+    eprom:00929500 size 000007EC  model E288 geometry
+    (none)         size 00000000  model E288 attributes(n=0)
+    eprom:00929D00 size 000007EC  model E289 geometry
+    (none)         size 00000000  model E289 attributes(n=0)
+    eprom:0092A500 size 00000A74  model E290 geometry
+    (none)         size 00000000  model E290 attributes(n=0)
+    eprom:0092AF80 size 00000B04  model E291 geometry
+    (none)         size 00000000  model E291 attributes(n=0)
+    eprom:0092BAA0 size 00000834  model E292 geometry
+    (none)         size 00000000  model E292 attributes(n=0)
+    eprom:0092C2E0 size 00000954  model E293 geometry
+    (none)         size 00000000  model E293 attributes(n=0)
+    eprom:0092CC40 size 0000078C  model E294 geometry
+    (none)         size 00000000  model E294 attributes(n=0)
+    eprom:0092D3E0 size 0000096C  model E295 geometry
+    (none)         size 00000000  model E295 attributes(n=0)
+    eprom:0092DD60 size 00000744  model E296 geometry
+    (none)         size 00000000  model E296 attributes(n=0)
+    eprom:0092E4C0 size 00000984  model E297 geometry
+    (none)         size 00000000  model E297 attributes(n=0)
+    eprom:0092EE60 size 0000084C  model E298 geometry
+    (none)         size 00000000  model E298 attributes(n=0)
+    eprom:0092F6C0 size 00000C9C  model E299 geometry
+    (none)         size 00000000  model E299 attributes(n=0)
+    eprom:00930360 size 000007BC  model E300 geometry
+    (none)         size 00000000  model E300 attributes(n=0)
+    eprom:00930B20 size 00000E64  model E301 geometry
+    (none)         size 00000000  model E301 attributes(n=0)
+    eprom:009319A0 size 00000834  model E302 geometry
+    (none)         size 00000000  model E302 attributes(n=0)
+    eprom:009321E0 size 00000CE4  model E303 geometry
+    (none)         size 00000000  model E303 attributes(n=0)
+    eprom:00932EE0 size 0000135C  model E304 geometry
+    (none)         size 00000000  model E304 attributes(n=0)
+    eprom:00934240 size 00001704  model E305 geometry
+    (none)         size 00000000  model E305 attributes(n=0)
+    eprom:00935960 size 00001734  model E306 geometry
+    (none)         size 00000000  model E306 attributes(n=0)
+    eprom:009370A0 size 00001A64  model E307 geometry
+    (none)         size 00000000  model E307 attributes(n=0)
+    eprom:00938B20 size 000013A4  model E308 geometry
+    (none)         size 00000000  model E308 attributes(n=0)
+    eprom:00939EE0 size 0000162C  model E309 geometry
+    (none)         size 00000000  model E309 attributes(n=0)
+    eprom:0093B520 size 00001734  model E310 geometry
+    (none)         size 00000000  model E310 attributes(n=0)
+    eprom:0093CC60 size 00001914  model E311 geometry
+    (none)         size 00000000  model E311 attributes(n=0)
+    eprom:0093E580 size 0000150C  model E312 geometry
+    (none)         size 00000000  model E312 attributes(n=0)
+    eprom:0093FAA0 size 00001734  model E313 geometry
+    (none)         size 00000000  model E313 attributes(n=0)
+    eprom:009411E0 size 000014DC  model E314 geometry
+    (none)         size 00000000  model E314 attributes(n=0)
+    eprom:009426C0 size 000014DC  model E315 geometry
+    (none)         size 00000000  model E315 attributes(n=0)
+    eprom:00943BA0 size 0000153C  model E316 geometry
+    (none)         size 00000000  model E316 attributes(n=0)
+    eprom:009450E0 size 000017C4  model E317 geometry
+    (none)         size 00000000  model E317 attributes(n=0)
+    eprom:009468C0 size 000014F4  model E318 geometry
+    (none)         size 00000000  model E318 attributes(n=0)
+    eprom:00947DC0 size 000016A4  model E319 geometry
+    (none)         size 00000000  model E319 attributes(n=0)
+    eprom:00949480 size 0000153C  model E320 geometry
+    (none)         size 00000000  model E320 attributes(n=0)
+    eprom:0094A9C0 size 00001824  model E321 geometry
+    (none)         size 00000000  model E321 attributes(n=0)
+    eprom:0094C200 size 00001494  model E322 geometry
+    (none)         size 00000000  model E322 attributes(n=0)
+    eprom:0094D6A0 size 000016BC  model E323 geometry
+    (none)         size 00000000  model E323 attributes(n=0)
+    eprom:0094ED60 size 00000EC4  model E324 geometry
+    (none)         size 00000000  model E324 attributes(n=0)
+    eprom:0094FC40 size 0000330C  model E325 geometry
+    (none)         size 00000000  model E325 attributes(n=0)
+    eprom:00952F60 size 000007EC  model E326 geometry
+    (none)         size 00000000  model E326 attributes(n=0)
+    eprom:00953760 size 00004F74  model E327 geometry
+    (none)         size 00000000  model E327 attributes(n=0)
+    eprom:009586E0 size 000008AC  model E328 geometry
+    (none)         size 00000000  model E328 attributes(n=0)
+    eprom:00958FA0 size 00006CE4  model E329 geometry
+    (none)         size 00000000  model E329 attributes(n=0)
+    eprom:0095FCA0 size 000007A4  model E330 geometry
+    (none)         size 00000000  model E330 attributes(n=0)
+    eprom:00960460 size 000008DC  model E331 geometry
+    (none)         size 00000000  model E331 attributes(n=0)
+    eprom:00960D40 size 0000078C  model E332 geometry
+    (none)         size 00000000  model E332 attributes(n=0)
+    eprom:009614E0 size 000007BC  model E333 geometry
+    (none)         size 00000000  model E333 attributes(n=0)
+    eprom:00961CA0 size 00001644  model E334 geometry
+    (none)         size 00000000  model E334 attributes(n=0)
+    eprom:00963300 size 000009FC  model E335 geometry
+    (none)         size 00000000  model E335 attributes(n=0)
+    eprom:00963D00 size 00002064  model E336 geometry
+    (none)         size 00000000  model E336 attributes(n=0)
+    eprom:00965D80 size 0000093C  model E337 geometry
+    (none)         size 00000000  model E337 attributes(n=0)
+    eprom:009666C0 size 0000306C  model E338 geometry
+    (none)         size 00000000  model E338 attributes(n=0)
+    eprom:00969740 size 00003A5C  model E339 geometry
+    (none)         size 00000000  model E339 attributes(n=0)
+    eprom:0096D1A0 size 0000027C  model E346 geometry
+    (none)         size 00000000  model E346 attributes(n=0)
+    eprom:0096D420 size 0000015C  model E348 geometry
+    (none)         size 00000000  model E348 attributes(n=0)
+    eprom:0096D580 size 0000075C  model E351 geometry
+    (none)         size 00000000  model E351 attributes(n=0)
+    eprom:0096DCE0 size 000003E4  model E353 geometry
+    (none)         size 00000000  model E353 attributes(n=0)
+    eprom:0096E0E0 size 00000084  model E358 geometry
+    (none)         size 00000000  model E358 attributes(n=0)
+    eprom:0096E180 size 00000474  model E359 geometry
+    (none)         size 00000000  model E359 attributes(n=0)
+    eprom:0096E600 size 000007EC  model E360 geometry
+    (none)         size 00000000  model E360 attributes(n=0)
+    eprom:0096EE00 size 000015FC  model E361 geometry
+    (none)         size 00000000  model E361 attributes(n=0)
+    eprom:00970400 size 0000267C  model E362 geometry
+    (none)         size 00000000  model E362 attributes(n=0)
+    eprom:00972A80 size 000001EC  model E363 geometry
+    (none)         size 00000000  model E363 attributes(n=0)
+    eprom:00972C80 size 00000174  model E364 geometry
+    (none)         size 00000000  model E364 attributes(n=0)
+    eprom:00972E00 size 000007A4  model E366 geometry
+    (none)         size 00000000  model E366 attributes(n=0)
+    eprom:009735C0 size 0000063C  model E367 geometry
+    (none)         size 00000000  model E367 attributes(n=0)
+    eprom:00973C00 size 00000894  model E368 geometry
+    (none)         size 00000000  model E368 attributes(n=0)
+    eprom:009744A0 size 00000F9C  model E369 geometry
+    (none)         size 00000000  model E369 attributes(n=0)
+    eprom:00975440 size 00000534  model E371 geometry
+    (none)         size 00000000  model E371 attributes(n=0)
+    eprom:00975980 size 000001A4  model E372 geometry
+    (none)         size 00000000  model E372 attributes(n=0)
+    eprom:00975B40 size 00000144  model E373 geometry
+    (none)         size 00000000  model E373 attributes(n=0)
+    eprom:00975CA0 size 00000234  model E374 geometry
+    (none)         size 00000000  model E374 attributes(n=0)
+    eprom:00975EE0 size 0000006C  model E375 geometry
+    (none)         size 00000000  model E375 attributes(n=0)
+    eprom:00975F60 size 000001BC  model E378 geometry
+    (none)         size 00000000  model E378 attributes(n=0)
+    eprom:00976120 size 0000012C  model E379 geometry
+    (none)         size 00000000  model E379 attributes(n=0)
+    eprom:00976260 size 00000444  model E380 geometry
+    (none)         size 00000000  model E380 attributes(n=0)
+    eprom:009766C0 size 000003FC  model E381 geometry
+    (none)         size 00000000  model E381 attributes(n=0)
+    eprom:00976AC0 size 000000E4  model E382 geometry
+    (none)         size 00000000  model E382 attributes(n=0)
+    eprom:00976BC0 size 00000A8C  model E383 geometry
+    (none)         size 00000000  model E383 attributes(n=0)
+    eprom:00977660 size 0000222C  model E384 geometry
+    (none)         size 00000000  model E384 attributes(n=0)
+    eprom:009798A0 size 00000444  model E385 geometry
+    (none)         size 00000000  model E385 attributes(n=0)
+    eprom:00979D00 size 000017AC  model E386 geometry
+    (none)         size 00000000  model E386 attributes(n=0)
+    eprom:0097B4C0 size 00002CF4  model E387 geometry
+    (none)         size 00000000  model E387 attributes(n=0)
+    eprom:0097E1C0 size 0000072C  model E388 geometry
+    (none)         size 00000000  model E388 attributes(n=0)
+    eprom:0097E900 size 00000264  model E389 geometry
+    (none)         size 00000000  model E389 attributes(n=0)
+    eprom:0097EB80 size 0000045C  model E390 geometry
+    (none)         size 00000000  model E390 attributes(n=0)
+    eprom:0097EFE0 size 000002F4  model E392 geometry
+    (none)         size 00000000  model E392 attributes(n=0)
+    eprom:0097F2E0 size 00001794  model E393 geometry
+    (none)         size 00000000  model E393 attributes(n=0)
+    eprom:00980A80 size 00000234  model E395 geometry
+    (none)         size 00000000  model E395 attributes(n=0)
+    eprom:00980CC0 size 000003E4  model E396 geometry
+    (none)         size 00000000  model E396 attributes(n=0)
+    eprom:009810C0 size 00000B1C  model E397 geometry
+    (none)         size 00000000  model E397 attributes(n=0)
+    eprom:00981BE0 size 00001E3C  model E398 geometry
+    (none)         size 00000000  model E398 attributes(n=0)
+    eprom:00983A20 size 000027E4  model E399 geometry
+    (none)         size 00000000  model E399 attributes(n=0)
+    eprom:00986220 size 0000072C  model E400 geometry
+    (none)         size 00000000  model E400 attributes(n=0)
+    eprom:00986960 size 00005694  model E401 geometry
+    (none)         size 00000000  model E401 attributes(n=0)
+    eprom:0098C000 size 00001314  model E402 geometry
+    (none)         size 00000000  model E402 attributes(n=0)
+    eprom:0098D320 size 00000504  model E405 geometry
+    (none)         size 00000000  model E405 attributes(n=0)
+    eprom:0098D840 size 0000078C  model E406 geometry
+    (none)         size 00000000  model E406 attributes(n=0)
+    eprom:0098DFE0 size 00000624  model E407 geometry
+    (none)         size 00000000  model E407 attributes(n=0)
+    eprom:0098E620 size 00000594  model E408 geometry
+    (none)         size 00000000  model E408 attributes(n=0)
+    eprom:0098EBC0 size 000005AC  model E409 geometry
+    (none)         size 00000000  model E409 attributes(n=0)
+    eprom:0098F180 size 0000072C  model E410 geometry
+    (none)         size 00000000  model E410 attributes(n=0)
+    eprom:0098F8C0 size 0000084C  model E411 geometry
+    (none)         size 00000000  model E411 attributes(n=0)
+    eprom:00990120 size 0000078C  model E413 geometry
+    (none)         size 00000000  model E413 attributes(n=0)
+  landscape object 1274 -> 1 models
+    mask:03E25200  size 00001A64  model 4958 geometry
+    mask:03E26C80  size 00000038  model 4958 attributes(n=1)
+
+## course 3  SA_COURSE4
+  landscape 3: texset 12, objects 1253,-1,-1,-1 / 1255, sky-ish table idx 1, floats (3000.0, 3100.0), 45, callbacks 0C1465CC 0C147430 0C14788C
+  collision 3:
+    mask:0E18EAA0  size 003154C0  collision (root struct at mask:0E4A3F4C)
+  STAT 3: RAM struct @0C3E0924
+  music stream 1:
+    mask:053B6B40  size 004A6DC0  stream
+  landscape textures (texset 12 list A):
+    mask:023763A0  size 00055554  texture 2024 512x256 texhead 000100C1 00E502C1
+    mask:02340E20  size 0002AAAA  texture 2022 256x256 texhead 000100C1 04E402C1
+    mask:023DF700  size 0002AAAA  texture 2033 256x256 texhead 000100C1 00E402C1
+    mask:02414C80  size 0002AAAA  texture 2036 256x256 texhead 000100C1 00E402C1
+    mask:0243F740  size 0002AAAA  texture 2037 256x256 texhead 000100C1 00E402C1
+    mask:0246A200  size 0002AAAA  texture 2038 256x256 texhead 000100C1 00E402C1
+    mask:02494CC0  size 0002AAAA  texture 2039 256x256 texhead 000100C1 00E402C1
+    mask:024BF780  size 0002AAAA  texture 2040 256x256 texhead 000100C1 00E402C1
+    mask:024EA240  size 0002AAAA  texture 2041 256x256 texhead 000100C1 00E402C1
+    mask:02514D00  size 0002AAAA  texture 2042 256x256 texhead 000100C1 00E402C1
+    mask:0253F7C0  size 0002AAAA  texture 2043 256x256 texhead 000100C1 00E402C1
+    mask:0256A280  size 0002AAAA  texture 2044 256x256 texhead 000100C1 00E402C1
+    mask:025AA2A0  size 0002AAAA  texture 2046 256x256 texhead 000100C1 00E402C1
+    mask:025D4D60  size 0002AAAA  texture 2047 256x256 texhead 000100C1 00E402C1
+    mask:025FF820  size 0002AAAA  texture 2048 256x256 texhead 000100C1 00E402C1
+    mask:02634DA0  size 0002AAAA  texture 2050 256x256 texhead 000100C1 00E402C1
+    mask:0265F860  size 0002AAAA  texture 2051 256x256 texhead 000100C1 00E402C1
+    mask:02594D40  size 00015554  texture 2045 256x128 texhead 000100C1 00DC02C1
+    mask:0262A2E0  size 0000AAAA  texture 2049 128x128 texhead 000100C1 00DB02C1
+    mask:0268A320  size 0000AAAA  texture 2052 128x128 texhead 000100C1 00DB02C1
+    mask:02694DE0  size 0000AAAA  texture 2053 128x128 texhead 000100C1 00DB02C1
+    mask:0269F8A0  size 0000AAAA  texture 2054 128x128 texhead 000100C1 00DB02C1
+    mask:026ACE20  size 0000AAAA  texture 2056 128x128 texhead 000100C1 00DB02C1
+    mask:0236B8E0  size 0000AAA8  texture 2023 256x64 texhead 000100C1 00D402C1
+    mask:023CB900  size 0000AAA8  texture 2025 256x64 texhead 000100C1 04D402C1
+    mask:0230EC00  size 00005554  texture 1991 128x64 texhead 000100C1 00D302C1
+    mask:02314C20  size 00005554  texture 1993 128x64 texhead 000100C1 00D302C1
+    mask:0240A1C0  size 00005554  texture 2034 128x64 texhead 000100C1 00D302C1
+    mask:0240F720  size 00005554  texture 2035 128x64 texhead 000100C1 00D302C1
+    mask:02308100  size 00002AAA  texture 1986 64x64 texhead 000100C1 00D202C1
+    mask:0231A180  size 00002AAA  texture 1994 64x64 texhead 000100C1 00D202C1
+    mask:0231CC40  size 00002AAA  texture 1995 64x64 texhead 000100C1 00D202C1
+    mask:0231F700  size 00002AAA  texture 1996 64x64 texhead 000100C1 00D202C1
+    mask:0232C2A0  size 00002AAA  texture 2009 64x64 texhead 000100C1 00D202C1
+    mask:02334300  size 00002AAA  texture 2015 64x64 texhead 000100C1 00D202C1
+    mask:02338320  size 00002AAA  texture 2017 64x64 texhead 000100C1 00D202C1
+    mask:0233ADE0  size 00002AAA  texture 2018 64x64 texhead 000100C1 00D202C1
+    mask:023D63C0  size 00002AAA  texture 2026 64x64 texhead 000100C1 00D202C1
+    mask:023D9C00  size 00002AAA  texture 2029 64x64 texhead 000100C1 00D202C1
+    mask:023DC6C0  size 00002AAA  texture 2030 64x64 texhead 000100C1 00D202C1
+    mask:026AA360  size 00002AAA  texture 2055 64x64 texhead 000100C1 00D202C1
+    mask:026B78E0  size 00002AAA  texture 2057 64x64 texhead 000100C1 00D202C1
+    mask:0230B680  size 00001554  texture 1988 64x32 texhead 000100C1 00CA02C1
+    mask:0230CBE0  size 00001554  texture 1989 64x32 texhead 000100C1 00CA02C1
+    mask:02322C80  size 00001554  texture 1998 64x32 texhead 000100C1 04CA02C1
+    mask:023241E0  size 00001554  texture 1999 64x32 texhead 000100C1 04CA02C1
+    mask:02325740  size 00001554  texture 2000 64x32 texhead 000100C1 04CA02C1
+    mask:0232ED60  size 00001554  texture 2010 64x32 texhead 000100C1 00CA02C1
+    mask:023302C0  size 00001554  texture 2011 64x32 texhead 000100C1 00CA02C1
+    mask:02331820  size 00001554  texture 2012 64x32 texhead 000100C1 00CA02C1
+    mask:02336DC0  size 00001554  texture 2016 64x32 texhead 000100C1 00CA02C1
+    mask:0233E360  size 00001554  texture 2020 64x32 texhead 000100C1 00CA02C1
+    mask:0233F8C0  size 00001554  texture 2021 64x32 texhead 000100C1 00CA02C1
+    mask:0230ABC0  size 00000AAA  texture 1987 32x32 texhead 000100C1 00C902C1
+    mask:0230E140  size 00000AAA  texture 1990 32x32 texhead 000100C1 04C902C1
+    mask:02314160  size 00000AAA  texture 1992 32x32 texhead 000100C1 00C902C1
+    mask:023221C0  size 00000AAA  texture 1997 32x32 texhead 000100C1 00C902C1
+    mask:02326CA0  size 00000AAA  texture 2001 32x32 texhead 000100C1 00C902C1
+    mask:02327760  size 00000AAA  texture 2002 32x32 texhead 000100C1 00C902C1
+    mask:02328220  size 00000AAA  texture 2003 32x32 texhead 000100C1 00C902C1
+    mask:02328CE0  size 00000AAA  texture 2004 32x32 texhead 000100C1 04C902C1
+    mask:023297A0  size 00000AAA  texture 2005 32x32 texhead 000100C1 04C902C1
+    mask:0232A260  size 00000AAA  texture 2006 32x32 texhead 000100C1 04C902C1
+    mask:0232AD20  size 00000AAA  texture 2007 32x32 texhead 000100C1 04C902C1
+    mask:0232B7E0  size 00000AAA  texture 2008 32x32 texhead 000100C1 04C902C1
+    mask:02332D80  size 00000AAA  texture 2013 32x32 texhead 000100C1 00C902C1
+    mask:02333840  size 00000AAA  texture 2014 32x32 texhead 000100C1 00C902C1
+    mask:0233D8A0  size 00000AAA  texture 2019 32x32 texhead 000100C1 00C902C1
+    mask:023D8E80  size 00000AAA  texture 2027 32x32 texhead 000100C1 00C902C1
+    mask:023D9940  size 000002AA  texture 2028 16x16 texhead 000100C1 00C002C1
+    mask:023DF180  size 000002AA  texture 2031 16x16 texhead 000100C1 00C002C1
+    mask:023DF440  size 000002AA  texture 2032 16x16 texhead 000100C1 00C002C1
+  landscape object 1253 -> 257 models
+    (none)         size 00000000  model 4066 geometry
+    mask:03A4D9C0  size 000006C8  model 4066 attributes(n=36)
+    mask:03A4E0A0  size 000014B4  model 4068 geometry
+    (none)         size 00000000  model 4068 attributes(n=0)
+    mask:03A4F560  size 000015EC  model 4069 geometry
+    (none)         size 00000000  model 4069 attributes(n=0)
+    mask:03A50B60  size 000018EC  model 4070 geometry
+    (none)         size 00000000  model 4070 attributes(n=0)
+    mask:03A52460  size 000017FC  model 4071 geometry
+    (none)         size 00000000  model 4071 attributes(n=0)
+    mask:03A53C60  size 00003404  model 4072 geometry
+    (none)         size 00000000  model 4072 attributes(n=0)
+    mask:03A57080  size 000016AC  model 4073 geometry
+    (none)         size 00000000  model 4073 attributes(n=0)
+    mask:03A58740  size 0000163C  model 4074 geometry
+    (none)         size 00000000  model 4074 attributes(n=0)
+    mask:03A59D80  size 000041EC  model 4075 geometry
+    (none)         size 00000000  model 4075 attributes(n=0)
+    mask:03A5DF80  size 00002358  model 4076 geometry
+    (none)         size 00000000  model 4076 attributes(n=0)
+    mask:03A602E0  size 000013FC  model 4077 geometry
+    (none)         size 00000000  model 4077 attributes(n=0)
+    mask:03A616E0  size 00001688  model 4078 geometry
+    (none)         size 00000000  model 4078 attributes(n=0)
+    mask:03A62D80  size 00001880  model 4079 geometry
+    (none)         size 00000000  model 4079 attributes(n=0)
+    mask:03A64600  size 00001320  model 4080 geometry
+    (none)         size 00000000  model 4080 attributes(n=0)
+    mask:03A65920  size 00001064  model 4081 geometry
+    (none)         size 00000000  model 4081 attributes(n=0)
+    mask:03A669A0  size 00001004  model 4082 geometry
+    (none)         size 00000000  model 4082 attributes(n=0)
+    mask:03A679C0  size 00000FEC  model 4083 geometry
+    (none)         size 00000000  model 4083 attributes(n=0)
+    mask:03A689C0  size 0000107C  model 4084 geometry
+    (none)         size 00000000  model 4084 attributes(n=0)
+    mask:03A69A40  size 0000126C  model 4085 geometry
+    (none)         size 00000000  model 4085 attributes(n=0)
+    mask:03A6ACC0  size 000012EC  model 4086 geometry
+    (none)         size 00000000  model 4086 attributes(n=0)
+    mask:03A6BFC0  size 000019EC  model 4087 geometry
+    (none)         size 00000000  model 4087 attributes(n=0)
+    mask:03A6D9C0  size 000016C8  model 4088 geometry
+    (none)         size 00000000  model 4088 attributes(n=0)
+    mask:03A6F0A0  size 000011E8  model 4089 geometry
+    (none)         size 00000000  model 4089 attributes(n=0)
+    mask:03A702A0  size 000010E0  model 4090 geometry
+    (none)         size 00000000  model 4090 attributes(n=0)
+    mask:03A71380  size 00001140  model 4091 geometry
+    (none)         size 00000000  model 4091 attributes(n=0)
+    mask:03A724C0  size 000011A0  model 4092 geometry
+    (none)         size 00000000  model 4092 attributes(n=0)
+    mask:03A73660  size 00000F78  model 4093 geometry
+    (none)         size 00000000  model 4093 attributes(n=0)
+    mask:03A745E0  size 00002654  model 4094 geometry
+    (none)         size 00000000  model 4094 attributes(n=0)
+    mask:03A76C40  size 000027D4  model 4095 geometry
+    (none)         size 00000000  model 4095 attributes(n=0)
+    mask:03A79420  size 00001FDC  model 4096 geometry
+    (none)         size 00000000  model 4096 attributes(n=0)
+    mask:03A7B400  size 000012F0  model 4097 geometry
+    (none)         size 00000000  model 4097 attributes(n=0)
+    mask:03A7C700  size 00001244  model 4098 geometry
+    (none)         size 00000000  model 4098 attributes(n=0)
+    mask:03A7D960  size 00002804  model 4099 geometry
+    (none)         size 00000000  model 4099 attributes(n=0)
+    mask:03A80180  size 000023CC  model 4100 geometry
+    (none)         size 00000000  model 4100 attributes(n=0)
+    mask:03A82560  size 00002264  model 4101 geometry
+    (none)         size 00000000  model 4101 attributes(n=0)
+    mask:03A847E0  size 00003AF4  model 4102 geometry
+    (none)         size 00000000  model 4102 attributes(n=0)
+    mask:03A882E0  size 0000269C  model 4103 geometry
+    (none)         size 00000000  model 4103 attributes(n=0)
+    mask:03A8A980  size 00003884  model 4104 geometry
+    (none)         size 00000000  model 4104 attributes(n=0)
+    mask:03A8E220  size 0000260C  model 4105 geometry
+    (none)         size 00000000  model 4105 attributes(n=0)
+    mask:03A90840  size 00003104  model 4106 geometry
+    (none)         size 00000000  model 4106 attributes(n=0)
+    mask:03A93960  size 00005174  model 4107 geometry
+    (none)         size 00000000  model 4107 attributes(n=0)
+    mask:03A98AE0  size 00002A44  model 4108 geometry
+    (none)         size 00000000  model 4108 attributes(n=0)
+    mask:03A9B540  size 0000107C  model 4109 geometry
+    (none)         size 00000000  model 4109 attributes(n=0)
+    mask:03A9C5C0  size 00002EC4  model 4110 geometry
+    (none)         size 00000000  model 4110 attributes(n=0)
+    mask:03A9F4A0  size 00003F74  model 4111 geometry
+    (none)         size 00000000  model 4111 attributes(n=0)
+    mask:03AA3420  size 000032CC  model 4112 geometry
+    (none)         size 00000000  model 4112 attributes(n=0)
+    mask:03AA6700  size 00001110  model 4113 geometry
+    (none)         size 00000000  model 4113 attributes(n=0)
+    mask:03AA7820  size 00001590  model 4114 geometry
+    (none)         size 00000000  model 4114 attributes(n=0)
+    mask:03AA8DC0  size 00001320  model 4115 geometry
+    (none)         size 00000000  model 4115 attributes(n=0)
+    mask:03AAA0E0  size 000020E4  model 4116 geometry
+    (none)         size 00000000  model 4116 attributes(n=0)
+    mask:03AAC1E0  size 000026CC  model 4117 geometry
+    (none)         size 00000000  model 4117 attributes(n=0)
+    mask:03AAE8C0  size 00001D9C  model 4118 geometry
+    (none)         size 00000000  model 4118 attributes(n=0)
+    mask:03AB0660  size 0000227C  model 4119 geometry
+    (none)         size 00000000  model 4119 attributes(n=0)
+    mask:03AB28E0  size 00001E14  model 4120 geometry
+    (none)         size 00000000  model 4120 attributes(n=0)
+    mask:03AB4700  size 00001574  model 4121 geometry
+    (none)         size 00000000  model 4121 attributes(n=0)
+    mask:03AB5C80  size 000010B0  model 4122 geometry
+    (none)         size 00000000  model 4122 attributes(n=0)
+    mask:03AB6D40  size 000020B4  model 4123 geometry
+    (none)         size 00000000  model 4123 attributes(n=0)
+    mask:03AB8E00  size 0000278C  model 4124 geometry
+    (none)         size 00000000  model 4124 attributes(n=0)
+    mask:03ABB5A0  size 0000164C  model 4125 geometry
+    (none)         size 00000000  model 4125 attributes(n=0)
+    mask:03ABCC00  size 00000CD8  model 4126 geometry
+    (none)         size 00000000  model 4126 attributes(n=0)
+    mask:03ABD8E0  size 00001DA0  model 4127 geometry
+    (none)         size 00000000  model 4127 attributes(n=0)
+    mask:03ABF680  size 00000F30  model 4128 geometry
+    (none)         size 00000000  model 4128 attributes(n=0)
+    mask:03AC05C0  size 000014E4  model 4129 geometry
+    (none)         size 00000000  model 4129 attributes(n=0)
+    mask:03AC1AC0  size 00001F90  model 4130 geometry
+    (none)         size 00000000  model 4130 attributes(n=0)
+    mask:03AC3A60  size 000026F8  model 4131 geometry
+    (none)         size 00000000  model 4131 attributes(n=0)
+    mask:03AC6160  size 00002380  model 4132 geometry
+    (none)         size 00000000  model 4132 attributes(n=0)
+    mask:03AC84E0  size 0000122C  model 4133 geometry
+    (none)         size 00000000  model 4133 attributes(n=0)
+    mask:03AC9720  size 000014B4  model 4134 geometry
+    (none)         size 00000000  model 4134 attributes(n=0)
+    mask:03ACABE0  size 000016B0  model 4135 geometry
+    (none)         size 00000000  model 4135 attributes(n=0)
+    mask:03ACC2A0  size 00000E88  model 4136 geometry
+    (none)         size 00000000  model 4136 attributes(n=0)
+    mask:03ACD140  size 00001020  model 4137 geometry
+    (none)         size 00000000  model 4137 attributes(n=0)
+    mask:03ACE160  size 00000FA8  model 4138 geometry
+    (none)         size 00000000  model 4138 attributes(n=0)
+    mask:03ACF120  size 00000CDC  model 4139 geometry
+    (none)         size 00000000  model 4139 attributes(n=0)
+    mask:03ACFE00  size 00000C04  model 4140 geometry
+    (none)         size 00000000  model 4140 attributes(n=0)
+    mask:03AD0A20  size 00000FBC  model 4141 geometry
+    (none)         size 00000000  model 4141 attributes(n=0)
+    mask:03AD19E0  size 00001380  model 4142 geometry
+    (none)         size 00000000  model 4142 attributes(n=0)
+    mask:03AD2D60  size 00001124  model 4143 geometry
+    (none)         size 00000000  model 4143 attributes(n=0)
+    mask:03AD3EA0  size 00000FD4  model 4144 geometry
+    (none)         size 00000000  model 4144 attributes(n=0)
+    mask:03AD4E80  size 00001A0C  model 4145 geometry
+    (none)         size 00000000  model 4145 attributes(n=0)
+    mask:03AD68A0  size 00004198  model 4146 geometry
+    (none)         size 00000000  model 4146 attributes(n=0)
+    mask:03ADAA40  size 00000C60  model 4147 geometry
+    (none)         size 00000000  model 4147 attributes(n=0)
+    mask:03ADB6A0  size 00000D00  model 4148 geometry
+    (none)         size 00000000  model 4148 attributes(n=0)
+    mask:03ADC3A0  size 00001468  model 4149 geometry
+    (none)         size 00000000  model 4149 attributes(n=0)
+    mask:03ADD820  size 00001048  model 4150 geometry
+    (none)         size 00000000  model 4150 attributes(n=0)
+    mask:03ADE880  size 000010F8  model 4151 geometry
+    (none)         size 00000000  model 4151 attributes(n=0)
+    mask:03ADF980  size 00000D0C  model 4152 geometry
+    (none)         size 00000000  model 4152 attributes(n=0)
+    mask:03AE06A0  size 00001144  model 4153 geometry
+    (none)         size 00000000  model 4153 attributes(n=0)
+    mask:03AE1800  size 00000EEC  model 4154 geometry
+    (none)         size 00000000  model 4154 attributes(n=0)
+    mask:03AE2700  size 00000F04  model 4155 geometry
+    (none)         size 00000000  model 4155 attributes(n=0)
+    mask:03AE3620  size 0000109C  model 4156 geometry
+    (none)         size 00000000  model 4156 attributes(n=0)
+    mask:03AE46C0  size 00000F1C  model 4157 geometry
+    (none)         size 00000000  model 4157 attributes(n=0)
+    mask:03AE55E0  size 00001144  model 4158 geometry
+    (none)         size 00000000  model 4158 attributes(n=0)
+    mask:03AE6740  size 00000EEC  model 4159 geometry
+    (none)         size 00000000  model 4159 attributes(n=0)
+    mask:03AE7640  size 00000ED4  model 4160 geometry
+    (none)         size 00000000  model 4160 attributes(n=0)
+    mask:03AE8520  size 00000F1C  model 4161 geometry
+    (none)         size 00000000  model 4161 attributes(n=0)
+    mask:03AE9440  size 00000F1C  model 4162 geometry
+    (none)         size 00000000  model 4162 attributes(n=0)
+    mask:03AEA360  size 00001054  model 4163 geometry
+    (none)         size 00000000  model 4163 attributes(n=0)
+    mask:03AEB3C0  size 00000F94  model 4164 geometry
+    (none)         size 00000000  model 4164 attributes(n=0)
+    mask:03AEC360  size 00000F34  model 4165 geometry
+    (none)         size 00000000  model 4165 attributes(n=0)
+    mask:03AED2A0  size 00001144  model 4166 geometry
+    (none)         size 00000000  model 4166 attributes(n=0)
+    mask:03AEE400  size 00000F1C  model 4167 geometry
+    (none)         size 00000000  model 4167 attributes(n=0)
+    mask:03AEF320  size 00000ED4  model 4168 geometry
+    (none)         size 00000000  model 4168 attributes(n=0)
+    mask:03AF0200  size 00000EEC  model 4169 geometry
+    (none)         size 00000000  model 4169 attributes(n=0)
+    mask:03AF1100  size 00000E8C  model 4170 geometry
+    (none)         size 00000000  model 4170 attributes(n=0)
+    mask:03AF1FA0  size 00001084  model 4171 geometry
+    (none)         size 00000000  model 4171 attributes(n=0)
+    mask:03AF3040  size 00000EEC  model 4172 geometry
+    (none)         size 00000000  model 4172 attributes(n=0)
+    mask:03AF3F40  size 00001560  model 4173 geometry
+    (none)         size 00000000  model 4173 attributes(n=0)
+    mask:03AF54A0  size 000021E8  model 4174 geometry
+    (none)         size 00000000  model 4174 attributes(n=0)
+    mask:03AF76A0  size 00001030  model 4175 geometry
+    (none)         size 00000000  model 4175 attributes(n=0)
+    mask:03AF86E0  size 00000E10  model 4176 geometry
+    (none)         size 00000000  model 4176 attributes(n=0)
+    mask:03AF9500  size 00000EA0  model 4177 geometry
+    (none)         size 00000000  model 4177 attributes(n=0)
+    mask:03AFA3A0  size 00000D68  model 4178 geometry
+    (none)         size 00000000  model 4178 attributes(n=0)
+    mask:03AFB120  size 00000F18  model 4179 geometry
+    (none)         size 00000000  model 4179 attributes(n=0)
+    mask:03AFC040  size 00001080  model 4180 geometry
+    (none)         size 00000000  model 4180 attributes(n=0)
+    mask:03AFD0C0  size 000013F8  model 4181 geometry
+    (none)         size 00000000  model 4181 attributes(n=0)
+    mask:03AFE4C0  size 00001230  model 4182 geometry
+    (none)         size 00000000  model 4182 attributes(n=0)
+    mask:03AFF700  size 000010F8  model 4183 geometry
+    (none)         size 00000000  model 4183 attributes(n=0)
+    mask:03B00800  size 00001230  model 4184 geometry
+    (none)         size 00000000  model 4184 attributes(n=0)
+    mask:03B01A40  size 000010F8  model 4185 geometry
+    (none)         size 00000000  model 4185 attributes(n=0)
+    mask:03B02B40  size 00001290  model 4186 geometry
+    (none)         size 00000000  model 4186 attributes(n=0)
+    mask:03B03DE0  size 00001008  model 4187 geometry
+    (none)         size 00000000  model 4187 attributes(n=0)
+    mask:03B04E00  size 00001128  model 4188 geometry
+    (none)         size 00000000  model 4188 attributes(n=0)
+    mask:03B05F40  size 00001758  model 4189 geometry
+    (none)         size 00000000  model 4189 attributes(n=0)
+    mask:03B076A0  size 00001278  model 4190 geometry
+    (none)         size 00000000  model 4190 attributes(n=0)
+    mask:03B08920  size 00001080  model 4191 geometry
+    (none)         size 00000000  model 4191 attributes(n=0)
+    mask:03B099A0  size 00000FC0  model 4192 geometry
+    (none)         size 00000000  model 4192 attributes(n=0)
+    mask:03B0A960  size 00000FA8  model 4193 geometry
+    (none)         size 00000000  model 4193 attributes(n=0)
+    mask:03B0B920  size 00001020  model 4194 geometry
+    (none)         size 00000000  model 4194 attributes(n=0)
+    mask:03B0C940  size 000010C8  model 4195 geometry
+    (none)         size 00000000  model 4195 attributes(n=0)
+    mask:03B0DA20  size 00002C9C  model 4196 geometry
+    (none)         size 00000000  model 4196 attributes(n=0)
+    mask:03B106C0  size 00002C9C  model 4197 geometry
+    (none)         size 00000000  model 4197 attributes(n=0)
+    mask:03B13360  size 00000E70  model 4198 geometry
+    (none)         size 00000000  model 4198 attributes(n=0)
+    mask:03B141E0  size 00000ED0  model 4199 geometry
+    (none)         size 00000000  model 4199 attributes(n=0)
+    mask:03B150C0  size 00001ACC  model 4200 geometry
+    (none)         size 00000000  model 4200 attributes(n=0)
+    mask:03B16BA0  size 0000347C  model 4201 geometry
+    (none)         size 00000000  model 4201 attributes(n=0)
+    mask:03B1A020  size 00001F4C  model 4202 geometry
+    (none)         size 00000000  model 4202 attributes(n=0)
+    mask:03B1BF80  size 0000239C  model 4203 geometry
+    (none)         size 00000000  model 4203 attributes(n=0)
+    mask:03B1E320  size 0000239C  model 4204 geometry
+    (none)         size 00000000  model 4204 attributes(n=0)
+    mask:03B206C0  size 0000254C  model 4205 geometry
+    (none)         size 00000000  model 4205 attributes(n=0)
+    mask:03B22C20  size 00002324  model 4206 geometry
+    (none)         size 00000000  model 4206 attributes(n=0)
+    mask:03B24F60  size 00000CD8  model 4207 geometry
+    (none)         size 00000000  model 4207 attributes(n=0)
+    mask:03B25C40  size 00000D64  model 4208 geometry
+    (none)         size 00000000  model 4208 attributes(n=0)
+    mask:03B269C0  size 00001C7C  model 4209 geometry
+    (none)         size 00000000  model 4209 attributes(n=0)
+    mask:03B28640  size 00002324  model 4210 geometry
+    (none)         size 00000000  model 4210 attributes(n=0)
+    mask:03B2A980  size 000033EC  model 4211 geometry
+    (none)         size 00000000  model 4211 attributes(n=0)
+    mask:03B2DD80  size 00001BEC  model 4212 geometry
+    (none)         size 00000000  model 4212 attributes(n=0)
+    mask:03B2F980  size 0000185C  model 4213 geometry
+    (none)         size 00000000  model 4213 attributes(n=0)
+    mask:03B311E0  size 00001020  model 4214 geometry
+    (none)         size 00000000  model 4214 attributes(n=0)
+    mask:03B32200  size 000024BC  model 4215 geometry
+    (none)         size 00000000  model 4215 attributes(n=0)
+    mask:03B346C0  size 00000CF0  model 4216 geometry
+    (none)         size 00000000  model 4216 attributes(n=0)
+    mask:03B353C0  size 00002114  model 4217 geometry
+    (none)         size 00000000  model 4217 attributes(n=0)
+    mask:03B374E0  size 000035E4  model 4218 geometry
+    (none)         size 00000000  model 4218 attributes(n=0)
+    mask:03B3AAE0  size 00002B4C  model 4219 geometry
+    (none)         size 00000000  model 4219 attributes(n=0)
+    mask:03B3D640  size 00000EE8  model 4220 geometry
+    (none)         size 00000000  model 4220 attributes(n=0)
+    mask:03B3E540  size 00000FA8  model 4221 geometry
+    (none)         size 00000000  model 4221 attributes(n=0)
+    mask:03B3F500  size 00000EB8  model 4222 geometry
+    (none)         size 00000000  model 4222 attributes(n=0)
+    mask:03B403C0  size 00000FD8  model 4223 geometry
+    (none)         size 00000000  model 4223 attributes(n=0)
+    mask:03B413A0  size 000024A4  model 4224 geometry
+    (none)         size 00000000  model 4224 attributes(n=0)
+    mask:03B43860  size 00001140  model 4225 geometry
+    (none)         size 00000000  model 4225 attributes(n=0)
+    mask:03B449A0  size 00001008  model 4226 geometry
+    (none)         size 00000000  model 4226 attributes(n=0)
+    mask:03B459C0  size 00000F78  model 4227 geometry
+    (none)         size 00000000  model 4227 attributes(n=0)
+    mask:03B46940  size 000027A4  model 4228 geometry
+    (none)         size 00000000  model 4228 attributes(n=0)
+    mask:03B49100  size 00000F18  model 4229 geometry
+    (none)         size 00000000  model 4229 attributes(n=0)
+    mask:03B4A020  size 00001F60  model 4230 geometry
+    (none)         size 00000000  model 4230 attributes(n=0)
+    mask:03B4BF80  size 00001134  model 4231 geometry
+    (none)         size 00000000  model 4231 attributes(n=0)
+    mask:03B4D0C0  size 00002024  model 4232 geometry
+    (none)         size 00000000  model 4232 attributes(n=0)
+    mask:03B4F100  size 0000348C  model 4233 geometry
+    (none)         size 00000000  model 4233 attributes(n=0)
+    mask:03B525A0  size 00002AA0  model 4234 geometry
+    (none)         size 00000000  model 4234 attributes(n=0)
+    mask:03B55040  size 000022A8  model 4235 geometry
+    (none)         size 00000000  model 4235 attributes(n=0)
+    mask:03B57300  size 0000260C  model 4236 geometry
+    (none)         size 00000000  model 4236 attributes(n=0)
+    mask:03B59920  size 000039A4  model 4237 geometry
+    (none)         size 00000000  model 4237 attributes(n=0)
+    mask:03B5D2E0  size 00003A4C  model 4238 geometry
+    (none)         size 00000000  model 4238 attributes(n=0)
+    mask:03B60D40  size 0000254C  model 4239 geometry
+    (none)         size 00000000  model 4239 attributes(n=0)
+    mask:03B632A0  size 0000236C  model 4240 geometry
+    (none)         size 00000000  model 4240 attributes(n=0)
+    mask:03B65620  size 00002F54  model 4241 geometry
+    (none)         size 00000000  model 4241 attributes(n=0)
+    mask:03B68580  size 00004F7C  model 4242 geometry
+    (none)         size 00000000  model 4242 attributes(n=0)
+    mask:03B6D500  size 00002174  model 4243 geometry
+    (none)         size 00000000  model 4243 attributes(n=0)
+    mask:03B6F680  size 00001934  model 4244 geometry
+    (none)         size 00000000  model 4244 attributes(n=0)
+    mask:03B70FC0  size 00002E04  model 4245 geometry
+    (none)         size 00000000  model 4245 attributes(n=0)
+    mask:03B73DE0  size 0000392C  model 4246 geometry
+    (none)         size 00000000  model 4246 attributes(n=0)
+    mask:03B77720  size 0000362C  model 4247 geometry
+    (none)         size 00000000  model 4247 attributes(n=0)
+    mask:03B7AD60  size 0000218C  model 4248 geometry
+    (none)         size 00000000  model 4248 attributes(n=0)
+    mask:03B7CF00  size 00002DD4  model 4249 geometry
+    (none)         size 00000000  model 4249 attributes(n=0)
+    mask:03B7FCE0  size 00001F44  model 4250 geometry
+    (none)         size 00000000  model 4250 attributes(n=0)
+    mask:03B81C40  size 000011B8  model 4251 geometry
+    (none)         size 00000000  model 4251 attributes(n=0)
+    mask:03B82E00  size 00001050  model 4252 geometry
+    (none)         size 00000000  model 4252 attributes(n=0)
+    mask:03B83E60  size 00006CE0  model 4253 geometry
+    (none)         size 00000000  model 4253 attributes(n=0)
+    mask:03B8AB40  size 000021A0  model 4254 geometry
+    (none)         size 00000000  model 4254 attributes(n=0)
+    mask:03B8CCE0  size 00000FD8  model 4255 geometry
+    (none)         size 00000000  model 4255 attributes(n=0)
+    mask:03B8DCC0  size 00001110  model 4256 geometry
+    (none)         size 00000000  model 4256 attributes(n=0)
+    mask:03B8EDE0  size 00002CB0  model 4257 geometry
+    (none)         size 00000000  model 4257 attributes(n=0)
+    mask:03B91AA0  size 0000612C  model 4258 geometry
+    (none)         size 00000000  model 4258 attributes(n=0)
+    mask:03B97BE0  size 000012A8  model 4259 geometry
+    (none)         size 00000000  model 4259 attributes(n=0)
+    mask:03B98EA0  size 0000149C  model 4260 geometry
+    (none)         size 00000000  model 4260 attributes(n=0)
+    mask:03B9A340  size 00002380  model 4261 geometry
+    (none)         size 00000000  model 4261 attributes(n=0)
+    mask:03B9C6C0  size 000016AC  model 4262 geometry
+    (none)         size 00000000  model 4262 attributes(n=0)
+    mask:03B9DD80  size 00000FD8  model 4263 geometry
+    (none)         size 00000000  model 4263 attributes(n=0)
+    mask:03B9ED60  size 0000558C  model 4264 geometry
+    (none)         size 00000000  model 4264 attributes(n=0)
+    mask:03BA4300  size 00003238  model 4265 geometry
+    (none)         size 00000000  model 4265 attributes(n=0)
+    mask:03BA7540  size 00006BD8  model 4266 geometry
+    (none)         size 00000000  model 4266 attributes(n=0)
+    mask:03BAE120  size 00001ED4  model 4267 geometry
+    (none)         size 00000000  model 4267 attributes(n=0)
+    mask:03BB0000  size 00001020  model 4268 geometry
+    (none)         size 00000000  model 4268 attributes(n=0)
+    mask:03BB1020  size 00002308  model 4269 geometry
+    (none)         size 00000000  model 4269 attributes(n=0)
+    mask:03BB3340  size 00001454  model 4270 geometry
+    (none)         size 00000000  model 4270 attributes(n=0)
+    mask:03BB47A0  size 00001304  model 4271 geometry
+    (none)         size 00000000  model 4271 attributes(n=0)
+    mask:03BB5AC0  size 00001394  model 4272 geometry
+    (none)         size 00000000  model 4272 attributes(n=0)
+    mask:03BB6E60  size 000012BC  model 4273 geometry
+    (none)         size 00000000  model 4273 attributes(n=0)
+    mask:03BB8120  size 000011FC  model 4274 geometry
+    (none)         size 00000000  model 4274 attributes(n=0)
+    mask:03BB9320  size 000013F4  model 4275 geometry
+    (none)         size 00000000  model 4275 attributes(n=0)
+    mask:03BBA720  size 00001214  model 4276 geometry
+    (none)         size 00000000  model 4276 attributes(n=0)
+    mask:03BBB940  size 00001214  model 4277 geometry
+    (none)         size 00000000  model 4277 attributes(n=0)
+    mask:03BBCB60  size 00001274  model 4278 geometry
+    (none)         size 00000000  model 4278 attributes(n=0)
+    mask:03BBDDE0  size 000012EC  model 4279 geometry
+    (none)         size 00000000  model 4279 attributes(n=0)
+    mask:03BBF0E0  size 00001484  model 4280 geometry
+    (none)         size 00000000  model 4280 attributes(n=0)
+    mask:03BC0580  size 00001244  model 4281 geometry
+    (none)         size 00000000  model 4281 attributes(n=0)
+    mask:03BC17E0  size 00001678  model 4282 geometry
+    (none)         size 00000000  model 4282 attributes(n=0)
+    mask:03BC2E60  size 00002B30  model 4283 geometry
+    (none)         size 00000000  model 4283 attributes(n=0)
+    mask:03BC59A0  size 00002578  model 4284 geometry
+    (none)         size 00000000  model 4284 attributes(n=0)
+    mask:03BC7F20  size 0000170C  model 4285 geometry
+    (none)         size 00000000  model 4285 attributes(n=0)
+    mask:03BC9640  size 000016C4  model 4286 geometry
+    (none)         size 00000000  model 4286 attributes(n=0)
+    mask:03BCAD20  size 00001020  model 4287 geometry
+    (none)         size 00000000  model 4287 attributes(n=0)
+    mask:03BCBD40  size 00001158  model 4288 geometry
+    (none)         size 00000000  model 4288 attributes(n=0)
+    mask:03BCCEA0  size 00001008  model 4289 geometry
+    (none)         size 00000000  model 4289 attributes(n=0)
+    mask:03BCDEC0  size 00001080  model 4290 geometry
+    (none)         size 00000000  model 4290 attributes(n=0)
+    mask:03BCEF40  size 00000EE8  model 4291 geometry
+    (none)         size 00000000  model 4291 attributes(n=0)
+    mask:03BCFE40  size 00001158  model 4292 geometry
+    (none)         size 00000000  model 4292 attributes(n=0)
+    mask:03BD0FA0  size 00001608  model 4293 geometry
+    (none)         size 00000000  model 4293 attributes(n=0)
+    mask:03BD25C0  size 00000BBC  model 4294 geometry
+    (none)         size 00000000  model 4294 attributes(n=0)
+    mask:03BD3180  size 00000BA4  model 4295 geometry
+    (none)         size 00000000  model 4295 attributes(n=0)
+    mask:03BD3D40  size 00000D54  model 4296 geometry
+    (none)         size 00000000  model 4296 attributes(n=0)
+    mask:03BD4AA0  size 00000BEC  model 4297 geometry
+    (none)         size 00000000  model 4297 attributes(n=0)
+    mask:03BD56A0  size 00000DCC  model 4298 geometry
+    (none)         size 00000000  model 4298 attributes(n=0)
+    mask:03BD6480  size 00000C4C  model 4299 geometry
+    (none)         size 00000000  model 4299 attributes(n=0)
+    mask:03BD70E0  size 00000D6C  model 4300 geometry
+    (none)         size 00000000  model 4300 attributes(n=0)
+    mask:03BD7E60  size 00000D84  model 4301 geometry
+    (none)         size 00000000  model 4301 attributes(n=0)
+    mask:03BD8C00  size 00000CAC  model 4302 geometry
+    (none)         size 00000000  model 4302 attributes(n=0)
+    mask:03BD98C0  size 00000C7C  model 4303 geometry
+    (none)         size 00000000  model 4303 attributes(n=0)
+    mask:03BDA540  size 00000FEC  model 4304 geometry
+    (none)         size 00000000  model 4304 attributes(n=0)
+    mask:03BDB540  size 00000FBC  model 4305 geometry
+    (none)         size 00000000  model 4305 attributes(n=0)
+    mask:03BDC500  size 00000FBC  model 4306 geometry
+    (none)         size 00000000  model 4306 attributes(n=0)
+    mask:03BDD4C0  size 00000FEC  model 4307 geometry
+    (none)         size 00000000  model 4307 attributes(n=0)
+    mask:03BDE4C0  size 00000F8C  model 4308 geometry
+    (none)         size 00000000  model 4308 attributes(n=0)
+    mask:03BDF460  size 00000FA4  model 4309 geometry
+    (none)         size 00000000  model 4309 attributes(n=0)
+    mask:03BE0420  size 00001034  model 4310 geometry
+    (none)         size 00000000  model 4310 attributes(n=0)
+    mask:03BE1460  size 00001648  model 4311 geometry
+    (none)         size 00000000  model 4311 attributes(n=0)
+    mask:03BE2AC0  size 00001408  model 4312 geometry
+    (none)         size 00000000  model 4312 attributes(n=0)
+    mask:03BE3EE0  size 00001810  model 4313 geometry
+    (none)         size 00000000  model 4313 attributes(n=0)
+    mask:03BE5700  size 000012B8  model 4314 geometry
+    (none)         size 00000000  model 4314 attributes(n=0)
+    mask:03BE69C0  size 000013A8  model 4315 geometry
+    (none)         size 00000000  model 4315 attributes(n=0)
+    mask:03BE7D80  size 000016C4  model 4316 geometry
+    (none)         size 00000000  model 4316 attributes(n=0)
+    mask:03BE9460  size 00001740  model 4317 geometry
+    (none)         size 00000000  model 4317 attributes(n=0)
+    mask:03BEABA0  size 00001BC0  model 4318 geometry
+    (none)         size 00000000  model 4318 attributes(n=0)
+    mask:03BEC760  size 00001568  model 4319 geometry
+    (none)         size 00000000  model 4319 attributes(n=0)
+    mask:03BEDCE0  size 000010B8  model 4320 geometry
+    (none)         size 00000000  model 4320 attributes(n=0)
+    mask:03BEEDA0  size 00001AB4  model 4321 geometry
+    (none)         size 00000000  model 4321 attributes(n=0)
+    mask:03BF0860  size 00001C34  model 4322 geometry
+    (none)         size 00000000  model 4322 attributes(n=0)
+    mask:03BF24A0  size 00001400  model 4323 geometry
+    (none)         size 00000000  model 4323 attributes(n=0)
+  landscape object 1255 -> 1 models
+    mask:03BF8EA0  size 00001884  model 4325 geometry
+    mask:03BFA740  size 00000038  model 4325 attributes(n=1)
+
+## course 4  (no STAT/LENS name)
+  landscape 4: texset E1, objects E122,-1,-1,-1 / E123, sky-ish table idx 3, floats (2500.0, 3000.0), 150, callbacks 0C146DF4 00000000 00000000
+  collision 4:
+    mask:0E5D4FE0  size 0004B140  collision (root struct at mask:0E620108)
+  STAT 4: none
+  landscape textures (texset E1 list A):
+    eprom:006BA8A0 size 00055554  texture E183 512x256 texhead 000100C1 00E502C1
+    eprom:0070FE00 size 0002AAAA  texture E184 256x256 texhead 000100C1 00E442C1
+    eprom:00755380 size 0002AAAA  texture E187 256x256 texhead 000100C1 00E442C1
+    eprom:0077FE40 size 0002AAAA  texture E188 256x256 texhead 000100C1 00E402C1
+    eprom:007AA900 size 0002AAAA  texture E189 256x256 texhead 000100C1 00E402C1
+    eprom:0073A8C0 size 00015554  texture E185 256x128 texhead 000100C1 00DC02C1
+    eprom:0074FE20 size 00005554  texture E186 128x64 texhead 000100C1 00D302C1
+  landscape object E122 -> 99 models
+    (none)         size 00000000  model E615 geometry
+    eprom:00A57E80 size 000001E8  model E615 attributes(n=10)
+    eprom:00A58080 size 000000E0  model E620 geometry
+    (none)         size 00000000  model E620 attributes(n=0)
+    eprom:00A58160 size 00000128  model E621 geometry
+    (none)         size 00000000  model E621 attributes(n=0)
+    eprom:00A582A0 size 00000188  model E622 geometry
+    (none)         size 00000000  model E622 attributes(n=0)
+    eprom:00A58440 size 00000128  model E623 geometry
+    (none)         size 00000000  model E623 attributes(n=0)
+    eprom:00A58580 size 000000C8  model E624 geometry
+    (none)         size 00000000  model E624 attributes(n=0)
+    eprom:00A58660 size 000001B8  model E630 geometry
+    (none)         size 00000000  model E630 attributes(n=0)
+    eprom:00A58820 size 00000158  model E631 geometry
+    (none)         size 00000000  model E631 attributes(n=0)
+    eprom:00A58980 size 00000158  model E632 geometry
+    (none)         size 00000000  model E632 attributes(n=0)
+    eprom:00A58AE0 size 000001A0  model E633 geometry
+    (none)         size 00000000  model E633 attributes(n=0)
+    eprom:00A58C80 size 00000200  model E634 geometry
+    (none)         size 00000000  model E634 attributes(n=0)
+    eprom:00A58E80 size 00000158  model E635 geometry
+    (none)         size 00000000  model E635 attributes(n=0)
+    eprom:00A58FE0 size 00000188  model E636 geometry
+    (none)         size 00000000  model E636 attributes(n=0)
+    eprom:00A59180 size 00000068  model E637 geometry
+    (none)         size 00000000  model E637 attributes(n=0)
+    eprom:00A59200 size 00000188  model E640 geometry
+    (none)         size 00000000  model E640 attributes(n=0)
+    eprom:00A593A0 size 00000128  model E641 geometry
+    (none)         size 00000000  model E641 attributes(n=0)
+    eprom:00A594E0 size 00000128  model E642 geometry
+    (none)         size 00000000  model E642 attributes(n=0)
+    eprom:00A59620 size 00000128  model E643 geometry
+    (none)         size 00000000  model E643 attributes(n=0)
+    eprom:00A59760 size 00000170  model E644 geometry
+    (none)         size 00000000  model E644 attributes(n=0)
+    eprom:00A598E0 size 00000158  model E645 geometry
+    (none)         size 00000000  model E645 attributes(n=0)
+    eprom:00A59A40 size 00000128  model E646 geometry
+    (none)         size 00000000  model E646 attributes(n=0)
+    eprom:00A59B80 size 00000128  model E647 geometry
+    (none)         size 00000000  model E647 attributes(n=0)
+    eprom:00A59CC0 size 00000188  model E648 geometry
+    (none)         size 00000000  model E648 attributes(n=0)
+    eprom:00A59E60 size 00000098  model E650 geometry
+    (none)         size 00000000  model E650 attributes(n=0)
+    eprom:00A59F00 size 00000188  model E651 geometry
+    (none)         size 00000000  model E651 attributes(n=0)
+    eprom:00A5A0A0 size 00000128  model E652 geometry
+    (none)         size 00000000  model E652 attributes(n=0)
+    eprom:00A5A1E0 size 00000128  model E653 geometry
+    (none)         size 00000000  model E653 attributes(n=0)
+    eprom:00A5A320 size 00000128  model E654 geometry
+    (none)         size 00000000  model E654 attributes(n=0)
+    eprom:00A5A460 size 00000170  model E655 geometry
+    (none)         size 00000000  model E655 attributes(n=0)
+    eprom:00A5A5E0 size 00000158  model E656 geometry
+    (none)         size 00000000  model E656 attributes(n=0)
+    eprom:00A5A740 size 00000128  model E657 geometry
+    (none)         size 00000000  model E657 attributes(n=0)
+    eprom:00A5A880 size 00000128  model E658 geometry
+    (none)         size 00000000  model E658 attributes(n=0)
+    eprom:00A5A9C0 size 00000188  model E659 geometry
+    (none)         size 00000000  model E659 attributes(n=0)
+    eprom:00A5AB60 size 00000098  model E660 geometry
+    (none)         size 00000000  model E660 attributes(n=0)
+    eprom:00A5AC00 size 00000158  model E661 geometry
+    (none)         size 00000000  model E661 attributes(n=0)
+    eprom:00A5AD60 size 000001D0  model E662 geometry
+    (none)         size 00000000  model E662 attributes(n=0)
+    eprom:00A5AF40 size 00000170  model E663 geometry
+    (none)         size 00000000  model E663 attributes(n=0)
+    eprom:00A5B0C0 size 00000170  model E664 geometry
+    (none)         size 00000000  model E664 attributes(n=0)
+    eprom:00A5B240 size 00002224  model E665 geometry
+    (none)         size 00000000  model E665 attributes(n=0)
+    eprom:00A5D480 size 000020EC  model E666 geometry
+    (none)         size 00000000  model E666 attributes(n=0)
+    eprom:00A5F580 size 00000664  model E667 geometry
+    (none)         size 00000000  model E667 attributes(n=0)
+    eprom:00A5FC00 size 00000170  model E668 geometry
+    (none)         size 00000000  model E668 attributes(n=0)
+    eprom:00A5FD80 size 00000170  model E669 geometry
+    (none)         size 00000000  model E669 attributes(n=0)
+    eprom:00A5FF00 size 00000200  model E670 geometry
+    (none)         size 00000000  model E670 attributes(n=0)
+    eprom:00A60100 size 00000110  model E671 geometry
+    (none)         size 00000000  model E671 attributes(n=0)
+    eprom:00A60220 size 00000128  model E672 geometry
+    (none)         size 00000000  model E672 attributes(n=0)
+    eprom:00A60360 size 00000188  model E673 geometry
+    (none)         size 00000000  model E673 attributes(n=0)
+    eprom:00A60500 size 00000128  model E674 geometry
+    (none)         size 00000000  model E674 attributes(n=0)
+    eprom:00A60640 size 000001FC  model E675 geometry
+    (none)         size 00000000  model E675 attributes(n=0)
+    eprom:00A60840 size 00005764  model E676 geometry
+    (none)         size 00000000  model E676 attributes(n=0)
+    eprom:00A65FC0 size 000089B8  model E677 geometry
+    (none)         size 00000000  model E677 attributes(n=0)
+    eprom:00A6E980 size 0000409C  model E678 geometry
+    (none)         size 00000000  model E678 attributes(n=0)
+    eprom:00A72A20 size 00000128  model E679 geometry
+    (none)         size 00000000  model E679 attributes(n=0)
+    eprom:00A72B60 size 00000128  model E680 geometry
+    (none)         size 00000000  model E680 attributes(n=0)
+    eprom:00A72CA0 size 00000188  model E681 geometry
+    (none)         size 00000000  model E681 attributes(n=0)
+    eprom:00A72E40 size 00000128  model E682 geometry
+    (none)         size 00000000  model E682 attributes(n=0)
+    eprom:00A72F80 size 00000110  model E683 geometry
+    (none)         size 00000000  model E683 attributes(n=0)
+    eprom:00A730A0 size 00000200  model E684 geometry
+    (none)         size 00000000  model E684 attributes(n=0)
+    eprom:00A732A0 size 00000158  model E685 geometry
+    (none)         size 00000000  model E685 attributes(n=0)
+    eprom:00A73400 size 00000158  model E686 geometry
+    (none)         size 00000000  model E686 attributes(n=0)
+    eprom:00A73560 size 0000162C  model E687 geometry
+    (none)         size 00000000  model E687 attributes(n=0)
+    eprom:00A74BA0 size 00004880  model E688 geometry
+    (none)         size 00000000  model E688 attributes(n=0)
+    eprom:00A79420 size 000012FC  model E689 geometry
+    (none)         size 00000000  model E689 attributes(n=0)
+    eprom:00A7A720 size 00000158  model E690 geometry
+    (none)         size 00000000  model E690 attributes(n=0)
+    eprom:00A7A880 size 00000158  model E691 geometry
+    (none)         size 00000000  model E691 attributes(n=0)
+    eprom:00A7A9E0 size 00000188  model E692 geometry
+    (none)         size 00000000  model E692 attributes(n=0)
+    eprom:00A7AB80 size 00000128  model E693 geometry
+    (none)         size 00000000  model E693 attributes(n=0)
+    eprom:00A7ACC0 size 00000098  model E694 geometry
+    (none)         size 00000000  model E694 attributes(n=0)
+    eprom:00A7AD60 size 000001A0  model E695 geometry
+    (none)         size 00000000  model E695 attributes(n=0)
+    eprom:00A7AF00 size 00000128  model E696 geometry
+    (none)         size 00000000  model E696 attributes(n=0)
+    eprom:00A7B040 size 00000128  model E697 geometry
+    (none)         size 00000000  model E697 attributes(n=0)
+    eprom:00A7B180 size 00000128  model E698 geometry
+    (none)         size 00000000  model E698 attributes(n=0)
+    eprom:00A7B2C0 size 00000170  model E699 geometry
+    (none)         size 00000000  model E699 attributes(n=0)
+    eprom:00A7B440 size 00000158  model E700 geometry
+    (none)         size 00000000  model E700 attributes(n=0)
+    eprom:00A7B5A0 size 00000128  model E701 geometry
+    (none)         size 00000000  model E701 attributes(n=0)
+    eprom:00A7B6E0 size 00000128  model E702 geometry
+    (none)         size 00000000  model E702 attributes(n=0)
+    eprom:00A7B820 size 00000170  model E703 geometry
+    (none)         size 00000000  model E703 attributes(n=0)
+    eprom:00A7B9A0 size 00000068  model E704 geometry
+    (none)         size 00000000  model E704 attributes(n=0)
+    eprom:00A7BA20 size 00000140  model E706 geometry
+    (none)         size 00000000  model E706 attributes(n=0)
+    eprom:00A7BB60 size 00000188  model E707 geometry
+    (none)         size 00000000  model E707 attributes(n=0)
+    eprom:00A7BD00 size 00000128  model E708 geometry
+    (none)         size 00000000  model E708 attributes(n=0)
+    eprom:00A7BE40 size 00000128  model E709 geometry
+    (none)         size 00000000  model E709 attributes(n=0)
+    eprom:00A7BF80 size 00000170  model E710 geometry
+    (none)         size 00000000  model E710 attributes(n=0)
+    eprom:00A7C100 size 00000158  model E711 geometry
+    (none)         size 00000000  model E711 attributes(n=0)
+    eprom:00A7C260 size 00000128  model E712 geometry
+    (none)         size 00000000  model E712 attributes(n=0)
+    eprom:00A7C3A0 size 00000128  model E713 geometry
+    (none)         size 00000000  model E713 attributes(n=0)
+    eprom:00A7C4E0 size 000001B8  model E714 geometry
+    (none)         size 00000000  model E714 attributes(n=0)
+    eprom:00A7C6A0 size 00000158  model E718 geometry
+    (none)         size 00000000  model E718 attributes(n=0)
+    eprom:00A7C800 size 00000170  model E719 geometry
+    (none)         size 00000000  model E719 attributes(n=0)
+    eprom:00A7C980 size 00000170  model E720 geometry
+    (none)         size 00000000  model E720 attributes(n=0)
+    eprom:00A7CB00 size 00000200  model E721 geometry
+    (none)         size 00000000  model E721 attributes(n=0)
+    eprom:00A7CD00 size 000001B8  model E722 geometry
+    (none)         size 00000000  model E722 attributes(n=0)
+    eprom:00A7CEC0 size 00000188  model E723 geometry
+    (none)         size 00000000  model E723 attributes(n=0)
+    eprom:00A7D060 size 00000188  model E724 geometry
+    (none)         size 00000000  model E724 attributes(n=0)
+    eprom:00A7D200 size 00000068  model E730 geometry
+    (none)         size 00000000  model E730 attributes(n=0)
+    eprom:00A7D280 size 000000F8  model E731 geometry
+    (none)         size 00000000  model E731 attributes(n=0)
+    eprom:00A7D380 size 00000128  model E732 geometry
+    (none)         size 00000000  model E732 attributes(n=0)
+    eprom:00A7D4C0 size 00000140  model E733 geometry
+    (none)         size 00000000  model E733 attributes(n=0)
+    eprom:00A7D600 size 00000098  model E734 geometry
+    (none)         size 00000000  model E734 attributes(n=0)
+  landscape object E123 -> 1 models
+    eprom:00A7D6A0 size 00001A4C  model E738 geometry
+    eprom:00A7F100 size 00000038  model E738 attributes(n=1)

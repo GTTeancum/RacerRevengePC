@@ -1,0 +1,56 @@
+# Per-course hook placements (tools\hookplace.py, straight-line symbolic pass; fr4..fr7 = x, y, z, 4th arg (guess: yaw degrees))
+# course 0 +44 = f_0C147078, course 3 +44 = f_0C147430; courses 1/2 +44 (f_0C14738A/f_0C147296) place nothing (they rotate an object and override draw count by sector)
+== hook f_0C147078
+  load obj 1229 -> slot 0CEC91F0
+  load obj 1230 -> slot 0CEC91F4
+  load obj 1235 -> slot 0CEC91F8
+  load obj 1236 -> slot 0CEC91FC
+  load obj 1237 -> slot 0CEC9200
+  load obj 1240 -> slot 0CEC9204
+  load obj 1231 -> slot 0CEC9208
+  load obj 1232 -> slot 0CEC920C
+  load obj 1233 -> slot 0CEC9210
+  load obj 1234 -> slot 0CEC9214
+  place @0C147170 obj 1230 (slot 0CEC91F4)  fr4..7 = 0.00, 0.00, 0.00, 90.00
+  place @0C147186 obj 1229 (slot 0CEC91F0)  fr4..7 = -100.00, 0.00, 380.00, 45.00
+  place @0C14719A obj 1229 (slot 0CEC91F0)  fr4..7 = -70.00, 0.00, 200.00, 45.00
+  place @0C1471AC obj 1229 (slot 0CEC91F0)  fr4..7 = -65.00, 0.00, -260.00, 45.00
+  place @0C1471C2 obj 1235 (slot 0CEC91F8)  fr4..7 = -150.00, 0.00, 710.00, 180.00
+  place @0C1471D8 obj 1236 (slot 0CEC91FC)  fr4..7 = -50.00, 0.00, -310.00, 70.00
+  place @0C1471EE obj 1237 (slot 0CEC9200)  fr4..7 = 50.00, 5.00, -408.00, 90.00
+  place @0C147204 obj 1240 (slot 0CEC9204)  fr4..7 = -70.00, -45.00, -280.00, 1.50
+  place @0C147224 obj 1232 (slot 0CEC920C)  fr4..7 = 0.00, 0.00, 0.00, 90.00
+  place @0C14723C obj 1233 (slot 0CEC9210)  fr4..7 = 0.00, 0.00, 0.00, 90.00
+  place @0C147256 obj 1234 (slot 0CEC9214)  fr4..7 = 0.00, 0.00, 0.00, 90.00
+== hook f_0C147430
+  load obj 1241 -> slot 0CEC9224
+  load obj 1242 -> slot 0CEC9228
+  load obj 1243 -> slot 0CEC922C
+  load obj 1248 -> slot 0CEC9230
+  load obj 1249 -> slot 0CEC9234
+  load obj 1250 -> slot 0CEC9238
+  load obj 1251 -> slot 0CEC923C
+  load obj 1244 -> slot 0CEC9240
+  load obj 1245 -> slot 0CEC9244
+  load obj 1246 -> slot 0CEC9248
+  load obj 1247 -> slot 0CEC924C
+  load obj E4 -> slot 0CEC9258
+  load obj E5 -> slot 0CEC925C
+  load obj E3 -> slot 0CEC9254
+  load obj 1254 -> slot 0CEC9250
+  place @0C147592 obj 1241 (slot 0CEC9224)  fr4..7 = -90.00, 0.00, 280.00, 30.00
+  place @0C1475A6 obj 1241 (slot 0CEC9224)  fr4..7 = -60.00, 0.00, 200.00, 30.00
+  place @0C1475BA obj 1242 (slot 0CEC9228)  fr4..7 = -60.00, 0.00, 250.00, 20.00
+  place @0C1475CE obj 1243 (slot 0CEC922C)  fr4..7 = 0.00, 0.00, 0.00, 55.00
+  place @0C1475E6 obj 1248 (slot 0CEC9230)  fr4..7 = -150.00, 0.00, 400.00, 150.00
+  place @0C1475FA obj 1249 (slot 0CEC9234)  fr4..7 = 45.00, 0.00, 100.00, 45.00
+  place @0C14760A obj 1250 (slot 0CEC9238)  fr4..7 = -60.00, 0.00, 400.00, 70.00
+  place @0C147620 obj 1250 (slot 0CEC9238)  fr4..7 = 50.00, 10.00, -200.00, 70.00
+  place @0C147638 obj 1251 (slot 0CEC923C)  fr4..7 = -40.00, -25.00, -7.00, 1.30
+  place @0C147658 obj 1245 (slot 0CEC9244)  fr4..7 = 0.00, 0.00, 0.00, 55.00
+  place @0C147670 obj 1246 (slot 0CEC9248)  fr4..7 = 0.00, 0.00, 0.00, 55.00
+  place @0C147688 obj 1247 (slot 0CEC924C)  fr4..7 = 0.00, 0.00, 0.00, 55.00
+  place @0C14769A obj E4 (slot 0CEC9258)  fr4..7 = 0.00, 0.00, 0.00, 1.00
+  place @0C1476AA obj E5 (slot 0CEC925C)  fr4..7 = 0.00, 0.00, 0.00, 1.00
+  place @0C1476BA obj 1254 (slot 0CEC9250)  fr4..7 = 0.00, 0.00, 0.00, 1.00
+  place @0C1476CC obj E3 (slot 0CEC9254)  fr4..7 = 0.00, 0.10, 0.00, 1.00
