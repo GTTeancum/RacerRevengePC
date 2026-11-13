@@ -409,7 +409,7 @@ public:
                 q.mainFilter.identity=reserved.main;q.secondaryFilter.identity=reserved.secondary;
                 need(r.assignSharedColdIdentities(slot),"actual shared cold identity lanes unavailable");
                 auto probeBindings=arena_.terrainBindings;
-                if(r.storage_.get()->count.sharedRosterCount)probeBindings.identity=reserved.terrain;
+                probeBindings.identity=reserved.terrain; //this racer's own 348, both layouts
                 terrain_probe_authoring50fq_fixture::Owner authoredProbe{};std::string error;
                 d.stage="terrain probe authoring";
                 const bool probeAuthored=terrain_probe_authoring50fq_fixture::prepare(authoredProbe,q.main,x.parameters,
@@ -425,6 +425,11 @@ public:
                 const bool recoveryBound=undertrack_owners50ew_fixture::bindSelectedCold(*q.recovery,collision,q.main,q.secondary,
                     x.parameters,phy,error);
                 need(recoveryBound,error.empty()?"original recovery source bind failed":error.c_str());
+                {   //212984/212990/21299C: this racer's own 690, 7A4, 348 (fixed size 3, sized before seal).
+                    auto& podList=q.recovery->podFilter.identityLists[0].identities;
+                    need(podList.size()==3u&&podList[0]==q.mainFilter.identity,"actual694 list size or 690 entry differs");
+                    podList[1]=q.movement->filter.identity;podList[2]=q.terrain.metadata.filter.identity;
+                }
                 if(r.storage_.get()->count.sharedRosterCount){
                     need(chariot_[slot]->nativeSecondaryContacts_!=nullptr,
                         "actual native secondary contact constructor absent");
@@ -453,6 +458,15 @@ public:
             const auto main=actualBank.bindRead(q.mainFilter.identity),secondary=actualBank.bindRead(q.secondaryFilter.identity);
             need(actualBank.read(slot,main)==r.bodyIdentities_[slot].main&&
                 actualBank.read(slot,secondary)==r.bodyIdentities_[slot].secondary,"actual saved native identities differ");
+            {   //All five of this racer's own identities are saved in its own slot.
+                const auto terrainLane=actualBank.bindRead(q.terrain.metadata.filter.identity);
+                const auto podLane=actualBank.bindRead(q.recovery->podFilter.identity);
+                const auto movementLane=actualBank.bindRead(q.movement->filter.identity);
+                need(actualBank.read(slot,terrainLane)==r.bodyIdentities_[slot].terrain&&
+                    actualBank.read(slot,podLane)==r.bodyIdentities_[slot].pod&&
+                    actualBank.read(slot,movementLane)==r.bodyIdentities_[slot].movement,
+                    "actual saved native 348/694/7A4 identities differ");
+            }
             d.stage="actual pod context binding";ra_cold_aggregate50LA::Diagnostic ad;
             need(aggregate_->bindRuntimePodLiveQuerySlot(actualBank,slot,x.bindings,x.parameters,ad,arena_.humanCount),
                 ad.failure?ad.failure:"actual RA pod context bind failed");

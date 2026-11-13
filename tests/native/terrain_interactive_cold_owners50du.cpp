@@ -22,6 +22,8 @@
 #include "terrain_probe_authoring50fq_fixture.h"
 #include "live_terrain_probe50fr_fixture.h"
 #include "undertrack_owners50ew_fixture.h"
+#include "native_racer_identities50pl.h"
+#include <cstdio>
 #include "original_ai_physical_recovery.h"
 #include "original_human_physical_recovery.h"
 #include "lap_drive50gj_fixture.h"
@@ -108,10 +110,10 @@ void OwnersContext::run() {
    racerBank.owner(membership->state);racerBank.elements(membership->links.data(),membership->links.size());
    racerBank.elements(membership->entries.data(),membership->entries.size());
   }
-  // Actual authored trigger groups need stable, distinct main/secondary
-  // identities. Only these scalar IDs are banked; shared reciprocal contacts,
-  // Gate fired/audio state and action counters never roll back on arena visits.
-  if(gcTriggerActions||isGaTrack||isMaSaTrack||isRaTrack||isMbTrack||isScTrack||isTcTrack||isRcTrack||isTbTrack||isGbTrack||isMcTrack){racerBank.owner(qfilter.identity);racerBank.owner(secondaryFilter.identity);}
+  // Each racer's own identities are banked on every course by
+  // native_racer_owners50hn.inc (the former course list, which left TA's
+  // racers sharing one 690/364 identity, is retired). Shared reciprocal
+  // contacts, Gate fired/audio state and action counters never roll back.
   if(isRaTrack)require50DU(raWorld->registerRuntimeQueryWorldOwners(racerBank,raDiagnostic),
       raDiagnostic.failure?raDiagnostic.failure:"RA world registration rejected");
   if(isMbTrack)for(std::size_t i=0;i<3;++i){
@@ -269,6 +271,24 @@ void OwnersContext::run() {
   // original-resource cold path before any tick. Only the legacy mixed POD01
   // selection retains the fixture startup. No live identity is flipped.
   if(isRcTrack)requireMbRuntimeNavigation50MB();
+  // One allocator for every course (native_racer_identities50pl.h): five
+  // identities per racer (690, 364, 348, 694, 7A4), each assigned inside that
+  // racer's own visit below. Checked against this course's static owners and
+  // the cold seeds; a conflict or exhaustion is refused before any write.
+  std::array<native_racer_identities50PL::RacerIdentities,native_racer_identities50PL::maxRacers> racerIdentities{};
+  if(!isRaTrack){
+   const std::uint32_t seeds[]={qfilter.identity,secondaryFilter.identity,movement.filter.identity,
+       terrainOwner.metadata.filter.identity,recoveryQueryOwners.podFilter.identity,
+       recoveryQueryOwners.globals.identity[0],recoveryQueryOwners.globals.identity[1],
+       recoveryQueryOwners.globals.terrainIdentity348};
+   auto available=[&](std::uint32_t id){
+    for(const auto seed:seeds)if(id==seed)return false;
+    for(const auto& candidate:candidates)if(candidate.candidate.collision.filter.identity==id)return false;
+    return true;
+   };
+   require50DU(native_racer_identities50PL::allocate(racerBank.count(),available,racerIdentities.data(),
+       racerIdentities.size()),"racer identity allocation exhausted or conflicts with a course owner");
+  }
   if(!isRaTrack)for(std::size_t racer=playerUsesRosterRig?0u:1u;racer<racerBank.count();++racer)racerBank.visit(racer,[&](){
    const auto& rig=*racerRigs[racer];const auto& collision=*racerCollisions[racer];
    coldRacerStage50DU(rig.podId,"rig installation",[&](){
@@ -392,12 +412,20 @@ void OwnersContext::run() {
    coldRacerStage50DU(rig.podId,"effect name binding",[&](){rig.buildEffectNames(s,namesForEffects);});
    coldRacerStage50DU(rig.podId,"effect owner construction",[&](){bindColdNativeEffects();});
    query.resource=&collision.main();secondaryQuery.resource=&collision.secondary();
-   if(gcTriggerActions||isGaTrack||isMaSaTrack||isMbTrack||isScTrack||isTcTrack||isRcTrack||isTbTrack||isGbTrack||isMcTrack){qfilter.identity=0x30000000u+static_cast<std::uint32_t>(racer*2);
-    secondaryFilter.identity=qfilter.identity+1u;}
+   // This racer's own five identities, written only inside its own visit
+   // (every course; the per-course formula and course list are retired).
+   const auto& ids=racerIdentities[racer];
+   qfilter.identity=ids.main;secondaryFilter.identity=ids.secondary;movement.filter.identity=ids.movement;
+   terrainOwner.metadata.filter.identity=ids.terrain; //banked lane; installProbeCold requires it first (as RA)
+   if(originalRecoveryEnabled){
+    recoveryQueryOwners.globals.identity[0]=recoveryQueryOwners.podFilter.identity=ids.pod;
+    recoveryQueryOwners.globals.identity[1]=ids.movement;recoveryQueryOwners.globals.terrainIdentity348=ids.terrain;
+   }
+   auto racerTerrainBindings=terrainBindings;racerTerrainBindings.identity=ids.terrain;
    terrain_probe_authoring50fq_fixture::Owner ownProbe{};std::string probeError;
    coldRacerStage50DU(rig.podId,"terrain probe authoring",[&](){
     const bool probeReady=terrain_probe_authoring50fq_fixture::prepare(ownProbe,query,x.parameters,
-        rig.phy,terrainBindings,probeError,collision);
+        rig.phy,racerTerrainBindings,probeError,collision);
     require50DU(probeReady,probeError.empty()?"original racer probe authoring failed":probeError.c_str());
    });
    for(unsigned axis=0;axis<3;++axis)x.parameters.bodies.main.probeLocal140[axis]=ownProbe.lowerEndpoint140.v[axis];
@@ -412,6 +440,12 @@ void OwnersContext::run() {
     require50DU(undertrack_owners50ew_fixture::bindSelectedCold(recoveryQueryOwners,
         collision,query,secondaryQuery,x.parameters,rig.phy,recoveryError),
         recoveryError.empty()?"selected original recovery query owner rejected":recoveryError.c_str());
+    {// 212984/212990/21299C: this racer's own 690, 7A4, 348 (size 3, fixed before seal).
+     auto& podList=recoveryQueryOwners.podFilter.identityLists[0].identities;
+     require50DU(podList.size()==3u&&podList[0]==qfilter.identity&&
+         terrainOwner.metadata.filter.identity==ids.terrain,"actual694 list size, 690 entry or own348 differs");
+     podList[1]=movement.filter.identity;podList[2]=terrainOwner.metadata.filter.identity;
+    }
     qfilter.identityLists[0].identities={secondaryFilter.identity,recoveryQueryOwners.podFilter.identity,
         movement.filter.identity,terrainOwner.metadata.filter.identity};
     secondaryFilter.identityLists[0].identities={qfilter.identity,recoveryQueryOwners.podFilter.identity,movement.filter.identity};
@@ -466,6 +500,27 @@ void OwnersContext::run() {
        <<" steering100="<<x.parameters.bodies.main.aero.steering100
        <<" repair="<<s.fields.repairCF4<<" cooling="<<boostCoolingCF8<<'\n';
   });
+  // Stage A pass mark, read back from each racer's saved slot (not from the
+  // allocator): every racer's own 690/694/7A4/348 and how many other racers
+  // share its 694 (must be 0 on every course).
+  if(!isRaTrack&&originalRecoveryEnabled){
+   const auto mainLane=racerBank.bindRead(qfilter.identity);
+   const auto podLane=racerBank.bindRead(recoveryQueryOwners.podFilter.identity);
+   const auto movementLane=racerBank.bindRead(movement.filter.identity);
+   const auto terrainLane=racerBank.bindRead(terrainOwner.metadata.filter.identity);
+   const std::size_t first=playerUsesRosterRig?0u:1u;
+   for(std::size_t racer=first;racer<racerBank.count();++racer){
+    const auto own=racerBank.read(racer,podLane);std::size_t shared=0;
+    for(std::size_t other=first;other<racerBank.count();++other)
+     if(other!=racer&&racerBank.read(other,podLane)==own)++shared;
+    char line[200];
+    std::snprintf(line,sizeof line,"racer_identity_lane slot=%zu own690=%08x own694=%08x own7A4=%08x own348=%08x shared694=%zu\n",
+        racer,unsigned(racerBank.read(racer,mainLane)),unsigned(own),unsigned(racerBank.read(racer,movementLane)),
+        unsigned(racerBank.read(racer,terrainLane)),shared);
+    std::cerr<<line;
+    require50DU(!shared,"two racers share one 694 identity");
+   }
+  }
   // Keep exact original names in fixed cold storage for allocation-free HUD publication.
   for(std::size_t racer=0;racer<raceRacerCount;++racer){
    require50DU(!racerNames[racer].empty()&&racerNames[racer].size()<=platform::maxVehicleWindowRacerName50DS,

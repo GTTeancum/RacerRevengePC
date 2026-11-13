@@ -12,6 +12,7 @@ namespace rr::game { class OriginalRaceConstructor50LA; }
 #include "ra_static_fog_observation50la.h"
 #include "original_follow_query_bridge50kx.h"
 #include "terrain_probe_authoring50fq_fixture.h"
+#include "native_racer_identities50pl.h"
 #include "original_racer_terrain_query_owner50la.h"
 #include "original_racer_query690_owner50la.h"
 #include "original_racer_secondary_body_owner50la.h"
@@ -1132,8 +1133,10 @@ class OwnershipBridge final {
     // Shared-mode opaque identities are assigned only at the actual selected
     // resource constructor cut. Every destination must already belong to the
     // current sealed Bank; no immutable legacy namespace is changed.
+    // Both storage layouts: each racer's own 348/694/7A4 lanes are written
+    // here, inside that racer's own Bank visit (2129C0 builds them per racer).
     bool assignSharedColdIdentities(std::size_t slot)noexcept {
-        auto* s=storage_.get();if(!s||!s->sharedRoster_)return true;
+        auto* s=storage_.get();if(!s)return true;
         const auto pin=bankLifetime_.lock();
         if(!pin||!bankIdentity_||pin->identity!=bankIdentity_||
            bankIdentity_->raWorldLifetime_.get()!=pin.get()||!bankIdentity_->sealed_||
@@ -2116,31 +2119,23 @@ class OwnershipBridge final {
             // Reserve before any Storage mutation; the immutable association is
             // the existing collisionRoster order. Actual arena IDs are assigned
             // only at the per-slot source resource-assignment phase.
-            std::uint32_t next=1;
+            // One allocator for every course (native_racer_identities50pl.h):
+            // five identities per racer, both storage layouts.
             auto available=[&](std::uint32_t id){
                 if(!plannedIdentityFree(id))return false;
-                constexpr std::uint32_t auxiliary[]={native_query_identities50KX::movement7A4,
-                    native_query_identities50KX::secondary364,native_query_identities50KX::terrain348,
-                    native_query_identities50KX::pod694};
-                for(auto value:auxiliary)if(id==value)return false;
                 for(auto value:rosterAuxiliaryIds_)if(id==value)return false;
                 if(inputs_.recovery)for(auto value:inputs_.recovery->globals.identity)if(id==value)return false;
+                if(inputs_.recovery&&id==inputs_.recovery->globals.terrainIdentity348)return false;
                 for(const auto& w:inputs_.wreck)for(auto value:w.identities)if(id==value)return false;
                 return true;
             };
+            std::array<native_racer_identities50PL::RacerIdentities,native_racer_identities50PL::maxRacers> allocated{};
+            if(!native_racer_identities50PL::allocate(inputs_.collisionRoster.size(),available,
+                allocated.data(),allocated.size()))return fail(d,"RA native body identity namespace exhausted");
             for(std::size_t slot=0;slot<inputs_.collisionRoster.size();++slot){
                 auto& row=bodyIdentities_[slot];row.collision=inputs_.collisionRoster[slot];
-                std::uint32_t* targets[]={&row.main,&row.secondary,&row.terrain,&row.pod,&row.movement};
-                const auto targetCount=shared?5u:2u;
-                for(unsigned targetIndex=0;targetIndex<targetCount;++targetIndex){
-                    auto* target=targets[targetIndex];
-                    while(next&&!available(next)){
-                        if(next==std::numeric_limits<std::uint32_t>::max())next=0;else ++next;
-                    }
-                    if(!next)return fail(d,"RA native body identity namespace exhausted");
-                    *target=next;
-                    if(next==std::numeric_limits<std::uint32_t>::max())next=0;else ++next;
-                }
+                row.main=allocated[slot].main;row.secondary=allocated[slot].secondary;
+                row.terrain=allocated[slot].terrain;row.pod=allocated[slot].pod;row.movement=allocated[slot].movement;
             }
             if(candidates_->triggerActions_){
                 if(inputs_.collisionRoster.empty()||!rosterResources_)

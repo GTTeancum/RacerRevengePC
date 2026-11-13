@@ -12,7 +12,15 @@
 registerRacerFrameExceptSharedMotionAndNoise50GB(racerBank,s);
 racerBank.owner(originalAi);
 racerBank.owner(originalAiReceipt);
+// Every course: each racer's own query identities (one allocator,
+// native_racer_identities50pl.h) are saved per racer, never shared. The 690
+// and 364 identities here; 348/694/7A4 with the recovery owners below.
+racerBank.owner(qfilter.identity);racerBank.owner(secondaryFilter.identity);
+racerBank.owner(terrainOwner.metadata.filter.identity);racerBank.owner(movement.filter.identity);
 if(originalRecoveryEnabled){
+ racerBank.owner(recoveryQueryOwners.podFilter.identity);
+ racerBank.owner(recoveryQueryOwners.globals.identity);
+ racerBank.owner(recoveryQueryOwners.globals.terrainIdentity348);
  racerBank.owner(originalRecovery);racerBank.owner(originalRecoveryModels);
  racerBank.owner(originalHumanRecovery);racerBank.owner(humanBaseUndertrack);
  recoveryQueryOwners.registerMutableOwners(racerBank);
