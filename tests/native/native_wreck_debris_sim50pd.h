@@ -1189,5 +1189,26 @@ inline bool bindCameraView(std::size_t slot,std::uint64_t sessionGeneration,std:
     v.racer=slot;v.view={sessionGeneration,racerKey,v.collections.data(),collections};
     return true;
 }
+// 229F80 -> 228110 at a Results replay start or loop: the racers in mask are
+// restored and their wreck leaves the world (the replay re-runs it at the
+// recorded moment). Pieces of racers kept wrecked (retired before the current
+// recording) stay. Frames never allocate: the removed pieces are retired in
+// place (zone memberships released), or the whole sim is cleared when no
+// other racer has pieces. Returns the pieces removed.
+inline std::size_t removeRacers(std::uint32_t mask) noexcept {
+    auto& s=sim();std::size_t removed=0;bool kept=false;
+    const auto listed=[&](std::size_t racer){return racer<32u&&((mask>>racer)&1u);};
+    for(std::size_t i=0;i<s.pieces.size();++i){
+        auto& p=s.pieces[i];
+        if(!listed(p.racer)){kept=true;continue;}
+        if(i<zones::maxPieces&&zones::membership(i))zones::remove(i);
+        if(!p.retired){p.retired=true;++removed;}
+    }
+    for(std::size_t gi=0;gi<s.groupCount&&gi<s.groups.size();++gi)if(listed(s.groups[gi].racer))s.groups[gi].active=false;
+    for(std::size_t r=0;r<s.activeCollections.size();++r)if(listed(r))s.activeCollections[r]=0;
+    if(listed(cameraView().racer))resetCameraView();
+    if(!kept)resetSim();
+    return removed;
+}
 
 } // namespace native_wreck_debris50PD

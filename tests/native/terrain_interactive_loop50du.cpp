@@ -17,6 +17,9 @@
 #include "../../src/game/collision_mesh_admission50cc.h"
 #include <algorithm>
 #include <array>
+#include <bit>
+#include <cstring>
+#include <iterator>
 #include <cstdio>
 #include <functional>
 #include <xmmintrin.h>
@@ -307,6 +310,39 @@ void Context::run() {
   {SimulationScope timing(phaseTiming.enabled,simulationTotals[6]);requireOriginalAiFleetReady();}return true;
  };
 
+ // 229F80 for every racer at a Results replay start (1AB520) and at each
+ // replay loop (1A8158). A racer that left the race before the current
+ // recording began (CD4 != 0 and race1A8 >= CD4, signed SLT at 229FBC) keeps
+ // its wreck; every other racer is restored by 228110: state40 = 0, damage
+ // 7D0..7DC = 0, C00..C06 = 0, its pieces leave the world (the replay re-runs
+ // the wreck at the recorded moment through 228914). Not represented: the
+ // 216A30 placement at C38/C40 (the replay pose comes from the played frame),
+ // the D40 +94 sound reset and the collision membership restore (a replay
+ // frame runs no contacts).
+ const auto unwreckReplayRacers229F80=[this](const char* at){
+  auto& replay=native_race_replay50PD::owner();
+  const auto race1A8=replay.race1A8();
+  std::uint32_t resetMask=0;
+  for(std::size_t slot=0;slot<racerBank.count()&&slot<rr::game::nativeDestroyedRacers50PD.size();++slot){
+   const std::uint32_t cd4=slot<std::size(originalAiSession.rank)?originalAiSession.rank[slot].retirementCD4:0u;
+   if(cd4&&std::bit_cast<std::int32_t>(race1A8)>=std::bit_cast<std::int32_t>(cd4)){
+    std::cerr<<"replay_unwreck at="<<at<<" slot="<<slot<<" kept=1 cd4="<<cd4<<" race1A8="<<race1A8<<'\n';continue;}
+   bool wasOut=false;std::uint32_t state=0;
+   require50DU(racerBank.visit(slot,[&](){
+    auto& record=rr::game::nativeDestroyedRacers50PD[slot];state=s.bodies.main.vehicleState40;
+    wasOut=state!=0u||record.destroyed||record.limping;
+    s.bodies.main.vehicleState40=0u;record={};
+    s.fields.damage7D0=s.fields.damage7D4=s.fields.damage7D8=s.fields.damage7DC=0.f;
+    std::memset(s.packedC00,0,sizeof s.packedC00);return true;}),"229F80 replay racer reset rejected");
+   require50DU(replay.clearRacerBytes229F80(slot),"229F80 replay racer C00..C06 store rejected");
+   if(wasOut){resetMask|=1u<<slot;
+    std::cerr<<"replay_unwreck at="<<at<<" slot="<<slot<<" kept=0 state40="<<state<<" cd4="<<cd4<<" race1A8="<<race1A8<<'\n';}
+  }
+  if(resetMask){const auto removed=native_wreck_debris50PD::removeRacers(resetMask);
+   std::cerr<<"replay_unwreck at="<<at<<" mask=0x"<<std::hex<<resetMask<<std::dec<<" debris_removed="<<removed
+       <<" debris_live="<<native_wreck_debris50PD::sim().pieces.size()<<'\n';}
+  return true;
+ };
  const auto withRace=[&](auto&& operation)->decltype(auto){
   if(isRcTrack)requireMbRuntimeNavigation50MB();
   if(isMcTrack){requireMbRuntimeNavigation50MB();return operation(mcRace);}
@@ -1490,10 +1526,33 @@ void Context::run() {
        if(replay.ended()){
         require50DU(!common.restartWorld||common.restartWorld(why),why?why:"replay loop world restart rejected");
         require50DU(replay.loop(why),why?why:"race78 replay loop rejected");
+        unwreckReplayRacers229F80("1A8158");
+        // 1A81DC..1A8204: TV reset and mode 6 at every loop (when the TV exists).
+        require50DU(sourceCameraSession->enterResultsReplayCamera1ACE14(),"1A8204 replay-loop TV camera request rejected");
         std::cerr<<"race_replay loop="<<replay.stats().loops<<'\n';
        }
        require50DU(racerBank.visitAll([&](std::size_t slot){return replay.apply(slot,s,x.bindings);}),
            replay.stats().lastRejection?replay.stats().lastRejection:"race78 replay pose rejected");
+       // 228620 with +3C != 0: +40 == 0 and a nonzero played +44 re-runs that
+       // handler (228914..2289B0); a racer in 1/2 whose +44 differs takes the
+       // same dispatch (228A94..228B2C); states 3/4 never re-dispatch (228764).
+       require50DU(racerBank.visitAll([&](std::size_t slot){
+           const auto state40=s.bodies.main.vehicleState40;const auto state44=replay.replayState44(slot);
+           if(!state44||state44>4u||state40==3u||state40==4u||state40==state44)return true;
+           if(state40!=0u){std::cerr<<"replay_wreck slot="<<slot<<" state40="<<state40<<" state44="<<state44
+               <<" skipped=limp_in_replay\n";return true;}
+           return advanceFramePart(slot,static_cast<NativeRacerFramePart>(static_cast<unsigned>(NativeRacerFramePart::Replay44_1)+state44-1u),
+               .016f,60.f);}),"228914 replay wreck dispatch rejected");
+       // The wreck world in a replay frame, as at a race world boundary.
+       racerBank.visit(0,[&](){native_wreck_debris50PD::step(.016f,s.noiseOwner().sharedRandomState);});
+       if(rr::game::nativeRacerDestroyed50PD(0)&&!native_wreck_debris50PD::cameraViewBound(0)){
+        const auto& identity=sourceCameraSession->deathIdentity();
+        const bool bound=native_wreck_debris50PD::bindCameraView(0,identity.sessionGeneration,identity.racerKey);
+        std::cerr<<"death_camera_debris bound="<<bound<<" pieces="<<native_wreck_debris50PD::cameraView().count
+            <<" collections="<<native_wreck_debris50PD::cameraView().view.count370<<" at=replay\n";
+       }
+       native_wreck_debris50PD::updateCameraView();
+       native_wreck_effects50PD::step(.016f);
        const auto frame=++sourceCameraTick;
        const auto scene=sourceCameraSession->advanceSceneChild(frame,sourceCamera::Cut::replayPose,.016f);
        advanceWorldAnimations();advanceNativeGcWater();advanceRcTrackParticles();advanceTbTrackParticles();
@@ -1906,7 +1965,7 @@ void Context::run() {
          // TA's world has no RA trigger list or physics index: its native
          // world restart is the particle/animation clear below.
          reason=nullptr;native_wreck_effects50PD::reset();return true;};
-        common.beginReplay=[this](const char*& reason){
+        common.beginReplay=[this,unwreckReplayRacers229F80](const char*& reason){
          replayFrames50PD=0;replayCameraReported50PD=false;
          // The original race no longer opens its Pause once finished
          // (1A7CDC). Retire the host Pause drawing so Results' own 14D440
@@ -1919,6 +1978,16 @@ void Context::run() {
          const bool rearmed=sourceCameraSession&&sourceCameraSession->rearmFadeInAfterRestart50PD();
          std::cerr<<"race_replay fade_in_rearmed="<<rearmed<<'\n';
          const bool begun=native_race_replay50PD::owner().beginReplay(reason);
+         if(begun){
+          // 1AB520 waiting branch: race1B0 bit4 on the race, then 1AC8E0's
+          // 1ACC24 -> 1ACE14 TV request. Every course, data-driven.
+          if(!native_race_replay50PD::owner().markResultsReplay1AB520()){reason="1AB520 race1B0 bit4 rejected";return false;}
+          if(!sourceCameraSession||!sourceCameraSession->enterResultsReplayCamera1ACE14()){reason="1ACE14 Results TV camera request rejected";return false;}
+          std::cerr<<"race_replay tv_camera present="<<sourceCameraSession->replayTvPresent()<<'\n';
+          // 1AC8E0's particle reset 161F60, then every racer 3C = 1 and 229F80.
+          native_wreck_effects50PD::reset();
+          unwreckReplayRacers229F80("1AB520");
+         }
          const auto& owned=originalMainApplication.sourceRace28COwner_;
          const auto st=owned?native_race_replay50PD::Owner::vcrState(*owned):rr::game::OriginalSimpleVCR50LA::State{};
          std::cerr<<"race_replay begin="<<begun<<" channels="<<st.channels<<" bytes="<<st.bytesUsed<<"/"<<st.capacityBytes
@@ -1937,6 +2006,22 @@ void Context::run() {
         std::cerr<<"race_replay record="<<started<<" at=1AFE30 subtype="<<dynamicMusicProfile.mode11258
             <<" why="<<(why?why:"")<<'\n';
         if(!started)common.fallback=true;
+       }
+       // 1A7F40..1A80EC: a human lap event (B4 flags58 bits3..4 = 1 or 3,
+       // non-subtype-3) with the association head not finished restarts the
+       // recording (229F20, race1A8 += 1, 287B60, bit1).
+       if(replay.phase()==native_race_replay50PD::Owner::Phase::recording&&dynamicMusicProfile.mode11258!=3u){
+        const auto mode=(originalAiSession.manager.flags58>>3u)&3u;
+        if(mode==1u||mode==3u){
+         bool finished=true;std::uint32_t lap=0;
+         racerBank.visit(0,[&](){finished=(s.fields.impactFlagsCD8&1u)!=0;lap=lapContinuity.state.vehicleCC8;});
+         if(!finished){
+          const bool restarted=replay.restartRecordingAtLap1A7F40(why);
+          std::cerr<<"race_replay lap_restart="<<restarted<<" race1A8="<<replay.race1A8()<<" lap="<<lap
+              <<" why="<<(why?why:"")<<'\n';
+          if(!restarted)common.fallback=true;
+         }
+        }
        }
        if(replay.phase()==native_race_replay50PD::Owner::Phase::recording){
         if(replay.captureDue())

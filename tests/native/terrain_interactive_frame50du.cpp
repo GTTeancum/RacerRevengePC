@@ -18,6 +18,9 @@ void Context::recordNativeResult(bool ok,const char* label) {
 
 bool Context::advance(std::size_t actualRacerSlot,Part part,
     float preparedOuterFactor,float liveSubstepScale) {
+ if(part==Part::Replay44_1||part==Part::Replay44_2||part==Part::Replay44_3||part==Part::Replay44_4)
+  return replayDestroy228620(actualRacerSlot,static_cast<std::uint32_t>(part)-static_cast<std::uint32_t>(Part::Replay44_1)+1u,
+      preparedOuterFactor);
  NativeCalls runNative{*this};
  requireMbRuntimeNavigation50MB();
  require50DU(preparedOuterFactor==.016f&&liveSubstepScale==60.f,

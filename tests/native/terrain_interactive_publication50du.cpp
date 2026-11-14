@@ -2134,6 +2134,13 @@ void Context::run() {
    if(isTbTrack){accountTbParticleRegistry();tbParticleRegistryFinalAccounted=true;}
    if(isRcTrack){accountRcParticleRegistry();rcParticleRegistryFinalAccounted=true;}
    }
+   // 175650: the course TV camera from the course's own archive. ONE call for
+   // every course, after both session routes (RA's stand-in route included)
+   // have produced a prepared session. A missing/unloadable file leaves no TV
+   // camera, as race48+78 = 0, and the Results replay keeps the current view.
+   {const auto tvArchive=runtime_startup50fl::readBytes(trackSession->archive);
+    const bool tv=sourceCameraSession&&sourceCameraSession->loadReplayTv175650(tvArchive,trackSession->archiveBytes,trackSession->world->code);
+    std::cerr<<"original_tv_camera loaded="<<tv<<" error="<<(sourceCameraSession?unsigned(sourceCameraSession->replayTvLoadError().code):0u)<<'\n';}
    // Demand comes from actual retained consumers, not a course-name list.
    // TB owns the canonical pool without a separate numeric renderer. RA has
    // its separate static-fog observation phase and has none of these owners.

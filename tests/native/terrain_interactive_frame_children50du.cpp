@@ -11,6 +11,7 @@
 #include "original_ai_physical_recovery.h"
 #include "original_human_physical_recovery.h"
 #include "../../src/game/native_destroyed_racers50pd.h"
+#include "../../src/game/packed_vehicle_tail50r.h"
 #include "../../src/game/native_test_undertrack50ut.h"
 #include <bit>
 #include "../../src/game/original_vehicle_damage50la.h"
@@ -940,7 +941,7 @@ bool Context::stopDestroyedPlainEffects(const char* label) {
 }
 
 bool Context::commitOriginalDestroyed(std::size_t actualRacerSlot,
-    const ImpactTransitionResult50C& decision,float preparedOuterFactor) {
+    const ImpactTransitionResult50C& decision,float preparedOuterFactor,bool replay) {
  using namespace rr::game;
  (void)preparedOuterFactor;
  require50DU(actualRacerSlot<nativeDestroyedRacers50PD.size(),"destroyed racer slot outside the race field");
@@ -1120,6 +1121,12 @@ bool Context::commitOriginalDestroyed(std::size_t actualRacerSlot,
   // limps instead, handled above before this switch).
 
   case 0x225e7cu:case 0x225ec0u:handler=0x226750u;break;
+  // 228914..2289B0 (Results replay, racer +3C != 0, +40 == 0): 229770's +44
+  // names the recorded handler; 88 = 2261B0, 8C = 226750, and 90/94 reach
+  // 227370/227A40, which with 3C != 0 take 226750 (the port's reading of
+  // 2273A0/227A70, as for the AI above).
+  case 0x228934u:handler=0x2261b0u;break;
+  case 0x228958u:case 0x22897cu:case 0x2289a0u:handler=0x226750u;break;
   default:
    std::cerr<<"original destroy dispatch unknown pc="<<std::hex<<decision.sourcePC<<std::dec<<'\n';
    require50DU(false,"original destroy dispatch site is not one of 225D10/225D9C/225E28/225E7C/225EC0");
@@ -1161,9 +1168,12 @@ bool Context::commitOriginalDestroyed(std::size_t actualRacerSlot,
   // 2263F8 / 226808: D40 virtual9C. AI: 16DF70 wreck cue and engine/binder stop.
   if(originalAiAudioEnabled&&s.fields.vehicle58==1u){
    std::uint32_t cue=0;
-   require50DU(originalAiAudio->destroyed16DF70(actualRacerSlot,s,x.bindings,sessionRandom,
-       s.noiseOwner().sharedRandomState,applicationClock,cue),"original AI D40 16DF70 destroy audio rejected");
-   std::cerr<<"pod_destroyed_audio slot="<<actualRacerSlot<<" wreck_cue="<<cue<<'\n';
+   const bool played=originalAiAudio->destroyed16DF70(actualRacerSlot,s,x.bindings,sessionRandom,
+       s.noiseOwner().sharedRandomState,applicationClock,cue);
+   // A replay wreck (Results) keeps going when the AI audio owner has already
+   // retired its race voices; logged. A race wreck still requires it.
+   require50DU(played||replay,"original AI D40 16DF70 destroy audio rejected");
+   std::cerr<<"pod_destroyed_audio slot="<<actualRacerSlot<<" wreck_cue="<<cue<<" played="<<played<<'\n';
   }else if(audioEnabled&&human&&liveAudio->outputOpen()){
    // Human D40 virtual9C = 1A0060: v88/v84 stop the binder/engine loops,
    // 2924A0(488) stops the p_event emitter, 292360(48C,1) plays p_debris cue1.
@@ -1211,11 +1221,12 @@ bool Context::commitOriginalDestroyed(std::size_t actualRacerSlot,
  // The same 79C refresh tail ends 2261B0/226750; not represented (see the
  // limp entry above).
  std::cerr<<"pod_destroyed_query79c slot="<<actualRacerSlot<<" represented=0\n";
- if(!limpEscalation)applySuffix();
+ // The replay path (228914..) calls the handler alone: no 225C50 suffix.
+ if(!limpEscalation&&!replay)applySuffix();
  // 226414..2264AC / 226824..2268BC: human (58==0, 3C==0) with the vibration
  // option (11050 bit2): device virtual40 (238870, clear both) then virtual44
  // (2388B0, both motors) for 2.0 s (explode) or 1.0 s (wreck in place).
- if(human&&!s.fields.vehicle3C&&(dynamicConsumerFlags11050&4u)&&playerSource5C<2u){
+ if(human&&!s.fields.vehicle3C&&!replay&&(dynamicConsumerFlags11050&4u)&&playerSource5C<2u){
   auto& device=feedbackDevices[playerSource5C];
   clearControllerFeedback50KZ(device,2);
   require50DU(requestControllerFeedback50KZ(device,2,0u,explode?2.f:1.f),"destroyed racer vibration request rejected");
@@ -1226,9 +1237,28 @@ bool Context::commitOriginalDestroyed(std::size_t actualRacerSlot,
      <<" frame="<<completedFrames<<" attacker="<<static_cast<std::int32_t>(record.attackerD30)
      <<" kill_credit="<<record.killCreditPending<<" music_song="<<record.musicSong<<" position="<<p.v[0]<<','<<p.v[1]<<','<<p.v[2]<<'\n';
  // The rest of this tick's racer frame does not run for a destroyed racer;
- // the next physics part only closes the phase.
- s.phase=VehicleFramePhase49W::AfterBodyChildren;
+ // the next physics part only closes the phase. A replay racer runs no frame.
+ if(!replay)s.phase=VehicleFramePhase49W::AfterBodyChildren;
  return true;
+}
+
+// Results replay, 228620 with racer +3C != 0 and +40 == 0 (228914..2289B0):
+// a nonzero played +44 dispatches its handler through the racer vtable
+// (88/8C/90/94). STAND-IN: the port does not store +3C = 1 on its replay
+// racers (1AB520); the replay flag stands for it inside the handler.
+bool Context::replayDestroy228620(std::size_t actualRacerSlot,std::uint32_t state44,float preparedOuterFactor) {
+ using namespace rr::game;
+ ImpactTransitionResult50C decision{};
+ switch(state44){
+  case 4u:decision.sourcePC=0x228934u;break;
+  case 3u:decision.sourcePC=0x228958u;break;
+  case 2u:decision.sourcePC=0x22897cu;break;
+  case 1u:decision.sourcePC=0x2289a0u;break;
+  default:require50DU(false,"replay racer +44 outside the 228914 dispatch (1..4)");
+ }
+ require50DU(s.bodies.main.vehicleState40==0u,"replay wreck reached a racer that is not intact");
+ std::cerr<<"replay_wreck slot="<<actualRacerSlot<<" state44="<<state44<<" pc=0x"<<std::hex<<decision.sourcePC<<std::dec<<'\n';
+ return commitOriginalDestroyed(actualRacerSlot,decision,preparedOuterFactor,true);
 }
 
 bool Context::advanceDestroyedChildren(std::size_t actualRacerSlot,float preparedOuterFactor) {
@@ -1245,6 +1275,24 @@ bool Context::advanceDestroyedChildren(std::size_t actualRacerSlot,float prepare
  if(s.bodies.main.vehicleState40==4u)
   require50DU(advanceOriginalExplosionTimer50LA(4u,preparedOuterFactor,record.timer268).okay(),
       "destroyed racer 268 timer rejected");
+ // 228B6C..228B7C: 3C == 0 -> 2291D0 packs C00..C06 on the destroyed frame
+ // too, so the race78 recording holds state 3/4 in C02's low nibble (read
+ // back by 229770 into +44 during the Results replay).
+ if(!s.fields.vehicle3C){
+  const auto& main=s.bodies.main;const auto& c=main.components;const auto& f=s.fields;
+  PackedVehicleInput50R in{};
+  in.drive[0]=c.engine.smoothedDrive[0];in.drive[1]=c.engine.smoothedDrive[1];
+  in.drive[2]=c.bindings.aeroDrive[0];in.drive[3]=c.bindings.aeroDrive[1];
+  std::memcpy(in.impactBA0,f.impactBA0.v,12);
+  in.damage7D0[0]=f.damage7D0;in.damage7D0[1]=f.damage7D4;in.damage7D0[2]=f.damage7D8;in.damage7D0[3]=f.damage7DC;
+  in.filteredB70=main.controls.bound.control.filtered.values[1];in.filteredB78=main.controls.bound.control.filtered.values[3];
+  in.actionB80=main.controls.player.actionB80;in.flagsB9C=main.controls.player.flagsB9C;
+  in.state40=static_cast<std::uint8_t>(main.vehicleState40);in.vehicle58=f.vehicle58;
+  in.configurationEntryNonzero=x.configurationEntryNonzero;
+  const auto packed=packVehicleTail50R(in);
+  require50DU(packed.complete,"destroyed racer 2291D0 packet rejected");
+  std::memcpy(s.packedC00,packed.bytesC00,7);
+ }
  // The schedule pairs each racer frame with this tick's dispatched factor.
  s.bodies.main.frameFactor=preparedOuterFactor;
  s.phase=VehicleFramePhase49W::AfterBodyChildren;

@@ -554,7 +554,8 @@ private:
     // Original destroy transition (225C50 -> 2261B0/226750) and the state3/4
     // frame (228764/228770 -> 228390). See docs/pod-destruction-20261108.md.
     bool commitOriginalDestroyed(std::size_t actualRacerSlot,
-        const rr::game::ImpactTransitionResult50C& decision,float preparedOuterFactor);
+        const rr::game::ImpactTransitionResult50C& decision,float preparedOuterFactor,bool replay=false);
+    bool replayDestroy228620(std::size_t actualRacerSlot,std::uint32_t state44,float preparedOuterFactor);
     bool advanceDestroyedChildren(std::size_t actualRacerSlot,float preparedOuterFactor);
     bool stopDestroyedPlainEffects(const char* label);
 };

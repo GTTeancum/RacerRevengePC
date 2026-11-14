@@ -67,7 +67,10 @@ bool selectTVCamera49E(const assets::TVCameraView49E& data,TVCameraSelectorState
         desired=current;
         const auto links=data.nextCameras(current);
         for(const auto index:links){
-            if(index>=cameras.size)return false;
+            // STAND-IN: the original indexes its camera array with an authored
+            // link past its end (SA Camera22 -> 24 of 23) and reads whatever
+            // follows; the port never reads outside the list and skips it.
+            if(index>=cameras.size)continue;
             float d;
             if(!distance(cameras[index].position,player,d))return false;
             if(d<best){best=d;desired=index;}

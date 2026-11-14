@@ -75,7 +75,7 @@ class Owner final {
 public:
     enum class Phase:std::uint8_t {idle,bound,recording,replay};
     struct Stats {
-        std::uint32_t captures=0,nativeSamples=0,applied=0,loops=0,rejected=0;
+        std::uint32_t captures=0,nativeSamples=0,applied=0,loops=0,rejected=0,lapRestarts=0;
         const char* lastRejection=nullptr;
     };
     // A course without the RA world join (its race uses the native owners).
@@ -90,7 +90,7 @@ public:
     void reset()noexcept{
         raceWeak_.reset();race_=nullptr;phase_=Phase::idle;count_=0;words_=nullptr;bytes_=nullptr;
         for(auto& t:tracks_){t.rootCount=0;t.samples.clear();}
-        stats_={};lastWrites_=0;
+        stats_={};lastWrites_=0;state44_={};
     }
     // 1AD9A0 for every racer, in roster order, after race78 and Race90 exist
     // and before the first VCR update (bit4 closes registration).
@@ -138,6 +138,38 @@ public:
         if(race_->flags1B0KnownValue_&8u)race_->flags1B0KnownValue_=std::uint8_t(race_->flags1B0KnownValue_&~8u);
         race_->flags1B0KnownMask_=std::uint8_t(race_->flags1B0KnownMask_|8u);
         phase_=Phase::recording;lastWrites_=0;return true;
+    }
+    // 1A7F40..1A80EC (race update, non-subtype-3, B4 flags58 bits3..4 = 1 or 3,
+    // i.e. a human lap event, and the association head 3C[0]+48 bit0 clear):
+    // 229F20 every racer, race1A8 += 1, 287B60, bit1. The recording restarts
+    // at each human lap, so the Results replay holds the human's last lap.
+    // 229F20's C38/C40 snapshot is not represented: the port's replay pose
+    // comes from the first played frame (apply), not from a 216A30 placement.
+    bool restartRecordingAtLap1A7F40(const char*& why)noexcept{
+        why=nullptr;auto* vcr=current(why);if(!vcr)return false;
+        if(phase_!=Phase::recording){why="lap restart outside recording";return false;}
+        race_->field1A8_+=1u;                    // 1A80BC..1A80C4 (ADDIU wraps)
+        OriginalSimpleVCRDiagnostic50LA d;
+        if(!vcr->startRecord1A80C8(*race_,d)){why=d.operation?d.operation:"287B60 rejected";return false;}
+        for(auto& t:tracks_)t.samples.clear();captured_.fill(false);lastWrites_=0;++stats_.lapRestarts;
+        return true;
+    }
+    // 229F80's C00..C06 = 0 on a restored racer. The original channels write
+    // straight into racer C00..C06, so the store also clears what 229770 reads
+    // until playback writes the next frame; here that is the channel backing.
+    bool clearRacerBytes229F80(std::size_t slot)noexcept{
+        if(phase_!=Phase::replay||!bytes_||slot>=count_)return false;
+        std::memset(bytes_+slot*racerBytes,0,racerBytes);state44_[slot]=0;return true;
+    }
+    std::uint32_t race1A8()const noexcept{return race_&&!raceWeak_.expired()?race_->field1A8_:0u;}
+    // 229770's racer+44 (C02 & 0xF) of the last applied frame; 228620 compares
+    // it with +40 to re-run the recorded wreck (2289..: 3C != 0 branches).
+    std::uint32_t replayState44(std::size_t slot)const noexcept{return slot<state44_.size()?state44_[slot]:0u;}
+    // 1AB520 waiting branch: race1B0 bit4 (Results replay) before 1AC8E0.
+    bool markResultsReplay1AB520()noexcept{
+        if(!race_||raceWeak_.expired())return false;
+        race_->flags1B0KnownValue_=std::uint8_t(race_->flags1B0KnownValue_|0x10u);
+        race_->flags1B0KnownMask_=std::uint8_t(race_->flags1B0KnownMask_|0x10u);return true;
     }
     // True when the next 287C90 will write a VCR frame: staging must be current.
     bool captureDue()const noexcept{
@@ -279,6 +311,7 @@ public:
         std::memcpy(&targets[0],w+10,4);std::memcpy(&targets[1],w+11,4);std::memcpy(&targets[3],w+12,4);
         // 229770.
         std::memcpy(s.packedC00,p,racerBytes);
+        state44_[slot]=p[2]&0xfu;                 // 229AD0..229ADC
         const auto code=[&](unsigned shift){return float((p[0]>>shift)&3u)*0.33f;};
         m.components.engine.smoothedDrive[0]=code(0);m.components.engine.smoothedDrive[1]=code(2);
         m.components.bindings.aeroDrive[0]=code(4);m.components.bindings.aeroDrive[1]=code(6);
@@ -305,6 +338,7 @@ private:
     std::uint32_t* words_=nullptr;std::uint8_t* bytes_=nullptr;
     std::array<RacerTrack,maxRacers> tracks_{};
     std::array<RootSample,maxRacers> pending_{};std::array<bool,maxRacers> captured_{};
+    std::array<std::uint32_t,maxRacers> state44_{};
     std::uint32_t lastWrites_=0;Stats stats_{};
 };
 inline Owner& owner()noexcept{static Owner o;return o;}

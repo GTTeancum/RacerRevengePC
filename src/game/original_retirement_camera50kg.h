@@ -39,7 +39,7 @@ inline OriginalRetirementCameraResult50KG transitionOriginalDeath177AB0(
     ResetVisibilityWorld50EY& visibility,OriginalCameraSceneOwner& spatial,
     const OriginalFollowVisibilityZones& zones,LiveZoneWorkspace50EN& workspace,
     const OriginalFollowSceneTransitionInput& in,
-    OriginalDeathCameraQueryColdOwner* cold=nullptr) noexcept {
+    OriginalDeathCameraQueryColdOwner* cold=nullptr,std::uint64_t tvChildKey=0) noexcept {
     using S=OriginalRetirementCameraStatus50KG;
     OriginalRetirementCameraResult50KG r;
     const auto& b=controller.binding;const auto& identity=death.identity;
@@ -48,7 +48,9 @@ inline OriginalRetirementCameraResult50KG transitionOriginalDeath177AB0(
        scene.sceneKey!=b.sceneKey)return r;
     //177B00 nonzero same-mode return precedes collection and subject reads.
     if(controller.mode44==1){r.status=S::complete;r.sourcePC=0x17864cu;return r;}
-    if(controller.mode44!=0&&controller.mode44!=5){
+    // Mode 6 is the Results-replay TV child (race48+78), reached only with a
+    // registered TV key: 177AB0's old-pose export is not consumed by 22D810.
+    if(controller.mode44!=0&&controller.mode44!=5&&!(controller.mode44==6&&tvChildKey)){
         r.status=S::sourcePath;r.sourcePC=0x177b48u;return r;
     }
     if(controller.flags62&0x60u){
@@ -72,6 +74,7 @@ inline OriginalRetirementCameraResult50KG transitionOriginalDeath177AB0(
         collection.registered38[collection.selected34]!=followChildren.follow64Key))||
        (controller.mode44==5&&(!attachedChildren.attached6C->active||
         collection.registered38[collection.selected34]!=attachedChildren.attached6CKey))||
+       (controller.mode44==6&&collection.registered38[collection.selected34]!=tvChildKey)||
        subject.identity.sessionGeneration!=identity.sessionGeneration||
        subject.identity.racerKey!=identity.racerKey||subject.identity.mainBodyKey!=identity.mainBodyKey||
        subject.identity.death68Key!=identity.death68Key||subject.identity.body288!=identity.body288||
@@ -218,6 +221,10 @@ struct OriginalRetirementCameraOwners50KG {
     const OriginalFollowChildRegistry& followChildren;
     const OriginalAttachedChildRegistry& attachedChildren;
     GameplayBlurPending& blur;
+    // Results replay with race1B0 bit4 and race48+78 (17622C..17624C): the
+    // death branch is 17692C..17698C, entered from any camera mode.
+    bool replayDirector=false;
+    std::uint64_t tvChildKey=0;
 };
 // Typed continuation around175D70's actual death mode1 branch. This never
 // pretends that missing race HUD text owners executed1AD230. Caller retains
@@ -232,6 +239,7 @@ class OriginalRetirementCameraCursor50KG final {
     std::uint64_t deathKey_=0;
     CameraRacerClass racerClass_=CameraRacerClass::unavailable;
     std::uint8_t raceFlags1B0_=0;
+    bool replay_=false;GameplayBlurPending* blur_=nullptr;
     OriginalRetirementCameraResult50KG finish() noexcept {
         controller_->flags62=static_cast<std::uint8_t>(controller_->flags62&~0x80u);
         phase_=Phase::idle;
@@ -241,7 +249,8 @@ class OriginalRetirementCameraCursor50KG final {
         if(controller_->mode44!=1||!death_||!death_->active||!collection_||
            collection_->selected34>=collection_->count30||
            collection_->registered38[collection_->selected34]!=deathKey_)return {OriginalRetirementCameraStatus50KG::continuation,0x1767c8u,true};
-        if(racerClass_==CameraRacerClass::player&&(raceFlags1B0_&3u)==1u){
+        // 176954 (replay): mode 1 returns at 176D9C with no 1AD230 HUD stop.
+        if(!replay_&&racerClass_==CameraRacerClass::player&&(raceFlags1B0_&3u)==1u){
             phase_=Phase::hud;
             return {OriginalRetirementCameraStatus50KG::needsHudAnimationStop1AD230,0x176800u,true};
         }
@@ -273,11 +282,16 @@ public:
             collection->registered38[collection->selected34]!=o.followChildren.follow64Key))||
            (o.controller.mode44==5&&(!o.attached.active||
             collection->registered38[collection->selected34]!=o.attachedChildren.attached6CKey)))return r;
+        // 17622C: race1B0 bit4 with race48+78 skips the ending orbit and, for a
+        // racer in 3/4, reaches 17692C from any mode (the TV mode 6 included).
+        const bool replay=o.replayDirector&&(frame.raceFlags1B0&0x10u);
         if((frame.racerState40!=3&&frame.racerState40!=4)||
-           (o.controller.mode44!=0&&o.controller.mode44!=5&&o.controller.mode44!=1)||
-           (frame.raceFlags1B0&0x10u)||((frame.raceStateFlags58&1u)&&frame.racerCD4==0)){
+           (!replay&&o.controller.mode44!=0&&o.controller.mode44!=5&&o.controller.mode44!=1)||
+           (replay&&o.controller.mode44!=0&&o.controller.mode44!=5&&o.controller.mode44!=1&&o.controller.mode44!=6)||
+           (!replay&&(frame.raceFlags1B0&0x10u))||(!replay&&(frame.raceStateFlags58&1u)&&frame.racerCD4==0)){
             r.status=S::sourcePath;r.sourcePC=0x17601cu;return r;
         }
+        if(o.controller.mode44==6&&(!o.tvChildKey||collection->registered38[collection->selected34]!=o.tvChildKey))return r;
         if(o.controller.mode44==1&&(!o.death.active||
            collection->registered38[collection->selected34]!=o.deathChildren.death68Key))return r;
         namespace d=original_race_camera_detail;
@@ -297,7 +311,7 @@ public:
         o.follow.shakeScale174=shake.followMagnitude174;o.follow.shakeAmplitude170=shake.followFactor170;
         o.attached.shakeScale2C=shake.attachedMagnitude2C;o.attached.shakeAmplitude28=shake.attachedFactor28;
         controller_=&o.controller;death_=&o.death;collection_=collection;deathKey_=o.deathChildren.death68Key;
-        racerClass_=b.racerClass;raceFlags1B0_=frame.raceFlags1B0;
+        racerClass_=b.racerClass;raceFlags1B0_=frame.raceFlags1B0;replay_=replay;blur_=&o.blur;
         if(o.controller.mode44!=1){phase_=Phase::transition;r.status=S::needsDeathTransition177AB0;r.sourcePC=0x176770u;r.prefixCommitted=true;return r;}
         return afterModeSelected();
     }
@@ -305,6 +319,8 @@ public:
     // does not certify the transition by accepting an arbitrary boolean.
     OriginalRetirementCameraResult50KG afterDeathTransition() noexcept {
         if(phase_!=Phase::transition||!controller_)return {OriginalRetirementCameraStatus50KG::continuation,0x176770u};
+        // 176970..176984 (replay): cut90 = 2.0 and 2AED10(blur, 100, 0).
+        if(replay_&&blur_){controller_->cutRemaining90=2.f;requestGameplayBlur(*blur_,100,0,0);}
         return afterModeSelected();
     }
     // The actual race HUD animation-stop helper has returned. Its source
