@@ -1,5 +1,6 @@
 #pragma once
 #include "track_materials50fa_fixture.h"
+#include "original_world_material_admission50cm.h"
 #include "mc_cold_sources50la.h"
 #include "mc_material_alpha50mc.h"
 #include "mc_world_semantics50mc.h"

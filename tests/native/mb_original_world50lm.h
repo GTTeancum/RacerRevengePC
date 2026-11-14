@@ -1,5 +1,6 @@
 #pragma once
 #include "track_materials50fa_fixture.h"
+#include "original_world_material_admission50cm.h"
 #include "material_alpha50gx_fixture.h"
 #include "source_texture50fc_fixture.h"
 

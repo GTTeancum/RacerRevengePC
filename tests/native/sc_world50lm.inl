@@ -71,7 +71,7 @@ inline std::uint32_t initialFrame(const a::MaterialFields48E& value){
 // already retained independent image hash was available and checked. Ordinary
 // image hashes are recorded after decoding, never used to select pixel data.
 inline Bytes image(const std::string& member,const Bytes& source,std::uint32_t& mipIndex,
-    bool& animated,a::DecodeError48C& error,bool* independentlyPinned=nullptr){
+    bool& animated,a::DecodeError48C& error,bool* independentlyPinned=nullptr,std::uint32_t authoredFrame=0){
     shared::need(source.size()>=12&&source.size()<=8u*1024u*1024u,"Original SC texture source extent");
     const auto name=key(member);const auto* pin=sourceImage(name);
     const source_texture50fc_fixture::detail::Entry* outputPin=nullptr;
@@ -82,7 +82,7 @@ inline Bytes image(const std::string& member,const Bytes& source,std::uint32_t& 
         if(outputPin)shared::need(std::string(outputPin->outputSha256)==entry.outputSha256,"SC independent pixel pin disagreement");
         outputPin=&entry;
     }
-    shared::need(pin||outputPin,"Original SC image has no authenticated source identity");
+    // No pin: decoded and admitted with its runtime identity (counted by the loader). Pins still verify exactly.
     const auto sourceSha=shared::sha256(source);
     if(pin)shared::need(source.size()==pin->sourceBytes&&sourceSha==pin->sourceSha256,
         "Original SC static image source identity differs");
@@ -92,6 +92,7 @@ inline Bytes image(const std::string& member,const Bytes& source,std::uint32_t& 
     // reader,24E0E0 channel swap and16C0D0 packed1555 conversion accept8x8.
     //251040 starts one level;251074's minimum16 comparison adds no mip for8.
     // This does not widen shared TGA/RA/canonical admission.
+    // Stand-in: name-keyed exact WHITE consumer; still requires its pin. Retire into a common TGA path.
     if(name=="TEXTURES/WHITE.TGA"){
         shared::need(pin&&pin->kind==3&&source.size()==236&&pin->width==8&&pin->height==8&&
             source[0]==0&&source[1]==0&&source[2]==2&&source[16]==24&&source[17]==0&&
@@ -119,9 +120,9 @@ inline Bytes image(const std::string& member,const Bytes& source,std::uint32_t& 
     }
     animated=name.ends_with(".ATM");
     shared::need(animated||name.ends_with(".PST"),"Unsupported original SC image extension");
-    shared::need(!animated||(pin&&source.size()>=24&&pin->initialFrame<pin->frameCount),
+    shared::need(!animated||(source.size()>=24&&(!pin||pin->initialFrame<pin->frameCount)),
         "Original SC ATM lacks its exact frame selection");
-    const auto frameIndex=pin?pin->initialFrame:0u;
+    const auto frameIndex=pin?pin->initialFrame:authoredFrame; // unpinned ATM: the frame the material authors
     const auto kind=shared::u32(source.data()+(animated?16:4));
     if(pin)shared::need(kind==pin->kind,"Original SC source image kind differs");
     Bytes output;
@@ -130,7 +131,7 @@ inline Bytes image(const std::string& member,const Bytes& source,std::uint32_t& 
         if(animated){
             std::vector<a::detail::OriginalIpumFrameExtent50LA> frames;std::size_t bad=0;
             shared::need(a::detail::frameOriginalIpumAtm50LA(source,frames,bad)&&
-                frames.size()==pin->frameCount&&frameIndex<frames.size(),
+                (!pin||frames.size()==pin->frameCount)&&frameIndex<frames.size(),
                 "Original SC IPUM ATM framing failed at "+std::to_string(bad));
             const auto& frame=frames[frameIndex];mipIndex=frame.count-1;mip=frame.mips[mipIndex];
         }else mip=framePst(source,mipIndex);
@@ -143,7 +144,7 @@ inline Bytes image(const std::string& member,const Bytes& source,std::uint32_t& 
         if(animated){
             a::OriginalUiAtm50KG frames;
             shared::need(a::splitOriginalUiAtm50KG(source.data(),source.size(),frames,error)&&
-                frames.frames.size()==pin->frameCount&&frameIndex<frames.frames.size(),
+                (!pin||frames.frames.size()==pin->frameCount)&&frameIndex<frames.frames.size(),
                 "Original SC indexed ATM framing: "+error.code);
             const auto& frame=frames.frames[frameIndex];
             pst.assign(source.begin()+frame.pstOffset,source.begin()+frame.pstOffset+frame.pstBytes);
@@ -153,8 +154,10 @@ inline Bytes image(const std::string& member,const Bytes& source,std::uint32_t& 
             "Original SC indexed PST decode: "+error.code);
         mipIndex=static_cast<std::uint32_t>(decoded.mips.size()-1);output=std::move(decoded.base_rrtex);
     }
-    const auto w=pin?pin->width:outputPin->width,h=pin?pin->height:outputPin->height;
-    const auto expectedMip=pin?pin->mipIndex:outputPin->mipIndex;
+    std::uint32_t w=0,h=0,expectedMip=mipIndex;
+    if(pin){w=pin->width;h=pin->height;expectedMip=pin->mipIndex;}
+    else if(outputPin){w=outputPin->width;h=outputPin->height;expectedMip=outputPin->mipIndex;}
+    else shared::need(wma50CM::decodedExtent(output,w,h),"Unpinned original image decoded framing"); // runtime identity
     shared::need(mipIndex==expectedMip&&output.size()==std::size_t(w)*h*4+16&&
         !std::memcmp(output.data(),"RRTEX001",8)&&shared::u32(output.data()+8)==w&&shared::u32(output.data()+12)==h,
         "Original SC decoded image source framing differs");
@@ -187,9 +190,9 @@ inline void validateBorrowedWorld(const Bytes& scb,const a::World48F& world,a::D
                 "Original SC parameter field provenance differs");
         }
     }
-    shared::need(world.scene_info_block==canonical.scene_info_block&&world.instances.size()==expectedInstances&&
-        world.instances.size()==canonical.instances.size()&&world.zones.size()==expectedZones&&
-        world.zones.size()==canonical.zones.size()&&world.portals.size()==expectedPortals&&world.portals.size()==canonical.portals.size(),
+    shared::need(world.scene_info_block==canonical.scene_info_block&&
+        world.instances.size()==canonical.instances.size()&&
+        world.zones.size()==canonical.zones.size()&&world.portals.size()==canonical.portals.size(),
         "Original SC typed world source extent differs");
     for(std::size_t i=0;i<canonical.zones.size();++i){const auto& x=world.zones[i];const auto& y=canonical.zones[i];
         shared::need(x.zone==y.zone&&x.models==y.models&&x.parameter_block==y.parameter_block,

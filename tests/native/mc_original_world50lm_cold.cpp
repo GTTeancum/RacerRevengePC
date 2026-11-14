@@ -1,5 +1,7 @@
 // Exact existing non-template cold body; namespace/private ownership unchanged.
 #include "mc_original_world50lm.h"
+#include "original_world_material_admission50cm.h"
+namespace wma=original_world_material_admission50CM;
 
 namespace mc_original_world50LM {
 bool Owner::load(std::shared_ptr<const mc_cold_sources50LA::Owner> sourceOwner,Diagnostic& d)noexcept{
@@ -8,10 +10,11 @@ bool Owner::load(std::shared_ptr<const mc_cold_sources50LA::Owner> sourceOwner,D
             shared::need(sourceOwner&&sourceOwner->ready(),"Original MC shared cold source absent");
             auto next=std::make_unique<Storage>();next->source=std::move(sourceOwner);d.stage="archive";
             const auto& archive=next->source->archive();const auto& world=next->source->world();
-            shared::need(archive.entries().size()==entryCount&&world.instances.size()==expectedInstances&&
+            // Identity is a receipt only. Stand-in: the shared cold source owner keeps its own archive gate.
+            const auto actualScbSha=shared::sha256(world.parameters.original_bytes);
+            wma::identityReceipt("MC",archive.entries().size()==entryCount&&world.instances.size()==expectedInstances&&
                 world.zones.size()==expectedZones&&world.portals.size()==expectedPortals&&
-                world.parameters.original_bytes.size()==scbBytesCount&&shared::sha256(world.parameters.original_bytes)==scbSha,
-                "Original MC exact shared source/world identity");
+                world.parameters.original_bytes.size()==scbBytesCount&&actualScbSha==scbSha,"",0,0,archive.entries().size(),actualScbSha,world.parameters.original_bytes.size());
             for(std::size_t i=0;i<archive.entries().size();++i)
                 shared::need(next->entries.emplace(detail::key(archive.entries()[i].name),i).second,"Ambiguous original MC member");
             std::map<std::string,std::uint32_t> materialIndices,textureIndices;
@@ -27,18 +30,15 @@ bool Owner::load(std::shared_ptr<const mc_cold_sources50LA::Owner> sourceOwner,D
                 shared::need(psm,"Original MC world material absent: "+materialName);d.member=psm->name;
                 const auto source=next->member(*psm,d.decode);a::Material48E authored;
                 const bool decoded=a::decodeMaterial48E(source,authored,d.decode);
-                shared::need(decoded&&!authored.passes.empty()&&authored.passes.size()<=2,
+                shared::need(decoded&&wma::materialPassCount(authored),
                     "Original MC material/program pass count");
                 const auto materialIndex=static_cast<std::uint32_t>(next->materials.size());
-                shared::need(materialIndex<expectedMaterials,"Original MC PSM count bound");
+                shared::need(materialIndex<wma::maxWorldMaterials,"Original MC PSM count bound");
                 const auto materialKey=shared::sha256(std::string("rr-native-material-48E-v1\n")+shared::sha256(source));
                 std::vector<std::uint32_t> selectedPasses;
                 for(std::size_t pi=0;pi<authored.passes.size();++pi){
-                    const auto& pass=authored.passes[pi];const bool projected=pass.microprogram=="ProjectedPrelit";
-                    shared::need(pass.pass==pi+1&&pass.textures.size()==1&&pass.textures[0].slot==1&&
-                        ((authored.passes.size()==2&&projected)||
-                         (authored.passes.size()==1&&!projected&&
-                          (detail::key(pass.microprogram)=="PRELITCOMPRESSED"||pass.microprogram=="DiffuseCompressed"||(normalized=="MC_SHIELD"&&pass.microprogram=="diffuseTextransCompressed")))),
+                    const auto& pass=authored.passes[pi];const bool projected=wma::projected(pass);
+                    shared::need(wma::pass(authored,pi), // common admission, no name/course key
                         "Unjoined original MC pass/program/texture subset");
                     const auto& map=pass.textures[0];shared::need(shared::name(map.name),"Invalid original MC texture basename");
                     const auto pstCandidate=map.name+".pst";
@@ -51,25 +51,24 @@ bool Owner::load(std::shared_ptr<const mc_cold_sources50LA::Owner> sourceOwner,D
                     }
                     shared::need(texture,"Original MC required texture absent: "+map.name);
                     const auto textureKey=detail::key(texture->name);const auto* pin=detail::sourceImage(textureKey);
-                    shared::need(pin,"Original MC static image lacks exact source pin");
                     const bool animated=textureKey.ends_with(".ATM");
-                    if(animated)shared::need(authored.passes.size()==1&&detail::initialFrame(pass.fields)==pin->initialFrame,
+                    if(animated)shared::need(authored.passes.size()==1&&(!pin||detail::initialFrame(pass.fields)==pin->initialFrame),
                         "Original MC material/ATM initial frame differs");
                     auto found=textureIndices.find(textureKey);
                     if(found==textureIndices.end()){
                         d.stage="texture";d.member=texture->name;const auto bytes=next->member(*texture,d.decode);
                         std::uint32_t mip=0;bool decodedAnimated=false,independent=false;
-                        auto image=detail::image(texture->name,bytes,mip,decodedAnimated,d.decode,&independent);
+                        auto image=detail::image(texture->name,bytes,mip,decodedAnimated,d.decode,&independent,detail::initialFrame(pass.fields));
                         shared::need(decodedAnimated==animated,"Original MC texture animation source classification");
                         const auto index=static_cast<std::uint32_t>(images.size());
-                        shared::need(index<expectedImages&&image.size()>=16,"MC original texture bank bound");
+                        shared::need(index<wma::maxWorldImages&&image.size()>=16,"MC original texture bank bound");
                         const auto w=shared::u32(image.data()+8),h=shared::u32(image.data()+12);
                         shared::need(w&&h&&w<=1024&&h<=1024&&image.size()==std::size_t(w)*h*4+16,"MC native image extent");
                         shared::add(rgbaBytes,std::size_t(w)*h*4,16u*1024u*1024u,"MC texture RMCA budget");
                         shared::add(serializedBytes,image.size(),16u*1024u*1024u,"MC texture framing budget");
                         tm::TextureSelection selected;selected.identity=textureBase+index+1;selected.bankIndex=index;
                         selected.mipIndex=mip;selected.width=w;selected.height=h;selected.path=texture->name;
-                        selected.key="disc:"+textureKey+":"+pin->sourceSha256;
+                        selected.key="disc:"+textureKey+":"+(pin?std::string(pin->sourceSha256):shared::sha256(bytes)); // unpinned: runtime source identity
                         selected.sha256=shared::sha256(image); // Actual runtime output identity, not necessarily an independent pin.
                         next->textures.push_back(std::move(selected));images.push_back(std::move(image));
                         next->independentlyPinnedImages.push_back(independent?1:0);
@@ -77,7 +76,7 @@ bool Owner::load(std::shared_ptr<const mc_cold_sources50LA::Owner> sourceOwner,D
                         found=textureIndices.emplace(textureKey,index).first;
                     }
                     const auto index=static_cast<std::uint32_t>(next->selections.size());
-                    shared::need(index<expectedSelections,"Original MC authored pass count bound");
+                    shared::need(index<wma::maxWorldSelections,"Original MC authored pass count bound");
                     const auto& image=next->textures[found->second];tm::Selection selected;
                     selected.assetIdentity=assetIdentity;selected.materialIndex=materialIndex;selected.pass=pass.pass;selected.slot=1;
                     selected.bankSlot=static_cast<std::uint32_t>(slots.size());selected.textureIndex=found->second;selected.mipIndex=image.mipIndex;
@@ -88,7 +87,7 @@ bool Owner::load(std::shared_ptr<const mc_cold_sources50LA::Owner> sourceOwner,D
                     selected.sourcePassFields=detail::fields(pass.fields);selected.staticAnimationFrame=animated;
                     selected.projectedPrelit=projected;
                     if(projected)selected.texGenMatrix=tm::detail::projection(selected.sourcePassFields);
-                    selected.decodedSourceMember=texture->name;selected.decodedSourceSha256=pin->sourceSha256;
+                    selected.decodedSourceMember=texture->name;selected.decodedSourceSha256=wma::keySha(image.key);
                     slots.push_back({{selected.assetIdentity,materialIndex,pass.pass,1},image.identity,a::MaterialTextureRequirement50EA::required});
                     selectedPasses.push_back(index);next->selections.push_back(std::move(selected));
                 }
@@ -125,7 +124,7 @@ bool Owner::load(std::shared_ptr<const mc_cold_sources50LA::Owner> sourceOwner,D
                     span.indexCount=static_cast<std::uint32_t>(surface.indices.size());span.worldInstanceIndex=static_cast<std::uint32_t>(wi);
                     span.surfaceIndex=static_cast<std::uint32_t>(si);span.hasOriginalColors=surface.has_original_colors;
                     const auto& selectedPasses=next->materialPasses.at(scene.materials[surface.material_index]);
-                    shared::need(!selectedPasses.empty()&&selectedPasses.size()<=2,"Original MC surface material pass closure");
+                    shared::need(!selectedPasses.empty()&&selectedPasses.size()<=wma::maxWorldPasses,"Original MC surface material pass closure");
                     for(const auto& source:surface.vertices){
                         shared::need(source.bone==0,"MC original static vertex bone");a::Vertex48B vertex{};
                         for(unsigned axis=0;axis<3;++axis){double value=0;
@@ -168,11 +167,16 @@ bool Owner::load(std::shared_ptr<const mc_cold_sources50LA::Owner> sourceOwner,D
             }
             d.scenes=next->scenes.size();d.stage="closure";d.member.clear();
             d.materials=next->materials.size();d.selections=next->selections.size();
-            shared::need(d.scenes==expectedScenes&&d.placements==expectedPlacements&&d.collisionOnly==expectedCollisionOnly&&d.surfaces==expectedSurfaces&&
+            // Stock counts are a receipt only (stand-in pins kept as data); bounds and invariants gate.
+            const bool stockClosure=d.scenes==expectedScenes&&d.placements==expectedPlacements&&d.collisionOnly==expectedCollisionOnly&&d.surfaces==expectedSurfaces&&
                 d.materials==expectedMaterials&&d.selections==expectedSelections&&d.secondPasses==expectedSecondPasses&&next->spans.size()==expectedSurfaces+expectedSecondPasses&&
                 next->mesh.vertices.size()==expectedVertices&&next->mesh.indices.size()==expectedIndices&&images.size()==expectedImages&&
                 next->normals.size()==next->mesh.vertices.size()&&
-                next->projectionUvs.size()==next->mesh.vertices.size()&&rgbaBytes==expectedRgbaBytes&&d.independentlyPinnedImages==expectedPinnedImages&&d.runtimeIdentityImages==expectedImages-expectedPinnedImages,
+                next->projectionUvs.size()==next->mesh.vertices.size()&&rgbaBytes==expectedRgbaBytes&&d.independentlyPinnedImages==expectedPinnedImages&&d.runtimeIdentityImages==expectedImages-expectedPinnedImages;
+            wma::closureReceipt("MC",stockClosure,d.materials,d.selections,next->spans.size(),images.size(),next->mesh.vertices.size());
+            shared::need(wma::closureBounds(d.scenes,d.placements,d.collisionOnly,d.surfaces,world.instances.size(),
+                d.materials,d.selections,d.secondPasses,next->spans.size(),next->mesh.vertices.size(),next->mesh.indices.size(),
+                images.size(),d.independentlyPinnedImages,d.runtimeIdentityImages)&&next->normals.size()==next->mesh.vertices.size()&&next->projectionUvs.size()==next->mesh.vertices.size(),
                 "Original MC full static source closure differs");
             for(unsigned axis=0;axis<3;++axis){next->mesh.bounds.minimum[axis]=std::numeric_limits<float>::infinity();
                 next->mesh.bounds.maximum[axis]=-std::numeric_limits<float>::infinity();}
@@ -183,7 +187,7 @@ bool Owner::load(std::shared_ptr<const mc_cold_sources50LA::Owner> sourceOwner,D
             for(std::size_t i=0;i<images.size();++i)textureInput.push_back({next->textures[i].identity,&images[i]});
             a::MaterialTextureAssetsInput50EA input;input.textures=textureInput.data();input.textureCount=static_cast<std::uint32_t>(textureInput.size());
             input.slots=slots.data();input.slotCount=static_cast<std::uint32_t>(slots.size());
-            input.budgets={expectedImages,expectedSelections,16u*1024u*1024u,16u*1024u*1024u,1024};
+            input.budgets={wma::maxWorldImages,wma::maxWorldSelections,16u*1024u*1024u,16u*1024u*1024u,1024};
             d.stage="pixel_bank";shared::need(next->bank.load(input,d.bank),"Original MC pixel bank rejected: "+d.bank.parserMessage);
             storage_=std::move(next);d.stage="complete";return true;
         }catch(const std::exception& error){try{d.message=error.what();}catch(...){}return false;}

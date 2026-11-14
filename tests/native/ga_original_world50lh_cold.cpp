@@ -1,24 +1,26 @@
 // Exact existing cold body outlined to its own translation unit.
 // No ownership, allocation, source arithmetic, or exception-policy change.
 #include "ga_original_world50lh.h"
+#include "original_world_material_admission50cm.h"
+namespace wma=original_world_material_admission50CM;
 
 namespace ga_original_world50LH {
 bool Owner::load(const Bytes& original,const a::World48F& world,Diagnostic& d)noexcept {
         try{
             d={};shared::need(!storage_&&std::fegetround()==FE_TONEAREST,"GA direct cold owner already loaded or rounding mode differs");
-            shared::need(original.size()==archiveBytes&&shared::sha256(original)==archiveSha,"Original GA archive identity differs");
+            const auto actualArchiveSha=shared::sha256(original);const bool stockArchive=original.size()==archiveBytes&&actualArchiveSha==archiveSha; // receipt only
+            shared::need(wma::archiveFits(original.size()),"Original GA archive exceeds the resource file limit");
             auto next=std::make_unique<Storage>();d.stage="archive";
-            a::DecodeLimits48C limits;limits.resource_file_bytes=archiveBytes;
-            limits.resource_decoded_bytes=watchtower_source_fixture::decodedBytes;
-            limits.resource_entries=watchtower_source_fixture::archiveEntries;
-            shared::need(a::decodeResource48C(original,next->archive,d.decode,nullptr,limits)&&next->archive.entries.size()==970&&next->archive.decoded.size()==26099712,
+            a::DecodeLimits48C limits=wma::archiveLimits(original.size()); // file-sized; decoded/entry caps are the shared resource limits
+            shared::need(a::decodeResource48C(original,next->archive,d.decode,nullptr,limits),
                 "Original GA archive decode: "+d.decode.code);
             for(std::size_t i=0;i<next->archive.entries.size();++i)
                 shared::need(next->entries.emplace(detail::key(next->archive.entries[i].name),i).second,"Ambiguous original GA member");
             d.stage="world";const auto* scb=next->entry("tracks\\ga.scb");
-            shared::need(scb&&scb->bytes==watchtower_source_fixture::scene.bytes,"Original GA SCB extent differs");
+            shared::need(scb&&scb->bytes,"Original GA SCB extent differs");
             const auto scbBytes=next->member(*scb,d.decode);
-            shared::need(shared::sha256(scbBytes)==watchtower_source_fixture::scene.sha,"Original GA SCB identity differs");
+            const auto actualScbSha=shared::sha256(scbBytes);
+            wma::identityReceipt("GA",stockArchive&&actualScbSha==watchtower_source_fixture::scene.sha,actualArchiveSha,original.size(),next->archive.decoded.size(),next->archive.entries.size(),actualScbSha,scbBytes.size());
             detail::validateBorrowedWorld(scbBytes,world,d.decode);
             std::map<std::string,std::uint32_t> materialIndices,textureIndices;
             std::vector<Bytes> images;
@@ -32,18 +34,15 @@ bool Owner::load(const Bytes& original,const a::World48F& world,Diagnostic& d)no
                 d.stage="material";const auto* psm=next->entry("textures\\"+materialName+".psm");
                 shared::need(psm,"Original GA world material absent: "+materialName);d.member=psm->name;
                 const auto source=next->member(*psm,d.decode);a::Material48E authored;
-                shared::need(a::decodeMaterial48E(source,authored,d.decode)&&!authored.passes.empty()&&authored.passes.size()<=2,
+                shared::need(a::decodeMaterial48E(source,authored,d.decode)&&wma::materialPassCount(authored),
                     "Original GA world material subset: "+d.member+" "+d.decode.code);
                 const auto materialIndex=static_cast<std::uint32_t>(next->materials.size());
-                shared::need(materialIndex<308,"Original GA PSM count bound");
+                shared::need(materialIndex<wma::maxWorldMaterials,"Original GA PSM count bound");
                 const auto materialKey=shared::sha256(std::string("rr-native-material-48E-v1\n")+shared::sha256(source));
                 std::vector<std::uint32_t> selectedPasses;
                 for(std::size_t pi=0;pi<authored.passes.size();++pi){
-                    const auto& pass=authored.passes[pi];const bool projected=pass.microprogram=="ProjectedPrelit";
-                    shared::need(pass.pass==pi+1&&pass.textures.size()==1&&pass.textures[0].slot==1&&
-                        ((authored.passes.size()==2&&projected)||
-                         (authored.passes.size()==1&&!projected&&
-                          (pass.microprogram=="PreLitCompressed"||pass.microprogram=="PrelitCompressed"||pass.microprogram=="DiffuseCompressed"))),
+                    const auto& pass=authored.passes[pi];const bool projected=wma::projected(pass);
+                    shared::need(wma::pass(authored,pi), // common admission, no name/course key
                         "Unjoined original GA pass/program/texture subset");
                     const auto& map=pass.textures[0];shared::need(shared::name(map.name),"Invalid original GA texture basename");
                     const a::ResourceEntry48C* texture=nullptr;
@@ -52,25 +51,24 @@ bool Owner::load(const Bytes& original,const a::World48F& world,Diagnostic& d)no
                     }
                     shared::need(texture,"Original GA required texture absent: "+map.name);
                     const auto textureKey=detail::key(texture->name);const auto* pin=detail::sourceImage(textureKey);
-                    shared::need(pin,"Original GA static image lacks exact source pin");
                     const bool animated=textureKey.ends_with(".ATM");
-                    if(animated)shared::need(authored.passes.size()==1&&detail::initialFrame(pass.fields)==pin->initialFrame,
+                    if(animated)shared::need(authored.passes.size()==1&&(!pin||detail::initialFrame(pass.fields)==pin->initialFrame),
                         "Original GA material/ATM initial frame differs");
                     auto found=textureIndices.find(textureKey);
                     if(found==textureIndices.end()){
                         d.stage="texture";d.member=texture->name;const auto bytes=next->member(*texture,d.decode);
                         std::uint32_t mip=0;bool decodedAnimated=false,independent=false;
-                        auto image=detail::image(texture->name,bytes,mip,decodedAnimated,d.decode,&independent);
+                        auto image=detail::image(texture->name,bytes,mip,decodedAnimated,d.decode,&independent,detail::initialFrame(pass.fields));
                         shared::need(decodedAnimated==animated,"Original GA texture animation source classification");
                         const auto index=static_cast<std::uint32_t>(images.size());
-                        shared::need(index<79&&image.size()>=16,"GA original texture bank bound");
+                        shared::need(index<wma::maxWorldImages&&image.size()>=16,"GA original texture bank bound");
                         const auto w=shared::u32(image.data()+8),h=shared::u32(image.data()+12);
                         shared::need(w&&h&&w<=1024&&h<=1024&&image.size()==std::size_t(w)*h*4+16,"GA native image extent");
                         shared::add(rgbaBytes,std::size_t(w)*h*4,16u*1024u*1024u,"GA texture RGBA budget");
                         shared::add(serializedBytes,image.size(),16u*1024u*1024u,"GA texture framing budget");
                         tm::TextureSelection selected;selected.identity=textureBase+index+1;selected.bankIndex=index;
                         selected.mipIndex=mip;selected.width=w;selected.height=h;selected.path=texture->name;
-                        selected.key="disc:"+textureKey+":"+pin->sourceSha256;
+                        selected.key="disc:"+textureKey+":"+(pin?std::string(pin->sourceSha256):shared::sha256(bytes)); // unpinned: runtime source identity
                         selected.sha256=shared::sha256(image); // Actual runtime output identity, not necessarily an independent pin.
                         next->textures.push_back(std::move(selected));images.push_back(std::move(image));
                         next->independentlyPinnedImages.push_back(independent?1:0);
@@ -78,7 +76,7 @@ bool Owner::load(const Bytes& original,const a::World48F& world,Diagnostic& d)no
                         found=textureIndices.emplace(textureKey,index).first;
                     }
                     const auto index=static_cast<std::uint32_t>(next->selections.size());
-                    shared::need(index<542,"Original GA authored pass count bound");
+                    shared::need(index<wma::maxWorldSelections,"Original GA authored pass count bound");
                     const auto& image=next->textures[found->second];tm::Selection selected;
                     selected.assetIdentity=0x4741;selected.materialIndex=materialIndex;selected.pass=pass.pass;selected.slot=1;
                     selected.bankSlot=static_cast<std::uint32_t>(slots.size());selected.textureIndex=found->second;selected.mipIndex=image.mipIndex;
@@ -89,7 +87,7 @@ bool Owner::load(const Bytes& original,const a::World48F& world,Diagnostic& d)no
                     selected.sourcePassFields=detail::fields(pass.fields);selected.staticAnimationFrame=animated;
                     selected.projectedPrelit=projected;
                     if(projected)selected.texGenMatrix=tm::detail::projection(selected.sourcePassFields);
-                    selected.decodedSourceMember=texture->name;selected.decodedSourceSha256=pin->sourceSha256;
+                    selected.decodedSourceMember=texture->name;selected.decodedSourceSha256=wma::keySha(image.key);
                     slots.push_back({{selected.assetIdentity,materialIndex,pass.pass,1},image.identity,a::MaterialTextureRequirement50EA::required});
                     selectedPasses.push_back(index);next->selections.push_back(std::move(selected));
                 }
@@ -127,7 +125,7 @@ bool Owner::load(const Bytes& original,const a::World48F& world,Diagnostic& d)no
                     span.indexCount=static_cast<std::uint32_t>(surface.indices.size());span.worldInstanceIndex=static_cast<std::uint32_t>(wi);
                     span.surfaceIndex=static_cast<std::uint32_t>(si);span.hasOriginalColors=surface.has_original_colors;
                     const auto& selectedPasses=next->materialPasses.at(scene.materials[surface.material_index]);
-                    shared::need(!selectedPasses.empty()&&selectedPasses.size()<=2,"Original GA surface material pass closure");
+                    shared::need(!selectedPasses.empty()&&selectedPasses.size()<=wma::maxWorldPasses,"Original GA surface material pass closure");
                     for(const auto& source:surface.vertices){
                         shared::need(source.bone==0,"GA original static vertex bone");a::Vertex48B vertex{};
                         for(unsigned axis=0;axis<3;++axis){double value=0;
@@ -169,11 +167,16 @@ bool Owner::load(const Bytes& original,const a::World48F& world,Diagnostic& d)no
             }
             d.scenes=next->scenes.size();d.stage="closure";d.member.clear();
             d.materials=next->materials.size();d.selections=next->selections.size();
-            shared::need(d.scenes==298&&d.placements==563&&d.collisionOnly==190&&d.surfaces==993&&
+            // Stock counts are a receipt only (stand-in pins kept as data); bounds and invariants gate.
+            const bool stockClosure=d.scenes==298&&d.placements==563&&d.collisionOnly==190&&d.surfaces==993&&
                 d.materials==308&&d.selections==542&&d.secondPasses==248&&next->spans.size()==1241&&
                 next->mesh.vertices.size()==144521&&next->mesh.indices.size()==258507&&images.size()==79&&
                 next->normals.size()==next->mesh.vertices.size()&&next->projectionUvs.size()==next->mesh.vertices.size()&&
-                rgbaBytes==4673536&&d.independentlyPinnedImages==5&&d.runtimeIdentityImages==74,
+                rgbaBytes==4673536&&d.independentlyPinnedImages==5&&d.runtimeIdentityImages==74;
+            wma::closureReceipt("GA",stockClosure,d.materials,d.selections,next->spans.size(),images.size(),next->mesh.vertices.size());
+            shared::need(wma::closureBounds(d.scenes,d.placements,d.collisionOnly,d.surfaces,world.instances.size(),
+                d.materials,d.selections,d.secondPasses,next->spans.size(),next->mesh.vertices.size(),next->mesh.indices.size(),
+                images.size(),d.independentlyPinnedImages,d.runtimeIdentityImages)&&next->normals.size()==next->mesh.vertices.size()&&next->projectionUvs.size()==next->mesh.vertices.size(),
                 "Original GA full static source closure differs");
             for(unsigned axis=0;axis<3;++axis){next->mesh.bounds.minimum[axis]=std::numeric_limits<float>::infinity();
                 next->mesh.bounds.maximum[axis]=-std::numeric_limits<float>::infinity();}
@@ -184,7 +187,7 @@ bool Owner::load(const Bytes& original,const a::World48F& world,Diagnostic& d)no
             for(std::size_t i=0;i<images.size();++i)textureInput.push_back({next->textures[i].identity,&images[i]});
             a::MaterialTextureAssetsInput50EA input;input.textures=textureInput.data();input.textureCount=static_cast<std::uint32_t>(textureInput.size());
             input.slots=slots.data();input.slotCount=static_cast<std::uint32_t>(slots.size());
-            input.budgets={79,542,16u*1024u*1024u,16u*1024u*1024u,1024};
+            input.budgets={wma::maxWorldImages,wma::maxWorldSelections,16u*1024u*1024u,16u*1024u*1024u,1024};
             d.stage="pixel_bank";shared::need(next->bank.load(input,d.bank),"Original GA pixel bank rejected: "+d.bank.parserMessage);
             storage_=std::move(next);d.stage="complete";return true;
         }catch(const std::exception& error){try{d.message=error.what();}catch(...){}return false;}

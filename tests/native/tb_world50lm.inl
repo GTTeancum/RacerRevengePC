@@ -172,7 +172,7 @@ inline std::uint32_t initialFrame(const a::MaterialFields48E& value){
 // already retained independent image hash was available and checked. Ordinary
 // image hashes are recorded after decoding, never used to select pixel data.
 inline Bytes image(const std::string& member,const Bytes& source,std::uint32_t& mipIndex,
-    bool& animated,a::DecodeError48C& error,bool* independentlyPinned=nullptr){
+    bool& animated,a::DecodeError48C& error,bool* independentlyPinned=nullptr,std::uint32_t authoredFrame=0){
     shared::need(source.size()>=12&&source.size()<=8u*1024u*1024u,"Original TB texture source extent");
     const auto name=key(member);const auto* pin=sourceImage(name);
     const source_texture50fc_fixture::detail::Entry* outputPin=nullptr;
@@ -183,7 +183,7 @@ inline Bytes image(const std::string& member,const Bytes& source,std::uint32_t& 
         if(outputPin)shared::need(std::string(outputPin->outputSha256)==entry.outputSha256,"TB independent pixel pin disagreement");
         outputPin=&entry;
     }
-    shared::need(pin||outputPin,"Original TB image has no authenticated source identity");
+    // No pin: decoded and admitted with its runtime identity (counted by the loader). Pins still verify exactly.
     const auto sourceSha=shared::sha256(source);
     if(pin)shared::need(source.size()==pin->sourceBytes&&sourceSha==pin->sourceSha256,
         "Original TB static image source identity differs");
@@ -191,9 +191,9 @@ inline Bytes image(const std::string& member,const Bytes& source,std::uint32_t& 
         "Original TB exceptional image source identity differs");
     animated=name.ends_with(".ATM");
     shared::need(animated||name.ends_with(".PST"),"Unsupported original TB image extension");
-    shared::need(!animated||(pin&&source.size()>=24&&pin->initialFrame<pin->frameCount),
+    shared::need(!animated||(source.size()>=24&&(!pin||pin->initialFrame<pin->frameCount)),
         "Original TB ATM lacks its exact frame selection");
-    const auto frameIndex=pin?pin->initialFrame:0u;
+    const auto frameIndex=pin?pin->initialFrame:authoredFrame; // unpinned ATM: the frame the material authors
     const auto kind=shared::u32(source.data()+(animated?16:4));
     if(pin)shared::need(kind==pin->kind,"Original TB source image kind differs");
     Bytes output;
@@ -202,7 +202,7 @@ inline Bytes image(const std::string& member,const Bytes& source,std::uint32_t& 
         if(animated){
             std::vector<a::detail::OriginalIpumFrameExtent50LA> frames;std::size_t bad=0;
             shared::need(a::detail::frameOriginalIpumAtm50LA(source,frames,bad)&&
-                frames.size()==pin->frameCount&&frameIndex<frames.size(),
+                (!pin||frames.size()==pin->frameCount)&&frameIndex<frames.size(),
                 "Original TB IPUM ATM framing failed at "+std::to_string(bad));
             const auto& frame=frames[frameIndex];mipIndex=frame.count-1;mip=frame.mips[mipIndex];
         }else mip=framePst(source,mipIndex);
@@ -215,7 +215,7 @@ inline Bytes image(const std::string& member,const Bytes& source,std::uint32_t& 
         if(animated){
             a::OriginalUiAtm50KG frames;
             shared::need(a::splitOriginalUiAtm50KG(source.data(),source.size(),frames,error)&&
-                frames.frames.size()==pin->frameCount&&frameIndex<frames.frames.size(),
+                (!pin||frames.frames.size()==pin->frameCount)&&frameIndex<frames.frames.size(),
                 "Original TB indexed ATM framing: "+error.code);
             const auto& frame=frames.frames[frameIndex];
             pst.assign(source.begin()+frame.pstOffset,source.begin()+frame.pstOffset+frame.pstBytes);
@@ -225,8 +225,10 @@ inline Bytes image(const std::string& member,const Bytes& source,std::uint32_t& 
             "Original TB indexed PST decode: "+error.code);
         mipIndex=static_cast<std::uint32_t>(decoded.mips.size()-1);output=std::move(decoded.base_rrtex);
     }
-    const auto w=pin?pin->width:outputPin->width,h=pin?pin->height:outputPin->height;
-    const auto expectedMip=pin?pin->mipIndex:outputPin->mipIndex;
+    std::uint32_t w=0,h=0,expectedMip=mipIndex;
+    if(pin){w=pin->width;h=pin->height;expectedMip=pin->mipIndex;}
+    else if(outputPin){w=outputPin->width;h=outputPin->height;expectedMip=outputPin->mipIndex;}
+    else shared::need(wma50CM::decodedExtent(output,w,h),"Unpinned original image decoded framing"); // runtime identity
     shared::need(mipIndex==expectedMip&&output.size()==std::size_t(w)*h*4+16&&
         !std::memcmp(output.data(),"RRTEX001",8)&&shared::u32(output.data()+8)==w&&shared::u32(output.data()+12)==h,
         "Original TB decoded image source framing differs");
@@ -261,9 +263,9 @@ inline void validateBorrowedWorld(const Bytes& scb,const a::World48F& world,a::D
                 "Original TB parameter field provenance differs");
         }
     }
-    shared::need(world.scene_info_block==canonical.scene_info_block&&world.instances.size()==expectedInstances&&
-        world.instances.size()==canonical.instances.size()&&world.zones.size()==expectedZones&&
-        world.zones.size()==canonical.zones.size()&&world.portals.size()==expectedPortals&&world.portals.size()==canonical.portals.size(),
+    shared::need(world.scene_info_block==canonical.scene_info_block&&
+        world.instances.size()==canonical.instances.size()&&
+        world.zones.size()==canonical.zones.size()&&world.portals.size()==canonical.portals.size(),
         "Original TB typed world source extent differs");
     for(std::size_t i=0;i<canonical.zones.size();++i){const auto& x=world.zones[i];const auto& y=canonical.zones[i];
         shared::need(x.zone==y.zone&&x.models==y.models&&x.parameter_block==y.parameter_block,
@@ -350,10 +352,10 @@ public:
             shared::need(sourceOwner&&sourceOwner->ready(),"Original TB shared cold source absent");
             auto next=std::make_unique<Storage>();next->source=std::move(sourceOwner);d.stage="archive";
             const auto& archive=next->source->archive();const auto& world=next->source->world();
-            shared::need(archive.entries().size()==entryCount&&world.instances.size()==expectedInstances&&
-                world.zones.size()==expectedZones&&world.portals.size()==expectedPortals&&
-                world.parameters.original_bytes.size()==scbBytesCount&&shared::sha256(world.parameters.original_bytes)==scbSha,
-                "Original TB exact shared source/world identity");
+            // Identity is a receipt only. Stand-in: the shared cold source owner keeps its own archive gate.
+            const auto actualScbSha=shared::sha256(world.parameters.original_bytes);
+            wma::identityReceipt("TB",archive.entries().size()==entryCount&&
+                world.parameters.original_bytes.size()==scbBytesCount&&actualScbSha==scbSha,"",0,0,archive.entries().size(),actualScbSha,world.parameters.original_bytes.size());
             for(std::size_t i=0;i<archive.entries().size();++i)
                 shared::need(next->entries.emplace(detail::key(archive.entries()[i].name),i).second,"Ambiguous original TB member");
             std::map<std::string,std::uint32_t> materialIndices,textureIndices;
@@ -369,19 +371,15 @@ public:
                 shared::need(psm,"Original TB world material absent: "+materialName);d.member=psm->name;
                 const auto source=next->member(*psm,d.decode);a::Material48E authored;
                 const bool decoded=a::decodeMaterial48E(source,authored,d.decode);
-                shared::need(decoded&&!authored.passes.empty()&&authored.passes.size()<=2,
+                shared::need(decoded&&wma::materialPassCount(authored),
                     "Original TB material/program pass count");
                 const auto materialIndex=static_cast<std::uint32_t>(next->materials.size());
-                shared::need(materialIndex<expectedMaterials,"Original TB PSM count bound");
+                shared::need(materialIndex<wma::maxWorldMaterials,"Original TB PSM count bound");
                 const auto materialKey=shared::sha256(std::string("rr-native-material-48E-v1\n")+shared::sha256(source));
                 std::vector<std::uint32_t> selectedPasses;
                 for(std::size_t pi=0;pi<authored.passes.size();++pi){
-                    const auto& pass=authored.passes[pi];const bool projected=pass.microprogram=="ProjectedPrelit";
-                    shared::need(pass.pass==pi+1&&pass.textures.size()==1&&pass.textures[0].slot==1&&
-                        ((authored.passes.size()==2&&projected)||
-                         (authored.passes.size()==1&&!projected&&
-                          (detail::key(pass.microprogram)=="PRELITCOMPRESSED"||pass.microprogram=="DiffuseCompressed"||
-                           (normalized=="TC_SHIELD"&&pass.microprogram=="diffuseTextransCompressed")))),
+                    const auto& pass=authored.passes[pi];const bool projected=wma::projected(pass);
+                    shared::need(wma::pass(authored,pi), // common admission, no name/course key
                         "Unjoined original TB pass/program/texture subset");
                     const auto& map=pass.textures[0];shared::need(shared::name(map.name),"Invalid original TB texture basename");
                     const auto pstCandidate=map.name+".pst";
@@ -394,25 +392,24 @@ public:
                     }
                     shared::need(texture,"Original TB required texture absent: "+map.name);
                     const auto textureKey=detail::key(texture->name);const auto* pin=detail::sourceImage(textureKey);
-                    shared::need(pin,"Original TB static image lacks exact source pin");
                     const bool animated=textureKey.ends_with(".ATM");
-                    if(animated)shared::need(authored.passes.size()==1&&detail::initialFrame(pass.fields)==pin->initialFrame,
+                    if(animated)shared::need(authored.passes.size()==1&&(!pin||detail::initialFrame(pass.fields)==pin->initialFrame),
                         "Original TB material/ATM initial frame differs");
                     auto found=textureIndices.find(textureKey);
                     if(found==textureIndices.end()){
                         d.stage="texture";d.member=texture->name;const auto bytes=next->member(*texture,d.decode);
                         std::uint32_t mip=0;bool decodedAnimated=false,independent=false;
-                        auto image=detail::image(texture->name,bytes,mip,decodedAnimated,d.decode,&independent);
+                        auto image=detail::image(texture->name,bytes,mip,decodedAnimated,d.decode,&independent,detail::initialFrame(pass.fields));
                         shared::need(decodedAnimated==animated,"Original TB texture animation source classification");
                         const auto index=static_cast<std::uint32_t>(images.size());
-                        shared::need(index<expectedImages&&image.size()>=16,"TB original texture bank bound");
+                        shared::need(index<wma::maxWorldImages&&image.size()>=16,"TB original texture bank bound");
                         const auto w=shared::u32(image.data()+8),h=shared::u32(image.data()+12);
                         shared::need(w&&h&&w<=1024&&h<=1024&&image.size()==std::size_t(w)*h*4+16,"TB native image extent");
                         shared::add(rgbaBytes,std::size_t(w)*h*4,16u*1024u*1024u,"TB texture RGBA budget");
                         shared::add(serializedBytes,image.size(),16u*1024u*1024u,"TB texture framing budget");
                         tm::TextureSelection selected;selected.identity=textureBase+index+1;selected.bankIndex=index;
                         selected.mipIndex=mip;selected.width=w;selected.height=h;selected.path=texture->name;
-                        selected.key="disc:"+textureKey+":"+pin->sourceSha256;
+                        selected.key="disc:"+textureKey+":"+(pin?std::string(pin->sourceSha256):shared::sha256(bytes)); // unpinned: runtime source identity
                         selected.sha256=shared::sha256(image); // Actual runtime output identity, not necessarily an independent pin.
                         next->textures.push_back(std::move(selected));images.push_back(std::move(image));
                         next->independentlyPinnedImages.push_back(independent?1:0);
@@ -420,7 +417,7 @@ public:
                         found=textureIndices.emplace(textureKey,index).first;
                     }
                     const auto index=static_cast<std::uint32_t>(next->selections.size());
-                    shared::need(index<expectedSelections,"Original TB authored pass count bound");
+                    shared::need(index<wma::maxWorldSelections,"Original TB authored pass count bound");
                     const auto& image=next->textures[found->second];tm::Selection selected;
                     selected.assetIdentity=assetIdentity;selected.materialIndex=materialIndex;selected.pass=pass.pass;selected.slot=1;
                     selected.bankSlot=static_cast<std::uint32_t>(slots.size());selected.textureIndex=found->second;selected.mipIndex=image.mipIndex;
@@ -431,7 +428,7 @@ public:
                     selected.sourcePassFields=detail::fields(pass.fields);selected.staticAnimationFrame=animated;
                     selected.projectedPrelit=projected;
                     if(projected)selected.texGenMatrix=tm::detail::projection(selected.sourcePassFields);
-                    selected.decodedSourceMember=texture->name;selected.decodedSourceSha256=pin->sourceSha256;
+                    selected.decodedSourceMember=texture->name;selected.decodedSourceSha256=wma::keySha(image.key);
                     slots.push_back({{selected.assetIdentity,materialIndex,pass.pass,1},image.identity,a::MaterialTextureRequirement50EA::required});
                     selectedPasses.push_back(index);next->selections.push_back(std::move(selected));
                 }
@@ -511,11 +508,16 @@ public:
             }
             d.scenes=next->scenes.size();d.stage="closure";d.member.clear();
             d.materials=next->materials.size();d.selections=next->selections.size();
-            shared::need(d.scenes==expectedScenes&&d.placements==expectedPlacements&&d.collisionOnly==expectedCollisionOnly&&d.surfaces==expectedSurfaces&&
+            // Stock counts are a receipt only (stand-in pins kept as data); bounds and invariants gate.
+            const bool stockClosure=d.scenes==expectedScenes&&d.placements==expectedPlacements&&d.collisionOnly==expectedCollisionOnly&&d.surfaces==expectedSurfaces&&
                 d.materials==expectedMaterials&&d.selections==expectedSelections&&d.secondPasses==expectedSecondPasses&&next->spans.size()==expectedSurfaces+expectedSecondPasses&&
                 next->mesh.vertices.size()==expectedVertices&&next->mesh.indices.size()==expectedIndices&&images.size()==expectedImages&&
                 next->normals.size()==next->mesh.vertices.size()&&
-                next->projectionUvs.size()==next->mesh.vertices.size()&&rgbaBytes==expectedRgbaBytes&&d.independentlyPinnedImages==expectedPinnedImages&&d.runtimeIdentityImages==expectedImages-expectedPinnedImages,
+                next->projectionUvs.size()==next->mesh.vertices.size()&&rgbaBytes==expectedRgbaBytes&&d.independentlyPinnedImages==expectedPinnedImages&&d.runtimeIdentityImages==expectedImages-expectedPinnedImages;
+            wma::closureReceipt("TB",stockClosure,d.materials,d.selections,next->spans.size(),images.size(),next->mesh.vertices.size());
+            shared::need(wma::closureBounds(d.scenes,d.placements,d.collisionOnly,d.surfaces,world.instances.size(),
+                d.materials,d.selections,d.secondPasses,next->spans.size(),next->mesh.vertices.size(),next->mesh.indices.size(),
+                images.size(),d.independentlyPinnedImages,d.runtimeIdentityImages)&&next->normals.size()==next->mesh.vertices.size()&&next->projectionUvs.size()==next->mesh.vertices.size(),
                 "Original TB full static source closure differs");
             for(unsigned axis=0;axis<3;++axis){next->mesh.bounds.minimum[axis]=std::numeric_limits<float>::infinity();
                 next->mesh.bounds.maximum[axis]=-std::numeric_limits<float>::infinity();}
@@ -526,7 +528,7 @@ public:
             for(std::size_t i=0;i<images.size();++i)textureInput.push_back({next->textures[i].identity,&images[i]});
             a::MaterialTextureAssetsInput50EA input;input.textures=textureInput.data();input.textureCount=static_cast<std::uint32_t>(textureInput.size());
             input.slots=slots.data();input.slotCount=static_cast<std::uint32_t>(slots.size());
-            input.budgets={expectedImages,expectedSelections,16u*1024u*1024u,16u*1024u*1024u,1024};
+            input.budgets={wma::maxWorldImages,wma::maxWorldSelections,16u*1024u*1024u,16u*1024u*1024u,1024};
             d.stage="pixel_bank";shared::need(next->bank.load(input,d.bank),"Original TB pixel bank rejected: "+d.bank.parserMessage);
             storage_=std::move(next);d.stage="complete";return true;
         }catch(const std::exception& error){try{d.message=error.what();}catch(...){}return false;}

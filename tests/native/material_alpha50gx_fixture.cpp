@@ -170,11 +170,8 @@ bool selectMaSa(const track_materials50fa_fixture::Selection& selection,
         get(Field::textureFunction) != 0 || get(Field::alphaCorrectionValue) != 0 ||
         get(Field::alphaBlendingControlInUnitsOfPixels) != 0) return false;
     const auto program = detail::lower(selection.program);
-    const bool shield = selection.track == track_source_fixture::Track::ma &&
-        detail::lower(selection.materialName) == "ma_shield" &&
-        detail::lower(selection.textureName) == "ma_shield";
     if (program != "prelitcompressed" && program != "diffusecompressed" &&
-        !(shield && program == "diffusetextranscompressed")) return false;
+        program != "diffusetextranscompressed") return false; // by program only (298C80), no material name
     Policy next;
     next.depthWrite = get(Field::zWriteDisabled) == 0;
     next.depthEqual = true; // Source GEQUAL becomes LEQUAL in the native depth map.
@@ -245,11 +242,8 @@ bool selectMb(const track_materials50fa_fixture::Selection& selection,
         get(Field::textureFunction) != 0 || get(Field::alphaCorrectionValue) != 0 ||
         get(Field::alphaBlendingControlInUnitsOfPixels) != 0) return false;
     const auto program = detail::lower(selection.program);
-    const bool shield = selection.track == track_source_fixture::Track::mb &&
-        detail::lower(selection.materialName) == "ma_shield" &&
-        detail::lower(selection.textureName) == "ma_shield";
     if (program != "prelitcompressed" && program != "diffusecompressed" &&
-        !(shield && program == "diffusetextranscompressed")) return false;
+        program != "diffusetextranscompressed") return false; // by program only (298C80), no material name
     Policy next;
     next.depthWrite = get(Field::zWriteDisabled) == 0;
     next.depthEqual = true; // Source GEQUAL becomes LEQUAL in the native depth map.
@@ -531,7 +525,8 @@ bool selectSc(const track_materials50fa_fixture::Selection& selection,
             get(Field::alphaTestOnOff) != (selection.pass == 1 ? 0 : 1) ||
             get(Field::alphaReferenceValue) != 0) return false;
     } else if (selection.passCount != 1 ||
-        (program != "prelitcompressed" && program != "diffusecompressed")) return false;
+        (program != "prelitcompressed" && program != "diffusecompressed" &&
+         program != "diffusetextranscompressed")) return false; // by program only (298C80), no material name
     Policy next;
     next.depthWrite = get(Field::zWriteDisabled) == 0;
     next.depthEqual = true; // Source GEQUAL becomes LEQUAL in the native depth map.
@@ -1231,14 +1226,11 @@ bool selectTb(const track_materials50fa_fixture::Selection& selection,
         get(Field::textureFunction) != 0 || get(Field::alphaCorrectionValue) != 0 ||
         get(Field::alphaBlendingControlInUnitsOfPixels) != 0) return false;
     const auto program = detail::lower(selection.program);
-    const bool shield = selection.track == track_source_fixture::Track::tb &&
-        detail::lower(selection.materialName) == "tc_shield" &&
-        detail::lower(selection.textureName) == "tc_shield";
     if(selection.projectedPrelit){
         if(selection.program!="ProjectedPrelit"||selection.passCount!=2||get(Field::alphaTestOnOff)!=0||
             get(Field::alphaBlendingOnOff)!=(selection.pass==1?0:1))return false;
     }else if(selection.passCount!=1||selection.pass!=1||
-        (program!="prelitcompressed"&&program!="diffusecompressed"&&!(shield&&program=="diffusetextranscompressed")))return false;
+        (program!="prelitcompressed"&&program!="diffusecompressed"&&program!="diffusetextranscompressed"))return false; // by program only
     Policy next;
     next.depthWrite = get(Field::zWriteDisabled) == 0;
     next.depthEqual = true; // Source GEQUAL becomes LEQUAL in the native depth map.

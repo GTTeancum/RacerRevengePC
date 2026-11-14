@@ -1,5 +1,6 @@
 #pragma once
 #include "track_materials50fa_fixture.h"
+#include "original_world_material_admission50cm.h"
 #include "tb_cold_sources50la.h"
 #include "material_alpha50gx_fixture.h"
 #include "source_texture50fc_fixture.h"
@@ -19,6 +20,7 @@
 
 // Cold TB owner proposal; strict geometry acceptance remains independently gated.
 namespace tb_original_world50LM {
+namespace wma=::original_world_material_admission50CM;
 namespace a=rr::assets;
 namespace shared=pod_materials50ed_fixture::detail;
 namespace tm=track_materials50fa_fixture;

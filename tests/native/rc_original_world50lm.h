@@ -1,5 +1,6 @@
 #pragma once
 #include "track_materials50fa_fixture.h"
+#include "original_world_material_admission50cm.h"
 #include "rc_cold_sources50la.h"
 #include "../../src/assets/original_tga_conversion50la.h"
 #include "../../src/game/original_track_environment50rc.h"
@@ -21,6 +22,7 @@
 
 // Cold RC owner proposal; strict geometry acceptance remains independently gated.
 namespace rc_original_world50LM {
+namespace wma=::original_world_material_admission50CM;
 namespace a=rr::assets;
 namespace shared=pod_materials50ed_fixture::detail;
 namespace tm=track_materials50fa_fixture;
