@@ -1,5 +1,6 @@
 // Original publication scope and its local owners; no root-only hooks/readers.
 #include "native_last_failure50pd.h"
+#include "course_cut_identity50ci.h"
 #include "native_course_archive_release50pd.h"
 #include "native_wreck_debris_gpu50pd.h"
 #include "native_water_surface50ws.h"
@@ -791,20 +792,22 @@ void Context::run() {
        maOriginalWorld?maOriginalWorld->archive():saOriginalWorld?saOriginalWorld->archive():&retainedTrackArchive;
    if(!tcOriginalWorld&&!scOriginalWorld&&!mbOriginalWorld&&!taOriginalWorld&&!gcOriginalWorld&&!gaOriginalWorld&&!maOriginalWorld&&!saOriginalWorld){
     const auto bytes=runtime_startup50fl::readBytes(trackSession->archive);
-    rr::assets::DecodeError48C diagnostic;rr::assets::DecodeLimits48C limits;
-    limits.resource_file_bytes=trackSession->archiveBytes;
-    limits.resource_decoded_bytes=64u*1024u*1024u;limits.resource_entries=4096;
-    require50DU(bytes.size()==trackSession->archiveBytes&&
-        pod_materials50ed_fixture::detail::sha256(bytes)==trackSession->archiveSha256&&
-        rr::assets::decodeResource48C(bytes,retainedTrackArchive,diagnostic,nullptr,limits),
-        "canonical particle selected-track archive authentication rejected");
+    // Common course rule: identity is a receipt; shared decode capacity.
+    rr::assets::DecodeError48C diagnostic;
+    course_archive_receipt50CI::receipt("track_mount",trackSession->world->code,bytes,
+        trackSession->archiveSha256,trackSession->archiveBytes);
+    require50DU(rr::assets::decodeResource48C(bytes,retainedTrackArchive,diagnostic,nullptr,course_archive_receipt50CI::limits()),
+        "canonical particle selected-track archive decode rejected");
    }
    const auto provider=trackMaterialRequest.canonicalDomain->archiveProvider3E1A70();
    rr::assets::OriginalStandardArchiveProvider50LA::Diagnostic mounted;
    require50DU(provider&&archive&&
        (taOriginalWorld?taOriginalWorld->mountCanonicalArchive(*provider,mounted,native_course_archive_release50PD::holder().begin(provider,
             trackMaterialRequest.canonicalDomain->resolver3E1A70())):
-           provider->mountAuthenticatedRes(trackSession->world->container,trackSession->archiveSha256,trackSession->archiveBytes,
+           // Label = the archive actually admitted (course_cut_identity50ci.h).
+           provider->mountAuthenticatedRes(trackSession->world->container,
+               course_cut_identity50CI::mountDigest(trackSession->world->code,trackSession->archiveSha256),
+               course_cut_identity50CI::mountBytes(trackSession->world->code,trackSession->archiveBytes),
                *archive,mounted,native_course_archive_release50PD::holder().begin(provider,
                    trackMaterialRequest.canonicalDomain->resolver3E1A70())))&&provider->sealNativeMounts(mounted)&&
        trackMaterialRequest.canonicalDomain->resolver3E1A70()->bindProvider3E1A70(provider,trackMaterialDiagnostic.canonical.texture),
@@ -1034,7 +1037,7 @@ void Context::run() {
    require50DU(mbAtm.loadSource(trackSession->archive,trackSource,*mbOriginalWorld,animationDiagnostic),
        animationDiagnostic.message.empty()?"MB actual animated textures rejected":animationDiagnostic.message.c_str());
   }
-  if(isScTrack){
+  if(isScTrack&&scColdSources&&scColdSources->authorsAnimatedTextures()){
    sc_atm_animation_fixture::Diagnostic animationDiagnostic;
    const bool atmLoaded=scAtm.loadSource(trackSession->archive,trackSource,*scOriginalWorld,animationDiagnostic);
    require50DU(atmLoaded,animationDiagnostic.message.empty()?"SC actual animated textures rejected":animationDiagnostic.message.c_str());
@@ -1304,10 +1307,13 @@ void Context::run() {
        !tcMapView.sameWorld(liveWorld)||!tcAiView.sameWorld(liveWorld)||
        !sourceCameraSession||!sourceCameraSession->ready()))return false;
     if(scOriginalDisc&&(!humanOriginalHud||!scColdSources||!scGround||
-       scGround->coldSource()!=scColdSources.get()||!scTriggerActions||!scTriggerActions->ready()||
-       scTriggerActions->status()!=sc_trigger_actions::Status::Complete||
+       scGround->coldSource()!=scColdSources.get()||
+       // Trigger actions exist exactly when the TOB authors triggers.
+       (scTriggerActions&&(!scTriggerActions->ready()||scTriggerActions->status()!=sc_trigger_actions::Status::Complete))||
        !navigationMap||!navigationAI||!navigationMap->indicesPrepared||!navigationAI->indicesPrepared||
-       navigationMap->track.count!=179||navigationAI->track.count!=180||
+       !scColdSources->sourcesDecoded()||
+       navigationMap->track.count!=scColdSources->sourcesDecoded()->map.track.count||
+       navigationAI->track.count!=scColdSources->sourcesDecoded()->ai.track.count||
        !sourceCameraSession||!sourceCameraSession->ready()))return false;
     if(isGbTrack&&(!gbParticleAuthoring||!gbParticleAuthoring->ready()||!gbParticleAttachments||!gbParticleAttachments->sourceGraphReady()||
        !gbTrackParticles||!gbTrackParticles->prepared()||!gbParticleRuntime||!gbParticleRuntime->sourceStaged()||
@@ -1328,7 +1334,9 @@ void Context::run() {
        !rcParticleRegistryFinalAccounted||!rcTrackParticles->particles()||
        rcTrackParticles->particles()->emitterStoragePayloadBytes()!=rcParticleRegistryPayloadCharged))return false;
     if(isScTrack&&(!scOriginalWorld||!scOriginalWorld->loaded()||
-       !scAtm.loaded()||!scAtm.ownsResources()||!scZeroSky.ready()))return false;
+       // ATM owner exactly when the archive authors animated textures.
+       (scColdSources&&scColdSources->authorsAnimatedTextures()?(!scAtm.loaded()||!scAtm.ownsResources()):scAtm.loaded())||
+       !(scZeroSky.ready()||(skyOwner&&skyOwner->loaded()))))return false; // sky: zero-sky or authored cube, per the data
     if(maOriginalDisc&&(!humanOriginalHud||!maOriginalWorld||!maOriginalWorld->loaded()||
        !sourceCameraSession||!sourceCameraSession->ready()))return false;
     if(saOriginalDisc&&(!humanOriginalHud||!saOriginalWorld||!saOriginalWorld->loaded()||
@@ -1432,7 +1440,7 @@ void Context::run() {
   if(!authoredFogSetting||std::string(authoredFogSetting)=="1"){
    require50DU(isTaTrack||isGcTrack||isGaTrack||isMaSaTrack||isMbTrack||isScTrack||isTcTrack||isRcTrack||isTbTrack||isGbTrack||isMcTrack,"unsupported reconstructed fog track");
    auto& fog=renderRequest.track.worldFog;
-   const float* color=isScTrack?scZeroSky.clearRgba():isMcTrack?mcSkyOwner->clearRgba():skyOwner->clearRgba();
+   const float* color=scZeroSky.ready()?scZeroSky.clearRgba():isMcTrack?mcSkyOwner->clearRgba():skyOwner->clearRgba();
    require50DU(color,"authenticated world fog RGB missing");
    for(unsigned i=0;i<3;++i)fog.color[i]=color[i];
    constexpr float minimum=1333.300048828125f,maximum=4000.f;
@@ -1449,7 +1457,7 @@ void Context::run() {
        <<" end "<<fog.end<<"; source ranges established, native world shader parity pending\n";
   }
   if(originalCameraEnabled&&!isGbTrack&&!isMcTrack){
-   const float* color=isScTrack?scZeroSky.clearRgba():skyOwner->clearRgba();
+   const float* color=scZeroSky.ready()?scZeroSky.clearRgba():skyOwner->clearRgba();
    require50DU(color,"actual source camera fog RGB missing");
    const auto channel=[&](unsigned axis){return static_cast<std::uint32_t>(std::lround(color[axis]*255.f));};
    sourceTrackFog.color30=0xff000000u|(channel(0)<<16)|(channel(1)<<8)|channel(2);
@@ -1669,7 +1677,8 @@ void Context::run() {
   const auto* raSky=isRaTrack?raWorld->skyAssets():nullptr;
   require50DU(!isRaTrack||raSky,"actual RA authored sky publication missing");
   std::vector<platform::VehicleWindowTrackSpan50DS> skyBindings;
-  if(!isScTrack){
+  // Only a course authoring zero sky cubes (zero-sky owner prepared) publishes no sky.
+  if(!scZeroSky.ready()){
   const auto* skyBank=isRaTrack?raSky->bank():isMcTrack?mcSkyOwner->bank():skyOwner->bank();
   const auto* skyMesh=isRaTrack?raSky->mesh():isMcTrack?mcSkyOwner->mesh():skyOwner->mesh();
   const auto* skySpans=isRaTrack?raSky->spans():isMcTrack?mcSkyOwner->spans():skyOwner->spans();

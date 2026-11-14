@@ -1,12 +1,13 @@
 #pragma once
 #include "sc_trigger_authoring_fixture.h"
 #include <array>
+#include <iostream>
 #include <string>
 #include <vector>
 
 namespace sc_static_model_params {
 namespace a=rr::assets;
-inline constexpr std::size_t count=451;
+inline constexpr std::size_t stockCount=451; // receipt only; the TOB's own count is used
 struct Source {
  std::string slt,modelName;
  std::uint32_t allowShadowReceiving148=1; //27A208/27A234 constructor default
@@ -20,11 +21,11 @@ struct ModelLease {
  std::uint32_t type=1;
 };
 struct Receipt {
- std::array<std::size_t,count> matched{};
+ std::vector<std::size_t> matched;
  std::size_t writes=0,unmatched=0;
 };
 class Owner final {
- std::array<Source,count> source_{};
+ std::vector<Source> source_;
  bool attempted_=false,ready_=false;
  static bool equal(const std::string& a,const std::string& b)noexcept {
   // Original308F00 is case-insensitive ASCII for these authenticated names.
@@ -41,22 +42,30 @@ public:
  bool load(const std::vector<std::uint8_t>& authenticatedTob,std::string& error){
   if(attempted_){error="SC static model parameter owner requires fresh lifetime";return false;}attempted_=true;
   try{using namespace ga_trigger_authoring::detail;
-   need(authenticatedTob.size()==sc_trigger_authoring::tobBytes&&
-      pod_materials50ed_fixture::detail::sha256(authenticatedTob)==sc_trigger_authoring::tobSha,"SC static model original TOB identity");
+   // Read from the course's own TOB (stock identity is a receipt). The
+   // original's 271A00 reads [StaticModelParams] NumberOfStaticModelParams
+   // and each Model<n> SLT/AllowShadowReceiving; absent block = none.
+   course_archive_receipt50CI::memberReceipt("sc_static_model_params","tracks\\sc.tob",authenticatedTob,0,0,
+       sc_trigger_authoring::tobBytes,sc_trigger_authoring::tobSha);
    a::ParameterDocument48F document;a::DecodeError48C why{};
-   need(a::decodeParameters48F(authenticatedTob,document,why),"SC static model original TOB rejected");
-   need(integer(field(block(document,"staticmodelparams"),"numberofstaticmodelparams"))==count,"SC static model original count changed");
-   std::array<Source,count> next{};
+   need(a::decodeParameters48F(authenticatedTob,document,why),"SC static model TOB rejected");
+   const a::ParameterBlock48F* header=nullptr;
+   for(const auto& b:document.blocks)if(b.name=="staticmodelparams"){need(!header,"SC duplicate StaticModelParams");header=&b;}
+   std::size_t count=0;
+   if(header){const std::string* text=nullptr;
+    for(const auto& f:header->fields)if(f.name=="numberofstaticmodelparams"){need(!text,"SC duplicate static model count");text=&f.value;}
+    if(text)count=integer(*text);}
+   need(count<=document.blocks.size(),"SC static model count exceeds the TOB's blocks");
+   course_archive_receipt50CI::countReceipt("sc_static_model_params","rows",count,stockCount);
+   std::vector<Source> next(count);
    for(std::size_t i=0;i<count;++i){const auto& b=block(document,"model"+std::to_string(i+1));auto& s=next[i];
-    need(b.fields.size()==2,"SC static model source fields changed");s.slt=field(b,"slt");
+    s.slt=field(b,"slt");
     //271A9C..AC calls1169D0 to find the LAST dot;271AB4..C8 clears its suffix.
     s.modelName=s.slt.substr(0,s.slt.rfind('.'));need(!s.modelName.empty(),"SC static model source name empty");
-    s.allowShadowReceiving148=boolean(field(b,"allowshadowreceiving"))?1u:0u;
-    need(!s.allowShadowReceiving148,"SC static model authored flag changed");
+    // Absent AllowShadowReceiving keeps the 27A208/27A234 constructor default 1.
+    const std::string* allow=nullptr;for(const auto& f:b.fields)if(f.name=="allowshadowreceiving")allow=&f.value;
+    s.allowShadowReceiving148=allow?(boolean(*allow)?1u:0u):1u;
    }
-   // Preserve numeric source order, including both genuine lava03 rows.
-   std::size_t repeated=0;for(const auto& row:next)if(equal(row.slt,"lava03.slt"))++repeated;
-   need(repeated==2,"SC repeated lava03 source rows changed");
    source_=std::move(next);ready_=true;error.clear();return true;
   }catch(const std::exception& e){error=e.what();return false;}
  }
@@ -66,8 +75,8 @@ public:
   //271A00 never loads/spawns a missing model or fabricates a new placement.
   for(std::size_t i=0;i<modelCount;++i)if(models[i].type==1&&
      (!models[i].sourceModelName||!models[i].allowShadowReceiving148))return false;
-  Receipt next{};
-  for(std::size_t s=0;s<count;++s){
+  Receipt next{};next.matched.assign(source_.size(),0);
+  for(std::size_t s=0;s<source_.size();++s){
    for(std::size_t i=0;i<modelCount;++i)if(models[i].type==1&&equal(*models[i].sourceModelName,source_[s].modelName)){
     *models[i].allowShadowReceiving148=source_[s].allowShadowReceiving148;++next.matched[s];++next.writes;
    }

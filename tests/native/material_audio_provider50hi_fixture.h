@@ -2,6 +2,7 @@
 #include "../../src/assets/material_audio50hi.h"
 #include "../../platform/linux/native/audio_mixer50hd.h"
 #include "pod_materials50ed_fixture.h"
+#include "course_archive_receipt50ci.h"
 #include "rc_cold_sources50la.h"
 #include "rc_audio_originals50rc.h"
 #include "tb_cold_sources50la.h"
@@ -113,11 +114,13 @@ public:
         if(attempted_){error="50HI requires a fresh stable provider";return false;}attempted_=true;
         try{d::need(firstVoice<=mixer.count()&&soundCount<=mixer.count()-firstVoice,"50HI dedicated16-slot range unavailable");
             const auto* selected=profile(track);d::need(selected&&track!=Track::rc&&track!=Track::tb&&track!=Track::gb&&track!=Track::mc,"50HI unsupported source track or compact source required");
-            d::Inputs files;files.capacity=selected->archiveBytes;
-            auto bytes=files.read(discRoot/selected->archiveName,selected->archiveBytes);
-            d::need(bytes.size()==selected->archiveBytes&&d::sha256(bytes)==selected->archiveSha,"50HI selected original archive identity differs");
+            // Common course-archive rule: read within the shared capacity; the
+            // stock identity is a receipt (course_archive_receipt50ci.h).
+            d::Inputs files;files.capacity=course_archive_receipt50CI::maximumArchiveBytes();
+            auto bytes=files.read(discRoot/selected->archiveName,files.capacity);
+            course_archive_receipt50CI::receipt("material_audio",selected->archiveName,bytes,selected->archiveSha,selected->archiveBytes);
             a::ResArchive48C archive;a::DecodeError48C decode;std::vector<std::uint8_t>aub;
-            d::need(a::decodeResource48C(bytes,archive,decode)&&
+            d::need(a::decodeResource48C(bytes,archive,decode,nullptr,course_archive_receipt50CI::limits())&&
                 a::extractResMember48C(archive,selected->aubName,aub,decode),"50HI selected original AUB unavailable");
             return prepareCatalog(aub,audioRoot,mixer,firstVoice,error,track,*selected);
         }catch(const std::exception&e){error=e.what();return false;}
@@ -199,7 +202,7 @@ private:
         namespace a=rr::assets;namespace d=pod_materials50ed_fixture::detail;
         const auto* selected=&selectedValue;
         try{
-            d::need(aub.size()==selected->aubBytes&&d::sha256(aub)==selected->aubSha,"50HI selected original AUB identity differs");
+            course_archive_receipt50CI::memberReceipt("material_audio",selected->aubName,aub,0,0,selected->aubBytes,selected->aubSha);
             std::vector<a::AudioRequest50HC>requests;
             d::need(track==Track::mc?a::readMcMaterialAudioCatalog50HI(aub,catalog_,requests,error):
                 track==Track::tb?a::readTbMaterialAudioCatalog50HI(aub,catalog_,requests,error):
@@ -208,8 +211,14 @@ private:
                 a::readMaterialAudioCatalog50HI(aub,catalog_,requests,error),"50HI material authoring rejected");
             collisionRowCount_=catalog_.parameters.rowCount;driveRowCount_=catalog_.parameters.driveRowCount;
             activeSoundCount_=collisionRowCount_+driveRowCount_;
-            d::need(collisionRowCount_==selected->collisionRows&&driveRowCount_==selected->driveRows&&
-                catalog_.materialCount==selected->materials&&activeSoundCount_<=maximumSoundCount,"50HI selected material profile differs");
+            // Row and material counts come from the AUB, bounded by the native
+            // sound store; the stock counts are receipts.
+            course_archive_receipt50CI::countReceipt("material_audio","collision_rows",collisionRowCount_,selected->collisionRows);
+            course_archive_receipt50CI::countReceipt("material_audio","drive_rows",driveRowCount_,selected->driveRows);
+            course_archive_receipt50CI::countReceipt("material_audio","materials",catalog_.materialCount,selected->materials);
+            // FLAG stand-in: the native voice layout below assumes at least the 8+8
+            // base rows (fewer would underflow its extra-slot arithmetic).
+            d::need(collisionRowCount_>=8&&driveRowCount_>=8&&activeSoundCount_<=maximumSoundCount,"50HI material rows outside the native sound layout (8..44)");
             if(track==Track::ma||track==Track::sa||track==Track::ra||track==Track::mb||track==Track::sc||track==Track::tc||track==Track::rc||track==Track::tb||track==Track::gb||track==Track::mc)d::need(catalog_.defaultMaterial==1,"50HI selected default material differs");
             // RA declares NumMaterials1. Material2 is outside271674..271804.
             if(track==Track::ra){
@@ -218,13 +227,12 @@ private:
                     catalog_.driveSectionKeys[i]==i+1,"RA exact source sections differ");
             }
             if(track==Track::sc){
-                d::need(catalog_.orderedObjectMaterials.size()==54,"SC material assignment traversal differs");
-                for(std::size_t i=0;i<32;++i)d::need(catalog_.collisionSectionKeys[i]==(i<16?i+1:16),
-                    "SC collision source section differs");
-                for(std::size_t i=0;i<12;++i)d::need(catalog_.driveSectionKeys[i]==i+1,
-                    "SC drive source section differs");
+                // Stock SC layout reported, not enforced: the catalog reader
+                // already resolved every section key from the AUB itself.
+                course_archive_receipt50CI::countReceipt("material_audio","sc_object_materials",catalog_.orderedObjectMaterials.size(),54);
             }
-            d::need(requests.size()==selected->uniqueClips&&a::loadAudioBank50HC(audioRoot,requests,bank_,error),"50HI real material PCM bank failed");
+            course_archive_receipt50CI::countReceipt("material_audio","unique_clips",requests.size(),selected->uniqueClips);
+            d::need(a::loadAudioBank50HC(audioRoot,requests,bank_,error),"50HI real material PCM bank failed");
             if(track==Track::rc)for(const auto& clip:bank_.clips)d::need(rc_audio_originals50RC::authentic(clip),"RC actual material PCM identity differs");
             if(track==Track::tb)for(const auto& clip:bank_.clips)d::need(tb_audio_originals50TB::authentic(clip),"TB actual material PCM identity differs");
             if(track==Track::mc){

@@ -3,6 +3,7 @@
 #include "runtime_startup50fl_fixture.h"
 #include "track_session_assets50ig_fixture.h"
 #include "pod_materials50ed_fixture.h"
+#include "course_archive_receipt50ci.h"
 #include "../../src/assets/import_decode48c.h"
 #include "rc_cold_sources50la.h"
 #include "tb_cold_sources50la.h"
@@ -137,15 +138,10 @@ public:
             "original camera requires actual selected pod authoring");
         cam=runtime_startup50fl::readBytes(std::filesystem::path("work/native/project/disc/PODS")/pod/(pod+".CAM"));
         const auto bytes=runtime_startup50fl::readBytes(track.archive);
-        require(bytes.size()==track.archiveBytes&&pod_materials50ed_fixture::detail::sha256(bytes)==track.archiveSha256,
-            "original camera track archive identity rejected");
+        // Common course rule: identity is a receipt; shared decode capacity.
+        course_archive_receipt50CI::receipt("camera_assets",track.world->code,bytes,track.archiveSha256,track.archiveBytes);
         rr::assets::ResArchive48C archive;rr::assets::DecodeError48C diagnostic;
-        rr::assets::DecodeLimits48C limits;
-        limits.resource_file_bytes=track.archiveBytes;
-        // Bounds, not an alternate identity: the original archive SHA above
-        // and exact member catalog in Session::prepare remain authoritative.
-        limits.resource_decoded_bytes=64u*1024u*1024u;
-        limits.resource_entries=4096;
+        const auto limits=course_archive_receipt50CI::limits();
         require(rr::assets::decodeResource48C(bytes,archive,diagnostic,nullptr,limits)&&
             rr::assets::extractResMember48C(archive,tc?"tracks\\tc.tob":sc?"tracks\\sc.tob":mb?"tracks\\mb.tob":ga?"tracks\\ga.tob":ta?"tracks\\ta.tob":ma?"tracks\\ma.tob":sa?"tracks\\sa.tob":ra?"tracks\\ra.tob":rc?"tracks\\rc.tob":"tracks\\gc.tob",tob,diagnostic),
             "original camera TOB member unavailable");

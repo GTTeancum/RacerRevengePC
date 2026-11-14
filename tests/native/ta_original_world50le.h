@@ -1,4 +1,5 @@
 #pragma once
+#include "../../src/assets/original_track_cut_identity50la.h"
 #include "../../platform/linux/native/loading_progress50du.h"
 #include "track_materials50fa_fixture.h"
 #include "original_world_material_admission50cm.h"
@@ -367,7 +368,7 @@ public:
         a::NativeRaceMountLease50LA* lease=nullptr)noexcept {
         if(!storage_||!storage_->encodedInput){d={};d.status=a::OriginalStandardArchiveProvider50LA::Status::input;return false;}
         try {
-            return provider.mountAuthenticatedRes("TRACKS/TA.RES",archiveSha,archiveBytes,storage_->archive,d,lease)&&
+            return provider.mountAuthenticatedRes("TRACKS/TA.RES",::rr::assets::originalTrackMountDigest50LA("TRACKS/TA.RES",archiveSha),::rr::assets::originalTrackMountBytes50LA("TRACKS/TA.RES",archiveBytes),storage_->archive,d,lease)&&
                 provider.retainTaEncodedInput(storage_->archive,storage_->encodedInput,d);
         }catch(...){d={};d.status=a::OriginalStandardArchiveProvider50LA::Status::allocation;return false;}
     }

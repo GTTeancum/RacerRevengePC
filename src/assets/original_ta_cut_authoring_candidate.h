@@ -142,7 +142,9 @@ public:
         status = Status::input;
         if(!input||(trackId!="TA"&&trackId!="RA"&&trackId!="GC"&&trackId!="SA"&&trackId!="MA"&&trackId!="GA"&&trackId!="MB"&&trackId!="SC"&&trackId!="GB"&&trackId!="RC"&&trackId!="TC"&&trackId!="MC"&&trackId!="TB"))return nullptr;
         const auto* identity=originalTrackCutIdentity50LA(trackId);
-        if(!identity||identity->cutCount!=((trackId=="TA"||trackId=="SC"||trackId=="TC")?3u:trackId=="RA"?7u:(trackId=="SA"||trackId=="GA"||trackId=="MB"||trackId=="RC"||trackId=="TB")?5u:4u)||
+        // Cut count from the course row (stock table or derived from its own TOB),
+        // bounded by the native 7-cut storage; no per-course literal.
+        if(!identity||!identity->cutCount||identity->cutCount>7u||
            memberCount!=static_cast<std::size_t>(identity->cutCount)+1u)return nullptr;
         for (std::size_t i=0; i<memberCount; ++i) {
             const auto& member=identity->members[i];

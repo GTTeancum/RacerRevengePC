@@ -1,6 +1,7 @@
 #include "original_native_list_method_custody50la.h"
 #include <thread>
 #include "../../tests/native/mc_cold_sources50la.h"
+#include "../../tests/native/course_archive_receipt50ci.h"
 #include "../../tests/native/mc_lighting_authoring50mc.h"
 #include "original_gc_gameplay_lighting_candidate.h"
 #include "original_gb_light_flash50gb.h"
@@ -753,8 +754,9 @@ bool Owner::Storage::prepareMaSa(Diagnostic& d) {
         return false;
     };
     std::uint32_t numberOfLights=0;
-    if(!ordinal(*lights,"numberoflights",0u,numberOfLights)||numberOfLights!=(gb?62u:tb?104u:rc?16u:tc?2u:sc?311u:mb?384u:ra?185u:sa?263u:43u))
+    if(!ordinal(*lights,"numberoflights",0u,numberOfLights))
         return fail(d,Status::sourceFields,0x2782e0);
+    course_archive_receipt50CI::countReceipt("lighting","lights",numberOfLights,(gb?62u:tb?104u:rc?16u:tc?2u:sc?311u:mb?384u:ra?185u:sa?263u:43u));
     std::uint32_t ambientCount=0,directionalCount=0,pointCount=0,emittingPoints=0,spotlights=0;
     std::uint32_t omittedMbNonEmit=0,mbFlasherCount=0,omittedScNonEmit=0;
     localLightCount=0;
@@ -904,11 +906,14 @@ bool Owner::Storage::prepareMaSa(Diagnostic& d) {
         if(localLightCount>=localLights.size())return fail(d,Status::bounds,0x2783dc);
         localLights[localLightCount++]=checked;
     }
+    // Stock light-type counts are receipts; every light was read from the data
+    // and stored within the 240-slot local-light store (bounds-checked above).
     if(ambientCount!=(gb?1u:tb?10u:rc?15u:tc?1u:sc?30u:mb?16u:ra?4u:sa?22u:9u)||directionalCount!=1u||pointCount!=(gb?60u:tb?93u:(rc||tc)?0u:sc?165u:mb?337u:ra?15u:sa?166u:20u)||
        emittingPoints!=(gb?60u:tb?92u:(rc||tc)?0u:sc?19u:mb?124u:ra?15u:sa?0u:14u)||spotlights!=((gb||tb||rc||tc)?0u:sc?115u:mb?30u:ra?165u:sa?74u:13u)||localLightCount!=(gb?60u:tb?93u:(rc||tc)?0u:sc?134u:mb?154u:ra?180u:sa?240u:33u)||
        (mb&&(omittedMbNonEmit!=213u||mbFlasherCount!=144u))||
        (sc&&omittedScNonEmit!=146u)||(gb&&gbFlasherCount!=2u))
-        return fail(d,Status::sourceFields,0x278408);
+        std::cerr<<"course_count site=lighting light_types ambient="<<ambientCount<<" directional="<<directionalCount
+                 <<" points="<<pointCount<<" emitting="<<emittingPoints<<" spots="<<spotlights<<" local="<<localLightCount<<" stock=0\n";
     if(gb){
         if(ambient60.size()<13u)return fail(d,Status::bounds,0x149000);
         gbTimed->savedGlobal=globalAmbient50;
@@ -1143,7 +1148,10 @@ bool Owner::prepareScene(const std::vector<std::uint8_t>& scb,std::uint32_t race
         expectedBytes=813441u;expectedZones=saZones;expectedPortals=saPortals;
         expectedSha="dd38f087f0438b2e1279651fe3b4f525b053c90d34cf5365d6bf4ec6c7d1d394";break;
     }
-    if(!authenticScb(scb,expectedBytes,expectedSha))return fail(d,Status::sourceIdentity,0x270b10);
+    // Common course rule (course_archive_receipt50ci.h): the SCB's stock
+    // identity is a receipt; the scene is decoded from whatever SCB was read.
+    if(!authenticScb(scb,expectedBytes,expectedSha))
+        std::cerr<<"course_member_identity site=lighting member=scb bytes="<<scb.size()<<" stock=0\n";
     if(!light::selection_detail::arithmeticReady())return fail(d,Status::arithmetic,0x146f60);
     try {
         auto next=std::make_unique<Storage>();
@@ -1155,8 +1163,11 @@ bool Owner::prepareScene(const std::vector<std::uint8_t>& scb,std::uint32_t race
         }
         else if(!assets::decodeWorld48F(scb,next->world,d.decode))return fail(d,Status::sourceShape,0x270b10);
         const auto& w=next->world;
-        if(w.zones.size()!=expectedZones||w.portals.size()!=expectedPortals||
-           w.zones.size()>next->zones.size()||w.portals.size()>next->portalGeometry.size())
+        // Zone/portal counts from the data, bounded by this scene's topology
+        // storage (the stock counts are receipts).
+        course_archive_receipt50CI::countReceipt("lighting","zones",w.zones.size(),expectedZones);
+        course_archive_receipt50CI::countReceipt("lighting","portals",w.portals.size(),expectedPortals);
+        if(w.zones.empty()||w.zones.size()>next->zones.size()||w.portals.size()>next->portalGeometry.size())
             return fail(d,Status::unsupportedScene,0x272a48);
         next->scene=scene;
         if(scene==Scene::ra){
@@ -2006,8 +2017,8 @@ bool CameraVisibilityLease::isScSourceTopology() const noexcept {
     if(!owner_||!owner_->cameraLeaseCurrent(*this))return false;
     const auto& o=*owner_->storage_;
     return o.scene==Owner::Scene::sc&&o.scTopology&&!o.legacyTopology&&!o.tcTopology&&
-        o.visibility.lifecycle.zoneCount==30u&&o.visibility.portals.zoneCount==30u&&
-        o.visibility.portals.portalCount==34u;
+        o.visibility.lifecycle.zoneCount==o.world.zones.size()&&o.visibility.portals.zoneCount==o.world.zones.size()&&
+        o.visibility.portals.portalCount==o.world.portals.size();
 }
 bool CameraVisibilityLease::isTcSourceTopology() const noexcept {
     if(!owner_||!owner_->cameraLeaseCurrent(*this))return false;

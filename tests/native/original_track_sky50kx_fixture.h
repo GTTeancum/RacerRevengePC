@@ -174,6 +174,15 @@ public:
             "26f5d637533ee9840e916e02d5cef7b06d68352f1b7e0b11a48bf050d73df51e",
             28u,"mcset4.cub",error);
     }
+    // Course-neutral: the same reader on a World48F its course's cold owner
+    // already decoded from that course's own archive. No identity pin; cube
+    // count, cube name and zone rows are the data's (the sky images themselves
+    // are loaded by sky50gw_fixture::Owner::loadFromCourseData from the same
+    // world, so both read one [Environment] block).
+    bool prepareFromCourseData(const rr::assets::World48F& world,std::string& error){
+        if(prepared_){error="source sky selection is cold one-shot";return false;}
+        return prepareSelection(world,nullptr,error);
+    }
 private:
     bool prepareAuthenticated(const rr::assets::World48F& world,std::size_t bytes,
         const char* hash,std::size_t zones,const char* cubeName,std::string& error){
@@ -181,6 +190,15 @@ private:
            pod_materials50ed_fixture::detail::sha256(world.parameters.original_bytes)!=hash||
            world.zones.size()!=zones||zones>zoneCube_.size()){
             error="source sky selection requires its actual authenticated SCB";return false;
+        }
+        return prepareSelection(world,cubeName,error);
+    }
+    // The 276C00 Environment read shared by every course. expectedCube is the
+    // stock rows' identity cross-check; null for a course read from its data.
+    bool prepareSelection(const rr::assets::World48F& world,const char* expectedCube,std::string& error){
+        // Bounded by this owner's fixed zone-row store; a larger world is refused.
+        if(world.zones.empty()||world.zones.size()>zoneCube_.size()){
+            error="source sky selection zone count exceeds its row store";return false;
         }
         const rr::assets::ParameterBlock48F* environment=nullptr;
         for(const auto& b:world.parameters.blocks)if(b.name=="environment"){
@@ -192,7 +210,7 @@ private:
         }
         const auto* cube=field(*environment,"cubefile1");
         if(!cube)cube=field(*environment,"cubefile"); //276CD8..276D1C first-cube legacy key.
-        if(!cube||*cube!=cubeName){
+        if(!cube||(expectedCube&&*cube!=expectedCube)){
             error="source sky selection cube identity differs";return false;
         }
         auto indices=zoneCube_;

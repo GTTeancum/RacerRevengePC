@@ -71,13 +71,16 @@ public:
     // 175650..1756A8, every course, the course's own archive.
     bool load175650(const std::vector<std::uint8_t>& archiveBytes,const char* code,std::size_t archiveSize)noexcept{
         clear();
-        if(!code||archiveBytes.size()!=archiveSize)return false;
+        // Common course-archive rule: no stock-size gate (archiveSize is the
+        // stock receipt value only); the shared decode capacity bounds it.
+        (void)archiveSize;
+        if(!code||archiveBytes.empty())return false;
         std::string name="tracks\\";
         for(const char* p=code;*p;++p)name.push_back(static_cast<char>(std::tolower(static_cast<unsigned char>(*p))));
         name+="TVCam.pos";
         try{
-            rr::assets::ResArchive48C archive;rr::assets::DecodeError48C error;rr::assets::DecodeLimits48C limits;
-            limits.resource_file_bytes=archiveSize;limits.resource_decoded_bytes=64u*1024u*1024u;limits.resource_entries=4096;
+            rr::assets::ResArchive48C archive;rr::assets::DecodeError48C error;
+            const rr::assets::DecodeLimits48C limits{}; // shared course-archive capacity
             if(!rr::assets::decodeResource48C(archiveBytes,archive,error,nullptr,limits))return false;
             std::vector<std::uint8_t> member;
             if(!rr::assets::extractResMember48C(archive,name,member,error,rr::assets::max_tv_camera_text_bytes49e))return false;

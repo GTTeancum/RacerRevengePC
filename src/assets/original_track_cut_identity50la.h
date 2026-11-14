@@ -5,6 +5,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <string>
 #include <string_view>
 namespace rr::assets {
 struct OriginalTrackMemberIdentity50LA {const char* name=nullptr;std::size_t size=0,ordinal=0;const char* sha256=nullptr;};
@@ -89,8 +90,54 @@ inline constexpr std::array<OriginalTrackCutIdentity50LA,13> originalTrackCutIde
   5,{{{"audio\\introAud.ini",556,1463,"bd83e5412da7cbf14f979c17c0002c798f477848ed0af38883197dfdc2320423"},{"audio\\scrptLns.ini",175,1462,"5197d42995287097b6d1f5981db602c5e7e148891392566427ff4b14f1bd22fc"}}},
   {{{57,39,56,1,109,123,135},{161,39,85,1,213,227,239},{265,39,114,1,317,331,343},{369,39,143,1,421,435,447},{473,39,172,1,525,539,551}}}},
 }};
-inline const OriginalTrackCutIdentity50LA* originalTrackCutIdentity50LA(std::string_view id)noexcept {
+// Stock table row (receipt source; the shipped archives).
+inline const OriginalTrackCutIdentity50LA* originalTrackCutStockIdentity50LA(std::string_view id)noexcept {
  for(const auto& row:originalTrackCutIdentities50LA)if(id==row.trackId)return &row;
  return nullptr;
+}
+// Common course rule: a non-stock course archive gets its row derived from
+// its own data (tests/native/course_cut_identity50ci.h) and held here, the
+// one place for it. Host memory only; one slot per course id.
+struct OriginalTrackCutRuntimeRow50LA {
+ std::string archiveSha;
+ std::array<std::string,8> names,shas;
+ std::array<std::string,2> introNames,introShas;
+ OriginalTrackCutIdentity50LA identity{};
+ bool present=false;
+ // Re-point the row's views at this slot's own strings (after any move).
+ void bind()noexcept{
+  identity.archiveSha256=archiveSha.c_str();
+  for(std::size_t i=0;i<names.size();++i)if(!names[i].empty()){identity.members[i].name=names[i].c_str();identity.members[i].sha256=shas[i].c_str();}
+  for(std::size_t i=0;i<introNames.size();++i)if(!introNames[i].empty()){identity.introMembers[i].name=introNames[i].c_str();identity.introMembers[i].sha256=introShas[i].c_str();}
+ }
+};
+inline std::array<OriginalTrackCutRuntimeRow50LA,originalTrackCutIdentities50LA.size()>& originalTrackCutRuntimeRows50LA()noexcept{
+ static std::array<OriginalTrackCutRuntimeRow50LA,originalTrackCutIdentities50LA.size()> rows;return rows;
+}
+inline OriginalTrackCutRuntimeRow50LA* originalTrackCutRuntimeSlot50LA(std::string_view id)noexcept {
+ for(std::size_t i=0;i<originalTrackCutIdentities50LA.size();++i)
+  if(id==originalTrackCutIdentities50LA[i].trackId)return &originalTrackCutRuntimeRows50LA()[i];
+ return nullptr;
+}
+// The label every course mount carries (one rule): the admitted archive's
+// digest/size when course select derived its row, else the stock identity.
+// container: "TRACKS/XX.RES" (case-insensitive); id = XX.
+inline const OriginalTrackCutRuntimeRow50LA* originalTrackMountSlot50LA(std::string_view container)noexcept {
+ if(container.size()!=13)return nullptr;
+ char id[2]{};
+ for(int i=0;i<2;++i){char c=container[7+i];if(c>='a'&&c<='z')c=char(c-32);id[i]=c;}
+ const auto* slot=originalTrackCutRuntimeSlot50LA(std::string_view(id,2));
+ return slot&&slot->present?slot:nullptr;
+}
+inline const char* originalTrackMountDigest50LA(std::string_view container,const char* stockSha)noexcept {
+ const auto* slot=originalTrackMountSlot50LA(container);return slot?slot->archiveSha.c_str():stockSha;
+}
+inline std::size_t originalTrackMountBytes50LA(std::string_view container,std::size_t stockBytes)noexcept {
+ const auto* slot=originalTrackMountSlot50LA(container);return slot?slot->identity.archiveBytes:stockBytes;
+}
+inline const OriginalTrackCutIdentity50LA* originalTrackCutIdentity50LA(std::string_view id)noexcept {
+ const auto* slot=originalTrackCutRuntimeSlot50LA(id);
+ if(slot&&slot->present)return &slot->identity;
+ return originalTrackCutStockIdentity50LA(id);
 }
 }

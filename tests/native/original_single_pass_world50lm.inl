@@ -266,7 +266,7 @@ public:
             storage_->canonicalAttempted=true;storage_->canonicalDomain=request.canonicalDomain;
             const auto& provider=request.canonicalDomain->archiveProvider3E1A70();
             a::OriginalStandardArchiveProvider50LA::Diagnostic mounted;d.stage="ma_sa_original_archive_mount";
-            shared::need(provider&&provider->mountAuthenticatedRes(archiveMember,archiveSha,archiveBytes,storage_->archive,mounted)&&
+            shared::need(provider&&provider->mountAuthenticatedRes(archiveMember,::rr::assets::originalTrackMountDigest50LA(archiveMember,archiveSha),::rr::assets::originalTrackMountBytes50LA(archiveMember,archiveBytes),storage_->archive,mounted)&&
                 provider->sealNativeMounts(mounted)&&request.canonicalDomain->resolver3E1A70()->bindProvider3E1A70(provider,d.canonical.texture),
                 "Original MA/SA canonical provider mount rejected");
             std::vector<std::shared_ptr<const a::OriginalStandardMaterialSource50LA>> materials;

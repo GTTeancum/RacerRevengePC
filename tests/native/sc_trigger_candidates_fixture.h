@@ -8,12 +8,14 @@ inline std::size_t prepare(const sc_trigger_authoring::Owner& source,
  sc_trigger_actions::Owner& actions,std::vector<g::Type2StaticCandidate49X>& candidates,
  std::vector<track_runtime_storage50IG::Binding>& bindings,std::uint8_t tag,
  std::uint8_t flags31,std::uint8_t flagsF8){
- if(!source.ready()||candidates.size()!=252||candidates.size()!=bindings.size()||
-    candidates.size()>track_runtime_storage50IG::hardTerrainOwners-sc_trigger_authoring::count)
-  throw std::runtime_error("SC native trigger cold owner extent");
- const auto first=candidates.size();candidates.resize(first+sc_trigger_authoring::count);bindings.resize(candidates.size());
+ // Bounded by the native owner store, not the stock 252 + 9.
+ const auto live=source.liveCount();
+ if(!source.ready()||candidates.size()!=bindings.size()||live>track_runtime_storage50IG::hardTerrainOwners||
+    candidates.size()>track_runtime_storage50IG::hardTerrainOwners-live)
+  throw std::runtime_error("SC trigger owners exceed the native owner store");
+ const auto first=candidates.size();candidates.resize(first+live);bindings.resize(candidates.size());
  for(std::size_t i=0;i<first;++i)bindings[i].candidate=&candidates[i];
- for(std::size_t i=0;i<sc_trigger_authoring::count;++i){const auto& authored=source.source(i);auto& target=candidates[first+i];
+ for(std::size_t i=0;i<live;++i){const auto& authored=source.source(i);auto& target=candidates[first+i];
   target.shapeType=authored.shapeType;target.nativeTriggers=&actions.nativeGroup();target.nativeTriggerIndex=i;
   target.nativeTriggerBox=authored.box;
   auto& c=target.candidate.collision;c.shapeType=authored.shapeType;

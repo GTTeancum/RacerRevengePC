@@ -81,7 +81,8 @@ public:
                 if(!provider->mount(v.mount,mount)||!mount.archiveName||!mount.archiveSha256){
                     diagnostic.status=Status::mountIdentity;return nullptr;
                 }
-                if(!i){for(const auto& candidate:specifications_)if(*mount.archiveName==candidate.archiveName)spec=&candidate;}
+                if(!i){for(const auto& candidate:specifications_)if(*mount.archiveName==candidate.archiveName)spec=&candidate;
+                    if(spec)spec=admittedSpecification(*spec);}
                 if(!spec||*mount.archiveName!=spec->archiveName||*mount.archiveSha256!=spec->archiveDigest||
                    mount.archiveBytes!=spec->archiveBytes||mount.memberCount!=spec->memberCount){
                     diagnostic.status=Status::mountIdentity;return nullptr;
@@ -197,6 +198,25 @@ private:
         std::array<std::string_view,originalRaceIntroEventsMax50LA> cameraValues;
     };
     const Specification* specification_=nullptr;
+    // Common course rule: a non-stock course archive admitted at course select
+    // (its cut row derived from its own data, original_track_cut_identity50la.h)
+    // gets its mount label, member count and intro member sizes/positions/
+    // digests from that row. FLAG stand-in: event byte offsets stay the stock
+    // row's; the layout check below still verifies them against the bytes.
+    static const Specification* admittedSpecification(const Specification& stock)noexcept{
+        const auto* slot=originalTrackCutRuntimeSlot50LA(stock.track);
+        if(!slot||!slot->present)return &stock;
+        static std::array<Specification,13> rows{};
+        std::size_t index=0;
+        for(;index<specifications_.size();++index)if(&specifications_[index]==&stock)break;
+        if(index>=rows.size())return &stock;
+        auto& row=rows[index];row=stock;
+        const auto& id=slot->identity;
+        row.archiveDigest=slot->archiveSha;row.archiveBytes=id.archiveBytes;row.memberCount=id.memberCount;
+        for(std::size_t i=0;i<2;++i){row.memberSizes[i]=id.introMembers[i].size;row.memberOrdinals[i]=id.introMembers[i].ordinal;
+            row.memberDigests[i]=slot->introShas[i].c_str();}
+        return &row;
+    }
     inline static constexpr std::array<Specification,13> specifications_{{
         {"TA","TRACKS/TA.RES","b491e34bf6cbd27869d5b9dc8db394b101ebaf4ac7f5e0d44fcca33a00d41ab8",
          3334562,383,3,39,{346,119},{381,380},

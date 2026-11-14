@@ -1,4 +1,5 @@
 #pragma once
+#include "../../src/assets/original_track_cut_identity50la.h"
 #include "../../platform/linux/native/loading_progress50du.h"
 #include "track_materials50fa_fixture.h"
 #include "original_world_material_admission50cm.h"
@@ -384,7 +385,7 @@ public:
             storage_->canonicalAttempted=true;storage_->canonicalDomain=request.canonicalDomain;
             const auto& provider=request.canonicalDomain->archiveProvider3E1A70();
             a::OriginalStandardArchiveProvider50LA::Diagnostic mounted;d.stage="ga_original_archive_mount";
-            shared::need(provider&&provider->mountAuthenticatedRes("TRACKS/GA.RES",archiveSha,archiveBytes,storage_->archive,mounted)&&
+            shared::need(provider&&provider->mountAuthenticatedRes("TRACKS/GA.RES",::rr::assets::originalTrackMountDigest50LA("TRACKS/GA.RES",archiveSha),::rr::assets::originalTrackMountBytes50LA("TRACKS/GA.RES",archiveBytes),storage_->archive,mounted)&&
                 provider->sealNativeMounts(mounted)&&request.canonicalDomain->resolver3E1A70()->bindProvider3E1A70(provider,d.canonical.texture),
                 "Original GA canonical provider mount rejected");
             std::vector<std::shared_ptr<const a::OriginalStandardMaterialSource50LA>> materials;

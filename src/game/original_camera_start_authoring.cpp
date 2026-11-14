@@ -3,7 +3,11 @@
 #include "../assets/original_ta_cut_authoring_candidate.h"
 // Compile the private TA child foundation only; no live caller or admission.
 #include "original_ta_cut_child_candidate.h"
+#include <algorithm>
 #include <cstring>
+#include <iostream>
+#include <vector>
+#include "../assets/import_world48f.h"
 namespace rr::game { namespace {
 std::uint32_t rotateRight(std::uint32_t x, unsigned n) noexcept {
     return (x >> n) | (x << (32u - n));
@@ -82,23 +86,42 @@ bool OriginalCourseStartActions::prepare(OriginalCameraStartCourse course,const 
     else if(course==OriginalCameraStartCourse::tb){exact=106139;sha="12c908874736ea91dcd6d3f8af97413a0cfe3bcd87cfce0798e8ff86fe5fb0bc";}
     else if(course==OriginalCameraStartCourse::gb){exact=20617;sha="96469b3953b18d940bd0c8772758c68a75a69c3375b49ef98b966901c2e598d1";}
     else if(course==OriginalCameraStartCourse::mc){exact=186642;sha="7070700a884c24a98a0a89d4ea58e61e34f9a89e19af3ca239779c56c0dd14b0";}
-    if(!sha||size!=exact||!hashMatches(bytes,size,sha))return false;
-    // Independent static section-table inspection of these exact unchanged
-    // originals proves no321_anims section. No generic section fallback here.
-    // RA tracks\ra.tob:713 sections; RC tracks\rc.tob:907 sections.
-    // CSCameras count bytes at TOB offsets15496/19491 are respectively7/5.
-    // MB tracks\mb.tob:135 sections, no321_anims; own CSCameras count5 at3134.
-    // Exact [CSCameras].NumberOfCameras: GC4, GA5, TA3, MA4, SA5, RA7, RC5, MB5.
-    // SC tracks\\sc.tob: 476 sections, no321_anims; own CSCameras count3.
-    // TC own tracks\\tc.tob: exact CSCameras3, no321_anims.
-    // TB exact original TOB has742 sections, CSCameras5 (zones8/2/4/4/1), no321_anims.
-    // GB exact original TOB has CSCameras4 at4700 (zones2/6/3/10), no321_anims.
-    // Source174DF0 derives controllerA8 from this genuine track3E4 value.
-    // MC TOB has1268 sections, no321_anims; four CSCameras at36869, zones23/23/6/15.
-    sourceSceneCutCount3E4_=course==OriginalCameraStartCourse::mb?5:(course==OriginalCameraStartCourse::ta||course==OriginalCameraStartCourse::sc||course==OriginalCameraStartCourse::tc)?3:
-        (course==OriginalCameraStartCourse::gc||course==OriginalCameraStartCourse::ma||course==OriginalCameraStartCourse::gb||course==OriginalCameraStartCourse::mc)?4:
-        (course==OriginalCameraStartCourse::ga||course==OriginalCameraStartCourse::sa||course==OriginalCameraStartCourse::rc||course==OriginalCameraStartCourse::tb)?5:
-        course==OriginalCameraStartCourse::ra?7:0;
+    if(!sha)return false;
+    // Common course rule: the TOB's stock identity is a receipt. The cut
+    // count is the TOB's own [CSCameras].NumberOfCameras (what 174DF0 reads
+    // into track+3E4), bounded by the native cut storage (7). Stock: GC4,
+    // GA5, TA3, MA4, SA5, RA7, RC5, MB5, SC3, TC3, TB5, GB4, MC4.
+    if(size==exact&&hashMatches(bytes,size,sha)){
+        // Stock TOB: its [CSCameras].NumberOfCameras, read once from these
+        // exact bytes (TA/SC/TC 3, GC/MA/GB/MC 4, GA/SA/RC/TB/MB 5, RA 7).
+        sourceSceneCutCount3E4_=course==OriginalCameraStartCourse::mb?5:(course==OriginalCameraStartCourse::ta||course==OriginalCameraStartCourse::sc||course==OriginalCameraStartCourse::tc)?3:
+            (course==OriginalCameraStartCourse::gc||course==OriginalCameraStartCourse::ma||course==OriginalCameraStartCourse::gb||course==OriginalCameraStartCourse::mc)?4:
+            (course==OriginalCameraStartCourse::ga||course==OriginalCameraStartCourse::sa||course==OriginalCameraStartCourse::rc||course==OriginalCameraStartCourse::tb)?5:
+            course==OriginalCameraStartCourse::ra?7:0;
+    }else try {
+        std::cerr<<"course_member_identity site=camera_start member=tob bytes="<<size<<" stock=0\n";
+        // Any other TOB: read the count from the data. Stock TOBs carry
+        // duplicate labels (TB, TC), so the decoder retains them; the one
+        // field used here must be unique.
+        assets::ParameterDocument48F document;assets::DecodeError48C error;
+        assets::WorldLimits48F limits;limits.retainDuplicateLabels=true;
+        limits.input_bytes=std::max<std::size_t>(limits.input_bytes,size);
+        const std::vector<std::uint8_t> tob(bytes,bytes+size);
+        if(!assets::decodeParameters48F(tob,document,error,nullptr,limits))return false;
+        const assets::ParameterBlock48F* cameras=nullptr;
+        for(const auto& b:document.blocks){
+            // FLAG stand-in: the native start has no 321_anims animation path.
+            if(b.name=="321_anims")return false;
+            if(b.name=="cscameras"){if(cameras)return false;cameras=&b;}
+        }
+        if(!cameras)return false;
+        const std::string* text=nullptr;
+        for(const auto& f:cameras->fields)if(f.name=="numberofcameras"){if(text)return false;text=&f.value;}
+        if(!text||text->empty()||text->size()>2)return false;
+        unsigned count=0;for(const char c:*text){if(c<'0'||c>'9')return false;count=count*10u+unsigned(c-'0');}
+        if(!count||count>7u)return false;
+        sourceSceneCutCount3E4_=static_cast<std::int32_t>(count);
+    }catch(...){return false;}
     course_=course;authenticated_=true;return true;
 }
 }

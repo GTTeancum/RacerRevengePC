@@ -1,6 +1,8 @@
 #pragma once
 #include "sc_cold_sources50la.h"
 #include <array>
+#include <cstdlib>
+#include <iostream>
 #include <memory>
 #include <string>
 
@@ -23,25 +25,38 @@ public:
         if(source_){error="SC zero-sky owner already prepared";return false;}
         const auto* decoded=source?source->sourcesDecoded():nullptr;
         const auto* receipt=source?source->zeroSkyReceipt():nullptr;
-        if(!decoded||!receipt||!receipt->authoredZeroAndArchiveHasNoCube()||decoded->world.zones.size()!=30){
-            error="SC actual authenticated zero-sky source required";return false;}
+        if(!decoded||!receipt||!receipt->authoredZeroAndArchiveHasNoCube()||
+           decoded->world.zones.size()!=receipt->zoneCount()||!receipt->zoneCount()){
+            error="SC authored zero-sky source required";return false;}
         const auto& ordinals=receipt->sourceZoneOrdinals();
-        for(std::size_t i=0;i<ordinals.size();++i)if(ordinals[i]!=i+1||decoded->world.zones[i].zone!=i+1){
+        for(std::size_t i=0;i<receipt->zoneCount();++i)if(ordinals[i]!=i+1||decoded->world.zones[i].zone!=i+1){
             error="SC zero-sky source zone identity differs";return false;}
         const auto* fog=block(decoded->world.parameters,"fog");
         if(!fog){error="SC original Fog block missing or duplicated";return false;}
         const auto* rgb=field(*fog,"colorrgb");const auto* haze=field(*fog,"haziness");const auto* visibility=field(*fog,"visibility");
-        // These are exact fields of the source owner's hash-authenticated SCB.
-        // Per-zone interpolation/retail shader parity is not asserted here.
-        if(!rgb||*rgb!="47,36,23"||!haze||*haze!="1"||!visibility||*visibility!="1"){
-            error="SC authored global fog differs";return false;}
-        clear_={{47.f/255.f,36.f/255.f,23.f/255.f,1.f}};
+        // Clear colour read from the course's own [Fog] ColorRGB (stock SC:
+        // 47,36,23). Haziness/Visibility are reported; the publication's fog
+        // fractions stay its per-course constants (FLAG stand-in, look only).
+        unsigned rgbValue[3]{};
+        {std::size_t begin=0;
+         for(unsigned axis=0;axis<3;++axis){
+            if(!rgb){error="SC [Fog] ColorRGB missing";return false;}
+            const auto end=rgb->find(',',begin);
+            if((axis<2)!=(end!=std::string::npos)){error="SC [Fog] ColorRGB unreadable";return false;}
+            const auto text=rgb->substr(begin,end==std::string::npos?std::string::npos:end-begin);
+            char* stop=nullptr;const auto v=std::strtoul(text.c_str(),&stop,10);
+            if(text.empty()||!stop||*stop||v>255){error="SC [Fog] ColorRGB unreadable";return false;}
+            rgbValue[axis]=unsigned(v);begin=end+1;}}
+        const bool stockFog=*rgb=="47,36,23"&&haze&&*haze=="1"&&visibility&&*visibility=="1";
+        if(!stockFog)std::cerr<<"sc_zero_sky fog="<<*rgb<<" haziness="<<(haze?*haze:std::string("absent"))
+            <<" visibility="<<(visibility?*visibility:std::string("absent"))<<" stock=0\n";
+        clear_={{rgbValue[0]/255.f,rgbValue[1]/255.f,rgbValue[2]/255.f,1.f}};
         source_=std::move(source);error.clear();return true;
     }
     bool ready()const noexcept {return source_&&source_->sourcesDecoded()&&source_->zeroSkyReceipt();}
     const float* clearRgba()const noexcept {return ready()?clear_.data():nullptr;}
     bool select(std::uint32_t actualCameraZone48,bool& enabled)const noexcept {
-        if(!ready()||actualCameraZone48>=30)return false;
+        if(!ready()||actualCameraZone48>=source_->zeroSkyReceipt()->zoneCount())return false;
         const auto* decoded=source_->sourcesDecoded();
         if(decoded->world.zones[actualCameraZone48].zone!=actualCameraZone48+1)return false;
         enabled=false;return true;

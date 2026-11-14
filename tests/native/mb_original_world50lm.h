@@ -1,4 +1,5 @@
 #pragma once
+#include "../../src/assets/original_track_cut_identity50la.h"
 #include "track_materials50fa_fixture.h"
 #include "original_world_material_admission50cm.h"
 #include "material_alpha50gx_fixture.h"

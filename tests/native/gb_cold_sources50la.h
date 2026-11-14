@@ -1,6 +1,7 @@
 #pragma once
 #include "track_cold_source_services50la.h"
 #include "pod_materials50ed_fixture.h"
+#include "course_archive_receipt50ci.h"
 #include "source_grid50ig_fixture.h"
 #include "../../src/assets/indexed_resource48c.h"
 #include "../../src/assets/import_world48f.h"
@@ -113,19 +114,20 @@ public:
   if(attempted_)return fail(d,"GB cold source preparation is one-attempt");attempted_=true;phase_=Phase::Authenticate;
   try {
    if(!availableCpuPayloadBytes||availableCpuPayloadBytes>32u*1024u*1024u)return fail(d,"GB source requires the unchanged existing32MiB allowance");
-   if(original.size()!=archiveBytes)return fail(d,"GB original archive extent differs");
+   if(original.empty()||original.size()>course_archive_receipt50CI::maximumArchiveBytes())return fail(d,"GB archive exceeds the shared course-archive capacity");
    if(original.capacity()>(std::numeric_limits<std::size_t>::max()-65536)/4||
       !reserve(availableCpuPayloadBytes,4*original.capacity()+65536,d))return fail(d,"GB authentication scratch exceeds existing payload budget");
-   if(pod_materials50ed_fixture::detail::sha256(original)!=archiveSha)return fail(d,"GB original archive identity differs");
+   // Common rule: the stock identity is a receipt (course_archive_receipt50ci.h).
+   course_archive_receipt50CI::receipt("gb_cold_sources","GB",original,archiveSha,archiveBytes);
    phase_=Phase::Archive;archive_=std::make_unique<a::IndexedResArchive48C>();
-   a::DecodeLimits48C limits;limits.resource_file_bytes=archiveBytes;limits.resource_decoded_bytes=decodedBytes;limits.resource_entries=archiveEntries;
+   a::DecodeLimits48C limits=course_archive_receipt50CI::limits();
    const auto owned=sizeof(Owner);if(availableCpuPayloadBytes<owned||
       !archive_->loadOwned(std::move(original),availableCpuPayloadBytes-owned,d.decode,nullptr,limits)||
-      archive_->entries().size()!=archiveEntries||archive_->blocks().size()!=1178||
-      archive_->decodedExtent()!=decodedBytes||archive_->compactBytes()!=compactBytes)return fail(d,"GB complete indexed original archive rejected");
+      archive_->entries().empty())return fail(d,"GB complete indexed original archive rejected");
+   course_archive_receipt50CI::countReceipt("gb_cold_sources","entries",archive_->entries().size(),archiveEntries);
    d.maximumReservationBytes=std::max(d.maximumReservationBytes,owned+archive_->preparationPeakPayloadBytes());
    // Exact existing full-name case rule, allocation-free duplicate check.
-   for(std::size_t i=0;i<archiveEntries;++i)for(std::size_t j=0;j<i;++j)
+   for(std::size_t i=0;i<archive_->entries().size();++i)for(std::size_t j=0;j<i;++j)
     if(a::OriginalStandardArchiveProvider50LA::sameName(archive_->entries()[i].name,archive_->entries()[j].name))
      return fail(d,"GB ambiguous archive member identity");
    if(!reserve(availableCpuPayloadBytes,sizeof(storage::Storage),d))return fail(d,"GB exact navigation storage exceeds remaining budget");
@@ -208,10 +210,10 @@ public:
    if(!Provider::sameName(mount.name,"TRACKS/GB.RES"))continue;
    d.mount=i;const auto& source=mount.gbSource;
    if(!source||!source->ready()||mount.gbThread!=std::this_thread::get_id()||
-      mount.digest!=archiveSha||mount.archiveBytes!=archiveBytes||mount.retainedBytes!=compactBytes||
-      mount.backing||mount.ui||mount.rcSource||mount.tbSource||mount.rows.size()!=archiveEntries)
+      mount.digest!=archiveSha||mount.archiveBytes!=archiveBytes||mount.retainedBytes!=source->archive_->compactBytes()||
+      mount.backing||mount.ui||mount.rcSource||mount.tbSource||mount.rows.size()!=source->archive_->entries().size())
     return Provider::fail(d,Provider::Status::identity);
-   for(std::size_t j=0;j<archiveEntries;++j){const auto member=source->archive_->member(j);const auto& row=mount.rows[j];
+   for(std::size_t j=0;j<source->archive_->entries().size();++j){const auto member=source->archive_->member(j);const auto& row=mount.rows[j];
     d.ordinal=j;
     if(!member.identity||row.name!=member.identity->name||row.data!=member.data||
        row.size!=member.size||row.offset!=member.identity->logical_offset)
@@ -226,7 +228,7 @@ public:
  std::size_t canonicalMountReservationBytes()const noexcept {
   using Provider=a::OriginalStandardArchiveProvider50LA;if(!ready())return 0;
   std::size_t n=sizeof(typename Provider::Mount)+2*Provider::maxMounts*sizeof(std::unique_ptr<const typename Provider::Mount>);
-  add(n,archiveEntries*sizeof(typename Provider::Row));
+  add(n,archive_->entries().size()*sizeof(typename Provider::Row));
   for(const auto& e:archive_->entries())add(n,2*std::max<std::size_t>(15,e.name.size())+1);
   add(n,256);return n;
  }
@@ -253,9 +255,9 @@ public:
    if(active){d={};return true;}
   }
   if(canonicalMountReservationBytes()>availableAdditionalPayloadBytes)return Provider::fail(d,Provider::Status::capacity);
-  try {auto next=std::make_unique<Provider::Mount>();next->name="TRACKS/GB.RES";next->digest=archiveSha;next->archiveBytes=archiveBytes;
-   next->gbSource=std::move(self);next->gbThread=thread_;next->retainedBytes=compactBytes;next->rows.reserve(archiveEntries);
-   for(std::size_t i=0;i<archiveEntries;++i){const auto m=archive_->member(i);d.ordinal=i;
+  try {auto next=std::make_unique<Provider::Mount>();next->name="TRACKS/GB.RES";next->digest=archiveSha;/*FLAG: mount label stays the stock digest (receipt only; real bytes are the source)*/next->archiveBytes=archiveBytes;
+   next->gbSource=std::move(self);next->gbThread=thread_;next->retainedBytes=archive_->compactBytes();next->rows.reserve(archive_->entries().size());
+   for(std::size_t i=0;i<archive_->entries().size();++i){const auto m=archive_->member(i);d.ordinal=i;
     if(!m.identity||!m.data||m.size!=m.identity->bytes||!Provider::nameOkay(m.identity->name))return Provider::fail(d,Provider::Status::identity);
     next->rows.push_back({m.identity->name,m.data,m.size,m.identity->logical_offset});}
    return provider.commit(std::move(next),d,lease);

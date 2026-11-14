@@ -2781,7 +2781,8 @@ void Context::run() {
     }
     // Original viewport clear consumes the authenticated track Fog.ColorRGB.
     // Unauthored sky tiles remain absent; do not invent lower sky geometry.
-    const float* clearColor=isScTrack?scZeroSky.clearRgba():isRaTrack?raSky->clearRgba():isMcTrack?mcSkyOwner->clearRgba():skyOwner->clearRgba();
+    // Zero-sky owner is prepared only when the course authors zero cubes (data).
+    const float* clearColor=scZeroSky.ready()?scZeroSky.clearRgba():isRaTrack?raSky->clearRgba():isMcTrack?mcSkyOwner->clearRgba():skyOwner->clearRgba();
     require50DU(clearColor,"authored track clear color unavailable");
     hudTiming.finish();
     EngineFlareOutput50GV flameOutput{};EngineFlareDiagnostic50GV flameDiagnostic{};
@@ -3023,12 +3024,12 @@ void Context::run() {
     renderFrame.materialUvs=playerFlameUvs.data();
     renderFrame.materialUvCount=static_cast<std::uint32_t>(playerFlameUvs.size());
     // TC has an actual48-tile sky request and retains the matching matrix.
-    // Only authenticated zero-sky SC omits both indices and matrix.
-    renderFrame.skyWorldViewProjection=isScTrack?nullptr:skyView.worldViewProjection;
+    // Only a course authoring zero sky cubes omits both indices and matrix.
+    renderFrame.skyWorldViewProjection=scZeroSky.ready()?nullptr:skyView.worldViewProjection;
     if(isMaSaTrack||isMbTrack||isRaTrack||isScTrack||isTcTrack||isRcTrack||isTbTrack||isGbTrack||isMcTrack){
      std::uint32_t cameraZone48=0;
      require50DU(sourceCameraSession&&sourceCameraSession->readCameraPrimaryZone48(cameraZone48)&&
-         (isScTrack?scZeroSky.select(cameraZone48,renderFrame.skyEnabled):isRaTrack?raWorld->sampleSky(cameraZone48,renderFrame.skyEnabled):
+         (scZeroSky.ready()?scZeroSky.select(cameraZone48,renderFrame.skyEnabled):isRaTrack?raWorld->sampleSky(cameraZone48,renderFrame.skyEnabled):
              sourceSkySelection.select(cameraZone48,renderFrame.skyEnabled)),
          "actual camera primary-zone sky selection rejected");
     }

@@ -1,10 +1,14 @@
 #pragma once
 // Isolated SC source-only preparation. Compile-visible, never instantiated by runtime.
 #include "pod_materials50ed_fixture.h"
+#include "course_archive_receipt50ci.h"
+#include "track_runtime_storage50ig_fixture.h"
 #include "../../src/assets/import_world48f.h"
 #include "../../src/assets/ai_authoring50iu.h"
 #include "../../src/game/lap_progress50gf.h"
 #include <array>
+#include <cstdlib>
+#include <iostream>
 #include <memory>
 #include <set>
 #include <string>
@@ -12,8 +16,14 @@
 
 namespace sc_cold_sources50LA {
 namespace a=rr::assets;namespace g=rr::game;
+// Stock identity and counts: RECEIPTS only (course_archive_receipt50ci.h). The
+// original reads whatever SC.RES holds; counts come from the data, bounded by
+// the native storage they land in (zones: hardZones; spline nodes: the
+// navigation storage, maxUndertrackNodes50ET).
 inline constexpr std::size_t archiveBytes=2974353,decodedBytes=26714112;
 inline constexpr std::uint32_t archiveEntries=984,zoneCount=30,mapNodeCount=179,aiNodeCount=180;
+inline constexpr std::size_t maxZones=track_runtime_storage50IG::hardZones;
+inline constexpr std::size_t maxNavigationNodes=rr::game::maxUndertrackNodes50ET;
 inline constexpr const char* archiveSha="8305641f0ac8fefeae6603145ad4f8441612e41926751ff853170763e66dfa4d";
 struct MemberPin {const char* name;std::size_t offset,bytes;const char* sha;};
 inline constexpr std::array<MemberPin,5> sources{{
@@ -30,14 +40,19 @@ inline constexpr std::uint32_t originalDescriptorRecordPod=16;
 class Owner;
 class ZeroSkyReceipt final {
  friend class Owner;
- std::array<std::uint32_t,zoneCount> sourceZoneOrdinals_{};
+ std::array<std::uint32_t,maxZones> sourceZoneOrdinals_{};
+ std::size_t zones_=0;std::uint32_t skyCubes_=0;
  bool authenticated_=false;
  ZeroSkyReceipt()=default;
 public:
  ZeroSkyReceipt(const ZeroSkyReceipt&)=delete;ZeroSkyReceipt& operator=(const ZeroSkyReceipt&)=delete;
  // Read-only source ordinal namespace, NOT native visibility/Entity refs.
- const std::array<std::uint32_t,zoneCount>& sourceZoneOrdinals()const noexcept{return sourceZoneOrdinals_;}
- bool authoredZeroAndArchiveHasNoCube()const noexcept{return authenticated_;}
+ // Live prefix [0,zoneCount()) of a hardZones-sized store.
+ const std::array<std::uint32_t,maxZones>& sourceZoneOrdinals()const noexcept{return sourceZoneOrdinals_;}
+ std::size_t zoneCount()const noexcept{return zones_;}
+ // The data branch the original takes: [Environment].NumberOfSkyCubes.
+ std::uint32_t authoredSkyCubes()const noexcept{return skyCubes_;}
+ bool authoredZeroAndArchiveHasNoCube()const noexcept{return authenticated_&&skyCubes_==0;}
 };
 struct DecodedSources final {
  a::ResArchive48C archive;
@@ -65,7 +80,7 @@ struct Diagnostic {
 class Owner final {
  std::unique_ptr<DecodedSources> data_;
  ZeroSkyReceipt zeroSky_;
- bool attempted_=false,decoded_=false;
+ bool attempted_=false,decoded_=false,atm_=false;
  static std::string canonical(std::string s){for(auto& c:s){if(c=='\\')c='/';else if(c>='A'&&c<='Z')c=char(c+32);}return s;}
  static const a::ParameterBlock48F* block(const a::ParameterDocument48F& p,const char* name){
   const a::ParameterBlock48F* found=nullptr;
@@ -88,31 +103,49 @@ public:
   const auto fail=[&](const char* reason){d.failedAt=d.stage;d.stage=Diagnostic::Stage::failed;d.failure=reason;return false;};
   try{
    d.stage=Diagnostic::Stage::archive;
-   if(original.size()!=archiveBytes||pod_materials50ed_fixture::detail::sha256(original)!=archiveSha)return fail("SC original archive identity");
+   course_archive_receipt50CI::receipt("sc_cold_sources","SC",original,archiveSha,archiveBytes);
    data_=std::make_unique<DecodedSources>();auto& s=*data_;
-   a::DecodeLimits48C limits;limits.resource_file_bytes=archiveBytes;limits.resource_decoded_bytes=decodedBytes;limits.resource_entries=archiveEntries;
-   if(!a::decodeResource48C(original,s.archive,d.decode,nullptr,limits)||s.archive.entries.size()!=archiveEntries||s.archive.decoded.size()!=decodedBytes)
-    return fail("SC original archive framing");
+   if(!a::decodeResource48C(original,s.archive,d.decode,nullptr,course_archive_receipt50CI::limits()))
+    return fail("SC archive framing exceeds the shared decode capacity");
+   course_archive_receipt50CI::countReceipt("sc_cold_sources","entries",s.archive.entries.size(),archiveEntries);
    std::set<std::string> names;
    for(const auto& row:s.archive.entries)if(!names.insert(canonical(row.name)).second)return fail("SC ambiguous member identity");
+   // Data branch for the animated-texture owner: the archive authors ATM
+   // textures or it does not (FLAG: keyed on member presence; the original
+   // loads an ATM when a material names it).
+   for(const auto& name:names)if(name.size()>=4&&name.compare(name.size()-4,4,".atm")==0)atm_=true;
    d.stage=Diagnostic::Stage::members;
    for(std::size_t i=0;i<sources.size();++i){const auto& pin=sources[i];const a::ResourceEntry48C* entry=nullptr;
     for(const auto& row:s.archive.entries)if(canonical(row.name)==canonical(pin.name))entry=&row;
-    if(!entry||entry->logical_offset!=pin.offset||entry->bytes!=pin.bytes||
-       !a::extractResMember48C(s.archive,pin.name,s.memberBytes[i],d.decode,pin.bytes)||
-       s.memberBytes[i].size()!=pin.bytes||pod_materials50ed_fixture::detail::sha256(s.memberBytes[i])!=pin.sha)
-     return fail("SC original member pin");
+    // Found by name (as the original's named member reads); the stock
+    // offset/size/SHA is a receipt.
+    if(!entry||!a::extractResMember48C(s.archive,entry->name,s.memberBytes[i],d.decode,entry->bytes)||
+       s.memberBytes[i].size()!=entry->bytes)
+     return fail("SC required member absent or unreadable");
+    course_archive_receipt50CI::memberReceipt("sc_cold_sources",pin.name,s.memberBytes[i],pin.offset,entry->logical_offset,pin.bytes,pin.sha);
    }
    d.stage=Diagnostic::Stage::world;
-   if(!a::decodeWorld48F(s.memberBytes[0],s.world,d.decode)||s.world.zones.size()!=zoneCount||s.world.portals.size()!=34||s.world.instances.size()!=4107)
-    return fail("SC original world counts");
+   if(!a::decodeWorld48F(s.memberBytes[0],s.world,d.decode))return fail("SC world rejected");
+   if(s.world.zones.empty()||s.world.zones.size()>maxZones||s.world.portals.size()>track_runtime_storage50IG::hardPortals)
+    return fail("SC world zones/portals exceed native storage");
+   course_archive_receipt50CI::countReceipt("sc_cold_sources","zones",s.world.zones.size(),zoneCount);
+   course_archive_receipt50CI::countReceipt("sc_cold_sources","portals",s.world.portals.size(),34);
+   course_archive_receipt50CI::countReceipt("sc_cold_sources","instances",s.world.instances.size(),4107);
    d.stage=Diagnostic::Stage::zeroSky;
    const auto* environment=block(s.world.parameters,"environment");
    const auto* count=environment?field(*environment,"numberofskycubes"):nullptr;
-   if(!count||*count!="0")return fail("SC requires explicit authored zero sky cubes");
-   for(const auto& f:environment->fields)if(f.name.rfind("cubefile",0)==0)return fail("SC unexpected cube reference");
-   for(const auto& name:names)if(name.size()>=4&&name.compare(name.size()-4,4,".cub")==0)return fail("SC unexpected CUB member");
-   for(std::size_t i=0;i<zoneCount;++i){const auto& zone=s.world.zones[i];
+   // Branch on the data the original reads. An absent key takes the
+   // reader's default 1. Zero cubes: no cube reference or CUB member may exist.
+   unsigned long cubes=1;
+   if(count){char* end=nullptr;cubes=std::strtoul(count->c_str(),&end,10);
+    if(count->empty()||!end||*end||cubes>64)return fail("SC NumberOfSkyCubes unreadable");}
+   if(cubes==0){
+    for(const auto& f:environment->fields)if(f.name.rfind("cubefile",0)==0)return fail("SC zero sky cubes but a cube reference");
+    for(const auto& name:names)if(name.size()>=4&&name.compare(name.size()-4,4,".cub")==0)return fail("SC zero sky cubes but a CUB member");
+   }
+   zeroSky_.skyCubes_=std::uint32_t(cubes);zeroSky_.zones_=s.world.zones.size();
+   if(cubes)std::cerr<<"sc_cold_sources sky_cubes="<<cubes<<" (zero-sky owner not used)\n";
+   for(std::size_t i=0;i<s.world.zones.size();++i){const auto& zone=s.world.zones[i];
     if(zone.zone!=i+1||zone.parameter_block>=s.world.parameters.blocks.size())return fail("SC actual zone ordinal coverage");
     zeroSky_.sourceZoneOrdinals_[i]=zone.zone;
    }
@@ -128,7 +161,8 @@ public:
     // this same scratch. No repeated gate parse or serial libm execution.
     if(i==1&&!g::prepareLapProgressTrack50GF(*scratch,s.mapLap,d.lap))
      return fail("SC original map lap markers");
-    if(navigation.track.count!=(i==1?mapNodeCount:aiNodeCount)||!navigation.gatesPrepared||navigation.indicesPrepared||
+    course_archive_receipt50CI::countReceipt("sc_cold_sources",i==1?"map_nodes":"ai_nodes",navigation.track.count,i==1?mapNodeCount:aiNodeCount);
+    if(!navigation.track.count||navigation.track.count>maxNavigationNodes||!navigation.gatesPrepared||navigation.indicesPrepared||
        !a::readAiTrackMetadata50IU(reinterpret_cast<const char*>(bytes.data()),bytes.size(),navigation,metadata,d.ai))
      return fail("SC source spline count or metadata");
    }
@@ -142,5 +176,6 @@ public:
  // authored absence. Gate preparation is NOT zone binding or race readiness.
  const DecodedSources* sourcesDecoded()const noexcept{return decoded_?data_.get():nullptr;}
  const ZeroSkyReceipt* zeroSkyReceipt()const noexcept{return decoded_?&zeroSky_:nullptr;}
+ bool authorsAnimatedTextures()const noexcept{return decoded_&&atm_;}
 };
 } // namespace sc_cold_sources50LA

@@ -1130,8 +1130,10 @@ SessionExit50DU Context::run() {
  const auto& row=*chosen;
  for(std::size_t k=0;k<preparedCandidates.size();++k){const auto&j=row["candidates"][row["order"][k].get<std::size_t>()];const auto name=authored_runtime_ground50cp_fixture::lower(corpus["meshes"][j["mesh"].get<std::size_t>()]["name"].get<std::string>());const authored_runtime_ground50cp_fixture::Owner*match=nullptr;for(const auto&o:ground.owners)if(authored_runtime_ground50cp_fixture::lower(o.name)==name){bool equal=true;for(unsigned n=12;n<15;++n)if(o.instance.world.v[n]!=preparedCandidates[k].candidate.collision.geometry.worldMatrix.v[n])equal=false;if(equal){match=&o;break;}}require50DU(match,"actual collider placement matches explicit candidate");preparedBindings[k]={static_cast<std::size_t>(match-ground.owners.data()),&preparedCandidates[k]};auto&radiusOwner=meshes[j["mesh"].get<std::size_t>()];require50DU(radiusOwner.radii.size()==match->mesh.nodes.size(),"actual mesh radius extent");std::vector<std::uint32_t> topology(match->mesh.nodes.size()+match->mesh.faces.size());require50DU(prepareStaticTargetRadii49X(match->mesh,radiusOwner.radii.data(),radiusOwner.radii.size(),{topology.data(),topology.size()},radiusOwner.maxDepth)==Type2ResourceStatus49X::Complete,"radii prepared from owned actual mesh");preparedCandidates[k].maxDepth=radiusOwner.maxDepth;stackCount=std::max(stackCount,1+mainQueryResource.maxDepth+radiusOwner.maxDepth);auto&v=preparedCandidates[k].candidate.collision;v.geometry.mesh=&match->mesh;v.geometry.worldMatrix=match->instance.world;v.filter.categoryA4=match->instance.category;v.sphere={{{match->instance.sphere.center.v[0],match->instance.sphere.center.v[1],match->instance.sphere.center.v[2]}},match->instance.sphere.radius};}
  }
- require50DU(preparedCandidates.size()==trackSession->terrainOwners&&ground.owners.size()==preparedCandidates.size(),
+ // Every retained owner is bound (the invariant); the stock count is a receipt.
+ require50DU(ground.owners.size()==preparedCandidates.size(),
      "original track binding must cover every retained terrain owner");
+ course_archive_receipt50CI::countReceipt("track_static_candidates",trackSession->world->code,preparedCandidates.size(),trackSession->terrainOwners);
  }else if(isRaTrack){
   require50DU(raRuntime->source.collisions.size()==trackSession->terrainOwners&&
       preparedCandidates.size()==raRuntime->bindings.size(),"RA same-world candidate extent differs");
@@ -1232,10 +1234,18 @@ SessionExit50DU Context::run() {
   scTriggerAuthoring=std::make_shared<sc_trigger_authoring::Owner>();std::string error;
   const bool decoded=scTriggerAuthoring->decode(scColdSources,error);
   require50DU(decoded,error.empty()?"SC same-source trigger authoring rejected":error.c_str());
+  // A TOB with NumberOfTriggers 0 (or no [Triggers]) has no trigger owners,
+  // as in the original's trigger reader; the data decides, not the course.
+  if(!scTriggerAuthoring->liveCount())scTriggerAuthoring.reset();
+  else{
   scTriggerActions=std::make_unique<sc_trigger_actions::Owner>();
   scTriggerCandidateFirst=sc_trigger_candidates::prepare(*scTriggerAuthoring,*scTriggerActions,
       preparedCandidates,preparedBindings,query.collisionTypeTag,qfilter.flags31,qfilter.flagsF8);
-  require50DU(scTriggerCandidateFirst==252&&preparedCandidates.size()==261,"SC actual COL/trigger closure changed");
+  // Closure from the data: triggers follow every static owner.
+  require50DU(scTriggerCandidateFirst==ground.owners.size()&&
+      preparedCandidates.size()==scTriggerCandidateFirst+scTriggerAuthoring->liveCount(),"SC COL/trigger closure changed");
+  course_archive_receipt50CI::countReceipt("sc_world","static_owners",scTriggerCandidateFirst,252);
+  }
  }
  if(isTcTrack){
   track_static_candidates50IG::Bindings names{};names.firstIdentity=0x10000000u;
@@ -1513,8 +1523,8 @@ SessionExit50DU Context::run() {
  if(gaAnimatedWorld)for(auto& membership:gaTriggerMembership)
   membership=std::make_unique<track_runtime_storage50IG::Membership>(trackCounts.membership);
  std::array<std::unique_ptr<track_runtime_storage50IG::Membership>,sc_trigger_authoring::count> scTriggerMembership;
- if(scTriggerAuthoring)for(auto& membership:scTriggerMembership)
-  membership=std::make_unique<track_runtime_storage50IG::Membership>(trackCounts.membership);
+ if(scTriggerAuthoring)for(std::size_t i=0;i<scTriggerAuthoring->liveCount();++i)
+  scTriggerMembership[i]=std::make_unique<track_runtime_storage50IG::Membership>(trackCounts.membership);
  std::array<std::unique_ptr<track_runtime_storage50IG::Membership>,ma_trigger_authoring::count> maTriggerMembership;
  if(maTriggerAuthoring)for(auto& membership:maTriggerMembership)
   membership=std::make_unique<track_runtime_storage50IG::Membership>(trackCounts.membership);

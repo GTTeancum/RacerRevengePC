@@ -788,7 +788,9 @@ SessionExit50DU Context::run() {
  bool scMembershipCleanupDone=!isScTrack;
  auto closeScCurrentMemberships=[&]() noexcept -> bool {
   if(!isScTrack)return true;
-  for(std::size_t i=0;i<scTriggerMembership.size();++i){auto* membership=scTriggerMembership[i].get();
+  // Live trigger prefix only (capacity-sized store; no triggers: nothing).
+  const std::size_t liveScTriggers=scTriggerAuthoring?scTriggerAuthoring->liveCount():0;
+  for(std::size_t i=0;i<liveScTriggers;++i){auto* membership=scTriggerMembership[i].get();
    if(!membership)return false;
    const auto expected=static_cast<CollectionRef50BX>(scTriggerCandidateFirst+i+1);
    if(membership->state.attached&&membership->state.object!=expected)return false;
@@ -1446,7 +1448,7 @@ SessionExit50DU Context::run() {
       lapOwner.bindMbTrack(markers),"actual MB lap markers or shared lap owner rejected");
  }else if(isScTrack){
   const auto* source=scColdSources->sourcesDecoded();
-  require50DU(source&&source->mapLap.prepared&&source->mapLap.nodeCount==179&&
+  require50DU(source&&source->mapLap.prepared&&source->mapLap.nodeCount==source->map.track.count&&
       source->map.gatesPrepared&&!source->map.indicesPrepared&&source->ai.gatesPrepared&&!source->ai.indicesPrepared,
       "SC same-read gate/lap source unavailable");
   *legacyNavigationMap=source->map;*legacyNavigationAI=source->ai;
@@ -1672,7 +1674,7 @@ SessionExit50DU Context::run() {
   require50DU(reportMembership(updateLiveZoneMembership50EN(zoneLifecycle,liveWorld,membership.state,
       bounds,membershipWork),"GA authored trigger cold update"),"GA trigger membership failed");
  }
- if(scTriggerAuthoring)for(std::size_t i=0;i<scTriggerMembership.size();++i){
+ if(scTriggerAuthoring)for(std::size_t i=0;i<scTriggerAuthoring->liveCount();++i){
   auto& membership=*scTriggerMembership[i];const auto& authored=scTriggerAuthoring->source(i);
   const auto bounds=sc_trigger_candidates::bounds(authored);
   const auto ref=static_cast<CollectionRef50BX>(scTriggerCandidateFirst+i+1);

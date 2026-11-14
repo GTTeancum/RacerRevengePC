@@ -34,9 +34,10 @@ public:
   if(attempted_){error="SC ground owner already attempted";return false;}attempted_=true;
   try{
    const auto* data=source?source->sourcesDecoded():nullptr;
-   need(data&&source->zeroSkyReceipt()&&data->world.zones.size()==30&&data->world.instances.size()==4107&&
-       data->map.gatesPrepared&&data->map.track.count==179&&data->ai.gatesPrepared&&data->ai.track.count==180,
-       "SC ground requires the actual authenticated decoded source owner");
+   // Counts are the cold owner's own (read from the data, bounded there).
+   need(data&&source->zeroSkyReceipt()&&data->world.zones.size()==source->zeroSkyReceipt()->zoneCount()&&
+       data->map.gatesPrepared&&data->map.track.count&&data->ai.gatesPrepared&&data->ai.track.count,
+       "SC ground requires the decoded source owner");
    auto next=std::make_unique<original::ColdScene>();next->world=data->world;
    next->stackCount=1;next->audit=nlohmann::json::array();
    for(std::size_t zone=0;zone<next->world.zones.size();++zone){
@@ -44,11 +45,15 @@ public:
     need(selection.status==a::ZoneSearchReadStatus50CN::Complete&&
         selection.selection.collisionStatic118==a::ZoneSearchKind50CN::List&&
         selection.selection.collisionDynamic11C==a::ZoneSearchKind50CN::List,
-        "SC authored List collision methods");
+        // FLAG stand-in: the native ground walks List searches only; another
+        // authored method is refused here until the common path grows it.
+        "SC zone collision search method other than List is not supported natively");
    }
    std::size_t count=0;for(const auto& instance:next->world.instances)
     if(original::hasCollisionMember50IG(data->archive,instance.collision_member))++count;
-   need(count==252&&count<=original::hardCollisionOwners50IG,"SC exact placed COL count");
+   // Upper limit, not the stock 252: the native owner store's real capacity.
+   course_archive_receipt50CI::countReceipt("sc_runtime_ground","placed_col",count,252);
+   need(count&&count<=original::hardCollisionOwners50IG,"SC placed COL count exceeds the native owner store");
    // A single cold reservation precedes every mesh/name borrow. No subsequent
    // resize, sorting or deduplication is allowed after publication.
    next->owners.reserve(count);a::DecodeError48C decode;
@@ -74,7 +79,10 @@ public:
    // result; no fabricated provider/terrain activation or generic fallback.
    need(next->height.sourceDomain.water334==g::UndertrackHeightOwner50EW::Absent&&
        next->height.sourceDomain.terrain330==g::UndertrackHeightOwner50EW::Absent&&
-       !next->height.waterNativeQueryBound,"SC fresh height owner differs");
+       !next->height.waterNativeQueryBound,
+       // FLAG stand-in: the SC loader has no water/terrain-height provider yet
+       // (GC/MC own one); a course authoring WaterFile is refused here.
+       "SC course authors water or terrain height: provider not wired on this loader");
    a::TrackStartScratch50AD startScratch{};a::TrackStart50AD start{};a::TrackStartDiagnostic50AD startDiagnostic{};
    const auto& map=data->memberBytes[1];
    need(a::readTrackStart50AD(reinterpret_cast<const char*>(map.data()),map.size(),actualGridRank,startScratch,start,startDiagnostic)&&

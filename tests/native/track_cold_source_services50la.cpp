@@ -2,6 +2,7 @@
 // payload arithmetic. Existing typed owners keep every allocation and phase.
 #include "track_cold_source_services50la.h"
 #include "pod_materials50ed_fixture.h"
+#include "course_archive_receipt50ci.h"
 #include "../../src/assets/indexed_resource48c.h"
 #include "../../src/assets/import_world48f.h"
 #include "../../src/assets/original_standard_archive_provider50la.h"
@@ -26,8 +27,10 @@ bool authenticateMember(const a::IndexedResArchive48C& archive,
   const a::ResourceEntry48C* match=nullptr;
   for(const auto& e:archive.entries())if(a::OriginalStandardArchiveProvider50LA::sameName(e.name,pin.name)){
    if(match)return false;match=&e;}
-  return match&&match->logical_offset==pin.offset&&match->bytes==pin.bytes&&
-   archive.extractMember(pin.name,out,decode,pin.bytes)&&out.size()==pin.bytes&&
-   pod_materials50ed_fixture::detail::sha256(out)==pin.sha;
+  // Common course rule: found by name; the stock offset/size/SHA is a
+  // receipt (course_archive_receipt50ci.h), never an admission gate.
+  if(!match||!archive.extractMember(match->name,out,decode,match->bytes)||out.size()!=match->bytes)return false;
+  course_archive_receipt50CI::memberReceipt("cold_source",pin.name,out,pin.offset,match->logical_offset,pin.bytes,pin.sha);
+  return true;
  }
 }

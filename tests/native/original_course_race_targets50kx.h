@@ -5,6 +5,8 @@ namespace original_main_entry50KG { struct Application; }
 #include "../../src/game/original_course_load_selection50kg.h"
 #include "runtime_startup50fl_fixture.h"
 #include "pod_materials50ed_fixture.h"
+#include "course_archive_receipt50ci.h"
+#include "course_cut_identity50ci.h"
 #include "../../platform/linux/native/original_ui_rider_profile50kg.h"
 #include "../../platform/linux/native/host_track_selection50im.h"
 #include <array>
@@ -202,10 +204,24 @@ public:
             if(!admission.gcMode2||!rr::platform::hostTrackAdmitted50IM(t.track,admission))continue;
             try {
                 auto bytes=runtime_startup50fl::readBytes(t.assets->archive);
-                if(bytes.size()!=t.assets->archiveBytes||
-                   pod_materials50ed_fixture::detail::sha256(bytes)!=t.assets->archiveSha256){
-                    std::cerr<<"Course cold target unavailable: original "<<t.assets->world->code<<" archive identity differs\n";
-                    continue;
+                // Common rule for every course (course_archive_receipt50ci.h):
+                // the original reads whatever archive the disc holds. Availability
+                // needs a readable RES within the shared decode capacity; the stock
+                // identity is a receipt only.
+                // The stock archive is known readable; any other is decoded once
+                // here so an unreadable file disables only this destination.
+                if(!course_archive_receipt50CI::receipt("course_select",t.assets->world->code,bytes,
+                    t.assets->archiveSha256,t.assets->archiveBytes)){
+                    rr::assets::ResArchive48C archive;rr::assets::DecodeError48C diagnostic;
+                    if(bytes.empty()||bytes.size()>course_archive_receipt50CI::maximumArchiveBytes()||
+                       !rr::assets::decodeResource48C(bytes,archive,diagnostic,nullptr,course_archive_receipt50CI::limits())){
+                        std::cerr<<"Course cold target unavailable: "<<t.assets->world->code<<" archive is not a readable RES ("<<diagnostic.code<<")\n";
+                        continue;
+                    }
+                    // Cut-camera row from this archive's own data (common rule).
+                    std::string cutError;
+                    if(!course_cut_identity50CI::derive(t.assets->world->code,archive,bytes,cutError))
+                        std::cerr<<"course_cut_identity code="<<t.assets->world->code<<" derived=0 ("<<cutError<<")\n";
                 }
                 originals_[i]=std::move(bytes);
             }catch(const std::exception& e){
@@ -228,7 +244,7 @@ public:
             if(s.rider==riders[i]&&!authenticatedRosters_[i].is_null())rosterPresent=true;
         if(!rosterPresent)return A::riderResourcesUnavailable;
         for(std::size_t i=0;i<targets.size();++i)
-            if(selected==&targets[i]&&originals_[i].size()==selected->assets->archiveBytes)return A::ready;
+            if(selected==&targets[i]&&!originals_[i].empty())return A::ready;
         return A::courseResourcesUnavailable;
     }
     const Target* admits(const Selection& s)const noexcept {

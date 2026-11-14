@@ -3,6 +3,8 @@
 #include "track_session_assets50ig_fixture.h"
 #include "runtime_startup50fl_fixture.h"
 #include "pod_materials50ed_fixture.h"
+#include "course_archive_receipt50ci.h"
+#include "course_cut_identity50ci.h"
 #include "../../src/game/original_track_particle_cold50la.h"
 #include "../../src/assets/import_world48f.h"
 #include "../../src/assets/original_standard_material_source50la.h"
@@ -73,23 +75,24 @@ inline bool prepare(rr::game::OriginalTrackParticleCold50LA& owner,
     const auto dot=member.find_last_of('.');
     if(dot!=std::string::npos)member.resize(dot);
     member+=".prt";
-    require(*particleName=="demoprt.tga"&&member=="particle\\demoprt.prt",
-        "Actual SCB-selected particle member identity rejected");
+    // The member is whatever the SCB names (stock: demoprt.tga); its stock
+    // name is a receipt only.
+    if(*particleName!="demoprt.tga")
+        std::cerr<<"course_member_identity site=track_particle member="<<member<<" stock=0\n";
     // Same bounded fresh-cold guard as the real RA particle stage: never
-    // adopt another manager's retained/populated canonical demoprt material.
+    // adopt another manager's retained/populated canonical particle material.
     std::int32_t particleRow=-1;rr::assets::OriginalStandardMaterialRowView50LA material;
-    require(actual382B38->find298C80("particle\\demoprt",particleRow,diagnostic.material)&&
+    require(actual382B38->find298C80(member.substr(0,member.size()-4),particleRow,diagnostic.material)&&
         actual382B38->row(particleRow,material)&&material.references08&&
         *material.references08==0&&!material.object04,
         "Track particle requires fresh canonical demoprt reference ownership");
     const std::string psmMember=member.substr(0,member.size()-4)+".psm";
     const std::string pstMember=member.substr(0,member.size()-4)+".pst";
     const auto bytes=runtime_startup50fl::readBytes(track.archive);
-    require(bytes.size()==archiveBytes&&pod_materials50ed_fixture::detail::sha256(bytes)==archiveSha,
-        "Track particle archive identity rejected");
+    // Common course rule: identity is a receipt; shared decode capacity.
+    course_archive_receipt50CI::receipt("track_particle",canonical->world->code,bytes,archiveSha,archiveBytes);
     rr::assets::ResArchive48C archive;rr::assets::DecodeError48C error;
-    rr::assets::DecodeLimits48C limits;limits.resource_file_bytes=archiveBytes;
-    limits.resource_decoded_bytes=64u*1024u*1024u;limits.resource_entries=4096;
+    const auto limits=course_archive_receipt50CI::limits();
     std::vector<std::uint8_t> prt,psm,pst;
     require(rr::assets::decodeResource48C(bytes,archive,error,nullptr,limits)&&
         rr::assets::extractResMember48C(archive,member,prt,error)&&
@@ -108,15 +111,15 @@ inline bool prepare(rr::game::OriginalTrackParticleCold50LA& owner,
         "Track particle parsed selection differs from authenticated SCB");
     // These are the two already-supported original atlas layouts, not
     // course identities. The numerical constructor retains its own bounds.
+    // Stock PRT/PSM bytes are receipts; the PRT/PSM parsers below keep
+    // their own bounds and refuse what they cannot read.
     const auto prtSha=pod_materials50ed_fixture::detail::sha256(prt);
-    require((prt.size()==9210u&&prtSha==
-            "d4604f2cfd8f40b9704fb63527fdb7574323cbebc9ac34b255b166e9f6be0a5f")||
-        (prt.size()==10310u&&prtSha==
-            "98a7d3c28ed61d1e8c9fb90a9dd433119e5e2574f648308271d4a2f4a0bd7a2a"),
-        "Original selected-track PRT supported layout rejected");
-    require(psm.size()==5022u&&pod_materials50ed_fixture::detail::sha256(psm)==
-        "ed7c0a0799dc749f0c406503f0c4825b481038bb790cae2f50fc12897bf9ebe1",
-        "Original selected-track particle PSM identity rejected");
+    if(!((prt.size()==9210u&&prtSha=="d4604f2cfd8f40b9704fb63527fdb7574323cbebc9ac34b255b166e9f6be0a5f")||
+         (prt.size()==10310u&&prtSha=="98a7d3c28ed61d1e8c9fb90a9dd433119e5e2574f648308271d4a2f4a0bd7a2a")))
+        std::cerr<<"course_member_identity site=track_particle member="<<member<<" stock=0\n";
+    if(!(psm.size()==5022u&&pod_materials50ed_fixture::detail::sha256(psm)==
+        "ed7c0a0799dc749f0c406503f0c4825b481038bb790cae2f50fc12897bf9ebe1"))
+        std::cerr<<"course_member_identity site=track_particle member="<<psmMember<<" stock=0\n";
     // PST pixels belong to this exact authenticated whole archive. Preserve
     // them byte-for-byte in the same mounted provider and canonical domain;
     // no another-course image, exported pixels or independent lookup exists.
@@ -125,8 +128,9 @@ inline bool prepare(rr::game::OriginalTrackParticleCold50LA& owner,
         Provider::MemberView selected;Provider::MountView mounted;
         return provider->lookup132820(requested,selected)==Provider::Lookup::present&&
             provider->mount(selected.mount,mounted)&&mounted.archiveName&&mounted.archiveSha256&&
-            *mounted.archiveName==archiveName&&*mounted.archiveSha256==archiveSha&&
-            mounted.archiveBytes==archiveBytes&&mounted.memberCount==archive.entries.size()&&
+            *mounted.archiveName==archiveName&&
+            *mounted.archiveSha256==course_cut_identity50CI::mountDigest(canonical->world->code,archiveSha)&&
+            mounted.archiveBytes==course_cut_identity50CI::mountBytes(canonical->world->code,archiveBytes)&&mounted.memberCount==archive.entries.size()&&
             selected.member&&*selected.member==requested&&selected.data&&
             selected.revision==providerRevision&&selected.size==original.size()&&
             !std::memcmp(selected.data,original.data(),original.size());
@@ -207,12 +211,14 @@ inline bool prepareRc(rr::game::OriginalTrackParticleCold50LA& owner,
     const auto dot=member.find_last_of('.');
     if(dot!=std::string::npos)member.resize(dot);
     member+=".prt";
-    require(*particleName=="demoprt.tga"&&member=="particle\\demoprt.prt",
-        "Actual SCB-selected particle member identity rejected");
+    // The member is whatever the SCB names (stock: demoprt.tga); its stock
+    // name is a receipt only.
+    if(*particleName!="demoprt.tga")
+        std::cerr<<"course_member_identity site=track_particle member="<<member<<" stock=0\n";
     // Same bounded fresh-cold guard as the real RA particle stage: never
-    // adopt another manager's retained/populated canonical demoprt material.
+    // adopt another manager's retained/populated canonical particle material.
     std::int32_t particleRow=-1;rr::assets::OriginalStandardMaterialRowView50LA material;
-    require(actual382B38->find298C80("particle\\demoprt",particleRow,diagnostic.material)&&
+    require(actual382B38->find298C80(member.substr(0,member.size()-4),particleRow,diagnostic.material)&&
         actual382B38->row(particleRow,material)&&material.references08&&
         *material.references08==0&&!material.object04,
         "Track particle requires fresh canonical demoprt reference ownership");
@@ -318,12 +324,14 @@ inline bool prepareTb(rr::game::OriginalTrackParticleCold50LA& owner,
     const auto dot=member.find_last_of('.');
     if(dot!=std::string::npos)member.resize(dot);
     member+=".prt";
-    require(*particleName=="demoprt.tga"&&member=="particle\\demoprt.prt",
-        "Actual SCB-selected particle member identity rejected");
+    // The member is whatever the SCB names (stock: demoprt.tga); its stock
+    // name is a receipt only.
+    if(*particleName!="demoprt.tga")
+        std::cerr<<"course_member_identity site=track_particle member="<<member<<" stock=0\n";
     // Same bounded fresh-cold guard as the real RA particle stage: never
-    // adopt another manager's retained/populated canonical demoprt material.
+    // adopt another manager's retained/populated canonical particle material.
     std::int32_t particleRow=-1;rr::assets::OriginalStandardMaterialRowView50LA material;
-    require(actual382B38->find298C80("particle\\demoprt",particleRow,diagnostic.material)&&
+    require(actual382B38->find298C80(member.substr(0,member.size()-4),particleRow,diagnostic.material)&&
         actual382B38->row(particleRow,material)&&material.references08&&
         *material.references08==0&&!material.object04,
         "Track particle requires fresh canonical demoprt reference ownership");
@@ -429,12 +437,14 @@ inline bool prepareGb(rr::game::OriginalTrackParticleCold50LA& owner,
     const auto dot=member.find_last_of('.');
     if(dot!=std::string::npos)member.resize(dot);
     member+=".prt";
-    require(*particleName=="demoprt.tga"&&member=="particle\\demoprt.prt",
-        "Actual SCB-selected particle member identity rejected");
+    // The member is whatever the SCB names (stock: demoprt.tga); its stock
+    // name is a receipt only.
+    if(*particleName!="demoprt.tga")
+        std::cerr<<"course_member_identity site=track_particle member="<<member<<" stock=0\n";
     // Same bounded fresh-cold guard as the real RA particle stage: never
-    // adopt another manager's retained/populated canonical demoprt material.
+    // adopt another manager's retained/populated canonical particle material.
     std::int32_t particleRow=-1;rr::assets::OriginalStandardMaterialRowView50LA material;
-    require(actual382B38->find298C80("particle\\demoprt",particleRow,diagnostic.material)&&
+    require(actual382B38->find298C80(member.substr(0,member.size()-4),particleRow,diagnostic.material)&&
         actual382B38->row(particleRow,material)&&material.references08&&
         *material.references08==0&&!material.object04,
         "Track particle requires fresh canonical demoprt reference ownership");

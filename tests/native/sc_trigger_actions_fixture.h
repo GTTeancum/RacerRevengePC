@@ -33,7 +33,7 @@ class Owner final {
  bool preflight(const g::TriggerActionCall50IN& call)const noexcept {
   if(!ready_||terminal_!=Status::Complete||call.triggerCollider<firstTriggerIdentity)return false;
   const auto t=call.triggerCollider-firstTriggerIdentity;
-  if(t>=sc_trigger_authoring::count||call.actionIndex!=0)return false;
+  if(t>=source_->liveCount()||call.actionIndex!=0)return false;
   const auto c=colliderIndex(call.otherCollider);if(c>=group_.colliders.size())return false;
   if(!call.entering)return servicing_&&!lease_;
   const auto& action=source_->source(t);
@@ -68,7 +68,7 @@ public:
   const auto* cold=source?source->coldSource():nullptr;
   const auto* data=cold?cold->sourcesDecoded():nullptr;
   if(!source||!source->ready()||!data||!data->ai.gatesPrepared||
-     actualAiCount!=data->ai.track.count||actualAiCount!=180||!racerCount||racerCount>racers||actualPlayerPrefixCount34>racerCount)return false;
+     actualAiCount!=data->ai.track.count||!racerCount||racerCount>racers||actualPlayerPrefixCount34>racerCount)return false;
   std::array<std::uint32_t,colliders> ids{};
   for(std::size_t i=0;i<racerCount;++i){ids[i*2]=identities[i].main690;ids[i*2+1]=identities[i].secondary;}
   for(std::size_t i=0;i<racerCount*2;++i){
@@ -76,11 +76,15 @@ public:
    for(std::size_t j=0;j<i;++j)if(ids[i]==ids[j])return false;
   }
   g::NativeTriggerGroup50GA next{};
-  if(!next.triggers.setCount(sc_trigger_authoring::count))return false;
+  const auto live=source->liveCount();
+  if(!live||!next.triggers.setCount(live))return false;
   if(!next.colliders.setCount(racerCount*2))return false;
   for(std::size_t i=0;i<racerCount*2;++i)next.colliders[i].identity=ids[i];
-  for(std::size_t i=0;i<sc_trigger_authoring::count;++i){const auto& authored=source->source(i);auto& state=next.triggers[i];
-   if(!authored.startEnabled||authored.oneTimeOnly||authored.ignorePlayer!=(i<6)||
+  for(std::size_t i=0;i<live;++i){const auto& authored=source->source(i);auto& state=next.triggers[i];
+   // PLAYER-ignore comes from each trigger's own IgnoreTrigger (no index rule).
+   // FLAG stand-in: flags29/1B8=3 encode StartEnabled TRUE + OneTimeOnly FALSE;
+   // other authored activation values are refused until their bits are read.
+   if(!authored.startEnabled||authored.oneTimeOnly||
       authored.authoredReset||authored.effectiveReset1B5A60||authored.actionCount!=1||
       authored.randomTriggerPercent!=100||authored.targetNodeIndex>=actualAiCount)return false;
    state.flags29=3;state.flags1B8=3;state.randomTriggerPercent90=100;state.callbackCount98=1;
@@ -121,7 +125,7 @@ public:
   if(lease_||servicing_||terminal_!=Status::Complete)return terminal_==Status::Complete?fail(Status::Input):terminal_;
   if(!g::validNativeTriggerGroup50GA(group_))return fail(Status::Input);
   servicing_=true;struct End{bool& flag;~End(){flag=false;}}end{servicing_};
-  for(std::size_t t=0;t<sc_trigger_authoring::count;++t){const auto& state=group_.triggers[t];const auto& authored=source_->source(t);
+  for(std::size_t t=0;t<source_->liveCount();++t){const auto& state=group_.triggers[t];const auto& authored=source_->source(t);
    std::array<g::TriggerOverlap50IN,g::triggerContactCapacity50IN> observations{};
    for(std::size_t slot=0;slot<state.collider.highWaterD0;++slot){const auto id=state.collider.membersCC[slot];if(!id)continue;
     const auto c=colliderIndex(id);if(c==group_.colliders.size()||!geometry_[c].valid)return fail(Status::Input);

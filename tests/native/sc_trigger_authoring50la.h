@@ -1,6 +1,8 @@
 #pragma once
 #include "sc_cold_sources50la.h"
+#include "../../src/game/native_trigger_group50ga.h"
 #include <array>
+#include <iostream>
 #include <charconv>
 #include <cmath>
 #include <memory>
@@ -11,7 +13,10 @@
 
 namespace sc_trigger_authoring50LA {
 namespace a=rr::assets;
-inline constexpr std::size_t count=9;
+// Capacity, not the stock count (9): the native trigger group's storage. The
+// live count is the TOB's own [Triggers] NumberOfTriggers (0 = no triggers).
+inline constexpr std::size_t count=rr::game::nativeTriggerCapacity50GA;
+inline constexpr std::size_t stockCount=9;
 // Authoring values only. No geometry kernel, transform, collider, C80 lease,
 // action callback, native Entity ID or source-manager PLAYER resolution.
 struct Vector3 {std::array<float,3> values{};};
@@ -35,6 +40,7 @@ struct Source {
 class Owner final {
  std::shared_ptr<const sc_cold_sources50LA::Owner> source_;
  std::array<Source,count> sources_{};
+ std::size_t live_=0;
  bool attempted_=false,decoded_=false;
  static void need(bool value,const char* reason){if(!value)throw std::runtime_error(reason);}
  static const a::ParameterBlock48F& block(const a::ParameterDocument48F& p,const std::string& name){
@@ -71,42 +77,56 @@ public:
   d={};if(attempted_){d.failure="SC trigger owner already attempted";return false;}attempted_=true;
   try{
    const auto* s=source?source->sourcesDecoded():nullptr;
-   need(s&&source->zeroSkyReceipt()&&s->world.zones.size()==30&&s->ai.gatesPrepared&&s->ai.track.count==180,
-        "actual authenticated SC source and AI spline owner required");
+   need(s&&source->zeroSkyReceipt()&&s->ai.gatesPrepared&&s->ai.track.count,
+        "SC source and AI spline owner required");
    source_=std::move(source);const auto& p=s->triggerParameters;
-   need(field(block(p,"triggers"),"numberoftriggers")=="9","SC trigger count");
-   constexpr std::uint32_t targets[count]={145,92,132,154,47,16,168,175,112};
-   constexpr std::uint32_t zones[count]={5,18,18,13,13,5,5,22,22};
-   constexpr const char* names[count]={"BigJump","Branch3RIght","Branch3Left","Branch2Left","Branch2Right",
-       "BigJumpTop","BigJumpMiddle","EndRampTop","EndRampBottom"};
+   // Every value is read from the course's own TOB, as the original's trigger
+   // reader does (stock SC: 9 triggers, all LostAI, StartEnabled TRUE ...).
+   const a::ParameterBlock48F* triggers=nullptr;
+   for(const auto& b:p.blocks)if(b.name=="triggers"){need(!triggers,"duplicate SC block");triggers=&b;}
+   const auto* authoredCount=triggers?optional(*triggers,"numberoftriggers"):nullptr;
+   const std::uint32_t n=authoredCount?integer(*authoredCount):0;
+   need(n<=count,"SC NumberOfTriggers exceeds the native trigger group");
+   if(n!=stockCount)std::cerr<<"sc_trigger_authoring triggers="<<n<<" stock="<<stockCount<<"\n";
+   const auto boolean=[](const std::string& text){
+    need(text=="TRUE"||text=="FALSE","SC trigger boolean text");return text=="TRUE";};
    std::array<Source,count> next{};
-   for(std::size_t i=0;i<count;++i){d.trigger=i+1;
-    const auto label="trigger"+std::to_string(i+1);const auto& b=block(p,label);const auto& action=block(p,label+"action1");auto& out=next[i];
-    need(field(b,"name")==names[i]&&integer(field(b,"zone"))==zones[i]&&field(b,"numberofactions")=="1","SC trigger identity");
-    need(field(b,"startenabled")=="TRUE"&&field(b,"onetimeonly")=="FALSE"&&field(b,"randomtriggerpercent")=="100.000000","SC activation authoring");
-    const auto* ignore=optional(b,"ignoretrigger");
-    need(i<6?(ignore&&*ignore=="PLAYER"):!ignore,"SC authored/absent PLAYER distinction");
-    if(ignore)out.ignoreTrigger=*ignore;
-    need(!optional(b,"parent")&&!optional(b,"attachtosoultree"),"SC unexpected attachment");
-    out.name=names[i];out.sourceZoneOrdinal=zones[i];out.position=vector(field(b,"position"));
-    const bool sphere=i>=1&&i<=4;
+   for(std::size_t i=0;i<n;++i){d.trigger=i+1;
+    const auto label="trigger"+std::to_string(i+1);const auto& b=block(p,label);auto& out=next[i];
+    // FLAG stand-in: one LostAI action per trigger is what the native action
+    // owner implements; another action count or type is refused here.
+    need(field(b,"numberofactions")=="1","SC trigger action count other than 1 is not supported natively");
+    const auto& action=block(p,label+"action1");
+    out.name=field(b,"name");out.sourceZoneOrdinal=integer(field(b,"zone"));
+    need(out.sourceZoneOrdinal>=1&&out.sourceZoneOrdinal<=s->world.zones.size(),"SC trigger zone outside the world");
+    out.startEnabled=boolean(field(b,"startenabled"));out.oneTimeOnly=boolean(field(b,"onetimeonly"));
+    out.randomTriggerPercent=number(field(b,"randomtriggerpercent"));
+    if(const auto* ignore=optional(b,"ignoretrigger"))out.ignoreTrigger=*ignore;
+    need(!optional(b,"parent")&&!optional(b,"attachtosoultree"),"SC trigger attachment is not supported natively");
+    out.position=vector(field(b,"position"));
+    // Shape from the authored fields: Radius = sphere, Box(+Yaw/Pitch/Roll) = box.
+    const bool sphere=optional(b,"radius")!=nullptr;
     if(sphere){
-     need(!optional(b,"box")&&!optional(b,"yaw")&&!optional(b,"pitch")&&!optional(b,"roll"),"SC sphere source shape");
+     need(!optional(b,"box"),"SC trigger authors both Radius and Box");
      out.radius=number(field(b,"radius"));need(*out.radius>0,"SC sphere radius");out.shape=Shape::sphere;
     }else{
-     need(!optional(b,"radius"),"SC box source shape");out.shape=Shape::box;out.box=vector(field(b,"box"));
+     out.shape=Shape::box;out.box=vector(field(b,"box"));
      for(const auto extent:out.box->values)need(extent>0,"SC authored box extent");
      out.yaw=number(field(b,"yaw"));out.pitch=number(field(b,"pitch"));out.roll=number(field(b,"roll"));
     }
-    need(field(action,"actiontype")=="LostAI"&&integer(field(action,"targetnodeindex"))==targets[i]&&
-         targets[i]<s->ai.track.count&&!optional(action,"reset"),"SC original LostAI target or omitted Reset");
-    out.targetAiNodeIndex=targets[i];out.startEnabled=true;out.oneTimeOnly=false;out.randomTriggerPercent=100;
-    // Keep authoredReset empty. No default is substituted into source fields.
-    out.resetDefault1B5A60=false;out.originalTrigger=&b;out.originalAction=&action;
+    need(field(action,"actiontype")=="LostAI","SC trigger action type other than LostAI is not supported natively");
+    out.targetAiNodeIndex=integer(field(action,"targetnodeindex"));
+    need(out.targetAiNodeIndex<s->ai.track.count,"SC LostAI target outside the AI spline");
+    if(const auto* reset=optional(action,"reset"))out.authoredReset=boolean(*reset);
+    // Original default when Reset is omitted: 0 (1B5A60).
+    out.resetDefault1B5A60=out.authoredReset.value_or(false);out.originalTrigger=&b;out.originalAction=&action;
    }
+   live_=n;
    sources_=std::move(next);decoded_=true;return true;
   }catch(...){d.failure="SC trigger authoring rejected; private prefix retained";return false;}
  }
+ // Live prefix [0,liveCount()) of a capacity-sized store.
  const std::array<Source,count>* sources()const noexcept{return decoded_?&sources_:nullptr;}
+ std::size_t liveCount()const noexcept{return decoded_?live_:0;}
 };
 } // namespace sc_trigger_authoring50LA

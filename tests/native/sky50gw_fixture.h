@@ -9,7 +9,10 @@
 #include "gb_cold_sources50la.h"
 #include "../../src/assets/import_decode48c.h"
 #include "../../src/assets/original_ipu_decoder.h"
+#include "../../src/assets/import_world48f.h"
 #include <cfenv>
+#include <charconv>
+#include <string>
 
 // Cold authenticated bridge for original TA/GC/GA/MA/SA/RA/MB/TC sky members. Cube geometry is the direct
 // 12A8A0 source constructor, not an invented enclosing mesh. Only authored
@@ -247,6 +250,108 @@ inline a::Vertex48B vertex(std::uint32_t face, std::uint32_t x,
     std::fill(std::begin(out.color), std::end(out.color), std::uint8_t(255));
     return out;
 }
+// Shared by load() and loadFromCourseData(): CUB format, tile walk, image
+// decode, quad construction and Fog.ColorRGB syntax. These are format facts
+// every authored single cube uses, not course identity.
+inline constexpr std::uint16_t cubMasks[6]{255,255,255,255,65535,0};
+inline constexpr std::uint32_t cubSizes[6]{0xaaaa,0xaaaa,0xaaaa,0xaaaa,0xaaaaaaaa,0};
+inline constexpr float cubSourcePose[9]{0,0,0,0,0,1,0,1,0};
+inline constexpr std::size_t cubHeaderOffset = 99100, cubFirstTileOffset = 99180;
+// Caller guarantees cub.size() >= cubFirstTileOffset (load(): by its pinned
+// CUB size/SHA; loadFromCourseData(): by an explicit extent check).
+inline void requireCubFormat(const Bytes& cub) {
+    need(u32(cub.data()) == 1 && u32(cub.data()+4) == 1 &&
+        u32(cub.data()+8) == 16 && u32(cub.data()+12) == cubHeaderOffset, "CUB source table");
+    const auto* header = cub.data() + cubHeaderOffset;
+    need(u32(header) == 32 && u16(header+4) == 0 && u16(header+6) == 0,
+        "CUB exact supported texture/flags");
+    for (unsigned face = 0; face < 6; ++face)
+        need(u16(header+8+face*2) == cubMasks[face] && u32(header+20+face*4) == cubSizes[face],
+            "CUB authored tile mask/sizes");
+    for (unsigned i = 0; i < 9; ++i)
+        need(f32(header+44+i*4) == cubSourcePose[i], "CUB authored origin/look/up");
+}
+//128D50/24F2C0: exact tile descriptor followed by four IPUM mips 16..128.
+// Walks [tile, tile+available) and returns the bytes the tile occupies;
+// largest/largestBytes locate its 128x128 mip. Every read is bounded first.
+inline std::size_t walkTile(const std::uint8_t* tile, std::size_t available,
+    std::size_t& largest, std::size_t& largestBytes) {
+    constexpr std::array<std::uint32_t,11> standardDescriptor{0,32,0,16,4096,4,0,0,0,0,0};
+    // Both exact source formats occur in authenticated CUB tiles.
+    // Select by source bytes, not course identity.
+    constexpr std::array<std::uint32_t,11> alternateDescriptor{0,34,0,16,16,4,0,0,0,0,0};
+    need(available>=sizeof(standardDescriptor),"Original sky tile descriptor extent");
+    bool standard=true,alternate=true;
+    for(std::size_t word=0;word<11;++word){
+        const auto value=u32(tile+word*4);
+        standard=standard&&value==standardDescriptor[word];
+        alternate=alternate&&value==alternateDescriptor[word];
+    }
+    need(standard||alternate,"Original sky tile descriptor");
+    std::size_t at=sizeof(standardDescriptor);largest=0;largestBytes=0;
+    for(std::uint32_t dimension=16;dimension<=128;dimension*=2){
+        need(at<=available&&available-at>=4,"Original sky mip size extent");
+        const auto bytes=u32(tile+at);at+=4;
+        need(bytes>=25&&bytes<=65536&&bytes<=available-at,"Original sky mip extent");
+        const auto* ipum=tile+at;
+        need(std::memcmp(ipum,"ipum",4)==0&&u32(ipum+4)==bytes-8&&
+            u16(ipum+8)==dimension&&u16(ipum+10)==dimension&&u32(ipum+12)==1,
+            "Original sky mip header");
+        largest=at;largestBytes=bytes;at+=bytes;
+    }
+    return at;
+}
+// Largest mip -> RRTEX001 128x128 RGBA (65552 bytes).
+inline void decodeLargestMip(const std::uint8_t* tile, std::size_t largest,
+    std::size_t largestBytes, Bytes& image) {
+    Bytes rgba;std::string codecError;
+    const bool decoded=a::decodeOriginalIpuRgba(tile+largest,largestBytes,
+        128,128,rgba,codecError);
+    need(decoded,"Original sky IPUM decode: "+codecError);
+    need(rgba.size()==128u*128u*4u,"Original sky RGBA extent");
+    image={'R','R','T','E','X','0','0','1',128,0,0,0,128,0,0,0};
+    image.insert(image.end(),rgba.begin(),rgba.end());
+}
+inline void appendTileQuad(a::Mesh48B& mesh, std::vector<Span>& spans,
+    std::uint32_t face, std::uint32_t tile, std::uint32_t index) {
+    const auto v = static_cast<std::uint32_t>(mesh.vertices.size());
+    const auto start = static_cast<std::uint32_t>(mesh.indices.size());
+    const auto x = (tile % 4) * 128, y = (tile / 4) * 128;
+    // Original12B634 and12B34C:UV=.03125+fraction*.9375.
+    constexpr float lo = 0.03125f, hi = 0.96875f;
+    mesh.vertices.push_back(vertex(face, x, y, lo, lo));
+    mesh.vertices.push_back(vertex(face, x, y+128, lo, hi));
+    mesh.vertices.push_back(vertex(face, x+128, y, hi, lo));
+    mesh.vertices.push_back(vertex(face, x+128, y+128, hi, hi));
+    // Preserve source strip order:top-left,bottom-left,top-right,bottom-right.
+    for (auto local : {0u,1u,2u,2u,1u,3u}) mesh.indices.push_back(v+local);
+    spans.push_back({start,6,v,4,index,face,tile});
+}
+inline void closeBounds(a::Mesh48B& mesh) {
+    auto& bounds = mesh.bounds;
+    for (unsigned axis = 0; axis < 3; ++axis) {
+        bounds.minimum[axis] = bounds.maximum[axis] = mesh.vertices.front().position[axis];
+        for (const auto& vertex : mesh.vertices) {
+            bounds.minimum[axis] = std::min(bounds.minimum[axis], vertex.position[axis]);
+            bounds.maximum[axis] = std::max(bounds.maximum[axis], vertex.position[axis]);
+        }
+    }
+}
+// "R,G,B", each 1..3 decimal digits <= 255, NUL-terminated. Authenticated GA
+// has a two-digit blue channel: never read a fixed three-digit stride.
+inline void parseFogRgb(const char* digit, std::array<float,4>& clearRgba) {
+    for (unsigned channel = 0; channel < 3; ++channel) {
+        unsigned value=0,count=0;
+        while(*digit>='0'&&*digit<='9'){
+            need(++count<=3u,"Original fog channel width");
+            value=value*10u+static_cast<unsigned>(*digit++-'0');
+        }
+        need(count&&value<=255u&&*digit==(channel<2?',':'\0'),"Original fog channel syntax");
+        clearRgba[channel] = static_cast<float>(value)/255.0f;
+        if(channel<2)++digit;
+    }
+    clearRgba[3] = 1.0f;
+}
 } // namespace detail
 
 class Owner final {
@@ -286,6 +391,13 @@ class Owner final {
     std::shared_ptr<const gb_cold_sources50LA::Owner> gbSource_;
     bool loadGb(const Request&,Diagnostic&) noexcept;
 public:
+    // Course-neutral single-cube load from an already decoded course archive
+    // and the World48F decoded from that archive's SCB (the course's own cold
+    // owner retains both; neither is retained here). Defined in
+    // sky_course_data50gw.inl. No identity pins: member names, tile extents and
+    // clear colour all come from the data; CUB format is still enforced.
+    bool loadFromCourseData(const a::ResArchive48C& archive,const a::World48F& world,
+        Diagnostic& d) noexcept;
     Owner() = default;
     Owner(const Owner&) = delete;
     Owner& operator=(const Owner&) = delete;
@@ -374,19 +486,8 @@ public:
                 a::extractResMember48C(archive, selected.cubMember, cub, error, selected.cubBytes),
                 "Original sky member extraction: " + error.detail);
             need(cub.size() == selected.cubBytes && sha256(cub) == selected.cubSha, "Original CUB identity");
-            need(u32(cub.data()) == 1 && u32(cub.data()+4) == 1 &&
-                u32(cub.data()+8) == 16 && u32(cub.data()+12) == 99100, "CUB source table");
-            const auto* header = cub.data() + 99100;
-            need(u32(header) == 32 && u16(header+4) == 0 && u16(header+6) == 0,
-                "CUB exact supported texture/flags");
-            constexpr std::uint16_t masks[6]{255,255,255,255,65535,0};
-            constexpr std::uint32_t sizes[6]{0xaaaa,0xaaaa,0xaaaa,0xaaaa,0xaaaaaaaa,0};
-            constexpr float sourcePose[9]{0,0,0,0,0,1,0,1,0};
-            for (unsigned face = 0; face < 6; ++face)
-                need(u16(header+8+face*2) == masks[face] && u32(header+20+face*4) == sizes[face],
-                    "CUB authored tile mask/sizes");
-            for (unsigned i = 0; i < 9; ++i)
-                need(f32(header+44+i*4) == sourcePose[i], "CUB authored origin/look/up");
+            requireCubFormat(cub);
+            const auto& masks = cubMasks;
 
             auto next = std::make_unique<Storage>();
             if(request.retainedRaSource){
@@ -436,20 +537,7 @@ public:
             need(fogRgbOffset<=sceneParameters.size() && colorBytes<=sceneParameters.size()-fogRgbOffset &&
                 std::memcmp(sceneParameters.data()+fogRgbOffset, selected.fogRgb, colorBytes) == 0,
                 "Original Fog.ColorRGB field");
-            // Authenticated GA has a two-digit blue channel. Never read a
-            // fixed three-digit stride through the next field's value bytes.
-            const char* digit=selected.fogRgb;
-            for (unsigned channel = 0; channel < 3; ++channel) {
-                unsigned value=0,count=0;
-                while(*digit>='0'&&*digit<='9'){
-                    need(++count<=3u,"Original fog channel width");
-                    value=value*10u+static_cast<unsigned>(*digit++-'0');
-                }
-                need(count&&value<=255u&&*digit==(channel<2?',':'\0'),"Original fog channel syntax");
-                next->clearRgba[channel] = static_cast<float>(value)/255.0f;
-                if(channel<2)++digit;
-            }
-            next->clearRgba[3] = 1.0f;
+            parseFogRgb(selected.fogRgb,next->clearRgba);
             next->mesh.vertices.reserve(vertexCount); next->mesh.indices.reserve(indexCount);
             next->spans.reserve(tileCount);
             std::array<Bytes, tileCount> images;
@@ -466,39 +554,12 @@ public:
                 need(sha256(source) == e.sourceSha256, "Sky source tile identity");
                 offset += e.bytes;
                 if(request.decodeOriginalImages){
-                    //128D50/24F2C0: exact tile descriptor followed by four IPUM mips.
-                    constexpr std::array<std::uint32_t,11> standardDescriptor{0,32,0,16,4096,4,0,0,0,0,0};
-                    // Both exact source formats occur in authenticated CUB tiles.
-                    // Select by source bytes, not course identity. Archive/CUB/tile
-                    // hashes precede this check; mip/output identities follow it.
-                    constexpr std::array<std::uint32_t,11> alternateDescriptor{0,34,0,16,16,4,0,0,0,0,0};
-                    need(source.size()>=sizeof(standardDescriptor),"Original sky tile descriptor extent");
-                    bool standard=true,alternate=true;
-                    for(std::size_t word=0;word<11;++word){
-                        const auto value=u32(source.data()+word*4);
-                        standard=standard&&value==standardDescriptor[word];
-                        alternate=alternate&&value==alternateDescriptor[word];
-                    }
-                    need(standard||alternate,"Original sky tile descriptor");
-                    std::size_t at=sizeof(standardDescriptor),largest=0,largestBytes=0;
-                    for(std::uint32_t dimension=16;dimension<=128;dimension*=2){
-                        need(at<=source.size()&&source.size()-at>=4,"Original sky mip size extent");
-                        const auto bytes=u32(source.data()+at);at+=4;
-                        need(bytes>=25&&bytes<=65536&&bytes<=source.size()-at,"Original sky mip extent");
-                        const auto* ipum=source.data()+at;
-                        need(std::memcmp(ipum,"ipum",4)==0&&u32(ipum+4)==bytes-8&&
-                            u16(ipum+8)==dimension&&u16(ipum+10)==dimension&&u32(ipum+12)==1,
-                            "Original sky mip header");
-                        largest=at;largestBytes=bytes;at+=bytes;
-                    }
-                    need(at==source.size(),"Original sky tile mip closure");
-                    Bytes rgba;std::string codecError;
-                    const bool decoded=a::decodeOriginalIpuRgba(source.data()+largest,largestBytes,
-                        128,128,rgba,codecError);
-                    need(decoded,"Original sky IPUM decode: "+codecError);
-                    need(rgba.size()==128u*128u*4u,"Original sky RGBA extent");
-                    images[index]={'R','R','T','E','X','0','0','1',128,0,0,0,128,0,0,0};
-                    images[index].insert(images[index].end(),rgba.begin(),rgba.end());
+                    // Archive/CUB/tile hashes precede this walk; mip/output
+                    // identities follow it.
+                    std::size_t largest=0,largestBytes=0;
+                    need(walkTile(source.data(),source.size(),largest,largestBytes)==source.size(),
+                        "Original sky tile mip closure");
+                    decodeLargestMip(source.data(),largest,largestBytes,images[index]);
                 }else images[index] = input.read(request.textureRoot / e.filename, 65552);
                 need(images[index].size() == 65552 && sha256(images[index]) == e.imageSha256 &&
                     std::memcmp(images[index].data(), "RRTEX001", 8) == 0 &&
@@ -512,29 +573,11 @@ public:
                 }
                 textures[index] = {index, &images[index]};
                 slots[index] = {{0, index, 1, 1}, index, a::MaterialTextureRequirement50EA::required};
-                const auto v = static_cast<std::uint32_t>(next->mesh.vertices.size());
-                const auto start = static_cast<std::uint32_t>(next->mesh.indices.size());
-                const auto x = (tile % 4) * 128, y = (tile / 4) * 128;
-                // Original12B634 and12B34C:UV=.03125+fraction*.9375.
-                constexpr float lo = 0.03125f, hi = 0.96875f;
-                next->mesh.vertices.push_back(vertex(face, x, y, lo, lo));
-                next->mesh.vertices.push_back(vertex(face, x, y+128, lo, hi));
-                next->mesh.vertices.push_back(vertex(face, x+128, y, hi, lo));
-                next->mesh.vertices.push_back(vertex(face, x+128, y+128, hi, hi));
-                // Preserve source strip order:top-left,bottom-left,top-right,bottom-right.
-                for (auto local : {0u,1u,2u,2u,1u,3u}) next->mesh.indices.push_back(v+local);
-                next->spans.push_back({start,6,v,4,index,face,tile});
+                appendTileQuad(next->mesh, next->spans, face, tile, index);
                 ++index;
             }
             need(index == tileCount && offset == cub.size(), "Complete CUB source tile closure");
-            auto& bounds = next->mesh.bounds;
-            for (unsigned axis = 0; axis < 3; ++axis) {
-                bounds.minimum[axis] = bounds.maximum[axis] = next->mesh.vertices.front().position[axis];
-                for (const auto& vertex : next->mesh.vertices) {
-                    bounds.minimum[axis] = std::min(bounds.minimum[axis], vertex.position[axis]);
-                    bounds.maximum[axis] = std::max(bounds.maximum[axis], vertex.position[axis]);
-                }
-            }
+            closeBounds(next->mesh);
             const a::MaterialTextureAssetsInput50EA bankInput{textures.data(), tileCount, slots.data(), tileCount,
                 {tileCount,tileCount,3146496,3145728,128}};
             need(next->bank.load(bankInput, d.bank), "Sky texture bank: " + d.bank.parserMessage);
@@ -557,3 +600,4 @@ public:
 } // namespace sky50gw_fixture
 
 #include "gb_sky_loader50gb.inl"
+#include "sky_course_data50gw.inl"

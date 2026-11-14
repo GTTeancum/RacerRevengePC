@@ -2871,7 +2871,10 @@ SessionExit50DU Context::run() {
  if(isScTrack){
   sc_static_model_params::Owner overrides;sc_static_model_params::Receipt receipt;
   std::string error;
-  const bool loaded=scTriggerAuthoring&&overrides.load(scTriggerAuthoring->originalTob(),error);
+  // The course's own TOB from the cold source owner (present with or
+  // without triggers).
+  const auto* scDecoded=scColdSources?scColdSources->sourcesDecoded():nullptr;
+  const bool loaded=scDecoded&&overrides.load(scDecoded->memberBytes[3],error);
   require50DU(loaded,error.empty()?"SC original static-model parameters rejected":error.c_str());
   std::vector<std::string> names(actualWorld.instances.size());
   std::vector<sc_static_model_params::ModelLease> models(actualWorld.instances.size());
@@ -3022,7 +3025,17 @@ SessionExit50DU Context::run() {
  std::vector<std::uint32_t> nativeFireSpanIds;
  std::vector<std::uint8_t> nativeFireSpanDrawn,nativeFireSpanOwner;
  sc_zero_sky50KX::Owner scZeroSky;
- if(isScTrack){
+ // The original branches on [Environment].NumberOfSkyCubes (276C4C/276C60), not
+ // the course: zero cubes -> the authenticated zero-sky owner; one or more ->
+ // the common course-data sky loader and zone selection below.
+ // FLAG stand-in: only SC's cold owner reaches the course-data loader so far;
+ // the other courses' sky sources are still their pinned stock rows.
+ const auto* scSkyReceipt=isScTrack&&scColdSources?scColdSources->zeroSkyReceipt():nullptr;
+ require50DU(!isScTrack||scSkyReceipt,"SC sky authoring receipt missing");
+ const bool scAuthoredSky=scSkyReceipt&&scSkyReceipt->authoredSkyCubes()!=0;
+ const auto* scSkyData=scAuthoredSky?scColdSources->sourcesDecoded():nullptr;
+ require50DU(!scAuthoredSky||scSkyData,"SC decoded course sources missing for its authored sky");
+ if(isScTrack&&!scAuthoredSky){
   std::string error;const bool ready=scZeroSky.prepare(scColdSources,error);
   require50DU(ready,error.empty()?"SC zero-sky authoring rejected":error.c_str());
  }
@@ -3063,12 +3076,18 @@ SessionExit50DU Context::run() {
  }else if(isTcTrack||isRcTrack||isTbTrack||isGbTrack){
   const bool loaded=skyOwner->load(skyRequest,skyDiagnostic);
   require50DU(loaded,skyDiagnostic.message.empty()?"TC own sky images rejected":skyDiagnostic.message.c_str());
+ }else if(scAuthoredSky){
+  // Same cold archive and world the SC owner decoded; borrowed for this call only.
+  const bool loaded=skyOwner->loadFromCourseData(scSkyData->archive,scSkyData->world,skyDiagnostic);
+  require50DU(loaded,skyDiagnostic.message.empty()?"course-data sky load failed":skyDiagnostic.message.c_str());
+  std::cerr<<"course_sky_data track="<<trackSession->world->code<<" tiles="<<skyOwner->spans()->size()
+      <<" textures="<<skyOwner->bank()->textureCount()<<"\n";
  }else if(!isScTrack)require50DU(skyOwner->load(skyRequest,skyDiagnostic),
      skyDiagnostic.message.empty()?"actual selected-track sky load failed":skyDiagnostic.message.c_str());
  original_track_sky50KX::Owner sourceSkySelection;
- if(isMaSaTrack||isMbTrack||isTcTrack||isRcTrack||isTbTrack||isGbTrack||isMcTrack){
+ if(isMaSaTrack||isMbTrack||isTcTrack||isRcTrack||isTbTrack||isGbTrack||isMcTrack||scAuthoredSky){
   std::string skySelectionError;
-  const bool skySelected=isMcTrack?sourceSkySelection.prepareMcSource(*mcColdSources,skySelectionError):isGbTrack?sourceSkySelection.prepareGbSource(*gbColdSources,skySelectionError):isTbTrack?sourceSkySelection.prepareTbSource(*tbColdSources,skySelectionError):isRcTrack?sourceSkySelection.prepareRcSource(*rcColdSources,skySelectionError):isTcTrack?sourceSkySelection.prepareTcSource(*tcOriginalWorld,skySelectionError):
+  const bool skySelected=scAuthoredSky?sourceSkySelection.prepareFromCourseData(scSkyData->world,skySelectionError):isMcTrack?sourceSkySelection.prepareMcSource(*mcColdSources,skySelectionError):isGbTrack?sourceSkySelection.prepareGbSource(*gbColdSources,skySelectionError):isTbTrack?sourceSkySelection.prepareTbSource(*tbColdSources,skySelectionError):isRcTrack?sourceSkySelection.prepareRcSource(*rcColdSources,skySelectionError):isTcTrack?sourceSkySelection.prepareTcSource(*tcOriginalWorld,skySelectionError):
       (isMbTrack?sourceSkySelection.prepareMbSource(*mbOriginalWorld,skySelectionError):
       sourceSkySelection.prepare(actualWorld,trackSource,skySelectionError));
   require50DU(skySelected,skySelectionError.empty()?"source zone-selected sky authoring rejected":skySelectionError.c_str());
