@@ -151,6 +151,9 @@ def _install(code, root, man, assets='assets'):
                        '(sky50gw: camera-centred, Y+1024, drawn first without depth/fog), with Fog ColorRGB as the clear colour.') % code.upper()),
         limits=limits)
     cc = os.path.join(SILO, assets, 'converted-content.json')
+    if os.path.exists(cc):  # keep rows for other files (pods installed by pod_silo.py)
+        old = json.load(open(cc))
+        doc['files'] += [f for f in old.get('files', []) if f.get('path', '').lower() != res_rel.lower()]
     open(cc, 'w').write(json.dumps(doc, indent=1))
     # re-read what was written
     back = open(silo_file, 'rb').read()

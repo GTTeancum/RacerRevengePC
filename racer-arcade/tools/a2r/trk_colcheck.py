@@ -133,11 +133,31 @@ def sweep(files, code, pos):
     import trk_verify
     A, B, top = _wall_bases(files, pos)
     tr, nodes, AP = trk_verify.load_spline(files['tracks' + BS + 'a' + code + '.spl'])
-    smp = []
-    for i in range(len(AP)):
-        a, b = AP[i], AP[(i + 1) % len(AP)]
-        n = max(1, int(np.linalg.norm(b - a) // 10))
-        smp += [a + (b - a) * k / n for k in range(n)]
+    # follow the spline's own links: the main loop by Next0 from node 0, then every branch from its
+    # fork node (Next1..) until it rejoins the main loop; each path is sampled separately
+    sp = trk_ini.parse(files['tracks' + BS + 'a' + code + '.spl'])
+    nxt_ = []
+    for n_, kv in sp.sections()[1:]:
+        d_ = dict(kv)
+        nxt_.append([int(d_['Next%d' % k]) for k in range(int(d_['NumNextNodes']))])
+    main, j = [0], nxt_[0][0]
+    while j != 0 and len(main) <= len(AP):
+        main.append(j); j = nxt_[j][0]
+    paths = [main + [0]]
+    on_main = set(main)
+    for f_ in main:
+        for b_ in nxt_[f_][1:]:
+            pth, j = [f_], b_
+            while j not in on_main and len(pth) <= len(AP):
+                pth.append(j); j = nxt_[j][0]
+            paths.append(pth + [j])
+    smp, starts = [], set()
+    for pth in paths:
+        starts.add(len(smp))
+        for i in range(len(pth) - 1):
+            a, b = AP[pth[i]], AP[pth[i + 1]]
+            n = max(1, int(np.linalg.norm(b - a) // 10))
+            smp += [a + (b - a) * k / n for k in range(n)]
     smp = np.array(smp)
     d = _dist(smp, A, B, top)
     mtr, mnodes, MP = trk_verify.load_spline(files['tracks' + BS + 'm' + code + '.spl'])
@@ -191,7 +211,9 @@ def sweep(files, code, pos):
     zone = next((z_ for z_ in sorted(zfloor) if floor_y(z_, smp[0]) is not None), None)
     no_floor, steps, slopes, prev_y = [], [], [], None
     for i_ in range(len(smp)):
-        if i_:
+        if i_ in starts and i_:
+            zone = next((z_ for z_ in sorted(zfloor) if floor_y(z_, smp[i_]) is not None), zone)
+        elif i_:
             for qi, q_ in enumerate(Q):
                 if _seg_quad(smp[i_ - 1] + np.array([0, 20.0, 0]), smp[i_] + np.array([0, 20.0, 0]), q_):
                     a_, b_ = conn[qi]

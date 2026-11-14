@@ -39,6 +39,18 @@ import trk_res3  # noqa: E402
 import trk_vub  # noqa: E402
 import a2r_space  # noqa: E402  (the one transform / course-code definition)
 
+# arcade STAT (wall polygon set) header per course: literal pool of f_0C142D98 @0C142E34
+STAT_HEADERS = {0: 0x0C3C2B64, 1: 0x0C3E4AA8, 3: 0x0C3E0924}
+# arcade per-course NPC lane routines (race-data.md 13; routine pointers in NPC +0x560/+0x564): segment range
+# (lo, hi] in which the NPC stops following the racing-line curve and holds lateral 0.1 (when its lateral
+# < 0.5) or 0.9 between the AI edge lists. Course 1 = f_0C13C1B8: words @0C13C232 160 / @0C13C230 216,
+# 0.5 @0C13C238, 0.1 @0C13C248, 0.9 @0C13C24C. Converted as a two-lane fork of the AI spline.
+AI_LANE_SPLITS = {1: (160, 216, (0.1, 0.9))}
+# [Fog] Visibility / Haziness per course where the user has decided against distance fog
+# (2026-11-13: "Lose the volumetric distance fog on Etti IV"). Port rule: fog end = min + Visibility *
+# (max - min), start = (end - 64) * (1 - Haziness); 1 / 0 = fog only in the last 64 ft of the view.
+FOG_FRACTIONS = {1: ('1.0', '0.0')}
+
 BS = chr(92)
 REVENGE = r'C:/Games/Star Wars Racer Revenge/TRACKS/'
 
@@ -533,6 +545,32 @@ class Conv:
         else:
             self.flags.append('AI spline positions: centre line (no arcade racing-line curve for this course) [A centre, G]')
 
+        # ---- two-lane fork where the arcade NPC routine holds one of two lanes (AI_LANE_SPLITS) [A]
+        lane = None
+        if guide is not None and self.course in AI_LANE_SPLITS:
+            s_lo, s_hi, (l_a, l_b) = AI_LANE_SPLITS[self.course]
+            js = [j for j, k in enumerate(ai_idx) if s_lo < k <= s_hi]
+            if js and js[0] > 0 and js[-1] < K - 1 and js == list(range(js[0], js[-1] + 1)):
+                def lane_pt(k, f_):
+                    q = gl[k] + f_ * (gr[k] - gl[k])
+                    ids = np.concatenate([sect_tris[(sec_of[k] + d_) % nsec] for d_ in (-1, 0, 1)])
+                    h = heights_under(tris[ids[floor[ids]]], *q)
+                    y = h[np.argmin(np.abs(h - C[k][1]))] if len(h) else C[k][1]
+                    return np.array([q[0], y, q[1]])
+                LA = np.array([lane_pt(ai_idx[j], l_a) for j in js])
+                LB = np.array([lane_pt(ai_idx[j], l_b) for j in js])
+                half = np.array([max(8.0, 0.5 * min(l_a, 1 - l_b) * np.linalg.norm(gr[ai_idx[j]] - gl[ai_idx[j]])) for j in js])
+                lane = dict(js=js, A=LA, B=LB, half=half)
+                PA[js] = LA
+                ai_left[js] = half; ai_right[js] = half
+                map_left[js] = half; map_right[js] = half
+                self.flags.append('AI lanes: arcade NPC routine of course %d (segments %d..%d hold lateral %.1f or %.1f) -> '
+                                  'AI and map spline fork: main nodes %d..%d on lane %.1f, branch 1 (%d nodes) on lane %.1f, '
+                                  'rejoining at node %d; gate half-width = half the lane-to-edge distance [A routine, G fork layout]'
+                                  % (self.course, s_lo, s_hi, l_a, l_b, js[0], js[-1], l_a, len(js), l_b, js[-1] + 1))
+            else:
+                self.flags.append('AI lanes: course %d lane range has no interior AI nodes; not forked [pending]' % self.course)
+
         # ---- distances, speed limits, progress nodes
         nxt = np.roll(np.arange(K), -1)
         seg3 = np.linalg.norm(P[nxt] - P, axis=1)
@@ -564,6 +602,10 @@ class Conv:
 
         def spline(kind):
             Q = PA if kind == 'a' else P
+            if kind == 'm' and lane is not None:
+                # the map spline forks around the same obstacle (originals fork both splines): main
+                # nodes on lane A, branch on lane B, so resets and the map arrow never sit inside it
+                Q = P.copy(); Q[lane['js']] = lane['A']
             dq = dist_to_finish(Q)
             tw = AI_TRACKWIDTH if kind == 'a' else MAP_TRACKWIDTH
             lw = (ai_left if kind == 'a' else map_left) - tw / 2
@@ -575,8 +617,29 @@ class Conv:
                       ('DistanceToFinish', '%f' % f32(dq[j])), ('BranchID', '0')]
                 if kind == 'm' and j in prog:
                     kv.append(('ProgressNode', '1'))
-                kv += [('NumNextNodes', '1'), ('Next0', str(int(nxt[j])))]
+                if lane is not None and j == lane['js'][0] - 1:
+                    kv += [('NumNextNodes', '2'), ('Next0', str(int(nxt[j]))), ('Next1', str(K))]
+                else:
+                    kv += [('NumNextNodes', '1'), ('Next0', str(int(nxt[j])))]
                 secs.append(('Node%d' % j, kv))
+            if lane is not None:
+                LB, js = lane['B'], lane['js']
+                rejoin = js[-1] + 1
+                m_ = len(js)
+                db = np.zeros(m_)
+                acc_ = float(dq[rejoin]) + float(np.linalg.norm(Q[rejoin] - LB[-1]))
+                for i_ in range(m_ - 1, -1, -1):
+                    db[i_] = acc_
+                    if i_:
+                        acc_ += float(np.linalg.norm(LB[i_] - LB[i_ - 1]))
+                for i_ in range(m_):
+                    j = js[i_]
+                    kv = [('Position', vec(LB[i_])), ('LeftTrackWidth', '%f' % f32(lane['half'][i_] - tw / 2)),
+                          ('RightTrackWidth', '%f' % f32(lane['half'][i_] - tw / 2)), ('SpeedLimit', '%f' % speed[j]),
+                          ('DistanceToFinish', '%f' % f32(db[i_])), ('BranchID', '1'),
+                          ('NumNextNodes', '1'), ('Next0', str(K + i_ + 1 if i_ < m_ - 1 else rejoin))]
+                    secs.append(('Node%d' % (K + i_), kv))
+                secs[0] = ('Track', [('NumNodes', str(K + m_)), ('TrackWidth', '%f' % tw)])
             return trk_ini.write_canonical(secs)
 
         self.put('tracks' + BS + 'a%s.spl' % self.code, spline('a'), 'A racing line + AI edge lines; G node choice, speed; distances A-derived')
@@ -659,7 +722,45 @@ class Conv:
                 q = [x[[0, 2, 1]] for x in q]
             for z_ in tri_zones[inner_t]:
                 wall_tris[z_].extend(q)
-        self.report['walls'] = dict(floor_strip_edges=n_inner, strip_outer_edges=n_outer, height_from_visual=n_visual)
+        # STAT: the arcade's second collision set (race-data.md 6 / 16): vertical wall polygons the pod
+        # physics reads (f_0C102378 / f_0C102992 / f_0C10586C) - e.g. Etti IV's centre divider, which has
+        # collision floor under it and no 0x8000 strip. Headers from the literal pool of the course
+        # loader f_0C142D98 (@0C142E34: SA_COURSE2, SA_COURSE4, S_ETTI4); courses 2 and 4 have none [A].
+        n_stat = 0
+        hdr = STAT_HEADERS.get(self.course)
+        if hdr is not None:
+            E_ = open(os.path.join(SCR, 'img', 'eprom.bin'), 'rb').read()
+            EB = 0x0C00FC00
+            n_poly, arr = struct.unpack_from('<2I', E_, hdr + 4 - EB)
+            cent_floor = TC.mean(1)
+            for i_ in range(n_poly):
+                v_ = struct.unpack_from('<4f12fI', E_, arr + 68 * i_ - EB)
+                pl = np.array(v_[:3]); Q4 = np.array(v_[4:16]).reshape(4, 3)
+                polys = [Q4[[0, 1, 2]]] if np.allclose(Q4[3], Q4[0]) else [Q4[[0, 1, 2]], Q4[[0, 2, 3]]]
+                for tri in polys:
+                    q = self.X(tri)
+                    nr = np.cross(q[1] - q[0], q[2] - q[0])
+                    if np.linalg.norm(nr) < 1e-9:
+                        continue
+                    want = a2r_space.normals(pl, self.XF)          # the arcade plane normal, Revenge frame
+                    if nr @ want < 0:
+                        q = q[[0, 2, 1]]
+                    c_ = q.mean(0)
+                    d2 = np.sum((cent_floor[:, [0, 2]] - c_[[0, 2]]) ** 2, 1)
+                    near = np.flatnonzero(d2 < 60.0 ** 2)
+                    if not len(near):
+                        near = [int(np.argmin(d2))]
+                    zs = set()
+                    for t_ in near:
+                        zs |= tri_zones[t_]
+                    for z_ in zs:
+                        wall_tris[z_].append(q)
+                    n_stat += 1
+            self.flags.append('STAT: %d arcade wall polygons (header @%08X, f_0C142D98 literal pool) -> collision walls, '
+                              'facing as the arcade plane normal, in the zones of the floor within 60 ft [A geometry, G zones]'
+                              % (n_stat, hdr))
+        self.report['walls'] = dict(floor_strip_edges=n_inner, strip_outer_edges=n_outer, height_from_visual=n_visual,
+                                    stat_polygons=n_stat)
         self.flags.append('walls: GENERATED vertical faces (derived from arcade data) on %d floor/strip boundary edges and %d '
                           'outer strip edges, facing the track; height = the visual barrier top above the edge where it is '
                           'higher than %.0f ft (%d edges), else %.0f ft (Revenge originals median); the 0x8000 strips stay as '
@@ -903,7 +1004,9 @@ class Conv:
                         ('HasLensFlare', 'T' if flare else 'F'), ('LensFlareColorRGB', '255,255,240'), ('LensFlareBrightness', '1.0'),
                         ('LensFlareLayersVisible', 'T,T,T,T,T')])] + point_lights + [
             ('GhostOpacity', [('Reset', '0.40'), ('Ghost', '0.53')]),
-            ('Fog', [('ColorRGB', '%d,%d,%d' % tuple(fog_rgb)), ('Visibility', '0.5')]),
+            ('Fog', [('ColorRGB', '%d,%d,%d' % tuple(fog_rgb))] +
+                    ([('Visibility', FOG_FRACTIONS[self.course][0]), ('Haziness', FOG_FRACTIONS[self.course][1])]
+                     if self.course in FOG_FRACTIONS else [('Visibility', '0.5')])),
             ('CSCameras', [('NumberOfCameras', '0')]),
         ] + gc_terrain
         self.flags += [
@@ -916,6 +1019,8 @@ class Conv:
                  fog_rgb, hook['fog_rgb'], (hook['fog_near'], hook['fog_far']) if hook else '-',
                  (hook['fog_near'] * self.XF['scale'], hook['fog_far'] * self.XF['scale']) if hook else '-')) if hook else
             'Fog: GC values [D] (no arcade fog entry)',
+            ('Fog: Visibility %s / Haziness %s by user decision (no distance fog) [user]' % FOG_FRACTIONS[self.course])
+            if self.course in FOG_FRACTIONS else 'Fog: Visibility 0.5 [D]',
 ('Light2 = arcade light 0: vector %s, colour %s (race-data.md 20) [A], mirrored with the course; flags GC [D]; '
              'HasLensFlare %s (arcade sun lens flare on courses 0, 1, 3, 4, race-data.md 18) [A]' % (dl[0][0], dl[0][1], 'T' if flare else 'F'))
             if dl else 'Light2 sun G (no arcade light entry)',

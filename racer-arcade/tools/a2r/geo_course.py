@@ -343,30 +343,21 @@ def convert(N):
     buckets = {}
     items = []
     # Double-sided arcade faces (nocull) arrive as a front copy and a reversed back copy in the
-    # same place. The port draws every track face from both sides (no back-face culling), so two
-    # coincident copies fight in the depth buffer and each polygon shows one or the other: half lit,
-    # half dark. Keep ONE copy per face: the side that faces the nearest centre-line point, so its
-    # baked lighting is the side seen from the track [G].
+    # same place, each lit for its own side (Odin add_triangle). The port draws track faces from both
+    # sides (no back-face culling), so coincident copies fight in the depth buffer. Both copies are
+    # kept, each moved half a layer step along its own (visible-side) vertex normals: from either
+    # side the copy facing the viewer is nearer and wins, with that side's lighting. Step as for the
+    # decal layers (grows with distance from the track, see the layer loop) [G].
     pt = np.loadtxt(os.path.join(ROOT, 'export', 'course%d' % N, 'path_table.tsv'))
     centre = np.c_[pt[:, 0], pt[:, 2], pt[:, 1]]
     centre = centre[np.all(np.isfinite(centre), 1)]
-    stats.update(double_sided_faces=0, double_sided_back_kept=0)
+    stats.update(double_sided_faces=0)
     for tag in ('land', 'sky'):
         for t in tris[tag]:
-            if t.get('nocull') and tag == 'land':
-                if not t['back']:
-                    continue                      # decided on its back copy (which follows it)
-                front = dict(t, P=t['P'][[0, 2, 1]], N=-t['N'][[0, 2, 1]], UV=t['UV'][[0, 2, 1]], A=t['A'][[0, 2, 1]])
-                c = front['P'].mean(0)
-                q = centre[np.argmin(np.sum((centre - c) ** 2, 1))]
-                nw = front['N'].sum(0)
-                stats['double_sided_faces'] += 1
-                if float((q - c) @ nw) < 0:
-                    stats['double_sided_back_kept'] += 1
-                else:
-                    t = front
-            elif t.get('nocull') and t['back']:
+            two_side = bool(t.get('nocull')) and tag == 'land'
+            if t.get('nocull') and t['back'] and tag == 'sky':
                 continue                          # sky dome: front copy only
+            stats['double_sided_faces'] += int(two_side and not t['back'])
             P, Nn, UV, A = apply(t, X)
             e = np.cross(P[1] - P[0], P[2] - P[0])
             if np.linalg.norm(e) < 1e-9:
@@ -380,7 +371,7 @@ def convert(N):
             # Hikaru 101 depth bias -> layer offset toward the viewer (applied after this loop)
             layer = layer_value(t)
             C = bake(Nn, t['mat'], A)
-            items.append([tag, material_key(t), P, Nn, UV, C, layer])
+            items.append([tag, material_key(t), P, Nn, UV, C, layer, two_side])
     # layers: distinct bias layers of this course in order; layer k moves k * LAYER_STEP toward the
     # viewer along the (visible-side) vertex normals, so shared vertices move together
     levels = sorted({it[6] for it in items})
@@ -400,6 +391,14 @@ def convert(N):
             step = np.clip(LAYER_DEPTH_K * d2, LAYER_STEP, LAYER_STEP_MAX)
             stats['layer_step_max_used'] = max(stats['layer_step_max_used'], float(step.max()))
             it[2] = it[2] + n * (k * step[:, None])
+    stats['double_sided_offset_tris'] = 0
+    for it in items:
+        if it[7]:
+            n = it[3] / np.maximum(np.linalg.norm(it[3], axis=1, keepdims=True), 1e-12)
+            d2 = np.min(np.sum((it[2][:, None, :] - centre_rv[None, :, :]) ** 2, -1), 1)
+            step = np.clip(LAYER_DEPTH_K * d2, LAYER_STEP, LAYER_STEP_MAX)
+            it[2] = it[2] + n * (0.5 * step[:, None])
+            stats['double_sided_offset_tris'] += 1
             stats['bias_layer_offset_tris'] = stats.get('bias_layer_offset_tris', 0) + 1
     items = [tuple(it[:6]) for it in items]
     # pass 2: cut points of every triangle that needs a UV split, registered on its edges
