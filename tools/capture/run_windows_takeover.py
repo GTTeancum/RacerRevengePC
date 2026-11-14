@@ -299,6 +299,25 @@ def main():
     (output / 'launch.json').write_text(json.dumps(result, indent=2) + '\n')
     # Inherited process error mode prevents OS crash-dialog waits. Application
     # dialogs, if any, remain bounded by termination of this exact child handle.
+    # User rule: one instance for this session, one for the arcade session.
+    # Never start while another of OUR RacerRevengePC.exe runs (any copy not
+    # under the work/scratch/racer-arcade folder, i.e. main-tree builds and evidence
+    # outputs). Arcade runs and the user's silo/play are ignored. Wait, never
+    # kill; the watchdog starts after the wait.
+    arcade = str(ROOT / 'work' / 'scratch' / 'racer-arcade').lower()
+    waited = 0.0
+    while True:
+        listing = subprocess.run(['powershell', '-NoProfile', '-Command',
+            "Get-CimInstance Win32_Process -Filter \"Name='RacerRevengePC.exe'\" | ForEach-Object { $_.ExecutablePath }"],
+            capture_output=True, text=True, errors='replace').stdout
+        ours = [line.strip() for line in listing.splitlines()
+                if line.strip() and not line.strip().lower().startswith(arcade)]
+        if not ours:
+            break
+        if waited == 0.0:
+            print('one_instance_wait: another RacerRevengePC.exe of this session is running; waiting', flush=True)
+        time.sleep(15.0); waited += 15.0
+    result['oneInstanceWaitSeconds'] = waited
     prior_mode = ctypes.windll.kernel32.SetErrorMode(0x0001 | 0x0002 | 0x8000)
     started = time.monotonic()
     child = None

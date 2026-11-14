@@ -195,18 +195,13 @@ bool VehicleWindowGl50DS::Storage::drawNativeResultsPackets(U bank)noexcept {
     gl.activeTexture(textureUnit0);if(gl.bindSampler)gl.bindSampler(0,0);
     drawGl.bindVertexArray(uiVertexArray);drawGl.bindBuffer(arrayBuffer,uiVertexBuffer);drawGl.bindBuffer(elementBuffer,uiIndexBuffer);
     bool okay=check("prepare Results native ordered packet lowering");
-    {   // Diagnostic receipt (fault 3, visual-faults NOTES): one line per packet
-        // whenever the packet list's shape changes, so a muted logs-only run
-        // shows whether the bottom-bar prompt icons/titles (canvas y 382..405)
-        // are lowered at all, and whether they precede the opaque bar
-        // (untextured, y 383..448) that the loop below draws in list order.
-        // Read-only: no GL call, no state change, bounded by the packet count.
-        static std::size_t loggedCount=0;static float loggedSignature=-1.f;
-        float signature=0.f;
-        for(const auto& packet:nativeResultsPackets)
-            for(const auto& v:packet.vertices)signature+=v.position[1]+(packet.hasTexture?0.5f:0.f);
-        if(nativeResultsPackets.size()!=loggedCount||signature!=loggedSignature){
-            loggedCount=nativeResultsPackets.size();loggedSignature=signature;
+    {   // Diagnostic receipt (fault 3, visual-faults NOTES): the packet list,
+        // once per Results screen (logged when the packet count changes, i.e.
+        // a new page/layout; never per frame or per keystroke during name
+        // entry). Read-only: no GL call, no state change, no per-frame scan.
+        static std::size_t loggedCount=0;
+        if(nativeResultsPackets.size()!=loggedCount){
+            loggedCount=nativeResultsPackets.size();
             std::fprintf(stderr,"results_packet_list count=%zu\n",nativeResultsPackets.size());
             for(std::size_t i=0;i<nativeResultsPackets.size();++i){const auto& packet=nativeResultsPackets[i];
                 float x0=1e9f,x1=-1e9f,y0=1e9f,y1=-1e9f;
