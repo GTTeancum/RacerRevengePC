@@ -56,7 +56,19 @@ inline constexpr std::size_t hardZones=256,hardPortals=4096;
 inline constexpr std::size_t sourceSelectionCapacity=CandidateMergeCapacity48S;
 static_assert(sourceSelectionCapacity==64);
 
+//Stage S: the retained per-racer collision roster every storage caller
+//passes to the ONE shared-roster factory (rows are sized from it).
+struct RosterPlan {
+    const native_racer_collision50HW::Owner* const* owners=nullptr;
+    std::size_t count=0;
+};
 struct Limits {
+    // Stage B switch: the course's retained racer roster. Set by the ONE
+    // storage caller (terrain_interactive_world50du.cpp) for every course
+    // world owner; when set, prepare() builds the shared layout (one world,
+    // every racer's five rows). Null: legacy layout (port stand-in kept for
+    // RA's borrowed route and the no-roster/no-recovery route).
+    const RosterPlan* roster=nullptr;
     std::size_t terrainOwners=hardTerrainOwners,zones=hardZones,portals=hardPortals;
     // Requested native element payload, including reserved filter elements.
     // Excludes allocator bookkeeping and independently owned mesh/radii bytes.
@@ -90,10 +102,10 @@ struct Binding {
 struct Counts {
     std::size_t terrain=0,zones=0,portals=0,methods=0,blocks=0,objects=0;
     std::size_t portalLinks=0,membership=0,selected=0,events=0;
-    CollectionRef50BX mainQuery=0,secondaryQuery=0,terrainQuery=0;
+    CollectionRef50BX legacyMainQuery=0,legacySecondaryQuery=0,legacyTerrainQuery=0;
     CollectionRef50BX cameraSphere=0,cameraRay=0,cameraDeath=0;
-    CollectionRef50BX podQuery=0,movementQuery=0;
-    std::size_t recoveryReferences=0;
+    CollectionRef50BX legacyPodQuery=0,legacyMovementQuery=0;
+    std::size_t legacyRecoveryReferences=0;
     std::size_t sharedRosterCount=0; //Fresh typed allocation only; no active objects implied.
     CollectionRef50BX wreckFirstQuery=0;
     std::size_t wreckReferences=0;
@@ -243,9 +255,10 @@ private:
     bool rosterSlotClaimed_=false;
 public:
     // Stage B P1: the ONE place that defines where a racer's 690/364/348/694/7A4
-    // query row lives. Legacy layout (port stand-in, deleted at the switch):
-    // only the live racer copy exists, so only rosterSlot_ is admitted and the
-    // fixed refs/memberships of today are returned unchanged. Shared layout:
+    // query row lives. Legacy layout (PORT STAND-IN, Stage B switch: kept only
+    // for RA's borrowed-world route and the no-roster/no-recovery route until
+    // RA's shared route lands with the camera step): only the live racer copy
+    // exists, so only rosterSlot_ is admitted. Shared layout (every other course):
     // that slot's own typed row. Every refusal returns an empty RowRef; nothing
     // is ever indexed out of range.
     struct RowRef {
@@ -271,11 +284,11 @@ public:
             return {ref,&m.state,m.storage(),nullptr};
         };
         switch(role){
-        case RosterRole::main690:return fixed(count.mainQuery,mainMembership);
-        case RosterRole::secondary364:return fixed(count.secondaryQuery,secondaryMembership);
-        case RosterRole::terrain348:return fixed(count.terrainQuery,terrainMembership);
+        case RosterRole::main690:return fixed(count.legacyMainQuery,legacyMainMembership);
+        case RosterRole::secondary364:return fixed(count.legacySecondaryQuery,legacySecondaryMembership);
+        case RosterRole::terrain348:return fixed(count.legacyTerrainQuery,legacyTerrainMembership);
         case RosterRole::pod694:case RosterRole::movement7A4:{
-            const auto ref=role==RosterRole::pod694?count.podQuery:count.movementQuery;
+            const auto ref=role==RosterRole::pod694?count.legacyPodQuery:count.legacyMovementQuery;
             const auto& b=legacyRecovery_[r-3u];
             if(!ref||ref>count.objects||!b.state)return {};
             return {ref,b.state,b.storage,nullptr};}
@@ -283,6 +296,15 @@ public:
         return {};
     }
     RowRef currentRow(RosterRole role) noexcept{return row(rosterSlot_,role);}
+    //A row's collector object carries that row's OWN immutable cold list
+    //backing (shared world), never the banked live filter vectors, which hold
+    //whichever racer is visited. Legacy rows (no typed row): unchanged.
+    //Refused (false) for a shared row whose cold filter was never built.
+    static bool useRowFilter(const RowRef& r,CollectionObject50BX& object) noexcept {
+        if(!r.row)return true;
+        if(!r.row->coldFilter)return false;
+        object.filter=r.row->coldFilter->view;return true;
+    }
     std::size_t rosterSlot()const noexcept{return rosterSlot_;}
     //Every row that exists now: legacy, the live racer's reserved rows (694/7A4
     //only when recovery reserved and lent them); shared, all count*5 rows. A
@@ -297,8 +319,8 @@ public:
                 }
             return true;
         }
-        const CollectionRef50BX reserved[rosterRoles]={count.mainQuery,count.secondaryQuery,
-            count.terrainQuery,count.podQuery,count.movementQuery};
+        const CollectionRef50BX reserved[rosterRoles]={count.legacyMainQuery,count.legacySecondaryQuery,
+            count.legacyTerrainQuery,count.legacyPodQuery,count.legacyMovementQuery};
         for(std::size_t r=0;r<rosterRoles;++r){
             //Not reserved, or 694/7A4 never lent (recovery owner not prepared): no row exists.
             if(!reserved[r]||(r>=3u&&!legacyRecovery_[r-3u].state))continue;
@@ -307,18 +329,46 @@ public:
         }
         return true;
     }
+    //Every racer query row's membership is detached (idle/retirement checks
+    //outside visits). Shared: all count*5 rows. Legacy: the three fixed rows
+    //of the live copy, exactly as the course world owners checked before.
+    bool rowsDetached()const noexcept {
+        if(sharedRoster_){
+            for(const auto& p:sharedRoster_->objects)
+                if(p&&(p->membership.state.attached||p->membership.state.object))return false;
+            return true;
+        }
+        for(const auto* m:{&legacyMainMembership,&legacySecondaryMembership,&legacyTerrainMembership})
+            if(m->state.attached||m->state.object)return false;
+        return true;
+    }
+    //Remove every racer query row's membership from the one world (teardown
+    //after the Bank closed). Same row set as rowsDetached. False on the first
+    //incomplete removal; earlier removals stay committed (real prefix).
+    bool detachAllRows() noexcept {
+        auto remove=[&](LiveZoneMembership50EN& m){
+            return removeLiveZoneMembership50EN(lifecycle,world,m,membershipWork).status==LiveZoneStatus50EN::Complete&&
+                !m.attached&&!m.object;};
+        if(sharedRoster_){
+            for(auto& p:sharedRoster_->objects)if(p&&!remove(p->membership.state))return false;
+            return true;
+        }
+        for(auto* m:{&legacyMainMembership,&legacySecondaryMembership,&legacyTerrainMembership})
+            if(!remove(m->state))return false;
+        return true;
+    }
     //Non-camera active collector extent (static owners plus every query row),
     //or the full extent including the trailing camera refs.
     std::size_t activeExtent(bool cameraDomain)const noexcept {
         if(cameraDomain)return count.objects;
         if(sharedRoster_)return count.terrain+rosterRoles*sharedRoster_->count;
-        return count.terrain+runtimeDynamicReferenceReserve+count.recoveryReferences;
+        return count.terrain+runtimeDynamicReferenceReserve+count.legacyRecoveryReferences;
     }
     //Cold, before seal, legacy layout only: lend the undertrack owner's two
     //memberships as rows 3/4. Idempotent for the same pair; any other refused.
     bool bindLegacyRecoveryRows(LiveZoneMembership50EN& podMember,LiveZoneStorage50EN podStorage,
         LiveZoneMembership50EN& movementMember,LiveZoneStorage50EN movementStorage) noexcept {
-        if(sharedRoster_||&podMember==&movementMember||!count.podQuery||!count.movementQuery)return false;
+        if(sharedRoster_||&podMember==&movementMember||!count.legacyPodQuery||!count.legacyMovementQuery)return false;
         const LegacyRecoveryRow next[2]={{&podMember,podStorage},{&movementMember,movementStorage}};
         for(const auto& n:next)
             if(!n.storage.links||!n.storage.entries||n.storage.capacity!=count.membership||
@@ -354,6 +404,8 @@ public:
         const PodShapeSource49W* authoredShape=nullptr;         //the racer's authored parameters.shape
         std::uint64_t sessionGeneration=0;                      //caller's race session, compared, never stored
         const TerrainPrepareState48M* authoredTerrain=nullptr;  //the authored348 the row resource came from
+        std::uint8_t collisionTypeTag=0;                        //the racer's query type tag (all five rows)
+        std::uint8_t movementShapeTag=3;                        //7A4 type3 tag (11C710)
     };
     //The ONE admission of a racer340 body as the 694 bodyA0 (every course;
     //RA's stageNativePod694 calls it too). Read only. sessionGeneration 0
@@ -461,6 +513,22 @@ public:
         auto& pod=*rows[static_cast<std::size_t>(RosterRole::pod694)];
         pod.type0Resource=in.podShape;pod.bodyA0=in.podBody;
         //7A4 endpoints/metadata belong to a later actual recovery producer.
+        //2129C0 constructs every racer's query objects at load: publish each
+        //row's collector record (identity, own cold list backing, filter lanes)
+        //now, so the one world never holds an identity-less object. Bounds stay
+        //empty until the row's own visit attaches and projects it; an unattached
+        //row is in no zone list and is never collected.
+        constexpr std::uint8_t shapeTags[rosterRoles]={2,2,2,0,0};
+        for(std::size_t i=0;i<rosterRoles;++i){
+            auto& r=*rows[i];
+            const auto shape=i==static_cast<std::size_t>(RosterRole::movement7A4)?in.movementShapeTag:shapeTags[i];
+            auto projected=projectCollectionObject50CF(*in.filters[i],CollisionSphere48J{},in.collisionTypeTag,shape,0u);
+            if(!projected.valid||projected.object.identity!=r.identity||
+               !r.reservedRef||r.reservedRef>count.objects)return false;
+            projected.object.filter=r.coldFilter->view;
+            objects[r.reservedRef-1u]=projected.object;source[r.reservedRef-1u]=projected.state;
+            ++r.effectRevision;
+        }
         return true;
     }
     //Withdraw a slot's cold custody (resource borrows); memberships and the
@@ -540,7 +608,7 @@ private:
         const auto membership=[&](const Membership& m){return absent(&m.state,sizeof(m.state))&&
             absent(m.links.data(),m.links.size()*sizeof(*m.links.data()))&&
             absent(m.entries.data(),m.entries.size()*sizeof(*m.entries.data()));};
-        for(const auto* m:{&mainMembership,&secondaryMembership,&terrainMembership})
+        for(const auto* m:{&legacyMainMembership,&legacySecondaryMembership,&legacyTerrainMembership})
             if(!membership(*m))return false;
         for(std::size_t i=0;i<movement.size();++i){const auto& c=movement[i].collision;
             if(!absent(&c.filter.flagsF8,sizeof(c.filter.flagsF8))||
@@ -557,7 +625,7 @@ private:
     }
     bool sharedRosterCanRetire()const noexcept {
         if(!sharedRoster_)return true;
-        if(queue.count||collectionInput.objectCount!=count.terrain||collectionInput.query||
+        if(queue.count||(collectionInput.objectCount!=count.terrain&&collectionInput.objectCount!=activeExtent(false))||collectionInput.query||
            collectionInput.zoneHead||collectionInput.initialActiveTree)return false;
         // Stage B has no query/Follow/reset borrow API. Refuse all actually
         // published row state rather than assuming allocated means detached.
@@ -634,7 +702,7 @@ public:
     FixedBuffer<LiveZonePortalLink50EN> portalLinks,portalScratchLinks;
     FixedBuffer<PortalGeometry50EO> portalGeometry;
     LiveZoneWorld50EN world{};
-    Membership mainMembership,secondaryMembership,terrainMembership;
+    Membership legacyMainMembership,legacySecondaryMembership,legacyTerrainMembership;
     FixedBuffer<CollectionZoneLink50BX> membershipScratchLinks;
     FixedBuffer<LiveZoneEntry50EN> membershipScratchEntries;
     LiveZoneWorkspace50EN membershipWork{};
@@ -660,7 +728,10 @@ private:
         globalValid3E0730(application_->collisionGlobalValid3E0730_),events(n.events),
         authoredPortals(borrowed?0:n.portals),portalHeads(borrowed?0:n.zones),portalLinks(borrowed?0:n.portalLinks),
         portalScratchLinks(n.portalLinks),portalGeometry(borrowed?0:n.portals),
-        mainMembership(n.membership),secondaryMembership(n.membership),terrainMembership(n.membership),
+        //Legacy-layout fixed memberships (port stand-in: RA and the no-roster route only);
+        //zero backing on the shared layout, where every row owns its own.
+        legacyMainMembership(sharedFresh?0:n.membership),legacySecondaryMembership(sharedFresh?0:n.membership),
+        legacyTerrainMembership(sharedFresh?0:n.membership),
         membershipScratchLinks(n.membership),membershipScratchEntries(n.membership),
         objects(n.objects),source(n.objects),scratch(n.objects),first(n.objects),second(n.objects),
         treeSource(n.methods),treeScratch(n.methods),treeFirst(n.methods),treeSecond(n.methods),
@@ -732,7 +803,12 @@ public:
             // Actual source descriptors/cursors below are per-invocation or
             // per-racer outputs. Shared topology, method state, object effects,
             // static movement mirrors and all memberships MUST NOT be banked.
-            bank.owner(collectionInput);bank.owner(rosterSlot_);bank.owner(rosterSlotClaimed_);
+            // collectionInput is the one world's collector descriptor: its
+            // extent (static prefix, every racer row, then the camera tail once
+            // published) is the same for every racer. Each collection writes
+            // the visited racer's own query ref, zone links, bounds and
+            // resource before collecting, so nothing of it is banked.
+            bank.owner(rosterSlot_);bank.owner(rosterSlotClaimed_);
             elements(registeredIndices);bank.owner(registeredCount);
             elements(probeIndices);bank.owner(probeCount);
             return;
@@ -745,7 +821,7 @@ public:
         bank.elements(world.portalHeads,world.zoneCount);
         bank.elements(world.portalLinks,world.portalLinkCount);
         bank.elements(world.portals,world.portalCount);
-        for(auto* m:{&mainMembership,&secondaryMembership,&terrainMembership}){
+        for(auto* m:{&legacyMainMembership,&legacySecondaryMembership,&legacyTerrainMembership}){
             bank.owner(m->state);elements(m->links);elements(m->entries);}
         elements(objects);elements(source);elements(treeSource);bank.owner(collectionInput);
         bank.owner(rosterSlot_);bank.owner(rosterSlotClaimed_);
@@ -816,8 +892,10 @@ inline void account(Budget& b,const Counts& n,bool borrowedWorld=false){
         b.add<CollectionRef50BX>(n.zones);b.add<LiveZonePortalLink50EN>(n.portalLinks);
         b.add<PortalGeometry50EO>(n.portals);}
     b.add<LiveZonePortalLink50EN>(n.portalLinks); // private transaction scratch in either route
-    b.add<CollectionZoneLink50BX>(n.membership,4);
-    b.add<LiveZoneEntry50EN>(n.membership,4);b.add<CollectionObject50BX>(n.objects);
+    //Scratch, plus the three legacy fixed memberships (legacy layout only).
+    const std::size_t memberships=n.sharedRosterCount?1u:4u;
+    b.add<CollectionZoneLink50BX>(n.membership,memberships);
+    b.add<LiveZoneEntry50EN>(n.membership,memberships);b.add<CollectionObject50BX>(n.objects);
     b.add<CollectionObjectState50BX>(n.objects,4);b.add<CollectionTreeState50BX>(n.methods,4);
     b.add<std::uint32_t>(sourceSelectionCapacity,5);
 }
@@ -873,14 +951,11 @@ public:
         const Limits& limits,Diagnostic& diagnostic) noexcept {
         using Original=typename std::decay_t<decltype(ground.owners)>::value_type;
         const SourceWorldView<Original> source{ground.world,{ground.owners.data(),ground.owners.size()}};
-        return prepareSource(source,bindings,count,limits,diagnostic,nullptr,{},std::move(app));
+        return prepareSource(source,bindings,count,limits,diagnostic,nullptr,{},std::move(app),limits.roster);
     }
     //Stage S: the retained per-racer collision roster every storage caller
     //passes to the ONE shared-roster factory (rows are sized from it).
-    struct SharedRosterPlan {
-        const native_racer_collision50HW::Owner* const* owners=nullptr;
-        std::size_t count=0;
-    };
+    using SharedRosterPlan=RosterPlan;
     //Stage S: owned-world entry of the one shared-roster factory, for the
     //course world owners that build their own portal world (every course but
     //RA, which borrows its World through prepareSharedRosterSource). Same
@@ -928,10 +1003,10 @@ private:
             Counts n{};n.sharedRosterCount=shared?shared->count:0;n.terrain=count;n.zones=ground.world.zones.size();n.portals=ground.world.portals.size();
             need(n.zones&&n.zones<=limits.zones&&n.portals<=limits.portals,"original world exceeds storage bounds");
             n.methods=n.zones*2;n.blocks=n.zones*4;
-            n.recoveryReferences=limits.originalRecoveryQueries?runtimeRecoveryReferenceReserve:0u;
+            n.legacyRecoveryReferences=!shared&&limits.originalRecoveryQueries?runtimeRecoveryReferenceReserve:0u;
             const std::size_t cameraReferences=limits.originalCameraQueries?3u:0u;
             const std::size_t roleReferences=shared?shared->count*Storage::rosterRoles:
-                runtimeDynamicReferenceReserve+n.recoveryReferences;
+                runtimeDynamicReferenceReserve+n.legacyRecoveryReferences;
             const std::size_t existingReferences=roleReferences+cameraReferences;
             need(limits.wreckPieceQueries<=(runtimeSearchSlotLimit-existingReferences)/3u,
                 "actual wreck query references exceed the one-block SearchList ceiling");
@@ -943,22 +1018,22 @@ private:
             if(n.wreckReferences)n.wreckFirstQuery=static_cast<CollectionRef50BX>(count+existingReferences+1u);
             n.membership=n.portals+1;n.selected=std::max(count,sourceSelectionCapacity);
             n.events=std::max<std::size_t>(128,n.objects);
-            n.mainQuery=static_cast<CollectionRef50BX>(count+1);
-            n.secondaryQuery=static_cast<CollectionRef50BX>(count+2);
-            n.terrainQuery=static_cast<CollectionRef50BX>(count+3);
+            n.legacyMainQuery=static_cast<CollectionRef50BX>(count+1);
+            n.legacySecondaryQuery=static_cast<CollectionRef50BX>(count+2);
+            n.legacyTerrainQuery=static_cast<CollectionRef50BX>(count+3);
             if(!shared&&limits.originalCameraQueries){
-                n.cameraSphere=static_cast<CollectionRef50BX>(count+4+n.recoveryReferences);
-                n.cameraRay=static_cast<CollectionRef50BX>(count+5+n.recoveryReferences);
-                n.cameraDeath=static_cast<CollectionRef50BX>(count+6+n.recoveryReferences);
+                n.cameraSphere=static_cast<CollectionRef50BX>(count+4+n.legacyRecoveryReferences);
+                n.cameraRay=static_cast<CollectionRef50BX>(count+5+n.legacyRecoveryReferences);
+                n.cameraDeath=static_cast<CollectionRef50BX>(count+6+n.legacyRecoveryReferences);
             }
             if(!shared&&limits.originalRecoveryQueries){
-                n.podQuery=static_cast<CollectionRef50BX>(count+runtimeDynamicReferenceReserve+1u);
-                n.movementQuery=static_cast<CollectionRef50BX>(count+runtimeDynamicReferenceReserve+2u);
+                n.legacyPodQuery=static_cast<CollectionRef50BX>(count+runtimeDynamicReferenceReserve+1u);
+                n.legacyMovementQuery=static_cast<CollectionRef50BX>(count+runtimeDynamicReferenceReserve+2u);
             }
             if(shared){
                 // Legacy fixed-role consumers cannot mistake reservation for
                 // publication. Real per-row refs live only in typed custody.
-                n.mainQuery=n.secondaryQuery=n.terrainQuery=0;
+                n.legacyMainQuery=n.legacySecondaryQuery=n.legacyTerrainQuery=0;
                 if(limits.originalCameraQueries){
                     n.cameraSphere=static_cast<CollectionRef50BX>(count+roleReferences+1u);
                     n.cameraRay=static_cast<CollectionRef50BX>(count+roleReferences+2u);
@@ -1194,7 +1269,9 @@ private:
             // vehicle owners. None may be queried before all cold bindings
             // publish actual records. The camera expands this BANKED active
             // extent only in bank0 after its own trailing pair is published.
-            input.objectCount=shared?n.terrain:n.terrain+runtimeDynamicReferenceReserve+n.recoveryReferences;
+            //Shared: the static prefix plus every racer's five rows (activeExtent).
+            //An unattached row is in no zone list, so the collector never meets it.
+            input.objectCount=next->activeExtent(false);
             // Shared reserved rows are not active, described, attached, or
             // visible merely because storage exists. Stage C owns publication.
             input.trees=next->trees.data();input.treeCount=n.methods;input.zones=next->zones.data();input.zoneCount=n.zones;

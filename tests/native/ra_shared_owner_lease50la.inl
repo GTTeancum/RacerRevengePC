@@ -57,8 +57,8 @@
         if(!policy||!policy->live_||policy->registered_||policy->sharedWorld_||policy->sharedRetired_||
            policy->frame_!=&a.frame||s->sharedRoster_->count>policy->sharedMemberships_.size()||
            policy->entries_[0].query!=&a.main||policy->entries_[1].query!=&a.secondary||
-           policy->entries_[0].membership!=&s->mainMembership.state||
-           policy->entries_[1].membership!=&s->secondaryMembership.state)
+           policy->entries_[0].membership!=&s->legacyMainMembership.state||
+           policy->entries_[1].membership!=&s->legacySecondaryMembership.state)
             return fail(d,"shared detector policy is not at its actual fresh registration cut");
         decltype(policy->sharedMemberships_) selected{};
         for(std::size_t slot=0;slot<s->sharedRoster_->count;++slot)for(unsigned role=0;role<2;++role){

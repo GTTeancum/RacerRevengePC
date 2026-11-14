@@ -123,19 +123,21 @@ class QueryBridge {
     }
     bool bindings() const noexcept {
         const auto& n=storage_.count;
+        //Rows through the one storage accessor (shared world: slot 0's own five;
+        //legacy: the fixed refs). The camera refs follow every racer row.
+        const bool podRows=bool(queryRow(storage::RosterRole::pod694))&&bool(queryRow(storage::RosterRole::movement7A4));
         const bool recoveryBindings=recovery_?
-            frame_&&movement_&&recoveryMeshStackCapacity_&&n.recoveryReferences==2u&&
-                n.podQuery==n.terrain+4u&&n.movementQuery==n.terrain+5u:
-            !frame_&&!movement_&&!recoveryMeshStackCapacity_&&!n.recoveryReferences&&!n.podQuery&&!n.movementQuery;
+            frame_&&movement_&&recoveryMeshStackCapacity_&&podRows:
+            !frame_&&!movement_&&!recoveryMeshStackCapacity_&&!podRows;
+        const auto active=storage_.activeExtent(false);
         const bool wreckBindings=n.wreckReferences?
             n.wreckFirstQuery==n.cameraDeath+1u&&n.wreckReferences%3u==0u&&
                 wreck_.size()==n.wreckReferences/3u&&wreckMeshStackCapacity_&&
                 n.objects==n.cameraDeath+n.wreckReferences:
             !n.wreckFirstQuery&&!wreck_.size()&&!wreckMeshStackCapacity_&&n.objects==n.cameraDeath;
-        return recoveryBindings&&wreckBindings&&n.mainQuery==n.terrain+1u&&n.secondaryQuery==n.terrain+2u&&
-            n.terrainQuery==n.terrain+3u&&n.cameraSphere==n.terrain+4u+n.recoveryReferences&&
-            n.cameraRay==n.terrain+5u+n.recoveryReferences&&
-            n.cameraDeath==n.terrain+6u+n.recoveryReferences&&
+        return recoveryBindings&&wreckBindings&&bool(queryRow(storage::RosterRole::main690))&&
+            bool(queryRow(storage::RosterRole::secondary364))&&bool(queryRow(storage::RosterRole::terrain348))&&
+            n.cameraSphere==active+1u&&n.cameraRay==active+2u&&n.cameraDeath==active+3u&&
             n.objects>=n.cameraDeath&&n.objects<=storage::runtimeSearchSlotLimit&&
             storage_.objects.size()==n.objects&&storage_.source.size()==n.objects&&
             main_.filter==&mainFilter_&&secondary_.filter==&secondaryFilter_&&
@@ -190,9 +192,10 @@ class QueryBridge {
            !member(*podRow.state,podRow.ref,storage_,0)||
            !member(*movementRow.state,movementRow.ref,storage_,3))return false;
         const LiveZoneMembership50EN* const rows[2]={podRow.state,movementRow.state};
-        for(unsigned i=0;i<2;++i){const auto& m=*rows[i];
-            if(m.storage.links!=actual.links[i].data()||m.storage.entries!=actual.entries[i].data()||
-               m.storage.capacity!=actual.links[i].size()||m.storage.capacity!=actual.entries[i].size())return false;}
+        const LiveZoneStorage50EN backing[2]={podRow.storage,movementRow.storage};
+        for(unsigned i=0;i<2;++i){const auto& m=*rows[i]; //each row's own backing
+            if(m.storage.links!=backing[i].links||m.storage.entries!=backing[i].entries||
+               m.storage.capacity!=backing[i].capacity)return false;}
         const auto& pod=*podRow.state;const auto& movement=*movementRow.state;
         std::size_t extent=0;
         return meshExtent(actual.selectedSource->mainTarget().mesh,extent)&&
@@ -219,7 +222,8 @@ class QueryBridge {
     }
     bool publishQuery(CollectionRef50BX ref,const CollisionFilter48J& filter,
         const LiveZoneMembership50EN& membership,std::uint8_t tag,
-        const std::array<float,4>& copied40,const std::array<float,4>& copied50) noexcept {
+        const std::array<float,4>& copied40,const std::array<float,4>& copied50,
+        const storage::RosterRowRef* row=nullptr) noexcept {
         CollisionSphere48J sphere{};
         std::memcpy(sphere.center.v,membership.bounds.cachedCenter.v,sizeof sphere.center.v);
         sphere.radius=membership.bounds.cachedRadius;
@@ -227,6 +231,7 @@ class QueryBridge {
             std::bit_cast<std::uint32_t>(membership.bounds.cachedCenter.v[3]));
         if(!projection.valid)return false;
         project(ref-1u,projection,copied40,copied50);
+        if(row&&!storage::Storage::useRowFilter(*row,storage_.objects[ref-1u]))return false;
         geometry_[ref-1u]={};geometry_[ref-1u].world=membership.lastShapeWorld;
         return true;
     }
@@ -247,6 +252,8 @@ class QueryBridge {
         const auto podIndex=podRow.ref-1u,movementIndex=movementRow.ref-1u; //row() proves 1..count.objects
         project(podIndex,pod,actual.podCopied40,actual.podCopied50);
         project(movementIndex,movement,movement_->copied40,movement_->copied50);
+        if(!storage::Storage::useRowFilter(podRow,storage_.objects[podIndex])||
+           !storage::Storage::useRowFilter(movementRow,storage_.objects[movementIndex]))return false;
         //11B350 leaves this actual694 response E8 null. Its original type0
         // mesh is camera-visible; the selected source and canonical00 matrix
         // are borrowed directly, including after a live reset/reattachment.
@@ -254,6 +261,24 @@ class QueryBridge {
         //7A4 remains its actual query-only type3 object. Its filter is not
         // altered to hide it:121B68 may still set F8 bit4 before eligibility.
         geometry_[movementIndex]={};geometry_[movementIndex].world=movementRow.state->lastShapeWorld;
+        //Shared world: every other racer's 694 is a real camera-visible type0
+        //pod in the one world (the original camera collides with it). Its
+        //geometry is that racer's own selected main-target mesh at the pose
+        //its own visit last registered (row membership shape, 120230).
+        if(storage_.sharedLayout()){
+            const auto own=storage_.rosterSlot();
+            const bool ok=storage_.forEachPresentRow([&](std::size_t slot,storage::RosterRole role,storage::RosterRowRef& row){
+                if(slot==own||role!=storage::RosterRole::pod694)return true;
+                if(!row.row||!row.row->collision||!row.row->collision->prepared())return false;
+                const auto index=row.ref-1u;
+                geometry_[index]=row.state->attached?
+                    OriginalCameraWorldGeometry{&row.row->collision->mainTarget().mesh,row.state->lastShapeWorld,nullptr,false}:OriginalCameraWorldGeometry{};
+                auto& c=copies_[index];
+                if(c.copied40.v[3]==0.f&&c.copied50.v[3]==0.f){c.copied40={{0.f,0.f,0.f,1.f}};c.copied50={{0.f,0.f,0.f,1.f}};}
+                return true;
+            });
+            if(!ok)return false;
+        }
         return true;
     }
     bool refreshRecords() noexcept {
@@ -301,11 +326,11 @@ class QueryBridge {
                 collision.hasResponseCallbackE8};
         }
         if(!publishQuery(mainRow.ref,mainFilter_,*mainRow.state,
-                main_.collisionTypeTag,main_.copied40,main_.copied50)||
+                main_.collisionTypeTag,main_.copied40,main_.copied50,&mainRow)||
            !publishQuery(secondaryRow.ref,secondaryFilter_,*secondaryRow.state,
-                secondary_.collisionTypeTag,secondary_.copied40,secondary_.copied50)||
+                secondary_.collisionTypeTag,secondary_.copied40,secondary_.copied50,&secondaryRow)||
            !publishQuery(terrainRow.ref,terrain_.filter,*terrainRow.state,
-                terrain_.collisionTypeTag,terrain_.copied40,terrain_.copied50)||!publishRecovery())
+                terrain_.collisionTypeTag,terrain_.copied40,terrain_.copied50,&terrainRow)||!publishRecovery())
             return fail("Follow query actual query projection rejected",0x120e70u);
         return true;
     }

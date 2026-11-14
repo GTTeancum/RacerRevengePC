@@ -113,8 +113,33 @@ class Binding final {
  }
  template<class T>bool registered(const T& v)const noexcept {return exactSpan(&v,sizeof v);}
  template<class T>bool registeredBuffer(const rt::FixedBuffer<T>& v)const noexcept {return exactSpan(v.data(),v.size()*sizeof(T));}
+ //Stage B shared world (every course with a roster): the one World, its
+ //trigger/animation memberships and every candidate lane must be ABSENT from
+ //the racer Bank; the pose is published once into the one world. This is the
+ //inverse of the legacy per-racer-copy enrollment below (kept for the legacy
+ //layout only, which has no racer rows).
+ bool sharedBackingAbsent()const noexcept {
+  const auto& s=*collision_->storage_->get();
+  auto buf=[&](const auto& v){return disjointBank(v.data(),v.size()*sizeof(*v.data()));};
+  auto one=[&](const auto& v){return disjointBank(&v,sizeof v);};
+  if(!one(s.lifecycle)||!buf(s.registries)||!buf(s.registrations)||!buf(s.blocks)||!buf(s.trees)||!buf(s.zones)||!one(s.queue)||!buf(s.events)||
+     !disjointBank(s.world.portalHeads,s.world.zoneCount*sizeof(g::CollectionRef50BX))||
+     !disjointBank(s.world.portalLinks,s.world.portalLinkCount*sizeof(g::LiveZonePortalLink50EN))||
+     !disjointBank(s.world.portals,s.world.portalCount*sizeof(g::PortalGeometry50EO))||
+     !buf(s.objects)||!buf(s.source)||!buf(s.treeSource))return false;
+  for(std::size_t i=0;i<s.count.terrain;++i){const auto& movement=s.movement[i].collision;const auto& target=collision_->candidates_[i].candidate.collision;
+   if(!one(movement.filter.flagsF8)||!one(movement.copied40)||!one(movement.copied50)||
+      !one(target.filter.flagsF8)||!one(target.copied40)||!one(target.copied50))return false;}
+  for(const auto& m:collision_->triggerMemberships_)if(!m||!one(m->state)||!buf(m->links)||!buf(m->entries))return false;
+  for(const auto& m:collision_->animationMemberships_)if(!m||!one(m->state)||!buf(m->links)||!buf(m->entries))return false;
+  return disjointBank(runtime_.get(),sizeof(runtime::Owner))&&disjointBank(runtime_->shared_,sizeof(*runtime_->shared_))&&
+    disjointBank(runtime_->mesh_.vertices.data(),runtime_->mesh_.vertices.size()*sizeof(rr::assets::Vertex48B))&&
+    disjointBank(runtime_->mesh_.indices.data(),runtime_->mesh_.indices.size()*sizeof(std::uint32_t))&&disjointBank(this,sizeof(Binding));
+ }
+ bool sharedWorld()const noexcept {return collision_&&collision_->storage_&&collision_->storage_->get()&&collision_->storage_->get()->sharedLayout();}
  bool bankBacking(bool withAnimations)const noexcept {
   if(!bank_||!collision_||!collision_->storage_||!collision_->storage_->get()||!runtime_)return false;const auto& s=*collision_->storage_->get();
+  if(s.sharedLayout())return sharedBackingAbsent();
   //Full actual Storage registration, not a caller-created receipt or count.
   if(!registered(s.lifecycle)||!registeredBuffer(s.registries)||!registeredBuffer(s.registrations)||!registeredBuffer(s.blocks)||
      !registeredBuffer(s.trees)||!registeredBuffer(s.zones)||!registered(s.queue)||!registeredBuffer(s.events)||
@@ -123,7 +148,7 @@ class Binding final {
      !exactSpan(s.world.portals,s.world.portalCount*sizeof(g::PortalGeometry50EO))||
      !registeredBuffer(s.objects)||!registeredBuffer(s.source)||!registeredBuffer(s.treeSource)||!registered(s.collectionInput)||
      !registeredBuffer(s.registeredIndices)||!registered(s.registeredCount)||!registeredBuffer(s.probeIndices)||!registered(s.probeCount))return false;
-  for(const auto* m:{&s.mainMembership,&s.secondaryMembership,&s.terrainMembership})
+  for(const auto* m:{&s.legacyMainMembership,&s.legacySecondaryMembership,&s.legacyTerrainMembership})
    if(!registered(m->state)||!registeredBuffer(m->links)||!registeredBuffer(m->entries))return false;
   for(std::size_t i=0;i<s.count.terrain;++i){const auto& movement=s.movement[i].collision;const auto& target=collision_->candidates_[i].candidate.collision;
    if(!registered(movement.filter.flagsF8)||!registered(movement.copied40)||!registered(movement.copied50)||
@@ -158,6 +183,8 @@ class Binding final {
  }
  template<class F>bool allPeers(F&& operation,Diagnostic& d) {
   if(!bankIdle(true)||!bankBacking(true))return fail(d,"GB actual complete idle Bank backing unavailable",0x120230);
+  //Shared world: one World, one publication, outside every racer visit.
+  if(sharedWorld()){d.peer=0;return operation(std::size_t{0});}
   bank_->gbAnimationVisit_=true;
   struct End{bool& flag;~End(){flag=false;}}end{bank_->gbAnimationVisit_};
   return bank_->visitAll([&](std::size_t peer){d.peer=peer;return operation(peer);});
@@ -230,7 +257,7 @@ public:
   bank_=&bank;
   if(!bankBacking(false)){bank_=nullptr;return fail(d,"GB exhaustive real Storage/trigger/candidate enrollment missing",0);}
   const auto priorCount=bank.spans_.size(),priorBytes=bank.bytes_;
-  try{for(auto& m:collision_->animationMemberships_){bank.owner(m->state);bank.elements(m->links.data(),m->links.size());bank.elements(m->entries.data(),m->entries.size());}
+  try{if(!sharedWorld())for(auto& m:collision_->animationMemberships_){bank.owner(m->state);bank.elements(m->links.data(),m->links.size());bank.elements(m->entries.data(),m->entries.size());}
    if(!bankBacking(true))throw std::runtime_error("GB animation membership backing rejected");
    bank.gbAnimationBacking_=collision_;bank.gbAnimationIssuer_=this;bank.gbAnimationBlocked_=true;bankActivated_=false;runtime_->publicationReady_=false;collision_->publicationBlocked_=true;ready_=false;return true;
   }catch(...){bank.spans_.resize(priorCount);bank.bytes_=priorBytes;bank_=nullptr;return fail(d,"GB cold enrollment failed without moving prior spans",0);}

@@ -217,6 +217,8 @@ struct ContactsContext final {
     tcWorldBorrowType& tcWorldBorrow;
     using trackCountsType = const track_runtime_storage50IG::Counts;
     trackCountsType& trackCounts;
+    using trackStorageType = track_runtime_storage50IG::Storage;
+    trackStorageType& trackStorage;
     using xType = runtime_startup50fl::Fixture;
     xType& x;
     using zoneLifecycleType = rr::game::ZoneLifecycle50CL;

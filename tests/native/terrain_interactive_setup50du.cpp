@@ -633,7 +633,7 @@ SessionExit50DU Context::run() {
   require50DU(undertrack_owners50ew_fixture::prepareStorage(recoveryQueryOwners,globals,
       trackCounts.membership,why),why.empty()?"actual694/7A4 cold storage rejected":why.c_str());
   // Legacy layout: the storage accessor lends these two memberships as rows 3/4.
-  require50DU(!trackCounts.podQuery||trackStorage.bindLegacyRecoveryRows(recoveryQueryOwners.memberships[0],
+  require50DU(trackStorage.sharedLayout()||!trackCounts.legacyPodQuery||trackStorage.bindLegacyRecoveryRows(recoveryQueryOwners.memberships[0],
       recoveryQueryOwners.storage(0),recoveryQueryOwners.memberships[1],recoveryQueryOwners.storage(1)),
       "actual694/7A4 legacy query rows rejected");
   // Source212918..21299C reciprocal first-list exclusions. Sizes/backing are
@@ -662,8 +662,11 @@ SessionExit50DU Context::run() {
 
  // Static references preserve authored candidate order; three real query
  // owners follow them. No fixed TA zone/collider dimensions remain here.
- const CollectionRef50BX mainQueryRef=trackCounts.mainQuery,
-     secondaryQueryRef=trackCounts.secondaryQuery,terrainQueryRef=trackCounts.terrainQuery;
+ // Slot 0's 690/364/348 refs (human/camera subject). Per-racer consumers read
+ // trackStorage.currentRow(role).ref at use; the shared world has no fixed ref.
+ const CollectionRef50BX mainQueryRef=trackStorage.row(0,track_runtime_storage50IG::RosterRole::main690).ref,
+     secondaryQueryRef=trackStorage.row(0,track_runtime_storage50IG::RosterRole::secondary364).ref,
+     terrainQueryRef=trackStorage.row(0,track_runtime_storage50IG::RosterRole::terrain348).ref;
  const auto collectionObjectCount=trackCounts.objects,zoneCount=trackCounts.zones;
  auto* collectionObjects=trackStorage.objects.data();
  auto* collectionSource=trackStorage.source.data();
@@ -1544,17 +1547,29 @@ SessionExit50DU Context::run() {
  std::uint64_t navigationUpdates=0,navigationGateSkips=0,navigationCA0Copies=0;
  std::uint64_t navigationAISequential=0,navigationMapSequential=0;
  std::uint64_t navigationAIScan=0,navigationMapScan=0;
- auto& mainMembership=trackStorage.mainMembership.state;
- auto& secondaryMembership=trackStorage.secondaryMembership.state;
- auto& terrainMembership=trackStorage.terrainMembership.state;
+ // Slot 0's rows (the human/camera subject). Row objects are stable,
+ // unbanked heap objects in the shared world, so these references stay valid;
+ // every per-racer consumer reads trackStorage.currentRow(role) at use.
  auto& membershipWork=trackStorage.membershipWork;
- const auto mainMembershipStorage=trackStorage.mainMembership.storage();
- const auto secondaryMembershipStorage=trackStorage.secondaryMembership.storage();
- const auto terrainMembershipStorage=trackStorage.terrainMembership.storage();
+ const auto slot0Main=trackStorage.row(0,track_runtime_storage50IG::RosterRole::main690);
+ const auto slot0Secondary=trackStorage.row(0,track_runtime_storage50IG::RosterRole::secondary364);
+ const auto slot0Terrain=trackStorage.row(0,track_runtime_storage50IG::RosterRole::terrain348);
+ require50DU(bool(slot0Main)&&bool(slot0Secondary)&&bool(slot0Terrain),"actual slot-0 690/364/348 query rows unavailable");
+ auto& mainMembership=*slot0Main.state;
+ auto& secondaryMembership=*slot0Secondary.state;
+ auto& terrainMembership=*slot0Terrain.state;
+ const auto mainMembershipStorage=slot0Main.storage;
+ const auto secondaryMembershipStorage=slot0Secondary.storage;
+ const auto terrainMembershipStorage=slot0Terrain.storage;
  live_terrain_probe50fr::Owner terrainLiveOwner{};
  require50DU(live_terrain_probe50fr::initialize(terrainLiveOwner,terrainOwner.initial.segment),"initialize actual single-pair terrain owner");
+ // Legacy layout only: the one saved 694 context over the lent membership.
+ // Shared world: each racer's own context lives in its 694 row
+ // (Storage::bindRowPodContext, bound in that racer's cold visit).
+ const auto legacyPodRow=trackStorage.sharedLayout()?track_runtime_storage50IG::RosterRowRef{}:
+     trackStorage.row(0,track_runtime_storage50IG::RosterRole::pod694);
  const PodLiveQueryContext50IZ recoveryPodLive{{zoneLifecycle,liveWorld,
-     recoveryQueryOwners.memberships[0],membershipWork,trackCounts.podQuery},&x.parameters.shape};
+     legacyPodRow?*legacyPodRow.state:recoveryQueryOwners.memberships[0],membershipWork,legacyPodRow.ref},&x.parameters.shape};
  using QueryRole50DU=track_runtime_storage50IG::RosterRole;
  auto recoveryBorrowedQueries=[&](){
   //Current racer's own 690/348 rows from the one storage accessor. An empty
@@ -1568,8 +1583,13 @@ SessionExit50DU Context::run() {
   q.terrainMembership=terrainRow.state;q.terrainStorage=terrainRow.storage;q.terrainRef=terrainRow.ref;
   return q;
  };
- auto recoveryQueries=[&](){return recoveryQueryOwners.binding(recoveryBorrowedQueries(),
-     {trackStorage.currentRow(QueryRole50DU::pod694).ref,trackStorage.currentRow(QueryRole50DU::movement7A4).ref});};
+ //The current racer's own 694/7A4 rows (shared world: that slot's pair;
+ //legacy layout: the lent undertrack memberships).
+ auto recoveryQueries=[&](){
+  const auto podRow=trackStorage.currentRow(QueryRole50DU::pod694);
+  const auto movementRow=trackStorage.currentRow(QueryRole50DU::movement7A4);
+  return recoveryQueryOwners.binding(recoveryBorrowedQueries(),{podRow.ref,movementRow.ref},
+      {podRow.state,movementRow.state},{podRow.storage,movementRow.storage});};
  auto publishRecoveryQueries=[&](){
   if(!originalRecoveryEnabled)return true;
   const auto podRow=trackStorage.currentRow(QueryRole50DU::pod694);
@@ -1586,7 +1606,9 @@ SessionExit50DU Context::run() {
   if(!pod.valid||!ray.valid)return false;
   const CollectionProjection50CF* projection[]{&pod,&ray};
   const CollectionRef50BX refs[]{podRow.ref,movementRow.ref}; //row() proves 1..count.objects
+  const track_runtime_storage50IG::RosterRowRef* rowRefs[]{&podRow,&movementRow};
   for(unsigned i=0;i<2;++i){const auto index=refs[i]-1u;collectionObjects[index]=projection[i]->object;
+   if(!track_runtime_storage50IG::Storage::useRowFilter(*rowRefs[i],collectionObjects[index]))return false;
    collectionSource[index].flagsF8=projection[i]->state.flagsF8;
    collectionSource[index].cachedCenter=projection[i]->state.cachedCenter;
    collectionSource[index].cachedRadius=projection[i]->state.cachedRadius;
@@ -1727,10 +1749,14 @@ SessionExit50DU Context::run() {
  const auto coldSecondaryRow=trackStorage.row(0,QueryRole50DU::secondary364);
  const auto coldTerrainRow=trackStorage.row(0,QueryRole50DU::terrain348);
  require50DU(bool(coldMainRow)&&bool(coldSecondaryRow)&&bool(coldTerrainRow),"actual cold 690/364/348 query rows unavailable");
- if(!isRaTrack)require50DU(reportMembership(attachLiveZoneMembership50EN(zoneLifecycle,liveWorld,*coldMainRow.state,
+ // Shared world: every slot's rows (slot 0 included) attach once, at that
+ // slot's grid placement after its cold binding; nothing is inherited from a
+ // pre-seal copy. Legacy layout (or no roster rig for slot 0): attach here.
+ const bool coldInitialAttach=!isRaTrack&&!(trackStorage.sharedLayout()&&playerUsesRosterRig);
+ if(coldInitialAttach)require50DU(reportMembership(attachLiveZoneMembership50EN(zoneLifecycle,liveWorld,*coldMainRow.state,
      coldMainRow.storage,coldMainRow.ref,initialCollisionZone,ZoneMethod50CL::Second,0.0f,mainInitialBounds,membershipWork),
      "main initial attachment"),"attach main live spring membership");
- if(!isRaTrack)require50DU(reportMembership(attachLiveZoneMembership50EN(zoneLifecycle,liveWorld,*coldSecondaryRow.state,
+ if(coldInitialAttach)require50DU(reportMembership(attachLiveZoneMembership50EN(zoneLifecycle,liveWorld,*coldSecondaryRow.state,
      coldSecondaryRow.storage,coldSecondaryRow.ref,initialCollisionZone,ZoneMethod50CL::Second,0.0f,secondaryInitialBounds,membershipWork),
      "secondary initial attachment"),"attach secondary live spring membership");
 
@@ -1742,7 +1768,7 @@ SessionExit50DU Context::run() {
  require50DU(prepareTerrainSinglePair48M(coldTerrainInput,coldTerrainPrepared)==TerrainPrepareStatus48M::QueryReady,
      "prepare initial authored terrain query bounds");
  const auto terrainInitialBounds=live_terrain_probe50fr::bounds(terrainLiveOwner,coldTerrainPrepared);
- if(!isRaTrack)require50DU(reportMembership(attachLiveZoneMembership50EN(zoneLifecycle,liveWorld,*coldTerrainRow.state,
+ if(coldInitialAttach)require50DU(reportMembership(attachLiveZoneMembership50EN(zoneLifecycle,liveWorld,*coldTerrainRow.state,
      coldTerrainRow.storage,coldTerrainRow.ref,initialCollisionZone,ZoneMethod50CL::Second,0.f,
      terrainInitialBounds,membershipWork),"terrain initial attachment"),"attach terrain probe membership");
  std::vector<std::uint32_t> terrainStack(stackCount);
@@ -1859,7 +1885,7 @@ SessionExit50DU Context::run() {
  auto nativeDetectorPolicy=std::shared_ptr<native_spring_detector_policy50LA::Owner>(
      new native_spring_detector_policy50LA::Owner(s,x.bindings,query,spring,settings,
          mainMembership,mainQueryRef,secondaryQuery,secondarySpring,secondarySettings,
-         secondaryMembership,secondaryQueryRef));
+         secondaryMembership,secondaryQueryRef,trackStorage.sharedLayout()));
  native_spring_detector_policy50LA::Owner::Lease nativeDetectorLease{nativeDetectorPolicy};
  trackStorage.nativeDetectorPolicy_=nativeDetectorPolicy;
  std::unique_ptr<original_ai_reset_ground_bridge::GroundBridge> originalResetGround;
@@ -1927,9 +1953,16 @@ SessionExit50DU Context::run() {
   collectionSource[terrainRow.ref-1]=terrainProjection.state;
   collectionObjects[mainRow.ref-1]=mainProjection.object;collectionSource[mainRow.ref-1]=mainProjection.state;
   collectionObjects[secondaryRow.ref-1]=secondaryProjection.object;collectionSource[secondaryRow.ref-1]=secondaryProjection.state;
+  using StorageS=track_runtime_storage50IG::Storage;
+  if(!StorageS::useRowFilter(terrainRow,collectionObjects[terrainRow.ref-1])||
+     !StorageS::useRowFilter(mainRow,collectionObjects[mainRow.ref-1])||
+     !StorageS::useRowFilter(secondaryRow,collectionObjects[secondaryRow.ref-1]))return false;
   if(!publishRecoveryQueries())return false;
   collectionInput.zoneLinks=mainLive.storage.links;collectionInput.zoneLinkCount=mainLive.storage.capacity;
   collectionInput.zoneHead=1;collectionInput.bounds=collectionBounds.bounds;
+  //The visited racer's own 690 object and main resource (shared world: the
+  //descriptor is not banked; legacy: the same values its bank copy holds).
+  collectionInput.query=mainRow.ref;collectionInput.type2Resource=query.resource;
   collectionInput.initialCurrentIdentity=query.initialQueryCurrentIdentity;
   //Native representation publication, not an original query effect. Only
   //the actual materializer completion may advance this producer's revision.

@@ -95,9 +95,12 @@ private:
         bank.owner(receipt);bank.owner(selectedSource);bank.owner(sourcePrepared);
     }
 public:
-    template<class Bank> void registerMutableOwners(Bank& bank) {
+    //sharedRows: the track storage owns one 694/7A4 row pair per racer in
+    //the one shared world, so these two memberships are unused and NOT banked
+    //(numeric/filter lanes only). Legacy layout: they are the lent rows 3/4.
+    template<class Bank> void registerMutableOwners(Bank& bank,bool sharedRows=false) {
         registerSharedNumericOwners(bank);
-        for(unsigned i=0;i<2;++i){bank.owner(memberships[i]);
+        if(!sharedRows)for(unsigned i=0;i<2;++i){bank.owner(memberships[i]);
             bank.elements(links[i].data(),links[i].size());
             bank.elements(entries[i].data(),entries[i].size());}
     }
@@ -105,6 +108,14 @@ public:
         const std::array<CollectionRef50BX,2>& addedRefs) noexcept {
         return bindingMembers(q,addedRefs,{&memberships[0],&memberships[1]},
             {storage(0),storage(1)});
+    }
+    //The caller's own 694/7A4 rows (track storage accessor; on the legacy
+    //layout those rows ARE memberships[0/1], lent at cold).
+    UndertrackQueryOwners50EW binding(const BorrowedQueries& q,
+        const std::array<CollectionRef50BX,2>& addedRefs,
+        const std::array<LiveZoneMembership50EN*,2>& added,
+        const std::array<LiveZoneStorage50EN,2>& backing) noexcept {
+        return bindingSharedMembers(q,addedRefs,added,backing);
     }
 private:
     //Shared native World lends its actual typed per-roster memberships through
@@ -347,16 +358,17 @@ inline bool attachFreshQueriesBound(Owners& owner,VehicleFrameState49W& frame,
 inline bool attachFreshQueries(Owners& owner,VehicleFrameState49W& frame,
     const VehicleFrameBindings49W& bindings,const VehicleFrameParameters49W& parameters,
     const BorrowedQueries& borrowed,const std::array<CollectionRef50BX,2>& refs,
+    const std::array<LiveZoneMembership50EN*,2>& rows,const std::array<LiveZoneStorage50EN,2>& rowBacking,
     ZoneLifecycle50CL& life,LiveZoneWorld50EN& world,LiveZoneWorkspace50EN& workspace,
     CollectionRef50BX actualInitialC34,
     ColdQueryRole50LH role=ColdQueryRole50LH::originalAi) noexcept {
-    //Legacy route preserves the original preflight and its own memberships.
+    //The caller's own 694/7A4 rows (one accessor, both layouts).
     if(frame.phase!=VehicleFramePhase49W::Ready||
        !coldQueryRoleMatches50LH(role,frame.fields.vehicle58,frame.fields.nativeAiOwnersBound50IV)||
        frame.bodies.main.frameFactor!=0.f||frame.shape.registrationE0||
        !actualInitialC34||actualInitialC34>life.zoneCount||!owner.sourcePrepared||
-       owner.memberships[0].attached||owner.memberships[1].attached)return false;
-    const auto queries=owner.binding(borrowed,refs);
+       !rows[0]||!rows[1]||rows[0]->attached||rows[1]->attached)return false;
+    const auto queries=owner.binding(borrowed,refs,rows,rowBacking);
     return attachFreshQueriesBound(owner,frame,bindings,parameters,borrowed,queries,
         life,world,workspace,actualInitialC34,role);
 }

@@ -183,11 +183,9 @@ public:
     if(s.queue.count||*main_!=a.racers_[peer].main690||*secondary_!=a.racers_[peer].secondary||
       a.group_.colliders[peer*2].identity!=*main_||a.group_.colliders[peer*2+1].identity!=*secondary_)return false;
     for(const auto& member:world_->animationMemberships_)if(member&&(member->state.attached||member->state.object))return false;
-    const std::array<g::CollectionRef50BX,3> objects{s.count.mainQuery,s.count.secondaryQuery,s.count.terrainQuery};std::size_t n=0;
-    for(auto* member:{&s.mainMembership,&s.secondaryMembership,&s.terrainMembership}){
-     if(member->state.attached&&member->state.object!=objects[n])return false;++n;
-     const auto r=g::removeLiveZoneMembership50EN(s.lifecycle,s.world,member->state,s.membershipWork);
-     if(r.status!=g::LiveZoneStatus50EN::Complete||member->state.attached||member->state.object)return false;}
+    //Every racer query row in the one world (idempotent across peers; the
+    //shared rows are not banked, so the first peer's sweep detaches them all).
+    if(!s.detachAllRows())return false;
     for(std::size_t i=0;i<18;++i){auto& member=world_->triggerMemberships_[i];if(!member)return false;
      if(member->state.attached&&member->state.object!=616+i)return false;
      const auto r=g::removeLiveZoneMembership50EN(s.lifecycle,s.world,member->state,s.membershipWork);

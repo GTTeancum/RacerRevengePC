@@ -2383,9 +2383,13 @@ void Context::run() {
      }
     }
     projectionTiming.finish();
-    if(sourceFogRenderPhase.bound())require50DU(
-        sourceFogRenderPhase.prepare(sourceCameraSession.get()).status==sourceCamera::Status::complete,
-        "actual shared camera fog render phase rejected");
+    if(sourceFogRenderPhase.bound()){
+     const auto fogPhase=sourceFogRenderPhase.prepare(sourceCameraSession.get());
+     if(fogPhase.status!=sourceCamera::Status::complete)
+      std::fprintf(stderr,"camera_fog_phase_rejected status=%u pc=0x%x\n",
+          static_cast<unsigned>(fogPhase.status),static_cast<unsigned>(fogPhase.sourcePC));
+     require50DU(fogPhase.status==sourceCamera::Status::complete,"actual shared camera fog render phase rejected");
+    }
     render_diagnostics50GQ::Scope cameraTiming(renderDiagnostics,render_diagnostics50GQ::Subphase::HostCamera);
     const auto& position=m.components.root.body.position;
     platform::VehicleViewCamera50DG camera{};

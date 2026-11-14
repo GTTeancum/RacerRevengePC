@@ -1290,10 +1290,10 @@ SessionExit50DU Context::run() {
  // Course can reuse this exact cold roster after leaving the frontend.
  // Construct its owners now at the real Rig.install, including UI-active
  // startup; never replay construction over the installed graph at Course.
- // Port stand-in (common-path rule, body694.md 4.6): the course list decides
- // whether racer340 bodies exist; the data rule is camera enabled and
- // Application started. On the shared layout a missing body refuses at cold.
- if((isTaTrack||isSaTrack||isRaTrack||directOriginalHuman)&&originalCameraEnabled&&originalMainApplication.enabled){
+ // Every course (body694.md 4.6, the former course list is retired): the
+ // racer340 bodies exist whenever the original camera and Application run.
+ // On the shared world a missing body refuses at cold.
+ if(originalCameraEnabled&&originalMainApplication.enabled){
   originalMainApplication.appStart(originalMainApplication.assetRoot);
   nativeModelDomain=originalMainApplication.standardMaterialDomain();
  }
@@ -1901,8 +1901,11 @@ SessionExit50DU Context::run() {
      if(removed.status!=LiveZoneStatus50EN::Complete||q.membership->attached||q.membership->object)return false;
      if(index==1)s.shape.registrationE0=0;
     }
-    auto removed=removeLiveZoneMembership50EN(zoneLifecycle,liveWorld,secondaryMembership,membershipWork);
-    if(removed.status!=LiveZoneStatus50EN::Complete||secondaryMembership.attached||secondaryMembership.object)return false;
+    //This slot's own 364 row (shared world: not slot 0's).
+    const auto secondaryRow=trackStorage.currentRow(track_runtime_storage50IG::RosterRole::secondary364);
+    if(!secondaryRow)return false;
+    auto removed=removeLiveZoneMembership50EN(zoneLifecycle,liveWorld,*secondaryRow.state,membershipWork);
+    if(removed.status!=LiveZoneStatus50EN::Complete||secondaryRow.state->attached||secondaryRow.state->object)return false;
     for(std::size_t i=0;i<3;++i){auto* member=mbCollisionWorld->triggerMembership(i);if(!member)return false;
      removed=removeLiveZoneMembership50EN(zoneLifecycle,liveWorld,member->state,membershipWork);
      if(removed.status!=LiveZoneStatus50EN::Complete||member->state.attached||member->state.object)return false;
@@ -2373,6 +2376,7 @@ SessionExit50DU Context::run() {
    .tcTriggerActions=tcTriggerActions,
    .tcWorldBorrow=tcWorldBorrow,
    .trackCounts=trackCounts,
+   .trackStorage=trackStorage,
    .x=x,
    .zoneLifecycle=zoneLifecycle,
   }.run();
@@ -3926,8 +3930,10 @@ SessionExit50DU Context::run() {
       if(r.status!=LiveZoneStatus50EN::Complete||q.membership->attached||q.membership->object)return false;
      }
      s.shape.registrationE0=0;
-     auto r=removeLiveZoneMembership50EN(zoneLifecycle,liveWorld,secondaryMembership,membershipWork);
-     if(r.status!=LiveZoneStatus50EN::Complete||secondaryMembership.attached||secondaryMembership.object)return false;
+     const auto secondaryRow=trackStorage.currentRow(track_runtime_storage50IG::RosterRole::secondary364);
+     if(!secondaryRow)return false;
+     auto r=removeLiveZoneMembership50EN(zoneLifecycle,liveWorld,*secondaryRow.state,membershipWork);
+     if(r.status!=LiveZoneStatus50EN::Complete||secondaryRow.state->attached||secondaryRow.state->object)return false;
      for(std::size_t i=0;i<3;++i){auto* membership=mbCollisionWorld->triggerMembership(i);
       if(!membership)return false;
       r=removeLiveZoneMembership50EN(zoneLifecycle,liveWorld,membership->state,membershipWork);

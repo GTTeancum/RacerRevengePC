@@ -457,6 +457,25 @@ SessionExit50DU Context::run() {
  // Explicit MC PC-native48MiB aggregate budget; all other tracks retain32MiB.
  if(isMcTrack)trackStorageLimits.coldPayloadBytes=48u*1024u*1024u;
  trackStorageLimits.originalRecoveryQueries=originalRecoveryEnabled;
+ // Stage B switch: one shared collision world for every course. The roster
+ // collision owners were built by the cold roster above; every course world
+ // owner's storage gets the same plan, so every racer's five query rows live
+ // in the one world (track_runtime_storage50IG::RosterPlan).
+ // PORT STAND-IN (Stage B): RA keeps its borrowed legacy-layout route until its
+ // shared route lands with the camera step; no roster or no recovery rows
+ // also keeps the legacy layout (no rows can be sized).
+ std::array<const native_racer_collision50HW::Owner*,track_runtime_storage50IG::Storage::maximumRoster> trackRosterOwners{};
+ track_runtime_storage50IG::RosterPlan trackRosterPlan{};
+ if(raceEnabled&&originalRecoveryEnabled&&!isRaTrack){
+  require50DU(raceRacerCount&&raceRacerCount<=trackRosterOwners.size()&&raceRacerCount<=racerCollisions.size(),
+      "shared roster plan exceeds the storage roster ceiling");
+  for(std::size_t racer=0;racer<raceRacerCount;++racer){
+   require50DU(bool(racerCollisions[racer]),"shared roster plan requires every racer's collision owner");
+   trackRosterOwners[racer]=racerCollisions[racer].get();
+  }
+  trackRosterPlan={trackRosterOwners.data(),raceRacerCount};
+  trackStorageLimits.roster=&trackRosterPlan;
+ }
  // Conservative precharge for GB fields added to shared VehicleWindow metadata, on every route.
  // This reduces each route's bounded allowance; MC alone uses the measured48MiB policy above.
  require50DU(trackStorageLimits.coldPayloadBytes>=rr::platform::gbParticleRendererMetadataReservation50DS,"shared renderer metadata reservation overflow");

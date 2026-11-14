@@ -163,6 +163,9 @@ def main():
                              'loads it through its own Rider screen; the route only checks it opened on it')
     parser.add_argument('--gpu-vertex-check', type=int, default=0,
                         help='Diagnostic: compare GPU pod vertices with the CPU reference every N rendered frames')
+    parser.add_argument('--keep-binaries', action='store_true',
+                        help='Keep the staged program/DLL copies and audio recording after a logs-only run '
+                             '(by default they are deleted when the run ends; logs are always kept)')
     args = parser.parse_args()
     if os.name != 'nt' or not 10 <= args.seconds <= 1800:
         parser.error('Windows required; watchdog must be 10..1800 seconds (chained-course runs need up to 30 min)')
@@ -220,6 +223,14 @@ def main():
         env['RR_EVIDENCE_LOGS_ONLY'] = '1'
     if args.camera_trace:
         env['RR_CAMERA_POSE_TRACE'] = '1'
+    # Test-only (PC port, not original): every injected input below is
+    # in-process (RR_TEST_* read by the game), so the run must not depend on
+    # the game window being in front. RR_TEST_IGNORE_FOCUS stops focus loss
+    # from pausing or releasing those inputs; a real minimise/close still does.
+    injected = (args.hold_throttle or args.steer_invert or args.camera_cycle or args.results_confirm or
+                args.destroy or getattr(args, 'pad_hold_a', False) or args.player_racer is not None)
+    if injected:
+        env['RR_TEST_IGNORE_FOCUS'] = '1'
     if args.hold_throttle:
         env['RR_TEST_HOLD_THROTTLE'] = '1'
     if args.repair:
@@ -377,6 +388,20 @@ def main():
             result['noImagesWritten'] = not any(p.suffix.lower() in {'.ppm', '.png', '.jpg', '.pending'} for p in output.rglob('*'))
             result['routeCompleted'] = result['routeCompleted'] and result['noImagesWritten']
         (output / 'execution.json').write_text(json.dumps(result, indent=2) + '\n')
+        # Disk hygiene (user request 2026-11-13): a logs-only run keeps its logs and
+        # receipts; the staged program, DLL copies and audio recording (~65 MB per
+        # run) are removed once the child has stopped.
+        if args.logs_only and not args.keep_binaries and result.get('childStopped'):
+            for name in [staged.name, *(dll.name for dll in runtime), 'audio.wav']:
+                try:
+                    (output / name).unlink(missing_ok=True)
+                except OSError:
+                    pass
+            for extra in output.glob('audio-*.wav'):
+                try:
+                    extra.unlink()
+                except OSError:
+                    pass
     print(json.dumps(result, indent=2))
     return 0 if result['routeCompleted'] else 1
 

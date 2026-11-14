@@ -2140,11 +2140,13 @@ public:
                     if(r.status!=OriginalFollowRaceFrameStatus::complete)
                         std::fprintf(stderr,"follow_camera_failure path=race_frame race_status=%u pose_status=%u pc=0x%x"
                             " collision_status=%u collision_pc=0x%x bad_op=%u bad_role=%u bad_bits=0x%08x bad_ordinal=%u"
-                            " operations=%u rounding=%d mxcsr=0x%x\n",
+                            " operations=%u rounding=%d mxcsr=0x%x follow_query=%s\n",
                             static_cast<unsigned>(r.status),static_cast<unsigned>(r.pose.status),r.pose.sourcePC,
                             static_cast<unsigned>(r.collision.status),r.collision.sourcePC,r.collision.firstBadOp,
                             r.collision.firstBadRole,r.collision.firstBadBits,r.collision.firstBadOrdinal,
-                            r.collision.operations,std::fegetround(),static_cast<unsigned>(_mm_getcsr()));
+                            r.collision.operations,std::fegetround(),static_cast<unsigned>(_mm_getcsr()),
+                            actual_.followQueries.get()&&actual_.followQueries.get()->diagnostic().message?
+                                actual_.followQueries.get()->diagnostic().message:"");
                 }
                 if(r.status!=OriginalFollowRaceFrameStatus::complete)return fail(Status::sourcePath,r.pose.sourcePC);
                 frameStage_=FrameStage::stableMatrix;break;

@@ -605,8 +605,17 @@ bool WindowHost50DQ::poll(WindowInput50DQ& input, WindowHostDiagnostic50DQ& d) n
     reportSlowHostCall50DQ("SDL_PumpEvents", pumpBegin);
     const Int count = s.peepEvents(events, static_cast<Int>(windowEventBudget50DQ), 2, 0, 0xffff);
     if (count < 0) return fail(d, WindowHostError50DQ::EventFailure, "SDL_PeepEvents", s.getError());
+    // TEST-ONLY (PC port, not original): RR_TEST_IGNORE_FOCUS=1, set by the
+    // unattended runner whenever it injects in-process inputs. Losing focus or
+    // running in the background then never counts as lost activity, never
+    // releases held inputs and never pauses, so a muted test keeps driving
+    // while another window is in front. A real minimise and close still do.
+    static const bool ignoreFocus=[]{const char* v=std::getenv("RR_TEST_IGNORE_FOCUS");
+        const bool on=v&&v[0]=='1'&&!v[1];
+        if(on)std::fprintf(stderr,"test_ignore_focus enabled=1 (test-only: focus loss neither pauses nor releases inputs)\n");
+        return on;}();
     input = {};
-    input.activityLost=!info_.focused||info_.minimized;
+    input.activityLost=(!info_.focused&&!ignoreFocus)||info_.minimized;
     input.eventsProcessed = static_cast<UInt>(count);
     input.eventBudgetExhausted = count == static_cast<Int>(windowEventBudget50DQ);
     const auto releaseKeys = [&]() noexcept {
@@ -634,9 +643,14 @@ bool WindowHost50DQ::poll(WindowInput50DQ& input, WindowHostDiagnostic50DQ& d) n
         else if (type == windowEvent && field<UInt>(event, 8) == s.windowId) {
             switch (field<std::uint8_t>(event, 12)) {
             case 5: case 6: input.resized = true; break; // RESIZED, SIZE_CHANGED
-            case 7: input.activityLost=true; releaseKeys(); break; // MINIMIZED
+            case 7: input.activityLost=true; releaseKeys(); // MINIMIZED (always real)
+                if(ignoreFocus)std::fprintf(stderr,"test_window_minimized focused=%u\n",static_cast<unsigned>(info_.focused));
+                break;
+            case 9: if(ignoreFocus)std::fprintf(stderr,"test_window_restored\n"); break; // RESTORED
             case 12: info_.focused = true; break; // FOCUS_GAINED
-            case 13: input.activityLost=true; info_.focused = false; releaseKeys(); break; // FOCUS_LOST
+            case 13: info_.focused = false; // FOCUS_LOST
+                if(!ignoreFocus){input.activityLost=true; releaseKeys();}
+                break;
             case 14: s.quitRequested = true; break; // CLOSE
             default: break;
             }
@@ -645,7 +659,7 @@ bool WindowHost50DQ::poll(WindowInput50DQ& input, WindowHostDiagnostic50DQ& d) n
             const Int scancode = field<Int>(event, 16);
             if (scancode <= 0 || scancode >= static_cast<Int>(s.down.size())) continue;
             const auto key = static_cast<std::size_t>(scancode);
-            if (type == keyDownEvent && info_.focused) {
+            if (type == keyDownEvent && (info_.focused||ignoreFocus)) {
                 if (!s.down[key] && !field<std::uint8_t>(event, 13)) input.pressed[key] = 1;
                 s.down[key] = 1;
             } else if (type == keyUpEvent) {
@@ -664,14 +678,22 @@ bool WindowHost50DQ::poll(WindowInput50DQ& input, WindowHostDiagnostic50DQ& d) n
     refreshWindowInfo();
     // Consult actual focus even if FOCUS_LOST remains behind this poll's budget.
     // This prevents a queued event flood from leaving movement stuck on blur.
-    if (!info_.focused || info_.minimized) { input.activityLost=true; releaseKeys(); }
+    if ((!info_.focused && !ignoreFocus) || info_.minimized) { input.activityLost=true; releaseKeys(); }
     input.resized = input.resized || width != info_.width || height != info_.height ||
         drawableWidth != info_.drawableWidth || drawableHeight != info_.drawableHeight;
     input.down = s.down;
-    input.focused = info_.focused;
+    input.focused = info_.focused||ignoreFocus; //test-only switch: treated as focused
+    // Test-only switch, window really unfocused: physical keyboard and pad
+    // input belongs to the window in front, never to this test. Held keys
+    // are released and pad state is dropped (no activity loss, no pause);
+    // the test's own inputs are in-process and are not touched here.
+    const bool backgroundTest=ignoreFocus&&!info_.focused;
+    if(backgroundTest){releaseKeys();input.down=s.down;input.pressed.fill(0);}
     input.minimized = info_.minimized;
     input.quitRequested = s.quitRequested;
     if(!s.sampleControllers(input,d))return false;
+    if(backgroundTest)for(auto& controller:input.controllers){
+        controller.axes.fill(0);controller.buttons.fill(0);controller.pressed.fill(0);controller.released.fill(0);}
     if(input.activityLost||input.quitRequested)for(unsigned slot=0;slot<2;++slot)
         if(s.controllers[slot]&&s.controllerRumbling[slot]){
             ControllerRumbleReceipt50KZ stopped{};
@@ -684,7 +706,7 @@ bool WindowHost50DQ::poll(WindowInput50DQ& input, WindowHostDiagnostic50DQ& d) n
     // Preserve a real Start tap even when press and release share this poll.
     // Edges are accepted only for the actually opened, still-attached instance.
     // Conservatively suppress the batch if it crossed an inactive interval.
-    for(Int i=0;!input.activityLost&&i<count;++i){const auto& event=events[i];const auto type=field<UInt>(event,0);
+    for(Int i=0;!input.activityLost&&!backgroundTest&&i<count;++i){const auto& event=events[i];const auto type=field<UInt>(event,0);
         if(type!=controllerButtonDownEvent&&type!=controllerButtonUpEvent)continue;
         const auto id=field<Int>(event,8);const auto button=field<std::uint8_t>(event,12);
         if(button>=15)continue;

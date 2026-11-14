@@ -57,6 +57,13 @@ constexpr std::uint32_t raceRacerCapacity=rr::game::defaultHostRaceRacers50HT;
 } // namespace
 
 void ContactsContext::run() {
+  // The visited racer's own 690/364 row pose (one storage accessor; shared
+  // world: that slot's row, never slot 0's).
+  auto rowShape=[&](track_runtime_storage50IG::RosterRole role)->const auto& {
+   const auto row=trackStorage.currentRow(role);
+   require50DU(bool(row),"actual visited racer 690/364 row unavailable");
+   return row.state->lastShapeWorld;
+  };
   // The neutral setup tick below performs genuine live trigger queries.
   // Bind the shared action owner only after every actual rig and final grid
   // pose exists, but before any tick can acquire its synchronous C80 lease.
@@ -73,8 +80,8 @@ void ContactsContext::run() {
        navigationAI->track.count,gcGateAudio.get(),!audioEnabled,originalAiHumanCount,raceRacerCount),
        "GC actual trigger/action destinations rejected");
    for(std::size_t racer=0;racer<racerBank.count();++racer)racerBank.visit(racer,[&](){
-    require50DU(gcTriggerActions->observePrepared(qfilter.identity,*query.resource,mainMembership.lastShapeWorld)&&
-        gcTriggerActions->observePrepared(secondaryFilter.identity,*secondaryQuery.resource,secondaryMembership.lastShapeWorld),
+    require50DU(gcTriggerActions->observePrepared(qfilter.identity,*query.resource,rowShape(track_runtime_storage50IG::RosterRole::main690))&&
+        gcTriggerActions->observePrepared(secondaryFilter.identity,*secondaryQuery.resource,rowShape(track_runtime_storage50IG::RosterRole::secondary364)),
         "GC trigger cold actual COL poses unavailable");
    });
    std::cerr<<"GC NATIVE TRIGGERS:9 authored spheres, method1 zones,16 actual COL identities; "
@@ -93,8 +100,8 @@ void ContactsContext::run() {
        "MB genuine late trigger identity binding rejected");
    mbColdBound=true;
    for(std::size_t slot=0;slot<raceRacerCount;++slot)racerBank.visit(slot,[&](){
-    require50DU(mbSourceTriggers->observePrepared(qfilter.identity,*query.resource,mainMembership.lastShapeWorld)&&
-        mbSourceTriggers->observePrepared(secondaryFilter.identity,*secondaryQuery.resource,secondaryMembership.lastShapeWorld),
+    require50DU(mbSourceTriggers->observePrepared(qfilter.identity,*query.resource,rowShape(track_runtime_storage50IG::RosterRole::main690))&&
+        mbSourceTriggers->observePrepared(secondaryFilter.identity,*secondaryQuery.resource,rowShape(track_runtime_storage50IG::RosterRole::secondary364)),
         "MB actual cold query geometry observation rejected");
    });
   }
@@ -105,8 +112,8 @@ void ContactsContext::run() {
    require50DU(mcQueryBinding->enroll(racerBank,mcCollisionWorld,mcNavigationOwner,qfilter.identity,
        secondaryFilter.identity,navigationProgress.reset.vehicleC80,originalAiHumanCount,s,sessionRandom,applicationClock),"MC typed current Bank/C80 enrollment rejected");
    for(std::size_t slot=0;slot<raceRacerCount;++slot)racerBank.visit(slot,[&](){
-    require50DU(mcQueryBinding->observePrepared(qfilter.identity,*query.resource,mainMembership.lastShapeWorld)&&
-        mcQueryBinding->observePrepared(secondaryFilter.identity,*secondaryQuery.resource,secondaryMembership.lastShapeWorld),
+    require50DU(mcQueryBinding->observePrepared(qfilter.identity,*query.resource,rowShape(track_runtime_storage50IG::RosterRole::main690))&&
+        mcQueryBinding->observePrepared(secondaryFilter.identity,*secondaryQuery.resource,rowShape(track_runtime_storage50IG::RosterRole::secondary364)),
         "MC actual cold Bank geometry observation rejected");
    });
   }else if(isGbTrack){
@@ -116,8 +123,8 @@ void ContactsContext::run() {
    require50DU(gbQueryBinding->enroll(racerBank,gbCollisionWorld,gbNavigationOwner,qfilter.identity,
        secondaryFilter.identity,navigationProgress.reset.vehicleC80,originalAiHumanCount),"GB typed current Bank/C80 enrollment rejected");
    for(std::size_t slot=0;slot<raceRacerCount;++slot)racerBank.visit(slot,[&](){
-    require50DU(gbQueryBinding->observePrepared(qfilter.identity,*query.resource,mainMembership.lastShapeWorld)&&
-        gbQueryBinding->observePrepared(secondaryFilter.identity,*secondaryQuery.resource,secondaryMembership.lastShapeWorld),
+    require50DU(gbQueryBinding->observePrepared(qfilter.identity,*query.resource,rowShape(track_runtime_storage50IG::RosterRole::main690))&&
+        gbQueryBinding->observePrepared(secondaryFilter.identity,*secondaryQuery.resource,rowShape(track_runtime_storage50IG::RosterRole::secondary364)),
         "GB actual cold Bank geometry observation rejected");
    });
   }
@@ -134,8 +141,8 @@ void ContactsContext::run() {
    const bool bound=tbTriggerActions->bindRacerIdentities(identities,originalAiHumanCount,raceRacerCount);
    require50DU(bound,"TB genuine late trigger identity/action binding rejected");
    for(std::size_t slot=0;slot<racerBank.count();++slot)racerBank.visit(slot,[&](){
-    require50DU(tbTriggerActions->observePrepared(qfilter.identity,*query.resource,mainMembership.lastShapeWorld)&&
-        tbTriggerActions->observePrepared(secondaryFilter.identity,*secondaryQuery.resource,secondaryMembership.lastShapeWorld),
+    require50DU(tbTriggerActions->observePrepared(qfilter.identity,*query.resource,rowShape(track_runtime_storage50IG::RosterRole::main690))&&
+        tbTriggerActions->observePrepared(secondaryFilter.identity,*secondaryQuery.resource,rowShape(track_runtime_storage50IG::RosterRole::secondary364)),
         "TB actual cold query geometry unavailable");
    });
   }
@@ -152,8 +159,8 @@ void ContactsContext::run() {
    const bool bound=tcTriggerActions->bindRacerIdentities(identities,originalAiHumanCount,raceRacerCount);
    require50DU(bound,"TC genuine late trigger identity/action binding rejected");
    for(std::size_t slot=0;slot<racerBank.count();++slot)racerBank.visit(slot,[&](){
-    require50DU(tcTriggerActions->observePrepared(qfilter.identity,*query.resource,mainMembership.lastShapeWorld)&&
-        tcTriggerActions->observePrepared(secondaryFilter.identity,*secondaryQuery.resource,secondaryMembership.lastShapeWorld),
+    require50DU(tcTriggerActions->observePrepared(qfilter.identity,*query.resource,rowShape(track_runtime_storage50IG::RosterRole::main690))&&
+        tcTriggerActions->observePrepared(secondaryFilter.identity,*secondaryQuery.resource,rowShape(track_runtime_storage50IG::RosterRole::secondary364)),
         "TC actual cold query geometry unavailable");
    });
   }
@@ -172,8 +179,8 @@ void ContactsContext::run() {
    require50DU(rcTriggerActions->prepare(rcTriggerAuthoring,identities,rcNavigationBorrow.ai().track.count,originalAiHumanCount,raceRacerCount),
        "RC genuine late trigger identity/action binding rejected");
    for(std::size_t slot=0;slot<racerBank.count();++slot)racerBank.visit(slot,[&](){
-    require50DU(rcTriggerActions->observePrepared(qfilter.identity,*query.resource,mainMembership.lastShapeWorld)&&
-        rcTriggerActions->observePrepared(secondaryFilter.identity,*secondaryQuery.resource,secondaryMembership.lastShapeWorld),
+    require50DU(rcTriggerActions->observePrepared(qfilter.identity,*query.resource,rowShape(track_runtime_storage50IG::RosterRole::main690))&&
+        rcTriggerActions->observePrepared(secondaryFilter.identity,*secondaryQuery.resource,rowShape(track_runtime_storage50IG::RosterRole::secondary364)),
         "RC actual cold query geometry unavailable");
    });
   }
@@ -189,8 +196,8 @@ void ContactsContext::run() {
    require50DU(scTriggerActions->prepare(scTriggerAuthoring,identities,navigationAI->track.count,originalAiHumanCount,raceRacerCount),
        "SC genuine late trigger identity/action binding rejected");
    for(std::size_t slot=0;slot<racerBank.count();++slot)racerBank.visit(slot,[&](){
-    require50DU(scTriggerActions->observePrepared(qfilter.identity,*query.resource,mainMembership.lastShapeWorld)&&
-        scTriggerActions->observePrepared(secondaryFilter.identity,*secondaryQuery.resource,secondaryMembership.lastShapeWorld),
+    require50DU(scTriggerActions->observePrepared(qfilter.identity,*query.resource,rowShape(track_runtime_storage50IG::RosterRole::main690))&&
+        scTriggerActions->observePrepared(secondaryFilter.identity,*secondaryQuery.resource,rowShape(track_runtime_storage50IG::RosterRole::secondary364)),
         "SC actual cold query geometry unavailable");
    });
   }
@@ -206,8 +213,8 @@ void ContactsContext::run() {
    require50DU(maTriggerActions->prepare(*maTriggerAuthoring,identities,navigationAI->track.count,originalAiHumanCount,raceRacerCount),
        "MA actual trigger/action destinations rejected");
    for(std::size_t racer=0;racer<racerBank.count();++racer)racerBank.visit(racer,[&](){
-    require50DU(maTriggerActions->observePrepared(qfilter.identity,*query.resource,mainMembership.lastShapeWorld)&&
-        maTriggerActions->observePrepared(secondaryFilter.identity,*secondaryQuery.resource,secondaryMembership.lastShapeWorld),
+    require50DU(maTriggerActions->observePrepared(qfilter.identity,*query.resource,rowShape(track_runtime_storage50IG::RosterRole::main690))&&
+        maTriggerActions->observePrepared(secondaryFilter.identity,*secondaryQuery.resource,rowShape(track_runtime_storage50IG::RosterRole::secondary364)),
         "MA trigger cold actual COL poses unavailable");
    });
   }
@@ -223,8 +230,8 @@ void ContactsContext::run() {
    require50DU(saTriggerActions->prepare(*saTriggerAuthoring,identities,originalAiHumanCount,navigationAI->track.count,raceRacerCount),
        "SA actual trigger/action destinations rejected");
    for(std::size_t racer=0;racer<racerBank.count();++racer)racerBank.visit(racer,[&](){
-    require50DU(saTriggerActions->observePrepared(qfilter.identity,*query.resource,mainMembership.lastShapeWorld)&&
-        saTriggerActions->observePrepared(secondaryFilter.identity,*secondaryQuery.resource,secondaryMembership.lastShapeWorld),
+    require50DU(saTriggerActions->observePrepared(qfilter.identity,*query.resource,rowShape(track_runtime_storage50IG::RosterRole::main690))&&
+        saTriggerActions->observePrepared(secondaryFilter.identity,*secondaryQuery.resource,rowShape(track_runtime_storage50IG::RosterRole::secondary364)),
         "SA trigger cold actual COL poses unavailable");
    });
   }
@@ -239,8 +246,8 @@ void ContactsContext::run() {
    require50DU(gaTriggerActions->prepare(*gaTriggerAuthoring,*gaAnimatedWorld,triggerIdentities,
        navigationAI->track.count,gaGateAudio.get(),!audioEnabled,originalAiHumanCount,raceRacerCount),"GA actual trigger/action destinations unavailable");
    for(std::size_t racer=0;racer<racerBank.count();++racer)racerBank.visit(racer,[&](){
-    require50DU(gaTriggerActions->observePrepared(qfilter.identity,*query.resource,mainMembership.lastShapeWorld)&&
-        gaTriggerActions->observePrepared(secondaryFilter.identity,*secondaryQuery.resource,secondaryMembership.lastShapeWorld),
+    require50DU(gaTriggerActions->observePrepared(qfilter.identity,*query.resource,rowShape(track_runtime_storage50IG::RosterRole::main690))&&
+        gaTriggerActions->observePrepared(secondaryFilter.identity,*secondaryQuery.resource,rowShape(track_runtime_storage50IG::RosterRole::secondary364)),
         "GA trigger lifecycle cold actual COL poses unavailable");
    });
    std::cerr<<"GA NATIVE TRIGGERS:10 authored spheres, method1 zones,16 actual racer COL identities; "
@@ -262,8 +269,12 @@ void ContactsContext::run() {
      const auto queryRole=directOriginalHuman&&humanCourseEnabled&&racer==0?
          undertrack_owners50ew_fixture::ColdQueryRole50LH::humanPlayer:
          undertrack_owners50ew_fixture::ColdQueryRole50LH::originalAi;
+     //This racer's own 694/7A4 rows (shared world: that slot's pair).
+     const auto podRow=trackStorage.currentRow(track_runtime_storage50IG::RosterRole::pod694);
+     const auto movementRow=trackStorage.currentRow(track_runtime_storage50IG::RosterRole::movement7A4);
      const bool attached=undertrack_owners50ew_fixture::attachFreshQueries(recoveryQueryOwners,s,x.bindings,x.parameters,
-         recoveryBorrowedQueries(),{trackCounts.podQuery,trackCounts.movementQuery},zoneLifecycle,liveWorld,
+         recoveryBorrowedQueries(),{podRow.ref,movementRow.ref},{podRow.state,movementRow.state},
+         {podRow.storage,movementRow.storage},zoneLifecycle,liveWorld,
          membershipWork,initialCollisionZone,queryRole);
      if(!attached)std::cerr<<"native_cold_query_rejected slot="<<racer
          <<" role="<<static_cast<unsigned>(queryRole)<<" vehicle58="<<s.fields.vehicle58

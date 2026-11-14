@@ -2162,7 +2162,7 @@ class OwnershipBridge final {
                a.terrain.receipt.podBoxMBytes!=a.selectedCollision.receipt().memberBytes[0]||
                !a.terrain.metadata.normalMode54Bound||a.terrain.metadata.normalMode54!=1u||
                !live_terrain_probe50fr::matches(a.terrainLive,a.terrain.initial)||
-               s.mainMembership.state.attached||s.secondaryMembership.state.attached||s.terrainMembership.state.attached)
+               !s.rowsDetached())
                 return fail(d,"actual Ready arena, selected resources or terrain/query constructor ownership differs");
             for(const auto& binding:*candidates_->staticBindings())
                 if(binding.candidate->candidate.collision.typeTag!=a.main.collisionTypeTag)
@@ -2383,7 +2383,7 @@ class OwnershipBridge final {
         if(gridArena_&&(&gridArena_->bindings!=&bindings||&gridArena_->parameters!=&parameters))
             return fail(d,"actual pod arena differs from retained grid arena");
         auto& s=*storage_.get();auto& recovery=*actual_->recovery;
-        if(!s.count.podQuery||s.count.podQuery>s.lifecycle.objectCount||
+        if(!s.count.legacyPodQuery||s.count.legacyPodQuery>s.lifecycle.objectCount||
            !registeredRange(&recovery.memberships[0],sizeof(recovery.memberships[0])))
             return fail(d,"actual reserved694 membership is not registered");
         try {
@@ -2391,7 +2391,7 @@ class OwnershipBridge final {
             // failure this object remains until actual Bank destruction.
             if(!podContext_){
                 podContext_.reset(new g::PodLiveQueryContext50IZ{
-                    {s.lifecycle,s.world,recovery.memberships[0],s.membershipWork,s.count.podQuery},&parameters.shape});
+                    {s.lifecycle,s.world,recovery.memberships[0],s.membershipWork,s.count.legacyPodQuery},&parameters.shape});
                 podBindings_=&bindings;podParameters_=&parameters;podHumanCount_=humanCount;
             }
             bool complete=false;
@@ -2756,7 +2756,8 @@ class OwnershipBridge final {
                     const auto movementView=pick(storage::RosterRole::movement7A4);
                     if(!podView||!movementView){fail(d,"actual fresh694/7A4 rows unavailable");return;}
                     if(!undertrack_owners50ew_fixture::attachFreshQueries(r,f,a.bindings,a.parameters,recoveryBorrows(),
-                        {podView.ref,movementView.ref},s.lifecycle,s.world,s.membershipWork,1,
+                        {podView.ref,movementView.ref},{podView.state,movementView.state},{podView.storage,movementView.storage},
+                        s.lifecycle,s.world,s.membershipWork,1,
                         slot<a.humanCount?undertrack_owners50ew_fixture::ColdQueryRole50LH::humanPlayer:
                             undertrack_owners50ew_fixture::ColdQueryRole50LH::originalAi)){
                         fail(d,"actual fresh694/7A4 attachment incomplete");return;}
@@ -2929,8 +2930,7 @@ class OwnershipBridge final {
             if(follow_||camera_||podContext_||endCandidateProducer_||queriesConstructed_||
                sharedOwnerLease_||sharedEffectsStopped_||!s->sharedRosterCanRetire())return false;
         }
-        if(s&&(s->mainMembership.state.attached||s->secondaryMembership.state.attached||
-               s->terrainMembership.state.attached))return false;
+        if(s&&!s->rowsDetached())return false;
         if(storageConstructed_&&inputs_.recovery&&
            (inputs_.recovery->memberships[0].attached||inputs_.recovery->memberships[1].attached))return false;
         // An entirely unpublished cold allocation can cancel its native

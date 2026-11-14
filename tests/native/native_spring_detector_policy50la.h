@@ -39,12 +39,16 @@ class Owner final {
     std::size_t sharedCount_=0;bool sharedRetired_=false;
     Frame* frame_;Bindings* bindings_;
     bool live_=true,registered_=false;
+    //Shared world (Stage B): each racer queries with its OWN 690/364 row, so
+    //the membership is the caller's current row from the track storage
+    //accessor (attached at that row's own ref), not one fixed member.
+    bool perRowMemberships_=false;
     Owner(Frame& frame,Bindings& bindings,Query& main,Spring& spring,Settings& settings,
         Membership& mainMembership,std::uint32_t mainRef,Query& secondary,Spring& secondarySpring,
-        Settings& secondarySettings,Membership& secondaryMembership,std::uint32_t secondaryRef)
+        Settings& secondarySettings,Membership& secondaryMembership,std::uint32_t secondaryRef,bool perRowMemberships=false)
         :entries_{{{&main,&spring,&settings,&mainMembership,mainRef},
                    {&secondary,&secondarySpring,&secondarySettings,&secondaryMembership,secondaryRef}}},
-         frame_(&frame),bindings_(&bindings) {}
+         frame_(&frame),bindings_(&bindings),perRowMemberships_(perRowMemberships) {}
     template<class Bank>void registerMutableOwners(Bank& bank){
         if(!live_||registered_)throw std::runtime_error("native detector policy registration repeated");
         bank.owner(lanes_);registered_=true;
@@ -69,7 +73,8 @@ public:
         rr::game::MainStaticDetectorAdmission50H& out)const noexcept {
         const auto index=secondary?1u:0u;const auto& e=entries_[index];const auto& policy=lanes_[index];
         if(sharedWorld_||sharedRetired_||!live_||!registered_||frame_!=&frame||bindings_!=&bindings||e.query!=&query||
-           e.spring!=&spring||e.settings!=&settings||e.membership!=&membership||!ref||e.ref!=ref||
+           e.spring!=&spring||e.settings!=&settings||!ref||
+           (perRowMemberships_?(!membership.attached||membership.object!=ref):(e.membership!=&membership||e.ref!=ref))||
            !query.resource||!query.filter||
            policy.pairs!=PairPolicy::nativeType2NoPairs||policy.provider!=ProviderPolicy::nativeAbsent)return false;
         out={true,true,policy.nativeEnabled,false,false,settings.pointContacts48,

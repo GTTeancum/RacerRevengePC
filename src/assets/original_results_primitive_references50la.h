@@ -64,6 +64,9 @@ private:
         NativeImage image;
         OriginalUiNativeMaterial50KG textured;
         OriginalUiNativeUntexturedMaterial50KG untextured;
+        // 29C150 final leaf of this primitive's pass 0 (after redirects), the
+        // key 24B7B0 drains by: ascending leaf, FIFO inside a leaf.
+        std::int32_t finalLeaf=-1;
         bool hasTexture=false;
     };
     // Only a reached source primitive, after its own CPU projection. No

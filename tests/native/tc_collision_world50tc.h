@@ -61,9 +61,7 @@ class Owner final : public std::enable_shared_from_this<Owner> {
  bool idleForRetirement()const noexcept {
   if(!thread()||(actions_&&actions_->nativeGroup().queryActive))return false;
   if(!storage_||!storage_->get())return true;const auto& s=*storage_->get();
-  if(s.queue.count||s.mainMembership.state.attached||s.mainMembership.state.object||
-     s.secondaryMembership.state.attached||s.secondaryMembership.state.object||
-     s.terrainMembership.state.attached||s.terrainMembership.state.object)return false;
+  if(s.queue.count||!s.rowsDetached())return false; //every racer's query rows (shared world: all of them)
   // Root must retire its real racer/camera/recovery/wreck memberships first.
   // Their primary registration is in this same real lifecycle, not a copy.
   for(std::size_t i=totalCandidates;i<s.registrations.size();++i){const auto& r=s.registrations[i];

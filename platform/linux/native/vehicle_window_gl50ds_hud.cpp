@@ -1,4 +1,5 @@
 #include "vehicle_window_gl50ds_storage.h"
+#include <algorithm>
 #include <cstdio>
 #include <cstdlib>
 #include <vector>
@@ -1745,6 +1746,12 @@ bool VehicleWindowGl50DS::Storage::preparePauseDerivedFrame(const game::Original
     }
     for(U q=0;q<source.quadCount;++q)if(!covered[q])return false;
     h.viewport=v;h.scene=v->sceneKey;h.generation=v->sessionGeneration;h.serial=source.serial;h.cameraPublication=source.cameraPublication;
+    // 24B7B0 drain order: leaves ascending, FIFO inside a leaf. The source
+    // command list submits the prompt icon/text before LetterBoxPause
+    // polygon0, which is opaque with ZTST ALWAYS; drawn in submission order it
+    // hides the prompt row. Each packet keeps its own quad range.
+    std::stable_sort(h.packets.begin(),h.packets.begin()+source.packetCount,
+        [](const auto& a,const auto& b)noexcept{return a.leaf<b.leaf;});
     h.quads=source.quadCount;h.packetCount=source.packetCount;h.frame=h.quads!=0;return true;
 }
 

@@ -90,11 +90,12 @@ class GroundBridge {
     bool layout() const noexcept {
         const auto& n=storage_.count;
         const bool camera=n.cameraSphere||n.cameraRay;
-        return n.terrain&&n.recoveryReferences==2u&&
-            n.mainQuery==n.terrain+1u&&n.secondaryQuery==n.terrain+2u&&n.terrainQuery==n.terrain+3u&&
-            n.podQuery==n.terrain+4u&&n.movementQuery==n.terrain+5u&&
-            (!camera||(n.cameraSphere==n.movementQuery+1u&&n.cameraRay==n.movementQuery+2u&&n.cameraDeath==n.movementQuery+3u))&&
-            n.objects>=n.movementQuery+(camera?3u:0u)&&n.objects<=storage::runtimeSearchSlotLimit&&
+        //Rows are resolved through the one storage accessor at use; here only
+        //the extent: every racer row, then the camera refs.
+        const auto rows=storage_.activeExtent(false);
+        return n.terrain&&rows>n.terrain&&
+            (!camera||(n.cameraSphere==rows+1u&&n.cameraRay==rows+2u&&n.cameraDeath==rows+3u))&&
+            n.objects>=rows+(camera?3u:0u)&&n.objects<=storage::runtimeSearchSlotLimit&&
             storage_.objects.size()==n.objects&&storage_.source.size()==n.objects&&
             storage_.registrations.size()==n.objects&&storage_.treeSource.size()==n.methods&&
             storage_.trees.size()==n.methods&&storage_.zones.size()==n.zones&&
@@ -152,7 +153,7 @@ class GroundBridge {
         const auto terrainRow=storage_.currentRow(storage::RosterRole::terrain348);
         const auto podRow=storage_.currentRow(storage::RosterRole::pod694);
         const auto movementRow=storage_.currentRow(storage::RosterRole::movement7A4);
-        if(!layout()||storage_.queue.count||(active!=n.movementQuery&&active!=n.objects)||
+        if(!layout()||storage_.queue.count||(active!=storage_.activeExtent(false)&&active!=n.objects)||
            !mainRow||!secondaryRow||!terrainRow||!podRow||!movementRow||
            !recovery_.storagePrepared||!recovery_.sourcePrepared||!recovery_.selectedSource||
            !recovery_.selectedSource->prepared()||
@@ -198,13 +199,24 @@ class GroundBridge {
                 return fail("AI reset actual camera/wreck tail ownership or FLOOR exclusion rejected",0x124e44u,rejected);
             for(auto ref=n.cameraSphere;ref<=n.objects;++ref)geometry_[ref-1u]={};
         }
+        //Shared world: the other racers' rows are theirs (published by their
+        //own visits) and are left exactly as they are, like the camera tail.
+        //Only this AI's five rows and the static prefix are restaged here.
+        const CollectionRef50BX ownRows[]{mainRow.ref,secondaryRow.ref,terrainRow.ref,podRow.ref,movementRow.ref};
+        const auto rowsEnd=storage_.activeExtent(false);
+        const auto otherRow=[&](std::size_t i) noexcept {
+            if(!storage_.sharedLayout()||i<n.terrain||i>=rowsEnd)return false;
+            for(const auto ref:ownRows)if(ref==i+1u)return false;
+            return true;
+        };
         const auto preserved=[&](std::size_t i) noexcept {
-            return canonicalTail&&i+1u>=n.cameraSphere;
+            return (canonicalTail&&i+1u>=n.cameraSphere)||otherRow(i);
         };
         // Validate identity provenance before publishing any refreshed records.
         for(std::size_t i=0;i<active;++i){
             const bool camera=preserved(i);
             const auto id=camera?storage_.objects[i].identity:projections_[i].object.identity;
+            if(!id&&otherRow(i))continue; //another racer's row not yet published
             if(!id)return fail("AI reset actual object identity is unbound",0x124df8u,static_cast<CollectionRef50BX>(i+1u));
             for(std::size_t j=0;j<i;++j){
                 const bool earlierCamera=preserved(j);
@@ -220,6 +232,9 @@ class GroundBridge {
             auto& source=storage_.source[i];source.flagsF8=projection.state.flagsF8;
             source.cachedCenter=projection.state.cachedCenter;source.cachedRadius=projection.state.cachedRadius;
         }
+        for(const auto* row:{&mainRow,&secondaryRow,&terrainRow,&podRow,&movementRow})
+            if(!storage::Storage::useRowFilter(*row,storage_.objects[row->ref-1u]))
+                return fail("AI reset actual row cold filter unavailable",0x120e70u,row->ref);
         // The current bank's entire concrete namespace is contiguous. Camera
         // and constructed wreck owners form the actual bank0 tail; inactive
         // tail storage is never relabeled as a fake object or recovery owner.

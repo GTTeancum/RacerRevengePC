@@ -121,7 +121,7 @@ inline bool Owner::constructRuntimeSourceCameraImpl(
             actual.bank,actual.arena,actual.bindings,actual.baseTail,actual.ai,actual.racerTiming,
             actual.all8Manager,actual.hostRace,actual.sharedRandom,actual.attachedGlobals,actual.applicationClock,
             actual.preferences,actual.launchKind11258,actual.configuration34,actual.application350,
-            *camera.lighting,storage.lifecycle,storage.mainMembership.state,actual.blur,(fresh?c::NativeFollowBorrow{}:c::NativeFollowBorrow{*runtime.follow_}),
+            *camera.lighting,storage.lifecycle,*storage.row(0,track_runtime_storage50IG::RosterRole::main690).state,actual.blur,(fresh?c::NativeFollowBorrow{}:c::NativeFollowBorrow{*runtime.follow_}),
             actual.poseHistory,actual.boost,actual.cycleAudio,actual.racer60,actual.humanCount34,actual.race94,
             actual.humanHeld,actual.raceHud,actual.deathDebris,entities,domain->materials382B38(),
             &application.materialDirectory36B970(),&actual.actualRigs,camera.particles.get(),

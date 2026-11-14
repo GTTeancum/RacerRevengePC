@@ -508,6 +508,7 @@ bool OriginalResultsPrimitiveReferences50LA::prepareNativePrimitive50LA(std::siz
                !current.state30||current.state30->contextCount()!=1||!sameContext(*current.state30,state))
                 return stop(S::phase,0x249BA0);
         }
+        next.finalLeaf=origin.finalLeaf; //Rechecked against the live registry just above.
         output=std::move(next);d.sourceEffectsCommitted|=serviced;return true;
     }catch(...){return stop(S::allocation,0x247110);}
 }

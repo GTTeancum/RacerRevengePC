@@ -2,6 +2,7 @@
 #include "../../../tests/native/original_race_f8_native_bars50la.h"
 #include "../../../src/game/original_results104_storage50la.h"
 #include "../../../src/assets/original_standard_material_domain50la.h"
+#include <algorithm>
 #include <array>
 #include <cstdio>
 #include <cstdlib>
@@ -242,8 +243,9 @@ bool VehicleWindowGl50DS::Storage::drawNativeResultsPackets(U bank)noexcept {
                 if(p[1]==0.f)p[1]=float(-oy/scale);else if(p[1]==448.f)p[1]=float((height-oy)/scale);}
             gl.scissor(0,0,width,height);
         }
-        // Upload this occurrence immediately; source packet order is retained
-        // even when another occurrence shares its image/sampler variant.
+        // Upload this occurrence immediately; the list is already in 24B7B0
+        // drain order (leaf ascending, FIFO within a leaf) and is kept even
+        // when another occurrence shares its image/sampler variant.
         drawGl.bufferSubData(arrayBuffer,0,std::intptr_t(packet.vertices.size()*sizeof(assets::Vertex48B)),
             bar?static_cast<const void*>(edge.data()):static_cast<const void*>(packet.vertices.data()));
         okay=check("upload Results native occurrence geometry");
@@ -308,7 +310,19 @@ bool VehicleWindowGl50DS::prepareNativeResultsResources50LA(
         std::size_t quads=0,rgbaBytes=0;
         if(capture->packets.size()>originalUiMaximumQuads50KG)
             return fail(d,VehicleWindowError50DS::limits,"Results native packet budget");
-        for(const auto& occurrence:capture->packets){
+        // 24B7B0 drain order, as the Garage collector drain already does:
+        // registered leaves ascending (24B8CC..93C), FIFO inside each leaf
+        // (29C248 append, 24B530 next walk). The capture keeps source
+        // submission order (icons/titles first, LetterBoxPause polygon38
+        // last); drawing that order lets the opaque ZTST-ALWAYS bar paint over
+        // the prompt row. Every Results occurrence is one leaf's pass 0.
+        std::vector<std::size_t> drainOrder(capture->packets.size());
+        for(std::size_t i=0;i<drainOrder.size();++i){drainOrder[i]=i;
+            if(capture->packets[i].material.finalLeaf<0)
+                return fail(d,VehicleWindowError50DS::material,"Results occurrence without a final collector leaf");}
+        std::stable_sort(drainOrder.begin(),drainOrder.end(),[&](std::size_t a,std::size_t b)noexcept {
+            return capture->packets[a].material.finalLeaf<capture->packets[b].material.finalLeaf;});
+        for(const std::size_t ordinal:drainOrder){const auto& occurrence=capture->packets[ordinal];
             if(occurrence.vertices.empty()||occurrence.vertices.size()%4||
                occurrence.vertices.size()/4>originalUiMaximumQuads50KG-quads)
                 return fail(d,VehicleWindowError50DS::limits,"Results native quad budget");

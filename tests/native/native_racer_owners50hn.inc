@@ -23,7 +23,7 @@ if(originalRecoveryEnabled){
  racerBank.owner(recoveryQueryOwners.globals.terrainIdentity348);
  racerBank.owner(originalRecovery);racerBank.owner(originalRecoveryModels);
  racerBank.owner(originalHumanRecovery);racerBank.owner(humanBaseUndertrack);
- recoveryQueryOwners.registerMutableOwners(racerBank);
+ recoveryQueryOwners.registerMutableOwners(racerBank,trackStorage.sharedLayout());
  racerBank.contents(qfilter.identityLists[0].identities);
  racerBank.contents(secondaryFilter.identityLists[0].identities);
  racerBank.owner(endpoints);racerBank.owner(endpointScenes);
@@ -158,7 +158,9 @@ racerBank.owner(terrainOwner.prepared);
 // every slot. Rebuild this cold owner in place when installing an archetype;
 // copying an owner whose resource points into a temporary is invalid.
 racerBank.owner(terrainLiveOwner);
-if(!isRaTrack&&!isMbTrack)for(auto& candidate:candidates){
+// Shared world: the static candidates' F8/copied lanes are the one world's
+// (1226E8 marks and copies seen by every racer, as in the original); never banked.
+if(!isRaTrack&&!isMbTrack&&!trackStorage.sharedLayout())for(auto& candidate:candidates){
  racerBank.owner(candidate.candidate.collision.filter.flagsF8);
  racerBank.owner(candidate.candidate.collision.copied40);
  racerBank.owner(candidate.candidate.collision.copied50);

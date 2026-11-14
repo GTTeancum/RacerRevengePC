@@ -82,31 +82,34 @@ void OwnersContext::run() {
    racerContactMaterials[racer]=native_racer_contact50HW::emptyPhysicalRootMaterial;
   }
 #include "native_racer_owners50hn.inc"
-  for(auto& membership:gcAnimatedMembership)if(membership){
+  // Shared world (Stage B): every trigger/animated membership is the one
+  // world's, so none is banked; the legacy layout banks them per racer copy.
+  const bool bankWorldMemberships=!this->trackStorage.sharedLayout();
+  if(bankWorldMemberships)for(auto& membership:gcAnimatedMembership)if(membership){
    racerBank.owner(membership->state);racerBank.elements(membership->links.data(),membership->links.size());
    racerBank.elements(membership->entries.data(),membership->entries.size());
   }
-  for(auto& membership:gaAnimatedMembership)if(membership){
+  if(bankWorldMemberships)for(auto& membership:gaAnimatedMembership)if(membership){
    racerBank.owner(membership->state);racerBank.elements(membership->links.data(),membership->links.size());
    racerBank.elements(membership->entries.data(),membership->entries.size());
   }
-  for(auto& membership:gaTriggerMembership)if(membership){
+  if(bankWorldMemberships)for(auto& membership:gaTriggerMembership)if(membership){
    racerBank.owner(membership->state);racerBank.elements(membership->links.data(),membership->links.size());
    racerBank.elements(membership->entries.data(),membership->entries.size());
   }
-  for(auto& membership:scTriggerMembership)if(membership){
+  if(bankWorldMemberships)for(auto& membership:scTriggerMembership)if(membership){
    racerBank.owner(membership->state);racerBank.elements(membership->links.data(),membership->links.size());
    racerBank.elements(membership->entries.data(),membership->entries.size());
   }
-  for(auto& membership:maTriggerMembership)if(membership){
+  if(bankWorldMemberships)for(auto& membership:maTriggerMembership)if(membership){
    racerBank.owner(membership->state);racerBank.elements(membership->links.data(),membership->links.size());
    racerBank.elements(membership->entries.data(),membership->entries.size());
   }
-  for(auto& membership:saTriggerMembership)if(membership){
+  if(bankWorldMemberships)for(auto& membership:saTriggerMembership)if(membership){
    racerBank.owner(membership->state);racerBank.elements(membership->links.data(),membership->links.size());
    racerBank.elements(membership->entries.data(),membership->entries.size());
   }
-  for(auto& membership:gcTriggerMembership)if(membership){
+  if(bankWorldMemberships)for(auto& membership:gcTriggerMembership)if(membership){
    racerBank.owner(membership->state);racerBank.elements(membership->links.data(),membership->links.size());
    racerBank.elements(membership->entries.data(),membership->entries.size());
   }
@@ -116,39 +119,39 @@ void OwnersContext::run() {
   // contacts, Gate fired/audio state and action counters never roll back.
   if(isRaTrack)require50DU(raWorld->registerRuntimeQueryWorldOwners(racerBank,raDiagnostic),
       raDiagnostic.failure?raDiagnostic.failure:"RA world registration rejected");
-  if(isMbTrack)for(std::size_t i=0;i<3;++i){
+  if(isMbTrack&&bankWorldMemberships)for(std::size_t i=0;i<3;++i){
    auto* membership=mbCollisionWorld->triggerMembership(i);
    require50DU(membership,"MB actual trigger membership backing missing");
    racerBank.owner(membership->state);racerBank.elements(membership->links.data(),membership->links.size());
    racerBank.elements(membership->entries.data(),membership->entries.size());
   }
-  if(isTcTrack)for(std::size_t i=0;i<tc_trigger_authoring50TC::count;++i){
+  if(isTcTrack&&bankWorldMemberships)for(std::size_t i=0;i<tc_trigger_authoring50TC::count;++i){
    auto* membership=tcWorldBorrow->triggerMembership(i);
    require50DU(membership,"TC actual trigger membership backing missing");
    racerBank.owner(membership->state);racerBank.elements(membership->links.data(),membership->links.size());
    racerBank.elements(membership->entries.data(),membership->entries.size());
   }
-  if(isRcTrack)for(std::size_t i=0;i<rc_trigger_authoring::count;++i){
+  if(isRcTrack&&bankWorldMemberships)for(std::size_t i=0;i<rc_trigger_authoring::count;++i){
    auto* membership=rcWorldBorrow->triggerMembership(i);
    require50DU(membership,"RC actual trigger membership backing missing");
    racerBank.owner(membership->state);racerBank.elements(membership->links.data(),membership->links.size());
    racerBank.elements(membership->entries.data(),membership->entries.size());
   }
-  if(isTbTrack)for(std::size_t i=0;i<tb_trigger_authoring50TB::count;++i){
+  if(isTbTrack&&bankWorldMemberships)for(std::size_t i=0;i<tb_trigger_authoring50TB::count;++i){
    auto* membership=tbWorldBorrow->triggerMembership(i);
    require50DU(membership,"TB actual trigger membership backing missing");
    racerBank.owner(membership->state);racerBank.elements(membership->links.data(),membership->links.size());
    racerBank.elements(membership->entries.data(),membership->entries.size());
   }
   if(isMcTrack){
-   for(std::size_t i=0;i<21;++i){auto* membership=mcWorldBorrow->triggerMembership(i);
+   if(bankWorldMemberships)for(std::size_t i=0;i<21;++i){auto* membership=mcWorldBorrow->triggerMembership(i);
     require50DU(membership,"MC actual trigger membership backing missing");
     racerBank.owner(membership->state);racerBank.elements(membership->links.data(),membership->links.size());
     racerBank.elements(membership->entries.data(),membership->entries.size());}
    const bool enrolled=mcAnimationBinding->enrollBank(racerBank,mcAnimationBindingDiagnostic);
    require50DU(enrolled,mcAnimationBindingDiagnostic.message.empty()?"MC real complete Bank animation enrollment rejected":mcAnimationBindingDiagnostic.message.c_str());
   }else if(isGbTrack){
-   for(std::size_t i=0;i<18;++i){auto* membership=gbWorldBorrow->triggerMembership(i);
+   if(bankWorldMemberships)for(std::size_t i=0;i<18;++i){auto* membership=gbWorldBorrow->triggerMembership(i);
     require50DU(membership,"GB actual trigger membership backing missing");
     racerBank.owner(membership->state);racerBank.elements(membership->links.data(),membership->links.size());
     racerBank.elements(membership->entries.data(),membership->entries.size());}
@@ -488,11 +491,17 @@ void OwnersContext::run() {
      in.podBody=nativeChariotModels[racer]?nativeChariotModels[racer]->coldMainBody340():nullptr;
      in.frame=&s;in.authoredShape=&x.parameters.shape;
      in.sessionGeneration=static_cast<std::uint64_t>(sessionIndex+1);
+     in.collisionTypeTag=query.collisionTypeTag;in.movementShapeTag=static_cast<std::uint8_t>(recoveryQueryOwners.movementTag);
      require50DU(this->trackStorage.bindRowColdOwners(racer,in),"actual shared per-role constructor binding rejected");
     }
     require50DU(native_original_ai_recovery::bindColdModels(s,x.bindings,rebaseModels,rebaseModelCount,
         originalRecoveryModels),"actual selected reset model-bound owners rejected");
-    x.bindings.podLiveQuery50IZ=&recoveryPodLive;
+    if(this->trackStorage.sharedLayout()){
+     //This racer's own saved 694 context, in its own row (one per slot).
+     const auto* context=this->trackStorage.bindRowPodContext(racer,x.parameters.shape);
+     require50DU(context,"actual shared per-row 694 context rejected");
+     x.bindings.podLiveQuery50IZ=context;
+    }else x.bindings.podLiveQuery50IZ=&recoveryPodLive;
    }
    // This slot has never advanced. Replace inherited enabled-probe construction
    // with captured pre-enable construction, then use its own native constructor.

@@ -139,7 +139,7 @@ class Owner final : public std::enable_shared_from_this<Owner> {
   if(!actualIdle()||(animations_&&(animations_->binding_||animations_->servicing_)))return false;
   for(const auto& member:animationMemberships_)if(member&&(member->state.attached||member->state.object))return false;
   if(!storage_||!storage_->get())return true;const auto& s=*storage_->get();
-  for(const auto* m:{&s.mainMembership,&s.secondaryMembership,&s.terrainMembership})if(m->state.attached||m->state.object)return false;
+  if(!s.rowsDetached())return false; //every racer's query rows (shared world: all of them)
   for(std::size_t i=totalCandidates;i<s.registrations.size();++i){const auto& r=s.registrations[i];if(r.owner||r.slot||r.encodedObject)return false;}
   return true;
  }
