@@ -1,0 +1,72 @@
+From 8f3c265126eef59497cd54fca5b0314bbc67b258 Mon Sep 17 00:00:00 2001
+From: GTTeancum <smmelton@gmail.com>
+Date: Fri, 13 Nov 2026 20:22:46 -0500
+Subject: [PATCH] Test option: timed F12 captures before green (intro cut
+ cameras, countdown) (silo)
+
+RR_TEST_CAPTURE_INTRO_MS=N / runner --capture-intro-ms N taps the existing F12
+capture every N ms while the race scene runs before green (40 taps at most).
+Look-checks only.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ tests/native/terrain_interactive_loop50du.cpp | 20 +++++++++++++++++++
+ tools/capture/run_windows_takeover.py         |  4 ++++
+ 2 files changed, 24 insertions(+)
+
+diff --git a/tests/native/terrain_interactive_loop50du.cpp b/tests/native/terrain_interactive_loop50du.cpp
+index 6b09166..74f36a4 100644
+--- a/tests/native/terrain_interactive_loop50du.cpp
++++ b/tests/native/terrain_interactive_loop50du.cpp
+@@ -410,6 +410,26 @@ void Context::run() {
+           <<" x="<<testPositionX50DU<<" z="<<testPositionZ50DU<<"\n";
+      }
+     }
++    // RR_TEST_CAPTURE_INTRO_MS=N: also tap F12 every N ms while the race scene runs
++    // before green (intro cut cameras, countdown), so the intro can be looked at.
++    static const unsigned captureIntroMs50CV=[]{const char* v=std::getenv("RR_TEST_CAPTURE_INTRO_MS");
++     const unsigned n=v?static_cast<unsigned>(std::strtoul(v,nullptr,10)):0u;return (n<100u||n>60000u)?0u:n;}();
++    static std::uint64_t introNextNs50CV=0;static unsigned introTaps50CV=0;
++    if(captureIntroMs50CV&&captureRun.unattended()&&windowCapture.enabled()){
++     const bool preGreen=raceEnabled&&race.phase!=race_session50HM::Phase::Racing&&
++         race.phase!=race_session50HM::Phase::Complete;
++     const auto nowNs=monotonicNow50DU();
++     if(!preGreen)introNextNs50CV=0;
++     else{
++      if(!introNextNs50CV)introNextNs50CV=nowNs+1000000ull*captureIntroMs50CV;
++      if(nowNs>=introNextNs50CV&&introTaps50CV<40u){
++       introNextNs50CV=nowNs+1000000ull*captureIntroMs50CV;++introTaps50CV;
++       hostInput.keys.focused=true;hostInput.keys.activityLost=false;
++       constexpr std::size_t keyF12=69;hostInput.keys.pressed[keyF12]=1;
++       std::cerr<<"test_capture_intro_tap n="<<introTaps50CV<<" phase="<<static_cast<int>(race.phase)<<"\n";
++      }
++     }
++    }
+    }
+    if(captureRun.unattended()&&raceEnabled&&race.phase==race_session50HM::Phase::Racing){
+     // Unattended test only (RR_TEST_DESTROY): arm each configured racer once
+diff --git a/tools/capture/run_windows_takeover.py b/tools/capture/run_windows_takeover.py
+index e086199..8cfbd5d 100644
+--- a/tools/capture/run_windows_takeover.py
++++ b/tools/capture/run_windows_takeover.py
+@@ -108,6 +108,8 @@ def main():
+                         help='Write real framebuffer images (PPM) instead of logs-only receipts (look-checks, not routine tests)')
+     parser.add_argument('--capture-every', type=int, default=0,
+                         help='With --images: tap F12 every N s while racing (64 images per session at most)')
++    parser.add_argument('--capture-intro-ms', type=int, default=0,
++                        help='With --images: also tap F12 every N ms before green (intro cut cameras, countdown)')
+     parser.add_argument('--seconds', type=int, default=180)
+     parser.add_argument('--profile-performance', action='store_true',
+                         help='Enable existing CPU/render/display phase measurements')
+@@ -221,6 +223,8 @@ def main():
+                RR_VIDEO_MAXIMIZED='0')  # Never cover the desktop unless asked.
+     if args.logs_only:
+         env['RR_EVIDENCE_LOGS_ONLY'] = '1'
++    if args.capture_intro_ms:
++        env['RR_TEST_CAPTURE_INTRO_MS'] = str(args.capture_intro_ms)
+     if args.capture_every:
+         env['RR_TEST_CAPTURE_EVERY_SECONDS'] = str(args.capture_every)
+     if args.camera_trace:
+-- 
+2.53.0.windows.2
+

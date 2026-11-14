@@ -1,0 +1,82 @@
+From 0aed478ca2c63b89956a88b04153315112b6f1e6 Mon Sep 17 00:00:00 2001
+From: GTTeancum <smmelton@gmail.com>
+Date: Fri, 13 Nov 2026 07:01:46 -0500
+Subject: [PATCH] Test option: timed F12 framebuffer captures while racing
+ (silo)
+
+RR_TEST_CAPTURE_EVERY_SECONDS=N taps the existing F12 capture key every N s
+after green in unattended runs; runner --images (real PPM frames instead of
+logs-only receipts) and --capture-every N. For look-checks only; each capture
+stalls the frame while the image is written.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ tests/native/terrain_interactive_loop50du.cpp | 20 +++++++++++++++++++
+ tools/capture/run_windows_takeover.py         |  6 ++++++
+ 2 files changed, 26 insertions(+)
+
+diff --git a/tests/native/terrain_interactive_loop50du.cpp b/tests/native/terrain_interactive_loop50du.cpp
+index 3429a50..6b09166 100644
+--- a/tests/native/terrain_interactive_loop50du.cpp
++++ b/tests/native/terrain_interactive_loop50du.cpp
+@@ -7,6 +7,7 @@
+ #include "../../platform/linux/native/test_results_input50pd.h"
+ #include "../../src/game/original_race_end_entry50la.h"
+ #include <cfenv>
++#include <cstdlib>
+ #include "../../platform/linux/native/stall_watchdog50du.h"
+ #include "../../src/game/ps2_float_mode50la.h"
+ #include "../../src/game/native_destroyed_racers50pd.h"
+@@ -391,6 +392,25 @@ void Context::run() {
+      holdLogged50DU=hold;
+     }
+    }
++   {
++    // Unattended test only: RR_TEST_CAPTURE_EVERY_SECONDS=N taps the existing
++    // F12 framebuffer-capture key every N s while racing (first tap 2 s after
++    // green). The capture owner's own 64-image session limit still applies.
++    static const unsigned captureEvery50CV=[]{const char* v=std::getenv("RR_TEST_CAPTURE_EVERY_SECONDS");
++     const unsigned n=v?static_cast<unsigned>(std::strtoul(v,nullptr,10)):0u;return n>3600u?0u:n;}();
++    static std::uint64_t captureGreenNs50CV=0;static unsigned captureTaps50CV=0;
++    if(captureEvery50CV&&captureRun.unattended()&&windowCapture.enabled()){
++     const bool racing=race.phase==race_session50HM::Phase::Racing;
++     const auto nowNs=monotonicNow50DU();
++     if(!racing)captureGreenNs50CV=0;else if(!captureGreenNs50CV){captureGreenNs50CV=nowNs;captureTaps50CV=0;}
++     if(racing&&nowNs-captureGreenNs50CV>=2000000000ull+1000000000ull*captureEvery50CV*captureTaps50CV){
++      ++captureTaps50CV;hostInput.keys.focused=true;hostInput.keys.activityLost=false;
++      constexpr std::size_t keyF12=69;hostInput.keys.pressed[keyF12]=1;
++      std::cerr<<"test_capture_tap n="<<captureTaps50CV<<" race_ms="<<(nowNs-captureGreenNs50CV)/1000000ull
++          <<" x="<<testPositionX50DU<<" z="<<testPositionZ50DU<<"\n";
++     }
++    }
++   }
+    if(captureRun.unattended()&&raceEnabled&&race.phase==race_session50HM::Phase::Racing){
+     // Unattended test only (RR_TEST_DESTROY): arm each configured racer once
+     // its race time passes; its next frame sets the canonical B9D bit0.
+diff --git a/tools/capture/run_windows_takeover.py b/tools/capture/run_windows_takeover.py
+index 541b3db..e086199 100644
+--- a/tools/capture/run_windows_takeover.py
++++ b/tools/capture/run_windows_takeover.py
+@@ -104,6 +104,10 @@ def main():
+                         'main-rider-course-ta', 'main-tournament-course-ta',
+                         'main-mawhonic09-course-ra', 'none'], default='main-dud04-course-ga')
+     parser.add_argument('--logs-only', action='store_true', default=True, help='Record stage and timing receipts without pixel readback or image files')
++    parser.add_argument('--images', dest='logs_only', action='store_false',
++                        help='Write real framebuffer images (PPM) instead of logs-only receipts (look-checks, not routine tests)')
++    parser.add_argument('--capture-every', type=int, default=0,
++                        help='With --images: tap F12 every N s while racing (64 images per session at most)')
+     parser.add_argument('--seconds', type=int, default=180)
+     parser.add_argument('--profile-performance', action='store_true',
+                         help='Enable existing CPU/render/display phase measurements')
+@@ -217,6 +221,8 @@ def main():
+                RR_VIDEO_MAXIMIZED='0')  # Never cover the desktop unless asked.
+     if args.logs_only:
+         env['RR_EVIDENCE_LOGS_ONLY'] = '1'
++    if args.capture_every:
++        env['RR_TEST_CAPTURE_EVERY_SECONDS'] = str(args.capture_every)
+     if args.camera_trace:
+         env['RR_CAMERA_POSE_TRACE'] = '1'
+     if args.hold_throttle:
+-- 
+2.53.0.windows.2
+
